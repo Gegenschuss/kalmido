@@ -575,25 +575,30 @@ async function docsAll(url, f = rawFetch) {
   }
   return rows;
 }
-async function rawFetch(method, url, body, key) {  // key: 2.270.0 C (#3022) the outbox entry's idempotency key
+// 2.577.0 (#4638): the office's area open under "All workspaces" (#office/s/<space>) goes along with every /api/office/ request
+// (header X-Kalmido-Office-Space, office/model.py office_space); '' = the server's choice from the setting workspace
+const ofc_spOpen = () => S.route?.mod === 'office' && S.route.wsp && typeof wsCur === 'function' && wsCur() === 'all' ? S.route.wsp : '';
+const ofc_spHdr = url => /^\/api\/office\//.test(String(url || '')) ? ofc_spOpen() : '';
+async function rawFetch(method, url, body, key, osp) {  // key: 2.270.0 C (#3022) the outbox entry's idempotency key; osp: 2.577.0 (#4638) its office area
   // 2.64.1 (#1817): texts of a locked list leave encrypted, ciphers in answers become plain texts in memory (liste2e.js)
   if (typeof le2eOut === 'function') body = await le2eOut(method, url, body);
   const in_ = j => typeof le2eIn === 'function' ? le2eIn(j, url) : j;
-  if (method === 'GET') return in_(await rawFetch0(method, url, body));
+  if (method === 'GET') return in_(await rawFetch0(method, url, body, undefined, osp));
   S.wseq = (S.wseq || 0) + 1;
-  try { return in_(await rawFetch0(method, url, body, key)); }
+  try { return in_(await rawFetch0(method, url, body, key, osp)); }
   catch (e) {  // 2.64.1 (#1817): a move missed texts (a subtask in the trash): fetched, converted, sent once more
     const b2 = e.data?.code === 'list_e2e_move' && e.data.need && typeof le2eFix === 'function' ? await le2eFix(url, body, e.data.need).catch(() => null) : null;
     if (!b2) throw e;
-    return in_(await rawFetch0(method, url, b2, key));
+    return in_(await rawFetch0(method, url, b2, key, osp));
   } finally { S.wseq++; }
 }
 // 2.298.0 C (#3187): a status code in words when the server sent no text (413 / 429 / 5xx; any other stays "Error 404").
 function httpErrText(st) {
   return st === 413 ? tr('File too large') : st === 429 ? tr('Too many requests, wait a moment') : st >= 500 ? tr('Server error, please try again later') : tr('Error {0}', st);
 }
-async function rawFetch0(method, url, body, key) {
+async function rawFetch0(method, url, body, key, osp) {
   const opt = {method, headers: {'X-Requested-With': 'kalmido'}, redirect: 'manual'};
+  const sp = osp !== undefined ? osp : ofc_spHdr(url); if (sp) opt.headers['X-Kalmido-Office-Space'] = sp;  // 2.577.0 (#4638)
   if (key) opt.headers['Idempotency-Key'] = key;  // 2.270.0 C (#3022): a replay the server already applied comes back as its first answer
   const dev = wpDevHeader(url); if (dev) opt.headers['X-Kalmido-Device'] = dev;
   const un = (typeof oun_hdr === 'function' ? oun_hdr(method, url) : '') || (typeof obj_hdr === 'function' ? obj_hdr(method, url) : ''); if (un) opt.headers['X-Kalmido-Undo'] = un;  // 2.111.0 A (#2233): office_undo.js; 2.558.0 (#4709): objsave.js
@@ -956,6 +961,7 @@ function enqueue(method, url, body) {
   const mo = method === 'PUT' && url === '/api/tasks/mine-order' && outSync().find((x, i) => (i > 0 || !OUT.flushing) && !x.sending && !x.done && x.url === url);
   if (mo) { outSave(() => { mo.body = {...mo.body, ids: body.ids}; }); return {ok: true}; }
   const e = {method, url, body, uid: S.me?.id, k: oxaKey(body) || outKey()};  // 2.528.0 (#4305 B1): the key the press chose
+  const osp = ofc_spHdr(url); if (osp) e.osp = osp;  // 2.577.0 (#4638): a change sent later lands in the office it was made in
   if (method === 'POST' && (url === '/api/tasks' || /^\/api\/lists\/\d+\/notes$/.test(url))) e.tmp = -Date.now() - Math.floor(Math.random() * 1000);  // 2.143.0 C (#2153): + a note
   outSave(() => OUT.q.push(e));  // 2.126.0 D (#1989)
   obxSyncReg();  // 2.143.0 C (#2153)
@@ -1052,7 +1058,7 @@ async function outFlush() {
       const wiki = /^\/api\/wiki\/pages\/\d+$/.test(e.url);  // 2.169.0 (#2671): a knowledge page's text (wiki.js, loaded for it)
       if (wiki && typeof wkoSent !== 'function' && typeof loadModule === 'function') await loadModule('wiki').catch(() => {});
       try {
-        let j = await rawFetch(e.method, url, body, e.ik || e.k);  // 2.270.0 C (#3022): the same key as the service worker's send; 2.551.0 (#4646): ik = the rebased send's own
+        let j = await rawFetch(e.method, url, body, e.ik || e.k, e.osp || '');  // 2.577.0 (#4638): + its office area (never the one open now)  // 2.270.0 C (#3022): the same key as the service worker's send; 2.551.0 (#4646): ik = the rebased send's own
         sent++; OUT.tries = 0; OUT.retryAt = 0;
         if (ntU(e.url)) sentNt++;  // 2.536.0 (#4567): a note's change (they go out online too now)
         if (wiki && typeof wkoSent === 'function') await wkoSent(e, j).catch(() => {});
@@ -1755,6 +1761,11 @@ function parseHash() {
   if (a === 'sheets') return {mod: 'sheets', key: 'sheets', sh: b === 'l' || b === 'f' ? null : +b || null, shl: b === 'l' ? +(h.split('/')[2]) || null : null, shf: b === 'f' ? +(h.split('/')[2]) || null : null};  // 2.89.0 (#1916): sheets/<id>, sheets/l/<list id>; 2.199.0 C (#2742): sheets/f/<folder id>
   if (a === 'ablage') return {mod: 'ablage', key: 'ablage', nid: +b || null, ...(/^aus-[a-z]{2,12}$/.test(b || '') ? {aus: b.slice(4)} : {})};  // 2.48.0 (#1207): ablage/<folder or file id>; 2.429.0 (#3580): ablage/aus-<key> (a collection)
   if (a === 'docs') return {mod: 'docs', key: 'docs', id: +b || null, ...(b === 'review' ? {review: true} : {}), ...(b === 'v' && +h.split('/')[2] ? {dv: +h.split('/')[2]} : {})};  // 2.579.0 (#4802): docs/v/<id> = a saved view (docviews.js)  // 2.48.0 (#1111): documents (docs.js); 2.353.0 D (#2759): docs/review = the saved filter To review
+  if (a === 'office' && b === 's') { const p = h.split('/'); return {mod: 'office', key: 'office', wsp: p[2] || '', tab: p[3] || '', id: +p[4] || null}; }  // 2.577.0 (#4638): office/s/<space>[/<tab>[/<id>]] under "All workspaces"
+  if (a === 'office' && b && S.route?.mod === 'office' && S.route.wsp && typeof wsCur === 'function' && wsCur() === 'all') {  // 2.577.0 (#4638): a link inside an open area keeps it (the address says it too)
+    history.replaceState(history.state, '', '#office/s/' + S.route.wsp + '/' + h.slice(7));
+    return {mod: 'office', key: 'office', wsp: S.route.wsp, tab: b, id: +(h.split('/')[2]) || null};
+  }
   if (a === 'office') return {mod: 'office', key: 'office', tab: b || '', id: +(h.split('/')[2]) || null};  // 2.36.1 (#1021): office/<tab>/<id>
   if (['cal', 'matrix', 'habits', 'pomo', 'news', 'stats', 'time', 'overview', 'family', 'life', 'review', 'clients', 'workload', 'tags'].includes(a)) return {mod: a, key: a};  // 2.22.0 (#663): life, review
   if (SMART[a]) return {mod: 'tasks', key: a};

@@ -4,6 +4,10 @@
  - #3964: a person who lost "Quotes & invoices" (edit) between her change of a client and its undo / redo: the undo puts the
    other fields back but leaves the invoicing fields (VAT ID, customer number, payment terms ...) as they are now, like the
    save (team/clients.py cl_bill_strip) would
+ - #4638: under "All workspaces" an office request names its area in the header X-Kalmido-Office-Space (office/model.py
+   office_space): only "private" or one of the person's own organisations, only while the setting is "All"; another value =
+   400, a chosen workspace outranks the header; a write lands in the named area
+ - freelancer-matrix: office (a person without an organisation: "private" works, a foreign organisation is refused)
 usage: p2577_b_office_test.py <datadir>"""
 import os
 import subprocess
@@ -12,6 +16,7 @@ import time
 
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
+from freelancer_fixture import freelancer  # noqa: E402
 from kt import FAILS, OKS, check, sess  # noqa: E402
 
 DATA = sys.argv[1]
@@ -63,6 +68,55 @@ check(r.ok and cli() == ("Second", "DE987654321", 30), f"redo: the note again, t
 check(A.put(B + f"{R}/people/{BOB}", json={"groups": []}).ok, "alice takes bob out of the groups again")
 r = Bo.post(B + O + f"/undo/client/{CL}", json={"sess": TOK, "op": "undo"})
 check(r.ok and cli() == ("First", "DE123456789", 14), f"with the right back: the undo puts the invoicing fields back too ({r.status_code} {cli()})")
+
+# ---------------------------------------------------------------- #4638: the office's area per request under "All"
+r = A.post(B + "/api/admin/orgs", json={"name": "Bravo", "admin_id": ME["id"]})
+check(r.ok, "setup: a second organisation " + r.text[:200])
+ORG2 = r.json().get("id")
+A.patch(B + "/api/settings", json={"workspace": "all"})
+
+
+def where(s, sp=None):
+    r = s.get(B + O + "/settings", headers={HS: sp} if sp is not None else {})
+    j = r.json() if r.ok else {}
+    return r.status_code, j.get("org_id"), bool(j.get("personal"))
+
+
+st = where(A)
+check(st[0] == 400, f"All, two organisations, no header: as before 400 (choose a workspace) {st}")
+check(where(A, f"org:{ORG}")[:2] == (200, ORG), f"header org:{ORG}: its office {where(A, f'org:{ORG}')}")
+check(where(A, f"org:{ORG2}")[:2] == (200, ORG2), f"header org:{ORG2}: its office {where(A, f'org:{ORG2}')}")
+st = where(A, "private")
+check(st[0] == 200 and st[2] and st[1] not in (ORG, ORG2), f"header private: the personal office {st}")
+check(where(A, "org:999999")[0] == 400, f"header of a foreign organisation: 400 {where(A, 'org:999999')}")
+check(where(A, "all")[0] == 400 and where(A, "org:x")[0] == 400, "header with another value: 400")
+check(where(Bo, f"org:{ORG2}")[:2] == (200, ORG), f"bob (workspace chosen) names Bravo, not his: the setting rules {where(Bo, f'org:{ORG2}')}")
+Bo.patch(B + "/api/settings", json={"workspace": "all"})
+check(where(Bo)[:2] == (200, ORG), f"bob under All with one organisation: as before its office {where(Bo)}")
+check(where(Bo, f"org:{ORG2}")[0] == 400, f"bob under All names Bravo (no member): 400, never another office {where(Bo, f'org:{ORG2}')}")
+A.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
+check(where(A, f"org:{ORG2}")[:2] == (200, ORG), f"alice with a workspace chosen: the header does nothing {where(A, f'org:{ORG2}')}")
+A.patch(B + "/api/settings", json={"workspace": "all"})
+r = A.post(B + O + "/services", json={"name_de": "Beratung Bravo"}, headers={HS: f"org:{ORG2}"})
+check(r.status_code == 201, f"a write with header org:{ORG2} ({r.status_code} {r.text[:160]})")
+
+
+def svc(sp):
+    r = A.get(B + O + "/services", headers={HS: sp})
+    return [x.get("name_de") for x in r.json().get("items", [])] if r.ok else [r.status_code]
+
+
+check("Beratung Bravo" in svc(f"org:{ORG2}") and "Beratung Bravo" not in svc(f"org:{ORG}") and "Beratung Bravo" not in svc("private"),
+      f"the service landed in Bravo only {svc(f'org:{ORG2}')} {svc(f'org:{ORG}')}")
+
+# ---------------------------------------------------------------- freelancer-matrix: office
+FID, Fr = freelancer(B, A)
+Fr.patch(B + "/api/settings", json={"workspace": "all"})
+st = where(Fr)
+check(st[0] == 200 and st[2], f"freelancer: her own office as before {st}")
+st = where(Fr, "private")
+check(st[0] == 200 and st[2], f"freelancer: header private = her own office {st}")
+check(where(Fr, f"org:{ORG}")[0] == 400, f"freelancer: an organisation she is not in: 400 {where(Fr, f'org:{ORG}')}")
 
 print(f"p2577_b_office: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

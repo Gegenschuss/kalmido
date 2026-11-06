@@ -414,6 +414,7 @@ async function swOutboxSend() {
       if (/\/-\d+(?=[/?]|$)/.test(url) || (body && [body.parent_id, body.task_id, ...(body.ids || []), ...(body.items || []).map(it => it && it.id)].some(v => typeof v === 'number' && v < 0))) break;
       const opt = {method: e.method, credentials: 'same-origin', redirect: 'manual', headers: {'X-Requested-With': 'kalmido'}};
       if (e.ik || e.k) opt.headers['Idempotency-Key'] = String(e.ik || e.k);  // 2.270.0 C (#3022): stopped before the delete below = the tab's resend is not applied twice; 2.574.0 (#4692): ik = the rebased send's own key, as core.js outFlush
+      if (e.osp) opt.headers['X-Kalmido-Office-Space'] = String(e.osp);  // 2.577.0 (#4638): the office area the change was made in
       if (body !== undefined) { opt.body = JSON.stringify(body); opt.headers['Content-Type'] = 'application/json'; }
       const r = await fetch(url, opt);  // offline again: throws, the browser tries again later
       // 2.359.0 A (#3023): a server error / too many requests: the browser tries the sync again later (the entry stays first)

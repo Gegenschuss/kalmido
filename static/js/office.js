@@ -2,7 +2,7 @@
 // equipment + sets, text blocks, framework contracts, settings (company, logo, colour, language, currency, number scheme,
 // producing / raw data rules, country pack, import / export of the master data). Everything belongs to the organisation
 // one works in (the workspace switch); members read the master data, the organisation's admins edit it.
-const OFC = {tab: '', data: {}, loading: {}, seq: 0, q: '', arch: false, info: null, infoErr: null, infoLoading: false, fromAll: ''};  // 2.543.0 (#4606): + fromAll
+const OFC = {tab: '', data: {}, loading: {}, seq: 0, q: '', arch: false, info: null, infoErr: null, infoLoading: false};  // 2.577.0 (#4638): fromAll (2.543.0) gone, the address says the area (ofc_sp)
 const OFC_TABS = [['offers', 'file', N_('Quotations')], ['invoices', 'receipt', N_('Invoices')], ['services', 'list', N_('Services')], ['equipment', 'camera', N_('Equipment')],
   ['texts', 'note', N_('Text blocks')], ['contracts', 'file', N_('Framework contracts')], ['settings', 'gear', N_('Settings')]];
 const OFC_UNITS = [['day', N_('Day|unit')], ['hour', N_('Hour|unit')], ['piece', N_('Piece|unit')], ['minute', N_('Minute|unit')], ['flat', N_('Flat rate|unit')], ['percent', N_('Percent|unit')]];  // 2.47.0 (#1649): percent (KSK)
@@ -92,16 +92,14 @@ function ofcAreaHint() {
 // overview of the areas (areas.js spo_html, like Knowledge) instead of silently one office or "Choose a workspace". The server reads the office from the workspace
 // setting, so a tap switches the workspace to that area (wsSet, the page stays) and its office opens; "All workspaces /" in
 // its head switches back to the overview. A workspace chosen = as before.
+// 2.577.0 (#4638): a tap opens the area's own address #office/s/<space> (like #workload/s/<space>) instead of switching the
+// workspace: the area goes along with every office request (core.js ofc_spHdr), the workspace on top stays "All", the
+// browser's Back and "All workspaces /" in the head lead to the overview again.
 const ofc_spaces = () => wsOptions().filter(w => w !== 'all');
-const ofc_allOvr = () => wsOn() && wsCur() === 'all' && ofc_spaces().length > 1;
-const ofc_allUpHtml = () => OFC.fromAll && wsOn() && wsCur() === OFC.fromAll ? `<button type="button" class="linkbtn ofcallup" data-ofcall="up">${esc(tr('All workspaces'))}</button><span class="abcsep" aria-hidden="true">/</span>` : '';
-document.addEventListener('click', e => {
-  const a = e.target.closest?.('.ofcall .spovr, [data-ofcall="up"]'); if (!a) return;
-  e.preventDefault();
-  const to = a.dataset.spov || 'all';
-  OFC.fromAll = a.dataset.spov || '';
-  wsSet(to, {keep: true});
-});
+const ofc_sp = () => { const sp = ofc_spOpen(); return sp && ofc_spaces().includes(sp) ? sp : ''; };  // the open area under "All" ('' = none / not mine)
+const ofc_allOvr = () => wsOn() && wsCur() === 'all' && ofc_spaces().length > 1 && !ofc_sp();
+const ofc_allUpHtml = () => ofc_sp() ? `<a href="#office" class="linkbtn ofcallup" data-ofcall="up">${esc(tr('All workspaces'))}</a><span class="abcsep" aria-hidden="true">/</span>` : '';
+const ofc_wsKey = () => (typeof wsCur === 'function' ? wsCur() : '') + (ofc_sp() ? '>' + ofc_sp() : '');  // OFC.ws: the shown office (a workspace, or "All" + an area)
 // the office's area in its header (Private / the organisation), with organisations the workspace switch itself
 function ofcAreaHtml() {
   const ws = ofcWs(), nm = OFC.info.personal ? tr('Private|workspace') : (orgLabelOf(OFC.info.org_id) || wsName(ws));
@@ -181,7 +179,7 @@ function viewOffice() {
   if (OFC.tab !== tab) { OFC.tab = tab; OFC.q = ''; }  // the search belongs to one tab
   if (tab === 'start' && ofm_menuOff(S.route.tab)) setTimeout(() => { if (ofm_menuOff(S.route.tab)) location.replace('#office/start'); }, 0);  // 2.440.0 (#3609)
   pb_wsFollow();
-  if (ofc_allOvr()) return `<div class="dash office ofcall">${spo_html(() => 'office', ofc_spaces().map(w => [w, wsName(w), wsIcon(w)]))}</div>`;  // 2.543.0 (#4606)
+  if (ofc_allOvr()) return `<div class="dash office ofcall">${spo_html(sp => 'office/s/' + sp, ofc_spaces().map(w => [w, wsName(w), wsIcon(w)]))}</div>`;  // 2.543.0 (#4606); 2.577.0 (#4638): the area's own address
   if (!OFC.info && !OFC.infoErr && !OFC.infoLoading) setTimeout(ofcInfo, 0);
   // 2.87.9 (#1917): no tab row any more -- the office menu (areas.js ofm_menuHtml, via mg_wrap) leads to every tab
   if (OFC.info) ofm_admSeen(OFC.info.role === 'admin', OFC.info.rights, OFC.info.used, OFC.info.settings?.menu_off);  // 2.276.0 A (#3039): + used; 2.440.0 (#3609): + the points switched off
@@ -219,13 +217,13 @@ function pb_reset(nav) {
 }
 function pb_wsFollow() {
   if (!S.me || !S.settings) return;
-  const ws = typeof wsCur === 'function' ? wsCur() : '';
+  const ws = ofc_wsKey();  // 2.577.0 (#4638): + the area open under "All"
   if (OFC.ws !== undefined && OFC.ws !== ws) pb_reset();
   OFC.ws = ws;
 }
 function pb_wsChanged(saving) {
   OFC.pbWait = !!saving;
-  if (saving) { pb_reset(true); OFC.ws = typeof wsCur === 'function' ? wsCur() : ''; }
+  if (saving) { pb_reset(true); OFC.ws = ofc_wsKey(); }
   else ofcDraw();
 }
 // the empty personal office of a person with organisations points to the offices of these organisations
@@ -1148,7 +1146,7 @@ document.addEventListener('click', async e => {
   if (a === 'pb-move') { pb_move(); return; }  // 2.47.3 (#1360)
   if (a === 'pb-transfer') { pb_transfer(); return; }  // 2.137.0 D (#1981)
   if (a === 'org-out') { ofc_orgOut(); return; }  // 2.356.0 A (#2926)
-  if (a === 'pb-ws') { if (typeof wsSet === 'function') wsSet(b.dataset.ws, {keep: true}); return; }  // 2.47.3 (#1360); 2.397.0 (#3404): the office stays
+  if (a === 'pb-ws') { if (ofc_sp()) go('office/s/' + b.dataset.ws); else if (typeof wsSet === 'function') wsSet(b.dataset.ws, {keep: true}); return; }  // 2.577.0 (#4638): under "All" the area's address  // 2.47.3 (#1360); 2.397.0 (#3404): the office stays
   if (a === 'new') { e.preventDefault(); ofcModal(b.dataset.kind, null); }
   else if (a === 'open') { e.preventDefault(); const r = ofcRow(b.dataset.kind, +b.dataset.id); if (r) ofcModal(b.dataset.kind, r); }
   else if (a === 'log-all' || a === 'log-ag') { e.preventDefault(); OFC.logAg = a === 'log-ag'; ofcDraw(); }  // 2.51.0 A (#1348)

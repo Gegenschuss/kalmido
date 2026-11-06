@@ -190,6 +190,7 @@ exports.login = async (user, pw = 'password123', o = {}) => {
 // ofc_allOvr); the suites written before open the office the server chose there (that organisation's): officeWs saves that
 // workspace for them, only in exactly this case ("All", one organisation). boot does it for a start in the office (hash office...)
 // unless allWs: true (the suites of the overview); a suite that walks into the office later calls it itself.
+// 2.577.0 (#4638): a tap in the overview opens #office/s/<space> (the workspace stays "All"); a suite can start there too.
 exports.officeWs = async hd => {
   const H = {...hd, 'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
   const j = await (await fetch(B + 'api/state', {headers: H})).json().catch(() => ({}));

@@ -239,10 +239,36 @@ def office_org(c, uid, admin=False, area=None):
     return oid
 
 
+# 2.577.0 (#4638): the office's own address under "All workspaces" (#office/s/<space>, static/js/office.js ofc_sp): the app
+# names the area of the open office per request in this header (core.js rawFetch0 ofc_spHdr, also kept on an outbox entry)
+OFFICE_SPACE_HDR = "X-Kalmido-Office-Space"
+
+
+def office_space(orgs, ws):
+    """2.577.0 (#4638): the workspace an office request works in: the setting ws, or -- only while it is "All workspaces"
+    ("" / all) -- the header's area: "private" or "org:<id>" of one of the person's own organisations orgs (exactly what the
+    setting workspace may hold, so the header can do nothing the setting cannot). Another value = 400 instead of silently
+    some other office (a change meant for an organisation the person left never lands elsewhere). Agents and API tokens:
+    no header (as before, their own setting)."""
+    if ws not in ("", "all") or not has_request_context() or g.get("auth_via") == "token":
+        return ws
+    u = getattr(g, "user", None)
+    if u is not None and "kind" in u.keys() and u["kind"] == "agent":
+        return ws
+    sp = (request.headers.get(OFFICE_SPACE_HDR) or "").strip()
+    if not sp:
+        return ws
+    m = re.fullmatch(r"org:(\d{1,9})", sp)
+    if sp == "private" or (m and int(m.group(1)) in orgs):
+        return sp
+    raise BadInput(tr(OFFICE_NO_ORG))
+
+
 def office_where(c, uid):
-    """2.187.0 (#2476): (office area id, uid's role there) -- the first half of office_org without the role checks."""
+    """2.187.0 (#2476): (office area id, uid's role there) -- the first half of office_org without the role checks.
+    2.577.0 (#4638): under "All workspaces" the request's own area (office_space)."""
     orgs = user_orgs(c, uid)
-    ws = (usettings(c, uid).get("workspace") or "").strip()
+    ws = office_space(orgs, (usettings(c, uid).get("workspace") or "").strip())
     m = re.fullmatch(r"org:(\d{1,9})", ws)
     if m and int(m.group(1)) in orgs:
         oid = int(m.group(1))

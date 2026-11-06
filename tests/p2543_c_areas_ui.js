@@ -4,8 +4,8 @@
 // Own container (start.sh), jsdom, invented data only. freelancer-matrix: office, workload
 // - Team under "All" with two organisations: the overview (no picker); a tap opens #workload/s/org:<id> with that area's
 //   data, the three tabs keep the area, the path "All workspaces / <name>" leads back to the overview
-// - the office under "All" (Private + two organisations): the overview; a tap switches the workspace to that area and opens
-//   its office on the same page, "All workspaces /" in its head switches back to the overview
+// - the office under "All" (Private + two organisations): the overview; a tap opens #office/s/<space> (2.577.0 #4638, was: a
+//   switch of the workspace), the workspace stays "All", "All workspaces /" in its head leads back to the overview
 // - a workspace chosen above: as before (no overview, its area); a person without an organisation: no overview anywhere
 const {execFileSync} = require('child_process');
 const path = require('path');
@@ -76,16 +76,15 @@ const rows = d => [...d.querySelectorAll('#view .spov [data-spov]')].map(a => a.
   w = await boot({hash: 'office/offers', allWs: true}); d = w.document;
   check(await until(() => rows(d) === `private,${WA},${WB}`), 'office under "All": Private, Alpha, Bravo ' + rows(d));
   check(!d.querySelector('#view .ofdlist') && !/Select a workspace/.test(d.querySelector('#view').textContent), 'office under "All": no list, no "Choose a workspace"');
+  // 2.577.0 (#4638): a tap opens the area's own address #office/s/<space>; the workspace stays "All" (was: wsSet to the area)
   d.querySelector(`#view .spov [data-spov="${WA}"]`).click();
-  check(await until(() => w.eval('S.settings.workspace') === WA && w.eval('OFC.info && OFC.info.org_id') === A && d.querySelector('#view .ofchead [data-ofcall="up"]')), 'a tap opens the office of Alpha (the workspace follows) ' + w.eval('S.settings.workspace'));
-  check(/^#office\/offers/.test(w.location.hash) && !rows(d), 'the same office page, no overview ' + w.location.hash);
-  let saved = ''; for (let i = 0; i < 40 && saved !== WA; i++) { saved = (await call('GET', '/api/state')).settings?.workspace; if (saved !== WA) await sleep(150); }
-  check(saved === WA, 'the server saved Alpha as the workspace ' + saved);
+  check(await until(() => w.location.hash === '#office/s/' + WA && w.eval('OFC.info && OFC.info.org_id') === A && d.querySelector('#view .ofchead [data-ofcall="up"]')), 'a tap opens the office of Alpha at its own address ' + w.location.hash);
+  check(w.eval('S.settings.workspace') === 'all' && !rows(d), 'the workspace stays "All", no overview ' + w.eval('S.settings.workspace'));
+  check((await call('GET', '/api/state')).settings?.workspace === 'all', 'the server keeps "All" as the workspace');
   d.querySelector('#view [data-ofcall="up"]').click();
-  check(await until(() => w.eval('S.settings.workspace') === 'all' && rows(d) === `private,${WA},${WB}`), '"All workspaces" in the head: back to the overview');
-  for (let i = 0; i < 40 && (await call('GET', '/api/state')).settings?.workspace !== 'all'; i++) await sleep(150);  // the switch back is saved (two quick switches may cross)
+  check(await until(() => w.location.hash === '#office' && rows(d) === `private,${WA},${WB}`), '"All workspaces" in the head: back to the overview ' + w.location.hash);
   d.querySelector('#view .spov [data-spov="private"]').click();
-  check(await until(() => w.eval('S.settings.workspace') === 'private' && w.eval('OFC.info && OFC.info.personal'), 60), 'Private opens the personal office ' + w.eval('JSON.stringify([S.settings.workspace, OFC.info && OFC.info.org_id, OFC.info && OFC.info.personal, OFC.infoErr, OFC.pbWait, location.hash])'));
+  check(await until(() => w.eval('OFC.info && OFC.info.personal'), 60), 'Private opens the personal office ' + w.eval('JSON.stringify([S.settings.workspace, OFC.info && OFC.info.org_id, OFC.info && OFC.info.personal, OFC.infoErr, location.hash])'));
   w.close();
   await call('PATCH', '/api/settings', {workspace: WB});
   w = await boot({hash: 'office/offers'}); d = w.document;
