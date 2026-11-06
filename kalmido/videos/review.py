@@ -561,6 +561,8 @@ def vdr_comment_patch(vid, cid):
     b = body()
     b = b if isinstance(b, dict) else {}
     mine, wr = x["author_id"] == uid, vdr_may(c, uid, r, write=True)
+    if mine and ("done" in b or "body" in b):  # 2.607.0 (#4549): a guest / read-only person of the review's
+        need_org_say(c, uid, r["org_id"], lambda: wr)  # organisation only reads -- asked before anything is written (review)
     if "done" in b:
         if not (mine or wr):
             raise Denied(403)
@@ -568,7 +570,6 @@ def vdr_comment_patch(vid, cid):
     if "body" in b:
         if not mine:
             raise Denied(403)
-        need_org_say(c, uid, r["org_id"], lambda: wr)  # 2.607.0 (#4549)
         t = vdr_clean(b.get("body"), VDR_BODY_MAX)
         if not t:
             return err(tr("Please write a comment."))

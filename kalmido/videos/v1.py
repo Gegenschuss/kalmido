@@ -19,6 +19,7 @@ from ..accounts.session import me
 from ..api.v1 import BadInput
 from ..api.common import v1_args, v1_json, v1_view
 from ..core.errors import reject_unknown
+from ..accounts.orgroles import need_org_say  # 2.607.0 (#4549)
 from .review import vdr_comment_add, vdr_comment_row, vdr_dict, vdr_list_of, vdr_may, vdr_reload, vdr_tc, vdr_touch, vdr_versions
 
 VDR_V1_LIMIT = 200
@@ -137,8 +138,10 @@ def vdr_v1_comment_patch(vid, comment_id):
     c, uid = db(), me()
     r = vdr_v1_need(c, vid)
     x = vdr_comment_row(c, r, cid)
-    if x["author_id"] != uid and not vdr_may(c, uid, r, write=True, api=True):
+    wr = vdr_may(c, uid, r, write=True, api=True)
+    if x["author_id"] != uid and not wr:
         raise Denied(403)
+    need_org_say(c, uid, r["org_id"], lambda: wr)  # 2.607.0 (#4549, review): a guest / read-only person only reads
     c.execute("UPDATE video_comments SET done=? WHERE id=?", (1 if b["done"] else 0, cid))
     vdr_touch(c, vid)
     access_note(vdr_list_of(c, r), True)
