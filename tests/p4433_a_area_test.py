@@ -95,10 +95,14 @@ def row(nid):
 def settled(s, nid, secs=90):
     """The document once recognised and no longer waiting for the sorting -> its JSON (GET /api/docs/<id>)."""
     def one():
+        # the sorting first, then the sheet: read the other way round, a sheet fetched while the queue still moved the
+        # document (area_sort 'sorting') came back with the old state (org_id None, private) next to the finished row
+        if (row(nid) or ("", "pending"))[1] in ("pending", "sorting"):  # review 2.522: + 'sorting' (claimed by the queue)
+            return None
         r = s.get(B + f"/api/docs/{nid}")
         if not r.ok or r.json()["state"] not in ("done", "failed"):
             return None
-        return r.json() if (row(nid) or ("", "pending"))[1] not in ("pending", "sorting") else None  # review 2.522: + 'sorting' (claimed by the queue)
+        return r.json() if (row(nid) or ("", "pending"))[1] not in ("pending", "sorting") else None
     return until(one, secs)
 
 
