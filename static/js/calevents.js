@@ -105,7 +105,7 @@ async function evPop(anchor, e) {
     ${t ? `<button class="linkbtn evtask" data-evp="task">${ic('done', 's')} ${esc(tr('Preparation: {0}', t.title))}</button>` : ''}
     ${me ? `<div class="evrsvp" role="group" aria-label="${esc(tr('Your answer'))}">${EV_PS.map(([k, n, i]) => `<button class="btn sm ${me.partstat === k ? 'on' : ''}" data-evps="${k}" aria-pressed="${me.partstat === k}">${ic(i, 's')} ${tr(n)}</button>`).join('')}</div>` : ''}
     ${w && ev.status === 'tentative' && !e.recurring ? `<div class="cevact apdraftact"><button class="btn sm pri" data-evp="apok">${ic('check', 's')} ${tr('Confirm')}</button><button class="btn sm" data-evp="del">${ic('x', 's')} ${tr('Discard')}</button></div>` : ''}
-    <div class="cevact">${w ? `<button class="btn sm${ev.status === 'tentative' && !e.recurring ? '' : ' pri'}" data-evp="edit">${ic('edit', 's')} ${tr('Edit')}</button>${!ev.task_id ? `<button class="btn sm" data-evp="prep">${ic('plus', 's')} ${tr('Preparation task')}</button>` : ''}<button class="btn sm danger" data-evp="del">${ic('trash', 's')} ${tr('Delete')}</button>` : `<button class="btn sm" data-evp="totask">${ic('plus', 's')} ${tr('Create task from event')}</button>`}</div></div>`;
+    <div class="cevact">${w ? `<button class="btn sm${ev.status === 'tentative' && !e.recurring ? '' : ' pri'}" data-evp="edit">${ic('edit', 's')} ${tr('Edit')}</button>${!ev.task_id ? `<button class="btn sm" data-evp="prep">${ic('plus', 's')} ${tr('Preparation task')}</button>` : ''}<button class="btn sm danger" data-evp="del">${ic('trash', 's')} ${tr('Delete')}</button>` : `<button class="btn sm" data-evp="totask">${ic('plus', 's')} ${tr('Create task from event')}</button>`}${feat('wiki') ? `<button class="btn sm" data-evp="minutes" title="${esc(tr('Minutes of this event as a knowledge page'))}">${ic('note', 's')} ${tr('Minutes|meeting')}</button>` : ''}</div></div>`;
   p.onclick = async ev2 => {
     const ps = ev2.target.closest('[data-evps]');
     if (ps) { try { await api('POST', `/api/events/${ev.id}/rsvp`, {partstat: ps.dataset.evps}); } catch { return; } closePop(); toast(tr('Answer sent: {0}', tr(EV_PS_WORD[ps.dataset.evps]))); calInvalidate(); renderView(); return; }
@@ -121,6 +121,8 @@ async function evPop(anchor, e) {
     else if (k === 'apok') ap_evConfirm(ev);  // 2.51.0 C (#1355): a draft (tentative) becomes confirmed (agentplan.js)
     else if (k === 'prep') evPrepTask(ev);
     else if (k === 'totask') cevToTask(cevPrep({...e}));
+    // 2.384.0 (#1958): the minutes as a knowledge page (wiki.js wk_minutes; this date of a series)
+    else if (k === 'minutes') wk_minutes({eid: ev.id, cal_id: ev.cal_id, day: e.d0 || String(e.start || ev.start).slice(0, 10), title: cevTitle(e), when: evWhen(e), location: e.location || '', description: e.description || '', attendees: att});
   };
 }
 // 2.484.0 (#3945): a date of a series with its own change (an override, RECURRENCE-ID) is a single event to the user: dragging,

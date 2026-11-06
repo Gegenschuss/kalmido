@@ -16978,5 +16978,9 @@
   "Input tax": "Voorbelasting",
   "Accounts of the DATEV archive {0}": "Rekeningen van het DATEV-archief {0}",
   "No figures for {0}, neither in Kalmido nor in the DATEV archive.": "Geen cijfers voor {0}, niet in Kalmido en niet in het DATEV-archief.",
+  "Minutes|meeting": "Notulen",
+  "Minutes|folder": "Notulen",
+  "Action items": "Actiepunten",
+  "Minutes of this event as a knowledge page": "Notulen van deze afspraak als kennispagina",
   "To change this, please sign in again to confirm (at most {0} minutes ago).": "Meld je opnieuw aan om dit te bevestigen (hoogstens {0} minuten geleden)."
 }

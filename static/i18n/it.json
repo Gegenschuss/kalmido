@@ -16979,5 +16979,9 @@
   "Input tax": "IVA a credito",
   "Accounts of the DATEV archive {0}": "Conti dell’archivio DATEV {0}",
   "No figures for {0}, neither in Kalmido nor in the DATEV archive.": "Nessuna cifra per {0}, né in Kalmido né nell’archivio DATEV.",
+  "Minutes|meeting": "Verbale",
+  "Minutes|folder": "Verbali",
+  "Action items": "Attività",
+  "Minutes of this event as a knowledge page": "Verbale di questo appuntamento come pagina di conoscenza",
   "To change this, please sign in again to confirm (at most {0} minutes ago).": "Per modificarlo, accedi di nuovo per confermare (al massimo {0} minuti fa)."
 }

@@ -114,6 +114,7 @@ const LD_CALL = {settings: ['settingsModal', 'setApply', 'settingsSync', 'modCou
   cfkinds: ['cfkTcEdit', 'cfkPick', 'cfkModalExtra'],  // 2.156.0 B (#2069)
   trashui: ['doneCleanup', 'ms_clTrashAct', 'attRestore', 'attPurge', 'trEmpty', 'trPurgeTask', 'trPurgeList'],  // 2.272.0 G (#3038); 2.530.0 D (#4316): tr*
   hookin: ['whiMount'],  // 2.115.0 (#2061)
+  wiki: ['wk_minutes'],  // 2.384.0 (#1958): "Minutes" in an event's popover (calevents.js)
   sectpl: ['sct_open'],  // 2.156.0 C (#2073)
   hubmailbox: ['hmb_dialog', 'hmb_compose'],  // 2.141.0 A (#2141, #2138)
   listprint: ['lexPrint'], evinvite: ['evf_modal'], projtime: ['tz_open'], dayplan: ['dayplanModal'], gitrepo: ['repoWire', 'folderRepoModal'], hubmail: ['hbm_open'],

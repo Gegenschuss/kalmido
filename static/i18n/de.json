@@ -16978,5 +16978,9 @@
   "Input tax": "Vorsteuer",
   "Accounts of the DATEV archive {0}": "Konten des DATEV-Archivs {0}",
   "No figures for {0}, neither in Kalmido nor in the DATEV archive.": "Keine Zahlen für {0}, weder in Kalmido noch im DATEV-Archiv.",
+  "Minutes|meeting": "Protokoll",
+  "Minutes|folder": "Protokolle",
+  "Action items": "Aufgaben",
+  "Minutes of this event as a knowledge page": "Protokoll zu diesem Termin als Wissensseite",
   "To change this, please sign in again to confirm (at most {0} minutes ago).": "Um das zu ändern, melde dich bitte zur Bestätigung neu an (höchstens vor {0} Minuten)."
 }

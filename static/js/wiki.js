@@ -769,16 +769,19 @@ function wk_after(sp) { if (WK.idx[sp]) { WK.idx[sp].v = -1; WK.idx[sp].mk = (WK
 // 2.371.2 (#3151): a template's placeholders, filled here when a page starts from it (one way for every space, a locked one
 // too): {{datum}} / {{date}} today, {{titel}} / {{title}} the page's name, {{ich}} / {{me}} my name, {{cursor}} where
 // writing starts (the first one; every {{cursor}} goes). Other {{…}} stay as they are.
-const WK_PH = /\{\{[ \t]*(datum|date|titel|title|ich|me|cursor)[ \t]*\}\}/gi;
-function wk_tplFill(text, path) {
-  const me = S.me?.display_name || S.me?.username || '', v = {datum: fmtDate(today()), titel: wk_base(path), ich: me};
-  const val = k => v[{date: 'datum', title: 'titel', me: 'ich'}[k] || k];
+// 2.384.0 (#1958): the minutes of an event (wk_minutes) fill {{termin}} / {{event}}, {{zeit}} / {{time}}, {{ort}} / {{place}},
+// {{teilnehmer}} / {{participants}} and {{tagesordnung}} / {{agenda}} as well (more = those values); elsewhere they stay
+const WK_PH = /\{\{[ \t]*(datum|date|titel|title|ich|me|cursor|termin|event|zeit|time|ort|place|teilnehmer|participants|tagesordnung|agenda)[ \t]*\}\}/gi;
+const WK_PH_EN = {date: 'datum', title: 'titel', me: 'ich', event: 'termin', time: 'zeit', place: 'ort', participants: 'teilnehmer', agenda: 'tagesordnung'};
+function wk_tplFill(text, path, more = {}) {
+  const me = S.me?.display_name || S.me?.username || '', v = {datum: fmtDate(today()), titel: wk_base(path), ich: me, ...more};
+  const val = k => v[WK_PH_EN[k] || k];
   let out = '', at = -1, last = 0, m;
   WK_PH.lastIndex = 0;
   while ((m = WK_PH.exec(text))) {
     out += text.slice(last, m.index); last = WK_PH.lastIndex;
-    const k = m[1].toLowerCase();
-    if (k !== 'cursor') out += val(k); else if (at < 0) at = out.length;
+    const k = m[1].toLowerCase(), x = val(k);
+    if (k === 'cursor') { if (at < 0) at = out.length; } else out += x ?? m[0];
   }
   return {text: out + text.slice(last), at};
 }
@@ -788,8 +791,8 @@ async function wk_tplText(sp, id) {  // a template's text (from the index when i
   const q = await rawFetch('GET', '/api/wiki/pages/' + id); if (typeof wkePage === 'function') await wkePage(q);
   return q.body || '';
 }
-async function wk_mk(sp, path, tpl) {  // makes the page (tpl = a template's id, 0 = empty); the answer {id, path, …}
-  const f = tpl ? wk_tplFill(await wk_tplText(sp, tpl), path) : {text: '', at: -1};
+async function wk_mk(sp, path, tpl, f0) {  // makes the page (tpl = a template's id, 0 = empty; f0 = a text made already, {text, at}); the answer {id, path, …}
+  const f = f0 || (tpl ? wk_tplFill(await wk_tplText(sp, tpl), path) : {text: '', at: -1});
   const r = wk_e2e(sp) ? await wkeCreate(sp, path, 0, f.text) : await rawFetch('POST', '/api/wiki/pages', {space: sp, path, ...(f.text ? {body: f.text} : {})});
   WK.caretNext = f.at >= 0 ? {id: r.id, at: f.at} : null;
   return r;
@@ -814,6 +817,45 @@ async function wk_day(sp, day = today()) {
   if (had) { if (S.route.wid !== had.id) go('wiki/' + had.id); return; }
   if (d.mayWrite === false) { toast(tr('This page does not exist or you cannot see it.')); return; }
   let r; try { r = await wk_mk(sp, path, wk_dayTpl(sp)?.id || 0); } catch (e) { toast(e.message); wk_after(sp); return; }
+  wk_made(sp, r);
+}
+// 2.384.0 (#1958): minutes of a meeting, no module of their own -- "Minutes" in an event's popover (calevents.js) makes a
+// knowledge page "Minutes/YYYY-MM-DD <title>" in the space of the event's calendar (Private for a person without an
+// organisation; a space one may not write = Private), from the template Templates/Besprechung (or Protokoll, Meeting,
+// Minutes; Vorlagen/…) when the space has one, else from the built-in one: title, date, time, place, participants and the
+// agenda (the event's notes, one item per line) filled in. The page keeps the event in its front matter (termin, datum)
+// and links to it (#ev/<id>); "Minutes" on the same event (the same date of a series) again opens that page. Decisions and
+// action items are checkbox lines: "Open items as tasks" (wkembed.js) makes tasks of them. The page is an ordinary page
+// (its space's rights, history, undo, conflicts), nothing is stored on the event.
+const WK_MEET_TPL = /^(templates|vorlagen)\/(besprechung|protokoll|meeting|minutes)$/i;
+const wk_meetTpl = sp => wk_pages(sp).find(x => WK_MEET_TPL.test(x.path));
+const wk_meetOf = (sp, eid, day) => wk_pages(sp).find(x => !wk_isTpl(x.path) && String(x.attrs?.termin ?? '') === String(eid) && String(x.attrs?.datum ?? '') === day);
+const wk_meetName = s => String(s || '').replace(/[\x00-\x1f\x7f[\]|#^\\/]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120);
+function wk_meetText(tpl, o, path) {  // the page's text: the template (or the built-in one) filled, the event in the front matter
+  const line = s => s.replace(/^\s*(?:[-*+]|\d+[.)])\s+/, '').trim();
+  const items = a => a.length ? a.map(x => '- ' + x).join('\n') : '- ';
+  const agenda = items(String(o.description || '').split('\n').map(line).filter(Boolean).slice(0, 50));
+  const who = items((o.attendees || []).map(a => wk_meetName(a.name || a.email)).filter(Boolean));
+  const link = `[${wk_meetName(o.title) || tr('(no title)')}](#ev/${o.eid})`;
+  const body = tpl ?? `# {{titel}}\n\n**${tr('Event|calendar')}:** {{termin}} · {{zeit}}${o.location ? ' · {{ort}}' : ''}\n\n## ${tr('Participants')}\n{{teilnehmer}}\n\n## ${tr('Agenda')}\n{{tagesordnung}}\n\n## ${tr('Notes')}\n{{cursor}}\n\n## ${tr('Decisions')}\n- [ ] \n\n## ${tr('Action items')}\n- [ ] \n`;
+  const f = wk_tplFill(body, path, {titel: o.title || tr('(no title)'), datum: fmtDate(o.day), termin: link, zeit: o.when || '', ort: o.location || '', teilnehmer: who, tagesordnung: agenda});
+  const fm = `termin: ${o.eid}\ndatum: ${o.day}\n`, has = /^---[ \t]*\r?\n/.exec(f.text);
+  const text = has ? f.text.slice(0, has[0].length) + fm + f.text.slice(has[0].length) : `---\n${fm}---\n` + f.text;
+  return {text, at: f.at < 0 ? -1 : f.at + text.length - f.text.length};
+}
+// o = the event as the popover shows it: {eid, cal_id, day (YYYY-MM-DD), title, when, location, description, attendees}
+async function wk_minutes(o) {
+  const c = typeof evCal === 'function' ? evCal(o.cal_id) : null, ok = s => wk_spaces().includes(s);
+  let sp = c && ok(wsOf(c)) ? wsOf(c) : 'private';
+  for (const s of new Set([sp, 'private'])) await wk_load(s, true);  // the newest index: minutes made on another device count
+  const d = WK.idx[sp]; if (!d?.pages) { toast(d?.err || tr('Loading…')); return; }
+  const had = wk_meetOf(sp, o.eid, o.day) || (sp !== 'private' && wk_meetOf('private', o.eid, o.day));
+  if (had) { go('wiki/' + had.id); return; }
+  if (d.mayWrite === false || wk_locked(sp)) { sp = 'private'; if (!WK.idx[sp]?.pages) { toast(WK.idx[sp]?.err || tr('Loading…')); return; } }
+  const base = `${tr('Minutes|folder')}/${o.day} ${wk_meetName(o.title) || tr('(no title)')}`;
+  let path = base; for (let i = 2; wk_byPath(sp, path); i++) path = `${base} (${i})`;
+  const t = wk_meetTpl(sp);
+  let r; try { r = await wk_mk(sp, path, 0, wk_meetText(t ? await wk_tplText(sp, t.id) : null, o, path)); } catch (e) { toast(e.message); wk_after(sp); return; }
   wk_made(sp, r);
 }
 function wk_dayBar(p) {
