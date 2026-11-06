@@ -6,8 +6,8 @@ const AINS_OS = [['mac', N_('Mac')], ['windows', N_('Windows')], ['linux', N_('L
 const ains_osGuess = () => /Mac|iPhone|iPad/.test(navigator.userAgent) ? 'mac' : /Win/.test(navigator.userAgent) ? 'windows' : 'linux';
 const ains_q = s => `'${String(s).replace(/'/g, "'\\''")}'`;   // POSIX shell single quotes
 const ains_pq = s => `'${String(s).replace(/'/g, "''")}'`;     // PowerShell single quotes
-// 2.46.6 (#1713): the language of the account goes along (--lang / -Lang): the script speaks German or English, anything else = English
-const ains_lang = () => (LS.get('lang') || S.settings?.lang || 'en').slice(0, 2).toLowerCase() === 'de' ? 'de' : 'en';
+// 2.46.6 (#1713): the language of the account goes along (--lang / -Lang): the script speaks German or English (2.574.0 #3759: also es, fr, it, nl), anything else = English
+const ains_lang = () => { const l = (LS.get('lang') || S.settings?.lang || 'en').slice(0, 2).toLowerCase(); return ['de', 'es', 'fr', 'it', 'nl'].includes(l) ? l : 'en'; };  // 2.574.0 (#3759): + es, fr, it, nl
 // 2.360.0 C (#2496): the scripts take http:// only for localhost or with --allow-http (a Kalmido without https); on Mac /
 // Linux the code goes in the environment, not on the command line (process list); 2.360.0 R (#2496, review): on Windows too
 const ains_http = url => /^http:\/\/(?!(localhost|127\.0\.0\.1|\[::1\])(:|\/|$))/i.test(url);

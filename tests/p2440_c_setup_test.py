@@ -260,9 +260,13 @@ for b in BASHES:
                         env=env, capture_output=True, text=True, timeout=60)
     check(rd.returncode == 0 and all(x in rd.stdout for x in ("Prüfe, was gebraucht wird", "Verbinde mit Kalmido", "Lade die Starter-Dateien", "Fertig", "(Probelauf)")), f"{b}: --lang de: German messages: {rd.stdout[:300]!r} {rd.stderr[-200:]!r}")
     check("Checking what is needed" not in rd.stdout and (OSN != "linux" or "Restart=always" in rd.stdout), f"{b}: --lang de: no English step lines, the unit text is unchanged")
+    # 2.574.0 (#3759): fr is French now (was: English); a language without a table (pt) stays English
     rf = subprocess.run([b, SETUP_SH, "--dry-run", "--lang", "fr", "--url", URL, "--code", "ks_good_code", "--dir", "~/my project", "--cmd", "fakeagent"],
                         env=env, capture_output=True, text=True, timeout=60)
-    check(rf.returncode == 0 and "Checking what is needed" in rf.stdout, f"{b}: --lang fr falls back to English")
+    check(rf.returncode == 0 and "Vérification de ce qui est nécessaire" in rf.stdout and "Checking what is needed" not in rf.stdout, f"{b}: --lang fr: French messages: {rf.stdout[:200]!r}")
+    rp = subprocess.run([b, SETUP_SH, "--dry-run", "--lang", "pt", "--url", URL, "--code", "ks_good_code", "--dir", "~/my project", "--cmd", "fakeagent"],
+                        env=env, capture_output=True, text=True, timeout=60)
+    check(rp.returncode == 0 and "Checking what is needed" in rp.stdout, f"{b}: --lang pt falls back to English")
     if OSN == "mac":
         check("<key>KeepAlive</key><true/>" in o and "<key>RunAtLoad</key><true/>" in o and "/bin/bash" in o and "--events" in o, f"{b}: LaunchAgent with KeepAlive / RunAtLoad")
     else:

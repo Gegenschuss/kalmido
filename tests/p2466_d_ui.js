@@ -53,7 +53,10 @@ const call = async (ck, method, url, body, h = {}) => { const r = await fetch(B 
     check(await ev(`!chatPermHtml({id: 8, from: 'agent', body: 'May I?', choices: {choices: [{id: 'allow', label: 'Allow'}, {id: 'deny', label: 'Deny'}], permission: {tool: 'Bash'}}}, 'open').includes('cchpen')`), '#1711: a permission question has no pen');
     // #1713: the language goes into the command
     check(await ev(`(() => { S.settings.lang = 'de'; LS.set('lang', 'de'); return ains_command('mac', 'https://k.example.com', 'ks_x', '~/p').endsWith(" --lang de") && ains_command('windows', 'https://k.example.com', 'ks_x', '~\\\\p').endsWith(" -Lang de"); })()`), '#1713: de account -> --lang de / -Lang de');
-    check(await ev(`(() => { S.settings.lang = 'fr'; LS.set('lang', 'fr'); return ains_command('mac', 'https://k.example.com', 'ks_x', '~/p').endsWith(" --lang en"); })()`), '#1713: another language -> en');
+    // 2.574.0 (#3759): the scripts speak es, fr, it, nl too (was: fr -> en); an unknown language stays en
+    check(await ev(`(() => { S.settings.lang = 'fr'; LS.set('lang', 'fr'); return ains_command('mac', 'https://k.example.com', 'ks_x', '~/p').endsWith(" --lang fr") && ains_command('windows', 'https://k.example.com', 'ks_x', '~\\\\p').endsWith(" -Lang fr") && ains_uninstallCmd({folder: '/p', os: 'mac'}, 'https://k.example.com').endsWith(" --lang fr"); })()`), '#3759: fr account -> --lang fr / -Lang fr, also the uninstall command');
+    check(await ev(`(() => { return ['es', 'it', 'nl'].every(l => { S.settings.lang = l; LS.set('lang', l); return ains_command('mac', 'https://k.example.com', 'ks_x', '~/p').endsWith(' --lang ' + l); }); })()`), '#3759: es, it, nl are passed on');
+    check(await ev(`(() => { S.settings.lang = 'pt'; LS.set('lang', 'pt'); return ains_command('mac', 'https://k.example.com', 'ks_x', '~/p').endsWith(" --lang en"); })()`), '#1713: another language -> en');
   }, false);
 
   console.log(`p2466_d_ui: ${ok} ok, ${F.length} failed`);

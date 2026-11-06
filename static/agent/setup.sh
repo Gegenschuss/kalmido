@@ -8,7 +8,7 @@
 # a launchd LaunchAgent on macOS, a systemd --user service on Linux. One instance per project folder (several agents on one
 # computer = several folders). Needs: bash (3.2 is enough), curl, python3 3.9+, the agent command (default: claude).
 #
-# usage: agent-setup.sh --url URL --code CODE --dir FOLDER [--tool claude|codex] [--cmd COMMAND] [--from DIR] [--no-autostart] [--dry-run] [--lang de|en]
+# usage: agent-setup.sh --url URL --code CODE --dir FOLDER [--tool claude|codex] [--cmd COMMAND] [--from DIR] [--no-autostart] [--dry-run] [--lang de|en|es|fr|it|nl]
 #        [--allow-http]
 #        agent-setup.sh --uninstall --dir FOLDER [--dry-run]
 #   --url        your Kalmido address
@@ -22,7 +22,7 @@
 #                server, Codex CLI the same server with -c mcp_servers.kalmido.command=... (no change of ~/.codex/config.toml)
 #   --from DIR   take the starter files from a local copy of mcp/ instead of downloading them
 #   --no-autostart  install everything but the autostart (start agent_launcher.sh yourself)
-#   --lang       language of the messages: de or en (Kalmido adds the language of your account; anything else = en)
+#   --lang       language of the messages: de, en, es, fr, it or nl (Kalmido adds the language of your account; anything else = en)
 #   --dry-run    only show what would happen: no code is redeemed, nothing is written, no autostart is loaded
 #   --uninstall  stop and remove the autostart, revoke this computer's token in Kalmido, delete the instance folder
 # Files: ~/.kalmido/agents/<folder name>-<hash>/ (starter files, kalmido-agent.env with mode 600, mcp.json, agent.log).
@@ -46,9 +46,9 @@ while [ $# -gt 0 ]; do
     *) UNKNOWN=$1; break ;;
   esac
 done
-# 2.46.6 (#1713): messages in German or English (--lang); anything else = English. bash 3.2: a case table, no assoc arrays.
+# 2.46.6 (#1713): messages in German or English (--lang); 2.574.0 (#3759): also es, fr, it, nl; anything else = English. bash 3.2: a case table, no assoc arrays.
 LANGC=$(printf '%s' "$LANGC" | tr 'A-Z' 'a-z' | cut -c1-2)
-[ "$LANGC" = de ] || LANGC=en
+case "$LANGC" in de|es|fr|it|nl) ;; *) LANGC=en ;; esac
 msg_de() {
   case "$1" in
     unknown) echo "agent-setup: unbekannte Option %s" ;;
@@ -195,7 +195,299 @@ msg_en() {
     *) echo "$1" ;;
   esac
 }
-msg() { if [ "$LANGC" = de ]; then msg_de "$1" && return 0; fi; msg_en "$1"; }
+msg_es() {
+  case "$1" in
+    unknown) echo "agent-setup: opción desconocida %s" ;;
+    undone) echo "agent-setup: deshecho (el token vuelve a estar revocado)" ;;
+    wrongos) echo "este script es para macOS y Linux; en Windows usa agent-setup.ps1 (Kalmido muestra ese comando cuando eliges Windows)" ;;
+    s_prereq) echo "Comprobando lo que hace falta" ;;
+    py_mac) echo "\n  - Python 3.9 o más reciente: ejecuta  xcode-select --install  (o instálalo desde python.org)" ;;
+    py_linux) echo "\n  - Python 3.9 o más reciente: instala python3 con tu gestor de paquetes" ;;
+    curl) echo "\n  - curl" ;;
+    claude) echo "\n  - Claude Code: ejecuta  curl -fsSL https://claude.ai/install.sh | bash  y después  claude  una vez para iniciar sesión" ;;
+    cmd) echo "\n  - el comando del agente %s" ;;
+    codex) echo "\n  - Codex CLI: ejecuta  npm install -g @openai/codex  y después  codex login  una vez para iniciar sesión" ;;
+    notlogged_codex) echo "  nota: Codex CLI parece no haber iniciado sesión todavía; ejecuta  codex login  una vez" ;;
+    ask_tool) echo "¿Qué herramienta debe ejecutar el agente? 1 = Claude Code (predeterminada), 2 = Codex CLI: " ;;
+    badtool) echo "herramienta desconocida %s (--tool claude o codex)" ;;
+    missing) echo "agent-setup: falta en este ordenador:%b\nInstálalo y ejecuta el mismo comando otra vez (crea un código nuevo en Kalmido si han pasado 15 minutos)." ;;
+    agentcmd) echo "  comando del agente: %s" ;;
+    notlogged) echo "  nota: Claude Code parece no haber iniciado sesión todavía; ejecuta  claude  una vez e inicia sesión" ;;
+    nodir) echo "falta --dir CARPETA (la carpeta del proyecto en la que trabaja el agente)" ;;
+    folder) echo "  carpeta del proyecto: %s" ;;
+    instance) echo "  instancia: %s" ;;
+    rev_fail) echo "  Kalmido no ha respondido: quita el ordenador en Ajustes > Agentes si todavía aparece en la lista" ;;
+    rev_ok) echo "  este ordenador se ha quitado en Kalmido (su token ya no funciona)" ;;
+    rev_gone) echo "  la clave de este ordenador ya estaba revocada en Kalmido (agente eliminado u ordenador quitado): solo se limpia aquí" ;;
+    rev_err) echo "  no se puede revocar el token: %s" ;;
+    s_uninstall) echo "Quitando de este ordenador el agente de %s" ;;
+    dry_revoke) echo "  (simulacro) revocar en Kalmido el token de este ordenador" ;;
+    uninstalled) echo "Listo. La carpeta del proyecto se queda tal como está." ;;
+    nourl) echo "falta --url (tu dirección de Kalmido)" ;;
+    nocode) echo "falta --code (el código de un solo uso de Kalmido)" ;;
+    s_connect) echo "Conectando con Kalmido" ;;
+    dry_redeem) echo "  (simulacro) canjear el código por el token del agente en %s/api/agent-setup/redeem (ordenador %s)" ;;
+    nocreate) echo "no se puede crear %s" ;;
+    refused) echo "Kalmido ha rechazado el código (HTTP %s): %s" ;;
+    refused_def) echo "no válido, ya usado o caducado" ;;
+    noreach) echo "no se puede acceder a %s: %s" ;;
+    stopped) echo "configuración detenida (no se instaló nada)" ;;
+    agent) echo "  agente: %s, token guardado en %s (solo legible para ti)" ;;
+    perm_you) echo "  las preguntas de permiso las responde la cuenta con id %s (quien creó el código); cambiarlo: en Kalmido, en el agente, Ejecución > Preguntas de permiso a (o KALMIDO_PERM_USER en %s)" ;;
+    perm_kept) echo "  preguntas de permiso: como estaban configuradas (KALMIDO_PERM_USER / KALMIDO_OWNER_IDS en %s)" ;;
+    perm_none) echo "  preguntas de permiso: no hay nadie asignado, todas se deniegan; elige una persona en Kalmido (en el agente, Ejecución > Preguntas de permiso a) o añade KALMIDO_PERM_USER=<id de cuenta> a %s" ;;
+    perm_owner) echo "  las preguntas de permiso las responde la persona a la que pertenece el agente" ;;
+    claude_new) echo "  CLAUDE.md creado: %s (a partir de la plantilla; añade tus propias reglas arriba)" ;;
+    claude_kept) echo "  CLAUDE.md ya existe, se deja como está: %s" ;;
+    dry_claude) echo "  (simulacro) crear CLAUDE.md a partir de la plantilla si no hay ninguno: %s" ;;
+    s_starter) echo "Descargando los archivos de inicio" ;;
+    dry_files) echo "  (simulacro) los archivos de %s/starter_files.txt en %s" ;;
+    nobase) echo "Kalmido no ha enviado ninguna dirección para los archivos de inicio; usa --from CARPETA" ;;
+    nohttp) echo "%s es una dirección http://: el código y el token viajarían sin cifrar por la red. Usa la dirección https:// (o --allow-http si tu Kalmido no tiene https)" ;;
+    basehttp) echo "Kalmido ha enviado una dirección sin https:// para los archivos de inicio (%s); usa --from CARPETA" ;;
+    nolist) echo "no hay starter_files.txt en %s" ;;
+    nolistfetch) echo "no se puede descargar la lista de archivos de inicio (%sstarter_files.txt); puede que esta versión aún no esté publicada - inténtalo más tarde o usa --from CARPETA" ;;
+    skippath) echo "  %s omitido (no se permiten rutas)" ;;
+    nofetch) echo "no se puede descargar %s" ;;
+    shabad) echo "%s no coincide con la suma de verificación que envió Kalmido - no se ha instalado. La dirección de descarga sirve otro archivo distinto al de esta versión; consulta a tu administrador de Kalmido" ;;
+    shanone) echo "  (Kalmido no ha enviado sumas de verificación de los archivos de inicio: versión anterior, sin comprobar)" ;;
+    skipfile) echo "  %s no disponible (omitido)" ;;
+    dry_mcp) echo "  (simulacro) escribir %s (servidor MCP kalmido: %s %s)" ;;
+    s_auto) echo "Iniciándolo en cada inicio de sesión" ;;
+    noauto) echo "  omitido (--no-autostart); inícialo con:" ;;
+    dry_file) echo "  (simulacro) %s:" ;;
+    launchfail) echo "launchctl no ha podido cargar %s" ;;
+    launchok) echo "  LaunchAgent %s (arranca al iniciar sesión, se reinicia tras un fallo; registro: %s)" ;;
+    launchbg) echo "  %s no tiene la sesión iniciada en la pantalla (p. ej. por SSH): el agente se ejecuta ahora en segundo plano hasta el próximo reinicio; después arranca en cuanto inicies sesión en el Mac" ;;
+    sysfail) echo "systemctl --user no ha podido iniciar %s" ;;
+    sysok) echo "  servicio de usuario de systemd %s (registro: %s)" ;;
+    linger) echo "  se ejecuta mientras tengas la sesión iniciada; para que siga tras cerrar sesión: loginctl enable-linger %s" ;;
+    s_done) echo "Listo" ;;
+    done1) echo "Kalmido muestra el ordenador en Ajustes > Agentes en un minuto (punto verde = conectado)." ;;
+    done2) echo "Para quitarlo de nuevo:  curl -fsSL %s/agent-setup.sh | bash -s -- --uninstall --dir %s" ;;
+    *) return 1 ;;
+  esac
+}
+msg_fr() {
+  case "$1" in
+    unknown) echo "agent-setup : option inconnue %s" ;;
+    undone) echo "agent-setup : annulé (le jeton est de nouveau révoqué)" ;;
+    wrongos) echo "ce script est pour macOS et Linux ; sous Windows, utilise agent-setup.ps1 (Kalmido affiche cette commande quand tu choisis Windows)" ;;
+    s_prereq) echo "Vérification de ce qui est nécessaire" ;;
+    py_mac) echo "\n  - Python 3.9 ou plus récent : lance  xcode-select --install  (ou installe-le depuis python.org)" ;;
+    py_linux) echo "\n  - Python 3.9 ou plus récent : installe python3 avec ton gestionnaire de paquets" ;;
+    curl) echo "\n  - curl" ;;
+    claude) echo "\n  - Claude Code : lance  curl -fsSL https://claude.ai/install.sh | bash  puis  claude  une fois pour te connecter" ;;
+    cmd) echo "\n  - la commande de l'agent %s" ;;
+    codex) echo "\n  - Codex CLI : lance  npm install -g @openai/codex  puis  codex login  une fois pour te connecter" ;;
+    notlogged_codex) echo "  remarque : Codex CLI ne semble pas encore connecté ; lance  codex login  une fois" ;;
+    ask_tool) echo "Quel outil doit exécuter l'agent ? 1 = Claude Code (par défaut), 2 = Codex CLI : " ;;
+    badtool) echo "outil inconnu %s (--tool claude ou codex)" ;;
+    missing) echo "agent-setup : il manque sur cet ordinateur :%b\nInstalle-le et relance la même commande (crée un nouveau code dans Kalmido si 15 minutes se sont écoulées)." ;;
+    agentcmd) echo "  commande de l'agent : %s" ;;
+    notlogged) echo "  remarque : Claude Code ne semble pas encore connecté ; lance  claude  une fois et connecte-toi" ;;
+    nodir) echo "--dir DOSSIER manque (le dossier du projet dans lequel l'agent travaille)" ;;
+    folder) echo "  dossier du projet : %s" ;;
+    instance) echo "  instance : %s" ;;
+    rev_fail) echo "  Kalmido n'a pas répondu : retire l'ordinateur sous Paramètres > Agents s'il figure encore dans la liste" ;;
+    rev_ok) echo "  cet ordinateur est retiré dans Kalmido (son jeton ne fonctionne plus)" ;;
+    rev_gone) echo "  la clé de cet ordinateur était déjà révoquée dans Kalmido (agent supprimé ou ordinateur retiré) : seul le nettoyage local est fait" ;;
+    rev_err) echo "  impossible de révoquer le jeton : %s" ;;
+    s_uninstall) echo "Suppression de l'agent de %s sur cet ordinateur" ;;
+    dry_revoke) echo "  (essai à blanc) révoquer dans Kalmido le jeton de cet ordinateur" ;;
+    uninstalled) echo "Terminé. Le dossier du projet reste tel quel." ;;
+    nourl) echo "--url manque (ton adresse Kalmido)" ;;
+    nocode) echo "--code manque (le code à usage unique de Kalmido)" ;;
+    s_connect) echo "Connexion à Kalmido" ;;
+    dry_redeem) echo "  (essai à blanc) échanger le code contre le jeton de l'agent sur %s/api/agent-setup/redeem (ordinateur %s)" ;;
+    nocreate) echo "impossible de créer %s" ;;
+    refused) echo "Kalmido a refusé le code (HTTP %s) : %s" ;;
+    refused_def) echo "invalide, déjà utilisé ou expiré" ;;
+    noreach) echo "%s est inaccessible : %s" ;;
+    stopped) echo "configuration interrompue (rien n'a été installé)" ;;
+    agent) echo "  agent : %s, jeton enregistré dans %s (lisible par toi seul)" ;;
+    perm_you) echo "  les questions d'autorisation reçoivent leur réponse du compte d'id %s (celui qui a créé le code) ; pour changer : dans Kalmido, sur l'agent, Exécution > Questions d'autorisation à (ou KALMIDO_PERM_USER dans %s)" ;;
+    perm_kept) echo "  questions d'autorisation : comme réglées auparavant (KALMIDO_PERM_USER / KALMIDO_OWNER_IDS dans %s)" ;;
+    perm_none) echo "  questions d'autorisation : personne n'est défini, toutes sont refusées ; choisis une personne dans Kalmido (sur l'agent, Exécution > Questions d'autorisation à) ou ajoute KALMIDO_PERM_USER=<id du compte> à %s" ;;
+    perm_owner) echo "  les questions d'autorisation reçoivent leur réponse de la personne à qui appartient l'agent" ;;
+    claude_new) echo "  CLAUDE.md créé : %s (d'après le modèle ; ajoute tes propres règles en haut)" ;;
+    claude_kept) echo "  CLAUDE.md existe déjà, laissé tel quel : %s" ;;
+    dry_claude) echo "  (essai à blanc) créer CLAUDE.md d'après le modèle s'il n'y en a pas : %s" ;;
+    s_starter) echo "Téléchargement des fichiers de démarrage" ;;
+    dry_files) echo "  (essai à blanc) les fichiers de %s/starter_files.txt dans %s" ;;
+    nobase) echo "Kalmido n'a envoyé aucune adresse pour les fichiers de démarrage ; utilise --from DOSSIER" ;;
+    nohttp) echo "%s est une adresse http:// : le code et le jeton circuleraient non chiffrés sur le réseau. Utilise l'adresse https:// (ou --allow-http si ton Kalmido n'a pas https)" ;;
+    basehttp) echo "Kalmido a envoyé une adresse sans https:// pour les fichiers de démarrage (%s) ; utilise --from DOSSIER" ;;
+    nolist) echo "pas de starter_files.txt dans %s" ;;
+    nolistfetch) echo "impossible de télécharger la liste des fichiers de démarrage (%sstarter_files.txt) ; cette version n'est peut-être pas encore publiée - réessaie plus tard ou utilise --from DOSSIER" ;;
+    skippath) echo "  %s ignoré (chemins interdits)" ;;
+    nofetch) echo "impossible de télécharger %s" ;;
+    shabad) echo "%s ne correspond pas à la somme de contrôle envoyée par Kalmido - non installé. L'adresse de téléchargement fournit un autre fichier que celui de cette version ; demande à ton administrateur Kalmido" ;;
+    shanone) echo "  (Kalmido n'a pas envoyé de sommes de contrôle des fichiers de démarrage : version plus ancienne, non vérifié)" ;;
+    skipfile) echo "  %s indisponible (ignoré)" ;;
+    dry_mcp) echo "  (essai à blanc) écrire %s (serveur MCP kalmido : %s %s)" ;;
+    s_auto) echo "Démarrage à chaque connexion" ;;
+    noauto) echo "  ignoré (--no-autostart) ; démarre-le avec :" ;;
+    dry_file) echo "  (essai à blanc) %s :" ;;
+    launchfail) echo "launchctl n'a pas pu charger %s" ;;
+    launchok) echo "  LaunchAgent %s (démarre à la connexion, redémarre après un plantage ; journal : %s)" ;;
+    launchbg) echo "  %s n'est pas connecté à l'écran (p. ex. par SSH) : l'agent tourne maintenant en arrière-plan jusqu'au prochain redémarrage ; ensuite il démarre dès que tu te connectes sur le Mac" ;;
+    sysfail) echo "systemctl --user n'a pas pu démarrer %s" ;;
+    sysok) echo "  service utilisateur systemd %s (journal : %s)" ;;
+    linger) echo "  il tourne tant que tu es connecté ; pour qu'il continue après la déconnexion : loginctl enable-linger %s" ;;
+    s_done) echo "Terminé" ;;
+    done1) echo "Kalmido affiche l'ordinateur sous Paramètres > Agents en une minute (point vert = connecté)." ;;
+    done2) echo "Pour le retirer :  curl -fsSL %s/agent-setup.sh | bash -s -- --uninstall --dir %s" ;;
+    *) return 1 ;;
+  esac
+}
+msg_it() {
+  case "$1" in
+    unknown) echo "agent-setup: opzione sconosciuta %s" ;;
+    undone) echo "agent-setup: annullato (il token è di nuovo revocato)" ;;
+    wrongos) echo "questo script è per macOS e Linux; su Windows usa agent-setup.ps1 (Kalmido mostra quel comando quando scegli Windows)" ;;
+    s_prereq) echo "Controllo di ciò che serve" ;;
+    py_mac) echo "\n  - Python 3.9 o più recente: esegui  xcode-select --install  (oppure installalo da python.org)" ;;
+    py_linux) echo "\n  - Python 3.9 o più recente: installa python3 con il tuo gestore di pacchetti" ;;
+    curl) echo "\n  - curl" ;;
+    claude) echo "\n  - Claude Code: esegui  curl -fsSL https://claude.ai/install.sh | bash  e poi  claude  una volta per accedere" ;;
+    cmd) echo "\n  - il comando dell'agente %s" ;;
+    codex) echo "\n  - Codex CLI: esegui  npm install -g @openai/codex  e poi  codex login  una volta per accedere" ;;
+    notlogged_codex) echo "  nota: Codex CLI sembra non avere ancora effettuato l'accesso; esegui  codex login  una volta" ;;
+    ask_tool) echo "Quale strumento deve eseguire l'agente? 1 = Claude Code (predefinito), 2 = Codex CLI: " ;;
+    badtool) echo "strumento sconosciuto %s (--tool claude o codex)" ;;
+    missing) echo "agent-setup: manca su questo computer:%b\nInstallalo ed esegui di nuovo lo stesso comando (crea un nuovo codice in Kalmido se sono passati 15 minuti)." ;;
+    agentcmd) echo "  comando dell'agente: %s" ;;
+    notlogged) echo "  nota: Claude Code sembra non avere ancora effettuato l'accesso; esegui  claude  una volta e accedi" ;;
+    nodir) echo "manca --dir CARTELLA (la cartella del progetto in cui lavora l'agente)" ;;
+    folder) echo "  cartella del progetto: %s" ;;
+    instance) echo "  istanza: %s" ;;
+    rev_fail) echo "  Kalmido non ha risposto: rimuovi il computer in Impostazioni > Agenti se è ancora elencato" ;;
+    rev_ok) echo "  questo computer è stato rimosso in Kalmido (il suo token non funziona più)" ;;
+    rev_gone) echo "  la chiave di questo computer era già revocata in Kalmido (agente eliminato o computer rimosso): si pulisce solo qui" ;;
+    rev_err) echo "  impossibile revocare il token: %s" ;;
+    s_uninstall) echo "Rimozione dell'agente di %s da questo computer" ;;
+    dry_revoke) echo "  (prova) revocare in Kalmido il token di questo computer" ;;
+    uninstalled) echo "Fatto. La cartella del progetto resta com'è." ;;
+    nourl) echo "manca --url (il tuo indirizzo Kalmido)" ;;
+    nocode) echo "manca --code (il codice monouso di Kalmido)" ;;
+    s_connect) echo "Connessione a Kalmido" ;;
+    dry_redeem) echo "  (prova) scambiare il codice con il token dell'agente su %s/api/agent-setup/redeem (computer %s)" ;;
+    nocreate) echo "impossibile creare %s" ;;
+    refused) echo "Kalmido ha rifiutato il codice (HTTP %s): %s" ;;
+    refused_def) echo "non valido, già usato o scaduto" ;;
+    noreach) echo "impossibile raggiungere %s: %s" ;;
+    stopped) echo "configurazione interrotta (non è stato installato nulla)" ;;
+    agent) echo "  agente: %s, token salvato in %s (leggibile solo da te)" ;;
+    perm_you) echo "  alle richieste di autorizzazione risponde l'account con id %s (chi ha creato il codice); per cambiarlo: in Kalmido, nell'agente, Runtime > Richieste di autorizzazione a (oppure KALMIDO_PERM_USER in %s)" ;;
+    perm_kept) echo "  richieste di autorizzazione: come impostate prima (KALMIDO_PERM_USER / KALMIDO_OWNER_IDS in %s)" ;;
+    perm_none) echo "  richieste di autorizzazione: nessuno impostato, ogni richiesta viene negata; scegli una persona in Kalmido (nell'agente, Runtime > Richieste di autorizzazione a) oppure aggiungi KALMIDO_PERM_USER=<id account> a %s" ;;
+    perm_owner) echo "  alle richieste di autorizzazione risponde la persona a cui appartiene l'agente" ;;
+    claude_new) echo "  CLAUDE.md creato: %s (dal modello; aggiungi le tue regole in alto)" ;;
+    claude_kept) echo "  CLAUDE.md esiste già, lasciato com'è: %s" ;;
+    dry_claude) echo "  (prova) creare CLAUDE.md dal modello se non ce n'è uno: %s" ;;
+    s_starter) echo "Scaricamento dei file di avvio" ;;
+    dry_files) echo "  (prova) i file di %s/starter_files.txt in %s" ;;
+    nobase) echo "Kalmido non ha inviato alcun indirizzo per i file di avvio; usa --from CARTELLA" ;;
+    nohttp) echo "%s è un indirizzo http://: il codice e il token viaggerebbero in rete senza cifratura. Usa l'indirizzo https:// (oppure --allow-http se il tuo Kalmido non ha https)" ;;
+    basehttp) echo "Kalmido ha inviato un indirizzo senza https:// per i file di avvio (%s); usa --from CARTELLA" ;;
+    nolist) echo "nessun starter_files.txt in %s" ;;
+    nolistfetch) echo "impossibile scaricare l'elenco dei file di avvio (%sstarter_files.txt); questa versione potrebbe non essere ancora pubblicata - riprova più tardi o usa --from CARTELLA" ;;
+    skippath) echo "  %s saltato (percorsi non consentiti)" ;;
+    nofetch) echo "impossibile scaricare %s" ;;
+    shabad) echo "%s non corrisponde al checksum inviato da Kalmido - non installato. L'indirizzo di download fornisce un file diverso da quello di questa versione; chiedi al tuo amministratore Kalmido" ;;
+    shanone) echo "  (Kalmido non ha inviato i checksum dei file di avvio: versione precedente, non verificato)" ;;
+    skipfile) echo "  %s non disponibile (saltato)" ;;
+    dry_mcp) echo "  (prova) scrivere %s (server MCP kalmido: %s %s)" ;;
+    s_auto) echo "Avvio a ogni accesso" ;;
+    noauto) echo "  saltato (--no-autostart); avvialo con:" ;;
+    dry_file) echo "  (prova) %s:" ;;
+    launchfail) echo "launchctl non è riuscito a caricare %s" ;;
+    launchok) echo "  LaunchAgent %s (parte all'accesso, riparte dopo un arresto anomalo; registro: %s)" ;;
+    launchbg) echo "  %s non ha effettuato l'accesso allo schermo (ad es. via SSH): l'agente ora gira in background fino al prossimo riavvio; dopo parte non appena accedi al Mac" ;;
+    sysfail) echo "systemctl --user non è riuscito ad avviare %s" ;;
+    sysok) echo "  servizio utente systemd %s (registro: %s)" ;;
+    linger) echo "  gira finché sei connesso; per tenerlo attivo anche dopo la disconnessione: loginctl enable-linger %s" ;;
+    s_done) echo "Fatto" ;;
+    done1) echo "Kalmido mostra il computer in Impostazioni > Agenti entro un minuto (punto verde = connesso)." ;;
+    done2) echo "Per rimuoverlo di nuovo:  curl -fsSL %s/agent-setup.sh | bash -s -- --uninstall --dir %s" ;;
+    *) return 1 ;;
+  esac
+}
+msg_nl() {
+  case "$1" in
+    unknown) echo "agent-setup: onbekende optie %s" ;;
+    undone) echo "agent-setup: ongedaan gemaakt (het token is weer ingetrokken)" ;;
+    wrongos) echo "dit script is voor macOS en Linux; gebruik op Windows agent-setup.ps1 (Kalmido toont die opdracht als je Windows kiest)" ;;
+    s_prereq) echo "Controleren wat er nodig is" ;;
+    py_mac) echo "\n  - Python 3.9 of nieuwer: voer  xcode-select --install  uit (of installeer het via python.org)" ;;
+    py_linux) echo "\n  - Python 3.9 of nieuwer: installeer python3 met je pakketbeheerder" ;;
+    curl) echo "\n  - curl" ;;
+    claude) echo "\n  - Claude Code: voer  curl -fsSL https://claude.ai/install.sh | bash  uit en daarna één keer  claude  om in te loggen" ;;
+    cmd) echo "\n  - de agentopdracht %s" ;;
+    codex) echo "\n  - Codex CLI: voer  npm install -g @openai/codex  uit en daarna één keer  codex login  om in te loggen" ;;
+    notlogged_codex) echo "  let op: Codex CLI lijkt nog niet ingelogd te zijn; voer één keer  codex login  uit" ;;
+    ask_tool) echo "Welk hulpmiddel moet de agent uitvoeren? 1 = Claude Code (standaard), 2 = Codex CLI: " ;;
+    badtool) echo "onbekend hulpmiddel %s (--tool claude of codex)" ;;
+    missing) echo "agent-setup: ontbreekt op deze computer:%b\nInstalleer het en voer dezelfde opdracht opnieuw uit (maak een nieuwe code in Kalmido als er 15 minuten voorbij zijn)." ;;
+    agentcmd) echo "  agentopdracht: %s" ;;
+    notlogged) echo "  let op: Claude Code lijkt nog niet ingelogd te zijn; voer één keer  claude  uit en log in" ;;
+    nodir) echo "--dir MAP ontbreekt (de projectmap waarin de agent werkt)" ;;
+    folder) echo "  projectmap: %s" ;;
+    instance) echo "  instantie: %s" ;;
+    rev_fail) echo "  Kalmido heeft niet geantwoord: verwijder de computer onder Instellingen > Agents als hij nog in de lijst staat" ;;
+    rev_ok) echo "  deze computer is verwijderd in Kalmido (zijn token werkt niet meer)" ;;
+    rev_gone) echo "  de sleutel van deze computer was in Kalmido al ingetrokken (agent verwijderd of computer verwijderd): alleen hier wordt opgeruimd" ;;
+    rev_err) echo "  het token kan niet worden ingetrokken: %s" ;;
+    s_uninstall) echo "De agent van %s van deze computer verwijderen" ;;
+    dry_revoke) echo "  (proefrun) het token van deze computer in Kalmido intrekken" ;;
+    uninstalled) echo "Klaar. De projectmap zelf blijft zoals hij is." ;;
+    nourl) echo "--url ontbreekt (je Kalmido-adres)" ;;
+    nocode) echo "--code ontbreekt (de eenmalige code uit Kalmido)" ;;
+    s_connect) echo "Verbinden met Kalmido" ;;
+    dry_redeem) echo "  (proefrun) de code inruilen voor het token van de agent bij %s/api/agent-setup/redeem (computer %s)" ;;
+    nocreate) echo "%s kan niet worden aangemaakt" ;;
+    refused) echo "Kalmido heeft de code geweigerd (HTTP %s): %s" ;;
+    refused_def) echo "ongeldig, al gebruikt of verlopen" ;;
+    noreach) echo "%s is niet bereikbaar: %s" ;;
+    stopped) echo "installatie gestopt (er is niets geïnstalleerd)" ;;
+    agent) echo "  agent: %s, token opgeslagen in %s (alleen voor jou leesbaar)" ;;
+    perm_you) echo "  toestemmingsvragen worden beantwoord door het account met id %s (wie de code maakte); wijzigen: in Kalmido, bij de agent, Runtime > Toestemmingsvragen naar (of KALMIDO_PERM_USER in %s)" ;;
+    perm_kept) echo "  toestemmingsvragen: zoals eerder ingesteld (KALMIDO_PERM_USER / KALMIDO_OWNER_IDS in %s)" ;;
+    perm_none) echo "  toestemmingsvragen: niemand ingesteld, elke vraag wordt geweigerd; kies een persoon in Kalmido (bij de agent, Runtime > Toestemmingsvragen naar) of voeg KALMIDO_PERM_USER=<account-id> toe aan %s" ;;
+    perm_owner) echo "  toestemmingsvragen worden beantwoord door de eigenaar van de agent" ;;
+    claude_new) echo "  CLAUDE.md aangemaakt: %s (uit de sjabloon; voeg je eigen regels bovenaan toe)" ;;
+    claude_kept) echo "  CLAUDE.md bestaat al, blijft zoals het is: %s" ;;
+    dry_claude) echo "  (proefrun) CLAUDE.md aanmaken uit de sjabloon als er geen is: %s" ;;
+    s_starter) echo "De startbestanden ophalen" ;;
+    dry_files) echo "  (proefrun) de bestanden uit %s/starter_files.txt naar %s" ;;
+    nobase) echo "Kalmido heeft geen adres voor de startbestanden gestuurd; gebruik --from MAP" ;;
+    nohttp) echo "%s is een http://-adres: de code en het token zouden onversleuteld over het netwerk gaan. Gebruik het https://-adres (of --allow-http als je Kalmido geen https heeft)" ;;
+    basehttp) echo "Kalmido heeft een adres zonder https:// voor de startbestanden gestuurd (%s); gebruik --from MAP" ;;
+    nolist) echo "geen starter_files.txt in %s" ;;
+    nolistfetch) echo "de lijst met startbestanden (%sstarter_files.txt) kan niet worden opgehaald; deze versie is misschien nog niet gepubliceerd - probeer het later opnieuw of gebruik --from MAP" ;;
+    skippath) echo "  %s overgeslagen (paden niet toegestaan)" ;;
+    nofetch) echo "%s kan niet worden opgehaald" ;;
+    shabad) echo "%s komt niet overeen met de controlesom die Kalmido stuurde - niet geïnstalleerd. Het downloadadres levert een ander bestand dan deze versie; vraag het aan je Kalmido-beheerder" ;;
+    shanone) echo "  (Kalmido stuurde geen controlesommen van de startbestanden: oudere versie, niet gecontroleerd)" ;;
+    skipfile) echo "  %s niet beschikbaar (overgeslagen)" ;;
+    dry_mcp) echo "  (proefrun) %s schrijven (MCP-server kalmido: %s %s)" ;;
+    s_auto) echo "Bij elke aanmelding starten" ;;
+    noauto) echo "  overgeslagen (--no-autostart); start het met:" ;;
+    dry_file) echo "  (proefrun) %s:" ;;
+    launchfail) echo "launchctl kon %s niet laden" ;;
+    launchok) echo "  LaunchAgent %s (start bij het aanmelden, start opnieuw na een crash; log: %s)" ;;
+    launchbg) echo "  %s is niet aangemeld op het scherm (bijv. via SSH): de agent draait nu op de achtergrond tot de volgende herstart; daarna start hij zodra je op de Mac aanmeldt" ;;
+    sysfail) echo "systemctl --user kon %s niet starten" ;;
+    sysok) echo "  systemd-gebruikersservice %s (log: %s)" ;;
+    linger) echo "  hij draait zolang je bent aangemeld; om hem na het afmelden te laten doorlopen: loginctl enable-linger %s" ;;
+    s_done) echo "Klaar" ;;
+    done1) echo "Kalmido toont de computer binnen een minuut onder Instellingen > Agents (groene stip = verbonden)." ;;
+    done2) echo "Om het weer te verwijderen:  curl -fsSL %s/agent-setup.sh | bash -s -- --uninstall --dir %s" ;;
+    *) return 1 ;;
+  esac
+}
+msg() { case "$LANGC" in de|es|fr|it|nl) "msg_$LANGC" "$1" && return 0 ;; esac; msg_en "$1"; }  # a missing text falls back to English, never empty
 [ -z "${UNKNOWN:-}" ] || { printf "$(msg unknown)\n" "$UNKNOWN" >&2; exit 2; }
 sayf() { local f; f=$(msg "$1"); shift; printf "$f\n" "$@"; }                 # sayf KEY args...
 stepf() { local f; f=$(msg "$1"); shift; printf "\n== $f\n" "$@"; }
