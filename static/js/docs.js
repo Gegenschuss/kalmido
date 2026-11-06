@@ -621,8 +621,11 @@ async function dc_patch(id, body, label) {
   done();
   if (DC.doc?.id === id) { DC.doc = pend.reduce(dc_localDoc, d); dc_mdDraw($('.dc-md')); }
   if (before) {
-    const put = v => async () => { const x = await api('PATCH', `/api/docs/${id}`, v); if (DC.doc?.id === id) { DC.doc = x; dc_mdDraw($('.dc-md')); } dc_load(); return {}; };
-    histToast(label, histAdd({label, undo: put(before), redo: put(body)}));
+    // 2.570.0 (#4770): only the changed keys, against the version the step before left (edited_at: a recognition run in the
+    // background is no change; core.js undoStep): changed in another session since -> said, their change stays
+    let ver = d?.edited_at || '';
+    const put = (v, from) => () => undoStep(`/api/docs/${id}`, v, ver, {now: from, label, then: x => { ver = x?.edited_at || ver; if (x?.id && DC.doc?.id === id) { DC.doc = x; dc_mdDraw($('.dc-md')); } }}).finally(dc_load);
+    histToast(label, histAdd({label, undo: put(before, body), redo: put(body, before)}));
   }
   dc_load();
 }
