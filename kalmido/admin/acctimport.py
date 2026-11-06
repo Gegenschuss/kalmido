@@ -39,6 +39,7 @@ from ..core.config import USERNAME_RE  # 2.278.0 B (#3094)
 from ..accounts.orgs import visible_people as umz_visible  # 2.278.0 B (#3094)
 from ..core.serializers import unlink_files  # 2.464.0 (#3865)
 from ..api.common import hit_limit  # 2.585.0 (#4350, review 2)
+from ..core.pg import write_lock  # review 2.611 (#4866)
 from ..files.upsafe import up_after_store, up_check, UploadRefused  # 2.464.0 (#3865): pulled up from functions
 from ..lists.projects import LIST_FILES_SUB
 from ..lists.tplextra import tx_import, tx_keys
@@ -2707,6 +2708,7 @@ def umz_undo_preview(c, uid, iid):
     from .orgimport import oi_undo_check
     oi_undo_check(c, uid, json.loads(r["created"] or "{}"), r["created_at"])
     # 2.611.0 (#4866): the undo itself in a savepoint, rolled back: its numbers are the preview's (no second way of counting)
+    write_lock(c, f"imp-undo:{int(iid)}")  # review 2.611: the probe and the real undo (importers.imp_undo) never run side by side
     got = []
     real = c.__dict__.get("commit"), c.__dict__.get("rollback")
 
