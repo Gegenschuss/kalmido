@@ -845,7 +845,8 @@ Who may see what is decided in one module, `kalmido/core/access.py`:
   ids and roles only, gone after two days); `org_member_add` within 24 hours puts back the memberships of other people's projects
   with their role, then the assignments and coming along (`olv_rejoin`, `accounts/orgleave.py`). A project in the trash or no
   longer in the organisation stays away, the person's own projects stay with the heir, a project with the lock takes them onto
-  its waiting list (no key comes along).
+  its waiting list (no key comes along). 2.579.0 (#4293): back as a guest or for the accounting only, nothing comes back (that
+  person sees only what is shared with them from then on).
 - **Invitations (2.87.0).** Leaving an organisation also ends the invitations to the events of its calendars (the person's
   and their agents'). An invitation counts only while the person may see the calendar's workspace (`ev_att_ok()`: event
   view, range, reply, CalDAV invitations, reminders); an organisation's event invites only its people, and a calendar moves

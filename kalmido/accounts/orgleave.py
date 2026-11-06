@@ -161,13 +161,17 @@ def olv_memo(c, oid, uid, snap):
                        json.dumps({"assign": assign, "people": people, "lists": lists}, separators=(",", ":"))))
 
 
-def olv_rejoin(c, oid, uid):
+def olv_rejoin(c, oid, uid, role="member"):
     """2.363.3 (#3133): uid just joined oid (org_member_add): within OLV_BACK_H hours of leaving, the assignments and "coming
     along" that ended come back, for tasks that still exist in the organisation and that uid may see now (an assignment only
     where uid may be assigned: check_assignee's rule; a task somebody else took over stays theirs). 2.463.0 (#3859): the
-    project memberships first (member_rejoin). -> how many came back."""
+    project memberships first (member_rejoin). 2.579.0 (#4293): back as a guest / accounting (role) = nothing comes back: such a
+    person sees only what is shared with them from now on (like the folder shares and channels of #4698 a); the memo stays.
+    -> how many came back."""
     from ..lists.lists import member_rejoin
     n = 0
+    if role in ("guest", "accounting"):
+        return 0
     with system_ctx(c):  # the person may not be the one making the request (an admin adds them); only their own rows change
         m = c.execute("SELECT id, at, detail FROM space_moves WHERE kind='orgleave' AND obj_id=? AND from_org=? ORDER BY id DESC LIMIT 1",
                       (uid, oid)).fetchone()

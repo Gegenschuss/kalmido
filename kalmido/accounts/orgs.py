@@ -184,7 +184,7 @@ def org_member_add(c, oid, uid, role="member", keep_office=True):
         _office_keep_on_join(c, uid)
     if n == 1:  # 2.363.3 (#3133): back within a day: their assignments and "coming along" return (every way of joining comes here)
         from .orgleave import olv_rejoin
-        olv_rejoin(c, oid, uid)
+        olv_rejoin(c, oid, uid, role)
 
 
 def _office_keep_on_join(c, uid):
