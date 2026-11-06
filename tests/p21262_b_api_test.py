@@ -219,7 +219,10 @@ check(r.ok and len(it) == 1 and it[0]["data"].get("path") == "Offer", "#2355: a 
 share(A, page_id=mp2, kind="person", email="frida@example.com")
 it = news(Fr)
 check(len(it) == 1 and it[0]["data"].get("path") == "Other/Page", "#2355: a freelancer receives the item " + str(it)[:200])
-check("Other/Page" in [p["path"] for p in Fr.get(B + "/api/wiki/shared").json().get("pages", [])], "#2355: the item's target (Shared with me) lists the page")
+# 2.565.0 (#4717): a person share is a core share on the page's node, so "Shared with me" shows the path from the shared node
+# down like every share of the knowledge trees (wkf_shown_path, #2747 B3: the page shared alone = its name, not the folders above)
+sh = [(p["id"], p["path"]) for p in Fr.get(B + "/api/wiki/shared").json().get("pages", [])]
+check((mp2, "Page") in sh, "#2355: the item's target (Shared with me) lists the page " + str(sh)[:200])
 
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
