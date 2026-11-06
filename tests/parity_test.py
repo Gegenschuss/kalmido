@@ -408,10 +408,10 @@ APP_ONLY = [
     ("2.122.0 A (#2097): file requests stay with people -- a person asks a client for files with a public link of a folder; the "
      "client uploads without an account; an agent sees the arriving files like any other file of a folder shared with it",
      ("=GET /api/files/nodes/{}/requests", "=POST /api/files/nodes/{}/requests", "* /api/files/requests/")),
-    ("2.112.1 (#2058): the file store's bulk trash / restore, the ZIP download and the phone scan are steps of people in the app "
+    ("2.112.1 (#2058): the file store's bulk trash / restore (2.589.0 #4875: + emptying the trash, for good - only an owner, agents never), the ZIP download and the phone scan are steps of people in the app "
      "(agents read and write files one by one); external share links publish data to people without an account and stay with "
      "people on purpose -- agents never make, list or revoke them",
-     ("=POST /api/files/trash", "=POST /api/files/restore", "=GET /api/files/zip", "=POST /api/files/scan",
+     ("=POST /api/files/trash", "=POST /api/files/restore", "=POST /api/files/trash/purge", "=GET /api/files/zip", "=POST /api/files/scan",
       "=GET /api/files/nodes/{}/ext-links", "=POST /api/files/nodes/{}/ext-links", "* /api/files/ext-links/",
       "=GET /api/share-defaults")),  # 2.470.0 (#3596): the workspace's start values of these links, for people (agents get 403)
     ("2.477.0 (#3936): the small preview of a picture is the cards' image in the browser; agents read the file itself (/files/{}/content)",
