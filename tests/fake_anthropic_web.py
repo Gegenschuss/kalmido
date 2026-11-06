@@ -5,7 +5,7 @@
 #                       last, roles, n}; answers by markers in the first user message:
 #     FAKEWEB_INJECT <task> <person> <asker>  step 1: a web search + a fetched page whose text tries to give orders, then (as
 #                       if the model obeyed) add_comment on <task> and send_chat to <person>; step 2: request_chat_approval
-#                       to <asker>; step 3: a final text with a cited web source and the earlier tool results
+#                       to <asker>; step 3: a text with a cited web source + send_chat to <asker> with the earlier tool results
 #     FAKEWEB_PAUSE     step 1: pause_turn after a web search; step 2 (the answer sent back): "FAKEWEB resumed"
 #     FAKEVIES <vat> END  step 1: check_vat_id <vat>; step 2: "FAKEVIES result: " + the tool result
 #     otherwise         "FAKEWEB answer"
@@ -110,10 +110,13 @@ class H(BaseHTTPRequestHandler):
             if k == 3:
                 return answer('tool_use', [{'type': 'tool_use', 'id': 'toolu_c3', 'name': 'request_chat_approval', 'input': {
                     'user_id': asker, 'title': 'Comment on the task', 'what': 'post the comment', 'body': 'May I post the comment?'}}])
-            return answer('end_turn', [
-                {'type': 'text', 'text': 'Pelican GmbH sells pelicans ', 'citations': [
-                    {'type': 'web_search_result_location', 'url': CITED, 'title': 'Cited', 'cited_text': 'pelicans', 'encrypted_index': 'e'}]},
-                {'type': 'text', 'text': 'FAKEWEB done: ' + text_of(msgs[2]['content'])[:1500]}])
+            if k == 5:  # the card went to the asker, so the final text would not be posted: the answer through send_chat
+                return answer('tool_use', [
+                    {'type': 'text', 'text': 'Pelican GmbH sells pelicans ', 'citations': [
+                        {'type': 'web_search_result_location', 'url': CITED, 'title': 'Cited', 'cited_text': 'pelicans', 'encrypted_index': 'e'}]},
+                    {'type': 'tool_use', 'id': 'toolu_c4', 'name': 'send_chat', 'input': {
+                        'user_id': asker, 'body': 'FAKEWEB done: ' + text_of(msgs[2]['content'])[:1500]}}])
+            return answer('end_turn', [{'type': 'text', 'text': 'ok'}])
         if 'FAKEWEB_PAUSE' in first:
             if k == 1:
                 return answer('pause_turn', [{'type': 'server_tool_use', 'id': 'srvtoolu_p1', 'name': 'web_search', 'input': {'query': 'x'}}],
