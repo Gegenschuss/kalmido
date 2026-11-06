@@ -301,7 +301,7 @@ check(ct2 == row[2] and dbx("SELECT COUNT(*) FROM contacts WHERE emails LIKE ?",
 r = pub.get(f"{B}/s/b/x/{CX1}")
 check(r.status_code == 200 and "Cancel the appointment" in r.text, "the cancel page")
 r = pub.post(f"{B}/s/b/x/{CX1}", data={"f": fkey(r.text), "reason": "Krank"})
-check(r.status_code == 200 and "Appointment cancelled" in r.text, "cancelled by the customer")
+check(r.status_code == 200 and "Appointment cancelled" in r.text, "cancelled by the customer " + str(r.status_code) + " " + re.sub(r"<[^>]+>|\s+", " ", r.text)[:300])
 row = dbx("SELECT status, cancelled_by, cancel_reason, event_id FROM appt_bookings WHERE id=?", (B1,))[0]
 check(tuple(row[:3]) == ("cancelled", "guest", "Krank") and dbx("SELECT deleted_at FROM events WHERE id=?", (row[3],))[0][0], "status + the event deleted " + str(row))
 check(f"{K}T1000" in slots(pub.get(f"{B}/s/b/alice-termine/{T1}?w={MON}").text, "alice-termine", T1), "the time is free again")
