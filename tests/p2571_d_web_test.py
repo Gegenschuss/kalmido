@@ -18,6 +18,7 @@ import json
 import os
 import shutil
 import subprocess
+from datetime import datetime, timedelta, timezone
 
 from kt import B, CT, DATA, check, dbx, done, docker_logs_on_first_fail, fresh, until
 from freelancer_fixture import freelancer
@@ -193,6 +194,37 @@ for bad in ("XX12345678", "DE12;DROP", "US123456789"):
 check(len(plog("vies.log")) == v1, "a broken number never went out")
 run = run_done(rid)
 check(run and run[1] == "done", f"the VIES run ended {run}")
+
+# ---------------------------------------------------------------- review F1: a long step, the run taken for lost
+# 2.571.0 (#4676): the beat comes after every tool result too; a run the watchdog took for lost ends itself (no step without
+# the web gate), and the gate holds a moment after it (srvweb_state)
+try:
+    os.remove(os.path.join(DATA, "slow-go"))
+except OSError:
+    pass
+n0 = len(plog())
+after, rid = chat(f"FAKEWEB_SLOW {T1}")
+step2 = until(lambda: [x for x in plog()[n0:] if x["path"] == "/v1/messages" and "FAKEWEB_SLOW" in x["first"] and x["n"] == 3], 40)
+check(step2, "the slow run is in its second model call")
+run = last_run()
+beat = dbx("SELECT beat_at FROM agent_runs WHERE id=?", (run[0],))[0][0] if run else ""
+at2 = datetime.fromisoformat(step2[0]["at"]) if step2 else None
+check(run and run[0] > rid and beat and at2 and datetime.fromisoformat(beat) >= at2.replace(microsecond=0) - timedelta(seconds=1),
+      f"the beat came after the slow tool (VIES time limit), not only after the model call {beat} {step2 and step2[0]['at']}")
+dbx("UPDATE agent_runs SET state='failed', ended=?, error='The server agent was interrupted' WHERE id=?",  # as the watchdog in _claim
+    (datetime.now(timezone.utc).isoformat(timespec="seconds"), run[0]))
+open(os.path.join(DATA, "slow-go"), "w").close()
+m = agent_says(after, "")
+check(m and "could not finish" in m["body"] and "slow ok" not in m["body"], f"the lost run ended itself {(m or {}).get('body', '')[:200]}")
+check(not dbx("SELECT 1 FROM comments WHERE task_id=? AND user_id=? AND body LIKE 'INJECTED slow%'", (T1, AID)),
+      "no comment after the run was taken for lost (the web gate never fell)")
+check(dbx("SELECT state FROM agent_runs WHERE id=?", (run[0],)) == [("failed",)], "the lost run stays failed")
+check(Fr.put(SRV, json={"flow_web": {"other": False}}).ok, "web off for the next run")
+after, rid = chat(f"After the lost run FAKEWEB_INJECT {T1} {GID} {FID}")
+check(agent_says(after, "FAKEWEB done"), "the run right after the lost one answered")
+check(not dbx("SELECT 1 FROM comments WHERE task_id=? AND user_id=? AND body LIKE 'INJECTED%'", (T1, AID)),
+      "the gate of the lost web run holds a moment after it (its process may still be in a step)")
+dbx("UPDATE agent_runs SET ended=? WHERE id=?", ((datetime.now(timezone.utc) - timedelta(hours=1)).isoformat(timespec="seconds"), run[0]))
 
 # ---------------------------------------------------------------- a team agent: a message to another person of its project by card
 # (a personal agent may only write to its owner anyway; a team agent reaches the people of its projects)

@@ -57,6 +57,7 @@ SRV_MAX_TOKENS = env_int("KALMIDO_SRVAGENT_MAX_TOKENS", 4096, lo=256, hi=64000) 
 SRV_CALL_S = env_int("KALMIDO_SRVAGENT_CALL_S", 120, lo=5, hi=600)     # s of one model call at most
 SRV_BUSY_S = 5             # s a run waits for a free place before it tries again
 SRV_LOST_S = SRV_CALL_S + 120  # a run without a beat for this long was lost (its process is gone)
+SRV_LOST_TEXT = N_("The server agent was interrupted")  # agent_runs.error of a lost run (srvweb.srvweb_state reads it)
 SRV_EVENTS = 20            # events one run reads at most (the rest: the next run)
 SRV_RESULT_MAX = 40000     # characters of one tool result for the model
 SRV_RUNS_KEEP = 200        # runs kept per agent
@@ -172,7 +173,7 @@ def _claim(c, aid, probe=False):
         c.execute("SELECT pg_advisory_xact_lock(hashtext(?))", ("srvagent:places",)).fetchone()
         now = now_utc()
         c.execute("UPDATE agent_runs SET state='failed', ended=?, error=? WHERE state='run' AND (beat_at IS NULL OR beat_at<?)",
-                  (iso(now), N_("The server agent was interrupted"), iso(now - timedelta(seconds=SRV_LOST_S))))
+                  (iso(now), SRV_LOST_TEXT, iso(now - timedelta(seconds=SRV_LOST_S))))
         a, row = agent_row(c, aid), srv_row(c, aid)
         if not a or not row or (a["provider"] or "") != SRV_PROVIDER or not agent_active(a) or srv_off(c) or not row["key_sealed"]:
             c.commit()
@@ -240,7 +241,22 @@ def _end(rid, state, text=""):
 
 
 def _aborted(rid):
-    return bool(_db(lambda c: c.execute("SELECT abort_at FROM agent_runs WHERE id=?", (rid,)).fetchone()[0]))
+    """"abort" = a person stopped the run, "lost" = the watchdog in _claim took it for lost (2.571.0 review F1: it ends itself
+    then, never goes on without its row - the web gate reads that row), "" = go on."""
+    r = _db(lambda c: c.execute("SELECT abort_at, state FROM agent_runs WHERE id=?", (rid,)).fetchone())
+    if r is None or r[1] != "run":
+        return "lost"
+    return "abort" if r[0] else ""
+
+
+def _beat(rid, wst=None):
+    """2.571.0 review F1: the beat after every tool result too (a step = a model call + all its tools), the web state with it."""
+    def f(c):
+        if wst is None:
+            c.execute("UPDATE agent_runs SET beat_at=? WHERE id=? AND state='run'", (iso(now_utc()), rid))
+        else:
+            c.execute("UPDATE agent_runs SET beat_at=?, web=? WHERE id=? AND state='run'", (iso(now_utc()), json.dumps(wst), rid))
+    _db(f)
 
 
 def _run(aid, rid):
@@ -429,8 +445,9 @@ def _call(prov, rid, deadline, *a):
     th.start()
     while th.is_alive():
         th.join(1.0)
-        if th.is_alive() and _aborted(rid):
-            raise _Stop("aborted")
+        why = _aborted(rid) if th.is_alive() else ""
+        if why:
+            raise _Stop(*_stopped(why, None)[:2])
         if th.is_alive() and time.time() > deadline + 5:
             raise _Stop("failed", N_("The time limit of the run is reached"))
     if "e" in box:
@@ -443,8 +460,9 @@ def _loop(aid, rid, api, mod, prov, model, system, tools, allowed, messages, dea
     a run with web access (2.571.0 D: counted and saved after every step; check_vat_id answered here)."""
     sent = set()
     for _ in range(SRV_STEPS):
-        if _aborted(rid):
-            return "aborted", "", sent
+        why = _aborted(rid)
+        if why:
+            return _stopped(why, sent)
         if time.time() >= deadline:
             return "failed", N_("The time limit of the run is reached"), sent
         if _db(srv_off):
@@ -475,19 +493,26 @@ def _loop(aid, rid, api, mod, prov, model, system, tools, allowed, messages, dea
         messages.append({"role": "assistant", "content": r["content"]})
         results = []
         for b in uses:
-            if _aborted(rid):
-                return "aborted", "", sent
+            why = _aborted(rid)
+            if why:
+                return _stopped(why, sent)
             if wst is not None and b.get("name") == SRV_VIES_TOOL:
                 results.append(srv_vies_result(b, wst))
                 webin = True
-                continue
-            results.append(_tool(api, mod, allowed, b, sent))
-        if wst is not None:
-            _db(lambda c: c.execute("UPDATE agent_runs SET web=? WHERE id=?", (json.dumps(wst), rid)))
+            else:
+                results.append(_tool(api, mod, allowed, b, sent))
+            _beat(rid, wst)  # review F1: a long step never looks lost (its web state saved with it)
         if webin:  # web content came in: the reminder after the results (results first, as the provider wants)
             results.append({"type": "text", "text": SRV_WEB_REMIND})
         messages.append({"role": "user", "content": results})
     return "failed", N_("The step limit of the run is reached"), sent
+
+
+def _stopped(why, sent):
+    """The end of _loop for _aborted: stopped by a person, or taken for lost (failed, as the watchdog wrote it)."""
+    if why == "lost":
+        return "failed", SRV_LOST_TEXT, sent
+    return "aborted", "", sent
 
 
 def _usage(api, aid, rid, model, u, flow=""):

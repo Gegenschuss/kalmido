@@ -30,7 +30,10 @@ import urllib.error
 import urllib.request
 from urllib.parse import urlparse
 
+from datetime import timedelta
+
 from ..core.config import PUBLIC_URL
+from ..core.db import iso, now_utc
 from ..core.pg import system_ctx
 from ..core.i18n import tr
 from ..core.env import env_int
@@ -287,9 +290,13 @@ def srv_web_sources(st):
 
 
 def srvweb_state(c, aid):
-    """The web state of agent aid's running run, None when no web run is on."""
+    """The web state of agent aid's running run, None when no web run is on. Review F1: a web run the watchdog took for lost
+    (srvagent_run._claim) holds the gate SRV_CALL_S more - its process may still be in a step and ends itself at the next check."""
+    from .srvagent_run import SRV_CALL_S, SRV_LOST_TEXT
+    since = iso(now_utc() - timedelta(seconds=SRV_CALL_S))
     with system_ctx(c):  # the agent's own run row (asked for its own requests only)
-        r = c.execute("SELECT web FROM agent_runs WHERE agent_id=? AND state='run' AND web<>'' ORDER BY id DESC LIMIT 1", (aid,)).fetchone()
+        r = c.execute("""SELECT web FROM agent_runs WHERE agent_id=? AND web<>'' AND (state='run' OR (state='failed' AND error=?
+                         AND ended>?)) ORDER BY id DESC LIMIT 1""", (aid, SRV_LOST_TEXT, since)).fetchone()
     if not r:
         return None
     try:

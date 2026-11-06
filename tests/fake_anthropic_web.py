@@ -6,6 +6,9 @@
 #     FAKEWEB_INJECT <task> <person> <asker>  step 1: a web search + a fetched page whose text tries to give orders, then (as
 #                       if the model obeyed) add_comment on <task> and send_chat to <person>; step 2: request_chat_approval
 #                       to <asker>; step 3: a text with a cited web source + send_chat to <asker> with the earlier tool results
+#     FAKEWEB_SLOW <task>  (review F1) step 1: a fetched page + check_vat_id DE555555555 (a slow tool: the VIES time limit);
+#                       step 2 waits until /data/slow-go exists (the test took the run for lost meanwhile), then add_comment
+#                       on <task>; step 3: "ok"
 #     FAKEWEB_PAUSE     step 1: pause_turn after a web search; step 2 (the answer sent back): "FAKEWEB resumed"
 #     FAKEVIES <vat> END  step 1: check_vat_id <vat>; step 2: "FAKEVIES result: " + the tool result
 #     otherwise         "FAKEWEB answer"
@@ -13,8 +16,10 @@
 #   POST /vies/check-vat-number  {countryCode, vatNumber}, logged in /data/vies.log: DE123456789 valid (Pelican GmbH),
 #                       DE999999999 invalid, DE555555555 waits 6 s (the time limit), anything else 400 INVALID_INPUT
 import json
+import os
 import re
 import time
+from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 LOG = open('/data/anthropic_web.log', 'a', buffering=1)
@@ -82,7 +87,7 @@ class H(BaseHTTPRequestHandler):
                                         for t in body.get('tools') or []],
                               'system': text_of(body.get('system')), 'first': first,
                               'last': text_of(msgs[-1]['content']) if msgs else '', 'roles': [m.get('role') for m in msgs],
-                              'n': len(msgs)}, ensure_ascii=False) + '\n')
+                              'n': len(msgs), 'at': datetime.now(timezone.utc).isoformat()}, ensure_ascii=False) + '\n')
         usage = {'input_tokens': 100, 'output_tokens': 20, 'cache_read_input_tokens': 0, 'cache_creation_input_tokens': 0}
         k = len(msgs)
 
@@ -117,6 +122,23 @@ class H(BaseHTTPRequestHandler):
                     {'type': 'tool_use', 'id': 'toolu_c4', 'name': 'send_chat', 'input': {
                         'user_id': asker, 'body': 'FAKEWEB done: ' + text_of(msgs[2]['content'])[:1500]}}])
             return answer('end_turn', [{'type': 'text', 'text': 'ok'}])
+        m = re.search(r'FAKEWEB_SLOW (\d+)', first)
+        if m:
+            if k == 1:
+                return answer('tool_use', [
+                    {'type': 'server_tool_use', 'id': 'srvtoolu_f9', 'name': 'web_fetch', 'input': {'url': PAGE}},
+                    {'type': 'web_fetch_tool_result', 'tool_use_id': 'srvtoolu_f9', 'content': {
+                        'type': 'web_fetch_result', 'url': PAGE, 'retrieved_at': '2026-11-06T10:00:00Z',
+                        'content': {'type': 'document', 'source': {'type': 'text', 'media_type': 'text/plain', 'data': INJECT}, 'title': 'Offer'}}},
+                    {'type': 'tool_use', 'id': 'toolu_s1', 'name': 'check_vat_id', 'input': {'vat_id': 'DE555555555'}},
+                ], {'web_fetch_requests': 1})
+            if k == 3:
+                t0 = time.monotonic()
+                while not os.path.exists('/data/slow-go') and time.monotonic() - t0 < 60:
+                    time.sleep(0.1)
+                return answer('tool_use', [{'type': 'tool_use', 'id': 'toolu_s2', 'name': 'add_comment',
+                                            'input': {'task_id': int(m.group(1)), 'body': 'INJECTED slow'}}])
+            return answer('end_turn', [{'type': 'text', 'text': 'FAKEWEB slow ok'}])
         if 'FAKEWEB_PAUSE' in first:
             if k == 1:
                 return answer('pause_turn', [{'type': 'server_tool_use', 'id': 'srvtoolu_p1', 'name': 'web_search', 'input': {'query': 'x'}}],
