@@ -586,10 +586,20 @@ def need_prop(c, jid, lock=False, team=False):
     return j
 
 
+def prop_view_input(j, uid):
+    """2.611.0 D (#4784): the input as person uid may see it. Another person with write rights (a team proposal, need_prop
+    team=True) gets for extract only what the card needs (the list with its sections, its members): never the free text nor
+    the image references of the one who asked."""
+    inp = json.loads(j["input"] or "{}")
+    if j["kind"] == "extract" and j["user_id"] != uid:
+        inp = {k: inp[k] for k in ("list", "members") if k in inp}
+    return inp
+
+
 def prop_view(c, j):
     rec = json.loads(j["applied"] or "null")
     out = {"job": job_dict(c, j), "kind": j["kind"], "state": j["prop_state"] or "requested",
-            "input": json.loads(j["input"] or "{}"), "proposal": json.loads(j["proposal"] or "null"),
+            "input": prop_view_input(j, me()), "proposal": json.loads(j["proposal"] or "null"),
             "agent": {"id": j["agent_id"], "name": user_names(c, [j["agent_id"]]).get(j["agent_id"], "")},
             "applied": {"undone": bool(rec.get("undone")), "list_id": rec.get("list"), "at": rec.get("at")} if rec else None,
             "limits": PROP_LIMITS}
@@ -803,6 +813,8 @@ def prop_run(c, j, sel, ed, extra):
         tid = j["task_id"]
         if not tid:
             raise Denied(404)
+        # 2.611.0 D (#4784): need_task (write=True) = write rights in the task's list NOW (moved since the request: 403), for
+        # the one who asked, too - kept on purpose, tests/p2611_d_props_test.py
         need_task(c, tid)
         t = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
         if t["deleted_at"]:
@@ -826,7 +838,7 @@ def prop_run(c, j, sel, ed, extra):
         return rec
     if kind == "extract":
         lid = j["list_id"]
-        need_list(c, lid)
+        need_list(c, lid)  # 2.611.0 D (#4784): write=True - a reader of the list (now) never writes into it (403)
         n = len(prop["tasks"])
         base = c.execute("SELECT COALESCE(MIN(sort),0) FROM tasks WHERE list_id=? AND parent_id IS NULL", (lid,)).fetchone()[0] - n - 1
         people = list_people(c, lid)

@@ -425,6 +425,9 @@ coding agents, building files, own tools.
   `GET /api/lists/<id>/agent-proposals` -> `{proposals: [{id, kind, title, state, agent, by, updated_at}]}`) and applies
   them; only who asked discards; undo / redo: who asked or who applied. Read-only members, other organisations and people
   outside the project get 404. Proposals of a personal server agent stay with its owner, also in a shared project.
+  Since 2.611.0 (#4784): of an `extract` the others see only the proposed tasks (`input` keeps just `list` and `members`,
+  never the notes or images of who asked). Applying `subtasks` / `extract` needs write rights in the task's or
+  project's list as it is NOW (moved to a project where you only read: `403`, also for who asked).
 
 Paths used below:
 

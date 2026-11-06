@@ -26,7 +26,7 @@ from ..core.config import app, USERNAME_RE
 from ..core.pg import system_ctx, write_lock
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, create_user, db, ensure_inbox, err, iso, now_utc, uset, usettings
-from ..core.access import Denied, list_role, WRITE_ROLES
+from ..core.access import Denied, list_role, list_roles, WRITE_ROLES
 from ..core.errors import BadInput
 from ..accounts.session import me
 from ..accounts.orgs import is_org_admin
@@ -44,7 +44,9 @@ SRV_PROV = SRV_PROVIDER
 SRV_TEAM_MAX = 5             # team server agents of one organisation that its admins create themselves
 # the events in which a person gives the agent an order: their right is checked again before a run (team agents)
 SRV_ORDER_EVENTS = AGENT_GATED + ("chat", "chat_choice")
-# the proposal kinds that belong to one project (their input comes from it): seen by its members with write rights
+# the proposal kinds that belong to one project (their input comes from it): seen by its members with write rights.
+# 2.611.0 D (#4784): applying needs write rights in the CURRENT list of the target (proposals.py prop_run: need_task / need_list write=True);
+# and of an extract the others see only the proposed tasks, never the free text / images of the one who asked (prop_view_input)
 SRV_TEAM_PROP_KINDS = ("subtasks", "extract", "cleanup")
 # SQL for srvagent_run._pending (on agent_events): an event a person other than the owner of a personal agent made
 SRV_FOREIGN_SQL = """EXISTS(SELECT 1 FROM agents x WHERE x.user_id=agent_events.agent_id AND x.owner_id IS NOT NULL
@@ -302,17 +304,30 @@ def srv_team_create(oid):
 def srv_prop_team_ok(c, j, uid):
     """May person uid (not the one who asked) see proposal job j? Only a proposal of a TEAM server agent that belongs to one project
     (SRV_TEAM_PROP_KINDS with its list_id, not a basket) and only with write rights in that project (list_role)."""
-    if not j or not j["kind"] or j["kind"] not in SRV_TEAM_PROP_KINDS or not j["list_id"] or not uid:
-        return False
-    with system_ctx(c):  # whose agent it is: the proposal's own agent row
-        a = agent_row(c, j["agent_id"])
+    return bool(j) and j["id"] in srv_prop_team_ids(c, [j], uid)
+
+
+def srv_prop_team_ids(c, jobs, uid):
+    """2.611.0 D (#4784): srv_prop_team_ok for many jobs at once -> the set of the ids uid may see as a team proposal. Only the
+    team kinds are looked at; their agent rows, lists and uid's roles are read once for all (not per job: Waiting for me scans
+    up to 500 jobs). The same rule as before, one place."""
+    cand = [j for j in jobs if j and j["kind"] in SRV_TEAM_PROP_KINDS and j["list_id"]]
+    if not cand or not uid:
+        return set()
+    aids = sorted({int(j["agent_id"]) for j in cand})
+    with system_ctx(c):  # whose agent it is: the proposals' own agent rows
+        team = {r[0] for r in c.execute(f"""SELECT a.user_id FROM agents a JOIN users u ON u.id=a.user_id
+                                            WHERE a.user_id IN ({','.join('?' * len(aids))}) AND u.kind='agent'
+                                            AND COALESCE(a.provider, '')=? AND a.owner_id IS NULL""", (*aids, SRV_PROV))}
         u = c.execute("SELECT kind FROM users WHERE id=?", (uid,)).fetchone()
-    if not a or (a["provider"] or "") != SRV_PROV or not u or u["kind"] == "agent":
-        return False
-    if a["owner_id"]:  # review: a personal server agent works for its owner alone - its proposals stay with the one who asked
-        return False
-    lst = c.execute("SELECT is_inbox FROM lists WHERE id=?", (j["list_id"],)).fetchone()
-    return bool(lst) and not lst["is_inbox"] and list_role(c, j["list_id"], uid) in WRITE_ROLES
+    # review: a personal server agent (owner_id) works for its owner alone - its proposals stay with the one who asked
+    cand = [j for j in cand if j["agent_id"] in team]
+    if not cand or not u or u["kind"] == "agent":
+        return set()
+    lids = sorted({int(j["list_id"]) for j in cand})
+    proj = {r[0] for r in c.execute(f"SELECT id FROM lists WHERE id IN ({','.join('?' * len(lids))}) AND is_inbox=0", lids)}
+    roles = list_roles(c, uid, sorted(proj))
+    return {j["id"] for j in cand if j["list_id"] in proj and roles.get(j["list_id"]) in WRITE_ROLES}
 
 
 @app.get("/api/lists/<int:lid>/agent-proposals")
@@ -326,7 +341,8 @@ def srv_team_props(lid):
     rows = c.execute(f"""SELECT * FROM agent_jobs WHERE list_id=? AND kind IN ({','.join('?' * len(SRV_TEAM_PROP_KINDS))})
                          AND prop_state='ready' AND state='waiting' ORDER BY updated_at DESC, id DESC LIMIT 100""",
                      (lid, *SRV_TEAM_PROP_KINDS)).fetchall()
-    rows = [j for j in rows if j["user_id"] == me() or srv_prop_team_ok(c, j, me())]
+    team = srv_prop_team_ids(c, [j for j in rows if j["user_id"] != me()], me())  # 2.611.0 D (#4784): one look for all rows
+    rows = [j for j in rows if j["user_id"] == me() or j["id"] in team]
     names = user_names(c, [j["agent_id"] for j in rows] + [j["user_id"] for j in rows if j["user_id"]])
     return jsonify(proposals=[{"id": j["id"], "kind": j["kind"], "title": j["title"], "state": j["prop_state"],
                                "agent": {"id": j["agent_id"], "name": names.get(j["agent_id"], "")},
