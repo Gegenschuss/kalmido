@@ -5,6 +5,8 @@ regression check. Own container (hosted, a server key: sealed files and a suppor
  - F1 an organisation's task template goes into a private project / the inbox only through its admin (logged), a member gets
    403; its project template makes the project in the organisation only: a read-only member 403 (was: privately), a support
    session without the organisation's own support access 403 support_session
+ - F4 an organisation's templates stay when their maker's account goes (the heir owns them, their files still open);
+   they no longer count for their maker's limit
 usage: p2609_c_review_api_test.py <datadir>"""
 import os
 import sys
@@ -141,5 +143,26 @@ r = Y.post(B + f"/api/templates/{CT}/apply", json={"name": "Support's studio"})
 check(r.status_code == 403 and r.json().get("code") == "support_session",
       f"F1: a support session makes no project in an organisation without its own support access {r.status_code} {r.text[:120]}")
 check(dbx("SELECT COUNT(*) FROM lists WHERE org_id=?", (CO,))[0][0] == n0, "F1: nothing was made there")
+
+# ================================================================== F4 the maker's account goes
+TF0 = task(Do, L1, "Escalation")
+attach(Do, TF0, "spec.txt", b"the spec\n")
+TF = tpl(Do, task_id=TF0, name="Escalation", space=f"org:{ORG}")
+r = A.delete(B + f"/api/users/{uid['dora']}")
+check(r.ok, f"F4: dora's account deleted {r.status_code} {r.text[:160]}")
+check(dbx("SELECT user_id, org_id FROM templates WHERE id=?", (TF,)) == [(ALICE, ORG)], "F4: the organisation's template stays, with the heir")
+check(any(x["id"] == TF for x in Bo.get(B + "/api/templates").json()["templates"]), "F4: the members still see it")
+r = Bo.post(B + f"/api/templates/{TF}/apply", json={"list_id": L1})
+nt = r.json().get("task", {}).get("id") if r.ok else None
+f = files_of(nt) if nt else []
+check(f and Bo.get(B + f"/api/attachments/{f[0][0]}").content == b"the spec\n", f"F4: its file opens after the key went {r.text[:120]} {f}")
+# the limit: the organisation's templates no longer count for the person who made them
+dbw("INSERT INTO templates(user_id,kind,name,data,created_at,updated_at,org_id) SELECT ?, 'task', 'bulk ' || g, '{\"task\":{\"title\":\"x\"}}', "
+    "'2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z', ? FROM generate_series(1, 200) g", (ALICE, ORG))
+r = A.post(B + "/api/templates", json={"kind": "task", "data": {"task": {"title": "Mine"}}, "name": "Still mine"})
+check(r.ok, f"F4: 200 organisation templates do not block her own {r.status_code} {r.text[:120]}")
+r = A.post(B + "/api/templates", json={"kind": "task", "data": {"task": {"title": "One more"}}, "name": "Org 201", "space": f"org:{ORG}"})
+check(r.status_code == 400, f"F4: the organisation has its own limit {r.status_code}")
+dbw("DELETE FROM templates WHERE org_id=? AND name LIKE 'bulk %'", (ORG,))
 
 sys.exit(kt.done("p2609_c_review_api"))

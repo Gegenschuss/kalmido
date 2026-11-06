@@ -38,7 +38,16 @@ from ..accounts.orgout import org_out  # 2.369.5 (#2517): pulled up from functio
 # today puts the dates relative to today. Subtasks up to MAX_DEPTH levels; 2.363.3 (#3134): assignees, files, the tags of others and
 # whatever else names people or stored files stay on the server (templates.extra, template_files; lists/tplextra.py).
 TPL_MAX_NODES = 500
-TPL_MAX_PER_USER = 200
+TPL_MAX_PER_USER = 200  # 2.609.0 (#3373, review F4): a person's private templates; an organisation's have the same limit of their own
+
+
+def tpl_room(c, oid, uid):
+    """2.609.0 (#3373, review F4): the error when space oid (None = uid's private one) holds TPL_MAX_PER_USER templates, else None.
+    An organisation's templates no longer count for the person who made them."""
+    q, a = ("org_id=?", oid) if oid else ("org_id IS NULL AND user_id=?", uid)
+    if c.execute(f"SELECT COUNT(*) FROM templates WHERE {q} AND deleted_at IS NULL", (a,)).fetchone()[0] >= TPL_MAX_PER_USER:
+        return err(tr("At most {0} templates", TPL_MAX_PER_USER))
+    return None
 HHMM_RE = re.compile(r"(?:[01]\d|2[0-3]):[0-5]\d")
 
 
@@ -445,12 +454,13 @@ def template_create():
     b = body()
     c = db()
     uid = me()
-    if c.execute("SELECT COUNT(*) FROM templates WHERE user_id=? AND deleted_at IS NULL", (uid,)).fetchone()[0] >= TPL_MAX_PER_USER:
-        return err(tr("At most {0} templates", TPL_MAX_PER_USER))
     try:
         to = tpl_space(c, b.get("space"))  # 2.609.0 (#3373): a template of an organisation (its admins)
     except BadInput as e:
         return err(str(e))
+    full = tpl_room(c, to, uid)  # 2.609.0 (#3373, review F4): the limit of the space the template goes to
+    if full:
+        return full
     base = local_now().date()
     extra = {}  # 2.363.3 (#3134): what stays on the server (tplextra)
     try:
@@ -569,8 +579,9 @@ def template_restore(tid):
     # 2.609.0 (#3373): an organisation's template: its admins (who may delete it) bring it back too
     if not r or not (r["user_id"] == uid if r["org_id"] is None else r["org_id"] in user_orgs_full(c, uid) and tpl_may_write(c, r)):
         raise Denied(404)
-    if c.execute("SELECT COUNT(*) FROM templates WHERE user_id=? AND deleted_at IS NULL", (uid,)).fetchone()[0] >= TPL_MAX_PER_USER:
-        return err(tr("At most {0} templates", TPL_MAX_PER_USER))
+    full = tpl_room(c, r["org_id"], uid)  # 2.609.0 (#3373, review F4): the limit of the template's own space
+    if full:
+        return full
     c.execute("UPDATE templates SET deleted_at=NULL, deleted_by=NULL, updated_at=? WHERE id=?", (iso(now_utc()), tid))
     bump(c)
     c.commit()

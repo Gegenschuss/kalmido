@@ -252,6 +252,23 @@ def tx_paths(c, tpl):
     return [r[0] for r in c.execute("SELECT path FROM template_files WHERE template_id=?", (tpl,))]
 
 
+def tx_reown(c, tpl, uid, made):
+    """2.609.0 (#3373, review F2 / F4): template tpl gets a new owner uid (an organisation's template made private by an admin, one
+    whose maker's account goes): its file copies are sealed for uid's account as new files (made += the new paths: the caller
+    removes them on a rollback), the rows follow -> the old paths, to remove after the commit."""
+    old = []
+    for f in c.execute("SELECT id, name, path FROM template_files WHERE template_id=? AND user_id<>? ORDER BY id", (tpl, uid)).fetchall():
+        src, rel = os.path.join(ATT_DIR, f["path"]), os.path.join("tplfiles", str(tpl), f"{uuid.uuid4().hex[:12]}-{f['name']}")
+        if not os.path.isfile(src):
+            rel = f["path"]
+        else:
+            made.append(rel)
+            oc_copy_file(c, src, os.path.join(ATT_DIR, rel), oc_user_space(uid))
+            old.append(f["path"])
+        c.execute("UPDATE template_files SET user_id=?, path=? WHERE id=?", (uid, rel, f["id"]))
+    return old
+
+
 def tx_user_files(c, uid):
     """The files of a person's templates (user_purge unlinks them after the rows went with the account)."""
     return [r[0] for r in c.execute("SELECT path FROM template_files WHERE user_id=?", (uid,))]

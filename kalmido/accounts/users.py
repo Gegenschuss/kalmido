@@ -623,6 +623,15 @@ def _user_purge(c, uid, made):
     # goes with the account (foreign key): what is left sealed with it can no longer be read
     from ..collab.teamchan import tcx_user_purge
     files += tcx_user_purge(c, uid)  # 2.113.1 (#2059): its team chat files sealed with its own key
+    from ..lists.tplextra import tx_reown, tx_user_files
+    with system_ctx(c):  # 2.609.0 (#3373, review F4): an organisation's templates stay with it: the heir (an admin first) owns them
+        from ..accounts.orgretain import upg_heir
+        for (o,) in c.execute("SELECT DISTINCT org_id FROM templates WHERE user_id=? AND org_id IS NOT NULL", (uid,)).fetchall():
+            h = upg_heir(c, o, uid)
+            if h:  # their file copies sealed for the heir before this account's key goes (none: they go with the account)
+                for (t,) in c.execute("SELECT id FROM templates WHERE user_id=? AND org_id=?", (uid, o)).fetchall():
+                    c.execute("UPDATE templates SET user_id=? WHERE id=?", (h, t))
+                    files += tx_reown(c, t, h, made)
     from ..admin.orgcrypt_cli import before_user_delete
     if before_user_delete(c, uid)[1]:  # a file that lives on could not be sealed for its new place: keep the key
         raise Denied(409, tr("Some files could not be encrypted again for their new place. Nothing was deleted; see the server log."))
@@ -631,7 +640,6 @@ def _user_purge(c, uid, made):
     files += wka_user_files(c, uid)  # 2.99.0 A (#2182): the files of its private pages (the rows go with the account)
     from ..sheets.shkinds import shk_user_files
     files += shk_user_files(c, uid)  # 2.124.0 B (#2110): the files of its private tables' file cells
-    from ..lists.tplextra import tx_user_files
     files += tx_user_files(c, uid)  # 2.363.3 (#3134): the files of its templates
     from ..wiki.wikie2e import wke_user_purge
     wke_user_purge(c, uid)  # 2.64.3 A (#1817): knowledge spaces with the lock whose key the person held: rotation pending
