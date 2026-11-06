@@ -80,6 +80,8 @@ def react(c, k, uid, emoji, on):
     """Adds (on) / removes my reaction; on a new 👍 / 👎: approval, suggestion apply / reject, event to an agent author.
     Returns {"approval": ..., "applied": bool} (caller commits)."""
     res = {"approval": None, "applied": False}
+    if emoji in ("up", "down") and k["suggestion"]:  # 2.574.0 (#3376, review F2): a thumb taken back and another one at the same
+        k = c.execute("SELECT * FROM comments WHERE id=? FOR UPDATE", (k["id"],)).fetchone() or k  # time read the stored state in turn
     if not on:
         c.execute("DELETE FROM comment_reactions WHERE comment_id=? AND user_id=? AND emoji=?", (k["id"], uid, emoji))
         sg = json.loads(k["suggestion"]) if emoji == "up" and k["suggestion"] else None
@@ -101,8 +103,7 @@ def react(c, k, uid, emoji, on):
     if res["approval"] and sug and sug.get("kind") in ("integrate", "deploy", "merge_request") \
             and not is_approver(c, t, uid, agent=author["id"], assignee=sug.get("kind") == "merge_request"):  # 2.126.0 B (#1975): only who may address the agent decides
         res["approval"] = None  # 2.148.1 D (#2495): integrate / deploy: the assignee alone does not decide (as approval jobs, #1974)
-    if res["approval"]:  # 2.126.0 review: logged only once the approval counts
-        log_act(c, t["id"], "approval", {"agent": author["id"], "comment": k["id"], "ok": emoji == "up"})
+    ap0 = res["approval"]
     from ..agents.gates import gate_decide, gate_two_eyes
     if sug and sug.get("kind") in ("integrate", "deploy"):  # 2.26.0 (#949): only an approver decides (see agents/gates.py)
         if sug.get("state") == "open" and res["approval"]:
@@ -120,6 +121,12 @@ def react(c, k, uid, emoji, on):
             if st == "approved":  # 2.60.0 C (#1512): an approved pull request counts as the review (by someone who may approve it)
                 from ..tasks.review import rvw_approved_by_pr
                 rvw_approved_by_pr(c, t["id"], f"{sug.get('repo') or ''}#{sug.get('number') or ''}", sug.get("pr_url"), uid=uid)
+    # 2.126.0 review: logged only once the approval counts; 2.574.0 (#3376, review F3): after the gate, a first of two approvals as
+    # waiting (like the decide route), a blocked one not at all
+    if res["approval"]:
+        log_act(c, t["id"], "approval", {"agent": author["id"], "comment": k["id"], "ok": emoji == "up"})
+    elif ap0 and "waiting" in (res.get("gate"), res.get("merge")):
+        log_act(c, t["id"], "approval", {"agent": author["id"], "comment": k["id"], "ok": True, "waiting": True})
     elif sug and sug.get("state") == "open" and emoji in ("up", "down") and not is_agent(g.user) \
             and task_visible(c, t["id"], uid, write=True) and not t["deleted_at"]:
         if emoji == "up":

@@ -162,6 +162,8 @@ def gate_decide_route(cid):
     need_collab()
     c, b = db(), body()
     k, _ = need_live_comment(c, cid)
+    # 2.574.0 (#3376, review F2): two approvers (or a thumb taken back) at the same time read the stored state in turn
+    k = c.execute("SELECT * FROM comments WHERE id=? FOR UPDATE", (cid,)).fetchone() or k
     t = c.execute("SELECT * FROM tasks WHERE id=?", (k["task_id"],)).fetchone()
     sug = json.loads(k["suggestion"]) if k["suggestion"] else None
     if not sug or sug.get("kind") not in GATE_KINDS:

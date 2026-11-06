@@ -13,13 +13,18 @@
      the first stays open (state open, suggestion.approvals), the same person again never approves (decide and reaction), the
      second person approves, a 👎 rejects at once, a thumb taken back takes the approval back; off = one 👍 as before; a person
      without an organisation alone in the project never gets past the first 👍 (the app shows a hint)
+ review F2 / F3 (two_eyes): a thumb taken back while a second approver reacts is not lost (row lock); the history logs a
+     first of two approvals by reaction as waiting
  (5) review F1: an agent duplicating a task / project or saving a template leaves out the tasks its data lock covers (with
      their subtasks; the copy would carry no lock tag any more); the person duplicating in the web keeps them (freelancer)
 tenant-matrix: org
 usage: p2574_d_api_test.py <datadir>      (KMT_NOSTART=1 / P2574D_NOSTART=1: a running server)"""
 import json
+import subprocess
 import sys
+import threading
 
+import kt
 import requests
 
 from freelancer_fixture import freelancer
@@ -252,6 +257,51 @@ r = decide(F, KF)
 check(r.ok and r.json()["state"] == "waiting" and sugg(KF)["state"] == "open", f"freelancer alone: never past the first approval {r.text[:120]}")
 check(F.patch(B + f"/api/lists/{LF}", json={"two_eyes": False}).ok and decide(F, KF).json()["state"] == "approved",
       "freelancer: switched off, the next approval decides")
+
+# review F3: the reaction way logs a first of two approvals as waiting (like the decide route), after the gate
+K5 = req()
+check(react(Ca, K5).json().get("gate") == "waiting", "F3: the first 👍 waits")
+acts = [json.loads(x[0]) for x in dbx("SELECT data FROM activity WHERE task_id=? AND kind='approval'", (TG,))]
+acts = [a for a in acts if a.get("comment") == K5]
+check(len(acts) == 1 and acts[0].get("waiting") is True and acts[0].get("ok") is True, f"F3: the history says waiting {acts}")
+# review F2: a thumb taken back while a second approver gives one - the second reads the state after the take-back
+K6 = req()
+check(react(Ca, K6).json().get("gate") == "waiting", "F2: setup, carol's first 👍 waits")
+HOLD = """
+import json, sys, time
+from kalmido.core import pg as _pg
+from kalmido.core.config import DATABASE_URL
+cid = int(sys.argv[1])
+c, w, n = _pg.connect_direct(DATABASE_URL), _pg.connect_direct(DATABASE_URL), 0
+with _pg.system_ctx(c):
+    sug = json.loads(c.execute("SELECT suggestion FROM comments WHERE id=? FOR UPDATE", (cid,)).fetchone()[0])
+    print("locked", flush=True)
+    for _ in range(400):  # until the reaction request waits for the row lock (a state, not a fixed time)
+        with _pg.system_ctx(w):
+            n = w.execute("SELECT count(*) FROM pg_stat_activity WHERE wait_event_type='Lock' AND query ILIKE '%comments%'").fetchone()[0]
+        w.commit()
+        if n:
+            break
+        time.sleep(0.05)
+    sug["approvals"] = []  # carol takes her thumb back first
+    c.execute("UPDATE comments SET suggestion=? WHERE id=?", (json.dumps(sug), cid))
+    c.execute("DELETE FROM comment_reactions WHERE comment_id=? AND emoji='up'", (cid,))
+c.commit()
+print("done", n, flush=True)
+"""
+hold = subprocess.Popen(["docker", "exec", "-i", kt.CT, "python", "-c", HOLD, str(K6)], stdout=subprocess.PIPE, text=True)
+line = hold.stdout.readline() or ""
+while line.startswith("migrations:"):  # #2561: the timing switch prints on import
+    line = hold.stdout.readline() or ""
+check(line.startswith("locked"), f"F2: setup, the comment row is locked by another transaction {line!r}")
+res = []
+th = threading.Thread(target=lambda: res.append(react(Da, K6)))
+th.start()
+held = hold.communicate(timeout=120)[0]
+th.join()
+check(held.strip().startswith("done") and "done 0" not in held, f"F2: dave's 👍 waited for the row ({held!r})")
+check(sugg(K6)["state"] == "open" and [a["by"] for a in sugg(K6).get("approvals") or []] == [DAVE],
+      f"F2: dave's 👍 is the first of two now, carol's take-back is not lost {sugg(K6)} {res and res[0].text[:160]}")
 
 
 # ---------------------------------------------------------------- (5) review F1 (#3376): an agent's data lock and duplicating
