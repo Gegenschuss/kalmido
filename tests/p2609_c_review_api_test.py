@@ -10,6 +10,9 @@ regression check. Own container (hosted, a server key: sealed files and a suppor
  - F4 an organisation's templates stay when their maker's account goes (the heir owns them, their files still open);
    they no longer count for their maker's limit
  - F5 the trash lists an organisation's deleted template for its admins (also when another admin made it), not for a member
+ - F6 a guest gets no workspace view of the organisation's ticket types (404) and in the plain list only key, name, icon,
+   colour of the types its shared project offers; the task counts only for the types' managers
+freelancer-matrix: orgschema. A person without an organisation: her template's trash, her ticket types as before
 usage: p2609_c_review_api_test.py <datadir>"""
 import os
 import sys
@@ -205,5 +208,37 @@ check(not any(x.get("org_tag_id") == OLB for x in lt), f"F3: the guest's tag by 
 check(Bo.patch(B + f"/api/tasks/{TG}", json={"ltags": ["Acme deal"]}).ok, "F3: a member uses the label")
 lt = next(x for x in st(A)["lists"] if x["id"] == L1)["tags"]
 check(any(x.get("org_tag_id") == OLB for x in lt) or any(x["name"] == "Acme deal" for x in lt), f"F3: the member's use works {lt}")
+
+# ================================================================== F6 ticket types and a guest
+r = A.post(B + "/api/ticket-types", json={"space": f"org:{ORG}", "name": "Incident", "template": "**Internal runbook**\n"})
+assert r.ok, r.text
+INC = r.json()["id"]
+r = A.post(B + "/api/ticket-types", json={"space": f"org:{ORG}", "name": "Hidden kind", "enabled": False})
+assert r.ok, r.text
+HID = r.json()["id"]
+TI = task(A, L1, "Server down", ttype="incident")
+r = Gi.get(B + "/api/ticket-types", params={"space": f"org:{ORG}"})
+check(r.status_code == 404, f"F6: a guest has no workspace view of the types {r.status_code}")
+ty = Gi.get(B + "/api/ticket-types").json()["types"]
+inc = next((x for x in ty if x["key"] == "incident"), None)
+check(inc and set(inc) <= {"key", "name", "icon", "color", "enabled", "org_id", "space"} and "template" not in inc,
+      f"F6: the guest sees the offered type with key, name, icon, colour only {inc}")
+check(not any(x["key"] == "hidden_kind" for x in ty), f"F6: not a switched off one {[x['key'] for x in ty]}")
+j = Bo.get(B + "/api/ticket-types", params={"space": f"org:{ORG}"}).json()
+check(j["types"] and all("tasks" not in x for x in j["types"]), f"F6: a member reads them without task counts {j['types']}")
+j = A.get(B + "/api/ticket-types", params={"space": f"org:{ORG}"}).json()
+check(next(x for x in j["types"] if x["id"] == INC).get("tasks") == 1, f"F6: the admin sees the count {j['types']}")
+check(any(x["key"] == "incident" and "template" in x for x in Bo.get(B + "/api/ticket-types").json()["types"]), "F6: a member still meets the full type")
+
+# ================================================================== freelancer-matrix: orgschema
+FL = mklist(Fr, "My work", None)
+FT = task(Fr, FL, "Invoice run")
+FP = tpl(Fr, task_id=FT, name="Invoice run")
+check(Fr.post(B + f"/api/templates/{FP}/apply", json={}).ok, "P4: her own template into her inbox as before")
+check(Fr.delete(B + f"/api/templates/{FP}").ok and FP in trash_tpls(Fr), "P4: her deleted template is in her trash")
+check(FP not in trash_tpls(A), "P4: not in anybody else's")
+check(Fr.post(B + f"/api/templates/{FP}/restore").ok, "P4: restored")
+check(Fr.get(B + "/api/ticket-types").ok and Fr.get(B + "/api/ticket-types", params={"space": "private"}).ok, "P4: her ticket types as before")
+check(Fr.get(B + "/api/ticket-types", params={"space": f"org:{ORG}"}).status_code == 404, "P4: no organisation's types")
 
 sys.exit(kt.done("p2609_c_review_api"))

@@ -19,7 +19,7 @@ from ..core.db import body, bump, db, err, iso, now_utc
 from ..accounts.session import me
 from ..core.access import Denied, need_list, vis_sql
 from ..core.errors import BadInput, reject_unknown
-from ..accounts.orgroles import org_roles_of
+from ..accounts.orgroles import org_roles_of, user_orgs_full
 from ..accounts.orgs import is_org_admin
 from ..api.common import v1_args, v1_json, v1_view
 from .validation import TICKET_TPL_MAX, TICKET_TYPES, TT_KEY_RE
@@ -95,7 +95,7 @@ def tt_space(c, uid, v):
         oid = int(s)
     except (TypeError, ValueError):
         raise BadInput(tr("Invalid value: {0}", "space")) from None
-    if oid not in org_roles_of(c, uid):
+    if oid not in user_orgs_full(c, uid):  # 2.609.0 (#3372, review F6): a guest / accounting person has no workspace view
         raise Denied(404)
     return oid
 
@@ -123,7 +123,7 @@ def tt_get(c, uid, tid, write=False):
     if not r:
         raise Denied(404)
     if r["org_id"]:
-        if r["org_id"] not in org_roles_of(c, uid):
+        if r["org_id"] not in user_orgs_full(c, uid):  # review F6: as tt_space
             raise Denied(404)
     elif r["owner_id"] != uid and (write or r["owner_id"] not in tt_owners_seen(c, uid)):
         raise Denied(404)  # another person's own types: never changed by someone else
@@ -156,16 +156,35 @@ def tt_index_data(c, uid, space=None):
         oid = tt_space(c, uid, space)
         owner = None if oid else uid
         rows = tt_rows(c, oid, owner)
-        return {"space": f"org:{oid}" if oid else "private", "can_edit": tt_may_edit(c, uid, oid, owner), "max": TT_MAX,
-                "types": [tt_out(c, uid, r, tt_task_count(c, oid, owner, r["key"])) for r in rows],
+        edit = tt_may_edit(c, uid, oid, owner)  # review F6: the task counts (over every project of the workspace) for its managers only
+        return {"space": f"org:{oid}" if oid else "private", "can_edit": edit, "max": TT_MAX,
+                "types": [tt_out(c, uid, r, tt_task_count(c, oid, owner, r["key"]) if edit else None) for r in rows],
                 "suggestions": tt_suggestions({r["key"] for r in rows}), "builtin": list(TICKET_TYPES)}
-    orgs = sorted(org_roles_of(c, uid))
+    orgs = sorted(user_orgs_full(c, uid))
     owners = sorted(tt_owners_seen(c, uid) | {uid})
     q = f"(org_id IS NULL AND owner_id IN ({','.join('?' * len(owners))}))"
     if orgs:
         q += f" OR org_id IN ({','.join('?' * len(orgs))})"
     rows = c.execute(f"SELECT * FROM ticket_types WHERE {q} ORDER BY sort, id", [*owners, *orgs]).fetchall()
-    return {"types": [tt_out(c, uid, r) for r in rows], "builtin": list(TICKET_TYPES)}
+    return {"types": [tt_out(c, uid, r) for r in rows] + tt_limited(c, uid, set(orgs)), "builtin": list(TICKET_TYPES)}
+
+
+def tt_limited(c, uid, full):
+    """2.609.0 (#3372, review F6): a guest / accounting person of an organisation meets only the types its projects shared with
+    them offer -- key, name, symbol and colour (no note template, no switched off ones, no counts)."""
+    lim = [o for o in org_roles_of(c, uid) if o not in full]
+    if not lim:
+        return []
+    out, seen = [], set()
+    for lr in c.execute(f"SELECT id, org_id FROM lists WHERE org_id IN ({','.join('?' * len(lim))}) AND id IN ({vis_sql()}) ORDER BY id",
+                        [*lim, uid, uid]).fetchall():
+        keys = set(tt_offered(c, lr["id"]))
+        for r in tt_rows(c, lr["org_id"], None, True):
+            if r["key"] in keys and r["id"] not in seen:
+                seen.add(r["id"])
+                out.append({"key": r["key"], "name": r["name"], "icon": r["icon"], "color": r["color"], "enabled": True,
+                            "org_id": r["org_id"], "space": f"org:{r['org_id']}"})
+    return out
 
 
 def tt_clean(b, create):
