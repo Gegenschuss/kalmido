@@ -25,7 +25,8 @@ let CK;
 const call = async (method, url, body) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: CK}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
 // 2.582.0 (#4830): the shared wait of tests/boot.js by time (at least 15 s), not 60 rounds - under a loaded Mac the new start took longer
 const until = (fn, n = 60) => require('./boot').until(fn, {timeout: Math.max(15000, n * 200), step: 200});
-const click = (w, el, o = {}) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true, ...o}));
+// 2.602.0 (#4913): a missing element is a failed check, not a crash that hides the checks after it
+const click = (w, el, o = {}) => { if (!el) { check(false, 'the element to click is there (' + (new Error().stack.split('\n')[2] || '').trim() + ')'); return false; } return el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true, ...o})); };
 const keyOn = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown', {key: k, bubbles: true, cancelable: true, ...o}));
 
 function pdf(pages) {  // a PDF with one text page per entry, written by hand

@@ -262,7 +262,12 @@ window.addEventListener('resize', () => dc_paneFit($('.dc-pane')));
 function dc_paneFill() {
   const p = $('.dc-pane'); if (!p) return;
   dc_paneHook(p);
-  if (DC.doc && DC.doc.id === DC.paneId && !p.firstChild) dc_mdDraw(p);
+  if (!DC.doc || DC.doc.id !== DC.paneId) return;
+  if (!p.firstChild) { dc_mdDraw(p); return; }
+  // 2.602.0 (#4913): a cold start on #docs/<id> draws the pane before docread.js ran (the module's files run one after the
+  // other), without the reading view; the redraw of the list once it is there keeps that content (data-fl-fill) - draw it anew
+  const m = $('.dc-main', p), rd = typeof dcr_inPane === 'function' && dcr_inPane(p);
+  if (m && m.classList.contains('dc-rd') !== rd) { const b = $('.dc-body', p); if (b) b.dataset.id = ''; dc_mdDraw(p); }
 }
 function dc_paneClose(p) {
   if (p?.isConnected) Element.prototype.remove.call(p);
