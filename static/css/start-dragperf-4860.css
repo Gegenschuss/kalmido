@@ -1,0 +1,5 @@
+/* 2.586.0 A (#4860): during a grip drag the content still reflows live every frame, but rows out of view skip their layout and
+   paint (content-visibility; the height they last had stands in: contain-intrinsic-size auto). Not a row with a caret (it stands
+   outside the row and would be clipped) nor the row being edited */
+.trow{contain-intrinsic-size:auto 2.75rem}
+body.pgdrag .trow:not(:has(> .caret)):not(.iedit){content-visibility:auto}

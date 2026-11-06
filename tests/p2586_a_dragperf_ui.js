@@ -37,21 +37,28 @@ const RO_WRAP = `() => { const RO = window.ResizeObserver; if (!RO || window.__r
 // in the page: the width steps of the drag timed (rafThrottle is wrapped while the grip is pressed: each step's own work +
 // the style / layout it causes, forced at once), the frames counted
 const PROBE = `(() => {
-  const P = window.__dp = {steps: [], frames: [], cls: [], vw: []};
+  const P = window.__dp = {steps: [], sty: [], lay: [], frames: [], cls: [], vw: [], at: [], fitDrag: {}, fitAfter: {}};
+  // the fitting functions of the bars and modes: how often they ran during the drag and after release
+  for (const n of ['fitTop', 'fitDtop', 'lsd_sync', 'agb_fit', 'ttlinFit', 'ttlinFitAll']) {
+    if (typeof window[n] !== 'function' || window[n].__w) continue;
+    const f0 = window[n], f = window[n] = function () { const P = window.__dp; if (P && !P.done) { const b = document.body.classList.contains('pgdrag') ? P.fitDrag : P.fitAfter; b[n] = (b[n] || 0) + 1; } return f0.apply(this, arguments); };
+    f.__w = 1;
+  }
   if (!window.__rt0) { window.__rt0 = rafThrottle;
     rafThrottle = fn => window.__rt0((...a) => { const t = performance.now(); fn(...a); const v = document.getElementById('view');
+      const t1 = performance.now(); void getComputedStyle(document.body).color; const t2 = performance.now();  // style first (the whole document), then layout
       void document.documentElement.getBoundingClientRect(); void (v && v.scrollHeight);
-      const P = window.__dp; if (P) { P.steps.push(performance.now() - t); P.cls.push(document.body.classList.contains('pgdrag')); P.vw.push(v ? v.clientWidth : 0); } }); }
+      const P = window.__dp; if (P) { P.steps.push(performance.now() - t); P.sty.push(t2 - t1); P.lay.push(performance.now() - t2); P.cls.push(document.body.classList.contains('pgdrag')); P.vw.push(v ? v.clientWidth : 0); P.at.push(performance.now()); if (P.cv == null) P.cv = [...document.querySelectorAll('#view .trow, #view .dc-card')].filter(x => getComputedStyle(x).contentVisibility === 'auto').length; } }); }
   window.__ro.on = true; window.__ro.n = 0; window.__ro.ms = 0; window.__ro.by = {};
   let last = performance.now(); const tick = t => { if (!window.__dp || window.__dp !== P || P.done) return; P.frames.push(t - last); last = t; requestAnimationFrame(tick); };
   requestAnimationFrame(tick); return 1; })()`;
 const RESULT = `(() => { const P = window.__dp; P.done = true; window.__ro.on = false;
   const q = (a, f) => { const s = [...a].sort((x, y) => x - y); return s.length ? Math.round(s[Math.min(s.length - 1, Math.floor(s.length * f))] * 10) / 10 : 0; };
   const fr = P.frames.slice(1);
-  return {frames: fr.length, med: q(fr, 0.5), p95: q(fr, 0.95), steps: P.steps.length, stepMed: q(P.steps, 0.5), stepP95: q(P.steps, 0.95),
+  return {frames: fr.length, med: q(fr, 0.5), p95: q(fr, 0.95), steps: P.steps.length, stepMed: q(P.steps, 0.5), stepP95: q(P.steps, 0.95), styMed: q(P.sty, 0.5), layMed: q(P.lay, 0.5), styP95: q(P.sty, 0.95), layP95: q(P.lay, 0.95),
     ro: window.__ro.n, roMs: Math.round(window.__ro.ms * 10) / 10, by: Object.fromEntries(Object.entries(window.__ro.by).map(([k, v]) => [k, v.n + 'x/' + Math.round(v.ms) + 'ms'])),
     clsDuring: P.cls.length > 0 && P.cls.every(Boolean), vwMin: Math.min(...P.vw), vwMax: Math.max(...P.vw), rows: document.querySelectorAll('#view .trow[data-id]').length,
-    tiles: document.querySelectorAll('#view .dc-card').length}; })()`;
+    tiles: document.querySelectorAll('#view .dc-card').length, fitDrag: P.fitDrag, fitAfter: P.fitAfter, ms: Math.round(P.at[P.at.length - 1] - P.at[0]), cv: P.cv, st: document.getElementById('view')?.scrollTop}; })()`;
 
 (async () => {
   await sleep(600);
@@ -85,7 +92,16 @@ const RESULT = `(() => { const P = window.__dp; P.done = true; window.__ro.on = 
     await ev(`(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
     check(await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`) === 200, 'login');
     // one drag of grip `k` for about one second: down, 60 moves of 16 ms back and forth over `span` px, up
-    const drag = async (k, span, tag) => {
+    // old = the drawing before 2.586 for the same drag in the same run (a fair comparison on a busy machine): the watchers
+    // measure every frame (dragRest runs at once), nothing skips (content-visibility visible) and the width is set on the root
+    const drag = async (k, span, tag, old = false) => {
+      await ev(`(() => { if (!window.__dr0) window.__dr0 = dragRest; dragRest = ${old} ? (k, fn) => fn() : window.__dr0;
+        let s = document.getElementById('dpold'); if (${old} && !s) { s = document.createElement('style'); s.id = 'dpold'; s.textContent = '.trow,.dc-card{content-visibility:visible!important}'; document.head.appendChild(s); }
+        if (!${old} && s) s.remove();
+        const a = document.getElementById('app').style; if (!a.__sp0) a.__sp0 = a.setProperty;
+        a.setProperty = ${old} ? function (k, v) { return document.documentElement.style.setProperty(k, v); } : a.__sp0;  // before: the width on the root
+        return 1; })()`);
+      tag += old ? '-old' : '';
       const g = await ev(`(() => { placeGrips(); const g = document.getElementById('pgrip-${k}'); if (!g || g.hidden) return null; const r = g.getBoundingClientRect(); return {x: Math.round(r.left + r.width / 2), y: Math.round(r.top + Math.min(r.height / 2, 300))}; })()`);
       check(!!g, `${tag}: the grip ${k} is there`);
       if (!g) return null;
@@ -97,6 +113,7 @@ const RESULT = `(() => { const P = window.__dp; P.done = true; window.__ro.on = 
       await cmd('input.releaseActions', {context: ctx});
       await ev(frame2);
       const r = await ev(RESULT);
+      r.skipAfter = await ev(`[...document.querySelectorAll('#view .trow, #view .dc-card')].filter(x => getComputedStyle(x).contentVisibility === 'auto').length`).catch(() => -1);
       r.after = await ev(`document.body.classList.contains('pgdrag') || document.body.classList.contains('kdrag')`);
       console.log(`DRAGPERF ${tag}: ` + JSON.stringify(r));
       out.push([tag, r]);
@@ -109,15 +126,20 @@ const RESULT = `(() => { const P = window.__dp; P.done = true; window.__ro.on = 
       check(await ready(ev, `document.querySelectorAll('#view .trow[data-id]').length >= 100`), `${W}: the list shows its rows`);
       await ev(`(() => { openDetail(${T[0]}); return 1; })()`);
       check(await ready(ev, `!!document.querySelector('#detail:not(.hidden) .dtop')`), `${W}: the task panel is open`);
+      await ev(`(() => { const v = document.getElementById('view'); v.scrollTop = Math.round(v.scrollHeight / 3); return 1; })()`);  // rows out of view above and below
       await sleep(300);
+      for (const old of [true, false, true]) await drag('det', W > 2000 ? 400 : 120, `list300-det-${W}`, old);
       const r1 = await drag('det', W > 2000 ? 400 : 120, `list300-det-${W}`);
       if (r1) {
         check(r1.steps >= 20, `${W} list: the width follows the pointer in many steps (${r1.steps})`);
         check(r1.vwMax - r1.vwMin >= 40, `${W} list: the content reflows live during the drag (#view ${r1.vwMin}-${r1.vwMax} px)`);
         check(r1.clsDuring, `${W} list: the body carries the drag class during every step`);
         check(!r1.after, `${W} list: the drag class is gone after release`);
-        const fit = Object.entries(r1.by).filter(([f]) => /^(render|detail|favtiles|agents)\.js/.test(f)).reduce((n, [, v]) => n + parseInt(v), 0);
-        check(fit <= 6, `${W} list: the bar watchers rest during the drag (${fit} callbacks of render/detail/favtiles/agents for ${r1.steps} steps) ` + JSON.stringify(r1.by));
+        check(r1.cv > 50 && r1.skipAfter === 0, `${W} list: rows may skip their drawing during the drag (${r1.cv} rows), none after release (${r1.skipAfter})`);
+        // 2.586.0 A (#4860): the bar / mode fitting rests during the drag (at most every 200 ms) and runs once after release
+        const fit = Object.values(r1.fitDrag).reduce((n, v) => n + v, 0);
+        check(Object.values(r1.fitDrag).every(v => v <= Math.ceil(r1.ms / 200) + 1) && fit < r1.steps, `${W} list: the bar watchers rest during the drag (${fit} fits for ${r1.steps} steps in ${r1.ms} ms, each at most every 200 ms) ` + JSON.stringify(r1.fitDrag));
+        check((r1.fitAfter.fitTop || 0) + (r1.fitAfter.fitDtop || 0) + (r1.fitAfter.lsd_sync || 0) >= 1, `${W} list: the bars are fitted after release ` + JSON.stringify(r1.fitAfter));
       }
       // after release: the bars fit the final width (the watchers ran once more)
       check(await ready(ev, `(() => { const t = document.getElementById('top'), d = document.querySelector('#detail .dtop'); return !!t && t.scrollWidth <= t.clientWidth + 1 && (!d || d.scrollWidth <= d.clientWidth + 1); })()`, 20), `${W} list: the head bar and the panel's bar fit after release`);
@@ -139,15 +161,18 @@ const RESULT = `(() => { const P = window.__dp; P.done = true; window.__ro.on = 
       await nav(B + '#docs');
       check(await ready(ev, `document.querySelectorAll('#view .dc-card').length >= 40`), `${W}: the documents show their tiles ` + await ev(`document.querySelectorAll('#view .dc-card').length`));
       await sleep(300);
+      for (const old of [true, false, true]) await drag('side', W > 2000 ? 200 : 80, `docs-side-${W}`, old);
       const r2 = await drag('side', W > 2000 ? 200 : 80, `docs-side-${W}`);
       if (r2) {
         check(r2.vwMax - r2.vwMin >= 40, `${W} docs: the tiles reflow live during the drag (#view ${r2.vwMin}-${r2.vwMax} px)`);
         check(!r2.after, `${W} docs: the drag class is gone after release`);
+        check(r2.cv > 20 && r2.skipAfter === 0, `${W} docs: tiles may skip their drawing during the drag (${r2.cv} tiles), none after release (${r2.skipAfter})`);
       }
       await shot(`p2586a-docs-${W}.png`);
     }
   });
-  console.log('DRAGPERF summary: ' + out.map(([t, r]) => `${t} frame med ${r.med} / p95 ${r.p95} ms, step med ${r.stepMed} / p95 ${r.stepP95} ms, RO ${r.ro}x ${r.roMs} ms`).join(' | '));
+  console.log('DRAGPERF summary: ' + out.map(([t, r]) => `${t} frame med ${r.med} / p95 ${r.p95} ms, step med ${r.stepMed} / p95 ${r.stepP95} ms, RO ${r.ro}x ${r.roMs} ms, fits ${JSON.stringify(r.fitDrag)}`).join(' | '));
+  if (process.env.P2586A_SHOTS) require('fs').writeFileSync(path.join(process.env.P2586A_SHOTS, 'p2586a-dragperf.json'), JSON.stringify(out, null, 1));  // the numbers next to the pictures (kalmido-mactest.sh shot)
   console.log(`p2586_a_dragperf_ui: ${ok} passed, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);
 })().catch(e => { console.log('FAIL: crash', e); process.exit(1); });

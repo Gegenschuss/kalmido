@@ -25,6 +25,21 @@ function rafThrottle(fn) {
   f.cancel = () => { if (id) cancelAnimationFrame(id); id = 0; args = null; };
   return f;
 }
+// 2.586.0 A (#4860): while a grip is dragged (body.pgdrag) the content still reflows live every frame, but the watchers that fit
+// bars and modes to a new width (fitTop, fitDtop, lsd_sync, the agents band, the inline title field) do not measure every
+// frame: dragRest(key, fn) runs fn at once outside a drag; during one each key runs at most once per DRAG_REST_MS (its last
+// call), and everything pending runs once more right after release (dragRestFlush, called where the drag ends)
+const DRAG_REST_MS = 200, DRAGREST = {fns: new Map(), t: 0, n: 0};
+function dragRest(key, fn) {
+  if (!document.body || !document.body.classList.contains('pgdrag')) { fn(); return; }
+  DRAGREST.fns.set(key, fn);
+  if (!DRAGREST.t) DRAGREST.t = setTimeout(dragRestRun, DRAG_REST_MS);
+}
+function dragRestRun() {
+  DRAGREST.t = 0; const fs = [...DRAGREST.fns.values()]; DRAGREST.fns.clear();
+  for (const f of fs) { DRAGREST.n++; try { f(); } catch (e) { console.error(e); } }
+}
+function dragRestFlush() { clearTimeout(DRAGREST.t); dragRestRun(); }
 
 // ------------------------------------------------------------------ dates
 // 2.223.3 A (#2877): while the server's deletion runs only count (KALMIDO_RETENTION_PURGE off), no trash promises a period

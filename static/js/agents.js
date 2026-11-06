@@ -146,7 +146,7 @@ function agb_fit() {
     more.hidden = !n; if (n) { more.textContent = '+' + n; more.setAttribute('aria-label', tr('Agents') + ' +' + n); }
   }
 }
-const agbRO = typeof ResizeObserver === 'function' ? new ResizeObserver(() => agb_fit()) : null;  // the band's own width (a column narrows without the window changing)
+const agbRO = typeof ResizeObserver === 'function' ? new ResizeObserver(() => dragRest('agb', agb_fit)) : null;  // the band's own width (a column narrows without the window changing)
 function agb_after() { if (!agbRO) { agb_fit(); return; } agbRO.disconnect(); for (const b of document.querySelectorAll('#view .agband')) agbRO.observe(b); agb_fit(); }
 function bandAgents() {
   if (isMobile() || S.route.mod !== 'tasks' || !feat('agents')) return [];

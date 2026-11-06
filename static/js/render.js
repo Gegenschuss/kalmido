@@ -700,7 +700,7 @@ function fitTop() {
 if (document.fonts?.ready) document.fonts.ready.then(() => fitTop()).catch(() => {});
 if (typeof ResizeObserver !== 'undefined') {
   let topRO = null;
-  const topWatch = () => { const t = $('#top'); if (!t || topRO) return; topRO = new ResizeObserver(() => { if (t.clientWidth !== topW) fitTop(); }); topRO.observe(t); };
+  const topWatch = () => { const t = $('#top'); if (!t || topRO) return; topRO = new ResizeObserver(() => dragRest('top', () => { if (t.clientWidth !== topW) fitTop(); })); topRO.observe(t); };
   domReady(topWatch);  // 2.191.0 B (#2505): defer
 } else addEventListener('resize', () => fitTop());
 // 2.557.0 A (#4553): list and detail side by side once the content area (#view, not the window) is at least 100rem wide:
@@ -717,7 +717,7 @@ function lsd_sync() {
   }
   if (typeof rcl_dockSync === 'function') rcl_dockSync();  // a docked receipt follows the size of the area
 }
-if (typeof ResizeObserver !== 'undefined') domReady(() => { const v = $('#view'); if (v) new ResizeObserver(() => lsd_sync()).observe(v); lsd_sync(); });
+if (typeof ResizeObserver !== 'undefined') domReady(() => { const v = $('#view'); if (v) new ResizeObserver(() => dragRest('lsd', lsd_sync)).observe(v); lsd_sync(); });
 else addEventListener('resize', () => lsd_sync());
 // Esc (events.js, nothing else open) closes the detail of the pair, the list stays
 function lsd_esc() {
@@ -1700,7 +1700,7 @@ document.addEventListener('pointerdown', e => {
     if (td_lcDrag?.g === g) td_lcDrag = null;
     ['pointermove', 'pointerup', 'pointercancel', 'lostpointercapture'].forEach((n, i) => g.removeEventListener(n, i ? up : mv));
     show.flush(); cell.style.width = cell.style.maxWidth = ''; if (cur != null) { lcwSet(lid, k, cur); cur = null; }
-    document.body.classList.remove('pgdrag', 'lcwdrag'); g.classList.remove('drag'); guide.remove(); cover.remove();
+    document.body.classList.remove('pgdrag', 'lcwdrag'); dragRestFlush(); g.classList.remove('drag'); guide.remove(); cover.remove();
   };
   // 2.40.0 (#1430): a render that replaces the grip loses the capture: lostpointercapture (and the sweep after a render) ends it
   td_lcDrag = {g, up};
@@ -1713,7 +1713,7 @@ function td_lcSweep() {
   if (td_lcDrag && !td_lcDrag.g.isConnected) td_lcDrag.up();
   if (td_lcDrag || document.body.classList.contains('lcmoving')) return;
   document.querySelectorAll('body > .lcguide, body > .lccover').forEach(x => x.remove());
-  if (document.body.classList.contains('pgdrag') && !document.querySelector('.drag')) document.body.classList.remove('pgdrag', 'lcwdrag');
+  if (document.body.classList.contains('pgdrag') && !document.querySelector('.drag')) { document.body.classList.remove('pgdrag', 'lcwdrag'); dragRestFlush(); }
 }
 document.addEventListener('dblclick', e => { const g = e.target.closest?.('.lchead .lcg'); if (g) lcwSet(+g.closest('.lchead').dataset.lid, g.dataset.lcg, null); });
 document.addEventListener('keydown', e => {

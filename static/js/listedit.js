@@ -37,10 +37,20 @@ function ttlPointPos(ttl, x, y) {
 // the field grows with the text: as many lines as the title has in the row (no scrolling sideways, the start stays visible)
 function ttlinFit(i) { if (!i) return; i.style.height = 'auto'; i.style.height = i.scrollHeight + 'px'; }
 // measured again whenever its width changes: the row's own layout settles after the mount, the task panel or the window narrows the list
+// 2.586.0 A (#4860): one observer for every title field (it was one per field); while a grip is dragged the fields are fitted
+// together at most every DRAG_REST_MS and once on release (core.js dragRest): first all widths read, then all heights set
+const TTLIN = {ro: null, w: new WeakMap()};
+function ttlinFitAll() {
+  const fs = [...document.querySelectorAll('.ttlin')].filter(i => i.isConnected && i.clientWidth !== TTLIN.w.get(i));
+  const ws = fs.map(i => i.clientWidth);
+  fs.forEach((i, k) => { TTLIN.w.set(i, ws[k]); i.style.height = 'auto'; });
+  const hs = fs.map(i => i.scrollHeight);
+  fs.forEach((i, k) => { i.style.height = hs[k] + 'px'; });
+}
 function ttlinWatch(i) {
   if (typeof ResizeObserver === 'undefined') return;
-  let w = -1;
-  new ResizeObserver(() => { if (!i.isConnected || i.clientWidth === w) return; w = i.clientWidth; ttlinFit(i); }).observe(i);
+  if (!TTLIN.ro) TTLIN.ro = new ResizeObserver(es => { for (const e of es) if (!e.target.isConnected) TTLIN.ro.unobserve(e.target); dragRest('ttlin', ttlinFitAll); });  // a closed field leaves the observer
+  TTLIN.w.set(i, i.clientWidth); TTLIN.ro.observe(i);
 }
 function inlineEditMount(focus) {
   const ie = S.ie; if (!ie) return;

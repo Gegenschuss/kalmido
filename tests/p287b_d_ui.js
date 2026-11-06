@@ -72,10 +72,12 @@ const frame = w => new Promise(r => w.requestAnimationFrame(() => w.requestAnima
     check(d.documentElement.style.getPropertyValue('--detW') === '25.5rem', '#1965: the width waits for the frame ' + d.documentElement.style.getPropertyValue('--detW'));
     await frame(w);
     check(w.eval('DRAGSTAT.frames') - f0 === 1, `#1965: 60 moves = one update (${w.eval('DRAGSTAT.frames') - f0} frames)`);
-    check(d.documentElement.style.getPropertyValue('--detW') === want + 'rem', '#1965: the panel shows the dragged width ' + d.documentElement.style.getPropertyValue('--detW'));
+    // 2.586.0 (#4860): during the drag the width sits on #app (a variable on the root restyled the whole page), on release on the root again
+    check(d.querySelector('#app').style.getPropertyValue('--detW') === want + 'rem', '#1965: the panel shows the dragged width ' + d.querySelector('#app').style.getPropertyValue('--detW'));
     check(JSON.stringify(w.__store) === st0, '#1965: still nothing stored');
     pe(w, g, 'pointerup', -rem * want);
     check(+w.__store['tasks.pw.det'] === want, '#1965: stored once on release ' + w.__store['tasks.pw.det']);
+    check(d.documentElement.style.getPropertyValue('--detW') === want + 'rem' && !d.querySelector('#app').style.getPropertyValue('--detW'), '#4860: on release the width is on the root again, the copy on #app is gone');
     check(!d.body.classList.contains('pgdrag') && !g.style.transform, '#1965: after the drag: no drag cursor sheet, the grip back in place');
     w.eval(`localStorage.removeItem('tasks.pw.det'); panelVars();`);
     w.eval('closeDetail()'); await sleep(300);

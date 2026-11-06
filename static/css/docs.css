@@ -242,6 +242,10 @@
 /* 2.430.0 (#3582): the card's own button rules leave out the choosing box (:not(.dc-selmark)); the box is its own button on the card: shown on hover / focus, while choosing and when ticked;
    touch screens: only while choosing (a long press starts it) */
 .dc-card{position:relative;-webkit-touch-callout:none}
+/* 2.586.0 A (#4860): tiles out of view skip layout and paint while a grip is dragged (app.css, the rows); not the current tile
+   (its ring stands outside) nor while choosing (the mark's touch room stands outside) */
+.dc-card{contain-intrinsic-size:auto 12rem}
+body.pgdrag .dc-grid:not(.dc-selon) .dc-card:not(.dc-cur){content-visibility:auto}
 .dc-grid:not(.dc-selon) .dc-card:not(.dc-on) .dc-selmark{opacity:0}
 .dc-grid:not(.dc-selon) .dc-card:hover .dc-selmark,.dc-grid .dc-selmark:focus-visible{opacity:1}
 @media (hover:none){.dc-grid:not(.dc-selon) .dc-card:not(.dc-on) .dc-selmark{display:none}}

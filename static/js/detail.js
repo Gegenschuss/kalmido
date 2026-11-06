@@ -253,16 +253,22 @@ function gripWire(g) {
     const box = gripEl(k).getBoundingClientRect(), right = box.right, left = box.left, max = panelMax(k), w0 = panelEff(k);  // 2.209.0 A (#2772): from the width in use
     const px = w => w * rem, px0 = px(w0);
     let w = w0; gripDrag = k;
+    // 2.586.0 A (#4860): during the drag the width variable sits on #app (only the grid of #app reads --detW / --sideW): set on
+    // the root it restyled the whole page every frame (measured in Firefox: ~20 ms per frame with 300 rows at 1280 px, ~1 ms
+    // on #app); on release panelSet stores it on the root again and the copy on #app goes. The chat's width stays on the root
+    const vk = {det: '--detW', chat: '--chatW', side: '--sideW'}[k], vEl = (k !== 'chat' && $('#app')) || document.documentElement;
     const mv = rafThrottle(x => {
       w = Math.round(Math.max(PW[k][1], Math.min(max, (k === 'side' ? x - left : right - x) / rem)) * 4) / 4;
-      document.documentElement.style.setProperty({det: '--detW', chat: '--chatW', side: '--sideW'}[k], w + 'rem');
+      vEl.style.setProperty(vk, w + 'rem');
       g.style.transform = `translateX(${(k === 'side' ? 1 : -1) * (px(w) - px0)}px)`;
     });
     let moved = false; const x0 = e.clientX;
     const mv2 = ev => { if (Math.abs(ev.clientX - x0) > 3) moved = true; if (moved) mv(ev.clientX); };
     const up = () => { g.removeEventListener('pointermove', mv2); mv.flush(); gripDrag = null; g.style.transform = '';
-      g.classList.remove('drag'); document.body.classList.remove('pgdrag');
-      if (moved) panelSet(k, w, true); fitLayout(); placeGrips();
+      g.classList.remove('drag'); document.body.classList.remove('pgdrag'); dragRestFlush();  // 2.586.0 A (#4860): the resting watchers once
+      if (moved) panelSet(k, w, true);
+      if (vEl !== document.documentElement) vEl.style.removeProperty(vk);
+      fitLayout(); placeGrips();
       // a tap without dragging: a small menu (the way without dragging, WCAG 2.5.7); a double-click resets instead
       if (!moved) { clearTimeout(g._mt); g._mt = setTimeout(() => { if (Date.now() - (g._dbl || 0) < 400) return; menu(g, [{label: tr('Wider'), icon: k === 'side' ? 'right' : 'left', fn: () => panelSet(k, panelEff(k) + 4)}, {label: tr('Narrower'), icon: k === 'side' ? 'left' : 'right', fn: () => panelSet(k, panelEff(k) - 4)}, {label: tr('Default width'), icon: 'undo', fn: () => panelSet(k, null)}]); }, 320); } };
     g.addEventListener('pointermove', mv2); g.addEventListener('pointerup', up, {once: true}); g.addEventListener('pointercancel', up, {once: true});
@@ -591,7 +597,7 @@ function fitDtop() {
   const chip = t.querySelector('.dchip');
   dtopCW = chip ? chip.clientWidth : -1;
   if (typeof ResizeObserver === 'function' && !dtopRO) {
-    dtopRO = new ResizeObserver(() => { const x = document.querySelector('#detail .dtop'), c = x && x.querySelector('.dchip'); if (x && (x.clientWidth !== dtopW || (c ? c.clientWidth : -1) !== dtopCW)) fitDtop(); });
+    dtopRO = new ResizeObserver(() => dragRest('dtop', () => { const x = document.querySelector('#detail .dtop'), c = x && x.querySelector('.dchip'); if (x && (x.clientWidth !== dtopW || (c ? c.clientWidth : -1) !== dtopCW)) fitDtop(); }));
   }
   if (dtopRO) { dtopRO.disconnect(); dtopRO.observe(t); if (chip) dtopRO.observe(chip); }
 }
