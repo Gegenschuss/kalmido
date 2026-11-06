@@ -18,6 +18,7 @@ Invented names only, the .xlsx is generated here.
 tenant-matrix: sheet
 freelancer-matrix: sheets
 usage: p2578_d_api_test.py <datadir>      (a fresh container; P2578D_NOSTART=1 = the server already runs)"""
+import html
 import io
 import json
 import os
@@ -118,7 +119,7 @@ F = [
     ('=NICHT(B1>1)', False),
     ('=AND(TRUE;FALSE)', False),
     ('=UND()', ("err", "syntax")),
-    ('=ABS(-4,5)', 4.5),
+    ('=ABS(-4.5)', 4.5),  # (without a ";" a "," separates arguments)
     ('=AUFRUNDEN(2,141;2)', 2.15),
     ('=ROUNDUP(-2,1;0)', -3),
     ('=AUFRUNDEN(1234;-2)', 1300),
@@ -257,8 +258,8 @@ if IM:
     for part in ("SUMIFS(B2:B4,A2:A4,&quot;a&quot;)", "COUNTIFS(A2:A4,&quot;a&quot;,B2:B4,&quot;&gt;1&quot;)", "MATCH(2,B2:B4,1)",
                  "WEEKNUM(DATE(2027,1,1),1)", "IFERROR(1/0,&quot;x&quot;)", "_xlfn.ISOWEEKNUM(DATE(2027,1,1))", "ROUNDUP(B2/3,1)",
                  "MATCH(&quot;b&quot;,A2:A4,0)", "WEEKNUM(DATE(2026,11,6),21)", "NETWORKDAYS(DATE(2026,11,2),DATE(2026,11,6))"):
-        alt = part.replace("&quot;", '"').replace("&gt;", ">")
-        check(part in sx or alt in sx, f"export holds {part} " + sx[sx.find('<f>'):sx.find('<f>') + 200])
+        plain = html.unescape(part)
+        check(plain in html.unescape(sx), f"export holds {plain} " + sx[sx.find('<f>'):sx.find('<f>') + 200])
 
 # ================================================================== #3462 point 5: chart kinds
 COLS = [c["id"] for c in get(A, SID)["columns"]]

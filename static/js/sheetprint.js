@@ -56,9 +56,10 @@ function shp_dialog(sh) {
     try { data = await shp_make(sh, {...o, ...pick}); } catch (x) { b.disabled = false; if (err) err.textContent = /** @type {any} */ (x).message; return; }
     md.remove();
     const name = (sh.title || tr('Table')).replace(/[\\/:*?"<>|]+/g, ' ').trim() + '.pdf';
-    const url = URL.createObjectURL(new Blob([data], {type: 'application/pdf'}));
+    let url = '';
+    try { url = URL.createObjectURL(new Blob([data], {type: 'application/pdf'})); } catch (x) { /* no blob addresses: the view shows the bytes */ }
     try { await loadModule('pdf'); } catch (x) { /* offline: the download below still works */ }
     if (typeof pdfView === 'function') pdfView({url, name, dlUrl: url, data, size: data.length});
-    else window.open(url, '_blank', 'noopener');
+    else if (url) window.open(url, '_blank', 'noopener');
   });
 }
