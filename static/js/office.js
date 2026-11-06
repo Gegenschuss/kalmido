@@ -414,6 +414,7 @@ function ofcModal(kind, r) {
     <div class="foot">${r && adm ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${adm ? tr('Cancel') : tr('Close')}</button>${adm ? `<button class="btn pri" data-m="save">${r ? tr('Save') : tr('Add')}</button>` : ''}</div>`);
   md.classList.add('ofcdlg');
   const close = fgModal(md);  // 2.40.0 (#1371): Cancel / Esc / backdrop ask before unsaved input is lost
+  if (r?.updated_at && adm) loadModule('objsave').then(() => dlgStale(md, `/api/office/${kind}/${r.id}`, () => (md._objBase || r).updated_at)).catch(() => {});  // 2.576.0 (#4764): saved elsewhere meanwhile -> the calm bar
   if (!adm) for (const el of $$('input,select,textarea,button[data-dpfor]', md)) el.disabled = true;
   if (kind === 'equipment') astBind(md, r);  // 2.92.0 B (#1931)
   if (kind === 'texts' && !r) $('#of-kind', md).addEventListener('change', e => { const l = /** @type {any} */ (e.target).value === 'letter', box = $('.ofclts', md); $('#of-text_de', md).maxLength = l ? 20000 : 8000; if (l) { $('[data-lt="de"]', box)?.click(); $$('textarea', box).forEach(t => { if (t.id !== 'of-text_de') t.value = ''; }); } $('.seg', box).style.display = l ? 'none' : ''; });  // 2.470.0 (#3596): a letter block has one text, no language tabs
@@ -451,18 +452,21 @@ function ofcModal(kind, r) {
       }
       if (['services', 'roles', 'crew', 'equipment', 'texts', 'contracts'].includes(kind)) body.trans = ofcTransBody(md);  // 2.460.0 (#3767)
       if ($('#of-archived', md)) body.archived = $('#of-archived', md).checked ? 1 : 0;
-      if (r?.updated_at) body.expect_updated_at = r.updated_at;  // 2.269.0 C (#3017): saved elsewhere meanwhile -> 409, never overwritten
-      const sv = await (r?.updated_at ? rawFetch : api)(r ? 'PATCH' : 'POST', r ? `/api/office/${kind}/${r.id}` : `/api/office/${kind}`, body);
+      // 2.576.0 (#4764): a change through objsave.js (saveDialog: only the fields that differ from the row as opened, with
+      // expect_updated_at; saved elsewhere meanwhile -> 409 "row" -> the merge bar on this dialog, what was typed stays)
+      let sv;
+      if (r?.updated_at) {
+        await loadModule('objsave');
+        const base = md._objBase || r, j = await saveDialog(`/api/office/${kind}/${r.id}`, base, body, {key: 'row'});
+        if (j?.conflict) { $('.aerr', md).textContent = ''; objMerge(md, j.conflict, cur => { md._objBase = cur; }, {field: k => $('#of-' + k, md)}); return; }
+        if (j === base) { md.remove(); return; }  // nothing changed
+        sv = j;
+      } else sv = await api(r ? 'PATCH' : 'POST', r ? `/api/office/${kind}/${r.id}` : `/api/office/${kind}`, body);
       md.remove(); ofcReload(kind);
       if (kind === 'contracts' && !r && sv?.id && typeof dmaAfterSave === 'function') dmaAfterSave(sv.id);  // 2.117.0 B (#2285): the chosen PDFs
       if (kind === 'equipment' && r && ofcAdmin()) astUndo(r, body, sv); else if (!(r && typeof oun_saved === 'function' && oun_saved(kind + ':' + r.id, body.name_de || body.name || body.key || r.name_de || r.name || r.key))) toast(r ? tr('Saved') : tr('Added'));  // 2.92.0 B (#1931): one undo step; 2.111.0 A (#2233): "… saved · Undo"
     } catch (x) {
       const el = $('.aerr', md); if (!el) return;
-      if (x.status === 409 && x.data?.row) {  // 2.269.0 C (#3017): "Reload" opens the saved state (this dialog's input is not saved)
-        el.innerHTML = `${esc(tr('Changed in the meantime'))} · ${esc(tr('Reload shows the saved version; your input here is not saved.'))} <button type="button" class="btn sm" data-ofc-reload>${tr('Reload')}</button>`;
-        $('[data-ofc-reload]', el).addEventListener('click', () => { md.remove(); ofcReload(kind); ofcModal(kind, x.data.row); });
-        return;
-      }
       el.textContent = x.message || '';
     }
   });

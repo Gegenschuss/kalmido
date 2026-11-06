@@ -502,13 +502,13 @@ function ctField(md, k) {
   const d = el?.closest('details'); if (d) d.open = true;
   return el || null;
 }
-async function ctEditor(c, cf) {
+async function ctEditor(c, cf, draft) {  // draft: 2.576.0 (#4764) the input of a new contact whose save failed
   if (c && !cf) await loadModule('objsave').catch(() => { /* offline without the copy: saved as before */ });
   const books = (S.books || []).filter(b => ctWrite(b) && (wsObjIn(b) || (c && b.id === c.book_id)));  // 2.30.0 (#1036): of the shown workspace (+ the contact's own)
   const fold = !!c && !ctWrite(ctBook(c.book_id));  // 2.351.0 B (#2749): changed through its folder: stays in its address book
   if (!books.length && !fold) { try { const bk = await api('POST', '/api/books', {name: tr('Contacts'), org_id: wsDefaultOrg()}); await load(); books.push(bk); } catch { return; } }
   const st = c ? JSON.parse(JSON.stringify(c)) : {book_id: +(CT.book || LS.get('ctBook', 0)) || books[0].id, given: '', family: '', fn: '', org: '', title: '', dept: '', nickname: '',
-    emails: [{value: '', type: ['home']}], phones: [{value: '', type: ['cell']}], addresses: [], urls: [], bday: '', anniversary: '', note: '', groups: [], photo: ''};
+    emails: [{value: '', type: ['home']}], phones: [{value: '', type: ['cell']}], addresses: [], urls: [], bday: '', anniversary: '', note: '', groups: [], photo: '', ...Object.fromEntries(Object.entries(draft || {}).filter(([, v]) => Array.isArray(v) ? v.length : v))};
   if (!fold && !books.some(b => b.id === st.book_id)) st.book_id = books[0].id;
   const custom = st.fn && st.fn !== [st.prefix, st.given, st.middle, st.family, st.suffix].filter(Boolean).join(' ');
   const typeSel = (k, i, it) => `<select class="ctty" data-ctk="${k}" data-ci="${i}" aria-label="${esc(tr('Kind'))}">${CT_TYPES[k].map(([v, n]) => `<option value="${v}" ${(it.type || [])[0] === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}${(it.type || [])[0] && !CT_TYPES[k].some(x => x[0] === it.type[0]) ? `<option value="${esc(it.type[0])}" selected>${esc(ctTypeWord(k, it))}</option>` : ''}</select>`;
@@ -602,6 +602,9 @@ async function ctEditor(c, cf) {
       if (S.route.mod === 'contacts' && isMobile() && !c) go('contacts/' + r.id);
     } catch (e) {  // api() showed it; 2.565.0 (#4705): saved elsewhere meanwhile: the dialog again with the current contact + what was typed
       if (e?.cf) { const x = e.cf; ctEditor({...x.cur, ...x.mine}, x); toast(tr('Changed by someone else in the meantime')); }
+      // 2.576.0 (#4764): another error (no connection, a server error, a rejected value): the dialog comes back with what was
+      // typed (an edit: the typed fields count as changed, as after a conflict); api() / the save showed the reason
+      else if (e?.message !== 'auth') { const mine = dlg ? objDiff(dlg.base, body) : body; if (c) ctEditor({...c, ...mine}, dlg ? {cur: c, theirs: [], mine, both: []} : undefined); else ctEditor(null, undefined, body); }
     }
   });
   setTimeout(() => { if (!c && !isTouch()) $('#ct-given', md)?.focus(); }, 40);

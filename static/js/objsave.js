@@ -92,8 +92,9 @@ async function objSaveForm(md, url, rec, body, method) {
   if (md?._objBase) md._objBase = null;  // saved: the dialog's own state is the base again
   return j === base ? null : j;
 }
-/** @param {any} md @param {any} x @param {(rec: any) => any} again */
-async function objConflict(md, x, again) {
+// 2.576.0 (#4764): field(dialog, k) -> the element of field k, when the dialog's inputs have no name (objMerge o.field)
+/** @param {any} md @param {any} x @param {(rec: any) => any} again @param {(m: any, k: string) => any} [field] */
+async function objConflict(md, x, again, field) {
   const cf = x?.conflict; if (!cf) return false;
   /** @type {any} */ let m = md?.isConnected ? md : null;
   if (!m) {  // the state to open: theirs with the person's changes; its base (not enumerable: never sent, never spread) = theirs
@@ -101,7 +102,7 @@ async function objConflict(md, x, again) {
     m = await Promise.resolve().then(() => again(rec)).catch(() => null);
   }
   if (!m?.isConnected) { toast(tr('Changed by someone else in the meantime')); return true; }
-  objMerge(m, cf, cur => { m._objBase = cur; }, {take: () => { m.remove(); again(cf.cur); }});
+  objMerge(m, cf, cur => { m._objBase = cur; }, {take: () => { m.remove(); again(cf.cur); }, field: field && (k => field(m, k))});
   return true;
 }
 // the version watch of an open dialog: when the counter of the app moved (S.v), the object is read again; another updated_at

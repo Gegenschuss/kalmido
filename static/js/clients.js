@@ -146,6 +146,7 @@ function clientModal(c, o = {}) {  // 2.80.0 (#1842): o.org_id (the office's are
   md.classList.add('cldlg');
   if (c && c.bill_edit === false) for (const el of md.querySelectorAll('.clbill [data-clb], [data-clb="email_invoice"]')) { el.disabled = true; el.removeAttribute('data-clb'); }  // 2.187.1 A (#2735): read only, never sent
   clkInit(md, c);
+  if (c?.updated_at) loadModule('objsave').then(() => dlgStale(md, `/api/clients/${c.id}`, () => (md._objBase || c._objBase || c).updated_at)).catch(() => {});  // 2.576.0 (#4764): saved elsewhere meanwhile -> the calm bar
   const scIn = $('#cl-sc', md), nmIn = $('#cl-name', md);  // 2.433.0 (#3604): capitals while typing, the automatic code as placeholder
   if (scIn) { scIn.addEventListener('input', () => { scIn.value = scIn.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); }); nmIn?.addEventListener('input', () => { scIn.placeholder = cl_autoCode(nmIn.value); }); }
   const close = fgModal(md);  // 2.40.0 (#1371): the client card asks before unsaved input is lost
@@ -204,7 +205,7 @@ function clientModal(c, o = {}) {  // 2.80.0 (#1842): o.org_id (the office's are
       if (!c && !o.stay) go('client/' + r.id);
       if (o.done) await o.done(r);
     } catch (x) {
-      if (typeof objConflict === 'function' && await objConflict(md, x, rec => clientModal(rec, o))) return;  // 2.576.0 (#4794): the merge bar
+      if (typeof objConflict === 'function' && await objConflict(md, x, rec => clientModal(rec, o), cl_field)) return;  // 2.576.0 (#4794): the merge bar
       const el = $('.aerr', md); if (el) el.textContent = x.message || '';
     }
   });
@@ -225,6 +226,9 @@ function cl_fdPut(md, v) {
 }
 // 2.269.0 C (#3017): someone else saved the client in between -- a bar instead of overwriting; "Reload" opens the dialog with
 // the saved state (the own input of this dialog is not saved, the bar says so)
+// 2.576.0 (#4764): the input of client field k in dialog md (for the merge bar's marks)
+const CL_IDS = {name: 'cl-name', name_extra: 'cl-nx', icon: 'cl-icon', email: 'cl-email', phone: 'cl-phone', display_name: 'cl-dname', note: 'cl-note', short_code: 'cl-sc', rate: 'cl-rate', budget_h: 'cl-bh', budget_amount: 'cl-ba', archived: 'cl-arch'};
+const cl_field = (md, k) => (CL_IDS[k] && $('#' + CL_IDS[k], md)) || md.querySelector(`[data-clb="${CSS.escape(k)}"]`);
 // 2.272.0 D (#3029): the text of a delete dialog from GET /api/clients/usage (u: null = unknown -> the general rule)
 function cl_delText(u, n = 1) {
   const t = [u?.in_use === n ? tr('Clients used in quotations, invoices or contracts are archived instead. Their projects stay; they only lose the client.')
