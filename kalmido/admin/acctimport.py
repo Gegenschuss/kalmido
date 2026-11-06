@@ -2542,14 +2542,54 @@ def umz_undo_tasks(c, uid, cr):
     return mine
 
 
-def umz_undo(c, uid, r):
-    """Undo of an account import (called by importers.imp_undo after its own checks): everything the run created.
-    2.272.0 C (#3027): tasks and lists go into the trash (restorable) instead of being deleted, and only what nobody touched
-    since the import: changed tasks, tasks with comments / files / time entries / subtasks added since and lists with such
-    tasks, other people's tasks or new project files stay; calendars and address books only go when nothing changed in them."""
+# 2.611.0 (#4866): the area of what an undo deletes for good, for the tables of the account import itself (oi_undo_preview)
+_UMZ_GONE_AREAS = {"habits": N_("Habits"), "filters": N_("Filters"), "templates": N_("Templates"), "template_files": N_("Templates"),
+                   "time_entries": N_("Time entries"), "bookmarks": N_("Bookmarks"), "sprints": N_("Sprints"), "list_rules": N_("Rules"),
+                   "ev_cals": N_("Calendars"), "pomos": N_("Focus sessions"), "view_layouts": N_("Saved arrangements"),
+                   "list_layouts": N_("Saved arrangements"), "journal": N_("Journal")}
+
+
+def _umz_there(c, uid, cr):
+    """2.611.0 (#4866): {(table, key)} of the rows run cr recorded that are still there and its undo may delete for good: by id
+    (the plan's rows - the account import's own and the areas' -, calendars, mailboxes), the more rows (umz_more_there), the
+    placements of tasks in other lists and the journal days. Taken before and after the undo's statements, the difference is what
+    went for good (rows put into a trash are still there). Table names only from fixed lists, never from the record."""
+    from .orgimport import oi_tables
+    from .umz_more import umz_more_there
+    from .umz_undoplan import undo_rows
+    names = oi_tables() | {"habits", "filters", "templates", "template_files", "time_entries", "bookmarks", "sprints", "list_rules",
+                           "portal_tickets", "ev_cals", "hub_mailboxes"}
+    want = {t: set(v) for t, v in undo_rows(cr).items() if t in names}
+    for t in ("ev_cals", "hub_mailboxes"):
+        want.setdefault(t, set()).update(int(x) for x in cr.get(t) or [])
+    out = umz_more_there(c, uid, cr)
+    for table, ids in want.items():
+        ids = sorted(ids)
+        for i in range(0, len(ids), 500):
+            p = ids[i:i + 500]
+            out.update((table, x[0]) for x in c.execute(f"SELECT id FROM {table} WHERE id IN ({','.join('?' * len(p))})", p).fetchall())
+    links = {(int(k[0]), int(k[1])) for t, k in cr.get("parts") or [] if t == "task_links" and isinstance(k, list) and len(k) == 2}
+    tids = sorted({x[0] for x in links})
+    for i in range(0, len(tids), 500):
+        p = tids[i:i + 500]
+        out.update(("task_links", (x[0], x[1])) for x in c.execute(
+            f"SELECT task_id, list_id FROM task_links WHERE task_id IN ({','.join('?' * len(p))})", p).fetchall() if (x[0], x[1]) in links)
+    days = [d for d in cr.get("journal") or [] if isinstance(d, str)]
+    for i in range(0, len(days), 500):
+        p = days[i:i + 500]
+        out.update(("journal", str(x[0])) for x in c.execute(f"SELECT day FROM journal WHERE user_id=? AND day IN ({','.join('?' * len(p))})",
+                                                             [uid] + p).fetchall())
+    return out
+
+
+def _umz_undo_rows(c, uid, r):
+    """2.611.0 (#4866): the database part of the undo of account import r, shared by umz_undo and its preview (umz_undo_preview runs
+    it in a savepoint and rolls it back): everything its numbers come from, so the preview counts exactly like the undo. Neither
+    commits nor touches files nor settings. -> (answer, cr, template file paths, area rows removed)."""
     cr = json.loads(r["created"] or "{}")
     since = parse_iso(r["created_at"])
-    from .orgimport import oi_undo, oi_undo_files, oi_undo_plan
+    from .orgimport import oi_undo, oi_undo_plan, oi_undo_preview
+    there = _umz_there(c, uid, cr)
     plan = oi_undo_plan(c, cr, since)  # 2.506.0 (#4299): before anything goes: only what is unchanged since and has nothing new below it
     n_oi, kept_rows = oi_undo(c, uid, cr, since, plan)  # 2.137.0 (#2344): the areas first (they point at the lists and tasks)
     kept_rows += umz_undo_parts(c, cr, plan, since, uid)  # 2.455.0 (#3469)
@@ -2618,6 +2658,21 @@ def umz_undo(c, uid, r):
         gone = c.execute("DELETE FROM hub_mailboxes WHERE id=? AND created_by=? AND secret='' AND error='password'", (int(mid), uid)).rowcount
         if not gone and c.execute("SELECT 1 FROM hub_mailboxes WHERE id=? AND created_by=?", (int(mid), uid)).fetchone():
             kept_rows += 1  # 2.533.0 (#4318) F20: a mailbox set up since (password saved) stays and is counted, not left out silently
+    kept_rows += plan.kept_n  # final after undo_trash (oi_undo): a folder that could not go into the trash stays
+    out = {"tasks": len(back), "lists": n_lists, "sections": 0, "kept_lists": kept_lists, "kept_tasks": len(kept),
+           "kept_cals": kept_cals, "kept_books": kept_books, "kept_rows": kept_rows, "trash_rows": plan.trashed, "trash": True,
+           "for_good": umz_areas_tr(oi_undo_preview(there - _umz_there(c, uid, cr), _UMZ_GONE_AREAS))}
+    return out, cr, tpl_paths, n_oi
+
+
+def umz_undo(c, uid, r):
+    """Undo of an account import (called by importers.imp_undo after its own checks): everything the run created.
+    2.272.0 C (#3027): tasks and lists go into the trash (restorable) instead of being deleted, and only what nobody touched
+    since the import: changed tasks, tasks with comments / files / time entries / subtasks added since and lists with such
+    tasks, other people's tasks or new project files stay; calendars and address books only go when nothing changed in them.
+    2.611.0 (#4866): the rows in _umz_undo_rows (its preview runs the same), here the settings, invitations, commit and files."""
+    out, cr, tpl_paths, n_oi = _umz_undo_rows(c, uid, r)
+    from .orgimport import oi_undo_files
     cur = usettings(c, uid)
     for k, v in (cr.get("settings") or {}).items():
         if k in UMZ_SETTINGS_ALL and isinstance(v, dict) and cur.get(k) == v.get("new"):  # 2.363.4 (#3127): + the allow list
@@ -2630,11 +2685,9 @@ def umz_undo(c, uid, r):
     c.commit()
     oi_undo_files(cr)  # 2.272.0 C (#3027): the files of the tasks stay with them in the trash (the trash run deletes them)
     unlink_files(tpl_paths)  # 2.464.0 (#3865)
-    kept_rows += plan.kept_n
-    print("account import undo", r["id"], "user", uid, "tasks", len(back), "kept", len(kept), "area rows", n_oi, "kept rows", kept_rows,
-          "into the trash", plan.trashed, flush=True)
-    return {"tasks": len(back), "lists": n_lists, "sections": 0, "kept_lists": kept_lists, "kept_tasks": len(kept),
-            "kept_cals": kept_cals, "kept_books": kept_books, "kept_rows": kept_rows, "trash_rows": plan.trashed, "trash": True}
+    print("account import undo", r["id"], "user", uid, "tasks", out["tasks"], "kept", out["kept_tasks"], "area rows", n_oi,
+          "kept rows", out["kept_rows"], "into the trash", out["trash_rows"], flush=True)
+    return out
 
 
 def umz_undo_preview(c, uid, iid):
@@ -2651,23 +2704,35 @@ def umz_undo_preview(c, uid, iid):
     until = umz_undo_until(since)
     if now_utc() > until:
         raise Denied(409, tr("An account import can only be undone within {0} days", ACCOUNT_IMPORT_UNDO_DAYS))
-    cr = json.loads(r["created"] or "{}")
-    from .orgimport import oi_undo_check, oi_undo_plan, oi_undo_preview
-    oi_undo_check(c, uid, cr, r["created_at"])
-    plan = oi_undo_plan(c, cr, since)
-    back, kept = imp_undo_split(c, uid, umz_undo_tasks(c, uid, cr), since, cr.get("time_entries") or [])
-    # the plan judges these of the account import itself too (umz_undoplan._BASE, bookmarks via "more", sprints & co. via "parts")
-    gone = umz_areas_tr(oi_undo_preview(plan, {"habits": N_("Habits"), "filters": N_("Filters"), "templates": N_("Templates"),
-                                                "template_files": N_("Templates"), "time_entries": N_("Time entries"),
-                                                "bookmarks": N_("Bookmarks"), "sprints": N_("Sprints"), "list_rules": N_("Rules")}))
-    n = 0
-    for day in cr.get("journal") or []:  # as umz_undo: a day written on since stays
-        j = c.execute("SELECT updated_at FROM journal WHERE user_id=? AND day=?", (uid, day)).fetchone()
-        n += bool(j) and not imp_undo_after(j["updated_at"], since)
-    if n:
-        gone.append({"what": tr("Journal"), "count": n})
-    return {"id": r["id"], "at": r["created_at"], "undo_until": iso(until), "for_good": gone, "trash_tasks": len(back),
-            "trash_rows": len(plan.roots), "kept_tasks": len(kept), "kept_rows": plan.kept_n}
+    from .orgimport import oi_undo_check
+    oi_undo_check(c, uid, json.loads(r["created"] or "{}"), r["created_at"])
+    # 2.611.0 (#4866): the undo itself in a savepoint, rolled back: its numbers are the preview's (no second way of counting)
+    got = []
+    real = c.__dict__.get("commit"), c.__dict__.get("rollback")
+
+    def refuse():
+        raise RuntimeError("the undo preview must not end the transaction")
+    c.commit = c.rollback = refuse  # a helper that commits would make the preview the undo: refused, the savepoint rolls back
+    try:
+        with c.savepoint():
+            got.append(_umz_undo_rows(c, uid, r)[0])
+            raise _UmzDryRun
+    except _UmzDryRun:
+        pass
+    finally:
+        for k, v in zip(("commit", "rollback"), real):
+            if v is None:
+                c.__dict__.pop(k, None)
+            else:
+                setattr(c, k, v)
+    p = got[0]
+    return {"id": r["id"], "at": r["created_at"], "undo_until": iso(until), "for_good": p["for_good"], "trash_tasks": p["tasks"],
+            "trash_rows": p["trash_rows"], "kept_tasks": p["kept_tasks"], "kept_rows": p["kept_rows"], "lists": p["lists"],
+            "kept_lists": p["kept_lists"], "kept_cals": p["kept_cals"], "kept_books": p["kept_books"]}
+
+
+class _UmzDryRun(Exception):
+    """2.611.0 (#4866): ends the preview's savepoint (rolled back)."""
 
 
 # ---------------------------------------------------------------- routes (people only)

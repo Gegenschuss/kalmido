@@ -363,6 +363,7 @@ def undo_trash(c, uid, plan):
     for rid in plan.of("clients", plan.roots):
         if c.execute("SELECT 1 FROM clients WHERE id=? AND deleted_at IS NULL", (rid,)).fetchone():
             cl_trash(c, rid)
+            plan.trashed += 1  # 2.611.0 (#4866): a client in its trash counts like a file, page or table (the undo dialog names them)
 
 
 def undo_files_left(c, plan, paths, extra_rows=(), owners=None):

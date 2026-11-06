@@ -602,18 +602,19 @@ def oi_undo_plan(c, cr, since):
     return undo_plan(c, cr, since, oi_tables(), {s.table: s.space for s in oi_specs()})
 
 
-def oi_undo_preview(plan, more=None):
-    """2.585.0 (#4350): what the undo plan `plan` deletes for good, by area -> [{what (N_ key), count}] (the rows going into
-    a trash and those that stay are counted by the caller); more = {table: N_ key} for the tables of the account import
-    itself (habits, filters ...). Reads nothing, the plan holds it."""
+def oi_undo_preview(gone, more=None):
+    """2.585.0 (#4350): what the undo deletes for good, by area -> [{what (N_ key), count}] (the rows going into a trash and those
+    that stay are counted by the caller); more = {table: N_ key} for the tables of the account import itself (habits, filters ...).
+    2.611.0 (#4866): gone = {(table, key)} the undo really removed (acctimport._umz_undo_rows compares before / after, also in
+    its preview, a run rolled back), no second way of counting from the plan. Reads nothing. Ties by name: the same order in the
+    preview and in the undo's answer."""
     labels, out = dict(more or {}), {}
     for spec in oi_specs():
         labels.setdefault(spec.table, _OI_AREA.get(spec.table) or spec.label)
-    for table, rid in plan.exist:
-        if plan.goes(table, rid):
-            k = labels.get(table) or N_("Other entries")
-            out[k] = out.get(k, 0) + 1
-    return sorted(({"what": k, "count": n} for k, n in out.items()), key=lambda x: -x["count"])
+    for table, _key in gone:
+        k = labels.get(table) or N_("Other entries")
+        out[k] = out.get(k, 0) + 1
+    return sorted(({"what": k, "count": n} for k, n in out.items()), key=lambda x: (-x["count"], x["what"]))
 
 
 def oi_prints(c, created):

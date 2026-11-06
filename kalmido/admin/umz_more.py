@@ -267,6 +267,27 @@ _UNDO = {"bookmarks": "id", "pomos": "id", "view_layouts": "id", "contact_care":
          "task_bell": "task_id", "task_watchers": "task_id", "conn_requests": "id"}
 
 
+def umz_more_there(c, uid, cr):
+    """2.611.0 (#4866): {(table, key)} of the rows umz_more_write recorded that are still there and the undo may delete (its
+    preview compares before / after; a connection request is withdrawn, never deleted: not here)."""
+    want = {}
+    for item in cr.get("more") or []:
+        if not (isinstance(item, list) and len(item) == 2 and item[0] in _UNDO) or item[0] == "conn_requests":
+            continue
+        col = _UNDO[item[0]]
+        v = item[1].get(col) if isinstance(item[1], dict) else item[1]
+        if isinstance(v, int) and not isinstance(v, bool):
+            want.setdefault(item[0], set()).add(v)
+    out = set()
+    for table, ids in want.items():
+        col, ids = _UNDO[table], sorted(ids)
+        for i in range(0, len(ids), 500):
+            p = ids[i:i + 500]
+            out.update((table, r[0]) for r in c.execute(f"SELECT {col} FROM {table} WHERE {col} IN ({','.join('?' * len(p))}) AND user_id=?",
+                                                         p + [uid]).fetchall())
+    return out
+
+
 def umz_more_undo(c, uid, cr, since, plan):
     """The rows umz_more_write recorded -> how many stay (2.506.0 #4299): one changed since the import is the person's own work now.
     Bookmarks: the plan judges them (their preview fetch writes the time columns) and counts them. A focus session is finished and
