@@ -145,6 +145,25 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   check(d.querySelectorAll('.tl-grp .tl-ms, .tl-dia').length === 2 && d.querySelectorAll('.tl-msl').length === 2, 'milestones as markers / diamonds in the timeline: ' + d.querySelectorAll('.tl-ms, .tl-dia').length);
   check(d.querySelector('.tl-ms.done') && /Beta/.test(d.querySelector('.tl-ms.done').title), 'a reached milestone looks done');
   await call('PATCH', `/api/lists/${P}`, {view: 'list'});
+  // 2.607.0 (#4901, CI red p271_ui): a load() under way when the view is switched, overtaken by writes in all three tries
+  // (the last one began before the click): its older state must not put the view back to "list". Its GETs are fetched at
+  // once (the server's state of that moment) and answered when the test lets them go; "other writes" = S.wseq counted up.
+  w.eval('load().then(() => render())');
+  await until(() => w.eval(`listById(${P}).view`) === 'list' && !d.querySelector('#view .tl'));
+  { const f1 = w.fetch, held = [];
+    w.fetch = (u, o = {}) => /\/api\/state\?/.test(String(u)) && !/auto=1/.test(String(u)) && (o.method || 'GET') === 'GET'
+      ? new Promise(res => { const r = f1(u, o); held.push(more => { if (more) w.eval('S.wseq += 2'); res(r); }); }) : f1(u, o);
+    const ld = w.eval('load()');
+    await until(() => held.length === 1); held.shift()(true);
+    await until(() => held.length === 1); held.shift()(true);
+    await until(() => held.length === 1);  // the third try, begun before the click
+    click(w, d.querySelector('#top [data-act="view-timeline"]'));
+    await until(async () => w.eval('OPT.size') === 0 && (await call('GET', '/api/state')).lists.find(l => l.id === P).view === 'timeline');
+    held.shift()(false); await ld; w.fetch = f1;
+    w.eval('render()');
+    check(w.eval(`listById(${P}).view`) === 'timeline' && d.querySelector('#view .tl'), '#4901: an older state that was on its way keeps the switched view ' + w.eval(`listById(${P}).view`));
+  }
+  await call('PATCH', `/api/lists/${P}`, {view: 'list'});
   w.close();
 
   // German wording: "Projektübersicht", never the global "Übersicht"

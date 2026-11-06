@@ -1288,7 +1288,7 @@ function userSwitch(id) {
 }
 // 2.489.0 C (#2656): public links of this kind may be made (the instance switch and the kind's switch; the server checks too)
 const pubOn = kind => !!S.publicLinks && !(S.publicLinksOff || []).includes(kind);
-function applyState(j) {
+function applyState(j, w0) {  // w0: S.wseq when its GET /api/state started (ld_go), 2.607.0 (#4901)
   if (j.me) {  // another user than last time in this browser: drop everything local of the previous one (userSwitch)
     const last = LS.get('uid', null);
     if (last !== null && last !== j.me.id) {
@@ -1360,6 +1360,7 @@ function applyState(j) {
   if (j.evsig !== undefined && j.evsig !== S.evsig) { S.evsig = j.evsig; if (S.booted) calInvalidate(); }
   // language changed on another device: switch once its file is loaded (the boot awaits it itself)
   if (S.booted && (j.settings.lang || 'en') !== I18N.code) i18nLoad(j.settings.lang).then(ok => { if (ok) render(); });
+  for (const p of OPT_DONE) { if ((w0 != null && p.end <= w0) || Date.now() - p.at > 120000) OPT_DONE.delete(p); else p.put(); }  // 2.607.0 (#4901)
   for (const p of OPT) p.put();  // 2.41.2 (#1501): own changes still on the way stay on top of a state fetched meanwhile
   if (typeof le2eState === 'function') le2eState();  // 2.64.1 (#1817): locked lists, ciphers of the offline cache
 }
@@ -1368,10 +1369,15 @@ function applyState(j) {
 // (api() said why) puts the old state back. While the request runs, a state that arrives (the poll's load()) gets the
 // change again on top, so the own change never flickers back; a state fetched across the write's end is fetched again (wseq).
 const OPT = new Set();
+// 2.607.0 (#4901, CI red p271_ui): a load() that began before an own write and was overtaken by writes three times in a row
+// is applied all the same (ld_go); the write's change was no longer in OPT then and flipped back (a list's view went back to
+// "list" after "Timeline"). A finished write stays here with S.wseq at its end until a state arrives whose GET began after
+// it (applyState's w0 >= end: the server's answer holds it), at most two minutes.
+const OPT_DONE = new Set();
 async function optWrite(put, req, draw = render) {  // draw: how the screen follows (default: everything)
   const p = {put}, back = put();
   OPT.add(p); draw();
-  try { return await req(); }
+  try { const r = await req(); p.end = S.wseq || 0; p.at = Date.now(); OPT_DONE.add(p); return r; }
   catch (e) { OPT.delete(p); back?.(); draw(); throw e; }
   finally { OPT.delete(p); }
 }
@@ -1399,11 +1405,11 @@ async function load(auto, want) {
   try { return await p; } finally { if (ld_run === p) ld_run = null; }
 }
 async function ld_go(auto) {
-  let j;
+  let j, ld_w0 = null;
   try {
     let crossed = false;
     for (let i = 0; i < 3; i++) {  // 2.13.4: an answer that a write overtook is fetched again (see rawFetch)
-      const w0 = S.wseq || 0;
+      const w0 = ld_w0 = S.wseq || 0;  // 2.607.0 (#4901): for applyState (OPT_DONE)
       j = await api('GET', (auto && !i ? '/api/state?auto=1&' : '/api/state?') + 'td=1&' + lzQuery());  // 2.575.0 B (#3966): + td  // 2.369.2 (#3136): + the start set  // 2.280.0 F (#3109): a repeat is no herd reload (it would brake itself)
       crossed = (S.wseq || 0) !== w0;
       if (!crossed) break;
@@ -1426,10 +1432,10 @@ async function ld_go(auto) {
     return;
   }
   if (OUT.q.length) {  // flush() reloads once the queue is through
-    if (!S.tasks.size || j?.me?.id !== S.me?.id) { applyState(j); OUT.q.forEach(applyLocal); }  // 2.126.0 D (#1992 O5): another user = applyState's switch
+    if (!S.tasks.size || j?.me?.id !== S.me?.id) { applyState(j, ld_w0); OUT.q.forEach(applyLocal); }  // 2.126.0 D (#1992 O5): another user = applyState's switch
     flush(); return;
   }
-  applyState(j);
+  applyState(j, ld_w0);
   if (S.qfWait && typeof qfSend === 'function') qfSend();  // 2.376.1 CI fix: files of a quick add whose new task was not loaded yet
   LS.set('cache', j); S.lpCache = j;  // 2.42.0 (#1376): the delta keeps the cache current (liveparts.js)
   if (S.extra) await loadExtra().catch(() => {});
