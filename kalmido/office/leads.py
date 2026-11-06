@@ -23,6 +23,7 @@ from ..core.csvimport import amount_text, csv_table_numbered
 from .calc import dec, dstr, money
 from .model import office_on, office_role, pb_cl_live, pb_cl_org, pb_cl_sql
 from .rights import ofr_rights
+from .owrite import ow_created  # 2.585.0 (#4795)
 from .legacyimport import fx_run, fx_settle  # 2.363.2 (#3104)
 from ..team.clients import cl_trash
 from .pipeline import (EMAIL_RE, LEAD_SOURCES, MAX_DEALS, PL2_PROB, _client_ok, _ctx, _one, _row, _txt, _update,
@@ -75,7 +76,9 @@ def lead_insert(c, oid, by, row):
     ts = iso_ms(now_utc())  # 2.571.0 (#4776): milliseconds, as every later save (ow_write)
     row.update(org_id=oid, created_by=by, created_at=ts, updated_at=ts)
     row = oc_enc_fields(c, oid, "office_deals", row)
-    return insert_id(c, f"INSERT INTO office_deals({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
+    did = insert_id(c, f"INSERT INTO office_deals({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
+    ow_created(c, by, "office_deal", did, row, oid)  # 2.585.0 (#4795): the lead starts its history (import, booking, agents)
+    return did
 
 
 def lead_title(b):

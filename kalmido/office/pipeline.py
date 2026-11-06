@@ -15,7 +15,7 @@ from flask import jsonify, request
 
 from ..core.config import app
 from ..core.pg import insert_id
-from .owrite import ow_history_answer, ow_kind, ow_uid, ow_write  # 2.567.0 (#4711): the office's write layer
+from .owrite import ow_created, ow_history_answer, ow_kind, ow_uid, ow_write  # 2.567.0 (#4711): the office's write layer; 2.585.0 (#4795): + ow_created
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.i18n import tr
 from ..core.db import body, bump, db, iso_ms, local_now, now_utc
@@ -304,6 +304,7 @@ def pl2_post():
     row.update(org_id=oid, created_by=uid, created_at=ts, updated_at=ts)
     row = oc_enc_fields(c, oid, "office_deals", row)
     did = insert_id(c, f"INSERT INTO office_deals({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
+    ow_created(c, uid, "office_deal", did, row, oid)  # 2.585.0 (#4795): a new deal / lead starts its history
     bump(c)
     c.commit()
     return jsonify(_one(c, oid, did)), 201

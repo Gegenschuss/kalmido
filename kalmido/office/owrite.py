@@ -170,6 +170,14 @@ def ow_write(c, uid, kind, rid, b, clean, *, where="id=? AND org_id=?", args=Non
     return (dec(c, new) if dec else dict(new)), changed
 
 
+def ow_created(c, uid, kind, rid, row, oid):
+    """2.585.0 (#4795): the "create" entry of a row made outside ow_write (a deal / lead): row = the columns as stored (sealed
+    ones stay sealed, as in ow_write's entries), without the bookkeeping columns and empty values."""
+    skip = ("org_id", "created_by", "created_at", "updated_by", "updated_at", "sort")
+    obj_history_add(c, uid, kind, rid, {}, {k: _stored(v) for k, v in row.items() if k not in skip and v not in (None, "", 0)},
+                    action="create", org_id=oid or None)
+
+
 def ow_history(c, kind, rid, oid, limit=50):
     """The history of row rid of kind, newest first. The caller checked the rights to read it (the office's own).
     2.570.0 (#4783 review F2): only the entries of office area oid (defence in depth on top of the route's row check);
