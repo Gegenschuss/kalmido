@@ -100,6 +100,14 @@ def fl_clean(c, ws, d, old=None):
         shown = None if keep else r["hook_secret"]
     else:
         r.pop("hook_secret", None)
+    if RU.trigger_of(r) == "scheduled":  # 2.581.0 (#4803 review): stamps count from the day the timing was set (since), not
+        # from the day the row was made: an old flow turned into a scheduled one does not run over the whole archive
+        o = old if isinstance(old, dict) else {}
+        same = RU.trigger_of(o) == "scheduled" and o.get("days") == r.get("days") and o.get("from") == r.get("from")
+        if not same:
+            r["since"] = local_now().date().isoformat()
+        elif o.get("since"):
+            r["since"] = o["since"]  # unchanged timing keeps its day (a flow saved before has none: its created_at, fl_tick)
     return r, shown
 
 
@@ -335,7 +343,8 @@ def fl_tick(c):
             days = int(r.get("days") or 0)
             col = SCHED_COL[r["from"]]
             try:
-                since = date.fromisoformat(r["_day"]) if r["_day"] else today
+                day = r.get("since") or r["_day"]  # 2.581.0 (#4803 review): the day the timing was set (fl_clean)
+                since = date.fromisoformat(str(day)[:10]) if day else today
             except ValueError:
                 since = today
             last, first = (today - timedelta(days=days)).isoformat(), (since - timedelta(days=days)).isoformat()
