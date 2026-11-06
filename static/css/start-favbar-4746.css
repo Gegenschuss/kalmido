@@ -1,6 +1,6 @@
 /* 2.572.0 (#4746, #4749): the head bar's favourites - rules of their own file since app.css takes no new ones (check_layout).
    #4749: a small letter badge tells equal symbols apart (favtiles.js fv2_distinct). #4746: the search shrinks first (12rem down
    to 7rem, app.css #kbar .kbsrch), then it is the loupe only (#kbar.kb-mini, favtiles.js fv2_fit), only then +N. */
-.fv2bar .fv2-bdg{position:absolute;left:.0625rem;bottom:.0625rem;min-width:.875rem;height:.875rem;padding:0 .125rem;display:flex;align-items:center;justify-content:center;border:1px solid var(--line2);border-radius:.25rem;background:var(--bg3);color:var(--text);font-size:.5625rem;font-weight:600;line-height:1;pointer-events:none}  /* 2.572.0 (#4749): equal symbols told apart */
+.fv2bar .fv2-bdg{position:absolute;left:.0625rem;bottom:.0625rem;min-width:.875rem;height:.875rem;padding:0 .125rem;display:flex;align-items:center;justify-content:center;border:1px solid var(--line2);border-radius:.25rem;background:var(--bg3);color:var(--text);font-size:var(--fs-xxs);font-weight:600;line-height:1;pointer-events:none}  /* 2.572.0 (#4749): equal symbols told apart; 2.582.0 (#4730): 9 px -> --fs-xxs (10 px), the smallest step of the scale (p2419_scale) */
 #kbar.kb-mini .kbsrch{width:1.875rem;min-width:1.875rem;flex:none;justify-content:center;padding:0}  /* 2.572.0 (#4746): the search shrinks first (12rem down to 7rem), then it is the loupe only (favtiles.js fv2_fit), only then +N */
 #kbar.kb-mini .kbsrch>span,#kbar.kb-mini .kbsrch>kbd{display:none}
