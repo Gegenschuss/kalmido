@@ -31,7 +31,7 @@ const dstr = x => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0'
   const q = await call('POST', '/api/office/docs', {kind: 'offer', lang: 'en', project_title: 'Spot', client_id: C.id, service_from: D1, items: [{kind: 'service', title: 'Concept', qty: 1, unit: 'day', rate: 800}]});
   const p = await call('POST', `/api/office/docs/${q.id}/parts`, {kind: 'shoot', title: 'Shoot Harbour'});
   const sh = await call('PATCH', `/api/office/docs/${q.id}/parts/${p.part?.id}`, {sheet: {head: {shoot_days: 2}, staff: [{role_id: CAM, qty: 2}]}});
-  check(q.id && p.part?.id && sh.status === 200 && CAM, 'setup: a quotation with a shoot part ' + sh.status);
+  check(q.id && p.part?.id && sh.id === q.id && CAM, 'setup: a quotation with a shoot part ' + JSON.stringify(sh).slice(0, 160));
 
   // ================= the preview: the shoot day with its date and places
   let w = await boot({user: 'alice', hash: 'office/offers/' + q.id}), d = w.document;
