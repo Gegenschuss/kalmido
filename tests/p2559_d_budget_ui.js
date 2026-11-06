@@ -141,7 +141,8 @@ async function round(who, ck) {
   check(await until(() => toastHas(/Deleted: Books/)), `${who}: the undo is offered after the answer`);
   unhold(w);
   await sleep(300);  // a reload the actions might start would be on its way by now
-  check(!stateFetches(w).length, `${who}: no action fetched the whole state again: ` + stateFetches(w).join(' | '));
+  // #3506 (CI red of 2.575.0, CI only, green on the Mac): the FAIL line names every request since watch() (which action led to it)
+  check(!stateFetches(w).length, `${who}: no action fetched the whole state again: ` + stateFetches(w).join(' | ') + (stateFetches(w).length ? ' -- all: ' + w.__sent.join(' > ').slice(-1500) : ''));
   w.close();
 }
 
