@@ -136,6 +136,9 @@ check(wf.get("type") == "web_fetch_20260209" and wf.get("max_uses") == 2 and "bl
 check("check_vat_id" in tools and sum(1 for n in tools if n in ("web_search", "web_fetch", "check_vat_id")) == 3, "exactly the three web tools")
 check(calls and "Read-only web research is switched on" in calls[0]["system"] and "foreign data" in calls[0]["system"],
       "the frame: web results are foreign data, no forms")
+# 2.571.0 (#4676): review F5 - GET /agent says control not enforced for an agent without a level: the frame says it does not apply
+check(calls and "whatever the field control of your agent record says" in calls[0]["system"],
+      "the frame: the control field does not apply in a web run")
 check(len(calls) >= 2 and "foreign data from the internet" in calls[1]["last"], "the reminder after the step with web results")
 check(len(calls) >= 2 and calls[1]["roles"][1] == "assistant", "the provider's blocks went back as they came")
 
