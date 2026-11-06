@@ -948,7 +948,7 @@ def encrypt_all(c, stop=None, pause=0.0):
             tot[k] += r[k]
     # 2.64.0 (#1864): the private spaces' files, and files that lie in another space now
     st = files_settle(c, stop, pause=pause)
-    tot["fields"] += _bud().bud_settle(c, stop=stop)  # 2.72.0 (#1333): the household budget's rows in their list's space
+    tot["fields"] += bud_settle_again(c, stop=stop)  # 2.72.0 (#1333): the household budget's rows in their list's space
     tot["fields"] += _wkh().wkh_settle(c, stop=stop)["changed"]  # 2.123.0 A (#2105): the knowledge pages' texts and history
     tot["fields"] += _priv_rows(c, stop=stop)  # 2.306.0 A (#2885): the journal and the private filed mails
     tot["fields"] += docs_pass(c, True, stop)["changed"]  # 2.126.0 A (#1971): the documents' values
@@ -1114,7 +1114,7 @@ def oc_settle_lists(list_ids, again=0):
     try:
         c = connect()
         files_settle(c, list_ids=list_ids, pause=_pause())
-        _bud().bud_settle(c, list_ids=list_ids, again=int(again or 0))  # 2.72.0 (#1333): a moved budget list's rows for its new space
+        bud_settle_again(c, list_ids=list_ids, again=int(again or 0))  # 2.72.0 (#1333): a moved budget list's rows for its new space
     except Exception as e:  # noqa: BLE001 -- a background thread never takes the server down
         print(TAG, "resealing moved files failed:", type(e).__name__, flush=True)
     finally:
@@ -1131,6 +1131,14 @@ def oc_settle_lists(list_ids, again=0):
 # transaction is long over by then; a list still busy after that is left to the next full pass (start-up, a move's kick)
 # instead of a queue row that comes back for ever
 OC_SETTLE_AGAIN = 4
+
+
+def bud_settle_again(c, list_ids=None, stop=None, again=0):
+    """2.611.0 (#4865): life/budget.py bud_settle of the background passes, the lists it had to leave queued again. -> rows."""
+    left = []
+    n = _bud().bud_settle(c, list_ids=list_ids, stop=stop, left=left)
+    oc_settle_again(left, again)
+    return n
 
 
 def oc_settle_again(list_ids, again=0):

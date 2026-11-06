@@ -236,7 +236,7 @@ check(s["sids"] == [-ids["paula"]] and s["file"] == -ids["paula"] and s["titles"
 
 # ---------------------------------------------------------------- #4865: a busy list is queued again, bounded
 r = in_ct(BUD + """owner(c2, BOB, commit=False)  # a request hands the list to bob, not committed yet
-n = bud.bud_settle(c, list_ids=[PL])
+n = cli.bud_settle_again(c, list_ids=[PL])
 mid = state(c)
 c2.commit()
 first = list(calls)
@@ -245,7 +245,7 @@ if calls:
 end = state(c)
 calls.clear()
 owner(c2, PID, commit=False)  # busy again, but queued often enough already: no new row (no loop)
-bud.bud_settle(c, list_ids=[PL], again=cli.OC_SETTLE_AGAIN)
+cli.bud_settle_again(c, list_ids=[PL], again=cli.OC_SETTLE_AGAIN)
 c2.rollback()
 print(json.dumps({"n": n, "mid": mid["sids"], "first": first, "bound": calls, **end}))""")
 check(r["n"] == 0 and r["mid"] == [-ids["paula"]], f"#4865: the busy list is left to its transaction {r}")
@@ -266,7 +266,7 @@ def edit_between(k, table, row):  # right after the pass read the row: an edit c
         c2.commit()
     return orig(k, table, row)
 bud.bud_dec = edit_between
-n = bud.bud_settle(c, list_ids=[PL])
+n = cli.bud_settle_again(c, list_ids=[PL])
 bud.bud_dec = orig
 mid = state(c)
 first = list(calls)

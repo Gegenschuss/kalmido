@@ -152,15 +152,15 @@ def bud_dkey(c, lid, sid, day, amount, kind, title):
     return hmac.new(key, msg, hashlib.sha256).hexdigest()[:40]
 
 
-def bud_settle(c, list_ids=None, plain=None, force_from=None, stop=None, commit=True, again=0):
+def bud_settle(c, list_ids=None, plain=None, force_from=None, stop=None, commit=True, left=None):
     """Every budget row encrypted for the space of its list now. plain(sid) -> True: decrypt that row (the way back:
     decrypt-all / decrypt-private); force_from = a space whose key is about to go (an account / organisation is
     deleted): its rows are moved to the space they lie in now even when that one is switched off. Rows of a space that is
     not active stay as they are (like files_settle). Commits per list (commit=False: inside the caller's transaction).
-    again (2.611.0, #4865): how often these lists were queued again already (admin/orgcrypt_cli.py oc_settle_again).
-    -> number of rows changed."""
+    left (2.611.0, #4865): a list that gets the ids of the lists the background pass could not finish (busy, or a row changed
+    meanwhile) -- admin/orgcrypt_cli.py bud_settle_again queues them again. -> number of rows changed."""
     n = 0
-    left = []  # 2.611.0 (#4865): lists the background pass could not finish (busy, or a row changed meanwhile): queued again
+    left = [] if left is None else left
     with system_ctx(c):  # orgcrypt: server-side bulk work over every space (no content leaves this function)
         q, args = "SELECT id, org_id, owner_id FROM lists WHERE life='budget'", []
         if list_ids is not None:
@@ -228,9 +228,6 @@ def bud_settle(c, list_ids=None, plain=None, force_from=None, stop=None, commit=
         if commit:
             c.commit()  # 2.585.0 (#4836): also when nothing changed -- ends the list's FOR SHARE
             n += changed
-    if left and commit and not plain and force_from is None:
-        from ..admin.orgcrypt_cli import oc_settle_again  # (late: that module imports this one)
-        oc_settle_again(left, again)
     return n
 
 
