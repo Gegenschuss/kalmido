@@ -184,7 +184,9 @@ check(pub.get(B + f"/ical/ev/{fid}.{'x' * len(sec)}.ics").status_code == 404, "(
 kt.dbx("UPDATE ev_cal_feeds SET secret=?, secret_hash=NULL WHERE id=?", ("altesGeheimnis4708abcdefghijklmnopqrstuv", int(fid or 0)))
 out = box("from kalmido.core.tokenhash import tkh_migrate\nprint('migrated', tkh_migrate(c))")
 row = (kt.dbx("SELECT secret, secret_hash FROM ev_cal_feeds WHERE id=?", (int(fid or 0),)) or [["?", None]])[0]
-check("migrated 1" in out and row[0] == "" and row[1], f"(6) the start hashes a plain secret left from before {out[-200:]} {row[0]!r}")
+import hashlib  # noqa: E402
+check(row[0] == "" and row[1] == hashlib.sha256(b"altesGeheimnis4708abcdefghijklmnopqrstuv").hexdigest(),
+      f"(6) the start hashes a plain secret left from before {[x for x in out.splitlines() if 'migrated' in x or 'Error' in x]} {row[0]!r}")
 r = pub.get(B + f"/ical/ev/{fid}.altesGeheimnis4708abcdefghijklmnopqrstuv.ics")
 check(r.status_code == 200, f"(6) ... and the old address still works {r.status_code}")
 U2 = Fr.post(B + f"/api/evcals/{FCAL}/feed", json={"action": "rotate"}).json().get("url") or ""

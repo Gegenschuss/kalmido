@@ -293,7 +293,8 @@ check(Fr.get(B + "/api/evinvite").json()["mail_ok"] is True, "freelancer: the ed
 UF = Fr.post(B + f"/api/evcals/{FCAL}/feed", json={"action": "create"}).json().get("url")
 rf = pub.get(B + feed_path(UF)) if UF else None
 check(rf is not None and rf.status_code == 200 and "Kundentermin" in rf.text, "freelancer: the subscription link of the own calendar")
-check(Fr.get(B + f"/api/evcals/{FCAL}/feed").json()["url"] == UF, "freelancer: the link is shown again")
+# 2.577.0 (#4708 6): the address is shown once; later the dialog sees "active"
+check(Fr.get(B + f"/api/evcals/{FCAL}/feed").json().get("active") is True, "freelancer: the link stays active (shown once)")
 check(Ca.get(B + f"/api/evcals/{FCAL}/feed").status_code == 404, "nobody else reaches the freelancer's link")
 check(Fr.post(B + f"/api/evcals/{FCAL}/feed", json={"action": "off"}).json()["url"] is None and pub.get(B + feed_path(UF)).status_code == 404,
       "freelancer: off")
