@@ -18,7 +18,7 @@ from datetime import date, datetime, timedelta
 from decimal import ROUND_DOWN, ROUND_HALF_UP, ROUND_UP, Decimal
 
 from ..core.db import local_now
-from .formula import ShErr, _date, _lg, _num, _text, _truthy, sh_parse_date, sh_parse_number
+from .formula import ShErr, _date, _lg, _num, _text, _truthy, sh_fn_key, sh_parse_date, sh_parse_number
 from .shfuncs import _Grid, _args, _int, _lookup_approx, _lookup_exact, _matches, _safe, _SKIP, _as, shf_crit, shf_grid, shf_spend
 
 SHF2_WORKDAYS_MAX = 100_000  # ARBEITSTAG: work days one call may step (about 380 years)
@@ -464,7 +464,6 @@ def shf_xl_text_fmt(f):
 
 def shf_text_fmts(toks):
     """The indexes of the text tokens that are the whole second argument of a TEXT call (the format)."""
-    from .formula import sh_fn_key
     out, stack = set(), []
     for i, t in enumerate(toks):
         if t[0] == "(":
