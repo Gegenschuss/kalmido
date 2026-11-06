@@ -241,13 +241,14 @@ function tcMsgMenu(anchor, mid) {
   const inTh = !!anchor?.closest?.('.tthview'), list = inTh ? tth_all() : S.tc.msgs;  // 2.139.0 A (#2127): a message of the thread view
   const m = list.find(x => x.id === mid); if (!m || m.deleted) return;
   const mine = m.user_id === S.me?.id;  // 2.37.0 (#1159): the menu on every message (Save as task); Edit / Delete only on my own
-  menu(anchor, [{label: tr('Reply'), icon: 'reply', fn: () => replyStart(inTh ? 'h' : 't', mid)},
-    ...(!inTh && !m.thread_of ? [{label: tr('Reply in thread'), icon: 'comment', fn: () => tth_open(S.tc.rid, mid, true)}] : []),  // 2.139.0 A (#2127)
-    cpnItem('t', m),  // 2.62.0 (#1848): Pin / Unpin
+  const sn = !!S.tc.room?.say_no;  // 2.607.0 (#4549): a guest / read-only person only reads: no Reply, Pin or Edit (Delete stays)
+  menu(anchor, [...(sn ? [] : [{label: tr('Reply'), icon: 'reply', fn: () => replyStart(inTh ? 'h' : 't', mid)}]),
+    ...(!sn && !inTh && !m.thread_of ? [{label: tr('Reply in thread'), icon: 'comment', fn: () => tth_open(S.tc.rid, mid, true)}] : []),  // 2.139.0 A (#2127)
+    ...(sn ? [] : [cpnItem('t', m)]),  // 2.62.0 (#1848): Pin / Unpin
     {label: tr('Copy'), icon: 'copy', fn: () => chatCopy(list, m, 'team')},  // 2.37.0 (#1165)
     {label: tr('Copy as Markdown'), icon: 'copy', fn: () => chatCopy(list, m, 'team', true)},  // 2.41.0 (#1374)
     ...(m.enc ? [] : [{label: m.saved_task_id ? tr('Saved as a task: open it') : tr('Save as task'), icon: 'bookmark', fn: () => m.saved_task_id ? chatSaveOpen(m.saved_task_id) : chatSaveModal('team', m, () => tcPatch())}]),  // 2.42.0 (#909): not for encrypted ones
-    ...(mine && !(m.enc && !m._dec) ? [{label: tr('Edit'), icon: 'edit', fn: () => { S.tc.edit = mid; S.tc.editTh = inTh; S.tc.editVer = m.edited_at || m.created_at; tcPatch(); setTimeout(() => { const t = tth_editBox(); if (t) { t.focus(); autosize(t); } }, 0); }},
+    ...(mine && !(m.enc && !m._dec) ? [sn ? null : {label: tr('Edit'), icon: 'edit', fn: () => { S.tc.edit = mid; S.tc.editTh = inTh; S.tc.editVer = m.edited_at || m.created_at; tcPatch(); setTimeout(() => { const t = tth_editBox(); if (t) { t.focus(); autosize(t); } }, 0); }},
       {label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => tcMsgDelete(mid)}] : [])]);
 }
 async function tcMsgDelete(mid) {
