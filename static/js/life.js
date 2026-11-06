@@ -488,34 +488,53 @@ document.addEventListener('change', e => {
   $$('.jhist a[download]').forEach(a => { a.href = a.href.replace(/&(from|to)=[^&]*/g, '') + (JH.from ? '&from=' + JH.from : '') + (JH.to ? '&to=' + JH.to : ''); });
 });
 // 2.269.0 C (#3017): one save after the other (each one's base = the answer of the one before) with expect_updated_at ("" = no
-// entry seen): written on the other device meanwhile -> 409, the bar offers "Reload" instead of overwriting
+// entry seen): written on the other device meanwhile -> 409
+// 2.576.0 (#4764): through the core's helper (objsave.js saveDialog / objMerge): the own text stays in the field, the bar marks
+// what the other device changed (its text as the title); while it shows nothing is saved by itself; "Keep mine" saves the own
+// text over the other one, "Take theirs" shows the saved entry (no bar "Reload" that drops the input any more)
 function rvSave(day, patch) { RV.chain = (RV.chain || Promise.resolve()).then(() => rvSave0(day, patch)); return RV.chain; }
+const rv_put = (r, j) => { r.journal = [...r.journal.filter(x => x.day !== j.day), ...(j.text || j.mood ? [j] : [])].sort((a, b) => a.day.localeCompare(b.day)); };
 async function rvSave0(day, patch) {
   const r = RV.data; if (!r?.journal) return;
   const cur = r.journal.find(x => x.day === day) || {day, text: '', mood: null, updated_at: ''};
-  const next = {...cur, ...patch};
+  const next = {...cur, ...patch}, url = `/api/life/journal/${day}`;
+  if (typeof saveDialog !== 'function') await loadModule('objsave').catch(() => { /* offline without the copy: saved as before */ });
+  const put = b => rawFetch('PUT', url, {text: next.text, mood: next.mood, expect_updated_at: b.expect_updated_at || ''});
   try {
-    const j = await rawFetch('PUT', `/api/life/journal/${day}`, {text: next.text, mood: next.mood, expect_updated_at: cur.updated_at || ''});
-    r.journal = [...r.journal.filter(x => x.day !== day), ...(j.text || j.mood ? [j] : [])].sort((a, b) => a.day.localeCompare(b.day));
+    const j = typeof saveDialog === 'function' ? await saveDialog(url, cur, {text: next.text, mood: next.mood ?? null}, {key: 'entry', send: put})
+      : await put({expect_updated_at: cur.updated_at || ''});
+    if (j?.conflict) { rv_conflict(r, day, j.conflict); return; }
+    if (j === cur) return;  // nothing changed
+    rv_put(r, {...j, day: j.day || day});
+    rv_unmark();  // saved over a conflict (e.g. a mood): its bar and marks go
     const s = $('.rvsaved'); if (s) s.textContent = tr('Saved');
   } catch (x) {
-    if (x.status === 409 && x.data?.entry) { rv_conflict(r, x.data.entry); return; }
+    if (x.status === 409) { toast(tr('Changed in the meantime')); return; }  // without objsave.js
     if (x.message !== 'auth') toast(x instanceof Offline ? tr('Offline: only works again with a connection') : x.message);
   }
 }
-function rv_conflict(r, theirs) {
-  const s = $('.rvsaved'); if (!s) { toast(tr('Changed in the meantime')); return; }
-  s.innerHTML = `${esc(tr('Changed in the meantime'))} · ${esc(tr('Reload shows the saved version; your input here is not saved.'))} <button type="button" class="btn sm" data-rv-reload>${tr('Reload')}</button>`;
-  $('[data-rv-reload]', s).addEventListener('click', ev => {
-    ev.stopPropagation(); clearTimeout(RV.t); RV.t = null;
-    r.journal = [...r.journal.filter(x => x.day !== theirs.day), ...(theirs.text || theirs.mood ? [theirs] : [])].sort((a, b) => a.day.localeCompare(b.day));
-    renderView();
+function rv_unmark() {
+  $('.rvjournal .obj-merge')?.remove();
+  $$('.rvjournal .obj-theirs').forEach(x => { x.classList.remove('obj-theirs'); x.style.outline = ''; });
+}
+function rv_conflict(r, day, cf) {
+  const sec = $('.rvjournal'), ta = $('#rv-text');
+  if (!sec || !ta || ta.dataset.day !== day) { rv_put(r, {...cf.cur, day}); toast(tr('Changed by someone else in the meantime')); return; }
+  clearTimeout(RV.t); RV.t = null;
+  objMerge(sec, cf, cur => rv_put(r, {...cur, day}), {field: k => k === 'text' ? ta : k === 'mood' ? $('.rvmood', sec) : null,  // lazy-ok: cf comes from saveDialog
+    take: () => { clearTimeout(RV.t); RV.t = null; renderView(); }});
+  const bar = $('.obj-merge', sec);
+  bar?.querySelector('[data-om="mine"]')?.addEventListener('click', () => {
+    const on = $('.rvmood .on', sec);
+    rvSave(day, {text: ta.value, mood: on ? +on.dataset.v : null});
   });
 }
 document.addEventListener('input', e => {
   if (e.target.id !== 'rv-text') return;
   const el = e.target, s = $('.rvsaved'); if (s) s.textContent = '';
-  clearTimeout(RV.t); RV.t = setTimeout(() => rvSave(el.dataset.day, {text: el.value}), 700);
+  clearTimeout(RV.t); RV.t = null;
+  if ($('.rvjournal .obj-merge')) return;  // 2.576.0 (#4764): a conflict waits for "Keep mine" / "Take theirs"
+  RV.t = setTimeout(() => rvSave(el.dataset.day, {text: el.value}), 700);
 });
 // 2.359.0 A (#3024): the page goes away within the 0.7 s of typing: the entry goes into the queue and out with keepalive (core.js
 // outKeep, same key); a change elsewhere meanwhile = 409 when it is sent, the text then waits in the conflicts dialog
