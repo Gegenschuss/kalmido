@@ -341,7 +341,7 @@ def _fetch_heads(M, uids):
             if isinstance(x, tuple) and len(x) > 1:
                 u, sz = re.search(rb"UID (\d+)", x[0]), re.search(rb"RFC822\.SIZE (\d+)", x[0])
                 if u:
-                    out[u.group(1)] = (int(sz.group(1)) if sz else 0, x[1] or b"")
+                    out[u.group(1)] = (int(sz.group(1)) if sz else None, x[1] or b"")  # review: no size = like too big (as mail_fetch), never a stall
     return out
 
 
@@ -464,7 +464,7 @@ def mbr_run(M, box):
                 if not fit:
                     continue  # its header lines fit no rule: looked at again next time (a new rule may take it)
                 known.add(key)
-                if heads[u][0] > MB.MBX_MAIL_MAX:
+                if heads[u][0] is None or heads[u][0] > MB.MBX_MAIL_MAX:
                     _skip(box, key)
                     continue
                 typ, parts = M.uid("FETCH", u.decode(), "(BODY.PEEK[])")

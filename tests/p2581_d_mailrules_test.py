@@ -230,4 +230,12 @@ check(len(docs(WS)) == before + 1, "Alpha got nothing of erin's mails (only its 
 j = Er.get(B + "/api/hubmail/mailbox/rules?ws=private").json()
 check(j.get("status", {}).get("polled_at") and not j["status"].get("error"), f"erin: the last run without an error ({j.get('status')})")
 
+# ---- review (#4804): a server answer without RFC822.SIZE counts as too big - the mail is passed over, the next one still comes
+open(os.path.join(MB, "nosize"), "w").write("Erin/2\n")
+drop("Erin", "Tax office <post@tax.example.org>", "Your letter", att="Letter-2")
+drop("Erin", "Tax office <post@tax.example.org>", "Your letter", att="Letter-3")
+check(run(Er, WSE), "erin's rules ran again")
+de = until(lambda: docs(WSE) if len(docs(WSE)) >= 2 else None, 30) or docs(WSE)
+check(sorted(x[1] for x in de) == ["Letter-1.pdf", "Letter-3.pdf"], f"no size: that mail skipped, the next one taken ({de})")
+
 sys.exit(done("p2581_d_mailrules"))

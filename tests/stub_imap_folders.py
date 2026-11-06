@@ -111,7 +111,12 @@ class Imap(socketserver.StreamRequestHandler):
                     head = re.split(rb"\r?\n\r?\n", data, maxsplit=1)[0]
                     keep = b"".join(m.group(0) for m in re.finditer(rb"(?im)^(message-id|from|subject|date):[^\n]*\n(?:[ \t][^\n]*\n)*", head + b"\n"))
                     keep += b"\r\n"
-                    out += f"* {seq} FETCH (UID {u} RFC822.SIZE {len(data)} BODY[HEADER.FIELDS (MESSAGE-ID FROM SUBJECT DATE)] {{{len(keep)}}}\r\n".encode() + keep + b")\r\n"
+                    try:  # /data/mbr/nosize: "<folder>/<uid>" lines whose answer leaves RFC822.SIZE out (a broken server)
+                        nos = open(os.path.join(D, "nosize")).read().split()
+                    except FileNotFoundError:
+                        nos = []
+                    size = "" if f"{folder}/{u}" in nos else f" RFC822.SIZE {len(data)}"
+                    out += f"* {seq} FETCH (UID {u}{size} BODY[HEADER.FIELDS (MESSAGE-ID FROM SUBJECT DATE)] {{{len(keep)}}}\r\n".encode() + keep + b")\r\n"
                 elif "RFC822.SIZE" in what:
                     out += f"* {seq} FETCH (UID {u} RFC822.SIZE {len(data)})\r\n".encode()
                 else:
