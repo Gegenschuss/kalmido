@@ -16569,6 +16569,7 @@
   "Template “{0}” deleted": "Sjabloon ‘{0}’ verwijderd",
   "Link “{0}” removed": "Link ‘{0}’ verwijderd",
   "Set again meanwhile: the earlier value was not restored.": "Intussen opnieuw ingesteld: de eerdere waarde is niet hersteld.",
+  "Only projects and their tasks are limited: the wiki, tables, calendars, contacts and files stay visible as far as the account may see them.": "Alleen projecten en hun taken worden beperkt: de wiki, tabellen, agenda's, contacten en bestanden blijven zichtbaar voor zover het account ze mag zien.",
   "The target folder is no longer open to you: documents land in the documents folder": "De doelmap is niet meer voor je bereikbaar: documenten komen in de documentenmap",
   "Target folder unavailable": "Doelmap niet bereikbaar",
   "Switched off: e-mails to this address are refused": "Uitgeschakeld: e-mails naar dit adres worden geweigerd",

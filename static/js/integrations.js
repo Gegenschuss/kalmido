@@ -693,7 +693,8 @@ function listCapHtml(sel, lists, id) {
   return `<div class="lcap" id="${id}"><p class="lcapst" aria-live="polite">${esc(lcap_st(rows.length))}</p><ul class="lcapsel">${rows.map(lcap_row).join('')}</ul>
     <div class="lcapadd"><input type="search" class="lcapq" data-lcapq="${id}" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="${id}-res" aria-label="${esc(tr('Add projects'))}" placeholder="${esc(tr('Add projects'))} …" autocomplete="off" enterkeyhint="done">
     <div class="lcapres" id="${id}-res" role="listbox" aria-label="${esc(tr('Add projects'))}" hidden></div></div>
-    <p class="lcaphint muted">${esc(tr('Add projects to limit access to them; none added = every project it is in. Other projects then do not exist for it, and it gets no events about them.'))}</p></div>`;
+    <p class="lcaphint muted">${esc(tr('Add projects to limit access to them; none added = every project it is in. Other projects then do not exist for it, and it gets no events about them.'))}</p>
+    <p class="lcaphint muted">${esc(tr('Only projects and their tasks are limited: the wiki, tables, calendars, contacts and files stay visible as far as the account may see them.'))}</p></div>`;  // 2.577.0 (#4708 7)
 }
 const listCapVal = (md, id) => $$(`#${id} [data-lcap]`, md).map(x => +x.dataset.lcap);
 // the offers for the typed words: the projects not added yet whose name or folder holds them, grouped by folder (folder order of

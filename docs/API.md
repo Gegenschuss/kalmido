@@ -88,6 +88,8 @@ shows it as `token.list_ids`. Agents get the same restriction in their dialog, s
 [Projects, people and agents](#lists-people-and-agents-2300). 2.86.0: such a token never creates projects on
 `POST /api/v1/import/{source}`: without `target` every list of the file must match one of its allowed projects (by name, or
 the inbox), else `403`; with `target` = an allowed project it imports as usual.
+2.577.0 (#4708): the limit covers projects and their tasks only (and no events about them arrive). The wiki, tables, calendars, contacts and the file store are not limited by `list_ids`: the token sees them as
+far as its user (or agent) may. To keep an agent out of such an area, use its data lock (the agent's dialog).
 
 **A Kalmido app on another server (2.73.0).** *Settings > Account > Servers* shows the accounts of a person on several
 Kalmido servers in one app; the home server reads and changes the tasks over there through this API with a personal token

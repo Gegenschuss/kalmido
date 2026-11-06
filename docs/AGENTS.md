@@ -118,7 +118,9 @@ needs no permission; 2.190.0: a token that may only read (no permission beyond *
   shows `token.list_ids`. Other projects answer `404`, queries leave them out, and no events about them arrive (2.86.0: also
   events queued before the project was taken away or limited are left out when polled; 2.351.0: also a quotation or
   invoice of another project filed in a folder shared with the agent). Documents made from a template (office documents) are
-  not tied to the limit, neither through the office routes nor through a folder. See
+  not tied to the limit, neither through the office routes nor through a folder. 2.577.0 (#4708): the wiki, tables,
+  calendars, contacts and the file store are not limited by `list_ids` either (the agent's data lock keeps it out of an
+  area). See
   [AGENT-SECURITY.md](AGENT-SECURITY.md#server-enforced-boundaries).
 
 ## Personal agents

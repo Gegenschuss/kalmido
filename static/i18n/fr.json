@@ -16569,6 +16569,7 @@
   "Template “{0}” deleted": "Modèle « {0} » supprimé",
   "Link “{0}” removed": "Lien « {0} » retiré",
   "Set again meanwhile: the earlier value was not restored.": "Redéfini entre-temps : l'ancienne valeur n'a pas été restaurée.",
+  "Only projects and their tasks are limited: the wiki, tables, calendars, contacts and files stay visible as far as the account may see them.": "Seuls les projets et leurs tâches sont limités : le wiki, les tableaux, les calendriers, les contacts et les fichiers restent visibles dans la mesure où le compte peut les voir.",
   "The target folder is no longer open to you: documents land in the documents folder": "Le dossier cible ne t’est plus accessible : les documents arrivent dans le dossier des documents",
   "Target folder unavailable": "Dossier cible indisponible",
   "Switched off: e-mails to this address are refused": "Désactivée : les e-mails à cette adresse sont refusés",
