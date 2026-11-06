@@ -17014,6 +17014,7 @@
   "Into the trash (restorable): {0} tasks, {1} files, pages, tables or clients.": "Dans la corbeille (restaurable) : {0} tâches, {1} fichiers, pages, tableaux ou clients.",
   "Stays because it changed since the import: {0} tasks, {1} other entries.": "Reste car modifié depuis l'importation : {0} tâches, {1} autres entrées.",
   "possible until {0}": "possible jusqu'au {0}",
+  "The target folder is in the trash": "Le dossier de destination est dans la corbeille",
   "**As a** \n**I want** \n**so that** \n\n**Acceptance criteria**\n- [ ] \n": "**En tant que** \n**je veux** \n**afin de** \n\n**Critères d'acceptation**\n- [ ] \n",
   "**Goal**\n\n**Scope**\n- \n\n**Done when**\n- [ ] \n": "**Objectif**\n\n**Périmètre**\n- \n\n**Terminé quand**\n- [ ] \n",
   "A change reaches every project that uses the field. The key stays the same in every project (API filter fkey_ and the key).": "Une modification s’applique à chaque projet qui utilise le champ. La clé reste la même dans chaque projet (filtre de l’API fkey_ et la clé).",

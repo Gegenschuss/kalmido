@@ -17015,6 +17015,7 @@
   "Into the trash (restorable): {0} tasks, {1} files, pages, tables or clients.": "Nel cestino (ripristinabile): {0} attività, {1} file, pagine, tabelle o clienti.",
   "Stays because it changed since the import: {0} tasks, {1} other entries.": "Resta perché modificato dopo l'importazione: {0} attività, {1} altre voci.",
   "possible until {0}": "possibile fino al {0}",
+  "The target folder is in the trash": "La cartella di destinazione è nel cestino",
   "**As a** \n**I want** \n**so that** \n\n**Acceptance criteria**\n- [ ] \n": "**Come** \n**voglio** \n**così che** \n\n**Criteri di accettazione**\n- [ ] \n",
   "**Goal**\n\n**Scope**\n- \n\n**Done when**\n- [ ] \n": "**Obiettivo**\n\n**Ambito**\n- \n\n**Fatto quando**\n- [ ] \n",
   "A change reaches every project that uses the field. The key stays the same in every project (API filter fkey_ and the key).": "Una modifica vale per ogni progetto che usa il campo. La chiave resta uguale in ogni progetto (filtro API fkey_ e la chiave).",

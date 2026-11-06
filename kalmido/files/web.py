@@ -17,7 +17,7 @@ from ..core.access import Denied, acx_of, collab_all
 from ..core.orgcrypt import oc_send_file
 from .upsafe import h6d_one_file_request, h6d_read
 from .scan import sc_guard  # 2.477.0 (#3936): pulled up from functions
-from .store import (fs_chain, fs_deleted, fs_link_target, fs_log_add, fs_new_version, fs_purge, fs_purge_files, fs_put, fs_read,
+from .store import (fs_chain, fs_chains, fs_deleted, fs_link_target, fs_log_add, fs_new_version, fs_purge, fs_purge_files, fs_put, fs_read,
                     fs_height, fs_mail_rows, fs_role, fs_version_row, DEPTH_MAX, fs_visible_ids, need_node, safe_fs_name, _free_name,
                     _now, _place, ROLE_RANK)
 from .fsref import (FSR, fs_ref_content, fs_ref_json, fs_ref_need_move, fs_ref_need_share, fs_ref_node, fs_ref_place, fs_ref_role,  # 2.199.0 A (#2742)
@@ -658,6 +658,8 @@ def _move(c, n, target, uid, fsl_ok=False):
         if t["kind"] != "folder":
             raise Denied(409, tr("Not a folder"))
         up = fs_chain(c, tid)
+        if fs_deleted(up):  # 2.595.0 (#4881): never into a folder that sits in the trash (itself or above)
+            raise Denied(400, tr("The target folder is in the trash"))
         if n["id"] in [r["id"] for r in up]:
             raise Denied(409, tr("A folder cannot be moved into itself"))
         if len(up) + 1 + fs_height(c, n["id"]) > DEPTH_MAX:
@@ -1035,6 +1037,8 @@ def files_folders():
     if request.args.get("ablage") == "1":  # 2.429.0 (#3580): the file store's own "Move to…" -- not into another area's folders
         hide = fsv_hidden(c, rows)
         rows = {k: v for k, v in rows.items() if k not in hide}
+    chains = fs_chains(c, rows.keys())  # 2.595.0 (#4881): no folder in the trash, nor below one (children carry no deleted_at of their own)
+    rows = {k: v for k, v in rows.items() if not fs_deleted(chains.get(k, []))}
     out = []
     for r in rows.values():
         if ROLE_RANK[fs_role(c, r["id"], uid)] < ROLE_RANK["edit"]:

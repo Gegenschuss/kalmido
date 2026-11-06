@@ -17014,6 +17014,7 @@
   "Into the trash (restorable): {0} tasks, {1} files, pages, tables or clients.": "A la papelera (recuperable): {0} tareas, {1} archivos, páginas, tablas o clientes.",
   "Stays because it changed since the import: {0} tasks, {1} other entries.": "Se mantiene porque cambió desde la importación: {0} tareas, {1} otras entradas.",
   "possible until {0}": "posible hasta el {0}",
+  "The target folder is in the trash": "La carpeta de destino está en la papelera",
   "**As a** \n**I want** \n**so that** \n\n**Acceptance criteria**\n- [ ] \n": "**Como** \n**quiero** \n**para** \n\n**Criterios de aceptación**\n- [ ] \n",
   "**Goal**\n\n**Scope**\n- \n\n**Done when**\n- [ ] \n": "**Objetivo**\n\n**Alcance**\n- \n\n**Hecho cuando**\n- [ ] \n",
   "A change reaches every project that uses the field. The key stays the same in every project (API filter fkey_ and the key).": "Un cambio llega a todos los proyectos que usan el campo. La clave es la misma en cada proyecto (filtro de la API fkey_ y la clave).",
