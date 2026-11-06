@@ -50,8 +50,10 @@ Bo = sess("bob")
 FID, Fr = freelancer(B, A, features="cal,comments,collab,office,clients,docs,files")
 for s in (A, Bo):
     s.patch(B + "/api/settings", json={"lang": "en", "tour": "done"})
+# 2.570.0 (#3506): the stand-in is copied once; a copy per start rewrote the file while the start before was still reading
+# it (docker exec -d returns at once), so on the slower CI the fake on 8095 read a half file and never listened ("conn")
+shutil.copy(os.path.join(N, "fake_offsite.py"), os.path.join(DATA, "fake_offsite.py"))
 for mode, port in (("webdav", 8094), ("webdav", 8095), ("s3", 8093)):
-    shutil.copy(os.path.join(N, "fake_offsite.py"), os.path.join(DATA, "fake_offsite.py"))
     subprocess.run(["docker", "exec", "-d", CT, "python", "/data/fake_offsite.py", mode, str(port),
                     S3KEY if mode == "s3" else "kbk", S3SECRET if mode == "s3" else DAVPASS])
 # 2.500.0 (#4083, #3901): a real state instead of a fixed second: all three fakes accept connections (red as "conn" before)
