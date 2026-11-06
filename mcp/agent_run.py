@@ -294,6 +294,37 @@ class Api:
     def typing(self, uid):
         self.soft("POST", "/agent/typing", {"chat_user_id": uid}, timeout=10)
 
+    task_typing_ok = None
+
+    def task_typing(self, tid):
+        """2.615.0 (#3757 / #3754): the typing dots on a task while a task run writes there (POST /tasks/{id}/typing, valid
+        8 s, sent again every TYPING_EVERY_S). A server without it (404 / 405) gets none from then on."""
+        if self.task_typing_ok is False or not tid:
+            return False
+        st = self.soft("POST", f"/tasks/{int(tid)}/typing", {}, timeout=10)
+        if st in (404, 405) and not self.task_typing_ok:
+            self.task_typing_ok = False
+            log("the server has no typing dots on tasks: sending none")
+        elif st == 200:
+            self.task_typing_ok = True
+        return st == 200
+
+    def reply_message(self, uid, rp):
+        """2.615.0 (#3757 / #3751): the chat message an answer refers to, in full -> {text, files} or None (deleted,
+        encrypted, not found, error: the caller keeps Kalmido's quote). GET /agent/chats?since=id-1&user_id=&limit=1."""
+        if not isinstance(rp, dict) or not str(rp.get("id") or "").isdigit() or rp.get("deleted") or rp.get("enc") or not uid:
+            return None
+        rid = int(rp["id"])
+        try:
+            rows = self.req("GET", "/agent/chats", query={"since": rid - 1, "user_id": int(uid), "limit": 1}, timeout=15, retry=False)
+        except Exception as e:
+            log(f"answered message {rid} not loaded: {type(e).__name__}")
+            return None
+        m = next((x for x in (rows or {}).get("data") or [] if isinstance(x, dict) and str(x.get("id")) == str(rid)), None)
+        if not m or m.get("deleted") or m.get("enc") or not str(m.get("body") or "").strip():
+            return None
+        return {"text": str(m["body"]), "files": [str(a.get("name") or "file") for a in m.get("attachments") or [] if isinstance(a, dict)]}
+
     # kalmido-capability: steps
     def progress(self, text, uid):
         if self.progress_ok is False:
@@ -787,14 +818,27 @@ def permission_modes(cmd, runtime=""):
 
 
 # kalmido-capability: reply_ref
+REPLY_FULL_MAX = 4000  # 2.615.0 (#3757 / #3751): the answered message in full, up to 4000 characters
+
+
 def reply_hint(rp):
-    """The message an answer refers to, as one line for the prompt (Kalmido sends a quote of at most 140 characters)."""
+    """The message an answer refers to, for the prompt. Kalmido sends a quote of at most 140 characters; 2.615.0 (#3751):
+    the runner fetches the whole message (rp["full"]: text + file names, Api.reply_message) -> it goes in fenced, up to
+    REPLY_FULL_MAX. Deleted, encrypted or not loaded: the quote stays, and the line says that only its start is there."""
     if not isinstance(rp, dict) or not rp.get("id"):
         return ""
     if rp.get("deleted"):
         return "(This answers a message that has been deleted since.)"
     who = "your own message" if rp.get("from") == "agent" else (rp.get("name") or "a message")
-    return f"(This answers {who}: \"{str(rp.get('text') or '').strip()[:140]}\")"
+    full = rp.get("full") if isinstance(rp.get("full"), dict) else None
+    if full and str(full.get("text") or "").strip():
+        files = [" ".join(str(n).split())[:120] for n in full.get("files") or []]
+        return "\n".join([f"(This answers {who}, message {rp.get('id')}, in full below"
+                          + (f"; its files: {', '.join(files)}" if files else "") + ":"]
+                         + fence(f"reply-{rp.get('id')}", "agent" if rp.get("from") == "agent" else rp.get("user_id") or "?",
+                                 str(full["text"]).strip()[:REPLY_FULL_MAX]) + [")"])
+    q = str(rp.get('text') or '').strip()[:140]
+    return f"(This answers {who}: \"{q}\"" + (" - only the start of that message is known" if len(q) >= 140 or rp.get("enc") else "") + ")"
 
 
 DEFAULT_PROMPT = "Read CLAUDE.md. Then handle this Kalmido event following it."
@@ -1356,11 +1400,26 @@ def wake_hint(x):
     if x.get("text"):
         out += ["The start of its result (data, written by the job):"] + fence(f"job-{j.get('id')}", "job", x["text"])
     out.append({"done": "Go on with the work of this chat where it follows from the result: the next step, or a short note to the "
-                        "person what is next. Do not repeat the result.",
+                        "person what is next. Do not repeat the result. If nothing new follows from it (no next step, nothing to "
+                        "decide, nothing to add), answer with the single line STILL: then nothing is posted, only logged.",
                 "stopped": "Do not start it again. Say in one line what is left open.",
                 "lost": "Tell the person in one line and offer to start it again; do not start it yourself."}.get(
         st, "Tell the person in one line what went wrong and what you propose; do not start it again yourself."))
     return out
+
+
+# kalmido-capability: job_wake (2.615.0, #3757 / #3755): STILL in capitals, then the line end or a separator (":", or a dash
+# before a space), markdown around it allowed; "STILLSTAND" or "Still ist es" do not count. Only for a job that is done.
+QUIET_RE = re.compile(r"[*_`]*STILL[*_`.]*\s*(?::|[-\u2013\u2014](?=[\s*_`]|$)|$)[*_`]*\s*(.*)")
+
+
+def wake_still(text):
+    """2.615.0 (#3755): a wake answer whose first line is STILL -> (True, the rest for the log); else (False, text)."""
+    lines = (text or "").lstrip().splitlines()
+    m = QUIET_RE.fullmatch(lines[0].strip()) if lines else None
+    if m:
+        return True, "\n".join([m.group(1), *lines[1:]]).strip()
+    return False, text
 
 
 def team_hint(x):
@@ -1550,17 +1609,27 @@ ASKS_DE = re.compile(
     r"(?im)^[^\n]*(?:\bsoll(?:en)? (?:ich|wir)\b|\bwillst du\b|\bmöchtest du\b|\bwollen wir\b|\bwelche variante\b"
     r"|\bvariante [0-9a-z]\b|\b(?:mitnehmen|aufnehmen|einplanen|umsetzen|übernehmen|einbauen|vorziehen)\b|\bvorschlag\b"
     r"|\bvorgeschlagen\b|\bentscheid\w*\b|\boder lieber\b|\bpasst (?:dir )?das\b)[^\n]*\?[ \t*_)]*$"
-    r"|\bantwort (?:von dir )?steht (?:noch )?aus\b|\bwartet auf (?:deine|dein) (?:antwort|entscheidung|ok|go|ja)\b"
+    r"|\bantwort (?:von dir )?steht (?:noch )?aus\b|\bwartet auf (?:deine|dein) (?:antwort|entscheidung|ok|go|ja|freigabe)\b"
+    # 2.615.0 (#3658 / #2390): an approval named in passing ("braucht deine Website-Freigabe", "sobald du freigibst")
+    r"|\b(?:brauche|braucht|brauchen|benötigt|fehlt|wartet auf)\b[^\n]{0,40}\b(?:deine|dein|deinen)\b[^\n]{0,25}?(?:freigabe|zustimmung|\b(?:ja|ok|go))\b"
+    # 2.615.0 (#3757 / #3753): "deine Freigabe" alone is a report ("deine Freigabe ist eingetragen"), only asked it counts
+    r"|\bdeine\b[^\n]{0,20}freigabe\b[^\n]*\?|\bsobald du (?:freigibst|ja sagst|zustimmst)\b|\bmit deinem (?:ja|ok|go)\b"
     # proposals as statements, no question mark ("small enough to take it into 2.40")
     r"|\b(?:mitzunehmen|aufzunehmen|einzuplanen|einzubauen|vorzuziehen|umzusetzen)\b|\bwürde ich\b|\bich würde (?!dich)"
-    r"|\bich schlage vor\b|\b(?:ich )?empfehle(?: ich)?\b|\bmein vorschlag\b|\bpasst\b[^\n]*\b(?:in|zu) (?:paket |release |version )?\d+\.\d+"
+    # 2.615.0 (#3753): "empfehle ich (gerade) nicht" advises against -- no proposal to decide
+    r"|\bich schlage vor\b|\b(?:ich )?empfehle(?: ich)?\b(?![^\n.;:]{0,30}\bnicht\b)|\bmein vorschlag\b|\bpasst\b[^\n]*\b(?:in|zu) (?:paket |release |version )?\d+\.\d+"
     r"|^[ \t>*_-]*(?:vorschlag|fix|empfehlung)\b[^\n:]{0,30}:")
 ASKS_EN = re.compile(
     r"(?im)^[^\n]*(?:\bshall (?:i|we)\b|\bshould (?:i|we)\b|\bdo you want\b|\bwould you like\b|\bwhich (?:option|variant)\b"
     r"|\b(?:option|variant) [0-9a-z]\b|\b(?:include|schedule|implement|take|add|plan|pull)\b[^\n]*\b(?:in|into|for) (?:release |version )?\d+\.\d+"
     r"|\bor rather\b|\b(?:is|does) (?:that|this) (?:ok|okay|fine|work for you)\b|\bgo ahead\b|\bproceed\b)[^\n]*\?[ \t*_)]*$"
     r"|\bwaiting for your (?:answer|decision|ok|okay|go|yes|approval)\b|\byour (?:call|decision)\b"
-    r"|\bi would (?!like to thank)|\bi'd (?:suggest|recommend|propose|do|go|take|add|include)\b|\bi (?:suggest|propose|recommend)\b"
+    # 2.615.0 (#3658 / #2390): an approval named in passing ("needs your approval", "once you approve")
+    r"|\b(?:need|needs|requires?|waits? for)\b[^\n]{0,40}\byour\b[^\n]{0,25}?(?:approval|consent|\b(?:yes|ok|okay|go))\b"
+    r"|\byour\b[^\n]{0,20}approval\b[^\n]*\?|\bonce you (?:approve|say yes|agree)\b|\bwith your (?:yes|ok|okay|go)\b"
+    # 2.615.0 (#3753): "I (would) not recommend it" / "I don't recommend" advise against -- no proposal to decide
+    r"|\bi would (?!like to thank|not\b)|\bi'd (?:suggest|recommend|propose|do|go|take|add|include)\b(?![^\n.;:]{0,30}\bnot\b)"
+    r"|\bi (?:suggest|propose|recommend)\b(?![^\n.;:]{0,30}\bnot\b)"
     r"|\bmy (?:suggestion|proposal|recommendation)\b|\b(?:small|worth|easy) enough to (?:include|take|add|fit)\b|\bworth (?:including|adding|taking)\b"
     r"|\bfits (?:in|into) (?:release |version )?\d+\.\d+"
     r"|^[ \t>*_-]*(?:proposal|suggestion|fix|recommendation)\b[^\n:]{0,30}:")
@@ -1603,6 +1672,8 @@ def asks_without_card(text, prefer=""):
     plain = re.sub(r"`[^`\n]*`", "", plain)
     plain = "\n".join(x for x in plain.splitlines()
                       if not x.lstrip().startswith(">") and not re.search(r"(?i)\b(?:karten?|cards?|cartes?|tarjetas?|schede|scheda|kaarten?)\b", x))
+    # 2.615.0 (#3757 / #3753): quoted words and titles („Freigabe“, "recommend", «…», task titles) are named, not said
+    plain = re.sub(r"„[^“\n]{0,120}“|\"[^\"\n]{0,120}\"|“[^”\n]{0,120}”|«[^»\n]{0,120}»", "…", plain)
     hits = [(m.start(), m.group(0), lang) for lang, rx in (("de", ASKS_DE), ("en", ASKS_EN), ("fr", ASKS_FR), ("es", ASKS_ES), ("it", ASKS_IT), ("nl", ASKS_NL))
             for m in [rx.search(plain)] if m]
     if not hits:
@@ -2334,6 +2405,11 @@ class Runner:
         key = self.session_start(uid, args, what)  # 2.44.0 (#1446): the conversation of this chat goes on
         if not self.agent:  # 2.46.6 (#1715): the rules block names the owner and the language (--once-event: not read yet)
             self.refresh_agent()
+        for ev in evs:  # 2.615.0 (#3757 / #3751): the answered message in full, not only Kalmido's 140-character quote
+            rp = ((ev.get("data") or {}).get("message") or {}).get("reply") if ev.get("event") == "chat" else None
+            full = self.api.reply_message(uid, rp) if rp and hasattr(self.api, "reply_message") else None
+            if full:
+                rp["full"] = full
         prompt = self.make_prompt(evs, uid, self.prompt_extra(uid, key)
                                   + self.workflow_hint(uid if any(e.get("event") == "chat" for e in evs) else None))
         log(f"run: {'+'.join(str(e.get('event')) for e in evs)} ({'chat ' + str(uid) if uid else 'task event'}), prompt {len(prompt)} chars"
@@ -2350,6 +2426,17 @@ class Runner:
         text = result_text(st)
         self.session_done(key, st)
         self.usage.report(force=True)
+        if uid and text and evs and all(e.get("event") == "job_wake" and ((e.get("data") or {}).get("job") or {}).get("state", "done") == "done"
+                                        for e in evs):  # 2.615.0 (#3755): a quiet wake after a finished job posts nothing
+            quiet, rest = wake_still(text)
+            _, appr_q, _, done_q = split_tail_blocks(rest)
+            if quiet and not appr_q and not (self.extras and self.extras.outbox_files()):  # files for the person: posted
+                if done_q:
+                    self.close_decided(uid, done_q)
+                log(f"wake run answered STILL, nothing posted: {' '.join(redact(rest).split())[:300]!r}")
+                self.api.status("idle", host=self.host())
+                return
+            text = rest if quiet else text  # STILL with a card: the card is posted, the STILL line is not
         if uid:
             if text:
                 body, appr, sugg, done = split_tail_blocks(redact(text))
@@ -2919,9 +3006,12 @@ class Runner:
                 self.status_say("working", what, task_id=tid, host=self.host())
 
         def typing():
-            if uid and time.time() - last_typing[0] >= TYPING_EVERY_S:
+            if (uid or (tid and steps)) and time.time() - last_typing[0] >= TYPING_EVERY_S:
                 last_typing[0] = time.time()
-                self.api.typing(uid)
+                if uid:
+                    self.api.typing(uid)
+                elif hasattr(self.api, "task_typing"):  # kalmido-capability: status_typing (2.615.0, #3754): a task run writes on the task (never a summary run)
+                    self.api.task_typing(tid)
 
         def on_usage(info):
             self.usage.seen(info)
