@@ -471,6 +471,8 @@ def doc_update(c, nid, d, uid, by=None):
     m = S.meta_row(c, nid)
     node = c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
     ws = m["ws"]
+    if d:  # 2.570.0 (#4770): every change through here (a person, a batch, an agent, the receipt sheet) is a new version
+        c.execute("UPDATE doc_meta SET edited_at=? WHERE node_id=?", (iso_ms(now_utc()), nid))
     sets = {}
     for k, col in (("date", "doc_date"), ("due", "due_date")):
         if k in d:
@@ -614,7 +616,7 @@ def docs_patch(nid):
     custom_fields? {field id: value | null} (2.153.0), expect_updated_at?}
     2.570.0 (#4770): expect_updated_at = the document's edited_at; set and changed since -> 409 with it under "doc" (2.564.0 D
     #4701; an undo never overwrites another session's change; a recognition run in the background is no change); missing
-    -> the old behaviour. Every change of a person stamps edited_at (also name, tags, folder, custom fields)."""
+    -> the old behaviour. Every change through doc_update stamps edited_at (also name, tags, folder, custom fields)."""
     c = db()
     _no_agent()
     write_lock(c, f"doc_meta-{int(nid)}")
@@ -626,8 +628,6 @@ def docs_patch(nid):
     e = doc_update(c, nid, d, me())
     if e:
         return e
-    if isinstance(d, dict) and d:
-        c.execute("UPDATE doc_meta SET edited_at=? WHERE node_id=?", (iso_ms(now_utc()), nid))
     if isinstance(d, dict) and {"amount", "date", "sender"} & set(d):  # 2.146.0 B (#2452): corrected values: look for a duplicate again
         dup_on_done(c, nid, False)
     fs_log_add(c, nid, "edit")
@@ -654,8 +654,6 @@ def docs_accept(nid):
     e = doc_update(c, nid, vals, me()) if vals else None
     if e:
         return e
-    if vals:  # 2.570.0 (#4770): taken suggestions are a change of the person (the version)
-        c.execute("UPDATE doc_meta SET edited_at=? WHERE node_id=?", (iso_ms(now_utc()), nid))
     m = S.meta_row(c, nid)
     left = {k: v for k, v in S.meta_json(c, m, "suggest", {}).items() if k != "_given"}
     if not left:
