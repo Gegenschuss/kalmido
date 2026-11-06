@@ -227,6 +227,19 @@ check(len(logs) == 1 and logs[0][1] == FID, f"(5) the change is in the office lo
 h = Fr.get(B + f"/api/office/letters/{LT}/history")
 check(h.ok and "subject" in h.text, f"(5) ... and in the letter's history (#4711) {h.status_code}")
 
+# ================================================================== (10) "Stop reminding" from a push sends the nag it saw (_prev)
+out = box("from kalmido.notify.push import webpush_payload\nimport json\nprint('P', json.dumps(webpush_payload('T', 'M', 4, task=7, nag='')))")
+pl = json.loads(next((x[2:] for x in out.splitlines() if x.startswith("P ")), "{}"))
+check(pl.get("task") == 7 and pl.get("nag") == "", f"(10) a nag push carries the task's nag setting {pl}")
+LN = Fr.post(B + "/api/lists", json={"name": "Erinnern 4708"}).json()["id"]
+TN = Fr.post(B + "/api/tasks", json={"title": "Nervig", "list_id": LN, "nag": "15"}).json()["id"]
+Fr.patch(B + f"/api/tasks/{TN}", json={"nag": "60"})  # changed on another device after the push went out
+r = Fr.patch(B + f"/api/tasks/{TN}", json={"nag": "off", "_prev": {"nag": "15"}})
+nag = kt.dbx("SELECT nag FROM tasks WHERE id=?", (TN,))[0][0]
+check(r.ok and r.json().get("conflicts") and nag == "60", f"(10) the push's nag-off with an old _prev is a conflict (the service worker opens the app) {nag} {r.text[:120]}")
+r = Fr.patch(B + f"/api/tasks/{TN}", json={"nag": "off", "_prev": {"nag": "60"}})
+check(r.ok and not r.json().get("conflicts") and kt.dbx("SELECT nag FROM tasks WHERE id=?", (TN,))[0][0] == "off", f"(10) with the current _prev it stops {r.text[:120]}")
+
 # @@NEXT@@
 
 sys.exit(kt.done("p2577_d_audit"))

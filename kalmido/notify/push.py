@@ -450,7 +450,7 @@ def push_reachable_many(c, S):
     return out
 
 
-def webpush_payload(title, msg, prio, click=None, actions=None, tag=None, task=None, due=None, lang=None):
+def webpush_payload(title, msg, prio, click=None, actions=None, tag=None, task=None, due=None, lang=None, nag=None):
     """What the notification shows, nothing more: title, text, the in-app link (hash only), buttons."""
     hash_ = urllib.parse.urlsplit(click).fragment if click else ""
     from ..collab.liste2eguard import le2b_net
@@ -466,6 +466,8 @@ def webpush_payload(title, msg, prio, click=None, actions=None, tag=None, task=N
         p["task"] = task
         if due:
             p["due"] = due
+        if nag is not None:  # 2.577.0 (#4708 10): the nag setting the push was sent with ("Stop reminding" sends it as _prev)
+            p["nag"] = str(nag)[:20]
     if actions:  # at most 2 buttons (some platforms show no more): comments Reply + Done, reminders Done + Snooze
         acts = [{"action": urllib.parse.urlsplit(u).fragment.split("/")[0] or "open", "title": label[:40],
                  "url": "/#" + urllib.parse.urlsplit(u).fragment} for label, u in actions]
@@ -518,7 +520,7 @@ def quiet_held_tick(c, users, S, LG, now):
 
 
 def notify(uid, title, msg, prio="4", click=None, actions=None, tag=None, s=None, task=None, due=None, ttl=86400, kind=None,
-           scope=None, chn_msg=None, quiet=True):
+           scope=None, chn_msg=None, quiet=True, nag=None):
     """One push to one user over the channel of their settings (push_channel):
     ntfy = the ntfy topic; webpush = every subscribed device, and the ntfy topic instead while no device is
     subscribed or none accepted it; both = both. Returns True when at least one channel accepted it.
@@ -549,7 +551,7 @@ def notify(uid, title, msg, prio="4", click=None, actions=None, tag=None, s=None
     if WEBPUSH_ON and ch in ("webpush", "both"):
         tag = tag or (urllib.parse.urlsplit(click).fragment.replace("/", "-") if click else None) or None
         st = {}
-        sent = webpush_user(uid, {**webpush_payload(title, msg, prio, click, actions, tag, task, due, lang=lg), "badge": badge_count},  # 2.281.0 B
+        sent = webpush_user(uid, {**webpush_payload(title, msg, prio, click, actions, tag, task, due, lang=lg, nag=nag), "badge": badge_count},  # 2.281.0 B
                             prio, ttl, topic=tag, stats=st)
         if not sent and st.get("subs"):  # devices exist but none accepted it (admin alert, counted per window)
             aa_count("webpush", "fallback", uid)
@@ -1098,7 +1100,7 @@ def _wd_nag(c, t, users, S, LG, now):
            actions=[(tr("Done|action", lg=lg), f"{PUBLIC_URL}/#done/{t['id']}"),
                     (tr("Stop reminding", lg=lg), f"{PUBLIC_URL}/#nagoff/{t['id']}"),
                     (tr("Snooze", lg=lg), f"{PUBLIC_URL}/#snooze/{t['id']}")],
-           task=t["id"], due=t["due"] if t["repeat"] else None)
+           task=t["id"], due=t["due"] if t["repeat"] else None, nag=t["nag"] or "")
 
 
 def _wd_focus(c, users, S, LG):

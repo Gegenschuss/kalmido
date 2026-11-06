@@ -257,7 +257,7 @@ async function swI18n(req) {
 const SAME = u => { try { const x = new URL(u, self.location.origin); return x.origin === self.location.origin ? x.pathname + x.search + x.hash : '/'; } catch { return '/'; } };
 function pushOptions(d) {
   const o = {body: d.body || '', icon: '/static/icon-192.png', badge: '/static/badge-96.png', lang: d.lang || undefined,
-    data: {url: SAME(d.url || '/'), task: d.task || null, due: d.due || null, actions: {}}, timestamp: d.ts || Date.now()};
+    data: {url: SAME(d.url || '/'), task: d.task || null, due: d.due || null, ...(typeof d.nag === 'string' ? {nag: d.nag} : {}), actions: {}}, timestamp: d.ts || Date.now()};
   if (d.tag) { o.tag = d.tag; o.renotify = true; }
   if (+d.prio >= 5) o.requireInteraction = true;
   // 2.7.0 (#413): nags carry three buttons (Done, Stop reminding, Snooze); as many as the platform shows (at least 2)
@@ -311,10 +311,15 @@ async function pushClick(action, data) {
   if (action === 'nagoff' && data.task) {
     try {
       const r = await fetch(`/api/tasks/${data.task}`, {method: 'PATCH', credentials: 'same-origin', redirect: 'manual',
-        headers: {'X-Requested-With': 'kalmido', 'Content-Type': 'application/json'}, body: JSON.stringify({nag: 'off'})});
+        // 2.577.0 (#4708 10): _prev = the setting the push came with: changed elsewhere meanwhile -> a conflict, the app asks
+        headers: {'X-Requested-With': 'kalmido', 'Content-Type': 'application/json'}, body: JSON.stringify({nag: 'off', ...(typeof data.nag === 'string' ? {_prev: {nag: data.nag}} : {})})});
       if (r.ok && (r.headers.get('content-type') || '').includes('json')) {
-        (await self.clients.matchAll({type: 'window'})).forEach(w => w.postMessage({type: 'refresh'}));
-        return 'nagoff';
+        let j = null;
+        try { j = await r.clone().json(); } catch { /* no body: done */ }
+        if (!(j?.conflicts?.length)) {
+          (await self.clients.matchAll({type: 'window'})).forEach(w => w.postMessage({type: 'refresh'}));
+          return 'nagoff';
+        }
       }
     } catch { /* offline -> open the app */ }
   }
