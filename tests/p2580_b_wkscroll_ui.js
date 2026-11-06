@@ -59,10 +59,13 @@ const BODY = Array.from({length: 100}, (_, i) => part(i)).join('\n');
     const where = n => ev(`(() => { const v = WKCM.view, sc = document.querySelector('#view'), at = v.state.doc.line(${n}).from, c = v.coordsAtPos(at), r = sc.getBoundingClientRect();
       return JSON.stringify({top: sc.scrollTop, max: sc.scrollHeight - sc.clientHeight, view: [Math.round(r.top), Math.round(r.bottom)], line: c ? Math.round(c.top) : null,
         head: v.state.doc.lineAt(v.state.selection.main.head).number, vp: [v.state.doc.lineAt(v.viewport.from).number, v.state.doc.lineAt(v.viewport.to).number],
-        trace: (window.__sc || []).slice(-12), set: (window.__st || []).slice(-6), ce: (window.__ce || []).slice(-3), fh: v.state.facet(CM6.EditorView.scrollHandler).length,
+        trace: (window.__sc || []).slice(-12), hf: [document.hasFocus(), v.hasFocus], set: (window.__st || []).slice(-6), ce: (window.__ce || []).slice(-3), fh: v.state.facet(CM6.EditorView.scrollHandler).length,
  wk: !!document.querySelector('#wk-cm'), md: !!document.querySelector('#wk-md')}); })()`);
     const stays = async (n, what) => {
       const a = await until(seen(n), 8000);
+      // 2.580.0 (#4800, B2): then the page is at rest - the formulas there drawn (diagram.js), no measure of CodeMirror
+      // pending (heights that change later moved the line away in the merge check) - and two frames later still so
+      if (a) await until(`!document.querySelector('#wk-cm pre[data-lang="math"]:not([data-dg]), #wk-cm .wkimath:not([data-dg])') && WKCM.view.measureScheduled < 0`, 8000);
       if (a) await frames();
       const b = a && await ev(seen(n));
       check(b, what + ' ' + (b ? '' : await where(n)));
@@ -79,10 +82,16 @@ const BODY = Array.from({length: 100}, (_, i) => part(i)).join('\n');
     await signin('frida');
     // desktop only: the phone's read view of this page (2000 lines, 200 formulas) did not get ready within a minute on the test
     // Mac (seen 06.11.2026); #view and the bringing-into-sight are the same at every width
-    for (const [w, h, tag] of [[1280, 900, 'desktop']]) {
+    // 2.580.0 (#4800, B2): twice, each on a freshly loaded page (the heights only estimated): the window with the system's
+    // focus, then without it (document.hasFocus() false: another window in front, a busy test Mac with many browsers).
+    // Without it CodeMirror does not hold #view's place when heights change after a measure (seen in the merge check: line
+    // 1001 9181 px above the screen after ArrowDown); wkcm.js wkcm_hold does it then
+    for (const [w, h, tag, nofocus] of [[1280, 900, 'desktop', false], [1280, 900, 'desktop without focus', true]]) {
       await size(w, h);
+      await nav(B + 'static/icon.svg');
       await nav(B + `#wiki/${id}`);
       check(await until(`!!${cm} && WKCM.view.state.doc.lines === 2000`, 40000), tag + ': the long page is in the editor ' + await ev(`JSON.stringify({wk: !!document.querySelector('#wk-cm'), cm: !!document.querySelector('#wk-cm .cm-content'), md: !!document.querySelector('#wk-md'), pen: !!document.querySelector('[data-wk="pen"]'), lines: window.WKCM?.view?.state.doc.lines})`));
+      if (nofocus) await ev(`(() => { document.hasFocus = () => false; return 1; })()`);
       await trace();
       check(await top() === 0, tag + ': #view at the top');
       // the cursor on line 1000 the way wiki.js puts it (wk_caretAt -> wkcm_caret)
@@ -90,9 +99,15 @@ const BODY = Array.from({length: 100}, (_, i) => part(i)).join('\n');
       await stays(1000, tag + ': the cursor on line 1000 is on screen, not the page\'s end');
       check(await ev(`WKCM.view.state.doc.lineAt(WKCM.view.state.selection.main.head).number === 1000 && document.activeElement === ${cm}`), tag + ': the cursor is on line 1000 with the focus');
       // a key press there keeps the place
-      await act([{type: 'key', id: 'k', actions: [{type: 'keyDown', value: ''}, {type: 'keyUp', value: ''}]}]);
+      await act([{type: 'key', id: 'k', actions: [{type: 'keyDown', value: '\uE015'}, {type: 'keyUp', value: '\uE015'}]}]);
       check(await until(`WKCM.view.state.doc.lineAt(WKCM.view.state.selection.main.head).number === 1001`), tag + ': ArrowDown moved to line 1001');
       await stays(1001, tag + ': after ArrowDown line 1001 is on screen');
+      // 2.580.0 (#4800, B2): a font arriving late (a busy machine) changes every estimated height above the screen at once;
+      // the cursor's line stays on screen once CodeMirror measured the new size
+      const lh0 = await ev(`WKCM.view.defaultLineHeight`);
+      await ev(`(() => { const c = ${cm}; c.style.fontSize = (parseFloat(getComputedStyle(c).fontSize) * 1.25) + 'px'; return 1; })()`);
+      check(await until(`Math.abs(WKCM.view.defaultLineHeight - ${lh0}) > 1`), tag + ': CodeMirror measured the larger font');
+      await stays(1001, tag + ': after a late font line 1001 is still on screen');
       // the stand-in field of the slash menu / suggestions, from the top
       await top();
       await ev(`(() => { const ta = wkcm_ta(), at = WKCM.view.state.doc.line(1500).from; ta.setSelectionRange(at, at); return 1; })()`);
@@ -100,7 +115,7 @@ const BODY = Array.from({length: 100}, (_, i) => part(i)).join('\n');
       // CodeMirror's own effect (search, jumps), back up to line 300
       await ev(`(() => { const v = WKCM.view; v.dispatch({effects: CM6.EditorView.scrollIntoView(v.state.doc.line(300).from, {y: 'center'})}); return 1; })()`);
       await stays(300, tag + ': the scrollIntoView effect to line 300 brings it on screen');
-      await shot(`p2580b-${tag}.png`);
+      await shot(`p2580b-${tag.replace(/ /g, '-')}.png`);
     }
   }, false);
   console.log(`p2580_b_wkscroll_ui: ${ok} ok, ${F.length} failed`);

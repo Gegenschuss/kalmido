@@ -106,7 +106,7 @@ function wkcm_mount() {
   const C = wkcm_C();
   box.textContent = '';
   v = WKCM.view = new C.EditorView({state: wkcm_state(p), parent: box});
-  v._pid = p.id; WKCM.px = null;
+  v._pid = p.id; WKCM.px = null; wkcm_measureFocus(v);
   if (box.contains(document.activeElement)) wkcm_focFx(v);
   wkcm_dgSoon();
   if (WKCM.caretAt != null) { const at = WKCM.caretAt; WKCM.caretAt = null; WKCM.focusNext = false; wkcm_caret(at); }
@@ -171,6 +171,20 @@ function wkcm_scroll(v, range, o) {
   };
   go(8, 0);
   return true;
+}
+// 2.580.0 (#4800): heights that change while CodeMirror measures (lines drawn for the first time, a font arriving late,
+// formulas drawn by diagram.js) move the text above the visible part; CodeMirror then moves its scroll parent #view back
+// to its anchor line inside its measure loop - but only while EditorView.hasFocus, which also asks document.hasFocus():
+// in a window without the system's focus (another window in front, a busy test Mac with many browsers) the page slid
+// away after wkcm_scroll had ended (line 1001 9181 px above the screen after ArrowDown, merge check of 2.580). The editor
+// counts as focused when it is the active element (wkcm_focused, wkcm_upd); during its measure CodeMirror sees the same,
+// everywhere else (focus events, the cursor's drawing) its own hasFocus stays as it is.
+function wkcm_measureFocus(v) {
+  const P = Object.getPrototypeOf(v), hf = Object.getOwnPropertyDescriptor(P, 'hasFocus'), ms = P.measure;
+  if (!hf?.get || typeof ms !== 'function') return;
+  let inMeasure = 0;
+  Object.defineProperty(v, 'hasFocus', {configurable: true, get() { return hf.get.call(this) || (inMeasure > 0 && this.contentDOM === this.root.activeElement); }});
+  v.measure = function (flush) { inMeasure++; try { return ms.call(this, flush); } finally { inMeasure--; } };
 }
 // the words of CodeMirror's search panel
 function wkcm_phrases() {
