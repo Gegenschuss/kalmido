@@ -14,7 +14,34 @@ minor one, anything that needs action on your side a major one.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
-## [2.575.0] - 2026-11-06
+## [2.579.0] - 2026-11-06
+
+Package 2.576 (Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Added
+- Saved task relations (#3371): "relates to" and "duplicate of" in a Relations block of the task panel, "Close as duplicate" (won't do, with a comment pointing to the other task, undoable); app routes, API v1 `/tasks/{id}/relations`, MCP tools `list_relations` / `add_relation` / `remove_relation`; only relations to tasks the reader can see are shown; computed similar tasks mark saved ones. New table `task_relations`.
+- Office > Receipts in the sidebar lists the office's documents not recorded yet ("New in the office"); office documents show "Also in Office › Receipts · File store" with a jump instead of a copy; "Documents" in the file store's panel folds (#4487).
+### Changed
+- Dialogs of the office rows, letters, document templates, deals, cash flow, subscriptions, bank rules, recurring items and clients save through the shared dialog helper (only changed fields + version; a conflict shows the merge bar with the other person's fields marked and keeps one's own input); the 409 alias keys `row` / `letter` / `client` of the office write routes are gone, the current state comes under `current` (#4794).
+- Office master data, clients, contacts, budget entries and templates, time entries, the journal and the table column dialog: no more "Reload" bar that throws away one's input on a conflict; the dialog reopens with the saved state and one's own input, the calm bar tells about a change elsewhere while it is open; a contact whose save fails for another reason keeps what was typed (#4764).
+- In an organisation's office the file store hides only office documents and receipts; contracts and other organisation documents stay visible (#4487).
+### Fixed
+- The Excel import reads its parts in chunks (iterparse) and stops at the cell limit instead of building the whole XML tree first; sharedStrings and whole-tree parts have limits; at most two imports read at once, a third gets a clear message (#4188).
+- The budget dialog no longer marks one's own field as changed by someone else after an optimistic save; the table column dialog compares against what it showed when it opened, so a change elsewhere is not overwritten silently (#4764).
+
+Package 2.579 (Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Added
+- Documents: saved views. Any search of the documents list (search field incl. the search language, filters, sort order) can be saved under a name ("Save view" in the documents bar). Views stand in the sidebar under the file store below "To review" with their count, can be pinned as a favourite, renamed, updated with the current filters and deleted with undo; "Show on Today" puts a block with the first 5 hits and the count onto Today. Views are private; in an organisation workspace an admin can share a view with all members. Counts and hits always use the rights of the person looking. Built on the shared core as object kind `docview`; the core gains `obj_space_set` (move an object into or out of an organisation, admins only) and `org_join="admin"` (#4802).
+- Tests: a Firefox suite with the real service worker behind a TCP relay (network really gone): start from the cache, loading a module offline, a change made offline arrives exactly once when back online, nothing left in the outbox after "clear local data"; a lint checks that the service worker and the app open the same IndexedDB (name, version, stores) (#4283).
+- Tests: a revocation suite over every read path per area (knowledge page, calendar + CalDAV, address book + CardDAV, file store folder, project: page, file, search, export, feeds, API token) for withdrawn, expired, leaving, rejoining as guest, downgrade and retirement (#4293).
+
+### Changed
+- Faster drawing with many tasks and lists: lists are looked up through a map, open tasks and counts are computed once per draw, board, timeline and overviews group in one pass; the command palette builds its entries once per opening and searches after a short typing pause (Enter and arrow keys take what was typed at once) (#4199).
+- Task loading and the live delta read only the dependencies, git links, time totals, contacts and events of the tasks they return instead of the whole instance; the delta sends the time totals of the changed tasks only and the app merges them (#4184).
+
+### Fixed
+- Dragging a task onto another parent task in the same list: undo now restores the old parent and section (the undo step had already taken the new values) (#4798).
+- Rejoining an organisation within a day as guest or accountant no longer brings back the old project memberships (#4293).
 
 Package 2.571 (Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher), CI-only rot: p2509_b).
 
@@ -67,6 +94,10 @@ CI-Fix: main rot von 2.570.0.
 - main: the rest of a partly released task takes the task's lock, so both close with the release (#4609)
 - main: tests follow 2.542-2.570 (private office wording, agents send the version they read, sprint settings version, history routes in the freelancer sweep, conflict wording, the trigger's sanctioned bypass in a test setup)
 - main: p292_d_ui opens the people settings only once the account is loaded and measures the list once it stands still; p2504_c_ui marks the rows again after a late redraw (both CI red of 2.570.0 on the slower runner)
+
+## [2.575.0] - 2026-11-06
+
+Not released (the CI of this version was red); its changes are listed under 2.579.0.
 
 ## [2.573.0] - 2026-11-06
 
@@ -1755,7 +1786,8 @@ Not released (the CI of this version was red); its changes are listed under 2.51
 
 Not released (the CI of this version was red); its changes are listed under 2.506.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.575.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.579.0...HEAD
+[2.579.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.579.0
 [2.575.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.575.0
 [2.573.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.573.0
 [2.570.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.570.0
