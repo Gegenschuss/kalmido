@@ -134,7 +134,8 @@ check(AK["address"] == "Lindenweg 4\n50667 Köln", "the free text stays in its c
 r = A.patch(B + f"/api/clients/{AK['id']}", json={"address": "Andere Straße 9\n12345 Irgendwo"})
 check(r.ok and r.json()["billing"]["street"] == "Lindenweg 4" and r.json()["billing"]["city"] == "Köln", "filled fields are never overwritten")
 # a row as an old version leaves it (free text only, the fields empty): the next write of "address" fills them
-dbx("UPDATE clients SET street='', zip='', city='', country='', address=? WHERE id=?", ("Beispielkunde AG\nz. Hd. Max Muster\nMarktstraße 5\n50667 Köln", AK["id"]))
+# (#4711: a save writes only what changed - an unchanged address is no write; the start's cdn_backfill fills such rows)
+dbx("UPDATE clients SET street='', zip='', city='', country='', address=? WHERE id=?", ("Beispielkunde AG\nMarktstraße 5\n50667 Köln", AK["id"]))
 r = A.patch(B + f"/api/clients/{AK['id']}", json={"address": "Beispielkunde AG\nz. Hd. Max Muster\nMarktstraße 5\n50667 Köln"})
 b = r.json()["billing"]
 check(b["street"] == "Marktstraße 5" and b["zip"] == "50667" and b["city"] == "Köln", f"a whole address block (name, attn.) is split too: {b}")
