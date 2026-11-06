@@ -23,3 +23,8 @@
   #side :is(.srow,.fhead) :is(.sbc-sl,.o3c-ring,.shr:not(.bellm)){display:none}
   #side .srow:not(.reorder):has(.shk){padding-right:.5rem}
 }
+/* 2.571.0 (#4790): #side is a column of flex items; with a long office tree the row of the areas (overflow hidden) shrank to 5 px
+   and left no way out of the office. It keeps its height: at least one row of tiles. */
+@media (max-width:767px){
+  #side .sbmr{flex:none;min-height:3.25rem}
+}
