@@ -86,7 +86,8 @@ GID, Gi = freelancer(B, A, "gina")  # the target account, without an organisatio
 OID, Ot = freelancer(B, A, "otto")  # the stranger
 r = Ot.post(B + "/api/budget/lists", json={"name": "Otto Haushalt"})
 check(r.ok, f"otto's budget list {r.status_code} {r.text[:160]}")
-OLIST = r.json().get("id") if r.ok else 0
+OLIST = r.json().get("list_id") if r.ok else 0
+check(OLIST and one("SELECT COUNT(*) FROM budget_cats WHERE list_id=?", (OLIST,)) > 0, f"guard: otto's list has its default categories {OLIST}")
 OTTO_BUD = {t: one(f"SELECT COUNT(*) FROM {t} WHERE list_id=?", (OLIST,)) for t in ("budget_cats", "budget_recurring", "budget_entries")}
 kt.dbx("INSERT INTO time_sheets(user_id, month, state, note, created_at, updated_at) VALUES(?, '2026-08', 'open', '', ?, ?)", (GID, TS, TS))
 kt.dbx("INSERT INTO playbooks(list_id, owner_id, folder, version, body, source, created_at) VALUES(NULL, ?, 'Bestand', 1, 'Gina eigen', 'edit', ?)",
