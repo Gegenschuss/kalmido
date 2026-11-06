@@ -815,7 +815,7 @@ async function reauthFresh(d) {
     return false;
   }
   try {
-    const j = await authPost('/api/auth/passkey', {credential: await pkGet(await authPost('/api/auth/passkey/options', {remember: true}))});
+    const j = await authPost('/api/auth/passkey', {credential: await pkGet(await authPost('/api/auth/passkey/options', {keep: true}))});
     if (S.me && j.user?.id !== S.me.id) { location.replace('/'); return false; }  // another account's passkey: that account now
     return true;
   } catch (x) { toast(x instanceof Error && x.j ? x.message : pkErr(x)); return false; }

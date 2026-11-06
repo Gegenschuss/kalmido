@@ -4,7 +4,7 @@
 sign-in. Invented data only; session ages are set in the database (no waiting).
  - PATCH /api/admin/settings with an opening switch (here: a kind of public link switched back on, registration private):
    a session older than REAUTH_FRESH_MIN (10) minutes -> 403 {reauth_needed, stepup, passkey}, nothing stored;
-   a session signed in just now (password / passkey / sign-in link) -> goes
+   a session signed in just now (password / passkey) -> goes; a sign-in link -> 403
  - an OIDC session alone is no fresh sign-in (a live session at the provider signs in without typing): only its step-up
    (sessions.stepup_for "0:su", at most 10 minutes old) counts
  - closing switches ask nothing (also with an old session); PUT /api/admin/oidc of the admin rule asks the same
@@ -74,8 +74,12 @@ assert A.patch(B + S, json={"public_links_off": ["files"], "password": PASSWORD}
 r = Bs.put(B + "/api/admin/oidc", json={"admin_domains": "corp.example"})
 check(r.status_code == 403 and r.json().get("reauth_needed") is True, f"#4019: the OIDC admin rule with an old session {r.status_code} {r.text[:160]}")
 
-# ---- a fresh sign-in counts (password / passkey / sign-in link of the last 10 minutes)
-for via in ("password", "passkey", "link"):
+# ---- a fresh sign-in counts (password / passkey of the last 10 minutes)
+# 2.611.0 (#4019, review): a sign-in link does not count (as orgcrypt._rck_fresh): a person signed in by link who becomes admin
+close()
+age(created=now_iso(60), via="link")
+check(reopen().status_code == 403, "#4019: a sign-in link a minute ago is no fresh sign-in")
+for via in ("password", "passkey"):
     close()
     age(created=now_iso(60), via=via)
     r = reopen()

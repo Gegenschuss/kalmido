@@ -12,6 +12,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from datetime import timedelta
 import segno
 import webauthn
 from cryptography.hazmat.primitives import hashes
@@ -26,7 +27,7 @@ from ..core.config import app, APP_NAME, COOKIE, MIN_PASSWORD, NTFY_TOPIC, PUBLI
 from ..core.pg import insert_id
 from ..core.i18n import lang, languages, N_, tr, LANGS
 from ..core.usertz import tz_names
-from ..core.db import adopt_orphans, body, bump, create_user, db, ensure_inbox, err, gset, gsetting, iso, local_now, now_utc, uset, write_lock
+from ..core.db import adopt_orphans, body, bump, create_user, db, ensure_inbox, err, gset, gsetting, iso, local_now, now_utc, parse_iso, uset, write_lock
 from ..accounts.session import (
     _DUMMY_HASH, _peer_trusted, _rate_fail, _rate_keys, _rate_reset, _token_hash,
     client_ip, FAIL_WINDOW, login_wait, proxy_login_value, rate_ip, set_cookie, start_session, user_public,
@@ -770,6 +771,15 @@ def auth_enrol_pk():
 
 
 # ---- passwordless login with a passkey (user verification required)
+def _pk_keep_long(c):
+    """2.611.0 (#4019, review): this browser's session was started with "remember me" (it lasts longer than one day); no session = no."""
+    tok = request.cookies.get(COOKIE)
+    r = c.execute("SELECT created_at, expires_at FROM sessions WHERE token_hash=?", (_token_hash(tok),)).fetchone() if tok else None
+    if not r:
+        return False
+    return parse_iso(r[1]) - parse_iso(r[0]) > timedelta(days=1, hours=1)
+
+
 @app.post("/api/auth/passkey/options")
 def auth_pk_options():
     c = db()
@@ -777,7 +787,10 @@ def auth_pk_options():
         return err(tr("Signing in with a passkey is turned off on this server"), 403)
     # 2.282.0 (#3111): no address lock here any more; POST /api/auth/passkey delays above the address limit
     chal, rp, opts = wa_auth_options(c, None, uv=True)
-    tok = pend_new("pk", None, chal=chal, rp=rp, remember=bool(body().get("remember", True)))
+    rem = bool(body().get("remember", True))
+    if body().get("keep"):  # 2.611.0 (#4019, review): the fresh sign-in before a server switch keeps how long this browser stays
+        rem = _pk_keep_long(c)  # signed in - a session without "remember me" (another person's computer) does not become a long one
+    tok = pend_new("pk", None, chal=chal, rp=rp, remember=rem)
     return pend_cookie(jsonify(opts), tok)
 
 

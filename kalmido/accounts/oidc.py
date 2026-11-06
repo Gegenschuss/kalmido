@@ -670,7 +670,7 @@ REAUTH_FRESH_MIN = 10
 # 2.611.0 (#4019): the sign-ins that count as fresh by their age: someone signed in again. An OIDC session alone does not
 # (it may come from a live session at the provider without anyone typing anything, as orgcrypt._rck_fresh): it counts
 # through its step-up (?stepup=su: prompt=login + a fresh auth_time); a restored backup's or a support session never
-REAUTH_FRESH_VIA = ("password", "2fa", "passkey", "link", "invite")
+REAUTH_FRESH_VIA = ("password", "2fa", "passkey")  # review 2.611: as orgcrypt._rck_fresh - a sign-in link never counts
 
 
 def reauth_fresh(c):
