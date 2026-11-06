@@ -91,6 +91,8 @@ const today = new Date().toISOString().slice(0, 10);
           const e = JSON.parse(await ev(ED));
           check(!e.side && e.tab === 1, `${theme} ${W} ${tab}: no sideways scrolling, the head before the positions in the DOM ` + JSON.stringify(e));
           // 2.555.0: since #4553 the document may stand beside its list; side by side counts by the document's own width (80rem)
+          // 2.571.0 (#4740): the pair reaches 160rem again, so at 2560 / 3840 px the document is >= 1280 px wide and side by side is mandatory
+          if (W >= 2560) check(e.cw >= 1280, `${theme} ${W} ${tab}: the document beside its list is at least 80rem wide ` + JSON.stringify(e));
           if (e.cw >= 1280) check(e.p[0] >= e.h[1] && Math.abs(e.p[2] - e.h[2]) <= 2, `${theme} ${W} ${tab}: head and positions side by side ` + JSON.stringify(e));
           else check(e.p[2] > e.h[2] && Math.abs(e.p[0] - e.h[0]) <= 1, `${theme} ${W} ${tab}: head above the positions as before ` + JSON.stringify(e));
           if (tab === 'invoices') { await ready(ev, theme_(theme)); await shot(`p2555-a-invoice-${W}-${theme}.png`); }

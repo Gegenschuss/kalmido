@@ -10,6 +10,7 @@
 
 /* quotations and invoices (office_docs.js ofd_pairHtml): the rows of the list on the left, the document on the right */
 #view.lsdw > .ofwrap:has(.lsd2){max-width:160rem}
+#view.lsdw .dash.office:has(.lsd2){max-width:none}  /* 2.571.0 (#4740): the office page (.dash, app.css) kept the pair at --w-seite = 96rem inside the wider .ofwrap */
 .lsd2{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr);gap:1rem;align-items:start}
 .lsd2 > .lsdl{position:sticky;top:0;max-height:calc(var(--vvh,100dvh) - 8rem);overflow-y:auto;overscroll-behavior:contain;min-width:0}
 .lsd2 > .lsdl > .ofdlist{margin:0}
