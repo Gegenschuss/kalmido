@@ -95,8 +95,9 @@ const LD_MODS = {
 // 2.65.0 (#1823): modules a module needs before its own files (their globals are used while it draws): the settings dialog
 // draws the agent panes (agentchat.js), the calendars (calview.js) and the tokens / webhooks (integrations.js), the agent chat
 // uses the token dialogs, a knowledge page embeds mind maps; 2.87.9 (#1936): Paperless-ngx (paperless.js) is in Integrations
-const LD_NEED = {settings: ['agentchat', 'calendar', 'integrations', 'playbook', 'docs', 'timesheet', 'team', 'ablage', 'family'], agentchat: ['integrations'], wiki: ['mindmap'], docs: ['ablage', 'tagsel', 'asstprop'], office: ['asstprop', 'ofundo', 'ablage', 'clientpage'], contacts: ['clientpage'], trashui: ['clientpage'], sheets: ['ofundo'], fsshare: ['ablage'], filereq: ['ablage'], tagsel: ['ablage'], fslock: ['ablage']};  // 2.122.0 B: docs -> tagsel; 2.126.1 A (#2123): docs / office -> asstprop
-// 2.501.0 (#4198): module ablage: settings (the sharing defaults), docs (the folder tree, moves, menus), office (FS_REF_ICON, requests) and the parts of the file store use its globals
+const LD_NEED = {settings: ['agentchat', 'calendar', 'integrations', 'playbook', 'docs', 'timesheet', 'team', 'family'], agentchat: ['integrations'], wiki: ['mindmap'], docs: ['ablage', 'tagsel', 'asstprop'], office: ['asstprop', 'ofundo', 'ablage', 'clientpage'], contacts: ['clientpage'], trashui: ['clientpage'], sheets: ['ofundo'], fsshare: ['ablage'], filereq: ['ablage'], tagsel: ['ablage'], fslock: ['ablage']};  // 2.122.0 B: docs -> tagsel; 2.126.1 A (#2123): docs / office -> asstprop
+// 2.599.0 (#4907): settings no longer name ablage: their sharing defaults load it themselves (settings.js); docs still needs it
+// 2.501.0 (#4198): module ablage: docs (the folder tree, moves, menus), office (FS_REF_ICON, requests) and the parts of the file store use its globals
 // functions of a module that code loaded at start calls: a stand-in loads the module and then calls the real one (the
 // module's own function declaration replaces the stand-in on window)
 const LD_CALL = {settings: ['settingsModal', 'setApply', 'settingsSync', 'modCountsSync', 'setSaved', 'setLocal', 'ojn_open', 'otkOpen'],  // 2.149.0 F (#2519): setLocal (the command bar's "Theme: …"); bundle B: ojn_open (2.148.1 #2480, bell item of an invitation); 2.574.0 (#3376): otkOpen (acctset.js)
@@ -259,16 +260,38 @@ function loadCss(f) {  // 2.65.0 (#1824): one stylesheet of static/css/; also us
   });
 }
 const LD_RAN = new Set();  // files that have run (a retry after a failure loads only the rest: a second run would declare twice)
+// 2.599.0 (#4907): a file that threw while it ran (or could not be parsed) fires "load" all the same. It does not count as run:
+// the files after it in its module would run on its missing globals (ablinks.js on AB_ACT of a broken ablage.js), and their
+// top-level const / let stay locked for good (xl_stdHtml "before initialization" in the settings). Its error rejects the module;
+// a second run cannot help (its own names are locked too), so it is kept here and only a reload of the page loads it again.
+const LD_BAD = new Map();  // file -> the error of its run
+const LD_PEND = new Map();  // file -> the promise of its tag while it loads (two chains never insert the same file twice)
 function ld_script(f) {
   if (LD_RAN.has(f)) return Promise.resolve();
-  return new Promise((res, rej) => {
+  if (LD_BAD.has(f)) return Promise.reject(LD_BAD.get(f));
+  if (LD_PEND.has(f)) return LD_PEND.get(f);
+  const p = new Promise((res, rej) => {
     const s = document.createElement('script');
     s.src = ld_url(f);
     s.dataset.ld = f;
-    s.onload = () => { LD_RAN.add(f); res(); };
-    s.onerror = () => { s.remove(); rej(new Error('could not load ' + f)); };
+    let err = null;
+    const own = ev => document.currentScript === s || (!!ev.filename && new URL(ev.filename, location.href).pathname === `/static/js/${f}.js`);
+    const onErr = ev => { if (!err && own(ev)) err = ev.error || new Error(ev.message); };
+    window.addEventListener('error', onErr);
+    const done = () => { window.removeEventListener('error', onErr); LD_PEND.delete(f); };
+    s.onload = () => {
+      done();
+      if (err) {
+        const e = new Error(`${f}.js failed while it ran: ${err.message || err}`);
+        LD_BAD.set(f, e); console.error('loadModule', e); rej(e); return;
+      }
+      LD_RAN.add(f); res();
+    };
+    s.onerror = () => { done(); s.remove(); rej(new Error('could not load ' + f)); };
     document.head.appendChild(s);
   });
+  LD_PEND.set(f, p);
+  return p;
 }
 // loadModule('settings') -> a promise that resolves once the module's files have run. A failure (offline without the cached
 // copy, a server restart) shows a toast with "Try again" (again: what to repeat) and may be retried.
@@ -289,7 +312,8 @@ function loadModule(name, again) {
   const p = LD_P[name] = Promise.all([css, files.reduce((q, f) => q.then(() => ld_script(f)), Promise.all([need, tx]))]).then(() => { ld_bar(-1); }, e => {
     ld_bar(-1); delete LD_P[name];
     for (const f of files) if (!LD_RAN.has(f)) document.querySelectorAll(`[data-ld="${f}"]`).forEach(x => x.remove());
-    toast(tr('Could not be loaded'), again || (() => loadModule(name)), 8000, tr('Try again'));
+    if (files.some(f => LD_BAD.has(f))) toast(tr('Could not be loaded'), () => location.reload(), 8000, tr('Reload'));  // 2.599.0 (#4907): only a reload runs a broken file again
+    else toast(tr('Could not be loaded'), again || (() => loadModule(name)), 8000, tr('Try again'));
     throw e;
   });
   return p;

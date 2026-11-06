@@ -684,6 +684,16 @@ function hostWire(md) {
     const p = $('[data-admp="server"]', md); if (p) { p.innerHTML = serverPaneHtml((id, on, label) => `<label class="chkl"><input type="checkbox" id="${id}" ${on ? 'checked' : ''}> ${label}</label>`, t => `<div class="shint">${t}</div>`); if (typeof rt9_adminDraw === 'function') rt9_adminDraw(md); if (typeof asst_admDraw === 'function') asst_admDraw(md); }  // 2.364.0 C (#3041): backups are under Organisation > Data
   });
 }
+// 2.599.0 (#4907): Settings > Data, the sharing defaults (ablinks.js, module ablage): drawn only once the module has run; when
+// it cannot load the place says so (loadModule shows its toast with the way to try again)
+function xl_stdLater(md, hint) {
+  const sec = $('#s-xlstd-sec', md); if (!sec) return;
+  loadModule('ablage').then(() => {
+    if (!sec.isConnected) return;
+    sec.innerHTML = xl_stdHtml(hint);
+    xl_stdMount(md);
+  }, () => { if (sec.isConnected) sec.innerHTML = `<p class="muted">${esc(tr('Could not be loaded'))}</p>`; });
+}
 function settingsModal(focus) {
   if (kd_pinNeed()) return kd_pinAsk(() => settingsModal(focus));  // 2.49.0 (#1551): a child with the parents' PIN
   const s = S.settings;
@@ -878,7 +888,7 @@ function settingsModal(focus) {
     <div class="sbody"><nav class="snav" role="tablist" aria-label="${tr('Settings')}">${secs.map(([k, i, n]) => `<button role="tab" id="st-${k}" aria-controls="sp-${k}" aria-selected="${k === cur}" data-sec="${k}" class="${k === cur ? 'on' : ''}"${k === 'access' && k !== cur && !acz_mine() ? ' hidden' : ''/* 2.364.0 C (#3044) */}>${ic(i, 's')}<span>${tr(n)}</span>${SET_DESC[k] ? `<small class="sndesc">${esc(tr(SET_DESC[k]))}</small>` : ''}</button>`).join('')}</nav>${mvOn() ? `<button type="button" class="snmv" data-mv="off">${ic('eye', 's')}<span>${tr('Show administration again')}</span></button>` : ''/* 2.436.0 (#3620): the way back, under the areas */}
       <div class="spanes">${secs.map(([k]) => `<section class="spane ${k === cur ? '' : 'hidden'}" role="tabpanel" id="sp-${k}" aria-labelledby="st-${k}" data-pane="${k}">${pane[k]}</section>`).join('')}</div></div>`);
   md.classList.add('smodal');
-  xl_stdMount(md);  // 2.470.0 (#3596): the sharing defaults of a workspace (ablinks.js)
+  xl_stdLater(md, hint);  // 2.470.0 (#3596): the sharing defaults of a workspace (ablinks.js); 2.599.0 (#4907): after the module ablage loaded
   tty_mount(md);  // 2.609.0 (#3372): own ticket types (below)
   $('[data-mv]', md)?.addEventListener('click', () => mvSet(false));  // 2.436.0 (#3620)
   mg_setSync(md);  // 2.171.0 (#2676): an area with only some parts on shows its switch half (indeterminate is no HTML attribute)
