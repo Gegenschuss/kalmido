@@ -281,7 +281,7 @@ VARS = (
     _v("KALMIDO_SRVAGENT_WEB_SEARCHES", "5", "Web searches of one server agent run with web research (max_uses of web_search).", "agents"),
     _v("KALMIDO_SRVAGENT_WEB_FETCHES", "5", "Pages one server agent run with web research may read (max_uses of web_fetch).", "agents"),
     _v("KALMIDO_SRVAGENT_WEB_TOKENS", "20000", "Tokens of one fetched page at most (max_content_tokens of web_fetch).", "agents"),
-    _v("KALMIDO_SRVAGENT_WEB_BLOCKED", "", "Comma separated domains the web tools of a server agent never open (the server's own address is always blocked).", "agents"),
+    _v("KALMIDO_SRVAGENT_WEB_BLOCKED", "", "Comma separated domains the web tools of a server agent never open (the host of PUBLIC_URL is always blocked; add every other host name of the same instance here, e.g. a second domain, a staging or an alias name).", "agents"),
     _v("KALMIDO_VIES_URL", "https://ec.europa.eu/taxation_customs/vies/rest-api", "Base address of the EU VIES REST API for VAT number checks of server agents (the tests point it at a stand-in).", "agents"),
     _v("KALMIDO_VIES_S", "10", "Seconds one VAT number check at VIES may take.", "agents"),
     _v("KALMIDO_EMBED_URL", "", "Address of the optional embedding service (related tasks, meaning search; empty = off); task titles and descriptions are sent to it.", "agents"),
