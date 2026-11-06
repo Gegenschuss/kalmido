@@ -32,7 +32,7 @@ from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.pg import insert_id
 from ..core.access import Denied, list_role, list_roles, my_inbox, need_list, wr_sql
 from ..core.errors import BadInput
-from .owrite import ow_kind, ow_write  # 2.567.0 (#4711): the office's write layer
+from .owrite import ow_history_answer, ow_kind, ow_write  # 2.567.0 (#4711): the office's write layer
 from ..files.fsref import fs_ref_rename
 from .oftref import oft_dropped  # 2.351.0 F (#2749)
 from .calc import dec, dstr, money
@@ -506,6 +506,14 @@ def agr_patch(aid):
              public=lambda c, cur: bk_public(c, oid, uid, _row(c, oid, aid)), extra=extra, force=True)
     c.commit()
     return jsonify(bk_public(c, oid, uid, _row(c, oid, aid)))
+
+
+@app.get("/api/office/agreements/<int:aid>/history")
+def agr_history(aid):
+    """2.570.0 (#4783): the history (office/owrite.py ow_history) with the rights of the save route."""
+    c, uid, oid = _ctx()
+    _row(c, oid, aid)
+    return ow_history_answer(c, "office_agreement", aid)
 
 
 @app.delete("/api/office/agreements/<int:aid>")

@@ -56,7 +56,7 @@ from .countries import fk_country_code  # 2.369.5 (#2517): pulled up from functi
 from ..core.serializers import csv_cell  # 2.369.5 (#2517): pulled up from functions
 from .docs import doc_items, recalc, ofd_free_receipts  # 2.369.5 (#2517): pulled up from functions
 from .otrash import otb_gone_out, otb_put, otb_restore  # 2.530.0 C (#4315, B17)
-from .owrite import ow_kind, ow_write  # noqa: E402  2.567.0 D (#4711): the saves go through the core's write layer
+from .owrite import ow_history_answer, ow_kind, ow_need_row, ow_write  # noqa: E402  2.567.0 D (#4711): the saves go through the core's write layer
 
 ow_kind("office_trip", "office_trips")
 ow_kind("office_trip_item", "office_trip_items")
@@ -529,6 +529,14 @@ def rk_trip_patch(tid):
     return jsonify(_one(c, oid, tid))
 
 
+@app.get("/api/office/trips/<int:tid>/history")
+def rk_trip_history(tid):
+    """2.570.0 (#4783): the history (office/owrite.py ow_history) with the rights of the save route."""
+    c, uid, oid = _ctx()
+    _trip(c, oid, tid)
+    return ow_history_answer(c, "office_trip", tid)
+
+
 @app.delete("/api/office/trips/<int:tid>")
 def rk_trip_delete(tid):
     """Deletes a trip with its receipts; answers the trip as it was (the client's undo posts it again)."""
@@ -613,6 +621,14 @@ def rk_item_patch(tid, iid):
              alias="row", public=lambda c, cur: next((x for x in _one(c, oid, tid)["items"] if x["id"] == iid), None))
     c.commit()
     return jsonify(_one(c, oid, tid))
+
+
+@app.get("/api/office/trips/<int:tid>/items/<int:iid>/history")
+def rk_item_history(tid, iid):
+    """2.570.0 (#4783): the history (office/owrite.py ow_history) with the rights of the save route."""
+    c, uid, oid = _ctx()
+    _item(c, oid, tid, iid)
+    return ow_history_answer(c, "office_trip_item", iid)
 
 
 @app.delete("/api/office/trips/<int:tid>/items/<int:iid>")
@@ -759,6 +775,14 @@ def rka_purpose_patch(pid):
                       oid=oid, alias="row", public=lambda c, cur: {"id": cur["id"], "name": cur["name"], "updated_at": cur["updated_at"]})
     c.commit()
     return jsonify(id=pid, name=row["name"], updated_at=row["updated_at"])
+
+
+@app.get("/api/office/trips/purposes/<int:pid>/history")
+def rka_purpose_history(pid):
+    """2.570.0 (#4783): the history (office/owrite.py ow_history) with the rights of the save route."""
+    c, uid, oid = _ctx()
+    ow_need_row(c, "office_trip_purposes", "id=? AND org_id=? AND deleted_at IS NULL", (pid, oid))
+    return ow_history_answer(c, "office_trip_purpose", pid)
 
 
 @app.delete("/api/office/trips/purposes/<int:pid>")

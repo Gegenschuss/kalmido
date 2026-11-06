@@ -29,7 +29,7 @@ from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc
 from ..core.access import Denied, need_list, vis_sql
 from ..core.errors import BadInput
-from .owrite import ow_crypt, ow_kind, ow_write  # 2.567.0 (#4711): the office's write layer
+from .owrite import ow_crypt, ow_history_answer, ow_kind, ow_write  # 2.567.0 (#4711): the office's write layer
 from .model import office_gate, office_org, office_settings, pb_cl_live, pb_cl_sql, pb_owner, trial_flag
 from .doctpl_samples import DMA_SAMPLES, SAMPLE_MT, sample_langs, sample_text  # 2.117.0 B (#2283); 2.449.0 (#3768)
 from .doclang import DOC_LANGS, doc_lg  # 2.185.0 C (#2520)
@@ -833,6 +833,14 @@ def dt_tpl_patch(tid):
     return jsonify(dt_tpl_public(dt_tpl(c, oid, tid)))
 
 
+@app.get("/api/office/doc-templates/<int:tid>/history")
+def dt_tpl_history(tid):
+    """2.570.0 (#4783): the history (office/owrite.py ow_history) with the rights of the save route."""
+    c, uid, oid = _ctx()
+    dt_tpl(c, oid, tid)
+    return ow_history_answer(c, "office_doctpl", tid)
+
+
 @app.delete("/api/office/doc-templates/<int:tid>")
 def dt_tpl_delete(tid):
     """Archives a template (its documents stay); POST .../restore takes it back (the client's undo)."""
@@ -1059,6 +1067,14 @@ def dt_doc_patch(gid):
              public=lambda c, cur: dt_doc_public(c, oid, dt_doc(c, oid, gid)), extra=extra)
     c.commit()
     return jsonify(dt_doc_public(c, oid, dt_doc(c, oid, gid)))
+
+
+@app.get("/api/office/gen-docs/<int:gid>/history")
+def dt_doc_history(gid):
+    """2.570.0 (#4783): the history (office/owrite.py ow_history) with the rights of the save route."""
+    c, uid, oid = _ctx()
+    dt_doc(c, oid, gid)
+    return ow_history_answer(c, "office_gendoc", gid)
 
 
 @app.delete("/api/office/gen-docs/<int:gid>")

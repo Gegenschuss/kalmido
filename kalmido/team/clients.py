@@ -20,7 +20,7 @@ from ..accounts.orgs import INSTANCE_ENV, user_orgs, is_org_admin, ws_chosen_org
 from ..accounts.orgroles import user_orgs_full, is_write_request  # 2.369.5 (#2517): pulled up from functions
 from ..personal.timetrack import time_report  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.supportgrant import sga_org_foreign
-from ..office.owrite import ow_write  # 2.567.0 (#4711): the office's write layer (the clients save through it)
+from ..office.owrite import ow_history_answer, ow_write  # 2.567.0 (#4711): the office's write layer (the clients save through it)
 
 
 # ---------------------------------------------------------------- 2.23.0 (#463): clients
@@ -464,6 +464,16 @@ def h6c_client_move_ok(c, uid, r):
     if r["org_id"] and is_org_admin(c, uid, r["org_id"]):
         return
     raise Denied(403, tr("Only the person who created the client or an admin of its organisation can move it"))
+
+
+@app.get("/api/clients/<int:cid>/history")
+def client_history(cid):
+    """2.570.0 (#4783): the client's history (office/owrite.py ow_history) with the rights of the save route (need_client)."""
+    c = db()
+    uid = me()
+    _gate(c)
+    need_client(c, cid, uid)
+    return ow_history_answer(c, "client", cid)
 
 
 @app.delete("/api/clients/<int:cid>")

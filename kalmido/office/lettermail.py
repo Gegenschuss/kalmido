@@ -20,7 +20,7 @@ from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.orgcrypt import OrgCryptError, oc_dec_fields, oc_enc_fields, oc_is_enc
 from ..core.i18n import N_, tr
 from ..core.db import body, bump
-from .owrite import ow_write  # 2.567.0 (#4711): the office's write layer
+from .owrite import ow_history_answer, ow_write  # 2.567.0 (#4711): the office's write layer
 from ..core.access import Denied
 from ..personal.timetrack import BadInput
 from ..files.store import fs_purge_files, fs_subtree  # 2.184.0 C (#2582)
@@ -423,6 +423,14 @@ def ltb_patch(bid):
                       public=lambda c, cur: ltb_public(cur), alias="row", lock=f"office_texts-{int(bid)}", write=write)
     c.commit()
     return jsonify(ltb_public(ltb_row(c, oid, bid)))
+
+
+@app.get("/api/office/letter-blocks/<int:bid>/history")
+def ltb_history(bid):
+    """2.570.0 (#4783): the history (office/owrite.py ow_history) with the rights of the save route."""
+    c, uid, oid = ltb_ctx()
+    ltb_row(c, oid, bid)
+    return ow_history_answer(c, "office_md_texts", bid)
 
 
 @app.delete("/api/office/letter-blocks/<int:bid>")

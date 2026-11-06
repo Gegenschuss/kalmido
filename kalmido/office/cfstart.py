@@ -32,7 +32,7 @@ from .otrash import OTB_UNDO, otb_put  # 2.567.0 (#4707): the start balance and 
 CFS_TRASH_START, CFS_TRASH_ADJ = "cf_start", "cf_adjust"  # 2.567.0 (#4707): their kinds in the office trash
 OTB_UNDO[CFS_TRASH_START] = OTB_UNDO[CFS_TRASH_ADJ] = _ctx  # the toast's undo: the office admin, as deleting them
 from .cashflow import rk_cashflow  # 2.369.5 (#2517): pulled up from functions
-from .owrite import ow_kind, ow_write  # 2.567.0 D (#4711): the corrections save through the core's write layer
+from .owrite import ow_history_answer, ow_kind, ow_write  # 2.567.0 D (#4711): the corrections save through the core's write layer
 
 ow_kind("office_cf_adjust", "office_cf_adjust")
 
@@ -188,6 +188,14 @@ def cfs_adjust_patch(aid):
              public=lambda c, cur: _adj_public(c, oid, _adj_row(c, oid, aid)))
     c.commit()
     return jsonify(_adj_public(c, oid, _adj_row(c, oid, aid)))
+
+
+@app.get("/api/office/cashflow/adjust/<int:aid>/history")
+def cfs_adjust_history(aid):
+    """2.570.0 (#4783): the history (office/owrite.py ow_history) with the rights of the save route."""
+    c, uid, oid = _ctx()
+    _adj_row(c, oid, aid)
+    return ow_history_answer(c, "office_cf_adjust", aid)
 
 
 @app.delete("/api/office/cashflow/adjust/<int:aid>")

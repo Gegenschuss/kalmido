@@ -56,7 +56,7 @@ from .mailsig import ofm_sender  # 2.369.5 (#2517): pulled up from functions
 from .fixedimport import fci_people  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.validation import log_act  # 2.369.5 (#2517): pulled up from functions
 from .cashflow import _fx  # 2.369.5 (#2517): pulled up from functions
-from .owrite import ow_kind, ow_write  # 2.567.0 D (#4711): the saves go through the core's write layer
+from .owrite import ow_history_answer, ow_kind, ow_write  # 2.567.0 D (#4711): the saves go through the core's write layer
 
 ow_kind("office_inv_series", "office_inv_series")
 
@@ -651,6 +651,14 @@ def rin_patch(sid):
                                                                                             "after": {k: v[1] for k, v in changed.items()}})
     c.commit()
     return jsonify(rin_public(c, oid, rin_row(c, oid, sid)))
+
+
+@app.get("/api/office/series/<int:sid>/history")
+def rin_history(sid):
+    """2.570.0 (#4783): the history (office/owrite.py ow_history) with the rights of the save route."""
+    c, uid, oid = _ctx()
+    rin_row(c, oid, sid)
+    return ow_history_answer(c, "office_inv_series", sid)
 
 
 @app.delete("/api/office/series/<int:sid>")

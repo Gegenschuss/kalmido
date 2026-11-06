@@ -270,6 +270,8 @@ APP_TO_API = {
 }
 # app routes with no API counterpart on purpose (prefix match on "METHOD /api/path"; reason first)
 APP_ONLY = [
+    ("2.570.0 A (#4783): the history of a client (who changed which field when, office/owrite.py ow_history) is read in the app like "
+     "the core objects' history -- an agent reads the client itself with GET /clients/{id}", ("=GET /api/clients/{}/history",)),
     ("2.567.0 A (#4707): sections, planned sprints, key links and templates in the trash are restored by a person (Undo, the trash "
      "view) -- an agent's delete puts them into that trash, the way back stays with people (like the files and comments)",
      ("=GET /api/trash/parts", "=POST /api/sections/{}/restore", "=POST /api/sprints/{}/restore", "=POST /api/lists/{}/links/{}/restore",

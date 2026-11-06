@@ -44,7 +44,7 @@ from .costs import ek_purchases  # 2.369.5 (#2517): pulled up from functions
 from .travel import rk_trips  # 2.369.5 (#2517): pulled up from functions
 from .docs import doc_row  # 2.369.5 (#2517): pulled up from functions
 from .ledger import ofx_log  # 2.369.5 (#2517): pulled up from functions
-from .owrite import ow_kind, ow_write  # 2.567.0 D (#4711): the saves go through the core's write layer
+from .owrite import ow_history_answer, ow_kind, ow_write  # 2.567.0 D (#4711): the saves go through the core's write layer
 from .otrash import OTB_UNDO, otb_put  # noqa: E402  2.567.0 (#4707): a deleted fixed cost goes into the office trash
 
 RK_FIXED_TRASH = "fixed_cost"  # 2.567.0 (#4707): kind of a deleted fixed cost / subscription in the office trash
@@ -227,6 +227,14 @@ def rk_fixed_patch(fid):
              public=lambda c, cur: _fixed_public(c, oid, _fixed_row(c, oid, fid)))
     c.commit()
     return jsonify(_fixed_public(c, oid, _fixed_row(c, oid, fid)))
+
+
+@app.get("/api/office/fixed-costs/<int:fid>/history")
+def rk_fixed_history(fid):
+    """2.570.0 (#4783): the history (office/owrite.py ow_history) with the rights of the save route."""
+    c, uid, oid = _ctx()
+    _fixed_row(c, oid, fid)
+    return ow_history_answer(c, "office_fixed_cost", fid)
 
 
 @app.delete("/api/office/fixed-costs/<int:fid>")

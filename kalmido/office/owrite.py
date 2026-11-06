@@ -24,7 +24,11 @@ Interface:
   ow_crypt(table, office) -> (dec, enc)                         for a table with encrypted columns (core/orgcrypt.py)
   ow_undo_ctx(kind, fn)                                         the session undo of the kind (office/undo.py route)
   ow_history(c, kind, rid, limit=50) -> the entries (the caller checked the rights to read the row)
-  ow_is_agent(c, uid) -> bool, ow_uid() -> the signed-in account or None"""
+  ow_is_agent(c, uid) -> bool, ow_uid() -> the signed-in account or None
+  ow_history_answer(c, kind, rid) -> {items}                   2.570.0 (#4783): the answer of a history route GET <save path>/history
+                                                                (the route runs the rights checks of its save route first; office/rights.py
+                                                                ofr_need asks a group for what saving needs)
+  ow_need_row(c, table, where, args)                            404 when the row is not there (the where of the save route)"""
 import json
 
 from flask import g, has_request_context, jsonify
@@ -177,3 +181,16 @@ def ow_history(c, kind, rid, limit=50):
     return [{"id": r["id"], "at": r["updated_at"], "user_id": r["user_id"], "name": names.get(r["user_id"], ""), "agent": bool(r["agent"]),
              "action": r["action"], "fields": sorted(set(json.loads(r["vals_before"] or "{}")) | set(json.loads(r["vals_after"] or "{}")))}
             for r in rows]
+
+
+def ow_history_answer(c, kind, rid):
+    """2.570.0 (#4783): {items: the history of row rid of kind} -- the routes GET <the save route's path>/history call it after
+    the rights checks of their save route (the gate, the row in the organisation, the level "own"; no state checks like
+    "draft only": a finished row's history stays readable)."""
+    return jsonify(items=ow_history(c, kind, rid))
+
+
+def ow_need_row(c, table, where, args):
+    """404 unless the row is there (the where / args of the save route's ow_write)."""
+    if c.execute(f"SELECT 1 FROM {table} WHERE {where}", tuple(args)).fetchone() is None:
+        raise Denied(404)

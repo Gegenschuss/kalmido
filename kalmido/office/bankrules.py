@@ -29,7 +29,7 @@ from ..core.i18n import tr
 from ..core.db import body, bump, iso, local_now, now_utc
 from ..core.access import Denied
 from ..core.errors import BadInput
-from .owrite import ow_kind, ow_write  # 2.567.0 D (#4711): the saves go through the core's write layer
+from .owrite import ow_history_answer, ow_kind, ow_need_row, ow_write  # 2.567.0 D (#4711): the saves go through the core's write layer
 from ..receipts.suggest import rc_categories
 from .bank import BNK_KINDS, IBAN_RE, _clean, _norm, _tx_dec
 from .books import bk_ws
@@ -394,6 +394,14 @@ def br_edit(rid):
              alias="row", public=lambda c, cur: br_public(cur))
     c.commit()
     return jsonify(rule=_one(c, oid, rid))
+
+
+@app.get("/api/office/bank/rules/<int:rid>/history")
+def br_history(rid):
+    """2.570.0 (#4783): the history (office/owrite.py ow_history) with the rights of the save route."""
+    c, uid, oid = _ctx()
+    ow_need_row(c, "office_bank_rules", "id=? AND org_id=? AND deleted_at IS NULL", (rid, oid))
+    return ow_history_answer(c, "office_bank_rule", rid)
 
 
 @app.delete("/api/office/bank/rules/<int:rid>")

@@ -28,7 +28,7 @@ from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.i18n import N_, csv_dialect, lang, tr
 from ..core.db import body, bump, db, iso, local_now, local_stamp, now_utc
 from ..core.access import Denied
-from .owrite import ow_crypt, ow_kind, ow_write  # 2.567.0 (#4711): the office's write layer
+from .owrite import ow_crypt, ow_history_answer, ow_kind, ow_write  # 2.567.0 (#4711): the office's write layer
 from ..core.errors import BadInput
 from .calc import calc_lang, dec, dstr, fmt_point, money
 from .model import ofx_name1, office_gate, office_org, office_settings, office_settings_lock, office_settings_save, pb_cl_live
@@ -261,6 +261,14 @@ def lb_vehicle_patch(vid):
 
 
 # ---------------------------------------------------------------- drives
+@app.get("/api/office/vehicles/<int:vid>/history")
+def lb_vehicle_history(vid):
+    """2.570.0 (#4783): the history (office/owrite.py ow_history) with the rights of the save route."""
+    c, uid, oid = _ctx()
+    _vehicle(c, oid, vid)
+    return ow_history_answer(c, "office_vehicle", vid)
+
+
 def _drive(c, oid, did, deleted=False):
     r = c.execute("SELECT * FROM office_drives WHERE id=? AND org_id=?", (did, oid)).fetchone()
     if not r or (bool(r["deleted_at"]) != deleted) or not lb_own_ok(r):
@@ -559,6 +567,14 @@ def lb_drive_patch(did):
              public=lambda c, cur: _one(c, oid, uid, did), extra=extra)
     c.commit()
     return jsonify(_one(c, oid, uid, did))
+
+
+@app.get("/api/office/drives/<int:did>/history")
+def lb_drive_history(did):
+    """2.570.0 (#4783): the history (office/owrite.py ow_history) with the rights of the save route."""
+    c, uid, oid = _ctx()
+    _drive(c, oid, did)
+    return ow_history_answer(c, "office_drive", did)
 
 
 @app.delete("/api/office/drives/<int:did>")

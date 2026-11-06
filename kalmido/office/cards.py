@@ -37,7 +37,7 @@ from .model import office_ctx, office_ctx_admin, office_role, pb_owner
 from .periodlock import period_need_open, pl_is_locked
 from .rights import LV, ofr_allows, ofr_need_area, ofr_rights
 from .bank import _norm, BNK_LIST_MAX  # 2.369.5 (#2517): pulled up from functions
-from .owrite import ow_kind, ow_write  # 2.567.0 D (#4711): the saves go through the core's write layer
+from .owrite import ow_history_answer, ow_kind, ow_write  # 2.567.0 D (#4711): the saves go through the core's write layer
 
 ow_kind("office_cc_card", "office_cc_cards")
 ow_kind("office_cc_line", "office_cc_lines")
@@ -200,6 +200,14 @@ def cc_patch(cid):
         ofx_log(c, oid, "update", target="cards", detail={"card": cid})
     c.commit()
     return jsonify(_card_public(c, oid, cc_card_row(c, oid, cid)))
+
+
+@app.get("/api/office/cards/<int:cid>/history")
+def cc_history(cid):
+    """2.570.0 (#4783): the history (office/owrite.py ow_history) with the rights of the save route."""
+    c, uid, oid = office_ctx_admin()
+    cc_card_row(c, oid, cid)
+    return ow_history_answer(c, "office_cc_card", cid)
 
 
 @app.delete("/api/office/cards/<int:cid>")

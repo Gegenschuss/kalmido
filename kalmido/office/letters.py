@@ -20,7 +20,7 @@ from flask import Response, g, has_request_context, jsonify, request
 
 from ..core.config import app, APP_VERSION
 from ..core.pg import insert_id, write_lock
-from .owrite import ow_crypt, ow_kind, ow_undo_ctx, ow_write  # 2.567.0 (#4711): the office's write layer
+from .owrite import ow_crypt, ow_history_answer, ow_kind, ow_undo_ctx, ow_write  # 2.567.0 (#4711): the office's write layer
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, err, iso, local_now, now_utc
@@ -870,6 +870,14 @@ def lt_patch(lid):
     d = lt_update(c, oid, lid, body(), uid=uid, version=True)
     c.commit()
     return jsonify(lt_public(c, oid, d))
+
+
+@app.get("/api/office/letters/<int:lid>/history")
+def lt_history(lid):
+    """2.570.0 (#4783): the history (office/owrite.py ow_history) with the rights of the save route."""
+    c, uid, oid = lt_ctx()
+    lt_row(c, oid, lid)
+    return ow_history_answer(c, "office_letter", lid)
 
 
 @app.delete("/api/office/letters/<int:lid>")

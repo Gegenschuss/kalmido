@@ -29,7 +29,7 @@ from .model import office_settings
 from .otrash import OTB_CHECK, otb_gone_out, otb_put, otb_restore
 from .rcsubmit import rsb_ingest
 from .bank import _rc_paid_amount  # 2.369.5 (#2517): pulled up from functions
-from .owrite import ow_write  # 2.567.0 D (#4711): the saves go through the core's write layer (kind office_cc_line: cards.py)
+from .owrite import ow_history_answer, ow_write  # 2.567.0 D (#4711): the saves go through the core's write layer (kind office_cc_line: cards.py)
 
 CL_DAYS = 10  # +- days around a position that count as "date close"
 CL_SCAN = 5000  # newest documents looked at
@@ -231,6 +231,14 @@ def cl_patch(lid):
              enc=lambda c, v: oc_enc_fields(c, oid, "office_cc_lines", v), alias="row", public=lambda c, cur: _public(c, cl_row(c, oid, lid, uid, every)[0]))
     c.commit()
     return _answer(c, oid, uid, lid, every)
+
+
+@app.get("/api/office/cards/lines/<int:lid>/history")
+def cl_history(lid):
+    """2.570.0 (#4783): the history (office/owrite.py ow_history) with the rights of the save route."""
+    c, uid, oid, every = cc_ctx()
+    cl_row(c, oid, lid, uid, every)
+    return ow_history_answer(c, "office_cc_line", lid)
 
 
 @app.delete("/api/office/cards/lines/<int:lid>")

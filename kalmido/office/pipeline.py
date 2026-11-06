@@ -15,7 +15,7 @@ from flask import jsonify, request
 
 from ..core.config import app
 from ..core.pg import insert_id
-from .owrite import ow_kind, ow_uid, ow_write  # 2.567.0 (#4711): the office's write layer
+from .owrite import ow_history_answer, ow_kind, ow_uid, ow_write  # 2.567.0 (#4711): the office's write layer
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.i18n import tr
 from ..core.db import body, bump, db, iso, local_now, now_utc
@@ -336,6 +336,14 @@ def pl2_patch(did):
     c.commit()
     before = st.get("before") or {}
     return jsonify({**_one(c, oid, did), "before": before})
+
+
+@app.get("/api/office/deals/<int:did>/history")
+def pl2_history(did):
+    """2.570.0 (#4783): the history (office/owrite.py ow_history) with the rights of the save route."""
+    c, uid, oid = _ctx()
+    _row(c, oid, did)
+    return ow_history_answer(c, "office_deal", did)
 
 
 @app.delete("/api/office/deals/<int:did>")

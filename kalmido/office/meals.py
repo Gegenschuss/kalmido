@@ -52,7 +52,7 @@ from .model import office_settings, ofx_name1  # 2.369.5 (#2517): pulled up from
 from .packs import office_pack_for, pack_retention  # 2.369.5 (#2517): pulled up from functions
 from ..files.upsafe import UploadRefused  # 2.369.5 (#2517): pulled up from functions
 from .mealpdf import bw_meal_pdf_data, bw_report_pdf  # 2.369.5 (#2517): pulled up from functions
-from .owrite import ow_kind, ow_write  # 2.567.0 D (#4711): the saves go through the core's write layer
+from .owrite import ow_history_answer, ow_kind, ow_write  # 2.567.0 D (#4711): the saves go through the core's write layer
 
 ow_kind("office_meal", "office_meals")
 ow_kind("office_meal_choice", "office_meal_choices")
@@ -559,6 +559,14 @@ def bw_choice_patch(cid):
     return jsonify(pub(c, row))
 
 
+@app.get("/api/office/meals/choices/<int:cid>/history")
+def bw_choice_history(cid):
+    """2.570.0 (#4783): the history (office/owrite.py ow_history) with the rights of the save route."""
+    c, uid, oid = _ctx()
+    _choice(c, oid, cid)
+    return ow_history_answer(c, "office_meal_choice", cid)
+
+
 @app.delete("/api/office/meals/choices/<int:cid>")
 def bw_choice_delete(cid):
     """Removes a choice (the meals keep their text); the undo posts it again."""
@@ -637,6 +645,14 @@ def bw_meal_patch(mid):
              alias="row", public=lambda c, cur: _one(c, oid, mid))
     c.commit()
     return jsonify(_one(c, oid, mid))
+
+
+@app.get("/api/office/meals/<int:mid>/history")
+def bw_meal_history(mid):
+    """2.570.0 (#4783): the history (office/owrite.py ow_history) with the rights of the save route."""
+    c, uid, oid = _ctx()
+    _meal(c, oid, mid)
+    return ow_history_answer(c, "office_meal", mid)
 
 
 @app.delete("/api/office/meals/<int:mid>")

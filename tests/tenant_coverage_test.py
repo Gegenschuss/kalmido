@@ -206,6 +206,12 @@ KINDS = {
 }
 
 ROUTES = {
+    # 2.570.0 (#4783): the history of an office row / a client (office/owrite.py ow_history, the rights of the save route): p2570_a_office_test.py
+    "GET /api/office/trips/{}/history": "office", "GET /api/office/trips/{}/items/{}/history": "office", "GET /api/office/trips/purposes/{}/history": "office", "GET /api/office/fixed-costs/{}/history": "office",
+    "GET /api/office/cashflow/adjust/{}/history": "office", "GET /api/office/cards/{}/history": "office", "GET /api/office/cards/lines/{}/history": "office", "GET /api/office/bank/rules/{}/history": "office",
+    "GET /api/office/series/{}/history": "office", "GET /api/office/meals/{}/history": "office", "GET /api/office/meals/choices/{}/history": "office", "GET /api/office/letters/{}/history": "office",
+    "GET /api/office/agreements/{}/history": "office", "GET /api/office/doc-templates/{}/history": "office", "GET /api/office/gen-docs/{}/history": "office", "GET /api/office/deals/{}/history": "office",
+    "GET /api/office/letter-blocks/{}/history": "office", "GET /api/office/vehicles/{}/history": "office", "GET /api/office/drives/{}/history": "office", "GET /api/clients/{}/history": "client",
     "GET /api/whatsnew": "own", "POST /api/whatsnew/seen": "own",  # 2.556.0 (#4685): the own seen version of "New for you"
     # 2.353.0 A (#2758): locked folders of the file store (files/fslock.py, p2353_a_lockfolder_test.py)
     "GET /api/files/lock/{}": "file", "POST /api/files/lock/{}/start": "file", "GET /api/files/lock/{}/todo": "file", "GET /api/files/lock/{}/raw/{}": "file", "POST /api/files/lock/{}/convert/{}": "file", "POST /api/files/lock/{}/finish": "file", "POST /api/files/lock/{}/stop": "file", "POST /api/files/lock/{}/keys": "file", "POST /api/files/lock/upload": "file", "POST /api/files/lock/folder": "file", "POST /api/files/lock/rename/{}": "file", "POST /api/files/lock/version/{}": "file", "POST /api/files/lock/move/{}": "file",

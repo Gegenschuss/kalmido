@@ -156,6 +156,9 @@ OWN_ROUTES = {
     "POST /api/office/cards/statements/<int:sid>/lines", "PATCH /api/office/cards/lines/<int:lid>", "DELETE /api/office/cards/lines/<int:lid>",
     "GET /api/office/cards/lines/<int:lid>/candidates", "POST /api/office/cards/lines/<int:lid>/match",
     "POST /api/office/cards/lines/<int:lid>/unmatch", "POST /api/office/cards/lines/<int:lid>/upload",
+    # 2.570.0 (#4783): the history of an own entry (the route runs the checks of its save route: 404 for anybody else's)
+    "GET /api/office/trips/<int:tid>/history", "GET /api/office/trips/<int:tid>/items/<int:iid>/history",
+    "GET /api/office/drives/<int:did>/history", "GET /api/office/meals/<int:mid>/history", "GET /api/office/cards/lines/<int:lid>/history",
 }
 
 # 2.545.0 (#4592, decision of 2026-11-04): an org member in "Previous access" works in these areas on the level "own" (their
@@ -239,6 +242,8 @@ def ofr_need(admin=False):
     needs "manage" (review)."""
     rule = request.url_rule.rule if request.url_rule is not None else request.path
     read = request.method in ("GET", "HEAD", "OPTIONS")
+    if read and rule.endswith("/history"):  # 2.570.0 (#4783): an office row's history (office/owrite.py) needs what saving the row needs
+        rule, read = rule[:-len("/history")], False
     if read:
         area = ofr_area_of(request.path)
         need = "manage" if rule in MANAGE_READ or (admin and AREA_LEGACY.get(area) == "member") else "view"

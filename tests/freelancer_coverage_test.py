@@ -103,6 +103,12 @@ KINDS = {
 }
 
 ROUTES = {
+    # 2.570.0 (#4783): the history of an office row / a client (office/owrite.py ow_history, the rights of the save route): p2570_a_office_test.py
+    "GET /api/office/trips/{}/history": "office", "GET /api/office/trips/{}/items/{}/history": "office", "GET /api/office/trips/purposes/{}/history": "office", "GET /api/office/fixed-costs/{}/history": "office",
+    "GET /api/office/cashflow/adjust/{}/history": "office", "GET /api/office/cards/{}/history": "office", "GET /api/office/cards/lines/{}/history": "office", "GET /api/office/bank/rules/{}/history": "office",
+    "GET /api/office/series/{}/history": "office", "GET /api/office/meals/{}/history": "office", "GET /api/office/meals/choices/{}/history": "office", "GET /api/office/letters/{}/history": "office",
+    "GET /api/office/agreements/{}/history": "office", "GET /api/office/doc-templates/{}/history": "office", "GET /api/office/gen-docs/{}/history": "office", "GET /api/office/deals/{}/history": "office",
+    "GET /api/office/letter-blocks/{}/history": "office", "GET /api/office/vehicles/{}/history": "office", "GET /api/office/drives/{}/history": "office", "GET /api/clients/{}/history": "office",
     # 2.556.0 (#4685): "New for you" after an update (p2556_b_whatsnew_api_test.py as the freelancer)
     "GET /api/whatsnew": "own", "POST /api/whatsnew/seen": "own",
     # 2.545.0 (#4595): the switch "Extend the lock" of the own office (p2545_b_rethold_test.py as the freelancer)
@@ -1285,10 +1291,6 @@ PATCH /api/me/tokens/{}
 PATCH /api/me/webhooks/{}
 PATCH /api/newsletter/segments/{}
 PATCH /api/notepads/{}
-PATCH /api/office/cashflow/adjust/{}
-PATCH /api/office/meals/choices/{}
-PATCH /api/office/trips/purposes/{}
-PATCH /api/office/vehicles/{}
 PATCH /api/servers/self
 PATCH /api/servers/{}
 PATCH /api/servers/{}/tasks/{}
