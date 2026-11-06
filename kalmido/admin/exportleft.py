@@ -33,6 +33,7 @@ UMZ_LEFT_TABLES = {
     "list_part_trash": _DERIVED,  # 2.567.0 A (#4707): the copies of deleted sections / sprints (working data until the trash period ends)
     "module_card_people": _ORG,  # 2.575.0 (#3778): the module cards of an organisation a member has
     "obj_history": _DERIVED, "obj_undo": _DERIVED, "obj_revoked": _SHARE,  # 2.558.0 (#4709): the core's change history / undo steps (the areas export their objects), revoked shares
+    "doc_views": _VIEW,  # 2.579.0 (#4802): saved views of the documents search (their filters name label ids of this server)
     "comment_trash_text": _DERIVED, "tchat_trash_text": _DERIVED,  # 2.531.0 (#4317 x #4315): the kept text of deleted comments / team chat messages (working data until the trash period ends)
     "task_mail": _SERVER,  # 2.393.2 B (#3375): Message-IDs of tasks (the reply addresses are signed with this server's key)
     "budget_meta": _DERIVED, "contact_occ": _DERIVED, "dav_meta": _DERIVED, "dav_sync": _DERIVED, "dav_sync2": _DERIVED, "dl_changes": _DERIVED,

@@ -274,6 +274,11 @@ def clean_setting(k, v):
         if not isinstance(arr, list) or len(arr) > 2000 or not all(isinstance(x, int) and not isinstance(x, bool) and 0 < x < 2 ** 53 for x in arr):
             raise bad
         return json.dumps(list(dict.fromkeys(arr)))
+    if k == "dv_today":  # 2.579.0 (#4802): the saved document views shown as a block on Today (comma list of ids, docs/dviews.py)
+        ids = [x.strip() for x in sv.split(",") if x.strip()]
+        if len(ids) > 20 or not all(re.fullmatch(r"[1-9][0-9]{0,15}", x) for x in ids):
+            raise bad
+        return ",".join(dict.fromkeys(ids))
     if k == "fav_views":  # 2.40.0 (#1361): the views filtered to favourites (route keys of the smart views)
         ks = [x.strip() for x in sv.split(",") if x.strip()]
         if len(ks) > 40 or not all(re.fullmatch(r"[a-z]{2,12}", x) for x in ks):

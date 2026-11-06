@@ -102,8 +102,10 @@ LC_SUG_WINDOW, LC_SUG_DAYS, LC_SUG_ACTS = 14, 5, 20
 # 2.441.0 (#3592): what can be a favourite beyond the client's own state: the kinds of files/fsref.py (their name, route and space
 # come from its registry) and, as nodes of the file store, files and documents. Trash: the two kinds whose base role ignores it.
 FV2_REF_KINDS = ("office_doc", "office_letter", "office_gendoc", "office_receipt", "wiki", "sheet", "contact", "address_book")
+FV2_REF_KINDS += ("docview",)  # 2.579.0 (#4802): a saved view of the documents search (docs/dviews.py, a core object)
 FV2_AREA = {"office_doc": "office", "office_letter": "office", "office_gendoc": "office", "office_receipt": "office", "wiki": "wiki",
             "sheet": "sheets", "contact": "contacts", "address_book": "contacts"}  # the area an organisation can switch off (orgs.areas_off)
+FV2_AREA["docview"] = "ablage"  # 2.579.0 (#4802)
 
 
 def _fv2_ws(c, uid, org_id, owner_id):

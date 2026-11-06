@@ -33,7 +33,7 @@ Interface (signatures fixed; stages 2 / 3 and the first areas #1958 #1957 #4675 
   obj_register(kind, table, *, label, fields, open_url=None, space=None, title=None, base_role=None, visible=None, cap=None,
                hidden=None, org_access="edit", area="other", scopes=("read", "tasks:write"), dl_area=None, feat=None,
                protect=None, on_trash=None, content=None, undo_scope=None, public=None, routes=True, trash_role="manage",
-               fsref=True, share_cols=(), on_restore=None, on_revoke=None, list_col="list_id")
+               fsref=True, share_cols=(), on_restore=None, on_revoke=None, list_col="list_id", org_join="member")
       fields     {name: cleaner} -- what obj_create / obj_write may set; cleaner(c, value, row) -> the clean value (raise
                  BadInput); helpers f_text / f_int / f_bool / f_choice / f_date below
       space      f(c, id) -> (org_id | None, owner_id) | None (default: the row's columns)
@@ -176,7 +176,7 @@ def obj_register(kind, table, *, label, fields, open_url=None, space=None, title
                  hidden=None, org_access="edit", area="other", scopes=("read", "tasks:write"), dl_area=None, feat=None,
                  protect=None, on_trash=None, content=None, undo_scope=None, public=None, routes=True, trash_role="manage",
                  fsref=True, share_cols=(), on_restore=None, on_revoke=None, list_col="list_id", listed=True, members=None,
-                 fs_hooks=None):
+                 fs_hooks=None, org_join="member"):
     """Register a kind of core object (module docstring). Registering the same kind again replaces it (a module reload).
     2.565.0 (#4719): listed=False = the object's reference node only carries its shares (files/fsref.py): it lies in no
     folder and the file store never shows it; the area writes the shares with obj_member_put / obj_member_take.
@@ -185,12 +185,15 @@ def obj_register(kind, table, *, label, fields, open_url=None, space=None, title
     obj_revoke_person takes its rows with the shares (leave: the person and their agents; retire: everyone but the owner
     and the owner's own agents), so a fallback row never opens what the core closed. fs_hooks = keyword arguments of fs_ref_register that replace the core's
     (base_role, on_trash, content_gate ...): a kind the file store knew before the core keeps its folder rules (contacts:
-    filing and sharing the book's node stay with who manages it, files/fsref.py 2.199.0 F)."""
+    filing and sharing the book's node stay with who manages it, files/fsref.py 2.199.0 F).
+    2.579.0 (#4802): org_join = who may bring an object into an organisation (obj_create with org_id, core/writes.py
+    obj_space_set): "member" (default: every member who writes there) or "admin" (only its admins: a saved view of the
+    documents search, which a person keeps private until an admin shares it with everyone of the organisation)."""
     if not _NAME.fullmatch(kind or "") or not _TABLE.fullmatch(table or ""):
         raise ValueError(f"obj_register: invalid kind / table {kind!r} {table!r}")
     if base_role is not None and visible is None:
         raise ValueError(f"obj_register {kind}: a base_role hook needs its visible hook (obj_visible_sql)")
-    if org_access not in ("edit", "view", None) or trash_role not in ("edit", "manage") or area not in LV_AREA_KEYS:
+    if org_access not in ("edit", "view", None) or trash_role not in ("edit", "manage") or area not in LV_AREA_KEYS or org_join not in ("member", "admin"):
         raise ValueError(f"obj_register {kind}: invalid org_access / trash_role / area")
     if not isinstance(fields, dict) or any(k in OBJ_COLS or not _TABLE.fullmatch(k) for k in fields):
         raise ValueError(f"obj_register {kind}: fields must be own columns")
@@ -201,7 +204,8 @@ def obj_register(kind, table, *, label, fields, open_url=None, space=None, title
            # 2.568.0 (#4739): an old area with its own reference kind and role table (module docstring)
            "fsref": bool(fsref), "share_cols": tuple(x for x in share_cols if _TABLE.fullmatch(x)), "on_restore": on_restore,
            "on_revoke": on_revoke, "list_col": list_col if _TABLE.fullmatch(list_col or "") else "list_id",
-           "members": tuple(members) if members else None}  # 2.566.0 (#4712)
+           "members": tuple(members) if members else None,  # 2.566.0 (#4712)
+           "org_join": org_join}  # 2.579.0 (#4802)
     if members and (len(members) != 2 or not all(_TABLE.fullmatch(x or "") for x in members)):
         raise ValueError(f"obj_register {kind}: members must be (table, key column)")
     OBJ[kind] = reg

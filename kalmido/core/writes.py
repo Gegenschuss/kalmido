@@ -23,6 +23,7 @@ Interface:
   obj_create(c, uid, kind, vals, org_id=None) -> row
   obj_write(c, uid, kind, id, body, expect=None) -> (row, changed fields)
   obj_trash(c, uid, kind, id) -> row, obj_restore(c, uid, kind, id) -> row, obj_purge(c, uid, kind, id)
+  obj_space_set(c, uid, kind, id, org_id) -> (row, moved?)   2.579.0 (#4802): into an organisation / back to the owner's own space
   obj_history(c, uid, kind, id, limit=50) -> [{id, at, user_id, name, agent, action, before, after}]  ('view')
   obj_undo(c, uid, kind, id, sess, op) -> {state counts}            op undo | redo | all | redoall
   obj_is_agent(c, uid) -> bool
@@ -44,10 +45,11 @@ from .conflict import VersionRequired, ccf_check
 from .db import bump, insert_id, iso, iso_ms, now_utc
 from .errors import BadInput, UnknownFields
 from .i18n import N_, tr
-from .objects import OBJ_COLS, obj_need, obj_public, obj_reg, obj_row, obj_title, obj_forget
-from .pg import table_columns, write_lock
+from .objects import OBJ_COLS, obj_need, obj_node_follow, obj_public, obj_reg, obj_row, obj_title, obj_forget
+from .pg import system_ctx, table_columns, write_lock
 from ..collab.comments import user_names
-from ..accounts.orgroles import need_org_write
+from ..accounts.orgroles import need_org_write, org_role_key
+from ..accounts.orgout import org_out  # 2.579.0 (#4802): obj_space_set
 from ..files.fsref import fs_ref_drop, fs_ref_rename
 from ..files.store import _free_name
 
@@ -65,6 +67,9 @@ UNDO_CONFLICT = N_("Changed by someone else in the meantime, so it cannot be und
 UNDO_MOVED = N_("Moved to another workspace in the meantime, so it cannot be undone")
 UNDO_NOTHING = N_("Nothing to undo")
 PURGE_FIRST = N_("Put it into the trash first")
+JOIN_ADMIN = N_("Only admins of the organisation can share this with everyone of it")  # 2.579.0 (#4802)
+MOVE_OWNER = N_("Its owner is not a member of that organisation")
+MOVE_SHARED = N_("It is shared with people or agents: take those shares back first")
 OBJ_TRACK = {}  # 2.567.0 (#4711): kind -> {table, area, undo_scope, undo_keep, undo_nofp, fields: None} (obj_track)
 
 
@@ -178,6 +183,7 @@ def obj_create(c, uid, kind, vals, org_id=None):
         if not acx_org_ok(c, uid, org_id):
             raise Denied(404)
         need_org_write(c, uid, org_id)
+        _join_ok(c, uid, reg, org_id)  # 2.579.0 (#4802)
     v = _clean(c, reg, vals, None)
     for k, f in reg["fields"].items():
         if k not in v:
@@ -222,6 +228,56 @@ def obj_write(c, uid, kind, rid, b, expect=None):
     obj_undo_post(c)
     bump(c, _area(reg))
     return obj_row(c, kind, rid), changed
+
+
+def _join_ok(c, uid, reg, org_id):
+    """2.579.0 (#4802): a kind registered with org_join="admin" comes into an organisation only through its admins."""
+    if reg.get("org_join") == "admin" and org_role_key(c, uid, org_id) != "admin":
+        raise Denied(403, tr(JOIN_ADMIN))
+
+
+def obj_space_set(c, uid, kind, rid, org_id):
+    """2.579.0 (#4802): the object moves into organisation org_id, or (None) back into its owner's own space -- e.g. a saved view
+    an admin shares with everyone of the organisation (the members get the kind's org_access) and takes back again.
+    Needs 'manage' and a person (no agent); into an organisation: a member who writes there (need_org_write; the kind's
+    org_join "admin": only its admins), its owner a member there too; out of an organisation: only its admin
+    (accounts/orgout.py org_out: logged, News to the other admins). An object whose reference node carries shares is refused
+    (409): they were made for the old workspace (the owner takes them back first). rev+1, updated_at, the history ('move', the
+    org_id before / after), the reference node follows (objects.obj_node_follow), bump. Returns (row, moved). The caller commits."""
+    reg = obj_reg(kind)
+    obj_need(c, uid, kind, rid, "manage")
+    if obj_is_agent(c, uid):
+        raise Denied(403)
+    if org_id is not None and (isinstance(org_id, bool) or not isinstance(org_id, int)):
+        raise BadInput(tr("Invalid value: {0}", "org_id"))
+    write_lock(c, f"obj-{kind}-{int(rid)}")
+    row = c.execute(f"SELECT * FROM {reg['table']} WHERE id=? FOR UPDATE", (int(rid),)).fetchone()
+    if row is None or row["deleted_at"]:
+        raise Denied(404)
+    old = row["org_id"] or None
+    if old == org_id:
+        return row, False
+    if org_id is not None:
+        if not acx_org_ok(c, uid, org_id):
+            raise Denied(404)
+        need_org_write(c, uid, org_id)
+        _join_ok(c, uid, reg, org_id)
+        if row["owner_id"] != uid and org_role_key(c, row["owner_id"], org_id) is None:
+            raise Denied(409, tr(MOVE_OWNER))
+    if old is not None:
+        org_out(c, old, org_id, kind, obj_title(c, kind, rid) or tr(reg["label"]))  # 403 for anybody but its admin
+    with system_ctx(c):  # structure: whether its node (in the tree it leaves) carries a share
+        shared = c.execute("SELECT 1 FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id WHERE n.kind='ref' AND n.ref_kind=? AND n.ref_id=? "
+                           "LIMIT 1", (kind, int(rid))).fetchone()
+    if shared:
+        raise Denied(409, tr(MOVE_SHARED))
+    ts = _now()
+    c.execute(f"UPDATE {reg['table']} SET org_id=?, rev=rev+1, updated_at=?, updated_by=? WHERE id=?", (org_id, ts, uid, int(rid)))
+    obj_history_add(c, uid, kind, rid, {"org_id": old}, {"org_id": org_id}, action="move", org_id=org_id)
+    obj_node_follow(c, kind, rid)
+    obj_forget()
+    bump(c, _area(reg))
+    return obj_row(c, kind, rid), True
 
 
 # ---------------------------------------------------------------- trash
