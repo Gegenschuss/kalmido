@@ -16642,6 +16642,7 @@
   "The passphrase does not match.": "De wachtwoordzin klopt niet.",
   "{0} checked the backup passphrase: it matches.": "{0} heeft de wachtwoordzin van de back-ups gecontroleerd: klopt.",
   "{0} checked the backup passphrase: it does not match.": "{0} heeft de wachtwoordzin van de back-ups gecontroleerd: klopt niet.",
+  "document rules of mailboxes": "Documentregels van postvakken",
   "Format": "Opmaak",
   "Drag to fill": "Sleep om te vullen",
   "{0} cell filled": ["{0} cel gevuld", "{0} cellen gevuld"],

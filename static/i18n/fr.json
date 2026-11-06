@@ -16642,6 +16642,7 @@
   "The passphrase does not match.": "La phrase secrète ne correspond pas.",
   "{0} checked the backup passphrase: it matches.": "{0} a vérifié la phrase secrète des sauvegardes : elle correspond.",
   "{0} checked the backup passphrase: it does not match.": "{0} a vérifié la phrase secrète des sauvegardes : elle ne correspond pas.",
+  "document rules of mailboxes": "Règles de documents des boîtes mail",
   "Format": "Mise en forme",
   "Drag to fill": "Faire glisser pour remplir",
   "{0} cell filled": ["{0} cellule remplie", "{0} cellules remplies"],

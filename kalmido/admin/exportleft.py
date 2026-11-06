@@ -94,6 +94,7 @@ UMZ_LEFT_TABLES = {
 # 2.531.0 (#4317 F12): the readable name of every table that is not yet in the account export (_LATER): the export page names
 # these areas (acctexport.umz_not_included_view), tools/check_export_tables.py checks that each _LATER table has one
 UMZ_LATER_NAMES = {
+    "hub_mailbox_rules": "document rules of mailboxes",  # 2.581.0 (#4804)
     "chat_files": "files of agent chats", "chat_saves": "chat messages saved as tasks", "contact_links": "birthday tasks of contacts",
     "contact_tasks": "links between contacts and tasks", "ctr_notices": "notices of contracts", "folder_heads": "header strips of folders",
     "folder_props": "defaults of folders", "fs_log": "access history of private files", "git_branches": "branches of connected repositories",

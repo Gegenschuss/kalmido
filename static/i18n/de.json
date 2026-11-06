@@ -16642,6 +16642,7 @@
   "The passphrase does not match.": "Die Passphrase passt nicht.",
   "{0} checked the backup passphrase: it matches.": "{0} hat die Passphrase der Sicherungen geprüft: passt.",
   "{0} checked the backup passphrase: it does not match.": "{0} hat die Passphrase der Sicherungen geprüft: passt nicht.",
+  "document rules of mailboxes": "Dokument-Regeln von Postfächern",
   "Format": "Format",
   "Drag to fill": "Ziehen zum Ausfüllen",
   "{0} cell filled": ["{0} Zelle ausgefüllt", "{0} Zellen ausgefüllt"],

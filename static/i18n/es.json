@@ -16642,6 +16642,7 @@
   "The passphrase does not match.": "La frase de contraseña no coincide.",
   "{0} checked the backup passphrase: it matches.": "{0} comprobó la frase de contraseña de las copias de seguridad: coincide.",
   "{0} checked the backup passphrase: it does not match.": "{0} comprobó la frase de contraseña de las copias de seguridad: no coincide.",
+  "document rules of mailboxes": "Reglas de documentos de los buzones",
   "Format": "Formato",
   "Drag to fill": "Arrastra para rellenar",
   "{0} cell filled": ["{0} celda rellenada", "{0} celdas rellenadas"],

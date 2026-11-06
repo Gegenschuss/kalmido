@@ -16643,6 +16643,7 @@
   "The passphrase does not match.": "La passphrase non corrisponde.",
   "{0} checked the backup passphrase: it matches.": "{0} ha verificato la passphrase dei backup: corrisponde.",
   "{0} checked the backup passphrase: it does not match.": "{0} ha verificato la passphrase dei backup: non corrisponde.",
+  "document rules of mailboxes": "Regole documenti delle caselle di posta",
   "Format": "Formato",
   "Drag to fill": "Trascina per riempire",
   "{0} cell filled": ["{0} cella riempita", "{0} celle riempite"],
