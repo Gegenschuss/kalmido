@@ -455,6 +455,27 @@
    "code": "return `<small class=\"wksnip\">${o + esc(cs.slice(at).join(''))}</small>`;",
    "reason": "client template: every text goes through esc() or the app's markdown renderer (commentBody), ids are numbers, the rest are literals; the XSS suites cover the rendering.",
    "date": "2026-11-05"
+  },
+  {
+   "rule": "python.flask.security.injection.tainted-sql-string.tainted-sql-string",
+   "file": "kalmido/accounts/orgtasks.py",
+   "code": "total = c.execute(f\"SELECT COUNT(*) FROM tasks t WHERE {w}\", args).fetchone()[0]",
+   "reason": "SQL built from fixed fragments only: the list ids are '?' placeholders (ids come from ot_lists of the organisation), status adds fixed conditions, the search text goes through the parameters.",
+   "date": "2026-11-06"
+  },
+  {
+   "rule": "python.flask.security.injection.tainted-sql-string.tainted-sql-string",
+   "file": "kalmido/accounts/orgtasks.py",
+   "code": "rows = c.execute(f\"\"\"SELECT t.id, t.list_id, t.parent_id, t.title, t.status, t.priority, t.due, t.due_time, t.assignee_id, t.ttype,",
+   "reason": "SQL built from fixed fragments only: the list ids are '?' placeholders (ids come from ot_lists of the organisation), status adds fixed conditions, the search text, limit and offset go through the parameters.",
+   "date": "2026-11-06"
+  },
+  {
+   "rule": "typescript.react.security.audit.react-unsanitized-method.react-unsanitized-method",
+   "file": "static/js/wkhist.js",
+   "code": "if (rn.length) box.insertAdjacentHTML('beforeend', `<p class=\"shint\">${esc(tr('Renamed'))}</p><ul class=\"wkhlist\">${rn.map(x => `<li class=\"muted\">${ic(x.agent ? 'bot' : 'edit', 's')} ${esc(fmtWhen(x.at))} · ${esc(x.by_name || '')}: ${esc(wk_base(x.from))} → ${esc(wk_base(x.to))}</li>`).join('')}</ul>`); // 2.571.0 (#4766)",
+   "reason": "Every value from the server goes through esc() (when, name, old and new page name); ic() is a fixed icon from a fixed name.",
+   "date": "2026-11-06"
   }
  ]
 }
