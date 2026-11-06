@@ -141,24 +141,25 @@ def v1_sheet_patch(sid):
     if er is not None:
         if isinstance(er, bool) or not isinstance(er, int):
             raise BadInput(tr("Invalid value: {0}", "expect_rev"))
-        if er != r["rev"]:
-            raise Conflict("current", _v1_sheet(c, r))
 
-    def clean(c, b, cur):
+    def clean(c, b, cur):  # review F8: cur = the row read under the lock (ow_write, FOR UPDATE), never the one read before
+        if er is not None and er != cur["rev"]:
+            raise Conflict("current", _v1_sheet(c, cur))
         f = {}
         if "title" in b:
-            f["title"] = sh_clean_title(b["title"]) or r["title"]
+            f["title"] = sh_clean_title(b["title"]) or cur["title"]
         if "list_id" in b:
             lid = _int_or_none(b["list_id"], "list_id")
-            if lid != r["list_id"]:
-                shs_need_own(c, r)  # 2.124.0 C (#2113): never through a share
-                if not sh_may_rebind(c, me(), r):
+            if lid != cur["list_id"]:
+                shs_need_own(c, cur)  # 2.124.0 C (#2113): never through a share
+                if not sh_may_rebind(c, me(), cur):
                     raise Denied(403)  # 2.89.0 (#1916): review 2, the rule of the web route; agents only on their own sheets
-                f["list_id"] = sh_check_list(c, r["org_id"], lid, me())
-        return shb_patch(c, r, f)  # 2.124.0 E (#2116): the list on the first sheet only; a further sheet's title = its name in the bar
+                f["list_id"] = sh_check_list(c, cur["org_id"], lid, me())
+        return shb_patch(c, cur, f)  # 2.124.0 E (#2116): the list on the first sheet only; a further sheet's title = its name in the bar
 
-    # 2.571.0 (#4766): the core's write layer (obj_history, bump); the version was checked above (expect_rev, as before)
-    shh_meta_write(c, me(), r, {k: v for k, v in b.items() if k != "expect_rev"}, clean, lambda c, cur: _v1_sheet(c, r), version=False)
+    # 2.571.0 (#4766): the core's write layer (obj_history, bump); the version is expect_rev (checked in clean, as before)
+    b2 = {k: v for k, v in b.items() if k != "expect_rev"}
+    shh_meta_write(c, me(), r, b2, clean, lambda c, cur: _v1_sheet(c, cur), version=False)
     c.commit()
     return jsonify(_v1_sheet(c, sh_reload(c, sid)))
 
