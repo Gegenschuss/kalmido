@@ -8,6 +8,11 @@
   deleted in Kalmido. A rule that is already there with the same content is not made again.
 - Learning: the documents of the run go into the workspace's models once at the end, as confirmed examples, with the values
   that came from Paperless-ngx (never what the recognition added). The models are loaded and stored once per feature.
+- Workflows (2.581.0, #4803): each trigger of a Paperless-ngx workflow becomes a document flow (docs/flows.py) where the fields
+  match: consumption / document added -> received, document updated -> changed, scheduled (created / added date + offset) ->
+  scheduled; sources, file name, has tags / correspondent / type, the matching; actions assignment (tags, correspondent, type,
+  custom fields) and removal (tags). Not taken over and reported: owner / permissions (only through the shared core #4709),
+  title, storage path, e-mail, "remove all", webhooks (an import never brings a webhook: its target is checked when a person saves it).
 pll_finish never raises: an error here must not spoil the import's state (it is logged)."""
 import json
 from collections import Counter
@@ -23,6 +28,131 @@ PLL_RULES_MAX = 500      # document rules per workspace an import fills up to
 PLL_LIST_MAX = 50        # names of rules not taken over that the summary lists
 PLL_TRAIN_MAX = 5000     # newest documents of one run the models learn from
 PLL_KINDS = (("tags", "tags"), ("correspondents", "senders"), ("document_types", "types"))
+# 2.581.0 (#4803): Paperless-ngx' workflow numbers (documents/models.py WorkflowTrigger / WorkflowAction)
+PLL_WF_TRIG = {1: "received", 2: "received", 3: "changed", 4: "scheduled"}
+PLL_WF_SRC = {1: "scan", 2: "upload", 3: "mail", 4: "upload"}   # consume folder, API upload, mail fetch, web UI
+PLL_WF_DATE = {"created": "date", "added": "added"}
+PLL_WF_MAX = 200         # workflows of one import
+
+
+def _wf_ids(v):
+    return [x for x in (v if isinstance(v, list) else []) if isinstance(x, int) and not isinstance(x, bool)][:50]
+
+
+def _wf_one(v):
+    return v if isinstance(v, int) and not isinstance(v, bool) else (v.get("id") if isinstance(v, dict) and isinstance(v.get("id"), int) else None)
+
+
+def pll_wf_trigger(t):
+    """A trigger of the API answer or the export -> the plain shape learn.py reads."""
+    t = t if isinstance(t, dict) else {}
+    algo = t.get("matching_algorithm")
+    src = t.get("sources")
+    if isinstance(src, str):  # stored as "1,2,3" (a multi-select field) in older versions / exports
+        src = [int(x) for x in src.split(",") if x.strip().isdigit()]
+    return {"type": t.get("type"), "sources": _wf_ids(src), "filename": str(t.get("filter_filename") or "")[:200],
+            "path": bool(t.get("filter_path")), "mailrule": t.get("filter_mailrule") is not None,
+            "tags": _wf_ids([_wf_one(x) for x in t.get("filter_has_tags") or []]),
+            "sender": _wf_one(t.get("filter_has_correspondent")), "type_id": _wf_one(t.get("filter_has_document_type")),
+            "match": str(t.get("match") or "")[:1000], "algo": algo if isinstance(algo, int) and not isinstance(algo, bool) else 0,
+            "insens": t.get("is_insensitive") is not False, "days": t.get("schedule_offset_days"),
+            "date": str(t.get("schedule_date_field") or "added"), "recurring": bool(t.get("schedule_is_recurring"))}
+
+
+def pll_wf_action(a):
+    a = a if isinstance(a, dict) else {}
+    vals = a.get("assign_custom_fields_values") if isinstance(a.get("assign_custom_fields_values"), dict) else {}
+    return {"type": a.get("type"), "tags": _wf_ids([_wf_one(x) for x in a.get("assign_tags") or []]),
+            "sender": _wf_one(a.get("assign_correspondent")), "type_id": _wf_one(a.get("assign_document_type")),
+            "fields": {str(k): vals.get(str(k), vals.get(k)) for k in _wf_ids([_wf_one(x) for x in a.get("assign_custom_fields") or []])},
+            "untag": _wf_ids([_wf_one(x) for x in a.get("remove_tags") or []]),
+            "rest": [k for k in ("assign_title", "assign_storage_path", "assign_owner", "assign_view_users", "assign_view_groups",
+                                 "assign_change_users", "assign_change_groups", "remove_all_tags", "remove_all_correspondents",
+                                 "remove_all_document_types", "remove_all_custom_fields", "remove_all_owners", "remove_all_permissions",
+                                 "remove_owners", "remove_correspondents", "remove_document_types", "remove_custom_fields")
+                     if a.get(k) not in (None, "", [], False)]}
+
+
+def pll_wf_api(x):
+    """A workflow of GET /api/workflows/ (triggers / actions nested) -> {id, name, enabled, triggers, actions}."""
+    return {"id": x.get("id"), "name": str(x.get("name") or "")[:120], "enabled": x.get("enabled") is not False,
+            "triggers": [pll_wf_trigger(t) for t in (x.get("triggers") or [])[:20]], "actions": [pll_wf_action(a) for a in (x.get("actions") or [])[:20]]}
+
+
+def pll_wf_export(wfs, trigs, acts, fields=None):
+    """The workflows of an export manifest: wfs = [(pk, fields)] of documents.workflow, trigs / acts = {pk: fields}."""
+    out = []
+    for pk, f in wfs[:PLL_WF_MAX]:
+        out.append({"id": pk, "name": str(f.get("name") or "")[:120], "enabled": f.get("enabled") is not False,
+                    "triggers": [pll_wf_trigger(trigs[t]) for t in _wf_ids(f.get("triggers")) if t in trigs],
+                    "actions": [pll_wf_action(acts[a]) for a in _wf_ids(f.get("actions")) if a in acts]})
+    return out
+
+
+def _wf_plan(labels, mapping, fields=None):
+    """[(kind 'workflow', {id, name}, rule | None, why)] -- one flow per trigger of a workflow (pl_id = workflow id * 100 + n)."""
+    names = {k: {x["id"]: x for x in (labels or {}).get(k) or [] if isinstance(x, dict)} for k, _m in PLL_KINDS}
+    fnames = fields or {}
+
+    def nm(kind, mkey, lid):
+        lab = names[kind].get(lid)
+        tgt = _target(kind, mkey, lab, mapping) if lab else None
+        return tgt[1] if tgt and (kind != "tags" or tgt[0] == "tags") else None
+
+    out = []
+    for wf in ((labels or {}).get("workflows") or [])[:PLL_WF_MAX]:
+        if not isinstance(wf, dict) or not isinstance(wf.get("id"), int):
+            continue
+        acts, why = {"tags": [], "untag": [], "fields": {}}, ""
+        for a in wf.get("actions") or []:
+            if a.get("type") == 1:
+                acts["tags"] += [n for n in (nm("tags", "tags", t) for t in a.get("tags") or []) if n]
+                for f, kind, mkey in (("sender", "correspondents", "senders"), ("type", "document_types", "types")):
+                    if a.get("sender" if f == "sender" else "type_id") and f not in acts:
+                        v = nm(kind, mkey, a["sender" if f == "sender" else "type_id"])
+                        if v:
+                            acts[f] = v
+                for fid, v in (a.get("fields") or {}).items():
+                    fn = (fnames.get(int(fid)) or fnames.get(str(fid)) or {}).get("name") if str(fid).isdigit() else None
+                    if fn:
+                        acts["fields"][fn] = None if v is None else str(v)
+            elif a.get("type") == 2:
+                acts["untag"] += [n for n in (nm("tags", "tags", t) for t in a.get("untag") or []) if n]
+            else:
+                why = why or ("webhook" if a.get("type") == 4 else "email" if a.get("type") == 3 else "action")
+            if a.get("rest"):
+                why = why or ("owner" if any("owner" in k or "users" in k or "groups" in k or "permissions" in k for k in a["rest"]) else "action")
+        for i, t in enumerate((wf.get("triggers") or [])[:20]):
+            lab = {"id": wf["id"] * 100 + i, "name": wf.get("name") or f"#{wf['id']}"}
+            trig = PLL_WF_TRIG.get(t.get("type"))
+            raw = {"name": lab["name"], "trigger": trig, "off": not wf.get("enabled", True),
+                   "sources": sorted({PLL_WF_SRC[x] for x in t.get("sources") or [] if x in PLL_WF_SRC}),
+                   "filename": t.get("filename") or "", "has_tags": [n for n in (nm("tags", "tags", x) for x in t.get("tags") or []) if n],
+                   "has_sender": nm("correspondents", "senders", t["sender"]) if t.get("sender") else "",
+                   "has_type": nm("document_types", "types", t["type_id"]) if t.get("type_id") else "",
+                   **{k: v for k, v in acts.items() if v}}
+            if len(raw["sources"]) == len(set(PLL_WF_SRC.values())):
+                raw["sources"] = []
+            tw = why
+            if not trig:
+                out.append(("workflow", lab, None, "trigger"))
+                continue
+            if trig == "scheduled":
+                if t.get("date") not in PLL_WF_DATE or t.get("recurring") or not isinstance(t.get("days"), int):
+                    out.append(("workflow", lab, None, "trigger"))
+                    continue
+                raw["days"], raw["from"] = max(0, min(RU.DAYS_MAX, t["days"])), PLL_WF_DATE[t["date"]]
+            if t.get("algo") in PLL_ALGO and str(t.get("match") or "").strip():
+                raw.update({"kind": PLL_ALGO[t["algo"]], "match": str(t["match"]).strip()[:RU.PATTERN_MAX], "case": t.get("insens") is False})
+            elif t.get("algo") == PLL_AUTO:
+                tw = tw or "auto"
+            if t.get("path") or t.get("mailrule"):
+                tw = tw or "filter"
+            try:
+                out.append(("workflow", lab, RU.clean_rule(raw), tw))
+            except RU.RuleError:
+                out.append(("workflow", lab, None, tw or "pattern"))
+    return out
 
 
 def _target(kind, mkey, lab, mapping):
@@ -69,7 +199,7 @@ def _plan(labels, mapping):
                 out.append((kind, lab, RU.clean_rule(raw), ""))
             except RU.RuleError:
                 out.append((kind, lab, None, "pattern"))
-    return out
+    return out + _wf_plan(labels, mapping, (labels or {}).get("_fields"))  # 2.581.0 (#4803)
 
 
 def _key(rule):

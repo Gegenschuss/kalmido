@@ -42,7 +42,7 @@ from ..core.orgcrypt import oc_active, oc_seal_k  # 2.149.0 G (#2517): pulled up
 from ..core.pg import insert_id, system_ctx, write_lock  # 2.149.0 G (#2517): pulled up from functions
 from ..accounts.session import GATE  # 2.369.5 (#2517): pulled up from functions
 from ..admin.hosting import quota_info, QuotaExceeded, fmt_bytes  # 2.369.5 (#2517): pulled up from functions
-from .learn import pll_finish, pll_stored, pll_rules_preview  # 2.369.5 (#2517): pulled up from functions
+from .learn import pll_finish, pll_stored, pll_rules_preview, pll_wf_export  # 2.369.5 (#2517): pulled up from functions
 from .web import _run_public, _gate, _ws, _public  # 2.369.5 (#2517): pulled up from functions
 from ..core.orgcrypt import MAGIC, OrgCryptError, oc_open_k  # 2.369.5 (#2517): pulled up from functions
 
@@ -279,10 +279,17 @@ def plh_scan(zf):
     labels = {"tags": {}, "correspondents": {}, "document_types": {}}
     kinds = {"documents.tag": "tags", "documents.correspondent": "correspondents", "documents.documenttype": "document_types"}
     fields, docs, notes, values, users = {}, {}, {}, {}, []
+    wfs, wtrig, wact = [], {}, {}  # 2.581.0 (#4803): the workflows (learn.py makes document flows of them)
     for x in recs:
         m, f = str(x.get("model") or ""), x["fields"]
         if m in kinds:
             labels[kinds[m]][x["pk"]] = _label(x, f)
+        elif m == "documents.workflow":  # 2.581.0 (#4803)
+            wfs.append((x["pk"], f))
+        elif m == "documents.workflowtrigger":
+            wtrig[x["pk"]] = f
+        elif m == "documents.workflowaction":
+            wact[x["pk"]] = f
         elif m == "auth.user":  # 2.81.0 (#1875): only for the export's key
             users.append((x["pk"], str(f.get("username") or "")[:200], str(f.get("date_joined") or "")[:40]))
         elif m == "documents.customfield":
@@ -326,7 +333,7 @@ def plh_scan(zf):
             if t in labels["tags"]:
                 labels["tags"][t]["count"] += 1
     return {"labels": {k: sorted(v.values(), key=lambda x: (x["name"].lower(), x["id"])) for k, v in labels.items()},
-            "fields": fields, "docs": docs, "src": plh_src(users, labels)}
+            "fields": fields, "docs": docs, "src": plh_src(users, labels), "workflows": pll_wf_export(wfs, wtrig, wact)}
 
 
 def _check(c, r):
@@ -527,7 +534,7 @@ def plh_zip_run(c, rid):
         c.rollback()
         print("paperless: zip run", rid, type(e).__name__, e, flush=True)
         error = "failed"
-    learn = _learn(c, t, uid, since, scan["labels"]) if scan else {}
+    learn = _learn(c, t, uid, since, {**scan["labels"], "workflows": scan.get("workflows") or [], "_fields": scan.get("fields") or {}}) if scan else {}  # 2.581.0 (#4803)
     try:
         beat(run_state="", state="done", run_error=error, run_learn=pll_stored(learn), updated_at=_now())
     except P.PlLost:

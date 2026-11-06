@@ -302,6 +302,25 @@ def pl_labels(c, url, token, kind):
     return out
 
 
+def pl_workflows(c, url, token):
+    """2.581.0 (#4803): the workflows (learn.py makes document flows of them); [] when this Paperless-ngx has none / answers
+    no list (older versions, a token without the right): the import goes on without them."""
+    from .learn import PLL_WF_MAX, pll_wf_api
+    out, page = [], 1
+    try:
+        while page <= PL_LABEL_PAGES and len(out) < PLL_WF_MAX:
+            j = pl_get(c, url, token, f"/api/workflows/?page_size=100&page={page}")
+            if not isinstance(j, dict) or not isinstance(j.get("results"), list):
+                return out
+            out += [pll_wf_api(x) for x in j["results"] if isinstance(x, dict) and isinstance(x.get("id"), int)]
+            if not j.get("next"):
+                break
+            page += 1
+    except PlError:
+        return out
+    return out[:PLL_WF_MAX]
+
+
 def pl_label_match(x):
     """2.69.0 B (#1847): {match, algo, insens} of a Paperless-ngx label (API answer or export record)."""
     algo = x.get("matching_algorithm")
@@ -588,6 +607,7 @@ def pl_run(c, sid):
         full = {k: pl_labels(c, r["url"], tok, k) for k in ("tags", "correspondents", "document_types")}
         labels = {k: {x["id"]: x["name"] for x in full[k]} for k in full}
         fields = pl_fields(c, r["url"], tok)
+        full["workflows"], full["_fields"] = pl_workflows(c, r["url"], tok), fields  # 2.581.0 (#4803): -> document flows (learn.py)
         order = "id" if r["run_kind"] == "all" else "-id"
         page, stop = 1, False
         while not stop:
