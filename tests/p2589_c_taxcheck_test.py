@@ -21,7 +21,7 @@ from freelancer_fixture import freelancer  # noqa: E402
 
 O = "/api/office"
 D = O + "/docs"
-TC = O + "/books/taxcheck"
+TC = "/api/office/books/taxcheck"  # the literal path: tests/tenant_coverage_test.py finds the route here
 FEAT = "cal,comments,collab,office,clients,docs"
 
 
