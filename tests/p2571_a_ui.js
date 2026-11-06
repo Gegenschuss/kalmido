@@ -31,6 +31,8 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
     await ev(`(() => { const s = document.querySelector('#side'); const d = document.createElement('div'); d.id = 'p2571pad'; d.style.cssText = 'height:3000px;flex:0 1 auto'; s.appendChild(d); return 1; })()`);
     const H2 = await ev(`Math.round(document.querySelector('#side .sbmr').getBoundingClientRect().height)`);
     check(H2 >= 44, '#4790: still one tile high with a tall drawer content, is ' + H2);
+    // the row sits in .sbfix (display:contents), so '#side>*{flex:none}' never reached it: it must not be able to shrink
+    check(await ev(`getComputedStyle(document.querySelector('#side .sbmr')).flexShrink === '0'`), '#4790: the row of the areas does not shrink in the column of the drawer');
     const cur = await ev(`location.hash`);
     const sel = await ev(`(() => { const b = [...document.querySelectorAll('#side .sbmr .srb[data-sbb]')].find(x => !x.classList.contains('on') && x.dataset.sbb !== 'office'); if (!b) return ''; b.id = 'p2571t'; return b.dataset.sbb; })()`);
     check(!!sel, '#4790: another area tile exists');
