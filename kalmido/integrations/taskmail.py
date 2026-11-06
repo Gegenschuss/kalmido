@@ -38,7 +38,7 @@ from ..core.pages import save_attachment_bytes
 from ..accounts.login import auth_key
 from ..admin.hosting import mail_budget
 from ..api.common import hit_limit
-from ..collab.comments import MAIL_REPLY, MENTION_RE, collab_user, user_names
+from ..collab.comments import MAIL_REPLY, MENTION_RE, collab_user, task_say_refusal, user_names
 from ..collab.liste2e import le2e_mode
 from ..collab.liste2eguard import le2b_list_locked
 from ..collab.news import news_add
@@ -140,11 +140,11 @@ def tmr_who(c, tid, sender, tu=0):
         return False, None
     if tu:
         r = c.execute("SELECT id FROM users WHERE id=? AND lower(email)=? AND disabled=0 AND COALESCE(kind,'user')<>'agent'", (tu, sender)).fetchone()
-        if r and task_visible(c, tid, tu, full=True):
-            return True, tu
+        if r and task_visible(c, tid, tu, full=True) and not task_say_refusal(c, tid, tu):  # 2.607.0 (#4549): a guest /
+            return True, tu  # read-only person of the list's organisation comments by mail as little as in the app
     else:
         for r in c.execute("SELECT id FROM users WHERE lower(email)=? AND disabled=0 AND COALESCE(kind,'user')<>'agent' ORDER BY id", (sender,)).fetchall():
-            if task_visible(c, tid, r[0], full=True):
+            if task_visible(c, tid, r[0], full=True) and not task_say_refusal(c, tid, r[0]):  # 2.607.0 (#4549)
                 return True, None
     return sender == tmr_reporter(c, tid), None
 
