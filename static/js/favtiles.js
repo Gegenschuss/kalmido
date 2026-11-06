@@ -112,7 +112,7 @@ function fv2_tile(key, ctx) {
     return {key, name: tr(x[1]), icon: ic(x[0]), ...go(v, S.route.mod === v)};
   }
   if (p === 'f') { const f = S.filters.find(x => x.id === +v); return f ? {key, name: f.name, icon: ic('filter'), ...go(keyToHash(key), onTasks && k === key)} : null; }
-  if (p === 'tag') return ctx.c.tags[v] ? {key, name: v, icon: ic('tag'), ...go(keyToHash(key), onTasks && k === key)} : null;
+  if (p === 'tag') return ctx.c.tags[v] ? {key, name: v, icon: ic('tag'), col: fv2_tagColor(v), ...go(keyToHash(key), onTasks && k === key)} : null;
   if (p === 'p') { const pp = ctx.people.find(x => x.id === +v); return pp ? {key, name: pp.name, icon: av(pp.id, pp.name, 'avatar fv2-av'), ...go('who/' + pp.id, onTasks && k === 'who:' + pp.id)} : null; }
   if (p === 'g') {
     const gr = collab() && (S.groups || []).find(x => x.id === +v && myGroup(x.id)); if (!gr) return null;
@@ -124,17 +124,42 @@ function fv2_tile(key, ctx) {
   }
   return null;
 }
+// 2.572.0 (#4749): the colour a project tag has in any list ('' = none); the target's own colour tells equal symbols apart
+const fv2_tagColor = name => { for (const l of S.lists) { const c = cssColor((l.tags || []).find(x => String(x.name).toLowerCase() === String(name).toLowerCase())?.color); if (c) return c; } return ''; };
 function fv2_tiles(lists = S.lists) {
   const ctx = {lists, c: counts(), people: teamPeople(), allWs: true};  // 2.441.0 (#3592): one row for all workspaces
   return fv2_keys().map(x => { try { return fv2_tile(x, ctx); } catch { return null; } }).filter(Boolean);
 }
 // 2.441.0 (#3592): a favourite on the screen: the name and its place as the hint, the person's own look, the dot of the workspace
 const fv2_hint = t => [t.name, t.place, t.ws && wsOn() ? wsName(t.ws) : ''].filter(Boolean).join(' · ');
+// 2.572.0 (#4749): equal symbols twice or more in ONE row (the head bar, the phone's row) are told apart on their own: the target's own
+// colour when it is unique in the group, else a small badge with the first letter (the first two when letters collide). A look the person
+// set (fav_meta) always wins and is left alone. Call it ONCE for the whole row (fv2_barDraw, the phone's row); it sets t.dk = {c} | {b} and returns the tiles.
+function fv2_distinct(ts) {
+  const meta = fv2_meta(), groups = new Map();
+  for (const t of ts) {
+    delete t.dk;
+    if (t.sep || !t.icon) continue;
+    const m = meta[t.key] || {}; if (m.i || m.c) continue;
+    (groups.get(t.icon) || groups.set(t.icon, []).get(t.icon)).push(t);
+  }
+  const ch = (t, n) => Array.from(String(t.name || '').replace(/^[#\s]+/, '')).slice(0, n).join('').toLocaleUpperCase();
+  for (const g of groups.values()) {
+    if (g.length < 2) continue;
+    const cnt = {}; for (const t of g) if (t.col) cnt[t.col.toLowerCase()] = (cnt[t.col.toLowerCase()] || 0) + 1;
+    const rest = [];
+    for (const t of g) { if (t.col && cnt[t.col.toLowerCase()] === 1) t.dk = {c: t.col}; else rest.push(t); }
+    if (rest.length === 1 && g.length > 1) continue;  // all others got their colour: the last one is different already
+    const one = {}; for (const t of rest) one[ch(t, 1)] = (one[ch(t, 1)] || 0) + 1;
+    for (const t of rest) { const b = one[ch(t, 1)] > 1 ? ch(t, 2) : ch(t, 1); if (b) t.dk = {b}; }
+  }
+  return ts;
+}
 function fv2_tileHtml(t, page) {
   const drag = isMobile() ? '' : ' draggable="true"';
   if (t.sep) return page ? '' : `<span class="fv2-sep" data-fv2="${esc(t.key)}" role="separator"${drag}></span>`;
   const m = fv2_meta()[t.key] || {}, dot = t.ws && wsOn() ? `<span class="fv2-wsd">${wsp_dot(t.ws)}</span>` : '';
-  return `<button type="button" class="fv2-tile ${t.on ? 'on' : ''}" data-fv2="${esc(t.key)}" ${t.attrs} title="${esc(fv2_hint(t))}" aria-label="${esc(fv2_hint(t))}"${t.on ? ' aria-current="page"' : ''}${m.c ? ` style="--fvc:${esc(m.c)}"` : ''}${drag}>${m.i ? ic(m.i) : t.icon}${dot}${page ? `<span class="fv2-pn">${esc(t.name)}</span>${t.place ? `<span class="fv2-pp">${esc(t.place)}</span>` : ''}` : ''}</button>`;
+  return `<button type="button" class="fv2-tile ${t.on ? 'on' : ''}" data-fv2="${esc(t.key)}" ${t.attrs} title="${esc(fv2_hint(t))}" aria-label="${esc(fv2_hint(t))}"${t.on ? ' aria-current="page"' : ''}${m.c || (!page && t.dk?.c) ? ` style="--fvc:${esc(m.c || t.dk.c)}"` : ''}${drag}>${m.i ? ic(m.i) : t.icon}${!page && t.dk?.b ? `<span class="fv2-bdg" aria-hidden="true">${esc(t.dk.b)}</span>` : ''}${dot}${page ? `<span class="fv2-pn">${esc(t.name)}</span>${t.place ? `<span class="fv2-pp">${esc(t.place)}</span>` : ''}` : ''}</button>`;
 }
 // the row: a computer in the head bar (left empty by sbb_barHtml), else under the header (#favrow, a phone: swipe it); hidden while the page is pinned
 // 2.552.0 (#4618): takes back #4014 -- the phone's sidebar shows no section "Favourites" (fv2_sideHtml), only this row or the tab
@@ -145,7 +170,7 @@ function fv2_barDraw() {
   if (row && row !== on && row.firstChild) { row.innerHTML = ''; row.classList.add('hidden'); FV2.last.delete(row); }
   if (!on) return;
   fv2_fetch();
-  const ts = fv2_tiles(), body = ts.map(t => fv2_tileHtml(t)).join('');
+  const ts = fv2_distinct(fv2_tiles()), body = ts.map(t => fv2_tileHtml(t)).join('');
   const html = on === kb ? `${body}<button type="button" class="fv2-more" data-fv2-more hidden aria-haspopup="menu"></button>` : body;
   if (on === row) row.classList.toggle('hidden', !ts.length);
   if (FV2.last.get(on) === html && on.firstChild) { if (on === kb) fv2_fit(); return; }
