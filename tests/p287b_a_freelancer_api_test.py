@@ -331,6 +331,16 @@ for key, path, payload, sub in (
         payload = {"vehicle_id": IDS["vehicle"], "day": TODAY, "dest": "Client", "purpose": "Meeting", "km": 20, "kind": "business"}
     x = ok(F.post(B + "/api/office" + path, json=payload), f"sweep setup: {key}", (200, 201))
     IDS[key] = (x.get(sub) or {}).get("id") if sub else _id(x)
+# 2.595.0 (#4911): GET routes with an id that came after the threshold went to 80 (#4783): one own row each - a budget entry
+# and template (#4764), a planned sprint of the private project, a custom field of it
+IDS["budgetentry"] = _id(ok(F.post(B + f"/api/budget/{IDS['budget']}/entries", json={"day": TODAY, "amount": 10, "kind": "out", "title": "Lens cloth"}),
+                            "sweep setup: a budget entry", (200, 201)))
+IDS["budgetrec"] = _id(ok(F.post(B + f"/api/budget/{IDS['budget']}/recurring", json={"title": "Studio", "amount": 300, "kind": "out", "per": "month", "start": TODAY[:7]}),
+                          "sweep setup: a budget template", (200, 201)))
+ok(F.put(B + f"/api/lists/{IDS['list']}/sprint-settings", json={"on": True}), "sweep setup: sprints on in the private project")
+_sp = ok(F.post(B + f"/api/lists/{IDS['list']}/sprints", json={"goal": "First cut"}), "sweep setup: a planned sprint", (200, 201))
+IDS["sprint"] = _sp.get("id") or (_sp.get("sprint") or {}).get("id")
+IDS["field"] = _id(ok(F.post(B + f"/api/lists/{IDS['list']}/fields", json={"name": "Reel", "type": "text"}), "sweep setup: a custom field", (200, 201)))
 for _ in range(480):  # the account export of "own" runs in the background: its file once it is done
     if F.get(B + "/api/account/export").json().get("state") != "running":
         break
@@ -359,6 +369,7 @@ SUBST = [
     (r"/office/letter-blocks/$", "letterblock"), (r"/office/vehicles/$", "vehicle"), (r"/office/drives/$", "drive"),
     (r"/office/cards/lines/$", "cardline"), (r"/office/cards/statements/$", "cardstmt"), (r"/office/cards/$", "card"), (r"/files/collections/$", "collection"),
     (r"/api/v1/wiki/files/$", "wikifile"),  # 2.488.0 (#2209): the file of the own knowledge page
+    (r"/budget/entries/$", "budgetentry"), (r"/budget/recurring/$", "budgetrec"), (r"/sprints/$", "sprint"), (r"/fields/$", "field"),  # 2.595.0 (#4911)
     (r"/budget/files/$", None), (r"/team/files/$", None), (r"/wiki/files/$", None), (r"/wiki/shared/files/$", None),
     (r"/lists/\d+/files/$", None),
     (r"/api/v1/mails/$", "client"),  # 2.483.0 (#1902): no filed mail on the test server (EXPECT_4XX)
