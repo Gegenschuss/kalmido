@@ -7,7 +7,7 @@
 .chst .adot{position:static;flex:none;border:0;width:.5rem;height:.5rem}
 .chst .atdots{padding:.1875rem .3125rem}
 .chst.st-limit,.chst.st-error{color:var(--danger)}
-.chst .chtask{font-size:inherit;padding:0}
+.chst .chtask{font-size:inherit;padding:0;color:color-mix(in srgb,var(--accent) 70%,var(--text))} /* 2.574.0 (#4792): the task link in the status line keeps 4.5:1 on the header in the dark theme */
 .agpct{display:inline-flex;align-items:center;gap:.375rem}
 .agpct input{width:5.5rem}
 /* 2.380 F (#3381): the line above the first message not seen yet */
