@@ -164,11 +164,11 @@ def agent_ids(h):
 
 
 OAID, OAH = agent("orgbot", ORG)  # the organisation's agent
-PAID, PAH = agent("ownbot")  # alice's own agent
+PAID, PAH = agent("ownbot", "private")  # alice's own agent of her private workspace
 check(agent_ids(OAH) == [] and agent_ids(PAH) == [] and requests.get(B + f"/api/v1/agent/objects/{K}/{VID}", headers=PAH, timeout=30).status_code == 404,
       "agents: nothing without a share")
-check(requests.get(B + "/api/docs/views", headers=OAH, timeout=30).status_code == 403
-      and requests.get(B + f"/api/docs/views/{VID}/hits", headers=OAH, timeout=30).status_code == 403, "agents: the person routes refuse them")
+st = (requests.get(B + "/api/docs/views", headers=OAH, timeout=30).status_code, requests.get(B + f"/api/docs/views/{VID}/hits", headers=PAH, timeout=30).status_code)
+check(st == (403, 403), f"agents: the person routes refuse them {st}")
 check(A.post(B + f"/api/docs/views/{VID}/share", json={"all": True}).ok and agent_ids(OAH) == [], "shared with everyone: still nothing for the organisation's agent")
 check(A.post(B + f"/api/docs/views/{VID}/share", json={"all": False}).ok, "back to private")
 r = A.post(B + f"/api/obj/{K}/{VID}/shares", json={"agent_id": PAID, "role": "view"})
@@ -194,4 +194,4 @@ FV = r.json()["id"]
 check(listed(Fr, "private") == {FV: 1} and Fr.get(B + f"/api/docs/views/{FV}/hits").json()["docs"][0]["id"] == F1, "freelancer: count and hits")
 check(Fr.post(B + f"/api/docs/views/{FV}/share", json={"all": True}).status_code == 409, "freelancer: no organisation to share it with")
 check(view(A, FV) == 404 and FV not in listed(A, "private"), "the instance admin does not see her view")
-done("p2579_c_api")
+sys.exit(done("p2579_c_api"))
