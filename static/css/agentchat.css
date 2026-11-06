@@ -390,6 +390,22 @@ button.jcdh{cursor:pointer}
 @media (max-width:30rem){ .chws{flex:none;max-width:6rem} }
 .chcomp.agcol{border-top-color:color-mix(in srgb,var(--agcol) 55%,var(--line))}
 .chcomp.agcol:focus-within{border-top-color:var(--agcol)}
+/* 2.542.0 (#4604): the agent's colour wins in its chat (wac-loc = its accent, wscolor.js wac_agentVars): a stripe on top of the
+   header (again, the rule was lost with the header of 2.350 #2790) over a light tint, the box's frame in the colour (the focus:
+   the accent = the agent's, fitted to 4.5:1), deeper bubbles (text keeps >= 6:1 on all 12 account colours, dark and light); a choice "Messages from agents" (data-chat-agent) still wins */
+.chath.agcol{box-shadow:inset 0 .1875rem 0 var(--agcol);background:color-mix(in srgb,var(--agcol) 7%,var(--bg))}
+/* the frame: the chat's local accent (the agent's colour fitted to 4.5:1, so it keeps 3:1 against the box in dark and light,
+   p2160_a11y); the focus adds a ring in it */
+.chcomp.agcol textarea{border-color:var(--accent)}
+.chcomp.agcol textarea:focus{border-color:var(--accent);box-shadow:0 0 0 .125rem color-mix(in srgb,var(--accent) 35%,transparent)}
+:root{--agent-tint-own:36%}
+:root[data-theme="light"]{--agent-tint-own:24%}
+@media (prefers-color-scheme: light){ :root[data-theme="auto"]{--agent-tint-own:24%} }
+:root:not([data-chat-agent]) .chmsgs.wac-loc .cmsg.agc:not(.jobm):not(.apv) .cbub:not(.del){background:color-mix(in srgb,var(--agcol) var(--agent-tint-own),var(--bg3))}
+/* my own bubbles there keep the workspace's accent (--acc-ws = :root's accent, before the chat's local one), so mine and the agent's stay apart */
+:root{--acc-ws:var(--accent)}
+.chmsgs.wac-loc .cmsg.me .cbub{background:color-mix(in srgb,var(--acc-ws) 20%,var(--bg3))}
+.chath .chnm .chws{margin-left:.5rem}
 .cmsg.jcfcut .cbub{max-height:7.5em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 70%,transparent);mask-image:linear-gradient(#000 70%,transparent)}
 /* 2.153.0 (#1962): a chat of its own per job -- in the whole chat the link to the job's chat under its card; in the job's
    chat its progress lines */

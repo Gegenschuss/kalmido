@@ -9,12 +9,13 @@ master data and write documents (see docs.py); foreign ids are 404, never 403 wi
 import json
 import re
 import unicodedata
+from contextlib import contextmanager
 from datetime import date
 
 from flask import g, has_request_context, request
 
 from ..core.i18n import LANGS, N_, tr
-from ..core.pg import insert_id, like_escape, table_columns, system_ctx, write_lock
+from ..core.pg import DatabaseError, insert_id, like_escape, table_columns, system_ctx, write_lock
 from ..core.db import db, iso, local_now, now_utc, usettings
 from ..accounts.session import me
 from ..core.access import Denied, acx_drop
@@ -1723,3 +1724,24 @@ def office_seed_texts(c, oid):
         office_create(c, oid, "texts", {"kind": "note", "key": "rights_note", "text_de": tx["rights_note"]["de"], "text_en": tx["rights_note"]["en"], "sort": 0})
         n += 1
     return n
+
+
+# ---------------------------------------------------------------- past the lock trigger
+@contextmanager
+def ofx_release(c, table="office_docs"):
+    """2.542.0 (#4598): the statements of the block may change / delete finalised documents past the database trigger
+    kalmido_office_locked (core/migrations.d/4598.py): set_config kalmido.locked_ok for this transaction only, off again
+    after the block. Only for the deliberate exceptions (a never-sent quotation back to a draft / deleted, the encryption
+    passes, a personal office moving, the organisation import and its undo) -- keep the block to the statements that need
+    it and commit after it, never inside. table: a generic loop passes its table; anything but office_docs is a no-op."""
+    if table != "office_docs":
+        yield
+        return
+    c.execute("SELECT set_config('kalmido.locked_ok', 'on', true)")
+    try:
+        yield
+    finally:
+        try:
+            c.execute("SELECT set_config('kalmido.locked_ok', '', true)")
+        except DatabaseError:  # an aborted transaction: its rollback ends the setting anyway (the first error stays the one raised)
+            pass

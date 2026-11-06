@@ -4246,6 +4246,8 @@ a.tref:hover{background:var(--accent-soft)}
 .dtl .dtt{flex:1;min-width:0;color:var(--text);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dtl .dt{font:var(--fs-xs) var(--mono);color:var(--muted)}
 .dtl .dt.over{color:var(--p5)}
+/* 2.542.0 (#4579): the subtasks done / all of a Start row */
+.dtl .subc{display:inline-flex;align-items:center;gap:.25rem;flex:none;font:var(--fs-xs) var(--mono);font-variant-numeric:tabular-nums;color:var(--muted)}
 .dwl a{display:flex;align-items:center;gap:.5rem;min-height:2.25rem;color:var(--text2);text-decoration:none;border-radius:var(--r-s);padding:0 .25rem}
 .dwl a:hover{background:var(--bg3)}
 .dwl .dwt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -8683,12 +8685,10 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 #app.sb-b #side .sbhead .sbtools{opacity:1}
 #app.sb-b #side .sbhead .sbtools .iconbtn{opacity:.8}
 #app.sb-b #side .sbhead .sbtools .iconbtn:hover{opacity:1}
-/* the bar of the areas: the open tile in the accent's tint (#e3dffa light), the button that shows a hidden panel */
+/* the bar of the areas: the open tile in the accent's tint (#e3dffa light) */
 :root[data-theme="light"] .srb.on{background:color-mix(in srgb,var(--accent) 15%,transparent)}
 @media (prefers-color-scheme: light){ :root[data-theme="auto"] .srb.on{background:color-mix(in srgb,var(--accent) 15%,transparent)} }
-#srail .srb.srpanel{padding:.375rem .125rem;margin-bottom:.25rem}
 @media (pointer:coarse){ #kbar .kbsw,#kbar .kbacct{min-height:2.75rem} #kbar .kbacct{width:2.75rem} }
-#app:not(.side-rail) #srail .srb.srpanel{display:none}
 #pop .menu-list:has(.kbwsi){max-width:17rem}
 #pop .kbwsi .ml{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #srail .srb.on,#side .sbmr .srb.on{color:color-mix(in srgb,var(--accent) 78%,var(--text))}  /* the open tile's word keeps 4.5:1 on its tint (light and dark), in the phone's drawer too */
@@ -8837,5 +8837,3 @@ time,.meta .dt,.dpbtn,.remchips button,.dprow .dpt,.dprow .dps,.fwhen{font-famil
 .aiph .aipht{flex:1 1 14rem;min-width:0}
 .abadge.abai{white-space:nowrap}
 
-/* 2.490.0 (#4032): the rail's show / hide button stays on top while the rail scrolls */
-#srail .srb.srpanel{position:sticky;top:0;z-index:2;background:var(--sbbg,var(--bg2))}

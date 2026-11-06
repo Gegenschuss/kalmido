@@ -68,7 +68,7 @@ const v1 = async (tok, method, url, body) => { const r = await fetch(B + 'api/v1
   const GEO = sel => `(() => { const h = document.querySelector('${sel} .chath.chh2'); if (!h) return null; const r = h.getBoundingClientRect(), b = h.querySelector('.chnm b'), x = h.querySelector('.chstx'), d = h.querySelector('.chst .adot');
     const cut = [...h.querySelectorAll('.chnm b, .chstx, .chl2, .chn')].filter(e => e.scrollWidth > e.clientWidth + 1).map(e => e.className || e.tagName);
     return {h: Math.round(r.height), right: Math.round(r.right), vw: innerWidth, name: b?.textContent, st: x?.textContent, cut, spin: d ? getComputedStyle(d).animationName : '', rm: matchMedia('(prefers-reduced-motion: reduce)').matches, dot: d?.className,
-      gone: ['.chmode', '.chmodel', '.chws'].filter(s => h.querySelector(s)), ring: [...h.querySelectorAll('.chring')].filter(e => e.offsetParent).length}; })()`;
+      gone: ['.chmode', '.chmodel'].filter(s => h.querySelector(s))  /* 2.542.0 (#4604): the workspace is back in the head as a dot with its name (.chws) */, ring: [...h.querySelectorAll('.chring')].filter(e => e.offsetParent).length}; })()`;
   const diag = ev => ev(`JSON.stringify({h: location.hash, w: innerWidth, ach: !!document.querySelector('#achat .chath'), cls: document.querySelector('.chath')?.className, ag: (window.S?.agents || []).map(a => a.id + ':' + a.name), v: (document.querySelector('#view')?.textContent || '').slice(0, 200)})`).catch(e => String(e));
   const items = `[...document.querySelectorAll('#pop:not(.hidden) [role=menuitem]')].map(b => b.textContent.trim().replace(/\\s+/g, ' '))`;
   const pickItem = (ev, re) => ev(`(() => { const b = [...document.querySelectorAll('#pop:not(.hidden) [role=menuitem]')].find(x => ${re}.test(x.textContent.trim())); if (!b) return 0; b.click(); return 1; })()`);
@@ -91,7 +91,7 @@ const v1 = async (tok, method, url, body) => { const r = await fetch(B + 'api/v1
       check(g && g.name === 'Dev Bot' && !g.cut.length && g.right <= g.vw, L + ': nothing cut off ' + JSON.stringify(g));
       check(g && /^working: Billing: notes/.test(g.st || '') && /st-working/.test(g.dot) && (g.spin === 'aspin' || g.rm), L + ': the state once, "working: <job>", the spinning circle (a still dot with reduced motion) ' + JSON.stringify(g));
       // 2.407.0 B (#3493): the usage ring is always shown (41 % = accent), no longer only near its limit
-      check(g && !g.gone.length && g.ring === 1, L + ': no mode, model or workspace in the header, the usage ring always ' + JSON.stringify(g));
+      check(g && !g.gone.length && g.ring === 1, L + ': no mode or model in the header, the usage ring always ' + JSON.stringify(g));
       const head = await ev(HEAD('#view'));
       check(head.length === 1 && head[0] === 'chat-head-menu', L + ': right only the ⋯ menu ' + JSON.stringify(head));
       await shot(`p2350a-phone-${W}-${theme}.png`);
@@ -125,7 +125,7 @@ const v1 = async (tok, method, url, body) => { const r = await fetch(B + 'api/v1
       const g = await ev(GEO(sel));
       check(g && !g.cut.length && g.name === 'Dev Bot' && /^working: Billing: notes/.test(g.st || '') && g.right <= g.vw, L + ': nothing cut off ' + JSON.stringify(g));
       // 2.407.0 B (#3493): the usage ring is always shown (41 % = accent), no longer only near its limit
-      check(g && !g.gone.length && g.ring === 1, L + ': no mode, model or workspace in the header, the usage ring always ' + JSON.stringify(g));
+      check(g && !g.gone.length && g.ring === 1, L + ': no mode or model in the header, the usage ring always ' + JSON.stringify(g));
       const head = (await ev(HEAD(sel))).sort();
       check(JSON.stringify(head) === JSON.stringify(page ? ['chat-head-menu'] : ['chat-close', 'chat-dock', 'chat-head-menu']), L + ': right exactly ' + (page ? '⋯ (the page has its back button)' : 'side panel, ⋯ and close') + ' ' + JSON.stringify(head));
       const c = await ev(COMP(sel));

@@ -175,7 +175,7 @@ document.addEventListener('click', e => {
 // the module switch, the names of the spaces, the hint of a trashed folder, the "Show in the file store" button of a file row
 const ab_on = () => feat('files') && !S.me?.kid;
 FEAT_DESC.files = N_('Folders and files, shared with people and agents, versions');
-const ab_spaceName = s => s === 'private' ? tr('My files') : s === 'shared' ? tr('Shared with me') : s === 'trash' ? tr('Trash') : wsName(s);
+const ab_spaceName = s => s === 'private' ? tr('Private|workspace') : s === 'shared' ? tr('Shared with me') : s === 'trash' ? tr('Trash') : wsName(s);
 const ab_spaceIcon = s => s === 'private' ? ic('home', 's') : s === 'shared' ? ic('users', 's') : s === 'trash' ? ic('trash', 's') : wsIcon(s);
 const fs_keptText = kept => kept?.length ? trn('{0} entry stays, one level up: {1}', '{0} entries stay, one level up: {1}', kept.length, [...new Set(kept.map(k => k.reason))].join(', ')) : '';
 const ab_linkBtn = (kind, id, org, cls) => ab_on() ? `<button type="button" class="${cls} ablink" data-ablink="${kind}:${id}:${org || ''}" title="${esc(tr('Show in the file store'))}" aria-label="${esc(tr('Show in the file store'))}">${ic('folder', 's')}</button>` : '';

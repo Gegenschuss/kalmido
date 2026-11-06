@@ -41,13 +41,14 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 200 : 150
   const hd = d.querySelector('.chath');
   check(hd && hd.classList.contains('agcol'), 'header still carries the colour for the input box line / name');
   // 2.350.0 (#3317): the workspace moved from the header into its ⋯ menu; 2.407.0 B (#3493): as the kind of agent ("Team agent · Alpha")
-  check(!hd.querySelector('.chws') && w.eval(`chatHeadInfo(document.querySelector('#jcd-fbtn')).some(x => x.label === 'Team agent · Alpha')`), 'the header menu names the kind of agent and its organisation');
+  // 2.542.0 (#4604): the agent's colour wins in its chat, the workspace stands in the header again only as its dot + name (decision of 04.11.2026)
+  check(/Alpha/.test(hd.querySelector('.chws')?.textContent || '') && !!hd.querySelector('.chws .wsp-dot') && w.eval(`chatHeadInfo(document.querySelector('#jcd-fbtn')).some(x => x.label === 'Team agent · Alpha')`), 'the header shows the workspace as dot + name, the menu names the kind of agent and its organisation');
   check(w.eval(`/class="chws"[^>]*>.*Private/.test(chatWsHtml({id: ${CL}, org_id: null}))`) || w.eval(`chatWsHtml({id: ${CL}, org_id: null}).includes('Private')`), 'a private agent shows "Private"');
   check(w.eval(`(() => { const o = S.me.workspaces; S.me.workspaces = []; const h = chatInner(${CL}); S.me.workspaces = o; return !h.includes('chws'); })()`), 'without organisations the header has no workspace name');
   const css = require('./boot').allCssSync();
   // 2.165.10 (#2681): the workspace name is not hidden on phones (shortened instead)
   check(!/\.chwsn\{display:none/.test(css), 'CSS: workspace name stays visible on narrow screens');
-  check(!/\.chath\.agcol\{border-top/.test(css), 'CSS: no colour bar on top of the header');
+  check(!/\.chath\.agcol\{border-top/.test(css) && /\.chath\.agcol\{box-shadow:inset 0 \.1875rem 0 var\(--agcol\)/.test(css), 'CSS: no border on top of the header; 2.542.0 (#4604): the stripe in the agent colour is back (inset)');
   check(/\.cmsg\.agc \.cbub\{background:color-mix\(in srgb,var\(--agcol,var\(--agent-bg\)\) var\(--agent-tint\),var\(--bg3\)\);color:var\(--text\)\}/.test(css), 'CSS: agent bubble tinted');
   check(/--agent-tint:26%/.test(css) && /\[data-theme="light"\]\{--agent-tint:14%\}/.test(css), 'CSS: tint 26 % dark, 14 % light');
   check(!/\.cmsg\.jobm[^{]*\.cbub\{box-shadow/.test(css), 'CSS: no stripe left on job bubbles');

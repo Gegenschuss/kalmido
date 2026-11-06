@@ -39,6 +39,7 @@ import warnings
 
 from ..core.config import ATT_DIR, OFFICE_DIR, app, SECRET_KEY
 from ..core.pg import system_ctx, write_lock
+from ..office.ledger import ofx_release  # 2.542.0 (#4598)
 from ..core import orgcrypt as oc
 from ..core.env import env_bool
 from ..core.db import connect, gset, gsetting, iso, now_utc  # 2.149.0 G (#2517): pulled up from functions
@@ -187,8 +188,9 @@ def fields_pass(c, oid, enc, key, stop=None):
                 for r in rows:
                     new = _tx(key, oid, table, col, kind, r["v"], enc)
                     if new != r["v"]:
-                        n += c.execute(f"UPDATE {table} SET {col}=? WHERE {idc}=? AND {w} AND {col}=?",
-                                       (new, r["rid"], *[oid] * k, r["v"])).rowcount
+                        with ofx_release(c, table):  # 2.542.0 (#4598): the same value sealed anew, also on a finalised document
+                            n += c.execute(f"UPDATE {table} SET {col}=? WHERE {idc}=? AND {w} AND {col}=?",
+                                           (new, r["rid"], *[oid] * k, r["v"])).rowcount
             c.commit()
             if len(rows) < BATCH:
                 break
@@ -1137,8 +1139,9 @@ def rot_fields(c, oid, k1, k2, stop=None, tbad=None):
                 for r in rows:
                     new = _rot_value(k1, k2, oid, kind, ctx, ws, r["v"], bad)
                     if new != r["v"]:
-                        n += c.execute(f"UPDATE {table} SET {col}=? WHERE {idc}=? AND {w} AND {col}=?",
-                                       (new, r["rid"], *args[:k], r["v"])).rowcount
+                        with ofx_release(c, table):  # 2.542.0 (#4598): the same value under the new key, also on a finalised document
+                            n += c.execute(f"UPDATE {table} SET {col}=? WHERE {idc}=? AND {w} AND {col}=?",
+                                           (new, r["rid"], *args[:k], r["v"])).rowcount
             c.commit()
             if len(rows) < BATCH:
                 break

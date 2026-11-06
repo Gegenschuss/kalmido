@@ -66,6 +66,12 @@ async function batch(action, data, clear, ids = [...S.multi], note = '') {
     if (lk.length) { ids = ids.filter(i => !lk.includes(i)); note = [note, trn('{0} locked task skipped', '{0} locked tasks skipped', lk.length)].filter(Boolean).join(' · '); }
     data = {...data, prev: btcPrev(ids, data)};  // 2.270.0 D (#3028): what each task showed here; changed elsewhere = kept + reported
   }
+  if (action === 'complete' || action === 'reopen') {  // 2.542.0 (#4609): locked tasks keep their status; (#4579) one question for open subtasks
+    const lk = ids.filter(i => tlkIs(S.tasks.get(i)));
+    if (lk.length === ids.length) { tlkDoneToast(S.tasks.get(lk[0])); return; }
+    if (lk.length) { ids = ids.filter(i => !lk.includes(i)); note = [note, trn('{0} locked task skipped', '{0} locked tasks skipped', lk.length)].filter(Boolean).join(' · '); }
+    if (action === 'complete' && (data?.status ?? 2) === 2 && !await ckKidsAsk(ids.map(i => S.tasks.get(i)).filter(Boolean))) return;
+  }
   if (action === 'complete' && !data?.expect) {  // 2.270.0 C (#3022): the date each recurring task had here -- a repeated send never advances it twice
     const ex = Object.fromEntries(ids.map(i => [i, S.tasks.get(i)]).filter(([, t]) => t?.repeat && t.status === 0)
       .map(([i, t]) => [i, /TIMES=/.test(t.repeat) ? {due: t.due ?? null, due_time: t.due_time ?? null} : {due: t.due ?? null}]));

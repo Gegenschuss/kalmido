@@ -332,9 +332,24 @@ async function patchUndoable(id, body, msg) {
   if (before) shiftLate(before, e || null, msg, t);  // 2.537.0 (#4568): the outbox's answer may still move dependent tasks along
   return t;
 }
+// 2.542.0 (#4579): the open subtasks (all levels) a completion ticks off along (server cascade lifecycle.do_complete; a locked
+// one stays open there); skip = ids ticked in the same step (a selection), not counted twice
+const ckOpenKids = (id, skip) => { let n = 0; const walk = x => { for (const k of children(x)) { if (k.status === 0 && !k.locked && !skip?.has(k.id)) n++; walk(k.id); } }; walk(id); return n; };
+// one question before ticking tasks with open subtasks (tick, swipe, x, selection, Start): true = go on
+async function ckKidsAsk(ts) {
+  const skip = new Set(ts.map(t => t.id)), has = ts.map(t => [t, ckOpenKids(t.id, skip)]).filter(([, n]) => n);
+  if (!has.length) return true;
+  const n = has.reduce((s, [, k]) => s + k, 0);
+  if (has.every(([t]) => t.repeat && t.due)) {  // a recurring task moves on: its subtasks are open again at the next occurrence (04.11. 21:04)
+    return askConfirm(trn('{0} open subtask left. It will be open again at the next occurrence; here it counts as not done. Complete anyway?',
+      '{0} open subtasks left. They will be open again at the next occurrence; here they count as not done. Complete anyway?', n), '', {ok: tr('Complete anyway')});
+  }
+  return askConfirm(trn('{0} open subtask left. Complete it too?', '{0} open subtasks left. Complete them all?', n), '', {ok: tr('Complete all'), cancel: tr('Cancel')});
+}
 async function toggleTask(id) {
   const t = taskById(id); if (!t) return;
   if (!canEdit(t)) { roToast(); return; }
+  if (tlkDone(t)) return;  // 2.542.0 (#4609): locked: the hint with "Unlock" first (before the subtask question), the server refuses it too
   const pend = UI.pend.get(id);
   if (pend) {  // 2.49.0 (#1766): ticked again while the exit runs: cancel it and reopen
     pend.cancel(); UI.pend.delete(id);
@@ -357,6 +372,7 @@ async function toggleTask(id) {
   }
   if (rvw_blocked(t)) { rvw_blockedAsk(t); return; }  // 2.60.0 C (#1512): waits for the review approval (the server says 409)
   if (t.blocked && dFor(t) && !await askConfirm(tr('“{0}” is still blocked by {1}. Complete it anyway?', t.title, blockedNames(t)), '', {ok: tr('Complete anyway')})) return;
+  if (!await ckKidsAsk([t])) return;  // 2.542.0 (#4579)
   // optimistic: strike the row through, then sync
   $$(`.trow[data-id="${id}"] .chk`).forEach(c => { c.classList.add('on'); c.innerHTML = ic('check'); });
   const cs = celeSnap([id]);
@@ -378,6 +394,7 @@ async function toggleTask(id) {
 }
 async function wontDo(id) {
   const snaps = withKids(id), t = taskById(id);
+  if (tlkDone(t)) return;  // 2.542.0 (#4609)
   const fade = an_rowOut([id]);  // 2.46.1 (#1559)
   let j; try { j = await api('POST', `/api/tasks/${id}/complete`, {status: -1}); } catch (x) { an_rowsBack([id]); throw x; }
   await fade; await load(); render();

@@ -6,9 +6,9 @@ media production (producing days, raw data, discount, transfer of rights), invoi
 payments and reminders, the running bookkeeping with its exports, and a PDF of every document.
 
 A person needs the module switched on (Settings > Modules > Office & finance, or the setup purpose "Office & finance").
-Since 2.47.3 no organisation is needed: everybody also has a **personal office** of their own (see below). Everything the
-module stores belongs to one office area - an organisation's office or one person's personal office; people of another
-organisation, and everybody else in the case of a personal office, never see it. Child accounts have no access. Agents (AI
+Since 2.47.3 no organisation is needed: everybody also has a **private office** of their own (see below). Everything the
+module stores belongs to one office area - an organisation's office or one person's private office; people of another
+organisation, and everybody else in the case of a private office, never see it. Child accounts have no access. Agents (AI
 assistants with a token) reach the module only through `/api/v1/office` and only for drafts (2.51.0, see "Agents" below).
 
 ## Roles
@@ -19,17 +19,17 @@ assistants with a token) reach the module only through `/api/v1/office` and only
 | Organisation member | without a group (see *Office rights*): read master data and settings, export the master data file, create / edit quotations and invoices, finalise and send them, PDF; since 2.545.0 their own trips in the travel expenses (enter, change, delete; nobody else's trips; no DATEV tick, billing, purposes or exports) |
 | Organisation roles *Read-only* and *Accounting* | at most reading and the exports; every change is refused (Accounting uploads receipts in the documents area) |
 | Organisation role *Guest* | nothing |
-| Owner of a personal office | everything an organisation admin may, in the own personal office |
+| Owner of a private office | everything an organisation admin may, in the own private office |
 | Agents | with office access on (scope, office rights group or the agent's switch, and the privacy switch): read master data and documents, drafts of quotations / invoices / reminders, payment suggestions (2.51.0) |
 | Children | nothing (403) |
 
 Which office you work in follows the workspace switch at the top of the sidebar: an organisation's workspace (`org:<id>`)
-shows its office, **Private** shows your personal office. Without any organisation (a freelancer, or a server in the
+shows its office, **Private** shows your private office. Without any organisation (a freelancer, or a server in the
 mode `shared`) there is no switch: the office is simply your personal one. With the switch on "All workspaces", a person
 in exactly one organisation works in that organisation's office (as before 2.47.3); with several organisations the
-office asks to choose one. Since 2.356.0 a person who already has data in the personal office (documents, master data,
+office asks to choose one. Since 2.356.0 a person who already has data in the private office (documents, master data,
 receipts, bank, cash book or private clients) and joins an organisation while the switch is on "All workspaces" keeps
-working in the personal office (the switch is set to **Private**; the organisation is one switch away). The office header
+working in the private office (the switch is set to **Private**; the organisation is one switch away). The office header
 always names the workspace of the shown office and, with organisations, is the workspace switch itself; the first change
 of the office's workspace shows one short hint.
 
@@ -43,7 +43,7 @@ narrows it down per person (members without the right to manage it see *My right
 
 - **The organisation role comes first**: *Guest* has no office, *Read-only* and *Accounting* cannot change anything,
   whatever their groups say.
-- **Not ruled by groups**: organisation admins and the owner of a personal office always have everything. A member in no
+- **Not ruled by groups**: organisation admins and the owner of a private office always have everything. A member in no
   group has the implicit group *Previous access*: exactly what members could do before 2.187, plus (since 2.545.0) the level
   `own` in Travel expenses. An update changes nothing else;
   restricting is done afterwards.
@@ -62,11 +62,11 @@ narrows it down per person (members without the right to manage it see *My right
 Routes: `GET /api/office/rights`, `POST /api/office/rights/groups`, `PATCH|DELETE /api/office/rights/groups/<id>`,
 `PUT /api/office/rights/people/<id>`, `GET /api/office/rights/log`.
 
-## Personal office
+## Private office
 
 *Since 2.47.3.*
 
-Every person has a personal office: own master data (services, equipment, text blocks, framework contracts, freelancer
+Every person has a private office: own master data (services, equipment, text blocks, framework contracts, freelancer
 roles, crew), own number series, settings, company fields, logo, quotations, invoices, payments and archive. The person
 is its admin (module settings, logo, import, delete, purchase prices and surplus). Its clients are the person's private
 clients (the clients without an organisation, which the workspace "Private" shows). The access log, e-invoices, the
@@ -78,19 +78,19 @@ of the organisation table (`orgs.personal_of` = its owner) without members; row-
 its rows, and it has its own encryption key like an organisation.
 Going back to a version before 2.47.3 keeps working, but such a version does not know these rows and lists them as
 organisations named `private-<id>` without members (admin dialog). Leave them alone there: do not add members, rename or
-delete them - members added there would reach the personal office.
+delete them - members added there would reach the private office.
 
-A person in an organisation who opens "Private" for the first time finds an empty personal office with a hint and a
+A person in an organisation who opens "Private" for the first time finds an empty private office with a hint and a
 button to the organisation's office.
 
 **Moving into a new organisation** (Settings > Data, section "Transfer into an organisation", button "Transfer into a new organisation…"; one way, after a confirmation): the personal
 office becomes a new organisation with its owner as admin - documents, numbers (no duplicates: it is the same area),
-settings, master data, files and the private clients go with it; "Private" is a new, empty personal office afterwards.
+settings, master data, files and the private clients go with it; "Private" is a new, empty private office afterwards.
 Only where organisations can be created (not in the mode `shared`); since 2.422 the owner herself too: it becomes a
 company of her own (at most 3, its e-mail domains only by an instance admin). Moving into an existing
 organisation is not offered yet. `POST /api/office/move` `{name, confirm: true}` -> `{org_id, name, clients}`.
 
-**Moving office data into another workspace** (2.97.0, both ways between the personal office and an organisation's office,
+**Moving office data into another workspace** (2.97.0, both ways between the private office and an organisation's office,
 or between two organisations): **Move to another workspace…** in a client's menu (Office > Clients, also for several
 selected clients), in the menu of a draft quotation / invoice, in the dialog of a trip and of a document template. The
 dialog names what moves and what stays before anything changes:
@@ -130,20 +130,20 @@ of both sides); sent letters stay for the retention, the client, contact, templa
 are unlinked. A **set** moves with its devices (`what: sets`); a device another set of the old office (or a booking, a
 receipt or contract link) still uses is copied into the target and stays, the set then names the copy. Every link that
 ends comes back with the undo. **Bank accounts with their transactions and the suppliers** never move one by one (booked
-data, the suppliers are the DATEV creditor accounts of the import): they move only with a whole personal office
+data, the suppliers are the DATEV creditor accounts of the import): they move only with a whole private office
 (*Transfer into an organisation*).
 
-**Your own part of an organisation's office into your personal office** (2.356.0, e.g. when you leave an office community):
-Settings of the organisation's office, *Transfer into your personal office…* (its admins only), the same dialog with preview
+**Your own part of an organisation's office into your private office** (2.356.0, e.g. when you leave an office community):
+Settings of the organisation's office, *Transfer into your private office…* (its admins only), the same dialog with preview
 and undo (`what: office`, `ids: [org id]`, `to: "private"`). Only what you created there moves: your clients (with your
 drafts; a client the organisation still uses stays there active and is created anew for you), your drafts, the framework
 contracts of the clients that move, your trips, entertainment receipts and templates. Issued documents stay (retention,
 read-only copies on request), drafts are numbered anew; the drafts of the others, the cash book, books, bank and the other
 master data stay in the organisation.
 
-**The whole personal office into an organisation** (2.139.1): Settings of the office, *Transfer into an organisation*, offered
+**The whole private office into an organisation** (2.139.1): Settings of the office, *Transfer into an organisation*, offered
 when you are an admin of at least one organisation. The preview names what goes along (documents, payments, clients with
-their contact persons, master data, cash book, travel expenses, files ...), what stays in the personal office (its settings,
+their contact persons, master data, cash book, travel expenses, files ...), what stays in the private office (its settings,
 company and bank data, your number counters, the start and real balances of the cash flow; the organisation keeps its own)
 and who sees it afterwards (every member of the organisation with access to the office). Every entry keeps its id;
 finalised invoices stay finalised with their numbers, closed cash book days stay closed; the protected fields and the
@@ -152,7 +152,7 @@ stored files are sealed anew with the organisation's key. A number the organisat
 own files in Documents) move into the organisation's documents, so its bookkeeping can open them (2.356.0). One way, no undo. Only the person in the app, never an agent or an
 access token. `GET /api/office/move/check?org=<id>` -> `{org, ok, moves, keeps, notes, conflicts, numbers, who}`;
 `POST /api/office/move/org` `{org, confirm: true}` -> `{ok, org_id, name, clients, files, rows}` (404 not a member, 403 not
-its admin, 409 conflicts / not a personal office / nothing to move).
+its admin, 409 conflicts / not a private office / nothing to move).
 
 **Small business (section 19 UStG)**: the setting `small_business` (Settings tab, "Invoices"; a setting of every office
 area, also of an organisation): new quotations and invoices are made without VAT and with the note "Gemäß § 19 UStG
@@ -238,7 +238,7 @@ the office groups; receipts keep the receipts lock and stay in place while their
 Office & finance > Settings > General shows its fields in six **areas**, with the same strip of tabs as
 Settings > Company & office: **Company** (company data, logo, brand colour, master data file), **Documents** (documents,
 invoices, invoice from parts, closing texts, calculation rules, default texts), **Packs** (country pack, packs list),
-**Functions** (the functions of the country pack, 2.147, see below), **Data** (DATEV inbox and booking export, legacy import, moving a personal office into an organisation) and **Access**
+**Functions** (the functions of the country pack, 2.147, see below), **Data** (DATEV inbox and booking export, legacy import, moving a private office into an organisation) and **Access**
 (agents' read access, access log). Only one area is shown; the last one chosen is remembered on the device. On a phone the
 strip scrolls sideways.
 
@@ -259,7 +259,7 @@ In the area Packs, every industry pack's card says **Switched on** or **Off** an
 *Since 2.147.*
 
 The country pack decides which office functions exist at all; the office admin switches single ones off in the area
-**Functions** (one switch each, saved at once, one undo step; in a personal office its owner is the admin).
+**Functions** (one switch each, saved at once, one undo step; in a private office its owner is the admin).
 
 | Function | Key | Germany (`DE`) | Base pack (`XX`) |
 |---|---|---|---|
@@ -438,7 +438,7 @@ A draft's number can be changed in the document editor (the pencil next to the n
 reminders and delivery notes the series continues from the new number (a gap needs a reason) and a draft numbered this
 way can no longer be deleted (no gaps); a quotation's own number leaves the counter as it is. The document
 list shows the new number at once. Both routes are session routes of the office (no API
-v1 / MCP tool), the same in the personal office of a person without an organisation.
+v1 / MCP tool), the same in the private office of a person without an organisation.
 
 ## Country packs
 
@@ -856,7 +856,7 @@ Nothing is stored before you confirm.
 
 *Since 2.91.*
 
-The office tab "Subscriptions & tools" (2.489.0: the filter *Subscriptions* of the point *Contracts & subscriptions*; office admins; in a personal office its owner) shows every fixed cost marked as a
+The office tab "Subscriptions & tools" (2.489.0: the filter *Subscriptions* of the point *Contracts & subscriptions*; office admins; in a private office its owner) shows every fixed cost marked as a
 subscription: price, repeat, the next renewal, the last day to cancel (notice period in days), who uses it and a "hardly
 used" switch. At the top are the sums per month and per year (net or gross; quarterly and yearly amounts spread over the
 months, one-off costs not counted) and, when some are marked, what the hardly used ones cost a year. Subscriptions are
@@ -880,7 +880,7 @@ period missed, next chance ...", sorts by that day and the reminder aims at it (
 
 *Since 2.50.*
 
-Two tabs for the admins of the office area (a personal office: its owner; members get `403`).
+Two tabs for the admins of the office area (a private office: its owner; members get `403`).
 
 - **Pipeline** - deals from the first inquiry to the order, in four stages: *Inquiry*, *Quotation sent*, *Order*, *Lost*
   (2.94: before them the leads, see below).
@@ -896,7 +896,7 @@ Two tabs for the admins of the office area (a personal office: its owner; member
   client's sign-off - the server moves its deal to *Order* (`pl2_offer_status`). A declined quotation leaves the deal
   where it is: the card is marked and the admin sets *Lost* or makes a new quotation. When a quotation that replaces
   another one is accepted, the deal of the old one moves to it (2.437). *Create project* (a won deal)
-  makes a project (type "Agency") named like the deal, in the office's workspace (a personal office: private),
+  makes a project (type "Agency") named like the deal, in the office's workspace (a private office: private),
   with the deal's client. Every change is one undo step; a deleted deal can be restored.
 - **Figures** - one view the server computes (`GET /api/office/kpi?year=`): revenue = payments received on invoices,
   net share of each payment (refunds on credit notes subtracted), this month and this year so far against the same span
@@ -978,7 +978,7 @@ supersedes it again the moment it is accepted, by hand or by the client. Unticke
 reference, both quotations may be accepted. A superseded quotation counts nowhere (cash flow, purchases, invoice picker) like
 a declined one, its approval link is void, the client portal keeps showing it as superseded; there is no rejection rate it
 could fall into. Deleting the draft of the copy gives the old quotation its status back. By hand the status can be set from
-sent or accepted, and back. Freelancers without an organisation have the same in their personal office.
+sent or accepted, and back. Freelancers without an organisation have the same in their private office.
 
 The choice **In the cash flow** sits in the quotation (also when it is sent or finalised: it is planning, not printed and
 not part of the approval) with a line which version counts; everyone who may edit the area's quotations may change it, one
@@ -1003,7 +1003,7 @@ off by default; format in [AGENTS.md](AGENTS.md#importing-old-data-into-the-offi
 itself. The proposal card shows the same preview as the Excel import (new / duplicate unticked / error greyed out with the
 reason, VAT per row, net and gross) and the office it goes into; "Take over N rows" writes them as you, one undo step
 removes them again. The agent never sees the office; an agent of an organisation imports only into that organisation.
-Freelancers without an organisation import into their personal office.
+Freelancers without an organisation import into their private office.
 
 **Monthly check** (optional; 2.365.2: set in **Settings > Company & office > Bank & taxes**, the cash flow links there): a tick creates the task "Cash flow: check the actual state" for one admin of the area, due
 on the 1st of every month in that person's basket, with only a link to the cash flow (never an amount). Another person
@@ -1020,7 +1020,7 @@ date have none. **Corrections by hand** ("Other money in" / "Other money out", a
 tax reserve) stay as they are. Adding, editing and deleting is one undo step each. **Real balance** (optional, by hand):
 the balance from the bank statement at the end of a month; the card shows the **difference** to the computed balance
 (only shown, nothing is booked). Without a starting balance and without corrections the cash flow looks exactly as before.
-Amounts and notes are encrypted at rest; the same for organisations and for freelancers in their personal office.
+Amounts and notes are encrypted at rest; the same for organisations and for freelancers in their private office.
 `GET/PUT/DELETE /api/office/cashflow/start` (`{amount, day}` -> `{start, prev}`), `POST /api/office/cashflow/adjust`
 (`{month, dir in|out, amount, note}`), `PATCH/DELETE /api/office/cashflow/adjust/<id>` (delete answers the row for the undo),
 `PUT /api/office/cashflow/actual` (`{month, amount}`; null removes it). The cash flow answer adds `start`, `adjust` and per
@@ -1047,7 +1047,7 @@ adds `gross`), `POST /api/office/fixed-costs/import/preview` (multipart `file`),
 
 *Since 2.90.*
 
-The tab **Bookkeeping** (admins of the office; without an organisation your personal office) covers the running bookkeeping
+The tab **Bookkeeping** (admins of the office; without an organisation your private office) covers the running bookkeeping
 of a self-employed person. **Photograph receipt** opens the camera on a phone (the file dialog on a desktop, PDF too): the
 receipt goes into your documents, amount and date are recognised in the background, and you add the category and the VAT
 rate (19 / 7 / 0 % or unknown). The **income/expense statement** of a year counts payments received on your invoices
@@ -1144,7 +1144,7 @@ it into the additional information of the receipt's line (*Zusatzinformation - A
 the batch has no field of its own for it). Only people tick: agents read the state (`receipt_checked` of the document)
 and get 403. The automatic check of a receipt (its hints) stays apart. Route: `POST /api/office/books/receipts/checked`
 `{node_ids: [ids] (up to 500), checked: true|false}` -> `{changed, rows: [{node_id, checked_at, checked_by}]}`; the
-rights of the receipts list (office group area *Receipts*, level edit). The same in a personal office.
+rights of the receipts list (office group area *Receipts*, level edit). The same in a private office.
 
 An **incoming e-invoice** (XRechnung / ZUGFeRD) that lands in the documents of an office area is recognised with its values
 (supplier, amount, date, VAT rate), but becomes a receipt only once you take it over (since 2.237): under **Receipts this
@@ -1156,7 +1156,7 @@ negative.
 
 *Since 2.90.*
 
-The tab **Bank** (admins of the office area; in a personal office its owner) matches the bookings of your account with
+The tab **Bank** (admins of the office area; in a private office its owner) matches the bookings of your account with
 invoices and receipts. Kalmido has no bank access: you import the file you download from your bank yourself.
 
 - **Import bank statement**: a CSV export (German and English formats: `1.234,56` or `1,234.56`, `DD.MM.YYYY`,
@@ -1242,7 +1242,7 @@ Since 2.355: amounts take thousand separators only in groups of three ("1.234,56
 unreadable row instead of another number ("1,234.5" with the decimal comma, "1.234" with the decimal point), cents are
 rounded half up; a minus in the credit column counts (a return); `DD/MM/YYYY` is a date format (a British file is guessed
 day first). The duplicate key of an EndToEndId carries the booking day (a fixed EndToEndId with the same amount every
-month gives one booking per month); keys stored before stay valid for their own day. A personal office moved into an
+month gives one booking per month); keys stored before stay valid for their own day. A private office moved into an
 organisation keeps its bookings found as duplicates there, and its locked months go along. `match` with `kind: invoice`
 takes `parts: [{id, amount}]` instead of `id`: one booking on several invoices or with a rest (100.01 on 100.00); every
 part is a payment, the rest shows as `match.rest`, `unmatch` takes every part back (its `was.parts` re-splits). A receipt
@@ -1257,7 +1257,7 @@ when it does not); its cancellation takes it back.
 At the bottom of **Bookkeeping**, **Tax dates** keeps the usual German deadlines in view: the VAT return (none, monthly,
 quarterly or yearly, optionally with the permanent extension), the income tax prepayments (10 March, June, September, December)
 and the trade tax prepayments (15 February, May, August, November). Each kind switched on becomes ONE recurring task in
-the basket of the person chosen (an admin of the office; in a personal office its owner), due on the deadline minus the
+the basket of the person chosen (an admin of the office; in a private office its owner), due on the deadline minus the
 lead time (default 3 days); the title names the real deadline, the VAT task links to the VAT return figures.
 **Yearly (annual return only)** (2.122) is for businesses that file no advance returns: instead of the advance return one
 yearly task "Submit the annual VAT return" (31 July of the following year; with a tax adviser the deadline is usually later,
@@ -1272,7 +1272,7 @@ Routes (office admins only): `GET /api/office/tax-dates`, `PUT /api/office/tax-d
 
 *Since 2.92.0.*
 
-The tab **Contracts & insurance** (2.489.0: the point *Contracts & subscriptions* with the filter *Contracts* / *Insurances*; office admins only; in a personal office its person) keeps the business contracts of the
+The tab **Contracts & insurance** (2.489.0: the point *Contracts & subscriptions* with the filter *Contracts* / *Insurances*; office admins only; in a private office its person) keeps the business contracts of the
 office in one place: insurances, rent, leasing, service providers and others. Per contract: name, provider, policy or
 contract number, the contribution per month / quarter / year (net when a VAT rate is set), start, the end of the current
 term, the notice period (days, weeks, months), the automatic renewal (or "ends without renewal"), how many days before the
@@ -1290,7 +1290,7 @@ the next deadline ("Cancel by 12 Mar 2027 · 41 days left", in red from the remi
   fixed cost (kind *Contract or insurance*, net or gross by the VAT rate), from the start (else the start of the current
   term) every period, up to the end of the term when it does not renew. The fixed costs list shows these rows read-only
   under *From contracts* with a link to the contract - they are never copied into the fixed costs.
-- **Document**: choose a document of the office's documents space (the organisation's, or your own in a personal office)
+- **Document**: choose a document of the office's documents space (the organisation's, or your own in a private office)
   or upload one there; it is stored encrypted like every document.
 - Cost, number and note are encrypted at rest. Every change is one undo step; a deleted contract can be restored by the
   undo (it is purged after 30 days (only with the deletion runs on, `KALMIDO_RETENTION_PURGE=1`: [Deletion periods](SELF-HOSTING.md#deletion-periods))).
@@ -1306,7 +1306,7 @@ deadline task). `GET /api/office/fixed-costs` also answers `agreements` (the con
 
 *Since 2.92.0.*
 
-Admins of an office (and every person in their personal office) can record what a device cost:
+Admins of an office (and every person in their private office) can record what a device cost:
 purchase date, net purchase price, serial number, vendor and the receipt. Open a device and unfold
 **Purchase and value**.
 
@@ -1368,7 +1368,7 @@ also `warranty_task` and per maintenance `task` (`{id, due, done}`).
 *Since 2.93.*
 
 The tab **Travel expenses** has a third view **Logbook** (admins of the office area; without an organisation your
-personal office). First add a **vehicle**: name, plate, kind (**private car used for business** -> mileage allowance, or
+private office). First add a **vehicle**: name, plate, kind (**private car used for business** -> mileage allowance, or
 **company car** -> its costs come through receipts) and the odometer at the start. Vehicles are archived, never deleted.
 
 - **Drives** of a vehicle and year, newest first (cards on a phone): date, start, destination, purpose, kilometres or
@@ -1407,7 +1407,7 @@ Routes (office admins only; members 403, other areas 404, agents 403): `GET|POST
 `POST /api/office/drives/<id>/trip`, `GET /api/office/logbook/report?year=&vehicle_id=`,
 `GET /api/office/logbook.csv|pdf?year=&vehicle_id=`, `PUT /api/office/logbook/settings` `{km_rate, year}`,
 `POST /api/office/logbook/close` `{month: "YYYY-MM", vehicle_id?}` (2.152; only past months since 2.186, the running one 400;
-moving the personal office into an organisation turns "every vehicle" into each of its own vehicles; a closed drive: `PATCH` / `DELETE` 409, a
+moving the private office into an organisation turns "every vehicle" into each of its own vehicles; a closed drive: `PATCH` / `DELETE` 409, a
 correction = `POST /api/office/drives` with `corrects_id` and `correct_note`; each drive answers `locked` auto | month,
 `corrects_id`, `corrected_by`).
 
@@ -1416,7 +1416,7 @@ correction = `POST /api/office/drives` with `corrects_id` and `correct_note`; ea
 *Since 2.444.*
 
 Only the total of a credit card statement leaves the business account; the positions need their receipts. **Credit cards** in
-the menu group Money (the people of the bookkeeping; a holder with an account sees only their own cards; in a personal office
+the menu group Money (the people of the bookkeeping; a holder with an account sees only their own cards; in a private office
 its owner):
 
 - **Card**: holder (a person of the area, or a free name), provider (Mastercard for now), last four digits, the business account.
@@ -1516,7 +1516,7 @@ is a marked gap "[ ... to fill in ]" in the view and in the exports; the view co
 - The document is in German when the app is in German, else in English. No legal advice: have it checked.
 
 Everybody with access to the office reads (members, read-only, accounting); admins save (without an organisation: your
-personal office, you are its admin). Saved data are encrypted at rest like the other office texts, every save and export
+private office, you are its admin). Saved data are encrypted at rest like the other office texts, every save and export
 is in the office log. With office groups: the area *Bookkeeping*, saving with the level `manage`. No agent API (no route in
 `/api/v1/office`).
 
@@ -1539,7 +1539,7 @@ suggestion), matching or unmatching bank bookings, a receipt's amount, date, cur
 moving it to the trash (also inside a folder), restoring it, a new file version or a new recognition, moving it to another
 workspace, cash entries, trips and their receipts (also imported or moved), entertainment receipts and the undo of a DATEV
 import. Corrections go into an open month, e.g. a credit note dated today. Importing a bank statement stays possible (the
-lines are not bookings until they are matched). A personal office with locked months cannot move into an organisation,
+lines are not bookings until they are matched). A private office with locked months cannot move into an organisation,
 and nothing moves into a locked month of the organisation.
 
 **Export for the tax auditor** (also in that section): one ZIP for a period (default: the previous calendar year, at most
@@ -1594,7 +1594,7 @@ once it is out.
   Occasion, Per diem, Breakdown, with a total) and **CSV** (semicolon, decimal comma). Each download is written to the
   office log.
 
-Routes (admins of the office area; a person without an organisation in the personal office): `GET
+Routes (admins of the office area; a person without an organisation in the private office): `GET
 /api/office/trips/vma-rates?year=` (countries, cities and rates of a year), `GET /api/office/trips/vma?year=&person=`
 (the report as JSON), `GET /api/office/trips/vma.pdf|vma.xlsx|vma.csv` (same parameters). Agents do not reach travel
 expenses. Kalmido does not replace tax advice.
@@ -1608,7 +1608,7 @@ expenses. Kalmido does not replace tax advice.
   own purposes: rename in place (saved when you leave the field), remove (one undo step), add more. Trips keep the text
   they have when a purpose is renamed or removed. The evaluation sums *by purpose* too; a spreadsheet import adopts
   purposes it does not know yet, an occasion named like an own purpose becomes that purpose; moving trips into another
-  office offers their purposes there as well. A person without an organisation has an own list in the personal office.
+  office offers their purposes there as well. A person without an organisation has an own list in the private office.
 - **Person filter**: next to *All* / *Not in DATEV* a choice of the people of the office and the free names of the
   trips (hidden when only one person occurs). It filters the trip list, the evaluation (each receipt with that person's
   equal share of the trip) and the per diem report, and the downloads (CSV, PDF, Excel) take it over. The choice stays
@@ -1629,7 +1629,7 @@ travel expenses.
 *Since 2.119.*
 
 Office -> Money -> **Entertainment receipts** (Bewirtungsbelege, section 4 (5) no. 2 EStG; admins of the office area, a
-person without an organisation in the personal office).
+person without an organisation in the private office).
 
 **In the bookkeeping (since 2.534, #4333):** the **approved** entertainment receipts (drafts and the trash never) count on
 the day of the meal:
@@ -1700,7 +1700,7 @@ changes, deleting and a new bill.
 
 All routes require a signed-in person with the module on; they work in the office of the shown workspace (`400` with a
 hint only for "All workspaces" with several organisations); writes need the area's admin. `GET /api/office/settings`
-also returns `personal` (1 = the personal office); a personal office adds `can_move` (1 = `POST /api/office/move` is
+also returns `personal` (1 = the private office); a private office adds `can_move` (1 = `POST /api/office/move` is
 allowed) and `org_offices` (`[{id, name}]` while it is empty and the person has organisations: the hint). `GET/PUT /api/office/settings`, `GET /api/office/packs`, `GET /api/office/packs/<code>`,
 `POST /api/office/packs/validate`, `GET /api/office/number-preview?scheme=&kind=offer|invoice|credit|reminder` (the next number, `yearly` = the counter restarts every year, or a plain-language `error`), and for each of `services`, `equipment`,
 `sets`, `texts`, `contracts`, `roles`, `crew` (2.47.0): `GET /api/office/<kind>?q=&archived=1`, `POST /api/office/<kind>`,
@@ -1749,7 +1749,7 @@ admins). The head also carries the period of service (`service_from`, `service_t
 
 A quotation, invoice or credit note can belong to a project (the editor's row "Project", `office_docs.list_id`): pick one
 of the projects you see in the office's workspace (the client's open projects on top) or tick "Create new project" (named
-"Client – project title", changeable; a project of the type agency in the office's workspace, a personal office's is private,
+"Client – project title", changeable; a project of the type agency in the office's workspace, a private office's is private,
 with the document's client, only you a member). It is an internal mark only, so it can be set and changed on finalised and
 sent documents too; the document itself (number, sums, PDF) stays as it is. An invoice from a quotation (also progress and
 final invoices), a credit note and a new quotation version keep the project, an invoice from the hours of exactly one project
@@ -1758,6 +1758,25 @@ the deal too when the deal has none. The project page shows "Quotations & invoic
 the document) only to people with office rights in the project's area; other project members see nothing of it.
 Routes: `POST /api/office/docs/<id>/project`, `GET /api/lists/<id>/office-docs` ([API.md](API.md)).
 
+### Finalised documents in the database
+
+*Since 2.542.0 (#4598).* Next to the app's own checks (`409` "This document is finalised ..."), the database trigger
+`kalmido_office_locked` on `office_docs` (`core/migrations.d/4598.py`) refuses every `UPDATE` of a finalised row
+(`locked_at` set) that changes anything but its free columns, and every `DELETE` of one -- so no row drifts away from
+the PDF / XML it was sent as, whatever path writes. Free: `status` (never back to `draft`), `sent_at`, `paid_at`,
+`updated_at`, `datev_sent_at`, `reminder_fee_state` / `reminder_fee_paid_at`, `cashflow`, `list_id`, `client_id` (client
+merge, a deleted client), `contract_id`, `replaces_id`, `version_of`; `pdf_sha256` / `xml_sha256` / `producing_on` only
+while still empty; the hash chain columns (`chain_key`, `chain_seq`, `chain_prev`, `chain_hash`) while the row has no
+place in its chain yet (its linking right after the finalising, the start's catch-up; freeing a copied place runs
+inside the switch below); on a
+trial document `source_doc_id` / `cancels_id` emptied. A `DELETE` goes through for a trial document and for the
+database's own reference actions (an organisation deleted for good takes its documents with it). The deliberate
+exceptions of the app (a never-sent quotation back to a draft or deleted, the encryption passes, moving a personal
+office into an organisation, the organisation import and its undo) run inside `ledger.ofx_release`, a switch for the
+current transaction only. A new write path to finalised documents needs its column in the trigger's list (or that
+switch, with a reason); an older version runs on with the trigger, the way back is `DROP TRIGGER kalmido_office_locked
+ON office_docs`.
+
 ### Trial documents
 
 *Since 2.144.10.*
@@ -1765,7 +1784,7 @@ Routes: `POST /api/office/docs/<id>/project`, `GET /api/lists/<id>/office-docs` 
 "Only to try it out": `POST /api/office/docs` (every kind) and `POST /api/office/docs/from-time` take `trial: true`. A trial
 document is fixed at creation (no later switch) and:
 
-- counts in its own series `TEST-001`, `TEST-002` ... (one counter per organisation or personal office for all kinds,
+- counts in its own series `TEST-001`, `TEST-002` ... (one counter per organisation or private office for all kinds,
   `office_numbers` kind `trial`); it never takes a real number, a number by hand answers `400`, the real series stay
   without gaps and the number ranges page does not show the TEST series;
 - passes trial on to everything made from it (invoice, progress / final invoice, credit note, reminder, delivery note,
@@ -1773,6 +1792,9 @@ document is fixed at creation (no later switch) and:
   trial invoice answers `409`;
 - prints SAMPLE / MUSTER large and diagonal on every page (instead of the draft mark) and has no e-invoice
   (no ZUGFeRD / XRechnung XML; `GET .../xml` answers `409`); webhooks and agent events skip it;
+- never goes out by e-mail (2.542.0, #4594): `POST /api/office/docs/<id>/send` answers `409` ("A trial document cannot
+  be sent by e-mail ..."), the same for an invoice series and every other mail of a document (they all go through
+  `invoices.inv_send`); the editor shows the send button switched off with that reason, the list menu has no send entry;
 - can be deleted by an admin at any time (finalised, sent, signed, with follow-ups; the follow-ups stay, their link
   is emptied). `POST /api/office/trial/delete-all` (admin; a person without an organisation is their own admin) deletes
   every trial document and trial document from a template of the area with payments, links, stored PDF / XML files
@@ -1867,13 +1889,13 @@ Documents, see below).
 
 A trial document
 
-- takes a number of its own range `TEST-001`, `TEST-002`, ... (one range per organisation or personal office, for all kinds);
+- takes a number of its own range `TEST-001`, `TEST-002`, ... (one range per organisation or private office, for all kinds);
   the real ranges keep counting without gaps;
 - prints a large watermark "MUSTER" on every page and never becomes an e-invoice;
 - stays out of bookkeeping, exports, VAT, figures and reminders; documents made from it (invoice, credit note, reminder,
   delivery note, progress invoice, document from a template) are trial documents too;
 - can be deleted by an admin at any time, also when it is finalised, sent, accepted or signed (the question reads
-  "Delete trial document?"). A person without an organisation is the admin of the personal office.
+  "Delete trial document?"). A person without an organisation is the admin of the private office.
 
 The lists mark trial documents with a small tag "Trial", the editor head as well; documents from templates show the same
 tag. Test mode (2.417.0): trial documents come from one switch, "Test mode" in the office settings (section Documents), per
@@ -1925,7 +1947,7 @@ and deleting answer `409` with a reason; the status of a quotation can still cha
 2.38.0 a quotation with status "sent" is locked the same way (a business letter is kept as sent; a new version = duplicate).
 
 Since 2.114.2 a finalised **quotation that never left the house** can be taken back by the organisation's admin (a
-person without an organisation in the personal office, too; members get `403`): it is still in status "draft", was never
+person without an organisation in the private office, too; members get `403`): it is still in status "draft", was never
 sent (no `sent_at`, no logged e-mail), the customer did not decide on an approval link, and no invoice or order
 confirmation was made from it. Then the "More" menu offers:
 
@@ -2003,7 +2025,7 @@ The part's name is one source (2.144.9): a rename changes every title page line 
   deleted and never land on a second invoice, also when two invoices are made at the same moment. The answer's `time`
   says how many entries were taken and skipped. Deleting the draft frees them again; a finalised invoice keeps them,
   also once cancelled - on a cancelled invoice the office admin frees them with *Release the time again*
-  (`POST /api/office/docs/{id}/time-release`, undoable). Without an organisation the personal office bills the
+  (`POST /api/office/docs/{id}/time-release`, undoable). Without an organisation the private office bills the
   person's private lists the same way;
 - **empty** (`POST /api/office/docs` with `{"kind": "invoice"}`).
 
@@ -2172,7 +2194,7 @@ then 2 and 3, each only after the last finalised reminder's deadline -- its date
 those days too), with the office's deadline and, from level 2 on, its fee. An invoice named in a reminder draft waits;
 an invoice and level are
 suggested only once (`office_dunning_marks`), so a draft deleted by hand comes back no sooner than on the next level.
-The office's admins (a personal office: its owner) get one task in their inbox with the link, never an amount. Whatever
+The office's admins (a private office: its owner) get one task in their inbox with the link, never an amount. Whatever
 `dunning_suggest` says, the setting `overdue_notice` (*Tell me when an invoice is overdue*, default on, 2.367.4) tells the
 same people once about an invoice past its due date (one News item per run, never an amount). The
 invoice list shows "N payment reminders suggested" with a jump to the drafts (`GET /api/office/docs` answers
@@ -2210,7 +2232,7 @@ series shows "From series ..., period ..." and carries `series_id` / `series_per
 The cash flow shows the expected income of the coming periods as "Invoice series" (kind `series`, planned, due on the
 period start plus the template's payment term) until the invoice exists; a draft of the series counts once. A missed
 period is made later, of more than three missed periods only the newest. Only admins of the office area (and a person in
-their personal office) manage series.
+their private office) manage series.
 
 Routes (office admins): `GET /api/office/series` (`?bin=1` the deleted ones), `POST /api/office/series` {template_id, every
 monthly | quarterly | yearly, start, until?, auto_send?, title?}, `PATCH /api/office/series/<id>`, `DELETE
@@ -2272,7 +2294,7 @@ category, e.g. software 4964 / 6837, office supplies 4930 / 6815, phone 4920 / 6
 input tax key 9 for 19 % and 8 for 7 % (`bu_in`), none for 0 %, an unknown rate or a small business. Every travel
 receipt is one line on the travel account of its category and the per diem of a trip one line on its last day, both
 without input tax (`travel` {fares, hotel, vma, other}; defaults for an organisation 4663 / 4666 / 4664 / 4660 resp.
-6663 / 6660 / 6664 / 6650, for a personal office the owner's accounts 4673 / 4676 / 4674 / 4676 resp. 6673 / 6680 /
+6663 / 6660 / 6664 / 6650, for a private office the owner's accounts 4673 / 4676 / 4674 / 4676 resp. 6673 / 6680 /
 6674 / 6680). `check=1` also answers `hints`: receipts without an amount (not exported), without a category (booked on
 the other expenses account), without a VAT rate (booked without input tax). `GET /api/office/datev/accounts` (admin)
 lists the receipt categories with their default and own account and the travel accounts for the settings page.
@@ -2281,7 +2303,7 @@ lists the receipt categories with their default and own account and the travel a
 
 *Since 2.148.*
 
-Settings → Company & office → Data → **Read DATEV data** (admins; a personal office: its owner) takes a DATEV file the tax advisor sends
+Settings → Company & office → Data → **Read DATEV data** (admins; a private office: its owner) takes a DATEV file the tax advisor sends
 (EXTF, Windows-1252 or UTF-8 with / without BOM, semicolons, CRLF; at most 10 MB and 20 000 rows). The columns are read by
 their names in line 2, not by position. A preview comes first (new / updated / skipped with the reason, the first 20
 rows); nothing is stored until **Take over**. Every import is a run with **Undo** (the toast, and the list on the import
@@ -2310,7 +2332,7 @@ is in the office log (`import` / `undo`, target `datev_in`).
 
 *Since 2.414.*
 
-Bookkeeping → **Booking archive** (admins; a personal office: its owner; never agents; needs the DATEV function of the country
+Bookkeeping → **Booking archive** (admins; a private office: its owner; never agents; needs the DATEV function of the country
 pack) keeps the complete DATEV data of past years in one place - to look things up, not to book. **Read DATEV data** takes
 what the tax advisor exports per year, as single files or one ZIP (also a ZIP inside it):
 
@@ -2390,7 +2412,7 @@ out with a quotation stays readable.
 
 A replaced or removed state is kept for 30 days (the undo step) and then deleted from the disk (only with the deletion runs on, `KALMIDO_RETENTION_PURGE=1`: [Deletion periods](SELF-HOSTING.md#deletion-periods)), unless a document of the office
 (the trash included) names it; the current state is never touched. Quotations, invoices and sent documents keep the state they went
-out with. This applies to organisation offices and to the personal office alike.
+out with. This applies to organisation offices and to the private office alike.
 
 - **Finalising** a document notes the state of its language (date, SHA-256); a draft follows the current state. A
   quotation prints the line "Es gelten unsere AGB (Stand ...), siehe Anhang." / "Our terms and conditions (as of ...)
@@ -2419,7 +2441,7 @@ out with. This applies to organisation offices and to the personal office alike.
   the state and the confirmation page says "Terms and conditions as of ...". Contracts and order confirmations made from
   templates keep the state when they are finished and offer it on their signature link (they have no mail dispatch).
 
-Routes (office members read, the office's admin writes; a personal office works the same): `GET /api/office/terms`
+Routes (office members read, the office's admin writes; a private office works the same): `GET /api/office/terms`
 (`{terms: {<language>: ...}, admin, max_mb}`), `POST /api/office/terms/<lang>` (multipart `file` - a PDF up to 10 MB - and
 `date` YYYY-MM-DD, default today), `GET /api/office/terms/<lang>/file` (`?inline=1`), `DELETE /api/office/terms/<lang>`
 (answers `removed` for the undo; the file stays), `POST /api/office/terms/<lang>/restore` `{sha256, date, name}` (only a
@@ -2507,7 +2529,7 @@ the sign-in link. Details: [TEAM.md](TEAM.md) *The customer portal*.
 *Since 2.93.0.*
 
 Tab *Documents* (admins of the office area; members `403`, agents `403`, another area `404`; a person without an
-organisation uses it in the personal office). Two parts: **templates** and the **documents** made from them. The task
+organisation uses it in the private office). Two parts: **templates** and the **documents** made from them. The task
 templates of the lists are something else and stay as they are.
 
 **Templates** (`office_doc_templates`): kind (contract, order confirmation, non-disclosure agreement, other; letter for
@@ -2599,7 +2621,7 @@ or *Edit* in a send dialog (`GET` / `PUT /api/office/mail-profile`, with any off
 *Since 2.153.0.*
 
 Tab *Correspondence* (admins of the office area; members `403`, agents `403`, another area `404`; a person without an
-organisation writes in the personal office). For letters to authorities, insurers, landlords or clients.
+organisation writes in the private office). For letters to authorities, insurers, landlords or clients.
 
 **Writing**: *New letter* (from a letter template, optionally for a client: its variables are filled) opens the editor.
 The recipient search offers the clients of the office (also with a contact person as "z. Hd.") and the address book
@@ -2672,7 +2694,7 @@ Letters of the tab "Correspondence" and documents of the documents area can be l
 - **Follow-up:** a letter sent with a follow-up (e.g. 14 days) that has no answer linked by then gets a task
   "Follow-up: <subject>" in the inbox of the person who wrote it, once. An answer that comes later leaves the task alone.
 
-Rights: admins of the office area (a person without organisation: the own personal office and the own private
+Rights: admins of the office area (a person without organisation: the own private office and the own private
 documents). A letter links only documents of its office's documents space that the person sees.
 
 ## Agents
@@ -2692,7 +2714,7 @@ text blocks, framework contracts, clients and the area's documents, and create:
   it): *Suggested payments* above the invoice list, an admin books or rejects each one.
 
 It never reserves a number, finalises, sends, changes a status, deletes or books. Its area is its workspace's office (a
-personal agent without a workspace: its owner's personal office), it acts for one person of that office (`requested_by`)
+personal agent without a workspace: its owner's private office), it acts for one person of that office (`requested_by`)
 and never sees another area. Each request is one line in the access log (filter *Agents*). Details: docs/AGENTS.md.
 People's routes: `GET/PATCH /api/office/agents/<id>` (the switch), `GET /api/office/pay-props`, `POST /api/office/pay-props/<id>`
 `{action: accept|reject}` (admins). The event `offer_accepted` tells the area's office agents about an accepted quotation.
@@ -2719,7 +2741,7 @@ settings > mail address), the mail carries a reply address of its own that belon
 the recipient never learns your document address). An answer to it becomes a document in that documents space and is
 linked to the letter as its reply; an answer to the document address itself is linked when it names the letter's
 Message-ID (In-Reply-To / References). The reply address stops working when the letter is deleted. Only a
-letter of the same office (the same organisation, or your personal office) is ever linked. Without a document address
+letter of the same office (the same organisation, or your private office) is ever linked. Without a document address
 answers go to the company e-mail and are assigned to the letter by hand. A reply without a PDF or image attachment
 creates no document (as every mail to the document address).
 
@@ -2797,7 +2819,7 @@ from a half read letterhead.
   stay as they are. Without a letterhead the PDF is exactly the one of before.
 - PDF/A: a letterhead that would make the documents invalid PDF/A is refused at the upload (2.296): a font not embedded,
   DeviceCMYK colours or LZW compression. Export it as PDF/A. A letterhead uploaded before that check stays and shows a hint.
-- Organisation admins (and a person without organisation in the personal office) upload and change it; members see the
+- Organisation admins (and a person without organisation in the private office) upload and change it; members see the
   state and the preview. The file is stored sealed like the documents below `<data>/office/<org_id>/`.
 
 Routes: `GET / POST / PUT / DELETE /api/office/letterhead` (state, multipart `file`, `{m1, m2, hide_head, hide_footer}`
@@ -2847,7 +2869,7 @@ Deleting an account (`DELETE /api/users/<id>`) or an organisation (`DELETE /api/
 answers `409` (`code: "retention"`) until the request carries `?retention=exported` (a finished export of that account /
 organisation within the last 7 days) or `?retention=waived` (the deleting admin does without it explicitly). Both, and every
 finished export, are noted (table `retention_log`) and land in the security log. The delete dialogs ask for this step
-first. An organisation admin can no longer delete an account whose personal office holds invoices or a cash book (only the
+first. An organisation admin can no longer delete an account whose private office holds invoices or a cash book (only the
 person can export it; a server admin deletes it after that).
 
 Since 2.186.0 a deletion that **retires** instead (your own server: records still under their legal period, see TEAM.md)

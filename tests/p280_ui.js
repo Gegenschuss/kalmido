@@ -210,7 +210,7 @@ const CONTRAST = `(() => {
           const small = await ev(SMALL('#side .srow'));
           check(!small.length, `${vw}px: sidebar rows >= 44 px ${JSON.stringify(small.slice(0, 4))}`);
           await ev(`(() => { openDetail(${T.win}); return 1; })()`); await sleep(600);
-          const fl = await ev(`(() => ({rail: document.querySelector('#app').classList.contains('side-rail'), menu: !!document.querySelector('#top .menu')?.offsetWidth || !!document.querySelector('#srail .srpanel')?.offsetWidth}))()`);  // 2.152.3 (#2619): sidebar B opens the drawer with the panel button on top of the bar
+          const fl = await ev(`(() => ({rail: document.querySelector('#app').classList.contains('side-rail'), menu: !!document.querySelector('#top .menu')?.offsetWidth || !!document.querySelector('#srail .srb.on[data-sbb]')?.offsetWidth}))()`);  // 2.152.3 (#2619): sidebar B opens the drawer with the panel button on top of the bar; 2.542.0 (#4610): with the open area's icon (the panel button is gone)
           check(fl.rail && fl.menu, `${vw}px + task panel: sidebar as drawer with the menu button ${JSON.stringify(fl)}`);
           await ev(`(() => { document.querySelector('#top .menu').click(); return 1; })()`); await sleep(500);
           check(await ev(`document.querySelector('#side').classList.contains('open')`), `${vw}px: the drawer opens`);

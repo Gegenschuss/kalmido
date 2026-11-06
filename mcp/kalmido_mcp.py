@@ -245,8 +245,10 @@ TASK_FIELDS = {
                      "code": {"type": "string", "maxLength": 20000}}}},
     # 2.36.0 (#1118): the lock of a task (a guard of the app, not of the API)
     "locked": {"type": "boolean", "description": "2.36.0: locked in the app (title, notes, dates, priority, project, tags, repeat and "
-               "assignee read-only there until a person unlocks it; comments, checkboxes, completing and subtasks stay free). "
-               "Tasks you create start locked; send false for an open one. You can still change locked tasks through the API."},
+               "assignee read-only there until a person unlocks it; comments, checkboxes and subtasks stay free). "
+               "Tasks you create start locked; send false for an open one. You can still change locked tasks through the API, "
+               "but 2.542.0: a locked task is never completed or reopened (error 409) - send locked false first (you may, "
+               "when you may change the task; the history shows it), then complete."},
     # 2.390.0 B (#3355): the sprint and the reviewer
     "sprint_id": {"type": ["integer", "null"], "description": "2.390.0: an open sprint of the same project (list_sprints); null = backlog"},
     "reviewer_id": {"type": ["integer", "null"], "description": "2.390.0: who reviews it (a person / agent with access to the project); "
@@ -741,7 +743,8 @@ TOOLS = [
            "path": {"type": "string", "maxLength": 300}, "line": {"type": "integer", "minimum": 1}}, ["task_id", "code"]),
      lambda api, a: api.call("POST", f"/tasks/{int(a['task_id'])}/snippets", body=_pick(a, ("code", "lang", "path", "line")))),
     ("complete_task", "Mark a task done (repeating tasks move to their next date). For a repeating task pass expect_due = its due "
-                      "date as you read it: a repeated call then does not advance it twice (answer skipped: true).",
+                      "date as you read it: a repeated call then does not advance it twice (answer skipped: true). "
+                      "A locked task (locked true) answers 409: unlock it first with update_task locked false, then complete.",
      _obj({"task_id": S_ID, "expect_due": {"type": "string", "description": "2.270.0: the task's due date (YYYY-MM-DD) you read"}}, ["task_id"]),
      lambda api, a: api.call("POST", f"/tasks/{int(a['task_id'])}/complete",
                              body={"expect_due": a["expect_due"]} if a.get("expect_due") else None)),
@@ -1607,7 +1610,7 @@ TOOLS += [
            "_prev": {"type": "object", "description": "2.370.0: {task id: {field: the value you read}}"},
            "expect": {"type": "object", "description": "2.370.0: {task id: {expect_due: the due date you read or null, expect_time?}}"}}, ["ids", "action"]),
      lambda api, a: api.call("POST", "/tasks/batch", body=a)),
-    ("reopen_task", "Reopen a completed task.", _obj({"task_id": S_ID}, ["task_id"]),
+    ("reopen_task", "Reopen a completed task (a locked one answers 409: update_task locked false first).", _obj({"task_id": S_ID}, ["task_id"]),
      lambda api, a: api.call("POST", f"/tasks/{_id(a, 'task_id')}/reopen")),
     ("delete_task", "Move a task (with its subtasks) to the trash (restorable with restore_task).", _obj({"task_id": S_ID}, ["task_id"]),
      lambda api, a: api.call("DELETE", f"/tasks/{_id(a, 'task_id')}")),

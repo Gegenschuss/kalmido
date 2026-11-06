@@ -72,8 +72,10 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
     await ev(`(() => { closePop(); return 1; })()`);
     check(await ev(tap('#side .sbbhide')), '#2619: Hide the panel (panel head)');  // 2.152.3 (#2619): hiding moved from the brand menu (wsm-side) to the panel head
     check(await ready(ev, `document.querySelector('#app').classList.contains('side-rail') && LS.get('sideFold', false) === true`), '#2607: the sidebar folds away on a wide screen');
-    check(await ev(tap('#srail .srpanel')), '#2619: hidden: the bar offers to show the panel again');  // 2.152.3 (#2619): was "Show the sidebar" in the brand menu
-    check(await ready(ev, `!document.querySelector('#app').classList.contains('side-rail') && LS.get('sideFold', false) === false`), '#2607: the sidebar is back');
+    // 2.542.0 (#4610): no button "Show the panel" on the bar any more; another area opens the panel again
+    check(await ev(`!document.querySelector('#srail .srpanel')`), '#4610: hidden: no panel button on the bar (the icons do not move)');
+    check(await ev(tap('#srail .srb[data-sbb]:not(.on)')) && await ready(ev, `!document.querySelector('#app').classList.contains('side-rail') && LS.get('sideFold', false) === false`), '#4610: the change of the area brings the sidebar back');
+    check(await ev(tap('#srail [data-sbb="tasks"]')) && await ready(ev, `!!document.querySelector('#side .sbbhide')?.getClientRects().length`), '#4610: back in Tasks, the panel is open');
     await ev(tap('#side .sbbhide')); await ready(ev, `document.querySelector('#app').classList.contains('side-rail')`);
     check(await ev(tap('#srail .srb.on[data-sbb]')) && await ready(ev, `!document.querySelector('#app').classList.contains('side-rail') && LS.get('sideFold', false) === false`), '#2619: a click on the open area\'s icon brings the panel back');  // 2.152.3 (#2619): new
     // #2608 with reduced motion: no animation on the empty page, no blink timer

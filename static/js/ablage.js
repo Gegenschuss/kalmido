@@ -97,7 +97,7 @@ function viewAblage() {
   AB.selHere = !trash && !!d?.items?.length && !(typeof dt_abOn === 'function' && dt_abOn(sp || d.space)) && !(typeof ftxtActive === 'function' && ftxtActive());
   let body;
   if (r.aus) return `<div class="abview ${desk ? 'abdesk' : ''}">${desk ? '' : spaces}<div class="abmain">${ab_collHtml(d, sp)}</div></div>`;  // 2.429.0 (#3580)
-  if (AB.err && AB.key === key) body = `<div class="empty">${ic('folder')}<span>${esc(AB.err)}</span><button type="button" class="btn" data-ab="space" data-sp="private">${tr('My files')}</button></div>`;
+  if (AB.err && AB.key === key) body = `<div class="empty">${ic('folder')}<span>${esc(AB.err)}</span><button type="button" class="btn" data-ab="space" data-sp="private">${tr('Private|workspace')}</button></div>`;
   else if (!d) body = `<p class="muted lempty">${tr('Loading…')}</p>`;
   else if (!d.items.length && !d.collections?.length) body = `<div class="empty abempty">${ic(trash ? 'trash' : 'folder')}<span>${trash ? tr('The trash is empty') : sp === 'shared' && !r.nid ? tr('Nothing is shared with you yet') : canAdd ? tr('Drop files here or use “Upload”') : tr('This folder is empty')}</span>${!r.nid && sp.startsWith('org:') && !ab_orgAdmin(sp) ? `<span class="muted abemptyhint">${tr('You see the organisation’s folders once an admin opens them to everyone or shares them with you.')}</span>` : ''}</div>`;
   else body = `<div class="ablist${AB.selOn ? ' abselon' : ''}" role="list">${d.items.map(n => ab_rowHtml(n, trash)).join('')}${(d.collections || []).map(ab_collRow).join('')}</div>`;  // 2.429.0 (#3580): + "From <area>" after the folders and files

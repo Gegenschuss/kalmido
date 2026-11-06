@@ -179,12 +179,12 @@ for access or erasure go to that controller:
   reports of the organisation. To erase a report, delete the task: the reporter's data goes with it when the trash is
   emptied (see section 3).
 - **Approvals:** the admins of the office (for an acceptance: the owner of the project) see the full record in the
-  quotation's approvals or under the project's public link; the export of the organisation or of the personal office
+  quotation's approvals or under the project's public link; the export of the organisation or of the private office
   holds all of them. An open link can be revoked at once. A decided approval is kept as the proof of the decision (a
   signed quotation cannot be deleted); it goes with the project, or with the organisation after its legal retention
   period. **Video sign-offs are different:** when the video, its task or its project is deleted, the record stays with name,
   e-mail, reason, address, browser and decision. The admins of the organisation and the creator see and delete it, a decided
-  record of an organisation or personal office only after its legal period (6 years, to the end of the year). Say in your
+  record of an organisation or private office only after its legal period (6 years, to the end of the year). Say in your
   statement how long you keep it and on which basis.
 - **Questionnaires:** the answers and the sender's address stand in the task the form makes, so everyone who sees that task
   reads them and the project's agents get it. They go with the task, or with the form.

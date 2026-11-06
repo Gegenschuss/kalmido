@@ -39,7 +39,7 @@ from ..core.i18n import N_, tr, trn
 from ..core.orgcrypt import FIELDS, JSON_KEYS, oc_dec_fields, oc_log_detail, oc_read_file, oc_write_file
 from ..core.pg import IntegrityError, system_ctx, table_columns, write_lock
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
-from .ledger import ofx_log
+from .ledger import ofx_log, ofx_release  # 2.542.0 (#4598): + ofx_release
 from .model import office_gate, office_org, pb_owner
 from .officemove import ofm_reseal
 from .payonline import POL_EXPIRE_S
@@ -57,7 +57,7 @@ PBT_SEALED = set(FIELDS) | {t for t, _c in JSON_KEYS} | {"office_doc_items"}
 PBT_STAY_FILE = re.compile(r"logo\.png|letterhead-[0-9a-f]{16}\.pdf")  # the settings' own files (pdfweb.LOGO_FILE, letterhead.BP_FILE_RE)
 PBT_SAME_FILE = re.compile(r"logo-[0-9a-f]{16}\.png|lhs-[0-9a-f]{16}\.pdf")  # content-addressed copies: the same name = the same content
 PBT_PLAIN_FILE = re.compile(r"logo.*\.png")  # logos are stored plain (shown openly)
-PBT_ONLY_PB = N_("Only a personal office can move into an organisation")
+PBT_ONLY_PB = N_("Only a private office can move into an organisation")
 # what the preview names (table -> label); everything else counts as "further office data"
 PBT_LABELS = (("office_docs", N_("Documents")), ("office_payments", N_("Payments")), ("office_contracts", N_("Framework contracts")),
               ("office_trips", N_("Travel expenses")), ("office_meals", N_("Entertainment receipts")),
@@ -135,7 +135,7 @@ def pbt_plan(c, uid, src, dst):
     tables = pbt_tables(c)
     lk, first = pl_through(c, dst), pl_first_month(c, src)
     if lk and first and first <= lk:  # 2.148.0 A (#2471): nothing lands in a locked month of the organisation
-        conflicts.append(tr("The organisation is locked up to {0}; the personal office has data from {1}", pl_label(lk), pl_label(first)))
+        conflicts.append(tr("The organisation is locked up to {0}; the private office has data from {1}", pl_label(lk), pl_label(first)))
     if pl_through(c, src):  # 2.355.0 B (#2845): its locks go along (was a conflict: the moved data would be editable again)
         notes.append(tr("Your office is locked up to {0}: the organisation is locked up to {0} as well (also its own data of these months)",
                         pl_label(pl_through(c, src))))
@@ -202,7 +202,7 @@ def pbt_plan(c, uid, src, dst):
     if files:
         moves.append(f"{tr('Files')}: {len(files)}")
     keeps.append(tr("Settings, company data and bank details of your office (the organisation keeps its own)"))
-    keeps.append(tr("Your number counters: your personal office keeps counting on, the organisation keeps its own"))
+    keeps.append(tr("Your number counters: your private office keeps counting on, the organisation keeps its own"))
     keeps.append(tr("Absences, bookings and everything outside the office stay private"))
     if same:
         notes.append(trn("{0} client has the same name as one in the organisation: both stay, they are not merged",
@@ -240,7 +240,7 @@ def pbt_plan(c, uid, src, dst):
     # only the text blocks every office gets on its first use: nothing to move
     total = sum(v for t, v in counts.items() if t != "office_texts") + len(cl) + len(files)
     if not total:
-        conflicts.append(tr("Your personal office is empty: there is nothing to move"))
+        conflicts.append(tr("Your private office is empty: there is nothing to move"))
     return {"counts": counts, "clients": cl, "files": files, "receipts": rcs, "moves": moves, "keeps": keeps, "notes": notes, "conflicts": conflicts,
             "numbers": taken, "viewers": {"people": who["n"], "admins": who["a"]}, "total": total, "tables": tables}
 
@@ -269,12 +269,12 @@ def pbt_dup_notes(c, src, dst):
         out.append(trn("{0} opening balance is in the organisation already: it is not added twice",
                        "{0} opening balances are in the organisation already: they are not added twice", int(same)))
     if diff:
-        out.append(trn("{0} opening balance differs from the organisation's: the organisation keeps its own, yours stays in your personal office",
+        out.append(trn("{0} opening balance differs from the organisation's: the organisation keeps its own, yours stays in your private office",
                        "{0} opening balances differ from the organisation's: the organisation keeps its own, yours stay in your personal office",
                        int(diff)))
     if c.execute("SELECT 1 FROM office_procdocs WHERE org_id=? LIMIT 1", (src,)).fetchone() \
             and c.execute("SELECT 1 FROM office_procdocs WHERE org_id=? LIMIT 1", (dst,)).fetchone():
-        out.append(tr("The organisation has its own procedure documentation: it stays the only one, yours stays in your personal office"))
+        out.append(tr("The organisation has its own procedure documentation: it stays the only one, yours stays in your private office"))
     return out
 
 
@@ -363,7 +363,8 @@ def pbt_rows(c, src, dst, tables):
                 cols = {"org_id": dst, **pbt_reseal(c, t, r, src, dst)}
                 if t == "office_doc_items":  # 2.144.5 A2 (#1523, review R10): the source list of a position stays behind
                     cols["list_id"] = None
-                c.execute(f"UPDATE {t} SET {', '.join(x + '=?' for x in cols)} WHERE id=?", [*cols.values(), r["id"]])
+                with ofx_release(c, t):  # 2.542.0 (#4598): its finalised documents move along and stay finalised
+                    c.execute(f"UPDATE {t} SET {', '.join(x + '=?' for x in cols)} WHERE id=?", [*cols.values(), r["id"]])
                 k += 1
             out[t] = k
         else:

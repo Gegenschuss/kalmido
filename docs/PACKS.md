@@ -3,7 +3,7 @@
 Country packs (tax rates, formats, labels, default texts; see [OFFICE.md](OFFICE.md#country-packs)) and industry packs
 (the shoot calculation, see [OFFICE.md](OFFICE.md#shoot-calculation-and-industry-packs)) ship with the app. Since
 2.76 an office admin can also search a **pack catalogue** and install further packs - or newer versions of the shipped
-ones - into their office area (an organisation, or the personal office of a person without one). This page is for
+ones - into their office area (an organisation, or the private office of a person without one). This page is for
 operators and for people who publish packs. How it looks in the app: *Office & finance > Settings > Packs*
 ([OFFICE.md](OFFICE.md)).
 

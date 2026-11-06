@@ -851,6 +851,7 @@ function cmComposer(t, top = false) {  // top: 2.4.2 (#386) newest first, the bo
 }
 function drawTimeline() {
   if (S.tl.id !== S.sel) return;
+  if (typeof rswLater === 'function' && rswLater('tl', drawTimeline, '#d-tl-items')) return;  // 2.542.0 (#4614): a swipe to reply is under way
   const sc = cmxScrollGet();  // 2.36.0 (#1120): who reads the newest comments at the end stays there when one arrives
   const box = $('#d-tl-items'), seen = !box?.lastElementChild || cf_visible(box.lastElementChild);
   if (box) { patchKids(box, timelineItems()); cf_comments(box, seen); }  // 2.46.2 (#1660)  // 2.12.2 (#451): only changed / new comments
@@ -1182,6 +1183,11 @@ window.addEventListener('keydown', e => {
   if (art && !S.mp && replyCancel(replyCtx(art), false)) { e.preventDefault(); e.stopImmediatePropagation(); }
 }, true);
 // phones: swipe right on a message
+// 2.542.0 (#4614): something between the finger and the message that scrolls sideways itself (a wide table, code that does not wrap)
+function rswSideScroll(el, m) {
+  for (let x = el; x && x !== m; x = x.parentElement) if (x.scrollWidth > x.clientWidth + 1 && /auto|scroll/.test(getComputedStyle(x).overflowX)) return true;
+  return false;
+}
 function rswRowAt(e) {
   const box = e.target.closest?.('#tc-msgs, #chat-msgs'), y = e.touches?.[0]?.clientY;
   if (!box || y == null || e.target.closest('button, a, input, textarea, select, label, [contenteditable="true"]')) return null;
@@ -1208,23 +1214,36 @@ function rswRowAt(e) {
   };
   const swEnd = cancel => {
     const st = sw; sw = null; document.removeEventListener('touchmove', swMove, {passive: false});
-    if (!st || !st.lock) return;
+    if (!st) return;
+    // 2.542.0 (#4614): what was held back comes after the finger is up, also after a tap or a scroll that never became a swipe
+    // (before only after a swipe: a tap kept the team chat's update until the next change). The agent chat's and the comments'
+    // redraws (rswLater) and a view redraw the poll held (lpHold)
+    const later = [...rswQ.values()]; rswQ.clear();
+    if (S.rswRedraw) { S.rswRedraw = false; later.unshift(() => { if (S.route.mod === 'team') { if (editingTeam()) tcPatch(); else renderView(); } }); }  // 2.151.1: the live update held back during the swipe
+    if (later.length || S.viewStale) setTimeout(() => { if (sw) { for (const f of later) rswQ.set(f, f); return; } for (const f of later) f(); if (S.viewStale && typeof viewSafeRender === 'function') viewSafeRender(); }, st.lock ? 200 : 0);
+    if (!st.lock) return;
     const m = st.m, go = !cancel && st.dx >= RSW_MIN;
     m.style.transition = reducedMotion() ? 'none' : 'transform .16s ease-out'; m.style.transform = '';
     setTimeout(() => { m.style.transition = ''; m.classList.remove('rsw'); m.querySelector(':scope > .rswarr')?.remove(); }, 180);
     if (go) { const [art, id] = String(m.dataset.mid).split(':'); replyStart(replyArt(m, art), +id); }
-    if (S.rswRedraw) { S.rswRedraw = false; setTimeout(() => { if (S.route.mod === 'team') { if (editingTeam()) tcPatch(); else renderView(); } }, 200); }  // 2.151.1: the live update held back during the swipe
   };
   // 2.151.1: a live redraw of the team chat while a finger is on a message replaced the touched node: the swipe died silently
   // (no touchend reaches the document). teamChanged() waits for the end of the swipe instead.
   window.rswBusy = () => !!sw;
+  // 2.542.0 (#4614): the same for the agent chat (#chat-msgs, chatPatch) and the comments (#d-tl-items, drawTimeline): a refresh
+  // that came while the finger is on one of box's messages swapped the touched row (a job's steps, a tick, a reaction), the
+  // swipe died on the phone. rswLater(key, fn, box) keeps fn (the last one per key) for the end of the swipe -> true
+  const rswQ = new Map();
+  window.rswLater = (key, fn, box) => { if (!sw || !sw.m.isConnected || (box && !sw.m.closest(box))) return false; rswQ.set(key, fn); return true; };
   document.addEventListener('touchstart', e => {
     if (sw) swEnd(true);
     if (e.touches?.length !== 1) return;
     // 2.34.0 (#1091): the whole row of a message counts (a short message has a narrow bubble): a touch beside it in the
     // messages box takes the message at that height
     const m = e.target.closest?.('#detail .cm[data-mid], #tc-msgs .cmsg[data-mid], .tthview .cmsg[data-mid], #chat-msgs .cmsg[data-mid]') || rswRowAt(e);
-    if (!m || m.querySelector('.cedit, .tcedit') || e.target.closest('textarea, input, pre, table, .rxrow, .catts, .chatts, .cchoices, .cperm, [contenteditable="true"]')) return;
+    // 2.542.0 (#4614): code and tables only when they really scroll sideways (a chat bubble's code wraps, see app.css .cbub pre.mdpre):
+    // a long answer with a code block or a small table was hardly swipeable anywhere
+    if (!m || m.querySelector('.cedit, .tcedit') || e.target.closest('textarea, input, .rxrow, .catts, .chatts, .cchoices, .cperm, [contenteditable="true"]') || rswSideScroll(e.target, m)) return;
     const t = e.touches[0]; if (t.clientX < RSW_EDGE || t.clientX > innerWidth - RSW_EDGE) return;
     const sel = getSelection?.(); if (sel && !sel.isCollapsed && String(sel).trim()) return;
     const [art0, id] = String(m.dataset.mid).split(':'), art = replyArt(m, art0); if (!replyCtx(art) || !replyMsg(art, +id)) return;

@@ -1043,7 +1043,7 @@ with them; with collaboration switched off only their own). What they cannot see
 
 **Which objects (2.115.0).** Task, comment and project events reach a personal webhook for every project its owner sees, as
 before. The newer events (calendar, files, invoices, time) reach a personal webhook only from its owner's **private
-area** (private calendars, own files, the personal office, private projects); what belongs to an organisation goes to the
+area** (private calendars, own files, the private office, private projects); what belongs to an organisation goes to the
 organisation's webhooks (below). A person without an organisation gets all of them from their own area.
 
 **Webhooks of an organisation (2.115.0).** Admins of an organisation add up to 10 webhooks under **Settings >
@@ -1650,7 +1650,7 @@ only with office rights in the project's own area, everybody else `{office: fals
 office settings page *Rights*). Levels `none | own | view | edit | manage` (`own` = only the person's own entries, in the
 areas that offer it), specials `release` (finalise + send invoices), `pay` (payments, bank), `lock` (lock periods),
 `export` (tax adviser / tax auditor), `rights` (manage the office rights; never an agent). Organisation admins and the
-owner of a personal office always have everything; a member without a group keeps the access of before ("previous
+owner of a private office always have everything; a member without a group keeps the access of before ("previous
 access"); an agent without a group has none (an agent with the old switch `office_drafts` on keeps that one until it is
 put into a group). `GET /api/office/rights` -> `{areas: [{key, name, group, own}], levels, specials: [{key, name}], mine:
 {levels, specials, groups, manager, legacy}, personal}` for everybody with office access; a person who manages the rights

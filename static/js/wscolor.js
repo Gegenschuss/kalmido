@@ -107,6 +107,18 @@ const wac_rowVars = t => wac_openList() ? '' : wac_listVars(lp_listOf(t?.list_id
 function wac_viewSync() {
   lp_put($('#view'), 'wac-loc', $('#main')?.classList.contains('lp-acc') ? '' : wac_listVars(wac_openList()), WAC_VARS);
 }
+// 2.542.0 (#4604): the one exception of #4026 -- an agent's chat wears the agent's own colour (its account colour, Settings of the
+// agent > Colour) as its accent: the header, the messages and the input box get class wac-loc with the same four variables, so
+// Send, the box's frame on focus and the links there follow it; text on Send reaches 4.5:1 (wac_fit, light and dark). '' = not a colour
+const wac_agentMemo = new Map();
+function wac_agentVars(hex) {
+  if (!/^#[0-9a-f]{6}$/i.test(hex || '')) return '';
+  let v = wac_agentMemo.get(hex);
+  if (v === undefined) { const d = wac_fit(hex, false), l = wac_fit(hex, true); v = d && l ? WAC_VARS.map((n, i) => `${n}:${[d, WAC_INK[0], l, WAC_INK[1]][i]}`).join(';') : ''; wac_agentMemo.set(hex, v); }
+  return v;
+}
+// a colour chosen while the chat is open (account.js): the parts marked data-agacc follow at once
+const wac_agentPut = (el, hex) => lp_put(el, 'wac-loc', wac_agentVars(hex), WAC_VARS);
 // 2.490.0 B (#4026): no flicker on a start -- the last shown workspace's accent before the app draws (like the theme, icons.js)
 try { const v = String(LS.get('wsAccent', '') || '').split(','); if (v.length === 4 && v.every(x => /^#[0-9a-f]{6}$/i.test(x))) wac_put(v); } catch { /* no storage */ }
 async function wsp_set(ws, v) {

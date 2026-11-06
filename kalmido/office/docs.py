@@ -29,7 +29,7 @@ from .homecur import HC_CODES, hc_code, hc_home, hc_office_rate  # 2.189.0 (#247
 from .model import (NAME_MAX, PT_MAX, TEXT_MAX, UNITS, client_short_code, pb_cl_sql, pb_cl_live, office_gate, office_need_feature, office_org, onc_next, onc_ready, onc_version, office_role, office_settings,
                     office_seed_texts, office_trial_number, trial_flag)
 from .pdf import pdf_paper  # 2.357.0 A (#3156)
-from .ledger import (ofx_company, ofx_company_print, ofx_sender_line, ofx_diff, ofx_items_brief, ofx_locked, ofx_log, ofx_logo_path, ofx_need_editable,
+from .ledger import (ofx_release, ofx_company, ofx_company_print, ofx_sender_line, ofx_diff, ofx_items_brief, ofx_locked, ofx_log, ofx_logo_path, ofx_need_editable,
                      ofx_number_at_finalize, ofx_snapshot_pack, OFX_LOCKED)
 from .countries import fk_country_label  # 2.296.0 B (#3168)
 from .invoices import (INV_KINDS, INV_STATUSES, STATE_TXT, inv_apply_client, inv_manual_number, inv_money_fields, inv_new_row, inv_paid_map, inv_payments,
@@ -1836,7 +1836,8 @@ def odoc_delete(did):
     tbill_free(c, did)  # 2.144.6 A (#2053): the time entries of the deleted document are open again
     odoc_replace_undo(c, oid, r, uid)  # 2.437.0 B (#3621)
     odoc_unlink_refs(c, oid, [did])
-    c.execute("DELETE FROM office_docs WHERE id=? AND org_id=?", (did, oid))
+    with ofx_release(c):  # 2.542.0 (#4598): a finalised quotation never sent (bga_offer_block above) may go
+        c.execute("DELETE FROM office_docs WHERE id=? AND org_id=?", (did, oid))
     from .docref import ofd_deleted
     ofd_deleted(c, did)  # 2.199.0 B (#2742): its folder entry goes along
     bump(c)
@@ -1852,8 +1853,9 @@ def trial_drop_doc(c, oid, r):
     import glob
     from .books import bk_ws
     did = r["id"]
-    for col in ("source_doc_id", "cancels_id", "version_of"):
-        c.execute(f"UPDATE office_docs SET {col}=NULL WHERE org_id=? AND {col}=?", (oid, did))
+    with ofx_release(c):  # 2.542.0 (#4598, review): a reference to the trial document going away is emptied even on a
+        for col in ("source_doc_id", "cancels_id", "version_of"):  # finalised follow-up (normally trial too, #2576)
+            c.execute(f"UPDATE office_docs SET {col}=NULL WHERE org_id=? AND {col}=?", (oid, did))
     # receipts and trip costs billed on it are free again for the real billing (time entries follow the invoices themselves)
     c.execute("UPDATE rc_receipts SET billed_doc_id=NULL, billed_at=NULL WHERE ws=? AND billed_doc_id=?", (bk_ws(c, oid), did))
     c.execute("UPDATE office_trip_items SET billed_doc_id=NULL, billed_at=NULL WHERE org_id=? AND billed_doc_id=?", (oid, did))

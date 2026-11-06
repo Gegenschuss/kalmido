@@ -151,12 +151,13 @@ const ORG = 'Lindenhof Filmproduktion und Postproduktion GbR';
     const hidden = `document.querySelector('#app').classList.contains('side-rail') && !document.querySelector('#side').getClientRects().length || getComputedStyle(document.querySelector('#side')).visibility === 'hidden'`;
     check(await ready(ev, hidden, 20), 'Hide the panel hides it');
     check(await ev(`(() => { const r = document.querySelector('#srail').getBoundingClientRect(), m = document.querySelector('#main').getBoundingClientRect(); return Math.abs(m.left - r.right) <= 2 && !!document.querySelector('#kbar .kbsw').getClientRects().length; })()`), 'the page moves up to the bar, the head bar stays');
-    check(await ev(`!!document.querySelector('#srail .srpanel')?.getClientRects().length`), 'the button to show the panel on top of the bar');
+    // 2.542.0 (#4610): no button "Show the panel" on top of the bar any more (the icons stay where they are)
+    check(await ev(`!document.querySelector('#srail .srpanel') && document.querySelector('#srail .srbs > .srb')?.dataset.sbb === 'home'`), '#4610: no button to show the panel, the first icon (Start) stays on top');
     await shot('p21523a-hidden-light.png');
     await nav(B + 'static/icon.svg'); await nav(B + `#l/${L}`);
     check(await ready(ev, `!!document.querySelector('#kbar .kbsw')`, 60) && await ready(ev, hidden, 20), 'the hidden panel stays hidden after reloading (per device)');
-    await click(ev, '#srail .srpanel');
-    check(await ready(ev, `!document.querySelector('#app').classList.contains('side-rail') && !!document.querySelector('#side .sbbhide')?.getClientRects().length`, 20), 'the button brings the panel back');
+    await click(ev, '#srail .srb.on[data-sbb]');  // 2.542.0 (#4610): the open area's icon (was the button "Show the panel")
+    check(await ready(ev, `!document.querySelector('#app').classList.contains('side-rail') && !!document.querySelector('#side .sbbhide')?.getClientRects().length`, 20), 'the open area\'s icon brings the panel back');
 
     // dark
     await ev(`(() => { localStorage.setItem('tasks.theme', '"dark"'); localStorage.setItem('tasks.lookLocal', 'true'); return 1; })()`);

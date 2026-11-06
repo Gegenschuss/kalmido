@@ -232,7 +232,7 @@ const canAddTo = id => canEditList(id) || isPart(id);                     // new
 const canEdit = t => !!t && (canEditList(t.list_id) || (isPart(t.list_id) && !t.context));
 // 2.36.0 (#1118): the lock of a task (t.locked = 1, stored at the server, the same on every device and for everybody sharing
 // the list). Locked: title, notes, date / time, priority, list, tags, repeat, assignee; free: comments, checkboxes in the
-// notes, completing / reopening, subtasks, sort order, pin. Whoever may change the task may lock / unlock it. tlkHits =
+// notes, subtasks, sort order, pin (2.542.0, #4609: completing / reopening only after unlocking, tlkDone). Whoever may change the task may lock / unlock it. tlkHits =
 // would this change touch a locked field (checkbox ticks are no change of the notes); api() stops such a write with the
 // hint + "Unlock", the openers (date, priority, assign, move, title, notes) stop before anything opens (tlkStop).
 const TLK_FIELDS = ['title', 'content', 'due', 'due_time', 'start', 'priority', 'list_id', 'repeat', 'repeat_from', 'assignee_id', 'assignee_group_id', 'rotation', 'tags', 'add_tags', 'ltags'];
@@ -255,6 +255,9 @@ function tlkHits(t, b) {
 }
 function tlkToast(t) { toast(tr('This task is locked. Unlock it to change it.'), () => tlkSet(t.id, false), 6000, tr('Unlock')); }
 const tlkStop = t => { if (!tlkIs(t) || !canEdit(t)) return false; tlkToast(t); return true; };
+// 2.542.0 (#4609): a locked task is not completed / reopened on any way (tick, swipe, x, selection, subtask tick; the server refuses it too)
+function tlkDoneToast(t) { toast(tr('This task is locked. Unlock it to complete or reopen it.'), canEdit(t) ? () => tlkSet(t.id, false) : undefined, 6000, canEdit(t) ? tr('Unlock') : undefined); }
+const tlkDone = t => { if (!tlkIs(t)) return false; tlkDoneToast(t); return true; };
 async function tlkSet(id, on) {
   const t = taskById(id); if (!t || !(t.id > 0)) return;
   if (!canEdit(t)) { roToast(); return; }
@@ -1599,6 +1602,7 @@ function parseHash() {
   const h = decodeURIComponent(location.hash.slice(1));
   if (!h) return {mod: 'tasks', key: LS.get('lastKey', START_KEY)};
   const [a, b] = h.split('/');
+  if (a === 't' && b && S.route.mod === 'home') return {mod: 'home', key: 'home', task: +b};  // 2.542.0 (#4579): from Start the detail opens over Start
   if (a === 't' && b) return {mod: 'tasks', key: S.route.key || START_KEY, task: +b};
   if (a === 'home') return {mod: 'home', key: 'home'};  // 2.17.0 (#475): the dashboard (the logo)
   if (a === 'projects') return {mod: 'tasks', key: 'projects'};  // 2.417.0 A (#3559): the start page of Projects (render.js viewProjStart)

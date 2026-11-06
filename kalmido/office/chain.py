@@ -27,7 +27,7 @@ from decimal import Decimal
 
 from ..core.orgcrypt import oc_dec_fields
 from ..core.pg import write_lock
-from .model import num_kind, office_settings
+from .model import num_kind, office_settings, ofx_release  # 2.542.0 (#4598): freeing a copied place passes the trigger
 
 HCH_DOC_FIELDS = ("number", "kind", "date", "service_from", "service_to", "currency", "locked_at")
 HCH_JSON_FIELDS = {"recipient_snapshot": "recipient", "sender": "sender", "totals": "totals"}
@@ -143,9 +143,10 @@ def hch_migrate(c):
     place); an office whose data cannot be read now (decryption) is left for the next start / its next finalising."""
     # review job/2606: a place copied by an older version (rollback: duplicate / recurring invoice took the chain columns along)
     # is no place - a draft, or the later of two rows on one place, gets chained anew when it is finalised / at this start
-    c.execute("UPDATE office_docs SET chain_key='', chain_seq=NULL, chain_prev='', chain_hash='' WHERE chain_seq IS NOT NULL AND "
-              "(locked_at IS NULL OR EXISTS (SELECT 1 FROM office_docs o WHERE o.org_id=office_docs.org_id AND o.chain_key=office_docs.chain_key "
-              "AND o.chain_seq=office_docs.chain_seq AND o.chain_hash=office_docs.chain_hash AND o.id<office_docs.id))")
+    with ofx_release(c):
+        c.execute("UPDATE office_docs SET chain_key='', chain_seq=NULL, chain_prev='', chain_hash='' WHERE chain_seq IS NOT NULL AND "
+                  "(locked_at IS NULL OR EXISTS (SELECT 1 FROM office_docs o WHERE o.org_id=office_docs.org_id AND o.chain_key=office_docs.chain_key "
+                  "AND o.chain_seq=office_docs.chain_seq AND o.chain_hash=office_docs.chain_hash AND o.id<office_docs.id))")
     for (oid,) in c.execute("SELECT DISTINCT org_id FROM office_docs WHERE locked_at IS NOT NULL AND chain_seq IS NULL AND kind<>'offer' "
                             "AND COALESCE(trial, 0)=0").fetchall():
         try:

@@ -57,7 +57,7 @@ const FEAT = 'cal,comments,collab,office,wiki,files';
   w.eval(`window.__ud = ua8_delete({id: ${FIO}, display_name: 'Fiona Example'})`);
   const ud = await until(() => [...d.querySelectorAll('.modal.cdlg')].find(m => /Fiona Example/.test(m.textContent)));
   const ut = (ud?.textContent || '').replace(/\s+/g, ' ');
-  check(/The personal office goes with its files: 1 document\./.test(ut) && /basket, habits/.test(ut), 'the account dialog names the personal office ' + ut.slice(0, 300));
+  check(/The private office goes with its files: 1 document\./.test(ut) && /basket, habits/.test(ut), 'the account dialog names the personal office ' + ut.slice(0, 300));
   click(w, ud.querySelector('[data-cd="no"]'));
   check(await w.eval('window.__ud') === false && (await call('GET', '/api/users')).status !== 500, 'cancelled: nothing deleted');
   check(((await call('GET', `/api/users/${FIO}/delete-info`)).purge || {}).office === 'delete', 'fiona is still there');

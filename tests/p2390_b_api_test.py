@@ -245,6 +245,30 @@ check(A.post(B + f"/api/proposals/{J}/redo").status_code == 409, "redo twice: 40
 r = A.post(B + f"/api/proposals/{J}/undo")
 check(r.ok and task(A, T["dup2"])["status"] == 0, "undo again after redo")
 
+# ================================================================== 2.542.0 (#4609, review): a locked task is never closed by a proposal
+LKL = A.post(B + "/api/lists", json={"name": "Locked ones"}).json()["id"]
+A.put(B + f"/api/lists/{LKL}/members", json={"user_id": AG, "role": "edit"})
+LK, LK2, FP = new_task(A, LKL, "Locked stale"), new_task(A, LKL, "Locked duplicate"), new_task(A, LKL, "Free stale")
+LKC = new_task(A, LKL, "locked subtask", parent_id=FP)
+for x in (LK, LK2, LKC):
+    check(A.patch(B + f"/api/tasks/{x}", json={"locked": True}).ok, "setup: locked")
+r = ask(A, list_id=LKL)
+check(r.status_code == 201, f"locked ones: request {r.status_code} {r.text[:200]}")
+J = r.json()["job"]["id"]
+check(submit({"kind": "cleanup", "summary": "x", "items": [
+    {"op": "close", "task_id": LK, "reason": "stale"}, {"op": "merge", "task_ids": [FP, LK2], "title": "Free stale", "reason": "same"},
+]}).status_code == 201, "locked ones: proposal")
+r = A.post(B + f"/api/proposals/{J}/apply", json={"select": ["0", "1"]})
+why = {x["task_id"]: x["why"] for x in r.json().get("skipped", [])}
+check(r.ok and why == {LK: "locked", LK2: "locked"} and task(A, LK)["status"] == 0 and task(A, LK2)["status"] == 0,
+      f"close / merge away of a locked task: skipped as locked, stays open {r.text[:300]}")
+r = ask(A, list_id=LKL)
+J = r.json()["job"]["id"]
+check(submit({"kind": "cleanup", "summary": "x", "items": [{"op": "close", "task_id": FP, "reason": "stale"}]}).status_code == 201, "free one: proposal")
+r = A.post(B + f"/api/proposals/{J}/apply", json={"select": ["0"]})
+check(r.ok and task(A, FP)["status"] == -1 and task(A, LKC)["status"] == 0, f"closing a free task leaves its locked subtask open {r.text[:200]}")
+check(A.post(B + f"/api/proposals/{J}/undo").ok and task(A, FP)["status"] == 0 and task(A, LKC)["status"] == 0, "undo: reopened, the locked one untouched")
+
 # ================================================================== packages: 50 per job, at most 5
 BIG = A.post(B + "/api/lists", json={"name": "Backlog"}).json()["id"]
 A.put(B + f"/api/lists/{BIG}/members", json={"user_id": AG, "role": "edit"})

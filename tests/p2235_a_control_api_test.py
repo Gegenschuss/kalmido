@@ -119,6 +119,12 @@ def run(who, S, UID, AID, H, L):
     check(r.status_code == 201, f"{who}: routine: comment {r.status_code}")
     CM = r.json()["id"]
     T2 = api("POST", "/tasks", json={"title": "Tick me", "list_id": L}).json()["id"]
+    # 2.542.0 (#4609): a task an agent creates starts locked; unlocking is routine, then it ticks off
+    r = api("POST", f"/tasks/{T2}/complete")
+    check(r.status_code == 409 and "locked" in r.text, f"{who}: routine: ticking off its locked task -> 409 {r.status_code}")
+    r = api("PATCH", f"/tasks/{T2}", json={"locked": True})
+    check(r.status_code == 409 and r.json()["error"]["step"] == "change", f"{who}: routine: setting a lock stays a change {r.status_code}")
+    check(api("PATCH", f"/tasks/{T2}", json={"locked": False}).ok, f"{who}: routine: unlocking passes")
     check(api("POST", f"/tasks/{T2}/complete").ok, f"{who}: routine: tick off")
     r = api("DELETE", f"/tasks/{T2}")
     check(r.status_code == 409 and r.json()["error"]["step"] == "one_way", f"{who}: routine: delete -> 409 one_way {r.status_code}")

@@ -34,7 +34,7 @@ from ..accounts.login import login_log_ip, login_log_name, RC_ALPHABET
 from ..core.access import acx_lists_sql, collab_all, Denied, ov_role, plists, pvis, task_visible, tvis, WRITE_ROLES
 from ..core.pages import valid_url
 from ..tasks.validation import (
-    check_parent, CONTENT_MAX, REM_COUNT, REM_MAX, REM_MIN, rmd_split, rr_feasible, rr_norm, rr_problem, TITLE_MAX, valid_date,
+    check_parent, CONTENT_MAX, lock_done_problem, REM_COUNT, REM_MAX, REM_MIN, rmd_split, rr_feasible, rr_norm, rr_problem, TITLE_MAX, valid_date,
 )
 from ..tasks.tasks import my_tags, task_create, task_update
 from ..tasks.lifecycle import task_complete, task_delete, task_reopen, task_restore
@@ -1143,7 +1143,19 @@ def dav_patch(c, u, cur, v, caps, lid):
     return p
 
 
+def dav_lock_guard(tid, cur_status, want, done_occurrence=False):
+    """2.542.0 (#4609): a locked task is not completed / reopened by a calendar app: 403 (it reloads the stored state)."""
+    if done_occurrence and cur_status == 0:
+        want = 2
+    if want == cur_status:
+        return
+    e = lock_done_problem(db().execute("SELECT locked FROM tasks WHERE id=?", (tid,)).fetchone())
+    if e:
+        raise DavError(403, e, "<D:need-privileges/>")
+
+
 def dav_status(tid, cur_status, want, done_occurrence=False):
+    dav_lock_guard(tid, cur_status, want, done_occurrence)
     if done_occurrence and cur_status == 0:
         want = 2
     if want == cur_status:
@@ -1176,6 +1188,7 @@ def dav_put(c, u, pw_row, lst, name):
         cur = have[0]
         if cur["id"] in pvis(c, u["id"], lid)[2] or lst["role"] == "view":
             raise DavError(403, "Read only", "<D:need-privileges/>")
+        dav_lock_guard(cur["id"], cur["status"], v["status"], v["done_occurrence"])  # 2.542.0 (#4609): before any field changes
         p = dav_patch(c, u, cur, v, caps, lid)
         if p:
             v1_call(task_update, cur["id"], body=p)

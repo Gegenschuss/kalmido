@@ -91,7 +91,7 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   // ================= the kind of agent
   check(w.eval(`chatKindLbl({org_id: ${ORG}, owner_id: S.me.id})`) === 'Your personal agent · Alpha', '#3493: my personal agent');
   check(w.eval(`chatKindLbl({org_id: ${ORG}, owner_id: ${BOB}})`) === 'Personal agent of Bob · Alpha', '#3493: the personal agent of someone else, with the name ' + w.eval(`chatKindLbl({org_id: ${ORG}, owner_id: ${BOB}})`));
-  check(w.eval(`chatKindLbl({org_id: null, owner_id: S.me.id})`) === 'Private agent' && w.eval(`chatKindLbl({org_id: null, owner_id: null})`) === 'Private agent', '#3493: an agent in the private area');
+  check(w.eval(`chatKindLbl({org_id: null, owner_id: S.me.id})`) === 'Private' && w.eval(`chatKindLbl({org_id: null, owner_id: null})`) === 'Private', '#3493: an agent in the private area');
   check(w.eval(`chatKindLbl({org_id: ${ORG}, owner_id: null})`) === 'Team agent · Alpha', '#3493: a team agent');
   w.eval(`(() => { const o = S.me.workspaces; S.me.workspaces = []; window._k = chatHeadInfo(document.body).some(x => x.cls === 'chmi-kind'); S.me.workspaces = o; })()`);
   check(w.eval('window._k'), '#3493: the kind stands there also without the workspace switcher (not tied to wsOn)');

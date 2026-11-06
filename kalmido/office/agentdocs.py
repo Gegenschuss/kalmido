@@ -168,7 +168,7 @@ def _v1ctx(c, rb=None, write=False, target="office", area=None):
     if not a or not oid and not a["office_drafts"]:
         raise Denied(403, tr(OFA_OFF))
     if not oid:
-        raise Denied(403, tr("This agent has no office area (its workspace or its owner's personal office)"))
+        raise Denied(403, tr("This agent has no office area (its workspace or its owner's private office)"))
     if not ofa_agent_on(c, a, oid, area, level):
         raise Denied(403, tr(OFA_NO_AREA if ofr_groups_of(c, oid, aid) or a["office_drafts"] else OFA_OFF))
     if rb not in (None, "", 0, "0"):

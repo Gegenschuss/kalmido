@@ -80,6 +80,8 @@ const ds = n => { const d = new Date(); d.setDate(d.getDate() + n); return  /* 2
 
   // ================= detail: fields section, values, chips
   w.eval(`openDetail(${t2})`); await idle(w);
+  // job/2919: under load the panel's fields come after idle (Mac check of 2.542: no section, then a crash) - wait for them
+  await until(() => d.querySelector('.cfsec')?.querySelectorAll('[data-cf]').length === 6, 8000);
   const sec = d.querySelector('.cfsec');
   check(sec && sec.querySelectorAll('[data-cf]').length === 6, 'detail: Fields section with 6 editors');
   change(w, sec.querySelector(`[data-cf="${FS.id}"]`), OPT.Doing);

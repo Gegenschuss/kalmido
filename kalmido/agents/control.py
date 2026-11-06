@@ -103,8 +103,10 @@ def ctl_class(method, path, b=None):
     b = b if isinstance(b, dict) else {}
     for ms, rx, cls in CTL_ROUTES:
         if method in ms and re.search(rx, path):
-            if cls == "plan":
-                return "routine" if b and set(b) <= CTL_PLAN_KEYS | CTL_PLAN_EXTRA else "change"
+            if cls == "plan":  # 2.542.0 (#4609): taking the lock off (locked false) is routine too - completing a locked task
+                # needs it first, and the tasks an agent creates start locked (#1118); setting a lock stays a change
+                unlock = {"locked"} if b.get("locked") is False or b.get("locked") == 0 else set()
+                return "routine" if b and set(b) <= CTL_PLAN_KEYS | CTL_PLAN_EXTRA | unlock else "change"
             if cls == "batch":
                 act, ch = b.get("action"), b.get("changes")
                 if act == "delete":

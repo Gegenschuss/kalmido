@@ -34,6 +34,7 @@ document.addEventListener('click', async e => {
   try { await api('PATCH', aid ? `/api/agents/${aid}/color` : '/api/me', {color: c}); } catch { return; }  // the error is shown
   (S.colors ||= {})[aid || S.me.id] = c;
   if (aid) for (const el of document.querySelectorAll(`[data-agid="${aid}"]`)) el.style.setProperty('--agcol', c);  // 2.438.0 A (#3322): bubbles take the new colour at once
+  if (aid) for (const el of document.querySelectorAll(`[data-agacc="${aid}"]`)) { el.style.setProperty('--agcol', c); if (typeof wac_agentPut === 'function') wac_agentPut(el, c); }  // 2.542.0 (#4604): the chat's accent too
   if (aid && prev && prev !== c && typeof histAdd === 'function') {  // 2.83.0 (#1775): one undo step for an agent's colour
     const put = v => async () => { await api('PATCH', `/api/agents/${aid}/color`, {color: v}); S.colors[aid] = v; render(); return {}; };
     offerUndo(tr('Saved'), histAdd({label: tr('Colour changed'), undo: put(prev), redo: put(c)}));
@@ -241,7 +242,7 @@ async function wsPaneDraw(md) {
   if ((j.retired || []).length) (dbox || box).insertAdjacentHTML('beforeend', j.retired.map(o => `<details class="sdet wsret"><summary><b>${esc(o.name)}</b> <span class="muted">${odlRetiredLabel(o)}</span></summary>
     <div class="shint">${esc(tr('You were an admin of this organisation before it was retired: you can still export it until it is deleted for good.'))}</div>
     ${oxBoxHtml(o)}${typeof rxBoxHtml === 'function' ? rxBoxHtml('org', o.id) : ''}</details>`).join(''));
-  if (!S.me?.kid) (dbox || box).insertAdjacentHTML('beforeend', `<div class="ocorg">${ocBoxHtml({id: 0}, {title: `${tr('Your personal office')}: ${tr('Encryption')}`})}</div>`);  // 2.138.0 C (#1972): its recovery key (hidden without encrypted data)
+  if (!S.me?.kid) (dbox || box).insertAdjacentHTML('beforeend', `<div class="ocorg">${ocBoxHtml({id: 0}, {title: `${tr('Your private office')}: ${tr('Encryption')}`})}</div>`);  // 2.138.0 C (#1972): its recovery key (hidden without encrypted data)
   oxDraw(box);  // 2.42.0 (#833): the export sections of the organisations I administer
   if (dbox) { oxDraw(dbox); ocDraw(dbox); }  // 2.364.0 C (#3041)
   whoDraw(box);  // 2.115.0 A (#2061): their webhooks; lazy-ok: settings dialog only (LD_NEED settings -> integrations)

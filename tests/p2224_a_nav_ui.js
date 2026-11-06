@@ -25,7 +25,7 @@ async function desktop(user, tag) {
   await until(() => d.querySelector('.calbar .seg [data-k="week"]'));
   check(app().classList.contains('sb-b') && app().classList.contains('sbb-nopan') && d.querySelector('#srail [data-sbb="cal"].on'), `${tag}: the calendar: the bar, no panel`);
   check(!d.querySelector('#side [data-sbbcal], #side [data-act="cal-mode"]') && w.eval(`sbb_panelHtml('cal')`) === '', `${tag}: no view rows in the panel`);
-  check(!d.querySelector('#srail .srpanel'), `${tag}: no button to show a panel`);
+  check(!d.querySelector('#srail .srpanel'), `${tag}: no button to show a panel`);  // 2.542.0 (#4610): there is none in any area now
   click(w, d.querySelector('.calbar .seg [data-k="week"]'));
   check(await until(() => w.eval('S.calMode') === 'week' && d.querySelector('.calbar .seg button.on[data-k="week"]')), `${tag}: a view tab on top switches the view`);
   click(w, d.querySelector('.calbar .seg [data-k="month"]'));
@@ -51,6 +51,9 @@ async function desktop(user, tag) {
   w.eval(`LS.set('sideFold', true); fitLayout(); go('time')`); await until(() => w.eval('S.route.mod') === 'time');
   await sleep(200);
   check(!app().classList.contains('side-rail') && !d.querySelector('#srail .srpanel'), `${tag}: folded elsewhere: Time has no rail and no show button`);
+  // 2.542.0 (#4610): the change of the area opened the panel again (sideFold false); folded here in Time, the lit icon leaves it
+  check(w.eval(`LS.get('sideFold', false)`) === false, `${tag}: #4610: the change of the area unfolds the panel`);
+  w.eval(`LS.set('sideFold', true); fitLayout(); render()`); await sleep(100);
   click(w, d.querySelector('#srail [data-sbb="time"].on')); await sleep(200);
   check(w.eval(`LS.get('sideFold', false)`) === true, `${tag}: the lit icon leaves the fold as it is`);
   w.eval(`LS.set('sideFold', false); fitLayout(); render()`);

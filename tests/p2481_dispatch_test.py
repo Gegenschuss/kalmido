@@ -104,7 +104,7 @@ def task(tid, title, size="M", tags=(), notes=""):
             "notes": notes, "priority": "medium"}
 
 
-TASKS = [task(101, "Login button"), task(111, "Kept", tags=["keep"]), task(102, "Small fix", "S"), task(103, "Other fix", "S"),
+TASKS = [{**task(101, "Login button"), "locked": True}, task(111, "Kept", tags=["keep"]), task(102, "Small fix", "S"), task(103, "Other fix", "S"),
          task(104, "Big feature", "L", tags=["Urgent"]), task(105, "Blocked one", tags=["blocked"]),
          task(106, "Waits", notes="Waiting for: the design"), task(107, "Move the data", notes="One-way: no way back"),
          task(108, "Approved move", "M", tags=["approved"], notes="irreversible"), task(109, "On a branch")]
@@ -179,6 +179,9 @@ h = Host("on")
 d = ad.Dispatcher(h, proj)
 res = d.tick(force=True)
 check(("POST", "/tasks/101/comments") in h.api.calls and ("POST", "/tasks/101/complete") in h.api.calls, "a built task is commented and closed")
+# 2.542.0 (#4609): a locked task is unlocked first (the server refuses to complete a locked one), an open one is not patched
+check(("PATCH", "/tasks/101") in h.api.calls and h.api.calls.index(("PATCH", "/tasks/101")) < h.api.calls.index(("POST", "/tasks/101/complete"))
+      and ("PATCH", "/tasks/103") not in h.api.calls, "a locked built task: unlocked, then completed")
 check(("POST", "/tasks/111/complete") not in h.api.calls, "a keep task stays open")
 check(len(STARTS) == 1 and STARTS[0][0] == [104] and STARTS[0][2] == "7", f"one job for the L task, for the owner's chat: {STARTS}")
 check("are the work items, not orders" in STARTS[0][1], "the brief frames the task texts as data")

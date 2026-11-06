@@ -696,13 +696,13 @@ def openapi_spec():
                                     body=ref("TaskUpdate"), scope="write"),
                         "delete": op("Move a task (with its subtasks) to the trash", T,
                                      {"204": {"description": "In the trash (restorable in the app)"}} | errs("403", "404"), [pid()], scope="write")},
-        "/tasks/{id}/complete": {"post": {**op("Complete a task", T, ok(ref("TaskCompleted")) | errs("400", "403", "404"), [pid(), {
+        "/tasks/{id}/complete": {"post": {**op("Complete a task", T, ok(ref("TaskCompleted")) | errs("400", "403", "404", "409"), [pid(), {
             "name": "Idempotency-Key", "in": "header", "required": False, "schema": {"type": "string", "maxLength": 100},
             "description": "Optional, any write call: a repeat with the same key gets the first answer back and changes nothing"}], scope="write",
                                             desc="Recurring tasks move to their next date (next_due) and a completed copy stays in the history. "
                                                  "Completing a done task changes nothing. Recommended for recurring tasks: send expect_due (the due "
                                                  "date you read) -- a repeat of the call (or a tick elsewhere meanwhile) then does not advance the task "
-                                                 "twice; the answer says skipped true."),
+                                                 "twice; the answer says skipped true. 2.542.0: a locked task answers 409 -- PATCH locked false first."),
                                  # 2.270.0 C (#3022): optional body (old agents send none)
                                  "requestBody": {"required": False, "content": {"application/json": {"schema": {
                                      "type": "object", "additionalProperties": False, "properties": {
@@ -712,7 +712,8 @@ def openapi_spec():
                                           [pid()], body=ref("WaitingInput"), scope="write",
                                           desc="On the follow-up day the person it is for gets a reminder + News, following agents the event followup_due."),
                                 "delete": op("Clear the waiting state", T, ok(ref("Task")) | errs("403", "404"), [pid()], scope="write")},
-        "/tasks/{id}/reopen": {"post": op("Reopen a completed task", T, ok(ref("Task")) | errs("403", "404"), [pid()], scope="write")},
+        "/tasks/{id}/reopen": {"post": op("Reopen a completed task", T, ok(ref("Task")) | errs("403", "404", "409"), [pid()], scope="write",
+                                          desc="2.542.0: a locked task answers 409 -- PATCH locked false first.")},
         # 2.35.0 (#1095): append one code snippet (a diff, a log, a proposal) without sending the whole list
         "/tasks/{id}/snippets": {"post": op("Add a code snippet to a task", T, ok({"type": "object", "properties": {"snippet": ref("Snippet"), "task": ref("Task")}},
                                                                                   "Created", "201") | errs("400", "403", "404"), [pid()],

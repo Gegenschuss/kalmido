@@ -231,8 +231,9 @@ def bk_task_end(c, aid, tid):
     if not t or t["status"] != 0 or t["deleted_at"]:
         return
     ts = iso(now_utc())
-    c.execute("UPDATE tasks SET repeat='', status=2, completed_at=?, updated_at=? WHERE id=? AND status=0", (ts, ts, tid))
-    log_act(c, tid, "complete")
+    if c.execute("UPDATE tasks SET repeat='', status=2, completed_at=?, updated_at=? WHERE id=? AND status=0 AND locked=0",
+                 (ts, ts, tid)).rowcount:  # 2.542.0 (#4609): a locked deadline task stays open
+        log_act(c, tid, "complete")
 
 
 def bk_task_fields(c, uid, r, dl):

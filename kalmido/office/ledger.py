@@ -35,6 +35,7 @@ from ..core.pg import write_lock
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields, oc_json_store, oc_log_detail
 from ..core.access import Denied
 from ..core.errors import BadInput, DeniedKey
+from .model import ofx_release  # noqa: F401  2.542.0 (#4598): moved to model, chain needs it at module level
 from .model import ofx_name1, ofx_name_clean, ofx_name_lines, office_gate, office_org, office_role, office_settings, pb_cl_sql
 from .packs import office_pack_for
 from .doclang import doc_lg, doc_pack
@@ -510,8 +511,9 @@ def ofx_unlock_post(did):
         if why:
             raise Denied(409, tr(why))
         # 2.296.0 F (#3177): the frozen files and their checksums go too (only a quotation in draft gets here, never an invoice)
-        c.execute("UPDATE office_docs SET locked_at=NULL, locked_by=NULL, sender=NULL, recipient_snapshot=NULL, tax_snapshot=NULL, "
-                  "pdf_sha256='', xml_sha256='', updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), did, oid))
+        with ofx_release(c):  # 2.542.0 (#4598): the one way a finalised row goes back (a quotation, checked above)
+            c.execute("UPDATE office_docs SET locked_at=NULL, locked_by=NULL, sender=NULL, recipient_snapshot=NULL, tax_snapshot=NULL, "
+                      "pdf_sha256='', xml_sha256='', updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), did, oid))
         ofx_log(c, oid, "unlock", doc_id=did, detail={"number": r["number"]})
         bump(c)
         c.commit()

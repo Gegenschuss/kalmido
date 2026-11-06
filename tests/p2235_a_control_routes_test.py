@@ -167,6 +167,10 @@ check(ctl_class("PATCH", "/tasks/{}", {"due": "2026-11-01", "start": None, "due_
       "plan + the conflict helper = routine")
 check(ctl_class("PATCH", "/tasks/{}", {"due": "2026-11-01", "title": "x"}) == "change", "a title with the date = change")
 check(ctl_class("PATCH", "/tasks/{}", {"priority": "high"}) == "change", "other fields = change")
+# 2.542.0 (#4609): taking the lock off is routine (ticking off a locked task needs it first), setting one stays a change
+check(ctl_class("PATCH", "/tasks/{}", {"locked": False}) == "routine", "unlocking = routine")
+check(ctl_class("PATCH", "/tasks/{}", {"locked": True}) == "change", "locking = change")
+check(ctl_class("PATCH", "/tasks/{}", {"locked": False, "title": "x"}) == "change", "unlocking with a title = change")
 check(ctl_class("POST", "/tasks/batch", {"action": "delete", "ids": [1]}) == "one_way", "a batch that deletes = one_way")
 check(ctl_class("POST", "/tasks/batch", {"action": "complete", "ids": [1]}) == "routine", "a batch that ticks off = routine")
 check(ctl_class("POST", "/tasks/batch", {"action": "update", "changes": {"due": "2026-11-01"}, "ids": [1]}) == "routine", "a batch plan = routine")

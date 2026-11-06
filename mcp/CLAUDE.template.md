@@ -111,10 +111,14 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
   tested it, the steps as a checklist with the commands in code blocks, how to switch it on and how to check that it
   works. Follow-ups go as a comment into the same task while it is open.
 - **Locked tasks (2.36.0).** Tasks you create start **locked**: in the app their title, description, date, priority,
-  project, tags, repeat and assignee are read-only until a person unlocks them (comments, checkboxes in the description,
-  completing and subtasks stay free). The lock binds only the app: you can still change a locked task through the API
-  (`update_task`; the field `locked` shows the state). Create a task with `locked: false` only when the person should
+  project, tags, repeat and assignee are read-only until a person unlocks them (comments, checkboxes in the description
+  and subtasks stay free). The lock binds only the app for those fields: you can still change a locked task through the
+  API (`update_task`; the field `locked` shows the state). Create a task with `locked: false` only when the person should
   edit it freely, and do not lift a lock a person set unless they ask you to.
+- **A locked task is never completed or reopened (2.542.0)** - not in the app, not by you, not by a calendar app or a
+  webhook: `complete_task` / `reopen_task` answer 409 "This task is locked". To complete one of your own tasks, unlock
+  it first (`update_task` with `locked: false`; you may whenever you may change the task, the history shows it), then
+  complete it.
 - **Do not overwrite people (2.270.0).** People edit the same tasks while you work. With `update_task` always send
   `expect_updated_at` = the task's `updated_at` from your last `get_task`; a `409` means someone changed it since: read
   it again (the answer's `current`), decide anew, never just resend. 2.564.0: a version is required for content

@@ -88,7 +88,7 @@ OFM_WHAT += ("office",)
 OFM_ADMIN += ("office",)
 OFM_OFFICE = (("clients", "clients"), ("drafts", "office_docs"), ("contracts", "office_contracts"), ("travel", "office_trips"),
               ("meals", "office_meals"), ("templates", "office_doc_templates"))
-OFM_OFFICE_TO = N_("The own part of an office moves into your personal office only")
+OFM_OFFICE_TO = N_("The own part of an office moves into your private office only")
 # 2.356.0 A (#2926): further areas, one row = one object with its own rows (kids: (table, column, parent table)). A row that
 # something outside it still points at stays in the old office archived and is created anew in the target (tables with
 # "archived"), or stays there (the others: keep "used"); the columns in clear point into the old office and end (noted, the
@@ -694,7 +694,7 @@ def ofm_notes(c, what, p, copy):
         notes.append(tr("Only what you created in this office moves; the drafts of the others, the cash book, the books, the bank and the suppliers stay"))
         # 2.356.1 (#3346): decided -- bank accounts with their transactions (booked data, GoBD) and the suppliers (DATEV creditor
         # accounts of the import) never move one by one, only with a whole personal office (pbtransfer.py, "Transfer into an organisation")
-        notes.append(tr("Bank accounts and suppliers move only with a whole office: a personal office goes along completely with “Transfer into an organisation”"))
+        notes.append(tr("Bank accounts and suppliers move only with a whole office: a private office goes along completely with “Transfer into an organisation”"))
     if p["clients"]:
         cl = p["clients"]
         moved = sum(1 for x in cl if x["mode"] == "move")
@@ -703,7 +703,7 @@ def ofm_notes(c, what, p, copy):
         for x in [x for x in cl if x["mode"] == "copy"][:8]:
             n = len(x["issued"]) + len(x["arch"])
             if p.get("keep_src"):  # 2.356.0 A (#2926): the organisation goes on using it
-                notes.append(tr("“{0}” is still used in the organisation: it stays there and is created anew in your personal office", x["row"]["name"]))
+                notes.append(tr("“{0}” is still used in the organisation: it stays there and is created anew in your private office", x["row"]["name"]))
                 continue
             notes.append(trn("“{1}” stays archived in the old workspace for {0} issued document and is created anew in the target",
                              "“{1}” stays archived in the old workspace for {0} issued documents and is created anew in the target", n, x["row"]["name"])

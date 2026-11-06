@@ -594,6 +594,8 @@ def git_close(c, r, tid, kind, ref, title, url, lids=None, vers=()):
     from ..tasks.review import rvw_gate
     if rvw_gate(c, tid):  # 2.60.0 C (#1512): waits for its review approval; a later poll completes it once approved
         return False
+    if t["locked"]:  # 2.542.0 (#4609): a locked task is not completed by a commit / pull request either
+        return False
     undo = {}
     with app.app_context():
         g.user = {"id": None}

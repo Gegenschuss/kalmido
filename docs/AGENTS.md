@@ -1013,8 +1013,8 @@ carry only the number `snippets_n` -- read the task itself for the code:
 
 A task can be **locked** in the app: its title, description, date and time, priority, project, tags, repeat and assignee
 are read-only there until someone who may change the task unlocks it (the lock button in the task header; the hint on
-an edit attempt offers *Unlock*). Comments, checkboxes in the description, completing / reopening and subtasks stay
-free. Every task in events and in the API has `"locked": true | false`.
+an edit attempt offers *Unlock*). Comments, checkboxes in the description and subtasks stay free. Every task in events
+and in the API has `"locked": true | false`.
 
 - Tasks created with an **agent token** (`POST /api/v1/tasks`, `POST /api/v1/tasks/{id}/subtasks`, MCP `create_task` /
   `add_subtask`) start **locked**; send `"locked": false` to create an open one. Tasks people create stay open.
@@ -1022,6 +1022,14 @@ free. Every task in events and in the API has `"locked": true | false`.
   MCP `update_task`) and can set or clear it with `{"locked": true | false}`. Do not lift a lock a person set unless
   they ask you to.
 - Locking and unlocking show in the task's history; existing tasks were not locked by the update.
+- *Since 2.542.0:* a locked task is **never completed or reopened**, on no way: the app, the agent API / MCP
+  (`POST /api/v1/tasks/{id}/complete` and `/reopen`, `complete_task`, `reopen_task` answer **409** "This task is locked.
+  Unlock it first (locked: false), then complete or reopen it."), CalDAV (a `STATUS:COMPLETED` of a locked task is
+  refused with 403, the calendar app reloads the stored state; its other fields stay free there), commit / pull request
+  keywords, deployments that close tasks and public links (the task stays as it is). A multi-select
+  (`POST /api/tasks/batch` complete / reopen / undo) skips locked tasks and lists them in `skipped`. Completing a parent
+  leaves a locked subtask open. To complete it, unlock it first (`PATCH /api/v1/tasks/{id}` / MCP `update_task` with
+  `{"locked": false}`): an agent may do that whenever it may change the task, the history shows who unlocked it.
 
 ### Reminders at a fixed time
 
@@ -2304,12 +2312,12 @@ only**: a person reserves the number, finalises, sends, deletes and books. Three
 
 - the scope `office` of the agent's token (Settings > Agents > Permissions: *Office drafts*);
 - the agent's switch **May draft office documents** (in its settings dialog; set by an admin of its office area, in a
-  personal office by the person);
+  private office by the person);
 - the area's privacy switch **Agents may read office data** (Settings > Company & office > Access): client and price data go to the
   agent's AI model.
 
 The agent works in the office area of its workspace (`agents.org_id`); a personal agent without one works in its owner's
-personal office (a freelancer without an organisation has the same functions). It acts for one person, `requested_by`
+private office (a freelancer without an organisation has the same functions). It acts for one person, `requested_by`
 (default: its owner; a team agent must name one), who must work in that office and share a project with the agent. Another
 area's clients, documents or projects answer `404`. 2.223.2: a person other than the owner only after they asked the agent
 for something lately (a chat message, an @mention, an assignment, a job, *Let an agent draft the answer*; the events of the
@@ -2320,7 +2328,7 @@ through groups (Settings > Company & office > Rights in the office: levels none 
 has no office access; an agent that had the switch *May draft office documents* on before keeps that previous access
 until someone puts it into a group, then only its groups count (the switch no longer matters). 2.223.2: in an organisation
 that previous access is the quotes' scope (services, text blocks, framework contracts, clients, documents); payment
-suggestions, leads and letters need a group. An agent of a personal office keeps its switch as before. A person without a
+suggestions, leads and letters need a group. An agent of a private office keeps its switch as before. A person without a
 group ("previous access") keeps the checks of before: payment suggestions only for an admin of the office. What each endpoint needs:
 services, text blocks, framework contracts -- the area of the same name; clients and documents -- *Quotes & invoices*
 (view to read, edit for drafts, invoices from quotations and reminders); payment suggestions -- *Bank*; leads --
@@ -2528,7 +2536,7 @@ owner, a team agent's person given as `user_id` (someone who may chat with it, i
   the preview of the spreadsheet import, judged against the office when the card is OPENED: every row new, already there
   (same name, amount and repeat as an existing cost or an earlier row; not ticked) or with an error (greyed out with the
   reason; never taken over). The person ticks rows, may change the VAT per row (net and gross shown) and takes them over
-  into the office they work in (their organisation or, without one, their personal office), shown on the card. An agent of
+  into the office they work in (their organisation or, without one, their private office), shown on the card. An agent of
   an organisation imports only into that organisation (another workspace: the card asks to switch, nothing is written).
   Only an admin of that office can take it over (403 otherwise, nothing written); only the person the card is for can open
   or decide it. Every row is checked again, all ticked rows are written in one step (at most 500 fixed costs per office),
@@ -2994,7 +3002,7 @@ capability `data_lock_info`).
 404). It applies to agents only; people keep their roles and the approvals of takeover and release. **The server enforces
 it**: every write of the agent's token under `/api/v1/` has a class - `meta` (its own channel `/agent/...`: status,
 typing, chat and approval cards, jobs, proposals; always allowed), `routine` (create tasks and subtasks, plan them = only
-`due` / `due_time` / `start`, comment, tick off / reopen / skip, reactions, team chat messages, watching a task and ending it), `one_way` (every `DELETE` except those listed here, and the delete actions:
+`due` / `due_time` / `start`, comment, take a task's lock off (`locked: false`, needed before ticking off a locked task; setting a lock stays `change`), tick off / reopen / skip, reactions, team chat messages, watching a task and ending it), `one_way` (every `DELETE` except those listed here, and the delete actions:
 emptying the trash, deleting folders, undoing an import, a batch with `action: delete`) or `change` (everything else; also the `DELETE` that only stops a timer or ends waiting, `DELETE /time/timer` and `DELETE /tasks/{id}/waiting`). Marking a task as being worked on (`/tasks/{id}/working`) belongs to `meta`.
 
 | Level | Allowed without a card |
@@ -3224,16 +3232,16 @@ person must work on the statement (the bookkeeping, or the holder of the card). 
 - Take over adds the positions to the draft as the person (the total only if the statement has none; 409 once it has positions,
   is confirmed or the month is locked; one undo step, skipped after a change by hand). They count only when the person
   confirms the statement with its sum check. Nothing is stored in the statement before that; a person without an organisation
-  does the same with the own agent in the personal office.
+  does the same with the own agent in the private office.
 
 **Reading a receipt (2.299.0, kind `receipt_read`).** Kalmido brings no model of its own and sends nothing out: on a
 document / receipt the person may change (document sheet, the bookkeeping's receipt sheet) "Read with an agent" asks one
 of their agents, which reads the file where it runs -- with its own model or a local one (for example through Ollama on the
 same computer). Who can be asked: the agents of the person's office area with the office switches as for `doc_summary`
-(in office groups the right *Receipts* to edit; *May draft office documents* alone only for a personal office's own agent,
+(in office groups the right *Receipts* to edit; *May draft office documents* alone only for a private office's own agent,
 in an organisation it opens only the quotes since 2.223.2; the area's *Agents may read office
 data*), the file shared with the agent, a person who may change the document and has the receipts right; a freelancer's
-own agent in the personal office the same way. `GET /api/proposals/agents?kind=receipt_read&doc_id=`.
+own agent in the private office the same way. `GET /api/proposals/agents?kind=receipt_read&doc_id=`.
 - `input.document` = `doc_summary`'s (what `GET /documents/{id}` shows the agent) + `mime`, `size`, `content_url`
   (`/api/v1/files/{id}/content`, with the token; MCP: `read_file` with `as: "base64"`) and `receipt` {is_receipt, category,
   vat_pct}; `categories` (the ones in use, at most 50); `bank` (open bookings paid out with the receipt's amount, at most

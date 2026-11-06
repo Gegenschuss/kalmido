@@ -851,7 +851,7 @@ async function ctBooksModal() {
         ...(typeof ctf_bookItems === 'function' ? ctf_bookItems(b, m) : []),  // 2.351.0 B (#2749): into a folder of the address book
         b.can_org && {label: tr('Hand over to the organisation…'), icon: 'building', fn: () => ob_take(b, refresh)},  // 2.52.0 (#1438)
         own && b.org_owned && {label: tr('Members of the organisation'), icon: 'building', more: ob_roleItems(b, refresh)},
-        own && b.org_owned && {label: tr('Make personal again…'), icon: 'home', fn: () => ob_drop(b, refresh)},
+        own && b.org_owned && {label: tr('Move to Private…'), icon: 'home', fn: () => ob_drop(b, refresh)},
         own && famOn() && !b.imported && {label: tr('Birthdays as tasks…'), icon: 'cake', fn: () => ctBdayModal(b, refresh)},
         ctWrite(b) && {label: tr('Import a vCard file…'), icon: 'upload', fn: () => ctImport(b.id)},
         ctWrite(b) && {label: tr('Import a CSV file…'), icon: 'upload', fn: () => ctImport(b.id, 'csv')},  // 2.119.1 A (#2080)
@@ -939,12 +939,12 @@ async function ob_take(b, done) {
   offerUndo(tr('Handed over to {0}', wsLabel(b.org_id)), histAdd({label: tr('Address book handed over'), undo: back, redo: go('view')}));
 }
 async function ob_drop(b, done) {
-  if (!await askConfirm(tr('Make “{0}” your personal address book again?', b.name),
-    tr('The members of the organisation then only see it where it is shared with them.'), {ok: tr('Make personal')})) return;
+  if (!await askConfirm(tr('Move “{0}” to Private?', b.name),
+    tr('The members of the organisation then only see it where it is shared with them.'), {ok: tr('Move to Private')})) return;
   const back = async () => { await api('POST', `/api/books/${b.id}/org`, {}); done(); };  // keeps the members' role it had
   const go = async () => { await api('DELETE', `/api/books/${b.id}/org`); done(); };
   try { await go(); } catch { return; }
-  offerUndo(tr('Personal address book again'), histAdd({label: tr('Address book made personal'), undo: back, redo: go}));
+  offerUndo(tr('Moved to Private'), histAdd({label: tr('Address book moved to Private'), undo: back, redo: go}));
 }
 function ob_roleItems(b, done) {
   const put = v => async () => { await api('PATCH', `/api/books/${b.id}/org`, {org_role: v}); done(); };

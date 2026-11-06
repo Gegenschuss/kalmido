@@ -42,7 +42,10 @@ GLOSSARY = ((r"\b[Cc]ustomers?\b", "client"), (r"\b[Ll]ogins?\b", "sign-in"), (r
             (r"\b[Ll]og(?:ged|s)? out\b|\b[Ll]ogout\b", "sign out"), (r"\b[Cc]olor", "colour"),
             (r"\b(?:[Cc]ustom|[Oo]rgan|[Rr]ecogn|[Ss]ummar)iz", "-ise"), (r"\b[Ii]nquir", "enquiry"), (r"\b[Vv]acations?\b", "holiday"),
             (r"(?<![-@\w.])[Mm]ails?\b(?!-)", "e-mail"), (r"\b[Ee]mails?\b", "e-mail"), (r"\b[Qq]uotes?\b", "quotation"),
-            (r"\bNobody assigned\b", "unassigned"))
+            (r"\bNobody assigned\b", "unassigned"),
+            # 2.542.0 (#4605): the own workspace is "Private" and nothing else; "personal" only for what belongs to a person
+            (r"\b[Mm]y files\b", "Private|workspace"), (r"\b[Pp]ersonal (?:office|workspace|area|space)\b", "private office / private workspace"),
+            (r"\b[Mm]y (?:workspace|area|space|office)\b", "Private|workspace"), (r"\bMake personal\b", "Move to Private"))
 GLOSSARY_KEEP = frozenset((
     "holiday vacation sick leave day off away absence",  # search words
     "Registered mail",  # the postal service
@@ -60,6 +63,27 @@ def glossary_errors(keys):
             m = re.search(rx, text)
             if m:
                 out.append(f"{k!r}: “{m.group(0)}”, the glossary says “{want}” (TRANSLATING.md)")
+    return out
+
+
+# 2.542.0 (#4605): the same rule for the translations: a third name of the own workspace is refused in the German values
+PRIVATE_VARIANTS = ((r"\bMeine Ablage\b|\bMein Bereich\b|\bMein Arbeitsbereich\b", "Privat"),
+                    (r"\bpersönliche[nsm]? Büro\b|\bPersönliche[nsm]? Büro\b", "privates Büro"))
+
+
+def private_term_errors(d, name=""):
+    """(#4605) "name: key: <variant>, say <wanted>" for a German value that names the own workspace with a third name."""
+    out = []
+    if not name.startswith("de"):
+        return out
+    for k, v in d.items():
+        for x in (v if isinstance(v, list) else [v]):
+            if not isinstance(x, str) or k.startswith("_"):
+                continue
+            for rx, want in PRIVATE_VARIANTS:
+                m = re.search(rx, x)
+                if m:
+                    out.append(f"{name}: {k[:60]!r}: “{m.group(0)}”, say “{want}” (Private, #4605)")
     return out
 
 
@@ -170,6 +194,13 @@ def main(argv):
         print("  ERROR", e)
         ok = False
     files = sorted(glob.glob(os.path.join(I18N_DIR, "*.json")))
+    for fn in files:
+        try:
+            for e in private_term_errors(json.load(open(fn, encoding="utf-8")), os.path.basename(fn)):
+                print("  ERROR", e)
+                ok = False
+        except ValueError:
+            pass  # reported below
     if argv:
         files = [f for f in files if os.path.basename(f)[:-5] in argv]
     for fn in files:

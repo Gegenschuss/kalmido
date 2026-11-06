@@ -312,6 +312,8 @@ def _apply(c, r, t, f, v, tail, ref):
         c.execute("UPDATE tasks SET content=?, updated_at=? WHERE id=?", (_with_tail(v or "", tail), ts, tid))
         log_act(c, tid, "content", {"prev": prev[:20000], "gsy": ref} if prev.strip() else {"gsy": ref}, uid=None)
     elif f == "state":
+        if t["locked"]:  # 2.542.0 (#4609): a locked task keeps its status (the repository's state is not taken over)
+            return
         if v == "closed":
             c.execute("UPDATE tasks SET status=2, completed_at=?, updated_at=? WHERE id=? AND status=0", (ts, ts, tid))
             log_act(c, tid, "complete", {"gsy": ref}, uid=None)

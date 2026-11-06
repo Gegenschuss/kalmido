@@ -25,6 +25,7 @@ from .oilock import oil_prepare  # #4300
 from ..core.config import ATT_DIR, MAX_FILE_MB, OFFICE_DIR
 from ..core.errors import BadInput
 from ..core.i18n import N_
+from ..office.ledger import ofx_release  # 2.542.0 (#4598)
 from ..lists.listhead import HEAD_DIR, HEAD_MAX_MB, o3c_head_process, o3c_head_rel
 from .acctimport import UMZ_NO_SPACE, _BAD, _coerce, _file_bytes, _oid, _read_entry, _txt, tr, umz_cols, umz_insert, umz_row
 from .acctimport import UMZ_ORG_SKIP  # 2.278.0 B (#3094)
@@ -330,7 +331,8 @@ def oi_write(c, run, uid, man, zf, files, data, who):
             if new:
                 sets[col] = new
         if sets:
-            c.execute(f"UPDATE {spec.table} SET {', '.join(f'{k}=?' for k in sets)} WHERE id=?", (*sets.values(), nid))
+            with ofx_release(c, spec.table):  # 2.542.0 (#4598): the references of a document imported as finalised
+                c.execute(f"UPDATE {spec.table} SET {', '.join(f'{k}=?' for k in sets)} WHERE id=?", (*sets.values(), nid))
     for fx in oi_fixes():  # references of lists / tasks / events into the areas
         if fx.col not in umz_cols(c, fx.data)[0]:
             continue
@@ -469,13 +471,14 @@ def oi_undo(c, uid, cr, since, plan):
         if not plan.goes(table, rid):
             continue
         col = (space_cols.get(table) or (None,))[0]
-        if col and col in umz_cols(c, table)[0]:
-            if space is None:
-                n += c.execute(f"DELETE FROM {table} WHERE id=? AND {col} IS NULL", (rid,)).rowcount
+        with ofx_release(c, table):  # 2.542.0 (#4598): a document imported as finalised goes with its import (oi_undo_check)
+            if col and col in umz_cols(c, table)[0]:
+                if space is None:
+                    n += c.execute(f"DELETE FROM {table} WHERE id=? AND {col} IS NULL", (rid,)).rowcount
+                else:
+                    n += c.execute(f"DELETE FROM {table} WHERE id=? AND {col}=?", (rid, space)).rowcount
             else:
-                n += c.execute(f"DELETE FROM {table} WHERE id=? AND {col}=?", (rid, space)).rowcount
-        else:
-            n += c.execute(f"DELETE FROM {table} WHERE id=?", (rid,)).rowcount
+                n += c.execute(f"DELETE FROM {table} WHERE id=?", (rid,)).rowcount
     _oi_undo_pics(c, cr)
     return n, kept_keys
 

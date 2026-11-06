@@ -502,8 +502,10 @@ class Dispatcher:
             if st == "done" and not has_tag(t, cfg["keep_tags"]):
                 sha = ev["done"][tid]
                 api = self.host.api
-                ok = w(f"close #{tid} (commit {sha})", lambda tid=tid, sha=sha: (
+                # 2.542.0 (#4609): a locked task is completed only after unlocking it (the agent may; the history shows it)
+                ok = w(f"close #{tid} (commit {sha})", lambda tid=tid, sha=sha, lk=bool(t.get("locked")): (
                     api.req("POST", f"/tasks/{tid}/comments", {"body": self.say("dispatch_closed", sha, cfg["close_ref"] or "HEAD")}),
+                    lk and api.req("PATCH", f"/tasks/{tid}", {"locked": False}),
                     api.req("POST", f"/tasks/{tid}/complete")))
                 if ok:
                     res["closed"].append(tid)

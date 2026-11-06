@@ -679,6 +679,11 @@ Since 2.37.0 Kalmido runs on PostgreSQL 17 only (`DATABASE_URL`); SQLite is gone
   a `UNIQUE` index on a table the fragment does not create can fail on existing rows and needs a line
   `# unique-ok <index>: <why no two rows can collide>` in the fragment. `tests/p2192_c_upgrade_test.py` starts the current
   server on the old dump with a row in every table.
+  A fragment's `SCHEMA` may also hold a trigger (`CREATE OR REPLACE FUNCTION` with a `$$` body, then `CREATE OR REPLACE
+  TRIGGER` on one statement; `trigger_skip_present` leaves an unchanged trigger alone), e.g. 2.542.0 (#4598)
+  `kalmido_office_locked`: finalised office documents stay as they were sent (docs/OFFICE.md). The suites' direct
+  database access (`tests/dbx.py`) passes it with `PGOPTIONS=-c kalmido.locked_ok=on`; `dbx.connect(path, guarded=True)`
+  is a session without it.
 - **Process roles (2.102).** `KALMIDO_ROLE=all` (default) runs web and background loops in one process; `web` runs no
   loop; `worker` (`python app.py worker`) runs only the loops. Every loop thread (by its name, `admin/worker.py`
   `WRK_LOOPS`) takes a session-level `pg_try_advisory_lock` of its own before its rounds -- the check sits in

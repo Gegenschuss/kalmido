@@ -45,7 +45,8 @@ CLN_MERGE_MAX = 10     # tasks in one merge entry
 CLN_TITLE = N_("Tidy up: {0}")
 CLN_TITLE_PACK = N_("Tidy up: {0} (package {1} of {2})")
 CLN_WHY = {"editing": N_("someone is editing it right now"), "changed": N_("changed since the proposal was made"),
-           "closed": N_("already completed or deleted"), "moved": N_("moved to another project"), "denied": N_("no write access")}
+           "closed": N_("already completed or deleted"), "moved": N_("moved to another project"), "denied": N_("no write access"),
+           "locked": N_("locked, unlock it first")}  # 2.542.0 (#4609): a locked task is never closed, not by a proposal either
 
 
 # ---- the request
@@ -263,7 +264,8 @@ def cln_change(c, rec, tid, want, aid):
 def cln_close(c, rec, tid, reason, into=None):
     """Won't do (status -1) with the open subtasks; the undo record keeps what changed."""
     ts = iso(now_utc())
-    kids = [d for d in descendants(c, tid) if c.execute("SELECT status FROM tasks WHERE id=?", (d,)).fetchone()[0] == 0]
+    kids = [d for d in descendants(c, tid)  # 2.542.0 (#4609): a locked subtask stays open
+            if c.execute("SELECT 1 FROM tasks WHERE id=? AND status=0 AND locked=0", (d,)).fetchone()]
     c.execute("UPDATE tasks SET status=-1, completed_at=?, completed_by=?, updated_at=? WHERE id=?", (ts, me(), ts, tid))
     for d in kids:
         c.execute("UPDATE tasks SET status=-1, completed_at=?, completed_by=?, updated_at=? WHERE id=? AND status=0", (ts, me(), ts, d))
@@ -286,6 +288,9 @@ def cln_run(c, j, sel, edits, rec):
         ids = it["task_ids"] if it["op"] == "merge" else [it["task_id"]]
         bad = [(t, cln_check(c, t, lid, snap, cache)) for t in ids]
         bad = [(t, w) for t, w in bad if w]
+        closing = ids if it["op"] == "close" else ids[1:] if it["op"] == "merge" else []
+        bad += [(t, "locked") for t in closing  # 2.542.0 (#4609): closing (or merging away) a locked task is refused
+                if c.execute("SELECT locked FROM tasks WHERE id=?", (t,)).fetchone()[0]]
         if bad:
             rec["skipped"] += [{"task_id": t, "title": cln_title(c, t, inp)[:200], "why": w, "entry": i} for t, w in bad]
             continue
@@ -365,13 +370,17 @@ def cln_undo(c, rec, back=True):
         except Denied:
             skipped += prop_titles(c, [tid])
             continue
-        t = c.execute("SELECT status, completed_at, deleted_at FROM tasks WHERE id=?", (tid,)).fetchone()
+        t = c.execute("SELECT status, completed_at, deleted_at, locked FROM tasks WHERE id=?", (tid,)).fetchone()
+        if t and t["locked"]:  # 2.542.0 (#4609): a task locked since stays as it is (no reopen, no close again)
+            skipped += prop_titles(c, [tid])
+            continue
         if back:
             if not t or t["deleted_at"] or t["status"] != -1 or t["completed_at"] != x["at"]:
                 skipped += prop_titles(c, [tid])
                 continue
             for d in [tid, *x["kids"]]:
-                c.execute("UPDATE tasks SET status=0, completed_at=NULL, completed_by=NULL, updated_at=? WHERE id=? AND status=-1", (ts, d))
+                c.execute("UPDATE tasks SET status=0, completed_at=NULL, completed_by=NULL, updated_at=? WHERE id=? AND status=-1 AND locked=0",
+                          (ts, d))
             log_act(c, tid, "reopen")
         else:
             if not t or t["deleted_at"] or t["status"] != 0:

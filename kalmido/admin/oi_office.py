@@ -21,6 +21,7 @@ from ..core.orgcrypt import oc_item_store, oc_json_store, oc_log_detail  # 2.149
 from ..core.orgcrypt import oc_dec_fields  # 2.188.0 A (#2498)
 from ..core.orgcrypt import OrgCryptError  # 2.516.0 (#4364)
 from ..core.pg import system_ctx  # 2.516.0 (#4364)
+from ..office.ledger import ofx_release  # 2.542.0 (#4598)
 from ..office.calc import dec  # 2.188.0 A (#2498)
 from ..core.db import insert_id, iso, now_utc  # 2.149.0 G (#2517): pulled up from functions
 from .orgexport import _safe_part  # 2.369.5 (#2517): pulled up from functions
@@ -694,7 +695,8 @@ def _f_docs(c, run, uid, data, who):
             if isinstance(ids, list) and ids:
                 sets[col] = json.dumps([n for n in (run.m("office_docs", i) for i in ids) if n])
         if sets:
-            c.execute(f"UPDATE office_docs SET {', '.join(k + '=?' for k in sets)} WHERE id=?", (*sets.values(), nid))
+            with ofx_release(c):  # 2.542.0 (#4598): the references of a document imported as finalised
+                c.execute(f"UPDATE office_docs SET {', '.join(k + '=?' for k in sets)} WHERE id=?", (*sets.values(), nid))
 
 
 def _f_runs(c, run, uid, data, who):

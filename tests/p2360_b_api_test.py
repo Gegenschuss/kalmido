@@ -4,7 +4,8 @@
    (also subtasks), locked: false creates an open one; a personal access token creates open tasks
  - the app (session) cannot change title, notes, date, priority, list, tags, list tags, repeat or assignee of a locked
    task (400 with a clear message; nothing changed), also not through the multi-select batch or a drag (reorder);
-   free: comments, ticking a checkbox in the notes, completing / reopening, subtasks, pin, sort order, unchanged values
+   free: comments, ticking a checkbox in the notes, subtasks, pin, sort order, unchanged values (2.542.0, #4609: completing /
+   reopening no longer -- tests/p2542_a_lock_api_test.py)
  - unlocking (also together with a change) by whoever may change the task; a view-only member cannot; locking and
    unlocking show in the history
  - the agent API is not bound by the lock: it changes locked tasks and sets / clears locked; bad values 400
@@ -112,8 +113,8 @@ check(r.ok, "unchanged values + pin + sort order are allowed " + r.text[:120])
 check(Bo.post(B + f"/api/tasks/{T}/comments", json={"body": "Looks good"}).ok, "a comment is allowed")
 r = Bo.post(B + "/api/tasks", json={"title": "My subtask", "parent_id": T})
 check(r.ok and r.json().get("locked") == 0, "a person's subtask of a locked task is allowed (and open)")
-check(Bo.post(B + f"/api/tasks/{T}/complete", json={}).ok and dbx("SELECT status FROM tasks WHERE id=?", (T,))[0][0] == 2, "completing is allowed")
-check(Bo.post(B + f"/api/tasks/{T}/reopen", json={}).ok and dbx("SELECT status FROM tasks WHERE id=?", (T,))[0][0] == 0, "reopening is allowed")
+# 2.542.0 (#4609): completing a locked task is refused on every way (409, the status stays; the rest in p2542_a_lock_api)
+check(Bo.post(B + f"/api/tasks/{T}/complete", json={}).status_code == 409 and dbx("SELECT status FROM tasks WHERE id=?", (T,))[0][0] == 0, "completing is refused (409)")
 # multi-select and drag
 r = Bo.post(B + "/api/tasks/batch", json={"ids": [T, HT], "action": "patch", "data": {"due": "2030-02-02"}})
 check(r.ok and any("locked" in e.lower() for e in r.json().get("errors", [])), "multi-select: the locked task is reported " + r.text[:160])

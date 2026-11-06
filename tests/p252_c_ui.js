@@ -1,7 +1,7 @@
 // 2.52.0 UI tests of part C (#1438 address books an organisation owns; own container, start.sh). jsdom, invented data only:
 // - Address books > More: "Hand over to the organisation…" for the owner (an admin of the book's organisation), after the
 //   confirmation the book belongs to it (row: "Belongs to Alpha"; no "Workspace…" any more)
-// - "Members of the organisation" > "They can edit" sets the members' role; "Make personal again…" makes it the admin's own
+// - "Members of the organisation" > "They can edit" sets the members' role; "Move to Private…" makes it the admin's own
 // - each is one undo step: undo of "make personal" hands it over again
 const {execFileSync} = require('child_process');
 const path = require('path');
@@ -43,14 +43,14 @@ const srv = async id => (await call('GET', '/api/books')).items.find(b => b.id =
     click(w, d.querySelector(`.modal [data-cbmenu="${BK}"]`)); return until(() => items(d).length && items(d));
   };
   await menuOf();
-  check(item(d, 'Hand over to the organisation…') && item(d, 'Workspace…') && !item(d, 'Make personal again…'), 'a personal book: "Hand over to the organisation…" + "Workspace…"');
+  check(item(d, 'Hand over to the organisation…') && item(d, 'Workspace…') && !item(d, 'Move to Private…'), 'a personal book: "Hand over to the organisation…" + "Workspace…"');
   click(w, item(d, 'Hand over to the organisation…'));
   let b = await until(async () => { const x = await srv(BK); return x.org_owned && x; });
   check(b && b.org_owned && b.org_role === 'view', 'handed over: the members can view');
   check(await until(() => /Belongs to Alpha/.test(d.querySelector('.modal #cb-body')?.textContent || '')), 'the row says "Belongs to Alpha"');
 
   await menuOf();
-  check(!item(d, 'Workspace…') && !item(d, 'Hand over to the organisation…') && item(d, 'Make personal again…'), 'an organisation\'s book: no "Workspace…", "Make personal again…"');
+  check(!item(d, 'Workspace…') && !item(d, 'Hand over to the organisation…') && item(d, 'Move to Private…'), 'an organisation\'s book: no "Workspace…", "Move to Private…"');
   click(w, item(d, 'Members of the organisation'));
   await until(() => item(d, 'They can edit'));
   check(item(d, 'They can view')?.classList.contains('on') && item(d, 'Only admins and people it is shared with'), 'the three choices, "They can view" ticked');
@@ -59,12 +59,12 @@ const srv = async id => (await call('GET', '/api/books')).items.find(b => b.id =
   check(b && b.org_role === 'edit', 'the members can edit now');
 
   await menuOf();
-  click(w, item(d, 'Make personal again…'));
+  click(w, item(d, 'Move to Private…'));
   b = await until(async () => { const x = await srv(BK); return !x.org_owned && x; });
   check(b && !b.org_owned && b.role === 'owner', 'made personal again (alice\'s own)');
   const labels = () => w.eval('JSON.stringify(HIST.undo.map(e => e.label))');
-  await until(() => /made personal/.test(labels()), 80);
-  check(labels() === JSON.stringify(['Address book handed over', 'Changed setting: Members of the organisation', 'Address book made personal']),
+  await until(() => /moved to Private/.test(labels()), 80);
+  check(labels() === JSON.stringify(['Address book handed over', 'Changed setting: Members of the organisation', 'Address book moved to Private']),
     'every step is one entry of the undo history ' + labels());
   w.eval("histStep('undo')");
   b = await until(async () => { const x = await srv(BK); return x.org_owned && x; });

@@ -500,10 +500,20 @@ const sbb_aw = () => (S.agents || []).reduce((n, x) => n + x.waiting + x.chat_un
 function sbb_railHtml(hid) {
   const cur = sbb_area(), aw = sbb_aw();
   const btn = id => sbb_btnHtml(id, cur, hid, aw);
-  // 2.152.3 A (#2619): the account moved up into the head bar (sbb_barHtml); with the panel hidden a small button on top
-  // of the bar brings it back
-  const show = `<button type="button" class="srb srpanel" data-act="sbb-panel" title="${esc(tr('Show the panel'))}" aria-label="${esc(tr('Show the panel'))}">${ic('panelshow')}</button>`;  // shown by app.css only while the panel is hidden (#app.side-rail)
-  return `<div class="srbs">${sbb_noPan() ? '' : show /* 2.224.0 A (#2817) */}${SBB_RAIL.map(r => btn(r[0])).join('')}</div>`;  // 2.380.2 (#3400): Settings moved into the Kalmido menu of the head bar (sbb_wsMenu)
+  // 2.152.3 A (#2619): the account moved up into the head bar (sbb_barHtml). 2.542.0 (#4610): the button "Show the panel" on top
+  // of the bar is gone (its place came and went, the icons below moved): a tap on the open area's icon brings the panel back,
+  // and a change of the area opens it again (sbb_unfoldOnSwitch)
+  return `<div class="srbs">${SBB_RAIL.map(r => btn(r[0])).join('')}</div>`;  // 2.380.2 (#3400): Settings moved into the Kalmido menu of the head bar (sbb_wsMenu)
+}
+// 2.542.0 (#4610): another area than the one drawn last opens the panel again (LS sideFold back to false, the layout follows
+// at once; no extra render). The first drawing after a load keeps the hidden panel; folded for room (#3163) and areas
+// without a panel (SBB_NOPANEL) stay as they are
+let sbb_lastArea = null;
+function sbb_unfoldOnSwitch() {
+  if (!S.booted) return;  // the cached state drawn before the first route() still says Tasks
+  const cur = sbb_area(), was = sbb_lastArea; sbb_lastArea = cur;
+  if (was === null || was === cur || !LS.get('sideFold', false)) return;
+  LS.set('sideFold', false); fitLayout(true);
 }
 // called by renderSide: the bar (or nothing on a phone); the account node stays the same <img> when nothing changed
 function sbb_render(hid) {
@@ -511,6 +521,7 @@ function sbb_render(hid) {
   $('#app')?.classList.toggle('sbb-nopan', sbb_noPan());  // 2.224.0 A (#2817): app.css drops the panel's column
   sbb_bar();  // 2.152.3 A (#2619)
   if (!on) { if (r.innerHTML) r.innerHTML = ''; return; }
+  sbb_unfoldOnSwitch();  // 2.542.0 (#4610)
   r.setAttribute('aria-label', tr('Areas|nav'));
   r.innerHTML = sbb_railHtml(hid);
   sbb_rove();
@@ -678,7 +689,7 @@ function sbb_panel() {
   if (rail && !fold) { $('#top .menu')?.click(); return; }
   sideFold(!fold);
   if (fold && $('#app')?.classList.contains('side-rail')) { $('#top .menu')?.click(); return; }  // still too narrow: the drawer
-  setTimeout(() => (fold ? $('#side .sbbhide') : $('#srail .srpanel'))?.focus({preventScroll: true}), 0);
+  setTimeout(() => (fold ? $('#side .sbbhide') : $('#srail .srb.on'))?.focus({preventScroll: true}), 0);  // 2.542.0 (#4610): hidden: the open area's icon (it brings the panel back)
 }
 document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-act="sbb-ws"], [data-act="sbb-foldall"], [data-act="sbb-panel"]'); if (!b) return;
@@ -691,7 +702,7 @@ document.addEventListener('click', e => {
   const b = e.target.closest?.('#srail .srb.on[data-sbb]'); if (!b || !(LS.get('sideFold', false) || $('#app')?.classList.contains('side-rail')) || !sbb_on() || sbb_noPan()) return;  // 2.224.0 A (#2817): no panel to bring back; 2.290.0 C (#3163): folded for room (task open) = the drawer
   e.preventDefault(); e.stopPropagation(); sbb_panel();
 }, true);
-const sbb_railItems = () => $$('#srail .srb').filter(b => !b.classList.contains('srpanel') || !!$('#app')?.classList.contains('side-rail'));  // 2.152.3 A (#2619)
+const sbb_railItems = () => $$('#srail .srb');  // 2.152.3 A (#2619); 2.542.0 (#4610): no panel button to leave out any more
 // the bar is ONE tab stop: Tab lands on the open area, up / down (Home / End) walk the icons
 function sbb_rove(cur) {
   const it = sbb_railItems(); if (!it.length) return;

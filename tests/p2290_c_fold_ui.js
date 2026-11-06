@@ -114,8 +114,8 @@ async function jsd(user, {L, T}, tag) {
       check(!b.more || !b.x || b.more.l + b.more.w <= b.x.l + 1 || b.more.t >= b.x.t + b.x.h - 1, `${k} + task: nothing in the header covers the close button ` + JSON.stringify({x: b.x, more: b.more}));
       await shot(`p2290c-${tag.replace(/\W+/g, '')}-${vw}${fs ? '-fs' + fs : ''}-task.png`);
       if (vw < 1200) {
-        await ev(`(() => { document.querySelector('#srail .srpanel')?.click(); return 1; })()`);
-        check(await until(() => ev(`document.querySelector('#side').classList.contains('open')`)), `${k} + task: the bar's panel button opens the drawer`);
+        await ev(`(() => { document.querySelector('#srail .srb.on[data-sbb]')?.click(); return 1; })()`);  // 2.542.0 (#4610): the open area's icon (the panel button is gone)
+        check(await until(() => ev(`document.querySelector('#side').classList.contains('open')`)), `${k} + task: the open area's icon opens the drawer`);
         await ev(`(() => { closeSide(); return 1; })()`); await sleep(300);
       }
       await ev(`(() => { closeDetail(); return 1; })()`); await sleep(400);

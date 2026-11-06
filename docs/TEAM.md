@@ -171,7 +171,7 @@ answers one of your comments (reply), comes right after your comment on that tas
   and the links to tasks stay. Only when nobody else is left in the organisation does it go with that person as before.
 - It always stays in its organisation's workspace and is seen only by its members. Phones get it over CardDAV like any other
   address book (read-only when members may only view).
-- **Make personal again…** only undoes one's own hand-over (2.148.1): the admin who handed it over gets it back as their
+- **Move to Private…** only undoes one's own hand-over (2.148.1): the admin who handed it over gets it back as their
   own; other admins keep it with the organisation and can export or copy the contacts.
 
 ## Report forms
@@ -240,7 +240,7 @@ questions stays the classic form.
 - **Undo after "Delete all times of this project"** brings the entries back exactly as they were, including the link to a
   timer started on a phone, so a stop that arrives later from that phone still finds its entry. Entries already billed stay:
   2.144.5 recognises them by the invoice position made from the project's times (also after the project was renamed, and in
-  the personal office of a person without an organisation); older invoices still by the project's name.
+  the private office of a person without an organisation); older invoices still by the project's name.
 
 ## Monthly timesheets: close, approve, send back
 
@@ -362,7 +362,7 @@ control*: it opens in a new tab and its comments carry no timecode.
 - Deleting for good: a sign-off in the trash is deleted for good after 30 days (only with the deletion runs on, `KALMIDO_RETENTION_PURGE=1`: [Deletion periods](SELF-HOSTING.md#deletion-periods)) with its versions and comments. A task,
   project or client that is deleted for good takes its video sign-offs with it. The customer's approval records **stay**: name,
   e-mail, reason, address, device and the decision, without the link to the video. The admins of the organisation and the
-  creator see and delete them; a decided record of an organisation or a personal office only after its legal period (6 years,
+  creator see and delete them; a decided record of an organisation or a private office only after its legal period (6 years,
   to the end of the year).
 - Every step can be undone. The players are embedded without loading any script of Vimeo or YouTube (YouTube through
   youtube-nocookie.com); only the two player addresses may be framed (Content-Security-Policy).
@@ -621,10 +621,10 @@ form does not put reports into that person's list; 2.360). Nobody needs an accou
 *Since 2.120.0.*
 
 With *Settings > Company & office > Data > Show documents in the client portal* (off by default; the office's admin, or the
-person in their own personal office) the portal also lists the client's **documents**: sent quotations (with the button
+person in their own private office) the portal also lists the client's **documents**: sent quotations (with the button
 *Review and approve* while an approval link is open), invoices with their payment state (open, partly paid with the open
 amount, overdue, paid; the due date; with online payment on, the button *Pay now* while something is open) and credit notes. Each opens as the PDF that was sent. The customer is every client
-of the same organisation (or the same personal office) whose e-mail or e-mail for invoices is the signed-in address.
+of the same organisation (or the same private office) whose e-mail or e-mail for invoices is the signed-in address.
 
 - **Getting in.** In the client's menu (*More*) **Send portal link** mails the client the same one-time sign-in link
   (30 minutes, once; then signed in for 7 days) to the e-mail for invoices, else the e-mail. No account, no password;
@@ -723,12 +723,12 @@ the server's organisation project for its members).
   name nor the organisation's and can only be handed over. The security log notes the deletion.
 - **Organisation admins** (*Settings > Organisation > People*) can delete the account of a member who belongs to their organisation
   alone, is no server admin and whose private space is empty (no private projects, nothing in the basket, no private
-  calendars, address books, files, pages, mails, habits or time entries, and since 2.148.1 no personal office, private
+  calendars, address books, files, pages, mails, habits or time entries, and since 2.148.1 no private office, private
   clients, bookmarks, news feeds, journal, booking page, polls, videos, agent chats or direct messages -- deleting the
   account would delete them too; the answer names these areas, never their content), handing the projects over the same
   way. For anyone else they remove the person from the organisation and choose which member gets the person's projects of
   the organisation.
-- **Retention (2.148.1):** no account is deleted while its personal office holds finalised documents or cash book entries,
+- **Retention (2.148.1):** no account is deleted while its private office holds finalised documents or cash book entries,
   also not by a server admin. Export the office first and disable the account instead.
 
 API for scripts of the web app (session, not the REST API): `GET /api/users?all=1&limit=50&offset=0&q=&filter=people`
@@ -832,7 +832,7 @@ The group no longer grows with every person you share a project with:
 
 *Since 2.152.0.*
 
-- **Deleting an account** removes it completely, files on the disk included: the personal office (its documents, the
+- **Deleting an account** removes it completely, files on the disk included: the private office (its documents, the
   logo, the stored PDFs and XML) and the own files go, the inbox goes with its attachments, the person's own agents go
   with their access keys. What belongs to others stays: time entries in projects of an organisation (without the
   person's name), calendars of an organisation (to an admin of the organisation, as when leaving it), direct
@@ -842,19 +842,19 @@ The group no longer grows with every person you share a project with:
   folder they lie in counts; never an agent, a child account or a disabled account). Others keep their shares; read-only shares
   and public links of a moved knowledge page end. Without such a person the object goes with the account, and the delete dialog
   counts both beforehand. Shared folders and files of the file store still go with the account.
-- **Kept by law**, each counted from the end of its calendar year (the delete dialog names the exact items): books, cash book, bank and card statements, payments, procedure documentation, asset register and finalised invoices: 10 years; receipts (also those not booked yet), entertainment receipts, receipts of trips taken into DATEV and the logbook: 8 years; sent letters and confirmed sign-offs: 6 years. A personal office or an
+- **Kept by law**, each counted from the end of its calendar year (the delete dialog names the exact items): books, cash book, bank and card statements, payments, procedure documentation, asset register and finalised invoices: 10 years; receipts (also those not booked yet), entertainment receipts, receipts of trips taken into DATEV and the logbook: 8 years; sent letters and confirmed sign-offs: 6 years. A private office or an
   organisation with such data is **retired** instead of deleted: its members leave it, nobody sees it in the app any
   more, the server admins see it in *Settings > Organisation > People > Organisations* as "kept until ..." (its delete
   button shows the period), nobody can change it. Since 2.186.0 only the people who were its admins when it was retired
   export it (*Settings > Organisation* lists it with the export), other server admins do not, with one exception: when no
   former admin is left (or it was retired before 2.186.0), the server admins may download the retention export (the records
-  kept by law), never the full export; the retired personal office of a deleted account nobody. Retiring needs no retention export and notes no waiver. The account itself is deleted all the same, unless no other server admin could hold what has to be kept or nobody could take over the organisation's calendars and agent projects: then the dialog says "Disable the account instead". After the date the retention run deletes it
+  kept by law), never the full export; the retired private office of a deleted account nobody. Retiring needs no retention export and notes no waiver. The account itself is deleted all the same, unless no other server admin could hold what has to be kept or nobody could take over the organisation's calendars and agent projects: then the dialog says "Disable the account instead". After the date the retention run deletes it
   for good (only when the server's retention switch is on; until then it is counted, see SELF-HOSTING.md).
 - **Deleting an organisation** asks first when it would take knowledge pages, tables or office data along: the dialog
   names them ("1 knowledge page, 2 tables") and offers the export of the organisation (its admins; for a retired one its former
   admins). Projects and files in the file store still block the deletion as before (files in a folder in the trash count
   as trash, 2.186.0).
-- The delete dialog of an account names the same: what is kept by law and until when, what goes with the personal office,
+- The delete dialog of an account names the same: what is kept by law and until when, what goes with the private office,
   the agents, calendars, time entries and conversations.
 
 API for scripts of the web app (session): `GET /api/admin/orgs/{id}/delete-info` answers `{content, kept, retain_until,

@@ -168,6 +168,8 @@ def env_close_tasks(c, mid, env_name, uid):
     for tid in ids:
         if rvw_gate(c, tid):  # 2.60.0 (#1514 + #1512): a task still waiting for its approval stays open
             continue
+        if c.execute("SELECT locked FROM tasks WHERE id=?", (tid,)).fetchone()[0]:  # 2.542.0 (#4609): a locked one stays open too
+            continue
         if not g.get("user"):
             g.user = {"id": None, "display_name": "", "username": "", "kind": "person"}  # a hook: nobody's completion
         try:

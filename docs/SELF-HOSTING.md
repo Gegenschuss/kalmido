@@ -780,7 +780,7 @@ are counted as `tasks_kept`. Restoring a wiki page brings back the files that we
 **Agent chat (`KALMIDO_CHAT_KEEP_DAYS`).** Optional day limit on top of the count limit. People can delete single
 messages and their whole history with an agent themselves at any time.
 
-**Retired organisations.** An organisation (or the personal office of a deleted account) that must keep invoices,
+**Retired organisations.** An organisation (or the private office of a deleted account) that must keep invoices,
 archived documents, booked receipts, travel receipts in DATEV or a logbook by law is retired instead of deleted: no
 members, nothing visible in the app, export only for the people who were its admins when it was retired (2.186.0; one
 retired before 2.186 by the instance admins), public links answer 404. After the legal period
@@ -841,7 +841,7 @@ At a glance (the same two lists as in Settings > Organisation > People > Organis
   a provider that does not send `auth_time` cannot confirm it), accounts signed in by a login proxy ask the server admin
   (`orgcrypt_cli recovery --org <id>`). Every showing is noted in the office log, and the organisation's other admins
   get a notice in their News (who and when, never the key). *New recovery key* replaces it: the earlier one stops
-  working at once. A person without an organisation finds the recovery key of the personal office under
+  working at once. A person without an organisation finds the recovery key of the private office under
   *Settings > Organisation* as soon as the office holds encrypted data. Store the key offline. If the master key is lost: set a
   new `KALMIDO_SECRET_KEY`, start once with `KALMIDO_SECRET_KEY_CHANGED=1` (2.190), then for each organisation
 
@@ -1129,7 +1129,7 @@ relies on the session).
   report). Not moved: public links and upload links (new ones are made where needed), open agent proposals, the learnt
   models and word indexes (rebuilt on the target), knowledge pages of a space locked in the browser (export them as
   Markdown from the unlocked space).
-- **A personal office** (2.139.1): its owner exports it the same way (*Settings > Company & office > Data > Export the office*: the office and
+- **A private office** (2.139.1): its owner exports it the same way (*Settings > Company & office > Data > Export the office*: the office and
   the owner's private clients, nothing else); the import of such a file into the private space goes into the personal
   office of the importing person.
 
@@ -1193,7 +1193,7 @@ organisation data that is not yours (use the organisation export for a whole org
 receipts by name only: the receipt files are not in the file, and the import takes over none of it. Save the receipts on the
 old server before you give it up.
 
-**Your own office (2.362.2).** With a personal office the file also holds a readable copy of it under `personal-office/`:
+**Your own office (2.362.2).** With a private office the file also holds a readable copy of it under `personal-office/`:
 the same parts as *Export the office* in the office settings, with the receipts and filed documents of the office. The
 account import names it as staying behind; to take the office to another server use *Export the office* (that archive now
 carries the receipts, filed letters, contract, equipment and cash book documents, and the import points the office at them

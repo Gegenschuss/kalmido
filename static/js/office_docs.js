@@ -323,7 +323,7 @@ function ofdEditorHtml() {
   if (kind === 'offer') acts.push(kvaNextHtml(d, lk, ro));  // 2.138.0 E (#2235): the next step of the quotation; 2.144.7 (#2572): + "Create invoice"
   if (kind === 'invoice' && lk && d.status !== 'cancelled' && adm) acts.push(`<button type="button" class="btn sm" data-ofd="pay">${ic('plus', 's')}<span>${tr('Record payment')}</span></button>`);
   if ((kind === 'offer' || kind === 'invoice') && ofd_lsOn()) acts.push(`<button type="button" class="btn sm" data-ofd="to-ls" title="${esc(tr('A delivery note or proof of service with the positions, without prices'))}">${ic('file', 's')}<span>${tr('Delivery note')}</span></button>`);  // 2.120.0 D (#2089)
-  if (ofdCanSend(d)) acts.push(`<button type="button" class="btn sm" data-ofd="send">${ic('send', 's')}<span>${tr('Send|mail')}</span></button>`);  // 2.113.2 (#2253): a finalised quotation is mailed too
+  if (ofdCanSend(d)) acts.push(d.trial ? `<button type="button" class="btn sm" data-ofd="send" disabled title="${esc(tr('A trial document cannot be sent by e-mail; create a real document for your client'))}">${ic('send', 's')}<span>${tr('Send|mail')}</span></button>` : `<button type="button" class="btn sm" data-ofd="send">${ic('send', 's')}<span>${tr('Send|mail')}</span></button>`);  // 2.542.0 (#4594): a trial document: the button is off with the reason  // 2.113.2 (#2253): a finalised quotation is mailed too
   if (vf) acts.length = 0;
   const head = `<div class="ofdhead">${back}<span class="ofdnum"><b>${lk ? ic('lock', 's') + ' ' : ''}${inv ? esc(absKindName(d) || ofdKindName(kind, true)) + ' ' : ''}${esc(numTxt)}</b>${tri_tag(d) /* 2.144.10 C (#2576) */}${typeof onumDocHtml === 'function' ? onumDocHtml(d) : ''}${d.number || lk || d.number_at_finalize || !adm ? '' : `<button type="button" class="btn sm" data-ofd="number">${tr('Assign number')}</button>`}</span>
     ${stSel}<span class="spacer"></span>
@@ -839,7 +839,7 @@ function ofdMoreItems(d, inList) {
       inList && d.kind === 'offer' ? {label: tr('Create invoice'), icon: 'receipt', fn: () => kvaToInvoice(d, true)} : null,  // 2.144.7 (#2572): in the list row menu; the editor has the button in its bar
       !inList ? null : {label: tr('Preview (PDF)'), icon: 'eye', fn: () => ofdPdfOpen(d, false)},  // 2.40.0 (#1364): the PDF, not the JSON print model; 2.138.2 A (#2393): a list row opens marked; 2.380.0 A (#3410): a draft opens at once, too; 2.356.0 C (#3005): the editor has its Preview button, the menu no second one
       !inList ? null : {label: tr('Download PDF'), icon: 'download', fn: () => d.status === 'draft' && !d.locked ? ofdPdfAskGo(d, true) : ofdPdfOpen(d, true)},  // 2.435.0 B (#3618)
-      !inList || !ofdCanSend(d) ? null : {label: tr('Send by e-mail…'), icon: 'send', fn: async () => { try { ofdSendDialog(d.timesheet_ok === undefined ? await api('GET', `/api/office/docs/${d.id}`) : d); } catch (x) { toast(x.message || tr('unknown')); } }},  // 2.435.0 B (#3618): the list row may lack fields, load the whole document first
+      !inList || !ofdCanSend(d) || d.trial ? null : {label: tr('Send by e-mail…'), icon: 'send', fn: async () => { try { ofdSendDialog(d.timesheet_ok === undefined ? await api('GET', `/api/office/docs/${d.id}`) : d); } catch (x) { toast(x.message || tr('unknown')); } }},  // 2.435.0 B (#3618): the list row may lack fields, load the whole document first
       ...(typeof ls_moreItems === 'function' ? ls_moreItems(d, inList) : []),  // 2.120.0 D (#2089)
       ofdIsInv(d) && d.kind !== 'reminder' && d.kind !== 'delivery' && d.locked && (ofcFeat('docs.einvoice') || d.xml_sha256) ? {label: tr('E-invoice XML'), icon: 'download', fn: () => window.open(`/api/office/docs/${d.id}/xml`, '_blank', 'noopener')} : null,
       ...(typeof pep_moreItems === 'function' ? pep_moreItems(d) : []),  // 2.154.0 B (#1960): send over Peppol, UBL
@@ -906,7 +906,7 @@ async function ofdClick(e) {
       tr('Reverse payment'), async md => { const j = await ofdSave('DELETE', `/api/office/docs/${d.id}/payments/${b.dataset.pid}`, {note: $('#ofd-p-rnote', md).value}); if (!j) return false; toast(tr('Payment reversed')); });
     return;
   }
-  if (a === 'send') { ofdSendDialog(d); return; }
+  if (a === 'send') { if (d.trial) { toast(tr('A trial document cannot be sent by e-mail; create a real document for your client')); return; } ofdSendDialog(d); return; }  // 2.542.0 (#4594)
   if (a === 'ln-x') { const n = OFD.langNotes; OFD.langNotesShut = n ? {id: n.id, key: JSON.stringify(n.notes)} : null; OFD.langNotes = null; ofdDraw(); return; }  // 2.482.0 (#3940): remembered as closed
   if (a === 'rights-add') { OFD.rightsFor = d.id; OFD.open.rights = true; ofdDraw(); return; }  // 2.356.0 C (#3005)
   if (a === 'cf-reload') { ofd_cfReload(); return; }  // 2.269.0 A (#3012)

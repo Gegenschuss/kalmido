@@ -1186,6 +1186,7 @@ def inv_datev_ready(c, oid, r, s):
         raise DeniedKey(409, N_("Trial documents do not go to the accounting"))
 
 
+INV_TRIAL_NO_MAIL = N_("A trial document cannot be sent by e-mail; create a real document for your client")  # 2.542.0 (#4594)
 INV_CC_MAX = 5  # 2.433.0 (#3599): copy addresses of one mail (= contacts_cl.FK_CC_MAX)
 
 
@@ -1203,6 +1204,8 @@ def inv_send(c, oid, uid, r, b, later=False, auto=False):
         raise DeniedKey(409, N_("Sending e-mail is not set up on this server (KALMIDO_SMTP_HOST)"))
     if not ofx_locked(r):
         raise DeniedKey(409, N_("Finalise the document first"))
+    if _col(r, "trial"):  # 2.542.0 (#4594): a trial document (SAMPLE mark) never goes out by e-mail: manual send, series, reminder
+        raise DeniedKey(409, INV_TRIAL_NO_MAIL)
     to = (b.get("to") or "").strip() if isinstance(b.get("to"), str) else ""
     cc = (b.get("cc") or "").strip() if isinstance(b.get("cc"), str) else ""
     mail_re = r"[^@\s,]+@[^@\s,]+\.[^@\s,]+"

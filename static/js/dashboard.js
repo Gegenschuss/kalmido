@@ -343,12 +343,18 @@ LY.clients = {key: 'view_clients', title: () => tr('Customise the client card'),
 LY.family = {key: 'view_family', grid: 'dgrid', title: () => tr('Customise Family'), blocks: () => [['occ', N_('Birthdays & anniversaries'), 'cake', 'half', false, 3], ['rot', N_('Whose turn'), 'turns', 'half', false, 3],
   ['meals', N_('Meal plan'), 'meal', 'half', false, 3], ['shop', N_('Shopping'), 'cart', 'half', false, 3], ['dl', N_('Deadlines'), 'hourglass', 'half', false, 3],
   ['kids', N_('Kids'), 'star', 'half', false, 3], ['pack', N_('Packing lists'), 'bag', 'half', false, 3]]};
+// 2.542.0 (#4579): a Start row shows its subtasks done / all like taskRow (render.js)
+function hpSubc(t) {
+  const kids = S.tasks.size ? children(t.id) : []; if (!kids.length) return '';
+  const dn = kids.filter(k => k.status !== 0).length, lab = esc(tr('{0} of {1} subtasks done', dn, kids.length));
+  return `<span class="subc" title="${lab}">${ic('sub', 's')}${dn}/${kids.length}<span class="sr"> ${lab}</span></span>`;
+}
 function dashCard(k) {
   const [_, name, icon] = DASH.find(d => d[0] === k), t0 = today();
   const card = (body, more = '', n = '', title = tr(name)) => `<section class="dcard dc-${k}" aria-labelledby="dh-${k}"><h3 id="dh-${k}">${ic(icon, 's')}<span>${esc(title)}</span>${n !== '' ? `<span class="dcn">${n}</span>` : ''}<span class="spacer"></span>${more}</h3>${body}</section>`;
   // 2.45.0 (#1504): the list as a label after the title (not the basket), the date right: overdue = the day, else the time or the day
   const hpDue = t => t.due < t0 ? dayLabel(t.due) : fmtTimeLoc(t.due_time) || dayLabel(t.due);  // 2.368.0 B (#2982)
-  const tasksList = (ts, n = 6) => ts.length ? `<ul class="dtl">${ts.slice(0, n).map(t => { const l = listById(t.list_id); return `<li><button type="button" class="chk p${t.priority}" data-act="toggle" data-id="${t.id}" role="checkbox" aria-checked="false" aria-label="${esc(tr('Complete: {0}', mdPlain(t.title)))}"></button><a href="#t/${t.id}" class="dtt">${mdTitleNL(t.title)}</a>${l && !l.is_inbox ? `<span class="hpll">${esc(lname(l))}</span>` : ''}${t.due ? `<span class="dt ${dueClass(t)}">${esc(hpDue(t))}</span>` : ''}</li>`; }).join('')}</ul>${ts.length > n ? `<p class="muted dmore">${tr('{0} more', ts.length - n)}</p>` : ''}` : '';
+  const tasksList = (ts, n = 6) => ts.length ? `<ul class="dtl">${ts.slice(0, n).map(t => { const l = listById(t.list_id); return `<li><button type="button" class="chk p${t.priority}" data-act="toggle" data-id="${t.id}" role="checkbox" aria-checked="false" aria-label="${esc(tr('Complete: {0}', mdPlain(t.title)))}"></button><a href="#t/${t.id}" class="dtt">${mdTitleNL(t.title)}</a>${hpSubc(t)}${l && !l.is_inbox ? `<span class="hpll">${esc(lname(l))}</span>` : ''}${t.due ? `<span class="dt ${dueClass(t)}">${esc(hpDue(t))}</span>` : ''}</li>`; }).join('')}</ul>${ts.length > n ? `<p class="muted dmore">${tr('{0} more', ts.length - n)}</p>` : ''}` : '';
   // 2.45.0 (#1504): an empty card is one slim line ("Waiting for you: nothing"), still a named section
   const slim = (txt = tr('{0}: nothing', tr(name))) => `<section class="dcard dempty dc-${k}" aria-labelledby="dh-${k}"><h3 id="dh-${k}"><span>${esc(txt)}</span></h3></section>`;
   if (k === 'wait') {

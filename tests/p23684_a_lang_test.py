@@ -94,6 +94,13 @@ check(len(bad) == 8, "every variant is an error " + str(bad))
 good = ["Client number", "Sign in", "Sign-in", "Accent colour", "Customise Today", "Fetch e-mails", "Your holiday", "New enquiry", "Quotations",
         "mailbox.org", "{0} mail-in address", "Reminder|pack", "Logo", "Log", "Registered mail", "Customer|pack"]
 check(ck.glossary_errors(good) == [], "the glossary words, a domain, a pack text and a Log pass " + str(ck.glossary_errors(good)))
+# 2.542.0 (#4605): "Private" is the own workspace, "personal" only for what a person owns
+bad = ck.glossary_errors(["My files", "Your personal office", "Make personal", "My workspace", "Personal area"])
+check(len(bad) == 5, "#4605: the third names of the own workspace are errors " + str(bad))
+check(ck.glossary_errors(["Private|workspace", "Your private office", "Move to Private", "Personal agent of {0}", "Your personal agent", "Personal API tokens"]) == [],
+      "#4605: private office, Private and what a person owns pass")
+check(len(ck.private_term_errors({"x": "Meine Ablage", "y": "Dein persönliches Büro"}, "de.json")) == 2
+      and ck.private_term_errors({"x": "Privat", "y": "Persönlicher Agent von {0}"}, "de.json") == [], "#4605: German third names are refused")
 keys, _, _ = ck.extract()
 check(ck.glossary_errors(keys) == [], "no variant in the code " + str(ck.glossary_errors(keys))[:300])
 check("Client number|customer" in keys and "Payment reminder|dunning" in keys and "Sign-in" in keys, "the renamed keys are in the code")

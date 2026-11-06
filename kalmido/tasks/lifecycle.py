@@ -27,6 +27,7 @@ from ..tasks.tasks import (
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from ..accounts.bgjobs import bgj_add, bgj_fn  # 2.281.0 A (#3112): 'Empty trash' in the background
 from ..tasks.validation import lock_problem  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.validation import lock_done_problem  # 2.542.0 (#4609)
 from ..lists.listtrash import otr_err_task, otr_trash  # 2.369.5 (#2517): pulled up from functions; 2.530.0 B (#4315): otr_trash for accounts/onboarding.py
 from ..lists.listtrash import otr_need
 
@@ -404,6 +405,8 @@ def task_complete(tid):
             "TIMES=" in t["repeat"] and b.get("expect_time") and b["expect_time"] != t["due_time"])):  # 2.116.0 D (#2066)
         return jsonify({**one_task(c, tid), "next_due": None, "skipped": True})
     st = int(b.get("status", 2))
+    if t["locked"] and t["status"] == st:  # 2.542.0 (#4609, review): a locked task already in that state - nothing changes,
+        return jsonify({**one_task(c, tid), "next_due": None, "undo": None})  # no history, no event (agents may repeat it)
     undo = {}
     nxt = do_complete(c, tid, st, undo)
     log_act(c, tid, "wont" if st == -1 else "reopen" if st == 0 else "complete", {"next": nxt} if nxt else None)
@@ -475,6 +478,11 @@ def do_complete(c, tid, status=2, undo=None):
     write_lock(c, f"task-{tid}")  # 2.126.0 D (#1987): one completion of a task at a time (the row below is then current)
     irr_guard(c, tid)  # 2.392.0 (#3370)
     t = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
+    e = lock_done_problem(t)  # 2.542.0 (#4609): every way of completing ends here -- a locked task is unlocked first
+    if e and t["status"] == status:  # review: completing a locked task that is done already changes nothing (agents may repeat it)
+        return None
+    if e:
+        raise Denied(409, e)
     if status == 2 and t["status"] != 2:  # 2.60.0 C (#1512): "done only after approval" -- every way of completing ends here
         from ..tasks.review import rvw_gate
         e = rvw_gate(c, tid)
@@ -538,7 +546,7 @@ def do_complete(c, tid, status=2, undo=None):
             k = c.execute("SELECT status, completed_at, completed_by FROM tasks WHERE id=?", (d,)).fetchone()
             if undo is not None and k["status"] != 0:
                 undo["kids"].append([d, k["status"], k["completed_at"], k["completed_by"]])
-            c.execute("UPDATE tasks SET status=0, completed_at=NULL, completed_by=NULL WHERE id=?", (d,))
+            c.execute("UPDATE tasks SET status=0, completed_at=NULL, completed_by=NULL WHERE id=? AND locked=0", (d,))  # 2.542.0 (#4609)
         if undo is not None:
             undo.update(copy_id=cur_id, next=nxt)
         if t["review"]:  # 2.60.0 C (#1512): the next occurrence needs its own approval
@@ -551,8 +559,8 @@ def do_complete(c, tid, status=2, undo=None):
             rsn_clear(c, tid)  # 2.556.0 C review (#4583, finding 3): open again = a live task, the old round's state goes
         if status != 0:  # completing a parent completes its open subtasks (all levels)
             for d in descendants(c, tid):
-                c.execute("UPDATE tasks SET status=?, completed_at=?, completed_by=?, updated_at=? WHERE id=? AND status=0",
-                          (status, ts, who, ts, d))
+                c.execute("UPDATE tasks SET status=?, completed_at=?, completed_by=?, updated_at=? WHERE id=? AND status=0 AND locked=0",
+                          (status, ts, who, ts, d))  # 2.542.0 (#4609): a locked subtask stays open
     rul_fire_done(c, tid, cur_id if nxt else None, rb)  # 2.71.0 A (#1457): a recurring task: its completed copy
     return nxt
 
@@ -591,6 +599,8 @@ def undo_status(c, tid, u):
         late = True
     if late:
         return tr("This can no longer be undone")
+    if lock_done_problem(t):  # 2.542.0 (#4609): an undo changes the status too -- not of a locked task
+        return lock_done_problem(t)
     ts = iso(now_utc())
     people = list_people(c, t["list_id"])
 
@@ -669,7 +679,8 @@ def undo_status(c, tid, u):
                 continue
             if st not in (2, -1):
                 continue
-            c.execute("UPDATE tasks SET status=?, completed_at=?, completed_by=? WHERE id=? AND parent_id IS NOT NULL AND status=0 AND list_id=?",
+            c.execute("UPDATE tasks SET status=?, completed_at=?, completed_by=? WHERE id=? AND parent_id IS NOT NULL AND status=0 AND list_id=? "
+                      "AND locked=0",  # 2.542.0 (#4609): a subtask locked since stays as it is
                       (st, cat, cby, d, t["list_id"]))
     else:
         if t["status"] == 0 or t["completed_at"] != at:
@@ -678,8 +689,8 @@ def undo_status(c, tid, u):
         if u.get("repeat") and not t["repeat"]:  # the last occurrence had ended the repetition
             c.execute("UPDATE tasks SET repeat=? WHERE id=?", (str(u["repeat"])[:500], tid))
         for d in descendants(c, tid):  # subtasks completed together with it
-            c.execute("UPDATE tasks SET status=0, completed_at=NULL, completed_by=NULL, updated_at=? WHERE id=? AND completed_at=?",
-                      (ts, d, at))
+            c.execute("UPDATE tasks SET status=0, completed_at=NULL, completed_by=NULL, updated_at=? WHERE id=? AND completed_at=? "
+                      "AND locked=0", (ts, d, at))  # 2.542.0 (#4609): a subtask locked since stays done
     stars_revoke(c, tid, at=at)  # 2.19.0 (#653): a kid's stars for exactly this completion
     # the "completed" News items this completion created for others
     c.execute("DELETE FROM notifications WHERE task_id=? AND kind='complete' AND actor_id=? AND created_at>=?",
@@ -799,7 +810,9 @@ def task_reopen(tid):
     c = db()
     need_task(c, tid)
     need_live(c, tid)  # 2.126.0 D (#1992 A3)
-    old = c.execute("SELECT status, completed_at, completed_by FROM tasks WHERE id=?", (tid,)).fetchone()
+    old = c.execute("SELECT status, completed_at, completed_by, locked FROM tasks WHERE id=?", (tid,)).fetchone()
+    if old["status"] != 0 and lock_done_problem(old):  # 2.542.0 (#4609): reopened only after unlocking
+        raise Denied(409, lock_done_problem(old))
     from ..lists.rules import rul_fire, rul_snap
     rb = rul_snap(c, tid)  # 2.71.0 A (#1457)
     if old["status"] != 0:

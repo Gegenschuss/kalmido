@@ -1538,7 +1538,6 @@ POST /api/v1/tasks/{}/contacts
 POST /api/v1/tasks/{}/dependencies
 POST /api/v1/tasks/{}/links
 POST /api/v1/tasks/{}/move
-POST /api/v1/tasks/{}/reopen
 POST /api/v1/tasks/{}/restore
 POST /api/v1/tasks/{}/review
 POST /api/v1/tasks/{}/skip

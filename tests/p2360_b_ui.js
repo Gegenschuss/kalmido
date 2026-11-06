@@ -2,7 +2,7 @@
 // #1118 the lock: a task an agent created shows a small lock in its row and the pressed lock button in the task header;
 //      title and description are read-only, Today / Tomorrow are gone; a click in the description, typing into the title,
 //      the date and priority pickers, moving to another list and a direct write show the hint with "Unlock" and change
-//      nothing; a checkbox in the description still ticks, a comment still posts, the task still completes; "Unlock"
+//      nothing; a checkbox in the description still ticks, a comment still posts (2.542.0, #4609: completing needs unlocking, p2542_a_ui); "Unlock"
 //      in the hint unlocks it (history step "Unlocked …", undo locks again); a view-only member sees no lock button;
 //      multi-select skips the locked task with a note; part 1: a click that selected text, a double click or a moved
 //      pointer never opens the editor, a plain click does (after the double-click pause), clicks in code / tables /

@@ -276,7 +276,7 @@ UA8_AREAS = (
     (N_("filed e-mails"), "SELECT 1 FROM hub_mails WHERE owner_id=? AND org_id IS NULL LIMIT 1"),
     (N_("habits"), "SELECT 1 FROM habits WHERE user_id=? LIMIT 1"),
     (N_("time entries"), "SELECT 1 FROM time_entries t LEFT JOIN lists l ON l.id=t.list_id WHERE t.user_id=? AND l.org_id IS NULL LIMIT 1"),
-    (N_("personal office"), None),  # 2.239.0 C (#2866): every office table of the schema (ua8_office_sql)
+    (N_("private office"), None),  # 2.239.0 C (#2866): every office table of the schema (ua8_office_sql)
     (N_("clients"), "SELECT 1 FROM clients WHERE created_by=? AND org_id IS NULL LIMIT 1"),
     (N_("bookmarks"), "SELECT 1 FROM bookmarks WHERE user_id=? AND org_id IS NULL LIMIT 1"),
     (N_("news feeds"), "SELECT 1 FROM rss_feeds WHERE user_id=? AND org_id IS NULL LIMIT 1"),  # 2.172.0 B (#2677)

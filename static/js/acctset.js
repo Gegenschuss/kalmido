@@ -1001,8 +1001,8 @@ function ua8PurgeHtml(p) {
   const to = ua8SharedCounts(p.shared?.to), gone = ua8SharedCounts(p.shared?.gone);
   if (to) rows.push([false, p.shared.names?.length ? tr('Shared with others, these stay and go to the longest-standing person who may change them ({1}): {0}.', to, p.shared.names.join(', ')) : tr('Shared with others, these stay and go to the longest-standing person who may change them: {0}.', to)]);
   if (gone) rows.push([true, tr('Shared with others, but nobody else may take them over, so these go with the account: {0}.', gone)]);
-  if (p.office === 'keep') rows.push([true, tr('The personal office keeps {0} by law until {1}: it is retired and goes for good after that date, nobody can export it any more (the person can download the retention export in the office before). Everything else of the account goes.', odlCounts(p.kept), fmtDate(p.kept_until))]);
-  else if (p.office === 'delete') rows.push([false, tr('The personal office goes with its files: {0}.', odlCounts(p.office_counts))]);
+  if (p.office === 'keep') rows.push([true, tr('The private office keeps {0} by law until {1}: it is retired and goes for good after that date, nobody can export it any more (the person can download the retention export in the office before). Everything else of the account goes.', odlCounts(p.kept), fmtDate(p.kept_until))]);
+  else if (p.office === 'delete') rows.push([false, tr('The private office goes with its files: {0}.', odlCounts(p.office_counts))]);
   if (p.agents) rows.push([false, trn('{0} own agent is deleted with its access keys.', '{0} own agents are deleted with their access keys.', p.agents)]);
   if (p.calendars) rows.push([false, trn('{0} calendar of an organisation goes to an admin of the organisation.', '{0} calendars of an organisation go to an admin of the organisation.', p.calendars)]);
   if (p.time_kept) rows.push([false, trn('{0} time entry in projects of an organisation stays, without the name.', '{0} time entries in projects of an organisation stay, without the name.', p.time_kept)]);

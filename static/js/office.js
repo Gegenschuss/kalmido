@@ -234,7 +234,7 @@ function pb_hintHtml() {
   if (!h.length) return '';
   return `<div class="pbhint shint keep">${ic('building', 's')}<div>${h.map(o => `<p>${esc(tr('The office of your organisation {0} is in the workspace {0}.', o.name))}</p>
     <button type="button" class="btn sm" data-ofc="pb-ws" data-ws="org:${o.id}">${esc(tr('Switch to {0}', o.name))}</button>`).join('')}
-    <p class="muted">${esc(tr('This is your personal office in the workspace Private: its clients, documents and settings are yours alone.'))}</p></div></div>`;
+    <p class="muted">${esc(tr('This is your office in the workspace Private: its clients, documents and settings are yours alone.'))}</p></div></div>`;
 }
 const orgLabelOf = oid => (S.me?.workspaces || []).find(o => o.id === oid)?.name || '';
 
@@ -594,7 +594,7 @@ function ofcSettingsHtml() {
     ${adm && OFC.info.personal && (OFC.info.can_move || OFC.info.move_orgs?.length) ? `<h3>${tr('Transfer into an organisation')}</h3>${''/* 2.144.6 C (#2436): one section, one word (übertragen) for both ways */}
     ${OFC.info.can_move ? `<p class="muted">${tr('Documents, numbers, settings, master data and clients go with it. This cannot be undone.')}</p><div class="lacts"><button type="button" class="btn sm" data-ofc="pb-move">${ic('building', 's')} ${tr('Transfer into a new organisation…')}</button></div>` : ''}
     ${OFC.info.move_orgs?.length ? `<p class="muted">${tr('Finalised invoices stay locked and keep their numbers. This cannot be undone.')}</p><div class="lacts"><button type="button" class="btn sm" data-ofc="pb-transfer">${ic('building', 's')} ${tr('Transfer into an organisation…')}</button></div>` : ''}` : ''}
-    ${adm && !OFC.info.personal && OFC.info.org_id && S.me?.kind !== 'agent' ? `<h3>${tr('Transfer into your personal office')}</h3><p class="muted">${tr('What you created in this office (clients, drafts, framework contracts, trips, templates) moves into your personal office, for example when you leave an office community. Issued invoices stay here; a read-only copy can go along. Can be undone.')}</p><div class="lacts"><button type="button" class="btn sm" data-ofc="org-out">${ic('user', 's')} ${tr('Transfer into your personal office…')}</button></div>` : ''}${''/* 2.356.0 A (#2926) */}
+    ${adm && !OFC.info.personal && OFC.info.org_id && S.me?.kind !== 'agent' ? `<h3>${tr('Transfer into your private office')}</h3><p class="muted">${tr('What you created in this office (clients, drafts, framework contracts, trips, templates) moves into your private office, for example when you leave an office community. Issued invoices stay here; a read-only copy can go along. Can be undone.')}</p><div class="lacts"><button type="button" class="btn sm" data-ofc="org-out">${ic('user', 's')} ${tr('Transfer into your private office…')}</button></div>` : ''}${''/* 2.356.0 A (#2926) */}
     ${adm && OFC.info.personal && typeof ox_pbBoxHtml === 'function' ? ox_pbBoxHtml(0) : ''}${''/* 2.137.0 A (#2344): export of the personal office */}
     ${adm && OFC.info.personal && typeof rxBoxHtml === 'function' ? rxBoxHtml('me') : ''}${''/* 2.146.0 D (#2468): the retention export of the own records */}
     </fieldset>
@@ -636,7 +636,7 @@ function ofcOwnRatesHtml(s, p, dis) {
 async function pb_move() {
   const name = ((await askPrompt(tr('Name of the new organisation'), (OFC.info?.settings?.company?.name || OFC.info?.company_fields?.name || '').split('\n').join(' '), {ok: tr('Next'), input: {max: 60}})) || '').trim();
   if (!name) return;
-  if (!await askConfirm(tr('Move your personal office into “{0}”?', name), tr('Turns this personal office into a new organisation with you as its admin: documents, numbers, settings, master data and your private clients go with it. This cannot be undone.'), {ok: tr('Move'), danger: true})) return;
+  if (!await askConfirm(tr('Move your private office into “{0}”?', name), tr('Turns this private office into a new organisation with you as its admin: documents, numbers, settings, master data and your private clients go with it. This cannot be undone.'), {ok: tr('Move'), danger: true})) return;
   try {
     const j = await api('POST', '/api/office/move', {name, confirm: true});
     await refreshMe(); S.workspaces = true; S.settings.workspace = 'org:' + j.org_id; LS.set('ws', S.settings.workspace);
@@ -657,7 +657,7 @@ async function pb_transfer() {
     if (want !== org) return;
     pv = j;
     box.innerHTML = (j.conflicts.length ? `<p><b>${esc(tr('Cannot be transferred'))}</b></p>${ul(j.conflicts)}` : '')
-      + `<p><b>${esc(tr('Goes along'))}</b></p>${ul(j.moves)}<p><b>${esc(tr('Stays in your personal office'))}</b></p>${ul(j.keeps)}${ul(j.notes)}<p>${esc(j.who)}</p><p class="muted">${esc(tr('This cannot be undone.'))}</p>`;
+      + `<p><b>${esc(tr('Goes along'))}</b></p>${ul(j.moves)}<p><b>${esc(tr('Stays in your private office'))}</b></p>${ul(j.keeps)}${ul(j.notes)}<p>${esc(j.who)}</p><p class="muted">${esc(tr('This cannot be undone.'))}</p>`;
     ok.disabled = !j.ok;
   };
   const html = (orgs.length > 1 ? `<label>${esc(tr('Organisation'))} <select id="pbt-org">${orgs.map(o => `<option value="${o.id}">${esc(o.name)}</option>`).join('')}</select></label>` : `<p>${esc(tr('Into “{0}”', orgs[0].name))}</p>`) + '<div id="pbt-pv"></div>';

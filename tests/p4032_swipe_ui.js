@@ -3,7 +3,7 @@
 // - jsdom: swipe left > 1/3 of the width closes (panel: folded and remembered like the button; drawer: closeSide), a short
 //   swipe keeps it open and the panel snaps back, a vertical move / a swipe to the right / a second finger do nothing,
 //   the same for a person without an organisation
-// - app.css: the rail's show / hide button is position: sticky (stays while the rail scrolls)
+// - app.css: the rail's show / hide button is position: sticky (stays while the rail scrolls); 2.542.0 (#4610): the button is gone, no rule for it left
 const path = require('path');
 const fs = require('fs');
 const {execFileSync} = require('child_process');
@@ -74,7 +74,7 @@ async function jsd(user, L, tag, mobile) {
   await jsd('frida', LF, 'tablet without organisation', false);
   await jsd('alice', LA, 'phone', true);
   const css = fs.readFileSync(path.join(__dirname, '..', 'static', 'app.css'), 'utf8');
-  check(/#srail \.srb\.srpanel\{[^}]*position:sticky;top:0/.test(css), 'app.css: the rail button is sticky');
+  check(!/srpanel/.test(css), '#4610: app.css: no rule for the removed panel button of the rail');  // 2.542.0 (#4610): was "the rail button is sticky"
   console.log(`p4032_swipe_ui: ${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);
 })().catch(e => { console.log('FAIL: crashed', e); process.exit(1); });

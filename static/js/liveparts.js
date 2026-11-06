@@ -17,7 +17,7 @@ let lpT = 0, lpAreas = new Set();
 const lpFormBusy = (root = document) => !!root && typeof fgDirty === 'function' && [...root.querySelectorAll('[data-fg]')].some(f => fgDirty(f.dataset.fg));
 // 2.358 (#3402): a press / drag that holds an element (drag.js: the timeline's bars and its new-task ghost .tl-ghost; the
 // calendar's held event .cgghost / .cgsrc): a redraw would replace it under the finger (on a phone the held event dropped)
-const lpHold = () => !!((typeof drg_cur !== 'undefined' && drg_cur) || (typeof CG !== 'undefined' && CG.st?.active));
+const lpHold = () => !!((typeof drg_cur !== 'undefined' && drg_cur) || (typeof CG !== 'undefined' && CG.st?.active) || (typeof rswBusy === 'function' && rswBusy()));  // 2.542.0 (#4614): + a swipe to reply (collab.js draws after it)
 const lpBusy = () => editing() || lpFormBusy() || lpHold();
 // the areas whose counter moved since the last poll (null: unknown -> the full way)
 // 2.280.0 F (#3109): + those of earlier polls not taken yet (typing, a dialog, a braked reload: S.v stayed behind); lpSettle

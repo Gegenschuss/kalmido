@@ -129,8 +129,14 @@ class DbError(Exception):
 IntegrityError = OperationalError = Error = DbError
 
 
-def _psql(dbc, dbn, sql, timeout=60):
-    p = subprocess.run(["docker", "exec", "-i", dbc, "psql", "-U", "kalmido", "-d", dbn, "-X", "-q", "-A", "-t",
+# 2.542.0 (#4598): the suites backdate and tamper with finalised documents on purpose (due dates, numbers, snapshots); their
+# own session passes the database trigger kalmido_office_locked (core/migrations.d/4598.py) -- the app's connections never.
+# connect(path, guarded=True): a session without it, for the tests of the trigger itself
+RELEASE = ["-e", "PGOPTIONS=-c kalmido.locked_ok=on"]
+
+
+def _psql(dbc, dbn, sql, timeout=60, guarded=False):
+    p = subprocess.run(["docker", "exec", *([] if guarded else RELEASE), "-i", dbc, "psql", "-U", "kalmido", "-d", dbn, "-X", "-q", "-A", "-t",
                         "-v", "ON_ERROR_STOP=1"], input=sql, capture_output=True, text=True, timeout=timeout)
     if p.returncode != 0:
         raise DbError((p.stderr or p.stdout).strip())
@@ -170,8 +176,9 @@ _TABLE_INFO = ("SELECT c.ordinal_position - 1 AS cid, c.column_name AS name, upp
 
 
 class Conn:
-    def __init__(self, path):
+    def __init__(self, path, guarded=False):
         self.dbc, self.dbn = _target(path)
+        self.guarded = guarded  # 2.542.0 (#4598)
         self.row_factory = None  # accepted (sqlite3.Row style); rows always answer to names
 
     def execute(self, sql, args=()):
@@ -184,16 +191,16 @@ class Conn:
                 body = f"WITH _q AS ({q}) SELECT json_agg(row_to_json(_q)) FROM _q"
             else:
                 body = f"SELECT json_agg(row_to_json(_q)) FROM ({q}) _q"
-            out = _psql(self.dbc, self.dbn, body + ";\n").strip()
+            out = _psql(self.dbc, self.dbn, body + ";\n", guarded=self.guarded).strip()
             # object_pairs_hook: two result columns of the same name ("?column?") stay two columns
             data = json.loads(out, object_pairs_hook=_Pairs) if out else None
             # json / jsonb come back as their JSON text, as through the app's own connection (and sqlite3 before)
             rows = [Row([k for k, _ in o], [json.dumps(_plain(v)) if isinstance(v, list) else v for _, v in o]) for o in (data or [])]
             return Cursor(rows, len(rows))
         if _DML.match(q):
-            out = _psql(self.dbc, self.dbn, f"WITH _q AS ({q} RETURNING 1) SELECT count(*) FROM _q;\n").strip()
+            out = _psql(self.dbc, self.dbn, f"WITH _q AS ({q} RETURNING 1) SELECT count(*) FROM _q;\n", guarded=self.guarded).strip()
             return Cursor([], int(out or 0))
-        _psql(self.dbc, self.dbn, q + ";\n")
+        _psql(self.dbc, self.dbn, q + ";\n", guarded=self.guarded)
         return Cursor([], -1)
 
     def executemany(self, sql, seq):
@@ -203,7 +210,7 @@ class Conn:
         return Cursor([], n)
 
     def executescript(self, sql):
-        _psql(self.dbc, self.dbn, sql)
+        _psql(self.dbc, self.dbn, sql, guarded=self.guarded)
 
     def commit(self):
         pass
@@ -221,8 +228,8 @@ class Conn:
         return False
 
 
-def connect(path, *_a, **_k):
-    return Conn(path)
+def connect(path, *_a, guarded=False, **_k):
+    return Conn(path, guarded=guarded)
 
 
 def q(path, sql, args=()):

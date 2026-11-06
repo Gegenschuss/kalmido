@@ -551,6 +551,13 @@ def lock_problem(c, cur, f, b=None):
     return tr("This task is locked. Unlock it to change it.") if hit else None
 
 
+# 2.542.0 (#4609): completing / reopening a locked task is refused on every way (app, API token, agents, MCP, CalDAV,
+# webhooks, public links, batches); the lock is taken off first (locked false), by anyone who may change the task.
+def lock_done_problem(row):
+    """The error text when the task row is locked (its status cannot change until it is unlocked), else None."""
+    return tr("This task is locked. Unlock it first (locked: false), then complete or reopen it.") if row is not None and "locked" in row.keys() and row["locked"] else None
+
+
 def lock_bypass_agent():
     """2.564.0 (#4702): an agent account writing through the API: not bound by the lock (the decision of #4702), but its
     change of a locked field is marked in the task's history as locked_bypass (lock_problem)."""

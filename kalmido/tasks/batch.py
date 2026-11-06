@@ -20,6 +20,7 @@ from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from function
 from ..core.serializers import unlink_files
 from ..tasks.atttrash import atr_purge_one  # 2.272.0 F (#3038, review E2-H2)
 from ..tasks.validation import lock_problem  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.validation import lock_done_problem  # 2.542.0 (#4609)
 from ..core.pg import write_lock  # review 2.528 (Fable 3)
 
 
@@ -176,7 +177,7 @@ def task_batch():
                   the others are reported in skipped
       undo:       a completion / reopen that changed meanwhile is reported as a conflict too
     The answer carries conflicts [{id, title, field, server, mine}], skipped [ids] (2.38.0, #1132: locked tasks that kept
-    their values; the others changed) and the server time (now)."""
+    their values; the others changed; 2.542.0, #4609: complete / reopen / undo skip locked tasks too) and the server time (now)."""
     from ..collab.comments import task_event
     from ..tasks.dependencies import completed_ids, unblock_events
     b = body()
@@ -227,6 +228,13 @@ def task_batch():
             role = need_task(c, tid)
             if role == "participant" and action == "delete":
                 raise Denied(403, tr("Participants cannot delete tasks"))
+            if action in ("complete", "undo", "reopen"):  # 2.542.0 (#4609): a locked task keeps its status, the rest changes
+                lr = c.execute("SELECT locked, status FROM tasks WHERE id=?", (tid,)).fetchone()
+                ld = lock_done_problem(lr)
+                if ld and (action == "undo" or (lr["status"] == 0) == (action == "complete")):
+                    errors.append(ld)
+                    skipped.append(tid)
+                    continue
             if action == "patch":
                 pv, cf = (data.get("prev") or {}).get(str(tid)) if isinstance(data.get("prev"), dict) else None, []
                 e = apply_update(c, tid, {**{k: v for k, v in data.items() if k != "prev"}, **({"_prev": pv} if isinstance(pv, dict) else {})}, cf, lock=True)

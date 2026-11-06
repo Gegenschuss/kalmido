@@ -467,6 +467,8 @@ def pub_tick(token):
         return pub_gone(lg)
     g.user, g.auth_via = PUB_ACTOR, "public"  # completion code below: attributed to "someone via the public link"
     st = visible[tid]["status"]
+    if c.execute("SELECT locked FROM tasks WHERE id=?", (tid,)).fetchone()[0]:  # 2.542.0 (#4609): a locked task keeps its status
+        to = None
     if to == "done" and st == 0 and not complete_stale(c, tid, visible[tid]["due"]):  # 2.126.0 D (#1987)
         nxt = do_complete(c, tid, 2)
         log_act(c, tid, "complete", {"next": nxt} if nxt else None)
@@ -670,6 +672,8 @@ def checklist_action(lid):
     ts = iso(now_utc())
     for tid in ids:
         if a == "uncheck_all":
+            if c.execute("SELECT locked FROM tasks WHERE id=?", (tid,)).fetchone()[0]:  # 2.542.0 (#4609): stays done until unlocked
+                continue
             c.execute("UPDATE tasks SET status=0, completed_at=NULL, completed_by=NULL, updated_at=? WHERE id=?", (ts, tid))
             log_act(c, tid, "reopen")
         elif c.execute("SELECT deleted_at FROM tasks WHERE id=?", (tid,)).fetchone()[0] is None:  # not gone with its parent
