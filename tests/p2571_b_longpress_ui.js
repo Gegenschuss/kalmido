@@ -94,10 +94,10 @@ const closeMenu = w => w.eval('closePop()');
 
   // ================= the calendar grid still drags: a long press there opens no row menu
   w = await boot({user: 'alice', hash: 'cal'}); d = w.document;
-  await until(() => d.querySelector('#view .cal, #view .cvx, #view [data-cev]'), 40);
-  const cell = d.querySelector('#view .cvx-day, #view .calcell, #view [data-day]');
-  if (cell) { check(!(await longPress(w, cell)), 'calendar: a long press on the grid opens no row menu'); closeMenu(w); }
-  else check(true, 'calendar: no grid cell found in this build (skipped)');
+  // 2.571.0 (#4608, nosham): the month grid's cell (.cal .cell, as the other calendar suites) - before a skip that could not fail
+  check(await until(() => d.querySelector('#view .cal .cell'), 40), 'calendar: the month grid is drawn');
+  const cell = d.querySelector('#view .cal .cell');
+  check(cell && !(await longPress(w, cell)), 'calendar: a long press on the grid opens no row menu'); closeMenu(w);
   w.close();
 
   check(!errs.length, 'no page errors ' + JSON.stringify(errs.slice(0, 3)));
