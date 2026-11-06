@@ -19,10 +19,11 @@ import sys
 import requests
 
 from freelancer_fixture import freelancer
-from kt import B, check, done, fresh, setup
+from kt import B, check, docker_logs_on_first_fail, done, fresh, setup
 
 V = B + "/api/v1"
 fresh(prefix="PR2472B")
+docker_logs_on_first_fail(tail=120, chars=12000)
 A = setup()
 A.patch(B + "/api/settings", json={"lang": "en", "tour": "done"})
 FID, F = freelancer(B, A)

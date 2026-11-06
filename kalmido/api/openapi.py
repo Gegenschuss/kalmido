@@ -736,7 +736,6 @@ def openapi_spec():
                                 "delete": op("Clear the waiting state", T, ok(ref("Task")) | errs("403", "404"), [pid()], scope="write")},
         "/tasks/{id}/reopen": {"post": op("Reopen a completed task", T, ok(ref("Task")) | errs("403", "404", "409"), [pid()], scope="write",
                                           desc="2.542.0: a locked task answers 409 -- PATCH locked false first.")},
-        "/tasks/{id}/reopen": {"post": op("Reopen a completed task", T, ok(ref("Task")) | errs("403", "404"), [pid()], scope="write")},
         # 2.577.0 (#3354)
         "/tasks/{id}/state": {"post": op("Set a task's state: into the first column with that meaning", T, ok(ref("Task")) | errs("400", "403", "404", "409"), [pid()],
                                          scope="write", body={"type": "object", "required": ["section_kind"], "properties": {

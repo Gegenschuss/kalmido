@@ -31,6 +31,7 @@ from ..tasks.validation import lock_done_problem  # 2.542.0 (#4609)
 from ..lists.listtrash import otr_err_task, otr_trash  # 2.369.5 (#2517): pulled up from functions; 2.530.0 B (#4315): otr_trash for accounts/onboarding.py
 from ..lists.listtrash import otr_need
 from ..tasks.ttypes import tt_check  # 2.609.0 (#3372)
+from ..lists.seckind import sk_after_status, sk_gate, sk_on_move, sk_snap, sk_undo  # 2.577.0 (#3354)
 
 
 def _norm(v):
