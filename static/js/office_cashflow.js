@@ -116,7 +116,7 @@ async function rk_fixedCatRename(k) {
   let j;
   try { j = await api('POST', '/api/office/fixed-costs/category-rename', {from: k, to}); } catch (x) { toast(x.message || tr('unknown')); return; }
   rk_cfReload();
-  toast(j.merged ? tr('Merged') : tr('Renamed'), async () => { await api('POST', '/api/office/fixed-costs/category-rename', {from: j.to, to: j.old, ids: j.ids}).catch(x => toast(x.message || tr('unknown'))); rk_cfReload(); });
+  toast(j.merged ? tr('Categories merged') : tr('Renamed'), async () => { await api('POST', '/api/office/fixed-costs/category-rename', {from: j.to, to: j.old, ids: j.ids}).catch(x => toast(x.message || tr('unknown'))); rk_cfReload(); });
 }
 // 2.122.3 A (#2333): without VAT net and gross are the same, so one amount without "net"/"gross" (like the contracts row)
 function rk_fixedSum(f) {

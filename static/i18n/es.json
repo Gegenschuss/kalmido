@@ -16928,6 +16928,7 @@
   "View “{0}” now keeps the current filters": "La vista «{0}» guarda ahora los filtros actuales",
   "View “{0}” saved": "Vista «{0}» guardada",
   "saved views of the documents search (their filters name label and folder ids of this server)": "vistas guardadas de la búsqueda de documentos (sus filtros nombran identificadores de etiquetas y carpetas de este servidor)",
+  "Categories merged": "Categorías unidas",
   "Shoot days go into the disposition only with the industry Film & Video.": "Los días de rodaje solo pasan a la planificación con el sector Cine y vídeo.",
   "Switch on the module Disposition to pencil the shoot days in.": "Activa el módulo Planificación para reservar provisionalmente los días de rodaje.",
   "You cannot book in the disposition of this workspace.": "No puedes reservar en la planificación de este espacio de trabajo.",
