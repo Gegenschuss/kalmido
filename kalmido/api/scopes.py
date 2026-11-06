@@ -133,6 +133,7 @@ _BATCH_SEEN, _BATCH_LOCK = {}, threading.Lock()
 APPROVAL_PENDING_MAX = 20  # waiting approvals per agent
 APPROVAL_BODY_MAX = 200_000
 _SCOPE_MAP = {}
+_AGENT_SCOPE_MAP = {}  # 2.582.0 (#4380): x-kalmido-agent-scope - the stricter scope an agent token needs for the same route
 _REPLAY_KEY = secrets.token_bytes(32)   # per process: a replay header only works inside this server
 
 
@@ -237,16 +238,23 @@ def scopes_offer(c, u, agent=False):
     return out
 
 
-def v1_scope_need(method, rule):
-    """The scope one API route needs, from the OpenAPI document (x-kalmido-scope); None = undocumented (refused)."""
+def v1_scope_need(method, rule, agent=False):
+    """The scope one API route needs, from the OpenAPI document (x-kalmido-scope); None = undocumented (refused).
+    2.582.0 (#4380): agent=True -> an x-kalmido-agent-scope of the operation wins (e.g. time entries: read for a person's
+    token, time for an agent), from the same document so documentation and enforcement stay one table."""
     if not _SCOPE_MAP:
         for p, ms in openapi_spec()["paths"].items():
             for m, op in ms.items():
-                _SCOPE_MAP[(m.upper(), re.sub(r"\{[^}]+\}", "{}", p))] = op.get("x-kalmido-scope", "read")
+                k = (m.upper(), re.sub(r"\{[^}]+\}", "{}", p))
+                _SCOPE_MAP[k] = op.get("x-kalmido-scope", "read")
+                if op.get("x-kalmido-agent-scope"):
+                    _AGENT_SCOPE_MAP[k] = op["x-kalmido-agent-scope"]
     if rule is None:  # no route matched (404 / 405 follow from the routing, no view runs)
         return "read"
     path = re.sub(r"<[^>]+>", "{}", rule.rule[len(API_PREFIX) - 1:])
     m = "GET" if method in ("HEAD", "OPTIONS") else method
+    if agent and (m, path) in _AGENT_SCOPE_MAP:
+        return _AGENT_SCOPE_MAP[(m, path)]
     return _SCOPE_MAP.get((m, path), "read" if m == "GET" and path == "/openapi.json" else None)
 
 

@@ -42,6 +42,7 @@ from ..agents.chat import (
 from ..agents.workstyle import ws_next_mark, ws_next_step  # 2.236.0 B (#2911)
 from ..agents.datalock import dl_job_input  # 2.235.0 B2 (#2902)
 from ..agents.core import agent_usable, agent_added_events, task_being_edited, tidy_changed_since  # 2.369.5 (#2517): pulled up from functions
+from ..agents.core import agent_never_lids  # 2.582.0 (#4380)
 from ..agents.jobchat import JCD_KINDS  # 2.369.5 (#2517): pulled up from functions
 from ..agents.steps import steps_take  # 2.369.5 (#2517): pulled up from functions
 from ..agents.chat import h6e_agent_push_ok, chat_choice_set  # 2.369.5 (#2517): pulled up from functions
@@ -388,6 +389,22 @@ def prop_validate(kind, b, inp):
 
 
 # ---- the request (a person asks an agent)
+def dp_agent_input(c, inp):
+    """2.582.0 (#4380, audit #2483 M4): a day plan's input without the tasks of lists that never reach an agent
+    (agent_never_lids: health, budget, ...), like extract / triage; the built-in plan's hint loses them too."""
+    off = agent_never_lids(c, [x.get("list_id") for k in ("tasks", "fixed") for x in inp.get(k) or []])
+    if not off:
+        return inp
+    gone = {x.get("task_id") for k in ("tasks", "fixed") for x in inp.get(k) or [] if x.get("list_id") in off}
+    for k in ("tasks", "fixed"):
+        inp[k] = [x for x in inp.get(k) or [] if x.get("list_id") not in off]
+    bi = inp.get("builtin") or {}
+    if bi:
+        bi["plan"] = [x for x in bi.get("plan") or [] if x.get("task_id") not in gone]
+        bi["nofit"] = [x for x in bi.get("nofit") or [] if x not in gone]
+    return inp
+
+
 def prop_input(c, uid, kind, b):
     """The job input for a request body b -> (input, title, task_id, list_id). Only what the person chose to send.
     2.448.0 (#3765): the title in the language of the person who asked (a plan's timer asks for them without a request)."""
@@ -413,6 +430,8 @@ def prop_input(c, uid, kind, b):
             raise BadInput(tr("Only open tasks can be broken down"))
         if list_role(c, t["list_id"]) not in WRITE_ROLES:
             raise Denied(403)
+        if agent_never_lids(c, [t["list_id"]]):  # 2.582.0 (#4380, audit #2483 M4): as extract - health / budget never reach an agent
+            raise BadInput(tr("Health projects and budgets never reach an agent"))
         e = check_parent(c, None, tid)
         if e:
             raise BadInput(e)
@@ -439,6 +458,7 @@ def prop_input(c, uid, kind, b):
         mine = [d for d in visible_lists(c, uid) if not d["is_inbox"] and not d["archived"] and d.get("role", "owner") in WRITE_ROLES
                 and not (d.get("life") == "travel" and d.get("org_id"))]  # 2.173.0 (#2680): an organisation's trip is no agent target
         rd = reading_ids(c, [d["id"] for d in mine])  # 2.172.1 A (#2689): nor a read-later project
+        rd |= agent_never_lids(c, [d["id"] for d in mine])  # 2.582.0 (#4380): nor a health / budget project as a target
         mine = [d for d in mine if d["id"] not in rd]
         if b.get("lists") not in (None, "all"):
             want = {_p_int(x, "lists") for x in _p_list(b.get("lists"), "lists", PROP_LISTS_MAX)}
@@ -455,7 +475,7 @@ def prop_input(c, uid, kind, b):
     if kind == "dayplan":  # 2.10.0 (#440): the same input the built-in planner uses
         _p_keys(b, "", ("agent_id", "kind", "date", "mode"))
         day = dayplan_day(b.get("date"))
-        inp = dayplan_input(c, uid, day, dayplan_mode(b.get("mode")))
+        inp = dp_agent_input(c, dayplan_input(c, uid, day, dayplan_mode(b.get("mode"))))  # 2.582.0 (#4380): without health / budget
         if not inp["tasks"]:
             raise BadInput(tr("There are no open tasks to plan"))
         return inp, tr(PROP_TITLES["dayplan"], day.isoformat(), lg=lg), None, None

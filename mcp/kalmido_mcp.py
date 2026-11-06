@@ -1829,7 +1829,8 @@ TOOLS += [
                     "with or without progress and status); a running one stops.", _obj({"task_id": S_ID, "list_id": S_ID, "note": {"type": "string"}}),
      lambda api, a: api.call("POST", "/time/timer", body=a)),
     ("stop_timer", "Stop the running timer.", _obj({}), lambda api, a: api.call("DELETE", "/time/timer")),
-    ("list_time_entries", "Time entries (from / to YYYY-MM-DD, default the last 7 days; scope mine | all; list_id, task_id).",
+    ("list_time_entries", "Time entries (from / to YYYY-MM-DD, default the last 7 days; scope mine | all; list_id, task_id). "
+                          "2.582.0: an agent needs the scope time; scope all shows others only where you and the person who set you up are project admins.",
      _obj({"from": {"type": "string"}, "to": {"type": "string"}, "scope": {"type": "string", "enum": ["mine", "all"]}, "list_id": S_ID,
            "task_id": S_ID, "limit": {"type": "integer", "minimum": 1, "maximum": 500}, "cursor": {"type": "string"}}),
      lambda api, a: api.call("GET", "/time/entries", a)),
@@ -2771,6 +2772,8 @@ TOOL_SCOPES["integrations"] = ("list_webhooks", "create_webhook", "update_webhoo
                                "get_webhook_log", "list_api_tokens", "create_api_token", "revoke_api_token", "add_repo_connection",
                                "update_repo_connection", "remove_repo_connection", "set_repo_version_field")
 TOOL_SCOPE = {n: s for s, names in TOOL_SCOPES.items() for n in names}   # every other tool: read
+# 2.582.0 (#4380): an agent token needs a stricter scope for these (the server's x-kalmido-agent-scope)
+TOOL_SCOPE_AGENT = {"list_time_entries": "time"}
 
 
 # 2.391.0 B (#3358): toolsets. --toolsets tickets,code,... / KALMIDO_TOOLSETS limits tools/list and tools/call to those packages
@@ -2905,7 +2908,7 @@ def tool_allowed(api, name):
     if ts is None:
         return True
     sc, agent = ts
-    need = TOOL_SCOPE.get(name, "read")
+    need = (agent and TOOL_SCOPE_AGENT.get(name)) or TOOL_SCOPE.get(name, "read")
     return agent if need == "agent" else need in sc
 
 
@@ -2984,7 +2987,8 @@ def handle(api, msg):
             return _result(i, {"content": [{"type": "text", "text": f"{name} is not in the active toolsets ({', '.join(sorted(ACTIVE_TOOLSETS))}); "
                                             f"it belongs to the toolset {TOOLSET_OF[name]} (start the server with --toolsets / KALMIDO_TOOLSETS including it)"}], "isError": True})
         if not tool_allowed(api, name):
-            need = TOOL_SCOPE.get(name, "read")
+            ts = token_scopes(api)
+            need = (ts and ts[1] and TOOL_SCOPE_AGENT.get(name)) or TOOL_SCOPE.get(name, "read")  # 2.582.0 (#4380)
             return _result(i, {"content": [{"type": "text", "text": f"not allowed for this token: needs the scope {need}" if need != "agent"
                                             else "only for agent tokens"}], "isError": True})
         problem = _check_args(t[2], args)

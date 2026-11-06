@@ -238,6 +238,8 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
   move a task because it lies idle. Read more with `list_stale_tasks`.
 - `get_time_gaps` (user_id = the person you work for) lists working days with work on tasks but no tracked time. Point
   them out to the person and offer entries; never add time for someone without asking.
+- `list_time_entries` needs the scope `time` (2.582.0); with `scope: all` you see other people's entries only in projects
+  where you and the person who set you up are owner / admin. Without it: ask the person for the permission, never work around it.
 
 ### Planned jobs
 - The event `scheduled_job` (2.34.0) is a job a person planned for you in the app ("every Monday at 9: the week

@@ -82,7 +82,7 @@ Every agent has **permissions** (scopes) on top of its projects and roles. New a
 | Delete & trash | `delete` | off |
 | Read / upload files of tasks, comments and projects | `attachments:read` / `attachments:write` | off |
 | The file store: read / add files and folders (2.48.0) | `files:read` / `files:write` | on |
-| Time tracking | `time` | off |
+| Time tracking: timer and time entries; 2.582.0: also reading time entries (`GET /time/entries`, MCP `list_time_entries`), the own running timer stays *Read* | `time` | off |
 | Export | `export` | off |
 | Calendar: events and event calendars (2.21.0) | `calendar` | off |
 | Contacts: address books and contacts, personal data of other people (2.21.0) | `contacts` | off |
@@ -3213,6 +3213,10 @@ the proposal in the app.
 | `dayplan` | `{date, mode, now, work: {start, end}, from, default_duration, events, fixed, tasks, builtin}` (2.10.0, see [Day plans](#day-plans)) |
 | `cleanup` | `{list: {id, name, sections: [{id, name}]}, package: {n, of, group}, snapshot_at, hint, items: [{task_id, title, notes, section_id, sort, due, priority, list_tags, assignee_id, created_at, updated_at, comments_count}]}` (2.39.0, see [Tidy up a project](#tidy-up-a-project)) |
 | `merge` | `{book: {id, name}, contacts: [{id, fn, given, family, org, emails: [values], phones: [values]}], limits}` (2.70.0): the contacts of ONE address book the person may change (at most 2,000), only these fields - no notes, addresses, birthdays, groups |
+
+2.582.0 (#4380): health and budget projects (and the other projects that never reach an agent: the list lock, an
+organisation's trip, read later) are never part of an input: *Break down* a task of such a project is refused (400),
+*Plan my day* leaves their tasks out (also from `builtin`), *Sort the basket* never offers them as targets.
 
 **Proposals** (the body of `POST /api/v1/agent/jobs/{id}/proposal`). Every kind may carry `summary` (a short
 explanation, Markdown, at most 2,000 characters) and `kind` (must match the job). Dates are `YYYY-MM-DD`, priority

@@ -5,7 +5,7 @@ import math
 import re
 import time
 from datetime import date, datetime, timedelta, timezone
-from flask import g, has_request_context, jsonify, request, Response
+from flask import g, jsonify, request, Response
 
 from ..core.config import app, PUBLIC_URL, TZ
 from ..core.pg import IntegrityError, insert_id, Row
@@ -126,11 +126,20 @@ def evis(c, uid, a="e."):
 
 def n43_admin_lists(c, uid):
     """2.63.0 (#1523): ids of the lists in which uid sees everyone's time entries: lists they own, lists where they are an
-    admin (MANAGE_ROLES) and the lists of organisations they administer. None = no limit (agents keep the time API's rules)."""
-    from ..agents.core import is_agent
+    admin (MANAGE_ROLES) and the lists of organisations they administer. None = no limit (the callers' own choice).
+    2.582.0 (#4380, audit #2483 M3): no exception for agents any more - an agent sees everyone's entries only in the lists
+    where it is such an admin itself AND the person who set it up (agents.owner_id) is one too, never more than that person."""
+    from ..agents.core import agent_row
+    ids = n43_admin_ids(c, uid)
+    a = agent_row(c, uid)
+    if a is not None and a["owner_id"]:
+        ids &= n43_admin_ids(c, a["owner_id"])
+    return ids
+
+
+def n43_admin_ids(c, uid):
+    """2.582.0 (#4380): the lists of n43_admin_lists for one account (person or agent), without the agent's owner limit."""
     from ..accounts.orgs import is_org_admin, user_orgs
-    if has_request_context() and is_agent(getattr(g, "user", None)):
-        return None
     ids = {r[0] for r in c.execute("SELECT id FROM lists WHERE owner_id=?", (uid,))}
     ids |= {r[0] for r in c.execute("SELECT list_id FROM list_members WHERE user_id=? AND role='admin'", (uid,))}
     orgs = [o for o in user_orgs(c, uid) if is_org_admin(c, uid, o)]

@@ -188,7 +188,7 @@ def api_authenticate():
     if not g.get("approved_job") and not srv_inproc and not token_ip_ok(row, client_ip()):  # 2.15.0 (#479): optional address restriction (checked when an approved request was stored)
         return v1_err(403, tr("This token may not be used from this address"))
     scopes = scopes_effective(c, row, u)
-    need = v1_scope_need(request.method, request.url_rule)
+    need = v1_scope_need(request.method, request.url_rule, agent=is_agent(u))  # 2.582.0 (#4380): + an agent's stricter scope
     g.scope_need = need
     # 2.207.0 A (#2763): an upload key reaches its two routes and nothing else; the stored prefix counts too (scopes changed by an older version)
     if "docs:upload" in api_scopes(row["scopes"]) or str(row["token_hash"] or "").startswith(UPLOAD_HASH_PREFIX):
@@ -1677,7 +1677,7 @@ def v1_time_entries():
          "scope": a.get("scope", "mine")}
     if a.get("task_id"):
         q["task_id"] = str(as_int(a["task_id"], "task_id", 1))
-    # 2.63.0 (#1523): as /api/time/entries (agents and the entries of one task: unchanged)
+    # 2.63.0 (#1523): as /api/time/entries (the entries of one task: unchanged); 2.582.0 (#4380): agents no longer unlimited
     rows, _, _, _ = time_rows(c, uid, q, own=None if q.get("task_id") else n43_admin_lists(c, uid))
     vis, ref, rm = vis_ids(c, uid), now_utc(), time_rounding(usettings(c, uid))
     out = [entry_out(r, uid, vis, ref, rm) for r in rows]

@@ -202,6 +202,20 @@ def wh_queue_raw(c, w, env):
               (w["id"], env["id"], env["event"], json.dumps({**env, "webhook_id": w["id"]}, ensure_ascii=False), time.time(), iso(now_utc())))
 
 
+def agent_never_sql(a="l"):
+    """2.582.0 (#4380): THE condition "a list nothing of which ever reaches an agent" on lists alias a: health, budget, the
+    list lock (e2e), an organisation's trip, read later (agent_emit's rule, also for what a person hands over in a proposal)."""
+    return f"(COALESCE({a}.life, '') IN ('health', 'budget') OR {a}.e2e IS NOT NULL OR {org_trip_sql(a + '.')} OR {reading_sql(a)})"
+
+
+def agent_never_lids(c, lids):
+    """2.582.0 (#4380, audit #2483 M4): the ids among lids that never reach an agent (agent_never_sql)."""
+    ids = sorted({int(x) for x in lids if x})
+    if not ids:
+        return set()
+    return {r[0] for r in c.execute(f"SELECT l.id FROM lists l WHERE l.id IN ({','.join('?' * len(ids))}) AND {agent_never_sql()}", ids)}
+
+
 def agent_emit(c, aid, event, data, actor="auto", via=None):
     """Records an event for agent aid (the polling queue) and queues its webhook delivery; the caller commits. Nothing for a
     paused / disabled agent or for the agent's own actions. Returns the event's seq or None."""
@@ -212,7 +226,7 @@ def agent_emit(c, aid, event, data, actor="auto", via=None):
     if isinstance(data, dict):  # 2.22.0 (#663): nothing of a health list ever reaches an agent
         lid = data.get("list_id") or (data.get("task") or {}).get("list_id") or (data.get("list") or {}).get("id") \
             or (data.get("room") or {}).get("list_id")
-        if lid and c.execute(f"SELECT 1 FROM lists l WHERE l.id=? AND (l.life IN ('health', 'budget') OR l.e2e IS NOT NULL OR {org_trip_sql()} OR {reading_sql()})", (lid,)).fetchone():
+        if lid and c.execute(f"SELECT 1 FROM lists l WHERE l.id=? AND {agent_never_sql()}", (lid,)).fetchone():  # 2.582.0 (#4380): one rule
             return None  # 2.64.1 B (#1817): nor of a list with the lock; 2.72.0 (#1333): nor of a budget; 2.173.1 A (#2714): nor of an organisation's trip; 2.172.1 (#2689): nor read later
         if lid and a["list_ids"]:  # 2.30.0 (#919): an agent limited to selected lists hears nothing of the others
             from ..agents.safety import ids_parse
