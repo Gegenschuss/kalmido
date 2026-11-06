@@ -522,7 +522,9 @@ const sbb_startHash = id => sbb_def(id) && sbb_shown(id) ? sbb_target(id) : 'hom
 function sbb_setUndo(k, v, label) {
   const from = S.settings[k] ?? '';
   if (String(from) === String(v)) return Promise.resolve();
-  const put = x => async () => { S.settings[k] = x; render(); await api('PATCH', '/api/settings', {[k]: x}); return {}; };
+  // writes go one after the other through the queue of nav_write (#3506): "Nach oben" pressed twice quickly were two requests
+  // at once, the server could store the first move last
+  const put = x => async () => { S.settings[k] = x; render(); const q = NAV_Q.then(() => api('PATCH', '/api/settings', {[k]: x})); NAV_Q = q.catch(() => {}); await q; return {}; };
   return put(v)().then(() => offerUndo(label, histAdd({label, undo: put(from), redo: put(v)})), () => { S.settings[k] = from; render(); });
 }
 // move an area before / after another (to: an area id); the whole order is stored

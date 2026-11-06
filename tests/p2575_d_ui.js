@@ -94,6 +94,20 @@ const closeMenu = w => { try { w.eval('closePop()'); } catch { /* none open */ }
       check(await until(async () => JSON.parse((await state(CA)).nav_menus || '{}').rail?.order?.[1] === 'notes'), 'the dragged order is stored');
     }
 
+    // two moves quickly one after the other: the server keeps the second (writes go through one queue like nav_write, #3506);
+    // the first request is held until the second one is asked for, without the queue the first lands last
+    {
+      const real = w.api; let open; const gate = new Promise(r => { open = r; }); let held = 0;
+      w.api = (m, u, b) => (m === 'PATCH' && b && 'nav_menus' in b && !held++) ? gate.then(() => real(m, u, b)) : real(m, u, b);
+      const o = rail(d), last = o[o.length - 1];
+      const p1 = w.eval(`sbb_move('notes', '${o[0]}', 'before', 'Notes')`), p2 = w.eval(`sbb_move('cal', '${last}', 'after', 'Calendar')`);
+      const want = JSON.parse(w.eval('S.settings.nav_menus')).rail.order;  // the client's last order (all areas, not only the shown icons)
+      open(); await Promise.all([p1, p2]);  // both requests answered: only then the stored value is final
+      const got = JSON.parse((await state(CA)).nav_menus || '{}').rail?.order;
+      check(JSON.stringify(got) === JSON.stringify(want), 'two quick moves: the second is stored last ' + JSON.stringify({want, got}));
+      w.api = real;
+    }
+
     // 2. Hide from the bar: the message names where it comes back; Undo brings it back
     right(w, d.querySelector('#srail .srb[data-sbb="cal"]'));
     check(await pick(w, 'sbb-hide'), 'Hide from the bar is there');
