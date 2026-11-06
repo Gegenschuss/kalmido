@@ -31,7 +31,9 @@ async function open(jar) {  // the setup page with a cookie jar of its own (as s
       w.confirm = () => true; w.prompt = () => null;
       require('./boot').dialogBridge(w);
     }});
-  await sleep(1500);
+  // 2.573 (#3506): wait for the drawn setup / login form instead of a fixed 1.5 s - right after start.sh the fresh container can take longer
+  for (let i = 0; i < 150 && !dom.window.document.querySelector('.authscreen #auth-form'); i++) await sleep(100);
+  await sleep(200);
   return dom.window;
 }
 async function submit(w, code) {
