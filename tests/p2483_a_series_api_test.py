@@ -115,9 +115,9 @@ check(A.put(B + O + "/settings", json={"agents_read": 1}).ok, "setup: agents may
 r = get(ANH, "/series")
 check(r.status_code == 403 and (r.json().get("error") or {}).get("required_scope") == "office", f"without the scope office: 403 ({r.status_code} {r.text[:160]})")
 check(get(ANH, "/subs").status_code == 403, "without the scope office: no subscriptions (403)")
-# 2.595.0 (#4505): a person's own token cannot get the scope office at all (400); the office routes stay for agents
 r = A.post(B + "/api/me/tokens", json={"name": "script", "scopes": ["read", "office"]})
-check(r.status_code == 400, f"a person's own token with the scope office: 400 ({r.status_code} {r.text[:160]})")
+if r.ok:
+    check(get(hdr(r.json()["token"]), "/series").status_code == 403, "a person's own token: 403 (the office routes are for agents)")
 
 # ================================================================ 2. the organisation's agent
 r = get(AH, "/series")

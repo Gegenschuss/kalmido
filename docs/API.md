@@ -44,10 +44,10 @@ Create a token under **Settings > Access** (API tokens, webhooks and the tokens 
   | `calendar` (2.21.0) | events and event calendars, reading included: `/event-calendars…`, `/events…` (2.467.0: with `/events/freebusy`), `/tasks/{id}/events`, 2.484.0: scheduling polls `/polls…` |
   | `contacts` (2.21.0) | address books and contacts, reading included (personal data of other people: never part of the old `write`, never an agent's default) |
   | `private` (2.22.0) | health projects and the journal, reading included (never part of the old `write`; an agent never gets it and never sees a health project) |
-  | `office` (2.51.0) | the office: quotations, invoices, letters, leads and documents; an agent only writes drafts a person checks (never part of the old `write`, off for new agents; a group right the admin grants on purpose, see [AGENTS.md](AGENTS.md#permissions)); 2.595.0: agents only, a personal token with it is refused (`400`) |
+  | `office` (2.51.0) | the office: quotations, invoices, letters, leads and documents; an agent only writes drafts a person checks (never part of the old `write`, off for new agents; a group right the admin grants on purpose, see [AGENTS.md](AGENTS.md#permissions)) |
   | `pinboard` (2.51.0) | notepads on project pages (an agent changes only its own; never part of the old `write`, off for new agents) |
-  | `layouts` (2.55.0) | read how views are arranged and propose arrangements (never part of the old `write`, off for new agents; 2.595.0: agents only, a personal token with it is refused (`400`)) |
-  | `import` (2.68.0) | propose old data for the office as an import card, `POST /agent/proposals/import` (never part of the old `write`, off for new agents; 2.595.0: agents only, a personal token with it is refused (`400`); a personal token saved with `office`, `layouts` or `import` before shows and has none of them) |
+  | `layouts` (2.55.0) | read how views are arranged and propose arrangements (never part of the old `write`, off for new agents) |
+  | `import` (2.68.0) | propose old data for the office as an import card, `POST /agent/proposals/import` (never part of the old `write`, off for new agents) |
   | `sheets:read` / `sheets:write` (2.89.0) | tables: read / change (agents: only tables shared with them; never part of the old `write`, off for new agents) |
   | `account` | your notification settings and app passwords (never for agents; `private` and `docs:upload` neither) |
   | `wiki:read` / `wiki:write` (2.200.0) | knowledge pages: read / change their text and add pages in folders where the account may edit (agents: only pages shared with exactly them); see [Knowledge pages](#knowledge-pages) |

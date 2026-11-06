@@ -17014,7 +17014,6 @@
   "Into the trash (restorable): {0} tasks, {1} files, pages, tables or clients.": "Naar de prullenbak (herstelbaar): {0} taken, {1} bestanden, pagina's, tabellen of klanten.",
   "Stays because it changed since the import: {0} tasks, {1} other entries.": "Blijft omdat het sinds de import is gewijzigd: {0} taken, {1} overige items.",
   "possible until {0}": "mogelijk tot {0}",
-  "Only agents can get the permission “{0}”": "Alleen agents kunnen de bevoegdheid ‘{0}’ krijgen",
   "The target folder is in the trash": "De doelmap staat in de prullenbak",
   "**As a** \n**I want** \n**so that** \n\n**Acceptance criteria**\n- [ ] \n": "**Als** \n**wil ik** \n**zodat** \n\n**Acceptatiecriteria**\n- [ ] \n",
   "**Goal**\n\n**Scope**\n- \n\n**Done when**\n- [ ] \n": "**Doel**\n\n**Omvang**\n- \n\n**Klaar als**\n- [ ] \n",

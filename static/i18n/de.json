@@ -17014,7 +17014,6 @@
   "Into the trash (restorable): {0} tasks, {1} files, pages, tables or clients.": "In den Papierkorb (wiederherstellbar): {0} Aufgaben, {1} Dateien, Seiten, Tabellen oder Kunden.",
   "Stays because it changed since the import: {0} tasks, {1} other entries.": "Bleibt, weil seit dem Import geändert: {0} Aufgaben, {1} weitere Einträge.",
   "possible until {0}": "möglich bis {0}",
-  "Only agents can get the permission “{0}”": "Nur Agenten können die Berechtigung „{0}“ bekommen",
   "The target folder is in the trash": "Der Zielordner liegt im Papierkorb",
   "**As a** \n**I want** \n**so that** \n\n**Acceptance criteria**\n- [ ] \n": "**Als** \n**möchte ich** \n**damit** \n\n**Abnahmekriterien**\n- [ ] \n",
   "**Goal**\n\n**Scope**\n- \n\n**Done when**\n- [ ] \n": "**Ziel**\n\n**Umfang**\n- \n\n**Fertig, wenn**\n- [ ] \n",
