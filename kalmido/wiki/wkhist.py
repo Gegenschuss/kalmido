@@ -473,6 +473,8 @@ def wkh_list(pid):
         seen[h] = wkx_may_see(c, r, h, me())
     rows = [x for x in rows if not x["wkx_held_at"] or seen[x["wkx_held_at"]]]
     names = user_names(c, {x["created_by"] for x in rows})
+    by = sorted({int(x["created_by"]) for x in rows if x["created_by"]})
+    agents = {r_[0] for r_ in c.execute(f"SELECT id FROM users WHERE kind='agent' AND id IN ({','.join('?' * len(by))})", by)} if by else set()
     try:  # 2.126.2 B (#2358): an unreadable page still lists its history (no version is marked current)
         cur = wkh_body(c, r)
     except WikiUnreadable:
@@ -487,7 +489,9 @@ def wkh_list(pid):
     uid = me()
     info = wkf_shared(c, uid)  # 2.200.0 F (#2747, review B3): through a share the paths start at the shared node
     out = [{"id": x["id"], "path": wkf_shown_path(c, uid, r, info, x["path"]), "size": x["size"], "created_at": x["created_at"],
-            "updated_at": x["updated_at"], "by_name": names.get(x["created_by"], ""), "current": i == 0 and same(x)}
+            "updated_at": x["updated_at"], "by_name": names.get(x["created_by"], ""),
+            "agent": x["created_by"] in agents,  # 2.577.0 (#4708 4): a version an agent account wrote
+            "current": i == 0 and same(x)}
            for i, x in enumerate(rows)]  # 2.571.0 (#4766): a rename since makes no version: the text alone says current
     return jsonify(versions=out, e2e=False, renames=wkh_renames(c, r, uid, info))  # 2.571.0 (#4766): + the renames
 

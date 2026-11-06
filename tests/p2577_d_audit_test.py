@@ -193,6 +193,27 @@ U2 = Fr.post(B + f"/api/evcals/{FCAL}/feed", json={"action": "rotate"}).json().g
 check(U2 and pub.get(B + urlparse(U2).path).status_code == 200 and r.status_code == 200
       and pub.get(B + f"/ical/ev/{fid}.altesGeheimnis4708abcdefghijklmnopqrstuv.ics").status_code == 404, "(6) rotate: a new address, the old one stops")
 
+# ================================================================== (4) who changed it last: events, contacts, wiki versions
+r = Fr.post(B + "/api/contacts", json={"book_id": BK, "fn": "Spur Example"})
+CS = r.json()["id"] if r.status_code == 201 else 0
+check(r.status_code == 201 and r.json().get("updated_by") == FID, f"(4) a new contact names who made it: updated_by {r.json().get('updated_by') if r.ok else r.text[:100]}")
+r = Bo.patch(B + f"/api/contacts/{CS}", json={"note": "von Bob"})
+check(r.ok and r.json().get("updated_by") == BOB and kt.dbx("SELECT updated_by FROM contacts WHERE id=?", (CS,))[0][0] == BOB,
+      f"(4) Bob's change (edit share) names Bob {r.status_code} {r.text[:120]}")
+r = Fr.post(B + "/api/contacts/bulk", json={"action": "set", "ids": [CS], "org": "Spur GmbH"})
+check(r.ok and kt.dbx("SELECT updated_by FROM contacts WHERE id=?", (CS,))[0][0] == FID, f"(4) a bulk change names its writer {r.status_code} {r.text[:120]}")
+r = Fr.post(B + "/api/events", json={"cal_id": FCAL, "title": "Spurtermin", "start": "2026-11-21T10:00", "end": "2026-11-21T11:00"})
+EV = r.json()["id"] if r.status_code == 201 else 0
+check(r.status_code == 201 and r.json().get("updated_by") == FID, f"(4) a new event names who made it {r.text[:120]}")
+# the wiki history marks a version an agent account wrote
+ag = A.post(B + "/api/admin/agents", json={"scopes": ["read"], "username": "spurhelfer", "display_name": "Spur Helfer"}).json()
+pv = Fr.post(B + "/api/wiki/pages", json={"path": "Spurseite", "body": "eins"}).json()["id"]
+vs = Fr.get(B + f"/api/wiki/pages/{pv}/versions").json().get("versions") or []
+check(vs and vs[0].get("agent") is False, f"(4) a person's version is not marked as an agent's {vs[:1]}")
+kt.dbx("UPDATE wiki_versions SET created_by=? WHERE page_id=?", (ag.get("id"), pv))
+vs = Fr.get(B + f"/api/wiki/pages/{pv}/versions").json().get("versions") or []
+check(vs and vs[0].get("agent") is True, f"(4) a version an agent account wrote is marked as an agent's {vs[:1]}")
+
 # @@NEXT@@
 
 sys.exit(kt.done("p2577_d_audit"))

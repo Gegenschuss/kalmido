@@ -48,7 +48,7 @@ async function wkh_dlg(p) {
   const box = $('#wkh-b', md), may = WK.idx[p.space]?.mayWrite !== false;
   let vs = [], rn = [];  // 2.571.0 (#4766): rn = the page's renames (the core's history)
   const list = () => {
-    box.innerHTML = vs.length ? `<p class="shint">${esc(tr('Saves of one person within ten minutes are one version.'))}</p><ul class="wkhlist">${vs.map(v => `<li><button type="button" class="wkhitem" data-wkh="open" data-id="${v.id}">${ic('clock', 's')}<span class="wkhwhen">${esc(fmtWhen(v.updated_at))}</span><span class="muted">${esc(v.by_name || '')}</span>${v.current ? `<span class="wkhcur">${esc(tr('current'))}</span>` : ''}</button></li>`).join('')}</ul>`
+    box.innerHTML = vs.length ? `<p class="shint">${esc(tr('Saves of one person within ten minutes are one version.'))}</p><ul class="wkhlist">${vs.map(v => `<li><button type="button" class="wkhitem" data-wkh="open" data-id="${v.id}">${ic('clock', 's')}<span class="wkhwhen">${esc(fmtWhen(v.updated_at))}</span><span class="muted">${esc(v.by_name || '')}</span>${v.agent ? `<span class="muted wkhagent">${esc(tr('Agent'))}</span>` : ''}${v.current ? `<span class="wkhcur">${esc(tr('current'))}</span>` : ''}</button></li>`).join('')}</ul>`
       : `<div class="muted mhint">${esc(tr('No earlier versions yet.'))}</div>`;
     if (rn.length) box.insertAdjacentHTML('beforeend', `<p class="shint">${esc(tr('Renamed'))}</p><ul class="wkhlist">${rn.map(x => `<li class="muted">${ic(x.agent ? 'bot' : 'edit', 's')} ${esc(fmtWhen(x.at))} · ${esc(x.by_name || '')}: ${esc(wk_base(x.from))} → ${esc(wk_base(x.to))}</li>`).join('')}</ul>`);  // 2.571.0 (#4766)
   };
