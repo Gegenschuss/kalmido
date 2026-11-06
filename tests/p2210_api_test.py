@@ -25,7 +25,7 @@ import requests
 import testclock
 
 N = os.path.dirname(os.path.abspath(__file__))
-from kt import FAILS, OKS, check, sess, until, B, H, DATA  # 2.206.0 (#2762): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, until, B, H, DATA, me_id  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 BERLIN = ZoneInfo("Europe/Berlin")
 
@@ -128,7 +128,7 @@ assert sess().post(B + "/api/auth/setup", json={"username": "alice", "display_na
 A = sess("alice")
 A.post(B + "/api/admin/setup", json={"lang": "en", "collab_all": True, "time_all": True, "modules": ["cal", "comments", "events", "contacts", "family"]})
 A.patch(B + "/api/settings", json={"tour": "done", "lang": "en", "push_channel": "ntfy"})
-A.patch(B + "/api/users/1", json={"email": "alice@example.org", "ntfy_topic": "t-alice"})
+A.patch(B + f"/api/users/{me_id(A)}", json={"email": "alice@example.org", "ntfy_topic": "t-alice"})
 ids = {"alice": 1}
 for u, n in (("bob", "Bob"), ("eve", "Eve")):
     r = A.post(B + "/api/users", json={"username": u, "display_name": n, "password": "password123", "email": f"{u}@example.org"})

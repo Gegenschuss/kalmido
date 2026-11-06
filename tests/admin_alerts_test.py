@@ -22,7 +22,7 @@ from zoneinfo import ZoneInfo
 import requests
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
-from kt import FAILS, OKS, check, sess, until  # 2.192.0 B (#2513): wait for a state instead of fixed sleeps
+from kt import FAILS, OKS, check, sess, until, me_id  # 2.192.0 B (#2513): wait for a state instead of fixed sleeps
 
 N = os.path.dirname(os.path.abspath(__file__))
 DATA = sys.argv[1]
@@ -125,7 +125,7 @@ start(extra=["-e KALMIDO_UPDATE_CHECK=1", "-e KALMIDO_UPDATE_URL=http://127.0.0.
 s0 = sess()
 assert s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
 A = sess("alice")
-A.patch(B + "/api/users/1", json={"ntfy_topic": "t-alice"})
+A.patch(B + f"/api/users/{me_id(A)}", json={"ntfy_topic": "t-alice"})
 r = A.post(B + "/api/users", json={"username": "bob", "display_name": "Bob", "password": "password123", "ntfy_topic": "t-bob"})
 assert r.ok, r.text
 BOB = r.json()["id"]

@@ -32,7 +32,7 @@ DATA = sys.argv[1]
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 V = B + "/api/v1"
 H = {"X-Requested-With": "kalmido"}
-from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, me_id  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 
 
 def dbx(sql, args=(), write=False):
@@ -342,11 +342,11 @@ check(r.ok and not dbx("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?",
 # 2.585.0 (#4290): the self-lock of the user management: the instance admin cannot take her own admin rights away, not
 # even together with a change of her organisations - nothing of the request stays (memberships, admin flag)
 have = dbx("SELECT org_id, role FROM org_members WHERE user_id=1 ORDER BY org_id")
-r = A.patch(B + "/api/users/1", json={"orgs": [], "is_admin": False})
+r = A.patch(B + f"/api/users/{me_id(A)}", json={"orgs": [], "is_admin": False})
 check(r.status_code == 400 and dbx("SELECT is_admin FROM users WHERE id=1")[0][0] == 1
       and dbx("SELECT org_id, role FROM org_members WHERE user_id=1 ORDER BY org_id") == have and have,
       f"#4290: self-lock: no own admin rights away, the organisations stay {r.status_code} {have}")
-r = A.patch(B + "/api/users/1", json={"orgs": [], "disabled": True})
+r = A.patch(B + f"/api/users/{me_id(A)}", json={"orgs": [], "disabled": True})
 check(r.status_code == 400 and dbx("SELECT disabled FROM users WHERE id=1")[0][0] == 0
       and dbx("SELECT org_id, role FROM org_members WHERE user_id=1 ORDER BY org_id") == have and A.get(B + "/api/state").ok,
       f"#4290: self-lock: not disabling oneself, the session and the organisations stay {r.status_code}")

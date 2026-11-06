@@ -28,7 +28,7 @@ H = {"X-Requested-With": "kalmido"}
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 TZ = ZoneInfo("Europe/Berlin")
 STUB = "http://127.0.0.1:8095"
-from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, state_file  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 T = testclock.today()
 
 
@@ -417,6 +417,6 @@ for i in range(21):
         break
 check(r.status_code == 409 and len(Ca.get(B + "/api/calendars").json()["subs"]) == 20, f"at most 20 subscriptions per user ({r.status_code})")
 
-json.dump({"good": good, "google": gid, "daily": did, "dav": dav}, open(os.path.join(N, "cal_ids.json"), "w"))
+json.dump({"good": good, "google": gid, "daily": did, "dav": dav}, open(state_file("cal_ids.json"), "w"))  # 2.609.0 (#4512): in the test data folder
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

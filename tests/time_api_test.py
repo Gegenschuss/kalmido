@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 import requests
 import testclock  # noqa: E402  (2.192.0 A, #2512: the group's test time, run_all.sh `now`)
 
-from kt import FAILS, OKS, check, sess, B, H, DATA  # 2.206.0 (#2762): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, B, H, DATA, me_id  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 TZ = ZoneInfo("Europe/Berlin")
 
 
@@ -40,7 +40,7 @@ def ver(s):
 
 assert sess().post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
 A = sess("alice")
-A.patch(B + "/api/users/1", json={"ntfy_topic": "t-alice"})
+A.patch(B + f"/api/users/{me_id(A)}", json={"ntfy_topic": "t-alice"})
 ids = {}
 for u, n in (("bob", "Bob"), ("carol", "Carol")):
     ids[u] = A.post(B + "/api/users", json={"username": u, "display_name": n, "password": "password123", "ntfy_topic": "t-" + u}).json()["id"]

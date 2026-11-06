@@ -24,7 +24,7 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
 
 N = os.path.dirname(os.path.abspath(__file__))
-from kt import FAILS, OKS, check, sess, B, H, DATA  # 2.206.0 (#2762): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, B, H, DATA, me_id  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 STUB = "http://127.0.0.1:9997"
 TZ = ZoneInfo("Europe/Berlin")
@@ -122,7 +122,7 @@ for u in ("bob", "carol"):
     r = A.post(B + "/api/users", json={"username": u, "display_name": u.title(), "password": "password123", "ntfy_topic": "t-" + u})
     assert r.ok, r.text
     ids[u] = r.json()["id"]
-A.patch(B + "/api/users/1", json={"ntfy_topic": "t-alice"})
+A.patch(B + f"/api/users/{me_id(A)}", json={"ntfy_topic": "t-alice"})
 Bo, Ca = sess("bob"), sess("carol")
 
 # ------------------------------------------------------------------ VAPID key

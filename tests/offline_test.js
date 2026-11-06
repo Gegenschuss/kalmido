@@ -1,4 +1,4 @@
-const {boot, sleep, errs} = require('./boot'); const ids = require('./ids.json');
+const {boot, sleep, errs, readState} = require('./boot'); const ids = readState('ids.json');  // 2.609.0 (#4512): from the test data folder
 (async () => {
   const w = await boot({user: 'alice', hash: 'inbox'});
   w.__offline = true;

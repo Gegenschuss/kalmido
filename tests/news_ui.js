@@ -1,6 +1,6 @@
 // News UI tests (jsdom). Needs the api_test.py DB (alice en, bob de, carol, eve collab off).
-const {boot, errs, sleep, until, idle} = require('./boot');  // 2.358.0 C (#2782): idle(w) instead of fixed sleeps
-const ids = require('./ids.json');
+const {boot, errs, sleep, until, idle, readState} = require('./boot');  // 2.358.0 C (#2782): idle(w) instead of fixed sleeps
+const ids = readState('ids.json');  // 2.609.0 (#4512): from the test data folder
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const api = async (w, method, url, body) => (await w.fetch(url, {method, headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: body ? JSON.stringify(body) : undefined})).json();

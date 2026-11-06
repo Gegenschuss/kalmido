@@ -8,7 +8,7 @@ from datetime import date, timedelta
 import requests
 import testclock
 
-from kt import FAILS, OKS, check, sess, B, DATA  # 2.206.0 (#2762): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, B, DATA, me_id  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 
 
 def db():
@@ -40,7 +40,7 @@ D = lambda n: (testclock.today() + timedelta(days=n)).isoformat()  # noqa: E731
 
 assert sess().post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
 A = sess("alice")
-A.patch(B + "/api/users/1", json={"ntfy_topic": "t-alice"})
+A.patch(B + f"/api/users/{me_id(A)}", json={"ntfy_topic": "t-alice"})
 ids = {}
 for u, n in (("bob", "Bob"), ("carol", "Carol"), ("dave", "Dave")):
     ids[u] = A.post(B + "/api/users", json={"username": u, "display_name": n, "password": "password123", "ntfy_topic": "t-" + u}).json()["id"]

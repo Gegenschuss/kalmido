@@ -28,7 +28,7 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 BP = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PROXY_PORT", "3041")
 V = B + "/api/v1"
 H = {"X-Requested-With": "kalmido"}
-from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, me_id  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 T = testclock.today()
 
 
@@ -102,7 +102,7 @@ assert s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name":
 A = sess("alice")
 for u in ("bob", "carol", "dave"):
     assert A.post(B + "/api/users", json={"username": u, "display_name": u.title(), "password": "password123"}).ok, u
-A.patch(B + "/api/users/1", json={"ntfy_topic": "admintopic"})
+A.patch(B + f"/api/users/{me_id(A)}", json={"ntfy_topic": "admintopic"})
 Bo, Ca = sess("bob"), sess("carol")
 check(A.get(B + "/api/state").json()["api"]["enabled"] is True, "state: API on")  # 2.364.0 C (#3044): + mine
 

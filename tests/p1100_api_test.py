@@ -31,7 +31,7 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 H = {"X-Requested-With": "kalmido"}
 STUB = "http://127.0.0.1:8097"
-from kt import FAILS, OKS, check, sess, until  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, until, me_id  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 
 
 def dbx(sql, args=()):
@@ -81,7 +81,7 @@ time.sleep(0.8)
 
 assert sess().post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
 A = sess("alice")
-A.patch(B + "/api/users/1", json={"ntfy_topic": "t-alice"})
+A.patch(B + f"/api/users/{me_id(A)}", json={"ntfy_topic": "t-alice"})
 ids = {"alice": 1}
 for u in ("bob", "carol", "pete", "vic", "dave"):
     r = A.post(B + "/api/users", json={"username": u, "display_name": u.title(), "password": "password123", "ntfy_topic": "t-" + u})

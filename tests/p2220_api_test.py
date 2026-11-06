@@ -21,7 +21,7 @@ import requests
 import testclock
 
 N = os.path.dirname(os.path.abspath(__file__))
-from kt import FAILS, OKS, check, sess, until, B, H, DATA  # 2.206.0 (#2762): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, until, B, H, DATA, me_id  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 
 
@@ -155,7 +155,7 @@ check(Bo.get(B + "/api/life").json()["care"]["items"] == [], "per person: Bob se
 r = A.put(B + f"/api/contacts/{c1['id']}/care", json={"last": "today"})
 check(r.json()["last"] == D(0) and r.json()["due"] == D(30), '"today" = in touch today')
 # the daily push (from the all-day reminder time on), once
-A.patch(B + "/api/users/1", json={"ntfy_topic": "t-alice"})
+A.patch(B + f"/api/users/{me_id(A)}", json={"ntfy_topic": "t-alice"})
 A.patch(B + "/api/settings", json={"allday_time": "00:00", "push_channel": "ntfy"})
 p = until(lambda: [x for x in ntfy() if x.get("title") == "Time to get in touch"], 25)
 check(p and "Max Muster" in p[0].get("msg", "") and "Erika" not in p[0].get("msg", "") and p[0]["click"].endswith("#life"), "the daily push lists who is due " + json.dumps(p[:1])[:200])
@@ -445,7 +445,7 @@ r = requests.post(B + "/api/auth/invite/accept", headers=H, json={"token": t2, "
 check(r.ok and Bo.get(B + "/api/me").status_code == 401, "#697: reset: new password, the old sessions end")
 Bo = sess.__call__(None); Bo.post(B + "/api/auth/login", json={"username": "bob", "password": "bob-new-pass-1"})
 check(Bo.get(B + "/api/me").ok, "#697: Bob logs in with the new password")
-check(Bo.post(B + f"/api/users/1/invite", json={}).status_code == 403, "#697: only admins create links")
+check(Bo.post(B + f"/api/users/{me_id(A)}/invite", json={}).status_code == 403, "#697: only admins create links")
 # expiry + the rate limit
 r = A.post(B + "/api/users", json={"username": "philipp", "display_name": "Philipp", "invite": True})
 t3 = r.json()["invitation"]["link"].split("#invite/")[1]

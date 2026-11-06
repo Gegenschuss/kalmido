@@ -28,7 +28,7 @@ DATA = sys.argv[1]
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 V = B + "/api/v1"
 H = {"X-Requested-With": "kalmido"}
-from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, me_id  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 T = testclock.today()
 
 
@@ -102,7 +102,7 @@ for u, n, mail in (("bob", "Bob Builder", "bob@example.com"), ("carol", "Carol",
     r = A.post(B + "/api/users", json={"username": u, "display_name": n, "password": "password123", "email": mail})
     assert r.ok, r.text
 Bo, Ca = sess("bob"), sess("carol")
-A.patch(B + "/api/users/1", json={"email": "alice@example.com"})
+A.patch(B + f"/api/users/{me_id(A)}", json={"email": "alice@example.com"})
 # a probe server inside the container: logs every request -- no URL from an imported file may ever reach it
 subprocess.run(["docker", "exec", "-d", os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test"), "python", "-c",
                 "import http.server\nclass H(http.server.BaseHTTPRequestHandler):\n def do_GET(s):\n  open('/data/probe.log','a').write(s.path+'\\n'); s.send_response(200); s.end_headers()\n"

@@ -26,7 +26,7 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 H = {"X-Requested-With": "kalmido"}
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
-from kt import FAILS, OKS, check, sess, until  # 2.206.0 (#2762): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, until, me_id  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 
 
 MAILENV = ["-e", "KALMIDO_MAIL_ADDRESS=tasks@example.test", "-e", "KALMIDO_IMAP_HOST=127.0.0.1", "-e", "KALMIDO_IMAP_PORT=1143",
@@ -78,7 +78,7 @@ assert sess().post(B + "/api/auth/setup", json={"username": "alice", "display_na
 A = sess("alice")
 A.post(B + "/api/admin/setup", json={"lang": "en", "collab_all": True, "time_all": True, "modules": ["agents", "comments"]})
 A.patch(B + "/api/settings", json={"features": "collab,agents,comments,kanban,cal", "lang": "en", "tour": "done"})
-A.patch(B + "/api/users/1", json={"ntfy_topic": "t-alice", "email": "alice@example.test"})
+A.patch(B + f"/api/users/{me_id(A)}", json={"ntfy_topic": "t-alice", "email": "alice@example.test"})
 ids = {"alice": 1}
 for u, n in (("bob", "Bob"), ("carol", "Carol"), ("dave", "Dave"), ("erin", "Erin"), ("zed", "Zed")):
     r = A.post(B + "/api/users", json={"username": u, "display_name": n, "password": "password123", "ntfy_topic": "t-" + u})

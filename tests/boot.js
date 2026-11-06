@@ -73,6 +73,17 @@ PooledLoader.busy = 0; PooledLoader.wait = [];
 exports.PooledLoader = PooledLoader;
 const B = process.env.BASE || `http://127.0.0.1:${process.env.KALMIDO_TEST_PROXY_PORT || 3041}/`;
 exports.B = B; exports.errs = [];
+// 2.609.0 (#4512): the test data folder (KALMIDO_TEST_DATA, the same as DATA in tests/kt.py) and the state files a suite writes
+// there for the suites after it in its group (ids.json of api_test.py, cal_ids.json of calendars_test.py): not in tests/, so two
+// runs in one work tree never overwrite each other's. meId(cookie): the user id of a login, instead of a fixed /api/users/1.
+exports.TEST_DATA = process.env.KALMIDO_TEST_DATA || require('path').join(__dirname, '.data');
+exports.stateFile = name => require('path').join(exports.TEST_DATA, name);
+exports.readState = name => JSON.parse(require('fs').readFileSync(exports.stateFile(name), 'utf8'));
+exports.meId = async cookie => {
+  const r = await fetch(B + 'api/me', {headers: {'X-Requested-With': 'kalmido', Cookie: cookie}});
+  if (!r.ok) throw new Error('/api/me: HTTP ' + r.status);
+  return (await r.json()).id;
+};
 // 2.65.0 (#1824): the app's whole CSS = app.css + the module stylesheets (static/css/, LAZY_CSS of sw.js, in that order: they
 // come later in the cascade); the suites that read rules use this, a rule may have moved into a module's stylesheet
 const cssList = sw => [...((sw.match(/const LAZY_CSS = \[(.*?)\];/s) || [, ''])[1]).matchAll(/'\/static\/css\/([\w-]+\.css)'/g)].map(m => m[1]);

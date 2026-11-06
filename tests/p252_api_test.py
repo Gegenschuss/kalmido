@@ -20,7 +20,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 
 N = os.path.dirname(os.path.abspath(__file__))
-from kt import FAILS, OKS, check, sess, B, DATA  # 2.206.0 (#2762): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, B, DATA, me_id  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 STUB = "http://127.0.0.1:9997"
 
@@ -135,7 +135,7 @@ start()
 s0 = sess()
 assert s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
 A = sess("alice")
-A.patch(B + "/api/users/1", json={"ntfy_topic": "t-alice"})
+A.patch(B + f"/api/users/{me_id(A)}", json={"ntfy_topic": "t-alice"})
 j = A.get(B + "/api/admin/alerts").json()
 check(j["ntfy_public"] is False and j["admins"][0]["topic"] == "t-alice", f"own ntfy server: the admin's topic as before: {j['ntfy_public']} {j['admins']}")
 r = A.post(B + "/api/admin/alerts/test")

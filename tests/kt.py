@@ -31,6 +31,21 @@ PASSWORD = "password123"
 FAILS, OKS = [], [0]
 
 
+def state_file(name):
+    """2.609.0 (#4512): a state file that one suite writes for the suites after it in its group (ids.json of api_test.py,
+    cal_ids.json of calendars_test.py, news_ids.json): in the test data folder DATA, not in tests/ - two runs in one work
+    tree (two Mac places, a hand run beside a shard) never overwrite each other's; start.sh removes it with the folder at
+    the next fresh group. The JS side: stateFile / readState in tests/boot.js."""
+    return os.path.join(DATA, name)
+
+
+def me_id(s):
+    """2.609.0 (#4512): the user id of session s (GET /api/me), for "myself" instead of a fixed /api/users/1."""
+    r = s.get(B + "/api/me")
+    assert r.ok, ("/api/me", r.status_code, r.text[:200])
+    return r.json()["id"]
+
+
 FIRST_FAIL = []
 
 

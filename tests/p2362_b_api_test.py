@@ -24,7 +24,7 @@ DATA = sys.argv[1]
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
-from kt import FAILS, OKS, check, sess, until  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, until, me_id  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 SECRET = "Geheimprojekt Nordlicht 4711"  # a list name: must never show up in an alert
 
 
@@ -93,7 +93,7 @@ time.sleep(1.5)  # the first watch tick takes the baseline
 s0 = sess()
 assert s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
 A = sess("alice")
-A.patch(B + "/api/users/1", json={"ntfy_topic": "t-alice"})
+A.patch(B + f"/api/users/{me_id(A)}", json={"ntfy_topic": "t-alice"})
 A.patch(B + "/api/settings", json={"lang": "en", "features": "cal,comments,collab", "tour": "done"})
 check(A.patch(B + "/api/admin/alerts", json={"max_hour": 100}).ok, "hourly cap raised for the suite")
 r = A.post(B + "/api/admin/alerts/test")

@@ -7,7 +7,7 @@ import requests
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 DATA = sys.argv[1]
 H = {"X-Requested-With": "kalmido"}
-from kt import FAILS, OKS, check, sess  # 2.206.0 (#2762): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, me_id, state_file  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 
 
 def pushes():
@@ -36,7 +36,7 @@ s0 = sess()
 r = s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"})
 assert r.ok, r.text
 A = sess("alice")
-A.patch(B + "/api/users/1", json={"ntfy_topic": "t-alice"})
+A.patch(B + f"/api/users/{me_id(A)}", json={"ntfy_topic": "t-alice"})
 ids = {"alice": 1}
 for u, n in (("bob", "Bob"), ("carol", "Carol"), ("dave", "Dave"), ("eve", "Eve")):
     r = A.post(B + "/api/users", json={"username": u, "display_name": n, "password": "password123", "ntfy_topic": "t-" + u})
@@ -389,5 +389,5 @@ time.sleep(1.2)
 check([x["topic"] for x in pushes()] == ["t-carol"], f"collab off: eve not notified (only carol's unassign): {[x['topic'] for x in pushes()]}")
 
 print(f"\n{OKS[0]} ok, {len(FAILS)} failed")
-json.dump({"ids": ids, "ST": ST, "PT": PT, "L": L}, open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "ids.json"), "w"))
+json.dump({"ids": ids, "ST": ST, "PT": PT, "L": L}, open(state_file("ids.json"), "w"))  # 2.609.0 (#4512): in the test data folder
 sys.exit(1 if FAILS else 0)

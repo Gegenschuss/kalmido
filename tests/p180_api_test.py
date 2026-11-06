@@ -15,7 +15,7 @@ import testclock
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 DATA = sys.argv[1]
 H = {"X-Requested-With": "kalmido"}
-from kt import FAILS, OKS, check, sess  # 2.206.0 (#2762): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, me_id  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 ALL = "cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,progress,deps,fields"
 
 
@@ -37,7 +37,7 @@ def wait_for(fn, timeout=8):
 
 assert sess().post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
 A = sess("alice")
-A.patch(B + "/api/users/1", json={"ntfy_topic": "t-alice"})
+A.patch(B + f"/api/users/{me_id(A)}", json={"ntfy_topic": "t-alice"})
 BOB = A.post(B + "/api/users", json={"username": "bob", "display_name": "Bob", "password": "password123"}).json()["id"]
 Bb = sess("bob")
 A.patch(B + "/api/settings", json={"features": ALL, "push_channel": "ntfy"})

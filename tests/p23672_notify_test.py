@@ -26,7 +26,7 @@ import requests
 
 import dbx as dbxm
 from freelancer_fixture import freelancer
-from kt import FAILS, OKS, check, sess
+from kt import FAILS, OKS, check, sess, me_id
 
 DATA = sys.argv[1]
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
@@ -99,7 +99,7 @@ def task(s, title, lid=None, **kw):
 
 assert sess().post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
 A = sess("alice")
-A.patch(B + "/api/users/1", json={"ntfy_topic": "t-alice"})
+A.patch(B + f"/api/users/{me_id(A)}", json={"ntfy_topic": "t-alice"})
 ids = {"alice": 1}
 for u in ("bob", "carol", "dave"):
     r = A.post(B + "/api/users", json={"username": u, "display_name": u.title(), "password": "password123", "ntfy_topic": "t-" + u})

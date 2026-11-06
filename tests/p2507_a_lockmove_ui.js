@@ -5,7 +5,7 @@
 // to frida's ids. Without the old ids nothing opens (the guard of the test). gina adds a file and unlocks the folder: plain again.
 const path = require('path');
 const {execFileSync} = require('child_process');
-const {sleep, B, login} = require('./boot');
+const {sleep, B, login, meId} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const firefox = require('./ff')({tag: 'p2507_a_lockmove_ui', check, shots: 'P2507A_SHOTS'});
@@ -101,7 +101,7 @@ const TXT = 'Rental contract, invented words';
 
     // an organisation: lena locks, her wrap of the admin's copy moves; alice reads it in the target, her copy then is her own
     const OA = (await call('POST', '/api/admin/orgs', {name: 'Alpha', admin_id: 1}, CA)).j.id, OB = (await call('POST', '/api/admin/orgs', {name: 'Beta', admin_id: 1}, CA)).j.id;
-    await call('PATCH', '/api/users/1', {email: 'alice@example.com'}, CA);
+    await call('PATCH', `/api/users/${await meId(CA)}`, {email: 'alice@example.com'}, CA);  // 2.609.0 (#4512): alice's id, not a fixed 1
     check((await call('POST', '/api/users', {username: 'lena', display_name: 'Lena', password: 'password123', email: 'lena@example.com'}, CA)).status < 300, 'lena');
     check((await call('PUT', `/api/orgs/${OA}/members`, {email: 'lena@example.com', role: 'member'}, CA)).status < 300, 'lena in the organisation');
     ck.lena = await login('lena');

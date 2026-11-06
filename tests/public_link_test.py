@@ -21,7 +21,7 @@ from datetime import datetime, timedelta, timezone
 
 import requests
 import testclock
-from kt import FAILS, OKS, check, sess, until, B, DATA  # 2.206.0 (#2762): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, until, B, DATA, me_id  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 
 N = os.path.dirname(os.path.abspath(__file__))
 BP = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PROXY_PORT", "3041")
@@ -83,7 +83,7 @@ assert s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name":
 A = sess("alice")
 for u in ("bob", "carol"):
     assert A.post(B + "/api/users", json={"username": u, "display_name": u.title(), "password": "password123"}).ok
-A.patch(B + "/api/users/1", json={"ntfy_topic": "admintopic"})
+A.patch(B + f"/api/users/{me_id(A)}", json={"ntfy_topic": "admintopic"})
 Bo, Ca = sess("bob"), sess("carol")
 # 1.9.0: "completed by others" News are off by default; this suite checks them for bob
 Bo.patch(B + "/api/settings", json={"news_kinds": "mention,assign,comment,unblock,share,status,complete"})

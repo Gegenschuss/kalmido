@@ -40,7 +40,7 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 BP = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PROXY_PORT", "3041")
 H = {"X-Requested-With": "kalmido"}
 TZ = ZoneInfo("Europe/Berlin")
-from kt import FAILS, OKS, check, sess, su_get  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, su_get, me_id  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 MAGIC = b"KALMIDO-BACKUP-ENC\x00"
 
 
@@ -162,7 +162,7 @@ start()
 s0 = sess()
 assert s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
 A = sess("alice")
-A.patch(B + "/api/users/1", json={"ntfy_topic": "t-alice"})
+A.patch(B + f"/api/users/{me_id(A)}", json={"ntfy_topic": "t-alice"})
 assert A.post(B + "/api/users", json={"username": "bob", "display_name": "Bob", "password": "password123"}).ok
 assert A.post(B + "/api/users", json={"username": "px", "display_name": "Proxy admin", "proxy_login": "px-sso", "is_admin": True}).ok
 Bo = sess("bob")

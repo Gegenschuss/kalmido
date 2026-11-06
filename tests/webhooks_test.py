@@ -20,7 +20,7 @@ import time
 import requests
 
 N = os.path.dirname(os.path.abspath(__file__))
-from kt import FAILS, OKS, check, sess, B, DATA  # 2.206.0 (#2762): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, B, DATA, me_id  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 STUB = "http://127.0.0.1:8097"
 
@@ -110,7 +110,7 @@ assert s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name":
 A = sess("alice")
 for u in ("bob", "carol"):
     assert A.post(B + "/api/users", json={"username": u, "display_name": u.title(), "password": "password123"}).ok
-A.patch(B + "/api/users/1", json={"ntfy_topic": "admintopic"})
+A.patch(B + f"/api/users/{me_id(A)}", json={"ntfy_topic": "admintopic"})
 Bo, Ca = sess("bob"), sess("carol")
 check(A.get(B + "/api/state").json()["webhooks"]["enabled"] is True, "state: webhooks on")  # 2.364.0 C (#3044): + mine
 

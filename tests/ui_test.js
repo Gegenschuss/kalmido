@@ -1,8 +1,8 @@
 // UI tests (jsdom) for comments / activity / mentions / link / collab + links toggles. node ui_test.js
 // Needs the state of api_test.py before it (its users + ids.json): alone it fails with "login alice 401" - run the pair
 // (the UI test runner and tests/stages.py --touched add api for it; ONLY_GROUPS=ui runs the whole group)
-const {boot, errs, sleep, B, until, untilEl, idle} = require('./boot');
-const ids = require('./ids.json');
+const {boot, errs, sleep, B, until, untilEl, idle, readState} = require('./boot');
+const ids = readState('ids.json');  // 2.609.0 (#4512): from the test data folder
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const api = async (w, method, url, body) => (await w.fetch(url, {method, headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: body ? JSON.stringify(body) : undefined})).json();

@@ -158,7 +158,7 @@ first 15 lines of its file is enough, `python3 suites.py --check` validates it, 
 ```sh
 ./start.sh                      # fresh container on 127.0.0.1:3041 (proxy port) and :3048 (app port)
 python3 api_test.py .data       # most Python suites expect a fresh container + the data dir
-node ui_test.js                 # after api_test.py (uses its ids.json)
+node ui_test.js                 # after api_test.py (uses its ids.json in the data folder, KALMIDO_TEST_DATA)
 ```
 
 Settings (environment variables, all optional):

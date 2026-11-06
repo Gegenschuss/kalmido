@@ -3,13 +3,11 @@
 // refresh, edit, add ICS + CalDAV, errors, remove), the admin allow-list, German labels.
 // Runs after calendars_test.py on its container (stub calendar server inside; ids in cal_ids.json).
 process.env.TZ = 'Europe/Berlin';
-const fs = require('fs');
-const path = require('path');
-const {boot, errs, sleep, idle} = require('./boot');  // 2.358.0 C (#2782): idle(w) instead of fixed sleeps
+const {boot, errs, sleep, idle, readState} = require('./boot');  // 2.358.0 C (#2782): idle(w) instead of fixed sleeps
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
-const ids = JSON.parse(fs.readFileSync(path.join(__dirname, 'cal_ids.json'), 'utf8'));
+const ids = readState('cal_ids.json');  // 2.609.0 (#4512): from the test data folder
 const api = async (w, m, u, b) => (await w.fetch(u, {method: m, headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: b ? JSON.stringify(b) : undefined})).json();
 const until = (fn, ms) => require('./boot').until(fn, {timeout: ms || 15000, step: 100});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const STUB = 'http://127.0.0.1:8095';

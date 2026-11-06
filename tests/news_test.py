@@ -3,7 +3,7 @@
 import json, os, sys, time, dbx, subprocess
 import requests
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048"); DATA = sys.argv[1]; H = {"X-Requested-With": "kalmido"}
-from kt import FAILS, OKS, check, sess  # 2.206.0 (#2762): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, me_id, state_file  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 def pushes():
     try: return [json.loads(l) for l in open(os.path.join(DATA, "ntfy.log"), encoding="utf-8") if l.strip()]
     except FileNotFoundError: return []
@@ -13,7 +13,7 @@ def kinds(s): return [(x["kind"], x["count"]) for x in news(s)["items"]]
 def db(): return dbx.connect(os.path.join(DATA, "tasks.db"))
 
 assert sess().post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
-A = sess("alice"); A.patch(B + "/api/users/1", json={"ntfy_topic": "t-alice"})
+A = sess("alice"); A.patch(B + f"/api/users/{me_id(A)}", json={"ntfy_topic": "t-alice"})
 ids = {"alice": 1}
 for u, n, topic in (("bob", "Bob", "t-bob"), ("carol", "Carol", "t-carol"), ("dave", "Dave", "t-dave"), ("eve", "Eve", "t-eve"), ("frank", "Frank", "")):
     r = A.post(B + "/api/users", json={"username": u, "display_name": n, "password": "password123", "ntfy_topic": topic}); assert r.ok, r.text
@@ -167,5 +167,5 @@ check(len(news(F)["items"]) == nf + 1 and news(F)["items"][0]["kind"] == "mentio
 A.post(B + f"/api/tasks/{ST}/comments", json={"body": "x" * 297 + f"<@{ids['frank']}> tail"})
 ex = news(F)["items"][0]["excerpt"]
 check(ex.endswith("…") and "<@" not in ex and len(ex) <= 301, f"excerpt cut cleanly ({len(ex)})")
-print(json.dumps({"ids": ids, "L": L, "ST": ST}), file=open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "news_ids.json"), "w"))
+print(json.dumps({"ids": ids, "L": L, "ST": ST}), file=open(state_file("news_ids.json"), "w"))  # 2.609.0 (#4512): in the test data folder
 print(f"\n{OKS[0]} ok, {len(FAILS)} failed"); sys.exit(1 if FAILS else 0)

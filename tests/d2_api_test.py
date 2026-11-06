@@ -14,7 +14,7 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 DATA = sys.argv[1]
 N = os.path.dirname(os.path.abspath(__file__))
 H = {"X-Requested-With": "kalmido"}
-from kt import FAILS, OKS, check, sess  # 2.206.0 (#2762): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, me_id  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 
 
 def db():
@@ -47,7 +47,7 @@ D = lambda n: (testclock.today() + timedelta(days=n)).isoformat()  # noqa: E731
 # ---- setup presets: the client sends the modules of the chosen card; new users follow them
 assert sess().post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
 A = sess("alice")
-A.patch(B + "/api/users/1", json={"ntfy_topic": "t-alice"})
+A.patch(B + f"/api/users/{me_id(A)}", json={"ntfy_topic": "t-alice"})
 SIMPLE = ["cal"]
 r = A.post(B + "/api/admin/setup", json={"lang": "en", "collab_all": False, "time_all": False, "modules": SIMPLE})
 check(r.ok, f"setup 'Simple list': {r.status_code} {r.text[:200]}")

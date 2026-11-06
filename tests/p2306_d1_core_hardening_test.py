@@ -28,7 +28,7 @@ import time
 import requests
 
 import kt
-from kt import B, CT, check, sess
+from kt import B, CT, check, sess, me_id
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from freelancer_fixture import freelancer, login  # noqa: E402
@@ -415,7 +415,7 @@ check(login(B, "mia").post(B + f"/api/orgs/{ORG}/join").ok and role(ORG, uid["mi
 r = A.patch(B + f"/api/admin/orgs/{GO}", json={"members_add": [1]})
 check(r.status_code == 403 and not kt.dbx("SELECT 1 FROM org_joins WHERE org_id=? AND user_id=1", (GO,)) and not role(GO, 1),
       "hosted: the operator does not invite itself into a client's organisation (2.399.0 #2687: 403) " + r.text[:120])
-r = A.patch(B + "/api/users/1", json={"orgs": [ORG, GO]})
+r = A.patch(B + f"/api/users/{me_id(A)}", json={"orgs": [ORG, GO]})
 check(r.status_code == 403 and not kt.dbx("SELECT 1 FROM org_joins WHERE org_id=? AND user_id=1", (GO,)) and role(ORG, 1) == [("admin",)],
       "hosted: not through the user dialog either (nothing changed) " + r.text[:120])
 check(Fr.patch(B + f"/api/admin/orgs/{GO}", json={"members_add": [FID]}).status_code == 403, "freelancer (no instance admin): 403 as before")

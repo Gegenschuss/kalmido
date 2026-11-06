@@ -27,7 +27,7 @@ PB = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PROXY_PORT", "3041")
 V = B + "/api/v1"
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 H = {"X-Requested-With": "kalmido"}
-from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, me_id  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 
 
 class Api:
@@ -103,7 +103,7 @@ if not _r.ok:  # 2.37.0 (#1150) diagnostics: why the first setup after a UI suit
     print(subprocess.run(["docker", "logs", "--tail", "40", _ct], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True).stdout[-4000:], flush=True)
 assert _r.ok
 A = sess("alice")
-A.patch(B + "/api/users/1", json={"ntfy_topic": "t-alice"})
+A.patch(B + f"/api/users/{me_id(A)}", json={"ntfy_topic": "t-alice"})
 ids = {"alice": 1}
 for u in ("bob", "pete", "vic", "dave", "conv", "carl"):
     r = A.post(B + "/api/users", json={"username": u, "display_name": u.title(), "password": "password123", "ntfy_topic": "t-" + u})
@@ -156,14 +156,14 @@ check(any(x["id"] == CVL for x in A.get(B + "/api/state").json()["lists"]), "the
 A.patch(B + f"/api/users/{ids['conv']}", json={"proxy_login": "convproxy"})
 r = requests.get(PB + "/api/state", headers={"Remote-User": "convproxy"})
 check(r.status_code in (401, 403), f"agent: no proxy login ({r.status_code})")
-check(A.patch(B + "/api/users/1", json={"kind": "agent"}).status_code == 400, "cannot turn myself into an agent")
+check(A.patch(B + f"/api/users/{me_id(A)}", json={"kind": "agent"}).status_code == 400, "cannot turn myself into an agent")
 # 2.585.0 (#4290): the other branches of the self-lock (users.py user_update / user_delete): only the agent branch was tested
-r = A.patch(B + "/api/users/1", json={"is_admin": False})
+r = A.patch(B + f"/api/users/{me_id(A)}", json={"is_admin": False})
 check(r.status_code == 400 and dbx("SELECT is_admin FROM users WHERE id=1")[0][0] == 1, f"#4290: cannot remove my own admin rights {r.status_code}")
-r = A.patch(B + "/api/users/1", json={"disabled": True})
+r = A.patch(B + f"/api/users/{me_id(A)}", json={"disabled": True})
 check(r.status_code == 400 and dbx("SELECT disabled FROM users WHERE id=1")[0][0] == 0 and A.get(B + "/api/state").ok,
       f"#4290: cannot disable myself, the session stays {r.status_code}")
-r = A.delete(B + "/api/users/1")
+r = A.delete(B + f"/api/users/{me_id(A)}")
 check(r.status_code == 400 and dbx("SELECT 1 FROM users WHERE id=1") and A.get(B + "/api/state").ok, f"#4290: cannot delete myself {r.status_code}")
 A.post(B + "/api/users", json={"username": "adm2", "password": "password123", "is_admin": True})
 adm2 = [x["id"] for x in A.get(B + "/api/users").json()["users"] if x["username"] == "adm2"][0]

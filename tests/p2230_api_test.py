@@ -25,7 +25,7 @@ import requests
 import testclock
 
 N = os.path.dirname(os.path.abspath(__file__))
-from kt import FAILS, OKS, check, sess, until, B, H, DATA  # 2.206.0 (#2762): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, until, B, H, DATA, me_id  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 V = B + "/api/v1"
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 
@@ -357,7 +357,7 @@ A.post(B + "/api/users", json={"username": "bobkid", "display_name": "Bobkid", "
 bk = next(u["id"] for u in A.get(B + "/api/users?all=1").json()["users"] if u["username"] == "bobkid")  # 2.46.0 (#1592): the user management
 r = Bo.post(B + f"/api/users/{bk}/signin-link")
 check(r.ok and "#signin/" in r.json()["link"], "a parent creates the link for their kid")
-check(A.post(B + "/api/users/1/signin-link").status_code == 409, "never for an admin")
+check(A.post(B + f"/api/users/{me_id(A)}/signin-link").status_code == 409, "never for an admin")
 check(A.post(B + f"/api/users/{AG}/signin-link").status_code == 404, "never for an agent")
 gran = A.post(B + "/api/users", json={"username": "grandma", "display_name": "Grandma"}).json()["id"]
 r = A.post(B + f"/api/users/{gran}/signin-link")

@@ -17,7 +17,7 @@ from zoneinfo import ZoneInfo
 import requests
 
 N = os.path.dirname(os.path.abspath(__file__))
-from kt import FAILS, OKS, check, sess, B, H, DATA  # 2.206.0 (#2762): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, B, H, DATA, me_id  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 IMG = os.environ.get("KALMIDO_TEST_IMAGE", "kalmido:test")
 CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 
@@ -89,7 +89,7 @@ for u in ("bob", "carol", "mallory"):
     r = A.post(B + "/api/users", json={"username": u, "display_name": u.title(), "password": "password123", "ntfy_topic": "t-" + u})
     assert r.ok, r.text
     ids[u] = r.json()["id"]
-A.patch(B + "/api/users/1", json={"ntfy_topic": "t-alice"})
+A.patch(B + f"/api/users/{me_id(A)}", json={"ntfy_topic": "t-alice"})
 Bo, Ca, Ma = sess("bob"), sess("carol"), sess("mallory")
 
 # ------------------------------------------------------------------ HIGH-1: ntfy inbox SSRF / file read / token leak
@@ -191,7 +191,7 @@ for due, dtm, rem, rep in (("not-a-date", None, "0", ""), (today, None, "abc", "
         (inbox_m, "poison", due, dtm, rem, rep, ts_now, ts_now, ids["mallory"]))
 dbx("UPDATE user_settings SET value='garbage' WHERE user_id=? AND key='allday_time'", (ids["mallory"],))
 dbx("INSERT INTO habits(name,remind_at,created_at,user_id,days,goal) VALUES('poison habit','xx:yy',?,?,'1234567','-5')", (ts_now, ids["mallory"]))  # 2.37.0: goal is a BIGINT column now
-A.patch(B + "/api/users/1", json={"ntfy_topic": "t-alice"})
+A.patch(B + f"/api/users/{me_id(A)}", json={"ntfy_topic": "t-alice"})
 leg = A.post(B + "/api/tasks", json={"title": "legit reminder after poison", "due": today, "due_time": tm, "reminders": "0"})
 check(leg.ok, "legit reminder task created")
 t0 = time.time()

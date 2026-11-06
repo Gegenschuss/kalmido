@@ -14,7 +14,7 @@ H = {"X-Requested-With": "kalmido"}
 TZ = ZoneInfo("Europe/Berlin")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import testclock  # noqa: E402  (2.149.0, #2512: the group's test time, run_all.sh `now`)
-from kt import FAILS, OKS, check, sess  # 2.206.0 (#2762): shared helpers (tests/kt.py)
+from kt import FAILS, OKS, check, sess, me_id  # 2.206.0 (#2762): shared helpers (tests/kt.py)
 
 
 def db():
@@ -30,7 +30,7 @@ A.patch(B + "/api/settings", json={"news_kinds": "mention,assign,comment,unblock
 r = A.post(B + "/api/users", json={"username": "bob", "display_name": "Bob", "password": "password123"})
 BOB = r.json()["id"]
 Bb = sess("bob")
-A.patch(B + "/api/users/1", json={"proxy_login": "alice-sso"})
+A.patch(B + f"/api/users/{me_id(A)}", json={"proxy_login": "alice-sso"})
 st = A.get(B + "/api/state").json()
 INBOX_A = [l for l in st["lists"] if l["is_inbox"]][0]["id"]
 WORK = A.post(B + "/api/lists", json={"name": "Work"}).json()["id"]
