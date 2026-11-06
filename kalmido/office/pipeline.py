@@ -18,7 +18,7 @@ from ..core.pg import insert_id
 from .owrite import ow_history_answer, ow_kind, ow_uid, ow_write  # 2.567.0 (#4711): the office's write layer
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.i18n import tr
-from ..core.db import body, bump, db, iso, local_now, now_utc
+from ..core.db import body, bump, db, iso_ms, local_now, now_utc
 from ..core.access import Denied
 from ..core.errors import BadInput
 from .calc import dec, dstr, money
@@ -300,7 +300,7 @@ def pl2_post():
     row = pl2_clean(c, oid, b)
     if "sort" not in row:
         row["sort"] = float(c.execute("SELECT COALESCE(MIN(sort), 0) - 1 FROM office_deals WHERE org_id=?", (oid,)).fetchone()[0])
-    ts = iso(now_utc())
+    ts = iso_ms(now_utc())  # 2.571.0 (#4776): milliseconds, as every later save (ow_write) -- the base of expect_updated_at
     row.update(org_id=oid, created_by=uid, created_at=ts, updated_at=ts)
     row = oc_enc_fields(c, oid, "office_deals", row)
     did = insert_id(c, f"INSERT INTO office_deals({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
@@ -351,7 +351,7 @@ def pl2_delete(did):
     """Into the bin (deleted_at); POST .../restore brings it back (the client's undo)."""
     c, uid, oid = _ctx()
     _row(c, oid, did)
-    c.execute("UPDATE office_deals SET deleted_at=? WHERE id=? AND org_id=?", (iso(now_utc()), did, oid))
+    c.execute("UPDATE office_deals SET deleted_at=? WHERE id=? AND org_id=?", (iso_ms(now_utc()), did, oid))  # 2.571.0 (#4776)
     bump(c)
     c.commit()
     return jsonify(ok=True, id=did)

@@ -654,8 +654,8 @@ def pk2_redo(c, j, rec):
     n += c.execute(f"SELECT COUNT(*) FROM tasks WHERE id IN ({','.join('?' * len(back)) or 'NULL'}) AND deleted_at IS NULL", back).fetchone()[0]
     ev = rec.get("events_deleted") or []
     if ev:
-        n += c.execute(f"UPDATE events SET deleted_at=NULL, updated_at=? WHERE id IN ({','.join('?' * len(ev))}) AND deleted_at IS NOT NULL",
-                       (iso(now_utc()), *ev)).rowcount
+        n += c.execute(f"UPDATE events SET deleted_at=NULL, updated_at=?, updated_by=COALESCE(?, updated_by) WHERE id IN ({','.join('?' * len(ev))}) "
+                       "AND deleted_at IS NOT NULL", (iso(now_utc()), (g.user["id"] if getattr(g, "user", None) is not None else None), *ev)).rowcount  # 2.571.0 (#4776): updated_by
         rec["events_deleted"] = []
         _pk2_events_at(c, rec)
     if rec.get("offer_deleted"):  # a new draft from the same proposal

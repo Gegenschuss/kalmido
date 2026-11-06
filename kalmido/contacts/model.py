@@ -949,7 +949,8 @@ def contact_store(c, uid, book_id, f, cid=None, uid_=None, href=None, extra=None
             base = re.sub(r"[^A-Za-z0-9._-]", "_", uid_)
             href = (base if base == uid_ and len(base) <= 180 else base[:170] + "-" + hashlib.sha256(uid_.encode()).hexdigest()[:8]) + ".vcf"
         cols.update(book_id=book_id, uid=uid_, href=href, extra=extra or "",
-                    version=version or "3.0", src_digest=src_digest or "", created_by=uid, created_at=ts, updated_at=ts)
+                    version=version or "3.0", src_digest=src_digest or "", created_by=uid, created_at=ts, updated_at=ts,
+                    updated_by=uid)  # 2.571.0 (#4776): who changed it last (app, API / agents, CardDAV, import all end here)
         cols["search"] = search_text({**cols, **{k: _jl(cols[k]) for k in ("emails", "phones", "addresses", "groups")}})
         cid = insert_id(c, f"INSERT INTO contacts({','.join(cols)}) VALUES({','.join('?' * len(cols))})", list(cols.values()))
     else:
@@ -961,6 +962,8 @@ def contact_store(c, uid, book_id, f, cid=None, uid_=None, href=None, extra=None
         if src_digest is not None:
             f["src_digest"] = src_digest
         f["updated_at"] = ts
+        if uid:
+            f["updated_by"] = uid  # 2.571.0 (#4776)
         c.execute(f"UPDATE contacts SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), cid])
         r = c.execute("SELECT * FROM contacts WHERE id=?", (cid,)).fetchone()
         c.execute("UPDATE contacts SET search=? WHERE id=?",
@@ -986,6 +989,7 @@ def contact_dict(c, r, uid=None, links=True):
     for k in ("emails", "phones", "addresses", "urls", "groups"):
         d[k] = _jl(r[k])
     d["created_at"], d["updated_at"] = r["created_at"], r["updated_at"]
+    d["updated_by"] = r["updated_by"] if "updated_by" in r.keys() else None  # 2.571.0 (#4776): who changed it last
     from ..newsletter.sync import nwl_contact_json
     d["newsletter"] = nwl_contact_json(r)  # 2.55.0 (#1455): the newsletter consent (read only here, set via /api/newsletter/consent)
     if links and uid:

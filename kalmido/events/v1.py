@@ -205,7 +205,8 @@ def events_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
         "guests_visible": {"type": "boolean", "description": "The invitation to external guests names all guests (false: only the recipient)"},
         "task_id": nul("integer", description="The linked preparation task"), "attendees": {"type": "array", "items": att},
         "role": {"type": "string", "enum": ["owner", "edit", "view", "attendee"]}, "partstat": {"type": "string", "enum": list(EV_PARTSTAT)},
-        "created_by": nul("integer"), "created_at": {"type": "string"}, "updated_at": {"type": "string"}}}
+        "created_by": nul("integer"), "created_at": {"type": "string"}, "updated_at": {"type": "string"},
+        "updated_by": nul("integer")}}  # 2.571.0 (#4776): who changed it last (null: not known, older rows)
     schemas["EventPage"] = page("Event")
     schemas["Occurrence"] = {"type": "object", "properties": {
         "eid": {"type": "integer"}, "occ": {"type": "string", "description": "The original start (key for occurrence=)"},

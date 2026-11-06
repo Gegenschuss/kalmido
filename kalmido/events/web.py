@@ -208,7 +208,7 @@ def op_event_edit(c, uid, eid, b, occ=None):
                     raise Denied(409, p)
         if c.execute("SELECT 1 FROM events WHERE cal_id=? AND (uid=? OR href=?) AND deleted_at IS NULL", (nc, r["uid"], r["href"])).fetchone():
             raise Denied(409, tr("The calendar has this event already"))
-        c.execute("UPDATE events SET cal_id=? WHERE id=?", (nc, eid))
+        c.execute("UPDATE events SET cal_id=?, updated_by=? WHERE id=?", (nc, uid, eid))  # 2.571.0 (#4776): updated_by
         cal_touch(c, r["cal_id"])
         r = c.execute("SELECT * FROM events WHERE id=?", (eid,)).fetchone()
     f = ev_fields(c, uid, {k: v for k, v in b.items() if k not in ("attendees", "cal_id", "expect")}, r)
@@ -235,7 +235,7 @@ def op_event_delete(c, uid, eid, occ=None):
     if occ:
         ev_occ_change(c, r, occ, {"delete": True})
     else:
-        ev_delete(c, r)
+        ev_delete(c, r, uid)  # 2.571.0 (#4776): updated_by
     c.commit()
     if _by_agent():  # 2.148.1 D (#2495): invitation / cancellation mails only by people, never through an agent's change
         return
@@ -253,7 +253,7 @@ def _by_agent():
 
 def op_event_restore(c, uid, eid):
     r, role = need_event(c, eid, write=True, deleted=True)
-    c.execute("UPDATE events SET deleted_at=NULL, updated_at=? WHERE id=?", (iso_ms(now_utc()), eid))
+    c.execute("UPDATE events SET deleted_at=NULL, updated_at=?, updated_by=? WHERE id=?", (iso_ms(now_utc()), uid, eid))  # 2.571.0 (#4776)
     cal_touch(c, r["cal_id"])
     bump(c)
     c.commit()
@@ -289,7 +289,7 @@ def op_prep_task(c, uid, eid, b):
     if b.get("list_id") not in (None, ""):
         tb["list_id"] = as_int(b["list_id"], "list_id", 1)
     t = v1_call(task_create, body=tb)
-    c.execute("UPDATE events SET task_id=?, updated_at=? WHERE id=?", (t["id"], iso_ms(now_utc()), eid))
+    c.execute("UPDATE events SET task_id=?, updated_at=?, updated_by=? WHERE id=?", (t["id"], iso_ms(now_utc()), uid, eid))  # 2.571.0 (#4776)
     cal_touch(c, r["cal_id"])
     bump(c)
     c.commit()

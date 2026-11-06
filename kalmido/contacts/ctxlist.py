@@ -579,7 +579,7 @@ def ctx_groups_change(c, uid, b):
     if not todo and not skipped:
         raise Denied(404)
     bk_gate(c, N_("Change {0} contacts at once"), len(todo))
-    ts = ms_write(c, rows, todo)
+    ts = ms_write(c, rows, todo, uid=uid)  # 2.571.0 (#4776): updated_by
     undo = [{**u, "expect": ts} for u in undo]  # 2.273.0 C (#3048): the undo leaves a contact changed again since then
     return {"action": action, "changed": len(todo), "skipped": skipped, "undo": undo}
 

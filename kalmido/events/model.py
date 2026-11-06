@@ -776,7 +776,8 @@ def ev_dict(c, r, uid, role=None, att=None):
          "reminders": [int(x) for x in (r["reminders"] or "").split(",") if x.strip()], "status": r["status"], "busy": bool(r["busy"]),
          "guests_visible": bool(r["guests_visible"]),  # 2.380 H (#3392)
          "url": r["url"], "task_id": None if hide else r["task_id"], "attendees": atts, "role": role, "created_by": r["created_by"],
-         "created_at": r["created_at"], "updated_at": r["updated_at"]}
+         "created_at": r["created_at"], "updated_at": r["updated_at"],
+         "updated_by": None if hide else (r["updated_by"] if "updated_by" in r.keys() else None)}  # 2.571.0 (#4776)
     mine = next((a for a in atts if a["user_id"] == uid), None)
     if mine:
         d["partstat"] = mine["partstat"]
@@ -880,7 +881,8 @@ def ev_store(c, uid, cal_id, f, eid=None, uid_=None, href=None, attendees=None, 
                 "description": f.get("description", ""), "all_day": f.get("all_day", 0), "start": f["start"], "end": f["end"],
                 "tz": f.get("tz", ""), "rrule": f.get("rrule", ""), "exdates": f.get("exdates", ""), "overrides": f.get("overrides", ""),
                 "reminders": f.get("reminders", ""), "status": f.get("status", "confirmed"), "busy": f.get("busy", 1), "url": f.get("url"),
-                "task_id": f.get("task_id"), "extra": f.get("extra", ""), "guests_visible": f.get("guests_visible", 0), "created_by": uid, "created_at": ts, "updated_at": ts}
+                "task_id": f.get("task_id"), "extra": f.get("extra", ""), "guests_visible": f.get("guests_visible", 0), "created_by": uid, "created_at": ts, "updated_at": ts,
+                "updated_by": uid}  # 2.571.0 (#4776): who changed it last (web, API / agents, CalDAV all end here)
         eid = insert_id(c, f"INSERT INTO events({','.join(map(pgb_col, cols))}) VALUES({','.join('?' * len(cols))})", list(cols.values()))
         who_note("event.created", "event", eid)
     else:
@@ -888,6 +890,8 @@ def ev_store(c, uid, cal_id, f, eid=None, uid_=None, href=None, attendees=None, 
         old = c.execute("SELECT * FROM events WHERE id=?", (eid,)).fetchone()
         if f:
             f["updated_at"] = ts
+            if uid:
+                f["updated_by"] = uid  # 2.571.0 (#4776)
             c.execute(f"UPDATE events SET {','.join(pgb_col(k) + '=?' for k in f)}, seq=seq+1 WHERE id=?", [*f.values(), eid])
     r = c.execute("SELECT * FROM events WHERE id=?", (eid,)).fetchone()
     # 2.126.0 C (#1992 K4): sent reminders count again only when the time, the rule or the reminders really changed
@@ -1078,8 +1082,19 @@ def when_text(r, lg=None, occ=None, s=None):
     return f"{short_day(loc.date(), lg)} {hm_text(loc, s)}"
 
 
-def ev_delete(c, r):
-    c.execute("UPDATE events SET deleted_at=?, updated_at=? WHERE id=?", (iso(now_utc()), iso_ms(now_utc()), r["id"]))
+def ev_actor(uid=None):
+    """2.571.0 (#4776): who writes an event: uid, else the signed-in account of the request (None in background work: then
+    updated_by stays as it is, COALESCE)."""
+    if uid:
+        return uid
+    from flask import g, has_request_context
+    u = getattr(g, "user", None) if has_request_context() else None
+    return u["id"] if u is not None else None
+
+
+def ev_delete(c, r, uid=None):
+    c.execute("UPDATE events SET deleted_at=?, updated_at=?, updated_by=COALESCE(?, updated_by) WHERE id=?",
+              (iso(now_utc()), iso_ms(now_utc()), ev_actor(uid), r["id"]))  # 2.571.0 (#4776): updated_by
     from ..integrations.webhooks import who_note
     who_note("event.deleted", "event", r["id"])  # 2.115.0 A (#2061)
     cal_touch(c, r["cal_id"])

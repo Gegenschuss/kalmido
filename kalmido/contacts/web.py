@@ -276,7 +276,7 @@ def op_contact_edit(c, uid, cid, b):
         if c.execute("SELECT occ_list_id FROM books WHERE id=?", (r["book_id"],)).fetchone()[0] != nbk[0]:
             from ..contacts.bulk import bk_occ_drop  # 2.46.1 (#1554): another birthday list: the old tasks go, contact_store makes new ones
             bk_occ_drop(c, uid, [cid])
-        c.execute("UPDATE contacts SET book_id=? WHERE id=?", (nb, cid))
+        c.execute("UPDATE contacts SET book_id=?, updated_by=? WHERE id=?", (nb, uid, cid))  # 2.571.0 (#4776)
         book_touch(c, r["book_id"])
         r = c.execute("SELECT * FROM contacts WHERE id=?", (cid,)).fetchone()
     f = contact_fields({k: v for k, v in b.items() if k != "book_id"}, r)

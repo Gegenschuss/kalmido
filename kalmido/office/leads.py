@@ -12,7 +12,7 @@ from datetime import date
 from flask import g, jsonify
 
 from ..core.config import app
-from ..core.db import body, bump, db, iso, local_now, now_utc, write_lock
+from ..core.db import body, bump, db, iso, iso_ms, local_now, now_utc, write_lock
 from ..core.i18n import N_, tr
 from ..core.access import Denied
 from ..core.pg import insert_id, system_ctx
@@ -72,7 +72,7 @@ def lead_insert(c, oid, by, row):
         raise BadInput(tr("Too many entries"))
     row = dict(row)
     row.setdefault("sort", float(c.execute("SELECT COALESCE(MIN(sort), 0) - 1 FROM office_deals WHERE org_id=?", (oid,)).fetchone()[0]))
-    ts = iso(now_utc())
+    ts = iso_ms(now_utc())  # 2.571.0 (#4776): milliseconds, as every later save (ow_write)
     row.update(org_id=oid, created_by=by, created_at=ts, updated_at=ts)
     row = oc_enc_fields(c, oid, "office_deals", row)
     return insert_id(c, f"INSERT INTO office_deals({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
@@ -350,7 +350,7 @@ def lead_import():
 
 def lead_bin(c, oid, ids):
     """These leads of the area (still leads) into the bin. -> how many. No commit."""
-    ts, n = iso(now_utc()), 0
+    ts, n = iso_ms(now_utc()), 0  # 2.571.0 (#4776)
     for i in ids:
         n += c.execute("UPDATE office_deals SET deleted_at=? WHERE id=? AND org_id=? AND stage='lead' AND deleted_at IS NULL", (ts, i, oid)).rowcount
     return n

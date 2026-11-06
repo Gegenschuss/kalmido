@@ -203,7 +203,8 @@ def contacts_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
         "id": {"type": "integer"}, "uid": {"type": "string"}, **props, "role": {"type": "string"},
         "tasks": {"type": "array", "items": {"type": "object", "properties": {"task_id": {"type": "integer"}, "kind": {"type": "string", "enum": list(CT_LINKS)},
                                                                               "title": {"type": "string"}, "status": {"type": "integer"}}}},
-        "events": {"type": "array", "items": {"type": "object"}}, "created_at": {"type": "string"}, "updated_at": {"type": "string"}}}
+        "events": {"type": "array", "items": {"type": "object"}}, "created_at": {"type": "string"}, "updated_at": {"type": "string"},
+        "updated_by": nul("integer")}}  # 2.571.0 (#4776): who changed it last (null: not known, older rows)
     schemas["ContactBrief"] = {"type": "object", "properties": {
         "id": {"type": "integer"}, "book_id": {"type": "integer"}, "fn": {"type": "string"}, "org": {"type": "string"}, "kind": {"type": "string"},
         "email": {"type": "string"}, "phone": {"type": "string"}, "photo": {"type": "boolean"}, "bday": {"type": "string"},

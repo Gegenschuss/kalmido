@@ -463,7 +463,7 @@ def evdav(m, c, u, pw_row, kind, key, name):
         im = request.headers.get("If-Match", "").strip()
         if im and im != "*" and have[1] not in [x.strip() for x in im.split(",")]:
             raise DavError(412, "The resource was changed meanwhile")
-        ev_delete(c, have[0])
+        ev_delete(c, have[0], u["id"])  # 2.571.0 (#4776): updated_by
         c.commit()
         return Response(status=204)
     if m == "PROPPATCH":

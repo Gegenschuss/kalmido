@@ -1091,6 +1091,9 @@ Read first, send the version back:
 | Events, contacts | `PATCH /api/v1/events/{id}`, `/contacts/{id}` (MCP `update_event`, `update_contact`) | `expect_updated_at` (or `expect`, `If-Match`) | `updated_at` of the event / contact |
 | Office drafts | quotation draft, letter draft, lead (MCP `update_offer_draft`, `update_letter_draft`, `update_office_lead`) | `expect_updated_at` | `updated_at` of the draft / lead |
 
+Events and contacts carry `updated_by` (2.571.0): the account that changed them last - in the app, through the API (an
+agent's own id), over CalDAV / CardDAV or an import; `null` for rows nobody changed since then.
+
 Content fields of a task: `title`, `notes`, `due`, `due_time`, `start`, `deadline`, `deadline_in_today`, `plan_start`,
 `duration`, `priority`, `repeat`, `repeat_from`, `assignee_id`, `assignee_group_id`, `rotation`, `list_tags`, `tags`,
 `people`, `fields`, `type`, `milestone`, `milestone_id`, `family`, `reviewer_id`, `url`, `points`, `snippets`. State steps

@@ -64,7 +64,7 @@ def ctt_trash(c, uid, cids):
     ctt_unlink(c, cids)
     ts = iso_ms(now_utc())
     for blk in bk_blocks(list(cids), 500):
-        c.execute(f"UPDATE contacts SET deleted_at=? WHERE id IN ({bk_in(blk)}) AND deleted_at IS NULL", [ts, *blk])
+        c.execute(f"UPDATE contacts SET deleted_at=?, updated_by=? WHERE id IN ({bk_in(blk)}) AND deleted_at IS NULL", [ts, uid, *blk])  # 2.571.0 (#4776)
 
 
 def ctt_unlink(c, cids):
@@ -96,7 +96,7 @@ def ctt_restore(c, uid, rows):
         ct_room(c, bid, sum(1 for r in rows if r["book_id"] == bid))
     ts = iso_ms(now_utc())
     for blk in bk_blocks([r["id"] for r in rows], 500):
-        c.execute(f"UPDATE contacts SET deleted_at=NULL, updated_at=? WHERE id IN ({bk_in(blk)})", [ts, *blk])
+        c.execute(f"UPDATE contacts SET deleted_at=NULL, updated_at=?, updated_by=? WHERE id IN ({bk_in(blk)})", [ts, uid, *blk])  # 2.571.0 (#4776)
     ctt_relink(c, [r["id"] for r in rows])  # 2.272.0 F (#3038, review M8)
     for r in rows:
         if r["bday"] or r["anniversary"]:
@@ -243,7 +243,7 @@ def ms_restore_items(b):
     return out
 
 
-def ms_write(c, rows, todo, redo=None):
+def ms_write(c, rows, todo, redo=None, uid=None):
     """Writes {id: columns} in committed blocks (search text, the books' ctag, the version). -> the change time written.
     redo (2.273.0 C, #3048): row -> its columns; each block is read again under the row lock and its columns are made from
     the rows as they are then (a change in between is kept, never overwritten); None / {} = left out."""
@@ -263,7 +263,7 @@ def ms_write(c, rows, todo, redo=None):
                 c.commit()
                 continue
         for i in blk:
-            f = {**todo[i], "updated_at": ts}
+            f = {**todo[i], "updated_at": ts, **({"updated_by": uid} if uid else {})}  # 2.571.0 (#4776): updated_by
             m = {**dict(rows[i]), **f}
             f["search"] = search_text({**m, **{k: json.loads(m[k] or "[]") for k in ("emails", "phones", "addresses", "groups")}})
             c.execute(f"UPDATE contacts SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), i])
@@ -315,7 +315,7 @@ def ms_set(c, uid, b, action):
 
     for i in ok:
         todo[i] = True
-    ts = ms_write(c, rows, todo, redo=redo)
+    ts = ms_write(c, rows, todo, redo=redo, uid=uid)  # 2.571.0 (#4776): uid
     out = {"action": action, "changed": len(todo), "skipped": len(ids) - len(ok)}
     if action == "set":
         out.update(unchanged=len(ok) - len(todo), undo=[{**undo[i], "expect": ts} for i in todo])
@@ -420,7 +420,7 @@ def op_contacts_bulk(c, uid, b):
             drop = [i for i in blk if occ.get(rows[i]["book_id"]) != bk["occ_list_id"]]
             if drop:
                 bk_occ_drop(c, uid, drop)
-            c.execute(f"UPDATE contacts SET book_id=?, updated_at=? WHERE id IN ({bk_in(blk)})", [nb, iso_ms(now_utc()), *blk])
+            c.execute(f"UPDATE contacts SET book_id=?, updated_at=?, updated_by=? WHERE id IN ({bk_in(blk)})", [nb, iso_ms(now_utc()), uid, *blk])  # 2.571.0 (#4776)
             for i in drop:
                 if rows[i]["bday"] or rows[i]["anniversary"]:
                     occ_sync(c, i)

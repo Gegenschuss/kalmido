@@ -924,7 +924,7 @@ def doc_create(c, oid, uid, b, admin, number=True):
            **prd_new_doc(c, oid, s),  # 2.113.1 (#2251, #2252): the options of the industry packs switched on
            "intro": _default_text(c, oid, s, "intro", lang), "closing": _default_text(c, oid, s, "closing", lang),
            "rights": json.dumps(rights, ensure_ascii=False), "fields": "[]", "totals": "{}", "created_by": uid, "created_at": ts,
-           "updated_at": ts, "sent_at": None, "trial": trial_flag(b.get("trial"))}  # 2.144.10 A (#2576)
+           "updated_at": iso_ms(now_utc()), "sent_at": None, "trial": trial_flag(b.get("trial"))}  # 2.144.10 A (#2576)
     if s.get("small_business"):  # 2.47.3 (#1360): section 19 UStG
         row["vat_note"] = "small"
     row["currency"] = hc_code(row["currency"]) or hc_home(s)  # 2.189.0 (#2475): the office's currency of new documents
@@ -1611,7 +1611,7 @@ def odoc_set_status(c, oid, did, st, uid, r=None):
                 ofx_log(c, oid, "status", doc_id=did, detail={"before": {"status": r["status"]}, "after": {"status": "paid"}})
                 return
     c.execute("UPDATE office_docs SET status=?, updated_at=?, sent_at=COALESCE(sent_at, ?) WHERE id=? AND org_id=?",
-              (st, ts, ts if st in ("sent", "accepted", "declined", "superseded") else None, did, oid))
+              (st, iso_ms(now_utc()), ts if st in ("sent", "accepted", "declined", "superseded") else None, did, oid))  # 2.571.0 (#4776): updated_at in ms
     if r["kind"] != "offer":
         c.execute("UPDATE office_docs SET paid_at=CASE WHEN status='paid' THEN COALESCE(paid_at, ?) ELSE NULL END WHERE id=? AND org_id=?", (ts, did, oid))
     if st != r["status"]:
@@ -1686,7 +1686,7 @@ def odoc_duplicate(did):
     row = {k: r[k] for k in r.keys() if k not in DUP_SKIP}
     today = local_now().date()
     ts = iso(now_utc())
-    row.update(number="", status="draft", date=today.isoformat(), totals="{}", created_by=uid, created_at=ts, updated_at=ts, sent_at=None,
+    row.update(number="", status="draft", date=today.isoformat(), totals="{}", created_by=uid, created_at=ts, updated_at=iso_ms(now_utc()), sent_at=None,
                valid_until=(today + timedelta(days=int(s.get("offer_valid_days") or 30))).isoformat() if r["kind"] == "offer" else "")
     if r["kind"] == "offer":  # 2.88.0 (#1915): the chain of versions points at its first quotation (a copy of a copy too)
         row["version_of"] = r["version_of"] or r["id"]
