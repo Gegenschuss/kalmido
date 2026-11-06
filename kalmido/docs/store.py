@@ -1092,7 +1092,9 @@ def learn_back(c, nid, run):
             back.append(f)
     if "folder" in af and str(node["parent_id"] or "") == af["folder"] and prev.get("parent_id"):
         chain = _fs_chain(c, int(prev["parent_id"]))  # the folder it came from: still a folder of the same space
-        if chain and chain[0]["kind"] == "folder" and not _fs_deleted(chain) and chain[0]["org_id"] == node["org_id"]:
+        # 2.607.0 (#4872, review): ... and not locked meanwhile (no plain, recognised document into a locked folder, _in_docs_tree)
+        if chain and chain[0]["kind"] == "folder" and not _fs_deleted(chain) and chain[0]["org_id"] == node["org_id"] \
+                and fsl_of_chain(c, chain) is None:
             c.execute("UPDATE fs_nodes SET parent_id=?, owner_id=?, updated_at=? WHERE id=?",
                       (int(prev["parent_id"]), prev.get("owner_id") or node["owner_id"], _now(), nid))
             back.append("folder")

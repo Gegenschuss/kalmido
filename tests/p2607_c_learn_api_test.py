@@ -151,4 +151,36 @@ check(r.ok, "share view-only " + r.text[:120])
 assert A.post(B + "/api/docs/rules", json={"ws": "private", "kind": "any", "match": "Stadtwerke", "sender": "Stadtwerke Nord"}).status_code == 201
 j = learn(Bo, [P])
 check(j.get("denied") == 1 and j.get("changed") == [] and get(A, P)["sender"] is None, "view-only: denied, unchanged " + str(j))
+
+# ---- 2.607.0 review (job/3138): the acting person's rights
+# a rule's folder is made only where BOTH the uploader and the person who applies may edit: Bob (an edit share on one document
+# of Alice) has no folder made in Alice's documents (was: made with her rights, then not used)
+assert A.put(B + "/api/docs/settings", json={"ws": "private", "levels": {f: "rules" for f in ("sender", "type", "tags", "folder")}}).ok
+P2 = doc(A, "private", "shared-edit.txt", "Stadtwerke Nord Gutschrift")
+r = A.post(B + f"/api/files/nodes/{P2}/shares", json={"user_id": uid["bob"], "role": "edit"})
+check(r.ok, "share to edit " + r.text[:120])
+r = A.post(B + "/api/docs/rules", json={"ws": "private", "kind": "any", "match": "Gutschrift", "folder": "Shared Bills"})
+check(r.status_code == 201, "a rule with a folder " + r.text[:120])
+p0 = get(A, P2)["parent_id"]
+j = learn(Bo, [P2])
+check(j.get("denied") == 0 and get(A, P2)["parent_id"] == p0, "review: another person's apply does not move the document " + str(j))
+check(dbx("SELECT COUNT(*) FROM fs_nodes WHERE name='Shared Bills'")[0][0] == 0, "review: ... and has no folder made where they may not edit")
+j = learn(A, [P2])
+check(name(get(A, P2), "folder") == "Shared Bills", "review: the owner's apply makes the folder and files it " + str(j))
+
+# the undo does not put a document back into a folder that was locked (encrypted in the browser) since
+P3 = doc(A, "private", "water.txt", "Wasserwerk Sued Bescheid")
+r = A.post(B + "/api/docs/rules", json={"ws": "private", "kind": "any", "match": "Wasserwerk", "folder": "Old place"})
+check(r.status_code == 201, "the rule for the first folder " + r.text[:120])
+learn(A, [P3])
+old = get(A, P3)
+check(name(old, "folder") == "Old place", "review setup: filed by the rule " + str(old.get("folder")))
+assert A.patch(B + f"/api/docs/rules/{r.json()['id']}", json={"kind": "any", "match": "Wasserwerk", "folder": "New place"}).ok
+j = learn(A, [P3])
+new = get(A, P3)
+check(name(new, "folder") == "New place" and new["parent_id"] != old["parent_id"], "review setup: the automatic folder found anew " + str(new.get("folder")))
+dbw("INSERT INTO fs_locks(node_id, org_id, e2e, e2e_gen) VALUES(?, NULL, 'on', 1)", (old["parent_id"],))
+u = learn(A, [P3], undo=True, run=j["run"])
+check(get(A, P3)["parent_id"] == new["parent_id"], "review: the undo leaves the document out of the folder locked since " + str(u))
+dbw("DELETE FROM fs_locks WHERE node_id=?", (old["parent_id"],))
 sys.exit(done("p2607_c_learn_api"))
