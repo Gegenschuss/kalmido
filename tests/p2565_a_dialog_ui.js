@@ -142,7 +142,9 @@ async function contactChecks(w, d, who) {
   await w.eval(`HIST.redo.length ? HIST.redo[HIST.redo.length - 1].redo() : HIST.undo[HIST.undo.length - 1].redo()`).catch(() => null);
   check(await until(async () => (await ov5())?.start === `${D5}T10:00`), 'redo: moved again');
   check((await call(CK2, 'PATCH', `/api/events/${SE.id}?occ=${D2}T09:00`, {title: 'Standup later'})).http === 200, 'drag: the other device changes the series meanwhile');
-  const r409 = await w.eval(`HIST.undo[HIST.undo.length - 1].undo().then(() => 'ok', e => e.status)`).catch(e => e?.status);
+  // 2.566.0 (#4704): the drag's undo goes through undoStep: a 409 resolves as {none} ("Changed elsewhere, not undone", the step
+  // is dropped) instead of rejecting; undoWrite answers null only on that 409
+  const r409 = await w.eval(`HIST.undo[HIST.undo.length - 1].undo().then(x => x?.none ? 409 : 'ok', e => e.status)`).catch(e => e?.status);
   const after = await call(CK, 'GET', `/api/events/${SE.id}`);
   check(r409 === 409 && (await ov5())?.start === `${D5}T10:00` && after.overrides.find(o => o.rid === `${D2}T09:00`)?.title === 'Standup later',
     `undo with a version of before: 409, the other's change and the move stay (${r409})`);
