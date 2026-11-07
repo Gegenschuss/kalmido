@@ -108,7 +108,9 @@ def chat_case(S, P, other, who, channel=None):
     check(t8 != t7 and sig_row(rid)[:3] == real(rid), f"{who}: a message written in the database moves t, counters right {sig_row(rid)} {real(rid)}")
     wdb("DELETE FROM tchat_msgs WHERE room_id=? AND body='By hand'", (rid,))
     t9 = ver(P)
-    check(t9 != t8 and sig_row(rid)[:3] == real(rid), f"{who}: a hard delete in the database moves t {sig_row(rid)} {real(rid)}")
+    # the newest id stays where it was after a hard delete (it only grows; the count and the change counter move)
+    check(t9 != t8 and sig_row(rid)[:2] == real(rid)[:2] and sig_row(rid)[2] >= real(rid)[2],
+          f"{who}: a hard delete in the database moves t {sig_row(rid)} {real(rid)}")
     # the poll reads the counters, not the messages: only the counter row changes -> t moves (old COUNT: the same t)
     wdb("UPDATE tchat_room_sig SET rev=rev+100 WHERE room_id=?", (rid,))
     check(ver(P) != t9, f"{who}: t comes from the counter row (#4183)")
@@ -131,11 +133,12 @@ chat_case(Fr, Fr, uid["frida"], "own channel of frida (no organisation)", channe
 def progress_case(S, who):
     lid = S.post(B + "/api/lists", json={"name": f"Progress {who}"}).json()["id"]
     ids = [S.post(B + "/api/tasks", json={"title": f"Step {i}", "list_id": lid}).json()["id"] for i in range(5)]
-    S.patch(B + f"/api/tasks/{ids[0]}", json={"status": 2})
-    S.patch(B + f"/api/tasks/{ids[1]}", json={"status": -1})  # won't do: not counted
-    S.delete(B + f"/api/tasks/{ids[2]}")                       # the trash: not counted
     due = (datetime.now(timezone.utc) - timedelta(days=3)).date().isoformat()
-    S.patch(B + f"/api/tasks/{ids[3]}", json={"due": due})
+    for tid, b in ((ids[0], {"status": 2}), (ids[1], {"status": -1}), (ids[3], {"due": due})):  # done; won't do: not counted
+        r = S.patch(B + f"/api/tasks/{tid}", json=b)
+        check(r.ok, f"{who}: task {b} {r.status_code} {r.text[:160]}")
+    r = S.delete(B + f"/api/tasks/{ids[2]}")  # the trash: not counted
+    check(r.ok, f"{who}: a task into the trash {r.status_code} {r.text[:160]}")
     # a done copy of a recurring task: same list, created_at and title as an older task (the original open, then deleted)
     for tid in (ids[3], ids[4]):
         wdb("""INSERT INTO tasks(list_id,title,content,status,created_at,updated_at,created_by)
@@ -143,6 +146,7 @@ def progress_case(S, who):
     wdb("UPDATE tasks SET deleted_at=? WHERE id=?", ("2026-11-07T10:00:00Z", ids[4]))
     pr = lambda: next(x for x in S.get(B + "/api/state").json()["lists"] if x["id"] == lid)["progress"]  # noqa: E731
     p = pr()
+    print(f"{who}: tasks of the list {kt.dbx('SELECT id, title, status, created_at, deleted_at, parent_id FROM tasks WHERE list_id=? ORDER BY id', (lid,))}", flush=True)
     check(p["done"] == 1 and p["total"] == 2 and p["overdue"] == 1,
           f"{who}: #4185 progress: 1 done of 2 (won't do, trash, done copies out, also of a deleted original), 1 overdue {p}")
     S.patch(B + f"/api/tasks/{ids[3]}", json={"status": 2})
@@ -208,7 +212,7 @@ def storage_case(S, who):
     check(u0 == fresh(), f"{who}: the badge and the fresh measure agree {u0}")
     r = S.post(B + f"/api/tasks/{tid}/attachments", files={"file": ("a.bin", os.urandom(120_000), "application/octet-stream")})
     check(r.ok, f"{who}: an upload {r.status_code} {r.text[:120]}")
-    aid = r.json()["id"]
+    aid = max(x["id"] for x in r.json()["attachments"])  # the answer is the task with its files
     check(badge() == u0 + 120_000, f"{who}: #4185 the own upload shows in the badge at once {badge()} {u0}")
     # a change without an own write (straight into the database): the fresh measure sees it, the badge keeps its value
     wdb("UPDATE attachments SET size=size+5000 WHERE id=?", (aid,))
