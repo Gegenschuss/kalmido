@@ -377,3 +377,4 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_TEST_ROT_ABORT` | `(empty)` | Tests: stop the key rotation right after the switch (1). |
 | `KALMIDO_TEST_TIMING_ALL` | `(empty)` | Tests: Server-Timing for every account, not only instance admins (1). |
 | `KALMIDO_TEST_UMZ_END_DELAY` | `(empty)` | Test containers only (with KALMIDO_TEST=1): seconds an account or wiki import's worker waits before it ends (2.308.0, #3261; 2.363.0, #3280). |
+| `KALMIDO_TEST_UMZ_SHARE_DELAY` | `(empty)` | Test containers only (with KALMIDO_TEST=1): seconds an account or organisation import waits after sharing with each ticked person, before it commits (2.644.0, #5024). |

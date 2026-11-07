@@ -431,6 +431,10 @@ def lf_own_stale(c, lid):
     owner now, a role ended on another way than the members dialog, an expiry) go into obj_revoked like a share taken back
     (restorable for 30 days): such a row opens nothing, it would only leave the project's node visible in the file store."""
     with system_ctx(c):
+        # 2.644.0 (#5024): the project's row locked first, the stale rows read after it: an import shares its projects in an open
+        # transaction after the rows were committed (acctimport.umz_share locks the same rows) - read before, the watchdog took
+        # the own member share the import was just confirming (a round trip lost bob's share on a slow CI runner)
+        c.execute("SELECT id FROM lists WHERE id=? FOR UPDATE", (int(lid),)).fetchall()
         ids = [r[0] for r in c.execute("""SELECT s.id FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id WHERE n.kind='ref' AND n.ref_kind=?
                                           AND n.ref_id=? AND s.list_own=1 AND NOT EXISTS (SELECT 1 FROM list_members m WHERE
                                           m.list_id=n.ref_id AND m.user_id=COALESCE(s.user_id, s.agent_id) AND m.own_role IS NOT NULL)""",
@@ -635,7 +639,7 @@ def lf_expire_tick(c):
                                              WHERE n.kind='ref' AND n.ref_kind=? AND s.list_own=1 AND NOT EXISTS (SELECT 1 FROM list_members m
                                              WHERE m.list_id=n.ref_id AND m.user_id=COALESCE(s.user_id, s.agent_id) AND m.own_role IS NOT NULL)""",
                                           (LF_KIND,)).fetchall()]
-    for lid in stale:
+    for lid in sorted(stale):  # 2.644.0 (#5024): rows locked in id order, like acctimport.umz_share
         if lid not in lids:
             lf_own_stale(c, lid)
     lf_resync(c, lids, actor=0)

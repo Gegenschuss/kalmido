@@ -230,7 +230,9 @@ MINE = ("chat/", "hub/", "newsletter/", "portal/", "lists/forms.json", "lists/fo
 
 # ---------------------------------------------------------------- server, people, organisations
 if not os.environ.get("P2137C_NOSTART"):
-    env = dict(os.environ, EXTRA=f"-e KALMIDO_INSTANCE_MODE=workspaces -e KALMIDO_SECRET_KEY={KEY}")
+    # 2.644.0 (#5024): the sharing step of an import waits 1.5 s per person in its open transaction, so the watchdog (1 s) runs
+    # in between on every run: it took a project's own member share there (round trip "store/shares.json: rows 6 -> 5", CI only)
+    env = dict(os.environ, EXTRA=f"-e KALMIDO_INSTANCE_MODE=workspaces -e KALMIDO_SECRET_KEY={KEY} -e KALMIDO_TEST_UMZ_SHARE_DELAY=1.5")
     r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=env, capture_output=True, text=True)
     assert r.returncode == 0, r.stdout + r.stderr
     s0 = requests.Session()

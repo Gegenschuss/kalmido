@@ -2027,6 +2027,11 @@ def umz_share(c, run, uid, data, picks, can_invite, salt=None):
     invited (instance admins only, the address typed by the admin must match the hash). Returns the people's results for
     the report."""
     out = []
+    # 2.644.0 (#5024): the imported projects locked until the caller commits (id order, like the watchdog's lffolder.lf_own_stale):
+    # their own member shares are committed already, the members not yet - the watchdog must not take those shares as stale
+    lids = sorted({int(x) for x in run.created.get("lists") or [] if isinstance(x, int)})
+    if lids:
+        c.execute(f"SELECT id FROM lists WHERE id IN ({','.join('?' * len(lids))}) ORDER BY id FOR UPDATE", tuple(lids)).fetchall()
     seen = umz_seen(c, uid, salt)
     for p in data.get("people", []):
         h = umz_pid(p)  # 2.278.0 B (#3094): the address hash, else "id<old id>" (matched by user name only)
@@ -2062,6 +2067,8 @@ def umz_share(c, run, uid, data, picks, can_invite, salt=None):
             n = sum(1 for lid, role in pairs if _folder_member_add(c, lid, target, role, uid))
         elif joins:  # 2.363.0 (#3132): noted on the invitation, shared when the person accepts
             ojn_later(c, run.org, joins, uid, pairs)
+        if os.environ.get("KALMIDO_TEST") == "1" and os.environ.get("KALMIDO_TEST_UMZ_SHARE_DELAY"):  # tests only (2.644.0, #5024)
+            time.sleep(float(os.environ["KALMIDO_TEST_UMZ_SHARE_DELAY"]))
         out.append({"key": h, "name": _txt(p.get("name"), 100), "state": state, "lists": n})
     return out
 
