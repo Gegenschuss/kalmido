@@ -54,10 +54,10 @@ async function dimp_delete(id) {
 // ---- the dialog: file -> preview -> take over
 function dimp_dialog() {
   DIMP.file = null;
-  const md = ofdDlg(tr('Read DATEV data'), `<p class="muted ofchint">${tr('A DATEV file (EXTF, CSV) from your tax advisor: debtors / creditors or a booking batch. Kalmido only fills empty fields and takes over only opening balances.')}</p>
+  const md = ofdDlg(tr('Read DATEV data'), `<p class="muted ofchint">${tr('A DATEV file (EXTF, CSV) from your tax advisor: debtors / creditors or a booking batch. Kalmido only fills empty fields and imports only opening balances.')}</p>
     <div class="row"><label for="dimp-file">${tr('File')}</label><input type="file" id="dimp-file" accept=".csv,.txt,text/csv,text/plain"></div>
-    <div id="dimp-pv" class="dimppv" aria-live="polite"></div>`, tr('Take over'), async () => {
-    if (!DIMP.file) throw new Error(tr('Choose a file first'));
+    <div id="dimp-pv" class="dimppv" aria-live="polite"></div>`, tr('Import'), async () => {
+    if (!DIMP.file) throw new Error(tr('Select a file first'));
     if (!await importTargetConfirm({what: tr('the data of the file'), ws: ofcWs(), place: tr('Office')})) return false;  // 2.356.0 B (#2934): the target in words (#1940)
     const fd = new FormData(); fd.append('file', DIMP.file);
     const j = await api('POST', '/api/office/datev/import', fd);
@@ -73,7 +73,7 @@ function dimp_dialog() {
 }
 function dimp_doneText(j) {
   const c = j.counts || {};
-  if (j.category === 21) return tr('{0} opening balances taken over', c.opening || 0);
+  if (j.category === 21) return tr('{0} opening balances imported', c.opening || 0);
   return tr('{0} new, {1} updated', c.new || 0, c.updated || 0);
 }
 async function dimp_check(input) {
@@ -95,7 +95,7 @@ function dimp_any(j) {
 function dimp_previewHtml(j) {
   const c = j.counts || {};
   const sum = j.category === 21
-    ? [tr('{0} opening balances', c.opening || 0), c.replaced ? tr('{0} replace existing ones', c.replaced) : '', c.other ? tr('{0} other bookings not taken over', c.other) : '', c.skipped ? tr('{0} skipped', c.skipped) : '']
+    ? [tr('{0} opening balances', c.opening || 0), c.replaced ? tr('{0} replace existing ones', c.replaced) : '', c.other ? tr('{0} other bookings not imported', c.other) : '', c.skipped ? tr('{0} skipped', c.skipped) : '']
     : [trn('{0} new', '{0} new', c.new || 0), tr('{0} updated', c.updated || 0), tr('{0} skipped', c.skipped || 0)];
   const head = `<p class="dimpsum" data-dimp-kind="${esc(j.kind)}"><b>${esc(j.category === 21 ? tr('Booking batch') : tr('Debtors and creditors'))}</b> · ${esc(sum.filter(Boolean).join(' · '))}</p>`;
   const hints = (j.hints || []).map(h => `<p class="muted ofchint">${esc(h)}</p>`).join('');

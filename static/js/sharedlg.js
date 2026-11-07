@@ -65,8 +65,8 @@ function folderShareModal(f, opt = {}) {
   const drawPub = j => {
     const box = $('#fsh-pub', md); if (!box) return;
     const ls = j.lists || [], on = ls.filter(x => x.link), can = ls.filter(x => !x.health);
-    box.innerHTML = `<div class="shint lhint keep">${tr('People without an account can open the projects of this folder through a secret link each: read only, without comments, assignees or files.')}</div>`
-      + (!j.enabled ? `<div class="muted mhint">${tr('Public links are turned off on this server')}</div>`
+    box.innerHTML = `<div class="shint lhint keep">${tr('People without an account can open the projects of this folder through a secret link each: read-only, without comments, assignees or files.')}</div>`
+      + (!j.enabled ? `<div class="muted mhint">${tr('Public links are switched off on this server')}</div>`
         : !ls.length ? `<div class="muted mhint">${tr('Applies to new projects in this folder. Shared projects of others keep their settings.')}</div>`
         : `${on.length ? `<div class="members fshpubl">${on.map(x => `<div class="mrow"><span class="n">${esc(x.name)}</span><button type="button" class="btn sm" data-fshcopy="${esc(x.link.url)}">${ic('copy', 's')} ${tr('Copy link')}</button></div>`).join('')}</div>` : ''}
           <div class="row"><button type="button" class="btn sm ${on.length ? '' : 'pri'}" data-m="fsh-pubon" ${can.length > on.length ? '' : 'hidden'}>${ic('link', 's')} ${on.length ? tr('Links for the other projects too') : tr('Create public links')}</button><button type="button" class="btn sm" data-m="fsh-puboff" ${on.length ? '' : 'hidden'}>${tr('Turn all off')}</button></div>
@@ -79,7 +79,7 @@ function folderShareModal(f, opt = {}) {
     const box = $('#fsh-own', md); if (!box) return;
     const mine = folderLists(f).filter(l => isOwner(l) && !l.is_inbox);
     box.innerHTML = `<div class="muted mhint">${esc(S.me?.display_name || '')}</div>`
-      + (mine.length ? `<div class="row owrow"><button class="btn sm" data-m="fsh-xfer">${ic('user', 's')} ${tr('Transfer ownership of all projects…')}</button></div><div class="shint lhint">${esc(trn('Your {0} project in this folder goes to the person you choose; you stay in it as project admin.', 'Your {0} projects in this folder go to the person you choose; you stay in them as project admin.', mine.length))}</div>`
+      + (mine.length ? `<div class="row owrow"><button class="btn sm" data-m="fsh-xfer">${ic('user', 's')} ${tr('Transfer ownership of all projects…')}</button></div><div class="shint lhint">${esc(trn('Your {0} project in this folder goes to the person you select; you stay in it as project admin.', 'Your {0} projects in this folder go to the person you select; you stay in them as project admin.', mine.length))}</div>`
         : fshGrey(tr('Transfer ownership of all projects…'), tr('No project of yours in this folder')));
     st('own', S.me?.display_name || '');
   };
@@ -136,7 +136,7 @@ function folderShareModal(f, opt = {}) {
       const aid = +$('#fsh-agadd', md).value; if (!aid) return;
       if (!await agSafeFirst()) return;  // 2.30.0 (#920): the one-time agent safety note, as in a list
       const first = !ags.agents.length;
-      try { const j = await api('PUT', '/api/folders/agents', {folder: f, agent_id: aid}); agRes(j, first ? trn('Shared with the agent in {0} project', 'Shared with the agent in {0} projects', j.changed || 0) : tr('Added: projects in this folder can choose it')); await done(); } catch { /* said */ }
+      try { const j = await api('PUT', '/api/folders/agents', {folder: f, agent_id: aid}); agRes(j, first ? trn('Shared with the agent in {0} project', 'Shared with the agent in {0} projects', j.changed || 0) : tr('Added: projects in this folder can select it')); await done(); } catch { /* said */ }
       return;
     }
     if (b.dataset.fshfirst) { try { agRes(await api('PUT', '/api/folders/agents', {folder: f, agent_id: +b.dataset.fshfirst, first: true}), tr('Default for the projects')); await done(); } catch { /* said */ } return; }
@@ -147,8 +147,8 @@ function folderShareModal(f, opt = {}) {
       return;
     }
     if (m === 'fsh-pubon' || m === 'fsh-puboff') {
-      if (m === 'fsh-puboff' && !await askConfirm(tr('Turn the public links off?'), tr('They stop working at once.'), {ok: tr('Turn off'), danger: true})) return;
-      try { const j = await calReq('PUT', '/api/folders/public-links', {folder: f, on: m === 'fsh-pubon'}); drawPub(j); toast(m === 'fsh-pubon' ? trn('{0} public link created', '{0} public links created', j.created) : tr('Public links turned off')); } catch (x) { toast(x.message); }
+      if (m === 'fsh-puboff' && !await askConfirm(tr('Turn the public links off?'), tr('They stop working at once.'), {ok: tr('Switch off'), danger: true})) return;
+      try { const j = await calReq('PUT', '/api/folders/public-links', {folder: f, on: m === 'fsh-pubon'}); drawPub(j); toast(m === 'fsh-pubon' ? trn('{0} public link created', '{0} public links created', j.created) : tr('Public links switched off')); } catch (x) { toast(x.message); }
       return;
     }
     if (b.dataset.fshcopy) { try { await navigator.clipboard.writeText(b.dataset.fshcopy); toast(tr('Link copied')); } catch { toast(b.dataset.fshcopy); } return; }

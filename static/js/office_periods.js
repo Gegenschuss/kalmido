@@ -46,10 +46,10 @@ async function plLockDialog() {
   let hints = [];
   try { hints = (await api('GET', `/api/office/periods?check=${to}`)).hints || []; } catch (x) { toast(x.message || tr('unknown')); return; }
   const lab = plLabel(to);
-  ofdDlg(tr('Lock up to {0}', lab), `<p>${esc(tr('All open months up to and including {0} are locked for good. Invoices, payments, bank matches, receipts, cash entries and trips of these months can then no longer be changed or deleted. This cannot be undone.', lab))}</p>
+  ofdDlg(tr('Lock up to {0}', lab), `<p>${esc(tr('All open months up to and including {0} are locked permanently. Invoices, payments, bank matches, receipts, cash entries and trips of these months can then no longer be changed or deleted. This cannot be undone.', lab))}</p>
     ${hints.length ? `<ul class="plhints">${hints.map(h => `<li>${esc(h.text)}</li>`).join('')}</ul>` : ''}
     <div class="row"><label for="pl-confirm">${esc(tr('Type {0} to confirm', lab))}</label><input id="pl-confirm" autocomplete="off" inputmode="numeric" placeholder="${esc(lab)}"></div>`,
-  tr('Lock for good'), async m => {
+  tr('Lock permanently'), async m => {
     const v = /** @type {HTMLInputElement} */ ($('#pl-confirm', m)).value.trim();
     if (v !== lab) throw new Error(tr('Please type {0} to confirm', lab));
     const j = await api('POST', '/api/office/periods/lock', {through: to, confirm: v});

@@ -315,7 +315,7 @@ def br_spec(b, old=None):
         raise BadInput(tr("Invalid value: {0}", "amount_max"))
     if d["action"] == "category":
         if not d["category"]:
-            raise BadInput(tr("Please choose a category"))
+            raise BadInput(tr("Please select a category"))
     else:
         d["category"], d["account"] = "", ""
     if not d["name"]:

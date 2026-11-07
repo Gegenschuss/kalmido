@@ -202,7 +202,7 @@ def dsr_zip_check(rows):
     """The refusal text when the ZIP would hold too much, else None."""
     size = sum(int(r["size"] or 0) for r in rows)
     if len(rows) > DSR_ZIP_FILES or size > DSR_ZIP_MB * 1024 * 1024:
-        return tr("Too much for one ZIP: at most {0} files and {1} MB. Please choose fewer.", DSR_ZIP_FILES, DSR_ZIP_MB)
+        return tr("Too much for one ZIP: at most {0} files and {1} MB. Please select fewer.", DSR_ZIP_FILES, DSR_ZIP_MB)
     return None
 
 

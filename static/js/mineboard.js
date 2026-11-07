@@ -33,7 +33,7 @@ function mb_cols(by, tasks) {
 function mb_view() {
   const by = moBoardBy(), t0 = today(), tasks = moAll().filter(t => mtCounts(t, t0)), cols = mb_cols(by, tasks);
   const card = t => taskRow(t, {compact: true, showList: by !== 'list'});
-  const head = c => `<div class="khead">${c.lic ? licMark(c.lic, 'lsm') : ''}<span class="mbname">${esc(c.name)}</span> <span class="muted mbn">${c.tasks.length}</span>${c.lock && by === 'list' ? `<span class="mblk" title="${esc(tr('View only'))}" aria-label="${esc(tr('View only'))}">${ic('lock', 's')}</span>` : ''}</div>`;
+  const head = c => `<div class="khead">${c.lic ? licMark(c.lic, 'lsm') : ''}<span class="mbname">${esc(c.name)}</span> <span class="muted mbn">${c.tasks.length}</span>${c.lock && by === 'list' ? `<span class="mblk" title="${esc(tr('Read-only'))}" aria-label="${esc(tr('Read-only'))}">${ic('lock', 's')}</span>` : ''}</div>`;
   const empty = tasks.length ? '' : `<p class="muted lempty">${esc(tr('Nothing here'))}</p>`;
   return `${moSegHtml()}${empty}<div class="kanban mboard" data-mbby="${by}">${cols.map(c => `
     <div class="kcol mbcol${c.lock ? ' mblock' : ''}" data-mbcol="${esc(c.key)}" role="group" aria-label="${esc(c.name)}">
@@ -64,7 +64,7 @@ async function mb_drop(t, el) {
   }
   const t0 = today(), we = mb_weekEnd(t0), tm = addDays(t0, 1);
   const due = {today: t0, week: tm <= we ? tm : undefined, later: addDays(we, 1), none: null}[key];
-  if (due === undefined) { toast(tr('Pick a day in the task')); return true; }  // Overdue (and This week on its last day) take nothing
+  if (due === undefined) { toast(tr('Select a day in the task')); return true; }  // Overdue (and This week on its last day) take nothing
   const cur = mb_cols('due', [t]).find(c => c.tasks.length)?.key;
   if (cur === key) return true;
   const body = due ? {due} : {due: null, due_time: null};

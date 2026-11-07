@@ -53,7 +53,7 @@ async function ltmBlocksModal(pick) {
     $('.ltm-blocks', md).innerHTML = xs.length ? xs.map(b => `<li><div class="ofcrow ltm-row">
         <button type="button" class="ltm-pick ofcn" data-m="${pick ? 'ins' : 'edit'}" data-id="${b.id}"><b>${esc(b.name)}</b><small class="muted">${esc((b.body || '').slice(0, 120))}</small></button>
         ${pick ? `<button type="button" class="btn sm" data-m="edit" data-id="${b.id}" aria-label="${esc(tr('Edit'))}" title="${esc(tr('Edit'))}">${ic('edit', 's')}</button>` : ''}</div></li>`).join('')
-      : `<li class="muted">${esc(q ? tr('Nothing found') : tr('No text blocks yet. Take over a sample or write your own.'))}</li>`;
+      : `<li class="muted">${esc(q ? tr('Nothing found') : tr('No text blocks yet. Add a sample or write your own.'))}</li>`;
   };
   const reload = async () => { try { blocks = (await api('GET', '/api/office/letter-blocks')).blocks || []; draw(); } catch (x) { /* the list stays */ } };
   draw();
@@ -118,7 +118,7 @@ async function ltmStarters(after) {
   /** @type {any} */
   const md = modal(`<h3>${tr('Use sample')}</h3><p class="muted">${esc(j.note || '')}</p>
     ${ofcRowF('ltm-slang', tr('Language'), ofcSel('ltm-slang', j.lang, (S.languages || []).map(L => [L.code, L.name])))}
-    <ul class="ofclist ltm-starters" role="list">${j.starters.map(s => `<li><div class="ofcrow"><span class="ofcn"><b>${esc(s.name)}</b></span><button type="button" class="btn sm pri" data-m="take" data-k="${esc(s.key)}">${tr('Take over')}</button></div></li>`).join('')}</ul>
+    <ul class="ofclist ltm-starters" role="list">${j.starters.map(s => `<li><div class="ofcrow"><span class="ofcn"><b>${esc(s.name)}</b></span><button type="button" class="btn sm pri" data-m="take" data-k="${esc(s.key)}">${tr('Add')}</button></div></li>`).join('')}</ul>
     <div class="aerr" role="alert"></div><div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button></div>`);
   md.classList.add('ofcdlg');
   const close = fgModal(md);

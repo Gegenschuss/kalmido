@@ -117,15 +117,15 @@ function bkEinvHtml(ei) {
   if (!ei.length) return '';
   const row = r => `<li class="bk-einvrow"><button type="button" class="ofcrow" data-bk="rc" data-id="${r.node_id}"><span class="ofcn"><b>${esc(r.supplier || r.title || tr('Receipt'))}</b>
     <small class="muted">${esc([fmtDateLoc(r.date), r.supplier ? r.title : '', bkVatLabel(r.vat_pct)].filter(Boolean).join(' · '))}</small></span><span class="rksum">${r.amount ? ofcMoney(r.amount) : ''}</span></button>
-    <button type="button" class="btn sm pri" data-bk="einv" data-id="${r.node_id}">${tr('Take over')}</button></li>`;
+    <button type="button" class="btn sm pri" data-bk="einv" data-id="${r.node_id}">${tr('Add')}</button></li>`;
   return `<div class="bk-einvs" role="group" aria-labelledby="bk-einvh"><h4 class="bk-h" id="bk-einvh">${esc(trn('{0} e-invoice to check', '{0} e-invoices to check', ei.length))}</h4>
-    <p class="muted">${tr('Incoming e-invoices become receipts only once you take them over.')}</p><ul class="ofclist" role="list">${ei.map(row).join('')}</ul></div>`;
+    <p class="muted">${tr('Incoming e-invoices become receipts only once you add them.')}</p><ul class="ofclist" role="list">${ei.map(row).join('')}</ul></div>`;
 }
 async function bkEinvTake(id, b) {
   const take = async () => { await api('POST', `/api/docs/${id}/receipt/einvoice`); bkReload(); return {}; };
   b.disabled = true;
   try { await take(); } catch (x) { b.disabled = false; toast(x.message || tr('unknown')); return; }
-  const label = tr('Taken over as receipt');
+  const label = tr('Added as receipt');
   histToast(label, histAdd({label, undo: async () => { await api('PUT', `/api/docs/${id}/receipt`, {project_id: null, category: '', vat_pct: null}); bkReload(); return {}; }, redo: take}));
 }
 function bkReceiptsHtml() {

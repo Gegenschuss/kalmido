@@ -18,7 +18,7 @@ week create one; a click opens it (details, your answer, *Edit*, *Delete*, *Prep
   shares (*can view* / *can edit*, like projects), imports an **ICS file** (an export of Google Calendar or any other app;
   importing it again changes the events instead of doubling them) and exports one.
 - **People**: invite people of this server (they see this one event, not your calendar, get News and a push and
-  answer *Accept* / *Maybe* / *Decline*), your contacts or any e-mail address.
+  answer *Accept* / *Maybe* / *Reject*), your contacts or any e-mail address.
 - **Preparation**: a task linked to the event, due before it (*Preparation task*), or the other way round *Schedule as
   an event* in a task's panel.
 - **People's availability** (2.155): while you invite, a free / busy bar shows you and every invited person of your
@@ -27,7 +27,7 @@ week create one; a click opens it (details, your answer, *Edit*, *Delete*, *Prep
   in the calendar, your team's on request as "away" only; the state can be set per person, also without an
   organisation. Your absences and holidays are also a subscription link for the phone's calendar app.
 - **On the phone**: each calendar is a calendar in the phone's own app (CalDAV), changes go both ways; invitations come
-  in a calendar *Invitations* and are answered there (*Accept* / *Maybe* / *Decline*) or in the app; a calendar created on
+  in a calendar *Invitations* and are answered there (*Accept* / *Maybe* / *Reject*) or in the app; a calendar created on
   the phone becomes a Kalmido calendar. See [Calendar and contacts on the phone](CALDAV.md#calendar-and-contacts-on-the-phone).
 - The family events of 2.19 (tasks with people who come along) became events once, with those people invited; the
   task stays, marked done and linked to its event.
@@ -117,7 +117,7 @@ how often that happens is up to the calendar app (Google: every few hours).
 > the location *On My Mac* instead of iCloud on a Mac, or Thunderbird.
 
 The secret in the URL is the only credential: anyone with the link can read these tasks. *New link* replaces it
-(the old URL stops working at once), *Turn off* removes it. Wrong tokens answer 404 and are rate-limited per
+(the old URL stops working at once), *Switch off* removes it. Wrong tokens answer 404 and are rate-limited per
 address. With a login proxy, let `/ical/*` bypass it (see *Reverse proxy*); Kalmido never reads the proxy header there.
 
 ## Calendar apps (CalDAV)

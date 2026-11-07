@@ -569,7 +569,7 @@ async function listDeleteForGood(id) {
   // 2.102.0 A (#1988): a list without the lock goes into the list trash (restorable, undo below); with the lock: for good
   const ok = !l.e2e ? await askConfirm(tr('Delete “{0}”?', lname(l)), '', {danger: true, ok: tr('Delete'), html: `<p>${esc(otr_note(l))}</p>${lmDeleteNotes(l, all.length, open)}`})
     : await askConfirm(tr('Delete “{0}” permanently?', lname(l)), '', {danger: true, ok: tr('Delete permanently'),
-    html: `<p>${tr('This cannot be undone. Lost for good:')}</p><ul class="cdlg-l">${lost.map(x => `<li>${esc(x)}</li>`).join('')}</ul>${isOwner(l) ? '' : lmDeleteNotes(l, all.length, open)}<p class="muted" ${isOwner(l) && !l.e2e ? '' : 'hidden'}>${all.length ? trn('Its {0} task goes to the trash of your basket ({1} open) and can be restored from there.', 'Its {0} tasks go to the trash of your inbox ({1} open) and can be restored from there.', all.length, open) : tr('The project has no tasks.')}</p>${isOwner(l) ? lmDeleteNotes(l, all.length, open) : ''}`});
+    html: `<p>${tr('This cannot be undone. Lost permanently:')}</p><ul class="cdlg-l">${lost.map(x => `<li>${esc(x)}</li>`).join('')}</ul>${isOwner(l) ? '' : lmDeleteNotes(l, all.length, open)}<p class="muted" ${isOwner(l) && !l.e2e ? '' : 'hidden'}>${all.length ? trn('Its {0} task goes to the trash of your basket ({1} open) and can be restored from there.', 'Its {0} tasks go to the trash of your inbox ({1} open) and can be restored from there.', all.length, open) : tr('The project has no tasks.')}</p>${isOwner(l) ? lmDeleteNotes(l, all.length, open) : ''}`});
   if (!ok) return false;
   // 2.46.2 (#1659): the list (and its tasks) leave the screen at once; archive + delete + the reload run behind it, an
   // error brings the list back (optWrite: a state that arrives meanwhile gets it removed again)
@@ -726,9 +726,9 @@ function shareModal(id, opt = {}) {
 // their pushes (they can be quieter, never louder; the News stay complete). The server checks it (notif_ok -> cap_ok).
 // The same block sits in the Share dialog and in "Share folder"; per person another template; a list in a folder follows
 // the folder until it gets its own. Members see who limited it (list menu > Notifications, Share dialog).
-const NTF_TPLS = [['read', N_('Read only'), N_('Pushes only for mentions, assignments and direct replies')],
+const NTF_TPLS = [['read', N_('Read-only'), N_('Pushes only for mentions, assignments and direct replies')],
   ['work', N_('Collaborate'), N_('Also comments on their own or assigned tasks and due reminders')],
-  ['all', N_('Everything'), N_('Nothing limited, as in their own settings')], ['custom', N_('Custom selection'), N_('You choose the events')]];  // 2.34.0 (#1089): own key ("Custom" is the date range)
+  ['all', N_('Everything'), N_('Nothing limited, as in their own settings')], ['custom', N_('Custom selection'), N_('You select the events')]];  // 2.34.0 (#1089): own key ("Custom" is the date range)
 const NTF_CUSTOM = ['mention', 'reply', 'assign', 'approval', 'comment', 'follow', 'newtask', 'complete', 'status', 'unblock', 'chat', 'reminder', 'errreport', 'share'];
 const NTF_WORK = ['mention', 'reply', 'assign', 'approval', 'comment', 'reminder'];
 const ntfName = t => tr((NTF_TPLS.find(x => x[0] === t) || NTF_TPLS[0])[1]);
@@ -780,7 +780,7 @@ function ntfAskSync() {
   const items = S.notifAsk || []; let bar = $('#ntfask');
   if (!items.length || S.me?.kid) { bar?.remove(); return; }
   if (!bar) { bar = document.createElement('div'); bar.id = 'ntfask'; bar.className = 'annbar ntfask'; bar.setAttribute('role', 'region'); bar.setAttribute('aria-label', tr('Notifications for members')); const ab = $('#annbar'); if (ab) ab.after(bar); else main.prepend(bar); }
-  const html = `${ic('bell', 's')}<span class="annt">${esc(tr('Your shared projects still notify everyone about everything. You can now limit that per project or folder.'))}</span><span class="ntfaskb"><button type="button" class="btn sm pri" data-act="ntfask-choose">${esc(tr('Choose template'))}</button><button type="button" class="btn sm" data-act="ntfask-keep">${esc(tr('Keep as it is'))}</button></span>`;
+  const html = `${ic('bell', 's')}<span class="annt">${esc(tr('Your shared projects still notify everyone about everything. You can now limit that per project or folder.'))}</span><span class="ntfaskb"><button type="button" class="btn sm pri" data-act="ntfask-choose">${esc(tr('Select template'))}</button><button type="button" class="btn sm" data-act="ntfask-keep">${esc(tr('Keep as it is'))}</button></span>`;
   if (bar.innerHTML !== html) bar.innerHTML = html;
 }
 document.addEventListener('click', async e => {
@@ -929,7 +929,7 @@ function listModal(id, folder = '', o = {}) {
   // folds into parts (lmSec), closed at first with a short state in the folded line; "Progress and status" is gone (#2752)
   const fown = id ? (() => { try { return JSON.parse(l.folder_own || '[]'); } catch { return []; } })() : [];
   const md = modal(`${id ? `<div class="lhdr"><h3>${tr('Edit project')}</h3><span class="ssaved" role="status" aria-live="polite"></span><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>` : `<h3>${tr('New project')}</h3>`}
-    <div class="row"><label for="l-name">${tr('Name')}</label><button class="emobtn" id="l-emo" title="${tr('Choose icon')}" ${adis}>${id && l.icon ? licon(l, 'licon m') : sbiEmo(emo) || ic('list')}</button><input id="l-name" value="${esc(base)}" ${adis}></div>
+    <div class="row"><label for="l-name">${tr('Name')}</label><button class="emobtn" id="l-emo" title="${tr('Select icon')}" ${adis}>${id && l.icon ? licon(l, 'licon m') : sbiEmo(emo) || ic('list')}</button><input id="l-name" value="${esc(base)}" ${adis}></div>
     <div class="emogrid hidden" id="l-emogrid"><button data-emo="" class="none" title="${tr('No icon')}">${ic('ban', 's')}</button>${sbiGrid().map(e => `<button data-emo="${e}" class="${e === emo && !l.icon ? 'on' : ''}">${sbiEmo(e)}</button>`).join('')}<input id="l-emocustom" placeholder="${tr('custom')}" maxlength="8">
       ${id && (own || ladm) ? `<div class="lipickw"><span class="muted lipl">${tr('Or a picture')}</span>${liconPickHtml(l)}</div>` : ''}</div>
     ${id ? '' : `<input type="hidden" id="l-kind" value="${(l.kind || 'list') === 'project' ? 'project' : 'list'}">`}
@@ -968,7 +968,7 @@ function listModal(id, folder = '', o = {}) {
     ${id && ['owner', 'admin'].includes(l.role || 'owner') && !l.family && !l.life ? staleRowHtml(l) : ''}
     ${id && !l.is_inbox && collab() && l.shared ? `<div class="row"><label for="l-bell">${ic(BELL_ICON[l.bell || 'default'], 's')} ${tr('Notifications')}</label><select id="l-bell" data-native data-lmdef="default">${BELLS.map(([m, n]) => `<option value="${m}" ${(l.bell || 'default') === m ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
     <div class="shint lhint" id="l-bellhint">${tr(BELLS.find(b => b[0] === (l.bell || 'default'))[2])} · ${tr('only for you')}</div>${isOwner(l) ? '' : ntfMemberHint(l)}
-    <div class="row" id="l-bellc" ${l.bell === 'custom' ? '' : 'hidden'}><span class="spacer"></span><button type="button" class="btn sm" data-m="bell-custom">${ic('sliders', 's')} ${tr('Choose events…')}</button></div>` : ''}`, fown)}
+    <div class="row" id="l-bellc" ${l.bell === 'custom' ? '' : 'hidden'}><span class="spacer"></span><button type="button" class="btn sm" data-m="bell-custom">${ic('sliders', 's')} ${tr('Select events…')}</button></div>` : ''}`, fown)}
     ${lmSec('agents', tr('Agents'), `
     ${id && shareOk(l) && collab() && agentsOn() && listAgents(l).length ? `<div class="row lagrow"><label>${tr('Agents')}</label><span class="muted lmsum">${esc([listAgents(l).map(a => a.name || '').filter(Boolean).join(', '), listenLabel(l)].filter(Boolean).join(' · '))}</span><button class="btn sm" data-m="share-open">${ic('users', 's')} ${tr('Share…')}</button></div>` : ''}
     ${id && !l.is_inbox && pbOn(l) ? (l.e2e && typeof le2u_pbHtml === 'function' ? le2u_pbHtml() : pbAreaHtml('list')) : ''}`, fown)}
@@ -991,11 +991,11 @@ function listModal(id, folder = '', o = {}) {
     ${spt_listRow(l, own)}${''/* 2.60.0 (#1511) */}
     ${ow_listRow(l, own)}${''/* 2.392.0 C (#3370) */}
     ${id && own && depsOn() ? `<div class="row"><label>${tr('Dependencies')}</label><label class="chkl"><input type="checkbox" id="l-depshift" ${l.dep_shift ? 'checked' : ''}> ${tr('Move dependent tasks along')}</label></div>
-    <div class="shint lhint">${tr('Postponing a task moves the tasks it blocks by the same number of days. One undo takes the whole chain back.')}</div>` : ''}
+    <div class="shint lhint">${tr('Postponing a task moves the tasks it blocks by the same number of days. One undo reverses the whole chain.')}</div>` : ''}
     ${id && canManage(l) && fieldsOn() ? `<h4 title="${esc(tr('Own columns for this project: budget, stage, client, …'))}">${tr('Custom fields')}</h4><div class="members" id="l-fields">${fieldsBox(id)}</div>` : id && fieldsOf(id).length ? `<h4>${tr('Custom fields')}</h4><div class="muted mhint">${esc(fieldsOf(id).map(f => f.name).join(', '))} · ${tr('only the owner and project admins can change them')}</div>` : ''}
     ${id ? `<div class="lrepo" ${repoShown(l) ? '' : 'hidden'}><div class="shint keep lhint lrepohint" hidden>${ic('git', 's')} ${tr('Connect a repository (optional)')}</div>${repoBoxHtml(l)}</div>` : ''}`, fown, o.open === 'proj' || (!id && (o.kind === 'project' || !!o.ptype)))}
     ${id && !l.is_inbox ? lmSec('props', tr('Properties'), pz_boxHtml(l), fown) : ''}${''/* 2.412.0 (#3552): the properties of the tasks (props.js) */}
-    ${lmSec('acts', tr('Actions'), `<div class="row lacts">${id && !l.is_inbox && canManage(l) ? (l.archived ? `<button class="btn" data-m="arch">${ic('undo', 's')} ${tr('Restore project from the archive')}</button><button class="btn danger" data-m="del">${ic('trash', 's')} ${l.e2e ? tr('Delete project permanently…') : tr('Delete project…') /* 2.102.0 (#1988): into the trash */}</button>` : `<button class="btn" data-m="arch" title="${tr('Hidden from your projects; undo or restore any time. Deleting for good is only possible from the archive.')}">${ic('archive', 's')} ${tr('Archive project')}</button>`) : ''}${id && !own ? `<button class="btn danger" data-m="leave">${ic('logout', 's')} ${tr('Leave project')}</button>` : ''}${id && canEditList(id) /* 2.126.0 D (#1992 A6) */ ? `<button class="btn" data-m="tpl" title="${l.e2e ? esc(tr('Not available in encrypted projects')) : tr('Save the sections and open tasks as a template')}" ${l.e2e ? 'disabled' : ''}>${ic('copy', 's')} ${tr('Save as template')}</button>` : ''}${id && dupOk(l) ? `<button class="btn" data-m="dup" title="${tr('A copy of this project with its sections, tasks and notepads')}">${ic('copy', 's')} ${tr('Duplicate')}</button>` : ''}</div>`, fown, l.archived)}
+    ${lmSec('acts', tr('Actions'), `<div class="row lacts">${id && !l.is_inbox && canManage(l) ? (l.archived ? `<button class="btn" data-m="arch">${ic('undo', 's')} ${tr('Restore project from the archive')}</button><button class="btn danger" data-m="del">${ic('trash', 's')} ${l.e2e ? tr('Delete project permanently…') : tr('Delete project…') /* 2.102.0 (#1988): into the trash */}</button>` : `<button class="btn" data-m="arch" title="${tr('Hidden from your projects; undo or restore any time. Deleting permanently is only possible from the archive.')}">${ic('archive', 's')} ${tr('Archive project')}</button>`) : ''}${id && !own ? `<button class="btn danger" data-m="leave">${ic('logout', 's')} ${tr('Leave project')}</button>` : ''}${id && canEditList(id) /* 2.126.0 D (#1992 A6) */ ? `<button class="btn" data-m="tpl" title="${l.e2e ? esc(tr('Not available in encrypted projects')) : tr('Save the sections and open tasks as a template')}" ${l.e2e ? 'disabled' : ''}>${ic('copy', 's')} ${tr('Save as template')}</button>` : ''}${id && dupOk(l) ? `<button class="btn" data-m="dup" title="${tr('A copy of this project with its sections, tasks and notepads')}">${ic('copy', 's')} ${tr('Duplicate')}</button>` : ''}</div>`, fown, l.archived)}
     ${id && !o.back ? '' : `<div class="foot"><span class="spacer"></span>${id ? `<button class="btn pri" data-m="close">${ic('back', 's')} ${tr('Back')}</button>` : `<button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Create')}</button>`}</div>`}`);
   lmSecWire(md);
   if (id) md.classList.add('lmodal'); else { md.classList.add('lnew'); lnew_short(md, o); }  // 2.364.0 D (#3033)
@@ -1300,7 +1300,7 @@ function listModal(id, folder = '', o = {}) {
     const s = autoEmoji(e.target.value);
     if (s === emo) return;
     emo = s;
-    const b = $('#l-emo', md); b.innerHTML = sbiEmo(emo) || ic('list'); b.title = emo ? tr('Suggested icon: tap to change or remove it') : tr('Choose icon');
+    const b = $('#l-emo', md); b.innerHTML = sbiEmo(emo) || ic('list'); b.title = emo ? tr('Suggested icon: tap to change or remove it') : tr('Select icon');
     b.classList.toggle('sugg', !!emo);
     $$('#l-emogrid button', md).forEach(x => x.classList.toggle('on', !!emo && x.dataset.emo === emo));
   });
@@ -1430,7 +1430,7 @@ function lookHtml() {
     ${lkChatHtml() /* 2.233.0 C (#3196) */}
     ${o3c_lookHtml() /* 2.83.0 C (#1427): header pictures + progress rings */}
     <div class="row"><label class="chkl"><input type="checkbox" id="s-look-local" ${lookLocal() ? 'checked' : ''}> ${tr('Only on this device')}</label></div>
-    <div class="shint">${tr('Off: your appearance is saved to your account and used on all your devices. On: this device keeps its own and neither sends nor takes over.')}</div>
+    <div class="shint">${tr('Off: your appearance is saved to your account and used on all your devices. On: this device keeps its own and neither sends nor receives.')}</div>
     <div class="row lkreset"><button class="btn sm" data-m="look-reset">${ic('undo', 's')} ${tr('Reset to defaults')}</button></div>`;
 }
 // 2.310.0 (#3270): the view of this device (icons.js vpMode / stableViewport): Automatic / Phone / Computer, kept only in

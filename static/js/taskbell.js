@@ -133,7 +133,7 @@ async function tbl_others(tid) {
   } catch { /* tbl_req said it */ }
   tbl_paint(tid);
   if (!acts.length) return;
-  const label = on.length ? trn('Urgent for {0} person', 'Urgent for {0} people', on.length) : trn('Urgent taken back for {0} person', 'Urgent taken back for {0} people', off.length);
+  const label = on.length ? trn('Urgent for {0} person', 'Urgent for {0} people', on.length) : trn('Urgent undone for {0} person', 'Urgent undone for {0} people', off.length);
   let cur = acts;
   const e = histAdd({label,
     undo: async () => { let r; for (const act of [...cur].reverse()) r = await tbl_req('POST', `/api/tasks/${tid}/bell/undo`, {act}); if (r) { tbl_cache()[tid] = r; tbl_paint(tid); } },
@@ -149,7 +149,7 @@ function tbl_actText(d, who) {
   if (d.undo) return tr('{0} undid a change of the urgent marking', who);
   if (d.self) return tr('{0} switched off the urgent marking for themselves', who);
   if (d.level === 'urgent') return trn('{1} marked the task urgent for {0} person', '{1} marked the task urgent for {0} people', d.n || 1, who) + (d.until ? ' · ' + esc(tr('until {0}', fmtDateLoc(d.until))) : '');
-  return trn('{1} took back the urgent marking for {0} person', '{1} took back the urgent marking for {0} people', d.n || 1, who);
+  return trn('{1} undid the urgent marking for {0} person', '{1} undid the urgent marking for {0} people', d.n || 1, who);
 }
 function tbl_newsText(it, who) {
   const d = it.data || {};

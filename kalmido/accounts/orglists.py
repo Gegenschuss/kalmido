@@ -173,9 +173,9 @@ def oadm_delete(oid, lid):
     _need_org_admin(c, oid)
     lr = _ol_list(c, oid, lid)
     if not lr["archived"]:
-        return err(tr("Archive the project first: only archived projects can be deleted for good"), 409)
+        return err(tr("Archive the project first: only archived projects can be deleted permanently"), 409)
     if str(b.get("confirm") or "").strip() != lr["name"].strip():
-        return err(tr("Type the name of the project to delete it for good"))
+        return err(tr("Type the name of the project to delete it permanently"))
     from ..collab.liste2e import le2e_mode
     if not le2e_mode(c, lid):  # 2.102.0 A (#1988): into the organisation's list trash (lists/listtrash.py), never a private one
         from ..lists.listtrash import otr_trash

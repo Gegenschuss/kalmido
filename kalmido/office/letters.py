@@ -317,9 +317,9 @@ def lt_image_in(v):
     elif data.startswith(b"\xff\xd8\xff"):
         mime = "image/jpeg"
     else:
-        raise BadInput(tr("Please choose a PNG or JPEG picture"))
+        raise BadInput(tr("Please select a PNG or JPEG picture"))
     if not pdf_image_object(data):
-        raise BadInput(tr("Please choose a PNG or JPEG picture"))
+        raise BadInput(tr("Please select a PNG or JPEG picture"))
     from ..files.scan import SC_RETRY_TEXT, sc_needs_retry, sc_scan  # 2.153.0: virus scan like every upload (2.148.1 E, #2496)
     try:
         if sc_needs_retry(sc_scan("signature.png" if mime == "image/png" else "signature.jpg", data), data):

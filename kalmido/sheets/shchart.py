@@ -56,14 +56,14 @@ def shc_clean(c, sid, v):
     x = None if x is None else col(x)
     ys = v.get("y")
     if not isinstance(ys, list) or not ys or len(ys) > SHC_SERIES_MAX:
-        raise BadInput(tr("Choose one to {0} columns with numbers", SHC_SERIES_MAX))
+        raise BadInput(tr("Select one to {0} columns with numbers", SHC_SERIES_MAX))
     out = []
     for y in ys:
         y = col(y)
         if y not in out and y != x:
             out.append(y)
     if not out:
-        raise BadInput(tr("Choose one to {0} columns with numbers", SHC_SERIES_MAX))
+        raise BadInput(tr("Select one to {0} columns with numbers", SHC_SERIES_MAX))
     if v["type"] in SHC_ONE and len(out) > 1:  # 2.578.0 (#3462): a pie shows the parts of one column
         raise BadInput(tr("A pie or ring chart shows one column with numbers"))
     return {"type": v["type"], "x": x, "y": out}

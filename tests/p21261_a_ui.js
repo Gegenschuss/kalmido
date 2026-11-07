@@ -70,12 +70,12 @@ const sql = (q, a = []) => JSON.parse(execFileSync('python3', [path.join(__dirna
   const md = await until(() => d.querySelector('.ppm .ast-head') && d.querySelector('.ppm'));
   const ta = md?.querySelector('#ast-text');
   check(/Proposal by Claude/.test(md?.textContent || '') && ta && ta.value === 'Vielen Dank für Ihre Anfrage.', "#2123: the card: who proposes it, the agent's text in a field");
-  check(md && md.querySelector('[data-ast-copy]') && /Take over/.test(md.querySelector('[data-pp="apply"]')?.textContent || '') && !!md.querySelector('[data-pp="discard"] .thumb svg')  /* 2.139.0 (#2401): app thumb */
+  check(md && md.querySelector('[data-ast-copy]') && /Apply/.test(md.querySelector('[data-pp="apply"]')?.textContent || '') && !!md.querySelector('[data-pp="discard"] .thumb svg')  /* 2.139.0 (#2401): app thumb */
     && !md.querySelector('.ppi') && /Alte Einleitung/.test(md.querySelector('.ast-was')?.textContent || ''), '#2123: Copy / Take over / Discard, the current text, no entry list');
   if (ta) ta.value = 'Vielen Dank für Ihre Anfrage, gern bieten wir an.';
   click(w, md?.querySelector('[data-pp="apply"]'));
   check(await until(async () => (await call('GET', `/api/office/docs/${q.id}`)).intro === 'Vielen Dank für Ihre Anfrage, gern bieten wir an.'), '#2123: Take over writes the edited text');
-  check(await until(() => /Text taken over into the draft/.test(d.querySelector('#toast, .toast')?.textContent || ''), 30), '#2123: the toast');
+  check(await until(() => /Text applied to the draft/.test(d.querySelector('#toast, .toast')?.textContent || ''), 30), '#2123: the toast');
   await sleep(300);
   await w.eval("histStep('undo')");
   check(await until(async () => (await call('GET', `/api/office/docs/${q.id}`)).intro === 'Alte Einleitung'), '#2123: Undo brings the old text back');

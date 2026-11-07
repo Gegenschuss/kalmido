@@ -307,7 +307,7 @@ def book_member_set(c, bid, uid, role):
     from ..agents.admin import personal_agent_foreign
     from ..agents.core import is_agent
     if not collab_all():
-        raise Denied(409, tr("Collaboration is turned off on this server"))
+        raise Denied(409, tr("Collaboration is switched off on this server"))
     if role not in BOOK_ROLES:
         raise BadInput(tr("Invalid value: {0}", "role"))
     b = c.execute("SELECT * FROM books WHERE id=?", (bid,)).fetchone()

@@ -8,7 +8,7 @@
 
 const frq_until = iso => iso ? fmtDay('short', new Date(iso)) : '';
 const frq_stateText = r => r.state === 'active' ? tr('Open until {0}', frq_until(r.expires_at)) : r.state === 'expired' ? tr('Expired on {0}', frq_until(r.expires_at))
-  : r.state === 'revoked' ? tr('Turned off') : tr('Not working: the creator can no longer add files to this folder');
+  : r.state === 'revoked' ? tr('Switched off') : tr('Not working: the creator can no longer add files to this folder');
 const frq_dayPlus = n => { const d = new Date(); d.setDate(d.getDate() + n); return ds(d); };
 
 async function frq_open(n) {
@@ -24,7 +24,7 @@ async function frq_open(n) {
         <div class="muted frq-facts"><span>${esc(frq_stateText(r))}</span><span>${esc(trn('{0} file arrived', '{0} files arrived', r.count))}</span>${r.mine ? '' : `<span>${esc(tr('by {0}', r.created_by_name))}</span>`}</div>
         ${r.url && r.state === 'active' ? `<div class="frq-link"><input readonly value="${esc(r.url)}" aria-label="${esc(tr('Upload link'))}"><button type="button" class="btn sm" data-frq="copy">${ic('copy', 's')} ${esc(tr('Copy'))}</button><button type="button" class="iconbtn" data-frq="qr" aria-label="${esc(tr('QR code'))}" title="${esc(tr('QR code'))}">${ic('grid', 's')}</button></div><div class="frq-qr" hidden></div>` : ''}</div>`).join('');
     $('.frq-body', md).innerHTML = `<div class="shint lhint keep">${esc(tr('Clients upload files into this folder through the link, without an account. They never see what is in it.'))}</div>
-      ${j.public_links ? '' : `<p class="muted mhint">${esc(tr('Public links are turned off on this server'))}</p>`}
+      ${j.public_links ? '' : `<p class="muted mhint">${esc(tr('Public links are switched off on this server'))}</p>`}
       <div class="frq-list">${rows || `<p class="muted mhint">${esc(tr('No file requests yet'))}</p>`}</div>
       <div class="foot">${j.public_links ? `<button type="button" class="btn" data-frq="new">${ic('plus', 's')} ${esc(tr('New file request'))}</button>` : ''}<span class="spacer"></span><button type="button" class="btn pri" data-frq="close">${esc(tr('Done'))}</button></div>`;
   };
@@ -91,7 +91,7 @@ function frq_new(n, lim, done) {
     const b = {title: $('#frq-title', md).value.trim(), note: $('#frq-note', md).value, expires_at: $('#frq-exp', md).value, tz: evTz(),
       max_mb: mb, max_files: nf, types, subfolder: $('#frq-sub', md).checked};
     if (!b.title) { fail(tr('Title missing')); $('#frq-title', md).focus(); return; }
-    if (!b.expires_at) { fail(tr('Please choose until when the link works')); return; }
+    if (!b.expires_at) { fail(tr('Please select until when the link works')); return; }
     if (!types.length) { fail(tr('Please allow at least one kind of file')); return; }
     if (!(mb >= 1 && mb <= lim.max_mb) || !(nf >= 1 && nf <= lim.max_files)) { fail(tr('Please check the limits')); return; }
     let r; try { r = await api('POST', `/api/files/nodes/${n.id}/requests`, b); } catch (x) { fail(x?.message || ''); return; }

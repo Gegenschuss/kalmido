@@ -69,7 +69,7 @@ UNDO_NOTHING = N_("Nothing to undo")
 PURGE_FIRST = N_("Put it into the trash first")
 JOIN_ADMIN = N_("Only admins of the organisation can share this with everyone of it")  # 2.579.0 (#4802)
 MOVE_OWNER = N_("Its owner is not a member of that organisation")
-MOVE_SHARED = N_("It is shared with people or agents: take those shares back first")
+MOVE_SHARED = N_("It is shared with people or agents: remove those shares first")
 OBJ_TRACK = {}  # 2.567.0 (#4711): kind -> {table, area, undo_scope, undo_keep, undo_nofp, fields: None} (obj_track)
 
 

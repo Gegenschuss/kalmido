@@ -1,7 +1,7 @@
 // 2.144.1 UI tests, part B (#2446, #2450, office: the bank import dialog), own container (start.sh, mode workspaces), Firefox,
 // English interface. Invented companies, accounts and figures only. freelancer-matrix: office
 // - a person without organisation (personal office): "Import bank statement" opens the dialog with the format hint (CAMT.053
-//   recommended, CSV, not pending / MT940) and "Choose files"; 360 px wide without sideways scrolling; two CAMT files handed
+//   recommended, CSV, not pending / MT940) and "Select files"; 360 px wide without sideways scrolling; two CAMT files handed
 //   over at once -> one preview naming the two files and their rows; import -> the undo offer in the toast, the undo takes
 //   the import back; an MT940 file -> its preview in the dialog (2.299.0); the cash flow has a button that opens the same dialog
 const path = require('path');
@@ -50,9 +50,9 @@ const MT = ':20:STARTUMS\n:25:12030000/0000202051\n:28C:1/1\n:60F:C261001EUR100,
     await signIn(ev, 'frida');
     await nav(B + '#office/bank');
     check(await ready(ev, `typeof bnkImpModal === 'function' && !!document.querySelector('[data-bnk="imp"]')`, 80), 'the bank tab');
-    // #2446: the dialog first, with the hint and "Choose files"
+    // #2446: the dialog first, with the hint and "Select files"
     await ev(`(() => { document.querySelector('[data-bnk="imp"]').click(); return 1; })()`);
-    check(await ready(ev, `document.querySelectorAll('.modal.bnkdlg .bnk-hint li').length === 4 && !!document.querySelector('.modal.bnkdlg [data-bi="pick"]')`, 40), 'the dialog opens with the hint and "Choose files"');
+    check(await ready(ev, `document.querySelectorAll('.modal.bnkdlg .bnk-hint li').length === 4 && !!document.querySelector('.modal.bnkdlg [data-bi="pick"]')`, 40), 'the dialog opens with the hint and "Select files"');
     const hint = await ev(`document.querySelector('.modal.bnkdlg .bnk-hint')?.textContent || ''`);
     check(/CAMT\.053/.test(hint) && !/V2 or V8/.test(hint) /* 2.298.0 A2 (#3186): the version note is gone */ && /balance column/.test(hint) && /MT940/.test(hint) && /pending/.test(hint), 'the hint names CAMT.053, CSV and what not to take ' + hint.slice(0, 200));
     check(await ev(`document.querySelector('.modal.bnkdlg .bnk-hint').querySelectorAll('svg.i').length === 4 && !/[\\u{1F300}-\\u{1FAFF}]/u.test(document.querySelector('.modal.bnkdlg .bnk-hint').textContent)`), 'app icons, no emoji');

@@ -67,7 +67,7 @@ function oft_rowHtml(i, on) {
 function oft_sharedHtml(area) {
   const xs = oft_get(area)?.shared || []; if (!xs.length) return '';
   return `<h3 class="ofcgrp">${esc(tr('Shared through a folder'))}</h3><ul class="ofclist dtp-list" role="list" data-oftshared="${esc(area)}">${xs.map(x => `<li><a class="ofcrow" href="/api/files/nodes/${x.node}/content" target="_blank" rel="noopener">
-    <span class="ofcn"><b>${esc(x.title)}</b><small class="muted">${esc(tr('Read only'))}</small></span>${ic('pdf', 's')}</a></li>`).join('')}</ul>`;
+    <span class="ofcn"><b>${esc(x.title)}</b><small class="muted">${esc(tr('Read-only'))}</small></span>${ic('pdf', 's')}</a></li>`).join('')}</ul>`;
 }
 
 // ---- changes

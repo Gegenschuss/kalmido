@@ -199,7 +199,7 @@ function msvvViewList() {
 // ---- writes on a foreign task
 async function msvvToggle(sid, id) {
   const t = msvvTask(sid, id); if (!t) return;
-  if (!msvvCanWrite(sid, t.list_id)) { toast(tr('View only')); return; }
+  if (!msvvCanWrite(sid, t.list_id)) { toast(tr('Read-only')); return; }
   const done = t.status === 2;
   try {
     const n = await msvvFetch('POST', `/api/servers/${sid}/tasks/${id}/${done ? 'reopen' : 'complete'}`);

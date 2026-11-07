@@ -32,7 +32,7 @@ function rc_html() {
       ${w ? `<span class="rc-acts"><button type="button" class="btn sm" data-rc="reject:${s.id}">${tr('Reject')}</button><button type="button" class="btn sm pri" data-rc="accept:${s.id}">${tr('Accept|suggestion')}</button></span>` : ''}</div>`).join('');
   const projBtn = rc_projBtn(d, w);  // 2.540.0 (#4471): the project picker of quotations and invoices instead of a native select
   // 2.185.0 A (#2583): an e-invoice in the office's documents that is no receipt yet (read before, moved in) -> take it over
-  const einv = d.einvoice_offer && w ? `<div class="rc-sug rc-einv" role="group"><span class="muted">${tr('This e-invoice is not a receipt yet.')}</span><button type="button" class="btn sm" data-rc="einv:0">${ic('receipt', 's')} ${tr('Take over as receipt')}</button></div>` : '';
+  const einv = d.einvoice_offer && w ? `<div class="rc-sug rc-einv" role="group"><span class="muted">${tr('This e-invoice is not a receipt yet.')}</span><button type="button" class="btn sm" data-rc="einv:0">${ic('receipt', 's')} ${tr('Add as receipt')}</button></div>` : '';
   // 2.497.0 A (#4046): the fields only at a receipt (a row in rc_receipts), an open suggestion, an e-invoice to take over or
   // recognised invoice values; any other document (a letter) gets the button "Record as receipt" that shows them
   // 2.522.0 (#4433): a person with an office records receipts only in the office; the private space offers "Move to office"
@@ -67,7 +67,7 @@ function rc_projPicker(b) {
   const to = v => { if (v !== (cur || null)) rc_projSet(v); };
   tch_listPicker(b, {title: tr('Project'), filter: l => ids.has(l.id), on: cur, search: 10,
     pre: [{label: tr('No project'), icon: 'ban', on: !cur, fn: () => to(null)}],
-    first: recent.length ? {head: tr('Recently chosen'), lists: recent, rest: tr('Other projects')} : null,
+    first: recent.length ? {head: tr('Recently selected'), lists: recent, rest: tr('Other projects')} : null,
     pick: l => to(l.id)});
 }
 async function rc_projSet(v) {
@@ -206,11 +206,11 @@ document.addEventListener('click', async e => {
   const label = act === 'accept' ? tr('Suggestion accepted') : tr('Suggestion rejected');
   histToast(label, histAdd({label, undo: () => rc_post(id, +sid, 'reopen'), redo: () => rc_post(id, +sid, act, body)}));
 });
-// 2.185.0 A (#2583): "Take over as receipt" -- one undo step (all empty = no receipt again)
+// 2.185.0 A (#2583): "Add as receipt" -- one undo step (all empty = no receipt again)
 async function rc_einvTake(id, b) {
   const take = async () => { const j = await api('POST', `/api/docs/${id}/receipt/einvoice`); if (RC.id === id) { RC.d = j; rc_draw(); } return {}; };
   try { await take(); } catch { b.disabled = false; return; }
-  const label = tr('Taken over as receipt');
+  const label = tr('Added as receipt');
   histToast(label, histAdd({label, undo: () => rc_put(id, {project_id: null, category: '', vat_pct: null}), redo: take}));
 }
 // 2.121.0 A (#2092): what the recognition read off a receipt (supplier, number, net, VAT rate, gross) -- one line
@@ -228,7 +228,7 @@ function rx_html(d) {
     x.net && `${tr('net')} ${esc(dc_money(x.net, cur))}`, x.vat_pct && esc(tr('VAT {0} %', x.vat_pct)), x.gross && `${tr('gross')} ${esc(dc_money(x.gross, cur))}`].filter(Boolean);
   const line = w && !x.hidden && x.new?.length && parts.length ? `<div class="rx-sug" role="group" aria-label="${esc(tr('Recognised'))}">
     <span><span class="muted">${tr('Recognised')}:</span> ${parts.join(' · ')}</span>
-    <span class="rc-acts"><button type="button" class="btn sm" data-rx="dismiss:${d.id}">${tr('Discard')}</button><button type="button" class="btn sm pri" data-rx="apply:${d.id}">${tr('Take over')}</button></span></div>` : '';
+    <span class="rc-acts"><button type="button" class="btn sm" data-rx="dismiss:${d.id}">${tr('Discard')}</button><button type="button" class="btn sm pri" data-rx="apply:${d.id}">${tr('Apply')}</button></span></div>` : '';
   const no = x.invoice_no ? `<div class="rx-no"><span class="muted">${tr('Invoice number')}:</span> <span class="rx-nov">${esc(x.invoice_no)}</span>
     <button type="button" class="linkbtn" data-rx="copy:${d.id}" aria-label="${esc(tr('Copy'))}">${tr('Copy')}</button></div>` : '';
   // 2.146.0 B (#2452): an older document looks like the same invoice -- a link to it, "No duplicate" keeps the decision
@@ -290,7 +290,7 @@ document.addEventListener('click', async e => {
     const label = tr('Marked as no duplicate');
     histToast(label, histAdd({label, undo: () => rx_post(id, {do: 'dup'}), redo: () => rx_post(id, {do: 'nodup'})}));
   } else if (act === 'apply') {
-    const before = j.before, label = tr('Recognised values taken over');
+    const before = j.before, label = tr('Recognised values applied');
     histToast(label, histAdd({label, undo: () => rx_post(id, {do: 'restore', before}), redo: () => rx_post(id, {do: 'apply'})}));
   } else {
     const label = tr('Suggestion discarded');

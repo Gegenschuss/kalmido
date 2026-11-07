@@ -367,8 +367,8 @@ def _aa_build(c, kind, key, b):
                                   "{0} calendar feed requests with an invalid link within {1} min, from {2}"), [mins, _aa_list(items)], b["n"])
     if kind == "security" and key == "2fa_on":  # 2.367.4 (#2974): a duty to turn it on is one alert; one person is not told of their own step
         ids = list(b["extra"].get("uid", {}))
-        return ("2fa_on:" + ",".join(sorted(items))[:150], Nn_("{0} person turned on two-factor authentication: {1}",
-                                                              "{0} people turned on two-factor authentication: {1}"),
+        return ("2fa_on:" + ",".join(sorted(items))[:150], Nn_("{0} person switched on two-factor authentication: {1}",
+                                                              "{0} people switched on two-factor authentication: {1}"),
                 [_aa_list(items)], len(items), None, int(ids[0]) if len(ids) == 1 else None)
     if kind == "security" and key == "org_usage":  # 2.367.4 (#2974): the instance admins' number; names stay in the organisation
         return (key, Nn_("{0} agent limit message went to organisations within {1} min", "{0} agent limit messages went to organisations within {1} min"), [mins], b["n"])

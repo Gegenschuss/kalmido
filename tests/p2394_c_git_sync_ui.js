@@ -2,7 +2,7 @@
 // 2.394.0 UI tests, part C (#3377): the issue sync in the list dialog > Repository, own container (start.sh) with the fake
 // GitHub of fake_git.py inside, jsdom. freelancer-matrix: lists
 // - per GitHub repository the switch "Sync issues both ways" with its explanation, off; on: saved, the state line says
-//   "read only" for a repository without a token (it cannot write issues), "Create new tasks as issues" is locked then
+//   "read-only" for a repository without a token (it cannot write issues), "Create new tasks as issues" is locked then
 // - a member who does not manage the repository sees no switches
 // - the history: a change made by the sync names the issue, a lost version of a conflict is shown with field and value
 const {execFileSync} = require('child_process');

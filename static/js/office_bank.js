@@ -98,8 +98,8 @@ function bnkSplitRest(amount) {
 function bnkImpHtml() {
   if (!BNK.imports) { setTimeout(() => bnkImpLoad(), 0); return `<p class="muted">${tr('Loading…')}</p>`; }
   if (!BNK.imports.length) return `<p class="muted bnkimps">${tr('No imports yet.')}</p>`;
-  return `<ul class="ofclist bnkimps" role="list">${BNK.imports.map(i => `<li class="ofcrow ${i.undone_at ? 'arch' : ''}"><span class="ofcn"><b>${esc(i.filename || i.fmt.toUpperCase())}</b><small class="muted">${esc([fmtDateLoc(i.created_at.slice(0, 10)), trn('{0} booking', '{0} bookings', i.count), i.dup_count ? trn('{0} already there', '{0} already there', i.dup_count) : '', i.undone_at ? tr('taken back') : ''].filter(Boolean).join(' · '))}</small></span>
-    ${i.undone_at ? '' : `<button class="btn sm ghost" data-bnk="impundo" data-id="${i.id}">${tr('Take back|import')}</button>`}</li>`).join('')}</ul>`;
+  return `<ul class="ofclist bnkimps" role="list">${BNK.imports.map(i => `<li class="ofcrow ${i.undone_at ? 'arch' : ''}"><span class="ofcn"><b>${esc(i.filename || i.fmt.toUpperCase())}</b><small class="muted">${esc([fmtDateLoc(i.created_at.slice(0, 10)), trn('{0} booking', '{0} bookings', i.count), i.dup_count ? trn('{0} already there', '{0} already there', i.dup_count) : '', i.undone_at ? tr('undone') : ''].filter(Boolean).join(' · '))}</small></span>
+    ${i.undone_at ? '' : `<button class="btn sm ghost" data-bnk="impundo" data-id="${i.id}">${tr('Undo|import')}</button>`}</li>`).join('')}</ul>`;
 }
 
 // ---- actions (one undo step each)
@@ -128,7 +128,7 @@ async function bnkUnmatch(tid) {
 async function bnkImpUndo(iid) {
   try { await api('POST', `/api/office/bank/imports/${iid}/undo`); } catch (x) { toast(x.message || tr('unknown')); return; }
   BNK.imports = null; bnkReload();
-  offerUndo(tr('Import taken back'), histAdd({label: tr('Import taken back'),
+  offerUndo(tr('Import undone'), histAdd({label: tr('Import undone'),
     undo: async () => { await api('POST', `/api/office/bank/imports/${iid}/restore`); BNK.imports = null; bnkReload(); },
     redo: async () => { await api('POST', `/api/office/bank/imports/${iid}/undo`); BNK.imports = null; bnkReload(); }}));
 }
@@ -140,7 +140,7 @@ async function bnkCand(tid) {
 }
 
 // ---- the import: file -> (CSV: columns) -> preview -> take over
-// 2.144.1 B (#2446, #2450): the button opens the dialog first: which file to take from the online banking + "Choose files"
+// 2.144.1 B (#2446, #2450): the button opens the dialog first: which file to take from the online banking + "Select files"
 // (several files or one ZIP, also dropped onto the dialog). The files go as they are (multipart, field files); the server reads
 // UTF-8, else windows-1252, opens a ZIP in memory and merges everything into one preview. after = called once imported (the
 // cash flow loads again).
@@ -151,7 +151,7 @@ function bnkPick(after) { return bnkImpModal(null, null, after); }
 function bnkHintHtml() {
   return `<ul class="bnk-hint" role="list">
     <li class="ok">${ic('check', 's')}<span>${tr('Recommended: account statement as XML (CAMT.053), booked transactions. Only this brings the account balance along. Several files or one ZIP work too.')}</span></li>
-    <li>${ic('info', 's')}<span>${tr('Also works: CSV export (you choose the columns) – the account balance only when the CSV has a balance column.')}</span></li>
+    <li>${ic('info', 's')}<span>${tr('Also works: CSV export (you select the columns) – the account balance only when the CSV has a balance column.')}</span></li>
     <li>${ic('info', 's')}<span>${tr('Also works: MT940 / MT942 (.sta, .mt940) – with the account balance.')}</span></li>
     <li class="no">${ic('ban', 's')}<span>${tr('Better not: CAMT.052 (day reports – pending transactions are only shown, never imported).')}</span></li></ul>`;
 }
@@ -203,7 +203,7 @@ function bnkImpModal(text, name, after) {  // text + name: one statement read al
   };
   const start = () => {
     card.innerHTML = `<h3>${tr('Import bank statement')}</h3><p class="muted">${tr('Which file from your online banking?')}</p>${bnkHintHtml()}
-      <div class="bnk-drop" data-bi-drop><button type="button" class="btn pri" data-bi="pick">${ic('upload', 's')}<span>${tr('Choose files')}</span></button><small class="muted">${tr('or drop them here')}</small></div>
+      <div class="bnk-drop" data-bi-drop><button type="button" class="btn pri" data-bi="pick">${ic('upload', 's')}<span>${tr('Select files')}</span></button><small class="muted">${tr('or drop them here')}</small></div>
       ${foot('')}`;
   };
   const filesInfo = p => {

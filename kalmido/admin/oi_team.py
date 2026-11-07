@@ -36,7 +36,7 @@ from ..lists.lists import LIST_COLOR_RE  # 2.369.5 (#2517): pulled up from funct
 from ..accounts.modcards import MC_ICON_RE, MC_NAME_MAX, mc_mods  # 2.575.0 (#3778)
 
 # the person columns of the rows of one person (the row is left out when the person does not map)
-_W_PEOPLE = N_("Entries of people who were not chosen were not taken over: {0}")
+_W_PEOPLE = N_("Entries of people who were not selected were not imported: {0}")
 
 
 def _who(ctx, v, own=False):
@@ -50,7 +50,7 @@ def _who(ctx, v, own=False):
     return n
 
 
-_W_OTHERS = N_("Entries that belong to other people were not taken over: {0}")
+_W_OTHERS = N_("Entries that belong to other people were not imported: {0}")
 
 
 def _person(col, own=True, member=False):
@@ -112,7 +112,7 @@ def _room(c, run, src, d, ctx):
     lid = d.get("list_id")
     if src.get("kind") != "list" or not lid:
         if src.get("kind") == "list":
-            run.warning(N_("Not taken over because the entry it belongs to is missing: {0}"), tr("Team chat"))
+            run.warning(N_("Not imported because the entry it belongs to is missing: {0}"), tr("Team chat"))
         return False
     r = c.execute("SELECT id FROM tchat_rooms WHERE kind='list' AND list_id=?", (lid,)).fetchone()
     if r:
@@ -151,7 +151,7 @@ def _chat_file(c, run, src, d, ctx):
 
 def _msg(c, run, src, d, ctx):
     if _txt(src.get("enc"), 10):
-        run.warning(N_("Chat messages encrypted in the browser were taken over as they are: they open with the keys of their channel."))
+        run.warning(N_("Chat messages encrypted in the browser were imported as they are: they open with the keys of their channel."))
     elif d.get("body"):  # 2.362.4 (#3100)
         d["body"] = umz_mentions(d["body"], run.names, ctx.who)
     return d
@@ -165,7 +165,7 @@ def _booking(c, run, src, d, ctx):
     else:
         new = run.m({"contact": "contacts", "equipment": "office_equipment", "set": "office_sets"}.get(kind, ""), rid)
     if not new:
-        run.warning(N_("A booking of a resource that was not taken over was left out: {0}"), _txt(src.get("res_label"), 80))
+        run.warning(N_("A booking of a resource that was not imported was left out: {0}"), _txt(src.get("res_label"), 80))
         return False
     d["resource_id"] = new
     return d
@@ -210,7 +210,7 @@ def _nl_conn(c, run, src, d, ctx):
     d["owner_id"] = None if run.org else ctx.uid
     d["ws"] = doc_ws(run.org, ctx.uid)
     d.update(secret="", hint="", auto=0, error=tr("The access data does not come with an export: connect the newsletter service again."))
-    run.warning(N_("Newsletter connection taken over without its access data: connect it again."))
+    run.warning(N_("Newsletter connection imported without its access data: connect it again."))
     return d
 
 
@@ -258,13 +258,13 @@ def _mbx(c, run, src, d, ctx):
     d["owner_id"] = None if run.org else ctx.uid
     d["ws"] = doc_ws(run.org, ctx.uid)
     if c.execute("SELECT 1 FROM hub_mailboxes WHERE ws=?", (d["ws"],)).fetchone():
-        run.warning(N_("The workspace already has a mailbox: the one of the export was not taken over."))
+        run.warning(N_("The workspace already has a mailbox: the one of the export was not imported."))
         return False
     v = mbx_take_values(src)
     if not v:
         return False
     d.update(v)
-    run.warning(N_("Mailbox taken over without its passwords and switched off: enter them in the settings and switch it on."))
+    run.warning(N_("Mailbox imported without its passwords and switched off: enter them in the settings and switch it on."))
     return d
 
 
@@ -443,13 +443,13 @@ def _feed(c, run, src, d, ctx):
     the limit of a space, none twice; the articles are fetched again."""
     url = _norm(src.get("url"))
     if not url:
-        run.warning(N_("A feed without its address was not taken over: {0}"), _txt(src.get("title"), 80))
+        run.warning(N_("A feed without its address was not imported: {0}"), _txt(src.get("title"), 80))
         return False
     w = ("org_id=?", run.org) if run.org else ("org_id IS NULL AND user_id=?", ctx.uid)
     if c.execute(f"SELECT 1 FROM rss_feeds WHERE {w[0]} AND url=? AND deleted_at IS NULL", (w[1], url)).fetchone():
         return False
     if c.execute(f"SELECT COUNT(*) FROM rss_feeds WHERE {w[0]} AND deleted_at IS NULL", (w[1],)).fetchone()[0] >= RSS_MAX_FEEDS:
-        run.warning(N_("A feed was not taken over, the limit is reached: {0}"), _txt(src.get("title"), 80))
+        run.warning(N_("A feed was not imported, the limit is reached: {0}"), _txt(src.get("title"), 80))
         return False
     d["url"] = url
     return d

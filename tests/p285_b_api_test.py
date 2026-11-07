@@ -98,7 +98,7 @@ BO.patch(B + "/api/settings", json={"tour": "done", "lang": "en", "features": "c
 # ================================================================== off by default
 check("feeds" not in A.get(B + "/api/state").json()["settings"]["features"].split(","), "the module is off by default")
 r = A.get(B + "/api/feeds")
-check(r.status_code == 409 and "turned off" in r.json().get("error", ""), f"GET /api/feeds while off: 409 ({r.status_code})")
+check(r.status_code == 409 and "switched off" in r.json().get("error", ""), f"GET /api/feeds while off: 409 ({r.status_code})")
 check(A.post(B + "/api/feeds", json={"url": FS + "/rss.xml"}).status_code == 409, "POST /api/feeds while off: 409")
 A.patch(B + "/api/settings", json={"features": "cal,feeds"})
 # 2.172.0 (#2677): + space and manage (feeds per workspace)

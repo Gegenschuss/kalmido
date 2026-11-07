@@ -7,7 +7,7 @@
    locked for the waiting days and this browser is signed out; the mail and the sign-in offer "Cancel the deletion"
    (account.js lg_delScreen). Classic script sharing the global scope (load order: lazyload.js, module settings). */
 const sdlHtml = () => S.me && !S.me.kid ? `<h4 id="s-sdl-h">${tr('Delete account')}</h4>
-  <div class="shint">${tr('Deletes your account and your data for good after a waiting time. You can export everything first.')}</div>
+  <div class="shint">${tr('Deletes your account and your data permanently after a waiting time. You can export everything first.')}</div>
   <div class="row"><button type="button" class="btn sm danger" data-sdl="open">${ic('trash', 's')} ${tr('Delete account…')}</button></div>` : '';
 
 // the choice of one project: its members who may take it over, or delete along (when allowed)
@@ -17,7 +17,7 @@ function sdlListRow(l, nodel) {
   const opts = (l.heirs || []).map((/** @type {any} */ p) => `<option value="to:${p.id}">${esc(tr('Hand over to {0}', p.name))}</option>`).join('');
   const del = nodel ? '' : `<option value="delete" ${l.shared ? '' : 'selected'}>${esc(tr('Delete along'))}</option>`;
   return `<div class="mrow sdlrow"><span class="n">${l.locked ? ic('lock', 's') + ' ' : ''}<b>${name}</b> <span class="muted">${l.org ? esc(l.org) + ' · ' : ''}${shared}</span></span>
-    <select data-sdll="${l.id}" aria-label="${esc(tr('What happens to {0}', l.name || tr('A private project')))}">${l.shared || !del ? `<option value="">${esc(tr('Choose'))}</option>` : ''}${opts}${del}</select></div>`;
+    <select data-sdll="${l.id}" aria-label="${esc(tr('What happens to {0}', l.name || tr('A private project')))}">${l.shared || !del ? `<option value="">${esc(tr('Select'))}</option>` : ''}${opts}${del}</select></div>`;
 }
 
 async function sdlOpen(/** @type {any} */ sm) {
@@ -28,7 +28,7 @@ async function sdlOpen(/** @type {any} */ sm) {
   const nodel = (/** @type {any} */ l) => l.foreign || (l.receipts && !rhost);
   const stuck = j.lists.filter((/** @type {any} */ l) => nodel(l) && !(l.heirs || []).length);
   const md = /** @type {any} */ (modal(`<h3>${esc(tr('Delete your account?'))}</h3>
-    <div class="shint keep warn">${ic('alert', 's')} ${esc(tr('Your account is locked at once and deleted for good after {0} days. Until then you can cancel the deletion: with the link in the e-mail or by signing in with your password.', j.days))}</div>
+    <div class="shint keep warn">${ic('alert', 's')} ${esc(tr('Your account is locked at once and deleted permanently after {0} days. Until then you can cancel the deletion: with the link in the e-mail or by signing in with your password.', j.days))}</div>
     ${j.email ? '' : `<div class="shint keep">${esc(tr('Your account has no e-mail address: you get no e-mail with the cancel link. Cancel by signing in with your password.'))}</div>`}
     <div class="row"><button type="button" class="btn sm" data-sdl="export">${ic('download', 's')} ${tr('Export your data first')}</button></div>
     ${j.lists.length ? `<fieldset class="sdllists"><legend>${esc(trn('Your project', 'Your {0} projects', j.lists.length))}</legend>
@@ -72,7 +72,7 @@ async function sdlOpen(/** @type {any} */ sm) {
     try {
       const r = await rawFetch('POST', '/api/account/delete', {password: $('#sdl-pw', md)?.value || '', code: $('#sdl-code', md)?.value.trim() || '', lists, ...(rx ? {retention: rx} : {})});
       md.remove();
-      await askConfirm(tr('Your account is locked'), tr('It will be deleted for good on {0}. Until then you can cancel the deletion: with the link in the e-mail or by signing in with your password.', fmtDate(String(r.delete_at).slice(0, 10))), {ok: tr('OK'), after: (/** @type {any} */ m) => { $('[data-cd="no"]', m).hidden = true; }});
+      await askConfirm(tr('Your account is locked'), tr('It will be deleted permanently on {0}. Until then you can cancel the deletion: with the link in the e-mail or by signing in with your password.', fmtDate(String(r.delete_at).slice(0, 10))), {ok: tr('OK'), after: (/** @type {any} */ m) => { $('[data-cd="no"]', m).hidden = true; }});
       location.replace('/');
     } catch (/** @type {any} */ x) {
       err.textContent = x?.message || tr('Not possible');

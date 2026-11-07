@@ -177,7 +177,7 @@ function viewMindmap(l) {
   if (!L.nodes.some(n => n.id === MM.sel)) MM.sel = 'r';
   const ro = mm_ro(l);
   const bar = `<div class="mmbar" role="toolbar" aria-label="${esc(tr('Mind map'))}">
-    ${ro ? `<span class="muted">${tr('View only')}</span>` : `<button type="button" class="btn sm" data-mm="sib" title="${esc(tr('New branch (Enter)'))}">${ic('plus', 's')}<span>${tr('Branch')}</span></button>
+    ${ro ? `<span class="muted">${tr('Read-only')}</span>` : `<button type="button" class="btn sm" data-mm="sib" title="${esc(tr('New branch (Enter)'))}">${ic('plus', 's')}<span>${tr('Branch')}</span></button>
     <button type="button" class="btn sm" data-mm="kid" title="${esc(tr('New sub-branch (Tab)'))}">${ic('indent', 's')}<span>${tr('Sub-branch')}</span></button>`}
     <span class="spacer"></span>
     <div class="seg" role="group" aria-label="${esc(tr('View'))}"><button type="button" data-mm="as-map" class="${MM.outline ? '' : 'on'}" aria-pressed="${!MM.outline}">${ic('mindmap', 's')}<span class="sr">${tr('Mind map')}</span></button><button type="button" data-mm="as-outline" class="${MM.outline ? 'on' : ''}" aria-pressed="${MM.outline}" title="${esc(tr('Outline'))}">${ic('list', 's')}<span class="sr">${tr('Outline')}</span></button></div>
@@ -607,7 +607,7 @@ function mm_ideasGraft(l, tree) {
 function mm_ideaBtns(n) {  // ✓ take over, × drop (drawn in the node; on phones the tap opens the sheet)
   const x = n.w - MM_IDB + 2, y = n.h / 2;
   const b = (dx, act, icn, lab) => `<g class="mmib ${act}" data-mm="idea-${act}" data-n="${n.id}" role="button" aria-label="${esc(lab)}" transform="translate(${x + dx} ${y - 9})"><rect width="18" height="18" rx="9"/>${mm_icSvg(icn, 3.5, 9, {})}</g>`;
-  return n.kind === 'idea' ? b(0, 'take', 'check', tr('Take over')) + b(21, 'drop', 'x', tr('Discard')) : '';
+  return n.kind === 'idea' ? b(0, 'take', 'check', tr('Apply')) + b(21, 'drop', 'x', tr('Discard')) : '';
 }
 function mm_ideasBar() {  // per request: waiting for the agent / ideas there with "Take all" / "Drop all"
   const l = listById(MM.lid), ro = !l || mm_ro(l), js = MM.ideas.jobs; if (!js.length) return '';
@@ -651,7 +651,7 @@ async function mm_ideasAsk(n) {
   if (!ags.length) { toast(tr('Share this project with a connected agent to get ideas (project menu > Share).'), null, 6000); return; }
   const send = async a => {
     const v = await askPrompt(tr('Ideas for “{0}”', n.kind === 'root' ? lname(l) : n.title), '', {ok: tr('Ask {0}', a.name),
-      body: tr('{0} gets the path of this branch and the name of the project, nothing else, and proposes sub-branches. Nothing is created until you take them over.', a.name),
+      body: tr('{0} gets the path of this branch and the name of the project, nothing else, and proposes sub-branches. Nothing is created until you apply them.', a.name),
       input: {max: 2000, placeholder: tr('What should the ideas be about? (optional)')}});
     if (v == null) return;
     try { await api('POST', '/api/proposals', {kind: 'ideas', agent_id: a.id, list_id: l.id, branch: n.id, hint: v.trim() || null}); } catch (e) { toast(e.message); return; }
@@ -664,7 +664,7 @@ async function mm_ideasAsk(n) {
 function mm_ideaMenu(anchor, n) {
   const l = listById(MM.lid), ro = !l || mm_ro(l), j = n.job;
   if (n.kind === 'ideawait') { menu(anchor, [{label: tr('Cancel request'), icon: 'x', fn: () => mm_ideasEnd(j, 'stop')}], null, null, n.title); return; }
-  menu(anchor, ro ? [] : [{label: tr('Take over'), icon: 'check', fn: () => mm_ideaDo(n, 'take')}, {label: tr('Discard'), icon: 'x', fn: () => mm_ideaDo(n, 'drop')}, '-',
+  menu(anchor, ro ? [] : [{label: tr('Apply'), icon: 'check', fn: () => mm_ideaDo(n, 'take')}, {label: tr('Discard'), icon: 'x', fn: () => mm_ideaDo(n, 'drop')}, '-',
     {label: tr('Take all'), icon: 'check', fn: () => mm_ideasEnd(j, 'take')}, {label: tr('Discard all'), icon: 'trash', fn: () => mm_ideasEnd(j, 'drop')}], null, null, n.title);
 }
 function mm_ideaClick(a, k) {
@@ -674,7 +674,7 @@ function mm_ideaClick(a, k) {
 async function mm_ideaSend(j, take, drop) {
   let r; try { r = await api('POST', `/api/proposals/${j.id}/ideas`, {take, drop}); } catch (e) { toast(e.message); mm_ideasLoad(); return null; }
   const made = r.tasks || [];
-  if (made.length) await histGroup(async () => { for (const t of made) { putTask(t); histCreate(tr('Created {0}', qn(String(t.title).slice(0, 40))), t); } }, trn('{0} idea taken over', '{0} ideas taken over', made.length));
+  if (made.length) await histGroup(async () => { for (const t of made) { putTask(t); histCreate(tr('Created {0}', qn(String(t.title).slice(0, 40))), t); } }, trn('{0} idea applied', '{0} ideas applied', made.length));
   Object.assign(j, {taken: r.taken, dropped: r.dropped});
   if (r.state !== 'ready') MM.ideas.jobs = MM.ideas.jobs.filter(x => x !== j);
   MM.ideas.sig = ''; return r;
@@ -694,7 +694,7 @@ async function mm_ideasEnd(j, act) {  // take all / drop all / cancel the reques
   } else {
     const keys = mm_ideaOpenKeys(j); if (!keys.length) return;
     const r = await mm_ideaSend(j, act === 'take' ? keys : [], act === 'take' ? [] : keys); if (!r) return;
-    if (act === 'take') toast(trn('{0} idea taken over', '{0} ideas taken over', Object.keys(r.taken).length));
+    if (act === 'take') toast(trn('{0} idea applied', '{0} ideas applied', Object.keys(r.taken).length));
   }
   if (MM.outline) renderView(); else mm_draw();
 }

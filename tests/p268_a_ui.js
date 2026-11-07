@@ -58,13 +58,13 @@ const ym = TC.today().slice(0, 7);
     check(await ev(`(() => { const d = ${row('Miete')}; return d.classList.contains('dup') && !d.querySelector('input').checked && /Already there/.test(d.textContent); })()`), 'already there: marked, not ticked');
     check(await ev(`(() => { const e = document.querySelector('.ppm .aim-l .fcirow.err'); return !!e && !e.querySelector('input') && /Row 4/.test(e.textContent); })()`), 'an error row greyed out without a tick, with its row');
     check(await ev(`${row('Liability insurance')}.querySelector('select').value === '0' && ${row('Software subscription')}.querySelector('select').value === '19'`), 'VAT per row: the insurance 0 %, else 19 %');
-    check(await ev(`/Take over 3 rows/.test(${apply}.textContent) && !${apply}.disabled`), 'Take over 3 rows');
+    check(await ev(`/Apply 3 rows/.test(${apply}.textContent) && !${apply}.disabled`), 'Take over 3 rows');
     check(await ev(`window.__aimx === undefined && !document.querySelector('.ppm .aim-l img') && /<img/.test(${row('Cleaning')}.textContent)`), 'a script in a name stays text');
     await shot('p268-a-card.png');
     await ev(`(() => { const s = ${row('Software subscription')}.querySelector('select'); s.value = '7'; s.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
     check(await ready(ev, `/31\\.99/.test(${row('Software subscription')}.querySelector('.aim-g').textContent)`), 'another VAT rate: the gross follows (31.99)');
     await ev(`(() => { const c = ${row('Liability insurance')}.querySelector('input'); c.checked = false; c.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
-    check(await ready(ev, `/Take over 2 rows/.test(${apply}.textContent)`), 'unticking counts down');
+    check(await ready(ev, `/Apply 2 rows/.test(${apply}.textContent)`), 'unticking counts down');
     // phone width
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
     await sleep(400);

@@ -84,7 +84,7 @@ function ast_rptShow(md, st) {
   prev.innerHTML = renderMd(st.md, true);
   let n = ast$('.ast-rptnote', md);
   if (!a.agent) { n?.remove(); return; }
-  const html = `<p class="ast-rptnote muted">${esc(use ? tr('The text an agent worded (you took it over).') : tr('The fixed text.'))}
+  const html = `<p class="ast-rptnote muted">${esc(use ? tr('The text an agent worded (you applied it).') : tr('The fixed text.'))}
     <button type="button" class="linkbtn" data-ast-rpt="toggle">${esc(use ? tr('Show the fixed text') : tr('Show the agent’s text'))}</button></p>`;
   if (n) n.outerHTML = html; else prev.insertAdjacentHTML('beforebegin', html);
 }
@@ -110,9 +110,9 @@ function ast_ask(kind, q, src) {
     : `<p class="muted">${esc(tr('{0} writes a draft. You get a notification when it is ready.', ags[0].name))}</p>`;
   const field = kind === 'office_text' ? `<div class="row"><label for="ast-field">${tr('Text')}</label><select id="ast-field"><option value="intro">${tr('Introduction')}</option><option value="closing">${tr('Closing')}</option></select></div>` : '';
   const hint = {office_text: tr('The agent gets the document without purchase prices, the client and the current text. Nothing is sent.'),
-    doc_summary: tr('The agent gets what it may read of this document anyway. Nothing is changed before you take it over.'),
-    receipt_read: tr('The agent reads the file it may see anyway, where it runs. Kalmido sends nothing out. Nothing is changed before you take the values over.'),
-    card_statement_read: tr('The agent reads the statement it may see anyway, where it runs. Kalmido sends nothing out. Nothing is changed before you take the positions over, and they count once you confirm them.'),
+    doc_summary: tr('The agent gets what it may read of this document anyway. Nothing is changed before you apply it.'),
+    receipt_read: tr('The agent reads the file it may see anyway, where it runs. Kalmido sends nothing out. Nothing is changed before you apply the values.'),
+    card_statement_read: tr('The agent reads the statement it may see anyway, where it runs. Kalmido sends nothing out. Nothing is changed before you apply the positions, and they count once you confirm them.'),
     report: tr('The agent gets the status report of this period (without comments, notes and names; your tracked hours only as a total). Nothing goes to the client.')}[kind];
   const md = modal(`<h3>${ic('bot', 's')} ${esc(title)}</h3>${agSel}${field}
     <div class="row"><label for="ast-wish">${tr('Your wish')}</label></div><textarea id="ast-wish" rows="2" maxlength="500" placeholder="${esc(tr('optional, e.g. friendly and short'))}"></textarea>
@@ -145,17 +145,17 @@ function ast_draw(v) {
   const what = kind === 'office_text' ? (v.input?.field === 'closing' ? tr('Closing') : tr('Introduction')) + (t.number ? ' · ' + t.number : '')
     : kind === 'doc_summary' ? tr('Summary') + (t.name ? ' · ' + t.name : '') : tr('Status report');
   const gone = t.gone || t.editable === false;
-  const how = kind === 'report' ? tr('Taking it over shows this text in the status report dialog instead of the fixed text; copy or share it from there. Nothing goes to the client.')
-    : kind === 'doc_summary' ? tr('Taking it over saves the text as the summary of the document, as you. Undo possible.')
-    : tr('Taking it over replaces the text of the draft, as you. Nothing is sent. Undo possible.');
+  const how = kind === 'report' ? tr('Applying it shows this text in the status report dialog instead of the fixed text; copy or share it from there. Nothing goes to the client.')
+    : kind === 'doc_summary' ? tr('Applying it saves the text as the summary of the document, as you. Undo possible.')
+    : tr('Applying it replaces the text of the draft, as you. Nothing is sent. Undo possible.');
   const main = `<div class="ast-head"><span class="muted">${esc(tr('Proposal by {0}', v.agent.name))}</span> · <b>${esc(what)}</b></div>
     <textarea id="ast-text" class="ast-text" rows="${kind === 'report' ? 12 : 7}" aria-label="${esc(tr('Text'))}">${esc(p.text || '')}</textarea>
     ${t.text && kind !== 'report' ? `<details class="ast-was"><summary class="muted">${esc(tr('Current text'))}</summary><div class="muted">${esc(t.text)}</div></details>` : ''}
-    ${gone ? `<div class="shint">${esc(kind === 'office_text' ? tr('The document is finalised or sent: the text can no longer be taken over.') : tr('This is no longer available to you.'))}</div>` : ''}
+    ${gone ? `<div class="shint">${esc(kind === 'office_text' ? tr('The document is finalised or sent: the text can no longer be applied.') : tr('This is no longer available to you.'))}</div>` : ''}
     <div class="shint keep">${esc(how)}</div>`;
   const foot = `<button class="btn danger" data-pp="discard" aria-label="${esc(tr('Discard'))}">${thumbIc(false)} ${esc(tr('Discard'))}</button><span class="spacer"></span>
     <button class="btn" data-pp="close">${tr('Close')}</button><button class="btn" data-ast-copy="1">${ic('copy', 's')} ${esc(tr('Copy'))}</button>
-    <button class="btn pri" data-pp="apply" ${gone ? 'disabled' : ''}>${ic('check', 's')} ${esc(tr('Take over'))}</button>`;
+    <button class="btn pri" data-pp="apply" ${gone ? 'disabled' : ''}>${ic('check', 's')} ${esc(tr('Apply'))}</button>`;
   return {main, foot};
 }
 /** @param {any} P @param {any} q */
@@ -169,8 +169,8 @@ document.addEventListener('click', async e => {
   try { await navigator.clipboard.writeText(v); toast(tr('Copied')); } catch { toast(tr('Could not copy')); }
 });
 /** @param {any} v */
-const ast_toast = v => v.kind === 'report' ? tr('Report text taken over') : v.kind === 'doc_summary' ? tr('Summary saved')
-  : v.kind === 'receipt_read' ? tr('Values taken over') : v.kind === 'card_statement_read' ? tr('Positions taken over') : tr('Text taken over into the draft');
+const ast_toast = v => v.kind === 'report' ? tr('Report text applied') : v.kind === 'doc_summary' ? tr('Summary saved')
+  : v.kind === 'receipt_read' ? tr('Values applied') : v.kind === 'card_statement_read' ? tr('Positions applied') : tr('Text applied to the draft');
 /** @param {any} v @param {boolean} [applied] */
 function ast_after(v, applied) {  // the open view follows apply / undo / redo
   const id = v.target?.doc_id;
@@ -203,10 +203,10 @@ function ccs_draw(v) {
     ${t.total && !t.fits ? `<div class="shint cnote">${esc(tr('The positions do not add up to the total of the statement'))}</div>` : ''}
     <table class="rcr-tab"><tbody>${rows}</tbody></table>
     ${gone ? `<div class="shint">${esc(tr('This is no longer available to you.'))}</div>` : ''}
-    <div class="shint keep">${esc(tr('Taking it over adds the positions to the statement. You then check them and confirm the statement. One step, undo takes it back.'))}</div>`;
+    <div class="shint keep">${esc(tr('Applying it adds the positions to the statement. You then check them and confirm the statement. One step, undo reverses it.'))}</div>`;
   const foot = `<button class="btn danger" data-pp="discard" aria-label="${esc(tr('Discard'))}">${thumbIc(false)} ${esc(tr('Discard'))}</button><span class="spacer"></span>
     <button class="btn" data-pp="close">${tr('Close')}</button>
-    <button class="btn pri" data-pp="apply" ${gone ? 'disabled' : ''}>${ic('check', 's')} ${esc(tr('Take over'))}</button>`;
+    <button class="btn pri" data-pp="apply" ${gone ? 'disabled' : ''}>${ic('check', 's')} ${esc(tr('Apply'))}</button>`;
   return {main, foot};
 }
 // office_cards.js: the line on a statement without positions -- the agent is reading / its proposal / the button
@@ -252,7 +252,7 @@ function rcr_html(d) {
   const p = a.values || {}, parts = rcr_parts(p);
   return `<div class="rx-sug rcr-sug" role="group" aria-label="${esc(tr('Read by the agent ({0})', a.agent?.name || ''))}">
     <span><span class="muted">${esc(tr('Read by the agent ({0})', a.agent?.name || ''))}:</span> ${parts.join(' · ') || esc(tr('no values'))}</span>
-    <span class="rc-acts"><button type="button" class="btn sm" data-rcr="discard:${+a.job}:${d.id}">${tr('Discard')}</button><button type="button" class="btn sm pri" data-rcr="apply:${+a.job}:${d.id}">${tr('Take over')}</button></span></div>
+    <span class="rc-acts"><button type="button" class="btn sm" data-rcr="discard:${+a.job}:${d.id}">${tr('Discard')}</button><button type="button" class="btn sm pri" data-rcr="apply:${+a.job}:${d.id}">${tr('Apply')}</button></span></div>
     ${rcr_checksHtml(a.checks)}${rcr_bankHtml(a.bank, d.id)}`;
 }
 // the proposal sheet (agents.js propDraw): the values, the positions (shown only), what Take over sets, the checks
@@ -271,11 +271,11 @@ function rcr_draw(v) {
     ${row(tr('VAT rates'), rates)}${row(tr('Category'), esc(p.category || ''))}${row(tr('Account'), esc(p.account || ''))}</tbody></table>${pos}
     ${rcr_checksHtml(t.checks)}${rcr_bankHtml(t.bank, t.doc_id)}
     ${gone ? `<div class="shint">${esc(tr('This is no longer available to you.'))}</div>` : ''}
-    <div class="shint keep">${esc(t.new?.length ? tr('Taking it over sets {0} and keeps the values with the document, as you. One step, undo takes it back.', t.new.map((/** @type {string} */ k) => tr(RCR_FIELDS[k] || k)).join(', '))
-      : tr('Taking it over keeps the values with the document (invoice number, VAT ID), as you. One step, undo takes it back.'))}</div>`;
+    <div class="shint keep">${esc(t.new?.length ? tr('Applying it sets {0} and keeps the values with the document, as you. One step, undo reverses it.', t.new.map((/** @type {string} */ k) => tr(RCR_FIELDS[k] || k)).join(', '))
+      : tr('Applying it keeps the values with the document (invoice number, VAT ID), as you. One step, undo reverses it.'))}</div>`;
   const foot = `<button class="btn danger" data-pp="discard" aria-label="${esc(tr('Discard'))}">${thumbIc(false)} ${esc(tr('Discard'))}</button><span class="spacer"></span>
     <button class="btn" data-pp="close">${tr('Close')}</button>${t.doc_id ? `<a class="btn" href="#docs/${+t.doc_id}">${esc(tr('Open document'))}</a>` : ''}
-    <button class="btn pri" data-pp="apply" ${gone ? 'disabled' : ''}>${ic('check', 's')} ${esc(tr('Take over'))}</button>`;
+    <button class="btn pri" data-pp="apply" ${gone ? 'disabled' : ''}>${ic('check', 's')} ${esc(tr('Apply'))}</button>`;
   return {main, foot};
 }
 /** @param {number} id  the open document sheet / receipt sheet / receipt box follow a take-over, an undo, a discard */
@@ -293,7 +293,7 @@ document.addEventListener('click', async e => {
   try {
     if (act === 'apply') {
       await calReq('POST', `/api/proposals/${x}/apply`, {select: ['0']});
-      const label = tr('Values taken over');
+      const label = tr('Values applied');
       histToast(label, histAdd({label, undo: async () => { await calReq('POST', `/api/proposals/${x}/undo`); await rcr_refresh(id); return {}; },
         redo: async () => { await calReq('POST', `/api/proposals/${x}/redo`); await rcr_refresh(id); return {}; }}));
     } else if (act === 'discard') {

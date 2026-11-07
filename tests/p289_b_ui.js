@@ -213,7 +213,7 @@ const contrast = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y
   await call('PUT', `/api/lists/${L}/members`, {user_id: BOB, role: 'view'});
   w = await boot({user: 'bob', hash: 'sheets/' + BID}); d = w.document;
   await until(() => d.querySelector('#shv-scroll'));
-  check(/Read only/.test(d.querySelector('.shvtop')?.textContent || '') && !d.querySelector('[data-shv="coladd"]') && d.getElementById('shv-in').readOnly, 'a reader: "Read only", no add buttons, the bar read only');
+  check(/Read-only/.test(d.querySelector('.shvtop')?.textContent || '') && !d.querySelector('[data-shv="coladd"]') && d.getElementById('shv-in').readOnly, 'a reader: "Read-only", no add buttons, the bar read only');
   w.close();
 
   // ---- phone width: tap = choose, a second tap edits; dave without an organisation

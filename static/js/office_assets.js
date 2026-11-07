@@ -58,7 +58,7 @@ function astFields(r) {
       tr('Declining: for purchases from July 2025 to December 2027. None: the price is only for the value and the insurance list, the receipt counts as a normal expense. No tax advice.'))}</div>
     ${tbl}
     ${ofcRowF('of-new_value', tr('New value'), ofcIn('of-new_value', astM(r?.new_value), {num: true, ph: astM(r?.purchase_net)}), tr('Default: the purchase price. Only for the insurance list: a value here is no expense and is not depreciated.'))}
-    ${ofcRowF('of-current_value', tr('Current value'), ofcIn('of-current_value', astM(r?.current_value), {num: true, ph: astM(r?.book_value)}), tr('Current value = book value, unless you enter an own value.'))}
+    ${ofcRowF('of-current_value', tr('Current value'), ofcIn('of-current_value', astM(r?.current_value), {num: true, ph: astM(r?.book_value)}), tr('Current value = book value, unless you enter your own value.'))}
     ${ofcRowF('of-agreement_id', tr('Insured by'), ofcSel('of-agreement_id', r?.agreement_id, r?.agreement_id ? [[r.agreement_id, r.agreement_name || `#${r.agreement_id}`]] : [], tr('none')))}
     ${astNote()}</details>${astCare(r)}${r?.id ? `<div class="astlink dlbox" id="ast-link" data-eq="${r.id}"></div>` : ''}`;  // 2.140.0 B (#2136): the private device link
 }
@@ -179,13 +179,13 @@ function astUndo(r, body, sv) {
 }
 
 // ---- 2.140.0 B (#2136): the own private device linked with this piece of equipment (life/devlink.py; the device side is
-// devlink.js). Only the person's own link ever shows; "Take over as a private device" needs the module "home".
+// devlink.js). Only the person's own link ever shows; "Add as a private device" needs the module "home".
 async function astLinkLoad(md, id) {
   const box = $('#ast-link', md); if (!box) return;
   let j; try { j = await rawFetch('GET', `${AST_URL}/${id}/link`); } catch { box.innerHTML = ''; return; }
   const l = j.link, o = l?.other, row = v => `<div class="row"><label>${esc(tr('Private'))}</label><span class="lacts">${v}</span></div>`;
   const rm = l ? `<button type="button" class="btn sm" data-ast="dl-unlink" data-link="${l.id}">${ic('x', 's')}<span>${tr('Remove link')}</span></button>` : '';
-  box.innerHTML = !l ? (j.can_take ? row(`<button type="button" class="btn sm" data-ast="dl-take" data-eq="${id}">${ic('tool', 's')}<span>${tr('Take over as a private device')}</span></button>`) : '')
+  box.innerHTML = !l ? (j.can_take ? row(`<button type="button" class="btn sm" data-ast="dl-take" data-eq="${id}">${ic('tool', 's')}<span>${tr('Add as a private device')}</span></button>`) : '')
     : o.state !== 'ok' ? row(`<span class="muted dlhint">${ic('alert', 's')} ${esc(tr('The linked private device does not exist any more.'))}</span>${rm}`)
       : row(`<span class="dllink">${ic('link', 's')} ${esc(tr('Linked with your private device “{0}”', o.name))}</span>
         <button type="button" class="btn sm" data-ast="dl-open" data-task="${o.task_id}">${ic('right', 's')}<span>${tr('Open')}</span></button>
@@ -199,7 +199,7 @@ async function astLinkAct(md, b) {
     $('[data-m="close"]', md)?.click();
     return;
   }
-  if (a === 'dl-pull' && !await askConfirm(tr('Update from the private device?'), tr('Name, serial number and purchase date are taken over from there; the prices stay.'), {ok: tr('Update')})) return;
+  if (a === 'dl-pull' && !await askConfirm(tr('Update from the private device?'), tr('Name, serial number and purchase date are copied from there; the prices stay.'), {ok: tr('Update')})) return;
   if (a === 'dl-unlink' && !await askConfirm(tr('Remove the link?'), tr('The device and the office equipment both stay; only the link goes.'), {ok: tr('Remove link')})) return;
   b.disabled = true;
   try {

@@ -55,7 +55,7 @@ narrows it down per person (members without the right to manage it see *My right
   `lock` (lock periods, close a cash book day or a logbook month), `export` (exports for the tax adviser and the tax auditor)
   and `rights` (manage the rights of the others).
 - **Built-in groups** (fixed; own groups are copies of them): Office admin, Finance admin / controlling, Bookkeeping,
-  Project management, Staff, Read only, No office access, Previous access.
+  Project management, Staff, Read-only, No office access, Previous access.
 - Nobody hands out more than they have, and admins cannot be restricted. Agents start without office access and never get
   `rights` (see *Agents*). Every change of a group or a membership is logged: who, whom, when, before and after.
 
@@ -840,7 +840,7 @@ Since 2.141 a workspace can bring its **own mailbox** and Kalmido can **send** f
 
 *Since 2.95.*
 
-Office -> Settings -> **Import legacy data** -> **Trips from a per diem spreadsheet** -> **Take over from Excel** (2.365.2:
+Office -> Settings -> **Import legacy data** -> **Trips from a per diem spreadsheet** -> **Import from Excel** (2.365.2:
 on the legacy data page; the trip list and the evaluation link there) reads a per diem spreadsheet you kept so far (.xlsx, up to 2 MB, at most 30 sheets with 500 rows each).
 Nothing is stored before you confirm.
 
@@ -858,7 +858,7 @@ Nothing is stored before you confirm.
   *hint* (the amount differs, start / end time of a single day missing, no rates for that year), *already there* (same
   person, same dates, same place; not ticked) or *error* (date not readable). Each sheet shows its sum from the
   spreadsheet next to the calculated one.
-- **Take over N trips** creates the ticked trips in one step; the toast's **Undo** removes them again within 24 hours;
+- **Import N trips** creates the ticked trips in one step; the toast's **Undo** removes them again within 24 hours;
   only trips
   unchanged since the import and without receipts go, the others stay.
 - Hints in comments (e.g. meals paid by the company, an unknown change of country) are never applied automatically: they
@@ -1006,18 +1006,18 @@ yearly rows (X, X+3, X+6, X+9); with month 0 the month wins (monthly). The VAT r
 contributions, else 19 %, and can be changed per row in the preview. Amounts like `1.200,50`, `12.500`, `1,200.50` and
 `29,90` are read. The preview marks every row new, duplicate (same name, amount and repeat as an existing cost or an
 earlier row of the file; not ticked) or error (no name, amount 0 or missing; never taken over). Nothing is stored before
-"Take over N rows"; then every row is checked again, all are written in one step (the undo removes them again), at most
+"Import N rows"; then every row is checked again, all are written in one step (the undo removes them again), at most
 500 fixed costs per area. Files up to 2 MB and 500 rows; cells are read as text, formulas are never run.
 
 **Import with your own agent** (2.68): old fixed costs in any other format (an old spreadsheet, a PDF, a list in a mail)
 can be read by your own agent, which sends them as an import proposal in a fixed JSON shape (permission *Propose imports*,
 off by default; format in [AGENTS.md](AGENTS.md#importing-old-data-into-the-office)). Kalmido does not read the data
 itself. The proposal card shows the same preview as the Excel import (new / duplicate unticked / error greyed out with the
-reason, VAT per row, net and gross) and the office it goes into; "Take over N rows" writes them as you, one undo step
+reason, VAT per row, net and gross) and the office it goes into; "Apply N rows" writes them as you, one undo step
 removes them again. The agent never sees the office; an agent of an organisation imports only into that organisation.
 Freelancers without an organisation import into their private office.
 
-**Monthly check** (optional; 2.365.2: set in **Settings > Company & office > Bank & taxes**, the cash flow links there): a tick creates the task "Cash flow: check the actual state" for one admin of the area, due
+**Monthly check** (optional; 2.365.2: set in **Settings > Company & office > Bank & taxes**, the cash flow links there): a tick creates the task "Cash flow: check the current status" for one admin of the area, due
 on the 1st of every month in that person's basket, with only a link to the cash flow (never an amount). Another person
 ends the old task and creates a new one; switching it off ends the task (done, without a next date; not deleted). If the
 person later loses access to the cash flow, the tab says so; nobody else is picked automatically.
@@ -1174,8 +1174,8 @@ rights of the receipts list (office group area *Receipts*, level edit). The same
 
 An **incoming e-invoice** (XRechnung / ZUGFeRD) that lands in the documents of an office area is recognised with its values
 (supplier, amount, date, VAT rate), but becomes a receipt only once you take it over (since 2.237): under **Receipts this
-month** the list *e-invoices to check* shows it with **Take over** (one tap, the VAT rate of the invoice); the receipt sheet
-and the document's receipt section offer **Take over as receipt** too. Until then it is an ordinary document you can delete. An
+month** the list *e-invoices to check* shows it with **Add** (one tap, the VAT rate of the invoice); the receipt sheet
+and the document's receipt section offer **Add as receipt** too. Until then it is an ordinary document you can delete. An
 invoice the office issued itself (same VAT ID, tax number or company name) is never offered. The amount of a credit note is
 negative.
 ## Bank reconciliation
@@ -1227,7 +1227,7 @@ server is set up for it) Kalmido fetches the bookings from the bank over FinTS w
   match** takes the
   payment back (2.152: as a reversal line, see "Payments and reminders"); reversing the payment on the invoice opens the
   booking too. Every step can be undone.
-- **Imports**: the list of imported files; **Take back** removes its bookings (refused while one of them is matched -
+- **Imports**: the list of imported files; **Undo** removes its bookings (refused while one of them is matched -
   undo those matches first); its undo brings them back.
 - **Bank rules** (2.299; Settings > Company & office > *Data*, admins of the office area, at most 300): a rule needs the
   counterpart's name, its IBAN or words of the purpose (whole words, not parts of a word), optionally an amount range on the
@@ -1239,7 +1239,7 @@ server is set up for it) Kalmido fetches the bookings from the bank over FinTS w
   with different outcomes marks nothing and shows the rules as a hint. A booking marked this way says *by rule* and its name.
   **Undo match** lifts one mark, *Undo the marks of this rule* all its marks outside locked months; pausing or deleting
   a rule
-  leaves its marks. **Take back** lifts the rule marks of the import by itself, except in locked months, which then block it.
+  leaves its marks. **Undo** lifts the rule marks of the import by itself, except in locked months, which then block it.
   The second time you mark the same counterpart (IBAN, else name) the same way, or match a receipt of the same category,
   within 400 days, the list offers *Always like this?*; declining is remembered per counterpart.
 - Amounts, counterparts, purposes and IBANs are encrypted at rest when the encryption of the organisation is on. The
@@ -1268,7 +1268,7 @@ server is set up for it) Kalmido fetches the bookings from the bank over FinTS w
   `DD-MM-YYYY` and `YYYYMMDD`.
 - **Several files or a ZIP** (2.144.1): choose several statements at once, a ZIP file (e.g. one statement per day from the
   bank) or drop them onto the dialog. Everything becomes one preview sorted by day (then file, then row) and one import
-  (one **Take back** / undo for all). A ZIP is read in memory only, never unpacked to disk: only `.xml`, `.csv`, `.txt`,
+  (one **Undo** / undo for all). A ZIP is read in memory only, never unpacked to disk: only `.xml`, `.csv`, `.txt`,
   `.sta`, `.mt940`, `.mt942` and `.swi` entries count (folders and hidden files of the packing system are ignored; other
   entries and nested ZIPs are named as
   skipped), only the file name is shown, encrypted entries are refused. Limits: 20 MB upload, 400 statements, 2 MB and 3000
@@ -1392,7 +1392,7 @@ serial numbers are encrypted at rest. No tax advice; figures without guarantee.
 **Private device <-> equipment (2.140).** A device of *Home & life* can be added to the office equipment from its task
 panel (*Add to the office equipment*: the own office, or an organisation where you are admin; the dialog asks for the
 net price because the device keeps what you paid), and a piece of equipment can be taken over as a private device
-(*Take over as a private device* in its editor; admins). The fields are copied once (name and model, serial number,
+(*Add as a private device* in its editor; admins). The fields are copied once (name and model, serial number,
 purchase date, price; the vendor becomes the device's note) and both sides show the link with a jump to the other side,
 *Update from there* and *Remove link*. Nothing is mirrored by itself. Only you see your link; when you leave the
 organisation or the other side is deleted, the link shows a hint (without names) and can be removed.
@@ -1428,7 +1428,7 @@ private office). First add a **vehicle**: name, plate, kind (**private car used 
   below the start is refused; a gap or an overlap to the odometer of the previous drive is shown as a warning and saved.
 - **Change log**: every create, change, delete and restore is recorded with the values before, who and when ("History"
   in the drive). Deleting only hides the drive (undo restores it); nothing is deleted for real.
-- **Take over into travel expenses** (business drives): creates a trip with day, route, purpose "job", client, project
+- **Add to travel expenses** (business drives): creates a trip with day, route, purpose "job", client, project
   and km - without a receipt, so nothing counts twice. Once taken over, the button opens that trip.
 - **Year report** per vehicle: km total / business / private / home - workplace, the business share and the **mileage
   allowance** (business km of private cars x the rate per km, default 0.30; the report names it and links to its
@@ -1479,7 +1479,7 @@ its owner):
   own agent (2.469, see docs/AGENTS.md; the
   statement then reaches that agent's AI model). Layouts differ between
   issuers: the reader follows the common German Mastercard layout.
-- **Receipts**: an open position shows the receipt found when its amount fits (also the original amount), **Choose receipt...**
+- **Receipts**: an open position shows the receipt found when its amount fits (also the original amount), **Select receipt...**
   searches all documents you see, also unsorted ones. A receipt is matched only when you press it; it becomes a receipt,
   paid on
   the position's day unless it already has a payment day. A different amount is only reported. Or **Upload receipt**:
@@ -2359,7 +2359,7 @@ lists the receipt categories with their default and own account and the travel a
 Settings → Company & office → Data → **Read DATEV data** (admins; a private office: its owner) takes a DATEV file the tax advisor sends
 (EXTF, Windows-1252 or UTF-8 with / without BOM, semicolons, CRLF; at most 10 MB and 20 000 rows). The columns are read by
 their names in line 2, not by position. A preview comes first (new / updated / skipped with the reason, the first 20
-rows); nothing is stored until **Take over**. Every import is a run with **Undo** (the toast, and the list on the import
+rows); nothing is stored until **Import**. Every import is a run with **Undo** (the toast, and the list on the import
 page).
 
 - **Debtors / creditors** (category 16): a debtor account (ledger length + 1 digits, first digit 1-6) becomes a client
@@ -2618,7 +2618,7 @@ set.
 the same rules as the approval of a quotation: 256-bit token, one live link per document, optional expiry, rate limits,
 form check value, the same `404` for unknown, expired, stopped and voided links). The customer page `/s/q/<token>` shows
 the text (escaped, no scripts), its SHA-256 and the PDF; the customer types a name, ticks *I sign this document* and signs
-or declines with an optional reason. Afterwards the document is *Signed* / *Declined*, the person who made the link gets
+or declines with an optional reason. Afterwards the document is *Signed* / *Rejected*, the person who made the link gets
 a push (*Approval requests*), the office log has the decision, and the signed PDF (the original plus a block with name,
 time in UTC, the SHA-256 of the text and *Simple electronic signature*) is filed next to the original when an admin opens
 the documents next. Archiving a document or changing its text stops its link. This is a simple electronic signature:
@@ -2733,7 +2733,7 @@ Letters of the tab "Correspondence" and documents of the documents area can be l
   client whose name is the sender's, with address and e-mail; otherwise the sender's name), the subject "Your letter of
   <date>" and the reference line prefilled, linked as "Answer to". The block "Correspondence" there lists the linked
   letters.
-- At a letter, **Choose a reference** links a document of the office's documents space ("Answer to"); after sending,
+- At a letter, **Select a reference** links a document of the office's documents space ("Answer to"); after sending,
   **Assign an answer** links the document that answers it. Links can be removed (one undo step each); deleting a
   document only removes the link, a document in the bin is not shown.
 - **Reference line (DIN 5008):** made from the answered document: "Your reference" (the sender's "Unser Zeichen",

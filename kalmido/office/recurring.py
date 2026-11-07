@@ -527,7 +527,7 @@ def _rin_as(c, oid, sid, today, actor, people):
         if t is None or t["kind"] != "invoice" or t["status"] == "cancelled":
             c.execute("UPDATE office_inv_series SET active=0, updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), sid, oid))
             name = _name(c, oid, s)
-            _tell(c, people, RIN_TASK_PAUSED, name, lambda lg: tr("The template invoice of the series was deleted or cancelled. Pick another one and switch the series on again.", lg=lg))
+            _tell(c, people, RIN_TASK_PAUSED, name, lambda lg: tr("The template invoice of the series was deleted or cancelled. Select another one and switch the series on again.", lg=lg))
             bump(c)
             c.commit()
             return
@@ -697,7 +697,7 @@ def rin_run(sid):
         raise Denied(409, tr("The series has ended; set a later end first"))
     t = c.execute("SELECT kind, status FROM office_docs WHERE id=? AND org_id=?", (s["template_id"], oid)).fetchone() if s["template_id"] else None
     if t is None or t["kind"] != "invoice" or t["status"] == "cancelled":
-        raise Denied(409, tr("The template invoice of the series was deleted or cancelled. Pick another one and switch the series on again."))
+        raise Denied(409, tr("The template invoice of the series was deleted or cancelled. Select another one and switch the series on again."))
     prev = s["next_date"]
     nid, sent, datev, why, post = rin_step(c, oid, uid, s, s["next_date"], [])  # the person is here: no task for what they just did
     bump(c)

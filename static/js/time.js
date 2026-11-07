@@ -103,8 +103,8 @@ async function tv_startTask(t) {
   if (!t) return;
   const l = listById(t.list_id);
   if (!mtTime(t.list_id)) {
-    if (!l || !isOwner(l)) { toast(tr('This project does not track time; only its owner can turn it on.')); return; }
-    if (!await askConfirm(tr('Turn on time tracking for this project?'), tr('“{0}” does not track time yet. Turn it on and start the timer for “{1}”?', lname(l), t.title), {ok: tr('Turn on and start')})) return;
+    if (!l || !isOwner(l)) { toast(tr('This project does not track time; only its owner can switch it on.')); return; }
+    if (!await askConfirm(tr('Switch on time tracking for this project?'), tr('“{0}” does not track time yet. Switch it on and start the timer for “{1}”?', lname(l), t.title), {ok: tr('Switch on and start')})) return;
     try { await api('PATCH', `/api/lists/${l.id}`, {time_tracking: true}); } catch { return; }
     l.time_tracking = 1;
   }
@@ -554,7 +554,7 @@ function timesheet() {
   $('.tsheet')?.remove();
   const el = document.createElement('div');
   el.className = 'tsheet';
-  el.innerHTML = `<div class="tsbar"><button class="btn pri" data-ts="print">${ic('download', 's')} ${tr('Print / save as PDF')}</button><button class="btn" data-ts="copy">${ic('copy', 's')} ${tr('Copy as text')}</button><label class="chkl"><input type="checkbox" id="ts-entries" ${LS.get('tsEntries', true) ? 'checked' : ''}> ${tr('Individual entries')}</label><span class="spacer"></span><span class="muted tshint">${tr('In the print dialog choose “Save as PDF”.')}</span><button class="iconbtn" data-ts="close" aria-label="${tr('Close')}">${ic('x')}</button></div><div class="tspage ${LS.get('tsEntries', true) ? '' : 'noentries'}" lang="${esc(document.documentElement.lang)}">${doc}</div>`;
+  el.innerHTML = `<div class="tsbar"><button class="btn pri" data-ts="print">${ic('download', 's')} ${tr('Print / save as PDF')}</button><button class="btn" data-ts="copy">${ic('copy', 's')} ${tr('Copy as text')}</button><label class="chkl"><input type="checkbox" id="ts-entries" ${LS.get('tsEntries', true) ? 'checked' : ''}> ${tr('Individual entries')}</label><span class="spacer"></span><span class="muted tshint">${tr('In the print dialog select “Save as PDF”.')}</span><button class="iconbtn" data-ts="close" aria-label="${tr('Close')}">${ic('x')}</button></div><div class="tspage ${LS.get('tsEntries', true) ? '' : 'noentries'}" lang="${esc(document.documentElement.lang)}">${doc}</div>`;
   document.body.appendChild(el);
   document.body.classList.add('tsprint');
   const close = () => { el.remove(); document.body.classList.remove('tsprint'); document.title = APP_NAME; };

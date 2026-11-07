@@ -51,7 +51,7 @@ function dsc_html() {
     ${feat('contacts') ? `<div class="row"><button type="button" class="btn sm" data-dsc="check">${ic('book', 's')} ${tr('Check my address book')}</button></div>
       <div class="shint">${tr('Shows which of your contacts use Kalmido and can be found. The addresses stay on this server.')}</div>${checkHtml}` : ''}
     ${inc.length ? `<h4 id="dsc-req-h">${tr('Requests')}</h4><div class="members" aria-labelledby="dsc-req-h">${inc.map(r => dsc_personRow(r.person,
-      `<button type="button" class="btn sm pri" data-dsc="accept" data-rid="${r.id}">${tr('Accept|connection')}</button><button type="button" class="btn sm" data-dsc="decline" data-rid="${r.id}">${tr('Decline|connection')}</button><button type="button" class="iconbtn" data-dsc="block" data-uid="${r.person.id}" title="${dsc_esc(tr('Block|person'))}" aria-label="${dsc_esc(tr('Block {0}', r.person.name))}">${ic('ban', 's')}</button>`)).join('')}</div>` : ''}
+      `<button type="button" class="btn sm pri" data-dsc="accept" data-rid="${r.id}">${tr('Accept|connection')}</button><button type="button" class="btn sm" data-dsc="decline" data-rid="${r.id}">${tr('Reject|connection')}</button><button type="button" class="iconbtn" data-dsc="block" data-uid="${r.person.id}" title="${dsc_esc(tr('Block|person'))}" aria-label="${dsc_esc(tr('Block {0}', r.person.name))}">${ic('ban', 's')}</button>`)).join('')}</div>` : ''}
     ${out.length ? `<h4 id="dsc-out-h">${tr('Sent requests')}</h4><div class="members" aria-labelledby="dsc-out-h">${out.map(r => dsc_personRow(r.person,
       `<span class="muted dsc-st">${tr('Request sent')}</span><button type="button" class="btn sm" data-dsc="withdraw" data-rid="${r.id}" data-ref="${dsc_esc(r.person.ref)}">${tr('Withdraw')}</button>`)).join('')}</div>` : ''}
     ${cons.length ? `<h4 id="dsc-con-h">${tr('Connections')}</h4><div class="members" aria-labelledby="dsc-con-h">${cons.map(r => dsc_personRow(r.person,
@@ -121,7 +121,7 @@ async function dsc_open() {
         dsc_step(md, tr('Connected with {0}', name), () => api('POST', `/api/disc/requests/${id}/reopen`), () => api('POST', `/api/disc/requests/${id}/accept`), true);
       } else if (k === 'decline') {
         await api('POST', `/api/disc/requests/${rid}/decline`);
-        dsc_step(md, tr('Declined the request of {0}', name), () => api('POST', `/api/disc/requests/${rid}/reopen`), () => api('POST', `/api/disc/requests/${rid}/decline`));
+        dsc_step(md, tr('Rejected the request of {0}', name), () => api('POST', `/api/disc/requests/${rid}/reopen`), () => api('POST', `/api/disc/requests/${rid}/decline`));
       } else if (k === 'withdraw') {
         await api('DELETE', `/api/disc/requests/${rid}`);
         let cur = rid;

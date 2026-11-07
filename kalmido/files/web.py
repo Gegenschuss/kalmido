@@ -686,7 +686,7 @@ def files_node_delete(nid):
         n = need_node(c, nid, write=True, trash=True)
         chain = fs_chain(c, nid)
         if not fs_deleted(chain):
-            return err(tr("Only what is in the trash can be deleted for good"), 409)
+            return err(tr("Only what is in the trash can be deleted permanently"), 409)
         if n["role"] != "owner":
             raise Denied(403)
         ids, paths = fs_purge(c, nid)  # this node and what is below it (a node inside a deleted folder: only that one)

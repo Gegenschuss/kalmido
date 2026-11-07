@@ -402,7 +402,7 @@ check(L6 and not p6["icon"] and p6["header_file"] == "" and p6["header_style"] =
 check(icon_of(ORG6) == "", f"#3849: something that is no picture does not become the symbol {icon_of(ORG6)}")
 check(pics(NL)["icon"] == before3, "#3849: a list id of the target in a file name changes nothing there")
 check(len(stored("listicons/*")) + len(stored("listheads/*")) == n_files, "#3849: not one file written")
-check(any("could not be taken over" in str(x.get("text")) for x in (j.get("result") or {}).get("warnings", [])), "#3849: the result names what was refused")
+check(any("could not be imported" in str(x.get("text")) for x in (j.get("result") or {}).get("warnings", [])), "#3849: the result names what was refused")
 ok(A.post(B + f"/api/imports/{(j.get('result') or {}).get('import_id')}/undo"), "undo of the doctored import")
 iid, st = plain(A, doctor({"files/pictures/../evil.png": good}))
 check(st.get("state") == "invalid", f"#3849: a path trick in a name is refused as a whole {st.get('state')}")

@@ -292,7 +292,7 @@ const ds = n => { const d = new Date(); d.setDate(d.getDate() + n); return  /* 2
   check(/Design/.test(dc.querySelector('#d-deps').textContent), 'view only: sees the blocker');
   check(!dc.querySelector('.lhead [data-act="status"]:not([disabled])') || /At risk/.test(dc.querySelector('.lhead .stpill').textContent), 'view only: pill shown');
   dc.querySelector('.lhead .stpill').click(); await sleep(500);
-  check(!lastModal(dc).querySelector('[data-m="save"]') && /View only/.test(lastModal(dc).textContent), 'view only: status dialog without save');
+  check(!lastModal(dc).querySelector('[data-m="save"]') && /Read-only/.test(lastModal(dc).textContent), 'view only: status dialog without save');
   lastModal(dc).remove();
   wc2.eval(`listModal(${WORK})`); await sleep(100);
   // 2.152.2 (#2624): project instead of list

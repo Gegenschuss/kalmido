@@ -16,10 +16,10 @@ from .news import notif_ok
 
 INTEG_FAILS = _env_int("KALMIDO_INTEG_FAILS", 5)  # failed polls in a row of a mailbox, a git connection -> told once
 INTEG_TEXT = {
-    "channel": N_("Forwarding {0} was turned off after repeated failed sends."),
-    "channel_admin": N_("Forwarding {0} was turned off: the person who set it up is no admin of the organisation any more."),
-    "webhook": N_("Webhook {0} was turned off: its events could not be delivered."),
-    "webhook_admin": N_("Webhook {0} was turned off: the person who set it up is no admin of the organisation any more."),
+    "channel": N_("Forwarding {0} was switched off after repeated failed sends."),
+    "channel_admin": N_("Forwarding {0} was switched off: the person who set it up is no admin of the organisation any more."),
+    "webhook": N_("Webhook {0} was switched off: its events could not be delivered."),
+    "webhook_admin": N_("Webhook {0} was switched off: the person who set it up is no admin of the organisation any more."),
     "hookin": N_("Inbound webhook {0} is paused: {1}"),
     "mailbox": N_("Mailbox {0} cannot fetch e-mail, failing since {1}."),
     "git": N_("Git connection {0} cannot fetch, failing since {1}."),

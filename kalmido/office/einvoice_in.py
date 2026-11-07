@@ -13,7 +13,7 @@ ei_html(inv)                   -> the readable view (HTML, every value escaped, 
 ei_amount(inv)                 -> 2.153.0 (#2055): the document amount (a credit note negative)
 ei_receipt(c, node, ws, inv, vat) -> 2.153.0 (#2055): in an office's documents space a receipt (not an own invoice; once)
 ei_receipt_late(c, nid)         -> 2.185.0 A (#2583): an e-invoice read before (before 2.153, moved into an office) made a receipt
-ei_rc_offer(c, m) / ei_take(c, node, m, uid) -> 2.185.0 A (#2583): the button "Take over as receipt" (receipts/suggest.py)
+ei_rc_offer(c, m) / ei_take(c, node, m, uid) -> 2.185.0 A (#2583): the button "Add as receipt" (receipts/suggest.py)
 
 Safety: at most XML_MAX bytes; a DOCTYPE or an ENTITY is refused before parsing (like core/csvimport.py camt_rows: no
 entity expansion, no external references, no new dependency); the parse runs as a pull parser that stops beyond
@@ -547,7 +547,7 @@ def ei_receipt(c, node, ws, inv, vat_pct, late=False):
     """docs/store.py process, the first time a document is read as an e-invoice. 2.185.0 A (#2583): True when the document is
     a receipt (docs/store.py keeps that, _eirc, later runs then leave it alone). 2.237.0 C (#2865): an incoming e-invoice no
     longer becomes a booked receipt by itself (no person, any inbound way): it stays an offer with its recognised values
-    (ei_rc_offer: the receipt sheet's "Take over as receipt", the office books' list) until a person with receipts edit
+    (ei_rc_offer: the receipt sheet's "Add as receipt", the office books' list) until a person with receipts edit
     takes it over (ei_take). Receipts made before stay as they are. Never raises."""
     try:
         return bool(c.execute("SELECT 1 FROM rc_receipts WHERE node_id=?", (node["id"],)).fetchone())

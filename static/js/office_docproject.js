@@ -105,7 +105,7 @@ function otk_dline(x, i) {
   for (const p of x.places || []) cnt[p.name] = (cnt[p.name] || 0) + 1;
   const places = Object.entries(cnt).map(([n, k]) => k > 1 ? `${k} × ${n}` : n).join(', ');
   const when = x.state === 'gone' ? `<span class="muted">${esc(x.start ? fmtDayAbs(x.start) : '')}</span>`
-    : dateIn(`${id}-d`, x.start || '', {label: tr('Date') + ': ' + x.title, ro: !ck, clear: false, empty: tr('Choose a date')});
+    : dateIn(`${id}-d`, x.start || '', {label: tr('Date') + ': ' + x.title, ro: !ck, clear: false, empty: tr('Select a date')});
   const firm = x.firm ? `<small class="muted">${esc(trn('{0} firm or filled booking is only marked', '{0} firm or filled bookings are only marked', x.firm))}</small>` : '';
   return `<tr class="otk-${x.state}${x.need_date ? ' otkd-need' : ''}"><td>${ck ? `<input type="checkbox" id="${id}" data-otkdp="${esc(x.key)}" data-otkdi="${i}" ${x.pick ? 'checked' : ''}>` : ''}</td>
     <td><label for="${id}"><b>${esc(x.title)}</b></label>${places ? `<small class="muted otktx">${esc(tr('Open places: {0}', places))}</small>` : ''}</td><td>${when}</td>
@@ -141,7 +141,7 @@ async function otk_open() {
     for (const x of $$('[data-otkdp]', md)) {
       if (!/** @type {HTMLInputElement} */ (x).checked) continue;
       const k = x.dataset.otkdp || '', day = j.dispo.days[+(x.dataset.otkdi || 0)], v = /** @type {HTMLInputElement|null} */ ($(`#otkd-${x.dataset.otkdi}-d`, md))?.value || '';
-      if (day.state !== 'gone' && !v) { toast(tr('Please choose the date of the shoot day “{0}”', day.title)); return; }
+      if (day.state !== 'gone' && !v) { toast(tr('Please select the date of the shoot day “{0}”', day.title)); return; }
       dpick.push(k); if (v) dates[k] = v;
     }
     if (!pick.length && !dpick.length) { toast(tr('Select at least one entry')); return; }

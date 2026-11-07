@@ -134,7 +134,7 @@ Switch it on in **Settings > Modules > Knowledge pages**; it then has its own ro
   embedded pages and tables are drawn in place; a click into one shows its Markdown. The "/" commands, the `[[`
   suggestions, Ctrl/Cmd+K and Ctrl/Cmd+Shift+7 / 8 / 9 and the formatting bar work as before, undo / redo is the
   editor's. On a phone a page opens read first; the pen opens the editor, the tick goes back to reading. The page's "…"
-  menu has *Edit as Markdown* (the plain text field, the way out, e.g. for a very long page) and *Read only* (a lock on
+  menu has *Edit as Markdown* (the plain text field, the way out, e.g. for a very long page) and *Read-only* (a lock on
   this device). The page stays one Markdown string: saving, conflicts, the offline outbox, the history and encrypted
   spaces are unchanged, and a page opened without typing is saved back byte for byte. Without a connection before the
   editor was ever loaded the plain text field is used.
@@ -249,7 +249,7 @@ later; "Customer A" never includes "Customer AB"). Whoever may write in the spac
 - **Public link**: a secret address `/s/w/<token>` that opens a plain read-only page without an account and without the app
   (no scripts): the page, or the list of the folder's pages. Pictures and files of the shared pages come along; a
   `[[link]]` to a page that is not shared shows as plain text, task numbers stay text. Optional *Valid until*; several links
-  per page are possible (one per customer). *Turn off* ends a link at once; Undo brings the same link back. Unknown,
+  per page are possible (one per customer). *Switch off* ends a link at once; Undo brings the same link back. Unknown,
   expired and turned-off links all answer "Link not available". The pages are `noindex`, never cached, rate limited like
   the public list links, and the server switch for public links (*Settings > Server > Server > Whole server*, `KALMIDO_PUBLIC_LINKS=0`)
   turns these off too. Only the SHA-256 of a token is looked up; the token itself is kept sealed so you can copy it again.

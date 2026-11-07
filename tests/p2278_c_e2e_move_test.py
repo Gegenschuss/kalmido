@@ -130,7 +130,7 @@ check(len(ek) == 1 and ek[0]["user_id"] == FRIDA and json.loads(ek[0]["bundle_pa
 man = zjson(EXP, "manifest.json")
 ce = man.get("client_encrypted") or {}
 check(ce.get("keys") is True and ce.get("locked_notes") == 1 and len(ce.get("attachments") or []) == 1, f"manifest: keys + counts {ce}")
-check("only with your password readable" not in ce.get("note", "") and "not taken over" in ce.get("note", ""), "manifest note is honest")
+check("only with your password readable" not in ce.get("note", "") and "not imported" in ce.get("note", ""), "manifest note is honest")
 
 # ---------------------------------------------------------------- into gina (no keys)
 iid, j = preview(Gi, EXP)
@@ -140,7 +140,7 @@ check(p.get("encrypted", {}).get("locked_lists") == 1, "preview: one encrypted p
 check(not any(x["name"].startswith("e2e1:") for x in p.get("lists", [])), "preview: no ciphertext project name")
 j = run(Gi, iid)
 check(j.get("state") == "done", f"import into gina {j.get('state')} {j.get('error')}")
-check("encrypted project was not taken over" in warns(j) and "Encryption keys taken over" in warns(j), "warnings: project skipped, keys taken " + warns(j))
+check("encrypted project was not imported" in warns(j) and "Encryption keys imported" in warns(j), "warnings: project skipped, keys taken " + warns(j))
 check(not dbx("SELECT 1 FROM lists WHERE owner_id=? AND name LIKE 'e2e1:%'", (GINA,)), "the encrypted project is not taken over")
 kg = Gi.get(B + "/api/e2e/keys").json()
 check(kg.get("set") and kg["pub"]["x"] == KF["pub"]["x"] and kg["bundle_rec"]["ct"] == KF["bundle_rec"]["ct"], "gina has frida's bundle")
@@ -191,7 +191,7 @@ check(Iv.get(B + "/api/e2e/keys").json().get("set"), "after the undo ivan still 
 iid, j = preview(Iv, EXP2)
 check((j.get("preview") or {}).get("encrypted", {}).get("keys") == "take", f"preview again: the same pair = take {(j.get('preview') or {}).get('encrypted')}")
 j = run(Iv, iid)
-check(j.get("state") == "done" and "Encryption keys taken over" in warns(j) and "already have your own" not in warns(j),
+check(j.get("state") == "done" and "Encryption keys imported" in warns(j) and "already have your own" not in warns(j),
       "import again: keys taken, no unreadable warning " + warns(j))
 ki = Iv.get(B + "/api/e2e/keys").json()
 check(ki.get("legacy_aad") == [f"kalmido-e2e:v1:{GINA}", f"kalmido-e2e:v1:{FRIDA}"], f"bundle again: the old ids once each {ki.get('legacy_aad')}")

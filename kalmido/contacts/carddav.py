@@ -304,7 +304,7 @@ def ab_report(c, u, book, raw):
 
 def ab_put(c, u, book, name):
     if book["role"] not in ("owner", "edit"):
-        raise DavError(403, "Read only", "<D:need-privileges/>")
+        raise DavError(403, "Read-only", "<D:need-privileges/>")
     ct = (request.content_type or "text/vcard").lower()
     if "vcard" not in ct and "directory" not in ct:
         raise DavError(415, "Expected text/vcard", "<CR:supported-address-data/>")
@@ -427,7 +427,7 @@ def abdav(m, c, u, p):
         if kind != "card":
             raise DavError(403, "Address books are deleted in the app")
         if book["role"] not in ("owner", "edit"):
-            raise DavError(403, "Read only", "<D:need-privileges/>")
+            raise DavError(403, "Read-only", "<D:need-privileges/>")
         have = card_now(c, book, name, lock=True)
         if not have:
             raise DavError(404, "Not found")

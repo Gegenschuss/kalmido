@@ -820,15 +820,15 @@ def fi_xls_read(raw):
     try:
         import xlrd
     except ImportError:
-        raise BadInput(tr("Old Excel files (.xls) cannot be read. Please save the file as .xlsx or CSV and choose it again.")) from None
+        raise BadInput(tr("Old Excel files (.xls) cannot be read. Please save the file as .xlsx or CSV and select it again.")) from None
     if len(raw) > FI_XLSX_MAX:
         raise BadInput(tr("The file is too large"))
     try:
         wb = xlrd.open_workbook(file_contents=raw, on_demand=True, ragged_rows=True, logfile=io.StringIO(), verbosity=0)
     except Exception as e:  # a third-party parser on an upload: every failure is a 400, never a 500
         if "encrypt" in str(e).lower():
-            raise BadInput(tr("This .xls file is protected with a password. Please remove the password or save the file as .xlsx or CSV and choose it again.")) from None
-        raise BadInput(tr("This .xls file cannot be read (damaged or an unknown format). Please save it as .xlsx or CSV and choose it again.")) from None
+            raise BadInput(tr("This .xls file is protected with a password. Please remove the password or save the file as .xlsx or CSV and select it again.")) from None
+        raise BadInput(tr("This .xls file cannot be read (damaged or an unknown format). Please save it as .xlsx or CSV and select it again.")) from None
     try:
         if wb.nsheets > FI_PARTS_MAX:
             raise BadInput(tr("The file is too large"))
@@ -861,7 +861,7 @@ def fi_xls_read(raw):
     except BadInput:
         raise
     except Exception:
-        raise BadInput(tr("This .xls file cannot be read (damaged or an unknown format). Please save it as .xlsx or CSV and choose it again.")) from None
+        raise BadInput(tr("This .xls file cannot be read (damaged or an unknown format). Please save it as .xlsx or CSV and select it again.")) from None
     finally:
         wb.release_resources()
 
@@ -1251,13 +1251,13 @@ def _import_client(c, oid, uid, x, rid, ts, counts, merged, clean_client, made=N
             try:
                 tid = int(x.get("merge_id"))
             except (TypeError, ValueError):
-                raise BadInput(tr("The chosen client no longer exists")) from None
+                raise BadInput(tr("The selected client no longer exists")) from None
         else:
             tid = made.get(x.get("contact_row"))
             if not tid:
                 raise BadInput(tr("The client of row {0} is not imported", x.get("contact_row") if isinstance(x.get("contact_row"), int) else "?"))
         if not c.execute(f"SELECT 1 FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (tid,)).fetchone():
-            raise BadInput(tr("The chosen client no longer exists"))
+            raise BadInput(tr("The selected client no longer exists"))
         name = str(x.get("contact") or "").strip()
         if not name:
             raise BadInput(tr("Name missing"))
@@ -1275,10 +1275,10 @@ def _import_client(c, oid, uid, x, rid, ts, counts, merged, clean_client, made=N
         try:
             mid = int(x.get("merge_id"))
         except (TypeError, ValueError):
-            raise BadInput(tr("The chosen client no longer exists")) from None
+            raise BadInput(tr("The selected client no longer exists")) from None
         cur = c.execute(f"SELECT * FROM clients WHERE id=? AND {pb_cl_sql(c, oid)}", (mid,)).fetchone()
         if not cur:
-            raise BadInput(tr("The chosen client no longer exists"))
+            raise BadInput(tr("The selected client no longer exists"))
         f.pop("name", None)
         f = clean_client(c, uid, f)
         fill = {k: v for k, v in f.items() if k in MERGE_FIELDS and v and not (cur[k] or "").strip()}

@@ -188,7 +188,7 @@ def form_create(lid):
     if f.get("portal"):
         f["ask_email"] = 1  # 2.63.0 (#1513): the status link goes to the reporter's address
     if f["access"] == "public" and not public_links_on(c, "forms"):
-        return err(tr("Public links are turned off on this server"), 409)
+        return err(tr("Public links are switched off on this server"), 409)
     if c.execute("SELECT COUNT(*) FROM forms WHERE list_id=?", (lid,)).fetchone()[0] >= FORMS_PER_LIST:
         return err(tr("At most {0} forms per project", FORMS_PER_LIST), 409)
     tok = secrets.token_urlsafe(24)
@@ -210,7 +210,7 @@ def form_update(fid):
     if (f.get("access") == "public" and r["access"] != "public") or (r["access"] == "public" and (f.get("enabled") or b.get("regenerate") is True)):
         _public_approval(c, r["list_id"], f.get("title") or r["title"])
     if f.get("access") == "public" and not public_links_on(c, "forms"):
-        return err(tr("Public links are turned off on this server"), 409)
+        return err(tr("Public links are switched off on this server"), 409)
     if f.get("portal", r["portal"]):
         f["ask_email"] = 1  # 2.63.0 (#1513): a status link needs the address
     if b.get("regenerate") is True:
@@ -293,7 +293,7 @@ def _may_use(c, f):
     lg = _lang(c, f)
     if not g.user:
         return _msg(tr("Please sign in", lg=lg), tr("This form is for the people of {0}. Sign in and open the link again.", APP_NAME, lg=lg),
-                    lg, 401, ("/", tr("To the sign-in", lg=lg)))
+                    lg, 401, ("/", tr("Go to sign-in", lg=lg)))
     if g.user["kid"]:
         return _gone(lg)
     if instance_mode(c) == "shared":  # 2.23.0 (#799): a shared instance: the owner's contacts

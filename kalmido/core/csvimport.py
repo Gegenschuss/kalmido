@@ -326,9 +326,9 @@ def csv_mapping(m, ncols):
             raise _bad(tr("Invalid value: {0}", k))
         out[k] = v
     if out["date"] is None or (out["amount"] is None and out["amount_in"] is None and out["amount_out"] is None):
-        raise _bad(tr("Please choose the columns for the date and the amount"))
+        raise _bad(tr("Please select the columns for the date and the amount"))
     if out["title"] is None and out["counterpart"] is None:
-        raise _bad(tr("Please choose the column for the text"))
+        raise _bad(tr("Please select the column for the text"))
     out["decimal"] = m.get("decimal") if m.get("decimal") in (",", ".") else ","
     out["date_format"] = m.get("date_format") if m.get("date_format") in DATE_FORMATS else "DD.MM.YYYY"
     return out

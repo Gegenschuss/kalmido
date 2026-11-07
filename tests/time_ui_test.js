@@ -213,7 +213,7 @@ const until = (fn, ms) => require('./boot').until(fn, {timeout: ms || 15000, ste
   await pick('Plan offsite');
   check(await until(() => /no time tracking/.test(d.querySelector(`#tvs-list [data-tvs="${tno}"]`)?.textContent || '')), '#2798: a task of a project without time tracking is marked');
   d.querySelector(`#tvs-list [data-tvs="${tno}"]`).click();
-  const yes = () => [...d.querySelectorAll('.cdlg')].find(m => /Turn on time tracking for this project/.test(m.textContent))?.querySelector('[data-cd="yes"]');
+  const yes = () => [...d.querySelectorAll('.cdlg')].find(m => /Switch on time tracking for this project/.test(m.textContent))?.querySelector('[data-cd="yes"]');
   check(await until(() => yes()), '#2798: asks to turn it on first ' + (d.querySelector('#toast')?.textContent || ''));
   check(!(await call('GET', '/api/state')).timer, '#2798: nothing starts before the yes');
   yes()?.click();

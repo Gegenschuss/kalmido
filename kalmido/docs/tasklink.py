@@ -54,7 +54,7 @@ def docs_task_link(nid):
     if not t or t["deleted_at"] or not task_visible(c, tid, uid):
         return err(tr("Task not found"), 404)
     if not dtl_link_ok(t, n["org_id"]):
-        return err(tr("Choose a task of this workspace"))
+        return err(tr("Select a task of this workspace"))
     prev = m["task_id"]
     c.execute("UPDATE doc_meta SET task_id=?, updated_at=? WHERE node_id=?", (tid, iso(now_utc()), nid))
     bump(c)

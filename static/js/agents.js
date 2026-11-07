@@ -245,7 +245,7 @@ async function agentChipMenu(a) {
     ...list.map(x => ({label: agentHstLine(x), dot: agentHst(x), cls: 'minfo', fn: () => x.enabled ? chatOpen(x.id) : go('agents')})),
     ...(list.length ? ['-'] : []), ...ags.filter(x => x.enabled).map(x => ({label: tr('Chat with {0}', x.name) + (x.chat_unread ? ` (${x.chat_unread})` : ''), icon: 'comment', fn: () => chatOpen(x.id)})),
     ...jc_menuItems(),  // 2.56.0 (#1793): running jobs ("Clara · Release …") open their own chat
-    {label: tr('Choose the agents shown…'), icon: 'gear', fn: () => settingsModal('agentdots')}]);
+    {label: tr('Select the agents shown…'), icon: 'gear', fn: () => settingsModal('agentdots')}]);
 }
 
 // ---- reactions + suggestions in the comments
@@ -1143,7 +1143,7 @@ function schedForm(md, a, s, done) {
     const er = $('#sc-err', box), fail = m => { er.textContent = m; er.hidden = false; };
     if (!d.title) return fail(tr('Please enter a title.'));
     if (!d.prompt && act() !== 'triage') return fail(tr('Please describe what the agent should do.'));
-    if (f === 'weekly' && !d.days.length) return fail(tr('Pick at least one weekday'));
+    if (f === 'weekly' && !d.days.length) return fail(tr('Select at least one weekday'));
     b.disabled = true;
     try { await rawFetch(isNew ? 'POST' : 'PATCH', isNew ? `/api/agents/${a.id}/schedules` : `/api/agent-schedules/${s.id}`, d); }
     catch (x) { b.disabled = false; return fail(x instanceof Offline ? tr('Only available online.') : x.message); }

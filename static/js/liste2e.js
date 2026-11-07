@@ -874,15 +874,15 @@ async function le2eMigrate(lid, onProgress, opts = {}) {
       if (!Object.keys(out).length && !made) {
         if (mode === 'on' && bad.size && !blank && opts.ask) {  // 2.64.2 review (M3): the same choice after a key change (by hand)
           const yes = typeof askConfirm === 'function' && await askConfirm(tr('Texts that cannot be decrypted'),
-            trn('{0} text of this project cannot be decrypted with the keys you hold. Take it over as an empty text? It cannot be restored.', '{0} texts of this project cannot be decrypted with the keys you hold. Take them over as empty texts? They cannot be restored.', bad.size), {ok: tr('Take over as empty'), danger: true});
+            trn('{0} text of this project cannot be decrypted with the keys you hold. Set it to an empty text? It cannot be restored.', '{0} texts of this project cannot be decrypted with the keys you hold. Set them to empty texts? They cannot be restored.', bad.size), {ok: tr('Set to empty'), danger: true});
           if (yes) { blank = true; last = -1; continue; }
         }
         if (mode === 'on' && bad.size) { LE2E.unread[lid] = bad.size; le2eChange(lid); }  // shown in the key change hint (liste2eui.js)
         if (mode === 'decrypting' && bad.size && !blank) {
           // M4: only texts no key here opens are left (a broken or foreign cipher): the owner decides, else the way back stops here
           const yes = typeof askConfirm === 'function' && await askConfirm(tr('Texts that cannot be decrypted'),
-            trn('{0} text of this project cannot be decrypted with the keys you hold. Take it over as an empty text? It cannot be restored.', '{0} texts of this project cannot be decrypted with the keys you hold. Take them over as empty texts? They cannot be restored.', bad.size), {ok: tr('Take over as empty'), danger: true});
-          if (!yes) throw le2eErr(trn('{0} text of this project cannot be decrypted. The project stays locked until it is taken over as empty.', '{0} texts of this project cannot be decrypted. The project stays locked until they are taken over as empty.', bad.size), 'list_e2e_unreadable');
+            trn('{0} text of this project cannot be decrypted with the keys you hold. Set it to an empty text? It cannot be restored.', '{0} texts of this project cannot be decrypted with the keys you hold. Set them to empty texts? They cannot be restored.', bad.size), {ok: tr('Set to empty'), danger: true});
+          if (!yes) throw le2eErr(trn('{0} text of this project cannot be decrypted. The project stays locked until it is set to empty.', '{0} texts of this project cannot be decrypted. The project stays locked until they are set to empty.', bad.size), 'list_e2e_unreadable');
           blank = true; last = -1;
           continue;
         }

@@ -80,7 +80,7 @@ const FEATS = 'cal,timeline,matrix,kanban,collab,progress,deps,fields,comments,a
   check(/A new project gets an icon matching its name/.test(txt(md.querySelector('#s-lemo').closest('.row').nextElementSibling)), 'Appearance: the icon hint under "Suggest icons"');
   check(/^Lines: a calm grey icon/.test(txt(md.querySelector('#s-sideic').closest('.row').nextElementSibling)), 'Appearance: the project icon hint under "Project icons"');
   w.eval(`wpState(document.querySelector('.smodal'), {channel: 'webpush', subs: [], ntfy: false})`);
-  check(/Turn on “Notify on this device” below\./.test(txt(md.querySelector('#s-wpstate'))), 'the push hint says below: ' + txt(md.querySelector('#s-wpstate')));
+  check(/Switch on “Notify on this device” below\./.test(txt(md.querySelector('#s-wpstate'))), 'the push hint says below: ' + txt(md.querySelector('#s-wpstate')));
   if (w.eval('!!S.webpush?.enabled')) {
     check(txt(np.querySelector('[data-m="ptest"]')) === 'Test all channels' && !np.querySelector('[data-m="test"]'), 'Notifications: "Test all channels", no second channel test at the ntfy topic');
     // a browser without Web Push (jsdom has none): the sentence once, in the status line on top, not again under "This device"

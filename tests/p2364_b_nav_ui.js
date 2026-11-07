@@ -50,7 +50,7 @@ const feats = async ck => ((await call('GET', '/api/state', null, ck)).settings 
     const pal = w.eval(`mg_nameKey(mg_area('office'))`);
     check(pal === 'Contacts', '#3018 fiona: one name for the area everywhere (mg_nameKey) ' + pal);
     const hint = await until(() => d.querySelector('#view .ct18'));
-    check(hint && /Quotations and invoices\?/.test(hint.textContent) && /Turn on Office & finance/.test(hint.textContent), '#3018 fiona: the contacts page offers Office & finance');
+    check(hint && /Quotations and invoices\?/.test(hint.textContent) && /Switch on Office & finance/.test(hint.textContent), '#3018 fiona: the contacts page offers Office & finance');
     // the clients' text in Settings > Modules: no "only within the workspace" without an organisation (2.411 #2938: was "your organisation")
     w.eval(`settingsModal('modules')`);
     const row = await until(() => d.querySelector('.smodal [data-modrow="clients"]'));

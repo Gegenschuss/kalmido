@@ -116,7 +116,7 @@ const toastText = d => d.querySelector('#toast:not(.hidden)')?.textContent || ''
   await until(() => /“Launch” is now blocked by “Copy”/.test(toastText(d)));  // the state is reloaded before the toast
   bar(Cc).focus(); key(w, bar(Cc), 'F10', {shiftKey: true}); await sleep(100);
   pop = d.querySelector('#pop:not(.hidden)');
-  check(pop && /Connect to…/.test(pop.textContent) && /Pick from a list…/.test(pop.textContent) && /No longer blocked by “Copy”/.test(pop.textContent), 'Shift+F10: bar menu with connect, list picker and remove');
+  check(pop && /Connect to…/.test(pop.textContent) && /Select from a list…/.test(pop.textContent) && /No longer blocked by “Copy”/.test(pop.textContent), 'Shift+F10: bar menu with connect, list picker and remove');
   [...pop.querySelectorAll('button')].find(b => /No longer blocked by “Copy”/.test(b.textContent)).click();
   check(await until(async () => !(await blockers(Cc)).includes(E)), 'bar menu: remove');
   bar(A).focus(); key(w, bar(A), 'Enter'); await sleep(300);
@@ -140,7 +140,7 @@ const toastText = d => d.querySelector('#toast:not(.hidden)')?.textContent || ''
   bar(A).dispatchEvent(new w.MouseEvent('click', {bubbles: true}));
   check(await until(async () => (await blockers(A, BK)).includes(E)), 'tap on the target links it (Design waits on Copy)');
   check(await until(() => /„Design“ ist jetzt blockiert durch „Copy“/.test(toastText(d))), 'German toast');
-  // "Pick from a list…": the searchable picker
+  // "Select from a list…": the searchable picker
   touch(w, bar(E), 'touchstart'); await sleep(380); touch(w, bar(E), 'touchend'); await sleep(100);
   [...d.querySelectorAll('#pop button')].find(b => /Aus einer Liste/.test(b.textContent)).click(); await sleep(200);
   const pm = lastModal(d);

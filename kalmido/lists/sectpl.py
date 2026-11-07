@@ -123,7 +123,7 @@ def sct_create():
             lid = as_int(b["list_id"], "list_id", 1)
             role = need_list(c, lid, write=False)
             if role not in WRITE_ROLES:
-                raise Denied(403, tr("View only: the project cannot be saved as a template"))
+                raise Denied(403, tr("Read-only: the project cannot be saved as a template"))
             names = sct_clean_names(sct_list_names(c, lid))
             src_org = c.execute("SELECT org_id FROM lists WHERE id=?", (lid,)).fetchone()["org_id"]
         else:

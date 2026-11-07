@@ -212,7 +212,7 @@ refused = {
     "assign on create": A.post(B + "/api/tasks", json={"title": "y", "list_id": lid, "assignee_id": ids["alice"]}),
 }
 for k, r in refused.items():
-    check(r.status_code == 403 and "Collaboration is turned off" in r.json().get("error", ""), f"off: {k} refused with 403 ({r.status_code} {r.text[:80]})")
+    check(r.status_code == 403 and "Collaboration is switched off" in r.json().get("error", ""), f"off: {k} refused with 403 ({r.status_code} {r.text[:80]})")
 # 2.395.0 (#3379): the project status works without collaboration (one person / freelancer); no News for others
 n0 = dbx("SELECT COUNT(*) FROM notifications WHERE kind='status'")[0][0]
 r = A.post(B + f"/api/lists/{lid}/status", json={"status": "at_risk", "note": "solo"})
@@ -294,7 +294,7 @@ for what, r in {"start": A.post(B + "/api/time/start", json={"task_id": tt}), "s
                 "csv": A.get(B + "/api/time/export.csv"),
                 "update": A.patch(B + f"/api/time/entries/{dbx('SELECT MIN(id) FROM time_entries')[0][0]}", json={"note": "x"}),
                 "delete": A.delete(B + f"/api/time/entries/{dbx('SELECT MIN(id) FROM time_entries')[0][0]}")}.items():
-    check(r.status_code == 403 and "Time tracking is turned off" in r.text, f"time off: {what} refused ({r.status_code})")
+    check(r.status_code == 403 and "Time tracking is switched off" in r.text, f"time off: {what} refused ({r.status_code})")
 check(A.get(B + "/api/stats").json().get("time") is None, "time off: no tracked time in the statistics")
 # focus session on a task does not become a time entry
 p = A.post(B + "/api/pomo/start", json={"kind": "stopwatch", "task_id": tt}).json()
@@ -322,7 +322,7 @@ check(r.ok and st["time_all"] is False and st["settings"]["features"] == "cal,ka
 nu = A.post(B + "/api/users", json={"username": "dora", "password": "password123"}).json()
 check(sess("dora").get(B + "/api/state").json()["settings"]["features"] == "cal,kanban,collab,time,agents", "new users get the default modules (2.22.0 #739: + agents)")
 A.post(B + "/api/admin/setup", json={"modules": list("x"), "collab_all": True, "time_all": True})
-# "Turn on collaboration now?" also switches the personal switches on
+# "Switch on collaboration now?" also switches the personal switches on
 A.patch(B + "/api/settings", json={"features": "cal"})
 A.patch(B + "/api/admin/settings", json={"collab_all": False})
 A.patch(B + "/api/admin/settings", json={"collab_all": True, "collab_personal_on": True})

@@ -1,5 +1,5 @@
 // 2.89.0 part D UI test (#1916): tables step 2 (static/js/sheets2.js), own container (start.sh), jsdom. Invented names only.
-// - the sheet's "…" menu offers "Create tasks from rows…", "Take over as a quotation…" (office on) and "List as rows…"
+// - the sheet's "…" menu offers "Create tasks from rows…", "Use as a quotation…" (office on) and "List as rows…"
 // - two chosen rows -> tasks: the dialog (list of the space, title column, "only the 2 chosen rows"), the tasks in the list,
 //   the mark in the row head, the panel "Carried over"; one undo step takes the tasks back
 // - "List as rows": the rows with live task values, then "Fetch new tasks of <list>" in the menu
@@ -44,7 +44,7 @@ const items = d => [...d.querySelectorAll('#pop:not(.hidden) [role="menuitem"]')
   check(await openMenu(), 'the sheet menu opens');
   const labels = items(d).map(b => b.textContent.trim());
   check(labels.some(t => t.includes('Create tasks from rows')), 'menu: Create tasks from rows… ' + labels.join(' | '));
-  check(labels.some(t => t.includes('Take over as a quotation')), 'menu: Take over as a quotation… (office on)');
+  check(labels.some(t => t.includes('Use as a quotation')), 'menu: Take over as a quotation… (office on)');
   // 2.152.2 (#2624): project instead of list
   check(labels.some(t => t.includes('Project as rows')), 'menu: List as rows…');
   w.eval(`closePop && closePop()`); await sleep(100);
@@ -56,7 +56,7 @@ const items = d => [...d.querySelectorAll('#pop:not(.hidden) [role="menuitem"]')
   check(await until(() => d.querySelector('.cdlg #sh2-list')), 'the dialog opens');
   const md = d.querySelector('.cdlg');
   check([...md.querySelectorAll('#sh2-list option')].some(o => +o.value === L), 'the dialog offers the list of the space');
-  check(/Only the 2 chosen rows/.test(md.textContent), 'only the 2 chosen rows ' + md.textContent.slice(0, 200));
+  check(/Only the 2 selected rows/.test(md.textContent), 'only the 2 selected rows ' + md.textContent.slice(0, 200));
   md.querySelector('#sh2-list').value = String(L);
   click(w, md.querySelector('[data-cd="yes"]'));
   let tl = [];

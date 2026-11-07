@@ -269,7 +269,7 @@ def pub_render(c, link, token, lg):
         body_ += (f'<details class="donegrp"{" open" if check else ""}><summary>{e(title)} <span class="n">{len(done_top)}</span></summary>'
                   f'<ul class="tasks">{"".join(row(t) for t in done_top)}</ul></details>')
     name = tr("Basket", lg=lg) if link["l_inbox"] and inbox_default(link["l_name"]) else link["l_name"]
-    mode = tr("You can tick off items on this page.", lg=lg) if tick else tr("View only.", lg=lg)
+    mode = tr("You can tick off items on this page.", lg=lg) if tick else tr("Read-only.", lg=lg)
     brand = ""
     if show["brand"]:  # 2.50.0 (#329): the organisation's name / logo above the project name
         bname, blogo = cv_brand(c, link)
@@ -381,7 +381,7 @@ def pub_signoffs(c, link, lg):
                 path = url[len(PUBLIC_URL.rstrip("/")):]
                 out.append(f'<a class="sgreq" href="{e(path)}">{e(tr("Confirm the acceptance: {0}", r["title"], lg=lg))}</a>')
         else:
-            word = tr("Accepted", lg=lg) if r["state"] == "accepted" else tr("Declined", lg=lg)
+            word = tr("Accepted", lg=lg) if r["state"] == "accepted" else tr("Rejected", lg=lg)
             out.append(f'<p class="sgdone">{e(word)}: {e(r["title"])} · {e((r["signed_at"] or "")[:10])}</p>')
     return f'<div class="sgbox">{"".join(out)}</div>' if out else ""
 
@@ -567,7 +567,7 @@ def pub_set(lid):
     c = db()
     need_pub_owner(c, lid)
     if not public_links_on(c, "lists"):
-        return err(tr("Public links are turned off on this server"), 409)
+        return err(tr("Public links are switched off on this server"), 409)
     from ..collab.liste2e import le2e_mode
     if le2e_mode(c, lid):  # 2.64.1 (#1817): its texts are encrypted in the browser
         return jsonify(error=tr("A project encrypted in the browser cannot have a public link."), code="list_e2e_public"), 409

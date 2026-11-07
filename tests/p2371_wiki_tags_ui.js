@@ -44,7 +44,7 @@ const rowOf = (d, txt) => [...d.querySelectorAll('#side .sbbt')].find(r => r.que
   check(Object.values(id).every(Boolean), 'setup: the pages');
 
   // ================= the tags in the text
-  const w = await boot({user: 'alice', hash: 'wiki/' + id.plan, ls: {'tasks.wkRo': '"1"'}}), d = w.document;  // 2.554.0 (#4052): the read view = the lock "Read only"
+  const w = await boot({user: 'alice', hash: 'wiki/' + id.plan, ls: {'tasks.wkRo': '"1"'}}), d = w.document;  // 2.554.0 (#4052): the read view = the lock "Read-only"
   const md = await until(() => d.querySelector('#view .wkpage #wk-md a.wktag') && d.querySelector('#view .wkpage #wk-md'));
   const links = md ? [...md.querySelectorAll('a.wktag')].map(a => a.textContent + '>' + a.getAttribute('href')) : [];
   check(JSON.stringify(links) === JSON.stringify(['#Projekt>#wiki/t/Projekt', '#kunde/Nord>#wiki/t/kunde%2FNord']), 'the #tags of the text are links to their list, not in code or a link target ' + JSON.stringify(links));

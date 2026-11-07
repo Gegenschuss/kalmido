@@ -201,7 +201,7 @@ check(A.post(B + f"{K}/lines/{L[1]['id']}/match", json={"node_id": CAFE}).status
 check(A.post(B + f"{K}/lines/{L[2]['id']}/match", json={"node_id": OTHER}).status_code == 409, "a fee takes no receipt")
 check(A.post(B + f"{K}/statements/{SID}/reopen").status_code == 409, "the confirmation stays while receipts hang on it")
 check(A.delete(B + f"{K}/statements/{SID}").status_code == 409, "the statement stays while receipts hang on it")
-check(A.post(B + f"{K}/lines/{L[0]['id']}/unmatch").ok, "taken back")
+check(A.post(B + f"{K}/lines/{L[0]['id']}/unmatch").ok, "undone")
 check(sql("SELECT paid_at FROM rc_receipts WHERE node_id=?", (CAFE,))[0][0] is None, "the payment day goes with it")
 assert A.post(B + f"{K}/lines/{L[0]['id']}/match", json={"node_id": CAFE}).ok
 assert A.delete(B + f"/api/files/nodes/{CAFE}").ok

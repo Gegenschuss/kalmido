@@ -54,7 +54,7 @@ const CARD = 'BEGIN:VCARD\r\nVERSION:3.0\r\nUID:ui-c1\r\nFN:Erik Beispiel\r\nBDA
   check(!!d.querySelector('.smodal #s-carddav'), '2.365.2 B (#2789): the address books are in Settings > Integrations');
   check(sw() && !sw().checked && sw().closest('.swc'), 'off by default, a switch (.swc)');
   check(/Write changes back to the address book/.test(sw()?.closest('.ctwb')?.textContent || ''), 'the switch is labelled');
-  check(!d.querySelector(`[data-ctwb="${S2.id}"]`) && /Read only/.test(d.querySelector(`[data-ctwbro="${S2.id}"]`)?.textContent || ''), 'the mirror: a hint instead of the switch');
+  check(!d.querySelector(`[data-ctwb="${S2.id}"]`) && /Read-only/.test(d.querySelector(`[data-ctwbro="${S2.id}"]`)?.textContent || ''), 'the mirror: a hint instead of the switch');
   // on -> asks; Cancel leaves it off
   sw().checked = true; sw().dispatchEvent(new w.Event('change', {bubbles: true}));
   check(!!await until(() => d.querySelector('.cdlg [data-cd="no"]')), 'switching on asks first');

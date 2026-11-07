@@ -74,9 +74,9 @@ def opdf_logo_process(raw):
         try:
             im = Image.open(io.BytesIO(raw))
         except Exception:  # noqa: BLE001  (SVG, PDF, text: not a raster picture Pillow knows)
-            raise ValueError(tr("Please choose a PNG, JPEG or WebP picture (PNG at least 600 px wide prints sharply)")) from None
+            raise ValueError(tr("Please select a PNG, JPEG or WebP picture (PNG at least 600 px wide prints sharply)")) from None
         if im.format not in ("JPEG", "PNG", "WEBP"):
-            raise ValueError(tr("Please choose a PNG, JPEG or WebP picture (PNG at least 600 px wide prints sharply)"))
+            raise ValueError(tr("Please select a PNG, JPEG or WebP picture (PNG at least 600 px wide prints sharply)"))
         if im.width * im.height > 30_000_000:
             raise ValueError(tr("This picture cannot be read"))
         im.load()

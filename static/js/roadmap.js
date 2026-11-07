@@ -168,7 +168,7 @@ function rmRowHtml(G, M, r) {
     const l = r.l, col = cssColor(lp_col(l)), em = leadEmoji(l.name);
     const sw = licMark(l, 'rmlic', true) || (em ? '' : `<span class="sw" style="${col ? 'background:' + col : ''}"></span>`);  // 2.36.2 (#1135)
     // 2.18.0 review (R13): the fold toggle and "Open list" are siblings (a button inside role=button was nested-interactive)
-    return `<div class="tl-row rm-row rm-g${r.open ? ' open' : ''}" data-l="${l.id}" style="top:${y}px"><div class="tl-name rm-gwrap" title="${esc(lname(l))}"><div class="rm-gname" data-act="rm-toggle" data-key="${esc(r.key)}" role="button" tabindex="0" aria-expanded="${r.open}">${ic('chev', 's rm-car' + (r.open ? '' : ' closed'))}${sw}<span class="n">${esc(lname(l))}</span>${l.role === 'view' ? `<span class="rm-ro" title="${esc(tr('View only'))}">${ic('eye', 's')}</span>` : ''}</div><button type="button" class="iconbtn rm-go" data-go="l/${l.id}" title="${esc(tr('Open project'))}" aria-label="${esc(tr('Open project'))}">${ic('arrow', 's')}</button></div>${tlCrTrack(l.id, null, 'g:' + l.id, rmCrGeo(G), canAddTo(l.id) && !S.tlPick, rmSumHtml(G, r) + rmMsHtml(G, l, r))}</div>`;
+    return `<div class="tl-row rm-row rm-g${r.open ? ' open' : ''}" data-l="${l.id}" style="top:${y}px"><div class="tl-name rm-gwrap" title="${esc(lname(l))}"><div class="rm-gname" data-act="rm-toggle" data-key="${esc(r.key)}" role="button" tabindex="0" aria-expanded="${r.open}">${ic('chev', 's rm-car' + (r.open ? '' : ' closed'))}${sw}<span class="n">${esc(lname(l))}</span>${l.role === 'view' ? `<span class="rm-ro" title="${esc(tr('Read-only'))}">${ic('eye', 's')}</span>` : ''}</div><button type="button" class="iconbtn rm-go" data-go="l/${l.id}" title="${esc(tr('Open project'))}" aria-label="${esc(tr('Open project'))}">${ic('arrow', 's')}</button></div>${tlCrTrack(l.id, null, 'g:' + l.id, rmCrGeo(G), canAddTo(l.id) && !S.tlPick, rmSumHtml(G, r) + rmMsHtml(G, l, r))}</div>`;
   }
   if (r.type === 's') return tlSecRow(r.l, r.sg, r.open, canAddTo(r.l.id) && !S.tlPick, rmCrGeo(G), y, r.n);
   if (r.type === 'a') return tlAddRow(r.l, rmCrGeo(G), y);
@@ -211,7 +211,7 @@ function viewRoadmap() {
     <div class="calnav"><button class="iconbtn" data-act="rm-prev" title="${tr('Earlier')}" aria-label="${tr('Earlier')}">${ic('left')}</button><button class="btn sm" data-act="rm-today">${tr('Today')}</button><button class="iconbtn" data-act="rm-next" title="${tr('Later')}" aria-label="${tr('Later')}">${ic('right')}</button></div>
     </div>`;
   const from = S.tlPick && S.tasks.get(S.tlPick.from);
-  const pick = from ? `<div class="tl-pick" role="status">${ic('deps', 's')}<span>${tr('Tap the task that “{0}” blocks', esc(from.title))}</span><span class="spacer"></span><button class="btn sm" data-act="tl-pick-list">${ic('search', 's')} ${tr('Pick from a list…')}</button><button class="btn sm" data-act="tl-pick-cancel">${tr('Cancel')}</button></div>` : '';
+  const pick = from ? `<div class="tl-pick" role="status">${ic('deps', 's')}<span>${tr('Tap the task that “{0}” blocks', esc(from.title))}</span><span class="spacer"></span><button class="btn sm" data-act="tl-pick-list">${ic('search', 's')} ${tr('Select from a list…')}</button><button class="btn sm" data-act="tl-pick-cancel">${tr('Cancel')}</button></div>` : '';
   if (!M.rows.length) return `${bar}${rmChips(M)}<div class="rm-empty muted">${tr('Nothing to show with these filters')}</div>`;
   const hint = isTouch() ? tr('Long-press a project bar to move the whole project. Tap a name to open or close it.') : tr('Drag a project bar to move all its open tasks with a date. Click a name to open or close it.');
   return `${bar}${rmChips(M)}${pick}
@@ -361,7 +361,7 @@ function rmMoveDialog(lid) {
   const days = () => { const n = parseInt($('#rm-n', md).value, 10); return Number.isFinite(n) ? Math.max(-3650, Math.min(3650, n * unit)) : 0; };
   const upd = () => {
     const d = days();
-    $('#rm-prev', md).textContent = d ? `${fmtDayAbs(sp.s)} – ${fmtDayAbs(sp.e)}  →  ${fmtDayAbs(addDays(sp.s, d))} – ${fmtDayAbs(addDays(sp.e, d))}` : tr('Choose how far to move it');
+    $('#rm-prev', md).textContent = d ? `${fmtDayAbs(sp.s)} – ${fmtDayAbs(sp.e)}  →  ${fmtDayAbs(addDays(sp.s, d))} – ${fmtDayAbs(addDays(sp.e, d))}` : tr('Select how far to move it');
     $('#rm-ok', md).disabled = !d;
   };
   upd();

@@ -117,7 +117,7 @@ async function rdl_tick(id) {
 // the share sheet of the phone: a shared link goes to read later in the picked space (2.490.0 C, #4025: Private unless an
 // organisation is picked; the server refuses an organisation the person may not add to)
 async function rdl_shareSave(url, title, space = 'private') {
-  if (!feat('reading')) { toast(tr('Read later is turned off in your settings')); return; }
+  if (!feat('reading')) { toast(tr('Read later is switched off in your settings')); return; }
   const u = rdl_href(url); if (!u) return;
   const t = (title || '').trim();
   let j; try { j = await rdl_save(u, t && t !== u ? t : '', true, space || 'private'); } catch { return; }  // api() showed the reason

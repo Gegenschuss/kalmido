@@ -60,7 +60,7 @@ def _period():
     if d1 < d0:
         raise BadInput(tr("The end lies before the start"))
     if (d1 - d0).days > BX_DAYS_MAX:
-        raise BadInput(tr("Choose at most three years"))
+        raise BadInput(tr("Select at most three years"))
     return d0.isoformat(), d1.isoformat()
 
 

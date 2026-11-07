@@ -15,7 +15,7 @@ const SHORTCUTS_ALL = [
   [N_('Multi-select'), [['Mod+A', N_('Select all tasks of the view')], ['Shift+↓', N_('Extend the selection down (or Shift+J)')], ['Shift+↑', N_('Extend the selection up (or Shift+K)')], ['Shift+X', N_('Select or unselect the task')],
     ['Space', N_('Complete the selected tasks (or X)')], ['m', N_('Move the selected tasks to a project')], ['d', N_('Change the date of the selected tasks')], ['Esc', N_('Clear the selection')]]],
   [N_('Calendar'), [['1', N_('Month')], ['2', N_('Week')], ['3', N_('Day')], ['4', N_('Timeline')], ['←', N_('Previous period')], ['→', N_('Next period')], ['.', N_('Jump to today')]]],
-  [N_('Timeline'), [['Tab', N_('Focus a bar')], ['c', N_('Connect to the task it blocks')], ['Shift+F10', N_('Bar menu')], ['d', N_('Pick a date…')], ['Esc', N_('Cancel connecting')]]],
+  [N_('Timeline'), [['Tab', N_('Focus a bar')], ['c', N_('Connect to the task it blocks')], ['Shift+F10', N_('Bar menu')], ['d', N_('Select a date…')], ['Esc', N_('Cancel connecting')]]],
   [N_('Go to'), [['g t', N_('Today')], ['g m', N_('Tomorrow')], ['g w', N_('Next 7 days')], ['g d', N_('Now doable')], ['g i', N_('Basket')], ['g a', N_('All')], ['g c', N_('Calendar')], ['g h', N_('Habits')], ['g f', N_('Focus timer')], ['g n', N_('Team chat')], ['g s', N_('Settings')]]],  /* 2.364.0 B (#3040): one name */  // 2.45.0 (#1509): g n = Messages
 ];
 // only what the switched-on modules offer (the Timeline group needs the timeline with dependencies)
@@ -478,7 +478,7 @@ function palDraw() {
     [ic('search', 's'), tr('Type to find tasks, projects, views, settings and actions')],
     [ic('hash', 's'), tr('#123 jumps to task 123')],
     [ic('plus', 's'), tr('Text + Enter creates a task: “Dentist tomorrow 3pm !high”')],
-    ...(ags.length ? [[ic('bot', 's'), tr('Ask {0}: type the question, then pick “Ask {0}”', ags[0].name)]] : [])].map(([i, t]) => `<div class="phint">${i}<span>${esc(t)}</span></div>`).join('')}</div>` : '';
+    ...(ags.length ? [[ic('bot', 's'), tr('Ask {0}: type the question, then select “Ask {0}”', ags[0].name)]] : [])].map(([i, t]) => `<div class="phint">${i}<span>${esc(t)}</span></div>`).join('')}</div>` : '';
   const hw = $('.phintw', el); if (hw) hw.innerHTML = hints;  // outside the listbox (only options in there)
   $('.plist', el).innerHTML = h || (hints ? '' : `<div class="pempty">${PAL.mode === 'ref' ? tr('Nothing found') : tr('Nothing found. Enter adds it as a new task.')}</div>`);
   $('.pqin', el).setAttribute('aria-activedescendant', PAL.items.length ? 'pi-' + PAL.i : '');

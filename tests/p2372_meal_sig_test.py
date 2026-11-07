@@ -7,7 +7,7 @@ freelancer-matrix: office
  - a staff member (office group "Staff": entertainment receipts on the level "own", no correspondence): the letters profile
    stays 403, GET / PUT / DELETE /api/office/meals/signature work on the person's OWN picture; my_sig follows it
  - another person never reaches it: a user_id in the body is ignored, Bob's GET shows Bob's (empty) picture
- - a member on "Previous access" (no entertainment receipts at all): 403; the group "Read only" (view): reads, PUT / DELETE 403
+ - a member on "Previous access" (no entertainment receipts at all): 403; the group "Read-only" (view): reads, PUT / DELETE 403
  - the staff member approves as host with the picture: on the PDF
  - snapshot: removing or replacing the profile picture later leaves the approved receipt's picture as it was; undoing the
    approval drops the snapshot (approved again without a picture: none)

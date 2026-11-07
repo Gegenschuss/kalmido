@@ -43,7 +43,7 @@ const type = (w, d, v) => { const q = d.querySelector('#wk-q'); q.value = v; q.d
   check(Object.values(id).every(Boolean), 'setup: the pages');
 
   // ================= #3292 the snippet under the name
-  const w = await boot({user: 'alice', hash: 'wiki', ls: {'tasks.wkRo': '"1"'}}), d = w.document;  // 2.554.0 (#4052): the read view = the lock "Read only"
+  const w = await boot({user: 'alice', hash: 'wiki', ls: {'tasks.wkRo': '"1"'}}), d = w.document;  // 2.554.0 (#4052): the read view = the lock "Read-only"
   await until(() => d.querySelector('#wk-q') && rowOf(d, 'Projekte'));
   type(w, d, 'kuhlschrank');
   const sn = await until(() => d.querySelector('#wks .wksnip'));

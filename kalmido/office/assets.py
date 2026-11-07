@@ -482,7 +482,7 @@ def ast_value_pdf():
     page.text(xs[3][0] - 4, y, pdf_money(s["new_value"], lg, cur), 8.6, True, align="r", width=xs[3][1])
     page.text(xs[4][0] - 4, y, pdf_money(s["current_value"], lg, cur), 8.6, True, align="r", width=xs[4][1])
     y += 26
-    page.para(PDF_L, y, tr("Current value = book value, unless you enter an own value.") + " " + d["disclaimer"], 8, PDF_CW, color=C_INK2)
+    page.para(PDF_L, y, tr("Current value = book value, unless you enter your own value.") + " " + d["disclaimer"], 8, PDF_CW, color=C_INK2)
     data = pdf_write(pages, {}, title=tr("Equipment value"), author=co)
     return Response(data, mimetype="application/pdf", headers={"Content-Disposition": 'attachment; filename="equipment-value.pdf"'})
 

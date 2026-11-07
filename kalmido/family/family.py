@@ -376,7 +376,7 @@ def rot_apply(c, f, cur, lid):
         return None
     r = json.loads(f["rotation"])
     if not collab_all():
-        return tr("Collaboration is turned off on this server (an admin can turn it on)")
+        return tr("Collaboration is switched off on this server (an admin can switch it on)")
     ppl = list_people(c, lid)
     agents = agent_ids(c)
     if any(x not in ppl or x in agents for x in r["who"]):

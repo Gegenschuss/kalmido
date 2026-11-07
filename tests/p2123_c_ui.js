@@ -53,7 +53,7 @@ const PDF = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 
   const PG2 = (await call('POST', '/api/wiki/pages', {space: SP, path: 'Scratch', body: ''})).id;
   check(PG > 0 && PG2 > 0, 'setup: the pages');
 
-  // ================= read mode as the admin (2.554.0 #4052: the lock "Read only", LS wkRo - a page one may write opens in the editor)
+  // ================= read mode as the admin (2.554.0 #4052: the lock "Read-only", LS wkRo - a page one may write opens in the editor)
   let w = await boot({user: 'alice', hash: 'wiki/' + PG, ls: {'tasks.wkSpace': JSON.stringify(SP), 'tasks.wkRo': '"1"'}}), d = w.document;
   const img = await until(() => d.querySelector('#wk-md img.wkimg'));
   check(img && img.getAttribute('src') === `/api/files/nodes/${PIC}/content`, '#2103: the picture of the file store shows (its address there, no copy)');
@@ -92,7 +92,7 @@ const PDF = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 
 
   // ================= the editor (another page): insert from the file store, suggestions
   w.location.hash = 'wiki/' + PG2;
-  // 2.554.0 (#4052): no Read / Edit switch: the read view above is the lock "Read only" of this device (LS wkRo); without it
+  // 2.554.0 (#4052): no Read / Edit switch: the read view above is the lock "Read-only" of this device (LS wkRo); without it
   // a computer writes at once (jsdom has no layout for CodeMirror: the plain field, the same as "Edit as Markdown")
   w.eval(`LS.del('wkRo')`);
   await until(() => w.eval('WK.pg?.id') === PG2 && d.querySelector('#wk-body'));

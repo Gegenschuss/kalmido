@@ -2,7 +2,7 @@
 // #927 Share > "Notifications for members" (owner): four templates as radio cards (44 px), Read only chosen for a new share,
 //      a tap saves (the folded line says which), Custom shows the events, a template per person; "Share folder" has the
 //      same block; members see who limited it (Share dialog + list menu > Notifications); the one-time question to owners
-//      of lists shared before 2.33 (bar with "Choose template" / "Keep as it is", answered for good)
+//      of lists shared before 2.33 (bar with "Select template" / "Keep as it is", answered for good)
 // #834 Administration > Server > "Your IP": the address the server sees + the warning (every sign-in here comes through the
 //      docker gateway, so the warning shows)
 const {execFileSync} = require('child_process');
@@ -53,7 +53,7 @@ const FEAT = 'cal,comments,collab,time,progress,agents,kanban,timeline,fields,fa
     const s1 = await ev(`(() => { const sec = document.querySelector('#sh-sec-ntf'); if (!sec) return null; sec.open = true; const rs = [...sec.querySelectorAll('input[name="ntf-tpl"]')];
       return {n: rs.length, vals: rs.map(x => x.value).join(), on: rs.find(x => x.checked)?.value, st: document.querySelector('#sh-st-ntf').textContent, h: Math.min(...[...sec.querySelectorAll('.ntfopt')].map(x => x.getBoundingClientRect().height)),
         ppl: [...sec.querySelectorAll('[data-ntfu]')].map(x => +x.dataset.ntfu).join(), cust: sec.querySelector('.ntfcust').hidden}; })()`);
-    check(s1 && s1.n === 4 && s1.vals === 'read,work,all,custom' && s1.on === 'read' && s1.st === 'Read only', '#927: four templates, a new share on Read only ' + JSON.stringify(s1));
+    check(s1 && s1.n === 4 && s1.vals === 'read,work,all,custom' && s1.on === 'read' && s1.st === 'Read-only', '#927: four templates, a new share on Read only ' + JSON.stringify(s1));
     check(s1 && s1.h >= 44 && s1.ppl === String(BOB) && s1.cust === true, '#927: cards >= 44 px, bob per person, events hidden ' + JSON.stringify(s1));
     await ev(`(() => { document.querySelector('#sh-sec-ntf input[value="work"]').click(); return 1; })()`); await sleep(1000);
     let j = await call('GET', `/api/lists/${L}/notify-template`);
@@ -75,7 +75,7 @@ const FEAT = 'cal,comments,collab,time,progress,agents,kanban,timeline,fields,fa
     // ================= "Share folder" has the same block
     await ev(`(() => { folderPeopleModal('Crew'); return 1; })()`); await sleep(1500);
     const s3 = await ev(`(() => { const sec = document.querySelector('#fp-sec-ntf'); if (!sec) return null; return {n: sec.querySelectorAll('input[name="ntf-tpl"]').length, st: document.querySelector('#fp-st-ntf').textContent}; })()`);
-    check(s3 && s3.n === 4 && s3.st === 'Read only', '#927: Share folder has the block ' + JSON.stringify(s3));
+    check(s3 && s3.n === 4 && s3.st === 'Read-only', '#927: Share folder has the block ' + JSON.stringify(s3));
     await ev(`(() => { const sec = document.querySelector('#fp-sec-ntf'); sec.open = true; sec.querySelector('input[value="work"]').click(); return 1; })()`); await sleep(1000);
     j = await call('GET', '/api/folders/notify-template?folder=Crew');
     check(j.own?.tpl === 'work', '#927: the folder template saved ' + JSON.stringify(j.own));
@@ -97,10 +97,10 @@ const FEAT = 'cal,comments,collab,time,progress,agents,kanban,timeline,fields,fa
     sql("INSERT INTO user_settings(user_id,key,value) VALUES(1,'notif_tpl_ask','1') ON CONFLICT (user_id,key) DO UPDATE SET value=excluded.value");
     await nav(B + 'static/icon.svg'); await nav(B + '#l/' + L); await ready(ev);
     const s5 = await ev(`(() => { const b = document.querySelector('#ntfask'); if (!b) return null; const bs = [...b.querySelectorAll('button')]; return {txt: bs.map(x => x.textContent).join('|'), h: Math.min(...bs.map(x => x.getBoundingClientRect().height)), w: b.getBoundingClientRect().right <= innerWidth + .5}; })()`);
-    check(s5 && s5.txt === 'Choose template|Keep as it is' && s5.h >= 44 && s5.w, '#927: the owner is asked once (bar, 44 px buttons) ' + JSON.stringify(s5));
+    check(s5 && s5.txt === 'Select template|Keep as it is' && s5.h >= 44 && s5.w, '#927: the owner is asked once (bar, 44 px buttons) ' + JSON.stringify(s5));
     await shot('p2330c-390-ask.png');
     await ev(`(() => { document.querySelector('#ntfask [data-act="ntfask-choose"]').click(); return 1; })()`); await sleep(1500);
-    check(await ev(`!!document.querySelector('#sh-sec-ntf[open]')`), '#927: "Choose template" opens the Share dialog at the notifications');
+    check(await ev(`!!document.querySelector('#sh-sec-ntf[open]')`), '#927: "Select template" opens the Share dialog at the notifications');
     await ev(`(() => { document.querySelectorAll('.modal, .mwrap').forEach(m => m.remove()); document.querySelector('#ntfask [data-act="ntfask-keep"]').click(); return 1; })()`); await sleep(1000);
     const st = await call('GET', '/api/state');
     check(!(await ev(`!!document.querySelector('#ntfask')`)) && st.notif_ask.length === 0, '#927: "Keep as it is" answers it for good');
@@ -111,11 +111,11 @@ const FEAT = 'cal,comments,collab,time,progress,agents,kanban,timeline,fields,fa
     await nav(B + '#l/' + L); await ready(ev);
     const s6 = await ev(`(() => { shareModal(${L}); const h = document.querySelector('.ntfhint'); const own = !!document.querySelector('#sh-sec-ntf'); document.querySelectorAll('.modal, .mwrap').forEach(m => m.remove()); return {h: h ? h.textContent.trim() : '', own}; })()`);
     // 2.152.2 (#2624): project instead of list
-    check(s6.h === 'Alice has limited the notifications for this project: Read only' && !s6.own, '#927: the member sees who limited it, without the owner block ' + JSON.stringify(s6));
+    check(s6.h === 'Alice has limited the notifications for this project: Read-only' && !s6.own, '#927: the member sees who limited it, without the owner block ' + JSON.stringify(s6));
     await ev(`(() => { bellMenu(document.querySelector('#top h1'), ${L}); return 1; })()`); await sleep(400);
     const s7 = await ev(`[...document.querySelectorAll('#pop [role="menuitem"]')].map(x => x.textContent.trim()).join('|')`);
     // 2.152.2 (#2624): project instead of list
-    check(s7.includes('Alice has limited the notifications for this project: Read only'), '#927: list menu > Notifications says it too ' + s7);
+    check(s7.includes('Alice has limited the notifications for this project: Read-only'), '#927: list menu > Notifications says it too ' + s7);
     await ev(`(() => { closePop(); return 1; })()`);
     check(!(await ev(`!!document.querySelector('#ntfask')`)), '#927: members are not asked');
   });

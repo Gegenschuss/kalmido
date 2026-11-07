@@ -189,7 +189,7 @@ SGA_NO_WRITE = tuple((m, re.compile(p)) for m, p in (
     # 2.538.0 (#4365, review F6): the next running number (a gap in the invoice series) is the bookkeeping's structure
     (None, r"/api/office/number-ranges/[^/]+"),
 ))
-SGA_BOOKING = N_("A support session books nothing in the office and deletes nothing for good: the client does that")
+SGA_BOOKING = N_("A support session books nothing in the office and deletes nothing permanently: the client does that")
 SGA_FOREIGN = N_("A support session puts nothing into an organisation that has not granted support access")
 
 

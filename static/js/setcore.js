@@ -41,7 +41,7 @@ async function wpEnable() {
   const perm = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
   if (perm !== 'granted') throw new Error(tr('Notifications are blocked for this site. Allow them in the browser or system settings.'));
   const {enabled, key} = await api('GET', '/api/push/vapid');
-  if (!enabled || !key) throw new Error(tr('Web Push is turned off on this server'));
+  if (!enabled || !key) throw new Error(tr('Web Push is switched off on this server'));
   const reg = await swReg();
   if (!reg) throw new Error(tr('The service worker is not ready yet, try again in a moment'));
   let sub = await reg.pushManager.getSubscription();

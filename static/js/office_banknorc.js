@@ -52,7 +52,7 @@ function bnr_row(t) {
   if (t.locked) return `<li class="bnkrow done" data-tx="${t.id}">${head}<p class="muted bnkmiss">${tr('This month is locked: nothing can be changed here.')}</p></li>`;
   const mem = BNR.rules && (t.iban || t.counterpart) ? `<button class="btn sm ghost" data-bnr="remember" data-id="${t.id}">${tr('No receipt needed – remember')}</button>` : '';
   const acts = `<div class="bnkacts">${out ? `<label class="btn sm">${ic('upload', 's')}<span>${tr('Upload receipt')}</span><input type="file" data-bnr-up="${t.id}" accept="${esc(typeof BK_ACCEPT === 'string' ? BK_ACCEPT : 'application/pdf,image/*')}" hidden></label>` : ''}
-    <button class="btn sm" data-bnr="pick" data-id="${t.id}" aria-expanded="${BNR.pick === t.id}">${ic('search', 's')}<span>${out ? tr('Choose receipt…') : tr('Choose invoice…')}</span></button>
+    <button class="btn sm" data-bnr="pick" data-id="${t.id}" aria-expanded="${BNR.pick === t.id}">${ic('search', 's')}<span>${out ? tr('Select receipt…') : tr('Select invoice…')}</span></button>
     <button class="btn sm ghost" data-bnr="noreceipt" data-id="${t.id}">${tr('No receipt needed')}</button>${mem}</div>`;
   return `<li class="bnkrow" data-tx="${t.id}" ${out ? `data-bnr-drop="${t.id}"` : ''}>${head}${acts}${BNR.pick === t.id ? bnr_pickHtml(t) : ''}</li>`;
 }
@@ -170,7 +170,7 @@ function bnr_settingsHtml(dis) {
   return `<h3>${tr('Bank bookings without a receipt')}</h3>
     ${ofcRowF('bnr-every', tr('Reminder'), `<select id="bnr-every" data-bnr-rem="every" ${dis}>${opt('off', tr('Off'))}${opt('week', tr('Weekly'))}${opt('month', tr('Monthly'))}</select>`, tr('a task while bookings without a receipt are there; done by itself once the list is empty'))}
     ${ppl.length > 1 && d.every !== 'off' ? ofcRowF('bnr-user', tr('Assignee|person'), `<select id="bnr-user" data-bnr-rem="user" ${dis}>${ppl.map(p => `<option value="${p.id}" ${p.id === (d.user || S.me?.id) ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select>`) : ''}
-    ${d.lost ? `<p class="aerr" role="alert">${tr('The person responsible is no longer an administrator. Please choose someone else.')}</p>` : ''}`;
+    ${d.lost ? `<p class="aerr" role="alert">${tr('The person responsible is no longer an administrator. Please select someone else.')}</p>` : ''}`;
 }
 document.addEventListener('change', async e => {
   const el = /** @type {any} */ (e.target).closest?.('[data-bnr-rem]'); if (!el) return;

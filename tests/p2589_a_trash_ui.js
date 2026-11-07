@@ -1,8 +1,8 @@
 // 2.589.0 part A UI test (#4875): the trash of the file store
 // kalmido-suite: fresh
 // Own container (start.sh; P2589A_NOSTART=1: the container runs already), jsdom. Invented names only.
-// - a row of the trash offers "Delete for good" next to "Restore"; it asks first, then the row is gone for good
-// - Select works in the trash: the bar offers Restore and "Delete for good" (each asks / ONE undo step for Restore)
+// - a row of the trash offers "Delete permanently" next to "Restore"; it asks first, then the row is gone for good
+// - Select works in the trash: the bar offers Restore and "Delete permanently" (each asks / ONE undo step for Restore)
 // - "Empty trash" on top asks with the number of files and folders and "cannot be undone"; No keeps everything, Yes
 //   empties the trash
 const {execFileSync} = require('child_process');
@@ -47,7 +47,7 @@ const gone = async id => (await call('GET', `/api/files/nodes/${id}`)).status ==
 
   // ================= one row for good
   const row = d.querySelector(`.abrow[data-abid="${F1}"]`);
-  check(row?.querySelector('[data-ab="restore"]') && row?.querySelector('[data-ab="purge"]'), 'the row offers Restore and "Delete for good"');
+  check(row?.querySelector('[data-ab="restore"]') && row?.querySelector('[data-ab="purge"]'), 'the row offers Restore and "Delete permanently"');
   check(d.querySelector('[data-ab="trash-empty"]'), 'the trash offers "Empty trash" on top');
   row?.querySelector('[data-ab="purge"]').click();
   check(await until(() => asked.length === 1), 'it asks first');
@@ -55,7 +55,7 @@ const gone = async id => (await call('GET', `/api/files/nodes/${id}`)).status ==
   check(await until(async () => await gone(F1), 60), 'the file is deleted for good');
   check(await until(() => !d.querySelector(`.abrow[data-abid="${F1}"]`)), 'the row is gone');
 
-  // ================= Select in the trash: Restore (ONE undo step) and "Delete for good"
+  // ================= Select in the trash: Restore (ONE undo step) and "Delete permanently"
   const mode = d.querySelector('[data-absel="mode"]');
   check(mode, 'the trash offers Select');
   mode?.click();
@@ -64,7 +64,7 @@ const gone = async id => (await call('GET', `/api/files/nodes/${id}`)).status ==
   tick(F2);
   let bar = await until(() => /1 selected/.test(d.querySelector('#ab-sbar')?.textContent || '') && d.querySelector('#ab-sbar'));
   check(bar && bar.querySelector('[data-absel="restore"]') && bar.querySelector('[data-absel="purge"]') && !bar.querySelector('[data-absel="move"]'),
-    'the bar offers Restore and "Delete for good" (no Move) ' + (bar?.textContent || '').replace(/\s+/g, ' '));
+    'the bar offers Restore and "Delete permanently" (no Move) ' + (bar?.textContent || '').replace(/\s+/g, ' '));
   const h0 = w.eval('HIST.undo.length');
   bar?.querySelector('[data-absel="restore"]').click();
   check(await until(async () => !(await trashIds()).includes(F2) && (await call('GET', `/api/files/nodes/${F2}`)).in_trash === false, 60), 'the chosen file is restored');
@@ -76,7 +76,7 @@ const gone = async id => (await call('GET', `/api/files/nodes/${id}`)).status ==
   bar = await until(() => /1 selected/.test(d.querySelector('#ab-sbar')?.textContent || '') && d.querySelector('#ab-sbar'));
   bar?.querySelector('[data-absel="purge"]').click();
   check(await until(() => asked.length === 2), 'the bar asks before deleting for good');
-  check(/Delete 1 item for good\?/.test(asked[1] || '') && /1 file/.test(asked[1] || ''), 'the question counts the file ' + asked[1]);
+  check(/Delete 1 item permanently\?/.test(asked[1] || '') && /1 file/.test(asked[1] || ''), 'the question counts the file ' + asked[1]);
   check(await until(async () => await gone(F3), 60), 'the chosen file is deleted for good');
 
   // ================= Empty trash: No keeps everything, Yes empties it

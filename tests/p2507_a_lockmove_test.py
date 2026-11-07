@@ -192,7 +192,7 @@ enc = (j.get("preview") or {}).get("encrypted") or {}
 check(enc.get("keys") == "take" and enc.get("locked_folders") == 1 and enc.get("locked_folders_lost") == 0, f"preview: the folder comes along {enc}")
 j = run(Gi, iid)
 check(j.get("state") == "done", f"import into gina {j.get('state')} {j.get('error')}")
-check("Locked folders taken over" in warns(j) and "stays out" not in warns(j), "result: it says the folder came along " + warns(j))
+check("Locked folders imported" in warns(j) and "stays out" not in warns(j), "result: it says the folder came along " + warns(j))
 G_SAFE = one("SELECT id FROM fs_nodes WHERE owner_id=? AND name='Vertraege' AND deleted_at IS NULL", (GINA,))
 check(G_SAFE and G_SAFE != SAFE, "gina has the folder under a new id")
 row = dbx("SELECT e2e, e2e_gen, e2e_by, aad_folder, org_id FROM fs_locks WHERE node_id=?", (G_SAFE,))

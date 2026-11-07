@@ -3,7 +3,7 @@
 //       month before marked better / worse, small bars per month), the period 3 / 6 / 12 switches the bars; the CSV import
 //       names a recognised bank layout and takes a CAMT file without the column step
 // #2136 a device's task panel offers "Add to the office equipment" (dialog: name with the model, net price), then shows the
-//       link; the equipment editor of the office shows the link back and offers "Take over as a private device"
+//       link; the equipment editor of the office shows the link back and offers "Add as a private device"
 // Firefox 390 touch: the comparison fits the phone (no horizontal scrolling), screenshot. Screenshots with P2140B_SHOTS=<dir>.
 // freelancer-matrix: n/a - nur Oberflaeche (die Person ohne Organisation prueft p2140_b_api_test.py)
 const {execFileSync} = require('child_process');
@@ -106,7 +106,7 @@ const PREV = (() => { const d = new Date(NOW.getFullYear(), NOW.getMonth() - 1, 
   d.querySelector('.modal #ast-link')?.closest('.modal')?.remove();
   click(w, d.querySelector(`[data-ofc="open"][data-kind="equipment"][data-id="${eq2.id}"]`));
   const back = await until(() => d.querySelector('.modal #ast-link [data-ast="dl-take"]'), 60);
-  check(back, '#2136: unlinked equipment offers "Take over as a private device"');
+  check(back, '#2136: unlinked equipment offers "Add as a private device"');
   click(w, back);
   await until(() => d.querySelector('.modal #ast-link .dllink'), 60);
   const l2 = await call('GET', `/api/office/equipment/${eq2.id}/link`);

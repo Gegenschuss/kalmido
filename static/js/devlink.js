@@ -83,7 +83,7 @@ document.addEventListener('click', async e => {
   if (b.dataset.dl === 'to-office') dlToOffice(tid);
   else if (b.dataset.dl === 'open-eq') dlOpenEquip(tid);
   else if (b.dataset.dl === 'pull') {
-    if (!await askConfirm(tr('Update from the office equipment?'), tr('Name, serial number, purchase date and price are taken over from there.'), {ok: tr('Update')})) return;
+    if (!await askConfirm(tr('Update from the office equipment?'), tr('Name, serial number, purchase date and price are copied from there.'), {ok: tr('Update')})) return;
     b.disabled = true;
     try { await rawFetch('POST', `/api/life/device-links/${lid}/pull`, {into: 'device'}); toast(tr('Updated')); } catch (er) { toast(er.message || tr('unknown')); }
     b.disabled = false; dlLoad(tid);

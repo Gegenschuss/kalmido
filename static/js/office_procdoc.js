@@ -40,7 +40,7 @@ function pdHtml() {
   if (!PD.data) { if (!PD.loadingT) PD.loadingT = setTimeout(() => { PD.loadingT = 0; pdLoad(); }, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
   const d = PD.data, q = PD.view ? `?version=${PD.view}` : '';
   const opts = [['0', tr('Current state')], ...(PD.versions || []).map(v => [String(v.version), tr('Version {0} from {1}', v.version, pdDay(v.created_at)) + (v.created_by ? ` · ${v.created_by}` : '')])];
-  const state = PD.view ? tr('Version {0} from {1}, read only', d.viewing, pdDay(d.saved_at))
+  const state = PD.view ? tr('Version {0} from {1}, read-only', d.viewing, pdDay(d.saved_at))
     : d.version ? tr('Last saved: version {0} from {1}', d.version, pdDay(d.saved_at)) + (d.saved_by ? ` · ${d.saved_by}` : '') : tr('No version saved yet');
   const gaps = PD.view ? 0 : d.sections.reduce((n, s) => n + s.fields.filter(f => !(f.key in PD.own ? PD.own[f.key] : f.own) && (f.need || (f.auto || '').includes(d.gap_marker))).length, 0);
   const head = `<div class="ofcbar pd-bar"><a class="btn sm ghost" href="#office/books">${ic('back', 's')}<span>${tr('Bookkeeping')}</span></a><span class="spacer"></span>

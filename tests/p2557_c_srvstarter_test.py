@@ -90,7 +90,7 @@ for k in ("briefing", "tidy", "docs", "meetings", "followup"):
     ps, rs = plans(F, AG[k]), rules(F, AG[k])
     if k == "briefing":
         check(len(ps) == 1 and ps[0]["freq"] == "daily" and ps[0]["time"] == "07:30" and ps[0]["action"] == "chat"
-              and ps[0]["enabled"] and ps[0]["title"] == "Morning briefing" and "read only" in ps[0]["prompt"] and not rs,
+              and ps[0]["enabled"] and ps[0]["title"] == "Morning briefing" and "read-only" in ps[0]["prompt"] and not rs,
               f"briefing: one plan daily 07:30 in the chat, read only {ps} {rs}")
     elif k == "tidy":
         check(len(ps) == 1 and ps[0]["action"] == "triage" and ps[0]["time"] == "07:00" and ps[0]["freq"] == "daily"

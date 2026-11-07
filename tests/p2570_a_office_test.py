@@ -11,7 +11,7 @@ tenant-matrix: office
  - the person without an organisation (tests/freelancer_fixture.py) in the personal office does the same
  - another organisation's admin: the history answers like the save route does (404), an org member ("Previous access"):
    denied where saving is denied (the same answer as an empty save)
- - office groups: "Read only" sees a trip but not its history (saving needs "edit"); "Staff" (level own) reads the history
+ - office groups: "Read-only" sees a trip but not its history (saving needs "edit"); "Staff" (level own) reads the history
    of an own trip, somebody else's is 404; "Bookkeeping" (travel edit) reads a trip's history but not a vehicle's (the
    vehicles' save needs "manage")
  - 2.570.0 (#4783 review F1): read-only / accounting / guest get no history (403 like saving), also inside an office group

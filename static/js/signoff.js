@@ -3,11 +3,11 @@
 // Public link (acceptance of the project / a section / a milestone). The customer decides on a server page without the app;
 // here: create, copy, stop, and the protocol (who, when, address, device).
 const sg_note = () => tr('Simple electronic signature: usually enough to accept a quotation or confirm an acceptance; not for contracts that the law requires in written form (they need a qualified signature). This is not legal advice.');
-const sg_stTxt = s => ({open: tr('Waiting for the client'), accepted: tr('Accepted|document'), declined: tr('Declined')})[s] || s;
+const sg_stTxt = s => ({open: tr('Waiting for the client'), accepted: tr('Accepted|document'), declined: tr('Rejected')})[s] || s;
 function sg_row(x) {
-  const st = x.revoked_at && x.state === 'open' ? tr('Turned off') : !x.live && x.state === 'open' ? tr('Expired') : sg_stTxt(x.state);
+  const st = x.revoked_at && x.state === 'open' ? tr('Switched off') : !x.live && x.state === 'open' ? tr('Expired') : sg_stTxt(x.state);
   const proto = x.state !== 'open' ? `<div class="sgproto">${esc([x.signer_name, x.signer_email].filter(Boolean).join(' · '))}<br>${esc(fmtWhen(x.signed_at))} · ${esc(tr('IP address {0}', x.ip || '?'))}${x.reason ? `<br>${esc(tr('Reason: {0}', x.reason))}` : ''}<details class="sgproof"><summary>${tr('Proof')}</summary><small class="muted">${esc(x.user_agent || '')}<br>SHA-256 ${esc(x.doc_hash || '')}</small></details></div>` : '';  // 2.298.0 A2 (#3186): device and checksum folded into "Proof"
-  const live = x.live && x.url ? `<div class="row icalrow"><input readonly value="${esc(x.url)}" aria-label="${esc(tr('Approval link'))}" data-sgurl="${x.id}"><button type="button" class="btn sm pri" data-sg="copy" data-id="${x.id}">${ic('copy', 's')} ${tr('Copy')}</button><button type="button" class="btn sm danger" data-sg="stop" data-id="${x.id}">${tr('Turn off')}</button></div>` : '';
+  const live = x.live && x.url ? `<div class="row icalrow"><input readonly value="${esc(x.url)}" aria-label="${esc(tr('Approval link'))}" data-sgurl="${x.id}"><button type="button" class="btn sm pri" data-sg="copy" data-id="${x.id}">${ic('copy', 's')} ${tr('Copy')}</button><button type="button" class="btn sm danger" data-sg="stop" data-id="${x.id}">${tr('Switch off')}</button></div>` : '';
   return `<li class="sgrow st-${esc(x.state)}"><div class="sghead"><b>${esc(st)}</b>${x.title ? ` <span class="muted">${esc(x.title)}</span>` : ''}<small class="muted"> · ${esc(fmtWhen(x.created_at))}</small></div>${live}${proto}</li>`;
 }
 function sg_draw(box, j, list) {
@@ -20,7 +20,7 @@ function sg_draw(box, j, list) {
 }
 // the quotation (office_docs.js draws the placeholder for sent and decided quotations)
 const SG_ACTIONS = {signoff_link: N_('approval link created'), signoff_revoke: N_('approval link stopped'), signoff_accepted: N_('accepted by the client'),
-  signoff_declined: N_('declined by the client'), signoff_delete: N_('approval record of a deleted video deleted')};
+  signoff_declined: N_('rejected by the client'), signoff_delete: N_('approval record of a deleted video deleted')};
 function sg_box(d) {
   if (typeof OFD_ACTIONS === 'object') Object.assign(OFD_ACTIONS, SG_ACTIONS);  // the office log's words (office_docs.js loads later)
   if (d.kind !== 'offer' || d.status === 'draft') return '';
@@ -42,7 +42,7 @@ document.addEventListener('click', async e => {
   const did = +box.dataset.doc || 0, lid = +box.dataset.lid || 0, a = b.dataset.sg;
   const err = box.querySelector('[data-sgerr]'), show = m => { if (err) { err.textContent = m || ''; err.hidden = !m; } };
   if (a === 'copy') { const i = box.querySelector(`[data-sgurl="${b.dataset.id}"]`); try { await navigator.clipboard.writeText(i.value); toast(tr('Link copied')); } catch { i.focus(); i.select(); toast(tr('Copy the selected link')); } return; }
-  if (a === 'stop' && !await askConfirm(tr('Stop the approval link?'), tr('It stops working at once.'), {ok: tr('Turn off'), danger: true})) return;
+  if (a === 'stop' && !await askConfirm(tr('Stop the approval link?'), tr('It stops working at once.'), {ok: tr('Switch off'), danger: true})) return;
   b.disabled = true; show('');
   try {
     if (a === 'new') {

@@ -2,7 +2,7 @@
 //   the calendar bar's "Find a date" opens the list (empty), "New poll" the form (three proposed times, + a time, a time
 //   removed), Create makes the poll (ONE undo step: undo = trash, redo = back), the poll window shows the link + copy + QR;
 //   two visitors vote on the public page (fetch, with its stamp), the window shows the counts, the names and the best time,
-//   "Choose this time" opens the calendar dialog and makes ONE event (undo = reopen, the event goes to the trash);
+//   "Select this time" opens the calendar dialog and makes ONE event (undo = reopen, the event goes to the trash);
 //   the task's "Find a date" and the client menu's "Find a date…" exist; a person without an organisation sees no workspace field.
 // Firefox 402 x 844 touch: the public page (open and closed) and the app's poll window without horizontal scrolling, the
 // answers >= 44 px high; screenshots with P298A_SHOTS. P298A_NOSTART=1 = the server already runs.

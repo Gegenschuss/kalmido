@@ -302,7 +302,7 @@ def shfm_rules_clean(c, sid, v, kept=()):
             raise BadInput(tr("Enter both values for the rule"))
         color, fill = r.get("color") or "", r.get("fill") or ""
         if (color and color not in SHFM_PALETTE) or (fill and fill not in SHFM_PALETTE) or not (color or fill):
-            raise BadInput(tr("Choose a text colour or a fill for the rule"))
+            raise BadInput(tr("Select a text colour or a fill for the rule"))
         rid = r.get("id") if isinstance(r.get("id"), str) and re.fullmatch(r"[a-z0-9]{1,16}", r.get("id") or "") else secrets.token_hex(4)
         x = {"id": rid, "cols": list(dict.fromkeys(cs)), "rows": list(rs) if rs else None, "op": op, "color": color, "fill": fill}
         if op in ("gt", "lt", "eq", "contains", "between"):

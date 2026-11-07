@@ -77,7 +77,7 @@ function tpPartsHtml(d, adm) {
     ${on ? '' : `<label class="chkl tpprint"><input type="checkbox" data-tp="print" data-pid="${p.id}" ${p.print ? 'checked' : ''}> ${tr('Print')}</label>`}
     <span class="ofdmv">${rowd_arrows(`<button type="button" class="ib" data-ofd="tp-up" data-pid="${p.id}" ${i === 0 ? 'disabled' : ''} aria-label="${esc(tr('Move up'))}">${ic('up', 's')}</button><button type="button" class="ib" data-ofd="tp-down" data-pid="${p.id}" ${i === ps.length - 1 ? 'disabled' : ''} aria-label="${esc(tr('Move down'))}">${ic('down', 's')}</button>`)}<button type="button" class="ib" data-ofd="tp-del" data-pid="${p.id}" aria-label="${esc(tr('Remove'))}">${ic('x', 's')}</button></span>${on ? `<div class="tpfbox" data-pid="${p.id}">${tpPartEditorHtml(d, adm, p.id)}</div>` : ''}</li>`; }).join('');
   const add = `<div class="ofdadd"><button type="button" class="btn sm" data-ofd="tp-add" data-kind="items">${ic('plus', 's')}<span>${tr('Add part')}</span></button>${d.parts_shoot && OFC.info?.industry?.length ? tpPackBtns(OFC.info.industry) : ''}</div>`;
-  return ofdSec('parts', tr('Parts'), `${ps.length ? `<ul class="ofdits tplist" role="list">${rows}</ul>` : `<p class="muted">${tr('A part is an own page of the quotation (e.g. a module or a shooting day). The title page lists it with a quantity.')}</p>`}${add}`,
+  return ofdSec('parts', tr('Parts'), `${ps.length ? `<ul class="ofdits tplist" role="list">${rows}</ul>` : `<p class="muted">${tr('A part is a separate page of the quotation (e.g. a module or a shooting day). The title page lists it with a quantity.')}</p>`}${add}`,
     ps.length ? `<span class="c muted">${ps.length}</span>` : '');
 }
 
@@ -200,7 +200,7 @@ function tpInvoiceDialog(d) {
 }
 // the office settings: the preset for invoices from quotations with parts
 function tpSettingsHtml(s, dis) {
-  return `${ofcRowF('os-parts-inv', tr('Invoice from a quotation with parts'), ofcSel('os-parts-inv', s.parts_invoice_mode || 'full', [['full', tr('like the quotation')], ['title', tr('title page only')], ['summary', tr('one position per VAT rate')]]), tr('preset; chosen again when the invoice is created'))}
+  return `${ofcRowF('os-parts-inv', tr('Invoice from a quotation with parts'), ofcSel('os-parts-inv', s.parts_invoice_mode || 'full', [['full', tr('like the quotation')], ['title', tr('title page only')], ['summary', tr('one position per VAT rate')]]), tr('preset; selected again when the invoice is created'))}
     ${ofcRowF('os-parts-t-de', tr('Title of the summary (German)'), `<input id="os-parts-t-de" value="${esc(s.parts_summary_title_de ?? '')}" placeholder="${esc(tr('Services|document'))}" maxlength="300" ${dis}>`)}
     ${ofcRowF('os-parts-t-en', tr('Title of the summary (English)'), `<input id="os-parts-t-en" value="${esc(s.parts_summary_title_en ?? '')}" placeholder="${esc(tr('Services|document'))}" maxlength="300" ${dis}>`)}`;
 }

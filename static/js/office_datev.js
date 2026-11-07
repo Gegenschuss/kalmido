@@ -4,7 +4,7 @@
 'use strict';
 
 const DX_CASES = [['standard', N_('Revenue at the standard rate')], ['reduced', N_('Revenue at the reduced rate')], ['exempt', N_('Tax-exempt revenue')],
-  ['reverse', N_('Reverse charge (services in the EU)')], ['abroad', N_('Not taxable domestically')], ['small', N_('Small business (no VAT)')],
+  ['reverse', N_('Reverse charge (services in the EU)')], ['abroad', N_('Not taxable domestically')], ['small', N_('Small business: no VAT')],
   // 2.355.0 C (#2840): the cash discounts granted
   ['skonto_standard', N_('Cash discount at the standard rate')], ['skonto_reduced', N_('Cash discount at the reduced rate')], ['skonto_other', N_('Cash discount without VAT')],
   // 2.355.0 C (#2844): reverse = services to EU businesses (8336); section 13b at home, goods to the EU, exports

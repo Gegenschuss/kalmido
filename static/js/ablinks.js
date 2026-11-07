@@ -35,7 +35,7 @@ function xl_rowHtml(l) {
   return `<div class="xl-row${l.expired ? ' xl-dead' : ''}" data-xlid="${l.id}">${ic(l.has_password ? 'lock' : 'link', 's')}<span class="xl-main"><span class="xl-name">${esc(l.label || tr('Link'))}</span><small class="muted">${esc(meta)}</small></span>
     <button type="button" class="iconbtn" data-xl="copy" title="${esc(tr('Copy'))}" aria-label="${esc(tr('Copy the link {0}', l.label || ''))}">${ic('copy', 's')}</button>
     <button type="button" class="iconbtn" data-xl="regen" title="${esc(tr('New link'))}" aria-label="${esc(tr('New link'))}">${ic('key', 's')}</button>
-    <button type="button" class="iconbtn" data-xl="revoke" title="${esc(tr('Turn off'))}" aria-label="${esc(tr('Turn off'))}">${ic('x', 's')}</button></div>`;
+    <button type="button" class="iconbtn" data-xl="revoke" title="${esc(tr('Switch off'))}" aria-label="${esc(tr('Switch off'))}">${ic('x', 's')}</button></div>`;
 }
 function xl_draw(box, n, j) {
   if (!box.isConnected) return;
@@ -105,7 +105,7 @@ async function xl_newDlg(nid, done, std) {
     if (b.dataset.xn === 'copy') { const i = $('#xl-url', md); try { await navigator.clipboard.writeText(i.value); toast(tr('Link copied')); } catch { i.focus(); i.select(); toast(tr('Copy the selected link')); } return; }
     const err = $('#xl-err', md), show = m => { err.textContent = m || ''; err.hidden = !m; };
     let exp = $('#xl-exp', md).value;
-    if (exp === 'date') { exp = $('#xl-day', md).value; if (!exp) { show(tr('Please choose a date')); return; } }
+    if (exp === 'date') { exp = $('#xl-day', md).value; if (!exp) { show(tr('Please select a date')); return; } }
     const pw = $('#xl-pw', md).value;
     if (pw && pw.length < 4) { show(tr('Password: at least {0} characters', 4)); return; }
     b.disabled = true; show('');

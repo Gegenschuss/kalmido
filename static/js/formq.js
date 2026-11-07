@@ -45,7 +45,7 @@ function fq_ckRowHtml(f) {
   const l = listById(f.list_id), org = l?.org_id || null;
   const cs = (S.clients || []).filter(c => !c.archived && (c.org_id || null) === org);
   if (!cs.length) return '';
-  return `<div class="row fq-ck"><label for="fq-ckc">${tr('Link for a client')}</label><select id="fq-ckc"><option value="">${tr('Choose a client')}</option>${cs.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select>
+  return `<div class="row fq-ck"><label for="fq-ckc">${tr('Link for a client')}</label><select id="fq-ckc"><option value="">${tr('Select a client')}</option>${cs.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select>
       <button type="button" class="btn sm" data-fq="cklink">${ic('copy', 's')} ${tr('Copy link')}</button></div>
       <p class="muted mhint">${tr('What is sent through this link lands with the client, also without a known e-mail address.')}</p>`;
 }
@@ -94,7 +94,7 @@ function fq_bind(ed, f) {
     } else if (k === 'entries') fq_entriesOpen(f);
     else if (k === 'cklink') {  // 2.102.0 C (#2201)
       const cid = +$('#fq-ckc', ed).value;
-      if (!cid) { $('#fq-ckc', ed).focus(); toast(tr('Choose a client')); return; }
+      if (!cid) { $('#fq-ckc', ed).focus(); toast(tr('Select a client')); return; }
       rawFetch('GET', `/api/forms/${f.id}/client-link?client=${cid}`).then(j => fq_ckCopy(j.url), x => toast(x.message || tr('Only available online.')));
     }
   });

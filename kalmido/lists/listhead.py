@@ -89,7 +89,7 @@ def o3c_head_process(raw):
     try:
         im = Image.open(io.BytesIO(raw))  # reads the header only
         if im.format not in ("JPEG", "PNG", "WEBP"):
-            raise BadInput(tr("Please choose a JPEG, PNG or WebP picture"))
+            raise BadInput(tr("Please select a JPEG, PNG or WebP picture"))
         if im.width * im.height > 20_000_000:  # 2.83.0 review: a 1600 x 800 strip needs no more (PNG / WebP decode in full)
             raise BadInput(tr("This picture cannot be read"))
         if im.format == "JPEG":

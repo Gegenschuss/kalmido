@@ -922,7 +922,7 @@ def dt_refs(c, oid, b, cur=None):
     out = {}
     cid = b.get("client_id") if "client_id" in b else (cur["client_id"] if cur else None)
     if cid in (None, "", 0):
-        raise BadInput(tr("Choose a client"))
+        raise BadInput(tr("Select a client"))
     cl = dt_client(c, oid, cid)
     pb_cl_live(c, oid, cl["id"], cur["client_id"] if cur else None)  # 2.370.4 (#3089) N2
     out["client_id"] = cl["id"]
@@ -1218,7 +1218,7 @@ def dt_signoff_new(gid):
     if r["status"] != "final" or r["archived"] or not r["sign"]:
         return err(tr("Signature links exist for finished documents that may be signed"), 409)
     if not public_links_on(c, "signoff"):
-        return err(tr("Public links are turned off on this server"), 409)
+        return err(tr("Public links are switched off on this server"), 409)
     b = body()
     try:
         exp = sig_expiry((b if isinstance(b, dict) else {}).get("expires"))

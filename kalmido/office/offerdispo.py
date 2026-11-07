@@ -224,7 +224,7 @@ def odp_apply(c, oid, uid, r, root, lid, pick, dates):
             continue
         start = dates.get(d["key"]) or _day(d["start"])
         if start is None:
-            raise BadInput(tr("Please choose the date of the shoot day “{0}”", d["title"]))
+            raise BadInput(tr("Please select the date of the shoot day “{0}”", d["title"]))
         a, e = start.isoformat(), (start + timedelta(days=d["days"] - 1)).isoformat()
         if d["state"] == "new":
             job = secrets.token_hex(8)

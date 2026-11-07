@@ -61,7 +61,7 @@ function wsh_dlg(p, folder) {
   const target = folder ? wsh_dir(p) : p.path, sp = p.space;
   const title = folder ? tr('Share folder “{0}”|wiki', wsh_baseName(target)) : tr('Share “{0}”|wiki', wsh_baseName(p.path));
   const md = modal(`<div class="lhdr"><h3>${esc(title)}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${esc(tr('Close'))}" title="${esc(tr('Close'))}">${ic('x')}</button></div>
-    <div class="shint lhint keep">${esc(folder ? tr('Read only: every page in this folder, also pages added later.') : tr('Read only: only this page.'))}</div>
+    <div class="shint lhint keep">${esc(folder ? tr('Read-only: every page in this folder, also pages added later.') : tr('Read-only: only this page.'))}</div>
     <div class="wshbox"></div>
     <div class="foot"><span class="spacer"></span><button class="btn pri" data-m="close">${tr('Done')}</button></div>`);
   md.classList.add('shmodal', 'wshmodal');
@@ -87,12 +87,12 @@ function wsh_fill(md, tgt, sp, folder, legacy) {
     if (j.locked) { box.innerHTML = `<div class="shint keep" role="note">${ic('lock', 's')} ${esc(tr('This workspace is encrypted in the browser: the server cannot show its pages to others, so they cannot be shared.'))}</div>`; return; }
     const ppl = j.shares.filter(s => s.kind === 'person'), links = j.shares.filter(s => s.kind === 'link');
     const cand = legacy ? [] : (users || []).filter(u => !ppl.some(s => s.direct && s.user?.id === u.id));  // 2.200.0 B (#2747): people are chosen above, by e-mail address here
-    const people = j.person ? `<div class="members" id="wsh-ppl" aria-labelledby="wsh-ppl-h">${ppl.length ? ppl.map(s => `<div class="mrow"><span class="n"><b>${esc(s.user?.name || '?')}</b>${via(s)}<small class="muted">${tr('Read only')}${exp(s) ? ' · ' + exp(s) : ''}${img(s)}</small></span>${s.direct ? `<button type="button" class="iconbtn" data-wsh="end" data-id="${s.id}" aria-label="${esc(tr('Stop sharing with {0}|wiki', s.user?.name || '?'))}" title="${esc(tr('Stop sharing|wiki'))}">${ic('x', 's')}</button>` : ''}</div>`).join('') : `<div class="muted mhint">${tr('Not shared with anyone yet.')}</div>`}</div>
-      <div class="row shmail">${cand.length ? `<select id="wsh-user" aria-label="${esc(tr('Person'))}"><option value="">${tr('Choose a person…')}</option>${cand.map(u => `<option value="${u.id}">${esc(u.display_name || u.username || '?')}</option>`).join('')}</select>` : ''}<input id="wsh-email" type="email" autocomplete="off" placeholder="${esc(tr('Share by e-mail address'))}" aria-label="${esc(tr('Share by e-mail address'))}"><button type="button" class="btn sm" data-wsh="person">${ic('plus', 's')} ${tr('Add')}</button></div>`
+    const people = j.person ? `<div class="members" id="wsh-ppl" aria-labelledby="wsh-ppl-h">${ppl.length ? ppl.map(s => `<div class="mrow"><span class="n"><b>${esc(s.user?.name || '?')}</b>${via(s)}<small class="muted">${tr('Read-only')}${exp(s) ? ' · ' + exp(s) : ''}${img(s)}</small></span>${s.direct ? `<button type="button" class="iconbtn" data-wsh="end" data-id="${s.id}" aria-label="${esc(tr('Stop sharing with {0}|wiki', s.user?.name || '?'))}" title="${esc(tr('Stop sharing|wiki'))}">${ic('x', 's')}</button>` : ''}</div>`).join('') : `<div class="muted mhint">${tr('Not shared with anyone yet.')}</div>`}</div>
+      <div class="row shmail">${cand.length ? `<select id="wsh-user" aria-label="${esc(tr('Person'))}"><option value="">${tr('Select a person…')}</option>${cand.map(u => `<option value="${u.id}">${esc(u.display_name || u.username || '?')}</option>`).join('')}</select>` : ''}<input id="wsh-email" type="email" autocomplete="off" placeholder="${esc(tr('Share by e-mail address'))}" aria-label="${esc(tr('Share by e-mail address'))}"><button type="button" class="btn sm" data-wsh="person">${ic('plus', 's')} ${tr('Add')}</button></div>`
       : legacy ? '' : `<div class="shint keep">${esc(tr('Every member of the organisation reads these pages already. For people outside it, use a public link.'))}</div>`;
-    const pub = !j.enabled ? `<div class="shint keep">${esc(tr('Public links are turned off on this server'))}</div>`
+    const pub = !j.enabled ? `<div class="shint keep">${esc(tr('Public links are switched off on this server'))}</div>`
       : `${links.map(s => `<div class="wshlink"><div class="row icalrow"><input readonly value="${esc(s.url)}" data-wsh-url="${s.id}" aria-label="${esc(tr('Public link'))}"><button type="button" class="btn sm pri" data-wsh="copy" data-id="${s.id}"${s.ended ? ' disabled' : ''}>${ic('copy', 's')} ${tr('Copy')}</button></div>
-          <div class="shint">${via(s)}${exp(s) ? exp(s) + ' · ' : ''}${esc(trn('opened {0} time', 'opened {0} times', s.views))}${s.last_used_at ? ' · ' + esc(tr('last {0}', relTime(s.last_used_at))) : ''}${img(s)}${s.direct ? ` <button type="button" class="btn sm danger" data-wsh="end" data-id="${s.id}">${tr('Turn off')}</button>` : ''}</div></div>`).join('')}
+          <div class="shint">${via(s)}${exp(s) ? exp(s) + ' · ' : ''}${esc(trn('opened {0} time', 'opened {0} times', s.views))}${s.last_used_at ? ' · ' + esc(tr('last {0}', relTime(s.last_used_at))) : ''}${img(s)}${s.direct ? ` <button type="button" class="btn sm danger" data-wsh="end" data-id="${s.id}">${tr('Switch off')}</button>` : ''}</div></div>`).join('')}
         ${links.length ? '' : `<div class="shint keep">${esc(tr('People without an account can read it through a secret link: only what you share here, nothing else of your pages.'))}</div>`}
         <div class="row"><label for="wsh-exp">${tr('Valid until')}</label>${dateIn('wsh-exp', '', {min: today(), label: tr('Valid until'), empty: tr('no expiry')})}</div>
         <div class="row"><button type="button" class="btn sm${links.some(s => s.direct && !s.ended) ? '' : ' pri'}" data-wsh="link">${ic('link', 's')} ${tr(links.some(s => s.direct && !s.ended) ? N_('Another public link') : N_('Create public link'))}</button></div>`;
@@ -128,7 +128,7 @@ function wsh_fill(md, tgt, sp, folder, legacy) {
         try { await navigator.clipboard.writeText(s.url); toast(tr('Link copied')); } catch { /* the field shows it */ }
       } else if (a === 'person') {
         const uid = +(wsh$('#wsh-user', md)?.value || 0), em = (wsh$('#wsh-email', md)?.value || '').trim();
-        if (!uid && !em) { show(tr('Choose a person or type an e-mail address')); return; }
+        if (!uid && !em) { show(tr('Select a person or type an e-mail address')); return; }
         const s = await calReq('POST', '/api/wiki/shares', {...tgt, kind: 'person', ...(uid ? {user_id: uid} : {email: em}), expires: exp, images});
         if (s.by_email) toast(tr('If an account has this address, it can read the page now.'));
         else { step(tr('Shared with {0}|wiki', s.user?.name || '?'), s.id, true); }
@@ -139,9 +139,9 @@ function wsh_fill(md, tgt, sp, folder, legacy) {
         await changed();
       } else if (a === 'end') {
         const s = j.shares.find(x => x.id === +b.dataset.id); if (!s) return;
-        if (s.kind === 'link' && !await askConfirm(tr('Turn the public link off?'), tr('It stops working at once.'), {ok: tr('Turn off'), danger: true})) return;
+        if (s.kind === 'link' && !await askConfirm(tr('Turn the public link off?'), tr('It stops working at once.'), {ok: tr('Switch off'), danger: true})) return;
         await calReq('DELETE', `/api/wiki/shares/${s.id}`);
-        await changed(); step(s.kind === 'link' ? tr('Public link turned off') : tr('Stopped sharing with {0}', s.user?.name || '?'), s.id, false);
+        await changed(); step(s.kind === 'link' ? tr('Public link switched off') : tr('Stopped sharing with {0}', s.user?.name || '?'), s.id, false);
       }
     } catch (x) { show(x.message); } finally { b.disabled = false; }
   });
@@ -188,7 +188,7 @@ async function wsh_read(id, md) {
   let p;
   try { p = await calReq('GET', '/api/wiki/shared/pages/' + id); } catch (x) { toast(x.status === 404 ? tr('This page does not exist or you cannot see it.') : x.message); return; }
   const inner = `<div class="lhdr"><h3>${esc(wsh_baseName(p.path))}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${esc(tr('Close'))}" title="${esc(tr('Close'))}">${ic('x')}</button></div>
-    <div class="shint keep">${esc(p.role === 'edit' ? tr('Shared with you · you can edit it') : tr('Shared by {0} · read only', p.owner_name || '?'))} · ${esc(p.path)}</div>
+    <div class="shint keep">${esc(p.role === 'edit' ? tr('Shared with you · you can edit it') : tr('Shared by {0} · read-only', p.owner_name || '?'))} · ${esc(p.path)}</div>
     <div class="md ntmd wkmd wshmd">${p.html || `<p class="muted">${tr('Empty page.')}</p>`}</div>
     ${p.files?.length ? `<section class="wkfiles" aria-label="${esc(tr('Files'))}"><h4>${ic('file', 's')}${tr('Files')} · ${p.files.length}</h4><ul>${p.files.map(f => `<li><a class="wkfile" href="${esc(f.url)}" target="_blank" rel="noopener" title="${esc(f.name)}">${f.image ? `<img src="${esc(f.url)}" alt="" loading="lazy">` : ic('pdf')}<span class="an">${esc(f.name)}</span><span class="as">${fmtSize(f.size)}</span></a></li>`).join('')}</ul></section>` : ''}
     <div class="ntfoot muted">${p.role === 'edit' ? `<button type="button" class="btn sm" data-wsh-edit="${p.id}">${ic('edit', 's')} ${tr('Edit')}</button>` : ''}<span class="spacer"></span><span>${esc(tr('Changed {0}', fmtWhen(p.updated_at)))}${p.updated_by_name ? ' · ' + esc(p.updated_by_name) : ''}</span></div>`;

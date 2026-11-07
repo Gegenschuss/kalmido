@@ -1184,7 +1184,7 @@ function taskRow(t, opts = {}) {
   if (opts.trash) meta.push(`<span>${tr('deleted {0}', dayLabel(t.deleted_at.slice(0, 10)))}</span>`);
   if (opts.trash) { const l = ttpLeft(t); if (l != null) meta.push(`<span class="ttpleft">${esc(l ? trn('{0} day left', '{0} days left', l) : tr('deleted soon'))}</span>`); }  // 2.116.0 A (#2063)
   const msvb = msvvSelfBadge(opts); if (msvb) meta.unshift(msvb);  // 2.73.0 C (#661): merged views, a server linked
-  if (opts.trash && t.keep) meta.push(`<span class="tkeep" title="${esc(tr('Only the project owner can delete it for good'))}">${ic('lock', 's')}${tr('stays')}</span>`);  // 2.0.5
+  if (opts.trash && t.keep) meta.push(`<span class="tkeep" title="${esc(tr('Only the project owner can delete it permanently'))}">${ic('lock', 's')}${tr('stays')}</span>`);  // 2.0.5
   // 2.8.0 (#434): the status glyph (circle; priority = its colour; an agent working on it = an open arc + dot) and, in
   // lists with tickets, the ticket number in a mono gutter
   const work = t.status === 0 && t.id > 0 && ((S.agents || []).some(a => a.enabled && a.status === 'working' && a.status_task === t.id) || !!agwOf(t));  // 2.407.0 A (#3513): + a working job
@@ -1399,7 +1399,7 @@ function cfkEditor(f, t, ro) {
     const on = new Set(cfk_ids(v));
     return `<span id="${id}" class="cfkmsed" role="group" aria-label="${esc(f.name)}">${(f.options?.options || []).map(o => `<button type="button" class="fchip sel${on.has(o.id) ? lrSelFill(o) + ' on' : ''}" ${on.has(o.id) ? lrSelStyle(o) : ''} data-cfkms="${f.id}" data-o="${esc(o.id)}" data-tid="${t.id}" aria-pressed="${on.has(o.id)}" ${can ? '' : 'disabled'}>${esc(o.name)}</button>`).join('')}</span>`;
   }
-  if (f.type === 'task') return `<span id="${id}" class="cfktask">${v ? cfk_taskLink(v, 'cfktc') : '<span class="muted">–</span>'}${can ? `<button type="button" class="iconbtn" data-cfkpick="${f.id}" data-tid="${t.id}" title="${esc(tr('Choose a task'))}" aria-label="${esc(tr('Choose a task'))}">${ic('search', 's')}</button>${v ? `<button type="button" class="iconbtn" data-cfkclr="${f.id}" data-tid="${t.id}" title="${esc(tr('Empty the field'))}" aria-label="${esc(tr('Empty the field'))}">${ic('x', 's')}</button>` : ''}` : ''}</span>`;
+  if (f.type === 'task') return `<span id="${id}" class="cfktask">${v ? cfk_taskLink(v, 'cfktc') : '<span class="muted">–</span>'}${can ? `<button type="button" class="iconbtn" data-cfkpick="${f.id}" data-tid="${t.id}" title="${esc(tr('Select a task'))}" aria-label="${esc(tr('Select a task'))}">${ic('search', 's')}</button>${v ? `<button type="button" class="iconbtn" data-cfkclr="${f.id}" data-tid="${t.id}" title="${esc(tr('Empty the field'))}" aria-label="${esc(tr('Empty the field'))}">${ic('x', 's')}</button>` : ''}` : ''}</span>`;
   return '';
 }
 function cfk_put(tid, fid, v) {
@@ -1854,7 +1854,7 @@ function viewListBody() {
   const rl = v.list && listById(v.list), ro = rl && !canEditList(rl.id), ck = !!(rl && rl.checklist);
   const lc = rl ? listCols(rl) : null;  // 2.14.0 (#425)
   const cols = rl && !lc && fieldCols(rl.id) ? fieldsOf(rl.id).slice(0, 6) : null;
-  let h = (rl ? listHead(rl) : v.folder ? folderHead(v.folder) : agBandHtml()) + (rl?.org_reader ? ovJoinBar(rl) : ro ? `<div class="rohint">${ic(isPart(rl.id) ? 'user' : 'eye', 's')}${esc(isPart(rl.id) ? tr('Only your tasks · shared by {0}', rl.owner_name) : tr('View only, shared by {0}', rl.owner_name))}</div>` : '');
+  let h = (rl ? listHead(rl) : v.folder ? folderHead(v.folder) : agBandHtml()) + (rl?.org_reader ? ovJoinBar(rl) : ro ? `<div class="rohint">${ic(isPart(rl.id) ? 'user' : 'eye', 's')}${esc(isPart(rl.id) ? tr('Only your tasks · shared by {0}', rl.owner_name) : tr('Read-only, shared by {0}', rl.owner_name))}</div>` : '');
   // 2.25.0 (UX-54): "Now doable" explains itself once
   if (S.route.key === 'stale' && !hintSeen('stale')) h += `<div class="onehint" data-hint="stale">${ic('clock', 's')}<span>${esc(tr('Untouched for {0} days or waiting without a follow-up day. Days can be set per project.', S.staleDays || 7))}</span><button type="button" class="iconbtn hx" data-act="hint-x" data-k="stale" aria-label="${esc(tr('Dismiss'))}" title="${esc(tr('Dismiss'))}">${ic('x', 's')}</button></div>`;  // 2.34.0 (#266)
   if (S.route.key === 'doable' && !hintSeen('doable')) h += `<div class="onehint" data-hint="doable">${ic('zap', 's')}<span>${esc(tr('Not blocked, started, and due today, overdue or without a date.'))}</span><button type="button" class="iconbtn hx" data-act="hint-x" data-k="doable" aria-label="${esc(tr('Dismiss'))}" title="${esc(tr('Dismiss'))}">${ic('x', 's')}</button></div>`;
@@ -1864,7 +1864,7 @@ function viewListBody() {
   const shopHint = !!rl && !ro && isOwner(rl) && famOn() && !rl.family && !rl.org_id && !rl.is_inbox && !isTracked(rl) && /einkauf|shopping|groceries|courses|compra|spesa|boodschap/i.test(rl.name) && !hintSeen('shop');
   if (shopHint) loadModule('family').catch(() => {});  // 2.501.0 (#4198): its button is handled in family.js
   if (shopHint) h += `<div class="onehint" data-hint="shop">${ic('cart', 's')}<span>${esc(tr('Use as a shopping list? Shopping mode with aisles and amounts, ticked items stay at the bottom.'))}</span><button type="button" class="btn sm" data-act="shop-on" data-id="${rl.id}">${tr('Use as a shopping list')}</button><button type="button" class="iconbtn hx" data-act="hint-x" data-k="shop" aria-label="${esc(tr('Dismiss'))}" title="${esc(tr('Dismiss'))}">${ic('x', 's')}</button></div>`;
-  else if (rl && !ro && isOwner(rl) && !ck && (['shopping', 'packing'].includes(rl.family) || /einkauf|shopping|groceries|pack(liste|ing)|courses|compra|spesa|boodschap|paklijst/i.test(rl.name)) && !hintSeen('dab')) h += `<div class="onehint" data-hint="dab">${ic('cart', 's')}<span>${esc(tr('Shopping or packing list? Ticked items stay at the bottom and come back with a tap.'))}</span><button type="button" class="btn sm" data-act="dab-on" data-id="${rl.id}">${tr('Turn on')}</button><button type="button" class="iconbtn hx" data-act="hint-x" data-k="dab" aria-label="${esc(tr('Dismiss'))}" title="${esc(tr('Dismiss'))}">${ic('x', 's')}</button></div>`;
+  else if (rl && !ro && isOwner(rl) && !ck && (['shopping', 'packing'].includes(rl.family) || /einkauf|shopping|groceries|pack(liste|ing)|courses|compra|spesa|boodschap|paklijst/i.test(rl.name)) && !hintSeen('dab')) h += `<div class="onehint" data-hint="dab">${ic('cart', 's')}<span>${esc(tr('Shopping or packing list? Ticked items stay at the bottom and come back with a tap.'))}</span><button type="button" class="btn sm" data-act="dab-on" data-id="${rl.id}">${tr('Switch on')}</button><button type="button" class="iconbtn hx" data-act="hint-x" data-k="dab" aria-label="${esc(tr('Dismiss'))}" title="${esc(tr('Dismiss'))}">${ic('x', 's')}</button></div>`;
   // 2.31.0 (#1052): grouped by date, "All to today" / "Another day…" sit in the head of "Overdue" (no card of their own)
   const odHead = S.route.key === 'today' && groups.some(g => g.id === 'd:over' && g.tasks.length);
   // 2.32.0 (#1063): Today is built from blocks (Customize): the cards above, the tasks, the inbox; the rest of h after
@@ -1967,8 +1967,8 @@ function hist_body() {
   if (trash) {  // 2.0.5: what "Empty" leaves behind (shared lists of other owners) is said up front and marked per row
     const kept = S.hist?.k === 'trash' && S.hist.kept != null ? S.hist.kept : arr.filter(t => t.keep).length;  // 2.40.0 (#1432): the whole trash
     const days = S.hist?.k === 'trash' ? S.hist.days : null;  // 2.116.0 A (#2063): the trash period, from the server
-    return otr + (days ? `<div class="shint ttphint">${ic('clock', 's')} ${esc(trashNote(trn('Tasks in the trash are deleted for good after {0} day.', 'Tasks in the trash are deleted for good after {0} days.', days)))}</div>` : '')
-      + (kept ? `<div class="shint trkeep">${ic('lock', 's')} ${esc(trn('{0} item stays when you empty the trash: it is in a project of another owner, only they can delete it for good.', '{0} items stay when you empty the trash: they are in projects of other owners, only they can delete them for good.', kept))}</div>` : '')
+    return otr + (days ? `<div class="shint ttphint">${ic('clock', 's')} ${esc(trashNote(trn('Tasks in the trash are deleted permanently after {0} day.', 'Tasks in the trash are deleted permanently after {0} days.', days)))}</div>` : '')
+      + (kept ? `<div class="shint trkeep">${ic('lock', 's')} ${esc(trn('{0} item stays when you empty the trash: it is in a project of another owner, only they can delete it permanently.', '{0} items stay when you empty the trash: they are in projects of other owners, only they can delete them permanently.', kept))}</div>` : '')
       + (vl_begin(arr.length) ? vl_seg('trash', arr, t => taskRow(t, {trash: true, showList: true})) : arr.map(t => taskRow(t, {trash: true, showList: true})).join('')) + histMoreHtml();  // 2.65.0 (#1825)
   }
   const g = new Map();

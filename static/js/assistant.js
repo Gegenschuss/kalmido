@@ -134,9 +134,9 @@ function asst_paneHtml(hint, inTab) {  // 2.555.0 C (#4664): under the sub-tab "
   return `${inTab ? '' : `<h4 id="s-asst-h">${tr('Assistant')}</h4>`}
     ${hint(tr('Summarises, drafts replies, suggests tags and dates, sorts the basket and plans your day. Everything only as a proposal: the assistant changes nothing by itself.'))}
     <div class="row"><label class="chkl"><input type="checkbox" id="s-asst-on" ${a.on ? 'checked' : ''}> ${tr('Use the assistant')}</label></div>
-    <div class="shint keep asstprov">${ic('info', 's')} <span>${esc(tr('Shared projects and the texts you choose are sent to {0} ({1}).', a.provider || '', a.host || ''))} ${esc(tr('Model: {0}', a.model || ''))}</span></div>
+    <div class="shint keep asstprov">${ic('info', 's')} <span>${esc(tr('Shared projects and the texts you select are sent to {0} ({1}).', a.provider || '', a.host || ''))} ${esc(tr('Model: {0}', a.model || ''))}</span></div>
     <h4 id="s-asst-lists-h">${tr('Projects the assistant may read')}</h4>
-    ${hint(tr('Only tasks of the projects ticked here go to the assistant, and only when you ask it. Basket tasks go only when you pick them yourself; health projects and locked notes never.'))}
+    ${hint(tr('Only tasks of the projects ticked here go to the assistant, and only when you ask it. Basket tasks go only when you select them yourself; health projects and locked notes never.'))}
     <div class="lcapgrid asstlists" id="s-asst-lists">${ls.map(l => `<label class="chkl"><input type="checkbox" data-asstl="${l.id}" ${on.has(l.id) ? 'checked' : ''}><span>${esc(l.name)}</span></label>`).join('') || `<span class="muted">${esc(tr('No projects yet.'))}</span>`}</div>
     <h4 id="s-asst-log-h">${tr('Log')}</h4>
     ${hint(tr('Every call with its time, kind, status and length. The texts themselves are not kept.'))}

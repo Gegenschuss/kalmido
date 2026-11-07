@@ -70,13 +70,13 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
   // the server: action endpoints of a switched-off module refuse (409, with the reason); the data stays
   await call('PATCH', '/api/settings', {features: ALL.split(',').filter(f => !['pomo', 'habits', 'time'].includes(f)).join(',')});
   let r = await call('POST', '/api/pomo/start', {kind: 'focus', minutes: 25});
-  check(r.status === 409 && /focus timer is turned off/.test(r.error), `pomo off: start refused (${r.status} ${r.error})`);
+  check(r.status === 409 && /focus timer is switched off/.test(r.error), `pomo off: start refused (${r.status} ${r.error})`);
   r = await call('POST', '/api/habits', {name: 'Read'});
-  check(r.status === 409 && /Habits are turned off/.test(r.error), `habits off: create refused (${r.status})`);
+  check(r.status === 409 && /Habits are switched off/.test(r.error), `habits off: create refused (${r.status})`);
   r = await call('POST', `/api/habits/${HB}/log`, {});
   check(r.status === 409, `habits off: check-in refused (${r.status})`);
   r = await call('POST', '/api/time/start', {task_id: T});
-  check(r.status === 409 && /Time tracking is turned off in your settings/.test(r.error), `time off: timer refused (${r.status} ${r.error})`);
+  check(r.status === 409 && /Time tracking is switched off in your settings/.test(r.error), `time off: timer refused (${r.status} ${r.error})`);
   r = await call('POST', '/api/time/entries', {task_id: T, start: new Date(Date.now() - 36e5).toISOString(), minutes: 10});
   check(r.status === 409, `time off: manual entry refused (${r.status})`);
   const s = await call('GET', '/api/state');

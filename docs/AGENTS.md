@@ -288,7 +288,7 @@ Behind a login proxy, let `/agent-setup.sh`, `/agent-setup.ps1` and `/api/agent-
 
 The app shows the same as *Which agent when?* where an agent is created. After creating an agent (a personal one, or a
 team agent without a webhook) the one-command setup opens right away; the API token of the new agent is shown only on
-request, under *For advanced users* (*Show the token for an own setup*). The dialog *New agent* shows only the display
+request, under *For advanced users* (*Show the token for your own setup*). The dialog *New agent* shows only the display
 name, team or personal, the workspace and the picture; everything else sits under *Advanced* with the usual defaults
 (the runtime's permission mode is called *Approvals* there). Until a computer connected, the
 agent's row says **Set up**. The Agents view lists on every agent's card the projects it is in that you see (folder, who may
@@ -2585,7 +2585,7 @@ shared with the agent (within its project limit) that the person sees (2.352.0: 
   that changes nothing: 400 with the reason. The person's own block settings are kept when they accept.
 - **The proposal** is a ready proposal job (kind `layout`): News + push "Proposal ready" per the person's settings and a card
   with before / after (two small grids with the block names and widths). 👍 *Accept* stores it as a saved arrangement
-  "<name> (proposal by <agent>)" of that view and, ticked by default, uses it at once; 👎 *Decline* discards it. Only the
+  "<name> (proposal by <agent>)" of that view and, ticked by default, uses it at once; 👎 *Reject* discards it. Only the
   person decides (never the agent's token or session); undo = one step back to the previous arrangement. The agent gets the
   event `job` with `action` approve / reject (`proposal`: `state`, `view`, `layout_id`, `used`).
 - **Limits**: one open proposal per agent, person and view (a new one replaces the old one); it expires after 14 days; at
@@ -3299,7 +3299,7 @@ no longer shared when you submit: 403; replacing a proposal after the person too
 
 **Texts worded by an agent (2.126.1, kinds `office_text`, `doc_summary`, `report`).** Kalmido never runs a model for
 these: a person asks one of their agents, the agent words the text and the person edits, takes over or discards it.
-Nothing is sent to a client, nothing changes before *Take over* (one undo step, as the person).
+Nothing is sent to a client, nothing changes before *Apply* (one undo step, as the person).
 - `office_text`: on an office draft (quotation, invoice, reminder; not finalised, not sent) in *Introduction and closing*,
   "Draft text with an agent". Only agents of the office area with their switch *May draft office documents* on, only
   while the area's *Agents may read office data* is on, only for a person who works in that office (a personal agent: its
@@ -3327,7 +3327,7 @@ person must work on the statement (the bookkeeping, or the holder of the card). 
 - The answer: `total?` and `lines` (at most `limits.card_lines_max`, merchant at most `limits.card_merchant_max` characters):
   values only, amounts and days strict, a foreign amount only with its currency; anything else 400. The agent's text is shown as
   plain text, never as HTML.
-- Take over adds the positions to the draft as the person (the total only if the statement has none; 409 once it has positions,
+- Apply adds the positions to the draft as the person (the total only if the statement has none; 409 once it has positions,
   is confirmed or the month is locked; one undo step, skipped after a change by hand). They count only when the person
   confirms the statement with its sum check. Nothing is stored in the statement before that; a person without an organisation
   does the same with the own agent in the private office.
@@ -3349,7 +3349,7 @@ own agent in the private office the same way. `GET /api/proposals/agents?kind=re
   `gross` ("12.34", not negative), `vat_pct`, `vat_rates` [{pct, net, vat}] (at most 5), `currency`, `positions` [{text, qty?,
   net?, vat_pct?}] (at most 100), `category`, `account`, `bank_tx` (only an id of `input.bank`). Unknown fields, wrong types,
   too long or too many: 400. Nothing is judged at the answer: sums that do not add up show as hints of the receipt checks.
-- The person sees "Read by the agent (name)" with the values, what *Take over* changes and the checks, and takes over (as
+- The person sees "Read by the agent (name)" with the values, what *Apply* changes and the checks, and applies them (as
   the person, one undo step: amount = gross, VAT rate, sender, document date, category; the read values become the
   document's recognised values -- invoice number, VAT id) or discards. Positions and the account are only shown. A
   suggested booking is matched by the person in the bank. A locked month: taking over 409, nothing changes. You never take
@@ -4385,7 +4385,7 @@ with the reason).
 | Colour rules of a table (2.578.0) | `PUT /api/v1/sheets/{id}/rules` | `sheet_set_rules` | sheets:write |
 | Append rows | `POST /api/v1/sheets/{id}/rows` | `sheet_append_rows` | sheets:write |
 | Add a column | `POST /api/v1/sheets/{id}/columns` | `sheet_add_column` | sheets:write |
-| Take back one of your calls | `POST /api/v1/sheets/{id}/batches/{batch}/undo` | `sheet_undo_batch` | sheets:write |
+| Undo one of your calls | `POST /api/v1/sheets/{id}/batches/{batch}/undo` | `sheet_undo_batch` | sheets:write |
 | The sheets of a table (2.124.0) | `GET /api/v1/sheets/{id}/tabs` | `sheet_tabs` | sheets:read |
 | Add a sheet to a table (2.124.0) | `POST /api/v1/sheets/{id}/tabs` | `sheet_add_tab` | sheets:write |
 

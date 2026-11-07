@@ -17,7 +17,7 @@ function aim_rowHtml(r, P) {
   const rp = k => tr(RK_CF_REPEATS.find(x => x[0] === k)?.[1] || k);
   if (r.status === 'error') return `<li class="fcirow err"><span class="fcick" aria-hidden="true">${ic('x', 's')}</span><span class="ofcn"><b>${esc(r.label || tr('Row {0}', r.row))}</b><small>${esc(tr('Row {0}', r.row))} · ${esc(r.reason)}</small></span></li>`;
   const on = P.sel.has(r.k), vat = P.ed[r.k]?.vat_rate ?? r.vat_rate;
-  return `<li class="fcirow aim-r ${on ? 'on' : ''} ${r.status}" data-k="${esc(r.k)}"><label class="fcick"><input type="checkbox" class="aim-ck" data-aim="sel" ${on ? 'checked' : ''} aria-label="${esc(tr('Take over {0}', r.label))}"></label>
+  return `<li class="fcirow aim-r ${on ? 'on' : ''} ${r.status}" data-k="${esc(r.k)}"><label class="fcick"><input type="checkbox" class="aim-ck" data-aim="sel" ${on ? 'checked' : ''} aria-label="${esc(tr('Apply {0}', r.label))}"></label>
     <span class="ofcn"><b>${esc(r.label)}</b><small class="muted">${esc([rp(r.repeat), tr('from {0}', fmtDateLoc(r.start)), r.until ? tr('until {0}', fmtDateLoc(r.until)) : '', r.category, r.status === 'dup' ? r.reason : ''].filter(Boolean).join(' · '))}</small></span>
     <span class="fciamt"><span>${aim_money(r.amount)} <small class="muted">${tr('net')}</small></span><small class="muted aim-g">${aim_money(aim_gross(r, vat))} ${tr('gross')}</small><select data-aim="vat" aria-label="${esc(tr('VAT rate'))}">${AIM_VATS.map(x => `<option value="${x}" ${+vat === x ? 'selected' : ''}>${x} %</option>`).join('')}</select></span></li>`;
 }
@@ -31,8 +31,8 @@ function aim_draw(v) {
     ${where}
     <p class="muted">${esc([trn('{0} new', '{0} new', cn.new || 0), cn.dup ? trn('{0} already there', '{0} already there', cn.dup) : '', cn.error ? trn('{0} with an error', '{0} with an error', cn.error) : ''].filter(Boolean).join(' · '))}</p>
     <ul class="fcilist aim-l" role="list">${rows.map(r => aim_rowHtml(r, P)).join('')}</ul>
-    <div class="shint keep">${esc(tr('Taking over creates the ticked fixed costs as you in this office; nothing else changes. Undo possible.'))}${im.expires_at ? ' ' + esc(tr('Open until {0}', dayLabel(im.expires_at.slice(0, 10)))) : ''}</div>`;
-  const foot = `<button class="btn danger" data-pp="discard" aria-label="${esc(tr('Decline|proposal'))}">${thumbIc(false)} ${esc(tr('Decline|proposal'))}</button><span class="spacer"></span>
+    <div class="shint keep">${esc(tr('Applying creates the ticked fixed costs as you in this office; nothing else changes. Undo possible.'))}${im.expires_at ? ' ' + esc(tr('Open until {0}', dayLabel(im.expires_at.slice(0, 10)))) : ''}</div>`;
+  const foot = `<button class="btn danger" data-pp="discard" aria-label="${esc(tr('Reject|proposal'))}">${thumbIc(false)} ${esc(tr('Reject|proposal'))}</button><span class="spacer"></span>
     <button class="btn" data-pp="close">${tr('Close')}</button><button class="btn pri" data-pp="apply" ${im.office ? '' : 'disabled'}></button>`;
   return {main, foot};
 }
@@ -51,7 +51,7 @@ function aim_propEdit(el) {
 }
 function aim_count() {
   const P = S.prop, b = $('[data-pp="apply"]', P.md), n = P.sel.size; if (!b) return;
-  b.textContent = trn('Take over {0} row', 'Take over {0} rows', n);
+  b.textContent = trn('Apply {0} row', 'Apply {0} rows', n);
   b.disabled = !n || !P.v.import?.office;
 }
 // after accept / undo / redo: the cash flow shows the new fixed costs when it is open

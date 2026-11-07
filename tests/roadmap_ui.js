@@ -221,7 +221,7 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   ptr(w, sum(WEB), 'pointerdown', 100); ptr(w, d, 'pointermove', 160);
   check(!sum(WEB).style.transform, 'view-only: the bar does not move');
   ptr(w, d, 'pointerup', 160);
-  check(await until(() => /View only/.test(toastText(d))), `view-only: toast instead: ${toastText(d)}`);
+  check(await until(() => /Read-only/.test(toastText(d))), `view-only: toast instead: ${toastText(d)}`);
   check(!cc.some(c => /shift/.test(c[1])), 'nothing sent');
   const r = await call('POST', `/api/lists/${WEB}/shift`, {days: 3}, CKc);
   check(/view only/i.test(r.error || ''), `the server refuses too: ${r.error}`);

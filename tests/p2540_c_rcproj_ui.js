@@ -50,9 +50,9 @@ async function upload(name) {
     check(!!pop, `${who}: the picker opens`);
     const items = [...(pop?.querySelectorAll('[role="menuitem"]') || [])], heads = [...(pop?.querySelectorAll('.mgh') || [])].map(g => g.textContent);
     check(/No project/.test(items[0]?.textContent || '') && items[0]?.classList.contains('on'), `${who}: "No project" on top, checked`);
-    check(heads[0] === 'Recently chosen' && heads.includes('Other projects'), `${who}: the recently chosen projects on top ` + heads.join(' | '));
+    check(heads[0] === 'Recently selected' && heads.includes('Other projects'), `${who}: the recently chosen projects on top ` + heads.join(' | '));
     const ex2 = items.find(x => /Extra 2/.test(x.textContent)), fair = items.find(x => /Trade fair/.test(x.textContent));
-    check(ex2?.closest('.mgrp')?.querySelector('.mgh')?.textContent === 'Recently chosen' && items.indexOf(ex2) < items.indexOf(fair), `${who}: Extra 2 in the recent group, before the rest`);
+    check(ex2?.closest('.mgrp')?.querySelector('.mgh')?.textContent === 'Recently selected' && items.indexOf(ex2) < items.indexOf(fair), `${who}: Extra 2 in the recent group, before the rest`);
     const err = items.filter(x => /Errands/.test(x.textContent));
     check(err.length === 1 && err[0].querySelector('.lic') && !/🛒/.test(err[0].textContent), `${who}: the project icon instead of the raw emoji ` + err.map(x => x.textContent).join(' | '));
     check(items.filter(x => /Extra|Trade fair|Errands/.test(x.textContent)).every(x => x.querySelector('.lic')), `${who}: every project with an icon (the same indent)`);

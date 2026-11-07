@@ -63,7 +63,7 @@ def atr_purge_list(c, lid):
 
 
 def atr_purge_one(c, table, rid):
-    """2.272.0 F (#3038, review E2-H2): one file in the trash deleted for good by a person now ("Delete for good" in the trash
+    """2.272.0 F (#3038, review E2-H2): one file in the trash deleted for good by a person now ("Delete permanently" in the trash
     of the task / project; rights checked by the caller). -> paths to unlink after the commit."""
     r = c.execute(f"SELECT id, path FROM {table} WHERE id=? AND deleted_at IS NOT NULL FOR UPDATE", (rid,)).fetchone()
     if not r:

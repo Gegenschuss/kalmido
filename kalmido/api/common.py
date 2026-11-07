@@ -175,8 +175,8 @@ def v1_page(items, offset, limit):
 def v1_feature(f):
     """The API also respects the user's own module switches (Settings > Layout / Collaboration)."""
     if f not in (usettings(db(), me()).get("features") or "").split(","):
-        raise Denied(403, tr("Collaboration is turned off in your settings") if f == "collab"
-                     else tr("Time tracking is turned off in your settings"))
+        raise Denied(403, tr("Collaboration is switched off in your settings") if f == "collab"
+                     else tr("Time tracking is switched off in your settings"))
 
 
 def agent_time_hidden():

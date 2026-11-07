@@ -438,7 +438,7 @@ def list_group_set(lid, gid):
     role = grp_role(body())
     from ..collab.liste2e import le2e_mode
     if role == "participant" and le2e_mode(c, lid):  # 2.64.1 (#1817)
-        return jsonify(error=tr("Projects encrypted in the browser have no participants. Choose another role."), code="list_e2e_member"), 409
+        return jsonify(error=tr("Projects encrypted in the browser have no participants. Select another role."), code="list_e2e_member"), 409
     from ..accounts.orgs import ws_member_problem
     for uid in grp_members(c, gid):  # 2.28.0 (#935): everyone in the group must belong to the list's workspace
         p = ws_member_problem(c, lid, uid)

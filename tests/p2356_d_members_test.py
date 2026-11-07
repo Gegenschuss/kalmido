@@ -6,7 +6,7 @@ Invented companies, people and figures only (@example.com, PDFs made here). free
    as her own, marked rc_receipts.submitted_by; "My receipts handed in" (GET /api/office/receipts/mine) lists only hers with
    the status submitted -> processed (the bookkeeping saved the receipt) / removed (deleted); she sees no other receipt, no
    bookkeeping, no cash book, not the list of handed-in receipts; another member does not see her files; read-only 403; a
-   group "Staff" may hand in, a group "Read only" not; the admin sees the receipts handed in (with "by") and in the receipts
+   group "Staff" may hand in, a group "Read-only" not; the admin sees the receipts handed in (with "by") and in the receipts
    list (submitted_by); a person of another organisation sees nothing of it; GET /api/office/settings submit only for the
    people who may hand in and do not see the bookkeeping
  - the freelancer (personal office, her own admin): submit works and is a normal receipt of her bookkeeping, submit flag off
@@ -149,7 +149,7 @@ inb = {x["node_id"] for x in A.get(B + INB).json()["rows"]}
 check(R1 not in inb and R2 in inb, "admin: a receipt worked on leaves the list of handed-in ones")
 # 2.356.0 (#3129, review M1): a receipt the bookkeeping took over stays as booked -- its submitter cannot trash or replace it
 r = Bo.delete(B + f"/api/files/nodes/{R1}")
-check(r.status_code == 409 and "taken over" in r.text, f"member: the receipt the bookkeeping took over cannot go into the trash ({r.status_code} {r.text[:120]})")
+check(r.status_code == 409 and "has booked" in r.text, f"member: the receipt the bookkeeping took over cannot go into the trash ({r.status_code} {r.text[:120]})")
 r = Bo.post(B + f"/api/files/nodes/{R1}/versions", files={"file": ("taxi-bob.pdf", tiny_pdf("other image"), "application/pdf")})
 check(r.status_code == 409, f"member: no new version of a taken-over receipt ({r.status_code} {r.text[:120]})")
 SR = next(iter(mine(Sa) or {0: None}))

@@ -176,7 +176,7 @@ def fsm_plan(c, uid, b, to, dry, office=False):
         fs_area_need_stay(c, nid)  # 2.200.0 A (#2747): a closed area's folders move with the area only (knowledge: wkmove.py)
         fsl_space_guard(c, [nid])  # 2.353.0 A (#2758): the folder key belongs to its people: a locked folder stays in its space
         if src is not _KEEP and (src or None) != (n["org_id"] or None):
-            raise Denied(400, tr("Choose items of one workspace"))
+            raise Denied(400, tr("Select items of one workspace"))
         src = n["org_id"] or None
         if any(r["id"] in chosen for r in fs_chain(c, nid)[1:]):
             continue  # inside a chosen folder: goes along with it

@@ -68,7 +68,7 @@ const FEAT = 'collab,comments,sheets';
   check(cl.includes('Open') && !cl.includes('Delete') && !cl.includes('Rename…'), 'the card menu of a read share: open only ' + cl.join(' | '));
   w.eval('closePop()');
   w.location.hash = 'sheets/' + S.id;
-  check(await until(() => /Read only/.test(d.querySelector('#view .shvro')?.textContent || '')), 'bob reads it, read only');
+  check(await until(() => /Read-only/.test(d.querySelector('#view .shvro')?.textContent || '')), 'bob reads it, read only');
   d.querySelector('#view [data-shv="menu"]')?.click();
   await until(() => items(d).length);
   const ml = items(d).map(b => b.textContent.trim());

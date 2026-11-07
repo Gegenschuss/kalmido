@@ -234,7 +234,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   check(!md.querySelector('#s-uag') && md.querySelector('#myag-user'), 'Bob: the create form, no admin switch');
   md.querySelector('#myag-user').value = 'bobs-claude'; md.querySelector('#myag-name').value = 'Bob\'s Claude';
   click(w, md.querySelector('[data-myag-act="new"]')); await sleep(900);
-  // 2.46.6 (#1709): the setup first; the token only behind "Show the token for an own setup"
+  // 2.46.6 (#1709): the setup first; the token only behind "Show the token for your own setup"
   // 2.364.0 (#3035): the one-command setup opens at once, the token under "For advanced users"
   check(await until(() => d.querySelector('.modal:not(.smodal) #ains-dir')), 'the setup is offered');
   click(w, d.querySelector('.modal:not(.smodal) [data-m="av-tok"]')); await sleep(200);

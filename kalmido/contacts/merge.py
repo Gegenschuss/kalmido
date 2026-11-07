@@ -80,7 +80,7 @@ def ctm_ids(target, ids):
         if x not in out:
             out.append(x)
     if len(out) < 2:
-        raise BadInput(tr("Choose at least two contacts"))
+        raise BadInput(tr("Select at least two contacts"))
     if len(out) > MG_MAX:
         raise BadInput(tr("At most {0} contacts at once", MG_MAX))
     return out

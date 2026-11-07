@@ -126,15 +126,15 @@ function overdueBanner() {
 async function overdueMove(due) {
   const od = overdueTasks(), may = od.filter(canEdit), ro = od.length - may.length;
   if (!may.length) { toast(trn('{0} overdue task is in a project you may only view', '{0} overdue tasks are in projects you may only view', ro)); return; }
-  await batch('patch', {due}, false, may.map(t => t.id), ro ? trn('{0} task skipped (view only)', '{0} tasks skipped (view only)', ro) : '');
+  await batch('patch', {due}, false, may.map(t => t.id), ro ? trn('{0} task skipped (read-only)', '{0} tasks skipped (read-only)', ro) : '');
 }
 function overdueOther(a) {
   menu(a, [{label: tr('Tomorrow'), icon: 'sunrise', fn: () => overdueMove(addDays(today(), 1))}, {label: tr('Next week (Mon)'), icon: 'week', fn: () => overdueMove(nextWeekday(1))},
-    {label: tr('Pick a date…'), icon: 'cal', fn: () => dpOpen(a, {kind: 'date', value: today(), min: today(), clear: false, label: tr('Pick a date…'), onPick: v => { if (v) overdueMove(v); }})}]);
+    {label: tr('Select a date…'), icon: 'cal', fn: () => dpOpen(a, {kind: 'date', value: today(), min: today(), clear: false, label: tr('Select a date…'), onPick: v => { if (v) overdueMove(v); }})}]);
 }
 function overdueAct(a) {
   const d = a.dataset.d;
-  if (d === 'pick') { dpOpen(a, {kind: 'date', value: today(), min: today(), clear: false, label: tr('Pick a date…'), onPick: v => { if (v) overdueMove(v); }}); return; }
+  if (d === 'pick') { dpOpen(a, {kind: 'date', value: today(), min: today(), clear: false, label: tr('Select a date…'), onPick: v => { if (v) overdueMove(v); }}); return; }
   overdueMove(d === 'w' ? nextWeekday(1) : addDays(today(), +d));
 }
 // 2.32.0 (#1055): the lists the selection can move to (the bar's Move, the key m without the multi panel)
@@ -163,8 +163,8 @@ function multiDateMenu(a) {
     {label: tr('Today'), icon: 'sun', fn: () => batch('patch', {due: today()})},
     {label: tr('Tomorrow'), icon: 'sunrise', fn: () => batch('patch', {due: addDays(today(), 1)})},
     {label: tr('Next week (Mon)'), icon: 'week', fn: () => batch('patch', {due: nextWeekday(1)})},
-    {label: tr('Pick a date…'), icon: 'cal', fn: () => {
-      dpOpen(a, {kind: 'date', value: today(), clear: false, future: true, label: tr('Pick a date…'), onPick: v => { if (v) batch('patch', {due: v}); }});
+    {label: tr('Select a date…'), icon: 'cal', fn: () => {
+      dpOpen(a, {kind: 'date', value: today(), clear: false, future: true, label: tr('Select a date…'), onPick: v => { if (v) batch('patch', {due: v}); }});
     }},
     {label: tr('No date|clear'), icon: 'ban', fn: () => batch('patch', {due: null})},
   ]);
@@ -740,7 +740,7 @@ async function folderPropsModal(f, opt = {}) {
     ${sel('fs-pt', 'ptype', PTYPE_UI.filter(([k]) => k).map(([k, n]) => [k, tr(n)]))}<div class="shint lhint">${tr('New projects in the folder start with this type and its sections. Existing projects keep theirs.')}</div>${''/* 2.411.0 (#3516) */}
     ${collab() && agentsOn() ? `<h4 id="fs-ag-h">${tr('Agents')}</h4>
       <div class="row fsagrow"><label>${tr('Agent')}</label><span class="fsags" id="fs-ags">${esc(agNames().join(', ') || tr('No agent'))}</span><button type="button" class="linkbtn" data-m="share-ag">${ic('users', 's')} ${tr('In the Share dialog…')}</button></div>
-      <div class="shint lhint">${tr('Which agents work in this folder you choose in its Share dialog; the switches here are the defaults for its projects.')}</div>
+      <div class="shint lhint">${tr('Which agents work in this folder you select in its Share dialog; the switches here are the defaults for its projects.')}</div>
       ${fsw('fs-am', 'agent_members', tr('Members may see and use the agent'), tr('Off: only you and project admins can chat with the agent, @mention it or assign it tasks here. Members still see what it does.') + (av_folderPersonal(f).length ? `<span class="avpers"> ${esc(av_personalHint(av_folderPersonal(f)))}</span>` : ''))}
       ${fsw('fs-af', 'agent_followup', tr('Agent follows up'), tr('Once a day the agent gets the tasks of this project that lie idle and asks about them in a comment or drafts a reminder. Nothing is sent to anyone outside. Off by default.'))}
       ${sel('fs-td', 'agent_tidy', TIDY.map(([k, n]) => [k, tr(n)]), hasAg() || 'agent_tidy' in p ? '' : 'disabled')}

@@ -67,14 +67,14 @@ def fx_clean_kpis(c, lid, v):
             x = k.get(name)
             if x in (None, ""):
                 if need:
-                    raise ValueError(tr("Choose a number field"))
+                    raise ValueError(tr("Select a number field"))
                 return None
             try:
                 x = int(x)
             except (TypeError, ValueError):
-                raise ValueError(tr("Choose a number field")) from None
+                raise ValueError(tr("Select a number field")) from None
             if x not in num:
-                raise ValueError(tr("Choose a number field"))
+                raise ValueError(tr("Select a number field"))
             return x
         d["field"] = fid("field", agg in ("sum", "avg", "ratio"))
         if agg == "ratio":

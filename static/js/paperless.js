@@ -220,20 +220,20 @@ function pll_preview_html(p) {
     // 2.581.0 (#4803): workflows -> document flows: what is not taken over (the rest of the flow is)
     trigger: N_('trigger not supported'), owner: N_('owner and rights not taken over'), webhook: N_('webhook not taken over'), email: N_('e-mail not taken over'), action: N_('action not taken over'), filter: N_('path or e-mail rule filter not taken over')};
   let h = `<div class="pll-rules">`;
-  if (n) h += `<label class="chkl"><input type="checkbox" id="pll-rules" ${r.on === false ? '' : 'checked'}> ${tr('Take over the matching rules from Paperless-ngx ({0})', n)}</label>`;
+  if (n) h += `<label class="chkl"><input type="checkbox" id="pll-rules" ${r.on === false ? '' : 'checked'}> ${tr('Import the matching rules from Paperless-ngx ({0})', n)}</label>`;
   const notes = [];
   if (r.dup) notes.push(trn('{0} rule is already here', '{0} rules are already here', r.dup));
   if (r.auto) notes.push(tr('{0} use “Auto” in Paperless-ngx: Kalmido learns them from the imported documents', r.auto));
   if (notes.length) h += `<p class="muted">${esc(notes.join(' · '))}</p>`;
-  if (bad.length) h += `<details class="pll-bad"><summary class="muted">${trn('{0} rule cannot be taken over', '{0} rules cannot be taken over', r.unsupported_n || bad.length)}</summary><ul>${bad.map(b => `<li>${esc(b.name)} <span class="muted">${esc(tr(WHY[b.why] || b.why))}</span></li>`).join('')}</ul></details>`;
+  if (bad.length) h += `<details class="pll-bad"><summary class="muted">${trn('{0} rule cannot be imported', '{0} rules cannot be imported', r.unsupported_n || bad.length)}</summary><ul>${bad.map(b => `<li>${esc(b.name)} <span class="muted">${esc(tr(WHY[b.why] || b.why))}</span></li>`).join('')}</ul></details>`;
   return h + '</div>';
 }
 function pll_line(l) {
   if (!l) return '';
   const parts = [];
   if (l.trained) parts.push(tr('learnt from {0} documents', l.trained));
-  if (l.rules_new) parts.push(trn('{0} rule taken over', '{0} rules taken over', l.rules_new));
-  if (l.unsupported_n) parts.push(trn('{0} rule not taken over', '{0} rules not taken over', l.unsupported_n));
+  if (l.rules_new) parts.push(trn('{0} rule imported', '{0} rules imported', l.rules_new));
+  if (l.unsupported_n) parts.push(trn('{0} rule not imported', '{0} rules not imported', l.unsupported_n));
   return parts.length ? `<p class="muted pll-line">${esc(parts.join(' · '))}</p>` : '';
 }
 // ---- 2.69.0 A (#1846): an export ZIP of Paperless-ngx (document_exporter), for a server Kalmido cannot reach
@@ -253,7 +253,7 @@ function plh_html(d) {
       <div class="foot"><button type="button" class="btn sm" data-pl="zip-drop">${tr('Discard')}</button><span class="spacer"></span><button type="button" class="btn sm pri" data-pl="zip-preview">${tr('Import documents…')}</button></div></div>`;
   }
   if (z?.state === 'upload' && z.mine) {
-    return h + `<p class="muted">${tr('The upload of {0} stopped at {1} %. Choose the same file again to continue.', esc(z.name || 'ZIP'), Math.floor(z.got * 100 / Math.max(1, z.size)))}</p>
+    return h + `<p class="muted">${tr('The upload of {0} stopped at {1} %. Select the same file again to continue.', esc(z.name || 'ZIP'), Math.floor(z.got * 100 / Math.max(1, z.size)))}</p>
       <div class="foot"><button type="button" class="btn sm" data-pl="zip-drop">${tr('Discard')}</button><span class="spacer"></span>${pick(tr('Continue…'), true)}</div></div>`;
   }
   if (z?.state === 'bad') h += `<p class="pl-err" role="alert">${esc(z.error_text)}</p>`;
@@ -263,7 +263,7 @@ function plh_html(d) {
     h += pll_line(r.learn);
   }
   if (z && ['upload', 'check', 'ready'].includes(z.state) && !z.mine) return h + `<p class="muted">${tr('Another import is under way in this area')}</p></div>`;
-  return h + intro + `<p class="pl-err plh-err" role="alert"></p>${pick(tr('Choose ZIP file…'))}</div>`;
+  return h + intro + `<p class="pl-err plh-err" role="alert"></p>${pick(tr('Select ZIP file…'))}</div>`;
 }
 function plh_size_html(sz) {
   if (!sz || sz.need == null) return '';
@@ -278,7 +278,7 @@ function plh_size_html(sz) {
 async function plh_upload(f) {
   const ws = PL.ws, er = () => $('.plh-err');
   const fail = msg => { PL.up = null; pl_draw(); const x = er(); if (x) x.textContent = msg; };
-  if (!/\.zip$/i.test(f.name) && f.type !== 'application/zip') return fail(tr('Choose the ZIP file of the export'));
+  if (!/\.zip$/i.test(f.name) && f.type !== 'application/zip') return fail(tr('Select the ZIP file of the export'));
   if (f.size > (PL.d?.zip_max || Infinity)) return fail(tr('The file is larger than {0} MB', Math.round(PL.d.zip_max / 1048576)));
   let z = PL.d?.zip;
   const resume = z && z.state === 'upload' && z.mine && z.size === f.size && z.name === f.name.slice(-120);

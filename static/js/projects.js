@@ -81,7 +81,7 @@ async function statusModal(lid) {
     ${can ? `<div class="stchoice">${STATUSES.map(([k, n]) => `<button class="stopt st-${k} ${sel === k ? 'on' : ''}" data-st="${k}"><i></i>${tr(n)}</button>`).join('')}<button class="stopt st-none ${sel ? '' : 'on'}" data-st=""><i></i>${tr('No status')}</button></div>
       ${typeof le2eOn === 'function' && le2eOn(lid) ? '' /* 2.538.0 (#4372): not encrypted: no note in a project with the lock */ : `<textarea id="st-note" rows="3" maxlength="500" placeholder="${tr('Short update: what is going on, what is needed?')}">${esc(l.status_note || '')}</textarea>`}
       <div class="shint">${collab() && l.shared ? tr('Everyone in this project gets it as news.') : tr('Shown in the project header, the sidebar and the project status.')}</div>`
-    : `<div class="rohint">${ic('eye', 's')}${tr('View only')}</div>`}
+    : `<div class="rohint">${ic('eye', 's')}${tr('Read-only')}</div>`}
     <h4>${tr('History')}</h4><div class="sthist" id="st-hist"><div class="muted mhint">${tr('Loading…')}</div></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button>${can ? `<button class="btn pri" data-m="save">${tr('Update status')}</button>` : ''}</div>`);
   md.classList.add('stmodal');
@@ -381,7 +381,7 @@ function povMsModal(l, m) {
       if (b.dataset.m === 'del') await povApi('DELETE', `/api/lists/${l.id}/milestones/${m.id}`);
       else {
         const day = $('#pm-day', md).value;
-        if (!day) { toast(tr('Pick a date')); return; }
+        if (!day) { toast(tr('Select a date')); return; }
         await povApi(m ? 'PATCH' : 'POST', `/api/lists/${l.id}/milestones${m ? '/' + m.id : ''}`, {name: $('#pm-name', md).value.trim(), day});
       }
     } catch { return; }
@@ -438,7 +438,7 @@ document.addEventListener('click', async e => {
     case 'file-restore': try { await povApi('POST', `/api/list-files/${id}/restore`); toast(tr('Restored')); } catch { /* shown */ } break;
     case 'file-purge': {  // 2.272.0 F (#3038, review E2-H2): asked first
       const nm = b.closest('li')?.querySelector('.an')?.textContent || '';
-      if (await askConfirm(tr('Delete “{0}” for good?', nm), tr('This cannot be undone.'), {ok: tr('Delete for good'), danger: true})) try { await povApi('DELETE', `/api/list-files/${id}/purge`); } catch { /* shown */ }
+      if (await askConfirm(tr('Delete “{0}” permanently?', nm), tr('This cannot be undone.'), {ok: tr('Delete permanently'), danger: true})) try { await povApi('DELETE', `/api/list-files/${id}/purge`); } catch { /* shown */ }
       break;
     }
     case 'md-more': { const lid = routeList().id, cur = LS.get('povMdOpen', []) || [], open = !cur.includes(lid); LS.set('povMdOpen', (open ? [...cur, lid] : cur.filter(x => x !== lid)).slice(-200)); const m = b.parentElement.querySelector('.povmd'); if (m) m.classList.toggle('clamp', !open); b.textContent = open ? tr('Show less') : tr('Show more'); b.setAttribute('aria-expanded', open); break; }  // 2.331.0 A (#3310)
@@ -554,7 +554,7 @@ function depPicker(tid, dir) {
   const have = new Set((dir === 'by' ? D.blocked_by : D.blocking).filter(x => x.id).map(x => x.id));
   const self = taskById(tid);
   const md = modal(`<h3>${dir === 'by' ? tr('Blocked by…') : tr('Blocking…')}</h3>
-    <div class="shint">${dir === 'by' ? tr('“{0}” can only really start once the chosen task is done.', esc(self?.title || '')) : tr('The chosen task is then blocked by “{0}”.', esc(self?.title || ''))}</div>
+    <div class="shint">${dir === 'by' ? tr('“{0}” can only really start once the selected task is done.', esc(self?.title || '')) : tr('The selected task is then blocked by “{0}”.', esc(self?.title || ''))}</div>
     <input id="dp-q" placeholder="${tr('Search open tasks')}" autocomplete="off" style="width:100%;margin-top:.5rem">
     <div class="dplist tpk" id="dp-list" role="listbox" aria-label="${esc(tr('Open tasks'))}"></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button></div>`);
@@ -791,7 +791,7 @@ function fieldModal(lid, f, done) {
     if (st.type === 'number') x.innerHTML = `<div class="row"><label for="fd-unit">${tr('Unit')}</label><input id="fd-unit" value="${esc(f?.options?.unit || '')}" maxlength="12" placeholder="${tr('optional, e.g. € or h')}" style="max-width:8.75rem"></div>`;
     // 2.40.0 (#1193): a palette per option instead of cycling, a handle to drag (Alt+↑/↓), the Status template for a new field
     else if (st.type === 'select' || st.type === 'multiselect') x.innerHTML = `<h4>${tr('Options')}</h4>${edit ? '' : `<div class="row lrtpl"><button type="button" class="btn sm" data-m="opt-tpl" title="${esc(tr('Not started, In progress, Waiting, Done'))}">${ic('list', 's')} ${tr('Template “Status”')}</button><button type="button" class="btn sm" data-m="opt-empty">${tr('Start empty')}</button></div>`}<div class="optlist" role="list">${st.opts.map((o, i) => `<div class="optrow" data-i="${i}" role="listitem"><span class="colh" data-oh="${i}" title="${esc(tr('Drag to reorder'))}" aria-hidden="true">${ic('grip', 's')}</span><button type="button" class="swc" data-ocol="${i}" style="background:${cssColor(o.color) || 'var(--bg4)'}" title="${tr('Colour')}" aria-label="${esc(tr('Colour'))}" aria-expanded="${st.pal === i}"></button><input data-oname="${i}" value="${esc(o.name)}" maxlength="60" placeholder="${tr('Option')}" title="${esc(tr('Alt+↑ / Alt+↓ moves the option'))}">${st.type === 'select' && st.stages ? cfst_optSel(o, i) : ''}<button type="button" class="iconbtn" data-orm="${i}" title="${tr('Remove')}">${ic('x', 's')}</button></div>${st.pal === i ? `<div class="colors lrpal" role="group" aria-label="${esc(tr('Colour'))}">${LCOLORS.map((c, k) => `<button type="button" data-opal="${esc(c)}" style="background:${c || 'var(--bg4)'}" class="${(o.color || '') === c ? 'on' : ''}" aria-pressed="${(o.color || '') === c}" aria-label="${esc(c ? tr('Colour {0}', k) : tr('No colour'))}"></button>`).join('')}</div>` : ''}`).join('')}</div><button class="btn sm" data-m="opt-add">${ic('plus', 's')} ${tr('Option')}</button>${edit ? `<div class="shint keep">${tr('Removing an option clears it in all tasks.')}</div>` : ''}${st.type === 'select' ? cfst_dlgRow(st) : ''}`;
-    else x.innerHTML = st.type === 'person' ? `<div class="shint keep">${tr('Pick the owner or a member of the project.')}</div>` : '';
+    else x.innerHTML = st.type === 'person' ? `<div class="shint keep">${tr('Select the owner or a member of the project.')}</div>` : '';
   };
   extra();
   md.addEventListener('change', e => {

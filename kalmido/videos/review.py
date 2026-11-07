@@ -659,7 +659,7 @@ def vdr_sig_new(vid):
     c, uid = db(), me()
     r = vdr_need(c, vid, write=True)
     if not public_links_on(c, "signoff"):
-        return err(tr("Public links are turned off on this server"), 409)
+        return err(tr("Public links are switched off on this server"), 409)
     if not vdr_versions(c, vid):
         return err(tr("Invalid value: {0}", "url"), 409)
     b = body()
@@ -911,7 +911,7 @@ def vdr_move_space(vid):
         o, _t, dest, _k = vdr_target(c, uid, {"list_id": pl})
         if (o or None) != (to or None):
             raise Denied(409, tr("Invalid value: {0}", "place"))
-    block = None if dest or b.get("undo") else tr("Choose a project in the target workspace")
+    block = None if dest or b.get("undo") else tr("Select a project in the target workspace")
     if deny:  # 2.361.2 B (#2923): the dry run; the creator can ask an admin (out_request)
         return jsonify(smv_answer(notes, deny.text(), count=1, **(deny.data or {})))
     if b.get("dry") or block:
@@ -937,7 +937,7 @@ def vdr_move_space(vid):
         except (Denied, BadInput):
             pass
     if not any(new.values()):  # 2.99.1 review L2: the old place no longer fits -> a project in the target, no review at nothing
-        return jsonify(smv_answer(notes, tr("Choose a project in the target workspace"), count=1))
+        return jsonify(smv_answer(notes, tr("Select a project in the target workspace"), count=1))
     org_out(c, r["org_id"], to, "video", r["title"], obj=vid)  # 2.361.2 B (#2923): logged, admins told, release used
     c.execute("UPDATE video_reviews SET org_id=?, owner_id=?, task_id=?, list_id=?, client_id=?, updated_at=?, brought_by=? WHERE id=?",
               (to, None if to else uid, new["task_id"], new["list_id"], new["client_id"], ts, uid if to and not r["org_id"] else None, vid))  # 2.365.1 (#3395): accounts/orgback.py

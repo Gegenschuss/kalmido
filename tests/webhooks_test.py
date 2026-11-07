@@ -271,7 +271,7 @@ w = wait_for(lambda: [x for x in A.get(B + "/api/me/webhooks").json()["hooks"] i
 check(w and w[0]["disabled_reason"] == "failures" and w[0]["last"]["status"] == 500, "turned off after the last retry " + str(w[:1]))
 time.sleep(4)
 al = dbx("SELECT kind, message FROM admin_alerts WHERE kind='integration'")
-check(any("Webhook" in m and "turned off" in m for _, m in al), "admin alert (integration) " + str(al))
+check(any("Webhook" in m and "switched off" in m for _, m in al), "admin alert (integration) " + str(al))
 check(not any("/fail" in m or STUB in m for _, m in al), "the alert does not name the URL")
 lg = A.get(B + f"/api/me/webhooks/{wf['id']}/log").json()["items"]
 check(len(lg) == 5 and all(not x["ok"] and x["status"] == 500 and x["error"] == "http" for x in lg) and "body" not in json.dumps(lg),

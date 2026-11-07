@@ -46,7 +46,7 @@ const DESK = {'(hover:hover) and (pointer:fine)': true};
     check(!L.some((x, i) => x === '-' && L[i + 1] === '-') && L[L.length - 1] !== '-', `${user}: no doubled or trailing divider ` + JSON.stringify(L));
     if (user !== 'alice') { w.close(); continue; }  // frida shares no list with the agent: only the top is checked
     const iAg = L.findIndex(x => /Office Helper/.test(x) && !/^Chat with/.test(x)), iChat = L.findIndex(x => /^Chat with Office Helper/.test(x));
-    check(iAg > 1 && iChat > iAg && L.indexOf('Choose the agents shown…') > iChat, `${user}: then the agents; chats and the rest stay below ` + JSON.stringify(L));
+    check(iAg > 1 && iChat > iAg && L.indexOf('Select the agents shown…') > iChat, `${user}: then the agents; chats and the rest stay below ` + JSON.stringify(L));
     w.close();
   }
 

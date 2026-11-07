@@ -49,7 +49,7 @@ function shareHtml(hint) {
     ${S.me?.support_session ? '' /* 2.538.0 (#4365): the download makes a new upload token, a support session gets none */ : `<div class="row"><a class="btn sm" id="s-hszip" href="/api/me/share/httpshortcuts.zip" download="kalmido-http-shortcuts.zip">${ic('download', 's')} ${tr('Download HTTP Shortcuts import')}</a></div>`}
     <details class="shelp sdet"><summary>${tr('How to set it up')}</summary><ol class="slist">
       <li>${tr('Install the free app <b>HTTP Shortcuts</b> (Play Store or F-Droid).')}</li>
-      <li>${tr('In HTTP Shortcuts: menu ⋮ > Import / Export > Import from file, choose the downloaded ZIP.')}</li>
+      <li>${tr('In HTTP Shortcuts: menu ⋮ > Import / Export > Import from file, select the downloaded ZIP.')}</li>
       <li>${tr('Then in any app: Share > HTTP Shortcuts > <b>Kalmido</b> for photos and files (also several), <b>Kalmido text</b> for links and text.')}</li>
       <li>${tr('Links and text also work with Share > Kalmido once the app is installed.')}</li>
     </ol></details>
@@ -62,7 +62,7 @@ function shareHtml(hint) {
     <details class="shelp sdet"><summary>${tr('Set it up in the Shortcuts app')}</summary><ol class="slist">
       ${ios ? `<li>${tr('Easiest: tap “Add the Kalmido shortcut” above, then Add Shortcut. It asks two questions: paste the server address (without /drop), then the upload token (copy them here first).')}</li>` : ''}
       <li>${tr('By hand: Shortcuts app > + (new shortcut), name it “Kalmido”.')}</li>
-      <li>${tr('Tap ⓘ (details) > turn on “Show in Share Sheet”; as input accept Images, Files, URLs and Text.')}</li>
+      <li>${tr('Tap ⓘ (details) > switch on “Show in Share Sheet”; as input accept Images, Files, URLs and Text.')}</li>
       <li>${tr('Add the action “Get Contents of URL”: URL = the server address above followed by <code class="topic">/drop</code>, Method = POST, Headers: Authorization = <code class="topic">Bearer</code> followed by a space and your upload token.')}</li>
       <li>${tr('Request Body: Form; add a field of type File named <code class="topic">file</code> with the value “Shortcut Input”. For links and text a second shortcut with a Text field named <code class="topic">text</code> instead.')}</li>
       <li>${tr('Done: in any app Share > Kalmido. The first time, iOS asks whether the shortcut may connect to your server: Always allow.')}</li>
@@ -539,7 +539,7 @@ async function tfaDraw(md, j) {
   const on = j.totp || j.passkeys.length;
   let h = j.required ? hintK(tr('Required on this server: keep at least one method (authenticator app or passkey).')) : '';
   h += `<div class="row"><label>${tr('Authenticator app')}</label><span class="tfastate ${j.totp ? 'on' : ''}">${j.totp ? tr('On') : tr('Off')}</span>
-      ${j.totp ? `<button class="btn sm" data-tfa="totp-off">${tr('Turn off')}</button>` : `<button class="btn sm pri" data-tfa="totp-on">${ic('lock', 's')} ${tr('Set up')}</button>`}</div>`;
+      ${j.totp ? `<button class="btn sm" data-tfa="totp-off">${tr('Switch off')}</button>` : `<button class="btn sm pri" data-tfa="totp-on">${ic('lock', 's')} ${tr('Set up')}</button>`}</div>`;
   h += `<div class="row"><label>${tr('Passkeys')}</label><button class="btn sm" data-tfa="pk-add" ${pkSupported() ? '' : 'disabled'}>${ic('key', 's')} ${tr('Add a passkey')}</button></div>`;
   if (!pkSupported()) h += hintK(tr('Passkeys need HTTPS (or localhost), a host name instead of an IP address and a current browser.'));
   if (j.passkeys.length) h += `<div class="members pklist">${j.passkeys.map(p => `<div class="mrow" data-pk="${p.id}"><span class="avatar">${ic('key', 's')}</span><span class="n">${esc(p.name)} <small class="muted">${tr('added {0}', esc(when(p.created_at)))}${p.last_used_at ? ' · ' + tr('last used {0}', esc(when(p.last_used_at))) : ''}${p.synced ? ' · ' + tr('synced') : ''}</small></span><button class="iconbtn" data-tfa="pk-ren" title="${tr('Rename')}">${ic('edit', 's')}</button><button class="iconbtn" data-tfa="pk-del" title="${tr('Remove')}">${ic('trash', 's')}</button></div>`).join('')}</div>`;
@@ -560,7 +560,7 @@ function tfaWire(md) {
         const t = await api('POST', '/api/me/2fa/totp', {password: pw.password});
         const res = await new Promise(done => {
           const m = modal(`<h3>${tr('Set up the authenticator app')}</h3><form class="totpform">${totpSetupHtml(t)}<div class="aerr" role="alert" id="totp-err"></div>
-            <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" type="submit">${tr('Turn on')}</button></div></form>`);
+            <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" type="submit">${tr('Switch on')}</button></div></form>`);
           m.classList.add('totpmodal');
           m.addEventListener('click', ev => { if (ev.target.closest('[data-m="close"]')) { m.remove(); done(null); } });
           m.querySelector('form').addEventListener('submit', async ev => {
@@ -576,8 +576,8 @@ function tfaWire(md) {
         await tfaDraw(md, res); await refreshMe();
       }
       if (a === 'totp-off') {
-        const pw = await pwPrompt(tr('Turn off the authenticator app'), {code: true}); if (!pw) return;
-        await tfaDraw(md, await api('POST', '/api/me/2fa/totp/disable', pw)); toast(tr('Authenticator app turned off')); await refreshMe();
+        const pw = await pwPrompt(tr('Switch off the authenticator app'), {code: true}); if (!pw) return;
+        await tfaDraw(md, await api('POST', '/api/me/2fa/totp/disable', pw)); toast(tr('Authenticator app switched off')); await refreshMe();
       }
       if (a === 'rc-new') {
         const pw = await pwPrompt(tr('New recovery codes'), {text: tr('The old codes stop working.')}); if (!pw) return;
@@ -620,7 +620,7 @@ async function bkrPurged(m, src) {
   const when = j.first === j.last ? esc(aaWhen(j.first)) : tr('{0} to {1}', esc(aaWhen(j.first)), esc(aaWhen(j.last)));
   const also = [j.recent ? trn('{0} entry deleted in the last {1} days stays either way.', '{0} entries deleted in the last {1} days stay either way.', j.recent, j.recent_days) : '',
     j.accounts ? trn('{0} account deleted since then stays deleted or disabled either way.', '{0} accounts deleted since then stay deleted or disabled either way.', j.accounts) : ''].filter(Boolean).join(' ');
-  box.innerHTML = (j.total ? `<p><b>${tr('Deleted for good since this backup')}</b><br>${kinds}<br><span class="muted">${tr('Deleted: {0}', when)}</span></p>
+  box.innerHTML = (j.total ? `<p><b>${tr('Deleted permanently since this backup')}</b><br>${kinds}<br><span class="muted">${tr('Deleted: {0}', when)}</span></p>
       <label class="chkl"><input type="radio" name="bkr-purge" id="bkr-again" checked> ${tr('Delete them again (default, for data protection)')}</label>
       <label class="chkl"><input type="radio" name="bkr-purge" id="bkr-keep"> ${tr('Keep everything in the backup (recorded in the admin alerts and the log)')}</label>` : '')
     + (also ? `<p class="muted">${also}</p>` : '');
@@ -767,8 +767,8 @@ async function offerCollab() {
   let n = 0;
   try { n = (await api('GET', '/api/users')).users.filter(u => !u.disabled).length; } catch { return; }
   if (n !== 2) return;
-  const md = modal(`<h3>${tr('Turn on collaboration now?')}</h3><p class="muted">${tr('Sharing projects, assigning tasks, comments and News, for both of you. You can change it any time under Settings > Modules.')}</p>
-    <div class="foot"><span class="spacer"></span><button class="btn" data-m="no">${tr('Not now')}</button><button class="btn pri" data-m="yes">${tr('Yes, turn on')}</button></div>`);
+  const md = modal(`<h3>${tr('Switch on collaboration now?')}</h3><p class="muted">${tr('Sharing projects, assigning tasks, comments and News, for both of you. You can change it any time under Settings > Modules.')}</p>
+    <div class="foot"><span class="spacer"></span><button class="btn" data-m="no">${tr('Not now')}</button><button class="btn pri" data-m="yes">${tr('Yes, switch on')}</button></div>`);
   md.classList.add('collabask');
   await new Promise(done => md.addEventListener('click', async e => {
     const b = e.target.closest('[data-m]'); if (!b) return;
@@ -778,7 +778,7 @@ async function offerCollab() {
     md.remove(); done();
   }));
 }
-// ---- 1.8.0: sample project "Example: Image film for client Muster" + a packing checklist (built on the server, in the
+// ---- 1.8.0: sample project "Example: Promo film for Example Ltd" + a packing checklist (built on the server, in the
 // user's language, only with the modules that are on). Offered in the setup and the welcome tour, created / removed
 // under Settings > Data (and the command palette). Removing takes exactly what the sample created: tasks the user
 // added stay, and so does their list.
@@ -796,7 +796,7 @@ function ind_setHtml(hint) {
   const d = S.industry; if (!d || !(d.choices || []).length || S.me?.kid) return '';
   return `<h4 id="s-industry-h">${tr('Industry')}</h4>
       <div class="row"><label for="s-industry">${tr('Industry')}</label><select id="s-industry" ${d.can_set ? '' : 'disabled'}>${indOpts(d, d.code)}</select></div>
-      ${hint(d.can_set ? tr('Adds the functions of one industry to the whole app, e.g. Film & Video: the shoot calculation in quotations and the image film as sample project. None: everything stays general.') : tr('The admins of your organisation choose its industry.'))}`;
+      ${hint(d.can_set ? tr('Adds the functions of one industry to the whole app, e.g. Film & Video: the shoot calculation in quotations and the image film as sample project. None: everything stays general.') : tr('The admins of your organisation select its industry.'))}`;
 }
 async function ind_save(md, el) {
   const old = S.industry?.code || '';
@@ -895,17 +895,17 @@ async function ua8_delete(u) {
     <div class="members ua8lists">${j.lists.map(l => `<div class="mrow"><span class="n">${l.locked ? ic('lock', 's') + ' ' : ''}${lname(l)} <span class="muted">${l.org && l.name != null ? esc(l.org) + ' · ' : ''}${l.shared ? esc(l.members.length ? tr('shared with {0}', l.members.join(', ') + (l.shared > l.members.length ? ' ' + tr('+{0}', l.shared - l.members.length) : '')) : trn('shared with {0} person', 'shared with {0} people', l.shared)) : esc(tr('not shared'))}</span></span></div>`).join('')}</div>
     <fieldset class="ua8how"><legend>${tr('The projects')}</legend>
       <label class="chkl"><input type="radio" name="ua8how" value="transfer" ${cand.length ? 'checked' : 'disabled'}> ${tr('Hand them over to')}</label>
-      <select id="ua8-to" aria-label="${esc(tr('New owner'))}" ${cand.length ? '' : 'disabled'}>${cand.some(p => p.id === S.me.id) ? '' : `<option value="">${esc(tr('Choose'))}</option>`}${cand.map(p => `<option value="${p.id}" ${p.id === S.me.id ? 'selected' : ''}>${esc(p.name)}${p.invited ? ' · ' + esc(tr('Invited')) : ''}</option>`).join('')}</select>
+      <select id="ua8-to" aria-label="${esc(tr('New owner'))}" ${cand.length ? '' : 'disabled'}>${cand.some(p => p.id === S.me.id) ? '' : `<option value="">${esc(tr('Select'))}</option>`}${cand.map(p => `<option value="${p.id}" ${p.id === S.me.id ? 'selected' : ''}>${esc(p.name)}${p.invited ? ' · ' + esc(tr('Invited')) : ''}</option>`).join('')}</select>
       ${cand.length ? '' : `<div class="shint keep">${tr('Nobody can take over every one of these projects (an organisation’s project stays in its organisation). Hand single projects over first or delete them along.')}</div>`}
       ${locked ? `<div class="shint keep">${ic('lock', 's')} ${tr('Projects with the lock: the new owner can read them once a member who holds the key opens them.')}</div>` : ''}
       ${alone ? `<div class="shint keep warn">${ic('alert', 's')} ${esc(trn('Nobody else has the key of {0} project with the lock: its content can no longer be read after the handover.', 'Nobody else has the key of {0} projects with the lock: their content can no longer be read after the handover.', alone))}</div>` : ''}
       <label class="chkl"><input type="radio" name="ua8how" value="delete" ${nodel ? 'disabled' : cand.length ? '' : 'checked'}> ${tr('Delete them along')}</label>
       ${foreign ? `<div class="shint keep">${tr('Projects of an organisation you do not belong to cannot be deleted along: hand them over instead.')}</div>` : ''}
       ${receipts && !rhost ? `<div class="shint keep">${tr('Projects with receipts cannot be deleted along (receipts are kept): hand them over instead.')}</div>` : ''}
-      ${receipts && rhost ? `<div class="shint keep">${tr('Projects with receipts go along at once only after the retention export (the next step). Without it they stay in the trash until the legal retention period ends and are deleted for good after that.')}</div>` : ''}
+      ${receipts && rhost ? `<div class="shint keep">${tr('Projects with receipts go along at once only after the retention export (the next step). Without it they stay in the trash until the legal retention period ends and are deleted permanently after that.')}</div>` : ''}
       <div id="ua8-del" ${cand.length || nodel ? 'hidden' : ''}>
         ${shared ? `<div class="shint keep warn">${ic('alert', 's')} ${esc(trn('{0} of these projects is shared: the other people lose it too.', '{0} of these projects are shared: the other people lose them too.', shared))}</div>` : ''}
-        <div class="shint keep warn dvaua8gone">${ic('alert', 's')} ${esc(tr('The projects are deleted for good with all their tasks, also those of other members: they do not go to the trash.'))}</div>${/* 2.533.0 (#4318) B43 */ ''}
+        <div class="shint keep warn dvaua8gone">${ic('alert', 's')} ${esc(tr('The projects are deleted permanently with all their tasks, also those of other members: they do not go to the trash.'))}</div>${/* 2.533.0 (#4318) B43 */ ''}
         <div class="row"><label for="ua8-conf">${esc(tr('Type {0} to confirm', j.username))}</label><input id="ua8-conf" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
       </div>
     </fieldset>
@@ -995,7 +995,7 @@ async function odlDelete(o) {
     try { await api('DELETE', `/api/admin/orgs/${o.id}${rxq ? '?' + rxq : ''}`); } catch { return false; }
     toast(tr('Deleted')); return true;
   }
-  const html = (retire ? `<div class="shint keep warn">${ic('alert', 's')} ${esc(tr('It keeps {0} by law until {1}. It is retired instead of deleted: the members leave it, nobody sees it in the app any more, its admins of today can still export it (Settings > Organisation), and it goes for good after that date.', odlCounts(j.kept), fmtDate(j.retain_until)))}</div>` : '')
+  const html = (retire ? `<div class="shint keep warn">${ic('alert', 's')} ${esc(tr('It keeps {0} by law until {1}. It is retired instead of deleted: the members leave it, nobody sees it in the app any more, its admins of today can still export it (Settings > Organisation), and it is removed permanently after that date.', odlCounts(j.kept), fmtDate(j.retain_until)))}</div>` : '')
     + (content ? `<div class="shint keep odlcontent">${esc(tr('These go with it: {0}. Export the organisation first.', content))}</div>` : '') + mem + exp;
   if (!await askConfirm(tr('Delete the organisation “{0}”?', o.name), '', {html, ok: retire ? tr('Retire the organisation') : tr('Delete'), danger: true, after: md => { oxDraw(md); olvNoticeWire(md, o); }})) return false;
   try { await api('DELETE', `/api/admin/orgs/${o.id}?confirm=1${rxq ? '&' + rxq : ''}`); } catch { return false; }
@@ -1030,7 +1030,7 @@ function ua8PurgeHtml(p) {
   const to = ua8SharedCounts(p.shared?.to), gone = ua8SharedCounts(p.shared?.gone);
   if (to) rows.push([false, p.shared.names?.length ? tr('Shared with others, these stay and go to the longest-standing person who may change them ({1}): {0}.', to, p.shared.names.join(', ')) : tr('Shared with others, these stay and go to the longest-standing person who may change them: {0}.', to)]);
   if (gone) rows.push([true, tr('Shared with others, but nobody else may take them over, so these go with the account: {0}.', gone)]);
-  if (p.office === 'keep') rows.push([true, tr('The private office keeps {0} by law until {1}: it is retired and goes for good after that date, nobody can export it any more (the person can download the retention export in the office before). Everything else of the account goes.', odlCounts(p.kept), fmtDate(p.kept_until))]);
+  if (p.office === 'keep') rows.push([true, tr('The private office keeps {0} by law until {1}: it is retired and is removed permanently after that date, nobody can export it any more (the person can download the retention export in the office before). Everything else of the account goes.', odlCounts(p.kept), fmtDate(p.kept_until))]);
   else if (p.office === 'delete') rows.push([false, tr('The private office goes with its files: {0}.', odlCounts(p.office_counts))]);
   if (p.agents) rows.push([false, trn('{0} own agent is deleted with its access keys.', '{0} own agents are deleted with their access keys.', p.agents)]);
   if (p.calendars) rows.push([false, trn('{0} calendar of an organisation goes to an admin of the organisation.', '{0} calendars of an organisation go to an admin of the organisation.', p.calendars)]);
@@ -1038,7 +1038,7 @@ function ua8PurgeHtml(p) {
   if (p.sheets_kept) rows.push([false, trn('{0} monthly timesheet of an organisation stays, without the name.', '{0} monthly timesheets of an organisation stay, without the name.', p.sheets_kept)]);  // 2.360.2 D (#2561)
   if (p.dms) rows.push([false, trn('{0} direct conversation stays for the other person.', '{0} direct conversations stay for the other people.', p.dms)]);
   // 2.533.0 (#4318) B42: the person's files in direct messages and groups are sealed with their key: they go for good
-  if (p.chat_files) rows.push([true, trn('{0} file this person sent in direct messages or groups is deleted for good: the other people lose it too.', '{0} files this person sent in direct messages or groups are deleted for good: the other people lose them too.', p.chat_files)]);
+  if (p.chat_files) rows.push([true, trn('{0} file this person sent in direct messages or groups is deleted permanently: the other people lose it too.', '{0} files this person sent in direct messages or groups are deleted permanently: the other people lose them too.', p.chat_files)]);
   rows.push([false, tr('Messages and comments of this person stay with their text, without the name.')]);  // 2.306.0 C (#2889)
   return rows.map(([w, t]) => `<div class="shint keep ua8purge${w ? ' warn' : ''}">${w ? ic('alert', 's') + ' ' : ''}${esc(t)}</div>`).join('');
 }
@@ -1081,7 +1081,7 @@ async function otkLoad(md, oid, more) {
 }
 function otkOpen(oid, name) {
   const md = modal(`<h3>${esc(tr('Tasks of the organisation {0}', name))}</h3>
-    <div class="shint keep">${ic('eye', 's')} ${esc(tr('Read only: the tasks of the projects listed under "Projects of the organisation", also where you are not a member. Private and encrypted projects stay invisible. Every look is recorded in the history there.'))}</div>
+    <div class="shint keep">${ic('eye', 's')} ${esc(tr('Read-only: the tasks of the projects listed under "Projects of the organisation", also where you are not a member. Private and encrypted projects stay invisible. Every look is recorded in the history there.'))}</div>
     <div class="row otkbar"><label for="otk-l" class="sr">${tr('Project')}</label><select id="otk-l"></select>
       <div class="seg" role="group" aria-label="${esc(tr('Show'))}">${OTK_ST.map(([k, n]) => `<button type="button" class="${k === 'open' ? 'on' : ''}" data-otk-st="${k}" aria-pressed="${k === 'open'}">${esc(tr(n))}</button>`).join('')}</div>
       <input id="otk-q" type="search" placeholder="${esc(tr('Search'))}" aria-label="${esc(tr('Search'))}" maxlength="200"></div>

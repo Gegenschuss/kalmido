@@ -184,12 +184,12 @@ function bw_placeOpts(m) {
   const ch = BW.data?.choices?.places || [], cur = m?.place_name || '';
   const hit = ch.find(c => c.name.toLocaleLowerCase() === cur.toLocaleLowerCase() && (c.extra || '') === (m?.place_address || ''));
   const sel = hit ? `c${hit.id}` : cur ? 'cur' : '';
-  return `<option value="" ${sel ? '' : 'selected'}>${esc(tr('Choose a place…'))}</option>${cur && !hit ? bw_opt('cur', cur, sel) : ''}${ch.map(c => bw_opt(`c${c.id}`, c.name, sel)).join('')}${bw_opt('__new', tr('New place…'), sel)}`;
+  return `<option value="" ${sel ? '' : 'selected'}>${esc(tr('Select a place…'))}</option>${cur && !hit ? bw_opt('cur', cur, sel) : ''}${ch.map(c => bw_opt(`c${c.id}`, c.name, sel)).join('')}${bw_opt('__new', tr('New place…'), sel)}`;
 }
 function bw_hostOpts(m) {
   const me = BW.data?.me, h = m ? m.host : {id: me}, ppl = BW.data?.people || [], ch = BW.data?.choices?.persons || [];
   const hit = h?.id ? `u${h.id}` : h?.name ? (ch.find(c => c.name.toLocaleLowerCase() === h.name.toLocaleLowerCase()) ? `c${ch.find(c => c.name.toLocaleLowerCase() === h.name.toLocaleLowerCase()).id}` : 'cur') : '';
-  return `<option value="" ${hit ? '' : 'selected'}>${esc(tr('Choose the host…'))}</option>${ppl.map(p => bw_opt(`u${p.id}`, p.name, hit)).join('')}${hit === 'cur' ? bw_opt('cur', bw_pn(h), hit) : ''}${ch.map(c => bw_opt(`c${c.id}`, bw_pn(c), hit)).join('')}${bw_opt('__new', tr('New person…'), hit)}`;
+  return `<option value="" ${hit ? '' : 'selected'}>${esc(tr('Select the host…'))}</option>${ppl.map(p => bw_opt(`u${p.id}`, p.name, hit)).join('')}${hit === 'cur' ? bw_opt('cur', bw_pn(h), hit) : ''}${ch.map(c => bw_opt(`c${c.id}`, bw_pn(c), hit)).join('')}${bw_opt('__new', tr('New person…'), hit)}`;
 }
 function bw_guestPool(m) {  // key -> {id} | {name, extra}: the people of the office, the choices, the meal's own guests
   const pool = new Map();

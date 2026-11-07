@@ -38,7 +38,7 @@ const MOCK = `(() => {
     if (p[0] === 'move') return J(200, {ok: true, task: {server: body.to.server, id: 300}, lost: {comments: 1, attachments: 0, subtasks: 2}});  // 2.73.0 (#661) review N3: subtasks
     if (p[0] === '2') return OFF();
     const tid = +p[2];
-    if (p[1] === 'data') return J(200, {lists: [{id: 10, name: 'Work inbox', color: '', folder: '', inbox: true, can_write: true}, {id: 11, name: 'Projects', color: '', folder: '', inbox: false, can_write: true}, {id: 12, name: 'Read only', color: '', folder: '', inbox: false, can_write: false}], tasks: __msv.tasks, today: t0, at: new Date().toISOString()});
+    if (p[1] === 'data') return J(200, {lists: [{id: 10, name: 'Work inbox', color: '', folder: '', inbox: true, can_write: true}, {id: 11, name: 'Projects', color: '', folder: '', inbox: false, can_write: true}, {id: 12, name: 'Read-only', color: '', folder: '', inbox: false, can_write: false}], tasks: __msv.tasks, today: t0, at: new Date().toISOString()});
     if (p[1] === 'tasks' && !tid && m === 'POST') return J(200, T(200 + __msv.calls.length, body.list_id || 10, body.title, {due: body.due || null}));
     if (p[1] === 'tasks' && p[3] === 'complete') return J(200, {...__msv.tasks.find(t => t.id === tid), status: 2});
     if (p[1] === 'tasks' && p[3] === 'reopen') return J(200, {...__msv.tasks.find(t => t.id === tid), status: 0});

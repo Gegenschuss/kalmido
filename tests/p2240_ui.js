@@ -148,7 +148,7 @@ const BASE = 'cal,comments,collab,time,progress,agents,kanban,timeline,matrix';
   check(items[0] === 'Plan my day' && items[1] === 'Fill free time', 'UX-35: the planners lead the "…" menu ' + items.slice(0, 3).join('|'));
   w.eval('closePop()');
   click(w, ob.querySelector('[data-act="od-other"]')); await sleep(150);
-  check([...d.querySelectorAll('#pop .menu-list button')].map(b => b.textContent.trim()).join('|') === 'Tomorrow|Next week (Mon)|Pick a date…', 'UX-35: "Another day…" = Tomorrow / Next week / Pick a date');
+  check([...d.querySelectorAll('#pop .menu-list button')].map(b => b.textContent.trim()).join('|') === 'Tomorrow|Next week (Mon)|Select a date…', 'UX-35: "Another day…" = Tomorrow / Next week / Pick a date');
   w.eval('closePop()');
   // 2.351.2 (#1507): the move is a batch request + reload: waited for instead of a fixed 400 ms (a busy CI runner was slower)
   click(w, ob.querySelector('[data-act="od-move"]'));

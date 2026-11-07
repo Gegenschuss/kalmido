@@ -75,7 +75,7 @@ function lyo_row(v, k, d) {
     return `<div class="lyo-r">${lab}<div class="seg lyo-seg" role="group" aria-labelledby="${id}">${lyo_ch(d).map(([c, l], i) => `<button type="button" data-lyo="${esc(d.name)}" data-x="${i}" class="${c === cur ? 'on' : ''}" aria-pressed="${c === cur}">${esc(tr(l))}</button>`).join('')}</div></div>`;
   }
   const src = lyo_src(d), gone = x != null && x !== '' && !src.some(c => c[0] === x);
-  return `<div class="lyo-r">${lab}<select data-lyo="${esc(d.name)}" aria-labelledby="${id}"><option value="">${esc(tr(d.all || 'All'))}</option>${gone ? `<option value="__gone" selected disabled>${esc(tr('No longer available'))}</option>` : ''}${src.map(([c, l]) => `<option value="${esc(String(c))}" ${c === cur ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>${gone ? `<span class="muted lyo-gone">${esc(tr('The chosen one is no longer available; the block shows everything.'))}</span>` : ''}</div>`;
+  return `<div class="lyo-r">${lab}<select data-lyo="${esc(d.name)}" aria-labelledby="${id}"><option value="">${esc(tr(d.all || 'All'))}</option>${gone ? `<option value="__gone" selected disabled>${esc(tr('No longer available'))}</option>` : ''}${src.map(([c, l]) => `<option value="${esc(String(c))}" ${c === cur ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>${gone ? `<span class="muted lyo-gone">${esc(tr('The selected one is no longer available; the block shows everything.'))}</span>` : ''}</div>`;
 }
 function lyo_body(v, k) {
   const own = lyo_defs(v, k).some(d => lyo_val(v, k, d.name) != null);

@@ -23,8 +23,8 @@ from freelancer_fixture import freelancer, org_join
 A = kt.setup()
 FEATS = "cal,timeline,matrix,collab,time,progress,deps,fields,office,clients"
 A.patch(B + "/api/settings", json={"features": FEATS})
-NEUTRAL, NCHECK = "Example: Website relaunch for client Muster", "Example: Launch checklist"
-FILM, FCHECK = "Example: Image film for client Muster", "Example: Shoot day packing list"
+NEUTRAL, NCHECK = "Example: Website relaunch for Example Ltd", "Example: Launch checklist"
+FILM, FCHECK = "Example: Promo film for Example Ltd", "Example: Shoot day packing list"
 
 
 def ind(s):

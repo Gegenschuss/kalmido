@@ -500,7 +500,7 @@ async function wkeImport(sp, file, onProg = null) {  // 2.177.0 (#2685): onProg(
     if (onProg && onProg(k, files.length) === false) break;
     const nm = x.name.slice(0, 200);
     if (!x.name.toLowerCase().endsWith('.md')) {  // 2.99.0 A (#2182): the files of a locked space are not taken over yet (decision 2.99)
-      skipped.push(nm); detail.push({name: nm, reason: /\.(pdf|png|jpe?g|gif|webp|svg)$/i.test(x.name) ? tr('Encrypted workspace: files are not taken over yet') : tr('Only PDF files and pictures (PNG, JPEG, GIF, WebP, SVG)')});
+      skipped.push(nm); detail.push({name: nm, reason: /\.(pdf|png|jpe?g|gif|webp|svg)$/i.test(x.name) ? tr('Encrypted workspace: files are not imported yet') : tr('Only PDF files and pictures (PNG, JPEG, GIF, WebP, SVG)')});
       continue;
     }
     if (x.usize > WKE_ZIP.file || x.csize > WKE_ZIP.file + 4096 || x.name.includes('__MACOSX') || (x.flags & 1) || ![0, 8].includes(x.method)) { skipped.push(nm); continue; }
@@ -580,9 +580,9 @@ async function wkeMigrate(sp, onProgress, opts = {}) {
         if (!rows.length) {
           if (mode !== 'encrypting' && bad.size && !blank && (mode === 'decrypting' || opts.ask)) {
             const yes = typeof askConfirm === 'function' && await askConfirm(tr('Texts that cannot be decrypted'),
-              trn('{0} text of this workspace cannot be decrypted with the keys you hold. Take it over as an empty text? It cannot be restored.', '{0} texts of this workspace cannot be decrypted with the keys you hold. Take them over as empty texts? They cannot be restored.', bad.size), {ok: tr('Take over as empty'), danger: true});
+              trn('{0} text of this workspace cannot be decrypted with the keys you hold. Set it to an empty text? It cannot be restored.', '{0} texts of this workspace cannot be decrypted with the keys you hold. Set them to empty texts? They cannot be restored.', bad.size), {ok: tr('Set to empty'), danger: true});
             if (yes) { blank = true; last = -1; bad.clear(); continue; }
-            if (mode === 'decrypting') throw wkeErr(trn('{0} text of this workspace cannot be decrypted. The workspace stays locked until it is taken over as empty.', '{0} texts of this workspace cannot be decrypted. The workspace stays locked until they are taken over as empty.', bad.size), 'wiki_e2e_unreadable');
+            if (mode === 'decrypting') throw wkeErr(trn('{0} text of this workspace cannot be decrypted. The workspace stays locked until it is set to empty.', '{0} texts of this workspace cannot be decrypted. The workspace stays locked until they are set to empty.', bad.size), 'wiki_e2e_unreadable');
           }
           if (mode === 'on' && bad.size) { WKE.unread[sp] = bad.size; wkeChange(sp); }
           throw wkeErr(trn('{0} text of this workspace cannot be decrypted with the keys you hold.', '{0} texts of this workspace cannot be decrypted with the keys you hold.', bad.size), 'wiki_e2e_unreadable');

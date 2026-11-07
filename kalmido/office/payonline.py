@@ -894,7 +894,7 @@ def pol_rotate():
     c, uid, oid = _admin()
     conf = pol_conf(c, oid)
     if not conf["provider"]:
-        raise Denied(409, tr("Choose a provider first"))
+        raise Denied(409, tr("Select a provider first"))
     conf["hook_token"], conf["hook_hash"] = pol_new_hook()
     pol_write(c, oid, uid, conf)
     ofx_log(c, oid, "payonline_setup", target="settings", detail={"hook_rotated": 1})

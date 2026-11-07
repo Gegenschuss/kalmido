@@ -371,7 +371,7 @@ def rq_set(lid):
         if st["why"] == "kind":
             return err(tr("Only projects have an e-mail address"), 409)
         if st["why"] == "portal":
-            return err(tr("Public links are turned off on this server"), 409)
+            return err(tr("Public links are switched off on this server"), 409)
         return err(tr("E-mail to tasks is not set up on this server"), 409)
     l = c.execute("SELECT org_id FROM lists WHERE id=?", (lid,)).fetchone()
     if "on" in b:

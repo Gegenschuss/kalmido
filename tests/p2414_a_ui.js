@@ -106,7 +106,7 @@ const b64 = s => Buffer.from(s).toString('base64');
     check(await ready(ev, `!!document.querySelector('.itc-dlg [data-cd="yes"]')`, 40), 'the import names its target first');
     await ev(`(() => { document.querySelector('.itc-dlg [data-cd="yes"]').click(); return 1; })()`);
     check(await ready(ev, arch(`j.years.length === 2 && j.runs.length === 1`), 80), 'taken over: two years, one run');
-    check(await ready(ev, `!document.querySelector('.modal #bka-file') && /253 bookings taken over/.test(document.querySelector('#toast')?.textContent || '')`, 60), 'the dialog closed, the toast names the result');
+    check(await ready(ev, `!document.querySelector('.modal #bka-file') && /253 bookings imported/.test(document.querySelector('#toast')?.textContent || '')`, 60), 'the dialog closed, the toast names the result');
 
     // the newest year first, then the other one: pages of 200
     check(await ready(ev, `document.querySelector('#bka-year')?.value === '${Y2}' && /3 bookings/.test(${sum})`, 80), 'the newest year first: 3 bookings ' + await ev(sum));

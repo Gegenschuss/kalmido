@@ -95,7 +95,7 @@ check("collab" in feats(A), "collab back on")
 # ================================================================== the Comments module off: writing refused, reading stays
 A.patch(B + "/api/settings", json={"features": ",".join(f for f in feats(A) if f != "comments")})
 r = A.post(B + f"/api/tasks/{tp}/comments", json={"body": "x"})
-check(r.status_code == 409 and "Comments are turned off" in r.json().get("error", ""), f"comments off: create 409 ({r.status_code} {r.text[:80]})")
+check(r.status_code == 409 and "Comments are switched off" in r.json().get("error", ""), f"comments off: create 409 ({r.status_code} {r.text[:80]})")
 check(A.patch(B + f"/api/comments/{cid}", json={"body": "y"}).status_code == 409, "comments off: edit 409")
 check(A.get(B + f"/api/tasks/{tp}/timeline").ok, "comments off: reading stays")
 check(a.post(V + f"/tasks/{tp}/comments", json={"body": "x"}).status_code == 409 and a.get(V + f"/tasks/{tp}/comments").ok, "API v1: create 409, list works")

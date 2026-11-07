@@ -228,7 +228,7 @@ before are skipped. Each task's history says "carried over the task from a table
 table's name: the project may be shared with people who cannot open the table). The row gets a small mark in its row head; the
 side panel shows "Carried over" with a link to the task. Undo moves the tasks to the trash and removes the marks.
 
-**Take over as a quotation.** Only when Office & finance is on for the table's space (an organisation's table: that
+**Use as a quotation.** Only when Office & finance is on for the table's space (an organisation's table: that
 organisation's office; a private table: your own private office). Map the columns for description, quantity, unit and unit
 price and choose a client of that office. Units are recognised from the usual words (`Tag`, `Std`, `Stk`, `pauschal`, `day`,
 `hour`, `piece`, `flat` ...). Kalmido creates a **draft** in the office - nothing is finalised, numbered or sent beyond what the

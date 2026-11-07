@@ -113,10 +113,10 @@ async function firefox(fn) {
   const wps = md.querySelector('#s-wpstate');
   check(wps && /No device subscribed for push yet\. Until then, notifications go to your ntfy topic\./.test(wps.textContent) && !wps.classList.contains('warn'), 'notifications: a neutral hint, not red: ' + wps?.textContent);
   w.eval(`wpState(document.querySelector('.smodal'), {channel: 'webpush', subs: [], ntfy: false})`);
-  check(/Turn on “Notify on this device”/.test(wps.textContent), 'without ntfy: how to turn it on');
+  check(/Switch on “Notify on this device”/.test(wps.textContent), 'without ntfy: how to turn it on');
   // 2.499.0 (#4215): the public ntfy.sh gets no fallback on Web Push, the hints do not promise one
   w.eval(`wpState(document.querySelector('.smodal'), {channel: 'webpush', subs: [], ntfy: true, ntfy_public: true})`);
-  check(/Turn on “Notify on this device”/.test(wps.textContent), '#4215 public ntfy.sh, no device: how to turn it on, no ntfy promise: ' + wps.textContent);
+  check(/Switch on “Notify on this device”/.test(wps.textContent), '#4215 public ntfy.sh, no device: how to turn it on, no ntfy promise: ' + wps.textContent);
   w.eval(`wpState(document.querySelector('.smodal'), {channel: 'webpush', subs: [{}], ntfy: true, ntfy_public: true})`);
   check(/^Web Push to 1 device\.$/.test(wps.textContent), '#4215 public ntfy.sh, one device: no ntfy promise: ' + wps.textContent);
   md.remove();
@@ -138,7 +138,7 @@ async function firefox(fn) {
   w.eval(`settingsModal('data')`); await sleep(900);
   md = d.querySelector('.smodal');
   const fi = md.querySelector('#s-import');
-  check(fi && fi.hidden && fi.closest('.filebtn') && /Choose a file…/.test(fi.closest('.filebtn').textContent) && md.querySelector('#s-import-name').textContent === 'No file chosen', 'import: an own file button, "No file chosen"');
+  check(fi && fi.hidden && fi.closest('.filebtn') && /Select a file…/.test(fi.closest('.filebtn').textContent) && md.querySelector('#s-import-name').textContent === 'No file selected', 'import: an own file button, "No file selected"');
   Object.defineProperty(fi, 'files', {configurable: true, value: [new w.File(['x'], 'todoist.csv')]});
   fi.dispatchEvent(new w.Event('change', {bubbles: true}));
   await sleep(300);

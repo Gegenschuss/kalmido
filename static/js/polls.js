@@ -16,8 +16,8 @@ function tpo_when(o, p) {
   return `${fmtDayAbs(d0)} ${fmtTimeLoc(o.start.slice(11, 16))}–${d1 !== d0 ? fmtDayAbs(d1) + ' ' : ''}${fmtTimeLoc(o.end.slice(11, 16))}${p ? tpo_tzNote(p) : ''}`;
 }
 function tpo_status(p) {
-  if (p.closed_at) { const o = p.options.find(x => x.id === p.chosen_id); return o ? tr('Chosen: {0}', tpo_when(o, p)) : tr('Closed'); }
-  return trn('{0} vote', '{0} votes', p.votes_n) + (p.link_on ? '' : ' · ' + tr('Link turned off'));
+  if (p.closed_at) { const o = p.options.find(x => x.id === p.chosen_id); return o ? tr('Selected: {0}', tpo_when(o, p)) : tr('Closed'); }
+  return trn('{0} vote', '{0} votes', p.votes_n) + (p.link_on ? '' : ' · ' + tr('Link switched off'));
 }
 async function tpo_get(id) { return (await api('GET', `/api/polls/${id}`)).poll; }
 function tpo_redraw() { calInvalidate(); render(); }
@@ -135,18 +135,18 @@ async function tpo_show(p) {
     const best = p.best_id, open = !p.closed_at, max = Math.max(1, ...p.options.map(o => o.y + o.m));
     const who = id => { const y = [], m = []; for (const v of p.votes || []) { const a = v.answers[String(id)]; if (a === 'y') y.push(v.name); else if (a === 'm') m.push(v.name); } return {y, m}; };
     const opt = o => { const w = who(o.id); return `<li class="tpo-o${o.id === best ? ' tpo-best' : ''}${o.id === p.chosen_id ? ' tpo-chosen' : ''}">
-      <div class="tpo-oh"><span class="tpo-ow">${esc(tpo_when(o, p))}</span>${o.id === best && open ? `<span class="tpo-tag">${esc(tr('Best time'))}</span>` : ''}${o.id === p.chosen_id ? `<span class="tpo-tag">${esc(tr('Chosen'))}</span>` : ''}</div>
+      <div class="tpo-oh"><span class="tpo-ow">${esc(tpo_when(o, p))}</span>${o.id === best && open ? `<span class="tpo-tag">${esc(tr('Best time'))}</span>` : ''}${o.id === p.chosen_id ? `<span class="tpo-tag">${esc(tr('Selected'))}</span>` : ''}</div>
       <div class="tpo-bar" aria-hidden="true"><span class="tpo-by" style="width:${(o.y / max * 100).toFixed(1)}%"></span><span class="tpo-bm" style="width:${(o.m / max * 100).toFixed(1)}%"></span></div>
       <div class="tpo-oc muted">${esc(tr('{0} yes · {1} maybe · {2} no', o.y, o.m, o.n))}</div>
       ${w.y.length || w.m.length ? `<div class="tpo-on">${w.y.length ? `<span><b>${esc(tr('Yes'))}:</b> ${esc(w.y.join(', '))}</span>` : ''}${w.m.length ? `<span><b>${esc(tr('Maybe'))}:</b> ${esc(w.m.join(', '))}</span>` : ''}</div>` : ''}
-      ${open && p.can_edit ? `<button type="button" class="btn sm${o.id === best ? ' pri' : ''}" data-tpo-pick="${o.id}">${ic('cal', 's')} ${esc(tr('Choose this time'))}</button>` : ''}</li>`; };
+      ${open && p.can_edit ? `<button type="button" class="btn sm${o.id === best ? ' pri' : ''}" data-tpo-pick="${o.id}">${ic('cal', 's')} ${esc(tr('Select this time'))}</button>` : ''}</li>`; };
     md.querySelector('.card').innerHTML = `<div class="lhdr"><h3 id="tpo-st">${esc(p.title)}</h3><span class="spacer"></span>
       ${p.can_edit ? `<button class="iconbtn" data-tpo="menu" aria-haspopup="menu" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('dots')}</button>` : ''}
       <button class="iconbtn" data-tpo="close" aria-label="${esc(tr('Close'))}">${ic('x')}</button></div>
       <p class="muted tpo-sub">${esc(tpo_status(p))}${p.location ? ' · ' + esc(p.location) : ''}${wsOn() ? ' · ' + esc(wsName(p.space)) : ''}</p>
       ${p.url ? `<div class="tpo-link"><input readonly value="${esc(p.url)}" aria-label="${esc(tr('Link to the poll'))}"${p.live ? '' : ' class="tpo-off"'}>
         <button type="button" class="btn sm" data-tpo="copy">${ic('copy', 's')} ${esc(tr('Copy'))}</button><button type="button" class="iconbtn" data-tpo="qr" aria-label="${esc(tr('QR code'))}" title="${esc(tr('QR code'))}">${ic('grid', 's')}</button></div>
-        ${p.live ? '' : `<p class="muted mhint">${esc(!p.link_on ? tr('The link is turned off: nobody can vote.') : p.expires_at && new Date(p.expires_at) < new Date() ? tr('Voting has ended: the link no longer opens.') : tr('Public links are turned off on this server'))}</p>`}
+        ${p.live ? '' : `<p class="muted mhint">${esc(!p.link_on ? tr('The link is switched off: nobody can vote.') : p.expires_at && new Date(p.expires_at) < new Date() ? tr('Voting has ended: the link no longer opens.') : tr('Public links are switched off on this server'))}</p>`}
         <div class="tpo-qr" hidden></div>` : ''}
       ${p.description ? `<p class="tpo-desc">${esc(p.description)}</p>` : ''}
       <ul class="tpo-opts">${p.options.map(opt).join('')}</ul>
@@ -182,7 +182,7 @@ async function tpo_show(p) {
       menu(b, [{label: tr('Edit'), icon: 'edit', fn: () => { md.remove(); tpo_edit(p); }},
         {label: tr('New link (the old one stops)'), icon: 'link', fn: () => tpo_patch(p, {regenerate: true}, tr('New link created'), null).then(reload)},
         {label: p.link_on ? tr('Turn the link off') : tr('Turn the link on'), icon: p.link_on ? 'ban' : 'link',
-          fn: () => tpo_patch(p, {link_on: !p.link_on}, p.link_on ? tr('Link turned off') : tr('Link turned on'), {link_on: p.link_on}).then(reload)},
+          fn: () => tpo_patch(p, {link_on: !p.link_on}, p.link_on ? tr('Link switched off') : tr('Link switched on'), {link_on: p.link_on}).then(reload)},
         typeof smv_can === 'function' && p.mine && smv_can(p.org_id ?? null) ? {label: tr('Move to another workspace…'), icon: 'brief', fn: () => tpo_move(p).then(reload)} : null,
         {label: tr('Delete'), icon: 'trash', fn: () => tpo_delete(p, md)}]);
     }
@@ -212,7 +212,7 @@ async function tpo_move(p) {
   histToast(tr('Poll moved'), histAdd({label: tr('Poll “{0}” moved', p.title), undo: () => api('POST', url, {to: from ?? 'private'}), redo: () => api('POST', url, {to: r.space})}));
 }
 
-// ---- "Choose this time": the calendar, the optional invitation
+// ---- "Select this time": the calendar, the optional invitation
 function tpo_cals() {  // Kalmido calendars the person may write + CalDAV subscriptions with "Allow writing"
   const own = (S.evcals || []).filter(evWrite).map(c => ({id: String(c.id), name: c.name + (c.role !== 'owner' && c.owner_name ? ' · ' + c.owner_name : '')}));
   return {own, subs: typeof dvw_cals === 'function' ? dvw_cals({}) : []};
@@ -222,10 +222,10 @@ function tpo_decide(p, oid, done) {
   const {own, subs} = tpo_cals();
   const mails = (p.votes || []).filter(v => v.email && ['y', 'm'].includes(v.answers[String(oid)])).length;
   const pc = (S.evcals || []).find(c => evWrite(c) && (c.org_id ?? null) === (p.org_id ?? null)) || (S.evcals || []).find(c => evWrite(c) && !c.org_id);
-  const md = modal(`<form class="tpo-form" novalidate><div class="lhdr"><h3 id="tpo-dt">${esc(tr('Choose this time'))}</h3><span class="spacer"></span><button type="button" class="iconbtn" data-tpo="close" aria-label="${esc(tr('Close'))}">${ic('x')}</button></div>
+  const md = modal(`<form class="tpo-form" novalidate><div class="lhdr"><h3 id="tpo-dt">${esc(tr('Select this time'))}</h3><span class="spacer"></span><button type="button" class="iconbtn" data-tpo="close" aria-label="${esc(tr('Close'))}">${ic('x')}</button></div>
     <p class="tpo-dw"><b>${esc(tpo_when(o, p))}</b></p>
     <p class="muted mhint">${esc(tr('The poll is closed afterwards.'))}</p>
-    <div class="shint">${esc(tr('The event is created in the calendar you choose; the voters are named in its description. The link then shows only this time.'))}</div>
+    <div class="shint">${esc(tr('The event is created in the calendar you select; the voters are named in its description. The link then shows only this time.'))}</div>
     <div class="row"><label for="tpo-cal">${esc(tr('Calendar'))}</label><select id="tpo-cal">${own.length || subs.length ? '' : `<option value="">${esc(tr('Calendar'))}</option>`}${own.map(c => `<option value="${c.id}" ${pc && String(pc.id) === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}
       ${subs.length ? `<optgroup label="${esc(tr('Subscribed calendars'))}">${subs.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}</optgroup>` : ''}</select></div>
     ${mails ? `<label class="chkl"><input type="checkbox" id="tpo-mail"> ${esc(trn('Send an invitation to the {0} voter with an e-mail address', 'Send an invitation to the {0} voters with an e-mail address', mails))}</label>` : ''}
@@ -244,7 +244,7 @@ function tpo_decide(p, oid, done) {
     md.remove();
     const again = {option_id: oid, ...target, mail: false};  // a redo never mails twice
     histToast(r.mailed ? trn('Event created, {0} invitation sent', 'Event created, {0} invitations sent', r.mailed) : tr('Event created'),
-      histAdd({label: tr('Time chosen for “{0}”', p.title), undo: () => api('POST', `/api/polls/${p.id}/reopen`).then(tpo_redraw),
+      histAdd({label: tr('Time selected for “{0}”', p.title), undo: () => api('POST', `/api/polls/${p.id}/reopen`).then(tpo_redraw),
         redo: () => api('POST', `/api/polls/${p.id}/decide`, again).then(tpo_redraw)}));
     tpo_redraw();
     done && done();

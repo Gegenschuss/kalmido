@@ -81,7 +81,7 @@ function clientDetailParts(c) {
         <a class="btn" href="/api/time/export.xlsx?${esc(clientTimeQuery(c, mon))}" download ${timeOn() && c.lists.length ? '' : 'hidden'}>${ic('download', 's')} ${tr('Excel (XLSX)')}</a></div>`,
     lists: `<section class="stcard"><div class="sthead"><h3>${tr('Projects')}</h3></div>
       ${lists ? `<table class="ttable cltable"><thead><tr><th>${tr('Project')}</th><th class="n">${tr('Estimate')}</th><th class="n">${tr('Actual')}</th><th class="n" title="${esc(tr('% of the estimate'))}"><span aria-hidden="true">%</span><span class="sr">${tr('% of the estimate')}</span></th><th class="n">${tr('Amount')}</th></tr></thead><tbody>${lists}</tbody></table>`
-        : `<p class="muted">${tr('No project yet: open a project’s settings and choose this client.')}</p>`}</section>`,
+        : `<p class="muted">${tr('No project yet: open a project’s settings and select this client.')}</p>`}</section>`,
     note: c.note ? `<section class="stcard"><div class="sthead"><h3>${tr('Note')}</h3></div><div class="md">${renderMd(c.note)}</div></section>` : ''};
 }
 function clientTimeQuery(c, mon) {
@@ -162,7 +162,7 @@ function clientModal(c, o = {}) {  // 2.80.0 (#1842): o.org_id (the office's are
         const addAnon = m => { const x = document.createElement('button'); x.type = 'button'; x.className = 'btn'; x.textContent = tr('Anonymise'); x.addEventListener('click', () => { anon = true; m.remove(); }); $('.foot .spacer', m).after(x); };
         const yes = await askConfirm(tr('Delete the client “{0}”?', c.name), cl_delText(u), {ok: tr('Delete'), danger: true, after: u?.in_use === 1 ? addAnon : undefined});
         if (anon) {
-          if (!await askConfirm(tr('Anonymise the client “{0}”?', c.name), tr('Its finalised documents stay as the law asks, with their own copy of the address. Name, contact details, address, note and contact persons of the client are removed for good.'), {ok: tr('Anonymise'), danger: true})) return;
+          if (!await askConfirm(tr('Anonymise the client “{0}”?', c.name), tr('Its finalised documents stay as the law asks, with their own copy of the address. Name, contact details, address, note and contact persons of the client are removed permanently.'), {ok: tr('Anonymise'), danger: true})) return;
           await api('POST', `/api/clients/${c.id}/anonymize`); md.remove(); await load(); render(); clReload(); toast(tr('Client anonymised'));
           return;
         }
@@ -226,7 +226,7 @@ const cl_field = (md, k) => (CL_IDS[k] && $('#' + CL_IDS[k], md)) || md.querySel
 function cl_delText(u, n = 1) {
   const t = [u?.in_use === n ? tr('Clients used in quotations, invoices or contracts are archived instead. Their projects stay; they only lose the client.')
     : trashKeeps() ? tr('Deleted clients go to the trash and can be restored there.')  // 2.223.3 A (#2877): no period while nothing is deleted
-    : trn('Deleted clients go to the trash and can be restored there for {0} day, then they are deleted for good.', 'Deleted clients go to the trash and can be restored there for {0} days, then they are deleted for good.', u?.trash_days || 30)];
+    : trn('Deleted clients go to the trash and can be restored there for {0} day, then they are deleted permanently.', 'Deleted clients go to the trash and can be restored there for {0} days, then they are deleted permanently.', u?.trash_days || 30)];
   if (u?.in_use && u.in_use !== n) t.push(trn('{0} of them is used in quotations, invoices or contracts and is archived instead.', '{0} of them are used in quotations, invoices or contracts and are archived instead.', u.in_use));
   if (u?.text) t.push(tr('Linked: {0}.', u.text));
   return t.join(' ');
@@ -301,7 +301,7 @@ function ckl_pick(md, anchor, i) {
     if (s !== seq || !$('#cklp-l')) return;
     items = j.contacts;
     $('#cklp-l').innerHTML = items.length ? items.map(c => `<button type="button" role="option" class="ctrow" data-cklp="${c.id}">${ctAv(c)}<span class="ctn"><b>${esc(c.fn || c.org)}</b><small class="muted">${esc([c.title, c.email || c.phone, c.book].filter(Boolean).join(' · '))}</small></span></button>`).join('')
-      : `<div class="muted">${esc(q ? tr('No contacts found') : tr('No contacts to choose from: only the address books of the organisation of the client can be linked (without an organisation: your own).'))}</div>`;
+      : `<div class="muted">${esc(q ? tr('No contacts found') : tr('No contacts to select from: only the address books of the organisation of the client can be linked (without an organisation: your own).'))}</div>`;
   };
   find('');
   p.oninput = e => { if (e.target.id === 'cklp-q') { clearTimeout(p._t); p._t = setTimeout(() => find(e.target.value.trim()), 180); } };
@@ -486,7 +486,7 @@ async function formsModal(lid) {
 }
 // 2.553.0 B (#3460): the project's switch "Requests by e-mail" below its forms: one request address; a mail to it becomes a task with
 // a status link for the sender, the public answers go back by mail, the sender's replies become comments of the same request
-const rqm_why = w => w === 'portal' ? tr('Public links are turned off on this server') : w === 'kind' ? tr('Only projects have an e-mail address')
+const rqm_why = w => w === 'portal' ? tr('Public links are switched off on this server') : w === 'kind' ? tr('Only projects have an e-mail address')
   : w === 'e2e' ? tr('Not available in a project with end-to-end encryption') : tr('E-mail to tasks is not set up on this server');
 async function rqm_load(md, lid) {
   const box = $('#fm-rqm', md); if (!box) return;
@@ -554,7 +554,7 @@ async function signinScreen(tok) {
     if (res.enrol) { await authEnrol(el, `<div class="alogo">${logoSvg(40)}<b>${wordSvg()}</b></div>`); return; }  // 2.86.0 (N4): the admin's 2FA policy
     $('.card p', el).textContent = res.error || httpErrText(r.status);
   } catch { $('.card p', el).textContent = tr('Server not reachable.'); }
-  $('.card', el).insertAdjacentHTML('beforeend', `<button class="btn pri" type="button" data-au="login">${tr('To the sign-in')}</button>`);
+  $('.card', el).insertAdjacentHTML('beforeend', `<button class="btn pri" type="button" data-au="login">${tr('Go to sign-in')}</button>`);
   el.addEventListener('click', e => { if (e.target.closest('[data-au="login"]')) location.replace('/'); });
 }
 
@@ -581,7 +581,7 @@ document.addEventListener('change', e => { if (e.target.id === 'wl-org') { WLV.o
 // 2.36.2 (#1021, E): billing details of a client for office & finance (structured address, VAT ID, customer number, buyer
 // reference, invoice e-mail, payment terms); folded away, the free address above stays
 const OFX_CL_FIELDS = [['street', N_('Street'), 200], ['address_extra', N_('Address extra'), 200], ['zip', N_('Postcode'), 20], ['city', N_('City'), 120], ['country', N_('Country'), 2],
-  ['vat_id', N_('VAT ID'), 20], ['customer_no', N_('Client number|customer'), 40], ['buyer_reference', N_('Buyer reference (e.g. routing ID)'), 60],
+  ['vat_id', N_('VAT ID'), 20], ['customer_no', N_('Client no.|customer'), 40], ['buyer_reference', N_('Buyer reference (e.g. routing ID)'), 60],
   ['email_invoice', N_('E-mail for invoices'), 200], ['payment_terms_days', N_('Payment terms (days)'), 3],
   ['peppol_id', N_('Peppol ID'), 90], ['doc_lang', N_('Document language'), 5]];  // 2.154.0 B (#1960): e-invoices over the Peppol network
 // 2.97.0 B (#1951): the address (street, extra line, postcode, city, country) stands in the form itself, the rest of the

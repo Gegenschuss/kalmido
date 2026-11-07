@@ -105,7 +105,7 @@ SID = SH["id"]
 R = [x["id"] for x in SH["rows"]]
 L = A.post(B + "/api/lists", json={"name": "Shoot", "org_id": ORG, "kind": "project", "time_tracking": True}).json()["id"]
 A.put(B + f"/api/lists/{L}/members", json={"user_id": uid["bob"], "role": "edit"})
-LRO = A.post(B + "/api/lists", json={"name": "Read only", "org_id": ORG}).json()["id"]
+LRO = A.post(B + "/api/lists", json={"name": "Read-only", "org_id": ORG}).json()["id"]
 A.put(B + f"/api/lists/{LRO}/members", json={"user_id": uid["bob"], "role": "view"})
 LPRIV = A.post(B + "/api/lists", json={"name": "Alice private", "org_id": None}).json()["id"]
 LBETA = Ca.post(B + "/api/lists", json={"name": "Beta list", "org_id": ORG2}).json()["id"]

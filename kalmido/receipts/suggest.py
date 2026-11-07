@@ -219,7 +219,7 @@ def rc_state(c, node, m, uid):
     projects, recent = rc_projects(c, node["org_id"], uid)
     return {"receipt": cur, "suggestions": sugs, "categories": rc_categories(c, m["ws"]), "projects": projects, "recent": recent,
             "can_edit": node["role"] in ("owner", "edit") and rc_office_ok(c, m, uid), "confirmed": rc_confirmed(c, node["id"], r),
-            "einvoice_offer": not r and ei_rc_offer(c, m) is not None}  # 2.185.0 A (#2583): "Take over as receipt"
+            "einvoice_offer": not r and ei_rc_offer(c, m) is not None}  # 2.185.0 A (#2583): "Add as receipt"
 
 
 def rc_projects(c, org_id, uid):
@@ -291,7 +291,7 @@ def rc_put(nid):
     if "rc13b" in b and r13 not in (None, "", "eu", "other"):
         return err(tr("Invalid value: {0}", "rc13b"))
     if lid and not rc_project_ok(c, lid, n, uid):
-        return err(tr("Choose a project of this workspace"))
+        return err(tr("Select a project of this workspace"))
     pl_receipt_need_open(c, nid, becoming=bool(cat or lid or b.get("keep") is True or bool(r13) or vat not in (_KEEP, None)))  # 2.148.0 A (#2471)
     rc_set(c, n, m["ws"], lid, cat, uid, vat, keep=b.get("keep") is True or bool(r13))
     if "rc13b" in b:
@@ -354,7 +354,7 @@ def rc_accept(sid):
     except BadInput as e:
         return err(str(e))
     if lid and not rc_project_ok(c, lid, n, uid):
-        return err(tr("Choose a project of this workspace"))
+        return err(tr("Select a project of this workspace"))
     pl_receipt_need_open(c, n["id"], becoming=True)  # 2.148.0 A (#2471)
     pa = pc = pv = None
     if amt or ccy:
@@ -439,7 +439,7 @@ def v1_rc_suggest(nid):
     if not (lid or cat or amt or vat):
         raise BadInput(tr("Suggest a project, a category, an amount or a VAT rate"))
     if lid and not rc_project_ok(c, lid, n, aid, agent=True):
-        raise BadInput(tr("Choose a project of this workspace"))
+        raise BadInput(tr("Select a project of this workspace"))
     note = b.get("note") or ""
     if not isinstance(note, str) or len(note) > RC_NOTE_MAX:
         raise BadInput(tr("Invalid value: {0}", "note"))

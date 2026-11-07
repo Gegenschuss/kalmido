@@ -1296,7 +1296,7 @@ def task_wake(tid):
     elif len(cands) == 1:
         aid = cands[0]
     else:
-        return err(tr("No agent can see this task") if not cands else tr("Choose an agent"), 409)
+        return err(tr("No agent can see this task") if not cands else tr("Select an agent"), 409)
     wake_limit()
     seq = agent_emit(c, aid, "wake", agent_task_data(c, tid, aid, user={"id": me(), "name": user_names(c, [me()]).get(me(), "")}, source="task"))
     c.commit()

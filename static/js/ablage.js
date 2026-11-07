@@ -107,7 +107,7 @@ function viewAblage() {
   const search = !trash && !d?.node?.locked && typeof ftxtBox === 'function' ? ftxtBox() : '';  // 2.61.0 (#1820): names + recognised text; 2.353.0 F (#2758, review N9): a locked folder searches its names here only (the banner)
   if (search && ftxtActive()) body = ftxtResults();
   const hint = !r.nid && sp === 'private' && d && !d.items.length ? `<p class="muted abhint">${tr('Share a folder with a person or an agent: they see exactly that folder, nothing else.')}</p>` : '';
-  const tdays = trash && d?.trash_days ? `<p class="muted abhint abtrashdays">${esc(trashNote(tr('Files and folders in the trash are deleted for good after {0} days.', d.trash_days), d.purge_on === false))}</p>` : '';  // 2.152.0 B (#2165)
+  const tdays = trash && d?.trash_days ? `<p class="muted abhint abtrashdays">${esc(trashNote(tr('Files and folders in the trash are deleted permanently after {0} days.', d.trash_days), d.purge_on === false))}</p>` : '';  // 2.152.0 B (#2165)
   return `<div class="abview ${canAdd ? 'abdropok' : ''} ${desk ? 'abdesk' : ''}" data-abzone="${r.nid || ''}">${desk ? '' : spaces}<div class="abmain">${search}${search && ftxtActive() ? `<h3 class="abtitle">${tr('Search results')}</h3>` : crumbs + tools + (r.nid ? ab_shHead(d) : '') + ab_scanDoneHtml() + (!trash && d && typeof abd_recogLine === 'function' ? abd_recogLine(d) : '')}${body}${search && ftxtActive() ? '' : hint + tdays + ab_smvBar(trash)}</div></div>`;
 }
 // 2.152.3 B (#2621): the panel of the file store (sidebar B on a computer): its parts (Files, Documents) as entries; below
@@ -181,12 +181,12 @@ document.addEventListener('click', e => { const b = e.target.closest?.('#side [d
 // grouped by its object (route ablage/aus-<key>, the space shown: AB.space). Open / download only; deleting stays on the
 // page / in the project. Knowledge pages themselves: the global search.
 const AB_COLL_ICON = {wiki: 'book', sheets: 'sheet', office: 'brief', lists: 'proj', contacts: 'user'};
-const ab_collRow = x => `<div class="abrow abcoll" role="listitem" data-abcoll="${esc(x.key)}"><button type="button" class="abopen" data-go="ablage/aus-${esc(x.key)}">${ic(AB_COLL_ICON[x.key] || 'folder')}<span class="abtxt"><span class="abname">${esc(x.name)}</span><span class="abmeta2 muted">${esc(tr('Read only'))}</span></span></button><span class="abmeta muted">${esc(tr('Read only'))}</span><span class="abbadges"><span class="abbadge" title="${esc(tr('Read only'))}">${ic('lock', 's')}</span></span></div>`;
+const ab_collRow = x => `<div class="abrow abcoll" role="listitem" data-abcoll="${esc(x.key)}"><button type="button" class="abopen" data-go="ablage/aus-${esc(x.key)}">${ic(AB_COLL_ICON[x.key] || 'folder')}<span class="abtxt"><span class="abname">${esc(x.name)}</span><span class="abmeta2 muted">${esc(tr('Read-only'))}</span></span></button><span class="abmeta muted">${esc(tr('Read-only'))}</span><span class="abbadges"><span class="abbadge" title="${esc(tr('Read-only'))}">${ic('lock', 's')}</span></span></div>`;
 function ab_collHtml(d, sp) {
   const crumbs = `<nav class="abcrumbs" aria-label="${esc(tr('Path'))}">${ab_all() ? spo_upHtml('ablage') : '' /* 2.540.0 (#4575) */}<button type="button" class="linkbtn" data-ab="space" data-sp="${esc(sp)}">${esc(ab_spaceName(sp))}</button><span class="abcsep" aria-hidden="true">/</span><span class="abccur" aria-current="page">${esc(d?.name || '')}</span></nav>`;
   if (AB.err && !d) return crumbs + `<div class="empty">${ic('folder')}<span>${esc(AB.err)}</span><button type="button" class="btn" data-ab="space" data-sp="${esc(sp)}">${esc(ab_spaceName(sp))}</button></div>`;
   if (!d) return `<p class="muted lempty">${tr('Loading…')}</p>`;
-  const note = `<p class="muted abhint abcollnote">${esc(d.key === 'wiki' ? tr('Files of knowledge pages, read only. Delete them on the page itself.') : d.key === 'lists' ? tr('Files of projects, read only. Delete them in the project itself.') : d.key === 'sheets' ? tr('Files of tables, read only. Delete them in the table itself.') : tr('Files of this area, read only.'))}</p>`;
+  const note = `<p class="muted abhint abcollnote">${esc(d.key === 'wiki' ? tr('Files of knowledge pages, read-only. Delete them on the page itself.') : d.key === 'lists' ? tr('Files of projects, read-only. Delete them in the project itself.') : d.key === 'sheets' ? tr('Files of tables, read-only. Delete them in the table itself.') : tr('Files of this area, read-only.'))}</p>`;
   if (!d.groups?.length) return crumbs + note + `<div class="empty abempty">${ic('folder')}<span>${tr('This folder is empty')}</span></div>`;
   const row = (f, gi) => `<div class="abrow" role="listitem"><button type="button" class="abopen" data-abc="open" data-g="${gi}" data-id="${f.id}">${ab_icon({kind: 'file', mime: f.mime})}<span class="abtxt"><span class="abname">${esc(f.name)}</span><span class="abmeta2 muted">${esc([fmtSize(f.size || 0), ab_when(f.created_at)].filter(Boolean).join(' · '))}</span></span></button><span class="abmeta muted">${esc([fmtSize(f.size || 0), ab_when(f.created_at)].filter(Boolean).join(' · '))}</span><a class="iconbtn" href="${esc(f.dl)}" download="${esc(f.name)}" aria-label="${esc(tr('Download') + ' ' + f.name)}" title="${esc(tr('Download'))}">${ic('download')}</a></div>`;
   const grp = (g, gi) => `<section class="abcollg"><h4 class="abcollh">${g.open ? `<button type="button" class="linkbtn" data-go="${esc(g.open)}">${esc(g.title)}</button>` : esc(g.title)}</h4><div class="ablist" role="list">${g.items.map(f => row(f, gi)).join('')}</div></section>`;
@@ -234,7 +234,7 @@ function ab_rowHtml(n, trash) {
     + (typeof abd_badge === 'function' ? abd_badge(n) : '');  // 2.353.0 D (#2759): a document (being recognised / to review)
   const main = trash ? `<span class="abopen">${ab_icon(n)}<span class="abtxt"><span class="abname">${esc(n.name)}</span>${meta ? `<span class="abmeta2 muted">${esc(meta)}</span>` : ''}</span></span>`
     : `<button type="button" class="abopen" data-ab="open" data-id="${n.id}" ${n.kind === 'folder' ? `data-abdrop="${n.id}"` : ''}>${ab_icon(n)}<span class="abtxt"><span class="abname">${esc(n.name)}</span>${meta ? `<span class="abmeta2 muted">${esc(meta)}</span>` : ''}</span></button>`;  // abmeta2: the details below the name on phones
-  const acts = trash ? `<button type="button" class="btn sm" data-ab="restore" data-id="${n.id}">${ic('undo', 's')} ${tr('Restore')}</button>${n.role === 'owner' ? `<button type="button" class="btn sm danger" data-ab="purge" data-id="${n.id}">${ic('trash', 's')} ${tr('Delete for good')}</button>` : ''}`  // 2.589.0 (#4875): + for good (owners)
+  const acts = trash ? `<button type="button" class="btn sm" data-ab="restore" data-id="${n.id}">${ic('undo', 's')} ${tr('Restore')}</button>${n.role === 'owner' ? `<button type="button" class="btn sm danger" data-ab="purge" data-id="${n.id}">${ic('trash', 's')} ${tr('Delete permanently')}</button>` : ''}`  // 2.589.0 (#4875): + for good (owners)
     : `<button type="button" class="iconbtn" data-ab="menu" data-id="${n.id}" aria-label="${esc(tr('More actions for {0}', n.name))}" title="${esc(tr('More'))}">${ic('dots')}</button>`;
   return `<div class="abrow" role="listitem" data-abid="${n.id}" ${!trash && ab_canWrite(n.role) ? (rowd_touch() ? 'data-abmv="1"' : 'draggable="true"') : '' /* 2.627.0 (#4961): a finger by drag.js */}>${ab_smvBox(n)}${main}${typeof dt_abTags === 'function' ? dt_abTags(n) : ''}<span class="abmeta muted">${esc(meta)}</span><span class="abbadges">${badges}</span>${acts}</div>`;
 }
@@ -342,9 +342,9 @@ async function ab_restore(n) {
   offerUndo([tr('“{0}” restored', n.name), st ? trn("{0} table stays in the tables' trash", "{0} tables stay in the tables' trash", st) : '', sw ? trn('{0} page stays in the knowledge trash', '{0} pages stay in the knowledge trash', sw) : ''].filter(Boolean).join(' · '), histAdd({label: tr('Restore “{0}”', n.name), undo: () => ab_req('DELETE', `/api/files/nodes/${n.id}`), redo: () => ab_req('POST', `/api/files/nodes/${n.id}/restore`)}));
 }
 async function ab_purge(n) {
-  if (!await askConfirm(tr('Delete “{0}” for good?', n.name), tr('All versions are removed. This cannot be undone.'), {ok: tr('Delete for good'), danger: true})) return;
+  if (!await askConfirm(tr('Delete “{0}” permanently?', n.name), tr('All versions are removed. This cannot be undone.'), {ok: tr('Delete permanently'), danger: true})) return;
   try { await api('DELETE', `/api/files/nodes/${n.id}?purge=1`); } catch { return; }
-  AB.sel.delete(n.id); ab_reload(); toast(tr('Deleted for good'));
+  AB.sel.delete(n.id); ab_reload(); toast(tr('Deleted permanently'));
 }
 function ab_newVersion(n) {
   if (n.locked) return typeof fsl_newVersion === 'function' ? fsl_newVersion(n) : ab_noFsl();  // 2.353.0 A (#2758); F (review N8): never plain
@@ -585,7 +585,7 @@ async function ab_smvDry(b) {  // the dry run: an error of the server is the dia
 async function ab_smvSpace(ns) {
   ns = (ns || []).filter(ab_smvOk); if (!ns.length) return;
   const from = ns[0].org_id || null;
-  if (ns.some(n => (n.org_id || null) !== from)) { toast(tr('Choose items of one workspace')); return; }
+  if (ns.some(n => (n.org_id || null) !== from)) { toast(tr('Select items of one workspace')); return; }
   const ids = ns.map(n => n.id), req = (to, p) => ({ids, to: smv_ws(to), parent: p ? +p : null});
   let last = null;
   const r = await smv_open({what: ns.length === 1 ? `“${ns[0].name}”` : trn('{0} item', '{0} items', ns.length), from, places: ab_smvPlaces, total: ids.length,  // 2.147.1 B (#2230): batches + progress
@@ -648,7 +648,7 @@ const ab_trashTools = d => d?.items?.length ? `<div class="abtools">${ab_smvTool
 function ab_trashBar() {
   const ns = ab_smvSel(), all = (AB.data?.items || []).length;
   const h = ms_barHtml('ab-sbar', 'absel', ns.length, tr('Tap files'), [['all', 'all', ns.length && ns.length === all ? tr('Select none') : tr('All')],
-    ['restore', 'undo', tr('Restore')], ['purge', 'trash', tr('Delete for good'), 'danger']]);
+    ['restore', 'undo', tr('Restore')], ['purge', 'trash', tr('Delete permanently'), 'danger']]);
   return ns.length && !ns.some(n => n.role === 'owner') ? h.replace(/(data-absel="purge")/, '$1 disabled') : h;
 }
 // "1 file, 2 folders" of the rows (a folder: with everything in it)
@@ -668,14 +668,14 @@ async function abm_purge(ns) {
   if (!rows.length) return;
   const own = rows.filter(n => n.role === 'owner'), other = rows.length - own.length;
   const what = abm_countText(own);
-  const txt = [what ? tr('Deleted for good: {0}. Folders go with everything in them. This cannot be undone.', what) : '',
-    other ? trn('{0} item stays: it belongs to someone else, only they can delete it for good.', '{0} items stay: they belong to others, only they can delete them for good.', other) : ''].filter(Boolean).join(' ');
+  const txt = [what ? tr('Deleted permanently: {0}. Folders go with everything in them. This cannot be undone.', what) : '',
+    other ? trn('{0} item stays: it belongs to someone else, only they can delete it permanently.', '{0} items stay: they belong to others, only they can delete them permanently.', other) : ''].filter(Boolean).join(' ');
   if (!own.length) { toast(txt); return; }
-  if (!await askConfirm(ns ? trn('Delete {0} item for good?', 'Delete {0} items for good?', own.length) : tr('Empty the trash permanently?'), txt,
-    {ok: ns ? tr('Delete for good') : tr('Empty trash'), danger: true})) return;
+  if (!await askConfirm(ns ? trn('Delete {0} item permanently?', 'Delete {0} items permanently?', own.length) : tr('Empty the trash permanently?'), txt,
+    {ok: ns ? tr('Delete permanently') : tr('Empty trash'), danger: true})) return;
   let r; try { r = await api('POST', '/api/files/trash/purge', ns ? {ids: rows.map(n => n.id)} : {all: true}); } catch { return; }
   ab_smvEnd(); ab_reload();
-  toast([trn('{0} item deleted for good', '{0} items deleted for good', r.deleted || 0),
+  toast([trn('{0} item deleted permanently', '{0} items deleted permanently', r.deleted || 0),
     r.kept ? trn('{0} stayed, it belongs to someone else', '{0} stayed, they belong to others', r.kept) : '',
     r.locked ? trn('{0} stayed, it is kept by law (retention)', '{0} stayed, they are kept by law (retention)', r.locked) : ''].filter(Boolean).join(' · '), null, r.kept || r.locked ? 6000 : undefined);
 }

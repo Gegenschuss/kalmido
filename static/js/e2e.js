@@ -359,7 +359,7 @@ function e2ePassDlg() {
   });
 }
 async function e2eRemove() {
-  if (!await askConfirm(tr('Remove your encryption keys?'), tr('Your encrypted notes are deleted, your encrypted files and messages can never be opened again, encrypted conversations are switched off. This cannot be undone.'), {ok: tr('Remove for good'), danger: true})) return false;
+  if (!await askConfirm(tr('Remove your encryption keys?'), tr('Your encrypted notes are deleted, your encrypted files and messages can never be opened again, encrypted conversations are switched off. This cannot be undone.'), {ok: tr('Remove permanently'), danger: true})) return false;
   const password = await e2eAcctPw(); if (password === null) return false;
   try { await rawFetch('DELETE', '/api/e2e/keys', {password}); } catch (x) { toast(x.message); return false; }
   await e2eForget(); E2E.st = {set: false}; toast(tr('Encryption keys removed')); e2eRefresh();

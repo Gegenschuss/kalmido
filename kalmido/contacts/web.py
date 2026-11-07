@@ -165,7 +165,7 @@ def op_book_purge(c, uid, bid):
     """2.272.0 E1 (#3038): an address book in the trash deleted for good now (the app asks first, naming the contacts)."""
     b, _ = need_book(c, bid, manage=True, trash=True)
     if not b["deleted_at"]:
-        raise Denied(409, tr("Only what is in the trash can be deleted for good"))
+        raise Denied(409, tr("Only what is in the trash can be deleted permanently"))
     cts = [r[0] for r in c.execute("SELECT id FROM contacts WHERE book_id=?", (bid,)).fetchall()]  # review 2.578 F2: they go along
     c.execute("DELETE FROM books WHERE id=?", (bid,))
     from .ctfolder import CTF_BOOK, CTF_CONTACT, ctf_dropped

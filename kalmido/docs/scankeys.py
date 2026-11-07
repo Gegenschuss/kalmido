@@ -221,7 +221,7 @@ def docs_scan_key_new():
     except Denied as e:
         if pid and e.code == 409 and e.text() == tr(LOCKED_MSG):
             return err(e.text(), 409)  # 2.353.0 (#2769): the reason, not "choose another folder"
-        return err(tr("Choose a folder of these documents you may add to") if pid else e.text(), 400 if pid else e.code)
+        return err(tr("Select a folder of these documents you may add to") if pid else e.text(), 400 if pid else e.code)
     if c.execute("SELECT COUNT(*) FROM api_tokens WHERE user_id=?", (uid,)).fetchone()[0] >= V.API_TOKEN_MAX:
         return err(tr("At most {0} tokens", V.API_TOKEN_MAX), 409)
     tok = "abk_" + secrets.token_urlsafe(32)

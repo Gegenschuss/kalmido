@@ -136,7 +136,7 @@ const NOTIF_ROWS = [
   ['share', N_('Projects shared with me')],
   ['unblock', N_('A task blocking mine was completed'), '', 'deps'],
   ['approval', N_('An agent waits for my approval'), '', 'agents'],
-  ['signoff', N_('Client decisions'), N_('a client approved or declined through a link (quotation, document, video)')],  // 2.266.0 (#2965)
+  ['signoff', N_('Client decisions'), N_('a client approved or rejected through a link (quotation, document, video)')],  // 2.266.0 (#2965)
   ['followup', N_('Follow-up day of a task waiting on someone')],
   ['reminder', N_('Reminders'), N_('due dates of my tasks')],
   ['nag', N_('Repeated reminders'), N_('until the task is done; not during your quiet hours')],  // 2.7.0 (#413)
@@ -241,7 +241,7 @@ async function wsPaneDraw(md) {
   // 2.186.0 A (#2599): retired organisations I was an admin of: no members any more, only their export until they go for good
   if (dbox) { dbox._j = j; dbox.innerHTML = j.orgs.filter(o => o.role === 'admin').map(o => `<div class="wsdorg" data-oid="${o.id}"><h5 class="wsdname">${esc(o.name)}</h5>${dataBoxes(o)}</div>`).join(''); }
   if ((j.retired || []).length) (dbox || box).insertAdjacentHTML('beforeend', j.retired.map(o => `<details class="sdet wsret"><summary><b>${esc(o.name)}</b> <span class="muted">${odlRetiredLabel(o)}</span></summary>
-    <div class="shint">${esc(tr('You were an admin of this organisation before it was retired: you can still export it until it is deleted for good.'))}</div>
+    <div class="shint">${esc(tr('You were an admin of this organisation before it was retired: you can still export it until it is deleted permanently.'))}</div>
     ${oxBoxHtml(o)}${typeof rxBoxHtml === 'function' ? rxBoxHtml('org', o.id) : ''}</details>`).join(''));
   if (!S.me?.kid) (dbox || box).insertAdjacentHTML('beforeend', `<div class="ocorg">${ocBoxHtml({id: 0}, {title: `${tr('Your private office')}: ${tr('Encryption')}`})}</div>`);  // 2.138.0 C (#1972): its recovery key (hidden without encrypted data)
   oxDraw(box);  // 2.42.0 (#833): the export sections of the organisations I administer
@@ -340,10 +340,10 @@ async function wsIconPick(md, oid, how, after) {
 // ---- 2.35.0 (#1101): an organisation admin's "Lists of the organisation": the lists that belong to the organisation (never
 // private lists, private sharing or inboxes) with owner, numbers and the last change - never their contents. Archive / restore,
 // hand over to another person of the organisation, delete for good from the archive (the name typed to confirm); a history.
-const OADM_ACT = {archive: N_('{0} archived {1}'), restore: N_('{0} restored {1}'), delete: N_('{0} deleted {1} for good'), trash: N_('{0} moved {1} to the trash'), undelete: N_('{0} restored {1} from the trash'), purge: N_('{0} deleted {1} for good'), owner: N_('{0} handed {1} to {2}'),
+const OADM_ACT = {archive: N_('{0} archived {1}'), restore: N_('{0} restored {1}'), delete: N_('{0} deleted {1} permanently'), trash: N_('{0} moved {1} to the trash'), undelete: N_('{0} restored {1} from the trash'), purge: N_('{0} deleted {1} permanently'), owner: N_('{0} handed {1} to {2}'),
   edit: N_('{0} changed {1}'), icon: N_('{0} changed the icon of {1}'),  // 2.56.0 (#1795)
   moveout: N_('{0} moved {1} out of the organisation'),  // 2.148.1 B (#2483)
-  outok: N_('{0} released {1} for its maker to take it back'), outno: N_('{0} declined to give {1} back'),  // 2.361.2 (#2923)
+  outok: N_('{0} released {1} for its maker to take it back'), outno: N_('{0} rejected giving {1} back'),  // 2.361.2 (#2923)
   export: N_('{0} exported {1} with the account export'),  // 2.148.1 C (#2492)
   tasks: N_('{0} looked at the tasks of {1}'), tasksall: N_('{0} looked at the tasks of all projects')};  // 2.574.0 (#3376): the read-only task view
 function oadmRow(x) {
@@ -363,7 +363,7 @@ function oorHtml(rs) {
   return `<h4 class="oadmh">${esc(tr('Asked back'))} <span class="muted">${open.length}</span></h4>
     <div class="shint keep">${esc(tr('These members brought something into the organisation or made it there and ask to take it back into their private workspace. Release it and they can move it themselves; nobody else in the organisation sees it there afterwards.'))}</div>
     ${open.map(r => `<div class="mrow oorrow" data-oor="${r.id}"><span class="n"><b>${esc(r.name || '–')}</b><small class="muted">${esc([oor_kind(r.kind), tr('asked by {0}', r.by), fmtWhen(r.created_at)].join(' · '))}</small></span>
-      <span class="oadmb"><button type="button" class="btn sm pri" data-oord="approve">${esc(tr('Release'))}</button><button type="button" class="btn sm" data-oord="decline">${esc(tr('Decline'))}</button></span></div>`).join('')}`;
+      <span class="oadmb"><button type="button" class="btn sm pri" data-oord="approve">${esc(tr('Release'))}</button><button type="button" class="btn sm" data-oord="decline">${esc(tr('Reject'))}</button></span></div>`).join('')}`;
 }
 function oadmDraw(md, j) {
   md._j = j;
@@ -387,7 +387,7 @@ async function oadmOpen(oid, name) {
     if (od) {  // 2.361.2 (#2923): one click releases / declines a member's request
       od.disabled = true;
       try { const r = await api('POST', `/api/orgs/${oid}/out-requests/${+od.closest('[data-oor]').dataset.oor}`, {decision: od.dataset.oord});
-        toast(r.state === 'approved' ? tr('Released: the person can take it back now') : tr('Declined'));
+        toast(r.state === 'approved' ? tr('Released: the person can take it back now') : tr('Rejected'));
       } catch { /* api() showed it */ }
       try { oadmDraw(md, await api('GET', `/api/orgs/${oid}/lists`)); } catch { /* offline */ }
       return;
@@ -447,7 +447,7 @@ function ole_edit(om, oid, x) {
   const emoBtn = () => x.icon ? licon(x, 'licon m') : sbiEmo(emo) || ic('list');
   const md = modal(`<h3>${esc(tr('Edit “{0}”', x.name))}</h3>
     <div class="shint keep">${esc(tr('Only the name, the icon and the colour: the contents stay with the people of the project. {0} and the members are told.', x.owner_name || '?'))}</div>
-    <div class="row"><label for="ole-name">${tr('Name')}</label><button type="button" class="emobtn" id="ole-emo" title="${tr('Choose icon')}" aria-label="${tr('Choose icon')}">${emoBtn()}</button><input id="ole-name" value="${esc(nm0)}" maxlength="200"></div>
+    <div class="row"><label for="ole-name">${tr('Name')}</label><button type="button" class="emobtn" id="ole-emo" title="${tr('Select icon')}" aria-label="${tr('Select icon')}">${emoBtn()}</button><input id="ole-name" value="${esc(nm0)}" maxlength="200"></div>
     <div class="emogrid hidden" id="ole-emogrid"><button type="button" data-emo="" class="none" title="${tr('No icon')}">${ic('ban', 's')}</button>${sbiGrid().map(e => `<button type="button" data-emo="${e}" class="${e === emo && !x.icon ? 'on' : ''}">${sbiEmo(e)}</button>`).join('')}
       <div class="lipickw">${pick()}</div></div>
     <div class="row"><label>${tr('Colour')}</label><div class="colors" id="ole-col" role="group" aria-label="${esc(tr('Colour'))}">${lp_dlgBtns(col0)}</div></div>
@@ -535,7 +535,7 @@ async function inviteScreen(tok) {
   lg_decor(el);  // 2.49.0 (#1553)
   const logo = `<div class="alogo">${logoSvg(40)}<b>${wordSvg()}</b></div>`;
   if (info.error) {
-    el.innerHTML = `<div class="card">${logo}<p role="alert">${esc(info.error)}</p><button class="btn pri" type="button" data-au="login">${tr('To the sign-in')}</button></div>`;
+    el.innerHTML = `<div class="card">${logo}<p role="alert">${esc(info.error)}</p><button class="btn pri" type="button" data-au="login">${tr('Go to sign-in')}</button></div>`;
   } else {
     el.innerHTML = `<div class="card">${logo}
       <h2 class="invh">${esc(info.kind === 'reset' ? tr('Set a new password') : info.kind === 'signup' ? tr('Confirm your registration') : tr('Welcome, {0}!', info.display_name))}</h2>
@@ -561,7 +561,7 @@ async function inviteScreen(tok) {
         if (!r.ok) { errEl.textContent = res.error || httpErrText(r.status); return; }
         if (res.twofa) { await authTwofa(el, logo, res.methods || ['totp']); return; }  // 2.49.0 (#1531): two-factor stays required after a reset
         if (res.enrol) { await authEnrol(el, logo); return; }
-        if (res.pending) { $('.card', el).innerHTML = `${logo}<h2 class="invh">${tr('Thank you!')}</h2><p role="status">${tr('Your account waits for an admin to approve it. You can sign in once it is approved.')}</p><button class="btn pri" type="button" data-au="login">${tr('To the sign-in')}</button>`; return; }  // 2.23.0 (#711)
+        if (res.pending) { $('.card', el).innerHTML = `${logo}<h2 class="invh">${tr('Thank you!')}</h2><p role="status">${tr('Your account waits for an admin to approve it. You can sign in once it is approved.')}</p><button class="btn pri" type="button" data-au="login">${tr('Go to sign-in')}</button>`; return; }  // 2.23.0 (#711)
         if ($('#inv-2fa', el).checked) LS.set('after2fa', true);
         location.replace('/');
       } catch { errEl.textContent = tr('Server not reachable.'); }
@@ -784,7 +784,7 @@ async function authEnrol(el, logo) {
       if (b.dataset.en === 'back') start();
       if (b.dataset.en === 'totp') {
         const t = await authPost('/api/auth/enrol/totp');
-        card.innerHTML = `${logo}<form id="en-totp">${totpSetupHtml(t)}<div class="aerr" role="alert" id="totp-err"></div><button class="btn pri" type="submit">${tr('Turn on')}</button></form><div class="alinks"><button type="button" class="linkbtn" data-en="back">${tr('Back')}</button></div>`;
+        card.innerHTML = `${logo}<form id="en-totp">${totpSetupHtml(t)}<div class="aerr" role="alert" id="totp-err"></div><button class="btn pri" type="submit">${tr('Switch on')}</button></form><div class="alinks"><button type="button" class="linkbtn" data-en="back">${tr('Back')}</button></div>`;
         setTimeout(() => $('#totp-code', card)?.focus(), 50);
       }
       if (b.dataset.en === 'pk') {
@@ -863,15 +863,15 @@ document.addEventListener('change', async e => {
 function lg_delScreen(el, logo, o) {
   el.innerHTML = `<div class="card">${logo}
     <h2 class="invh">${tr('Your account will be deleted')}</h2>
-    <p role="status">${esc(o.at ? tr('Your account will be deleted for good on {0}. It is locked until then.', fmtDate(String(o.at).slice(0, 10))) : tr('Cancel the deletion of your account? It can be used again afterwards.'))}</p>
+    <p role="status">${esc(o.at ? tr('Your account will be deleted permanently on {0}. It is locked until then.', fmtDate(String(o.at).slice(0, 10))) : tr('Cancel the deletion of your account? It can be used again afterwards.'))}</p>
     <div class="aerr" role="alert" id="dc-err"></div>
     <button class="btn pri" type="button" data-dc="go">${tr('Cancel the deletion')}</button>
-    <button class="linkbtn" type="button" data-au="back">${tr('Back to the sign-in')}</button></div>`;
+    <button class="linkbtn" type="button" data-au="back">${tr('Back to sign-in')}</button></div>`;
   $('[data-dc="go"]', el).addEventListener('click', async e => {
     const b = e.currentTarget; b.disabled = true;
     try {
       await authPost('/api/auth/delete-cancel', o.token ? {token: o.token} : {username: o.username, password: o.password});
-      $('.card', el).innerHTML = `${logo}<h2 class="invh">${tr('The deletion was cancelled')}</h2><p role="status">${tr('Your account can be used again. Please sign in.')}</p><button class="btn pri" type="button" data-au="back">${tr('To the sign-in')}</button>`;
+      $('.card', el).innerHTML = `${logo}<h2 class="invh">${tr('The deletion was cancelled')}</h2><p role="status">${tr('Your account can be used again. Please sign in.')}</p><button class="btn pri" type="button" data-au="back">${tr('Go to sign-in')}</button>`;
     } catch (x) { $('#dc-err', el).textContent = x.message; b.disabled = false; }
   });
 }
@@ -883,7 +883,7 @@ function lg_forgotScreen(el, logo, pre = '') {
       <label class="aulab" for="fg-login">${tr('E-mail or user name')}</label><input id="fg-login" name="username" autocomplete="username" autocapitalize="off" spellcheck="false" maxlength="200" required value="${esc(pre)}">
       <div class="aerr" role="alert" id="fg-err"></div>
       <button class="btn pri" type="submit">${tr('Send the link')}</button>
-      <button class="linkbtn" type="button" data-au="back">${tr('Back to the sign-in')}</button>
+      <button class="linkbtn" type="button" data-au="back">${tr('Back to sign-in')}</button>
     </form></div>`;
   el.querySelector('#fg-form').addEventListener('submit', async e => {
     e.preventDefault();
@@ -893,7 +893,7 @@ function lg_forgotScreen(el, logo, pre = '') {
       const r = await fetch('/api/auth/forgot', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({login: $('#fg-login', el).value.trim()})});
       const res = await r.json().catch(() => ({}));
       if (!r.ok) { errEl.textContent = res.error || httpErrText(r.status); btn.disabled = false; return; }
-      $('.card', el).innerHTML = `${logo}<h2 class="invh">${tr('Check your e-mail')}</h2><p role="status" class="lgsent">${tr('If an account with a stored e-mail address matches, a link to set a new password is on its way.')}</p><p class="muted">${tr('No e-mail after a few minutes? Look in the spam folder or ask an admin.')}</p><button class="btn" type="button" data-au="back">${tr('Back to the sign-in')}</button>`;
+      $('.card', el).innerHTML = `${logo}<h2 class="invh">${tr('Check your e-mail')}</h2><p role="status" class="lgsent">${tr('If an account with a stored e-mail address matches, a link to set a new password is on its way.')}</p><p class="muted">${tr('No e-mail after a few minutes? Look in the spam folder or ask an admin.')}</p><button class="btn" type="button" data-au="back">${tr('Back to sign-in')}</button>`;
     } catch { errEl.textContent = tr('Server not reachable.'); btn.disabled = false; }
   });
   setTimeout(() => $('#fg-login', el)?.focus(), 50);
@@ -909,7 +909,7 @@ function signupScreen(el, logo, info) {
       ${pw ? `<label class="aulab" for="su-pw">${tr('Password')}</label><input id="su-pw" type="password" autocomplete="new-password" minlength="${info.signup.min_password || 8}" required placeholder="${esc(tr('at least {0} characters', info.signup.min_password || 8))}">` : ''}
       <div class="aerr" role="alert" id="su-err"></div>
       <button class="btn pri" type="submit">${tr('Create account')}</button>
-      <button class="linkbtn" type="button" data-au="back">${tr('Back to the sign-in')}</button>
+      <button class="linkbtn" type="button" data-au="back">${tr('Back to sign-in')}</button>
     </form></div>`;
   el.querySelector('#su-form').addEventListener('submit', async e => {
     e.preventDefault();
@@ -919,7 +919,7 @@ function signupScreen(el, logo, info) {
         body: JSON.stringify({name: $('#su-name', el).value.trim(), email: $('#su-mail', el).value.trim(), lang: I18N.code || 'en', ...(pw ? {password: $('#su-pw', el).value} : {})})});
       const res = await r.json().catch(() => ({}));
       if (!r.ok) { errEl.textContent = res.error || httpErrText(r.status); return; }
-      $('.card', el).innerHTML = `${logo}<h2 class="invh">${tr('Almost done')}</h2><p role="status">${esc(res.mail ? tr('If the address can be used, an e-mail with a link is on its way. Open it to choose your password.') : tr('Your account waits for an admin to approve it. You can sign in once it is approved.'))}</p><button class="btn" type="button" data-au="back">${tr('Back to the sign-in')}</button>`;
+      $('.card', el).innerHTML = `${logo}<h2 class="invh">${tr('Almost done')}</h2><p role="status">${esc(res.mail ? tr('If the address can be used, an e-mail with a link is on its way. Open it to choose your password.') : tr('Your account waits for an admin to approve it. You can sign in once it is approved.'))}</p><button class="btn" type="button" data-au="back">${tr('Back to sign-in')}</button>`;
     } catch { errEl.textContent = tr('Server not reachable.'); }
   });
   setTimeout(() => $('#su-name', el)?.focus(), 50);
@@ -1248,7 +1248,7 @@ async function setupChoices(el, logo) {
     el.innerHTML = `<div class="card setupcard">${logo}
       ${''/* 2.365.0 (#2802): the language as a small menu top right (it took half a phone screen; the browser's language is preselected) */}<details class="sulang" id="su-lang"><summary title="${esc(tr('Language'))}">${ic('globe', 's')}<span>${langName(langs.find(L => L.code === lang) || {code: lang, name: lang})}</span></summary><div class="sulangs">${langs.map(L => `<button type="button" data-su-lang="${esc(L.code)}" class="${L.code === lang ? 'on' : ''}" lang="${esc(L.code)}" aria-pressed="${L.code === lang}">${langName(L)}</button>`).join('')}</div></details>
       <h3>${tr('What do you use Kalmido for?')}</h3>
-      <p class="muted">${tr('Pick a start, untick what you do not need. Can be changed later.')}</p>
+      <p class="muted">${tr('Select a start, untick what you do not need. Can be changed later.')}</p>
       <div class="supresets">${Object.entries(SETUP_PRESETS).map(([k, p]) => `<button type="button" class="supreset ${isOn(k) ? 'on' : ''}" data-su-preset="${k}" aria-pressed="${isOn(k)}"><b>${ic(p.icon, 's')}${tr(p.name)}</b> <small class="muted">${tr(p.desc)}</small>${SU_ADDS[k] ? ` <small class="suadds">${esc(tr('Adds: {0}', SU_ADDS[k]().join(', ')))}</small>` : ''}</button>`).join('')}</div>
       <div class="supriv" id="su-priv">${suPriv()}</div>
       ${pm_allHtml('su-modsall', modsAll ?? SETUP_MODS.every(([k]) => picked.has(k)))}

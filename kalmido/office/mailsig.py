@@ -37,7 +37,7 @@ OFM_MAIL_RE = r"[^@\s,;<>]+@[^@\s,;<>]+\.[^@\s,;<>]+"
 OFM_VIA = ("", "server", "workspace", "private")
 OFM_LOGO_PX = 96  # twice the 48 px of the mail: sharp on a phone, small as a picture
 OFM_CID = "kalmido-sig-logo"
-OFM_NOTE_SERVER = N_("E-mails leave from the server's address so they do not land in spam; answers go to the answer address. An own sender address needs a mailbox with SMTP (E-mail filing).")
+OFM_NOTE_SERVER = N_("E-mails leave from the server's address so they do not land in spam; answers go to the answer address. Your own sender address needs a mailbox with SMTP (E-mail filing).")
 OFM_NOTE_BOX = N_("E-mails leave from {0} through your mailbox.")
 
 

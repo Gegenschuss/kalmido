@@ -4,7 +4,7 @@
 'use strict';
 const TOUR_TABS = '[data-mgtabs]', tourParts = id => () => mg_parts(mg_area(id)).length > 1;
 const TOUR_MODS = {
-  cal: [{id: 'cal1', t: N_('Your calendar'), d: N_('Tasks with a date and your appointments, side by side.')}, {id: 'cal2', sel: '.calbar', t: N_('Your view'), d: N_('Switch between day, week and month here and move through time.')}, {id: 'cal3', t: N_('New appointment'), d: N_('Pick a free time to add an appointment.')}],
+  cal: [{id: 'cal1', t: N_('Your calendar'), d: N_('Tasks with a date and your appointments, side by side.')}, {id: 'cal2', sel: '.calbar', t: N_('Your view'), d: N_('Switch between day, week and month here and move through time.')}, {id: 'cal3', t: N_('New appointment'), d: N_('Select a free time to add an appointment.')}],
   office: [{id: 'office1', t: N_('Your office'), d: N_('Clients, quotations, invoices and receipts in one place.')}, {id: 'office2', sel: TOUR_TABS, t: N_('Get around'), d: N_('This bar takes you to each part of the office.')}, {id: 'office3', t: N_('Start with a client'), d: N_('Create a client first: quotations and invoices then fill in the address for you.')}],
   time: [{id: 'time1', t: N_('Track your time'), d: N_('Start the timer on a task or enter the hours afterwards.')}, {id: 'time2', t: N_('See the totals'), d: N_('Your times add up per day and per project.')}],
   review: [{id: 'review1', t: N_('Look back'), d: N_('Write a few lines about your day and see how the week went.')}, {id: 'review2', sel: TOUR_TABS, on: tourParts('review'), t: N_('Statistics'), d: N_('Completed tasks and trends have their own tab.')}],

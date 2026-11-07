@@ -59,7 +59,7 @@ const FEAT = 'cal,comments,collab,office,clients,docs,files';
     check(await ready(ev, `/Last saved: version 2/.test(document.querySelector('.pd-state')?.textContent || '')`, 60), 'version 2 saved');
     // version 1 read only
     await ev(`(() => { const s = document.querySelector('#pd-ver'); s.value = '1'; s.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
-    check(await ready(ev, `/read only/.test(document.querySelector('.pd-state')?.textContent || '') && !document.querySelector('textarea[data-pdf]') && !document.querySelector('[data-pd="save"]')`, 60), 'version 1 read only');
+    check(await ready(ev, `/read-only/.test(document.querySelector('.pd-state')?.textContent || '') && !document.querySelector('textarea[data-pdf]') && !document.querySelector('[data-pd="save"]')`, 60), 'version 1 read only');
     check(await ev(`document.querySelector('.pd-field[data-pdk="company"] .pd-owntxt')?.textContent === 'Sole trader, video production (v1)'`), 'the text of version 1');
     check(await ev(`!!document.querySelector('a[href="/api/office/procdoc.pdf?version=1"]')`), 'export of version 1');
     await shot('p2148-c-version1.png');

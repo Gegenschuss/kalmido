@@ -51,10 +51,10 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   check(d.querySelectorAll('.oimpv .oimarea input[data-oim-area]').length === 3 && /Import 4 entries/.test(btn()), '#1557: three areas with a switch, 4 entries: ' + btn());
   const sw = k => d.querySelector(`.oimpv input[data-oim-area="${k}"]`);
   sw('clients').checked = false; sw('clients').dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(50);
-  check(/Import 3 entries/.test(btn()) && !d.querySelector('.oimpv [data-oim-c]') && /not taken over/.test(d.querySelector('.oimpv .oimarea.off')?.textContent || ''), '#1557: the clients switched off fold away: ' + btn());
+  check(/Import 3 entries/.test(btn()) && !d.querySelector('.oimpv [data-oim-c]') && /not imported/.test(d.querySelector('.oimpv .oimarea.off')?.textContent || ''), '#1557: the clients switched off fold away: ' + btn());
   d.querySelector('.oimpv [data-oim="area-skip"][data-area="equipment"]').click(); await sleep(50);
   check(/Import 1 entry/.test(btn()) && w.eval(`OIM.pv.equipment.every(x => x.action === 'skip')`), '#1557: Skip all of the equipment: ' + btn());
-  check(/Take over all/.test(d.querySelector('.oimpv [data-oim="area-skip"][data-area="equipment"]')?.textContent || ''), '#1557: Skip all turns into Take over all');
+  check(/Import all/.test(d.querySelector('.oimpv [data-oim="area-skip"][data-area="equipment"]')?.textContent || ''), '#1557: Skip all turns into Take over all');
   d.querySelector('.oimpv [data-oim="area-skip"][data-area="equipment"]').click(); await sleep(50);
   check(/Import 3 entries/.test(btn()), '#1557: Take over all brings them back: ' + btn());
   d.querySelector('[data-oim="import"]').click();

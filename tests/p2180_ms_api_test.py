@@ -179,7 +179,7 @@ check(A.get(B + f"/api/tasks/{MX}/milestone").json().get("progress", {}).get("to
 A.delete(B + f"/api/tasks/{MX}")
 check(A.delete(B + f"/api/tasks/{MX}?hard=1").ok and not dbx("SELECT 1 FROM tasks WHERE id=?", (MX,)), "the milestone deleted for good")
 check(dbx("SELECT milestone_id FROM tasks WHERE id=?", (TX,))[0][0] is None, "deleted for good: the link goes")
-MY = A.post(B + "/api/tasks", json={"title": "Turned off", "list_id": L, "ms": 1}).json()["id"]
+MY = A.post(B + "/api/tasks", json={"title": "Switched off", "list_id": L, "ms": 1}).json()["id"]
 TY = A.post(B + "/api/tasks", json={"title": "In turned off", "list_id": L, "milestone_id": MY}).json()["id"]
 check("ms" not in A.patch(B + f"/api/tasks/{MY}", json={"ms": 0}).json() and dbx("SELECT milestone_id FROM tasks WHERE id=?", (TY,))[0][0] is None,
       "turning a milestone off clears it on its tasks")

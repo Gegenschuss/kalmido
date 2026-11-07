@@ -67,7 +67,7 @@ check(j["modules"] == [] and "contracts" not in j, "GET /api/life with everythin
 for path, body in (("contracts", {"name": "x", "ends": D(90)}), ("devices", {"name": "x"}), ("upkeep", {"title": "x", "every_months": 12}),
                    ("health", {"type": "appointment", "title": "x", "date": D(3)}), ("trips", {"name": "x", "from": D(10), "to": D(12)})):
     r = A.post(B + f"/api/life/{path}", json=body)
-    check(r.status_code == 409 and "turned off" in r.json().get("error", ""), f"{path}: refused while off ({r.status_code})")
+    check(r.status_code == 409 and "switched off" in r.json().get("error", ""), f"{path}: refused while off ({r.status_code})")
 check(A.get(B + "/api/life/review").status_code == 409 and A.put(B + f"/api/life/journal/{D(0)}", json={"text": "x"}).status_code == 409,
       "review + journal refused while off")
 A.patch(B + "/api/settings", json={"features": "cal,comments,collab,contacts,events," + LIFE})

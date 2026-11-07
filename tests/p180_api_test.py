@@ -64,7 +64,7 @@ S = st()
 sm = S["sample"]
 check(sm and len(sm["lists"]) == 2 and sm["tasks"] == 27, "state.sample: 2 lists, 27 tasks: " + str(sm)[:200])
 L = next(l for l in S["lists"] if l["id"] == r["list_id"])
-check(L["name"] == "Example: Image film for client Muster" and L["kind"] == "project", "project list: " + L["name"] + " " + L["kind"])
+check(L["name"] == "Example: Promo film for Example Ltd" and L["kind"] == "project", "project list: " + L["name"] + " " + L["kind"])
 check(L.get("status") == "on_track", "project status set")
 PK = next((l for l in S["lists"] if l["name"] == "Example: Shoot day packing list"), None)
 check(PK and PK["kind"] == "list" and PK["checklist"] == 1, "packing list: a list with completed at the bottom (2.7.2)")

@@ -141,7 +141,7 @@ const getT = async id => (await call('GET', '/api/tasks/' + id));
   // the keyboard: d opens the date of the panel, Esc ends the selection
   w.eval('closePop()'); d.activeElement?.blur?.();
   key(w, d.body, 'd'); await sleep(150);
-  check(!d.querySelector('#pop').classList.contains('hidden') && [...d.querySelectorAll('#pop .menu-list button')].some(b => b.textContent.trim() === 'Pick a date…'), '#936: "d" opens the date menu of the panel');
+  check(!d.querySelector('#pop').classList.contains('hidden') && [...d.querySelectorAll('#pop .menu-list button')].some(b => b.textContent.trim() === 'Select a date…'), '#936: "d" opens the date menu of the panel');
   w.eval('closePop()');
   // removing one from the panel, a title opens one task alone
   click(w, d.querySelector(`#detail [data-act="me-drop"][data-id="${SEL[2]}"]`)); await sleep(150);

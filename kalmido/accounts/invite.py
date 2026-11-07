@@ -138,7 +138,7 @@ def invite_mail(c, u, link, kind, inviter, days=INVITE_DAYS, by=None):
         intro = t(N_("{0} created an account for you. In {1} we plan tasks, projects and appointments together – in the browser and as an app on the phone."), inviter or t(N_("An admin")), APP_NAME)
         button = t(N_("Set up your account"))
     valid = t(N_("The link works once and for {0} days."), days)
-    steps = [t(N_("Choose your own password on the page the button opens.")), t(N_("Best right away: turn on two-factor sign-in (an app code or a passkey).")),
+    steps = [t(N_("Choose your own password on the page the button opens.")), t(N_("Best right away: switch on two-factor sign-in (an app code or a passkey).")),
              t(N_("On the phone: in the browser “Add to home screen” – then {0} runs like an app, with notifications."), APP_NAME)]
     box = Safe(f"""<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:{bg};border-radius:12px">
   <tr><td style="padding:18px 20px;font-size:15px;line-height:1.7">

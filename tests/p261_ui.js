@@ -146,8 +146,8 @@ const HEAD = `(() => {
   const mi0 = [...d.querySelectorAll('#pop .menu-list button')];
   const mi = mi0[0] && /Agents and jobs/.test(mi0[0].textContent) ? mi0.slice(1) : mi0;
   check(mi.length >= 4 && mi[0].querySelector('.hdot') && /Claude: working · Checking links/.test(mi[0].textContent) && /Helper: ready/.test(mi[1].textContent), 'menu: every agent with its dot and state: ' + mi0.map(x => x.textContent.trim()).join(' | '));
-  const choose = mi.find(x => /Choose the agents shown/.test(x.textContent));
-  check(choose, 'menu: "Choose the agents shown…"');
+  const choose = mi.find(x => /Select the agents shown/.test(x.textContent));
+  check(choose, 'menu: "Select the agents shown…"');
   click(w, choose); await idle(w);
   md = d.querySelector('.smodal');
   const vis = [...md.querySelectorAll('[data-agvis]')];
@@ -246,7 +246,7 @@ const HEAD = `(() => {
   check(w.eval(`listMenuItems(${L}).flatMap(x => x.more || [x]).some(x => x.label === 'Notifications: Custom selection')`), 'list menu names it');
   w.eval(`listModal(${L})`); await idle(w);
   const lsel = d.querySelector('.lmodal #l-bell');
-  check(lsel.value === 'custom' && !d.querySelector('.lmodal #l-bellc').hidden && /own choice per event/.test(d.querySelector('#l-bellhint').textContent), 'list dialog: custom + "Choose events…"');
+  check(lsel.value === 'custom' && !d.querySelector('.lmodal #l-bellc').hidden && /own choice per event/.test(d.querySelector('#l-bellhint').textContent), 'list dialog: custom + "Select events…"');
   lsel.value = 'mute'; change(w, lsel); await idle(w);
   check((await call('GET', '/api/state', null, CKB)).lists.find(l => l.id === L).bell === 'mute' && d.querySelector('.lmodal #l-bellc').hidden, 'list dialog: back to Mute');
   lsel.value = 'custom'; change(w, lsel); await sleep(300);

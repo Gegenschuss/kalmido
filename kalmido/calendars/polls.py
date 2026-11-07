@@ -14,7 +14,7 @@ address; the own vote can be changed with the edit key (a cookie on the device +
 SHA-256 only). The page shows only the poll, its times and -- unless the owner turned it off -- the voters' names with their
 answers; never addresses, never other events or calendars of the owner. Expired, revoked, deleted or unknown = the same 404
 page. Spam without an outside service: the signed page stamp of the forms (frm_stamp, once only), a honeypot, limits per
-address / poll / hour, a cap of votes per poll and per address. "Choose this time" makes ONE event in a calendar the person
+address / poll / hour, a cap of votes per poll and per address. "Select this time" makes ONE event in a calendar the person
 may write (a Kalmido calendar of the same workspace or a private one -- served over CalDAV to the phones -- or a CalDAV
 subscription with "Allow writing", calendars/davwrite.py; never Google, #1128); the voters without an account are named in
 its description; an invitation mail goes to the voters with an address only when the person ticks it (off by default). The
@@ -62,7 +62,7 @@ TPO_PER_USER = 300               # polls per person (not deleted)
 TPO_VOTES_MAX = 300              # votes per poll
 TPO_VOTES_IP = 20                # new votes of one address per poll
 TPO_VIEW_RATE, TPO_VOTE_RATE, TPO_VOTE_HOUR = 60, 10, 200  # per address / minute, per address / minute, per poll / hour
-TPO_MAIL_MAX = 50                # invitation mails per "Choose this time"
+TPO_MAIL_MAX = 50                # invitation mails per "Select this time"
 TPO_ANSWERS = ("y", "m", "n")
 TPO_ONLY = N_("Only who created this poll or an admin of the organisation can change it")
 TPO_GONE = N_("Poll not available")
@@ -476,7 +476,7 @@ def tpo_restore(pid):
     return jsonify(poll=tpo_dict(c, tpo_need(c, pid), me()))
 
 
-# ---- "Choose this time": the event, the poll closes
+# ---- "Select this time": the event, the poll closes
 def tpo_event_text(c, r, opt_id, lg):
     """The event's description: the poll's text + the voters who can come (yes, then maybe) by name."""
     yes, maybe = [], []
@@ -488,7 +488,7 @@ def tpo_event_text(c, r, opt_id, lg):
         parts.append(tr("Yes: {0}", ", ".join(yes), lg=lg))
     if maybe:
         parts.append(tr("Maybe: {0}", ", ".join(maybe), lg=lg))
-    parts.append(tr("Chosen with the scheduling poll “{0}”", r["title"], lg=lg))
+    parts.append(tr("Selected with the scheduling poll “{0}”", r["title"], lg=lg))
     return "\n\n".join(parts)[:20000]
 
 
@@ -511,7 +511,7 @@ def tpo_decide(pid):
     c, uid, b = db(), me(), body()
     r = tpo_need(c, pid, write=True)
     if r["closed_at"]:
-        return err(tr("A time has already been chosen for this poll"), 409)
+        return err(tr("A time has already been selected for this poll"), 409)
     oid = _int(b.get("option_id"), "option_id", 1, 2 ** 62)
     o = c.execute('SELECT id, start, "end" FROM sched_poll_options WHERE id=? AND poll_id=?', (oid, pid)).fetchone()
     if not o:
@@ -529,13 +529,13 @@ def tpo_decide(pid):
             return ref
         r = tpo_need(c, pid, write=True)  # the write committed (no transaction is open while the calendar server is asked)
         if r["closed_at"]:
-            return err(tr("A time has already been chosen for this poll"), 409)
+            return err(tr("A time has already been selected for this poll"), 409)
     else:
         from ..events.model import ev_fields, ev_store, need_evcal
         cid = b.get("cal_id")
         cid = _int(cid, "cal_id", 1, 2 ** 62) if cid not in (None, "") else tpo_default_cal(c, uid, r["org_id"])
         if not cid:
-            return err(tr("Please choose a calendar"), 409)
+            return err(tr("Please select a calendar"), 409)
         cal, _role = need_evcal(c, cid, write=True)
         if cal["org_id"] and r["org_id"] and cal["org_id"] != r["org_id"]:  # never into another organisation's calendar
             return err(tr("This calendar belongs to another workspace"), 409)
@@ -626,7 +626,7 @@ def tpo_mail(rcpts, r, o, who, lg):
         lg = voter[0] if voter and voter[0] in LANGS else olg
         when = tpo_when(o["start"], o["end"], r["tz"], lg) + f" ({f['tz']})"
         text = "\n\n".join(x for x in (tr("Hello {0},", name, lg=lg),
-                                       tr("{0} has chosen a time for “{1}”:", who or tr("Someone", lg=lg), r["title"], lg=lg) + "\n" + when
+                                       tr("{0} has selected a time for “{1}”:", who or tr("Someone", lg=lg), r["title"], lg=lg) + "\n" + when
                                        + (("\n" + r["location"]) if r["location"] else ""),
                                        tr("The event is attached: open it to add it to your calendar.", lg=lg),
                                        tr("You get this e-mail because you entered this address when you voted. If that was not you, you can ignore it.", lg=lg)) if x)
@@ -639,7 +639,7 @@ def tpo_mail(rcpts, r, o, who, lg):
 
 @app.post("/api/polls/<int:pid>/reopen")
 def tpo_reopen(pid):
-    """The undo of "Choose this time": the poll is open again, its Kalmido event goes to the trash (restorable there); an
+    """The undo of "Select this time": the poll is open again, its Kalmido event goes to the trash (restorable there); an
     event in a CalDAV subscription is deleted by the client through the calendar's own route (DELETE
     /api/calendars/<sid>/events, 2.98.0 review L1)."""
     tpo_gate()
@@ -834,7 +834,7 @@ def tpo_page(c, r, token, lg, mine=None, vals=None, error="", note="", code=None
 
     if closed:
         o = next((x for x in opts if x["id"] == r["chosen_id"]), None)
-        main = (head + f'<div class="tpo-done"><p class="sub">{e(tr("The time has been chosen:", lg=lg))}</p>'
+        main = (head + f'<div class="tpo-done"><p class="sub">{e(tr("The time has been selected:", lg=lg))}</p>'
                 + (f'<p class="tpo-chosen">{when(o)}</p>' if o else "") + '</div>' + tzl)
         return tpo_headers(pub_html(r["title"], main + '<script src="/s/v/time.js"></script>', lg, code or 200, foot=True))
     rows = []

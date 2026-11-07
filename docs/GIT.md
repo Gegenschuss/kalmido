@@ -57,7 +57,7 @@ folder's owner connects it; the token stays sealed.
   version, with *Undo*. It is off for every project until someone switches it on. A task marked as done only in part
   (finished up to a later version) waits for that version; a parked task is never completed. Webhooks and agents get
   `task.completed` with `via: "release"` and no actor. It only reads what the poll stored and never writes to Git.
-- **Error reports** (2.18.0): *Error reports > Turn on* gives the project a secret URL (shown once; *New URL*, *Turn off*).
+- **Error reports** (2.18.0): *Error reports > Switch on* gives the project a secret URL (shown once; *New URL*, *Switch off*).
   Point a Sentry webhook (an internal integration with issue / alert webhooks) or any service that sends JSON
   `{title, body, url, fingerprint, level}` at it: a new error becomes a bug ticket with the details and the link, the same
   error again only counts up at its open ticket. A new error sends one News item and push (*Settings > Notifications >

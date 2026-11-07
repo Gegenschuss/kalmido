@@ -196,7 +196,7 @@ async function histStep(dir, n = 1) {
       const from = HIST[dir], e = from[from.length - 1]; if (!e) break;
       if (e.lids.some(l => listById(l) && !canAddTo(l))) {  // the list became view-only in the meantime (participants: the server checks each task)
         from.pop(); stop = true;
-        toast(dir === 'undo' ? tr('View only: “{0}” can no longer be undone', e.label) : tr('View only: “{0}” can no longer be redone', e.label));
+        toast(dir === 'undo' ? tr('Read-only: “{0}” can no longer be undone', e.label) : tr('Read-only: “{0}” can no longer be redone', e.label));
         break;
       }
       let r;

@@ -751,7 +751,7 @@ def wiki_bulk(trash):
     return jsonify(ok=True, ids=done, skipped=skipped, files=fdone, files_skipped=fskip, renamed=renamed)
 
 
-# ---- 2.143.0 B (#2211): the trash of pages -- listed, deleted for good by hand ("Delete for good", "Empty trash") and after
+# ---- 2.143.0 B (#2211): the trash of pages -- listed, deleted for good by hand ("Delete permanently", "Empty trash") and after
 # the trash period of tasks (tasktrash.ttp_days, KALMIDO_TRASH_DAYS) by the watchdog. Final = the row and what cascades from it
 # (links, files, history, word index), the files' scan / text marks and move records; the stored files after the commit.
 WKT_TICK = {"at": 0.0}

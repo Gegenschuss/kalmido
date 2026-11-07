@@ -40,7 +40,7 @@ function dsc_watcherHtml(s, host) {
     ${sc.downloads.length ? `<div class="dsc-dl">${main.map(dl).join('')}</div>${more.length ? `<p class="dsc-more muted">${more.map(small).join(' · ')}</p>` : ''}`
       : `<p class="muted">${tr('Not available on this server - the image builds the programs (Dockerfile)')}</p>`}
     ${sc.encrypted ? `<p class="muted">${tr('The file travels encrypted (HTTPS) and is stored encrypted on the server.')}</p>` : ''}
-    ${!sc.api ? `<p class="muted">${tr('The API is turned off on this server, so there are no scan inboxes.')}</p>` : `
+    ${!sc.api ? `<p class="muted">${tr('The API is switched off on this server, so there are no scan inboxes.')}</p>` : `
     ${sc.keys.length ? `<ul class="dc-rules">${sc.keys.map(key).join('')}</ul>` : ''}
     ${DSCN.code ? dsc_codeHtml() : ''}
     <details class="dc-radd dsc-new"${sc.keys.length || DSCN.code ? '' : ' open'}><summary>${tr('New scan inbox')}</summary>
@@ -62,8 +62,8 @@ function dsc_editHtml(k, s) {
 function dsc_codeHtml() {
   return `<div class="dsc-code" role="status"><p><b>${tr('Setup code')}</b> <span class="muted">${tr('Only visible now')}</span></p>
     <div class="dsc-row"><input id="dsc-code" readonly value="${esc(DSCN.code)}" aria-label="${esc(tr('Setup code'))}"><button type="button" class="btn sm" data-dsc="copy">${ic('copy', 's')} ${tr('Copy')}</button></div>
-    <ol class="dsc-steps"><li>${tr('Start the program. Mac: the first time open System Settings > Privacy & Security and choose “Open Anyway” (the program is not signed by Apple). Windows: in the SmartScreen notice choose “More info” > “Run anyway”.')}</li>
-      <li>${tr('Paste the code and choose the folder to watch.')}</li>
+    <ol class="dsc-steps"><li>${tr('Start the program. Mac: the first time open System Settings > Privacy & Security and select “Open Anyway” (the program is not signed by Apple). Windows: in the SmartScreen notice select “More info” > “Run anyway”.')}</li>
+      <li>${tr('Paste the code and select the folder to watch.')}</li>
       <li>${tr('Scanner: in the scan software set up a profile that saves as PDF into this folder (searchable is not needed, Kalmido recognises the text itself).')}</li></ol></div>`;
 }
 function dsc_mailHtml(s, sc) {
@@ -73,8 +73,8 @@ function dsc_mailHtml(s, sc) {
   return `<div class="dsc-way"><h5>${ic('mail', 's')} ${tr('By e-mail')}</h5>
     <p class="muted">${tr('PDFs and images attached to e-mails sent to this address become documents here.')}</p>
     ${m.address ? `<div class="dsc-row dc-mail"><code>${esc(m.address)}</code><button type="button" class="btn sm" data-dsc="mailcopy">${ic('copy', 's')} ${tr('Copy')}</button></div>
-      <p><button type="button" class="linkbtn" data-dsc="mailnew">${tr('New address')}</button> · <button type="button" class="linkbtn" data-dsc="maildel">${tr('Turn off')}</button></p>
-      <p class="muted">${tr('Scanner: in the scan software choose “Send by e-mail” and send to this address.')}</p>`
+      <p><button type="button" class="linkbtn" data-dsc="mailnew">${tr('New address')}</button> · <button type="button" class="linkbtn" data-dsc="maildel">${tr('Switch off')}</button></p>
+      <p class="muted">${tr('Scanner: in the scan software select “Send by e-mail” and send to this address.')}</p>`
       : `<button type="button" class="btn sm" data-dsc="mailnew">${tr('Create address')}</button>`}
     ${big ? `<div class="dsc-note" role="note">${ic('info', 's')}<div><p>${tr('E-mail is not end-to-end encrypted. E-mail providers on the way can read the content and the attachments, like a postcard. For confidential papers use the folder watcher.')}</p>
       <button type="button" class="btn sm" data-dsc="notice">${tr('Got it')}</button></div></div>`
@@ -107,7 +107,7 @@ document.addEventListener('click', async e => {
     return;
   }
   if (a === 'maildel') {
-    if (!await askConfirm(tr('Turn off the address?'), tr('E-mails to it no longer arrive.'), {ok: tr('Turn off'), danger: true})) return;
+    if (!await askConfirm(tr('Switch off the address?'), tr('E-mails to it no longer arrive.'), {ok: tr('Switch off'), danger: true})) return;
     await api('DELETE', `/api/docs/mail?ws=${encodeURIComponent(s.ws)}`).catch(() => null);
     s.mail.address = ''; dsc_embedDraw(md);
     return;

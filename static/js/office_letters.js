@@ -309,7 +309,7 @@ function ltSigClear(url) {
       for (let i = 0; i < a.length; i += 4) { const l = (a[i] + a[i + 1] + a[i + 2]) / 3; if (l > 200) a[i + 3] = l > 235 ? 0 : Math.round(a[i + 3] * (235 - l) / 35); }
       cx.putImageData(px, 0, 0); ok(cv.toDataURL('image/png'));
     };
-    im.onerror = () => no(new Error(tr('Please choose a PNG or JPEG picture')));
+    im.onerror = () => no(new Error(tr('Please select a PNG or JPEG picture')));
     im.src = url;
   });
 }
@@ -348,7 +348,7 @@ function ltProfileModal(opts = {}) {
     ${ofcRowF('lt-pname', tr('Name under the letter'), ofcIn('lt-pname', P.name, {max: 120, ph: P.default_name}))}`}
     <div class="row"><label>${tr('Signature picture')}</label><div class="lt-sigbox">${pic()}</div></div>
     <div class="lt-padbox" hidden></div>
-    <div class="row lt-sigbtns"><label class="btn sm">${ic('upload', 's')} ${tr('Choose picture')}<input type="file" id="lt-pfile" accept="image/png,image/jpeg" hidden></label>
+    <div class="row lt-sigbtns"><label class="btn sm">${ic('upload', 's')} ${tr('Select picture')}<input type="file" id="lt-pfile" accept="image/png,image/jpeg" hidden></label>
       <button type="button" class="btn sm" data-m="draw">${ic('edit', 's')} ${tr('Draw')}</button>
       <button type="button" class="btn sm ghost" data-m="padclr" hidden>${tr('Clear')}</button>
       <button type="button" class="btn sm ghost danger" data-m="rm" ${img ? '' : 'hidden'}>${tr('Remove')}</button></div>
@@ -361,7 +361,7 @@ function ltProfileModal(opts = {}) {
   md.addEventListener('change', e => {
     if (/** @type {any} */ (e.target).id !== 'lt-pfile') return;
     const f = /** @type {any} */ (e.target).files?.[0]; if (!f) return;
-    if (!/^image\/(png|jpeg)$/.test(f.type)) { err(tr('Please choose a PNG or JPEG picture')); return; }
+    if (!/^image\/(png|jpeg)$/.test(f.type)) { err(tr('Please select a PNG or JPEG picture')); return; }
     if (f.size > 12 * 1024 * 1024) { err(tr('The picture is too large (at most {0} KB)', 300)); return; }  // 2.357.0 C (#3158): made smaller here
     const r = new FileReader();
     r.onload = async () => {

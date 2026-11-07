@@ -337,7 +337,7 @@ def sh_pub_put():
     if not isinstance(on, bool) or ("notes" in b and not isinstance(b["notes"], bool)):
         return err(tr("Invalid value: {0}", "on"))
     if on and not public_links_on(c, "lists"):
-        return err(tr("Public links are turned off on this server"), 409)
+        return err(tr("Public links are switched off on this server"), 409)
     created = removed = 0
     for r in _pub_rows(c, f):
         if on and not r["link"] and not r["health"] and not r["e2e"] and not r.get("budget"):  # 2.72.0 (#1333): a budget neither

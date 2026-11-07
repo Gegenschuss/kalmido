@@ -1077,7 +1077,7 @@ async function dc_smvAll() {  // every document the search and the filters find 
 }
 async function dc_smvMove(sel, what) {
   const orgs = new Set(sel.values());
-  if (orgs.size !== 1) { toast(tr('Choose items of one workspace')); return null; }
+  if (orgs.size !== 1) { toast(tr('Select items of one workspace')); return null; }
   const ids = [...sel.keys()], from = [...orgs][0];
   let last = null;
   const r = await smv_open({what, from, total: ids.length,  // 2.147.1 B (#2230): batches + progress
@@ -1316,7 +1316,7 @@ async function dc_bulkTags(add) {
 }
 async function dc_bulkSet(kind) {
   const list = (kind === 'type' ? DC.facets?.types : DC.facets?.senders) || [];
-  const v = await askDialog({title: kind === 'type' ? tr('Document type of the chosen documents ({0})', DC.sel.size) : tr('Sender of the chosen documents ({0})', DC.sel.size), ok: tr('Save'),
+  const v = await askDialog({title: kind === 'type' ? tr('Document type of the selected documents ({0})', DC.sel.size) : tr('Sender of the selected documents ({0})', DC.sel.size), ok: tr('Save'),
     input: {value: '', max: 120, placeholder: kind === 'type' ? tr('e.g. Invoice, Contract, Letter') : tr('Sender')},
     after: md => { const i = $('#cdlg-in', md); if (!i) return; const dl = document.createElement('datalist'); dl.id = 'dc-bulkdl'; dl.innerHTML = list.map(x => `<option value="${esc(x.name)}">`).join(''); i.setAttribute('list', dl.id); i.after(dl); }});
   if (v == null || !String(v).trim()) return;

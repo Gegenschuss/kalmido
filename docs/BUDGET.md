@@ -30,7 +30,7 @@ left at the end of the month. Switch it on under *Settings > Modules > Home > Bu
 
 - Menu **…** > *Recurring entries*: rent, salary, insurance with how often (monthly, quarterly, yearly), from which
   month and, if it ends, until which month.
-- With the module *Contracts* on, *Take over from contracts* turns your contracts with a cost into recurring entries.
+- With the module *Contracts* on, *Add from contracts* turns your contracts with a cost into recurring entries.
   The values are copied; if a contract changes later, the budget says *Contract changed* and *Match it* takes the new
   cost over.
 
@@ -48,7 +48,7 @@ file with the same reader as the bank import of the office (same formats and che
    apart), the text and who was paid; check the guess, the decimal separator and the date format.
 2. The preview lists every row. Rows that are already in the budget are marked and not chosen; a row that matches an
    open recurring entry is linked to it (so it is not counted twice). The category can be changed per row.
-3. *Take over N entries* imports the chosen rows. The column mapping is remembered for the next file of the same bank.
+3. *Import N entries* imports the chosen rows. The column mapping is remembered for the next file of the same bank.
 
 Since 2.146:
 
@@ -59,13 +59,13 @@ Since 2.146:
 - **Debit / credit mark**: for exports with an amount without a sign and a column S/H (Soll/Haben, D/C, -/+), choose the
   column under *Debit / credit mark*; Kalmido guesses it (also the Volksbank / Raiffeisenbank layouts), so expenses never
   become income. Dates also as `DD-MM-YYYY` and `YYYYMMDD`.
-- **CAMT.052 day reports**: pending bookings are listed apart ("not taken over") and never imported; a booking that is in
+- **CAMT.052 day reports**: pending bookings are listed apart ("not imported") and never imported; a booking that is in
   several reports (pending first, booked later, with another day or text) counts once by its bank reference. For a full
   statement better export CAMT.053.
 - **Duplicates without the text**: a row with the counterpart's IBAN is also found again by day + amount + IBAN, so a CSV
   and a CAMT export of the same account overlap without double entries (entries of earlier versions are still found by
   their text).
-- **Take an import back**: the dialog lists the last imports; *Take this import back* deletes exactly that import's entries
+- **Take an import back**: the dialog lists the last imports; *Undo this import* deletes exactly that import's entries
   with their receipts (the budget has no trash). Entries you changed after the import (or gave a receipt) are named and
   kept, unless you tick *Delete the changed ones too*. Routes: `GET /api/budget/<list>/import/runs`,
   `POST /api/budget/<list>/import/runs/<run>/undo` `{edited: keep | delete}`; `import/parse` takes `multipart/form-data`

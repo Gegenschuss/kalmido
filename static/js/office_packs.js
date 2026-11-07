@@ -251,7 +251,7 @@ function ocf_chooseHtml(slim) {
   // every other page: one slim line whose button leads there
   const ent = typeof ofm_items === 'function' && ofm_items().some(i => i.key === 'pipeline') ? 'pipeline' : 'offers';
   if (slim || (S.route.tab && ![ent, 'start'].includes(S.route.tab) && !isMobile()))  // 2.470.0 (#3596): slim in Settings, the card may stand behind the dialog
-    return `<div class="ocf-choose ocf-slim muted">${ic('globe', 's')}<span>${tr('Where is your office?')}</span><button type="button" class="btn sm" ${slim ? 'data-ocf="to-pack"' /* 2.555.0 (#4664): in Settings the country is chosen on the same page */ : `data-go="office/${ent}"`}>${tr('Choose country')}</button></div>`;
+    return `<div class="ocf-choose ocf-slim muted">${ic('globe', 's')}<span>${tr('Where is your office?')}</span><button type="button" class="btn sm" ${slim ? 'data-ocf="to-pack"' /* 2.555.0 (#4664): in Settings the country is chosen on the same page */ : `data-go="office/${ent}"`}>${tr('Select country')}</button></div>`;
   pkc_sync();
   if (!PKC.packs && !PKC.packsBusy) setTimeout(pkc_loadPacks, 0);
   const opts = (PKC.packs?.country || []).map(p => [p.code, p.neutral ? pkc_nm(p) : `${pkc_nm(p)} (${p.code})`]);
@@ -284,7 +284,7 @@ async function ocf_confirmSwitch(code) {
   return askConfirm(tr('Change the country to “{0}”?', pkc_nm(j)), lines.join(' '), {ok: tr('Change')});
 }
 document.addEventListener('click', e => { const b = e.target.closest?.('[data-ocf="choose"]'); if (b) { e.preventDefault(); ocf_choose(); } });
-// 2.555.0 (#4664): "Choose country" in Settings > Company & office: to the country pack field of the same page (Packs), never out of the settings
+// 2.555.0 (#4664): "Select country" in Settings > Company & office: to the country pack field of the same page (Packs), never out of the settings
 document.addEventListener('click', e => {
   const b = e.target.closest?.('#s-biz [data-ocf="to-pack"]'); if (!b) return;
   e.preventDefault();

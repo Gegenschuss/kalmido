@@ -287,7 +287,7 @@ that task or client).
   voter's own time zone and names the poll's zone. A voter can change their vote later on the same device or with the
   link on the thank-you page.
 - **The result:** per time the votes as a bar, the names, the best time marked (most *Yes*, then most *Maybe*).
-- **Choose this time:** pick the calendar (your Kalmido calendars, or a subscribed CalDAV calendar with *Allow writing*;
+- **Select this time:** select the calendar (your Kalmido calendars, or a subscribed CalDAV calendar with *Allow writing*;
   never Google) and Kalmido makes one event with the title, place and description; the voters are named in it. The
   invitation by e-mail to the voters with an address is off unless you tick it (the event goes along as an `.ics`
   file). The poll is then closed and its link shows only the chosen time. *Reopen poll* (or Undo) puts the event into

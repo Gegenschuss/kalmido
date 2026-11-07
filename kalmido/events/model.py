@@ -300,7 +300,7 @@ def cal_touch(c, cid):
 def cal_member_set(c, cid, uid, role):
     from ..agents.admin import personal_agent_foreign
     if not collab_all():
-        raise Denied(409, tr("Collaboration is turned off on this server"))
+        raise Denied(409, tr("Collaboration is switched off on this server"))
     if role not in EV_ROLES:
         raise BadInput(tr("Invalid value: {0}", "role"))
     u = c.execute("SELECT id FROM users WHERE id=? AND disabled=0", (uid,)).fetchone()
@@ -937,7 +937,7 @@ def att_clean(c, items, eid=None, cal_id=None):
         row = {"user_id": None, "contact_id": None, "email": "", "name": "", "partstat": ps, "role": role}
         if a.get("user_id") not in (None, ""):
             if not collab_all():
-                raise Denied(409, tr("Collaboration is turned off on this server"))
+                raise Denied(409, tr("Collaboration is switched off on this server"))
             u = as_int(a["user_id"], "user_id", 1)
             if not c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0", (u,)).fetchone() or (me_ and personal_agent_foreign(c, u, me_)) \
                     or (me_ and u not in had_u and not may_see(c, me_, u)):  # 2.22.0 (#752): only people one may see; 2.30.0 (#1036): also newly invited ones of an existing event

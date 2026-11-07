@@ -98,7 +98,7 @@ UMZ_NOT_INCLUDED = (
     N_("your agents and their keys and tokens (set them up again on the target)"),
     # 2.531.0 (#4317 F10): the trashes stay behind; the tasks of the trash are in the file, the import leaves them there
     N_("the trash of your files, knowledge pages, tables, address books, filed e-mails and video reviews (restore what you want to keep before the export)"),
-    N_("tasks in the trash with their comments and files: they are in the file, but an import does not take them over (restore them before the export)"),
+    N_("tasks in the trash with their comments and files: they are in the file, but an import leaves them out (restore them before the export)"),
 )
 
 # 2.619.0 (#3862): the tables that stay out of the account export, with the reason, are in admin/exportleft.py UMZ_LEFT_TABLES (one list;

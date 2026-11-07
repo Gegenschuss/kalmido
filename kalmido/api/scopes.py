@@ -115,10 +115,10 @@ SCOPE_HELP = {"read": N_("Everything the account sees that no other permission c
               # 2.51.0 A (#1348): also needs the agent's switch and the office's privacy switch
               "office": N_("Read clients, services and prices of the office; quotation, invoice and payment reminder drafts, payment suggestions"),
               "pinboard": N_("Write notepads on project pages (an agent changes only its own, e.g. a weekly status)"),  # 2.51.0 (#1352)
-              "layouts": N_("See how your views are arranged (blocks only, never their content) and propose arrangements you accept or decline"),  # 2.55.0 (#1066)
-              "import": N_("Read your old data (for example fixed costs) and send it as an import proposal you check and take over into the office; never sees the office itself"),  # 2.68.0 (#1839)
+              "layouts": N_("See how your views are arranged (blocks only, never their content) and propose arrangements you accept or reject"),  # 2.55.0 (#1066)
+              "import": N_("Read your old data (for example fixed costs) and send it as an import proposal you check and apply to the office; never sees the office itself"),  # 2.68.0 (#1839)
               "sheets:read": N_("Tables shared with you: cells, formulas and values (calculated with your visibility)"),  # 2.89.0 C (#1916)
-              "sheets:write": N_("Create tables and change their cells, rows and columns; every call can be taken back"),
+              "sheets:write": N_("Create tables and change their cells, rows and columns; every call can be undone"),
               "docs:upload": N_("Only upload documents into one place; reads nothing, deletes nothing"),  # 2.207.0 A (#2763)
               "wiki:read": N_("Knowledge pages shared with you (the page or a folder above it): their text"),  # 2.200.0 C (#1781)
               "wiki:write": N_("Change the text of knowledge pages shared with you to edit and add pages in such folders; every save stays in the page history"),
@@ -787,7 +787,7 @@ def v1_trash_empty():
     v1_args(())
     c = db()
     n = tre_plan(c, me())[2]["deleted"]  # 2.530.0 D (#4316): the number this really deletes (own trash, not kept by law)
-    need_approval(c, N_("Empty the trash for good ({0} tasks)"), (n,))
+    need_approval(c, N_("Empty the trash permanently ({0} tasks)"), (n,))
     j = v1_call(trash_empty, body={})
     # 2.281.0 A (#3112): queued = more than 200 tasks, deleted in the background within seconds (list_trash shows the rest until then)
     return jsonify(deleted=j.get("deleted", 0), kept=j.get("kept", 0), **({"queued": True} if j.get("queued") else {}))
@@ -1074,7 +1074,7 @@ def v1_list_delete(lid):
     need_list(c, lid, write=False, manage=True)
     r = c.execute("SELECT name, is_inbox, archived FROM lists WHERE id=?", (lid,)).fetchone()
     if not r["is_inbox"] and r["archived"]:
-        need_approval(c, N_("Delete the project “{0}” for good"), (r["name"],), list_id=lid)
+        need_approval(c, N_("Delete the project “{0}” permanently"), (r["name"],), list_id=lid)
     v1_call(list_delete, lid, body={})
     return Response(status=204)
 

@@ -1014,7 +1014,7 @@ def cal_rate(uid, sid=None):
 
 def need_cal():
     if not CAL_ON:
-        raise Denied(409, tr("Calendar subscriptions are turned off on this server"))
+        raise Denied(409, tr("Calendar subscriptions are switched off on this server"))
 
 
 def cal_public(r):
@@ -1147,7 +1147,7 @@ def cal_create():
         if not server or not isinstance(user, str) or not isinstance(pw, str) or not user.strip() or not pw or len(user) > 200 or len(pw) > 500:
             return err(tr("Server address, username and password are needed"))
         if not isinstance(sel, list) or not sel or len(sel) > CAL_MAX_SUBS or not all(isinstance(x, dict) for x in sel):
-            return err(tr("Choose at least one calendar"))
+            return err(tr("Select at least one calendar"))
         user, todo = user.strip(), []
         for x in sel:
             u = cal_norm_url(x.get("url"))

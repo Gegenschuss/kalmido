@@ -201,7 +201,7 @@ def cb_books_get():
 # 2.538.0 (#4368): cash in for an invoice books a payment on it, which needs the special "pay" of the offers area (#4072):
 # checked before the entry is written, with a message that says what to do (no half booking, no bare "no right")
 CB_PAY_DENIED = N_("Cash for an invoice books a payment on it, and your office rights do not include payments on invoices: book the cash without the invoice or ask an administrator.")
-CB_UNPAY_DENIED = N_("This entry booked a payment on an invoice; cancelling it takes the payment back, and your office rights do not include payments on invoices. Ask an administrator.")
+CB_UNPAY_DENIED = N_("This entry booked a payment on an invoice; cancelling it reverses the payment, and your office rights do not include payments on invoices. Ask an administrator.")
 
 
 def cb_may_pay(c, uid, oid):

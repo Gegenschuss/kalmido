@@ -254,7 +254,7 @@ def otb_gone_out(notes):
     areas (cards, trips) say the same sentence."""
     out = {"gone": notes["gone"]} if notes.get("gone") else {}
     if "client_id" in out.get("gone", ()):  # 2.552.0 (#4561 B19): the app shows this sentence
-        out["note"] = tr("Restored without a client: the client was deleted for good meanwhile.")
+        out["note"] = tr("Restored without a client: the client was deleted permanently meanwhile.")
     return out
 
 

@@ -266,7 +266,7 @@ def ofm_need(c, uid, what, ids):
         rows = [need_client(c, i, uid) for i in ids]
         ws = {r["org_id"] or None for r in rows}
         if len(ws) != 1:
-            raise BadInput(tr("Choose items of one workspace"))
+            raise BadInput(tr("Select items of one workspace"))
         w = ws.pop()
         if w is None and any(r["created_by"] != uid for r in rows):
             raise Denied(404)
@@ -278,7 +278,7 @@ def ofm_need(c, uid, what, ids):
         raise Denied(404)
     areas = {r["org_id"] for r in rows}
     if len(areas) != 1:
-        raise BadInput(tr("Choose items of one workspace"))
+        raise BadInput(tr("Select items of one workspace"))
     area = areas.pop()
     if not office_role(c, uid, area) or office_role(c, uid, area) == "guest":
         raise Denied(404)

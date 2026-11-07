@@ -4,7 +4,7 @@
 //   reload the values are there; the four fixed one-way steps are ticked and locked; "After the deadline" only with a deadline
 // - the goal field only on "Free run with a goal"
 // - the history lists the agent's decision; Undo takes it back (the task goes to the trash)
-// - an agent from before 2.235.0 shows "No level chosen yet - works as before."
+// - an agent from before 2.235.0 shows "No level selected yet - works as before."
 // - 2.235.0 A2 (#2891): the approval card shows its step (bound method, path, body), one-way and the recommendation
 // - the same for a person without an organisation (freelancer-matrix: agents)
 const path = require('path');
@@ -73,7 +73,7 @@ async function scenario(tag, user, ag, ck, lid) {
   check(undo, 'the history line has Undo' + T);
   if (undo) {
     click(w, undo);
-    check(await until(() => [...md.querySelectorAll('.awch .mrow')].some(x => /Made by the agent/.test(x.textContent) && /taken back/.test(x.textContent))), 'the line says taken back' + T);
+    check(await until(() => [...md.querySelectorAll('.awch .mrow')].some(x => /Made by the agent/.test(x.textContent) && /undone/.test(x.textContent))), 'the line says taken back' + T);
     check(await until(() => (dbx('SELECT deleted_at FROM tasks WHERE id=?', [r.id])[0] || {}).deleted_at), 'the task is in the trash' + T);
   }
   w.close();

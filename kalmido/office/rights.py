@@ -215,7 +215,7 @@ TEMPLATES = {
                  ("release",)),
     "staff": (N_("Staff"), N_("Only their own receipts, travel expenses, drives, entertainment receipts and times"),
               _mix(_all("none"), own=tuple(AREA_OWN), view=("services", "equipment")), ()),
-    "readonly": (N_("Read only"), N_("Sees every office area, changes nothing"), _all("view"), ()),
+    "readonly": (N_("Read-only"), N_("Sees every office area, changes nothing"), _all("view"), ()),
     TPL_NONE: (N_("No office access"), N_("Sees nothing of the office"), _all("none"), ()),
     TPL_LEGACY: (N_("Previous access"), N_("Exactly what members could do before the office rights existed"), None, ()),
 }
@@ -806,7 +806,7 @@ def ofr_person_put(pid):
         raise BadInput(tr("Invalid data"))
     refs = list(dict.fromkeys(refs)) or [f"tpl:{TPL_NONE}"]
     if agent and f"tpl:{TPL_LEGACY}" in refs:
-        raise BadInput(tr(N_("Agents start without office access: choose a group")))
+        raise BadInput(tr(N_("Agents start without office access: select a group")))
     if len(refs) > 1 and f"tpl:{TPL_LEGACY}" in refs:
         refs = [r for r in refs if r != f"tpl:{TPL_LEGACY}"]
     if len(refs) > 1 and f"tpl:{TPL_NONE}" in refs:

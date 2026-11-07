@@ -588,7 +588,7 @@ def chk_agents(c, lid, uid):
 
 def _chk_agent(c, lid, uid, aid):
     if isinstance(aid, bool) or not isinstance(aid, int) or aid not in {a["id"] for a in chk_agents(c, lid, uid)}:
-        raise BadInput(tr("Choose an agent of this project"))
+        raise BadInput(tr("Select an agent of this project"))
     return aid
 
 

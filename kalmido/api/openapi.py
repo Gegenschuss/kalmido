@@ -278,7 +278,7 @@ def openapi_spec():
             "path": nul("string", maxLength=300, description="Optional file path, e.g. src/app.py"),
             "line": nul("integer", minimum=1, description="Optional line in that file"),
             "code": {"type": "string", "maxLength": 20000, "description": "The code itself (plain text, kept as it is)"},
-            "by": nul("integer", description="Read only: who changed it last"), "updated_at": {"type": "string", "description": "Read only"},
+            "by": nul("integer", description="Read only: who changed it last"), "updated_at": {"type": "string", "description": "Read-only"},
             "truncated": {"type": "boolean", "description": "Only in task events: the code is cut (get_task has all of it)"}}},
         "TaskCreate": {"type": "object", "additionalProperties": False, "required": ["title"], "properties": {**task_in, "client_ref": {  # 2.270.0 D (#3028)
             "type": "string", "maxLength": 64, "description": "Your id of the new task: sent again (a retry after a lost answer) = the task created the first time (200 instead of 201)"}}},

@@ -315,7 +315,7 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   await wb.eval('load().then(render)'); await sleep(200);
   db.dispatchEvent(new wb.KeyboardEvent('keydown', {key: 'z', ctrlKey: true, bubbles: true, cancelable: true})); await sleep(400);
   check((await get(s1)).priority === 5, 'view-only: nothing changed on the server');
-  check(/View only/.test(db.querySelector('#toast:not(.hidden)')?.textContent || '') && wb.eval('HIST.undo.length') === 0, 'refused with a toast, the step leaves the history');
+  check(/Read-only/.test(db.querySelector('#toast:not(.hidden)')?.textContent || '') && wb.eval('HIST.undo.length') === 0, 'refused with a toast, the step leaves the history');
   wb.close();
 
   check(errs.length === 0, 'no script errors: ' + errs.join(' | '));

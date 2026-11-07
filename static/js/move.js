@@ -9,12 +9,12 @@ const umzHtml = hint => `<h4 id="s-umz-h">${tr('Move and export everything')}</h
   ${hint(tr(UMZ_OFFICE_COPY))}
   <div id="s-umz-exp" aria-live="polite"><div class="muted mhint">${tr('Loading…')}</div></div>
   <div id="s-umz-sig"></div>
-  <div class="row"><label for="s-umz-file">${tr('Take over from a Kalmido export')}</label>${fileBtn('s-umz-file', '.zip,application/zip')}${''/* lazy-ok: 2.149.0 F (#2519): settings.js draws this section */}</div>
+  <div class="row"><label for="s-umz-file">${tr('Import from a Kalmido export')}</label>${fileBtn('s-umz-file', '.zip,application/zip')}${''/* lazy-ok: 2.149.0 F (#2519): settings.js draws this section */}</div>
   <div id="s-umz-imp" aria-live="polite"></div>
   <details class="umzhow"><summary>${tr('Move to your own server')}</summary><ol class="umzsteps">
     <li>${tr('Here: “Export everything” and download the file.')}</li>
     <li>${tr('Set up your own Kalmido server (see SELF-HOSTING.md, section “Moving from and to app.kalmido.com”).')}</li>
-    <li>${tr('There: sign in, Settings > Data > “Take over from a Kalmido export”, check the preview and start.')}</li>
+    <li>${tr('There: sign in, Settings > Data > “Import from a Kalmido export”, check the preview and start.')}</li>
     <li>${tr('Invite the people you work with; your projects are shared with them again once you tick them in the preview. Moving back works the same way.')}</li></ol></details>`;
 // 2.531.0 (#4317 F9/F10): what the file does not hold (the server's list, readable, also the trashes), before and after an export
 const umzLeftHtml = j => (j.not_included || []).length ? `<details class="umzleft"><summary>${esc(tr('What is not in the file ({0})', j.not_included.length))}</summary>
@@ -60,15 +60,15 @@ function umzPreviewHtml(j) {
       + (p.can_invite && !x.key.startsWith('id') ? `<label class="umzck"><input type="checkbox" data-umzp="${i}" data-k="invite"> ${tr('Invite by e-mail')}</label>${x.need_address === false ? '' : `<input type="email" class="umzem" data-umze="${i}" autocomplete="off" placeholder="${esc(tr('Their e-mail address'))}" aria-label="${esc(tr('E-mail address of {0}', x.name || ''))}"><span class="muted umzmis" data-umzm="${i}" hidden>${tr('This is not the address in the file: nobody is invited.')}</span>`}` : x.by_login ? '' : `<span class="muted">${tr('Skipped')}</span>`)}</div>`).join('')
     + hintK(tr('Nothing is shared without a tick: an address on another server can belong to somebody else here.')) : '';
   const lists = p.lists.length ? `<div class="umzlists">${p.lists.slice(0, 12).map(l => `<div class="mrow"><span class="n">${esc(l.inbox ? tr('Basket') : l.name)}${l.folder ? ` <span class="muted">${esc(l.folder)}</span>` : ''}</span><span class="muted">${trn('{0} task', '{0} tasks', l.tasks)}</span></div>`).join('')}${p.lists.length > 12 ? `<div class="muted mhint">${esc(trn('and {0} more', 'and {0} more', p.lists.length - 12))}</div>` : ''}</div>` : '';
-  const notes = [p.again ? `<div class="shint warn" role="alert">${ic('alert', 's')} ${umzAgainText(p.earlier)}</div><label class="umzck"><input type="checkbox" data-umzagain> ${tr('Import again: what is already in the chosen place is skipped')}</label>` : '',  // 2.362.3 (#3098)
+  const notes = [p.again ? `<div class="shint warn" role="alert">${ic('alert', 's')} ${umzAgainText(p.earlier)}</div><label class="umzck"><input type="checkbox" data-umzagain> ${tr('Import again: what is already in the selected place is skipped')}</label>` : '',  // 2.362.3 (#3098)
     p.server_links.length ? hintK(tr('Set up the connection to {0} again (Settings > Account > Servers): access keys never move along.', p.server_links.map(esc).join(', '))) : '',
     p.encrypted.attachments || p.encrypted.locked_notes ? hintK(p.encrypted.keys === 'take' ? tr('Your encryption keys come along: locked notes and your encrypted files open with your passphrase from before.')
       : p.encrypted.keys === 'keep' ? tr('You already have your own encryption keys here: locked notes and encrypted files from the export arrive unreadable.')
       : tr('The export has no encryption keys: locked notes and encrypted files arrive unreadable.')) : '',  // 2.278.0 C (#3091): only what the import does
-    p.encrypted.locked_lists ? hintK(trn('{0} encrypted project is not taken over: switch its encryption off before the export or export its content.', '{0} encrypted projects are not taken over: switch their encryption off before the export or export their content.', p.encrypted.locked_lists)) : '',
+    p.encrypted.locked_lists ? hintK(trn('{0} encrypted project is not imported: switch its encryption off before the export or export its content.', '{0} encrypted projects are not imported: switch their encryption off before the export or export their content.', p.encrypted.locked_lists)) : '',
     p.encrypted.locked_folders ? hintK(trn('{0} locked folder comes along with its key: it opens with your passphrase from before.', '{0} locked folders come along with their keys: they open with your passphrase from before.', p.encrypted.locked_folders)) : '',  // #4300
     p.encrypted.locked_folders_lost ? hintK(`${trn('{0} locked folder arrives without its encrypted content, its key does not fit your encryption keys here: unlock it on the old server before the export.', '{0} locked folders arrive without their encrypted content, their keys do not fit your encryption keys here: unlock them on the old server before the export.', p.encrypted.locked_folders_lost)} ${(p.encrypted.locked_folders_lost_names || []).map(esc).join(', ')}`) : '',
-    (p.taken_areas || []).length ? hintK(tr('Also taken over: {0}', p.taken_areas.map(x => `${esc(x.what)} (${x.count})`).join(', '))) : '',  // 2.137.0 (#2344)
+    (p.taken_areas || []).length ? hintK(tr('Also imported: {0}', p.taken_areas.map(x => `${esc(x.what)} (${x.count})`).join(', '))) : '',  // 2.137.0 (#2344)
     p.not_taken.length ? hintK(tr('These areas stay on the old server: {0}', p.not_taken.map(x => `${esc(x.what)} (${x.count})`).join(', '))) : '',  // 2.273.0 A (#3030)
     p.office_copy ? hintK(tr(UMZ_OFFICE_COPY)) : ''].join('');  // 2.362.2 (#3099)
   const tgt = p.targets.length > 1 || org ? `<div class="row"><label for="s-umz-tgt">${tr('Into')}</label><select id="s-umz-tgt">${p.targets.map(t => `<option value="${esc(String(t.id))}">${esc(t.id === 'private' ? tr('Private|workspace') : t.name)}</option>`).join('')}</select></div>` : '';
@@ -99,7 +99,7 @@ async function umzUndoAsk(id) {
   let p; try { p = await api('GET', `/api/imports/${+id}/undo-plan`); } catch { return false; }
   const li = x => `<li>${esc(x.what)}: ${+x.count}</li>`;
   const html = `<p>${esc(tr('You can undo this import until {0}.', fmtWhen(p.undo_until)))}</p>`
-    + (p.for_good.length ? `<p><b>${esc(tr('Deleted for good:'))}</b></p><ul>${p.for_good.map(li).join('')}</ul>` : `<p>${esc(tr('Nothing is deleted for good.'))}</p>`)
+    + (p.for_good.length ? `<p><b>${esc(tr('Deleted permanently:'))}</b></p><ul>${p.for_good.map(li).join('')}</ul>` : `<p>${esc(tr('Nothing is deleted permanently.'))}</p>`)
     + (p.trash_tasks || p.trash_rows ? `<p>${esc(tr('Into the trash (restorable): {0} tasks, {1} files, pages, tables or clients.', p.trash_tasks, p.trash_rows))}</p>` : '')
     + (p.kept_tasks || p.kept_rows ? `<p>${esc(tr('Stays because it changed since the import: {0} tasks, {1} other entries.', p.kept_tasks, p.kept_rows))}</p>` : '')
     // 2.593.0 (#4864): finalised documents never go with the undo; they stay with their client, PDF / XML and files (inside kept_rows)

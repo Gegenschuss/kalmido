@@ -1381,7 +1381,7 @@ def bud_import_commit(c, uid, lid, b):
         if not isinstance(x, dict):
             raise BadInput(tr("Invalid value: {0}", "rows"))
         if x.get("pending"):
-            raise BadInput(tr("Pending bookings are not taken over"))
+            raise BadInput(tr("Pending bookings are not imported"))
         v = {"day": _day(x.get("day")), "amount": _amt_s(_amt(x.get("amount"))), "kind": _kind(x.get("kind")),
              "title": _txt(x.get("title"), BUD_TITLE_MAX, "title", need=True), "note": "",
              "counterpart": _txt(x.get("counterpart"), BUD_CP_MAX, "counterpart"), "cat_id": _cat_of(c, lid, x.get("cat_id")),

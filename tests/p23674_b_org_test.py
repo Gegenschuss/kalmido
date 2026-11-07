@@ -212,7 +212,7 @@ print([t for _, t, _ in x.aa_recipients(c, cfg)], [t for _, t, _ in x.aa_recipie
 check(out == f"[{ALICE}] []", f"skip leaves the admin out {out}")
 sec = Bo.post(B + "/api/me/2fa/totp", json={"password": "password123"}).json()["secret"]
 check(Bo.post(B + "/api/me/2fa/totp/confirm", json={"code": totp(sec)}).ok, "setup: bob turns two-factor on")
-check(until(lambda: [x for x in alerts() if "1 person turned on two-factor authentication: bob" in (x.get("message") or "")], 70), "it reaches the list as a summed alert")
+check(until(lambda: [x for x in alerts() if "1 person switched on two-factor authentication: bob" in (x.get("message") or "")], 70), "it reaches the list as a summed alert")
 dbx("UPDATE admin_alerts SET sent_at='2000-01-01T00:00:00+00:00' WHERE sent_at IS NOT NULL")  # the hourly cap: a capped row counts for no cooldown
 for _ in range(2):  # the same reset twice within the cooldown
     dbx("UPDATE users SET totp_secret='x' WHERE id=?", (EVE,))

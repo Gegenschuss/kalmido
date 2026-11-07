@@ -63,7 +63,7 @@ const K = {Enter: '\uE007', Escape: '\uE00C'};
     const lg = await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${run.who}', password: 'password123'})}).then(r => r.status)`);
     check(lg === 200, `${tag}: login`);
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
-    await ev(`(() => { localStorage.setItem('tasks.wkRo', '"1"'); return 1; })()`);  // 2.554.0 (#4052): the read view = the lock "Read only" (else the editor)
+    await ev(`(() => { localStorage.setItem('tasks.wkRo', '"1"'); return 1; })()`);  // 2.554.0 (#4052): the read view = the lock "Read-only" (else the editor)
     // a page without formulas / diagrams: nothing of them is loaded
     await nav(B + `#wiki/${run.plain}`);
     const p0 = await until(`(() => { const m = document.querySelector('#wk-md'); return m && m.querySelector('h4') ? m.textContent : null; })()`);

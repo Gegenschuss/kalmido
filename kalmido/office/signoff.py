@@ -276,7 +276,7 @@ def sig_notify(c, r, st, name):
             print("signoff notify failed:", type(e).__name__, e, flush=True)
             continue
         lg = lang_of(s)
-        title = tr("Approved by the client", lg=lg) if st == "accepted" else tr("Declined by the client", lg=lg)
+        title = tr("Approved by the client", lg=lg) if st == "accepted" else tr("Rejected by the client", lg=lg)
         if r["kind"] == "document" and st == "accepted":  # 2.93.0 A (#1927)
             title = tr("Signed by the client", lg=lg)
         if r["kind"] == "video":  # 2.99.1 A (#1959)
@@ -321,7 +321,7 @@ def sig_offer_new(did):
     if r["kind"] != "offer" or r["status"] != "sent":
         return err(tr("Approval links exist for sent quotations only"), 409)
     if not public_links_on(c, "signoff"):
-        return err(tr("Public links are turned off on this server"), 409)
+        return err(tr("Public links are switched off on this server"), 409)
     b = body()
     try:
         exp = sig_expiry((b if isinstance(b, dict) else {}).get("expires"))
@@ -475,7 +475,7 @@ def sig_list_new(lid):
     need_pub_owner(c, lid)
     sig_list_rights(c, lid, "edit")
     if not public_links_on(c, "signoff"):
-        return err(tr("Public links are turned off on this server"), 409)
+        return err(tr("Public links are switched off on this server"), 409)
     b = body()
     b = b if isinstance(b, dict) else {}
     try:
@@ -610,7 +610,7 @@ def sig_page(c, r, token, lg, error=None, code=200):
     if r["state"] != "open":
         d = sig_dec(c, r)
         doc = r["kind"] == "document"  # 2.93.0 A (#1927)
-        h = (tr("Signed", lg=lg) if doc else tr("Accepted|document", lg=lg)) if d["state"] == "accepted" else tr("Declined", lg=lg)
+        h = (tr("Signed", lg=lg) if doc else tr("Accepted|document", lg=lg)) if d["state"] == "accepted" else tr("Rejected", lg=lg)
         if r["kind"] == "video":  # 2.99.1 A (#1959)
             h = tr("Approved|video", lg=lg) if d["state"] == "accepted" else tr("Changes requested", lg=lg)
         when = d["signed_at"] or ""
@@ -639,7 +639,7 @@ def sig_page(c, r, token, lg, error=None, code=200):
     acc = (tr("I accept the quotation", lg=lg) if r["kind"] == "offer" else tr("I sign this document", lg=lg) if r["kind"] == "document"
            else tr("I approve this version of the video", lg=lg) if vid else tr("I confirm the acceptance", lg=lg))
     go = tr("Sign bindingly", lg=lg) if r["kind"] == "document" else tr("Approve|video", lg=lg) if vid else tr("Accept bindingly", lg=lg)
-    no = tr("Request changes", lg=lg) if vid else tr("Decline", lg=lg)
+    no = tr("Request changes", lg=lg) if vid else tr("Reject", lg=lg)
     ver = ""
     if vid:
         from ..videos.review import vdr_sig_newest

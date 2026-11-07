@@ -137,7 +137,7 @@ async function swTests() {
   let asked = '';
   w.confirm = m => { asked = m; return true; };
   click(w, d.querySelector('[data-act="trash-empty"]')); await sleep(1500);
-  check(/1 task is deleted for good/.test(asked), 'confirm counts only what is deleted: ' + asked);
+  check(/1 task is deleted permanently/.test(asked), 'confirm counts only what is deleted: ' + asked);
   const toast = d.querySelector('#toast');
   // 2.152.2 (#2624): project instead of list
   check(toast && !toast.classList.contains('hidden') && /2 items stay: they are in projects of other owners/.test(toast.textContent), 'toast: 2 items stay');

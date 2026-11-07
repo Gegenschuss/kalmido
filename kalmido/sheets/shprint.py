@@ -161,7 +161,7 @@ def shp_pdf(c, sheet, opts):
         pg = P()
         pages.append(pg)
         if len(pages) > SHP_PAGES_MAX:
-            raise BadInput(tr("Too many pages: choose fewer rows or columns"))
+            raise BadInput(tr("Too many pages: select fewer rows or columns"))
         y = top
         if first:
             pg.text(SHP_MARGIN, y, title, 12, bold=True)

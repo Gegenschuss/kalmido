@@ -107,7 +107,7 @@ def oil_prepare(c, run, uid, oi):
         run.warning(N_("The encrypted content of these locked folders stays out, the folder key in the export does not fit your encryption keys here: {0}. The folders arrive without the lock. Unlock them on the old server and export again, or import into an account with the same keys."),
                     ", ".join(p["names"][:OIL_NAMES_MAX]) or str(len(p["gone"])), must=True)  # 2.531.0 (#4317) F4: always named
     if p["keep"]:
-        run.warning(N_("Locked folders taken over: {0}. They open with your passphrase from before."), str(len(p["keep"])), must=True)
+        run.warning(N_("Locked folders imported: {0}. They open with your passphrase from before."), str(len(p["keep"])), must=True)
     return p
 
 

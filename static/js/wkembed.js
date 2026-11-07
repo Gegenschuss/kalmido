@@ -168,7 +168,7 @@ async function wem_cbDlg(p, ks) {
     ${pick.length > 1 ? `<ul class="wemcbl">${pick.map((L, i) => `<li><label><input type="checkbox" data-wemi="${i}" checked> <span>${esc(L.text)}</span></label></li>`).join('')}</ul>` : `<p class="wemcb1">${esc(pick[0].text)}</p>`}
     <div class="row"><label for="wem-list">${esc(tr('Project'))}</label><select id="wem-list">${ls.map(l => `<option value="${l.id}">${esc(lname(l))}</option>`).join('')}</select></div>
     <p class="muted wemhint">${esc(tr('Dates, #tags and !priority like in quick add. Ticking it in the page ticks the task too.'))}</p>
-    <p class="shint keep wemlock" ${lockHint(ls[0]?.id) ? '' : 'hidden'}>${ic('lock', 's')} ${esc(tr('This page is end-to-end encrypted, the chosen project is not: the task titles are stored without that lock.'))}</p>
+    <p class="shint keep wemlock" ${lockHint(ls[0]?.id) ? '' : 'hidden'}>${ic('lock', 's')} ${esc(tr('This page is end-to-end encrypted, the selected project is not: the task titles are stored without that lock.'))}</p>
     <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-m="close">${esc(tr('Cancel'))}</button><button type="button" class="btn pri" data-m="ok">${ic('plus', 's')} ${esc(tr('Create tasks'))}</button></div>`);
   md.classList.add('wemdlg');
   const sel = $('#wem-list', md);

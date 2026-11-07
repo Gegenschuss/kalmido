@@ -365,7 +365,7 @@ async function fsl_lockDlg(n) {
   const get = (info.members || []).filter(m => m.has_keys && m.user_id !== S.me.id);  // 2.353.0 F (#2758, review M1): named before the lock
   const yes = await askConfirm(tr('Lock “{0}”?', n.name), '', {ok: tr('Lock folder'), danger: true, html:
     [tr('Names and files of this folder are encrypted in your browser. The server, the operator, agents and API tokens cannot read them any more: no preview, no text recognition, no search on the server.'),
-      `<b>${esc(tr('Warning: if you and everyone holding the key lose passphrase and recovery code, the content is lost for good. Nobody can restore it, not even the operator.'))}</b>`,
+      `<b>${esc(tr('Warning: if you and everyone holding the key lose passphrase and recovery code, the content is lost permanently. Nobody can restore it, not even the operator.'))}</b>`,
       get.length ? tr('These people get the key with the lock: {0}', get.map(m => m.name).join(', ')) : '',
       without.length ? tr('Waiting for the key until they set up encryption: {0}', without.map(m => m.name).join(', ')) : ''].filter(Boolean).map(x => `<p>${x.startsWith('<b>') ? x : esc(x)}</p>`).join('')});
   if (!yes) return;

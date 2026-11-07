@@ -89,7 +89,7 @@ BA_UNDO_HOURS = 24
 BA_UNDO_LATE = N_("An archive import can only be undone within 24 hours of its import.")
 BA_NO_YEAR = N_("The year of the batch cannot be read")
 BA_ROW_BAD = N_("{0} lines without a readable amount, debit / credit mark or account (only in the original file)")
-BA_NOTHING = N_("Nothing to take over")
+BA_NOTHING = N_("Nothing to import")
 BA_TOO_BIG = N_("The files are too large together (at most {0} MB)")  # as core/zipread.py
 
 _GUID = re.compile(r"[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}")

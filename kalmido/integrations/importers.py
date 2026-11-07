@@ -728,7 +728,7 @@ def _todoist_csv(text, fname, opts, plan):
         n1, n4 = raw.count("1"), raw.count("4")
         scale = "4" if n1 > n4 else "1"  # most tasks carry the lowest priority: that end tells the direction
         if any(x and x not in ("1", "4") for x in raw) or (n1 and n4):
-            imp_warn(plan, N_("Todoist priorities read as {0} = p1 (highest); if that is wrong, choose the other scale"), None, scale)
+            imp_warn(plan, N_("Todoist priorities read as {0} = p1 (highest); if that is wrong, select the other scale"), None, scale)
     pmap = {"1": 5, "2": 3, "3": 1, "4": 0} if scale == "1" else {"4": 5, "3": 3, "2": 1, "1": 0}
     section, stack, last, seen = None, [], None, {}
     for r in rows:
@@ -2170,7 +2170,7 @@ def imp_run(c, uid, plan, opts, dry):
         for L in plan["lists"]:
             lid = my_inbox(c, uid) if L["inbox"] else own.get(L["name"])
             if not lid or lid not in tl:
-                raise Denied(403, tr("This token is limited to selected projects and cannot create new projects: choose one of them as the import target"))
+                raise Denied(403, tr("This token is limited to selected projects and cannot create new projects: select one of them as the import target"))
     collab = collab_all()
     # a task's effective parent: same list, at most MAX_DEPTH levels (deeper ones hang below the deepest allowed level)
     where = {}

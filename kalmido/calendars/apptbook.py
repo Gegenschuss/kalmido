@@ -268,7 +268,7 @@ def apb_page_put():
         if not apb_mail_on():
             return err(tr("This server sends no e-mail: the booking page cannot be switched on"), 409)
         if not public_links_on(c, "calendar"):
-            return err(tr("Public links are turned off on this server"), 409)
+            return err(tr("Public links are switched off on this server"), 409)
         cid = f.get("cal_id", p["cal_id"] if p else None)
         if not cid or not apb_cal_ok(c, uid, cid):
             f["cal_id"] = default_cal(c, uid)
@@ -741,7 +741,7 @@ def apb_html(c, p, title, main, lg, code=200):
 def apb_msg(c, p, lg, h, lines=(), back=None, code=200):
     e = html.escape
     main = f'<div class="msg"><h1>{e(h)}</h1>' + "".join(f"<p>{e(x)}</p>" for x in lines if x) + \
-        (f'<p><a class="btn" href="{e(back)}">{e(tr("Choose another time", lg=lg))}</a></p>' if back else "") + "</div>"
+        (f'<p><a class="btn" href="{e(back)}">{e(tr("Select another time", lg=lg))}</a></p>' if back else "") + "</div>"
     return apb_html(c, p, h, main, lg, code)
 
 
@@ -834,13 +834,13 @@ def apb_form(c, p, t, s, lg, vals=None, error=None, code=200):
             f'<p class="signote">{e(tr(APB_PRIVACY, lg=lg))}</p>')
     main = apb_head(c, p, lg, t["name"]) + f'<p class="apb-when">{e(apb_when(p, s, s + timedelta(minutes=t["duration_min"]), lg))}</p>' + \
         (f'<p class="sub">{e(t["location"])}</p>' if t["location"] else "") + \
-        f'<p class="sub"><a href="{APB_PREFIX}{e(p["slug"])}/{t["id"]}?w={(s.date() - timedelta(days=s.weekday())).isoformat()}">{e(tr("Choose another time", lg=lg))}</a></p>' + form
+        f'<p class="sub"><a href="{APB_PREFIX}{e(p["slug"])}/{t["id"]}?w={(s.date() - timedelta(days=s.weekday())).isoformat()}">{e(tr("Select another time", lg=lg))}</a></p>' + form
     return apb_html(c, p, t["name"], main, lg, code)
 
 
 def apb_gone_slot(c, p, t, s, lg):
     back = f'{APB_PREFIX}{p["slug"]}/{t["id"]}' + (f'?w={(s.date() - timedelta(days=s.weekday())).isoformat()}' if s else "")
-    return apb_msg(c, p, lg, tr("This time is no longer free", lg=lg), [tr("Please choose another time.", lg=lg)], back, 409)
+    return apb_msg(c, p, lg, tr("This time is no longer free", lg=lg), [tr("Please select another time.", lg=lg)], back, 409)
 
 
 @app.get("/s/b/<slug>/<int:tid>/<slot>")
@@ -1051,7 +1051,7 @@ def apb_confirm(token):
     if not tp or not tp["active"] or t["deleted_at"] or not apb_slot_free(c, p, tp, s.astimezone(apb_zone(p)), skip=r["id"]):
         c.execute("UPDATE appt_bookings SET status='expired', confirm_hash=NULL WHERE id=?", (r["id"],))
         c.commit()
-        return apb_msg(c, p, lg, tr("This time is no longer free", lg=lg), [tr("Please choose another time.", lg=lg)], f'{APB_PREFIX}{p["slug"]}', 409)
+        return apb_msg(c, p, lg, tr("This time is no longer free", lg=lg), [tr("Please select another time.", lg=lg)], f'{APB_PREFIX}{p["slug"]}', 409)
     eid, cid, did = apb_make(c, p, t, r)
     ctok = secrets.token_urlsafe(32)
     c.execute("UPDATE appt_bookings SET status='confirmed', confirmed_at=?, cancel_hash=?, event_id=?, contact_id=?, deal_id=?, ip='' WHERE id=?",

@@ -211,7 +211,7 @@ function newsText(it, U) {
     case 'unassign': return !it.task_id && it.list_id ? tr('{0} removed you as assignee of a task in {1}', who, q(newsListName(it))) : tr('{0} removed you as assignee', who);  // 2.38.0 (#1155): out of sight
     case 'complete': return d.st === 'reopen' ? tr('{0} reopened a task', who) : d.st === 'wont' ? tr('{0} closed a task as won’t do', who) : tr('{0} completed a task', who);  // 2.473.0 (#3357): st = what a watcher hears of
     case 'share': return d.org ? (d.role === 'admin' ? tr('{0} added you to the organisation {1} as an admin', who, q(d.name || '')) : tr('{0} added you to the organisation {1}', who, q(d.name || '')))  // 2.28.0 (#935)
-      : d.role === 'view' ? tr('{0} shared the project {1} with you (view only)', who, q(newsListName(it)))
+      : d.role === 'view' ? tr('{0} shared the project {1} with you (read-only)', who, q(newsListName(it)))
       : d.role === 'participant' ? tr('{0} added you to {1} as a participant (you see the tasks assigned to you)', who, q(newsListName(it)))
         : d.role === 'admin' ? tr('{0} shared the project {1} with you as an admin', who, q(newsListName(it)))
           : d.group ? tr('{0} shared the project {1} with your group {2}', who, q(newsListName(it)), q(d.group)) : tr('{0} shared the project {1} with you', who, q(newsListName(it)));
@@ -225,11 +225,11 @@ function newsText(it, U) {
       + ((d.reset || []).includes('hook') ? ' ' + esc(tr('Its deploy webhooks were switched off: switch them on again under environments if needed.')) : '');
     case 'orglist': return ({archive: tr('{0} archived the project {1} (admin of {2})', who, q(d.name || ''), q(d.org || '')),  // 2.35.0 (#1101)
       restore: tr('{0} restored the project {1} from the archive (admin of {2})', who, q(d.name || ''), q(d.org || '')),
-      delete: tr('{0} deleted the project {1} for good (admin of {2}). Its tasks are in the trash of the owner’s basket.', who, q(d.name || ''), q(d.org || '')),
+      delete: tr('{0} deleted the project {1} permanently (admin of {2}). Its tasks are in the trash of the owner’s basket.', who, q(d.name || ''), q(d.org || '')),
       // 2.39.1 (#1188): a list admin archived / restored / deleted my list
       larchive: d.member ? tr('{0} archived the project {1} (project admin)', who, q(d.name || '')) : tr('{0} archived your project {1} (project admin)', who, q(d.name || '')),  // 2.40.0 (#1337): d.member
       lrestore: d.member ? tr('{0} restored the project {1} from the archive (project admin)', who, q(d.name || '')) : tr('{0} restored your project {1} from the archive (project admin)', who, q(d.name || '')),
-      ldelete: tr('{0} deleted your project {1} for good (project admin). Its tasks are in the trash of your basket.', who, q(d.name || '')),
+      ldelete: tr('{0} deleted your project {1} permanently (project admin). Its tasks are in the trash of your basket.', who, q(d.name || '')),
       // 2.102.0 A (#1988): into the list trash (restorable there with everything)
       trash: tr('{0} moved the project {1} to the trash (admin of {2})', who, q(d.name || ''), q(d.org || '')),
       ltrash: tr('{0} moved your project {1} to the trash (project admin)', who, q(d.name || '')),
@@ -240,7 +240,7 @@ function newsText(it, U) {
       // 2.361.2 (#2923): a member asks back what they brought in; an admin releases / declines it
       outreq: tr('{0} asks to take {1} back into their private workspace (organisation {2})', who, q(d.name || ''), q(d.org || '')),
       outok: tr('{0} released {1}: you can move it into your private workspace now (within {2} days)', who, q(d.name || ''), d.days || 14),
-      outno: tr('{0} declined to give {1} back (organisation {2})', who, q(d.name || ''), q(d.org || '')),
+      outno: tr('{0} rejected giving {1} back (organisation {2})', who, q(d.name || ''), q(d.org || '')),
       takeover: tr('{0} (server admin) handed your project {1} to {2}', who, q(d.name || ''), q(d.to || '')),  // 2.148.1 B (#2491)
       // 2.56.0 (#1795): an organisation admin renamed it / changed its icon or colour
       rename: tr('{0} renamed the project {1} to {2} (admin of {3})', who, q(d.old || ''), q(d.name || ''), q(d.org || '')),
@@ -273,7 +273,7 @@ function newsText(it, U) {
       rejected: tr('{0} rejected {1}', who, q(it.task_title || ''))}[d.state] || tr('{0} decided on your approval request', who);  // 2.23.0 (#463)
     case 'signup': return d.org_id ? tr('{0} registered with the address of your organisation and waits for approval', q(d.name || d.username || '')) : tr('{0} registered and waits for your approval', q(d.name || d.username || ''));  // 2.23.0 (#711); 2.464.0 (#3882): an organisation's admin approves too
     case 'orglogin': return tr('Admin {0} signed in from a new address: {1}', q(d.name || ''), esc(d.ip || ''));  // 2.367.4 (#2974)
-    case 'orgjoinres': return d.yes ? tr('{0} accepted your invitation to {1}', who, q(d.name || '')) : tr('{0} declined your invitation to {1}', who, q(d.name || ''));
+    case 'orgjoinres': return d.yes ? tr('{0} accepted your invitation to {1}', who, q(d.name || '')) : tr('{0} rejected your invitation to {1}', who, q(d.name || ''));
     case 'orgrole': return tr('{0} changed your role in {1}: {2}', who, q(d.name || ''), esc(({admin: tr('Admin'), readonly: tr('Read-only'), accounting: tr('Accounting'), guest: tr('Guest')})[d.role] || tr('Member')));
     case 'agentjoin': return d.provider ? tr('{0} added the agent {1} to {2}. It runs at {3}. What it reads in the project goes there.', who, q(d.agent || ''), q(newsListName(it)), q(d.provider))
       : tr('{0} added the agent {1} to {2}. What it reads in the project goes to its AI provider.', who, q(d.agent || ''), q(newsListName(it)));  // 2.24.0 (#896)
@@ -297,7 +297,7 @@ function newsText(it, U) {
     case 'calsub': return tr('Your calendar subscription {0} keeps failing. Its events may be out of date.', q(d.name || ''));  // 2.367.2 (#2969)
     case 'budgetwarn': { const nm = q(d.scope === 'task' ? it.task_title || '' : newsListName(it)), hh = esc(tr('{0} of {1} h', fmtNum(d.tracked_h ?? 0, 1), fmtNum(d.h ?? 0, 1)));  // 2.555.0 (#4570)
       return d.level >= 100 ? tr('{0} is over its budget: {1}', nm, hh) : tr('{0} reached 80 % of its budget: {1}', nm, hh); }
-    case 'abshare': return d.role === 'edit' ? tr('{0} shared the address book {1} with you', who, q(d.name || '')) : tr('{0} shared the address book {1} with you (view only)', who, q(d.name || ''));  // 2.21.0 (#658)
+    case 'abshare': return d.role === 'edit' ? tr('{0} shared the address book {1} with you', who, q(d.name || '')) : tr('{0} shared the address book {1} with you (read-only)', who, q(d.name || ''));  // 2.21.0 (#658)
     case 'status': return d.status ? tr('{0} set {1} to {2}', who, q(newsListName(it)), `<span class="stpill st-${esc(d.status)} inl"><i></i>${esc(statusLabel(d.status))}</span>`) : tr('{0} cleared the status of {1}', who, q(newsListName(it)));
   }
   return tr('{0} changed something', who);
@@ -494,7 +494,7 @@ async function newsOpen(i, opts) {
   if (it.kind === 'fetcherr') { settingsModal('fetcher'); return; }  // 2.425.0 C (#3453): the receipt fetcher's portals
   if (it.kind === 'docflow' && it.data?.doc) { go('docs/' + it.data.doc); return; }  // 2.581.0 (#4803): the document
   if (it.kind === 'tsheet') { tsl_open(it.data); return; }  // 2.125.0 B (#2119): the time page on that month
-  if (it.kind === 'wiki_shared') { if (feat('wiki')) { S.wshFocus = true; go('wiki'); } else toast(tr('Turn on the knowledge pages in the settings to read it.')); return; }  // 2.126.2 B (#2355): "Shared with me"
+  if (it.kind === 'wiki_shared') { if (feat('wiki')) { S.wshFocus = true; go('wiki'); } else toast(tr('Switch on the knowledge pages in the settings to read it.')); return; }  // 2.126.2 B (#2355): "Shared with me"
   if (it.kind === 'upscan' && it.data?.where === 'chat') { if (feat('agents') && agentsOn()) go('agents'); return; }
   if (it.kind === 'signoff' || it.kind === 'docpaid' || it.kind === 'docoverdue') { const k = String(it.data?.click || ''); if (k.startsWith('#') && k.length > 1) go(k.slice(1)); return; }  // 2.266.0 (#2965): the quotation / document / video
   if (it.kind === 'whorgcut') { settingsModal('webhooks'); return; }  // 2.380 G (#3391): Settings > Access, the webhooks

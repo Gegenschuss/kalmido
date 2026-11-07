@@ -31,7 +31,7 @@ function dkSheetHtml(part, doc, adm) {
     <ul class="ofdits" role="list">${(st.items || []).map((it, i) => `<li class="ofdit dkrow"><div class="ofditb"><span class="dkn">${esc(dkName(it, d))}</span><span class="ofdnums"><input data-dk="set.items.${i}.qty" inputmode="decimal" class="numin" value="${esc(ofdNumIn(it.qty))}" aria-label="${esc(tr('Quantity'))}"><span class="muted">× ${esc(m(it.rate))}</span></span></div>${del('set.items', i)}</li>`).join('')}</ul>
     <div class="ofdadd"><button type="button" class="btn sm" data-dka="eq">${ic('plus', 's')}<span>${tr('Add equipment')}</span></button></div>
     ${setL ? `<p class="dksum"><span>${esc(tr('{0} per day', m(setL.rate)))}</span><b>${esc(m(setL.total))}</b></p>` : ''}</div>`
-    : `<div class="ofdadd"><button type="button" class="btn sm" data-dka="set">${ic('plus', 's')}<span>${tr('Choose equipment set')}</span></button></div>`;
+    : `<div class="ofdadd"><button type="button" class="btn sm" data-dka="set">${ic('plus', 's')}<span>${tr('Select equipment set')}</span></button></div>`;
   const extras = (s.extras || []).map((r, i) => `<li class="ofdit dkrow"><div class="ofditb"><input class="ofdtt" data-dk="extras.${i}.name" value="${esc(r.name || '')}" maxlength="200" placeholder="${esc(tr('Additional costs'))}" aria-label="${esc(tr('Description'))}">
     <span class="ofdnums"><input data-dk="extras.${i}.qty" inputmode="decimal" class="numin" value="${esc(ofdNumIn(r.qty))}" aria-label="${esc(tr('Quantity'))}"><span class="muted">×</span><input data-dk="extras.${i}.rate" inputmode="decimal" class="numin ofdrate" value="${esc(ofdNumIn(r.rate))}" aria-label="${esc(tr('Price'))}"><b class="ofdlt">${esc(tot(r.uid))}</b></span>
     ${adm ? `<span class="ofdflags">${ie(`extras.${i}.intext`, r.intext)}${mk(`extras.${i}.markup_pct`, r.markup_pct)}</span>` : ''}</div>${del('extras', i)}</li>`).join('');
@@ -109,7 +109,7 @@ function dkSheetBind(root, part) {
     if (a === 'extra') { (s.extras = s.extras || []).push({name: '', qty: 1, rate: 0}); dkSave(root, pid, s); return; }
     if (a === 'role') return dkPick('crew', tr('Add crew'), r => `${dkName({name: r.name_de, name_en: r.name_en})}`, r => r.rate_day != null ? ofdMoney(r.rate_day) + ' ' + tr('per day') : '', r => { (s.staff = s.staff || []).push({role_id: r.id, qty: 1, prep: 1}); dkSave(root, pid, s); });
     if (a === 'svc') return dkPick('services', tr('Shooting service'), r => dkName({name: r.name_de, name_en: r.name_en}), r => r.daily_rate != null ? ofdMoney(r.daily_rate) : '', r => { (s.extras = s.extras || []).push({service_id: r.id, qty: 1}); dkSave(root, pid, s); }, r => r.intext === 'shooting');
-    if (a === 'set') return dkPick('sets', tr('Choose equipment set'), r => r.name, r => r.discount_pct ? tr('{0} % discount', ofdQty(r.discount_pct)) : '', r => { s.set = {set_id: r.id}; dkSave(root, pid, s); });
+    if (a === 'set') return dkPick('sets', tr('Select equipment set'), r => r.name, r => r.discount_pct ? tr('{0} % discount', ofdQty(r.discount_pct)) : '', r => { s.set = {set_id: r.id}; dkSave(root, pid, s); });
     if (a === 'eq') return dkPick('equipment', tr('Add equipment'), r => dkName(r), r => r.daily_rate != null ? ofdMoney(r.daily_rate) + ' ' + tr('per day') : '', r => {
       const st = s.set || {}; const items = (st.items || []).map(i => ({equipment_id: i.equipment_id, qty: i.qty}));
       const ex = items.find(i => i.equipment_id === r.id); if (ex) ex.qty = (+ex.qty || 0) + 1; else items.push({equipment_id: r.id, qty: 1});

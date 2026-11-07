@@ -2,7 +2,7 @@
 // ofdOffersTab(el)) with the list and the editor (#office/offers/<id>). The server computes the sums (kalmido/office/calc.py)
 // on every change and returns them; the editor shows exactly those figures in the document's language and currency.
 const OFD = {list: null, next: null, more: false, listQ: '', loading: false, q: '', status: '', trial: LS.get('ofdTrial', '') || '', first: null, office: null, trialCount: 0, kind: 'offer', kindOf: {}, sec: '', doc: null, docId: null, docLoading: false, seq: 0, saving: 0, err: '', open: {head: true, rights: true, texts: false, fields: false, log: false, pay: true}, log: null, logFor: 0};
-const OFD_STATUS = [['draft', N_('Draft')], ['sent', N_('Sent|document')], ['accepted', N_('Accepted|document')], ['declined', N_('Declined')], ['superseded', N_('Superseded')]];
+const OFD_STATUS = [['draft', N_('Draft')], ['sent', N_('Sent|document')], ['accepted', N_('Accepted|document')], ['declined', N_('Rejected')], ['superseded', N_('Superseded')]];
 // 2.38.0 (#1021, F1): invoices, credit notes and reminders share the tab; the server derives partial / overdue / cancelled
 const OFD_KINDS = [['offer', N_('Quotations')], ['invoice', N_('Invoices')], ['credit', N_('Credit notes')], ['reminder', N_('Payment reminders|dunning')], ['delivery', N_('Delivery notes')], ['archive', N_('Archive|documents')]];  // 2.39.1 (#1182): + the legacy archive (office_import.js)
 // 2.380.0 B (#3409): two areas of the menu instead of one tab "Quotes & invoices": Quotations (office/offers: quotations and
@@ -38,11 +38,11 @@ function ofd_oldLink() {
   history.replaceState(history.state, '', `#office/invoices/${p[2]}`); route();
   return true;
 }
-const OFD_STATE = {done: N_('Settled'), draft: N_('Draft'), issued: N_('Finalised'), sent: N_('Sent|document'), paid: N_('Paid'), partial: N_('Partly paid'), overdue: N_('Overdue'), open: N_('Open items'), cancelled: N_('Cancelled'), accepted: N_('Accepted|document'), declined: N_('Declined')};
+const OFD_STATE = {done: N_('Settled'), draft: N_('Draft'), issued: N_('Finalised'), sent: N_('Sent|document'), paid: N_('Paid'), partial: N_('Partly paid'), overdue: N_('Overdue'), open: N_('Open items'), cancelled: N_('Cancelled'), accepted: N_('Accepted|document'), declined: N_('Rejected')};
 const OFD_INV_STATUS = {invoice: ['draft', 'issued', 'sent', 'paid', 'cancelled'], credit: ['draft', 'issued', 'sent', 'paid'], reminder: ['draft', 'issued', 'sent'], delivery: ['draft', 'issued', 'sent']};  // 2.120.0 D (#2089): + delivery
 const OFD_PAY = [['transfer', N_('Bank transfer')], ['cash', N_('Cash')], ['card', N_('Card')], ['other', N_('Other|payment')]];
 const OFD_PAY_ONLINE = N_('Online payment');  // 2.469.0 (#3459): only the provider's webhook books it
-const OFD_VATN = [['', N_('choose…')], ['reverse', N_('Reverse charge (recipient pays the VAT)')], ['abroad', N_('Not taxable domestically')], ['small', N_('Small business, no VAT')],
+const OFD_VATN = [['', N_('select…')], ['reverse', N_('Reverse charge (recipient pays the VAT)')], ['abroad', N_('Not taxable domestically')], ['small', N_('Small business: no VAT')],
   ['eu_goods', N_('Goods to a business in the EU (tax-exempt)')], ['export', N_('Export of goods outside the EU (tax-exempt)')]];  // 2.355.0 C (#2844)
 const ofdIsInv = d => !!d && d.kind !== 'offer';
 const ofdKindName = (k, one) => tr(one ? {offer: N_('Quotation'), invoice: N_('Invoice'), credit: N_('Credit note'), reminder: N_('Payment reminder|dunning'), delivery: N_('Delivery note')}[k] || k : OFD_KINDS.find(x => x[0] === k)?.[1] || k);
@@ -263,7 +263,7 @@ function ofdListHtml() {
   const list = lst_sorted(rows.filter(hit), ofd_listKey(k), r => ({date: r.date, client: r.recipient_name, amount: inv ? r.gross : k === 'delivery' ? null : r.net, name: r.project_title || r.number}));  // 2.451.0 (#3834)
   const emptyTxt = {offer: N_('No quotations yet.'),  // 2.298.0 A1 (#3186): the button sits right below
     invoice: N_('No invoices yet. Make one from a quotation, from time entries or start empty.'),
-    credit: N_('No credit notes yet. A credit note is made from a finalised invoice.'), reminder: N_('No payment reminders yet. Pick open invoices in the invoice list.'),
+    credit: N_('No credit notes yet. A credit note is made from a finalised invoice.'), reminder: N_('No payment reminders yet. Select open invoices in the invoice list.'),
     delivery: N_('No delivery notes yet. From a quotation, an invoice or empty – without prices.')};  // 2.120.0 D (#2089)
   if (!list.length) return bar + `<div class="empty nempty eact">${ic('receipt')}<span>${q || OFD.status || OFD.trial || ofd_grpQs() ? tr('Nothing matches.') : tr(emptyTxt[k])}</span>${!q && !OFD.status && !OFD.trial && !ofd_grpQs() && k === 'offer' ? `<button class="btn pri" data-ofd="new">${ic('plus', 's')}<span>${tr('New quotation')}</span></button>` : ''}</div>` + more;
   // 2.40.0 (#1368 point 9): settled reminders (all their invoices paid or cancelled) below the open ones
@@ -400,7 +400,7 @@ function ofdEditorHtml() {
 // 2.38.0 (#1021, F1): the invoices a reminder lists (read-only rows), the payments of an invoice
 function ofdRefsHtml(d, t) {
   const rows = (t.lines || []).filter(l => l.kind === 'ref');
-  if (!rows.length) return `<p class="muted">${tr('No invoices chosen.')}</p>`;
+  if (!rows.length) return `<p class="muted">${tr('No invoices selected.')}</p>`;
   return `<ul class="ofdits ofdrefs" role="list">${rows.map(l => `<li class="ofdit ofdref"><span class="ofdpos muted">${ic('receipt', 's')}</span><span class="ofcn"><b><a href="#office/offers/${l.id}">${esc(l.number || '#' + l.id)}</a></b><small class="muted">${esc([l.date ? fmtDateLoc(l.date) : '', l.due_date ? tr('due {0}', fmtDateLoc(l.due_date)) : ''].filter(Boolean).join(' · '))}</small></span><b class="ofdlt">${esc(l.open_text || ofdMoney(l.open, d))}</b></li>`).join('')}</ul>`;
 }
 // 2.40.0 (#1368 point 8): the fee of a finalised reminder is an own open item (stays after the invoice is paid); admins waive it or mark it paid
@@ -466,7 +466,7 @@ function ofdItemsHtml(d, adm) {
 // 2.114.3 (#2266): which positions the producing switch counts; in a part whether its producing values are the document's or its own
 function ofdProdHint(d) {
   const p = d.tpPart;
-  if (!p) return `<div class="shint ofdprodhint">${esc(d.kind === 'offer' ? tr('Applies to the positions of this page with a producing tick. Parts without an own setting take over the switch and calculate their producing themselves.') : tr('Applies to the positions with a producing tick.'))}</div>`;  // 2.298.0 A1 (#3186): behind the (i) of the switch
+  if (!p) return `<div class="shint ofdprodhint">${esc(d.kind === 'offer' ? tr('Applies to the positions of this page with a producing tick. Parts without a separate setting use the switch and calculate their producing themselves.') : tr('Applies to the positions with a producing tick.'))}</div>`;  // 2.298.0 A1 (#3186): behind the (i) of the switch
   const own = ['producing_on', 'prod_quotient', 'producing_rate'].some(k => (p.settings || {})[k] != null);
   return `<div class="shint ofdprodhint">${esc(tr('Applies to the positions of this part with a producing tick.'))}</div>
     <span class="tpprodsrc${own ? ' own' : ''}"><span class="rotag">${esc(own ? tr('own setting') : tr('like the document'))}</span>${own ? `<a href="#" role="button" class="btn sm" data-ofd="tp-prod-doc" data-pid="${p.id}">${esc(tr('Use the values of the document'))}</a>` : ''}</span>`;
@@ -544,7 +544,7 @@ function kvaNextHtml(d, lk, ro) {
   const st = (v, icon, label, cls = '') => `<button type="button" class="btn sm ofdnext${cls}" data-ofd="kva-st" data-st="${v}" aria-label="${esc(tr(label))}" title="${esc(tr(label))}">${ic(icon, 's')}<span>${tr(label)}</span></button>`;
   const acc = d.status === 'accepted';
   const inv = `<button type="button" class="btn sm${acc ? ' pri' : ''} ofdnext ofdtoinv" data-ofd="to-invoice" aria-label="${esc(tr('Create invoice'))}" title="${esc(tr('An invoice draft with the positions of this quotation'))}">${ic('receipt', 's')}<span>${tr('Create invoice')}</span></button>`;
-  if (d.status === 'sent') return st('accepted', 'check', N_('Accepted|document'), ' pri') + st('declined', 'x', N_('Declined')) + inv;
+  if (d.status === 'sent') return st('accepted', 'check', N_('Accepted|document'), ' pri') + st('declined', 'x', N_('Rejected')) + inv;
   if (d.status === 'draft' && (lk || ro)) return st('sent', 'send', N_('Mark as sent'), ' pri') + inv;
   return inv;  // accepted: the main button; a draft that can be edited ("Finalise" behind) or declined: a plain one
 }
@@ -853,7 +853,7 @@ function ofdMoreItems(d, inList) {
       d.kind === 'invoice' && d.status === 'cancelled' && d.time_billed?.entries && ofcAdmin() ? {label: tr('Release the time again'), icon: 'clock', fn: () => tbill_release(d)} : null,  // 2.144.6 A (#2053)
       d.can_delete ? '-' : null,
       d.can_delete ? {label: tr('Delete'), icon: 'trash', cls: 'danger', fn: async () => {
-        if (d.trial) { if (!await askConfirm(tr('Delete trial document?'), tr('{0} is a trial document and disappears for good.', d.number || ofdKindName(d.kind, true)), {ok: tr('Delete'), danger: true})) return; }  // 2.144.10 C (#2576)
+        if (d.trial) { if (!await askConfirm(tr('Delete trial document?'), tr('{0} is a trial document and disappears permanently.', d.number || ofdKindName(d.kind, true)), {ok: tr('Delete'), danger: true})) return; }  // 2.144.10 C (#2576)
         else if (!await askConfirm(tr('Delete {0}?', d.number || ofdKindName(d.kind, true)), d.locked ? tr('Its number stays used and shows as a gap in the office log.') : tr('Its number stays used.'), {ok: tr('Delete'), danger: true})) return;  // 2.114.2 A (#2263); 2.417.0 C (#2604): no test phase rule for sent quotations any more
         try { const j = await api('DELETE', `/api/office/docs/${d.id}`); gone();  // 2.272.0 E2 (#3038): a draft goes to the office trash, the toast undoes it
           if (j?.trash_id) toast(tr('“{0}” moved to the trash', d.number || ofdKindName(d.kind, true)), () => otb_restore(j.trash_id)); else toast(tr('Deleted')); } catch (x) { toast(x.message || tr('unknown')); }
@@ -947,7 +947,7 @@ const cdn_on = () => typeof clientsOn === 'function' && clientsOn();
 function cdn_recHtml(d, ro) {
   const r = d.recipient || {}, lines = (r.lines || []).filter(x => String(x).trim());
   const addr = lines.length ? `<address class="cdnadr">${lines.map(x => esc(String(x))).join('<br>')}</address>` : '';
-  if (!d.client_id) return `<div class="row cdnrec"><label>${esc(tr('Recipient'))}</label><div class="cdnrecb">${addr || `<span class="muted">${esc(tr('No client chosen'))}</span>`}${ro ? '' : `<button type="button" class="btn sm" data-ofd="client-new">${ic('plus', 's')}<span>${tr('Add client')}</span></button>`}</div></div>`;
+  if (!d.client_id) return `<div class="row cdnrec"><label>${esc(tr('Recipient'))}</label><div class="cdnrecb">${addr || `<span class="muted">${esc(tr('No client selected'))}</span>`}${ro ? '' : `<button type="button" class="btn sm" data-ofd="client-new">${ic('plus', 's')}<span>${tr('Add client')}</span></button>`}</div></div>`;
   const miss = d.recipient_missing && !ro ? `<p class="cdnmiss" role="status">${ic('info', 's')} ${esc(tr('Address missing - add it at the client'))}</p>` : '';
   return `<div class="row cdnrec"><label>${esc(tr('Address'))}</label><div class="cdnrecb">${addr}${miss}${ro ? '' : `<button type="button" class="linkbtn" data-ofd="client-edit">${ic('edit', 's')} ${tr('Edit client')}</button>`}</div></div>`;
 }
@@ -1028,7 +1028,7 @@ function tri_settingsHtml() {
 const tri_delLabel = () => trn('Delete {0} trial document', 'Delete all {0} trial documents', TRI.count || 0);
 async function tri_deleteAll() {
   const n = TRI.count || OFD.trialCount;
-  if (!await askConfirm(tr('Delete all trial documents?'), trn('{0} trial document (with its PDFs and share links) disappears for good. Real documents stay.', '{0} trial documents (with their PDFs and share links) disappear for good. Real documents stay.', n), {ok: tr('Delete all'), danger: true})) return;
+  if (!await askConfirm(tr('Delete all trial documents?'), trn('{0} trial document (with its PDFs and share links) disappears permanently. Real documents stay.', '{0} trial documents (with their PDFs and share links) disappear permanently. Real documents stay.', n), {ok: tr('Delete all'), danger: true})) return;
   try { const j = await rawFetch('POST', '/api/office/trial/delete-all', {}); OFD.list = null; OFD.doc = null; TRI.count = 0; const b = $('#tri-del-all'); if (b) b.hidden = true; toast(trn('{0} trial document deleted', '{0} trial documents deleted', (+j.docs || 0) + (+j.gen_docs || 0))); }
   catch (x) { toast(x.message || tr('unknown')); }
 }
@@ -1218,11 +1218,11 @@ async function ofdReminderDialog() {
   // 2.355.0 D (#2846): only invoices past their due date can be reminded of (the server answers 409); the others stay visible, greyed out
   const day0 = today(), early = r => !!r.due_date && r.due_date >= day0;
   const list = `<ul class="ofdpick" role="list">${rows.map(r => `<li><label class="chkl"><input type="checkbox" data-rid="${r.id}" data-cid="${r.client_id || ''}" ${r.state === 'overdue' && !early(r) ? 'checked' : ''} ${early(r) ? 'disabled' : ''}> <span class="ofcn"><b>${esc(r.number)}${r.recipient_name ? ` · ${esc(r.recipient_name)}` : ''}</b><small class="muted">${esc([r.due_date ? tr('due {0}', fmtDateLoc(r.due_date)) : '', early(r) ? tr('not yet overdue') : r.status_text, tr('open: {0}', r.open_text || r.open)].filter(Boolean).join(' · '))}</small></span></label></li>`).join('')}</ul>`;
-  const md0 = ofdDlg(tr('Create payment reminder'), `<p class="muted ofchint">${tr('Pick the overdue invoices of one client.')}</p>${list}<p class="ofdwarn" id="ofd-r-warn" hidden></p>` + ofdF('r-level', tr('Reminder level'), ofcSel('ofd-r-level', 1, [[1, tr('1 - payment reminder')], [2, tr('2 - reminder')], [3, tr('3 - final reminder')]]))
+  const md0 = ofdDlg(tr('Create payment reminder'), `<p class="muted ofchint">${tr('Select the overdue invoices of one client.')}</p>${list}<p class="ofdwarn" id="ofd-r-warn" hidden></p>` + ofdF('r-level', tr('Reminder level'), ofcSel('ofd-r-level', 1, [[1, tr('1 - payment reminder')], [2, tr('2 - reminder')], [3, tr('3 - final reminder')]]))
     + ofdF('r-fee', tr('Reminder fee'), `<input id="ofd-r-fee" inputmode="decimal" class="numin" value="${esc(ofdNumIn(0))}" maxlength="10">`) + ofdF('r-days', tr('Payment deadline'), `<span class="lacts"><input id="ofd-r-days" inputmode="numeric" class="numin" value="${esc(String(s.reminder_deadline_days ?? 10))}" maxlength="3"><span class="muted">${tr('days')}</span></span>`),
     tr('Create'), async md => {
       const picked = [...md.querySelectorAll('[data-rid]:checked')];
-      if (!picked.length) throw new Error(tr('Pick at least one invoice'));
+      if (!picked.length) throw new Error(tr('Select at least one invoice'));
       if (new Set(picked.map(x => x.dataset.cid)).size > 1) throw new Error(tr('One payment reminder covers the invoices of one client'));
       const j = await ofdRefCall('reminder', ref => rawFetch('POST', '/api/office/docs/reminder', {doc_ids: picked.map(x => +x.dataset.rid), level: +$('#ofd-r-level', md).value, fee: ofcNum($('#ofd-r-fee', md).value), deadline_days: ofcNum($('#ofd-r-days', md).value), client_ref: ref}));
       OFD.list = null; OFD.kind = 'reminder'; OFD.doc = j; go(ofd_href(j.id, j.kind));
@@ -1351,16 +1351,16 @@ async function otb_restore(tid, after) {
 async function otb_open() {
   let d; try { d = await api('GET', '/api/office/trash'); } catch (x) { toast(x.message || tr('unknown')); return; }
   const row = x => `<li data-id="${x.id}"><span class="an">${esc(x.kind === 'doc' ? ofdKindName(x.sub, true) : x.kind === 'trip' ? tr('Trip') : x.kind === 'trip_item' ? tr('Receipt') : x.kind === 'cc_line' ? tr('Credit card position') : ({fixed_cost: tr('Fixed cost'), fixed_import: tr('Fixed costs'), cf_start: tr('Starting balance'), cf_adjust: tr('Correction'), letter_link: tr('Letter'), trip_import: tr('Trips')})[x.kind] || tr('Master data'))}${x.label ? ' · ' + esc(x.label) : ''}</span> <span class="muted">${esc(fmtDayAbs(x.deleted_at.slice(0, 10)))}</span>
-    <button type="button" class="linkbtn" data-m="restore">${esc(tr('Restore'))}</button> <button type="button" class="linkbtn" data-m="purge">${esc(tr('Delete for good'))}</button></li>`;
+    <button type="button" class="linkbtn" data-m="restore">${esc(tr('Restore'))}</button> <button type="button" class="linkbtn" data-m="purge">${esc(tr('Delete permanently'))}</button></li>`;
   const md = modal(`<h3>${esc(tr('Trash'))}</h3>${d.items.length ? `<ul class="atrash otblist">${d.items.map(row).join('')}</ul>` : `<p class="muted">${esc(tr('The trash is empty'))}</p>`}
-    <p class="muted">${esc(trashNote(tr('Items in the trash are deleted for good after {0} days.', d.days)))}</p><div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button></div>`);
+    <p class="muted">${esc(trashNote(tr('Items in the trash are deleted permanently after {0} days.', d.days)))}</p><div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button></div>`);
   md.addEventListener('click', async e => {
     const b = e.target.closest('[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { md.remove(); return; }
     const li = b.closest('li'), id = +li?.dataset.id; if (!id) return;
     if (b.dataset.m === 'restore') { md.remove(); await otb_restore(id); return; }
     if (b.dataset.m === 'purge') {
-      if (!await askConfirm(tr('Delete “{0}” for good?', li.querySelector('.an')?.textContent || ''), tr('This cannot be undone.'), {ok: tr('Delete for good'), danger: true})) return;
+      if (!await askConfirm(tr('Delete “{0}” permanently?', li.querySelector('.an')?.textContent || ''), tr('This cannot be undone.'), {ok: tr('Delete permanently'), danger: true})) return;
       try { await api('DELETE', `/api/office/trash/${id}`); li.remove(); } catch (x) { toast(x.message || tr('unknown')); }
     }
   });

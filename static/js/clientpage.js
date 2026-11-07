@@ -35,7 +35,7 @@ function ms_clGdHtml(c) {
   if (typeof officeOn !== 'function' || !officeOn()) return '';
   if (MSC.gd?.id !== c.id) { if (!MSC.gdLoading) setTimeout(() => ms_clGdLoad(c.id), 0); return ''; }
   const ds = MSC.gd.docs; if (!ds) return '';
-  const st = {draft: tr('Draft'), final: tr('Finished'), signed: tr('Signed'), declined: tr('Declined')};
+  const st = {draft: tr('Draft'), final: tr('Finished'), signed: tr('Signed'), declined: tr('Rejected')};
   return `<div class="ctsec"><h4>${tr('Letters & contracts')}</h4>${ds.length ? `<ul class="ctlinks">${ds.map(x => `<li><a class="linkbtn" href="#office/gendocs/${x.id}">${ic('file', 's')} ${esc(x.title || x.kind_label)}</a><span class="muted"> · ${esc([x.list_name, st[x.status] || x.status].filter(Boolean).join(' · '))}</span></li>`).join('')}</ul>` : `<p class="muted">${tr('No letters or contracts yet.')}</p>`}<a class="btn sm" href="#office/gendocs">${ic('plus', 's')} ${tr('New letter or contract')}</a></div>`;  // 2.491.0 (#4020): the texts follow the name of the area (Schreiben & Verträge)
 }
 async function ms_clGdLoad(id, q) {
@@ -100,7 +100,7 @@ function ms_clView() {
   if (id && MSC.invFor !== id && !MSC.invLoading) MSC.inv = null;  // 2.369.0 A (#3200): another client
   if (id && MSC.inv === null && !MSC.invLoading && typeof officeOn === 'function' && officeOn()) setTimeout(ms_clInvLoad, 0);
   const d = id && CLV.data && CLV.id === id ? CLV.data : null;
-  const card = !id ? (mob ? '' : `<div class="ctcard ctnone muted">${ic('brief')}${tr('Choose a client')}</div>`)
+  const card = !id ? (mob ? '' : `<div class="ctcard ctnone muted">${ic('brief')}${tr('Select a client')}</div>`)
     : !d ? `<div class="ctcard ctnone muted">${tr('Loading…')}</div>`
     : d.error ? `<div class="ctcard ctnone muted">${ic('brief')}${tr('This client does not exist or you cannot see it.')}${mob ? `<a class="btn" href="#clients">${tr('All clients')}</a>` : ''}</div>` : ms_clCard(d);
   const head = '';  // 2.87.9 (#1917): no "Office › Clients" heading (it looked like a way back); the office menu shows the place, the path only on a client
@@ -154,7 +154,7 @@ function ms_clCard(c) {
       ${f('at', tr('E-mail'), c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : '')}
       ${f('phone', tr('Phone'), c.phone ? `<a href="tel:${esc(c.phone.replace(/[^\d+]/g, ''))}">${esc(c.phone)}</a>` : '')}
       ${f('mappin', tr('Address'), ctk_mapLink(adr))}${''/* 2.119.1 B (#2086): a map link */}
-      ${f('hash', tr('Client number|customer'), esc(b.customer_no || ''), 'cl_customer_no')}
+      ${f('hash', tr('Client no.|customer'), esc(b.customer_no || ''), 'cl_customer_no')}
       ${f('receipt', tr('VAT ID'), esc(b.vat_id || ''), 'cl_vat_id')}
       ${f('tag', tr('Buyer reference (e.g. routing ID)'), esc(b.buyer_reference || ''), 'cl_buyer_reference')}
       ${f('send', tr('Peppol ID'), esc(b.peppol_id || ''), 'cl_peppol_id')}${''/* 2.154.0 B (#1960) */}
@@ -224,7 +224,7 @@ async function ms_clAct(k) {
 // that stays, the contact persons are joined; the overview comes from the server (dry); one undo step (and Undo in the history)
 function clm_merge(ids) {
   const sel = ids.map(i => (MSC.items || []).find(c => c.id === i)).filter(Boolean);
-  if (sel.length < 2) { toast(tr('Choose at least two entries to merge')); return; }
+  if (sel.length < 2) { toast(tr('Select at least two entries to merge')); return; }
   const cur = S.settings.time_currency || '€', num = (v, d, u) => v == null || v === '' ? '' : `${fmtNum(v, d)}${u ? ' ' + u : ''}`;
   const val = (k, fn) => Object.fromEntries(sel.map(c => [c.id, String(fn(c) ?? '')]));
   const fields = [['name', tr('Name'), c => c.name], ['contact', tr('Default contact person'), c => c.contact], ['email', tr('E-mail'), c => c.email],
@@ -347,7 +347,7 @@ function ofm_clients(ids) {
   const sel = ids.map(i => (MSC.items || []).find(c => c.id === i) || (CLV.data?.id === i ? CLV.data : null)).filter(Boolean);
   if (!sel.length) return;
   const from = sel[0].org_id ?? null;
-  if (sel.some(c => (c.org_id ?? null) !== from)) { toast(tr('Choose items of one workspace')); return; }
+  if (sel.some(c => (c.org_id ?? null) !== from)) { toast(tr('Select items of one workspace')); return; }
   ofm_move({what: 'clients', ids: sel.map(c => c.id), from, label: sel.length === 1 ? qn(sel[0].name) : trn('{0} client', '{0} clients', sel.length),
     after: async () => { if (MSC.pick) ms_clEnd(); await ms_clAfter(); }});
 }

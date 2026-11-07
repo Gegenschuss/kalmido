@@ -99,7 +99,7 @@ function viewBudget() {
   const menu = `<details class="bgmenu"><summary class="iconbtn" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('dots')}</summary><div class="bgmenul" role="menu">
     ${w ? `<button type="button" role="menuitem" data-bg="cats">${ic('tag', 's')}<span>${tr('Categories')}</span></button>
     <button type="button" role="menuitem" data-bg="rec">${ic('repeat', 's')}<span>${tr('Recurring entries')}</span></button>
-    ${feat('contracts') ? `<button type="button" role="menuitem" data-bg="contracts">${ic('file', 's')}<span>${tr('Take over from contracts')}</span></button>` : ''}
+    ${feat('contracts') ? `<button type="button" role="menuitem" data-bg="contracts">${ic('file', 's')}<span>${tr('Add from contracts')}</span></button>` : ''}
     <button type="button" role="menuitem" data-bg="csv">${ic('upload', 's')}<span>${tr('Import a CSV file')}</span></button>` : ''}
     ${shareOk(listById(d.list_id)) ? `<button type="button" role="menuitem" data-bg="share">${ic('users', 's')}<span>${tr('Share')}</span></button>` : ''}
     ${w ? `<button type="button" role="menuitem" data-bg="create">${ic('plus', 's')}<span>${tr('New budget')}</span></button>` : ''}</div></details>`;
@@ -456,18 +456,18 @@ async function bg_contractsModal() {
   const lid = BG.lid; let items;
   try { items = (await api('GET', bg_url('/contracts'))).items; } catch { return; }
   const per = p => tr(PERIOD_WORD[p] || BG_PER[p] || '');
-  const body = items.length ? `<ul class="bgctr">${items.map(x => `<li><label class="chkl ${x.taken ? 'bgtaken' : ''}"><input type="checkbox" data-ctid="${x.task_id}" ${x.taken ? 'disabled' : x.cost != null ? 'checked' : ''} ${x.cost == null ? 'disabled' : ''}><span class="bgel"><b>${esc(x.name)}</b><small class="muted">${esc([x.provider, x.cost != null ? bg_money(x.cost) + ' ' + per(x.per) : tr('no cost entered'), x.taken ? tr('already taken over') : ''].filter(Boolean).join(' · '))}</small></span></label></li>`).join('')}</ul>
+  const body = items.length ? `<ul class="bgctr">${items.map(x => `<li><label class="chkl ${x.taken ? 'bgtaken' : ''}"><input type="checkbox" data-ctid="${x.task_id}" ${x.taken ? 'disabled' : x.cost != null ? 'checked' : ''} ${x.cost == null ? 'disabled' : ''}><span class="bgel"><b>${esc(x.name)}</b><small class="muted">${esc([x.provider, x.cost != null ? bg_money(x.cost) + ' ' + per(x.per) : tr('no cost entered'), x.taken ? tr('already added') : ''].filter(Boolean).join(' · '))}</small></span></label></li>`).join('')}</ul>
     <div class="row"><label for="bg-ctc">${tr('Category')}</label><select id="bg-ctc">${bg_catOpts('out', (BG.data?.cats || []).find(c => c.kind === 'out' && /versicher|insur/i.test(c.name))?.id)}</select></div>`
     : `<p class="muted">${tr('No contracts with a cost yet. Add them on Home & life under Contracts.')}</p>`;
-  return bg_modal(`<h3>${ic('file', 's')} ${tr('Take over from contracts')}</h3>
+  return bg_modal(`<h3>${ic('file', 's')} ${tr('Add from contracts')}</h3>
     <div class="shint lhint keep">${tr('Each contract becomes a recurring entry with its cost. The values are copied: if the contract changes later, the budget shows it and you can match it.')}</div>
-    ${body}${items.some(x => !x.taken && x.cost != null) ? lifeFoot(tr('Take over')) : `<div class="aerr" role="alert"></div><div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button></div>`}`, async md => {
+    ${body}${items.some(x => !x.taken && x.cost != null) ? lifeFoot(tr('Add')) : `<div class="aerr" role="alert"></div><div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button></div>`}`, async md => {
     const ids = $$('[data-ctid]:checked:not(:disabled)', md).map(x => +x.dataset.ctid);
-    if (!ids.length) throw new Error(tr('Please choose at least one contract'));
+    if (!ids.length) throw new Error(tr('Please select at least one contract'));
     const cat = +$('#bg-ctc', md)?.value || 0, req = {task_ids: ids, ...(cat ? {cat_id: cat} : {})};
     const j = await api('POST', `/api/budget/${lid}/contracts`, req);
     let made = j.items || [];
-    offerUndo(trn('{0} contract taken over', '{0} contracts taken over', j.created), histAdd({label: tr('Taken over from contracts'),
+    offerUndo(trn('{0} contract added', '{0} contracts added', j.created), histAdd({label: tr('Added from contracts'),
       undo: async () => { for (const r of made) await api('DELETE', `/api/budget/recurring/${r.id}`); bg_after(); },
       redo: async () => { made = (await api('POST', `/api/budget/${lid}/contracts`, req)).items || []; bg_after(); }}));
     md.remove(); bg_after();
@@ -484,14 +484,14 @@ const BG_DATE_FORMATS = ['DD.MM.YYYY', 'DD.MM.YY', 'YYYY-MM-DD', 'MM/DD/YYYY', '
 function bg_runsHtml(items) {
   const live = (items || []).filter(x => x.left > 0).slice(0, 5);
   if (!live.length) return '';
-  return `<section class="bgsec bgruns"><h4>${tr('Last imports')}</h4><ul class="bgrunl" role="list">${live.map(x => `<li class="bgrun"><span class="bgel"><b>${esc(x.label || x.fmt.toUpperCase())}</b><small class="muted">${esc([x.at ? fmtDateLoc(x.at.slice(0, 10)) : '', trn('{0} entry', '{0} entries', x.left)].filter(Boolean).join(' · '))}</small></span><button type="button" class="btn sm" data-csundo="${esc(x.id)}">${ic('undo', 's')}<span>${tr('Take this import back')}</span></button></li>`).join('')}</ul></section>`;
+  return `<section class="bgsec bgruns"><h4>${tr('Last imports')}</h4><ul class="bgrunl" role="list">${live.map(x => `<li class="bgrun"><span class="bgel"><b>${esc(x.label || x.fmt.toUpperCase())}</b><small class="muted">${esc([x.at ? fmtDateLoc(x.at.slice(0, 10)) : '', trn('{0} entry', '{0} entries', x.left)].filter(Boolean).join(' · '))}</small></span><button type="button" class="btn sm" data-csundo="${esc(x.id)}">${ic('undo', 's')}<span>${tr('Undo this import')}</span></button></li>`).join('')}</ul></section>`;
 }
 // takes one import run back; entries changed after the import (or with a receipt) are named and kept unless chosen too
 async function bg_runUndo(lid, run) {
   let items; try { items = (await api('GET', `/api/budget/${lid}/import/runs`)).items; } catch { return null; }
   const it = items.find(x => x.id === run); if (!it || !it.left) return null;
   let all = false;
-  const ok = await askDialog({title: tr('Take this import back?'), danger: true, ok: tr('Take back'),
+  const ok = await askDialog({title: tr('Undo this import?'), danger: true, ok: tr('Undo'),
     html: `<p>${esc(trn('{0} entry of this import will be deleted, with its receipts.', '{0} entries of this import will be deleted, with their receipts.', it.left - it.edited))}</p>${it.edited ? `<p>${esc(trn('{0} entry was changed after the import and stays.', '{0} entries were changed after the import and stay.', it.edited))}</p><label class="chkl"><input type="checkbox" data-csall> ${tr('Delete the changed ones too')}</label>` : ''}`,
     after: md => md.addEventListener('change', e => { if (e.target.matches('[data-csall]')) all = e.target.checked; })});
   if (!ok) return null;
@@ -509,7 +509,7 @@ function bg_csvModal() {
   const label = () => st.files.length === 1 ? st.files[0].name : trn('{0} file', '{0} files', st.files.length);
   const step1 = () => {  // 2.140.0 B (#2134): CSV or CAMT; 2.146.0 C (#2455): several files / a ZIP, the last imports
     area.innerHTML = `<div class="shint lhint keep">${ic('lock', 's')} ${tr('No bank access – only the file you download from your bank yourself (CSV export of your account statement).')}</div>
-      <label class="btn bgpick">${ic('upload', 's')}<span>${tr('Choose files')}</span><input type="file" multiple accept="${BG_ACCEPT}" data-cs-file hidden></label>
+      <label class="btn bgpick">${ic('upload', 's')}<span>${tr('Select files')}</span><input type="file" multiple accept="${BG_ACCEPT}" data-cs-file hidden></label>
       <p class="muted bgfmts">${tr('CSV of any bank, or CAMT (XML) or MT940 like in the office’s bank import. Several files or one ZIP work too.')}</p><div class="bgrunsw"></div>`;
     foot.innerHTML = footHtml(''); err();
     api('GET', `/api/budget/${lid}/import/runs`).then(j => { const w = $('.bgrunsw', md); if (w && !st.p) w.innerHTML = bg_runsHtml(j.items); }).catch(() => {});
@@ -541,7 +541,7 @@ function bg_csvModal() {
   };
   const takeable = r => !r.error && !r.pending;
   const chosen = () => st.rows.map((r, i) => [r, i]).filter(([r, i]) => takeable(r) && (i < BG_SHOW ? $(`[data-csr="${i}"]`, md)?.checked : !r.dup));
-  const okLabel = () => trn('Take over {0} entry', 'Take over {0} entries', chosen().length);
+  const okLabel = () => trn('Import {0} entry', 'Import {0} entries', chosen().length);
   const step3 = () => {
     const rows = st.rows, p = st.p, recName = id => (BG.data?.open_recurring || []).find(o => o.recurring.id === id)?.recurring.title || '';
     const shown = rows.slice(0, BG_SHOW), pend = rows.filter(r => r.pending && !r.error), many = (p.files || 1) > 1;
@@ -554,8 +554,8 @@ function bg_csvModal() {
         ${r.recurring_id ? `<label class="chkl bgrecs2"><input type="checkbox" data-csrec="${i}" checked> ${esc(tr('belongs to “{0}”', recName(r.recurring_id) || tr('recurring entry')))}</label>` : ''}
         ${r.error ? '' : `<select data-cscat="${i}" aria-label="${esc(tr('Category'))}">${bg_catOpts(r.kind, r.cat_id)}</select>`}</span>
         ${r.amount != null ? `<span class="bgamt ${r.kind}">${r.kind === 'in' ? '+' : '−'}${esc(bg_money(r.amount))}</span>` : ''}</li>`).join('')}</ul>
-      ${rows.length > BG_SHOW ? `<p class="muted bgmore">${esc(trn('{0} more row is taken over as suggested', '{0} more rows are taken over as suggested', rows.slice(BG_SHOW).filter(r => takeable(r) && !r.dup).length))}</p>` : ''}
-      ${pend.length ? `<section class="bgsec bgpend"><h4>${esc(trn('{0} pending booking – not taken over', '{0} pending bookings – not taken over', pend.length))}</h4><p class="muted">${tr('Not booked yet: the booked version comes with a later statement.')}</p><ul class="bgpendl" role="list">${pend.slice(0, 50).map(r => `<li><span class="bgel"><b>${esc(r.title || '–')}</b><small class="muted">${esc([r.day ? fmtDateLoc(r.day) : '', r.counterpart].filter(Boolean).join(' · '))}</small></span>${r.amount != null ? `<span class="bgamt ${r.kind}">${r.kind === 'in' ? '+' : '−'}${esc(bg_money(r.amount))}</span>` : ''}</li>`).join('')}</ul></section>` : ''}`;
+      ${rows.length > BG_SHOW ? `<p class="muted bgmore">${esc(trn('{0} more row is imported as suggested', '{0} more rows are imported as suggested', rows.slice(BG_SHOW).filter(r => takeable(r) && !r.dup).length))}</p>` : ''}
+      ${pend.length ? `<section class="bgsec bgpend"><h4>${esc(trn('{0} pending booking – not imported', '{0} pending bookings – not imported', pend.length))}</h4><p class="muted">${tr('Not booked yet: the booked version comes with a later statement.')}</p><ul class="bgpendl" role="list">${pend.slice(0, 50).map(r => `<li><span class="bgel"><b>${esc(r.title || '–')}</b><small class="muted">${esc([r.day ? fmtDateLoc(r.day) : '', r.counterpart].filter(Boolean).join(' · '))}</small></span>${r.amount != null ? `<span class="bgamt ${r.kind}">${r.kind === 'in' ? '+' : '−'}${esc(bg_money(r.amount))}</span>` : ''}</li>`).join('')}</ul></section>` : ''}`;
     foot.innerHTML = footHtml(okLabel(), true); err();
   };
   // the chosen rows in parts of at most BG_PART, the rows of one file together; one import run for all parts
@@ -583,7 +583,7 @@ function bg_csvModal() {
           const cat = i < BG_SHOW ? +$(`[data-cscat="${i}"]`, md)?.value || null : r.cat_id, rec = i < BG_SHOW ? $(`[data-csrec="${i}"]`, md)?.checked : true;
           return {day: r.day, amount: r.amount, kind: r.kind, title: r.title, counterpart: r.counterpart || '', cat_id: cat, iban: r.iban || null, ref: r.ref || null, e2e: r.e2e || null, fi: r.fi || 0, ...(r.recurring_id && rec ? {recurring_id: r.recurring_id} : {})};
         });
-        if (!rows.length) { err(tr('Nothing chosen')); return; }
+        if (!rows.length) { err(tr('Nothing selected')); return; }
         const bl = listById(lid);  // 2.87.9 (#1940): where the entries go, in words (the budget's list decides the workspace)
         if (!await importTargetConfirm({what: trn('{0} entry', '{0} entries', rows.length), ws: wsOf(bl), place: bl ? lname(bl) : ''})) return;
         let j = await commit(rows);
@@ -596,7 +596,7 @@ function bg_csvModal() {
         return;
       }
       st.mapping = mapOf();
-      if (st.mapping.date == null || st.mapping.title == null || (st.mapping.amount == null && st.mapping.amount_in == null && st.mapping.amount_out == null)) { err(tr('Please choose the columns for date, amount and text')); return; }
+      if (st.mapping.date == null || st.mapping.title == null || (st.mapping.amount == null && st.mapping.amount_in == null && st.mapping.amount_out == null)) { err(tr('Please select the columns for date, amount and text')); return; }
       const j = await api('POST', `/api/budget/${lid}/import/parse`, form(st.mapping));
       st.rows = j.rows || []; st.skipped = j.skipped || 0; st.p = {...st.p, ...j, columns: st.p.columns, sample: st.p.sample, guess: st.p.guess}; step3();
     } catch (er) { err(er.message); } finally { const b2 = $('[data-cs="next"]', md); if (b2) b2.disabled = false; }

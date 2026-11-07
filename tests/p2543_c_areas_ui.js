@@ -75,7 +75,7 @@ const rows = d => [...d.querySelectorAll('#view .spov [data-spov]')].map(a => a.
   await call('PATCH', '/api/settings', {workspace: 'all'});
   w = await boot({hash: 'office/offers', allWs: true}); d = w.document;
   check(await until(() => rows(d) === `private,${WA},${WB}`), 'office under "All": Private, Alpha, Bravo ' + rows(d));
-  check(!d.querySelector('#view .ofdlist') && !/Choose a workspace/.test(d.querySelector('#view').textContent), 'office under "All": no list, no "Choose a workspace"');
+  check(!d.querySelector('#view .ofdlist') && !/Select a workspace/.test(d.querySelector('#view').textContent), 'office under "All": no list, no "Choose a workspace"');
   d.querySelector(`#view .spov [data-spov="${WA}"]`).click();
   check(await until(() => w.eval('S.settings.workspace') === WA && w.eval('OFC.info && OFC.info.org_id') === A && d.querySelector('#view .ofchead [data-ofcall="up"]')), 'a tap opens the office of Alpha (the workspace follows) ' + w.eval('S.settings.workspace'));
   check(/^#office\/offers/.test(w.location.hash) && !rows(d), 'the same office page, no overview ' + w.location.hash);

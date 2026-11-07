@@ -25,7 +25,7 @@ from .calc import dec, dstr, money
 from .model import office_feature, office_settings
 
 EC_SRC_ARCHIVE = N_("Source: DATEV archive")
-EC_NOTE = N_("Comparison for display only: nothing is booked, taken over or counted into this year.")
+EC_NOTE = N_("Comparison for display only: nothing is booked, imported or counted into this year.")
 EC_NOTE_ARCHIVE = N_("The year before comes from the DATEV booking archive (sums of the profit and loss accounts and the VAT accounts); it is not added to figures in Kalmido.")
 
 

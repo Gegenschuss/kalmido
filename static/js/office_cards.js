@@ -66,7 +66,7 @@ function ccSheetHtml() {
     : draft ? `<p class="muted">${s.reader === 'manual' && !ls.length ? tr('This statement could not be read. Enter its positions by hand.') : tr('Please check the positions. They count once you confirm them.')}</p>` : '';
   const acts = `<a class="btn sm" href="/api/office/cards/statements/${s.id}/file" target="_blank" rel="noopener">${ic('file', 's')}<span>PDF</span></a>
     ${lock ? '' : draft ? `<button class="btn sm" data-cc="addline">${ic('plus', 's')}<span>${tr('Add position')}</span></button><button class="btn sm pri" data-cc="confirm">${ic('check', 's')}<span>${tr('Confirm positions')}</span></button>`
-    : `<button class="btn sm ghost" data-cc="reopen">${tr('Take confirmation back')}</button>${CC.data.manage && !s.bank && ofcCan('bank', 'edit', 'pay') ? `<button class="btn sm" data-cc="bank" aria-expanded="${!!CC.bank}">${ic('bank', 's')}<span>${tr('Match bank booking')}</span></button>` : ''}`}
+    : `<button class="btn sm ghost" data-cc="reopen">${tr('Undo confirmation')}</button>${CC.data.manage && !s.bank && ofcCan('bank', 'edit', 'pay') ? `<button class="btn sm" data-cc="bank" aria-expanded="${!!CC.bank}">${ic('bank', 's')}<span>${tr('Match bank booking')}</span></button>` : ''}`}
     ${lock ? '' : `<button class="btn sm ghost" data-cc="delstmt">${tr('Delete')}</button>`}`;
   return `<div class="ofcbar"><button class="btn ghost" data-cc="tocard">${ic('back', 's')}<span>${tr('Back')}</span></button><span class="spacer"></span></div>
     <h3 class="ofcgrp">${esc(ccMon(s.month))}</h3>${facts}${hint}${draft && !lock && !ls.length && typeof ccs_html === 'function' ? ccs_html(s, CC.sheet.agent_read) : ''}<div class="bnkacts">${acts}</div>${CC.bank ? ccBankHtml(s) : ''}
@@ -87,7 +87,7 @@ function ccLine(x, s) {
   return `<li class="bnkrow">${head}
     ${sg ? `<div class="bnkacts ccsug"><button class="btn sm pri" data-cc="match" data-id="${x.id}" data-node="${sg.id}">${ic('check', 's')}<span>${esc(tr('Take “{0}”', sg.label || tr('Receipt')))}</span></button><small class="muted">${esc(sg.reason)}</small></div>` : ''}
     <div class="bnkacts"><label class="btn sm">${ic('upload', 's')}<span>${tr('Upload receipt')}</span><input type="file" data-cc-rc="${x.id}" accept="${esc(typeof BK_ACCEPT === 'string' ? BK_ACCEPT : 'application/pdf,image/*')}" hidden></label>
-    <button class="btn sm" data-cc="pick" data-id="${x.id}" aria-expanded="${CC.pick === x.id}">${ic('search', 's')}<span>${tr('Choose receipt…')}</span></button>
+    <button class="btn sm" data-cc="pick" data-id="${x.id}" aria-expanded="${CC.pick === x.id}">${ic('search', 's')}<span>${tr('Select receipt…')}</span></button>
     <button class="btn sm ghost" data-cc="mark" data-id="${x.id}" data-v="noreceipt">${tr('No receipt needed')}</button><button class="btn sm ghost" data-cc="mark" data-id="${x.id}" data-v="private">${tr('Private')}</button></div>
     ${CC.pick === x.id ? ccPickHtml(x) : ''}</li>`;
 }
@@ -192,7 +192,7 @@ document.addEventListener('click', async e => {
   else if (a === 'delcard') { const ok = await ccDo(tr('Card removed'), () => api('DELETE', `/api/office/cards/${id}`), () => api('POST', `/api/office/cards/${id}/restore`)); if (ok) { CC.card = null; ofcDraw(); } }
   else if (a === 'delstmt') { const ok = await ccDo(tr('Statement removed'), () => api('DELETE', `/api/office/cards/statements/${sid}`), () => api('POST', `/api/office/cards/statements/${sid}/restore`)); if (ok) { CC.sid = null; ofcDraw(); } }
   else if (a === 'confirm') ccConfirm(sid);
-  else if (a === 'reopen') ccDo(tr('Confirmation taken back'), () => api('POST', `/api/office/cards/statements/${sid}/reopen`), () => api('POST', `/api/office/cards/statements/${sid}/confirm`, {accept_diff: true}));
+  else if (a === 'reopen') ccDo(tr('Confirmation undone'), () => api('POST', `/api/office/cards/statements/${sid}/reopen`), () => api('POST', `/api/office/cards/statements/${sid}/confirm`, {accept_diff: true}));
   else if (a === 'total') {
     const was = CC.sheet.statement.total, md = ofdDlg(tr('Total of the statement'), ofcRowF('cc-t', tr('Amount'), ofcIn('cc-t', was, {max: 14})), tr('Save'), async m => {
       const t = $('#cc-t', m).value.trim(), r = ofcNum(t);

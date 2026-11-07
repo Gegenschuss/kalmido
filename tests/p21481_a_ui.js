@@ -1,7 +1,7 @@
 // 2.148.1 part A (#2480, jsdom) joining an organisation needs the person's yes, own container (start.sh, mode workspaces):
 // - an organisation admin adds an existing account by e-mail: the person is not a member yet, the News show the invitation
 // - opening it asks "Join the organisation …?"; "Later" keeps it open, "Join" makes the person a member in the invited role
-// - "Decline the invitation" removes it (a second invitation, declined)
+// - "Reject the invitation" removes it (a second invitation, declined)
 const {execFileSync} = require('child_process');
 const path = require('path');
 const {boot, sleep, B, login} = require('./boot');

@@ -58,7 +58,7 @@ const V = B + 'api/v1';
   items = await menuOf(w, d, mine.id);
   click(w, items.find(b => b.textContent.trim() === 'Delete message'));
   let dlg = await until(() => d.querySelector('.modal.cdlg [data-cd="yes"]') && d.querySelector('.modal.cdlg'));
-  check(/for good/.test(dlg?.textContent || ''), 'it asks first, and says "for good"');
+  check(/permanently/.test(dlg?.textContent || ''), 'it asks first, and says "for good"');
   check((await msgs()).some(m => m.id === mine.id), 'asking deletes nothing yet');
   click(w, dlg.querySelector('[data-cd="no"]'));
   await sleep(200);
@@ -81,7 +81,7 @@ const V = B + 'api/v1';
     if (b) {
       click(w, b);
       dlg = await until(() => d.querySelector('.modal.cdlg [data-cd="yes"]') && d.querySelector('.modal.cdlg'));
-      check(/Claude/.test(dlg?.textContent || '') && /for good/.test(dlg?.textContent || ''), 'it names the agent and asks first');
+      check(/Claude/.test(dlg?.textContent || '') && /permanently/.test(dlg?.textContent || ''), 'it names the agent and asks first');
       click(w, dlg.querySelector('[data-cd="yes"]'));
       check(await until(() => !cm(d, mine2.id) && !cm(d, theirs.id)), 'the chat is empty on screen');
       check((await msgs()).length === 0, 'and on the server');

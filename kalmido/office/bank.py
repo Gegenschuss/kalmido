@@ -339,7 +339,7 @@ def bnk_import():
 def bnk_import_of(c, uid, oid, b, fs):
     """The import itself -> the answer as a dict (2.616.0 #2473: shared with the FinTS fetch, office/fints.py); commits."""
     if b.get("mapping") is None and any(not bnk_is_camt(f["text"]) and not bnk_is_mt940(f["text"]) for f in fs.files):
-        raise BadInput(tr("Please choose the columns for the date and the amount"))
+        raise BadInput(tr("Please select the columns for the date and the amount"))
     write_lock(c, f"office_bank_import_{oid}")
     fmt, rows, _cols, parts, info = bnk_parse(c, oid, b, fs)
     new = [r for r in rows if not r["error"] and not r["dup"] and not r["pending"]]  # 2.146.0 C (#2469): never a pending one
@@ -389,7 +389,7 @@ def bnk_import_undo(iid):
     write_lock(c, f"office_bank_rules_{oid}")  # 2.299.0 (#3191 review): no rule marks bookings of this import meanwhile (order as bnk_import)
     r = _import_row(c, oid, iid)
     if r["undone_at"]:
-        raise Denied(409, tr("This import was already taken back"))
+        raise Denied(409, tr("This import was already undone"))
     _br.br_release(c, oid, import_id=iid)  # 2.299.0 B (#3191): marks of a rule do not hold the take-back up (locked months stay)
     if c.execute("SELECT 1 FROM office_bank_tx WHERE org_id=? AND import_id=? AND deleted_at IS NULL AND match_kind IS NOT NULL LIMIT 1",
                  (oid, iid)).fetchone():
@@ -754,7 +754,7 @@ def bnk_match(tid):
         live = bnk_split_live(c, oid, tid)
         if live:  # 2.355.0 B (#2843): parts of an earlier split are still booked; 2.355.0 E (#2843): the answer names the invoices
             nums = ", ".join(dict.fromkeys(doc_row(c, oid, p["doc_id"])["number"] or str(p["doc_id"]) for p in live))
-            raise Denied(409, tr("Payments of this booking are still on invoices ({0}); take them back there first", nums))
+            raise Denied(409, tr("Payments of this booking are still on invoices ({0}); remove them there first", nums))
         parts = bnk_parts(b, t) if split else [(mid, abs(t["amount"]))]
         pids = []
         for did, a in parts:

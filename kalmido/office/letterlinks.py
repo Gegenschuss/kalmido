@@ -195,7 +195,7 @@ def ltl_day(day, lg):
 
 
 LTL_REF_PARTS = (("theirs", N_("Your reference: {0}")), ("ours", N_("Our reference: {0}")), ("policy", N_("Policy number: {0}")),
-                 ("customer", N_("Client number: {0}")), ("tax", N_("Tax number: {0}")))
+                 ("customer", N_("Client no.: {0}")), ("tax", N_("Tax number: {0}")))
 
 
 def ltl_ref_line(refs, doc_date=None, lg=None):

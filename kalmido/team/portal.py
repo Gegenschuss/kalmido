@@ -392,7 +392,7 @@ def pt_stop(token):
     c.execute("UPDATE portal_tickets SET notify=0 WHERE id=?", (p["id"],))
     c.commit()
     e = html.escape
-    return _pt_rt().pub_html(tr("E-mails turned off", lg=lg), f'<div class="msg"><h1>{e(tr("E-mails turned off", lg=lg))}</h1>'
+    return _pt_rt().pub_html(tr("E-mails switched off", lg=lg), f'<div class="msg"><h1>{e(tr("E-mails switched off", lg=lg))}</h1>'
                              f'<p>{e(tr("You get no more e-mails about “{0}”. The status page stays available.", p["title"], lg=lg))}</p>'
                              f'<form method="post" action="/p/{e(token)}/notify" class="fform"><input type="hidden" name="f" value="{pt_key(c, p, "n")}">'
                              f'<button type="submit">{e(tr("Turn e-mails on again", lg=lg))}</button></form>'
@@ -612,7 +612,7 @@ def pt_portal():
     who = pt_cookie_read(c) if _pt_rt().public_links_on(c, "portal") else None
     if not who:
         return _pt_rt().pub_html(tr("Your reports", lg=lg), f'<div class="msg"><h1>{e(tr("Your reports", lg=lg))}</h1>'
-                                 f'<p>{e(tr("Open the status link of one of your reports and choose “All my reports”: we send you a sign-in link.", lg=lg))}</p></div>', lg)
+                                 f'<p>{e(tr("Open the status link of one of your reports and select “All my reports”: we send you a sign-in link.", lg=lg))}</p></div>', lg)
     acx_anon_bind(c, who[1])  # nobody, inside exactly the space of the sign-in
     g.user, g.auth_via = _pt_rt().PUB_ACTOR, "public"
     with system_ctx(c):  # the owners' accounts (disabled = gone); the query itself is bound to the cookie's address and space

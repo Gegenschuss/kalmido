@@ -20,8 +20,8 @@ function evCalRename(id, name, draw) {
 }
 const evWrite = c => !!c && (c.role === 'owner' || c.role === 'edit');
 const evWritable = () => (S.evcals || []).filter(c => evWrite(c) && !c.hidden && wsObjIn(c));  // 2.30.0 (#1036): of the shown workspace
-const EV_PS = [['accepted', N_('Accept'), 'check'], ['tentative', N_('Maybe'), 'help'], ['declined', N_('Decline'), 'x']];
-const EV_PS_WORD = {accepted: N_('Accepted'), tentative: N_('Maybe'), declined: N_('Declined'), 'needs-action': N_('No answer yet')};
+const EV_PS = [['accepted', N_('Accept'), 'check'], ['tentative', N_('Maybe'), 'help'], ['declined', N_('Reject'), 'x']];
+const EV_PS_WORD = {accepted: N_('Accepted'), tentative: N_('Maybe'), declined: N_('Rejected'), 'needs-action': N_('No answer yet')};
 // all-day reminders: minutes before the day's midnight (-540 = 9:00 on the day)
 const EV_REM_TIMED = ['0', '5', '10', '15', '30', '60', '120', '1440', '2880', '10080'];
 const EV_REM_DAY = [['-540', N_('On the day at 9:00')], ['900', N_('1 day before at 9:00')], ['2340', N_('2 days before at 9:00')], ['9540', N_('1 week before at 9:00')]];
@@ -371,7 +371,7 @@ async function evEditor(o = {}) {
     if (s && s.k[0] === 'u') atts.push({user_id: +s.k.slice(1), name: s.v, partstat: 'needs-action'});
     else if (s && s.k[0] === 'c') atts.push({contact_id: +s.k.slice(1), name: s.c.fn, email: s.c.email, partstat: 'needs-action'});
     else if (/^[^@\s<>"]+@[^@\s<>"]+$/.test(v)) atts.push({email: v, partstat: 'needs-action'});
-    else { toast(tr('Pick a person from the list or type an e-mail address')); return; }
+    else { toast(tr('Select a person from the list or type an e-mail address')); return; }
     inp.value = ''; drawAtts(); inp.focus();
   };
   md.addEventListener('input', e => { if (e.target.id === 'ev-attin') attList(e.target.value.trim()); });
@@ -530,7 +530,7 @@ async function evCalsModal() {
     // 2.566.0 (#4707): the calendars in the trash (the shared core's trash): opened on demand, restore with their events
     const tr2 = !feat('events') ? '' : `<button type="button" class="btn sm evctrbtn" data-evc="trash" aria-expanded="${!!st.trash}">${ic('trash', 's')} ${tr('Trash')}</button>${!st.trash ? ''
       : st.trash.items.length ? `<ul class="evclist evctrash" aria-label="${esc(tr('Trash'))}">${st.trash.items.map(c => `<li class="evcrow" style="--cc:${cssColor(c.color) || 'var(--accent)'}"><i class="cevdot"></i><span class="evcn">${esc(c.name)}<span class="muted"> · ${esc(trn('{0} event', '{0} events', c.events))} · ${esc(tr('In the trash since {0}', fmtDate((c.deleted_at || '').slice(0, 10))))}</span></span><button type="button" class="btn sm" data-evctr="${c.id}">${ic('undo', 's')} ${tr('Restore')}</button></li>`).join('')}</ul>`
-      : `<p class="muted">${tr('The trash is empty')}</p>`}${st.trash?.trash_days ? `<p class="muted">${esc(trashNote(tr('Calendars in the trash are deleted for good after {0} days, with their events.', st.trash.trash_days)))}</p>` : ''}`;
+      : `<p class="muted">${tr('The trash is empty')}</p>`}${st.trash?.trash_days ? `<p class="muted">${esc(trashNote(tr('Calendars in the trash are deleted permanently after {0} days, with their events.', st.trash.trash_days)))}</p>` : ''}`;
     $('#evc-body', md).innerHTML = tl + own + tr2 + sb + (typeof abc_group === 'function' ? abc_group() : '');  // 2.155.0 B (#2076)
   };
   const redraw = () => { cvxRedraw(); draw(); };
@@ -669,7 +669,7 @@ function davGuide() {
       tr('Your calendars and projects appear in Calendar and Reminders, your address books in Contacts.')])}
     ${step(tr('Android (DAVx⁵)'), [tr('Install DAVx⁵ (Play Store or F-Droid) and open it, then + > Login with URL and user name.'),
       tr('Base URL: {0}, user name and app password as above.', `<code>${esc(base)}</code>`),
-      tr('Pick the calendars and address books to sync. They appear in the phone’s calendar and contacts apps (tasks with Tasks.org or jtx Board).')])}
+      tr('Select the calendars and address books to sync. They appear in the phone’s calendar and contacts apps (tasks with Tasks.org or jtx Board).')])}
     ${step(tr('Thunderbird'), [tr('Calendar: New Calendar > On the network, user name and the address {0}; Thunderbird finds every calendar.', `<code>${esc(base)}</code>`),
       tr('Contacts: Address book > New address book > Add CardDAV address book, the same address and user name.'),
       tr('Enter the app password when Thunderbird asks for it.')])}
@@ -690,7 +690,7 @@ function evNewsText(it, who, q) {
   if (it.kind === 'evinvite') return tr('{0} invited you: {1}', who, q(d.title || ''));
   if (it.kind === 'evchange') return {time: tr('{0} changed the time of {1}', who, q(d.title || '')), place: tr('{0} changed the place of {1}', who, q(d.title || '')),  // 2.367.2 (#2969)
     cancelled: tr('{0} cancelled {1}', who, q(d.title || '')), occ: tr('{0} cancelled one date of {1}', who, q(d.title || '')), removed: tr('{0} took you off the guest list of {1}', who, q(d.title || ''))}[d.what] || '';
-  if (it.kind === 'evshare') return d.role === 'edit' ? tr('{0} shared the calendar {1} with you', who, q(d.name || '')) : tr('{0} shared the calendar {1} with you (view only)', who, q(d.name || ''));
+  if (it.kind === 'evshare') return d.role === 'edit' ? tr('{0} shared the calendar {1} with you', who, q(d.name || '')) : tr('{0} shared the calendar {1} with you (read-only)', who, q(d.name || ''));
   return '';
 }
 function evOpen(id) {  // #ev/<id> (a push, News): the calendar on that day, the event's popover

@@ -109,7 +109,7 @@ const ALL = 'cal,timeline,comments,collab,events,contacts';
   md.querySelector('#ev-attin').value = 'Bob'; click(w, md.querySelector('[data-evm="attadd"]'));
   md.querySelector('#ev-attin').value = 'guest@example.net'; click(w, md.querySelector('[data-evm="attadd"]'));
   md.querySelector('#ev-attin').value = 'not an address'; click(w, md.querySelector('[data-evm="attadd"]'));
-  check(md.querySelectorAll('#ev-atts .evatp').length === 2 && /Pick a person/.test(d.querySelector('#toast').textContent), 'two people; something else is refused with a hint');
+  check(md.querySelectorAll('#ev-atts .evatp').length === 2 && /Select a person/.test(d.querySelector('#toast').textContent), 'two people; something else is refused with a hint');
   click(w, md.querySelector('[data-evm="save"]'));
   const TD = await until(async () => (await call('GET', `/api/events?from=${t2}&to=${day(30)}`)).items.find(x => x.title === 'Team day'));
   const td = TD && await call('GET', `/api/events/${TD.eid}`);

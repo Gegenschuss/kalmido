@@ -60,7 +60,7 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,sheets';
     check(await ev(`!document.querySelector('#ocf-ch') && !document.querySelector('#view .ofpt') && ${h1} === ${cur}`), '#2816: no card, no small heading, the head = the marked point');
     await shot('p2224-b-bank.png');
     await ev(`(() => { document.querySelector('.ocf-slim [data-go]').click(); return 1; })()`);
-    check(await ready(ev, `location.hash === '#office/pipeline' && !!document.querySelector('.ocf-choose #ocf-ch')`, 60), '#2816: "Choose country" leads to the card');
+    check(await ready(ev, `location.hash === '#office/pipeline' && !!document.querySelector('.ocf-choose #ocf-ch')`, 60), '#2816: "Select country" leads to the card');
     await nav(B + '#office/settings');
     check(await ready(ev, `!!document.querySelector('#s-biz .ocf-slim') && document.querySelectorAll('#ocf-ch').length <= 1`, 80), '#2816: Settings: the slim line, one country choice on the screen');  // 2.470.0 (#3596): the dialog over office/start
     // 2.555.0 (#4664): in Settings the button stays on the page: to the country pack field under Packs (was: closed Settings, #3596)

@@ -54,7 +54,7 @@ def clm_ids(target, ids):
         raise BadInput(tr("At most {0} entries can be merged at once", MG_MAX))
     out = list(dict.fromkeys([target, *(as_int(x, "ids", 1) for x in ids)]))
     if len(out) < 2:
-        raise BadInput(tr("Choose at least two entries to merge"))
+        raise BadInput(tr("Select at least two entries to merge"))
     if len(out) > MG_MAX:
         raise BadInput(tr("At most {0} entries can be merged at once", MG_MAX))
     return target, out

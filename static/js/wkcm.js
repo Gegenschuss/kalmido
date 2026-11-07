@@ -2,7 +2,7 @@
 /* Kalmido web client: 2.554.0 (#4052) -- the ONE editor of knowledge pages, on CodeMirror 6 (like SilverBullet).
    - A page one may write opens ready to type (a phone first shows it read, its pen opens this editor). There is no
      Read / Edit switch and no Source / Preview button any more; the page's "…" menu has "Edit as Markdown" (the plain
-     field #wk-body, the way out) and "Read only" (a lock of this device). LS "wkEd" (the former choice, LOOK_KEYS) is ignored.
+     field #wk-body, the way out) and "Read-only" (a lock of this device). LS "wkEd" (the former choice, LOOK_KEYS) is ignored.
    - Live preview by decorations: Markdown marks (**, _, #, `, the parts of [text](address) and [[Page]]) show only while
      the cursor / selection is inside that element, everything else is drawn formatted. Boxes (- [ ]) are ticked by the
      first click, links open by the first click ([[…]], #123 and addresses like the read view). Tables are drawn as tables:

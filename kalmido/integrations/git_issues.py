@@ -328,7 +328,7 @@ def gis_import(cid):
                 return err(git_err_text(e.stored()), 502)
     plan = gis_plan(r, new, more, lg, fetched=len(issues))
     if left:
-        imp_warn(plan, N_("The comments of {0} issues were not taken over (too many or the Git server was too slow)"), None, left)
+        imp_warn(plan, N_("The comments of {0} issues were not imported (too many or the Git server was too slow)"), None, left)
     opts = {"target": r["list_id"], "completed": comp, "_fname": f"{r['owner']}/{r['repo']}"[:200],
             "_before": gis_before(cid, stats), "_after": gis_after(r, uid, lg, stats)}
     return jsonify(imp_run(c, uid, plan, opts, dry))

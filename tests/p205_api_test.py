@@ -119,7 +119,7 @@ for s in (A, Bo, Ca):
 
 # ================================================================== #310 trash
 DEV = Ca.post(B + "/api/lists", json={"name": "Dev", "kind": "project"}).json()["id"]
-VIEW = Ca.post(B + "/api/lists", json={"name": "Read only", "kind": "project"}).json()["id"]
+VIEW = Ca.post(B + "/api/lists", json={"name": "Read-only", "kind": "project"}).json()["id"]
 for lid, u, role in ((DEV, "alice", "edit"), (DEV, "bob", "edit"), (VIEW, "alice", "view")):
     assert Ca.put(B + f"/api/lists/{lid}/members", json={"user_id": ids[u], "role": role}).ok
 TA = A.post(B + "/api/tasks", json={"title": "Alice in Dev", "list_id": DEV}).json()["id"]

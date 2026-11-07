@@ -138,11 +138,11 @@ async function ojn_open(d) {
   let dec = false;
   const yes = await askDialog({title: tr('Join the organisation {0}?', d.name || ''), ok: tr('Join'), cancel: tr('Later'),
     html: `<p>${esc(tr('Your role: {0}', oinvRoleSel.label(d.role)))}</p><p class="muted">${esc(tr('Its admins then see your name and can share projects with you. You can leave it at any time.'))}</p>
-      <button type="button" class="linkbtn ojndecline" data-ojn="decline">${esc(tr('Decline the invitation'))}</button>`,
+      <button type="button" class="linkbtn ojndecline" data-ojn="decline">${esc(tr('Reject the invitation'))}</button>`,
     after: md => $('[data-ojn="decline"]', md).addEventListener('click', () => { dec = true; $('[data-cd="no"]', md).click(); })});
   try {
     if (yes) { await api('POST', `/api/orgs/${oid}/join`); toast(tr('You joined {0}', d.name || '')); await load(); render(); }
-    else if (dec) { await api('DELETE', `/api/orgs/${oid}/join`); toast(tr('Invitation declined')); }
+    else if (dec) { await api('DELETE', `/api/orgs/${oid}/join`); toast(tr('Invitation rejected')); }
     if (yes || dec) loadNews().then(() => { if (S.route.mod === 'news') renderView(); });
   } catch { /* api() showed it (e.g. the invitation expired) */ }
 }

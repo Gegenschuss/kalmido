@@ -72,7 +72,7 @@ def avatar_process(raw):
     try:
         im = Image.open(io.BytesIO(raw))  # reads the header only
         if im.format not in ("JPEG", "PNG", "WEBP", "GIF", "BMP"):
-            raise BadInput(tr("Please choose a JPEG, PNG or WebP picture"))
+            raise BadInput(tr("Please select a JPEG, PNG or WebP picture"))
         if im.width * im.height > 60_000_000:  # the browser sends 512 px; this only stops huge direct uploads (memory)
             raise BadInput(tr("This picture cannot be read"))
         if im.format == "JPEG":
@@ -186,7 +186,7 @@ def list_icon_process(raw):
     try:
         im = Image.open(io.BytesIO(raw))
         if im.format not in ("JPEG", "PNG", "WEBP", "GIF", "BMP"):
-            raise BadInput(tr("Please choose a JPEG, PNG or WebP picture"))
+            raise BadInput(tr("Please select a JPEG, PNG or WebP picture"))
         if im.width * im.height > 60_000_000:
             raise BadInput(tr("This picture cannot be read"))
         if im.format == "JPEG":

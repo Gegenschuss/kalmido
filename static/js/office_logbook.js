@@ -167,7 +167,7 @@ function lbDriveModal(d, fix) {
     ${d ? `<details class="lgb-hist" open><summary>${ic('clock', 's')}<span>${tr('History')}</span></summary><ol class="lgb-hlist"><li class="muted">${tr('Loading…')}</li></ol></details>` : ''}
     <div class="aerr" role="alert"></div>
     <div class="foot lgb-foot">${d ? `${ro ? '' : `<button class="btn danger" data-m="del">${tr('Delete')}</button>`}<button class="btn" data-m="log">${ic('clock', 's')}<span>${tr('History')}</span></button>` : ''}
-    ${d && d.kind === 'business' ? `<button class="btn" data-m="trip">${ic('plane', 's')}<span>${d.trip_id ? tr('Open trip') : tr('Take over into travel expenses')}</span></button>` : ''}
+    ${d && d.kind === 'business' ? `<button class="btn" data-m="trip">${ic('plane', 's')}<span>${d.trip_id ? tr('Open trip') : tr('Add to travel expenses')}</span></button>` : ''}
     <span class="spacer"></span><button class="btn" data-m="close">${ro ? tr('Close') : tr('Cancel')}</button>${ro ? (d.corrected_by ? '' : `<button class="btn pri" data-m="fix">${tr('Correct|verb')}</button>`)
       : `<button class="btn pri" data-m="save">${d && !fix ? tr('Save') : tr('Add')}</button>`}</div>`);
   md.classList.add('ofcdlg');
@@ -194,7 +194,7 @@ function lbDriveModal(d, fix) {
       if (b.dataset.m === 'fix') { md.remove(); lbDriveModal(null, d); return; }
       if (b.dataset.m === 'trip') {
         const j = await api('POST', `/api/office/drives/${d.id}/trip`); md.remove();
-        if (!j.existing) toast(tr('Taken over into the travel expenses'), async () => { await api('DELETE', `/api/office/trips/${j.trip.id}`); lbReload(); RK.data = null; });
+        if (!j.existing) toast(tr('Added to the travel expenses'), async () => { await api('DELETE', `/api/office/trips/${j.trip.id}`); lbReload(); RK.data = null; });
         RK.year = (j.trip.date_from || '').slice(0, 4); RK.view = 'trips'; RK.open = j.trip.id; LB.drives = null; rk_reload();
         return;
       }
@@ -242,7 +242,7 @@ function lbDriveModal(d, fix) {
   return md;  // 2.576.0 (#4794): objConflict opens it again after a 409 (the merge bar)
   // (lbReload(true) emptied LB.base first, the dialog then failed on the missing vehicles and never showed)
 }
-const LB_ACT = {create: N_('Created'), change: N_('Changed'), delete: N_('Deleted'), restore: N_('Restored'), trip: N_('Taken over into the travel expenses'),  // 2.93.0 B (#1928 review): trip
+const LB_ACT = {create: N_('Created'), change: N_('Changed'), delete: N_('Deleted'), restore: N_('Restored'), trip: N_('Added to the travel expenses'),  // 2.93.0 B (#1928 review): trip
   corrected: N_('Corrected')};  // 2.152.0 C (#2169)
 const LB_FLD = {vehicle_id: N_('Vehicle'), user_id: N_('Driver'), day: N_('Date'), start_place: N_('Start'), dest: N_('Destination'), purpose: N_('Purpose'),
   km: N_('Kilometres'), odo_start: N_('Odometer start'), odo_end: N_('Odometer end'), kind: N_('Kind'), client_id: N_('Client'), project: N_('Project'),

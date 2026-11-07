@@ -48,7 +48,7 @@ const until = async (fn, n = 60) => { for (let i = 0; i < n; i++) { const x = aw
   check(Object.values(id).every(Boolean), 'setup: frida\'s private pages');
 
   // ================= embeds
-  const w = await boot({user: 'frida', hash: 'wiki/' + id.haupt, ls: {'tasks.wkRo': '"1"'}}), d = w.document;  // 2.554.0 (#4052): the read view = the lock "Read only" (a page one may write opens in the editor)
+  const w = await boot({user: 'frida', hash: 'wiki/' + id.haupt, ls: {'tasks.wkRo': '"1"'}}), d = w.document;  // 2.554.0 (#4052): the read view = the lock "Read-only" (a page one may write opens in the editor)
   const md = () => d.querySelector('#view #wk-md');
   check(await until(() => md() && md().querySelectorAll('.wempg').length === 6 && !md().textContent.includes('Loading…')), 'Haupt: six frames, all loaded ' + (md()?.textContent || '').slice(0, 300));
   await call(CF, 'POST', '/api/wiki/trash', {ids: [id.weg]});  // deleted after the index came: the page's own route answers

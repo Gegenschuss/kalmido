@@ -123,7 +123,7 @@ async function awOpen(agent) {
     const el = /** @type {any} */ (e.target).closest('[data-aw], [data-aw-day]'); if (!el) return;
     if (el.dataset.awDay) {
       const days = $$('[data-aw-day]', md).filter(x => x.checked).map(x => +x.dataset.awDay);
-      if (!days.length) { el.checked = true; show(tr('Pick at least one weekday.')); return; }
+      if (!days.length) { el.checked = true; show(tr('Select at least one weekday.')); return; }
       save('work_days', days, el); return;
     }
     const k = el.dataset.aw, v = aw_read(k, el);

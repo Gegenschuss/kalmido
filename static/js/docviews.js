@@ -140,7 +140,7 @@ function dcv_menuItems(v) {
   const key = 'r:docview:' + v.id, fav = typeof fv2_is === 'function' && fv2_is(key), w = v.role !== 'view';
   return [
     w ? {label: tr('Rename…'), icon: 'edit', fn: () => dcv_rename(v)} : null,
-    w ? {label: tr('Take over the current filters'), icon: 'filter', fn: () => dcv_update(v)} : null,
+    w ? {label: tr('Use the current filters'), icon: 'filter', fn: () => dcv_update(v)} : null,
     typeof fv2_set === 'function' ? {label: fav ? tr('Remove from favourites') : tr('Add to favourites'), icon: 'star', on: fav, fn: () => fv2_set(key, !fav)} : null,
     {label: tr('Show on Today'), icon: 'sun', on: dcv_isToday(v.id), fn: () => dcv_todaySet(v.id, !dcv_isToday(v.id))},
     v.role === 'manage' && dcv_mayShare(v) ? {label: tr('Share with everyone of the organisation'), icon: 'users', on: v.shared_all, fn: () => dcv_shareAll(v, !v.shared_all)} : null,

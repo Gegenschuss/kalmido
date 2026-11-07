@@ -71,7 +71,7 @@ const upload = async (name, text) => {
     '#3194: "Read by the agent (Claude)" with the values, Discard / Take over');
   click(w, line?.querySelector('[data-rcr^="apply:"]'));
   check(await until(async () => (await call('GET', `/api/docs/${id}`)).amount === '119.00'), '#3194: Take over sets the amount');
-  check(await until(() => /Values taken over/.test(d.querySelector('#toast, .toast')?.textContent || ''), 30), '#3194: the toast');
+  check(await until(() => /Values applied/.test(d.querySelector('#toast, .toast')?.textContent || ''), 30), '#3194: the toast');
   check(await until(() => !d.querySelector('.rcr-sug')), '#3194: the line goes after taking over');
   await sleep(300);
   await w.eval("histStep('undo')");

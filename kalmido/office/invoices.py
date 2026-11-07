@@ -1310,7 +1310,7 @@ def inv_own_text_quota(c, oid, uid):
     n = c.execute("SELECT COUNT(*) FROM office_doc_log WHERE org_id=? AND action='send' AND at>=? AND detail LIKE ?",  # pg-ok: own JSON, exact case
                   (oid, since, '%"own_text": 1%')).fetchone()[0]
     if n >= INV_OWN_TEXT_DAY:
-        raise Denied(429, tr("Your organisation sent {0} e-mails with an own text today; members can send more tomorrow or with the standard text", INV_OWN_TEXT_DAY))
+        raise Denied(429, tr("Your organisation sent {0} e-mails with their own text today; members can send more tomorrow or with the standard text", INV_OWN_TEXT_DAY))
 
 
 # 2.86.0 (N27): the day's budget of document mails (any text), generous so month-end billing never hits it

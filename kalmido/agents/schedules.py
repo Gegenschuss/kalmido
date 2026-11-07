@@ -145,7 +145,7 @@ def sched_in(c, aid, uid, b, cur=None):
     if freq == "weekly":
         days = sorted(set(days))
         if not days or any(not 1 <= x <= 7 for x in days):
-            raise BadInput(tr("Pick at least one weekday"))
+            raise BadInput(tr("Select at least one weekday"))
     elif freq == "monthly":
         if len(days) != 1 or not 1 <= days[0] <= 31:
             raise BadInput(tr("Invalid value: {0}", "days"))

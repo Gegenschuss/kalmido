@@ -34,9 +34,9 @@ from ..accounts.supportgrant import sga_scope_check  # 2.538.0 (#4365)
 from .packs import PACK_FEATURES  # 2.369.5 (#2517): pulled up from functions
 
 OFFICE_FEAT = "office"
-OFFICE_NO_ORG = N_("Choose a workspace at the top (Private or an organisation) to open its office")  # 2.47.3 (#1360)
+OFFICE_NO_ORG = N_("Select a workspace at the top (Private or an organisation) to open its office")  # 2.47.3 (#1360)
 OFFICE_ADMIN_ONLY = N_("Only an admin of this workspace can do this")
-OFFICE_OFF = N_("Office & finance is turned off in your settings")
+OFFICE_OFF = N_("Office & finance is switched off in your settings")
 UNITS = ("day", "hour", "piece", "minute", "flat", "percent")  # 2.47.0 (#1649): percent = a rate on the external fees (KSK)
 TAXES = ("standard", "reduced", "exempt")
 INTEXT = ("intern", "extern", "shooting")  # 2.47.0 (#1216): shooting = only in the shoot calculation
@@ -114,7 +114,7 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      # 2.51.0 A (#1348): agents may read office data (clients, prices) -- they go to the agent's AI model; off by
                      # default, needed together with the agent's own switch "may draft office documents" (office/agentdocs.py)
                      "agents_read": 0,
-                     # 2.67.0 A (#1838): the monthly task "Cash flow: check the actual state" (set only by its own route,
+                     # 2.67.0 A (#1838): the monthly task "Cash flow: check the current status" (set only by its own route,
                      # office/fixedimport.py): on, the person it goes to, the id of the task
                      "cf_check": 0, "cf_check_user": None, "cf_check_task": None,
                      # 2.90.0 A (#1921): bookkeeping light: tax reserve in percent of the net income received (0 = off), VAT

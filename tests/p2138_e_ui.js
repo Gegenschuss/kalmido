@@ -145,7 +145,7 @@ const absOk = async (w, d) => { const b = await until(() => d.querySelector('.mo
   click(w, d.querySelector('.ofdhead [data-st="sent"]'));
   await until(() => nb() === 'accepted,declined,to-invoice');
   check(nb() === 'accepted,declined,to-invoice' && !tiPri() && (await docStatus(doc2.id)) === 'sent', '#2235 sent: Accepted / Declined in front ' + nb());
-  check(d.querySelector('.ofdhead [data-st="declined"]')?.getAttribute('aria-label') === 'Declined', '#2235: the icon button keeps its name for screen readers');
+  check(d.querySelector('.ofdhead [data-st="declined"]')?.getAttribute('aria-label') === 'Rejected', '#2235: the icon button keeps its name for screen readers');
   check(d.querySelector('.ofdhead [data-ofd="to-invoice"]')?.getAttribute('aria-label') === 'Create invoice', '#2572: the invoice button keeps its name on the phone');
   click(w, d.querySelector('.ofdhead [data-st="accepted"]'));
   await until(() => nb() === 'to-invoice');

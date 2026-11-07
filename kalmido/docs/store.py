@@ -1018,11 +1018,11 @@ def redo_back(c, nid):
     # a new version of the file since then: the old text would not belong to it
     stale = prev.get("state") == "done" and int(prev.get("version") or 0) != int(node["cur_version"] or 0)
     if not prev or not fresh or stale or prev.get("ws") != m["ws"]:
-        raise BadInput(tr("This recognition can no longer be taken back"))
+        raise BadInput(tr("This recognition can no longer be undone"))
     try:  # 2.363.3 (#3134, review): a key rotation since then: the kept copy is sealed with a key that is gone
         doc_open_as(c, m["ws"], "doc_meta.text", prev["text"])
     except OrgCryptError:
-        raise BadInput(tr("This recognition can no longer be taken back")) from None
+        raise BadInput(tr("This recognition can no longer be undone")) from None
     auto, hand = json.loads(prev["auto"] or "{}"), hand_fields(meta_json(c, m, "auto", {}))
     auto.pop("_hand", None)
     auto.pop("_was", None)

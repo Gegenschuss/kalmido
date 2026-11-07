@@ -82,7 +82,7 @@ const openSheet = async (w, d) => {
   check(await until(async () => (await call('GET', `/api/office/cards/statements/${s.id}`)).lines?.length === 2), '#3749: Take over adds the positions');
   const t = await call('GET', `/api/office/cards/statements/${s.id}`);
   check(t.statement.state === 'draft' && t.statement.total === '42.50', '#3749: still a draft the person confirms');
-  check(await until(() => /Positions taken over/.test(d.querySelector('#toast, .toast')?.textContent || '')), '#3749: the toast');
+  check(await until(() => /Positions applied/.test(d.querySelector('#toast, .toast')?.textContent || '')), '#3749: the toast');
   await sleep(300);
   await w.eval("histStep('undo')");
   check(await until(async () => (await call('GET', `/api/office/cards/statements/${s.id}`)).lines?.length === 0), '#3749: Undo takes them back');

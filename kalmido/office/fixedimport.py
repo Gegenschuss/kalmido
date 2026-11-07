@@ -80,7 +80,7 @@ FCI_REPEATS = (("once", re.compile(r"einmal|once", re.I)), ("quarterly", FCI_QUA
 FCI_REASONS = {"name": N_("No name"), "amount": N_("Amount missing or not readable"), "zero": N_("Amount is 0"),
                "month": N_("Due month must be 0 to 12"), "vat": N_("VAT rate must be 0, 7 or 19"),
                "notice": N_("Notice period must be 0 to 730 days")}  # 2.91.0 B (#1924)
-FCI_TASK_TITLE = N_("Cash flow: check the actual state")
+FCI_TASK_TITLE = N_("Cash flow: check the current status")
 
 
 def fci_num(v):

@@ -122,7 +122,7 @@ function dlgStale(md, url, base, onTake) {
       const j = await rawFetch('GET', url);
       if (j.updated_at !== base() && md.isConnected && !md.querySelector('.obj-stale, .obj-merge')) {
         const b = document.createElement('div'); b.className = 'cfbar obj-stale'; b.setAttribute('role', 'status');
-        b.innerHTML = `<span>${esc(tr('Changed by someone else in the meantime'))}</span>${onTake ? `<button type="button" class="btn sm" data-os="take">${tr('Take over')}</button>` : ''}`;
+        b.innerHTML = `<span>${esc(tr('Changed by someone else in the meantime'))}</span>${onTake ? `<button type="button" class="btn sm" data-os="take">${tr('Apply')}</button>` : ''}`;
         if (onTake) b.querySelector('[data-os]')?.addEventListener('click', () => { b.remove(); onTake(j); });
         objBar(md, b);
       }

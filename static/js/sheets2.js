@@ -37,8 +37,8 @@ const sh2Find = (sh, kinds, rx) => (sh.columns.find(c => rx && rx.test(c.title |
 const sh2Field = (id, label, inner) => `<label class="sh2f" for="${id}"><span>${esc(label)}</span><select id="${id}">${inner}</select></label>`;
 function sh2RowsChoice(sh, chosen) {  // "only the chosen rows (n)" / "all rows"
   return chosen ? `<fieldset class="sh2rows"><legend class="sr">${esc(tr('Rows'))}</legend>
-    <label><input type="radio" name="sh2-rows" value="sel" checked> ${esc(trn('Only the chosen row', 'Only the {0} chosen rows', chosen.length))}</label>
-    <label><input type="radio" name="sh2-rows" value="all"> ${esc(tr('All rows'))}</label></fieldset>` : `<p class="muted mhint">${esc(tr('All rows with content are carried over. Choose several rows first to take only those.'))}</p>`;
+    <label><input type="radio" name="sh2-rows" value="sel" checked> ${esc(trn('Only the selected row', 'Only the {0} selected rows', chosen.length))}</label>
+    <label><input type="radio" name="sh2-rows" value="all"> ${esc(tr('All rows'))}</label></fieldset>` : `<p class="muted mhint">${esc(tr('All rows with content are carried over. Select several rows first to take only those.'))}</p>`;
 }
 const sh2Val = (md, id) => { const v = $('#' + id, md)?.value; return v ? +v : null; };
 const sh2RowsOf = (md, chosen) => chosen && $('input[name="sh2-rows"]:checked', md)?.value !== 'all' ? chosen : null;
@@ -85,7 +85,7 @@ async function sh2ToOffer(sh) {
     ${sh2Field('sh2-price', tr('Unit price'), sh2ColOpts(sh, sh2Find(sh, ['currency'], /preis|satz|price|rate/i), true))}
     ${sh2Field('sh2-client', tr('Client'), `<option value="">${esc(tr('No client'))}</option>` + (d.clients || []).map(c => `<option value="${c.id}">${esc(cdn_label(c))}</option>`).join(''))}
     ${sh2RowsChoice(sh, chosen)}<p class="muted mhint">${esc(tr('A draft is created in the office; check and send it there. Nothing is finalised.'))}</p>`;
-  const v = await sh2Ask(tr('Take over as a quotation'), html, tr('Create draft'), md => ({desc_col: sh2Val(md, 'sh2-desc'), qty_col: sh2Val(md, 'sh2-qty'),
+  const v = await sh2Ask(tr('Use as a quotation'), html, tr('Create draft'), md => ({desc_col: sh2Val(md, 'sh2-desc'), qty_col: sh2Val(md, 'sh2-qty'),
     unit_col: sh2Val(md, 'sh2-unit'), price_col: sh2Val(md, 'sh2-price'), client_id: sh2Val(md, 'sh2-client'), rows: sh2RowsOf(md, chosen)}));
   if (!v) return;
   await sh2Step(sh, tr('Quotation from {0}', qn(sh.title || tr('Untitled table'))), 'to-offer', v,
@@ -117,7 +117,7 @@ function sh2SrcLists(sh, d) {  // the lists this sheet already has rows of (for 
 SHV_HOOKS.menu.push(sh => {
   if (!sh?.can_write || sh.shared_in) return [];  // 2.124.0 C (#2113): carrying over never through a share
   const d = sh2Data(sh), out = ['-', {label: tr('Create tasks from rows…'), icon: 'check', fn: () => sh2ToTasks(sh)}];
-  if (d?.office) out.push({label: tr('Take over as a quotation…'), icon: 'receipt', fn: () => sh2ToOffer(sh)});
+  if (d?.office) out.push({label: tr('Use as a quotation…'), icon: 'receipt', fn: () => sh2ToOffer(sh)});
   out.push({label: tr('Project as rows…'), icon: 'download', fn: () => sh2FromList(sh)});
   for (const l of sh2SrcLists(sh, d)) out.push({label: tr('Fetch new tasks of {0}', l.name), icon: 'sync', fn: () => sh2FromList(sh, l.id)});
   return out;

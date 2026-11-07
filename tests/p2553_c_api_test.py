@@ -78,7 +78,7 @@ def run(s, who):
     check(r.status_code == 400, f"{who}: POST with red under yellow: 400 ({r.status_code})")
     # ---- rights (like wip_limit)
     RO = board(s, who, ag, "view")
-    SR = sec(s, RO, "Read only")
+    SR = sec(s, RO, "Read-only")
     r = requests.patch(V + f"/sections/{SR}", json={"dwell_warn_h": 5}, headers=H)
     check(r.status_code in (403, 404) and lim(SR) == (None, None), f"{who}: a read-only project: refused ({r.status_code} {lim(SR)})")
     r = s.post(B + "/api/lists", json={"name": f"Private {who}"})

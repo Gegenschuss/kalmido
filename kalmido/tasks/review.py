@@ -265,7 +265,7 @@ def rvw_apply(c, tid, b):
         if sec and t["section_id"] != sec and not t["parent_id"]:  # into the review section ("Send for review")
             t = _set(c, tid, review_sec=t["section_id"], section_id=sec)
         if not rvw_request(c, t, rid, note):
-            raise BadInput(tr("Choose a reviewer first"))
+            raise BadInput(tr("Select a reviewer first"))
         return one_task(c, tid)
     rid = b.get("reviewer_id")
     if rid is not None:

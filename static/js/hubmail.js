@@ -248,7 +248,7 @@ function hbm_addrMenu(b, key, ws) {
   menu(b, [{label: tr('New address'), icon: 'sync', fn: async () => {
     if (await askConfirm(tr('Make a new address?'), tr('The old address stops working at once.'), {ok: tr('New address')})) hbm_addr(key, ws, true);
   }}, {label: tr('Turn the address off'), icon: 'x', fn: async () => {
-    if (!await askConfirm(tr('Turn the address off?'), tr('E-mails to it are no longer filed. The filed e-mails stay.'), {ok: tr('Turn off'), danger: true})) return;
+    if (!await askConfirm(tr('Turn the address off?'), tr('E-mails to it are no longer filed. The filed e-mails stay.'), {ok: tr('Switch off'), danger: true})) return;
     const t = hbm_target(key, ws), qs = Object.entries(t).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&');
     try { await api('DELETE', `/api/hubmail/address?${qs}`); } catch { return; }
     hbm_load(key);

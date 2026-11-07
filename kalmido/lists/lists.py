@@ -725,7 +725,7 @@ def list_delete(lid):
         return err(tr("The basket cannot be deleted"))
     # 1.5 (UX1): deleting for good only from the archive; "Delete" in the app archives (undoable) first
     if not r["archived"]:
-        return err(tr("Archive the project first: only archived projects can be deleted for good"), 409)
+        return err(tr("Archive the project first: only archived projects can be deleted permanently"), 409)
     from ..collab.liste2e import le2e_mode
     if not le2e_mode(c, lid):  # 2.102.0 A (#1988): into the list trash with everything (lists/listtrash.py), restorable
         from .listtrash import otr_trash
@@ -1406,7 +1406,7 @@ def agent_share_all(aid):
     bump(c)
     c.commit()
     return jsonify(added=n, **agent_share_counts(c, aid, d), **({"other_agent": other, "other_agent_reason": tr(ONE_AGENT_MSG)} if other else {}),
-                   **({"bridge": bridged, "bridge_reason": tr("These projects have other people than the agent’s other projects. Choose the agent in each one explicitly so it may see them.")} if bridged else {}))
+                   **({"bridge": bridged, "bridge_reason": tr("These projects have other people than the agent’s other projects. Select the agent in each one explicitly so it may see them.")} if bridged else {}))
 
 
 def list_created(c, uid, lid, agents=True):

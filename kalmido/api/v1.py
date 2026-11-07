@@ -133,7 +133,7 @@ def api_authenticate():
     from ..agents.usage import usage_refused
     from ..api.scopes import agent_ro_refused, approval_replay_token, SCOPE_LABELS, scopes_effective, token_ip_ok, v1_scope_need
     if not API_ON:
-        return v1_err(404, tr("The API is turned off on this server"))
+        return v1_err(404, tr("The API is switched off on this server"))
     if request.path == API_PREFIX + "openapi.json":
         return None  # the spec contains no data
     g.audit_t0 = time.monotonic()
@@ -525,7 +525,7 @@ def v1_list(d):
 # ---- token management (Settings > Account > API tokens; session / proxy login only, a token cannot reach these)
 def need_api():
     if not API_ON:
-        raise Denied(409, tr("The API is turned off on this server"))
+        raise Denied(409, tr("The API is switched off on this server"))
 
 
 def token_public(r):

@@ -2,7 +2,7 @@
 // (the preselected simple start of a new instance, comments off too) / Family / Team / Software projects, fine-tuning, language) and
 // "Start with" (2.7.0, K21: Empty / Sample project / Agency / Software / Personal as cards) sets the instance switches +
 // default modules. Then: the admin
-// creates the second user while collaboration is off -> "Turn on collaboration now?".
+// creates the second user while collaboration is off -> "Switch on collaboration now?".
 // Restarts the test container (start.sh) for every fresh install.
 const {execFileSync} = require('child_process');
 const path = require('path');
@@ -97,7 +97,7 @@ const feats = st => st.settings.features.split(',');
   };
   await addUser('bob');
   let ask = await waitSel(d, '.modal.collabask');
-  check(ask && /Turn on collaboration now\?/.test(ask.textContent), 'second user: "Turn on collaboration now?"');
+  check(ask && /Switch on collaboration now\?/.test(ask.textContent), 'second user: "Switch on collaboration now?"');
   click(w, ask.querySelector('[data-m="yes"]')); await sleep(900);
   st = await api(jar, 'GET', '/api/state');
   const bj = {}; await fetch(B + 'api/auth/login', {method: 'POST', headers: H, body: JSON.stringify({username: 'bob', password: 'password123'})}).then(r => { bj.c = r.headers.get('set-cookie').split(';')[0]; });

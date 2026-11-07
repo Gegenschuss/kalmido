@@ -62,7 +62,7 @@ def _bookmarks(c, run, uid, data, ts):
         if key in have:  # the same link saved here already stays as it is
             continue
         if n >= BM_MAX:
-            run.warning(N_("A row could not be taken over: {0}"), tr(N_("Bookmarks")))
+            run.warning(N_("A row could not be imported: {0}"), tr(N_("Bookmarks")))
             continue
         try:
             tags = bm_tags(json.loads(r["tags"]) if isinstance(r.get("tags"), str) and r["tags"].startswith("[") else r.get("tags"))
@@ -120,7 +120,7 @@ def _layouts(c, run, uid, data, ts):
             with c.savepoint():
                 nid = lyv_save(c, uid, key, _txt(r.get("name"), 60) or "Import", r.get("layout") or "")
         except (BadInput, Denied):  # a layout that does not fit, or LYV_MAX arrangements of that view here already
-            run.warning(N_("A row could not be taken over: {0}"), tr(N_("Saved arrangements")))
+            run.warning(N_("A row could not be imported: {0}"), tr(N_("Saved arrangements")))
             continue
         _more(run, "view_layouts", nid)
     for r in data.get("list_layouts") or []:

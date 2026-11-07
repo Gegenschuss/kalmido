@@ -196,10 +196,10 @@ def frq_clean(b, new=False):
     elif "expires_at" in b:
         x = _expiry(b["expires_at"], b.get("tz"))
         if not x:
-            raise Denied(400, tr("Please choose until when the link works"))
+            raise Denied(400, tr("Please select until when the link works"))
         out["expires_at"] = x
     elif new:
-        raise Denied(400, tr("Please choose until when the link works"))
+        raise Denied(400, tr("Please select until when the link works"))
     if "expires_at" in out:
         if out["expires_at"] <= _now():
             raise Denied(400, tr("The end date must lie in the future"))
@@ -254,7 +254,7 @@ def frq_create(nid):
     _gate()
     n = _folder(c, nid)
     if not public_links_on(c, "uploads"):
-        return err(tr("Public links are turned off on this server"), 409)
+        return err(tr("Public links are switched off on this server"), 409)
     fsl_need_unlocked(c, nid, "fs_locked_link")  # 2.353.0 A (#2758): an external person has no key
     f = frq_clean(body(), new=True)
     d = sd_for(c, n["org_id"], me())  # 2.470.0 (#3596): the workspace's defaults
@@ -513,7 +513,7 @@ def frq_send(token):
     if age is None or not FRQ_MIN_S <= age <= FRQ_MAX_S:
         return again(tr("Please send the files once more: the page was open for a long time.", lg=lg))
     if not files:
-        return again(tr("Please choose at least one file.", lg=lg))
+        return again(tr("Please select at least one file.", lg=lg))
     if len(files) > min(left, FRQ_PER_POST):
         return again(_more(min(left, FRQ_PER_POST), lg))
     allowed = frq_allowed(frq_types_of(r))
@@ -581,7 +581,7 @@ def frq_send(token):
             return jsonify(error=bad[0]), 400
         return jsonify(ok=True, n=len(saved), errors=bad)
     if not saved:
-        return again(bad[0] if bad else tr("Please choose at least one file.", lg=lg))
+        return again(bad[0] if bad else tr("Please select at least one file.", lg=lg))
     text = trn("{0} file has arrived.", "{0} files have arrived.", len(saved), lg=lg) + ((" " + " ".join(bad)) if bad else "")
     return _msg(tr("Thank you!", lg=lg), text, lg, 200, (f"/u/{token}", tr("Upload more files", lg=lg)))
 

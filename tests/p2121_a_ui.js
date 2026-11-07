@@ -46,7 +46,7 @@ const INV = ['Muster Bau GmbH · Werkstraße 12 · 54321 Beispielort', 'Herrn', 
   check(e.querySelector('#dc-sender')?.value === 'Muster Bau GmbH', 'Take over: the sender');
   check(e.querySelector('#rc-vat')?.value === '19', 'Take over: the VAT rate of the receipt');
   check(!e.querySelector('.rx-sug') && e.querySelector('.rx-no'), 'taken over: the line goes, the number stays');
-  check(v.eval(`HIST.undo.length && /taken over/.test(HIST.undo[HIST.undo.length - 1].label)`), 'Take over = one undo step');
+  check(v.eval(`HIST.undo.length && /applied/.test(HIST.undo[HIST.undo.length - 1].label)`), 'Take over = one undo step');
   await v.eval(`histStep('undo')`);
   await until(() => e.querySelector('.rx-sug') && !e.querySelector('#dc-sender')?.value, 80);
   check(e.querySelector('.rx-sug') && !e.querySelector('#dc-sender')?.value, 'Undo: the old values and the line are back');

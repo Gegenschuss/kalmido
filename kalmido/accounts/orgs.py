@@ -548,7 +548,7 @@ def _obj_sharers(c, table, members, oid_col, obj_id):
             return [r[0] for r in c.execute(f"SELECT user_id FROM {members} WHERE {oid_col}=? ORDER BY user_id", (obj_id,)).fetchall()]
         rows = c.execute("SELECT user_id, agent_id, group_id FROM fs_shares WHERE node_id=? ORDER BY id", (n[0],)).fetchall()
     if any(r["group_id"] for r in rows):
-        raise Denied(409, tr("Shared with a group: take that share back before the workspace changes"))
+        raise Denied(409, tr("Shared with a group: remove that share before the workspace changes"))
     return sorted({r["user_id"] or r["agent_id"] for r in rows if r["user_id"] or r["agent_id"]})
 
 

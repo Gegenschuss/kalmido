@@ -207,7 +207,7 @@ def pl_sees_books(c, uid, oid):
     return r["levels"].get("books", "none") != "none"
 
 
-PL_TAKEN = N_("The bookkeeping has taken over this receipt; only it can change or remove it")
+PL_TAKEN = N_("The bookkeeping has booked this receipt; only it can change or remove it")
 
 
 def _pl_taken(c, oid, r):

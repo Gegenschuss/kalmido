@@ -60,7 +60,7 @@ OT, ot = agent("otto")      # only reads the list
 NO, no = agent("nora")      # not in the list at all
 W = A.post(B + "/api/lists", json={"name": "Work", "org_id": ORG}).json()["id"]
 check(A.put(B + f"/api/lists/{W}/members", json={"user_id": CL, "role": "edit"}).ok, "setup: claude edits the list")
-WR = A.post(B + "/api/lists", json={"name": "Read only", "org_id": ORG}).json()["id"]  # one agent per list: otto only views this one
+WR = A.post(B + "/api/lists", json={"name": "Read-only", "org_id": ORG}).json()["id"]  # one agent per list: otto only views this one
 check(A.put(B + f"/api/lists/{WR}/members", json={"user_id": OT, "role": "view"}).ok, "setup: otto only views the list")
 check(A.put(B + f"/api/lists/{W}/members", json={"user_id": BOB, "role": "edit"}).ok, "setup: bob in the list")
 T = A.post(B + "/api/tasks", json={"title": "Board columns", "list_id": W}).json()["id"]

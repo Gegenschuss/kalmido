@@ -120,7 +120,7 @@ function agrModal(a) {
   const drawDoc = () => {
     const el = $('.agr-docv', md); if (!el) return;
     el.innerHTML = (doc ? `<a href="#docs/${doc.id}" class="agr-docname">${ic('file', 's')} ${esc(doc.name)}</a><button type="button" class="btn sm ghost" data-m="docx">${tr('Remove')}</button>` : '')
-      + `<button type="button" class="btn sm" data-m="docpick">${ic('search', 's')} ${tr('Choose')}</button><button type="button" class="btn sm" data-m="docup">${ic('upload', 's')} ${tr('Upload')}</button>`;
+      + `<button type="button" class="btn sm" data-m="docpick">${ic('search', 's')} ${tr('Select')}</button><button type="button" class="btn sm" data-m="docup">${ic('upload', 's')} ${tr('Upload')}</button>`;
   };
   const listRow = () => { const on = $('#agr-task', md)?.checked; $('.agr-listrow', md)?.classList.toggle('hidden', !on); };
   drawDoc(); listRow();
@@ -189,7 +189,7 @@ async function agrDelete(a) {
 // ---- the document: one of the office's documents space (choose) or a new one (uploaded there, sealed like every document)
 function agrDocPick(done) {
   const ws = AGR.data?.doc_ws || 'private';
-  const md = modal(`<h3>${tr('Choose a document')}</h3><div class="row"><input id="agr-dq" type="search" placeholder="${esc(tr('Search'))}" aria-label="${esc(tr('Search'))}" maxlength="100"></div>
+  const md = modal(`<h3>${tr('Select a document')}</h3><div class="row"><input id="agr-dq" type="search" placeholder="${esc(tr('Search'))}" aria-label="${esc(tr('Search'))}" maxlength="100"></div>
     <ul class="ofclist agr-docs" role="list"><li class="muted">${tr('Loading…')}</li></ul><div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button></div>`);
   md.classList.add('ofcdlg');
   let seq = 0, docs = [];

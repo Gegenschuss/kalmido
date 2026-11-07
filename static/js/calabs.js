@@ -36,7 +36,7 @@ function abc_group() {
       ${fbo.map(([k, v]) => `<option value="${k}" ${k === fbv ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select>
       <span class="muted mhint">${esc(tr('Colleagues only see busy or free, never titles.'))}</span></div>` : '';
   return `<div class="cvxgrp">${tr('Holidays and absences')}</div>
-    ${row('hol', S.settings.cal_holidays !== '0', tr('Public holidays'), cur ? st[cur] || cur : tr('no country chosen'))}
+    ${row('hol', S.settings.cal_holidays !== '0', tr('Public holidays'), cur ? st[cur] || cur : tr('no country selected'))}
     ${row('abs', S.settings.cal_abs !== '0', tr('My absences'), '')}
     ${team ? row('team', S.settings.cal_abs_team === '1', tr('Team absences'), tr('only “away”')) : ''}
     ${sel}${fb}<div class="row abcfeed"><button type="button" class="btn sm" data-abc="feed">${ic('link', 's')} ${tr('Subscription link…')}</button></div>`;
@@ -90,7 +90,7 @@ async function abc_feedModal() {
       return;
     }
     if (a === 'rotate' && !await askConfirm(tr('Create a new link?'), tr('Calendars subscribed with the old one stop updating.'), {ok: tr('New link'), danger: true})) return;
-    if (a === 'off' && !await askConfirm(tr('Turn the link off'), tr('Subscribed calendars stop updating.'), {ok: tr('Turn off'), danger: true})) return;
+    if (a === 'off' && !await askConfirm(tr('Turn the link off'), tr('Subscribed calendars stop updating.'), {ok: tr('Switch off'), danger: true})) return;
     b.disabled = true;
     try { draw(await api('POST', '/api/team/absences/feed', {action: a})); } catch { b.disabled = false; return; }
     if (a === 'rotate') toast(tr('New link created, the old one no longer works'));

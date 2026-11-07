@@ -342,7 +342,7 @@ def comment_create(tid):
         if not is_agent(g.user):
             return err(tr("Only agents can post suggestions"), 403)
         if (c.execute("SELECT agent_tidy FROM lists WHERE id=?", (t["list_id"],)).fetchone()[0] or "off") == "off":
-            return err(tr("Tidying up is turned off in this project"), 409)
+            return err(tr("Tidying up is switched off in this project"), 409)
         if not task_visible(c, tid, me(), write=True):
             raise Denied(403)
         if tidy_agent_of(c, t["list_id"]) != me():  # 2.4.1 (#379)

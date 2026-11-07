@@ -327,7 +327,7 @@ def _occ_to_task(c, t, sid, uid_, kind, name, mo, dy, y, lg):
 
 
 WB_ERR = {"conflict": N_("A date was changed in the address book at the same time: Kalmido took the date of the address book"),
-          "read_only": N_("This address book cannot be changed (read only or a mirror): changes stay in Kalmido"),
+          "read_only": N_("This address book cannot be changed (read-only or a mirror): changes stay in Kalmido"),
           "weak_etag": N_("This address book server sends no reliable version tags: Kalmido does not write there"),
           "parse": N_("A contact could not be changed safely: nothing was written"),
           "failed": N_("Writing back failed: {0}")}
@@ -421,7 +421,7 @@ def cdv_wb_note(c, tid, cur, b):
 
 
 CONTACT_ERR = dict(CAL_ERR, not_book=N_("No address book found at this address"),
-                   no_list=N_("The project for the birthdays is gone: choose another one"))
+                   no_list=N_("The project for the birthdays is gone: select another one"))
 
 
 def contact_err_text(stored):

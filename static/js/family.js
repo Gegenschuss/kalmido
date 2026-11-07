@@ -83,14 +83,14 @@ function viewFamily() {
   // whose turn
   const rotH = d.rots.length ? `<ul class="flist">${d.rots.map(t => { const r = t.rotation;
     return `<li><a ${open(t.id)} class="frow">${av(t.assignee_id, personName(t.list_id, t.assignee_id) || '?')}<span class="ft"><b>${esc(t.title)}</b><span class="muted">${esc(rotOrder(t))} · ${esc(r.mode === 'week' ? tr('weekly') : tr('after each time'))}</span></span>${t.due ? `<span class="fwhen ${t.due < t0 ? 'over' : ''}">${esc(dayLabel(t.due))}</span>` : ''}</a></li>`; }).join('')}</ul>`
-    : `<p class="muted">${tr('Nobody takes turns yet: open a repeating task in a shared project and choose “Take turns”.')}</p>`;
+    : `<p class="muted">${tr('Nobody takes turns yet: open a repeating task in a shared project and select “Take turns”.')}</p>`;
   // meal plan of the week
   const days = [...Array(7)].map((_, i) => addDays(d.mon, i));
   const mealH = `<div class="fweek" role="group" aria-label="${esc(tr('Meal plan'))}">${days.map(day => { const ms = d.meals.filter(t => t.due === day);
     return `<div class="fday ${day === t0 ? 'today' : ''}"><span class="fdl">${esc(dayLabel(day))}</span><span class="fdm">${ms.map(t => `<span class="fmeal ${t.status ? 'done' : ''}"><a ${open(t.id)}>${esc(t.title)}</a><button type="button" class="iconbtn" data-act="fam-ingr" data-id="${t.id}" title="${esc(tr('Ingredients to the shopping list'))}" aria-label="${esc(tr('Ingredients of {0} to the shopping list', t.title))}">${ic('cart', 's')}</button></span>`).join('')}</span><button type="button" class="iconbtn" data-act="fam-meal" data-day="${day}" title="${esc(tr('Add a meal'))}" aria-label="${esc(tr('Add a meal on {0}', fmtDateLoc(day)))}">${ic('plus', 's')}</button></div>`; }).join('')}</div>`;
   // 2.140.0 A (#2132): any week: back / ahead, a day to start from, back to today; the range is said
   const away = !!S.famWeek && S.famWeek !== t0;
-  const weekNav = `<span class="fwnav"><button type="button" class="iconbtn" data-act="fam-week" data-d="-7" aria-label="${esc(tr('Previous week'))}" title="${esc(tr('Previous week'))}">${ic('left', 's')}</button><button type="button" class="btn sm fwpick" data-act="fam-weekpick" aria-label="${esc(tr('Show the meal plan from') + ': ' + fmtDateLoc(d.mon) + ' – ' + fmtDateLoc(addDays(d.mon, 6)))}" title="${esc(tr('Choose a day'))}">${ic('cal', 's')}<span>${esc(fmtDateLoc(d.mon))} – ${esc(fmtDateLoc(addDays(d.mon, 6)))}</span></button><button type="button" class="iconbtn" data-act="fam-week" data-d="7" aria-label="${esc(tr('Next week'))}" title="${esc(tr('Next week'))}">${ic('right', 's')}</button>${away ? `<button type="button" class="btn sm" data-act="fam-weeknow">${tr('Today')}</button>` : ''}</span>`;  // "Today" last: the buttons before it keep their place (the focus)
+  const weekNav = `<span class="fwnav"><button type="button" class="iconbtn" data-act="fam-week" data-d="-7" aria-label="${esc(tr('Previous week'))}" title="${esc(tr('Previous week'))}">${ic('left', 's')}</button><button type="button" class="btn sm fwpick" data-act="fam-weekpick" aria-label="${esc(tr('Show the meal plan from') + ': ' + fmtDateLoc(d.mon) + ' – ' + fmtDateLoc(addDays(d.mon, 6)))}" title="${esc(tr('Select a day'))}">${ic('cal', 's')}<span>${esc(fmtDateLoc(d.mon))} – ${esc(fmtDateLoc(addDays(d.mon, 6)))}</span></button><button type="button" class="iconbtn" data-act="fam-week" data-d="7" aria-label="${esc(tr('Next week'))}" title="${esc(tr('Next week'))}">${ic('right', 's')}</button>${away ? `<button type="button" class="btn sm" data-act="fam-weeknow">${tr('Today')}</button>` : ''}</span>`;  // "Today" last: the buttons before it keep their place (the focus)
   const mealFoot = `<div class="fcfoot"><button type="button" class="btn sm" data-act="fam-recipes">${ic('book', 's')}<span>${tr('Recipes')}</span>${famRecipes().length ? `<span class="c">${famRecipes().length}</span>` : ''}</button></div>`;
   // shopping
   const shopH = d.shops.length ? `<ul class="flist">${d.shops.map(l => `<li class="frow fshop"><a href="#l/${l.id}" class="ft"><b>${esc(lname(l))}</b><span class="muted">${esc(trn('{0} item left', '{0} items left', shopOpen(l.id)))}</span></a><button type="button" class="btn pri" data-act="fam-shop" data-id="${l.id}">${ic('cart', 's')}<span>${tr('Shopping mode')}</span></button></li>`).join('')}</ul>`
@@ -156,7 +156,7 @@ function occModal(o = {}) {
   const months = [...Array(12)].map((_, i) => MON[i]);
   const md = modal(`<h3>${ic('cake', 's')} ${tr('Birthday or anniversary')}</h3>
     <div class="seg" id="oc-kind" role="radiogroup" aria-label="${esc(tr('Kind'))}"><button type="button" role="radio" aria-checked="true" class="on" data-k="birthday">${tr('Birthday')}</button><button type="button" role="radio" aria-checked="false" data-k="anniversary">${tr('Anniversary')}</button></div>
-    <div class="row"><label for="oc-name">${tr('Who')}</label><input id="oc-name" maxlength="100" autocomplete="off" placeholder="${esc(tr('e.g. Grandma Erika'))}"></div>
+    <div class="row"><label for="oc-name">${tr('Who')}</label><input id="oc-name" maxlength="100" autocomplete="off" placeholder="${esc(tr('e.g. Grandma Rose'))}"></div>
     <div class="row"><label for="oc-day">${tr('Date')}</label><span class="ocdate"><input id="oc-day" type="number" inputmode="numeric" min="1" max="31" placeholder="${esc(tr('Day'))}" aria-label="${esc(tr('Day'))}"><select id="oc-month" aria-label="${esc(tr('Month'))}">${months.map((m, i) => `<option value="${i + 1}" ${i === new Date().getMonth() ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select><input id="oc-year" type="number" inputmode="numeric" min="1900" max="${new Date().getFullYear()}" placeholder="${esc(tr('Year'))}" aria-label="${esc(tr('Year (optional)'))}"></span></div>
     <div class="row"><label for="oc-lead">${tr('Remind me')}</label><select id="oc-lead">${[0, 1, 3, 7, 14, 30].map(n => `<option value="${n}" ${n === 7 ? 'selected' : ''}>${n ? trn('{0} day before', '{0} days before', n) : tr('on the day')}</option>`).join('')}</select></div>
     <div class="row"><label for="oc-gifts">${tr('Gift ideas')}</label><input id="oc-gifts" placeholder="${esc(tr('optional, separated by commas'))}"></div>
@@ -188,7 +188,7 @@ function dlModal() {
   const md = modal(`<h3>${ic('hourglass', 's')} ${tr('Household deadline')}</h3>
     <div class="ptcards dltypes" role="radiogroup" aria-label="${esc(tr('Kind'))}">${DL_TYPES.map(([k, n, i], j) => `<button type="button" class="ptcard ${j ? '' : 'on'}" role="radio" aria-checked="${!j}" data-dl="${k}">${ic(i, 's')}<b>${tr(n)}</b></button>`).join('')}</div>
     <div class="row"><label for="dl-who" id="dl-wholab">${tr('For whom / what')}</label><input id="dl-who" maxlength="100" autocomplete="off" placeholder="${esc(tr('e.g. Lina, the family car, household insurance'))}"></div>
-    <div class="row"><label id="dl-explab">${tr('Expires on')}</label>${dateIn('dl-exp', '', {label: tr('Expires on'), empty: tr('choose')})}</div>
+    <div class="row"><label id="dl-explab">${tr('Expires on')}</label>${dateIn('dl-exp', '', {label: tr('Expires on'), empty: tr('select')})}</div>
     <div class="row dlnotice" hidden><label for="dl-notice">${tr('Notice period')}</label><select id="dl-notice">${[0, 1, 2, 3, 6, 12].map(n => `<option value="${n}">${n ? trn('{0} month', '{0} months', n) : tr('none')}</option>`).join('')}</select></div>
     <div class="shint lhint" id="dl-hint"></div>
     ${lists.length > 1 || !hl ? `<div class="row"><label for="dl-list">${tr('Project')}</label><select id="dl-list">${hl ? '' : `<option value="">${tr('New project: Family')}</option>`}${lists.map(l => `<option value="${l.id}" ${l === hl ? 'selected' : ''}>${esc(lname(l))}</option>`).join('')}</select></div>` : ''}
@@ -462,8 +462,8 @@ function famDavDraw(sm) {
 }
 // 2.140.0 D (#2137): the write-back switch of an address book; a read-only one (a mirror) gets a hint instead
 function ctWbHtml(s) {
-  if (s.writeback_avail === 'no') return `<span class="muted ctwb-note" data-ctwbro="${s.id}">${tr('Read only (for example a mirror): changes stay in Kalmido')}</span>`;
-  return `<span class="ctwb"><label class="swc"><input type="checkbox" data-ctwb="${s.id}" ${s.writeback ? 'checked' : ''}><span class="swt" aria-hidden="true"></span><span class="sr">${esc(tr('Write changes back to the address book'))}</span></label><span aria-hidden="true">${tr('Write changes back to the address book')}</span></span>${s.writeback && s.writeback_avail === 'some' ? `<span class="muted ctwb-note">${tr('Some of its address books are read only: nothing is written there')}</span>` : ''}${s.writeback_error ? `<span class="aerr ctwb-note">${esc(s.writeback_error)}</span>` : ''}`;
+  if (s.writeback_avail === 'no') return `<span class="muted ctwb-note" data-ctwbro="${s.id}">${tr('Read-only (for example a mirror): changes stay in Kalmido')}</span>`;
+  return `<span class="ctwb"><label class="swc"><input type="checkbox" data-ctwb="${s.id}" ${s.writeback ? 'checked' : ''}><span class="swt" aria-hidden="true"></span><span class="sr">${esc(tr('Write changes back to the address book'))}</span></label><span aria-hidden="true">${tr('Write changes back to the address book')}</span></span>${s.writeback && s.writeback_avail === 'some' ? `<span class="muted ctwb-note">${tr('Some of its address books are read-only: nothing is written there')}</span>` : ''}${s.writeback_error ? `<span class="aerr ctwb-note">${esc(s.writeback_error)}</span>` : ''}`;
 }
 const fmtAgo = iso => { const m = Math.round((Date.now() - Date.parse(iso)) / 60000); return m < 1 ? tr('just now') : m < 60 ? trn('{0} min ago', '{0} min ago', m) : m < 1440 ? trn('{0} h ago', '{0} h ago', Math.round(m / 60)) : fmtDateLoc(iso.slice(0, 10)); };
 
@@ -679,7 +679,7 @@ document.addEventListener('click', async e => {
   else if (k === 'fam-give') famGive(+a.dataset.kid);
   else if (k === 'fam-rewards') rewardsModal(+a.dataset.kid);
   else if (k === 'fam-pin') kd_pinSet(+a.dataset.kid);  // 2.49.0 (#1551)
-  else if (k === 'fam-decide') { try { famKidSet(await api('POST', `/api/family/rewards/${a.dataset.rid}/decide`, {approve: a.dataset.ok === '1'})); toast(a.dataset.ok === '1' ? tr('Redeemed') : tr('Declined')); } catch { /* api() said it */ } }
+  else if (k === 'fam-decide') { try { famKidSet(await api('POST', `/api/family/rewards/${a.dataset.rid}/decide`, {approve: a.dataset.ok === '1'})); toast(a.dataset.ok === '1' ? tr('Redeemed') : tr('Rejected')); } catch { /* api() said it */ } }
   else if (k === 'kid-tick') {
     const t = taskById(id); if (!t) return;
     const was = t.status, before = S.kids?.[0]?.stars ?? 0;
@@ -724,7 +724,7 @@ function paskOpen() {
   if (!pre || pre === 'done' || S.me?.kid || $('.paskdlg')) return Promise.resolve(false);
   let cur = PURPOSES.some(x => x[0] === pre) ? pre : 'me';
   return new Promise(res => {
-    const md = modal(`<h3>${tr('What do you use Kalmido for?')}</h3><p class="muted">${tr('Pick what fits: it switches the modules. Everything can be changed later under Settings > Modules.')}</p>
+    const md = modal(`<h3>${tr('What do you use Kalmido for?')}</h3><p class="muted">${tr('Select what fits: it switches the modules. Everything can be changed later under Settings > Modules.')}</p>
       <div id="pask-c">${purposeCards(cur, 'data-pask')}</div><div class="aerr" role="alert" id="pask-err"></div>
       <div class="foot"><span class="spacer"></span><button type="button" class="btn pri" data-pask-go>${tr('Continue')}</button></div>`);
     md.classList.add('paskdlg');

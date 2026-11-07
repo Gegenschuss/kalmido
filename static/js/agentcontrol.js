@@ -27,7 +27,7 @@ function awc_html(st) {
   const free = st.projects.filter(p => !(String(p.id) in (chosen ? d.projects : {})));
   const hist = st.history || [];
   return `<h4 id="awc-h">${tr('Control')}</h4>
-    ${chosen ? '' : `<div class="awstate" role="status" data-awc-legacy>${esc(tr('No level chosen yet - works as before.'))}</div>`}
+    ${chosen ? '' : `<div class="awstate" role="status" data-awc-legacy>${esc(tr('No level selected yet - works as before.'))}</div>`}
     <div class="awclv" role="radiogroup" aria-labelledby="awc-h">${AWC_LEVELS.map(([v, n, h]) => `<label class="chkl awcl"><input type="radio" name="awc-level" data-awc="level" value="${v}" ${chosen && d.level === v ? 'checked' : ''}><span><b>${esc(tr(n))}</b><small class="muted">${esc(tr(h))}</small></span></label>`).join('')}</div>
     <div class="awsub" ${chosen && d.level === 'free' ? '' : 'hidden'}><textarea id="awc-goal" data-awc="goal" rows="2" maxlength="500" placeholder="${esc(tr('e.g. keep the project free of bugs'))}" aria-label="${esc(tr('Goal'))}">${esc(d.goal || '')}</textarea></div>
     <div class="row"><label id="awc-ph">${tr('Exceptions per project')}</label></div>
@@ -43,7 +43,7 @@ function awc_html(st) {
     <div class="row" ${chosen && d.deadline !== 'off' ? '' : 'hidden'}><label for="awc-then">${tr('After the deadline')}</label><select id="awc-then" data-awc="then">${awc_opts(AWC_THEN, d.then)}</select></div>
     <div class="shint" ${chosen && d.deadline !== 'off' ? '' : 'hidden'}>${tr('One-way steps are always rejected.')}</div>
     <div class="row"><label id="awc-hh">${tr('History')}</label></div>
-    <div class="awch" aria-labelledby="awc-hh">${hist.length ? hist.map(h => `<div class="mrow" data-awc-row="${h.id}"><span class="n">${esc(tr(AWC_KIND[h.kind] || AWC_KIND.other))}${h.title ? ': ' + esc(h.title) : h.kind === 'other' ? ' ' + esc(h.method + ' ' + h.path) : ''}<small class="muted">${esc(fmtWhen(h.created_at))}${h.list_name ? ' · ' + esc(h.list_name) : ''}${h.via === 'approval' ? ' · ' + esc(tr('approved')) : ''}</small></span>${h.undone_at ? `<span class="muted">${tr('taken back')}</span>` : h.can_undo ? `<button type="button" class="linkbtn" data-awc-undo="${h.id}">${tr('Undo')}</button>` : ''}</div>`).join('') : `<div class="muted mhint">${tr('No decisions yet.')}</div>`}</div>`;
+    <div class="awch" aria-labelledby="awc-hh">${hist.length ? hist.map(h => `<div class="mrow" data-awc-row="${h.id}"><span class="n">${esc(tr(AWC_KIND[h.kind] || AWC_KIND.other))}${h.title ? ': ' + esc(h.title) : h.kind === 'other' ? ' ' + esc(h.method + ' ' + h.path) : ''}<small class="muted">${esc(fmtWhen(h.created_at))}${h.list_name ? ' · ' + esc(h.list_name) : ''}${h.via === 'approval' ? ' · ' + esc(tr('approved')) : ''}</small></span>${h.undone_at ? `<span class="muted">${tr('undone')}</span>` : h.can_undo ? `<button type="button" class="linkbtn" data-awc-undo="${h.id}">${tr('Undo')}</button>` : ''}</div>`).join('') : `<div class="muted mhint">${tr('No decisions yet.')}</div>`}</div>`;
 }
 /** @param {any} md @param {any} agent */
 function awc_mount(md, agent) {
@@ -77,7 +77,7 @@ function awc_mount(md, agent) {
     else if (t.dataset.awcUndo) {
       chain = chain.then(async () => {
         err('');
-        try { st = await api('POST', `${base}/history/${t.dataset.awcUndo}/undo`); draw(); toast(tr('Taken back')); }
+        try { st = await api('POST', `${base}/history/${t.dataset.awcUndo}/undo`); draw(); toast(tr('Undone')); }
         catch (e2) { err(e2 instanceof Offline ? tr('Only available online.') : e2.message); }
       });
     }

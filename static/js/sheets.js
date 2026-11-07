@@ -202,13 +202,13 @@ function shvSheetHtml(sh) {
   SHV.rset = shvRangeSet();
   const back = sh.list_id ? `<a class="btn sm" href="#sheets/l/${sh.list_id}" title="${esc(tr('Attached to {0}', sh.list_title || ''))}">${ic('back', 's')}<span class="shvbk">${esc(sh.list_title || tr('Project'))}</span></a>` : `<a class="btn sm" href="#sheets">${ic('back', 's')}<span class="shvbk">${tr('Tables')}</span></a>`;
   const top = `<div class="shvtop">${back}<h2 class="shvh"><button type="button" class="shvtitle" data-shv="rename" ${w ? '' : 'disabled'} title="${esc(w ? tr('Rename…') : '')}">${esc((sh.book_title ?? sh.title) || tr('Untitled table'))}</button></h2>
-    ${w ? '' : `<span class="shvro">${ic('eye', 's')}${tr('Read only')}</span>`}<span class="spacer"></span>
+    ${w ? '' : `<span class="shvro">${ic('eye', 's')}${tr('Read-only')}</span>`}<span class="spacer"></span>
     ${nf ? `<button type="button" class="btn sm" data-shv="unfilter" title="${esc(tr('Reset filters'))}">${ic('filter', 's')}${trn('{0} filter', '{0} filters', nf)}${ic('x', 's')}</button>` : ''}
     <button type="button" class="btn sm ${SHV.deps ? 'on' : ''}" data-shv="deps" aria-haspopup="menu" aria-pressed="${!!SHV.deps}">${ic('deps', 's')}<span class="shvbk">${tr('Dependencies')}</span></button>${typeof shz_btnsHtml === 'function' ? shz_btnsHtml(sh) : ''}
     <button type="button" class="iconbtn" data-shv="menu" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots')}</button></div>`;
   const c0 = SHV.cur && sh._col.has(SHV.cur.c) && sh._rowNo.has(SHV.cur.r) ? SHV.cur : null, cc = c0 && shvCell(c0.r, c0.c, sh);
   const bar = `<div class="shvbar"><span class="shvaddr" id="shv-addr" aria-live="polite">${c0 ? esc(cc?.name || shvAddr(c0.r, c0.c, sh)) : ''}</span><span class="shvfx" aria-hidden="true">fx</span>
-    <span class="shvinw"><input id="shv-in" value="${esc(cc?.raw || '')}" autocomplete="off" spellcheck="false" ${w && c0 ? '' : 'readonly'} aria-label="${esc(tr('Content of the cell'))}" placeholder="${esc(c0 ? (w ? tr('Value or =formula') : '') : tr('Choose a cell'))}"></span></div>`;  // 2.543.0 (#4611): the wrapper holds the coloured mirror
+    <span class="shvinw"><input id="shv-in" value="${esc(cc?.raw || '')}" autocomplete="off" spellcheck="false" ${w && c0 ? '' : 'readonly'} aria-label="${esc(tr('Content of the cell'))}" placeholder="${esc(c0 ? (w ? tr('Value or =formula') : '') : tr('Select a cell'))}"></span></div>`;  // 2.543.0 (#4611): the wrapper holds the coloured mirror
   const shz = typeof shz_plan === 'function' && shz_plan(sh);  // 2.98.0 C (#2181): sheetsize.js
   const colgroup = `<colgroup><col class="shvrhc">${cols.map(c => `<col data-c="${c.id}" style="width:${shvW(c) / 16}rem">`).join('')}${w ? '<col class="shvaddcc">' : ''}${shz ? shz_colsHtml(sh) : ''}</colgroup>`;  // 2.98.0 C (#2181): + the empty columns that fill the frame
   const head = `<thead><tr><th class="shvcorner" scope="col"><span class="sr">${tr('Row')}</span></th>${cols.map(c => shvTh(sh, c, filt)).join('')}${w ? `<th class="shvaddc"><button type="button" class="iconbtn" data-shv="coladd" title="${esc(tr('Add column'))}" aria-label="${esc(tr('Add column'))}">${ic('plus', 's')}</button></th>` : ''}${shz ? shz_headHtml(sh) : ''}</tr></thead>`;
@@ -300,18 +300,18 @@ function shvSideHtml(sh) {
       ${c ? `<div class="shvkv"><span>${tr('Value')}</span><b class="shvval o-${origin}">${c.error ? shvShow(c) : esc(c.display ?? '')}</b></div>
       ${isF ? `<div class="shvkv"><span>${tr('Formula')}</span><code class="shvcode">${esc(c.raw)}</code></div>` : ''}
       <div class="shvkv"><span>${tr('Origin')}</span><span class="shvorg o-${origin}">${tr(SHV_ORIGIN[origin] || N_('Own value'))}</span></div>
-      ${c.agent ? `<div class="shvkv shvagk"><span>${ic('bot', 's')}</span><span>${esc(tr('Changed by {0}', c.agent.name || tr('Agent')))}${w && c.agent.batch ? ` <button type="button" class="linkbtn" data-shv="bundo" data-b="${esc(c.agent.batch)}">${tr('Take back')}</button>` : ''}</span></div>` : ''}
+      ${c.agent ? `<div class="shvkv shvagk"><span>${ic('bot', 's')}</span><span>${esc(tr('Changed by {0}', c.agent.name || tr('Agent')))}${w && c.agent.batch ? ` <button type="button" class="linkbtn" data-shv="bundo" data-b="${esc(c.agent.batch)}">${tr('Undo')}</button>` : ''}</span></div>` : ''}
       ${w && (isF || c.frozen) ? `<button type="button" class="btn sm" data-shv="freeze">${ic(c.frozen ? 'sync' : 'snow', 's')}${c.frozen ? tr('Live again') : tr('Freeze value')}</button>` : ''}
-      <h5>${tr('Comes from')}</h5>${from.length ? `<ul class="shvrefs">${from.join('')}</ul>` : `<p class="muted mhint">${tr('Nothing – an own value.')}</p>`}
+      <h5>${tr('Comes from')}</h5>${from.length ? `<ul class="shvrefs">${from.join('')}</ul>` : `<p class="muted mhint">${tr('Nothing – your own value.')}</p>`}
       <h5>${tr('Goes into')}</h5>${into.length ? `<ul class="shvrefs">${into.join('')}</ul>` : `<p class="muted mhint">${tr('No other cell uses it.')}</p>`}`
       : `<p class="muted mhint">${w ? tr('Empty. Type a value or a formula starting with =, e.g. {0}', tr('=B2*C2 · =SUM(C2:C9) · =here.total_time')) : tr('Empty.')}</p>`}</section>`;
-  } else cell = `<section class="shvsec"><p class="muted mhint">${tr('Choose a cell to see where its value comes from.')}</p></section>`;
+  } else cell = `<section class="shvsec"><p class="muted mhint">${tr('Select a cell to see where its value comes from.')}</p></section>`;
   const srcs = sh.sources || [];
   const src = srcs.length ? `<section class="shvsec"><h4>${tr('Kalmido sources')}</h4><ul class="shvrefs">${srcs.map(s => `<li>${s.denied ? `<span class="shverr">${ic('lock', 's')}${tr('No access')}</span>` : `<a href="${s.type === 'k' ? '#client/' + +s.id : '#l/' + +s.id}" class="shvsrc">${ic(s.type === 'k' ? 'brief' : s.type === 'p' ? 'rocket' : 'list', 's')}${esc(s.label || '')}</a>`}
       ${s.deleted ? ` <span class="shverr">${tr('Source deleted')}</span>` : s.denied ? '' : ` <span class="muted">${esc((s.fields || []).join(', '))}</span>`}</li>`).join('')}</ul></section>` : '';
   const bs = (sh.batches || []).slice(0, 12);
   const bat = bs.length ? `<section class="shvsec"><h4>${tr('Changes by agents')}</h4><ul class="shvrefs">${bs.map(b => `<li class="shvbat ${b.undone ? 'undone' : ''}">${ic('bot', 's')}<span>${esc(b.agent_name || tr('Agent'))} · ${trn('{0} change', '{0} changes', b.count || 0)}${b.created_at ? ' · ' + esc(relTime(b.created_at)) : ''}</span>
-      ${b.undone ? `<span class="muted">${tr('Taken back')}</span>` : sh.can_write ? `<button type="button" class="btn sm" data-shv="bundo" data-b="${esc(b.batch)}">${tr('Take back')}</button>` : ''}</li>`).join('')}</ul></section>` : '';
+      ${b.undone ? `<span class="muted">${tr('Undone')}</span>` : sh.can_write ? `<button type="button" class="btn sm" data-shv="bundo" data-b="${esc(b.batch)}">${tr('Undo')}</button>` : ''}</li>`).join('')}</ul></section>` : '';
   const ext = (SHV_HOOKS.side || []).map(f => { try { return f(sh) || ''; } catch (er) { console.error(er); return ''; } }).join('');  // 2.89.0 (#1916, D): carried over
   return cell + ext + src + bat;
 }
@@ -372,7 +372,7 @@ function shvBarSync() {
   const sh = SHV.sh, inp = $('#shv-in'), ad = $('#shv-addr'); if (!sh || !inp) return;
   const cur = SHV.cur, c = cur && shvCell(cur.r, cur.c);
   if (ad) ad.textContent = cur ? (c?.name || shvAddr(cur.r, cur.c)) : '';
-  if (document.activeElement !== inp && !(SHV.ed && SHV.ed.bar)) { inp.value = SHV.ed ? SHV.ed.val ?? '' : c?.raw || ''; inp.readOnly = !sh.can_write || !cur; inp.placeholder = cur ? (sh.can_write ? tr('Value or =formula') : '') : tr('Choose a cell'); }
+  if (document.activeElement !== inp && !(SHV.ed && SHV.ed.bar)) { inp.value = SHV.ed ? SHV.ed.val ?? '' : c?.raw || ''; inp.readOnly = !sh.can_write || !cur; inp.placeholder = cur ? (sh.can_write ? tr('Value or =formula') : '') : tr('Select a cell'); }
   shvRefPaint();  // 2.543.0 (#4611)
   if (typeof shfm_sync === 'function') shfm_sync();  // 2.578.0 (#3462 C): the format bar shows the active cell's format
 }
@@ -728,7 +728,7 @@ async function shvName(c, name) {
   histToast(name ? tr('Cell named {0}: usable in formulas', name) : tr('Name removed'), e);
 }
 function shxUndoKeptText(k) {  // 2.528.0 (#4306 B24): what stayed at the agent Undo because someone typed into it since
-  const out = [tr('Changes taken back')];
+  const out = [tr('Changes undone')];
   if (k?.sheet) out.push(tr('The table stays because someone has typed values into it since; only the agent\'s entries were removed.'));
   if (k?.rows?.length) out.push(trn('{0} row stays because someone has typed values into it since.', '{0} rows stay because someone has typed values into them since.', k.rows.length));
   if (k?.cols?.length) out.push(trn('{0} column stays because someone has typed values into it since.', '{0} columns stay because someone has typed values into them since.', k.cols.length));
@@ -736,7 +736,7 @@ function shxUndoKeptText(k) {  // 2.528.0 (#4306 B24): what stayed at the agent 
 }
 async function shvBatchUndo(batch) {
   const sh = SHV.sh; if (!sh) return;
-  if (!await askConfirm(tr('Take back the changes of this agent call?'), tr('The cells get the values from before; rows and a table the agent created go to the trash, unless someone has typed values into them since.'), {ok: tr('Take back')})) return;
+  if (!await askConfirm(tr('Undo the changes of this agent call?'), tr('The cells get the values from before; rows and a table the agent created go to the trash, unless someone has typed values into them since.'), {ok: tr('Undo')})) return;
   let res; try { res = await rawFetch('POST', `/api/sheets/${sh.id}/batches/${encodeURIComponent(batch)}/undo`); } catch (e) { toast(e.message); return; }
   toast(shxUndoKeptText(res?.kept));
   for (const d of Object.values(SHV.idx)) d.v = -1;
@@ -1048,7 +1048,7 @@ document.addEventListener('click', async e => {
     ...SHV_HOOKS.menu.flatMap(f => { try { return f(sh) || []; } catch (er) { console.error(er); return []; } }),
     ...(sh.can_write && !sh.shared_in ? ['-', {label: (sh.tabs || []).length > 1 ? tr('Delete table') : tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => shvDelete(bk.id, bk.title, sh.list_id)}] : [])]);  // 2.124.0 C (#2113)
   else if (k === 'deps') menu(a, [{label: tr('No arrows'), on: !SHV.deps, fn: () => { SHV.deps = 0; shvRender(); }},
-    {label: tr('Arrows for the chosen cell'), on: SHV.deps === 1, fn: () => { SHV.deps = 1; shvRender(); }},
+    {label: tr('Arrows for the selected cell'), on: SHV.deps === 1, fn: () => { SHV.deps = 1; shvRender(); }},
     {label: tr('Arrows for the whole table'), on: SHV.deps === 2, fn: () => { SHV.deps = 2; shvRender(); }}]);
   else if (k === 'unfilter') { delete SHV.filt[sh.id]; shvRender(); }
   else if (k === 'rowadd') { SHV.enterAdd = false; shvRowAdd(null); }
@@ -1294,7 +1294,7 @@ async function shxTrashDlg(sp) {
     $('[data-shx="empty"]', md).classList.toggle('hidden', !items.length || !j.may_empty);
     box.innerHTML = (items.length ? `<div class="members">${items.map(x => `<div class="mrow shx-row" data-shxid="${x.id}"><span class="n"><b>${esc(x.title || tr('Untitled table'))}</b><small class="muted">${esc([shxWhen(x.deleted_at), x.list_title, x.files ? trn('{0} file', '{0} files', x.files) + ' · ' + fmtBytes(x.size) : ''].filter(Boolean).join(' · '))}</small></span>`
       + (x.can_write ? `<span class="oadmb"><button type="button" class="btn sm" data-shx="restore">${ic('undo', 's')}<span>${tr('Restore')}</span></button><button type="button" class="btn sm danger" data-shx="purge">${ic('trash', 's')}<span>${tr('Delete permanently…')}</span></button></span>` : '') + '</div>').join('')}</div>`
-      : `<div class="muted mhint">${tr('Trash is empty.')}</div>`) + `<div class="shint">${esc(trashNote(tr('Tables in the trash are deleted for good after {0} days, with their files.', j.days || 30), j.purge_on === false))}</div>`;
+      : `<div class="muted mhint">${tr('Trash is empty.')}</div>`) + `<div class="shint">${esc(trashNote(tr('Tables in the trash are deleted permanently after {0} days, with their files.', j.days || 30), j.purge_on === false))}</div>`;
   };
   md.addEventListener('change', e => { if (e.target.matches?.('[data-shx-sp]')) { sp = e.target.value; draw(); } });
   md.addEventListener('click', async e => {
@@ -1305,11 +1305,11 @@ async function shxTrashDlg(sp) {
     try {
       if (k === 'restore' && x) { await rawFetch('POST', `/api/sheets/${id}/restore`); shvAfterIdx(id); toast(tr('Restored')); }
       if (k === 'purge' && x) {
-        if (!await askConfirm(tr('Delete “{0}” permanently?', x.title || tr('Untitled table')), tr('The table and its files are deleted for good. This cannot be undone.'), {danger: true, ok: tr('Delete permanently')})) return;
+        if (!await askConfirm(tr('Delete “{0}” permanently?', x.title || tr('Untitled table')), tr('The table and its files are deleted permanently. This cannot be undone.'), {danger: true, ok: tr('Delete permanently')})) return;
         await rawFetch('POST', '/api/sheets/purge', {space: sp, ids: [id]});
       }
       if (k === 'empty') {
-        if (!await askConfirm(tr('Empty the trash permanently?'), tr('All tables in the trash and their files are deleted for good. This cannot be undone.'), {danger: true, ok: tr('Empty trash')})) return;
+        if (!await askConfirm(tr('Empty the trash permanently?'), tr('All tables in the trash and their files are deleted permanently. This cannot be undone.'), {danger: true, ok: tr('Empty trash')})) return;
         await rawFetch('POST', '/api/sheets/purge', {space: sp, all: true});
       }
       await draw();
@@ -1333,7 +1333,7 @@ async function shxSheetTrashDlg(sh) {
       [tr('Columns'), (j.columns || []).map(x => row('col', x.id, x.title || tr('Column'), [vals(x), shxWhen(x.deleted_at)].join(' · ')))],
       [tr('Sheets'), (j.tabs || []).map(x => row('tab', x.id, x.name || tr('Sheet'), shxWhen(x.deleted_at)))]].filter(p => p[1].length);
     box.innerHTML = (parts.length ? parts.map(([h, xs]) => `<h4 class="shx-h">${esc(h)}</h4><div class="members">${xs.join('')}</div>`).join('')
-      : `<div class="muted mhint">${tr('Nothing of this table is in the trash.')}</div>`) + `<div class="shint">${esc(trashNote(tr('Deleted rows and columns are removed for good after {0} days.', j.days || 30), j.purge_on === false))}</div>`;
+      : `<div class="muted mhint">${tr('Nothing of this table is in the trash.')}</div>`) + `<div class="shint">${esc(trashNote(tr('Deleted rows and columns are removed permanently after {0} days.', j.days || 30), j.purge_on === false))}</div>`;
   };
   md.addEventListener('click', async e => {
     const b = e.target.closest('[data-shx]'); if (!b) return;

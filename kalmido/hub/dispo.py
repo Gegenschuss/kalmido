@@ -366,7 +366,7 @@ def dsp_create():
     v = _clean(b)
     res = b.get("resources")
     if not isinstance(res, list) or not res or len(res) > DSP_RES_MAX:
-        raise BadInput(tr("Choose at least one person or device"))
+        raise BadInput(tr("Select at least one person or device"))
     idx = _res_index(dsp_resources(c, uid, oid))
     picks = []
     for x in res:

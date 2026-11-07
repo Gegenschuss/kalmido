@@ -45,7 +45,15 @@ GLOSSARY = ((r"\b[Cc]ustomers?\b", "client"), (r"\b[Ll]ogins?\b", "sign-in"), (r
             (r"\bNobody assigned\b", "unassigned"),
             # 2.542.0 (#4605): the own workspace is "Private" and nothing else; "personal" only for what belongs to a person
             (r"\b[Mm]y files\b", "Private|workspace"), (r"\b[Pp]ersonal (?:office|workspace|area|space)\b", "private office / private workspace"),
-            (r"\b[Mm]y (?:workspace|area|space|office)\b", "Private|workspace"), (r"\bMake personal\b", "Move to Private"))
+            (r"\b[Mm]y (?:workspace|area|space|office)\b", "Private|workspace"), (r"\bMake personal\b", "Move to Private"),
+            # 2.622.0 (#3894): the rest of the wording review #2991 (a person taking over a project keeps "take over", so no rule)
+            (r"\bfor good\b", "permanently"), (r"\b[Tt]urn(?:s|ed|ing)?(?: (?:it|them))?(?: back)? (?:on|off)\b", "switch on / off"),
+            (r"\b[Vv]iew[- ]only\b|\b[Rr]ead only\b", "read-only"), (r"\b[Dd]ecline[ds]?\b", "reject"),
+            (r"\b[Aa]n own\b", "your own / a separate"), (r"\b[Tt]ak(?:e|es|en|ing) back\b|\btook back\b", "undo"),
+            (r"\b[Aa]ctual state\b", "current status"), (r"\bTo the sign-in\b", "Go to sign-in"), (r"\bFurther people\b", "Other people"),
+            (r"\b[Pp]ick\b(?! up)", "select"),
+            (r"\b[Cc]hoose\b(?! (?:(?:a |your |your own |a new |their )?pass(?:word|phrase)|what happens|otherwise|whether|for every))", "select"),
+            (r"\bSmall business(?:, no VAT| \(no VAT\))", "Small business: no VAT"))
 GLOSSARY_KEEP = frozenset((
     "holiday vacation sick leave day off away absence",  # search words
     "Registered mail",  # the postal service

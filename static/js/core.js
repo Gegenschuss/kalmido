@@ -350,7 +350,7 @@ function personNameAny(id) {
 }
 function roToast() {  // participants: their role, not "view only", keeps them from the change
   const k = S.route.key, lid = k.startsWith('l:') ? +k.slice(2) : taskById(S.sel)?.list_id;
-  toast(lid && isPart(lid) ? tr('Your role in this shared project does not allow this change') : tr('View only: you cannot change this shared project'));
+  toast(lid && isPart(lid) ? tr('Your role in this shared project does not allow this change') : tr('Read-only: you cannot change this shared project'));
 }
 // 2.17.0 (#649): children by parent from an index built once per tick (was a scan of every task per call: a view with
 // thousands of rows took seconds, "All" with 20 000 tasks minutes). The index is dropped after the current task (a

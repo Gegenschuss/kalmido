@@ -70,7 +70,7 @@ async function shk_personMenu(r, c) {
   let ps; try { ps = await shk_peopleOf(sh.id); } catch (e) { toast(e.message); return; }
   const cur = String(cell?.raw || '').trim();
   const items = ps.map(p => ({label: p.name || '?', icon: 'user', on: cur === String(p.id), fn: () => shvPut([{row_id: r, col_id: c, raw: String(p.id)}], tr('Cell {0} changed', addr))}));
-  if (!items.length) items.push({label: tr('Nobody can be chosen here'), dis: true, fn: () => {}});
+  if (!items.length) items.push({label: tr('Nobody can be selected here'), dis: true, fn: () => {}});
   items.push('-', {label: tr('(empty)'), icon: 'x', fn: () => shvPut([{row_id: r, col_id: c, raw: ''}], tr('Cell {0} emptied', addr))});
   menu(document.getElementById(`shv-c-${r}-${c}`) || $('#shv-scroll'), items, null, null, col?.title || col?.letter);
 }

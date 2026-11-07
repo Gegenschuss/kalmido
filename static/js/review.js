@@ -42,7 +42,7 @@ function rvw_barHtml(t, ro) {
     may && (st === 'pending' || st === 'changes') ? b('approve', `${thumbIc(true)} ${tr('Approve')}`) : '',
     may && (st === 'pending' || st === 'approved') ? b('changes', `${thumbIc(false)} ${tr('Back|review')}`) : '',
     !ro && t.status === 0 && st !== 'pending' && (t.reviewer_id || cfg?.reviewer) ? `<button type="button" class="linkbtn" data-rvw="request" data-id="${t.id}">${tr('Send for review')}</button>` : '',
-    !ro ? `<button type="button" class="linkbtn" data-rvw="pick" data-id="${t.id}">${t.reviewer_id ? tr('Change reviewer') : tr('Choose reviewer')}</button>` : ''].join('');
+    !ro ? `<button type="button" class="linkbtn" data-rvw="pick" data-id="${t.id}">${t.reviewer_id ? tr('Change reviewer') : tr('Select reviewer')}</button>` : ''].join('');
   return `<div class="apbar rvwbar rvw-${st || 'none'}" role="status">${st === 'approved' ? thumbIc(true) : st === 'changes' ? thumbIc(false) : ic('eye', 's')}<span class="apt">${esc(txt)}</span>${acts ? `<span class="apacts">${acts}</span>` : ''}</div>`;
 }
 const rvw_snap = t => ({reviewer_id: t.reviewer_id ?? null, review: t.review || '', section_id: t.section_id ?? null});

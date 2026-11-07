@@ -87,7 +87,7 @@ def oor_ask(oid):
         return jsonify({"ok": True, "id": old["id"], "state": old["state"], "again": True})
     if c.execute("SELECT 1 FROM org_out_requests WHERE org_id=? AND kind=? AND obj_id=? AND by_id=? AND state='declined' AND decided_at>=?",
                  (oid, kind, obj, me(), iso(now_utc() - timedelta(days=OOR_PAUSE_DAYS)))).fetchone():  # review: no News spam after a no
-        raise Denied(409, tr("An admin declined this a short while ago. Ask again in a few days or talk to the admins."))
+        raise Denied(409, tr("An admin rejected this a short while ago. Ask again in a few days or talk to the admins."))
     rid = insert_id(c, "INSERT INTO org_out_requests(org_id,kind,obj_id,name,by_id,state,created_at) VALUES(?,?,?,?,?,'open',?)",
                     (oid, kind, obj, mine[1], me(), iso(now_utc())))
     oo_news(c, oor_admins(c, oid), {"action": "outreq", "name": mine[1], "org": oor_org_name(c, oid), "org_id": oid, "kind": kind})

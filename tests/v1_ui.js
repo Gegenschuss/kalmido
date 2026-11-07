@@ -70,7 +70,7 @@ const sql = q => execFileSync('python3', [path.join(__dirname, 'dbx.py'), DATA, 
   check(w.eval('timeOn()') === false && !d.querySelector('#side [data-go="time"], #srail [data-go="time"]'), 'time off: module gone from the navigation');  // 2.152.2 (#2622): + the bar of the areas
   md.remove();
   w.eval(`settingsModal('layout')`); await sleep(300); md = d.querySelector('.smodal');
-  check(md.querySelector('[data-pane="modules"] [data-feat="time"]').disabled && /Turned off on this server/.test(md.querySelector('[data-modrow="time"]').textContent), 'time off: personal switch disabled + note');
+  check(md.querySelector('[data-pane="modules"] [data-feat="time"]').disabled && /Switched off on this server/.test(md.querySelector('[data-modrow="time"]').textContent), 'time off: personal switch disabled + note');
   check(!md.querySelector('#s-trnd'), 'time off: no time tracking options');
   md.remove();
   w.eval(`openDetail([...S.tasks.keys()][0])`); await sleep(300);

@@ -64,7 +64,7 @@ function pp_html() {
 }
 function pp_card(x) {
   const who = cdn_name(x.client_id, x.client_name) || x.contact;  // 2.97.0 B (#1951)
-  const offer = x.offer_id ? `<span class="rotag ${x.offer_status === 'declined' ? 'ppdecl' : `st-${esc(x.offer_status)}`}">${esc(tr('Quotation {0}', x.offer_number || ''))}${x.offer_status === 'declined' ? ' · ' + tr('declined') : x.offer_status === 'superseded' ? ' · ' + tr('Superseded') : ''}</span>` : '';
+  const offer = x.offer_id ? `<span class="rotag ${x.offer_status === 'declined' ? 'ppdecl' : `st-${esc(x.offer_status)}`}">${esc(tr('Quotation {0}', x.offer_number || ''))}${x.offer_status === 'declined' ? ' · ' + tr('rejected') : x.offer_status === 'superseded' ? ' · ' + tr('Superseded') : ''}</span>` : '';
   return `<li><div role="button" tabindex="0" class="ppcard${x.offer_status === 'declined' && x.stage !== 'lost' ? ' warn' : ''}" draggable="true" data-pp="open" data-id="${x.id}">
     <span class="pptitle">${esc(x.title)}</span>${who ? `<small class="muted">${esc(who)}</small>` : ''}
     <span class="ppmeta"><b class="rksum">${ofcMoney(x.value)}</b><span class="muted" title="${esc(tr('Probability'))}">${x.probability} %</span>${x.expected_date ? `<span class="muted" title="${esc(tr('Expected date'))}">${esc(fmtDateLoc(x.expected_date))}</span>` : ''}</span>
@@ -96,7 +96,7 @@ function pp_modal(x, stage) {
   const st = x?.stage || stage || 'inquiry';
   const lf = typeof leadFields === 'function', isL = lf && st === 'lead';  // 2.94.0 A (#1930): the lead's rows instead of client / probability / date
   const md = modal(`<h3>${x ? (x.stage === 'lead' ? tr('Edit lead') : tr('Edit deal')) : isL ? tr('New lead') : tr('New enquiry')}</h3>
-    ${ofcRowF('pp-title', tr('Name'), ofcIn('pp-title', x?.title, {ph: tr('e.g. Image film for the spring')}))}
+    ${ofcRowF('pp-title', tr('Name'), ofcIn('pp-title', x?.title, {ph: tr('e.g. Promo film for the spring')}))}
     ${cls.length ? `<div class="ppnolead" ${isL ? 'hidden' : ''}>${ofcRowF('pp-client', tr('Client'), ofcSel('pp-client', x?.client_id, cls, tr('none')))}</div>` : ''}
     ${ofcRowF('pp-contact', tr('Contact|person'), ofcIn('pp-contact', x?.contact, {ph: tr('Name, if there is no client yet')}))}
     ${lf ? leadFields(x, isL) : ''}
@@ -109,7 +109,7 @@ function pp_modal(x, stage) {
     ${x && x.stage !== 'lead' ? `<div class="ppacts">${x.offer_id ? `<a class="btn" href="#office/offers/${x.offer_id}" data-m="close">${ic('receipt', 's')}<span>${tr('Open quotation')}</span></a>`
       : `<button class="btn" data-m="offer">${ic('receipt', 's')}<span>${tr('Create quotation')}</span></button>`}
       ${x.list_id ? `<a class="btn" href="#l/${x.list_id}" data-m="close">${ic('brief', 's')}<span>${tr('Open project')}</span></a>` : x.stage === 'won' ? `<button class="btn" data-m="project">${ic('brief', 's')}<span>${tr('Create project')}</span></button>` : ''}</div>
-      ${x.offer_status === 'declined' && x.stage !== 'lost' ? `<p class="muted ofchint">${tr('The client declined the quotation. Set the stage to "Lost" or make a new quotation.')}</p>` : ''}` : ''}
+      ${x.offer_status === 'declined' && x.stage !== 'lost' ? `<p class="muted ofchint">${tr('The client rejected the quotation. Set the stage to "Lost" or make a new quotation.')}</p>` : ''}` : ''}
     <div class="aerr" role="alert"></div>
     <div class="foot">${x ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${x ? tr('Save') : tr('Add')}</button></div>`);
   md.classList.add('ofcdlg');

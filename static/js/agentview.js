@@ -22,7 +22,7 @@ function av_setupOffer(a, base, token) {
   const md = ains_setupModal(a, base);
   $$('.foot', md).pop().insertAdjacentHTML('beforebegin', `<details class="agadv" id="av-adv"><summary>${tr('For advanced users')}</summary>
     <div class="shint keep">${esc(tr('Set it up by hand instead: the step-by-step guide under Settings > Agents > Set up.'))}</div>
-    <button type="button" class="linkbtn" data-m="av-tok">${tr('Show the token for an own setup')}</button><div class="avtok" id="av-tok" hidden></div></details>`);
+    <button type="button" class="linkbtn" data-m="av-tok">${tr('Show the token for your own setup')}</button><div class="avtok" id="av-tok" hidden></div></details>`);
   md.addEventListener('click', async e => {
     const b = e.target.closest('button[data-m]'); if (!b) return;
     if (b.dataset.m === 'av-copy') { try { await navigator.clipboard.writeText(token); toast(tr('Copied')); } catch { $('#av-tokv', md)?.select(); } return; }

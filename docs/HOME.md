@@ -67,7 +67,7 @@ calendar, CalDAV, sharing and the API work as everywhere.
 - **Budget** (2.72.0; its own part of *At home*): a budget is a list of its own that opens the budget view. Entries
   (income or expense, amount, day, title, category, counterpart, note, receipts), categories with a monthly limit, a
   month view with planned / spent / left and the last six months as bars. **Recurring entries** (monthly, quarterly,
-  yearly) are templates: *Open this month* books them with one tap; *Take over from contracts* turns your contracts into
+  yearly) are templates: *Open this month* books them with one tap; *Add from contracts* turns your contracts into
   recurring entries. **CSV import**: the file you download from your bank (no bank access), columns mapped once and
   remembered, duplicates and errors left out, categories suggested from earlier entries. Share it with your family like
   any project (read-only or writing); agents never see it, there is no API v1 / MCP for it. Amounts, texts and receipts are

@@ -65,8 +65,8 @@ const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown'
     const pg = await call('GET', '/api/wiki/pages/' + START);
     check(pg.body && pg.body.startsWith('See [[Docs/Other]]'), 'saved on the server: ' + JSON.stringify(pg.body));
   }
-  // read mode: the link, the mind map block (2.554.0 #4052: no Read / Edit switch: the entry "Read only" of the page's "…" menu)
-  await w.eval(`wk_modeItems(WK.pg).find(x => x.label === 'Read only').fn()`);
+  // read mode: the link, the mind map block (2.554.0 #4052: no Read / Edit switch: the entry "Read-only" of the page's "…" menu)
+  await w.eval(`wk_modeItems(WK.pg).find(x => x.label === 'Read-only').fn()`);
   await sleep(300);
   const lk = await until(() => d.querySelector('#wk-md a.wklink'));
   check(lk && lk.getAttribute('href') === '#wiki/' + OTHER, '[[link]] becomes a link to the page');

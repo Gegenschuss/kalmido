@@ -71,7 +71,7 @@ function dup_draw(v) {
     <div class="muted dupbook">${esc(tr('Address book {0}', book))} · ${esc(trn('{0} group', '{0} groups', gs.length))}</div>
     <div class="ppbar"><button class="btn sm" data-pp="all">${tr('Select all')}</button><button class="btn sm" data-pp="none">${tr('Select none')}</button></div>
     <div class="ppl">${gs.length ? gs.map(dup_groupHtml).join('') : `<div class="ppwait">${ic('check')}<p>${esc(tr('{0} found no duplicates in this address book.', v.agent.name))}</p></div>`}</div>
-    <div class="shint keep">${esc(tr('Merging keeps the main contact and moves the others into it (e-mails, phones, links), as you. One step, undo takes back every merge of this proposal.'))}</div>`;
+    <div class="shint keep">${esc(tr('Merging keeps the main contact and moves the others into it (e-mails, phones, links), as you. One step, undo reverses every merge of this proposal.'))}</div>`;
   const foot = `<button class="btn danger" data-pp="discard">${tr('Discard')}</button><span class="spacer"></span><span class="muted ppcount ppfc"></span><button class="btn" data-pp="close">${tr('Close')}</button><button class="btn pri" data-pp="apply"></button>`;
   return {main, foot};
 }

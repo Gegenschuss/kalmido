@@ -1142,7 +1142,7 @@ for one). Agents and API tokens cannot do this; it is a person's step in the app
    key derived from `KALMIDO_SECRET_KEY` and readable only by the server, mode 0600); *Download* gives you the plain ZIP,
    *Delete now* removes it at once. The download asks for the same second step as showing a recovery key.
 2. **Set up the other server** (this guide) and sign in there (or ask its admin for an account).
-3. **Import.** *Settings > Data > Take over from a Kalmido export*: the file is uploaded in pieces (large exports work),
+3. **Import.** *Settings > Data > Import from a Kalmido export*: the file is uploaded in pieces (large exports work),
    checked (every checksum, format and version) and shown as a preview: the counts, the projects with their folders, the
    people of your lists and whether an account with the same e-mail address exists here. Choose the target -- your
    private space or an organisation you administer -- and start. Everything is created anew; one *Undo* (30 days)
@@ -1537,7 +1537,7 @@ build) keeps working: such documents show *Text recognition is not available on 
 2.121.0: for invoices and receipts the same local rules also read the supplier (company name with its legal form, VAT id,
 tax number), the VAT rate (19 %, 7 % or 0 % for small businesses, reverse charge, intra-community supplies), net, VAT and
 gross (they must add up, else only the gross stays) and the invoice number. They are only a suggestion: the document
-sheet and the office's receipt sheet show one line *Recognised: ...* with *Take over* (sender, VAT rate and amount, one
+sheet and the office's receipt sheet show one line *Recognised: ...* with *Apply* (sender, VAT rate and amount, one
 undo step) and *Discard*; the invoice number stays visible with a copy button.
 
 2.146.0: HEIC / HEIF photos (iPhone) were read with `pi-heif`. Since 2.499 it is no longer in the image (discontinued, known

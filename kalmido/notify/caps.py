@@ -3,7 +3,7 @@
 The owner of a list (or of a shared folder: its lists inherit it, a list can override it) decides how much the OTHER
 people of that list may be notified at most -- a ceiling over each person's own settings (Settings > Notifications and
 the list bell): a person can be quieter, never louder. Templates:
-  read    "Read only": pushes only for @mentions, assignments, direct replies and an agent waiting for their approval
+  read    "Read-only": pushes only for @mentions, assignments, direct replies and an agent waiting for their approval
   work    "Collaborate": + comments on their own / assigned tasks and due reminders (also nags and follow-ups)
   all     "Everything": no ceiling (as before 2.33)
   custom  "Custom": the owner ticks the events one by one (CUSTOM_ROWS)
@@ -363,7 +363,7 @@ def notif_ask_state(c, uid, s):
 
 @app.post("/api/notify-templates/asked")
 def notif_ask_done():
-    """The one-time question is answered ("Keep as it is" or "Choose template")."""
+    """The one-time question is answered ("Keep as it is" or "Select template")."""
     c = db()
     uset(c, me(), "notif_tpl_ask", "0")
     c.commit()

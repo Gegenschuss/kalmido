@@ -80,7 +80,7 @@ WH_ERR = {"blocked": CAL_ERR["blocked"], "timeout": CAL_ERR["timeout"], "network
 
 def need_wh():
     if not WH_ON:
-        raise Denied(409, tr("Webhooks are turned off on this server"))
+        raise Denied(409, tr("Webhooks are switched off on this server"))
 
 
 def wh_allow(c):
@@ -546,7 +546,7 @@ def wh_result(c, r, res):
         c.execute("DELETE FROM webhook_queue WHERE webhook_id=?", (w["id"],))
         c.execute("UPDATE webhooks SET enabled=0, disabled_reason='failures', updated_at=? WHERE id=?", (iso(now_utc()), w["id"]))
         print(f"webhook {w['id']} of user {w['user_id']} turned off after {att} failed attempts ({errc} {status or ''})", flush=True)
-        aa_now("integration", f"webhook:{w['id']}", N_("Webhook {0} of {1} was turned off after {2} failed attempts to deliver an event (last error: {3})."),
+        aa_now("integration", f"webhook:{w['id']}", N_("Webhook {0} of {1} was switched off after {2} failed attempts to deliver an event (last error: {3})."),
                [w["id"], w["username"], att, errc + (f" {status}" if status else "")])
         wh_off_tell(c, w, "webhook")
     else:
@@ -614,7 +614,7 @@ def wh_fields(c, b, old=None):
     if "events" in b or old is None:
         ev = b.get("events")
         if not isinstance(ev, list) or not ev or any(e not in WH_EVENTS for e in ev):
-            raise BadInput(tr("Choose at least one event"))
+            raise BadInput(tr("Select at least one event"))
         out["events"] = ",".join(e for e in WH_EVENTS if e in ev)
     if "enabled" in b:
         if not isinstance(b["enabled"], bool):

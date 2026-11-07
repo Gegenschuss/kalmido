@@ -41,7 +41,7 @@ function oimHtml() {
     ${OIM.pv ? oimPreviewHtml() : ''}</section>${oim_moreHtml()}
     <section class="oimsec" id="oim-archive"><h4>${ic('archive', 's')} ${tr('Old invoices and quotations')}</h4>
     <p class="muted">${tr('Only archived, never renumbered or sent. Add amount and payment afterwards.')}</p>
-    <div class="lacts"><input type="file" id="oim-pdf" accept="application/pdf,.pdf" multiple hidden><button type="button" class="btn sm" data-oim="pick-pdf" ${OIM.archBusy ? 'disabled' : ''}>${ic('upload', 's')} ${tr('Choose PDF files')}</button></div>
+    <div class="lacts"><input type="file" id="oim-pdf" accept="application/pdf,.pdf" multiple hidden><button type="button" class="btn sm" data-oim="pick-pdf" ${OIM.archBusy ? 'disabled' : ''}>${ic('upload', 's')} ${tr('Select PDF files')}</button></div>
     ${oim_fntHtml()}${oimArchHtml()}</section>
     <section class="oimsec"><h4>${ic('hash', 's')} ${tr('Number counters')}</h4>${oimCounterHtml()}${ofcSetLink('docs', tr('Number schemes and the next numbers'))}</section>
     <section class="oimsec"><h4>${ic('clock', 's')} ${tr('Import runs')}</h4>${imr_archivedHtml()}${oimRunsHtml()}</section></div>`;

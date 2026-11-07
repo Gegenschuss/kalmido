@@ -98,7 +98,7 @@ const camt = es => `<?xml version="1.0" encoding="UTF-8"?><Document xmlns="urn:i
     check(await ready(ev, `${rows} === 2`, 80), 'phone: the view');
     check(await ev(noSide), 'phone: nothing sticks out to the side');
     check(await ev(`(() => { const b = [...document.querySelectorAll('.bnkrow .bnkacts .btn')]; return b.length > 0 && b.every(x => x.getBoundingClientRect().height >= 43.5); })()`), 'phone: the buttons are 44 px');
-    check(await ev(`!document.querySelector('.bnrrc')`), 'phone: no drag column, "Choose receipt…" instead');
+    check(await ev(`!document.querySelector('.bnrrc')`), 'phone: no drag column, "Select receipt…" instead');
     await shot('p2299-c-norc-phone.png');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}});
     // member: no counter

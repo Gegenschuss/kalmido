@@ -88,7 +88,7 @@ T1, T2, T3, T4 = new_task(A, OPEN, "Mine again"), new_task(A, OPEN, "Taken over"
 for t in (T1, T2, T3, T4):
     check(A.patch(B + f"/api/tasks/{t}", json={"assignee_id": BID, "people": [BID]}).ok, f"setup: bob on task {t}")
 # 2.463.0 (#3859): closed projects: a role comes back, one bob was taken out of before does not, his own stays with the heir
-VIEWL, GONE, TRASHED = new_list(A, "Read only", ORG), new_list(A, "Taken out", ORG), new_list(A, "Trashed since", ORG)
+VIEWL, GONE, TRASHED = new_list(A, "Read-only", ORG), new_list(A, "Taken out", ORG), new_list(A, "Trashed since", ORG)
 assert A.put(B + f"/api/lists/{VIEWL}/members", json={"email": "bob@example.com", "role": "view"}).ok
 for lid in (GONE, TRASHED):
     assert A.put(B + f"/api/lists/{lid}/members", json={"email": "bob@example.com", "role": "edit"}).ok

@@ -287,7 +287,7 @@ questions stays the classic form.
 - **Send as template…** sends the current arrangement to people you see (your organisations and connections; never to
   agents, at most 20 at once; a project page only to people with access to it). Only the arrangement travels (blocks,
   order, widths, heights, a block's switches), never content: a block the recipient cannot see simply stays empty. They get a
-  News item ("For you", switched off together with the sharing News) with a preview and *Take over* / *Decline*; taken over,
+  News item ("For you", switched off together with the sharing News) with a preview and *Apply* / *Reject*; applied,
   it is their own saved arrangement, named after the sender, with no link back.
 - Agents cannot use any of this (403); they propose arrangements their own way (2.55.0, #1066).
 - **A standard per organisation** (2.627.0). The admins of an organisation set the standard of the start page, Today, Time
@@ -324,7 +324,7 @@ For software teams and anything that needs a second look. Off until a project sw
 step*, with an optional default reviewer, the review section (default: the section named *Review*) and *Done only after
 approval*.
 
-- A task shows its reviewer and the review state in the task panel (*Choose reviewer*, *Send for review*). The reviewer
+- A task shows its reviewer and the review state in the task panel (*Select reviewer*, *Send for review*). The reviewer
   is a person or an agent of the project.
 - Moving a task into the review section (dragging on the board or changing the section) asks its reviewer; they get a
   News item and a push (Settings > Notifications, row *Reviews*).
@@ -471,7 +471,7 @@ moves freely in the own private space.
 
 **The way back for members (2.361.2).** Whoever brought something into an organisation or made it there (a project they own,
 a table, file / folder, knowledge page, office client or draft, video sign-off they made, a poll or bookmark of theirs) and is no admin gets *Ask an admin* instead of a plain refusal -- in the move dialog
-and in the message. The organisation's admins get a News item and find the request at the top of *Settings > Organisation > People > Projects of the organisation*: *Release* or *Decline* is one click. After a release the member moves that one thing into
+and in the message. The organisation's admins get a News item and find the request at the top of *Settings > Organisation > People > Projects of the organisation*: *Release* or *Reject* is one click. After a release the member moves that one thing into
 their private space with the usual dialog (which still lists what the move ends) within 14 days; the release is used up
 by that move. Knowledge pages, office clients and drafts, video sign-offs, polls and bookmarks no longer let their
 maker take them out without an admin (before 2.361.2 they did, unlogged). Releases, declines and the move itself are in the project history; nothing goes back silently. The dry run
@@ -797,7 +797,7 @@ noted in the server log).
 
 An organisation admin who adds an existing account (by e-mail address under *Settings > Organisation > People*, or with *Invite by
 e-mail*) no longer makes the person a member at once: the person gets an invitation in their News (*X invites you to join
-the organisation Y*), by mail and as a push (at most one a day; the push follows *Tasks assigned to me*) and chooses *Join*, *Later* or *Decline the invitation*. Only after *Join* are they a member
+the organisation Y*), by mail and as a push (at most one a day; the push follows *Tasks assigned to me*) and chooses *Join*, *Later* or *Reject the invitation*. Only after *Join* are they a member
 in the chosen role. An open invitation ends after two weeks; inviting again renews it. The answer to the admin is the same
 for every address (with or without an account), so nobody learns through it who has an account. The instance admin still
 adds people directly (on a hosted instance the operator invites, too). A new address (without an account) gets a new account
@@ -1027,7 +1027,7 @@ Someone who gets no pushes still learns when a task is assigned to them or they 
   A participant's view is filtered on the server everywhere (search, calendar feed, statistics, time reports, News,
   pushes, reminders, the REST API, webhooks), not only hidden in the app; sections show only when they hold one of
   their tasks. Changing a role takes effect at once. Projects shared before 1.10.0 keep their meaning: *Can edit* is now
-  *Member*, *View only* is *Viewer*. Members can leave a project; the basket cannot be shared.
+  *Member*, *Read-only* is *Viewer*. Members can leave a project; the basket cannot be shared.
 - **Delegate to an agent and watch a task** (2.473.0): in a task's detail, under the assignee, *Delegate to an agent* picks one
   agent of the project (only agents that are open to you in this project). The person stays the assignee; the agent gets the
   task like an assignment and it counts in the agent's queue. A delegation needs the right to assign the task. *Watch* (the
@@ -1070,11 +1070,11 @@ subtasks and due dates, and the tasks completed in the last 7 days (in a checkli
 assignees, tags, files, custom fields or anything from other projects; task notes only if you tick *Show task notes*
 (then as plain text).
 
-- **Access:** *View only* or *View and tick off*. Ticking goes through the normal completion: the history says
+- **Access:** *Read-only* or *View and tick off*. Ticking goes through the normal completion: the history says
   *Someone via the public link*, and the task's creator gets a News item and a push like after any completion in a
   shared project (if collaboration is on). Put back on the project works too; nothing else can be changed.
 - **Password** (optional, stored hashed): visitors enter it once per browser (a cookie for that link only). Changing
-  or removing the password, *New link* and *Turn off* take effect at once.
+  or removing the password, *New link* and *Switch off* take effect at once.
 - **Expiry** (optional): the link works through the end of that day.
 - Only the owner creates and manages the link; the basket cannot be shared. The page loads no scripts and nothing
   external, is marked `noindex`, is never cached, and has a strict Content-Security-Policy. Views, ticks, unknown links
@@ -1097,7 +1097,7 @@ boolean `checklist` are still accepted as deprecated aliases.
 
 <p align="center"><img src="comments.png" alt="Task panel with comments of the team, reactions and activity lines"></p>
 
-- **Comments** (module *Comments*, on by default): everyone who can see a task can comment on it, including *View only*
+- **Comments** (module *Comments*, on by default): everyone who can see a task can comment on it, including *Read-only*
   members (they still cannot change the task). In private projects and without collaboration, comments are personal
   notes with a timestamp: no @mentions, no News, no pushes, no history of your own changes. Checklists have none.
   On a desktop (2.31.0, #344) the comments and the history have their own area below the properties: drag the line
@@ -1150,10 +1150,10 @@ what agents do (their comments, completions, new tasks, status) are off by defau
 for what agents do*); an agent's @mention of you and its approval requests push as before.
 
 **Notification templates** (2.33.0, #927): the owner of a shared project or folder chooses in the share dialog how much
-the other people are notified at most -- *Read only* (mentions, assignments, direct replies), *Collaborate* (+ comments
+the other people are notified at most -- *Read-only* (mentions, assignments, direct replies), *Collaborate* (+ comments
 on their tasks and due reminders), *Everything* or *Custom*, also per person. Members can set themselves quieter, never
 louder, and see who limited the project; the News list stays complete, only pushes are held back. New shares start with
-*Read only*; projects and folders shared before 2.33.0 keep *Everything* until the owner chooses (asked once).
+*Read-only*; projects and folders shared before 2.33.0 keep *Everything* until the owner chooses (asked once).
 
 <p align="center"><img src="news.png" alt="News inbox with mentions, grouped comments, an assignment, a completion and a shared project"></p>
 

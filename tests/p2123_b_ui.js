@@ -53,7 +53,7 @@ const FEAT = 'cal,comments,collab,wiki';
     // 2.200.0 B (#2747): Share… opens the one Share dialog of the file store; links and e-mail shares are its section
     check(await wait(ev, `!!document.querySelector('.abshdlg .fsextra [data-wsh="link"]')`), '1440: the dialog with People and Public link');
     const d = await ev(`(() => { const m = document.querySelector('.abshdlg'); return {h: m.querySelector('h3').textContent, secs: [...m.querySelectorAll('.fsextra h4')].map(x => x.textContent.trim()), person: !!m.querySelector('[data-wsh="person"]'), people: !!m.querySelector('#ab-sht')}; })()`);
-    check(d && /Customer\/Guide|Guide/.test(d.h) && d.secs.includes('Links and earlier shares') && d.secs.includes('Read only by e-mail address') && d.secs.includes('Public link') && d.person && d.people, '1440: dialog sections ' + JSON.stringify(d));  // 2.200.0 B (#2747)
+    check(d && /Customer\/Guide|Guide/.test(d.h) && d.secs.includes('Links and earlier shares') && d.secs.includes('Read-only by e-mail address') && d.secs.includes('Public link') && d.person && d.people, '1440: dialog sections ' + JSON.stringify(d));  // 2.200.0 B (#2747)
     await ev(`(() => { document.querySelector('.abshdlg [data-wsh="link"]').click(); return 1; })()`);
     check(await wait(ev, `!!document.querySelector('.abshdlg [data-wsh-url]')`), '1440: the new link shows in the dialog');
     url = await ev(`document.querySelector('.abshdlg [data-wsh-url]').value`);

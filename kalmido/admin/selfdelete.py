@@ -310,16 +310,16 @@ def sdl_content(c, kind, username, lg, at=None, tok=None):
     t = lambda s, *a: tr(s, *a, lg=lg)  # noqa: E731
     link, button = (f"{PUBLIC_URL}/#delete-cancel={tok}", t(N_("Cancel the deletion"))) if tok else (None, None)
     if kind == "asked":
-        lines = [t(N_("You asked to delete your account {0}. It is locked now and will be deleted for good on {1}."), username, _when(at, lg)),
+        lines = [t(N_("You asked to delete your account {0}. It is locked now and will be deleted permanently on {1}."), username, _when(at, lg)),
                  t(N_("Changed your mind? Until then, the button below cancels the deletion (or sign in with your password)."))]
     elif kind == "remind":
-        lines = [t(N_("Your account {0} will be deleted for good tomorrow ({1})."), username, _when(at, lg)),
+        lines = [t(N_("Your account {0} will be deleted permanently tomorrow ({1})."), username, _when(at, lg)),
                  t(N_("Changed your mind? Until then, the button below cancels the deletion (or sign in with your password)."))]
     elif kind == "cancelled":
         lines = [t(N_("The deletion of your account {0} was cancelled. You can sign in again."), username)]
         link, button = f"{PUBLIC_URL}/", t(N_("Open {0}"), APP_NAME)
     else:
-        lines = [t(N_("Your account {0} and its data were deleted for good."), username)]
+        lines = [t(N_("Your account {0} and its data were deleted permanently."), username)]
     if kind in ("asked", "done"):
         lines.append(_backup_line(c, lg))
     if kind in ("asked", "remind", "cancelled"):

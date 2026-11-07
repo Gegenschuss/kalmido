@@ -157,7 +157,23 @@ the wording of an office pack (key ending in `|pack`) is checked by the pack, no
 | Urlaub, Feiertag | holiday, public holiday | vacation |
 | Anfrage | enquiry | inquiry |
 | Standard | default (a standard VAT rate stays standard) | |
-| Endgültig | permanently | |
+| Endgültig | permanently | for good |
+| Übernehmen | by meaning: apply (a proposal, recognised values), import (a file, an export, another tool), add (a sample, a receipt), use; a person still takes over a project | take over |
+| Zurücknehmen | undo (a share or a payment: remove) | take back |
+| Eigene(r) | your own, a separate | an own |
+| Ist-Stand | current status | actual state |
+| Zur Anmeldung | Go to sign-in | To the sign-in |
+| Weitere Personen | other people | further people |
+| Ein- / Ausschalten | switch on / switch off | turn on / off |
+| Nur lesen | read-only (also the organisation role) | view only, read only |
+| Auswählen | select (choose a password / passphrase stays) | choose, pick |
+| Ablehnen | reject (a technical "refused" stays; the stored pair Allow / Deny stays) | decline |
+| Kleinunternehmer | Small business: no VAT | Small business, no VAT |
+| Bestellnr. / Referenz, Kunden-Nr. | Ref./PO no., Client no. (the DATEV Mandantennummer stays "client number") | Ref./PO No., Customer No. |
+| Erledigt / Abgeschlossen | done = a button or a column, completed = the state of a task | |
+| Vorschlag / Hinweis | proposal = what an agent proposes, suggestion = a hint of the system | |
+
+Examples in texts: Promo film, Example Ltd, Grandma Rose.
 
 Spelling is British, with -ise: customise, organise, recognise, summarise.
 

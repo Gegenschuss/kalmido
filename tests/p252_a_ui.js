@@ -45,7 +45,7 @@ const ALL = 'cal,events,comments';
   const RV = await ev('Review', `${W1}T10:00`, `${W1}T11:00`);
   const SU = await ev('Standup', `${W1}T08:00`, `${W1}T08:30`, {rrule: 'FREQ=DAILY;COUNT=5'});
   const DR = await ev('Draft plan', `${W2}T14:00`, `${W2}T15:00`, {status: 'tentative'});
-  const RO = await call('POST', '/api/events', {title: 'Read only', cal_id: BC.id, start: `${W2}T10:00`, end: `${W2}T11:00`, tz: TZ, reminders: []}, CB);
+  const RO = await call('POST', '/api/events', {title: 'Read-only', cal_id: BC.id, start: `${W2}T10:00`, end: `${W2}T11:00`, tz: TZ, reminders: []}, CB);
   check(RV.id && SU.id && DR.id && RO.id, 'events set up ' + JSON.stringify([RV.status, SU.status, DR.status, RO.status]));
   const get = async id => (await fetch(B + `api/events/${id}`, {headers: {...H, Cookie: CK}})).json();  // the event's own status field
   const find = async title => (await call('GET', `/api/events?from=${day(-3)}&to=${day(10)}`)).items?.find(x => x.title === title);
@@ -152,7 +152,7 @@ const ALL = 'cal,events,comments';
     const dr = await until(async () => { const x = await get(DR.id); return x.start !== `${W2}T14:00` ? x : null; });
     check(dr && dr.start === `${W2}T15:00` && dr.status === 'tentative', 'desktop: a draft moved stays a draft ' + JSON.stringify(dr && [dr.start, dr.status]));
     await week(e, W1); await blocks(e);
-    b = await block(e, 'Read only');
+    b = await block(e, 'Read-only');
     check(b && !b.ok, 'desktop: a read-only event is not marked draggable');
     if (b) { await drag(b.x, b.y, 0, p.H); await sleep(500); }
     check((await get(RO.id)).start === `${W2}T10:00` && await e(`!document.querySelector('.modal')`), 'desktop: a read-only event does not move');

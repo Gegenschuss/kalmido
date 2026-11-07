@@ -637,7 +637,7 @@ document.addEventListener('toggle', e => {
 // ---- 2.95.0 B (#1932): the import of a per diem spreadsheet (part B fills this block; server kalmido/office/vmaimport.py).
 // rk_impBtn: the button that opens the import; 2.365.2 D (#2789): on the legacy data page (office_import.js oim_moreHtml), the
 // trips tab links there (#office/import/trips).
-function rk_impBtn() { return `<button type="button" class="btn sm rki-btn" data-rki="pick">${ic('upload', 's')}<span>${tr('Take over from Excel')}</span></button>`; }
+function rk_impBtn() { return `<button type="button" class="btn sm rki-btn" data-rki="pick">${ic('upload', 's')}<span>${tr('Import from Excel')}</span></button>`; }
 function rk_impPick() {
   const i = document.createElement('input'); i.type = 'file'; i.accept = '.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
   i.onchange = () => { if (i.files[0]) rk_impPreview(i.files[0]); }; i.click();
@@ -664,19 +664,19 @@ function rk_impModal(j, name) {
       r.t_start && r.t_end ? `${r.t_start}–${r.t_end}` : '', r.purpose === 'acquisition' ? tr('Acquisition / research') : r.purpose && r.purpose !== 'job' ? r.purpose : r.project].filter(Boolean).join(' · ');
     const why = (r.reasons || []).join(' · ');
     if (r.status === 'error') return `<li class="fcirow err"><span class="fcick" aria-hidden="true">${ic('x', 's')}</span><span class="ofcn"><b>${esc(r.dest || tr('Row {0}', r.row))}</b><small>${esc(tr('Row {0}', r.row))} · ${esc(why)}</small></span></li>`;
-    return `<li class="fcirow rki-row ${r.sel ? 'on' : ''} ${r.status}"><label class="fcick"><input type="checkbox" data-rki="sel" data-s="${si}" data-i="${i}" ${r.sel ? 'checked' : ''} aria-label="${esc(tr('Take over {0}', r.dest || tr('Trip')))}"></label>
+    return `<li class="fcirow rki-row ${r.sel ? 'on' : ''} ${r.status}"><label class="fcick"><input type="checkbox" data-rki="sel" data-s="${si}" data-i="${i}" ${r.sel ? 'checked' : ''} aria-label="${esc(tr('Import {0}', r.dest || tr('Trip')))}"></label>
       <span class="ofcn"><b>${esc(r.dest || tr('Trip'))}</b><small class="muted">${esc(sub)}</small>${why ? `<small class="rki-why">${esc(why)}</small>` : ''}</span>
       <span class="fciamt"><span>${amt(r.amount)}</span><small class="muted">${esc(tr('Excel: {0}', r.excel == null ? '–' : ofcMoney(r.excel)))}</small></span></li>`;
   };
   const draw = () => {
     const n = sheets.reduce((a, s) => a + s.rows.filter(ok).length, 0), cnt = k => sheets.reduce((a, s) => a + s.rows.filter(r => r.status === k).length, 0);
-    card.innerHTML = `<h3>${tr('Take over per diems from Excel')}</h3><p class="muted">${esc(name)} · ${esc([cnt('new') ? trn('{0} new', '{0} new', cnt('new')) : '', cnt('warn') ? trn('{0} with a hint', '{0} with a hint', cnt('warn')) : '', cnt('dup') ? trn('{0} already there', '{0} already there', cnt('dup')) : '', cnt('error') ? trn('{0} with an error', '{0} with an error', cnt('error')) : ''].filter(Boolean).join(' · '))}</p>
+    card.innerHTML = `<h3>${tr('Import per diems from Excel')}</h3><p class="muted">${esc(name)} · ${esc([cnt('new') ? trn('{0} new', '{0} new', cnt('new')) : '', cnt('warn') ? trn('{0} with a hint', '{0} with a hint', cnt('warn')) : '', cnt('dup') ? trn('{0} already there', '{0} already there', cnt('dup')) : '', cnt('error') ? trn('{0} with an error', '{0} with an error', cnt('error')) : ''].filter(Boolean).join(' · '))}</p>
       ${sheets.map((s, si) => `<section class="rki-sheet"><div class="rki-head"><label class="rki-pl" for="rki-p${si}">${esc(s.sheet)}</label>
         <select id="rki-p${si}" data-rki="person" data-s="${si}">${ppl.map(p => `<option value="u${p.id}" ${s.pv === `u${p.id}` ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}<option value="n" ${s.pv === 'n' ? 'selected' : ''}>${esc(tr('As a free name: {0}', s.person?.name || s.sheet))}</option></select>
         <small class="muted rki-sum">${esc(tr('Sum: Excel {0}, calculated {1}', ofcMoney(s.sum_excel), ofcMoney(s.sum_calc)))}</small></div>
         <ul class="fcilist rki-list" role="list">${s.rows.map((r, i) => rowHtml(r, si, i)).join('')}</ul></section>`).join('')}
       <div class="aerr" role="alert"></div>
-      <div class="foot"><span class="spacer"></span><button class="btn" data-rki="close">${tr('Cancel')}</button><button class="btn pri" data-rki="go" ${n ? '' : 'disabled'}>${esc(trn('Take over {0} trip', 'Take over {0} trips', n))}</button></div>`;
+      <div class="foot"><span class="spacer"></span><button class="btn" data-rki="close">${tr('Cancel')}</button><button class="btn pri" data-rki="go" ${n ? '' : 'disabled'}>${esc(trn('Import {0} trip', 'Import {0} trips', n))}</button></div>`;
   };
   draw();
   md.addEventListener('change', e => {

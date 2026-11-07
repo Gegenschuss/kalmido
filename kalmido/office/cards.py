@@ -52,7 +52,7 @@ CC_AGENT_SCAN = 20  # newest card_statement_read jobs of a person looked at for 
 MONTH_RE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 CC_DRAFT_ONLY = N_("Confirm the positions first")
-CC_CONFIRMED = N_("The positions are confirmed; take the confirmation back to change them")
+CC_CONFIRMED = N_("The positions are confirmed; undo the confirmation to change them")
 
 
 def cc_sees_all(c, uid, oid):
@@ -145,7 +145,7 @@ def _card_fields(c, oid, b, cur=None):
     if not re.fullmatch(r"\d{4}", v["last4"] or ""):
         raise BadInput(tr("Please enter the last four digits of the card"))
     if not v["holder_id"] and not v["holder_name"]:
-        raise BadInput(tr("Please choose the holder or enter a name"))
+        raise BadInput(tr("Please select the holder or enter a name"))
     if v["holder_id"]:
         v["holder_name"] = ""
     return v

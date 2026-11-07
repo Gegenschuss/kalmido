@@ -697,7 +697,7 @@ def digest_mail_content(c, uid, today):
     if not parts:
         return None
     subj = f"{APP_NAME}: " + (trn("{0} task today", "{0} tasks today", len(tod) + len(over), lg=lg) if tod or over else tr("Your day", lg=lg))
-    foot = tr("You get this summary every day. Change or turn it off in Settings > Notifications:", lg=lg)  # 2.367.5 (#2975): the footer of the event mail
+    foot = tr("You get this summary every day. Change or switch it off in Settings > Notifications:", lg=lg)  # 2.367.5 (#2975): the footer of the event mail
     text = "\n\n".join(parts) + f"\n\n{PUBLIC_URL}/#today\n\n-- \n{foot} {PUBLIC_URL}/#settings/notify\n"
     hfoot = Safe(f'{html.escape(foot)} <a href="{html.escape(PUBLIC_URL)}/#settings/notify" style="color:{MAIL_ACC}">{html.escape(tr("Settings", lg=lg))}</a>')
     return subj, text, mail_html(subj, parts, tr("Open {0}", APP_NAME, lg=lg), f"{PUBLIC_URL}/#today", foot=hfoot, lang=lg)  # 2.420.0 B (#3499)
@@ -783,7 +783,7 @@ def _mail_off_page(token, done):
     e = html.escape
     name = tr("Daily summary by e-mail", lg=lg) if what == "digest" else tr("E-mails for assignments and mentions", lg=lg)
     if done:
-        title, body_ = tr("E-mails turned off", lg=lg), (f'<p>{e(name)}</p><p>{e(tr("You can turn them on again in Settings > Notifications.", lg=lg))}</p>'
+        title, body_ = tr("E-mails switched off", lg=lg), (f'<p>{e(name)}</p><p>{e(tr("You can switch them on again in Settings > Notifications.", lg=lg))}</p>'
                                                          f'<a class="btn" href="{e(PUBLIC_URL)}/#settings/notify">{e(tr("Settings", lg=lg))}</a>')
     else:
         title, body_ = tr("Turn e-mails off", lg=lg), (f'<p>{e(name)}</p><form method="post" class="fform">'

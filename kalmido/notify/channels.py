@@ -547,7 +547,7 @@ def chn_event_text(c, t, ev, cid, actor, owner):
 # ---------------------------------------------------------------- settings API
 def chn_need_on():
     if not CH_ON:
-        raise Denied(409, tr("Notification channels are turned off on this server"))
+        raise Denied(409, tr("Notification channels are switched off on this server"))
 
 
 def chn_need_person():
@@ -603,7 +603,7 @@ def chn_fields(c, b, oid, old=None):
     if "events" in b or old is None:
         ev = b.get("events", list(CH_DEFAULT_ORG if oid else CH_DEFAULT_ME))
         if not isinstance(ev, list) or not ev or any(e not in allowed for e in ev):
-            raise BadInput(tr("Choose at least one event"))
+            raise BadInput(tr("Select at least one event"))
         out["events"] = ",".join(e for e in allowed if e in ev)
     if "enabled" in b:
         if not isinstance(b["enabled"], bool):
@@ -903,7 +903,7 @@ def evm_content(lines, total, lg):
     import html
     subj = f"{APP_NAME}: " + trn("{0} new notification", "{0} new notifications", total, lg=lg)
     more = total - len(lines)
-    foot = tr("You get these e-mails for assignments and mentions. Change or turn them off in Settings > Notifications:", lg=lg) + \
+    foot = tr("You get these e-mails for assignments and mentions. Change or switch them off in Settings > Notifications:", lg=lg) + \
         f" {PUBLIC_URL}/#settings/notify"
     text = "\n\n".join(f"- {w} · {ln}\n  {u}" for w, ln, u in lines) + \
         (("\n\n" + trn("and {0} more", "and {0} more", more, lg=lg)) if more > 0 else "") + "\n\n-- \n" + foot + "\n"

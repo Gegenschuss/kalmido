@@ -71,7 +71,7 @@ async function evf_modal(c) {
       return;
     }
     if (a === 'rotate' && !await askConfirm(tr('Create a new link?'), tr('Calendars subscribed with the old one stop updating.'), {ok: tr('New link'), danger: true})) return;
-    if (a === 'off' && !await askConfirm(tr('Turn the link off'), tr('Subscribed calendars stop updating.'), {ok: tr('Turn off'), danger: true})) return;
+    if (a === 'off' && !await askConfirm(tr('Turn the link off'), tr('Subscribed calendars stop updating.'), {ok: tr('Switch off'), danger: true})) return;
     b.disabled = true;
     try { draw(await api('POST', `/api/evcals/${c.id}/feed`, {action: a})); } catch { b.disabled = false; return; }
     if (a === 'rotate') toast(tr('New link created, the old one no longer works'));

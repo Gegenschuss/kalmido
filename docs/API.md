@@ -2041,7 +2041,7 @@ when someone changed it since). `GET /api/lists/{id}/status-report` (web) also c
 *Since 2.299.0:* `kind: "receipt_read"` -- an agent reads a receipt. `GET /api/proposals/agents?kind=receipt_read&doc_id=`
 (as doc_summary, with the office right *Receipts*), `POST /api/proposals {agent_id, kind: "receipt_read", doc_id, wish?}`.
 The agent answers the values it read (AGENTS.md *Reading a receipt*); `GET /api/proposals/{id}` adds `target` {doc_id,
-name, editable, new (the fields Take over changes: amount, vat_pct, sender, date, category), checks, bank?};
+name, editable, new (the fields Apply changes: amount, vat_pct, sender, date, category), checks, bank?};
 `POST /api/proposals/{id}/apply {select: ["0"], edits?: {"0": {fields: [...]}}}` sets them as the person (a locked month:
 409), `.../undo` / `.../redo` put the values back (skipped when one was changed since). `GET /api/docs/{id}` (people only,
 never API v1) carries `agent_read` {job, state: requested | ready, agent, values?, new?, checks?, bank?} or null.

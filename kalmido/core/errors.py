@@ -17,7 +17,7 @@ class Denied(Exception):
 
     def text(self):
         # 2.298.0 C (#3187): a bare 404 says what probably happened instead of "unknown"
-        return self.msg or (tr("No permission (view only)") if self.code == 403 else
+        return self.msg or (tr("No permission (read-only)") if self.code == 403 else
                             tr("Not found. Maybe deleted or no longer shared with you.") if self.code == 404 else tr("unknown"))
 
 

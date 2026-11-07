@@ -176,7 +176,7 @@ sql("UPDATE office_signoffs SET created_by=? WHERE id=?", (BOB, S2["id"]), write
 clear()
 check(decide(S2["url"].split("/s/q/")[1], "decline").status_code == 303, "the customer declines a link of the ex-member")
 p = until(lambda: pushes("t-alice"), 6)
-check(p and p[0]["title"] == "Declined by the client", f"#2965: the office admin hears of it instead {p}")
+check(p and p[0]["title"] == "Rejected by the client", f"#2965: the office admin hears of it instead {p}")
 check(not pushes("t-bob") and not news(Bo, "signoff"), "#2965: the ex-member gets neither a push nor a News item")
 
 # ================================================================ #2963 security mails

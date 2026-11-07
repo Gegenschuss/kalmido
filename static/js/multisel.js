@@ -98,7 +98,7 @@ function ms_merge(o) {
     const lists = (o.lists || []).map(l => [l, joined(l)]).filter(([, v]) => v.length);
     body.innerHTML = `<h3>${esc(o.title)}</h3>
       <fieldset class="mgset"><legend>${tr('Keep')}</legend>${o.recs.map(r => radio('mg-t', r.id, String(r.id) === st.target, r.label, r.sub)).join('')}</fieldset>
-      ${df.length ? `<p class="muted">${tr('Choose which value stays where the entries differ.')}</p>` : ''}
+      ${df.length ? `<p class="muted">${tr('Select which value stays where the entries differ.')}</p>` : ''}
       ${df.map(f => `<fieldset class="mgset"><legend>${esc(f.label)}</legend>${ids.filter(i => (f.vals[i] ?? '').trim()).map(i => radio('mg-f-' + f.k, i, st.pick[f.k] === i, f.vals[i])).join('')}</fieldset>`).join('')}
       ${lists.length ? `<div class="mgjoin"><b>${tr('Joined')}</b>${lists.map(([l, v]) => `<div><span class="muted">${esc(l.label)}:</span> ${esc(v.slice(0, 6).join(', '))}${v.length > 6 ? ' …' : ''}</div>`).join('')}</div>` : ''}
       ${same.length ? `<p class="muted mgsame">${esc(tr('Same in all: {0}', same.join(', ')))}</p>` : ''}

@@ -45,7 +45,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   const txt = d.querySelector('.otkmd')?.textContent || '';
   check(row && /Book the studio/.test(row.textContent) && /Studio plan/.test(row.textContent), 'the task of a project alice is not in ' + (row?.textContent || ''));
   check(row && row.querySelector('.prm.p7')?.textContent === '!!!!', 'its priority mark: !!!!');
-  check(!/Secret gift/.test(txt) && /Read only/.test(txt), 'no private project; the read-only hint');
+  check(!/Secret gift/.test(txt) && /Read-only/.test(txt), 'no private project; the read-only hint');
   check([...d.querySelectorAll('#otk-l option')].map(o => o.textContent).join('|') === 'All projects|Studio plan', 'the project filter');
   check(!d.querySelector('.otkmd input:not(#otk-q), .otkmd [contenteditable]') && !d.querySelector('.otkmd [data-act]'), 'nothing to edit in it');
   click(w, d.querySelector('[data-otk-st="done"]'));

@@ -94,7 +94,7 @@ for s in (A, Bo, Ca, Da):
 # ================================================================ module off -> 409
 for meth, path, body in (("get", "/api/budget", None), ("post", "/api/budget/lists", {}), ("get", "/api/budget/1", None)):
     r = getattr(A, meth)(B + path, **({"json": body} if body is not None else {}))
-    check(r.status_code == 409 and "turned off" in r.json().get("error", ""), f"module off: {meth} {path} -> 409 ({r.status_code})")
+    check(r.status_code == 409 and "switched off" in r.json().get("error", ""), f"module off: {meth} {path} -> 409 ({r.status_code})")
 for s in (A, Bo, Ca, Da):
     s.patch(B + "/api/settings", json={"features": "cal,comments,collab,contracts,budget"})
 check(A.get(B + "/api/budget").json() == {"lists": [], "month": A.get(B + "/api/budget").json()["month"], "summary": None},

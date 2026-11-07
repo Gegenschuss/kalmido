@@ -131,7 +131,7 @@ def f8b_stop(c, action, done, total):
 def bk_ids(b):
     ids = b.get("ids")
     if not isinstance(ids, list) or not ids:
-        raise BadInput(tr("Choose at least one contact"))
+        raise BadInput(tr("Select at least one contact"))
     if len(ids) > BULK_MAX:
         raise BadInput(tr("At most {0} contacts at once", BULK_MAX))
     out = {}
@@ -214,7 +214,7 @@ def ms_apply(r, f):
 def ms_restore_items(b):
     items = b.get("items")
     if not isinstance(items, list) or not items:
-        raise BadInput(tr("Choose at least one contact"))
+        raise BadInput(tr("Select at least one contact"))
     if len(items) > BULK_MAX:
         raise BadInput(tr("At most {0} contacts at once", BULK_MAX))
     out = {}

@@ -146,7 +146,7 @@ def aim_target(c, j):
         want = a["org_id"]
     name = (c.execute("SELECT name FROM orgs WHERE id=?", (want or oid,)).fetchone() or [""])[0]
     if want and want != oid:
-        raise Denied(409, tr("This proposal can only be taken over into the office of “{0}”: switch your workspace there first", name or "?"))
+        raise Denied(409, tr("This proposal can only be applied to the office of “{0}”: switch your workspace there first", name or "?"))
     personal = pb_owner(c, oid) is not None
     return oid, (tr("Your private office") if personal else name), personal
 

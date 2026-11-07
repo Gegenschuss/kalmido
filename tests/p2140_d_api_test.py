@@ -239,7 +239,7 @@ patch(xt, {"due": nxt(3, 16), "_act": "occ_date"})
 check(until(lambda: next(x for x in Fr.get(B + "/api/family/contacts").json()["sources"] if x["id"] == XSRC)["writeback_avail"] == "no"),
       "403 on the PUT: the book is marked read only")
 xs = next(x for x in Fr.get(B + "/api/family/contacts").json()["sources"] if x["id"] == XSRC)
-check("read only" in xs["writeback_error"] and card("x", "c1.vcf") == C1, "… the source says so, the card unchanged " + json.dumps(xs)[:300])
+check("read-only" in xs["writeback_error"] and card("x", "c1.vcf") == C1, "… the source says so, the card unchanged " + json.dumps(xs)[:300])
 
 # ---- privacy: the password never in the server's log, the sources stay private
 if not NOSTART:

@@ -189,7 +189,7 @@ function shfm_merge() {
   const [rs, cs] = shvGrid(), ar = rs[q.r0], ac = cs[q.c0], h = q.r1 - q.r0 + 1, w = q.c1 - q.c0 + 1;
   const was = shvCell(ar, ac)?.fmt?.merge;
   if (h * w === 1 || (was && was[0] === h && was[1] === w)) {  // one cell / the block itself: a merged block is split again
-    if (!was) { toast(tr('Choose several cells to merge')); return null; }
+    if (!was) { toast(tr('Select several cells to merge')); return null; }
     return shfm_apply((f, y) => (y.r === ar && y.c === ac ? {...f, merge: null} : f), tr('Cells split'));
   }
   const filled = shfmCells().filter(y => (y.r !== ar || y.c !== ac) && shvRaw(y.r, y.c) !== '').length;
@@ -209,7 +209,7 @@ function shfm_paintStart() {
   if (SHFM.paint) { SHFM.paint = null; shfm_sync(); return; }
   const c = SHV.cur && shvCell(SHV.cur.r, SHV.cur.c), f = {...(c?.fmt || {})}; delete f.merge;
   SHFM.paint = {f: shfm_norm(f), at: Date.now()};
-  shfm_sync(); toast(tr('Now choose the cells that get this format'));
+  shfm_sync(); toast(tr('Now select the cells that get this format'));
 }
 function shfm_paintDrop() {
   const p = SHFM.paint; if (!p || Date.now() - p.at < 150) return;
@@ -266,7 +266,7 @@ function shfm_rulesDlg() {
     ${SHFM_PAL.map(p => `<button type="button" role="radio" data-shfmr-${k}="${p}" aria-checked="${cur === p}" class="${cur === p ? 'on' : ''}" title="${esc(tr(SHFM_PAL_N[p]))}" aria-label="${esc(tr(SHFM_PAL_N[p]))}">${sw(k, p)}</button>`).join('')}</div>`;
   const md = modal(`<h3>${tr('Colour rules')}</h3><div id="shfm-rl"></div>
     <h4>${tr('New rule for {0}', esc(cols.map(colName).join(', ')))}</h4>
-    ${rows ? `<fieldset class="shvmode"><legend class="sr">${tr('Where')}</legend><label class="chkl"><input type="radio" name="shfm-sc" value="rows" checked> ${tr('Only the chosen rows')}</label><label class="chkl"><input type="radio" name="shfm-sc" value="cols"> ${tr('Whole columns')}</label></fieldset>` : ''}
+    ${rows ? `<fieldset class="shvmode"><legend class="sr">${tr('Where')}</legend><label class="chkl"><input type="radio" name="shfm-sc" value="rows" checked> ${tr('Only the selected rows')}</label><label class="chkl"><input type="radio" name="shfm-sc" value="cols"> ${tr('Whole columns')}</label></fieldset>` : ''}
     <div class="row"><label for="shfm-op">${tr('If the cell')}</label><select id="shfm-op">${SHFM_OPS.map(([k, n]) => `<option value="${k}">${tr(n)}</option>`).join('')}</select></div>
     <div class="row" id="shfm-ab"><label for="shfm-a">${tr('Value')}</label><input id="shfm-a" maxlength="200" autocomplete="off"><input id="shfm-b" maxlength="200" autocomplete="off" aria-label="${esc(tr('and'))}" hidden></div>
     <div class="row"><span class="lbl">${tr('Text colour')}</span><div id="shfm-pc"></div></div>
@@ -285,7 +285,7 @@ function shfm_rulesDlg() {
     const a = (/** @type {any} */ (md.querySelector('#shfm-a'))).value.trim(), b = (/** @type {any} */ (md.querySelector('#shfm-b'))).value.trim();
     if (!['empty', 'overdue'].includes(st.op) && !a) { toast(tr('Enter a value for the rule')); (/** @type {any} */ (md.querySelector('#shfm-a'))).focus(); return false; }
     if (st.op === 'between' && !b) { toast(tr('Enter both values for the rule')); (/** @type {any} */ (md.querySelector('#shfm-b'))).focus(); return false; }
-    if (!st.color && !st.fill) { toast(tr('Choose a text colour or a fill for the rule')); return false; }
+    if (!st.color && !st.fill) { toast(tr('Select a text colour or a fill for the rule')); return false; }
     st.rules.push({cols: cols.slice(), rows: st.scope === 'rows' ? rows : null, op: st.op, ...(['empty', 'overdue'].includes(st.op) ? {} : {a}), ...(st.op === 'between' ? {b} : {}), color: st.color, fill: st.fill});
     (/** @type {any} */ (md.querySelector('#shfm-a'))).value = ''; (/** @type {any} */ (md.querySelector('#shfm-b'))).value = '';
     draw(); return true;

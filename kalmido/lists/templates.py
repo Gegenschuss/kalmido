@@ -426,7 +426,7 @@ def template_create():
             if role == "participant":  # the whole list is not theirs to copy
                 raise Denied(403, tr("Participants cannot save the whole project as a template"))
             if role not in WRITE_ROLES:  # 2.126.0 D (#1992 A6): view only
-                raise Denied(403, tr("View only: the project cannot be saved as a template"))
+                raise Denied(403, tr("Read-only: the project cannot be saved as a template"))
             _tpl_org_out(c, lid, None)  # 2.148.1 H (#2483)
             kind, data = "list", tpl_list_data(c, lid, uid, base, rel=True, extra=extra, skip=_dup_locked(c, uid, list_id=lid))  # 2.352.0 B (#2752): dates always relative
             name = data["name"]
@@ -650,7 +650,7 @@ def list_duplicate(lid):
     if role == "participant":
         raise Denied(403, tr("Participants cannot duplicate the whole project"))
     if role not in WRITE_ROLES:  # 2.126.0 D (#1992 A6): view only
-        raise Denied(403, tr("View only: the project cannot be duplicated"))
+        raise Denied(403, tr("Read-only: the project cannot be duplicated"))
     from ..collab.liste2eguard import le2b_list_locked, le2b_off
     if le2b_list_locked(c, lid):  # 2.78.0 N35 (#476): the copy would be an unlocked list (like a template, 2.64.1 B)
         return jsonify(error=le2b_off(), code="list_e2e"), 409

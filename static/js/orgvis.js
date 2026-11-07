@@ -45,7 +45,7 @@ async function ovSet(id, body) {
     redo: async () => { await api('PATCH', '/api/lists/' + id, body); await load(); render(); return {skipped: []}; }}));
 }
 
-// the bar above a list seen only through the organisation (instead of "View only")
+// the bar above a list seen only through the organisation (instead of "Read-only")
 // 2.147.2 A (#2500): read-only in the organisation = joining brings no writing (the server caps the role to view): no Join
 const ovOrgRO = l => !!l?.org_id && (S.me?.workspaces || []).some(o => o.id === l.org_id && o.role === 'readonly');
 function ovJoinBar(l) {

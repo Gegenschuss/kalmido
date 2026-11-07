@@ -492,7 +492,7 @@ function wk_attrsHtml(a, sp) {
   return `<dl class="wkattrs">${ks.map(k => `<div><dt>${esc(k)}</dt><dd>${tagv(k, a[k]) || esc(Array.isArray(a[k]) ? a[k].join(', ') : String(a[k]))}</dd></div>`).join('')}</dl>`;
 }
 // 2.554.0 (#4052): one editor (wkcm.js, CodeMirror): a page one may write opens ready to type on a computer; a phone shows it
-// read first and its pen opens the same editor. "Read only" (LS wkRo, this device) and "Edit as Markdown" (the plain field,
+// read first and its pen opens the same editor. "Read-only" (LS wkRo, this device) and "Edit as Markdown" (the plain field,
 // WK.mdFor) are in the page's "…" menu; without the right to write the page is only read. LS wkEd (the former choice) is ignored.
 const wk_ro = () => !!LS.get('wkRo', '');
 const wk_typing = () => !!document.activeElement?.closest?.('#wk-cm, #wk-body');
@@ -929,7 +929,7 @@ async function wk_trashDlg(sp = wk_cur()) {
     $('[data-wkt="empty"]', md).classList.toggle('hidden', !pages.length || j.may_empty === false);  // 2.306.0 D3 (#2875): an organisation's admins
     box.innerHTML = (pages.length ? `<div class="members">${pages.map(p => `<div class="mrow wktrow" data-wktid="${p.id}"><span class="n"><b>${p.path ? esc(p.path) : `<span class="muted">${tr('Encrypted page')}</span>`}</b><small class="muted">${esc([tr('Moved to the trash on {0}', fmtWhen(p.deleted_at)), p.files ? trn('{0} file', '{0} files', p.files) + ' · ' + fmtBytes(p.size) : ''].filter(Boolean).join(' · '))}</small></span>`
       + `<span class="oadmb"><button type="button" class="btn sm" data-wkt="restore">${ic('undo', 's')}<span>${tr('Restore')}</span></button><button type="button" class="btn sm danger" data-wkt="purge">${ic('trash', 's')}<span>${tr('Delete permanently…')}</span></button></span></div>`).join('')}</div>`
-      : `<div class="muted mhint">${tr('Trash is empty.')}</div>`) + `<div class="shint">${esc(trashNote(tr('Pages in the trash are deleted for good after {0} days, with their files.', j.days || 30), j.purge_on === false))}</div>`;
+      : `<div class="muted mhint">${tr('Trash is empty.')}</div>`) + `<div class="shint">${esc(trashNote(tr('Pages in the trash are deleted permanently after {0} days, with their files.', j.days || 30), j.purge_on === false))}</div>`;
   };
   md.addEventListener('click', async e => {
     const b = e.target.closest('[data-wkt]'); if (!b) return;
@@ -939,11 +939,11 @@ async function wk_trashDlg(sp = wk_cur()) {
     try {
       if (k === 'restore' && p) { const r = await rawFetch('POST', '/api/wiki/restore', {ids: [id]}); if (r.skipped?.length) toast(tr('A page with this name already exists')); else if (r.renamed?.length) toast(tr('Its name was taken: restored as {0}', qn(wk_base(r.renamed[0].path)))); }  // 2.552.0 (#4561 B28)
       if (k === 'purge' && p) {
-        if (!await askConfirm(tr('Delete “{0}” permanently?', p.path ? wk_base(p.path) : tr('Encrypted page')), tr('The page and its files are deleted for good. This cannot be undone.'), {danger: true, ok: tr('Delete permanently')})) return;
+        if (!await askConfirm(tr('Delete “{0}” permanently?', p.path ? wk_base(p.path) : tr('Encrypted page')), tr('The page and its files are deleted permanently. This cannot be undone.'), {danger: true, ok: tr('Delete permanently')})) return;
         await rawFetch('POST', '/api/wiki/purge', {space: sp, ids: [id]});
       }
       if (k === 'empty') {
-        if (!await askConfirm(tr('Empty the trash permanently?'), tr('All pages in the trash and their files are deleted for good. This cannot be undone.'), {danger: true, ok: tr('Empty trash')})) return;
+        if (!await askConfirm(tr('Empty the trash permanently?'), tr('All pages in the trash and their files are deleted permanently. This cannot be undone.'), {danger: true, ok: tr('Empty trash')})) return;
         await rawFetch('POST', '/api/wiki/purge', {space: sp, all: true});
       }
       wk_after(sp); await draw();
@@ -1044,11 +1044,11 @@ document.addEventListener('change', e => {
   if (e.target.matches?.('[data-wk-tpl]')) WK.tplPick = +e.target.value;
   if (e.target.matches?.('[data-wk-sp]')) { WK.spPick = e.target.value; const t = e.target.closest('.cdlg-b')?.querySelector('[data-wk-tpl]'); if (t) { t.innerHTML = wk_tplOpts(WK.spPick); t.closest('.wktpl')?.classList.toggle('hidden', !wk_pages(WK.spPick).some(x => wk_isTpl(x.path))); WK.tplPick = 0; } }  // 2.198.0 A (#2743): New page without an open space: its templates follow the space
 });
-// 2.554.0 (#4052): the page's "…" entries of the editor: the plain Markdown field as the way out, and the lock "Read only"
+// 2.554.0 (#4052): the page's "…" entries of the editor: the plain Markdown field as the way out, and the lock "Read-only"
 function wk_modeItems(p) {
   const asMd = WK.mdFor === p.id, ro = wk_ro(), sw = fn => async () => { await wk_flush(); fn(); renderView(); if (WK.edit) setTimeout(() => wk_ta()?.focus(), 30); };
   return [...(ro ? [] : [asMd ? {label: tr('Back to the editor'), icon: 'edit', fn: sw(() => { WK.mdFor = 0; })} : {label: tr('Edit as Markdown'), icon: 'code', fn: sw(() => { WK.mdFor = p.id; WK.edit = true; })}]),
-    {label: tr('Read only'), icon: 'lock', on: ro, fn: sw(() => { if (ro) LS.del('wkRo'); else { LS.set('wkRo', '1'); WK.mdFor = 0; WK.fresh = 0; } WK.edit = false; })}];
+    {label: tr('Read-only'), icon: 'lock', on: ro, fn: sw(() => { if (ro) LS.del('wkRo'); else { LS.set('wkRo', '1'); WK.mdFor = 0; WK.fresh = 0; } WK.edit = false; })}];
 }
 document.addEventListener('input', async e => {
   if (wk_isTa(e.target) && e.target.id === 'wk-body') { wk_queue(); wk_acUpdate(e.target); }  // 2.554.0 (#4052): the editor saves through its own listener (wkcm.js wkcm_upd)

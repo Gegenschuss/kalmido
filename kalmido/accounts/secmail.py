@@ -29,7 +29,7 @@ SEC_EVENTS = {
     "password_admin": (N_("Your password was changed"), N_("An admin changed the password of your account {0}.")),
     "password_reset": (N_("Your password was reset"), N_("A new password was set for your account {0} through a reset link.")),
     "email": (N_("Your e-mail address was changed"), N_("The e-mail address of your account {0} was changed from {1} to {2}.")),
-    "2fa_off": (N_("Two-factor sign-in was turned off"), N_("Sign-in codes from an authenticator app were turned off for your account {0}.")),
+    "2fa_off": (N_("Two-factor sign-in was switched off"), N_("Sign-in codes from an authenticator app were switched off for your account {0}.")),
     "2fa_reset": (N_("Two-factor sign-in was reset"), N_("An admin reset the two-factor sign-in of your account {0}: app codes, passkeys and recovery codes are gone.")),
     "passkey": (N_("A passkey was removed"), N_("The passkey “{1}” was removed from your account {0}.")),
     "codes": (N_("New recovery codes"), N_("New recovery codes were made for your account {0}; the old ones no longer work.")),
@@ -37,7 +37,7 @@ SEC_EVENTS = {
     "login": (N_("New sign-in to your account"), N_("Your account {0} was signed in from a new device: {1}, address {2}.")),
     "disabled": (N_("Your account was deactivated"), N_("An admin deactivated your account {0}. You can no longer sign in.")),
     "approved": (N_("Your account is approved"), N_("An admin approved your registration: you can sign in with your account {0} now.")),
-    "orgjoin": (N_("Invitation to an organisation"), N_("{1} invites your account {0} to join the organisation {2}. Open the app to accept or decline.")),
+    "orgjoin": (N_("Invitation to an organisation"), N_("{1} invites your account {0} to join the organisation {2}. Open the app to accept or reject.")),
 }
 SEC_NOT_ME = N_("If that was not you: change your password right away and tell an admin.")
 

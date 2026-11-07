@@ -108,7 +108,7 @@ function makePdf(pages) {  // a minimal PDF ('' = a page without a text layer, l
   w.eval(`listModal(${L})`); await sleep(400);
   const h = d.querySelector('.lmodal .ntfhint');
   // 2.152.2 (#2624): project instead of list
-  check(h && /Alice has limited the notifications for this project: Read only/.test(h.textContent), '#1089: the member sees who limited it in the list settings ' + (h?.textContent || ''));
+  check(h && /Alice has limited the notifications for this project: Read-only/.test(h.textContent), '#1089: the member sees who limited it in the list settings ' + (h?.textContent || ''));
   w.close();
 
   // ================= Firefox 390 touch, German

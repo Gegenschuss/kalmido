@@ -180,7 +180,7 @@ def rul_clean(c, lid, b, partial=None, see_only=False):
             dst = _int(a["list_id"], "action.list_id") if a.get("list_id") not in (None, "", 0) else lid
             sid = _int(a["section_id"], "action.section_id") if a.get("section_id") not in (None, "", 0) else None
             if dst == lid and sid is None:
-                raise BadInput(tr("Choose a project or a column"))
+                raise BadInput(tr("Select a project or a column"))
             if dst != lid:
                 e = rul_target_ok(c, lid, dst, me(), see_only)
                 if e:

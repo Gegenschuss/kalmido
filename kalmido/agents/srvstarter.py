@@ -67,13 +67,13 @@ SRV_BRIEF_AT, SRV_TIDY_AT, SRV_FOLLOWUP_AT = "07:30", "07:00", "09:00"
 SRV_OFFICE_AT, SRV_OFFICE_DAYS = "08:00", [1]  # 2.568.0 (#4673): weekly on Mondays (ISO weekday 1)
 SRV_DOC_FEATURES = ("sender", "type", "tags")
 SRV_TEXTS = {  # one literal each (tools/i18n_check.py reads no joined strings)
-    "briefing": (N_("Morning briefing"), N_("Morning briefing, read only: list what is due today, what is overdue, what nobody touched for a while and what waits on someone. Change nothing; answer in one short message.")),  # noqa: E501
+    "briefing": (N_("Morning briefing"), N_("Morning briefing, read-only: list what is due today, what is overdue, what nobody touched for a while and what waits on someone. Change nothing; answer in one short message.")),  # noqa: E501
     "tidy": (N_("Tidy up the basket"), N_("Sort my basket: propose for every item the project (and column), a due date, the priority and tags. Only as a proposal; I decide.")),  # noqa: E501
     "docs": N_("Documents and receipts: suggest sender, type and tags from the recognised text as a proposal; never set them yourself."),  # noqa: E501
     "meetings": N_("Meeting notes: when I give you meeting notes, turn them into a proposal “Tasks from notes”; never create the tasks yourself."),  # noqa: E501
     "followup": (N_("Follow up"), N_("Look at my tasks that have been waiting on someone for more than {0} days. Draft a short, friendly follow-up for each as a comment and ask me with an approval card; post or send nothing before my Yes.")),  # noqa: E501
     # 2.568.0 (#4673): the plan "Due billing" and the standing rule of the office item
-    "office": (N_("Due billing"), N_("Due billing, read only: look at my tracked time that is billable and not billed yet, and at due invoice series and subscriptions. Post one short reminder in this chat: per client and project the open hours and what is due. Offer to prepare an invoice draft for each and ask me with an approval card; create a draft only after my Yes, never finalise, number, send or cancel anything."),  # noqa: E501
+    "office": (N_("Due billing"), N_("Due billing, read-only: look at my tracked time that is billable and not billed yet, and at due invoice series and subscriptions. Post one short reminder in this chat: per client and project the open hours and what is due. Offer to prepare an invoice draft for each and ask me with an approval card; create a draft only after my Yes, never finalise, number, send or cancel anything."),  # noqa: E501
                N_("Quotations and invoices only as drafts: never finalise, number, send or cancel them. Send raw values only; Kalmido computes sums, VAT, numbers and the required e-invoice fields.")),  # noqa: E501
 }
 # 2.568.0 (#4673): why the office item is skipped -- each names where the person gives the right (nothing is granted here)

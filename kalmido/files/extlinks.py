@@ -92,13 +92,13 @@ def xl_chain_ok(chain):
 def xl_why_not(c, n, chain):
     """Why node n cannot get an external link (a text for the dialog), or None."""
     if not public_links_on(c, "files"):
-        return tr("Public links are turned off on this server")
+        return tr("Public links are switched off on this server")
     if n["kind"] == "link":
         return tr("A linked file of a task or project cannot be shared outside. Share the original instead.")
     if n["kind"] not in ("file", "folder") or not xl_chain_ok(chain):
         return tr("Folders of agents and items in the trash cannot be shared outside.")
     if not xl_org_on(c, n["org_id"]):
-        return tr("External share links are turned off in this organisation.")
+        return tr("External share links are switched off in this organisation.")
     if fs_area_of(c, n["id"]) in FS_AREA_RULES:  # 2.200.0 A (#2747, review 10): the knowledge folders have their own public links
         return tr("Folders of this area are shared from the area itself.")
     if fl_is_locked(c, n["id"]):  # 2.353.0 A (#2758): external people have no key

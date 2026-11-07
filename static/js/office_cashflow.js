@@ -201,11 +201,11 @@ function fci_modal(rows, name) {
     card.innerHTML = `<h3>${tr('Import fixed costs')}</h3><p class="muted">${esc(name)} · ${esc([trn('{0} new', '{0} new', cnt('new')), cnt('dup') ? trn('{0} already there', '{0} already there', cnt('dup')) : '', cnt('error') ? trn('{0} with an error', '{0} with an error', cnt('error')) : ''].filter(Boolean).join(' · '))}</p>
       <ul class="fcilist" role="list">${rows.map((r, i) => r.status === 'error'
         ? `<li class="fcirow err"><span class="fcick" aria-hidden="true">${ic('x', 's')}</span><span class="ofcn"><b>${esc(r.label || tr('Row {0}', r.row))}</b><small>${esc(tr('Row {0}', r.row))} · ${esc(r.reason)}</small></span></li>`
-        : `<li class="fcirow ${r.sel ? 'on' : ''} ${r.status}"><label class="fcick"><input type="checkbox" data-fci="sel" data-i="${i}" ${r.sel ? 'checked' : ''} aria-label="${esc(tr('Take over {0}', r.label))}"></label>
+        : `<li class="fcirow ${r.sel ? 'on' : ''} ${r.status}"><label class="fcick"><input type="checkbox" data-fci="sel" data-i="${i}" ${r.sel ? 'checked' : ''} aria-label="${esc(tr('Import {0}', r.label))}"></label>
           <span class="ofcn"><b>${esc(r.label)}${r.part ? ` <small class="muted">${esc(r.part)}</small>` : ''}</b><small class="muted">${esc([rp(r.repeat), tr('from {0}', fmtDateLoc(r.start)), r.category, r.sub ? tr('Subscription') : '', r.notice_days ? tr('notice {0} days', r.notice_days) : '', r.status === 'dup' ? r.reason : ''].filter(Boolean).join(' · '))}</small></span>
           <span class="fciamt"><span>${ofcMoney(r.amount)} <small class="muted">${tr('net')}</small></span><select data-fci="vat" data-i="${i}" aria-label="${esc(tr('VAT rate'))}">${FCI_VATS.map(v => `<option value="${v}" ${+r.vat_rate === v ? 'selected' : ''}>${v} %</option>`).join('')}</select></span></li>`).join('')}</ul>
       <div class="aerr" role="alert"></div>
-      <div class="foot"><span class="spacer"></span><button class="btn" data-fci="close">${tr('Cancel')}</button><button class="btn pri" data-fci="go" ${n ? '' : 'disabled'}>${esc(trn('Take over {0} row', 'Take over {0} rows', n))}</button></div>`;
+      <div class="foot"><span class="spacer"></span><button class="btn" data-fci="close">${tr('Cancel')}</button><button class="btn pri" data-fci="go" ${n ? '' : 'disabled'}>${esc(trn('Import {0} row', 'Import {0} rows', n))}</button></div>`;
   };
   draw();
   md.addEventListener('change', e => {
@@ -230,7 +230,7 @@ function fci_modal(rows, name) {
   return md;
 }
 
-// ---- 2.67.0 (#1838): the optional monthly task "Cash flow: check the actual state" for one person (only a link, no amounts)
+// ---- 2.67.0 (#1838): the optional monthly task "Cash flow: check the current status" for one person (only a link, no amounts)
 // 2.365.2 D (#2789): in Settings > Company & office > Bank & taxes (loads the check of the shown office itself)
 function fci_setHtml() {
   if (RKF.chkOid !== OFC.info?.org_id) { RKF.chkOid = OFC.info?.org_id; RKF.check = null; setTimeout(fci_load, 0); return ''; }
@@ -241,9 +241,9 @@ function fci_checkHtml() {
   const k = RKF.check; if (!k) return '';
   const ppl = k.people || [];
   return `<div class="ofcbar"><h3 class="ofcgrp">${tr('Monthly check')}</h3></div><div class="fcichk">
-    <label class="chkl"><input type="checkbox" data-fcc="on" ${k.on ? 'checked' : ''} ${ppl.length ? '' : 'disabled'}><span>${tr('Monthly task: check the actual state of the cash flow')}</span></label>
+    <label class="chkl"><input type="checkbox" data-fcc="on" ${k.on ? 'checked' : ''} ${ppl.length ? '' : 'disabled'}><span>${tr('Monthly task: check the current status of the cash flow')}</span></label>
     ${k.on || ppl.length ? `<div class="row"><label for="fcc-user">${tr('Assignee|person')}</label><select id="fcc-user" data-fcc="user">${k.user_id && !ppl.some(p => p.id === k.user_id) ? `<option value="${k.user_id}" selected>${esc(tr('Person without access'))}</option>` : ''}${ppl.map(p => `<option value="${p.id}" ${p.id === (k.user_id || S.me?.id) ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></div>` : ''}
-    ${k.lost ? `<p class="aerr" role="alert">${tr('The person responsible no longer has access to the cash flow. Please choose someone else.')}</p>` : ''}
+    ${k.lost ? `<p class="aerr" role="alert">${tr('The person responsible no longer has access to the cash flow. Please select someone else.')}</p>` : ''}
     <p class="muted ofchint">${tr('On the 1st of every month in the Basket of the person, without amounts.')}</p></div>`;
 }
 document.addEventListener('change', async e => {

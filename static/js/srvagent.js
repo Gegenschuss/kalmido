@@ -7,7 +7,7 @@
 // four characters ("…abcd"): replace or delete it. Lazy module "agentchat" (lazyload.js).
 const SRV_PROV = 'kalmido-server';
 // the five items of the starter pack (all only propose; decision 05.11.2026, card 12870): [key, label, hint]
-const SRV_ST = [['briefing', N_('Morning briefing at 07:30'), N_('Daily in its chat, read only: due, overdue, untouched, waiting on someone.')],
+const SRV_ST = [['briefing', N_('Morning briefing at 07:30'), N_('Daily in its chat, read-only: due, overdue, untouched, waiting on someone.')],
   ['tidy', N_('Tidy up the basket'), N_('Project, due date, priority and tags as a proposal.')],
   ['docs', N_('Sort receipts and documents'), N_('Sender, type and tags suggested from the recognised text.')],
   ['meetings', N_('Meeting notes into task proposals'), N_('Notes become a proposal “Tasks from notes”, never tasks directly.')],
@@ -44,7 +44,7 @@ const srv_webName = k => k === 'other' ? tr('Everything else (chat, mentions, ta
 function srv_webHtml(j) {
   const fw = j.flow_web || {};
   return `<fieldset class="srvweb"><legend>${tr('Web research per routine')}</legend>
-    <div class="shint keep">${esc(tr('Read only: search the web, read a page, check a VAT number with the EU service VIES. Off by default. A run with the web never sends forms; every change and every message to someone else then waits for your approval, and each web find names its source.'))}</div>
+    <div class="shint keep">${esc(tr('Read-only: search the web, read a page, check a VAT number with the EU service VIES. Off by default. A run with the web never sends forms; every change and every message to someone else then waits for your approval, and each web find names its source.'))}</div>
     ${SRV_WEB_KEYS.map(k => `<label class="chkl"><input type="checkbox" data-srv-web="${k}" data-was="${fw[k] ? 1 : 0}" ${fw[k] ? 'checked' : ''}><span>${esc(srv_webName(k))}</span></label>`).join('')}</fieldset>`;
 }
 // only the switches that changed; null = none
@@ -216,7 +216,7 @@ function srv_adminHtml(hint) {
 }
 async function srv_adminSwitch(el) {
   const on = el.checked;
-  if (!on && !await askConfirm(tr('Switch server agents off?'), tr('No server agent runs any more until you switch them on again; nothing is deleted.'), {ok: tr('Turn off'), danger: true})) { el.checked = true; return; }
+  if (!on && !await askConfirm(tr('Switch server agents off?'), tr('No server agent runs any more until you switch them on again; nothing is deleted.'), {ok: tr('Switch off'), danger: true})) { el.checked = true; return; }
   try {  // allowing them again opens the server: the account password like the other opening switches (core/instance.py)
     let j; try { j = await rawFetch('PATCH', '/api/admin/settings', {server_agents_off: !on}); } catch (x) {
       if (x.data?.reauth_needed) { if (!await reauthFresh(x.data)) throw x; j = await api('PATCH', '/api/admin/settings', {server_agents_off: !on}); } else {  // 2.611.0 (#4019)

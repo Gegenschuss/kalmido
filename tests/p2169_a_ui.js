@@ -54,7 +54,7 @@ function browser() {
 
   // ================= the copy: kept on opening, the next sync only for changed texts
   const br = browser();
-  // 2.554.0 (#4052): the read view of these checks is the lock "Read only" (LS wkRo): a page one may write opens in the editor
+  // 2.554.0 (#4052): the read view of these checks is the lock "Read-only" (LS wkRo): a page one may write opens in the editor
   const opt = {user: 'frida', hash: 'wiki', shared: br.shared, setup: br.setup, ls: {'tasks.wkSpace': JSON.stringify('private'), 'tasks.wkRo': '"1"'}};
   let w = await boot(opt), d = w.document;
   await until(() => typeof w.wk_loadPage === 'function' && w.eval(`(WK.idx.private?.pages || []).length`) === 2, 60);

@@ -82,7 +82,7 @@ const docNew = async (name, text, ws = 'private', ck = CK) => {
   check(await until(async () => (await call('GET', `/api/obj/docview/${VID}`)).query === 'q=Koala&area=private'), 'undo: the old search again');
   // the menu
   const labels = w.eval(`dcv_menuItems(dcv_get(${VID})).filter(x => x !== '-').map(x => x.label)`);
-  check(['Rename…', 'Take over the current filters', 'Add to favourites', 'Show on Today', 'Delete view'].every(x => labels.includes(x)) && !labels.includes('Share with everyone of the organisation'),
+  check(['Rename…', 'Use the current filters', 'Add to favourites', 'Show on Today', 'Delete view'].every(x => labels.includes(x)) && !labels.includes('Share with everyone of the organisation'),
     'the menu of a private view (no sharing with an organisation) ' + JSON.stringify(labels));
   w.prompt = () => 'Koala invoices';
   w.eval(`dcv_rename(dcv_get(${VID}))`);

@@ -53,7 +53,7 @@ const D2 = c052('R-2', [ntry('12.50', '2026-09-02', 'BOOK', 'REF-A1', 'Bakery ag
   const dup = prs.find(x => x.classList.contains('dup'));
   check(dup && /Bakery again/.test(dup.textContent) && !dup.querySelector('[data-csr]').checked, '#2469: the same bank reference in the second report = a duplicate, not chosen');
   check(prs.some(x => /tag2\.xml/.test(x.textContent)), '#2455: several files: each row names its file');
-  check(/Take over 2 entries/.test(dlg().querySelector('[data-cs="next"]')?.textContent || ''), '#2455: "Take over 2 entries"');
+  check(/Import 2 entries/.test(dlg().querySelector('[data-cs="next"]')?.textContent || ''), '#2455: "Take over 2 entries"');
   click(w, dlg().querySelector('[data-cs="next"]'));
   check(await until(() => d.querySelector('.itc-dlg [data-cd="yes"]')), 'the import names its target first');
   click(w, d.querySelector('.itc-dlg [data-cd="yes"]')); await until(() => !dlg(), 60);

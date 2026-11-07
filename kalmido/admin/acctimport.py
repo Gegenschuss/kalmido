@@ -235,7 +235,7 @@ UMZ_REFUSED_AREA = {
 # 2.531.0 (#4317) F6: the person columns of a task besides the assignee -> the role named when it does not come along
 UMZ_TASK_ROLES = (("approver_id", N_("Approver")), ("reviewer_id", N_("Reviewer")), ("review_by", N_("Reviewer")),
                   ("wait_by", N_("Waiting on")), ("delegate_agent_id", N_("Delegated agent")), ("assignee_group_id", N_("Group")))
-UMZ_ROLE_LOST = N_("Role on tasks not taken over (the person is not on this server or was not chosen): {0}")
+UMZ_ROLE_LOST = N_("Role on tasks not imported (the person is not on this server or was not selected): {0}")
 UMZ_AREAS_LEFT = N_("These areas stay on the old server: {0}")
 UMZ_WARN_MAX = 50  # the result names at most this many warnings, the ones a run must always name (run.must) on top and first
 
@@ -970,7 +970,7 @@ def umz_billed(run, src, d, ts):
     if not d.get("billed_doc_id"):
         d["billed_doc_id"] = None
         d["billable"] = 0
-        run.warning(N_("Billed time entries without their invoice were taken over as not billable"))
+        run.warning(N_("Billed time entries without their invoice were imported as not billable"))
     return d
 
 
@@ -1001,7 +1001,7 @@ def umz_refused(run):
         area = UMZ_REFUSED_AREA.get(table, table)
         by[area] = by.get(area, 0) + n
     for area, n in by.items():
-        run.warning(N_("{1} entries in {0} were refused by this server and not taken over"),
+        run.warning(N_("{1} entries in {0} were refused by this server and not imported"),
                     (area,) if area in UMZ_REFUSED_AREA.values() else area, n)
 
 
@@ -1342,7 +1342,7 @@ def umz_formulas(c, run, data):
             with c.savepoint():
                 fx_tpl_fix(c, lid)
         except (ValueError, TypeError, AttributeError, RecursionError):  # another field's options from the file are no JSON object
-            run.warning(N_("A formula could not be taken over"))
+            run.warning(N_("A formula could not be imported"))
 
 
 def umz_files(c, run, uid, me_old, zf, files, data):
@@ -1357,7 +1357,7 @@ def umz_files(c, run, uid, me_old, zf, files, data):
                 continue
             enc = _coerce(r.get("enc"), "bigint") if table == "attachments" else 0
             if enc and _oid(r.get("enc_by")) != me_old:
-                run.warning(N_("Encrypted file of another person not taken over: {0}"), _txt(r.get("name"), 80))
+                run.warning(N_("Encrypted file of another person not imported: {0}"), _txt(r.get("name"), 80))
                 continue
             if run.stopped:  # 2.362.4 (#3100): the storage is full, the rows without a file still come
                 run.warning(UMZ_NO_SPACE)
@@ -1384,7 +1384,7 @@ def umz_files(c, run, uid, me_old, zf, files, data):
                     raw, mime, info = up_check(c, name, raw, _txt(r.get("mime"), 120) or "application/octet-stream", uid,
                                                run.list_org.get(run.task_list.get(parent) if kind == "tasks" else parent), "att")
                 except UploadRefused:
-                    run.warning(N_("A file could not be taken over: {0}"), name)
+                    run.warning(N_("A file could not be imported: {0}"), name)
                     continue
             sub = os.path.join(str(parent)) if kind == "tasks" else os.path.join(LIST_FILES_SUB, str(parent))
             os.makedirs(os.path.join(ATT_DIR, sub), exist_ok=True)
@@ -1406,7 +1406,7 @@ def umz_files(c, run, uid, me_old, zf, files, data):
             d = umz_row(c, table, r, fixed, ts)
             nid = umz_insert(c, table, d) if d else None
             if not nid:
-                run.warning(N_("A file could not be taken over: {0}"), name)
+                run.warning(N_("A file could not be imported: {0}"), name)
                 continue
             run.put(table, r.get("id"), nid)  # 2.137.0 B (#2344): the links of the file store point at them (oi_store.py)
             up_after_store(c, "att" if kind == "tasks" else "list", nid, lorg or None, info)  # 2.148.1 C (#2492): unchecked = scanned later
@@ -1429,7 +1429,7 @@ def umz_template_files(c, run, uid, zf, files, data):
         if tpl not in keys:
             keys[tpl] = tx_keys(json.loads(c.execute("SELECT data FROM templates WHERE id=?", (tpl,)).fetchone()[0] or "{}"))
         if node not in keys[tpl]:  # review: a task the template does not have: the file would never be used, only count
-            run.warning(N_("A file could not be taken over: {0}"), _txt(r.get("name"), 80))
+            run.warning(N_("A file could not be imported: {0}"), _txt(r.get("name"), 80))
             continue
         if run.stopped:
             run.warning(UMZ_NO_SPACE)
@@ -1451,7 +1451,7 @@ def umz_template_files(c, run, uid, zf, files, data):
         try:
             raw, mime, info = up_check(c, name, raw, _txt(r.get("mime"), 120) or "application/octet-stream", uid, None, "att")
         except UploadRefused:
-            run.warning(N_("A file could not be taken over: {0}"), name)
+            run.warning(N_("A file could not be imported: {0}"), name)
             continue
         rel = os.path.join("tplfiles", str(tpl), f"{uuid.uuid4().hex[:12]}-{name}")
         full = os.path.join(ATT_DIR, rel)
@@ -1464,7 +1464,7 @@ def umz_template_files(c, run, uid, zf, files, data):
         if not nid:
             run.written.remove(full)  # review: no row, no file (the commit keeps what is in the list)
             os.remove(full)
-            run.warning(N_("A file could not be taken over: {0}"), name)
+            run.warning(N_("A file could not be imported: {0}"), name)
             continue
         run.put("template_files", r.get("id"), nid)
         run.created["template_files"].append(nid)
@@ -1557,7 +1557,7 @@ def umz_write(c, run, uid, man, zf, files, data, people):
             run.put("lists", L.get("id"), inbox)
             continue
         if L.get("e2e"):  # 2.278.0 C (#3091): its list keys never move along -- the texts would stay ciphertext for good
-            run.warning(N_("An encrypted project was not taken over: switch its encryption off before the export or export its content."))
+            run.warning(N_("An encrypted project was not imported: switch its encryption off before the export or export its content."))
             continue
         if run.there("lists", L.get("id")):  # 2.362.3 (#3098)
             continue
@@ -1576,7 +1576,7 @@ def umz_write(c, run, uid, man, zf, files, data, people):
                                      "header_style": hst if hst in HEAD_STYLES and hst != "image" else ""}, ts)
         lid = umz_insert(c, "lists", d, told=True) if d else None
         if not lid:
-            run.warning(N_("A project could not be taken over: {0}"), _txt(L.get("name"), 80))
+            run.warning(N_("A project could not be imported: {0}"), _txt(L.get("name"), 80))
             continue
         list_created(c, uid, lid, agents=False)  # 2.25.0 (#931); agents only when the person shares later
         run.list_org[lid] = lorg
@@ -1623,7 +1623,7 @@ def umz_write(c, run, uid, man, zf, files, data, people):
         status = status if status in (0, 2, -1) else 0
         aid = who(t.get("assignee_id"))
         if t.get("assignee_id") and not aid:
-            run.warning(N_("Assignment not taken over (the person is not on this server or was not chosen)"))
+            run.warning(N_("Assignment not imported (the person is not on this server or was not selected)"))
         spr = run.m("sprints", t.get("sprint_id"))  # 2.455.0 (#3469): of the same list, else the backlog
         spr = spr if run.sprint_list.get(spr) == lid else None
         roles = umz_task_roles(c, run, t, who)  # 2.531.0 (#4317) F6
@@ -1636,7 +1636,7 @@ def umz_write(c, run, uid, man, zf, files, data, people):
             **_umz_delivery(t)}, ts)
         tid = umz_insert(c, "tasks", d, told=True) if d else None
         if not tid:
-            run.warning(N_("A task could not be taken over: {0}"), _txt(t.get("title"), 80))
+            run.warning(N_("A task could not be imported: {0}"), _txt(t.get("title"), 80))
             continue
         run.put("tasks", t.get("id"), tid)
         run.task_list[tid] = lid
@@ -1724,7 +1724,7 @@ def umz_write(c, run, uid, man, zf, files, data, people):
             run.warning(N_("Encrypted content from the export stays unreadable because you already have your own encryption keys here."))
         elif k == "taken":
             run.count("e2e_keys")
-            run.warning(N_("Encryption keys taken over: open locked notes and encrypted files with your passphrase from before."))
+            run.warning(N_("Encryption keys imported: open locked notes and encrypted files with your passphrase from before."))
         else:
             run.warning(N_("The encryption keys in the export are broken: encrypted content stays unreadable."))
     names = run.names = {_oid(p.get("user_id")): _txt(p.get("name"), 100) for p in data.get("people", [])}
@@ -1798,7 +1798,7 @@ def umz_write(c, run, uid, man, zf, files, data, people):
             elif table == "templates":
                 extra["data"] = umz_template_data(_txt(r.get("kind"), 10) or "task", r.get("data"))
                 if extra["data"] is None:
-                    run.warning(N_("A template could not be taken over: {0}"), _txt(r.get("name"), 80))
+                    run.warning(N_("A template could not be imported: {0}"), _txt(r.get("name"), 80))
                     continue
                 extra["extra"] = tx_import(r.get("extra"), who, tx_keys(json.loads(extra["data"])))  # 2.463.0 (#3860): never the file's text
             d = umz_row(c, table, r, {**fixed, **extra, "updated_at": ts, "changed_at": ts}, ts)
@@ -1864,13 +1864,13 @@ def umz_write(c, run, uid, man, zf, files, data, people):
         from ..docs.store import doc_ws
         mws, v = doc_ws(run.org, uid), mbx_take_values(data["mailbox"][0])
         if v and c.execute("SELECT 1 FROM hub_mailboxes WHERE ws=?", (mws,)).fetchone():
-            run.warning(N_("The workspace already has a mailbox: the one of the export was not taken over."))
+            run.warning(N_("The workspace already has a mailbox: the one of the export was not imported."))
         elif v:
             v.update(org_id=run.org, owner_id=None if run.org else uid, ws=mws, created_by=uid, created_at=ts, updated_at=ts)
             nid = insert_id(c, f"INSERT INTO hub_mailboxes({', '.join(v)}) VALUES({','.join('?' * len(v))})", tuple(v.values()))
             run.created.setdefault("hub_mailboxes", []).append(nid)
             run.count("mailbox")
-            run.warning(N_("Mailbox taken over without its passwords and switched off: enter them in the settings and switch it on."))
+            run.warning(N_("Mailbox imported without its passwords and switched off: enter them in the settings and switch it on."))
     cur = usettings(c, uid)
     for r in data.get("settings", []):
         k, v = r.get("key"), r.get("value")
@@ -2087,7 +2087,7 @@ def umz_fix_people(c, run, uid, names):
                           AND NOT EXISTS (SELECT 1 FROM list_members m WHERE m.list_id=tasks.list_id AND m.user_id=tasks.assignee_id)""",
                       part + [uid]).rowcount
         if n:
-            run.warning(N_("Assignment not taken over (the person is not on this server or was not chosen)"))
+            run.warning(N_("Assignment not imported (the person is not on this server or was not selected)"))
         # 2.362.4 (#3100): the same for person fields and mentions
         c.execute(f"""DELETE FROM task_field_values v USING list_fields f, tasks t WHERE f.id=v.field_id AND t.id=v.task_id AND t.id IN ({q})
                       AND f.type='person' AND v.value!=? AND NOT EXISTS (SELECT 1 FROM list_members m WHERE m.list_id=t.list_id AND m.user_id::text=v.value)""",
@@ -2201,7 +2201,7 @@ def umz_run(uid, iid, opts):
             except Exception as e:  # noqa: BLE001 -- the import stays (and can be undone); the sharing is reported
                 c.heal() or c.rollback()
                 print(f"account import of user {uid}: sharing failed: {type(e).__name__}", flush=True)
-                run.warning(N_("Sharing with the chosen people failed. Share the projects by hand."))
+                run.warning(N_("Sharing with the selected people failed. Share the projects by hand."))
             names = {}
             for p in data.get("people", []):  # the new account ids of the mapped people -> their names from the file
                 o = _oid(p.get("user_id"))
@@ -2245,7 +2245,7 @@ def umz_run(uid, iid, opts):
         from .orgimport import oi_drop_empty_pb
         oi_drop_empty_pb(c, run, uid)  # 2.137.1 (#2399): the personal office made for this run, if it stayed empty
         print(f"account import of user {uid} failed: {type(e).__name__}", flush=True)
-        _set(uid, iid, state="failed", error=[N_("The import failed. Nothing was taken over. Please try again later or ask the server admin (server log).")])
+        _set(uid, iid, state="failed", error=[N_("The import failed. Nothing was imported. Please try again later or ask the server admin (server log).")])
     finally:
         try:
             p = os.path.join(_dir(uid, iid), "upload.bin")
@@ -2894,7 +2894,7 @@ def umz_go(iid):
     # 2.362.3 (#3098): the same source, and going on takes over only what the chosen target does not have yet
     if b.get("again") is not True and umz_earlier(c, uid, st.get("src") or "", st.get("export_id") or ""):
         c.rollback()
-        return err(tr("This export was imported already. Confirm that you want to import it again: what is already in the chosen place is skipped."), 409)
+        return err(tr("This export was imported already. Confirm that you want to import it again: what is already in the selected place is skipped."), 409)
     tg = b.get("target", "private")
     org = None
     if tg != "private":

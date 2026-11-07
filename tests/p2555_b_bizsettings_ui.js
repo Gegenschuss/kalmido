@@ -10,7 +10,7 @@
 // - the paper size hint once (only in the letterhead part); the industry packs only on their cards (a link in the rules)
 // - travel expenses / entertainment receipts under Bank & taxes, not Packs
 // - every label[for] points to an element; no empty label (the agents switch); the locked home currency's label too
-// - "Choose country" of a new office stays in Settings and leads to the country pack field
+// - "Select country" of a new office stays in Settings and leads to the country pack field
 // - a member sees "Only admins and the bookkeeping change this." once
 const {execFileSync} = require('child_process');
 const path = require('path');
@@ -59,12 +59,12 @@ async function openBiz(who) {
     check(!!form, `${who}: the office settings in Settings > Company & office`);
     if (!form) { w.close(); continue; }
     const box = d.querySelector('#s-biz');
-    // "Choose country" of the new office (first, before anything is saved): stays in Settings, to the country pack field
+    // "Select country" of the new office (first, before anything is saved): stays in Settings, to the country pack field
     const slim = await until(() => box.querySelector('.ocf-slim [data-ocf="to-pack"]'), 40);
-    check(!!slim && !box.querySelector('.ocf-slim [data-go]'), `${who}: the new office's "Choose country" stays on the page`);
+    check(!!slim && !box.querySelector('.ocf-slim [data-go]'), `${who}: the new office's "Select country" stays on the page`);
     if (slim) {
       click(w, slim);
-      check(!!d.querySelector('.smodal') && !!(await until(() => d.querySelector('#s-biz #os-pack')?.closest('.row.sflash'), 20)) && w.location.hash !== '#office/pipeline' && w.location.hash !== '#office/offers', `${who}: "Choose country" marks the country pack field, Settings stay open`);
+      check(!!d.querySelector('.smodal') && !!(await until(() => d.querySelector('#s-biz #os-pack')?.closest('.row.sflash'), 20)) && w.location.hash !== '#office/pipeline' && w.location.hash !== '#office/offers', `${who}: "Select country" marks the country pack field, Settings stay open`);
     }
     // the head: the area as text, no workspace menu
     check(!box.querySelector('[data-act="ws-menu"]'), `${who}: no workspace menu in Company & office`);

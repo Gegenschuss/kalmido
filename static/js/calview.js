@@ -5,7 +5,7 @@
 'use strict';
 // Settings > Integrations > Calendars (own requests, applied at once) + the admin allow-list (Settings > Users)
 function calsHtml(chk, hint) {
-  if (!S.calendars?.enabled) return `<h4 id="s-cals-h">${tr('Calendars')}</h4>${hintK(tr('Calendar subscriptions are turned off on this server'))}`;
+  if (!S.calendars?.enabled) return `<h4 id="s-cals-h">${tr('Calendars')}</h4>${hintK(tr('Calendar subscriptions are switched off on this server'))}`;
   return `<h4 id="s-cals-h">${tr('Calendars')}</h4>
     ${hint(tr('Show events from Google Calendar, iCloud, Outlook or any CalDAV server next to your tasks: in the calendar, the timeline and on Today. Only you see them. Read-only, unless you allow writing for a CalDAV calendar (Edit).'))}
     <div class="members" id="s-cals"><div class="muted mhint">${tr('Loading…')}</div></div>
@@ -137,7 +137,7 @@ function calAddModal(done) {
         b.textContent = tr('Add'); return;
       }
       const cals = found.filter((_, i) => $(`[data-ci="${i}"]`, md)?.checked);
-      if (!cals.length) { showErr(tr('Choose at least one calendar')); return; }
+      if (!cals.length) { showErr(tr('Select at least one calendar')); return; }
       const j = await calReq('POST', '/api/calendars', {kind, ...auth, interval, calendars: cals});
       md.remove();
       toast(j.errors?.length ? tr('{0} added, {1} failed: {2}', j.created.length, j.errors.length, j.errors[0].error) : trn('{0} calendar added', '{0} calendars added', j.created.length));

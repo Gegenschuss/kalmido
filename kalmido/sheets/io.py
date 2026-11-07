@@ -1104,9 +1104,9 @@ def shx_report_text(rep):
     if rep.get("sheets_total", 0) > rep.get("sheets", 1):
         out.append(trn("{0} sheet left out (at most {1} per table)", "{0} sheets left out (at most {1} per table)", rep["sheets_total"] - rep["sheets"], rep["sheets"]))
     if rep["formulas"]:
-        out.append(trn("{0} formula taken over", "{0} formulas taken over", rep["formulas"]))
+        out.append(trn("{0} formula imported", "{0} formulas imported", rep["formulas"]))
     if rep["as_value"]:
-        out.append(trn("{0} formula taken over as a value", "{0} formulas taken over as a value", rep["as_value"]))
+        out.append(trn("{0} formula imported as a value", "{0} formulas imported as a value", rep["as_value"]))
     if rep["options_added"]:
         out.append(trn("{0} value added as a new choice", "{0} values added as new choices", rep["options_added"]))
     if rep.get("fmt_left_out"):  # 2.578.0 (#3462, review G1)

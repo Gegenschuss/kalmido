@@ -144,7 +144,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
   check(g(o3).due === addD(T0, -2), 'view-only task untouched');
   check(g(onToday).due === T0, 'a task due today is not touched');
   await until(() => /skipped/.test(d.querySelector('#toast')?.textContent || ''), 2000);
-  check(/3 tasks changed/.test(d.querySelector('#toast')?.textContent || '') && /1 task skipped \(view only\)/.test(d.querySelector('#toast')?.textContent || ''), 'toast counts moved and skipped: ' + d.querySelector('#toast')?.textContent);
+  check(/3 tasks changed/.test(d.querySelector('#toast')?.textContent || '') && /1 task skipped \(read-only\)/.test(d.querySelector('#toast')?.textContent || ''), 'toast counts moved and skipped: ' + d.querySelector('#toast')?.textContent);
   check(w.eval('HIST.undo.length') === h0 + 1, 'one undo step');
   await until(() => !w.eval('HIST.busy'));
   check(ban() && /Overdue\s*1(?!\d)/.test(ban().textContent), 'Overdue now holds the view-only one only: ' + ban()?.textContent);
@@ -162,7 +162,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,
   await until(async () => (await st()).tasks.find(t => t.id === o2)?.due === addD(T0, -1));
   await sleep(300);
   // pick a date opens the picker
-  other('Pick a date…'); await sleep(100);
+  other('Select a date…'); await sleep(100);
   check(w.eval('!!DP.el'), 'Pick a date… opens the date picker');
   w.eval('dpClose(false)');
   // only on Today

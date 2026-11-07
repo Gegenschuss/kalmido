@@ -136,7 +136,7 @@ LE2A_BLOCKERS = {
     "inbox": N_("The basket cannot be encrypted."),
     "agent": N_("Remove the agent from the project first: agents cannot read encrypted projects."),
     "public_link": N_("Remove the public link of the project first."),
-    "org_open": N_("Turn off \"Everyone in the organisation\" for this project first."),
+    "org_open": N_("Switch off \"Everyone in the organisation\" for this project first."),
     "participant": N_("Change the role \"Participant\" first: projects encrypted in the browser have no participants."),
     "folder_participant": N_("A folder share with the role \"Participant\" reaches this project: change it first."),
     "note_lock": N_("Unlock the notes locked with a password in this project first."),
@@ -145,7 +145,7 @@ LE2A_BLOCKERS = {
     # 2.64.1 review (M3): lists the server itself writes texts into
     "family": N_("Projects of the Family module cannot be encrypted yet."),
     "life": N_("Projects of Home & life cannot be encrypted yet."),
-    "generator": N_("Birthdays from an address book land in this project: choose another project for them first."),
+    "generator": N_("Birthdays from an address book land in this project: select another project for them first."),
 }
 
 
@@ -499,7 +499,7 @@ def le2a_member_problem(c, lid, uid, role):
     if u and is_agent(u):
         return tr("Agents cannot be members of a project encrypted in the browser.")
     if role == "participant":
-        return tr("Projects encrypted in the browser have no participants. Choose another role.")
+        return tr("Projects encrypted in the browser have no participants. Select another role.")
     return None
 
 
@@ -510,7 +510,7 @@ def le2a_folder_problem(c, owner, folder, role, uid=None):
         return None
     for r in c.execute("SELECT folder FROM lists WHERE owner_id=? AND e2e IS NOT NULL", (owner,)).fetchall():
         if _in_folder(r["folder"], folder):
-            return tr("This folder holds projects encrypted in the browser: they have no participants. Choose another role.")
+            return tr("This folder holds projects encrypted in the browser: they have no participants. Select another role.")
     return None
 
 

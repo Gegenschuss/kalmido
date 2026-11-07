@@ -9,7 +9,7 @@ function wpState(md, j = md._wp) {
   // 2.499.0 (#4215): on Web Push the public ntfy.sh gets no fallback, the message stays in the app
   const noFb = j.ntfy_public && ch !== 'both';
   el.textContent = ch === 'ntfy' ? tr('Everything goes to ntfy.')
-    : !n ? (j.ntfy && !noFb ? tr('No device subscribed for push yet. Until then, notifications go to your ntfy topic.') : tr('No device subscribed for push yet. Turn on “Notify on this device” below.'))
+    : !n ? (j.ntfy && !noFb ? tr('No device subscribed for push yet. Until then, notifications go to your ntfy topic.') : tr('No device subscribed for push yet. Switch on “Notify on this device” below.'))
     : ch === 'both' ? trn('Web Push to {0} device and ntfy.', 'Web Push to {0} devices and ntfy.', n)
     : noFb ? trn('Web Push to {0} device.', 'Web Push to {0} devices.', n)
     : trn('Web Push to {0} device. ntfy only if no device accepts a push.', 'Web Push to {0} devices. ntfy only if no device accepts a push.', n);
@@ -26,7 +26,7 @@ async function wpDraw(md) {
   // 2.555.0 C (#4664): the iPhone app / a browser without Web Push: the sentence stands once, in the status line on top (#s-pushnow)
   const top = !!$('#s-pushnow', md);
   if (shellIOS()) h += top ? '' : hintK(tr('Notifications are not available in the iPhone app yet.'));  // 2.435.0 B (#3578)
-  else if (isIOS() && !isStandalone()) h += hintK(tr('Add Kalmido to your Home Screen to get notifications on iPhone: Share > Add to Home Screen (iOS 16.4 or newer), then open it from there and turn it on here.'));
+  else if (isIOS() && !isStandalone()) h += hintK(tr('Add Kalmido to your Home Screen to get notifications on iPhone: Share > Add to Home Screen (iOS 16.4 or newer), then open it from there and switch it on here.'));
   else if (!wpSupported()) h += top ? '' : hintK(tr('This browser does not support Web Push'));
   else {
     h += `<div class="row"><label>${tr('Web Push')}</label><label class="chkl"><input type="checkbox" id="s-wpdev" ${mine ? 'checked' : ''}> ${tr('Notify on this device')}</label>${mine && !top ? `<button class="btn sm" data-m="wp-test" data-sub="${mine.id}">${ic('bell', 's')} ${tr('Send test to this device')}</button>` : ''}</div>`;  // 2.555.0 C (#4664): the device test once
@@ -38,13 +38,13 @@ async function wpDraw(md) {
   }
   box.innerHTML = h;
   wpState(md, j);
-  // 2.25.0 (UX-46): on top of Notifications, in one line: does THIS device ring? With "Turn on" / "Send test"
+  // 2.25.0 (UX-46): on top of Notifications, in one line: does THIS device ring? With "Switch on" / "Send test"
   const now = $('#s-pushnow', md);
   if (now) {
     const can = wpSupported() && !shellIOS() && !(isIOS() && !isStandalone()) && Notification.permission !== 'denied';
     now.className = 'pushnow ' + (mine ? 'on' : 'off');
-    now.innerHTML = `${ic(mine ? 'bellring' : 'belloff', 's')}<span><b>${mine ? tr('This device gets notifications') : tr('This device gets no notifications')}</b>${mine ? '' : `<small>${esc(shellIOS() ? tr('Notifications are not available in the iPhone app yet.') : !wpSupported() ? tr('This browser does not support Web Push') : isIOS() && !isStandalone() ? tr('Add Kalmido to the Home Screen first') : Notification.permission === 'denied' ? tr('Blocked in the browser or system settings') : j.subs.length ? trn('{0} other device does', '{0} other devices do', j.subs.length) : tr('No device is turned on yet'))}</small>`}</span>`
-      + (mine ? `<button class="btn sm" data-m="wp-test" data-sub="${mine.id}">${ic('bell', 's')} ${tr('Send test')}</button>` : can ? `<button class="btn sm pri" data-m="wp-on">${tr('Turn on')}</button>` : '');
+    now.innerHTML = `${ic(mine ? 'bellring' : 'belloff', 's')}<span><b>${mine ? tr('This device gets notifications') : tr('This device gets no notifications')}</b>${mine ? '' : `<small>${esc(shellIOS() ? tr('Notifications are not available in the iPhone app yet.') : !wpSupported() ? tr('This browser does not support Web Push') : isIOS() && !isStandalone() ? tr('Add Kalmido to the Home Screen first') : Notification.permission === 'denied' ? tr('Blocked in the browser or system settings') : j.subs.length ? trn('{0} other device does', '{0} other devices do', j.subs.length) : tr('No device is switched on yet'))}</small>`}</span>`
+      + (mine ? `<button class="btn sm" data-m="wp-test" data-sub="${mine.id}">${ic('bell', 's')} ${tr('Send test')}</button>` : can ? `<button class="btn sm pri" data-m="wp-on">${tr('Switch on')}</button>` : '');
   }
 }
 // Settings: tabbed dialog (vertical tab list on the left on desktop, a horizontally scrollable tab strip on phones).
@@ -332,7 +332,7 @@ function modRowHtml(k, opt = () => '') {
   const adm = !!S.me?.is_admin;
   const n = FEATS.find(x => x[0] === k)?.[1] || k, srv = k === 'collab' ? S.collabAll !== false : k === 'time' ? S.timeAll !== false : true;
   const all = adm && (k === 'collab' || k === 'time') ? `<label class="mall" title="${esc(k === 'collab' ? tr('Off: nobody can share projects, assign tasks, comment, or get News and collaboration notifications; shared projects are then only visible to their owner.') : tr('Off: nobody sees timers, time entries or reports; running timers are stopped at that moment, focus sessions no longer become time entries.'))}"><span class="swc"><input type="checkbox" id="${k === 'collab' ? 's-collaball' : 's-timeall'}" ${srv ? 'checked' : ''}><span class="swt" aria-hidden="true"></span></span><span>${tr('for everyone')}</span></label>${ad_markHtml(k === 'collab' ? 's-collaball-a' : 's-timeall-a')}` : '';
-  return `<div class="modrow ${feat(k) ? '' : 'off'}" data-modrow="${k}"><label class="mmain"><span class="swc"><input type="checkbox" data-feat="${k}" ${feat(k) ? 'checked' : ''} ${srv ? '' : 'disabled'}><span class="swt" aria-hidden="true"></span></span><span><b>${tr(n)}</b><small class="muted">${tr((!(S.me?.workspaces || []).length && FEAT_DESC_SOLO[k]) || MOD_DESC[k] || FEAT_DESC[k] || '')}</small>${modPrivHtml([k])}${srv ? '' : `<small class="muted cnote" id="${k === 'collab' ? 's-collabnote' : 's-timenote'}">${tr('Turned off on this server, for everyone. Your own setting applies again once an admin turns it back on.')}</small>`}</span></label>${all}${opt(k)}</div>`;
+  return `<div class="modrow ${feat(k) ? '' : 'off'}" data-modrow="${k}"><label class="mmain"><span class="swc"><input type="checkbox" data-feat="${k}" ${feat(k) ? 'checked' : ''} ${srv ? '' : 'disabled'}><span class="swt" aria-hidden="true"></span></span><span><b>${tr(n)}</b><small class="muted">${tr((!(S.me?.workspaces || []).length && FEAT_DESC_SOLO[k]) || MOD_DESC[k] || FEAT_DESC[k] || '')}</small>${modPrivHtml([k])}${srv ? '' : `<small class="muted cnote" id="${k === 'collab' ? 's-collabnote' : 's-timenote'}">${tr('Switched off on this server, for everyone. Your own setting applies again once an admin switches it back on.')}</small>`}</span></label>${all}${opt(k)}</div>`;
 }
 // 2.46.6 (#1710): an admin switch that stays next to the own setting says so: "Admin · applies to everyone" + a jump to
 // the same switch under Administration (adSel = the id there)
@@ -458,7 +458,7 @@ async function mcpGrantsDraw(md) {
       <small class="muted">${esc(tr('Agent: {0}', x.agent.name))} · ${esc(tr('given {0}', when(x.created_at)))} · ${esc(tr('last used {0}', when(x.last_used_at)))}</small></span>
     <button class="btn sm danger" data-mcpg-act="revoke" aria-label="${esc(tr('Disconnect {0}', x.client))}">${tr('Disconnect')}</button></div>`;
   box.innerHTML = `<h4 id="s-mcpgr-h">${tr('Connected apps')}</h4>
-    ${j.on ? `<div class="shint keep">${esc(tr('Apps with an MCP connector (e.g. a chat app or an editor) connect here; you choose the agent whose permissions they get.'))}</div>
+    ${j.on ? `<div class="shint keep">${esc(tr('Apps with an MCP connector (e.g. a chat app or an editor) connect here; you select the agent whose permissions they get.'))}</div>
     <div class="row"><label for="s-mcpurl">${tr('Connector address')}</label><input id="s-mcpurl" readonly value="${esc(j.url)}"></div>` : ''}
     <div class="members" aria-labelledby="s-mcpgr-h">${j.grants.map(row).join('') || `<div class="muted mhint">${tr('No app is connected.')}</div>`}</div>`;
 }
@@ -737,7 +737,7 @@ function settingsModal(focus) {
       ${rsy_sideSetHtml(chk) /* 2.56.1 (#1799) */}${lc_favSetHtml(chk, hint)}${sv_setHtml() /* 2.156.0 D (#2186) */}`,
     general: `<h4 id="s-lang-h">${tr('Language')}</h4>
       <div class="row"><div class="seg" id="s-lang" role="group" aria-labelledby="s-lang-h">${(S.languages || []).map(L => `<button data-lang-set="${esc(L.code)}" class="${(s.lang || 'en') === L.code ? 'on' : ''}" lang="${esc(L.code)}">${langName(L)}</button>`).join('')}</div></div>
-      ${hint(tr('Quick add understands English, German and the language chosen here.'))}
+      ${hint(tr('Quick add understands English, German and the language selected here.'))}
       <h4 id="s-startpg-h">${tr('Start page')}</h4>
       <div class="row"><label for="s-startpg">${tr('Open the app on')}</label><select id="s-startpg">${START_PAGES.map(([v, n]) => `<option value="${v}" ${(s.start_page || 'home') === v ? 'selected' : ''}>${esc(tr(n))}</option>`).join('')}${st_areaOpts(s.start_page) /* 2.575.0 D (#4051) */}</select></div>
       ${typeof ind_setHtml === 'function' ? ind_setHtml(hint) : '' /* 2.578.0 (#4573): acctset.js */}
@@ -748,7 +748,7 @@ function settingsModal(focus) {
       ${depsOn() ? `<div class="row">${chk('s-hideblk', s.hide_blocked_today === '1', tr('Hide tasks that are still blocked by another task'))}</div>` : ''}
       <h4 id="s-dates-h">${tr('Changing and completing tasks')}</h4>
       <div class="row">${chk('s-dateok', s.date_confirm === '1', tr('Confirm changes of the date with OK'))}</div>
-      ${hint(tr('Off: saved as soon as you pick it, “Undo” takes it back. On: changes wait for OK.'))}
+      ${hint(tr('Off: saved as soon as you select it, “Undo” reverses it. On: changes wait for OK.'))}
       <div class="row">${chk('s-celebrate', s.celebrate !== '0', tr('Celebrate completions'))}</div>
       ${hint(tr('When Today is cleared or a project is complete, the Kalmido figure hops by with a one-liner. With reduced motion (system setting) it just says hello.'))}
       <div class="row">${chk('s-progsub', s.progress_subtasks === '1', tr('Count subtasks in the progress of a project'))}</div>
@@ -764,7 +764,7 @@ function settingsModal(focus) {
       <div class="row"><label for="s-pushch">${tr('Channel|push')}</label><select id="s-pushch">${[['webpush', N_('Web Push')], ['ntfy', 'ntfy'], ['both', N_('Both')]].map(([v, n]) => `<option value="${v}" ${(s.push_channel || 'webpush') === v ? 'selected' : ''}>${v === 'ntfy' ? n : tr(n)}</option>`).join('')}</select><button class="btn sm" data-m="ptest">${ic('bell', 's')} ${tr('Test all channels')}</button></div>
       ${prio}
       <div class="shint wpstate" id="s-wpstate"></div>
-      ${hint(tr('No extra app needed. Turn it on below on every device that should ring.'))}
+      ${hint(tr('No extra app needed. Switch it on below on every device that should ring.'))}
       <h4>${tr('This device')}</h4>
       <div id="s-wp"><div class="muted">${tr('Loading…')}</div></div>` : ''}
       <div id="s-ntfy"><h4>${S.webpush?.enabled ? 'ntfy' : tr('Notifications (ntfy)')}</h4>
@@ -1096,7 +1096,7 @@ function settingsModal(focus) {
     if (e.target.id !== 's-wpdev') return;
     e.target.disabled = true;
     try { if (e.target.checked ? await wpEnable() : await wpDisable()) toast(e.target.checked ? tr('Notifications on for this device') : tr('Notifications off for this device')); }
-    catch (x) { if (x.message !== 'auth') toast(tr('Could not turn on notifications: {0}', x.message || x)); }
+    catch (x) { if (x.message !== 'auth') toast(tr('Could not switch on notifications: {0}', x.message || x)); }
     await wpDraw(md);
   });
   const tabDraw = () => {
@@ -1230,28 +1230,28 @@ const IMP_ACCEPT = {todoist: '.csv,.zip,.json,text/csv,application/zip,applicati
   jira: '.csv,text/csv', linear: '.csv,text/csv', csv: '.csv,.tsv,.txt,text/csv,text/tab-separated-values', markdown: '.md,.markdown,.txt,text/markdown,text/plain'};  // 2.142.0 B (#2147)
 function impHelp(src) {
   return {
-    todoist: tr('<b>Todoist:</b> open the project > … > Export as a CSV file (one file per project), or Settings > Backups > download a backup (a ZIP with every project). Sections, subtasks, @labels, priorities, dates (English and German date texts, also recurring ones), durations and comments are taken over; attachments stay links. The project is named after the file.'),
+    todoist: tr('<b>Todoist:</b> open the project > … > Export as a CSV file (one file per project), or Settings > Backups > download a backup (a ZIP with every project). Sections, subtasks, @labels, priorities, dates (English and German date texts, also recurring ones), durations and comments are imported; attachments stay links. The project is named after the file.'),
     trello: tr('<b>Trello:</b> open the board > Menu > Print, export and share > Export as JSON. Lists become sections of one project (or one project each, see below), cards tasks, checklists subtasks, labels tags, due dates and “complete” are kept; comments and attachment links go into the notes. Archived cards are skipped unless you choose otherwise.'),
-    asana: tr('<b>Asana:</b> open the project > arrow next to its name > Export / Print > CSV. Sections, subtasks, tags, start and due dates and completion are taken over, other fields go into the notes. An assignee is assigned when they are a member of the target project (same e-mail or name), otherwise their name goes into the notes.'),
+    asana: tr('<b>Asana:</b> open the project > arrow next to its name > Export / Print > CSV. Sections, subtasks, tags, start and due dates and completion are imported, other fields go into the notes. An assignee is assigned when they are a member of the target project (same e-mail or name), otherwise their name goes into the notes.'),
     mstodo: tr('<b>Microsoft To Do</b> has no export of its own. Recommended: classic Outlook for Windows > File > Open & Export > Import/Export > Export to a file > Comma Separated Values > your Tasks folder (Outlook for Mac: File > Export > Tasks). CSV files of export tools (columns such as Title, List, Status, Importance, Due) and ICS files work too. English and German Outlook columns are recognised, also in Windows-1252.'),
-    ics: tr('<b>ICS files with tasks (VTODO):</b> Nextcloud Tasks (calendar > … > Export), Thunderbird (right-click the calendar > Export), Apple Reminders via an export app or a CalDAV server, Tasks.org via its CalDAV account. Each calendar becomes a project; subtasks, repetitions, reminders, categories (tags), priorities and completion are taken over.'),
-    ticktick: tr('<b>TickTick:</b> Settings > Account > Generate backup (CSV). Lists, sections, subtasks, tags, dates and reminders are taken over.'),
+    ics: tr('<b>ICS files with tasks (VTODO):</b> Nextcloud Tasks (calendar > … > Export), Thunderbird (right-click the calendar > Export), Apple Reminders via an export app or a CalDAV server, Tasks.org via its CalDAV account. Each calendar becomes a project; subtasks, repetitions, reminders, categories (tags), priorities and completion are imported.'),
+    ticktick: tr('<b>TickTick:</b> Settings > Account > Generate backup (CSV). Lists, sections, subtasks, tags, dates and reminders are imported.'),
     // 2.142.0 B (#2147)
-    notion: tr('<b>Notion:</b> Settings > Workspace > Export all workspace content (or … on a page > Export) > Markdown & CSV, include subpages. Choose the ZIP as it is (parts inside it are read too). Every database becomes a project (name, status, date, tags and priority are recognised, other properties go into the notes), pages with checkboxes become projects with tasks. People stay names in the notes.'),
-    gtasks: tr('<b>Google Tasks:</b> takeout.google.com > deselect all > select Tasks > create the export, then choose the ZIP (or the Tasks.json inside it). Lists, subtasks, due dates, notes and completion are taken over.'),
-    clickup: tr('<b>ClickUp:</b> open the list or space > … > Export > CSV, all columns. Lists (in folders), subtasks, checklists, tags, priorities, start and due dates, estimates and comments are taken over; assignees stay names in the notes.'),
+    notion: tr('<b>Notion:</b> Settings > Workspace > Export all workspace content (or … on a page > Export) > Markdown & CSV, include subpages. Select the ZIP as it is (parts inside it are read too). Every database becomes a project (name, status, date, tags and priority are recognised, other properties go into the notes), pages with checkboxes become projects with tasks. People stay names in the notes.'),
+    gtasks: tr('<b>Google Tasks:</b> takeout.google.com > deselect all > select Tasks > create the export, then select the ZIP (or the Tasks.json inside it). Lists, subtasks, due dates, notes and completion are imported.'),
+    clickup: tr('<b>ClickUp:</b> open the list or space > … > Export > CSV, all columns. Lists (in folders), subtasks, checklists, tags, priorities, start and due dates, estimates and comments are imported; assignees stay names in the notes.'),
     // 2.394.0 A (#3377): issue type, story points and sprint are taken over now
     jira: tr('<b>Jira:</b> Filters > search the issues > Export > Export CSV (all fields). Each Jira project becomes a project; sub-tasks and child issues become subtasks, labels tags; priorities, due dates, issue types (Bug, Story, Task), story points and the sprint of open issues are kept; the issue key, description and components go into the notes, assignees stay names.'),
-    linear: tr('<b>Linear:</b> enter a personal API key (Linear > Settings > Security & access > Personal API keys, read access is enough) - it is used only for this preview and import and never stored. Or choose the CSV export (Settings > Import / export > Export CSV). Each team becomes a project; status, priority, estimate (story points), labels (Bug and Feature set the type), cycle, due date, parent issues and comments are taken over.'),
+    linear: tr('<b>Linear:</b> enter a personal API key (Linear > Settings > Security & access > Personal API keys, read access is enough) - it is used only for this preview and import and never stored. Or select the CSV export (Settings > Import / export > Export CSV). Each team becomes a project; status, priority, estimate (story points), labels (Bug and Feature set the type), cycle, due date, parent issues and comments are imported.'),
     csv: tr('<b>Any CSV file</b> (also from a spreadsheet): one row per task. Columns such as Title / Name / Task, Due / Date, Notes / Description, List / Project, Section, Priority, Tags and Done / Status are recognised in English and German; every other column goes into the notes. The preview shows which column went where.'),
     markdown: tr('<b>Markdown checklist</b> (Obsidian, Logseq, a README …): headings become projects (deeper headings sections), - [ ] and - [x] tasks, indented items subtasks, text below a task its notes. Only clear dates (2025-01-15 or 15.01.2025) and #tags are read.'),
   }[src] || '';
 }
 // 2.5.2 (K15): an own file button in the app's language (+ the chosen file's name) instead of the browser's "Browse… No file selected."
-const fileBtn = (id, accept) => `<span class="filebtn"><label class="btn sm">${ic('file', 's')} ${tr('Choose a file…')}<input type="file" id="${id}" accept="${esc(accept)}" hidden></label><span class="muted fname" id="${id}-name">${tr('No file chosen')}</span></span>`;
+const fileBtn = (id, accept) => `<span class="filebtn"><label class="btn sm">${ic('file', 's')} ${tr('Select a file…')}<input type="file" id="${id}" accept="${esc(accept)}" hidden></label><span class="muted fname" id="${id}-name">${tr('No file selected')}</span></span>`;
 document.addEventListener('change', e => {
   const f = e.target; if (!f?.matches?.('.filebtn input[type=file]')) return;
-  const n = document.getElementById(f.id + '-name'); if (n) n.textContent = f.files?.[0]?.name || tr('No file chosen');
+  const n = document.getElementById(f.id + '-name'); if (n) n.textContent = f.files?.[0]?.name || tr('No file selected');
 }, true);
 function impInit(md) {
   const I = {src: 'todoist', file: null, key: '', opts: {}, last: null};
@@ -1279,7 +1279,7 @@ function impInit(md) {
       ? trn('Preview: {0} task will be created', 'Preview: {0} tasks will be created', n) + (j.skipped ? ' · ' + trn('{0} is already there and will be skipped', '{0} are already there and will be skipped', j.skipped) : '')
       : trn('Imported: {0} task', 'Imported: {0} tasks', n) + (j.skipped ? ' · ' + trn('{0} skipped (already there)', '{0} skipped (already there)', j.skipped) : '');
     const ls = j.lists.map(l => `<div class="mrow"><span class="n">${esc(l.name)}</span><span class="muted">${trn('{0} task', '{0} tasks', l.tasks)}${l.skipped ? ' · ' + tr('{0} skipped', l.skipped) : ''}${l.sections ? ' · ' + trn('{0} new section', '{0} new sections', l.sections) : ''} · ${l.existing ? tr('existing project') : tr('new project')}</span></div>`).join('');
-    const opts = j.dry_run ? sel('s-imp-target', tr('Into'), [['new', tr('New projects (an own project with the same name is reused)')], ...lists().map(l => [String(l.id), lname(l)])], I.opts.target || 'new')
+    const opts = j.dry_run ? sel('s-imp-target', tr('Into'), [['new', tr('New projects (your own project with the same name is reused)')], ...lists().map(l => [String(l.id), lname(l)])], I.opts.target || 'new')
       + (wsOn() && !(I.opts.target && I.opts.target !== 'new') ? sel('s-imp-space', tr('Workspace'), wsOptions().filter(w => w !== 'all').map(w => [w, wsName(w)]), I.opts.space) : '')  // 2.87.9 (#1940)
       + (I.src === 'trello' ? sel('s-imp-mode', tr('Trello lists'), [['sections', tr('as sections of one project')], ['lists', tr('as separate projects (in a folder)')]], I.opts.mode || 'sections')
         + sel('s-imp-archived', tr('Archived cards'), [['skip', tr('skip')], ['done', tr('import as completed')]], I.opts.archived || 'skip') : '')
@@ -1313,7 +1313,7 @@ function impInit(md) {
   }
   hist();
   $('#s-imp-src', md).addEventListener('change', e => {
-    I.src = e.target.value; I.opts = {}; I.file = null; inp.value = ''; unkey(); $('#s-imp-keyrow', md).hidden = I.src !== 'linear'; const fn = $('#s-import-name', md); if (fn) fn.textContent = tr('No file chosen'); inp.accept = IMP_ACCEPT[I.src] || ''; out.innerHTML = '';
+    I.src = e.target.value; I.opts = {}; I.file = null; inp.value = ''; unkey(); $('#s-imp-keyrow', md).hidden = I.src !== 'linear'; const fn = $('#s-import-name', md); if (fn) fn.textContent = tr('No file selected'); inp.accept = IMP_ACCEPT[I.src] || ''; out.innerHTML = '';
     $('#s-imp-help', md).innerHTML = impHelp(I.src);
   });
   inp.addEventListener('change', async e => {
@@ -1412,7 +1412,7 @@ const ALLOWP = [['calendar', N_('Calendars')], ['carddav', N_('Address books (Ca
 function cer_html(a, hint) {
   const ls = a.client_errors_lists || [], cur = a.client_errors_list || 0;
   return `<h4 id="s-cer-h">${tr('Errors in the browser')}</h4>
-    ${hint(tr('An unexpected error in the app becomes a bug ticket in this project: only the message, the place in the code, the version and the open area; never texts of tasks or form values. To choose from: projects with error reports on (project dialog > Repository).'))}
+    ${hint(tr('An unexpected error in the app becomes a bug ticket in this project: only the message, the place in the code, the version and the open area; never texts of tasks or form values. To select from: projects with error reports on (project dialog > Repository).'))}
     <div class="row"><label for="s-cerlist">${tr('Report to')}</label><select id="s-cerlist"><option value="0">${tr('Off')}</option>${ls.map(l => `<option value="${l.id}"${l.id === cur ? ' selected' : ''}>${esc(l.name)}</option>`).join('')}${cur && !ls.some(l => l.id === cur) ? `<option value="${cur}" selected>${tr('(Project of another admin)')}</option>` : ''}</select></div>`;  // 2.555.0 C (#4664): reports running into a project not in my list are not shown as Off
 }
 async function cer_setList(el) {
@@ -1539,7 +1539,7 @@ function sh_pubKindsHtml(a) {
 async function sh_pubKind(md, el, fromHist) {
   const k = el.dataset.pubk, on = el.checked, was = S.about?.public_links_off || [];
   const off = on ? was.filter(x => x !== k) : [...new Set([...was, k])];
-  if (!on && !fromHist && !await askConfirm(tr('Turn these public links off?'), tr('Every link of this kind stops working at once; nothing is deleted.'), {ok: tr('Turn off'), danger: true})) { el.checked = true; return; }
+  if (!on && !fromHist && !await askConfirm(tr('Turn these public links off?'), tr('Every link of this kind stops working at once; nothing is deleted.'), {ok: tr('Switch off'), danger: true})) { el.checked = true; return; }
   try {
     let j; try { j = await rawFetch('PATCH', '/api/admin/settings', {public_links_off: off}); } catch (x) {
       if (x.data?.reauth_needed) { if (!await reauthFresh(x.data)) throw x; j = await api('PATCH', '/api/admin/settings', {public_links_off: off}); } else {  // 2.611.0 (#4019)
@@ -1559,10 +1559,10 @@ async function adminSwitch(md, el, fromHist) {
   const on = el.checked;
   const ask = async (t, b, ok) => fromHist || await askConfirm(t, b, {ok, danger: true});
   const key = ADMIN_SW[el.id][0];
-  if (key === 'collab_all' && !on && !await ask(tr('Turn collaboration off for everyone?'), tr('Shared projects are then only visible to their owner; nothing is deleted.'), tr('Turn off'))) { el.checked = true; return; }
-  if (key === 'time_all' && !on && !await ask(tr('Turn time tracking off for everyone?'), tr('Running timers are stopped now; entries are kept.'), tr('Turn off'))) { el.checked = true; return; }
+  if (key === 'collab_all' && !on && !await ask(tr('Turn collaboration off for everyone?'), tr('Shared projects are then only visible to their owner; nothing is deleted.'), tr('Switch off'))) { el.checked = true; return; }
+  if (key === 'time_all' && !on && !await ask(tr('Turn time tracking off for everyone?'), tr('Running timers are stopped now; entries are kept.'), tr('Switch off'))) { el.checked = true; return; }
   if (el.id === 's-2fareq' && on && !await ask(tr('Require two-factor authentication?'), tr('Everyone who signs in with a password must set it up at the next sign-in (sessions that are open now stay open).'), tr('Require'))) { el.checked = false; return; }
-  if (el.id === 's-publinks' && !on && !await ask(tr('Turn public links off for everyone?'), tr('Every public link stops working at once; nothing is deleted.'), tr('Turn off'))) { el.checked = true; return; }
+  if (el.id === 's-publinks' && !on && !await ask(tr('Turn public links off for everyone?'), tr('Every public link stops working at once; nothing is deleted.'), tr('Switch off'))) { el.checked = true; return; }
   try {
     // 2.306.0 Fix-1 (#2875 review): accounts by the sign-on's admin rule: switched on with the account password.
     // 2.360.0 A (#2496): every security switch (core/instance.py AUTH_SWITCHES) asks for it when it changes
@@ -1596,7 +1596,7 @@ async function icalDraw(md, j) {
   if (!j) { try { j = await api('GET', '/api/ical'); } catch { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; } }
   // 2.138.0 C (#1907): the server keeps only a hash: the link is in the answer of create / rotate once, later only "active since"
   if (!j.url && !j.active) { box.innerHTML = `<div class="row"><button class="btn sm pri" data-m="ical-create">${ic('cal', 's')} ${tr('Create subscription link')}</button></div>`; return; }
-  const at = j.created_at ? new Date(j.created_at) : null, btns = `<button class="btn sm" data-m="ical-rotate">${ic('key', 's')} ${tr('New link')}</button><button class="btn sm danger" data-m="ical-off">${tr('Turn off')}</button>`;
+  const at = j.created_at ? new Date(j.created_at) : null, btns = `<button class="btn sm" data-m="ical-rotate">${ic('key', 's')} ${tr('New link')}</button><button class="btn sm danger" data-m="ical-off">${tr('Switch off')}</button>`;
   if (!j.url) { box.innerHTML = `<div class="row"><span class="muted" id="s-icalact">${at && !isNaN(at) ? esc(tr('Subscription link active since {0}', fmtDateNum(at))) : tr('Subscription link active')}</span></div><div class="row">${btns}</div>`; return; }
   box.innerHTML = `<div class="row icalrow"><input id="s-icalurl" readonly value="${esc(j.url)}" aria-label="${tr('Subscription link')}"><button class="btn sm pri" data-m="ical-copy">${ic('copy', 's')} ${tr('Copy')}</button></div>
     <div class="shint keep" role="status">${tr('Only visible now: copy it now. If you lose it, create a new one.')}</div>
@@ -1609,7 +1609,7 @@ async function icalAction(md, a) {
     return;
   }
   if (a === 'rotate' && !await askConfirm(tr('Create a new link?'), tr('Calendars subscribed with the old one stop updating.'), {ok: tr('New link'), danger: true})) return;
-  if (a === 'off' && !await askConfirm(tr('Turn the calendar feed off?'), tr('Subscribed calendars stop updating.'), {ok: tr('Turn off'), danger: true})) return;
+  if (a === 'off' && !await askConfirm(tr('Turn the calendar feed off?'), tr('Subscribed calendars stop updating.'), {ok: tr('Switch off'), danger: true})) return;
   try { icalDraw(md, await api('POST', '/api/ical', {action: a})); } catch { /* api() showed it */ }
   if (a === 'rotate') toast(tr('New link created, the old one no longer works'));
 }

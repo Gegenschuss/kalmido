@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """2.298.0 C (#3187): less text in knowledge, agents, settings and account; the error texts that said nothing.
  - a bare 404 (Denied() without a text) says "Not found. Maybe deleted or no longer shared with you." instead of "unknown",
-   in English and in German; a 403 keeps "No permission (view only)"
+   in English and in German; a 403 keeps "No permission (read-only)"
  - the same for a person without an organisation (freelancer-matrix: settings)
  - the four broken German texts are fixed (static check of de.json): "keinm", "Eine Unterhaltung" with the wrong article,
    "im Eingabezeile ... in der aktuellen Projekt"; the encryption texts say "auch nicht der Betreiber" everywhere

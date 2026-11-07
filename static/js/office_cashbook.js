@@ -207,7 +207,7 @@ async function cbCloseModal() {
     <div class="cb-plan" aria-live="polite"></div>
     <p class="muted">${esc(tr('Closing is final and cannot be undone: afterwards no entry up to this day can change, corrections only by cancellation.'))}</p>
     <div class="aerr" role="alert"></div>
-    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save" disabled>${tr('Close for good')}</button></div>`);
+    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save" disabled>${tr('Close permanently')}</button></div>`);
   md.classList.add('ofcdlg');
   const close = fgModal(md), err = cb$('.aerr', md), go = cb$('[data-m="save"]', md);
   const preview = async () => {
@@ -224,7 +224,7 @@ async function cbCloseModal() {
   md.addEventListener('click', async ev => {
     const x = /** @type {any} */ (ev.target).closest('[data-m]'); if (!x) return;
     if (x.dataset.m === 'close') { close(); return; }
-    if (!await askConfirm(tr('Close the day for good?'), tr('This cannot be undone.'), {ok: tr('Close for good')})) return;
+    if (!await askConfirm(tr('Close the day permanently?'), tr('This cannot be undone.'), {ok: tr('Close permanently')})) return;
     try { await api('POST', `/api/office/cashbooks/${b.id}/closing`, {day: cb$('#cb-cday', md).value}); md.remove(); cbReload(true); toast(tr('Day closed')); }
     catch (y) { err.textContent = y.message || ''; }
   });

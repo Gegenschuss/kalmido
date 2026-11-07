@@ -211,12 +211,12 @@ def oi_file(ctx, path, sub, name, space=None, base=ATT_DIR, check=True, mime="",
             if strict and sc_needs_retry(_i.get("scan"), raw):  # 2.360.2 L (#2561): a file without a later scan of its own
                 raise UploadRefused(name)
         except UploadRefused:
-            run.warning(N_("A file could not be taken over: {0}"), name)
+            run.warning(N_("A file could not be imported: {0}"), name)
             return None
     rel = os.path.join(sub, f"{uuid.uuid4().hex[:12]}-{name}") if sub is not None else name
     full = os.path.realpath(os.path.join(base, rel))
     if not full.startswith(os.path.realpath(base) + os.sep):
-        run.warning(N_("A file could not be taken over: {0}"), name)
+        run.warning(N_("A file could not be imported: {0}"), name)
         return None
     os.makedirs(os.path.dirname(full), exist_ok=True)
     run.written.append(full)
@@ -255,7 +255,7 @@ def oi_write(c, run, uid, man, zf, files, data, who):
             continue
         take, space = oi_space(c, run, spec)
         if not take:
-            run.warning(N_("Not taken over into the private workspace: {0}"), (spec.label,) if spec.label else spec.path)
+            run.warning(N_("Not imported into the private workspace: {0}"), (spec.label,) if spec.label else spec.path)
             continue
         cols, _fks = umz_cols(c, spec.table)
         if not cols:
@@ -274,7 +274,7 @@ def oi_write(c, run, uid, man, zf, files, data, who):
                 fixed[col] = new
             if skip:  # 2.278.0 B (#3094): counted, one warning per area with the number (never silently; the trash stays behind)
                 if skip is True:
-                    run.warning(N_("Not taken over because the entry it belongs to is missing: {0}"), oi_area(spec))
+                    run.warning(N_("Not imported because the entry it belongs to is missing: {0}"), oi_area(spec))
                 continue
             for col, mode in spec.people.items():
                 v = src.get(col)
@@ -291,7 +291,7 @@ def oi_write(c, run, uid, man, zf, files, data, who):
                     new = uid if mode == "me" else None
                 fixed[col] = new
             if skip:  # 2.278.0 B (#3094)
-                run.warning(N_("Entries of people who were not chosen were not taken over: {0}"), oi_area(spec))
+                run.warning(N_("Entries of people who were not selected were not imported: {0}"), oi_area(spec))
                 continue
             for col in spec.space:
                 fixed[col] = space
@@ -304,7 +304,7 @@ def oi_write(c, run, uid, man, zf, files, data, who):
                 continue
             if d is None:
                 if spec.label:
-                    run.warning(N_("A row could not be taken over: {0}"), (spec.label,))  # #3808: the key, read in the reader's language
+                    run.warning(N_("A row could not be imported: {0}"), (spec.label,))  # #3808: the key, read in the reader's language
                 continue
             enc_space = space or (oc_user_space(uid) if spec.enc == "user" else None)
             if spec.enc and enc_space:
@@ -312,7 +312,7 @@ def oi_write(c, run, uid, man, zf, files, data, who):
             nid = umz_insert(c, spec.table, d, rid=spec.rid, told=bool(spec.label))  # 2.531.0 (#4317) F11: a label warns below
             if not nid:
                 if spec.label:
-                    run.warning(N_("A row could not be taken over: {0}"), (spec.label,))  # #3808: the key, read in the reader's language
+                    run.warning(N_("A row could not be imported: {0}"), (spec.label,))  # #3808: the key, read in the reader's language
                 continue
             if spec.rid:
                 run.put(spec.kind, src.get("id"), nid)
@@ -359,7 +359,7 @@ def _oi_pic(c, run, uid, zf, files, path, max_mb, process):
     try:
         out = process(_file_bytes(zf, files, path))
     except BadInput:
-        run.warning(N_("A file could not be taken over: {0}"), what)
+        run.warning(N_("A file could not be imported: {0}"), what)
         return None
     if not quota_fits(c, uid, len(out)):
         run.warning(N_("A file is empty or too large and was skipped: {0}"), what)
@@ -378,18 +378,18 @@ def oi_pictures(c, run, uid, zf, files, data):
         run.step()
         m = OI_PIC_RE.fullmatch(path)
         if not m:
-            run.warning(N_("A file could not be taken over: {0}"), (N_("Pictures"),))
+            run.warning(N_("A file could not be imported: {0}"), (N_("Pictures"),))
             continue
         tok = secrets.token_urlsafe(12)
         if m[1] is None:
             if not run.org:
-                run.warning(N_("Not taken over into the private workspace: {0}"), (N_("Symbol"),))
+                run.warning(N_("Not imported into the private workspace: {0}"), (N_("Symbol"),))
                 continue
             png = _oi_pic(c, run, uid, zf, files, path, AVATAR_MAX_MB, list_icon_process)
             if png is None:
                 continue
             if not c.execute("UPDATE orgs SET icon=? WHERE id=? AND icon=''", ("u:" + tok, run.org)).rowcount:
-                run.warning(N_("The organisation keeps its symbol: the one in the file was not taken over."))
+                run.warning(N_("The organisation keeps its symbol: the one in the file was not imported."))
                 continue
             full, kind, sealed = org_icon_path(run.org, tok), "org", run.org
             space = run.org

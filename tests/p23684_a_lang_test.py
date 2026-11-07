@@ -103,12 +103,12 @@ check(len(ck.private_term_errors({"x": "Meine Ablage", "y": "Dein persönliches 
       and ck.private_term_errors({"x": "Privat", "y": "Persönlicher Agent von {0}"}, "de.json") == [], "#4605: German third names are refused")
 keys, _, _ = ck.extract()
 check(ck.glossary_errors(keys) == [], "no variant in the code " + str(ck.glossary_errors(keys))[:300])
-check("Client number|customer" in keys and "Payment reminder|dunning" in keys and "Sign-in" in keys, "the renamed keys are in the code")
+check("Client no.|customer" in keys and "Payment reminder|dunning" in keys and "Sign-in" in keys, "the renamed keys are in the code")
 for lg in ("de", "es", "fr", "it", "nl"):
     with open(os.path.join(N, "..", "static", "i18n", lg + ".json"), encoding="utf-8") as f:
         d = json.load(f)
     check(not [k for k in ("Customer number", "Log in", "Log out", "Vacation", "Accent color", "Users") if k in d], lg + ": no old key left")
     if lg == "de":  # the German wording stays: a word of the English source changed, nothing else
-        check(d["Client number|customer"] == "Kundennummer" and d["Client number"] == "Mandantennummer" and d["Sign in"] == "Anmelden"
+        check(d["Client no.|customer"] == "Kundennummer" and d["Client number"] == "Mandantennummer" and d["Sign in"] == "Anmelden"
               and d["Holiday"] == "Urlaub" and d["Payment reminder|dunning"] == "Mahnung", "German stays as it was")
 sys.exit(done("p23684_a_lang"))

@@ -137,7 +137,7 @@ async function dp_sheet(day) {
     const v = {title: $('#dp-title', md).value.trim(), start: a + (t0 ? 'T' + t0 : ''), end: z + (t1 ? 'T' + t1 : t0 ? 'T23:59' : ''), status: $('.dpstat button.on', md)?.dataset.s || 'option',
       note: $('#dp-note', md).value, list_id: $('#dp-list', md)?.value || null, org: d.org_id, resources: $$('.dppick input:checked', md).map(x => ({kind: x.dataset.k, id: +x.value}))};
     if (!v.title) { toast(tr('Please enter a name')); $('#dp-title', md).focus(); return; }
-    if (!v.resources.length) { toast(tr('Choose at least one person or device')); return; }
+    if (!v.resources.length) { toast(tr('Select at least one person or device')); return; }
     b.disabled = true;
     try {
       const r = await api('POST', '/api/team/dispo/bookings', v);

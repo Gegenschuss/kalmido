@@ -72,7 +72,7 @@ function pbDiffHtml(a, b) {
 
 // ---- the area in the list dialog / folder dialog / its own dialog
 function pbPrevHtml(j, sc) {
-  const parts = (j.folders || []).filter(f => (f.text || '').trim()).map(f => `<div class="pbpart pbinh"><div class="pbparth">${ic('folder', 's')} ${esc(tr('From the folder {0}', fDisp(f.folder)))} <span class="muted">· ${tr('read only here')}</span></div><div class="md">${renderMd(f.text, true)}</div></div>`);
+  const parts = (j.folders || []).filter(f => (f.text || '').trim()).map(f => `<div class="pbpart pbinh"><div class="pbparth">${ic('folder', 's')} ${esc(tr('From the folder {0}', fDisp(f.folder)))} <span class="muted">· ${tr('read-only here')}</span></div><div class="md">${renderMd(f.text, true)}</div></div>`);
   if ((j.text || '').trim()) parts.push(`<div class="pbpart pbown">${parts.length ? `<div class="pbparth">${ic(sc.lid ? 'list' : 'folder', 's')} ${esc(sc.lid ? tr('This project adds') : tr('This folder adds'))}</div>` : ''}<div class="md">${renderMd(j.text, true, sc.lid ? {lid: sc.lid} : {})}</div></div>`);
   return parts.length ? `<div class="pbprev">${parts.join('')}</div>` : `<div class="muted mhint pbempty">${esc(j.can_edit ? tr('No playbook yet. Describe how agents should work on the tasks here.') : tr('No playbook yet.'))}</div>`;
 }
@@ -342,7 +342,7 @@ function pbCheckForm(box, lid, j, c, done) {
     if (isNew && tz) d.tz = tz;
     const er = $('#pc-err', box), fail = m => { er.textContent = m; er.hidden = false; };
     if (!d.agent_id) return fail(tr('Give this project an agent first (Share > Agents).'));
-    if (f === 'weekly' && !d.days.length) return fail(tr('Pick at least one weekday'));
+    if (f === 'weekly' && !d.days.length) return fail(tr('Select at least one weekday'));
     b.disabled = true;
     try { await rawFetch(isNew ? 'POST' : 'PATCH', isNew ? `/api/lists/${lid}/checks` : `/api/list-checks/${c.id}`, d); }
     catch (x) { b.disabled = false; return fail(x instanceof Offline ? tr('Only available online.') : x.message); }

@@ -61,7 +61,7 @@ const FEAT = 'cal,comments,collab,agents';
     await ev(`(() => { listModal(${LID}); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('.lmodal #pb-area [data-pb="edit"]')`), 'the list dialog shows the Playbook area with Edit');
     const a0 = await ev(`(() => { const b = document.querySelector('.lmodal #pb-area'); return {inh: b.querySelector('.pbinh')?.textContent || '', ck: !!b.querySelector('[data-pb="checks"]'), empty: !!b.querySelector('.pbown')}; })()`);
-    check(/From the folder Finance/.test(a0.inh) && /Folder rule/.test(a0.inh) && /read only here/.test(a0.inh), 'the folder part is shown and marked as inherited ' + JSON.stringify(a0));
+    check(/From the folder Finance/.test(a0.inh) && /Folder rule/.test(a0.inh) && /read-only here/.test(a0.inh), 'the folder part is shown and marked as inherited ' + JSON.stringify(a0));
     check(a0.ck && !a0.empty, 'Regular check offered, no own text yet ' + JSON.stringify(a0));
     await shot('p2390u-list-area.png');
 

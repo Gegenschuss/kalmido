@@ -217,7 +217,7 @@ function rul_draw(v) {
     ${p.summary ? `<div class="ppsum">${commentBody(p.summary, {})}</div>` : ''}
     ${rv ? `<div class="rul-prop">${ic('zap', 's')}<div class="rul-txt"><b>${esc(rv.name)}</b><span>${esc(rul_sentence(rv))}</span></div></div>` : ''}
     <div class="shint keep">${esc(tr('Accepting adds the rule to the project; it runs with your rights and belongs to you. Nothing else changes. Undo possible.'))}</div>`;
-  const foot = `<button class="btn danger" data-pp="discard" aria-label="${esc(tr('Decline|proposal'))}">${thumbIc(false)} ${esc(tr('Decline|proposal'))}</button><span class="spacer"></span>
+  const foot = `<button class="btn danger" data-pp="discard" aria-label="${esc(tr('Reject|proposal'))}">${thumbIc(false)} ${esc(tr('Reject|proposal'))}</button><span class="spacer"></span>
     <button class="btn" data-pp="close">${tr('Close')}</button><button class="btn pri" data-pp="apply" aria-label="${esc(tr('Accept|suggestion'))}">${thumbIc(true)} ${esc(tr('Accept|suggestion'))}</button>`;
   return {main, foot};
 }

@@ -289,7 +289,7 @@ def apppw_public(r):
 
 def need_dav():
     if not DAV_ON:
-        raise Denied(409, tr("CalDAV is turned off on this server"))
+        raise Denied(409, tr("CalDAV is switched off on this server"))
 
 
 def dav_info(u):
@@ -1189,7 +1189,7 @@ def dav_put(c, u, pw_row, lst, name):
     if have:
         cur = have[0]
         if cur["id"] in pvis(c, u["id"], lid)[2] or lst["role"] == "view":
-            raise DavError(403, "Read only", "<D:need-privileges/>")
+            raise DavError(403, "Read-only", "<D:need-privileges/>")
         dav_lock_guard(cur["id"], cur["status"], v["status"], v["done_occurrence"])  # 2.542.0 (#4609): before any field changes
         p = dav_patch(c, u, cur, v, caps, lid)
         if p:
@@ -1202,7 +1202,7 @@ def dav_put(c, u, pw_row, lst, name):
         c.commit()
         return Response(status=204)
     if lst["role"] == "view":
-        raise DavError(403, "Read only", "<D:need-privileges/>")
+        raise DavError(403, "Read-only", "<D:need-privileges/>")
     # a UID that already lives here under another name / in another list (a client moving a task between lists)
     since = iso(now_utc() - timedelta(seconds=DAV_MOVE_S))
     for oid in dav_find_uid(c, v["uid"], lid, since):
@@ -1454,7 +1454,7 @@ def dav(p):
             if kind != "member":
                 raise DavError(403, "Lists are deleted in the app")
             if lst.get("o3a_ov"):  # 2.83.0 (#1725): read-only like its privileges say
-                raise DavError(403, "Read only", "<D:need-privileges/>")
+                raise DavError(403, "Read-only", "<D:need-privileges/>")
             have = dav_member(c, u, lst, name)
             if not have:
                 raise DavError(404, "Not found")

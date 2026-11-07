@@ -59,7 +59,7 @@ const today = TC.today();
       '#1196: open sum and weighted sum on top ' + await ev(`document.querySelector('.pptiles')?.textContent`));
     check(await ev(`document.querySelectorAll('.ppfcl li').length === 6 && document.querySelectorAll('.ppfcl li.next').length === 1`), '#1196: the months ahead with the next one marked');
     check(await ev(`document.querySelectorAll('[data-pipcol="inquiry"] .ppcard').length === 1 && document.querySelectorAll('[data-pipcol="offer"] .ppcard').length === 1`), '#1196: the cards in their columns');
-    check(await ev(`document.querySelector('[data-pipcol="offer"] .ppcard').classList.contains('warn') && /declined/.test(document.querySelector('[data-pipcol="offer"] .ppcard').textContent)`), '#1196: a declined quotation shows on the card');
+    check(await ev(`document.querySelector('[data-pipcol="offer"] .ppcard').classList.contains('warn') && /rejected/.test(document.querySelector('[data-pipcol="offer"] .ppcard').textContent)`), '#1196: a declined quotation shows on the card');
     // new inquiry through the dialog
     await ev(`(() => { document.querySelector('[data-pp="new"]').click(); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('.modal #pp-title')`), '#1196: the deal dialog');

@@ -65,12 +65,12 @@ const ym = TC.today().slice(0, 7);
     check(await ev(`!document.querySelector('.fcibar [data-rkf="fimp"]') && !document.querySelector('.fcibar a[href$="/import/template"]') && !!document.querySelector('.oimlink a[href="#office/import/fixed"]')`), 'import link to the import page');
     await ev(`(async () => { const b = await (await fetch('/api/office/fixed-costs/import/template', {credentials: 'same-origin'})).blob(); fci_preview(new File([b], 'template.xlsx')); return 1; })()`);
     check(await ready(ev, `document.querySelectorAll('.fcidlg .fcirow').length === 2`), 'the preview dialog with the two example rows');
-    check(await ev(`/Take over 2 rows/.test(document.querySelector('.fcidlg [data-fci="go"]').textContent) && document.querySelector('.fcidlg [data-fci="vat"][data-i="1"]').value === '0'`),
+    check(await ev(`/Import 2 rows/.test(document.querySelector('.fcidlg [data-fci="go"]').textContent) && document.querySelector('.fcidlg [data-fci="vat"][data-i="1"]').value === '0'`),
       'both ticked, the insurance with 0 %');
     await shot('p267-a-import.png');
     await ev(`(() => { const s = document.querySelector('.fcidlg [data-fci="vat"][data-i="0"]'); s.value = '7'; s.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
     await ev(`(() => { const c = document.querySelector('.fcidlg [data-fci="sel"][data-i="1"]'); c.checked = false; c.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
-    check(await ready(ev, `/Take over 1 row/.test(document.querySelector('.fcidlg [data-fci="go"]')?.textContent || '')`), 'unticking counts down');
+    check(await ready(ev, `/Import 1 row/.test(document.querySelector('.fcidlg [data-fci="go"]')?.textContent || '')`), 'unticking counts down');
     // phone width
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
     await sleep(400);

@@ -333,7 +333,7 @@ def lyo_send():
         raise Denied(403, tr("Sharing is off"))
     if not isinstance(to, list) or not to or len(to) > LYO_TO_MAX \
             or not all(isinstance(x, int) and not isinstance(x, bool) for x in to):
-        raise BadInput(tr("Choose up to {0} people", LYO_TO_MAX))
+        raise BadInput(tr("Select up to {0} people", LYO_TO_MAX))
     n = (b.get("name") or "").strip()[:LYV_NAME_MAX] if isinstance(b.get("name"), str) else ""
     if not n:
         raise BadInput(tr("Give the arrangement a name"))

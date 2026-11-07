@@ -52,7 +52,7 @@ def ms_clients_in_use(c, ids):
 def ms_cl_ids(b, k="ids"):
     ids = b.get(k)
     if not isinstance(ids, list) or not ids:
-        raise BadInput(tr("Choose at least one client"))
+        raise BadInput(tr("Select at least one client"))
     if len(ids) > MS_CL_MAX:
         raise BadInput(tr("At most {0} clients at once", MS_CL_MAX))
     return list(dict.fromkeys(as_int(x, k, 1) for x in ids))

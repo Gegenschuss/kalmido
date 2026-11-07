@@ -866,7 +866,7 @@ def _pk_keep_long(c):
 def auth_pk_options():
     c = db()
     if gsetting(c, "passkey_login") == "0":
-        return err(tr("Signing in with a passkey is turned off on this server"), 403)
+        return err(tr("Signing in with a passkey is switched off on this server"), 403)
     # 2.282.0 (#3111): no address lock here any more; POST /api/auth/passkey delays above the address limit
     chal, rp, opts = wa_auth_options(c, None, uv=True)
     rem = bool(body().get("remember", True))
@@ -882,7 +882,7 @@ def auth_pk():
     c = db()
     keys = [("ip:" + rate_ip(), 20)]
     if gsetting(c, "passkey_login") == "0":
-        return err(tr("Signing in with a passkey is turned off on this server"), 403)
+        return err(tr("Signing in with a passkey is switched off on this server"), 403)
     e = login_wait(keys, "")  # 2.282.0 (#3111): no name, so never "known": delayed above the address limit
     if e:
         return e
@@ -1020,7 +1020,7 @@ def me_totp_disable():
     c.commit()
     from .secmail import sec_mail
     sec_mail(c, u["id"], "2fa_off")  # 2.266.0 (#2963)
-    aa_now("security", f"2faoff:{u['username']}:{int(time.time())}", N_("{0} turned off two-factor authentication ({1})."),
+    aa_now("security", f"2faoff:{u['username']}:{int(time.time())}", N_("{0} switched off two-factor authentication ({1})."),
            [u["username"], {"t": N_("authenticator app")}])
     return jsonify(twofa_state(c, _user(c, u["id"])))
 

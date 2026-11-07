@@ -80,7 +80,7 @@ async function openSetup(jar) {  // the app with a cookie jar of its own (the se
 
   // ================= (2) the sample in the app: Flow, Now doable
   w = await boot({user: 'admin', hash: 'l/' + PRJ}); d = w.document;
-  check(w.eval('S.lists').find(l => l.id === PRJ)?.name === 'Example: Image film for client Muster', 'sample list loaded');
+  check(w.eval('S.lists').find(l => l.id === PRJ)?.name === 'Example: Promo film for Example Ltd', 'sample list loaded');
   check(w.eval('sortMode()') === 'flow', 'project sample: Flow order');
   check(d.querySelectorAll('#view .trow').length >= 14, 'rows shown: ' + d.querySelectorAll('#view .trow').length);
   check(d.querySelectorAll('#view .ghead').length >= 5, 'sections shown');
@@ -94,11 +94,11 @@ async function openSetup(jar) {  // the app with a cookie jar of its own (the se
   await w.eval(`settingsModal('sample')`); await until(() => d.querySelector('.smodal #s-sample [data-m="sample-rm"]'));  // 2.53.0 (#1410): settings.js loads on demand (own jsdom page, no boot())
   const row = () => d.querySelector('.smodal #s-sample');
   check(d.querySelector('.smodal [data-sec="data"].on') && d.querySelector('.smodal #s-sample-h'), 'Settings opens on Data > Sample project');
-  check(row()?.querySelector('[data-m="sample-rm"]') && /Image film/.test(row().textContent), 'row: Remove + the list names');
+  check(row()?.querySelector('[data-m="sample-rm"]') && /Promo film/.test(row().textContent), 'row: Remove + the list names');
   click(w, row().querySelector('[data-m="sample-rm"]')); await until(() => /27 sample tasks/.test(d.querySelector('.modal.cdlg')?.textContent || ''));
   let dlg = d.querySelector('.modal.cdlg');
   const txt = dlg?.textContent || '';
-  check(/Remove the sample project\?/.test(txt) && /Image film for client Muster/.test(txt) && /Shoot day packing list/.test(txt) && /27 sample tasks/.test(txt), 'dialog names the lists and the tasks: ' + txt.slice(0, 200));
+  check(/Remove the sample project\?/.test(txt) && /Promo film for Example Ltd/.test(txt) && /Shoot day packing list/.test(txt) && /27 sample tasks/.test(txt), 'dialog names the lists and the tasks: ' + txt.slice(0, 200));
   click(w, dlg.querySelector('[data-cd="no"]')); await until(() => !d.querySelector('.modal.cdlg')); await idle(w);
   check((await call('GET', '/api/state', null, await login('admin'))).sample, 'Cancel keeps the sample');
   click(w, row().querySelector('[data-m="sample-rm"]')); await until(() => d.querySelector('.modal.cdlg [data-cd="yes"]'));
@@ -142,7 +142,7 @@ async function openSetup(jar) {  // the app with a cookie jar of its own (the se
   click(w, d.querySelector('[data-tour="next"]'));
   check(await until(() => w.eval('S.sample')), 'tour: Done created it');
   check(w.eval('S.lists').some(l => l.name === 'Getting started') && w.eval('S.sample.lists').length === 2, 'Getting started list + the sample');
-  check(w.eval('S.sample.lists').some(l => l.name === 'Example: Website relaunch for client Muster'), 'tour without an industry: the website relaunch');  // 2.578.0 (#4573)
+  check(w.eval('S.sample.lists').some(l => l.name === 'Example: Website relaunch for Example Ltd'), 'tour without an industry: the website relaunch');  // 2.578.0 (#4573)
   w.close();
   // bob: German, no project modules -> unticked, Done creates nothing
   const BK = await login('bob');

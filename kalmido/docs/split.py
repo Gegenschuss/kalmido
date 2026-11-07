@@ -641,7 +641,7 @@ def docs_split(nid):
         return err(str(e))
     except Denied as e:  # 2.154.0 E (#1111): e.g. no write right in the stack's folder
         c.rollback()
-        return err(e.msg or tr("No permission (view only)"), 403)
+        return err(e.msg or tr("No permission (read-only)"), 403)
     c.commit()
     docs_kick()
     return jsonify(ids=ids, stack_id=nid), 201

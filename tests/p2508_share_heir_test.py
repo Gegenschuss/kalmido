@@ -308,7 +308,7 @@ ft = until(lambda: (lambda r: r and r[0][0] in ("found", "none", "skip", "error"
 check(ft == "found", f"the text of the file is recognised ({ft})")
 BEFORE = stored(PLAN)
 # read only on top, an edit share on a folder inside it: that folder goes on its own, the read share lives on on it
-RO = folder(Ol, "Read only")
+RO = folder(Ol, "Read-only")
 ROF = upload(Ol, "ro.txt", b"only read", RO)
 INNER = folder(Ol, "Inner", RO)
 INF = upload(Ol, "inner.txt", b"inner text", INNER)

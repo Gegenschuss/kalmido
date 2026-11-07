@@ -106,16 +106,16 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   // ================= view-only member
   w = await boot({user: 'carol', hash: 'l/' + L}); d = w.document;
   check(d.querySelector(`#view .ghead[data-section="${A}"]`) && !d.querySelector('.shandle') && !d.querySelector('.sdrop'), 'view-only: no handles, no drop zones');
-  w.eval(`taskToSection(${t2}, ${C})`); await until(() => /View only/.test(toastText(d))); await idle(w);
-  check(/View only/.test(toastText(d)), 'view-only: a move gives the notice');
+  w.eval(`taskToSection(${t2}, ${C})`); await until(() => /Read-only/.test(toastText(d))); await idle(w);
+  check(/Read-only/.test(toastText(d)), 'view-only: a move gives the notice');
   check((await taskOf(t2)).section_id === A, 'nothing moved');
   const r = await call('POST', `/api/lists/${L}/sections/order`, {ids: [C, A, Bs]}, CKc);
   check(r.status === 403, `view-only: the server refuses the order too (${r.status})`);
   const cmob = await boot({user: 'carol', hash: 'l/' + L, mobile: true, media: {'(hover: none)': true}});
   const hc = cmob.document.querySelector(`#view .ghead[data-section="${A}"]`);
   touch(cmob, hc, 'touchstart'); await sleep(520); touch(cmob, hc, 'touchend');  // wanted: a hold longer than the long-press timer (450 ms, dnd.js)
-  await until(() => /Nur ansehen|View only/.test(cmob.document.querySelector('#toast:not(.hidden)')?.textContent || ''));
-  check(/Nur ansehen|View only/.test(cmob.document.querySelector('#toast:not(.hidden)')?.textContent || ''), 'view-only: long-press on a header gives the notice');
+  await until(() => /Nur ansehen|Read-only/.test(cmob.document.querySelector('#toast:not(.hidden)')?.textContent || ''));
+  check(/Nur ansehen|Read-only/.test(cmob.document.querySelector('#toast:not(.hidden)')?.textContent || ''), 'view-only: long-press on a header gives the notice');
   cmob.close(); w.close();
 
   await call('POST', `/api/lists/${L}/sections/order`, {ids: [A, Bs, C]});

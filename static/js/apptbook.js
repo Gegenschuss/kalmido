@@ -51,13 +51,13 @@ function apbDayRow(cb) { cb.closest('.apb-day')?.classList.toggle('off', !cb.che
 function apbDraw() {
   const md = APB.md, D = APB.data; if (!md || !D) return;
   const p = D.page, el = $('.apb-body', md);
-  const warn = !D.mail_ok ? tr('This server sends no e-mail: the booking page cannot be switched on') : !D.links_ok ? tr('Public links are turned off on this server') : '';
+  const warn = !D.mail_ok ? tr('This server sends no e-mail: the booking page cannot be switched on') : !D.links_ok ? tr('Public links are switched off on this server') : '';
   const link = D.exists ? `<div class="apb-link"><code>${esc(p.url)}</code><button class="btn sm" data-apb="copy">${ic('copy', 's')} ${tr('Copy link')}</button><a class="btn sm" href="${esc(p.url)}" target="_blank" rel="noopener">${ic('link', 's')} ${tr('Open')}</a></div>` : '';
   const cals = D.calendars.map(c => `<option value="${c.id}" ${c.id === p.cal_id ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
   const offs = D.offices.map(o => `<option value="${o.personal ? 'personal' : o.id}" ${p.office_org_id && (o.id === p.office_org_id) ? 'selected' : ''}>${esc(o.name)}</option>`).join('');
   const types = APB.types.length ? `<ul class="apb-list">${APB.types.map(t => `<li class="${t.active ? '' : 'off'}"><button class="apb-main" data-apbtype="${t.id}"><b>${esc(t.name)}</b><span class="muted">${esc(apbTypeSub(t))}</span></button>
       <button class="iconbtn" data-apbdel="${t.id}" aria-label="${esc(tr('Delete {0}', t.name))}" title="${esc(tr('Delete'))}">${ic('trash', 's')}</button></li>`).join('')}</ul>`
-    : `<p class="muted">${tr('No appointment type yet. Clients choose one of them first.')}</p>`;
+    : `<p class="muted">${tr('No appointment type yet. Clients select one of them first.')}</p>`;
   el.innerHTML = `${warn ? `<p class="apb-warn" role="note">${esc(warn)}</p>` : ''}
     <label class="mmain apb-onrow"><span class="swc"><input type="checkbox" id="apb-on" ${p.enabled ? 'checked' : ''} ${warn && !p.enabled ? 'disabled' : ''}><span class="swt" aria-hidden="true"></span></span>
       <span><b>${tr('Clients can book appointments')}</b>${APB.types.length ? '' : `<small class="muted">${tr('A public page without sign-in: free times come from your calendars, every booking is confirmed by e-mail.')}</small>`}</span></label>
@@ -234,7 +234,7 @@ async function apbDelete(b) {
   if (!b) return;
   const coming = b.status === 'confirmed' && new Date(b.end).getTime() >= Date.now();
   const ok = await askConfirm(tr('Delete the booking of {0}?', b.name),
-    tr('The booking with name, e-mail and message is deleted for good. The event in your calendar, the contact and the lead stay as they are. The client gets no e-mail.')
+    tr('The booking with name, e-mail and message is deleted permanently. The event in your calendar, the contact and the lead stay as they are. The client gets no e-mail.')
     + (coming ? ' ' + tr('The appointment is still coming up: the client\'s cancel link stops working. Call it off first if it should not take place.') : ''),
     {ok: tr('Delete'), cancel: tr('Back'), danger: true});
   if (!ok) return;

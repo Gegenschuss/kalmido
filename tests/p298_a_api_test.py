@@ -9,7 +9,7 @@
  - the result: counts per time, the best time (most yes, then maybe); the addresses only for who may change the poll
  - another person / another organisation: 404; an organisation's poll: every member reads it (no addresses), only the owner or
    an admin of the organisation changes it (403) (tenant-matrix: poll)
- - "Choose this time": exactly one event in the chosen calendar (title, place, time, the voters in the description), the poll
+ - "Select this time": exactly one event in the chosen calendar (title, place, time, the voters in the description), the poll
    closed, the link shows only the chosen time and takes no votes (409), a second choice 409, a calendar of another person 404;
    reopen (the undo): the event goes to the trash, the poll is open again
  - delete + restore (undo); moving private <-> organisation: dry run, move, the link to a task of the old workspace taken off,
@@ -249,7 +249,7 @@ n = py_in_app("from kalmido.core.db import connect\nc = connect(); print(c.execu
 check(n == "1", "exactly one event " + n)
 check(Bo.post(B + f"/api/polls/{PID}/decide", json={"option_id": o1}).status_code == 409, "a second choice: 409")
 st, txt, _ = page(visitor(), PP)
-check(st == 200 and "The time has been chosen" in txt and 'name="stamp"' not in txt, "the link shows only the result")
+check(st == 200 and "The time has been selected" in txt and 'name="stamp"' not in txt, "the link shows only the result")
 r = V2.post(B + PP, data={"name": "Late", "a%d" % o1: "y", "stamp": "1.aaaaaaaaaaaa.x"}, headers={"Accept-Language": "en"})
 check(r.status_code == 409, "closed: no more votes (409)")
 check(Bo.patch(B + f"/api/polls/{PID}", json={"options": TIMES}).status_code == 409, "closed: the times stay")

@@ -302,7 +302,7 @@ def ctx_cards(raw, mapping=None):
     t = ctx_read(raw)
     m = ctx_mapping(mapping, len(t["headers"])) if mapping is not None else ctx_guess(t["headers"])
     if not any(m):
-        raise BadInput(tr("Choose at least one column"))
+        raise BadInput(tr("Select at least one column"))
     out, ts = [], iso(now_utc())
     for row in t["rows"]:
         v = ctx_row(t["headers"], row, m)

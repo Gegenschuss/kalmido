@@ -47,7 +47,7 @@ function ctyField(id, code, o = {}) {
     <input type="text" class="ctyq" id="${esc(id)}-q" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="${esc(id)}-l" autocomplete="off" spellcheck="false"
       aria-label="${esc(o.label || tr('Country'))}" value="${esc(shown)}" placeholder="${esc(tr('Germany (default)'))}" ${o.dis || ''}>
     <ul class="ctyl" id="${esc(id)}-l" role="listbox" hidden></ul>
-    ${ok ? '' : `<small class="ctybad" role="alert">${esc(tr('“{0}” is no country code: please choose the country', v))}</small>`}</span>`;
+    ${ok ? '' : `<small class="ctybad" role="alert">${esc(tr('“{0}” is no country code: please select the country', v))}</small>`}</span>`;
 }
 function ctyOpen(q, filter) {
   const box = q.closest('[data-cty]'), ul = box && $('.ctyl', box); if (!ul) return;

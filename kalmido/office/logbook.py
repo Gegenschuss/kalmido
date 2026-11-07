@@ -878,7 +878,7 @@ def _prev_text(prev, vs, clients):
 
 
 LB_ACTIONS = {"create": N_("Created"), "change": N_("Changed"), "delete": N_("Deleted"), "restore": N_("Restored"),
-              "update": N_("Changed"), "trip": N_("Taken over into the travel expenses"),  # 2.93.0 B (#1928 review): update, trip
+              "update": N_("Changed"), "trip": N_("Added to the travel expenses"),  # 2.93.0 B (#1928 review): update, trip
               "corrected": N_("Corrected"), "close": N_("Month closed")}  # 2.152.0 C (#2169)
 
 

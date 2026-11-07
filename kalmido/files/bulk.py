@@ -155,7 +155,7 @@ def files_bulk_purge():
             n = need_node(c, i, write=True, trash=True)  # like the single purge: 404 unseen, 403 read only
             chain = fs_chain(c, i)
             if not fs_deleted(chain):
-                return err(tr("Only what is in the trash can be deleted for good"), 409)
+                return err(tr("Only what is in the trash can be deleted permanently"), 409)
             if n["role"] != "owner" and fs_trash_root_by(chain) != uid:
                 raise Denied(404)  # the trash hides a withdrawn branch from everybody but who may restore it (files/web.py files_node)
             rows.append((i, n["role"]))
@@ -237,7 +237,7 @@ def abm_too_big(files, size, max_files=None, max_mb=None):
     """The refusal text when a ZIP would hold too much, else None (the limits of ABM_ZIP_MAX_FILES / ABM_ZIP_MAX_MB or lower ones)."""
     mf, mm = min(max_files or ABM_ZIP_MAX_FILES, ABM_ZIP_MAX_FILES), min(max_mb or ABM_ZIP_MAX_MB, ABM_ZIP_MAX_MB)
     if files > mf or size > mm * 1024 * 1024:
-        return tr("Too much for one ZIP: at most {0} files and {1} MB. Please choose fewer.", mf, mm)
+        return tr("Too much for one ZIP: at most {0} files and {1} MB. Please select fewer.", mf, mm)
     return None
 
 

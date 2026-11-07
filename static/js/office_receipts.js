@@ -338,8 +338,8 @@ function rcm_settingsHtml() {
       : `<p><button type="button" class="btn sm" data-rcm="make">${tr('Create address')}</button></p>`}
     <details class="rcm-gmail"><summary>${tr('Forward automatically from Gmail')}</summary><ol>
       <li>${esc(tr('In Gmail: Settings > See all settings > Forwarding and POP/IMAP > Add a forwarding address. Enter this address; the confirmation code arrives here as a document.'))}</li>
-      <li>${esc(tr('Search for the e-mails of your invoice senders, for example from:(stripe.com OR paddle.com OR apple.com), and choose “Create filter”.'))}</li>
-      <li>${esc(tr('Tick “Forward it to”, pick this address and create the filter.'))}</li></ol></details>`;
+      <li>${esc(tr('Search for the e-mails of your invoice senders, for example from:(stripe.com OR paddle.com OR apple.com), and select “Create filter”.'))}</li>
+      <li>${esc(tr('Tick “Forward it to”, select this address and create the filter.'))}</li></ol></details>`;
 }
 document.addEventListener('click', async e => {
   const b = /** @type {any} */ (e.target).closest?.('[data-rcm]'); if (!b) return;

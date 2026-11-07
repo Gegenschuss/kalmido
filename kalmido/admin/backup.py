@@ -2186,7 +2186,7 @@ def bk_state(c):
 def need_backups():
     need_admin()
     if not BK_ON_ENV:
-        raise Denied(404, tr("Backups are turned off on this server (KALMIDO_BACKUPS=0)"))
+        raise Denied(404, tr("Backups are switched off on this server (KALMIDO_BACKUPS=0)"))
 
 
 # 2.13.0: Settings > Administration > "Check storage": every task attachment and project file whose file is missing,

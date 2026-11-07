@@ -68,7 +68,7 @@ function bkaHtml() {
     <h2 class="bka-h">${tr('Booking archive')}</h2>`;
   const note = `<p class="muted bk-note bka-note">${esc(ov.note || '')}</p>`;
   if (!years.length) {
-    return head + `<div class="bka-empty"><p>${tr('The archive holds the complete DATEV data of past years: every booking, the account labels and the receipt images, read only.')}</p>
+    return head + `<div class="bka-empty"><p>${tr('The archive holds the complete DATEV data of past years: every booking, the account labels and the receipt images, read-only.')}</p>
       <p class="muted">${tr('Ask your tax advisor for the DATEV export of each year (booking batch, account labels, receipt images as ZIP) and read it in here.')}</p><p>${read}</p></div>`
       + bkaRunsHtml() + note;
   }
@@ -136,7 +136,7 @@ async function bkaOpen(id) {
   const md = modal(`<h3>${esc(tr('Booking {0}', fmtDateLoc(j.day) || j.day || ''))}</h3>
     <p class="bka-dsum">${bkaAcct(j.account, j.account_label)}${j.counter ? ` <span class="muted">→</span> ${bkaAcct(j.counter, j.counter_label)}` : ''} · <b>${esc(ofcMoney(j.amount))}</b> ${esc(bkaSide(j.side))}</p>
     <div class="bka-raw scroll"><table class="bka-rawt"><tbody>${raw.map(([k, v]) => `<tr><th scope="row">${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}</tbody></table></div>
-    <p class="muted ofchint">${esc(tr('Line {0} of the booking batch; read only.', j.line))}</p>
+    <p class="muted ofchint">${esc(tr('Line {0} of the booking batch; read-only.', j.line))}</p>
     <div class="foot">${j.doc_id ? `<a class="btn" href="${BKA_URL}/docs/${j.doc_id}" target="_blank" rel="noopener" data-bka-doc>${ic('file', 's')}<span>${tr('Open receipt')}</span></a>` : ''}<span class="spacer"></span><button type="button" class="btn pri" data-m="close">${tr('Close')}</button></div>`);
   md.classList.add('bka-dlg');
   md.addEventListener('click', e => { if (/** @type {any} */ (e.target).closest('[data-m="close"]')) md.remove(); });
@@ -146,17 +146,17 @@ async function bkaOpen(id) {
 function bkaDialog() {
   BKA.files = null;
   const md = ofdDlg(tr('Read DATEV data'), `<p class="muted ofchint">${tr('The DATEV export of past years from your tax advisor: booking batches, account labels, debtors / creditors and receipt images (document.xml with its files), also as one ZIP.')}</p>
-    <p class="bka-ro">${tr('Read only: the past years do not flow into the income statement, VAT or reserve.')}</p>
+    <p class="bka-ro">${tr('Read-only: the past years do not flow into the income statement, VAT or reserve.')}</p>
     <div class="row"><label for="bka-file">${tr('Files')}</label><input type="file" id="bka-file" multiple accept=".csv,.txt,.zip,.xml,.pdf,.jpg,.jpeg,.png,.tif,.tiff,text/csv,application/zip,application/xml"></div>
-    <div id="bka-pv" class="bkapv" aria-live="polite"></div>`, tr('Take over'), async () => {
+    <div id="bka-pv" class="bkapv" aria-live="polite"></div>`, tr('Import'), async () => {
     const fs = BKA.files;
-    if (!fs?.length) throw new Error(tr('Choose a file first'));
+    if (!fs?.length) throw new Error(tr('Select a file first'));
     if (!await importTargetConfirm({what: tr('the data of the files'), ws: ofcWs(), place: tr('Office')})) return false;
     const fd = new FormData(); for (const f of fs) fd.append('file', f);
     const j = await api('POST', `${BKA_URL}/import`, fd);
     BKA.year = Math.max(0, ...(j.years || []).map(y => y.year)); bkaReload();
     const skip = j.counts?.docs_skipped ? ' · ' + trn('{0} receipt without image content left out', '{0} receipts without image content left out', j.counts.docs_skipped) : '';
-    toast(trn('{0} booking taken over', '{0} bookings taken over', j.counts?.bookings || 0) + skip, async () => { await api('POST', `${BKA_URL}/runs/${j.run_id}/undo`); bkaReload(); }, 12000);
+    toast(trn('{0} booking imported', '{0} bookings imported', j.counts?.bookings || 0) + skip, async () => { await api('POST', `${BKA_URL}/runs/${j.run_id}/undo`); bkaReload(); }, 12000);
   });
   md.classList.add('bka-imp');
   const ok = /** @type {any} */ ($('[data-m="ok"]', /** @type {any} */ (md))); if (ok) ok.disabled = true;
@@ -190,7 +190,7 @@ function bkaPreviewHtml(j) {
   const errs = (j.errors || []).map(e => `<p class="aerr">${esc([e.file, e.error].filter(Boolean).join(': '))}</p>`).join('');
   return (years ? `<h4>${tr('Years')}</h4><ul class="ofclist bka-pyears" role="list">${years}</ul>` : '')
     + (files ? `<h4>${tr('Files')}</h4><ul class="ofclist bka-pfiles" role="list">${files}</ul>` : '') + docs + errs
-    + (j.ok ? '' : `<p class="muted bka-pnone">${tr('Nothing to take over')}</p>`);
+    + (j.ok ? '' : `<p class="muted bka-pnone">${tr('Nothing to import')}</p>`);
 }
 
 const bkaReload = () => { BKA.ov = null; BKA.list = null; BKA.sums = null; ofcDraw(); };

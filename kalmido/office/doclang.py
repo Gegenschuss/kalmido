@@ -89,7 +89,7 @@ def doc_txt(de, en, lang):
 # 2.185.0 C (#2520): the words and standard texts of the built-in packs (labels / texts in English, the pack's own word as
 # the key): a document in a language the pack has no words for (nl, fr, es, it) gets them translated; a pack's own
 # (other) English word stays English
-DPK_WORDS = (N_("Quotation|pack"), N_("Quotation No.|pack"), N_("Invoice|pack"), N_("Invoice No.|pack"), N_("Project|pack"), N_("Ref./PO No.|pack"),
+DPK_WORDS = (N_("Quotation|pack"), N_("Quotation No.|pack"), N_("Invoice|pack"), N_("Invoice No.|pack"), N_("Project|pack"), N_("Ref./PO No.|pack"), N_("Ref./PO no.|pack"),
              N_("Client|pack"), N_("Date|pack"), N_("Valid until|pack"), N_("No.|pack"), N_("Title|pack"), N_("Qty|pack"), N_("Unit Price|pack"),
              N_("VAT|pack"), N_("Total|pack"), N_("Net Total|pack"), N_("Gross Total|pack"), N_("Net total with option raw data|pack"),
              N_("excluding raw data|pack"), N_("Optional: delivery of raw data|pack"), N_("Delivery of raw data|pack"), N_("Producing|pack"),
@@ -98,7 +98,7 @@ DPK_WORDS = (N_("Quotation|pack"), N_("Quotation No.|pack"), N_("Invoice|pack"),
              N_("Order confirmation|pack"), N_("Place, date, signature|pack"), N_("days|pack"), N_("hrs|pack"), N_("pcs|pack"), N_("min|pack"),
              N_("flat|pack"), N_("day|pack"), N_("hr|pack"), N_("pc|pack"), N_("Credit note|pack"), N_("Credit note No.|pack"),
              N_("Payment reminder|pack"), N_("Reminder|pack"), N_("Final reminder|pack"), N_("Reminder No.|pack"),
-             N_("Credit note for invoice No.|pack"), N_("Re quotation No.|pack"), N_("Customer No.|pack"), N_("Service period|pack"),
+             N_("Credit note for invoice No.|pack"), N_("Re quotation No.|pack"), N_("Customer No.|pack"), N_("Client no.|pack"), N_("Service period|pack"),
              N_("Due on|pack"), N_("Exchange rate €1|pack"), N_("Subtotal|pack"), N_("Total amount due|pack"), N_("Credit total|pack"),
              N_("Already paid|pack"), N_("Amount outstanding|pack"), N_("Reminder fee|pack"), N_("Amount|pack"), N_("Payment|pack"), N_("Due|pack"),
              N_("Thank you for your enquiry. We are pleased to submit the following quotation:|pack"), N_("Dear Sir or Madam,|pack"),

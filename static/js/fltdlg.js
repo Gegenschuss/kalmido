@@ -102,7 +102,7 @@ function flt_rowHtml(c, i, cs, groups) {
   const val = c.op === 'empty' || c.op === 'set' ? '<span class="fc-vn"></span>'
     : c.op === 'has' || c.op === 'nhas' ? `<input class="fc-t" data-i="${i}" value="${esc(c.v || '')}" placeholder="${esc(tr('Title or notes contain …'))}" aria-label="${esc(tr('Value'))}" autocomplete="off">`
     : !flt_isList(c) ? `<span class="fc-num"><input class="fc-n" data-i="${i}" inputmode="decimal" value="${esc(c.v ?? '')}" aria-label="${esc(tr('Value'))}">${unit ? `<span class="muted">${esc(unit)}</span>` : ''}</span>`
-    : (s => `<button type="button" class="btn sm fc-v${s ? '' : ' fc-v0'}" data-i="${i}" aria-haspopup="menu" aria-label="${esc(tr('Value'))}: ${esc(s || tr('Choose'))}"><span class="fc-vs">${esc(s || tr('Choose') + '…')}</span>${ic('chev', 's')}</button>`)(flt_sum(c, cs));
+    : (s => `<button type="button" class="btn sm fc-v${s ? '' : ' fc-v0'}" data-i="${i}" aria-haspopup="menu" aria-label="${esc(tr('Value'))}: ${esc(s || tr('Select'))}"><span class="fc-vs">${esc(s || tr('Select') + '…')}</span>${ic('chev', 's')}</button>`)(flt_sum(c, cs));
   return `<div class="fcond" data-i="${i}">${what}${ops}${val}<button type="button" class="iconbtn fc-x" data-i="${i}" aria-label="${esc(tr('Remove condition'))}" title="${esc(tr('Remove condition'))}">${ic('x', 's')}</button></div>`;
 }
 // the value menu: the app's menu (with its search from 8 entries), a click switches one value and keeps the menu open
@@ -176,7 +176,7 @@ function filterModal(id) {
     const b = /** @type {HTMLElement} */ (e.target).closest('button'); if (!b) return;
     if (b.classList.contains('fc-v')) {
       const i = +b.dataset.i, c = cs[i];
-      flt_valMenu(b, c, cs, () => { const s = flt_sum(c, cs); const x = $(`.fcond[data-i="${i}"] .fc-v`, md); if (x) { $('.fc-vs', x).textContent = s || tr('Choose') + '…'; x.classList.toggle('fc-v0', !s); x.setAttribute('aria-label', `${tr('Value')}: ${s || tr('Choose')}`); } count(); });
+      flt_valMenu(b, c, cs, () => { const s = flt_sum(c, cs); const x = $(`.fcond[data-i="${i}"] .fc-v`, md); if (x) { $('.fc-vs', x).textContent = s || tr('Select') + '…'; x.classList.toggle('fc-v0', !s); x.setAttribute('aria-label', `${tr('Value')}: ${s || tr('Select')}`); } count(); });
       return;
     }
     if (b.classList.contains('fc-x')) { cs.splice(+b.dataset.i, 1); draw(cs.length ? [Math.max(0, +b.dataset.i - 1), '.fc-x'] : null); if (!cs.length) $('[data-m="cond-add"]', md)?.focus(); return; }

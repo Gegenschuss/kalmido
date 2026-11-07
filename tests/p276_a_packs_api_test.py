@@ -311,7 +311,7 @@ check(items(A.get(B + O + "/catalog").json())[("country", "LU")]["affects"] == 0
 
 # ---- uninstall + restore
 r = A.delete(B + O + "/packs/installed/country/AT")
-check(r.status_code == 409 and r.json().get("error") == "This pack is the country pack of this office. Choose another one first.",
+check(r.status_code == 409 and r.json().get("error") == "This pack is the country pack of this office. Select another one first.",
       f"uninstall refused while chosen ({r.status_code} {r.text[:200]})")
 check(items(A.get(B + O + "/catalog").json())[("country", "AT")]["in_use"] is True, "catalogue: in_use")
 check(Bo.delete(B + O + "/packs/installed/country/AT").status_code == 403, "member: uninstall 403")

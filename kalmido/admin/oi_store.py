@@ -389,7 +389,7 @@ def _df_opts(raw):
 
 def _df_skip(run):
     """A field / value not taken over. 2.369.0 (#2734): one warning of the run, the report counts it ("... (12×)")."""
-    run.warning(N_("Field values not taken over"))
+    run.warning(N_("Field values not imported"))
     return False
 
 
@@ -457,7 +457,7 @@ def _video_version(c, run, src, d, ctx):
     try:
         v = vdr_parse(src.get("url"))
     except BadInput:
-        run.warning(N_("A row could not be taken over: {0}"), (N_("Video sign-offs"),))
+        run.warning(N_("A row could not be imported: {0}"), (N_("Video sign-offs"),))
         return False
     for k in ("url", "provider", "embed_id"):
         if k in d or k in umz_cols(c, "video_versions")[0]:
@@ -465,7 +465,7 @@ def _video_version(c, run, src, d, ctx):
     return d
 
 
-_W_LOCKED = N_("Knowledge pages encrypted in the browser were not taken over: export them as Markdown from the unlocked workspace and import that file into the knowledge pages.")
+_W_LOCKED = N_("Knowledge pages encrypted in the browser were not imported: export them as Markdown from the unlocked workspace and import that file into the knowledge pages.")
 
 
 def _page(c, run, src, d, ctx):

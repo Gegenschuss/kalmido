@@ -37,7 +37,7 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   check(PG > 0, 'setup: the page');
   const body = async () => (await call('GET', '/api/wiki/pages/' + PG)).body || '';
 
-  // 2.554.0 (#4052): the read view with its boxes = the lock "Read only" (LS wkRo); without it a page one may write opens in the editor
+  // 2.554.0 (#4052): the read view with its boxes = the lock "Read-only" (LS wkRo); without it a page one may write opens in the editor
   let w = await boot({user: 'frida', hash: 'wiki/' + PG, ls: {'tasks.wkSpace': JSON.stringify('private'), 'tasks.wkRo': '"1"'}}), d = w.document;
   const boxes = () => [...d.querySelectorAll('#wk-md input[type="checkbox"]')];
   const box = k => d.querySelector(`#wk-md input[data-wkcb="${k}"]`);

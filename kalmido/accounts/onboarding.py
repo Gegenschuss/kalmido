@@ -50,7 +50,7 @@ def onboarding_tasks(feats, touch, mac):
             ("timeline+deps", N_("Plan a project in the timeline"),
              N_("Edit project > View: Timeline. Drag the dot at the end of one bar onto another: the second task is then blocked by the first.")
              if not touch else
-             N_("Edit project > View: Timeline. Long-press a bar and choose “Connect to…”, then tap the task it blocks."))]
+             N_("Edit project > View: Timeline. Long-press a bar and select “Connect to…”, then tap the task it blocks."))]
     for k, t, d in mods:
         if all(x in feats for x in k.split("+")):
             tt.append((t, d, 0, False, []))
@@ -112,8 +112,8 @@ def onboarding():
 
 
 # ---------------------------------------------------------------- sample project (1.8.0)
-# 2.578.0 (#4573): the variant follows the app's industry (SAMPLE_VARIANTS): "Example: Website relaunch for client Muster"
-# without one, "Example: Image film for client Muster" with Film & Video. The film one: a realistic project list (sections, dates around today, start dates for the
+# 2.578.0 (#4573): the variant follows the app's industry (SAMPLE_VARIANTS): "Example: Website relaunch for Example Ltd"
+# without one, "Example: Promo film for Example Ltd" with Film & Video. The film one: a realistic project list (sections, dates around today, start dates for the
 # timeline, dependencies, all four matrix quadrants, subtasks, a Markdown checklist, tags, a repeating task, a comment,
 # custom fields, a time entry, a project status) plus a checklist "Example: Shoot day packing list". Offered in the
 # first-run setup and the welcome tour, created / removed under Settings > Data. Only uses the modules the user has
@@ -158,7 +158,7 @@ SAMPLE_PACKING = (N_("Camera and three batteries"), N_("Memory cards (formatted)
                   N_("Shooting schedule and contact list"), N_("Release forms"), N_("Water and snacks"))
 
 
-# 2.578.0 (#4573): the neutral sample (no industry chosen): "Example: Website relaunch for client Muster" with the same
+# 2.578.0 (#4573): the neutral sample (no industry chosen): "Example: Website relaunch for Example Ltd" with the same
 # building blocks as the film one (sections, dependencies, subtasks, a checklist in the description, tags, budget, effort,
 # a timed appointment, a repeating task, a comment, a time entry, a project status) plus a launch checklist. The image film
 # with its shoot days and packing list is the sample of the industry Film & Video only (app_industry).
@@ -199,11 +199,11 @@ SAMPLE_CHECKLIST_NEUTRAL = (N_("Back up the old website"), N_("Set up the redire
 # per variant: project name, colour, tasks, sections, dependencies, checklist name + items, the time entry (task title,
 # note), the project status note
 SAMPLE_VARIANTS = {
-    "film": {"name": N_("Example: Image film for client Muster"), "tasks": _sample_tasks, "sections": SAMPLE_SECTIONS,
+    "film": {"name": N_("Example: Promo film for Example Ltd"), "tasks": _sample_tasks, "sections": SAMPLE_SECTIONS,
              "deps": SAMPLE_DEPS, "check_name": N_("Example: Shoot day packing list"), "check": SAMPLE_PACKING,
              "time": (N_("Write the concept and treatment"), N_("First draft of the treatment")),
              "status": N_("Shoot dates confirmed with the client")},
-    "": {"name": N_("Example: Website relaunch for client Muster"), "tasks": _sample_tasks_neutral,
+    "": {"name": N_("Example: Website relaunch for Example Ltd"), "tasks": _sample_tasks_neutral,
          "sections": SAMPLE_SECTIONS_NEUTRAL, "deps": SAMPLE_DEPS_NEUTRAL, "check_name": N_("Example: Launch checklist"),
          "check": SAMPLE_CHECKLIST_NEUTRAL, "time": (N_("Write the concept and sitemap"), N_("First draft of the sitemap")),
          "status": N_("Launch date confirmed with the client")},
@@ -423,7 +423,7 @@ def sample_delete():
 # list holds "film" already, so nothing is migrated; new ones start without.
 IND_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "office", "packs", "industry")
 IND_NO_RIGHT = N_("Only an admin of the organisation chooses its industry")
-IND_NO_AREA = N_("Choose a workspace first: the industry belongs to an organisation or to your own area")
+IND_NO_AREA = N_("Select a workspace first: the industry belongs to an organisation or to your own area")
 _ind_cache = {}
 
 

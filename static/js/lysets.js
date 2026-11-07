@@ -184,7 +184,7 @@ document.addEventListener('click', e => {
 function lyv_manage(v) {
   const key = lyv_key(v); if (!key) return;
   const md = modal(`<h3 id="lyvm-t">${esc(tr('Manage arrangements'))}</h3><div class="lyvlist" role="list"></div>
-    <p class="muted lyvhint">${esc(tr('The default is what the view shows without an own arrangement.'))}</p>
+    <p class="muted lyvhint">${esc(tr('The default is what the view shows without your own arrangement.'))}</p>
     <div class="foot"><span class="spacer"></span><button type="button" class="btn pri" data-lyvm="close">${tr('Done')}</button></div>`);
   md.classList.add('lyvm'); md.setAttribute('role', 'dialog'); md.setAttribute('aria-labelledby', 'lyvm-t');
   const draw = () => {
@@ -226,14 +226,14 @@ async function lyv_send(v) {
   const ppl = await lyv_people(), a = lyv_active(v, key);
   if (!ppl.length) { toast(tr('There is nobody to send it to.')); return; }
   const md = modal(`<form novalidate><h3 id="lyvs-t">${esc(tr('Send as template'))}</h3>
-    <p class="muted">${esc(tr('They get the arrangement of this view as a suggestion, never its content. Each person decides whether to take it over.'))}</p>
+    <p class="muted">${esc(tr('They get the arrangement of this view as a suggestion, never its content. Each person decides whether to use it.'))}</p>
     <label class="fl">${tr('Name')}<input id="lyvs-n" maxlength="60" value="${esc(a?.name || '')}" placeholder="${esc(tr('e.g. Focus or Overview'))}" autocomplete="off"></label>
     <input type="search" id="lyvs-q" placeholder="${esc(tr('Search people'))}" aria-label="${esc(tr('Search people'))}" autocomplete="off">
     <div class="lyvppl" role="group" aria-label="${esc(tr('People'))}">${ppl.map(u => `<label class="chkl lyvp" data-q="${esc((u.display_name + ' ' + u.username).toLowerCase())}"><input type="checkbox" value="${u.id}"> ${esc(u.display_name || u.username)}</label>`).join('')}</div>
     <div class="foot"><span class="muted lyvcnt" aria-live="polite"></span><span class="spacer"></span><button type="button" class="btn" data-lyvs="no">${tr('Cancel')}</button><button type="submit" class="btn pri">${tr('Send')}</button></div></form>`);
   md.classList.add('lyvs'); md.setAttribute('role', 'dialog'); md.setAttribute('aria-labelledby', 'lyvs-t');
   const picked = () => $$('.lyvppl input:checked', md).map(x => +x.value);
-  const cnt = () => { const n = picked().length; $('.lyvcnt', md).textContent = n ? tr('{0} chosen', n) : ''; $$('.lyvppl input:not(:checked)', md).forEach(x => { x.disabled = n >= 20; }); };
+  const cnt = () => { const n = picked().length; $('.lyvcnt', md).textContent = n ? tr('{0} selected', n) : ''; $$('.lyvppl input:not(:checked)', md).forEach(x => { x.disabled = n >= 20; }); };
   md.addEventListener('change', cnt);
   $('#lyvs-q', md).addEventListener('input', e => { const q = e.target.value.trim().toLowerCase(); $$('.lyvp', md).forEach(x => { x.hidden = !!q && !x.dataset.q.includes(q); }); });
   md.addEventListener('click', e => { if (e.target.closest('[data-lyvs="no"]')) modalClose(md); });
@@ -241,7 +241,7 @@ async function lyv_send(v) {
     e.preventDefault();
     const name = $('#lyvs-n', md).value.trim(), to = picked();
     if (!name) { $('#lyvs-n', md).focus(); toast(tr('Give the arrangement a name')); return; }
-    if (!to.length) { toast(tr('Choose at least one person')); return; }
+    if (!to.length) { toast(tr('Select at least one person')); return; }
     try { await api('POST', '/api/layouts/offers', {key, name, layout: lyv_current(v), to}); } catch { return; }
     modalClose(md); toast(to.length === 1 ? tr('Template sent') : tr('Template sent to {0} people', to.length));
   });
@@ -266,13 +266,13 @@ async function lyv_offerOpen(oid) {
     <p class="muted">${esc(tr('Only the arrangement of the blocks comes along, nothing of its content.'))}</p>
     ${lyv_preview(o.key, o.layout)}
     <label class="chkl"><input type="checkbox" id="lyvo-act" checked> ${tr('Show it right away')}</label>
-    <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-lyvo="no">${tr('Decline|proposal')}</button><button type="button" class="btn pri" data-lyvo="yes">${tr('Take over')}</button></div>`);
+    <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-lyvo="no">${tr('Reject|proposal')}</button><button type="button" class="btn pri" data-lyvo="yes">${tr('Apply')}</button></div>`);
   md.classList.add('lyvo'); md.setAttribute('role', 'dialog'); md.setAttribute('aria-labelledby', 'lyvo-t');
   md.addEventListener('click', async e => {
     const b = e.target.closest('[data-lyvo]'); if (!b) return;
     b.disabled = true;
     try {
-      if (b.dataset.lyvo === 'no') { await lyv_call('POST', `/api/layouts/offers/${o.id}/decline`); modalClose(md); toast(tr('Template declined')); }
+      if (b.dataset.lyvo === 'no') { await lyv_call('POST', `/api/layouts/offers/${o.id}/decline`); modalClose(md); toast(tr('Template rejected')); }
       else {
         const act = $('#lyvo-act', md).checked, j = await lyv_call('POST', `/api/layouts/offers/${o.id}/accept`, {activate: act});
         modalClose(md); await lyv_reload();

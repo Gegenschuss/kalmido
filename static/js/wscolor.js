@@ -212,7 +212,7 @@ function wsc_paneDraw(box) {
     row.innerHTML = `<label>${tr('Colour of the organisation')}</label><div class="colors" role="group" aria-label="${esc(tr('Colour of the workspace'))}">${WSC_TONES.map((t, i) => `<button type="button" style="background:${t[0]}" class="${cur === t[0] ? 'on' : ''}" aria-pressed="${cur === t[0]}" aria-label="${esc(tr('Colour {0}', i + 1))}" data-wscp="${t[0]}" ${adm ? '' : 'disabled'}></button>`).join('')}</div>`;
     const hint = document.createElement('div');
     hint.className = 'shint keep';
-    hint.textContent = adm ? tr('Every member sees it as a stripe on top of the sidebar and a dot in the workspace switch, unless they choose their own colour.') : tr('Only an admin of this organisation can change it.');  // 2.138.2 C (#2389): new hint
+    hint.textContent = adm ? tr('Every member sees it as a stripe on top of the sidebar and a dot in the workspace switch, unless they select their own colour.') : tr('Only an admin of this organisation can change it.');  // 2.138.2 C (#2389): new hint
     const sum = det.querySelector('summary');
     sum.after(row); row.after(hint);
     if (!adm) continue;

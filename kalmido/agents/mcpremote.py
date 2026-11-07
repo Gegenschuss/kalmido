@@ -428,7 +428,7 @@ def _consent(c, u, cl, req, problem="", code=200):
             f'<p>{e(tr("{0} wants to work in {1} as one of your agents.", cl["name"], APP_NAME))} '
             f'{e(tr("Afterwards it is sent back to {0}.", host))}'
             f'{" " + e(tr("That is a program on this computer.")) if local else ""}</p>'
-            f'<p>{e(tr("It gets exactly the permissions of the agent you choose: only the projects shared with it. You can disconnect it at any time under Settings > Agents."))}</p>'
+            f'<p>{e(tr("It gets exactly the permissions of the agent you select: only the projects shared with it. You can disconnect it at any time under Settings > Agents."))}</p>'
             + (f'<p class="err" role="alert">{e(problem)}</p>' if problem else "")
             + f'<fieldset><legend>{e(tr("Which agent?"))}</legend>{rows}</fieldset>'
             f'<input type="hidden" name="t" value="{e(t)}">'
@@ -474,7 +474,7 @@ def mcpr_authorize_post():
         except ValueError:
             aid = 0
         if aid not in [a[0] for a in mcpr_agents(c, u)] or not mcpr_may(c, u["id"], aid):
-            return _consent(c, u, cl, req, tr("Please choose an agent."), 400)
+            return _consent(c, u, cl, req, tr("Please select an agent."), 400)
     code = secrets.token_urlsafe(32)
     now = now_utc()
     c.execute("DELETE FROM oauth_codes WHERE expires_at<?", (iso(now - timedelta(days=1)),))

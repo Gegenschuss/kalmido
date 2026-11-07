@@ -103,7 +103,7 @@ function viewTeam() {
     : `<div class="empty tcempty">${botFig('ruhig')}<b>${tr('No conversations yet')}</b><span>${S.tc.people.length || (S.tc.rooms || []).length ? tr('Write to someone you work with, or share a project: every shared project gets its own chat.') : tr('Share a project with someone: every shared project gets its own chat.')}</span>${S.tc.people.length || (S.tc.rooms || []).length ? `<button type="button" class="btn sm pri" data-act="tc-new">${ic('plus', 's')}${tr('Start a conversation')}</button>` : ''}</div>`}
   </nav>`;
   const thp = rid && S.tc.th && tth_wide();  // 2.139.0 A (#2127): the open thread right of the conversation
-  return `<div class="tcwrap"><div class="tcview ${rid ? 'inroom' : ''}${thp ? ' inthread' : ''}${off ? (rid ? ' nolist' : ' listpage') : ''}">${list}${rid ? `<section class="tcroom" aria-label="${esc(roomName(S.tc.room ? {...S.tc.room, name: (rooms.find(x => x.id === rid) || {}).name} : rooms.find(x => x.id === rid)))}">${tcRoomHtml()}</section>` : (isMobile() || off ? '' : `<section class="tcroom tcnone"><div class="empty">${ic('comment')}<span>${tr('Pick a conversation.')}</span></div></section>`)}${thp ? `<aside class="tthpane" aria-label="${esc(tr('Thread'))}">${tth_html()}</aside>` : ''}</div></div>`;
+  return `<div class="tcwrap"><div class="tcview ${rid ? 'inroom' : ''}${thp ? ' inthread' : ''}${off ? (rid ? ' nolist' : ' listpage') : ''}">${list}${rid ? `<section class="tcroom" aria-label="${esc(roomName(S.tc.room ? {...S.tc.room, name: (rooms.find(x => x.id === rid) || {}).name} : rooms.find(x => x.id === rid)))}">${tcRoomHtml()}</section>` : (isMobile() || off ? '' : `<section class="tcroom tcnone"><div class="empty">${ic('comment')}<span>${tr('Select a conversation.')}</span></div></section>`)}${thp ? `<aside class="tthpane" aria-label="${esc(tr('Thread'))}">${tth_html()}</aside>` : ''}</div></div>`;
 }
 // 2.83.0 (#1774): "Open in split window" in the head of a team room (a phone has no long press / right click); not inside the panel itself
 function o3b_splitBtn(room, rid) {
@@ -707,7 +707,7 @@ async function tcx_settings() {
       ${man ? `<form class="tcxname row"><label for="tcx-name">${tr('Name')}</label><input type="text" id="tcx-name" maxlength="80" value="${esc(r.kind === 'group' ? r.custom_name || '' : r.name || '')}" ${ch ? '' : `placeholder="${esc(r.name || '')}"`}><button type="submit" class="btn sm">${tr('Save')}</button></form>` : `<p><b>${esc(r.name || '')}</b></p>`}
       ${ch && man && r.org_id ? `<div class="row"><label class="chkl"><input type="checkbox" id="tcx-open" ${r.open ? 'checked' : ''}> ${tr('Open to the whole organisation')}</label></div>` : ch ? `<p class="muted tcxhint">${r.open ? tr('Open to the whole organisation') : tr('Invited people only')}</p>` : ''}
       <h4>${tr('Members')} <span class="muted">${mem.length}</span></h4><div class="tcxmem">${mem.map(m => `<div class="tcxrow">${av(m.id, m.name, 'avatar sm')}<span class="tcxn">${esc(m.name)}${m.agent ? agentBadge(m.id) : ''}</span>${ch && man && m.id !== S.me.id ? `<button type="button" class="iconbtn" data-xs="rm" data-uid="${m.id}" title="${esc(tr('Remove'))}" aria-label="${esc(tr('Remove') + ': ' + m.name)}">${ic('x', 's')}</button>` : ''}</div>`).join('')}</div>
-      ${add.length ? `<div class="row"><label for="tcx-add">${tr('Add someone')}</label><select id="tcx-add"><option value="">${tr('Choose')}</option>${add.map(id => `<option value="${id}">${esc(S.tc.users[id] || '?')}</option>`).join('')}</select></div>` : ''}
+      ${add.length ? `<div class="row"><label for="tcx-add">${tr('Add someone')}</label><select id="tcx-add"><option value="">${tr('Select')}</option>${add.map(id => `<option value="${id}">${esc(S.tc.users[id] || '?')}</option>`).join('')}</select></div>` : ''}
       <div class="foot">${ids.has(S.me.id) ? `<button type="button" class="btn" data-xs="leave">${ic('logout', 's')}${tr('Leave')}</button>` : ''}${ch && man ? `<button type="button" class="btn" data-xs="archive">${ic('archive', 's')}${tr('Archive')}</button>` : ''}<span class="spacer"></span><button type="button" class="btn pri" data-xs="close">${tr('Done')}</button></div>`;
   };
   const after = async () => { await tcx_refresh(rid); if (md.isConnected) draw(); };
@@ -906,7 +906,7 @@ function nt_pageHtml(cur) {
   const hid = LS.get('sideFold', false) || $('#app')?.classList.contains('side-rail');  // the panel hidden or a drawer: its buttons here
   const nw = !hid || S.me?.kid ? '' : !S.nt.lid || S.nt.mayWrite ? `<button type="button" class="btn sm pri" ${S.nt.lid ? 'data-act="nt-new"' : 'data-sb="note-new"'}>${ic('plus', 's')}${tr('New note')}</button>` : '';
   const show = hid ? `<button type="button" class="btn sm" data-act="sbb-panel">${ic('panelhide', 's')}${tr('Show the sidebar')}</button>` : '';
-  return `<div class="ntwrap"><div class="ntview ntsolo ntpick">${symEmpty('note', tr('Choose a note in the list on the left.'), '')}${hid ? `<div class="ntpickb">${show}${nw}</div>` : ''}</div></div>`;
+  return `<div class="ntwrap"><div class="ntview ntsolo ntpick">${symEmpty('note', tr('Select a note in the list on the left.'), '')}${hid ? `<div class="ntpickb">${show}${nw}</div>` : ''}</div></div>`;
 }
 // the list of one list's notes (search, trash, "New note", the cards) and the open note; list null = not loaded yet
 function nt_listOf() {

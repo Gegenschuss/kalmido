@@ -19,7 +19,7 @@ if (process.env.P2538BU_NOSTART !== '1') execFileSync('bash', [path.join(__dirna
 const call = async (ck, method, url, body) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), http: r.status}; };
 const until = (fn, n, ms = 150) => require('./boot').until(fn, {timeout: n ? n * ms : 15000, step: ms});
 const FEAT = 'collab,time,comments,progress';
-const NOTE = 'The project description, the note of the project status and the notes of time entries cannot be encrypted: they are not available in it, and existing ones are deleted for good when you switch it on.';
+const NOTE = 'The project description, the note of the project status and the notes of time entries cannot be encrypted: they are not available in it, and existing ones are deleted permanently when you switch it on.';
 
 (async () => {
   await sleep(600);

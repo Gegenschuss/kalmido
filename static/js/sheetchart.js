@@ -140,7 +140,7 @@ function shc_html(sh) {  // the chart above the formula bar ('' without a settin
   const sl = one ? shc_slices(dt) : null;
   const legend = one ? `<span class="shc-one muted">${esc(dt.ys[0]?.title || '')}</span>` : dt.ys.length > 1 ? `<ul class="shc-leg">${dt.ys.map((c, k) => `<li><i class="shc-key shc-s${k}${ch.type === 'line' ? ' shc-kl' : ch.type === 'stacked' && shc_hatched(k) ? ' shc-kh' : ''}" aria-hidden="true"></i>${esc(c.title || c.letter || '')}</li>`).join('')}</ul>`
     : `<span class="shc-one muted">${esc(dt.ys[0]?.title || '')}</span>`;
-  const body = !dt.ys.length ? `<p class="muted">${tr('The columns of the chart are gone. Choose new ones.')}</p>`
+  const body = !dt.ys.length ? `<p class="muted">${tr('The columns of the chart are gone. Select new ones.')}</p>`
     : !dt.pts.length || (sl && !sl.parts.length) ? `<p class="muted">${tr('No numbers to show yet.')}</p>`
       : sl ? `<div class="shc-piebox">${shc_pieSvg(sh, ch, sl)}${shc_pieLegend(sh, sl)}</div>`
       : `<div class="shc-scroll">${shc_svg(sh, ch, dt)}</div>${dt.more ? `<p class="muted shc-note">${tr('The first {0} rows are shown.', SHC_MAX)}</p>` : ''}`;
@@ -193,7 +193,7 @@ function shc_dialog(sh) {  // kind, the labels' column, the columns with numbers
     if (a !== 'save') return;
     const y = [...md.querySelectorAll('.shc-ys input:checked')].map(i => +(/** @type {HTMLInputElement} */ (i)).value);
     const err = md.querySelector('#shc-err');
-    if (!y.length || y.length > 6) { if (err) err.textContent = tr('Choose one to {0} columns with numbers', 6); return; }
+    if (!y.length || y.length > 6) { if (err) err.textContent = tr('Select one to {0} columns with numbers', 6); return; }
     const xv = (/** @type {HTMLSelectElement|null} */ (md.querySelector('#shc-x')))?.value || '';
     const tv = (/** @type {HTMLInputElement|null} */ (md.querySelector('input[name="shc-t"]:checked')))?.value || 'bar';
     const t = SHC_KINDS.includes(tv) ? tv : 'bar';  // 2.578.0 (#3462): + stacked, pie, donut

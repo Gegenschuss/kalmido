@@ -6,7 +6,7 @@
 // - ** of bold text only shows while the cursor is inside it, else the word is drawn bold
 // - a table is drawn as a table: a click edits that cell only, Tab goes to the next one, the Markdown follows
 // - a box ticks with the first click and is saved; a [[link]] opens with the first click
-// - "Edit as Markdown" in the "…" menu is the plain field (the way out) and back; "Read only" locks it on this device
+// - "Edit as Markdown" in the "…" menu is the plain field (the way out) and back; "Read-only" locks it on this device
 // - without the right to write: the read view, no editor, no "…" menu
 // - phone 390 px: the page is read first, the pen opens the same editor, "Done" goes back to reading
 // freelancer-matrix: wiki
@@ -133,12 +133,12 @@ const ROUND = '---\ntags: demo\n---\n# Title  \n\nSome **bold** word and `code`.
     await click(`[...document.querySelectorAll('#pop [role="menuitem"]')].find(b => /Back to the editor/.test(b.textContent))`);
     check(await until(`!!${cm} && !document.querySelector('#wk-body') && WKCM.view.state.doc.toString().endsWith('Plain end')`), 'markdown: back in the editor with the new text');
 
-    // ---- "Read only" lock and back
+    // ---- "Read-only" lock and back
     await ev(`(() => { document.querySelector('[data-wk="pmenu"]').click(); return 1; })()`);
-    await click(`[...document.querySelectorAll('#pop [role="menuitem"]')].find(b => /^Read only/.test(b.textContent.trim()))`);
+    await click(`[...document.querySelectorAll('#pop [role="menuitem"]')].find(b => /^Read-only/.test(b.textContent.trim()))`);
     check(await until(`!!document.querySelector('#wk-md') && !document.querySelector('#wk-cm')`), 'read only: the read view on this device');
     await ev(`(() => { document.querySelector('[data-wk="pmenu"]').click(); return 1; })()`);
-    await click(`[...document.querySelectorAll('#pop [role="menuitem"]')].find(b => /^Read only/.test(b.textContent.trim()))`);
+    await click(`[...document.querySelectorAll('#pop [role="menuitem"]')].find(b => /^Read-only/.test(b.textContent.trim()))`);
     check(await until(`!!${cm}`), 'read only: off again, the editor');
 
     // ---- a [[link]] opens with the first click

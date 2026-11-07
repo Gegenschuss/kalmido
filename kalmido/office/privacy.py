@@ -50,7 +50,7 @@ from ..core.access import acx_of  # 2.369.5 (#2517): pulled up from functions
 DSB_KINDS = {"dpa": (N_("Data processing agreement"), "privacy_dpa", True),
              "info": (N_("Privacy information"), "privacy_info", False),
              "consent": (N_("Consent"), "privacy_consent", True)}
-DSB_STATUS = {"open": N_("Open"), "sent": N_("Sent"), "handed": N_("Handed over"), "signed": N_("Signed"), "declined": N_("Declined")}
+DSB_STATUS = {"open": N_("Open"), "sent": N_("Sent"), "handed": N_("Handed over"), "signed": N_("Signed"), "declined": N_("Rejected")}
 DSB_HINT_DPA = N_("Only needed when you process personal data on behalf of the client (Art. 28 GDPR).")
 DSB_REVIEW = N_("Signed (by e-mail, please check)")
 DSB_REPLY = N_("Reply received (please check)")  # 2.154.0 E (#2192): review=2, a reply that was not filed

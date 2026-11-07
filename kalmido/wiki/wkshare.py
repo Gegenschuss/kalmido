@@ -473,7 +473,7 @@ def wsh_create():
     page = None if folder else int(b["page_id"])  # 2.360.0 D (#2496): bound to the page (WSH_COVER); wsh_target checked it
     if kind == "link":
         if not public_links_on(c, "wiki"):
-            return jsonify(error=tr("Public links are turned off on this server")), 409
+            return jsonify(error=tr("Public links are switched off on this server")), 409
         tok = secrets.token_urlsafe(24)  # 192 bits, the shape of the list links (lists/public.py PUB_TOKEN_RE)
         h = _token_hash(tok)
         sid = insert_id(c, "INSERT INTO wiki_shares(org_id,owner_id,path,is_folder,kind,token_hash,token,expires_at,created_by,created_at,page_id,images) "
@@ -569,7 +569,7 @@ def wsh_restore(sid):
     c = db()
     r = wsh_need(c, sid)
     if r["kind"] == "link" and not public_links_on(c, "wiki"):
-        return jsonify(error=tr("Public links are turned off on this server")), 409
+        return jsonify(error=tr("Public links are switched off on this server")), 409
     if wsh_locked(c, r["org_id"], r["owner_id"]):
         return jsonify(error=tr("Pages of a workspace encrypted in the browser cannot be shared."), code="wiki_e2e_share"), 409
     cut = r["kind"] == "person" and not r["revoked_at"] and bool(wsh_cut(c, [r]))  # 2.565.0 (#4717): ended elsewhere
@@ -818,7 +818,7 @@ def wsh_pub_page(token, pid=None):
         name = s["path"].split("/")[-1]
         items = "".join(f'<li><a href="{e(base)}/p/{p["id"]}">{e(p["path"][len(s["path"]) + 1:] or p["path"].split("/")[-1])}</a></li>'
                         for p in pages)
-        main = (f'<header><h1>{e(name)}</h1><p class="sub">{e(tr("Shared pages · read only", lg=lg))}</p></header>'
+        main = (f'<header><h1>{e(name)}</h1><p class="sub">{e(tr("Shared pages · read-only", lg=lg))}</p></header>'
                 + (f'<ul class="wkpidx">{items}</ul>' if items else f'<p class="empty">{e(tr("No pages yet.", lg=lg))}</p>'))
         return pub_html(f"{name} · {APP_NAME}", main, lg)
     r = next((p for p in pages if p["id"] == pid), None)
@@ -843,7 +843,7 @@ def wsh_pub_page(token, pid=None):
     title = r["path"].split("/")[-1]
     day = local_day(r["updated_at"])  # the day in the server's time zone
     when = short_day(day, lg, year=True) if day else ""
-    main = (f'<header>{back}<h1>{e(title)}</h1><p class="sub">{e(tr("Read only", lg=lg))}'
+    main = (f'<header>{back}<h1>{e(title)}</h1><p class="sub">{e(tr("Read-only", lg=lg))}'
             + (f' · {e(tr("Changed {0}", when, lg=lg))}' if when else "") + f'</p></header><article class="wkpub">{md}</article>{flist}')
     return pub_html(f"{title} · {APP_NAME}", main, lg)
 

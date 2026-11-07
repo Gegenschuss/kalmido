@@ -417,7 +417,7 @@ check(one("SELECT COUNT(*) FROM time_entries WHERE list_id=?", (NL,)) == 2, "tim
 check(T("SELECT user_id FROM time_entries WHERE list_id=? AND note LIKE 'Bob Mitglied: %'", (NL,)) == [(ALICE,)], "bob's time entry under alice, named")
 check(one("SELECT COUNT(*) FROM time_sheets WHERE org_id=?", (ORG3,)) == 0 or
       one("SELECT COUNT(*) FROM time_sheets WHERE org_id=? AND user_id=?", (ORG3, DORA)) == 0, "dora's timesheet not")
-check("not chosen were not taken over" in W, f"the warning names the left-out rows {W[:300]}")
+check("not selected were not imported" in W, f"the warning names the left-out rows {W[:300]}")
 # 2.237.0 (#2870): rows of one other person (encrypted notes, timesheets) are not put under their account
 check(one("SELECT COUNT(*) FROM task_enc_notes WHERE task_id=?", (NT,)) == 0 and "belong to other people" in W, "bob's encrypted note not taken over")
 check(one("SELECT user_id FROM task_people WHERE task_id=?", (NT,)) == BOB, "bob comes along to the new task")

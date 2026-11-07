@@ -54,7 +54,7 @@ const scopeExpand = sc => (sc || []).includes('write') ? SCOPE_ALL.filter(x => x
 function scopeSummary(sc) {
   const e = scopeExpand(sc);
   if (e.includes('docs:upload')) return tr('Only upload documents');  // 2.207.0 A (#2763): a scan inbox (document settings)
-  if (e.length <= 1) return tr('read only');
+  if (e.length <= 1) return tr('read-only');
   if (SCOPE_ALL.filter(x => x !== 'admin-read' && x !== 'account' && x !== 'integrations' && x !== 'pinboard' && x !== 'layouts' && x !== 'import' && !x.startsWith('sheets:') && !x.startsWith('wiki:')).every(x => e.includes(x))) return tr('all permissions');  // 2.391.0 (#3362): integrations is opt-in too; 2.51.0 (#1352): pinboard is opt-in, never part of the legacy write; 2.55.0 (#1066): layouts too; 2.68.0 (#1839): import too; 2.89.0 C (#1916): sheets too; 2.200.0 C (#1781): wiki too
   return e.filter(x => x !== 'read').map(x => tr(SCOPE_SHORT[x] || x)).join(', ');
 }
@@ -185,7 +185,7 @@ function caldavHtml(hint) {
       <li>${tr('<b>Thunderbird (Windows, macOS, Linux):</b> Tasks > New Calendar > On the Network. User name and location {0}, Find Calendars; enter the app password when asked and let Thunderbird remember it. Tick the lists you want: their tasks show under Tasks.', url)}</li>
       <li>${tr('<b>Android, Tasks.org:</b> Settings > Synchronization > Add account > CalDAV. URL {0}, user name, app password. Every project becomes a list in Tasks.org.', url)}</li>
       <li>${tr('<b>Android, DAVx⁵:</b> + > Login with URL and user name. Base URL {0}, user name, app password, Create account. Under CalDAV tick the lists; DAVx⁵ asks which task app shows them (Tasks.org, jtx Board or OpenTasks).', url)}</li>
-      <li>${tr('<b>Linux, Evolution:</b> File > New > Task List, type CalDAV, URL {0}, user name, Find Task Lists, pick a list.', url)}</li>
+      <li>${tr('<b>Linux, Evolution:</b> File > New > Task List, type CalDAV, URL {0}, user name, Find Task Lists, select a list.', url)}</li>
       <li>${tr('<b>Windows:</b> the Windows Calendar app and Outlook do not sync tasks over CalDAV. Use Thunderbird.')}</li></ul></details>
     <details class="shelp sdet"><summary>${tr('What syncs')}</summary><ul class="slist">
       <li>${tr('Title, notes, due date and time, start, priority, done / won\'t do, tags, subtasks, repeat rules (daily to yearly), reminders and the link. Assignee, sections, comments, files and custom fields stay in Kalmido; other details a calendar app saves come back to it unchanged.')}</li>
@@ -204,7 +204,7 @@ const WH_EV_GROUPS = [[N_('Tasks'), ['task.', 'comment.', 'list.']], [N_('Calend
 const whEvGrid = (evs, on) => WH_EV_GROUPS.map(([g, ps]) => [g, evs.filter(x => ps.some(p => x.startsWith(p)))]).filter(([, xs]) => xs.length)
   .map(([g, xs]) => `<div class="whevg"><b class="muted">${esc(tr(g))}</b><div class="featgrid">${xs.map(x => `<label><input type="checkbox" data-whev="${esc(x)}" ${on.has(x) ? 'checked' : ''}> ${esc(tr(WH_EV_NAMES[x] || x))} <code class="muted">${esc(x)}</code></label>`).join('')}</div></div>`).join('');
 const whHtml = () => S.webhooks?.enabled ? `<h4 id="s-wh-h">${tr('Webhooks')}</h4>
-  <div class="shint">${tr('Kalmido sends a signed POST to your URL when something changes in projects you see. Failed deliveries are retried for up to 2 hours, then the webhook is turned off.')}</div>
+  <div class="shint">${tr('Kalmido sends a signed POST to your URL when something changes in projects you see. Failed deliveries are retried for up to 2 hours, then the webhook is switched off.')}</div>
   <a class="slink" href="${API_DOCS}#webhooks" target="_blank" rel="noopener noreferrer">${tr('How to verify the signature')}</a>
   <div class="members" id="s-whs"><div class="muted mhint">${tr('Loading…')}</div></div>
   <div class="row"><button class="btn sm" data-wh="new">${ic('plus', 's')} ${tr('Add webhook')}</button></div>` : '';
@@ -237,7 +237,7 @@ document.addEventListener('click', e => {
   else ains_setupModal(a, base);  // lazy-ok: the settings dialog (LD_NEED settings -> agentchat bundle with agentsetup.js)
 });
 function whState(w) {
-  if (!w.enabled) return `<span class="calerr" role="alert">${w.disabled_reason === 'failures' ? tr('turned off after failed deliveries') : tr('off')}</span>`;
+  if (!w.enabled) return `<span class="calerr" role="alert">${w.disabled_reason === 'failures' ? tr('switched off after failed deliveries') : tr('off')}</span>`;
   if (!w.last) return esc(tr('no deliveries yet'));
   return w.last.ok ? esc(tr('last delivery ok {0}', relTime(w.last.at))) : `<span class="calerr" role="alert">${esc(tr('last delivery failed: {0}', w.last.error_text))}</span>`;
 }
@@ -313,7 +313,7 @@ function whModal(w, j, done, base = '/api/me/webhooks') {  // 2.115.0 A (#2061):
     const body = {name: $('#wh-name', md).value.trim(), url: $('#wh-url', md).value.trim(), events: $$('[data-whev]', md).filter(x => x.checked).map(x => x.dataset.whev)};
     if (w) body.enabled = $('#wh-on', md).checked;
     if (!body.url) { need($('#wh-url', md)); return; }
-    if (!body.events.length) { show(tr('Choose at least one event')); return; }
+    if (!body.events.length) { show(tr('Select at least one event')); return; }
     b.disabled = true; show('');
     try {
       const r = await calReq(w ? 'PATCH' : 'POST', w ? `${base}/${w.id}` : base, body);
@@ -339,14 +339,14 @@ function pubDraw(md, lid, j) {
   box._j = j;
   const st = $('#sh-st-pub', md); if (st) st.textContent = k ? (k.expired ? tr('Expired') : tr('On')) : tr('Off');  // 2.32.0 (#1058): the folded line
   box.innerHTML = `${k ? `<div class="row icalrow"><input id="lp-url" readonly value="${esc(k.url)}" aria-label="${tr('Public link')}"><button class="btn sm pri" data-lp="copy">${ic('copy', 's')} ${tr('Copy')}</button></div>
-      <div class="shint">${k.expired ? `<span class="calerr" role="alert">${tr('Expired')}</span> · ` : ''}${esc(trn('opened {0} time', 'opened {0} times', k.views))}${k.last_used_at ? ' · ' + esc(tr('last {0}', relTime(k.last_used_at))) : ''}</div>` : `<div class="shint keep">${tr('People without an account can open the project through a secret link: only this project and only what you choose here.')}</div>`}
-    <div class="row"><label for="lp-mode">${tr('Access')}</label><select id="lp-mode"><option value="view">${tr('View only')}</option><option value="tick" ${k?.mode === 'tick' ? 'selected' : ''}>${tr('View and tick off')}</option></select></div>
+      <div class="shint">${k.expired ? `<span class="calerr" role="alert">${tr('Expired')}</span> · ` : ''}${esc(trn('opened {0} time', 'opened {0} times', k.views))}${k.last_used_at ? ' · ' + esc(tr('last {0}', relTime(k.last_used_at))) : ''}</div>` : `<div class="shint keep">${tr('People without an account can open the project through a secret link: only this project and only what you select here.')}</div>`}
+    <div class="row"><label for="lp-mode">${tr('Access')}</label><select id="lp-mode"><option value="view">${tr('Read-only')}</option><option value="tick" ${k?.mode === 'tick' ? 'selected' : ''}>${tr('View and tick off')}</option></select></div>
     <div class="row"><label for="lp-exp">${tr('Valid until')}</label>${dateIn('lp-exp', pubDate(k?.expires_at), {min: today(), label: tr('Valid until'), empty: tr('no expiry')})}</div>
     <div class="row"><label for="lp-pw">${tr('Password')}</label><input type="password" id="lp-pw" autocomplete="new-password" placeholder="${k?.has_password ? tr('saved, empty = keep') : tr('optional')}">${k?.has_password ? `<label class="chkl"><input type="checkbox" id="lp-nopw"> ${tr('remove')}</label>` : ''}</div>
     <div class="row"><label></label><label class="chkl"><input type="checkbox" id="lp-notes" ${k?.notes ? 'checked' : ''}> ${tr('Show task notes')}</label></div>
     ${cv_html(k, j.options)}
     ${k ? sg_list_box(lid) : ''}
-    <div class="row">${k ? `<button class="btn sm" data-lp="regen">${ic('key', 's')} ${tr('New link')}</button><button class="btn sm danger" data-lp="off">${tr('Turn off')}</button>` : `<button class="btn sm pri" data-lp="save">${ic('link', 's')} ${tr('Create public link')}</button>`}</div>
+    <div class="row">${k ? `<button class="btn sm" data-lp="regen">${ic('key', 's')} ${tr('New link')}</button><button class="btn sm danger" data-lp="off">${tr('Switch off')}</button>` : `<button class="btn sm pri" data-lp="save">${ic('link', 's')} ${tr('Create public link')}</button>`}</div>
     <div class="calerr" role="alert" id="lp-err" hidden></div>`;
 }
 function pubWire(md, lid) {
@@ -357,13 +357,13 @@ function pubWire(md, lid) {
     const a = b.dataset.lp;
     if (a === 'copy') { const i = $('#lp-url', md); try { await navigator.clipboard.writeText(i.value); toast(tr('Link copied')); } catch { i.focus(); i.select(); toast(tr('Copy the selected link')); } return; }
     if (a === 'regen' && !await askConfirm(tr('Create a new link?'), tr('The old one stops working at once.'), {ok: tr('New link'), danger: true})) return;
-    if (a === 'off' && !await askConfirm(tr('Turn the public link off?'), tr('It stops working at once.'), {ok: tr('Turn off'), danger: true})) return;
+    if (a === 'off' && !await askConfirm(tr('Turn the public link off?'), tr('It stops working at once.'), {ok: tr('Switch off'), danger: true})) return;
     b.disabled = true; show('');
     try {
       let j;
       if (a === 'save') { j = await calReq('PUT', `/api/lists/${lid}/public-link`, pubBody(md)); toast(tr('Public link saved')); }  // creates the link
       if (a === 'regen') { j = await calReq('POST', `/api/lists/${lid}/public-link/regenerate`); toast(tr('New link created, the old one no longer works')); }
-      if (a === 'off') { j = await calReq('DELETE', `/api/lists/${lid}/public-link`); toast(tr('Public link turned off')); }
+      if (a === 'off') { j = await calReq('DELETE', `/api/lists/${lid}/public-link`); toast(tr('Public link switched off')); }
       pubDraw(md, lid, j);
     } catch (x) { show(x.message); } finally { b.disabled = false; }
   });
@@ -400,7 +400,7 @@ async function whoLoad(box) {
   let j; try { j = await api('GET', `/api/orgs/${oid}/webhooks`); } catch { rows.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; }
   box._j = j;
   if (!j.enabled) { box.hidden = true; return; }
-  rows.innerHTML = j.hooks.length ? j.hooks.map(w => `<div class="mrow whrow ${w.enabled ? '' : 'off'}" data-whid="${w.id}"><span class="n"><b>${esc(w.name || urlHost(w.url))}</b> <span class="muted">${esc(urlHost(w.url))}</span><small class="muted">${esc(trn('{0} event|webhook', '{0} events|webhook', w.events.length))} · ${w.enabled || w.disabled_reason !== 'admin' ? whState(w) : `<span class="calerr" role="alert">${esc(tr('turned off: the person who set it up is no admin any more'))}</span>`}</small></span>
+  rows.innerHTML = j.hooks.length ? j.hooks.map(w => `<div class="mrow whrow ${w.enabled ? '' : 'off'}" data-whid="${w.id}"><span class="n"><b>${esc(w.name || urlHost(w.url))}</b> <span class="muted">${esc(urlHost(w.url))}</span><small class="muted">${esc(trn('{0} event|webhook', '{0} events|webhook', w.events.length))} · ${w.enabled || w.disabled_reason !== 'admin' ? whState(w) : `<span class="calerr" role="alert">${esc(tr('switched off: the person who set it up is no admin any more'))}</span>`}</small></span>
       <button class="iconbtn" data-who="test" title="${tr('Send test')}" aria-label="${tr('Send test')}" ${w.enabled ? '' : 'disabled'}>${ic('send', 's')}</button>
       <button class="iconbtn" data-who="log" title="${tr('Delivery log')}" aria-label="${tr('Delivery log')}">${ic('list', 's')}</button>
       <button class="iconbtn" data-who="edit" title="${tr('Edit')}" aria-label="${tr('Edit')}">${ic('edit', 's')}</button>
@@ -439,7 +439,7 @@ const CHN_EV = {reminder: N_('Reminders'), assign: N_('Assignments'), comment: N
 const CHN_EV_ORG = {assign: N_('Assignment'), comment: N_('Comment')};
 const chn_evName = (e, org) => tr((org && CHN_EV_ORG[e]) || CHN_EV[e] || e);
 function chn_state(ch) {
-  if (!ch.enabled) return `<span class="calerr" role="alert">${esc(ch.disabled_reason === 'failures' ? tr('turned off after {0} failed sends', ch.fails) : ch.disabled_reason === 'admin' ? tr('turned off: the person who set it up is no admin any more') : ch.disabled_reason === 'disabled' ? tr('turned off: the account of the person who set it up is disabled') : tr('off'))}</span>`;
+  if (!ch.enabled) return `<span class="calerr" role="alert">${esc(ch.disabled_reason === 'failures' ? tr('switched off after {0} failed sends', ch.fails) : ch.disabled_reason === 'admin' ? tr('switched off: the person who set it up is no admin any more') : ch.disabled_reason === 'disabled' ? tr('switched off: the account of the person who set it up is disabled') : tr('off'))}</span>`;
   if (ch.last_error) return `<span class="calerr" role="alert">${esc(tr('last send failed: {0}', ch.last_error))}</span>`;
   return esc(ch.last_at ? tr('last send ok {0}', relTime(ch.last_at)) : tr('nothing sent yet'));
 }
@@ -569,7 +569,7 @@ function chn_modal(ch, j, base, done, org) {
       fs.forEach(x => { body[x.dataset.chnf] = x.value.trim(); });
     }
     if (ch) body.enabled = $('#chn-on', md).checked;
-    if (!body.events.length) { show(tr('Choose at least one event')); return; }
+    if (!body.events.length) { show(tr('Select at least one event')); return; }
     b.disabled = true; show('');
     try { await calReq(ch ? 'PATCH' : 'POST', ch ? `${base}/${ch.id}` : base, body); md.remove(); toast(tr('Saved')); done && done(); }
     catch (x) { show(x.message); } finally { b.disabled = false; }
@@ -665,7 +665,7 @@ const bm_bookmarklet = () => `javascript:(()=>{window.open(${JSON.stringify(loca
 const bmls_html = () => feat('reading') ? `<h4 id="s-bmlet-h">${tr('Save button for the browser')}</h4>
   <div class="row caprow"><a class="btn pri capbm" href="${esc(bm_bookmarklet())}" data-intb="bmhint" draggable="true">${ic('bookmark', 's')} ${tr('Save to Kalmido')}</a></div>
   <div class="shint">${tr('Drag the button to your bookmarks bar. On any page, click it: a small window shows the page and asks where it goes: “Read later · Private” (Enter), “Read later” in one of your organisations, or a bookmark. A link you already saved there is not saved twice. It runs no code of ours on that page and uses your normal sign-in.')}</div>
-  <div class="shint keep">${tr('On the phone: share a link from any app to Kalmido and choose “Read later” or “Save as bookmark”.')}</div>` : '';
+  <div class="shint keep">${tr('On the phone: share a link from any app to Kalmido and select “Read later” or “Save as bookmark”.')}</div>` : '';
 // ---- the booking page (its own dialog, apptbook.js; the calendars dialog keeps its button)
 const apbs_html = () => feat('events') && !S.me?.kid ? `<h4 id="s-apb-h">${tr('Booking page')}</h4>
   <div class="row"><span class="muted">${tr('A public page where others book an appointment with you: times, appointment types, the calendar it goes into.')}</span><button type="button" class="btn sm" data-intb="apb">${ic('cal', 's')} ${tr('Booking page…')}</button></div>` : '';

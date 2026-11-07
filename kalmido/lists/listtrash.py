@@ -155,7 +155,7 @@ def otr_delete(lid):
     if early and (request.args.get("confirm") or "") != r["name"]:  # 2.186.1 (#2732): before the end of the period
         return err(tr("Type the project name to confirm"), 409)
     if not early and (r["retain_until"] or "") >= now_utc().date().isoformat():  # 2.186.0 A (#2566): kept by law until then
-        return err(tr("This project keeps receipts by law until {0}: it can be deleted for good after that.", r["retain_until"]), 409)
+        return err(tr("This project keeps receipts by law until {0}: it can be deleted permanently after that.", r["retain_until"]), 409)
     got = otr_hard(c, lid)
     if got is None:  # 2.102.0 review F1: restored meanwhile
         raise Denied(404)
@@ -170,7 +170,7 @@ def otr_delete(lid):
     c.commit()
     otr_drop_files(lid, icon, files)
     if early:  # 2.186.1 (#2732): the security log (like the account deletion, useradmin.ua8_audit)
-        rx_alert(N_("{0} deleted the kept project {1} for good before the end of its retention period ({2})."),
+        rx_alert(N_("{0} deleted the kept project {1} permanently before the end of its retention period ({2})."),
                  [g.user["username"], r["name"], r["retain_until"]])
     print("list", lid, "deleted for good from the trash by", login_log_who(g.user), flush=True)
     return jsonify(ok=True)

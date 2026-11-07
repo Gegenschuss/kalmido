@@ -349,7 +349,7 @@ def ev_att_learn(c, pw_row, v):
 
 def ev_put(c, u, coll, name, pw_row=None):
     if coll["role"] not in ("owner", "edit"):
-        raise DavError(403, "Read only", "<D:need-privileges/>")
+        raise DavError(403, "Read-only", "<D:need-privileges/>")
     if "text/calendar" not in (request.content_type or "text/calendar").lower():
         raise DavError(415, "Expected text/calendar", "<C:supported-calendar-data/>")
     raw = dav_body()
@@ -456,7 +456,7 @@ def evdav(m, c, u, pw_row, kind, key, name):
         if coll["role"] == "rsvp":  # 2.155.0 A (#2074): an invitation removed on the device = declined
             return ev_rsvp_delete(c, u, coll, name)
         if coll["role"] not in ("owner", "edit"):
-            raise DavError(403, "Read only", "<D:need-privileges/>")
+            raise DavError(403, "Read-only", "<D:need-privileges/>")
         have = member_now(c, u, coll, name, lock=True)  # 2.565.0 (#4703)
         if not have:
             raise DavError(404, "Not found")
@@ -499,7 +499,7 @@ def _rsvp_member(c, u, coll, name, missing=403):
     if not have and missing == 404:
         raise DavError(404, "Not found")
     if not have or not c.execute("SELECT 1 FROM event_attendees WHERE event_id=? AND user_id=?", (have[0]["id"], u["id"])).fetchone():
-        raise DavError(403, "Read only", "<D:need-privileges/>")
+        raise DavError(403, "Read-only", "<D:need-privileges/>")
     return have
 
 

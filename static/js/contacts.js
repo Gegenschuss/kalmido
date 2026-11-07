@@ -108,12 +108,12 @@ function viewContacts() {
     : `<ul class="ctlist" role="list" aria-label="${esc(tr('Contacts'))}">${ctRows(items, (c, vl) => `<li${vl}><button type="button" class="ctrow ${c.id === CT.sel ? 'on' : ''} ${bk_rowCls(c)}" data-ctopen="${c.id}" ${CT.pick ? `aria-pressed="${CT.pick.has(c.id)}"` : `aria-current="${c.id === CT.sel}"`}>${CT.pick ? bk_chk(c) : ''}${ctAv(c)}<span class="ctn"><b>${esc(c.fn || c.org || '?')}</b><small class="muted">${esc([c.org !== c.fn ? c.org : '', c.email || c.phone].filter(Boolean).join(' · '))}</small></span>${(books.length > 1 && ctBook(c.book_id)) ? `<i class="cevdot" style="--cc:${cssColor(ctBook(c.book_id).color) || 'var(--accent)'}" title="${esc(ctBook(c.book_id).name)}"></i>` : ''}</button></li>`)}</ul>
       ${CT.total > CT.items.length ? `<div class="muted ctmore">${tr('{0} of {1} loaded', CT.items.length, CT.total)} <button type="button" class="linkbtn" data-ctxmore ${CT.more ? 'disabled' : ''}>${tr('Show more')}</button></div>` : ''}`;  // 2.119.1 A (#2081): the next page comes when scrolling near the end
   const fbar = typeof ctf_barHtml === 'function' && !(mob && showCard) ? ctf_barHtml() : '';  // 2.351.0 B (#2749): the folder filter
-  return CT.html = `<div class="ctview ${showCard ? 'withcard' : ''} ${CT.pick ? 'ctpicking' : ''}"><h2 class="sr">${tr('Contacts')}</h2>${ct18_hintHtml()}${CT.pick && !(mob && showCard) ? bk_barHtml() : ''}${mob && showCard ? '' : bar}${fbar}<div class="ctcols">${mob && showCard ? '' : `<div class="ctlistw" data-vlsc>${list}</div>`}${showCard ? ctCardHtml(CT.card) : mob ? '' : `<div class="ctcard ctnone muted">${ic('user')}${tr('Choose a contact')}</div>`}</div></div>`;
+  return CT.html = `<div class="ctview ${showCard ? 'withcard' : ''} ${CT.pick ? 'ctpicking' : ''}"><h2 class="sr">${tr('Contacts')}</h2>${ct18_hintHtml()}${CT.pick && !(mob && showCard) ? bk_barHtml() : ''}${mob && showCard ? '' : bar}${fbar}<div class="ctcols">${mob && showCard ? '' : `<div class="ctlistw" data-vlsc>${list}</div>`}${showCard ? ctCardHtml(CT.card) : mob ? '' : `<div class="ctcard ctnone muted">${ic('user')}${tr('Select a contact')}</div>`}</div></div>`;
 }
 // 2.364.0 B (#3018): Office & finance off: a line above the contacts that turns it on right here (instead of Settings >
 // Modules > Areas > Parts); everyone but a child switches their own modules (without an organisation they are their own admin)
 const ct18_hintHtml = () => S.me?.kid || officeOn() || LS.get('ct18Hide') ? '' : `<div class="ct18" data-ct18>${ic('receipt', 's')}<span>${esc(tr('Quotations and invoices?'))}</span>
-  <label class="chkl swl"><span class="swc"><input type="checkbox" role="switch" data-ct18on><span class="swt" aria-hidden="true"></span></span><span>${esc(tr('Turn on Office & finance'))}</span></label>
+  <label class="chkl swl"><span class="swc"><input type="checkbox" role="switch" data-ct18on><span class="swt" aria-hidden="true"></span></span><span>${esc(tr('Switch on Office & finance'))}</span></label>
   <button type="button" class="iconbtn" data-ct18x aria-label="${esc(tr('Hide'))}" title="${esc(tr('Hide'))}">${ic('x', 's')}</button></div>`;
 document.addEventListener('change', async e => {
   const el = e.target.closest?.('[data-ct18on]'); if (!el || !el.checked) return;
@@ -138,9 +138,9 @@ function ctt_html() {
   const bar = `<div class="ctbar"><button class="iconbtn" data-ct="tback" aria-label="${esc(tr('Back'))}">${ic('back')}</button><h2 class="sr">${tr('Trash')}</h2><b>${tr('Trash')}</b><span class="spacer"></span>${t.items?.length ? `<button class="btn sm" data-ct="tempty">${ic('trash', 's')} ${tr('Empty trash')}</button>` : ''}</div>`;
   if (!t.items) { setTimeout(ctt_load, 0); return `<div class="ctview">${bar}<div class="muted ctempty">${tr('Loading…')}</div></div>`; }
   const row = (x, k, name, sub) => `<li><div class="ctrow msarch">${k === 'b' ? `<i class="cevdot" style="--cc:${cssColor(x.color) || 'var(--accent)'}"></i>` : ctAv(x)}<span class="ctn"><b>${esc(name)}</b><small class="muted">${sub}</small></span>
-    <button type="button" class="btn sm" data-ctt="${k}rest" data-id="${x.id}">${ic('undo', 's')} ${tr('Restore')}</button><button type="button" class="iconbtn" data-ctt="${k}purge" data-id="${x.id}" aria-label="${esc(tr('Delete for good'))}" title="${esc(tr('Delete for good'))}">${ic('trash', 's')}</button></div></li>`;
+    <button type="button" class="btn sm" data-ctt="${k}rest" data-id="${x.id}">${ic('undo', 's')} ${tr('Restore')}</button><button type="button" class="iconbtn" data-ctt="${k}purge" data-id="${x.id}" aria-label="${esc(tr('Delete permanently'))}" title="${esc(tr('Delete permanently'))}">${ic('trash', 's')}</button></div></li>`;
   const list = t.books.length || t.items.length ? `<ul class="ctlist" role="list" aria-label="${esc(tr('Trash'))}">${t.books.map(b => row(b, 'b', b.name, esc(trn('{0} contact', '{0} contacts', b.count)) + ' · ' + since(b))).join('')}${t.items.map(c => row(c, 'c', c.fn || c.org || '?', [esc(ctBook(c.book_id)?.name || ''), since(c)].filter(Boolean).join(' · '))).join('')}</ul>` : `<div class="empty">${ic('trash')}${tr('The trash is empty')}</div>`;
-  return `<div class="ctview">${bar}<div class="ctlistw">${list}${t.days ? `<p class="muted mscltrdays">${esc(trashNote(trn('Contacts in the trash are deleted for good after {0} day.', 'Contacts in the trash are deleted for good after {0} days.', t.days)))}</p>` : ''}</div></div>`;
+  return `<div class="ctview">${bar}<div class="ctlistw">${list}${t.days ? `<p class="muted mscltrdays">${esc(trashNote(trn('Contacts in the trash are deleted permanently after {0} day.', 'Contacts in the trash are deleted permanently after {0} days.', t.days)))}</p>` : ''}</div></div>`;
 }
 async function ctt_act(k, id) {
   const t = CT.trash; if (!t?.items) return;
@@ -150,11 +150,11 @@ async function ctt_act(k, id) {
     else if (k === 'brest') await api('POST', `/api/books/${id}/restore`);
     else if (k === 'bpurge') {
       const b = t.books.find(x => x.id === id); if (!b) return;
-      if (!await askConfirm(tr('Delete the address book “{0}” for good?', b.name), trn('Its {0} contact is deleted with it. This cannot be undone.', 'Its {0} contacts are deleted with it. This cannot be undone.', b.count), {ok: tr('Delete for good'), danger: true})) return;
+      if (!await askConfirm(tr('Delete the address book “{0}” permanently?', b.name), trn('Its {0} contact is deleted with it. This cannot be undone.', 'Its {0} contacts are deleted with it. This cannot be undone.', b.count), {ok: tr('Delete permanently'), danger: true})) return;
       await api('POST', `/api/books/${id}/purge`);
     } else {
       const ids = k === 'call' ? t.items.map(c => c.id) : [id]; if (!ids.length) return;
-      if (!await askConfirm(trn('Delete {0} contact for good?', 'Delete {0} contacts for good?', ids.length), tr('This cannot be undone.'), {ok: tr('Delete for good'), danger: true})) return;
+      if (!await askConfirm(trn('Delete {0} contact permanently?', 'Delete {0} contacts permanently?', ids.length), tr('This cannot be undone.'), {ok: tr('Delete permanently'), danger: true})) return;
       await bk_send({action: 'purge'}, ids);
     }
   } catch (x) { toast(x.message || ''); again(); return; }
@@ -205,7 +205,7 @@ function ctCardHtml(c) {
   const kinds = Object.fromEntries(CT_LINK);
   return `<article class="ctcard" aria-labelledby="ct-h" data-ck="${c.id}">
     <div class="cthead">${isMobile() ? `<button class="iconbtn" data-ct="back" aria-label="${esc(tr('Back'))}">${ic('back')}</button>` : ''}${ctAv(c, 'avatar ctav big')}<div class="cthn"><h3 id="ct-h">${esc(c.fn || c.org || '?')}</h3>${feat('clients') ? `<div class="mstags">${ms_tag('contact')}</div>` : ''}${[c.title, c.org !== c.fn ? c.org : '', c.dept].filter(Boolean).length ? `<div class="muted">${esc([c.title, c.org !== c.fn ? c.org : '', c.dept].filter(Boolean).join(' · '))}</div>` : ''}</div>
-      <span class="ctacts">${w ? `<button class="btn sm" data-ct="edit">${ic('edit', 's')} ${tr('Edit')}</button>` : `<span class="rotag">${ic('eye', 's')}${tr('View only')}</span>`}<button class="iconbtn" data-ct="cmenu" aria-haspopup="menu" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('dots')}</button></span></div>
+      <span class="ctacts">${w ? `<button class="btn sm" data-ct="edit">${ic('edit', 's')} ${tr('Edit')}</button>` : `<span class="rotag">${ic('eye', 's')}${tr('Read-only')}</span>`}<button class="iconbtn" data-ct="cmenu" aria-haspopup="menu" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('dots')}</button></span></div>
     <div class="ctfields">
       ${it('phones', 'phone', x => `<a href="tel:${esc(x.value.replace(/[^\d+]/g, ''))}">${esc(x.value)}</a>`)}
       ${it('emails', 'at', x => `<a href="mailto:${esc(x.value)}">${esc(x.value)}</a>`)}
@@ -826,7 +826,7 @@ async function ctx_csvMap(bid, f, noPhotos) {
   md.addEventListener('click', e => {
     const k = e.target.closest('[data-ctx]')?.dataset.ctx; if (!k) return;
     if (k === 'close') { md.remove(); return; }
-    if (!map.some(Boolean)) { toast(tr('Choose at least one column')); return; }
+    if (!map.some(Boolean)) { toast(tr('Select at least one column')); return; }
     md.remove(); ctImpRun(bid, f, map);
   });
 }
@@ -1012,7 +1012,7 @@ const ctm_L = () => [['phones', tr('Phone')], ['emails', tr('E-mail')], ['addres
 const ctm_name = c => c.fn || c.org || '?';
 const ctm_adr = a => [a.street, [a.code, a.city].filter(Boolean).join(' '), a.region, a.country].filter(Boolean).join(', ');
 async function ctm_merge(ids) {
-  if (ids.length < 2) { toast(tr('Choose at least two contacts')); return; }
+  if (ids.length < 2) { toast(tr('Select at least two contacts')); return; }
   if (ids.length > CTM_MAX) { toast(tr('At most {0} contacts at once', CTM_MAX)); return; }
   let recs; try { recs = await Promise.all(ids.map(i => api('GET', `/api/contacts/${i}`))); } catch { return; }
   const photo = {}; for (const c of recs) if (c.photo && !(c.photo in photo)) photo[c.photo] = ctm_name(c);

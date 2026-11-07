@@ -76,7 +76,7 @@ async function dgDepAdd(pairs) {
 // the phone's way (and the menu's): "Waiting on a task…" with the task search
 function dgDepPick(id) {
   const t = S.tasks.get(id); if (!t) return;
-  dgPick({title: tr('Waiting on a task…'), hint: tr('“{0}” can only really start once the chosen task is done.', t.title),
+  dgPick({title: tr('Waiting on a task…'), hint: tr('“{0}” can only really start once the selected task is done.', t.title),
     filter: x => x.id !== id && dFor(x) && !(t.blockers || []).includes(x.id) && !tlReaches(x.id, id), near: t,
     pick: x => dgDepAdd([[id, x.id]])});
 }
@@ -210,7 +210,7 @@ async function dgMakeSubs(ids, pid) {
   const items = {};
   list.forEach((i, k) => { items[i] = {parent_id: pid, sort: s0 + k}; });
   const notes = [deep.length ? trn('{0} task stays: its own subtasks would go deeper than {1} levels', '{0} tasks stay: their own subtasks would go deeper than {1} levels', deep.length, maxDepth()) : '',
-    ro.length ? trn('{0} task skipped (view only)', '{0} tasks skipped (view only)', ro.length) : '',
+    ro.length ? trn('{0} task skipped (read-only)', '{0} tasks skipped (read-only)', ro.length) : '',
     ms.length ? tr('A milestone cannot be a subtask') : ''];
   return dgApply(items, trn('{0} task is now a subtask of “{1}”', '{0} tasks are now subtasks of “{1}”', list.length, dgShort(p.title)), notes);
 }
@@ -229,12 +229,12 @@ async function dgDetach(ids) {
     arr.forEach((i, k) => { items[i] = {parent_id: null, section_id: tp.section_id || null, sort: (tp.sort || 0) + (hi - (tp.sort || 0)) * (k + 1) / (arr.length + 1)}; });
   }
   return dgApply(items, trn('{0} subtask is now standalone', '{0} subtasks are now standalone', Object.keys(items).length),
-    [ro.length ? trn('{0} task skipped (view only)', '{0} tasks skipped (view only)', ro.length) : '']);
+    [ro.length ? trn('{0} task skipped (read-only)', '{0} tasks skipped (read-only)', ro.length) : '']);
 }
 // "Subtasks of…": the task search, without the selection and what is under it, only where another level fits
 function dgSubPick(ids) {
   const set = new Set(ids), roots = dgRoots(ids);
-  dgPick({title: tr('Subtasks of…'), hint: trn('The {0} selected task becomes a subtask of the chosen task.', 'The {0} selected tasks become subtasks of the chosen task.', roots.length),
+  dgPick({title: tr('Subtasks of…'), hint: trn('The {0} selected task becomes a subtask of the selected task.', 'The {0} selected tasks become subtasks of the selected task.', roots.length),
     near: S.tasks.get(roots[0]),
     filter: x => !set.has(x.id) && !dgAncestors(x.id).some(a => set.has(a)) && canEdit(x) && !isMs(x) && depthOf(x) < maxDepth() - 1,
     pick: x => dgMakeSubs(ids, x.id)});
@@ -270,7 +270,7 @@ async function dgBlock(ids, row, after) {
   });
   if (((mode === 'date' || mode === 'title' || mode === 'creator' || mode.startsWith('created') || sortByCol(mode)) && !kcol) || mode === 'flow') LS.set('sort2.' + S.route.key, 'prio');  // a manual drop: prio + manual (as one task)
   return dgApply(items, trn('{0} task moved', '{0} tasks moved', n), [deep.length ? trn('{0} task stays: its own subtasks would go deeper than {1} levels', '{0} tasks stay: their own subtasks would go deeper than {1} levels', deep.length, maxDepth()) : '',
-    ro.length ? trn('{0} task skipped (view only)', '{0} tasks skipped (view only)', ro.length) : '']);
+    ro.length ? trn('{0} task skipped (read-only)', '{0} tasks skipped (read-only)', ro.length) : '']);
 }
 // into a section / kanban column of a list as standalone tasks, at its top, order kept
 async function dgToSection(ids, lid, sid) {
@@ -285,7 +285,7 @@ async function dgToSection(ids, lid, sid) {
   list.forEach((id, k) => { const t = S.tasks.get(id); items[id] = {parent_id: null, section_id: sid, sort: top - list.length + k, ...(t.list_id !== lid ? {list_id: lid} : {})}; });
   if (['date', 'title', 'creator', 'flow', 'created', 'created_asc'].includes(sortMode()) || sortByCol(sortMode())) LS.set('sort2.' + S.route.key, 'prio');
   return dgApply(items, trn('{0} task moved to section {1}', '{0} tasks moved to section {1}', list.length, secName(sid)),
-    [ro.length ? trn('{0} task skipped (view only)', '{0} tasks skipped (view only)', ro.length) : '']);
+    [ro.length ? trn('{0} task skipped (read-only)', '{0} tasks skipped (read-only)', ro.length) : '']);
 }
 async function dgToNewSection(ids) {
   const lid = S.tasks.get(ids[0])?.list_id; if (!lid) return;
@@ -308,7 +308,7 @@ async function dgToList(ids, lid) {
   const items = {};
   for (const id of list) { const t = S.tasks.get(id); if (t.list_id !== lid || t.parent_id) items[id] = {list_id: lid, ...(t.list_id !== lid ? {section_id: null} : {}), ...(t.parent_id ? {parent_id: null} : {})}; }
   return dgApply(items, trn('Moved {0} task to {1}', 'Moved {0} tasks to {1}', Object.keys(items).length, lname(listById(lid)) || '?'),
-    [ro.length ? trn('{0} task skipped (view only)', '{0} tasks skipped (view only)', ro.length) : '']);
+    [ro.length ? trn('{0} task skipped (read-only)', '{0} tasks skipped (read-only)', ro.length) : '']);
 }
 
 // ---- dragging (desktop); dnd.js asks dgOver on every dragover and dgDrop on the drop

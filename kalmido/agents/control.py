@@ -699,7 +699,7 @@ def ctl_route_undo(aid, did):
     if not r:
         raise Denied(404)
     if r["undone_at"]:
-        return err(tr("This was taken back already"), 409)
+        return err(tr("This was undone already"), 409)
     undo = json.loads(r["undo"]) if r["undo"] else {}
     msg = ctl_undo(c, r, undo)
     if msg:
@@ -736,7 +736,7 @@ def ctl_undo(c, r, undo):
         news_forget_comment(c, k["id"])
         c.commit()
         return None
-    changed = tr("Changed meanwhile by someone else – take it back by hand")
+    changed = tr("Changed meanwhile by someone else – undo it by hand")
     try:
         if r["kind"] == "task_completed":  # 2.235.0 A2 (#2891): all visible first; only what the agent itself ticked off
             ids = [int(x) for x in undo.get("ids") or []]
@@ -752,7 +752,7 @@ def ctl_undo(c, r, undo):
         if r["kind"] == "task_planned":  # 2.235.0 A2 (#2891): only while the dates are still the agent's
             tasks, after = undo.get("tasks") or {}, undo.get("after")
             if not isinstance(after, dict):
-                return tr("This cannot be taken back automatically")
+                return tr("This cannot be undone automatically")
             if not all(task_visible(c, int(tid), me(), write=True) for tid in tasks):
                 return no
             plan = {}
@@ -766,7 +766,7 @@ def ctl_undo(c, r, undo):
                 if diff:  # unchanged since the agent's own step: taking it back passes the app's task lock (#1118)
                     e = apply_update(c, tid, diff)
                     if e:
-                        return tr("This cannot be taken back any more") + f" ({e})"
+                        return tr("This cannot be undone any more") + f" ({e})"
             return None
     except V1Error as e:
         try:
@@ -774,5 +774,5 @@ def ctl_undo(c, r, undo):
             why = j.get("error") if isinstance(j.get("error"), str) else (j.get("error") or {}).get("message")
         except Exception:  # noqa: BLE001
             why = None
-        return tr("This cannot be taken back any more") + (f" ({why})" if why else "")
-    return tr("This cannot be taken back automatically")
+        return tr("This cannot be undone any more") + (f" ({why})" if why else "")
+    return tr("This cannot be undone automatically")

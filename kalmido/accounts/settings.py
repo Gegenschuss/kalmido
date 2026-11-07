@@ -880,7 +880,7 @@ def push_subs_add():
     'sync' = the app's daily check-in: only updates a device that is still registered, never adds one."""
     from ..notify.push import _b64u_dec, webpush_endpoint_ok, WEBPUSH_MAX_SUBS, WEBPUSH_ON
     if not WEBPUSH_ON:
-        return err(tr("Web Push is turned off on this server"), 404)
+        return err(tr("Web Push is switched off on this server"), 404)
     b = body()
     ep, keys = b.get("endpoint"), b.get("keys") if isinstance(b.get("keys"), dict) else {}
     if not webpush_endpoint_ok(ep):

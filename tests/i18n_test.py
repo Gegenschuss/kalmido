@@ -143,10 +143,10 @@ COUNTS = [
     ("static/js/liste2e.js", "{0} text of this project cannot be decrypted with the keys you hold."),
     ("static/js/liste2eui.js", "{0} text of this project cannot be opened with your key. Compare the safety numbers with the members."),
     ("static/js/wikie2e.js", "{0} page of this workspace cannot be opened with your key."),
-    ("static/js/wikie2e.js", "{0} text of this workspace cannot be decrypted. The workspace stays locked until it is taken over as empty."),
+    ("static/js/wikie2e.js", "{0} text of this workspace cannot be decrypted. The workspace stays locked until it is set to empty."),
     ("static/js/paperless.js", "{0} document in Paperless-ngx"),
     ("static/js/paperless.js", "{0} rule is already here"),
-    ("static/js/paperless.js", "{0} rule taken over"),
+    ("static/js/paperless.js", "{0} rule imported"),
     ("static/js/wiki.js", "{0} page imported"),
     ("static/js/wiki.js", "{0} name shortened"),
     ("static/js/office_books.js", "{0} file already exists"),
@@ -158,7 +158,7 @@ COUNTS = [
     ("static/js/office_docs.js", "{0} entry taken; skipped: {1} already billed, {2} not billable"),
     ("kalmido/office/books.py", "{0} receipt lies in a folder you cannot open and is not in this export; the GoBD export holds it."),
     ("kalmido/sheets/io.py", "{0} sheet imported"),
-    ("kalmido/sheets/io.py", "{0} formula taken over"),
+    ("kalmido/sheets/io.py", "{0} formula imported"),
 ]
 SAME_OK = {"{0} already imported", "{0} duplicate"}  # the form does not change in some languages
 for rel, one in COUNTS:
@@ -171,7 +171,7 @@ for rel, one in COUNTS:
             check(v[0] != v[1], f"{code}: singular differs from plural for '{one[:50]}'")
         if isinstance(v, list):
             check(all(x in v[0] for x in re.findall(r"\{\d+\}", one)), f"{code}: singular keeps the placeholders of '{one[:50]}'")
-OLD_TR = ["{0} rules taken over", "{0} rules not taken over", "{0} rules cannot be taken over", "{0} texts of this project cannot be decrypted with the keys you hold.",
+OLD_TR = ["{0} rules imported", "{0} rules not imported", "{0} rules cannot be imported", "{0} texts of this project cannot be decrypted with the keys you hold.",
           "{0} pages imported", "{0} names shortened", "{0} rows with errors", "{0} consents recorded", "{0} tasks computed, {1} waiting"]
 allsrc = "".join(open(f, encoding="utf-8").read() for f in glob.glob(os.path.join(ROOT, "static", "js", "*.js")))
 for k in OLD_TR:

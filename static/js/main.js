@@ -117,7 +117,7 @@ function bootDone() {
     history.replaceState(null, '', '/' + (location.hash || ''));  // the parameter goes first: a reload never toggles twice
     if (timeOn()) location.hash = '#time';
     await route();
-    if (!timeOn()) toast(tr('Time tracking is turned off in your settings'));
+    if (!timeOn()) toast(tr('Time tracking is switched off in your settings'));
     else if (S.timer) await timerStop();
     else {  // a timer needs a task or list with time tracking on: the one of the latest entry, else the first such list
       let last = null;

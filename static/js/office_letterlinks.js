@@ -28,7 +28,7 @@ function ltkHtml() {
       <button type="button" class="iconbtn ltk-x" data-ltk="unlink:${l.node_id}:${l.kind}" aria-label="${esc(tr('Unlink'))}" title="${esc(tr('Unlink'))}">${ic('x', 's')}</button></li>`).join('')}</ul>`
     : `<p class="muted ltk-none">${tr('No document linked yet.')}</p>`;
   const refBtn = !sent && x.ref_line && x.ref_line !== (d.ref_line || '') ? `<button type="button" class="btn sm" data-ltk="refline">${tr('Reference line from the reference')}</button>` : '';
-  const acts = `<div class="ltk-acts"><button type="button" class="btn sm" data-ltk="pick:answers">${ic('link', 's')} ${tr('Choose a reference')}</button>
+  const acts = `<div class="ltk-acts"><button type="button" class="btn sm" data-ltk="pick:answers">${ic('link', 's')} ${tr('Select a reference')}</button>
     ${sent ? `<button type="button" class="btn sm" data-ltk="pick:reply">${ic('inbox', 's')} ${tr('Assign an answer')}</button>` : ''}${refBtn}</div>`;
   const picker = LTK.pick ? `<div class="ltk-pick" role="search"><input type="search" class="ltk-q" value="${esc(LTK.q)}" placeholder="${esc(tr('Search documents'))}" aria-label="${esc(tr('Search documents'))}" autocomplete="off">
       <ul class="ltk-res">${LTK.res.map(r => `<li><button type="button" class="ltk-hit" data-ltk="link:${r.id}">${esc(r.name)}<span class="muted">${esc([r.sender?.name, ltkDay(r.date)].filter(Boolean).join(' · '))}</span></button></li>`).join('')

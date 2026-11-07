@@ -651,7 +651,7 @@ def hbm_mail_assign(mid):
         if (cl["org_id"] or None) != org:
             return err(tr("The client belongs to another workspace"), 409)
     elif m["owner_id"] != uid:
-        raise Denied(403, tr("Only the recipient can take an e-mail back to Not assigned"))
+        raise Denied(403, tr("Only the recipient can move an e-mail back to Not assigned"))
     prev = {"client_id": m["client_id"], "list_id": m["list_id"]}
     c.execute("UPDATE hub_mails SET client_id=?, list_id=? WHERE id=?", (cid or None, lid or None, mid))
     _move_folder(c, uid, m, cid, lid)

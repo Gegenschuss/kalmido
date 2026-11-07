@@ -42,7 +42,7 @@ DOC_KINDS = ("offer",) + INV_KINDS + ("delivery",)  # 2.120.0 D (#2089): deliver
 STATUSES = ("draft", "sent", "accepted", "declined", "superseded")  # 2.437.0 B (#3621): superseded = replaced by a newer quotation (replaces_id)
 OFD_REPLACEABLE = ("sent", "accepted")  # 2.437.0 B (#3621): the states a quotation can be superseded from
 ITEM_KINDS = ("service", "text", "heading")
-STATUS_TXT = {"draft": N_("Draft"), "sent": N_("Sent|document"), "accepted": N_("Accepted|document"), "declined": N_("Declined"), "superseded": N_("Superseded"), **STATE_TXT}
+STATUS_TXT = {"draft": N_("Draft"), "sent": N_("Sent|document"), "accepted": N_("Accepted|document"), "declined": N_("Rejected"), "superseded": N_("Superseded"), **STATE_TXT}
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 MAX_ITEMS = 300
 MAX_FIELDS = 20

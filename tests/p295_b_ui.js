@@ -1,6 +1,6 @@
 // 2.95.0 B UI tests (#1932: a per diem spreadsheet into the travel expenses), own container (start.sh, mode workspaces),
 // Firefox (desktop + phone width). The spreadsheet: tests/p295_b_xlsx.py (invented people, places and figures).
-// - the empty trip list offers "Take over from Excel"; the file -> the preview: a section per sheet with the person
+// - the empty trip list offers "Import from Excel"; the file -> the preview: a section per sheet with the person
 //   (a person of the office or "As a free name"), the rows with status, amount and the spreadsheet's amount, the sum
 // - unticking counts down; on a phone the rows stay inside the screen with large tap targets
 // - "Take over N trips" (after naming the target) -> the list shows the trips of that year -> the toast's undo removes them
@@ -43,7 +43,7 @@ const XLSX = execFileSync('python3', ['-I', path.join(__dirname, 'p295_b_xlsx.py
     check(await ready(ev, `!!document.querySelector('.office a[href="#office/import/trips"]') && !document.querySelector('.office [data-rki="pick"]')`, 80), 'the empty trip list links to the import');
     await nav(B + '#office/import/trips');
     check(await ready(ev, `!!document.querySelector('.office #oim-trips [data-rki="pick"]')`, 80), 'the legacy data page offers the trips import');
-    check(await ev(`/Take over from Excel/.test(document.querySelector('#oim-trips [data-rki="pick"]').textContent)`), 'the button text');
+    check(await ev(`/Import from Excel/.test(document.querySelector('#oim-trips [data-rki="pick"]').textContent)`), 'the button text');
     await nav(B + '#office/travel');
     await ready(ev, `!!document.querySelector('.office a[href="#office/import/trips"]')`, 80);
     // ---- the preview (the file handed to the same function the file picker calls)
@@ -51,11 +51,11 @@ const XLSX = execFileSync('python3', ['-I', path.join(__dirname, 'p295_b_xlsx.py
     check(await ready(ev, `document.querySelectorAll('.rki-dlg .rki-sheet').length === 2 && document.querySelectorAll('.rki-dlg .fcirow').length === 6`), 'the preview: two sheets, six rows');
     check(await ev(`(() => { const s = document.querySelectorAll('.rki-dlg select[data-rki="person"]'); return s[0].value === 'u${me.id}' && s[1].value === 'n' && /As a free name: Tom Beispiel/.test(s[1].selectedOptions[0].textContent); })()`),
       'the person of a sheet: the office person, else a free name');
-    check(await ev(`/Take over 5 trips/.test(${go})`), 'five rows ticked (the error row has no tick) ' + await ev(go));
+    check(await ev(`/Import 5 trips/.test(${go})`), 'five rows ticked (the error row has no tick) ' + await ev(go));
     check(await ev(`(() => { const t = document.querySelector('.rki-dlg').textContent; return /Sum: Excel \\D*173\\.00/.test(t) && /calculated \\D*173\\.00/.test(t) && /Start and end time missing/.test(t) && /Date missing or not readable/.test(t) && /Excel: \\D*131\\.00/.test(t); })()`),
       'the sums, the hints and the spreadsheet amount');
     await ev(`(() => { const c = document.querySelector('.rki-dlg [data-rki="sel"][data-s="0"][data-i="2"]'); c.checked = false; c.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
-    check(await ready(ev, `/Take over 4 trips/.test(${go})`), 'unticking counts down');
+    check(await ready(ev, `/Import 4 trips/.test(${go})`), 'unticking counts down');
     // phone width
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
     await sleep(400);

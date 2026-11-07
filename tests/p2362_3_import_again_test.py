@@ -147,7 +147,7 @@ j = run(F, iid)
 res = j.get("result") or {}
 check(j.get("state") == "done" and counts(FID) == first, f"the same file again creates nothing {counts(FID)} {res}")
 check(not res.get("import_id") and any("skipped" in w["text"] for w in res.get("warnings") or []), f"the result names what was skipped {res}")
-check(not any("could not be taken over" in w["text"] for w in res.get("warnings") or []), f"no false alarm for the tasks {res}")
+check(not any("could not be imported" in w["text"] for w in res.get("warnings") or []), f"no false alarm for the tasks {res}")
 
 # a newer export of the same account: a new export id, the same source; only the new task comes, into the imported project
 NEW = ok(F.post(B + "/api/tasks", json={"title": "Neue Aufgabe", "list_id": LID}), "a new task")["id"]

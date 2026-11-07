@@ -75,7 +75,7 @@ function env_setModal(l, e) {
     const b = ev.target.closest('[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { md.remove(); return; }
     const mid = +$('#env-ms', md).value || null, ver = $('#env-ver', md).value.trim();
-    if (!mid && !ver) { toast(tr('Pick a milestone or enter a version')); return; }
+    if (!mid && !ver) { toast(tr('Select a milestone or enter a version')); return; }
     md.remove();
     await env_deploy(e.id, {...(mid ? {milestone_id: mid} : {}), ...(ver ? {version: ver} : {})}, e.name);
   });

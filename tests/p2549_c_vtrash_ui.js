@@ -1,6 +1,6 @@
 // 2.549.0 C (#4536) UI test, own container (start.sh), jsdom: the trash view shows the video sign-offs in their trash.
 // kalmido-suite: fresh
-// - a review whose project was deleted for good shows in the section "Video sign-offs" with "Without a place" and the hint of
+// - a review whose project was deleted permanently shows in the section "Video sign-offs" with "Without a place" and the hint of
 //   the trash period (the test server: the deletion runs are off, so the hint says the trash keeps; with them on a row counts down)
 // - "Restore" asks for a project of its workspace; the chosen one gets it (GET /api/videos?list_id=), the row leaves the section
 // - a review that still has its project is restored without a question
@@ -30,7 +30,7 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   const V1 = (await call('POST', '/api/videos', {list_id: LG, url: 'https://vimeo.com/123456789', title: 'Lost cut'})).id;
   await call('PATCH', `/api/lists/${LG}`, {archived: true});
   await call('DELETE', `/api/lists/${LG}`);
-  check((await call('DELETE', `/api/trash/lists/${LG}`)).status === 200, 'setup: the project deleted for good');
+  check((await call('DELETE', `/api/trash/lists/${LG}`)).status === 200, 'setup: the project deleted permanently');
   const LT = (await call('POST', '/api/lists', {name: 'New home', kind: 'project', org_id: null})).id;
   const V2 = (await call('POST', '/api/videos', {list_id: LT, url: 'https://vimeo.com/987654321', title: 'Kept cut'})).id;
   check((await call('DELETE', `/api/videos/${V2}`)).status === 200, 'setup: a review deleted at its project');
@@ -47,8 +47,8 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   const note = d.querySelector('#view .vtrlist .otrnote')?.textContent || '';
   check(/stay in the trash until the deletion runs of the server are switched on/.test(note), '#4536: the hint of the trash period (runs off on the test server): ' + note);
   w.eval('S.trashPurge = true; VTR.purge = true; renderView()');
-  await until(() => /Deleted for good in 30 days/.test(row(V1)?.textContent || ''));
-  check(/Deleted for good in 30 days/.test(row(V1)?.textContent || '') && /deleted for good after 30 days/.test(d.querySelector('#view .vtrlist .otrnote')?.textContent || ''),
+  await until(() => /Deleted permanently in 30 days/.test(row(V1)?.textContent || ''));
+  check(/Deleted permanently in 30 days/.test(row(V1)?.textContent || '') && /deleted permanently after 30 days/.test(d.querySelector('#view .vtrlist .otrnote')?.textContent || ''),
     '#4536: with the runs on: the days left and the period ' + (row(V1)?.textContent || ''));
   // restore without a place: the dialog asks for the project
   row(V1).querySelector('[data-vtra="restore"]').click();

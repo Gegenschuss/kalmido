@@ -36,7 +36,7 @@ function repoWire(md, lid, folder) {
         <div class="shint lhint" id="rp-phint" hidden></div>
         <div class="row"><label for="rp-base">${tr('Server')}</label><input id="rp-base" type="url" inputmode="url" autocomplete="off" placeholder="${esc(tr('empty = github.com'))}"></div>
         <div class="row"><label for="rp-name">${tr('Repository')}</label><input id="rp-name" autocomplete="off" aria-describedby="rp-cerr" placeholder="${esc(tr('owner/name or its web address'))}"></div>
-        <div class="shint keep lhint rpself" id="rp-self" hidden>${esc(tr('This looks like a self-hosted server: pick its provider (GitLab, Gitea / Forgejo or Bitbucket) above.'))}</div>
+        <div class="shint keep lhint rpself" id="rp-self" hidden>${esc(tr('This looks like a self-hosted server: select its provider (GitLab, Gitea / Forgejo or Bitbucket) above.'))}</div>
         <div class="row"><label for="rp-tok">${tr('Access token')}</label><input id="rp-tok" type="password" autocomplete="new-password" placeholder="${esc(tr('read-only is enough; empty for a public repository'))}" ${j.key ? '' : 'disabled'}></div>
         ${j.key ? '' : `<div class="shint keep lhint">${esc(tr('Set KALMIDO_SECRET_KEY on the server to store repository tokens (32 random bytes, base64)'))}</div>`}
         <div class="rpcerr" id="rp-cerr" role="alert"></div>
@@ -59,7 +59,7 @@ function repoWire(md, lid, folder) {
   // 2.394.0 C (#3377): the two switches of the issue sync with their state (only the project's admins see them)
   const gsyHtml = r => {
     const s = r.issue_state; if (!s || r.folder || !(r.provider === 'github' || r.provider === 'gitlab')) return '';
-    const st = !r.issue_sync ? '' : s.error || (s.rw === 'read' ? tr('Read only: the token cannot write issues') : s.synced_at ? tr('Synced {0}', relTime(s.synced_at)) : tr('Waiting for the first sync'));
+    const st = !r.issue_sync ? '' : s.error || (s.rw === 'read' ? tr('Read-only: the token cannot write issues') : s.synced_at ? tr('Synced {0}', relTime(s.synced_at)) : tr('Waiting for the first sync'));
     return `<div class="gsy" data-gsy-rid="${r.id}">
       <div class="row"><label class="chkl"><input type="checkbox" data-gsy="issue_sync" ${r.issue_sync ? 'checked' : ''} ${s.available || r.issue_sync ? '' : 'disabled'}> ${tr('Sync issues both ways')}</label></div>
       <div class="shint lhint">${esc(s.available ? tr('Title, text, open / closed, labels (as project tags) and comments, in both directions. When both sides changed the same thing, the newer change wins and the other one stays in the task’s history.') : s.block_text)}</div>
@@ -88,7 +88,7 @@ function repoWire(md, lid, folder) {
     const eh = j.errors; if (!eh || !isProject(lid) || (!eh.may && !eh.on)) return '';
     const st = eh.on ? [tr('On'), tr('{0} received', eh.received || 0), eh.open ? trn('{0} open ticket', '{0} open tickets', eh.open) : '', eh.last_at ? tr('last {0}', relTime(eh.last_at)) : ''].filter(Boolean).join(' · ') : tr('Off');
     const ctl = !eh.may ? '' : eh.on ? `<button class="iconbtn" data-rp="err-menu" title="${esc(tr('Error reports'))}: ${esc(tr('More'))}" aria-label="${esc(tr('Error reports'))}: ${esc(tr('More'))}">${ic('dots', 's')}</button>`
-      : `<button class="btn sm" data-rp="err-on">${tr('Turn on')}</button>`;
+      : `<button class="btn sm" data-rp="err-on">${tr('Switch on')}</button>`;
     return `<div class="errhook" id="rp-err"><div class="mrow reporow errrow">${ic('bug', 's')}<span class="n"><b>${tr('Error reports')}</b><span class="muted rpm">${esc(st)}</span></span>${ctl}</div>
       <div class="shint lhint">${tr('Sentry or any service that sends JSON: a new error becomes a bug ticket, the same error again only counts up at its open ticket.')}</div>
       ${errUrl && errHdr ? `<div class="shint lhint rpsec" role="status">${esc(tr('Webhook URL:'))} <code>${esc(errHdr.hook_url)}</code><br>${esc(tr('Header (shown only now, keep it secret):'))} <code>${esc('Authorization: Bearer ' + errHdr.token)}</code> <button class="linkbtn" data-rp="err-copy" data-v="h">${ic('copy', 's')} ${tr('Copy')}</button></div>

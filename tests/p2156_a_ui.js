@@ -150,7 +150,7 @@ const toastText = d => d.querySelector('#toast')?.textContent || '';
     '#1201: its sub-idea now hangs at the new task');
   // the phone's sheet of an idea
   const sheet = w.eval(`(() => { let got = null; const m0 = menu; menu = (a, its) => { got = its; }; mm_nodeMenu(null, MM.last.L.nodes.find(n => n.kind === 'idea' && n.title === 'Cart')); menu = m0; return got.filter(x => x && x.label).map(x => x.label).join('|'); })()`);
-  check(/Take over/.test(sheet) && /Discard/.test(sheet) && /Take all/.test(sheet), '#1201: the sheet of an idea: ' + sheet);
+  check(/Apply/.test(sheet) && /Discard/.test(sheet) && /Take all/.test(sheet), '#1201: the sheet of an idea: ' + sheet);
   await w.eval(`histStep('undo')`);
   check(await until(async () => !(await tasks()).some(t => t.title === 'Shop')), '#1201: Undo removes the idea taken over');
   d.querySelector('#view .mmideas [data-mm="ideas-drop"]')?.click();

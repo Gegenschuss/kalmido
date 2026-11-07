@@ -65,7 +65,7 @@ small **×** next to it (*Show progress* in the project's … menu or the projec
   - **Link:** drag the dot at the end of a bar onto another bar: the second task then waits on the first (valid
     targets light up, a loop or a task you may only view is refused). A click on the dot, a long-press on a phone
     (*Connect to…*), or the keyboard (focus a bar with Tab, press **C**, then Enter on the target) do the same;
-    *Pick from a project…* opens the searchable picker. Shift+F10 or right-click opens a bar's menu.
+    *Select from a list…* opens the searchable picker. Shift+F10 or right-click opens a bar's menu.
   - **Remove:** click an arrow for *Remove dependency* and links to both tasks, or use the bar's menu.
   - **Move dependent tasks along** (project dialog, on by default in a new project): when a task is postponed, the tasks that wait on it
     (also in other projects) move by the same number of days, keeping their length, and

@@ -847,7 +847,7 @@ def task_delete(tid):
             raise Denied(403, tr("Only the project owner can delete tasks permanently"))
         kept = tre_kept(c, [tid])  # 2.530.0 D (#4316, audit B9): a project kept by law keeps its tasks on every way
         if kept:
-            return err(tr("This project keeps receipts by law until {0}: it can be deleted for good after that.", kept[0]), 409)
+            return err(tr("This project keeps receipts by law until {0}: it can be deleted permanently after that.", kept[0]), 409)
         wh_note(c, tid, "purge")
         files = hard_delete(c, [tid])
     else:

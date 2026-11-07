@@ -115,7 +115,7 @@ Adding an entry, in this order:
   things), an expiry, and revoke tokens you no longer use. Behind a login proxy, only let `/api/v1/` requests that carry
   an `abk_` token bypass the login (see docs/API.md).
 - Webhook receivers should check `X-Kalmido-Signature` and the timestamp (5 minute window) before trusting a payload.
-- Public list links are readable by anyone who has the link. Use *View only* unless ticking off is wanted, a password
+- Public list links are readable by anyone who has the link. Use *Read-only* unless ticking off is wanted, a password
   for anything sensitive, and *New link* if a link got out.
 - Backups contain everything (all users' data, the server secrets in the settings table). They are only served to
   admins; keep copies you move elsewhere encrypted (*Encrypt backups*) and the passphrase outside the server. A

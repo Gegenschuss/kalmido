@@ -3,7 +3,7 @@
 //   owner; switching saves at once with one undo step, the switch "Members of the organisation may edit" appears with it
 // - a private list has no such row; a member without admin rights sees it disabled
 // - a reader (organisation member, not invited) sees the list in the sidebar with the "Not joined" mark, a bar with "Join"
-//   instead of "View only"; its tasks stay out of Today until joining; "Join" makes them a member (one undo step = leave)
+//   instead of "Read-only"; its tasks stay out of Today until joining; "Join" makes them a member (one undo step = leave)
 const {execFileSync} = require('child_process');
 const path = require('path');
 const {boot, sleep, B, login} = require('./boot');

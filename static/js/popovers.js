@@ -154,7 +154,7 @@ function selSheet(el) {
     if (g !== grp) { grp = g; if (g) body += `<div class="ssgrp" role="presentation">${esc(g.label)}</div>`; }
     body += item(o, i);
   });
-  const p = openPop(el, `${tch_sheetHead(lab, 'ss-h', 'sshead')}<div class="selsheet">${search ? `<div class="sssearch">${ic('search', 's')}<input id="ss-q" type="search" placeholder="${esc(tr('Search'))}" aria-label="${esc(tr('Search'))}" autocomplete="off" enterkeyhint="search"></div>` : ''}<div class="menu-list" role="listbox" ${lab ? 'aria-labelledby="ss-h"' : `aria-label="${esc(tr('Choose'))}"`}>${body}</div></div>`, () => { if (el.isConnected) try { el.focus({preventScroll: true}); } catch { /* ignore */ } });
+  const p = openPop(el, `${tch_sheetHead(lab, 'ss-h', 'sshead')}<div class="selsheet">${search ? `<div class="sssearch">${ic('search', 's')}<input id="ss-q" type="search" placeholder="${esc(tr('Search'))}" aria-label="${esc(tr('Search'))}" autocomplete="off" enterkeyhint="search"></div>` : ''}<div class="menu-list" role="listbox" ${lab ? 'aria-labelledby="ss-h"' : `aria-label="${esc(tr('Select'))}"`}>${body}</div></div>`, () => { if (el.isConnected) try { el.focus({preventScroll: true}); } catch { /* ignore */ } });
   p.classList.add('selpop');
   const btns = () => [...p.querySelectorAll('[data-si]')].filter(b => !b.hidden && !b.disabled);
   p.onclick = e => {
@@ -545,7 +545,7 @@ function dpClose(focusBack = true) {
 function dpOpen(anchor, o) {
   dpClose(false); an_flush();
   const el = document.createElement('div');
-  el.id = 'dpop'; el.className = 'dpop ' + o.kind; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', o.label || (o.kind === 'date' ? tr('Choose a date') : tr('Choose a time')));
+  el.id = 'dpop'; el.className = 'dpop ' + o.kind; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', o.label || (o.kind === 'date' ? tr('Select a date') : tr('Select a time')));
   document.body.appendChild(el);
   DP.el = el; DP.anchor = anchor; anchor?.setAttribute?.('aria-expanded', 'true');
   const v = o.value || '';
@@ -997,7 +997,7 @@ function snoozeSheet(id, anchor, extra = [], head = false, pre = []) {
     {label: tr('Tomorrow'), icon: 'sunrise', fn: () => go2({due: addDays(today(), 1), due_time: t.due_time}, tr('tomorrow'))},
     {label: tr('Tomorrow 9 am'), icon: 'sunrise', fn: () => go2({due: addDays(today(), 1), due_time: '09:00'}, tr('tomorrow 9 am'))},
     {label: tr('Next week (Mon)'), icon: 'week', fn: () => go2({due: nextWeekday(1), due_time: t.due_time}, dayLabel(nextWeekday(1)))},
-    {label: tr('Pick a date…'), icon: 'cal', fn: () => datePop(anchor || $('#top h1'), id)},
+    {label: tr('Select a date…'), icon: 'cal', fn: () => datePop(anchor || $('#top h1'), id)},
     ...extra,
   ]);
 }

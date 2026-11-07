@@ -1,6 +1,6 @@
 // 2.217.0 B (#2797) UI tests: the chat with an agent while the module Agents is off. The header menu still offers
 // "Chat with … (1)"; a tap asks to turn the module on instead of a dead end (phone: the route fell back to Today), and the
-// chat is neither loaded nor marked read meanwhile. "Not now" leaves everything as it was; "Turn on and open" switches the
+// chat is neither loaded nor marked read meanwhile. "Not now" leaves everything as it was; "Switch on and open" switches the
 // module on and opens the chat (desktop panel, phone view). jsdom, own container (start.sh). No organisation (freelancer).
 const {execFileSync} = require('child_process');
 const path = require('path');
@@ -75,7 +75,7 @@ const DESK = {'(hover:hover) and (pointer:fine)': true};
     }
     click(w, d.querySelector('[data-cd="yes"]'));
     const msg = await until(() => [...d.querySelectorAll('.cmsg')].find(m => /A first note from the helper/.test(m.textContent)), 60);
-    check(!!msg, 'phone: "Turn on and open" opens the chat with the message');
+    check(!!msg, 'phone: "Switch on and open" opens the chat with the message');
     check(/^#agents\//.test(w.location.hash), 'phone: the chat view is open ' + w.location.hash);
     check((await call('GET', '/api/state')).settings.features.split(',').includes('agents'), 'phone: the module Agents is on now');
     check(await until(async () => await unread() === 0), 'phone: read once the chat is shown');

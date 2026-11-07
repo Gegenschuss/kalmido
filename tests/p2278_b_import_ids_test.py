@@ -208,7 +208,7 @@ check(x.get("billed_doc_id") is None and (x.get("billed_at") or "").startswith("
       f"billed without its document: stays billed (not billable), never open {x}")
 o = te.get(3600, {})
 check(o.get("billed_doc_id") is None and not o.get("billed_at") and o.get("billable") == 1, f"the open entry stays open {o}")
-check(W.get("Billed time entries without their invoice were taken over as not billable") == 1, f"warning with its number {W}")
+check(W.get("Billed time entries without their invoice were imported as not billable") == 1, f"warning with its number {W}")
 # chat thread
 NR = one("SELECT id FROM tchat_rooms WHERE kind='list' AND list_id=?", (NL,))
 by = {r["body"]: dict(r) for r in dbx("SELECT id, body, thread_of FROM tchat_msgs WHERE room_id=?", (NR,))}
@@ -256,7 +256,7 @@ check(set(fe) == {1200, 2400}, f"freelancer: both entries came along {sorted(fe)
 check(fe.get(1200, {}).get("billable") == 0 and (fe.get(1200, {}).get("billed_at") or "").startswith("2026-10-15")
       and fe.get(1200, {}).get("billed_doc_id") is None, f"freelancer: the billed entry stays billed {fe.get(1200)}")
 check(fe.get(2400, {}).get("billable") == 1 and not fe.get(2400, {}).get("billed_at"), f"freelancer: the open entry stays open {fe.get(2400)}")
-check(warns(j).get("Billed time entries without their invoice were taken over as not billable") == 1, f"freelancer: warning {warns(j)}")
+check(warns(j).get("Billed time entries without their invoice were imported as not billable") == 1, f"freelancer: warning {warns(j)}")
 check(not dbx("SELECT 1 FROM org_members WHERE user_id IN (?,?)", (FID, GID)), "freelancer: still in no organisation")
 
 if FAILS:

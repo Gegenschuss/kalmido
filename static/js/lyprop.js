@@ -9,7 +9,7 @@ const lyp_is = v => v?.kind === 'layout';
 // planned jobs (agents.js SCHED_TPL): a template before "Own plan" -- the agent looks at the start page once a week
 SCHED_TPL.splice(SCHED_TPL.findIndex(t => t.k === 'own'), 0,
   {k: 'lyprop', t: N_('Propose a better start page'), freq: 'weekly', days: [1], time: '08:30',
-    p: N_('Look at how my start page is arranged (tools get_view_layout and list_layout_blocks, view dashboard, user_id = my id) and which projects I use most. Only if a clearly better arrangement exists (for example my favourites and what I use every day on top), send me ONE proposal (tool propose_layout) with a short reason. Never repeat one I declined. Change nothing yourself.')});
+    p: N_('Look at how my start page is arranged (tools get_view_layout and list_layout_blocks, view dashboard, user_id = my id) and which projects I use most. Only if a clearly better arrangement exists (for example my favourites and what I use every day on top), send me ONE proposal (tool propose_layout) with a short reason. Never repeat one I rejected. Change nothing yourself.')});
 // the grid of one arrangement: the visible blocks in order (span = width in columns of six), the hidden ones below
 function lyp_grid(lay, names, label, other) {
   if (!lay) return '';
@@ -29,7 +29,7 @@ function lyp_draw(v) {
     ${p.proposed?.mobile ? `<div class="shint">${esc(tr('Different on the phone'))}: ${esc(p.proposed.mobile.order.filter(k => !p.proposed.mobile.hidden.includes(k)).map(k => names[k] || k).join(', '))}</div>` : ''}
     <label class="ppshare lyp-use"><input type="checkbox" id="lyp-use" checked> ${esc(tr('Use it right away'))}</label>
     <div class="shint keep">${esc(tr('Accepting saves it as an arrangement of this view; nothing else changes. Undo possible.'))}${v.expires_at ? ' ' + esc(tr('Open until {0}', dayLabel(v.expires_at.slice(0, 10)))) : ''}</div>`;
-  const foot = `<button class="btn danger" data-pp="discard" aria-label="${esc(tr('Decline|proposal'))}">${thumbIc(false)} ${esc(tr('Decline|proposal'))}</button><span class="spacer"></span>
+  const foot = `<button class="btn danger" data-pp="discard" aria-label="${esc(tr('Reject|proposal'))}">${thumbIc(false)} ${esc(tr('Reject|proposal'))}</button><span class="spacer"></span>
     <button class="btn" data-pp="close">${tr('Close')}</button><button class="btn pri" data-pp="apply" aria-label="${esc(tr('Accept|proposal'))}">${thumbIc(true)} ${esc(tr('Accept|proposal'))}</button>`;
   return {main, foot};
 }

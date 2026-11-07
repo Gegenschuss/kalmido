@@ -173,7 +173,7 @@ function viewTimeline(listId, inCal) {
   const tlHow = [chint, hint, dhint].filter(Boolean).join(' ');
   const ndBtn = tlNdBtn(ndOn, undated);
   return `${inCal ? '' : `<div class="calbar"><h2>${tr('Timeline')}</h2>${ndBtn}<div class="calnav"><button class="iconbtn" data-act="tl-prev" title="${esc(tr('Previous period'))}" aria-label="${esc(tr('Previous period'))}">${ic('left')}</button><button class="btn sm" data-act="tl-today">${tr('Today')}</button><button class="iconbtn" data-act="tl-next" title="${esc(tr('Next period'))}" aria-label="${esc(tr('Next period'))}">${ic('right')}</button></div></div>`}
-    ${from ? `<div class="tl-pick" role="status">${ic('deps', 's')}<span>${tr('Tap the task that “{0}” blocks', esc(from.title))}</span><span class="spacer"></span><button class="btn sm" data-act="tl-pick-list">${ic('search', 's')} ${tr('Pick from a list…')}</button><button class="btn sm" data-act="tl-pick-cancel">${tr('Cancel')}</button></div>` : ''}
+    ${from ? `<div class="tl-pick" role="status">${ic('deps', 's')}<span>${tr('Tap the task that “{0}” blocks', esc(from.title))}</span><span class="spacer"></span><button class="btn sm" data-act="tl-pick-list">${ic('search', 's')} ${tr('Select from a list…')}</button><button class="btn sm" data-act="tl-pick-cancel">${tr('Cancel')}</button></div>` : ''}
     <div class="tl${pick ? ' picking' : ''}${DW < 22 ? ' tl-sm' : ''}" style="--dw:${DW}px;--days:${ND}">
     <div class="tl-scroll" id="tlscroll"><div class="tl-inner">
       <div class="tl-row tl-headrow" title="${esc(tr('Set a date range via “Start” in the date dialog.'))}"><div class="tl-name"></div><div class="tl-track tl-headtrack"><div class="tl-months">${months}</div><div class="tl-days">${head}</div></div></div>
@@ -304,10 +304,10 @@ function tlBarMenu(el) {
   const id = +el.dataset.id, t = S.tasks.get(id); if (!t) return;
   const items = [{label: tr('Open'), icon: 'edit', fn: () => openDetail(id)}];
   // 2.18.0 review: a keyboard way to move a bar / milestone diamond to another day (D, or this menu: Shift+F10)
-  if (canEdit(t) && t.status === 0) items.push({label: t.ms ? tr('Move to date…') : tr('Pick a date…'), icon: 'cal', keys: 'D', fn: () => datePop(el, id)});
+  if (canEdit(t) && t.status === 0) items.push({label: t.ms ? tr('Move to date…') : tr('Select a date…'), icon: 'cal', keys: 'D', fn: () => datePop(el, id)});
   if (canEdit(t) && t.due) items.push({label: tr('Remove date'), icon: 'ban', fn: () => tlUndate(id)});
   if (dFor(t)) {
-    if (canEdit(t)) items.push({label: tr('Connect to…'), icon: 'deps', keys: 'C', fn: () => tlPickStart(id)}, {label: tr('Pick from a list…'), icon: 'search', fn: () => depPicker(id, 'blocking')});
+    if (canEdit(t)) items.push({label: tr('Connect to…'), icon: 'deps', keys: 'C', fn: () => tlPickStart(id)}, {label: tr('Select from a list…'), icon: 'search', fn: () => depPicker(id, 'blocking')});
     const nm = x => x.length > 32 ? x.slice(0, 31) + '…' : x;
     const rm = [...(canEdit(t) ? (t.blockers || []).map(b => S.tasks.get(b)).filter(Boolean).map(b => ({label: tr('No longer blocked by “{0}”', nm(b.title)), icon: 'x', fn: () => tlUnlink(id, b.id)})) : []),
       ...openTasks().filter(x => (x.blockers || []).includes(id) && canEdit(x)).map(x => ({label: tr('“{0}” is no longer blocked', nm(x.title)), icon: 'x', fn: () => tlUnlink(x.id, id)}))];
