@@ -57,7 +57,7 @@ The app addresses people informally in every language (German "du", French "tu")
 | `_meta.name` | Name of the language in the language itself, shown in the language selector (`Deutsch`, `Français`) |
 | `_meta.locale` | BCP 47 locale for number and date formatting by the browser (`de-DE`, `fr-FR`), used for full dates such as "created on ...", the first day of the week and the plural rule |
 | `_meta.beta` | optional, `true` for a machine-translated or unreviewed file: the language pickers show a *Beta* mark |
-| `_weekdays`, `_weekdays_short` | 7 names, **starting with Sunday** (the order of JavaScript's `Date.getDay()`). The calendar still starts its weeks on Monday. |
+| `_weekdays`, `_weekdays_short` | 7 names, **starting with Sunday** (the order of JavaScript's `Date.getDay()`). The calendar starts its weeks on the first weekday of `_meta.locale` (Monday in `de-DE`, Sunday in `en-US`) unless the person picks one under *First day of the week*; habit weeks stay on Monday unless a first day is picked. |
 | `_months`, `_months_short` | 12 names, January first |
 | `_date_formats` | Patterns for the short date labels in task rows and the calendar, see below. A missing format falls back to English. |
 
