@@ -115,8 +115,12 @@ dbx("UPDATE office_docs SET trial=1 WHERE id=?", (I3,))
 # the server's own watchdog ticks too (every 10 s in the test container): all four fall due in ONE statement, so any tick sees them together
 dbx("UPDATE office_docs SET due_date=? WHERE id IN (?,?,?,?)", ((date.today() - timedelta(days=2)).isoformat(), I2, I3, I4, I5))
 tick()
+# 2.641.0 (#5012): the watchdog's tick may be the one that tells (or still be committing): wait for the bundle item itself
+# instead of taking n[0] (CI v2.632.0 found the old single item in front)
+until(lambda: [x for x in news(A, "docoverdue") if x["data"]["click"] == "#office/invoices"], 30)
 n = news(A, "docoverdue")
-check(len(n) == 2 and n[0]["data"]["n"] == 2 and n[0]["data"]["click"] == "#office/invoices", f"one item for a run: paid and trial invoices do not count {n}")
+bundle = [x for x in n if x["data"]["click"] == "#office/invoices"]
+check(len(n) == 2 and len(bundle) == 1 and bundle[0]["data"]["n"] == 2, f"one item for a run: paid and trial invoices do not count {n}")
 assert A.put(B + O + "/settings", json={"overdue_notice": 0}).ok
 check('"overdue_notice": 0' in A.get(B + O + "/settings").text.replace('"overdue_notice":0', '"overdue_notice": 0'), "the switch is stored")
 invoice(A, CL, overdue=2)
@@ -127,6 +131,38 @@ assert A.put(B + f"/api/orgs/{ORG}/members", json={"user_id": BOB, "role": "memb
 check(not news(Bo, "docoverdue"), "no office admin any more: the items are gone")
 assert A.put(B + f"/api/orgs/{ORG}/members", json={"user_id": BOB, "role": "admin"}).ok
 
+# 2.641.0 (#5012): two runs at once on the same invoices (the watchdog and another process) tell once. The second run reads
+# the invoices, then the first one marks and commits them before the second one writes its marks: only the run whose marks
+# went in reports. A day far ahead, so the server's own watchdog (today) never takes these invoices.
+J = invoice(A, CL)
+RACE = f"""import app, json
+from kalmido.core.db import connect
+from kalmido.core.pg import system_ctx
+from kalmido.office import dunning as x, invoices as inv
+c1, c2 = connect(), connect()
+oid = c1.execute("SELECT org_id FROM office_docs WHERE id={J}").fetchone()[0]
+c1.commit()
+told, orig, held = [], inv.inv_paid_map, []
+x.news_add = lambda c, p, kind, **kw: told.append(kw["data"]["n"])
+def pm(c, o, ids):
+    if c is c2 and not held:
+        held.append(1)
+        with system_ctx(c1):
+            x.dun_overdue(c1, o, "2099-01-01", [0])
+        c1.commit()
+    return orig(c, o, ids)
+inv.inv_paid_map = pm
+with system_ctx(c2):
+    x.dun_overdue(c2, oid, "2099-01-01", [0])
+c2.commit()
+print(json.dumps({{"told": told, "held": len(held)}}))
+"""
+r = subprocess.run(["docker", "exec", CT, "python3", "-c", RACE], capture_output=True, text=True, timeout=120)
+assert r.returncode == 0, r.stdout + r.stderr
+race = json.loads(r.stdout.strip().splitlines()[-1])
+check(race["held"] == 1 and len(race["told"]) == 1 and race["told"][0] >= 1, f"two runs at once: one report {race}")
+check(dbx("SELECT COUNT(*) FROM office_dunning_marks WHERE doc_id=? AND level=0", (J,))[0][0] == 1, "and one mark")
+
 # ================================================================== invoice series
 Q = A.post(B + D, json={"client_id": CL, "project_title": "Retainer"}).json()["id"]
 A.put(B + f"{D}/{Q}/items", json={"items": [{"kind": "service", "title": "Care", "qty": 1, "unit": "flat", "rate": 500}]})
@@ -134,15 +170,20 @@ TPL = A.post(B + f"{D}/{Q}/invoice", json={}).json()["id"]
 GONE = A.post(B + "/api/users", json={"username": "gone", "display_name": "Gone", "password": "password123", "orgs": []}).json()["id"]
 
 
-def series(title):
-    r = A.post(B + O + "/series", json={"template_id": TPL, "every": "monthly", "start": date.today().isoformat(), "auto_send": False, "title": title})
-    check(r.status_code == 201, f"setup: a series {r.text[:200]}")
-    dbx("UPDATE office_inv_series SET created_by=? WHERE id=?", (GONE, r.json()["id"]))  # its creator left: every admin hears of it
+def series(*titles):
+    # 2.641.0 (#5012): made for tomorrow, then due today with the creator gone in ONE statement: the server's own watchdog
+    # (every 10 s in the test container) never takes a series while its creator is still Alice (then only she hears of it)
+    ids = []
+    for title in titles:
+        r = A.post(B + O + "/series", json={"template_id": TPL, "every": "monthly", "start": (date.today() + timedelta(days=1)).isoformat(),
+                                            "auto_send": False, "title": title})
+        check(r.status_code == 201, f"setup: a series {r.text[:200]}")
+        ids.append(r.json()["id"])
+    today = date.today().isoformat()
+    dbx(f"UPDATE office_inv_series SET created_by=?, start=?, next_date=? WHERE id IN ({','.join('?' * len(ids))})", (GONE, today, today, *ids))  # its creator left: every admin hears of it
 
 
-series("Serie Eins")
-series("Serie Zwei")
-series("Serie Drei")
+series("Serie Eins", "Serie Zwei", "Serie Drei")
 series_tick()
 
 
@@ -160,6 +201,43 @@ series("Serie Vier")
 series_tick()
 t = stasks(ALICE)
 check(len(t) == 1 and "Serie Vier" in t[0][0] and "3 invoice" not in t[0][0] and "/#office/offers/" in t[0][2], f"a done task: a new one with its own title and link {t}")
+
+# 2.641.0 (#5012): two series runs at once tell one person: the second waits for the first one's commit and adds to its task
+# (it read the person's open task before the first one wrote it and made a second task). Waits for the real state: the
+# second connection blocked on a lock or done.
+RACER = A.post(B + "/api/users", json={"username": "racer", "display_name": "Racer", "password": "password123", "orgs": []}).json()["id"]
+RACE2 = f"""import app, json, threading, time
+from kalmido.core.config import app as flask_app
+from kalmido.core.db import connect
+from kalmido.core.pg import system_ctx
+from kalmido.office import recurring as x
+c1, c2, c3 = connect(), connect(), connect()
+from kalmido.core.access import my_inbox
+with system_ctx(c1):
+    my_inbox(c1, {RACER})  # the inbox exists before the race
+c1.commit()
+pid = c2.execute("SELECT pg_backend_pid()").fetchone()[0]
+c2.commit()
+def run(c, name):
+    with flask_app.test_request_context("/"), system_ctx(c):
+        x.rin_bundle(c, {RACER}, name, "Check the race draft", None)
+run(c1, "Race series one")
+t = threading.Thread(target=lambda: (run(c2, "Race series two"), c2.commit()))
+t.start()
+end = time.monotonic() + 20
+while t.is_alive() and time.monotonic() < end and not c3.execute("SELECT 1 FROM pg_stat_activity WHERE pid=? AND wait_event_type='Lock'", (pid,)).fetchone():
+    c3.commit()
+    time.sleep(0.05)
+c1.commit()
+t.join(30)
+with system_ctx(c3):
+    rows = c3.execute("SELECT title FROM tasks WHERE created_by=? AND completed_at IS NULL AND deleted_at IS NULL", ({RACER},)).fetchall()
+print(json.dumps([r[0] for r in rows]))
+"""
+r = subprocess.run(["docker", "exec", CT, "python3", "-c", RACE2], capture_output=True, text=True, timeout=120)
+assert r.returncode == 0, r.stdout + r.stderr
+race = json.loads(r.stdout.strip().splitlines()[-1])
+check(len(race) == 1 and race[0].startswith("2 "), f"two series runs at once: one task for the person {race}")
 
 # ================================================================== the portal link
 CF = client(A, "Client Fr", email="client-fr@example.com")

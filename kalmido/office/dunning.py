@@ -154,9 +154,12 @@ def dun_overdue(c, oid, today, people):
     if not new:
         return
     ts = iso(now_utc())
-    for r in new:
-        c.execute("INSERT INTO office_dunning_marks(org_id, doc_id, level, created_at) VALUES(?,?,?,?) ON CONFLICT(doc_id, level) DO NOTHING",
-                  (oid, r["id"], DUN_NOTICE, ts))
+    # 2.641.0 (#5012): the server's watchdog and another run can read the same invoices at once; only the marks THIS run set
+    # count (RETURNING is empty when the other one was first), so the bell rings once per invoice and never twice for a run
+    new = [r for r in new if c.execute("INSERT INTO office_dunning_marks(org_id, doc_id, level, created_at) VALUES(?,?,?,?) "
+                                       "ON CONFLICT(doc_id, level) DO NOTHING RETURNING doc_id", (oid, r["id"], DUN_NOTICE, ts)).fetchone()]
+    if not new:
+        return
     one = new[0] if len(new) == 1 else None
     data = {"org_id": oid, "n": len(new), "click": f"#office/invoices/{int(one['id'])}" if one else "#office/invoices"}
     if one:

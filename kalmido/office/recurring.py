@@ -388,6 +388,9 @@ def rin_bundle(c, person, title, text, doc_id=None):
     """2.367.4 (#2972): the series of one day share ONE task per person: the first keeps its own title and link, the next ones
     turn it into "3 invoice series need you" with a line each and the link to the invoices. Setting rin_open = day:task:count."""
     day = local_now().date().isoformat()
+    # 2.641.0 (#5012): two series made at once (the watchdog and another run, each holding only its own series' lock) read
+    # rin_open before either wrote it and made two tasks; one lock per person until the commit makes it one task
+    write_lock(c, f"rin_bundle_{int(person)}")
     o = str(usettings(c, person).get("rin_open") or "").split(":")
     t = None
     if len(o) == 3 and o[0] == day and o[1].isdigit() and o[2].isdigit():
@@ -405,7 +408,7 @@ def rin_bundle(c, person, title, text, doc_id=None):
 
 
 def _tell(c, people, key, name, text, doc_id=None):
-    for p in people:
+    for p in sorted(people):  # 2.641.0 (#5012): the person locks of rin_bundle always in the same order
         lg = lang(c, p)
         rin_bundle(c, p, tr(key, name, lg=lg), text(lg), doc_id)
 
