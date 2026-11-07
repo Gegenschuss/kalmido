@@ -283,7 +283,7 @@ function vdr_sigDraw(st) {
   }).join('');
   el.innerHTML = `<h4>${tr('Client link')}</h4><p class="muted mhint">${esc(tr('Your client watches the newest version without an account, comments at a time and approves or requests changes.'))}</p>
     ${rows ? `<ul class="sglist" role="list">${rows}</ul>` : ''}
-    <div class="vdrsignew"><label class="vdrsigexp">${tr('Valid until (optional)')} <input type="date" class="vdrsigdate" min="${esc(new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10))}" aria-label="${esc(tr('Valid until (optional)'))}"></label>
+    <div class="vdrsignew"><label class="vdrsigexp">${tr('Valid until (optional)')} <input type="date" class="vdrsigdate" min="${esc(today())}" aria-label="${esc(tr('Valid until (optional)'))}"></label>
     ${r.versions.length > 1 ? `<label class="chk"><input type="checkbox" class="vdrsigold"> ${tr('The client may also see the older versions')}</label>` : ''}
     <button type="button" class="btn sm" data-vdr="signew">${ic('link', 's')} ${live.length ? tr('New client link') : tr('Create client link')}</button></div>`;
 }
