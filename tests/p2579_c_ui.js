@@ -44,8 +44,12 @@ const docNew = async (name, text, ws = 'private', ck = CK) => {
   let w = await boot({user: 'alice', hash: 'docs'}), d = w.document;
   await until(() => w.eval(`typeof DC !== 'undefined' && DC.total === 2 && typeof dcv_barHtml === 'function'`), 100);
   const type = q => { const qi = d.querySelector('#dc-q'); qi.value = q; qi.dispatchEvent(new w.Event('input', {bubbles: true})); };  // as a person types (docs.js: 300 ms later the list loads)
+  // 2.627.0 (#4976): wait for the end state of every input - the search set, its list loaded (DC.key carries the loaded
+  // search), the view's route applied - not for numbers an earlier state shows as well (CI: "Emu" typed while the view
+  // was still being applied, dcv_apply set the search back to "Koala")
+  const listed = q => `DC.q === ${JSON.stringify(q)} && !DC.loading && new URLSearchParams(DC.key || '').get('q') === ${JSON.stringify(q)}`;
   type('Koala');
-  await until(() => w.eval(`DC.total === 1 && !DC.loading`));
+  await until(() => w.eval(`${listed('Koala')} && DC.total === 1`));
   const save = await until(() => d.querySelector('[data-dcv="save"]'));
   check(save, 'the documents\' bar offers "Save view"');
   w.prompt = () => 'Koala docs';
@@ -54,9 +58,10 @@ const docNew = async (name, text, ws = 'private', ck = CK) => {
   check(VID, 'saved: the view is there');
   check(await until(() => w.location.hash === '#docs/v/' + VID), 'the saved view opens (#docs/v/<id>)');
   const st = () => w.eval(`JSON.stringify({q: DC.q, total: DC.total, loading: DC.loading, dv: DC.dv, route: S.route, applied: DCV.applied, now: typeof dc_params === 'function' ? dcv_queryNow() : '', hash: location.hash})`);
-  const v0 = w.eval(`dcv_get(${VID})`);
+  const v0 = await until(() => w.eval(`(v => v && v.count === 1 ? v : null)(dcv_get(${VID}))`)) || w.eval(`dcv_get(${VID})`);
   check(v0 && v0.query === 'q=Koala&area=private' && v0.ws === 'private' && v0.count === 1, 'it keeps the search and counts its hits ' + JSON.stringify(v0));
-  const side = await until(() => d.querySelector(`#side [data-sbbpart="docs-view"][data-dcvid="${VID}"]`), 60);
+  const side = await until(() => (e => e && e.querySelector('.c')?.textContent === '1' ? e : null)(d.querySelector(`#side [data-sbbpart="docs-view"][data-dcvid="${VID}"]`)))
+    || d.querySelector(`#side [data-sbbpart="docs-view"][data-dcvid="${VID}"]`);
   check(side && side.textContent.includes('Koala docs') && side.querySelector('.c')?.textContent === '1', 'the sidebar: the view with its number ' + side?.outerHTML?.slice(0, 200));
   check(side && side.getAttribute('aria-current') === 'page' && !d.querySelector('#side [data-sbbpart="docs"]')?.classList.contains('on'), 'the open view is marked, not "Documents"');
   check(d.querySelector('.dcv-name')?.textContent.includes('Koala docs') && !d.querySelector('[data-dcv="update"]'), 'the bar names the open view, nothing changed yet');
@@ -65,10 +70,11 @@ const docNew = async (name, text, ws = 'private', ck = CK) => {
   // (Documents itself brings back its own last search text when one comes back: viewmem.js, #3439)
   check(await until(() => w.eval(`DC.dv === null && DCV.applied === null && !DC.vsort && !DC.f.review && !DC.loading`)), 'back to Documents: the view is left (its sort and filters go) ' + st());
   click(w, d.querySelector(`#side [data-dcvid="${VID}"]`));
-  check(await until(() => w.eval(`DC.q === 'Koala' && DC.total === 1 && !DC.loading`)), 'the sidebar row applies the view again');
+  check(await until(() => w.eval(`location.hash === '#docs/v/${VID}' && DC.dv === ${VID} && DCV.applied?.id === ${VID} && ${listed('Koala')} && DC.total === 1`)),
+    'the sidebar row applies the view again ' + st());
   // a changed search: "Update view" takes it over
   type('Emu');
-  const upd = await until(() => !w.eval('DC.loading') && d.querySelector('[data-dcv="update"]'));
+  const upd = await until(() => w.eval(`${listed('Emu')} && DCV.applied?.id === ${VID}`) && d.querySelector('[data-dcv="update"]'));
   check(upd && d.querySelector('.dcv-dirty'), 'a changed search: marked, "Update view" offered ' + st());
   click(w, upd);
   check(await until(() => w.eval(`dcv_get(${VID})?.query === 'q=Emu&area=private'`)), 'updated: the view keeps the new search');
