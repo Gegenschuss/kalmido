@@ -108,7 +108,8 @@ async function srv_newModal(o = {}) {
     <div class="foot"><div class="calerr" role="alert" id="srv-err" hidden></div><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button>${d.enabled_instance ? `<button class="btn pri" data-m="srv-ok">${tr('Create')}</button>` : ''}</div>`));
   userNameFollow(md, 'srv-name', 'srv-user', 'srv-userhint');
   // 2.621.0 (#4715): which workspace "Sort receipts and documents" meets: private or the organisation of the chosen team agent
-  const dw = $('#srv-docsws', md), docsWs = () => { if (!dw) return; const v = $('#srv-own', md)?.value || 'me', w = (d.docs_scopes || []).find(x => x.key === v);  // 2.621.0 (#4715): an owner without a listed workspace (instance team agent) shows no hint dw.textContent = w ? tr('Applies to: {0}', w.name) : ''; dw.hidden = !w; };
+  // 2.621.0 (#4715): an owner without a listed workspace (instance team agent) shows no hint
+  const dw = $('#srv-docsws', md), docsWs = () => { if (!dw) return; const v = $('#srv-own', md)?.value || 'me', w = (d.docs_scopes || []).find(x => x.key === v); dw.textContent = w ? tr('Applies to: {0}', w.name) : ''; dw.hidden = !w; };
   docsWs(); $('#srv-own', md)?.addEventListener('change', docsWs);
   const un0 = $('#srv-user', md); if (un0) un0.value = slugUser(d.default_name || '');
   const err = $('#srv-err', md), show = m => { err.textContent = m || ''; err.hidden = !m; };
