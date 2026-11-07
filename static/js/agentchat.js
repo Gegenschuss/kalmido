@@ -1503,7 +1503,7 @@ function agGuideModal() {
     <div class="shint">${tr('Kalmido never starts or downloads an agent: you run the agent (for example Claude Code) on a machine you control, walled off from everything else. Kalmido gives it an account, a token, events and an MCP server.')}</div>
     <div class="seg agtabs" role="tablist"><button role="tab" data-agt="a" aria-selected="${tab === 'a'}" class="${tab === 'a' ? 'on' : ''}">${ic('bot', 's')} ${tr('Let Claude Code set it up')}</button><button role="tab" data-agt="b" aria-selected="${tab === 'b'}" class="${tab === 'b' ? 'on' : ''}">${ic('code', 's')} ${tr('Do it yourself')}</button></div>
     <div class="agpane" data-agp="a" ${tab === 'a' ? '' : 'hidden'}>
-      <ol class="agsteps"><li>${tr('Create the agent (Settings > Agents > Add agent, admins) and copy its token.')}</li>
+      <ol class="agsteps"><li>${setLinkHtml(tr('Create the agent (Settings > Agents > Add agent, admins) and copy its token.'))}</li>
         <li>${tr('On the machine for the agent, put the token into a file only you can read (mode 600), with the two lines KALMIDO_URL=… and KALMIDO_TOKEN=….')}</li>
         <li>${tr('Adjust the two values below, copy the prompt and paste it into Claude Code on that machine (in a normal user account with sudo). It shows you every sudo command before it runs it.')}</li></ol>
       <div class="row"><label for="agg-env">${tr('Token file')}</label><input id="agg-env" value="${esc(d.env)}" autocomplete="off" spellcheck="false"></div>

@@ -239,7 +239,7 @@ async function orgModal(o, done) {
     ${o ? `<div class="oghd"><b id="og-mh">${tr('Members')}</b><span class="muted" id="og-cnt" aria-live="polite"></span></div>
     <div class="ua8bar"><input type="search" id="og-q" placeholder="${esc(tr('Name, user name or e-mail'))}" aria-label="${esc(tr('Search people'))}" autocomplete="off" autocapitalize="off" spellcheck="false"><select id="og-flt" aria-label="${esc(tr('Filter'))}"><option value="mem">${tr('Members')}</option><option value="all">${tr('All')}</option></select></div>
     <div class="members ogml" id="og-list" role="group" aria-labelledby="og-mh"></div>
-    <div class="shint">${tr('Admins of an organisation manage its members, name and e-mail domains (Settings > Organisation > People); they are not admins of the server.')}${picAdm ? '' : ` <span id="og-pich">${tr('Only an admin of the organisation can upload a picture.')}</span>`}</div>` : `<div class="shint">${tr('You become its first member and admin; add people afterwards.')}</div>`}
+    <div class="shint">${setLinkHtml(tr('Admins of an organisation manage its members, name and e-mail domains (Settings > Organisation > People); they are not admins of the server.'))}${picAdm ? '' : ` <span id="og-pich">${tr('Only an admin of the organisation can upload a picture.')}</span>`}</div>` : `<div class="shint">${tr('You become its first member and admin; add people afterwards.')}</div>`}
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${o ? tr('Save') : tr('Create')}</button></div>`);
   md.classList.add('ogmodal');
   const row = u => `<div class="mrow ogrow" data-ogrow="${u.id}">${uRowAv(u)}<span class="n">${esc(u.display_name)} <span class="muted">${esc(u.username)}${u.is_admin ? ' · ' + tr('Manages the server') : ''}</span></span>`
@@ -970,7 +970,7 @@ async function odlDelete(o) {
   // 2.186.0 A (#2599): a retired organisation: only its former admins export it
   // 2.239.0 C (#2943): an instance admin (no former admin left) gets the retention export only, never the whole organisation
   const day0 = today(), exp = j.can_export ? oxBoxHtml(o) : j.can_retention ? `<div class="shint">${esc(tr('Only its former admins can export the whole organisation. Nobody of them is left: you can download the records it keeps by law.'))}</div>${rxBoxHtml('org', o.id)}`
-    : `<div class="shint">${esc(j.retired ? tr('Only its former admins can export it (Settings > Organisation).') : tr('Only an admin of the organisation can export it (Settings > Organisation).'))}</div>`;
+    : `<div class="shint">${setLinkHtml(j.retired ? tr('Only its former admins can export it (Settings > Organisation).') : tr('Only an admin of the organisation can export it (Settings > Organisation).'))}</div>`;
   if (j.kept_until && j.kept_until >= day0) {
     await askConfirm(tr('Delete the organisation “{0}”?', o.name), '', {ok: tr('Close'), after: md => oxDraw(md),
       html: `<div class="shint keep">${esc(tr('This organisation is kept until {0} by law (invoices, receipts, logbook): it can be deleted after that', fmtDate(j.kept_until)))}</div>${exp}`});
@@ -995,7 +995,7 @@ async function odlDelete(o) {
     try { await api('DELETE', `/api/admin/orgs/${o.id}${rxq ? '?' + rxq : ''}`); } catch { return false; }
     toast(tr('Deleted')); return true;
   }
-  const html = (retire ? `<div class="shint keep warn">${ic('alert', 's')} ${esc(tr('It keeps {0} by law until {1}. It is retired instead of deleted: the members leave it, nobody sees it in the app any more, its admins of today can still export it (Settings > Organisation), and it is removed permanently after that date.', odlCounts(j.kept), fmtDate(j.retain_until)))}</div>` : '')
+  const html = (retire ? `<div class="shint keep warn">${ic('alert', 's')} ${setLinkHtml(tr('It keeps {0} by law until {1}. It is retired instead of deleted: the members leave it, nobody sees it in the app any more, its admins of today can still export it (Settings > Organisation), and it is removed permanently after that date.', odlCounts(j.kept), fmtDate(j.retain_until)))}</div>` : '')
     + (content ? `<div class="shint keep odlcontent">${esc(tr('These go with it: {0}. Export the organisation first.', content))}</div>` : '') + mem + exp;
   if (!await askConfirm(tr('Delete the organisation “{0}”?', o.name), '', {html, ok: retire ? tr('Retire the organisation') : tr('Delete'), danger: true, after: md => { oxDraw(md); olvNoticeWire(md, o); }})) return false;
   try { await api('DELETE', `/api/admin/orgs/${o.id}?confirm=1${rxq ? '&' + rxq : ''}`); } catch { return false; }

@@ -88,7 +88,7 @@ function tc_panelHtml() {
 }
 function viewTeam() {
   if (typeof cw_tcHome === 'function' && S.cw.lt) return cw_tcHome(viewTeam);  // 2.47.1 (#1720): a conversation live in the chat panel (chatwins.js)
-  if (!teamOn()) return `<div class="empty">${tr('The team chat needs collaboration (Settings > Modules).')}</div>`;
+  if (!teamOn()) return `<div class="empty">${setLinkHtml(tr('The team chat needs collaboration (Settings > Modules).'))}</div>`;
   if (S.tc.rooms === null && !S.tc.loading) { S.tc.loading = true; loadTeam().then(() => { S.tc.loading = false; if (S.route.mod === 'team') renderView(); }); }
   // 2.27.0 (#986): only conversations that have messages (newest first); an empty one shows once it is opened / written in
   // 2.479.0 (#2814): off = a computer's area "Chat": the list is the area's start page (no conversation open, full width) and the

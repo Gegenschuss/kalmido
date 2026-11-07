@@ -662,7 +662,7 @@ function davGuide() {
     <div class="dgaddr"><div><span class="muted">${tr('Server')}</span><code>${esc(host)}</code><button class="iconbtn" data-copy="${esc(host)}" aria-label="${esc(tr('Copy'))}">${ic('copy', 's')}</button></div>
       <div><span class="muted">${tr('Address')}</span><code>${esc(base)}</code><button class="iconbtn" data-copy="${esc(base)}" aria-label="${esc(tr('Copy'))}">${ic('copy', 's')}</button></div>
       <div><span class="muted">${tr('User name')}</span><code>${esc(user)}</code><button class="iconbtn" data-copy="${esc(user)}" aria-label="${esc(tr('Copy'))}">${ic('copy', 's')}</button></div>
-      <div><span class="muted">${tr('Password')}</span><span>${tr('an app password (Settings > Account > App passwords), never your account password')}</span><button class="btn sm" data-dg="apppw">${ic('key', 's')} ${tr('App passwords…')}</button></div></div>
+      <div><span class="muted">${tr('Password')}</span><span>${setLinkHtml(tr('an app password (Settings > Account > App passwords), never your account password'))}</span><button class="btn sm" data-dg="apppw">${ic('key', 's')} ${tr('App passwords…')}</button></div></div>
     ${step(tr('iPhone and iPad'), [tr('Settings > Apps > Calendar > Calendar Accounts > Add Account > Other > Add CalDAV Account.'),
       tr('Server: {0}, user name and app password as above, then Next.', `<code>${esc(host)}</code>`),
       tr('For the contacts: Settings > Apps > Contacts > Contacts Accounts > Add Account > Other > Add CardDAV Account, with the same three entries.'),

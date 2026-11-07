@@ -176,7 +176,7 @@ const ofc_setBody = () => S.route.tab === 'import' && typeof oimHtml === 'functi
 // 2.470.0 (#3596): the pages behind Settings (services, text blocks, rights) lead back there; was the tab row General | Templates
 const ofr_backHtml = tab => ofr_grp() && ofr_lvOf('settings') === 'none' ? '' : `<div class="ofcbar"><button type="button" class="btn sm" data-setgo="${tab === 'settings' ? 'biz' : 'biz-tpl'}">${ic('back', 's')} ${tr('Settings')}</button></div>`;
 function viewOffice() {
-  if (!officeOn()) return `<div class="empty">${tr('Office & finance is off (Settings > Modules)')}</div>`;
+  if (!officeOn()) return `<div class="empty">${setLinkHtml(tr('Office & finance is off (Settings > Modules)'))}</div>`;
   const tab = ofcTab();
   if (OFC.tab !== tab) { OFC.tab = tab; OFC.q = ''; }  // the search belongs to one tab
   if (tab === 'start' && ofm_menuOff(S.route.tab)) setTimeout(() => { if (ofm_menuOff(S.route.tab)) location.replace('#office/start'); }, 0);  // 2.440.0 (#3609)

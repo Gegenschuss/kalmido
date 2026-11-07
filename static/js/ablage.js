@@ -72,7 +72,7 @@ const ab_reload = () => { AB.key = ''; ab_ptStale(); if (S.route.mod === 'ablage
 
 // ---- the view
 function viewAblage() {
-  if (!ab_on()) return `<div class="empty">${tr('The file store is off (Settings > Modules)')}</div>`;
+  if (!ab_on()) return `<div class="empty">${setLinkHtml(tr('The file store is off (Settings > Modules)'))}</div>`;
   if (typeof dt_abOn !== 'function' && typeof ld_later === 'function') ld_later('tagsel');  // 2.122.0 B (#2099 #2295): tags, Shift ranges
   if (typeof abd_cardsHtml !== 'function' && feat('docs') && typeof ld_later === 'function') ld_later('docs');  // 2.353.0 D (#2759): cards, recognition (abdocs.js)
   const r = S.route;

@@ -61,7 +61,7 @@ function budgetBar(c) {
   return `<div class="clbud lv-${b.level}"><div class="clbar" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.min(100, pc)}" aria-label="${esc(tr('Budget used'))}"><i style="width:${Math.min(100, pc)}%"></i></div><span class="clbt"><b>${pc} %</b> ${esc(txt)} · ${esc(tr(BUDGET_TXT[b.level]))}</span></div>`;
 }
 function viewClients() {
-  if (!clientsOn()) return `<div class="empty">${tr('Clients are off (Settings > Modules)')}</div>`;
+  if (!clientsOn()) return `<div class="empty">${setLinkHtml(tr('Clients are off (Settings > Modules)'))}</div>`;
   return ms_clView();  // 2.47.3 (#1734): list + card like the contacts (clientpage.js) instead of the grid / the detail page
 }
 // 2.55.0 (#1067): the parts of the client's card below its details (blocks of the view builder, clientpage.js)

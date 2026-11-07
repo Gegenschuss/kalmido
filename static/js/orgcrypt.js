@@ -151,7 +151,7 @@ function oa_boundaryHtml(bd) {
   const rows = det.map(x => `<div class="mrow"><span class="n">${esc(tr(OA_TYPE[x.type] || x.type))}: <b>${esc(x.name || '#' + x.id)}</b> <span class="muted">${esc(x.user || '#' + x.user_id)}${x.agent ? ' ' + esc(tr('Agent')) : ''}</span></span></div>`).join('');
   const more = bd.violations > det.length ? `<div class="muted mhint">${esc(trn('and {0} more', 'and {0} more', bd.violations - det.length))}</div>` : '';
   const fix = det.some(x => x.fixable) ? `<div class="row"><button type="button" class="btn sm" data-oa="repair">${ic('check', 's')} ${tr('Clean up')}</button></div>` : '';
-  const ag = det.some(x => x.agent) ? `<div class="shint keep">${esc(tr('Move the agent to the right workspace (Settings > Agents).'))}</div>` : '';
+  const ag = det.some(x => x.agent) ? `<div class="shint keep">${setLinkHtml(tr('Move the agent to the right workspace (Settings > Agents).'))}</div>` : '';
   return `<details class="sdet" id="a-orgs-bd"><summary class="mhint">${esc(head)}</summary><div class="members">${rows}</div>${more}${ag}${fix}</details>`;
 }
 document.addEventListener('click', async e => {

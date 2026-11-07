@@ -65,7 +65,7 @@ function viewLife() {
   }
   if (d.care) {
     const c = d.care;
-    const body = !c.contacts ? `<p class="muted">${tr('Staying in touch needs the module Contacts (Settings > Modules).')}</p>`
+    const body = !c.contacts ? `<p class="muted">${setLinkHtml(tr('Staying in touch needs the module Contacts (Settings > Modules).'))}</p>`
       : c.items.length ? `<ul class="flist">${c.items.map(x => `<li class="frow lcare"><a href="#contacts/${x.contact_id}" class="ft"><b>${esc(x.fn)}</b><span class="muted">${esc(x.last ? tr('last contact {0}', fmtDateLoc(x.last)) : tr('no contact noted yet'))}${x.note ? ' · ' + esc(x.note) : ''}</span></a>${x.days <= 0 ? `<span class="fwhen ${x.days < 0 ? 'over' : 'soon'}">${esc(x.days < 0 ? trn('{0} day overdue', '{0} days overdue', -x.days) : tr('today'))}</span>` : `<span class="fwhen">${esc(daysWord(x.days))}</span>`}${ro ? '' : `<button type="button" class="btn sm" data-act="life-touch" data-cid="${x.contact_id}" title="${esc(tr('We were in touch today'))}">${ic('check', 's')}<span>${tr('In touch')}</span></button>`}</li>`).join('')}</ul>`
       : `<p class="muted">${org ? tr('Open a contact of this organisation and select how often you want to be in touch: Kalmido tells you when it has been too long.') : tr('Open a contact and select how often you want to be in touch: Kalmido tells you when it has been too long.')}</p>`;
     cards.push(card('care', 'users', tr('Staying in touch'), body, c.contacts ? `<a class="btn sm" href="#contacts">${ic('users', 's')}<span>${tr('Contacts')}</span></a>` : '', c.items.filter(x => x.days <= 0).length || ''));

@@ -129,6 +129,22 @@ function swMessage(e) {
 }
 const SET_SECS = [['account', 'user', N_('Account')], ['org', 'building', N_('Organisation')], ['biz', 'receipt', N_('Company & office')], ['general', 'sliders', N_('General')], ['look', 'palette', N_('Appearance')], ['nav', 'menu', N_('Navigation')], ['modules', 'grid', N_('Modules')],  // 2.418.0 (#3560): nav
   ['notify', 'bell', N_('Notifications')], ['integr', 'link', N_('Integrations')], ['docs', 'file', N_('Documents|settings')], ['access', 'key', N_('Access|settings')], ['ai', 'bot', N_('Agents')], ['data', 'download', N_('Data')], ['users', 'grid', N_('Server|settings')], ['help', 'help', N_('Help')]];
+// 2.630.0 (#4519): "(Settings > Modules)" in a hint becomes a link that opens the settings at that section. It reads the way in the
+// translated text itself (the word for Settings + the section's name from SET_SECS, then any " > sub" parts up to a bracket / colon /
+// comma), so no text key changes. Returns safe HTML (text escaped; safe = true: s is HTML already). A way it does not know stays text.
+function setLinkHtml(s, safe) {
+  s = String(s ?? ''); const e = safe ? x => x : esc, pre = tr('Settings') + ' > ';
+  const secs = SET_SECS.map(([k, , n]) => [k, tr(n)]).sort((a, b) => b[1].length - a[1].length);
+  let out = '', at = 0, i;
+  while ((i = s.indexOf(pre, at)) >= 0) {
+    const from = i + pre.length, sec = secs.find(([, n]) => s.startsWith(n, from));
+    if (!sec) { out += e(s.slice(at, from)); at = from; continue; }
+    const path = /^( > [^()>:;,.“”]+)*/.exec(s.slice(from + sec[1].length))[0].replace(/\s+$/, ''), end = from + sec[1].length + path.length;
+    out += e(s.slice(at, i)) + `<a href="#" class="setlink" data-setlink="${sec[0]}">${e(s.slice(i, end))}</a>`; at = end;
+  }
+  return out + e(s.slice(at));
+}
+document.addEventListener('click', ev => { const a = ev.target.closest?.('[data-setlink]'); if (!a) return; ev.preventDefault(); settingsModal(a.dataset.setlink); });
 // 2.489.0 (#2664, decision #2654): the built-in assistant is a sub-tab of Agents (AI_SUBS), no section of its own
 const MOD_GROUPS = [[N_('Views'), ['cal', 'timeline', 'kanban', 'matrix']], [N_('Calendar and people'), ['events']], [N_('For you'), ['habits', 'comments']],
   [N_('Projects and team'), ['collab', 'progress', 'deps', 'fields', 'agents', 'workload', 'dispo', 'forms', 'wiki', 'sheets', 'videos']], [N_('Areas|nav'), ['a:office', 'a:ablage', 'a:time', 'a:review', 'a:life', 'a:reading']]];  // 2.48.0 (#1207): + the file store; 2.172.0 B (#2679): + Reading
