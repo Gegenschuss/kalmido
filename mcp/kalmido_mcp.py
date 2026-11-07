@@ -2638,15 +2638,20 @@ TOOLS += [
                            "changes (the customer's decision), versions (links), open_comments. Only reviews whose task / project is shared with you.",
      _obj({"task_id": S_ID, "list_id": S_ID}), lambda api, a: api.call("GET", "/videos", _pick(a, ("task_id", "list_id")))),
     ("get_video_review", "2.99.1: one video sign-off with its versions and ALL comments by version and timecode (timecode mm:ss, author, "
-                         "customer = written by the customer, done, replies). Use it to sum up the feedback for the edit.",
+                         "customer = written by the customer, done, replies). Use it to sum up the feedback for the edit. 2.641.0: also "
+                         "images / PDFs (kind image | pdf; a version names its file_id of the file store, readable with the file tools when "
+                         "shared with you); a comment's pos is {t} | {x, y} | {page, x, y} (x / y 0..1 from the top left), mark = its point's number.",
      _obj({"review_id": S_ID}, ["review_id"]), lambda api, a: api.call("GET", f"/videos/{_id(a, 'review_id')}")),
     ("add_video_comment", "2.99.1 (scope comments): a comment on a video sign-off, optionally at at_sec (seconds; the newest version unless "
                           "version_id), or an answer to a comment (parent_id; it takes that comment's version and timecode). Your comments "
                           "stay internal; an ANSWER to a customer's comment shows on the customer page (needs the right to change the task "
-                          "/ project) -- answer the customer only when the person asked you to.",
+                          "/ project) -- answer the customer only when the person asked you to. 2.641.0: on an image / PDF pos = {x, y} / "
+                          "{page, x, y} (x / y 0..1 of the width / height from the top left; page 1 = the first) instead of at_sec.",
      _obj({"review_id": S_ID, "body": {"type": "string", "minLength": 1, "maxLength": 2000}, "at_sec": {"type": "number", "minimum": 0, "maximum": 86400},
+           "pos": {"type": "object", "properties": {"t": {"type": "number", "minimum": 0}, "x": {"type": "number", "minimum": 0, "maximum": 1},
+                                                    "y": {"type": "number", "minimum": 0, "maximum": 1}, "page": {"type": "integer", "minimum": 1}}},
            "version_id": S_ID, "parent_id": S_ID}, ["review_id", "body"]),
-     lambda api, a: api.call("POST", f"/videos/{_id(a, 'review_id')}/comments", body=_pick(a, ("body", "at_sec", "version_id", "parent_id")))),
+     lambda api, a: api.call("POST", f"/videos/{_id(a, 'review_id')}/comments", body=_pick(a, ("body", "at_sec", "pos", "version_id", "parent_id")))),
     ("set_video_comment_done", "2.99.1 (scope comments): mark a comment of a video sign-off done (done: true) or open again (false); "
                                "your own comments, or all when you may change the task / project.",
      _obj({"review_id": S_ID, "comment_id": S_ID, "done": {"type": "boolean"}}, ["review_id", "comment_id", "done"]),

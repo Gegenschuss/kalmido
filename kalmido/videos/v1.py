@@ -8,7 +8,9 @@ same for an agent and a person's script. Never in the answer: the customer links
 changing, deleting a review, no new version, no decision in the customer's name: that stays with people.
 Writing: a comment / answer (author = the token's account) by everybody who sees the review (like the app); an answer to a
 CUSTOMER's comment shows on the customer page, so it needs the right to change the task / list (like the portal answers of
-tasks); done / not done: its author or who may change it."""
+tasks); done / not done: its author or who may change it.
+2.641.0 (#4769): images and PDFs of the file store as well (kind, pos {x, y} / {page, x, y}); their bytes only when the token's
+account also sees the file (videos/vdmedia.py)."""
 from flask import jsonify
 
 from ..core.config import app
@@ -20,6 +22,7 @@ from ..api.v1 import BadInput
 from ..api.common import v1_args, v1_json, v1_view
 from ..core.errors import reject_unknown
 from ..accounts.orgroles import need_org_say  # 2.607.0 (#4549)
+from .vdmedia import vdm_send, vdm_version_row  # 2.641.0 (#4769)
 from .review import vdr_comment_add, vdr_comment_row, vdr_dict, vdr_list_of, vdr_may, vdr_reload, vdr_tc, vdr_touch, vdr_versions
 
 VDR_V1_LIMIT = 200
@@ -52,7 +55,7 @@ def vdr_v1_comments(c, d):
             out.append(y)
     for y in out:
         y["replies"] = by.get(y["id"], [])
-    out.sort(key=lambda y: (y["version"] or 0, y["at_sec"] is None, y["at_sec"] or 0, y["id"]))
+    out.sort(key=lambda y: (y["version"] or 0, y["at_sec"] is None, y["at_sec"] or 0, y["page"] or 0, y["id"]))  # 2.641.0 (#4769): + page
     return out
 
 
@@ -62,6 +65,9 @@ def vdr_v1_dict(c, r, full=False):
         d.pop(k, None)
     d["can_write"] = vdr_may(c, me(), r, write=True, api=True)
     d["url"] = f"/api/v1/videos/{r['id']}"
+    for v in d["versions"]:  # 2.641.0 (#4769): the bytes of an image / PDF through the API
+        if v.get("content"):
+            v["content"] = f"/api/v1/videos/{r['id']}/versions/{v['id']}/file"
     if full:
         d["comments"] = vdr_v1_comments(c, d)
     return d
@@ -109,7 +115,7 @@ def vdr_v1_comment_new(vid):
     """{body, at_sec?, version_id? (default the newest), parent_id? (an answer)}."""
     v1_args(())
     b = v1_json()
-    reject_unknown(b, ("body", "at_sec", "version_id", "parent_id"))
+    reject_unknown(b, ("body", "at_sec", "pos", "version_id", "parent_id"))  # 2.641.0 (#4769): + pos
     c, uid = db(), me()
     r = vdr_v1_need(c, vid)
     par = b.get("parent_id")
@@ -123,6 +129,16 @@ def vdr_v1_comment_new(vid):
     d = vdr_v1_dict(c, vdr_reload(c, vid), full=True)
     one = next((y for x in d["comments"] for y in [x, *x["replies"]] if y["id"] == cid), None)
     return jsonify(comment=one, review=d), 201
+
+
+@app.get("/api/v1/videos/<int:vid>/versions/<int:nid>/file")
+@v1_view
+def vdr_v1_file(vid, nid):
+    """2.641.0 (#4769): the image / PDF of a version -- the review shared with the token's account AND its file (vdmedia)."""
+    v1_args(("dl",))
+    c = db()
+    r = vdr_v1_need(c, vid)
+    return vdm_send(c, vdm_version_row(c, r["id"], nid))
 
 
 @app.patch("/api/v1/videos/<int:vid>/comments/<comment_id>")  # second id as text like /tasks/<tid>/links/<list_id>: the spec says {comment_id}
@@ -155,6 +171,10 @@ def vdr_v1_spec(paths, schemas, op, ok, errs, ref, pid, q):
     cm = {"type": "object", "properties": {
         "id": {"type": "integer"}, "version_id": {"type": "integer"}, "version": {"type": ["integer", "null"], "description": "v1, v2 ... as a number"},
         "parent_id": {"type": ["integer", "null"]}, "at_sec": {"type": ["number", "null"], "description": "Seconds from the start; null = no timecode"},
+        "pos": {"type": ["object", "null"], "description": "2.641.0: the place -- video {t: seconds}, image {x, y}, PDF {page, x?, y?}; x / y = 0..1 "
+                                                             "of the width / height of the image or page (0, 0 = top left); null = none"},
+        "page": {"type": ["integer", "null"], "description": "PDF: the page (1 = the first)"},
+        "mark": {"type": ["integer", "null"], "description": "The number of its point on the image / page (per version)"},
         "timecode": {"type": "string", "description": "mm:ss or h:mm:ss, empty without a timecode"}, "body": {"type": "string"},
         "author_id": {"type": ["integer", "null"], "description": "null = the customer"}, "author": {"type": "string", "description": "Name"},
         "customer": {"type": "boolean", "description": "Written by the customer through the approval link"},
@@ -165,7 +185,10 @@ def vdr_v1_spec(paths, schemas, op, ok, errs, ref, pid, q):
         "id": {"type": "integer"}, "title": {"type": "string"}, "state": {"type": "string", "enum": ["open", "approved", "changes"],
                                                                          "description": "The customer's decision (changes = changes requested)"},
         "space": {"type": "string"}, "task_id": {"type": ["integer", "null"]}, "list_id": {"type": ["integer", "null"]},
-        "versions": {"type": "array", "items": {"type": "object", "description": "{id, n, url, provider vimeo|youtube|file|audio|link, embed, timed, created_at}"}},
+        "kind": {"type": "string", "enum": ["video", "image", "pdf"], "description": "2.641.0: the newest version's medium"},
+        "versions": {"type": "array", "items": {"type": "object", "description": "{id, n, kind video|image|pdf, url, provider vimeo|youtube|file|audio|link|store, "
+                                                                                 "embed, timed, created_at}; image / pdf also {file_id, file_no, file_name, "
+                                                                                 "mime, content (GET: the bytes)}"}},
         "version": {"type": "integer", "description": "The newest version's number"}, "open_comments": {"type": "integer"},
         "can_write": {"type": "boolean"}, "comments": {"type": "array", "items": ref("VideoComment"), "description": "Only when reading one review"},
         "url": {"type": "string"}}}
@@ -186,11 +209,16 @@ def vdr_v1_spec(paths, schemas, op, ok, errs, ref, pid, q):
         | errs("400", "403", "404"), [vid],
         body={"type": "object", "required": ["body"], "properties": {
             "body": {"type": "string", "maxLength": 2000}, "at_sec": {"type": ["number", "null"], "minimum": 0, "maximum": 86400},
+            "pos": {"type": "object", "description": "2.641.0: instead of at_sec -- video {t}, image {x, y}, PDF {page, x?, y?} (x / y 0..1)"},
             "version_id": {"type": "integer", "description": "Default: the newest version"},
             "parent_id": {"type": "integer", "description": "Answer this top-level comment (its version and timecode)"}}},
         scope="comments",
         desc="Team comments stay internal. An answer to a customer's comment shows on the customer page: it needs the right to "
              "change the task / list (403 otherwise). A link without time control takes no timecode.")}
+    paths["/videos/{id}/versions/{version_id}/file"] = {"get": op(
+        "The image / PDF of a sign-off version (2.641.0)", T, ok({"type": "string", "format": "binary"}) | errs("404"),
+        [vid, pid("version_id", "Version id")],
+        desc="Only when you see the review and its file in the file store. Served as its real type (JPEG, PNG, WebP, PDF).")}
     paths["/videos/{id}/comments/{comment_id}"] = {"patch": op(
         "Mark a video comment done or open again (2.99.1)", T, ok(ref("VideoReview")) | errs("400", "403", "404"),
         [vid, pid("comment_id", "Comment id")], body={"type": "object", "required": ["done"], "properties": {"done": {"type": "boolean"}}},

@@ -930,6 +930,7 @@ ROUTES = {
     "DELETE /api/videos/{}/versions/{}": "video", "POST /api/videos/{}/comments": "video", "PATCH /api/videos/{}/comments/{}": "video",
     "DELETE /api/videos/{}/comments/{}": "video", "POST /api/videos/{}/comments/{}/restore": "video", "GET /api/videos/{}/export": "video",
     "POST /api/videos/{}/signoff": "video", "POST /api/videos/{}/signoffs/{}/revoke": "video", "POST /api/videos/{}/move-space": "video",
+    "GET /api/videos/{}/versions/{}/file": "video", "GET /api/v1/videos/{}/versions/{}/file": "video",  # 2.641.0 (#4769): p2641_b_media_test.py
     "GET /api/videos/trash": "video",  # 2.549.0 (#4536): the video trash (p2549_c_vtrash_test.py: no other person's / organisation's review, no guest)
     # 2.99.1 C (#1959): video sign-offs for agents (videos/v1.py; p2991_c_api_test.py)
     "GET /api/v1/videos": "video", "GET /api/v1/videos/{}": "video", "POST /api/v1/videos/{}/comments": "video",

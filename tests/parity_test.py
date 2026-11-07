@@ -278,6 +278,7 @@ APP_TO_API = {
     # at a timecode, answer and mark comments done
     "GET /api/videos": ["GET /videos"], "GET /api/videos/{}": ["GET /videos/{}"], "GET /api/videos/{}/export": ["GET /videos/{}"],
     "POST /api/videos/{}/comments": ["POST /videos/{}/comments"], "PATCH /api/videos/{}/comments/{}": ["PATCH /videos/{}/comments/{}"],
+    "GET /api/videos/{}/versions/{}/file": ["GET /videos/{}/versions/{}/file"],  # 2.641.0 (#4769): the image / PDF of a version
 }
 # app routes with no API counterpart on purpose (prefix match on "METHOD /api/path"; reason first)
 APP_ONLY = [
@@ -342,7 +343,7 @@ APP_ONLY = [
      "retention export; an API token / agent 404)", ("=GET /api/trash/lists/{}/export.zip", "=POST /api/trash/lists/{}/export.zip")),
     ("2.99.1 C (#1959): a video sign-off itself stays with people -- creating, renaming, trash / restore, new versions, the "
      "customer link and moving it; deleting comments and editing their text; an agent reads it, comments and marks comments done",
-     ("=POST /api/videos", "=PATCH /api/videos/{}", "=DELETE /api/videos/{}", "=POST /api/videos/{}/restore", "* /api/videos/{}/versions",
+     ("=POST /api/videos", "=PATCH /api/videos/{}", "=DELETE /api/videos/{}", "=POST /api/videos/{}/restore", "=POST /api/videos/{}/versions", "=DELETE /api/videos/{}/versions/{}",  # 2.641.0 (#4769): exact (the file of a version is mapped)
       "=DELETE /api/videos/{}/comments/{}", "=POST /api/videos/{}/comments/{}/restore", "=POST /api/videos/{}/signoff",
       "=POST /api/videos/{}/signoffs/{}/revoke", "=POST /api/videos/{}/move-space")),
     # 2.549.0 (#4536): the video trash list belongs to trash / restore above (people only, agents 404)
@@ -952,6 +953,7 @@ API_ONLY = {  # REST routes on purpose without an MCP tool (reason)
     "GET /office/docs/{}/pdf": "2.51.0 (#1348): the PDF preview of a draft is binary; the chat card (notify) links it for the person",
     "GET /office/letters/{}": "2.153.0 (#2031): list_letter_drafts returns the agent's letters with every field; one letter by id is for scripts",
     "GET /openapi.json": "the API description itself",
+    "GET /videos/{}/versions/{}/file": "2.641.0 (#4769): the bytes of an image / PDF version; get_video_review names its file_id, the file tools read it when it is shared",
     "GET /tasks/{}/working": "2.407.0 A (#3513): set_working answers the same (working + job); the job itself via get_job",
     "PATCH /tasks/{}/working": "2.407.0 A (#3513): set_working (POST) adds the line as well while working; PATCH is for scripts that must not start one",
     "GET /documents/upload-target": "2.207.0 A (#2763): only for scan inbox keys (docs:upload, the folder watcher); never agents",

@@ -431,6 +431,7 @@ ORDER = (
     "office.letteragent",  # 2.153.0 (#2031): agents draft letters (API v1, MCP, event at a document)
     "videos.review",  # 2.99.1 A (#1959): video sign-off with comments at a timecode (links only), customer link = signoff kind video
     "videos.vdrescue",  # 2.530.0 D (#4316): video sign-offs go to their own trash before a hard delete of task / list / client
+    "videos.vdmedia",  # 2.641.0 (#4769): the sign-off of images and PDFs of the file store (the bytes of a version)
     "office.logbook",  # 2.93.0 B (#1928): the logbook (vehicles, drives, change log, year report, mileage allowance)
     "office.cashbook",  # 2.121.0 B (#2095): the cash book (cash boxes, entries, cancellations, day closings, CSV / PDF)
     "office.procdoc",  # 2.148.0 C (#2472): the procedure documentation (GoBD), prefilled, versions, Markdown / PDF

@@ -31,11 +31,12 @@ function vdr_rows(k, id, redraw) {
   return c || null;
 }
 function vdr_listHtml(rows, k, id, add) {
-  const li = rows.map(r => `<li><button type="button" class="vdrrow" data-vdr="open" data-id="${r.id}">${ic(vdr_isAud(r.versions?.[r.versions.length - 1]) ? 'music' : 'film', 's')}<span class="vdrrt"><b>${esc(r.title)}</b>
+  const li = rows.map(r => `<li><button type="button" class="vdrrow" data-vdr="open" data-id="${r.id}">${ic(r.kind === 'image' ? 'picture' : r.kind === 'pdf' ? 'pdf' : vdr_isAud(r.versions?.[r.versions.length - 1]) ? 'music' : 'film', 's')}<span class="vdrrt"><b>${esc(r.title)}</b>
     <small class="muted">${esc([`v${r.version}`, tr(VDR_ST[r.state] || r.state), r.open_comments ? trn('{0} open comment', '{0} open comments', r.open_comments) : ''].filter(Boolean).join(' · '))}</small></span>
     <span class="vdrst st-${esc(r.state)}" aria-hidden="true"></span></button></li>`).join('');
   return (li ? `<ul class="vdrrows" role="list">${li}</ul>` : '')
-    + (add ? `<button type="button" class="btn sm vdradd" data-vdr="new" data-k="${k}" data-i="${id}">${ic('plus', 's')} ${tr('Add video or audio link')}</button>` : '');
+    + (add ? `<button type="button" class="btn sm vdradd" data-vdr="new" data-k="${k}" data-i="${id}">${ic('plus', 's')} ${tr('Add video or audio link')}</button>`
+      + ` <button type="button" class="btn sm vdradd" data-vdr="newfile" data-k="${k}" data-i="${id}">${ic('plus', 's')} ${tr('Add image or PDF')}</button>` : '');  // 2.641.0 (#4769)
 }
 // 2.96.3 (#1959): the section arrives after the detail - redraw it without taking the focus (comment box of #reply/<id>)
 function vdr_redrawTask(tid) {
@@ -190,11 +191,12 @@ async function vdr_open(id, have) {
       <div class="vdrcmp"></div><ul class="vdrcms" role="list"></ul><div class="vdrsig"></div></div>`);
   md.classList.add('vdrdlg');
   md.setAttribute('aria-labelledby', 'vdr-h');
-  const st = VDR.cur = {md, r, ver: (r.versions[r.versions.length - 1] || {}).id, at: true, frozen: null, reply: null, ctl: null};
-  onRemove(md, () => { st.ctl?.stop(); if (VDR.cur === st) VDR.cur = null; });
+  // 2.641.0 (#4769): pt = the point set on the image / page for the next comment, page = the PDF page shown, pdf = its document
+  const st = VDR.cur = {md, r, ver: (r.versions[r.versions.length - 1] || {}).id, at: true, frozen: null, reply: null, ctl: null, pt: null, page: 1, pdf: null};
+  onRemove(md, () => { st.ctl?.stop(); try { st.pdf?.doc.destroy(); } catch { /* gone */ } if (VDR.cur === st) VDR.cur = null; });
   vdr_draw(st, true);
   md.addEventListener('click', e => vdr_click(e, st));
-  md.addEventListener('change', e => { if (e.target.id === 'vdr-ver') { st.ver = +e.target.value; st.reply = null; vdr_draw(st, true); } });
+  md.addEventListener('change', e => { if (e.target.id === 'vdr-ver') { st.ver = +e.target.value; st.reply = null; st.pt = null; st.page = 1; vdr_draw(st, true); } });
   md.addEventListener('focusin', e => {  // typing pauses the player and keeps its time for the comment
     if (e.target.id !== 'vdr-in' || st.frozen != null) return;
     st.ctl?.pause(); st.frozen = st.ctl ? st.ctl.cur : 0; vdr_atDraw(st);
@@ -211,13 +213,17 @@ function vdr_draw(st, player) {
     + (v && v.id !== r.versions[r.versions.length - 1].id ? `<span class="muted">${esc(tr('An older version: its comments stay here'))}</span>` : '')
     + (ro ? '' : `<span class="spacer"></span>${r.state === 'open' ? `<button type="button" class="btn sm" data-vdr="state" data-st="approved">${ic('check', 's')} ${tr('Mark as approved')}</button>`
       : `<button type="button" class="btn sm" data-vdr="state" data-st="open">${ic('undo', 's')} ${tr('Back to review')}</button>`}`);
-  if (player) {
+  if (player && v && v.kind && v.kind !== 'video') {  // 2.641.0 (#4769): an image / PDF with its points instead of the player
+    st.ctl?.stop(); st.ctl = null; st.frozen = null;
+    $('.vdrpl', md).innerHTML = vdr_mediaHtml(v);
+    vdr_mediaLoad(st);
+  } else if (player) {
     st.ctl?.stop();
     $('.vdrpl', md).innerHTML = vdr_playerHtml(v, r.title);
     st.ctl = v && v.timed ? vdr_ctl($('.vdrplay', md), v.provider, w => { if (w === 'dur') vdr_tlDraw(st); else if (st.frozen == null) vdr_atDraw(st); }) : null;
     st.frozen = null;
   }
-  vdr_tlDraw(st); vdr_cmpDraw(st); vdr_cmsDraw(st); vdr_sigDraw(st);
+  vdr_tlDraw(st); vdr_cmpDraw(st); vdr_cmsDraw(st); vdr_sigDraw(st); vdr_pinsDraw(st);
 }
 const vdr_top = st => st.r.comments.filter(c => c.version_id === st.ver && !c.parent_id);
 function vdr_tlDraw(st) {
@@ -238,7 +244,8 @@ function vdr_cmpDraw(st) {
   const rep = st.reply && st.r.comments.find(c => c.id === st.reply);
   $('.vdrcmp', st.md).innerHTML = `${rep ? `<div class="vdrrep muted">${ic('reply', 's')}<span>${esc(tr('Answer to {0}', rep.author))}</span><button type="button" class="linkbtn" data-vdr="noreply">${tr('Cancel')}</button></div>` : ''}
     <div class="vdrin">${timed ? `<button type="button" class="vdrat on" data-vdr="at" aria-pressed="true" title="${esc(tr('Tap to comment without a time'))}">${ic('clock', 's')}<span></span></button>` : ''}
-    <textarea id="vdr-in" rows="2" maxlength="2000" placeholder="${esc(rep ? tr('Your answer') : timed ? tr('Comment at this moment') : tr('Comment'))}" aria-label="${esc(tr('Comment'))}"></textarea>
+    ${vdr_media(v) && !st.reply ? `<button type="button" class="vdrat vdrptb ${st.pt ? 'on' : ''}" data-vdr="pt" aria-pressed="${!!st.pt}" title="${esc(st.pt ? tr('Tap to comment without a point') : tr('Tap on the image to set a point'))}">${ic('mappin', 's')}<span>${esc(st.pt ? tr('at point {0}', vdr_nextMark(st)) : tr('without point'))}</span></button>` : '' /* 2.641.0 (#4769) */}
+    <textarea id="vdr-in" rows="2" maxlength="2000" placeholder="${esc(rep ? tr('Your answer') : timed ? tr('Comment at this moment') : vdr_media(v) ? tr('Tap on the image, then write') : tr('Comment'))}" aria-label="${esc(tr('Comment'))}"></textarea>
     <button type="button" class="btn pri sm" data-vdr="send" aria-label="${esc(tr('Send'))}">${ic('send', 's')}</button></div>`;
   vdr_atDraw(st);
 }
@@ -249,6 +256,7 @@ function vdr_cmsDraw(st) {
     const mine = c.author_id && c.author_id === uid, can = r.can_write || mine;
     return `<li class="vdrc ${c.done ? 'done' : ''} ${c.customer ? 'cust' : ''}" data-cid="${c.id}">
       <div class="vdrch">${!reply && c.at_sec != null ? `<button type="button" class="vdrtc" data-vdr="seek" data-at="${c.at_sec}" aria-label="${esc(tr('Jump to {0}', vdr_tc(c.at_sec)))}">${esc(vdr_tc(c.at_sec))}</button>` : ''}
+        ${!reply && c.at_sec == null && (c.mark || c.page) ? `<button type="button" class="vdrtc vdrpb" data-vdr="pin" data-id="${c.id}" aria-label="${esc(c.mark ? tr('Show point {0}', c.mark) : tr('Page {0}', c.page))}">${esc([c.page ? tr('p. {0}|page', c.page) : '', c.mark ? String(c.mark) : ''].filter(Boolean).join(' · '))}</button>` : '' /* 2.641.0 (#4769) */}
         <b>${esc(c.author || tr('Unknown'))}</b>${c.customer ? `<span class="rotag">${tr('Client')}</span>` : ''}<small class="muted">${esc(fmtWhen(c.created_at))}</small><span class="spacer"></span>
         ${!reply ? `<button type="button" class="iconbtn" data-vdr="reply" data-id="${c.id}" aria-label="${esc(tr('Reply'))}" title="${esc(tr('Reply'))}">${ic('reply', 's')}</button>` : ''}
         ${!reply && can ? `<button type="button" class="iconbtn vdrdone ${c.done ? 'on' : ''}" data-vdr="done" data-id="${c.id}" aria-pressed="${c.done}" aria-label="${esc(c.done ? tr('Mark as open') : tr('Mark as done'))}" title="${esc(c.done ? tr('Mark as open') : tr('Mark as done'))}">${ic('check', 's')}</button>` : ''}
@@ -260,7 +268,7 @@ function vdr_cmsDraw(st) {
 }
 function vdr_sigDraw(st) {
   const r = st.r, el = $('.vdrsig', st.md);
-  if (!r.can_write) { el.innerHTML = ''; return; }
+  if (!r.can_write || vdr_media(r.versions[r.versions.length - 1])) { el.innerHTML = ''; return; }  // 2.641.0 (#4769): the client link is for videos
   const sw = {open: tr('Waiting for the client'), accepted: tr('Approved|video'), declined: tr('Changes requested')};
   const rows = (r.signoffs || []).slice(0, 5).map(x => {
     const s = x.revoked_at && x.state === 'open' ? tr('Switched off') : !x.live && x.state === 'open' ? tr('Expired') : sw[x.state] || x.state;
@@ -282,9 +290,10 @@ async function vdr_send(st) {
   const ta = $('#vdr-in', st.md), text = (ta?.value || '').trim();
   if (!text) { ta?.focus(); return; }
   const v = vdr_v(st), at = v.timed && st.at && !st.reply ? Math.round((st.frozen != null ? st.frozen : st.ctl ? st.ctl.cur : 0) * 10) / 10 : null;
-  const body = st.reply ? {parent_id: st.reply, body: text} : {version_id: v.id, at_sec: at, body: text};
+  const pos = vdr_media(v) && st.pt ? (v.kind === 'pdf' ? {page: st.pt.page, x: st.pt.x, y: st.pt.y} : {x: st.pt.x, y: st.pt.y}) : null;  // 2.641.0 (#4769)
+  const body = st.reply ? {parent_id: st.reply, body: text} : pos ? {version_id: v.id, pos, body: text} : {version_id: v.id, at_sec: at, body: text};
   let j; try { j = await vdr_req(st, 'POST', `/api/videos/${st.r.id}/comments`, body); } catch (e) { toast(e.message); return; }
-  st.reply = null; st.frozen = null;
+  st.reply = null; st.frozen = null; st.pt = null;
   vdr_draw(st, false);
   const cid = j.comment_id, rid = st.r.id;
   const h = histAdd({label: tr('Comment added'), ids: [], snaps: [], lids: [],
@@ -306,7 +315,7 @@ function vdr_gateLoad(st, b) {
   st.ctl = v.timed ? vdr_ctl(box, v.provider, w => { if (w === 'dur') vdr_tlDraw(st); else if (st.frozen == null) vdr_atDraw(st); }) : null;
 }
 async function vdr_click(e, st) {
-  const b = e.target.closest('[data-vdr],[data-m="close"]'); if (!b) return;
+  const b = e.target.closest('[data-vdr],[data-m="close"]'); if (!b) { vdr_stageTap(e, st); return; }  // 2.641.0 (#4769)
   if (b.dataset.m === 'close') { st.md.remove(); return; }
   const a = b.dataset.vdr, r = st.r, rid = r.id, id = +b.dataset.id || 0;
   if (a === 'gate') { vdr_gateLoad(st, b); return; }
@@ -316,6 +325,10 @@ async function vdr_click(e, st) {
   if (a === 'reply') { st.reply = id; vdr_cmpDraw(st); $('#vdr-in', st.md)?.focus(); return; }
   if (a === 'noreply') { st.reply = null; vdr_cmpDraw(st); return; }
   if (a === 'menu') { vdr_menu(b, st); return; }
+  if (a === 'pt') { if (st.pt) { st.pt = null; vdr_ptDraw(st); vdr_pinsDraw(st); } else toast(tr('Tap on the image to set a point')); return; }  // 2.641.0 (#4769)
+  if (a === 'pin') { vdr_pinGo(st, id); return; }
+  if (a === 'mk') { vdr_cmHl(st, id); return; }
+  if (a === 'pg') { vdr_pageGo(st, st.page + (+b.dataset.d || 0)); return; }
   try {
     if (a === 'done') {
       const was = !!r.comments.find(c => c.id === id)?.done, set = v => vdr_after(rid, 'PATCH', `/api/videos/${rid}/comments/${id}`, {done: v});
@@ -347,14 +360,16 @@ async function vdr_click(e, st) {
 function vdr_menu(anchor, st) {
   const r = st.r, rid = r.id, w = r.can_write;
   menu(anchor, [
-    w && {label: tr('New version…'), icon: 'upload', fn: () => vdr_newVersion(st)},
+    w && !vdr_media(vdr_v(st)) && {label: tr('New version…'), icon: 'upload', fn: () => vdr_newVersion(st)},
+    w && {label: tr('New version from a file…'), icon: 'upload', fn: () => vdr_newFile(null, 0, st)},  // 2.641.0 (#4769)
     w && {label: tr('Rename…'), icon: 'edit', fn: () => vdr_rename(st)},
     '-',
     {label: tr('Copy comments as text'), icon: 'copy', fn: () => vdr_copyText(st)},
     {label: tr('Download comments (CSV)'), icon: 'download', fn: () => { location.href = `/api/videos/${rid}/export?version_id=${st.ver}`; }},
-    {label: tr('Open the original link'), icon: 'link', fn: () => window.open(vdr_v(st).url, '_blank', 'noopener,noreferrer')},
+    vdr_media(vdr_v(st)) ? vdr_v(st).content && {label: tr('Download the file'), icon: 'download', fn: () => { location.href = vdr_v(st).content + '?dl=1'; }}
+      : {label: tr('Open the original link'), icon: 'link', fn: () => window.open(vdr_v(st).url, '_blank', 'noopener,noreferrer')},
     '-',
-    w && typeof smv_can === 'function' && smv_can(r.org_id) && {label: tr('Move to another workspace…'), icon: 'arrow', fn: () => vdr_move(st)},
+    w && !r.versions.some(vdr_media) && typeof smv_can === 'function' && smv_can(r.org_id) && {label: tr('Move to another workspace…'), icon: 'arrow', fn: () => vdr_move(st)},  // 2.641.0 (#4769): files stay in their workspace
     w && {label: tr('Delete'), icon: 'trash', cls: 'danger', fn: () => vdr_delete(st)}], null, null, r.title);
 }
 async function vdr_newVersion(st) {
@@ -403,8 +418,183 @@ async function vdr_move(st) {
     undo: async () => { const b = await req(from, {undo: mid}); mid = b.move_id; vdr_forget(); vdr_cache(b.review); return {skipped: []}; },
     redo: async () => { const b = await req(res.space === 'private' ? null : +res.space.slice(4), {undo: mid}); mid = b.move_id; vdr_forget(); vdr_cache(b.review); return {skipped: []}; }}));
 }
+// ---- 2.641.0 (#4769): images (JPG, PNG, WebP) and PDFs of the file store in the same review: a comment sits at a point of the
+// image / of a PDF page (x / y 0..1), shown as a numbered point; a tap on the image sets the point, a tap on a comment's number
+// shows it (a PDF opens that page). The PDF pages come from the bundled pdf.js of the PDF preview (pdfview.js, module pdf).
+const vdr_media = v => !!v && (v.kind === 'image' || v.kind === 'pdf');
+const VDR_ACCEPT = 'image/jpeg,image/png,image/webp,application/pdf,.jpg,.jpeg,.png,.webp,.pdf';
+const VDR_FILE_RE = /^(image\/(jpeg|png|webp)|application\/pdf)$/;
+function vdr_mediaHtml(v) {
+  if (!v.content) return `<div class="vdrnolink">${ic('info', 's')}<p>${esc(tr('The file of this version is no longer in the file store.'))}</p></div>`;
+  const stage = `<div class="vdrstage" data-vdr-stage>${v.kind === 'pdf' ? '<div class="vdrcv"></div>' : `<img src="${esc(v.content)}" alt="${esc(v.file_name || '')}" draggable="false">`}<div class="vdrpins"></div></div>`;
+  return `<div class="vdrmedia vdrk-${v.kind}">${v.kind === 'pdf' ? `<div class="vdrpgbar" hidden><button type="button" class="iconbtn" data-vdr="pg" data-d="-1" aria-label="${esc(tr('Previous page'))}" title="${esc(tr('Previous page'))}">${ic('left')}</button>
+    <span class="vdrpgno" aria-live="polite"></span><button type="button" class="iconbtn" data-vdr="pg" data-d="1" aria-label="${esc(tr('Next page'))}" title="${esc(tr('Next page'))}">${ic('right')}</button></div>
+    <div class="vdrpgmsg muted">${esc(tr('Loading…'))}</div>` : ''}${stage}</div>`;
+}
+function vdr_mediaLoad(st) {
+  const v = vdr_v(st), box = $('.vdrstage', st.md); if (!box) return;
+  const img = $('img', box);
+  if (img) img.addEventListener('error', () => { $('.vdrpl', st.md).innerHTML = `<div class="vdrnolink">${ic('info', 's')}<p>${esc(tr('File damaged or missing'))}</p></div>`; }, {once: true});
+  if (v.kind === 'pdf') vdr_pageGo(st, st.page || 1);
+}
+// one PDF page at the width of the view; the document is fetched once per version (same origin, nothing in it runs)
+async function vdr_pageGo(st, n) {
+  const v = vdr_v(st), box = $('.vdrstage', st.md); if (!box || v.kind !== 'pdf' || !v.content) return;
+  const my = st.pgen = (st.pgen || 0) + 1, msg = $('.vdrpgmsg', st.md);
+  try {
+    if (!st.pdf || st.pdf.ver !== v.id) {
+      await loadModule('pdf');
+      const res = await fetch(v.content, {credentials: 'same-origin'});
+      if (!res.ok) throw new Error(tr('File damaged or missing'));
+      const data = new Uint8Array(await res.arrayBuffer());
+      const lib = await pv_timed(pv_load());
+      const task = lib.getDocument({data, isEvalSupported: false, enableScripting: false, disableAutoFetch: true, stopAtErrors: false, useSystemFonts: true});
+      const doc = await pv_timed(task.promise, task);
+      if (my !== st.pgen || !st.md.isConnected) { doc.destroy(); return; }
+      try { st.pdf?.doc.destroy(); } catch { /* gone */ }
+      st.pdf = {ver: v.id, doc};
+    }
+    const doc = st.pdf.doc;
+    st.page = Math.max(1, Math.min(doc.numPages, n || 1));
+    const page = await doc.getPage(st.page);
+    const w = Math.max(200, box.parentElement.clientWidth || 600), vp = page.getViewport({scale: w / page.getViewport({scale: 1}).width});
+    const dpr = Math.min(window.devicePixelRatio || 1, 2, Math.sqrt(16e6 / (vp.width * vp.height)));
+    const cv = document.createElement('canvas');
+    cv.width = Math.floor(vp.width * dpr); cv.height = Math.floor(vp.height * dpr);
+    cv.setAttribute('aria-label', tr('Page {0}', st.page));
+    await page.render({canvas: cv, canvasContext: cv.getContext('2d'), viewport: vp, transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null}).promise;
+    if (my !== st.pgen || !st.md.isConnected) return;
+    $('.vdrcv', box).replaceChildren(cv);
+    box.dataset.page = String(st.page);
+    if (msg) msg.hidden = true;
+    const bar = $('.vdrpgbar', st.md);
+    if (bar) {
+      bar.hidden = doc.numPages < 2;
+      $('.vdrpgno', bar).textContent = tr('Page {0} of {1}', st.page, doc.numPages);
+      $('[data-d="-1"]', bar).disabled = st.page <= 1; $('[data-d="1"]', bar).disabled = st.page >= doc.numPages;
+    }
+    if (st.pt && st.pt.page !== st.page) st.pt = null;
+    vdr_pinsDraw(st); vdr_ptDraw(st);
+  } catch (e) {
+    if (my !== st.pgen || !st.md.isConnected) return;
+    if (msg) { msg.hidden = false; msg.textContent = e?.name === 'PasswordException' ? tr('This PDF is protected with a password and cannot be shown here.') : e?.message && e.name === 'Error' ? e.message : tr('The preview could not be loaded.'); }
+  }
+}
+// the composer's point button follows without drawing the composer again (the text typed stays)
+function vdr_ptDraw(st) {
+  const b = $('[data-vdr="pt"]', st.md); if (!b) return;
+  b.classList.toggle('on', !!st.pt); b.setAttribute('aria-pressed', String(!!st.pt));
+  b.title = st.pt ? tr('Tap to comment without a point') : tr('Tap on the image to set a point');
+  $('span', b).textContent = st.pt ? tr('at point {0}', vdr_nextMark(st)) : tr('without point');
+}
+// the next point's number (the comments with a point of this version + 1)
+const vdr_nextMark = st => vdr_top(st).filter(c => c.mark).length + 1;
+function vdr_pinsDraw(st) {
+  const v = vdr_v(st), el = $('.vdrpins', st.md); if (!el || !vdr_media(v)) return;
+  const pdf = v.kind === 'pdf', ms = vdr_top(st).filter(c => c.mark && (!pdf || c.page === st.page));
+  el.innerHTML = ms.map(c => `<button type="button" class="vdrpin ${c.done ? 'done' : ''}" data-vdr="mk" data-id="${c.id}" style="left:${(c.pos.x * 100).toFixed(2)}%;top:${(c.pos.y * 100).toFixed(2)}%" aria-label="${esc(tr('Point {0}', c.mark) + ': ' + c.body.slice(0, 60))}" title="${esc(c.body.slice(0, 80))}">${c.mark}</button>`).join('')
+    + (st.pt && (!pdf || st.pt.page === st.page) ? `<span class="vdrpin new" style="left:${(st.pt.x * 100).toFixed(2)}%;top:${(st.pt.y * 100).toFixed(2)}%" aria-hidden="true">${vdr_nextMark(st)}</span>` : '');
+}
+function vdr_stageTap(e, st) {  // a tap on the image / page (not on a point): the point of the next comment
+  const box = e.target.closest('[data-vdr-stage]'); if (!box || e.target.closest('.vdrpin') || st.reply) return false;
+  const v = vdr_v(st), r = box.getBoundingClientRect();
+  if (!r.width || !r.height || (v.kind === 'pdf' && !$('canvas', box))) return true;
+  const cl = x => Math.round(Math.max(0, Math.min(1, x)) * 10000) / 10000;
+  st.pt = {x: cl((e.clientX - r.left) / r.width), y: cl((e.clientY - r.top) / r.height), page: v.kind === 'pdf' ? st.page : null};
+  vdr_pinsDraw(st); vdr_ptDraw(st);
+  $('#vdr-in', st.md)?.focus({preventScroll: true});
+  return true;
+}
+function vdr_cmHl(st, id) {  // a tap on a point: its comment in the list
+  const li = $(`.vdrc[data-cid="${id}"]`, st.md); if (!li) return;
+  li.scrollIntoView({block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'});
+  li.classList.remove('hl'); void li.offsetWidth; li.classList.add('hl');
+}
+async function vdr_pinGo(st, id) {  // a tap on a comment's number: its page, its point marked
+  const c = st.r.comments.find(x => x.id === id); if (!c) return;
+  if (c.page && c.page !== st.page && vdr_v(st).kind === 'pdf') await vdr_pageGo(st, c.page);
+  const p = $(`.vdrpin[data-id="${id}"]`, st.md);
+  $('.vdrstage', st.md)?.scrollIntoView({block: 'nearest'});
+  if (p) { p.classList.remove('hl'); void p.offsetWidth; p.classList.add('hl'); p.focus({preventScroll: true}); }
+}
+function vdr_space(k, id) {  // the workspace of a section ('' = unknown: only the search)
+  const l = k === 'list_id' ? listById(id) : k === 'task_id' ? listById(taskById(id)?.list_id) : null;
+  return l ? (l.org_id ? 'org:' + l.org_id : 'private') : '';
+}
+// a new review (k / id = its place) or a new version (st) from an image / PDF: an upload or a file of the file store
+function vdr_newFile(k, id, st) {
+  const sp = st ? (st.r.org_id ? 'org:' + st.r.org_id : 'private') : vdr_space(k, id), ps = {parent: null, q: '', n: 0};
+  const md = modal(`<form class="vdrform vdrfile" novalidate><h3 id="vdr-ft">${st ? tr('New version') : tr('Add image or PDF')}</h3>
+    <div class="shint">${esc(tr('Images (JPG, PNG, WebP) and PDFs. The file stays in the file store; comments sit at a point.'))}</div>
+    <label class="btn pri vdrup">${ic('upload', 's')} ${tr('Upload a file')}<input type="file" id="vdr-file" class="sr" accept="${VDR_ACCEPT}"></label>
+    <p class="muted mhint">${esc(tr('Uploads go into the folder “Approvals” of the file store. Who may not see the file there does not see the approval.'))}</p>
+    <h4>${tr('From the file store')}</h4>
+    <div class="ctsearch">${ic('search', 's')}<input id="vdr-fq" type="search" placeholder="${esc(tr('Find a file'))}" aria-label="${esc(tr('Find a file'))}" autocomplete="off"></div>
+    <div class="wempick vdrpick" role="list"></div>
+    ${st ? '' : `<label for="vdr-ttl">${tr('Title')}</label><input id="vdr-ttl" maxlength="200" placeholder="${esc(tr('e.g. Logo draft'))}">`}
+    <div class="calerr" role="alert" hidden></div>
+    <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-m="close">${tr('Cancel')}</button></div></form>`);
+  md.setAttribute('aria-labelledby', 'vdr-ft');
+  const list = $('.vdrpick', md), err = $('.calerr', md);
+  const load = async () => {
+    const n = ++ps.n;
+    if (!ps.q && !ps.parent && !sp) { list.innerHTML = `<p class="muted">${esc(tr('Find a file'))}</p>`; return; }
+    list.innerHTML = `<p class="muted">${esc(tr('Loading…'))}</p>`;
+    let j; try { j = await rawFetch('GET', ps.q ? `/api/files/search?q=${encodeURIComponent(ps.q)}${sp ? '&space=' + encodeURIComponent(sp) : ''}` : ps.parent ? `/api/files?parent=${ps.parent}` : `/api/files?space=${encodeURIComponent(sp)}`); }
+    catch (e) { if (n === ps.n) list.innerHTML = `<p class="muted">${esc(e.message)}</p>`; return; }
+    if (n !== ps.n) return;
+    const its = (j.items || []).filter(x => !x.no_access && ((x.kind === 'file' && VDR_FILE_RE.test(x.mime || '')) || (x.kind === 'folder' && !ps.q)));
+    list.innerHTML = (ps.parent && !ps.q ? `<button type="button" role="listitem" class="wemit" data-vdrf="up">${ic('left', 's')}<span class="wemn">${esc(tr('Back'))}</span></button>` : '')
+      + (its.length ? its.map(x => `<button type="button" role="listitem" class="wemit" data-vdrf="${x.id}">${ic(x.kind === 'folder' ? 'folder' : x.mime === 'application/pdf' ? 'pdf' : 'picture', 's')}<span class="wemn">${esc(x.name)}</span>${x.kind === 'file' ? `<small class="muted">${fmtSize(x.size || 0)}</small>` : ''}</button>`).join('')
+        : `<p class="muted">${esc(ps.q ? tr('Nothing found') : tr('No files here yet.'))}</p>`);
+    list._its = its; list._up = j.parent_id ?? (j.crumbs || []).slice(-2, -1)[0]?.id ?? null;
+  };
+  const send = async payload => {
+    err.hidden = true;
+    let r; try { r = await rawFetch('POST', st ? `/api/videos/${st.r.id}/versions` : '/api/videos', payload); } catch (x) { err.textContent = x.message; err.hidden = false; return; }
+    md.remove();
+    if (st) { vdr_fileVersion(st, r, payload); return; }
+    vdr_cache(r);
+    const h = histAdd({label: tr('Created {0}', qn(r.title)), ids: [], snaps: [], lids: [],
+      undo: async () => { await rawFetch('DELETE', `/api/videos/${r.id}`); vdr_cache(r, true); vdr_closeIf(r.id); return {skipped: []}; },
+      redo: async () => { vdr_cache(await rawFetch('POST', `/api/videos/${r.id}/restore`)); return {skipped: []}; }});
+    histToast(tr('Approval {0} created', qn(r.title)), h);
+    vdr_open(r.id, r);
+  };
+  const title = () => ($('#vdr-ttl', md)?.value || '').trim();
+  $('#vdr-file', md).addEventListener('change', e => {
+    const f = e.target.files?.[0]; if (!f) return;
+    const fd = new FormData();
+    fd.append('file', f, f.name);
+    if (!st) { fd.append(k, String(id)); if (title()) fd.append('title', title()); }
+    send(fd);
+  });
+  let qt = 0;
+  $('#vdr-fq', md).addEventListener('input', e => { clearTimeout(qt); qt = setTimeout(() => { ps.q = e.target.value.trim(); load(); }, 250); });
+  md.addEventListener('submit', e => e.preventDefault());
+  md.addEventListener('click', e => {
+    if (e.target.closest('[data-m="close"]')) { md.remove(); return; }
+    const b = e.target.closest('[data-vdrf]'); if (!b) return;
+    if (b.dataset.vdrf === 'up') { ps.parent = list._up || null; load(); return; }
+    const x = (list._its || []).find(i => i.id === +b.dataset.vdrf); if (!x) return;
+    if (x.kind === 'folder') { ps.parent = x.id; load(); return; }
+    send(st ? {file_id: x.id} : {[k]: id, file_id: x.id, title: title()});
+  });
+  load();
+  setTimeout(() => $('#vdr-fq', md)?.focus(), 60);
+}
+function vdr_fileVersion(st, j, payload) {  // a new version from a file: shown at once, one undo step (its file stays in the file store)
+  const rid = st.r.id;
+  st.r = j; vdr_cache(j);
+  let nid = j.new_version;
+  st.ver = nid; st.pt = null; st.page = 1; vdr_draw(st, true);
+  const fid = (j.versions.find(v => v.id === nid) || {}).file_id;
+  histToast(tr('Version {0} added', 'v' + j.version), histAdd({label: tr('Version {0} added', 'v' + j.version), ids: [], snaps: [], lids: [],
+    undo: async () => { await vdr_after(rid, 'DELETE', `/api/videos/${rid}/versions/${nid}`); return {skipped: []}; },
+    redo: async () => { const x = await vdr_after(rid, 'POST', `/api/videos/${rid}/versions`, payload instanceof FormData ? {file_id: fid} : payload); nid = x.new_version; return {skipped: []}; }}));
+}
 document.addEventListener('click', e => {  // the sections (task, project, client)
-  const b = e.target.closest('[data-vdr="open"],[data-vdr="new"]'); if (!b || b.closest('.vdrdlg')) return;
+  const b = e.target.closest('[data-vdr="open"],[data-vdr="new"],[data-vdr="newfile"]'); if (!b || b.closest('.vdrdlg')) return;
   e.preventDefault();
-  if (b.dataset.vdr === 'open') vdr_open(+b.dataset.id); else vdr_new(b.dataset.k, +b.dataset.i);
+  if (b.dataset.vdr === 'open') vdr_open(+b.dataset.id); else if (b.dataset.vdr === 'newfile') vdr_newFile(b.dataset.k, +b.dataset.i); else vdr_new(b.dataset.k, +b.dataset.i);
 });

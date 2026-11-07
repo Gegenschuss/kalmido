@@ -47,6 +47,7 @@ from ..office.signoff import sig_create, sig_expiry, sig_public, SIG_PREFIX, sig
 from ..lists.public import public_links_on, pub_gone, pub_headers, pub_html, pub_limited  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgout import oo_denied, oo_into_note, org_out, org_out_ok  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.spacemove import smv_answer, smv_refuse_agent, smv_same, smv_target  # 2.369.5 (#2517): pulled up from functions
+from .vdmedia import vdm_body, vdm_files_ok, vdm_has_files, vdm_marks, vdm_media, vdm_need_movable, vdm_pos, vdm_pos_dict, vdm_pos_text  # 2.641.0 (#4769)
 
 VDR_URL_MAX, VDR_TITLE_MAX, VDR_BODY_MAX, VDR_NAME_MAX = 2000, 200, 2000, 120
 VDR_AT_MAX = 86400.0                     # a timecode lies within 24 hours
@@ -186,6 +187,8 @@ def vdr_may(c, uid, r, write=False, api=False):
         return False
     if vdr_is_agent(c, uid) and not (api and (r["task_id"] or r["list_id"])):
         return False
+    if not vdm_files_ok(c, uid, r["id"]):  # 2.641.0 (#4769): who may not see a file of an image / PDF version sees no review
+        return False
     if r["task_id"]:
         t = c.execute("SELECT deleted_at FROM tasks WHERE id=?", (r["task_id"],)).fetchone()
         return bool(t) and not t["deleted_at"] and task_visible(c, r["task_id"], uid, write=write, full=True)
@@ -248,15 +251,21 @@ def vdr_versions(c, vid):
 
 
 def vdr_version_dict(v):
-    return {"id": v["id"], "n": v["n"], "url": v["url"], "provider": v["provider"], "embed": vdr_embed(v),
-            "timed": v["provider"] != "link", "created_at": v["created_at"]}
+    # 2.641.0 (#4769): kind video | image | pdf; an image / PDF: its file of the file store and the route of its bytes
+    kind = v["kind"] or "video"
+    d = {"id": v["id"], "n": v["n"], "url": v["url"], "provider": v["provider"], "embed": vdr_embed(v) if kind == "video" else None,
+         "timed": kind == "video" and v["provider"] != "link", "created_at": v["created_at"], "kind": kind}
+    if kind != "video":
+        d.update(file_id=v["file_id"], file_no=v["file_no"], file_name=v["file_name"], mime=v["mime"],
+                 content=f"/api/videos/{v['review_id']}/versions/{v['id']}/file" if v["file_id"] else None)
+    return d
 
 
 def vdr_comments(c, vid, version_id=None, public=False):
     """The live comments of review vid (one version or all), oldest timecode first; public = only the customers' comments
     and the answers to them (the customer page)."""
     rows = c.execute("SELECT * FROM video_comments WHERE review_id=? AND deleted_at IS NULL" + (" AND version_id=?" if version_id else "")
-                     + " ORDER BY at_sec NULLS LAST, id", (vid, version_id) if version_id else (vid,)).fetchall()
+                     + " ORDER BY at_sec NULLS LAST, page NULLS FIRST, id", (vid, version_id) if version_id else (vid,)).fetchall()
     if public:
         ext = {x["id"] for x in rows if x["ext_name"] and not x["parent_id"]}
         rows = [x for x in rows if x["id"] in ext or x["parent_id"] in ext]
@@ -282,10 +291,12 @@ def rg4_dec_text(body, lg=None):
     return f"{text}: {reason}" if reason else text
 
 
-def vdr_comment_dict(x, names):
+def vdr_comment_dict(x, names, marks=None):
     return {"id": x["id"], "version_id": x["version_id"], "parent_id": x["parent_id"], "at_sec": x["at_sec"], "body": rg4_dec_text(x["body"]),
             "author_id": x["author_id"], "author": x["ext_name"] or names.get(x["author_id"]) or "", "customer": bool(x["ext_name"]),
-            "done": bool(x["done"]), "created_at": x["created_at"]}
+            "done": bool(x["done"]), "created_at": x["created_at"],
+            # 2.641.0 (#4769): the place {t} | {x, y} | {page, x?, y?} and the number of its point on the image / page
+            "pos": vdm_pos_dict(x), "page": x["page"], "mark": (marks or {}).get(x["id"])}
 
 
 def vdr_space_key(oid):
@@ -310,11 +321,12 @@ def vdr_dict(c, r, uid, full=False, signoffs=True):
          "task_id": r["task_id"], "list_id": r["list_id"], "client_id": r["client_id"], "created_by": r["created_by"],
          "created_at": r["created_at"], "updated_at": r["updated_at"], "deleted": bool(r["deleted_at"]),
          "versions": [vdr_version_dict(v) for v in vs], "version": vs[-1]["n"] if vs else 0, "open_comments": n_open,
-         "can_write": vdr_may(c, uid, r, write=True)}
+         "can_write": vdr_may(c, uid, r, write=True), "kind": (vs[-1]["kind"] or "video") if vs else "video"}  # 2.641.0 (#4769)
     if full:
         cm = vdr_comments(c, r["id"])
         names = user_names(c, [x["author_id"] for x in cm])
-        d["comments"] = [vdr_comment_dict(x, names) for x in cm]
+        mk = vdm_marks(cm)  # 2.641.0 (#4769)
+        d["comments"] = [vdr_comment_dict(x, names, mk) for x in cm]
         if d["can_write"] and signoffs:
             # 2.122.4 A (#2215 L3): the records keep their review across a move; only those of its current workspace show
             rows = c.execute("SELECT * FROM office_signoffs WHERE video_id=? AND kind='video' AND org_id IS NOT DISTINCT FROM ? ORDER BY id DESC LIMIT 20",
@@ -339,8 +351,11 @@ def vdr_touch(c, vid):
 
 def vdr_version_add(c, r, link, uid):
     n = (c.execute("SELECT MAX(n) FROM video_versions WHERE review_id=?", (r["id"],)).fetchone()[0] or 0) + 1
-    return insert_id(c, "INSERT INTO video_versions(review_id, org_id, n, url, provider, embed_id, created_by, created_at) VALUES(?,?,?,?,?,?,?,?)",
-                     (r["id"], r["org_id"], n, link["url"], link["provider"], link["embed_id"], uid, iso(now_utc())))
+    # 2.641.0 (#4769): + the medium and, for an image / PDF, its file of the file store (vdmedia.vdm_media)
+    return insert_id(c, "INSERT INTO video_versions(review_id, org_id, n, url, provider, embed_id, created_by, created_at, kind, file_id, file_no, "
+                        "file_name, mime) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                     (r["id"], r["org_id"], n, link["url"], link["provider"], link["embed_id"], uid, iso(now_utc()), link.get("kind") or "video",
+                      link.get("file_id"), link.get("file_no"), link.get("file_name") or "", link.get("mime") or ""))
 
 
 def vdr_comment_add(c, r, uid, b, ext_name=None):
@@ -357,20 +372,21 @@ def vdr_comment_add(c, r, uid, b, ext_name=None):
         ver = max(vs, key=lambda k: vs[k]["n"]) if vs else None
     if isinstance(ver, bool) or ver not in vs:
         raise BadInput(tr("Invalid value: {0}", "version_id"))
-    at = vdr_at(b.get("at_sec"))
+    at, page, px, py = vdm_pos(vs[ver]["kind"] or "video", b, vdr_at)  # 2.641.0 (#4769): {t} | {x, y} | {page, x, y}
     par = b.get("parent_id")
     if par not in (None, "", 0):
         p = c.execute("SELECT id, version_id, parent_id FROM video_comments WHERE id=? AND review_id=? AND deleted_at IS NULL",
                       (par if isinstance(par, int) and not isinstance(par, bool) else -1, r["id"])).fetchone()
         if not p or p["parent_id"]:  # one level of answers
             raise BadInput(tr("Invalid value: {0}", "parent_id"))
-        par, ver, at = p["id"], p["version_id"], None
+        par, ver, at, page, px, py = p["id"], p["version_id"], None, None, None, None
     else:
         par = None
     if vs[ver]["provider"] == "link":
         at = None
-    cid = insert_id(c, "INSERT INTO video_comments(review_id, version_id, org_id, parent_id, at_sec, body, author_id, ext_name, done, created_at) "
-                       "VALUES(?,?,?,?,?,?,?,?,0,?)", (r["id"], ver, r["org_id"], par, at, text, None if ext_name else uid, ext_name, iso(now_utc())))
+    cid = insert_id(c, "INSERT INTO video_comments(review_id, version_id, org_id, parent_id, at_sec, body, author_id, ext_name, done, created_at, page, pos_x, pos_y) "
+                       "VALUES(?,?,?,?,?,?,?,?,0,?,?,?,?)", (r["id"], ver, r["org_id"], par, at, text, None if ext_name else uid, ext_name, iso(now_utc()),
+                                                            page, px, py))
     vdr_touch(c, r["id"])
     return cid
 
@@ -399,11 +415,10 @@ def vdr_create():
     # 2.623.0 (#4765): the module Approval off (Settings > Modules, the person's own switch, also without an organisation) = no
     # new review (409 like every module); the existing ones stay readable, keep their versions and comments, restore from the trash
     need_feat("videos")
-    b = body()
-    b = b if isinstance(b, dict) else {}
+    b = vdm_body()  # 2.641.0 (#4769): JSON {url | file_id} or a multipart upload (file)
     oid, tid, lid, cid = vdr_target(c, uid, b)
-    link = vdr_parse(b.get("url"))
-    title = vdr_clean(b.get("title"), VDR_TITLE_MAX) or tr("Video")
+    link = vdm_media(c, uid, oid, b)
+    title = vdr_clean(b.get("title"), VDR_TITLE_MAX) or (link.get("file_name") or tr("Video"))[:VDR_TITLE_MAX]
     ts = iso(now_utc())
     vid = insert_id(c, "INSERT INTO video_reviews(org_id, owner_id, task_id, list_id, client_id, title, state, created_by, created_at, updated_at) "
                        "VALUES(?,?,?,?,?,?,'open',?,?,?)", (oid, None if oid else uid, tid, lid, cid, title, uid, ts, ts))
@@ -510,8 +525,7 @@ def vdr_version_new(vid):
     """{url} -> a new version (the next number); the comments of the older ones stay at them."""
     c, uid = db(), me()
     r = vdr_need(c, vid, write=True)
-    b = body()
-    link = vdr_parse((b if isinstance(b, dict) else {}).get("url"))
+    link = vdm_media(c, uid, r["org_id"], vdm_body())  # 2.641.0 (#4769): {url} | {file_id} | an upload (file)
     write_lock(c, f"video_review_{int(vid)}")
     nid = vdr_version_add(c, r, link, uid)
     if r["state"] != "open":
@@ -619,10 +633,10 @@ def vdr_export_rows(c, r, version_id=None):
     names = user_names(c, [x["author_id"] for x in cm])
     ns = {v["id"]: v["n"] for v in vdr_versions(c, r["id"])}
     top = [x for x in cm if not x["parent_id"]]
-    out = []
-    for x in sorted(top, key=lambda x: (ns.get(x["version_id"], 0), x["at_sec"] is None, x["at_sec"] or 0, x["id"])):
+    mk, out = vdm_marks(cm), []  # 2.641.0 (#4769): an image / PDF comment: page and point number instead of the timecode
+    for x in sorted(top, key=lambda x: (ns.get(x["version_id"], 0), x["at_sec"] is None, x["at_sec"] or 0, x["page"] or 0, x["id"])):
         for y in [x] + [k for k in cm if k["parent_id"] == x["id"]]:
-            out.append((f"v{ns.get(y['version_id'], '')}", vdr_tc(y["at_sec"] if y is x else x["at_sec"]), y["ext_name"] or names.get(y["author_id"]) or "",
+            out.append((f"v{ns.get(y['version_id'], '')}", vdr_tc(x["at_sec"]) or vdm_pos_text(x, mk.get(x["id"])), y["ext_name"] or names.get(y["author_id"]) or "",
                         rg4_dec_text(y["body"]), bool(x["done"]), y is not x))  # 2.122.4 A (#2217)
     return out
 
@@ -666,8 +680,11 @@ def vdr_sig_new(vid):
     r = vdr_need(c, vid, write=True)
     if not public_links_on(c, "signoff"):
         return err(tr("Public links are switched off on this server"), 409)
-    if not vdr_versions(c, vid):
+    vs = vdr_versions(c, vid)
+    if not vs:
         return err(tr("Invalid value: {0}", "url"), 409)
+    if (vs[-1]["kind"] or "video") != "video":  # 2.641.0 (#4769): no public file -- sharing images / PDFs outside is a task of its own
+        return err(tr("The client link is for videos only"), 409)
     b = body()
     try:
         exp = sig_expiry((b if isinstance(b, dict) else {}).get("expires"))
@@ -703,7 +720,8 @@ def vdr_sig_row(c, s):
 
 def vdr_sig_valid(c, s):
     r = vdr_sig_row(c, s)
-    return bool(r) and vdr_sig_hash(r) == s["doc_hash"] and bool(vdr_versions(c, r["id"]))
+    vs = vdr_versions(c, r["id"]) if r else []
+    return bool(r) and vdr_sig_hash(r) == s["doc_hash"] and bool(vs) and (vs[-1]["kind"] or "video") == "video"  # 2.641.0 (#4769)
 
 
 def vdr_sig_newest(c, s):
@@ -889,6 +907,7 @@ def vdr_move_space(vid):
     smv_refuse_agent()
     c, uid = db(), me()
     r = vdr_need(c, vid, write=True)
+    vdm_need_movable(c, vid)  # 2.641.0 (#4769): its files stay in their workspace (the tenant boundary)
     write_lock(c, f"video_review_{int(vid)}")  # 2.122.4 (#2215): a customer decision does not land in the old workspace mid-move
     b = body()
     b = b if isinstance(b, dict) else {}
@@ -972,6 +991,8 @@ def vdr_home(c, r, uid):
     vdr_move_space does without the dialog. Its place: its task / project when that went back too, else the person's inbox
     (a review always has a place; False without one: it stays). The caller commits."""
     import json
+    if vdm_has_files(c, r["id"]):
+        return False  # 2.641.0 (#4769): images / PDFs stay with their files in the organisation
     write_lock(c, f"video_review_{int(r['id'])}")  # as the route: a customer decision does not land in the old workspace mid-move
     place = "task_id" if r["task_id"] else "list_id" if r["list_id"] else "client_id" if r["client_id"] else None
     new = {"task_id": None, "list_id": None, "client_id": None}
