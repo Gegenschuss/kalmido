@@ -44,6 +44,7 @@ from ..collab.news import news_add, notif_ok  # 2.369.5 (#2517): pulled up from 
 from ..lists.public import need_pub_owner  # 2.369.5 (#2517): pulled up from functions
 from .calc import fmt_money  # 2.369.5 (#2517): pulled up from functions
 from .pdfweb import _file_response, _render, epdf_name, epdf_out, epdf_stored, qac_pdf  # 2.369.5 (#2517): pulled up from functions
+from ..videos.vdlink import vdl_name, vdl_name_set, vdl_old_shown  # 2.642.0 (#4772)
 
 SIG_PREFIX = "/s/q/"
 SIG_VIEW_RATE = 60          # page views per client address and minute
@@ -655,7 +656,6 @@ def sig_page(c, r, token, lg, error=None, code=200):
     ver = gname = ""
     if vid:
         from ..videos.review import vdr_sig_newest
-        from ..videos.vdlink import vdl_name
         ver = f'<input type="hidden" name="v" value="{vdr_sig_newest(c, r)["id"]}">'
         gname = vdl_name()  # 2.642.0 (#4772): the name the client typed before on this link
     form = (f'<form method="post" action="{SIG_PREFIX}{e(token)}" class="fform sigf">'
@@ -670,7 +670,6 @@ def sig_page(c, r, token, lg, error=None, code=200):
             + (f'<p class="err" role="alert">{e(error)}</p>' if error else "")
             + f'</form><p class="signote">{note}</p>')
     if vid:  # 2.642.0 (#4772): an older version (a link that shows them) is read-only: no decision there
-        from ..videos.vdlink import vdl_old_shown
         if vdl_old_shown(c, r):
             form = ""
     resp = pub_html(f"{r['title']} · {APP_NAME}", head + form, lg, code)
@@ -879,6 +878,5 @@ def sig_decide(token):
         qac_file(c, r)
     push_later(push)  # 2.370.2 (#2779): through the maintenance gate; 2.370.3 (#2760): a queue row
     if r["kind"] == "video":  # 2.642.0 (#4772): the name stays for this link (the next version's comments)
-        from ..videos.vdlink import vdl_name_set
         return vdl_name_set(redirect(SIG_PREFIX + token, 303), token, SIG_PREFIX, name)
     return redirect(SIG_PREFIX + token, 303)

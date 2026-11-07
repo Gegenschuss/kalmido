@@ -83,8 +83,7 @@ def vdl_shown(c, s, versions):
 
 
 def vdl_old_shown(c, s):
-    from .review import vdr_versions
-    vs = vdr_versions(c, s["video_id"]) if s["video_id"] else []
+    vs = c.execute("SELECT id, n FROM video_versions WHERE review_id=? ORDER BY n", (s["video_id"],)).fetchall() if s["video_id"] else []
     return bool(vs) and vdl_shown(c, s, vs)[1]
 
 
