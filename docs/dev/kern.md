@@ -100,6 +100,15 @@ there). `obj_need` turns this into 404 / 403; `obj_visible_sql(c, uid, kind)` / 
 with a `cap` hook lists only with `obj_rows` (it asks `obj_role` per row): `obj_visible_sql` refuses it with `ValueError`,
 because a share there may open less than the SQL would name.
 
+Office documents filed in a folder (`office/docref.py`, decision of #2742, confirmed with #5048): the folder share and the
+office groups are two ways in, and the higher one counts for the document itself -- a folder share can lift reading or
+changing a draft above the person's office group in the area (also for a member whose group gives the area nothing). The
+cap stays the organisation role only (`ofd_cap`: guests nothing, read-only / accounting read). Everything beyond the
+document stays with the office groups: finalising, releasing / sending, payments, locking periods, exports and deleting
+have no route on the folder way (`/api/fsref/office_doc/<id>`: read, PDF, head fields without status / number / links into
+the master data, positions), and a finalised document stays unchangeable (409). Agents only through a share with exactly
+them, and then read only.
+
 Losing access is in one place too: `obj_revoke_person(c, uid, org, reason)` (called by the layer accounts through
 `core/objhooks.person_revoked`, so accounts never imports the core's modules; `core/objects.py` and `core/writes.py`
 belong to the layer domain, `core/objweb.py` to the layer integrations, `LAYER_OF` in `kalmido/__init__.py`) runs when a person leaves an organisation
