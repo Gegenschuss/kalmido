@@ -42,7 +42,7 @@ def collab_all():
 
 def need_collab():
     if not collab_all():
-        raise Denied(403, tr("Collaboration is turned off on this server (an admin can turn it on)"))
+        raise Denied(403, tr("Collaboration is switched off on this server (an admin can switch it on)"))
 
 
 # Time tracking for everyone (admin switch, settings.time_all), same pattern: off = the time endpoints refuse,
@@ -57,28 +57,28 @@ def time_all():
 
 def need_time():
     if not time_all():
-        raise Denied(403, tr("Time tracking is turned off on this server (an admin can turn it on)"))
+        raise Denied(403, tr("Time tracking is switched off on this server (an admin can switch it on)"))
 
 
 # the user's own module switches (Settings > Layout): the action endpoints of a switched-off module refuse like the
 # list-type gating (409 with the reason); reading, stopping and the data stay. deps / fields keep their API (D2 rule).
-FEAT_OFF = {"pomo": N_("The focus timer is turned off in your settings"), "habits": N_("Habits are turned off in your settings"),
-            "time": N_("Time tracking is turned off in your settings"), "comments": N_("Comments are turned off in your settings"),
-            "events": N_("Events are turned off in your settings"), "contacts": N_("Contacts are turned off in your settings"),
+FEAT_OFF = {"pomo": N_("The focus timer is switched off in your settings"), "habits": N_("Habits are switched off in your settings"),
+            "time": N_("Time tracking is switched off in your settings"), "comments": N_("Comments are switched off in your settings"),
+            "events": N_("Events are switched off in your settings"), "contacts": N_("Contacts are switched off in your settings"),
             # 2.22.0 (#663): the modules of "Home & life"
-            "contracts": N_("Contracts are turned off in your settings"), "home": N_("Home & devices are turned off in your settings"),
-            "care": N_("Staying in touch is turned off in your settings"), "health": N_("Health is turned off in your settings"),
-            "review": N_("The review is turned off in your settings"), "travel": N_("Travel is turned off in your settings"),
-            "reading": N_("Read later is turned off in your settings"),
+            "contracts": N_("Contracts are switched off in your settings"), "home": N_("Home & devices are switched off in your settings"),
+            "care": N_("Staying in touch is switched off in your settings"), "health": N_("Health is switched off in your settings"),
+            "review": N_("The review is switched off in your settings"), "travel": N_("Travel is switched off in your settings"),
+            "reading": N_("Read later is switched off in your settings"),
             # 2.23.0 (#463): package "Team, family, clients"
-            "clients": N_("Clients are turned off in your settings"), "workload": N_("Workload is turned off in your settings"),
-            "forms": N_("Forms are turned off in your settings"),
-            "office": N_("Office & finance is turned off in your settings"),  # 2.36.1 (#1021)
-            "dispo": N_("The disposition is turned off in your settings"),  # 2.50.0 (#1194)
-            "budget": N_("The household budget is turned off in your settings"),  # 2.72.0 (#1333)
-            "feeds": N_("Feeds are turned off in your settings"),  # 2.85.0 B (#1162)
-            "sheets": N_("Tables are turned off in your settings"),  # 2.89.0 (#1916)
-            "videos": N_("Approvals are turned off in your settings")}  # 2.623.0 (#4765)
+            "clients": N_("Clients are switched off in your settings"), "workload": N_("Workload is switched off in your settings"),
+            "forms": N_("Forms are switched off in your settings"),
+            "office": N_("Office & finance is switched off in your settings"),  # 2.36.1 (#1021)
+            "dispo": N_("The disposition is switched off in your settings"),  # 2.50.0 (#1194)
+            "budget": N_("The household budget is switched off in your settings"),  # 2.72.0 (#1333)
+            "feeds": N_("Feeds are switched off in your settings"),  # 2.85.0 B (#1162)
+            "sheets": N_("Tables are switched off in your settings"),  # 2.89.0 (#1916)
+            "videos": N_("Approvals are switched off in your settings")}  # 2.623.0 (#4765)
 
 
 # 2.22.0 (#663): health lists (lists.life 'health') are private. An agent never sees them (whatever list it is a member

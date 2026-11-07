@@ -31,7 +31,7 @@ function objp_draw(v) {
     ${gone ? '' : `<div class="ppl">${list}</div>`}
     <div class="shint keep">${esc(hint)}</div>`;
   const off = gone || stale || ro;
-  const foot = `<button class="btn danger" data-pp="discard" aria-label="${esc(tr('Decline|proposal'))}">${thumbIc(false)} ${esc(tr('Decline|proposal'))}</button><span class="spacer"></span>
+  const foot = `<button class="btn danger" data-pp="discard" aria-label="${esc(tr('Reject|proposal'))}">${thumbIc(false)} ${esc(tr('Reject|proposal'))}</button><span class="spacer"></span>
     <button class="btn" data-pp="close">${tr('Close')}</button><button class="btn pri" data-pp="apply" ${off ? 'disabled' : ''} aria-label="${esc(tr('Accept|suggestion'))}">${thumbIc(true)} ${esc(tr('Accept|suggestion'))}</button>`;
   return {main, foot};
 }

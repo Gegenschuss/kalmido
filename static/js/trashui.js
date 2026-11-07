@@ -24,10 +24,10 @@ async function ms_clTrashLoad() {
 }
 function ms_clTrashHtml() {
   if (MSC.tItems === null) { setTimeout(ms_clTrashLoad, 0); return `<div class="muted ctempty">${tr('Loading…')}</div>`; }
-  const hint = MSC.tDays ? `<p class="muted mscltrdays">${esc(trashNote(tr('Clients in the trash are deleted for good after {0} days.', MSC.tDays)))}</p>` : '';
+  const hint = MSC.tDays ? `<p class="muted mscltrdays">${esc(trashNote(tr('Clients in the trash are deleted permanently after {0} days.', MSC.tDays)))}</p>` : '';
   if (!MSC.tItems.length) return `<div class="empty">${ic('trash')}${tr('The trash is empty')}</div>${hint}`;
   return `<ul class="ctlist mscltrash" role="list" aria-label="${esc(tr('Trash'))}">${MSC.tItems.map(c => `<li><div class="ctrow msarch">${ms_clAv(c)}<span class="ctn"><b>${esc(c.label || c.name)}</b><small class="muted">${esc(tr('In the trash since {0}', fmtDate((c.deleted_at || '').slice(0, 10))))}</small></span>
-    ${c.can_delete ? `<button type="button" class="btn sm" data-mscl="trest" data-id="${c.id}">${ic('undo', 's')} ${tr('Restore')}</button><button type="button" class="iconbtn" data-mscl="tpurge" data-id="${c.id}" aria-label="${esc(tr('Delete for good'))}" title="${esc(tr('Delete for good'))}">${ic('trash', 's')}</button>` : ''}</div></li>`).join('')}</ul>${hint}`;
+    ${c.can_delete ? `<button type="button" class="btn sm" data-mscl="trest" data-id="${c.id}">${ic('undo', 's')} ${tr('Restore')}</button><button type="button" class="iconbtn" data-mscl="tpurge" data-id="${c.id}" aria-label="${esc(tr('Delete permanently'))}" title="${esc(tr('Delete permanently'))}">${ic('trash', 's')}</button>` : ''}</div></li>`).join('')}</ul>${hint}`;
 }
 async function ms_clTrashAct(k, id) {
   const c = (MSC.tItems || []).find(x => x.id === id); if (!c) return;
@@ -36,23 +36,23 @@ async function ms_clTrashAct(k, id) {
     toast(tr('Restored')); MSC.tItems = null; await ms_clAfter(); return;
   }
   const u = await api('GET', `/api/clients/usage?ids=${id}`).catch(() => null);
-  if (!await askConfirm(tr('Delete the client “{0}” for good?', c.label || c.name), [u?.text ? tr('Linked: {0}.', u.text) : '', tr('This cannot be undone.')].filter(Boolean).join(' '), {ok: tr('Delete for good'), danger: true})) return;
+  if (!await askConfirm(tr('Delete the client “{0}” permanently?', c.label || c.name), [u?.text ? tr('Linked: {0}.', u.text) : '', tr('This cannot be undone.')].filter(Boolean).join(' '), {ok: tr('Delete permanently'), danger: true})) return;
   try { await api('DELETE', `/api/clients/${id}/purge`); } catch (x) { toast(x.message || ''); MSC.tItems = null; await ms_clAfter(); return; }
-  toast(tr('Deleted for good')); MSC.tItems = null; ms_clDraw();
+  toast(tr('Deleted permanently')); MSC.tItems = null; ms_clDraw();
 }
 // 2.272.0 E2 (#3038): the task's files in the trash (task and comment files), each with "Restore", and the trash period
 function attTrashHtml(t) {
   const arr = t.attachments_trash || [];
   if (!arr.length) return '';
-  // 2.272.0 F (#3038, review E2-M6 / E2-H2): a comment's file only for its author or a project manager (as the server), + "Delete for good"
+  // 2.272.0 F (#3038, review E2-M6 / E2-H2): a comment's file only for its author or a project manager (as the server), + "Delete permanently"
   const may = a => canEdit(t) && (!a.comment_id || a.mine || canManage(listById(t.list_id)));
-  const rows = arr.map(a => `<li><span class="an">${esc(String(a.name).startsWith('e2e1:') ? tr('Encrypted file') : a.name)}</span> <span class="muted">${fmtSize(a.size || 0)}</span>${may(a) ? ` <button class="linkbtn" type="button" data-act="att-restore" data-att="${a.id}">${esc(tr('Restore'))}</button> <button class="linkbtn" type="button" data-act="att-purge" data-att="${a.id}">${esc(tr('Delete for good'))}</button>` : ''}</li>`).join('');
+  const rows = arr.map(a => `<li><span class="an">${esc(String(a.name).startsWith('e2e1:') ? tr('Encrypted file') : a.name)}</span> <span class="muted">${fmtSize(a.size || 0)}</span>${may(a) ? ` <button class="linkbtn" type="button" data-act="att-restore" data-att="${a.id}">${esc(tr('Restore'))}</button> <button class="linkbtn" type="button" data-act="att-purge" data-att="${a.id}">${esc(tr('Delete permanently'))}</button>` : ''}</li>`).join('');
   const d = arr[0].days || 30;
-  return `<details class="atrash"><summary class="muted">${ic('trash', 's')} ${esc(tr('Trash'))} (${arr.length})</summary><ul>${rows}</ul><p class="muted">${esc(trashNote(trn('Files in the trash are deleted for good after {0} day.', 'Files in the trash are deleted for good after {0} days.', d)))}</p></details>`;
+  return `<details class="atrash"><summary class="muted">${ic('trash', 's')} ${esc(tr('Trash'))} (${arr.length})</summary><ul>${rows}</ul><p class="muted">${esc(trashNote(trn('Files in the trash are deleted permanently after {0} day.', 'Files in the trash are deleted permanently after {0} days.', d)))}</p></details>`;
 }
 // 2.272.0 F (#3038, review E2-H2): a file in the trash deleted for good by the person (asked first)
 async function attPurge(aid, name) {
-  if (!await askConfirm(tr('Delete “{0}” for good?', name || ''), tr('This cannot be undone.'), {ok: tr('Delete for good'), danger: true})) return;
+  if (!await askConfirm(tr('Delete “{0}” permanently?', name || ''), tr('This cannot be undone.'), {ok: tr('Delete permanently'), danger: true})) return;
   let j; try { j = await api('DELETE', `/api/attachments/${aid}/purge`); } catch { return; }
   if (j && j.id) putTask(j); render(); renderDetail();
 }
@@ -66,9 +66,9 @@ async function attRestore(aid) {
 function povTrashHtml(j, can) {
   const arr = j.files_trash || [];
   if (!arr.length) return '';
-  const rows = arr.map(f => `<li><span class="an">${esc(String(f.name).startsWith('e2e1:') ? tr('Encrypted file') : f.name)}</span> <span class="muted">${fmtSize(f.size || 0)}</span>${can ? ` <button class="linkbtn" type="button" data-pov="file-restore" data-id="${f.id}">${esc(tr('Restore'))}</button> <button class="linkbtn" type="button" data-pov="file-purge" data-id="${f.id}">${esc(tr('Delete for good'))}</button>` : ''}</li>`).join('');  // 2.272.0 F (#3038, E2-H2)
+  const rows = arr.map(f => `<li><span class="an">${esc(String(f.name).startsWith('e2e1:') ? tr('Encrypted file') : f.name)}</span> <span class="muted">${fmtSize(f.size || 0)}</span>${can ? ` <button class="linkbtn" type="button" data-pov="file-restore" data-id="${f.id}">${esc(tr('Restore'))}</button> <button class="linkbtn" type="button" data-pov="file-purge" data-id="${f.id}">${esc(tr('Delete permanently'))}</button>` : ''}</li>`).join('');  // 2.272.0 F (#3038, E2-H2)
   const d = j.files_trash_days || 30;  // 2.272.0 F (#3038, review E2-N4): plural
-  return `<details class="atrash"><summary class="muted">${ic('trash', 's')} ${esc(tr('Trash'))} (${arr.length})</summary><ul>${rows}</ul><p class="muted">${esc(trashNote(trn('Files in the trash are deleted for good after {0} day.', 'Files in the trash are deleted for good after {0} days.', d)))}</p></details>`;
+  return `<details class="atrash"><summary class="muted">${ic('trash', 's')} ${esc(tr('Trash'))} (${arr.length})</summary><ul>${rows}</ul><p class="muted">${esc(trashNote(trn('Files in the trash are deleted permanently after {0} day.', 'Files in the trash are deleted permanently after {0} days.', d)))}</p></details>`;
 }
 // 1.5.2: "Delete completed…" on the Completed view: all, or those completed more than 30 / 90 days ago, go to the
 // trash (restorable, one undo step). Only what the user may change; items of checklists stay (the reusable part of such
@@ -154,7 +154,7 @@ async function trPurgeTask(id) {
 // a project in the projects' trash (listadmin.js): true = the person confirmed
 async function trPurgeList(id, name) {
   const j = await trPurgeInfo('?list=' + id);
-  return askConfirm(tr('Delete “{0}” permanently?', name), [tr('The project, its tasks, comments, files, fields and chat are deleted for good. This cannot be undone.'), trCascText(j)].filter(Boolean).join(' '), {danger: true, ok: tr('Delete permanently')});
+  return askConfirm(tr('Delete “{0}” permanently?', name), [tr('The project, its tasks, comments, files, fields and chat are deleted permanently. This cannot be undone.'), trCascText(j)].filter(Boolean).join(' '), {danger: true, ok: tr('Delete permanently')});
 }
 // "Empty" of the task trash (events.js 'trash-empty'): the own trash; an instance admin is asked a second time, with the number,
 // before the other owners' trash in projects they may edit goes too (?all=1)
@@ -163,13 +163,13 @@ async function trEmpty() {
   const n = j ? j.tasks : S.hist?.k === 'trash' && S.hist.deletable != null ? S.hist.deletable : (S.extra || []).filter(t => !t.keep).length;
   let r = null;
   if (n > 0) {
-    if (!await askConfirm(tr('Empty the trash permanently?'), [trn('{0} task is deleted for good. This cannot be undone.', '{0} tasks are deleted for good. This cannot be undone.', n), trCascText(j)].filter(Boolean).join(' '), {ok: tr('Empty'), danger: true})) return;
+    if (!await askConfirm(tr('Empty the trash permanently?'), [trn('{0} task is deleted permanently. This cannot be undone.', '{0} tasks are deleted permanently. This cannot be undone.', n), trCascText(j)].filter(Boolean).join(' '), {ok: tr('Empty'), danger: true})) return;
     try { r = await api('DELETE', '/api/trash'); } catch { return; }
   }
   if (j?.others > 0) {
     const w = await trPurgeInfo('?all=1');
     const m = (w?.tasks || 0);
-    if (m > 0 && await askConfirm(tr('Also empty the trash of other owners?'), [trn('As an instance admin you may also delete {0} task of other owners for good: it lies in the trash of their projects where you may edit. They would lose it from their trash too. This cannot be undone.', 'As an instance admin you may also delete {0} tasks of other owners for good: they lie in the trash of their projects where you may edit. They would lose them from their trash too. This cannot be undone.', m), trCascText(w)].filter(Boolean).join(' '), {ok: tr('Empty theirs too'), danger: true})) {
+    if (m > 0 && await askConfirm(tr('Also empty the trash of other owners?'), [trn('As an instance admin you may also delete {0} task of other owners permanently: it lies in the trash of their projects where you may edit. They would lose it from their trash too. This cannot be undone.', 'As an instance admin you may also delete {0} tasks of other owners permanently: they lie in the trash of their projects where you may edit. They would lose them from their trash too. This cannot be undone.', m), trCascText(w)].filter(Boolean).join(' '), {ok: tr('Empty theirs too'), danger: true})) {
       try { r = await api('DELETE', '/api/trash?all=1'); } catch { /* api() said why */ }
     }
   }
@@ -197,9 +197,9 @@ function vtr_html() {
   const xs = (VTR.items || []).filter(x => wsObjIn({org_id: x.org_id}));
   if (!xs.length) return '';
   return `<div class="group vtrlist"><div class="ghead">${esc(tr('Approvals|sign-off'))} <span class="c">${xs.length}</span></div>`
-    + xs.map(x => { const d = vtr_left(x); return `<div class="mrow otrrow vtrrow" data-vtr="${+x.id}"><span class="n"><b>${esc(x.title || tr('Video'))}</b><small class="muted">${esc([tr('In the trash since {0}', fmtDate((x.deleted_at || '').slice(0, 10))), vtr_place(x), x.version ? 'v' + x.version : '', x.org_id && wsLabel(x.org_id), d != null ? trn('Deleted for good in {0} day', 'Deleted for good in {0} days', d) : ''].filter(Boolean).join(' · '))}</small></span>`
+    + xs.map(x => { const d = vtr_left(x); return `<div class="mrow otrrow vtrrow" data-vtr="${+x.id}"><span class="n"><b>${esc(x.title || tr('Video'))}</b><small class="muted">${esc([tr('In the trash since {0}', fmtDate((x.deleted_at || '').slice(0, 10))), vtr_place(x), x.version ? 'v' + x.version : '', x.org_id && wsLabel(x.org_id), d != null ? trn('Deleted permanently in {0} day', 'Deleted permanently in {0} days', d) : ''].filter(Boolean).join(' · '))}</small></span>`
       + `<span class="oadmb">${x.can_restore ? `<button type="button" class="btn sm" data-vtra="restore">${ic('undo', 's')}<span>${tr('Restore')}</span></button>` : ''}</span></div>`; }).join('')
-    + (VTR.days ? `<div class="muted otrnote">${esc(trashNote(trn('Approvals in the trash are deleted for good after {0} day.', 'Approvals in the trash are deleted for good after {0} days.', VTR.days), !VTR.purge))}</div>` : '') + '</div>';
+    + (VTR.days ? `<div class="muted otrnote">${esc(trashNote(trn('Approvals in the trash are deleted permanently after {0} day.', 'Approvals in the trash are deleted permanently after {0} days.', VTR.days), !VTR.purge))}</div>` : '') + '</div>';
 }
 async function vtr_restore(id) {
   const x = (VTR.items || []).find(y => y.id === id); if (!x) return;
@@ -208,7 +208,7 @@ async function vtr_restore(id) {
     const ls = (S.lists || []).filter(l => !l.is_inbox && !l.archived && !l.e2e && (l.org_id || null) === (x.org_id || null) && canEditList(l.id));
     if (ls.length) {
       lid = ls[0].id;
-      const html = `<p>${esc(tr('Its place was deleted for good. Choose the project it goes to.'))}</p><label class="fl">${esc(tr('Project'))}<select id="vtr-pl">${ls.map(l => `<option value="${l.id}">${esc(lname(l))}</option>`).join('')}</select></label>`;
+      const html = `<p>${esc(tr('Its place was deleted permanently. Select the project it goes to.'))}</p><label class="fl">${esc(tr('Project'))}<select id="vtr-pl">${ls.map(l => `<option value="${l.id}">${esc(lname(l))}</option>`).join('')}</select></label>`;
       if (!await askConfirm(tr('Restore “{0}”', x.title || tr('Video')), '', {html, ok: tr('Restore'),
         after: md => md.addEventListener('change', e => { if (e.target.id === 'vtr-pl') lid = +e.target.value; })})) return;
     }
@@ -240,7 +240,7 @@ function ptr_html() {
   return `<div class="group otrlists ptrlist"><div class="ghead">${esc(tr('Other deleted items'))} <span class="c">${xs.length}</span></div>`
     + xs.map((x, i) => `<div class="mrow otrrow" data-ptr="${i}"><span class="n"><b>${esc(x.name || PTR_KIND[x.kind][0]())}</b><small class="muted">${esc([PTR_KIND[x.kind][0](), x.list, tr('Deleted {0} by {1}', fmtWhen(x.deleted_at), x.by_name || '?')].filter(Boolean).join(' · '))}</small></span>`
       + `<span class="oadmb"><button type="button" class="btn sm" data-ptra="restore">${ic('undo', 's')}<span>${tr('Restore')}</span></button></span></div>`).join('')
-    + (PTR.days ? `<div class="muted otrnote">${esc(trashNote(trn('Deleted items are deleted for good after {0} day.', 'Deleted items are deleted for good after {0} days.', PTR.days)))}</div>` : '') + '</div>';
+    + (PTR.days ? `<div class="muted otrnote">${esc(trashNote(trn('Deleted items are deleted permanently after {0} day.', 'Deleted items are deleted permanently after {0} days.', PTR.days)))}</div>` : '') + '</div>';
 }
 document.addEventListener('click', async e => {
   const b = /** @type {HTMLElement} */ (e.target).closest?.('[data-ptra]'); if (!(b instanceof HTMLElement)) return;
