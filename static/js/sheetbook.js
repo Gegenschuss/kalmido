@@ -15,7 +15,7 @@ function shb_barHtml(sh) {
   if (tabs.length < 2) return `<div class="shbbar one">${add}</div>`;
   return `<div class="shbbar"><div class="shbtabs" role="tablist" aria-label="${esc(tr('Sheets'))}">${tabs.map(t => {
     const on = t.id === sh.id;
-    return `<button type="button" role="tab" class="shbtab${on ? ' on' : ''}" aria-selected="${on}" ${on ? 'aria-haspopup="menu"' : ''} data-shb="tab" data-id="${t.id}" ${w ? 'draggable="true"' : ''} title="${esc(on && w ? tr('Sheet menu') : t.name)}">${esc(t.name)}${on && w ? ic('down', 's') : ''}</button>`;
+    return `<button type="button" role="tab" class="shbtab${on ? ' on' : ''}" aria-selected="${on}" ${on ? 'aria-haspopup="menu"' : ''} data-shb="tab" data-id="${t.id}" ${w && !rowd_touch() ? 'draggable="true"' : ''} title="${esc(on && w ? tr('Sheet menu') : t.name)}">${esc(t.name)}${on && w ? ic('down', 's') : ''}</button>`;
   }).join('')}</div>${add}</div>`;
 }
 
@@ -90,7 +90,7 @@ document.addEventListener('dblclick', e => {
   const a = /** @type {any} */ (e.target).closest?.('[data-shb="tab"]');
   if (a && SHV.sh?.can_write && +a.dataset.id === SHV.sh.id) { closePop(); shbRename(SHV.sh, SHV.sh.id); }
 });
-// drag a tab onto another one (a computer; on a phone: the menu's Move left / right)
+// drag a tab onto another one (a computer; on a phone also the menu's Move left / right, and the hold below, #4621)
 document.addEventListener('dragstart', e => {
   const a = /** @type {any} */ (e.target).closest?.('[data-shb="tab"]');
   if (!a || !SHV.sh?.can_write) return;
@@ -108,4 +108,23 @@ document.addEventListener('drop', e => {
   if (!a || !sh || !tid) return;
   e.preventDefault();
   shbMove(sh, tid, shbTabs().findIndex(t => t.id === +a.dataset.id));
+});
+// 2.623.0 E (#4621): the finger by drag.js: hold a tab, then drag it onto another one (the same shbMove as the mouse); a
+// swipe without the hold scrolls the bar, a tap opens as before, a hold without moving acts as the tap. The mouse keeps
+// the browser's drag above.
+drg_attach(document, {
+  mouse: false, hold: ROWD_HOLD, holdMove: 8, onTarget: true, raf: true, ghost: {el: d => d.a, cls: 'ghost-drag'},
+  scrollX: () => $('#view .shbtabs'), edge: 40, step: 10,
+  start: t => {
+    const a = /** @type {any} */ (t).closest?.('[data-shb="tab"]');
+    return a && SHV.sh?.can_write && $('#view')?.contains(a) ? {a, tid: +a.dataset.id} : null;
+  },
+  onHold: d => { d.a.classList.add('drag'); if (navigator.vibrate) navigator.vibrate(12); },
+  onDrop: (d, x, y) => {
+    d.a.classList.remove('drag');
+    const o = /** @type {any} */ (document.elementFromPoint(x, y))?.closest?.('[data-shb="tab"]'), sh = SHV.sh;
+    if (o && sh && +o.dataset.id !== d.tid) shbMove(sh, d.tid, shbTabs().findIndex(t => t.id === +o.dataset.id));
+  },
+  onTap: d => { d.a.classList.remove('drag'); if (d.a.isConnected) d.a.click(); },
+  onCancel: d => d.a.classList.remove('drag'),
 });
