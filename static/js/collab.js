@@ -536,7 +536,7 @@ function nswTarget(dir) {
 let nsw = null;
 document.addEventListener('touchstart', e => {
   nsw = null;
-  if (!nswOn() || !isMobile() || e.touches.length !== 1 || $('.modal') || $('#pop:not(.hidden)')) return;
+  if (!nswOn() || !isTouch() || e.touches.length !== 1 || $('.modal') || $('#pop:not(.hidden)')) return;
   const d = $('#detail'), el = e.target;
   if (!d || d.classList.contains('multi') || !el.closest?.('#detail .dbody, #detail .dtop') || dswBlocked(el)) return;
   const t0 = e.touches[0];

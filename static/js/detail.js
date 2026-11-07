@@ -884,7 +884,7 @@ function dswBlocked(el) {
 }
 document.addEventListener('touchstart', e => {
   dsw = null;
-  if (!S.sel || !isMobile() || e.touches.length !== 1 || $('.modal') || $('#pop:not(.hidden)') || (typeof nswOn === 'function' && nswOn())) return;  // 2.122.0 (#2314): opened from the news: collab.js swipes
+  if (!S.sel || !isTouch() || e.touches.length !== 1 || $('.modal') || $('#pop:not(.hidden)') || (typeof nswOn === 'function' && nswOn())) return;  // 2.122.0 (#2314): opened from the news: collab.js swipes
   const d = $('#detail'), el = e.target;
   if (!d || d.classList.contains('multi') || !el.closest?.('#detail .dbody, #detail .dtop') || dswBlocked(el)) return;
   const t0 = e.touches[0];
