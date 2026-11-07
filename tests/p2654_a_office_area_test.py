@@ -34,8 +34,9 @@ INVOICE = ("Beispiel Papier GmbH\nUSt-IdNr. DE123456789\n\nRechnung Nr. ER-2026-
 
 
 def upload(s, name, sort=False, hdr=None):
+    # the name in the text: the same content again would be a duplicate (dups), no new document
     form = {"ws": "private", **({"sort": "1"} if sort else {})}
-    r = s.post(B + "/api/docs", data=form, files=[("files", (name, INVOICE, "text/plain"))], headers=hdr or {})
+    r = s.post(B + "/api/docs", data=form, files=[("files", (name, INVOICE + f"Ablage {name}\n".encode(), "text/plain"))], headers=hdr or {})
     assert r.ok and r.json().get("ids"), r.text
     return r.json()["ids"][0]
 
