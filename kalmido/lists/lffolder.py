@@ -426,7 +426,7 @@ def lf_own_expired(c, lid):
                                            AND s.expires_at IS NOT NULL AND s.expires_at <= ?""", (LF_KIND, int(lid), _now()))}
 
 
-def lf_own_stale(c, lid):
+def lf_own_stale(c, lid, skip_locked=False):
     """2.568.0 (#4739): the core's own member rows (list_own) of list lid whose person has no own role there any more (the
     owner now, a role ended on another way than the members dialog, an expiry) go into obj_revoked like a share taken back
     (restorable for 30 days): such a row opens nothing, it would only leave the project's node visible in the file store."""
@@ -434,7 +434,13 @@ def lf_own_stale(c, lid):
         # 2.644.0 (#5024): the project's row locked first, the stale rows read after it: an import shares its projects in an open
         # transaction after the rows were committed (acctimport.umz_share locks the same rows) - read before, the watchdog took
         # the own member share the import was just confirming (a round trip lost bob's share on a slow CI runner)
-        c.execute("SELECT id FROM lists WHERE id=? FOR UPDATE", (int(lid),)).fetchall()
+        # 2.644.0 (#5024, review): the watchdog (skip_locked) does not wait for an open import - it takes the project next round
+        if skip_locked:
+            if not c.execute("SELECT id FROM lists WHERE id=? FOR UPDATE SKIP LOCKED", (int(lid),)).fetchall() and \
+                    c.execute("SELECT 1 FROM lists WHERE id=?", (int(lid),)).fetchone():
+                return 0
+        else:
+            c.execute("SELECT id FROM lists WHERE id=? FOR UPDATE", (int(lid),)).fetchall()
         ids = [r[0] for r in c.execute("""SELECT s.id FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id WHERE n.kind='ref' AND n.ref_kind=?
                                           AND n.ref_id=? AND s.list_own=1 AND NOT EXISTS (SELECT 1 FROM list_members m WHERE
                                           m.list_id=n.ref_id AND m.user_id=COALESCE(s.user_id, s.agent_id) AND m.own_role IS NOT NULL)""",
@@ -641,7 +647,7 @@ def lf_expire_tick(c):
                                           (LF_KIND,)).fetchall()]
     for lid in sorted(stale):  # 2.644.0 (#5024): rows locked in id order, like acctimport.umz_share
         if lid not in lids:
-            lf_own_stale(c, lid)
+            lf_own_stale(c, lid, skip_locked=True)
     lf_resync(c, lids, actor=0)
     if lids:
         bump(c)  # 2.352.0 F (#2748, review N1): the clients drop the lists at once
