@@ -29,7 +29,7 @@ from ..core.i18n import N_, tr
 VDM_KINDS = ("video", "image", "pdf")
 VDM_PAGE_MAX = 9999
 VDM_FOLDER = N_("Approvals|sign-off")
-VDM_TYPES = N_("Please choose an image (JPG, PNG, WebP) or a PDF.")
+VDM_TYPES = N_("Please select an image (JPG, PNG, WebP) or a PDF.")
 VDM_SPACE = N_("Only files of the same workspace can be added")
 VDM_NOMOVE = N_("An approval of images or PDFs stays in the workspace of its files")
 

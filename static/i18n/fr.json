@@ -17419,7 +17419,7 @@
   "Uploads go into the folder “Approvals” of the file store. Who may not see the file there does not see the approval.": "Les fichiers téléversés vont dans le dossier « Validations » du classement. Qui ne peut pas y voir le fichier ne voit pas la validation.",
   "e.g. Logo draft": "p. ex. Ébauche du logo",
   "The client link is for videos only": "Le lien client est réservé aux vidéos",
-  "Please choose an image (JPG, PNG, WebP) or a PDF.": "Veuillez choisir une image (JPG, PNG, WebP) ou un PDF.",
+  "Please select an image (JPG, PNG, WebP) or a PDF.": "Veuillez choisir une image (JPG, PNG, WebP) ou un PDF.",
   "Only files of the same workspace can be added": "Seuls les fichiers du même espace de travail peuvent être ajoutés",
   "An approval of images or PDFs stays in the workspace of its files": "Une validation d'images ou de PDF reste dans l'espace de travail de ses fichiers",
   "At most {0} change proposals per day for one person": "Au plus {0} propositions de modification par jour pour une personne",

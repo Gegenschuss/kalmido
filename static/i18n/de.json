@@ -17419,7 +17419,7 @@
   "Uploads go into the folder “Approvals” of the file store. Who may not see the file there does not see the approval.": "Hochgeladenes landet in der Ablage im Ordner „Abnahmen“. Wer die Datei dort nicht sehen darf, sieht auch die Abnahme nicht.",
   "e.g. Logo draft": "z. B. Logo-Entwurf",
   "The client link is for videos only": "Den Kunden-Link gibt es nur für Videos",
-  "Please choose an image (JPG, PNG, WebP) or a PDF.": "Bitte ein Bild (JPG, PNG, WebP) oder ein PDF wählen.",
+  "Please select an image (JPG, PNG, WebP) or a PDF.": "Bitte ein Bild (JPG, PNG, WebP) oder ein PDF wählen.",
   "Only files of the same workspace can be added": "Nur Dateien aus demselben Arbeitsbereich lassen sich hinzufügen",
   "An approval of images or PDFs stays in the workspace of its files": "Eine Abnahme von Bildern oder PDFs bleibt im Arbeitsbereich ihrer Dateien",
   "At most {0} change proposals per day for one person": "Höchstens {0} Änderungsvorschläge pro Tag für eine Person",
