@@ -1155,7 +1155,8 @@ ROUTES = {
     "POST /api/sheets/{}/cells/{}/freeze": "sheet", "POST /api/sheets/{}/cells/{}/name": "sheet",
     "POST /api/sheets/{}/columns": "sheet", "PATCH /api/sheets/{}/columns/{}": "sheet", "DELETE /api/sheets/{}/columns/{}": "sheet",
     "POST /api/sheets/{}/columns/{}/restore": "sheet", "POST /api/sheets/{}/rows": "sheet", "DELETE /api/sheets/{}/rows/{}": "sheet",
-    "POST /api/sheets/{}/rows/{}/restore": "sheet", "POST /api/sheets/{}/rows/order": "sheet", "POST /api/sheets/{}/presence": "sheet",
+    "POST /api/sheets/{}/rows/{}/restore": "sheet", "POST /api/sheets/{}/rows/order": "sheet", "POST /api/sheets/{}/columns/order": "sheet",  # 2.631.0 (#4620): p2631_b_sheet_move_test.py
+    "POST /api/sheets/{}/presence": "sheet",
     "GET /api/sheets/{}/vars": "sheet", "POST /api/sheets/{}/batches/{}/undo": "sheet",
     # 2.528.0 (#4306 B22): the trash of tables (p2528_c_sheets_test.py: another organisation's / person's trash 404 or nothing)
     "GET /api/sheets/trash": "sheet", "GET /api/sheets/{}/trash": "sheet", "POST /api/sheets/purge": "sheet",

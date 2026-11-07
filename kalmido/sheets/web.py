@@ -23,6 +23,7 @@ from ..core.retention import ret_on, ret_trash_days
 from ..core.serializers import unlink_files
 from ..accounts.orgs import is_org_admin
 from .core import sh_list_title, sh_may, sh_space, sh_space_key, sh_to_display
+from .shorder import sho_apply, sho_moved, sho_plan, sho_restore_apply, sho_restore_plan  # 2.631.0 (#4620)
 from .shhist import shh_meta_write  # 2.564.0 (#4701/#4702); 2.571.0 (#4766): shh_meta_write
 
 
@@ -366,28 +367,50 @@ def sheets_row_restore(sid, rid):
 
 @app.post("/api/sheets/<int:sid>/rows/order")
 def sheets_rows_order(sid):
-    """{ids: [row ids in the new order], prev?: [the row ids in the order the writer saw]} -- sorting for good (rows not named
-    keep their order behind). 2.528.0 (#4305 A12): under the sheet's lock; with prev a sorting / moving elsewhere since (or a
-    row of it deleted) gives 409 {error, rows: the current order, rev} instead of a silent overwrite (rows added since: fine)."""
+    """{ids: [row ids in the new order], prev?: [the row ids in the order the writer saw], moved?: [the rows dragged]} -- sorting
+    for good (rows not named keep their order behind). 2.528.0 (#4305 A12): under the sheet's lock; with prev a sorting / moving
+    elsewhere since (or a row of it deleted) gives 409 {error, rows: the current order, rev} instead of a silent overwrite (rows
+    added since: fine). 2.631.0 (#4620): with moved the ranges of formulas keep their rows (sheets/shorder.py) -> also
+    {formulas: [{sheet_id, row_id, col_id, raw, now}]} (the changed ones); the Undo sends them back as formulas (with the old
+    order, without moved): the ones still as the move left them get their text again."""
+    return _sh_order(sid, "row")
+
+
+@app.post("/api/sheets/<int:sid>/columns/order")
+def sheets_cols_order(sid):
+    """2.631.0 (#4620): {ids: [column ids in the new order], prev?: [the column ids in the order the writer saw], moved?: [the
+    columns dragged]} -- like rows/order: columns not named keep their order behind, prev guards against a move elsewhere
+    since (409 {error, columns, rev}), moved keeps the ranges of formulas on their columns -> {ok, rev, formulas?}; formulas =
+    the Undo's texts (rows/order)."""
+    return _sh_order(sid, "col")
+
+
+def _sh_order(sid, kind):
+    """rows/order and columns/order (2.631.0, #4620: one way for both)."""
     c = db()
-    _need_w(c, sid)
+    r0 = _need_w(c, sid)
     write_lock(c, "sheet:" + str(sid))  # 2.528.0 (#4305 A12): one writer per sheet, also for rows / columns
     b = body()
     ids = b.get("ids")
-    live = [x[0] for x in c.execute("SELECT id FROM sheet_rows WHERE sheet_id=? AND deleted_at IS NULL ORDER BY pos, id", (sid,))]
+    table, key = ("sheet_rows", "rows") if kind == "row" else ("sheet_columns", "columns")
+    live = [x[0] for x in c.execute(f"SELECT id FROM {table} WHERE sheet_id=? AND deleted_at IS NULL ORDER BY pos, id", (sid,))]
     lset = set(live)
     if shx_order_moved(live, b.get("prev")):
         r = sh_reload(c, sid)
         name = user_names(c, [r["updated_by"]]).get(r["updated_by"]) or "?"
-        return jsonify(error=tr("Changed in the meantime by {0}", name), rows=live, rev=r["rev"]), 409
+        return jsonify(error=tr("Changed in the meantime by {0}", name), **{key: live}, rev=r["rev"]), 409
     if not isinstance(ids, list) or len(ids) > len(live) or any(isinstance(x, bool) or x not in lset for x in ids) or len(set(ids)) != len(ids):
         raise BadInput(tr("Invalid value: {0}", "ids"))
     given = set(ids)
     order = ids + [x for x in live if x not in given]
-    for i, rid in enumerate(order):
-        c.execute("UPDATE sheet_rows SET pos=? WHERE id=?", (float(i + 1), rid))
+    back = sho_restore_plan(c, r0, b.get("formulas"), me())  # 2.631.0 (#4620): the Undo of a move puts its formulas back
+    plan = sho_plan(c, r0, kind, live, order, sho_moved(b, live), me())  # before the new order is stored
+    for i, x in enumerate(order):
+        c.execute(f"UPDATE {table} SET pos=? WHERE id=?", (float(i + 1), x))
+    fx = sho_apply(c, plan, me())
+    sho_restore_apply(c, back, me())
     sh_touch(c, sid, me())
-    return _done(c, sid)
+    return _done(c, sid, {"formulas": fx} if b.get("moved") is not None else None)
 
 
 @app.post("/api/sheets/<int:sid>/presence")

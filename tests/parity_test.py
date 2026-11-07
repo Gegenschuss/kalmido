@@ -356,7 +356,7 @@ APP_ONLY = [
      "in one step, writes cells, appends rows / columns and takes back its own calls",
      ("=DELETE /api/sheets/{}", "=POST /api/sheets/{}/restore", "=PATCH /api/sheets/{}/columns/{}", "=DELETE /api/sheets/{}/columns/{}",
       "=POST /api/sheets/{}/columns/{}/restore", "=DELETE /api/sheets/{}/rows/{}", "=POST /api/sheets/{}/rows/{}/restore",
-      "=POST /api/sheets/{}/rows/order", "=POST /api/sheets/{}/cells/{}/freeze", "=POST /api/sheets/{}/cells/{}/name",
+      "=POST /api/sheets/{}/rows/order", "=POST /api/sheets/{}/columns/order", "=POST /api/sheets/{}/cells/{}/freeze", "=POST /api/sheets/{}/cells/{}/name",  # 2.631.0 (#4620): + columns/order
       "=POST /api/sheets/{}/presence",
       "=GET /api/sheets/trash", "=GET /api/sheets/{}/trash", "=POST /api/sheets/purge")),  # 2.528.0 (#4306 B22): the trash of tables
     ("2.124.0 E (#2116): arranging the sheets of a table stays with people in the app -- renaming, moving in the sheet bar, the "

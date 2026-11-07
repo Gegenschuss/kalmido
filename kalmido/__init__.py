@@ -225,6 +225,7 @@ ORDER = (
     "sheets.shkinds",  # 2.124.0 B (#2110, #2111): column kinds checkbox / person / link / file, rows / columns kept in view
     "sheets.shhist",  # 2.124.0 B (#2112): the change history of the cells (people and agents)
     "sheets.core",  # 2.89.0 (#1916): sheets, columns, rows, cells, agent batches (no routes; used by sheets.web and part C/D)
+    "sheets.shorder",  # 2.631.0 (#4620): ranges of formulas keep their rows / columns when those are moved (no routes)
     "sheets.web",  # 2.89.0 (#1916): the routes of the tables area (/api/sheets)
     "sheets.step2",  # 2.89.0 (#1916, D): step 2 -- rows to tasks / quotation, a list as rows (by button)
     "sheets.shmove",  # 2.96.0 B (#1941): a table to the other workspace (private <-> organisation)

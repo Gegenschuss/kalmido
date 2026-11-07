@@ -347,3 +347,10 @@ input.shvmx{color:transparent!important;caret-color:var(--text);background:trans
 @media (pointer:coarse){.shfl-h{width:.75rem;height:.75rem;border-radius:50%}.shfl-h::after{inset:-.75rem}}
 .shvgrid td.shvc.shfl-p{box-shadow:inset 0 0 0 .0625rem var(--accent);background:color-mix(in srgb,var(--accent) 8%,var(--bg))}
 .shvscroll.shfl-on,.shvscroll.shfl-on *{cursor:crosshair!important}
+/* 2.631.0 (#4620): move rows / columns by their heads (sheetmove.js): grab on a computer, no phone callout on a long press,
+   the drop line, the lifted head */
+@media (hover: hover){.shvgrid th.shvrh>button,.shvgrid th.shvch>.shvchb{cursor:grab}}
+.shvgrid th.shvrh,.shvgrid th.shvch{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.shvgrid th.drag{outline:.125rem solid var(--accent);outline-offset:-.125rem}
+.shmv-line{position:fixed;z-index:96;pointer-events:none;background:var(--accent);border-radius:.125rem}
+.shmv-ghost{display:flex;align-items:center;justify-content:center}

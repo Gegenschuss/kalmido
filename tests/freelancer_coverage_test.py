@@ -941,6 +941,7 @@ ROUTES = {
     "POST /api/sheets/{}/presence": "sheets", "POST /api/sheets/{}/restore": "sheets",
     "POST /api/sheets/{}/rows": "sheets", "POST /api/sheets/{}/rows-from-list": "sheets",
     "POST /api/sheets/{}/rows/order": "sheets", "POST /api/sheets/{}/rows/{}/restore": "sheets",
+    "POST /api/sheets/{}/columns/order": "sheets",  # 2.631.0 (#4620): p2631_b_sheet_move_test.py
     "POST /api/sheets/{}/to-offer": "sheets", "POST /api/sheets/{}/to-tasks": "sheets", "POST /api/v1/sheets": "sheets",
     "POST /api/v1/sheets/{}/batches/{}/undo": "sheets", "POST /api/v1/sheets/{}/columns": "sheets",
     "POST /api/v1/sheets/{}/rows": "sheets", "PUT /api/sheets/{}/cells": "sheets", "PUT /api/v1/sheets/{}/cells": "sheets",
