@@ -17407,6 +17407,8 @@
   "Select a column": "Elegir una columna",
   "Select a tag": "Elegir una etiqueta",
   "Select a person": "Elegir una persona",
+  "The mailbox's holder cannot file into the folder of this rule": "El titular del buzón no puede archivar en la carpeta de esta regla",
+  "The last e-mail of this rule became no document (storage full, a locked folder or the hour's limit); it is tried again": "El último correo de esta regla no se convirtió en documento (almacenamiento lleno, carpeta bloqueada o límite por hora); se intentará de nuevo",
   "Tap to comment without a point": "Toca para comentar sin punto",
   "Tap on the image to set a point": "Toca la imagen para marcar un punto",
   "at point {0}": "en el punto {0}",

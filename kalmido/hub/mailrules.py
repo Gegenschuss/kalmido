@@ -34,7 +34,7 @@ from ..core.conflict import ccf_check
 from ..core.i18n import N_, lang, tr
 from ..accounts.session import GATE, me
 from ..api.common import hit_limit
-from ..files.store import fs_role, fs_roles_many
+from ..files.store import fs_chain, fs_deleted, fs_role, fs_roles_many
 from ..docs import store as DS
 from ..docs.ingest import docs_kick, docs_mailbox_import, _mail_parts, _mail_toks
 from ..docs.maillink import ml_collect, ml_links
@@ -48,6 +48,9 @@ MBR_AGE_MAX = 365
 MBR_AFTER = ("seen", "flag", "move", "none")
 MBR_HOUR = {"links": 30, "eml": 60}  # per mailbox and hour: invoice link downloads / mails filed without a file (as a document address)
 MBR_NO_HOLDER = N_("Nobody can receive documents for this mailbox (no admin of the workspace)")
+# 2.636.0 (#4853): the state of a rule whose mail became no document (hub_mailbox_rules.last_error; the mail is tried again)
+MBR_RULE_ERR = {"target": N_("The mailbox's holder cannot file into the folder of this rule"),
+                "nodoc": N_("The last e-mail of this rule became no document (storage full, a locked folder or the hour's limit); it is tried again")}
 _CTRL = re.compile(r"[\x00-\x1f\x7f]")
 _MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 _BUDGET = {}            # (box id, kind) -> [hour, used]: this process (the mailbox round runs in one process)
@@ -96,8 +99,18 @@ def _target_ok(c, ws, tid):
     return fs_role(c, tid, me()) in ("owner", "edit")
 
 
-def _vals(c, d, cur, ws):
-    """The checked columns of a rule from body d (cur = the stored rule or the defaults); a string = what is wrong."""
+def _holder_can(c, holder, tid):
+    """2.636.0 (#4853): the mailbox's holder (the documents are filed as them, mbx_holder) may file into folder tid: 'edit' or
+    'owner' on it and nothing above it in the trash -- the same right fs_put asks for in the run."""
+    if not holder:
+        return False
+    chain = fs_chain(c, tid)
+    return bool(chain) and not fs_deleted(chain) and fs_role(c, tid, holder, chain=chain) in ("owner", "edit")
+
+
+def _vals(c, d, cur, ws, box=None):
+    """The checked columns of a rule from body d (cur = the stored rule or the defaults); a string = what is wrong.
+    box: the mailbox -- a new target folder also needs its holder's right (2.636.0 #4853)."""
     v = {}
     for k, n in (("name", 80), ("from_has", 200), ("subject_has", 200)):
         x = d.get(k, cur[k])
@@ -138,6 +151,12 @@ def _vals(c, d, cur, ws):
         return tr("Invalid value: {0}", "target_id")
     elif tid != cur["target_id"] and not _target_ok(c, ws, tid):  # a stored one stays when it is not changed
         return tr("This folder cannot be selected")
+    elif tid != cur["target_id"] and box is not None:
+        holder = MB.mbx_holder(c, box)  # 2.636.0 (#4853): the run files as the holder, so they must be able to file there too
+        if not holder:
+            return tr(MBR_NO_HOLDER)
+        if not _holder_can(c, holder, tid):
+            return tr(MBR_RULE_ERR["target"])
     v["target_id"] = tid
     pos = d.get("pos", cur["pos"])
     if isinstance(pos, bool) or not isinstance(pos, int) or not 0 <= pos <= 10000:
@@ -158,6 +177,9 @@ def _out(r):
                            "hits", "last_hit_at", "updated_at")}
     d.update({k: bool(r[k]) for k in ("active", "need_att", "take_files", "take_mail", "sender_from_mail", "delete_mail")})
     d["tags"] = json.loads(r["tags"] or "[]")
+    code = r.get("last_error") or ""
+    d["error"] = code  # 2.636.0 (#4853): the last run left a mail of this rule without a document (tried again)
+    d["error_text"] = tr(MBR_RULE_ERR[code]) if code in MBR_RULE_ERR else ""
     return d
 
 
@@ -218,7 +240,7 @@ def mbr_add():
     n = c.execute("SELECT count(*) FROM hub_mailbox_rules WHERE box_id=?", (box["id"],)).fetchone()[0]
     if n >= MBR_RULES_MAX:
         return err(tr("At most {0} rules", MBR_RULES_MAX))
-    v = _vals(c, d, {**DEFAULT, "pos": n}, ws)
+    v = _vals(c, d, {**DEFAULT, "pos": n}, ws, box)
     if isinstance(v, str):
         return err(v)
     ts = _now()
@@ -234,7 +256,7 @@ def mbr_put(rid):
     """{expect_updated_at?, ...the fields of POST} -- changes a rule; a stale expect_updated_at -> 409 with the current rule."""
     c = db()
     d = body() if isinstance(body(), dict) else {}
-    _org, ws, _box, r = _rule_ws(c, rid)
+    _org, ws, box, r = _rule_ws(c, rid)
     unknown = sorted(set(d) - KNOWN)
     if unknown:
         return err(tr("Unknown field: {0}", ", ".join(unknown)[:200]))
@@ -243,7 +265,7 @@ def mbr_put(rid):
     if not r:
         raise Denied(404)
     ccf_check(d, r["updated_at"], "rule", lambda: _out(r))
-    v = _vals(c, d, dict(r), ws)
+    v = _vals(c, d, dict(r), ws, box)
     if isinstance(v, str):
         return err(v)
     c.execute(f"UPDATE hub_mailbox_rules SET {', '.join(k + '=?' for k in COLS)}, updated_at=? WHERE id=?", (*[v[k] for k in COLS], _now(), rid))
@@ -401,10 +423,16 @@ def _take(box, holder, rule, key, raw):
             return None, 0
         first, made = docs_mailbox_import(c, holder, box["org_id"] or None, msg, raw, meta=meta, parent_id=rule["target_id"],
                                           take_files=bool(rule["take_files"]), take_mail=bool(rule["take_mail"]), budget=budget, pre=pre)
+        if not made:
+            # 2.636.0 (#4853): no document (the holder may not file into the folder, storage full, a locked folder, the hour's
+            # limit): the claim goes again, so the next run tries this mail once more, and the rule shows why
+            c.execute("DELETE FROM hub_mailbox_docs WHERE box_id=? AND mid=?", (box["id"], key))
+            code = "target" if rule["target_id"] and not _holder_can(c, holder, rule["target_id"]) else "nodoc"
+            c.execute("UPDATE hub_mailbox_rules SET last_error=? WHERE id=?", (code, rule["id"]))
+            return False, 0
         c.execute("UPDATE hub_mailbox_docs SET node_id=? WHERE box_id=? AND mid=?", (first or None, box["id"], key))
-        if made:
-            c.execute("UPDATE hub_mailbox_rules SET hits=hits+1, last_hit_at=? WHERE id=?", (_now(), rule["id"]))
-        return bool(made), len(made)
+        c.execute("UPDATE hub_mailbox_rules SET hits=hits+1, last_hit_at=?, last_error='' WHERE id=?", (_now(), rule["id"]))
+        return True, len(made)
     return _bg(run)
 
 

@@ -27,7 +27,7 @@ function mbr_ruleLine(r) {
     r.need_att ? tr('with attachment') : '', trn('last {0} day', 'last {0} days', r.max_age)].filter(Boolean).join(' · ');
   const what = [r.take_files ? tr('attachments') : '', r.take_mail ? tr('the e-mail itself') : ''].filter(Boolean).join(' + ');
   return `<li class="mbrrule${r.active ? '' : ' muted'}" data-mbrid="${r.id}"><span class="mbrtxt"><b>${esc(r.name || tr('Rule'))}</b>
-    <small class="muted">${esc(cond)}</small><small>${esc(tr('Documents: {0}', what))}${mbr_afterText(r) ? ' · ' + esc(mbr_afterText(r)) : ''}${r.active ? '' : ' · ' + esc(tr('paused'))}</small></span>
+    <small class="muted">${esc(cond)}</small><small>${esc(tr('Documents: {0}', what))}${mbr_afterText(r) ? ' · ' + esc(mbr_afterText(r)) : ''}${r.active ? '' : ' · ' + esc(tr('paused'))}</small>${r.error_text ? `<small class="hmbbad" role="status">${ic('info', 's')} ${esc(r.error_text)}</small>` : ''}</span>
     <button type="button" class="btn sm" data-mbra="edit">${ic('edit', 's')}<span>${tr('Change')}</span></button>
     <button type="button" class="iconbtn" data-mbra="del" aria-label="${tr('Delete')}" title="${tr('Delete')}">${ic('trash', 's')}</button></li>`;
 }

@@ -12,6 +12,8 @@
    sender, subject, "has an attachment" and the age decide; a second run takes nothing twice (each Message-ID once per
    mailbox); without the delete switch no mail is ever marked deleted or expunged, with it exactly that mail goes
  - a person without an organisation: her private mailbox and a rule into her own folder (freelancer-matrix: hub)
+ - 2.636.0 (#4853): a mail whose documents are all refused (the target folder in the trash) is not remembered, the rule shows
+   the error; a target folder the holder cannot file into is refused on saving; the next run (folder back) takes the mail
 usage: p2581_d_mailrules_test.py <datadir>"""
 import email.message
 import email.utils
@@ -101,7 +103,7 @@ def run(s, ws):
 docker_logs_on_first_fail()
 # ---- setup: alice (instance admin), Alpha = bob (admin) + carol, Beta = dave, erin without an organisation
 fresh(ENV)
-for d in ("INBOX", "Rechnungen", "Archiv", "Belege", "Markiert", "Weg", "Erin"):
+for d in ("INBOX", "Rechnungen", "Archiv", "Belege", "Markiert", "Weg", "Erin", "Ziel"):  # 2.636.0 (#4853): + Ziel
     os.makedirs(os.path.join(MB, d), exist_ok=True)
 shutil.copy(os.path.join(N, "stub_imap_folders.py"), DATA)
 subprocess.run(["docker", "exec", "-d", CT, "python", "/data/stub_imap_folders.py"], check=True)
@@ -271,5 +273,32 @@ check(files("Entwürfe") == [] and files("Büro & Ablage") == ["1.eml"],
       f"#5033: moved from 'Entwürfe' into 'Büro & Ablage' ({files('Entwürfe')} / {files('Büro & Ablage')})")
 lg = imap_log()
 check('SELECT "Entw&APw-rfe"' in lg and '"B&APw-ro &- Ablage"' in lg, "#5033: both names went out in modified UTF-7, quoted")
+
+# ---- 2.636.0 (#4853): a mail that became no document is not remembered; the rule shows why; the next run takes it
+import hashlib  # noqa: E402
+ZF = Bo.post(B + "/api/files/folders", json={"name": "Mail target", "space": f"org:{ORG}"}).json().get("id")
+r = Bo.post(B + "/api/hubmail/mailbox/rules", json={"ws": f"org:{ORG}", "name": "Into a folder", "folder": "Ziel", "need_att": True,
+                                                    "target_id": ZF, "after": "seen"})
+check(ZF and r.status_code == 201, f"#4853: a rule into an organisation folder ({r.status_code} {r.text[:200]})")
+RZ = (r.json() or {}).get("rule") or {}
+check(RZ.get("error") == "" and RZ.get("error_text") == "", f"#4853: a new rule has no error ({RZ.get('error')!r})")
+check(Bo.post(B + "/api/files/trash", json={"ids": [ZF]}).ok, "#4853: the target folder into the trash")
+r = Bo.put(B + f"/api/hubmail/mailbox/rules/{RA.get('id')}", json={"target_id": ZF})
+check(r.status_code == 400, f"#4853: a folder the holder cannot file into is refused when the rule is saved ({r.status_code})")
+MZ = drop("Ziel", "Shop <billing@shop.example.com>", "Invoice into a folder", att="Ziel-1")
+KZ = hashlib.sha256(MZ.encode()).hexdigest()
+nz = len(docs(WS))
+check(run(Bo, WS), "#4853: the run while the holder cannot file into the folder")
+check(not dbx("SELECT 1 FROM hub_mailbox_docs WHERE mid=?", (KZ,)), "#4853: no document -> the mail is not remembered")
+check(len(docs(WS)) == nz and "\\Seen" not in flags().get("Ziel/1", []), f"#4853: no document, the mail stays unread ({flags().get('Ziel/1')})")
+rz = next((x for x in Bo.get(B + f"/api/hubmail/mailbox/rules?ws=org:{ORG}").json().get("rules", []) if x["id"] == RZ.get("id")), {})
+check(rz.get("error") == "target" and rz.get("error_text"), f"#4853: the rule shows the error ({rz.get('error')!r} {rz.get('error_text')!r})")
+check(Bo.post(B + "/api/files/restore", json={"ids": [ZF]}).ok, "#4853: the target folder back out of the trash")
+check(run(Bo, WS), "#4853: the next run")
+dz = until(lambda: [x for x in docs(WS) if x[1] == "Ziel-1.pdf"], 30) or []
+check(len(dz) == 1 and dz[0][3] == ZF, f"#4853: now the mail became a document in the folder ({dz})")
+check(dbx("SELECT 1 FROM hub_mailbox_docs WHERE mid=?", (KZ,)) and "\\Seen" in flags().get("Ziel/1", []), "#4853: remembered and marked seen now")
+rz = next((x for x in Bo.get(B + f"/api/hubmail/mailbox/rules?ws=org:{ORG}").json().get("rules", []) if x["id"] == RZ.get("id")), {})
+check(rz.get("error") == "" and rz.get("hits") == 1, f"#4853: the error is gone after a document ({rz.get('error')!r}, hits {rz.get('hits')})")
 
 sys.exit(done("p2581_d_mailrules"))

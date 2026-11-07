@@ -17407,6 +17407,8 @@
   "Select a column": "Spalte wählen",
   "Select a tag": "Tag wählen",
   "Select a person": "Person wählen",
+  "The mailbox's holder cannot file into the folder of this rule": "Der Halter des Postfachs darf nicht in den Ordner dieser Regel ablegen",
+  "The last e-mail of this rule became no document (storage full, a locked folder or the hour's limit); it is tried again": "Aus der letzten E-Mail dieser Regel wurde kein Dokument (Speicher voll, gesperrter Ordner oder Stundengrenze); sie wird erneut versucht",
   "Tap to comment without a point": "Tippen, um ohne Punkt zu kommentieren",
   "Tap on the image to set a point": "Tippe ins Bild, um einen Punkt zu setzen",
   "at point {0}": "an Punkt {0}",
