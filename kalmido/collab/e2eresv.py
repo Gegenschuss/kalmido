@@ -11,6 +11,7 @@ import hmac
 import time
 
 from ..accounts.login import auth_key
+from ..core.pg import write_lock
 
 E2R_TTL = 900  # seconds a reservation stays valid (the browser encrypts and sends right after asking)
 _E2R_TABLES = {"wiki": "wiki_pages", "chan": "tchat_msgs"}
@@ -41,4 +42,7 @@ def e2r_ok(c, kind, scope, uid, rid, tok):
         return False
     if not hmac.compare_digest(mac, _e2r_mac(c, kind, scope, uid, rid, int(ts))):
         return False
+    # Fable review 2.640: two requests with the same reservation at the same moment - the second waits here until the first
+    # transaction ends and then finds the id taken (400) instead of failing on the primary key (500) or a misleading 409
+    write_lock(c, f"e2eresv:{kind}:{rid}")
     return c.execute(f"SELECT 1 FROM {_E2R_TABLES[kind]} WHERE id=?", (rid,)).fetchone() is None

@@ -174,5 +174,29 @@ r = Fr.post(B + "/api/wiki/e2e/bulk", json={"space": "private", "pages": [{"id":
                                                                             "body": ct(gen=2) if p["body"] else None} for p in td.get("pages", [])]})
 check(r.ok and r.json()["left"]["pages"] == 0, "bulk: v 2 ciphers of generation 2 taken " + r.text[:200])
 
+# Fable review 2.640 (#3388): the same reservation sent twice at the same moment - one is stored, the other 400 (was a 500 on the
+# primary key in the channel, a misleading 409 on the knowledge page)
+import threading  # noqa: E402
+
+
+def twice(fn):
+    out, go = [], threading.Barrier(2)
+
+    def one():
+        go.wait()
+        out.append(fn().status_code)
+    ts = [threading.Thread(target=one) for _ in range(2)]
+    [t.start() for t in ts]
+    [t.join() for t in ts]
+    return sorted(out)
+
+
+RC = A.post(B + f"/api/team/rooms/{RID}/msgid").json()
+got = twice(lambda: A.post(B + f"/api/team/rooms/{RID}/messages", json={"enc": chan(), "msg_id": RC.get("id"), "resv": RC.get("resv")}))
+check(len(got) == 2 and got[0] < 300 and got[1] == 400, f"channel: one reservation sent twice at once -> one stored, one 400 {got}")
+WC = Fr.post(B + "/api/wiki/e2e/newid", json={"space": "private"}).json()
+got = twice(lambda: Fr.post(B + "/api/wiki/pages", json={"space": "private", "path": ct(gen=2), "id": WC.get("id"), "resv": WC.get("resv")}))
+check(len(got) == 2 and got[0] < 300 and got[1] == 400, f"wiki: one reservation sent twice at once -> one stored, one 400 {got}")
+
 print(f"\np2640_b_aad: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

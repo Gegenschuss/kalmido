@@ -12,7 +12,7 @@ space run in the browser; the server neither fills wiki_links nor answers search
 #   "wiki:<space_id>:<gen>", info "kalmido-wikikey:v1") -> AES-256-GCM, AAD "kalmido-wikikey:v1:<space_id>:<gen>:<R>:<W>";
 # - path / text: AES-256-GCM, AAD "kalmido-wiki:v1:<space_id>:<g>:path|body", stored as "e2e1:{v, g, iv, ct}" (body "" stays "").
 #   2.640.0 (#3388): v 2 = AAD "kalmido-wiki:v2:<space_id>:<g>:<page_id>:path|body" (a cipher opens only on its own page; a new
-#   page is created under an id reserved before the encryption, POST /api/wiki/pages/newid); the browser writes v 2 only.
+#   page is created under an id reserved before the encryption, POST /api/wiki/e2e/newid); the browser writes v 2 only.
 # Who manages: the private space its owner, an organisation's space its admins. Agents and API tokens never take part.
 import json
 
