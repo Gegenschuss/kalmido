@@ -27,7 +27,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,d
 const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 
 (async () => {
-  await sleep(600);
+  await until(async () => (await fetch(B + 'sw.js').catch(() => null))?.ok);
   const SW = await (await fetch(B + 'sw.js')).text();
   check(/const CACHE = 'tasks-shell-v(?:8[5-9]|9[0-9]|[1-9][0-9]{2})'/.test(SW), 'service worker cache v85');
 
@@ -73,7 +73,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   check(e4.status === 200 && e4.attachments?.length === 1, 'N6: a file with content is attached');
   w = await boot({user: 'alice', hash: 'l/' + P}); d = w.document;
   const sent = []; const of = w.fetch; w.fetch = (u, o) => { sent.push(String(u)); return of(u, o); };
-  await w.eval(`uploadFiles(${T[0]}, [new File([], 'leer.txt')])`); await sleep(300);
+  await w.eval(`uploadFiles(${T[0]}, [new File([], 'leer.txt')])`); await until(() => /leer\.txt: the file is empty and was not uploaded/.test(d.querySelector('#toast')?.textContent || ''));
   check(/leer\.txt: the file is empty and was not uploaded/.test(d.querySelector('#toast')?.textContent || '') && !sent.some(u => /attachments/.test(u)), 'N6: the app says so before uploading and sends nothing');
   w.fetch = of; w.close();
 
@@ -107,8 +107,8 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   check(d.body.classList.contains('chat-yield') && d.querySelector('#detail .dchatb'), `N1: ${w.innerWidth} px: the task takes the chat's place (body.chat-yield), with a chat button in its header`);
   click(w, d.querySelector('#detail .dchatb')); await idle(w);
   check(!w.eval('S.sel') && !d.body.classList.contains('chat-yield') && d.body.classList.contains('chat-open'), 'N1: the chat button closes the task, the chat is back');
-  w.eval(`openDetail(${T[0]})`); await sleep(300);
-  w.eval(`chatOpen(${AG})`); await sleep(300);
+  w.eval(`openDetail(${T[0]})`); await until(() => w.eval('S.sel') === T[0]); await idle(w);
+  w.eval(`chatOpen(${AG})`); await until(() => !w.eval('S.sel') && !d.body.classList.contains('chat-yield')); await idle(w);
   check(!w.eval('S.sel') && !d.body.classList.contains('chat-yield'), 'N1: opening the chat (agent pill, person card) closes the task in its place');
   // N9 (logic): the pill and Send do not take the focus from the chat box
   const ci = d.querySelector('#chat-in'); ci.focus();
@@ -120,7 +120,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   // ================= N7 + F14: a waiting job once in Today; the card stays when the Agents module (tab) is off
   const J = (await tcall('POST', '/agent/jobs', TOK, {title: 'Publish page 1', task_id: T[0], state: 'waiting', log: 'ready'})).id;
   w = await boot({user: 'alice', hash: 'today'}); d = w.document;
-  await until(() => d.querySelector('#view .waitcard'), 60); await sleep(300);
+  await until(() => d.querySelector('#view .waitcard'), 60); await until(() => d.querySelector('#view .agband')); await idle(w);
   check(d.querySelector('#view .waitcard') && d.querySelector('#view .agband') && !d.querySelector('#view .agband .agb-w'), 'N7: Today on a desktop: the card "1 job waits for you", the agent band without the same approval');
   // N2: a re-render of the view keeps the keyboard focus on the band cell (no ping-pong to the start)
   const cell = d.querySelector('#view .agband [data-act="team-agent"]'); cell.focus();
@@ -159,7 +159,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   await w.eval(`setListView(listById(${P}), 'kanban')`); await idle(w);
   const sm = [...d.querySelectorAll('#view [data-act="section-menu"]')];
   check(sm.length === 2 && sm.every(b => /^More: /.test(b.getAttribute('aria-label') || '')), 'F9: Kanban column "…" buttons are labelled: ' + sm.map(b => b.getAttribute('aria-label')).join(' | '));
-  await w.eval(`setListView(listById(${P}), 'list')`); await sleep(300);
+  await w.eval(`setListView(listById(${P}), 'list')`); await idle(w);
   w.close();
 
   // ================= N5: 75-150 %; a stored 50 counts as 75
@@ -182,10 +182,11 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   };
   // 2.358.0 C (#2782): settle = the page's requests done (ff.js idle) + two frames drawn, instead of fixed sleeps after an action;
   // rsz after a viewport change: the app's resize handlers wait 150 ms (chatbase.js, agentchat.js), then two frames
+  // 2.624.0 (#3943): rsz(ev, until, cond) waits for the handlers' effect (cond = page expression) instead of the 400 ms
   const frames = ev => ev(`new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(1))))`).catch(() => 0);
   const settle = async (ev, idle) => { await idle({quiet: 300}); await frames(ev); };
-  const rsz = async ev => { await sleep(400); await frames(ev); };
-  const ready = async (ev, idle, n = 30) => { for (let i = 0; i < n && !(await ev(`!!document.querySelector('#top h1')`).catch(() => false)); i++) await sleep(300); await settle(ev, idle); };
+  const rsz = async (ev, until, cond) => { if (cond) await until(cond); else await sleep(400); await frames(ev); };  // 2.624.0 (#3943): kept (no cond): a window in which the resize handlers must NOT change anything (keyboard: height only)
+  const ready = async (ev, idle, n = 30) => { await require('./boot').until(() => ev(`!!document.querySelector('#top h1')`).catch(() => false), {timeout: n * 300, step: 150}); await settle(ev, idle); };
   const VVSIM = `(() => { const vv = window.visualViewport; window.__kb = {h: null, t: 0};
     Object.defineProperty(vv, 'height', {configurable: true, get: () => window.__kb.h ?? innerHeight});
     Object.defineProperty(vv, 'offsetTop', {configurable: true, get: () => window.__kb.t});
@@ -193,7 +194,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     return 1; })()`;
 
   // ---- desktop 1440 / 1920, mouse: N1 side by side, N10 pinned on resize, N2 Tab through the band with live updates
-  for (const vw of [1440, 1920]) await firefox(async ({cmd, ev, nav, ctx, shot, idle}) => {
+  for (const vw of [1440, 1920]) await firefox(async ({cmd, ev, nav, ctx, shot, idle, until: fu}) => {
     check(await ffLogin({ev, nav}) === 200, vw + ': login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: 900}});
     await nav(B + '#l/' + P); await ready(ev, idle);
@@ -203,23 +204,23 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     check(g.main && g.det && g.chat && !g.yld && g.det.r <= g.chat.l + 1 && g.det.l - g.main.r <= 2 && g.main.w >= 318,  /* 2.209.0 (#2772): short of room the list shrinks to 320 px before the sidebar floats */ `${vw} N1: list | task | chat side by side, nothing under the chat, no gap ` + JSON.stringify(g));
     await shot(`p2132-${vw}-list-task-chat.png`);
     // N10: the panel stays at the bottom when the window gets lower
-    await ev(`(() => { closeDetail(); const b = document.querySelector('#chat-msgs'); b.scrollTop = b.scrollHeight; return 1; })()`); await sleep(400);
-    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: 560}}); await rsz(ev);
+    await ev(`(() => { closeDetail(); const b = document.querySelector('#chat-msgs'); b.scrollTop = b.scrollHeight; return 1; })()`); await fu(`!S.sel && (b => b.scrollHeight - b.scrollTop - b.clientHeight <= 4)(document.querySelector('#chat-msgs'))`); await settle(ev, idle);
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: 560}}); await rsz(ev, fu, `innerHeight === 560 && (b => b.scrollHeight - b.scrollTop - b.clientHeight <= 4)(document.querySelector('#chat-msgs'))`);
     const pb = await ev(`(() => { const b = document.querySelector('#chat-msgs'); return {gap: Math.round(b.scrollHeight - b.scrollTop - b.clientHeight), h: b.clientHeight}; })()`);
     check(pb.gap <= 4, `${vw} N10: the chat panel stays at the bottom when the window gets lower ` + JSON.stringify(pb));
-    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: 900}}); await sleep(600);
-    await ev(`(() => { chatClose(); return 1; })()`); await sleep(300);
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: 900}}); await rsz(ev, fu, `innerHeight === 900 && (b => b.scrollHeight - b.scrollTop - b.clientHeight <= 4)(document.querySelector('#chat-msgs'))`);
+    await ev(`(() => { chatClose(); return 1; })()`); await fu(`!document.body.classList.contains('chat-open')`); await settle(ev, idle);
     if (vw !== 1440) return;
     // N1 at 1100: 2.290.0 C (#3163): with a task open below 1200 px the sidebar's panel folds into the drawer, so list | task |
     // chat fit side by side again (the list keeps its 320 px)
-    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1100, height: 800}}); await sleep(500);
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1100, height: 800}}); await rsz(ev, fu, `innerWidth === 1100`);
     await ev(`(() => { chatOpen(${AG}); return 1; })()`); await settle(ev, idle);
     await ev(`(() => { openDetail(${T[0]}); return 1; })()`); await settle(ev, idle);
     const g11 = await ev(`(() => { const r = s => { const e = document.querySelector(s); if (!e || getComputedStyle(e).display === 'none') return null; const b = e.getBoundingClientRect(); return {l: Math.round(b.left), r: Math.round(b.right), w: Math.round(b.width)}; }; return {main: r('#main'), det: r('#detail'), chat: r('#achat'), yld: document.body.classList.contains('chat-yield')}; })()`);
     check(g11.yld || (g11.main && g11.det && g11.chat && g11.det.r <= g11.chat.l + 1 && g11.main.w >= 318), '1100 N1: list | task | chat side by side (the panel folded) or the task in the chat\'s place ' + JSON.stringify(g11));
-    await ev(`(() => { closeDetail(); chatClose(); return 1; })()`); await sleep(400);
+    await ev(`(() => { closeDetail(); chatClose(); return 1; })()`); await fu(`!S.sel && !document.body.classList.contains('chat-open')`); await settle(ev, idle);
     // N1 at 1000: no room for all three: the task replaces the chat, its chat button brings the chat back
-    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1000, height: 800}}); await sleep(500);
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1000, height: 800}}); await rsz(ev, fu, `innerWidth === 1000`);
     await ev(`(() => { chatOpen(${AG}); return 1; })()`); await settle(ev, idle);
     await ev(`(() => { openDetail(${T[0]}); return 1; })()`); await settle(ev, idle);
     const y = await ev(`(() => { const c = document.querySelector('#achat'), b = document.querySelector('#detail .dchatb'), d = document.querySelector('#detail').getBoundingClientRect(); return {yld: document.body.classList.contains('chat-yield'), chatHidden: getComputedStyle(c).display === 'none', btn: !!b && getComputedStyle(b).display !== 'none', detR: Math.round(d.right), vw: innerWidth}; })()`);
@@ -229,7 +230,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     const y2 = await ev(`(() => ({sel: S.sel, chat: getComputedStyle(document.querySelector('#achat')).display !== 'none', focus: document.activeElement?.id}))()`);
     check(!y2.sel && y2.chat && y2.focus === 'chat-in', '1000 N1: back to the chat, its box has the focus ' + JSON.stringify(y2));
     await ev(`(() => { chatClose(); return 1; })()`);
-    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1440, height: 900}}); await sleep(500);
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1440, height: 900}}); await rsz(ev, fu, `innerWidth === 1440 && innerHeight === 900`);
     // N2: Tab through the agent band while the agent's status changes (live re-renders): the focus walks on. 2.31.0
     // (#1052): Today shows the band only when something needs me, so this runs in the project list (band always there)
     const J2 = (await tcall('POST', '/agent/jobs', TOK, {title: 'Approve me', state: 'waiting'})).id;
@@ -239,9 +240,10 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     const id = () => ev(`(() => { const a = document.activeElement; return a ? (a.dataset.act || a.id || a.tagName) + ':' + (a.dataset.jid || a.dataset.aid || '') + ':' + [...document.querySelectorAll('button, a, input')].indexOf(a) : '-'; })()`);
     for (let i = 0; i < 4; i++) {
       await tcall('PUT', '/agent/status', TOK, {status: i % 2 ? 'idle' : 'working', text: 'step ' + i});
-      await ev(`load().then(() => { render(); return 1; })`); await sleep(250);
+      await ev(`load().then(() => { render(); return 1; })`); await settle(ev, idle);
+      const before = await id();
       await cmd('input.performActions', {context: ctx, actions: [{type: 'key', id: 'k', actions: [{type: 'keyDown', value: ''}, {type: 'keyUp', value: ''}]}]});
-      await sleep(150); seen.push(await id());
+      seen.push(await fu(async () => { const x = await id(); return x !== before && x; }, {timeout: 3000}) || await id());
     }
     check(new Set(seen).size === seen.length && seen.every(s => s !== '-' && !/^BODY/.test(s)), 'N2: Tab moves on through live re-renders (no ping-pong): ' + seen.join(' > '));
     await tcall('PATCH', `/agent/jobs/${J2}`, TOK, {state: 'done'});
@@ -252,38 +254,38 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     const ov = await ev(`(() => { const col = document.querySelector('#view .kcol .kcards'); const r = [...col.children].map(x => x.getBoundingClientRect()); let bad = 0; for (let i = 1; i < r.length; i++) if (r[i].top < r[i - 1].bottom - 1) bad++; return {n: r.length, bad, two: r.some(x => x.height > 50)}; })()`);
     check(ov.n >= 20 && ov.bad === 0, 'F1: Kanban: cards of a long column do not overlap ' + JSON.stringify(ov));
     await shot('p2132-1440-kanban.png');
-    await ev(`setListView(listById(${P}), 'list').then(() => 1)`); await sleep(400);
+    await ev(`setListView(listById(${P}), 'list').then(() => 1)`); await settle(ev, idle);
   }, false);
 
   // ---- Fold 904 touch, dark, French: N3 fold / unfold with a half-typed quick add, F3 matrix at 904 x 680, F2 numbers
   await call('PATCH', '/api/settings', {lang: 'fr'});
-  await firefox(async ({cmd, ev, nav, ctx, shot, idle}) => {
+  await firefox(async ({cmd, ev, nav, ctx, shot, idle, until: fu}) => {
     check(await ffLogin({ev, nav}, 'dark', {[`tasks.ids.${P}`]: 'true'}) === 200, 'Fold: login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 904, height: 904}});
     await nav(B + '#today'); await ready(ev, idle);
     const q0 = await ev(`(() => { const q = document.querySelector('#qinput'); if (!q || !q.offsetParent) return false; q.focus(); q.value = 'Half typed task'; q.dispatchEvent(new Event('input', {bubbles: true})); q.setSelectionRange(4, 4); return true; })()`);
     check(q0, 'Fold 904: the "Add task" box is there');
-    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 412, height: 904}}); await rsz(ev);
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 412, height: 904}}); await rsz(ev, fu, `(s => !!s && s.value === 'Half typed task' && document.activeElement?.id === 'qsheet')(document.querySelector('#qsheet'))`);
     const q1 = await ev(`(() => { const s = document.querySelector('#qsheet'); return {sheet: !!s, val: s && s.value, focus: document.activeElement?.id, caret: s && s.selectionStart}; })()`);
     check(q1.sheet && q1.val === 'Half typed task' && q1.focus === 'qsheet', 'N3: folding: the half-typed text moves into the phone\'s quick sheet with the focus ' + JSON.stringify(q1));
     await shot('p2132-fold-folded-quick.png');
     await ev(`(() => { const s = document.querySelector('#qsheet'); s.value += ' and more'; s.dispatchEvent(new Event('input', {bubbles: true})); return 1; })()`);
-    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 904, height: 904}}); await rsz(ev);
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 904, height: 904}}); await rsz(ev, fu, `!document.querySelector('#qsheet') && document.activeElement?.id === 'qinput'`);
     const q2 = await ev(`(() => { const q = document.querySelector('#qinput'); return {val: q && q.value, sheet: !!document.querySelector('#qsheet'), focus: document.activeElement?.id}; })()`);
     check(q2.val === 'Half typed task and more' && !q2.sheet && q2.focus === 'qinput', 'N3: unfolding: the text is back in the box, the sheet closed, focus kept ' + JSON.stringify(q2));
     await ev(`(() => { const q = document.querySelector('#qinput'); q.value = ''; q.blur(); return 1; })()`);
     // N3 inside the phone layout: a tablet / Fold portrait (720 px, docked box) folded to 390 never crosses 767 px (2.364.0 #3040: the computer layout from 768 px, was 880)
-    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 720, height: 904}}); await rsz(ev);
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 720, height: 904}}); await rsz(ev, fu, `innerWidth === 720`); await settle(ev, idle);
     const q3 = await ev(`(() => { const q = document.querySelector('#qinput'); if (!q || !q.offsetParent) return false; q.focus(); q.value = 'Docked draft'; q.dispatchEvent(new Event('input', {bubbles: true})); return true; })()`);
     if (q3) {
-      await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}}); await rsz(ev);
+      await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}}); await rsz(ev, fu, `(s => !!s && s.value === 'Docked draft' && document.activeElement?.id === 'qsheet')(document.querySelector('#qsheet'))`);
       const q4 = await ev(`(() => { const s = document.querySelector('#qsheet'); return {sheet: !!s, val: s && s.value, focus: document.activeElement?.id}; })()`);
       check(q4.sheet && q4.val === 'Docked draft' && q4.focus === 'qsheet', 'N3: 720 (docked box) -> 390: the text moves into the quick sheet ' + JSON.stringify(q4));
-      await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 720, height: 904}}); await rsz(ev);
+      await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 720, height: 904}}); await rsz(ev, fu, `!document.querySelector('#qsheet') && document.querySelector('#qinput')?.value === 'Docked draft'`);
       const q5 = await ev(`(() => { const q = document.querySelector('#qinput'); return {val: q && q.value, sheet: !!document.querySelector('#qsheet')}; })()`);
       check(q5.val === 'Docked draft' && !q5.sheet, 'N3: 390 -> 720: back in the docked box ' + JSON.stringify(q5));
       // a keyboard (only the height changes) never moves it
-      await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 720, height: 500}}); await rsz(ev);
+      await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 720, height: 500}}); await rsz(ev);  // 2.624.0 (#3943): kept: nothing may move into the sheet
       check(!(await ev(`!!document.querySelector('#qsheet')`)), 'N3: a keyboard (height only) never moves the text into the sheet');
       await ev(`(() => { const q = document.querySelector('#qinput'); if (q) { q.value = ''; q.blur(); } return 1; })()`);
     } else console.log('p2132_ui: no docked box at 720 x 904 (viewport rule), 720 -> 390 part skipped');
@@ -299,14 +301,14 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     await ev(`setListView(listById(${P}), 'kanban').then(() => 1)`); await settle(ev, idle);
     const gw = await ev(`(() => { const g = document.querySelector('#view .kcards .tgut'); if (!g) return null; const r = g.getBoundingClientRect(), t = g.parentElement.querySelector('.tmain, .ttl').getBoundingClientRect(); return {w: Math.round(r.width), gap: Math.round(t.left - r.right)}; })()`);
     check(gw && gw.w < 40 && gw.gap <= 12, 'F2: the number in a card is compact ' + JSON.stringify(gw));
-    await ev(`setListView(listById(${P}), 'list').then(() => 1)`); await sleep(300);
+    await ev(`setListView(listById(${P}), 'list').then(() => 1)`); await settle(ev, idle);
   }, true);
   await call('PATCH', '/api/settings', {lang: 'de'});
 
   await call('PATCH', '/api/settings', {chat_kbd_agent: false});  // 2.351.1: N9 is the switch off (2.235.0 D, #2899: phones close the keyboard after sending by default)
   // ---- phones 390 / 428 touch, German: N8 iOS keyboard pushes the page, N9 pill + Send keep the keyboard, F8, F11, F13,
   // helper texts, N5 round circles at 75 %
-  for (const vw of [390, 428]) await firefox(async ({cmd, ev, nav, ctx, shot, idle}) => {
+  for (const vw of [390, 428]) await firefox(async ({cmd, ev, nav, ctx, shot, idle, until: fu}) => {
     const vh = vw === 390 ? 844 : 926;
     check(await ffLogin({ev, nav}) === 200, vw + ': login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
@@ -314,19 +316,19 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     const rect = sel => ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const r = e.getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + r.height / 2}; })()`);
     await nav(B + '#agents/' + AG); await ready(ev, idle);
     await ev(VVSIM);
-    const ci = await rect('#chat-in'); await tap(ci.x, ci.y); await sleep(300);
-    await ev(`__setKb(${Math.round(vh * .6)}, 260)`); await sleep(700);
+    const ci = await rect('#chat-in'); await tap(ci.x, ci.y); await fu(`document.activeElement?.id === 'chat-in'`);
+    await ev(`__setKb(${Math.round(vh * .6)}, 260)`); await fu(`document.querySelector('.chview').classList.contains('vvfix') && (m => m.scrollHeight - m.scrollTop - m.clientHeight < 8)(document.querySelector('#chat-msgs'))`); await frames(ev);
     const kb = await ev(`(() => { const h = document.querySelector('.chview .chath').getBoundingClientRect(), i = document.querySelector('#chat-in').getBoundingClientRect(), vv = visualViewport, m = document.querySelector('#chat-msgs'); return {hTop: Math.round(h.top), hBot: Math.round(h.bottom), inBot: Math.round(i.bottom), visTop: vv.offsetTop, visBot: vv.offsetTop + vv.height, fix: document.querySelector('.chview').classList.contains('vvfix'), atBottom: m.scrollHeight - m.scrollTop - m.clientHeight < 8, focus: document.activeElement.id}; })()`);
     check(kb.fix && kb.hTop >= kb.visTop - 1 && kb.hBot > kb.visTop + 5 && kb.inBot <= kb.visBot + 1 && kb.atBottom && kb.focus === 'chat-in', `${vw} N8: iOS keyboard pushed the page (offsetTop 260): header with Back, newest message and the box are in view ` + JSON.stringify(kb));
     await shot(`p2132-${vw}-ios-kb-pushed.png`);
     // N9: the pill and Send keep the focus (the keyboard stays)
     // the pill for real: scrolled up, an answer arrives (a pill shown by hand could be hidden again by the next refresh)
-    await ev(`(() => { const b = document.querySelector('#chat-msgs'); b.scrollTop = 0; b.dispatchEvent(new Event('scroll')); return 1; })()`); await sleep(200);
+    await ev(`(() => { const b = document.querySelector('#chat-msgs'); b.scrollTop = 0; b.dispatchEvent(new Event('scroll')); return 1; })()`); await fu(`S.chat.pin === false`);
     await tcall('POST', `/agent/chats/${ME}`, TOK, {body: 'An answer while you read above (' + vw + ')'});
-    await ev(`chatLoad().then(() => 1)`); await sleep(300);
+    await ev(`chatLoad().then(() => 1)`); await fu(`!document.querySelector('#chat-new').classList.contains('hidden')`);
     const pv = await ev(`(() => ({pill: !document.querySelector('#chat-new').classList.contains('hidden'), focus: document.activeElement.id}))()`);
     check(pv.pill && pv.focus === 'chat-in', `${vw} N9: scrolled up + an answer: "New message ↓" shows, the box keeps the focus ` + JSON.stringify(pv));
-    const pl = await rect('#chat-new'); await tap(pl.x, pl.y); await sleep(400);
+    const pl = await rect('#chat-new'); await tap(pl.x, pl.y); await fu(`document.querySelector('#chat-new').classList.contains('hidden')`); await frames(ev);
     check(await ev(`document.activeElement.id`) === 'chat-in', `${vw} N9: a tap on "New message ↓" keeps the keyboard (focus in the box)`);
     await ev(`(() => { const t = document.querySelector('#chat-in'); t.focus(); t.value = 'Hello'; t.dispatchEvent(new Event('input', {bubbles: true})); return 1; })()`);
     const sb = await rect('[data-act="chat-send"]'); await tap(sb.x, sb.y); await settle(ev, idle);
@@ -341,20 +343,19 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     const sb2 = await rect('[data-act="chat-send"]'); await tap(sb2.x, sb2.y); await settle(ev, idle);
     af = await until(async () => { const x = await ev(AF); return x.focus === 'chat-in' && x.val === '' && /Hello again/.test(x.last) && x; }) || await ev(AF);
     check(af.focus === 'chat-in' && af.val === '' && /Hello again/.test(af.last), `${vw} N9: with "close the keyboard" off Send sends and keeps the keyboard ` + JSON.stringify(af));
-    await ev(`(() => { document.activeElement.blur(); __setKb(null, 0); return 1; })()`); await sleep(500);
+    await ev(`(() => { document.activeElement.blur(); __setKb(null, 0); return 1; })()`); await fu(`!document.querySelector('.chview').classList.contains('vvfix')`);
     check(!(await ev(`document.querySelector('.chview').classList.contains('vvfix')`)), `${vw} N8: keyboard down: the chat is back in the page`);
     if (vw !== 390) return;
     // F8: offline while a task is open: said in the task's header
     await nav(B + '#l/' + P); await ready(ev, idle);
     await ev(`(() => { openDetail(${T[0]}); return 1; })()`); await settle(ev, idle);
     // offline for the app (the 4 s change check must not switch it back to online in between)
-    await ev(`(() => { Object.defineProperty(OUT, 'online', {configurable: true, get: () => false, set() {}}); staleDraw(); return 1; })()`); await sleep(200);
+    await ev(`(() => { Object.defineProperty(OUT, 'online', {configurable: true, get: () => false, set() {}}); staleDraw(); return 1; })()`); await fu(`!!document.querySelector('#stale')?.closest('#detail .dtop')`); await frames(ev);
     const of = await ev(`(() => { const s = document.querySelector('#stale'); const r = s && s.getBoundingClientRect(); return {inHead: !!s && !!s.closest('#detail .dtop'), vis: !!r && r.width > 0 && r.top >= 0 && r.bottom <= innerHeight, txt: s ? s.textContent : ''}; })()`);
     check(of.inHead && of.vis && /Offline/.test(of.txt), '390 F8: offline with a task open: "Offline" in the task header ' + JSON.stringify(of));
     await shot('p2132-390-detail-offline.png');
     await ev(`(() => { delete OUT.online; OUT.online = true; closeDetail(); return 1; })()`);
-    for (let i = 0; i < 30 && await ev(`!!(history.state && history.state.detail)`).catch(() => true); i++) await sleep(100);
-    await sleep(300);
+    await fu(`!(history.state && history.state.detail)`, {timeout: 3000}); await settle(ev, idle);
     // F11: 44 px for "Set status" and the assignee pictures' hit area
     const t11 = await ev(`(() => { const b = document.createElement('button'); b.className = 'stpill none'; b.textContent = 'Status'; document.body.appendChild(b); const h = b.getBoundingClientRect().height; b.remove();
       const w = document.createElement('button'); w.className = 'whob'; document.body.appendChild(w); const a = getComputedStyle(w, '::after'); const ins = parseFloat(a.top); w.remove(); return {stpill: h, whob: ins}; })()`);
@@ -376,7 +377,11 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
     check(nu <= 4, '390 helper texts: Administration has at most 4 inline texts (was 8): ' + nu);
     await ev(`(() => { document.querySelectorAll('.modal:not(.authscreen)').forEach(x => x.remove()); return 1; })()`);
     // N5: 75 %: the done circles stay round (no 7 x 44 ovals)
-    await ev(`(() => { LS.set('fsize', 75); applyLook(); render(); return 1; })()`); await sleep(600);
+    await ev(`(() => { LS.set('fsize', 75); applyLook(); render(); return 1; })()`); await settle(ev, idle);
+    // 2.624.0 (#3943): measure once the done circle stopped changing (same size twice in a row) instead of after 600 ms
+    const CKQ = `(() => { const c = document.querySelector('#view .trow .chk'); if (!c) return null; const r = c.getBoundingClientRect(); return {w: r.width, h: r.height}; })()`;
+    let ck0 = await ev(CKQ).catch(() => null);
+    await fu(async () => { const n = await ev(CKQ).catch(() => null); const same = ck0 && n && n.w === ck0.w && n.h === ck0.h; ck0 = n; return same; }, {timeout: 4500, step: 150});
     const ck = await ev(`(() => { const c = document.querySelector('#view .trow .chk'); const r = c.getBoundingClientRect(); const fs = Math.min(...[...document.querySelectorAll('#view .trow .ttl, #view .trow .meta span')].filter(x => x.offsetWidth).map(x => parseFloat(getComputedStyle(x).fontSize))); return {w: r.width, h: r.height, fs}; })()`);
     check(Math.abs(ck.w - ck.h) < .5 && ck.w > 8 && ck.fs >= 9, '390 N5: at 75 % the done circles stay round, text at least 9 px ' + JSON.stringify(ck));
     await shot('p2132-390-font-75.png');
