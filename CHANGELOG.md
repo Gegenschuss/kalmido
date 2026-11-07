@@ -15,6 +15,23 @@ minor one, anything that needs action on your side a major one.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.626.0] - 2026-11-07
+
+### Fixed - main: pg_prepare knows that the second preview column of the documents comes with a later version (CI red of 2.614.0)
+### Fixed - My tasks: a section opened again no longer folds back when another section is deleted at the same moment (CI red of 2.614.0, p2569_a_mine_sections_ui)
+### Fixed - main: p290_a_ui and p2555_b_bizsettings_ui follow the year comparison (#4921) and the income statement's basis (#4927), scroll_ui runs at a fixed test time (midnight edge) (CI red of 2.614.0)
+### Fixed - Notes: the search field in the panel keeps the focus when the page is drawn again while typing; p2350_c_pins_race_ui follows the own changes kept since 2.607.0 (CI red of 2.618.0)
+
+Package 2.581 (Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Added
+- Documents: the document rules become flows - trigger "received" (as before), "changed" (tags / type / sender / a field set) or scheduled (X days after the document date, due date or arrival, once per document and day); filters by source (upload, mail, mailbox, scan, fetcher, import), file name, content (any / all / exact / regex / fuzzy), tags, type, sender; actions set / remove tags, type, sender, folder, a custom field, create a task, notify people (News, own switch), webhook (only allowed targets like the other webhooks, signed with an own secret shown once). Every run is in the document's history with undo; a flow never triggers another one. Existing rules keep working as "received" flows. Paperless-ngx workflows (API and export ZIP) become flows where the fields match, the rest is listed with the reason (#4803).
+- Documents from the own mailbox of a workspace: mail rules per mailbox (IMAP folder, sender, subject, has attachment, age) take attachments and / or the mail itself (.eml) as documents into a folder with tags and the mail's sender; afterwards mark read, flag or move the mail (delete only with its own switch, off by default). Runs with the mailbox poll every 10 minutes and with "Fetch documents now"; every mail only once (Message-ID). Same intake as the document address (duplicates, ZIP / winmail, invoice links) (#4804).
+- Backups: "Check passphrase" next to the passphrase field - an admin types a passphrase and only learns whether it matches the stored one (or KALMIDO_BACKUP_PASSPHRASE); step-up, 5 tries per 15 minutes, constant-time compare, admin log entry without the value (#4826).
+- Cash flow > fixed costs: a pencil on every category heading renames the category for all its fixed costs in one step; an existing name merges both (asked first); one undo for the whole step (#4820).
+### Fixed
+- Fixed cost import: a colon (and spaces) at the end of a category or group line is dropped, "Digital Abos:" becomes "Digital Abos"; the same for categories typed by hand (#4820).
+- Organisation export / import keeps the core's nodes of calendars, address books, projects and team chat channels with their shares and history (#4811).
+
 ## [2.621.0] - 2026-11-07
 
 Package 2.615.0 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
@@ -169,7 +186,8 @@ Package 2.582 (Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher),
 
 Not released (the CI of this version was red); its changes are listed under 2.605.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.621.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.626.0...HEAD
+[2.626.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.626.0
 [2.621.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.621.0
 [2.618.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.618.0
 [2.614.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.614.0

@@ -19,11 +19,10 @@
 
 ## What's new
 
-**2.621.0** (2026-11-07):
-- **Office**: fetch a bank account's transactions directly over FinTS (needs your own FinTS product ID); choose how your file names are built when importing old documents.
-- **Documents**: clear stacks with archive number codes are split automatically, with Undo.
-- **Wiki**: task links are written `[[#123]]`; a bare `#123` stays text.
-- **Agents**: read-only audit jobs, a hook that refuses dangerous commands, and project search for token and agent limits.
+**2.626.0** (2026-11-07):
+- **Documents**: flows with triggers received / changed / scheduled, filters and actions incl. task, notification and webhook, with undo.
+- **Documents**: workspace mailbox rules fetch attachments as documents, then mark or move the mail.
+- **Office**: rename or merge a fixed cost category in cash flow in one step.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 
