@@ -15,6 +15,54 @@ minor one, anything that needs action on your side a major one.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.621.0] - 2026-11-07
+
+Package 2.615.0 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Fixed
+- Phone: the dialog "New for you" is a normal full-width bottom sheet whose height follows its content, with a gap before the hint (#4938).
+### Added
+- Reference starter: a PreToolUse hook refuses force-push, deleting remote refs or tags, docker / podman prune and reboot / shutdown in every run and job, whatever the allow list says; `KALMIDO_BLOCK_DANGEROUS=0` switches it off; docs/AGENT-SECURITY.md lists what it covers and what not (#3758, #3756).
+- Reference starter: approval cards of a job belong to that job (its answer goes to the job), a card wanders to the newest answer that refers to it, an approval only mentioned in passing becomes a card, messages from a job's card reach the running job after its next tool step (only from the job's person or an operator), Stop with a job id ends that one job (#3658, #2347, #2390, #1801, #2422).
+- Reference starter: the full replied message in the prompt, typing dots on tasks, no card alarm for advice against something or quoted words, cards with the same title close one by one, a quiet wake after a finished job (#3757, #3751, #3752, #3753, #3754, #3755).
+- Tests: CalDAV smoke test with a real client (vdirsyncer): list, task both ways, change, delete, also for a person without an organisation (#4513).
+
+Package 2.619 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Changed
+- Wiki pages: a task link is only `[[#123]]` (or `[[#123|label]]`); a bare `#123` stays plain text in the page, the editor, encrypted pages and "Linked from". The "/" task search inserts `[[#123]]`. Chat, comments and task texts keep `#123` (#4947)
+- Reload waves: the first poll after start fetches a delta instead of the whole state again (`/api/state` sends the area counters `lva`), at most `KALMIDO_STATE_AUTO_MAX` (default 4) live reloads of the whole state run at once per process, and after a server update open windows reload spread over 0-30 s (#3890)
+- Agent starter parity: rules in the template and the in-app rules (never set formula fields, meetings/contacts/contracts flows), weekly limit handled apart from the 5-hour window, image sharing bound to the project folder (`KALMIDO_PROJECT_DIR`), read-only audit jobs (`agent_job.py start --audit`), the usage hook in jobs, the macOS step names the launcher, a task run commits as the project's git author (#3659, #1521, #1870, #2196, #2383, #2792, #3267, #3467)
+- Export: one list of left-out tables per export (`exportleft.py`), the duplicate lists in the retention and the account export are gone (#3862)
+### Fixed
+- Phone: Back closes the quick add sheet also after a menu in it was opened and closed (Android); tapping the entry of the page already open closes the sidebar (iOS) (#4943)
+
+Package 2.580 (Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Sammelpaket: Aufgabe).
+### Added
+- Documents: a clear stack (every part starts with an archive number code, no page before the first code, no number twice or already taken) is split automatically after recognition, without a confirmation; the parts carry the note "Split automatically from a stack" with Undo. Unclear stacks still ask "Stack - split?" (#4401)
+- Mixed views under All workspaces (Today, Upcoming, filters, search, tags) show each task's origin "Workspace · Project" with the workspace's colour dot; phones show the dot and short letters (#4821)
+### Changed
+- Project limit of API tokens and agents (New API token, token rights, Edit agent, Settings > Agents): a field "Add projects" with a search, folder groups and whole folders, the chosen projects as removable rows; none = all projects as before (#4488)
+- Settings > Organisation > Data: the overview "What is encrypted?" stands once, folded, instead of once per organisation (#4485)
+- Every page sits on one of the four widths: documents use the page width and fill the row with tiles, office forms, tables overview, Completed/Trash, channel list, news and the calendar agenda follow the common widths; dead width rules removed (#4815)
+### Fixed
+- What's new dialog: a gap and a thin line between the scrolling list and the hint below, the last entry ends fully readable (#4822)
+
+Package 2.621 (Bündel: CI-only rot: p2273_a_backup, CI-only rot: twofa, Sammelpaket: Aufgaben ohne Paket (Dispatcher) u. 1 weitere).
+
+### Added
+- Office > Import > old documents: a choice "File names" under "Choose PDF files" - the standard reading as before, three common patterns (date_number_client, number_client_date, client_number) or an own template from fixed parts and one separator; kept per office area, also without an organisation (#4600).
+
+### Fixed
+- Agent on the Kalmido server, starter pack: a second run after switching the language no longer creates a second plan or rule (plans are found by their fixed routine marker); the dialog names the workspace "Sort receipts and documents" applies to (#4715).
+
+Package 2.616 (Bündel: CI-only rot: p2466_c_ui + p2306_f_doc_anchors (Nac, CI-only rot: p2299_e_agentread_ui (TypeError readi, Büro: direkter Bankabruf per).
+### Added
+- #2473: Office > Bank: "Fetch from the bank" pulls the statement of a bank account directly over FinTS (PIN asked on every fetch and never stored, TAN approval in the banking app or TAN entry in the dialog) into the same preview, duplicate check, bank rules and undo as the file import. Off until the instance sets its own FinTS product ID (`KALMIDO_FINTS_PRODUCT_ID`, registered with the Deutsche Kreditwirtschaft); agents cannot start it. New dependency python-fints 5.0.1 (LGPL-3.0).
+### Changed
+- #4563: the neutral export writes one 70 % entertainment row per VAT rate with the rate filled (the tip at 0 %).
+### Fixed
+- #4563: an invoice sent over the API with `terms: true` whose frozen terms file is gone (and no current terms in its language) answers 409 `terms_missing` instead of going out without terms.
+- #4933: the menu path check matches a sub-tab as a whole word ("Server > Backups" is reported again); the sub-tab list test knows Server > Backup.
+
 ## [2.618.0] - 2026-11-07
 
 Package 2.611 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
@@ -121,7 +169,8 @@ Package 2.582 (Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher),
 
 Not released (the CI of this version was red); its changes are listed under 2.605.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.618.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.621.0...HEAD
+[2.621.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.621.0
 [2.618.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.618.0
 [2.614.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.614.0
 [2.605.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.605.0
