@@ -44,7 +44,7 @@ const CSV = 'Name;Company;E-mail\\nErika Beispiel;Beispiel Studio;erika@example.
   // the next file picker gets this file (the picker of the app is a hidden input it clicks)
   const pickNext = (url, name, text) => `(async () => { const b = ${url ? `await (await fetch('${url}', {credentials: 'same-origin'})).blob()` : `new Blob(['${text}'], {type: 'text/csv'})`};
     const orig = HTMLInputElement.prototype.click;
-    HTMLInputElement.prototype.click = function () { if (this.type !== 'file') return orig.call(this); HTMLInputElement.prototype.click = orig; const dt = new DataTransfer(); dt.items.add(new File([b], '${name}')); this.files = dt.files; this.onchange && this.onchange(); };
+    HTMLInputElement.prototype.click = function () { if (this.type !== 'file') return orig.call(this); HTMLInputElement.prototype.click = orig; const dt = new DataTransfer(); dt.items.add(new File([b], '${name}')); this.files = dt.files; if (this.onchange) this.onchange(); else this.dispatchEvent(new Event('change', {bubbles: true})); };  // 2.633.0 (#4920): the fixed inputs #fci-file / #lead-file upload in their change
     return 1; })()`;
   const inView = sel => `(() => { const e = document.querySelector('${sel}'); if (!e) return false; const t = e.getBoundingClientRect().top; return t >= -2 && t < innerHeight / 2; })()`;
 

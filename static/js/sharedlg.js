@@ -199,7 +199,7 @@ const fg_gico = gid => { const u = fg_gUrl(gid); return u ? `<img class="fggimg"
 function fg_pickHtml(cur) {
   const up = cur.startsWith('/api/group-avatar/');
   return [...AV_PRESETS, ...AV_BOTS].map(([k]) => `<button type="button" class="avopt ${cur === `/static/avatars/${k}.svg` ? 'on' : ''}" data-fgav="${k}" title="${esc(avTitle(k))}" aria-label="${esc(avTitle(k))}" aria-pressed="${cur === `/static/avatars/${k}.svg`}"><img src="/static/avatars/${k}.svg" alt=""></button>`).join('')
-    + `<button type="button" class="avopt up ${up ? 'on' : ''}" data-fgav="upload" title="${esc(tr('Upload a photo…'))}" aria-label="${esc(tr('Upload a photo…'))}" aria-pressed="${up}">${up ? `<img src="${esc(cur)}" alt="">` : ic('plus')}</button>`
+    + `<input type="file" id="gr-avfile" accept="image/jpeg,image/png,image/webp,image/gif" hidden><button type="button" class="avopt up ${up ? 'on' : ''}" data-fgav="upload" title="${esc(tr('Upload a photo…'))}" aria-label="${esc(tr('Upload a photo…'))}" aria-pressed="${up}">${up ? `<img src="${esc(cur)}" alt="">` : ic('plus')}</button>`
     + `<button type="button" class="avopt none ${cur ? '' : 'on'}" data-fgav="none" title="${esc(tr('No picture (group symbol)'))}" aria-label="${esc(tr('No picture (group symbol)'))}" aria-pressed="${!cur}">${ic('users', 's')}</button>`;
 }
 const fg_pickRow = g => `<div class="row avrow"><label>${tr('Picture')}</label><div class="avpick" id="gr-avpick">${fg_pickHtml(g?.avatar || '')}</div></div>`;
@@ -212,17 +212,17 @@ function fg_pickWire(md, g) {  // -> () => the pending choice: null (unchanged) 
     const k = b.dataset.fgav;
     if (k === 'none') { pend = {none: true}; show(''); return; }
     if (k !== 'upload') { pend = {preset: k}; show(`/static/avatars/${k}.svg`); return; }
-    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/jpeg,image/png,image/webp,image/gif';
-    inp.addEventListener('change', async () => {
-      const f = inp.files?.[0]; if (!f) return;
-      if (f.size > 8 * 1024 * 1024) { toast(tr('The picture is too large (at most {0} MB)', 8)); return; }
-      const bl = await avCropModal(f); if (!bl || !md.isConnected) return;
-      if (pend?.url) URL.revokeObjectURL(pend.url);
-      pend = {blob: bl, url: URL.createObjectURL(bl)};
-      box.innerHTML = fg_pickHtml('/api/group-avatar/new');
-      const im = $('[data-fgav="upload"] img', box); if (im) im.src = pend.url;
-    });
-    inp.click();
+    $('#gr-avfile', box)?.click();  // 2.633.0 (#4920): fixed hidden file input, its change uploads (a drop onto the window too, dropany.js)
+  });
+  box.addEventListener('change', async e => {
+    const t = e.target; if (t.id !== 'gr-avfile' || !t.files?.length) return;
+    const f = t.files[0]; t.value = '';
+    if (f.size > 8 * 1024 * 1024) { toast(tr('The picture is too large (at most {0} MB)', 8)); return; }
+    const bl = await avCropModal(f); if (!bl || !md.isConnected) return;
+    if (pend?.url) URL.revokeObjectURL(pend.url);
+    pend = {blob: bl, url: URL.createObjectURL(bl)};
+    box.innerHTML = fg_pickHtml('/api/group-avatar/new');
+    const im = $('[data-fgav="upload"] img', box); if (im) im.src = pend.url;
   });
   onRemove(md, () => { if (pend?.url) URL.revokeObjectURL(pend.url); });
   return () => pend;

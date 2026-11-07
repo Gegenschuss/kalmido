@@ -349,14 +349,16 @@ async function ab_purge(n) {
 function ab_newVersion(n) {
   if (n.locked) return typeof fsl_newVersion === 'function' ? fsl_newVersion(n) : ab_noFsl();  // 2.353.0 A (#2758); F (review N8): never plain
   const inp = document.createElement('input'); inp.type = 'file';
-  inp.addEventListener('change', async () => {
-    const f = inp.files?.[0]; if (!f) return;
-    const fd = new FormData(); fd.append('file', f, f.name);
-    try { await api('POST', `/api/files/nodes/${n.id}/versions`, fd); } catch { return; }
-    ab_reload(); toast(tr('New version of “{0}” saved', n.name));
-    if ($('.abdlg')) ab_details(n.id);
-  });
+  inp.addEventListener('change', () => { const f = inp.files?.[0]; if (f) ab_newVersionFile(n, f); });
   inp.click();
+}
+// 2.633.0 (#4920): the chosen / dropped file as a new version (the details dialog's fixed input, ab_details)
+async function ab_newVersionFile(n, f) {
+  if (n.locked) return typeof fsl_newVersionFile === 'function' ? fsl_newVersionFile(n, f) : ab_noFsl();  // never plain (as above)
+  const fd = new FormData(); fd.append('file', f, f.name);
+  try { await api('POST', `/api/files/nodes/${n.id}/versions`, fd); } catch { return; }
+  ab_reload(); toast(tr('New version of “{0}” saved', n.name));
+  if ($('.abdlg')) ab_details(n.id);
 }
 function ab_menu(anchor, n, pick) { menu(anchor, pick ? [...cm_selHead(n.name, pick), ...ab_menuItems(n)] : ab_menuItems(n), null, null, pick ? '' : n.name); }  // 2.607.0 (#4612): pick = "Select" on top
 // 2.199.0 A (#2742): the items of a node's menu (the row's "…", the tree's right-click / long press); tree: + New folder…
@@ -414,7 +416,7 @@ async function ab_details(id) {
     <div class="abfacts">${n.kind !== 'folder' ? `<span>${fmtSize(n.size || 0)}</span>` : ''}<span>${esc(tr('Changed {0}', ab_when(n.updated_at)))}</span>${n.owner ? `<span>${esc(tr('Owner: {0}', n.owner))}</span>` : ''}<span>${esc(ab_role(n.role))}</span></div>
     ${typeof dt_abDetails === 'function' ? dt_abDetails(n) : ''}
     ${n.kind === 'link' ? `<div class="shint keep">${ic('link', 's')} ${esc(tr('A link to a file of a task or project. Whoever opens it needs access to the original.'))}</div>` : ''}
-    ${n.kind !== 'folder' ? `<div class="row"><button type="button" class="btn sm" data-abd="open">${ic('eye', 's')} ${tr('Open')}</button>${ab_canWrite(n.role) && n.kind === 'file' ? `<button type="button" class="btn sm" data-abd="ver">${ic('upload', 's')} ${tr('Upload a new version…')}</button>` : ''}</div>` : ''}
+    ${n.kind !== 'folder' ? `<div class="row"><button type="button" class="btn sm" data-abd="open">${ic('eye', 's')} ${tr('Open')}</button>${ab_canWrite(n.role) && n.kind === 'file' ? `<input type="file" id="abd-verfile" hidden><button type="button" class="btn sm" data-abd="ver">${ic('upload', 's')} ${tr('Upload a new version…')}</button>` : ''}</div>` : ''}
     ${vers ? `<h4>${tr('Versions')}</h4><div class="abvers">${vers}</div>` : ''}
     ${n.role === 'owner' ? `<h4>${tr('Shared with')}</h4><div class="abshsum">${shares.length || n.org_access || n.org_access_from ? shares.map(s => `<span class="abshp">${s.agent_id ? ic('bot', 's') : s.group_id ? ic('users', 's') : ic('user', 's')}${esc(s.name)} · ${esc(ab_role(s.role))}${s.from ? ` <small class="muted">${esc(tr('from “{0}”', s.from))}</small>` : ''}</span>`).join('') + (n.org_access || n.org_access_from ? `<span class="abshp">${ic('building', 's')}${esc(tr('Whole organisation'))}</span>` : '') : `<span class="muted">${tr('Only you')}</span>`}</div><div class="row"><button type="button" class="btn sm" data-abd="share">${ic('users', 's')} ${tr('Share…')}</button></div>` : ''}
     ${n.log ? `<h4>${tr('History')}</h4><div class="ablog">${log || `<span class="muted">${tr('Nothing yet')}</span>`}</div><p class="muted abhint">${tr('Every access of an agent is listed here.')}</p>` : ''}
@@ -422,6 +424,7 @@ async function ab_details(id) {
   md.classList.add('abdlg');
   if (n.kind === 'file' && feat('wiki')) ab_wikiRefs(md, n.id);  // 2.123.0 C (#2107)
   if (typeof xl_mount === 'function') xl_mount(md, n);  // 2.112.1 B (#2058): "Link for external people"
+  md.addEventListener('change', e => { const t = e.target; if (t.id === 'abd-verfile' && t.files?.length) { const f = t.files[0]; t.value = ''; ab_newVersionFile(n, f); } });  // 2.633.0 (#4920)
   md.addEventListener('click', async e => {
     if (e.target.closest('[data-m="close"]')) { modalClose(md); return; }
     const v = e.target.closest('[data-abv]');
@@ -431,7 +434,7 @@ async function ab_details(id) {
     }
     const b = e.target.closest('[data-abd]'); if (!b) return;
     if (b.dataset.abd === 'open') ab_openFile(n);
-    else if (b.dataset.abd === 'ver') ab_newVersion(n);
+    else if (b.dataset.abd === 'ver') $('#abd-verfile', md)?.click();  // 2.633.0 (#4920): fixed hidden file input, its change uploads (a drop onto the window too, dropany.js)
     else if (b.dataset.abd === 'tags' && typeof dt_abEdit === 'function') dt_abEdit(n, () => ab_details(n.id));  // 2.122.0 B (#2099)
     else if (b.dataset.abd === 'share') { modalClose(md); ab_share(n.id); }
   });

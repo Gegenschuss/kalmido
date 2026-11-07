@@ -13,6 +13,11 @@
 // - an organisation's credit card statement (one "Upload receipt" per position): the position under the pointer stands out,
 //   released there -> that position's input, not another one; released outside every row -> nothing
 // - touch (no hover): no frame, nothing filled
+// 2.633.0 (#4920): buttons that made their file input only on the click have a fixed hidden input now (its change uploads):
+// - a person without organisation (office private): the meal receipt dialog's restaurant bill, the contacts import (a .vcf
+//   dragged onto the contacts view -> the import with its target confirmation -> "Imported: 1 new"), the profile picture in
+//   Settings > Account (-> crop -> "Profile picture saved"), a wiki page's "Attach files" (-> "1 files attached")
+// - an organisation's bank import: "Select files" clicks the dialog's fixed input #bi-file, its change reads the files
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {sleep, B, login} = require('./boot');
@@ -23,7 +28,7 @@ const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 const DATA = process.argv[2] || path.join(__dirname, '.data');
 if (!process.env.KMT_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore', env: {...process.env, EXTRA: (process.env.EXTRA || '') + ' -e KALMIDO_INSTANCE_MODE=workspaces'}});
 const call = async (ck, method, url, body) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); const j = await r.json().catch(() => ({})); return {...j, http: r.status}; };
-const FEAT = 'cal,comments,collab,office,clients,docs,files';
+const FEAT = 'cal,comments,collab,office,clients,docs,files,contacts,wiki';  // 2.633.0 (#4920): + contacts, wiki
 const pdf = lines => {  // a PDF with a text layer, hand-written
   const stream = `BT /F1 10 Tf 12 TL 40 760 Td\n${lines.map(x => `(${x}) Tj T*`).join('\n')}\nET`;
   const objs = ['<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [3 0 R] /Count 1 >>', '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>',
@@ -69,6 +74,8 @@ const PAGE = `(() => {
   const CF = await login('frida');
   await call(CF, 'PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT});
   check(((await call(CF, 'GET', '/api/state')).me?.workspaces || []).length === 0, 'frida is in no organisation');
+  const WPG = (await call(CF, 'POST', '/api/wiki/pages', {space: 'private', path: 'Drop notes', body: 'Some text'})).id;  // 2.633.0 (#4920)
+  check(!!WPG, 'frida has a private wiki page');
 
   const ready = async (ev, expr, n = 60) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
   const signIn = (ev, u) => ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${u}', password: 'password123'})}).then(r => r.ok)`);
@@ -137,6 +144,56 @@ const PAGE = `(() => {
     await ev(`(() => { __drag('.dc-view', 'drop', [__pdf('vertrag.pdf', 1)]); return 1; })()`);
     check(await ready(ev, `${count}.then(n => n === ${d0} + 1)`, 80), 'documents: its own drop uploads as before ' + await ev(toastT));
     check(await ev(`window.__ch.length === 0`), 'documents: no file input filled');
+    // ---- 2.633.0 (#4920): the fixed inputs (a person without organisation)
+    // the meal receipt: a new receipt's dialog, the bill waits for Save
+    await nav(B + '#office/meals');
+    check(await ready(ev, `!!document.querySelector('[data-bw="new"]')`, 80), '#4920 meals: the list with "New"');
+    await ev(`(() => { document.querySelector('[data-bw="new"]').click(); return 1; })()`);
+    check(await ready(ev, `!!document.querySelector('.modal #bw-file') && document.querySelector('.modal #bw-file').nextElementSibling?.dataset.bwm === 'file'`, 40), '#4920 meals: the dialog has the fixed input right before "Attach the restaurant bill"');
+    await ev(PAGE);
+    await ev(`(() => { const c = document.querySelector('.modal:last-of-type .card') || document.querySelector('.modal .card'); __drag(c, 'dragover', [__pdf('bewirtung.pdf')]); return 1; })()`);
+    check(await ev(`/Attach the restaurant bill/.test(${hint})`), '#4920 meals: the hint names the button ' + await ev(hint));
+    await ev(`(() => { const c = document.querySelector('.modal:last-of-type .card') || document.querySelector('.modal .card'); __drag(c, 'drop', [__pdf('bewirtung.pdf')]); return 1; })()`);
+    check(await ev(`window.__ch.join() === 'bw-file'`), '#4920 meals: the file went into #bw-file ' + await ev(`window.__ch.join()`));
+    check(await ready(ev, `/bewirtung\\.pdf/.test(document.querySelector('.modal .bwpend')?.textContent || '')`, 20), '#4920 meals: the bill waits for Save, as after a click');
+    await ev(`(() => { document.querySelectorAll('.modal').forEach(m => m.remove()); return 1; })()`);
+    // the contacts import: a .vcf dragged onto the contacts view
+    await nav(B + '#contacts');
+    check(await ready(ev, `!!document.querySelector('#view #ct-impfile') && !!document.querySelector('#view [data-ct="menu"]')`, 80), '#4920 contacts: the fixed import input before "..."');
+    await ev(PAGE);
+    const VCF = 'BEGIN:VCARD\\r\\nVERSION:3.0\\r\\nFN:Erika Beispiel\\r\\nN:Beispiel;Erika;;;\\r\\nEMAIL:erika@example.com\\r\\nEND:VCARD\\r\\n';
+    await ev(`(() => { __drag('#view', 'dragover', [__mk('erika.vcf', 'text/vcard', '${VCF}')]); return 1; })()`);
+    check(await ev(`document.documentElement.classList.contains('dropany-one')`), '#4920 contacts: the whole window takes the drop ' + await ev(hint));
+    await shot('p2633b-contacts-drop.png');
+    await ev(`(() => { __drag('#view', 'drop', [__mk('erika.vcf', 'text/vcard', '${VCF}')]); return 1; })()`);
+    check(await ev(`window.__ch.join() === 'ct-impfile'`), '#4920 contacts: the file went into #ct-impfile ' + await ev(`window.__ch.join()`));
+    check(await ready(ev, `!!document.querySelector('.itc-dlg form')`, 40), '#4920 contacts: the import asks for its target, as from the menu');
+    await ev(`(() => { document.querySelector('.itc-dlg form').requestSubmit(); return 1; })()`);
+    check(await ready(ev, `/Imported: 1 new/.test(document.querySelector('#ctimp .ctimp-t')?.textContent || '')`, 80), '#4920 contacts: "Imported: 1 new" ' + await ev(`document.querySelector('#ctimp')?.textContent || ''`));
+    await ev(`(() => { document.querySelector('#ctimp [data-ctimp="close"]')?.click(); return 1; })()`);
+    // the profile picture: Settings > Account (the crop dialog answers at once with a real picture)
+    await ev(`(() => { settingsModal('account'); return 1; })()`);
+    check(await ready(ev, `!!document.querySelector('.modal #a-avpick input[type="file"][data-fpass]')`, 40), '#4920 profile picture: the fixed input before "Upload a photo"');
+    await ev(PAGE);
+    await ev(`(() => { window.avCropModal = () => new Promise(r => { const c = document.createElement('canvas'); c.width = c.height = 32; const x = c.getContext('2d'); x.fillStyle = '#3a7'; x.fillRect(0, 0, 32, 32); c.toBlob(r, 'image/jpeg', .9); }); return 1; })()`);
+    const PNG = `__mk('me.png', 'image/png', 'x')`;
+    await ev(`(() => { __drag(document.querySelector('.modal #a-avpick'), 'dragover', [${PNG}]); return 1; })()`);
+    const avh = await ev(hint);
+    check(/Upload a photo/.test(avh) || /Drag onto a row/.test(avh), '#4920 profile picture: the window or the row takes the drop ' + avh);
+    await ev(`(() => { const a = document.querySelector('.modal #a-avpick'); __drag(a, 'dragover', [${PNG}]); __drag(a, 'drop', [${PNG}]); return 1; })()`);
+    check(await ev(`window.__ch.join() === 'fpass='`), '#4920 profile picture: the file went into the fixed input ' + await ev(`window.__ch.join()`));
+    check(await ready(ev, `/Profile picture saved/.test(${toastT})`, 40), '#4920 profile picture: saved as after a click ' + await ev(toastT));
+    check(await ready(ev, `fetch('/api/state', {headers: {'X-Requested-With': 'kalmido'}}).then(r => r.json()).then(j => String(j.me?.avatar || '').startsWith('/api/avatar/'))`, 20), '#4920 profile picture: the account has the picture');
+    await ev(`(() => { document.querySelectorAll('.modal').forEach(m => m.remove()); return 1; })()`);
+    // a wiki page: "Attach files"
+    await nav(B + '#wiki/' + WPG);
+    check(await ready(ev, `!!document.querySelector('#wka-file') && document.querySelector('#wka-file').nextElementSibling?.dataset.wka === 'add'`, 80), '#4920 wiki: the page has the fixed input before "Attach files"');
+    await ev(PAGE);
+    // a real PNG (the server checks the content against the type)
+    await ev(`new Promise(r => { const c = document.createElement('canvas'); c.width = c.height = 16; c.getContext('2d').fillRect(0, 0, 8, 8); c.toBlob(b => { window.__png = new File([b], 'skizze.png', {type: 'image/png'}); r(1); }, 'image/png'); })`);
+    await ev(`(() => { const v = document.querySelector('.wkfiles'); __drag(v, 'dragover', [__png]); __drag(v, 'drop', [__png]); return 1; })()`);
+    check(await ev(`window.__ch.join() === 'wka-file'`), '#4920 wiki: the file went into #wka-file ' + await ev(`window.__ch.join()`) + ' ' + await ev(hint));
+    check(await ready(ev, `/1 files? attached/.test(${toastT})`, 40), '#4920 wiki: attached as after a click ' + await ev(toastT));
     // ---- an organisation's credit card statement: one button per position
     await ev(`fetch('/api/auth/logout', {method: 'POST', headers: {'X-Requested-With': 'kalmido'}}).then(r => r.ok)`);
     await nav(B + 'static/icon.svg');
@@ -161,6 +218,17 @@ const PAGE = `(() => {
     check(await ev(`window.__de === 'none' && window.__ch.length === 0`), 'outside every row: no drop, nothing filled');
     await ev(`(() => { const row = document.querySelectorAll('[data-cc-rc]')[1].closest('.bnkrow'); __drag(row.querySelector('.bnkhead') || row, 'drop', [__pdf('druckerei.pdf')]); return 1; })()`);
     check(await ev(`window.__ch.join() === 'ccRc=${second}'`), 'released on the second position: its input, no other ' + await ev(`window.__ch.join()`));
+    // ---- 2.633.0 (#4920): the bank import dialog: "Select files" clicks its fixed input, the input's change reads the files
+    await nav(B + '#office/bank');
+    check(await ready(ev, `!!document.querySelector('[data-bnk="imp"]')`, 80), '#4920 bank: "Import"');
+    await ev(`(() => { document.querySelector('[data-bnk="imp"]').click(); return 1; })()`);
+    check(await ready(ev, `!!document.querySelector('.modal #bi-file') && document.querySelector('.modal #bi-file').nextElementSibling?.dataset.bi === 'pick'`, 40), '#4920 bank: the fixed input right before "Select files"');
+    const bf = await ev(`(() => { const i = document.querySelector('.modal #bi-file'); window.__bic = 0; const o = i.click; i.click = () => { window.__bic++; }; document.querySelector('.modal [data-bi="pick"]').click(); i.click = o; return {n: window.__bic, multiple: i.multiple, accept: i.accept}; })()`);
+    check(bf.n === 1 && bf.multiple && /csv/i.test(bf.accept), '#4920 bank: "Select files" opens the fixed input (multiple, same types) ' + JSON.stringify(bf));
+    await ev(PAGE);
+    await ev(`(() => { const i = document.querySelector('.modal #bi-file'); const dt = new DataTransfer(); dt.items.add(__mk('konto.csv', 'text/csv', 'Datum;Betrag;Text\\r\\n02.01.2025;-12,50;Cafe Beispiel\\r\\n')); i.files = dt.files; i.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
+    check(await ev(`window.__ch.join() === 'bi-file'`), '#4920 bank: the change of #bi-file');
+    check(await ready(ev, `!document.querySelector('.modal [data-bi-drop]')`, 40), '#4920 bank: the files are read (the start view goes, as after a click) ' + await ev(`(document.querySelector('.modal .card')?.textContent || '').slice(0, 200)`));
   }, false);
 
   // ---- touch: nothing changes

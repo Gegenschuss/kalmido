@@ -120,11 +120,15 @@ function agrModal(a) {
   const drawDoc = () => {
     const el = $('.agr-docv', md); if (!el) return;
     el.innerHTML = (doc ? `<a href="#docs/${doc.id}" class="agr-docname">${ic('file', 's')} ${esc(doc.name)}</a><button type="button" class="btn sm ghost" data-m="docx">${tr('Remove')}</button>` : '')
-      + `<button type="button" class="btn sm" data-m="docpick">${ic('search', 's')} ${tr('Select')}</button><button type="button" class="btn sm" data-m="docup">${ic('upload', 's')} ${tr('Upload')}</button>`;
+      + `<button type="button" class="btn sm" data-m="docpick">${ic('search', 's')} ${tr('Select')}</button><input type="file" id="agr-docfile" hidden><button type="button" class="btn sm" data-m="docup">${ic('upload', 's')} ${tr('Upload')}</button>`;
   };
   const listRow = () => { const on = $('#agr-task', md)?.checked; $('.agr-listrow', md)?.classList.toggle('hidden', !on); };
   drawDoc(); listRow();
-  md.addEventListener('change', e => { if (e.target.id === 'agr-task') listRow(); });
+  md.addEventListener('change', e => {
+    const t = e.target;
+    if (t.id === 'agr-task') listRow();
+    else if (t.id === 'agr-docfile' && t.files?.length) { agrDocSend(t.files[0], d => { doc = d; drawDoc(); }, $('.aerr', md)); t.value = ''; }  // 2.633.0 (#4920)
+  });
   const close = fgModal(md);
   const v = id => $(id, md)?.value ?? '';
   const read = () => ({kind: v('#agr-kind'), name: v('#agr-name'), provider: v('#agr-provider'), number: v('#agr-number'), cost: ofcNum(v('#agr-cost')) ?? '',
@@ -137,7 +141,7 @@ function agrModal(a) {
     if (m === 'close') { close(); return; }
     if (m === 'docx') { doc = null; drawDoc(); return; }
     if (m === 'docpick') { agrDocPick(d => { doc = d; drawDoc(); }); return; }
-    if (m === 'docup') { agrDocUpload(d => { doc = d; drawDoc(); }, $('.aerr', md)); return; }
+    if (m === 'docup') { $('#agr-docfile', md)?.click(); return; }  // 2.633.0 (#4920): fixed hidden file input, its change uploads (a drop onto the window too, dropany.js)
     try {
       if (m === 'del') { await agrDelete(a); md.remove(); return; }
       if (m === 'arch') { await agrArchive(a, !a.archived); md.remove(); return; }
@@ -210,17 +214,12 @@ function agrDocPick(done) {
   });
   load(); setTimeout(() => $('#agr-dq', md)?.focus(), 0);
 }
-function agrDocUpload(done, errEl) {
-  const i = document.createElement('input'); i.type = 'file';
-  i.onchange = async () => {
-    const f = i.files[0]; if (!f) return;
-    const fd = new FormData(); fd.append('files', f); fd.append('ws', AGR.data?.doc_ws || 'private');
-    try {
-      const j = await api('POST', '/api/docs', fd);
-      if (j.ids?.[0]) done({id: j.ids[0], name: f.name}); else if (errEl) errEl.textContent = (j.errors || []).join(' ');
-    } catch (x) { if (errEl) errEl.textContent = x.message || ''; }
-  };
-  i.click();
+async function agrDocSend(f, done, errEl) {  // 2.633.0 (#4920): the file of the fixed input (was agrDocUpload, which made the input on the click)
+  const fd = new FormData(); fd.append('files', f); fd.append('ws', AGR.data?.doc_ws || 'private');
+  try {
+    const j = await api('POST', '/api/docs', fd);
+    if (j.ids?.[0]) done({id: j.ids[0], name: f.name}); else if (errEl) errEl.textContent = (j.errors || []).join(' ');
+  } catch (x) { if (errEl) errEl.textContent = x.message || ''; }
 }
 
 document.addEventListener('click', e => {

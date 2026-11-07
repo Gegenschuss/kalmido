@@ -52,10 +52,10 @@ function oimHtml() {
 function oim_moreHtml() {
   return `<section class="oimsec" id="oim-fixed"><h4>${ic('trend', 's')} ${tr('Fixed costs from a spreadsheet')}</h4>
     <div class="shint">${tr('A spreadsheet (.xlsx, .xls or CSV) with name, net amount and due month; you see a preview before anything is saved.')}</div>
-    <div class="lacts"><a class="btn sm ghost" href="/api/office/fixed-costs/import/template" download>${ic('download', 's')}<span>${tr('Download template')}</span></a><button type="button" class="btn sm" data-rkf="fimp">${ic('upload', 's')}<span>${tr('Import from Excel')}</span></button></div></section>
+    <div class="lacts"><a class="btn sm ghost" href="/api/office/fixed-costs/import/template" download>${ic('download', 's')}<span>${tr('Download template')}</span></a><input type="file" id="fci-file" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" hidden><button type="button" class="btn sm" data-rkf="fimp">${ic('upload', 's')}<span>${tr('Import from Excel')}</span></button></div></section>
     <section class="oimsec" id="oim-leads"><h4>${ic('target', 's')} ${tr('Leads from a CSV file')}</h4>
     <div class="shint">${tr('A CSV file with name, company, e-mail and phone; leads with an e-mail that is already there are skipped.')}</div>
-    <div class="lacts"><button type="button" class="btn sm" data-lead="import">${ic('upload', 's')}<span>${tr('Import CSV')}</span></button></div></section>
+    <div class="lacts"><input type="file" id="lead-file" accept=".csv,.txt,text/csv,text/plain" hidden><button type="button" class="btn sm" data-lead="import">${ic('upload', 's')}<span>${tr('Import CSV')}</span></button></div></section>
     ${typeof rk_impBtn === 'function' ? `<section class="oimsec" id="oim-trips"><h4>${ic('plane', 's')} ${tr('Trips from a per diem spreadsheet')}</h4>
     <div class="shint">${tr('An .xlsx file with one sheet per person (date, destination, times); you see a preview before anything is saved.')}</div>
     <div class="lacts">${rk_impBtn()}</div></section>` : ''}`;  // 2.365.2 D (#2789): was in the travel tab

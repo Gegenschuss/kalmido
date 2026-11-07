@@ -215,14 +215,16 @@ async function fsl_rename(n) {
 }
 function fsl_newVersion(n) {
   const inp = document.createElement('input'); inp.type = 'file';
-  inp.addEventListener('change', async () => {
-    const f = inp.files?.[0]; if (!f) return;
-    const fd = new FormData();
-    try { fd.append('file', new Blob([await fslFileEnc(n.lock_id, {name: n.name, type: f.type, data: new Uint8Array(await f.arrayBuffer())})]), 'encrypted.kenc'); } catch (x) { fslToast(x); return; }
-    try { await api('POST', `/api/files/lock/version/${n.id}`, fd); } catch { return; }
-    ab_reload(); toast(tr('New version of “{0}” saved', n.name));
-  });
+  inp.addEventListener('change', () => { const f = inp.files?.[0]; if (f) fsl_newVersionFile(n, f); });
   inp.click();
+}
+// 2.633.0 (#4920): the chosen / dropped file (the details dialog's fixed input, ab_newVersionFile) encrypted as a new version
+/** @param {any} n @param {File} f */
+async function fsl_newVersionFile(n, f) {
+  const fd = new FormData();
+  try { fd.append('file', new Blob([await fslFileEnc(n.lock_id, {name: n.name, type: f.type, data: new Uint8Array(await f.arrayBuffer())})]), 'encrypted.kenc'); } catch (x) { fslToast(x); return; }
+  try { await api('POST', `/api/files/lock/version/${n.id}`, fd); } catch { return; }
+  ab_reload(); toast(tr('New version of “{0}” saved', n.name));
 }
 // moving across the border of a locked folder: re-encrypted here (true = handled, false = an ordinary move)
 async function fsl_moveHook(n, target) {

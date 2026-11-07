@@ -63,10 +63,14 @@ async function leadConvert(x, md) {
 }
 
 // ---- CSV import: file -> preview -> take over (one undo step: the imported leads into the bin)
+// 2.633.0 (#4920): fixed hidden file input, its change uploads (a drop onto the window too, dropany.js): the page with the
+// button puts <input type="file" id="lead-file" accept=".csv,.txt,text/csv,text/plain" hidden> right before it; without it the old way
 function leadPick() {
+  const fi = $('#lead-file'); if (fi) { fi.click(); return; }
   const i = document.createElement('input'); i.type = 'file'; i.accept = '.csv,.txt,text/csv,text/plain';
   i.onchange = () => { if (i.files[0]) leadRead(i.files[0]); }; i.click();
 }
+document.addEventListener('change', e => { const t = e.target; if (t.id === 'lead-file' && t.files?.length) { leadRead(t.files[0]); t.value = ''; } });
 async function leadRead(f) {
   const rd = enc => new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = () => no(r.error); r.readAsText(f, enc); });
   let text;

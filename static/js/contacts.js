@@ -102,7 +102,7 @@ function viewContacts() {
     ${CT.groups.length ? `<select id="ct-group" aria-label="${esc(tr('Group'))}"><option value="">${tr('All groups')}</option>${CT.groups.map(g => `<option value="${esc(g)}" ${g === CT.group ? 'selected' : ''}>${esc(g)}</option>`).join('')}<option value="${CTX_MANAGE}">${tr('Manage groups…')}</option></select>` : ''}
     ${books.length > 1 ? `<select id="ct-book" aria-label="${esc(tr('Address book'))}"><option value="">${tr('All address books')}</option>${books.map(b => `<option value="${b.id}" ${String(b.id) === String(CT.book) ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select>` : ''}
     <span class="spacer"></span>${books.some(ctWrite) ? `<button class="iconbtn ${CT.pick ? 'on' : ''}" data-ct="pick" aria-pressed="${!!CT.pick}" aria-label="${esc(tr(CT.pick ? 'End selection' : 'Select'))}" title="${esc(tr(CT.pick ? 'End selection' : 'Select'))}">${ic('select')}</button>` : ''}<button class="btn sm pri" data-ct="new">${ic('plus', 's')}<span class="cdl">${tr('New contact')}</span></button>
-    <button class="iconbtn" data-ct="menu" aria-haspopup="menu" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('dots')}</button></div>`;
+    ${!books.length || books.some(ctWrite) ? `<input type="file" id="ct-impfile" accept="${CT_IMP_ACCEPT}" multiple hidden>` : ''}<button class="iconbtn" data-ct="menu" aria-haspopup="menu" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('dots')}</button></div>`;
   const list = items === null ? `<div class="muted ctempty">${tr('Loading…')}</div>` : !items.length
     ? `<div class="empty">${ic('users')}${CT.q || CT.group ? tr('No contact matches.') : tr('No contacts yet. Add one, import a vCard file, or connect the phone.')}</div>`
     : `<ul class="ctlist" role="list" aria-label="${esc(tr('Contacts'))}">${ctRows(items, (c, vl) => `<li${vl}><button type="button" class="ctrow ${c.id === CT.sel ? 'on' : ''} ${bk_rowCls(c)}" data-ctopen="${c.id}" ${CT.pick ? `aria-pressed="${CT.pick.has(c.id)}"` : `aria-current="${c.id === CT.sel}"`}>${CT.pick ? bk_chk(c) : ''}${ctAv(c)}<span class="ctn"><b>${esc(c.fn || c.org || '?')}</b><small class="muted">${esc([c.org !== c.fn ? c.org : '', c.email || c.phone].filter(Boolean).join(' · '))}</small></span>${(books.length > 1 && ctBook(c.book_id)) ? `<i class="cevdot" style="--cc:${cssColor(ctBook(c.book_id).color) || 'var(--accent)'}" title="${esc(ctBook(c.book_id).name)}"></i>` : ''}</button></li>`)}</ul>
@@ -714,14 +714,23 @@ function ctPhoto(file) {  // a square JPEG of at most 256 px (small enough for e
     r.readAsDataURL(file);
   });
 }
-function ctImport(bookId, kind, file) {  // 2.143.0 C (#2154): file = a .vcf shared from another app (no file picker)
+// 2.633.0 (#4920): a fixed hidden file input before "..." of the contacts view: vCard / ZIP / CSV files dropped onto the window
+// (dropany.js) go the import's way (address book chosen, target confirmed), CSV by its ending; the menu entries stay as they are
+const CT_IMP_ACCEPT = '.vcf,.vcard,.zip,text/vcard,text/x-vcard,application/zip,.csv,.txt,.tsv,text/csv,text/plain';
+document.addEventListener('change', e => {
+  const t = /** @type {HTMLInputElement} */ (e.target); if (t.id !== 'ct-impfile' || !t.files?.length) return;
+  const fs = [...t.files]; t.value = '';
+  if (fs.every(f => /\.(csv|tsv|txt)$/i.test(f.name))) { if (fs.length > 1) { toast(tr('Only one file fits here')); return; } ctImport(null, 'csv', fs[0]); }
+  else ctImport(null, 'vcf', fs);
+});
+function ctImport(bookId, kind, file) {  // 2.143.0 C (#2154): file = a .vcf shared from another app (no file picker); 2.633.0 (#4920): or the files of #ct-impfile
   const books = (S.books || []).filter(b => ctWrite(b) && wsObjIn(b));
   const run = async bid => {
     const inp = document.createElement('input');
     inp.type = 'file'; inp.accept = kind === 'csv' ? '.csv,.txt,.tsv,text/csv,text/plain' : '.vcf,.vcard,.zip,text/vcard,text/x-vcard,application/zip';  // 2.119.1 A (#2080)
     if (kind !== 'csv') inp.multiple = true;  // 2.146.0 E (#2457): one .vcf per contact (Outlook) or a ZIP (Google Takeout)
     inp.onchange = async () => {
-      const fs = file ? [file] : [...inp.files], f = fs[0]; if (!f) return;
+      const fs = file ? [].concat(file) : [...inp.files], f = fs[0]; if (!f) return;
       // 2.87.9 (#1940): where the contacts go, in words; from an organisation's book also into an own private book
       const b = (S.books || []).find(x => x.id === bid);
       const ph = {};  // 2.306.0 C (#2889): vCard files only (a CSV has no pictures)

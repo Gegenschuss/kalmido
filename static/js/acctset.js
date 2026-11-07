@@ -224,7 +224,7 @@ async function orgModal(o, done) {
   const icPrev = v => orgIconHtml(v ? {icon: v} : {icon_url: o?.icon_url});  // a typed symbol replaces the picture on saving
   // 2.161.0 (#2594): an own picture also here (as in Settings > Workspaces, the same routes: only an admin of this organisation)
   const picAdm = !!o && (o.admins || []).includes(S.me?.id);
-  const picRow = () => picAdm ? `<button type="button" class="iconbtn" data-ogpic="up" title="${esc(tr('Upload a picture…'))}" aria-label="${esc(tr('Upload a picture…'))}">${ic('picture', 's')}</button>${o.icon_url ? `<button type="button" class="iconbtn" data-ogpic="rm" title="${esc(tr('Remove the picture'))}" aria-label="${esc(tr('Remove the picture'))}">${ic('x', 's')}</button>` : ''}` : '';
+  const picRow = () => picAdm ? `<input type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden data-fpass><button type="button" class="iconbtn" data-ogpic="up" title="${esc(tr('Upload a picture…'))}" aria-label="${esc(tr('Upload a picture…'))}">${ic('picture', 's')}</button>${o.icon_url ? `<button type="button" class="iconbtn" data-ogpic="rm" title="${esc(tr('Remove the picture'))}" aria-label="${esc(tr('Remove the picture'))}">${ic('x', 's')}</button>` : ''}` : '';
   const picDone = async () => {
     try { S.orgs = (await api('GET', '/api/admin/orgs')).orgs; } catch { return; }
     const f = S.orgs.find(x => x.id === o.id); if (!f) return;

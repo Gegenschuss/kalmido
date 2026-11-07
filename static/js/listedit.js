@@ -199,7 +199,7 @@ const licon = (l, cls = 'licon') => l && l.icon && liconOk(l.icon) ? `<img class
 function liconPickHtml(l) {
   const cur = l.icon || '';
   return `<div class="lipick" role="group" aria-label="${esc(tr('Picture'))}">${LICON_PRESETS.map(([k, n]) => `<button type="button" class="avopt ${cur === liconSrc(k) ? 'on' : ''}" data-licon="${k}" title="${esc(k === 'kalmido' ? n : avTitle(k))}" aria-label="${esc(k === 'kalmido' ? n : avTitle(k))}" aria-pressed="${cur === liconSrc(k)}"><img src="${liconSrc(k)}" alt=""></button>`).join('')}` +
-    `<button type="button" class="avopt up ${cur.startsWith('/api/list-icon/') ? 'on' : ''}" data-licon="upload" title="${esc(tr('Upload a picture…'))}" aria-label="${esc(tr('Upload a picture…'))}">${cur.startsWith('/api/list-icon/') ? `<img src="${esc(cur)}" alt="">` : ic('plus')}</button>` +
+    `<input type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden data-fpass><button type="button" class="avopt up ${cur.startsWith('/api/list-icon/') ? 'on' : ''}" data-licon="upload" title="${esc(tr('Upload a picture…'))}" aria-label="${esc(tr('Upload a picture…'))}">${cur.startsWith('/api/list-icon/') ? `<img src="${esc(cur)}" alt="">` : ic('plus')}</button>` +
     (cur ? `<button type="button" class="avopt none" data-licon="none" title="${esc(tr('Remove the picture'))}" aria-label="${esc(tr('Remove the picture'))}">${ic('ban', 's')}</button>` : '') + '</div>';
 }
 async function liconSet(lid, how) {
@@ -215,12 +215,18 @@ async function liconSet(lid, how) {
 }
 function liconUpload(lid) {
   return new Promise(res => {
-    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/jpeg,image/png,image/webp,image/gif';
-    inp.addEventListener('change', async () => {
-      const f = inp.files?.[0]; if (!f) { res(null); return; }
+    const go = async f => {
       if (f.size > 8 * 1024 * 1024) { toast(tr('The picture is too large (at most {0} MB)', 8)); res(null); return; }
       const bl = await avCropModal(f, {title: tr('Project icon'), png: true, square: true}); if (!bl) { res(null); return; }
       res(await liconSet(lid, bl));
+    };
+    // 2.633.0 (#4920): fixed hidden file input, its change uploads (a drop onto the window too, dropany.js): the file of the
+    // input before the button (liconPickHtml, data-fpass in account.js) instead of the file picker
+    const f0 = fpass_take(); if (f0) { go(f0); return; }
+    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/jpeg,image/png,image/webp,image/gif';
+    inp.addEventListener('change', async () => {
+      const f = inp.files?.[0]; if (!f) { res(null); return; }
+      go(f);
     });
     inp.click();
   });

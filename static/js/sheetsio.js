@@ -19,23 +19,33 @@ function shxUiSpace(space, lid) {  // the space of an imported table: the list's
   if (space && space !== 'all') return space;
   return typeof shvNewSpace === 'function' ? shvNewSpace() : 'private';
 }
+// 2.633.0 (#4920): a fixed hidden file input #shx-import-file (when the overview has one) is clicked, its change uploads (a drop
+// onto the window too, dropany.js); without it the input made here as before
+const SHX_IMPORT_ACCEPT = '.csv,.tsv,.txt,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 function shxUiImport(space, lid) {
-  const sp = shxUiSpace(space, lid), inp = document.createElement('input');
-  inp.type = 'file'; inp.accept = '.csv,.tsv,.txt,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-  inp.onchange = async () => {
-    const f = inp.files?.[0]; if (!f) return;
-    const l = lid && typeof listById === 'function' ? listById(lid) : null;  // 2.356.0 B (#2934): the target in words (#1940)
-    if (!await importTargetConfirm({what: tr('the data of the file'), ws: sp, place: l ? lname(l) : tr('Tables')})) return;
-    const fd = new FormData(); fd.append('file', f); fd.append('space', sp); if (lid) fd.append('list_id', String(lid));
-    let r; try { r = await rawFetch('POST', '/api/sheets/import', fd); } catch (e) { toast(e.message); return; }
-    const id = r.sheet.id, title = r.sheet.title || '';
-    const after = gone => { if (typeof shvAfterIdx === 'function') shvAfterIdx(id, gone); };
-    after(false);
-    const e = histAdd({label: tr('Import of {0}', qn(title)), ids: [], snaps: [], lids: [],
-      undo: async () => { await rawFetch('DELETE', '/api/sheets/' + id); after(true); return {skipped: []}; },
-      redo: async () => { await rawFetch('POST', `/api/sheets/${id}/restore`); after(false); return {skipped: []}; }});
-    histToast((r.messages || []).join(' · ') || tr('Import finished'), e);
-    go('sheets/' + id);
-  };
+  const fx = document.getElementById('shx-import-file'); if (fx) { fx.click(); return; }
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = SHX_IMPORT_ACCEPT;
+  inp.onchange = () => { const f = inp.files?.[0]; if (f) shxUiImportFile(f, space, lid); };
   inp.click();
+}
+document.addEventListener('change', e => {  // 2.633.0 (#4920): the overview's space / list as its "…" menu passes them (sheets.js omenu)
+  const t = e.target; if (t.id !== 'shx-import-file' || !t.files?.length) return;
+  const lid = S.route.shl || null;
+  shxUiImportFile(t.files[0], lid ? null : (typeof wsCur === 'function' ? wsCur() : 'all'), lid); t.value = '';
+});
+async function shxUiImportFile(f, space, lid) {
+  const sp = shxUiSpace(space, lid);
+  const l = lid && typeof listById === 'function' ? listById(lid) : null;  // 2.356.0 B (#2934): the target in words (#1940)
+  if (!await importTargetConfirm({what: tr('the data of the file'), ws: sp, place: l ? lname(l) : tr('Tables')})) return;
+  const fd = new FormData(); fd.append('file', f); fd.append('space', sp); if (lid) fd.append('list_id', String(lid));
+  let r; try { r = await rawFetch('POST', '/api/sheets/import', fd); } catch (e) { toast(e.message); return; }
+  const id = r.sheet.id, title = r.sheet.title || '';
+  const after = gone => { if (typeof shvAfterIdx === 'function') shvAfterIdx(id, gone); };
+  after(false);
+  const e = histAdd({label: tr('Import of {0}', qn(title)), ids: [], snaps: [], lids: [],
+    undo: async () => { await rawFetch('DELETE', '/api/sheets/' + id); after(true); return {skipped: []}; },
+    redo: async () => { await rawFetch('POST', `/api/sheets/${id}/restore`); after(false); return {skipped: []}; }});
+  histToast((r.messages || []).join(' · ') || tr('Import finished'), e);
+  go('sheets/' + id);
 }

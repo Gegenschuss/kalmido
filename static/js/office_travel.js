@@ -637,11 +637,10 @@ document.addEventListener('toggle', e => {
 // ---- 2.95.0 B (#1932): the import of a per diem spreadsheet (part B fills this block; server kalmido/office/vmaimport.py).
 // rk_impBtn: the button that opens the import; 2.365.2 D (#2789): on the legacy data page (office_import.js oim_moreHtml), the
 // trips tab links there (#office/import/trips).
-function rk_impBtn() { return `<button type="button" class="btn sm rki-btn" data-rki="pick">${ic('upload', 's')}<span>${tr('Import from Excel')}</span></button>`; }
-function rk_impPick() {
-  const i = document.createElement('input'); i.type = 'file'; i.accept = '.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-  i.onchange = () => { if (i.files[0]) rk_impPreview(i.files[0]); }; i.click();
-}
+// 2.633.0 (#4920): fixed hidden file input, its change uploads (a drop onto the window too, dropany.js)
+function rk_impBtn() { return `<input type="file" id="rki-file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden><button type="button" class="btn sm rki-btn" data-rki="pick">${ic('upload', 's')}<span>${tr('Import from Excel')}</span></button>`; }
+function rk_impPick() { $('#rki-file')?.click(); }
+document.addEventListener('change', e => { const t = e.target; if (t.id === 'rki-file' && t.files?.length) { rk_impPreview(t.files[0]); t.value = ''; } });  // 2.633.0 (#4920)
 async function rk_impPreview(file) {
   const fd = new FormData(); fd.append('file', file);
   let j;

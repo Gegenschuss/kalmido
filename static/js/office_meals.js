@@ -211,7 +211,7 @@ function bw_fileHtml(m) {
   const rows = fs.map(f => `<li class="bwf"><a href="${BW_U}/${m.id}/file/${f.id}${f.mime === 'application/pdf' ? '?inline=1' : ''}" target="_blank" rel="noopener"${f.mime === 'application/pdf' ? pv_attr({url: `${BW_U}/${m.id}/file/${f.id}?inline=1`, name: f.name, size: f.size, dlUrl: `${BW_U}/${m.id}/file/${f.id}`}) : ''}>${ic(f.mime === 'application/pdf' ? 'pdf' : 'picture', 's')}<span>${esc(f.name)}</span></a>
     ${m.locked || m.own_ro ? '' : `<button type="button" class="iconbtn" data-bwm="rmfile" data-fid="${f.id}" aria-label="${esc(tr('Remove {0}', f.name))}" title="${esc(tr('Remove'))}">${ic('trash', 's')}</button>`}</li>`).join('');
   return (rows ? `<ul class="bwfiles" role="list">${rows}</ul>` : `<p class="muted bwnofile">${tr('No restaurant bill attached')}</p>`)
-    + (m?.locked || m?.own_ro ? '' : `<button type="button" class="btn sm" data-bwm="file">${ic('upload', 's')}<span>${fs.length ? tr('Replace the bill') : tr('Attach the restaurant bill')}</span></button>`);
+    + (m?.locked || m?.own_ro ? '' : `<input type="file" id="bw-file" accept="application/pdf,.pdf,image/jpeg,image/png" hidden><button type="button" class="btn sm" data-bwm="file">${ic('upload', 's')}<span>${fs.length ? tr('Replace the bill') : tr('Attach the restaurant bill')}</span></button>`);
 }
 const bw_actLabel = e => e.action === 'approve' ? tr('Approved on {0} by {1}', bw_when(e.at), e.user || '–') : tr('Approval undone on {0} by {1}', bw_when(e.at), e.user || '–') + (e.reason ? ` – ${e.reason}` : '');
 const bw_when = ts => { const d = new Date(ts); return isNaN(+d) ? ts : fmtMoment(d); };
@@ -241,7 +241,7 @@ function bw_modal(m0) {
     <p class="bwsum" aria-live="polite"></p><p class="muted ofchint bw250" hidden>${tr('Above 250 € gross the restaurant bill must be made out to the company.')}</p>
     <div class="row"><label for="bw-note">${tr('Note')}</label><textarea id="bw-note" rows="2" maxlength="2000">${esc(m?.note || '')}</textarea></div>
     </fieldset>
-    <div class="row"><span class="rklab">${tr('Restaurant bill')}</span><div class="bwfilebox">${m ? bw_fileHtml(m) : `<button type="button" class="btn sm" data-bwm="file">${ic('upload', 's')}<span>${tr('Attach the restaurant bill')}</span></button><span class="muted bwpend"></span>`}</div></div>
+    <div class="row"><span class="rklab">${tr('Restaurant bill')}</span><div class="bwfilebox">${m ? bw_fileHtml(m) : `<input type="file" id="bw-file" accept="application/pdf,.pdf,image/jpeg,image/png" hidden><button type="button" class="btn sm" data-bwm="file">${ic('upload', 's')}<span>${tr('Attach the restaurant bill')}</span></button><span class="muted bwpend"></span>`}</div></div>
     ${m?.id && OFC.info?.role === 'admin' ? `<div class="row bwpay" data-fg-skip><label for="bw-pay">${tr('Paid with')}</label><span class="bwpaybox muted">${tr('Loading…')}</span></div>` : ''}${''/* 2.603.0 (#4927): the proof of its bank / cash / card line */}
     ${(m?.log || []).length ? `<div class="bwlogbox"><b>${tr('Approval log')}</b><ul class="bwlog" role="list">${m.log.map(e => `<li>${esc(bw_actLabel(e))}</li>`).join('')}</ul></div>` : ''}
     ${hostOk || (!ro && m?.own_host !== 0) ? bw_sigHtml() : ''}
@@ -293,8 +293,17 @@ function bw_modal(m0) {
     }
     return m;
   };
+  const attach = async f => {  // 2.633.0 (#4920): the bill from the fixed file input (formerly bw_pick's callback)
+    err('');
+    if (!m) { pend = f; $('.bwpend', md).textContent = tr('{0} is attached when you save', f.name); return; }
+    try {
+      const j = await api('POST', `${BW_U}/${m.id}/file`, bw_fd(f)), id = m.id; m = j; $('.bwfilebox', md).innerHTML = bw_fileHtml(m); bw_reload();
+      toast(tr('Attached'), async () => { await api('DELETE', `${BW_U}/${id}/file/${j.file_id}`); for (const o of j.replaced || []) await api('POST', `${BW_U}/${id}/file/${o}/restore`); bw_reload(); });
+    } catch (x) { err(x.message); }
+  };
   md.addEventListener('change', e => {
     const t = /** @type {any} */ (e.target);
+    if (t.id === 'bw-file') { const f = t.files?.[0]; t.value = ''; if (f) attach(f); return; }  // 2.633.0 (#4920)
     if (t.id === 'bw-place') place();
     else if (t.id === 'bw-host') host();
     else if (t.dataset?.bwl === 'rate') delete t.closest('.bwln').dataset.bwdef;  // 2.408.0 (#3521): a rate chosen by hand stays
@@ -325,13 +334,7 @@ function bw_modal(m0) {
       if (a === 'pdf') { bw_openPdf(m); return; }
       if (a === 'unlock') { await bw_unlock(m, md); return; }
       if (a === 'del') { await bw_delete(m, md); return; }
-      if (a === 'file') { bw_pick(async f => {
-        if (!m) { pend = f; $('.bwpend', md).textContent = tr('{0} is attached when you save', f.name); return; }
-        try {
-          const j = await api('POST', `${BW_U}/${m.id}/file`, bw_fd(f)), id = m.id; m = j; $('.bwfilebox', md).innerHTML = bw_fileHtml(m); bw_reload();
-          toast(tr('Attached'), async () => { await api('DELETE', `${BW_U}/${id}/file/${j.file_id}`); for (const o of j.replaced || []) await api('POST', `${BW_U}/${id}/file/${o}/restore`); bw_reload(); });
-        } catch (x) { err(x.message); }
-      }); return; }
+      if (a === 'file') { /** @type {any} */ ($('#bw-file', md))?.click(); return; }  // 2.633.0 (#4920): fixed hidden file input, its change uploads (a drop onto the window too, dropany.js)
       if (a === 'rmfile') {
         const fid = +b.dataset.fid, id = m.id; m = await api('DELETE', `${BW_U}/${id}/file/${fid}`); $('.bwfilebox', md).innerHTML = bw_fileHtml(m); bw_reload();
         toast(tr('Removed'), async () => { await api('POST', `${BW_U}/${id}/file/${fid}/restore`); bw_reload(); });
@@ -367,10 +370,6 @@ async function bw_payLoad(md, id) {
   });
 }
 function bw_fd(f) { const fd = new FormData(); fd.append('file', f, f.name || 'bill.pdf'); return fd; }
-function bw_pick(done) {
-  const i = document.createElement('input'); i.type = 'file'; i.accept = 'application/pdf,.pdf,image/jpeg,image/png';
-  i.onchange = () => { if (i.files[0]) done(i.files[0]); }; i.click();
-}
 
 // ---- the evaluation (approved receipts only), CSV / PDF with the same filters
 async function bw_loadReport() {

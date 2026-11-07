@@ -203,7 +203,7 @@ function bnkImpModal(text, name, after) {  // text + name: one statement read al
   };
   const start = () => {
     card.innerHTML = `<h3>${tr('Import bank statement')}</h3><p class="muted">${tr('Which file from your online banking?')}</p>${bnkHintHtml()}
-      <div class="bnk-drop" data-bi-drop><button type="button" class="btn pri" data-bi="pick">${ic('upload', 's')}<span>${tr('Select files')}</span></button><small class="muted">${tr('or drop them here')}</small></div>
+      <div class="bnk-drop" data-bi-drop><input type="file" id="bi-file" class="bnk-file" accept="${esc(BNK_ACCEPT)}" multiple hidden><button type="button" class="btn pri" data-bi="pick">${ic('upload', 's')}<span>${tr('Select files')}</span></button><small class="muted">${tr('or drop them here')}</small></div>
       ${foot('')}`;
   };
   const filesInfo = p => {
@@ -235,7 +235,7 @@ function bnkImpModal(text, name, after) {  // text + name: one statement read al
     if (am) { for (const x of $$('#bi-am [data-am]', md)) { x.classList.toggle('on', x === am); x.setAttribute('aria-checked', x === am); } $('.bi-one', md).hidden = am.dataset.am === 'two'; $('.bi-two', md).hidden = am.dataset.am !== 'two'; return; }
     const b = e.target.closest('button[data-bi]'); if (!b) return;
     if (b.dataset.bi === 'close') { md.remove(); return; }
-    if (b.dataset.bi === 'pick') { const i = document.createElement('input'); i.type = 'file'; i.multiple = true; i.accept = BNK_ACCEPT; i.className = 'bnk-file'; i.hidden = true; i.onchange = () => { take(i.files); i.remove(); }; md.append(i); i.click(); return; }
+    if (b.dataset.bi === 'pick') { $('#bi-file', md)?.click(); return; }  // 2.633.0 (#4920): fixed hidden file input, its change uploads (a drop onto the window too, dropany.js)
     if (b.dataset.bi === 'back') { await preview(null); return; }
     if (st.p?.columns) { st.mapping = mapOf(); b.disabled = true; await preview(st.mapping); return; }
     // 2.356.0 B (#2934): the target before the start, in words: the office area of the account(s) + the account (#1940)
@@ -252,6 +252,7 @@ function bnkImpModal(text, name, after) {  // text + name: one statement read al
         redo: async () => { await api('POST', `/api/office/bank/imports/${iid}/restore`); BNK.imports = null; bnkReload(); }}));
     } catch (x) { b.disabled = false; err(x.message); }
   });
+  md.addEventListener('change', e => { const t = e.target; if (t.id === 'bi-file' && t.files?.length) { take(t.files); t.value = ''; } });  // 2.633.0 (#4920)
   // 2.144.1 B (#2446): files dropped onto the dialog
   md.addEventListener('dragover', e => { if ([...(e.dataTransfer?.types || [])].includes('Files')) { e.preventDefault(); $('[data-bi-drop]', md)?.classList.add('on'); } });
   md.addEventListener('dragleave', e => { if (!md.contains(e.relatedTarget)) $('[data-bi-drop]', md)?.classList.remove('on'); });

@@ -183,7 +183,7 @@ function viewMindmap(l) {
     <div class="seg" role="group" aria-label="${esc(tr('View'))}"><button type="button" data-mm="as-map" class="${MM.outline ? '' : 'on'}" aria-pressed="${!MM.outline}">${ic('mindmap', 's')}<span class="sr">${tr('Mind map')}</span></button><button type="button" data-mm="as-outline" class="${MM.outline ? 'on' : ''}" aria-pressed="${MM.outline}" title="${esc(tr('Outline'))}">${ic('list', 's')}<span class="sr">${tr('Outline')}</span></button></div>
     <button type="button" class="iconbtn ${MM.props ? 'on' : ''}" data-mm="props" aria-pressed="${MM.props}" title="${esc(tr('Show properties') + (isTouch() ? '' : ' (E)'))}" aria-label="${esc(tr('Show properties'))}">${ic('sliders', 's')}</button>
     ${MM.outline ? '' : `<button type="button" class="iconbtn" data-mm="fit" title="${esc(tr('Fit to screen'))}" aria-label="${esc(tr('Fit to screen'))}">${ic('expand', 's')}</button>`}
-    <button type="button" class="iconbtn" data-mm="more" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots')}</button></div>`;
+    ${ro ? '' : `<input type="file" id="mm-import-file" accept="${MM_IMPORT_ACCEPT}" hidden>`}<button type="button" class="iconbtn" data-mm="more" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots')}</button></div>`;
   const ib = mm_ideasBar();
   if (MM.outline) return `<div class="mmwrap mmout" data-lid="${l.id}">${bar}${ib}${mm_outlineHtml(tree, ro)}</div>`;
   if (!MM.pan) { MM.pan = mm_fitPan(L); MM.fitNow = true; }  // fitted again to the real stage once it is on the page (mm_bind)
@@ -350,18 +350,20 @@ function mm_exportPng() {
   img.onerror = () => toast(tr('The image could not be made'));
   img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
 }
+// 2.633.0 (#4920): fixed hidden file input before the "More" button, its change uploads (a drop onto the window too, dropany.js)
+const MM_IMPORT_ACCEPT = '.md,.txt,.opml,.mm,.xml,text/markdown,text/plain,text/xml';
 function mm_import() {
   const l = listById(MM.lid); if (!l || mm_ro(l)) return;
-  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.md,.txt,.opml,.mm,.xml,text/markdown,text/plain,text/xml';
-  inp.onchange = async () => {
-    const f = inp.files?.[0]; if (!f) return;
-    if (f.size > 500000) { toast(tr('The file is too large')); return; }
-    const text = await f.text(), ext = (f.name.split('.').pop() || '').toLowerCase();
-    let tree; try { tree = await rawFetch('POST', '/api/outline/parse', {text, format: ext === 'opml' ? 'opml' : ext === 'mm' ? 'mm' : ext === 'md' || ext === 'txt' ? 'md' : ''}); } catch (e) { toast(e.message); return; }
-    await mm_importTree(l, tree);
-  };
-  inp.click();
+  $('#mm-import-file')?.click();
 }
+async function mm_importFile(f) {
+  const l = listById(MM.lid); if (!l || mm_ro(l) || !f) return;
+  if (f.size > 500000) { toast(tr('The file is too large')); return; }
+  const text = await f.text(), ext = (f.name.split('.').pop() || '').toLowerCase();
+  let tree; try { tree = await rawFetch('POST', '/api/outline/parse', {text, format: ext === 'opml' ? 'opml' : ext === 'mm' ? 'mm' : ext === 'md' || ext === 'txt' ? 'md' : ''}); } catch (e) { toast(e.message); return; }
+  await mm_importTree(l, tree);
+}
+document.addEventListener('change', e => { const t = e.target; if (t.id === 'mm-import-file' && t.files?.length) { mm_importFile(t.files[0]); t.value = ''; } });  // 2.633.0 (#4920)
 // 2.156.0 A (#1949): items deeper than maxDepth() levels hang below the deepest allowed level (in their order)
 function mm_flatCap(items, lv) {
   let moved = 0;

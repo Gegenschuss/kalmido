@@ -178,10 +178,14 @@ function rk_fixedModal(f) {
 
 // ---- 2.67.0 (#1838): fixed costs from a spreadsheet: pick a file -> preview (nothing stored) -> take over the ticked rows
 const FCI_VATS = [0, 7, 19];
+// 2.633.0 (#4920): fixed hidden file input, its change uploads (a drop onto the window too, dropany.js): the page with the
+// button puts <input type="file" id="fci-file" accept="(as below)" hidden> right before it; without it the old way
 function fci_pick() {
+  const fi = $('#fci-file'); if (fi) { fi.click(); return; }
   const i = document.createElement('input'); i.type = 'file'; i.accept = '.xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv';
   i.onchange = () => { if (i.files[0]) fci_preview(i.files[0]); }; i.click();
 }
+document.addEventListener('change', e => { const t = e.target; if (t.id === 'fci-file' && t.files?.length) { fci_preview(t.files[0]); t.value = ''; } });  // 2.633.0 (#4920)
 async function fci_preview(file) {
   const fd = new FormData(); fd.append('file', file);
   let j;

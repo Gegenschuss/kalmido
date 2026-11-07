@@ -24,7 +24,7 @@ function dmaListHtml(items, cid) {
       ${adm ? `<span class="dma-acts"><button type="button" class="iconbtn" data-dma="file" data-fid="${f.id}" aria-haspopup="menu" title="${esc(tr('Move to folder…'))}" aria-label="${esc(tr('Move to folder…'))}: ${esc(f.name)}">${ic('folder', 's')}</button><button type="button" class="iconbtn" data-dma="replace" data-fid="${f.id}" title="${esc(tr('Replace'))}" aria-label="${esc(tr('Replace'))}: ${esc(f.name)}">${ic('upload', 's')}</button><button type="button" class="iconbtn" data-dma="rm" data-fid="${f.id}" title="${esc(tr('Remove'))}" aria-label="${esc(tr('Remove'))}: ${esc(f.name)}">${ic('trash', 's')}</button></span>` : ''}</li>`).join('');
   const pend = cid ? '' : DMA.pending.map((f, i) => `<li class="dma-f"><span class="dma-open">${ic('file', 's')}<span class="dma-n">${esc(f.name)}</span><small class="muted">${esc(tr('is attached when you save'))}</small></span><span class="dma-acts"><button type="button" class="iconbtn" data-dma="unpick" data-i="${i}" title="${esc(tr('Remove'))}" aria-label="${esc(tr('Remove'))}: ${esc(f.name)}">${ic('x', 's')}</button></span></li>`).join('');
   const list = rows || pend ? `<ul class="dma-list" role="list">${rows}${pend}</ul>` : `<p class="muted dma-none">${tr('No PDF attached yet')}</p>`;
-  return list + (adm ? `<button type="button" class="btn sm dma-up" data-dma="up">${ic('upload', 's')}<span>${tr('Upload PDF')}</span></button>` : '');
+  return list + (adm ? `<input type="file" id="dma-file" accept="application/pdf,.pdf" multiple hidden><button type="button" class="btn sm dma-up" data-dma="up">${ic('upload', 's')}<span>${tr('Upload PDF')}</span></button>` : '');
 }
 async function dmaLoad(md) {
   const box = $('#dma-box', md); if (!box) return;
@@ -60,13 +60,8 @@ document.addEventListener('click', async e => {
   const md = b.closest('.modal'), box = md && $('#dma-box', md); if (!box) return;
   const cid = +box.dataset.cid, a = b.dataset.dma, fid = +b.dataset.fid, f = (DMA.items || []).find(x => x.id === fid);
   dmaErr(md, '');
-  if (a === 'up') {
-    dmaPick(true, fs => {
-      if (cid) { dmaUploadAll(md, cid, fs); return; }
-      if (fs.some(x => !dmaIsPdf(x))) { dmaErr(md, tr('Only PDF files can be attached')); return; }
-      DMA.pending.push(...fs); box.innerHTML = dmaListHtml([], null);
-    });
-  } else if (a === 'unpick') { DMA.pending.splice(+b.dataset.i, 1); box.innerHTML = dmaListHtml([], null); }
+  if (a === 'up') /** @type {HTMLInputElement|null} */ ($('#dma-file', box))?.click();  // 2.633.0 (#4920): fixed hidden file input, its change uploads (a drop onto the window too, dropany.js)
+  else if (a === 'unpick') { DMA.pending.splice(+b.dataset.i, 1); box.innerHTML = dmaListHtml([], null); }
   else if (a === 'view' && f) {
     const u = dmaUrl(cid, fid);
     typeof pdfView === 'function' ? pdfView({url: u, name: f.name, size: f.size, dlUrl: u}) : window.open(u, '_blank', 'noopener');
@@ -85,6 +80,16 @@ document.addEventListener('click', async e => {
       toast(tr('Removed'), async () => { await api('POST', dmaUrl(cid, fid) + '/restore'); dmaLoad(md); ofcReload('contracts'); });
     } catch (x) { dmaErr(md, x.message); }
   }
+});
+document.addEventListener('change', e => {  // 2.633.0 (#4920): the files of "Upload PDF" (the click or a drop onto the window)
+  const t = /** @type {HTMLInputElement} */ (e.target); if (t.id !== 'dma-file' || !t.files?.length) return;
+  const fs = [...t.files]; t.value = '';
+  const md = /** @type {any} */ (t.closest('.modal')), box = md && $('#dma-box', md); if (!box) return;
+  const cid = +(/** @type {HTMLElement} */ (box).dataset.cid || 0);
+  dmaErr(md, '');
+  if (cid) { dmaUploadAll(md, cid, fs); return; }
+  if (fs.some(x => !dmaIsPdf(x))) { dmaErr(md, tr('Only PDF files can be attached')); return; }
+  DMA.pending.push(...fs); box.innerHTML = dmaListHtml([], null);
 });
 document.addEventListener('change', async e => {
   const inp = /** @type {any} */ (e.target).closest?.('input[data-dma="date"]'); if (!inp) return;

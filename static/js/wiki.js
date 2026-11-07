@@ -417,7 +417,7 @@ function wk_deskHtml(sp, d, id, cur, sel, op) {
   if (all && !op) d = null;  // 2.198.0 A (#2743): no space open: no space's menu, offline mark or lock bar
   const bar = `<div class="wkbar">${sel}<div class="ctsearch">${ic('search', 's')}<input id="wk-q" type="search" value="${esc(WK.q)}" placeholder="${esc(tr('Find a page'))}" aria-label="${esc(tr('Find a page'))}" autocomplete="off"></div>
     <button type="button" class="btn pri" data-wk="new">${ic('plus', 's')}${tr('New page')}</button>${!all || op ? wk_dayBtn() : ''}${wk_canFolder(sp) && (!all || op) ? wk_folderBtn() + wk_selBtn(sp, !q && !id && !!pages.length) : ''}
-    ${S.me?.kid || !op ? '' : `<button type="button" class="iconbtn" data-wk="amenu" aria-haspopup="menu" title="${esc(tr('Workspace'))}" aria-label="${esc(tr('Workspace'))}">${ic('dots')}</button>`}</div>${d?.off ? wko_offHtml(d.off, d.more) : wk_moreHtml(d)}${d && typeof wkeBarHtml === 'function' ? wkeBarHtml(sp) : ''}`;  // 2.169 (#2671): the offline mark; 2.210 A (#2755): the cap online
+    ${S.me?.kid || !op ? '' : `${!id && WK.idx[wk_cur()]?.mayWrite !== false ? '<input type="file" id="wk-zip-file" accept=".zip,application/zip" hidden>' : ''}<button type="button" class="iconbtn" data-wk="amenu" aria-haspopup="menu" title="${esc(tr('Workspace'))}" aria-label="${esc(tr('Workspace'))}">${ic('dots')}</button>`}</div>${d?.off ? wko_offHtml(d.off, d.more) : wk_moreHtml(d)}${d && typeof wkeBarHtml === 'function' ? wkeBarHtml(sp) : ''}`;  // 2.169 (#2671): the offline mark; 2.210 A (#2755): the cap online
   const hits = all && q ? wk_allHitsHtml(q, 'wkdlist') : q && d?.pages ? `<nav id="wk-res" class="wkdlist" aria-label="${esc(tr('Pages'))}">${(v => v.length ? `<ul class="wktree">${v.map((p, i) => `<li><a href="#wiki/${p.id}" class="wkitem">${ic('note', 's')}${wk_hitName(p, i)}</a></li>`).join('')}</ul>` : `<div class="empty">${tr('No page matches.')}</div>`)(pages.filter(p => p.path.toLowerCase().includes(q) || d.off && String(p.body || '').toLowerCase().includes(q)))}${!d.off && typeof wks_html === 'function' ? wks_html(sp, WK.q, pages.filter(p => p.path.toLowerCase().includes(q))) : ''}</nav>` : '';  // 2.169 (#2671): offline the texts are searched here
   if (id && !hits) return `<div class="ntwrap wkwrap wkdesk">${bar}<article class="ntedit wkpage${typeof wkst_cls === 'function' ? wkst_cls(cur?.space || sp) : ''}" aria-label="${esc(cur ? wk_base(cur.path) : tr('Page'))}">${cur ? (cur._wke && typeof wkeLockHtml === 'function' ? wkeLockHtml(cur.space, true) : wk_pageHtml(cur)) : (WK.pgErr && WK.pgLost === id ? wk_lostHtml() : `<div class="muted mhint">${WK.pgErr ? esc(WK.pgErr) : tr('Loading…')}</div>`)}</article></div>`;
   if (!hits && S.route.wtag != null && typeof wkt_viewHtml === 'function' && (!all || op)) return `<div class="ntwrap wkwrap wkdesk">${bar}<section class="wkfolder wktagview" aria-label="${esc(tr('Tags'))}">${wkt_viewHtml(sp, S.route.wtag)}</section></div>`;  // 2.371 (#3150): a tag's pages
@@ -624,26 +624,23 @@ function wka_put(h, fls) {
 function wka_html(p, may) {
   const fs = p.files || [], open = !wk_e2e(p.space);
   if (!fs.length && !(may && open)) return '';
-  return `<section class="wkfiles" aria-label="${esc(tr('Files'))}"><h4>${ic('file', 's')}${tr('Files')}${fs.length ? ` · ${fs.length}` : ''}<span class="spacer"></span>${may && open ? `<button type="button" class="btn" data-wka="add">${ic('upload', 's')}${tr('Attach files')}</button>` : ''}</h4>
+  return `<section class="wkfiles" aria-label="${esc(tr('Files'))}"><h4>${ic('file', 's')}${tr('Files')}${fs.length ? ` · ${fs.length}` : ''}<span class="spacer"></span>${may && open ? `<input type="file" id="wka-file" multiple accept="${WKA_ACCEPT}" hidden><button type="button" class="btn" data-wka="add">${ic('upload', 's')}${tr('Attach files')}</button>` : ''}</h4>
     ${fs.length ? `<ul>${fs.map(f => `<li><a class="wkfile" href="${esc(f.url)}" target="_blank" rel="noopener" title="${esc(f.name)}">${f.image ? `<img src="${esc(f.url)}" alt="" loading="lazy">` : ic('pdf')}<span class="an">${esc(f.name)}</span><span class="as">${fmtSize(f.size)}</span></a>
       <button type="button" class="iconbtn" data-wka="copy" data-id="${f.id}" title="${esc(tr('Copy link'))}" aria-label="${esc(tr('Copy link'))}">${ic('link')}</button>${may ? `<button type="button" class="iconbtn" data-wka="del" data-id="${f.id}" title="${esc(tr('Delete'))}" aria-label="${esc(tr('Delete'))}">${ic('trash')}</button>` : ''}</li>`).join('')}</ul>` : ''}</section>`;
 }
 const wka_md = f => `${f.image ? '!' : ''}[${f.name.replace(/[[\]]/g, '')}](${f.url})`;
-function wka_add(p) {
-  const inp = document.createElement('input');
-  inp.type = 'file'; inp.multiple = true; inp.accept = '.pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,application/pdf,image/*';
-  inp.onchange = async () => {
-    const fl = [...(inp.files || [])]; if (!fl.length) return;
-    const fd = new FormData(); fl.forEach(f => fd.append('file', f));
-    let r; try { r = await rawFetch('POST', `/api/wiki/pages/${p.id}/files`, fd); } catch (e) { toast(e.message); return; }
-    const files = (r.files || []).map(f => f.id);
-    wk_after(p.space);
-    const e = histAdd({label: tr('Attach files'), ids: [], snaps: [], lids: [], wsp: p.space,
-      undo: async () => { await rawFetch('POST', '/api/wiki/trash', {ids: [], files}); wk_after(p.space); return {skipped: []}; },
-      redo: async () => { await rawFetch('POST', '/api/wiki/restore', {ids: [], files}); wk_after(p.space); return {skipped: []}; }});
-    histToast(tr('{0} files attached', files.length), e);
-  };
-  inp.click();
+// 2.633.0 (#4920): fixed hidden file input before "Attach files" (wka_html), its change uploads (a drop onto the window too, dropany.js)
+const WKA_ACCEPT = '.pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,application/pdf,image/*';
+document.addEventListener('change', e => { const t = e.target; if (t.id === 'wka-file' && t.files?.length) { if (WK.pg) wka_add(WK.pg, [...t.files]); t.value = ''; } });
+async function wka_add(p, fl) {
+  const fd = new FormData(); fl.forEach(f => fd.append('file', f));
+  let r; try { r = await rawFetch('POST', `/api/wiki/pages/${p.id}/files`, fd); } catch (e) { toast(e.message); return; }
+  const files = (r.files || []).map(f => f.id);
+  wk_after(p.space);
+  const e = histAdd({label: tr('Attach files'), ids: [], snaps: [], lids: [], wsp: p.space,
+    undo: async () => { await rawFetch('POST', '/api/wiki/trash', {ids: [], files}); wk_after(p.space); return {skipped: []}; },
+    redo: async () => { await rawFetch('POST', '/api/wiki/restore', {ids: [], files}); wk_after(p.space); return {skipped: []}; }});
+  histToast(tr('{0} files attached', files.length), e);
 }
 async function wka_del(p, f) {
   try { await rawFetch('DELETE', '/api/wiki/files/' + f.id); } catch (e) { toast(e.message); return; }
@@ -669,7 +666,7 @@ function wka_report(r) {
 document.addEventListener('click', e => {
   const a = e.target.closest?.('[data-wka]'); if (!a || !$('#view')?.contains(a)) return;
   const p = WK.pg, f = p?.files?.find(x => x.id === +a.dataset.id); if (!p) return;
-  if (a.dataset.wka === 'add') wka_add(p);
+  if (a.dataset.wka === 'add') $('#wka-file')?.click();  // 2.633.0 (#4920): the input's change uploads
   else if (a.dataset.wka === 'copy' && f) navigator.clipboard?.writeText(wka_md(f)).then(() => toast(tr('Link copied')));
   else if (a.dataset.wka === 'del' && f) wka_del(p, f);
 });
@@ -951,21 +948,25 @@ async function wk_trashDlg(sp = wk_cur()) {
   });
   await draw();
 }
+// 2.633.0 (#4920): fixed hidden file input #wk-zip-file before the bar's space menu (wk_deskHtml, no page open: there the drop
+// goes to "Attach files"), its change imports (a drop onto the window too, dropany.js); without that input made here as before
 function wk_import() {
-  let sp = wk_cur();
+  const fx = $('#wk-zip-file'); if (fx) { fx.click(); return; }
   const inp = document.createElement('input');
   inp.type = 'file'; inp.accept = '.zip,application/zip';
-  inp.onchange = async () => {
-    const f = inp.files?.[0]; if (!f) return;
-    // 2.87.9 (#1940): where the pages go, in words; from an organisation's knowledge also into the private one
-    const to = await importTargetConfirm({what: tr('the pages'), ws: sp, place: tr('Knowledge pages'), privOk: true});
-    if (!to) return;
-    if (to === 'private') sp = 'private';
-    if (!wk_e2e(sp)) { wki_start(sp, f); return; }  // 2.177.0 (#2685): in pieces with progress, unpacked in the background (wkimport.js)
-    let r; try { r = await wki_e2e(sp, f); } catch (e) { toast(e.message); return; }  // 2.64.3 B (#1817): read and encrypted in the browser
-    if (r) wka_done(sp, r);
-  };
+  inp.onchange = () => { const f = inp.files?.[0]; if (f) wk_importFile(f); };
   inp.click();
+}
+document.addEventListener('change', e => { const t = e.target; if (t.id === 'wk-zip-file' && t.files?.length) { wk_importFile(t.files[0]); t.value = ''; } });
+async function wk_importFile(f) {
+  let sp = wk_cur();
+  // 2.87.9 (#1940): where the pages go, in words; from an organisation's knowledge also into the private one
+  const to = await importTargetConfirm({what: tr('the pages'), ws: sp, place: tr('Knowledge pages'), privOk: true});
+  if (!to) return;
+  if (to === 'private') sp = 'private';
+  if (!wk_e2e(sp)) { wki_start(sp, f); return; }  // 2.177.0 (#2685): in pieces with progress, unpacked in the background (wkimport.js)
+  let r; try { r = await wki_e2e(sp, f); } catch (e) { toast(e.message); return; }  // 2.64.3 B (#1817): read and encrypted in the browser
+  if (r) wka_done(sp, r);
 }
 // the end of an import: the report, one Undo step (2.177.0 #2685: also from wkimport.js when the server finished)
 function wka_done(sp, r) {

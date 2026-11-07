@@ -20,9 +20,20 @@ const AV_BOTS = AV_PRESETS.map(([k], i) => ['a-' + k, AV_BOTS_N[i]]);
 const avTitle = k => tr([...AV_PRESETS, ...AV_BOTS].find(([x]) => x === k)?.[1] || 'Profile picture');
 function avPickHtml(cur = S.me?.avatar || '', own = true, name = S.me?.display_name, set = AV_PRESETS) {
   return set.map(([k]) => `<button type="button" class="avopt ${cur === `/static/avatars/${k}.svg` ? 'on' : ''}" data-av="${k}" title="${esc(avTitle(k))}" aria-label="${esc(avTitle(k))}" aria-pressed="${cur === `/static/avatars/${k}.svg`}"><img src="/static/avatars/${k}.svg" alt=""></button>`).join('') +
-    (own ? `<button type="button" class="avopt up ${cur.startsWith('/api/avatar/') ? 'on' : ''}" data-av="upload" title="${esc(tr('Upload a photo…'))}" aria-label="${esc(tr('Upload a photo…'))}">${cur.startsWith('/api/avatar/') ? `<img src="${esc(cur)}" alt="">` : ic('plus')}</button>` : '') +
+    (own ? `<input type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden data-fpass><button type="button" class="avopt up ${cur.startsWith('/api/avatar/') ? 'on' : ''}" data-av="upload" title="${esc(tr('Upload a photo…'))}" aria-label="${esc(tr('Upload a photo…'))}">${cur.startsWith('/api/avatar/') ? `<img src="${esc(cur)}" alt="">` : ic('plus')}</button>` : '') +
     `<button type="button" class="avopt none ${cur ? '' : 'on'}" data-av="none" title="${esc(tr('No picture (initials)'))}" aria-label="${esc(tr('No picture (initials)'))}" aria-pressed="${!cur}">${esc(initials(name))}</button>`;
 }
+// 2.633.0 (#4920): fixed hidden file input, its change uploads (a drop onto the window too, dropany.js). For pickers whose
+// button is wired in other files (profile / agent picture, project icon): the change hands the file to the click of the button
+// right after the input (<input data-fpass hidden><button>), and the button's own upload path takes it (fpass_take) instead of
+// opening the file picker - same checks, same crop, same toasts. A click on the button alone still opens the picker.
+const FPASS = {f: /** @type {File|null} */ (null)};
+const fpass_take = () => { const f = FPASS.f; FPASS.f = null; return f; };
+document.addEventListener('change', e => {
+  const t = e.target; if (!t.matches?.('input[type="file"][data-fpass]') || !t.files?.length) return;
+  FPASS.f = t.files[0]; t.value = '';
+  try { t.nextElementSibling?.click(); } finally { FPASS.f = null; }  // taken synchronously by the button's handler, else dropped
+});
 // 2.47.1 (#1721): the palette of the fixed account colours as round buttons (the own colour here, an agent's in its settings)
 const AC_NAMES = [N_('Blue'), N_('Orange'), N_('Green'), N_('Purple'), N_('Red'), N_('Teal'), N_('Yellow'), N_('Pink'), N_('Sky blue'), N_('Brown'), N_('Violet'), N_('Lime')];
 const ac_pickHtml = (cur, who) => AC_COLORS.map((c, i) => `<button type="button" data-accol="${c}" data-acwho="${esc(String(who))}" style="--acol:${c}" title="${esc(tr(AC_NAMES[i]))}" aria-label="${esc(tr(AC_NAMES[i]))}" aria-pressed="${cur === c}"></button>`).join('');
@@ -114,13 +125,17 @@ function avCropModal(file, opt = {}) {
   });
 }
 async function avUpload(url = '/api/me/avatar', done = avSet) {  // 2.1.2 (#346): also an agent's picture (admins)
-  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/jpeg,image/png,image/webp,image/gif';
-  inp.addEventListener('change', async () => {
-    const f = inp.files?.[0]; if (!f) return;
+  const go = async f => {
     if (f.size > 8 * 1024 * 1024) { toast(tr('The picture is too large (at most {0} MB)', 8)); return; }
     const bl = await avCropModal(f); if (!bl) return;
     const fd = new FormData(); fd.append('file', bl, 'avatar.jpg');
     try { done(await api('POST', url, fd)); toast(tr('Profile picture saved')); } catch { /* api() showed it */ }
+  };
+  const f0 = fpass_take(); if (f0) { go(f0); return; }  // 2.633.0 (#4920): the file of the fixed input before the button (avPickHtml)
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/jpeg,image/png,image/webp,image/gif';
+  inp.addEventListener('change', async () => {
+    const f = inp.files?.[0]; if (!f) return;
+    go(f);
   });
   inp.click();
 }
@@ -230,7 +245,7 @@ async function wsPaneDraw(md) {
     ${o.role === 'admin' && j.manage ? oinvRoleSel.help(o.roles || []) : ''}
     ${o.role === 'admin' && j.manage ? `<div class="row wsadd"><button type="button" class="btn sm" data-oinv="new">${ic('send', 's')} ${tr('Invite people')}</button></div>${''/* 2.364.0 C (#3041): one dialog (e-mail or link) instead of the field + Add */}
     <div class="row"><label for="ws-name-${o.id}">${tr('Name')}</label><input id="ws-name-${o.id}" value="${esc(o.name)}" maxlength="60" data-wsf="name"><label for="ws-dom-${o.id}">${tr('E-mail domains')}</label><input id="ws-dom-${o.id}" value="${esc(o.domains || '')}" ${S.me?.is_admin ? 'placeholder="example.com" data-wsf="domains"' : 'readonly'}></div>${S.me?.is_admin ? '' : `<div class="muted mhint" id="ws-dom-hint-${o.id}">${tr('Only an admin of this server sets the e-mail domains of an organisation')}</div>`}` : ''}${''/* 2.166.0 (#2633): name and domains save themselves (no Save button); 2.467.0 (#3898): domains read only unless an admin of the server */}
-    ${o.role === 'admin' && j.manage ? `<div class="row wsic"><label>${tr('Symbol')}</label><span class="wsicprev">${orgIconHtml(o)}</span><button type="button" class="btn sm" data-wsic="up">${ic('picture', 's')} ${tr('Upload a picture…')}</button>${o.icon_url ? `<button type="button" class="btn sm" data-wsic="rm">${tr('Remove the picture')}</button>` : ''}</div>` : ''}${''/* 2.87.9 (#1913) */}
+    ${o.role === 'admin' && j.manage ? `<div class="row wsic"><label>${tr('Symbol')}</label><span class="wsicprev">${orgIconHtml(o)}</span><input type="file" id="ws-icfile-${o.id}" accept="image/jpeg,image/png,image/webp,image/gif" hidden data-wsicf><button type="button" class="btn sm" data-wsic="up">${ic('picture', 's')} ${tr('Upload a picture…')}</button>${o.icon_url ? `<button type="button" class="btn sm" data-wsic="rm">${tr('Remove the picture')}</button>` : ''}</div>` : ''}${''/* 2.87.9 (#1913) */}
     ${o.role === 'admin' ? `<div class="row"><button type="button" class="btn sm" data-oadm="${o.id}">${ic('list', 's')} ${tr('Projects of the organisation')}</button><button type="button" class="btn sm" data-otk="${o.id}">${ic('done', 's')} ${tr('Tasks of the organisation')}</button></div>` : ''}${''/* 2.574.0 (#3376): + the read-only task view */}
     ${o.role === 'admin' && inl ? dataBoxes(o) : ''}${''/* 2.42.0 (#828): encryption + recovery key, export; 2.146.0 D (#2468): the retention export */}
     ${o.role === 'admin' ? whoBoxHtml(o) : ''}${''/* 2.115.0 A (#2061): the organisation's webhooks; lazy-ok: 2.149.0 F (#2519): settings dialog only (LD_NEED loads integrations) */}
@@ -260,6 +275,8 @@ async function wsPaneDraw(md) {
 }
 function wsPaneWire(md) {
   md.addEventListener('change', async e => {
+    const t = e.target;  // 2.633.0 (#4920): the symbol's fixed file input (wsPaneDraw)
+    if (t.dataset?.wsicf !== undefined && t.files?.length) { const fl = t.files[0]; t.value = ''; wsIconFile(md, +t.closest('[data-oid]').dataset.oid, fl); return; }
     const f = e.target.dataset?.wsf;
     if (f) {  // 2.166.0 (#2633): the organisation's name / e-mail domains save when the field is left (the settings pattern of #2247)
       const el = e.target, oid = +el.closest('[data-oid]').dataset.oid, v = f === 'name' ? el.value.trim() : el.value;
@@ -281,7 +298,11 @@ function wsPaneWire(md) {
     const otk = e.target.closest('[data-otk]');
     if (otk) { const o = (($('#s-ws', md)._j || {}).orgs || []).find(x => x.id === +otk.dataset.otk); otkOpen(+otk.dataset.otk, o?.name || ''); return; }  // 2.574.0 (#3376)
     const wi = e.target.closest('[data-wsic]');
-    if (wi) { wsIconPick(md, +wi.closest('[data-oid]').dataset.oid, wi.dataset.wsic); return; }  // 2.87.9 (#1913)
+    if (wi) {  // 2.87.9 (#1913)
+      const oid = +wi.closest('[data-oid]').dataset.oid;
+      if (wi.dataset.wsic === 'up') { $(`#ws-icfile-${oid}`, md)?.click(); return; }  // 2.633.0 (#4920): fixed hidden file input, its change uploads (a drop onto the window too, dropany.js)
+      wsIconPick(md, oid, wi.dataset.wsic); return;
+    }
     const ok = e.target.closest('[data-wsok]');
     if (ok) { try { await api('POST', `/api/users/${ok.dataset.wsok}/approve`, {}); toast(tr('Approved: the person can sign in now')); } catch { /* shown */ } wsPaneDraw(md); return; }  // 2.464.0 (#3882)
     const wd = e.target.closest('[data-wsdel]');
@@ -324,18 +345,20 @@ function olvLeaveHtml(j, self) {
 }
 // 2.87.9 (#1913): an organisation admin sets an own picture as its symbol (cropped square like a list icon) or removes it;
 // 2.161.0 (#2594): after = what to redraw instead of the workspaces pane (the admin dialog "Edit organisation")
+const wsIconDone = async (md, after) => { toast(tr('Saved')); await load(); render(); after ? await after() : wsPaneDraw(md); };
 async function wsIconPick(md, oid, how, after) {
-  const done = async () => { toast(tr('Saved')); await load(); render(); after ? await after() : wsPaneDraw(md); };
-  if (how === 'rm') { try { await api('DELETE', `/api/orgs/${oid}/icon`); await done(); } catch { /* api() showed it */ } return; }
+  if (how === 'rm') { try { await api('DELETE', `/api/orgs/${oid}/icon`); await wsIconDone(md, after); } catch { /* api() showed it */ } return; }
+  const f0 = fpass_take(); if (f0) { wsIconFile(md, oid, f0, after); return; }  // 2.633.0 (#4920): a fixed input before the button (data-fpass)
   const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/jpeg,image/png,image/webp,image/gif';
-  inp.addEventListener('change', async () => {
-    const f = inp.files?.[0]; if (!f) return;
-    if (f.size > 8 * 1024 * 1024) { toast(tr('The picture is too large (at most {0} MB)', 8)); return; }
-    const bl = await avCropModal(f, {title: tr('Symbol'), png: true, square: true}); if (!bl) return;
-    const fd = new FormData(); fd.append('file', bl, 'icon.png');
-    try { await api('POST', `/api/orgs/${oid}/icon`, fd); await done(); } catch { /* api() showed it */ }
-  });
+  inp.addEventListener('change', () => { const f = inp.files?.[0]; if (f) wsIconFile(md, oid, f, after); });
   inp.click();
+}
+// 2.633.0 (#4920): the chosen / dropped picture of an organisation's symbol: checked, cropped, uploaded
+async function wsIconFile(md, oid, f, after) {
+  if (f.size > 8 * 1024 * 1024) { toast(tr('The picture is too large (at most {0} MB)', 8)); return; }
+  const bl = await avCropModal(f, {title: tr('Symbol'), png: true, square: true}); if (!bl) return;
+  const fd = new FormData(); fd.append('file', bl, 'icon.png');
+  try { await api('POST', `/api/orgs/${oid}/icon`, fd); await wsIconDone(md, after); } catch { /* api() showed it */ }
 }
 // ---- 2.35.0 (#1101): an organisation admin's "Lists of the organisation": the lists that belong to the organisation (never
 // private lists, private sharing or inboxes) with owner, numbers and the last change - never their contents. Archive / restore,
@@ -477,11 +500,15 @@ function ole_edit(om, oid, x) {
     if (b.dataset.licon) {
       const k = b.dataset.licon;
       if (k !== 'upload') { await iconSet(k); return; }
+      const go = async f => {
+        if (f.size > 8 * 1024 * 1024) { toast(tr('The picture is too large (at most {0} MB)', 8)); return; }
+        const bl = await avCropModal(f, {title: tr('Project icon'), png: true, square: true}); if (bl) await iconSet(bl);
+      };
+      const f0 = fpass_take(); if (f0) { go(f0); return; }  // 2.633.0 (#4920): the file of the fixed input before the button (liconPickHtml)
       const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/jpeg,image/png,image/webp,image/gif';
       inp.addEventListener('change', async () => {
         const f = inp.files?.[0]; if (!f) return;
-        if (f.size > 8 * 1024 * 1024) { toast(tr('The picture is too large (at most {0} MB)', 8)); return; }
-        const bl = await avCropModal(f, {title: tr('Project icon'), png: true, square: true}); if (bl) await iconSet(bl);
+        go(f);
       });
       inp.click(); return;
     }

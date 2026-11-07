@@ -159,7 +159,7 @@ function shvOverview(lid) {
   const hooks = SHV_HOOKS.overview.length;
   const head = `<div class="shvtop">${lid ? `<a class="btn sm" href="#l/${lid}">${ic('back', 's')}${esc(l ? lname(l) : tr('Project'))}</a>` : ''}
     ${lid ? `<h2 class="shvh">${esc(tr('Attached to {0}', l ? lname(l) : ''))}</h2><a class="btn sm" href="#sheets">${esc(tr('All tables'))}</a>` : ''}<span class="spacer"></span>
-    ${hooks ? `<button type="button" class="iconbtn" data-shv="omenu" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots')}</button>` : ''}
+    ${hooks ? `${typeof SHX_IMPORT_ACCEPT === 'string' ? `<input type="file" id="shx-import-file" accept="${SHX_IMPORT_ACCEPT}" hidden>` : ''}<button type="button" class="iconbtn" data-shv="omenu" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots')}</button>` : ''}
     ${!lid || (l && canEditList(lid)) ? `<button type="button" class="btn sm pri" data-shv="new">${ic('plus', 's')}${lid ? tr('Attach a new table') : tr('New table')}</button>` : ''}</div>`;
   if (!d?.items) return `<div class="shvwrap shvov">${head}<p class="muted lempty" role="status">${d?.err ? esc(d.err) : tr('Loading…')}</p></div>`;
   if (!items.length && (lid || !shf_data().folders.length)) return `<div class="shvwrap shvov">${head}${symEmpty('sheet', lid ? tr('No tables attached yet.') : tr('No tables yet.'), lid ? tr('Tables are independent. The ones you attached to this project appear here.') : tr('Lists and calculations; every cell can fetch figures from Kalmido: hours booked, budget, open tasks.'))}</div>`;
