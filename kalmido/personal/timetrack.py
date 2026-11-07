@@ -339,10 +339,12 @@ def time_day_h(c):
 BUDGET_FIELD_NAMES = ("budget h", "budget (h)", "budget hours", "budget std", "budget (std)", "budget-stunden", "budgetstunden")
 
 
-def budget_parents(c, lid, vals):
+def budget_parents(c, lid, vals, up=None):
     """2.410.0 (#3437): a budget counts once per branch - the tasks of list lid with a budget value (vals: {task_id: hours})
-    below them; their own value is left out of the sum (the subtasks' values count instead; the stored value stays)."""
-    up = dict(c.execute("SELECT id, parent_id FROM tasks WHERE list_id=? AND deleted_at IS NULL AND parent_id IS NOT NULL", (lid,)).fetchall())
+    below them; their own value is left out of the sum (the subtasks' values count instead; the stored value stays).
+    up (2.640.0, #4185): {task id: parent id} of the list when the caller read it already (time_list_totals: all lists at once)."""
+    if up is None:
+        up = dict(c.execute("SELECT id, parent_id FROM tasks WHERE list_id=? AND deleted_at IS NULL AND parent_id IS NOT NULL", (lid,)).fetchall())
     out = set()
     for tid in vals:
         p, seen = up.get(tid), {tid}
@@ -368,20 +370,29 @@ def time_list_totals(c, uid, own=False):
             out[r["list_id"]] = {"s": r["s"], "b": None}
     names = set(BUDGET_FIELD_NAMES) | {tr("Budget h", lg=x).lower() for x in LANGS}
     part = set(plists(c, uid))  # a participant sees only some tasks: no budget sum there
-    for r in c.execute(f"""SELECT f.list_id, f.id, f.name FROM list_fields f WHERE f.type='number' AND f.list_id IN {vis_sql()}
-                           AND f.list_id IN {MT_TIME_SQL}""", (uid, uid)).fetchall():
-        if (r["name"] or "").strip().lower() not in names or r["list_id"] in part:
-            continue
-        vals = {}
-        for tid, v in c.execute("""SELECT v.task_id, v.value FROM task_field_values v JOIN tasks t ON t.id=v.task_id
-                                   WHERE v.field_id=? AND t.deleted_at IS NULL""", (r["id"],)):
+    fl = [r for r in c.execute(f"""SELECT f.list_id, f.id, f.name FROM list_fields f WHERE f.type='number' AND f.list_id IN {vis_sql()}
+                                    AND f.list_id IN {MT_TIME_SQL}""", (uid, uid)).fetchall()
+          if (r["name"] or "").strip().lower() in names and r["list_id"] not in part]
+    # 2.640.0 (#4185): the values of all budget fields and the parents of their lists in two queries (were two per field)
+    fv, ups = {}, {}
+    if fl:
+        for fid, tid, v in c.execute("""SELECT v.field_id, v.task_id, v.value FROM task_field_values v JOIN tasks t ON t.id=v.task_id
+                                        WHERE v.field_id = ANY(CAST(? AS BIGINT[])) AND t.deleted_at IS NULL""",
+                                     (st_ids(sorted({r["id"] for r in fl})),)):
             try:
                 x = float(str(v).replace(",", "."))
             except (TypeError, ValueError):
                 continue
             if math.isfinite(x) and x > 0:
-                vals[tid] = x
-        skip = budget_parents(c, r["list_id"], vals) if vals else set()
+                fv.setdefault(fid, {})[tid] = x
+        bl = sorted({r["list_id"] for r in fl if r["id"] in fv})
+        if bl:
+            for tid, lid, p in c.execute("""SELECT id, list_id, parent_id FROM tasks WHERE list_id = ANY(CAST(? AS BIGINT[]))
+                                            AND deleted_at IS NULL AND parent_id IS NOT NULL""", (st_ids(bl),)):
+                ups.setdefault(lid, {})[tid] = p
+    for r in fl:
+        vals = fv.get(r["id"], {})
+        skip = budget_parents(c, r["list_id"], vals, ups.get(r["list_id"], {})) if vals else set()
         tot = sum(x for tid, x in vals.items() if tid not in skip)
         if tot > 0:
             o = out.setdefault(r["list_id"], {"s": 0, "b": None})
