@@ -80,9 +80,11 @@ const item = (d, t) => items(d).find(x => (x.querySelector('.ml')?.firstChild?.t
   check(ta, '#1346: the new notepad opens for writing');
   if (ta) {
     ta.value = '- call **the printer**'; ta.dispatchEvent(new w.Event('input', {bubbles: true}));
+    // 2.634.0 (#4996): red once in the CI (v2.626.0), cause not found on the Mac: the state at leaving and at the end goes into the message
+    const st0 = w.eval(`JSON.stringify({pad: WG.pad, focus: document.activeElement?.className || document.activeElement?.tagName})`) + ' connected:' + ta.isConnected;
     ta.dispatchEvent(new w.FocusEvent('focusout', {bubbles: true})); ta.blur();
     y = await until(async () => { const x = await lay(); return (x.pads || []).some(p => p.body === '- call **the printer**') ? x : null; });
-    check(y, '#1346: leaving the field saves the notepad');
+    check(y, '#1346: leaving the field saves the notepad ' + (y ? '' : `at leaving ${st0}; now ${w.eval(`JSON.stringify({pad: WG.pad, focus: document.activeElement?.className, toast: document.querySelector('.toast')?.textContent, modal: !!document.querySelector('.modal')})`)} pads ${JSON.stringify((await lay()).pads)}`));
     await until(() => d.querySelector('#view .wgpadmd b'));
     check(d.querySelector('#view .wgpadmd b')?.textContent === 'the printer', '#1346: shown as Markdown');
   }
