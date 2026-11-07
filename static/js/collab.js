@@ -66,13 +66,21 @@ function bellPopHtml() {
 // The size is kept per device (rem, so it follows the font size).
 const BELL_MIN = {w: 18, h: 14}, BELL_MAX_W = 48;
 const remPx = () => parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+// 2.631.0 (#4993): the phone sheet grows at most to the height of its list (and the screen)
+function bellMaxH(pop) {
+  const h = pop.style.height, m = pop.style.maxHeight;
+  pop.style.height = 'auto'; pop.style.maxHeight = 'none';
+  const n = Math.ceil(Math.max(pop.scrollHeight, pop.getBoundingClientRect().height)) || 1e9;
+  pop.style.height = h; pop.style.maxHeight = m;
+  return Math.min(innerHeight - 8, n);
+}
 function bellSize(p) {
   const pop = $('.bpop', p); if (!pop) return;
   const r = remPx();
   if (isMobile()) {
-    const h = +LS.get('bellSheetH', 0) || 0, maxH = innerHeight - 8;
+    const h = +LS.get('bellSheetH', 0) || 0, maxH = h ? bellMaxH(pop) : innerHeight - 8;
     pop.style.height = h ? Math.min(h * r, maxH) + 'px' : ''; pop.style.maxHeight = h ? 'none' : '';
-    p.classList.toggle('bpfull', !!h && h * r >= maxH - 2);
+    p.classList.toggle('bpfull', !!h && Math.min(h * r, maxH) >= innerHeight - 10);
     return;
   }
   const sz = LS.get('bellSize', null);
@@ -95,12 +103,12 @@ function bellResizeWire(p, anchor) {
     if (!grip && !grab) return;
     e.preventDefault();
     const x0 = e.clientX, y0 = e.clientY, w0 = p.offsetWidth, h0 = pop().offsetHeight;
-    let moved = false, last = [w0, h0];
+    let moved = false, last = [w0, h0]; const cap = grab ? Math.max(h0, bellMaxH(pop())) : 0;
     try { (grip || grab).setPointerCapture(e.pointerId); } catch { /* old browsers */ }
     // 2.87.9 (#1965): the size follows once per frame
     const show = rafThrottle((x, y) => {
       if (grip) last = apply(w0 - (x - x0), h0 + (y - y0));
-      else { const h = Math.max(BELL_MIN.h * remPx() * .5, Math.min(innerHeight - 8, h0 - (y - y0))); pop().style.height = h + 'px'; pop().style.maxHeight = 'none'; last = [0, h]; }
+      else { const h = Math.max(BELL_MIN.h * remPx() * .5, Math.min(cap, h0 - (y - y0))); pop().style.height = h + 'px'; pop().style.maxHeight = 'none'; last = [0, h]; }
     });
     const mv = ev => {
       if (Math.abs(ev.clientX - x0) + Math.abs(ev.clientY - y0) > 4) moved = true;
@@ -110,8 +118,8 @@ function bellResizeWire(p, anchor) {
       removeEventListener('pointermove', mv); removeEventListener('pointerup', up); removeEventListener('pointercancel', up);
       show.flush();
       if (grip) { if (moved) save(...last); return; }
-      const r = remPx(), full = innerHeight - 8;
-      if (!moved) { const was = +LS.get('bellSheetH', 0); if (was * r >= full - 2) LS.del('bellSheetH'); else LS.set('bellSheetH', Math.round(full / r * 100) / 100); bellSize(p); return; }
+      const r = remPx(), full = Math.max(h0, bellMaxH(pop()));
+      if (!moved) { const was = +LS.get('bellSheetH', 0); if (was * r >= full - 2 || full <= h0 + 2) LS.del('bellSheetH'); else LS.set('bellSheetH', Math.round(full / r * 100) / 100); bellSize(p); return; }
       if (last[1] < BELL_MIN.h * r * .75) { closePop(); return; }  // dragged far down: close
       LS.set('bellSheetH', Math.round(Math.min(last[1], full) / r * 100) / 100); bellSize(p);
     };
@@ -126,7 +134,7 @@ function bellGripKey(e) {
   const r = remPx(), step = r * (e.shiftKey ? 4 : 1);
   if (g.dataset.bpgrab !== undefined) {  // phone handle: Enter / Space = full height or back
     if (e.key !== 'Enter' && e.key !== ' ') return;
-    e.preventDefault(); const was = +LS.get('bellSheetH', 0); if (was * r >= innerHeight - 10) LS.del('bellSheetH'); else LS.set('bellSheetH', Math.round((innerHeight - 8) / r * 100) / 100); bellSize(p); return;
+    e.preventDefault(); const was = +LS.get('bellSheetH', 0), full = bellMaxH(pop); if (was * r >= full - 2) LS.del('bellSheetH'); else LS.set('bellSheetH', Math.round(full / r * 100) / 100); bellSize(p); return;
   }
   const d = {ArrowLeft: [step, 0], ArrowRight: [-step, 0], ArrowDown: [0, step], ArrowUp: [0, -step]}[e.key];
   if (!d && e.key !== 'Home') return;

@@ -21,6 +21,14 @@ function sd_scrolled(t, el) {
   for (let n = t; n && n !== el.parentElement; n = n.parentElement) if (n.scrollTop > 0) return true;
   return false;
 }
+// 2.631.0 (#4993): the height the content needs (measured with height auto, so a stretched sheet does not raise its own ceiling)
+function sd_natural(el) {
+  const h = el.style.height, m = el.style.maxHeight, tr = el.style.transition;
+  el.style.transition = 'none'; el.style.height = 'auto'; el.style.maxHeight = 'none';
+  const n = Math.max(el.scrollHeight, el.getBoundingClientRect().height);
+  el.style.height = h; el.style.maxHeight = m; el.style.transition = tr;
+  return n > 0 ? Math.ceil(n) : 1e9;  // no layout (jsdom): no ceiling
+}
 function sd_resizable(el) { return el.id === 'pop' || el.classList.contains('card'); }
 function sd_start(t, x, y, touch) {
   if (SD.el) return false;
@@ -31,7 +39,7 @@ function sd_start(t, x, y, touch) {
   const r = el.getBoundingClientRect(), head = y - r.top <= 44;
   if (!head && !touch) return false;  // a mouse drags only at the head (text selection in the content stays)
   const b = getComputedStyle(el).transform;  // the sheet's own transform (quick add on a tablet is centred with translateX)
-  Object.assign(SD, {el, head, base: b && b !== 'none' ? b + ' ' : '', x0: x, y0: y, h0: r.height, on: false, ty: 0, lastY: y, lastT: performance.now(), v: 0, sized: false, t});
+  Object.assign(SD, {el, head, base: b && b !== 'none' ? b + ' ' : '', x0: x, y0: y, h0: r.height, nat: sd_resizable(el) ? sd_natural(el) : 0, on: false, ty: 0, lastY: y, lastT: performance.now(), v: 0, sized: false, t});
   return true;
 }
 // 2.102.0 (#1998): drag.js asks whether a move starts the drag: 8 px in either direction, then only a vertical move, and in
@@ -48,7 +56,7 @@ function sd_move(x, y) {
   const dy = y - SD.y0;
   const now = performance.now(), dt = Math.max(1, now - SD.lastT);
   SD.v = 0.6 * SD.v + 0.4 * ((y - SD.lastY) / dt); SD.lastY = y; SD.lastT = now;
-  const vh = sd_vh(), maxH = Math.max(SD.h0, Math.round(vh * 0.94)), minH = Math.min(SD.h0, Math.round(vh * 0.4));
+  const vh = sd_vh(), maxH = Math.max(SD.h0, Math.min(Math.round(vh * 0.94), SD.nat || 0)), minH = Math.min(SD.h0, Math.round(vh * 0.4));
   let h = SD.h0, ty = 0;
   if (sd_resizable(el)) {
     h = Math.max(minH, Math.min(maxH, SD.h0 - dy));
@@ -79,7 +87,7 @@ function sd_end(cancel) {
     }, 180);
   } else {
     if (SD.sized) {  // snap: half or almost full (a quick move up / down picks the side)
-      const vh = sd_vh(), cur = h - SD.ty, half = Math.round(vh * 0.5), full = Math.max(SD.h0, Math.round(vh * 0.94));  // 2.161.0: a sheet that opens taller than 94 % never shrinks on a drag up
+      const vh = sd_vh(), cur = h - SD.ty, half = Math.round(vh * 0.5), full = Math.max(SD.h0, Math.min(Math.round(vh * 0.94), SD.nat || 0));  // 2.161.0: a sheet that opens taller than 94 % never shrinks on a drag up
       const to = SD.v < -0.4 ? full : SD.v > 0.4 ? half : (Math.abs(cur - half) <= Math.abs(cur - full) ? half : full);
       el.style.height = Math.max(Math.min(to, full), Math.min(SD.h0, half)) + 'px';
     }
