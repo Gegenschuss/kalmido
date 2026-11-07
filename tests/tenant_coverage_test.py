@@ -557,7 +557,7 @@ ROUTES = {
     "POST /api/office/leads/import": "office", "POST /api/office/leads/import/undo": "office",
     "GET /api/v1/office/leads": "office", "POST /api/v1/office/leads": "office", "PATCH /api/v1/office/leads/{}": "office",
     # 2.644.0 (#3663): inquiries and deals for agents (office admins; another organisation 404 in p2644_b_pipeline_agent_test.py)
-    "GET /api/v1/office/deals": "office", "POST /api/v1/office/deals": "office", "PATCH /api/v1/office/deals/{}": "office",
+    "GET /api/v1/office/deals": "office", "POST /api/v1/office/deals": "office", "PATCH /api/v1/office/deals/{}": "office",  # p2644_b_pipeline_agent_test.py
     # 2.94.0 B (#1929): appointment booking settings and bookings of the person (p294_b_api_test.py)
     "GET /api/appt/page": "calendar", "PUT /api/appt/page": "calendar", "GET /api/appt/types": "calendar", "POST /api/appt/types": "calendar",
     "PATCH /api/appt/types/{}": "calendar", "DELETE /api/appt/types/{}": "calendar", "POST /api/appt/types/{}/restore": "calendar",
