@@ -3,8 +3,8 @@ dependency). What a process keeps in memory and another process changes -- a set
 should hear, work for the process that runs a queue -- is told to the others with bus_send(name, data); every process that
 registered bus_on(name, fn) calls fn(data) in its listener thread.
 
-Only when there are other processes (KALMIDO_WEB_PROCS > 1, KALMIDO_REPLICAS > 1 or the roles web / worker of 2.102;
-KALMIDO_PGBUS=1 / 0 forces it on / off): a single process does its own step itself and sends nothing, as before.
+Only when there are other processes (KALMIDO_REPLICAS > 1 or the roles web / worker of 2.102; KALMIDO_PGBUS=1 / 0 forces
+it on / off): a single process does its own step itself and sends nothing, as before.
 The sender always does its own step locally first; a process never handles its own signal again. bus_send(..., c=conn) puts the
 signal into that connection's transaction: Postgres delivers it with the commit (a rollback sends nothing), so the others never
 hear of a row they cannot read yet. A lost listener connection is opened again; since signals of that gap are lost, every
@@ -45,7 +45,7 @@ def bus_active():
     if f in ("0", "off", "false", "no"):
         return False
     role = (os.environ.get("KALMIDO_ROLE", "") or "all").strip().lower()
-    return role in ("web", "worker") or _env_int("KALMIDO_REPLICAS", 1) > 1 or _env_int("KALMIDO_WEB_PROCS", 1) > 1
+    return role in ("web", "worker") or _env_int("KALMIDO_REPLICAS", 1) > 1
 
 
 def bus_on(name, fn):

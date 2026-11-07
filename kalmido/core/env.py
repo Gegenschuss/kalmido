@@ -42,6 +42,7 @@ VARS = (
     _v("KALMIDO_ACX_TTL", "10", "Seconds the access context of a person (roles, organisations) is cached per process (0 = off).", "core"),
     _v("KALMIDO_ROLE", "all", "What this process runs: all (web + background work), web (requests only) or worker (background work only).", "core"),
     _v("KALMIDO_REPLICAS", "1", "Number of web processes behind one database (only for the connection check at start).", "core"),
+    _v("KALMIDO_PGBUS", "auto", "Signals between the processes of one instance over Postgres (LISTEN / NOTIFY): `1` on, `0` off; by default on when `KALMIDO_REPLICAS` is above 1 or `KALMIDO_ROLE` is `web` / `worker`.", "core"),  # 2.622.0 (#3891)
     _v("KALMIDO_INSTANCE_MODE", "", "Older switch of the instance mode (shared / workspaces); since 2.46 only read for the row-level security check.", "core"),
     _v("KALMIDO_ORG_NAME", "", "Name of the first organisation created on a new server.", "core"),
     _v("KALMIDO_UPDATE_CHECK", "1", "Switch: admins see when a newer release exists (one request a few times a day, never updates anything).", "core"),

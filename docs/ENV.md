@@ -21,6 +21,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_MIGRATE_CLI` | `(empty)` | Internal: set by `python app.py migrate-sqlite` for the move from SQLite. |
 | `KALMIDO_ONBOARDING` | `1` | Switch: new accounts get a sample list and the welcome tour. |
 | `KALMIDO_ORG_NAME` | `(empty)` | Name of the first organisation created on a new server. |
+| `KALMIDO_PGBUS` | `auto` | Signals between the processes of one instance over Postgres (LISTEN / NOTIFY): `1` on, `0` off; by default on when `KALMIDO_REPLICAS` is above 1 or `KALMIDO_ROLE` is `web` / `worker`. |
 | `KALMIDO_POOL_MAX` | `(empty)` | Older name of KALMIDO_DB_POOL_MAX (used when that one is not set). |
 | `KALMIDO_REPLICAS` | `1` | Number of web processes behind one database (only for the connection check at start). |
 | `KALMIDO_ROLE` | `all` | What this process runs: all (web + background work), web (requests only) or worker (background work only). |

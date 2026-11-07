@@ -1,4 +1,4 @@
-"""2.622.0 (#3891): short-lived state in the database, so every web process of an instance sees it (KALMIDO_WEB_PROCS,
+"""2.622.0 (#3891): short-lived state in the database, so every web process of an instance sees it (later KALMIDO_WEB_PROCS,
 KALMIDO_REPLICAS, the roles of 2.102). It replaces the dictionaries in the process memory that broke when step one of a flow
 landed in one process and step two in another: sign-in steps (accounts/login.py), OIDC states (accounts/oidc.py), download
 tickets, undo tokens, typing / presence markers and short counters.
