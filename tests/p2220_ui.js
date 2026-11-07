@@ -14,7 +14,7 @@
 const {execFileSync} = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const {boot, sleep, B, login} = require('./boot');
+const {boot, B, login, idle} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const firefox = require('./ff')({tag: 'p2220_ui', check, shots: 'P2220_SHOTS'});
@@ -35,7 +35,7 @@ const LIFE = 'contracts,home,care,health,review,travel,reading';
 const BASE = 'cal,comments,collab,deps,progress,contacts,events';
 
 (async () => {
-  await sleep(600);
+  await until(async () => (await fetch(B + 'sw.js').catch(() => null))?.ok);
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
   await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true, time_all: true, modules: ['cal', 'comments']});
@@ -44,9 +44,9 @@ const BASE = 'cal,comments,collab,deps,progress,contacts,events';
 
   // ================= jsdom: off = no trace
   let w = await boot({user: 'alice', hash: 'life'}), d = w.document;
-  await sleep(300);
+  await until(() => w.eval('S.route?.mod') === 'tasks' && d.querySelector('#srail')); await idle(w);
   check(w.eval('S.route.mod') === 'tasks' && !d.querySelector('#srail [data-sbb="life"]') && !d.querySelector('#srail [data-sbb="review"]'), 'off: #life goes to the tasks, no sidebar rows');  // 2.152.2 (#2622): the area icons of the bar
-  w.eval(`settingsModal('modules')`); await sleep(400);
+  w.eval(`settingsModal('modules')`); await until(() => d.querySelector('.smodal [data-feat="reading"]')); await idle(w);
   const sw = LIFE.split(',').map(k => d.querySelector(`.smodal [data-feat="${k}"]`));
   check(sw.every(x => x && !x.checked), 'Settings > Modules: seven switches under "At home", all off');
   [...d.querySelectorAll('.modal')].forEach(m => m.remove()); w.close();
@@ -58,10 +58,10 @@ const BASE = 'cal,comments,collab,deps,progress,contacts,events';
   check(d.querySelector('#srail [data-sbb="life"].on') && d.querySelector('#side [data-sbbpart="life"][aria-current="page"]') && d.querySelector('#srail [data-sbb="review"]'), 'on: the sidebar rows "Home & life" and "Review & journal"');  // 2.152.2 (#2622 #2618): the area icons in the bar, the part in the panel
   check(['contracts', 'home', 'care', 'health', 'travel', 'reading'].every(k => d.querySelector(`#view .lc-${k}`)), 'the view: a card per module');
   // contract dialog
-  click(w, d.querySelector('#view [data-act="life-contract"]')); await sleep(200);
+  click(w, d.querySelector('#view [data-act="life-contract"]')); await until(() => d.querySelector('.modal.lifedlg #lf-name'));
   let md = d.querySelector('.modal.lifedlg');
   check(md && md.querySelector('#lf-name') && md.querySelector('#lf-ends') && md.querySelector('.lhint.keep'), 'the contract dialog (hint stays visible)');
-  click(w, md.querySelector('[data-m="save"]')); await sleep(200);
+  click(w, md.querySelector('[data-m="save"]')); await until(() => /name/i.test(md.querySelector('.aerr')?.textContent || ''));
   check(/name/i.test(md.querySelector('.aerr').textContent), 'no name: an error in the dialog');
   input(w, md.querySelector('#lf-name'), 'Mobile phone'); md.querySelector('#lf-prov').value = 'Telco'; md.querySelector('#lf-cost').value = '19,99';
   md.querySelector('#lf-ends').value = day(120); md.querySelector('#lf-notice').value = '1'; md.querySelector('#lf-nu').value = 'm'; md.querySelector('#lf-renew').value = '12';
@@ -73,9 +73,9 @@ const BASE = 'cal,comments,collab,deps,progress,contacts,events';
   await until(() => d.querySelector('#view .lc-contracts .lsum'));
   check(/19[.,]99/.test(d.querySelector('#view .lc-contracts .lsum').textContent) && /Mobile phone/.test(d.querySelector('#view .lc-contracts').textContent), 'the card: the sum per month and the contract');
   // the task panel: the contract section, edit
-  w.eval(`openDetail(${C.id})`); await sleep(400);
+  w.eval(`openDetail(${C.id})`); await until(() => /Telco/.test(d.querySelector('#detail .lifesec')?.textContent || '')); await idle(w);
   check(d.querySelector('#detail .lifesec') && /Telco/.test(d.querySelector('#detail .lifesec').textContent), 'the task panel: the contract section');
-  click(w, d.querySelector('#detail [data-act="life-cedit"]')); await sleep(200);
+  click(w, d.querySelector('#detail [data-act="life-cedit"]')); await until(() => d.querySelector('.modal.lifedlg #lf-name')?.value === 'Mobile phone');
   md = d.querySelector('.modal.lifedlg');
   check(md && md.querySelector('#lf-name').value === 'Mobile phone' && md.querySelector('#lf-ends').value === day(120), 'edit: the dialog filled (the end = due + notice)');
   md.querySelector('#lf-cost').value = '24,50';
@@ -83,15 +83,15 @@ const BASE = 'cal,comments,collab,deps,progress,contacts,events';
   check(await until(async () => (await call('GET', `/api/tasks/${C.id}`)).fam?.cost === 24.5), 'edit: the cost saved');
   w.eval('closeDetail()');
   // device, upkeep (a suggestion), health (medication), trip
-  w.eval('deviceModal()'); await sleep(150); md = d.querySelector('.modal.lifedlg');
+  w.eval('deviceModal()'); md = await until(() => d.querySelector('.modal.lifedlg #lf-model')?.closest('.modal.lifedlg'));
   input(w, md.querySelector('#lf-name'), 'Washing machine'); click(w, md.querySelector('[data-m="save"]'));
   await until(() => !md.isConnected);
-  await w.eval('upkeepModal()'); await sleep(300); md = d.querySelector('.modal.lifedlg');
+  await w.eval('upkeepModal()'); md = await until(() => d.querySelector('.modal.lifedlg .lpre [data-pre="smoke"]')?.closest('.modal.lifedlg'));
   const pre = md.querySelector('.lpre [data-pre="smoke"]');
   click(w, pre);
   check(md.querySelector('#lf-title').value === 'Test the smoke detectors' && md.querySelector('#lf-every').value === '12' && pre.getAttribute('aria-pressed') === 'true', 'upkeep: a suggestion fills the dialog');
   click(w, md.querySelector('[data-m="save"]')); await until(() => !md.isConnected);
-  w.eval('healthModal()'); await sleep(150); md = d.querySelector('.modal.lifedlg');
+  w.eval('healthModal()'); md = await until(() => d.querySelector('.modal.lifedlg [data-ht="medication"]')?.closest('.modal.lifedlg'));
   click(w, md.querySelector('[data-ht="medication"]'));
   check(!md.querySelector('.lh-times').hidden && md.querySelector('.lh-time').hidden, 'health: medication shows the times');
   input(w, md.querySelector('#lf-title'), 'Vitamin D'); md.querySelector('#lf-times').value = '8:00, 20:00';
@@ -99,7 +99,7 @@ const BASE = 'cal,comments,collab,deps,progress,contacts,events';
   st = await call('GET', '/api/state');
   check(st.tasks.filter(t => t.fam?.kind === 'health').map(t => t.due_time).sort().join() === '08:00,20:00', 'health: two daily tasks (8:00 normalized)');
   check(st.lists.some(l => l.life === 'health'), '… in a health list');
-  w.eval('tripModal()'); await sleep(150); md = d.querySelector('.modal.lifedlg');
+  w.eval('tripModal()'); md = await until(() => d.querySelector('.modal.lifedlg #lf-where')?.closest('.modal.lifedlg'));
   input(w, md.querySelector('#lf-name'), 'Summer in Italy'); md.querySelector('#lf-where').value = 'Rome';
   click(w, md.querySelector('[data-m="save"]'));
   await until(() => w.eval('S.route.key').startsWith('l:'));
@@ -145,7 +145,7 @@ const BASE = 'cal,comments,collab,deps,progress,contacts,events';
 
   // ================= #682: the emoji of a new list
   w = await boot({user: 'alice', hash: 'inbox'}); d = w.document;
-  w.eval('listModal()'); await sleep(200);
+  w.eval('listModal()'); await until(() => [...d.querySelectorAll('.modal')].pop()?.querySelector('#l-name'));
   md = [...d.querySelectorAll('.modal')].pop();
   input(w, md.querySelector('#l-name'), 'Einkaufsliste');
   check(md.querySelector('#l-emo').textContent.includes('🛒') && md.querySelector('#l-emo').classList.contains('sugg'), '#682: "Einkaufsliste" -> 🛒 suggested');
@@ -154,7 +154,7 @@ const BASE = 'cal,comments,collab,deps,progress,contacts,events';
   input(w, md.querySelector('#l-name'), 'Urlaub Italien');
   click(w, md.querySelector('[data-m="save"]'));
   check(await until(async () => (await call('GET', '/api/state')).lists.some(l => l.name === '🏖️Urlaub Italien')), '#682: saved with the emoji');
-  w.eval('listModal()'); await sleep(200);
+  w.eval('listModal()'); await until(() => { const m = [...d.querySelectorAll('.modal')].pop(); return m && m !== md && m.querySelector('#l-emogrid [data-emo=""]'); });
   md = [...d.querySelectorAll('.modal')].pop();
   click(w, md.querySelector('#l-emogrid [data-emo=""]'));
   input(w, md.querySelector('#l-name'), 'Arbeit');
@@ -166,10 +166,10 @@ const BASE = 'cal,comments,collab,deps,progress,contacts,events';
   const i1 = await call('POST', '/api/tasks', {title: 'Unsorted idea', list_id: ib});
   await call('POST', '/api/tasks', {title: 'Due today thing', due: day(0)});
   w = await boot({user: 'alice', hash: 'today'}); d = w.document;
-  await sleep(300);
+  await until(() => /Due today thing/.test(d.querySelector('#view')?.textContent || '')); await idle(w);
   const n0 = w.eval('counts().today');
   check(!d.querySelector('#view .tinbox'), '#681: off by default: no inbox in Today');
-  await call('PATCH', '/api/settings', {today_inbox: '1'}); await w.eval('load()'); w.eval('render()'); await sleep(200);
+  await call('PATCH', '/api/settings', {today_inbox: '1'}); await w.eval('load()'); w.eval('render()'); await until(() => d.querySelector('#view .tinbox'));
   check(d.querySelector('#view .tinbox') && /Unsorted idea/.test(d.querySelector('#view .tinbox').textContent) && w.eval('counts().today') === n0 + 1, '#681: on: its own section, counted in Today');
   click(w, d.querySelector(`#view .tinbox [data-act="tin-due"][data-d="1"][data-id="${i1.id}"]`));
   check(await until(async () => (await call('GET', `/api/tasks/${i1.id}`)).due === day(1)), '#681: "Tomorrow" sorts it');
@@ -181,26 +181,26 @@ const BASE = 'cal,comments,collab,deps,progress,contacts,events';
   const a1 = await call('POST', '/api/tasks', {title: 'Design', list_id: P}), a2 = await call('POST', '/api/tasks', {title: 'A very long title that goes on and on so that it needs two lines in the picker row', list_id: P});
   await call('POST', '/api/tasks', {title: 'Checkout', list_id: P2});
   w = await boot({user: 'alice', hash: 'l/' + P}); d = w.document;
-  await sleep(300);
-  w.eval(`openDetail(${a1.id})`); await sleep(500);
+  await until(() => d.querySelector(`#view .trow[data-id="${a2.id}"]`)); await idle(w);
+  w.eval(`openDetail(${a1.id})`); await until(() => d.querySelector('#detail .depsec [data-act="wait-on"]')); await idle(w);
   check(d.querySelector('#detail .depsec [data-act="wait-on"]'), '#686 / 2.25.0 (UX-43): ONE button "Waiting on…" in the dependencies');
-  w.eval(`depPicker(${a1.id}, 'by')`); await sleep(200);
+  w.eval(`depPicker(${a1.id}, 'by')`); await until(() => d.querySelector('.dpmodal .tpkg'));
   const grp = [...d.querySelectorAll('.dpmodal .tpkg')];
   // 2.152.2 (#2624): project instead of list
   // 2.352.0 B (#2752): every list is a project, so the seeded lists with open tasks are groups too
   check(grp.length >= 2 && /This project/.test(grp[0].querySelector('.tpkh').textContent) && grp.slice(1).some(g => /Shop/.test(g.querySelector('.tpkh').textContent))
     && grp[0].querySelector('.tpkrow .tpkt') && grp[0].querySelector('.tpkrow .tpkm'), '#685: grouped (this list first, then the others under their name), title + list in their own lines');
   d.querySelector('.dpmodal').remove();
-  click(w, d.querySelector('#detail [data-act="wait-on"]')); await sleep(150);
-  [...d.querySelectorAll('#pop [role="menuitem"]')].find(b => /Someone outside/.test(b.textContent)).click(); await sleep(200);
+  click(w, d.querySelector('#detail [data-act="wait-on"]')); await until(() => [...d.querySelectorAll('#pop [role="menuitem"]')].find(b => /Someone outside/.test(b.textContent)));
+  [...d.querySelectorAll('#pop [role="menuitem"]')].find(b => /Someone outside/.test(b.textContent)).click(); await until(() => d.querySelector('.waitmodal #w-note'));
   md = d.querySelector('.waitmodal');
   md.querySelector('#w-note').value = 'Client approval'; click(w, md.querySelector('[data-m="ok"]'));
   check(await until(async () => (await call('GET', `/api/tasks/${a1.id}`)).wait_note === 'Client approval'), '#686: "Waiting on…" > "Someone outside…" sets it');
-  w.eval('closeDetail()'); await sleep(200);
+  w.eval('closeDetail()'); await idle(w); await until(() => d.querySelector(`#view .trow[data-id="${a2.id}"]`));
   // the row's right-click menu
   const row = d.querySelector(`#view .trow[data-id="${a2.id}"]`);
   row.dispatchEvent(new w.MouseEvent('contextmenu', {bubbles: true, cancelable: true}));
-  await sleep(200);
+  await until(() => /Pin/.test(d.querySelector('#pop')?.textContent || ''));
   // 2.364.0 (#3036): alice shares no project yet (bob comes later): no "Waiting on someone…" while she works alone
   check(/Pin/.test(d.querySelector('#pop')?.textContent || '') && !/Waiting on someone…/.test(d.querySelector('#pop')?.textContent || ''), '#686: right-click on a row: the task menu (alone: without "Waiting on someone…")');
   w.eval('closePop()');
@@ -211,14 +211,14 @@ const BASE = 'cal,comments,collab,deps,progress,contacts,events';
   key(w, qi, 'Enter');
   check(await until(async () => (await call('GET', '/api/state')).tasks.some(t => t.title === 'Send the offer' && t.wait_note === 'Kunde')), '#686: wartet:Kunde = waiting on external "Kunde"');
   // the palette offers it for the current task
-  w.eval(`openDetail(${a2.id})`); await sleep(300);
+  w.eval(`openDetail(${a2.id})`); await until(() => w.eval('S.sel') === a2.id); await idle(w);
   check(w.eval(`palAll().some(x => x.id === 'a:wait' && /waiting on someone/i.test(x.label))`), '#686: the palette offers "waiting on external" for the open task');
   w.close();
 
   // ================= #678 the quick add @ picker and a pasted image
   await call('PUT', `/api/lists/${P}/members`, {user_id: BOB, role: 'edit'});
   w = await boot({user: 'alice', hash: 'l/' + P}); d = w.document;
-  await sleep(300);
+  await until(() => d.querySelector('#qinput') && d.querySelector(`#view .trow[data-id="${a2.id}"]`)); await idle(w);
   const q2 = d.querySelector('#qinput');
   q2.focus(); input(w, q2, 'Ask @B'); q2.setSelectionRange(6, 6); input(w, q2, 'Ask @B');
   let pk = d.querySelector('.qadd .qmpick:not(.hidden)');
@@ -240,8 +240,8 @@ const BASE = 'cal,comments,collab,deps,progress,contacts,events';
 
   // ================= #693 "Bob is writing …" in the comments
   w = await boot({user: 'alice', hash: 'l/' + P}); d = w.document;
-  await sleep(300);
-  w.eval(`openDetail(${a2.id})`); await sleep(500);
+  await until(() => d.querySelector(`#view .trow[data-id="${a2.id}"]`)); await idle(w);
+  w.eval(`openDetail(${a2.id})`); await until(() => d.querySelector('#detail #c-input')); await idle(w);
   const CB = await login('bob');
   await fetch(B + `api/tasks/${a2.id}/typing`, {method: 'POST', headers: {...H, Cookie: CB}});
   check(await until(() => /Bob is writing/.test(d.querySelector('#d-typing')?.textContent || ''), 60), '#693: "Bob is writing …" in the task panel with the next sync');
@@ -258,7 +258,7 @@ const BASE = 'cal,comments,collab,deps,progress,contacts,events';
   await until(() => d.querySelector('.authscreen #inv-form'));
   check(/Welcome, Newbie/.test(d.querySelector('.authscreen').textContent) && d.querySelector('#inv-user').value === 'newbie' && !w.location.hash.includes(itok), '#697: the page greets the person, the token left the address bar');
   d.querySelector('#inv-pw').value = 'newbie-pass-1'; d.querySelector('#inv-pw2').value = 'other';
-  d.querySelector('#inv-form').dispatchEvent(new w.Event('submit', {bubbles: true, cancelable: true})); await sleep(200);
+  d.querySelector('#inv-form').dispatchEvent(new w.Event('submit', {bubbles: true, cancelable: true})); await until(() => /not the same/.test(d.querySelector('#inv-err')?.textContent || ''));
   check(/not the same/.test(d.querySelector('#inv-err').textContent), '#697: the two passwords must match');
   w.close();
   check((await call('GET', '/api/users')).users.find(u => u.username === 'newbie')?.invite === 'invited', '#697: still invited');
@@ -280,7 +280,9 @@ const BASE = 'cal,comments,collab,deps,progress,contacts,events';
     await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); localStorage.setItem('tasks.lookLocal', 'true'); return 1; })()`);
     return ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${user}', password: 'password123'})}).then(r => r.status)`);
   };
-  const ready = async (ev, sel = '#top h1', n = 40) => { for (let i = 0; i < n && !(await ev(`!!document.querySelector('${sel}')`).catch(() => false)); i++) await sleep(250); await sleep(700); };
+  // 2.624.0 (#3943): settle = the page's requests done (ff.js idle) + two frames drawn, instead of fixed sleeps after an action
+  const settle = async (ev, idle) => { await idle({quiet: 300}); await ev(`new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(1))))`).catch(() => 0); };
+  const ready = async (ev, idle, sel = '#top h1', n = 40) => { await until(() => ev(`!!document.querySelector('${sel}')`).catch(() => false), n * 250 / 150); await settle(ev, idle); };
   const SMALL = sel => `(() => { const coarse = matchMedia('(pointer: coarse)').matches, min = coarse ? 43.5 : 23.5; return [...document.querySelectorAll('${sel}')].filter(b => { const r = b.getBoundingClientRect(), cs = getComputedStyle(b); return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && !b.closest('[hidden]'); })
     .filter(b => { const r = b.getBoundingClientRect(); return r.width < min || r.height < min; }).map(b => (b.dataset.act || b.className) + ' ' + Math.round(b.getBoundingClientRect().width) + 'x' + Math.round(b.getBoundingClientRect().height)).slice(0, 8); })()`;
   const axe = async (ev, where) => {
@@ -292,29 +294,29 @@ const BASE = 'cal,comments,collab,deps,progress,contacts,events';
   // a folder with two lists for the sidebar tree (#680)
   await call('POST', '/api/lists', {name: 'Taxes', folder: 'Private'}); await call('POST', '/api/lists', {name: 'Garden', folder: 'Private'});
   for (const [vw, vh, th, touch] of [[390, 844, 'dark', true], [690, 829, 'light', true], [1440, 900, 'light', false]]) await firefox(async o => {
-    const {cmd, ev, ctx, shot} = o, tag = `${vw}x${vh} ${th}`;
+    const {cmd, ev, ctx, shot, idle, until: fu} = o, tag = `${vw}x${vh} ${th}`;
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
     check(await ffLogin(o, 'alice', th) === 200, tag + ': login');
-    await o.nav(B + '#life'); await ready(ev, '#view .life .lc-contracts');
+    await o.nav(B + '#life'); await ready(ev, idle, '#view .life .lc-contracts');
     check(await sideways(ev) <= 0, `${tag}: Home & life: nothing sideways`);
     const sm = await ev(SMALL('#view .life button, #view .life a.btn, #view .life a.frow'));
     check(!sm.length, `${tag}: Home & life: targets ` + JSON.stringify(sm));
     if (vw !== 690) await axe(ev, `${tag} Home & life`);
     await shot(`p2220-${vw}-${th}-life.png`);
-    await ev(`(() => { contractModal(); return 1; })()`); await sleep(500);
+    await ev(`(() => { contractModal(); return 1; })()`); await fu(`!!document.querySelector('.lifedlg #lf-name')`); await settle(ev, idle);
     check(await sideways(ev) <= 0, `${tag}: the contract dialog: nothing sideways`);
     const smd = await ev(SMALL('.lifedlg button, .lifedlg input, .lifedlg select'));
     check(!touch || !smd.length, `${tag}: the contract dialog: 44 px on touch ` + JSON.stringify(smd));
     if (vw === 390) await axe(ev, `${tag} contract dialog`);
     await shot(`p2220-${vw}-${th}-contract.png`);
-    await ev(`(() => { document.querySelectorAll('.modal').forEach(m => m.remove()); location.hash = '#review'; return 1; })()`); await ready(ev, '#view .review .rv-done');
+    await ev(`(() => { document.querySelectorAll('.modal').forEach(m => m.remove()); location.hash = '#review'; return 1; })()`); await ready(ev, idle, '#view .review .rv-done');
     check(await sideways(ev) <= 0, `${tag}: the review: nothing sideways`);
     if (vw !== 690) await axe(ev, `${tag} review`);
     await shot(`p2220-${vw}-${th}-review.png`);
     if (vw === 390) {  // #692: the sidebar's sort mode on a phone: the buttons in one column on the right
       // 2.196.0 A (#2737): the phone's drawer shows the panel of the page's area, the projects are in the area Tasks
-      await ev(`(() => { location.hash = '#today'; return 1; })()`); await ready(ev, '#view');
-      await ev(`(() => { document.querySelectorAll('.modal').forEach(m => m.remove()); S.listReorder = true; render(); document.querySelector('#side').classList.add('open'); return 1; })()`); await sleep(600);
+      await ev(`(() => { location.hash = '#today'; return 1; })()`); await ready(ev, idle, '#view');
+      await ev(`(() => { document.querySelectorAll('.modal').forEach(m => m.remove()); S.listReorder = true; render(); document.querySelector('#side').classList.add('open'); return 1; })()`); await fu(`document.querySelectorAll('#side .srow.reorder .rctl').length >= 5`); await settle(ev, idle);
       const rc = await ev(`(() => { const rs = [...document.querySelectorAll('#side .srow.reorder')]; const xs = rs.map(r => Math.round(r.querySelector('.rctl').getBoundingClientRect().right));
         return {n: rs.length, xs: [...new Set(xs)], grip: rs.every(r => r.querySelector('.sgrip')), side: document.querySelector('#side').scrollWidth - document.querySelector('#side').clientWidth}; })()`);
       check(rc.n >= 5 && rc.xs.length === 1 && rc.grip && rc.side <= 0, '#692: sort mode: every row has a grip, the buttons end in one column ' + JSON.stringify(rc));
@@ -324,15 +326,15 @@ const BASE = 'cal,comments,collab,deps,progress,contacts,events';
     if (vw === 1440) {
       // #680: the sidebar tree: the folder starts where the lists start, its lists one step in
       // 2.220.0 (#2807): one folder step is 0.875 rem now (was 2 rem): a list's name lines up with its folder's name (after the arrow), the row itself stays indented
-      await ev(`(() => { location.hash = '#inbox'; return 1; })()`); await ready(ev, '#side .fhead');
+      await ev(`(() => { location.hash = '#inbox'; return 1; })()`); await ready(ev, idle, '#side .fhead');
       const g = await ev(`(() => { const f = [...document.querySelectorAll('#side .fhead')].find(x => /Private/.test(x.textContent)); const top = [...document.querySelectorAll('#side .sg-lists .srow[data-list]')].find(r => !r.closest('.fbody'));
         const kid = [...document.querySelectorAll('#side .fbody .srow[data-list]')].find(r => /Taxes/.test(r.textContent));
         const x = el => el.querySelector('.n').getBoundingClientRect().left; return f && top && kid ? {fold: Math.round(f.getBoundingClientRect().left), top: Math.round(top.getBoundingClientRect().left), kid: Math.round(kid.getBoundingClientRect().left), fn: Math.round(x(f)), kn: Math.round(x(kid)), cnt: f.querySelector('.c')?.textContent} : null; })()`);
       check(g && Math.abs(g.fold - g.top) <= 1 && g.kid > g.fold + 8 && g.kn > g.fn - 4, '#680: the folder row flush with the lists, its lists indented ' + JSON.stringify(g));
       // #683: one focus ring while editing a title in the list
       const T = (await call('POST', '/api/tasks', {title: 'Edit me'})).id;
-      await ev(`(() => { location.hash = '#inbox'; return 1; })()`); await ready(ev, `#view .trow[data-id="${T}"]`);
-      await ev(`(() => { kfocus(${T}); inlineEditStart(${T}); return 1; })()`); await sleep(300);
+      await ev(`(() => { location.hash = '#inbox'; return 1; })()`); await ready(ev, idle, `#view .trow[data-id="${T}"]`);
+      await ev(`(() => { kfocus(${T}); inlineEditStart(${T}); return 1; })()`); await fu(`!!document.activeElement?.matches('.ttlin')`); await settle(ev, idle);
       const rings = await ev(`(() => { const a = document.activeElement; if (!a || !a.matches('.ttlin')) return {err: 'no field'};
         const sheets = [...document.styleSheets].filter(x => !x.disabled); let txt = '';
         for (const sh of sheets) { try { txt += [...sh.cssRules].map(r => r.cssText).join('\\n') + '\\n'; } catch { } }
@@ -346,7 +348,7 @@ const BASE = 'cal,comments,collab,deps,progress,contacts,events';
       check(rings && rings.n && rings.n.length === 1 && /ttlin/.test(rings.n[0]), '#683: editing a title in the list: exactly one ring (the field) ' + JSON.stringify(rings));
       await ev(`(() => { inlineEditCancel(); return 1; })()`);
       // #679: the settings dialog on a computer
-      await ev(`(() => { settingsModal('look'); return 1; })()`); await sleep(700);
+      await ev(`(() => { settingsModal('look'); return 1; })()`); await fu(`!!document.querySelector('.smodal .card') && !!document.querySelector('.lookpv .lpv-link')`); await settle(ev, idle);
       const sd = await ev(`(() => { const c = document.querySelector('.smodal .card').getBoundingClientRect(), bg = getComputedStyle(document.querySelector('.smodal')).backgroundColor;
         const a = [...document.querySelectorAll('.smodal a:not(.btn):not(.linkbtn)')].filter(x => x.offsetParent).map(x => getComputedStyle(x).textDecorationLine);
         const ib = document.querySelector('.smodal .lkfs')?.previousElementSibling?.querySelector('.ib') || null;
@@ -357,13 +359,13 @@ const BASE = 'cal,comments,collab,deps,progress,contacts,events';
       check(sd.fsInfo && sd.prio && !/mono/i.test(sd.dev), '#679: (i) at the "Font size" heading, "!high" as a flag, no monospace for words ' + JSON.stringify(sd));
       await shot(`p2220-${vw}-${th}-settings.png`);
       // #696: the child-account options only once "Child account" is ticked
-      await ev(`(() => { document.querySelectorAll('.modal').forEach(m => m.remove()); userModal(null, () => {}); return 1; })()`); await sleep(500);
+      await ev(`(() => { document.querySelectorAll('.modal').forEach(m => m.remove()); userModal(null, () => {}); return 1; })()`); await fu(`!!document.querySelector('#u-kid') && !!document.querySelector('#u-parrow')`); await settle(ev, idle);
       const k0 = await ev(`(() => { const c = document.querySelector('#u-kid'), r = document.querySelector('#u-parrow'); return {disp: getComputedStyle(r).display, exp: c.getAttribute('aria-expanded')}; })()`);
-      await ev(`(() => { const c = document.querySelector('#u-kid'); c.click(); return 1; })()`); await sleep(300);
+      await ev(`(() => { const c = document.querySelector('#u-kid'); c.click(); return 1; })()`); await fu(`document.querySelector('#u-kid').getAttribute('aria-expanded') === 'true'`);
       const k1 = await ev(`(() => { const c = document.querySelector('#u-kid'), r = document.querySelector('#u-parrow'); return {disp: getComputedStyle(r).display, exp: c.getAttribute('aria-expanded')}; })()`);
       check(k0.disp === 'none' && k0.exp === 'false' && k1.disp !== 'none' && k1.exp === 'true', '#696: child options hidden until ticked, aria-expanded ' + JSON.stringify([k0, k1]));
       // #688 / 2.136.0 (#2193): the bot figure mid-celebration (the suite's Firefox prefers reduced motion: the motion version is forced for the picture)
-      await ev(`(() => { document.querySelectorAll('.modal').forEach(m => m.remove()); window.matchMedia = q => ({matches: false, addEventListener() {}, addListener() {}}); celebrate('today', {frame: 0.5, force: true}); return 1; })()`); await sleep(200);
+      await ev(`(() => { document.querySelectorAll('.modal').forEach(m => m.remove()); window.matchMedia = q => ({matches: false, addEventListener() {}, addListener() {}}); celebrate('today', {frame: 0.5, force: true}); return 1; })()`); await fu(`!!document.querySelector('.cele .cbot')`);
       const b = await ev(`(() => { const r = document.querySelector('.cele .cbot').getBoundingClientRect(); return {x: Math.round(r.left + r.width / 2), y: Math.round(r.top), w: Math.round(r.width)}; })()`);
       check(Math.abs(b.x - vw / 2) < 120 && b.y > 0 && b.y < vh / 2 && b.w >= 90, '#2193: the bot figure is in the upper middle ' + JSON.stringify(b));
       await shot(`p2220-${vw}-${th}-bot.png`);
