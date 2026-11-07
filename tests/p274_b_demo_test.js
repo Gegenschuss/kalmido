@@ -209,7 +209,12 @@ const srv = http.createServer((req, res) => {
       const e = JSON.parse(await ev(`JSON.stringify({over: document.documentElement.scrollWidth - innerWidth, txt: (document.querySelector('#view') || {}).textContent || '', csp: KDEMO.csp})`));
       check(e.over <= 0 && /2\.444,17\s€/.test(e.txt), `${tag}: invoice editor fits (${e.over}), total shown`);
       await shot(`p274b-editor-${vw}.png`);
-      await ev(`(() => { KDEMO.printView(${id}); return 1; })()`); await sleep(500);
+      // 2.651.0 (#5036): wait for the styled print view (demo.css on its buttons, the page laid out), not a fixed 500 ms: on a
+      // loaded runner the measurement fell before the style (buttons 23 px, page 18 px over); at most 15 s, then measured as is
+      await ev(`(async () => { KDEMO.printView(${id}); const end = Date.now() + 15000;
+        while (Date.now() < end) { const b = document.querySelector('#kd-print .kd-btn'), pg = document.querySelector('.kp-page');
+          if (b && pg && getComputedStyle(b).display === 'inline-flex' && pg.clientWidth > 0) break; await new Promise(r => setTimeout(r, 100)); }
+        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); return 1; })()`);
       const p = JSON.parse(await ev(`(() => { const pg = document.querySelector('.kp-page'), sc = document.querySelector('#kd-print .kd-pscroll'), bar = document.querySelector('#kd-print .kd-pbar');
         const btn = [...document.querySelectorAll('#kd-print .kd-btn')].map(b => b.getBoundingClientRect().height);
         return JSON.stringify({page: pg ? pg.scrollWidth - pg.clientWidth : -1, sc: sc ? sc.scrollWidth - sc.clientWidth : -1, over: document.documentElement.scrollWidth - innerWidth,
