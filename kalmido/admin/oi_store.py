@@ -38,6 +38,7 @@ from ..wiki.pages import wiki_set_links  # 2.369.5 (#2517): pulled up from funct
 from ..wiki.wksearch import wks_index  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.attachtext import file_kind  # 2.369.5 (#2517): pulled up from functions
 from ..sheets.shshare import SHS_CARD, shs_core_move  # 2.647.0 (#5047)
+from ..docs.store import doc_seal as _doc_seal  # 2.635.0 (#4807 d)
 
 _LOCKED = "e2e1:"
 _FILE_CELL = re.compile(r"file:(\d{1,15})")
@@ -447,6 +448,17 @@ def _field_value(c, run, src, d, ctx):
     return d
 
 
+def _doc_note(c, run, src, d, ctx):
+    """2.635.0 (#4807 d): a note on a document, sealed with the target document's workspace key (a text that did not open in
+    the export is left out); its author maps like every person column (else NULL: the note keeps its text and time)."""
+    v = src.get("text")
+    m = c.execute("SELECT ws FROM doc_meta WHERE node_id=?", (d["node_id"],)).fetchone()
+    if not m or not isinstance(v, str) or not v.strip() or v.startswith("kenc1:"):
+        return False
+    d["ws"], d["text"] = m[0], _doc_seal(c, m[0], "doc_notes.text", v)
+    return d
+
+
 # ---- knowledge pages -----------------------------------------------------------------------------------------------------
 def _wiki_locked(c, ctx):
     return c.execute("SELECT 1 FROM wiki_spaces WHERE COALESCE(org_id,0)=? AND COALESCE(owner_id,0)=? AND e2e IS NOT NULL",
@@ -770,6 +782,8 @@ SPECS = [
     OiT("documents/fields.json", "doc_fields", people=_P, prep=_field),
     OiT("documents/field_values.json", "doc_field_values", refs={"node_id": "fs_nodes", "field_id": "doc_fields"},
         need=("node_id", "field_id"), prep=_field_value),
+    OiT("documents/notes.json", "doc_notes", refs={"node_id": "fs_nodes"}, need=("node_id",), people={"user_id": "null"},
+        prep=_doc_note),  # 2.635.0 (#4807 d): after the documents (doc_meta: their workspace)
     OiT("office/letter_links.json", "office_letter_links", refs={"letter_id": "office_letters", "node_id": "fs_nodes"},
         need=("letter_id", "node_id"), people={**_P, "agent_id": "null"}, private="office", label=N_("Letters")),
     # knowledge pages (text sealed in prep: enc off) and their files

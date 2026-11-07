@@ -320,10 +320,11 @@ def search_ids(c, ws_nodes, query):
                 names = {x[0]: x[1] for x in c.execute(f"SELECT id, name FROM fs_nodes WHERE id IN ({qm})", tuple(part))}
                 from .fields import df_index_texts
                 cfs = df_index_texts(c, ws, part)
+                nts = notes_texts(c, ws, part)  # 2.635.0 (#4807 d): the notes count like the rest of the index
                 for r in c.execute(f"SELECT * FROM doc_meta WHERE node_id IN ({qm})", tuple(part)).fetchall():
                     # 2.153.0 (#2179): everything the index holds (also sender, archive number, custom field values), not only text + name
                     have = set(index_words(index_text(c, dict(r), names.get(r["node_id"]) or "", doc_open(c, ws, "doc_meta.text", r["text"]),
-                                                      cf=cfs.get(r["node_id"], ""))))
+                                                      cf=cfs.get(r["node_id"], ""), notes=nts.get(r["node_id"], ""))))
                     if all(any(x.startswith(w) for x in have) for w in check):
                         ok.add(r["node_id"])
             cand = ok
@@ -510,13 +511,27 @@ def was_digest(nid, f, v):
     return hmac.new(SECRET_KEY or b"kalmido-doc-was", f"{nid}|{f}|{v}".encode(), hashlib.sha256).hexdigest()[:32]
 
 
-def index_text(c, m, name, text, cf=None):
+def index_text(c, m, name, text, cf=None, notes=None):
     """What the word index of a document holds: name, sender, archive number, the custom field values (2.153.0) and the
-    recognised text. cf: the custom field values read already (2.184.0 B, #2580: fields.py df_index_texts)."""
+    recognised text. cf: the custom field values read already (2.184.0 B, #2580: fields.py df_index_texts). 2.635.0 (#4807 d):
+    + its notes (notes: read already, notes_texts)."""
     from .fields import df_index_text
     sender = label_name(c, m["ws"], "sender", m["sender_id"]) or ""
     asn = f"{cfg_get(c, m['ws'])['asn_prefix']}{m['asn']} {m['asn']}" if m.get("asn") else ""
-    return f"{name}\n{sender}\n{asn}\n{df_index_text(c, m['node_id'], m['ws']) if cf is None else cf}\n{text}"
+    nt = notes_texts(c, m["ws"], [m["node_id"]]).get(int(m["node_id"]), "") if notes is None else notes
+    return f"{name}\n{sender}\n{asn}\n{df_index_text(c, m['node_id'], m['ws']) if cf is None else cf}\n{text}\n{nt}"
+
+
+def notes_texts(c, ws, nids):
+    """2.635.0 (#4807 d): the opened texts of the notes of the documents nids of ws ({node id: text}; docs/notes.py writes them)."""
+    out = {int(n): [] for n in nids}
+    if not out:
+        return {}
+    op = doc_opener(c, ws, "doc_notes.text")
+    for r in c.execute(f"SELECT node_id, text FROM doc_notes WHERE ws=? AND node_id IN ({','.join('?' * len(out))}) ORDER BY id",
+                       (ws, *out)).fetchall():
+        out[r["node_id"]].append(op(r["text"]) or "")
+    return {n: "\n".join(x) for n, x in out.items()}
 
 
 def meta_row(c, nid):

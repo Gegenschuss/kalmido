@@ -6,17 +6,20 @@
      preview (GET /api/files/nodes/{id}/preview: the same small model, never the XML); an ODF part with a DOCTYPE is
      refused (failed, never a 500), a sheet with a million repeated empty rows reads quickly; .rtf / .pptx stay files
      without text (done, method none - the document view shows the hint)
- - a person without an organisation (freelancer-matrix: docs): the same for an .odt in the own space
+ (d) notes on a document: several with author and time, seen by everybody who sees the document (also in its view), written
+     with edit (403 with view, 404 without any right), sealed with the area key, found by a word / a prefix and gone from the
+     index when deleted; deleted by someone with edit or by the author (also after the right fell to view); db.bump
+ - a person without an organisation (the documents' area "files" of the freelancer matrix): the same for an .odt in the own space
 usage: p2635_c_docs_test.py <datadir>"""
 import io
 import sys
 import zipfile
 
 import kt
-from kt import B, check, until
-from freelancer_fixture import freelancer
+from kt import B, check, sess, until
+from freelancer_fixture import freelancer, org_join
 
-kt.fresh(prefix="P2635C")
+kt.fresh(env={"KALMIDO_SECRET_KEY": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8="}, prefix="P2635C")  # a server key: values are sealed
 A = kt.setup()
 FID, Fr = freelancer(B, A)
 
@@ -128,10 +131,71 @@ for name, data, mime in (("alt.rtf", b"{\\rtf1\\ansi Rosenquarz}", "application/
     check(d.get("state") == "done" and d.get("method") == "none", f"#4807 (a) {name} stays a file without text {d.get('state')} {d.get('method')}")
 check(found(A, "rosenquarz") == [], "#4807 (a) the RTF is not read as plain text")
 
-# freelancer-matrix: docs
+# freelancer-matrix: files
 nid = upload(Fr, "eigen.odt", odt("Bernsteinfuchs"), ODT_MIME)
 d = done(Fr, nid)
 check(d.get("method") == "office" and nid in (found(Fr, "bernsteinfuchs") or []), f"#4807 (a) freelancer: an .odt is read and found {d.get('method')}")
 check(nid not in (found(A, "bernsteinfuchs") or []), "#4807 (a) ... and only in her own space")
+
+# ---- (d) notes on a document: several, author + time, seen by all who see it, written with edit, sealed, searchable
+ids = {}
+for u in ("bob", "carol", "dave", "erin"):
+    r = A.post(B + "/api/users", json={"username": u, "display_name": u.title(), "password": "password123", "email": f"{u}@example.com"})
+    ids[u] = r.json()["id"]
+r = A.post(B + "/api/admin/orgs", json={"name": "Alpha", "admin_id": ids["bob"]})
+ORG = r.json()["id"]
+Bo = sess("bob")
+for u in ("carol", "dave"):
+    Bo.put(B + f"/api/orgs/{ORG}/members", json={"email": f"{u}@example.com"})
+    org_join(B, u, ORG)
+Ca, Da, Er = sess("carol"), sess("dave"), sess("erin")
+for s_ in (Bo, Ca, Da, Er):
+    s_.patch(B + "/api/settings", json={"lang": "en", "tour": "done"})
+r = Bo.post(B + "/api/docs", data={"ws": f"org:{ORG}"}, files=[("files", ("akte.docx", docx("Aktenzeichen"), DOCX_MIME))])
+DN = r.json()["ids"][0] if r.ok else 0
+done(Bo, DN)
+check(Bo.post(B + f"/api/files/nodes/{DN}/shares", json={"user_id": ids["carol"], "role": "view"}).ok, "setup: shared with carol (view)")
+check(Bo.post(B + f"/api/files/nodes/{DN}/shares", json={"user_id": ids["dave"], "role": "edit"}).ok, "setup: shared with dave (edit)")
+NB = f"/api/docs/{DN}/notes"
+ver0 = int(kt.dbx("SELECT value FROM settings WHERE key='version'")[0][0])
+r = Da.post(B + NB, json={"text": "Rueckruf bei Hummelwiese\nzweite Zeile"})
+check(r.status_code == 201 and r.json()["note"]["author"]["name"] == "Dave" and r.json()["note"]["created_at"], f"#4807 (d) dave (edit) writes a note {r.status_code} {r.text[:160]}")
+NOTE1 = r.json()["note"]["id"] if r.status_code == 201 else 0
+check(int(kt.dbx("SELECT value FROM settings WHERE key='version'")[0][0]) > ver0, "#4807 (d) other devices learn of it (db.bump)")
+check(Ca.post(B + NB, json={"text": "nope"}).status_code == 403, "#4807 (d) carol (view) writes none")
+# tenant-matrix: document
+check(Er.get(B + NB).status_code == 404 and Er.post(B + NB, json={"text": "x"}).status_code == 404, "#4807 (d) erin (no right) sees none, writes none")
+check(Er.delete(B + f"{NB}/{NOTE1}").status_code == 404, "#4807 (d) erin deletes none of another organisation's notes")
+r = Bo.post(B + NB, json={"text": "Frist pruefen Kiefernzapfen"})
+check(r.status_code == 201, "#4807 (d) bob (owner) writes a second one")
+NOTE2 = r.json()["note"]["id"] if r.status_code == 201 else 0
+j = Ca.get(B + NB).json()
+check([n["text"] for n in j["notes"]] == ["Rueckruf bei Hummelwiese\nzweite Zeile", "Frist pruefen Kiefernzapfen"]
+      and [n["author"]["name"] for n in j["notes"]] == ["Dave", "Bob"] and not any(n["can_delete"] for n in j["notes"]),
+      f"#4807 (d) carol sees both, oldest first, with their authors, deletes none {j}")
+full = Ca.get(B + f"/api/docs/{DN}").json()
+check(len(full.get("notes") or []) == 2, "#4807 (d) the document view brings its notes")
+raw = [x[0] for x in kt.dbx("SELECT text FROM doc_notes WHERE node_id=? ORDER BY id", (DN,))]
+check(len(raw) == 2 and all(x.startswith("kenc1:") and "Hummelwiese" not in x for x in raw), f"#4807 (d) the texts are sealed with the area key {[x[:12] for x in raw]}")
+check(DN in (found(Ca, "hummelwiese") or []) and DN in (found(Ca, "kiefernz") or []), "#4807 (d) found by a word / a prefix of a note")
+check(Da.post(B + NB, json={"text": "x" * 5001}).status_code == 400 and Da.post(B + NB, json={"text": "  "}).status_code == 400,
+      "#4807 (d) an empty or too long note is refused")
+check(Ca.delete(B + f"{NB}/{NOTE1}").status_code == 403, "#4807 (d) carol (view) deletes no one else's note")
+r = Da.delete(B + f"{NB}/{NOTE2}")
+check(r.ok and [n["id"] for n in r.json()["notes"]] == [NOTE1], "#4807 (d) dave (edit) deletes bob's note")
+check(DN not in (found(Ca, "kiefernzapfen") or []), "#4807 (d) ... and its words leave the index")
+sid = kt.dbx("SELECT id FROM fs_shares WHERE node_id=? AND user_id=?", (DN, ids["dave"]))[0][0]
+check(Bo.patch(B + f"/api/files/shares/{sid}", json={"role": "view"}).ok, "setup: dave only views now")
+check(Da.post(B + NB, json={"text": "y"}).status_code == 403, "#4807 (d) dave (view now) writes none")
+check(Da.delete(B + f"{NB}/{NOTE1}").ok and Ca.get(B + NB).json()["notes"] == [], "#4807 (d) the author deletes his own note with view")
+check(Bo.delete(B + f"{NB}/999999").status_code == 404, "#4807 (d) an unknown note: 404")
+
+# freelancer-matrix: files
+r = Fr.post(B + f"/api/docs/{nid}/notes", json={"text": "Eigene Notiz Ringelblume"})
+check(r.status_code == 201 and r.json()["note"]["can_delete"], f"#4807 (d) freelancer: a note on her own document {r.status_code}")
+check(nid in (found(Fr, "ringelblume") or []) and Fr.get(B + f"/api/docs/{nid}/notes").json()["notes"][0]["author"]["id"] == FID,
+      "#4807 (d) freelancer: found by it, she is its author")
+check(A.get(B + f"/api/docs/{nid}/notes").status_code == 404, "#4807 (d) freelancer: nobody else sees her notes")
+check(Fr.delete(B + f"/api/docs/{nid}/notes/{r.json()['note']['id']}").ok, "#4807 (d) freelancer: deletes it")
 
 sys.exit(kt.done("p2635_c_docs"))

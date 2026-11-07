@@ -1180,6 +1180,7 @@ ROUTES = {
     "DELETE /api/docs/{}/task": "document", "GET /api/docs/settings": "document", "PUT /api/docs/settings": "document",
     "POST /api/docs/rules": "document", "PATCH /api/docs/rules/{}": "document", "DELETE /api/docs/rules/{}": "document",
     "GET /api/docs/{}/flowruns": "document", "POST /api/docs/flowruns/{}/undo": "document",  # 2.581.0 (#4803): p2581_c_flows_test.py
+    "GET /api/docs/{}/notes": "document", "POST /api/docs/{}/notes": "document", "DELETE /api/docs/{}/notes/{}": "document",  # 2.635.0 (#4807 d): p2635_c_docs_test.py
     "POST /api/docs/fields": "document", "PATCH /api/docs/fields/{}": "document", "DELETE /api/docs/fields/{}": "document",  # 2.153.0 (#2179)
     "PATCH /api/docs/labels/{}/{}": "document", "DELETE /api/docs/labels/{}/{}": "document", "POST /api/docs/labels/{}": "document", "POST /api/docs/mail": "document",
     "DELETE /api/docs/mail": "document", "GET /api/v1/documents": "document", "GET /api/v1/documents/{}": "document",

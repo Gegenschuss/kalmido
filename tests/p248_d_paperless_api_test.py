@@ -224,16 +224,20 @@ if pb and tn:
     full = A.get(B + f"/api/docs/{pb['id']}").json()
     t = full.get("text") or ""
     # 2.153.0 (#2179): custom fields are real fields of the document now, no longer lines below the text
-    check("Power bill May total 42.00 EUR" in t and "Archive serial number: 17" in t and "Contract number" not in t and "Paid on 10 May" in t,
-          f"text + serial number + note, no custom field lines ({t[:300]!r})")
+    # 2.635.0 (#4807): the notes are notes of the document now (author + time of Paperless), no longer lines of the text
+    check("Power bill May total 42.00 EUR" in t and "Archive serial number: 17" in t and "Contract number" not in t and "Paid on 10 May" not in t,
+          f"text + serial number, no custom field / note lines ({t[:300]!r})")
+    nts = full.get("notes") or []
+    check([(n["text"], n["author"]["name"], n["source"], n["created_at"]) for n in nts] == [("Paid on 10 May", "someone", "paperless", "2025-05-10T07:00:00+00:00")],
+          f"2.635.0 (#4807): the note as a note of the document with its Paperless author and time ({nts})")
     cf = {x["name"]: x for x in full.get("custom_fields") or []}
     check(cf.get("Contract number", {}).get("value") == "C-123" and cf.get("Status", {}).get("label") == "Paid"
           and cf.get("Status", {}).get("type") == "select" and cf.get("Amount", {}).get("value") == "42.00 EUR"
           and cf.get("Signed", {}).get("value") == "1" and cf.get("Related", {}).get("value") == "Paperless #12"
           and (full.get("auto") or {}).get(f"cf{cf.get('Status', {}).get('id')}") == "import",
           f"API 10 custom fields as fields: text, the select option's label, amount, yes / no, document link ({cf})")
-    t2 = A.get(B + f"/api/docs/{tn['id']}").json().get("text") or ""
-    check("Check the objection period" in t2, "notes fetched when the list only counts them")
+    t2 = [n["text"] for n in A.get(B + f"/api/docs/{tn['id']}").json().get("notes") or []]  # 2.635.0 (#4807): as notes
+    check(t2 == ["Check the objection period"], f"notes fetched when the list only counts them {t2}")
     f = A.get(B + f"/api/docs/{pb['id']}/file")
     check(f.ok and f.content.startswith(b"%PDF"), "the original file is stored")
     # 2.66.1 (#1944): an import with Paperless' text gets its preview all the same; alice has no organisation -> her

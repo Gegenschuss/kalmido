@@ -432,6 +432,7 @@ OX_AREAS = (
     ("documents/document_tags.json", "doc_node_tags", "node_id IN (SELECT id FROM fs_nodes WHERE org_id=?)"),  # 2.122.0 B (#2099): + files / folders
     ("documents/fields.json", "doc_fields", "org_id=?"),  # 2.153.0 (#2179): custom fields + their values (decrypted)
     ("documents/field_values.json", "doc_field_values", "org_id=?"),
+    ("documents/notes.json", "doc_notes", "org_id=?"),  # 2.635.0 (#4807 d): notes on documents (decrypted)
     ("documents/rules.json", "doc_rules", "org_id=?"),
     ("documents/settings.json", "doc_cfg", "org_id=?"),
     ("documents/receipts.json", "rc_receipts", "org_id=?"),  # 2.137.0 B (#2344): project and category of receipts (set by people)
@@ -603,7 +604,7 @@ def ox_csq(by_id):
 
 # 2.190.0 R (#2561): rows of the file store that belong to one node (left out with a hidden filed mail's nodes)
 OX_NODE_TABLES = ("fs_versions", "fs_shares", "fs_log", "doc_meta", "doc_node_tags", "doc_field_values", "rc_receipts",
-                  "fs_area_roots", "fs_locks")  # 2.353.0 C (#2829), #4300
+                  "fs_area_roots", "fs_locks", "doc_notes")  # 2.353.0 C (#2829), #4300; 2.635.0 (#4807 d): doc_notes
 
 
 def ox_hidden_nodes(c, oid, hidden):
@@ -963,6 +964,7 @@ def ox_pb_store(c, zf, man, lk, oid, owner, have, pre=""):
             ("documents/document_tags.json", "doc_node_tags", f"node_id IN ({k})", ()),
             ("documents/fields.json", "doc_fields", "ws=?", (ws,)),
             ("documents/field_values.json", "doc_field_values", f"node_id IN ({k})", ()),
+            ("documents/notes.json", "doc_notes", f"node_id IN ({k})", ()),  # 2.635.0 (#4807 d)
             ("documents/meta.json", "doc_meta", f"node_id IN ({k})", ()),
             ("documents/receipts.json", "rc_receipts", f"node_id IN ({k})", ())):
         if table in have:

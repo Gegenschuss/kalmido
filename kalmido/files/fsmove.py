@@ -386,6 +386,9 @@ def fsm_doc(c, nid, to, owner, uid, name, new_paths, old_paths, df_define=None):
             old_paths.append(src)  # 2.273.0 B (#3051): the old preview goes only once the new one is written
         except (OSError, OrgCryptError):
             pass  # no preview: the documents view shows the placeholder (docs/thumbfill.py makes it again)
+    for r in c.execute("SELECT id, text FROM doc_notes WHERE node_id=?", (nid,)).fetchall():  # 2.635.0 (#4807 d): the notes go along
+        c.execute("UPDATE doc_notes SET ws=?, org_id=?, text=? WHERE id=?",
+                  (new, to, S.doc_seal(c, new, "doc_notes.text", fsm_open(c, old, "doc_notes.text", r["text"]) or ""), r["id"]))
     S.doc_index(c, nid, new, S.index_text(c, dict(S.meta_row(c, nid)), name, text))
     for r in c.execute("SELECT * FROM rc_receipts WHERE node_id=?", (nid,)).fetchall():
         c.execute("UPDATE rc_receipts SET ws=?, org_id=?, list_id=? WHERE node_id=?",

@@ -128,6 +128,7 @@ ODL_MORE_SKIP = frozenset((
     "nl_suppress", "nl_consent_log", "portal_logins", "office_letter_profiles", "office_letter_blocks", "office_cashbooks",
     # parts of another row (they go with it): items, versions, files, logs, closings
     "doc_flow_runs",  # 2.581.0 (#4803): the runs of document flows go with their documents
+    "doc_notes",  # 2.635.0 (#4807 d): the notes on documents go with their documents
     "office_doc_items", "office_doc_parts", "office_doc_log", "office_payments", "office_signoffs", "office_dunning_marks",
     "office_sub_reminders", "office_contract_files", "office_trip_items", "office_trip_purposes", "office_meal_files",
     "office_meal_choices", "office_meal_log", "office_letter_links", "office_drive_log", "office_drive_closed",

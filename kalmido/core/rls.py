@@ -69,6 +69,7 @@ TABLES = (
     "doc_meta", "doc_senders", "doc_types", "doc_tags", "doc_rules", "doc_models", "doc_cfg", "doc_mail",  # 2.48.0 (#1111): documents
     "doc_fields", "doc_field_values",  # 2.153.0 (#2179): custom fields of documents (NULL = a person's own workspace)
     "doc_flow_runs",  # 2.581.0 (#4803): runs of document flows (NULL = a person's own workspace)
+    "doc_notes",  # 2.635.0 (#4807 d): notes on documents (NULL = a person's own workspace, the app checks the document)
     "pl_sources", "pl_imported",  # 2.48.0 (#1152): the Paperless-ngx connection + what came in
     "pl_rules",  # 2.69.0 B (#1847): where a document rule from Paperless-ngx came from
     "rc_receipts", "rc_suggest",  # 2.48.0 (#1356): receipts: project / category, the agents' suggestions

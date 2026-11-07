@@ -514,9 +514,10 @@ function dc_mdDraw(md) {
       ${!ro && (noDue || noAmt) ? `<div class="dc-optbtn" role="group" aria-label="${esc(tr('Add'))}">${noDue ? `<button type="button" class="dc-chip" data-dc="showopt:due">${ic('plus', 's')} ${tr('Due')}</button>` : ''}${noAmt ? `<button type="button" class="dc-chip" data-dc="showopt:amount">${ic('plus', 's')} ${tr('Amount')}</button>` : ''}</div>` : '' /* 2.497.0 A (#4046): one chip per field */}
       ${(d.custom_fields || []).map(f => dc_cfRow(d, f, ro)).join('')}
     </div>
-    <details class="dc-text"><summary><h4>${tr('Recognised text')}</h4>${ic('chev', 's dc-chev')}</summary>${d.text ? `<pre>${esc(d.text)}</pre>` : `<p class="muted">${tr('No text recognised.')}</p>`}</details><div class="dc-flows"></div></div></div>`);
+    <details class="dc-text"><summary><h4>${tr('Recognised text')}</h4>${ic('chev', 's dc-chev')}</summary>${d.text ? `<pre>${esc(d.text)}</pre>` : `<p class="muted">${tr('No text recognised.')}</p>`}</details><div class="dc-notes" data-fl-fill></div><div class="dc-flows"></div></div></div>`);
   dc_pvDraw(md, d);
   if (typeof dfl_runs === 'function') dfl_runs(md, d);  // 2.581.0 (#4803): the runs of flows with Undo (docflows.js)
+  if (typeof dn_draw === 'function') dn_draw(md, d);  // 2.635.0 (#4807 d): the notes (docnotes.js)
   if (DC.slide) dc_slideIn(md);  // 2.476.0 (#3935): the next document glides in from the side it was swiped to
 }
 // 2.430.0 (#3582): the preview at the top: the small picture at once, then an image as itself or a PDF's first page drawn sharp

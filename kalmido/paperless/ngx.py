@@ -15,7 +15,7 @@ another one. Only Paperless-ngx -> Kalmido: Kalmido only reads (GET), it never w
   a tag | a folder of the documents | skipped; correspondent -> sender, document type -> type; names can be changed).
 - Import: in the background (one thread per server process, the state in pl_sources.run_*), stoppable, with progress.
   What comes along: the original file, Paperless' text (no new recognition), the date, tags, correspondent, type, custom
-  fields + notes + archive serial number as text below the document's text. Nothing twice: pl_imported (Paperless id per
+  fields (as fields), notes (as notes of the document, 2.635.0 #4807) + archive serial number as text below the document's text. Nothing twice: pl_imported (Paperless id per
   connection address) and the checksum of the file within the workspace.
 - Following (optional): every every_min minutes the newest documents come in (newest first, until a page holds nothing new).
 """
@@ -43,6 +43,7 @@ from ..admin.hosting import QuotaExceeded  # 2.369.5 (#2517): pulled up from fun
 from ..accounts.session import GATE  # 2.369.5 (#2517): pulled up from functions
 from ..core.orgcrypt import OrgCryptError, oc_dec_k  # 2.369.5 (#2517): pulled up from functions
 from ..docs.fields import df_from_paperless  # 2.369.5 (#2517): pulled up from functions
+from ..docs.notes import dn_import  # 2.635.0 (#4807 d)
 from ..accounts.orgs import is_org_admin  # 2.369.5 (#2517): pulled up from functions
 
 PL_TIMEOUT = 20               # s per request
@@ -452,19 +453,26 @@ def _doc_text(doc, notes, fields):
         extra.append(f"{tr('Archive serial number')}: {doc['archive_serial_number']}")
     if extra:
         parts.append("\n".join(extra))
-    if notes:
-        parts.append(tr("Notes") + ":\n" + "\n".join(f"- {n}" for n in notes))
+    # 2.635.0 (#4807 d): the notes are no longer lines of the text: plh_store makes them notes of the document (docs/notes.py)
     return "\n\n".join(p for p in parts if p)[:PL_TEXT_MAX]
+
+
+def _note(x):
+    """2.635.0 (#4807 d): one Paperless note -> {text, author, created} (author: the name of its Paperless user, if given)."""
+    u = x.get("user")
+    who = ""
+    if isinstance(u, dict):
+        who = " ".join(str(u.get(k) or "").strip() for k in ("first_name", "last_name")).strip() or str(u.get("username") or "").strip()
+    return {"text": str(x.get("note") or "").strip(), "author": who[:200], "created": str(x.get("created") or "")[:40]}
 
 
 def _notes(c, r, tok, doc):
     n = doc.get("notes")
-    if isinstance(n, list):
-        return [str(x.get("note") or "").strip() for x in n if isinstance(x, dict) and str(x.get("note") or "").strip()][:200]
     if isinstance(n, int) and n > 0:
         j = pl_get(c, r["url"], tok, f"/api/documents/{int(doc['id'])}/notes/")
-        j = j.get("results") if isinstance(j, dict) else j
-        return [str(x.get("note") or "").strip() for x in (j or []) if isinstance(x, dict) and str(x.get("note") or "").strip()][:200]
+        n = j.get("results") if isinstance(j, dict) else j
+    if isinstance(n, list):
+        return [y for y in (_note(x) for x in n if isinstance(x, dict)) if y["text"]][:200]
     return []
 
 
@@ -480,13 +488,15 @@ def pl_import_doc(c, r, uid, tok, doc, labels, fields):
         return "skip"
     data, mime, fname = pl_get(c, r["url"], tok, f"/api/documents/{pid}/download/?original=true", raw=True,
                                limit=MAX_FILE_MB * 1024 * 1024)
-    return plh_store(c, r, uid, src, doc, data, mime, fname, labels, lambda: _doc_text(doc, _notes(c, r, tok, doc), fields), fields)
+    return plh_store(c, r, uid, src, doc, data, mime, fname, labels, lambda: _doc_text(doc, None, fields), fields,
+                     notes=lambda: _notes(c, r, tok, doc))
 
 
-def plh_store(c, r, uid, src, doc, data, mime, fname, labels, text, fields=None):
+def plh_store(c, r, uid, src, doc, data, mime, fname, labels, text, fields=None, notes=None):
     """2.69.0 A (#1846): file the bytes of one Paperless document (fetched over the API or read from an export ZIP) into r's
     workspace: the same file already there = 'dup', else the mapping of r (tags / folder / sender / type) and docs_ingest =
-    'new'; either way one pl_imported row (ws, src, pl_id). text() = the document's text (only asked for a new one)."""
+    'new'; either way one pl_imported row (ws, src, pl_id). text() = the document's text (only asked for a new one); notes =
+    [{text, author, created}] or a function giving them (2.635.0, #4807 d: they become notes of the new document)."""
     ws, pid = r["ws"], int(doc["id"])
     sha = hashlib.sha256(data).hexdigest()
     asn = doc.get("archive_serial_number") if isinstance(doc.get("archive_serial_number"), int) else None
@@ -526,6 +536,8 @@ def plh_store(c, r, uid, src, doc, data, mime, fname, labels, text, fields=None)
     nid = docs_ingest(c, uid, r["org_id"], name[:200], data, mime or None, "paperless", meta)
     if doc.get("custom_fields"):  # 2.153.0 (#2179): Paperless' custom fields as fields of the document
         df_from_paperless(c, ws, nid, doc, fields, uid)
+    if notes:  # 2.635.0 (#4807 d): Paperless' notes as notes of the document (author name + time of Paperless)
+        dn_import(c, nid, notes() if callable(notes) else notes)
     if folder:
         node = c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
         fid = S.folder_by_name(c, node, uid, folder)

@@ -211,7 +211,7 @@ def docs_spec(paths, schemas, op, ok, errs, ref, pid, q):
         "id": {"type": "integer", "description": "The file's id in the file store (/files/{id})"}, "name": {"type": "string"},
         "mime": {"type": "string"}, "size": {"type": "integer"}, "org_id": {"type": ["integer", "null"]},
         "state": {"type": "string", "enum": list(S.STATES), "description": "Recognition: wait, run, done, failed (error says why)"},
-        "error": {"type": "string"}, "method": {"type": "string", "description": "pdf (text layer), ocr, text, import, e-invoice"},
+        "error": {"type": "string"}, "method": {"type": "string", "description": "pdf (text layer), ocr, text, import, e-invoice, office (2.635.0: Word / Excel / OpenDocument), none (no text reader for the kind of file)"},
         "date": {"type": ["string", "null"], "format": "date"}, "due": {"type": ["string", "null"], "format": "date"},
         "taken_at": {"type": ["string", "null"], "description": "Capture time of a photo (from its EXIF, read before the metadata was removed)"},
         "amount": {"type": ["string", "null"], "description": "Decimal text, e.g. 119.00"}, "currency": {"type": ["string", "null"]},
@@ -237,7 +237,11 @@ def docs_spec(paths, schemas, op, ok, errs, ref, pid, q):
         "custom_fields": {"type": "array", "description": "2.153.0: the custom fields of the document's workspace with this document's "
                           "value (single document only): id, name, type (text, number, money, date, checkbox, select, url), options "
                           "(select: id, name), value (null = none; money '12.50 EUR', checkbox '1', select the option id), label",
-                          "items": {"type": "object"}}}}
+                          "items": {"type": "object"}},
+        # 2.635.0 (#4807 d)
+        "notes": {"type": "array", "description": "2.635.0: single document only: the notes on the document, oldest first: id, text, "
+                  "author {id, name}, created_at, source (paperless = imported), can_delete. Read only for agents",
+                  "items": {"type": "object"}}}}
     schemas["DocumentPage"] = {"type": "object", "properties": {"data": {"type": "array", "items": ref("Document")},
                                                                 "next_cursor": {"type": ["string", "null"]}}}
     T = "Documents"

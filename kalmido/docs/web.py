@@ -11,6 +11,7 @@ from flask import g, jsonify, request
 
 from ..core.config import app, ATT_DIR
 from ..core.db import body, bump, db, err, iso, iso_ms, now_utc, insert_id
+from .notes import dn_view  # 2.635.0 (#4807 d)
 from ..core.conflict import ccf_check  # 2.564.0 D (#4701)
 from ..core.i18n import tr
 from ..core.numtext import server_num
@@ -200,6 +201,7 @@ def doc_json(c, m, node, full=False, role=None, pre=None):
         ast_doc_extra(c, d, m)  # 2.126.1 A (#2123): the summary a person took over from an agent
         from .fields import df_json
         d["custom_fields"] = df_json(c, m)  # 2.153.0 (#2179)
+        d["notes"] = dn_view(c, m, role or "view", me())  # 2.635.0 (#4807 d): the notes, oldest first (also for agents: read only)
         if acx_of(c, me()).role != "agent":  # 2.522.0 (#4433): office or private space, "Move to office" / "Wrong area"
             d["area"] = ar_view(c, dict(node, role=role or "view"), m, me())
     return d

@@ -79,6 +79,7 @@ DOC_JOBS = [("doc_meta", "node_id", col, f"doc_meta.{col}") for col in ("text", 
     ("pl_sources", "id", "mapping", "pl_sources.mapping"),
     ("file_text", "id", "text", "file_text.text"),
     ("doc_field_values", "id", "value", "doc_field_values.value"),  # 2.153.0 (#2179): custom field values (docs/fields.py)
+    ("doc_notes", "id", "text", "doc_notes.text"),  # 2.635.0 (#4807 d): notes on documents (docs/notes.py)
 ]
 
 
@@ -1229,7 +1230,8 @@ ROT_WS = (("doc_rules", "id", "data", "doc_rules.data"), ("doc_models", "id", "d
           ("rc_suggest", "id", "amount", "rc_suggest.amount"), ("rc_suggest", "id", "prev_amount", "rc_suggest.prev_amount"),
           ("doc_meta", "node_id", "summary", "doc_meta.summary"),  # 2.138.0 (#1972): document summaries of 2.126.1 (#2123)
           ("pl_uploads", "id", "mapping", "pl_sources.mapping"),  # 2.138.0 (#1972): the mapping chosen for an uploaded export
-          ("doc_field_values", "id", "value", "doc_field_values.value"))  # 2.153.0 (#2179): custom field values (docs/fields.py)
+          ("doc_field_values", "id", "value", "doc_field_values.value"),  # 2.153.0 (#2179): custom field values (docs/fields.py)
+          ("doc_notes", "id", "text", "doc_notes.text"))  # 2.635.0 (#4807 d): notes on documents (docs/notes.py)
 ROT_SETTLE = float(os.environ.get("KALMIDO_ORGCRYPT_ROT_SETTLE", "30"))  # 2.360.2 L (#2561): longest wait for running writers (0 = none)
 
 

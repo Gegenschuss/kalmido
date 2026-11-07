@@ -301,8 +301,8 @@ def plh_scan(zf):
             fields[x["pk"]] = {"name": str(f.get("name") or "")[:S.NAME_MAX], "type": str(f.get("data_type") or ""), "options": opts}
         elif m == "documents.note" and _int(f.get("document")) is not None and not f.get("deleted_at"):
             t = str(f.get("note") or "").strip()
-            if t:
-                notes.setdefault(f["document"], []).append(t)
+            if t:  # 2.635.0 (#4807 d): with its time and user (the name is looked up below: auth.user may come later)
+                notes.setdefault(f["document"], []).append({"text": t, "created": str(f.get("created") or "")[:40], "user": _int(f.get("user"))})
         elif m == "documents.customfieldinstance" and _int(f.get("document")) is not None and _int(f.get("field")) is not None:
             values.setdefault(f["document"], []).append(f)
         elif m == "documents.document" and not f.get("deleted_at"):
@@ -319,8 +319,9 @@ def plh_scan(zf):
                              "original_file_name": str(f.get("original_filename") or (fn if isinstance(fn, str) else "") or "")[-200:].rsplit("/", 1)[-1],
                              "member": member, "mime": mime if _MIME_RE.fullmatch(mime) else "",
                              "size": names[member].file_size if member else 0}
+    unames = {u[0]: u[1] for u in users}
     for pk, d in docs.items():
-        d["notes"] = notes.get(pk, [])[:200]
+        d["notes"] = [{"text": x["text"], "created": x["created"], "author": unames.get(x["user"], "")} for x in notes.get(pk, [])[:200]]
         cf = []
         for f in values.get(pk, []):
             col = _VALUE.get((fields.get(f["field"]) or {}).get("type"))
@@ -513,7 +514,7 @@ def plh_zip_run(c, rid):
                             c.commit()
                             with c.savepoint():
                                 res = P.plh_store(c, t, uid, _src(r), d, data, d["mime"] or None, d["original_file_name"], labels,
-                                                  lambda d=d: P._doc_text(d, d["notes"], scan["fields"]), scan["fields"])
+                                                  lambda d=d: P._doc_text(d, None, scan["fields"]), scan["fields"], notes=d["notes"])
                 except PlhError as e:
                     if e.code == "zip_gone":  # the parts are gone: nothing more can come; a damaged member only fails its document
                         raise

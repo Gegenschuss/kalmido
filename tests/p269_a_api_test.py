@@ -361,8 +361,10 @@ if pb and tn:
     full = Bo.get(B + f"/api/docs/{pb['id']}").json()
     t = full.get("text") or ""
     cf = {x["name"]: x.get("label") for x in full.get("custom_fields") or []}  # 2.153.0 (#2179): custom fields are fields now
-    check("Power bill May total 42.00 EUR" in t and "Archive serial number: 17" in t and "Paid on 10 May" in t
-          and cf.get("Contract number") == "C-123" and cf.get("Status") == "Paid", f"text + serial number + note, custom fields as fields ({t[:300]!r}, {cf})")
+    # 2.635.0 (#4807): the note is a note of the document (no longer a line of the text)
+    nts = [n["text"] for n in full.get("notes") or []]
+    check("Power bill May total 42.00 EUR" in t and "Archive serial number: 17" in t and "Paid on 10 May" not in t and nts == ["Paid on 10 May"]
+          and cf.get("Contract number") == "C-123" and cf.get("Status") == "Paid", f"text + serial number, note as note, custom fields as fields ({t[:300]!r}, {nts}, {cf})")
     f = Bo.get(B + f"/api/docs/{pb['id']}/file")
     check(f.ok and f.content == PDF1, "the original file, unchanged")
 check(not any(d["org_id"] == ORG for d in docs(A, "all")), "alice (no member) sees none of them")
