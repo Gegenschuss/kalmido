@@ -433,6 +433,25 @@ registering the ones of its area.
    see "Styles and start scripts" below); `python3 tools/sw_lists.py` rewrites `SHELL` in `static/sw.js` from it.
 3. `python3 tools/check_layout.py` compares the lists; `node --check` runs on every file in CI.
 
+### Fingers or mouse, narrow or wide
+
+*Since 2.653.0 (#5087).*
+
+Two separate questions, two switches in `static/js/icons.js`:
+
+- **Operation** (fingers): `isTouchUi()` = `(pointer:coarse)` or `(hover:none)`. Gestures (swipes, touch handlers),
+  autofocus that pops up the on-screen keyboard, `inputmode`, native `draggable`, keyboard shortcut hints, the motion of
+  the phone sheets. In CSS: `@media (pointer:coarse), (hover:none)`.
+- **Layout** (space): `isMobile()` = `(max-width:767px)`, in CSS the width queries. Only for what fits on the screen.
+
+A touch tablet or an unfolded foldable is wider than 767 px: `isMobile()` is false there, `isTouchUi()` true. Hang
+finger rules on the width and they are missing on these devices. `isTouch()` (narrow or no hover) is the older switch and
+stays for the places that use it. Both are read again on every render, so turning or folding the device needs no
+listener. `tools/check_touch_switch.py` (inside `check_layout.py`) is red when a line tests the width and does something
+for fingers or the keyboard; a real layout case carries a comment `layout: <why>` in that line. The hits from before the
+rule stand in `tools/touch_switch_legacy.txt` with the task that fixes them; the list only shrinks. Settings > Help >
+About shows the window size, pixel ratio, pointer, hover and both switches of the device.
+
 ### Caching of static files and request timing
 
 *Since 2.149.0.*

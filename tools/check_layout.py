@@ -308,6 +308,14 @@ ERR += check_done_exit.errors()
 import check_pubkinds  # noqa: E402
 ERR += check_pubkinds.errors()
 
+# 2.653.0 (#5087): finger operation hangs on isTouchUi(), the width (isMobile()) only on layout (tools/check_touch_switch.py,
+# list tools/touch_switch_legacy.txt); runs here so the CI lint and the Mac lint both have it
+import check_touch_switch  # noqa: E402
+_ts_err, _ts_warn = check_touch_switch.errors()
+ERR += _ts_err
+for _w in _ts_warn:
+    print(_w)
+
 for e in ERR:
     print("ERROR:", e)
 print(f"check_layout: {len(tags)} client modules, {len(order)} server modules, {n_people} tables with people, {len(ERR)} error(s)")

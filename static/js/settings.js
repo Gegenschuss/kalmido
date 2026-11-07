@@ -1514,9 +1514,19 @@ function aboutVerRows(a) {
   return `<div class="row aboutapp${off ? ' off' : ''}"><label>${tr('App in this window')}</label><span>v${esc(app)}${off ? ` · <b>${esc(tr('Server: v{0}', srv))}</b> <button type="button" class="btn sm pri" data-nv="go">${esc(tr('Reload'))}</button>` : ` · <span class="muted">${esc(tr('up to date'))}</span>`}</span></div>`;
 }
 // Settings > Help: the version, 2.101.0 (#1964): the trademark note (2.46.6 (#1710): the admins' update check result moved to Administration > Server, ad_updHtml)
+// 2.653.0 (#5087): one quiet line about this device (window size, pixel ratio, pointer, hover, the two switches) - to see
+// which layout and which operation a foldable or tablet gets; refreshed on resize while Settings > Help is open
+function aboutDevTxt() {
+  const mm = q => { try { return matchMedia(q).matches; } catch { return false; } }, yn = v => tr(v ? 'yes' : 'no');
+  const ptr = mm('(pointer:coarse)') ? tr('coarse') : mm('(pointer:fine)') ? tr('fine') : tr('none');
+  return tr('{0} × {1} px · pixel ratio {2} · pointer {3} · hover {4} · phone layout {5} · finger operation {6}',
+    innerWidth, innerHeight, fmtNum(devicePixelRatio || 1, 2), ptr, yn(mm('(hover:hover)')), yn(isMobile()), yn(isTouchUi()));
+}
+window.addEventListener('resize', () => { const el = document.getElementById('s-aboutdev'); if (el) el.textContent = aboutDevTxt(); });
 function aboutHtml(chk, hint) {
   const a = S.about || {};
   let h = `<h4 id="s-about-h">${tr('About')}</h4><div class="row"><label>${tr('Version')}</label><span class="aboutver">Kalmido v${esc(a.version || '?')}</span></div>${aboutVerRows(a)}
+    <div class="row aboutdev"><label>${tr('This device')}</label><span class="muted" id="s-aboutdev">${esc(aboutDevTxt())}</span></div>
     <div class="row aboutcopy"><label>©</label><span class="muted">2026 Gegenschuss Doberenz Enders Grund eGbR · AGPL-3.0</span></div>
     <div class="row aboutmarks"><label></label><span class="muted">${tr('Product and company names mentioned in Kalmido are trademarks of their respective owners. Kalmido is an independent project, not affiliated with or endorsed by them.')}</span></div>
     <div class="row aboutlinks"><label></label>${ABOUT_LINKS.map(([u, n, i]) => `<a class="btn sm" href="${u}" target="_blank" rel="noopener noreferrer">${ic(i, 's')} ${tr(n)}</a>`).join('')}${legalLinks(a.legal, 'btn sm')}</div>`;

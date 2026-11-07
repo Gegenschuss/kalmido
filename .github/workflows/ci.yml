@@ -217,6 +217,7 @@ jobs:
       # tokens before / after compared with the tokenizer of the pinned ESLint (only comments may differ)
       - name: Comment remover of the static files
         run: npx --yes -p eslint@10.13.0 -c "python tools/strip_check.py -v --need-espree"
+      # 2.653.0 (#5087): check_layout.py runs tools/check_touch_switch.py too (finger operation on isTouchUi(), not on isMobile())
       - name: Module lists agree (index.html / sw.js / static/js, kalmido/__init__.py / the package)
         run: python tools/check_layout.py
       # 2.380 G (#3390): the hashes the server sends to the agent setup match the starter files

@@ -457,6 +457,15 @@ try { if (sessionStorage.getItem('kalmido.booted')) document.documentElement.cla
 try { matchMedia('(prefers-color-scheme: light)').addEventListener('change', applyTheme); } catch { /* old browser */ }
 // density per device: compact (default on desktop) | comfortable (default on phones and touch screens)
 const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform || '');
+// 2.653.0 (#5087): the finger switch. Operation (fingers) - never for layout; isMobile() only for layout by space.
+// isTouchUi() = a coarse pointer or no hover: gestures, autofocus (the on-screen keyboard), inputmode, native drag,
+// keyboard shortcut hints, sheet motion. It is true on a touch tablet or an unfolded foldable wider than 767 px, where
+// isMobile() is false. CSS: @media (pointer:coarse),(hover:none) for finger rules, widths only for space.
+// tools/check_touch_switch.py turns red on isMobile() next to such operation. Read fresh per render (td_rc lives for one
+// render only), so turning the device or folding / unfolding it is picked up by the next render without a listener.
+const isTouchUi = () => td_rc('touchui', () => { try { return matchMedia('(pointer:coarse)').matches || matchMedia('(hover:none)').matches; } catch { return false; } });
+// isTouch() (unchanged since before 2.653): narrow OR no hover - the older switch many places use; new code takes
+// isTouchUi() for fingers and isMobile() for space
 const isTouch = () => td_rc('touch', () => { try { return isMobile() || matchMedia('(hover: none)').matches; } catch { return false; } });
 // 2.655.0 (#5081): autofocus into a text field only without touch (finger: the screen keyboard would pop up and cover the
 // dialog, calendar or hits); {select: true} also selects the text. Returns whether it focused.
