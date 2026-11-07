@@ -135,7 +135,8 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   w.eval('closeDetail()'); await sleep(200);
 
   // ================= conflict: a second session changes the field in between
-  await w.eval(`patchTask(${t2}, {priority: 1})`); await sleep(100);
+  await w.eval(`patchTask(${t2}, {priority: 1})`);
+  await until(() => !w.eval('OUT.q.length')); await sleep(100);  // 2.599.0: the own change has reached the server before the other device writes (under load the outbox left after it: a server conflict instead of the undo's report)
   await call('PATCH', `/api/tasks/${t2}`, {priority: 3});  // the same user on another device (API)
   await key('z');
   check((await get(t2)).priority === 3, 'undo does not overwrite the change made elsewhere');
