@@ -175,7 +175,8 @@ check(r.status_code == 201 and status(A, I1) == "paid", f"with pay: the payment 
 E1 = r.json().get("id")
 before = count()
 r = CASH.post(B + f"{O}/cash-entries/{E1}/cancel", json={"day": TD})
-check(r.status_code == 403 and "takes the payment back" in r.json().get("error", ""),
+# 2.644.0 (#5029): wording "reverses the payment" since #3894 (b0599d10e)
+check(r.status_code == 403 and "reverses the payment" in r.json().get("error", ""),
       f"cancelling an entry that booked a payment: refused with the reason {r.status_code} {r.text[:200]}")
 check(tuple(count()) == tuple(before) and status(A, I1) == "paid", "refused cancel: no counter entry, the invoice stays paid")
 r = CASHPAY.post(B + f"{O}/cash-entries/{E1}/cancel", json={"day": TD})
