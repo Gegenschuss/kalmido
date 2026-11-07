@@ -122,7 +122,7 @@ const lateAppError = e => !!e && closedRealms.some(T => e instanceof T) && /Cann
   && /\/static\/(js\/)?[\w.-]+\.js/.test(String(e.stack || '').split('\n').slice(0, 2).join('\n'))
   || !!e && closedRealms.length > 0 && /reading '_location'/.test(e.message || '');  // 2.442.0 (#3744): jsdom's own location getter on a closed window; its TypeError is of this realm (p2440_d_ui)
 process.on('unhandledRejection', e => {
-  if (lateAppError(e)) { console.log('late app rejection after a window was closed (ignored):', String(e.stack).split('\n').slice(0, 2).join(' | ')); return; }
+  if (lateAppError(e)) { console.log('late app rejection after a window was closed (ignored):', String(e.stack).split('\n').slice(0, 8).join(' | ')); return; }  // 2.655.0 (#5045): 8 stack lines, so the caller of $() shows
   console.error(e); process.exit(1);
 });
 // 2.504.0 (#4084): jsdom has no CSS object, the app uses it (office.js ost_find, core.js, ...: a ReferenceError when the path gets there).
