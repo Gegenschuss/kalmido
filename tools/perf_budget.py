@@ -33,7 +33,7 @@ CEILINGS = (("decke_js_gzip", "start_js_gzip"), ("decke_css_gzip", "start_css_gz
 # 2.599.0 (#4506): hand-made delays (clearTimeout / setTimeout pairs) in static/js/*.js, counted as "clearTimeout(" in the
 # bytes the server sends (no comments). New code uses debounce() of static/js/core.js; the count may only go down: over it is
 # red, under it the tool asks to lower this number to the new count in the same commit. Kept here, not in perf_budget.json.
-CLEARTIMEOUT_MAX = 237  # 06.11.2026: the count of 2.599.0 on main e645af24c (dragRestFlush of 2.586.0 A counted too); 07.11.: the two new ones of main (dropany.js, kbLp) offset by debounce in dropany.js and chatbase.js
+CLEARTIMEOUT_MAX = 230  # 07.11.2026 11:50: lowered to the count on main c69fcd6 + 2.599.0; before: 06.11.2026: the count of 2.599.0 on main e645af24c (dragRestFlush of 2.586.0 A counted too); 07.11.: the two new ones of main (dropany.js, kbLp) offset by debounce in dropany.js and chatbase.js
 SHRINK_HINT = ("only the project owner raises a ceiling; make the start smaller by loading on demand (static/js/lazyload.js LD_MODS / LD_CALL / "
                "LD_VIEW) or by moving texts out of the language core, never by cutting code, comments or names")
 

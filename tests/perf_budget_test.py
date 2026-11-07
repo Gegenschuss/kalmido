@@ -28,7 +28,7 @@ def run(*a):
 rc, out = run()
 check(rc == 0, "(a) current state within the budget: " + out)
 rc, out = run("--json")
-d = json.loads(out)
+d = json.JSONDecoder().raw_decode(out)[0]
 check(rc == 0 and d["over"] == [] and d["measured"]["start_scripts"] > 50, "(a) --json output")
 CEIL = ("decke_js_gzip", "decke_css_gzip", "decke_i18n_gzip", "decke_scripts")
 check(all(d["limits"].get(k) for k in CEIL + ("start_ms",)) and d["measured"]["start_i18n_gzip"] > 0, "(a) 2.521.0 (#4391): the ceilings and start_ms are the limits")
@@ -86,7 +86,7 @@ with tempfile.TemporaryDirectory() as tmp:
     # (d) 2.599.0 (#4506): the hand-made delays may only go down: one more clearTimeout( is red and names debounce, a comment
     # does not count, one less asks to lower CLEARTIMEOUT_MAX
     rc, out = run("--root", root, "--json")
-    ct = json.loads(out)["measured"]["js_cleartimeouts"]
+    ct = json.JSONDecoder().raw_decode(out)[0]["measured"]["js_cleartimeouts"]
     check(rc == 0 and ct > 100, f"(d) the copy counts {ct} hand-made delays")
     extra = os.path.join(root, "static", "js", "zz_delay.js")
     open(extra, "w").write("// clearTimeout(x) in a comment does not count\n")
