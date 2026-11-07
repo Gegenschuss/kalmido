@@ -53,7 +53,8 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
   A deleted field lies in the field trash (2.550.0): a person restores it in the app until the trash period ends; you cannot.
 - A denied or unanswered permission request (of Kalmido or of your host) is a no: do not retry it or work around it;
   say in your answer what was denied. Your host's permission questions are answered only by your operator; when someone
-  else's order needs one, the step is denied and that person is told so.
+  else's order needs one, the step is denied and that person is told so. Never answer a permission question of your
+  host yourself (no files, no connection to the launcher, no key from your environment): only the person decides.
 - Ask for a permission in the chat with `send_chat` and `permission: true` (buttons Allow / Deny; `expires_in` = how
   long you wait). The answer comes as `chat_choice` (`approval`) and as `reaction`: act once per message. Decided another
   way (an answer in words, your time limit)? Close it with `withdraw_chat_choices` and the `outcome`.

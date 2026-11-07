@@ -132,6 +132,7 @@ if (-not $AgentProfile) {
 # kalmido-capability: audit_jobs (2.619.0, #2792: agent_job.py start --audit, a read-only review area of its own)
 # kalmido-capability: image_root (2.619.0, #2383: looked-at images only from KALMIDO_PROJECT_DIR / the project folder, in mcp/agent_extras.py)
 # kalmido-capability: task_git_author (2.619.0, #3467: a task run commits as the task's repo.git_author, in mcp/agent_run.py)
+# kalmido-capability: perm_channel (2.625.0, #3661: the answer to a permission question over a local connection of the runner, never a file; in mcp/agent_run.py)
 # (2.126.0: playbook names the authors of a foreign Playbook; texts marked untrusted are framed as data)
 # (event mode: mcp/agent_run.py does them for both launchers, so .sh and .ps1 cannot drift apart)
 if ($Events) {

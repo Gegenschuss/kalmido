@@ -31,7 +31,8 @@ that arrive together: one run), the same way a hosted chat service does it:
                       cards the person decided in words (withdraw), never as a yes (2.44.0, #1441)
   - approval state:   open cards survive a restart (state.json), one reminder after 2 h, expired after 7 days (#1444)
   - permissions:      Claude Code: a PermissionRequest hook (`agent_run.py --perm-hook`, per run via --settings) asks the
-                      person in the chat before a tool outside the allow list; 9 min without an answer = no (#1442)
+                      person in the chat before a tool outside the allow list; 9 min without an answer = no (#1442); the answer
+                      comes over a local connection of the runner, never a file (2.625.0, #3661)
   - command guard:    Claude Code: a PreToolUse hook (`agent_run.py --guard-hook`, per run via --settings) refuses force-push,
                       deleting / moving tags, docker ... prune and reboot / shutdown, whatever the allow list says (#3758)
   - conversations:    Claude Code: each person's chat goes on in one conversation (--resume); a new one after size, runs,
@@ -44,8 +45,10 @@ that arrive together: one run), the same way a hosted chat service does it:
 usage: agent_run.py [--state DIR] [--once-event FILE] [--dry-run] -- COMMAND [ARGS...]   |   agent_run.py --perm-hook | --guard-hook
   KALMIDO_URL, KALMIDO_TOKEN    from the environment (the launcher loads the env file)
   KALMIDO_PROMPT_FILE           optional text put in front of every event (default: read CLAUDE.md, handle the event)
-  KALMIDO_STATE_DIR             event cursor, state.json, queue, lock, permission files (default ~/.cache/kalmido-agent)
+  KALMIDO_STATE_DIR             event cursor, state.json, queue, lock (default ~/.cache/kalmido-agent; 2.625.0 #3661: no permission files)
   KALMIDO_PERM_RELAY / _TIMEOUT / _USER   permission questions in the chat (default on / 540 s / the agent's owner)
+  KALMIDO_PERM_SOCK_DIR / _SHARED  where the local connection of the permission questions lives (default: the temp folder)
+                                and 1 = reachable for an agent under an OS user of its own (docs/AGENT-SECURITY.md, #3661)
   KALMIDO_SESSION_RESUME        0 = a fresh run per event (default 1); KALMIDO_SESSION_MAX_TOKENS / _MAX_RUNS / _IDLE_MIN
                                 only when Kalmido does not send them (2.233.0, #3189: runtime rotate_tokens / rotate_runs /
                                 rotate_idle_min, set in the agent's runtime section "Interim summary"; a new day starts at
@@ -2486,57 +2489,185 @@ def guard_hook(argv):
     return 0
 
 
+# kalmido-capability: perm_channel (2.625.0, #3661)
+PERM_MAX_REQ = 256 * 1024  # one request of the hook (tool name + input) at most 256 KB
+PERM_MAX_OPEN = 32  # at most 32 questions wait at once; more = denied at once (a flood of connections asks nobody)
+
+
+def perm_family():
+    """2.625.0 (#3661): the kind of the local connection hook <-> runner: a named pipe on Windows, a Unix socket elsewhere."""
+    return "AF_PIPE" if os.name == "nt" else "AF_UNIX"
+
+
+def peer_pid(conn):
+    """2.625.0 (#3661): the process id of the other end of a connected multiprocessing Connection (Linux SO_PEERCRED, macOS
+    LOCAL_PEERPID, Windows GetNamedPipeServerProcessId of the pipe's server); None = the system cannot tell."""
+    try:
+        if os.name == "nt":
+            import ctypes
+            from ctypes import wintypes
+            fn = ctypes.WinDLL("kernel32", use_last_error=True).GetNamedPipeServerProcessId
+            fn.argtypes, fn.restype = [wintypes.HANDLE, ctypes.POINTER(wintypes.ULONG)], wintypes.BOOL
+            v = wintypes.ULONG(0)
+            return int(v.value) if fn(conn._handle, ctypes.byref(v)) else None
+        import socket
+        import struct
+        s = socket.socket(fileno=os.dup(conn.fileno()))
+        try:
+            if hasattr(socket, "SO_PEERCRED"):
+                return struct.unpack("3i", s.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, struct.calcsize("3i")))[0]
+            if sys.platform == "darwin":
+                return struct.unpack("i", s.getsockopt(0, 0x002, 4))[0]  # SOL_LOCAL, LOCAL_PEERPID
+        finally:
+            s.close()  # only the duplicate; conn stays open
+    except Exception:
+        return None
+    return None
+
+
+class PermChannel:
+    """2.625.0 (#3661): the local connection over which the PermissionRequest hook asks and gets its answer -- never a file
+    in the state folder (who could write there, e.g. the agent with its tools, could give itself an allow). A Unix socket
+    with a random name in a fresh 0700 folder (KALMIDO_PERM_SOCK_DIR, else the system's temp folder; KALMIDO_PERM_SHARED=1:
+    folder 0711 / socket 0666 for an agent under an OS user of its own), a named pipe with a random name on Windows. Each
+    connection proves the key of the current run both ways (HMAC challenge, multiprocessing.connection); the hook in
+    addition checks that the other end IS the runner's process (peer_pid) and sends a one-time nonce that the answer must
+    carry. The key is new for every run (new_key). on_request(request, nonce, conn) gets each authenticated request."""
+
+    def __init__(self, on_request):
+        import secrets
+        import tempfile
+        from multiprocessing import connection as mpc
+        self.mpc, self.on_request = mpc, on_request
+        self.key = secrets.token_bytes(32)
+        self.dir = None
+        shared = os.environ.get("KALMIDO_PERM_SHARED", "").strip() == "1"
+        if os.name == "nt":
+            self.address = r"\\.\pipe\kalmido-perm-" + secrets.token_hex(16)
+        else:
+            self.dir = tempfile.mkdtemp(prefix="kalmido-perm-", dir=os.environ.get("KALMIDO_PERM_SOCK_DIR") or None)  # 0700
+            if shared:
+                os.chmod(self.dir, 0o711)  # others may pass, not list: the socket's random name stays unknown to them
+            self.address = os.path.join(self.dir, secrets.token_hex(8) + ".sock")
+        self.listener = mpc.Listener(self.address, perm_family(), backlog=16)  # no authkey here: the handshake runs per thread
+        if shared and self.dir:
+            os.chmod(self.address, 0o666)
+        self.closed, self.busy, self.lk = False, 0, threading.Lock()
+        threading.Thread(target=self._accept, daemon=True).start()
+
+    def new_key(self):
+        """A new key for the next run: a key of an earlier run (or one the agent read there) opens nothing any more."""
+        import secrets
+        self.key = secrets.token_bytes(32)
+        return self.key.hex()
+
+    def _accept(self):
+        while not self.closed:
+            try:
+                c = self.listener.accept()
+            except Exception:
+                if self.closed:
+                    return
+                time.sleep(0.2)
+                continue
+            with self.lk:
+                full = self.busy >= PERM_MAX_OPEN
+                if not full:
+                    self.busy += 1
+            if full:
+                c.close()
+                continue
+            threading.Thread(target=self._serve, args=(c,), daemon=True).start()
+
+    def _serve(self, c):
+        took = False
+        try:
+            key = self.key
+            self.mpc.deliver_challenge(c, key)  # the hook proves the run's key ...
+            self.mpc.answer_challenge(c, key)  # ... and the runner proves it to the hook
+            if not c.poll(10):
+                return
+            rq = json.loads(c.recv_bytes(PERM_MAX_REQ).decode("utf-8"))
+            nonce = str(rq.get("nonce") or "") if isinstance(rq, dict) else ""
+            if not re.fullmatch(r"[0-9a-f]{32}", nonce):
+                return
+            took = True
+            self.on_request(rq, nonce, c)  # conn belongs to on_request now (it answers and closes it)
+        except Exception:
+            pass
+        finally:
+            with self.lk:
+                self.busy -= 1
+            if not took:
+                try:
+                    c.close()
+                except Exception:
+                    pass
+
+    def close(self):
+        self.closed = True
+        try:
+            self.listener.close()
+        except Exception:
+            pass
+        if self.dir:
+            shutil.rmtree(self.dir, ignore_errors=True)
+
+
 def perm_hook(argv):
-    """2.44.0 (#1442) `agent_run.py --perm-hook`: the PermissionRequest hook of a Claude Code run (the runner hands it in
-    with --settings). It writes the request into KALMIDO_PERM_DIR, waits until the runner wrote the person's answer
-    (KALMIDO_PERM_TIMEOUT, default 9 min; no answer = deny) and tells Claude Code allow or deny. No runner holds the lock
-    -> deny at once. Never fails the run: any error = deny."""
+    """2.44.0 (#1442) / 2.625.0 (#3661) `agent_run.py --perm-hook`: the PermissionRequest hook of a Claude Code run (the
+    runner hands it in with --settings). It connects to the runner's PermChannel (KALMIDO_PERM_SOCK), checks that the other
+    end is the runner's process (KALMIDO_PERM_PID) and knows the run's key (KALMIDO_PERM_KEY, both ways), sends the request
+    with a one-time nonce and waits on that connection for the person's answer (KALMIDO_PERM_TIMEOUT, default 9 min). Only
+    an answer on this connection with this nonce counts; no runner, wrong process, wrong key, no answer in time or the
+    connection gone = deny. No file is read: nothing in the state folder can give an allow. Never fails the run: any
+    error = deny."""
     def out(allow, why=""):
         d = {"behavior": "allow"} if allow else {"behavior": "deny", "message": f"Kalmido launcher: {why}. Do not retry it; "
                                                  "say in your answer what was denied."}
         print(json.dumps({"hookSpecificOutput": {"hookEventName": "PermissionRequest", "decision": d}}))
         return 0
+    c = None
     try:
+        import secrets
+        from multiprocessing import connection as mpc
         d = json.loads(sys.stdin.read() or "{}")
-        pdir = os.environ.get("KALMIDO_PERM_DIR") or ""
-        if not pdir or not RunLock.held(os.path.join(os.path.dirname(pdir), "runner.lock")):
+        addr, key, rpid = (os.environ.get(k) or "" for k in ("KALMIDO_PERM_SOCK", "KALMIDO_PERM_KEY", "KALMIDO_PERM_PID"))
+        if not addr or not key or not rpid.isdigit():
             return out(False, "the launcher is not running, nobody can answer the question")
-        os.makedirs(pdir, exist_ok=True)
-        pid = f"{time.time_ns()}-{os.getpid()}"
+        try:
+            c = mpc.Client(addr, perm_family())
+        except OSError:
+            return out(False, "the launcher is not running, nobody can answer the question")
+        if peer_pid(c) != int(rpid):  # someone else holds the address (e.g. a process of the agent): never its answer
+            return out(False, "the question did not reach the launcher (another process answered)")
+        k = bytes.fromhex(key)
+        mpc.answer_challenge(c, k)
+        mpc.deliver_challenge(c, k)
+        nonce = secrets.token_hex(16)
         req = {"tool_name": d.get("tool_name"), "tool_input": d.get("tool_input"), "uid": os.environ.get("KALMIDO_PERM_UID") or "",
-               "label": os.environ.get("KALMIDO_RUN_LABEL") or "", "at": time.time()}
-        tmp = os.path.join(pdir, pid + ".tmp")
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(req, f, ensure_ascii=False)
-        os.replace(tmp, os.path.join(pdir, pid + ".req.json"))
-        ans = os.path.join(pdir, pid + ".ans")
-        end = time.time() + int(os.environ.get("KALMIDO_PERM_TIMEOUT") or PERM_TIMEOUT_S)
-        decision, asked = "", ""
-        while time.time() < end:
-            if os.path.exists(ans):
-                with open(ans, encoding="utf-8") as f:
-                    decision = f.read().strip()
-                try:  # 2.44.0 (review): an allow counts only for a question the runner really posted in the chat
-                    with open(os.path.join(pdir, pid + ".posted"), encoding="utf-8") as f:
-                        asked = f.read().strip()
-                except OSError:
-                    asked = ""
-                break
-            time.sleep(0.5)
-        if decision == "allow" and not asked:
-            decision = "deny"
-        for x in (pid + ".req.json", pid + ".ans", pid + ".posted"):
-            try:
-                os.remove(os.path.join(pdir, x))
-            except OSError:
-                pass
+               "label": os.environ.get("KALMIDO_RUN_LABEL") or "", "at": time.time(), "nonce": nonce}
+        c.send_bytes(json.dumps(req, ensure_ascii=False).encode("utf-8"))
+        if not c.poll(int(os.environ.get("KALMIDO_PERM_TIMEOUT") or PERM_TIMEOUT_S)):
+            return out(False, "no answer in the chat in time (counts as no)")
+        try:
+            ans = json.loads(c.recv_bytes(4096).decode("utf-8"))
+        except EOFError:
+            return out(False, "the launcher stopped before the person answered (counts as no)")
+        decision = str(ans.get("decision") or "") if isinstance(ans, dict) and ans.get("nonce") == nonce else ""
         if decision == "allow":
             return out(True)
         if decision == "operator":  # 2.126.0 B (#1973)
             return out(False, "only the agent's operator can allow this step and the person in the chat is not the operator")
-        return out(False, "denied by the person in the chat" if decision else "no answer in the chat in time (counts as no)")
+        return out(False, "denied by the person in the chat" if decision == "deny" else "no answer in the chat in time (counts as no)")
     except Exception as e:
         return out(False, f"the question could not be asked ({type(e).__name__})")
+    finally:
+        if c is not None:
+            try:
+                c.close()
+            except Exception:
+                pass
 
 
 def kill_tree(p):
@@ -2578,6 +2709,7 @@ class Runner:
         self.was_held = False  # 2.503.0 (#4309): the last answer of held()
         self.api.keep_status = self.held
         self.perm_thread = None
+        self.perm_chan, self.perm_conns, self.perm_lk = None, {}, threading.Lock()  # 2.625.0 (#3661): nonce -> waiting hook
         self.cur = 0
         self.proc, self.cur_st, self.abort_ev = None, None, None  # 2.144.0 (#2412): the running command, its stream, the Stop
         self.cur_uid = None  # 2.144.0 (#2412): whose chat the running command answers (None: a task / event run)
@@ -2603,9 +2735,6 @@ class Runner:
     def session_args(self, args, sid):
         return with_session(self.profile, args, sid)
 
-    def perm_dir(self):
-        return os.path.join(self.state_dir, "perm")
-
     def hook_settings(self):
         """2.44.0 (#1442): the settings file handed to every run with --settings (never the person's own settings): the
         PermissionRequest hook that asks in the chat. Further hooks of other parts go in here too (see hook_settings)."""
@@ -2615,7 +2744,12 @@ class Runner:
         """2.44.0 (#1442): the environment of one run (the hook finds the runner through it)."""
         ex = getattr(self, "extras", None)  # part B (agent_extras): KALMIDO_OUTBOX, KALMIDO_CHAT_USER, ... as the base
         env = dict(ex.env() if ex and hasattr(ex, "env") else os.environ)
-        env.update(KALMIDO_PERM_DIR=self.perm_dir(), KALMIDO_PERM_TIMEOUT=str(PERM_TIMEOUT_S),
+        for k in ("KALMIDO_PERM_DIR", "KALMIDO_PERM_SOCK", "KALMIDO_PERM_KEY", "KALMIDO_PERM_PID"):
+            env.pop(k, None)  # 2.625.0 (#3661): never an inherited channel; without the runner's channel the hook denies
+        ch = getattr(self, "perm_chan", None)
+        if ch:  # 2.625.0 (#3661): a new key per run; the hook checks that the answer comes from this process
+            env.update(KALMIDO_PERM_SOCK=ch.address, KALMIDO_PERM_KEY=ch.new_key(), KALMIDO_PERM_PID=str(os.getpid()))
+        env.update(KALMIDO_PERM_TIMEOUT=str(PERM_TIMEOUT_S),
                    KALMIDO_PERM_UID=str(uid or self.perm_uid(tid) or ""),
                    KALMIDO_RUN_LABEL=("chat" if uid else f"task {tid}" if tid else "event"))
         if tid:  # 2.619.0 (#3467): a task run commits as the task's repo.git_author (both launchers: they start this runner)
@@ -3459,8 +3593,9 @@ class Runner:
         self.confirm_abort(ev)
 
     def resolve_perm(self, mid, decision):
-        """The person's answer to permission question mid -> the hook's answer file (allow / deny). Twice: once; after the
-        time limit: the note that it came too late (the command was denied already)."""
+        """The person's answer to permission question mid -> the waiting hook over its own connection (allow / deny,
+        2.625.0 #3661: no answer file any more). Twice: once; after the time limit: the note that it came too late (the
+        command was denied already)."""
         d = self.state.data
         with self.state.lock:
             if mid in d["perm_expired"]:
@@ -3478,14 +3613,26 @@ class Runner:
             d["perms"].pop(mid)
             self.state.remember("perm_done", mid)
             self.state.save()
-        try:
-            tmp = os.path.join(self.perm_dir(), q["pid"] + ".ans.new")
-            with open(tmp, "w", encoding="utf-8") as f:
-                f.write(decision)
-            os.replace(tmp, os.path.join(self.perm_dir(), q["pid"] + ".ans"))
-        except OSError as e:
-            log(f"permission answer not handed over: {type(e).__name__}")
+        if not self.perm_reply(q["pid"], decision):
+            log("permission answer not handed over: the hook is gone (the step was denied)")
         log(f"permission question {mid}: {decision}")
+
+    def perm_reply(self, nonce, decision):
+        """2.625.0 (#3661): the answer to the hook waiting with this nonce, on its own connection; True = handed over."""
+        with self.perm_lk:
+            c = self.perm_conns.pop(nonce, None)
+        if c is None:
+            return False
+        try:
+            c.send_bytes(json.dumps({"nonce": nonce, "decision": decision}).encode("utf-8"))
+            return True
+        except Exception:
+            return False
+        finally:
+            try:
+                c.close()
+            except Exception:
+                pass
 
     def perm_expire(self):
         """Open permission questions past their time limit: closed (expired); a later answer gets the 'too late' note."""
@@ -3496,6 +3643,7 @@ class Runner:
                     d["perms"].pop(mid)
                     d["perm_expired"][mid] = {"uid": q.get("uid"), "at": time.time()}
                     changed = True
+                    self.perm_reply(q.get("pid"), "deny")  # 2.625.0 (#3661): the waiting hook (if any) hears no at once
                     self.api.withdraw(q.get("uid"), mid, "expired")
                     log(f"permission question {mid}: no answer in time (denied)")
             for mid, q in list(d["perm_expired"].items()):
@@ -3506,48 +3654,47 @@ class Runner:
                 self.state.save()
         return changed
 
-    def perm_poll(self):
-        """New requests of the hook -> a permission question in the chat (no person to ask / not postable: deny)."""
-        pdir = self.perm_dir()
-        try:
-            names = sorted(f for f in os.listdir(pdir) if f.endswith(".req.json"))
-        except OSError:
-            names = []
-        for name in names:
-            pid = name[:-len(".req.json")]
-            if os.path.exists(os.path.join(pdir, pid + ".posted")) or os.path.exists(os.path.join(pdir, pid + ".ans")):
-                continue
+    def perm_request(self, rq, nonce, conn):
+        """2.625.0 (#3661, before: perm_poll over files): an authenticated request of the hook on PermChannel -> a permission
+        question in the chat; conn waits for the answer (perm_reply). Not the operator / no person to ask / not postable /
+        too many open: deny at once."""
+        with self.perm_lk:
+            if len(self.perm_conns) >= PERM_MAX_OPEN or nonce in self.perm_conns:
+                full = True
+            else:
+                full, self.perm_conns[nonce] = False, conn
+        if full:
             try:
-                with open(os.path.join(pdir, name), encoding="utf-8") as f:
-                    rq = json.load(f)
-                uid = int(rq["uid"]) if str(rq.get("uid") or "").isdigit() else self.perm_uid()
-                if uid and uid not in self.perm_operators():  # 2.126.0 B (#1973): only the operator answers
-                    try:
-                        self.api.chat(uid, self.say("perm_operator_only"))
-                    except Exception:
-                        pass
-                    log("permission question of a person who is not the operator: denied")
-                    with open(os.path.join(pdir, pid + ".ans"), "w") as f:
-                        f.write("operator")
-                    continue
-                tin = rq.get("tool_input") if isinstance(rq.get("tool_input"), dict) else {}
-                detail = tin.get("command") or tin.get("file_path") or tin.get("url") or json.dumps(tin, ensure_ascii=False)
-                body = (self.say("perm_text", f"{rq.get('label') or 'run'}, {rq.get('tool_name') or '?'}")
-                        + "\n\n```\n" + redact(str(detail))[:1500].replace("```", "` ` `") + "\n```")
-                m = self.api.perm_question(uid, body, PERM_TIMEOUT_S) if uid else None
-                mid = str((m or {}).get("id") or "")
-                with open(os.path.join(pdir, pid + ".posted"), "w") as f:
-                    f.write(mid)
-                if not mid:
-                    raise ValueError("no person to ask")
-                with self.state.lock:
-                    self.state.data["perms"][mid] = {"pid": pid, "uid": uid, "at": time.time()}
-                    self.state.save()
-                log(f"permission question {mid} asked ({rq.get('tool_name')})")
-            except Exception as e:
-                log(f"permission question not asked ({type(e).__name__}): denied")
-                with open(os.path.join(pdir, pid + ".ans"), "w") as f:
-                    f.write("deny")
+                conn.close()
+            except Exception:
+                pass
+            log("permission question not asked (too many open): denied")
+            return
+        try:
+            uid = int(rq["uid"]) if str(rq.get("uid") or "").isdigit() else self.perm_uid()
+            if uid and uid not in self.perm_operators():  # 2.126.0 B (#1973): only the operator answers
+                try:
+                    self.api.chat(uid, self.say("perm_operator_only"))
+                except Exception:
+                    pass
+                log("permission question of a person who is not the operator: denied")
+                self.perm_reply(nonce, "operator")
+                return
+            tin = rq.get("tool_input") if isinstance(rq.get("tool_input"), dict) else {}
+            detail = tin.get("command") or tin.get("file_path") or tin.get("url") or json.dumps(tin, ensure_ascii=False)
+            body = (self.say("perm_text", f"{rq.get('label') or 'run'}, {rq.get('tool_name') or '?'}")
+                    + "\n\n```\n" + redact(str(detail))[:1500].replace("```", "` ` `") + "\n```")
+            m = self.api.perm_question(uid, body, PERM_TIMEOUT_S) if uid else None
+            mid = str((m or {}).get("id") or "")
+            if not mid:
+                raise ValueError("no person to ask")
+            with self.state.lock:
+                self.state.data["perms"][mid] = {"pid": nonce, "uid": uid, "at": time.time()}
+                self.state.save()
+            log(f"permission question {mid} asked ({rq.get('tool_name')})")
+        except Exception as e:
+            log(f"permission question not asked ({type(e).__name__}): denied")
+            self.perm_reply(nonce, "deny")
 
     def ensure_perm_watch(self):
         if self.perm_thread or not PERM_RELAY or not self.is_claude():
@@ -3555,10 +3702,16 @@ class Runner:
         if not self.perm_operators():  # 2.126.0 review (#1973): say it once at start instead of only denying later
             log("permission questions: no operator known (choose one in the agent's settings in Kalmido, or set KALMIDO_PERM_USER or KALMIDO_OWNER_IDS) - every question is denied")
 
+        try:  # 2.625.0 (#3661): the local connection the hook asks over (no channel: every question is denied)
+            self.perm_chan = PermChannel(self.perm_request)
+            import atexit
+            atexit.register(self.perm_chan.close)
+        except Exception as e:
+            log(f"permission questions: no local connection ({type(e).__name__}) - every question is denied")
+
         def watch():
             while True:
                 try:
-                    self.perm_poll()
                     self.perm_expire()
                 except Exception as e:
                     log(f"permission watch: {type(e).__name__}")

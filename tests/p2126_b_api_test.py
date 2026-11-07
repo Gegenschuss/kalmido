@@ -78,16 +78,25 @@ class StubApi:
 TMP = tempfile.mkdtemp(prefix="kalmido-p2126b-")
 
 
+class FakeConn:  # 2.625.0 (#3661): the hook's connection (PermChannel) instead of the answer file
+    def __init__(self):
+        self.sent, self.closed = [], False
+
+    def send_bytes(self, b):
+        self.sent.append(json.loads(b.decode("utf-8")))
+
+    def close(self):
+        self.closed = True
+
+
 def perm_ask(r, uid, n):
-    """A permission request of the hook for person uid -> (answer file text or None, posted question?)."""
-    os.makedirs(r.perm_dir(), exist_ok=True)
-    pid = f"p{n}"
-    with open(os.path.join(r.perm_dir(), pid + ".req.json"), "w") as f:
-        json.dump({"tool_name": "Bash", "tool_input": {"command": "make deploy"}, "uid": str(uid), "label": "chat", "at": time.time()}, f)
+    """A permission request of the hook for person uid -> (answer sent on its connection or None, posted question?)."""
+    nonce = "%032x" % n
+    c = FakeConn()
     before = len(r.api.perms)
-    r.perm_poll()
-    ans = os.path.join(r.perm_dir(), pid + ".ans")
-    return (open(ans).read() if os.path.exists(ans) else None), len(r.api.perms) > before
+    r.perm_request({"tool_name": "Bash", "tool_input": {"command": "make deploy"}, "uid": str(uid), "label": "chat", "at": time.time()}, nonce, c)
+    ans = c.sent[-1]["decision"] if c.sent and c.sent[-1].get("nonce") == nonce else None
+    return ans, len(r.api.perms) > before
 
 
 # #1973: a personal agent (owner 7): the owner is asked; someone else chatting gets the step denied with a note

@@ -175,7 +175,9 @@ pa = r.run_args(["claude"])
 with open(pa[-1]) as f:
     check("PermissionRequest" not in json.load(f)["hooks"], "KALMIDO_PERM_RELAY=0: no PermissionRequest hook")
 ar.PERM_RELAY = True
-henv = dict(os.environ, KALMIDO_PERM_DIR=r.perm_dir(), KALMIDO_PERM_UID="7", KALMIDO_PERM_TIMEOUT="20", KALMIDO_RUN_LABEL="chat")
+# 2.625.0 (#3661): the hook asks over the runner's local connection (PermChannel), no files in the state folder any more
+henv = {k: v for k, v in os.environ.items() if not k.startswith("KALMIDO_PERM_")}
+henv.update(KALMIDO_PERM_UID="7", KALMIDO_PERM_TIMEOUT="20", KALMIDO_RUN_LABEL="chat")
 
 
 def hook(env=None):
@@ -190,23 +192,25 @@ def decision(p, inp='{"tool_name": "Bash", "tool_input": {"command": "rm -rf bui
 t0 = time.time()
 d = decision(hook())
 check(d["behavior"] == "deny" and "not running" in d["message"] and time.time() - t0 < 10, f"no runner: denied at once: {d}")
-lock = ar.RunLock(os.path.join(r.state_dir, "runner.lock"))
-check(lock.acquire(), "the runner's lock")
-
-
-def wait_req(n=1):  # 2.206.0 B (#2513): kt.until, 30 s (CI load)
-    return bool(until(lambda: os.path.isdir(r.perm_dir()) and len([f for f in os.listdir(r.perm_dir()) if f.endswith(".req.json")]) >= n, 30, 0.1))
-
-
 r.agent = {"owner_id": 7}  # 2.126.0 (#1973): only the agent's operator answers permission questions (here its owner)
+r.ensure_perm_watch()
+check(r.perm_chan is not None, "2.625.0 (#3661): the runner opens its local connection")
+cenv = r.child_env(7, None)
+henv.update({k: cenv[k] for k in ("KALMIDO_PERM_SOCK", "KALMIDO_PERM_KEY", "KALMIDO_PERM_PID")})
+
+
+def wait_req(n=1):  # 2.206.0 B (#2513): kt.until, 30 s (CI load); 2.625.0 (#3661): the question in the chat is the sign
+    return bool(until(lambda: len(r.api.perms) >= n, 30, 0.1))
+
+
 p = hook()
 p.stdin.write('{"tool_name": "Bash", "tool_input": {"command": "deploy --token=' + os.environ["KALMIDO_TOKEN"] + '"}}')
 p.stdin.close()
-check(wait_req(), "the hook wrote its request")
-r.perm_poll()
+check(wait_req(), "the hook's request became a question")
 check(len(r.api.perms) == 1 and r.api.perms[0][0] == 7 and "Bash" in r.api.perms[0][1] and "deploy" in r.api.perms[0][1]
       and os.environ["KALMIDO_TOKEN"] not in r.api.perms[0][1] and r.api.perms[0][2] == ar.PERM_TIMEOUT_S,
       f"asked in the chat of the person, masked, with the time limit: {r.api.perms}")
+check(not os.path.isdir(os.path.join(r.state_dir, "perm")), "2.625.0 (#3661): no permission files in the state folder")
 check(r.intercept([chat(5, "Ja")]) == [], "a plain yes while one question is open is the answer, no run")
 out = p.stdout.read()
 p.wait(30)
@@ -215,8 +219,7 @@ p1, p2 = hook(), hook()
 for q in (p1, p2):
     q.stdin.write('{"tool_name": "Write", "tool_input": {"file_path": "a.txt"}}')
     q.stdin.close()
-check(wait_req(2), "two questions")
-r.perm_poll()
+check(wait_req(3), "two questions")
 check(r.intercept([chat(6, "nein")]) == [chat(6, "nein")], "yes / no with two open questions: a normal message")
 m1, m2 = sorted(r.state.data["perms"])
 r.intercept([{"event": "chat_choice", "data": {"message_id": int(m1), "permission": True, "approval": "rejected", "choice_ids": ["deny"]}}])
@@ -227,6 +230,11 @@ ar.PERM_TIMEOUT_S = 1
 p = hook(dict(henv, KALMIDO_PERM_TIMEOUT="1"))
 d = decision(p)
 check(d["behavior"] == "deny" and "in time" in d["message"], f"no answer in time = denied: {d}")
+check(wait_req(4), "the late question was asked")
+for q in r.state.data["perms"].values():  # 2.625.0 (#3661): the question stays open until its time limit; close it here
+    q["at"] = 0
+r.perm_expire()
+check(not r.state.data["perms"], "past the time limit: closed")
 r.state.data["perms"]["950"] = {"pid": "gone", "uid": 7, "at": time.time() - 30}
 r.perm_expire()
 check("950" in r.state.data["perm_expired"] and (7, "950", "expired") in r.api.withdrawn, "the question is closed as expired")
@@ -234,10 +242,11 @@ n = len(r.api.posts)
 check(r.intercept([{"event": "chat_choice", "data": {"message_id": 950, "permission": True, "approval": "approved"}}]) == []
       and r.api.posts[n:] and r.api.posts[-1]["body"] == ar.say("perm_late"), "a late answer: 'too late', no run")
 ar.PERM_TIMEOUT_S = 540
-lock.release()
 cl = go(r, chat(9, "status"))
-check(cl and cl[0]["env"].get("KALMIDO_PERM_DIR") == r.perm_dir() and cl[0]["env"].get("KALMIDO_PERM_UID") == "7"
-      and "--settings" in cl[0]["args"], f"the run gets the hook's environment: {cl[:1]}")
+check(cl and cl[0]["env"].get("KALMIDO_PERM_SOCK") == r.perm_chan.address and cl[0]["env"].get("KALMIDO_PERM_UID") == "7"
+      and cl[0]["env"].get("KALMIDO_PERM_PID") == str(os.getpid()) and cl[0]["env"].get("KALMIDO_PERM_KEY") not in ("", None, henv["KALMIDO_PERM_KEY"])
+      and "KALMIDO_PERM_DIR" not in cl[0]["env"] and "--settings" in cl[0]["args"],
+      f"the run gets the hook's connection, a new key per run: {cl[:1]}")  # 2.625.0 (#3661): was KALMIDO_PERM_DIR
 
 # ---- #1446 session_resume: one conversation per chat, change with a summary, gone = fresh once, tasks stay fresh
 r = runner("s4")

@@ -705,6 +705,11 @@ chat messages of one person that arrive together: one run). It does what a hoste
   before its next run, no change on the computer needed. When someone else chats with a team agent and a step needs a
   permission, the step is denied and that person gets a short note. `KALMIDO_PERM_RELAY=0` switches it off; it needs a
   permission mode that asks (`default`). See [AGENT-SECURITY.md](AGENT-SECURITY.md#4-claude-code-project-settings).
+  2.625.0 (#3661): the hook gets the answer over a local connection of the runner (a Unix socket in a fresh 0700 folder,
+  a named pipe on Windows; a key per run both ways, the runner's process checked, a one-time nonce per question), no
+  longer through files in the state folder: nothing the agent writes there gives an allow. `KALMIDO_PERM_SOCK_DIR`
+  chooses the socket's parent folder (default: the temp folder); `KALMIDO_PERM_SHARED=1` lets Claude Code under an own
+  OS user connect ([AGENT-SECURITY.md](AGENT-SECURITY.md#4b-an-own-os-user-for-the-agents-tools)).
 - **Dangerous commands refused** (2.615.0, Claude Code only): the same run settings carry a `PreToolUse` hook for Bash that
   refuses force-push, deleting remote branches or tags, deleting or moving tags, `docker ... prune` and reboot / shutdown,
   whatever the allow list or the permission mode say (also `bypassPermissions`); it reads chains, `$( )`, `sh -c`, `ssh`,

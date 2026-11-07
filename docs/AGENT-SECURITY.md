@@ -340,11 +340,20 @@ commands (they have no such hook); `KALMIDO_PERM_RELAY=0` switches it off. What 
   someone else chats with a team agent, a step that needs a permission is denied at once and that person gets a short
   note (`KALMIDO_PERM_OPERATOR_ONLY`); task runs ask the operator. `dontAsk` above never
   asks anyone: keep it for agents that must never wait for a click.
-- It guards against mistakes, not against a hostile command: the hook and the runner talk through files in the state
-  folder, and the command runs as the same OS user. Once a tool that can write files or run programs is allowed, the
-  command could answer its own later questions or change the runner. Against injected instructions the allow list and
-  `dontAsk` stay the real limit; for a stronger wall run the command as an own OS user without write access to the
-  state folder and the starter files.
+- **The answer travels over a local connection, never through a file (2.625.0, #3661, `perm_channel`).** The runner
+  opens a Unix socket with a random name in a fresh folder of mode 0700 (Windows: a named pipe with a random name). The
+  hook connects, both sides prove the key of the current run to each other (HMAC challenge, a new key for every run),
+  the hook checks that the other end *is* the runner's own process (peer credentials on Linux / macOS, the pipe's server
+  process on Windows) and sends a one-time nonce; only an answer on that same connection carrying that nonce counts.
+  No runner, another process at the address, a wrong or old key, no answer in time or the connection gone: **no**.
+  Nothing in the state folder can give an allow any more, so a command that may write files there cannot answer its own
+  question (before 2.625.0 the answer was a file the agent could have written).
+- What stays: the hook gets address and key through its environment, and Claude Code hands that same environment to
+  the agent's tools. An agent that may run programs can read the key and ask questions of its own (they only reach the
+  chat; an *Allow* goes back to its own connection and opens nothing), but it cannot answer one. Running as **the same
+  OS user** it can still change its own Claude Code settings, the starter files or the runner itself. Against a hostile
+  agent the allow list and `dontAsk` stay the real limit; the wall is the own OS user for the agent's tools below
+  ([An own OS user for the agent's tools](#an-own-os-user-for-the-agents-tools)).
 
 **Dangerous commands refused (2.615.0, `dangerous_guard`).** In event mode with Claude Code the same per-run settings
 file also carries a `PreToolUse` hook for Bash (`agent_run.py --guard-hook`). Jobs (`agent_job.py`) get the same hook
@@ -403,6 +412,54 @@ What it does **not** cover (state it to the people you run the agent for):
   the starter files can switch the guard off; if the hook cannot start at all (Python missing), Claude Code runs the
   command. Like the permission relay it guards against mistakes and plain injected commands; the wall against a hostile
   agent stays the own OS user, the narrow allow list and branch / tag protection on the git server.
+
+### 4b. An own OS user for the agent's tools
+
+The dedicated user of step 1 keeps the agent away from *your* account. For permission questions there is one more
+step: the runner (`agent_run.py`, its state folder, the starter files) belongs to one user, Claude Code and every tool
+it runs belong to a second one. Then the tools cannot write the runner's files, cannot take over its socket and cannot
+change the per-run settings with the hooks; an *Allow* comes only from the person in the chat.
+
+Linux (macOS the same with `sysadminctl -addUser` and the same sudoers line):
+
+```sh
+sudo useradd --create-home --shell /bin/bash kalmido-tools   # the agent's tools; the runner stays kalmido-agent
+sudo passwd --lock kalmido-tools
+# the work folder belongs to kalmido-tools; starter files and the state folder to kalmido-agent, readable, not writable:
+sudo install -d -o kalmido-agent -m 0755 /var/lib/kalmido-agent        # KALMIDO_STATE_DIR (run-settings.json lives here)
+sudo chown -R root:root ~kalmido-agent/kalmido/mcp && sudo chmod -R a+rX,go-w ~kalmido-agent/kalmido/mcp
+sudo chmod 0711 ~kalmido-agent   # kalmido-tools may pass to the starter files (the hook), not list the home folder
+# /etc/sudoers.d/kalmido-agent (visudo -f): kalmido-agent may start claude as kalmido-tools, nothing else
+#   Defaults:kalmido-agent env_keep += "KALMIDO_PERM_SOCK KALMIDO_PERM_KEY KALMIDO_PERM_PID KALMIDO_PERM_UID"
+#   Defaults:kalmido-agent env_keep += "KALMIDO_PERM_TIMEOUT KALMIDO_RUN_LABEL"
+#   kalmido-agent ALL=(kalmido-tools) NOPASSWD: /usr/local/bin/claude
+```
+
+In the env file of the runner (`kalmido-agent`):
+
+```sh
+KALMIDO_STATE_DIR=/var/lib/kalmido-agent
+KALMIDO_PERM_SHARED=1           # socket folder 0711 / socket 0666: kalmido-tools may connect, not list or replace it
+KALMIDO_AGENT_PROFILE=claude    # the command below is a wrapper around Claude Code
+```
+
+and start the launcher with the wrapper as COMMAND (`~kalmido-agent/kalmido/bin/claude-tools`, owned by root, 0755):
+
+```sh
+#!/bin/sh
+exec sudo -n -H -u kalmido-tools /usr/local/bin/claude "$@"
+```
+
+Set up the MCP server for `kalmido-tools` as in step 3 (its own env file, its own Claude Code settings in its work
+folder). Check it once: `sudo -u kalmido-agent sudo -l` lists only that command, and a permission question still reaches the
+chat. A wrong setup fails closed: when the tools user cannot reach the socket, every question is denied. A connection
+from the tools user still has to prove the run's key, and the hook still checks that the other end is the runner's
+process, so a socket of the tools user at another address answers nothing.
+
+Windows: there is no `sudo` in the box. Run the whole starter under a local standard account of its own (no admin,
+*Log on as a batch job* for the scheduled task, your own profile folder not readable for it); the named pipe and the
+check of its server process keep a replaced pipe out, but tools and runner then share that account, so the limits of
+the same user (above) apply there.
 
 ### 5. Event loop with back-off
 
