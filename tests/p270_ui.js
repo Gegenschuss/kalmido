@@ -16,6 +16,7 @@
 const {spawn, execFileSync} = require('child_process');
 const fs = require('fs'), os = require('os'), path = require('path');
 const {boot, sleep, B, login, errs} = require('./boot');
+const settle = w => require('./boot').idle(w, {quiet: 50});  // 2.641.0 (#4979): wait until the page's requests are done instead of a fixed pause
 const WS = globalThis.WebSocket || require('ws');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
@@ -76,24 +77,24 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   check(row(D1) && !row(D2), 'Today: a deadline (on Today) from its first reminder on (2 weeks before, due in 10 days); not the other one');
   check(row(D1)?.querySelector('.dlc.hot') && /10 days left/.test(row(D1).querySelector('.dlc').textContent), 'row: "10 days left", highlighted: ' + row(D1)?.querySelector('.dlc')?.textContent);
   check(w.eval('counts().today') === 1, 'sidebar count of Today includes it');
-  w.eval(`go('l/${L}')`); await sleep(400);
+  w.eval(`go('l/${L}')`); await settle(w);
   check(row(D2)?.querySelector('.dlc') && !row(D2).querySelector('.dlc.hot') && /30 days left/.test(row(D2).querySelector('.dlc').textContent), 'list: "30 days left", not highlighted before its first reminder');
   check(!row(D3)?.querySelector('.dlc'), 'a plain due date: no countdown');
   // ================= #412 / #413 the date popover
-  w.eval(`datePop(document.querySelector('#top h1'), ${D2})`); await sleep(150);
+  w.eval(`datePop(document.querySelector('#top h1'), ${D2})`); await settle(w);
   let pop = d.querySelector('#pop');
   const chips = [...pop.querySelectorAll('.remchips [data-rem]')].map(b => b.dataset.rem);
   check(['0', '15', '60', '1440', '10080', '20160', '43200'].every(v => chips.includes(v)), 'popover chips incl. 2 weeks + 1 month: ' + chips);
   check(/2 weeks/.test(pop.querySelector('[data-rem="20160"]').textContent) && /1 month/.test(pop.querySelector('[data-rem="43200"]').textContent), 'chip labels');
-  click(w, pop.querySelector('[data-q="remc"]')); await sleep(50);
+  click(w, pop.querySelector('[data-q="remc"]')); await settle(w);
   check(pop.querySelector('#p-remn') && pop.querySelector('#p-remu') && pop.querySelector('[data-q="remadd"]'), '"Other…": number + unit + Add');
   pop.querySelector('#p-remn').value = '3'; change(w, pop.querySelector('#p-remn'));
   pop.querySelector('#p-remu').value = '10080'; change(w, pop.querySelector('#p-remu'));
-  click(w, pop.querySelector('[data-q="remadd"]')); await sleep(50);
+  click(w, pop.querySelector('[data-q="remadd"]')); await settle(w);
   check(pop.querySelector('[data-rem="30240"].on') && /3 weeks/.test(pop.querySelector('[data-rem="30240"]').textContent), 'own reminder: 3 weeks before, shown as a chip');
-  click(w, pop.querySelector('[data-q="remc"]')); await sleep(50);
+  click(w, pop.querySelector('[data-q="remc"]')); await settle(w);
   pop.querySelector('#p-remn').value = '400'; pop.querySelector('#p-remu').value = '1440';
-  click(w, pop.querySelector('[data-q="remadd"]')); await sleep(50);
+  click(w, pop.querySelector('[data-q="remadd"]')); await settle(w);
   check(/at most a year/.test(d.querySelector('#toast').textContent) && !pop.querySelector('[data-rem="576000"]'), 'more than a year: refused');
   const dl = pop.querySelector('#p-dl');
   check(dl && dl.checked && !pop.querySelector('#p-dlt').checked, 'Deadline ticked, "On Today" not');
@@ -105,9 +106,9 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   ns.value = '15'; change(w, ns); await sleep(900); await until(() => w.eval('!OUT.q.length && !OUT.flushing'));
   let t2 = await task(D2);
   check(t2.reminders.split(',').includes('30240') && t2.deadline === 2 && t2.nag === '15', `saved at once: ${t2.reminders} deadline ${t2.deadline} nag ${t2.nag}`);
-  click(w, d.querySelector('#pop [data-q="done"]')); await sleep(300);
+  click(w, d.querySelector('#pop [data-q="done"]')); await settle(w);
   check(row(D2)?.querySelector('.nagm') && /every 15 min/.test(row(D2).querySelector('.nagm').title), 'row: bell + repeat mark with its interval');
-  w.eval(`openDetail(${D2})`); await sleep(300);
+  w.eval(`openDetail(${D2})`); await settle(w);
   const ddl = d.querySelector('#detail .ddl');
   check(ddl && /days left/.test(ddl.textContent) && /Repeat reminder: every 15 min/.test(ddl.textContent), 'task panel: countdown + repeat line: ' + ddl?.textContent);
   w.eval('closeDetail()');
@@ -115,14 +116,14 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   w.location.hash = '#nagoff/' + D2; await sleep(900); await until(() => w.eval('!OUT.q.length && !OUT.flushing'));
   check((await task(D2)).nag === 'off' && /No more repeated reminders/.test(d.querySelector('#toast').textContent), '#nagoff: switched off + toast');
   // ================= #413 settings + the list default
-  w.eval(`settingsModal('notify')`); await sleep(500);
+  w.eval(`settingsModal('notify')`); await settle(w);
   let md = d.querySelector('.smodal');
   check(md.querySelector('#s-qfrom') && md.querySelector('#s-qto') && md.querySelector('#s-qfrom').value === '22:00' && md.querySelector('#s-qto').value === '07:00', 'quiet hours from / until (22:00 - 07:00)');
   const nm = md.querySelector('[data-nm="nag"][data-ch="push"]');
   check(nm && nm.checked && !md.querySelector('[data-nm="nag"][data-ch="news"]'), 'matrix: "Repeated reminders", push only');
   check([...md.querySelectorAll('#s-defrem option')].some(o => o.value === '20160') && [...md.querySelectorAll('#s-defrem option')].some(o => o.value === '43200'), 'default reminder: 2 weeks + 1 month');
   closeAll(w);
-  w.eval(`listModal(${L})`); await sleep(400);
+  w.eval(`listModal(${L})`); await settle(w);
   md = d.querySelector('.lmodal');
   const ln = md.querySelector('#l-nag');
   check(ln && ln.value === '', 'list dialog: Repeat reminders (off)');
@@ -141,37 +142,37 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   await call('PATCH', `/api/lists/${L}`, {checklist: false});
   await call('PATCH', `/api/lists/${L}`, {kind: 'list'});
   // ================= #407 the time sum
-  await w.eval('load().then(render)'); w.eval(`go('l/${P}')`); await sleep(500);
+  await w.eval('load().then(render)'); w.eval(`go('l/${P}')`); await settle(w);
   const ts = d.querySelector('#view .lhead .tsum');
   check(ts && /3 h/.test(ts.textContent) && /0\.4 days/.test(ts.textContent) && ts.querySelector('.tbud i') && /3\/20 h/.test(ts.querySelector('.tbn').textContent), 'list header: 3 h · 0.4 days, budget 3/20 h: ' + ts?.textContent);
   check(/at 8 h per day/.test(ts.title) && /Budget: 20 h/.test(ts.title), 'tooltip: day length + budget: ' + ts?.title);
-  w.eval(`listModal(${P})`); await sleep(400);
+  w.eval(`listModal(${P})`); await settle(w);
   md = d.querySelector('.lmodal');
   const dh = md.querySelector('#l-dayh');
   check(dh && dh.placeholder === '8', 'list dialog: hours per day (empty = the server\'s 8)');
   dh.value = '6'; dh.dispatchEvent(new w.Event('input', {bubbles: true})); dh.dispatchEvent(new w.FocusEvent('focusout', {bubbles: true})); await sleep(1300);
   check((await call('GET', '/api/state')).lists.find(l => l.id === P).day_hours === 6, 'list: 6 h per day saved');
-  closeAll(w); await w.eval('load().then(render)'); await sleep(300);
+  closeAll(w); await w.eval('load().then(render)'); await settle(w);
   check(/0\.5 days/.test(d.querySelector('#view .lhead .tsum')?.textContent || ''), 'with 6 h per day: 0.5 days');
-  w.eval(`go('folder/Clients')`); await sleep(500);
+  w.eval(`go('folder/Clients')`); await settle(w);
   check(/3 h/.test(d.querySelector('#view .lhead.fhd .tsum')?.textContent || ''), 'folder view: the sum of its project lists');
   // Administration: hours per day for the server
-  w.eval(`settingsModal('users')`); await sleep(500);
+  w.eval(`settingsModal('users')`); await settle(w);
   const sdh = d.querySelector('.smodal #s-dayh');
   check(sdh && sdh.value === '8', 'Administration: hours per day (8)');
   sdh.value = '7,5'; change(w, sdh); await sleep(700);
   check((await call('GET', '/api/state')).time_day_h === 7.5, 'server value 7.5 saved');
   closeAll(w);
   // ================= #405 S items
-  w.eval(`settingsModal('account')`); await sleep(400);
+  w.eval(`settingsModal('account')`); await settle(w);
   md = d.querySelector('.smodal');
   check(md.querySelector('[data-pane="account"] [data-m="go-share"]') && !md.querySelector('[data-acc="token"]'), 'S3: Account links to Share from your phone, no token there');
-  click(w, md.querySelector('[data-m="go-share"]')); await sleep(200);
+  click(w, md.querySelector('[data-m="go-share"]')); await settle(w);
   check(md.querySelector('.snav [data-sec="integr"]').classList.contains('on'), 'S3: the link opens Integrations');
   check(!md.querySelector('[data-pane="data"] [data-m="purge"]') && !/Delete all completed/.test(md.querySelector('[data-pane="data"]').textContent), 'S4: no "Delete all completed" in Data');
   check(md.querySelector('.snav [data-sec="ai"]') && md.querySelector('[data-aisub="agents"]').textContent.trim() === 'Status', 'S2/S5: Agents with the module on; first sub-tab "Status"');
   closeAll(w);
-  w.eval(`settingsModal('focus')`); await sleep(300);
+  w.eval(`settingsModal('focus')`); await settle(w);
   md = d.querySelector('.smodal');
   check(md.querySelector('.snav [data-sec="modules"]').classList.contains('on') && md.querySelector('[data-modrow="pomo"] details.mopt').open, 'S8: settingsModal(\'focus\') opens the focus options in Modules');
   closeAll(w);
@@ -190,7 +191,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   check(/device-width/.test(vp(820, 1180, false)), 'K13: a portrait tablet (iPad) keeps device-width');
   check(/device-width/.test(vp(884, 1060, false, false)), 'K13: a mouse screen is never scaled');
   // the bell's dropdown: grip + keys, kept per device
-  w.eval(`bellPop(document.querySelector('#kbar .bell'))`); await sleep(400);  // 2.152.3 (#2619): the bell moved into the head bar
+  w.eval(`bellPop(document.querySelector('#kbar .bell'))`); await settle(w);  // 2.152.3 (#2619): the bell moved into the head bar
   const grip = d.querySelector('#pop .bpgrip');
   check(grip && /Resize/.test(grip.getAttribute('aria-label')), 'bell dropdown: a resize grip');
   const bh = d.querySelector('#pop .bphl[data-bp="news"]');
@@ -198,13 +199,13 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   key(w, grip, 'ArrowLeft'); key(w, grip, 'ArrowDown', {shiftKey: true});
   const bs = JSON.parse(w.__store['tasks.bellSize'] || 'null');
   check(bs && bs.w > 0 && bs.h > 0, 'keys resize it, stored per device: ' + JSON.stringify(bs));
-  click(w, bh); await sleep(300);
+  click(w, bh); await settle(w);
   check(w.eval('S.route.mod') === 'news' && d.querySelector('#pop').classList.contains('hidden'), 'the heading opens the News view');
-  w.eval(`go('today')`); await sleep(300);
+  w.eval(`go('today')`); await settle(w);
   check(!d.querySelector('#pop').classList.contains('bellpop') && !d.querySelector('#pop').style.width, 'closed: nothing of it stays on the popover');
   w.close();
   w = await boot({user: 'alice', hash: 'today', mobile: true}); d = w.document;
-  w.eval(`bellPop(document.querySelector('#top .bell'))`); await sleep(400);
+  w.eval(`bellPop(document.querySelector('#top .bell'))`); await settle(w);
   const grab = d.querySelector('#pop .bpgrab');
   check(grab && !d.querySelector('#pop .bpgrip'), 'phone: the sheet has a handle (no corner grip)');
   key(w, grab, 'Enter');
@@ -213,7 +214,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   // S2: no Agents page without the module (no agents yet)
   await call('PATCH', '/api/settings', {features: ALL.replace(',agents', '')});
   w = await boot({user: 'alice', hash: 'today'}); d = w.document;
-  w.eval(`settingsModal('ai')`); await sleep(400);
+  w.eval(`settingsModal('ai')`); await settle(w);
   check(!d.querySelector('.smodal .snav [data-sec="ai"]') && !d.querySelector('.smodal [data-pane="ai"]'), 'S2: admin without agents, module off: no Agents page');
   check(!w.eval(`palAll().some(x => x.id === 's:ai')`), 'S2: not in the palette either');
   w.close();
@@ -223,7 +224,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   w = await boot({user: 'alice', hash: 'l/' + L}); d = w.document;
   check(w.eval(`tr('Completed tasks')`) === 'Erledigte Aufgaben' && w.eval(`tr('Ownership…')`) === 'Besitzer…' && w.eval(`tr('Show completed at the bottom')`) === 'Erledigte unten anzeigen', 'German: Erledigte Aufgaben, Eigentümer…, Erledigte unten zeigen');
   check(/noch 30 Tage/.test(row(D2)?.querySelector('.dlc')?.textContent || ''), 'German: "noch 30 Tage"');
-  w.eval(`datePop(document.querySelector('#top h1'), ${D2})`); await sleep(150);
+  w.eval(`datePop(document.querySelector('#top h1'), ${D2})`); await settle(w);
   check(/Erinnerung wiederholen/.test(d.querySelector('#pop').textContent) && /2 Wochen/.test(d.querySelector('#pop [data-rem="20160"]').textContent), 'German popover: Erinnerung wiederholen, 2 Wochen');
   w.eval('popOnClose = null; closePop()');
   w.close();
@@ -235,7 +236,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   w = await boot({user: 'alice', hash: 'l/' + L, mobile: true}); d = w.document;
   // 2.25.0 (UX-12): on a phone "…" lists Undo / Redo only when there is something to undo / redo
   check(!d.querySelector('#top [data-act="hist-undo"]') && !w.eval('topMoreItems()').some(x => x.icon === 'undo' && /hmi/.test(x.cls || ''))  /* 2.49.0 (#1535): a new list's "Completed: like the default" row carries the undo icon too */, 'phone: nothing to undo: no dead "Undo" row in "…"');
-  await w.eval(`patchUndoable(S.lists[0] && [...S.tasks.values()][0]?.id, {priority: 5}, 'p')`).catch?.(() => {}); await sleep(300);
+  await w.eval(`patchUndoable(S.lists[0] && [...S.tasks.values()][0]?.id, {priority: 5}, 'p')`).catch?.(() => {}); await settle(w);
   check(!w.eval('HIST.undo.length') || w.eval('topMoreItems()').some(x => x.icon === 'undo' && /hmi/.test(x.cls || ''))  /* 2.49.0 (#1535): a new list's "Completed: like the default" row carries the undo icon too */, 'phone: ← in "…" once there is something to undo');
   w.close();
   if (errs.length) { check(false, 'JS errors: ' + [...new Set(errs)].join(' | ')); }
