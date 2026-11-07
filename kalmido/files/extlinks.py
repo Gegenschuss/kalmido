@@ -595,6 +595,8 @@ def xl_restore(xid):
     why = xl_why_not(c, n, fs_chain(c, n["id"]))
     if why:
         return err(why, 409)
+    if r["revoked_at"] and fs_role(c, n["id"], r["created_by"]) != "owner":  # 2.649.0 (#5051, Fable 1): the creator must still be able to share it (as xl_find), else a link revoked on leaving would open again on coming back
+        return err(tr("The person who created this link may no longer share this folder"), 409)
     c.execute("UPDATE fs_ext_links SET revoked_at=NULL WHERE id=?", (xid,))
     with system_ctx(c):  # 2.649.0 (#5051): back = out of the register (core/objects.py _take_public; the row may name the creator's org)
         c.execute("DELETE FROM obj_revoked WHERE src='fs_ext_links' AND ref_id=?", (xid,))

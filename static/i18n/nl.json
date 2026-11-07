@@ -17387,5 +17387,7 @@
   "This is a lead: a person converts it into an enquiry": "Dit is een lead: een persoon maakt er een aanvraag van",
   "Daily limit": "Daglimiet",
   "Proposed with the first key: the agent pauses for the day once its runs used this many tokens, also the runs other people start through chat, mentions or assignments. Empty = no limit.": "Voorgesteld bij de eerste sleutel: de agent pauzeert voor de dag zodra zijn runs zoveel tokens hebben verbruikt, ook de runs die anderen via chat, vermeldingen of toewijzingen starten. Leeg = geen limiet.",
-  "No usage limit: every run, also those other people start through chat, mentions or assignments, is billed to this key without a cap. Set one under “Usage limit” in the agent’s settings.": "Geen gebruikslimiet: elke run, ook die anderen via chat, vermeldingen of toewijzingen starten, gaat zonder plafond op deze sleutel. Stel er een in onder ‘Verbruikslimiet’ in de instellingen van de agent."
+  "No usage limit: every run, also those other people start through chat, mentions or assignments, is billed to this key without a cap. Set one under “Usage limit” in the agent’s settings.": "Geen gebruikslimiet: elke run, ook die anderen via chat, vermeldingen of toewijzingen starten, gaat zonder plafond op deze sleutel. Stel er een in onder ‘Verbruikslimiet’ in de instellingen van de agent.",
+  "The person who created this link may no longer share this folder": "De persoon die deze link heeft gemaakt, mag deze map niet meer delen",
+  "The person who created this request may no longer upload into this folder": "De persoon die dit verzoek heeft gemaakt, mag niet meer uploaden naar deze map"
 }

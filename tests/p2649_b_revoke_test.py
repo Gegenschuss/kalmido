@@ -10,6 +10,7 @@
    back opens nothing
  - 3 withdrawing an invitation (the account stays: another organisation's invitation lies on it) takes the person's shares
    through the core (obj_revoked) instead of only deleting the membership
+ - 1 (Fable) while the creator may no longer share / write there, nobody can restore them (409, as obj_share_restore)
  - 4 the boundary repair takes a share and a table's card through the core: both visible in obj_revoked (reason boundary),
    the card ended (revoked_at), its core share gone
  - a person without an organisation (freelancer_fixture): their own link and file request stay untouched by all of it
@@ -98,6 +99,14 @@ check(dbx("SELECT revoked_at IS NOT NULL FROM fs_ext_links WHERE id=?", (XL,)) =
 check(dbx("SELECT revoked_at IS NOT NULL FROM fs_upload_requests WHERE id=?", (RQ,)) == [(True,)], "1 left: the file request is revoked")
 check(revoked("fs_ext_links", XL) == [("leave",)] and revoked("fs_upload_requests", RQ) == [("leave",)], "1 left: both in obj_revoked (leave)")
 check(not dbx("SELECT 1 FROM obj_revoked WHERE src='fs_ext_links' AND row_json LIKE '%token%'"), "1 left: no token in the register")
+# Fable 1: an owner of the folder (alice) cannot bring them back while bob may no longer share / write there (409, the
+# register row stays) -- else they would open again by themselves the day bob comes back as an admin
+r = A.post(B + f"/api/files/ext-links/{XL}/restore")
+check(r.status_code == 409 and revoked("fs_ext_links", XL) == [("leave",)], "1 left: alice restores bob's link -> 409, still in the register " + r.text[:160])
+r = A.patch(B + f"/api/files/requests/{RQ}", json={"revoked": False})
+check(r.status_code == 409 and revoked("fs_upload_requests", RQ) == [("leave",)]
+      and dbx("SELECT revoked_at IS NOT NULL FROM fs_upload_requests WHERE id=?", (RQ,)) == [(True,)],
+      "1 left: alice reopens bob's file request -> 409, still revoked " + r.text[:160])
 member(K, "bob@example.com", BOB, "guest")
 check(page(XP) == 404 and page(RP) == 404, "1 back as a guest: link and file request 404")
 member(K, "bob@example.com", BOB, "admin")

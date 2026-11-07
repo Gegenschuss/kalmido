@@ -288,6 +288,10 @@ def frq_update(rid):
         if not isinstance(b["revoked"], bool):
             raise Denied(400, tr("Invalid value: {0}", "revoked"))
         f["revoked_at"] = (r["revoked_at"] or _now()) if b["revoked"] else None
+        if r["revoked_at"] and not b["revoked"] and fs_role(c, r["node_id"], r["created_by"]) not in ("owner", "edit"):
+            # 2.649.0 (#5051, Fable 1): back only while its creator still writes there (the rule of frq_alive), else a
+            # request revoked on leaving would open again on coming back
+            raise Denied(409, tr("The person who created this request may no longer upload into this folder"))
     if f:
         c.execute(f"UPDATE fs_upload_requests SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), rid])
         if "revoked_at" in f and bool(f["revoked_at"]) != bool(r["revoked_at"]):
