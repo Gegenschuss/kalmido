@@ -4,7 +4,8 @@
  - 1 a person's public file links (fs_ext_links) and file requests (fs_upload_requests) of an organisation are revoked when
    they leave it (revoked_at + a row in obj_revoked): back the same day as a guest, then made an admin again = still 404;
    restorable (the link's restore, the request's revoked=false) -- then they open again and the register row is gone.
-   Made a guest: the links of nodes they can no longer share are revoked too (reason role).
+   Made a guest: the links of nodes they can no longer share are revoked too (reason role); a file request stays while
+   they can still write in its folder (the runtime rule of files/filereq.py frq_alive).
  - 2 an agent moved from one organisation to another loses its shares on the old organisation's nodes (obj_revoked), moving
    back opens nothing
  - 3 withdrawing an invitation (the account stays: another organisation's invitation lies on it) takes the person's shares
@@ -112,9 +113,10 @@ check(r.ok and page(RP) == 200 and not revoked("fs_upload_requests", RQ), "1 res
 member(K, "bob@example.com", BOB, "guest")
 check(dbx("SELECT revoked_at IS NOT NULL FROM fs_ext_links WHERE id=?", (XL,)) == [(True,)] and revoked("fs_ext_links", XL) == [("role",)],
       "1 made a guest: the link is revoked (role)")
-check(revoked("fs_upload_requests", RQ) == [("role",)], "1 made a guest: the file request is revoked (role)")
+# a guest keeps the write right in the folder he made: his file request stays (the same rule as files/filereq.py frq_alive)
+check(not revoked("fs_upload_requests", RQ) and page(RP) == 200, "1 made a guest: the file request of a folder he still writes in stays")
 member(K, "bob@example.com", BOB, "admin")
-check(page(XP) == 404 and page(RP) == 404, "1 admin again: nothing reopens")
+check(page(XP) == 404, "1 admin again: the link does not reopen")
 check(page(FXP) == 200 and page(FRP) == 200, "freelancer: untouched by bob's leaving and role changes")
 
 # ================================================================== 2 an agent alt -> new -> alt opens nothing
@@ -137,7 +139,9 @@ check(not dbx("SELECT 1 FROM fs_shares WHERE node_id=? AND agent_id=?", (AF, AG)
 r = A.post(B + f"/api/orgs/{K}/invites", json={"email": "nina@example.com", "role": "member"})
 check(r.ok, "setup: Kestrel invites a new address " + r.text[:160])
 NINA = dbx("SELECT id FROM users WHERE email='nina@example.com'")[0][0]
-r = A.post(B + f"/api/orgs/{K2}/invites", json={"email": "nina@example.com", "role": "member"})
+ERIN, Er = user("erin")  # Osprey's admin (no instance admin: an instance admin adds an existing account at once)
+dbx("INSERT INTO org_members(org_id,user_id,role) VALUES(?,?,'admin')", (K2, ERIN))
+r = Er.post(B + f"/api/orgs/{K2}/invites", json={"email": "nina@example.com", "role": "member"})
 check(r.ok and dbx("SELECT 1 FROM org_joins WHERE org_id=? AND user_id=?", (K2, NINA)), "setup: Osprey invites the same address " + r.text[:160])
 NF = A.post(B + "/api/files/folders", json={"name": "Welcome pack", "space": f"org:{K}"}).json()["id"]
 dbx("INSERT INTO fs_shares(node_id,user_id,role,created_by,created_at) VALUES(?,?,'view',?,'2026-11-07T10:00:00+00:00')", (NF, NINA, ALICE))
