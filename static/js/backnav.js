@@ -8,7 +8,7 @@
 const BN = {i: 0, nt: ''};  // index of the current view; every history entry of Kalmido carries it as state.bn
 const bnOverlay = () => { const s = history.state; return !!(s && (s.f8d || s.jc || s.shop || s.detail)); };
 const bnCan = () => BN.i > 0 || bnOverlay();
-const bnTip = () => tr('Back') + ' (' + kbText(IS_MAC ? 'Mod+[' : 'Alt+←') + ')';
+const bnTip = () => isTouch() ? tr('Back') : tr('Back') + ' (' + kbText(IS_MAC ? 'Mod+[' : 'Alt+←') + ')';  // 2.655.0 (#5084)
 function bnBtn() {
   const t = esc(bnTip());
   return `<button type="button" class="iconbtn bnback" data-act="nav-back" aria-label="${t}" title="${t}"${bnCan() ? '' : ' disabled'}>${ic('arrowl')}</button>`;

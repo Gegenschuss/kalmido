@@ -846,12 +846,12 @@ function settingsModal(focus) {
       log: aaHtml(),
       backup: bkHtml() + stoHtml()}, ad_admFocus(focus)) : '',  // 2.582.0 (#4827): the server admins' backups (also without an organisation)
     help: `<h4>${tr('Getting started')}</h4>
-      <div class="row"><button class="btn sm" data-m="tour">${ic('arrow', 's')} ${tr('Restart the welcome tour')}</button>${isMobile() ? '' : `<button class="btn sm" data-m="keys">${ic('help', 's')} ${tr('Keyboard shortcuts')} ${kb('?')}</button>`}<button class="btn sm" data-m="cele-try">${ic('check', 's')} ${tr('Show the celebration')}</button></div>
+      <div class="row"><button class="btn sm" data-m="tour">${ic('arrow', 's')} ${tr('Restart the welcome tour')}</button>${isTouch() ? '' : `<button class="btn sm" data-m="keys">${ic('help', 's')} ${tr('Keyboard shortcuts')} ${kb('?')}</button>`}<button class="btn sm" data-m="cele-try">${ic('check', 's')} ${tr('Show the celebration')}</button></div>
       <div class="row"><button class="btn sm" data-m="practice-add">${ic('plus', 's')} ${tr('Create the practice project')}</button>${S.sample ? '' : `<button class="btn sm" data-m="sample-add">${ic('plus', 's')} ${tr('Create sample project')}</button>`}</div>
       <div class="row">${chk('s-wnew', s.whatsnew_on !== '0', tr('Show what is new after an update'))}</div><!-- 2.556.0 (#4685): the dialog "New for you" -->
       ${S.me?.kid ? '' : `<div class="row">${chk('s-tmore', s.tours_more !== '0', tr('Show more introductions'))}</div>
       <div class="row">${TOUR_AREAS.filter(id => sbb_def(id)?.[3]()).map(id => `<button class="btn sm" data-m="tour-mod" data-v="${id}">${esc(tr(sbb_def(id)[2]))}</button>`).join('')}</div>`}<!-- 2.466.0 (#3314): one area's introduction again -->
-      ${isMobile() ? '' : `<div class="shelp">${tr('{0}: search and commands for everything (tasks, projects, views, settings). j / k move through the tasks, x completes, s snoozes, g t goes to Today.', kbText('Mod+K'))}</div>`}
+      ${isTouch() ? '' : `<div class="shelp">${tr('{0}: search and commands for everything (tasks, projects, views, settings). j / k move through the tasks, x completes, s snoozes, g t goes to Today.', kbText('Mod+K'))}</div>`}
       <h4>${tr('Quick add')}</h4>
       <div class="shelp">${tr('today, tomorrow, day after tomorrow, friday, next monday, in 3 days, 12.10., 3pm, at 15:00<br>daily, weekdays, weekly, every monday, every 2 weeks, monthly, yearly<br>!high / !medium / !low (or !!!, !!, !) · #tag · ~project, “in project Work” or “… in Work” at the end<br>German works too: morgen 15 uhr, jeden montag, !hoch<br>Keyboard: n = new task, / = search, Esc = close')}</div>
       <div class="shelp">${tr('@name assigns (people of the project) · 30 min, 2h, for 1.5 hours = duration<br>remind me 15 min before · remind me tomorrow 9am, remind me Tue 9:00 (also without a date)')}</div>  <!-- 2.111.0 C (#2057) -->

@@ -68,7 +68,7 @@ const mpo_posItem = moves => ({label: tr('Change position…'), icon: 'sort', di
 function menu(anchor, items, back, fsel, title) {
   items = menuTidy(items);  // 2.27.0: no doubled / edge separators
   const tt = title || tchSheetT, hd = isMobile() ? tch_sheetHead(tt) : '';
-  const btn = (it, i, j) => `<button role="menuitem" data-i="${i}" ${j != null ? `data-j="${j}"` : ''} class="${it.on ? 'on' : ''} ${it.cls || ''}${it.more ? ' msubm' : ''}" ${it.more ? 'aria-haspopup="menu"' : ''} ${it.dis ? 'disabled aria-disabled="true"' : ''} ${it.title ? `title="${esc(it.title)}"` : ''}${it.act ? ` data-act="${esc(it.act)}"` : '' /* 2.551.0 (#4607): a test anchor */}>${it.swc !== undefined ? `<span class="mswc" style="background:${cssColor(it.swc) || 'var(--bg4)'}"></span>` : it.lic && listIconHtml(it.lic, {cls: 'mlic'}) ? listIconHtml(it.lic, {cls: 'mlic'}) : it.dot ? `<span class="mdot">${hdot(it.dot)}</span>` : it.icon ? ic(it.icon, 's') : ''}<span class="ml">${esc(it.label)}${it.sub ? `<small class="msub">${esc(it.sub)}</small>` : ''}</span>${it.keys && !isMobile() ? kb(it.keys) : ''}${it.on ? `<span class="mchk" aria-hidden="true">${ic('check', 's')}</span>` : ''}${it.more ? `<span class="mchev" aria-hidden="true">${ic('right', 's')}</span>` : ''}</button>`;
+  const btn = (it, i, j) => `<button role="menuitem" data-i="${i}" ${j != null ? `data-j="${j}"` : ''} class="${it.on ? 'on' : ''} ${it.cls || ''}${it.more ? ' msubm' : ''}" ${it.more ? 'aria-haspopup="menu"' : ''} ${it.dis ? 'disabled aria-disabled="true"' : ''} ${it.title ? `title="${esc(it.title)}"` : ''}${it.act ? ` data-act="${esc(it.act)}"` : '' /* 2.551.0 (#4607): a test anchor */}>${it.swc !== undefined ? `<span class="mswc" style="background:${cssColor(it.swc) || 'var(--bg4)'}"></span>` : it.lic && listIconHtml(it.lic, {cls: 'mlic'}) ? listIconHtml(it.lic, {cls: 'mlic'}) : it.dot ? `<span class="mdot">${hdot(it.dot)}</span>` : it.icon ? ic(it.icon, 's') : ''}<span class="ml">${esc(it.label)}${it.sub ? `<small class="msub">${esc(it.sub)}</small>` : ''}</span>${it.keys && !isTouch() ? kb(it.keys) : ''}${it.on ? `<span class="mchk" aria-hidden="true">${ic('check', 's')}</span>` : ''}${it.more ? `<span class="mchev" aria-hidden="true">${ic('right', 's')}</span>` : ''}</button>`;
   // {row: [item, item]} = one line of equal buttons (1.5.1: "Today" / "Tomorrow" on top of the task menu)
   let html = '', grp = false;
   items.forEach((it, i) => {
@@ -730,8 +730,8 @@ const qdLabel = t => qdPlus(t) ? tr('+1 day') : tr('Tomorrow');
 const qdTitle = t => qdPlus(t) ? tr('Set to {0}', dayLabel(addDays(t.due, 1))) : tr('Tomorrow, each further click +1 day');
 const qdMinus = t => !!(t?.due && t.due > today());
 const quickDueRow = id => { const t = taskById(id), d0 = today(), d1 = addDays(d0, 1);
-  return {row: [{label: tr('Today'), icon: 'sun', title: isMobile() ? '' : `${tr('Due today')} (${keyName('t')})`, on: t?.due === d0, fn: () => quickDue(id, 0)},
-    {label: qdLabel(t), icon: 'sunrise', title: isMobile() ? qdTitle(t) : `${qdTitle(t)} (${kbText('Shift+T')})`, on: t?.due === d1, fn: () => quickDue(id, 1)},
+  return {row: [{label: tr('Today'), icon: 'sun', title: isTouch() ? '' : `${tr('Due today')} (${keyName('t')})`, on: t?.due === d0, fn: () => quickDue(id, 0)},
+    {label: qdLabel(t), icon: 'sunrise', title: isTouch() ? qdTitle(t) : `${qdTitle(t)} (${kbText('Shift+T')})`, on: t?.due === d1, fn: () => quickDue(id, 1)},
     ...(qdMinus(t) ? [{label: tr('-1 day'), icon: 'back', title: tr('Set to {0}', dayLabel(addDays(t.due, -1) < d0 ? d0 : addDays(t.due, -1))), fn: () => quickDue(id, -1)}] : [])]}; };
 // ---- 2.1.0 (#335): "Waiting on external": who / what + a follow-up day (reminder + News on that day, agents get
 // followup_due). A chip on the row and a bar in the task panel; clearing it is one click.

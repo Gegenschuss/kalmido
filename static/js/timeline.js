@@ -165,7 +165,7 @@ function viewTimeline(listId, inCal) {
   }).join('');
   S.tlL = {bars};
   const from = pick && S.tasks.get(pick.from);
-  const hint = isMobile() ? tr('Long-press and drag a bar: the middle moves it, the ends change start / due date.') : tr('Drag a bar to move it, drag its ends to change start / due date.');
+  const hint = isTouch() ? tr('Long-press and drag a bar: the middle moves it, the ends change start / due date.') : tr('Drag a bar to move it, drag its ends to change start / due date.');
   const dhint = !deps || ![...bars.keys()].some(i => dFor(S.tasks.get(i))) ? '' : isTouch() ? tr('Long-press a bar and let go for more: connect it to the task it blocks, remove a dependency.') : tr('Drag the dot at the end of a bar onto another bar: that task is then blocked by it. Click an arrow to remove it.');
   // 2.18.0 review: the footer also tells how to draw a new task (only where the user may add one)
   const chint = !pick && groups.some(g => canAddTo(g.l.id)) ? (isTouch() ? tr('Hold an empty spot in a project or section row, then drag to add a task, or tap “+”.') : tr('Drag across empty days in a project or section row to add a task, double-click a day or use “+”.')) : '';
