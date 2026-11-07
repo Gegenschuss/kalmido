@@ -38,8 +38,9 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
     check(/^<i>x<\/i> /.test(h.e), 'safe = true keeps the given HTML ' + h.e);
     // a real view: Clients are off
     await ready(ev, `typeof viewClients === 'function'`);
-    await ev(`(() => { document.body.insertAdjacentHTML('beforeend', '<div id="slt">' + viewClients() + '</div>'); return 1; })()`);
-    check(await ready(ev, `!!document.querySelector('#slt .empty a.setlink[data-setlink="modules"]')`), 'Clients are off: the hint has the link ' + (await ev(`typeof viewClients + ':' + (typeof clientsOn === 'function' && clientsOn()) + ':' + document.body.innerHTML.length`)));
+    // the view's output follows the settings the app is still loading after boot: draw the box anew until it shows the hint (a real state)
+    check(await ready(ev, `(document.getElementById('slt')?.remove(), document.body.insertAdjacentHTML('beforeend', '<div id="slt">' + viewClients() + '</div>'), !!document.querySelector('#slt .empty a.setlink[data-setlink="modules"]'))`),
+      'Clients are off: the hint has the link ' + (await ev(`typeof viewClients + ':' + (typeof clientsOn === 'function' && clientsOn()) + ':' + viewClients().slice(0, 200)`)));
     await ev(`document.querySelector('#slt .empty a.setlink').click()`);
     check(await ready(ev, `!!document.querySelector('.smodal #sp-modules:not(.hidden)')`), 'a press opens the settings on Modules');
   }, false);

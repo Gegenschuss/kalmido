@@ -60,7 +60,7 @@ def _mine_sql(tw):
 def stl_contracts(c, uid, today, tw):
     """The running contracts: how many, the cost per month / year, the deadlines to cancel of the next 90 days, by provider."""
     items = []
-    for r in c.execute(f"SELECT t.id, t.title, t.due, t.fam {_mine_sql(tw)} AND t.status=0 AND t.fam LIKE ? ORDER BY t.id",
+    for r in c.execute(f"SELECT t.id, t.title, t.due, t.fam {_mine_sql(tw)} AND t.status=0 AND t.fam ILIKE ? ORDER BY t.id",
                        (uid, uid, uid, uid, '%"kind":"contract"%')):
         f = _fam(r["fam"])
         if f.get("kind") != "contract":
@@ -103,7 +103,7 @@ def stl_health(c, uid, today, mon0, weeks, tw):
         return p
 
     sql = f"""SELECT t.id, t.title, t.due, t.due_time, t.status, t.completed_at, t.completed_by, t.repeat, t.fam {_mine_sql(tw)}
-              AND l.life='health' AND t.fam LIKE ? AND (t.status=0 OR (t.status=2 AND t.completed_by=? AND t.completed_at IS NOT NULL)) ORDER BY t.id"""
+              AND l.life='health' AND t.fam ILIKE ? AND (t.status=0 OR (t.status=2 AND t.completed_by=? AND t.completed_at IS NOT NULL)) ORDER BY t.id"""
     nxt = []
     for r in c.execute(sql, (uid, uid, uid, uid, '%"kind":"health"%', uid)):
         f = _fam(r["fam"])
