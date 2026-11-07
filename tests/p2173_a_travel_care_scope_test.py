@@ -11,7 +11,8 @@ contracts, devices, health, the household budget and family stay private. Guarde
  - agents / API tokens: no organisation space, an organisation's trip never goes to an agent automatically, the REST API
    leaves an organisation's contacts alone
  - "Travel expenses" of a trip: one office trip filled from it (period, destination, name), a second call opens the same;
-   only the admins of the trip's organisation (members 403), a private trip in the person's own office
+   only the admins of the trip's organisation (members: only their own since 2.620.0 #4642, 403 on the admin's), a private
+   trip in the person's own office
  - a person without an organisation uses everything privately (freelancer-matrix: life_org)
  - 2.173.1 A (#2714): the travel expenses button asks whether expenses are linked (GET); an organisation's trip reaches
    no agent event and not the assistant; a folder default moves a trip like the project dialog; care_space also from
@@ -215,8 +216,9 @@ check(r.status_code == 400, f"REST API: no space field ({r.status_code})")
 check(requests.post(B + f"/api/life/trips/{OT}/expenses", headers=AGH).status_code in (401, 403, 404), "agent: no travel expenses")
 
 # ================================================================ travel expenses from a trip
-r = Bo.post(B + f"/api/life/trips/{OT}/expenses")
-check(r.status_code == 403, f"a member makes no travel expenses ({r.status_code})")
+# 2.620.0 (#4642): a member makes the own travel expenses now (tests/p2620_c_office_test.py); read-only still 403
+r = Ri.post(B + f"/api/life/trips/{OT}/expenses")
+check(r.status_code in (403, 404), f"read-only makes no travel expenses ({r.status_code})")
 r = Fr.post(B + f"/api/life/trips/{OT}/expenses")
 check(r.status_code == 404, f"another organisation: 404 ({r.status_code})")
 r = A.post(B + f"/api/life/trips/{OT}/expenses")
@@ -227,6 +229,9 @@ check(row and tuple(row[0]) == (ORG, D1, D2, 1, 1), f"filled from the trip: {row
 r = A.post(B + f"/api/life/trips/{OT}/expenses")
 check(r.status_code == 200 and r.json()["trip_id"] == TID and not r.json()["created"], "a second click: the same one")
 check(dbx("SELECT COUNT(*) FROM office_trips WHERE org_id=?", (ORG,))[0][0] == 1, "exactly one office trip")
+# 2.620.0 (#4642): the admin's travel expenses of the shared trip stay the admin's: the member 403
+r = Bo.post(B + f"/api/life/trips/{OT}/expenses")
+check(r.status_code == 403, f"a member does not get the admin's travel expenses ({r.status_code})")
 check(A.patch(B + "/api/settings", json={"workspace": SP}).ok, "the office of the organisation")
 j = A.get(B + "/api/office/trips", params={"year": D1[:4]}).json()
 t = next((x for x in j["trips"] if x["id"] == TID), None)
@@ -282,7 +287,7 @@ check(Fl.post(B + "/api/life/trips", json={"name": "X", "from": D1, "to": D2, "s
 # the travel expenses button knows whether expenses are linked (GET, the same gate as the POST)
 r = A.get(B + f"/api/life/trips/{OT}/expenses")
 check(r.ok and r.json().get("trip_id") == TID2, "GET: the linked travel expenses " + r.text[:200])
-check(Bo.get(B + f"/api/life/trips/{OT}/expenses").status_code == 403, "GET: a member 403")
+check(Bo.get(B + f"/api/life/trips/{OT}/expenses").status_code == 403, "GET: a member 403")  # 2.620.0 (#4642): the admin's travel expenses
 check(Fr.get(B + f"/api/life/trips/{OT}/expenses").status_code == 404, "GET: another organisation 404")
 check(requests.get(B + f"/api/life/trips/{OT}/expenses", headers=AGH).status_code in (401, 403, 404), "GET: no agent")
 check(requests.get(B + f"/api/life/trips/{PT}/expenses", headers=PTH).status_code in (401, 403, 404), "GET: no API token")

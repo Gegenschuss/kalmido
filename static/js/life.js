@@ -271,7 +271,7 @@ function tripModal(l) {
 // 2.173.0 A (#2680): "Travel expenses" on a trip -- one trip of the office made from it (period, destination, name), later
 // the same one opened (kalmido/life/tripcost.py); for who makes travel expenses there: the admins of the trip's organisation,
 // a private trip in the person's own office. No costs in the trip planning itself.
-const lf_costOk = l => typeof officeOn === 'function' && officeOn() && (!l.org_id || wsOrg(l.org_id)?.role === 'admin');
+const lf_costOk = l => typeof officeOn === 'function' && officeOn() && (!l.org_id || ['admin', 'member'].includes(wsOrg(l.org_id)?.role));  // 2.620.0 (#4642): members too (their own office trip)
 async function lf_tripCost(lid) {
   const l = listById(lid); if (!l) return;
   let j; try { j = await api('POST', `/api/life/trips/${lid}/expenses`, {}); } catch { return; }  // api() said it
