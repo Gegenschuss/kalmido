@@ -226,8 +226,9 @@ def _history(c, run, src, d, ctx):
     elif act == "share_change" and ":" in det:
         d["detail"] = _share_id(run, det.split(":", 1)[0]) + ":" + det.split(":", 1)[1]
     elif act == "move":  # 2.636.0 (#4854): the parent folder's id -> the target's folder (one that did not come along: none)
-        new = run.m("fs_nodes", det) if det else None
-        d["detail"] = str(new) if new else ""
+        if det.isdigit():  # a word ("lock", files/fslock.py) is no id and stays as it is
+            new = run.m("fs_nodes", det)
+            d["detail"] = str(new) if new else ""
     elif act == "moved_space":  # 2.636.0 (#4854): "org:<source org>->..." names the source server's workspaces: no ids
         d["detail"] = ""
     return d

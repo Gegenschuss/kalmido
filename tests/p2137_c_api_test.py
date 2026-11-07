@@ -356,7 +356,8 @@ ok(A.post(B + "/api/files/upload", data={"parent_id": FD}, files=[("file", ("bri
 # 2.636.0 (#4854): history lines with ids of this server: a move (the parent folder; one that does not come along) and a move
 # into another workspace ("org:<id>->org:<id>")
 FD2 = ok(A.post(B + "/api/files/folders", json={"name": "Archiv", "space": f"org:{ORG}"}), "a second folder").get("id")
-for act, det in (("move", str(FD2)), ("move", "987654321"), ("moved_space", f"org:987654321->org:{ORG}")):
+# 2.636.0 (#4854, review): a lock move ("lock", files/fslock.py) is a word, no id: it stays
+for act, det in (("move", str(FD2)), ("move", "987654321"), ("move", "lock"), ("moved_space", f"org:987654321->org:{ORG}")):
     dbx("INSERT INTO fs_log(node_id,user_id,agent,action,detail,at) VALUES(?,?,0,?,?,?)", (FD, ALICE, act, det, NOW))
 ok(A.post(B + "/api/wiki/pages", json={"space": f"org:{ORG}", "path": "Ablauf", "body": "# Ablauf\nErst planen."}), "a knowledge page")
 SH = ok(A.post(B + "/api/sheets", json={"title": "Budget", "space": f"org:{ORG}"}), "a table")
@@ -432,7 +433,7 @@ check("not selected were not imported" in W, f"the warning names the left-out ro
 NFD = one("SELECT id FROM fs_nodes WHERE org_id=? AND kind='folder' AND name='Kunden' AND deleted_at IS NULL", (ORG3,))
 NFD2 = one("SELECT id FROM fs_nodes WHERE org_id=? AND kind='folder' AND name='Archiv' AND deleted_at IS NULL", (ORG3,))
 hist = sorted(T("SELECT action, detail FROM fs_log WHERE node_id=? AND action IN ('move','moved_space')", (NFD,)))
-check(NFD and NFD2 and hist == sorted([("move", str(NFD2)), ("move", ""), ("moved_space", "")]),
+check(NFD and NFD2 and hist == sorted([("move", str(NFD2)), ("move", ""), ("move", "lock"), ("moved_space", "")]),
       f"history of the imported folder: move -> the target's folder, no id of the source {hist} (folder {NFD2}, source {FD2})")
 # 2.237.0 (#2870): rows of one other person (encrypted notes, timesheets) are not put under their account
 check(one("SELECT COUNT(*) FROM task_enc_notes WHERE task_id=?", (NT,)) == 0 and "belong to other people" in W, "bob's encrypted note not taken over")
