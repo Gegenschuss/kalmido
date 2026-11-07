@@ -282,6 +282,10 @@ ERR += [e.removeprefix("ERROR: ") for e in _kt_err]
 for _w in _kt_warn:
     print(_w)
 
+# 2.623.0 (#4950): a test file must end with sys.exit(done(...)), not a bare done(...) (tools/check_done_exit.py)
+import check_done_exit  # noqa: E402
+ERR += check_done_exit.errors()
+
 for e in ERR:
     print("ERROR:", e)
 print(f"check_layout: {len(tags)} client modules, {len(order)} server modules, {n_people} tables with people, {len(ERR)} error(s)")
