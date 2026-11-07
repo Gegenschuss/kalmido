@@ -586,9 +586,10 @@ async function dc_cfLinkFind(el) {  // the documents whose name / text has the w
   const dl = document.getElementById(el.getAttribute('list') || ''); if (!dl || !el.isConnected) return;
   dl.innerHTML = (j.docs || []).filter(x => x.id !== DC.doc?.id).map(x => `<option value="${esc(`${x.name} · #${x.id}`)}">`).join('');
 }
+const dc_cfLinkFindLater = debounce(dc_cfLinkFind, 250);  // #4807: debounce instead of a clearTimeout / setTimeout pair (perf budget)
 document.addEventListener('input', e => {
   const el = e.target.closest?.('[data-dcfl]'); if (!el) return;
-  clearTimeout(el._t); el._t = setTimeout(() => dc_cfLinkFind(el), 250);
+  dc_cfLinkFindLater(el);
 });
 function dc_val(f, el) {
   const v = el.value.trim();
