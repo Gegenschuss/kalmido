@@ -109,6 +109,19 @@ check(Bo.delete(B + f"/api/files/shares/{fs3[0][0] if fs3 else 0}").ok and not d
       "... taken back: deleted")
 check(dbx("SELECT COUNT(*) FROM obj_revoked")[0][0] == n0, "... as before without an obj_revoked row")
 
+# review F1 (2.623.0): a share on an organisation's knowledge page, taken back in the file store's dialog, lies in obj_revoked
+# under that organisation (not as a private row)
+r = Bo.post(B + "/api/wiki/pages", json={"space": SP, "path": "Team note", "body": "team"})
+check(r.status_code == 201, f"bob writes an organisation's page {r.status_code} {r.text[:120]}")
+WO = r.json().get("id", 0) if r.ok else 0
+wn = dbx("SELECT id FROM fs_nodes WHERE kind='ref' AND ref_kind='wiki' AND ref_id=?", (WO,))
+r = Bo.post(B + f"/api/files/nodes/{wn[0][0] if wn else 0}/shares", json={"user_id": CARL, "role": "view"})
+fsw = dbx("SELECT id FROM fs_shares WHERE node_id=? AND user_id=?", (wn[0][0] if wn else 0, CARL))
+check(bool(wn) and r.ok and bool(fsw), f"bob shares the page's node with carl in the file store {wn} {r.status_code} {r.text[:120]}")
+check(bool(fsw) and Bo.delete(B + f"/api/files/shares/{fsw[0][0]}").ok, "... and takes it back there")
+check(dbx("SELECT org_id FROM obj_revoked WHERE src='fs_shares' AND kind='wiki' AND ref_id=?", (WO,)) == [(ORG,)],
+      "... the row lies in obj_revoked under the organisation")
+
 # ================================================================ freelancer-matrix: sheets -- a card by address goes
 P1 = table(Fr, "Own rates", "private")
 r = Fr.post(B + f"/api/sheets/{P1}/shares", json={"email": "fiona@example.com", "role": "read"})

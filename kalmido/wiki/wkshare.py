@@ -294,7 +294,8 @@ def wsh_fs_unshare(c, uid, n, s):
     if not cards and not (n["kind"] == "ref" and n["ref_kind"] == "wiki"):
         return False  # a folder share of no card: the file store's way (deleted as before)
     from ..core.objects import obj_node_unshare
-    obj_node_unshare(c, uid, n, s["id"], kind="wiki", ref_id=n["ref_id"] if n["kind"] == "ref" else None)
+    # review F1 (2.623.0): the row of an organisation's page lies under that organisation in obj_revoked (as files/web.py does)
+    obj_node_unshare(c, uid, n, s["id"], kind="wiki", ref_id=n["ref_id"] if n["kind"] == "ref" else None, org=n["org_id"] or None)
     ts = iso(now_utc())
     for r in cards:
         wsh_core_drop(c, uid, r)  # the card's other core share (the one just taken is gone already)
