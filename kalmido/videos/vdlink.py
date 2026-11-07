@@ -12,6 +12,7 @@ office/signoff.py (kind video; no table and no token way of its own) and the cus
 Nothing here shows the task, the project, other sign-offs or contacts: the page reads the one review of the link."""
 import base64
 import html
+import re
 
 from flask import request
 
@@ -44,10 +45,12 @@ def vdl_carry(c, r, nid):
     rows = c.execute("SELECT * FROM office_signoffs WHERE video_id=? AND kind='video' AND org_id IS NOT DISTINCT FROM ? "
                      "AND state IN ('accepted', 'declined') AND revoked_at IS NULL AND token_hash NOT LIKE 'carried:%' ORDER BY id",
                      (r["id"], r["org_id"])).fetchall()
-    ts, n = iso(now), 0
+    ts, n, live = iso(now), 0, vdl_live_count(c, r)
     for s in rows:
         if s["expires_at"] and parse_iso(s["expires_at"]) <= now:
             continue
+        if live + n >= VDL_LIVE_MAX:  # 2.642.0 (#4772, review): carrying on keeps the limit of live links too
+            break
         c.execute("UPDATE office_signoffs SET token_hash=? WHERE id=?", (f"carried:{s['id']}:{s['token_hash']}", s["id"]))
         insert_id(c, "INSERT INTO office_signoffs(org_id, kind, video_id, title, token_hash, token, expires_at, state, doc_hash, created_by, "
                      "created_at, show_old, carried_from, carried_ver) VALUES(?,?,?,?,?,?,?,'open',?,?,?,?,?,?)",
@@ -62,11 +65,15 @@ def vdl_uncarry(c, vid, nid):
     record (the client sees that decision again); one switched off meanwhile stays off. The caller commits."""
     rows = c.execute("SELECT id, token_hash, carried_from FROM office_signoffs WHERE video_id=? AND kind='video' AND carried_ver=? "
                      "AND state='open' AND revoked_at IS NULL AND carried_from IS NOT NULL", (vid, nid)).fetchall()
+    n = 0
     for s in rows:
-        c.execute("DELETE FROM office_signoffs WHERE id=?", (s["id"],))
+        # 2.642.0 (#4772, review): only while still open and on (a decision given meanwhile is never taken away)
+        if c.execute("DELETE FROM office_signoffs WHERE id=? AND state='open' AND revoked_at IS NULL", (s["id"],)).rowcount != 1:
+            continue
+        n += 1
         c.execute("UPDATE office_signoffs SET token_hash=? WHERE id=? AND token_hash=?",
                   (s["token_hash"], s["carried_from"], f"carried:{s['carried_from']}:{s['token_hash']}"))
-    return len(rows)
+    return n
 
 
 # ---------------------------------------------------------------- the customer page
@@ -74,7 +81,7 @@ def vdl_shown(c, s, versions):
     """(the version to show, is it an older one) for link s: ?v=<n> only when the link shows the older versions."""
     newest = versions[-1]
     want = request.args.get("v") or ""
-    if not (s["show_old"] and want.isdigit() and len(want) < 7):
+    if not (s["show_old"] and re.fullmatch(r"[0-9]{1,6}", want)):
         return newest, False
     for v in versions[:-1]:
         if v["n"] == int(want):

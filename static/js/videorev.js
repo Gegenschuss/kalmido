@@ -274,10 +274,11 @@ function vdr_sigDraw(st) {
   // 2.642.0 (#4772): several links: every running one, then the last five records (decisions, switched off, expired)
   const all = r.signoffs || [], live = all.filter(x => x.live), rest = all.filter(x => !x.live).slice(0, 5);
   const rows = [...live, ...rest].map(x => {
-    const s = x.revoked_at && x.state === 'open' ? tr('Switched off') : !x.live && x.state === 'open' ? tr('Expired') : sw[x.state] || x.state;
+    const s = x.revoked_at && x.state !== 'open' ? `${sw[x.state] || x.state} · ${tr('Switched off')}` : x.revoked_at && x.state === 'open' ? tr('Switched off') : !x.live && x.state === 'open' ? tr('Expired') : sw[x.state] || x.state;
     const ex = x.live && x.expires_at ? ` · ${esc(tr('until {0}', fmtDateNum(new Date(Date.parse(x.expires_at) - 1000))))}` : '', old = x.show_old ? ` · ${esc(tr('older versions too'))}` : '';
     return `<li class="sgrow st-${esc(x.state)}"><div class="sghead"><b>${esc(s)}</b><small class="muted"> · ${esc(fmtWhen(x.created_at))}${ex}${old}</small>${x.signer_name ? ` <span class="muted">${esc(x.signer_name)}</span>` : ''}</div>
       ${x.live && x.url ? `<div class="row icalrow"><input readonly value="${esc(x.url)}" aria-label="${esc(tr('Client link'))}" data-vdrurl="${x.id}"><button type="button" class="btn sm pri" data-vdr="sigcopy" data-id="${x.id}">${ic('copy', 's')} ${tr('Copy')}</button><button type="button" class="btn sm danger" data-vdr="sigstop" data-id="${x.id}">${tr('Switch off')}</button></div>` : ''}
+      ${!x.live && !x.revoked_at && x.state !== 'open' ? `<div class="row"><button type="button" class="btn sm danger" data-vdr="sigstop" data-id="${x.id}">${tr('Switch off')}</button></div>` : ''}
       ${x.reason ? `<div class="muted">${esc(tr('Reason: {0}', x.reason))}</div>` : ''}</li>`;
   }).join('');
   el.innerHTML = `<h4>${tr('Client link')}</h4><p class="muted mhint">${esc(tr('Your client watches the newest version without an account, comments at a time and approves or requests changes.'))}</p>

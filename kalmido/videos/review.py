@@ -557,6 +557,7 @@ def vdr_version_del(vid, nid):
     """Takes back the NEWEST version (the undo of "New version"), while it has no comments and is not the only one."""
     c, uid = db(), me()
     vdr_need(c, vid, write=True)
+    write_lock(c, f"video_review_{int(vid)}")  # 2.642.0 (#4772, review): serialised with a client's decision and a new version
     vs = vdr_versions(c, vid)
     if len(vs) < 2 or vs[-1]["id"] != nid:
         raise Denied(409, tr("Only the newest version can be removed"))
@@ -728,7 +729,7 @@ def vdr_sig_revoke(vid, sid):
                   (sid, vid, r["org_id"])).fetchone()  # 2.122.4 A (#2215 L3): never one of the old workspace
     if not s:
         raise Denied(404)
-    if s["state"] == "open" and not s["revoked_at"]:
+    if not s["revoked_at"]:  # 2.642.0 (#4772, review): a decided link too - it then stops and does not go on with a new version
         c.execute("UPDATE office_signoffs SET revoked_at=? WHERE id=?", (iso(now_utc()), sid))
         c.commit()
     return jsonify(sig_public(c, c.execute("SELECT * FROM office_signoffs WHERE id=?", (sid,)).fetchone(), vdr_full(c, uid, r)))

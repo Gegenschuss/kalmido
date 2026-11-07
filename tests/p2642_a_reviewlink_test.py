@@ -191,6 +191,14 @@ check(pg.status_code == 200 and "Version 1" in head and "youtube-nocookie.com/em
 check('name="text"' not in pg.text and 'name="do"' not in pg.text and "older version" in pg.text, "an older version is read-only (no comment, no decision)")
 
 # ---------------------------------------------------------------- the same answer for switched off / expired / unknown
+# 2.642.0 (#4772, review): a digit outside 0-9 in ?v= is no error page
+check(guest().get(B + "/s/q/" + T2 + "?v=%C2%B2").status_code == 200, "?v= with a superscript digit shows the newest version")
+# 2.642.0 (#4772, review): a decided link can be switched off and then does not come back with a new version
+D1 = next(x for x in A.get(B + f"{V}/{VID}").json()["signoffs"] if x.get("carried_from") == S1["id"] and x["state"] == "declined")
+check(A.post(B + f"{V}/{VID}/signoffs/{D1['id']}/revoke").ok and guest().get(B + "/s/q/" + T1).text == UNKNOWN.text, "a decided link switched off answers like an unknown one")
+V4 = A.post(B + f"{V}/{VID}/versions", json={"url": "https://vimeo.com/987654323"}).json()["new_version"]
+check(guest().get(B + "/s/q/" + T1).text == UNKNOWN.text, "a new version does not bring the switched-off link back")
+check(A.delete(B + f"{V}/{VID}/versions/{V4}").ok, "undo of version 4")
 check(A.post(B + f"{V}/{VID}/signoffs/{S2['id']}/revoke").ok, "switch the second link off")
 off = guest().get(B + "/s/q/" + T2)
 S3 = A.post(B + f"{V}/{VID}/signoff", json={}).json()
