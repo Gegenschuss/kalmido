@@ -47,9 +47,10 @@ execFileSync('docker', ['exec', '-d', CT, 'python', '/data/fake_newsletter.py'])
   check(cn.http === 200, `frida connects her own newsletter service (${cn.http})`);
 
   // ---- server: the old format stays, the exclusions count
+  const canon = o => o && typeof o === 'object' ? JSON.stringify(o, Object.keys(o).sort()) : JSON.stringify(o);  // key order of the stored rule is the server's (sorted)
   const seg = async (name, rule) => { const r = await call('POST', '/api/newsletter/segments', {ws: 'private', name, rule, create_list: true}, FK); return {r, s: (r.segments || []).find(x => x.id === r.segment_id)}; };
   const old = await seg('Old VIP', {tags: ['VIP'], companies: [], books: [bk.id]});
-  check(old.r.http < 300 && JSON.stringify(old.s?.rule) === JSON.stringify({tags: ['VIP'], companies: [], books: [bk.id]}), `an old segment keeps its rule as it was ${JSON.stringify(old.s?.rule)}`);
+  check(old.r.http < 300 && canon(old.s?.rule) === canon({tags: ['VIP'], companies: [], books: [bk.id]}), `an old segment keeps its rule as it was ${JSON.stringify(old.s?.rule)}`);
   check(old.s?.counts?.match === 2, `old segment: Anna and Ben (${old.s?.counts?.match})`);
   const ex = await seg('VIP no press', {tags: ['VIP'], companies: [], books: [], not_tags: ['press']});
   check(ex.r.http < 300 && JSON.stringify(ex.s?.rule?.not_tags) === '["press"]', `the exclusion is stored ${JSON.stringify(ex.s?.rule)}`);
@@ -109,7 +110,7 @@ execFileSync('docker', ['exec', '-d', CT, 'python', '/data/fake_newsletter.py'])
   click(w, nm.querySelector('[data-ns="save"]'));
   await until(() => !d.querySelector('.nwl-smd'));
   const s2 = (await call('GET', '/api/newsletter?ws=private', null, FK)).segments.find(x => x.name === 'VIP rows');
-  check(JSON.stringify(s2?.rule) === JSON.stringify({tags: ['VIP'], companies: [], books: [], not_tags: ['Press']}), `the rows are saved as the rule ${JSON.stringify(s2?.rule)}`);
+  check(canon(s2?.rule) === canon({tags: ['VIP'], companies: [], books: [], not_tags: ['Press']}), `the rows are saved as the rule ${JSON.stringify(s2?.rule)}`);
   check(s2?.counts?.match === 1, `… and hit the same contact as the server rule: Anna (${s2?.counts?.match})`);
 
   // reopening shows the exclusion row; removing it saves the old format again
@@ -122,7 +123,7 @@ execFileSync('docker', ['exec', '-d', CT, 'python', '/data/fake_newsletter.py'])
   click(w, em.querySelector('[data-ns="save"]'));
   await until(() => !d.querySelector('.nwl-smd'));
   const s3 = (await call('GET', '/api/newsletter?ws=private', null, FK)).segments.find(x => x.id === s2?.id);
-  check(JSON.stringify(s3?.rule) === JSON.stringify({tags: ['VIP'], companies: [], books: []}) && s3?.counts?.match === 2, `without the row: the old format, Anna and Ben ${JSON.stringify(s3?.rule)}`);
+  check(canon(s3?.rule) === canon({tags: ['VIP'], companies: [], books: []}) && s3?.counts?.match === 2, `without the row: the old format, Anna and Ben ${JSON.stringify(s3?.rule)}`);
   w.close();
 
   console.log(`p2625_a_nwlseg_ui: ${ok} ok, ${F.length} failed`);
