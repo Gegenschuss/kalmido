@@ -8,8 +8,10 @@ const keyName = k => k === 'Mod' ? (IS_MAC ? '⌘' : 'Ctrl') : k === 'Shift' ? (
 // 'Mod+K' -> ⌘ K keys; 'g t' -> G, T (a sequence)
 const kb = s => `<span class="kbs">${s.split(' ').map(ch => ch.split('+').map(k => `<kbd>${esc(keyName(k))}</kbd>`).join('')).join('')}</span>`;
 const kbText = s => s.split(' ').map(ch => ch.split('+').map(keyName).join(IS_MAC ? '' : '+')).join(' ');
+// 2.655.0 (#4998): n / q / m / a / / come from the key registry (events.js kb_on); the row '@kb' marks where a group's
+// registered keys go (sc_withRegistry; without it they go to the group's end)
 const SHORTCUTS_ALL = [
-  [N_('General'), [['Mod+K', N_('Search and commands')], ['?', N_('Keyboard shortcuts')], ['n', N_('New task')], ['q', N_('Quick capture to the basket')], ['m', N_('New note')], ['a', N_('Chat with an agent (window)')], ['Ctrl+Space', N_('Quick capture, also while typing')], ['/', N_('Search')], ['Mod+Z', N_('Undo')], ['Mod+Shift+Z', N_('Redo')], ['Esc', N_('Close')]]],
+  [N_('General'), [['Mod+K', N_('Search and commands')], ['?', N_('Keyboard shortcuts')], ['@kb', ''], ['Ctrl+Space', N_('Quick capture, also while typing')], ['Mod+Z', N_('Undo')], ['Mod+Shift+Z', N_('Redo')], ['Esc', N_('Close')]]],
   [N_('Tasks'), [['↓', N_('Next task (or J)')], ['↑', N_('Previous task (or K)')], ['Enter', N_('Open task')], ['Space', N_('Complete task (or X)')], ['e', N_('Edit title in the list (or double-click)')], ['s', N_('Snooze task')], ['d', N_('Change date')], ['t', N_('Due today')], ['Shift+T', N_('Due tomorrow')], ['m', N_('Move to project')], ['Shift+C', N_('Collapse or expand all')]]],
   // 2.0.6 (#191): multi-select and the calendar views
   [N_('Multi-select'), [['Mod+A', N_('Select all tasks of the view')], ['Shift+↓', N_('Extend the selection down (or Shift+J)')], ['Shift+↑', N_('Extend the selection up (or Shift+K)')], ['Shift+X', N_('Select or unselect the task')],
@@ -27,9 +29,10 @@ function sc_withRegistry(base) {
   const out = base.map(([g, rows]) => [g, [...rows]]);
   for (const [g, rows] of typeof kb_helpRows === 'function' ? kb_helpRows() : []) {
     let grp = out.find(([n]) => n === g); if (!grp) { grp = [g, []]; out.push(grp); }
-    for (const r of rows) if (!grp[1].some(([k, n]) => k === r[0] && n === r[1])) grp[1].push(r);
+    const at = grp[1].findIndex(([k]) => k === '@kb'), add = rows.filter(r => !grp[1].some(([k, n]) => k === r[0] && n === r[1]));  // 2.655.0 (#4998): at the mark
+    if (at >= 0) grp[1].splice(at, 0, ...add); else grp[1].push(...add);
   }
-  return out;
+  return out.map(([g, rows]) => [g, rows.filter(([k]) => k !== '@kb')]);
 }
 const CAL_KEYS = {1: 'month', 2: 'week', 3: 'day', 4: 'timeline'};
 // multi-select from the keyboard: the task rows of the view, the focused one (j / k), the multi bar's own buttons

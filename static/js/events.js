@@ -967,13 +967,19 @@ document.addEventListener('keydown', async e => {
   // 2.4.0 (#187): Ctrl+Space = quick capture from anywhere (also while typing somewhere else)
   if (S.me?.kid) return;  // 2.49.0 (#1537): a child has no shortcuts (quick add, views ... only fail for it)
   if (e.ctrlKey && !e.altKey && !e.metaKey && (e.code === 'Space' || e.key === ' ') && t.id !== 'qsheet' && !$('.authscreen')) { e.preventDefault(); quickCapture(); return; }
-  if (/INPUT|TEXTAREA|SELECT/.test(t.tagName) || t.isContentEditable || e.metaKey || e.ctrlKey || e.altKey) return;  // 2.554.0 (#4052): + a contenteditable field (the knowledge editor): its letters are text, no shortcuts
-  if (e.key === 'n') { e.preventDefault(); const q = currentQuickInput(); if (q && (!isMobile() || tabletDock())) q.focus(); else openQuickSheet(); }
-  if (e.key === 'q' && !$('.modal')) { e.preventDefault(); quickCapture(); }
+  // 2.655.0 (#4998): the letters n / q / m / a / / are the key registry's (keys.js, below): one source for the keys and their help
+});
+// 2.655.0 (#4998): the shell's letter keys on the key registry (keys.js, scope global): not while typing (input, textarea, select, a
+// contenteditable field: its letters are text), not with Ctrl / Cmd / Alt, not for a child (2.49.0 (#1537)); the help
+// (palette.js SHORTCUTS) lists them from here. An open dialog on the registry's stack keeps them (it is modal).
+domReady(() => {
+  const no = () => !!S.me?.kid;
+  kb_on('global', 'n', () => { if (no()) return false; const q = currentQuickInput(); if (q && (!isMobile() || tabletDock())) q.focus(); else openQuickSheet(); }, {help: N_('New task'), group: 'General'});
+  kb_on('global', 'q', () => { if (no() || $('.modal')) return false; quickCapture(); }, {help: N_('Quick capture to the basket'), group: 'General'});
   // 2.477.0 (#3881): m = a quick note, where m means nothing else (palette.js: the focused task / the selection moves; the timeline's bar)
-  if (e.key === 'm' && !e.defaultPrevented && !$('.modal') && !t.closest?.('.rm-sum')) { e.preventDefault(); qn_new(); }
-  if (e.key === 'a' && !$('.modal') && !chatFull() && feat('agents') && chatFabAgent()) { e.preventDefault(); chatPop(); }  // 2.29.0 (#363)
-  if (e.key === '/') { e.preventDefault(); go('search'); }
+  kb_on('global', 'm', e => { if (no() || $('.modal') || /** @type {any} */ (e.target).closest?.('.rm-sum')) return false; qn_new(); }, {help: N_('New note'), group: 'General'});
+  kb_on('global', 'a', () => { if (no() || $('.modal') || chatFull() || !feat('agents') || !chatFabAgent()) return false; chatPop(); }, {help: N_('Chat with an agent (window)'), group: 'General'});  // 2.29.0 (#363)
+  kb_on('global', '/', () => { if (no()) return false; go('search'); }, {help: N_('Search'), group: 'General'});
 });
 // 2.630.0 (#4510): the shell's Escape, asked by the key registry (keys.js) after the open dialogs and menus on its stack:
 // open things not on the stack (a lightbox, a sheet, the menu, a dialog of its own kind, the drawer), then - after the view's
