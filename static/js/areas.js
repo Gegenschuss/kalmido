@@ -190,8 +190,10 @@ document.addEventListener('contextmenu', e => {
   e.preventDefault(); ps_menu(r);
 });
 // a computer: right-click on a point of a panel = "Hide from menu" / "Customize" (navmenu.js nav_rowMenu)
+// 2.655.0 (#5083): touch: the same menu by the shared long press (ms_rowMenu, like #4616), also on a tablet
+ms_rowMenu('#side [data-navk]', b => { if (!nav_canEdit(b.dataset.navk.split(':')[0])) return; loadModule('navmenu').then(() => nav_rowMenu(b), () => {}); });
 document.addEventListener('contextmenu', e => {
-  const b = e.target.closest?.('#side [data-navk]'); if (!b || isMobile() || !nav_canEdit(b.dataset.navk.split(':')[0])) return;
+  const b = e.target.closest?.('#side [data-navk]'); if (!b || isMobile() || isTouch() || !nav_canEdit(b.dataset.navk.split(':')[0])) return;
   e.preventDefault(); e.stopPropagation();
   loadModule('navmenu').then(() => nav_rowMenu(b), () => {});
 }, true);

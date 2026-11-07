@@ -4029,6 +4029,7 @@ body.lcmoving{cursor:grabbing!important;user-select:none!important}  /* 2.331.0 
 .lchead .lc:has(>.lcmb){padding-right:1.125rem}  /* the arrow has its own room: a click on the title never hits it */
 .lchead .lcmb{position:absolute;right:-.125rem;top:50%;transform:translateY(-50%);display:none;align-items:center;justify-content:center;width:1.25rem;height:1.25rem;padding:0;border:0;border-radius:var(--r-s);background:var(--bg);color:var(--muted);cursor:pointer}
 .lchead .lc:hover .lcmb,.lchead .lcmb:focus-visible{display:inline-flex}
+@media (hover:none){.lchead .lcmb{display:inline-flex}}  /* 2.655.0 (#5083): no hover on a finger: the arrow is always there */
 .lchead .lcmb:hover{color:var(--text);background:var(--bg4)}
 .colmd .coladd{margin:.5rem 0 0}
 .colmd .colr .colfe,.colmd .colr .colfd{flex:none}

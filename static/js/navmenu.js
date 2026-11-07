@@ -77,7 +77,7 @@ function nav_edHtml(id, o = {}) {
   const body = id === 'office' ? OFM_GROUPS.map(g => { const r = on.filter(x => x.group === g[0]); return r.length ? `${g[3] ? '' /* 2.489.0 (#2664): the address book, an entry of its own */ : `<h5 class="navgh">${esc(tr(g[2]))}</h5>`}${ul(r, g[0])}` : ''; }).join('') : ul(on);
   const tip = id === 'tabbar' ? tr('This device fits {0} tabs, the rest goes under “More”.', tabMax()) : tr('Hidden points stay where they are: the search still finds them, nothing is deleted.');
   const head = o.page ? '' : `<div class="navedh"><b>${esc(tr('Edit menu'))}</b><span class="muted">${esc(nav_title(id))}</span><span class="spacer"></span><button type="button" class="btn sm pri" data-act="nav-done">${esc(tr('Done'))}</button></div>`;
-  return `<div class="naved${isMobile() ? ' navtouch' : ''}" data-naved="${id}" role="group" aria-label="${esc(tr('Edit menu') + ': ' + nav_title(id))}">${head}${on.length ? body : `<p class="muted">${esc(tr('Nothing in the menu'))}</p>`}`
+  return `<div class="naved${isTouch() ? ' navtouch' : ''}" data-naved="${id}" role="group" aria-label="${esc(tr('Edit menu') + ': ' + nav_title(id))}">${head}${on.length ? body : `<p class="muted">${esc(tr('Nothing in the menu'))}</p>`}`
     + `<h5 class="navgh navhh">${esc(tr('Hidden'))}</h5>${off.length ? `<ul class="navl navoffl" role="list">${off.map(nav_hidRow).join('')}</ul>` : `<p class="muted navnone">${esc(tr('Nothing hidden'))}</p>`}`
     + `<p class="muted navhint" id="navhint-${id}">${esc(tip)}</p><button type="button" class="linkbtn" data-act="nav-reset">${esc(tr('Reset to defaults'))}</button></div>`;
 }
