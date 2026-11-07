@@ -42,6 +42,7 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
 
   // ================= (a) navigation exists once
   let w = await boot({user: 'alice', hash: 'today'}), d = w.document;
+  const routed = async k => { await until(() => w.eval('S.route.key') === k); await idle(w); };  // 2.624.0 (#3943): the route is there and its requests are done, instead of a fixed sleep
   // 2.8.0 (#434): no rail; the sidebar holds search / statistics / time / overview / settings once (desktop and drawer)
   check(!d.querySelector('#rail'), 'no rail any more');
   const navK = [...d.querySelectorAll('#side .srow')].map(x => x.dataset.go || x.dataset.act).concat([...d.querySelectorAll('#srail .srb')].map(x => x.dataset.sbb || x.dataset.act));  // 2.152.2 (#2622): + the bar of the areas
@@ -56,16 +57,16 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   check(!txt().includes('Hidden in archive'), 'Today: task of an archived list hidden');
   check(w.eval('counts().today') === 3, 'Today count without the archived task: ' + w.eval('counts().today'));
   check(!w.eval(`openTasks().some(t => t.list_id === ${OLD})`), 'openTasks leaves out the archived list (matrix, overview, filters, tags)');
-  w.eval(`go('matrix')`); await sleep(300);
+  w.eval(`go('matrix')`); await until(() => d.querySelector('.mxbar') && txt().includes('Alpha'));
   check(!txt().includes('Hidden in archive') && txt().includes('Alpha'), 'matrix: archived task hidden');
-  w.eval(`go('l/${OLD}')`); await sleep(400);
+  w.eval(`go('l/${OLD}')`); await until(() => txt().includes('Hidden in archive'));
   check(txt().includes('Hidden in archive'), 'the archived list itself still shows its tasks');
   w.eval(`go('cal')`); await idle(w);
   check(!w.eval(`[...calByDay('${T0}', '${addD(T0, 6)}').values()].flat().some(t => t.list_id === ${OLD})`), 'calendar: no tasks or ghosts of the archived list');
 
   // ================= (b) calendar ghosts follow the recurring tasks
   // the checks ask calByDay for three weeks themselves; the open calendar would ask for its own range in between
-  w.eval(`go('today')`); await sleep(300);
+  w.eval(`go('today')`); await routed('today');
   const ghosts = () => w.eval(`[...calByDay('${T0}', '${addD(T0, 20)}').values()].flat().filter(t => t.ghost).map(t => t.id + '@' + t.due)`);
   check(await until(() => ghosts().includes(`${a}@${addD(T0, 7)}`)), 'weekly task: ghost a week later: ' + ghosts());
   check(!ghosts().some(g => g.startsWith(b + '@')), 'no ghosts for a one-off task');
@@ -77,7 +78,7 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   check(w.eval('S.occ.key') !== keyBefore, 'cache key follows the recurring tasks');
   await w.eval(`patchTask(${b}, {repeat: ''})`);
   check(await until(() => !ghosts().some(g => g.startsWith(b + '@'))), 'repeat removed: ghosts gone at once');
-  await w.eval(`toggleTask(${a})`); await sleep(300);
+  await w.eval(`toggleTask(${a})`); await idle(w);
   check(await until(() => ghosts().includes(`${a}@${addD(T0, 14)}`) && !ghosts().includes(`${a}@${addD(T0, 7)}`)), 'completed occurrence: the series moves on (next ghost two weeks out)');
   // another device changes the repeat (sync = the state reload)
   await call('PATCH', `/api/tasks/${c}`, {repeat: 'FREQ=DAILY', due: T0});
@@ -87,7 +88,7 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   w.eval(`S.occ.want = 'x'; window.__n = S.occ.items.length`);
   check(w.eval('S.occ.items.length') === w.eval('window.__n') && w.eval('S.occ.items.length') > 0, 'items stay while a newer request loads');
   w.eval(`S.occ.want = ''`);
-  w.eval(`go('cal')`); await sleep(300);
+  w.eval(`go('cal')`); await routed('cal');
   for (const v of ['week', 'day', 'month']) {  // the open views show the ghosts too (c repeats daily now)
     w.eval(`S.calSel = '${T1}'; S.calMonth = '${T1}'.slice(0, 7); S.calMode = '${v}'; renderView()`);
     check(await until(() => !!d.querySelector(`#view .ghost[data-id="${c}"]`)), `${v} view shows the ghost of tomorrow`);
@@ -95,77 +96,77 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   w.eval(`S.calSel = '${T0}'; S.calMode = 'month'`);
 
   // ================= (c) "Show completed" per view
-  w.eval(`go('today')`); await sleep(400);
+  w.eval(`go('today')`); await until(() => [...d.querySelectorAll('#view .ghead')].some(g => /Completed/.test(g.textContent)));
   const doneGroup = () => [...d.querySelectorAll('#view .ghead')].some(g => /Completed/.test(g.textContent));
   check(doneGroup(), 'Today: Completed group (shown by default)');
-  click(w, d.querySelector('#top [data-act="top-more"]')); await sleep(80);
+  click(w, d.querySelector('#top [data-act="top-more"]')); await until(() => menuLabels(d).includes('Hide completed'));
   check(menuLabels(d).includes('Hide completed'), 'header "…": Hide completed: ' + menuLabels(d));
-  click(w, [...d.querySelectorAll('#pop .menu-list button')].find(x => x.textContent.trim() === 'Hide completed')); await sleep(300);
+  click(w, [...d.querySelectorAll('#pop .menu-list button')].find(x => x.textContent.trim() === 'Hide completed')); await until(() => !doneGroup());
   check(!doneGroup(), 'Today: group gone');
   check(await until(async () => JSON.parse((await st()).settings.show_done_views).today === 0), 'stored per view on the server');
   check(!('show_completed' in (await st()).settings), '1.8.1: no global setting any more');
   check(w.eval('HIST.undo[HIST.undo.length - 1].label') === 'Hide completed: Today', 'history step: ' + w.eval('HIST.undo[HIST.undo.length - 1]?.label'));
-  w.eval(`go('l/${WORK}')`); await sleep(400);
+  w.eval(`go('l/${WORK}')`); await until(() => w.eval('S.route.key') === `l:${WORK}` && doneGroup());
   check(doneGroup(), 'the list keeps its own (default) choice');
-  w.eval(`go('today')`); await sleep(300);
-  await w.eval(`histStep('undo')`); await sleep(200);
+  w.eval(`go('today')`); await routed('today'); await until(() => !doneGroup());
+  await w.eval(`histStep('undo')`); await until(async () => doneGroup() && !('today' in JSON.parse((await st()).settings.show_done_views)));
   check(doneGroup() && !('today' in JSON.parse((await st()).settings.show_done_views)), 'undo: back to the default');
-  await w.eval(`histStep('redo')`); await sleep(200);
+  await w.eval(`histStep('redo')`); await until(() => !doneGroup()); await idle(w);
   check(!doneGroup(), 'redo');
   // sort menu + palette act on the current view
-  w.eval(`sortMenu(document.querySelector('#top h1'))`); await sleep(80);
+  w.eval(`sortMenu(document.querySelector('#top h1'))`); await until(() => menuLabels(d).includes('Show completed'));
   check(menuLabels(d).includes('Show completed'), 'sort menu: the current view: ' + menuLabels(d));
   w.eval('closePop()');
-  w.eval('openPalette()'); await sleep(100);
+  w.eval('openPalette()'); await until(() => w.eval(`palAll().some(x => x.id === 'a:showdone' && x.label === 'Show completed: Today')`));
   check(w.eval(`palAll().some(x => x.id === 'a:showdone' && x.label === 'Show completed: Today')`), 'palette: names the view');
   w.eval('closePalette()');
   // filters and smart lists have their completed tasks too
   const FID = (await call('POST', '/api/filters', {name: 'Mine', rules: {lists: [WORK]}})).id;
   await w.eval('load()');
   for (const k of ['week', 'all', `f/${FID}`]) {
-    w.eval(`go('${k}')`); await sleep(300);
-    click(w, d.querySelector('#top [data-act="top-more"]')); await sleep(60);
+    w.eval(`go('${k}')`); await routed(k.replace('/', ':')); await until(doneGroup);
+    click(w, d.querySelector('#top [data-act="top-more"]')); await until(() => menuLabels(d).includes('Hide completed'));
     check(menuLabels(d).includes('Hide completed') && doneGroup(), `${k}: Completed group + toggle`);
     w.eval('closePop()');
   }
   // 1.8.1: no global default any more: an old show_completed value is ignored, a view without its own choice shows
   w.eval(`S.settings.show_completed = '0'; render()`);
-  w.eval(`go('l/${WORK}')`); await sleep(300);
+  w.eval(`go('l/${WORK}')`); await routed(`l:${WORK}`); await until(doneGroup);
   check(doneGroup() && w.eval(`showDone('inbox')`), 'a view without its own choice shows (old global value ignored)');
-  await w.eval(`setShowDone(false)`); await sleep(200);
+  await w.eval(`setShowDone(false)`); await until(() => !doneGroup()); await idle(w);
   check(!doneGroup() && !w.eval(`showDone('l:${WORK}')`) && w.eval(`showDone('inbox')`), 'own choice only for this view');
-  await w.eval(`setShowDone(true)`); await sleep(200);
-  w.eval(`settingsModal('general')`); await sleep(200);
+  await w.eval(`setShowDone(true)`); await until(doneGroup); await idle(w);
+  w.eval(`settingsModal('general')`); await until(() => d.querySelector('.smodal')); await idle(w);
   check(!d.querySelector('.smodal #s-showdone') && !/Show in lists/.test(d.querySelector('.smodal').textContent), 'Settings: the global switch is gone');
   d.querySelector('.smodal').remove();
   // the calendar: own entry "cal" in show_done_views, toggle in its bar, default shown
-  const z = await mk('Done in the calendar', WORK, {due: T0}); await w.eval('load()'); await w.eval(`toggleTask(${z})`); await sleep(300);
+  const z = await mk('Done in the calendar', WORK, {due: T0}); await w.eval('load()'); await w.eval(`toggleTask(${z})`); await until(() => w.eval(`taskById(${z})?.status`)); await idle(w);
   const calDone = () => w.eval(`[...calByDay('${T0}', '${T0}').values()].flat().some(t => t.id === ${z} && t.status)`);
-  w.eval(`go('cal')`); await sleep(300); w.eval(`S.calSel = '${T0}'; S.calMonth = '${T0}'.slice(0, 7); S.calMode = 'month'; renderView()`);
+  w.eval(`go('cal')`); await routed('cal'); w.eval(`S.calSel = '${T0}'; S.calMonth = '${T0}'.slice(0, 7); S.calMode = 'month'; renderView()`);
   const chip = () => d.querySelector('#view .calbar [data-act="cal-done"]');
   check(calDone() && chip() && chip().getAttribute('aria-pressed') === 'true', 'calendar: completed shown by default, toggle pressed');
-  click(w, chip()); await sleep(300);
+  click(w, chip()); await until(() => !calDone() && chip()?.getAttribute('aria-pressed') === 'false');
   check(!calDone() && chip().getAttribute('aria-pressed') === 'false', 'calendar toggle hides completed tasks');
   check(await until(async () => JSON.parse((await st()).settings.show_done_views).cal === 0), 'stored as the calendar\'s own entry');
   check(w.eval(`showDone('l:${WORK}')`), 'lists keep their own choice');
   check(w.eval('HIST.undo[HIST.undo.length - 1].label') === 'Hide completed: Calendar', 'history step names the calendar: ' + w.eval('HIST.undo[HIST.undo.length - 1]?.label'));
-  w.eval('openPalette()'); await sleep(100);
+  w.eval('openPalette()'); await until(() => w.eval(`palAll().some(x => x.id === 'a:showdone' && x.label === 'Show completed: Calendar')`));
   check(w.eval(`palAll().some(x => x.id === 'a:showdone' && x.label === 'Show completed: Calendar')`), 'palette: calendar toggle');
   w.eval('closePalette()');
   for (const v of ['week', 'day']) { w.eval(`S.calMode = '${v}'; renderView()`); check(!!chip(), `${v} view has the toggle`); }
-  await w.eval(`histStep('undo')`); await sleep(200);
+  await w.eval(`histStep('undo')`); await until(async () => calDone() && !('cal' in JSON.parse((await st()).settings.show_done_views)));
   check(calDone() && !('cal' in JSON.parse((await st()).settings.show_done_views)), 'undo: calendar back to the default (shown)');
   if (w.eval(`feat('timeline')`)) { w.eval(`S.calMode = 'timeline'; renderView()`); check(!chip(), 'timeline mode: no toggle'); }
   w.eval(`S.calSel = '${T0}'; S.calMode = 'month'`);
   // a checklist has no toggle
   const CKL = (await call('POST', '/api/lists', {name: 'Shop', kind: 'checklist'})).id;
-  await w.eval('load()'); w.eval(`go('l/${CKL}')`); await sleep(300);
+  await w.eval('load()'); w.eval(`go('l/${CKL}')`); await routed(`l:${CKL}`);
   check(!w.eval('doneToggleView()'), 'checklists keep their Done section, no toggle');
 
   // ================= (d) one tap Today / Tomorrow
-  w.eval(`go('l/${WORK}')`); await sleep(300);
+  w.eval(`go('l/${WORK}')`); await routed(`l:${WORK}`);
   await call('PATCH', `/api/tasks/${a}`, {due: T0, due_time: '14:30'}); await w.eval('load()'); w.eval('render()');  // 2.199.0 M (#2768): starts today, Tomorrow on a later date now adds a day
-  w.eval(`taskMenu(document.querySelector('#view .trow[data-id="${a}"]'), ${a})`); await sleep(80);
+  w.eval(`taskMenu(document.querySelector('#view .trow[data-id="${a}"]'), ${a})`); await until(() => d.querySelector('#pop .menu-list > .mgrp:first-child > .mgh + .mquick button'));
   // 2.31.0 (#1056): the menu is grouped; the first group "Plan" starts with the two buttons (right under its small heading)
   const g0 = d.querySelector('#pop .menu-list').firstElementChild;
   const q = [...d.querySelectorAll('#pop .menu-list > .mgrp:first-child > .mgh + .mquick button')];
@@ -180,26 +181,26 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   check(await until(async () => (await task(a)).due === T0), 'undo puts the old day back');
   // detail panel
   await call('PATCH', `/api/tasks/${a}`, {due: T1}); await w.eval('load()');  // 2.218.0 (#2799): due today shows no Today button, so start tomorrow
-  w.eval(`openDetail(${a})`); await sleep(300);
+  w.eval(`openDetail(${a})`); await until(() => d.querySelectorAll('#detail .dtop [data-act="due-q"]').length === 3); await idle(w);
   const dq = [...d.querySelectorAll('#detail .dtop [data-act="due-q"]')];
   check(dq.length === 3 && /^Due: Today/.test(dq[0].title), 'detail panel: Today, Tomorrow and -1 day next to the date');  // 2.354.0 C (#3326): due tomorrow also shows "-1 day"
   click(w, dq[0]);
   check(await until(async () => (await task(a)).due === T0), 'detail: Today');
   check(await until(() => !d.querySelector('#detail [data-act="due-q"][data-d="0"]') && d.querySelector('#detail [data-act="due-q"][data-d="1"]')), 'detail: Today is the date, only Tomorrow left');  // 2.218.0 (#2799): was "Today marked"
-  w.eval('closeDetail()'); await sleep(100);
+  w.eval('closeDetail()'); await until(() => d.querySelector('#detail').classList.contains('hidden')); await idle(w);
   // keyboard: t / Shift+T on the focused row
   w.eval(`kfocus(${b})`);
   key(w, d.body, 'T', {shiftKey: true});
   check(await until(async () => (await task(b)).due === T1), 'Shift+T: tomorrow');
   key(w, d.body, 't');
   check(await until(async () => (await task(b)).due === T0), 't: today');
-  w.eval('shortcutsModal()'); await sleep(100);
+  w.eval('shortcutsModal()'); await until(() => d.querySelector('.modal'));
   check(/Due today/.test(d.querySelector('.modal').textContent) && /Due tomorrow/.test(d.querySelector('.modal').textContent), 'shortcut help lists t / Shift+T');
   d.querySelector('.modal').remove();
   // selection bar
   // 2.26.0 (#936): the date of a selection is set in the multi panel (the bar keeps Complete / Delete)
-  w.eval(`S.multi.add(${a}); S.multi.add(${b}); render()`); await sleep(100);
-  click(w, d.querySelector('#detail.multi [data-act="me-f"][data-f="date"]')); await sleep(100);
+  w.eval(`S.multi.add(${a}); S.multi.add(${b}); render()`); await until(() => d.querySelector('#detail.multi [data-act="me-f"][data-f="date"]'));
+  click(w, d.querySelector('#detail.multi [data-act="me-f"][data-f="date"]')); await until(() => [...d.querySelectorAll('#pop .menu-list button')].some(x => x.textContent.trim() === 'Tomorrow'));
   const tmw = [...d.querySelectorAll('#pop .menu-list button')].find(x => x.textContent.trim() === 'Tomorrow');
   check(!!tmw && !!d.querySelector('#detail.multi [data-act="me-shift"]'), 'selection: Today / Tomorrow / shift in the multi panel');
   click(w, tmw);
@@ -212,9 +213,9 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   // ================= (f) first weekday: timeline, roadmap, statistics
   const ws = w.eval('weekStart()');
   w.eval(`S.tlStart = null; go('l/${WORK}')`);
-  await call('PATCH', `/api/lists/${WORK}`, {view: 'timeline'}); await w.eval('load()'); w.eval('render()'); await sleep(300);
+  await call('PATCH', `/api/lists/${WORK}`, {view: 'timeline'}); await w.eval('load()'); w.eval('render()'); await until(() => w.eval('S.tlStart'));
   check(w.eval('pd(S.tlStart).getDay()') === ws, `timeline starts on the first weekday (${ws})`);
-  w.eval(`go('all')`); await sleep(200);
+  w.eval(`go('all')`); await routed('all');
   w.eval(`S.rmStart = null; viewRoadmap()`);
   check(w.eval('pd(S.rmStart).getDay()') === ws, 'roadmap starts on the first weekday');
   const seen = [];
@@ -226,8 +227,8 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   await call('PATCH', `/api/lists/${WORK}`, {view: 'list'}); await w.eval('load()');
 
   // ================= (g) the list dialog saves itself
-  w.eval(`go('l/${WORK}')`); await sleep(200);
-  w.eval(`listModal(${WORK})`); await sleep(200);
+  w.eval(`go('l/${WORK}')`); await routed(`l:${WORK}`);
+  w.eval(`listModal(${WORK})`); await until(() => d.querySelector('.modal.lmodal')); await idle(w);
   const md = () => d.querySelector('.modal.lmodal');
   check(md() && !md().querySelector('[data-m="save"]') && !/Cancel/.test(md().querySelector('.foot')?.textContent || ''), 'no Save / Cancel');  // 2.352.0 C (#2751): an open project has no footer (actions moved into the "Actions" section)
   check(!!md().querySelector('.lhdr [data-m="close"]'), 'close button in the header');
@@ -243,18 +244,18 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   nm.value = 'Work stuff'; nm.dispatchEvent(new w.Event('input', {bubbles: true}));
   nm.dispatchEvent(new w.FocusEvent('focusout', {bubbles: true}));
   check(await until(async () => (await st()).lists.find(l => l.id === WORK).name === 'Work stuff'), 'name saves on leaving the field');
-  nm.value = '  '; nm.dispatchEvent(new w.FocusEvent('focusout', {bubbles: true})); await sleep(400);
+  nm.value = '  '; nm.dispatchEvent(new w.FocusEvent('focusout', {bubbles: true})); await sleep(400);  // 2.624.0 (#3943): kept: a window in which NO save of the empty name may happen
   check((await st()).lists.find(l => l.id === WORK).name === 'Work stuff' && nm.value === 'Work stuff', 'an empty name is not saved, the field gets the name back');
   const fo = md().querySelector('#l-folder');
   fo.value = 'Jobs'; fo.dispatchEvent(new w.Event('input', {bubbles: true}));
   click(w, md().querySelector('[data-m="close"]'));
   check(await until(async () => (await st()).lists.find(l => l.id === WORK).folder === 'Jobs'), 'typed text is saved when the dialog closes');
   const vw = () => { w.eval(`listModal(${WORK})`); return d.querySelector('.modal.lmodal'); };
-  const m2 = vw(); await sleep(100);
+  const m2 = vw(); await until(() => d.querySelector('.modal.lmodal #l-view')); await idle(w);
   m2.querySelector('#l-view').value = 'kanban'; m2.querySelector('#l-view').dispatchEvent(new w.Event('change', {bubbles: true}));
   check(await until(async () => (await st()).lists.find(l => l.id === WORK).view === 'kanban'), 'select saves at once');
   m2.remove();
-  w.eval(`listModal()`); await sleep(100);
+  w.eval(`listModal()`); await until(() => [...d.querySelectorAll('.modal')].pop()?.querySelector('[data-m="save"]')); await idle(w);
   const nw = [...d.querySelectorAll('.modal')].pop();
   check(!nw.classList.contains('lmodal') && nw.querySelector('[data-m="save"]')?.textContent === 'Create', 'a new list keeps Create');
   nw.querySelector('#l-name').value = 'Fresh'; click(w, nw.querySelector('[data-m="save"]'));
@@ -268,17 +269,17 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   // ================= (h) time page: the running timer as a card
   const PRJ = (await call('POST', '/api/lists', {name: 'Client X', kind: 'project', color: '#f59e0b', time_tracking: true})).id; // 2.41.0 (#1471): time tracking is a switch of the list
   const tt = await mk('Write offer', PRJ);
-  await w.eval('load()'); w.eval(`go('time')`); await sleep(400);
+  await w.eval('load()'); w.eval(`go('time')`); await routed('time'); await until(() => d.querySelector('#view .tvrun'));
   check(!!d.querySelector('.tvrun.idle') && /No timer running/.test(d.querySelector('.tvrun').textContent), 'nothing running: short hint');
-  await w.eval(`timerStart({task_id: ${tt}})`); await sleep(300);
+  await w.eval(`timerStart({task_id: ${tt}})`); await until(() => d.querySelector('#view .tvrun:not(.idle)'));
   const card = () => d.querySelector('#view .tvrun:not(.idle)');
   // 2.44.0 (#1187): the area tabs (Time: time tracking / focus timer) may stand above the page; the card is the first thing below them
   const top = [...d.querySelector('#view').children].find(x => !x.classList.contains('mgtabs'));
   check(!!card() && top && top.firstElementChild === card(), 'running: card on top of the page');
   check(/Write offer/.test(card().querySelector('.tvr-task').textContent) && /Client X/.test(card().querySelector('.tvr-list').textContent) && /since \d{1,2}:\d\d/.test(card().textContent), 'card: task, project, start time');  // 2.368.0 (#2982): the time as the app shows times (12 h in an en-US browser)
-  w.eval(`S.timer.start = new Date(Date.now() - 3723e3).toISOString()`); await sleep(1300);
+  w.eval(`S.timer.start = new Date(Date.now() - 3723e3).toISOString()`); await until(() => /1:02:0\d/.test(card()?.querySelector('[data-timer-live]')?.textContent || ''));
   check(/1:02:0\d/.test(card().querySelector('[data-timer-live]').textContent), 'card: live time ticks: ' + card().querySelector('[data-timer-live]').textContent);
-  click(w, card().querySelector('.tvr-task')); await sleep(300);
+  click(w, card().querySelector('.tvr-task')); await until(() => w.eval('S.sel') === tt); await idle(w);
   check(w.eval('S.sel') === tt, 'task title opens the task');
   w.eval('closeDetail()');
   click(w, card().querySelector('[data-act="tv-stop"]'));
@@ -291,7 +292,7 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   check(/* 2.364.0 (#3040): the phone layout ends at 767 px */ /@media \(max-width:767px\)\{\s*\.tvrun\{grid-template-columns:minmax\(0,1fr\)/.test(css2), 'phone: the card stacks');
 
   // ================= (j) archived lists: one plain row "Archived" like Trash (1.6.1), a main view lists them
-  w.eval(`go('today')`); await sleep(300);
+  w.eval(`go('today')`); await routed('today');
   const sarch = () => d.querySelector('#side .sarch');
   const archRow = () => d.querySelector(`#side .srow[data-list="${OLD}"]`);
   const trashRow = d.querySelector('#side .srow[data-go="trash"]');
@@ -302,7 +303,7 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   check(sarch().parentElement === trashRow.parentElement && sarch().previousElementSibling === trashRow, 'right below Trash in the group More');  // 2.45.0 (#1502): the footer rows are the group "More"
   check(!archRow(), 'the archived list itself is never in the sidebar');
   check(!w.eval(`S.collapsed.has('side:arch-open')`) && !w.eval(`/side:arch-open|side-arch/.test(renderSide.toString())`), 'no fold state any more');
-  click(w, sarch()); await sleep(400);
+  click(w, sarch()); await routed('archived'); await until(() => d.querySelector('#top h1').textContent.startsWith('Archived'));
   check(w.eval('S.route.key') === 'archived' && w.location.hash === '#archived', 'opens the "Archived" view (own hash)');
   check(sarch().classList.contains('on') && d.querySelector('#top h1').textContent.startsWith('Archived'), 'row lit, title "Archived"');
   check(!d.querySelector('#view #qinput') && w.eval('noFab()'), 'no quick add on the view');
@@ -312,11 +313,11 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   check(!!arow().querySelector('.aname .sw, .aname .aemo') &&  // 2.36.2 (#1135): line icon / dot instead of the swatch
     !!arow().querySelector(`[data-go="l/${OLD}"]`) && !!arow().querySelector('[data-act="arch-restore"]') && !!arow().querySelector('[data-act="arch-del"]'), 'colour, Open, Restore, Delete permanently');
   check(!!(await st()).lists.find(l => l.id === OLD).archived_at, 'server keeps when it was archived');
-  click(w, arow().querySelector('.aacts [data-go]')); await sleep(400);
+  click(w, arow().querySelector('.aacts [data-go]')); await until(() => w.eval('S.route.key') === `l:${OLD}` && txt().includes('Hidden in archive')); await idle(w);
   check(w.eval('S.route.key') === `l:${OLD}` && txt().includes('Hidden in archive'), 'Open shows the list as before');
   check(!archRow() && sarch().classList.contains('on'), 'an open archived list lights the "Archived" row, not a row of its own');
   // Restore (undoable) from the view
-  w.eval(`go('archived')`); await sleep(300);
+  w.eval(`go('archived')`); await until(() => arow()?.querySelector('[data-act="arch-restore"]')); await idle(w);
   click(w, arow().querySelector('[data-act="arch-restore"]'));
   check(await until(async () => !(await st()).lists.find(l => l.id === OLD).archived), 'Restore brings the list back');
   // 2.152.2 (#2624): project instead of list
@@ -324,7 +325,7 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   check(!(await st()).lists.find(l => l.id === OLD).archived_at, 'archived date cleared on restore');
   check(await until(() => !!d.querySelector(`#side .srow[data-list="${OLD}"]`)), 'back among the lists');
   check(/^Restored .*Old.* from the archive$/.test(w.eval('HIST.undo[HIST.undo.length - 1]?.label') || ''), 'history step for the restore: ' + w.eval('HIST.undo[HIST.undo.length - 1]?.label'));
-  await w.eval(`histStep('undo')`); await w.eval('load()'); w.eval('render()'); await sleep(200);
+  await w.eval(`histStep('undo')`); await w.eval('load()'); w.eval('render()'); await until(async () => (await st()).lists.find(l => l.id === OLD).archived && !!arow() && !!sarch());
   check((await st()).lists.find(l => l.id === OLD).archived && !!arow() && !!sarch(), 'undo archives it again');
   // 2.283.0 (#3119): restore / archive show at once while the reload behind them still runs: the history step (and the
   // toast's undo) are there at once, an undo right away waits for the write and takes it back
@@ -347,17 +348,17 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   check(await until(async () => !(await st()).lists.find(l => l.id === OLD).archived), 'slow reload: the undo right away restores it');
   w.eval('load = window.__L0');
   await call('PATCH', `/api/lists/${OLD}`, {archived: 1}); await w.eval('load()'); w.eval('render()');
-  w.eval(`go('archived')`); await sleep(300);
+  w.eval(`go('archived')`); await until(() => !!arow() && !!sarch()); await idle(w);
   check(!!arow() && !!sarch(), 'archived again for the next checks');
   // Delete permanently: only for an archived list of the owner, the app's own dialog
   const GONE = (await call('POST', '/api/lists', {name: 'Gone'})).id;
   await mk('Gone task', GONE);
   await call('PATCH', `/api/lists/${GONE}`, {archived: 1});
-  await w.eval('load()'); w.eval('render()'); await sleep(200);
+  await w.eval('load()'); w.eval('render()'); await until(() => sarch()?.querySelector('.c').textContent === '2');
   check(sarch().querySelector('.c').textContent === '2', 'count follows');
   let asked = '';
   w.confirm = m => { asked = m; return false; };
-  click(w, d.querySelector(`#view .arow[data-list="${GONE}"] [data-act="arch-del"]`)); await sleep(300);
+  click(w, d.querySelector(`#view .arow[data-list="${GONE}"] [data-act="arch-del"]`)); await until(() => asked); await idle(w);
   check(/Delete “Gone”\?/.test(asked) && (await st()).lists.some(l => l.id === GONE), 'asks with the own dialog; Cancel keeps it');  // 2.102.0 (#1988): into the trash
   w.confirm = () => true;
   click(w, d.querySelector(`#view .arow[data-list="${GONE}"] [data-act="arch-del"]`));
@@ -380,19 +381,19 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   const ps = dp.querySelector('#side .sarch');
   check(!!ps && ps.classList.contains('on') && !ps.querySelector('.fcar') && !dp.querySelector(`#side .srow[data-list="${OLD}"]`), 'phone drawer: plain row, lit for the open archived list');
   check(!wp.eval(`S.collapsed.has('side:arch-open')`) && wp.eval(`S.collapsed.has('fold:x')`), 'old "side:arch-open" state ignored, others kept');
-  click(wp, ps); await sleep(400);
+  click(wp, ps); await until(() => wp.eval('S.route.key') === 'archived' && !!dp.querySelector(`#view .arow[data-list="${OLD}"]`));
   check(wp.eval('S.route.key') === 'archived' && !!dp.querySelector(`#view .arow[data-list="${OLD}"]`), 'phone: opens the view');
   wp.close();
-  w.eval(`go('l/${OLD}')`); await sleep(300);
+  w.eval(`go('l/${OLD}')`); await routed(`l:${OLD}`);
 
   // ================= (l) folder view
   const SIDE = (await call('POST', '/api/lists', {name: 'Side gig', folder: 'Jobs', color: '#f472b6'})).id;
   await mk('Invoice side gig', SIDE);
   await mk('Loose inbox thing', null);
-  await w.eval('load()'); w.eval(`go('today')`); await sleep(300);
+  await w.eval('load()'); w.eval(`go('today')`); await routed('today'); await until(() => d.querySelector('#side .fhead[data-folder="Jobs"] .sbbtn'));
   const fh = () => d.querySelector('#side .fhead[data-folder="Jobs"]');
   check(!!fh().querySelector('.sbbtn[data-go="folder/Jobs"]'), 'folder name links to the folder view');  // 2.352.0 (#2748): the name is the tree's button (.sbbtn)
-  click(w, fh().querySelector('.sbbtn')); await sleep(400);
+  click(w, fh().querySelector('.sbbtn')); await routed('folder:Jobs'); await until(() => txt().includes('Invoice side gig'));
   check(w.eval('S.route.key') === 'folder:Jobs' && w.location.hash === '#folder/Jobs', 'opens the folder view (own hash)');
   check(fh().classList.contains('on'), 'folder row marked as the current view');
   const heads = [...d.querySelectorAll('#view .ghead')].map(x => x.textContent);
@@ -402,7 +403,7 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   check(w.eval('quickDefaults().list_id') === w.eval(`folderLists('Jobs')[0].id`), 'quick add goes to the first list of the folder');
   check(w.eval('doneToggleView()'), 'has its own "Show completed"');
   const wasClosed = fh().classList.contains('closed');
-  click(w, fh().querySelector('.fcar')); await sleep(200);
+  click(w, fh().querySelector('.fcar')); await until(() => fh().classList.contains('closed') !== wasClosed);
   check(fh().classList.contains('closed') !== wasClosed && w.eval('S.route.key') === 'folder:Jobs', 'the chevron still folds, the view stays');
   check(w.eval(`tabItem('folder:Jobs').go`) === 'folder/Jobs', 'can be pinned as a tab');
 
@@ -444,7 +445,7 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   w.__dialogs = undefined;
 
   // ================= 1.5.3 (m) Filters: no placeholder line, the text is the tooltip
-  w.eval(`go('today')`); await sleep(200);
+  w.eval(`go('today')`); await routed('today');
   const fhd = [...d.querySelectorAll('#side .shead')].find(x => /Filters/.test(x.textContent));
   // 2.152.2 (#2624): project instead of list
   check(fhd && /Combine projects, dates, priorities, tags/.test(fhd.title) && /Combine projects/.test(fhd.querySelector('[data-act="filter-new"]').title) && fhd.querySelector('[data-act="filter-new"]').getAttribute('aria-label') === 'New filter', 'Filters heading + "+" carry the text as tooltip');
@@ -453,7 +454,7 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
 
   // ================= (n) tooltips, keyboard hints, show-once hints (desktop jsdom = mouse)
   check(/\(G T\)/.test(d.querySelector('#side .srow[data-go="today"]').title), 'sidebar Today: shortcut in the tooltip: ' + d.querySelector('#side .srow[data-go="today"]').title);
-  w.eval(`openDetail(${a})`); await sleep(300);
+  w.eval(`openDetail(${a})`); await until(() => d.querySelector('#detail .dchip')); await idle(w);
   check(/\(D\)/.test(d.querySelector('#detail .dchip').title) && /\(X\)/.test(d.querySelector('#detail .dtop .chk').title) && /Shift\+T/.test(d.querySelector('#detail [data-act="due-q"][data-d="1"]').title), 'task panel: date (D), complete (X), tomorrow (Shift+T)');
   check(!d.querySelector('#detail .atthint') && /drop files here/.test(d.querySelector('#detail .attadd')?.title || ''), 'attachments: the drop hint is the tooltip');
   w.eval('closeDetail()');
@@ -462,51 +463,51 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   check(/data-hint="x"/.test(w.eval(`hintOnce('x', 'y')`)), 'touch: the hint shows once');
   w.eval(`hintDone('x')`);
   check(w.eval(`hintOnce('x', 'y')`) === '', 'dismissed: gone for good on this device');
-  w.eval(`settingsModal('look')`); await sleep(200);
-  click(w, d.querySelector('.smodal [data-m="hints-reset"]')); await sleep(100);
+  w.eval(`settingsModal('look')`); await until(() => d.querySelector('.smodal [data-m="hints-reset"]')); await idle(w);
+  click(w, d.querySelector('.smodal [data-m="hints-reset"]')); await until(() => /data-hint="x"/.test(w.eval(`hintOnce('x', 'y')`)));
   check(/data-hint="x"/.test(w.eval(`hintOnce('x', 'y')`)), 'Settings > Appearance: "Show tips again" brings them back');
   d.querySelector('.smodal').remove();
   w.matchMedia = mm0;
 
   // ================= (o) matrix scope
-  w.eval(`LS.del('mx'); go('matrix')`); await sleep(300);
+  w.eval(`LS.del('mx'); go('matrix')`); await until(() => d.querySelector('.mxbar [data-act="mx-scope"]'));
   // 2.152.2 (#2624): project instead of list
   check(!!d.querySelector('.mxbar [data-act="mx-scope"]') && /All projects/.test(d.querySelector('.mxbar').textContent), 'matrix: scope button "All lists"');
   check(w.eval(`mxTasks().some(t => t.list_id === ${CKL}) || mxTasks().some(t => t.title === 'Alpha')`), 'all lists by default');
-  w.eval(`mxSet({scope: 'folder:Jobs'})`); await sleep(200);
+  w.eval(`mxSet({scope: 'folder:Jobs'})`); await until(() => /Matrix · Folder Jobs/.test(d.querySelector('#top h1').textContent));
   check(w.eval(`mxTasks().every(t => folderLists('Jobs').some(l => l.id === t.list_id))`) && /Matrix · Folder Jobs/.test(d.querySelector('#top h1').textContent), 'folder scope + title: ' + d.querySelector('#top h1').textContent);
   check(w.eval('mxList()') === w.eval(`folderLists('Jobs')[0].id`), 'quick add in the scoped matrix goes to the folder\'s first list');
-  w.eval(`mxSet({scope: 'f:${FID}', due: 'today'})`); await sleep(200);
+  w.eval(`mxSet({scope: 'f:${FID}', due: 'today'})`); await until(() => w.eval('mxGet().scope') === `f:${FID}` && d.querySelector('.mxbar [data-act="mx-reset"]'));
   check(w.eval(`mxTasks().every(t => t.list_id === ${WORK} && t.due && t.due <= today())`), 'filter scope (same engine) + due by today');
   check(!!d.querySelector('.mxbar [data-act="mx-reset"]'), 'reset × shown');
-  click(w, d.querySelector('.mxbar [data-act="mx-reset"]')); await sleep(100);
+  click(w, d.querySelector('.mxbar [data-act="mx-reset"]')); await until(() => !w.eval(`mxActive(mxGet())`) && d.querySelector('#top h1').textContent.startsWith('Matrix'));
   check(!w.eval(`mxActive(mxGet())`) && d.querySelector('#top h1').textContent.startsWith('Matrix'), 'reset: everything again');
-  w.eval(`go('l/${SIDE}')`); await sleep(300);
-  click(w, d.querySelector('#top [data-act="top-more"]')); await sleep(80);
+  w.eval(`go('l/${SIDE}')`); await until(() => w.eval('S.route.key') === `l:${SIDE}` && w.eval('S.route.mod') === 'tasks'); await idle(w);
+  click(w, d.querySelector('#top [data-act="top-more"]')); await until(() => [...d.querySelectorAll('#pop .menu-list button')].some(x => /Show as matrix/.test(x.textContent)));
   const smx = [...d.querySelectorAll('#pop .menu-list button')].find(x => /Show as matrix/.test(x.textContent));
   check(!!smx, 'list "…": Show as matrix');
-  click(w, smx); await sleep(300);
+  click(w, smx); await until(() => w.eval('S.route.mod') === 'matrix' && w.eval('mxGet().scope') === 'l:' + SIDE);
   check(w.eval('S.route.mod') === 'matrix' && w.eval('mxGet().scope') === 'l:' + SIDE, 'opens the matrix with that list');
   w.eval(`LS.del('mx')`);
 
   // ================= (p) the docked composer
-  w.eval(`go('l/${SIDE}')`); await sleep(300);
+  w.eval(`go('l/${SIDE}')`); await until(() => w.eval('S.route.mod') === 'tasks' && d.querySelector('#view .lwrap > .qdock .qadd.dock')); await idle(w);
   const dock = d.querySelector('#view .lwrap > .qdock .qadd.dock');
   check(!!dock && dock.querySelector('#qinput')?.placeholder === 'Add task…' && /Dentist/.test(dock.querySelector('#qinput').title) && !!dock.querySelector('.qplus') && !!dock.querySelector('.qkey kbd'), 'composer at the bottom: +, short placeholder, example as tooltip, key badge');
   check(!d.querySelector('#view .qadd.inline'), 'no old input on top');
   const qi = d.querySelector('#qinput'); qi.focus(); qi.value = 'Draft email tomorrow !high'; qi.dispatchEvent(new w.Event('input', {bubbles: true})); w.eval(`updateChips(document.querySelector('#qinput'))`);
   const qc = () => [...d.querySelectorAll('#qdchips .qdc')].map(x => x.textContent.trim());
   check(qc().length === 3 && qc()[0] === 'Tomorrow' && /Side gig/.test(qc()[1]) && qc()[2] === 'High', 'chips: date, list, priority from the text + view: ' + qc().join(' | '));
-  click(w, d.querySelector('#qdchips [data-act="qd-prio"]')); await sleep(60);
-  click(w, [...d.querySelectorAll('#pop .menu-list button')].find(x => x.textContent.trim() === 'Low')); await sleep(60);
+  click(w, d.querySelector('#qdchips [data-act="qd-prio"]')); await until(() => [...d.querySelectorAll('#pop .menu-list button')].some(x => x.textContent.trim() === 'Low'));
+  click(w, [...d.querySelectorAll('#pop .menu-list button')].find(x => x.textContent.trim() === 'Low')); await until(() => qc()[2] === 'Low');
   check(qc()[2] === 'Low', 'priority chip changes it');
   key(w, d.querySelector('#qinput'), 'Enter'); await idle(w);
   const nt = (await st()).tasks.find(t => t.title === 'Draft email');
   check(nt && nt.priority === 1 && nt.due === T1 && nt.list_id === SIDE, 'Enter adds with the chips (a chip picked after the text wins)');
   check(d.activeElement === d.querySelector('#qinput') && d.querySelector('#qinput').value === '', 'focus stays for the next task');
   // 2.380.2 (#3403): the chips stay for the next task, but a word in the text wins over a chip picked before
-  click(w, d.querySelector('#qdchips [data-act="qd-prio"]')); await sleep(60);
-  click(w, [...d.querySelectorAll('#pop .menu-list button')].find(x => x.textContent.trim() === 'Medium')); await sleep(60);
+  click(w, d.querySelector('#qdchips [data-act="qd-prio"]')); await until(() => [...d.querySelectorAll('#pop .menu-list button')].some(x => x.textContent.trim() === 'Medium'));
+  click(w, [...d.querySelectorAll('#pop .menu-list button')].find(x => x.textContent.trim() === 'Medium')); await until(() => qc()[2] === 'Medium');
   w.eval(`S.qov.due = '${T0}'; qdockChips()`);
   check(qc()[2] === 'Medium' && qc()[0] === 'Today', '#3403: chips Medium + today picked: ' + qc().join(' | '));
   const qi2 = d.querySelector('#qinput'); qi2.value = 'Prio from text !!! tomorrow'; qi2.dispatchEvent(new w.Event('input', {bubbles: true})); w.eval(`updateChips(document.querySelector('#qinput'))`);
@@ -519,7 +520,7 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   check(qc()[2] === 'Medium', '#3403: no word in the text = the chip stays: ' + qc().join(' | '));
   key(w, d.querySelector('#qinput'), 'Enter');
   check(await until(async () => (await st()).tasks.some(t => t.title === 'Prio from chip' && t.priority === 3 && t.due === T0)), '#3403: added with the chips');
-  w.eval(`go('matrix')`); await sleep(200);
+  w.eval(`go('matrix')`); await until(() => d.querySelector('.mxbar'));
   check(!d.querySelector('.qdock'), 'not in the matrix');
 
   // ================= (q) undated tasks in the timeline, (r) bigger bars
@@ -538,10 +539,10 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   check(await until(async () => (await task(nd2)).due === T1 && !(await task(nd2)).start), 'a click = that day');
   await w.eval(`tlUndate(${nd2})`);
   check(await until(async () => !(await task(nd2)).due), '"Remove date" (bar menu) clears it');
-  w.eval(`tlBarMenu(document.querySelector('.tl-bar[data-id="${dt1}"]'))`); await sleep(60);
+  w.eval(`tlBarMenu(document.querySelector('.tl-bar[data-id="${dt1}"]'))`); await until(() => [...d.querySelectorAll('#pop .menu-list button')].some(x => /Remove date/.test(x.textContent)));
   check([...d.querySelectorAll('#pop .menu-list button')].some(x => /Remove date/.test(x.textContent)), 'bar menu offers "Remove date"');
   w.eval('closePop()');
-  click(w, d.querySelector('[data-act="tl-nd"]')); await sleep(200);
+  click(w, d.querySelector('[data-act="tl-nd"]')); await until(() => !d.querySelector('.tl-ndhead'));
   check(!d.querySelector('.tl-ndhead') && w.eval(`LS.get('tlnd')`)['l' + PJ] === false, 'header switch "No date" (remembered per device)');
   check(!w.eval(`tlNdOn(null)`), 'off by default outside project lists');
   const css3 = await require('./boot').allCss(); // 2.65.0 (#1824): + the module stylesheets
