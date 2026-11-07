@@ -87,7 +87,7 @@ class Imap(socketserver.StreamRequestHandler):
             with LOCK:
                 self.one(tag, cmd, args, text, caps, folder)
                 if cmd == "SELECT":
-                    name = mbox(text.split(" ", 2)[2] if len(parts) > 2 else "")
+                    name = mbox((text.split(" ", 2) + ["", ""])[2])
                     folder = name if name and os.path.isdir(os.path.join(D, name)) else None
                 if cmd == "LOGOUT":
                     return
@@ -99,7 +99,7 @@ class Imap(socketserver.StreamRequestHandler):
             ok = [a.strip('"') for a in args[:2]] == ["kalmido", "secret"]
             self.w(f"{tag} OK LOGIN done\r\n" if ok else f"{tag} NO wrong login\r\n")
         elif cmd == "SELECT":
-            name = mbox(text.split(" ", 2)[2] if len(parts) > 2 else "")
+            name = mbox((text.split(" ", 2) + ["", ""])[2])
             if name is None:
                 self.w(f"{tag} BAD not a folder name\r\n")
                 return
@@ -158,7 +158,7 @@ class Imap(socketserver.StreamRequestHandler):
             if args[0].upper() == "MOVE" and "MOVE" not in caps.split():
                 self.w(f"{tag} BAD unknown\r\n")
                 return
-            dest = mbox(text.split(" ", 4)[4] if len(parts) > 4 else "")
+            dest = mbox((text.split(" ", 4) + [""] * 4)[4])
             if dest is None:
                 self.w(f"{tag} BAD not a folder name\r\n")
                 return
