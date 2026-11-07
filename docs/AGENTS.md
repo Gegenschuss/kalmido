@@ -39,6 +39,7 @@ The one exception is the optional [built-in assistant](ASSISTANT.md) (2.75.0, of
 - [Coding agent workflow](#coding-agent-workflow)
 - [Example: a Claude Code session that polls Kalmido](#example-a-claude-code-session-that-polls-kalmido)
 - [MCP server](#mcp-server); [Hosted MCP](#hosted-mcp) (2.488.0: apps connect to Kalmido itself with OAuth)
+- [Command line](#command-line) (2.630.0: `kalmido_cli.py` list / show / add / comment / done from a script)
 - [Use agents safely](#use-agents-safely) (2.30.0)
 - [Security](#security)
 - [Built-in assistant vs. your own agents](#built-in-assistant-vs-your-own-agents) (2.75.0)
@@ -4114,6 +4115,28 @@ Kalmido starts no agent and runs no model; it only answers the tool calls of the
   [API.md](API.md#oauth-for-the-hosted-mcp-access).
 
 The local MCP server with its fixed token stays as it is.
+
+## Command line
+
+2.630.0 (#4520): [`mcp/kalmido_cli.py`](../mcp/kalmido_cli.py) is a small command line for scripts and terminals, the way
+you would use `gh`: the common task commands over the REST API, with the same `KALMIDO_URL` / `KALMIDO_TOKEN` as the MCP
+server (an agent's token or a personal token from *Settings > Access*). Python 3 standard library only; it uses the HTTP
+client of `kalmido_mcp.py` next to it (retries on 429 / 503, one `Idempotency-Key` per write). The agent starter brings it
+along (`mcp/starter_files.txt`). There is no npm package.
+
+```sh
+export KALMIDO_URL=https://tasks.example.com KALMIDO_TOKEN=abk_...
+alias kalmido='python3 /path/to/kalmido_cli.py'
+kalmido list --project 12 --status open        # --assignee me|none|ID, --search TEXT, --limit N
+kalmido show APP-12                            # a task by id or ticket key, with notes and comments
+kalmido add "Renew the certificate" --project 12 --due 2026-12-01 --priority high --notes -   # notes from stdin
+kalmido comment APP-12 "Deployed to staging"   # - = the text from stdin
+kalmido done APP-12
+kalmido --json list                            # every command: the API answer as JSON
+```
+
+Scopes: `read` for list / show, `tasks:write` for add / done, `comments` for comment. Exit codes: 0 done, 1 the API refused
+or cannot be reached (the message, e.g. `HTTP 403: ...`, on stderr), 2 wrong use or `KALMIDO_URL` / `KALMIDO_TOKEN` missing.
 
 ## Use agents safely
 

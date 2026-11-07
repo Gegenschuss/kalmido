@@ -237,6 +237,23 @@ as a **Stop hook**, and (2.11.0) for subagents as a **SubagentStop hook** with t
 The env file holds `KALMIDO_URL` and `KALMIDO_TOKEN` (optional `KALMIDO_USAGE_PRICES`, `KALMIDO_USAGE_TASK`,
 `KALMIDO_USAGE_STATE_DIR`). Details, the price table and `--dry-run`: [docs/AGENTS.md](../docs/AGENTS.md#claude-code-report-usage-automatically).
 
+## Command line (2.630.0)
+
+`kalmido_cli.py` is a small command line for scripts (Python 3 standard library, uses the HTTP client of `kalmido_mcp.py`
+next to it, same `KALMIDO_URL` / `KALMIDO_TOKEN`):
+
+```sh
+python3 kalmido_cli.py list [--project ID] [--status open|done|wont_do|all] [--assignee me|none|ID] [--search TEXT] [--limit N]
+python3 kalmido_cli.py show APP-12          # id or ticket key; notes and comments
+python3 kalmido_cli.py add "Title" [--project ID] [--notes TEXT|-] [--due YYYY-MM-DD] [--priority high]
+python3 kalmido_cli.py comment APP-12 "Text"  # - = from stdin
+python3 kalmido_cli.py done APP-12
+python3 kalmido_cli.py --json list          # the API answer as JSON
+```
+
+Exit codes: 0 done, 1 the API refused or cannot be reached (message on stderr), 2 wrong use or no configuration. See
+[docs/AGENTS.md](../docs/AGENTS.md#command-line).
+
 ## Security
 
 - The token has exactly the agent's permissions: only the projects shared with it, only its scopes (2.15.0), never admin rights. An admin can pause the agent at any time. A paused agent's token stops working at once.
@@ -252,4 +269,5 @@ python3 tests/usage_hook_test.py   # the usage hook against a stub API with a sa
 python3 tests/launcher_ps1_test.py # agent_launcher.ps1 against a stub API (needs pwsh; skipped without it)
 python3 tests/launcher_parity_test.py   # both launchers carry every capability; agent_run.py without a server
 python3 tests/agent_docs_coverage_test.py   # every agent event, agent endpoint and MCP tool is documented
+python3 tests/p2630_d_cli_test.py   # kalmido_cli.py against a test server (needs the test container)
 ```

@@ -38,6 +38,7 @@ subscription or API key. Kalmido provides:
   11. [Test checklist](#11-test-checklist)
 - [Connector in a chat app or editor (hosted MCP)](#connector-in-a-chat-app-or-editor-hosted-mcp) (2.488.0)
 - [Other tools: Codex CLI, Cursor, Windsurf, Gemini CLI](#other-tools-codex-cli-cursor-windsurf-gemini-cli) (2.391.0)
+- [From a script: the command line](#from-a-script-the-command-line) (2.630.0)
 - [Several specialist agents under one Kalmido agent](#several-specialist-agents-under-one-kalmido-agent)
 - [A meeting becomes tasks](#a-meeting-becomes-tasks) (2.70.0)
 - [Troubleshooting](#troubleshooting)
@@ -1068,6 +1069,14 @@ Cursor, Windsurf and Gemini CLI use the Kalmido tools while you work with them; 
 launcher runs only Claude Code and Codex CLI per event, or any command that answers on stdout with
 `KALMIDO_AGENT_PROFILE=generic`). On Windows the command is `pwsh` with
 `"args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "C:/path/to/kalmido/mcp/run.ps1"]`.
+
+## From a script: the command line
+
+2.630.0 (#4520): for a shell script, a cron job or a CI step that only needs a few task commands, the starter folder has
+`kalmido_cli.py` (no MCP client needed). With the agent's env file loaded (`KALMIDO_URL`, `KALMIDO_TOKEN`):
+`python3 kalmido_cli.py list`, `show APP-12`, `add "Title" --project 12`, `comment APP-12 "Text"`, `done APP-12`, each with
+`--json`. Exit code 1 = the API refused (message on stderr), 2 = wrong use or no configuration. Details:
+[AGENTS.md, Command line](AGENTS.md#command-line).
 
 ## Several specialist agents under one Kalmido agent
 
