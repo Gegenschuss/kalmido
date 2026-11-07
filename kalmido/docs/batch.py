@@ -7,6 +7,7 @@ person sees (files/store.py fs_visible_sql). Every change and every file in a ZI
 that cannot be read (damaged, missing, locked by the virus scanner) is left out of the ZIP, the rest still comes. Limits:
 DSR_IDS documents per request, the ZIP at most DSR_ZIP_FILES files and DSR_ZIP_MB MB (checked before anything is written,
 refused with a hint), at most two ZIPs built at once. The web app only (agents: API v1)."""
+import json
 import os
 import re
 import secrets
@@ -21,6 +22,7 @@ from ..core.config import app
 from ..core.db import body, bump, db, err, local_now
 from ..core.i18n import tr
 from ..core.access import Denied
+from ..core.ephem import eph_put, eph_take  # 2.622.0 (#3891)
 from ..core.orgcrypt import OrgCryptError
 from ..accounts.session import me
 from ..files.store import fs_log_add, fs_read, fs_role, fs_visible_sql
@@ -33,8 +35,8 @@ DSR_ZIP_FILES = int(os.environ.get("KALMIDO_DOCS_ZIP_MAX_FILES", "2000"))
 DSR_ZIP_MB = int(os.environ.get("KALMIDO_DOCS_ZIP_MAX_MB", "1024"))
 DSR_TICKET_S = 300      # a ZIP ticket is good for five minutes, once
 DSR_BUSY = threading.BoundedSemaphore(2)
-DSR_TICKETS = {}        # ticket -> (account id, [node ids], until); one server process (waitress threads)
-DSR_LOCK = threading.Lock()
+DSR_TICKET_MAX = 3      # open tickets per account (the oldest gives way)
+EPH_DSR = "dsrzip"      # 2.622.0 (#3891): the tickets live in the database (core/ephem.py), every web process knows them
 DSR_PACKED = ("pdf", "jpg", "jpeg", "png", "gif", "webp", "avif", "heic", "heif", "zip", "docx", "xlsx", "pptx", "odt", "ods")
 
 
@@ -204,11 +206,6 @@ def dsr_zip_check(rows):
     return None
 
 
-def _tickets_gc(now):
-    for k in [k for k, v in DSR_TICKETS.items() if v[2] < now]:
-        DSR_TICKETS.pop(k, None)
-
-
 @app.post("/api/docs/zip")
 def docs_zip_ticket():
     """{ids} -> {files, size, url}: the check before the download (only documents I see; too many / too large = 413 with
@@ -224,11 +221,10 @@ def docs_zip_ticket():
         return err(msg, 413)
     tok = secrets.token_urlsafe(18)
     now = time.time()
-    with DSR_LOCK:
-        _tickets_gc(now)
-        for k in [k for k, v in DSR_TICKETS.items() if v[0] == uid][:-2]:  # review: at most three open tickets per account (memory)
-            DSR_TICKETS.pop(k, None)
-        DSR_TICKETS[tok] = (uid, [r["id"] for r in rows], now + DSR_TICKET_S)
+    # review: at most three open tickets per account; 2.622.0 (#3891): in the database, the ticket only as an HMAC
+    if not eph_put(EPH_DSR, tok, json.dumps({"ids": [r["id"] for r in rows], "until": now + DSR_TICKET_S}), DSR_TICKET_S, uid=uid,
+                   caps={"uid": DSR_TICKET_MAX}):
+        raise Denied(503, tr("Please try again in a minute"))
     return jsonify(files=len(rows), size=sum(int(r["size"] or 0) for r in rows), url=f"/api/docs/zip/{tok}")
 
 
@@ -238,12 +234,11 @@ def docs_zip_get(tok):
     c = db()
     _no_agent()
     uid = me()
-    with DSR_LOCK:
-        _tickets_gc(time.time())
-        t = DSR_TICKETS.get(str(tok))
-        if not t or t[0] != uid:  # another account's request leaves the ticket alone
-            raise Denied(404)
-        DSR_TICKETS.pop(str(tok), None)
+    v = eph_take(EPH_DSR, str(tok), uid=uid)  # 2.622.0 (#3891): once over all processes; another account's request leaves it alone
+    if not v:
+        raise Denied(404)
+    tv = json.loads(v)
+    t = (uid, tv["ids"], tv["until"])
     rows = dsr_visible(c, uid, t[1])
     if not rows:
         raise Denied(404)
@@ -251,8 +246,9 @@ def docs_zip_get(tok):
     if msg:
         return err(msg, 413)
     if not DSR_BUSY.acquire(blocking=False):
-        with DSR_LOCK:  # review: a busy server keeps the ticket for the next try
-            DSR_TICKETS[str(tok)] = t
+        left = t[2] - time.time()  # review: a busy server keeps the ticket for the next try (until its own end)
+        if left > 1:
+            eph_put(EPH_DSR, str(tok), json.dumps({"ids": t[1], "until": t[2]}), left, uid=uid, caps={"uid": DSR_TICKET_MAX})
         raise Denied(429, tr("Too many requests"))
     fd, path = tempfile.mkstemp(prefix="kalmido-docs-zip-", suffix=".zip")
     try:

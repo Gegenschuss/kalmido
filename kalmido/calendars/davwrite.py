@@ -1,6 +1,6 @@
 """2.52.0 B (#1128): writing events into CalDAV subscriptions (new, change, delete) with ETags."""
+import json
 import posixpath
-import threading
 import time
 import urllib.parse
 import uuid as uuidlib
@@ -13,6 +13,7 @@ from ..core.i18n import tr
 from ..core.db import body, db, err, iso_ms, now_utc
 from ..accounts.session import FAIL_WINDOW, me
 from ..core.access import Denied
+from ..core.ephem import eph_put, eph_take  # 2.622.0 (#3891)
 from ..calendars.icalfeed import ics_text, ics_utc
 from ..calendars.subscriptions import (DAV_NS, CalError, _CAL_RATE, _CAL_RATE_LOCK, _cal_clean, _cal_limited,
                                        cal_allow, cal_err_text, cal_href_ok, cal_public, cal_sync, cal_unseal, dav_propfind,
@@ -34,9 +35,10 @@ from ..events.model import ev_zone, tz_ok, wall
 # changed on its own (the whole series moves; the client offers only "All dates").
 CDW_LIMIT = 60          # writes per user within FAIL_WINDOW (own bucket next to cal_rate: dragging is quick)
 CDW_TEXT = {"title": 500, "location": 500, "description": 20000}
-CDW_UNDO_S = 15 * 60    # how long a deleted event can be put back (the old resource, in memory)
+CDW_UNDO_S = 15 * 60    # how long a deleted event can be put back (the old resource; 2.622.0 #3891: in the database)
 CDW_UNDO_MAX = 512 * 1024  # bytes of one kept resource
-_CDW_UNDO, _CDW_UNDO_LOCK = {}, threading.Lock()
+CDW_UNDO_KEEP = 500     # kept resources on the server (the oldest give way)
+EPH_CDW = "cdwundo"     # 2.622.0 (#3891): the undo of a delete lives in the database (core/ephem.py): every web process can put it back
 _CDW_PRIV = f"{{{DAV_NS}}}current-user-privilege-set"
 
 
@@ -478,13 +480,9 @@ def cdw_delete(sid):
     if len(data) > CDW_UNDO_MAX:  # a huge resource is not kept in memory: no undo
         return jsonify(ok=True, undo=None)
     tok = uuidlib.uuid4().hex
-    with _CDW_UNDO_LOCK:
-        now = time.time()
-        for k in [k for k, v in _CDW_UNDO.items() if now - v[0] > CDW_UNDO_S]:
-            _CDW_UNDO.pop(k, None)
-        if len(_CDW_UNDO) > 500:
-            _CDW_UNDO.clear()
-        _CDW_UNDO[tok] = (now, me(), sid, res["href"], data)
+    keep = {"href": res["href"], "data": data.decode("utf-8", "replace") if isinstance(data, bytes) else data}
+    if not eph_put(EPH_CDW, f"{sid}:{tok}", json.dumps(keep, ensure_ascii=False), CDW_UNDO_S, uid=me(), caps={"all": CDW_UNDO_KEEP}):
+        return jsonify(ok=True, undo=None)  # not kept (the database is away): no undo
     return jsonify(ok=True, undo=tok)
 
 
@@ -494,12 +492,10 @@ def cdw_restore(sid):
     c, b = db(), body()
     r = _cdw_sub(c, sid)
     tok = b.get("undo")
-    with _CDW_UNDO_LOCK:
-        u = _CDW_UNDO.get(tok) if isinstance(tok, str) else None
-        if not u or u[1] != me() or u[2] != sid or time.time() - u[0] > CDW_UNDO_S:
-            u = None
-        else:
-            _CDW_UNDO.pop(tok, None)
+    # 2.622.0 (#3891): taken once over all processes; another person / another subscription finds nothing and leaves it
+    v = eph_take(EPH_CDW, f"{sid}:{tok}", uid=me()) if isinstance(tok, str) and len(tok) <= 64 else None
+    kept = json.loads(v) if v else None
+    u = (None, None, sid, kept["href"], kept["data"]) if kept else None
     if not u:
         return err(tr("This can no longer be undone"), 410)
     if not cdw_rate(me()):
