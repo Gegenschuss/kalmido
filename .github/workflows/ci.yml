@@ -146,7 +146,7 @@ jobs:
           { echo "stage=$stage"; echo "count=$n"; echo "shards=[$(seq -s, 1 "$n")]"; echo "hard=$h"; echo "matrix=$matrix"; } >> "$GITHUB_OUTPUT"
           echo "::notice title=stage::$stage - $n shards ($h hard first), $(grep -vc '^#' shard-plan.txt) groups - ${REASON//%/%25}"
           { echo "### Test stage: $stage ($n shards, $h of them hard first)"; echo; echo "$REASON"; } >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: shard-plan
           path: shard-plan.txt
@@ -484,7 +484,7 @@ jobs:
           tests/run_all.sh --shard "$SHARD"
       - name: Suite timings
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: timings-shard-${{ matrix.shard }}
           path: tests/timings*
@@ -617,7 +617,7 @@ jobs:
         run: python3 tools/install_upgrade_check.py run --ref "$GITHUB_SHA" --dir "$RUNNER_TEMP/kalmido-install" --out "$RUNNER_TEMP/upgrade-fixture"
       - name: The old database (quarterly fixture for tests/fixtures/upgrade/)
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: upgrade-fixture
           path: ${{ runner.temp }}/upgrade-fixture
