@@ -82,7 +82,7 @@ check(Bo.get(B + f1.get("url", "/x")).content == PNG, "the listed address gives 
 check(FB not in (ids(r) or []), "another organisation's file is never listed")
 
 # rights
-check(lst(Ca, SP).status_code == 404, "another organisation: 404")
+check(lst(Ca, SP).status_code == 404, "another organisation: 404")  # tenant: GET /api/wiki/space-files
 check(lst(Bo, SP2).status_code == 404, "a member of Alpha asks for Beta: 404")
 check(lst(Bo, "org:999999").status_code == 404, "an unknown organisation: 404")
 if rg.ok:
