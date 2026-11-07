@@ -104,7 +104,7 @@ const ymd = dt => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '
       tc(w, t, 'touchstart', 100, 300); tc(w, t, 'touchmove', 160, 302); tc(w, t, 'touchmove', 240, 303);
       tc(w, t, 'touchend', 240, 303);
       check(r.style.transform === 'translateX(110%)', `${tag}: a swipe right carries the row out (was phones only): ${r.style.transform}`);
-      check(await until(() => w.eval(`taskById(${T2})?.status`) === 1), `${tag}: the swipe completed the task`);
+      check(await until(async () => (await call('GET', `/api/tasks/${T2}`)).status === 1), `${tag}: the swipe completed the task`);
       check((await call('POST', `/api/tasks/${T2}/reopen`)).http < 300, `${tag}: reopened for the next part`);
     }
 
