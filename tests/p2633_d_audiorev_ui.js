@@ -81,7 +81,8 @@ const FIT = sel => `(() => { const vw = document.documentElement.clientWidth, e 
       await ev(`(() => { const t = document.querySelector('#vdr-in'); t.value = 'Rauschen hier ${wd}'; document.querySelector('.vdrdlg [data-vdr="send"]').click(); return 1; })()`);
       const cm = await until(`fetch('/api/videos/${R.id}', {headers: {'X-Requested-With': 'kalmido'}}).then(r => r.json()).then(j => { const c = (j.comments || []).find(x => x.body === 'Rauschen hier ${wd}'); return c ? JSON.stringify(c) : ''; })`);
       check(cm && JSON.parse(cm).at_sec === 42.3, tag + ' the comment stored at 42.3 ' + cm);
-      check(await until(`!!document.querySelector('.vdrdlg .vdrtl .vdrmk')`), tag + ' a mark on the time line');
+      // 2.641.0 (#4769): the customer's mark is there before the send - wait for both, not for any
+      check(await until(`document.querySelectorAll('.vdrdlg .vdrtl .vdrmk').length >= 2`), tag + ' a mark on the time line');
       const left = await ev(`[...document.querySelectorAll('.vdrdlg .vdrtl .vdrmk')].map(m => m.style.left).join(' ')`);
       // two marks: the customer's comment at 42.0 (70 %) and this one at 42.3
       check(/\b70\.5%/.test(left) && /\b70%/.test(left), tag + ' the marks at 42.0 and 42.3 / 60 = 70 % and 70.5 % ' + left);
