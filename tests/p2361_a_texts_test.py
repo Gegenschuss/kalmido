@@ -59,8 +59,9 @@ for lg in ("de", "fr", "es", "it", "nl"):
     for k in ("Nothing to show yet: add equipment in Office & finance.", "No other people yet. Share by e-mail address or invite them.",
               "The newsletter settings could not be loaded.", "Only an admin of this workspace can do this"):
         check(d.get(k), f"{lg}: translated '{k[:40]}'")
-check(json.load(open(os.path.join(ROOT, "static/i18n/de.json"), encoding="utf-8"))["Clients sit above your projects: hours, budget and the timesheet per client. Only you see them."].endswith("Nur du siehst sie."),
-      "de: 'Nur du siehst sie.' for private clients")
+# 2.627.0 (#4980): the empty client grid with "Only you see them." went with the dead clientsGridHtml (#4815, efce4f2fd);
+# the client list is ms_clView now - check that the old text stays gone instead of reading its removed translation (KeyError)
+check("Clients sit above your projects" not in src("static/js/clients.js"), "clients.js: the removed client grid text stays gone")
 
 # ---------------------------------------------------------------- runtime
 if os.environ.get("P2361A_NOSTART") != "1":
