@@ -90,11 +90,19 @@ def wait_import(iid):
 
 
 # ================================================================ organisation import: card and core share bound
+# T1 / T2 in a folder of the tables' panel: their node and its core share come along with the store (the audit's case of two
+# rights); T0 at the top of the tree: its node stays behind, the card gets a new core share in the target
+T0 = table(A, "Loose", f"org:{ORG}")
 T1 = table(A, "Rates", f"org:{ORG}")
 T2 = table(A, "Costs", f"org:{ORG}")
-share(A, T1, GINA)
-share(A, T2, GINA)
-check(Gi.get(B + f"/api/sheets/{T1}").status_code == 200 and Gi.get(B + f"/api/sheets/{T2}").status_code == 200, "setup: the guest reads both")
+r = A.post(B + "/api/sheets/folders", json={"space": f"org:{ORG}", "name": "Finance"})
+check(r.status_code == 201, f"setup: a folder of the tables {r.status_code} {r.text[:120]}")
+FOLD = r.json()["folder"]["id"]
+for t in (T0, T1, T2):
+    share(A, t, GINA)
+for t in (T1, T2):
+    check(A.post(B + "/api/files/refs", json={"ref_kind": "sheet", "ref_id": t, "parent_id": FOLD}).ok, f"setup: table {t} into the folder")
+check(all(Gi.get(B + f"/api/sheets/{t}").status_code == 200 for t in (T0, T1, T2)), "setup: the guest reads all three")
 
 r = A.post(B + f"/api/orgs/{ORG}/export")
 check(r.status_code == 202, f"organisation export started {r.text[:120]}")
@@ -123,10 +131,9 @@ check(r.status_code == 202, f"the import runs {r.status_code} {r.text[:160]}")
 j = wait_import(IID)
 check(j.get("state") == "done", f"imported into the empty organisation {j.get('state')} {j.get('error')}")
 
-N1 = (dbx("SELECT id FROM sheets WHERE org_id=? AND title='Rates'", (ORG3,)) or [[None]])[0][0]
-N2 = (dbx("SELECT id FROM sheets WHERE org_id=? AND title='Costs'", (ORG3,)) or [[None]])[0][0]
-check(N1 and N2, f"both tables came along {N1} {N2}")
-for n in (N1, N2):
+N0, N1, N2 = ((dbx("SELECT id FROM sheets WHERE org_id=? AND title=?", (ORG3, t)) or [[None]])[0][0] for t in ("Loose", "Rates", "Costs"))
+check(N0 and N1 and N2, f"the tables came along {N0} {N1} {N2}")
+for n in (N0, N1, N2):
     cards = dbx("SELECT id, core_id FROM sheet_shares WHERE sheet_id=? AND user_id=? AND revoked_at IS NULL", (n, GINA))
     cs = core(n, GINA)
     check(len(cards) == 1 and len(cs) == 1 and cards[0][1] == cs[0],
@@ -140,7 +147,7 @@ check(not core(N1, GINA), "#5047: ... the core share is gone too")
 check(Gi.get(B + f"/api/sheets/{N1}").status_code == 404, "#5047: ... the guest reads nothing any more")
 
 # ending it in the file store's dialog ends the card too
-fs2 = core(N2, GINA)[0]
+fs2 = (core(N2, GINA) or [0])[0]
 check(A.delete(B + f"/api/files/shares/{fs2}").ok, "ended in the file store's dialog")
 check(dbx("SELECT revoked_at IS NOT NULL FROM sheet_shares WHERE sheet_id=? AND user_id=?", (N2, GINA)) == [(True,)], "#5047: ... the card is ended")
 check(Gi.get(B + f"/api/sheets/{N2}").status_code == 404 and listed(A, N2) == [], "#5047: ... the guest reads nothing, the dialog is empty")
