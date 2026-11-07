@@ -1183,7 +1183,8 @@ negative.
 *Since 2.90.*
 
 The tab **Bank** (admins of the office area; in a private office its owner) matches the bookings of your account with
-invoices and receipts. Kalmido has no bank access: you import the file you download from your bank yourself.
+invoices and receipts. You import the file you download from your bank yourself, or (2.616, German accounts, when the
+server is set up for it) Kalmido fetches the bookings from the bank over FinTS with your PIN - see "Fetch from bank" below.
 
 - **Import bank statement**: a CSV export (German and English formats: `1.234,56` or `1,234.56`, `DD.MM.YYYY`,
   `YYYY-MM-DD` …; account lines above the header are skipped) or a CAMT.052 / CAMT.053 XML file. For a CSV you confirm
@@ -1192,6 +1193,26 @@ invoices and receipts. Kalmido has no bank access: you import the file you downl
   preview (booking day, amount with credit / debit, counterpart and IBAN, purpose, the bank's reference). XML files with
   a DOCTYPE or ENTITY are refused. At most 2 MB and 3000 rows per file. 2.140: the household budget reads files with the
   same reader (one module, no data shared); a few bank layouts are recognised by their columns and pre-fill the choice.
+- **Fetch from bank** (2.616; FinTS with PIN/TAN, e.g. Sparkasse, Volksbank, most German banks; no account service in
+  between): pick the bank account (a German IBAN; the bank code comes from it), type your sign-in name at the bank, your
+  PIN and the address of the bank's FinTS server (your bank names it, e.g. under "FinTS / HBCI PIN/TAN"), and the period
+  (default: from the day of the newest booking of the office area, else the last 90 days; at most 730 days). If the bank
+  offers several TAN methods you choose one; then you approve in your banking app (pushTAN and other app approvals: Kalmido
+  waits and goes on by itself) or type the TAN shown. The statement the bank sends (CAMT, else MT940) runs through exactly
+  the way of a downloaded file: the same preview, duplicates, bank rules, matching and **Take back**. The **PIN is never
+  stored**: it is asked at every fetch and lives only in the server's memory while the bank connection runs (at most 5
+  minutes after the last step, 15 minutes in all; closing the dialog ends it). The sign-in name and the server address may be
+  remembered per account (sealed like the IBAN). After a refusal of the bank (wrong PIN, locked access) Kalmido never tries
+  again by itself; after two refusals within an hour the account waits for the rest of that hour, so the bank does not lock
+  your access. Flicker codes (chipTAN optic) cannot be shown; choose another TAN method. Agents cannot start a fetch (an
+  agent never handles a PIN). The button stays switched off with the reason while the server has no FinTS product
+  registration (see [SELF-HOSTING.md](SELF-HOSTING.md#office-bank-fetch-over-fints)). Routes (admins of the office area,
+  the person in a personal office; another person's dialog 404): `GET /api/office/bank/fints` (on / code, the accounts),
+  `POST /api/office/bank/fints/start` `{account_id, login, pin, server, from?, to?, remember?, mechanism?}` -> 201
+  `{dialog: {id, state mechanism | decoupled | tan | preview, ...}}`, `POST .../{id}/mechanism {id}`, `.../{id}/tan {tan}`,
+  `.../{id}/poll` (the approval in the app), `.../{id}/import` (201, the answer of the file import), `DELETE .../{id}`.
+  Refusals answer with `code`: `pin`, `locked`, `wait` (429), `expired` (404), `connection`, `blocked`, `unsupported`,
+  `no_account`, `tan_method`, `bank`; off: 503 `no_product_id` / `no_library`.
 - **Duplicates**: a booking already imported into this office area (same day, amount, counterpart, purpose, reference)
   is skipped and counted; two equal bookings in one file stay two.
 - **Matching**: every open booking shows the best suggestion with its reason. Money in -> open invoices (same amount as

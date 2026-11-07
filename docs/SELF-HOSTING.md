@@ -1739,6 +1739,26 @@ the security model: [PACKS.md](PACKS.md)). Without a catalogue Kalmido makes no 
 - Installations are stored per office area in the database (table `office_pack_installs`) and travel with backups;
   finalised documents keep their own copy of the pack.
 
+### Office: bank fetch over FinTS
+
+*Since 2.616.*
+
+The office's tab **Bank** can fetch the bookings of a German bank account directly from the bank over FinTS (PIN/TAN), with
+no account service in between ([OFFICE.md](OFFICE.md#bank-reconciliation)). FinTS banks only answer software that is
+registered with the Deutsche Kreditwirtschaft (DK): whoever runs the instance registers it there (free of charge, a form at
+the DK's FinTS site) and gets a **product registration number**. The registration is bound to the one who registered: it
+does not belong into a public repository or a shared image, so Kalmido ships none and every instance enters its own.
+
+- `KALMIDO_FINTS_PRODUCT_ID=` - the product registration number of your instance; empty (default) = the fetch is off and
+  the button shows why. The number is sent to the bank with every fetch, nothing else of the instance.
+- The library python-fints (LGPL-3.0-or-later) is part of the image and only loaded when a fetch runs; an own build without
+  it keeps the button off (code `no_library`).
+- The PIN is never written anywhere (database, log, backup); a running bank connection lives only in the memory of the web
+  process (at most 15 minutes) - a restart ends it. With several web processes behind one address the steps of one fetch
+  must reach the same process (sticky sessions); the standard setup runs one.
+- The server talks to the bank's FinTS address the person enters: https only, public addresses only (the same guard as the
+  calendar subscriptions), no redirect to another host.
+
 ### Built-in assistant
 
 *Since 2.75.*
@@ -2064,6 +2084,7 @@ or a person sets the function up.
 | Sign-in with OIDC | Sign-in data to your identity provider | at sign-in | do not set up OIDC |
 | Newsletter services | E-mail address and name of subscribers to listmonk, Brevo or CleverReach | when the office newsletter module is used | leave the newsletter module off |
 | Paperless | Requests to the Paperless server of the person | per use | do not connect Paperless |
+| Bank fetch (FinTS) | Sign-in name, PIN, TAN and the product registration number to the FinTS server of the bank the person entered; the bank sends the statement | when a person starts a fetch in the office's tab Bank | leave `KALMIDO_FINTS_PRODUCT_ID` empty (default) |
 | E-invoice (Peppol) | The invoice with customer data to Storecove or your own endpoint | when you send an invoice that way | do not set up Peppol |
 | Online payment (Stripe) | Amount, currency, invoice number as title and return address to `api.stripe.com`; fees of a payout are fetched. Stripe calls back at `/api/hooks/pay/...` | when a customer starts a payment; when a payout is matched | do not set up online payment in the office |
 | Invoice links in mails | A download link in a mail to a document address is fetched once (https, public addresses only, no sign-in) | when such a mail has no file of its own | do not give out a document address |
