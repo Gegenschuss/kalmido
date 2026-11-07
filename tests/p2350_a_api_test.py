@@ -172,7 +172,10 @@ try:
     check(len(pr) == 1, f"one run for one message: {len(pr)}")
     if pr:
         check("-p" in pr[0]["args"] and "stream-json" in pr[0]["args"] and "--verbose" in pr[0]["args"], "headless stream-json run: " + str(pr[0]["args"]))
-        check("Yes, check it" in pr[0]["prompt"] and 'This answers your own message: "Should I check the nightly build?"' in pr[0]["prompt"],
+        # 2.628.0 (#4982): since 2.615.0 (#3757 / #3751) the runner loads the answered message in full and fences it
+        # (reply_hint); Kalmido's 140-character quote line is only the fallback when that message cannot be loaded
+        check("Yes, check it" in pr[0]["prompt"] and f"(This answers your own message, message {Q}, in full below:" in pr[0]["prompt"]
+              and f"<<<message reply-{Q} from user agent>>>\nShould I check the nightly build?\n<<<end message reply-{Q}>>>" in pr[0]["prompt"],
               "the prompt carries the message and the quote it answers")
         check(TOKEN not in pr[0]["prompt"], "the token is not in the prompt")
     if ans:
