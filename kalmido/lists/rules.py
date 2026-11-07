@@ -16,6 +16,13 @@ Every change goes through the usual paths (apply_update, log_act, comment pushes
 {"rule": {"id", "name"}} and the client shows "Rule <name>" instead of the person. Agents read rules (GET
 /api/v1/lists/{id}/rules) and may only PROPOSE one (POST /api/v1/lists/{id}/rules/proposals, kind "rule"); the owner /
 an admin accepts it and the rule then belongs to that person.
+
+2.637.0 (#4768): the due trigger has a distance ("3 days before the due date", "overdue for 2 days"; 0 = the due day as
+before), once per rule, task and due day (a moved due date runs again). A rule has up to RUL_ACT_MAX actions that run one
+after the other in ONE savepoint (all or nothing; a missing right in any of them pauses the whole rule), a move into another
+list only as the last one. Optional conditions "only when" (priority, assigned person, list tag, column): all must hold on
+the task when the rule runs. The first action stays in act / act_val, the others in more_acts, the conditions in conds
+(migrations.d/4768_a.py): an older version runs such a rule with its first action and without conditions.
 """
 import contextlib
 import json
@@ -44,6 +51,10 @@ RUL_TEXT_MAX = 2000         # the fixed comment
 RUL_DAYS_MAX = 365          # due date: today + 0..365 days
 RUL_DUE_BATCH = 500         # tasks per watchdog tick (due date reached)
 RUL_PROP_DAY_MAX = 20       # rule proposals of one agent per 24 hours
+RUL_ACT_MAX = 5             # 2.637.0 (#4768): actions per rule, run one after the other
+RUL_DUE_OFF_MAX = 30        # 2.637.0 (#4768): due trigger: 0..30 days before the due date / overdue for 0..30 days
+RUL_DUE_WHEN = {"before": "b", "overdue": "o"}  # 2.637.0 (#4768): trig_val of the due trigger: '' (today) | b<days> | o<days>
+RUL_CONDS = ("priority", "user_id", "tag_id", "section_id")  # 2.637.0 (#4768): the conditions "only when" (all must hold)
 RUL_TRIGGERS = ("section", "done", "reopen", "ltag", "due", "created", "assigned", "field")  # 2.138.0 D (#2060): + created, assigned, field
 RUL_ACTIONS = ("assign", "due", "comment", "move", "priority", "tag", "field",  # 2.138.0 D (#2060): + priority, tag, field
                "done", "reopen")  # 2.633.0 (#4781): mark it done / open it again (the tick's own way)
@@ -118,10 +129,11 @@ def rul_target_ok(c, src, dst, uid, see_only=False):
 
 
 def rul_clean(c, lid, b, partial=None, see_only=False):
-    """{name, trigger: {kind, section_id | tag_id}, action: {kind, user_id | days | text | list_id, section_id}} -> the
-    columns (BadInput / Denied). The references are checked with the rights of the current user. partial = the stored
-    row (PATCH: missing parts stay)."""
-    reject_unknown(b, ("name", "trigger", "action", "active"))
+    """{name, trigger: {kind, section_id | tag_id | when + days}, action: {kind, user_id | days | text | list_id, section_id}
+    | actions: [action, ...], conditions?} -> the columns (BadInput / Denied). The references are checked with the rights of
+    the current user. partial = the stored row (PATCH: missing parts stay). 2.637.0 (#4768): "actions" (1..RUL_ACT_MAX, one
+    after the other) or the single "action" (= a chain of one); "conditions" {priority?, user_id?, tag_id?, section_id?}."""
+    reject_unknown(b, ("name", "trigger", "action", "actions", "conditions", "active"))
     out = {}
     if "name" in b or partial is None:
         name = " ".join(str(b.get("name") or "").split())
@@ -132,7 +144,7 @@ def rul_clean(c, lid, b, partial=None, see_only=False):
         t = b.get("trigger")
         if not isinstance(t, dict) or t.get("kind") not in RUL_TRIGGERS:
             raise BadInput(tr("Invalid value: {0}", "trigger"))
-        reject_unknown(t, ("kind", "section_id", "tag_id", "user_id", "field_id", "value"))
+        reject_unknown(t, ("kind", "section_id", "tag_id", "user_id", "field_id", "value", "when", "days"))
         val = ""
         if t["kind"] == "section":
             sid = _int(t.get("section_id"), "trigger.section_id")
@@ -146,56 +158,183 @@ def rul_clean(c, lid, b, partial=None, see_only=False):
             val = str(tag)
         elif t["kind"] in ("assigned", "field"):
             val = rul_trig_clean(c, lid, t)
+        elif t["kind"] == "due":  # 2.637.0 (#4768)
+            val = rul_due_clean(t)
         out["trig"], out["trig_val"] = t["kind"], val
-    if "action" in b or partial is None:
-        a = b.get("action")
-        if not isinstance(a, dict) or a.get("kind") not in RUL_ACTIONS:
+    if "action" in b or "actions" in b or partial is None:
+        if "action" in b and "actions" in b:
             raise BadInput(tr("Invalid value: {0}", "action"))
-        k, target, v = a["kind"], None, {}
-        if k == "assign":
-            reject_unknown(a, ("kind", "user_id"))
-            aid = _int(a.get("user_id"), "action.user_id")
-            e = check_assignee(c, lid, aid)
-            if e:
-                raise BadInput(e)
-            v = {"user_id": aid}
-        elif k == "due":
-            reject_unknown(a, ("kind", "days"))
-            d = a.get("days")
-            if d is not None:
-                d = _int(d, "action.days")
-                if not 0 <= d <= RUL_DAYS_MAX:
-                    raise BadInput(tr("Invalid value: {0}", "action.days"))
-            v = {"days": d}
-        elif k == "comment":
-            reject_unknown(a, ("kind", "text"))
-            text = a.get("text")
-            if not isinstance(text, str) or not text.strip():
-                raise BadInput(tr("The comment is empty"))
-            if len(text) > RUL_TEXT_MAX:
-                raise BadInput(tr("The comment is too long (max. {0} characters)", RUL_TEXT_MAX))
-            v = {"text": text.strip()}
-        elif k in ("priority", "tag", "field"):
-            v = rul_act_clean(c, lid, a)
-        elif k in ("done", "reopen"):  # 2.633.0 (#4781): no value
-            reject_unknown(a, ("kind",))
-        else:  # move: into a list and / or a column (the column belongs to the target list)
-            reject_unknown(a, ("kind", "list_id", "section_id"))
-            dst = _int(a["list_id"], "action.list_id") if a.get("list_id") not in (None, "", 0) else lid
-            sid = _int(a["section_id"], "action.section_id") if a.get("section_id") not in (None, "", 0) else None
-            if dst == lid and sid is None:
-                raise BadInput(tr("Select a project or a column"))
-            if dst != lid:
-                e = rul_target_ok(c, lid, dst, me(), see_only)
-                if e:
-                    raise BadInput(e)
-            if sid is not None and not c.execute("SELECT 1 FROM sections WHERE id=? AND list_id=?", (sid, dst)).fetchone():
-                raise BadInput(tr("Invalid value: {0}", "action.section_id"))
-            v, target = {"list_id": dst, "section_id": sid}, (dst if dst != lid else None)
-        out["act"], out["act_val"], out["target_list_id"] = k, json.dumps(v, separators=(",", ":")), target
+        acts = b.get("actions") if "actions" in b else [b.get("action")]
+        if not isinstance(acts, list) or not 1 <= len(acts) <= RUL_ACT_MAX:
+            raise BadInput(tr("A rule has 1 to {0} actions", RUL_ACT_MAX))
+        done = [rul_act_one(c, lid, a, see_only) for a in acts]
+        if any(x[2] for x in done[:-1]):  # 2.637.0 (#4768): after a move into another list the task is no longer here
+            raise BadInput(tr("A move into another project can only be the last action"))
+        out["act"], out["act_val"], out["target_list_id"] = done[0][0], json.dumps(done[0][1], separators=(",", ":")), done[-1][2]
+        out["more_acts"] = json.dumps([{"kind": k, **v} for k, v, _ in done[1:]], separators=(",", ":")) if len(done) > 1 else ""
+    if "conditions" in b:  # 2.637.0 (#4768)
+        out["conds"] = rul_cond_clean(c, lid, b["conditions"])
     if "active" in b:
         out["active"] = 1 if b["active"] else 0
     return out
+
+
+def rul_act_one(c, lid, a, see_only=False):
+    """One action of a rule -> (kind, value dict, target list id or None). 2.637.0 (#4768): split off rul_clean (a chain)."""
+    if not isinstance(a, dict) or a.get("kind") not in RUL_ACTIONS:
+        raise BadInput(tr("Invalid value: {0}", "action"))
+    k, target, v = a["kind"], None, {}
+    if k == "assign":
+        reject_unknown(a, ("kind", "user_id"))
+        aid = _int(a.get("user_id"), "action.user_id")
+        e = check_assignee(c, lid, aid)
+        if e:
+            raise BadInput(e)
+        v = {"user_id": aid}
+    elif k == "due":
+        reject_unknown(a, ("kind", "days"))
+        d = a.get("days")
+        if d is not None:
+            d = _int(d, "action.days")
+            if not 0 <= d <= RUL_DAYS_MAX:
+                raise BadInput(tr("Invalid value: {0}", "action.days"))
+        v = {"days": d}
+    elif k == "comment":
+        reject_unknown(a, ("kind", "text"))
+        text = a.get("text")
+        if not isinstance(text, str) or not text.strip():
+            raise BadInput(tr("The comment is empty"))
+        if len(text) > RUL_TEXT_MAX:
+            raise BadInput(tr("The comment is too long (max. {0} characters)", RUL_TEXT_MAX))
+        v = {"text": text.strip()}
+    elif k in ("priority", "tag", "field"):
+        v = rul_act_clean(c, lid, a)
+    elif k in ("done", "reopen"):  # 2.633.0 (#4781): no value
+        reject_unknown(a, ("kind",))
+    else:  # move: into a list and / or a column (the column belongs to the target list)
+        reject_unknown(a, ("kind", "list_id", "section_id"))
+        dst = _int(a["list_id"], "action.list_id") if a.get("list_id") not in (None, "", 0) else lid
+        sid = _int(a["section_id"], "action.section_id") if a.get("section_id") not in (None, "", 0) else None
+        if dst == lid and sid is None:
+            raise BadInput(tr("Select a project or a column"))
+        if dst != lid:
+            e = rul_target_ok(c, lid, dst, me(), see_only)
+            if e:
+                raise BadInput(e)
+        if sid is not None and not c.execute("SELECT 1 FROM sections WHERE id=? AND list_id=?", (sid, dst)).fetchone():
+            raise BadInput(tr("Invalid value: {0}", "action.section_id"))
+        v, target = {"list_id": dst, "section_id": sid}, (dst if dst != lid else None)
+    return k, v, target
+
+
+# ---------------------------------------------------------------- 2.637.0 (#4768): due distance, chains, conditions
+def rul_due_clean(t):
+    """trig_val of the due trigger {when: before | overdue (default before), days: 0..RUL_DUE_OFF_MAX (default 0)}: '' = the
+    due day is today (as before 2.637), b<days> = that many days before it, o<days> = overdue for that many days."""
+    when = t.get("when") if t.get("when") not in (None, "") else "before"
+    if when not in RUL_DUE_WHEN:
+        raise BadInput(tr("Invalid value: {0}", "trigger.when"))
+    days = 0 if t.get("days") in (None, "") else _int(t.get("days"), "trigger.days")
+    if not 0 <= days <= RUL_DUE_OFF_MAX:
+        raise BadInput(tr("Invalid value: {0}", "trigger.days"))
+    return "" if when == "before" and not days else RUL_DUE_WHEN[when] + str(days)
+
+
+def rul_due_off(tv):
+    """The due day of a due trigger's trig_val, counted from today (+3 = due in 3 days, -2 = overdue for 2 days); None = a
+    value this version does not know (the rule does not run)."""
+    tv = tv or ""
+    if not tv:
+        return 0
+    if tv[0] in "bo" and tv[1:].isdigit() and int(tv[1:]) <= RUL_DUE_OFF_MAX:
+        return int(tv[1:]) * (1 if tv[0] == "b" else -1)
+    return None
+
+
+def rul_due_key(day, tv):
+    """The run marker in list_rule_runs: due:<due day> for the due day itself (unchanged since 2.71), else
+    due:<due day>:<trig_val> -- once per rule, task, due day and distance; a moved due date is a new key."""
+    return "due:" + day + (":" + tv if tv else "")
+
+
+def rul_cond_clean(c, lid, d):
+    """conds of {priority?, user_id?, tag_id?, section_id?} (null / {} = none): a priority name, a person of the list (the task
+    is assigned to them), a list tag (the task has it), a column of the list (the task is in it). '' when empty."""
+    if d in (None, "", {}):
+        return ""
+    if not isinstance(d, dict):
+        raise BadInput(tr("Invalid value: {0}", "conditions"))
+    reject_unknown(d, RUL_CONDS)
+    out = {}
+    if d.get("priority") not in (None, ""):
+        if d["priority"] not in RUL_PRIO:
+            raise BadInput(tr("Invalid value: {0}", "conditions.priority"))
+        out["priority"] = d["priority"]
+    if d.get("user_id") not in (None, "", 0):
+        uid = _int(d["user_id"], "conditions.user_id")
+        if uid not in list_people(c, lid):
+            raise BadInput(tr("Invalid value: {0}", "conditions.user_id"))
+        out["user_id"] = uid
+    if d.get("tag_id") not in (None, "", 0):
+        tag = _int(d["tag_id"], "conditions.tag_id")
+        if not c.execute("SELECT 1 FROM list_tags WHERE id=? AND list_id=?", (tag, lid)).fetchone():
+            raise BadInput(tr("Invalid value: {0}", "conditions.tag_id"))
+        out["tag_id"] = tag
+    if d.get("section_id") not in (None, "", 0):
+        sid = _int(d["section_id"], "conditions.section_id")
+        if not c.execute("SELECT 1 FROM sections WHERE id=? AND list_id=?", (sid, lid)).fetchone():
+            raise BadInput(tr("Invalid value: {0}", "conditions.section_id"))
+        out["section_id"] = sid
+    return json.dumps(out, separators=(",", ":")) if out else ""
+
+
+def _rul_col(r, k):
+    """A column of a rule row that an older row / a proposal's stand-in may lack ('' then)."""
+    try:
+        return r[k] or ""
+    except (KeyError, IndexError):
+        return ""
+
+
+def _rul_jload(v, empty):
+    try:
+        x = json.loads(v) if v else empty
+    except (TypeError, ValueError):
+        return empty
+    return x if isinstance(x, type(empty)) else empty
+
+
+def rul_acts(r):
+    """The actions of rule row r in order: [(kind, value dict)] -- act / act_val first, then more_acts."""
+    out = [(r["act"], _rul_jload(r["act_val"], {}))]
+    for a in _rul_jload(_rul_col(r, "more_acts"), []):
+        if isinstance(a, dict):
+            out.append((a.get("kind"), {k: v for k, v in a.items() if k != "kind"}))
+    return out
+
+
+def rul_conds(r):
+    """The conditions of rule row r ({} = none)."""
+    return _rul_jload(_rul_col(r, "conds"), {})
+
+
+def rul_cond_ok(c, r, tid):
+    """True when every condition of rule r holds on task tid now."""
+    d = rul_conds(r)
+    if not d:
+        return True
+    t = c.execute("SELECT priority, assignee_id, section_id FROM tasks WHERE id=?", (tid,)).fetchone()
+    if not t:
+        return False
+    if "priority" in d and (t["priority"] or 0) != RUL_PRIO.get(d["priority"], -1):
+        return False
+    if "user_id" in d and t["assignee_id"] != d["user_id"]:
+        return False
+    if "section_id" in d and t["section_id"] != d["section_id"]:
+        return False
+    if "tag_id" in d and not c.execute("SELECT 1 FROM task_list_tags WHERE task_id=? AND tag_id=?", (tid, d["tag_id"])).fetchone():
+        return False
+    return True
 
 
 # ---------------------------------------------------------------- 2.138.0 D (#2060): created / assigned / field, priority / tag / field
@@ -259,6 +398,11 @@ def rul_act_clean(c, lid, a):
 def rul_trig_val(t):
     """The stored trig_val of a (checked) trigger dict -- the proposal card builds a rule row from it."""
     t = t or {}
+    if t.get("kind") == "due":  # 2.637.0 (#4768)
+        try:
+            return rul_due_clean(t)
+        except BadInput:
+            return ""
     if t.get("kind") == "field" and t.get("field_id"):
         v = t.get("value")
         return str(t["field_id"]) + ("" if v is None or v == "" else "=" + ("" if v in (False, 0, "0", "false") else "1" if v is True else str(v)))
@@ -273,16 +417,19 @@ def rul_val_name(c, f, v):
 
 
 def rul_ref_gone(c, r):
-    """The pause reason when the custom field / list tag a rule refers to was deleted, else None."""
-    a = json.loads(r["act_val"] or "{}")
+    """The pause reason when the custom field / list tag a rule refers to was deleted, else None. 2.637.0 (#4768): every
+    action of the chain and the conditions (a deleted tag / column of a condition pauses it too)."""
+    acts, cond = rul_acts(r), rul_conds(r)
     tv = (r["trig_val"] or "").split("=")[0]
     if (r["trig"] == "field" and tv.isdigit() and not _field_row(c, r["list_id"], int(tv))) or \
-            (r["act"] == "field" and not _field_row(c, r["list_id"], a.get("field_id") or 0)):
+            any(k == "field" and not _field_row(c, r["list_id"], a.get("field_id") or 0) for k, a in acts):
         return "field"
     tags = [int(tv)] if r["trig"] == "ltag" and tv.isdigit() else []
-    tags += [a.get("tag_id") or 0] if r["act"] == "tag" else []
+    tags += [a.get("tag_id") or 0 for k, a in acts if k == "tag"] + ([cond["tag_id"]] if cond.get("tag_id") else [])
     if any(not c.execute("SELECT 1 FROM list_tags WHERE id=? AND list_id=?", (x, r["list_id"])).fetchone() for x in tags):
         return "tag"
+    if cond.get("section_id") and not c.execute("SELECT 1 FROM sections WHERE id=? AND list_id=?", (cond["section_id"], r["list_id"])).fetchone():
+        return "section"
     return None
 
 
@@ -338,7 +485,6 @@ def rul_sync(c, lid):
 
 
 def rul_dict(c, r):
-    a = json.loads(r["act_val"] or "{}")
     trig = {"kind": r["trig"]}
     names = {}
     if r["trig"] == "section" and r["trig_val"]:
@@ -358,10 +504,41 @@ def rul_dict(c, r):
         trig["field_id"], trig["value"] = int(fid), (("1" if v else "0") if f and f["type"] == "checkbox" else v) if eq else None
         names["field"] = f["name"] if f else None
         names["value"] = rul_val_name(c, f, v) if eq and v != RUL_FILLED else None
-    act = {"kind": r["act"], **a}
-    if r["act"] == "assign":
+    elif r["trig"] == "due":  # 2.637.0 (#4768): the distance
+        tv = r["trig_val"] or ""
+        trig["when"] = "overdue" if tv[:1] == "o" else "before"
+        trig["days"] = abs(rul_due_off(tv) or 0)
+    acts = [{"kind": k, **a} for k, a in rul_acts(r)]
+    anames = [rul_act_names(c, r, x) for x in acts]
+    names.update(anames[0])  # the first action's names flat, as before 2.637 (older clients)
+    names["acts"] = anames
+    cond = rul_conds(r)
+    if cond:
+        cn = {}
+        if cond.get("user_id"):
+            cn["user"] = user_names(c, [cond["user_id"]]).get(cond["user_id"])
+        if cond.get("tag_id"):
+            s = c.execute("SELECT name FROM list_tags WHERE id=?", (cond["tag_id"],)).fetchone()
+            cn["tag"] = s[0] if s else None
+        if cond.get("section_id"):
+            s = c.execute("SELECT name FROM sections WHERE id=?", (cond["section_id"],)).fetchone()
+            cn["section"] = s[0] if s else None
+        names["cond"] = cn
+    by = r["created_by"]
+    return {"id": r["id"], "list_id": r["list_id"], "name": r["name"], "trigger": trig, "action": acts[0], "actions": acts,
+            "conditions": cond, "names": names,
+            "active": bool(r["active"]), "paused_reason": r["paused_reason"] or None,
+            "paused_text": tr(RUL_PAUSE[r["paused_reason"]]) if r["paused_reason"] in RUL_PAUSE else None,
+            "created_by": by, "created_by_name": user_names(c, [by]).get(by) if by else None,
+            "created_at": r["created_at"], "updated_at": r["updated_at"]}
+
+
+def rul_act_names(c, r, a):
+    """The names of what one action refers to (user, list, section_to, tag_to, field_to, value_to, field_type)."""
+    names, k = {}, a.get("kind")
+    if k == "assign":
         names["user"] = user_names(c, [a.get("user_id")]).get(a.get("user_id"))
-    elif r["act"] == "move":
+    elif k == "move":
         # 2.71.0 (#1457, review M1): the target's names only for a viewer who sees the target list
         see = not a.get("list_id") or a["list_id"] == r["list_id"] or bool(has_request_context() and g.get("user") and list_role(c, a["list_id"]))
         if a.get("list_id") and a["list_id"] != r["list_id"] and see:
@@ -370,19 +547,14 @@ def rul_dict(c, r):
         if a.get("section_id") and see:
             s = c.execute("SELECT name FROM sections WHERE id=?", (a["section_id"],)).fetchone()
             names["section_to"] = s[0] if s else None
-    elif r["act"] == "tag":  # 2.138.0 D (#2060)
+    elif k == "tag":  # 2.138.0 D (#2060)
         s = c.execute("SELECT name FROM list_tags WHERE id=?", (a.get("tag_id"),)).fetchone()
         names["tag_to"] = s[0] if s else None
-    elif r["act"] == "field":
+    elif k == "field":
         f = _field_row(c, r["list_id"], a.get("field_id") or 0)
         names["field_to"], names["value_to"] = (f["name"] if f else None), rul_val_name(c, f, a.get("value"))
         names["field_type"] = f["type"] if f else None
-    by = r["created_by"]
-    return {"id": r["id"], "list_id": r["list_id"], "name": r["name"], "trigger": trig, "action": act, "names": names,
-            "active": bool(r["active"]), "paused_reason": r["paused_reason"] or None,
-            "paused_text": tr(RUL_PAUSE[r["paused_reason"]]) if r["paused_reason"] in RUL_PAUSE else None,
-            "created_by": by, "created_by_name": user_names(c, [by]).get(by) if by else None,
-            "created_at": r["created_at"], "updated_at": r["updated_at"]}
+    return names
 
 
 # ---------------------------------------------------------------- web routes (owner / list admins; agents never)
@@ -412,9 +584,9 @@ def rul_insert(c, lid, f, uid):
         raise BadInput(tr("At most {0} rules per project", RUL_LIST_MAX))
     org = c.execute("SELECT org_id FROM lists WHERE id=?", (lid,)).fetchone()[0]
     return insert_id(c, """INSERT INTO list_rules(list_id,org_id,name,trig,trig_val,act,act_val,target_list_id,active,paused_reason,
-                         created_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,'',?,?,?)""",
+                         created_by,created_at,updated_at,more_acts,conds) VALUES(?,?,?,?,?,?,?,?,?,'',?,?,?,?,?)""",
                      (lid, org, f["name"], f["trig"], f["trig_val"], f["act"], f["act_val"], f["target_list_id"], f.get("active", 1),
-                      uid, ts, ts))
+                      uid, ts, ts, f.get("more_acts", ""), f.get("conds", "")))  # 2.637.0 (#4768): + more_acts, conds
 
 
 @app.post("/api/lists/<int:lid>/rules")
@@ -436,8 +608,9 @@ def rule_create(lid):
 
 @app.patch("/api/rules/<int:rid>")
 def rule_update(rid):
-    """{name?, trigger?, action?, active?}. Changing the trigger / action or switching a rule on again makes the editing
-    person its owner (it runs with their rights from now on) and clears a pause."""
+    """{name?, trigger?, action? | actions?, conditions?, active?}. Changing the trigger / action or switching a rule on again
+    makes the editing person its owner (it runs with their rights from now on) and clears a pause. 2.637.0 (#4768): "action"
+    alone replaces the whole chain with that one action."""
     _need_person()
     c = db()
     r = need_rule(c, rid)
@@ -448,7 +621,7 @@ def rule_update(rid):
     try:
         f = rul_clean(c, r["list_id"], b, partial=r)
         if ((f.get("active") and not r["active"]) or "trig" in f) and "act" not in f:  # on again / new owner (review N1): the stored action is checked with my rights
-            rul_clean(c, r["list_id"], {"action": rul_dict(c, r)["action"]}, partial=r)
+            rul_clean(c, r["list_id"], {"actions": rul_dict(c, r)["actions"]}, partial=r)  # 2.637.0 (#4768): every action of the chain
     except BadInput as e:
         return err(str(e))
     if any(k in f for k in ("trig", "act")) or (f.get("active") and not r["active"]):
@@ -600,11 +773,24 @@ def rul_check(c, r, tid):
         return "locked"
     if rul_list_ok(c, r["list_id"]):  # 2.71.0 (#1457, review N4): the list became a health list afterwards
         return "list"
-    a = json.loads(r["act_val"] or "{}")
-    if r["act"] == "move" and a.get("section_id") and not c.execute(  # review N2: a deleted target column pauses the rule
+    why = rul_ref_gone(c, r)  # 2.138.0 D (#2060): the field / list tag of the rule was deleted
+    if why:
+        return why
+    if rul_conds(r).get("user_id") and rul_conds(r)["user_id"] not in list_people(c, r["list_id"]):  # 2.637.0 (#4768)
+        return "assignee"
+    for k, a in rul_acts(r):  # 2.637.0 (#4768): every action of the chain, before any of them runs
+        why = rul_check_act(c, r, k, a)
+        if why:
+            return why
+    return None
+
+
+def rul_check_act(c, r, k, a):
+    """Under rul_as: the pause reason when the creator may not run the action (k, a) of rule r now, else None."""
+    if k == "move" and a.get("section_id") and not c.execute(  # review N2: a deleted target column pauses the rule
             "SELECT 1 FROM sections WHERE id=? AND list_id=?", (a["section_id"], a.get("list_id") or r["list_id"])).fetchone():
         return "section"
-    if r["act"] == "move" and a.get("list_id") and a["list_id"] != r["list_id"]:
+    if k == "move" and a.get("list_id") and a["list_id"] != r["list_id"]:
         if rul_locked(c, a["list_id"]):
             return "locked"
         try:
@@ -612,23 +798,56 @@ def rul_check(c, r, tid):
                 return "target"
         except Denied:
             return "target"
-    why = rul_ref_gone(c, r)  # 2.138.0 D (#2060): the field / list tag of the rule was deleted
-    if why:
-        return why
-    if r["act"] == "field":  # the fixed value must still fit (an option removed, a person left the list)
+    if k == "field":  # the fixed value must still fit (an option removed, a person left the list)
         try:
             field_value(c, _field_row(c, r["list_id"], a["field_id"]), a.get("value"), r["list_id"])
         except BadInput:
             return "field"
-    if r["act"] == "assign" and (a.get("user_id") not in list_people(c, r["list_id"]) or check_assignee(c, r["list_id"], a.get("user_id"))):
+    if k == "assign" and (a.get("user_id") not in list_people(c, r["list_id"]) or check_assignee(c, r["list_id"], a.get("user_id"))):
         return "assignee"
     return None
 
 
+def _rul_body(c, r, tid, k, a):
+    """The apply_update body of one action (BadInput for a kind this version does not know: never a move)."""
+    if k == "assign":
+        return {"assignee_id": a["user_id"]}
+    if k == "priority":  # 2.138.0 D (#2060)
+        return {"priority": RUL_PRIO.get(a.get("priority"), 0)}
+    if k == "tag":
+        from ..collab.reactions import ltag_names
+        return {"ltags": ltag_names(c, tid) + [c.execute("SELECT name FROM list_tags WHERE id=?", (a["tag_id"],)).fetchone()[0]]}
+    if k == "field":
+        return {"fields": {str(a["field_id"]): a.get("value")}}
+    if k == "due":
+        return {"due": None if a.get("days") is None else (local_now().date() + timedelta(days=a["days"])).isoformat()}
+    if k == "move":
+        dst = a.get("list_id") or r["list_id"]
+        return {"list_id": dst, **({"section_id": a["section_id"]} if a.get("section_id") else {}), **rul_carry(c, tid, r["list_id"], dst)}
+    raise BadInput("unknown action")  # 2.138.0 D (#2060, review): an action this version does not know does nothing
+
+
+def _rul_side_keep():
+    """What a rule run notes for after the request (pushes, webhooks, channel events): a chain that fails is rolled back
+    as a whole (2.637.0, #4768), so are its notes."""
+    return {k: (list(v) if isinstance(v, list) else dict(v)) for k in ("pushes", "wh", "chn") if isinstance(v := g.get(k), (list, dict))}
+
+
+def _rul_side_back(keep):
+    for k in ("pushes", "wh", "chn"):
+        if k in keep:
+            setattr(g, k, keep[k])
+        else:
+            g.pop(k, None)
+
+
 def rul_exec(c, r, tid):
-    """Runs the action of rule r on task tid as its creator (one savepoint: a failing action leaves nothing behind)."""
+    """Runs the actions of rule r on task tid as its creator, one after the other in ONE savepoint (a failing action leaves
+    nothing of the chain behind). 2.637.0 (#4768): the conditions are checked first (not met = nothing happens)."""
     if not r["created_by"]:
         rul_pause(c, r, "creator")
+        return False
+    if not rul_cond_ok(c, r, tid):
         return False
     with rul_as(c, r):
         try:
@@ -638,42 +857,33 @@ def rul_exec(c, r, tid):
         if why:
             pause = why
         else:
-            pause = None
-            a = json.loads(r["act_val"] or "{}")
+            pause, k, keep = None, None, _rul_side_keep()
             try:
                 with c.savepoint():
-                    if r["act"] == "comment":
-                        rul_comment(c, r, tid, a["text"])
-                    elif r["act"] in ("done", "reopen"):  # 2.633.0 (#4781)
-                        if not rul_status(c, tid, r["act"]):
-                            return False
-                    else:
-                        if r["act"] == "assign":
-                            b = {"assignee_id": a["user_id"]}
-                        elif r["act"] == "priority":  # 2.138.0 D (#2060)
-                            b = {"priority": RUL_PRIO.get(a.get("priority"), 0)}
-                        elif r["act"] == "tag":
-                            from ..collab.reactions import ltag_names
-                            b = {"ltags": ltag_names(c, tid) + [c.execute("SELECT name FROM list_tags WHERE id=?", (a["tag_id"],)).fetchone()[0]]}
-                        elif r["act"] == "field":
-                            b = {"fields": {str(a["field_id"]): a.get("value")}}
-                        elif r["act"] == "due":
-                            b = {"due": None if a.get("days") is None else (local_now().date() + timedelta(days=a["days"])).isoformat()}
-                        elif r["act"] == "move":
-                            dst = a.get("list_id") or r["list_id"]
-                            b = {"list_id": dst, **({"section_id": a["section_id"]} if a.get("section_id") else {}), **rul_carry(c, tid, r["list_id"], dst)}
-                        else:  # 2.138.0 D (#2060, review): an action this version does not know does nothing (never a move)
-                            return False
-                        e = apply_update(c, tid, b)
-                        if e:
-                            raise BadInput(e)
+                    did = False
+                    for k, a in rul_acts(r):
+                        if k == "comment":
+                            rul_comment(c, r, tid, a["text"])
+                        elif k in ("done", "reopen"):  # 2.633.0 (#4781); in a chain (2.637.0): done / open already = this step does nothing
+                            if not rul_status(c, tid, k):
+                                continue
+                        else:
+                            e = apply_update(c, tid, _rul_body(c, r, tid, k, a))
+                            if e:
+                                raise BadInput(e)
+                        did = True
+                    if not did:
+                        return False
             except Denied as e:
+                _rul_side_back(keep)
                 if e.code == 409:  # 2.577.0 (#3354): a done column behind the review gate: not this time, no question of rights
                     return False
-                pause = "target" if r["act"] == "move" else "role"
+                pause = "target" if k == "move" else "role"
             except BadInput:
+                _rul_side_back(keep)
                 return False  # not a question of rights (e.g. a milestone cannot move): this time nothing happens
             except Exception as e:  # noqa: BLE001  (a rule never breaks the change that triggered it)
+                _rul_side_back(keep)
                 print("list rule", r["id"], "failed:", type(e).__name__, e, flush=True)
                 return False
     if pause:
@@ -735,25 +945,36 @@ def rul_comment(c, r, tid, text):
 # ---------------------------------------------------------------- due date reached (watchdog)
 def rul_due_tick(c):
     """Watchdog: rules "due date reached" -- open tasks of the rule's list (subtasks too) whose due day is today (server time
-    zone), once per rule, task and due day (list_rule_runs). Each run as the rule's creator inside a request context of its
+    zone; 2.637.0 #4768: or the rule's distance before / after it), once per rule, task and due day (list_rule_runs). Each run as the rule's creator inside a request context of its
     own (no request is going on here)."""
-    day = local_now().date().isoformat()
-    rows = c.execute("""SELECT r.id AS rid, t.id AS tid FROM list_rules r JOIN tasks t ON t.list_id=r.list_id
-                        WHERE r.trig='due' AND r.active=1 AND r.deleted_at IS NULL AND t.due=? AND t.status=0 AND t.deleted_at IS NULL
-                        AND NOT EXISTS (SELECT 1 FROM list_rule_runs x WHERE x.rule_id=r.id AND x.task_id=t.id AND x.key=?)
-                        ORDER BY r.id, t.id LIMIT ?""", (day, "due:" + day, RUL_DUE_BATCH)).fetchall()
+    today = local_now().date()
+    rows = []
+    # 2.637.0 (#4768): per distance (trig_val) the due day it looks for: today + 3 for "3 days before", today - 2 for "overdue
+    # for 2 days"; the marker holds the due day, so a moved due date runs again
+    tvs = sorted({x[0] or "" for x in c.execute("SELECT DISTINCT trig_val FROM list_rules WHERE trig='due' AND active=1 AND deleted_at IS NULL")})
+    for tv in tvs:
+        off = rul_due_off(tv)
+        if off is None or len(rows) >= RUL_DUE_BATCH:
+            continue
+        day = (today + timedelta(days=off)).isoformat()
+        key = rul_due_key(day, tv)
+        rows += [(x["rid"], x["tid"], key) for x in c.execute(
+            """SELECT r.id AS rid, t.id AS tid FROM list_rules r JOIN tasks t ON t.list_id=r.list_id
+               WHERE r.trig='due' AND r.trig_val=? AND r.active=1 AND r.deleted_at IS NULL AND t.due=? AND t.status=0 AND t.deleted_at IS NULL
+               AND NOT EXISTS (SELECT 1 FROM list_rule_runs x WHERE x.rule_id=r.id AND x.task_id=t.id AND x.key=?)
+               ORDER BY r.id, t.id LIMIT ?""", (tv, day, key, RUL_DUE_BATCH - len(rows))).fetchall()]
     if not rows:
         return
-    for x in rows:
-        r = c.execute("SELECT * FROM list_rules WHERE id=?", (x["rid"],)).fetchone()
+    for rid, tid, key in rows:
+        r = c.execute("SELECT * FROM list_rules WHERE id=?", (rid,)).fetchone()
         if not r or not r["active"]:
             continue
         with app.test_request_context("/api/rules/due"):
             g.db, g.pushes = c, []
             try:
                 c.execute("INSERT INTO list_rule_runs(rule_id,task_id,key,at) VALUES(?,?,?,?) ON CONFLICT DO NOTHING",
-                          (r["id"], x["tid"], "due:" + day, iso(now_utc())))
-                rul_exec(c, r, x["tid"])
+                          (r["id"], tid, key, iso(now_utc())))
+                rul_exec(c, r, tid)
                 _due_flush(c)
                 bump(c)
                 c.commit()
@@ -763,7 +984,7 @@ def rul_due_tick(c):
                 print("list rule", r["id"], "due run failed:", type(e).__name__, e, flush=True)
                 with pg_system(c):  # 2.71.0 (#1457): system on purpose: only the run marker of this rule and task
                     c.execute("INSERT INTO list_rule_runs(rule_id,task_id,key,at) VALUES(?,?,?,?) ON CONFLICT DO NOTHING",
-                              (r["id"], x["tid"], "due:" + day, iso(now_utc())))
+                              (r["id"], tid, key, iso(now_utc())))
                 c.commit()
             finally:
                 g.pop("db", None)  # the watchdog's connection: closed by the watchdog, not by this context
@@ -862,10 +1083,12 @@ def rul_prop_validate(b, inp):
     """prop_validate for kind rule: {name, trigger, action, summary} -> {rule: {name, trigger, action}}. The references are
     checked as the agent sees them (a target list the agent sees); accepting checks them again as the person."""
     from ..agents.proposals import _p_keys
-    _p_keys(b, "", ("kind", "summary", "name", "trigger", "action", "title"))
+    _p_keys(b, "", ("kind", "summary", "name", "trigger", "action", "actions", "conditions", "title"))
     c = db()
     lid = int(inp["list_id"])
-    rule = {k: b.get(k) for k in ("name", "trigger", "action")}
+    rule = {k: b.get(k) for k in ("name", "trigger", "action", "actions", "conditions") if k in b or k in ("name", "trigger")}  # 2.637.0 (#4768)
+    if "action" not in rule and "actions" not in rule:
+        rule["action"] = None  # rul_clean says what is missing
     f = rul_clean(c, lid, rule, see_only=True)
     rule["name"] = f["name"]
     return {"rule": rule}
@@ -879,9 +1102,12 @@ def rul_prop_extra(c, j):
     if not lid or j["user_id"] != me() or not list_role(c, lid):
         return {}
     rr = p.get("rule") or {}
+    acts = [a for a in (rr.get("actions") if isinstance(rr.get("actions"), list) else [rr.get("action")]) if isinstance(a, dict)] or [{}]
     fake = {"id": 0, "list_id": lid, "name": rr.get("name") or "", "trig": (rr.get("trigger") or {}).get("kind"),
             "trig_val": rul_trig_val(rr.get("trigger")),  # 2.138.0 D (#2060)
-            "act": (rr.get("action") or {}).get("kind"), "act_val": json.dumps({k: v for k, v in (rr.get("action") or {}).items() if k != "kind"}),
+            "act": acts[0].get("kind"), "act_val": json.dumps({k: v for k, v in acts[0].items() if k != "kind"}),
+            "more_acts": json.dumps(acts[1:]) if len(acts) > 1 else "",  # 2.637.0 (#4768)
+            "conds": json.dumps(rr["conditions"]) if isinstance(rr.get("conditions"), dict) and rr["conditions"] else "",
             "active": 1, "paused_reason": "", "created_by": None, "created_at": j["created_at"], "updated_at": j["created_at"]}
     name = c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()
     return {"rule_view": rul_dict(c, fake), "list_name": name[0] if name else ""}
@@ -918,15 +1144,19 @@ def rul_spec(paths, schemas, op, ok, errs, ref, pid):
     schemas["ListRule"] = {"type": "object", "properties": {
         "id": {"type": "integer"}, "list_id": {"type": "integer"}, "name": {"type": "string", "maxLength": RUL_NAME_MAX},
         "trigger": {"type": "object", "description": "kind: section (a task comes into column section_id), done (completed), "
-                    "reopen (opened again), ltag (gets the list tag tag_id), due (its due day is today), created (a task is created "
+                    "reopen (opened again), ltag (gets the list tag tag_id), due (2.637.0: when = before (default) with days 0.."
+                    f"{RUL_DUE_OFF_MAX} = that many days before the due day, 0 = on the due day; when = overdue with days = overdue for that many "
+                    "days; once per rule, task and due day, a moved due date runs again), created (a task is created "
                     "in the list), assigned (a person is newly assigned, not by an approval; user_id = only that person, null = anybody), field (a value "
                     "of the list's custom field field_id changes; value = only when set to that option id of a selection field / "
                     "\"1\" checked, \"0\" unchecked of a checkbox field, \"*\" = whenever it has a value (2.473.0; not on a checkbox field), "
                     "null = any change; formula fields never trigger)",
                     "properties": {"kind": {"type": "string", "enum": list(RUL_TRIGGERS)}, "section_id": {"type": "integer"},
                                    "tag_id": {"type": "integer"}, "user_id": {"type": ["integer", "null"]},
-                                   "field_id": {"type": "integer"}, "value": {"type": ["string", "null"]}}},
-        "action": {"type": "object", "description": "kind: assign (user_id, a person of the list), due (days from today 0.."
+                                   "field_id": {"type": "integer"}, "value": {"type": ["string", "null"]},
+                                   "when": {"type": "string", "enum": list(RUL_DUE_WHEN)},
+                                   "days": {"type": "integer", "minimum": 0, "maximum": RUL_DUE_OFF_MAX}}},
+        "action": {"type": "object", "description": "The first action of actions (as before 2.637.0). kind: assign (user_id, a person of the list), due (days from today 0.."
                    f"{RUL_DAYS_MAX}, null = clear), comment (text, at most {RUL_TEXT_MAX} characters), move (list_id and / or section_id; 2.473.0: "
                    "values of text, number, currency, rating, date and checkbox fields go along into the target's field of the same name and type), "
                    "priority (priority none | low | medium | high), tag (adds the list tag tag_id), field (sets the list's custom "
@@ -938,8 +1168,18 @@ def rul_spec(paths, schemas, op, ok, errs, ref, pid):
                                   "section_id": {"type": ["integer", "null"]}, "priority": {"type": "string", "enum": list(RUL_PRIO)},
                                   "tag_id": {"type": "integer"}, "field_id": {"type": "integer"},
                                   "value": {"type": ["string", "null"]}}},
+        "actions": {"type": "array", "minItems": 1, "maxItems": RUL_ACT_MAX, "items": {"type": "object"},
+                    "description": f"2.637.0 (#4768): 1..{RUL_ACT_MAX} actions (each like action), run one after the other, all or "
+                    "nothing; a missing right in any of them pauses the rule. A move into another list only as the last one. "
+                    "Write either action (a chain of one) or actions."},
+        "conditions": {"type": "object", "description": "2.637.0 (#4768): only when ALL of them hold on the task when the rule runs "
+                       "({} = always): priority (none | low | medium | high | urgent), user_id (assigned to that person of the list), "
+                       "tag_id (has that list tag), section_id (is in that column of the list)",
+                       "properties": {"priority": {"type": "string", "enum": list(RUL_PRIO)}, "user_id": {"type": "integer"},
+                                      "tag_id": {"type": "integer"}, "section_id": {"type": "integer"}}},
         "names": {"type": "object", "description": "Names of what the rule refers to (section, tag, trig_user, field, value, user, list, "
-                  "section_to, tag_to, field_to, value_to, field_type)"},
+                  "section_to, tag_to, field_to, value_to, field_type; 2.637.0: acts = these names per action, cond = user, tag, "
+                  "section of the conditions)"},
         "active": {"type": "boolean"}, "paused_reason": {"type": ["string", "null"], "enum": [None, *RUL_PAUSE]},
         "created_by": {"type": ["integer", "null"], "description": "The rule runs with this person's rights"},
         "created_at": {"type": "string"}, "updated_at": {"type": "string"}}}
@@ -953,11 +1193,13 @@ def rul_spec(paths, schemas, op, ok, errs, ref, pid):
     paths["/lists/{id}/rules/proposals"] = {"post": op(
         "2.71.0 (#1457): propose a rule for a list (the owner or an admin accepts or declines it)", "Agents",
         ok({"type": "object"}, "Created", "201") | errs("400", "403", "404", "409", "413", "429"), [lp],
-        body={"type": "object", "required": ["name", "trigger", "action"], "properties": {
+        body={"type": "object", "required": ["name", "trigger"], "properties": {
             "name": {"type": "string", "maxLength": RUL_NAME_MAX}, "trigger": {"type": "object"}, "action": {"type": "object"},
+            "actions": {"type": "array", "maxItems": RUL_ACT_MAX, "items": {"type": "object"}, "description": "2.637.0: instead of action"},
+            "conditions": {"type": "object", "description": "2.637.0: as in ListRule"},
             "summary": {"type": "string", "description": "Markdown: why this rule helps"}, "title": {"type": "string"},
             "user_id": {"type": "integer", "description": "Owner / admin of the list who decides (default: the list's owner)"}}},
         scope="structure",
-        desc=f"Agents only. trigger / action as in ListRule. A ready proposal (kind rule) for the person: News + a card. Accepting "
+        desc=f"Agents only. trigger / action (or actions) / conditions as in ListRule. A ready proposal (kind rule) for the person: News + a card. Accepting "
              f"creates the rule with THEIR rights (it belongs to them, never to you). At most {RUL_PROP_DAY_MAX} per day. The answer "
              "comes as the event job (action approve / reject).")}

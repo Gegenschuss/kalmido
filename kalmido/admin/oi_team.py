@@ -24,6 +24,7 @@ from .orgexport import _safe_part  # 2.380 H (#2398)
 from .acctimport import umz_legacy_aad  # 2.362.0 (#3090)
 from ..life.rss import _norm, RSS_MAX_FEEDS  # 2.455.0 (#3469)
 from ..lists.rules import RUL_ACTIONS, RUL_DAYS_MAX, RUL_LIST_MAX, RUL_NAME_MAX, RUL_PRIO, RUL_TEXT_MAX, RUL_TRIGGERS  # 2.455.0 (#3469)
+from ..lists.rules import RUL_ACT_MAX, rul_due_off  # 2.637.0 (#4768)
 from .acctimport import umz_mentions  # 2.362.4 (#3100)
 from ..core.orgcrypt import FIELDS  # 2.363.4 (#3127)
 from ..hub.hubmail import hbm_seal  # 2.363.4 (#3127)
@@ -379,21 +380,58 @@ def rule_ids(c, run, who, types, src, d):
         fid, eq, val = tv.partition("=")
         new = run.m("list_fields", fid)
         tv, pause = f"{new}{eq}{val}" if new else "", "" if new else "field"
+    elif trig == "due":  # 2.637.0 (#4768): the distance before / after the due day ('' | b<days> | o<days>)
+        tv = tv if rul_due_off(tv) is not None else ""
     else:
         tv = ""
     try:
         a = json.loads(src.get("act_val") or "{}") if isinstance(src.get("act_val"), str) else (src.get("act_val") or {})
     except (ValueError, RecursionError):
         a = {}
-    a, v, target = a if isinstance(a, dict) else {}, {}, None
+    one = _rule_act_ids(run, who, types, name, lid, act, a, bool(src.get("target_list_id")))
+    if one is None:
+        return None
+    v, target, why = one
+    pause = pause or why
+    # 2.637.0 (#4768): the further actions and the conditions point at rows of the list too (mapped the same way)
+    more = src.get("more_acts")
+    try:
+        more = json.loads(more) if isinstance(more, str) and more else (more or [])
+    except (ValueError, RecursionError):
+        more = []
+    more = [x for x in more if isinstance(x, dict)] if isinstance(more, list) else []
+    if len(more) >= RUL_ACT_MAX or any(x.get("kind") not in RUL_ACTIONS for x in more):
+        run.warning(_W_RULE_LEFT, name)
+        return None
+    acts = []
+    for x in more:
+        one = _rule_act_ids(run, who, types, name, lid, x["kind"], {k: y for k, y in x.items() if k != "kind"}, True)
+        if one is None:
+            return None
+        acts.append({"kind": x["kind"], **one[0]})
+        target, pause = one[1] or target, pause or one[2]
+    cond, why = _rule_cond_ids(run, who, src.get("conds"))
+    pause = pause or why
+    d.update(name=name, trig=trig, trig_val=tv, act=act, act_val=json.dumps(v, separators=(",", ":")), target_list_id=target,
+             more_acts=json.dumps(acts, separators=(",", ":")) if acts else "", conds=json.dumps(cond, separators=(",", ":")) if cond else "")
+    if pause:
+        d.update(active=0, paused_reason=pause)
+        run.warning(_W_RULE_PAUSED, name)
+    return d
+
+
+def _rule_act_ids(run, who, types, name, lid, act, a, had_target):
+    """One action of a rule with its ids mapped -> (value dict, target list id | None, pause reason | '') or None (left out).
+    had_target: the file named a target list (a move without one into a list that did not come along = paused)."""
+    a, v, target, pause = a if isinstance(a, dict) else {}, {}, None, ""
     if act == "assign":
         v = {"user_id": who(a.get("user_id"))}
-        pause = pause or ("" if v["user_id"] else "assignee")
+        pause = "" if v["user_id"] else "assignee"
     elif act == "move":
-        dst = run.m("lists", a.get("list_id")) if a.get("list_id") else lid if not src.get("target_list_id") and a else None
+        dst = run.m("lists", a.get("list_id")) if a.get("list_id") else lid if not had_target and a else None
         sid = run.m("sections", a.get("section_id")) if a.get("section_id") else None
         v, target = {"list_id": dst, "section_id": sid}, dst if dst != lid else None
-        pause = pause or ("target" if not dst else "section" if a.get("section_id") and not sid else "")
+        pause = "target" if not dst else "section" if a.get("section_id") and not sid else ""
     elif act == "due":
         days = a.get("days")
         if days is not None and not (isinstance(days, int) and not isinstance(days, bool) and 0 <= days <= RUL_DAYS_MAX):
@@ -413,19 +451,35 @@ def rule_ids(c, run, who, types, src, d):
         v = {"priority": a["priority"]}
     elif act == "tag":
         v = {"tag_id": run.m("list_tags", a.get("tag_id"))}
-        pause = pause or ("" if v["tag_id"] else "tag")
+        pause = "" if v["tag_id"] else "tag"
     else:  # field: a person's value is an id too; a value of other types has none
         fid, val = run.m("list_fields", a.get("field_id")), a.get("value")
         if types.get(_oid(a.get("field_id"))) == "person" and val is not None:
             val = who(val)
-            pause = pause or ("" if val else "field")
+            pause = "" if val else "field"
         v = {"field_id": fid, "value": val}
         pause = pause or ("" if fid else "field")
-    d.update(name=name, trig=trig, trig_val=tv, act=act, act_val=json.dumps(v, separators=(",", ":")), target_list_id=target)
-    if pause:
-        d.update(active=0, paused_reason=pause)
-        run.warning(_W_RULE_PAUSED, name)
-    return d
+    return v, target, pause
+
+
+def _rule_cond_ids(run, who, conds):
+    """2.637.0 (#4768): the conditions of a rule with their ids mapped -> (dict, pause reason | ''); a person / tag / column
+    that did not come along pauses the rule (never an old id)."""
+    try:
+        d = json.loads(conds) if isinstance(conds, str) and conds else (conds or {})
+    except (ValueError, RecursionError):
+        d = {}
+    d, out, pause = d if isinstance(d, dict) else {}, {}, ""
+    if d.get("priority") in RUL_PRIO:
+        out["priority"] = d["priority"]
+    for k, m, why in (("user_id", None, "assignee"), ("tag_id", "list_tags", "tag"), ("section_id", "sections", "section")):
+        if d.get(k):
+            new = who(d[k]) if m is None else run.m(m, d[k])
+            if new:
+                out[k] = new
+            else:
+                pause = pause or why
+    return out, pause
 
 
 def _rule(c, run, src, d, ctx):

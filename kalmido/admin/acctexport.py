@@ -399,15 +399,18 @@ def umz_extra_queries(uid):
                              WHERE f.list_id IN {private} ORDER BY e.created_at""", (uid,)),
         "leave_quota": ("SELECT org_id, year, days, carry, updated_at FROM hub_leave_quota WHERE user_id=? ORDER BY year, org_id", (uid,)),
         # 2.455.0 (#3469): the sprints, further placements and rules of my lists; a placement only between my own lists, and a
-        # move rule into a list that is not mine without its target (other people's lists are no part of my data). The customer
+        # move rule into a list that is not mine without its target (other people's lists are no part of my data; 2.637.0 #4768:
+        # such a move is the last action of a chain, so of more_acts when there are several). The customer
         # reports of my private lists like the forms (a report sent to an organisation stays there), never their status links
         "sprints": (f"SELECT id, list_id, num, name, start, end_day, goal, state, review, closed_at, created_at FROM sprints WHERE list_id IN {own} ORDER BY id", (uid,)),
         "task_links": (f"""SELECT l.task_id, l.list_id, l.section_id, l.sort, l.created_at FROM task_links l JOIN tasks t ON t.id=l.task_id
                            WHERE t.list_id IN {own} AND l.list_id IN {own}""", (uid, uid)),
         "list_rules": (f"""SELECT id, list_id, name, trig, trig_val, act, active, paused_reason, created_at, updated_at,
                            CASE WHEN target_list_id IN {own} THEN target_list_id END AS target_list_id,
-                           CASE WHEN target_list_id IS NULL OR target_list_id IN {own} THEN act_val ELSE '{{}}' END AS act_val
-                           FROM list_rules WHERE list_id IN {own} AND deleted_at IS NULL ORDER BY id""", (uid, uid, uid)),
+                           CASE WHEN more_acts<>'' OR target_list_id IS NULL OR target_list_id IN {own} THEN act_val ELSE '{{}}' END AS act_val,
+                           CASE WHEN more_acts='' OR target_list_id IS NULL OR target_list_id IN {own} THEN more_acts
+                                ELSE jsonb_set(more_acts::jsonb, '{{-1}}', '{{"kind": "move"}}'::jsonb)::text END AS more_acts, conds
+                           FROM list_rules WHERE list_id IN {own} AND deleted_at IS NULL ORDER BY id""", (uid, uid, uid, uid)),
         "portal_tickets": (f"""SELECT id, task_id, list_id, name, email, notify, mailed_status, lang, claimed, created_at, last_seen_at, last_mail_at
                                FROM portal_tickets WHERE list_id IN {private} ORDER BY id""", (uid,)),
     }
