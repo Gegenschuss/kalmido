@@ -36,7 +36,7 @@ KINDS = {
     "office": ("matrix", SUITE + ", p2199_b_office_test.py (2.199.0: a quotation of the personal office in a private folder, the folder routes, her agent), p2473_a_api_test.py, p288_a_api_test.py, p293_a_api_test.py, p293_b_api_test.py, p294_a_api_test.py, p295_a_api_test.py, p295_b_api_test.py, p2111_a_api_test.py, p2113c_a_api_test.py, p2110_b_api_test.py: the personal office (the freelancer is its admin): settings, company "
                          "fields, private clients, quotation, invoice, finalising, PDF, e-invoice; receipts, newsletter, Paperless; document "
                          "templates with signature, logbook (2.93.0); travel expenses with the per diem, its report and import (2.95.0); undo of the editors (2.111.0); "
-                         "p2137_a_api_test.py: the owner exports the personal office (export, recovery key) and imports an organisation's office into it (2.137.0); p2146_d_api_test.py: the retention export of the own records before a deletion (2.146.0); p2483_a_series_api_test.py: her agent reads her invoice series, subscriptions and the series fields of her invoices (2.483.0)"),
+                         "p2137_a_api_test.py: the owner exports the personal office (export, recovery key) and imports an organisation's office into it (2.137.0); p2146_d_api_test.py: the retention export of the own records before a deletion (2.146.0); p2483_a_series_api_test.py: her agent reads her invoice series, subscriptions and the series fields of her invoices (2.483.0); p2616_c_fints_test.py: her bank fetch over FinTS (2.616.0)"),
     "files": ("matrix", SUITE + ", p2353_a_lockfolder_test.py, p2353_a_scanlock_test.py (2.353.0: a locked private folder, scans refused there), p2199_a_fsref_test.py (2.199.0: reference nodes, sorting by hand, protected nodes in the private tree), p21121_a_api_test.py, p2122_a_api_test.py, p2122_b_api_test.py, p2122_c_api_test.py: the own file store (folders, upload, content, versions) and documents; every GET; "
                          "file requests of a private folder, tags of files / folders, the tag filter, the documents' filters, bulk change, ZIP, CSV, documents via the API (2.122.0); "
                          "p2154_a_api_test.py: a stack split in the private workspace, its undo, a private document linked with a private task (2.154.0); "
@@ -717,6 +717,7 @@ ROUTES = {
     "DAV /": "pim", "DAV /.well-known/caldav": "pim", "DAV /.well-known/caldav/": "pim", "DAV /.well-known/carddav": "pim",
     "DAV /.well-known/carddav/": "pim", "DAV /dav": "pim", "DAV /dav/": "pim", "DAV /dav/{}": "pim",
     "DAV /api/test/boom": "test",  # 2.359.0 (#3023): tests/p2359_a_api_test.py
+    "POST /api/test/fints/age": "test",  # 2.616.0 (#2473): tests/p2616_c_fints_test.py (the dialogs' clock)
     "DAV /test/boom": "test",  # 2.447.0 (#3761): tests/p2447_a_lang_test.py
     "DELETE /api/books/{}": "pim", "DELETE /api/books/{}/members/{}": "pim", "DELETE /api/books/{}/org": "pim",
     "POST /api/books/{}/restore": "pim", "POST /api/books/{}/purge": "pim", "POST /api/contacts/{}/restore": "pim",  # 2.272.0 E1 (#3038)
@@ -1047,6 +1048,10 @@ ROUTES = {
     "POST /api/office/bank/import/preview": "office", "POST /api/office/bank/imports/{}/restore": "office",
     "POST /api/office/bank/imports/{}/undo": "office", "POST /api/office/bank/tx/{}/match": "office",
     "POST /api/office/bank/tx/{}/unmatch": "office", "POST /api/office/series": "office",
+    # 2.616.0 (#2473): the direct bank fetch over FinTS (p2616_c_fints_test.py, freelancer-matrix: office)
+    "GET /api/office/bank/fints": "office", "POST /api/office/bank/fints/start": "office", "POST /api/office/bank/fints/{}/mechanism": "office",
+    "POST /api/office/bank/fints/{}/tan": "office", "POST /api/office/bank/fints/{}/poll": "office", "POST /api/office/bank/fints/{}/import": "office",
+    "DELETE /api/office/bank/fints/{}": "office",
     # 2.299.0 B (#3191): bank rules (p2299_b_bankrules_test.py, also as a person without an organisation)
     "GET /api/office/bank/rules": "office", "POST /api/office/bank/rules": "office", "PUT /api/office/bank/rules/{}": "office",
     "DELETE /api/office/bank/rules/{}": "office", "POST /api/office/bank/rules/{}/restore": "office", "POST /api/office/bank/rules/{}/apply": "office",

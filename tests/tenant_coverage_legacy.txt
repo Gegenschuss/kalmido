@@ -169,7 +169,6 @@ GET /api/office/bank/noreceipt
 GET /api/office/bank/noreceipt/count
 GET /api/office/bank/noreceipt/reminder
 GET /api/office/bank/rules
-GET /api/office/bank/tx
 GET /api/office/bank/tx/{}/candidates
 GET /api/office/books
 GET /api/office/books/archive
@@ -557,7 +556,6 @@ POST /api/office/agreements/{}/restore
 POST /api/office/bank/import
 POST /api/office/bank/import/preview
 POST /api/office/bank/imports/{}/restore
-POST /api/office/bank/imports/{}/undo
 POST /api/office/bank/rules
 POST /api/office/bank/rules/decline
 POST /api/office/bank/rules/{}/apply

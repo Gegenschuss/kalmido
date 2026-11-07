@@ -66,7 +66,7 @@ KINDS = {
     # one works in); foreign ids 404; agents and kids 403 before any query; 2.47.3 (#1360): a private person works in the own
     # personal office (a hidden area only its owner reaches). No /api/v1, no MCP in stage 1
     "industry": ("matrix", "p2578_b_industry_test.py: the app's industry (2.578.0) only of the own area: an organisation's by its admins, a member 403, another organisation unchanged"),  # 2.578.0 (#4573)
-    "office": ("matrix", "p2199_b_office_test.py (2.199.0: the folder routes of a filed quotation: another organisation 404), p2361_b_api_test.py (settings, master data, import / export), p2361_c_api_test.py (documents), p2361_d_api_test.py (logo, PDF), p2362_e_api_test.py (finalising, company fields, office log), p2380_a_api_test.py (invoices, payments, reminders), p2391_f_api_test.py (legacy import, archive), p2473_a_api_test.py (the personal office: a second person, row-level security, Private vs. organisation), p2473_b_api_test.py (travel expenses, cash flow), p2473_e_api_test.py (DATEV booking batch), p250_b_api_test.py (sales pipeline, business figures), p251_a_api_test.py (agents in the office: drafts, payment suggestions), p290_a_api_test.py (bookkeeping light), p290_b_api_test.py (bank reconciliation), p290_c_api_test.py (tax dates), p291_a_api_test.py (invoice series), p291_b_api_test.py (subscriptions and tools), p292_a_api_test.py (business contracts and insurances), p292_b_api_test.py (equipment value, insurance list), p293_a_api_test.py (document templates, signature), p293_b_api_test.py (logbook), p294_a_api_test.py (leads), p295_a_api_test.py (per diem, its report), p295_b_api_test.py (per diem spreadsheet import), p2113c_a_api_test.py (terms and conditions as PDF), p2110_b_api_test.py (receipts list, its export for the tax adviser), p2414_api_test.py (the booking archive: lines, receipts, files, runs of another organisation 404), p2483_a_series_api_test.py (agents read invoice series / subscriptions of their own office area only), p2531_a_chain_api_test.py (2.531.0 #4497: the chain check: a member 403, the organisation never counts the Private documents, another person never sees them)"),
+    "office": ("matrix", "p2199_b_office_test.py (2.199.0: the folder routes of a filed quotation: another organisation 404), p2361_b_api_test.py (settings, master data, import / export), p2361_c_api_test.py (documents), p2361_d_api_test.py (logo, PDF), p2362_e_api_test.py (finalising, company fields, office log), p2380_a_api_test.py (invoices, payments, reminders), p2391_f_api_test.py (legacy import, archive), p2473_a_api_test.py (the personal office: a second person, row-level security, Private vs. organisation), p2473_b_api_test.py (travel expenses, cash flow), p2473_e_api_test.py (DATEV booking batch), p250_b_api_test.py (sales pipeline, business figures), p251_a_api_test.py (agents in the office: drafts, payment suggestions), p290_a_api_test.py (bookkeeping light), p290_b_api_test.py (bank reconciliation), p290_c_api_test.py (tax dates), p291_a_api_test.py (invoice series), p291_b_api_test.py (subscriptions and tools), p292_a_api_test.py (business contracts and insurances), p292_b_api_test.py (equipment value, insurance list), p293_a_api_test.py (document templates, signature), p293_b_api_test.py (logbook), p294_a_api_test.py (leads), p295_a_api_test.py (per diem, its report), p295_b_api_test.py (per diem spreadsheet import), p2113c_a_api_test.py (terms and conditions as PDF), p2110_b_api_test.py (receipts list, its export for the tax adviser), p2414_api_test.py (the booking archive: lines, receipts, files, runs of another organisation 404), p2483_a_series_api_test.py (agents read invoice series / subscriptions of their own office area only), p2531_a_chain_api_test.py (2.531.0 #4497: the chain check: a member 403, the organisation never counts the Private documents, another person never sees them), p2616_c_fints_test.py (2.616.0 #2473: the FinTS dialog of another person / organisation 404)"),
     # 2.48.0 (#1111): documents = files of the file store (fs_visible_sql / need_node) + their recognition rows; labels, rules,
     # models, settings and the mail address belong to one workspace (private or an organisation, admins change it)
     "document": ("matrix", "p248_b_api_test.py: another organisation / person: 404 on a document, nothing in list, search, filter labels; settings and upload only for the own workspace; agents only with a share; "
@@ -443,6 +443,10 @@ ROUTES = {
     "POST /api/office/bank/import/preview": "office", "POST /api/office/bank/import": "office", "GET /api/office/bank/imports": "office",
     "POST /api/office/bank/imports/{}/undo": "office", "POST /api/office/bank/imports/{}/restore": "office", "GET /api/office/bank/tx": "office",
     "GET /api/office/bank/tx/{}/candidates": "office", "POST /api/office/bank/tx/{}/match": "office", "POST /api/office/bank/tx/{}/unmatch": "office",
+    # 2.616.0 (#2473): the direct bank fetch over FinTS: a dialog of another person / organisation 404 (p2616_c_fints_test.py)
+    "GET /api/office/bank/fints": "office", "POST /api/office/bank/fints/start": "office", "POST /api/office/bank/fints/{}/mechanism": "office",
+    "POST /api/office/bank/fints/{}/tan": "office", "POST /api/office/bank/fints/{}/poll": "office", "POST /api/office/bank/fints/{}/import": "office",
+    "DELETE /api/office/bank/fints/{}": "office",
     # 2.299.0 B (#3191): bank rules (p2299_b_bankrules_test.py, also as a person without an organisation)
     "GET /api/office/bank/rules": "office", "POST /api/office/bank/rules": "office", "PUT /api/office/bank/rules/{}": "office",
     "DELETE /api/office/bank/rules/{}": "office", "POST /api/office/bank/rules/{}/restore": "office", "POST /api/office/bank/rules/{}/apply": "office",
@@ -646,6 +650,7 @@ ROUTES = {
     "DAV /": "dav", "DAV /.well-known/caldav": "dav", "DAV /.well-known/caldav/": "dav", "DAV /.well-known/carddav": "dav",
     "DAV /.well-known/carddav/": "dav", "DAV /dav": "dav", "DAV /dav/": "dav", "DAV /dav/{}": "dav",
     "DAV /api/test/boom": "test",  # 2.359.0 (#3023): tests/p2359_a_api_test.py
+    "POST /api/test/fints/age": "test",  # 2.616.0 (#2473): tests/p2616_c_fints_test.py (the dialogs' clock)
     "DAV /test/boom": "test",  # 2.447.0 (#3761): tests/p2447_a_lang_test.py
     # ---- event (19)
     "GET /api/calendars/events": "event", "GET /api/v1/events": "event", "POST /api/v1/events": "event",
@@ -1482,7 +1487,7 @@ def unproven(routes, kinds, src):
 
 LEGACY_FILE = os.path.join(N, "tenant_coverage_legacy.txt")
 LEGACY = [ln.strip() for ln in open(LEGACY_FILE, encoding="utf-8") if ln.strip() and not ln.startswith("#")]
-LEGACY_COUNT = 884  # 2.546.0 (#4291): the length of tenant_coverage_legacy.txt; lower it together with the file, never raise it
+LEGACY_COUNT = 882  # 2.546.0 (#4291): the length of tenant_coverage_legacy.txt; lower it together with the file, never raise it
 UNPROVEN = unproven(ROUTES, KINDS, open(__file__, encoding="utf-8").read())
 check(len(LEGACY) == len(set(LEGACY)) and LEGACY == sorted(LEGACY), "tenant_coverage_legacy.txt: sorted, no entry twice")
 for r in sorted(UNPROVEN - set(LEGACY)):
