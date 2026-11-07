@@ -78,4 +78,4 @@ with tempfile.TemporaryDirectory() as d:
          '    return spec\n\n\nm = load("m")\n')
     rc, out = run(d)
     check(rc == 1 and "kalmido/a/m.py" in out, "a load(\"m\") helper is followed: " + out[-300:])
-done("singlefile_import_lint")
+sys.exit(done("singlefile_import_lint"))

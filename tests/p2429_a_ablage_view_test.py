@@ -9,6 +9,7 @@
  - a page in the trash takes its files out of the collection; a space of another person / organisation is 404, an unknown key 404
  - a person without an organisation (the fixture): everything in the private workspace
 usage: p2429_a_ablage_view_test.py <datadir>      (KMT_NOSTART=1 / P2429A_NOSTART=1: a running server)"""
+import sys
 import base64
 
 from freelancer_fixture import FEATURES, freelancer, login
@@ -140,4 +141,4 @@ sh = [x["id"] for x in top(Bo, "shared").get("items", [])]
 check(PLAIN in sh and TT not in sh, f"#3580: 'Shared with me' shows the file store's folder, not the tables' one {sh}")
 check(not ({"Tables"} & set(names(top(A, f"org:{ORG}")))), "#3580: the organisation's top shows no root of the tables")
 check(Bo.get(B + "/api/files", params={"parent": TT}).ok, "#3580: bob still opens the shared folder by its id (the tables' panel)")
-done("p2429_a_ablage_view")
+sys.exit(done("p2429_a_ablage_view"))

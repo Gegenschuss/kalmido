@@ -9,6 +9,7 @@
    then 403 in that organisation only), not to Home & life
  - a person without an organisation: ?space=private works the same, with the journal
 usage: p2398_api_test.py <datadir>      (KMT_NOSTART=1 / P2398_NOSTART=1: a running server)"""
+import sys
 from freelancer_fixture import FEATURES, freelancer
 from kt import B, check, done, fresh, setup
 
@@ -98,4 +99,4 @@ check(fs.ok and fs.json()["done"]["today"] == 1, f"#3406 freelancer: the statist
 check(Fr.get(B + f"/api/life/review?space=org:{ORG}").status_code == 404, "#3406 freelancer: someone else's organisation is 404")
 check("Water the roses" not in str(Fr.get(B + "/api/life/review").json()), "#3406 freelancer: never someone else's tasks")
 
-done("p2398_api")
+sys.exit(done("p2398_api"))

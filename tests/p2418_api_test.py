@@ -8,6 +8,7 @@
    GET /api/orgs and /api/state (me.workspaces) carry it; a member cannot change it; a malformed point is 400
  - a person without an organisation arranges her own menus the same way (her own admin)
 usage: p2418_api_test.py <datadir>      (KMT_NOSTART=1 / P2418_NOSTART=1: a running server)"""
+import sys
 import json
 
 from freelancer_fixture import FEATURES, freelancer, login
@@ -71,4 +72,4 @@ check(r.ok, f"#3560: the freelancer arranges her menus {r.status_code} {r.text[:
 check(menus(Fr) == {"office": {"hidden": ["contacts"], "shown": ["cashflow", "subs"]}, "ablage": {"order": ["docs", "ablage"]}}, "#3560: freelancer: stored")
 check(Fr.get(B + "/api/contacts").status_code != 403, "#3560: freelancer: a hidden point stays reachable")
 check(Fr.get(B + "/api/state").json()["me"].get("workspaces") in (None, []), "#3560: freelancer: no organisation (nothing an admin switches for her)")
-done("p2418_api_test")
+sys.exit(done("p2418_api_test"))

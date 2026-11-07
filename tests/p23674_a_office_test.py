@@ -191,4 +191,4 @@ check(len(n) == 1 and n[0]["data"]["client"] == "Eigenkunde GmbH", f"the own per
 check(not news(A, "docoverdue") or all(x["data"].get("client") != "Eigenkunde GmbH" for x in news(A, "docoverdue")), "nobody else hears of it")
 assert Fr.post(B + f"{D}/{FI}/payments", json={"amount": "10.00", "date": date.today().isoformat()}).ok
 check(not news(Fr, "docpaid"), "the own booking stays quiet")
-done("p23674_a_office")
+sys.exit(done("p23674_a_office"))

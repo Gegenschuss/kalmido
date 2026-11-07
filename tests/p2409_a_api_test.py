@@ -9,6 +9,7 @@
  - every person switches areas off per workspace for themselves (setting ws_areas_off): stored normalised, strict, and it
    never locks a route (only hides in the app); a person without an organisation does the same for Private
 usage: p2409_a_api_test.py <datadir>      (KMT_NOSTART=1 / P2409A_NOSTART=1: a running server)"""
+import sys
 import json
 
 from freelancer_fixture import FEATURES, freelancer, login
@@ -105,4 +106,4 @@ check(r.ok, f"#3490: the freelancer switches areas off in Private {r.status_code
 check(json.loads(F.get(B + "/api/state").json()["settings"]["ws_areas_off"]) == {"private": ["office", "reading"]}, "#3490: freelancer: stored")
 check(F.get(B + "/api/office/settings").ok, "#3490: freelancer: her personal office is never locked by the server")
 check(F.patch(B + "/api/settings", json={"ws_areas_off": "{}"}).ok, "#3490: freelancer: everything on again")
-done("p2409_a_api_test")
+sys.exit(done("p2409_a_api_test"))
