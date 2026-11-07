@@ -3,8 +3,9 @@
 'use strict';
 
 // The sheets: menus / choice sheets / the bell (#pop.sheet), the date and time picker (.dpop.sheet), quick add (.qadd.sheet)
-// and the dialogs, which are bottom sheets below 900 px. Dragging at the grip / head (top 44 px) moves the sheet; in the
-// content only a pull down while the content is scrolled to the very top does (scrolling stays scrolling). Up = taller (up to
+// and the dialogs, which are bottom sheets below 768 px. Only the grip / head (top 44 px) drags the sheet; a swipe in the
+// content always scrolls (2.652.0, #5078: before, a pull down in the content scrolled to the top dragged, shrank, snapped or
+// closed the sheet, and the snap on release made a scrolled dialog jump back up). Up = taller (up to
 // almost the full screen), down = shorter (down to 40 %), then it follows the finger; past a threshold or with a quick flick
 // it closes through the sheet's normal close path (closePop / dpClose / the dialog's own close with its draft guard).
 // On release the height snaps to half or full. Only transform is animated. Horizontal moves are left alone (iOS back swipe).
@@ -13,13 +14,10 @@ const SD = {el: null};
 const sd_vh = () => (window.visualViewport?.height || innerHeight);
 function sd_sheet(t) {
   const el = t?.closest?.(SD_SEL);
-  if (!el || !(isMobile() || (el.classList.contains('qadd') && matchMedia('(pointer:coarse)').matches))) return null;  // + the tablet quick-add sheet
+  // 2.652.0 (#5078): phone width, or a touch screen where the element is laid out as a sheet (.sheet: the tablet quick add) -
+  // the touch switch, not the width (a dialog of 768 px and up is a centred card, no sheet)
+  if (!el || !(isMobile() || (el.classList.contains('sheet') && isTouch()))) return null;
   return el;
-}
-// the content above the target that is scrolled away from its top (then a pull down scrolls, it does not drag)
-function sd_scrolled(t, el) {
-  for (let n = t; n && n !== el.parentElement; n = n.parentElement) if (n.scrollTop > 0) return true;
-  return false;
 }
 // 2.631.0 (#4993): the height the content needs (measured with height auto, so a stretched sheet does not raise its own ceiling)
 function sd_natural(el) {
@@ -31,24 +29,24 @@ function sd_natural(el) {
   return n > 0 ? Math.ceil(n) : 1e9;  // no layout (jsdom): no ceiling
 }
 function sd_resizable(el) { return el.id === 'pop' || el.classList.contains('card'); }
-function sd_start(t, x, y, touch) {
+function sd_start(t, x, y) {
   if (SD.el) return false;
   const el = sd_sheet(t); if (!el) return false;
   if (t.closest('input,textarea,select,[contenteditable="true"],.qhcs')) return false;  // typing / horizontal chip rows stay theirs
   if (t.closest('[data-bpgrab],[data-bpgrip]')) return false;  // the bell's own handle keeps its own drag (up to the full height, stored)
   if (t.closest('[data-rowd]')) return false;  // 2.456.0 (#3837): the grip of a row drags the row (drag.js rowd_attach), not the sheet
   const r = el.getBoundingClientRect(), head = y - r.top <= 44;
-  if (!head && !touch) return false;  // a mouse drags only at the head (text selection in the content stays)
+  if (!head) return false;  // 2.652.0 (#5078): only the grip / head drags, touch and mouse alike; the content scrolls
   const b = getComputedStyle(el).transform;  // the sheet's own transform (quick add on a tablet is centred with translateX)
-  Object.assign(SD, {el, head, base: b && b !== 'none' ? b + ' ' : '', x0: x, y0: y, h0: r.height, nat: 0, on: false, ty: 0, lastY: y, lastT: performance.now(), v: 0, sized: false, t});
+  Object.assign(SD, {el, head, base: b && b !== 'none' ? b + ' ' : '', x0: x, y0: y, h0: r.height, nat: 0, on: false, ty: 0, lastY: y, lastT: performance.now(), v: 0, sized: false});
   return true;
 }
-// 2.102.0 (#1998): drag.js asks whether a move starts the drag: 8 px in either direction, then only a vertical move, and in
-// the content only a pull down while it is scrolled to the very top
+// 2.102.0 (#1998): drag.js asks whether a move starts the drag: 8 px in either direction, then only a vertical move (at the
+// head only, 2.652.0 #5078)
 function sd_accept(dx, dy) {
   const el = SD.el; if (!el) return false;
   if (Math.abs(dy) < 8 && Math.abs(dx) < 8) return null;
-  if (Math.abs(dx) > Math.abs(dy) || (!SD.head && (dy < 0 || sd_scrolled(SD.t, el)))) { SD.el = null; return false; }
+  if (Math.abs(dx) > Math.abs(dy)) { SD.el = null; return false; }
   SD.on = true; SD.nat = sd_resizable(el) ? sd_natural(el) : 0;  // 2.649.0 (#5062): measured once a drag really starts, not on every tap
   el.style.transition = 'none'; el.classList.add('sd-drag');
   return true;
@@ -104,7 +102,7 @@ function sd_reset(el, keepSize) {
 // 2.102.0 (#1998): touch (touch events: a pointer would be cancelled as soon as the browser starts to pan the sheet's content;
 // a second finger cancels) and mouse / pen (a narrow desktop window, tests; at the head, with pointer capture) through drag.js
 drg_attach(document, {
-  start: (t, x, y, kind) => sd_start(t, x, y, kind === 'touch'),
+  start: (t, x, y) => sd_start(t, x, y),
   accept: (d, dx, dy) => sd_accept(dx, dy),
   onMove: (d, x, y) => { sd_move(x, y); },
   onDrop: () => { sd_end(false); },

@@ -110,11 +110,17 @@ const FEAT = 'comments,collab,agents,stats,time';
     const dp = await rect(ev, '.dpop.sheet');
     check(!!dp, '#1181: the date picker is a sheet on the phone');
     if (dp) { await drag(195, dp.top + 8, 0, Math.min(500, 830 - dp.top - 8), 'touch'); await sleep(700); check(await ev(`!document.getElementById('dpop')`), '#1181: the date picker closes with a swipe down'); }
-    // a dialog in sheet form; a pull down in its scrolled-to-top content closes it too
+    // a dialog in sheet form; 2.652.0 (#5078): a pull down in its content scrolls only (it closed the dialog before), the head
+    // closes it
     await ev(`(() => { listModal(${L}); return 1; })()`); await sleep(700);
     const md = await rect(ev, '.modal:not(.smodal) > .card');
     check(!!md, '#1181: the list dialog opens as a sheet');
-    if (md) { await drag(195, md.top + 70, 0, Math.min(500, 830 - md.top - 70), 'touch'); await sleep(800); check(await ev(`!document.querySelector('.modal:not(.smodal)')`), '#1181: the dialog closes with a swipe down from its content (scrolled to the top)'); }
+    if (md) {
+      await drag(195, md.top + 70, 0, Math.min(500, 830 - md.top - 70), 'touch'); await sleep(800);
+      check(await ev(`!!document.querySelector('.modal:not(.smodal)')`), '#5078: a swipe down in the content leaves the dialog open');
+      await drag(195, md.top + 12, 0, Math.min(500, 830 - md.top - 12), 'touch'); await sleep(800);
+      check(await ev(`!document.querySelector('.modal:not(.smodal)')`), '#1181: the dialog closes with a swipe down at its head');
+    }
 
     // ---- #1180 statistics
     const ax = await ev(`(() => {
