@@ -54,6 +54,8 @@ EXPECT_4XX = {
     "GET /api/docs/{}/split": (409, "the own document is no PDF with two pages or more"),
     "GET /api/docs/{}/thumb": (404, "the own document is a text receipt: no thumbnail"),
     "GET /api/hubmail/targets": (404, "no filed mail on the test server (?mail= names one)"),
+    # 2.649.0 (#5061): the mail rules (#4804) belong to a workspace's own mailbox; the test server sets up none (IMAP)
+    "GET /api/hubmail/mailbox/rules": (404, "no own mailbox (IMAP) set up on the test server (the same for every person)"),
     "GET /api/v1/mails/{}": (404, "no filed mail on the test server (the id is the own client's)"),  # 2.483.0 (#1902)
     "GET /api/life/karakeep/lists": (400, "Karakeep (an outside service) is not connected"),
     "GET /api/newsletter/lists": (404, "no newsletter connection (an outside service)"),
