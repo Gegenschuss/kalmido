@@ -1119,6 +1119,8 @@ ROUTES = {
     "POST /api/wiki/restore": "wiki", "POST /api/wiki/trash": "wiki",
     # 2.143.0 B (#2211): the trash of a space -- list, delete for good / empty (p2143_b_api_test.py: another space 404 / skipped)
     "GET /api/wiki/trash": "wiki", "POST /api/wiki/purge": "wiki",
+    # 2.637.0 (#4745): the files of a space for the offline copy (p2637_a_wikioff_test.py: another organisation / unknown 404)
+    "GET /api/wiki/space-files": "wiki",
     # 2.123.0 C (#2103, #2107): files of the file store / tables in pages (another organisation 404, p2123_c_api_test.py)
     "POST /api/wiki/pages/{}/refs": "wiki", "GET /api/wiki/refs": "wiki",
     # 2.99.0 A (#2182): files of knowledge pages (a file of another organisation / person: 404, p299_a_api_test.py)
