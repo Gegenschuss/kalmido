@@ -686,7 +686,7 @@ document.addEventListener('pointermove', e => {
   e.preventDefault(); lydragMoveF(e.clientX, e.clientY);
 });
 document.addEventListener('pointerup', () => { if (lyDg?.mouse) lydragEnd(false); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && lyDg?.active) { e.preventDefault(); e.stopPropagation(); lydragEnd(true); } }, true);
+domReady(() => kb_on('first', 'Escape', () => { if (!lyDg?.active) return false; lydragEnd(true); }));  // 2.655.0 (#4998): key registry (keys.js), before every field and area
 document.addEventListener('touchstart', e => {
   const el = e.target.closest?.('.lycanvas .lyedb'); if (!el || e.touches.length > 1 || e.target.closest('.lytool button:not(.lyhandle)')) return;
   const p = e.touches[0]; if (p.clientX < 24 || p.clientX > innerWidth - 24) return;  // the Back swipe from the edge stays free

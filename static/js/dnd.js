@@ -521,7 +521,7 @@ function tdCancel() {
 }
 document.addEventListener('visibilitychange', () => { if (document.hidden && (lp?.active || $('.ghost-drag:not(.side-ghost)'))) tdCancel(); });
 window.addEventListener('blur', () => { if (lp?.active) tdCancel(); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && lp?.active) { e.preventDefault(); tdCancel(); } }, true);
+domReady(() => kb_on('first', 'Escape', e => { if (lp?.active) { e.preventDefault(); tdCancel(); } return false; }));  // 2.655.0 (#4998): key registry (keys.js); the key goes on (as before: only its default is taken)
 // 2.13.4: held near the top or bottom edge of the list, it scrolls on its own (the deeper in the edge zone, the faster),
 // also while the finger stays still
 const TD_EDGE = 72, TD_MAX = 16;

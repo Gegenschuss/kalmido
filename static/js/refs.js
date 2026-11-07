@@ -227,7 +227,7 @@ document.addEventListener('pointerout', e => {
 });
 const rf_title = a => { if (a?.dataset.rftitle) { a.title = a.dataset.rftitle; delete a.dataset.rftitle; } };
 for (const ev of ['scroll', 'wheel']) window.addEventListener(ev, () => { if (RFH.el || RFH.wait) rf_pvHide(); }, {capture: true, passive: true});
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && RFH.el) rf_pvHide(); });
+domReady(() => kb_on('first', 'Escape', () => { if (RFH.el) rf_pvHide(); return false; }));  // 2.655.0 (#4998): key registry (keys.js); the key goes on (the open thing below closes too, as before)
 document.addEventListener('pointerdown', e => { if (RFH.el && !e.target.closest?.('.rfpv')) rf_pvHide(); }, true);
 function rf_pvHide() {
   clearTimeout(RFH.t); clearTimeout(RFH.hide);

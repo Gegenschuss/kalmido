@@ -249,5 +249,5 @@ function wgPointerEnd(cancel) {
 }
 document.addEventListener('pointerup', () => wgPointerEnd(false));
 document.addEventListener('pointercancel', () => wgPointerEnd(true));
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && (WG.rs || WG.mv?.active)) { e.preventDefault(); e.stopPropagation(); wgPointerEnd(true); } }, true);
+domReady(() => kb_on('first', 'Escape', () => { if (!(WG.rs || WG.mv?.active)) return false; wgPointerEnd(true); }));  // 2.655.0 (#4998): key registry (keys.js), before every field and area
 

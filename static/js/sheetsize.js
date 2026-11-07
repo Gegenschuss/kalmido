@@ -221,7 +221,7 @@ function shz_fullSet(on) {
 }
 document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) shz_fullSet(false); });
 window.addEventListener('hashchange', () => { if (!/^#sheets\/\d+/.test(location.hash)) shz_fullSet(false); });
-window.addEventListener('keydown', e => { if (e.key === 'Escape' && document.documentElement.classList.contains('shzfull') && !document.fullscreenElement && !e.target.closest?.('input,textarea,.menu-list,#pop,.smodal')) shz_fullSet(false); });
+kb_on('first', 'Escape', e => { if (document.documentElement.classList.contains('shzfull') && !document.fullscreenElement && !e.target.closest?.('input,textarea,.menu-list,#pop,.smodal')) shz_fullSet(false); return false; });  // 2.655.0 (#4998): key registry (keys.js); the key goes on (the open thing below closes too, as before)
 document.addEventListener('click', e => {
   const b = e.target.closest?.('button[data-shz]'); if (!b || !SHV.sh) return;
   e.preventDefault(); e.stopPropagation();

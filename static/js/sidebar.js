@@ -856,12 +856,11 @@ document.addEventListener('click', e => {
   e.preventDefault(); e.stopPropagation();
   dx_pick(id, how);
 }, true);
-document.addEventListener('keydown', e => {
-  if (e.key !== 'Escape' || !(S.route?.key || '').startsWith('lists:') || $('.modal') || $('.tsheet') || !$('#pop')?.classList.contains('hidden') || S.sel || S.multi?.size) return;
-  if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName) || e.target.isContentEditable) return;
-  e.preventDefault(); e.stopImmediatePropagation();
+domReady(() => kb_on('first', 'Escape', e => {  // 2.655.0 (#4998): key registry (keys.js), registered late (sidebar.js loads before keys.js)
+  if (!(S.route?.key || '').startsWith('lists:') || $('.modal') || $('.tsheet') || !$('#pop')?.classList.contains('hidden') || S.sel || S.multi?.size) return false;
+  if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName) || e.target.isContentEditable) return false;
   dx_clear();
-}, true);
+}));
 // the header of the marked view: archive them, clear the selection
 function dx_listsActs(k) {
   const ids = dx_listIds(k);

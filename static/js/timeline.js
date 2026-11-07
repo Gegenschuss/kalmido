@@ -623,9 +623,10 @@ document.addEventListener('contextmenu', e => {
   const b = e.target.closest?.('.tl-bar[data-id]'); if (!b || isTouch()) return;
   e.preventDefault(); tlBarMenu(b);
 });
+// 2.655.0 (#4998): Esc ends connecting / picking: key registry (keys.js), before every field and area
+kb_on('first', 'Escape', () => { if (!(tlLink || S.tlPick)) return false; if (tlLink) tlLinkEnd(null, true); else tlPickEnd(); });
 // keyboard on a focused bar (capture: before the global shortcuts)
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && (tlLink || S.tlPick)) { e.preventDefault(); e.stopPropagation(); if (tlLink) tlLinkEnd(null, true); else tlPickEnd(); return; }
   const b = e.target.closest?.('.tl-bar[data-id]'); if (!b || e.ctrlKey || e.metaKey || e.altKey) return;
   const id = +b.dataset.id, k = e.key;
   if (k === 'Enter' || k === ' ') { if (S.tlPick) tlPickDo(id); else openDetail(id); }

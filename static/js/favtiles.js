@@ -560,10 +560,10 @@ window.addEventListener('click', e => {
   if (!t.closest?.('#favup') || t.closest('#favup .fv2-tile')) fvd_set(false);
 }, true);
 document.addEventListener('pointerdown', e => { if (fvd_isOpen() && !e.target.closest?.('#favup, #favgrip, #tabs, #pop')) fvd_set(false); }, true);
-window.addEventListener('keydown', e => {
-  if (e.key !== 'Escape' || !fvd_isOpen() || !$('#pop')?.classList.contains('hidden')) return;
-  e.preventDefault(); e.stopPropagation(); fvd_set(false); $('#favgrip')?.focus({preventScroll: true});
-}, true);
+domReady(() => kb_on('first', 'Escape', () => {  // 2.655.0 (#4998): key registry (keys.js), before every field and area
+  if (!fvd_isOpen() || !$('#pop')?.classList.contains('hidden')) return false;
+  fvd_set(false); $('#favgrip')?.focus({preventScroll: true});
+}));
 // a field takes or leaves the focus (the keyboard comes or goes), the phone turns: the grip follows
 document.addEventListener('focusin', () => fvd_sync(), true);
 document.addEventListener('focusout', () => setTimeout(() => fvd_sync(), 0), true);

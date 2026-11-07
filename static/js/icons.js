@@ -421,7 +421,7 @@ document.addEventListener('mouseover', e => { const b = e.target.closest?.('.ib[
 document.addEventListener('mouseout', e => { if (e.target.closest?.('.ib[data-ii]')) iiHide(); });
 document.addEventListener('focusin', e => { if (e.target.matches?.('.ib[data-ii]')) iiShow(e.target); });
 document.addEventListener('focusout', e => { if (e.target.matches?.('.ib[data-ii]')) iiHide(); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#iitip:not(.hidden)')) { iiHide(true); e.stopPropagation(); } }, true);
+document.addEventListener('DOMContentLoaded', () => kb_on('first', 'Escape', () => { if (!$('#iitip:not(.hidden)')) return false; iiHide(true); }), {once: true});  // 2.655.0 (#4998): key registry (keys.js), before every field and area (core.js's domReady loads after icons.js)
 document.addEventListener('scroll', () => iiHide(true), true);
 const hintK = t => `<div class="shint keep">${t}</div>`;  // 2.13.0: a helper line that stays inline (security, data loss, a state)
 const kt = (label, keys) => isTouch() ? label : `${label} (${kbText(keys)})`;  // a label with its keyboard shortcut

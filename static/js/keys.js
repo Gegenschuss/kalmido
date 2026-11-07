@@ -9,7 +9,9 @@
    contenteditable) unless the handler asks for it (inField). The help (palette.js SHORTCUTS) lists every key registered
    with a help text.
    The listener sits on window (the bubble phase): every area's own listener on the element or the document has its say
-   first; one that took the key (preventDefault / stopPropagation) wins. Older listeners keep working until they move here. */
+   first; one that took the key (preventDefault / stopPropagation) wins. Older listeners keep working until they move here.
+   2.655.0 (#4998): the scope 'first' runs in the capture phase before every field and area (see kb_runFirst). A script
+   loaded before keys.js registers late: domReady(() => kb_on(...)). */
 'use strict';
 
 /** @typedef {{key: string, spec: string, fn: (e: KeyboardEvent, s: KbScope) => any, help: string, group: string, inField: boolean}} KbHandler */
@@ -69,6 +71,21 @@ function kb_run(/** @type {KeyboardEvent} */ e) {
   return false;
 }
 window.addEventListener('keydown', e => { kb_run(e); });
+// ---- 2.655.0 (#4998): 'first' = what went before everything as a capture listener on the document (a tooltip, a drag that
+// Esc cancels, a mode like connecting bars): asked in the capture phase on window, before any field or area, and NOT held by an
+// open dialog (they never were). A handler that takes the key stops it there (preventDefault + stopPropagation); one that only
+// watches (hides its preview and lets the key go on) returns false. The registration order is the order they are asked in.
+function kb_runFirst(/** @type {KeyboardEvent} */ e) {
+  if (e.defaultPrevented) return false;  // a window capture listener before it took the key (the tour of palette.js)
+  const k = kb_keyOf(e); if (!k) return false;
+  const letter = !/^(alt|mod)\+/.test(k) && (e.key || '').length === 1, typ = kb_typing(e.target);
+  for (const h of [...(KBR.on.get('first') || [])]) {
+    if (h.key !== k || (letter && typ && !h.inField)) continue;
+    if (h.fn(e, {scope: 'first'}) !== false) { e.preventDefault(); e.stopPropagation(); return true; }
+  }
+  return false;
+}
+window.addEventListener('keydown', e => { kb_runFirst(e); }, true);
 /** the help's rows of the registered keys with a help text: [[group, [[key, text]]]] (texts are i18n keys) */
 function kb_helpRows() {
   /** @type {Map<string, Array<[string, string]>>} */

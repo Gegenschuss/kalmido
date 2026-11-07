@@ -281,12 +281,11 @@ function dc_paneClose(p) {
 // the next / previous document of the list in the pane (arrow keys); the card comes into view and keeps the focus
 // 2.476.0 (#3935): the same for the phone's whole page, the swipe on the preview and the arrow buttons (dc_step)
 const dc_paneStep = dir => dc_step(dir);
-document.addEventListener('keydown', e => {
-  if (!DC.paneId || S.route.mod !== 'docs' || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || $('.modal') || $('.lightbox') || $('#pop:not(.hidden)')) return;
-  if (e.target.closest?.('input, textarea, select, [contenteditable="true"], [contenteditable=""]')) return;
-  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); dc_paneStep(e.key === 'ArrowDown' ? 1 : -1); }
-  else if (e.key === 'Escape' && !DC.selOn) { e.preventDefault(); dc_paneClose($('.dc-pane')); }
-});
+// 2.655.0 (#4998): key registry (keys.js): the view's keys, after an open dialog / menu (the stack) and before the selection / detail
+const dc_paneKeyOk = (/** @type {any} */ e) => !!DC.paneId && S.route.mod === 'docs' && !$('.modal') && !$('.lightbox') && !$('#pop:not(.hidden)') && !e.target.closest?.('input, textarea, select, [contenteditable="true"], [contenteditable=""]');
+kb_on('view:docs', 'ArrowDown', e => { if (!dc_paneKeyOk(e)) return false; dc_paneStep(1); });
+kb_on('view:docs', 'ArrowUp', e => { if (!dc_paneKeyOk(e)) return false; dc_paneStep(-1); });
+kb_on('view:docs', 'Escape', e => { if (!dc_paneKeyOk(e) || DC.selOn) return false; dc_paneClose($('.dc-pane')); });
 document.addEventListener('click', e => { if (e.target.closest?.('.dc-pane')) dc_mdClick(e); });
 // ---- 2.476.0 (#3935): leafing through the open document -- always in the list as shown (filtered, sorted: DC.docs, like
 // the arrow keys). "3 of 48" and two arrow buttons above the preview; a swipe sideways on the preview (not on the fields

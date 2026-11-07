@@ -575,7 +575,7 @@ document.addEventListener('click', e => {
   $$('.chcomp.chmore').forEach(x => { if (x !== c) chMoreSet(x, false); });
   if (c) chMoreSet(c, !c.classList.contains('chmore'));
 });
-document.addEventListener('keydown', e => { if (e.key !== 'Escape') return; const c = $('.chcomp.chmore'); if (c) { e.stopPropagation(); chMoreSet(c, false); c.querySelector('[data-chmore]')?.focus(); } }, true);
+domReady(() => kb_on('first', 'Escape', () => { const c = $('.chcomp.chmore'); if (!c) return false; chMoreSet(c, false); c.querySelector('[data-chmore]')?.focus(); }));  // 2.655.0 (#4998): key registry (keys.js), before every field and area
 // the open keyboard stays while the plus or a tool is tapped (the box keeps the focus)
 for (const ev of ['pointerdown', 'mousedown']) document.addEventListener(ev, e => { if (/** @type {any} */ (document.activeElement)?.closest?.('.chcomp') && /** @type {any} */ (e.target).closest?.('.chcomp [data-chmore], .chcomp .chtools button')) e.preventDefault(); });
 const tcx_clipHtml = room => tcx_filesOk(room) ? `<button type="button" class="iconbtn chclip" data-act="tc-attach" title="${esc(tr('Attach images or files'))}" aria-label="${esc(tr('Attach images or files'))}">${ic('clip')}</button><input type="file" id="tc-file" multiple hidden>` : '';

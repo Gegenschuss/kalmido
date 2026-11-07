@@ -361,7 +361,7 @@ drg_attach(document, {
 document.addEventListener('touchend', e => { if (CG.st?.touch && CG.st.active && e.cancelable) e.preventDefault(); }, {passive: false});
 document.addEventListener('contextmenu', e => { if (CG.st?.touch && e.target.closest?.('#view .week, #view .cal')) e.preventDefault(); });
 // Esc also while a finger holds without having moved yet (drag.js cancels moved drags itself)
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && CG.st?.active) { e.preventDefault(); e.stopPropagation(); drg_cancel(); if (CG.st) cg_cancel(); } }, true);
+kb_on('first', 'Escape', () => { if (!CG.st?.active) return false; drg_cancel(); if (CG.st) cg_cancel(); });  // 2.655.0 (#4998): key registry (keys.js), before every field and area
 document.addEventListener('click', e => {  // the click that follows a drag (or the press that closed a block) does nothing more
   if (CG.swallow && Date.now() - CG.swallow < 500 && e.target.closest?.('#view .week, #view .cal')) { e.stopImmediatePropagation(); e.preventDefault(); CG.swallow = 0; }
 }, true);
