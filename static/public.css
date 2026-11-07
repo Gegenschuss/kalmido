@@ -264,4 +264,4 @@ ul.xl-list .xl-off{color:var(--muted)}
 .vdr-aud audio{display:block;width:100%;max-width:100%}
 /* 2.642.0 (#4772): the versions of a client link that shows the older ones */
 .vdr-vers ul{list-style:none;display:flex;flex-wrap:wrap;gap:.25rem .75rem;margin:0 0 .75rem;padding:0}
-.vdr-vers a,.vdr-vers b{display:inline-block;padding:.5rem 0;min-height:44px;box-sizing:border-box}
+.vdr-vers a,.vdr-vers b{display:inline-block;padding:.5rem 0;min-height:2.75rem;box-sizing:border-box}

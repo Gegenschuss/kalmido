@@ -43,7 +43,7 @@ def vdl_carry(c, r, nid):
     caller holds the review's write lock and commits. -> the number carried on."""
     now = now_utc()
     rows = c.execute("SELECT * FROM office_signoffs WHERE video_id=? AND kind='video' AND org_id IS NOT DISTINCT FROM ? "
-                     "AND state IN ('accepted', 'declined') AND revoked_at IS NULL AND token_hash NOT LIKE 'carried:%' ORDER BY id",
+                     "AND state IN ('accepted', 'declined') AND revoked_at IS NULL AND substr(token_hash, 1, 8) <> 'carried:' ORDER BY id",
                      (r["id"], r["org_id"])).fetchall()
     ts, n, live = iso(now), 0, vdl_live_count(c, r)
     for s in rows:
