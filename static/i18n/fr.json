@@ -17279,6 +17279,7 @@
   "Markdown: # heading, - list, [[Page]] links a page, [[#123]] a task": "Markdown : # titre, - liste, [[Page]] lie une page, [[#123]] une tâche",
   "Write … ([[Page]], [[#123]])": "Écrire … ([[Page]], [[#123]])",
   "Write … ([[Page]], [[#123]], / for commands)": "Écrire … ([[Page]], [[#123]], / pour les commandes)",
+  "This poll belongs to an agent that changed hands: it stays in the trash": "Ce sondage appartient à un agent qui a changé de propriétaire : il reste dans la corbeille",
   "is": "est",
   "is not": "n’est pas",
   "Without groups: {0}": "Sans groupes : {0}",

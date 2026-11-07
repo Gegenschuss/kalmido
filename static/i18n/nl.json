@@ -17279,6 +17279,7 @@
   "Markdown: # heading, - list, [[Page]] links a page, [[#123]] a task": "Markdown: # kop, - lijst, [[Pagina]] linkt een pagina, [[#123]] een taak",
   "Write … ([[Page]], [[#123]])": "Schrijven … ([[Pagina]], [[#123]])",
   "Write … ([[Page]], [[#123]], / for commands)": "Schrijven … ([[Pagina]], [[#123]], / voor opdrachten)",
+  "This poll belongs to an agent that changed hands: it stays in the trash": "Deze peiling hoort bij een agent die van eigenaar is gewisseld: ze blijft in de prullenbak",
   "is": "is",
   "is not": "is niet",
   "Without groups: {0}": "Zonder groepen: {0}",

@@ -82,6 +82,8 @@ def tpo_may(c, uid, r, write=False):
     an organisation's: members read, owner / admins (and the owner of the personal agent that made it) change. An agent reads
     someone else's poll only when it hangs on a task / project / client the agent may see (tpo_agent_ref)."""
     if r["org_id"] is None:
+        if r["trash_owner"]:  # 2.625.0 C (#3961): kept from an agent that changed hands: its former owner reads it, nobody changes it
+            return not write and r["trash_owner"] == uid
         return r["user_id"] == uid or tpo_agent_owner(c, r["user_id"]) == uid
     if r["user_id"] != uid and tpo_is_agent(c, uid) and (write or not tpo_agent_ref(c, uid, r)):
         return False
@@ -358,10 +360,10 @@ def tpo_rows(c, uid, a):
     elif sp != "all":
         orgs = [tpo_space(c, uid, sp)]
     q = ("SELECT * FROM sched_polls WHERE deleted_at IS " + ("NOT NULL" if a.get("deleted") == "1" else "NULL")
-         + " AND ((org_id IS NULL AND (user_id=? OR user_id IN (SELECT a.user_id FROM agents a WHERE a.owner_id=?)))"
+         + " AND ((org_id IS NULL AND (user_id=? OR user_id IN (SELECT a.user_id FROM agents a WHERE a.owner_id=?) OR trash_owner=?))"
          + (f" OR org_id IN ({','.join('?' * len(orgs))})" if orgs else "") + ")")
     own = uid if sp in ("all", "private") else 0
-    args = [own, own, *orgs]
+    args = [own, own, own, *orgs]  # 2.625.0 C (#3961): + the polls kept in uid's trash from an agent that changed hands
     for k in ("task_id", "client_id", "list_id"):
         if a.get(k):
             try:
@@ -469,6 +471,8 @@ def tpo_delete(pid):
 def tpo_restore(pid):
     tpo_gate()
     c = db()
+    if tpo_need(c, pid, deleted=True)["trash_owner"]:  # 2.625.0 C (#3961): kept from an agent that changed hands
+        return err(tr("This poll belongs to an agent that changed hands: it stays in the trash"), 409)
     tpo_need(c, pid, write=True, deleted=True)
     c.execute("UPDATE sched_polls SET deleted_at=NULL, updated_at=? WHERE id=?", (iso_ms(now_utc()), pid))
     bump(c)

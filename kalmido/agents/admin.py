@@ -8,7 +8,7 @@ from flask import g, has_request_context, jsonify
 from ..core.config import app, TZ, USERNAME_RE
 from ..core.pg import insert_id, system_ctx
 from ..core.i18n import tr, trn
-from ..core.db import body, bump, create_user, db, ensure_inbox, err, gset, gsetting, iso, now_utc, uset, usettings, write_lock
+from ..core.db import body, bump, create_user, db, ensure_inbox, err, gset, gsetting, iso, iso_ms, now_utc, uset, usettings, write_lock
 from ..accounts.session import _token_hash, me
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from ..accounts.pictures import avatar_drop_file, ALL_PRESETS
@@ -523,14 +523,30 @@ def agent_owner_set(c, aid, owner, given):
     its lists stay). Nothing when not given. BadInput for an unknown person / an agent / a disabled account."""
     if not given:
         return
+    was = agent_owner(c, aid)
     if owner in (None, "", 0, "team"):
+        if was is not None:
+            agent_polls_retire(c, aid, was)  # 2.625.0 C (#3961)
         c.execute("UPDATE agents SET owner_id=NULL, admin_paused=0, office_drafts=CASE WHEN owner_id IS NULL THEN office_drafts ELSE 0 END WHERE user_id=?", (aid,))  # 2.51.0 A (#1348)
         return
     if isinstance(owner, bool) or not isinstance(owner, int) or \
             not c.execute("SELECT 1 FROM users WHERE id=? AND kind!='agent' AND disabled=0", (owner,)).fetchone():
         raise BadInput(tr("Invalid value: {0}", "owner_id"))
+    if was != owner:
+        agent_polls_retire(c, aid, was or aid)  # 2.625.0 C (#3961): a former team agent keeps them itself
     # 2.51.0 A (#1348): another owner = maybe another office area (a personal one): the office switch starts off again
     c.execute("UPDATE agents SET owner_id=?, office_drafts=CASE WHEN owner_id IS NOT DISTINCT FROM ? THEN office_drafts ELSE 0 END WHERE user_id=?", (owner, owner, aid))
+
+
+def agent_polls_retire(c, aid, keeper):
+    """2.625.0 C (#3961): agent aid changes hands: its private scheduling polls (open or in the trash) go into the trash of
+    keeper (its former owner; a former team agent: the agent itself), read-only there (calendars/polls.py tpo_may) -- their
+    links close at once, the new owner never sees them with their voters' addresses. The polls of an organisation stay (the
+    organisation's members see them by its rules). The caller bumps and commits."""
+    ts = now_utc()
+    with system_ctx(c):  # the agent's private rows (no organisation to bind to)
+        c.execute("UPDATE sched_polls SET deleted_at=COALESCE(deleted_at, ?), trash_owner=?, updated_at=? "
+                  "WHERE user_id=? AND org_id IS NULL AND trash_owner IS NULL", (iso(ts), keeper, iso_ms(ts), aid))
 
 
 def agent_org_set(c, aid, v):
