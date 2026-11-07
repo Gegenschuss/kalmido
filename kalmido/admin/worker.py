@@ -30,7 +30,7 @@ from flask import g, jsonify
 from ..core.config import app, APP_VERSION, DATABASE_URL
 from ..core.db import connect, db, gset, gsetting, iso, now_utc
 from ..core.db import db_log_err  # 2.239.0 B (#2888): no values of database errors in the log
-from ..core.pg import POOL_MAX, WEB_THREADS, connect_direct, pool_stats
+from ..core.pg import POOL_MAX_ALL, WEB_PROC, WEB_PROCS, WEB_THREADS, WEB_THREADS_ALL, connect_direct, pool_stats
 from ..core.reqtime import rt_stats
 from ..accounts.session import _BG_TURN, GATE
 from ..accounts.bgjobs import bgj_add, bgj_counts, bgj_fn, bgj_kick
@@ -48,7 +48,7 @@ try:
     WRK_REPLICAS = max(1, int(os.environ.get("KALMIDO_REPLICAS", "") or 1))
 except ValueError:
     WRK_REPLICAS = 1
-WRK_CONN_EXTRA = 6  # direct connections outside the pool per process (start-up, loop locks, backup, CLI)
+WRK_CONN_EXTRA = 7  # direct connections outside the pool per process (start-up, loop locks, backup, CLI; 2.642.0 #4975: + the busy locks of core/ephem.py)
 WRK_CONN_RESERVE = 5  # left for an operator's psql / pg_dump
 _BUSY = {"n": 0, "peak": 0, "served": 0, "since": time.time()}
 _BLK = threading.Lock()
@@ -56,6 +56,7 @@ WRK_ROLE = (os.environ.get("KALMIDO_ROLE", "") or "all").strip().lower()
 if WRK_ROLE not in ("all", "web", "worker"):
     print(f"warning: KALMIDO_ROLE={WRK_ROLE!r} is not all / web / worker; using all", flush=True)
     WRK_ROLE = "all"
+WRK_SINGLE = WRK_ROLE == "all" and WRK_REPLICAS == 1 and WEB_PROCS == 1  # 2.642.0 (#4975): one process serves the whole instance
 WRK_LOCKS_ON = os.environ.get("KALMIDO_LOOP_LOCKS", "1") != "0"  # 0 = every process runs its loops (the behaviour before 2.102)
 WRK_LOCK_CLASS = 21020  # first key of the two-key advisory locks (a key space of its own next to write_lock's one-key locks)
 WRK_RETRY_S = 15  # a loop another process runs: asks again after this
@@ -216,18 +217,22 @@ def wrk_conn_budget(c):
     """Postgres' max_connections against what the replicas may open (pool + direct connections each)."""
     mx = int(c.execute("SHOW max_connections").fetchone()[0])
     su = int(c.execute("SHOW superuser_reserved_connections").fetchone()[0])
-    need = WRK_REPLICAS * (POOL_MAX + WRK_CONN_EXTRA)
+    need = WRK_REPLICAS * (POOL_MAX_ALL + WRK_CONN_EXTRA * WEB_PROCS)  # 2.642.0 (#4975): every web process of every replica
     room = mx - su - WRK_CONN_RESERVE
-    return {"max_connections": mx, "reserved": su + WRK_CONN_RESERVE, "replicas": WRK_REPLICAS, "need": need, "ok": need <= room}
+    return {"max_connections": mx, "reserved": su + WRK_CONN_RESERVE, "replicas": WRK_REPLICAS, "web_procs": WEB_PROCS, "need": need,
+            "ok": need <= room}
 
 
 def wrk_conn_check():
     """At the start: warn in the log when the replicas could open more connections than Postgres allows."""
+    if WEB_PROC:  # 2.642.0 (#4975): the first web process of the container checks for all of them
+        return
     c = connect()
     try:
         b = wrk_conn_budget(c)
         if not b["ok"]:
-            print(f"WARNING database connections: {b['replicas']} replica(s) x (pool {POOL_MAX} + {WRK_CONN_EXTRA}) = {b['need']} "
+            print(f"WARNING database connections: {b['replicas']} replica(s) x ({WEB_PROCS} web process(es): pool {POOL_MAX_ALL} + "
+                  f"{WRK_CONN_EXTRA * WEB_PROCS}) = {b['need']} "
                   f"but Postgres allows {b['max_connections']} ({b['reserved']} reserved). Raise max_connections or lower "
                   "KALMIDO_DB_POOL_MAX / KALMIDO_THREADS (see SELF-HOSTING).", flush=True)
     except Exception as e:  # noqa: BLE001 - a check never stops the start
@@ -252,6 +257,7 @@ def wrk_health(c):
             pass
     return {"ok": True, "version": APP_VERSION, "role": WRK_ROLE, "loop_locks": WRK_LOCKS_ON, "loops": wrk_loops(),
             "worker": hb if isinstance(hb, dict) else None,
+            "proc": {"index": WEB_PROC, "of": WEB_PROCS, "pid": os.getpid(), "threads_all": WEB_THREADS_ALL},  # 2.642.0 (#4975)
             "threads": {"configured": WEB_THREADS, "busy": busy["n"], "peak": busy["peak"], "served": busy["served"],
                         "since_s": int(time.time() - busy["since"])},
             "pool": pool_stats(), "connections": wrk_conn_budget(c),
@@ -271,3 +277,90 @@ def admin_retention():
     """2.152.0 (#2165): admins of the server: the retention runs (switch, period, last result in numbers). No user data."""
     need_admin()
     return jsonify(ret_status(db()))
+
+
+# ---- 2.642.0 (#4975): KALMIDO_WEB_PROCS -- several web processes of one container on the same port ---------------------------
+# app.py: the first process (index 0, the role of KALMIDO_ROLE; with "all" it alone runs the background work) starts the others
+# (index 1 .. N-1, role "web": requests only, their queue rows go to bg_jobs and the signals over core/pgbus.py) as child processes
+# of `python app.py`, starts a child again that ended, and stops them with its own SIGTERM. Each process binds the port itself with
+# SO_REUSEPORT; the kernel hands every new connection to one of them. Threads and pool are shared out (core/pg.py).
+WRK_PROC_RESTART_S = 5  # a child that ended is started again after this
+WRK_PROC_GUARD_S = 3  # a child looks this often whether its first process is still there
+_PROCS = {"kids": {}, "stopping": False}
+
+
+def wrk_listen_sockets(addrs):
+    """The listening sockets of this web process for waitress' sockets= (one per "host:port") with SO_REUSEPORT."""
+    import socket
+    out = []
+    for a in addrs:
+        host, _, port = a.rpartition(":")
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+        s.bind((host, int(port)))
+        s.listen(1024)
+        out.append(s)
+    return out
+
+
+def _wrk_spawn(script, i):
+    import subprocess
+    import sys
+    env = dict(os.environ, KALMIDO_WEB_PROC_INDEX=str(i), KALMIDO_WEB_PROC_PARENT=str(os.getpid()))
+    if WRK_ROLE == "all":
+        env["KALMIDO_ROLE"] = "web"  # the background work stays in the first process
+    _PROCS["kids"][i] = subprocess.Popen([sys.executable, script], env=env, close_fds=True)
+
+
+def wrk_web_procs_start(script):
+    """The first web process: starts the other KALMIDO_WEB_PROCS - 1 (nothing with 1 or in a started one), keeps them running
+    and ends them with its own stop. Main thread only (installs the SIGTERM handler before the web server)."""
+    if WEB_PROCS <= 1 or WEB_PROC:
+        return
+    import signal
+    for i in range(1, WEB_PROCS):
+        _wrk_spawn(script, i)
+    prev = signal.getsignal(signal.SIGTERM)
+
+    def stop(signum, frame):
+        _PROCS["stopping"] = True
+        for p in list(_PROCS["kids"].values()):
+            if p.poll() is None:
+                p.terminate()  # each one puts its own queue rows back (bgj_on_term) and ends
+        if callable(prev):
+            return prev(signum, frame)
+        os._exit(128 + signal.SIGTERM)
+        return None
+    signal.signal(signal.SIGTERM, stop)
+
+    def watch():
+        while not _PROCS["stopping"]:
+            time.sleep(2)
+            for i, p in list(_PROCS["kids"].items()):
+                if p.poll() is not None and not _PROCS["stopping"]:
+                    print(f"web process {i} ended (exit {p.returncode}); starting it again", flush=True)
+                    time.sleep(WRK_PROC_RESTART_S)
+                    if not _PROCS["stopping"]:
+                        _wrk_spawn(script, i)
+    threading.Thread(target=watch, daemon=True, name="web-procs").start()
+    print(f"Kalmido {APP_VERSION}: {WEB_PROCS} web processes on one port (SO_REUSEPORT), {WEB_THREADS_ALL} threads in all; "
+          f"background work in process 0 (role {WRK_ROLE})", flush=True)
+
+
+def wrk_web_proc_guard():
+    """A started web process ends when its first process is gone (a hard stop sends it no SIGTERM)."""
+    try:
+        parent = int(os.environ.get("KALMIDO_WEB_PROC_PARENT", "") or 0)
+    except ValueError:
+        parent = 0
+    if not WEB_PROC or not parent:
+        return
+    import signal
+
+    def watch():
+        while os.getppid() == parent:
+            time.sleep(WRK_PROC_GUARD_S)
+        print(f"web process {WEB_PROC}: the first process is gone; ending", flush=True)
+        os.kill(os.getpid(), signal.SIGTERM)
+    threading.Thread(target=watch, daemon=True, name="web-proc-guard").start()

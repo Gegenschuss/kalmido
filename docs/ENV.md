@@ -13,7 +13,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `DATABASE_URL` | `(empty)` | PostgreSQL connection (postgresql://user:password@host:5432/db). Required. |
 | `KALMIDO_ACX_TTL` | `10` | Seconds the access context of a person (roles, organisations) is cached per process (0 = off). |
 | `KALMIDO_ALLOW_DOWNGRADE` | `0` | Switch: start on a database (or restore a backup) that a newer minor version of Kalmido wrote. Only for an emergency; the older version may not understand newer data. |
-| `KALMIDO_DB_POOL_MAX` | `(empty)` | Largest number of pooled database connections per process (empty = threads + 16). |
+| `KALMIDO_DB_POOL_MAX` | `(empty)` | Largest number of pooled database connections per process (empty = threads + 16); with KALMIDO_WEB_PROCS the number of the whole container, shared out (empty = each web process its threads + 16 for the first, + 8 for the others). |
 | `KALMIDO_DB_STATEMENT_TIMEOUT` | `30` | Seconds one database statement of a request may run (0 = no limit). |
 | `KALMIDO_DB_WAIT` | `60` | Seconds the start waits for the database to answer. |
 | `KALMIDO_INSTANCE_MODE` | `(empty)` | Older switch of the instance mode (shared / workspaces); since 2.46 only read for the row-level security check. |
@@ -21,7 +21,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_MIGRATE_CLI` | `(empty)` | Internal: set by `python app.py migrate-sqlite` for the move from SQLite. |
 | `KALMIDO_ONBOARDING` | `1` | Switch: new accounts get a sample list and the welcome tour. |
 | `KALMIDO_ORG_NAME` | `(empty)` | Name of the first organisation created on a new server. |
-| `KALMIDO_PGBUS` | `auto` | Signals between the processes of one instance over Postgres (LISTEN / NOTIFY): `1` on, `0` off; by default on when `KALMIDO_REPLICAS` is above 1 or `KALMIDO_ROLE` is `web` / `worker`. |
+| `KALMIDO_PGBUS` | `auto` | Signals between the processes of one instance over Postgres (LISTEN / NOTIFY): `1` on, `0` off; by default on when `KALMIDO_REPLICAS` or `KALMIDO_WEB_PROCS` is above 1 or `KALMIDO_ROLE` is `web` / `worker`. |
 | `KALMIDO_POOL_MAX` | `(empty)` | Older name of KALMIDO_DB_POOL_MAX (used when that one is not set). |
 | `KALMIDO_REPLICAS` | `1` | Number of web processes behind one database (only for the connection check at start). |
 | `KALMIDO_ROLE` | `all` | What this process runs: all (web + background work), web (requests only) or worker (background work only). |
@@ -29,9 +29,12 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_SLOW_REQUEST_MS` | `500` | Requests slower than this many milliseconds get a log line with route, duration and statement count (0 = off). |
 | `KALMIDO_STATE_AUTO_MAX` | `4` | Whole-state reloads of the live update (a change everyone sees) that run at the same time; one more is answered later with the client's next poll (0 = no limit). |
 | `KALMIDO_STATE_LAZY_MIN` | `3000` | Tasks in the start state of one person above which a new web client gets only the start set (Today, Upcoming, My tasks, the lists it had open) and loads a list's tasks when it is opened (0 = always the start set). |
-| `KALMIDO_THREADS` | `24` | Web server threads per process (2-256). |
+| `KALMIDO_THREADS` | `24` | Web server threads per container (2-256); with KALMIDO_WEB_PROCS shared out over the web processes. |
 | `KALMIDO_UPDATE_CHECK` | `1` | Switch: admins see when a newer release exists (one request a few times a day, never updates anything). |
 | `KALMIDO_UPDATE_URL` | `https://api.github.com/repos/Gegenschuss/kalmido/releases/latest` | Address the update check asks for the latest release. |
+| `KALMIDO_WEB_PROCS` | `1` | Web processes of this container on the same port (1-16, SO_REUSEPORT, Linux only; elsewhere 1 with a log line). The first one runs the background work and starts the others, which answer requests only; threads and pool are shared out, not multiplied. A restore of a backup needs 1. |
+| `KALMIDO_WEB_PROC_INDEX` | `(empty)` | Internal: set by the first web process for the ones it starts (KALMIDO_WEB_PROCS). |
+| `KALMIDO_WEB_PROC_PARENT` | `(empty)` | Internal: the process id of the first web process, for the ones it starts (they end with it). |
 | `PATH` | `(empty)` | Search path for the helper programs (pg_dump, tesseract); passed on to them unchanged. |
 | `PORT` | `3040` | Port the web server listens on inside the container. |
 | `PUBLIC_URL` | `http://localhost:3040` | The address people use to open Kalmido (https://tasks.example.com). Used for links in notifications and mails, passkeys and the origin check; set it on every server. |

@@ -573,7 +573,7 @@ docker compose up -d kalmido
   archive with 2.148.1 or newer. After a restore the attachment folder of before is only removed when it holds nothing the
   archive format does not cover; otherwise it stays next to the data folder (`attachments.pre-restore-…`, the server log
   names the folders) and you delete it by hand once you have checked it. A restore needs one server process
-  (`KALMIDO_ROLE=all`, `KALMIDO_REPLICAS=1`): with separate web and worker processes it is refused, stop the others and
+  (`KALMIDO_ROLE=all`, `KALMIDO_REPLICAS=1`, `KALMIDO_WEB_PROCS=1`): with separate web and worker processes it is refused, stop the others and
   start a single one for the restore.
   2.370.2: *Backups* and an admin alert at the start name such folders, also the ones a hard stop in the middle of a
   restore left behind; the next successful restore removes them unless they hold files the archive does not cover. The
@@ -1950,13 +1950,21 @@ instances the numbers can be set and the work can be split:
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `KALMIDO_THREADS` | `24` | request threads of the web server |
+| `KALMIDO_THREADS` | `24` | request threads of the web server (of the whole container; 2.642: shared out over `KALMIDO_WEB_PROCS`) |
+| `KALMIDO_WEB_PROCS` | `1` | 2.642: web processes of one container on the same port (Linux, SO_REUSEPORT); the first one runs the background work |
 | `KALMIDO_DB_POOL_MAX` | threads + 16 (= 40; 2.521, was threads x 3 + 8) | database connections per container (`KALMIDO_POOL_MAX` works too) |
 | `KALMIDO_REPLICAS` | `1` | how many Kalmido containers share the database: only for the start-up check of `max_connections` |
 | `KALMIDO_ROLE` | `all` | `all` = web + background work, `web` = requests only, `worker` = background work only |
 | `KALMIDO_LOOP_LOCKS` | `1` | `0` = every container runs its background loops (the behaviour before 2.102; only for diagnosis) |
 
-- **Start-up check.** When `KALMIDO_REPLICAS` x (pool + 6) is above `max_connections` minus a reserve, the log says
+- **Several web processes in one container (2.642).** `KALMIDO_WEB_PROCS=2` (up to 16) lets more than one Python process answer
+  requests, so one busy request no longer holds the others up behind Python's global interpreter lock. The first process starts
+  the others, starts one again that ended and stops them with its own stop; all of them listen on the same port and the kernel
+  hands every new connection to one of them. Only the first one runs the background work (the others behave like
+  `KALMIDO_ROLE=web`). `KALMIDO_THREADS` and an explicit `KALMIDO_DB_POOL_MAX` are the container's numbers and are shared out;
+  without an explicit pool each process gets its threads + 16 (the first) or + 8 (the others). Where SO_REUSEPORT is missing
+  (not Linux) the server runs one process and says so in the log. A restore of a backup needs `KALMIDO_WEB_PROCS=1`.
+- **Start-up check.** When `KALMIDO_REPLICAS` x (pool + 7 per web process) is above `max_connections` minus a reserve, the log says
   `WARNING database connections: ...` with the numbers. Raise `max_connections` of the database or lower the pool.
 - **Loop locks need a direct database connection.** They are session-level advisory locks: behind a connection pooler in
   transaction mode (for example pgbouncer `pool_mode = transaction`) they do not hold; point Kalmido at Postgres directly.

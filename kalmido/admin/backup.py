@@ -181,7 +181,7 @@ BK_ERR = {"busy": N_("Another backup or restore is running, please try again in 
           # 2.370.2 (#2779): a folder that is a mount of its own cannot be renamed (EXDEV / EBUSY)
           "mounts": N_("The attachments or office folder is a mount of its own, so a restore cannot swap it. Nothing was changed. Mount the data folder as a whole, see SELF-HOSTING.md."),
           # 2.148.1 C (#2482): the maintenance mode of a restore holds in this process only
-          "procs": N_("A restore needs a single server process (KALMIDO_ROLE=all, KALMIDO_REPLICAS=1). Stop the other processes first, see SELF-HOSTING.md."),
+          "procs": N_("A restore needs a single server process (KALMIDO_ROLE=all, KALMIDO_REPLICAS=1, KALMIDO_WEB_PROCS=1). Stop the other processes first, see SELF-HOSTING.md."),
           "restore": N_("The restore failed ({0}); nothing was changed."),
           # 2.273.0 A (#3050): the way back to the state before failed too
           "rollback": N_("The restore failed and so did the way back: the database may be incomplete, so the server stays closed. Restart it: the start completes the database. The safety backup {0} holds the state from before the restore."),
@@ -1948,8 +1948,8 @@ def bk_start_clean():
     a helper such as `app.py set-password` also imports the package, beside a running restore): the keys it took away
     (bk_fks_back) and its work folder, the database as a plain dump, also next to encrypted backups. No restore runs while a server
     starts (it needs a single process); a check may on another process, so with several processes only one a day old goes."""
-    from .worker import WRK_REPLICAS, WRK_ROLE
-    single, day_ago = WRK_ROLE == "all" and WRK_REPLICAS == 1, time.time() - 86400
+    from .worker import WRK_SINGLE
+    single, day_ago = WRK_SINGLE, time.time() - 86400  # 2.642.0 (#4975): KALMIDO_WEB_PROCS counts like KALMIDO_REPLICAS
     for p in glob.glob(glob.escape(BK_DIR) + "/.restore-*"):
         shutil.rmtree(p, ignore_errors=True)
     for p in glob.glob(glob.escape(BK_DIR) + "/.verify-*"):
@@ -1972,8 +1972,8 @@ def bk_leftovers_clean(listed):
 def bk_restore(path, pw, admin, via, keep_purged=False):
     """The whole restore (see the section comment). Returns (new session token or None, safety backup name).
     2.505.0 (#4302): keep_purged = what was deleted for good since the backup stays (the admin's choice, bkr_restore_journal)."""
-    from .worker import WRK_REPLICAS, WRK_ROLE
-    if WRK_ROLE != "all" or WRK_REPLICAS > 1:  # 2.148.1 C (#2482): other processes would keep writing during the swap
+    from .worker import WRK_SINGLE
+    if not WRK_SINGLE:  # 2.148.1 C (#2482): other processes would keep writing during the swap (2.642.0 #4975: + KALMIDO_WEB_PROCS)
         raise BackupError("procs")
     if bk_own_mounts():  # 2.370.2 (#2779)
         raise BackupError("mounts")

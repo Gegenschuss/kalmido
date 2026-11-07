@@ -482,6 +482,55 @@ try:
 except ValueError:
     print("warning: KALMIDO_THREADS is not a number; using 24", flush=True)
     WEB_THREADS = 24
+WEB_PROCS_MAX = 16
+
+
+def _reuseport_ok():
+    """2.642.0 (#4975): SO_REUSEPORT spreads the connections of one port over the processes (Linux; elsewhere the option is
+    missing or does not balance, then KALMIDO_WEB_PROCS falls back to 1)."""
+    import socket
+    import sys
+    if not sys.platform.startswith("linux") or not hasattr(socket, "SO_REUSEPORT"):
+        return False
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+        finally:
+            s.close()
+        return True
+    except OSError:
+        return False
+
+
+def _web_procs():
+    """2.642.0 (#4975): KALMIDO_WEB_PROCS = web processes of this container on the same port (default 1 = one process, as
+    before). The worker role serves no requests: always 1."""
+    try:
+        n = min(WEB_PROCS_MAX, max(1, int(os.environ.get("KALMIDO_WEB_PROCS", "") or 1)))
+    except ValueError:
+        print("warning: KALMIDO_WEB_PROCS is not a number; using 1", flush=True)
+        n = 1
+    if n > 1 and (os.environ.get("KALMIDO_ROLE", "") or "all").strip().lower() == "worker":
+        n = 1
+    if n > 1 and not _reuseport_ok():
+        if not os.environ.get("KALMIDO_WEB_PROC_INDEX"):
+            print(f"warning: KALMIDO_WEB_PROCS={n} needs SO_REUSEPORT, which this platform lacks; running one web process", flush=True)
+        n = 1
+    return n
+
+
+# 2.642.0 (#4975): with KALMIDO_WEB_PROCS the threads are shared out, not multiplied: KALMIDO_THREADS stays the number of the
+# whole container, every process gets its part (the first one the remainder). KALMIDO_WEB_PROC_INDEX is set by app.py for the
+# processes it starts (1 .. N-1); the first process is 0.
+WEB_PROCS = _web_procs()
+try:
+    WEB_PROC = min(WEB_PROCS - 1, max(0, int(os.environ.get("KALMIDO_WEB_PROC_INDEX", "") or 0)))
+except ValueError:
+    WEB_PROC = 0
+WEB_THREADS_ALL = WEB_THREADS
+if WEB_PROCS > 1:
+    WEB_THREADS = max(2, WEB_THREADS_ALL // WEB_PROCS + (WEB_THREADS_ALL % WEB_PROCS if WEB_PROC == 0 else 0))
 # 2.521.0 E (#4475): the default is threads + 16 (40 at 24 threads; was threads x 3 + 8 = 80). Every Postgres connection is a
 # process with its own caches (some 10-20 MB with ~270 tables); 80 of them do not fit a database limited to 512 MB - 1 GB
 # (the OOM restarts of 04.11.2026). A request holds one connection (a few borrow a second one for a moment, a long-poll gives
@@ -489,7 +538,23 @@ except ValueError:
 # (pool_timeout_warn) and counted in /api/admin/health. Idle connections above POOL_MIN close after POOL_IDLE_S (one per
 # interval, psycopg_pool), so a burst does not keep its processes for hours (the pool's default: 10 min each).
 POOL_MIN = 4
-POOL_MAX = max(POOL_MIN, int(os.environ.get("KALMIDO_DB_POOL_MAX", "") or os.environ.get("KALMIDO_POOL_MAX", "") or WEB_THREADS + 16))
+POOL_BG_EXTRA, POOL_WEB_EXTRA = 16, 8  # 2.642.0 (#4975): room beside the threads in the process with / without the background work
+
+
+def pool_max_of(proc, procs=None):
+    """2.642.0 (#4975): the pool of web process `proc`. One process: KALMIDO_DB_POOL_MAX or threads + 16 (as before). Several:
+    an explicit KALMIDO_DB_POOL_MAX is the container's whole pool and is shared out; by default each process gets its threads +
+    16 (the first one, which runs the background work) or + 8 (the others: a request may borrow a second connection)."""
+    procs = WEB_PROCS if procs is None else procs
+    th = WEB_THREADS_ALL if procs == 1 else max(2, WEB_THREADS_ALL // procs + (WEB_THREADS_ALL % procs if proc == 0 else 0))
+    raw = os.environ.get("KALMIDO_DB_POOL_MAX", "") or os.environ.get("KALMIDO_POOL_MAX", "")
+    if raw:
+        return max(POOL_MIN, -(-int(raw) // procs))
+    return max(POOL_MIN, th + (POOL_BG_EXTRA if procs == 1 or proc == 0 else POOL_WEB_EXTRA))
+
+
+POOL_MAX = pool_max_of(WEB_PROC)
+POOL_MAX_ALL = sum(pool_max_of(i) for i in range(WEB_PROCS))  # the whole container (the connection check at start)
 POOL_IDLE_S = 30
 POOL_WAIT_S = 30
 _POOL_TO = {"n": 0, "last": 0.0}  # 2.102.0 D (#1994): pool waits that ran out (the health check shows them, the log warns)

@@ -69,19 +69,28 @@ if __name__ == "__main__":
     bgj_on_term()  # 2.370.3 (#2760): a stop (SIGTERM) puts this process' running queue rows back at once
     if WRK_ROLE == "worker":  # 2.102.0 D (#1997): kalmido/admin/worker.py
         sys.exit(wrk_main())
-    from kalmido.admin.backup import bk_start_clean
-    bk_start_clean()  # 2.510.0 (#4286): what a hard stop of a restore left; here, not on the import (helpers import the package too)
-    from kalmido.accounts.setupcode import sh_code_startup
-    sh_code_startup()  # 2.45.0 (#1515): a server without users prints its one-time setup code
-    from kalmido.core.db import skfp_warn_changed
-    skfp_warn_changed()  # 2.190.0 R (#2592): KALMIDO_SECRET_KEY_CHANGED left on
+    if not WEB_PROC:  # 2.642.0 (#4975): once per container, in the first web process (KALMIDO_WEB_PROCS)
+        from kalmido.admin.backup import bk_start_clean
+        bk_start_clean()  # 2.510.0 (#4286): what a hard stop of a restore left; here, not on the import (helpers import the package too)
+        from kalmido.accounts.setupcode import sh_code_startup
+        sh_code_startup()  # 2.45.0 (#1515): a server without users prints its one-time setup code
+        from kalmido.core.db import skfp_warn_changed
+        skfp_warn_changed()  # 2.190.0 R (#2592): KALMIDO_SECRET_KEY_CHANGED left on
     from waitress import serve
     port = int(os.environ.get("PORT", 3040))
     listen = f"0.0.0.0:{port}" + (f" 0.0.0.0:{AUTH_PROXY_PORT}" if AUTH_PROXY_PORT and AUTH_PROXY_PORT != str(port) else "")
+    # 2.642.0 (#4975): KALMIDO_WEB_PROCS > 1 -- every process binds the same port(s) with SO_REUSEPORT (admin/worker.py); the
+    # first one starts the others after its start-up work (migrations, setup code) is done
+    where = {"listen": listen}
+    if WEB_PROCS > 1:
+        where = {"sockets": wrk_listen_sockets(listen.split())}
+        wrk_web_procs_start(os.path.abspath(__file__))
+        wrk_web_proc_guard()
     # restore uploads may be larger than attachments (waitress spools the body to a temp file first)
     # 2.0.0: 16 threads (was 8): agents' long-polls (at most KALMIDO_AGENT_WAITERS) each hold one while waiting
     # 2.10.0 (#445): forwarded headers are handled by proxy_mw (several trusted proxies / networks, which waitress'
     # trusted_proxy cannot express); waitress must not clear them before the app sees them.
     # 2.102.0 D (#1994): KALMIDO_THREADS (default 16, core/pg.py WEB_THREADS; the pool follows it)
-    serve(app, listen=listen, threads=WEB_THREADS, max_request_body_size=max(BK_MAX_BYTES, app.config["MAX_CONTENT_LENGTH"]) + 1024 * 1024,
+    # 2.642.0 (#4975): WEB_THREADS = this process' part of KALMIDO_THREADS
+    serve(app, **where, threads=WEB_THREADS, max_request_body_size=max(BK_MAX_BYTES, app.config["MAX_CONTENT_LENGTH"]) + 1024 * 1024,
           clear_untrusted_proxy_headers=False)

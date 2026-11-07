@@ -17454,6 +17454,7 @@
   "Select a column": "Choisir une colonne",
   "Select a tag": "Choisir une étiquette",
   "Select a person": "Choisir une personne",
+  "A restore needs a single server process (KALMIDO_ROLE=all, KALMIDO_REPLICAS=1, KALMIDO_WEB_PROCS=1). Stop the other processes first, see SELF-HOSTING.md.": "Une restauration nécessite un seul processus serveur (KALMIDO_ROLE=all, KALMIDO_REPLICAS=1, KALMIDO_WEB_PROCS=1). Arrêtez d'abord les autres processus, voir SELF-HOSTING.md.",
   "older versions too": "aussi les versions antérieures",
   "The client may also see the older versions": "Le client peut aussi voir les versions antérieures",
   "At most {0} client links at once: switch one off first": "Au plus {0} liens client à la fois : désactivez-en d'abord un",

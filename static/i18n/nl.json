@@ -17454,6 +17454,7 @@
   "Select a column": "Kies een kolom",
   "Select a tag": "Kies een label",
   "Select a person": "Kies een persoon",
+  "A restore needs a single server process (KALMIDO_ROLE=all, KALMIDO_REPLICAS=1, KALMIDO_WEB_PROCS=1). Stop the other processes first, see SELF-HOSTING.md.": "Een herstel heeft één serverproces nodig (KALMIDO_ROLE=all, KALMIDO_REPLICAS=1, KALMIDO_WEB_PROCS=1). Stop eerst de andere processen, zie SELF-HOSTING.md.",
   "older versions too": "ook oudere versies",
   "The client may also see the older versions": "De klant mag ook de oudere versies zien",
   "At most {0} client links at once: switch one off first": "Hoogstens {0} klantlinks tegelijk: zet er eerst een uit",
