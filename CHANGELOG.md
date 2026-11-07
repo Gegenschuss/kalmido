@@ -16,6 +16,28 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.650.0] - 2026-11-07
+
+Package 2.547 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Added
+- Office > Receipts: a one-time hint "N receipts are still in your documents" opens a preview of the old receipts of the personal documents (move / stays per row; tag Tax and uncertain ones preset to stays). Only the click moves them, in groups; one undo for the whole move for 30 days (folders, names, ended shares come back). No automatic move at the update (#4434)
+### Changed
+- Save as view: the section Projects lists only the folders (folded, one tick per folder, half-set when mixed), single projects after unfolding, a search field above the list; every group except Plan starts folded (#4484)
+- Team chat: live updates (new message, reaction, edit) change only the changed messages instead of rebuilding the list - no flashing, avatars stay (#4500)
+### Fixed
+- Notification channels: the hint shows only the host or the Telegram chat ID, no longer the last four characters of the webhook URL, bot token or number; existing hints are rewritten at start (#4516)
+- Documents reading view: pulling the grip back right after dragging it fully to the right no longer lands on a width in between (#4492)
+- Imports: a failing database look at the import queue counts as busy instead of ended, so a running import is never offered a second start or a clean-up (#4295); new tests for the import edges (undo in a locked month, numbering after import, foreign ids in a forged organisation archive, a cancelled import leaves nothing)
+
+Package 2.640 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Security
+- End-to-end encryption: locked knowledge pages and list channel messages are bound to their record (AAD v2 with the page id and path/body field, or room, generation, sender and message id); a server can no longer pass one page's or message's ciphertext off as another's. The browser reserves the id first (signed, short-lived reservation: `POST /api/wiki/e2e/newid`, `POST /api/team/rooms/<rid>/msgid`), writes only v2 (new, edit, switching the lock on, re-encryption after a key change, moving between spaces) and reads v1 only when the ciphertext itself says v1, so there is no downgrade; old v1 records stay readable (#3388).
+### Changed
+- Performance: the team chat marker of the 4-second poll comes from counters per room kept by a database trigger instead of counting all messages; deleting and restoring a message now moves it too (#4183).
+- Performance: the start state reads budgets, clients and formula field names in set queries, checks recurring copies only for done tasks, sums the storage in one statement with indexes on the uploader and computes the storage badge at most once a minute per person (own uploads and deletions show at once) (#4185).
+### Fixed
+- Tests: p265_b_ui waits for every module it checks (#5065); p2623_d_abnahme expects the renamed refusal "Approvals are switched off" (#5016); p2574_b_wkcm_ui no longer races CodeMirror's own late scroll and waits for the drawn screen instead of a fixed 10 s, a red check prints where screen and decorations stood (#5019).
+
 ## [2.648.0] - 2026-11-07
 
 Package 2.644 (Bündel: CI-only rot: p2137_c_api, CI-only rot: p23674_b_org, CI-only rot: p2538_c_buero u. 3 weitere).
@@ -409,7 +431,8 @@ Package 2.582 (Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher),
 
 Not released (the CI of this version was red); its changes are listed under 2.605.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.648.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.650.0...HEAD
+[2.650.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.650.0
 [2.648.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.648.0
 [2.646.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.646.0
 [2.645.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.645.0
