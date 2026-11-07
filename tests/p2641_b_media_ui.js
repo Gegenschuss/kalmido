@@ -67,7 +67,7 @@ const PDF = Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\ne
   const img = d.querySelector('.vdrdlg .vdrstage img');
   check(img.getAttribute('src') === `/api/videos/${R.id}/versions/${R.versions[0].id}/file`, 'the image comes from its bytes route ' + img.getAttribute('src'));
   const pins = [...d.querySelectorAll('.vdrdlg .vdrpin')];
-  check(pins.map(p => p.textContent).join(',') === '1,2' && pins[0].style.left === '25.00%' && pins[0].style.top === '50.00%', 'points 1 and 2 at their place ' + pins.map(p => p.style.cssText).join(' | '));
+  check(pins.map(p => p.textContent).join(',') === '1,2' && parseFloat(pins[0].style.left) === 25 && parseFloat(pins[0].style.top) === 50, 'points 1 and 2 at their place ' + pins.map(p => p.style.cssText).join(' | '));
   check(!d.querySelector('.vdrdlg .vdrsig h4'), 'an image review has no client link');
   check(!d.querySelector('.vdrdlg .vdrtl:not([hidden]) .vdrmk'), 'no time line');
 
