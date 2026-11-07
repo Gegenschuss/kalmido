@@ -80,6 +80,8 @@ Interface (signatures fixed; stages 2 / 3 and the first areas #1958 #1957 #4675 
       to heir), 'role' (uid's role in org is now role: guest / accounting leave the open channels they joined themselves),
       'retire' (org retires, uid None: every share on its nodes, every membership of its rooms), 'delete' (account uid goes:
       its undo steps, its name in the history). What goes lands in obj_revoked (30 days, OBJ_REVOKED_DAYS).
+      2.649.0 (#5051): 'leave' / 'retire' also revoke the person's (the organisation's) public links and file requests of
+      the file store (revoked_at + a row in obj_revoked), 'role' those of nodes uid can no longer share / write in
 The caller commits."""
 import json
 import re
@@ -95,6 +97,7 @@ from .i18n import tr
 from .pg import system_ctx, table_columns
 from ..files.fsref import FSR, _api_way as fsr_api_way, fs_ref_node, fs_ref_node_role, fs_ref_register
 from ..files.store import _free_name, _FsPre, fs_chain, fs_chains, fs_log_add, fs_visible_sql_c, safe_fs_name
+from ..files.store import fs_role  # 2.649.0 (#5051): _take_public
 from ..files.web import _agent_event, _inherited_shares, _share_targets, _shares
 from .dlock import dl_of
 from ..files.fslock import fl_is_locked, fsl_denied
@@ -894,6 +897,28 @@ def _take(c, src, sql, args, reason, by, org, who_col, kind=None):
     return len(rows)
 
 
+_PUBLIC = (("fs_ext_links", "label", ("owner",), ""), ("fs_upload_requests", "title", ("owner", "edit"), " AND deleted_at IS NULL"))
+
+
+def _take_public(c, sql, args, reason, by, org, uid=None):
+    """2.649.0 (#5051): the public links of the file store (fs_ext_links) and file requests (fs_upload_requests) matching sql
+    die (revoked_at) and go into obj_revoked (src = the table, ref_id = the row's id; no token in row_json). uid given (a
+    role change): only the rows whose node uid can no longer share (links) / write in (requests). Restorable as before:
+    files/extlinks.py xl_restore, files/filereq.py frq_update revoked=false (both drop the obj_revoked row). {table: n}."""
+    out, at = {}, iso(now_utc())
+    for src, tcol, keep, more in _PUBLIC:
+        rows = c.execute(f"SELECT id, node_id, org_id, created_by, {tcol} AS t FROM {src} WHERE revoked_at IS NULL{more} AND {sql}",
+                         args).fetchall()
+        if uid is not None:
+            rows = [r for r in rows if fs_role(c, r["node_id"], int(uid)) not in keep]
+        for r in rows:
+            c.execute(f"UPDATE {src} SET revoked_at=? WHERE id=?", (at, r["id"]))
+            _revoked_add(c, src, {"id": r["id"], "node_id": r["node_id"], "org_id": r["org_id"], "created_by": r["created_by"],
+                                  "title": r["t"]}, reason, by, org=org, uid=r["created_by"], ref_id=r["id"])
+        out[src] = len(rows)
+    return out
+
+
 def _agents_of(c, uid):
     return [r[0] for r in c.execute("SELECT user_id FROM agents WHERE owner_id=?", (int(uid),)).fetchall()]
 
@@ -919,6 +944,8 @@ def obj_revoke_person(c, uid, org, reason, heir=None, role=None):
                                      (*ppl, *ppl, int(org)), reason, by, int(org), "user_id")
             out["tchat_members"] = _take(c, "tchat_members", f"user_id IN ({q}) AND room_id IN (SELECT id FROM tchat_rooms WHERE org_id=?)",
                                          (*ppl, int(org)), reason, by, int(org), "user_id")
+            # 2.649.0 (#5051): their public links and file requests in the organisation die (coming back, also as a guest = still dead)
+            out.update(_take_public(c, "created_by=? AND org_id=?", (int(uid), int(org)), reason, by, int(org)))
             for reg in OBJ.values():  # 2.566.0 (#4712): the old member tables of kinds moving onto the core (ev_cal_members ...)
                 if reg["members"]:
                     mt, key = reg["members"]
@@ -930,6 +957,8 @@ def obj_revoke_person(c, uid, org, reason, heir=None, role=None):
                     if reg["base_role"] is None:  # the default rules: the organisation's object stays with it, the heir owns it
                         c.execute(f"UPDATE {reg['table']} SET owner_id=? WHERE org_id=? AND owner_id=?", (int(heir), int(org), int(uid)))
         elif reason == "role" and uid and org:
+            # 2.649.0 (#5051): the public links / file requests of a node they can no longer share / write in die
+            out.update(_take_public(c, "created_by=? AND org_id=?", (int(uid), int(org)), reason, by, int(org), uid=uid))
             if role in ("guest", "accounting"):  # F5 (#2822): the open channels they had joined
                 # 2.565.0 (#4719): like #4698 b (accounts/orgs.py org_open_chan_off) every row of them and their personal agents,
                 # and their shares on those rooms' nodes too (the core's members) -- restorable, nothing stays to reopen the room
@@ -951,6 +980,7 @@ def obj_revoke_person(c, uid, org, reason, heir=None, role=None):
                                      int(org), "user_id")
             out["tchat_members"] = _take(c, "tchat_members", "room_id IN (SELECT id FROM tchat_rooms WHERE org_id=?)", (int(org),),
                                          reason, by, int(org), "user_id")
+            out.update(_take_public(c, "org_id=?", (int(org),), reason, by, int(org)))  # 2.649.0 (#5051)
             for reg in OBJ.values():  # 2.566.0 (#4712, #4697): everyone but the owner and the owner's own agents (their delegates)
                 if reg["members"]:
                     mt, key = reg["members"]

@@ -596,6 +596,8 @@ def xl_restore(xid):
     if why:
         return err(why, 409)
     c.execute("UPDATE fs_ext_links SET revoked_at=NULL WHERE id=?", (xid,))
+    with system_ctx(c):  # 2.649.0 (#5051): back = out of the register (core/objects.py _take_public; the row may name the creator's org)
+        c.execute("DELETE FROM obj_revoked WHERE src='fs_ext_links' AND ref_id=?", (xid,))
     bump(c)
     c.commit()
     return jsonify(xl_answer(c, n, {"id": xid}))

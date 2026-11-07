@@ -292,6 +292,9 @@ def frq_update(rid):
         c.execute(f"UPDATE fs_upload_requests SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), rid])
         if "revoked_at" in f and bool(f["revoked_at"]) != bool(r["revoked_at"]):
             _log(c, r["node_id"], me(), "frq_revoke" if f["revoked_at"] else "frq_open", r["title"])
+            if not f["revoked_at"]:  # 2.649.0 (#5051): back = no longer in the register (core/objects.py _take_public)
+                with system_ctx(c):
+                    c.execute("DELETE FROM obj_revoked WHERE src='fs_upload_requests' AND ref_id=?", (rid,))
     bump(c)
     c.commit()
     return jsonify(frq_json(c, c.execute("SELECT * FROM fs_upload_requests WHERE id=?", (rid,)).fetchone(), role))
