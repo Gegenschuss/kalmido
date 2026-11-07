@@ -35,7 +35,7 @@ from ..core.serializers import unlink_files
 from ..core.errors import BadInput, BadKey, err_stored
 from ..tasks.attachments import file_ext, safe_name, send_stored
 from .pages import (WIKI_ZIP_FILES, WIKI_ZIP_FILE_MAX, wiki_clean_path, wiki_fit_paths, wiki_path_parts, wiki_frontmatter, wiki_insert, wiki_need,
-                    wiki_set_links, wiki_space_sql)
+                    wiki_set_links, wiki_space, wiki_space_key, wiki_space_sql)
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 from .wikie2e import wke_page_mode  # 2.369.5 (#2517): pulled up from functions
 
@@ -230,6 +230,45 @@ def wka_get(fid, name=None):
     if f["mime"] != SVG:
         return send_stored(f)
     return wka_send(c, f)
+
+
+WKA_SPACE_LIST = 20000  # 2.637.0 (#4745): files of one space in the list for the device's copy (more = "more": true)
+
+
+@app.get("/api/wiki/space-files")
+def wka_space_files():
+    """2.637.0 (#4745): ?space=private|org:<id> -- every file of the space for the device's offline copy ("Offline
+    available", static/js/wikioff.js): {space, files: [{id, page_id, name, mime, size, v, created_at, url, up?}], bytes,
+    more, e2e}. The space's own right as the index (wiki_space: guests / accounting 404) and as wka_need for each file
+    (wkf_base: the space's role; folder shares from elsewhere do not count here). Files in the trash and the files of pages in
+    the trash are missing (the device removes its copy then). v = the content's sha256 (a file's content never changes;
+    another content is another file). A space with the lock has no files (wka_upload refuses them, wke_start needs none):
+    files [] and e2e true."""
+    c = db()
+    uid = me()
+    oid = wiki_space(c, uid, request.args.get("space"))
+    from .wkfolder import wkf_base
+    if wkf_base(c, uid, {"org_id": oid, "owner_id": uid}) is None:
+        raise Denied(404)  # an agent's token, guests (the same as wka_need for every file of the space)
+    from .wikie2e import wke_mode
+    if wke_mode(c, oid, uid)[0]:
+        return jsonify(space=wiki_space_key(oid), files=[], bytes=0, more=False, e2e=True)
+    w, a = wiki_space_sql(oid, uid)
+    rows = c.execute(f"SELECT id, page_id, name, mime, size, sha256, created_at FROM wiki_files WHERE deleted_at IS NULL AND {w} "
+                     f"AND page_id IN (SELECT id FROM wiki_pages WHERE deleted_at IS NULL AND {w}) ORDER BY id LIMIT {WKA_SPACE_LIST + 1}",
+                     [*a, *a]).fetchall()
+    more = len(rows) > WKA_SPACE_LIST
+    rows = rows[:WKA_SPACE_LIST]
+    from ..files.upsafe import up_marks
+    marks = up_marks(c, "wiki", [r["id"] for r in rows])
+    files = []
+    for r in rows:
+        d = {"id": r["id"], "page_id": r["page_id"], "name": r["name"], "mime": r["mime"], "size": int(r["size"] or 0),
+             "v": r["sha256"] or "", "created_at": r["created_at"], "url": wka_url(r["id"], r["name"])}
+        if r["id"] in marks:
+            d["up"] = marks[r["id"]]  # unchecked / infected: the device does not fetch it (wka_get answers 403)
+        files.append(d)
+    return jsonify(space=wiki_space_key(oid), files=files, bytes=sum(f["size"] for f in files), more=more, e2e=False)
 
 
 def wka_send(c, f, dl=None):

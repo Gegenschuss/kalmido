@@ -1057,7 +1057,8 @@ ROUTES = {
     "POST /api/wiki/pages/{}/refs": "wiki", "GET /api/wiki/refs": "wiki",
     # 2.97.0 D (#2050 #2051): locked spaces / clean-up (p297_d_api_test.py) - routes below this line
     # 2.99.0 A (#2182): files of knowledge pages (p299_a_api_test.py: import, upload, read, delete in the private workspace)
-    "GET /api/wiki/files/{}": "wiki", "GET /api/wiki/files/{}/{}": "wiki", "DELETE /api/wiki/files/{}": "wiki",
+    "GET /api/wiki/files/{}": "wiki", "GET /api/wiki/space-files": "wiki",  # 2.637.0 (#4745)
+    "GET /api/wiki/files/{}/{}": "wiki", "DELETE /api/wiki/files/{}": "wiki",
     "POST /api/wiki/pages/{}/files": "wiki",
     # 2.123.0 B (#2104): shares of knowledge pages / folders (p2123_b_api_test.py: person + link in the private workspace); the public page = link
     "GET /api/wiki/shares": "wiki", "POST /api/wiki/shares": "wiki", "PATCH /api/wiki/shares/{}": "wiki", "DELETE /api/wiki/shares/{}": "wiki",
