@@ -1001,10 +1001,13 @@ def v1_comment_update(cid):
     """{body, expect_updated_at?}: only the author edits a comment. 2.638.0 (#4775): expect_updated_at (or If-Match) = the
     comment's edited_at, else its created_at, as read; changed meantime -> 409 with the comment; agents must send it."""
     v1_args(())
-    b = take_version(dict(_v1_body(("body", "expect_updated_at"))))
+    b = dict(_v1_body(("body", "expect_updated_at")))
     if not isinstance(b.get("body"), str):
         raise BadInput(tr("Expected {0}", '{"body": "..."}'))
     c = db()
+    if need_live_comment(c, cid)[0]["user_id"] != me():  # the rights before the version (someone else's comment: 403 as before)
+        raise Denied(403, tr("Only the author can edit this comment"))
+    b = take_version(b)
     j = v1_call(comment_update, cid, body={"body": b["body"], **({"expect_updated_at": b["expect_updated_at"]} if b.get("expect_updated_at") else {})})
     tid = c.execute("SELECT task_id FROM comments WHERE id=?", (cid,)).fetchone()[0]
     return jsonify(v1_comment(c, {**j, "task_id": tid}, user_names(c, [j.get("user_id") or me()])))

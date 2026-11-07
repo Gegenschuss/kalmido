@@ -1149,6 +1149,9 @@ def v1_tchat_edit(mid):
     v1_args(())
     b = dict(v1_json())
     reject_unknown(b, ("body", "expect_updated_at"))
+    c = db()
+    need_tchat(c)
+    need_tmsg(c, mid, edit=True)  # the rights before the version (404 / 403 as before)
     return jsonify(v1_call(tchat_edit, mid, body=take_version(b)))
 
 
