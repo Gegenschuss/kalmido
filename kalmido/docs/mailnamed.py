@@ -105,7 +105,7 @@ def docs_mail_address_new():
     except ValueError as e:
         return err(tr("Name missing") if str(e) == "name" else tr("Invalid value: {0}", str(e)))
     except Denied as e:
-        return err(tr("Choose a folder of these documents you may add to"), 400) if e.code == 409 else err(e.text(), e.code)
+        return err(tr("Select a folder of these documents you may add to"), 400) if e.code == 409 else err(e.text(), e.code)
     write_lock(c, f"doc_mail-{uid}-{oid or 0}")
     if c.execute("SELECT COUNT(*) FROM doc_mail WHERE user_id=? AND org_id IS NOT DISTINCT FROM ? AND aid<>''", (uid, oid)).fetchone()[0] >= DMN_MAX:
         return err(tr("At most {0} addresses", DMN_MAX), 409)
@@ -135,7 +135,7 @@ def docs_mail_address_set(aid):
     except ValueError as e:
         return err(tr("Name missing") if str(e) == "name" else tr("Invalid value: {0}", str(e)))
     except Denied as e:
-        return err(tr("Choose a folder of these documents you may add to"), 400) if e.code == 409 else err(e.text(), e.code)
+        return err(tr("Select a folder of these documents you may add to"), 400) if e.code == 409 else err(e.text(), e.code)
     if v:
         v["updated_at"] = now_iso()
         cols = ", ".join(f"{k}=?" for k in v)
