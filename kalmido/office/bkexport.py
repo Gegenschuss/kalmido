@@ -32,6 +32,7 @@ from ..files.bulk import abm_zip_name, abm_send_zip, ABM_BUSY, ABM_ZIP_MAX_FILES
 from .packs import office_pack_for  # 2.369.5 (#2517): pulled up from functions
 from .ledger import ofx_log  # 2.369.5 (#2517): pulled up from functions
 from ..files.store import fs_read  # 2.369.5 (#2517): pulled up from functions
+from .meals import BW_SHARE  # 2.616.0 (#4563): bx_meal_parts
 
 BX_COLS = ("type", "date", "number", "counterparty", "text", "category", "tax_pct", "net", "tax", "gross", "currency", "file")
 BX_DAYS_MAX = 3 * 366  # one export covers at most three years
@@ -135,13 +136,34 @@ def bx_rows(c, oid, frm, to, gaps=None):
     for m in ofc_meals_home(c, oid, frm, to, s):
         v, sm = ofc_meals_euer([m], small)
         nd = dec(sm["not_deductible"])
-        for cat, net, tax in ((tr("Entertainment (70 % deductible)"), v[0], v[1]), (tr("Entertainment (30 % not deductible)"), nd, dec(0))):
-            rows.append({"type": "meal", "date": m["date"], "number": "", "counterparty": "", "text": m["title"], "category": cat, "tax_pct": "",
+        ded = [(tr("Entertainment (70 % deductible)"), pct, net, tax) for pct, net, tax in bx_meal_parts(m, v)]  # 2.616.0 (#4563): per VAT rate
+        for cat, pct, net, tax in ded + [(tr("Entertainment (30 % not deductible)"), "", nd, dec(0))]:
+            rows.append({"type": "meal", "date": m["date"], "number": "", "counterparty": "", "text": m["title"], "category": cat, "tax_pct": pct,
                          "net": -net, "tax": -tax if tax else "", "gross": -(net + tax), "currency": home, "file": ""})
     from .cardnorc import cc_bk_rows
     rows += cc_bk_rows(c, oid, frm, to)  # 2.444.0 (#3447)
     rows.sort(key=lambda x: (x["date"] or "", list(BX_TYPES).index(x["type"]), x["number"]))
     return rows, docs, recs
+
+
+def bx_meal_parts(m, v):
+    """2.616.0 (#4563): the deductible part of meal m (ofc_meals_home row) as [(tax_pct | "", net, tax)]: v = ofc_meals_euer's
+    [net, vat, gross]. A small business (no input tax) or a meal without lines: one row without a rate. Else one row per VAT
+    rate of its lines (70 % of their net, their full input tax) and the tip (no VAT) at 0 %; the last row takes the rounding
+    cents so the rows add up to v exactly (the EUeR line)."""
+    if not v[1] or not m.get("rates"):
+        return [("", v[0], v[1])]
+    by = {}
+    for pct, net, tax in m["rates"]:
+        n0, t0 = by.get(pct, (dec(0), dec(0)))
+        by[pct] = (n0 + net, t0 + tax)
+    if m.get("tip"):
+        n0, t0 = by.get(dec(0), (dec(0), dec(0)))
+        by[dec(0)] = (n0 + m["tip"], t0)
+    out = [(pct.normalize(), money(net * BW_SHARE), money(tax)) for pct, (net, tax) in sorted(by.items(), key=lambda x: -x[0])]
+    pct, net, tax = out[-1]
+    out[-1] = (pct, net + v[0] - sum((x[1] for x in out), dec(0)), tax + v[1] - sum((x[2] for x in out), dec(0)))
+    return out
 
 
 def _zip_part(name):

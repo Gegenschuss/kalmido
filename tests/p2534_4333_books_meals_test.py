@@ -5,7 +5,8 @@
  - a draft counts nowhere; an approved meal (food 119.00 at 19 %, drinks 21.40 at 7 %, tip 10: gross 150.40, input tax
    20.40, net 130.00, 70 % = 91.00, 30 % = 39.00) is the EUeR line "Entertainment (70 % deductible)" with net 91.00 and the
    full input tax, the 30 % and the double-count hint are named in the notes; field 66 of its quarter carries 20.40, the
-   other quarter nothing; the neutral export has its two rows (70 % with the tax, 30 % without)
+   other quarter nothing; the neutral export has a 70 % row per VAT rate with the tax and the rate (2.616.0, #4563: the tip
+   at 0 %) and one 30 % row without
  - a small business: 70 % of the gross amount (105.28), no input tax, no VAT return figures
  - a person without an organisation (freelancer-matrix: office): the same in the personal office
 usage: p2534_4333_books_meals_test.py <datadir>"""
@@ -94,9 +95,13 @@ def books(s, who, host):
     rows = [x for x in txt.split("\r\n") if "Trattoria" in x]
     ded = [x for x in rows if "70 %" in x]
     nd = [x for x in rows if "30 %" in x]
-    check(r.ok and len(rows) == 2 and ded and nd, f"{who}: the export has two rows {rows} {r.status_code}")
-    check(ded and ("-91,00" in ded[0] or "-91.00" in ded[0]) and ("-20,40" in ded[0] or "-20.40" in ded[0]) and ("-111,40" in ded[0] or "-111.40" in ded[0]),
-          f"{who}: export 70 % row with the tax {ded}")
+    # 2.616.0 (#4563): one 70 % row per VAT rate (19 %: 70.00 + 19.00, 7 %: 14.00 + 1.40, the tip at 0 %: 7.00), tax_pct filled;
+    # before, one 70 % row (91.00 + 20.40) with an empty rate. The organisation's office writes "," as decimal mark (de).
+    cells = [x.split(";") if ";" in x else x.split(",") for x in ded]
+    got = sorted(((c_[6], c_[7], c_[8], c_[9]) for c_ in cells), key=lambda x: x[0]) if all(len(c_) >= 12 for c_ in cells) else []
+    want = [("0", "-7,00", "", "-7,00"), ("19", "-70,00", "-19,00", "-89,00"), ("7", "-14,00", "-1,40", "-15,40")]
+    check(r.ok and len(rows) == 4 and len(ded) == 3 and len(nd) == 1, f"{who}: #4563: the export has three 70 % rows and one 30 % row {rows} {r.status_code}")
+    check([tuple(v.replace(".", ",") for v in g) for g in got] == want, f"{who}: #4563: a 70 % row per rate with its tax and rate {got}")
     check(nd and ("-39,00" in nd[0] or "-39.00" in nd[0]), f"{who}: export 30 % row {nd}")
     # a small business: no input tax, 70 % of the gross amount
     check(s.put(B + O + "/settings", json={"small_business": True}).ok, f"{who}: small business on")

@@ -389,7 +389,9 @@ def ofc_meals_home(c, oid, frm, to, s):
         net, ded = f(k["net"]), f(k["deductible"])
         out.append({"id": m["id"], "date": m["date"], "title": m["title"], "gross": f(k["gross"]), "vat": f(k["vat"]), "net": net,
                     "deductible": ded, "not_deductible": net - ded, "unrated": cur if rate is None else None,
-                    "pay": m.get("pay")})  # 2.603.0 (#4927): (kind, id) of its bank / cash / card line or None
+                    "pay": m.get("pay"),  # 2.603.0 (#4927): (kind, id) of its bank / cash / card line or None
+                    "rates": [(dec(x["rate"]), f(x["net"]), f(x["vat"])) for x in k.get("lines") or []],  # 2.616.0 (#4563): per line
+                    "tip": f(k.get("tip") or 0)})
     return out
 
 
