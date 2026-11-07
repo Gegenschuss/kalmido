@@ -110,7 +110,8 @@ const NEW = {agentchat: ['agentchat', 'agentsetup', 'agentrotate', 'agentwork', 
   check(!!wt && w.getComputedStyle(wt).position === 'absolute', 'calendar week: a rule of calendar.css applies (.wtime absolute)');
   // documents
   w.eval(`go('docs')`);
-  await until(() => lazyTags().includes('docs') && d.querySelector('#view .dc-view'), 80);
+  // 2.640.0: wait for everything the check reads (receipts.js and docs.css came after docs.js under load: red in the merged check)
+  await until(() => ['docs', 'paperless', 'receipts'].every(f => lazyTags().includes(f)) && cssOn('docs') && d.querySelector('#view .dc-view'), 80);
   check(['docs', 'paperless', 'receipts'].every(f => lazyTags().includes(f)) && cssOn('docs') && w.getComputedStyle(d.querySelector('#view .dc-view')).position === 'relative', 'documents: docs.js + paperless.js + receipts.js + docs.css, style applies' + why());
   // knowledge pages (already loaded by the task panel): the view
   w.eval(`go('wiki')`);
