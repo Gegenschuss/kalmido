@@ -926,6 +926,8 @@ async function dc_sClick(e) {
   if (a === 'go-set') { md.remove(); settingsModal('docs'); return; }
   if (a === 'lists' || a === 'go-integr') { const sm = md.closest('.modal'); if (sm) modalClose(sm); if (a === 'lists') { go('docs'); dc_settings(s?.ws); } else settingsModal('scans'); return; }
   if (a === 'fadd' || /^f(ren|opt|del):/.test(a)) return dc_cfAct(a, s, md);  // 2.153.0 (#2179)
+  if (a.startsWith('redit:') && typeof dfl_edit === 'function') { dfl_edit(md, s, +a.slice(6)); return; }  // 2.635.0 (#4856): edit a flow
+  if (a === 'radd' && typeof dfl_save === 'function' && b.closest('.dfl-add')?.dataset.edit) { await dfl_save(md, s, +b.closest('.dfl-add').dataset.edit); return; }
   if (a === 'radd') {
     const v = id => ($(`#${id}`, md)?.value || '').trim();
     const r = typeof dfl_collect === 'function' ? dfl_collect(md, s) : {ws: s.ws, kind: v('dcr-kind'), match: v('dcr-match'), sender: v('dcr-sender'), type: v('dcr-type'), tags: v('dcr-tags'), folder: v('dcr-folder')};  // 2.581.0 (#4803)

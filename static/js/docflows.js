@@ -20,8 +20,10 @@ function dfl_ruleHtml(r, can) {  // one flow in the list: trigger, filters, acti
   const does = [r.sender && `${tr('Sender')}: ${r.sender}`, r.type && `${tr('Document type')}: ${r.type}`, r.tags?.length && `${tr('Tags')}: ${dfl_list(r.tags)}`,
     r.folder && `${tr('Folder')}: ${r.folder}`, r.untag?.length && `${tr('Remove tags')}: ${dfl_list(r.untag)}`,
     r.fields && Object.keys(r.fields).length && `${tr('Custom fields')}: ${Object.entries(r.fields).map(([k, v]) => `${k} = ${v ?? ''}`).join(', ')}`,
-    r.task && tr('Create task'), r.notify?.length && `${tr('Notify')}: ${r.notify.length}`, r.webhook && `${tr('Webhook')}: ${r.webhook}`].filter(Boolean);
+    r.task && tr('Create task'), r.notify?.length && `${tr('Notify')}: ${r.notify.length}`, r.webhook && `${tr('Webhook')}: ${r.webhook}`,
+    r.share?.length && `${tr('Share')}: ${r.share.length}`].filter(Boolean);  // 2.635.0 (#4856)
   return `<li class="dc-rule${r.off ? ' muted' : ''}"><span>${r.name ? `<b>${esc(r.name)}</b> · ` : ''}<span class="muted">${esc(when)}</span>${ifs.length ? ` · ${ifs.join(' · ')}` : ''} → ${esc(does.join(' · '))}${r.off ? ` <span class="muted">(${tr('off')})</span>` : ''}</span>${can ? `<span>
+    <button type="button" class="iconbtn" data-dcs="redit:${r.id}" aria-label="${esc(tr('Edit flow'))}" title="${esc(tr('Edit flow'))}">${ic('edit')}</button>
     <button type="button" class="iconbtn" data-dcs="rtog:${r.id}" aria-label="${esc(r.off ? tr('Switch on') : tr('Switch off'))}" title="${esc(r.off ? tr('Switch on') : tr('Switch off'))}">${ic(r.off ? 'play' : 'pause')}</button>
     <button type="button" class="iconbtn" data-dcs="rdel:${r.id}" aria-label="${esc(tr('Delete rule'))}">${ic('trash')}</button></span>` : ''}</li>`;
 }
@@ -58,8 +60,10 @@ function dfl_formHtml(s) {  // the form "New flow" (ids dcr-* as before for the 
       <label class="chkl"><input type="checkbox" id="dfl-tdue"> ${tr('Due on the due date of the document')}</label></div>
     ${(s.people || []).length ? `<p class="muted">${tr('Notify')}</p>${chk('notify', (s.people || []).map(p => [p.id, p.name]))}` : ''}
     ${s.hooks ? row('dfl-hook', tr('Webhook'), inp('dfl-hook', 2000, 'type="url" placeholder="https://"')) : ''}
+    ${(s.share_to || []).length ? `<p class="muted">${tr('Share the document with')}</p>${chk('share', s.share_to.map(x => [`${x.key}:${x.id}`, x.name]))}
+      ${row('dfl-srole', tr('Role'), `<select id="dfl-srole"><option value="view">${tr('Can view')}</option><option value="edit">${tr('Can edit')}</option></select>`)}` : ''}
     <p class="muted">${tr('A flow never starts another one. Every run can be undone in the document.')}</p>
-    <div class="foot"><span class="spacer"></span><button type="button" class="btn pri" data-dcs="radd">${tr('Add flow')}</button></div></details>`;
+    <div class="foot"><span class="spacer"></span><button type="button" class="btn dfl-cancel" data-dcs="redit:0" hidden>${tr('Cancel')}</button><button type="button" class="btn pri" data-dcs="radd">${tr('Add flow')}</button></div></details>`;
 }
 function dfl_change(e) {  // the parts of the form for the chosen trigger / the task
   const md = e.target.closest('.dfl-add'); if (!md) return false;
@@ -79,7 +83,57 @@ function dfl_collect(md, s) {  // the form -> the body of POST /api/docs/rules
   if (v('dfl-field')) r.fields = {[v('dfl-field')]: v('dfl-fval')};
   if (/** @type {HTMLInputElement|null} */ (md.querySelector('#dfl-task'))?.checked) r.task = {title: v('dfl-ttitle'), due: !!(/** @type {HTMLInputElement|null} */ (md.querySelector('#dfl-tdue'))?.checked)};
   if (v('dfl-hook')) r.webhook = v('dfl-hook');
+  const role = v('dfl-srole') || 'view';  // 2.635.0 (#4856): the action "share" (one role for the chosen people / groups)
+  r.share = on('share').map(x => { const [k, i] = x.split(':'); return {[k]: +i, role}; });
   return r;
+}
+// ---- 2.635.0 (#4856): edit a flow -- the same form, filled; saved with PATCH and the flow's version (409 = changed elsewhere)
+function dfl_edit(md, s, id) {
+  const r = id ? s.rules.find(x => x.id === id) : null;
+  if (!r) { dc_sDraw(md); return; }  // "Cancel" (id 0): the form as new again
+  const f = /** @type {HTMLDetailsElement|null} */ (md.querySelector('.dfl-add')); if (!f) return;
+  const set = (sel, v) => { const x = /** @type {HTMLInputElement|null} */ (f.querySelector('#' + sel)); if (x) x.value = v ?? ''; };
+  const tick = (name, vals) => f.querySelectorAll(`[data-dfl="${name}"]`).forEach(x => { /** @type {HTMLInputElement} */ (x).checked = vals.includes(/** @type {HTMLInputElement} */ (x).value); });
+  const trig = r.trigger || 'received';
+  set('dfl-name', r.name); set('dfl-trig', trig);
+  f.querySelectorAll('.dfl-t').forEach(x => { /** @type {HTMLElement} */ (x).hidden = !x.classList.contains('dfl-t-' + trig); });
+  tick('on', r.on || []);
+  if (trig === 'scheduled') { set('dfl-days', r.days ?? 0); set('dfl-from', r.from || 'date'); }
+  if (r.kind) set('dcr-kind', r.kind);
+  set('dcr-match', r.match); tick('src', r.sources || []); set('dfl-fn', r.filename); set('dfl-htags', dfl_list(r.has_tags));
+  set('dfl-htype', r.has_type); set('dfl-hsender', r.has_sender); set('dcr-sender', r.sender); set('dcr-type', r.type);
+  set('dcr-tags', dfl_list(r.tags)); set('dfl-untag', dfl_list(r.untag)); set('dcr-folder', r.folder);
+  const fk = Object.keys(r.fields || {})[0]; if (fk) { set('dfl-field', fk); set('dfl-fval', r.fields[fk]); }
+  const t = /** @type {HTMLInputElement|null} */ (f.querySelector('#dfl-task')); if (t) t.checked = !!r.task;
+  const tx = /** @type {HTMLElement|null} */ (f.querySelector('.dfl-taskx')); if (tx) tx.hidden = !r.task;
+  set('dfl-ttitle', r.task?.title); const td = /** @type {HTMLInputElement|null} */ (f.querySelector('#dfl-tdue')); if (td) td.checked = !!r.task?.due;
+  tick('notify', (r.notify || []).map(String)); set('dfl-hook', r.webhook);
+  tick('share', (r.share || []).map(x => x.user_id ? `user_id:${x.user_id}` : `group_id:${x.group_id}`));
+  set('dfl-srole', r.share?.some(x => x.role === 'edit') ? 'edit' : 'view');
+  f.dataset.edit = String(id); f.dataset.ver = r.updated_at || '';
+  const sm = f.querySelector('summary'); if (sm) sm.textContent = tr('Edit flow');
+  const b = f.querySelector('[data-dcs="radd"]'); if (b) b.textContent = tr('Save flow');
+  const cn = /** @type {HTMLElement|null} */ (f.querySelector('.dfl-cancel')); if (cn) cn.hidden = false;
+  f.open = true; f.scrollIntoView({block: 'nearest'});
+  /** @type {HTMLInputElement|null} */ (f.querySelector('#dfl-name'))?.focus();
+}
+async function dfl_save(md, s, id) {  // the filled form -> PATCH /api/docs/rules/<id> with expect_updated_at
+  const f = md.querySelector('.dfl-add'), old = s.rules.find(x => x.id === id); if (!f || !old) return;
+  const r = dfl_collect(f, s);
+  if (old.case) r.case = true;  // what the form does not show stays as it was
+  if (old.off) r.off = true;
+  if (old.task?.to && r.task) r.task.to = old.task.to;
+  if (Object.keys(old.fields || {}).length > 1) r.fields = {...old.fields, ...(r.fields || {})};
+  let j;
+  try { j = await api('PATCH', `/api/docs/rules/${id}`, {...r, expect_updated_at: f.dataset.ver || undefined}); } catch (e) {
+    if (e?.status === 409 && e.data?.rules) { s.rules = e.data.rules; dc_sDraw(md); }  // the message came from api(); the list as it is now
+    return;
+  }
+  s.rules = j.rules; dc_sDraw(md);
+  if (j.hook_secret) dfl_secret(j.hook_secret);
+  const back = {...old, id: undefined, updated_at: undefined};
+  const put = b => async () => { const x = await api('PATCH', `/api/docs/rules/${id}`, b); if (DC.set) { DC.set.rules = x.rules; dc_sDraw($('.dc-smd')); } return {}; };
+  histToast(tr('Flow saved'), histAdd({label: tr('Flow saved'), sett: true, undo: put(back), redo: put(r)}));
 }
 function dfl_secret(sec) {  // a new webhook secret: shown once
   if (!sec) return;
@@ -94,7 +148,7 @@ async function dfl_runs(md, d) {
   let j; try { j = await api('GET', `/api/docs/${d.id}/flowruns`); } catch { return; }
   if (!box.isConnected || !j.runs.length) { box.innerHTML = ''; return; }
   box.innerHTML = `<details class="dc-text"><summary><h4>${tr('Flows')} (${j.runs.length})</h4>${ic('chev', 's dc-chev')}</summary><ul class="dc-rules">${j.runs.map(r => {
-    const what = [...r.did.map(k => tr(DFL_DID[k] || k)), r.task_id && tr('Task'), r.told && tr('{0} notified', r.told), r.hook && tr('Webhook')].filter(Boolean).join(', ');
+    const what = [...r.did.map(k => tr(DFL_DID[k] || k)), r.task_id && tr('Task'), r.told && tr('{0} notified', r.told), r.hook && tr('Webhook'), r.shared && tr('Shared')].filter(Boolean).join(', ');
     return `<li class="dc-rule"><span>${esc(r.name || tr('Flow'))} <span class="muted">${esc(fmtWhen(r.at))} · ${esc(what)}${r.undone ? ` · ${tr('undone')}` : ''}</span></span>${j.can_undo && !r.undone ? `<button type="button" class="btn sm" data-dflundo="${r.id}">${tr('Undo')}</button>` : ''}</li>`;
   }).join('')}</ul></details>`;
   if (!box._on) {

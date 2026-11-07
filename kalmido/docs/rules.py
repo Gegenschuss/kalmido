@@ -84,13 +84,16 @@ def check_pattern(pat):
     return None
 
 
-def clean_rule(r, extra=False):
+def clean_rule(r, extra=False, share=False):
     """A rule dict from user input (raises RuleError with a reason).
     2.581.0 (#4803): a rule is a flow ("Ablauf"): a trigger (received = as before, changed, scheduled), filters (the words
     as before, now optional when another filter or trigger is given; source, file name, tag / type / sender) and actions
     (set sender / type / folder / tags as before; remove tags, set custom fields, make a task; with extra=True also notify
     people and call a webhook -- those need the checks of docs/flows.py fl_clean against the database, so an import of
-    rules (Paperless, organisation import) never brings them in). Old rules read as flows with trigger received."""
+    rules (Paperless, organisation import) never brings them in). Old rules read as flows with trigger received.
+    2.635.0 (#4856): the action "share" ([{user_id | group_id, role: view | edit}], the shares of the shared core) only with
+    extra=True (fl_clean checks the targets) or share=True (the Paperless import, its targets checked by docs/flows.py
+    fl_share_pool)."""
     kind = r.get("kind") or "any"
     if kind not in KINDS:
         raise RuleError("kind")
@@ -168,6 +171,10 @@ def clean_rule(r, extra=False):
             out["webhook"] = url[:2000]
             if r.get("hook_secret"):
                 out["hook_secret"] = str(r["hook_secret"])[:100]
+    if extra or share:  # 2.635.0 (#4856): the shape only; who may get a share: docs/flows.py fl_clean / fl_share_pool
+        sh = _clean_share(r.get("share"))
+        if sh:
+            out["share"] = sh
     if not any(k in out for k in ACTIONS):
         raise RuleError("nothing")
     return out
@@ -179,7 +186,25 @@ SCHED_FROM = ("date", "due", "added")            # X days after the document's d
 DAYS_MAX = 3650
 FIELDS_MAX = 5
 NOTIFY_MAX = 20
-ACTIONS = ("sender", "type", "folder", "tags", "untag", "fields", "task", "notify", "webhook")
+ACTIONS = ("sender", "type", "folder", "tags", "untag", "fields", "task", "notify", "webhook", "share")  # 2.635.0 (#4856): + share
+SHARE_MAX = 10  # 2.635.0 (#4856): people / groups one flow shares a document with
+
+
+def _clean_share(v):
+    """2.635.0 (#4856): [{user_id | group_id: int, role: view | edit}] -- one entry per target (the higher role wins)."""
+    seen = {}
+    for x in v if isinstance(v, list) else []:
+        if not isinstance(x, dict):
+            raise RuleError("share")
+        key = next((k for k in ("user_id", "group_id") if k in x), None)
+        t, role = x.get(key) if key else None, x.get("role") or "view"
+        if key is None or isinstance(t, bool) or not isinstance(t, int) or t <= 0 or role not in ("view", "edit"):
+            raise RuleError("share")
+        if seen.get((key, t)) != "edit":
+            seen[(key, t)] = role
+    if len(seen) > SHARE_MAX:
+        raise RuleError("share")
+    return [{k: t, "role": role} for (k, t), role in sorted(seen.items())]
 # the source filter: a group -> the values of doc_meta.source (docs/ingest.py docs_ingest callers); "mailbox" for the own
 # mailbox of a workspace (#4804) when it marks its documents apart from the document address
 SOURCES = {"upload": ("upload", "share", "api", "folder", "office", "payonline"), "mail": ("mail", "mailbox"), "scan": ("scan",),

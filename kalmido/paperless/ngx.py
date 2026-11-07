@@ -321,6 +321,26 @@ def pl_workflows(c, url, token):
     return out[:PLL_WF_MAX]
 
 
+def pl_people(c, url, token):
+    """2.635.0 (#4856): {"users": {id: user name}, "groups": {id: name}} of this Paperless-ngx (learn.py maps a workflow's owner /
+    permissions by name); what the token may not read stays empty (the permissions are then reported, the import goes on)."""
+    out = {"users": {}, "groups": {}}
+    for key, path, field in (("users", "/api/users/", "username"), ("groups", "/api/groups/", "name")):
+        page = 1
+        try:
+            while page <= PL_LABEL_PAGES:
+                j = pl_get(c, url, token, f"{path}?page_size=100&page={page}")
+                if not isinstance(j, dict) or not isinstance(j.get("results"), list):
+                    break
+                out[key].update({str(x["id"]): str(x.get(field) or "")[:200] for x in j["results"] if isinstance(x, dict) and isinstance(x.get("id"), int)})
+                if not j.get("next"):
+                    break
+                page += 1
+        except PlError:
+            continue
+    return out
+
+
 def pl_label_match(x):
     """2.69.0 B (#1847): {match, algo, insens} of a Paperless-ngx label (API answer or export record)."""
     algo = x.get("matching_algorithm")
@@ -608,6 +628,7 @@ def pl_run(c, sid):
         labels = {k: {x["id"]: x["name"] for x in full[k]} for k in full}
         fields = pl_fields(c, r["url"], tok)
         full["workflows"], full["_fields"] = pl_workflows(c, r["url"], tok), fields  # 2.581.0 (#4803): -> document flows (learn.py)
+        full["_people"] = pl_people(c, r["url"], tok) if full["workflows"] else {}  # 2.635.0 (#4856): permissions by name
         order = "id" if r["run_kind"] == "all" else "-id"
         page, stop = 1, False
         while not stop:

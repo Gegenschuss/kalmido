@@ -280,6 +280,7 @@ def plh_scan(zf):
     kinds = {"documents.tag": "tags", "documents.correspondent": "correspondents", "documents.documenttype": "document_types"}
     fields, docs, notes, values, users = {}, {}, {}, {}, []
     wfs, wtrig, wact = [], {}, {}  # 2.581.0 (#4803): the workflows (learn.py makes document flows of them)
+    groups = {}  # 2.635.0 (#4856): the group names (learn.py maps a workflow's permissions by name)
     for x in recs:
         m, f = str(x.get("model") or ""), x["fields"]
         if m in kinds:
@@ -292,6 +293,8 @@ def plh_scan(zf):
             wact[x["pk"]] = f
         elif m == "auth.user":  # 2.81.0 (#1875): only for the export's key
             users.append((x["pk"], str(f.get("username") or "")[:200], str(f.get("date_joined") or "")[:40]))
+        elif m == "auth.group":  # 2.635.0 (#4856)
+            groups[str(x["pk"])] = str(f.get("name") or "")[:200]
         elif m == "documents.customfield":
             ed = f.get("extra_data") if isinstance(f.get("extra_data"), dict) else {}
             opts = ed.get("select_options") if isinstance(ed.get("select_options"), list) else []
@@ -333,7 +336,8 @@ def plh_scan(zf):
             if t in labels["tags"]:
                 labels["tags"][t]["count"] += 1
     return {"labels": {k: sorted(v.values(), key=lambda x: (x["name"].lower(), x["id"])) for k, v in labels.items()},
-            "fields": fields, "docs": docs, "src": plh_src(users, labels), "workflows": pll_wf_export(wfs, wtrig, wact)}
+            "fields": fields, "docs": docs, "src": plh_src(users, labels), "workflows": pll_wf_export(wfs, wtrig, wact),
+            "people": {"users": {str(pk): nm for pk, nm, _j in users}, "groups": groups}}  # 2.635.0 (#4856)
 
 
 def _check(c, r):
@@ -534,7 +538,8 @@ def plh_zip_run(c, rid):
         c.rollback()
         print("paperless: zip run", rid, type(e).__name__, e, flush=True)
         error = "failed"
-    learn = _learn(c, t, uid, since, {**scan["labels"], "workflows": scan.get("workflows") or [], "_fields": scan.get("fields") or {}}) if scan else {}  # 2.581.0 (#4803)
+    learn = _learn(c, t, uid, since, {**scan["labels"], "workflows": scan.get("workflows") or [], "_fields": scan.get("fields") or {},
+                                      "_people": scan.get("people") or {}}) if scan else {}  # 2.581.0 (#4803); _people: #4856
     try:
         beat(run_state="", state="done", run_error=error, run_learn=pll_stored(learn), updated_at=_now())
     except P.PlLost:

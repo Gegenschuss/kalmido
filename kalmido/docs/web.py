@@ -877,15 +877,28 @@ def _settings_json(c, ws, uid):
     cfg = S.cfg_get(c, ws)
     from .fields import df_list  # 2.153.0 (#2179): the custom fields of the workspace
     return {"ws": f"org:{oid}" if oid else "private", "can_manage": can, "fields": df_list(c, ws), "levels": cfg["levels"], "inbox": cfg["inbox"],
-            "rules": S.rules_get(c, ws) if can else [], **_flow_extra(c, ws, can), **_settings_labels(c, ws, uid, can), "folders": folders,
+            "rules": _rules_v(c, ws) if can else [], **_flow_extra(c, ws, can), **_settings_labels(c, ws, uid, can), "folders": folders,
             "root_id": root, "inbox_path": S.inbox_path(c, root, uid), "ocr": ocr_available(), "ocr_missing": _ocr_missing(c, uid), "asn_prefix": cfg["asn_prefix"], "asn_next": S.asn_next(c, ws), "mail": {"enabled": MAIL_IN_ON, "address": mail_addr(tok[0]) if (tok and MAIL_IN_ON) else ""},
             "scan": _scan_json(c, uid, oid)}  # 2.207.0 A (#2763): scan inboxes, folder watcher downloads, the mail note
 
 
 def _flow_extra(c, ws, can):
     """2.581.0 (#4803): for the flow form: the people a flow may notify / give a task, whether webhooks are on."""
-    from .flows import fl_people, FL_URL_CHECK
-    return {"people": fl_people(c, ws) if can else [], "hooks": bool(FL_URL_CHECK) and can}
+    from .flows import fl_people, fl_share_list, FL_URL_CHECK
+    return {"people": fl_people(c, ws) if can else [], "hooks": bool(FL_URL_CHECK) and can,
+            "share_to": fl_share_list(c, ws, me()) if can else []}  # 2.635.0 (#4856): who the action "share" may name
+
+
+def _rule_ver(c, rid):
+    """2.635.0 (#4856): the version of a flow (expect_updated_at of PATCH): updated_at, for a row never saved since: created_at."""
+    r = c.execute("SELECT COALESCE(NULLIF(updated_at, ''), created_at) FROM doc_rules WHERE id=?", (rid,)).fetchone()
+    return r[0] if r else ""
+
+
+def _rules_v(c, ws):
+    """2.635.0 (#4856): the flows of ws as rules_get gives them, each with its version (updated_at)."""
+    ver = {r[0]: r[1] for r in c.execute("SELECT id, COALESCE(NULLIF(updated_at, ''), created_at) FROM doc_rules WHERE ws=?", (ws,))}
+    return [{**r, "updated_at": ver.get(r["id"], "")} for r in S.rules_get(c, ws)]
 
 
 def _scan_json(c, uid, oid):
@@ -930,13 +943,15 @@ def _rule_save(c, ws, d, rid=None):
                "invalid": tr("The pattern is not a valid regular expression"), "empty": tr("The condition is empty"),
                "nothing": tr("The rule does not set anything"), "days": tr("Invalid value: {0}", "days"),
                "person": tr("Only people of this workspace can be selected"), "field": tr("Unknown field: {0}", ", ".join(d.get("fields") or {})[:60] if isinstance(d.get("fields"), dict) else ""),
-               "hooks_off": tr("Webhooks are switched off on this server")}.get(why, tr("Invalid value: {0}", "rule"))
+               "hooks_off": tr("Webhooks are switched off on this server"),
+               "share": tr("Invalid value: {0}", "share"),  # 2.635.0 (#4856)
+               "share_target": tr("Only people, groups and agents of the same workspace can get a share")}.get(why, tr("Invalid value: {0}", "rule"))
         return None, err(msg)
     if shown:
         g.fl_secret = shown  # 2.581.0 (#4803): the webhook's secret, shown once
     data = S._jseal(c, ws, "doc_rules.data", r)
     if rid:
-        c.execute("UPDATE doc_rules SET data=? WHERE id=? AND ws=?", (data, rid, ws))
+        c.execute("UPDATE doc_rules SET data=?, updated_at=? WHERE id=? AND ws=?", (data, iso_ms(now_utc()), rid, ws))  # 2.635.0 (#4856)
         return rid, None
     pos = (c.execute("SELECT COALESCE(MAX(pos), 0) FROM doc_rules WHERE ws=?", (ws,)).fetchone()[0] or 0) + 1
     return insert_id(c, "INSERT INTO doc_rules(org_id, ws, pos, data, created_by, created_at) VALUES(?,?,?,?,?,?)",
@@ -957,7 +972,7 @@ def docs_rule_add():
     if e:
         return e
     c.commit()
-    return jsonify(id=rid, rules=S.rules_get(c, ws), **({"hook_secret": g.fl_secret} if g.get("fl_secret") else {})), 201
+    return jsonify(id=rid, rules=_rules_v(c, ws), **({"hook_secret": g.fl_secret} if g.get("fl_secret") else {})), 201
 
 
 def _rule_ws(c, rid):
@@ -970,20 +985,26 @@ def _rule_ws(c, rid):
 
 @app.patch("/api/docs/rules/<int:rid>")
 def docs_rule_edit(rid):
+    """The flow's keys (docs_rule_add) and / or pos. 2.635.0 (#4856): expect_updated_at = the flow's updated_at the form was
+    filled from; changed since -> 409 with the flows under "rules" (core/conflict.py)."""
     c = db()
     _no_agent()
     ws = _rule_ws(c, rid)
     d = body()
+    write_lock(c, f"doc_rules-{rid}")
+    ccf_check(d, _rule_ver(c, rid), "rules", lambda: _rules_v(c, ws))
+    d = {k: v for k, v in d.items() if k not in ("expect_updated_at", "updated_at", "id")} if isinstance(d, dict) else d
     if "pos" in d and isinstance(d["pos"], (int, float)) and not isinstance(d["pos"], bool):
         if not -1e9 < d["pos"] < 1e9:  # 2.126.0 A (#1979 L4): also no Infinity / NaN
             return err(tr("Invalid value: {0}", "pos"))
-        c.execute("UPDATE doc_rules SET pos=? WHERE id=?", (int(d["pos"]), rid))
+        c.execute("UPDATE doc_rules SET pos=?, updated_at=? WHERE id=?", (int(d["pos"]), iso_ms(now_utc()), rid))
     if set(d) - {"pos", "ws"}:  # 2.581.0 (#4803): a flow may have no words ("match"); was: only with "match"
         _rid, e = _rule_save(c, ws, d, rid)
         if e:
             return e
+    bump(c)
     c.commit()
-    return jsonify(rules=S.rules_get(c, ws), **({"hook_secret": g.fl_secret} if g.get("fl_secret") else {}))
+    return jsonify(rules=_rules_v(c, ws), **({"hook_secret": g.fl_secret} if g.get("fl_secret") else {}))
 
 
 @app.delete("/api/docs/rules/<int:rid>")
@@ -993,7 +1014,7 @@ def docs_rule_del(rid):
     ws = _rule_ws(c, rid)
     c.execute("DELETE FROM doc_rules WHERE id=?", (rid,))
     c.commit()
-    return jsonify(rules=S.rules_get(c, ws))
+    return jsonify(rules=_rules_v(c, ws))
 
 
 @app.patch("/api/docs/labels/<kind>/<int:lid>")

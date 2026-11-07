@@ -11,7 +11,10 @@
 - Workflows (2.581.0, #4803): each trigger of a Paperless-ngx workflow becomes a document flow (docs/flows.py) where the fields
   match: consumption / document added -> received, document updated -> changed, scheduled (created / added date + offset) ->
   scheduled; sources, file name, has tags / correspondent / type, the matching; actions assignment (tags, correspondent, type,
-  custom fields) and removal (tags). Not taken over and reported: owner / permissions (only through the shared core #4709),
+  custom fields) and removal (tags). 2.635.0 (#4856): owner / permissions become the flow's action "share" of the shared core
+  (docs/flows.py): the owner and "change" users / groups get "edit", "view" ones "view", matched by user name / group name to
+  the people and groups the importing person may share the workspace's documents with (fl_share_pool); one not found there,
+  "remove owners / permissions" and the rest are reported. Not taken over and reported besides:
   title, storage path, e-mail, "remove all", webhooks (an import never brings a webhook: its target is checked when a person saves it).
 pll_finish never raises: an error here must not spoil the import's state (it is logged)."""
 import json
@@ -21,6 +24,7 @@ from ..core.db import insert_id, iso, now_utc
 from ..docs import classify as CL
 from ..docs import rules as RU
 from ..docs import store as S
+from ..docs.flows import fl_share_pool  # 2.635.0 (#4856)
 
 PLL_ALGO = {1: "any", 2: "all", 3: "exact", 4: "regex", 5: "fuzzy"}
 PLL_AUTO = 6
@@ -66,11 +70,46 @@ def pll_wf_action(a):
             "sender": _wf_one(a.get("assign_correspondent")), "type_id": _wf_one(a.get("assign_document_type")),
             "fields": {str(k): vals.get(str(k), vals.get(k)) for k in _wf_ids([_wf_one(x) for x in a.get("assign_custom_fields") or []])},
             "untag": _wf_ids([_wf_one(x) for x in a.get("remove_tags") or []]),
-            "rest": [k for k in ("assign_title", "assign_storage_path", "assign_owner", "assign_view_users", "assign_view_groups",
-                                 "assign_change_users", "assign_change_groups", "remove_all_tags", "remove_all_correspondents",
+            "share": _wf_share(a),  # 2.635.0 (#4856): owner / permissions -> the action share
+            "rest": [k for k in ("assign_title", "assign_storage_path", "remove_all_tags", "remove_all_correspondents",
                                  "remove_all_document_types", "remove_all_custom_fields", "remove_all_owners", "remove_all_permissions",
                                  "remove_owners", "remove_correspondents", "remove_document_types", "remove_custom_fields")
                      if a.get(k) not in (None, "", [], False)]}
+
+
+def _wf_share(a):
+    """2.635.0 (#4856): [[user | group, Paperless id, edit | view]] of an action's owner and permissions (the higher role wins)."""
+    out = {}
+    for key, kind, role in (("assign_view_users", "user", "view"), ("assign_view_groups", "group", "view"),
+                            ("assign_change_users", "user", "edit"), ("assign_change_groups", "group", "edit")):
+        for i in _wf_ids([_wf_one(x) for x in a.get(key) or []]):
+            out[(kind, i)] = "edit" if role == "edit" else out.get((kind, i), "view")
+    own = _wf_one(a.get("assign_owner"))
+    if isinstance(own, int):
+        out[("user", own)] = "edit"
+    return [[k, i, r] for (k, i), r in sorted(out.items())]
+
+
+def pll_wf_who(c, ws, uid, people):
+    """2.635.0 (#4856): a resolver (kind user | group, Paperless id) -> {user_id | group_id: Kalmido id} or None: by user name /
+    group name (case-insensitive, an ambiguous group name matches nothing) among the people and groups uid may share the
+    documents of ws with (docs/flows.py fl_share_pool). people = {"users": {pk: user name}, "groups": {pk: name}} of the import."""
+    pool = fl_share_pool(c, ws, uid)
+    ids = sorted(pool["user_id"])
+    names = {}
+    if ids:
+        names = {str(r[1]).strip().lower(): r[0] for r in c.execute(
+            f"SELECT id, username FROM users WHERE id IN ({','.join('?' * len(ids))})", ids) if r[1]}
+    grp = Counter(str(n).strip().lower() for n in pool["group_id"].values())
+    gnames = {str(n).strip().lower(): i for i, n in pool["group_id"].items() if grp[str(n).strip().lower()] == 1}
+    people = people if isinstance(people, dict) else {}
+
+    def who(kind, pl_id):
+        src = people.get("users" if kind == "user" else "groups") or {}
+        nm = str(src.get(str(pl_id)) or src.get(pl_id) or "").strip().lower()
+        kid = (names if kind == "user" else gnames).get(nm) if nm else None
+        return {"user_id" if kind == "user" else "group_id": kid} if kid else None
+    return who
 
 
 def pll_wf_api(x):
@@ -89,8 +128,9 @@ def pll_wf_export(wfs, trigs, acts, fields=None):
     return out
 
 
-def _wf_plan(labels, mapping, fields=None):
-    """[(kind 'workflow', {id, name}, rule | None, why)] -- one flow per trigger of a workflow (pl_id = workflow id * 100 + n)."""
+def _wf_plan(labels, mapping, fields=None, who=None):
+    """[(kind 'workflow', {id, name}, rule | None, why)] -- one flow per trigger of a workflow (pl_id = workflow id * 100 + n).
+    who = pll_wf_who's resolver (None: owner / permissions are reported, #4856)."""
     names = {k: {x["id"]: x for x in (labels or {}).get(k) or [] if isinstance(x, dict)} for k, _m in PLL_KINDS}
     fnames = fields or {}
 
@@ -103,8 +143,14 @@ def _wf_plan(labels, mapping, fields=None):
     for wf in ((labels or {}).get("workflows") or [])[:PLL_WF_MAX]:
         if not isinstance(wf, dict) or not isinstance(wf.get("id"), int):
             continue
-        acts, why = {"tags": [], "untag": [], "fields": {}}, ""
+        acts, why = {"tags": [], "untag": [], "fields": {}, "share": []}, ""
         for a in wf.get("actions") or []:
+            for kind, pid, role in a.get("share") or []:  # 2.635.0 (#4856)
+                t = who(kind, pid) if who else None
+                if t:
+                    acts["share"].append({**t, "role": role})
+                else:
+                    why = why or "owner"
             if a.get("type") == 1:
                 acts["tags"] += [n for n in (nm("tags", "tags", t) for t in a.get("tags") or []) if n]
                 for f, kind, mkey in (("sender", "correspondents", "senders"), ("type", "document_types", "types")):
@@ -149,7 +195,7 @@ def _wf_plan(labels, mapping, fields=None):
             if t.get("path") or t.get("mailrule"):
                 tw = tw or "filter"
             try:
-                out.append(("workflow", lab, RU.clean_rule(raw), tw))
+                out.append(("workflow", lab, RU.clean_rule(raw, share=True), tw))
             except RU.RuleError:
                 out.append(("workflow", lab, None, tw or "pattern"))
     return out
@@ -170,7 +216,7 @@ def _target(kind, mkey, lab, mapping):
     return ("sender" if kind == "correspondents" else "type", name) if name else None
 
 
-def _plan(labels, mapping):
+def _plan(labels, mapping, who=None):
     """[(kind, label, rule | None, why)] -- why '' = a rule, 'auto' = Paperless learns it, 'long' / 'pattern' = not taken over."""
     out = []
     for kind, mkey in PLL_KINDS:
@@ -199,7 +245,7 @@ def _plan(labels, mapping):
                 out.append((kind, lab, RU.clean_rule(raw), ""))
             except RU.RuleError:
                 out.append((kind, lab, None, "pattern"))
-    return out + _wf_plan(labels, mapping, (labels or {}).get("_fields"))  # 2.581.0 (#4803)
+    return out + _wf_plan(labels, mapping, (labels or {}).get("_fields"), who)  # 2.581.0 (#4803); who: #4856
 
 
 def _key(rule):
@@ -242,6 +288,8 @@ def _take_rules(c, ws, org_id, uid, src, plan):
         if c.execute("SELECT 1 FROM pl_rules WHERE ws=? AND src=? AND kind=? AND pl_id=?", (ws, src, kind, lab["id"])).fetchone():
             dup += 1
             continue
+        if rule.get("share"):  # 2.635.0 (#4856): the importing person is the share's author (docs/flows.py _share checks them)
+            rule = {**rule, "share_by": uid}
         k = _key(rule)
         if k in have:
             dup += 1
@@ -375,6 +423,19 @@ def pll_stored(res):
     return json.dumps({k: v for k, v in res.items() if k != "unsupported" and isinstance(v, (int, bool))}, separators=(",", ":"))
 
 
+def _who_safe(c, ws, uid, labels):
+    """2.635.0 (#4856): pll_wf_who for the workflows of the import, None without workflows or on an error (owner / permissions
+    are then reported as before, the rest of the learning goes on)."""
+    if not (labels or {}).get("workflows"):
+        return None
+    try:
+        with c.savepoint():
+            return pll_wf_who(c, ws, uid, (labels or {}).get("_people"))
+    except Exception as e:  # noqa: BLE001 -- the share mapping never spoils the import's learning
+        print("paperless: learn who", type(e).__name__, e, flush=True)
+        return None
+
+
 def pll_finish(c, ws, org_id, uid, src, since, labels, mapping):
     """Once at the end of an import run (also after a stop / a full storage): the rules (unless the mapping says no) and the
     learning from the documents this run brought. {rules_new, rules_dup, auto, unsupported, unsupported_n, trained}; {} on an
@@ -382,7 +443,8 @@ def pll_finish(c, ws, org_id, uid, src, since, labels, mapping):
     mapping = mapping if isinstance(mapping, dict) else {}
     try:
         with c.savepoint():
-            plan = _plan(labels, mapping)
+            who = _who_safe(c, ws, uid, labels)  # 2.635.0 (#4856)
+            plan = _plan(labels, mapping, who)
             new = dup = 0
             over = []
             if mapping.get("rules", True) is not False:

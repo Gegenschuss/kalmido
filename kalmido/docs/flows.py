@@ -16,7 +16,11 @@ Actions: sender / type / folder / tags (as before), remove tags, set custom fiel
 author or a chosen person who sees the document), notify people (News "docflow", their switch "docflow"; only people who
 see the document), webhook (the same check as the other webhooks: integrations/webhooks.py wh_url_check when saved and again
 when sent, no internal host; signed with the flow's own secret, shown once).
-Owner / rights as an action: not here -- only through the shared core (#4709).
+Share (2.635.0, #4856): give people / groups of the workspace a share of the document (view | edit) -- only through the shared
+core (#4709): the targets are the ones the file store's share dialog offers (files/web.py _share_targets), the row is written by
+core/objects.py obj_node_share. Who saved the share action (share_by) must be allowed to share the document: checked when the
+flow is saved (the targets) and again on every run (manage on the document, organisation boundary, the target still in the
+pool); a target that already has a share keeps it as it is, so the undo takes back only the shares the run made.
 
 Every run that did something is a row of doc_flow_runs (sealed values before / after) with an entry "flow" in the document's
 history (fs_log); a person who may edit the document takes it back (POST /api/docs/flowruns/<id>/undo): the values the run set
@@ -34,13 +38,15 @@ from flask import g, has_request_context, jsonify
 from ..core.config import app, PUBLIC_URL
 from ..core.db import bump, db, err, insert_id, iso, local_now, now_utc
 from ..core.i18n import tr
-from ..core.access import Denied, task_visible
+from ..core.access import Denied, acx_of, acx_org_ok, task_visible
 from ..core.pages import new_inbox_task
 from ..tasks.validation import log_act
 from ..accounts.session import me
 from ..collab.comments import collab_user
 from ..collab.news import notif_ok
 from ..files.store import fs_log_add, fs_role
+from ..files.fsroots import fs_area_share  # 2.635.0 (#4856)
+from ..files.web import _share_targets  # 2.635.0 (#4856): the file store's share pool
 from . import rules as RU
 from . import store as S
 from .ingest import doc_on_done
@@ -77,10 +83,42 @@ def fl_people(c, ws):
     return sorted(({"id": r["id"], "name": r["n"]} for r in rows), key=lambda x: str(x["name"]).lower())
 
 
+def _share_node(c, ws):
+    """2.635.0 (#4856): the node the pool of a workspace is asked for: its documents folder, else a stand-in of the workspace."""
+    rid = S.root_id(c, ws)
+    n = c.execute("SELECT * FROM fs_nodes WHERE id=?", (rid,)).fetchone() if rid else None
+    return n or {"id": 0, "org_id": S.ws_org(ws), "owner_id": S.ws_user(ws), "kind": "folder", "name": ""}
+
+
+def fl_share_pool(c, ws, uid, n=None):
+    """2.635.0 (#4856): {"user_id": {id: name}, "group_id": {id: name}} -- the people and groups uid may share a document of
+    ws (or node n) with: the file store's own rule (files/web.py _share_targets: the same workspace, visible people, groups),
+    nothing for an agent account."""
+    if not uid or acx_of(c, uid).role == "agent":
+        return {"user_id": {}, "group_id": {}}
+    t = _share_targets(c, n if n is not None else _share_node(c, ws), uid)
+    return {"user_id": {x["id"]: x["name"] for x in t["people"]}, "group_id": {x["id"]: x["name"] for x in t["groups"]}}
+
+
+def fl_share_list(c, ws, uid):
+    """2.635.0 (#4856): the pool for the settings' form: [{key, id, name}] (people first, then groups)."""
+    p = fl_share_pool(c, ws, uid)
+    return [{"key": k, "id": i, "name": nm} for k in ("user_id", "group_id") for i, nm in sorted(p[k].items(), key=lambda x: str(x[1]).lower())]
+
+
 def fl_clean(c, ws, d, old=None):
     """The flow to store from user input d (old = the stored one when it is edited). Raises RU.RuleError (a reason of
     docs/web.py _rule_save) or returns (flow, secret shown once or None)."""
     r = RU.clean_rule(d, extra=True)
+    if r.get("share"):  # 2.635.0 (#4856): only targets the person who saves may share with; an unchanged share keeps its author
+        o = old if isinstance(old, dict) else {}
+        if o.get("share") == r["share"] and o.get("share_by"):
+            r["share_by"] = o["share_by"]
+        else:
+            pool = fl_share_pool(c, ws, me())
+            if any(x.get("user_id", x.get("group_id")) not in pool["user_id" if "user_id" in x else "group_id"] for x in r["share"]):
+                raise RU.RuleError("share_target")
+            r["share_by"] = me()
     people = None
     for uid in [*(r.get("notify") or []), *([r["task"]["to"]] if r.get("task", {}).get("to") else [])]:
         people = people if people is not None else _ws_people(c, ws)
@@ -200,20 +238,51 @@ def _extra(c, nid, r, levels=None):
                                                                            ensure_ascii=False), _ts()))
             told += 1
     hook = bool(r.get("webhook")) and bool(FL_URL_CHECK)
-    return tid, told, hook
+    return tid, told, hook, _share(c, node, r)
 
 
-def _record(c, nid, r, trig, before, tid, told, hook, stamp="", run_id=None):
-    """The run's row (+ the history entry); None when the run did nothing."""
+def _share(c, node, r):
+    """2.635.0 (#4856): the action share through the shared core. -> the ids of the shares this run made. Checked again now:
+    the flow's share author (share_by, else its author) may still share the document (manage, or the area lets them), is no
+    agent, stays inside the document's organisation, and each target is still in their pool; a target with a share already
+    keeps it (role / expiry as they are)."""
+    want = r.get("share") or []
+    uid = r.get("share_by") or r.get("_by")
+    if not want or not uid:
+        return []
+    from ..core.objects import obj_node_share
+    if acx_of(c, uid).role == "agent" or not acx_org_ok(c, uid, node["org_id"]):
+        return []
+    if not c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0", (uid,)).fetchone():
+        return []
+    if fs_role(c, node["id"], uid) != "owner" and not fs_area_share(c, uid, node):
+        return []
+    pool = fl_share_pool(c, None, uid, node)
+    made = []
+    for x in want:
+        key = "user_id" if "user_id" in x else "group_id"
+        t = x[key]
+        if t not in pool[key] or c.execute(f"SELECT 1 FROM fs_shares WHERE node_id=? AND {key}=?", (node["id"], t)).fetchone():
+            continue
+        try:
+            made.append(obj_node_share(c, uid, node, key, t, x.get("role") or "view", None, node["org_id"] or None))
+        except Denied:
+            continue  # too many shares on the document: the others still go
+    return made
+
+
+def _record(c, nid, r, trig, before, tid, told, hook, stamp="", run_id=None, shared=()):
+    """The run's row (+ the history entry); None when the run did nothing. shared = the ids of the shares it made (#4856)."""
     after = _snap(c, nid)
     did = _did(before, after)
-    if not did and not tid and not told and not hook:
+    if not did and not tid and not told and not hook and not shared:
         if run_id:
             c.execute("UPDATE doc_flow_runs SET state='skip' WHERE id=?", (run_id,))
         return None
     m = S.meta_row(c, nid)
     ws = m["ws"]
-    data = S._jseal(c, ws, CTX, {"b": before, "a": after, "did": did, "told": told, "name": (r.get("name") or "")[:120]})
+    data = S._jseal(c, ws, CTX, {"b": before, "a": after, "did": did, "told": told, "name": (r.get("name") or "")[:120],
+                                  **({"shared": list(shared)} if shared else {})})
     who = me() if has_request_context() and getattr(g, "user", None) else None
     if run_id:
         c.execute("UPDATE doc_flow_runs SET state='done', data=?, task_id=?, by_user=?, hook=? WHERE id=?",
@@ -235,10 +304,10 @@ def fl_run(c, nid, r, trig, stamp="", run_id=None):
     _IN.on = True
     try:
         _sort(c, nid, r)
-        tid, told, hook = _extra(c, nid, r)
+        tid, told, hook, shared = _extra(c, nid, r)
     finally:
         _IN.on = False
-    return _record(c, nid, r, trig, before, tid, told, hook, stamp, run_id)
+    return _record(c, nid, r, trig, before, tid, told, hook, stamp, run_id, shared)
 
 
 def _hits(c, m, node, rules):
@@ -281,10 +350,10 @@ def fl_on_done(c, nid, first):
         before["tags"] = sorted(t for t in cur["tags"] if not (t in tags_rule and RU.fold(tags_rule[t]["name"]) in mine))
         _IN.on = True
         try:
-            tid, told, hook = _extra(c, nid, r, lv)
+            tid, told, hook, shared = _extra(c, nid, r, lv)
         finally:
             _IN.on = False
-        _record(c, nid, r, "received", before, tid, told, hook)
+        _record(c, nid, r, "received", before, tid, told, hook, shared=shared)
 
 
 if fl_on_done not in doc_on_done:
@@ -393,6 +462,7 @@ def _run_json(c, row):
     d = S._jopen(c, row["ws"], CTX, row["data"], {})
     return {"id": row["id"], "flow_id": row["rule_id"], "name": d.get("name") or "", "trigger": row["trig"], "at": row["created_at"],
             "did": d.get("did") or [], "told": d.get("told") or 0, "task_id": row["task_id"], "hook": row["hook"],
+            "shared": len(d.get("shared") or []),  # 2.635.0 (#4856)
             "undone": bool(row["undone_at"])}
 
 
@@ -430,6 +500,19 @@ def _undo_vals(c, nid, b, a):
         df_set(c, S.meta_row(c, nid), {k: v for k, v in back.items()}, by="flow")
 
 
+def _undo_shares(c, nid, sids):
+    """2.635.0 (#4856): the shares the run made go again (into obj_revoked, restorable) -- only when the person who takes the
+    run back may manage the document's shares (an editor leaves them, like the folder above)."""
+    if not sids:
+        return
+    from ..core.objects import obj_node_unshare
+    node = c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
+    if not node or (fs_role(c, nid, me()) != "owner" and not fs_area_share(c, me(), node)):
+        return
+    for sid in sids:
+        obj_node_unshare(c, me(), node, sid, reason="flow-undo")
+
+
 @app.post("/api/docs/flowruns/<int:rid>/undo")
 def docs_flow_undo(rid):
     """Take a run back (who may edit the document): values as before where nothing changed them since, the task it made into
@@ -450,6 +533,7 @@ def docs_flow_undo(rid):
         _undo_vals(c, nid, d.get("b") or {}, d.get("a") or {})
     finally:
         _IN.on = False
+    _undo_shares(c, nid, d.get("shared") or [])  # 2.635.0 (#4856)
     tid = row["task_id"]
     if tid and task_visible(c, tid, me(), write=True):
         if c.execute("UPDATE tasks SET deleted_at=? WHERE id=? AND deleted_at IS NULL RETURNING id", (_ts(), tid)).fetchone():
