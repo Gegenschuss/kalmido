@@ -174,7 +174,9 @@ def portal_make():
 
 def portal_again():  # 2.638.0 (#4294): the report is taken, but without a status link that would not open
     t = portal_send("Picture flickers")
-    return "/p/" not in t and "Thank you" in t
+    # 2.638.0 (#4294, review): the form page no longer asks for the address "for the status link" either
+    page = requests.get(B + PORTAL_FORM).text
+    return "/p/" not in t and "Thank you" in t and "for the status link" not in page
 
 
 COMPANY = {"name": "Example Film Ltd", "street": "Sample road 1", "zip": "12345", "city": "Sampletown", "country": "DE",

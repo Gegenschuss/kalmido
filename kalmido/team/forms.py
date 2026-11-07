@@ -377,7 +377,8 @@ def _page(c, f, token, lg, vals=None, error="", qvals=None, cur=None):
                             f'<label for="ff-text">{e(t("Description"))}</label><textarea id="ff-text" name="text" rows="6" maxlength="{FORM_TEXT_MAX}">{e(v.get("text", ""))}</textarea>']
     if not me_row:
         fields.append(f'<label for="ff-name">{e(t("Your name|public"))}</label><input id="ff-name" name="name" autocomplete="name" maxlength="{FORM_NAME_MAX}" value="{e(v.get("name", ""))}">')
-        if f["portal"]:  # 2.63.0 (#1513): the status link goes to this address
+        # 2.638.0 (#4294): the kind portal off = no status link, so the page does not ask for the address for it
+        if f["portal"] and public_links_on(c, "portal"):  # 2.63.0 (#1513): the status link goes to this address
             fields.append(f'<label for="ff-email">{e(tr("Your e-mail (for the status link)", lg=lg))}</label><input id="ff-email" name="email" type="email" required autocomplete="email" maxlength="200" value="{e(v.get("email", ""))}">')
         elif f["ask_email"]:
             fields.append(f'<label for="ff-email">{e(t("Your e-mail (for questions)"))}</label><input id="ff-email" name="email" type="email" autocomplete="email" maxlength="200" value="{e(v.get("email", ""))}">')
