@@ -82,7 +82,7 @@ def _folder_move(c, uid, fn):
             nf = fn(r["folder"])
             if nf != r["folder"]:
                 c.execute(f"UPDATE {tbl} SET folder=? WHERE {key}=? AND {who}=?", (nf, r["k"], uid))
-    for k in ("folders", "folders_closed"):
+    for k in ("folders", "folders_closed", "cal_folders_hidden"):  # 2.624.0 (#3946): the folders hidden in the calendar go along
         try:
             arr = json.loads(usettings(c, uid).get(k) or "[]")
         except (TypeError, ValueError):
@@ -98,6 +98,17 @@ def _folder_move(c, uid, fn):
             c.execute("UPDATE group_shares SET folder=? WHERE id=?", (nf, r["id"]))
     grp_sync(c, grp_list_ids(c, owner=uid) | {r[0] for r in c.execute("SELECT list_id FROM list_members m JOIN lists l ON l.id=m.list_id "
                                                                        "WHERE m.grole IS NOT NULL AND l.owner_id=?", (uid,))})
+
+
+def _cal_folder_drop(c, uid, name):
+    """2.624.0 (#3946): a deleted folder leaves cal_folders_hidden (its lists go up a level and show in the calendar again;
+    its subfolders keep their own entry, moved up by _folder_move)."""
+    try:
+        arr = json.loads(usettings(c, uid).get("cal_folders_hidden") or "[]")
+    except (TypeError, ValueError):
+        arr = []
+    if isinstance(arr, list) and name in arr:
+        uset(c, uid, "cal_folders_hidden", json.dumps([x for x in arr if x != name], ensure_ascii=False))
 
 
 @app.post("/api/folders/rename")
@@ -173,6 +184,7 @@ def folder_delete():
         return p
     from ..lists.lffolder import lf_folder_dissolve
     lf_folder_dissolve(c, uid, name)  # 2.352.0 A (#2748): its nodes go, their content one level up (before the paths move)
+    _cal_folder_drop(c, uid, name)  # 2.624.0 (#3946): before the move, so the parent does not get the folder's "hidden"
     _folder_move(c, uid, lambda p: "" if up(p) == "\0" else up(p))
     from ..integrations.gitfolder import gf_folder_removed
     gf_folder_removed(c, uid, lambda p: "" if up(p) == "\0" else up(p))  # 2.33.0 (#934): its repositories go to the parent folder

@@ -489,6 +489,40 @@ function viewAgenda() {
   return calBar(tr('Agenda') + ` <span class="muted agrange">${esc(fmtDayAbs(from))} – ${esc(fmtDayAbs(to))}</span>`) + `<div class="agenda agendav">${h || `<div class="empty">${ic('cal')}${tr('Nothing in the next two weeks.')}</div>`}</div>`;
 }
 
+// ---- 2.624.0 (#3946): "Per project" in the Calendars window: the lists grouped by folder (sidebar.js folderNames, the own
+// sidebar paths), a switch per folder (cal_folders_hidden); a list or subfolder below a folder that is off shows its switch
+// greyed with "Off through the folder". From CVF_SEARCH_MIN lists a search on top filters by list and folder names (data-cvfq:
+// the name + the folder path), hits with their folder path. In a list's own calendar view the rule does not apply (lcal_has).
+const CVF_SEARCH_MIN = 8;
+function cvf_lists(lists, hidL, hidF, tasksOn, sw, q) {
+  const ind = d => d ? `padding-left:${(1.5 + d * 1.25).toFixed(2)}rem` : '';
+  const viaTxt = `<span class="muted"> · ${esc(tr('Off through the folder'))}</span>`;
+  const path = f => f ? `<span class="muted cvfpath" hidden> · ${esc(fDisp(f))}</span>` : '';
+  const lrow = l => {
+    const via = cvxFolderOff(l.folder, hidF);
+    return `<div class="cvxrow sub" data-cvfq="${esc((lname(l) + ' ' + (l.folder || '')).toLowerCase())}" style="--cc:${cssColor(lp_col(l)) || 'var(--muted)'};${ind(fDepth(l.folder || ''))}">${sw(String(l.id), 'list', !via && !hidL.includes(l.id), !tasksOn || via, tr('Show {0} in my calendar', lname(l)))}<i class="cevdot"></i><span class="evcn">${esc(lname(l))}${path(l.folder)}${via ? viaTxt : ''}</span></div>`;
+  };
+  const frow = f => {
+    const via = cvxFolderOff(fParent(f), hidF);
+    return `<div class="cvxrow cvfrow" data-cvfq="${esc(f.toLowerCase())}" data-folder="${esc(f)}" style="${ind(fDepth(f) - 1) || 'padding-left:1.5rem'}">${sw(esc(f), 'folder', !via && !hidF.includes(f), !tasksOn || via, tr('Show folder {0} in my calendar', fName(f)))}${ic('folder', 's')}<span class="evcn">${esc(fName(f))}${path(fParent(f))}${via ? viaTxt : ''}</span></div>`;
+  };
+  const own = lists.filter(l => !l.is_inbox);
+  const rows = [...own.filter(l => !l.folder).map(lrow),
+    ...folderNames().filter(f => own.some(l => fUnder(l.folder, f))).flatMap(f => [frow(f), ...own.filter(l => l.folder === f).map(lrow)]),
+    ...lists.filter(l => l.is_inbox).map(lrow)];
+  const srch = lists.length >= CVF_SEARCH_MIN ? `<div class="cvxrow cvfsrch"><input type="search" data-cvfq-in value="${esc(q || '')}" placeholder="${esc(tr('Search projects and folders'))}" aria-label="${esc(tr('Search projects and folders'))}" autocomplete="off" maxlength="200" style="flex:1;min-width:0"></div>` : '';
+  return `<div class="cvflists">${srch}${rows.join('')}<p class="muted cvfnone" hidden>${esc(tr('No project or folder found'))}</p></div>`;
+}
+function cvf_filter(md, q) {
+  const box = $('.cvflists', md); if (!box) return;
+  const s = String(q || '').trim().toLowerCase(); let n = 0;
+  for (const r of box.querySelectorAll('[data-cvfq]')) {
+    const hit = !s || r.dataset.cvfq.includes(s); r.hidden = !hit; n += hit;
+    for (const p of r.querySelectorAll('.cvfpath')) p.hidden = !s;
+  }
+  $('.cvfnone', box).hidden = !s || n > 0;
+}
+
 // ---- calendars: list, new, rename / colour, hide, share, import (ICS), export, delete; the phone setup
 async function evCalsModal() {
   // 2.36.1 (#1127 #956): ONE window for everything the calendar shows: "Tasks" (all dated tasks, fold-out: per list), my own
@@ -509,13 +543,16 @@ async function evCalsModal() {
   };
   const head = `<div class="cvxhead"><span class="cvxhn"></span><span title="${esc(tr('In my calendar'))}">${tr('Calendar|col')}</span><span title="${esc(tr('On Today'))}">${tr('Today')}</span><span title="${esc(tr('When planning'))}">${tr('Plan|col')}</span></div>`;
   const draw = () => {
-    const cs = S.evcals || [], hidL = cvxList('cal_lists_hidden'), tasksOn = S.settings.cal_tasks !== '0';
+    const cs = S.evcals || [], hidL = cvxList('cal_lists_hidden'), hidF = cvxList('cal_folders_hidden'), tasksOn = S.settings.cal_tasks !== '0';
     const lists = [...S.lists.filter(l => !l.archived && !l.is_inbox), ...S.lists.filter(l => !l.archived && l.is_inbox)];
-    // tasks: one switch for all dated tasks, fold-out: one per list (the lists are only listed, never changed here)
+    const nOff = lists.filter(l => cvxListOff(l.id, hidL, hidF)).length;  // 2.624.0 (#3946): also the ones off through a folder
+    // tasks: one switch for all dated tasks, fold-out: one per list (the lists are only listed, never changed here);
+    // 2.624.0 (#3946): grouped by folder like the sidebar (own lists first, then folder by folder, subfolders indented, the
+    // inbox last), a switch per folder (cal_folders_hidden: its lists and subfolders off, also later ones); from 8 lists a search
     const tl = `<div class="cvxgrp">${tr('Tasks')}</div><div class="cvxrow" style="--cc:var(--accent)">
-      ${sw('tasks', 'tasks', tasksOn, false, tr('Show tasks in my calendar'))}<i class="cevdot"></i><span class="evcn">${tr('Tasks with a date')}${hidL.length && tasksOn ? `<span class="muted"> · ${esc(trn('{0} project hidden', '{0} projects hidden', hidL.length))}</span>` : ''}</span>
+      ${sw('tasks', 'tasks', tasksOn, false, tr('Show tasks in my calendar'))}<i class="cevdot"></i><span class="evcn">${tr('Tasks with a date')}${nOff && tasksOn ? `<span class="muted"> · ${esc(trn('{0} project hidden', '{0} projects hidden', nOff))}</span>` : ''}</span>
       <button class="iconbtn cvxfold" data-evc="lists" aria-expanded="${st.lists}" aria-label="${esc(tr('Per project'))}" title="${esc(tr('Per project'))}">${ic('right', 's')}</button></div>
-      ${st.lists ? lists.map(l => `<div class="cvxrow sub" style="--cc:${cssColor(lp_col(l)) || 'var(--muted)'}">${sw(String(l.id), 'list', !hidL.includes(l.id), !tasksOn, tr('Show {0} in my calendar', lname(l)))}<i class="cevdot"></i><span class="evcn">${esc(lname(l))}</span></div>`).join('') : ''}`;
+      ${st.lists ? cvf_lists(lists, hidL, hidF, tasksOn, sw, st.q) : ''}`;
     const own = !feat('events') ? '' : `<div class="cvxgrp">${tr('My calendars')}</div>${cs.length ? head + `<ul class="evclist">${cs.map(c => `<li class="evcrow" style="--cc:${cssColor(c.color) || 'var(--accent)'}">
       <i class="cevdot"></i><span class="evcn">${esc(c.name)}${wsOn() && c.role === 'owner' ? `<span class="muted wslbl"> · ${esc(wsLabel(c.org_id))}</span>` : ''}${c.role !== 'owner' ? `<span class="muted"> · ${esc(c.owner_name || '')} · ${esc(c.role === 'edit' ? tr('can edit') : tr('can view'))}</span>` : c.members?.length ? `<span class="muted"> · ${esc(trn('shared with {0} person', 'shared with {0} people', c.members.length))}</span>` : ''}</span>
       <label class="swc" title="${esc(tr('Show in my calendar'))}"><input type="checkbox" data-evcshow="${c.id}" ${c.hidden ? '' : 'checked'}><span class="swt" aria-hidden="true"></span><span class="sr">${esc(tr('Show {0} in my calendar', c.name))}</span></label>
@@ -532,9 +569,11 @@ async function evCalsModal() {
       : st.trash.items.length ? `<ul class="evclist evctrash" aria-label="${esc(tr('Trash'))}">${st.trash.items.map(c => `<li class="evcrow" style="--cc:${cssColor(c.color) || 'var(--accent)'}"><i class="cevdot"></i><span class="evcn">${esc(c.name)}<span class="muted"> · ${esc(trn('{0} event', '{0} events', c.events))} · ${esc(tr('In the trash since {0}', fmtDate((c.deleted_at || '').slice(0, 10))))}</span></span><button type="button" class="btn sm" data-evctr="${c.id}">${ic('undo', 's')} ${tr('Restore')}</button></li>`).join('')}</ul>`
       : `<p class="muted">${tr('The trash is empty')}</p>`}${st.trash?.trash_days ? `<p class="muted">${esc(trashNote(tr('Calendars in the trash are deleted permanently after {0} days, with their events.', st.trash.trash_days)))}</p>` : ''}`;
     $('#evc-body', md).innerHTML = tl + own + tr2 + sb + (typeof abc_group === 'function' ? abc_group() : '');  // 2.155.0 B (#2076)
+    cvf_filter(md, st.q);  // 2.624.0 (#3946)
   };
   const redraw = () => { cvxRedraw(); draw(); };
   const refresh = async () => { await load().catch(() => {}); await cvxCals(true).catch(() => {}); redraw(); };
+  md.addEventListener('input', e => { if (e.target.matches?.('[data-cvfq-in]')) { st.q = e.target.value; cvf_filter(md, st.q); } });  // 2.624.0 (#3946)
   md.addEventListener('change', async e => {
     const s = e.target.closest('[data-evcshow]');
     if (s) {  // 2.559.0 (#4659): switched at once (a hidden calendar's events leave the views), an error switches it back
@@ -546,6 +585,7 @@ async function evCalsModal() {
     const kind = x.dataset.cvx, key = x.dataset.key, on = x.checked;
     if (kind === 'tasks') { await cvxSave('cal_tasks', on ? '1' : '0'); redraw(); return; }
     if (kind === 'list') { await cvxOff('cal_lists_hidden', +key, !on); redraw(); return; }
+    if (kind === 'folder') { await cvxOff('cal_folders_hidden', key, !on); redraw(); return; }  // 2.624.0 (#3946)
     if (kind === 'today') { await cvxOff('today_cals_hidden', key, !on); renderView(); return; }
     if (kind === 'plan') { await cvxOff('plan_cals_off', key, !on); return; }
     if (kind === 'show') { if (!await cvxShow(key, on)) { x.checked = !on; return; } draw(); }

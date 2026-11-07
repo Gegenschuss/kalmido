@@ -271,3 +271,6 @@ function layoutDay(evs, extra = []) {  // side-by-side lanes for overlapping tim
 // (the "Events today" block) and plan_cals_off (the day planner, also the agent's). A calendar is keyed "e:<own calendar id>"
 // or "s:<subscription id>". "Show in my calendar" stays what it was (evcals.hidden / cal_subs.visible, one field each);
 // a calendar hidden there is gone from Today and the planner as well (the server does not even send its events).
+// 2.624.0 (#3946): + cal_folders_hidden (json list of my sidebar folder paths): every list in such a folder or a subfolder of
+// it is off too, also lists added later (calendar.js cvxListOff); the switches sit under "Per project" (calevents.js cvf_lists).
+// A list's own calendar view (S.lcal, lcal_has) always shows its tasks.

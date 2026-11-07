@@ -405,12 +405,16 @@ def clean_setting(k, v):
 
 DONE_VIEWS_MAX = 500
 # 2.36.1 (#1127, #956): the calendar visibility lists (a json list each; stored sorted and without doubles)
-CAL_LIST_KEYS = ("cal_lists_hidden", "today_cals_hidden", "plan_cals_off")
+CAL_LIST_KEYS = ("cal_lists_hidden", "today_cals_hidden", "plan_cals_off", "cal_folders_hidden")
 CAL_LIST_MAX = 500
+# 2.624.0 (#3946): json list of my folder paths (as in my sidebar, "Clients/Company X") whose lists -- also those of their
+# subfolders and the ones added later -- the calendar views leave out (static/js/calendar.js cvxTaskOn); a renamed / moved
+# folder takes it along (lists/sections.py _folder_move)
+USER_DEFAULTS.setdefault("cal_folders_hidden", "[]")
 
 
 def clean_cal_list(k, v):
-    """cal_lists_hidden: list ids (ints); today_cals_hidden / plan_cals_off: calendar keys "e:<evcal id>" | "s:<sub id>"
+    """cal_lists_hidden: list ids (ints); cal_folders_hidden: folder paths (2.624.0, #3946); today_cals_hidden / plan_cals_off: calendar keys "e:<evcal id>" | "s:<sub id>"
     (today_cals_hidden also "x:hol" | "x:abs" | "x:team").
     -> stored json; BadInput if malformed. Ids of calendars / lists that no longer exist are harmless (never matched)."""
     bad = BadInput(tr("Invalid value: {0}", k))
@@ -426,6 +430,10 @@ def clean_cal_list(k, v):
         if not all(isinstance(x, int) and not isinstance(x, bool) and 0 < x < 10 ** 12 for x in arr):
             raise bad
         return json.dumps(sorted(set(arr)))
+    if k == "cal_folders_hidden":  # 2.624.0 (#3946): folder paths, only in the stored form (clean_folder: trimmed, no empty names)
+        if not all(isinstance(x, str) and x and clean_folder(x, False) == x for x in arr):
+            raise bad
+        return json.dumps(sorted(set(arr)), ensure_ascii=False)
     # 2.443.0 (#3740): Today also switches holidays and absences off (x:hol | x:abs | x:team, cvxKey in calendar.js)
     pat = r"[es]:[1-9][0-9]{0,11}|x:(hol|abs|team)" if k == "today_cals_hidden" else r"[es]:[1-9][0-9]{0,11}"
     if not all(isinstance(x, str) and re.fullmatch(pat, x) for x in arr):

@@ -295,7 +295,10 @@ function isoWeek(s) { const d = pd(s); d.setDate(d.getDate() + 3 - (d.getDay() +
 const cvxKey = e => e.holiday ? 'x:hol' : e.absence ? `x:${e.absence === 'team' ? 'team' : 'abs'}` : e.own ? `e:${e.cal}` : `s:${e.sub}`;  // 2.155.0 B (#2076): x = holidays / absences
 function cvxList(k) { try { const a = JSON.parse(S.settings?.[k] || '[]'); return Array.isArray(a) ? a : []; } catch { return []; } }
 const cvxTodayOn = e => (e.own && e.cal == null) || !cvxList('today_cals_hidden').includes(cvxKey(e));
-const cvxTaskOn = t => S.settings?.cal_tasks !== '0' && !cvxList('cal_lists_hidden').includes(t.list_id);
+// 2.624.0 (#3946): a list is also off when one folder of its path (own sidebar path, l.folder) is in cal_folders_hidden
+const cvxFolderOff = (f, hid = cvxList('cal_folders_hidden')) => { const ps = String(f || '').split('/').filter(Boolean); return hid.length > 0 && ps.some((_, i) => hid.includes(ps.slice(0, i + 1).join('/'))); };
+const cvxListOff = (id, hl = cvxList('cal_lists_hidden'), hf = cvxList('cal_folders_hidden')) => hl.includes(id) || (hf.length > 0 && cvxFolderOff(listById(id)?.folder, hf));
+const cvxTaskOn = t => S.settings?.cal_tasks !== '0' && !cvxListOff(t.list_id);
 // stores one of the json lists (the local copy first, so the views redraw at once)
 function cvxSave(k, arr) {
   S.settings[k] = typeof arr === 'string' ? arr : JSON.stringify(arr);
