@@ -1126,9 +1126,13 @@ def proposal_undo(jid):
     elif j["kind"] in PROP_AST:  # 2.126.1 A (#2123 #2124): the text before comes back (unless changed since)
         from ..agents.asstprop import ast_undo
         n, skipped = ast_undo(c, j, rec)
-    elif j["kind"] == "obj_patch":  # 2.623.0 (#4718): the values before come back (unless changed since)
+    elif j["kind"] == "obj_patch":  # 2.623.0 (#4718): the values before come back (changed since: 409, the card stays applied)
         from ..agents.objprop import objp_undo
-        n, skipped = objp_undo(c, j, rec)
+        try:
+            n, skipped = objp_undo(c, j, rec)
+        except (BadInput, Denied):
+            c.rollback()
+            raise
     elif j["kind"] in ("triage", "dayplan"):
         for tid, ch in rec["changes"].items():
             try:
@@ -1243,9 +1247,13 @@ def proposal_redo(jid):
     elif j["kind"] in PROP_AST:  # 2.126.1 A (#2123 #2124)
         from ..agents.asstprop import ast_undo
         n, skipped = ast_undo(c, j, rec, back=False)
-    elif j["kind"] == "obj_patch":  # 2.623.0 (#4718): the proposal's values again (unless changed since)
+    elif j["kind"] == "obj_patch":  # 2.623.0 (#4718): the proposal's values again (changed since: 409, the card stays undone)
         from ..agents.objprop import objp_undo
-        n, skipped = objp_undo(c, j, rec, back=False)
+        try:
+            n, skipped = objp_undo(c, j, rec, back=False)
+        except (BadInput, Denied):
+            c.rollback()
+            raise
         rec.update(undone=False)
     elif j["kind"] in ("triage", "dayplan"):
         for tid, ch in rec["changes"].items():

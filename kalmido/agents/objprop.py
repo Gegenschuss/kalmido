@@ -32,7 +32,7 @@ from ..core.errors import BadInput
 from ..core.i18n import N_, tr
 from ..core.objects import obj_need, obj_public, obj_reg, obj_role, obj_title
 from ..core.objweb import _agent_kind
-from ..core.writes import NEED_VERSION, _clean, _same, obj_write
+from ..core.writes import NEED_VERSION, UNDO_CONFLICT, _clean, _same, obj_write
 from ..accounts.session import me
 from ..agents.core import JOB_TITLE_MAX, agent_ids, job_dict
 
@@ -145,8 +145,9 @@ def objp_result(rec):
 
 
 def objp_undo(c, j, rec, back=True):
-    """Undo (back) / redo: the values before / the proposal's values, with the version the last step left; changed since by
-    anybody = skipped (nothing written). -> (n, skipped titles)."""
+    """Undo (back) / redo: the values before / the proposal's values, with the version the last step left -> (n, []).
+    Review C (2.623): changed since by anybody = Denied 409 (nothing written, the caller rolls back), so the card keeps its
+    state (applied / undone) instead of claiming a step that did not happen."""
     kind, rid = rec.get("object_kind"), rec.get("object_id")
     if not kind or not rid or not rec.get("changed"):
         return 0, []
@@ -154,7 +155,7 @@ def objp_undo(c, j, rec, back=True):
     try:
         row, changed = obj_write(c, me(), kind, rid, body, expect=rec.get("version"))
     except Conflict:
-        return 0, [(obj_title(c, kind, rid) or "")[:40]]
+        raise Denied(409, tr(UNDO_CONFLICT) if back else tr("Nothing to redo")) from None
     rec["version"] = str(row["updated_at"])
     return (1 if changed else 0), []
 

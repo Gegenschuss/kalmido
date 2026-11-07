@@ -9,18 +9,23 @@ with the test kind 'objprobe' (KALMIDO_TEST_OBJ=1, tests/obj_probe.py). Invented
    cannot open or accept the card (404); the agent gets the event job (approve / reject)
  - accepting after someone else changed the object: 409 with a plain message, nothing written, the card says stale
  - a person who lost the write right since (now read-only in the organisation) cannot accept (403), nothing written; discarding
+ - review C: undo / redo after someone else's change 409 (the card keeps its state); discarding while accepting holds the
+   proposal's row waits for it and answers 409 (next commit)
 tenant-matrix: obj (another organisation's agent: 404 on a proposal)
 freelancer-matrix: obj (a person without an organisation: her agent proposes, she accepts)
 usage: p2623_c_objprop_test.py <datadir>"""
 import os
+import subprocess
 import sys
+import time
 
 import requests
 
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 from freelancer_fixture import freelancer  # noqa: E402
-from kt import B, check, done, sess  # noqa: E402
+import dbx as _dbx  # noqa: E402
+from kt import B, DATA, check, dbx, done, sess  # noqa: E402
 from obj_probe import K, agent, new, start  # noqa: E402
 
 start("P2623C")
@@ -109,8 +114,22 @@ check(r.ok and r.json().get("undone") == 1 and get(Bo, O)["note"] == "first" and
 r = Bo.post(B + f"/api/proposals/{J1}/redo")
 check(r.ok and r.json().get("redone") == 1 and get(Bo, O)["note"] == "by proposal", f"redo: the proposal's values again ({r.status_code} {r.text[:160]})")
 Ca.patch(B + f"/api/obj/{K}/{O}", json={"note": "carl's"})
-Bo.post(B + f"/api/proposals/{J1}/undo")
-check(get(Bo, O)["note"] == "carl's", "undo after someone else's change: skipped, nothing written")
+r = Bo.post(B + f"/api/proposals/{J1}/undo")
+# 2.623.0 (#4718, review C): a step that cannot be done is a 409 and the card keeps its state (was: 200 "undone", nothing written)
+check(r.status_code == 409 and get(Bo, O)["note"] == "carl's" and Bo.get(B + f"/api/proposals/{J1}").json()["applied"]["undone"] is False,
+      f"undo after someone else's change: 409, nothing written, the card stays applied ({r.status_code} {r.text[:160]})")
+
+# ---------------------------------------------------------------- review C: redo after someone else's change (409, stays undone)
+cur = AG.get(O).json()
+r = propose(AG, O, {"values": {"note": "redo me"}, "expect_updated_at": cur["updated_at"]})
+J4 = r.json().get("id") if r.status_code == 201 else None
+check(Bo.post(B + f"/api/proposals/{J4}/apply", json={"select": ["0"]}).ok and Bo.post(B + f"/api/proposals/{J4}/undo").ok
+      and get(Bo, O)["note"] == "carl's", "applied and undone")
+Ca.patch(B + f"/api/obj/{K}/{O}", json={"note": "carl again"})
+r = Bo.post(B + f"/api/proposals/{J4}/redo")
+x = Bo.get(B + f"/api/proposals/{J4}").json()
+check(r.status_code == 409 and get(Bo, O)["note"] == "carl again" and x["applied"]["undone"] is True,
+      f"redo after someone else's change: 409, nothing written, the card stays undone ({r.status_code} {r.text[:160]} {x.get('applied')})")
 
 # ---------------------------------------------------------------- accepting after someone else changed it: 409
 cur = AG.get(O).json()
@@ -118,7 +137,7 @@ r = propose(AG, O, {"values": {"size": 7}, "expect_updated_at": cur["updated_at"
 J2 = r.json().get("id") if r.status_code == 201 else None
 check(r.status_code == 201, f"a second proposal ({r.status_code} {r.text[:160]})")
 r = propose(AG, O, {"values": {"size": 8}, "expect_updated_at": o["updated_at"]})
-check(r.status_code == 409 and r.json()["error"].get("current", {}).get("note") == "carl's", f"proposing on an old version: 409 with the current state ({r.status_code})")
+check(r.status_code == 409 and r.json()["error"].get("current", {}).get("note") == "carl again", f"proposing on an old version: 409 with the current state ({r.status_code})")
 Ca.patch(B + f"/api/obj/{K}/{O}", json={"title": "Kick-off (carl)"})
 x = Bo.get(B + f"/api/proposals/{J2}").json()
 check(x.get("object", {}).get("stale") is True, "the card says: changed since")
