@@ -52,7 +52,7 @@ def person(name, orgs):
     return s
 
 
-ORG = A.post(B + "/api/admin/orgs", json={"name": "Alpha", "admin_id": uid["alice"]}).json()["id"]
+ORG = A.post(B + "/api/admin/orgs", json={"name": "Alpha"}).json()["id"]  # alice (the creator) is its member
 Bo = person("bob", [ORG])
 FID, Fr = freelancer(B, A, "frida", features=FEAT)
 uid["frida"] = FID
