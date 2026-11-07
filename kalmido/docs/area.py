@@ -26,7 +26,7 @@ POST /api/docs/<id>/area {to: office | private, undo?: true} -- a person moves a
 private space ("Move to office" of the private sheet, "Wrong area" of a sorted one; undo = the same call back)."""
 import re
 
-from flask import g, jsonify
+from flask import g, has_request_context, jsonify
 
 from ..core.config import app
 from ..core.db import body, bump, db, err, usettings
@@ -40,6 +40,8 @@ from ..accounts.spacemove import smv_refuse_agent
 from ..files.store import fs_log_add, need_node
 from ..files.fsmove import _rm, fsm_apply, fsm_plan
 from ..office.model import OFFICE_FEAT
+from ..office.model import office_space  # 2.654.0 (#4823)
+from ..core.errors import BadInput  # 2.654.0 (#4823)
 from ..office.rights import ofr_allows  # review 2.522 (4)
 from . import store as S
 from .ingest import doc_after
@@ -49,9 +51,26 @@ AR_AREAS = ("office", "private")
 AR_NO_WRITE = ("guest", "readonly")  # roles that add nothing to an organisation's documents folder (docs/store.py root_add_ok)
 
 
+def _ar_space(orgs, ws, uid):
+    """2.654.0 (#4823): under "All workspaces" the office area the person's own request has open (header
+    X-Kalmido-Office-Space / ?_osp=, office/model.py office_space: only the person's own memberships), like the office
+    routes; only in uid's own request -- the queue (ar_sort_queued, no request / no header) and another person keep the
+    setting. An area that is not the person's (office_space: 400) = as before, the setting."""
+    if not has_request_context() or g.get("auth_via") == "token":
+        return ws
+    u = getattr(g, "user", None)
+    if u is None or int(u["id"]) != int(uid):
+        return ws
+    try:
+        return office_space(orgs, ws)
+    except BadInput:
+        return ws
+
+
 def ar_office(c, uid):
     """The office of person uid as ('own', 'u<uid>', None) | ('org', 'o<oid>', oid), or None (no office: nothing is sorted).
-    Like office/model.py office_where, without making the personal office (no write, no commit: also in the queue)."""
+    Like office/model.py office_where, without making the personal office (no write, no commit: also in the queue).
+    2.654.0 (#4823): under "All workspaces" the office area the person's request has open (_ar_space)."""
     if not uid:
         return None
     with system_ctx(c):  # the person's own account row (kind, kid, settings): the queue has no request
@@ -62,7 +81,7 @@ def ar_office(c, uid):
     if OFFICE_FEAT not in (st.get("features") or "").split(","):
         return None
     orgs = user_orgs(c, uid)
-    ws = (st.get("workspace") or "").strip()
+    ws = _ar_space(orgs, (st.get("workspace") or "").strip(), uid)
     m = re.fullmatch(r"org:(\d{1,9})", ws)
     if m and int(m.group(1)) in orgs:
         oid = int(m.group(1))
