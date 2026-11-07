@@ -37,6 +37,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends tesseract-ocr t
 # 2.360.3 (#2915): every package with its version and hashes, also what the direct ones pull in (tools/requirements.in + .lock)
 COPY tools/requirements.lock /tmp/requirements.lock
 RUN pip install --no-cache-dir --require-hashes -r /tmp/requirements.lock && rm /tmp/requirements.lock
+# 2.630.0 (#4671): the image libraries inside the Pillow wheel (libjpeg-turbo, zlib-ng, libtiff, libwebp, freetype, openjpeg,
+# lcms2) are at least the versions of WHEEL_MIN in tools/pins.py, else the build stops here
+COPY tools/pins.py /tmp/pins.py
+RUN python /tmp/pins.py --wheels && rm /tmp/pins.py
 # 2.554.0 (#4169): pip itself is not needed at runtime (CMD, HEALTHCHECK and the app never call it) and carries known holes: removed after the last pip call
 RUN python -m pip uninstall -y pip
 WORKDIR /app
