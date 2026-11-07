@@ -26,7 +26,12 @@ an expired row of somebody who keeps a role is replaced. External links and the 
 disk error) stays the deleted person's and goes; the dialog cannot foresee that and counted it as handed on. A branch that
 lies in a locked folder, or nobody to take it, goes with the account as before, and the dialog counts it so.
 
-ush_plan is the one place that decides: the dialog counts what the deletion then does. No routes."""
+ush_plan is the one place that decides: the dialog counts what the deletion then does. No routes.
+
+2.631.0 (#4584): the dialog says per branch handed on what of it does not go along (locked folders, links, agent folders, the
+trash, the copies of mails that go with the account) and how many public links and file requests of others on it end; agents
+of other people with a share in it keep it (as built, only said). _branch_walk is the one rule for that and for _folders. The
+mail copies (ush_mail_doomed, also for accounts/users.py _up_mail_nodes) are no longer sealed again for the heir only to be deleted right after."""
 import os
 
 from ..collab.comments import user_names
@@ -40,7 +45,7 @@ from ..core.i18n import tr
 from ..core.pg import insert_id, system_ctx
 from ..core.orgcrypt import OrgCryptError
 from ..files.extlinks import xl_space_moved
-from ..files.fslock import fsl_of, fsl_of_chain
+from ..files.fslock import fsl_map, fsl_of_chain
 from ..files.fsmove import fsm_doc, fsm_text, fsm_versions, fsm_walk
 from ..files.fstags import dt_move
 from ..files.fsref import fs_ref_node
@@ -131,10 +136,81 @@ def _above_rows(c, ids):
     return direct, groups
 
 
-def _fs_branches(c, uid):
+def ush_mail_doomed(c, uid):
+    """(roots, ids): the filed copies (fs_nodes marked with hub_mail_id) of the mails that go with account uid (the hub_mails
+    DELETE in accounts/users.py _user_purge) -- a folder only when everything in it belongs to those mails --, without
+    deleting anything: the roots to purge in node order (users._up_mail_nodes, 2.148.1 H #2488) and every node id in them.
+    2.631.0 (#4584): a branch handed on leaves them out (they were sealed again for the heir only to go right after) and the
+    delete dialog counts them."""
+    roots, ids = [], set()
+    with system_ctx(c):  # the nodes may lie in an organisation's tree
+        gone = {r[0] for r in c.execute("SELECT id FROM hub_mails WHERE owner_id=? AND (org_id IS NULL OR (client_id IS NULL AND list_id IS NULL))", (uid,))}
+        if not gone:
+            return roots, ids
+        q = ",".join("?" * len(gone))
+        for (nid,) in c.execute(f"SELECT id FROM fs_nodes WHERE hub_mail_id IN ({q}) ORDER BY id", list(gone)).fetchall():
+            if nid in ids:
+                continue
+            sub = fs_subtree(c, nid)
+            marks = c.execute(f"SELECT hub_mail_id FROM fs_nodes WHERE id IN ({','.join('?' * len(sub))})", sub).fetchall()
+            if all(m[0] in gone for m in marks):
+                roots.append(nid)
+                ids.update(sub)
+    return roots, ids
+
+
+def _mail_doomed(c, uid):
+    return ush_mail_doomed(c, int(uid))[1]
+
+
+def _branch_walk(c, uid, root, doomed):
+    """(moved rows (fsm_walk, root first), subtree ids) of branch root (_folders): locked folders below it with what lies in
+    them, links, agent folders, the trash and the mail copies that go (doomed) stay. 2.631.0 (#4584): one map of the locks
+    instead of one look per node; the delete dialog counts with it (_branch_counts)."""
+    sub = fs_subtree(c, root["id"])
+    locked = set()
+    for i in range(0, len(sub), 500):
+        locked.update(fsl_map(c, sub[i:i + 500]))
+    stays = {i for i in sub if i != root["id"] and (i in locked or i in doomed)}
+    moved, _stay = fsm_walk(c, root, only=set(sub) - stays)
+    return moved, sub
+
+
+def _in_parts(c, sql, ids, *args):
+    """The rows of sql (with {q} for the ids) over ids in parts of 500."""
+    out = []
+    for i in range(0, len(ids), 500):
+        part = ids[i:i + 500]
+        out += c.execute(sql.format(q=",".join("?" * len(part))), (*part, *args)).fetchall()
+    return out
+
+
+def _branch_counts(c, uid, x, doomed):
+    """2.631.0 (#4584): {stay, ends, agents} of branch item x handed on (_fs_branches): entries of the deleted person in it
+    that do not go along (filed objects count as themselves above), the live public links and the file requests of others
+    that end (_folders), the agents of other people with a live share in it (they keep it). Numbers only."""
+    root = c.execute("SELECT * FROM fs_nodes WHERE id=?", (x["id"],)).fetchone()
+    if root is None:
+        return {"stay": 0, "ends": 0, "agents": 0}
+    moved, sub = _branch_walk(c, uid, root, doomed)
+    own = [r["id"] for r in moved if r["owner_id"] == uid]
+    mine = sum(r[0] for r in _in_parts(c, "SELECT COUNT(*) FROM fs_nodes WHERE id IN ({q}) AND owner_id=? AND kind<>'ref'", sub, uid))
+    stay = mine - sum(1 for r in moved if r["owner_id"] == uid and r["kind"] != "ref")
+    now = iso(now_utc())
+    ends = sum(r[0] for r in _in_parts(c, "SELECT COUNT(*) FROM fs_ext_links WHERE node_id IN ({q}) AND revoked_at IS NULL "
+                                          "AND (expires_at IS NULL OR expires_at>?)", own, now))
+    ends += sum(r[0] for r in _in_parts(c, "SELECT COUNT(*) FROM fs_upload_requests WHERE node_id IN ({q}) AND created_by<>? "
+                                           "AND revoked_at IS NULL AND deleted_at IS NULL", own, x["heir"]))
+    agents = {r[0] for r in _in_parts(c, "SELECT s.user_id FROM fs_shares s JOIN agents a ON a.user_id=s.user_id WHERE s.node_id IN ({q}) "
+                                         "AND (a.owner_id IS NULL OR a.owner_id<>?) AND (s.expires_at IS NULL OR s.expires_at>?)", own, uid, now)}
+    return {"stay": stay, "ends": ends, "agents": len(agents)}
+
+
+def _fs_branches(c, uid, doomed=frozenset()):
     """(items (_item, heir set), n gone) of the folders and files of uid's private tree shared with a person or a group,
     outside the areas (a table, page or address book in a shared folder counts as itself above). 2.537.0 (#4347): top
-    down; a node inside a branch that is handed on goes along with it; the others go with the account (counted)."""
+    down; a node inside a branch that is handed on goes along with it; the others go with the account (counted). 2.631.0
+    (#4584): a mail copy that goes with the account (doomed) is never handed on (it goes, counted)."""
     roots = {r[0] for r in c.execute("SELECT node_id FROM fs_area_roots WHERE node_id IS NOT NULL")}
     found = []
     # 2.566.0 (#4712): the reference node of a calendar / address book on the shared core carries its shares: it counts as the
@@ -157,7 +233,7 @@ def _fs_branches(c, uid):
         # only the person's own tree (never a node of theirs in somebody else's folder), nothing locked
         mine = all(x["owner_id"] == uid and not x["org_id"] for x in chain)
         it = None
-        if mine and fsl_of_chain(c, chain) is None:
+        if mine and nid not in doomed and fsl_of_chain(c, chain) is None:
             above = [x["id"] for x in chain[1:]]
             it = _item(c, uid, None, nid, _node_shares(c, [nid]), _node_shares(c, above), "edit")
             if it:  # review #4347: a group's share above stays the group's (a member who leaves it loses it), no row per member
@@ -172,10 +248,14 @@ def _fs_branches(c, uid):
     return items, gone
 
 
-def ush_plan(c, uid):
+def ush_plan(c, uid, doomed=None):
     """{calendars, books, sheets, wiki: [item (_item)]} of account uid. Numbers and ids only (the caller may be an instance
-    admin outside it all)."""
-    uid = int(uid)
+    admin outside it all). doomed: the mail copies that go (_mail_doomed; looked up when None)."""
+    return _plan(c, int(uid), _mail_doomed(c, int(uid)) if doomed is None else doomed)[0]
+
+
+def _plan(c, uid, doomed):
+    """(ush_plan, n folders gone) -- 2.631.0 (#4584): one walk of the shared branches for the plan and the dialog."""
     out = {"calendars": [], "books": [], "sheets": [], "wiki": [], "folders": []}
     with system_ctx(c):  # the deleted person's objects, whoever deletes the account
         for (cid,) in c.execute("SELECT id FROM ev_cals WHERE owner_id=? AND org_id IS NULL", (uid,)).fetchall():
@@ -194,21 +274,25 @@ def ush_plan(c, uid):
                 read = [(r["created_at"], r["user_id"], "view") for r in shares if wsh_covers(r, p["path"], p["id"])]
                 out["wiki"].append(_item(c, uid, None, p["id"], read, _folder_shares(c, uid, WKF_KIND, p["id"]), "edit",
                                          fits=lambda u: not wke_mode(c, None, u)[0]))  # review: never into a space with the lock (the text would lie open there)
-        out["folders"] = _fs_branches(c, uid)[0]  # 2.537.0 (#4347)
-    return {k: [x for x in v if x] for k, v in out.items()}
+        out["folders"], gone = _fs_branches(c, uid, doomed)  # 2.537.0 (#4347)
+    return {k: [x for x in v if x] for k, v in out.items()}, gone
 
 
 def ush_info(c, uid):
-    """For the delete dialog (orgretain.upg_info): {to: {kind: n}, gone: {kind: n}, names: [who takes them over]}."""
-    plan = ush_plan(c, uid)
+    """For the delete dialog (orgretain.upg_info): {to: {kind: n}, gone: {kind: n}, names: [who takes them over], branches:
+    [{stay, ends, agents}] (2.631.0, #4584: per branch handed on with something to say, _branch_counts)}."""
+    uid = int(uid)
+    doomed = _mail_doomed(c, uid)
+    plan, fgone = _plan(c, uid, doomed)
     to = {k: sum(1 for x in v if x["heir"]) for k, v in plan.items()}
     gone = {k: sum(1 for x in v if not x["heir"]) for k, v in plan.items()}
+    gone["folders"] = fgone  # 2.537.0 (#4347): only the branches nobody takes over
     with system_ctx(c):  # numbers only
-        gone["folders"] = _fs_branches(c, int(uid))[1]  # 2.537.0 (#4347): only the branches nobody takes over
+        branches = [b for b in (_branch_counts(c, uid, x, doomed) for x in plan["folders"]) if any(b.values())]
         heirs = sorted({x["heir"] for v in plan.values() for x in v if x["heir"]})
         names = user_names(c, heirs)
     return {"to": {k: n for k, n in to.items() if n}, "gone": {k: n for k, n in gone.items() if n},
-            "names": [names.get(h, "") for h in heirs if names.get(h)]}
+            "names": [names.get(h, "") for h in heirs if names.get(h)], "branches": branches}
 
 
 def _calendars(c, items):
@@ -273,19 +357,17 @@ def _wiki(c, uid, items, new_paths, old_paths):
                 insert_id(c, "INSERT INTO fs_shares(node_id,user_id,role,created_by,created_at) VALUES(?,?,?,?,?)", (n["id"], u, role, heir, iso(now_utc())))
 
 
-def _folders(c, uid, items, new_paths, old_paths):
+def _folders(c, uid, items, new_paths, old_paths, doomed=frozenset()):
     """2.537.0 (#4347): each branch of items (_fs_branches) into the top level of its heir's own tree; what is the deleted
-    person's in it passes to the heir, its files sealed again for the heir's account (as files/fsmove.py fsm_apply does)."""
+    person's in it passes to the heir, its files sealed again for the heir's account (as files/fsmove.py fsm_apply does).
+    2.631.0 (#4584): what stays: _branch_walk (the mail copies that go included)."""
     for x in items:
         nid, heir = x["id"], x["heir"]
         root = c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
         if root is None or root["owner_id"] != uid or root["org_id"]:
             continue
-        sub = fs_subtree(c, nid)
-        q = ",".join("?" * len(sub))
         # review #4347: recognised documents go along (the retention took what it keeps out of the tree before, upg_personal)
-        stays = {i for i in sub if i != nid and fsl_of(c, i) is not None}  # a locked folder and what lies in it
-        moved, _stay = fsm_walk(c, root, only=set(sub) - stays)
+        moved, _sub = _branch_walk(c, uid, root, doomed)  # a locked folder and what lies in it stays
         ids = sorted(r["id"] for r in moved)  # review #4347: in node order, as fs_purge (#3090), no deadlock with the recognition
         for i in range(0, len(ids), 500):  # as fsm_apply: no recognition starts on the moved files until the commit
             part = ids[i:i + 500]
@@ -354,14 +436,15 @@ def ush_hand_on(c, uid, new_paths):
     everything of ush_plan with a heir passes to it. -> the stored files to remove after the commit. new_paths: the sealed
     copies made here are added, for the caller to remove if the deletion fails later on. The caller commits."""
     uid = int(uid)
-    plan = {k: [x for x in v if x["heir"]] for k, v in ush_plan(c, uid).items()}
+    doomed = _mail_doomed(c, uid)  # 2.631.0 (#4584): the mail copies that go right after (users._up_mail_nodes) are not handed on
+    plan = {k: [x for x in v if x["heir"]] for k, v in ush_plan(c, uid, doomed).items()}
     old_paths = []
     with system_ctx(c):  # the rows of both people, whoever deletes the account
         _calendars(c, plan["calendars"])
         _books(c, plan["books"])
         _sheets(c, plan["sheets"], new_paths, old_paths)
         _wiki(c, uid, plan["wiki"], new_paths, old_paths)
-        _folders(c, uid, plan["folders"], new_paths, old_paths)  # 2.537.0 (#4347): after the areas (their filed nodes went already)
+        _folders(c, uid, plan["folders"], new_paths, old_paths, doomed)  # 2.537.0 (#4347): after the areas (their filed nodes went already)
     n = sum(len(v) for v in plan.values())
     if n:
         print(f"account deletion: {n} shared object(s) handed on (#4301)", flush=True)

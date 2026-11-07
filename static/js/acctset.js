@@ -1029,6 +1029,14 @@ function ua8PurgeHtml(p) {
   p = p || {};
   const to = ua8SharedCounts(p.shared?.to), gone = ua8SharedCounts(p.shared?.gone);
   if (to) rows.push([false, p.shared.names?.length ? tr('Shared with others, these stay and go to the longest-standing person who may change them ({1}): {0}.', to, p.shared.names.join(', ')) : tr('Shared with others, these stay and go to the longest-standing person who may change them: {0}.', to)]);
+  // 2.631.0 (#4584): per folder handed on, what of it does not go along and which links end (purgeshare._branch_counts)
+  for (const b of p.shared?.branches || []) {
+    const parts = [b.stay && trn('{0} entry in it does not go along and goes with the account (locked folders, shortcuts, agent folders, the trash, e-mail copies)', '{0} entries in it do not go along and go with the account (locked folders, shortcuts, agent folders, the trash, e-mail copies)', b.stay),
+      b.ends && trn('{0} public link or file request on it ends', '{0} public links or file requests on it end', b.ends),
+      b.agents && trn('{0} agent of another person keeps its access', '{0} agents of other people keep their access', b.agents)].filter(Boolean);
+    if (parts.length) rows.push([!!(b.stay || b.ends), tr('A shared folder or file that is handed on: {0}.', parts.join('; '))]);
+  }
+  if (p.shared?.to?.folders) rows.push([false, tr('A file that cannot be sealed again for the new owner goes with the account.')]);
   if (gone) rows.push([true, tr('Shared with others, but nobody else may take them over, so these go with the account: {0}.', gone)]);
   if (p.office === 'keep') rows.push([true, tr('The private office keeps {0} by law until {1}: it is retired and is removed permanently after that date, nobody can export it any more (the person can download the retention export in the office before). Everything else of the account goes.', odlCounts(p.kept), fmtDate(p.kept_until))]);
   else if (p.office === 'delete') rows.push([false, tr('The private office goes with its files: {0}.', odlCounts(p.office_counts))]);

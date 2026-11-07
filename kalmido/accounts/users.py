@@ -536,25 +536,20 @@ def user_delete_run(c, uid, actor, along=False, settle=None, how=None):
     return None, None, n
 
 
-def _up_mail_nodes(c, uid):
+def _up_mail_nodes(c, roots):
     """2.148.1 H (#2488): the filed copies (fs_nodes marked with hub_mail_id) of the mails that go with the account (see the
-    hub_mails DELETE in user_purge) go, too -- a folder only when everything in it belongs to those mails. Returns the files."""
-    from ..files.store import fs_purge, fs_subtree
+    hub_mails DELETE in user_purge) go, too -- a folder only when everything in it belongs to those mails. Returns the files.
+    2.631.0 (#4584): which ones (roots): admin/purgeshare.py ush_mail_doomed, the one rule for the deletion, the hand-on of
+    shared folders (they are not sealed again for the heir first) and the delete dialog."""
+    from ..files.store import fs_purge
     paths, done = [], set()
     with system_ctx(c):  # the nodes may lie in an organisation's tree
-        gone = {r[0] for r in c.execute("SELECT id FROM hub_mails WHERE owner_id=? AND (org_id IS NULL OR (client_id IS NULL AND list_id IS NULL))", (uid,))}
-        if not gone:
-            return paths
-        q = ",".join("?" * len(gone))
-        for (nid,) in c.execute(f"SELECT id FROM fs_nodes WHERE hub_mail_id IN ({q}) ORDER BY id", list(gone)).fetchall():
+        for nid in roots:
             if nid in done:
                 continue
-            ids = fs_subtree(c, nid)
-            marks = c.execute(f"SELECT hub_mail_id FROM fs_nodes WHERE id IN ({','.join('?' * len(ids))})", ids).fetchall()
-            if all(m[0] in gone for m in marks):
-                gone_ids, gone_paths = fs_purge(c, nid)
-                done.update(gone_ids)
-                paths += gone_paths
+            gone_ids, gone_paths = fs_purge(c, nid)
+            done.update(gone_ids)
+            paths += gone_paths
     return paths
 
 
@@ -587,7 +582,7 @@ def _user_purge(c, uid, made):
     # law; agents, organisation calendars, time of organisation projects, direct messages, mentions, logs, the inbox
     files = upg_personal(c, uid)
     files += upg_rest(c, uid)
-    from ..admin.purgeshare import ush_hand_on
+    from ..admin.purgeshare import ush_hand_on, ush_mail_doomed
     files += ush_hand_on(c, uid, made)  # 2.508.0 (#4301): what it shares privately goes to who may write it, before its tree and key go
     from ..team.clients import cl_user_purge
     cl_user_purge(c, uid)  # 2.223.3 B (#2878): its private clients (kept ones with the retired office, anonymised)
@@ -607,7 +602,7 @@ def _user_purge(c, uid, made):
     a = c.execute("SELECT webhook_id FROM agents WHERE user_id=?", (uid,)).fetchone()
     if a and a["webhook_id"]:
         c.execute("DELETE FROM webhooks WHERE id=?", (a["webhook_id"],))
-    files += _up_mail_nodes(c, uid)  # 2.148.1 H (#2488): before the tree is handed on
+    files += _up_mail_nodes(c, ush_mail_doomed(c, uid)[0])  # 2.148.1 H (#2488): before the tree is handed on
     from ..files.store import fs_user_purge
     files += fs_user_purge(c, uid)  # 2.48.0 (#1207): the file store (organisation branches go to an admin, the own tree goes)
     c.execute("DELETE FROM doc_fields WHERE ws=?", (f"u{int(uid)}",))  # 2.153.0 (#2179): the own documents' custom fields
