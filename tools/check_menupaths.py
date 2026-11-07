@@ -77,7 +77,8 @@ def check_text(text, secs, tabs):
             continue
         rest = re.match(DECOR + SEP + DECOR + r"(.*)", tail[len(sec):])
         allowed = tabs.get(secs[sec])
-        if rest and allowed and not any(rest.group(1).startswith(t) for t in allowed):
+        # 2.616.0 (#4933): a sub-tab counts as a whole word - the tab Backup (#4827) let the old plural Backups pass as a prefix
+        if rest and allowed and not any(re.match(re.escape(t) + r"(?!\w)", rest.group(1)) for t in allowed):
             bad.append((line, "Settings > " + short))
     bad += [(text.count("\n", 0, m.start()) + 1, " ".join(m.group(0).split())) for m in BARE.finditer(text)]
     for w in OLD_WORDS:

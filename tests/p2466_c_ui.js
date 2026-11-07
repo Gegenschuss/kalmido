@@ -48,7 +48,7 @@ const FEAT = 'cal,comments,collab,time,agents';
   w.eval(`settingsModal('agentpolicy')`);
   let md = await until(() => d.querySelector('.smodal'));
   check(secOn(md) === 'org' && admOn(md) === 'agents' && !md.querySelector('#admp-agents').hidden, "settingsModal('agentpolicy') opens Organisation > Agents: " + secOn(md) + '/' + admOn(md));
-  check([...md.querySelectorAll('[data-admsub]')].map(b => b.dataset.admsub).join() === 'users,agents,odata,signin,server,log', 'the sub-tabs of Organisation and Server: ' + [...md.querySelectorAll('[data-admsub]')].map(b => b.dataset.admsub).join());
+  check([...md.querySelectorAll('[data-admsub]')].map(b => b.dataset.admsub).join() === 'users,agents,odata,signin,server,log,backup', 'the sub-tabs of Organisation and Server: ' + [...md.querySelectorAll('[data-admsub]')].map(b => b.dataset.admsub).join());  // 2.616.0 (#4933): + backup (Server > Backup, #4827)
   const ap = md.querySelector('#admp-agents');
   await until(() => ap.querySelector('#s-sclim .sclim') && ap.querySelector('#s-aud'));
   check(ap.querySelector('#s-uag') && ap.querySelector('#s-uagmax') && ap.querySelectorAll('#s-sclim .sclim').length === 2, 'Agents: personal agents for everyone + the permission limit (loaded)');
