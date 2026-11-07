@@ -1112,6 +1112,17 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                    "Created", "201") | errs("400", "403", "404", "409", "429"), scope=W,
             body={"type": "object", "required": ["text"], "additionalProperties": False, "properties": {
                 "text": {"type": "string"}, "chat_user_id": {"type": "integer"}, "job_id": {"type": "integer"}}})},
+        # 2.653.0 (#5079): a decision outside the Kalmido API, as a line in the agent's own history
+        "/agent/decisions": {"post": op(
+            "2.653.0 (#5079): one line in YOUR OWN history (Work style > History, shown as \"Decided: <title>\") for a decision that "
+            "did not run through the Kalmido API: a job card you answered yourself, a change of a tool on your server, something "
+            "you deliberately did not start. title: plain words, max 200 characters (whitespace folded, longer is cut, secrets "
+            "masked; empty = 400); ref: optional, what it refers to (a task, a commit subject), max 200. No undo. At most 30 per minute (429).",
+            AG, ok({"type": "object", "properties": {"id": {"type": "integer"}, "kind": {"type": "string"}, "title": {"type": "string"},
+                                                     "ref": {"type": "string"}, "created_at": {"type": "string"}}},
+                   "Created", "201") | errs("400", "403", "429"), scope=W,
+            body={"type": "object", "required": ["title"], "additionalProperties": False, "properties": {
+                "title": {"type": "string", "maxLength": 4000}, "ref": {"type": "string", "maxLength": 4000}}})},
         "/agent/events": {"get": op("Events for the agent after a cursor; long-polling with wait", AG, ok(ref("EventPage")) | errs("400", "403"),
                                     [q("since", "seq of the last event you processed (0 = from the start)", {"type": "integer"}),
                                      q("limit", "At most 500", {"type": "integer"}),
