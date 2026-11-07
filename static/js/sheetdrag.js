@@ -23,10 +23,11 @@ function sd_scrolled(t, el) {
 }
 // 2.631.0 (#4993): the height the content needs (measured with height auto, so a stretched sheet does not raise its own ceiling)
 function sd_natural(el) {
-  const h = el.style.height, m = el.style.maxHeight, tr = el.style.transition;
+  const h = el.style.height, m = el.style.maxHeight, tr = el.style.transition, st = el.scrollTop;
   el.style.transition = 'none'; el.style.height = 'auto'; el.style.maxHeight = 'none';
   const n = Math.max(el.scrollHeight, el.getBoundingClientRect().height);
   el.style.height = h; el.style.maxHeight = m; el.style.transition = tr;
+  if (el.scrollTop !== st) el.scrollTop = st;  // 2.649.0 (#5062): height auto let a scrolled dialog jump to its top, a tap then hit another row
   return n > 0 ? Math.ceil(n) : 1e9;  // no layout (jsdom): no ceiling
 }
 function sd_resizable(el) { return el.id === 'pop' || el.classList.contains('card'); }
@@ -39,7 +40,7 @@ function sd_start(t, x, y, touch) {
   const r = el.getBoundingClientRect(), head = y - r.top <= 44;
   if (!head && !touch) return false;  // a mouse drags only at the head (text selection in the content stays)
   const b = getComputedStyle(el).transform;  // the sheet's own transform (quick add on a tablet is centred with translateX)
-  Object.assign(SD, {el, head, base: b && b !== 'none' ? b + ' ' : '', x0: x, y0: y, h0: r.height, nat: sd_resizable(el) ? sd_natural(el) : 0, on: false, ty: 0, lastY: y, lastT: performance.now(), v: 0, sized: false, t});
+  Object.assign(SD, {el, head, base: b && b !== 'none' ? b + ' ' : '', x0: x, y0: y, h0: r.height, nat: 0, on: false, ty: 0, lastY: y, lastT: performance.now(), v: 0, sized: false, t});
   return true;
 }
 // 2.102.0 (#1998): drag.js asks whether a move starts the drag: 8 px in either direction, then only a vertical move, and in
@@ -48,7 +49,8 @@ function sd_accept(dx, dy) {
   const el = SD.el; if (!el) return false;
   if (Math.abs(dy) < 8 && Math.abs(dx) < 8) return null;
   if (Math.abs(dx) > Math.abs(dy) || (!SD.head && (dy < 0 || sd_scrolled(SD.t, el)))) { SD.el = null; return false; }
-  SD.on = true; el.style.transition = 'none'; el.classList.add('sd-drag');
+  SD.on = true; SD.nat = sd_resizable(el) ? sd_natural(el) : 0;  // 2.649.0 (#5062): measured once a drag really starts, not on every tap
+  el.style.transition = 'none'; el.classList.add('sd-drag');
   return true;
 }
 function sd_move(x, y) {
