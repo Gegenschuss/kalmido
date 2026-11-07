@@ -277,6 +277,9 @@ OX_AREAS = (
     ("tasks/watchers.json", "task_watchers", f"task_id IN ({TSQ})"),  # 2.473.0 (#3357)
     ("tasks/links.json", "task_links", f"task_id IN ({TSQ})"),  # 2.137.0 C (#2344): a task placed in a further list
     ("tasks/decisions.json", "task_decisions", f"task_id IN ({TSQ})"),  # 2.392.0 C (#3370)
+    # 2.654.0 (#4585): where a task came from in a quotation (office/offertasks.py); the import maps task, list, quotation and the
+    # position key (admin/oi_office.py _p_offer_link), so the moved positions stay linked and are not offered as new again
+    ("tasks/offer_links.json", "task_offer_links", f"task_id IN ({TSQ})"),
     ("tasks/history.json", "activity", f"task_id IN ({TSQ})"),
     ("tasks/encrypted_notes.json", "task_enc_notes", f"task_id IN ({TSQ})"),  # 2.42.0 (#828, agent A): browser-encrypted, as stored
     ("tasks/locked_notes.json", "task_note_locks", f"task_id IN ({TSQ})"),  # 2.48.0 (#1642): locked notes, browser-encrypted, as stored
@@ -488,7 +491,6 @@ _ONLINEPAY = "the online provider's working data (the payments themselves are in
 _LATER2 = "not yet in the export"  # follow-up task #3642: the 2.390 / 2.352 tables
 OX_LEFT = {
     # organisation column
-    "task_offer_links": _DERIVED,  # 2.537.0 C (#3433): the quotation position of a task (ids are new on the target)
     "agents": _AGENT, "bg_jobs": _SERVER, "doc_mail": _SECRET, "doc_models": _DERIVED, "doc_flow_runs": _DERIVED, "file_text": _DERIVED,
     "doc_fetchers": "a person's receipt fetcher and its token (set up again on the target)", "doc_fetch_portals": _DERIVED,
     "fs_ext_links": _SECRET, "fs_upload_requests": _SECRET, "hub_tokens": _SECRET, "life_trip_costs": _PERSONAL,

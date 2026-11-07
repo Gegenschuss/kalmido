@@ -17,6 +17,7 @@ import uuid
 from ..core.config import OFFICE_DIR
 from ..core.i18n import N_
 from .orgimport import OiFix, OiT, _txt  # noqa: F401
+from .orgimport import _oid  # 2.654.0 (#4585)
 from ..core.orgcrypt import oc_item_store, oc_json_store, oc_log_detail  # 2.149.0 G (#2517): pulled up from functions
 from ..core.orgcrypt import oc_dec_fields  # 2.188.0 A (#2498)
 from ..core.orgcrypt import OrgCryptError  # 2.516.0 (#4364)
@@ -545,6 +546,54 @@ def _p_letter_profile(c, run, src, d, ctx):
 
 
 # ---------------------------------------------------------------- the tables, in the order they are created
+# 2.654.0 (#4585): the quotation positions of tasks (office/offertasks.py). origin_id of a position / part names the first
+# quotation of its chain it was copied from (NULL = its own origin); the task links name that origin in their key
+# (i:<item> | s:<part>:<crew row uid>). Both are mapped to the new ids here, so after a move the positions find their tasks
+# again (not "new" and ticked: one click would make every task twice).
+_OI_ORIGIN = (("office_doc_items", "office/document_items.json"), ("office_doc_parts", "office/document_parts.json"))
+_OI_LINK_KEY = re.compile(r"i:([1-9][0-9]{0,17})|s:([1-9][0-9]{0,17}):([^\s]{1,80})")
+
+
+def _oi_origins(run, data):
+    """{(table, old origin id): new origin id} of the positions and parts this import made. An origin that did not come along
+    (its quotation was deleted) becomes the first of its copies that did, so the chain keeps one key."""
+    got = getattr(run, "oi_origins", None)
+    if got and got[0] is data:
+        return got[1]
+    out = {}
+    for table, path in _OI_ORIGIN:
+        groups = {}
+        for src in (data.get("oi") or {}).get(path) or []:
+            new = run.m(table, src.get("id")) if isinstance(src, dict) else None
+            o = _oid(src.get("origin_id")) or _oid(src.get("id")) if new else None
+            if o:
+                groups.setdefault(o, []).append(new)
+        for o, news in groups.items():
+            out[(table, o)] = run.m(table, o) or min(news)
+    run.oi_origins = (data, out)
+    return out
+
+
+def _p_offer_link(c, run, src, d, ctx):
+    """2.654.0 (#4585): a task's quotation position: its key on the new origin ids, the chain's root mapped (a root that did not
+    come along: the quotation itself). A key that names nothing of this import is left out (the task stays, as an own task)."""
+    org = _oi_origins(run, ctx.data)
+    m = _OI_LINK_KEY.fullmatch(str(src.get("item_key") or ""))
+    if not m:
+        return False
+    if m.group(1):
+        new = org.get(("office_doc_items", int(m.group(1))))
+        key = f"i:{new}" if new else None
+    else:
+        new = org.get(("office_doc_parts", int(m.group(2))))
+        key = f"s:{new}:{m.group(3)}" if new else None
+    if not key:
+        return False
+    d["item_key"] = key
+    d["root_id"] = run.m("office_docs", src.get("root_id")) or run.m("office_docs", src.get("doc_id"))
+    return d
+
+
 _P = {"created_by": "null"}
 SPECS = [
     OiT("office/import_runs.json", "office_import_runs", people={**_P, "undone_by": "null"}, private="office"),
@@ -575,6 +624,9 @@ SPECS = [
     OiT("office/document_parts.json", "office_doc_parts", refs={"doc_id": "office_docs"}, need=("doc_id",), private="office", prep=_p_part),
     OiT("office/document_items.json", "office_doc_items", refs={"doc_id": "office_docs", "service_id": "office_services",
         "part_id": "office_doc_parts", "ref_part_id": "office_doc_parts", "list_id": "lists"}, need=("doc_id",), private="office", prep=_p_item),
+    # 2.654.0 (#4585): no organisation column (space=()); into the private space with the tasks; no id: it goes with its task (CASCADE)
+    OiT("tasks/offer_links.json", "task_offer_links", refs={"task_id": "tasks", "list_id": "lists", "doc_id": "office_docs"},
+        need=("task_id", "list_id"), space=(), private="user", enc=False, rid=False, prep=_p_offer_link),
     OiT("office/purchases.json", "office_purchases", refs={"doc_id": "office_docs"}, need=("doc_id",), private="office", prep=_p_purchase),
     OiT("office/invoice_series.json", "office_inv_series", refs={"template_id": "office_docs"}, need=("template_id",), people=_P, private="office"),
     OiT("office/payments.json", "office_payments", refs={"doc_id": "office_docs"}, need=("doc_id",), people=_P, private="office"),
@@ -773,4 +825,15 @@ def _f_equipment(c, run, uid, data, who):
         eqc_sync(c, r["org_id"], nid, before=row, revive=True, uid=uid)  # dropped ones made anew (not overdue), kept ones stay
 
 
-FINISH = [_f_docs, _f_runs, _f_bank, _f_datev_guids, _f_equipment]  # 2.558.0 D (#4591, review F5): + _f_equipment
+def _f_origins(c, run, uid, data, who):
+    """2.654.0 (#4585): origin_id of the positions and parts that came along, on the new ids (umz_row drops every *_id column)."""
+    org = _oi_origins(run, data)
+    for table, path in _OI_ORIGIN:
+        for src in (data.get("oi") or {}).get(path) or []:
+            new = run.m(table, src.get("id")) if isinstance(src, dict) else None
+            o = org.get((table, _oid(src.get("origin_id")) or _oid(src.get("id")))) if new else None
+            if o and o != new:
+                c.execute(f"UPDATE {table} SET origin_id=? WHERE id=?", (o, new))
+
+
+FINISH = [_f_docs, _f_runs, _f_bank, _f_datev_guids, _f_equipment, _f_origins]  # 2.558.0 D (#4591, review F5): + _f_equipment; 2.654.0 (#4585): + _f_origins
