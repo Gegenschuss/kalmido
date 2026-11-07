@@ -53,6 +53,8 @@ from .contacts_cl import fk_has_name, fk_add, fk_sync  # 2.369.5 (#2517): pulled
 from ..team.clients import clean_client  # 2.369.5 (#2517): pulled up from functions
 from .model import office_row  # 2.369.5 (#2517): pulled up from functions
 from .model import office_settings_lock, office_settings_save  # 2.621.0 (#4600): the kept file name template
+from .sheet import dk_pack  # 2.636.0 (#4952): the industry's file name template
+from ..accounts.onboarding import ind_codes  # 2.636.0 (#4952)
 from ..files.upsafe import UploadRefused  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.attachtext import pdf_text, PDF_RATE  # 2.369.5 (#2517): pulled up from functions
 from .ledger import ofx_company, ofx_log  # 2.369.5 (#2517): pulled up from functions
@@ -1900,10 +1902,20 @@ def fnt_clean(b, cur=None):
     return {"name": name, "custom": custom if isinstance(custom, dict) else None}
 
 
+def fnt_industry(s):
+    """2.636.0 (#4952): the file name template the industry of the office settings s suggests (its pack's
+    legacy_fn_template: a fixed template, never "custom"), "standard" without one (Film & Video, no industry)."""
+    packs = s.get("industry_packs") if isinstance(s.get("industry_packs"), list) else []
+    code = next((x for x in packs if x in ind_codes()), "")  # the industry: the first built-in pack (onboarding.py ind_of_area)
+    ft = (dk_pack(code) or {}).get("legacy_fn_template") if code else None
+    return ft if ft in FNT_TEMPLATES and ft != "custom" else "standard"
+
+
 def fnt_stored(s):
-    """The kept choice of the office settings s -> {name, custom} (anything broken or unknown = the standard)."""
+    """The kept choice of the office settings s -> {name, custom} (anything broken or unknown = the standard; 2.636.0 #4952:
+    nothing kept = the template of the industry)."""
     v = s.get("legacy_fn_template") if isinstance(s.get("legacy_fn_template"), dict) else {}
-    name = v.get("name") if v.get("name") in FNT_TEMPLATES else "standard"
+    name = v.get("name") if v.get("name") in FNT_TEMPLATES else ("standard" if v.get("name") else fnt_industry(s))
     try:
         custom = fnt_custom_clean(v["custom"]) if v.get("custom") else None
     except BadInput:
@@ -1977,7 +1989,8 @@ def fnt_parse(name, clients=(), t=None):
 def fnt_public(t):
     """The templates for the import page: the fixed ones with their blocks, the blocks and separators of an own one, the choice."""
     return {"templates": [{"name": k, **({"fields": list(v["fields"]), "sep": v["sep"]} if v else {})} for k, v in FNT_TEMPLATES.items()],
-            "fields": list(FNT_FIELDS), "seps": list(FNT_SEPS), "custom_max": FNT_CUSTOM_MAX, "current": t["name"], "custom": t["custom"]}
+            "fields": list(FNT_FIELDS), "seps": list(FNT_SEPS), "custom_max": FNT_CUSTOM_MAX, "current": t["name"], "custom": t["custom"],
+            "industry": t.get("industry", "standard")}  # 2.636.0 (#4952): the template the office's industry suggests
 
 
 def fnt_remember(c, oid, b):
@@ -2622,7 +2635,8 @@ def fi_parse_post():
 def fnt_get():
     """2.621.0 (#4600) org admin: the file name templates of the archive import and the one kept for this office area."""
     c, uid, oid = _ctx()
-    return jsonify(fnt_public(fnt_stored(office_settings(c, oid))))
+    s = office_settings(c, oid)
+    return jsonify(fnt_public({**fnt_stored(s), "industry": fnt_industry(s)}))
 
 
 @app.post("/api/office/legacy/archive/address")

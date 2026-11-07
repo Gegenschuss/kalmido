@@ -244,7 +244,8 @@ for root, dirs, fs in os.walk(PACKS):
             hits.append(rel)
 # 2.461 (#3773): the holiday tables per country live in packs/holidays/ (shipped data, no private words: the scan above covers them)
 hol = [f for f in files if os.path.dirname(f) == "holidays" and re.fullmatch(r"[a-z]{2}\.json", os.path.basename(f))]
-check(sorted(f for f in files if f not in hol) == ["de.json", os.path.join("industry", "film.json"), "xx.json"] and "holidays/de.json".replace("/", os.sep) in hol,
+# 2.636.0 (#4952): + the second built-in industry pack Agency & services (agency)
+check(sorted(f for f in files if f not in hol) == ["de.json", os.path.join("industry", "agency.json"), os.path.join("industry", "film.json"), "xx.json"] and "holidays/de.json".replace("/", os.sep) in hol,
       "#2251: only the shipped packs under kalmido/office/packs (+ #3773 holiday tables) " + str(files))
 check(not hits, "#2251: no private pack name under kalmido/office/packs " + str(hits))
 

@@ -62,7 +62,7 @@ def line(calc, uid):
 # ---- the pack
 pack = S.dk_pack("film")
 check(pack is not None, "the pack film loads")
-eq(S.dk_pack_codes(), ["film"], "pack codes")
+eq(S.dk_pack_codes(), ["agency", "film"], "pack codes")  # 2.636.0 (#4952): + the second built-in industry pack Agency & services (agency)
 with open(os.path.join(SRC, "kalmido", "office", "packs", "industry", "film.json"), encoding="utf-8") as f:
     raw = json.load(f)
 eq(S.dk_pack_validate(raw), [], "film.json is valid")

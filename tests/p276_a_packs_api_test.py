@@ -173,13 +173,14 @@ j = A.get(B + O + "/catalog").json()
 check(j.get("configured") is False and j.get("error") is None and j.get("fetched_at") is None and j.get("can_manage") is True
       and j.get("source") == "" and j.get("skipped") == 0, f"no catalogue: configured false, can_manage ({j})")
 check(S["bob"].get(B + O + "/catalog").json().get("can_manage") is False, "no catalogue: a member reads, cannot manage")
-check(set(items(j)) == {("country", "DE"), ("country", "XX"), ("industry", "film")} and all(x["builtin"] and x["badge"] == "verified" for x in j["items"]),
+# 2.636.0 (#4952): + the second built-in industry pack Agency & services (agency)
+check(set(items(j)) == {("country", "DE"), ("country", "XX"), ("industry", "agency"), ("industry", "film")} and all(x["builtin"] and x["badge"] == "verified" for x in j["items"]),
       f"no catalogue: only the built-in packs ({sorted(items(j))})")
 r = A.post(B + O + "/packs/install", json={"kind": "country", "code": "AT", "version": 1})
 check(r.status_code == 404, f"no catalogue: install 404 ({r.status_code})")
 j = A.get(B + O + "/packs").json()
 check([p["code"] for p in j["packs"]] == ["DE", "XX"] and j["packs"][0]["source"] == "builtin" and j["packs"][0]["badge"] == "verified"
-      and [x["code"] for x in j.get("industry") or []] == ["film"], f"GET packs: built-in DE + film ({j.get('industry')})")
+      and [x["code"] for x in j.get("industry") or []] == ["agency", "film"], f"GET packs: built-in DE + agency + film ({j.get('industry')})")  # 2.636.0 (#4952): + the second built-in industry pack Agency & services (agency)
 
 # ================================================================ 2. with the fake catalogue
 start(f" -e KALMIDO_PACKS_CATALOG={FK}/index.json -e KALMIDO_PACKS_ALLOW_HOSTS=127.0.0.1:8099")
@@ -215,12 +216,13 @@ check("<" not in at.get("description", "") and "*Austria*" in at.get("descriptio
       f"AT: tags removed from the description, javascript: homepage dropped ({at.get('description')!r}, {at.get('homepage')!r})")
 check(it[("country", "DE")]["builtin"] and it[("industry", "film")]["builtin"] and it[("country", "LU")]["badge"] == "community",
       "built-in DE / film, LU community")
-check(sorted([x["code"] for x in j["items"]][:3]) == ["DE", "XX", "film"], f"built-in packs first ({[x['code'] for x in j['items']][:4]})")  # 2.147.0 (#2461): + XX
+check(sorted([x["code"] for x in j["items"]][:4]) == ["DE", "XX", "agency", "film"], f"built-in packs first ({[x['code'] for x in j['items']][:5]})")  # 2.147.0 (#2461): + XX
+# 2.636.0 (#4952): + the second built-in industry pack Agency & services (agency)
 check(j.get("can_manage") is True, "admin: can_manage")
 check(items(A.get(B + O + "/catalog?q=austr").json()).keys() == {("country", "AT")}, "search: q matches the name")
 check(items(A.get(B + O + "/catalog?q=example%20group&kind=industry").json()).keys() == {("industry", "photo"), ("industry", "film")},
       "search: author + kind filter")
-check(set(items(A.get(B + O + "/catalog?kind=industry").json())) == {("industry", "film"), ("industry", "photo")}, "kind filter: industry")
+check(set(items(A.get(B + O + "/catalog?kind=industry").json())) == {("industry", "agency"), ("industry", "film"), ("industry", "photo")}, "kind filter: industry")  # 2.636.0 (#4952): + the second built-in industry pack Agency & services (agency)
 jb = Bo.get(B + O + "/catalog")
 check(jb.ok and jb.json().get("can_manage") is False and ("country", "AT") in items(jb.json()), "member: reads the catalogue, cannot manage")
 

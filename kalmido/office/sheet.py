@@ -188,6 +188,9 @@ def dk_pack_validate(d):
                 if not isinstance(L.get(k), str) or not L[k]:
                     bad.append(f"labels.{lg}.{k}: text required")
     bad += prd_calc_validate(d.get("calc"))  # 2.113.1 (#2251, #2252)
+    ft = d.get("legacy_fn_template")  # 2.636.0 (#4952): optional, the archive import's file name template of the industry
+    if ft is not None and (not isinstance(ft, str) or not _CODE_RE.match(ft)):
+        bad.append("legacy_fn_template: the name of a file name template")
     for path, s in _strings(d):
         if "<" in s and ">" in s or "javascript:" in s.lower():
             bad.append(f"{path}: markup is not allowed")

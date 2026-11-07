@@ -934,7 +934,8 @@ a project admin may archive and delete a shared project too (the tasks go to the
 `403` even with admin rights. For an agent in such a project it is the same as when the owner archives, hands over or deletes it.
 
 **Industry (2.578.0).** An organisation (or a person without one) may choose an industry for the whole app (default none;
-Film & Video adds the shoot calculation of the office and the image film sample). It is chosen by people only
+Film & Video adds the shoot calculation of the office and the image film sample; 2.636.0: Agency & services its own
+calculation pack). It is chosen by people only
 (`PUT /api/industry`, agents `403`); the agent API, the MCP tools and the events are unchanged.
 
 ## Events

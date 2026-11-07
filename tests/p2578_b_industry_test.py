@@ -45,7 +45,8 @@ def shoot_packs(s):
 # ================================================================== a new account: no industry, the neutral sample
 i0 = ind(A)
 check(i0.get("code") == "" and i0.get("can_set") is True, "new account: no industry, may choose " + str(i0))
-check([c["code"] for c in i0.get("choices", [])] == ["film"] and i0["choices"][0]["name"] == "Film & Video", "choices: Film & Video " + str(i0.get("choices")))
+# 2.636.0 (#4952): + the second built-in industry pack Agency & services (agency)
+check([c["code"] for c in i0.get("choices", [])] == ["agency", "film"] and i0["choices"][1]["name"] == "Film & Video", "choices: Agency & services, Film & Video " + str(i0.get("choices")))
 check(A.get(B + "/api/industry").json().get("industry", {}).get("code") == "", "GET /api/industry: the same")
 r = A.post(B + "/api/sample", json={})
 check(r.ok and r.json().get("created"), "sample created " + r.text[:120])

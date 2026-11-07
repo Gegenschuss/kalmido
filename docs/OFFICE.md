@@ -520,6 +520,14 @@ page. Three layers, no code plugin:
   the welcome tour and Settings > General (`PUT /api/industry`, see API.md) as well; with Film & Video the sample project is
   the image film with its packing list, without an industry a neutral website relaunch. Accounts and organisations that
   had the film pack on keep it (nothing is migrated).
+- **Agency & services** (`agency`, 2.636.0, #4952): the second built-in industry pack - the same day-based calculation with
+  project days instead of shooting days, services as functions (project lead, consulting, concept, design, copywriting,
+  development, social media; photography, translation, prepress external), tools and equipment, third-party services,
+  a project management share (0.1) and no meals block. Its optional key `legacy_fn_template` names the file name
+  template of the archive import an office of that industry starts with (`date_number_client`, e.g.
+  `2025-03-12_RE-1043_Example Ltd.pdf`) until an admin keeps another one; Film & Video and no industry keep the standard
+  names. The sample project stays the neutral website relaunch; the film-only things (image film sample, shoot days
+  of a quotation in the disposition) stay with Film & Video.
 
 Purchase, surplus, markup and internal / external are for the organisation's admins only: members edit the sheet but
 get none of these values (the price of a row with a markup is shown including it) and cannot set them; the server keeps
@@ -704,7 +712,7 @@ the list's order, or `{sorts: {id: sort}}` = exactly these values; answers `chan
 (2.621.0: `template` = `standard | date_number_client | number_client_date | client_number | custom`, for `custom` with
 `fields` (1-6 of `kind, number, project_no, project, client, date, skip`, each but `skip` once) and `sep` (`_ - . ` or a
 space); given, it is kept for the office area, an unknown name or a broken own template `400`; the answer carries `template`),
-`GET /api/office/legacy/archive/templates` (2.621.0: `{templates, fields, seps, custom_max, current, custom}`),
+`GET /api/office/legacy/archive/templates` (2.621.0: `{templates, fields, seps, custom_max, current, custom}`; 2.636.0: + `industry` = the template the industry suggests),
 `POST /api/office/legacy/archive/run`, `POST /api/office/legacy/archive` (multipart `file` + `run_id`, `kind`, `number`,
 `project_no`, `project`, `client_id`, `client_name`, `date`, `amount`, `paid`; 409 for a used number or the same PDF
 twice), `GET /api/office/legacy/archive?kind=&client_id=`, `PATCH /api/office/legacy/archive/<id>` (only `amount`, `paid`,
