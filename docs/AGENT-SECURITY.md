@@ -355,7 +355,7 @@ commands (they have no such hook); `KALMIDO_PERM_RELAY=0` switches it off. What 
   OS user** it can still change its own Claude Code settings, the starter files or the runner itself (or stop the runner
   and wait for its process number to come back). Against a hostile
   agent the allow list and `dontAsk` stay the real limit; the wall is the own OS user for the agent's tools below
-  ([An own OS user for the agent's tools](#an-own-os-user-for-the-agents-tools)).
+  ([An own OS user for the agent's tools](#4b-an-own-os-user-for-the-agents-tools)).
 
 **Dangerous commands refused (2.615.0, `dangerous_guard`).** In event mode with Claude Code the same per-run settings
 file also carries a `PreToolUse` hook for Bash (`agent_run.py --guard-hook`). Jobs (`agent_job.py`) get the same hook
