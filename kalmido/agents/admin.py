@@ -550,7 +550,7 @@ def _agent_ws_check(c, aid, v):
     # 2.30.0 (#1036): calendars and address books follow the same rule
     # 2.647.0 (#5046): the members as the core has them -- the live shares of a node, the old row only without one (a share
     # taken back / run out in the core does not hold the agent back)
-    from ..core.objects import obj_share_rows_sql
+    from ..core.objects import obj_share_rows_sql  # loads after this module (ORDER)
     with system_ctx(c):  # numbers only (the calendar / book may lie in a tree the admin does not see)
         n = sum(c.execute(f"SELECT COUNT(*) FROM {tb} k WHERE COALESCE(k.org_id,0)!=? AND (k.id IN (SELECT ref_id FROM "
                           f"{obj_share_rows_sql(kd)} x WHERE x.user_id=? OR x.agent_id=?) OR (k.id IN (SELECT {col} FROM {mt} WHERE "

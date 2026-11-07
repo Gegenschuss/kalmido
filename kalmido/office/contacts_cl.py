@@ -16,7 +16,7 @@ from ..core.i18n import tr
 from ..core.pg import insert_id, like_escape
 from ..core.errors import BadInput
 from .model import pb_cl_sql
-from ..contacts.model import contact_visible, contact_brief, contacts_on, my_book_ids  # 2.369.5 (#2517): pulled up from functions
+from ..contacts.model import bk_member_role, contact_visible, contact_brief, contacts_on, my_book_ids  # 2.369.5 (#2517): pulled up from functions
 from ..team.clients import client_rows, clients_on  # 2.369.5 (#2517): pulled up from functions
 from ..core.pg import system_ctx  # 2.369.5 (#2517): pulled up from functions
 
@@ -214,8 +214,7 @@ def ckl_book_fits(cl, b, c=None, book_id=None):
         return True
     if c is None or not book_id or not cl["created_by"]:
         return False
-    from ..contacts.model import bk_member_role  # 2.647.0 (#5046): the share as the core has it (taken back / run out = none)
-    return bool(bk_member_role(c, book_id, cl["created_by"]))
+    return bool(bk_member_role(c, book_id, cl["created_by"]))  # 2.647.0 (#5046): the core's live share (taken back / run out = none)
 
 
 def ckl_contact_ok(c, uid, cl, kid):
