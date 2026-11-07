@@ -105,24 +105,58 @@ def quota_default_mb(c):
 
 
 def _user_bytes(c, uids, cached=False):
-    """The bytes of uids' files. cached (2.549.0, #3139 / #3884): the list pictures from _PIC_CACHE (the /api/state badge)."""
+    """The bytes of uids' files. cached (2.549.0, #3139 / #3884): the list pictures from _PIC_CACHE (the /api/state badge).
+    2.640.0 (#4185): the sums of the file tables in ONE statement (were nine); attachments / list_files by their user index
+    (migrations.d/4185_a.py)."""
     if not uids:
         return 0
     q = ",".join("?" * len(uids))
-    a = c.execute(f"SELECT COALESCE(SUM(size),0) FROM attachments WHERE user_id IN ({q}) AND deleted_at IS NULL", uids).fetchone()[0]
-    b = c.execute(f"SELECT COALESCE(SUM(size),0) FROM list_files WHERE user_id IN ({q}) AND deleted_at IS NULL", uids).fetchone()[0]  # 2.272.0 F (#3038, E2-H2): not the trash
-    d = c.execute(f"""SELECT COALESCE(SUM(f.size),0) FROM chat_files f JOIN agent_chat m ON m.id=f.message_id
-                      WHERE m.sender='user' AND m.user_id IN ({q})""", uids).fetchone()[0]
+    sums = [
+        f"SELECT COALESCE(SUM(size),0) FROM attachments WHERE user_id IN ({q}) AND deleted_at IS NULL",
+        f"SELECT COALESCE(SUM(size),0) FROM list_files WHERE user_id IN ({q}) AND deleted_at IS NULL",  # 2.272.0 F (#3038, E2-H2): not the trash
+        f"""SELECT COALESCE(SUM(f.size),0) FROM chat_files f JOIN agent_chat m ON m.id=f.message_id
+            WHERE m.sender='user' AND m.user_id IN ({q})""",
+        f"SELECT COALESCE(SUM(size),0) FROM budget_files WHERE user_id IN ({q})",  # 2.72.0 (#1333): receipts
+        f"SELECT COALESCE(SUM(size),0) FROM wiki_files WHERE created_by IN ({q})",  # 2.99.0 A (#2182)
+        f"SELECT COALESCE(SUM(size),0) FROM sheet_files WHERE created_by IN ({q})",  # 2.124.0 B (#2110)
+        # 2.122.4 B (#2316): entertainment receipts and contract files count for their uploader too
+        *(f"SELECT COALESCE(SUM(size),0) FROM {t} WHERE created_by IN ({q})" for t in ("office_meal_files", "office_contract_files")),
+        f"SELECT COALESCE(SUM(size),0) FROM tchat_files WHERE user_id IN ({q})",  # 2.113.1 (#2059): team chat files
+        f"SELECT COALESCE(SUM(size),0) FROM template_files WHERE user_id IN ({q})",  # 2.363.3 (#3134)
+    ]
+    a = c.execute("SELECT " + " + ".join(f"({x})" for x in sums), [*uids] * len(sums)).fetchone()[0]
     e = fs_bytes_of(c, uids)  # 2.48.0 (#1207): every version in the file store counts for its uploader
-    g = c.execute(f"SELECT COALESCE(SUM(size),0) FROM budget_files WHERE user_id IN ({q})", uids).fetchone()[0]  # 2.72.0 (#1333): receipts
-    h = c.execute(f"SELECT COALESCE(SUM(size),0) FROM wiki_files WHERE created_by IN ({q})", uids).fetchone()[0]  # 2.99.0 A (#2182)
-    h += c.execute(f"SELECT COALESCE(SUM(size),0) FROM sheet_files WHERE created_by IN ({q})", uids).fetchone()[0]  # 2.124.0 B (#2110)
-    # 2.122.4 B (#2316): entertainment receipts and contract files count for their uploader too
-    k = sum(c.execute(f"SELECT COALESCE(SUM(size),0) FROM {t} WHERE created_by IN ({q})", uids).fetchone()[0]
-            for t in ("office_meal_files", "office_contract_files"))
-    t_ = c.execute(f"SELECT COALESCE(SUM(size),0) FROM tchat_files WHERE user_id IN ({q})", uids).fetchone()[0]  # 2.113.1 (#2059): team chat files
-    t_ += c.execute(f"SELECT COALESCE(SUM(size),0) FROM template_files WHERE user_id IN ({q})", uids).fetchone()[0]  # 2.363.3 (#3134)
-    return int(a + b + d + e + g + h + k + t_ + _list_pic_bytes(c, uids, q, cached))
+    return int(a + e + _list_pic_bytes(c, uids, q, cached))
+
+
+# 2.640.0 (#4185): the used bytes of the storage badge in /api/state at most once a minute per person (or pool) and process.
+# The stamp is the newest of the people's own write versions (version:by:<id>, core/db.py bump): an upload or a deletion of
+# their own moves it, so the badge never stays wrong after their own change; changes by others or in the background (the
+# trash run) show within USED_CACHE_S. The upload check and the storage page always measure fresh (cached=False).
+USED_CACHE_S = 60
+_USED_CACHE = {}
+_USED_LOCK = threading.Lock()
+
+
+def _used_stamp(c, uids):
+    q = ",".join("?" * len(uids))
+    return c.execute(f"SELECT MAX(CAST(value AS BIGINT)) FROM settings WHERE key IN ({q})",
+                     [f"version:by:{int(u)}" for u in uids]).fetchone()[0]
+
+
+def _user_bytes_cached(c, uids):
+    key, now = tuple(sorted(int(u) for u in uids)), time.monotonic()
+    stamp = _used_stamp(c, key)
+    with _USED_LOCK:
+        hit = _USED_CACHE.get(key)
+    if hit and hit[0] > now and hit[1] == stamp:
+        return hit[2]
+    n = _user_bytes(c, list(key), True)
+    with _USED_LOCK:
+        if len(_USED_CACHE) > 5000:
+            _USED_CACHE.clear()
+        _USED_CACHE[key] = (now + USED_CACHE_S, stamp, n)
+    return n
 
 
 # 2.549.0 (#3139 / #3884): the list pictures of the storage badge in /api/state, per process for PIC_CACHE_S seconds: their
@@ -177,7 +211,7 @@ def quota_info(c, uid, cached=False):
         pool = "user"
     mb = own if own is not None else quota_default_mb(c)
     limit = mb * 1024 * 1024 * (len(members) if pool == "org" else 1) if mb else None
-    used = _user_bytes(c, members, cached)
+    used = _user_bytes_cached(c, members) if cached else _user_bytes(c, members)  # 2.640.0 (#4185): the badge from a short cache
     pct = round(used * 100 / limit, 1) if limit else 0
     level = "ok" if not limit or pct < 80 else "warn" if pct < 95 else "high" if used < limit else "full"
     return {"used": used, "limit": limit, "pct": pct, "level": level, "pool": pool, "members": len(members) if pool == "org" else 1,
