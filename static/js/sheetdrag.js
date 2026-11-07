@@ -9,7 +9,8 @@
 // almost the full screen), down = shorter (down to 40 %), then it follows the finger; past a threshold or with a quick flick
 // it closes through the sheet's normal close path (closePop / dpClose / the dialog's own close with its draft guard).
 // On release the height snaps to half or full. Only transform is animated. Horizontal moves are left alone (iOS back swipe).
-const SD_SEL = '#pop.sheet, .dpop.sheet, .qadd.sheet, .modal:not(.smodal):not(.authscreen):not(.shopmode):not(.palette) > .card';  // not: sign-in, shopping mode, palette
+const SD_SEL = '#pop.sheet, .dpop.sheet, .qadd.sheet, .modal:not(.smodal):not(.authscreen):not(.shopmode):not(.palette):not(.dc-md) > .card';  // not: sign-in, shopping mode, palette
+// 2.652.0 (#5072): nor the open document (.dc-md): it is a whole page, a pull down on its preview shrank it to half a window with the list below
 const SD = {el: null};
 const sd_vh = () => (window.visualViewport?.height || innerHeight);
 function sd_sheet(t) {

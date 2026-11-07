@@ -217,10 +217,14 @@ async function dc_shareFiles(files) {  // the share sheet: "File as document"
 }
 
 // ---- the document sheet
+// 2.652.0 (#5072): the pane beside the list only with a mouse or from 64rem on; a touch screen below (a tablet, an unfolded
+// Fold) gets the whole page like a phone: the sticky pane let the list behind it scroll over it under the finger
+const dc_paneOk = () => !isMobile() && !(isTouch() && !matchMedia('(min-width:64rem)').matches);
+const dc_pageOn = () => !dc_paneOk();  // (a phone is never paneOk)
 async function dc_open(id, o = {}) {  // 2.353.0 D (#2759): o.keep = opened from the file store's cards (its route stays)
   // 2.430.0 (#3582): in the documents view of a computer the document opens in the pane beside the list; phones
   // and the file store keep the sheet (phones: as a whole page). DC.opening = the document being fetched (a later one wins)
-  const pane = o.pane ?? (!o.keep && !isMobile() && S.route.mod === 'docs' && !$('.dc-md:not(.dc-pane)'));  // 2.476.0 (#3935): o.pane = stay in the pane
+  const pane = o.pane ?? (!o.keep && dc_paneOk() && S.route.mod === 'docs' && !$('.dc-md:not(.dc-pane)'));  // 2.476.0 (#3935): o.pane = stay in the pane
   DC.opening = id;
   let d;
   try { d = await api('GET', `/api/docs/${id}`); } catch { if (DC.opening === id) DC.opening = null; if (dc_hashId() === id) history.replaceState(null, '', DC.paneId ? `#docs/${DC.paneId}` : '#docs'); return; }
@@ -244,6 +248,7 @@ async function dc_open(id, o = {}) {  // 2.353.0 D (#2759): o.keep = opened from
   if (!md) {
     md = modal('<div class="dc-body"></div>');
     md.classList.add('dc-md');
+    if (dc_pageOn()) md.classList.add('dc-page');  // 2.652.0 (#5072): the whole page also on a touch tablet (docs.css)
     onRemove(md, () => { DC.doc = null; if (dc_hashId()) history.replaceState(null, '', '#docs'); if (o.keep && S.route.mod === 'ablage' && typeof ab_reload === 'function') ab_reload(); });
     md.addEventListener('click', dc_mdClick);
     md.addEventListener('change', dc_mdChange);

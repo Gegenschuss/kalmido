@@ -40,6 +40,11 @@
 .dc-prev{display:flex;justify-content:center;box-sizing:border-box;width:100%;max-height:28rem;padding:0;border:1px solid var(--line);border-radius:var(--r-s);background:var(--bg3);overflow:hidden;cursor:zoom-in}
 .dc-prev img,.dc-prev canvas{display:block;max-width:100%;max-height:28rem;width:auto;height:auto;object-fit:contain;object-position:top}
 .dc-prev .dc-ph{min-height:10rem}
+/* 2.652.0 (#5072): the small picture stands at once in the size of the sharp page that replaces it (full width, its own shape; an A4
+   shape until it has loaded), so the preview and the buttons below it no longer jump; the sharp page fades in */
+.dc-prev img,.dc-prev canvas{width:100%;aspect-ratio:auto 210 / 297}
+@media (prefers-reduced-motion:no-preference) { .dc-prev canvas{animation:dc-pvfade .2s ease-out} }
+@keyframes dc-pvfade{from{opacity:.4}to{opacity:1}}
 /* 2.476.0 (#3935): leafing through the open document: "3 of 48" with two arrows above the preview; the preview takes a
    sideways swipe (up / down scrolls the page), enlarged it moves with the finger; the next document glides in, the end springs back */
 .dc-nav{display:flex;align-items:center;justify-content:center;gap:.25rem;margin-bottom:-.25rem}
@@ -86,6 +91,15 @@
   .dc-pane{position:static;max-height:none;margin:0;padding:.5rem 0;border:0;background:none}
 }
 .dc-acts{display:flex;flex-wrap:wrap;align-items:stretch;gap:.375rem}
+/* 2.652.0 (#5072): the document as a whole page on every touch screen below 64rem too (docs.js dc_pageOn: a tablet, an unfolded
+   Fold), and on a phone: it covers the screen, scrolling moves only its own content (never the list behind it, not at its ends) */
+.modal.dc-md.dc-page{padding:0;align-items:stretch;justify-items:stretch;background:var(--bg)}
+.modal.dc-md.dc-page>.card{max-width:none;width:100%;height:100%;max-height:none;margin:0;border-radius:0;box-sizing:border-box;padding-top:calc(.75rem + var(--safe-t,0px));overflow-y:auto;overscroll-behavior:contain}
+.modal.dc-md.dc-page:not(.smodal):not(.authscreen):not(.shopmode):not(.palette)>.card{background-image:none}
+.dc-md.dc-page .dc-back{display:inline-flex}
+.dc-md.dc-page .dc-x{display:none}
+.dc-page .dc-prev,.dc-page .dc-prev img,.dc-page .dc-prev canvas{max-height:60dvh}
+@media (min-width:768px){ .modal.dc-md.dc-page .dc-body{max-width:44rem;margin:0 auto} }
 /* 2.497.0 A (#4046): the row of actions; the rarer ones fold out on a line of their own, Delete apart at the end */
 .dc-ag{display:flex;flex-wrap:wrap;gap:.375rem}
 .dc-amore{flex-basis:100%}
