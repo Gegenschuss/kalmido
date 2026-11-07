@@ -42,6 +42,7 @@ from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 from ..accounts.orgs import _need_org_admin, ORG_ROLES, _operator_apart, may_see, org_member_add, org_member_put  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.invite import invite_state, invite_new  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.users import user_purge  # 2.369.5 (#2517): pulled up from functions
+from ..core.objhooks import person_revoked  # 2.649.0 (#5051)
 
 OINV_DAY = 20  # new invitations per inviting person and day
 OINV_RESEND_DAY = 3  # 2.148.1 A (#2486): resends per invitation and day
@@ -303,6 +304,7 @@ def org_invite_withdraw(oid, ref):
     with system_ctx(c):  # the never used account of this organisation's own invitation (its inbox, settings, membership)
         if other_join:  # 2.458.0 (#3843): another organisation's open invitation lies on it: the account stays, only ours ends
             c.execute("DELETE FROM org_joins WHERE org_id=? AND user_id=?", (oid, uid))
+            person_revoked(c, uid, oid, "leave")  # 2.649.0 (#5051): what the membership opened goes through the core (obj_revoked)
             c.execute("DELETE FROM org_members WHERE org_id=? AND user_id=?", (oid, uid))
             c.execute("DELETE FROM org_invites WHERE org_id=? AND user_id=?", (oid, uid))
             c.execute("DELETE FROM user_invites WHERE user_id=? AND used_at IS NULL", (uid,))  # review: this invitation's link ends with it
