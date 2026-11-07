@@ -4,7 +4,7 @@
 organisations the caller shares with them (the share dialog needs no more); the instance admin's list stays as it was.
 Invented names only.
  - carl is in Alpha and Beta: bob (Alpha) reads only Alpha at carl, dave (admin of Beta) only Beta
- - the instance admin (alice, in Alpha only) reads both at carl, in the list and in the user management (?all=1)
+ - the instance admin (alice, in no organisation) reads both at carl, in the list and in the user management (?all=1)
  - freelancer-matrix: team (frida without an organisation, connected with carl through her own list, reads carl without
    any organisation id)
 usage: p2627_d_users_test.py <datadir>      (a fresh container; P2627D_NOSTART=1 = the server already runs)"""
@@ -24,9 +24,8 @@ s0 = requests.Session()
 s0.headers.update(kt.H)
 assert s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
 A = sess("alice")
-A.post(B + "/api/admin/setup", json={"org_name": "Alpha", "lang": "en", "collab_all": True})
+A.post(B + "/api/admin/setup", json={"lang": "en", "collab_all": True})
 A.patch(B + "/api/settings", json={"lang": "en", "tour": "done"})
-ORG = A.get(B + "/api/state").json()["me"]["workspaces"][0]["id"]
 uid = {}
 
 
@@ -40,11 +39,13 @@ def person(name, orgs):
     return s
 
 
-Da = person("dave", [])
+Da, Bo = person("dave", []), person("bob", [])
+r = A.post(B + "/api/admin/orgs", json={"name": "Alpha", "admin_id": uid["bob"]})
+assert r.status_code == 201, r.text
+ORG = r.json()["id"]
 r = A.post(B + "/api/admin/orgs", json={"name": "Beta", "admin_id": uid["dave"]})
 assert r.status_code == 201, r.text
 ORG2 = r.json()["id"]
-Bo = person("bob", [{"id": ORG, "role": "member"}])
 Ca = person("carl", [{"id": ORG, "role": "member"}, {"id": ORG2, "role": "member"}])
 FID, Fr = freelancer(B, A, "frida")
 CARL = uid["carl"]
@@ -71,10 +72,8 @@ check(all(set(u.get("orgs") or []) <= {ORG} for u in Bo.get(B + "/api/users").js
       "#4526: no row of bob's list names an organisation bob is not in")
 
 # the instance admin as before
-x = row(A, CARL)
-check(x is not None and set(x.get("orgs") or []) == {ORG, ORG2}, f"#4526: the instance admin reads both at carl: {x and x.get('orgs')}")
 x = row(A, CARL, "?all=1")
-check(x is not None and set(x.get("orgs") or []) == {ORG, ORG2}, "#4526: ... in the user management, too")
+check(x is not None and set(x.get("orgs") or []) == {ORG, ORG2}, f"#4526: the instance admin's user management reads both at carl: {x and x.get('orgs')}")
 
 # a person without an organisation (freelancer-matrix: team): connected with carl through her own list
 r = Fr.post(B + "/api/lists", json={"name": "Garten"})
