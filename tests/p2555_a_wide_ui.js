@@ -23,7 +23,7 @@ const today = new Date().toISOString().slice(0, 10);
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   const CA = await login('alice');
   await call(CA, 'POST', '/api/admin/setup', {lang: 'en', collab_all: true});
-  await call(CA, 'PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'cal,comments,collab,office,clients,docs,time'});
+  await call(CA, 'PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'cal,comments,collab,office,clients,docs,time,contacts'});
   await call(CA, 'PUT', '/api/office/settings', {lang: 'en', company_fields: {name: 'Beispiel Studio GmbH', street: 'Musterweg 1', zip: '12345', city: 'Musterstadt', country: 'DE', tax_number: '12/345/67890', iban: 'DE02120300000000202051'}});
   const cl = await call(CA, 'POST', '/api/clients', {name: 'Kunde Eins GmbH', street: 'Kundenweg 5', zip: '20000', city: 'Beispielstadt', country: 'DE'});
   const items = [{title: 'Shoot', qty: 2, unit: 'day', rate: 4000, tax: 'standard'}, {title: 'Script', qty: 1, unit: 'flat', rate: 2000, tax: 'reduced'}, {title: 'Edit', qty: 3, unit: 'day', rate: 900, tax: 'standard'}];
@@ -108,6 +108,27 @@ const today = new Date().toISOString().slice(0, 10);
     const strip = await ev(`(() => { const s = document.querySelector('.smodal .spane:not(.hidden) .aisub'); if (!s) return false; const p = s.closest('.spane'); return s.getBoundingClientRect().width >= p.getBoundingClientRect().width - 2; })()`);
     check(strip, '2560: the sub-tabs span both columns');
     await shot('p2555-a-settings-org-2560.png');
+    // 2.630.0 (#4695): the contact form: at 2560 px the name parts and phone / e-mail / addresses side by side (each part at most
+    // --w-form), at 1440 and 390 px one column as before; nothing overflows, the DOM order (name before phone) is the tab order
+    const CTF = `(() => { const md = document.querySelector('.modal.ctmodal'); if (!md) return 'null'; const r = e => e.getBoundingClientRect(), card = md.querySelector('.card');
+      const g = r(md.querySelector('#ct-given').closest('.row')), ph = r(md.querySelector('[data-ctm="phones"]')), em = r(md.querySelector('[data-ctm="emails"]')), ad = r(md.querySelector('[data-ctm="addresses"]'));
+      const n = md.querySelector('#ct-given'), p = md.querySelector('[data-ctm="phones"] input');
+      return JSON.stringify({gl: Math.round(g.left), pl: Math.round(ph.left), gt: Math.round(g.top), pt: Math.round(ph.top), pw: Math.round(ph.width), el: Math.round(em.left), al: Math.round(ad.left), cw: Math.round(r(card).width),
+        side: document.documentElement.scrollWidth > document.documentElement.clientWidth || card.scrollWidth > card.clientWidth + 1, tab: n.compareDocumentPosition(p) & Node.DOCUMENT_POSITION_FOLLOWING ? 1 : 0}); })()`;
+    for (const [W, Hh] of [[2560, 1440], [1440, 900], [390, 844]]) {
+      await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: W, height: Hh}});
+      await nav(B + 'static/icon.svg'); await nav(B + '#contacts');
+      await ready(ev, `typeof ctEditor === 'function' && !!document.querySelector('#view')`);
+      await ev(`(() => { document.querySelectorAll('.modal').forEach(m => m.remove()); ctEditor(null); return 1; })()`);
+      check(await ready(ev, `!!document.querySelector('.modal.ctmodal #ct-given')`), `${W}: the contact form opens`);
+      let last = ''; for (let i = 0; i < 40; i++) { const v = await ev(CTF); if (v === last) break; last = v; await sleep(150); }
+      const c = JSON.parse(await ev(CTF));
+      check(!c.side && c.tab === 1, `${W}: contact form: no sideways scrolling, name before phone in the DOM ` + JSON.stringify(c));
+      if (W >= 2560) check(c.pl > c.gl + 400 && Math.abs(c.pt - c.gt) <= 40 && c.pw <= 645 && c.pw >= 400 && c.el === c.pl && c.al === c.pl, `${W}: contact form: phone / e-mail / addresses beside the name parts, a section at most --w-form ` + JSON.stringify(c));
+      else check(c.pl === c.gl && c.pt > c.gt, `${W}: contact form: one column as before ` + JSON.stringify(c));
+      await shot(`p2630-b-contact-${W}.png`);
+      await ev(`document.querySelectorAll('.modal').forEach(m => m.remove())`);
+    }
   }, false);
 
   console.log(`p2555_a_wide_ui: ${ok} ok, ${F.length} failed`);

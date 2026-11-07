@@ -31,3 +31,11 @@
 /* 2.351.0 B (#2749): the folder filter above the contacts list (ctfold.js) */
 .ctfbar{display:flex;align-items:center;gap:.5rem;padding:.375rem .75rem;margin:0 0 .5rem;border-radius:var(--radius);background:var(--bg2);font-size:var(--fs-m)}
 .ctfbar>span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+/* 2.630.0 (#4695): the contact form on a wide monitor (from 100rem of the window): the name parts on the left, phone / e-mail /
+   addresses on the right, each section at most --w-form. The DOM order stays the tab order (no order:); below 100rem and on
+   phones the two parts stand one under the other as before. */
+@media (min-width:100rem) {
+  .ctmodal .card{width:min(calc(2 * var(--w-form) + 5.5rem),100%)}
+  .ctmodal .ctfcols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0 3rem;align-items:start}
+  .ctmodal .ctfcol{min-width:0}
+}

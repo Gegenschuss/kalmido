@@ -529,11 +529,14 @@ async function ctEditor(c, cf, draft) {  // draft: 2.576.0 (#4764) the input of 
     return `<div class="row ctdate"><span class="rlab">${label}</span>${dateIn('ct-' + k, full, {label, empty: tr('none')})}<label class="chkl"><input type="checkbox" id="ct-${k}-noy" ${noy ? 'checked' : ''}> ${tr('without the year')}</label></div>`; };
   const md = modal(`<div class="lhdr"><h3>${c ? tr('Edit contact') : tr('New contact')}</h3><span class="spacer"></span><button class="iconbtn" data-ctm2="close" aria-label="${tr('Close')}">${ic('x')}</button></div>
     <div class="ctphoto"><span id="ct-ph">${ctAv(st, 'avatar ctav big')}</span><label class="btn sm">${ic('upload', 's')} ${tr('Photo')}<input type="file" id="ct-photo" accept="image/*" hidden></label>${st.photo ? `<button type="button" class="linkbtn" data-ctm2="nophoto">${tr('Remove')}</button>` : ''}</div>
+    <div class="ctfcols"><div class="ctfcol">
     <div class="row"><label for="ct-given">${tr('First name')}</label><input id="ct-given" value="${esc(st.given || '')}" autocomplete="off" maxlength="300"></div>
     <div class="row"><label for="ct-family">${tr('Last name')}</label><input id="ct-family" value="${esc(st.family || '')}" autocomplete="off" maxlength="300"></div>
     <div class="row"><label for="ct-org">${tr('Company')}</label><input id="ct-org" value="${esc(st.org || '')}" autocomplete="off" maxlength="300"></div>
     <div class="row"><label for="ct-title">${tr('Job title')}</label><input id="ct-title" value="${esc(st.title || '')}" autocomplete="off" maxlength="300"></div>
+    </div><div class="ctfcol">
     ${multi('phones', tr('Phone'), '+49 …', 'tel')}${multi('emails', tr('E-mail'), 'name@example.org', 'email')}${adrs()}
+    </div></div>
     ${dateRow('bday', tr('Birthday'))}${dateRow('anniversary', tr('Anniversary'))}
     <div class="row"><label for="ct-groups">${tr('Groups')}</label><input id="ct-groups" value="${esc((st.groups || []).join(', '))}" list="ct-gl" placeholder="${esc(tr('e.g. Family, Clients'))}" autocomplete="off"><datalist id="ct-gl">${CT.groups.map(g => `<option value="${esc(g)}"></option>`).join('')}</datalist></div>
     <div class="row ppcol"><label for="ct-note">${tr('Notes')}</label><textarea id="ct-note" rows="3" maxlength="20000">${esc(st.note || '')}</textarea></div>
