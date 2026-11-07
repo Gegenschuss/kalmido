@@ -7,7 +7,8 @@ off (only for tests and automation that create the first account themselves).
 2.144.0 D2 (#797): a code the hosting operator asks for (admin/operator.py) is kept as a hash with an end (24 h) in the
 database (settings), so every web process of the instance knows it; it is deleted with the first account.
 2.642.0 (#4975): the start code's hash goes to the database as well (setting setup_code_start_hash): the first web process of a
-container prints it (app.py, KALMIDO_WEB_PROCS) and every other process -- and replica -- accepts it and prints none of its own;
+container prints it (app.py, KALMIDO_WEB_PROCS) and every other web process of that container accepts it and prints none
+of its own (with KALMIDO_REPLICAS each replica prints its own and the last started one counts in the database);
 a restart of the first process makes a new one. It is deleted with the first account (in the same transaction)."""
 import hmac
 import os
@@ -87,8 +88,8 @@ def sh_code_ensure(c, start=False):
     if SH_CODE_OFF or SH_CODE_ENV or c.execute("SELECT 1 FROM users").fetchone():
         return
     with _SH_LOCK:  # 2.81.0 (#1627): check and make in one go, two first requests print one code
-        if _SH["hash"] or (not start and gsetting(c, SH_START_HASH)):
-            return
+        if _SH["hash"] or (not start and (gsetting(c, SH_START_HASH) or gsetting(c, SH_OP_HASH))):
+            return  # 2.642.0 (#4975, review): an operator's code stays the only one until a restart
         sh_code_new()
 
 

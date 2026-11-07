@@ -191,12 +191,14 @@ def eph_within(ns, grp, n, cap, ttl):
 # twice, so the keys this process holds are kept beside it (two threads of one process are told "busy" as well).
 EPH_BUSY_CLASS = 21021  # two-key advisory locks: a key space of its own next to admin/worker.py's loop locks (21020)
 _BUSY_HELD = set()
+_BUSY_DB = set()  # 2.642.0 (#4975, review): the keys of _BUSY_HELD whose lock this session really holds in the database
 _BUSY_CONN = {"c": None}
 _BUSY_LOCK = threading.Lock()
 
 
 def _busy_conn_drop():
     c, _BUSY_CONN["c"] = _BUSY_CONN["c"], None
+    _BUSY_DB.clear()  # the session's locks went with it
     if c is not None:
         try:
             c.close()
@@ -216,13 +218,17 @@ def eph_busy_take(key):
                     if _BUSY_CONN["c"] is None:
                         c = _BUSY_CONN["c"] = connect_direct(config.DATABASE_URL)
                         for k in _BUSY_HELD:  # what this process still runs, held again on the new session
-                            c.execute("SELECT pg_try_advisory_lock(?, hashtext(?))", (EPH_BUSY_CLASS, k)).fetchone()
+                            if c.execute("SELECT pg_try_advisory_lock(?, hashtext(?))", (EPH_BUSY_CLASS, k)).fetchone()[0]:
+                                _BUSY_DB.add(k)
+                            else:  # 2.642.0 (#4975, review): another process took it in the gap; told, ours ends on its own
+                                print("ephem: busy lock", k, "taken by another process while the connection was gone", flush=True)
                         c.commit()
                     c = _BUSY_CONN["c"]
                     ok = c.execute("SELECT pg_try_advisory_lock(?, hashtext(?))", (EPH_BUSY_CLASS, key)).fetchone()[0]
                     c.commit()  # session-level: the lock outlives the transaction
                     if not ok:
                         return False
+                    _BUSY_DB.add(key)
                     break
                 except Exception as e:  # noqa: BLE001
                     _busy_conn_drop()
@@ -238,8 +244,9 @@ def eph_busy_give(key):
             return
         _BUSY_HELD.discard(key)
         c = _BUSY_CONN["c"]
-        if c is None:
+        if c is None or key not in _BUSY_DB:  # 2.642.0 (#4975, review): no unlock of a lock this session does not hold
             return
+        _BUSY_DB.discard(key)
         try:
             c.execute("SELECT pg_advisory_unlock(?, hashtext(?))", (EPH_BUSY_CLASS, key)).fetchone()
             c.commit()

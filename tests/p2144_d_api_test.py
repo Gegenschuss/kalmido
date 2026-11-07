@@ -108,6 +108,9 @@ check(dbc.execute("SELECT COUNT(*) FROM settings WHERE key IN ('setup_code_op_ha
       "the operator's code is kept in the database")
 check(CODE.replace("-", "") not in str(dbc.execute("SELECT value FROM settings WHERE key='setup_code_op_hash'").fetchone()[0]),
       "only its hash")
+# 2.642.0 (#4975, review): the sign-in page asked afterwards prints no new start code beside the operator's
+requests.get(B + "/api/auth/info", timeout=30)
+check(not dbc.execute("SELECT 1 FROM settings WHERE key='setup_code_start_hash'").fetchone(), "the operator's code stays the only one")
 dbc.execute("UPDATE settings SET value='1000' WHERE key='setup_code_op_until'")
 r = s0.post(B + "/api/auth/setup", json=dict(SETUP, setup_code=CODE))
 check(r.status_code == 403 and "expired" in r.text, f"an expired operator code is refused {r.status_code} {r.text[:200]}")

@@ -342,14 +342,19 @@ def wrk_web_procs_start(script):
     signal.signal(signal.SIGTERM, stop)
 
     def watch():
+        born, fails = {}, {}  # 2.642.0 (#4975, review): a process that dies again at once waits longer each time (up to 5 min)
         while not _PROCS["stopping"]:
             time.sleep(2)
             for i, p in list(_PROCS["kids"].items()):
+                born.setdefault(i, time.time())
                 if p.poll() is not None and not _PROCS["stopping"]:
-                    print(f"web process {i} ended (exit {p.returncode}); starting it again", flush=True)
-                    time.sleep(WRK_PROC_RESTART_S)
+                    fails[i] = fails.get(i, 0) + 1 if time.time() - born[i] < 60 else 1
+                    wait = min(WRK_PROC_RESTART_S * 2 ** (fails[i] - 1), 300)
+                    print(f"web process {i} ended (exit {p.returncode}); starting it again in {wait} s", flush=True)
+                    time.sleep(wait)
                     if not _PROCS["stopping"]:
                         _wrk_spawn(script, i)
+                        born[i] = time.time()
     threading.Thread(target=watch, daemon=True, name="web-procs").start()
     print(f"Kalmido {APP_VERSION}: {WEB_PROCS} web processes on one port (SO_REUSEPORT), {WEB_THREADS_ALL} threads in all; "
           f"background work in process 0 (role {WRK_ROLE})", flush=True)
