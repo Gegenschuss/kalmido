@@ -226,7 +226,7 @@ j = run(Ha, iid)
 check(j.get("state") == "done" and "stays out" in warns(j) and "Vertraege" in warns(j), "result: the folder is named " + warns(j))
 check(cipher_nodes(HANK) == 0, "no node with a cipher name at hank")
 check(one("SELECT COUNT(*) FROM fs_versions v JOIN fs_nodes n ON n.id=v.node_id WHERE n.owner_id=? AND n.mime='application/octet-stream'", (HANK,)) == 0, "no ciphertext file at hank")
-check("Not taken over because the entry" not in warns(j), "the left-out versions are no second warning " + warns(j))
+check("Not imported because the entry" not in warns(j), "the left-out versions are no second warning " + warns(j))
 check(not dbx("SELECT 1 FROM fs_locks l JOIN fs_nodes n ON n.id=l.node_id WHERE n.owner_id=?", (HANK,)), "no lock at hank")
 
 # ---------------------------------------------------------------- an older archive: cipher nodes, no lock rows, no keys

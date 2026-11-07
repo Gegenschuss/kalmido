@@ -216,8 +216,9 @@ n1, n2 = by.get("Thread Anfang", {}), by.get("Thread Antwort", {})
 check(n1.get("id") and n2.get("thread_of") == n1.get("id") and n1.get("id") != M1, f"the answer hangs on the NEW first message {n1} {n2}")
 check(n1.get("thread_of") is None, "the first message stays the thread's start")
 # left-out rows: named once, with their number
-check(W.get("Not taken over because the entry it belongs to is missing: Payments") == 1, f"the payment without its document is named {W}")
-check(W.get("Entries of people who were not chosen were not taken over: Team chat", 0) >= 1, f"bob's chat reaction is named {W}")
+# 2.622.0 (#3894): the warnings say "Not imported" / "not selected"
+check(W.get("Not imported because the entry it belongs to is missing: Payments") == 1, f"the payment without its document is named {W}")
+check(W.get("Entries of people who were not selected were not imported: Team chat", 0) >= 1, f"bob's chat reaction is named {W}")
 check(not [k for k in W if "entry it belongs to is missing" in k and ("Reactions" in k or "History" in k)],
       f"the trash stays behind without a warning {W}")
 check(one("SELECT COUNT(*) FROM office_payments WHERE org_id=?", (ORG3,)) == 0, "no payment without its document")

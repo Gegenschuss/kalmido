@@ -224,7 +224,7 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   check(await until(() => /Read-only/.test(toastText(d))), `view-only: toast instead: ${toastText(d)}`);
   check(!cc.some(c => /shift/.test(c[1])), 'nothing sent');
   const r = await call('POST', `/api/lists/${WEB}/shift`, {days: 3}, CKc);
-  check(/view only/i.test(r.error || ''), `the server refuses too: ${r.error}`);
+  check(/read-only/i.test(r.error || ''), `the server refuses too: ${r.error}`);
   await sleep(450); sum(WEB).click(); await sleep(100);
   pop = d.querySelector('#pop:not(.hidden)');
   // 2.152.2 (#2624): project instead of list
