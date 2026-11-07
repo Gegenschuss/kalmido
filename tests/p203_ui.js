@@ -79,7 +79,8 @@ const call = async (u, method, url, body) => { const r = await fetch(B + url.rep
 
   // ---- #286 iOS home-screen app
   w = await boot({user: 'alice', mobile: true, hash: 'inbox'}); d = w.document;
-  check(d.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')?.content === 'black', 'status bar style "black" (page starts below it)');
+  // 2.633.0 (#4994): black-translucent - the page reaches behind the clock, --safe-t keeps the head below it (p2633_b_safearea_ui)
+  check(d.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')?.content === 'black-translucent', 'status bar style "black-translucent" (page behind the status bar, safe area on top)');
   check(!d.documentElement.classList.contains('iosgap') && w.eval('typeof iosGapSync') === 'undefined', 'no bottom-edge shift any more');
   check(d.querySelector('meta[name="theme-color"]')?.content === '#16171a', 'theme-color = tab bar colour (dark)');
   w.close();

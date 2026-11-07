@@ -34,6 +34,7 @@
   --shadow:0 1rem 3rem rgba(0,0,0,.55),0 0 0 1px var(--line2);
   --safe-b:env(safe-area-inset-bottom,0px);--safe-t:env(safe-area-inset-top,0px);
   --tabs-h:0px;--ui:1;
+  --tabs-pb:var(--safe-b);--tabs-bot:calc(var(--tabs-h) + var(--tabs-pb));  /* 2.633.0 (#4994): the tab bar keeps only part of the home indicator room below (--tabs-pb, phones below); --tabs-bot = its top edge above the screen bottom, for everything that sits above it */
   /* 2.149.0 F (#2519): names some rules used without defining them (the property was dropped); aliases of the scale above, both themes */
   --shadow-s:0 1px .125rem rgba(0,0,0,.2);--fs:var(--fs-b);--fs-sm:var(--fs-s);--text3:var(--faint);--warn:var(--st-wait-t);
   /* 2.534.0 A (#4551): the four page widths (only upper limits, centred: static/css/start-breite.css assigns every page one): reading text, a form section, lists / office, board / calendar / timeline / matrix / sheet / mind map */ --w-lesen:46rem;--w-form:40rem;--w-seite:96rem;--w-voll:none;--w-leiste:15rem;--w-leiste-min:14rem;  /* 2.602.0 (#4817): --w-leiste = ONE width for the lists that stay in the page (file store without sidebar B, team chat, contacts / clients, notes without the panel), as the panel (--sideW 15rem, at least 14rem) */
@@ -389,7 +390,7 @@ body>.modal{position:fixed;inset:0;max-height:none;max-width:none;margin:0}  /* 
 code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);font-family:var(--mono);font-size:var(--fs-s);word-break:break-all}
 
 /* ---------- toast ---------- */
-#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(1.5rem + var(--tabs-h) + var(--safe-b));z-index:80;background:var(--bg3);border-radius:var(--radius);padding:.5rem .625rem .5rem .875rem;display:flex;gap:.75rem;align-items:center;box-shadow:var(--shadow);font-size:var(--fs-m);width:max-content;max-width:calc(100vw - 2rem)}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(1.5rem + var(--tabs-bot));z-index:80;background:var(--bg3);border-radius:var(--radius);padding:.5rem .625rem .5rem .875rem;display:flex;gap:.75rem;align-items:center;box-shadow:var(--shadow);font-size:var(--fs-m);width:max-content;max-width:calc(100vw - 2rem)}
 #toast button{color:var(--accent);font-weight:600}
 /* 2.41.0 (#1437): the vCard import's progress / result: stays until it is closed */
 
@@ -540,11 +541,11 @@ code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);f
 
 /* ================= mobile ================= */
 @media (max-width:767px){
-  :root{--tabs-h:3.5rem}
+  :root{--tabs-h:3.5rem;--tabs-pb:max(calc(var(--safe-b) - .75rem),min(var(--safe-b),.5rem))}
   #app,#app.detail-open{grid-template-columns:1fr;display:block}
   #rail{display:none}
   #main{height:100dvh}
-  #view{padding:0 .75rem calc(var(--tabs-h) + var(--safe-b) + 6rem)}
+  #view{padding:0 .75rem calc(var(--tabs-bot) + 4.5rem)}
   #top{padding:calc(.625rem + var(--safe-t)) .5rem .375rem .25rem;min-height:3.25rem}
   #top h1{font-size:var(--fs-page-m)}
   #top .menu{display:inline-flex}
@@ -560,12 +561,12 @@ code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);f
   /* #286: the canvas outside the page (e.g. a band an iOS home-screen app leaves under the tab bar) in the tab bar colour */
   html{background:var(--bg2)}
   body{background:var(--bg)}
-  #tabs{display:flex;position:fixed;left:0;right:0;bottom:0;height:calc(var(--tabs-h) + var(--safe-b));padding-bottom:var(--safe-b);background:color-mix(in srgb,var(--bg2) 94%,transparent);backdrop-filter:blur(.75rem);border-top:1px solid var(--line);z-index:40}
+  #tabs{display:flex;position:fixed;left:0;right:0;bottom:0;height:calc(var(--tabs-h) + var(--tabs-pb));padding-bottom:var(--tabs-pb);background:color-mix(in srgb,var(--bg2) 94%,transparent);backdrop-filter:blur(.75rem);border-top:1px solid var(--line);z-index:40}
   #tabs button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.1875rem;font-size:var(--fs-xs);color:var(--muted);position:relative}
   #tabs button.on{color:var(--accent)}
   #tabs button.on::before{content:'';position:absolute;top:-1px;left:30%;right:30%;height:2px;border-radius:0 0 2px 2px;background:var(--accent)}
   #tabs button .dot{position:absolute;top:.5rem;left:calc(50% + .5rem);width:.375rem;height:.375rem;border-radius:50%;background:var(--accent)}
-  #fab{display:grid;place-items:center;position:fixed;right:1rem;bottom:calc(var(--tabs-h) + var(--safe-b) + 1rem);width:3.25rem;height:3.25rem;border-radius:.875rem;background:var(--accent);color:var(--accent-ink);z-index:41;box-shadow:0 .5rem 1.5rem rgba(0,0,0,.45)}
+  #fab{display:grid;place-items:center;position:fixed;right:1rem;bottom:calc(var(--tabs-bot) + 1rem);width:3.25rem;height:3.25rem;border-radius:.875rem;background:var(--accent);color:var(--accent-ink);z-index:41;box-shadow:0 .5rem 1.5rem rgba(0,0,0,.45)}
   #fab svg{width:1.5rem;height:1.5rem;stroke-width:2.2}
   #fab.gone{display:none}
   .qadd.inline{display:none}
@@ -639,7 +640,7 @@ fieldset[disabled] .rowgrip{cursor:auto}
 .md a{color:var(--accent);text-decoration:none;border-bottom:1px solid color-mix(in srgb,var(--accent) 40%,transparent)}
 .md code{font-family:var(--mono);font-size:var(--fs-s);background:var(--bg3);padding:1px .3125rem;border-radius:var(--r-s)}
 
-#mbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(1.25rem + var(--tabs-h) + var(--safe-b));z-index:44;background:var(--bg3);border:1px solid var(--line2);border-radius:var(--r-l);padding:.375rem .5rem;display:flex;align-items:center;gap:2px;box-shadow:0 .75rem 1.875rem rgba(0,0,0,.45);max-width:calc(100vw - 1.25rem);overflow-x:auto}
+#mbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(1.25rem + var(--tabs-bot));z-index:44;background:var(--bg3);border:1px solid var(--line2);border-radius:var(--r-l);padding:.375rem .5rem;display:flex;align-items:center;gap:2px;box-shadow:0 .75rem 1.875rem rgba(0,0,0,.45);max-width:calc(100vw - 1.25rem);overflow-x:auto}
 #mbar .mcount{font:var(--fs-s) var(--mono);padding:0 .5rem;white-space:nowrap;color:var(--accent)}
 
 .fchips{display:flex;flex-wrap:wrap;gap:.375rem}
@@ -1510,7 +1511,7 @@ svg.chart{display:block;max-width:100%;overflow:visible}
 .cconf svg{width:100%;height:100%;stroke:var(--cc,var(--accent))}
 .ccheck{position:absolute;display:grid;place-items:center;border-radius:50%;background:var(--accent);color:var(--accent-ink);opacity:0;box-shadow:0 .75rem 2.5rem rgba(0,0,0,.3);will-change:transform,opacity}
 .ccheck svg{width:58%;height:58%;stroke:currentColor}
-.cele-quip{position:fixed;left:50%;bottom:calc(1.75rem + var(--tabs-h) + var(--safe-b));z-index:97;display:flex;align-items:center;gap:.75rem;width:max-content;max-width:min(27.5rem,calc(100vw - 2rem));padding:.625rem 1rem .625rem .875rem;
+.cele-quip{position:fixed;left:50%;bottom:calc(1.75rem + var(--tabs-bot));z-index:97;display:flex;align-items:center;gap:.75rem;width:max-content;max-width:min(27.5rem,calc(100vw - 2rem));padding:.625rem 1rem .625rem .875rem;
   background:var(--bg2);border-radius:var(--r-l);box-shadow:var(--shadow);pointer-events:none;opacity:0;transform:translate(-50%,.5rem);transition:opacity .25s,transform .25s}
 .cele-quip.on,.cele-quip.calm{opacity:1;transform:translate(-50%,0)}
 .cele-quip div{display:flex;flex-direction:column;gap:2px;min-width:0}
@@ -2104,7 +2105,7 @@ button.tvr-task:hover{color:var(--accent)}
   /* 2.25.0 (UX-39): #view already keeps the tab bar's height as padding, and a sticky box stops at that padding: bottom 0
      puts the bar right on top of the tab bar (with the tab bar's height again it floated mid-screen on the Fold) */
   html.tdock .qdock{display:block;bottom:0;padding-bottom:.75rem}
-  html.tdock #view:has(> .lwrap){padding-bottom:calc(var(--tabs-h) + var(--safe-b))}
+  html.tdock #view:has(> .lwrap){padding-bottom:var(--tabs-bot)}
 }
 /* 1.5.3 (r): taller bars, handles reaching past the ends, the text clips inside the bar */
 .tl-bar{overflow:visible;font-size:var(--fs-m)}
@@ -3055,7 +3056,7 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 #pov-desc > .povbar{flex:none}
 .povbar{display:flex;align-items:center;gap:.5rem;margin-top:.5rem;font-size:var(--fs-s)}
 .povbar.povedit{position:sticky;bottom:0;z-index:2;background:var(--bg2);border-top:1px solid var(--line);padding:.5rem 0}  /* 2.331.0 A (#3306) */
-@media (max-width:899px){ .povbar.povedit{bottom:calc(var(--tabs-h,0px) + var(--safe-b,0px))} }  /* above the bottom bar */
+@media (max-width:899px){ .povbar.povedit{bottom:var(--tabs-bot)} }  /* above the bottom bar */
 .povm{display:flex;align-items:center;gap:.625rem;min-height:2.25rem;border-top:1px solid var(--line);font-size:var(--fs-b)}
 .povm:first-of-type{border-top:0}
 .povm .chk{margin:0;border-radius:50%}
@@ -3495,7 +3496,7 @@ body.qsheet-open #fab{display:none}
 }
 /* P15: the calendar's week / day view: only the hour grid scrolls */
 #view.calfit{padding-bottom:0}
-@media (max-width:767px){ #view.calfit{padding-bottom:calc(var(--tabs-h) + var(--safe-b))} }
+@media (max-width:767px){ #view.calfit{padding-bottom:var(--tabs-bot)} }
 /* P16: the logo follows the accent */
 svg.logo{color:var(--accent);flex:none}
 #app.wsb-on svg.logo{color:var(--wbc)}  /* 2.233.0 C (#3195): --wbc is always set (muted without a workspace colour), so only an active workspace colour wins */
@@ -3664,7 +3665,7 @@ svg.kword{display:block;height:.82em;width:auto;aspect-ratio:371.8/81;color:#EEE
 /* 2.13.4: the phone chat: only the messages scroll. #view kept its list padding (room for the + button) and scrolled
    by it, so a swipe beside the box pushed the composer up and left an empty gap above the tab bar */
 @media (max-width:767px){
-  body.in-chat #view{overflow:hidden;padding-bottom:calc(var(--tabs-h) + var(--safe-b));overscroll-behavior:none}
+  body.in-chat #view{overflow:hidden;padding-bottom:var(--tabs-bot);overscroll-behavior:none}
   body.in-chat.kb-open #view{padding-bottom:0}
   body.in-chat .chview{height:100%}
   .chview .chcomp{overscroll-behavior:contain}
@@ -4167,7 +4168,7 @@ button.trdline:hover,button.trdline:focus-visible{background:var(--bg3);color:va
 .trdp{display:flex;align-items:center;gap:.5rem;min-height:2rem}
 @media (pointer:coarse){.tthline,button.trdline{min-height:2.75rem}}
 @media (max-width:767px){
-  body.in-team #view{overflow:hidden;padding-bottom:calc(var(--tabs-h) + var(--safe-b));display:flex;flex-direction:column;overscroll-behavior:none}
+  body.in-team #view{overflow:hidden;padding-bottom:var(--tabs-bot);display:flex;flex-direction:column;overscroll-behavior:none}
   body.in-team.kb-open #view{padding-bottom:0}
   body.in-team.kb-open .tcview{min-height:0}  /* 2.446.0 (#3334): the 20rem ran on behind the box in landscape */
   .tcview{grid-template-columns:minmax(0,1fr);flex:1;height:auto;border:0;border-radius:0;margin:0 -.75rem}
@@ -5983,7 +5984,7 @@ html.nozoom,html.nozoom body{touch-action:pan-x pan-y}
 .cchw .cchb.st-primary+.cchpen{border-color:transparent;background:var(--accent);color:var(--accent-ink);border-left:1px solid color-mix(in srgb,var(--accent-ink) 30%,transparent)}
 @media (pointer:coarse){ .cchw .cchb{min-height:2.75rem} .cchpen{min-width:2.75rem;min-height:2.75rem} }
 /* 2.39.1 (#1294): a list in its own small window (/?mini=1#l/<id>, miniwin.js): only the list, its title bar and the composer */
-html.mini{--tabs-h:0px}
+html.mini{--tabs-h:0px;--tabs-pb:var(--safe-b)}
 html.mini #side,html.mini #tabs,html.mini #top .menu,html.mini #chatfab,html.mini #achat,html.mini #fab{display:none!important}
 html.mini #app{grid-template-columns:minmax(0,1fr)}
 html.mini .qdock{display:block;bottom:0;padding-bottom:.75rem}
@@ -6386,7 +6387,7 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 
 /* 2.46.1 C (#1554): several contacts at once - the selection bar (looks like the tasks' #mbar), a tick per row;
    2.428.0 A (#3581): class .mselbar = every selection's bar (multisel.js ms_barHtml) */
-.mselbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(1.25rem + var(--tabs-h) + var(--safe-b));z-index:44;background:var(--bg3);border:1px solid var(--line2);border-radius:var(--r-l);padding:.375rem .5rem;display:flex;align-items:center;gap:2px;box-shadow:0 .75rem 1.875rem rgba(0,0,0,.45);max-width:calc(100vw - 1.25rem);overflow-x:auto;scrollbar-width:none}
+.mselbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(1.25rem + var(--tabs-bot));z-index:44;background:var(--bg3);border:1px solid var(--line2);border-radius:var(--r-l);padding:.375rem .5rem;display:flex;align-items:center;gap:2px;box-shadow:0 .75rem 1.875rem rgba(0,0,0,.45);max-width:calc(100vw - 1.25rem);overflow-x:auto;scrollbar-width:none}
 .mselbar .mcount{font:var(--fs-s) var(--mono);padding:0 .5rem;white-space:nowrap;color:var(--accent)}
 .mselbar .mbb{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:.125rem;min-width:2.75rem;min-height:2.75rem;padding:.125rem .375rem;border:0;border-radius:var(--radius);background:none;color:var(--text2);font:inherit;font-size:var(--fs-xs);line-height:1.1;cursor:pointer;flex:none}
 .mselbar .mbb:hover:not(:disabled){background:var(--bg4);color:var(--text)}
@@ -7337,7 +7338,7 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
 .cdlg .tbl-all{border-bottom:1px solid var(--line)}
 .cdlg .tbl-until{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin-top:.5rem}
 /* 2.53.0 A (#1410) modules loaded on demand: a thin bar at the top while a module loads (shown only after 300 ms) */
-.ldbar { position: fixed; top: 0; left: 0; right: 0; height: 2px; z-index: 9999; pointer-events: none; overflow: hidden; opacity: 0; transition: opacity .2s ease; }
+.ldbar { position: fixed; top: var(--safe-t,0px); left: 0; right: 0; height: 2px; z-index: 9999; pointer-events: none; overflow: hidden; opacity: 0; transition: opacity .2s ease; }  /* 2.633.0 (#4994): below the status bar of the home-screen app (black-translucent), that area stays calm */
 .ldbar.on { opacity: 1; }
 .ldbar::before { content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 40%; background: var(--accent); border-radius: 2px; transform: translateX(-100%); animation: none; }
 /* 2.220.0 A (#2813): the loop only runs while the bar is shown */
@@ -8283,7 +8284,7 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 .hbmdlg .card>.hbmview>.hbmframe,.hbmdlg .card>.hbmview>.hbmtext{flex:1 1 auto;height:auto;min-height:12rem;max-height:none}
 .hbmdlg .card>.foot{margin-top:auto}
 .hbmwhole{display:inline-flex;align-items:center;gap:.375rem;font-size:var(--fs-s);cursor:pointer}
-@media (max-width:40rem){.hbmdlg{padding:0}.hbmdlg .card{width:100%;height:100dvh;border-radius:0}}
+@media (max-width:40rem){.hbmdlg{padding:0}.hbmdlg .card{width:100%;height:100dvh;border-radius:0;padding-top:calc(1.25rem + var(--safe-t))}}  /* 2.633.0 (#4994): not under the clock */
 .hbmactrow{display:flex;gap:.375rem;flex-wrap:wrap;margin:0 0 .5rem}
 .hbmmade{display:flex;flex-direction:column;align-items:flex-start;gap:.125rem;margin:0 0 .5rem;font-size:var(--fs-s)}
 .hbmvbar{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin:0 0 .375rem}
@@ -8421,8 +8422,8 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 :root[data-theme="light"] #app.wsb-on{--wbc:var(--wbl)}
 @media (prefers-color-scheme: light){ :root[data-theme="auto"] #app.wsb-on{--wbc:var(--wbl)} }
 #side{border-top:.375rem solid var(--wbc)}  /* the scroll box's own border: never scrolls, never covered by the sticky head */
-@media (max-width:767px){ #top{box-shadow:inset 0 .25rem 0 var(--wbc)} }
-#app.side-rail #top{box-shadow:inset 0 .25rem 0 var(--wbc)}
+@media (max-width:767px){ #top{box-shadow:inset 0 var(--safe-t) 0 var(--bg),inset 0 calc(var(--safe-t) + .25rem) 0 var(--wbc)} }  /* 2.633.0 (#4994): the home-screen app reaches behind the status bar (black-translucent): the 4 px stripe sits below it, the area behind the clock stays calm (the first shadow paints it in the page colour; without a safe area it is empty) */
+#app.side-rail #top{box-shadow:inset 0 var(--safe-t) 0 var(--bg),inset 0 calc(var(--safe-t) + .25rem) 0 var(--wbc)}
 #side .sbhead{display:flex;align-items:center;gap:.25rem;min-height:2.25rem;margin:0 0 .5rem}
 #side .sbhead .spacer{flex:1}
 :root #side .sbhead .wsbar,:root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .sbhead .wsbar{width:auto;max-width:100%;min-height:2.25rem;padding:0 .375rem;margin-left:-.125rem;gap:.5rem;border:0;border-radius:var(--radius);background:none;color:var(--text);font-size:var(--fs-l);font-weight:600;letter-spacing:-.01em}
@@ -8812,7 +8813,7 @@ time,.meta .dt,.dpbtn,.remchips button,.dprow .dpt,.dprow .dps,.fwhen{font-famil
   #tabs button>span:not(.dot):not(.temoji):not(.tsw):not(.tico){position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%)}
 }
 /* 2.363.3 (#3134): upload progress with Cancel (upbar.js), above the toast */
-#upbars{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(4.75rem + var(--tabs-h) + var(--safe-b));z-index:80;display:flex;flex-direction:column;gap:.375rem;width:min(22rem,calc(100vw - 2rem))}
+#upbars{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(4.75rem + var(--tabs-bot));z-index:80;display:flex;flex-direction:column;gap:.375rem;width:min(22rem,calc(100vw - 2rem))}
 .upbar{background:var(--bg3);border-radius:var(--radius);box-shadow:var(--shadow);padding:.5rem .625rem .5rem .875rem;font-size:var(--fs-m)}
 .uphead{display:flex;gap:.75rem;align-items:center}
 .upn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

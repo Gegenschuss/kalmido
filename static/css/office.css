@@ -348,7 +348,7 @@ ul.ofdpick .ofcn{display:flex;flex-direction:column}
   .tplist .tpopen{flex-basis:100%}
   .tphead .tptitle{flex-basis:100%}
 }
-.oimfoot{display:flex;align-items:center;justify-content:flex-end;gap:.5rem;flex-wrap:wrap;position:sticky;bottom:calc(var(--tabs-h) + var(--safe-b));z-index:2;margin:1rem -1.75rem 0;padding:.75rem 1.75rem calc(.75rem + var(--safe-b));background:var(--bg2);border-top:1px solid var(--line2);box-shadow:0 -.5rem 1rem -.5rem rgba(0,0,0,.5)}
+.oimfoot{display:flex;align-items:center;justify-content:flex-end;gap:.5rem;flex-wrap:wrap;position:sticky;bottom:var(--tabs-bot);z-index:2;margin:1rem -1.75rem 0;padding:.75rem 1.75rem .75rem;background:var(--bg2);border-top:1px solid var(--line2);box-shadow:0 -.5rem 1rem -.5rem rgba(0,0,0,.5)}
 .oimfoot .aerr{flex:1 1 12rem;min-width:0}
 .oimfoot .spacer{flex:1 1 0}
 @media (max-width:767px) {
@@ -540,7 +540,7 @@ ul.ofdpick .ofcn{display:flex;flex-direction:column}
 .cfs-adj{margin-top:.25rem}
 .cfs-add{display:flex;justify-content:flex-end;margin-top:.25rem}
 .cfs-add .btn{min-height:2.75rem}
-@media (max-width:767px){.cfb-real{position:sticky;bottom:calc(var(--tabs-h) + var(--safe-b));z-index:6;background:var(--bg2)}}  /* 2.144.2 B (#2372): above the tab bar like the sheet bar */
+@media (max-width:767px){.cfb-real{position:sticky;bottom:var(--tabs-bot);z-index:6;background:var(--bg2)}}  /* 2.144.2 B (#2372): above the tab bar like the sheet bar */
 /* 2.124.0 D (#2342): the balance according to the bank (cash flow, import preview) */
 .cfb-box{display:flex;flex-direction:column;gap:.25rem;margin:.5rem 0;padding:.5rem .75rem;border:.0625rem solid var(--line2);border-radius:var(--radius)}
 .cfb-head{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem}
