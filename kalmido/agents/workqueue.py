@@ -5,9 +5,15 @@ the work style goes along wherever the agent chooses its next task (GET /api/v1/
 
 Kalmido does not start or stop the agent's work: the agent reads the queue and keeps to it. 2.392.0 A (#3367): with
 max_parallel > 0 the limit is hard for new running jobs (POST /api/v1/agent/jobs: 409 slots_full, agents/api.py); the person sees the same queue
-in the agent's settings (GET /api/agents/<aid>/queue, owner of a personal agent / an instance admin for a team agent)."""
+in the agent's settings (GET /api/agents/<aid>/queue, owner of a personal agent / an instance admin for a team agent).
+
+2.624.0 (#4521): every item carries its size (the selection field Size of a software project, its options s / m / l, any
+language and name: lists/templates.py PTYPE_FIELD_OPTS) and its points S=1, M=2, L=3; a task without a size counts as M (2).
+GET /api/v1/agent/queue?points=N marks the next bundle: the first items in queue order whose points together stay within N
+(bundle: true on them, {points, sum, count} in "bundle"); a first item above N alone is the bundle, so the queue never stalls."""
 import contextlib
 import json
+import re
 from flask import g, has_request_context, jsonify
 
 from ..core.config import app
@@ -22,6 +28,9 @@ from ..accounts.session import me
 
 WQ_ORDER_MAX = 500
 WQ_PRIO = {0: "none", 1: "low", 3: "medium", 5: "high", 7: "urgent"}  # the names of api/v1.py PRIO_NAMES
+WQ_SIZE_POINTS = {"s": 1, "m": 2, "l": 3}  # 2.624.0 (#4521): the options of the field Size (lists/templates.py PTYPE_FIELD_OPTS)
+WQ_SIZE_NONE = 2  # a task without a size counts as M
+WQ_POINTS_MAX = 10000
 
 
 @contextlib.contextmanager
@@ -59,6 +68,48 @@ def _wq_rows(c, aid):
                              ORDER BY t.priority DESC, t.due IS NULL, t.due, t.id""", (aid, aid, aid, aid)).fetchall()
 
 
+def _wq_sizes(c, tids):
+    """2.624.0 (#4521): task id -> "s" | "m" | "l" from the Size field of the task's current list: a selection field whose
+    options hold the ids s, m and l (the first such field by its place, when a list has more). Tasks without a value are missing."""
+    if not tids:
+        return {}
+    out = {}
+    for r in c.execute(f"""SELECT v.task_id, v.value, f.options FROM task_field_values v JOIN list_fields f ON f.id=v.field_id
+                           JOIN tasks t ON t.id=v.task_id AND t.list_id=f.list_id
+                           WHERE v.task_id IN ({",".join("?" * len(tids))}) AND f.type='select' ORDER BY f.sort, f.id""", tids):
+        if r["task_id"] in out or r["value"] not in WQ_SIZE_POINTS:
+            continue
+        try:
+            opts = json.loads(r["options"] or "{}").get("options") or []
+        except (ValueError, TypeError, AttributeError):
+            continue
+        if set(WQ_SIZE_POINTS) <= {o.get("id") for o in opts if isinstance(o, dict)}:
+            out[r["task_id"]] = r["value"]
+    return out
+
+
+def wq_points_arg(raw):
+    """2.624.0 (#4521): the parameter points of GET /api/v1/agent/queue: None when absent, else a whole number 1..10000 (400)."""
+    if raw is None:
+        return None
+    if not re.fullmatch(r"[1-9][0-9]{0,4}", raw.strip()) or int(raw) > WQ_POINTS_MAX:
+        raise BadInput(tr("Invalid value: {0}", "points") + f" (1-{WQ_POINTS_MAX})")
+    return int(raw)
+
+
+def wq_bundle(q, points):
+    """2.624.0 (#4521): marks the next bundle of queue q in place (see the module text)."""
+    total = n = 0
+    for it in q["items"]:
+        if n and total + it["points"] > points:
+            break
+        total, n = total + it["points"], n + 1
+    for i, it in enumerate(q["items"]):
+        it["bundle"] = i < n
+    q["bundle"] = {"points": points, "sum": total, "count": n}
+    return q
+
+
 def wq_build(c, a, ws=None):
     """{max_parallel, priority_rule, items} of agent row a (see the module text)."""
     aid, ws = a["user_id"], ws or ws_get(a)
@@ -70,13 +121,16 @@ def wq_build(c, a, ws=None):
             seen.add(tid)
             out.append(by_id[tid])
     mp, names, items = ws["max_parallel"], {}, []
+    sizes = _wq_sizes(c, [r["id"] for r in out])
     for i, r in enumerate(out):
         if r["list_id"] not in names:
             names[r["list_id"]] = lst_brief(c, r["list_id"])["name"]
         active = not mp or i < mp
         items.append({"task_id": r["id"], "title": r["title"], "list_id": r["list_id"], "list_name": names[r["list_id"]],
                       "state": "active" if active else "waiting", "position": None if active else i - mp + 1,
-                      "priority": WQ_PRIO.get(r["priority"], "none"), "due": r["due"]})
+                      "priority": WQ_PRIO.get(r["priority"], "none"), "due": r["due"],
+                      "size": sizes[r["id"]].upper() if r["id"] in sizes else None,
+                      "points": WQ_SIZE_POINTS.get(sizes.get(r["id"]), WQ_SIZE_NONE)})
     return {"max_parallel": mp, "priority_rule": ws["priority_rule"], "items": items}
 
 
@@ -95,11 +149,12 @@ def wq_event_extra(c, aid, tid):
 @v1_view
 def v1_agent_queue():
     """The agent's own queue: {max_parallel, priority_rule, items: [{task_id, title, list_id, list_name, state, position,
-    priority, due}]}."""
-    v1_args(())
+    priority, due, size, points}]}; 2.624.0 (#4521): ?points=N + bundle {points, sum, count} and bundle: true / false per item."""
+    pts = wq_points_arg(v1_args(("points",)).get("points"))
     aid = need_agent()
     c = db()
-    return jsonify(wq_build(c, agent_row(c, aid)))
+    q = wq_build(c, agent_row(c, aid))
+    return jsonify(wq_bundle(q, pts) if pts else q)
 
 
 @app.put("/api/v1/agent/queue")
@@ -140,7 +195,7 @@ def wq_route_get(aid):
                                          (*ids, me(), me()))} if ids else set()
     q["items"] = [x if x["task_id"] in mine else {"state": x["state"], "position": x["position"], "hidden": True,
                                                    "task_id": None, "title": None, "list_id": None, "list_name": None,
-                                                   "priority": None, "due": None} for x in q["items"]]
+                                                   "priority": None, "due": None, "size": None, "points": None} for x in q["items"]]
     return jsonify(q)
 
 
@@ -154,11 +209,20 @@ def wq_spec(paths, schemas, op, ok, errs, ref):
             "task_id": {"type": "integer"}, "title": {"type": "string"}, "list_id": {"type": "integer"}, "list_name": {"type": "string"},
             "state": {"type": "string", "enum": ["active", "waiting"], "description": "the first max_parallel are active, the rest waits"},
             "position": {"type": ["integer", "null"], "description": "1.. for the waiting ones, null for the active ones"},
-            "priority": {"type": "string", "enum": list(WQ_PRIO.values())}, "due": {"type": ["string", "null"]}}}}}}
+            "priority": {"type": "string", "enum": list(WQ_PRIO.values())}, "due": {"type": ["string", "null"]},
+            "size": {"type": ["string", "null"], "enum": ["S", "M", "L", None], "description": "2.624.0 (#4521): the field Size of a software project, null = none"},
+            "points": {"type": "integer", "description": "2.624.0 (#4521): S=1, M=2, L=3; without a size 2"},
+            "bundle": {"type": "boolean", "description": "2.624.0 (#4521): only with ?points=N: part of the next bundle"}}}},
+        "bundle": {"type": "object", "description": "2.624.0 (#4521): only with ?points=N: the next bundle", "properties": {
+            "points": {"type": "integer", "description": "N as asked"}, "sum": {"type": "integer", "description": "the points of the bundle"},
+            "count": {"type": "integer", "description": "the first count items form the bundle"}}}}}
     paths["/agent/queue"] = {
         "get": op("2.236.0 (#2906 #2907): your queue - the open tasks assigned to you that you see, in your order (PUT), the rest by "
                   "priority (high first), due date, creation; the first max_parallel are active, the rest waits. Choose the next task "
-                  "from it and keep to priority_rule", AG, ok(ref("AgentQueue")) | errs("403")),
+                  "from it and keep to priority_rule. 2.624.0 (#4521): points=N marks the next bundle - the first items whose points "
+                  "(size S=1, M=2, L=3, none = 2) stay within N; a first item above N alone", AG, ok(ref("AgentQueue")) | errs("400", "403"),
+                  params=[{"name": "points", "in": "query", "required": False, "schema": {"type": "integer", "minimum": 1, "maximum": WQ_POINTS_MAX},
+                           "description": "mark the next bundle of at most N points"}]),
         "put": op("2.236.0 (#2906): set the order of your queue (at most 500 of your own open tasks; unknown / foreign ids = 400); the "
                   "tasks not named follow in the default order", AG, ok(ref("AgentQueue")) | errs("400", "403"), scope="write",
                   body={"type": "object", "required": ["order"], "additionalProperties": False, "properties": {

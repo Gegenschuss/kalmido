@@ -566,8 +566,11 @@ TOOLS = [
                   "items: [{task_id, title, list_id, list_name, state: active | waiting, position (1.. for the waiting ones), priority, "
                   "due}]}. Your order (set_queue_order) first, the rest by priority, due date, creation. Work on the active ones only "
                   "(max_parallel 0 = no limit; above 0 a further running job is refused with 409 slots_full) and choose the next task from it by "
-                  "priority_rule, the owner's rule in their words.",
-     _obj({}), lambda api, a: api.call("GET", "/agent/queue")),
+                  "priority_rule, the owner's rule in their words. 2.624.0 (#4521): each item has size (S | M | L | null, the field Size "
+                  "of a software project) and points (S=1, M=2, L=3, no size = 2); points=N marks the next bundle: bundle: true on the "
+                  "first items whose points stay within N (a first item above N alone), bundle {points, sum, count}. Take the bundle together.",
+     _obj({"points": {"type": "integer", "minimum": 1, "maximum": 10000}}),
+     lambda api, a: api.call("GET", "/agent/queue", query={"points": a.get("points")})),
     ("get_rules", "2.235.0 (#2903): your standing rules (\"from now on always ...\" instructions you saved), active and paused: "
                   "{data: [{id, text, state: active | paused, created_at, source: {kind: chat | comment | manual, id, task_id, user_id, "
                   "excerpt}}], max, text_max}. Follow the active ones in every run; paused ones do not apply. Your owner (an admin "

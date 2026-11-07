@@ -3009,12 +3009,23 @@ GET /api/v1/agent -> {…, "work_style": {"budget_period": "week", "budget_metri
 it sees, at most 500; an unknown or foreign id = 400); the tasks not named follow in the default order. The owner sees the
 same queue in the agent's settings (`GET /api/agents/{id}/queue`).
 
+Since 2.624.0 every item carries `size` (`S`, `M`, `L` from the selection field Size of a software project, `null` without
+one) and `points` (S = 1, M = 2, L = 3; a task without a size counts 2). `GET /api/v1/agent/queue?points=N` (MCP
+`get_queue` with `points`) marks the next bundle: the first items in queue order whose points together stay within N get
+`"bundle": true`, the rest `false`, and the answer carries `"bundle": {"points": N, "sum": ..., "count": ...}`. A first
+item that alone is above N forms the bundle by itself, so the queue never stalls. N is a whole number 1..10000 (else 400);
+without `points` the answer has no bundle fields.
+
 ```
 GET /api/v1/agent/queue -> {"max_parallel": 2, "priority_rule": "Customer bugs before features", "items": [
     {"task_id": 31, "title": "Login fails", "list_id": 4, "list_name": "Web", "state": "active", "position": null,
-     "priority": "high", "due": "2026-11-02"},
+     "priority": "high", "due": "2026-11-02", "size": "S", "points": 1},
     {"task_id": 35, "title": "Dark mode", "list_id": 4, "list_name": "Web", "state": "waiting", "position": 1,
-     "priority": "medium", "due": null}]}
+     "priority": "medium", "due": null, "size": "M", "points": 2}]}
+GET /api/v1/agent/queue?points=3 -> {..., "bundle": {"points": 3, "sum": 3, "count": 2}, "items": [
+    {"task_id": 31, ..., "size": "S", "points": 1, "bundle": true},
+    {"task_id": 35, ..., "size": "M", "points": 2, "bundle": true},
+    {"task_id": 36, ..., "size": "L", "points": 3, "bundle": false}]}
 ```
 
 The event `assigned` carries `queue` `{position, active, max_parallel}` (`position` null while active) and

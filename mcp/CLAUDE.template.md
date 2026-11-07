@@ -407,7 +407,8 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
   report, start nothing new. Outside the work window (`state.working` false) start nothing until `work_resumes_at`. In
   the quiet window keep working, Kalmido holds the pushes.
 - **Queue**: work on at most `max_parallel` tasks at once (above 0 a further running job is refused: 409 `slots_full`; finish one first) (`get_queue`, your order with `set_queue_order`); choose the next
-  task from the queue by `priority_rule`, the owner's rule (it also comes with the event `assigned`).
+  task from the queue by `priority_rule`, the owner's rule (it also comes with the event `assigned`). To take several small
+  tasks at once, `get_queue` with `points` (size S=1, M=2, L=3) marks the next bundle (`bundle: true`); work on it together.
 - **Reports** as `report_length` / `report_lang` / `report_tables` / `report_jargon` say; results go where `results_to`
   says (comment, chat or both: the comment + one line in the chat).
 - **Pushes**: with `push` "limits" only a limit disturbs - send such a message (a one-way step, a refusal, a stop, an error)
