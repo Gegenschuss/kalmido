@@ -611,7 +611,8 @@ APP_ONLY = [
      "organisation's admins, people only (an API token 403)", ("* /api/retention",)),
     ("2.42.0 (#828, #909): end-to-end encryption happens in a person's browser (keys, encrypted note / files, the switch of an encrypted DM); "
      "agents see only placeholders (encrypted_note, encrypted files) and never take part in DMs", (
-        "* /api/e2e/", "* /api/tasks/{}/enc-note", "=POST /api/tasks/{}/enc-attachments", "=POST /api/team/rooms/{}/e2e")),
+        "* /api/e2e/", "* /api/tasks/{}/enc-note", "=POST /api/tasks/{}/enc-attachments", "=POST /api/team/rooms/{}/e2e",
+        "=POST /api/team/rooms/{}/msgid")),  # 2.640.0 (#3388): the id reservation of a locked channel message (browser only)
     # 2.48.0 (#1642): a task's note locked with its owner's password, encrypted in the browser; agents see note_locked only
     ("2.48.0 (#1642): locking a task's note with one's own password happens in that person's browser (end-to-end); agents see only "
      "note_locked and get 409 when they write the notes", ("* /api/tasks/{}/note-lock",)),
