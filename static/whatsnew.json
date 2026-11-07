@@ -1,6 +1,20 @@
 {
  "versions": [
   {
+   "version": "2.646.0",
+   "date": "2026-11-07",
+   "items": [
+    {
+     "de": "Wissensseiten und Notizen haben im Menü eine Seitenbreite: Lesen, Breit oder Voll.",
+     "en": "Knowledge pages and notes have a page width in their menu: Read, Wide or Full."
+    },
+    {
+     "de": "Auf großen Bildschirmen liegt eine Wissensseite oder Notiz als Blatt da, die Kopfzeile steht bündig zur Seite.",
+     "en": "On large screens a knowledge page or note lies as a sheet, with the top bar flush with the page."
+    }
+   ]
+  },
+  {
    "version": "2.645.0",
    "date": "2026-11-07",
    "items": [

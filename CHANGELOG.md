@@ -16,6 +16,21 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.646.0] - 2026-11-07
+
+Package 2.599 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), CI-only rot: p271_ui, Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Added
+- Knowledge pages and notes: a page width switch in the page menu (… > Page width): Read (default), Wide or Full, for this page (kept on the device) or as the default for knowledge pages / notes (kept with the account's appearance); in Read, code blocks and tables may reach the edge of the sheet and scroll sideways instead of being cut (#4808).
+- Frontend: one delay helper `debounce(fn, ms)` with `flush()`, `cancel()` and `pending()` in core.js; `tools/perf_budget.py` counts hand-made `clearTimeout(` delays in static/js and that count may only go down (#4506).
+
+### Changed
+- Wide screens (from 1700 px): the top bar (page title, search, buttons) stands in the same middle and width as the page below it; the agenda bar, the team chat room head and the bars above a letter and the rights page share the edges of their content. Full-width pages, 1440 x 900, tablets and phones stay as they were (#4814).
+- Wide screens (from 1700 px): a knowledge page or a note lies as a sheet (own surface, fine border, rounded corners) with its header, path and toolbar flush with the reading column; the knowledge bar (search, new page, today, new folder) and the notes list with the note form one centred block. The Notepad reading style keeps its own frame (#4808).
+
+### Fixed
+- Settings no longer break with "xl_stdHtml before initialization" when the file store module failed to run while loading: a module file that throws while it runs now fails its module (and asks for a reload) instead of counting as loaded, and the sharing defaults are drawn only once their module has loaded (#4907).
+
 ## [2.645.0] - 2026-11-07
 
 Package 2.638 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), CI-only rot: p2551_c_favout_ui, Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatche).
@@ -379,7 +394,8 @@ Package 2.582 (Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher),
 
 Not released (the CI of this version was red); its changes are listed under 2.605.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.645.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.646.0...HEAD
+[2.646.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.646.0
 [2.645.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.645.0
 [2.643.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.643.0
 [2.639.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.639.0
