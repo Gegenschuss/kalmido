@@ -24,14 +24,17 @@ from ..core.i18n import tr
 from ..core.access import Denied
 from ..accounts.session import me
 from . import store as S
+from ..files.store import need_node  # 2.635.0 (#4807 c): the documents' own visibility check (links)
 from .web import _no_agent, _ws_manage, doc_amount, ws_param
 from .web import _reindex  # 2.369.5 (#2517): pulled up from functions
 from ..core.pages import valid_link  # 2.369.5 (#2517): pulled up from functions
 
-DF_TYPES = ("text", "number", "money", "date", "checkbox", "select", "url")
+DF_TYPES = ("text", "number", "money", "date", "checkbox", "select", "url", "longtext", "documentlink")  # 2.635.0 (#4807 c): + long text, link to documents
 DF_MAX = 50           # fields per workspace
 DF_NAME_MAX = 60
 DF_TEXT_MAX = 1000
+DF_LONG_MAX = 10000   # 2.635.0 (#4807 c): characters of a long text
+DF_LINKS_MAX = 20     # 2.635.0 (#4807 c): documents one link field points to
 CTX = "doc_field_values.value"
 MONEY_RE = re.compile(r"(-?[\d.,]+)\s*([A-Za-z€$£]{0,3})")
 
@@ -159,8 +162,20 @@ def fmt_num(x):
 def df_value(f, v):
     """The stored (plain) value of field f (row) from the client; None = no value. Raises ValueError(message)."""
     t, name = f["type"], f["name"]
-    if v is None or v == "" or v is False:
+    if v is None or v == "" or v is False or v == []:
         return None
+    if t == "documentlink":  # 2.635.0 (#4807 c): document ids ("12,34" or a list); "pl:<id>" = a Paperless document not yet in
+        toks = v if isinstance(v, list) else str(v).split(",")
+        out = []
+        for x in toks[:DF_LINKS_MAX + 1]:
+            x = str(x).strip()
+            if not re.fullmatch(r"(pl:)?[1-9]\d{0,17}", x):
+                raise ValueError(tr("{0}: invalid value", name))
+            if x not in out:
+                out.append(x)
+        if len(out) > DF_LINKS_MAX:
+            raise ValueError(tr("{0}: at most {1} documents", name, DF_LINKS_MAX))
+        return ",".join(out) or None
     if isinstance(v, (dict, list)):
         raise ValueError(tr("{0}: invalid value", name))
     s = str(v).strip()
@@ -168,6 +183,8 @@ def df_value(f, v):
         return None
     if t == "text":
         return s[:DF_TEXT_MAX]
+    if t == "longtext":  # 2.635.0 (#4807 c)
+        return s[:DF_LONG_MAX]
     if t == "url":
         if not valid_link(s):
             raise ValueError(tr("The link must be a web address (https://…) or a file link (smb://…, file://…)"))
@@ -208,7 +225,7 @@ def df_value(f, v):
 
 def df_label(f, v):
     """The value as a person reads it (select: the option's name)."""
-    if v is None:
+    if v is None or f["type"] == "documentlink":  # 2.635.0 (#4807 c): links are no words of the index (names: df_links)
         return None
     if f["type"] == "select":
         o = next((o for o in _opts(f).get("options", []) if o["id"] == v), None)
@@ -226,8 +243,46 @@ def df_values(c, nid, ws):
     return out
 
 
+def _link_seen(c, ws, nid):
+    """2.635.0 (#4807 c): the name of document nid when it is a document of ws the signed-in account sees (the documents' own
+    visibility check, files/store.py need_node), else None -- also without a signed-in account (fail closed)."""
+    try:
+        n = need_node(c, int(nid))
+    except (Denied, ValueError, TypeError):
+        return None
+    except Exception:  # noqa: BLE001 -- outside a request (no account): nothing is shown
+        return None
+    m = S.meta_row(c, int(nid))
+    return n["name"] if m and m["ws"] == ws and n["kind"] == "file" else None
+
+
+def _pl_node(c, ws, tok):
+    """The node id a "pl:<id>" token of an import points to once that Paperless document came in (pl_imported), else None."""
+    r = c.execute("SELECT node_id FROM pl_imported WHERE ws=? AND pl_id=? AND node_id IS NOT NULL ORDER BY dup, created_at LIMIT 1",
+                  (ws, int(tok[3:]))).fetchone()
+    return r[0] if r else None
+
+
+def df_links(c, ws, v):
+    """2.635.0 (#4807 c): ([{id, name}] of the linked documents the asker sees, [ids / tokens kept but not shown]) of a stored
+    link value -- checked when it is shown, not only when it was set."""
+    seen, hidden = [], []
+    for x in str(v or "").split(","):
+        x = x.strip()
+        if not x:
+            continue
+        nid = _pl_node(c, ws, x) if x.startswith("pl:") else int(x)
+        name = _link_seen(c, ws, nid) if nid else None
+        if name is not None and all(s["id"] != nid for s in seen):
+            seen.append({"id": nid, "name": name})
+        else:
+            hidden.append(x)
+    return seen, hidden
+
+
 def df_json(c, m):
-    """The fields of the document's workspace with its values: [{id, name, type, options?, value, label}]."""
+    """The fields of the document's workspace with its values: [{id, name, type, options?, value, label}]. 2.635.0 (#4807 c):
+    a link field also has links [{id, name}]: only documents of the same workspace the asker sees (value = their ids)."""
     ws = m["ws"]
     vals = df_values(c, m["node_id"], ws)
     out = []
@@ -235,6 +290,11 @@ def df_json(c, m):
         d = df_def(r)
         d["value"] = vals.get(r["id"])
         d["label"] = df_label(r, d["value"])
+        if r["type"] == "documentlink":
+            seen, hidden = df_links(c, ws, d["value"])
+            d["links"], d["value"] = seen, ",".join(str(x["id"]) for x in seen) or None
+            d["label"] = ", ".join(x["name"] for x in seen) or None
+            d["hidden"] = len(hidden)  # documents it points to that this person does not see (or not yet imported)
         out.append(d)
     return out
 
@@ -293,6 +353,18 @@ def df_set(c, m, vals, by=None):
             return str(e)
     if not clean:
         return None
+    if by != "import":  # 2.635.0 (#4807 c): links only to documents of this workspace the person / agent sees
+        have = None
+        for fid, v in list(clean.items()):
+            f = by_id[str(fid)]
+            if f["type"] != "documentlink":
+                continue
+            have = df_values(c, nid, ws) if have is None else have
+            keep = df_links(c, ws, have.get(fid))[1]  # what the asker cannot see stays (it cannot remove what it does not see)
+            for x in (v or "").split(","):
+                if x and x not in keep and (x.startswith("pl:") or int(x) == nid or _link_seen(c, ws, int(x)) is None):
+                    return tr("{0}: only documents of this workspace you can open", f["name"])
+            clean[fid] = ",".join(dict.fromkeys([*(v.split(",") if v else []), *keep])) or None
     for fid, v in clean.items():
         _put(c, nid, ws, fid, v)
     auto = S.meta_json(c, m, "auto", {})
@@ -341,8 +413,8 @@ def df_move(c, nid, old, new, uid=None, define=None):
 
 
 # ---- Paperless-ngx: its custom fields as fields here -----------------------------------------------------------------
-PL_TYPES = {"string": "text", "longtext": "text", "url": "url", "date": "date", "boolean": "checkbox", "integer": "number",
-            "float": "number", "monetary": "money", "select": "select", "documentlink": "text"}
+PL_TYPES = {"string": "text", "longtext": "longtext", "url": "url", "date": "date", "boolean": "checkbox", "integer": "number",
+            "float": "number", "monetary": "money", "select": "select", "documentlink": "documentlink"}  # 2.635.0 (#4807 c): + longtext, documentlink
 
 
 def _pl_options(fd):
@@ -396,6 +468,11 @@ def df_from_paperless(c, ws, nid, doc, fields, uid=None):
                     f = None
             elif t == "text":
                 v = _field_text(fd, v)
+            elif t == "documentlink":  # 2.635.0 (#4807 c): the Kalmido document of an imported one, else "pl:<id>" (shown once it came in)
+                ids = [x for x in (v if isinstance(v, list) else [v]) if isinstance(x, int) and x > 0][:DF_LINKS_MAX]
+                got = {r[0]: r[1] for r in c.execute("SELECT pl_id, node_id FROM pl_imported WHERE ws=? AND node_id IS NOT NULL AND pl_id = ANY(CAST(? AS BIGINT[]))",
+                                                     (ws, "{" + ",".join(map(str, ids)) + "}"))} if ids else {}
+                v = [str(got[x]) if x in got else f"pl:{x}" for x in ids] or None
         if f and (f["id"] in have or v is None):
             continue
         if not f and t == "checkbox" and v is None:

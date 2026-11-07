@@ -235,7 +235,8 @@ def docs_spec(paths, schemas, op, ok, errs, ref, pid, q):
         # 2.126.1 A (#2123)
         "summary": {"type": "string", "description": "Single document only: the summary a person took over from an agent's draft ('' = none)"},
         "custom_fields": {"type": "array", "description": "2.153.0: the custom fields of the document's workspace with this document's "
-                          "value (single document only): id, name, type (text, number, money, date, checkbox, select, url), options "
+                          "value (single document only): id, name, type (text, number, money, date, checkbox, select, url; 2.635.0: longtext, documentlink = "
+                          "ids of documents of the same workspace, comma-separated, links [{id, name}] = the ones you see), options "
                           "(select: id, name), value (null = none; money '12.50 EUR', checkbox '1', select the option id), label",
                           "items": {"type": "object"}},
         # 2.635.0 (#4807 d)

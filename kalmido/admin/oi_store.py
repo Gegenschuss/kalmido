@@ -439,6 +439,8 @@ def _field_value(c, run, src, d, ctx):
     v = src.get("value")
     if not f or not isinstance(v, str) or v.startswith("kenc1:"):
         return _df_skip(run)  # a value that did not open in the export
+    if f["type"] == "documentlink":  # 2.635.0 (#4807 c): its ids are the source server's documents -- not taken over (yet)
+        return _df_skip(run)
     if f["type"] == "select":
         omap = _st(run).get("opts", {}).get(d["field_id"])
         v = omap.get(v) if omap is not None else v

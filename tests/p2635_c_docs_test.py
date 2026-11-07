@@ -9,6 +9,9 @@
  (d) notes on a document: several with author and time, seen by everybody who sees the document (also in its view), written
      with edit (403 with view, 404 without any right), sealed with the area key, found by a word / a prefix and gone from the
      index when deleted; deleted by someone with edit or by the author (also after the right fell to view); db.bump
+ (c) custom field types long text and link to documents: a long text keeps its lines, is indexed; a link only to documents
+     of the same workspace the person sees (refused: not seen, other workspace, itself, a Paperless reference, more than 20),
+     shown only to who sees the linked document, a link one cannot see stays when another is set / cleared
  (b) the text recognition languages of an area (Settings > Documents): the installed ones (no osd), deu+eng by default,
      KALMIDO_OCR_LANGS the cap (ocr.py loaded as a single file); a language not installed / too many are refused, only the
      area's admins change it, none = the default again
@@ -245,5 +248,54 @@ if st.get("ocr"):
     check(r.ok and r.json()["ocr_langs"]["chosen"] == ["nld"], f"#4807 (b) freelancer: her own area's languages {r.text[:160]}")
 else:
     print("NOTE: no Tesseract in this image -- the settings checks of (b) are skipped", flush=True)
+
+# ---- (c) field types long text and link to documents (only documents of the same workspace the person sees, checked
+# when set and when shown; a click opens it: the client links #docs/<id>)
+def fld(s_, ws, name, typ):
+    r = s_.post(B + "/api/docs/fields", json={"ws": ws, "name": name, "type": typ})
+    check(r.status_code == 201, f"#4807 (c) a field {name} ({typ}) {r.status_code} {r.text[:120]}")
+    return r.json().get("id") if r.status_code == 201 else 0
+
+
+def cfv(s_, did, fid):
+    return next((x for x in s_.get(B + f"/api/docs/{did}").json().get("custom_fields") or [] if x["id"] == fid), {})
+
+
+FL, FD = fld(Bo, f"org:{ORG}", "Vermerk", "longtext"), fld(Bo, f"org:{ORG}", "Bezug", "documentlink")
+LONG = "Lange Zeile mit Feuerlilie\n" + "x" * 3000
+check(Bo.patch(B + f"/api/docs/{DN}", json={"custom_fields": {str(FL): LONG}}).ok and cfv(Bo, DN, FL).get("value") == LONG,
+      "#4807 (c) a long text keeps its lines and 3000+ characters")
+check(DN in (found(Ca, "feuerlilie") or []), "#4807 (c) the long text is in the word index")
+r = Bo.post(B + "/api/docs", data={"ws": f"org:{ORG}"}, files=[("files", ("anlage.docx", docx("Anlage"), DOCX_MIME))])
+D2 = r.json()["ids"][0] if r.ok else 0
+r = Bo.post(B + "/api/docs", data={"ws": f"org:{ORG}"}, files=[("files", ("vertraulich.docx", docx("Geheim"), DOCX_MIME))])
+D4 = r.json()["ids"][0] if r.ok else 0  # bob's, not linked, dave does not see it
+r = Da.post(B + "/api/docs", data={"ws": f"org:{ORG}"}, files=[("files", ("dave.docx", docx("Dave"), DOCX_MIME))])
+D3 = r.json()["ids"][0] if r.ok else 0
+done(Bo, D2), done(Da, D3)
+r = Bo.patch(B + f"/api/docs/{DN}", json={"custom_fields": {str(FD): str(D2)}})
+v = cfv(Bo, DN, FD)
+check(r.ok and v.get("type") == "documentlink" and v.get("links") == [{"id": D2, "name": "anlage.docx"}] and v.get("value") == str(D2),
+      f"#4807 (c) bob links a document he sees {r.status_code} {v}")
+v = cfv(Ca, DN, FD)
+check(v.get("links") == [] and v.get("value") is None and v.get("hidden") == 1, f"#4807 (c) carol does not see the linked document: not shown {v}")
+check(Bo.patch(B + f"/api/files/shares/{sid}", json={"role": "edit"}).ok, "setup: dave edits again")
+for bad, what in ((str(D4), "a document he cannot see"), (f"{D2},{D4}", "a document he cannot see beside one linked already"), (str(nid), "a document of another workspace"), (str(DN), "the document itself"),
+                  ("pl:12", "a Paperless reference"), ("abc", "no id"), (",".join(str(D3 + i) for i in range(21)), "more than 20")):
+    check(Da.patch(B + f"/api/docs/{DN}", json={"custom_fields": {str(FD): bad}}).status_code == 400, f"#4807 (c) dave links no {what}")
+r = Da.patch(B + f"/api/docs/{DN}", json={"custom_fields": {str(FD): str(D3)}})
+check(r.ok and [x["id"] for x in cfv(Da, DN, FD).get("links") or []] == [D3], f"#4807 (c) dave links his own document {r.status_code} {r.text[:120]}")
+check(sorted(x["id"] for x in cfv(Bo, DN, FD).get("links") or []) == sorted([D2, D3]), "#4807 (c) ... the one he cannot see stays linked")
+check(Da.patch(B + f"/api/docs/{DN}", json={"custom_fields": {str(FD): None}}).ok and [x["id"] for x in cfv(Bo, DN, FD).get("links") or []] == [D2],
+      "#4807 (c) dave clears the field: only his link goes")
+
+# freelancer-matrix: files
+FF = fld(Fr, "private", "Siehe auch", "documentlink")
+r = Fr.post(B + "/api/docs", data={"ws": "private"}, files=[("files", ("zweit.odt", odt("Zweit"), ODT_MIME))])
+N2 = r.json()["ids"][0] if r.ok else 0
+done(Fr, N2)
+r = Fr.patch(B + f"/api/docs/{nid}", json={"custom_fields": {str(FF): str(N2)}})
+check(r.ok and [x["id"] for x in cfv(Fr, nid, FF).get("links") or []] == [N2], f"#4807 (c) freelancer: a link between her own documents {r.status_code}")
+check(Fr.patch(B + f"/api/docs/{nid}", json={"custom_fields": {str(FF): str(DN)}}).status_code == 400, "#4807 (c) freelancer: no link to another organisation's document")
 
 sys.exit(kt.done("p2635_c_docs"))

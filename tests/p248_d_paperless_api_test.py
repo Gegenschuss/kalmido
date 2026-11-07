@@ -233,7 +233,9 @@ if pb and tn:
     cf = {x["name"]: x for x in full.get("custom_fields") or []}
     check(cf.get("Contract number", {}).get("value") == "C-123" and cf.get("Status", {}).get("label") == "Paid"
           and cf.get("Status", {}).get("type") == "select" and cf.get("Amount", {}).get("value") == "42.00 EUR"
-          and cf.get("Signed", {}).get("value") == "1" and cf.get("Related", {}).get("value") == "Paperless #12"
+          and cf.get("Signed", {}).get("value") == "1"
+          # 2.635.0 (#4807 c): a document link is a link field now: Paperless #12 imported after it is shown as that document
+          and cf.get("Related", {}).get("type") == "documentlink" and [x["id"] for x in cf.get("Related", {}).get("links") or []] == [tn["id"]]
           and (full.get("auto") or {}).get(f"cf{cf.get('Status', {}).get('id')}") == "import",
           f"API 10 custom fields as fields: text, the select option's label, amount, yes / no, document link ({cf})")
     t2 = [n["text"] for n in A.get(B + f"/api/docs/{tn['id']}").json().get("notes") or []]  # 2.635.0 (#4807): as notes

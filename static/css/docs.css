@@ -404,3 +404,8 @@ body.pgdrag .dc-grid:not(.dc-selon) .dc-card:not(.dc-cur){content-visibility:aut
 .dcs-ocr legend{font-weight:600;padding:0}
 .dcs-ocrl{display:flex;flex-wrap:wrap;gap:.25rem 1rem}
 .dcs-ocrc{display:inline-flex;align-items:center;gap:.375rem;min-height:2.75rem}
+/* 2.635.0 (#4807 c): a field linking documents */
+.dc-cflinks{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem .75rem;flex:1;min-width:0}
+.dc-cfl{display:inline-flex;align-items:center;gap:.125rem;max-width:100%}
+.dc-cfl a{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dc-cflinks input{flex:1;min-width:10rem}

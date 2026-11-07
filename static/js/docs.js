@@ -12,7 +12,7 @@ const DC_LEVELS = [['learn', N_('Learns from your documents')], ['rules', N_('Ru
 const DC_KINDS = [['any', N_('contains one of the words')], ['all', N_('contains all words')], ['exact', N_('contains the exact phrase')],
   ['fuzzy', N_('contains the phrase (tolerates typos)')], ['regex', N_('matches the pattern (regular expression)')]];
 // 2.153.0 (#2179): the types of the custom fields of documents (docs/fields.py DF_TYPES; DC_FTYPES = the file types of the filter)
-const DC_CFTYPES = [['text', N_('Text')], ['number', N_('Number')], ['money', N_('Amount')], ['date', N_('Date')], ['checkbox', N_('Checkbox')], ['select', N_('Selection')], ['url', N_('Link')]];
+const DC_CFTYPES = [['text', N_('Text')], ['number', N_('Number')], ['money', N_('Amount')], ['date', N_('Date')], ['checkbox', N_('Checkbox')], ['select', N_('Selection')], ['url', N_('Link')], ['longtext', N_('Long text')], ['documentlink', N_('Link to documents')]];  // 2.635.0 (#4807 c): + long text, link to documents
 const DC_STATE = {wait: N_('Waiting for recognition'), run: N_('Recognising…'), done: N_('Recognised'), failed: N_('Recognition failed')};
 const DC_BY = {rule: N_('set by a rule'), learn: N_('learnt from your documents'), agent: N_('set by an agent'), import: N_('imported'), code: N_('read from the code on the document'), photo: N_('from the capture date of the photo')};  // 2.61.0 B (#1819): photo
 
@@ -566,10 +566,30 @@ function dc_cfRow(d, f, ro) {  // 2.153.0 (#2179): one custom field of the docum
     : f.type === 'date' ? dateIn(id, v, {label: f.name, ro: !!ro, attrs: a})
     : f.type === 'money' ? `<input id="${id}" ${a} inputmode="decimal" value="${esc(v ? v.replace(/^-?[\d.]+/, x => numField(x, 2, 2)) : '')}" placeholder="${esc(curMoney(0, 'EUR'))}" ${ro}>`
     : f.type === 'number' ? `<input id="${id}" ${a} inputmode="decimal" value="${esc(v ? numField(v) : '')}" ${ro}>`
+    : f.type === 'longtext' ? `<textarea id="${id}" ${a} rows="3" maxlength="10000" ${ro}>${esc(v)}</textarea>`  // 2.635.0 (#4807 c)
+    : f.type === 'documentlink' ? dc_cfLinksHtml(f, id, ro)
     : f.type === 'url' ? `<span class="dc-amt"><input type="url" id="${id}" ${a} value="${esc(v)}" placeholder="https://" ${ro}>${v && /^https?:\/\//i.test(v) ? `<a class="iconbtn" href="${esc(v)}" target="_blank" rel="noopener noreferrer" aria-label="${esc(tr('Open'))}">${ic('link')}</a>` : ''}</span>`
     : `<input id="${id}" ${a} value="${esc(v)}" maxlength="1000" ${ro}>`;
   return `<div class="row dc-f dc-cf"><label for="${id}">${esc(f.name)}</label>${input}${dc_auto(d, 'cf' + f.id)}</div>`;
 }
+// 2.635.0 (#4807 c): a field linking documents of the same workspace: each one opens with a click (#docs/<id>); the server
+// shows only the ones this person sees (f.links) and checks every new one; "Link a document" searches by name (datalist)
+function dc_cfLinksHtml(f, id, ro) {
+  const ls = (f.links || []).map(l => `<span class="dc-cfl"><a href="#docs/${+l.id}">${ic('file', 's')} ${esc(l.name)}</a>${ro ? '' : `<button type="button" class="iconbtn" data-dc="cflx:${+f.id}:${+l.id}" aria-label="${esc(tr('Remove the link to {0}', l.name))}" title="${esc(tr('Remove the link to {0}', l.name))}">${ic('x', 's')}</button>`}</span>`).join('');
+  const more = f.hidden ? `<span class="muted">${esc(tr('+{0} you cannot open', f.hidden))}</span>` : '';
+  const add = ro ? '' : `<input id="${id}" data-dcfl="${+f.id}" list="${id}-l" autocomplete="off" placeholder="${esc(tr('Link a document…'))}"><datalist id="${id}-l"></datalist>`;
+  return `<span class="dc-cflinks">${ls}${more}${add}</span>`;
+}
+async function dc_cfLinkFind(el) {  // the documents whose name / text has the words typed, as choices "Name · #id"
+  const q = el.value.trim(); if (q.length < 2 || /#\d+$/.test(q)) return;
+  let j; try { j = await api('GET', `/api/docs?facets=0&limit=10&q=${encodeURIComponent(q)}${DC.doc?.org_id ? `&ws=org:${DC.doc.org_id}` : '&ws=private'}`); } catch { return; }
+  const dl = document.getElementById(el.getAttribute('list') || ''); if (!dl || !el.isConnected) return;
+  dl.innerHTML = (j.docs || []).filter(x => x.id !== DC.doc?.id).map(x => `<option value="${esc(`${x.name} · #${x.id}`)}">`).join('');
+}
+document.addEventListener('input', e => {
+  const el = e.target.closest?.('[data-dcfl]'); if (!el) return;
+  clearTimeout(el._t); el._t = setTimeout(() => dc_cfLinkFind(el), 250);
+});
 function dc_val(f, el) {
   const v = el.value.trim();
   if (f === 'tags') return v ? v.split(',').map(x => x.trim()).filter(Boolean) : [];
@@ -640,6 +660,13 @@ async function dc_patch(id, body, label) {
   dc_load();
 }
 async function dc_mdChange(e) {
+  const lk = e.target.closest('[data-dcfl]');
+  if (lk && DC.doc) {  // 2.635.0 (#4807 c): a document chosen to link
+    const m = /#(\d+)$/.exec(lk.value.trim()); if (!m) return;
+    const f = (DC.doc.custom_fields || []).find(x => x.id === +lk.dataset.dcfl); if (!f) return;
+    const ids = [...(f.links || []).map(l => l.id), +m[1]];
+    return dc_patch(DC.doc.id, {custom_fields: {[f.id]: [...new Set(ids)].join(',')}}, tr('Edited {0}', DC.doc.name));
+  }
   const cf = e.target.closest('[data-dcf]');
   if (cf && DC.doc) {  // 2.153.0 (#2179)
     const v = cf.type === 'checkbox' ? cf.checked : cf.value.trim();
@@ -686,6 +713,12 @@ async function dc_mdClick(e) {
   }
   if (a === 'space') { if (await dc_smvMove(new Map([[d.id, d.org_id || null]]), `“${d.name}”`)) md.remove(); return; }  // 2.96.0 A (#1941)
   if (a.startsWith('step:')) { dc_step(+a.slice(5)); return; }  // 2.476.0 (#3935): the arrow buttons above the preview
+  if (a.startsWith('cflx:')) {  // 2.635.0 (#4807 c): one link of a link field removed (the ones this person cannot see stay)
+    const [fid, lid] = a.slice(5).split(':').map(Number), f = (d.custom_fields || []).find(x => x.id === fid); if (!f) return;
+    const rest = (f.links || []).map(l => l.id).filter(x => x !== lid);
+    dc_patch(d.id, {custom_fields: {[fid]: rest.length ? rest.join(',') : null}}, tr('Edited {0}', d.name));
+    return;
+  }
   if (typeof dcr_click === 'function' && dcr_click(a, md)) return;  // 2.521.0 (#4476): zoom, fold the properties
   if (a === 'view') {
     if (Date.now() - (DCW.end || 0) < 700) return;  // 2.476.0 (#3935): the end of a swipe / zoom on the preview is no tap
