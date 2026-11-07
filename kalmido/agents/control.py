@@ -39,12 +39,12 @@ from ..core.db import body, bump, db, err, iso, iso_ms, now_utc, parse_iso
 from ..core.pg import insert_id
 from ..core.access import Denied, joined_lists_sql, list_role, task_visible, WRITE_ROLES
 from ..core.errors import BadInput, UnknownFields
-from ..api.common import v1_call, v1_err, V1Error
+from ..api.common import hit_limit, v1_args, v1_call, v1_err, v1_json, v1_view, V1Error
 from ..accounts.session import me
 from ..tasks.lifecycle import apply_update, task_reopen, trash_task
 from ..collab.news import news_forget_comment
 from ..notify.push import notify, push_prio, WD_TICKS
-from ..agents.core import agent_emit, agent_row, agent_shares, is_agent
+from ..agents.core import agent_emit, agent_row, agent_shares, is_agent, need_agent
 from ..agents.chat import _jload, chat_choices_withdraw, choice_state
 from ..agents.workstyle import ws_need_editor
 from ..collab.cmttrash import cmt_trash  # 2.530.0 A (#4315, B11): text and files into the trash like comment_delete
@@ -58,7 +58,12 @@ CTL_DEADLINES = {"off": None, "1h": 3600, "4h": 4 * 3600, "1d": 86400, "3d": 3 *
 CTL_THEN = ("reject", "ask_again", "recommend")
 CTL_GOAL_MAX = 500
 CTL_DEFAULTS = {"level": "approve_all", "goal": "", "projects": {}, "one_way": [], "deadline": "off", "then": "reject"}
-CTL_KEEP = 50  # history lines per agent
+CTL_KEEP = 500  # history lines per agent (2.653.0, #5079: was 50; the dialog shows the newest groups, "Whole history" pages)
+CTL_SHOW = 50  # 2.653.0 (#5079): the lines GET /api/agents/<id>/control carries; older ones through .../control/history?before=
+CTL_PAGE_MAX = 200
+CTL_DECISION_MAX = 200  # 2.653.0 (#5079): title and ref of a decision the agent writes itself (POST /api/v1/agent/decisions)
+CTL_DECISION_RATE = 30  # per minute and agent
+CTL_FIELDS_MAX = 12
 CTL_WRITE = ("POST", "PUT", "PATCH", "DELETE")
 CTL_PLAN_KEYS = {"due", "due_time", "start"}  # "plan" = only these dates (+ the conflict helpers of PATCH)
 CTL_PLAN_EXTRA = {"expect_updated_at", "_prev", "shift_chain"}
@@ -415,7 +420,7 @@ def ctl_gate():
             return v1_err(409, tr("This approval does not fit: it needs a person's Yes, exactly this method, path and body, and works once."),
                           name="approval_invalid", step=step, level=level, project_id=lid)
     g.ctl_note = {"step": step, "level": level, "lid": lid, "path": path, "mid": mid, "aid": a["user_id"],
-                  "before": ctl_before(c, path, b)}
+                  "before": ctl_before(c, path, b), "info": ctl_info(path, b)}
     return None
 
 
@@ -479,18 +484,41 @@ def ctl_before(c, path, b):
     return None
 
 
+def ctl_info(path, b):
+    """2.653.0 (#5079): what a task change touched, for a history line in words: {fields: [the body's keys], count?: tasks of a
+    batch} -- only the names of the fields, never their values. {} for any other route."""
+    skip = CTL_PLAN_EXTRA | {"If-Match"}
+    if request.method == "PATCH" and path == "/tasks/{}":
+        return {"fields": sorted(k for k in b if isinstance(k, str) and k not in skip)[:CTL_FIELDS_MAX]}
+    if path == "/tasks/batch":
+        ch, ids = b.get("changes"), b.get("ids")
+        fields = sorted(k for k in ch if isinstance(k, str))[:CTL_FIELDS_MAX] if isinstance(ch, dict) else []
+        return {"fields": fields, "action": str(b.get("action") or "")[:40], "count": len(ids) if isinstance(ids, list) else 0}
+    return {}
+
+
 def ctl_kind(note, method, resp_j):
-    """The kind of a history line and what it needs for Undo -> (kind, target id, title, undo data)."""
+    """The kind of a history line and what it needs for Undo -> (kind, target id, title, undo data).
+    2.653.0 (#5079): a change of a task that is no plan of its dates is task_changed (its title + the changed fields in info),
+    no longer "other" -- the history reads in words, never as method + path."""
     p, bf = note["path"], note["before"] or {}
     j = resp_j if isinstance(resp_j, dict) else {}
+    info = note.get("info") or {}
     if method == "POST" and p in ("/tasks", "/tasks/{}/subtasks") and isinstance(j.get("id"), int):
         return "task_created", j["id"], j.get("title") or "", None
     if method == "POST" and p == "/tasks/{}/comments" and isinstance(j.get("id"), int):
         return "comment", j["id"], re.sub(r"\s+", " ", str(j.get("body") or ""))[:120], {"task_id": (request.view_args or {}).get("tid")}
     if p in ("/tasks/{}/complete", "/tasks/batch") and bf.get("ids"):
         return "task_completed", bf["ids"][0], bf.get("title") or "", {"ids": bf["ids"]}
-    if p in ("/tasks/{}", "/tasks/batch") and bf.get("tasks") and note["step"] == "routine":
+    plan = p == "/tasks/batch" or set(info.get("fields") or ()) & CTL_PLAN_KEYS  # 2.653.0 (#5079): unlocking only = a change
+    if p in ("/tasks/{}", "/tasks/batch") and bf.get("tasks") and note["step"] == "routine" and plan:
         return "task_planned", int(next(iter(bf["tasks"]))), bf.get("title") or "", {"tasks": bf["tasks"]}
+    if method == "PATCH" and p == "/tasks/{}":
+        tid = (request.view_args or {}).get("tid")
+        return "task_changed", tid if isinstance(tid, int) else None, str(j.get("title") or bf.get("title") or ""), None
+    if p == "/tasks/batch":
+        ids = [x for x in ((bf.get("ids") or list((bf.get("tasks") or {}).keys())) or []) if str(x).isdigit()]
+        return "task_changed", int(ids[0]) if ids else None, "", None
     return "other", None, "", None
 
 
@@ -517,10 +545,12 @@ def ctl_after(resp):
             undo["after"] = {str(r["id"]): {"due": r["due"], "due_time": r["due_time"], "start": r["start"]} for r in c.execute(
                 f"SELECT id, due, due_time, start FROM tasks WHERE id IN ({','.join('?' * len(ids))})", ids)}
         ts = iso(now_utc())
-        insert_id(c, """INSERT INTO agent_decisions(agent_id,list_id,step,level,kind,method,path,target_id,title,undo,via,message_id,created_at)
-                        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        info = (note.get("info") or {}) if kind == "task_changed" else {}
+        insert_id(c, """INSERT INTO agent_decisions(agent_id,list_id,step,level,kind,method,path,target_id,title,undo,via,message_id,created_at,info)
+                        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                   (note["aid"], note["lid"], note["step"], note["level"], kind, request.method, request.path[:300], target, title[:200],
-                   json.dumps(undo) if undo else None, "approval" if note["mid"] else "self", note["mid"], ts))
+                   json.dumps(undo) if undo else None, "approval" if note["mid"] else "self", note["mid"], ts,
+                   json.dumps(info) if info else ""))
         ctl_prune(c, note["aid"])
         c.commit()
     except Exception as e:  # noqa: BLE001  the history never breaks the agent's answer
@@ -534,11 +564,52 @@ def ctl_prune(c, aid):
                  ORDER BY id DESC LIMIT 1 OFFSET ?)""", (aid, aid, CTL_KEEP))
 
 
-def ctl_log(c, aid, kind, title, lid=None, message_id=None, via="deadline", step="", level=""):
-    """A history line without a request (the deadline of an approval)."""
-    insert_id(c, """INSERT INTO agent_decisions(agent_id,list_id,step,level,kind,method,path,target_id,title,undo,via,message_id,created_at)
-                    VALUES(?,?,?,?,?,'','',NULL,?,NULL,?,?,?)""", (aid, lid, step, level, kind, title[:200], via, message_id, iso(now_utc())))
+def ctl_log(c, aid, kind, title, lid=None, message_id=None, via="deadline", step="", level="", info=None):
+    """A history line without a request (the deadline of an approval; 2.653.0 #5079: a decision the agent wrote itself)."""
+    did = insert_id(c, """INSERT INTO agent_decisions(agent_id,list_id,step,level,kind,method,path,target_id,title,undo,via,message_id,created_at,info)
+                    VALUES(?,?,?,?,?,'','',NULL,?,NULL,?,?,?,?)""",
+                    (aid, lid, step, level, kind, title[:200], via, message_id, iso(now_utc()), json.dumps(info) if info else ""))
     ctl_prune(c, aid)
+    return did
+
+
+# ---------------------------------------------------------------- 2.653.0 (#5079): a decision the agent writes itself
+def ctl_decision_text(v, name, need):
+    """One line of text for a decision: whitespace folded, secrets out (agents/steps.py redact), cut to CTL_DECISION_MAX."""
+    if v is None and not need:
+        return ""
+    if not isinstance(v, str) or len(v) > 4000:
+        raise BadInput(tr("Invalid value: {0}", name))
+    from .steps import redact
+    t = re.sub(r"\s+", " ", redact(v)[0]).strip()
+    if need and not t:
+        raise BadInput(tr("Invalid value: {0}", name))
+    return t[:CTL_DECISION_MAX - 1].rstrip() + "…" if len(t) > CTL_DECISION_MAX else t
+
+
+@app.post("/api/v1/agent/decisions")
+@v1_view
+def v1_agent_decision():
+    """{title, ref?} -- a line in the agent's OWN history (Settings > Agents > Work style > History) for a decision that ran
+    outside the Kalmido API: a job card it answered itself, a change of a tool on its server, something it deliberately did not
+    start. kind decision, shown as "Decided: <title>"; no Undo (nothing in Kalmido to take back). Only ever the token's own agent
+    (no agent id in the path). title max 200 characters (longer is cut), empty = 400; ref (a task, a commit subject) max 200.
+    CTL_DECISION_RATE per minute (429). 201 {id, kind, title, ref, created_at}."""
+    v1_args(())
+    aid = need_agent()
+    b = v1_json()
+    unknown = sorted(k for k in b if k not in ("title", "ref"))
+    if unknown:
+        raise UnknownFields(unknown)
+    title = ctl_decision_text(b.get("title"), "title", True)
+    ref = ctl_decision_text(b.get("ref"), "ref", False)
+    if hit_limit(f"ctl-decisions:{aid}", CTL_DECISION_RATE):
+        return v1_err(429, tr("Too many requests, please slow down"), {"Retry-After": "5"})
+    c = db()
+    did = ctl_log(c, aid, "decision", title, via="self", info={"ref": ref} if ref else None)
+    c.commit()
+    r = c.execute("SELECT created_at FROM agent_decisions WHERE id=?", (did,)).fetchone()
+    return jsonify(id=did, kind="decision", title=title, ref=ref, created_at=r["created_at"] if r else None), 201
 
 
 # ---------------------------------------------------------------- the approval card (agents/chat.py chat_approval_clean)
@@ -644,24 +715,45 @@ WD_TICKS.append(("agent approval deadlines", ctl_deadline_tick))
 
 
 # ---------------------------------------------------------------- the routes of the settings (Settings > Agents > the gear)
+def ctl_area(path):
+    """2.653.0 (#5079): the area of a line's route ("tasks", "lists", "events" ...: its first part after the API prefix), for a
+    line in words ("Entry changed · Calendar") instead of method + path."""
+    p = path[len(API_PREFIX) - 1:] if path.startswith(API_PREFIX) else path
+    m = re.match(r"/([a-z][a-z0-9_-]{0,40})", p or "")
+    return m.group(1) if m else ""
+
+
 def ctl_decision_dict(c, r, names):
-    return {"id": r["id"], "kind": r["kind"], "step": r["step"], "level": r["level"], "title": r["title"], "via": r["via"],
+    try:
+        info = json.loads(r["info"]) if r.get("info") else {}
+    except (ValueError, TypeError):
+        info = {}
+    info = info if isinstance(info, dict) else {}
+    kind, area = r["kind"], ctl_area(r["path"] or "")
+    if kind == "other" and r["method"] == "PATCH" and re.fullmatch(r"/tasks/\d+", (r["path"] or "")[len(API_PREFIX) - 1:]):
+        kind = "task_changed"  # 2.653.0 (#5079): a line from before 2.653 reads in words too (its title was never stored)
+    return {"id": r["id"], "kind": kind, "step": r["step"], "level": r["level"], "title": r["title"], "via": r["via"],
             "method": r["method"], "path": r["path"], "list_id": r["list_id"], "list_name": names.get(r["list_id"]),
+            "area": area, "fields": [x for x in info.get("fields") or [] if isinstance(x, str)][:CTL_FIELDS_MAX],
+            "count": info.get("count") if isinstance(info.get("count"), int) else None, "ref": str(info.get("ref") or ""),
             "created_at": r["created_at"], "undone_at": r["undone_at"],
-            "can_undo": bool(r["undo"] or r["kind"] == "task_created") and not r["undone_at"] and r["kind"] != "other"}
+            "can_undo": bool(r["undo"] or r["kind"] == "task_created") and not r["undone_at"] and r["kind"] not in ("other", "decision")}
+
+
+def ctl_names(c, a):
+    """The projects of agent a the person sees -> [{id, name, max_level}] (the offer of the settings, the names of the history)."""
+    aid = a["user_id"]
+    rows = c.execute(f"""SELECT l.id, l.name FROM lists l WHERE l.deleted_at IS NULL AND l.id IN {joined_lists_sql()}
+                        ORDER BY l.name, l.id""", (aid, aid)).fetchall()
+    return [{"id": r["id"], "name": r["name"], "max_level": ctl_cap(c, a, r["id"])} for r in rows if list_role(c, r["id"], me())]
 
 
 def ctl_state(c, a):
     d = ctl_get(a)
     aid = a["user_id"]
-    rows = c.execute(f"""SELECT l.id, l.name FROM lists l WHERE l.deleted_at IS NULL AND l.id IN {joined_lists_sql()}
-                        ORDER BY l.name, l.id""", (aid, aid)).fetchall()
-    offer = []
-    for r in rows:
-        if list_role(c, r["id"], me()):  # only projects the person sees
-            offer.append({"id": r["id"], "name": r["name"], "max_level": ctl_cap(c, a, r["id"])})
+    offer = ctl_names(c, a)  # only projects the person sees
     names = {x["id"]: x["name"] for x in offer}
-    hist = c.execute("SELECT * FROM agent_decisions WHERE agent_id=? ORDER BY id DESC LIMIT ?", (aid, CTL_KEEP)).fetchall()
+    hist = c.execute("SELECT * FROM agent_decisions WHERE agent_id=? ORDER BY id DESC LIMIT ?", (aid, CTL_SHOW)).fetchall()
     return {"control": d, "chosen": d is not None, "defaults": CTL_DEFAULTS,
             "one_way_fixed": [{"id": k, "text": tr(CTL_ONE_WAY_TEXT[k])} for k in CTL_ONE_WAY_FIXED],
             "projects": offer, "history": [ctl_decision_dict(c, r, names) for r in hist]}
@@ -672,6 +764,25 @@ def ctl_route_get(aid):
     c = db()
     a = ws_need_editor(c, aid)
     return jsonify(ctl_state(c, a))
+
+
+@app.get("/api/agents/<int:aid>/control/history")
+def ctl_route_history(aid):
+    """2.653.0 (#5079): the whole history, page by page (the view "Whole history"): ?before=<line id> (older than it), ?limit=
+    (1..200, default 100) -> {history: [newest first], more: bool}. Owner / instance admin like the settings, else 404."""
+    c = db()
+    a = ws_need_editor(c, aid)
+    try:
+        before = int(request.args.get("before") or 0)
+        limit = int(request.args.get("limit") or 100)
+    except ValueError:
+        raise BadInput(tr("Invalid value: {0}", "before / limit")) from None
+    if before < 0 or not 1 <= limit <= CTL_PAGE_MAX:
+        raise BadInput(tr("Invalid value: {0}", "before / limit"))
+    names = {x["id"]: x["name"] for x in ctl_names(c, a)}
+    rows = c.execute(f"SELECT * FROM agent_decisions WHERE agent_id=? {'AND id<?' if before else ''} ORDER BY id DESC LIMIT ?",
+                     (aid, before, limit + 1) if before else (aid, limit + 1)).fetchall()
+    return jsonify(history=[ctl_decision_dict(c, r, names) for r in rows[:limit]], more=len(rows) > limit)
 
 
 @app.patch("/api/agents/<int:aid>/control")

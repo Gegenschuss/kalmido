@@ -1161,6 +1161,8 @@ ROUTES = {
     "GET /api/agents/{}/data-lock": "agents", "PATCH /api/agents/{}/data-lock": "agents",
     # 2.235.0 A (#2891 #2901): the control of an agent and the undo of its decisions (owner / instance admin, else 404; p2235_a_control_test.py)
     "GET /api/agents/{}/control": "agents", "PATCH /api/agents/{}/control": "agents", "POST /api/agents/{}/control/history/{}/undo": "agents",
+    # 2.653.0 (#5079): the whole history page by page and the agent's own decision line (p2653_a_agentlog_test.py, freelancer-matrix: agents)
+    "GET /api/agents/{}/control/history": "agents", "POST /api/v1/agent/decisions": "agents",
     # 2.557.0 C (#4670): the setup of a server agent -- its defaults and the starter pack (owner / instance admin, else 404; p2557_c_srvstarter_test.py)
     "GET /api/agents/server/defaults": "agents", "POST /api/agents/{}/server/starter": "agents",
     # 2.144.6 A (#2053): time entries to an invoice (office/timebill.py: the office area's client lists, release = office admin;

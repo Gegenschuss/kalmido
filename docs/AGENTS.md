@@ -3169,10 +3169,32 @@ the body, e.g. a move). A write to an object the server cannot place in a projec
 documents, an object without a project, a `list_id` that is no id) counts as at most `routine` for a personal agent.
 
 **History and Undo.** Every step the agent takes without a card (on `routine` / `free`) and every approved step is one
-line in the history of its settings (the newest 50), with *Undo* where the server can: a created task goes to the trash,
+line in the history of its settings (the newest 500), with *Undo* where the server can: a created task goes to the trash,
 a planned task gets its old dates, a ticked-off task is open again, a comment is deleted. The agent gets
 `decision_undone`. Undo of a plan or a tick only while nobody changed it since (else `409`, the person takes it back by
 hand).
+
+2.653.0 (#5079): the history reads in words, never as method + path: a changed task is *Task changed: <title>* or names
+its field (*Priority changed*, *Moved to another project*, *Tags changed* ...; only the field names are kept, never the
+values), a step in another area is *Entry changed* with the area. Like steps in a row (same kind, same project, at most
+5 minutes apart) are one line ("12 tasks changed in Releases") that opens to the single steps, each with its own Undo.
+The settings dialog shows the newest five lines; *Show whole history* opens all of them, page by page
+(`GET /api/agents/{id}/control/history?before=<line id>&limit=<1..200>` -> `{history, more}`, the owner / an instance
+admin only). Each line carries `kind`, `title`, `fields`, `count`, `area`, `ref`, `list_name`, `can_undo`.
+
+**Decisions outside the API** (2.653.0, #5079). A decision that did not run through the Kalmido API - a job card the
+agent answered itself, a change of a tool on its server, something it deliberately did not start - goes into its own
+history with
+
+```
+POST /api/v1/agent/decisions   {"title": "Answered the job card myself - tick off 2.599", "ref": "#2599"}
+  -> 201 {id, kind: "decision", title, ref, created_at}
+```
+
+shown as *Decided: <title>*. `title` max 200 characters (whitespace folded, longer is cut, recognisable secrets masked
+like steps; empty = `400`), `ref` optional (a task, a commit subject; max 200). Always the token's own agent (no id in
+the path: no agent writes another agent's history), on every control level (its own channel), no Undo, at most 30 a
+minute (`429`). MCP: `log_decision`. The agent's Kalmido steps are logged by the server already - it does not repeat them.
 
 **Deadline for approvals** (`deadline` in seconds, null = none; the owner picks 1 h, 4 h, 1 day or 3 days): an approval
 card left unanswered that long ends by itself, as `then` says - `reject` (default; the card shows *expired*),
@@ -4057,7 +4079,7 @@ endpoint is named somewhere in this guide or in [AGENT-SETUP.md](AGENT-SETUP.md)
 `propose_playbook`, `propose_to_other_topic`, `propose_to_person`, `react`, `react_team_message`, `react_to_chat`,
 `read_attachment`, `read_briefing`, `read_file`, `read_project_status`, `read_team_chat`, `related_tasks`, `remove_dependency`, `remove_relation`,
 `rename_folder`, `rename_section`, `reopen_task`, `reorder_project_links`, `reorder_sections`, `reply_to_event`,
-`report_plan_usage`, `report_progress`, `report_usage`, `request_approval`, `request_chat_approval`,
+`log_decision`, `report_plan_usage`, `report_progress`, `report_usage`, `request_approval`, `request_chat_approval`,
 `request_comment_approval`, `request_deploy_approval`, `request_integration_approval`, `request_merge_approval`,
 `request_reward`, `restore_event`, `restore_note`, `restore_task`, `review_task`, `search_contacts`, `search_files`, `search_messages`, `search_notes`,
 `search_tasks`, `send_chat`, `set_contact_care`, `set_delivery`, `set_list_columns`, `set_list_review`, `set_office_deal_stage`, `set_project_overview`, `set_project_status`,

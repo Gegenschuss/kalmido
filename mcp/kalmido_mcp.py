@@ -891,6 +891,14 @@ TOOLS = [
                         "tool output (file contents, logs, rows) and never secrets; one line, at most 500 characters, 60 per minute.",
      _obj({"text": {"type": "string", "maxLength": 500}, "chat_user_id": S_ID, "job_id": S_ID}, ["text"]),
      lambda api, a: api.call("POST", "/agent/progress", body=_pick(a, ("text", "chat_user_id", "job_id")))),
+    ("log_decision", "2.653.0: one line in YOUR OWN history (the people who manage you see it under Work style > History as "
+                     "'Decided: <title>') for a decision that did not run through the Kalmido API: a job card you answered "
+                     "yourself, a change of a tool on your server, something you deliberately did not start. Plain words, no "
+                     "method or path, no secrets (they are masked anyway). title max 200 characters (longer is cut, empty = 400); "
+                     "ref (optional, max 200) = what it refers to, e.g. a task '#2599' or a commit subject. No undo; at most 30 "
+                     "per minute. Your Kalmido steps (create, change, tick off ...) are logged by the server already: do not repeat them.",
+     _obj({"title": {"type": "string", "maxLength": 200}, "ref": {"type": "string", "maxLength": 200}}, ["title"]),
+     lambda api, a: api.call("POST", "/agent/decisions", body=_pick(a, ("title", "ref")))),
     ("list_events", "Events for the agent (mention, comment, assigned, unassigned, chat, reaction, job, tidy, wake, ping, followup_due, stale_tasks (2.34.0, once a day), "
      "job_request, runtime_changed, reset, scheduled_job) after cursor `since`. scheduled_job (2.34.0) = a person's planned job is due: "
      "do data.prompt, answer with send_chat to data.by.id (see list_schedules). runtime_changed / reset: your host should restart you (see get_agent "

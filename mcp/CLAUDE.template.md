@@ -400,6 +400,9 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
   after the Yes call `use_approval` with the card's message id and repeat the call once, same body. Never work around a refusal.
 - One-way steps (deleting, costs, login / registration, migrations without a way back, the owner's own list) always need
   a card first, on every level, also when they happen outside Kalmido.
+- A decision that does not run through the Kalmido API (a job card you answer yourself, a change of a tool on your
+  server, something you deliberately do not start): one line into your own history with `log_decision` (`title` in plain
+  words in the person's language, `ref` = the task or commit subject). Your Kalmido steps are logged already; never secrets.
 
 ### Work style (2.236.0)
 - **Read your work style and keep to it**: `get_agent` gives `work_style` (set by your owner; for a team agent an admin),
@@ -857,7 +860,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `propose_object_change`, `propose_rule`, `propose_sheet_tasks`, `propose_shoot`, `propose_time_entries`, `propose_to_other_topic`,
 `propose_to_person`, `react`, `react_team_message`, `react_to_chat`, `read_attachment`, `read_briefing`, `read_file`,
 `read_project_status`, `read_team_chat`, `related_tasks`, `remove_dependency`, `remove_relation`, `rename_folder`, `rename_section`, `reopen_task`,
-`reorder_project_links`, `reorder_sections`, `reply_to_event`, `report_plan_usage`, `report_progress`, `report_usage`,
+`log_decision`, `reorder_project_links`, `reorder_sections`, `reply_to_event`, `report_plan_usage`, `report_progress`, `report_usage`,
 `request_approval`, `request_chat_approval`, `request_comment_approval`, `request_deploy_approval`,
 `request_integration_approval`, `request_merge_approval`, `request_reward`, `restore_event`, `restore_note`, `restore_task`, `review_task`, `search_contacts`,
 `search_files`, `search_messages`, `search_notes`, `search_tasks`, `send_chat`, `sheet_add_column`, `sheet_append_rows`,

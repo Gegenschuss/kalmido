@@ -491,6 +491,12 @@ body.kb-open .acsug-l{max-height:min(30vh,9rem)}
 .awdlg .awcp .mrow,.awdlg .awco .mrow,.awdlg .awch .mrow{min-height:2.75rem;gap:.5rem}
 .awdlg .awch .n{white-space:normal;min-width:0}
 .awdlg .awch small{display:block}
+/* 2.653.0 (#5079): like steps in a row are one line that opens to the single steps; the view "Whole history" */
+.awdlg .awcg>summary{cursor:pointer;list-style:none}
+.awdlg .awcg>summary::-webkit-details-marker{display:none}
+.awdlg .awcg>summary .n::before{content:'\25B8';display:inline-block;width:1rem;color:var(--text2)}
+.awdlg .awcg[open]>summary .n::before{content:'\25BE'}
+.awdlg .awcgl{padding-left:1rem;border-left:2px solid var(--border,rgba(128,128,128,.25));margin:0 0 .25rem .375rem}
 @media (max-width:30rem){.awdlg .row{flex-wrap:wrap}.awdlg .row>label:first-child{flex:1 0 100%}.awdlg select,.awdlg input:not([type=checkbox]){min-height:2.75rem}}
 /* 2.350.0 A (#2790 #3317): one header on the phone and the desktop: avatar, name + ONE state line, right one group
    (side panel switch, ⋯, close; the phone only ⋯); at most 56 px high on the phone; nothing cut off */

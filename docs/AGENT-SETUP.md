@@ -423,6 +423,8 @@ For headless runs (`claude -p`, step 9) the same server as a JSON file, `~/agent
 - Set your status (set_status) while you work on something, and back to idle when done.
 - Keep to your control level (2.235.0: get_agent control, again on control_changed): a write it refuses (409
   approval_required) only after an approval card with step and the person's Yes (use_approval); one-way steps always by card.
+- A decision outside the Kalmido API (2.653.0: a job card you answer yourself, a tool change on your server, something you
+  deliberately do not start): one line in your own history with log_decision (title in plain words, ref = task / commit).
 - Read your work style (2.236.0: get_agent work_style, again on the event work_style_changed) and keep to it: budget, work
   window, at most max_parallel tasks at once from your queue (get_queue, set_queue_order; get_queue points=N marks the next
   bundle by size S=1, M=2, L=3), the next task by
