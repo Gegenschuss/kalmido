@@ -65,6 +65,17 @@ const SPLIT = `(sel => [...document.querySelectorAll(sel)].filter(n => n.getClie
       // 2.499.0 (#4047): nothing in the drawer is cut: no "…" class, no text beyond its box in either direction
       const cut = await ev(`[...document.querySelectorAll('#side .sbmr .srbn')].filter(n => n.classList.contains('srcut') || getComputedStyle(n).getPropertyValue('-webkit-line-clamp') !== 'none' || n.scrollWidth > n.clientWidth + 1 || n.scrollHeight > n.clientHeight + 1).map(n => n.textContent)`);
       check(cut.length === 0, `#4047 ${px} px: no area name cut in the drawer: ` + JSON.stringify(cut));
+      // 2.651.0 (#5063): the names' type grows after the fit without a redraw, resize or font event (in the CI a font load did
+      // it: "Rückblick" drawn in 10 px after it was measured in 9 px): the app fits them again by itself
+      if (px === 320) {
+        await ev(`(() => { const st = document.createElement('style'); st.id = 'p2458grow'; st.textContent = 'html body #side .sbmr .srb{font-size:.75rem}'; document.head.append(st); return 1; })()`);
+        const GROWN = `(() => { const ns = [...document.querySelectorAll('#side .sbmr .srbn')]; return {fs: getComputedStyle(document.querySelector('#side .sbmr .srb')).fontSize, split: ${SPLIT}('#side .sbmr .srbn'), over: ns.filter(n => n.scrollWidth > n.clientWidth + 1).map(n => n.textContent), sizes: ns.map(n => n.style.fontSize)}; })()`;
+        await until(async () => { const g = await ev(GROWN); return g.fs === '12px' && !g.split.length && !g.over.length; });
+        const g = await ev(GROWN);
+        check(g.fs === '12px' && !g.split.length && !g.over.length, '#5063 320 px: names that grow after the fit are fitted again: ' + JSON.stringify(g));
+        await ev(`(() => { document.getElementById('p2458grow').remove(); return 1; })()`);
+        check(await until(() => ev(`${SPLIT}('#side .sbmr .srbn').length === 0`)), '#5063 320 px: and again when they shrink back');
+      }
       await shot(`p2458-${px}-drawer.png`);
     }
     await ev(`(() => { const n = document.querySelector('#side .sbmr .srbn'); n.textContent = 'Donaudampfschifffahrtsgesellschaft'; sbb_fit(); return 1; })()`);

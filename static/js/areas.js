@@ -665,6 +665,21 @@ function sbb_fit() {
     row.style.gridTemplateColumns = w.map(x => `minmax(${x}px,1fr)`).join(' '); row.style.overflow = 'auto hidden';
     row.closest('#side').scrollTop = y;  // measuring moved the row's height: the drawer stays where it was
   }
+  sbb_fitWatch();
+}
+// 2.651.0 (#5063): a name's size can change after the fit without a redraw, resize or font event (Firefox measured a reset
+// name in its old 9 px type during a font load; a moment later it drew in 10 px, too wide for its column, and nothing fitted it
+// again: "Rückblick" split / cut in the 320 px drawer). Each name's box is noted at the end of a fit; when it differs later,
+// the fit runs again in the next frame. The fit's own result is noted, so a fit never wakes itself (no loop)
+const SBB_FITSZ = new WeakMap();
+let sbb_fitRO = null, sbb_fitDue = false;
+function sbb_fitWatch() {
+  if (typeof ResizeObserver !== 'function') return;
+  sbb_fitRO ||= new ResizeObserver(es => {
+    if (sbb_fitDue || !es.some(e => e.target.isConnected && Math.abs(e.contentRect.width - (SBB_FITSZ.get(e.target) ?? e.contentRect.width)) > .5)) return;
+    sbb_fitDue = true; requestAnimationFrame(() => { sbb_fitDue = false; sbb_fit(); });
+  });
+  for (const n of $$('#srail .srbn, #side .sbmr .srbn')) { SBB_FITSZ.set(n, n.getBoundingClientRect().width); sbb_fitRO.observe(n); }
 }
 window.addEventListener('resize', () => requestAnimationFrame(sbb_fit));
 document.fonts?.addEventListener('loadingdone', sbb_fit);
