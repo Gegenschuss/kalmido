@@ -39,10 +39,13 @@ const css = fs.readFileSync(path.join(__dirname, '..', 'static', 'app.css'), 'ut
     // many areas: a long name in place of one of them
     for (const w of [360, 320]) {
       await size(w, 740); await drawer(); await sleep(350);
-      await ev(`(() => { const n = document.querySelector('#side .sbmr .srb[data-sbb="life"] .srbn, #side .sbmr .srb .srbn'); n.textContent = 'Reisen & Kontakte'; sbb_fit(); return 1; })()`);  // 2.458.0 (#3880): the app fits a name after each draw; the swapped name too (with Notes, #3405, 11 areas = 6 columns at 320 px)
+      await ev(`(() => { const n = document.querySelector('#side .sbmr .srb[data-sbb="life"] .srbn, #side .sbmr .srb .srbn'); n.dataset.p2442o ??= n.textContent; n.textContent = 'Reisen & Kontakte'; sbb_fit(); return 1; })()`);  // 2.458.0 (#3880): the app fits a name after each draw; the swapped name too (with Notes, #3405, 11 areas = 6 columns at 320 px)
       const g = await ev(GRID);
       check(g.n >= 8 && g.rows <= 2 && g.inside && g.side && g.minH >= 43 && !g.cut.length, `#3739 ${w}: two rows at most, nothing cut ` + JSON.stringify(g));
     }
+    // 2.651.0 (#5032): the swapped name back - since #4509 renderSide keeps the nodes when its HTML is the same, so a redraw no longer
+    // undid the swap: the two-line name made the row 4 px higher and Today ended 1 px under the top of the search after 400 px
+    await ev(`(() => { const n = document.querySelector('#side .sbmr .srbn[data-p2442o]'); if (n) { n.textContent = n.dataset.p2442o; delete n.dataset.p2442o; sbb_fit(); } return 1; })()`);
     // 11 areas (the drawer of the report): two copies, the columns sbm_rowHtml sets for 11
     await size(360, 740); await drawer();
     await ev(`(() => { const r = document.querySelector('#side .sbmr'), bs = r.querySelectorAll('.srb[data-sbb]'); while (r.querySelectorAll('.srb[data-sbb]').length < 11) r.append(bs[2].cloneNode(true)); r.style.setProperty('--sbmc', 6); sbb_fit(); return 1; })()`);
