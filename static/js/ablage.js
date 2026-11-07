@@ -240,6 +240,17 @@ function ab_rowHtml(n, trash) {
 }
 const ab_item = id => (AB.data?.items || []).find(x => x.id === +id) || (AB.data?.node?.id === +id ? AB.data.node : null) || (typeof ftxtItem === 'function' ? ftxtItem(id) : null) || (typeof dt_abItem === 'function' ? dt_abItem(id) : null);  // 2.61.0 (#1820): + search hits; 2.122.0 B: + tag filter hits
 
+// 2.652.0 (#5071): a PDF of the folder leafs in the full screen through the folder's PDFs and pictures in the order shown
+// (a swipe on a touch screen, the arrow keys and two buttons, pdfview.js o.step); alone in its folder: no leafing
+function ab_pvOpts(n) {
+  const o = {url: ab_url(n), name: n.name, size: n.size, dlUrl: ab_url(n, true)};
+  if (!ab_isPdf(n)) { o.img = ab_url(n); o.kind = 'img'; }
+  const list = (AB.data?.items || []).filter(x => x.kind === 'file' && !x._enc && !upLocked(x) && (ab_isPdf(x) || ab_isImg(x))), i = list.findIndex(x => x.id === n.id);
+  if (i < 0 || list.length < 2) return o;
+  Object.assign(o, {pos: tr('{0} of {1}', i + 1, list.length), first: i <= 0, last: i >= list.length - 1, prevT: tr('Previous document'), nextT: tr('Next document'),
+    step: async dir => (list[i + dir] ? ab_pvOpts(list[i + dir]) : null)});
+  return o;
+}
 // ---- opening a file: images in the lightbox, PDFs in the PDF view, text in the text view, the rest downloads
 function ab_openFile(n) {
   if (n.kind === 'ref' && FS_REF_VIEW[n.ref_kind] === 'pdf' && typeof pdfView === 'function') { pdfView({url: ab_url(n), name: n.name, size: n.size, dlUrl: ab_url(n, true)}); return; }  // 2.351.0 B (#2749)
@@ -249,7 +260,7 @@ function ab_openFile(n) {
   if (n._enc && typeof fsl_open === 'function') { fsl_open(n); return; }  // 2.353.0 A (#2758): decrypted in the browser
   if (ab_isImg(n)) { const imgs = (AB.data?.items || []).filter(x => ab_isImg(x) && !upLocked(x)); attLightbox(n.id, imgs, (a, dl) => ab_url(a, dl)); return; }
   if (n.kind === 'file' && dv_is(n)) { dpvOpen({url: `/api/files/nodes/${encodeURIComponent(n.id)}/preview`, name: n.name, size: n.size, dlUrl: ab_url(n, true)}); return; }  // 2.92.0 C (#1926)
-  if (ab_isPdf(n)) { if (typeof pdfView === 'function') pdfView({url: ab_url(n), name: n.name, size: n.size, dlUrl: ab_url(n, true)}); else window.open(ab_url(n), '_blank', 'noopener'); return; }
+  if (ab_isPdf(n)) { if (typeof pdfView === 'function') pdfView(ab_pvOpts(n)); else window.open(ab_url(n), '_blank', 'noopener'); return; }  // 2.652.0 (#5071): ab_pvOpts
   if (isTextFile(n) && (n.size || 0) <= TV_MAX) { textView({url: ab_url(n, true), name: n.name, size: n.size, md: isMdFile(n), ext: attExt(n)}); return; }
   const a = document.createElement('a'); a.href = ab_url(n, true); a.download = n.name; document.body.appendChild(a); a.click(); a.remove();
 }

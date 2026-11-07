@@ -75,6 +75,7 @@ async function pdfView(o) {
     const s = fit * zoom;
     pages.forEach((p, i) => { p.style.width = Math.floor(base[i].w * s) + 'px'; p.style.height = Math.floor(base[i].h * s) + 'px'; p.dataset.s = ''; p.textContent = ''; });
     status();
+    if (swn) body.style.touchAction = zoom <= 1 ? 'pan-y' : '';  // 2.652.0 (#5071): sideways is the swipe; enlarged the page scrolls both ways
   };
   const draw = async (p, i) => {
     const s = fit * zoom, my = gen;
@@ -116,6 +117,7 @@ async function pdfView(o) {
 
   m.addEventListener('click', e => {
     const b = e.target.closest('[data-pv]');
+    if (e.target === m && swn?.recent()) return;  // 2.652.0 (#5071): the end of a swipe is no tap
     if (e.target === m || b?.dataset.pv === 'x') { close(); return; }
     if (b?.dataset.pv === 'arch') { close(); r81b_archEdit(o.arch); return; }
     if (!b || b.disabled) return;
@@ -136,7 +138,14 @@ async function pdfView(o) {
     gen++; io?.disconnect(); try { doc?.destroy(); } catch {}
     pdfView({...n, back});  // its first part (the new box, the focus) runs at once
     const lb = $('.lightbox.pview'); if (f && lb) $(`[data-pv="${f}"]:not([disabled])`, lb)?.focus();
+    if (swiped && lb) swn_slideIn($('.pvbody', lb), dir);  // 2.652.0 (#5071): it glides in from the side of the swipe
   };
+  // 2.652.0 (#5071): on a touch screen (phone, tablet, any width) a swipe sideways leafs through the list (swipenav.js, the
+  // gesture of the document preview); enlarged (zoom over the width) one finger moves the page as before
+  let swiped = false;
+  const swn = o.step && typeof swn_attach === 'function' ? swn_attach(body, {area: () => zoom <= 1 ? body : null,
+    can: dir => !(dir > 0 ? o.last : o.first), go: dir => { swiped = true; leaf(dir).finally(() => { swiped = false; }); }}) : null;
+  if (swn) body.style.touchAction = 'pan-y';
   // own keys while the preview has the focus (Esc here also gives the focus back, events.js only removes a lightbox)
   m.addEventListener('keydown', e => {
     if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); return; }
@@ -159,7 +168,7 @@ async function pdfView(o) {
   body.addEventListener('scroll', () => { if (doc) curFromScroll(); }, {passive: true});
   body.addEventListener('wheel', e => { if (!doc || !(e.ctrlKey || e.metaKey)) return; e.preventDefault(); setZoom(zoom * (e.deltaY < 0 ? 1.1 : 1 / 1.1)); }, {passive: false});
   // touch: two fingers pinch (the pages scale live with a transform, drawn sharp again at the end); one finger swiped
-  // sideways turns the page when the page fits the width (no sideways scrolling to steal)
+  // sideways turns the page when the page fits the width (no sideways scrolling to steal); 2.652.0 (#5071): not while leafing (o.step: the swipe above)
   let t0 = null;
   body.addEventListener('touchstart', e => {
     if (!doc) return;
@@ -179,7 +188,7 @@ async function pdfView(o) {
     if (t0.pinch) { const w = $('.pvpages', body); if (w) w.style.transform = ''; if (e.touches.length < 2) { const r = t0.r; t0 = null; if (Math.abs(r - 1) > 0.02) setZoom(zoom * r); } return; }
     const c = e.changedTouches[0], dx = c.clientX - t0.x, dy = c.clientY - t0.y, quick = Date.now() - t0.at < 600;
     t0 = null;
-    if (quick && zoom <= 1 && Math.abs(dx) > 60 && Math.abs(dx) > 2 * Math.abs(dy)) go(cur + (dx < 0 ? 1 : -1));
+    if (quick && zoom <= 1 && !swn && Math.abs(dx) > 60 && Math.abs(dx) > 2 * Math.abs(dy)) go(cur + (dx < 0 ? 1 : -1));
   }, {passive: true});
 
   document.body.appendChild(m);

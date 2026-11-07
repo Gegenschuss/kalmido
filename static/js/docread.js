@@ -245,7 +245,7 @@ document.addEventListener('keydown', e => {
 function dcr_fullOpts(d) {
   const o = {url: dc_fileUrl(d), name: d.name, size: d.size, dlUrl: dc_fileUrl(d, true)};
   if (!dc_isPdf(d)) { o.img = /^image\//.test(d.mime || '') ? dc_fileUrl(d) : null; o.kind = o.img ? 'img' : 'file'; }
-  if (isMobile()) return o;  // phones as before
+  // 2.652.0 (#5071): phones too (before: no leafing there) - a swipe sideways leafs on every touch screen (pdfview.js)
   const i = dc_navIdx(d);
   if (i >= 0) {
     const n = Math.max(DC.total || 0, DC.docs.length);
