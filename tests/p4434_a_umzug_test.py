@@ -105,7 +105,10 @@ check((row(f1), row(f2)) == before, f"#4434: the preview moves nothing {row(f1)}
 G = freelancer(B, A, "gina")[1]
 g1 = upload(G, "rechnung-gina.xml", ubl_inv("ER-2026-93", "Beispiel Licht AG", "DE345678912"))
 r = Fr.post(MV, json={"ids": [g1]})
+# tenant: POST /api/docs/office-move
 check(r.status_code == 409 and row(g1)[:2] == ("", ""), f"another person's document is never moved {r.status_code} {row(g1)}")
+# tenant: GET /api/docs/office-move
+check(not ({f1, f2} & set(picks(preview(G)))) and g1 not in picks(preview(Fr)), "each preview names only the own documents")
 check(Fr.post(MV, json={"ids": "all"}).status_code == 400, "ids must be a list: 400")
 r = A.post(B + "/api/admin/agents", json={"scopes": ["write"], "username": "umzieher", "display_name": "Umzieher"})
 tok = (r.json().get("token") or "") if r.status_code in (200, 201) else ""
@@ -123,6 +126,7 @@ r = Fr.get(B + "/api/docs", params={"ws": "all", "facets": "0", "area": "office"
 check(f1 in [d["id"] for d in r.json()["docs"]], "the office lists f1 now")
 j = preview(Fr, count="1")
 check(j["n"] == 0 and j["hidden"] and j["undo"] and j["undo"]["id"] == RUN and j["undo"]["n"] == 2, f"the hint gone, the undo line there {j}")
+# tenant: POST /api/docs/office-move/{}/undo
 check(G.post(MV + f"/{RUN}/undo").status_code == 404, "another person's undo: 404 (tenant-matrix: document)")
 r = Fr.post(B + f"/api/docs/office-move/{RUN}/undo")
 check(r.ok and r.json()["back"] == 2 and not r.json()["stayed"], f"the undo {r.status_code} {r.text[:200]}")
@@ -145,8 +149,11 @@ check(preview(Fr, count="1")["undo"] is None, "after 30 days no undo line")
 r = Fr.post(MV + f"/{RUN3}/undo")
 check(r.status_code == 409 and row(f2)[0] == "office", f"after 30 days: 409, it stays in the office {r.status_code} {row(f2)}")
 
+g_hidden = preview(G, count="1").get("hidden")
 r = Fr.post(B + "/api/docs/office-move/hide")
 check(r.ok and preview(Fr, count="1")["hidden"], "the hint closed")
+# tenant: POST /api/docs/office-move/hide
+check(preview(G, count="1").get("hidden") == g_hidden, "closing the hint changes nothing for another person")
 
 # ==== a person without an office
 No = freelancer(B, A, "nora", features="files,docs")[1]
