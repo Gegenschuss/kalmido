@@ -47,7 +47,7 @@ from ..api.v1 import (
     V1_TASK_IN, v1_task_in,
 )
 from ..api.v1 import V1_TASK_VERSIONED  # 2.564.0 (#4702)
-from ..core.conflict import need_version, VersionRequired  # 2.564.0 (#4702)
+from ..core.conflict import need_version, take_version, VersionRequired  # 2.564.0 (#4702); 2.638.0 (#4775): take_version
 from ..api.common import cursor_dec, v1_args, v1_call, v1_feature, v1_json, v1_page, v1_view
 from ..api.openapi import openapi_spec
 from ..agents.core import agent_emit, agent_row, is_agent, job_dict, JOB_LOG_MAX
@@ -998,13 +998,14 @@ def v1_attachment_delete(aid):
 @app.patch("/api/v1/comments/<int:cid>")
 @v1_view
 def v1_comment_update(cid):
-    """{body}: only the author edits a comment."""
+    """{body, expect_updated_at?}: only the author edits a comment. 2.638.0 (#4775): expect_updated_at (or If-Match) = the
+    comment's edited_at, else its created_at, as read; changed meantime -> 409 with the comment; agents must send it."""
     v1_args(())
-    b = _v1_body(("body",))
+    b = take_version(dict(_v1_body(("body", "expect_updated_at"))))
     if not isinstance(b.get("body"), str):
         raise BadInput(tr("Expected {0}", '{"body": "..."}'))
     c = db()
-    j = v1_call(comment_update, cid, body={"body": b["body"]})
+    j = v1_call(comment_update, cid, body={"body": b["body"], **({"expect_updated_at": b["expect_updated_at"]} if b.get("expect_updated_at") else {})})
     tid = c.execute("SELECT task_id FROM comments WHERE id=?", (cid,)).fetchone()[0]
     return jsonify(v1_comment(c, {**j, "task_id": tid}, user_names(c, [j.get("user_id") or me()])))
 

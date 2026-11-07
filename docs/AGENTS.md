@@ -1159,6 +1159,7 @@ Read first, send the version back:
 | Notes | `PATCH /api/v1/notes/{id}` with `title`, `body` or `tags` (MCP `update_note`) | `expect_updated_at` | `updated_at` of `get_note` |
 | Events, contacts | `PATCH /api/v1/events/{id}`, `/contacts/{id}` (MCP `update_event`, `update_contact`) | `expect_updated_at` (or `expect`, `If-Match`) | `updated_at` of the event / contact |
 | Office drafts | quotation draft, letter draft, lead (MCP `update_offer_draft`, `update_letter_draft`, `update_office_lead`) | `expect_updated_at` | `updated_at` of the draft / lead |
+| Own comments, team chat messages (2.638.0) | `PATCH /api/v1/comments/{id}`, `/team/messages/{id}` (MCP `update_comment`, `edit_team_message`) | `expect_updated_at` or `If-Match` | `edited_at` of the comment / message, `created_at` when it was never edited |
 
 Events and contacts carry `updated_by` (2.571.0): the account that changed them last - in the app, through the API (an
 agent's own id), over CalDAV / CardDAV or an import; `null` for rows nobody changed since then.
@@ -4217,7 +4218,7 @@ own chat.
 | `GET /team/rooms` | `list_team_chats` | read |
 | `GET /team/rooms/{id}/messages?before=&limit=` | `read_team_chat` | read |
 | `POST /team/rooms/{id}/messages` `{body, task_id?, reply_to?}` (mentions as `<@user id>`; 2.33.0 `reply_to`: a message of the same conversation; 2.281.0: at most 60 messages per account and minute, then `429`) | `post_team_message` | comments |
-| `PATCH /team/messages/{id}` · `DELETE …` (own messages) | `edit_team_message` · `delete_team_message` | comments |
+| `PATCH /team/messages/{id}` `{body, expect_updated_at}` · `DELETE …` (own messages; 2.638.0: `expect_updated_at` = `edited_at`, else `created_at`, required for agents, `409` + `error.current` when edited since) | `edit_team_message` · `delete_team_message` | comments |
 | `POST /team/messages/{id}/reactions` `{emoji, on?}` | `react_team_message` | comments |
 | `POST /team/messages/{id}/pin` `{pinned?}` (2.62.0: at most 5 per conversation; the page of a conversation carries `pins`) | `pin_team_message` | comments |
 | `POST /team/rooms/{id}/read` `{last_id?, thread?}` (2.139.0: `thread` = the read mark in a thread) | `mark_team_chat_read` | comments |

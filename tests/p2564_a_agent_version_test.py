@@ -7,6 +7,8 @@
  - tasks batch update: _prev for every task of the batch
  - a locked task: the agent is not bound, the history shows locked_bypass
  - knowledge page (wiki_write), table cells (expect_rev / prev), a new file version (expect_version / If-Match)
+ - 2.638.0 (#4775): own comments (PATCH /comments/{id}) and team chat messages (PATCH /team/messages/{id}): no version 400,
+   the version read (edited_at, else created_at) 200, the one from before an edit 409, If-Match counts
  - the same for a person without an organisation and her own agent"""
 import os
 import subprocess
@@ -43,7 +45,7 @@ Bo.patch(B + "/api/settings", json={"lang": "en", "features": FEAT, "tour": "don
 ids = {u["username"]: u["id"] for u in A.get(B + "/api/users").json()["users"]}
 L = A.post(B + "/api/lists", json={"name": "Shared work"}).json()["id"]
 A.put(B + f"/api/lists/{L}/members", json={"user_id": ids["bob"], "role": "edit"})
-SCOPES = ["read", "tasks:write", "wiki:read", "wiki:write", "sheets:read", "sheets:write", "files:read", "files:write"]
+SCOPES = ["read", "tasks:write", "wiki:read", "wiki:write", "sheets:read", "sheets:write", "files:read", "files:write", "comments"]  # 2.638.0 (#4775): + comments
 ag = A.post(B + "/api/admin/agents", json={"scopes": SCOPES, "username": "claude", "display_name": "Claude", "org_id": ORG}).json()
 AGID, AGH = ag.get("id"), {"Authorization": "Bearer " + ag.get("token", "x"), **H}
 A.put(B + f"/api/lists/{L}/members", json={"user_id": AGID, "role": "edit"})
@@ -254,16 +256,54 @@ def files_round(who, h, person_h=None):
 
 files_round("org", AGH, PH)
 
+
+# ================================================================== 2.638.0 (#4775): own comments and team chat messages
+def ver(x):
+    return x.get("edited_at") or x.get("created_at")
+
+
+def own_text_round(who, h, path, made):
+    """made = the agent's own comment / message (v1); PATCH path: no version 400, the version read 200, that old one again
+    409 with the current text (nothing changes), If-Match counts."""
+    check(made.get("id") and ver(made), f"{who}: setup: the agent's own text carries created_at {made}")
+    r = call(h, "PATCH", f"{path}/{made.get('id')}", json={"body": "edited without a version"})
+    check(vreq(r) and "expect_updated_at" in r.json()["error"]["fields"], f"{who}: no version: 400 version_required {r.status_code} {r.text[:200]}")
+    r = call(h, "PATCH", f"{path}/{made.get('id')}", json={"body": "first edit", "expect_updated_at": ver(made)})
+    check(r.ok and r.json().get("body") == "first edit" and r.json().get("edited_at"), f"{who}: the version read writes {r.status_code} {r.text[:200]}")
+    now = r.json() if r.ok else {}
+    r = call(h, "PATCH", f"{path}/{made.get('id')}", json={"body": "stale edit", "expect_updated_at": ver(made)})
+    check(conflict(r), f"{who}: the version from before the edit: 409 conflict {r.status_code} {r.text[:200]}")
+    r = call(h, "PATCH", f"{path}/{made.get('id')}", hdr={"If-Match": '"' + str(ver(now)) + '"'}, json={"body": "second edit"})
+    check(r.ok and r.json().get("body") == "second edit", f"{who}: If-Match counts as the version {r.status_code} {r.text[:200]}")
+
+
+def own_texts(who, h, owner, lid, agent_id):
+    T = owner.post(B + "/api/tasks", json={"title": "Talk about the cut", "list_id": lid}).json()["id"]
+    r = call(h, "POST", f"/tasks/{T}/comments", json={"body": "my first words"})
+    check(r.status_code == 201, f"{who}: setup: the agent's comment {r.status_code} {r.text[:200]}")
+    own_text_round(f"{who} comment", h, "/comments", r.json() if r.status_code == 201 else {})
+    r = owner.post(B + "/api/team/channels", json={"name": f"Versions {who}", **({"org_id": ORG} if who == "org" else {})})
+    check(r.status_code == 201, f"{who}: setup: a channel {r.status_code} {r.text[:200]}")
+    room = r.json().get("id") if r.status_code == 201 else None
+    check(room and owner.post(B + f"/api/team/rooms/{room}/members", json={"user_id": agent_id}).ok, f"{who}: setup: the agent in the channel")
+    r = call(h, "POST", f"/team/rooms/{room}/messages", json={"body": "hello all"})
+    check(r.status_code == 201, f"{who}: setup: the agent's message {r.status_code} {r.text[:200]}")
+    own_text_round(f"{who} team message", h, "/team/messages", r.json() if r.status_code == 201 else {})
+
+
+own_texts("org", AGH, A, L, AGID)
+
 # ================================================================== a person without an organisation, her own agent
 A.put(B + "/api/admin/agent-policy", json={"user_agents": True})
 FID, Fr = freelancer(B, A)
-r = Fr.post(B + "/api/my/agents", json={"username": "fridabot", "display_name": "Frida Bot", "scopes": ["read", "tasks:write", "files:read", "files:write"]})
+r = Fr.post(B + "/api/my/agents", json={"username": "fridabot", "display_name": "Frida Bot", "scopes": ["read", "tasks:write", "files:read", "files:write", "comments"]})  # 2.638.0 (#4775): + comments
 check(r.status_code == 201, "setup: the freelancer's own agent " + r.text[:200])
 FAG, FH = r.json().get("id"), {"Authorization": "Bearer " + r.json().get("token", "x"), **H}
 FL = Fr.post(B + "/api/lists", json={"name": "Mine"}).json()["id"]
 Fr.put(B + f"/api/lists/{FL}/members", json={"user_id": FAG, "role": "edit"})
 tasks_round("freelancer", FH, FL, Fr)
 files_round("freelancer", FH)
+own_texts("freelancer", FH, Fr, FL, FAG)
 
 print(f"p2564_a_agent_version: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 sys.exit(1 if FAILS else 0)

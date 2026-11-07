@@ -1776,8 +1776,11 @@ TOOLS += [
      lambda api, a: api.call("DELETE", f"/attachments/{_id(a, 'attachment_id')}")),
     ("delete_chat_attachment", "Remove a file you sent in a chat.", _obj({"attachment_id": S_ID}, ["attachment_id"]),
      lambda api, a: api.call("DELETE", f"/chat-attachments/{_id(a, 'attachment_id')}")),
-    ("update_comment", "Edit your comment (Markdown).", _obj({"comment_id": S_ID, "body": {"type": "string", "minLength": 1}}, ["comment_id", "body"]),
-     lambda api, a: api.call("PATCH", f"/comments/{_id(a, 'comment_id')}", body={"body": a["body"]})),
+    ("update_comment", "Edit your comment (Markdown). 2.638.0: expect_updated_at = the comment's edited_at, else its created_at, as "
+     "you read it; required (400 version_required without it); changed since = 409 conflict with error.current.",
+     _obj({"comment_id": S_ID, "body": {"type": "string", "minLength": 1}, "expect_updated_at": {"type": "string"}},
+          ["comment_id", "body", "expect_updated_at"]),
+     lambda api, a: api.call("PATCH", f"/comments/{_id(a, 'comment_id')}", body=_pick(a, ("body", "expect_updated_at")))),
     ("delete_comment", "Delete a comment (yours; project owners / admins any). 2.530.0: it goes into the trash with its files (a person "
      "restores it in the app)." + APPROVAL_NOTE, _obj({"comment_id": S_ID}, ["comment_id"]),
      lambda api, a: api.call("DELETE", f"/comments/{_id(a, 'comment_id')}")),
@@ -1942,8 +1945,10 @@ TOOLS += [
     ("leave_team_channel", "2.138.1 (#2059): leave a team chat channel a person added you to (user_id = your own user id).",
      _obj({"room_id": S_ID, "user_id": S_ID}, ["room_id", "user_id"]),
      lambda api, a: api.call("DELETE", f"/team/rooms/{int(a['room_id'])}/members/{int(a['user_id'])}")),
-    ("edit_team_message", "2.17.0: change your own team chat message.", _obj({"message_id": S_ID, "body": {"type": "string"}}, ["message_id", "body"]),
-     lambda api, a: api.call("PATCH", f"/team/messages/{int(a['message_id'])}", body={"body": a["body"]})),
+    ("edit_team_message", "2.17.0: change your own team chat message. 2.638.0: expect_updated_at = the message's edited_at, else its "
+     "created_at, as you read it; required (400 version_required without it); edited since = 409 conflict with error.current.",
+     _obj({"message_id": S_ID, "body": {"type": "string"}, "expect_updated_at": {"type": "string"}}, ["message_id", "body", "expect_updated_at"]),
+     lambda api, a: api.call("PATCH", f"/team/messages/{int(a['message_id'])}", body=_pick(a, ("body", "expect_updated_at")))),
     ("delete_team_message", "2.17.0: delete your own team chat message.", _obj({"message_id": S_ID}, ["message_id"]),
      lambda api, a: api.call("DELETE", f"/team/messages/{int(a['message_id'])}")),
     ("react_team_message", "2.17.0: toggle a reaction (up, down, heart or one emoji) on a team chat message; on=true/false sets it.",

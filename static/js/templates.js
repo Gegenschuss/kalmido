@@ -161,9 +161,12 @@ function templateModal(tp, done) {
           const p = tplParse($('#tp-outline', md).value, d.tasks || [], true);
           data = {...d, name: $('#tp-lname', md).value.trim(), sections: p.sections, tasks: p.roots};
         }
-        await api('PATCH', '/api/templates/' + tp.id, {name, data});
+        await api('PATCH', '/api/templates/' + tp.id, {name, data, ...(tp.updated_at ? {expect_updated_at: tp.updated_at} : {})});  // 2.638.0 (#4775): the version the dialog opened with
       }
-    } catch { return; }  // api() showed it
+    } catch (x) {  // api() showed it; 2.638.0 (#4775): saved elsewhere meantime -> the dialog again with the current template
+      if (x?.status === 409 && x.data?.template && b.dataset.m === 'save') { md.remove(); await load(); render(); templateModal(x.data.template, done); }
+      return;
+    }
     md.remove(); await load(); render(); done && done();
     // 2.567.0 A (#4707): a deleted template waits in the trash: the toast and the undo history take it back out
     if (b.dataset.m === 'del') offerUndo(tr('Template deleted'), histAdd({label: tr('Template “{0}” deleted', tp.name), undo: async () => { await api('POST', `/api/templates/${tp.id}/restore`); await load(); render(); done && done(); }, redo: async () => { await api('DELETE', '/api/templates/' + tp.id); await load(); render(); done && done(); }}));

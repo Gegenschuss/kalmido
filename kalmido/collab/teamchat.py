@@ -1143,10 +1143,13 @@ def v1_tchat_post(rid):
 @app.patch("/api/v1/team/messages/<int:mid>")
 @v1_view
 def v1_tchat_edit(mid):
+    """{body, expect_updated_at?}. 2.638.0 (#4775): expect_updated_at (or If-Match) = the message's edited_at, else its
+    created_at, as read; edited meantime -> 409 with the message; agents must send it (core/conflict.py take_version)."""
+    from ..core.conflict import take_version
     v1_args(())
-    b = v1_json()
-    reject_unknown(b, ("body",))
-    return jsonify(v1_call(tchat_edit, mid, body=b))
+    b = dict(v1_json())
+    reject_unknown(b, ("body", "expect_updated_at"))
+    return jsonify(v1_call(tchat_edit, mid, body=take_version(b)))
 
 
 @app.delete("/api/v1/team/messages/<int:mid>")

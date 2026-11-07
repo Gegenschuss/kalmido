@@ -132,6 +132,7 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
   and positions you keep in `update_offer_draft` go with their `id`.
   2.564.0: `update_event`, `update_contact`, `update_offer_draft`, `update_letter_draft` and `update_office_lead` require
   `expect_updated_at` (the `updated_at` you read; without it `400` `version_required`, changed since = `409` with `error.current`).
+  2.638.0: `update_comment` and `edit_team_message` too, with the comment's / message's `edited_at` (else `created_at`) as you read it.
 - **Dates move the chain (2.67.0).** Postponing a task's due date in a project with progress and status with *Move dependent tasks along* on
   also moves every task waiting on it by the same days (the whole chain; the answer's `chain` / `chain_note` names them,
   `chain.skipped` what stayed). Mention it when you report the change. Send `shift_chain: false` only when the person
