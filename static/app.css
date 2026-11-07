@@ -8868,7 +8868,3 @@ time,.meta .dt,.dpbtn,.remchips button,.dprow .dpt,.dprow .dps,.fwhen{font-famil
    make room (FLIP, transform only, class kflip while it runs). Reduced motion: the placeholder alone, nothing slides */
 #view .kcards>.kph{flex-shrink:0;border:2px dashed var(--accent);border-radius:var(--radius);background:color-mix(in srgb,var(--accent) 8%,transparent);pointer-events:auto}
 @media (prefers-reduced-motion:no-preference){ #view .kcards>.trow.kflip{transition:transform .18s cubic-bezier(.2,.8,.2,1)} }
-/* 2.637.0 (#4768): rule dialog: chain of actions, "Only if" */
-.rul-ablk+.rul-ablk{border-top:1px solid var(--line);margin-top:.5rem;padding-top:.5rem}
-.rul-dlg [id^="rul-text-"]{width:100%;box-sizing:border-box;resize:vertical}
-.rul-cond{margin:.25rem 0 .5rem}.rul-cond>summary{cursor:pointer;min-height:2.75rem;display:flex;align-items:center;color:var(--muted)}

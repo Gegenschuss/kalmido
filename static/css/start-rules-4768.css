@@ -1,0 +1,6 @@
+/* 2.637.0 (#4768): the rule dialog (rules.js rul_dialog) - a chain of up to five actions and the folded "Only if" - rules of
+   their own file since app.css takes no new ones (check_layout). */
+.rul-ablk+.rul-ablk{border-top:1px solid var(--line);margin-top:.5rem;padding-top:.5rem}
+.rul-dlg [id^="rul-text-"]{width:100%;box-sizing:border-box;resize:vertical}
+.rul-cond{margin:.25rem 0 .5rem}
+.rul-cond>summary{cursor:pointer;min-height:2.75rem;display:flex;align-items:center;color:var(--muted)}
