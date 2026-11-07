@@ -146,8 +146,19 @@ function attLightbox(id, list, url = attUrl) {  // 2.32.0 (#983): url = the addr
     tx = e.clientX - pan.x; ty = e.clientY - pan.y; moved = moved || Math.hypot(e.clientX - pan.x0, e.clientY - pan.y0) > 4; put();
   });
   for (const t of ['pointerup', 'pointercancel']) m.addEventListener(t, () => { pan = null; });
+  // 2.652.0 (#5073): a swipe sideways on the picture leafs to the next / previous one (swipenav.js, the gesture of the
+  // document preview; at the first / last it springs back, the buttons still go round); zoomed, one finger moves the
+  // picture; a start at the screen's edge stays the phone's Back gesture; the end of a swipe is no tap (nothing closes)
+  let sw = null;
+  // lazy-ok-begin: swOn runs only once swipenav.js is in (the typeof / loadModule below)
+  const swOn = () => { sw = swn_attach(m, {area: t => z === 1 && t && !t.closest?.('.lbbar') ? img() : null, can: d => !!imgs[i + d],
+    go: d => { i += d; draw(); swn_slideIn(img(), d); }}); };
+  // lazy-ok-end
+  if (typeof swn_attach === 'function') swOn();
+  else if (navigator.maxTouchPoints > 0 || isTouch()) loadModule('swipenav').then(() => { if (m.isConnected && !sw) swOn(); }).catch(() => {});
   m.addEventListener('click', e => {
     const b = e.target.closest('[data-lb]');
+    if (!b && sw?.recent()) return;  // 2.652.0 (#5073): the end of a swipe
     if (b && b.dataset.lb !== 'x') { i = (i + +b.dataset.lb + imgs.length) % imgs.length; draw(); return; }
     if (!b && e.target.tagName === 'IMG' && (z > 1 || moved)) { moved = false; return; }  // 2.331.0 E (#3311): zoomed / moved
     if (b || e.target === m || e.target.tagName === 'IMG') m.remove();

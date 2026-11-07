@@ -133,6 +133,31 @@ function swipe(w, el, dx, dy = 0, x0 = 200) {  // one finger from (x0, 300) by d
     m.close();
   }
 
+  // ================= #5073: the image viewer, phone and touch tablet
+  for (const [label, opt] of [['phone', {mobile: true}], ['tablet', {media: {'(hover: none)': true, '(pointer: coarse)': true}}]]) {
+    const m = await boot({user: 'alice', hash: 'ablage', ...opt}), d = m.document;
+    const open = () => m.eval(`attLightbox('a', ['a', 'b', 'c'].map(id => ({id, name: id + '.png', size: 10})), (a, dl) => '/static/icon.svg?' + a.id + (dl ? '&dl' : ''))`);
+    open();
+    const lb = () => d.querySelector('.lightbox:not(.pview)'), img = () => lb()?.querySelector('img'), at = () => (img()?.getAttribute('src') || '').replace(/.*\?/, '');
+    check(lb() && at() === 'a', `${label} viewer: the first picture`);
+    swipe(m, img(), -150);
+    check(await until(() => at() === 'b'), `${label} viewer: a swipe to the left = the next picture (${at()})`);
+    click(m, img());
+    check(lb() && at() === 'b', `${label} viewer: the end of a swipe is no tap (the view stays open)`);
+    swipe(m, img(), 150);
+    check(await until(() => at() === 'a'), `${label} viewer: a swipe to the right = the one before`);
+    swipe(m, img(), 150);
+    check(await until(() => !img()?.style.transform) && at() === 'a', `${label} viewer: before the first it springs back (no wrap round)`);
+    swipe(m, img(), -150, 0, 8);
+    swipe(m, img(), -20, -160);
+    check(at() === 'a', `${label} viewer: a start at the screen's edge and a swipe up do not leaf`);
+    click(m, lb().querySelector('[data-lb="x"]'));
+    open();
+    click(m, img());
+    check(await until(() => !lb()), `${label} viewer: a plain tap on the picture still closes it`);
+    m.close();
+  }
+
   // ================= Firefox: the real layout on a touch screen, phone 390 and tablet 840
   await firefox(async ({cmd, ev, nav: go, ctx, shot}) => {
     await go(B + 'static/icon.svg');
@@ -165,6 +190,21 @@ function swipe(w, el, dx, dy = 0, x0 = 200) {  // one finger from (x0, 300) by d
       check(await ev(`${NO} === '2 of 3' && getComputedStyle(document.querySelector('.lightbox.pview .pvbody')).touchAction !== 'pan-y'`), `Firefox ${W}: enlarged, one finger does not leaf (the page scrolls)`);
       await ev(`(document.querySelector('.lightbox.pview [data-pv="x"]').click(), 1)`);
       await wait(`!document.querySelector('.lightbox')`);
+      // #5073: the image viewer
+      await ev(`(attLightbox('a', ['a', 'b'].map(id => ({id, name: id + '.png', size: 10})), (a, dl) => '/static/icon.svg?' + a.id + (dl ? '&dl' : '')), 1)`);
+      const AT = `(document.querySelector('.lightbox > img')?.getAttribute('src') || '').replace(/.*\\?/, '')`;
+      check(await wait(`${AT} === 'a' && document.querySelector('.lightbox > img').complete && typeof swn_attach === 'function'`), `Firefox ${W}: the image viewer open`);
+      await ev(`(() => { ${TOUCH} sw(document.querySelector('.lightbox > img'), -${Math.round(W * .4)}); return 1; })()`);
+      check(await wait(`${AT} === 'b'`), `Firefox ${W}: a swipe on the picture = the next picture`);
+      await ev(`(document.querySelector('.lightbox > img').click(), 1)`);
+      check(await ev(`!!document.querySelector('.lightbox')`), `Firefox ${W}: ... the end of the swipe does not close it`);
+      const img = `document.querySelector('.lightbox > img')`;
+      await ev(`(async () => { const el = ${img}, r = el.getBoundingClientRect(); for (let i = 0; i < 3; i++) { el.dispatchEvent(new WheelEvent('wheel', {deltaY: -100, ctrlKey: true, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, bubbles: true, cancelable: true})); await new Promise(f => requestAnimationFrame(f)); } return 1; })()`);
+      check(await wait(`pz_busy() === false && document.querySelector('.lightbox').classList.contains('lbz')`), `Firefox ${W}: the picture zoomed`);
+      await ev(`(() => { ${TOUCH} sw(${img}, ${Math.round(W * .4)}); return 1; })()`);
+      await sleep(400);  // nothing may happen: no state to wait for
+      check(await ev(`${AT} === 'b'`), `Firefox ${W}: zoomed, one finger does not leaf`);
+      await ev(`(document.querySelector('.lightbox [data-lb="x"]').click(), 1)`);
     }
   }, true);
 
