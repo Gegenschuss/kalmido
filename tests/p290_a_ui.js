@@ -68,7 +68,8 @@ const today = TC.today();
     check(await ready(ev, `/1,000/.test(document.querySelector('#bk-ustva .bk-kz').textContent) && /Field 81/.test(document.querySelector('#bk-ustva .bk-kz').textContent)`),
       'field 81 with the paid invoice ' + await ev(`document.querySelector('#bk-ustva .bk-kz')?.textContent`));
     // the EUeR
-    check(await ev(`document.querySelectorAll('.bk-tab').length === 2 && /1,000\\.00/.test(document.querySelector('.bk-tab').textContent)`), 'the EUeR: income from the payment');
+    // #3506 (CI red of 2.614.0): the comparison with the year before (2.603.0, #4921) is a third table of its own (.bk-cmptab)
+    check(await ev(`document.querySelectorAll('.bk-tab:not(.bk-cmptab)').length === 2 && document.querySelectorAll('.bk-cmptab').length === 1 && /1,000\\.00/.test(document.querySelector('.bk-tab').textContent)`), 'the EUeR: income from the payment ' + await ev(`document.querySelectorAll('.bk-tab').length + ' | ' + [...document.querySelectorAll('.bk-tab')].map(t => t.textContent.replace(/\\s+/g, ' ').slice(0, 160)).join(' || ')`));
     check(await ev(`!!document.querySelector('a[href="/api/office/books/euer.csv?year=${year}"]') && !!document.querySelector('a[href="/api/office/books/euer.pdf?year=${year}"]')`), 'the EUeR: CSV + PDF links');
     check(await ev(`/200\\.00/.test(document.querySelector('.bk-res')?.textContent || '')`), 'the EUeR: tax reserve of the year (20 % of 1,000)');
     await shot('p290-a-books.png');
