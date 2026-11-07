@@ -633,10 +633,11 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
       for (let i = 0; i < 3; i++) {
         const n = await ev(`S.chat.msgs.length`), text = `#4230 ${what} ${i}`;
         await tapAt(BOX); await fu(`document.activeElement?.id === 'chat-in'`);
-        if (kb) { await size(480); await fu(`document.body.classList.contains('kb-open') && document.querySelector(${JSON.stringify(SEND)}).getBoundingClientRect().bottom <= innerHeight`); }
+        if (kb) { await size(480); await fu(`document.body.classList.contains('kb-open') && document.querySelector(${JSON.stringify(SEND)}).getBoundingClientRect().bottom <= innerHeight`, {timeout: 30000}); }
         await ev(`(() => { const t = document.querySelector(${JSON.stringify(BOX)}); t.value = ${JSON.stringify(text)}; t.dispatchEvent(new Event('input', {bubbles: true})); return 1; })()`);
         await tapAt(SEND);
-        await fu(`S.chat.msgs.length > ${n} && !S.chat.sending && S.chat.msgs.some(m => m.body === ${JSON.stringify(text)} && !m.pending)`);
+        // 2.595.0: 30 s for the send - in the long Mac batch (22 min, 16 places) 'keyboard up 1' missed the 15 s default once, alone green
+        await fu(`S.chat.msgs.length > ${n} && !S.chat.sending && S.chat.msgs.some(m => m.body === ${JSON.stringify(text)} && !m.pending)`, {timeout: 30000});
         if (kb) { await fu(`document.activeElement?.id !== 'chat-in'`); await size(844); await fu(`!document.body.classList.contains('kb-open') && document.querySelector(${JSON.stringify(SEND)}).getBoundingClientRect().bottom > 480`); }
         await settle(ev, idle);
         if (busy) await ev(`new Promise(r => setTimeout(r, 1100))`);  // one tick of chatAbortSync, it redraws the ⋯ button
