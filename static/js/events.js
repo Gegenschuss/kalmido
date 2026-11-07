@@ -961,16 +961,7 @@ document.addEventListener('keydown', async e => {
       const f = fieldById(+t.dataset.cf), v = taskById(S.sel)?.fields?.[+t.dataset.cf];
       if (f && (f.type === 'number' || f.type === 'text' || f.type === 'url')) { e.preventDefault(); e.stopPropagation(); t.value = v == null || v === '' ? '' : f.type === 'number' ? (+v).toLocaleString(LOCALE(), {useGrouping: false, maximumFractionDigits: 6}) : String(v); t.blur(); return; }
     }
-    const lb = $('.lightbox'); if (lb) { lb.remove(); return; }
-    const ts = $('.tsheet'); if (ts && !$('.modal')) { $('[data-ts="close"]', ts).click(); return; }
-    if (!$('#pop').classList.contains('hidden') || $('.qadd.sheet')) { closePop(); return; }
-    if (S.multi.size || S.multiMode) { S.multi.clear(); S.multiMode = false; render(); return; }
-    const m = $$('.modal:not(.authscreen)').pop(); if (m) { modalClose(m); return; }  // 2.37.0 (#1158): its own close if it has one
-    if ($('#side.open')) { closeSide(); return; }  // 2.16.0 (#473): Esc closes the drawer
-    if (/INPUT|TEXTAREA/.test(t.tagName)) { t.blur(); return; }
-    if (S.sel) closeDetail();
-    else if (typeof lsd_esc === 'function') lsd_esc();  // 2.557.0 A (#4553): list and detail side by side -> the detail closes, the list stays
-    return;
+    return;  // 2.630.0 (#4510): the rest of Escape (dialog, menu, drawer, selection, detail) is the key registry's (keys.js)
   }
   // 2.4.0 (#187): Ctrl+Space = quick capture from anywhere (also while typing somewhere else)
   if (S.me?.kid) return;  // 2.49.0 (#1537): a child has no shortcuts (quick add, views ... only fail for it)
@@ -983,6 +974,25 @@ document.addEventListener('keydown', async e => {
   if (e.key === 'a' && !$('.modal') && !chatFull() && feat('agents') && chatFabAgent()) { e.preventDefault(); chatPop(); }  // 2.29.0 (#363)
   if (e.key === '/') { e.preventDefault(); go('search'); }
 });
+// 2.630.0 (#4510): the shell's Escape, asked by the key registry (keys.js) after the open dialogs and menus on its stack:
+// open things not on the stack (a lightbox, a sheet, the menu, a dialog of its own kind, the drawer), then - after the view's
+// own Escape - the selection, a field, the detail. false = nothing to close (the key goes on)
+function ev_escOverlay(/** @type {KeyboardEvent} */ e) {
+  const lb = $('.lightbox'); if (lb) { lb.remove(); return; }
+  const ts = $('.tsheet'); if (ts && !$('.modal')) { $('[data-ts="close"]', ts).click(); return; }
+  if (!$('#pop').classList.contains('hidden') || $('.qadd.sheet')) { closePop(); return; }
+  const m = $$('.modal:not(.authscreen)').pop(); if (m) { modalClose(m); return; }  // 2.37.0 (#1158): its own close if it has one
+  if ($('#side.open')) { closeSide(); return; }  // 2.16.0 (#473): Esc closes the drawer
+  return false;
+}
+function ev_escGlobal(/** @type {KeyboardEvent} */ e) {
+  const t = /** @type {any} */ (e.target);
+  if (S.multi.size || S.multiMode) { S.multi.clear(); S.multiMode = false; render(); return; }
+  if (/INPUT|TEXTAREA/.test(t?.tagName || '')) { t.blur(); return; }
+  if (S.sel) { closeDetail(); return; }
+  if (typeof lsd_esc === 'function' && lsd_esc()) return;  // 2.557.0 A (#4553): list and detail side by side -> the detail closes, the list stays
+  return false;
+}
 document.addEventListener('focusout', e => {
   if (e.target.id === 'c-input' || e.target.classList?.contains('c-edit-input')) setTimeout(() => { if (S.mp && document.activeElement !== S.mp.ta) mentionClose(); }, 150);
   if (e.target.id === 'd-title' || e.target.id === 'd-content') flushSaves();

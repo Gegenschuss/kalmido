@@ -71,6 +71,7 @@ function lexPrint(lid) {
     <label class="chkl"><input type="checkbox" id="lex-done"> ${tr('Show completed')}</label><label class="chkl"><input type="checkbox" id="lex-notes"> ${tr('Notes')}</label>
     <span class="spacer"></span><button class="btn" data-ts="close">${tr('Close')}</button></div><div class="tspage lexpage"></div>`;
   document.body.appendChild(el);
+  kb_push('dialog', el, {close: () => $('[data-ts="close"]', el)?.click()});  // 2.630.0 (#4510): the sheet on the key registry's stack (keys.js)
   document.body.classList.add('tsprint');
   const close = () => { el.remove(); document.body.classList.remove('tsprint'); document.title = APP_NAME; };
   el.addEventListener('click', ev => {

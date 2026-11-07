@@ -88,7 +88,7 @@ const svc = (title, qty, rate) => ({kind: 'service', title, qty, unit: 'day', ra
       await ev(`document.querySelector('[data-ofd="to-ls"]').click()`);
       check(await ready(ev, `document.querySelectorAll('#pop [role="menuitem"]').length >= 2`, 40), tag + 'menu: delivery note / proof of service');
       await shot(`p2120-d-menu-${u}-${w}.png`);
-      await ev(`document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}))`);
+      await ev(`document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true}))`);  // 2.630.0 (#4510): the key registry listens on window (keys.js): the key bubbles like a real one
     }
   });
   console.log(F.length ? `FAILED ${F.length}:\n` + F.join('\n') : `p2120_d_ui: ${ok} checks passed`);

@@ -315,9 +315,9 @@ document.addEventListener('click', e => {
     kp_menuItem(c)]);  // 2.120.0 B (#2088)
   }
 });
-document.addEventListener('keydown', e => {  // capture: before the global Esc (an open menu / dialog closes first)
-  if (e.key === 'Escape' && MSC.pick && S.route.mod === 'clients' && !$('.modal, .lightbox') && $('#pop')?.classList.contains('hidden')) { e.preventDefault(); ms_clEnd(); }
-}, true);
+kb_on('view:clients', 'Escape', () => {  // 2.630.0 (#4510): key registry (keys.js): the view's Esc, after an open menu / dialog and before the detail
+  if (!(MSC.pick && S.route.mod === 'clients' && !$('.modal, .lightbox') && $('#pop')?.classList.contains('hidden'))) return false; ms_clEnd();
+});
 
 // ---- 2.97.0 C (#2049): office data into another workspace (office/officemove.py, POST /api/office/move-space): clients (with
 // their contact persons and drafts), drafts, trips, templates. Issued documents stay where they were issued; on request a

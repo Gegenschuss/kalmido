@@ -11,7 +11,7 @@ const popRetLive = r => {
   const same = e => r.id ? e.id === r.id : !!r.dataset?.act && e.dataset.act === r.dataset.act && e.dataset.id === r.dataset.id;  // (no CSS.escape: jsdom has none)
   return [...document.querySelectorAll(r.id ? '[id]' : '[data-act]')].find(e => same(e) && e.getClientRects().length && !e.closest('#pop')) || null;
 };
-function closePop() { popFocusBack(); document.body.classList.remove('pop-open'); /* 2.28.0 (#976) */ const t = $('#toast'); if (t && !t.classList.contains('hidden') && $('#pop.sheet:not(.hidden)')) requestAnimationFrame(() => toastPlace(t)); $('#pop').classList.add('hidden'); $('#pop').classList.remove('sheet', 'overmodal'); $('#scrim').classList.add('hidden'); $('#scrim').classList.remove('clear', 'overmodal'); popOnClose && popOnClose(); popOnClose = null; sideRearm(); }
+function closePop() { popFocusBack(); document.body.classList.remove('pop-open'); /* 2.28.0 (#976) */ const t = $('#toast'); if (t && !t.classList.contains('hidden') && $('#pop.sheet:not(.hidden)')) requestAnimationFrame(() => toastPlace(t)); $('#pop').classList.add('hidden'); $('#pop').classList.remove('sheet', 'overmodal'); $('#scrim').classList.add('hidden'); $('#scrim').classList.remove('clear', 'overmodal'); popOnClose && popOnClose(); popOnClose = null; kb_pop($('#pop')); /* 2.630.0 (#4510) */ sideRearm(); }
 // 2.30.0 (#1043): a menu / popover opened from the open drawer (phone, folded sidebar) took over the drawer's close hook and
 // hid its scrim; a dialog opened from it (Folder settings…, People and roles…, Edit list…) then left the drawer open without
 // dimming, and a tap next to it went to the task behind. When the popover closes and the drawer is still open, the drawer gets
@@ -38,6 +38,7 @@ function openPop(anchor, html, onClose) {
   // #318: a menu opened from inside a dialog (e.g. Settings > Agents > "Share a list with an agent…") goes above it
   const om = !!anchor?.closest?.('.modal'); p.classList.toggle('overmodal', om); $('#scrim').classList.toggle('overmodal', om);
   popOnClose = onClose || null;
+  kb_push('popover', p, {close: closePop});  // 2.630.0 (#4510): the last opened (menu in a dialog / dialog over a menu) closes first (keys.js)
   if (isMobile()) { p.classList.add('sheet'); const t = $('#toast'); if (t && !t.classList.contains('hidden')) requestAnimationFrame(() => toastPlace(t)); return p; }  // 2.13.0 (#453 A12)
   $('#scrim').classList.add('clear');
   const r = anchor.getBoundingClientRect();

@@ -437,7 +437,7 @@ document.addEventListener('click', e => {
   else return;
   e.preventDefault();
 });
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && RK.sel.size && $('#rk-sbar') && !$('.modal, .lightbox') && $('#pop')?.classList.contains('hidden')) { e.preventDefault(); RK.sel.clear(); ofcDraw(); } });  // 2.428.0 A (#3581)
+kb_on('view', 'Escape', () => { if (!(RK.sel.size && $('#rk-sbar') && !$('.modal, .lightbox') && $('#pop')?.classList.contains('hidden'))) return false; RK.sel.clear(); ofcDraw(); });  // 2.428.0 A (#3581); // 2.630.0 (#4510): key registry (keys.js), after the open dialogs / menus
 document.addEventListener('change', async e => {
   const x = e.target;
   if (x.id === 'rk-year') { RK.year = x.value; RK.open = null; rk_reload(); return; }

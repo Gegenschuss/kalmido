@@ -556,6 +556,7 @@ function timesheet() {
   el.className = 'tsheet';
   el.innerHTML = `<div class="tsbar"><button class="btn pri" data-ts="print">${ic('download', 's')} ${tr('Print / save as PDF')}</button><button class="btn" data-ts="copy">${ic('copy', 's')} ${tr('Copy as text')}</button><label class="chkl"><input type="checkbox" id="ts-entries" ${LS.get('tsEntries', true) ? 'checked' : ''}> ${tr('Individual entries')}</label><span class="spacer"></span><span class="muted tshint">${tr('In the print dialog select “Save as PDF”.')}</span><button class="iconbtn" data-ts="close" aria-label="${tr('Close')}">${ic('x')}</button></div><div class="tspage ${LS.get('tsEntries', true) ? '' : 'noentries'}" lang="${esc(document.documentElement.lang)}">${doc}</div>`;
   document.body.appendChild(el);
+  kb_push('dialog', el, {close: () => $('[data-ts="close"]', el)?.click()});  // 2.630.0 (#4510): the sheet on the key registry's stack (keys.js)
   document.body.classList.add('tsprint');
   const close = () => { el.remove(); document.body.classList.remove('tsprint'); document.title = APP_NAME; };
   el.addEventListener('click', async ev => {

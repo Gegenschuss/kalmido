@@ -20,8 +20,17 @@ const SHORTCUTS_ALL = [
 ];
 // only what the switched-on modules offer (the Timeline group needs the timeline with dependencies)
 const SC_MOD = {'g c': 'cal', 'g h': 'habits', 'g f': 'pomo'};
-const SHORTCUTS = () => SHORTCUTS_ALL.filter(([g]) => (g !== 'Timeline' || (feat('timeline') && depsOn())) && (g !== 'Calendar' || feat('cal')))
-  .map(([g, rows]) => [g, rows.filter(([k]) => (!SC_MOD[k] || feat(SC_MOD[k])) && (k !== 'g n' || teamOn()) && !(g === 'Calendar' && k === '4' && !feat('timeline')))]);
+const SHORTCUTS = () => sc_withRegistry(SHORTCUTS_ALL.filter(([g]) => (g !== 'Timeline' || (feat('timeline') && depsOn())) && (g !== 'Calendar' || feat('cal')))
+  .map(([g, rows]) => [g, rows.filter(([k]) => (!SC_MOD[k] || feat(SC_MOD[k])) && (k !== 'g n' || teamOn()) && !(g === 'Calendar' && k === '4' && !feat('timeline')))]));
+// 2.630.0 (#4510): + the keys registered with a help text (keys.js kb_on): into their group (a new one at the end), never twice
+function sc_withRegistry(base) {
+  const out = base.map(([g, rows]) => [g, [...rows]]);
+  for (const [g, rows] of typeof kb_helpRows === 'function' ? kb_helpRows() : []) {
+    let grp = out.find(([n]) => n === g); if (!grp) { grp = [g, []]; out.push(grp); }
+    for (const r of rows) if (!grp[1].some(([k, n]) => k === r[0] && n === r[1])) grp[1].push(r);
+  }
+  return out;
+}
 const CAL_KEYS = {1: 'month', 2: 'week', 3: 'day', 4: 'timeline'};
 // multi-select from the keyboard: the task rows of the view, the focused one (j / k), the multi bar's own buttons
 function kbSelect(ids) { for (const i of ids) S.multi.add(i); if (ids.length) S.multiLast = ids[ids.length - 1]; $$('#view .trow').forEach(r => r.classList.toggle('msel', S.multi.has(+r.dataset.id))); renderMultiBar(); }

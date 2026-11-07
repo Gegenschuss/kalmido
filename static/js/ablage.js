@@ -622,7 +622,7 @@ function ab_smvPick(id, shift) {
   AB.selLast = id; if (typeof dt_rsAnchor === 'function') dt_rsAnchor('ab:' + AB.dkey, id);  // tagsel.js takes the next Shift / Ctrl-click from here
   ab_draw();
 }
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && AB.selOn && $('#view .abview') && !$('.modal, .lightbox') && $('#pop')?.classList.contains('hidden')) { e.preventDefault(); ab_smvEnd(); ab_draw(); } });
+kb_on('view', 'Escape', () => { if (!(AB.selOn && $('#view .abview') && !$('.modal, .lightbox') && $('#pop')?.classList.contains('hidden'))) return false; ab_smvEnd(); ab_draw(); }); // 2.630.0 (#4510): key registry (keys.js), after the open dialogs / menus
 document.addEventListener('change', e => {
   const b = e.target.closest?.('[data-absel="one"]'); if (!b) return;
   const id = +b.dataset.id; if (b.checked) AB.sel.add(id); else AB.sel.delete(id);

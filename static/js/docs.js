@@ -1105,7 +1105,7 @@ document.addEventListener('click', e => {
   else if (a === 'more') dc_smvMore(b);
 });
 // 2.428.0 A (#3581): Esc ends the selection (the long press: dc_selToggle above, 2.430.0 #3582)
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && DC.selOn && $('#view .dc-view') && !$('.modal, .lightbox') && $('#pop')?.classList.contains('hidden')) { e.preventDefault(); dc_selEnd(); } });
+kb_on('view', 'Escape', () => { if (!(DC.selOn && $('#view .dc-view') && !$('.modal, .lightbox') && $('#pop')?.classList.contains('hidden'))) return false; dc_selEnd(); }); // 2.630.0 (#4510): key registry (keys.js), after the open dialogs / menus
 
 // 2.122.0 (#2100): the chosen documents as a CSV file (the server leaves out what the person may not see)
 async function dcx_csv() {

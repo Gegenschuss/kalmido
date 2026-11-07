@@ -387,7 +387,7 @@ document.addEventListener('click', e => {  // 2.428.0 A (#3581): Ctrl / Cmd / Sh
   const r = a.closest('.wkrow'), nid = wk_rowNid(r); if (!nid || ms_lpRecent(wk_lpS)) { if (nid) e.preventDefault(); return; }
   if (WK.selOn || (ms_modClick(e) && !isMobile())) { e.preventDefault(); e.stopPropagation(); wk_selPick(nid, e.shiftKey); }
 }, true);
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && WK.selOn && S.route.mod === 'wiki' && !$('.modal, .lightbox') && $('#pop')?.classList.contains('hidden')) { e.preventDefault(); wk_selEnd(); renderView(); } });
+kb_on('view:wiki', 'Escape', () => { if (!(WK.selOn && S.route.mod === 'wiki' && !$('.modal, .lightbox') && $('#pop')?.classList.contains('hidden'))) return false; wk_selEnd(); renderView(); }); // 2.630.0 (#4510): key registry (keys.js), after the open dialogs / menus
 function wk_nodeItems(nid, anchor) {  // the menu of a folder / a page (the row's "…", the tree's right-click / long press)
   const x = wk_nodeInfo(nid); if (!x) return [];
   // 2.200.0 F (#2747, review 11): Share… (the one dialog, wkshare.js; an encrypted space gets its hint there)

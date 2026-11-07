@@ -203,7 +203,7 @@ const items = async ck => JSON.parse((await call(ck, 'GET', '/api/state')).setti
     // "Only favourites" is reachable without the heading: in the menu of a tile
     await ev(`(() => { fv2_tileMenu(document.querySelector('#favup .fv2-tile')); return 1; })()`);
     check(await ready(ev, `[...document.querySelectorAll('.menu-list [role="menuitem"]')].some(x => /Only favourites/.test(x.textContent))`), 'phone: "Only favourites" is in the menu of a tile');
-    await ev(`(() => { document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'})); return 1; })()`);
+    await ev(`(() => { document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true})); return 1; })()`);  // 2.630.0 (#4510): bubbles (the key registry listens on window, keys.js)
     await ev(`(() => { document.querySelector('#favup .fv2-tile[data-fv2="l:${FL}"]').click(); return 1; })()`);
     // CI red of 2.560 / 2.562 only (green on the Mac): the message says where the app stood, to find the cause
     check(await ready(ev, `S.route.key === 'l:${FL}'`), 'phone: a tile of the row opens its target ' + await ev(`JSON.stringify({route: S.route?.key, hash: location.hash, menu: !!document.querySelector('.menu-list'), side: !!document.querySelector('#side.open'), tile: !!document.querySelector('#favup .fv2-tile[data-fv2="l:${FL}"]'), attrs: document.querySelector('#favup .fv2-tile[data-fv2="l:${FL}"]')?.outerHTML.replace(/<svg.*?<\\/svg>/g, '').slice(0, 200)})`).catch(e => String(e)));

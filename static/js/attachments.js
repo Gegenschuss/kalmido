@@ -153,6 +153,7 @@ function attLightbox(id, list, url = attUrl) {  // 2.32.0 (#983): url = the addr
     if (b || e.target === m || e.target.tagName === 'IMG') m.remove();
   });
   document.body.appendChild(m);
+  kb_push('dialog', m, {close: () => m.remove()});  // 2.630.0 (#4510): Esc closes it when it is the innermost open thing (keys.js)
 }
 // ---- 2.30.0 (#1035 #380): text files (Markdown, plain text, code, data) open in a viewer instead of only downloading:
 // Markdown formatted with the description's renderer (switch "Formatted / Source"), everything else as source text

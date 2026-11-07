@@ -479,9 +479,9 @@ async function bk_move(ids, b) {
   toast([j.moved || !j.copied ? trn('{0} contact moved to {1}', '{0} contacts moved to {1}', j.moved, b.name) : '', j.copied ? trn('{0} copied from an imported address book', '{0} copied from imported address books', j.copied) : '', conf ? trn('{0} was there already and stayed', '{0} were there already and stayed', conf) : ''].filter(Boolean).join(' · '));
   bk_end(); await load().catch(() => {}); ctLoad(); if (CT.sel) ctOpen(CT.sel);
 }
-document.addEventListener('keydown', e => {  // capture: before the global Esc (an open menu / dialog closes first)
-  if (e.key === 'Escape' && CT.pick && S.route.mod === 'contacts' && !$('.modal, .lightbox') && $('#pop')?.classList.contains('hidden')) { e.preventDefault(); bk_end(); }
-}, true);
+kb_on('view:contacts', 'Escape', () => {  // 2.630.0 (#4510): key registry (keys.js): the view's Esc, after an open menu / dialog and before the detail
+  if (!(CT.pick && S.route.mod === 'contacts' && !$('.modal, .lightbox') && $('#pop')?.classList.contains('hidden'))) return false; bk_end();
+});
 // 2.607.0 (#4612): a long press (phone) / a right click (computer) on a row opens its menu: the name, "Select" (starts the
 // selection with it), Open, favourite, Delete; while the selection runs a long press ticks the row (the click after it does nothing)
 function bk_rowMenu(r) {

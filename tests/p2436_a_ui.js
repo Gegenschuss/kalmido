@@ -101,7 +101,7 @@ const VIEW = `(() => { const md = document.querySelector('.modal.smodal'); if (!
   check(await until(async () => (await call('GET', '/api/state')).settings.member_view === '0'), '#3620: ... saved');
   um?.click();
   check(await until(() => d.querySelector('#pop [role="menuitem"]')) && ![...d.querySelectorAll('#pop [role="menuitem"]')].some(b => /Show administration again/.test(b.textContent)), '#3620: switched off, the menu has no such entry');
-  w.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}))`);
+  w.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true}))`);  // 2.630.0 (#4510): the key registry listens on window (keys.js): the key bubbles like a real one
 
   // ================= the way back under the settings' areas
   await call('PATCH', '/api/settings', {member_view: '1'});
