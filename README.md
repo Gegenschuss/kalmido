@@ -19,10 +19,10 @@
 
 ## What's new
 
-**2.626.0** (2026-11-07):
-- **Documents**: flows with triggers received / changed / scheduled, filters and actions incl. task, notification and webhook, with undo.
-- **Documents**: workspace mailbox rules fetch attachments as documents, then mark or move the mail.
-- **Office**: rename or merge a fixed cost category in cash flow in one step.
+**2.643.0** (2026-11-07):
+- **Tables**: move rows and columns by dragging their head, on a phone after a long press.
+- **Statistics**: new blocks for contracts, health and travel when those areas are on.
+- **Agents**: command line `mcp/kalmido_cli.py` lists, shows, adds, comments and completes tasks with a token.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 
