@@ -116,7 +116,11 @@ function swRun(src, {failLazy = false} = {}) {
   w.close();
   w = await boot({user: 'alice', lazy: true, hash: 'office'}); d = w.document; await ready(w);
   await until(() => w.eval('typeof OFC') === 'object' && !/^\s*Loading…\s*$/.test(d.querySelector('#view .lempty')?.textContent || ''), 80);
-  check(w.eval('typeof OFC') === 'object' && lazyTags().filter(f => f.startsWith('office')).length === LAZY.filter(f => f.startsWith('office')).length, 'cold start #office: all office files loaded');
+  // 2.628.0 (#4984): the files of the module office (LD_MODS.office), not every LAZY file named office*: office_fints.js
+  // (2.616.0, #2473) is its own module fints, loaded only by "Fetch from bank" - counting it made this red everywhere
+  const ofMods = JSON.parse(w.eval('JSON.stringify(LD_MODS.office)'));
+  check(w.eval('typeof OFC') === 'object' && ofMods.length >= 13 && ofMods.every(f => lazyTags().includes(f)), 'cold start #office: all office files loaded: ' + ofMods.filter(f => !lazyTags().includes(f)).join(' '));
+  check(!lazyTags().includes('office_fints'), 'cold start #office: the FinTS dialog (office_fints.js) is not loaded yet (on demand)');
   check(w.eval('OFC_TABS.map(t => t[0]).join()').endsWith('settings') && w.eval('typeof pp_html') === 'function', 'office: the tabs of the later files are there (run in order)');
   w.close();
 
