@@ -43,14 +43,14 @@ async function bw_saveNow(m, b, pend) {  // the button "Save draft": the dialog 
     // 2.560.0 D (#4700) kept: the draft's save checks the version too (409: the receipt is back, the dialog opens again with the input and "Reload")
     // 2.576.0 (#4794): objsave.js - only the changed fields; a 409 opens the dialog again on the saved receipt with the input and the merge bar
     const m0 = ofcBase(null, m);  // before the row shows the new values (optSet changes the row object)
-    try { j = await optWrite(optSet(() => bw_meal(m.id), bw_local(b, m)), () => ofcSave(null, `${BW_U}/${m.id}`, m0, b), ofcDraw); } catch (x) { ofcSaveErr(null, x, r => { const m2 = bw_modal(r); bw_reload(); return m2; }); return null; }
+    try { j = await optWrite(optSet(() => bw_meal(m.id), bw_local(b, m)), () => ofcSave(null, `${BW_U}/${m.id}`, m0, b), ofcDraw, {mod: true}); } catch (x) { ofcSaveErr(null, x, r => { const m2 = bw_modal(r); bw_reload(); return m2; }); return null; }
     if (!j) { bw_refresh(); return m; }
     bw_mealSet(j); bw_refresh();
     const now = j; toast(tr('Saved'), async () => { await undoWrite(`${BW_U}/${m.id}`, old, now?.updated_at, {now: b}).catch(() => null); bw_refresh(); });  // 2.566.0 (#4704): core.js undoWrite - only the keys this save changed, against its version; changed since -> said, kept
     return j;
   }
   const tmp = -Date.now();
-  try { j = await optWrite(bw_in(tmp, bw_local(b)), () => api('POST', BW_U, b), ofcDraw); } catch { return null; }
+  try { j = await optWrite(bw_in(tmp, bw_local(b)), () => api('POST', BW_U, b), ofcDraw, {mod: true}); } catch { return null; }
   bw_mealSet(j, tmp);
   if (pend) { try { j = await api('POST', `${BW_U}/${j.id}/file`, bw_fd(pend)); bw_mealSet(j); } catch { /* api() said why; the draft is stored */ } }
   bw_refresh();
@@ -135,7 +135,7 @@ function bw_rowMenu(id, anchor) {
 async function bw_delete(m, md) {
   if (!await askConfirm(tr('Delete the entertainment receipt “{0}”?', bw_title(m)), '', {ok: tr('Delete'), danger: true})) return;
   md?.remove();  // 2.559.0 (#4660): gone at once, a refusal brings it back (api() says why)
-  try { await optWrite(bw_out(m.id), () => api('DELETE', `${BW_U}/${m.id}`), ofcDraw); } catch { return; }
+  try { await optWrite(bw_out(m.id), () => api('DELETE', `${BW_U}/${m.id}`), ofcDraw, {mod: true}); } catch { return; }
   bw_refresh();
   toast(tr('Deleted'), async () => { await api('POST', `${BW_U}/${m.id}/restore`); bw_refresh(); });
 }
@@ -144,7 +144,7 @@ const bw_body = m => Object.fromEntries(BW_KEYS.map(k => [k, m[k]]));
 async function bw_dup(m) {  // a new draft with the same data (without the bill); opens it
   // 2.559.0 (#4660): the copy is a provisional row at once; the dialog opens with the stored copy after the answer
   const tmp = -Date.now(), b = bw_body(m);
-  let j; try { j = await optWrite(bw_in(tmp, {...m, files: [], log: [], status: 'draft', locked: false, own_ro: 0, approved_at: null, approved_name: ''}), () => api('POST', BW_U, b), ofcDraw); } catch { return; }
+  let j; try { j = await optWrite(bw_in(tmp, {...m, files: [], log: [], status: 'draft', locked: false, own_ro: 0, approved_at: null, approved_name: ''}), () => api('POST', BW_U, b), ofcDraw, {mod: true}); } catch { return; }
   bw_mealSet(j, tmp); bw_refresh();
   toast(tr('Copy created'), async () => { await api('DELETE', `${BW_U}/${j.id}`); bw_refresh(); });
   bw_modal(j);

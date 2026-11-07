@@ -55,6 +55,7 @@ const stateFetches = w => { let rep = 0; return w.__sent.filter(s => { if (!/^GE
   const rowOf = re => [...d.querySelectorAll('.bwlist [data-bw="open"]')].find(b => re.test(b.textContent));
   const toastHas = re => re.test(d.querySelector('#toast')?.textContent || '');
   const loading = () => /Loading…/.test(d.querySelector('.ofcbody')?.textContent || '');
+  const nTr0 = () => [...d.querySelectorAll('.bwlist [data-bw="open"]')].filter(b => /Trattoria Neu/.test(b.textContent)).length;  // 2.651.0 (#5076)
   const menuPick = async (re, label) => {
     click(w, rowOf(re).closest('li').querySelector('[data-bw="rowmore"]'));
     const b = await until(() => [...d.querySelectorAll('#pop .menu-list button')].find(x => x.textContent.trim() === label));
@@ -107,6 +108,10 @@ const stateFetches = w => { let rep = 0; return w.__sent.filter(s => { if (!/^GE
   unhold(w);
 
   // ================= duplicate: the copy at once, the dialog with the stored copy after the answer
+  // 2.651.0 (#5076, CI red "the row is gone before the answer"): a state of the app fetched before the copy and arriving after
+  // it (the live update the write itself set off) put the copy's provisional row in once more (OPT_DONE, 2.607.0); fetched
+  // here from outside the page (no request of the page, see stateFetches)
+  const old = JSON.stringify(await call(ck, 'GET', '/api/state'));
   hold(w, /^POST \/api\/office\/meals$/);
   await menuPick(/Trattoria Neu/, 'Duplicate');
   check(await until(() => w.__held.length === 1), 'Duplicate: the request is held');
@@ -116,6 +121,9 @@ const stateFetches = w => { let rep = 0; return w.__sent.filter(s => { if (!/^GE
   check(await until(() => dlg()?.querySelector('[data-bwm="del"]') && dlg()?.querySelector('#bw-pname')?.value === 'Trattoria Neu'), 'the dialog opens with the stored copy');
   click(w, dlg()?.querySelector('[data-bwm="close"]'));
   check(await until(() => !dlg() && [...d.querySelectorAll('.bwlist [data-bw="open"]')].every(b => +b.dataset.id > 0)), 'every row carries its real id');
+  w.__old = old;
+  w.eval('applyState(JSON.parse(window.__old)); render()');  // ... arrives now (applyState and render are synchronous)
+  check([...d.querySelectorAll('.bwlist [data-bw="open"]')].every(b => +b.dataset.id > 0) && nTr0() === 2, '#5076: an older state of the app does not bring the copy\'s provisional row back ' + nTr0());
   unhold(w);
 
   // ================= delete: at once, a refusal brings the row back

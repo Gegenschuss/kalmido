@@ -100,13 +100,28 @@ const FEAT = 'cal,contracts,feeds';
   click(w, rd());
   await until(() => d.querySelector(`.rssitem[data-id="${items[1].dataset.id}"]`)?.classList.contains('unread'));
   check(d.querySelector(`.rssitem[data-id="${items[1].dataset.id}"]`)?.classList.contains('unread'), '#1162: … and "Unread" back');
+  // 2.651.0 (#5064, CI red): a state of the app fetched before "Mark all read" and arriving after its undo (the live update
+  // the write itself set off) put the finished "all read" back on the articles (OPT_DONE, 2.607.0); it is fetched here first
+  w.__old = null;
+  w.eval(`api('GET', '/api/state').then(j => { window.__old = JSON.stringify(j); })`);
+  await until(() => w.__old);
+  // the live update's reloads wait until the older state is in (as p151_ui): a fresh one started after the write would
+  // drop the kept write before the older state arrives, which is what the CI runner's timing did not do
+  // (only the live update's auto loads; the gate opens by itself after 20 s so the suite can never hang on it)
+  w.eval(`window.__L0 = load; window.__gate = new Promise(r => { window.__open = r; setTimeout(r, 20000); }); load = async (auto, ...a) => { if (auto) await window.__gate; return window.__L0(auto, ...a); }`);
   click(w, d.querySelector('[data-rss="allread"]'));
   await until(() => !d.querySelector('.rssitem.unread'));
   check(!d.querySelector('.rssitem.unread'), '#1162: "Mark all read"');
   await until(() => w.eval(`HIST.undo[HIST.undo.length - 1]?.label`) === 'Mark all read');  // 2.559.0 (#4660): shown at once, the undo step comes with the answer
+  // 2.651.0 (#5064): the finished write is not kept for a later state of the app (OPT_DONE): it lives in RSS, which applyState
+  // never touches; kept, an older state arriving after the undo below marked everything read again (the CI's timing)
+  check(w.eval('OPT_DONE.size') === 0, '#5064: a finished "Mark all read" is not kept to be put again over a later state of the app');
   await w.eval(`histStep('undo')`);
   await until(() => d.querySelector('.rssitem.unread'));
   check(d.querySelector('.rssitem.unread'), '#1162: one undo step brings the unread one back');
+  w.eval('applyState(JSON.parse(window.__old)); render()');  // ... arrives after the undo (applyState and render are synchronous)
+  check(d.querySelector('.rssitem.unread') && w.eval('RSS.items.some(x => !x.read)'), '#5064: an older state of the app arriving after the undo does not mark all read again');
+  w.eval('load = window.__L0; window.__open()');
   w.close();
 
   // ================= the card on Home & life

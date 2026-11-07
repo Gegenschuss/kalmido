@@ -126,7 +126,7 @@ let rss_q = Promise.resolve();  // the marks go out one after the other: read an
 async function rss_mark(ids, read) {
   const want = ids.filter(id => { const x = rss_item(id); return x && !!x.read !== read; });
   const sp = rss_sp(), go = () => api('POST', '/api/feeds/read', {ids, read, space: sp});
-  const j = await optWrite(rss_readPut(ids, read), () => (rss_q = rss_q.catch(() => {}).then(go)), rss_draw);
+  const j = await optWrite(rss_readPut(ids, read), () => (rss_q = rss_q.catch(() => {}).then(go)), rss_draw, {mod: true});
   // the server changed others than shown (another device was quicker): its counts in the background
   if (j.ids.length !== want.length || j.ids.some(id => !want.includes(id))) rss_reload();
   return j.ids;
@@ -144,7 +144,7 @@ const rss_allPut = feed => () => {
 };
 async function rss_allRead() {
   const space = rss_sp(), feed = RSS.feed;
-  const j = await optWrite(rss_allPut(feed), () => api('POST', '/api/feeds/read', feed ? {feed_id: feed, read: true, space} : {read: true, space}), rss_draw);
+  const j = await optWrite(rss_allPut(feed), () => api('POST', '/api/feeds/read', feed ? {feed_id: feed, read: true, space} : {read: true, space}), rss_draw, {mod: true});
   rss_reload();  // in the background
   if (!j.ids.length) return;
   let ids = j.ids;
@@ -166,7 +166,7 @@ const rss_laterPut = id => () => {
 };
 async function rss_later(id) {
   const x = rss_item(id); if (!x) return;
-  const j = await optWrite(rss_laterPut(id), () => api('POST', `/api/feeds/items/${id}/later`, {}), rss_draw);
+  const j = await optWrite(rss_laterPut(id), () => api('POST', `/api/feeds/items/${id}/later`, {}), rss_draw, {mod: true});
   const y = rss_item(id) || x;
   y.task_id = j.task_id; if (!y.read) { y.read = true; RSS.unread = Math.max(0, RSS.unread - 1); }
   rss_draw();

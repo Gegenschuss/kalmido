@@ -1415,10 +1415,13 @@ const OPT = new Set();
 // "list" after "Timeline"). A finished write stays here with S.wseq at its end until a state arrives whose GET began after
 // it (applyState's w0 >= end: the server's answer holds it), at most two minutes.
 const OPT_DONE = new Set();
-async function optWrite(put, req, draw = render) {  // draw: how the screen follows (default: everything)
+// 2.651.0 (#5064, #5076): o.mod = the change lives in a module's own data (RSS, BW, BG ...), not in S: applyState never
+// overwrites it and the module's loader puts what is still on its way (OPT) itself, so a finished write is not kept for
+// applyState; it used to come back over a later own step (an undo of "Mark all read", a duplicate's provisional row)
+async function optWrite(put, req, draw = render, o) {  // draw: how the screen follows (default: everything)
   const p = {put}, back = put();
   OPT.add(p); draw();
-  try { const r = await req(); p.end = S.wseq || 0; p.at = Date.now(); OPT_DONE.add(p); return r; }
+  try { const r = await req(); p.end = S.wseq || 0; p.at = Date.now(); if (!o?.mod) OPT_DONE.add(p); return r; }
   catch (e) { OPT.delete(p); back?.(); draw(); throw e; }
   finally { OPT.delete(p); }
 }
