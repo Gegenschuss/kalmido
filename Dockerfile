@@ -2,7 +2,7 @@
 # natively on the build machine (also for a multi-platform image), tested, packed; Settings > Documents offers the files
 # 2.168.5: ${BUILDPLATFORM:-linux/amd64} and no RUN --mount - the classic builder (Docker without buildx, e.g. a
 # staging host) knows neither; BuildKit (release, multi-platform) still sets BUILDPLATFORM itself, so the default stays unused
-FROM --platform=${BUILDPLATFORM:-linux/amd64} golang:1.27-alpine@sha256:d200d2dd76b03a99b52651fd1325aff7dcd35422c35c01bac56571b0507f3deb AS folderwatch
+FROM --platform=${BUILDPLATFORM:-linux/amd64} golang:1.27-alpine@sha256:fa3d596898d9f126af7c01d14ee7597bab3f39cccf392ef36b69fe77cd681f18 AS folderwatch
 ENV CGO_ENABLED=0 GOTOOLCHAIN=local GOPROXY=off GOFLAGS=-trimpath
 WORKDIR /src
 COPY folderwatch/ .
@@ -21,14 +21,14 @@ RUN set -e; go vet ./...; go test ./...; v="$(cat /VERSION)"; \
 
 # 2.360.3 (#2915): base images by digest (the tag stays readable), kept current with tools/pins.py --update
 # 2.442.0 (#2808): JS / CSS packed ahead of time (gzip, brotli) on the build machine, the app sends them by Accept-Encoding
-FROM --platform=${BUILDPLATFORM:-linux/amd64} python:3.12-slim@sha256:aa943ce411423c7582288f18707ff66eddcbaeb510502d747a72aeb34f30d159 AS staticpack
+FROM --platform=${BUILDPLATFORM:-linux/amd64} python:3.12-slim@sha256:4840d514c583a4d3d8cad3940e68dee6f0f6f3635c12fcd0a3d74c21a5b93a54 AS staticpack
 COPY tools/requirements.static.lock /tmp/requirements.lock
 RUN pip install --no-cache-dir --require-hashes -r /tmp/requirements.lock
 COPY static /src/static
 COPY kalmido/core/strip.py tools/pack_static.py /src/tools/
 RUN python /src/tools/pack_static.py /src/static /out
 
-FROM python:3.12-slim@sha256:aa943ce411423c7582288f18707ff66eddcbaeb510502d747a72aeb34f30d159
+FROM python:3.12-slim@sha256:4840d514c583a4d3d8cad3940e68dee6f0f6f3635c12fcd0a3d74c21a5b93a54
 # 2.37.0: pg_dump/pg_restore for the in-app backup (Debian 13 ships PostgreSQL 17)
 # 2.143.0 B (#2152): + openssh-client (sftp) for the off-site backup target
 RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client-17 openssh-client && rm -rf /var/lib/apt/lists/*
