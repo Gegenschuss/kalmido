@@ -2802,7 +2802,9 @@ Changing the settings sends the event `runtime_changed`, *Reset now* the event `
 6. (2.396.0) starts the agent with the git author of `git_author` (`GIT_AUTHOR_NAME` / `GIT_AUTHOR_EMAIL` and
    `GIT_COMMITTER_NAME` / `GIT_COMMITTER_EMAIL`), sets `KALMIDO_GIT_COAUTHOR=1` when `git_coauthor` is on, and restarts
    it when they change; without `git_author` (an older Kalmido) it sets nothing. A task's `repo.git_author` (the
-   project's override, else the agent's value) wins for commits in that repository.
+   project's override, else the agent's value) wins for commits in that repository. 2.619.0 (#3467): in event mode
+   `mcp/agent_run.py` sets it for each task run itself (`GIT_AUTHOR_*` / `GIT_COMMITTER_*` and `KALMIDO_GIT_COAUTHOR`
+   from the event's `repo`), for both launchers alike; a chat run keeps the agent's value.
 
 ### Working a list off (2.481.0)
 
@@ -3572,7 +3574,15 @@ always 0, and when Kalmido is unreachable the next run sends the missed turns.
 Subagents (2.11.0): Claude Code runs subagents (the Agent tool) in transcripts of their own. Wire the same command as
 `SubagentStop` hook as well: it then reads the subagent's transcript (`agent_transcript_path`) and reports it as a session
 of its own (state `sub-<agent_id>`, note `claude-code <session> · subagent <agent_id>`). Without it, subagent tokens are
-missing from the usage.
+missing from the usage. Background jobs need the hook too (2.619.0, #3267): the reference starter's `agent_job.py` hands a
+Claude Code job the same hook with `--settings` (a file in the job's folder), unless the command has `--settings` itself or
+`KALMIDO_USAGE_HOOK=0`.
+
+**Two plan limits (2.619.0, #2196).** The 5-hour window and the weekly limit (`seven_day`) are different pauses: at the
+weekly limit wait until its own reset (plus a few minutes) instead of failing after a few tries, take the reset time from
+the usage data (`resets_at`), never guess it, and let anything that resumes paused work act once per reset (a stamp) with a
+dry run. The reference starter's jobs do this: a job at the weekly limit waits until that reset + 10 minutes without using
+up its 3 resumes of the 5-hour window; an unknown weekly reset means it looks again every hour.
 
 ```bash
 # /path/to/kalmido-agent.env  (chmod 600)
@@ -4594,6 +4604,11 @@ Everything longer or freer (code, research, long jobs, working tickets, chat) st
   the job card in the app shows the chain ("Continues Job 82", "Part jobs: ..."). A person given in `user_id` must reach you in
   the project of every task.
 - The reference starter passes them: `agent_job.py start --parent ID --continue-of ID --task 12 --task 13`.
+- Reviews in their own read-only area (2.619.0, #2792): audits run in a small area of their own that never blocks a
+  building agent, with **read only** as a hard rule in their brief (no commit, merge, push, tag, deploy, nothing written but
+  comments and the result). The reference starter: `agent_job.py start --audit` (at most `KALMIDO_AUDIT_MAX`, default 3,
+  open; not with `--worktree` / `--parent`; `list` and `status` mark it). Kalmido itself counts such a job like any running
+  job against your work style's `max_parallel`.
 - The watchdog (every minute on the server) tells once per case and never stops anything: `job_stalled` (work style `stall_min`,
   default 60 minutes, 0 = off; Settings > Agents > the agent > How it works) and `branch_stranded` (3 days). The job's owner (the
   person it is for, else the agent's owner) gets a News entry ("An agent waits for me" row) and a push only where that row's push is

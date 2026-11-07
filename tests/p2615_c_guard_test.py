@@ -289,7 +289,13 @@ check(aj.job_settings(ar, {"cmd": ["claude", "--settings", "x.json"]}, base + ["
       "job with its own --settings: none added")
 check(aj.job_settings(ar, {"cmd": ["codex"]}, ["codex", "exec"], jtmp) == [], "job of another profile: none")
 os.environ["KALMIDO_BLOCK_DANGEROUS"] = "0"
-check(aj.job_settings(ar, {"cmd": ["claude"]}, base, jtmp) == [], "job with KALMIDO_BLOCK_DANGEROUS=0: no settings")
+# 2.619.0 (#3267): jobs also get the usage hook, so KALMIDO_BLOCK_DANGEROUS=0 only drops the guard; with KALMIDO_USAGE_HOOK=0 as well: none
+extra0 = aj.job_settings(ar, {"cmd": ["claude"]}, base, jtmp)
+jhs0 = json.load(open(extra0[1], encoding="utf-8")) if extra0[:1] == ["--settings"] else {}
+check("PreToolUse" not in jhs0.get("hooks", {}), f"job with KALMIDO_BLOCK_DANGEROUS=0: no guard {jhs0}")
+os.environ["KALMIDO_USAGE_HOOK"] = "0"
+check(aj.job_settings(ar, {"cmd": ["claude"]}, base, jtmp) == [], "job with KALMIDO_BLOCK_DANGEROUS=0 and KALMIDO_USAGE_HOOK=0: no settings")
+os.environ.pop("KALMIDO_USAGE_HOOK", None)
 os.environ.pop("KALMIDO_BLOCK_DANGEROUS", None)
 check(ar.hook_settings(True, usage=False)["hooks"].keys() >= {"PermissionRequest", "PreToolUse"}
       and ar.Runner.hook_settings(None)["hooks"].get("PreToolUse") == ar.hook_settings(False)["hooks"]["PreToolUse"],

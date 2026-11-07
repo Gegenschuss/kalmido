@@ -97,6 +97,8 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
   description. Never reverse one silently: present the conflict to an owner and wait.
 - When you tidy up a task, keep the person's original text as a quoted "Original" line. Send the task's `updated_at`
   you read as `base_updated_at`; a 409 means someone is working on it: try again later, never overwrite.
+- **Formula fields are computed by the server (2.43.0)**: never set a field of type `formula` (it answers 400); change the
+  fields it calculates from instead.
 - A raw report (a file name as title, an empty description) gets a meaningful title, a Markdown description and a link
   to the task that implements it; a duplicate is closed with a comment pointing to the original.
 - Answer **every comment of an owner** on a task in that task.
@@ -306,7 +308,10 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
   address of your own. Add a `Co-Authored-By:` line only when `git_coauthor` is true. Before every "done" report
   call `list_build_status` (list_id = the project) and settle each open task that already has a published version or an open
   branch; `get_task` shows the same as `build` (`state` released / main / branch / none, `branches`, `stale` = open
-  although published).
+  although published). The reference starter (2.619.0) sets `repo.git_author` itself for each task run.
+- **Reviews in their own read-only area (2.619.0).** Audits and reviews run in a small area of their own (a few places)
+  that never takes the place of a building agent. Their brief says **read only** as a hard rule: no commit, merge, push,
+  tag, deploy or server change, nothing written but comments and the result; a needed change becomes a finding.
 
 ### When you are stuck
 - Never stall silently. **Park a blocker** with a short note on the task (what is missing, who has to act) and a chat
@@ -376,7 +381,12 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
 
 ### Usage
 - Report your model usage with the hook `mcp/claude_usage_hook.py`, registered as **Stop and SubagentStop** hook in
-  `.claude/settings.json` (numbers only, never text).
+  `.claude/settings.json` (numbers only, never text). Every run that uses the model needs it, also background jobs you
+  start (2.619.0): a job without the hook leaves its usage out.
+- **Two plan limits (2.619.0)**: the 5-hour window resets within hours, the weekly limit (`seven_day`) only at its own
+  reset. At the weekly limit pause until that reset (plus a few minutes) instead of trying again and failing; take the
+  reset time from the usage data (`resets_at`), never guess it. Something that resumes paused work acts once per reset
+  (keep a stamp) and has a dry run.
 - If your host knows your plan usage (e.g. Claude Code's status line `rate_limits`), it reports it with
   `report_plan_usage` (the ring next to your name). Before a large piece of work, at your own limit: finish the current
   step, park cleanly and start nothing big until the reset.
@@ -421,6 +431,14 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
 - **Scheduling polls** (2.484.0): `create_poll` (scope `calendar`) proposes 2-20 times and gives `url`, the public link;
   hand it to the people who should vote. `list_polls` / `get_poll` read the tally. You never vote yourself and never choose
   the time: a person does that in the app.
+
+### Meetings, contacts, contracts (2.70.0, details below)
+- `job_request` kind `extract` (meeting notes, maybe photos): ONE `submit_proposal` with the tasks; assignees only from
+  `input.members`, a due date only where the notes name one, nothing invented. Never create the tasks yourself.
+- `job_request` kind `merge` (one address book): ONE `submit_proposal` `{groups}` with clear duplicates only (same e-mail,
+  same phone, or a name variant plus a shared company, e-mail or phone). Never merge or change contacts yourself.
+- Event `contract_notice`: ONE `propose_contract_notice`, one sentence in the person's language without pressure. Never
+  cancel, send or change a contract yourself.
 <!-- kalmido-agent-rules:end -->
 
 ### Refused commands (2.615.0)
@@ -500,12 +518,14 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
 ### Reference starter: files, long work, bundled tasks (2.44.0)
 Only when your host runs `mcp/agent_run.py` (the prompt then says so):
 - **Files for the person**: put them into the folder `$KALMIDO_OUTBOX`; they are attached to your chat answer. An image you
-  look at with the Read tool is attached automatically (not in task runs, not the person's own uploads).
+  look at with the Read tool is attached automatically (not in task runs, not the person's own uploads; 2.619.0: only from
+  the project folder `KALMIDO_PROJECT_DIR` or `KALMIDO_AUTO_IMAGE_DIRS`, never from a home folder).
 - **Long work** (more than about ten minutes: release build, audit, full test run): do not do it in the chat run. Start a job
   with the command your prompt names (`"<python>" "<mcp>/agent_job.py" start --title "..." [--worktree] -`; 2.223.8: the Python
   that runs the starter and quoted paths, never a bare `python3`, which Windows often lacks; in PowerShell put `&` in front)
   (the complete brief on stdin: goal, rules, what to report;
-  2.59.0: the job gets a name, `--name NAME` to choose it, `--parent ID` for a part job of job ID),
+  2.59.0: the job gets a name, `--name NAME` to choose it, `--parent ID` for a part job of job ID;
+  2.619.0: `--audit` for a review in the read-only audit area, never with `--worktree`),
   tell the person in one line what you started and end your answer. The job posts its result into the chat; then the launcher
   wakes you with one run that carries the outcome (2.46.6): go on from there, do not repeat the result, never restart a
   stopped job by yourself, and offer a new start of a lost one. Milestones: `agent_job.py progress ID "..."`. After a compaction, read the brief again and carry on.

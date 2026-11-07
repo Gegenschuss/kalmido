@@ -7,6 +7,7 @@ that survives a restart of the event runner (agent_run.py), reports to a Kalmido
 usage (from inside a run; KALMIDO_URL / KALMIDO_TOKEN / KALMIDO_CHAT_USER are in the environment of the run):
   agent_job.py start --title "Release 2.29" [--name Alma] [--parent ID] [--continue-of ID] [--worktree] [--task ID ...]
                     [--timeout-h 6] -       brief on stdin ("-") or a file; --task more than once = a job of several tasks
+  agent_job.py start --audit --title "Audit" -   2.619.0 (#2792): a review job in its own read-only area (see below)
   agent_job.py list                         the jobs of this host (open ones first)
   agent_job.py status ID                    one job: state, pid, resumes, last progress line
   agent_job.py progress ID "text"           a milestone for the person (job log + status line)
@@ -26,7 +27,15 @@ How it works
   - after a compaction of the conversation (stream event compact_boundary) the brief is played in again, when the command
     takes a stream of user messages (Claude Code: --input-format stream-json); other commands cannot be reminded.
   - plan limit: the job waits until the window resets (+ 2 min, state "paused" counts as active) and resumes the SAME
-    session (--resume, at most 3 times). Stop works during the wait.
+    session (--resume, at most 3 times). Stop works during the wait. 2.619.0 (#2196): the weekly limit (a seven_day window
+    of the stream at 100 %, or the command's text says so) is told apart from the 5-hour window: the job waits until that
+    reset + 10 min (no 5 h cap, not counted in the 3 resumes); a reset time it does not know is never guessed: it looks
+    again every hour.
+  - 2.619.0 (#3267): a Claude Code job gets the launcher's usage hook (claude_usage_hook.py as Stop / SubagentStop hook,
+    --settings with a file in the job's folder) like every run of agent_run.py, unless its command has --settings itself.
+  - 2.619.0 (#2792): --audit = a review job in its own small area: at most KALMIDO_AUDIT_MAX (default 3) open audit jobs,
+    never counted against the working copies of build jobs, not with --worktree / --parent; a read-only note goes in front
+    of its brief (no commit, merge, push, deploy, nothing changed in Kalmido but comments and its result); list marks it.
   - a time limit (KALMIDO_JOB_TIMEOUT_H, default 6) ends the job; it says so in its result.
   - 2.59.0 (#1827): every job gets a name, its title starts with it ("Alma: Release 2.29"): --name, else the next free one
     of JOB_NAMES; --parent ID makes it a part job of job ID ("Alma B", the result posts job_parent). The app shows the
@@ -67,6 +76,16 @@ MAX_RESUMES = 3
 CHAT_CHUNK = 7500
 STEP_GAP_S = 5.0
 LIMIT_WORDS = ("usage limit", "rate limit", "hit your limit", "limit reached", "5-hour limit", "rate_limit", "429")
+# 2.619.0 (#2196): the weekly limit, told apart from the 5-hour window
+WEEK_WORDS = ("weekly limit", "week limit", "seven_day", "7-day limit", "weekly usage")
+WEEK_EXTRA_S = 600
+WEEK_LOOK_AGAIN_S = 3600
+WEEK_MAX_S = 8 * 86400
+WEEK_MAX_WAITS = 200
+AUDIT_NOTE = ("## Audit job: read only\n\nThis job is a review in the read-only audit area. Read, run read-only checks and "
+              "report. Never commit, merge, push, tag, deploy, change a server or delete anything; in Kalmido write only "
+              "comments and your result. Something that needs a change becomes a finding in your result (or a task the "
+              "person creates), never a change by you.\n\n")
 SECRET_RES = [
     re.compile(r"\b(?:abk|sk-ant|sk-proj|sk)[-_][A-Za-z0-9_-]{16,}"),
     re.compile(r"\b(?:ghp|gho|ghu|ghs|ghr|github_pat)_[A-Za-z0-9_]{16,}"),
@@ -624,6 +643,7 @@ def cmd_start(argv):
     title, task, worktree, timeout_h, src = "", None, False, float(os.environ.get("KALMIDO_JOB_TIMEOUT_H") or 6), None
     name, parent = "", None  # 2.58.0 (#1803): own name (POST /agent/jobs {name}); 2.59.0 (#1827): part job of job ID
     tasks, cont = [], None  # 2.392.2 (#3366): --task more than once, --continue-of ID
+    audit = False  # kalmido-capability: audit_jobs (2.619.0, #2792): a review job in the read-only audit area
     i = 0
     while i < len(argv):
         a = argv[i]
@@ -642,10 +662,15 @@ def cmd_start(argv):
             timeout_h = float(argv[i + 1]); i += 2
         elif a == "--worktree":
             worktree = True; i += 1
+        elif a == "--audit":
+            audit = True; i += 1
         else:
             src = a; i += 1
     if not title.strip() or not src:
-        print("usage: agent_job.py start --title TITLE [--name NAME] [--parent ID] [--continue-of ID] [--worktree] [--task ID ...] [--timeout-h N] - (brief on stdin) | FILE")
+        print("usage: agent_job.py start --title TITLE [--name NAME] [--parent ID] [--continue-of ID] [--worktree | --audit] [--task ID ...] [--timeout-h N] - (brief on stdin) | FILE")
+        return 2
+    if audit and (worktree or parent):
+        print("--audit is a read-only review job of its own: not with --worktree or --parent")
         return 2
     if name and not NAME_RE.match(name + ": "):
         print("--name: one word with a capital letter first, 2 to 12 letters, optionally a capital letter after a space (\"Alma\", \"Alma B\")")
@@ -660,6 +685,10 @@ def cmd_start(argv):
     except (ValueError, AssertionError):
         print("KALMIDO_JOB_CMD missing: start jobs from a run of agent_run.py")
         return 2
+    acap = int(os.environ.get("KALMIDO_AUDIT_MAX") or 3)  # 2.619.0 (#2792): the audit area has its own places
+    if audit and sum(1 for j in all_jobs() if is_open(j) and j.get("audit")) >= acap:
+        print(f"{acap} audit jobs are open already: wait for one of them (build jobs are not affected)")
+        return 3
     cap = int(os.environ.get("KALMIDO_JOB_WORKTREES") or 2)
     if worktree and sum(1 for j in all_jobs() if is_open(j) and j.get("worktree")) >= cap:
         print(f"{cap} jobs with their own working copy are open already: wait for one or start this one without --worktree")
@@ -695,7 +724,7 @@ def cmd_start(argv):
     j = {"id": jid, "kalmido_job": jid, "title": title.strip(), "name": name, "parent": parent, "state": "starting", "cmd": cmd, "task": task,
          "tasks": tasks, "continue_of": cont,
          "chat_user": int(uid) if uid.isdigit() else None, "timeout_s": int(timeout_h * 3600), "resumes": 0,
-         "created": time.time(), "cwd": os.getcwd(), "worktree": None, "session": ""}
+         "created": time.time(), "cwd": os.getcwd(), "worktree": None, "session": "", "audit": audit}
     if worktree:
         try:
             top = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True, check=True, timeout=30).stdout.strip()
@@ -718,7 +747,8 @@ def cmd_list(argv):
     if not js:
         print("no jobs")
     for j in sorted(js, key=lambda j: (not is_open(j), -int(j["id"]))):
-        print(f"#{j['id']} {j['state']:8} {j['title']}" + (f"  [{j['worktree']['branch']}]" if j.get("worktree") else ""))
+        print(f"#{j['id']} {j['state']:8} {j['title']}" + (f"  [{j['worktree']['branch']}]" if j.get("worktree") else "")
+              + ("  [audit, read only]" if j.get("audit") else ""))
     return 0
 
 
@@ -734,6 +764,7 @@ def cmd_status(argv):
     except OSError:
         pass
     print(json.dumps({"id": j["id"], "title": j["title"], "state": j["state"], "resumes": j.get("resumes", 0),
+                      "audit": bool(j.get("audit")), "week_waits": j.get("week_waits", 0),  # 2.619.0 (#2792, #2196)
                       "worktree": j.get("worktree"), "last_progress": last,
                       "parent_id": j.get("parent"), "continue_of": j.get("continue_of"), "task_ids": j.get("tasks") or ([j["task"]] if j.get("task") else [])},
                      ensure_ascii=False))  # 2.392.2 (#3366)
@@ -856,29 +887,60 @@ def rules_for_job(api):
                 "- Never print secrets or token values.\n\n")
 
 
-def limit_wait(result, stderr_text, resets_at):
-    """Seconds to wait when the run ended on the plan's window (0 = not a limit end): until the reset + 2 min, 5 min to 5 h."""
+def limit_end(result, stderr_text, week=False):
+    """2.619.0 (#2196): how the run ended: "" (not on a limit), "window" (the 5-hour window) or "week" (the weekly limit:
+    week = the stream reported a seven_day window at 100 %, or the text names it)."""
     if result and not result.get("is_error") and str(result.get("result") or "").strip():
-        return 0
+        return ""
     txt = (str((result or {}).get("result") or "") + " " + stderr_text[-2000:]).lower()
-    if not any(w in txt for w in LIMIT_WORDS):
+    if not any(w in txt for w in LIMIT_WORDS + WEEK_WORDS):
+        return ""
+    return "week" if week or any(w in txt for w in WEEK_WORDS) else "window"
+
+
+def limit_wait(result, stderr_text, resets_at, week_resets=None, week=False):
+    """Seconds to wait when the run ended on the plan's window (0 = not a limit end): until the reset + 2 min, 5 min to 5 h.
+    2.619.0 (#2196): the weekly limit waits until ITS reset + 10 min (up to 8 days); an unknown weekly reset is never
+    guessed: look again in an hour."""
+    kind = limit_end(result, stderr_text, week)
+    if not kind:
         return 0
     if os.environ.get("KALMIDO_JOB_TEST_WAIT_S"):  # tests only
         return float(os.environ["KALMIDO_JOB_TEST_WAIT_S"])
-    wait = (resets_at - time.time() + 120) if isinstance(resets_at, (int, float)) and resets_at > time.time() else 1800
+    now = time.time()
+    if kind == "week":
+        if isinstance(week_resets, (int, float)) and week_resets > now:
+            return min(week_resets - now + WEEK_EXTRA_S, WEEK_MAX_S)
+        return float(WEEK_LOOK_AGAIN_S)
+    wait = (resets_at - now + 120) if isinstance(resets_at, (int, float)) and resets_at > now else 1800
     return max(300.0, min(wait, 18000.0))
+
+
+def week_window(info, state):
+    """2.619.0 (#2196): a rate_limit_event's weekly window (unifiedWindows key seven_day..., or the older rateLimitType) at
+    100 % or rejected -> state["week"] = True and state["week_resets"] = its reset time (epoch) when it names one."""
+    uw = info.get("unifiedWindows") if isinstance(info.get("unifiedWindows"), dict) else {}
+    pairs = list(uw.items()) + ([(info.get("rateLimitType"), info)] if info.get("rateLimitType") else [])
+    for k, w in pairs:
+        if not (isinstance(w, dict) and str(k or "").startswith("seven_day")):
+            continue
+        u = w.get("utilization")
+        if (isinstance(u, (int, float)) and u >= 1) or str(w.get("status") or "") == "rejected":
+            state["week"] = True
+            if isinstance(w.get("resetsAt"), (int, float)) and w["resetsAt"] > time.time():
+                state["week_resets"] = max(state.get("week_resets") or 0, w["resetsAt"])
 
 
 # kalmido-capability: dangerous_guard (2.615.0, #3758)
 def job_settings(ar, j, base, d):
     """2.615.0 E (#3758): ["--settings", <job folder>/run-settings.json] for a Claude Code job without its own --settings:
     the guard against dangerous commands (agent_run.hook_settings: PreToolUse / Bash, KALMIDO_BLOCK_DANGEROUS=0 = off),
-    never the person's own settings. No permission relay (nobody answers it for a job) and no usage hook (the job's
-    usage stays as before); [] for other profiles, without hooks or when agent_run.py cannot be loaded."""
+    never the person's own settings. No permission relay (nobody answers it for a job); 2.619.0 (#3267): with the usage
+    hook (KALMIDO_USAGE_HOOK=0 = off), the same builder as the chat runs; [] for other profiles, without hooks or when agent_run.py cannot be loaded."""
     if not ar or ar.agent_profile(j["cmd"]) != "claude" or not ar.claude_native(j["cmd"]) or \
             any(a == "--settings" or a.startswith("--settings=") for a in base):
         return []
-    hs = ar.hook_settings(perm_relay=False, usage=False)
+    hs = ar.hook_settings(perm_relay=False, usage=True)  # 2.619.0 (#3267): jobs get the usage hook too
     if not hs["hooks"]:
         return []
     f = os.path.join(d, "run-settings.json")
@@ -893,7 +955,8 @@ def cmd_run(argv):
     api = Api()
     d = job_dir(j["id"])
     outbox = os.path.join(d, "outbox")
-    brief = rules_for_job(api) + open(os.path.join(d, "brief.txt"), encoding="utf-8").read() + footer(j)
+    brief = (rules_for_job(api) + (AUDIT_NOTE if j.get("audit") else "")  # 2.619.0 (#2792): read only
+             + open(os.path.join(d, "brief.txt"), encoding="utf-8").read() + footer(j))
     ar = runner_module()  # kalmido-capability: profile (2.391.0, #3359): claude | codex | generic, as in agent_run.py
     profile = ar.agent_profile(j["cmd"]) if ar else "claude"
     base = ar.profile_args(profile, j["cmd"]) if ar else list(j["cmd"])
@@ -905,7 +968,7 @@ def cmd_run(argv):
     streaming = profile == "claude" and "claude" in os.path.basename(base[0]).lower()
     if streaming and "--input-format" not in base:
         base += ["--input-format", "stream-json"]
-    base += job_settings(ar, j, base, d)  # 2.615.0 E (#3758): the guard against dangerous commands, as in the chat runs
+    base += job_settings(ar, j, base, d)  # 2.615.0 E (#3758): the guard against dangerous commands, as in the chat runs; kalmido-capability: usage_hook (2.619.0, #3267: jobs too)
     env = dict(os.environ, KALMIDO_OUTBOX=outbox, KALMIDO_JOB_ID=str(j["id"]))
     env.pop("KALMIDO_JOB_CMD", None)  # a job does not start jobs
     exe = shutil.which(base[0]) or base[0]
@@ -982,6 +1045,7 @@ def cmd_run(argv):
                     for w in list(uw.values()) + [info]:
                         if isinstance(w, dict) and isinstance(w.get("resetsAt"), (int, float)) and w["resetsAt"] > time.time():
                             state["resets"] = max(state.get("resets") or 0, w["resetsAt"])
+                    week_window(info, state)  # kalmido-capability: weekly_limit (2.619.0, #2196)
                 elif t == "system" and ev.get("subtype") == "compact_boundary":
                     state["compact"] = True
                 elif t == "result":
@@ -1053,13 +1117,27 @@ def cmd_run(argv):
             stderr_text = open(err_path, encoding="utf-8", errors="replace").read()
         except OSError:
             stderr_text = ""
-        wait = limit_wait(result, stderr_text, state.get("resets"))
-        if not wait or int(j.get("resumes") or 0) >= MAX_RESUMES or not j.get("session"):
+        wait = limit_wait(result, stderr_text, state.get("resets"), state.get("week_resets"), bool(state.get("week")))
+        weekly = bool(wait) and limit_end(result, stderr_text, bool(state.get("week"))) == "week"  # 2.619.0 (#2196)
+        if not wait or not j.get("session"):
             break
-        j.update(state="paused", resumes=int(j.get("resumes") or 0) + 1)
+        if weekly:  # the weekly limit is no failed try: it does not use up the 3 resumes of the 5-hour window
+            if int(j.get("week_waits") or 0) >= WEEK_MAX_WAITS:
+                break
+            j.update(state="paused", week_waits=int(j.get("week_waits") or 0) + 1)
+        elif int(j.get("resumes") or 0) >= MAX_RESUMES:
+            break
+        else:
+            j.update(state="paused", resumes=int(j.get("resumes") or 0) + 1)
         save(j)
-        when = time.strftime("%H:%M", time.localtime(time.time() + wait))
-        api.soft("PATCH", f"/agent/jobs/{int(j['id'])}", {"append_log": f"{time.strftime('%H:%M')} plan limit: waiting until about {when}, then the same session goes on ({j['resumes']}/{MAX_RESUMES})"})
+        if weekly:
+            known = isinstance(state.get("week_resets"), (int, float)) and state["week_resets"] > time.time()
+            line = (f"weekly limit: waiting until about {time.strftime('%d.%m. %H:%M', time.localtime(time.time() + wait))} (its reset + 10 min), then the same session goes on"
+                    if known else "weekly limit: its reset time is not known, looking again in an hour")
+        else:
+            when = time.strftime("%H:%M", time.localtime(time.time() + wait))
+            line = f"plan limit: waiting until about {when}, then the same session goes on ({j['resumes']}/{MAX_RESUMES})"
+        api.soft("PATCH", f"/agent/jobs/{int(j['id'])}", {"append_log": f"{time.strftime('%H:%M')} {line}"})
         end = time.time() + wait
         while time.time() < end:
             time.sleep(2)

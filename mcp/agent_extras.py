@@ -94,6 +94,18 @@ def multipart(fields, files):
 
 
 # kalmido-capability: outbox, event_bundling (2.44.0)
+
+# kalmido-capability: image_root (2.619.0, #3659 / #2383)
+def image_root():
+    """2.619.0 (#2383): [the project folder] whose images the agent may attach by looking at them: KALMIDO_PROJECT_DIR (the
+    setup scripts write it; the launchers start in it), else the working folder. [] when that is the home folder or a
+    drive / file system root: a starter started from there would share almost everything."""
+    d = os.path.realpath(os.path.expanduser(os.environ.get("KALMIDO_PROJECT_DIR") or "") or os.getcwd())
+    home = os.path.realpath(os.path.expanduser("~"))
+    if d == home or os.path.dirname(d) == d:
+        return []
+    return [d]
+
 class Extras:
     def __init__(self, api, state_dir, cmd=None):
         self.api = api
@@ -352,11 +364,13 @@ class Extras:
 
     def _own_image(self, path):
         """False for what the person sent (upload folders) and for files that are not there or too big. 2.126.0 B (#1979 G1):
-        only images inside the project folder (the working folder) or a folder named in KALMIDO_AUTO_IMAGE_DIRS."""
+        only images inside the project folder (the working folder) or a folder named in KALMIDO_AUTO_IMAGE_DIRS.
+        2.619.0 (#2383): the project folder is image_root() (KALMIDO_PROJECT_DIR, else the working folder), never the home
+        folder or a drive root: started from there, only KALMIDO_AUTO_IMAGE_DIRS count."""
         p = os.path.realpath(os.path.expanduser(path))
         if not os.path.isfile(p) or os.path.getsize(p) > max_file_bytes() or os.path.getsize(p) == 0:
             return False
-        roots = [os.getcwd()] + [d for d in (os.environ.get("KALMIDO_AUTO_IMAGE_DIRS") or "").split(os.pathsep) if d.strip()]
+        roots = image_root() + [d for d in (os.environ.get("KALMIDO_AUTO_IMAGE_DIRS") or "").split(os.pathsep) if d.strip()]
         if not any(p.startswith(os.path.realpath(os.path.expanduser(d)).rstrip(os.sep) + os.sep) for d in roots):
             return False
         parts = {s.lower() for s in p.split(os.sep)}

@@ -559,6 +559,7 @@ else {
   $lines = @("# Kalmido agent $AgName ($AgUser), set up by agent-setup.ps1 -- keep this file private",
              "KALMIDO_URL=$Url", "KALMIDO_TOKEN=$($r.token)", 'KALMIDO_EVENTS=1', '# KALMIDO_TOOLSETS=tickets,code,chat   # optional (2.391.0): only these MCP tool packages, chat is always on; default: all',
              "KALMIDO_STATE_DIR=`"$(Join-Path $Inst 'state')`"")  # one state folder per instance (cursor, approvals, lock); 2.443.0 (#2940): quoted, a " #" in a value starts a comment
+  $lines += "KALMIDO_PROJECT_DIR=`"$Dir`""  # 2.619.0 (#2383): the project folder named here; looked-at images only from it
   if ($env:KALMIDO_PYTHON) { $lines += "KALMIDO_PYTHON=`"$env:KALMIDO_PYTHON`"" }  # 2.443.0 (#2940): the autostart runs without this shell's variables
   # 2.306.0 E (#2927): who answers permission questions -- kept from an earlier setup of this folder, else (team agent) the
   # person who made the code (operator_id), as KALMIDO_PERM_USER; KALMIDO_OWNER_IDS would also narrow who gives orders

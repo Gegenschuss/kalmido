@@ -730,7 +730,9 @@ chat messages of one person that arrive together: one run). It does what a hoste
   only; task runs have no folder; folders named in `KALMIDO_NO_AUTO_IMAGE_DIRS`, and any path with a part `uploads` or
   `chat-attachments`, are never attached, so the person's own uploads do not come back; 2.126.0: only images inside the
   project folder (the working folder of the launcher) or a folder named in `KALMIDO_AUTO_IMAGE_DIRS` are attached, other
-  files the agent wants to show go into `$KALMIDO_OUTBOX`). The prompt tells the agent about the folder. Needs
+  files the agent wants to show go into `$KALMIDO_OUTBOX`; 2.619.0: the project folder is `KALMIDO_PROJECT_DIR` of the env
+  file, which the setup scripts write from `--dir`, else the working folder; a home folder or a drive root never counts,
+  so a starter started from the home folder attaches only images from `KALMIDO_AUTO_IMAGE_DIRS`). The prompt tells the agent about the folder. Needs
   a server with chat files (2.13.1+); older servers get nothing.
 - **Working a list off** (2.481.0, [`mcp/agent_dispatch.py`](../mcp/agent_dispatch.py)): *Settings > Agents > (agent) >
   Runtime > Work the list off* (*Off* / *Dry run* / *Active*) lets the starter work the lists of `KALMIDO-DISPATCH.json` in
@@ -766,6 +768,13 @@ chat messages of one person that arrive together: one run). It does what a hoste
   posted anyway; not offered when the job's result could not be posted or messages for it came after its end); a stopped job wakes it with the hint not to
   restart it, a failed one with what went wrong (a job without a chat person leaves a note for the next run). *Stop* on the job stops the process. When the plan
   limit ends a run, the job waits for the reset (+ 2 minutes) and continues the **same session** (`--resume`, at most 3 times).
+  2.619.0: the **weekly limit** is told apart from the 5-hour window (a `seven_day` window of the stream at 100 %, or the
+  command says so): the job waits until that reset + 10 minutes, without the 5-hour cap and without using up the 3 resumes;
+  a weekly reset it does not know is never guessed, it looks again every hour. A Claude Code job gets the usage hook of
+  step 10 like every run (`--settings` with a file in the job's folder), so its usage shows in *Usage* too. `--audit` starts a
+  **review job in a read-only area of its own**: at most `KALMIDO_AUDIT_MAX` (default 3) open, never counted against the
+  working copies of build jobs, not with `--worktree` / `--parent`; a read-only note goes in front of its brief (no commit,
+  merge, push, deploy, nothing written but comments and the result) and `list` marks it.
   `--worktree` gives it its own `git worktree` and branch `job/<id>` (at most `KALMIDO_JOB_WORKTREES` open, default 2); `list`,
   `status ID` and `stop ID` do what they say; `KALMIDO_JOB_TIMEOUT_H` (default 6) ends a job that runs too long. After the
   command compacted its conversation (`compact_boundary`) the brief is played in again -- this needs an agent command that
@@ -905,7 +914,18 @@ the pushes). Check it in the log: `outside the work window of its work style: no
 every subagent as *SubagentStop* hook (both wired in step 7, the same command) and reports the token usage to Kalmido: numbers only, never prompt or answer text. *Settings > Agents >
 Usage* then shows it, and the limits in the agent's dialog apply. Optional keys in the env file:
 `KALMIDO_USAGE_PRICES` (a price table to show costs), `KALMIDO_USAGE_TASK`, `KALMIDO_USAGE_STATE_DIR`. Test it without
-sending: `python3 ~/kalmido/mcp/claude_usage_hook.py --dry-run ~/.config/kalmido/agent.env < /dev/null`.
+sending: `python3 ~/kalmido/mcp/claude_usage_hook.py --dry-run ~/.config/kalmido/agent.env < /dev/null`. The hook belongs
+in every run that uses the model, also in background jobs (2.619.0: the reference starter's jobs get it by themselves).
+
+**Two plan limits (2.619.0).** Tell the 5-hour window and the weekly limit (`seven_day`) apart: at the weekly limit work
+pauses until **its** reset (plus a few minutes) instead of failing after a few tries. Take the reset time from the usage
+data (`resets_at`), never guess it. Something of your own that resumes paused work after a reset (a timer, a cron job)
+acts **once per reset** (keep a stamp of the reset it handled), removes only stop files that belong to an older reset,
+and has a dry run that only says what it would do.
+
+**Reviews in their own area (2.619.0).** Give audits and reviews a small area of their own (a few places) that never
+blocks a building agent, and make **read only** a hard rule in their brief: no commit, merge, push, tag, deploy or server
+change; a needed change becomes a finding. The reference starter does this with `agent_job.py start --audit`.
 
 **Plan usage ring (2.33.0, optional).** The chat header can show how much of the agent's plan is used (Claude's 5-hour and
 weekly windows) as a ring next to its name: yellow from 75 %, red from your limit with *paused until …* (since 2.407.0 the ring is always

@@ -692,6 +692,8 @@ with open(e["KALMIDO_SETUP_ENV"] + ".new", "w", encoding="utf-8") as f:
     # one state folder per instance (event cursor, approvals, lock): two project folders on one computer never share one
     # 2.443.0 (#2940): quoted, the launcher reads this file as shell (a space in the home folder)
     f.write("KALMIDO_STATE_DIR=%s\n" % shlex.quote(os.path.join(os.path.dirname(e["KALMIDO_SETUP_ENV"]), "state")))
+    # 2.619.0 (#2383): the project folder named with --dir; looked-at images are attached only from it (agent_extras.py)
+    f.write("KALMIDO_PROJECT_DIR=%s\n" % shlex.quote(os.path.abspath(e["KALMIDO_SETUP_DIR"])))
     if e.get("KALMIDO_PYTHON"):  # 2.443.0 (#2940): the autostart runs without this shell's variables
         f.write("KALMIDO_PYTHON=%s\n" % shlex.quote(e["KALMIDO_PYTHON"]))
     f.write("".join(ln + "\n" for ln in keep))

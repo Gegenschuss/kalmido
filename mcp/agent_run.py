@@ -723,6 +723,36 @@ def profile_args(profile, cmd):
     return args
 
 
+# kalmido-capability: usage_hook (2.619.0, #3659 / #3267: one builder for runs and jobs)
+def usage_hook_settings():
+    """2.306.0 E (#2927): the usage hook next to this file as Stop / SubagentStop hook ("Usage" and the usage limits in
+    Kalmido); it reads KALMIDO_URL / KALMIDO_TOKEN from the run's environment. KALMIDO_USAGE_HOOK=0 switches it off.
+    2.619.0 (#3267): module level, so agent_job.py gives its jobs the same hook ({} = none)."""
+    uh = os.path.join(os.path.dirname(os.path.abspath(__file__)), "claude_usage_hook.py")
+    if os.environ.get("KALMIDO_USAGE_HOOK", "1").strip() == "0" or not os.path.isfile(uh):
+        return {}
+    ucmd = [{"hooks": [{"type": "command", "command": f'"{sys.executable}" "{uh}"', "timeout": 30}]}]
+    return {"Stop": ucmd, "SubagentStop": ucmd}
+
+
+# kalmido-capability: task_git_author (2.619.0, #3659 / #3467)
+GIT_AUTHOR_RE = re.compile(r"^\s*([^<>\x00-\x1f\x7f]{1,100}?)\s*<([^<>,\s\x00-\x1f\x7f]{3,200})>\s*$")
+
+
+def git_author_env(repo):
+    """2.619.0 (#3467): a task's repo.git_author ("Name <mail>", the project's choice, else the agent's value, filled in by
+    the server) -> GIT_AUTHOR_* / GIT_COMMITTER_* (+ KALMIDO_GIT_COAUTHOR) for that task's run; {} when the event has none
+    or the value does not look like "Name <mail>" (then the launcher's agent-level values stay)."""
+    m = GIT_AUTHOR_RE.match(str((repo or {}).get("git_author") or "")) if isinstance(repo, dict) else None
+    if not m:
+        return {}
+    env = {"GIT_AUTHOR_NAME": m.group(1), "GIT_AUTHOR_EMAIL": m.group(2),
+           "GIT_COMMITTER_NAME": m.group(1), "GIT_COMMITTER_EMAIL": m.group(2)}
+    if "git_coauthor" in repo:
+        env["KALMIDO_GIT_COAUTHOR"] = "1" if repo.get("git_coauthor") is True else "0"
+    return env
+
+
 def with_session(profile, args, sid):
     """args of profile_args + going on in conversation sid (None: a fresh one). Codex: the resume subcommand after the exec
     options and `-` = the prompt comes on stdin."""
@@ -2431,11 +2461,8 @@ def hook_settings(perm_relay=False, usage=True):
     # kalmido-capability: usage_hook (2.306.0, #2927)
     # 2.306.0 E (#2927): the usage hook next to this file as Stop / SubagentStop hook ("Usage" and the usage limits in
     # Kalmido); it reads KALMIDO_URL / KALMIDO_TOKEN from the run's environment. KALMIDO_USAGE_HOOK=0 switches it off.
-    uh = os.path.join(os.path.dirname(os.path.abspath(__file__)), "claude_usage_hook.py")
-    if usage and os.environ.get("KALMIDO_USAGE_HOOK", "1").strip() != "0" and os.path.isfile(uh):
-        ucmd = [{"hooks": [{"type": "command", "command": f'"{sys.executable}" "{uh}"', "timeout": 30}]}]
-        s["hooks"]["Stop"] = ucmd
-        s["hooks"]["SubagentStop"] = ucmd
+    if usage:  # 2.619.0 (#3267): the one builder of the usage hook (usage_hook_settings), runs and jobs alike
+        s["hooks"].update(usage_hook_settings())
     return s
 
 
@@ -2591,6 +2618,8 @@ class Runner:
         env.update(KALMIDO_PERM_DIR=self.perm_dir(), KALMIDO_PERM_TIMEOUT=str(PERM_TIMEOUT_S),
                    KALMIDO_PERM_UID=str(uid or self.perm_uid(tid) or ""),
                    KALMIDO_RUN_LABEL=("chat" if uid else f"task {tid}" if tid else "event"))
+        if tid:  # 2.619.0 (#3467): a task run commits as the task's repo.git_author (both launchers: they start this runner)
+            env.update(git_author_env(getattr(self, "run_repo", None)))
         return env
 
     # kalmido-capability: perm_user_choice (2.312.0, #3266)
@@ -2793,6 +2822,9 @@ class Runner:
         if self.extras:  # 2.44.0 B (#1443): a fresh outbox folder for a chat run
             self.extras.begin_run(uid, not uid)
         tid = None if uid else task.get("id")
+        # 2.619.0 (#3467): the repository of the task's event (repo.git_author for child_env), None for a chat run
+        self.run_repo = None if uid else next(((ev.get("data") or {}).get("repo") for ev in evs
+                                               if isinstance((ev.get("data") or {}).get("repo"), dict)), None)
         self.mode_args([])  # 2.437.0 (#2931): the status names the mode of this run
         self.status_say("working", what, task_id=tid, host=self.host())
         key = self.session_start(uid, args, what)  # 2.44.0 (#1446): the conversation of this chat goes on
