@@ -311,15 +311,22 @@ def shs_node(c, uid, r):
     return c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
 
 
-def shs_core_put(c, uid, r, shid, event=True):
+def shs_core_put(c, uid, r, shid, event=True, bind=False):
     """The card shid (bound to an account, not revoked) of table r gets its core share (again: role kept in step); returns
-    the core share's id or None (an open address row)."""
+    the core share's id or None (an open address row). 2.647.0 (#5047, review): bind=True (shs_core_move: import, start-up
+    step) -- a core share the same account already holds on the table's node is only bound, its role and expiry stay (the
+    card takes the core's role); a card nobody touched never turns a time-limited read share into a lasting write share."""
     from ..core.objects import obj_node_share
     x = c.execute("SELECT * FROM sheet_shares WHERE id=?", (shid,)).fetchone()
     if x is None or not x["user_id"] or x["revoked_at"]:
         return None
     key = "agent_id" if _agent_row(c, x["user_id"]) is not None else "user_id"
     n = shs_node(c, uid, r)
+    old = c.execute(f"SELECT id, role FROM fs_shares WHERE node_id=? AND {key}=?", (n["id"], x["user_id"])).fetchone() if bind else None
+    if old:
+        c.execute("UPDATE sheet_shares SET core_id=?, role=? WHERE id=?", (old["id"], SHS_CARD.get(old["role"], x["role"]), shid))
+        shs_drop_cache()
+        return old["id"]
     fid = obj_node_share(c, uid, n, key, x["user_id"], SHS_CORE.get(x["role"], "view"), None, r["org_id"] or None, event=event)
     c.execute("UPDATE sheet_shares SET core_id=? WHERE id=?", (fid, shid))
     shs_drop_cache()
@@ -372,7 +379,7 @@ def shs_core_move(c, sheet_id=None, by=None):
             r = c.execute("SELECT * FROM sheets WHERE id=?", (x["sheet_id"],)).fetchone()
             try:
                 with c.savepoint():
-                    n += bool(shs_core_put(c, by or x["created_by"], r, x["id"], event=False))
+                    n += bool(shs_core_put(c, by or x["created_by"], r, x["id"], event=False, bind=True))
             except Denied:  # too many shares on the node: the card stays listed without a right (2.647.0, #5047: no fallback)
                 print(f"WARNING sheet share card {x['id']} found no room on its table's node (#5047)", flush=True)
     return n

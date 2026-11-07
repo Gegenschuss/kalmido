@@ -37,7 +37,7 @@ from ..wiki.wkhist import wkh_seal, WKH_VCTX  # 2.369.5 (#2517): pulled up from 
 from ..wiki.pages import wiki_set_links  # 2.369.5 (#2517): pulled up from functions
 from ..wiki.wksearch import wks_index  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.attachtext import file_kind  # 2.369.5 (#2517): pulled up from functions
-from ..sheets.shshare import shs_core_move  # 2.647.0 (#5047)
+from ..sheets.shshare import SHS_CARD, shs_core_move  # 2.647.0 (#5047)
 
 _LOCKED = "e2e1:"
 _FILE_CELL = re.compile(r"file:(\d{1,15})")
@@ -622,10 +622,13 @@ def _finish_sheet_shares(c, run, oi, uid):
         if x is None:
             continue
         sheets.add(x["sheet_id"])
-        if x["core_id"] and not c.execute("SELECT 1 FROM fs_shares f JOIN fs_nodes n ON n.id=f.node_id WHERE f.id=? AND n.kind='ref' "
-                                          "AND n.ref_kind='sheet' AND n.ref_id=? AND ? IN (f.user_id, f.agent_id)",
-                                          (x["core_id"], x["sheet_id"], x["user_id"])).fetchone():
+        f = c.execute("SELECT f.role FROM fs_shares f JOIN fs_nodes n ON n.id=f.node_id WHERE f.id=? AND n.kind='ref' "
+                      "AND n.ref_kind='sheet' AND n.ref_id=? AND ? IN (f.user_id, f.agent_id)",
+                      (x["core_id"], x["sheet_id"], x["user_id"])).fetchone() if x["core_id"] else None
+        if f is None:
             c.execute("UPDATE sheet_shares SET core_id=NULL WHERE id=?", (x["id"],))
+        else:  # review: the card shows the role the core grants
+            c.execute("UPDATE sheet_shares SET role=? WHERE id=?", (SHS_CARD.get(f["role"], "read"), x["id"]))
     for sid in sorted(sheets):
         shs_core_move(c, sid, by=uid)
 

@@ -343,7 +343,11 @@ def wsh_core_settle(c):
                     wkf_sync(c, o, None)
             except Exception as e:  # noqa: BLE001  a tree that cannot be checked: its cards wait for the owner's next index
                 print(f"WARNING knowledge tree of account {int(o)} not checked (#5047): {type(e).__name__}", flush=True)
-            n += wsh_core_move(c, o)
+            try:  # review: one owner's cards that fail never stop the start (the step would rerun at every start)
+                with c.savepoint():
+                    n += wsh_core_move(c, o)
+            except Exception as e:  # noqa: BLE001
+                print(f"WARNING knowledge shares of account {int(o)} not moved (#5047): {type(e).__name__}", flush=True)
     return n
 
 
