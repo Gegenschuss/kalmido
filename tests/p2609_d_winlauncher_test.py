@@ -186,6 +186,23 @@ def pid_alive(pid):
         return True
 
 
+# ---- 2b. 2.651.0 (#5038): Windows PowerShell 5.1 makes every stderr line of a native command under "2>$null" an error
+# record; with the script-wide $ErrorActionPreference = 'Stop' the polite taskkill ("can only be terminated forcefully")
+# ended Stop-Agent before the /F, so on 5.1 a pause never ended the tree (CI step "Windows PowerShell 5.1" red, 7 green).
+# Every function that calls a native command with 2>$null sets a local 'Continue' (Signal-Agent runs inside Stop-Agent).
+with open(PS1, encoding="utf-8") as f:
+    ps1 = f.read()
+fn = re.search(r"^function Stop-Agent \{\n(.*?)^\}", ps1, re.M | re.S)
+check(fn and "taskkill.exe" in fn.group(1) and re.search(r"^  \$ErrorActionPreference = 'Continue'$", fn.group(1), re.M)
+      and fn.group(1).index("$ErrorActionPreference = 'Continue'") < fn.group(1).index("taskkill.exe"),
+      "agent_launcher.ps1: Stop-Agent sets a local ErrorActionPreference Continue before taskkill ... 2>$null (PowerShell 5.1)")
+natives = [m.start() for m in re.finditer(r"^\s*.*& .*2>\$null", ps1, re.M)]
+for pos in natives:
+    owner = [m for m in re.finditer(r"^function ([\w-]+)", ps1[:pos], re.M)]
+    name = owner[-1].group(1) if owner else "?"
+    check(name in ("Stop-Agent", "Signal-Agent"), f"agent_launcher.ps1: a native call with 2>$null only under Stop-Agent's Continue ({name})")
+
+
 # ---- 3. the launcher with a stub API
 PWSH = os.environ.get("PWSH") or shutil.which("pwsh") or (shutil.which("powershell") if WIN else None)
 if not PWSH:
@@ -255,7 +272,18 @@ class H(BaseHTTPRequestHandler):
     do_PATCH = do_DELETE = do_POST
 
 
-srv = ThreadingHTTPServer(("127.0.0.1", 0), H)
+class Srv(ThreadingHTTPServer):
+    # 2.651.0 (#5038): a runner killed during its long-poll closes the connection; the reply then hit BrokenPipeError,
+    # socketserver printed the traceback from a daemon thread while the interpreter shut down -> "Fatal Python error"
+    # after "49 ok, 0 failed" (CI, Linux shard). A gone client is no error here, and server_close() joins the handler threads.
+    daemon_threads = False
+
+    def handle_error(self, request, client_address):
+        if not isinstance(sys.exc_info()[1], (BrokenPipeError, ConnectionResetError, ConnectionAbortedError)):
+            super().handle_error(request, client_address)
+
+
+srv = Srv(("127.0.0.1", 0), H)
 threading.Thread(target=srv.serve_forever, daemon=True).start()
 URL = f"http://127.0.0.1:{srv.server_address[1]}"
 
@@ -391,6 +419,7 @@ finally:
             except OSError:
                 pass
     srv.shutdown()
+    srv.server_close()
     logf.close()
 
 sys.exit(done("p2609_d_winlauncher"))

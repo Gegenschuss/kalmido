@@ -281,6 +281,10 @@ function Signal-Agent([string]$sig, [int]$id) {  # Unix: its process group, else
 }
 function Stop-Agent {
   if (-not $script:Proc) { return }
+  # 2.651.0 (#5038): Windows PowerShell 5.1 turns every stderr line of a native command under "2>$null" into an error record,
+  # and the script-wide 'Stop' made the first one ("can only be terminated forcefully" of the polite taskkill) end this
+  # function before the /F: a pause never ended the tree. Local to this function (and Signal-Agent called from here).
+  $ErrorActionPreference = 'Continue'
   $id = $script:Proc.Id
   if ($OnWindows) {
     if (-not $script:Proc.HasExited) {
