@@ -22,7 +22,8 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
 const FEAT = 'cal,comments,collab,files,docs,office,clients';
 const type = (w, d, q) => { const sq = d.querySelector('#s-search'); sq.dispatchEvent(new w.FocusEvent('focus')); sq.value = q; sq.dispatchEvent(new w.Event('input', {bubbles: true})); };
 // the hit is the section heading or its card at the top of Integrations (a button that jumps to it): either is marked
-const SCAN = '#s-scan-h.sflash, .icard[data-jump="#s-scan-h"].sflash';
+// 2.625.0 (#4489): or the folded row "Documents: inboxes" around it (a hit on the row's name opens and marks the row)
+const SCAN = '#s-scan-h.sflash, .icard[data-jump="#s-scan-h"].sflash, details.introw[data-intr="scan"].sflash';
 const hits = d => [...d.querySelectorAll('#s-sres [data-hit]')];
 const openSettings = async (w, d) => { w.eval(`settingsModal()`); return until(() => d.querySelector('#s-search')); };
 

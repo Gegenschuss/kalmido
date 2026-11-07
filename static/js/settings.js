@@ -359,6 +359,14 @@ function integrCardsHtml() {
   // 2.353.0 B (#2773): API tokens and webhooks live in Access: a link here, no second copy
   return `<div class="icards">${C.map(([i, n, d, to]) => `<button type="button" class="icard" data-jump="${to}">${ic(i, 's')}<span><b>${tr(n)}</b><small>${tr(d)}</small></span>${ic('chev', 's fcar')}</button>`).join('')}</div>${acz_linkHtml(S.api?.enabled || S.webhooks?.enabled)}`;
 }
+// 2.625.0 (#4489): every integration is one folded row (native details): icon, name and its state once the pane has loaded
+// one (intr_st; none = only the name); opening it shows the form as before. The cards above, the focus keys and the settings
+// search open the row around their target (intr_open; the search opens every details around a hit).
+const intr_row = (k, i, n, html) => html ? `<details class="introw" data-intr="${k}"><summary>${ic(i, 's')}<b>${tr(n)}</b><span class="introw-st" data-intrst="${k}"></span>${ic('chev', 's fcar')}</summary><div class="introw-b">${html}</div></details>` : '';
+const intr_open = (md, sel) => { const el = $(sel, md), d = el?.closest('details.introw'); if (d) d.open = true; return el; };
+function intr_st(k, on) {
+  for (const el of $$(`[data-intrst="${k}"]`)) { el.textContent = on == null ? '' : on ? tr('connected') : tr('not connected'); el.classList.toggle('on', !!on); }
+}
 // 2.409.0 (#3490): the page shows the main switches (wsa_raw), below them the areas per workspace (areas.js wsa_modHtml)
 const modulesHtml = hint => wsa_raw(() => modulesHtmlMain(hint)) + wsa_modHtml();
 function modulesHtmlMain(hint) {
@@ -891,7 +899,7 @@ function settingsModal(focus) {
       <div class="row"><label for="s-qfrom">${tr('Quiet from')}</label>${timeIn('s-qfrom', s.quiet_from ?? '22:00', {label: tr('Quiet from'), empty: tr('none')})}<label for="s-qto" class="qtol">${tr('until|time')}</label>${timeIn('s-qto', s.quiet_to ?? '07:00', {label: tr('Quiet until'), empty: tr('none')})}</div>
       ${hint(tr('No pushes during these hours, on your clock (the time zone under General > Region and formats). The bell keeps everything; one summary when they end. Urgent tasks, focus timers and times you set yourself (digest, briefing) still come.'))}
       ${hint(tr('A task or a project can repeat its reminder until done (date dialog or project dialog). Nothing repeats during the quiet hours.'))}`,
-    integr: integrCardsHtml() + calsHtml(chk, hint) + (typeof famDavHtml === 'function' ? famDavHtml() : '') + `<h4 id="s-ical-h">${tr('Calendar subscription')}</h4>
+    integr: integrCardsHtml() + intr_row('cals', 'cal', N_('Calendars'), calsHtml(chk, hint)) + intr_row('carddav', 'cake', N_('Birthdays from your contacts'), typeof famDavHtml === 'function' ? famDavHtml() : '') + intr_row('ical', 'link', N_('Calendar subscription'), `<h4 id="s-ical-h">${tr('Calendar subscription')}</h4>
       ${hint(tr('Read-only. Calendar apps fetch changes every few hours.'))}
       <div id="s-ical"><div class="muted mhint">${tr('Loading…')}</div></div>
       <div class="row"><label for="s-icalscope">${tr('Tasks')}</label><select id="s-icalscope"><option value="all">${tr('All visible tasks (incl. shared projects)')}</option><option value="mine" ${s.ical_scope === 'mine' ? 'selected' : ''}>${tr('Only mine and assigned to me')}</option></select></div>
@@ -903,15 +911,16 @@ function settingsModal(focus) {
         <li>${tr('<b>Thunderbird:</b> Calendar > New Calendar > On the Network, paste the link.')}</li>
         <li>${tr('<b>Outlook:</b> Add calendar > Subscribe from web.')}</li>
         <li>${tr('<b>Only reachable at home or over a VPN?</b> Google Calendar, iCloud and Outlook.com fetch the feed from their own servers and then cannot reach it. Use an app that fetches on the device instead: on Android ICSx⁵ (the calendar then shows up in every calendar app), on a Mac the location “On My Mac” instead of iCloud, or Thunderbird.')}</li></ul></details>
-      ${hintK(tr('Anyone who knows the link sees these tasks. If it got out, create a new link: the old one stops working at once.'))}
-      ${caldavHtml(hint)}
-      ${feat('docs') && typeof dsc_integrHtml === 'function' ? dsc_integrHtml() : ''}${''/* 2.353.0 B (#2773): docscan.js, drawn by dsc_integrDraw */}
-      ${feat('docs') && typeof pl_setHtml === 'function' ? pl_setHtml() : ''}
-      ${kks_html()}${nwls_html()}${apbs_html()}${''/* 2.365.2 B (#2789): Karakeep, newsletter service, booking page (integrations.js) */}
-      <h4 id="s-mail-h">${tr('Tasks by e-mail')}</h4><div id="s-mail"></div>
-      ${shareHtml(hint)}
-      ${bmls_html()}
-      ${acz_linkHtml(S.webhooks?.enabled)}`,  // 2.166.0 (#2633): the webhooks moved to Access
+      ${hintK(tr('Anyone who knows the link sees these tasks. If it got out, create a new link: the old one stops working at once.'))}`)
+      + intr_row('dav', 'sync', N_('Calendar apps (CalDAV)'), caldavHtml(hint))
+      + intr_row('scan', 'download', N_('Documents: inboxes'), feat('docs') && typeof dsc_integrHtml === 'function' ? dsc_integrHtml(false) : '')  // 2.353.0 B (#2773): docscan.js, drawn by dsc_integrDraw
+      + intr_row('fetch', 'receipt', N_('Receipt fetcher'), feat('docs') && typeof fx_html === 'function' ? fx_html() : '')  // 2.625.0 (#4489): its own row (was inside dsc_integrHtml)
+      + intr_row('pl', 'file', N_('Paperless-ngx'), feat('docs') && typeof pl_setHtml === 'function' ? pl_setHtml() : '')
+      + intr_row('kk', 'bookmark', N_('Karakeep'), kks_html()) + intr_row('nwl', 'megaphone', N_('Newsletter service'), nwls_html()) + intr_row('apb', 'clock', N_('Booking page'), apbs_html())  // 2.365.2 B (#2789): integrations.js
+      + intr_row('mail', 'send', N_('Tasks by e-mail'), `<h4 id="s-mail-h">${tr('Tasks by e-mail')}</h4><div id="s-mail"></div>`)
+      + intr_row('share', 'phone', N_('Share from your phone'), shareHtml(hint))
+      + intr_row('bmlet', 'globe', N_('Save button for the browser'), bmls_html())
+      + acz_linkHtml(S.webhooks?.enabled),  // 2.166.0 (#2633): the webhooks moved to Access
     access: acz_html(),  // 2.166.0 (#2633): API tokens, webhooks and agent tokens in one place
     data: `<h4 id="s-imp-h">${tr('Import')}</h4>
       ${hint(tr('You see a preview first; an import can be undone for 24 hours. Nothing inside the file is fetched from the internet.'))}${nwls_impLinkHtml()}
@@ -973,7 +982,7 @@ function settingsModal(focus) {
   // 2.365.2 (#2789): what was set inside a module: Company & office (the office's settings, following the workspace) and Documents
   pane.biz = typeof biz_paneHtml === 'function' ? biz_paneHtml() : '';
   pane.docs = typeof dcs_paneHtml === 'function' ? dcs_paneHtml() : '';
-  pane.data += biz_dataHtml(); pane.integr += biz_integrHtml();  // 2.365.2 D (#2789): the office's data and its Peppol access (both live in Company & office)
+  pane.data += biz_dataHtml(); pane.integr += intr_row('pep', 'building', N_('E-invoice (Peppol)'), biz_integrHtml());  // 2.365.2 D (#2789): the office's data and its Peppol access (both live in Company & office)
   pane.help += aboutHtml(chk, hint);
   const secs = SET_SECS.filter(([k]) => pane[k]);
   let cur = {tabbar: 'look', sidebar: 'look', layout: 'modules', collab: 'modules', focus: 'modules', time: 'modules', templates: 'data', sample: 'data', newskinds: 'notify', agents: 'ai', agentdots: 'ai', usage: 'ai', activity: S.me?.is_admin ? 'org' : 'ai', agentpolicy: 'org', server: 'users', signin: 'users', agentsafe: 'ai', agentsetup: 'ai', assistant: 'ai', share: 'integr', ical: 'integr', calendars: 'integr', webhooks: 'access', caldav: 'integr', paperless: 'integr', scans: 'integr', tokens: 'access', apppw: 'account', about: 'help', groups: 'org', users: 'org', odata: S.me?.is_admin ? 'users' : 'org', backup: 'users', dayplan: 'general'}[focus] || (INTB_FOCUS[focus] ? 'integr' : focus);  // 2.364.0 C (#3041): people, groups, agent rules under Organisation; 2.582.0 (#4827): backup / old odata of a server admin = Server > Backup
@@ -1008,13 +1017,13 @@ function settingsModal(focus) {
   md.addEventListener('change', e => { if (e.target.id === 's-fsize' && S.settings) render(); });
   if (focus === 'tabbar') setTimeout(() => $('#s-tabbar-h', md)?.scrollIntoView({block: 'start'}), 0);
   if (focus === 'sidebar') setTimeout(() => $('#s-side-h', md)?.scrollIntoView({block: 'start'}), 0);  // 2.25.0 (UX-03)
-  if (focus === 'newskinds' || focus === 'share') setTimeout(() => $(focus === 'share' ? '#s-share-h' : '#s-news-h', md)?.scrollIntoView({block: 'start'}), 0);
+  if (focus === 'newskinds' || focus === 'share') setTimeout(() => intr_open(md, focus === 'share' ? '#s-share-h' : '#s-news-h')?.scrollIntoView({block: 'start'}), 0);
   if (focus === 'agentdots') setTimeout(() => $('#s-agdots-h', md)?.scrollIntoView({block: 'start'}), 0);
   if (focus === 'groups' || focus === 'dayplan') setTimeout(() => $(focus === 'groups' ? '#s-groups-h' : '#s-plan-h', md)?.scrollIntoView({block: 'start'}), 0);  // 2.10.0
-  if (focus === 'scans') setTimeout(() => $('#s-scan-h', md)?.scrollIntoView({block: 'start'}), 50);  // 2.353.0 B (#2773)
-  if (INTB_FOCUS[focus]) setTimeout(() => $(INTB_FOCUS[focus], md)?.scrollIntoView({block: 'start'}), 50);  // 2.365.2 B (#2789)
-  if (focus === 'fetcher') setTimeout(() => $('#s-fetch-h', md)?.scrollIntoView({block: 'start'}), 50);  // 2.425.0 C (#3453)
-  if (focus === 'caldav' || focus === 'apppw') setTimeout(() => $(focus === 'caldav' ? '#s-dav-h' : '#s-apw-h', md)?.scrollIntoView({block: 'start'}), 0);
+  if (focus === 'scans') setTimeout(() => intr_open(md, '#s-scan-h')?.scrollIntoView({block: 'start'}), 50);  // 2.353.0 B (#2773)
+  if (INTB_FOCUS[focus]) setTimeout(() => intr_open(md, INTB_FOCUS[focus])?.scrollIntoView({block: 'start'}), 50);  // 2.365.2 B (#2789)
+  if (focus === 'fetcher') setTimeout(() => intr_open(md, '#s-fetch-h')?.scrollIntoView({block: 'start'}), 50);  // 2.425.0 C (#3453)
+  if (focus === 'caldav' || focus === 'apppw') setTimeout(() => intr_open(md, focus === 'caldav' ? '#s-dav-h' : '#s-apw-h')?.scrollIntoView({block: 'start'}), 0);
   // 2.7.0 (#405 S8): the module keys land on their row (and open its options), not just on top of Modules
   const modFocus = {layout: 'cal', collab: 'collab', focus: 'pomo', time: 'time'}[focus];
   if (modFocus) setTimeout(() => { const r = $(`[data-pane="modules"] [data-modrow="${modFocus}"]`, md); if (!r) return; const gd = r.closest('details.modgrp'); if (gd) gd.open = true; const gp = r.closest('details.mgparts'); if (gp) gp.open = true; const o = $('details.mopt', r); if (o) o.open = true; r.scrollIntoView?.({block: 'start'}); r.classList.add('flash'); }, 0);
@@ -1165,7 +1174,7 @@ function settingsModal(focus) {
     show(h.k); idx(false);
     const ap = h.el.closest('[data-admp]'); if (ap) admSubShow(md, ap.dataset.admp, true);
     const ai = h.el.closest('[data-aisp]'); if (ai) aiSubShow(md, ai.dataset.aisp, true);
-    for (let det = h.el.closest('details'); det; det = det.parentElement?.closest('details')) if (!(det === h.el.closest('details') && h.el.matches('summary'))) det.open = true;  // 2.25.0: also the folded module group around it
+    for (let det = h.el.closest('details'); det; det = det.parentElement?.closest('details')) if (!(det === h.el.closest('details') && h.el.matches('summary') && !det.matches('.introw'))) det.open = true;  // 2.25.0: also the folded module group around it
     const r = h.el.closest('.row, .modrow, details, h4, label') || h.el;
     setTimeout(() => { r.scrollIntoView?.({block: 'center'}); r.classList.add('sflash'); setTimeout(() => r.classList.remove('sflash'), 1600); }, 30);  // 2.250.0 C (#2994): the soft ring (prefers-reduced-motion: a still ring)
   });
@@ -1256,7 +1265,7 @@ function settingsModal(focus) {
     if (b.dataset.m === 'tab-add') { tabAddSheet(id => { tabSet([...tabIds(), id]); $('#s-tabadd', md)?.focus(); }); return; }  // 2.122.2 (#2329)
     if (b.dataset.m === 'sync-now') { b.disabled = true; try { if (OUT.q.length) await flush(); await refreshNow(); } finally { b.disabled = false; const st = $('#s-synced', md); if (st) st.textContent = syncedTxt(); } return; }  // 2.25.0 (UX-56)
     if (b.dataset.m === 'wp-on') { const c = $('#s-wpdev', md); if (c && !c.checked) c.click(); return; }  // 2.25.0 (UX-46)
-    if (b.dataset.jump) { const t = $(b.dataset.jump, md); if (t) { t.scrollIntoView?.({block: 'start'}); t.classList.add('flash'); setTimeout(() => t.classList.remove('flash'), 1600); } return; }  // 2.25.0 (UX-20)
+    if (b.dataset.jump) { const t = intr_open(md, b.dataset.jump); if (t) { t.scrollIntoView?.({block: 'start'}); t.classList.add('flash'); setTimeout(() => t.classList.remove('flash'), 1600); } return; }  // 2.25.0 (UX-20)
     const sg = b.closest('[data-sideg]');
     if (sg && (b.dataset.smove || 'sideEye' in b.dataset)) {  // 2.25.0 (UX-03)
       const p = sidePref(), g = sg.dataset.sideg;
@@ -1285,7 +1294,7 @@ function settingsModal(focus) {
     if (b.dataset.m === 'hints-reset') { LS.del('hintsSeen'); toast(tr('Done')); render(); return; }
     if (b.dataset.m === 'ag-guide') { aiSubShow(md, 'setup', true); return; }  // 2.4.2 (#392); 2.7.2 (#420): the Set up tab
     if (b.dataset.m === 'go-access') { $('.snav [data-sec="access"]', md)?.click(); return; }  // 2.166.0 (#2633)
-    if (b.dataset.m === 'go-share') { $('.snav [data-sec="integr"]', md)?.click(); setTimeout(() => $('#s-share-h', md)?.scrollIntoView?.({block: 'start'}), 50); return; }  // 2.7.0 (#405 S3)
+    if (b.dataset.m === 'go-share') { $('.snav [data-sec="integr"]', md)?.click(); setTimeout(() => intr_open(md, '#s-share-h')?.scrollIntoView?.({block: 'start'}), 50); return; }  // 2.7.0 (#405 S3)
     if (b.dataset.m === 'go-modules') { $('.snav [data-sec="modules"]', md)?.click(); setTimeout(() => $('[data-pane="modules"] [data-modrow="agents"]', md)?.scrollIntoView?.({block: 'center'}), 50); return; }  // 2.6.0 (K09)
     if (b.dataset.m === 'cele-try') { const k = ['project', 'list', 'today'][(b._cele = ((b._cele ?? -1) + 1) % 3)]; celebrate(k, {force: true, name: k === 'project' ? tr('Example project') : tr('Example list')}); return; }  // 2.39.1 (#1292): each try shows the next level
     const trw = b.closest('[data-tpl]');
@@ -1714,6 +1723,7 @@ async function adminSwitch(md, el, fromHist) {
 async function icalDraw(md, j) {
   const box = $('#s-ical', md); if (!box) return;
   if (!j) { try { j = await api('GET', '/api/ical'); } catch { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; } }
+  intr_st('ical', !!(j.url || j.active));  // 2.625.0 (#4489): the state on its folded row in Settings > Integrations
   // 2.138.0 C (#1907): the server keeps only a hash: the link is in the answer of create / rotate once, later only "active since"
   if (!j.url && !j.active) { box.innerHTML = `<div class="row"><button class="btn sm pri" data-m="ical-create">${ic('cal', 's')} ${tr('Create subscription link')}</button></div>`; return; }
   const at = j.created_at ? new Date(j.created_at) : null, btns = `<button class="btn sm" data-m="ical-rotate">${ic('key', 's')} ${tr('New link')}</button><button class="btn sm danger" data-m="ical-off">${tr('Switch off')}</button>`;

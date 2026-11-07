@@ -45,6 +45,7 @@ async function nwl_load() {
 function nwl_draw() {
   const els = $$('.nwl-md .nwl-body'); if (!els.length) return;
   els.forEach(el => { el.innerHTML = nwl_html(!!el.closest('.nwl-set')); });
+  if (typeof intr_st === 'function') intr_st('nwl', NWL.d ? !!NWL.d.conn : null);  // 2.625.0 (#4489): the state on its folded row in Settings > Integrations
   clearTimeout(NWL.poll);
   if (NWL.d?.conn?.busy || NWL.d?.runs?.[0]?.state === 'busy') NWL.poll = setTimeout(nwl_load, 2000);
 }

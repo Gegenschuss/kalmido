@@ -17,6 +17,7 @@ async function fx_draw(/** @type {ParentNode} */ md) {
   const ws = fx_ws();
   try { FXS.j = await api('GET', `/api/docs/fetchers?ws=${encodeURIComponent(ws)}`); } catch { box.innerHTML = ''; return; }
   if (FXS.code && FXS.ws !== ws) FXS.code = '';
+  if (typeof intr_st === 'function') intr_st('fetch', !!FXS.j?.fetchers?.length);  // 2.625.0 (#4489): the state on its folded row in Settings > Integrations
   FXS.ws = ws;
   if (box.isConnected) box.innerHTML = fx_bodyHtml(FXS.j);
 }

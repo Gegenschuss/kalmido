@@ -390,7 +390,7 @@ function pg_settingParts(add) {
     [N_('Templates'), 'templates', '#s-tpl-h', 'download', 1], [N_('Members'), 'org', '#og-mh', 'users', lmOrgPaneOn()], [N_('Groups'), 'groups', '#s-groups-h', 'users', adm]];
   for (const [n, focus, sel, icon, on] of parts) if (on) add('sp:' + focus + ':' + sel, 'setting', tr('Settings: {0}', tr(n)), icon, () => {
     settingsModal(focus);
-    pg_waitEl(sel, el => { el.scrollIntoView?.({block: 'center'}); (el.closest('.row, h4') || el).classList.add('flash'); setTimeout(() => (el.closest('.row, h4') || el).classList.remove('flash'), 1600); });
+    pg_waitEl(sel, el => { el.closest('details.introw')?.setAttribute('open', '');  /* 2.625.0 (#4489): a folded integration row */ el.scrollIntoView?.({block: 'center'}); (el.closest('.row, h4') || el).classList.add('flash'); setTimeout(() => (el.closest('.row, h4') || el).classList.remove('flash'), 1600); });
   }, {qonly: true});
 }
 // 2.87.9 (#1934): what the views of the areas list on their side, as search hits: the senders, document types and tags of the

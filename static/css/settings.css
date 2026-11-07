@@ -126,6 +126,21 @@
 @media (min-width:768px) {
   .icards{grid-template-columns:repeat(3,1fr)}
 }
+/* 2.625.0 (#4489): Settings > Integrations: one folded row per integration (like the module groups), the form inside */
+.introw{border-top:1px solid var(--line)}
+.introw > summary{display:flex;align-items:center;gap:.5rem;min-height:2.75rem;cursor:pointer;list-style:none;color:var(--text);font-size:var(--fs-b)}
+.introw > summary::-webkit-details-marker{display:none}
+.introw > summary > svg:first-child{color:var(--accent);flex:none}
+.introw > summary b{flex:1;min-width:0;font-weight:600;overflow-wrap:anywhere}
+.introw-st{flex:none;font-size:var(--fs-m);color:var(--muted)}
+.introw-st.on{color:var(--ok-t)}
+.introw > summary .fcar{flex:none;color:var(--muted);transform:rotate(-90deg);transition:transform .15s}
+.introw[open] > summary .fcar{transform:none}
+.introw-b{padding-bottom:.75rem}
+.introw-b > h4:first-child{margin-top:0}
+@media (prefers-reduced-motion:reduce) {
+  .introw > summary .fcar{transition:none}
+}
 .pushnow{display:flex;align-items:center;gap:.75rem;padding:.75rem .875rem;margin:.25rem 0 1rem;border-radius:var(--radius);border:1px solid var(--line2);background:var(--bg2)}
 .pushnow > span{display:flex;flex-direction:column;flex:1;min-width:0}
 .pushnow small{color:var(--muted);font-size:var(--fs-m)}

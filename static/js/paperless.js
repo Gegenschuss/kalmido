@@ -44,6 +44,7 @@ async function pl_load() {
 function pl_draw() {
   const els = $$('.pl-slot');
   els.forEach(el => { el.innerHTML = pl_html(el.dataset.plmode); });
+  if (typeof intr_st === 'function') intr_st('pl', PL.d ? !!PL.d.conn : null);  // 2.625.0 (#4489): the state on its folded row in Settings > Integrations
   clearTimeout(PL.poll);
   // 2.87.9 (#1938): polls while a run goes on and a slot shows it; a slot drawn later loads again (pl_slot)
   if (els.length && !PL.up && pl_running(PL.d)) PL.poll = setTimeout(pl_load, Math.min(10000, 2000 * (PL.fail + 1)));
@@ -52,6 +53,7 @@ function pl_draw() {
 function pl_jumpNow() {  // 2.87.9 (#1936): the jump from the search / the documents settings lands on the section
   const h = PL.jump && $('#s-pl-h'); if (!h) return;
   PL.jump = false; if (typeof som_reveal === 'function') som_reveal(h);  // 2.583.0 (#4833): it lies under "Further options"
+  h.closest('details.introw')?.setAttribute('open', '');  // 2.625.0 (#4489): its folded row
   h.scrollIntoView?.({block: 'start'}); h.classList.add('flash'); setTimeout(() => h.classList.remove('flash'), 1600);
 }
 // 2.87.9 (#1940): where a run files the documents, in words

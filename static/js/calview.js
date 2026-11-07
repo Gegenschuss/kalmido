@@ -27,6 +27,7 @@ async function calsDraw(md, j) {
   const box = $('#s-cals', md); if (!box) return;
   if (!j) { try { j = await api('GET', '/api/calendars'); } catch { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; } }
   box._j = j;
+  if (typeof intr_st === 'function') intr_st('cals', j.subs.length > 0);  // 2.625.0 (#4489): the state on its folded row in Settings > Integrations
   S.calendars = {...(S.calendars || {}), enabled: j.enabled, subs: j.subs.filter(x => x.visible).length};
   calInvalidate();
   box.innerHTML = j.subs.length ? j.subs.map(x => `<div class="calsub ${x.visible ? '' : 'off'}" data-cal="${x.id}" style="--cc:${cssColor(x.color) || '#94a3b8'}">

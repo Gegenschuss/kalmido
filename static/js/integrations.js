@@ -161,7 +161,7 @@ function apwWire(md) {
     if (c) { try { await navigator.clipboard.writeText(c.dataset.davcopy); toast(tr('Copied')); } catch { toast(tr('Copy failed')); } return; }
     const b = e.target.closest('[data-apw]'); if (!b) return;
     if (b.dataset.apw === 'new') { apwModal(md); return; }
-    if (b.dataset.apw === 'howto') { $('.snav [data-sec="integr"]', md)?.click(); setTimeout(() => $('#s-dav-h', md)?.scrollIntoView({block: 'start'}), 0); return; }
+    if (b.dataset.apw === 'howto') { $('.snav [data-sec="integr"]', md)?.click(); setTimeout(() => intr_open(md, '#s-dav-h')?.scrollIntoView({block: 'start'}), 0); return; }  // 2.625.0 (#4489): opens its row
     if (b.dataset.apw === 'list') { $('.snav [data-sec="account"]', md)?.click(); setTimeout(() => $('#s-apw-h', md)?.scrollIntoView({block: 'start'}), 0); return; }
     const row = b.closest('[data-apwid]'), t = ($('#s-apws', md)?._t || []).find(x => x.id === +row?.dataset.apwid); if (!t) return;
     if (!await askConfirm(tr('Revoke the app password “{0}”?', t.name), tr('The calendar app that uses it stops syncing at once.'), {ok: tr('Revoke'), danger: true})) return;
@@ -607,6 +607,7 @@ async function kks_draw(md) {
   let cur; try { cur = await api('GET', '/api/life/karakeep'); } catch { box.innerHTML = ''; return; }
   if (!box.isConnected) return;
   box._cur = cur;
+  if (typeof intr_st === 'function') intr_st('kk', !!cur.connected);  // 2.625.0 (#4489): the state on its folded row in Settings > Integrations
   const rl = S.lists.filter(l => l.life === 'reading' && !l.archived && canEditList(l.id));
   box.innerHTML = `<p class="muted">${tr('Links you save in Karakeep become bookmarks, notes become tasks of your “Read later” project; archived bookmarks and ticked tasks are archived in Karakeep.')}</p>
     <div class="row"><label for="kk-url">${tr('Address')}</label><input id="kk-url" type="url" inputmode="url" autocomplete="off" value="${esc(cur.url || '')}" placeholder="https://karakeep.example.com"></div>

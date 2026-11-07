@@ -7,8 +7,8 @@ const DSCN = {code: '', ws: '', md: null, es: /** @type {any} */ (null), edit: 0
 // 2.365.2 B (#2789): the whole block "Documents: inboxes" is there now (the folder of the file store, the folder watcher with
 // the scan inboxes, the forwarding address); the document settings only point to it
 // Settings > Integrations: the whole part (download, set-up code, inboxes with their last use) for the shown workspace
-function dsc_integrHtml() {
-  return `<h4 id="s-scan-h">${tr('Documents: inboxes')}</h4><div id="s-scan" class="dsc-embed"><div class="muted mhint">${tr('Loading…')}</div></div>${typeof fx_html === 'function' ? fx_html() : ''}`;  // 2.425.0 C (#3453): + the receipt fetcher (docfetch.js)
+function dsc_integrHtml(fx = true) {  // 2.625.0 (#4489): Settings > Integrations draws the receipt fetcher as its own row (fx false)
+  return `<h4 id="s-scan-h">${tr('Documents: inboxes')}</h4><div id="s-scan" class="dsc-embed"><div class="muted mhint">${tr('Loading…')}</div></div>${fx && typeof fx_html === 'function' ? fx_html() : ''}`;  // 2.425.0 C (#3453): + the receipt fetcher (docfetch.js)
 }
 async function dsc_integrDraw(md) {
   if (typeof fx_draw === 'function') fx_draw(md);  // 2.425.0 C (#3453)
