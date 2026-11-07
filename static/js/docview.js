@@ -253,7 +253,7 @@ async function dcv_pvDraw(md, d) {
   if (box._pv === key && box.firstChild) return;
   box._pv = key;
   if (DVW.pdf && DVW.pdf.box !== box) dcv_free();
-  if (!DVW.ro && typeof ResizeObserver === 'function') DVW.ro = new ResizeObserver(es => { for (const e of es) if (/** @type {any} */ (e.target).isConnected) { clearTimeout(/** @type {any} */ (e.target)._rt); /** @type {any} */ (e.target)._rt = setTimeout(() => dcv_layout(/** @type {any} */ (e.target)), 80); } });
+  if (!DVW.ro && typeof ResizeObserver === 'function') DVW.ro = new ResizeObserver(es => { for (const e of es) if (/** @type {any} */ (e.target).isConnected) { const t = /** @type {any} */ (e.target); (t._rt ||= debounce(() => dcv_layout(t), 80))(); } });
   DVW.ro?.observe(box);
   if (!box._sc) { box._sc = true; box.addEventListener('scroll', () => dcv_pgn(box), {passive: true}); }
   const live = () => box.isConnected && box._pv === key;

@@ -14,8 +14,8 @@ const TS_MIN = 7, TS_MAX = 28, TS_TEXT = 9, TS_SHARP = 13;  // rem; the server c
 const ts_key = () => isMobile() ? 'dc_tile_m' : 'dc_tile_d';
 const ts_std = () => isMobile() ? 9.5 : 11;  // the sizes before #4812 (docs.css)
 const ts_clamp = v => Math.round(Math.min(TS_MAX, Math.max(TS_MIN, v)) * 4) / 4;
-/** @type {{v: number|null, t: any, sharp: boolean|null}} v = the size while it changes (before it is saved) */
-const TS = {v: null, t: 0, sharp: null};
+/** @type {{v: number|null, sharp: boolean|null}} v = the size while it changes (before it is saved) */
+const TS = {v: null, sharp: null};
 function ts_get() {
   if (TS.v != null) return TS.v;
   const v = parseFloat(S.settings?.[ts_key()]);
@@ -41,11 +41,11 @@ function ts_set(v, save = true) {
   TS.v = ts_clamp(v);
   ts_apply();
   if (!save) return;
-  clearTimeout(TS.t);
-  TS.t = setTimeout(ts_save, 400);
+  ts_saveLater();
 }
+const ts_saveLater = debounce(() => ts_save(), 400);  // saved once it rests (core.js debounce, no hand-made delay)
 async function ts_save() {
-  clearTimeout(TS.t);
+  ts_saveLater.cancel();
   if (TS.v == null) return;
   const k = ts_key(), v = String(TS.v);
   if (S.settings) S.settings[k] = v;
