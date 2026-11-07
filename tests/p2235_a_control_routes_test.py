@@ -32,6 +32,7 @@ ROUTES = {
     "POST /api/v1/agent/chats/{}/messages/{}/reactions": "meta", "POST /api/v1/agent/chats/{}/messages/{}/withdraw": "meta",
     "POST /api/v1/agent/jobs": "meta", "POST /api/v1/agent/jobs/{}/proposal": "meta", "POST /api/v1/agent/progress": "meta",
     "POST /api/v1/agent/proposals": "meta", "POST /api/v1/agent/proposals/import": "meta",
+    "POST /api/v1/agent/objects/{}/{}/proposals": "meta",  # 2.623.0 (#4718): a change proposal a person takes or not
     "POST /api/v1/agent/proposals/sheet-tasks": "meta", "POST /api/v1/agent/proposals/shoot": "meta",
     "POST /api/v1/agent/proposals/time": "meta", "POST /api/v1/agent/typing": "meta", "POST /api/v1/agent/usage": "meta",
     "POST /api/v1/agent/rules": "meta",  # 2.235.0 A2: C (#2903) its own standing rules, taken from a person's message
