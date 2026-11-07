@@ -55,6 +55,7 @@ const WS_VIEWS = {
   'static/js/ablinks.js': 'helper',           // 2.470.0 (#3596): wsCur only preselects the workspace of Settings > Data > Sharing defaults (the select has its own pick)
   'static/js/acctset.js': 'helper',           // 2.365.2 C (#2789): wsCur only preselects the organisation of Settings > Absences and holiday (the dialog has its own picker, no view keeping data)
   'static/js/polls.js': 'helper',            // 2.98.1: the default workspace of a new poll (the dialog shows all polls, with their workspace)
+  'static/js/widgets.js': 'draw',             // 2.627.0 (#4504): wgStdLoad loads the standard of the shown workspace again when it changed (WG.stdWs)
   'static/js/palette.js': 'draw',
   'static/js/areas.js': 'draw',               // 2.87.0: private areas hidden in an organisation's view (o3a_hid while drawing, #1845)
   'static/js/docviews.js': 'draw',           // 2.579.0 (#4802): saved document views of the shown workspace (wsCur); drawing the sidebar / list loads again when DCV.ws differs
@@ -94,6 +95,8 @@ const WS_VIEWS = {
   'static/js/popovers.js': 'helper',          // 2.455.0 (#3848): the project picker lists the workspace the caller names (o.ws, inWs), no view keeping data
   'static/js/spacemove.js': 'helper',         // 2.455.0 (#3848): mv_home - a Basket task counts as the shown workspace while the move dialog opens, no view keeping data
   'kalmido/personal/timesheet.py': 'helper',  // 2.125.0 (#2119): tsl_org - which organisation a closed month goes to (no view)
+  'kalmido/accounts/layouts.py': 'helper',    // 2.627.0 (#4504): wg_std_org - without ?ws the saved workspace picks whose standard
+                                              // arrangement of the views counts (no data of its own; the client sends ?ws)
   'kalmido/accounts/orgs.py': 'helper',       // 2.148.1 (#2480): ws_chosen_org - the default workspace of a new list (no view)
   'kalmido/office/search.py': 'helper',       // 2.250.0 A (#2992): bs_office_oid - the office area of the search hits, per request
                                               // like office_where (no view keeping data; p2250_a_officesearch checks Private)
