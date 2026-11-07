@@ -36,6 +36,7 @@ from urllib.parse import quote
 from flask import g, jsonify, request
 
 from ..core import objhooks  # 2.565.0: START (core/db.init_db runs the forward copy)
+from ..files.fsref import fs_unshare_hooks  # 2.623.0 (#4778)
 from ..core.config import app, APP_NAME, PUBLIC_URL, TZ, ATT_DIR
 from ..core.i18n import browser_lang, lang, short_day, tr
 from ..core.db import body, bump, db, iso, local_day, local_now, now_utc
@@ -281,6 +282,24 @@ def wsh_core_drop(c, uid, r, reason="unshare"):
         n = c.execute("SELECT n.* FROM fs_nodes n JOIN fs_shares f ON f.node_id=n.id WHERE f.id=?", (fid,)).fetchone() if fid else None
         if n is not None:
             obj_node_unshare(c, uid, n, fid, kind="wiki", ref_id=n["ref_id"] if n["kind"] == "ref" else None, reason=reason)
+
+
+def wsh_fs_unshare(c, uid, n, s):
+    """2.623.0 (#4778): the file store's dialog takes share row s of node n back (files/web.py files_share_delete,
+    files/fsref.py fs_unshare_hooks; the caller checked who may). A page's node or a core share of a person card: the row goes
+    into obj_revoked like in the knowledge dialog, and the card ends as a whole (its other core share goes too, revoked_at) --
+    an older version reads only the card and must not open the share again. Undo = the card's restore (wsh_restore)."""
+    cards = c.execute("SELECT * FROM wiki_shares WHERE kind='person' AND revoked_at IS NULL AND (core_id=? OR core_id2=?)",
+                      (s["id"], s["id"])).fetchall()
+    if not cards and not (n["kind"] == "ref" and n["ref_kind"] == "wiki"):
+        return False  # a folder share of no card: the file store's way (deleted as before)
+    from ..core.objects import obj_node_unshare
+    obj_node_unshare(c, uid, n, s["id"], kind="wiki", ref_id=n["ref_id"] if n["kind"] == "ref" else None)
+    ts = iso(now_utc())
+    for r in cards:
+        wsh_core_drop(c, uid, r)  # the card's other core share (the one just taken is gone already)
+        c.execute("UPDATE wiki_shares SET revoked_at=? WHERE id=?", (ts, r["id"]))
+    return True
 
 
 def wsh_core_move(c, owner=None):
@@ -1024,3 +1043,4 @@ def wsh_md(text, link, file, depth=0, node=None):
 
 
 objhooks.START.append(("migr_core4717_wiki", True, wsh_core_move))  # 2.565.0 (#4717): once (core/db.init_db)
+fs_unshare_hooks.append(wsh_fs_unshare)  # 2.623.0 (#4778)

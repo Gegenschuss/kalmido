@@ -28,6 +28,7 @@ takes the core share back (obj_node_unshare: obj_revoked) and marks / removes th
 from flask import g, has_request_context, jsonify
 
 from ..core import objhooks  # 2.565.0: START (core/db.init_db runs the forward copy)
+from ..files.fsref import fs_unshare_hooks  # 2.623.0 (#4778)
 from ..core.config import app, EMAIL_RE
 from ..core.access import Denied, acx_org_ok, collab_all, need_feat
 from ..core.dlock import dl_list_locked  # 2.560.0 B (#4699)
@@ -335,6 +336,27 @@ def shs_core_drop(c, uid, x, reason="unshare"):
     shs_drop_cache()
 
 
+def shs_fs_unshare(c, uid, n, s):
+    """2.623.0 (#4778): the file store's dialog takes share row s of a table's node n back (files/web.py files_share_delete,
+    files/fsref.py fs_unshare_hooks; the caller checked who may): the row goes into obj_revoked like in the table's own dialog
+    and the card bound to it is marked ended (revoked_at; one with a typed address goes, as in sheets_shares_delete) -- so an
+    older version, which reads only the card, does not open the share again. Undo = share again (the card opens again)."""
+    if n["kind"] != "ref" or n["ref_kind"] != "sheet":
+        return False
+    from ..core.objects import obj_node_unshare
+    x = c.execute("SELECT * FROM sheet_shares WHERE core_id=? AND sheet_id=? AND revoked_at IS NULL", (s["id"], n["ref_id"])).fetchone()
+    t = c.execute("SELECT org_id FROM sheets WHERE id=?", (n["ref_id"],)).fetchone()
+    obj_node_unshare(c, uid, n, s["id"], kind="sheet", ref_id=n["ref_id"], org=(t["org_id"] if t else n["org_id"]) or None)
+    if x is not None:
+        if x["email_key"]:  # 2.360.2 M (#2561): the address is not kept
+            c.execute("DELETE FROM sheet_shares WHERE id=?", (x["id"],))
+        else:
+            c.execute("UPDATE sheet_shares SET revoked_at=? WHERE id=?", (iso_ms(now_utc()), x["id"]))
+            _tell_unshared(c, n["ref_id"], [x["user_id"]])
+    shs_drop_cache()
+    return True
+
+
 def shs_core_move(c, sheet_id=None):
     """The forward copy (one-shot migr_core4717 in core/db.py init_db, and for a table coming back from the trash or handed
     on to an heir): every live card bound to an account without a core share gets one. Idempotent; a table in the trash
@@ -528,3 +550,4 @@ def sheets_shares_delete(sid, shid):
 
 
 objhooks.START.append(("migr_core4717", True, shs_core_move))  # 2.565.0 (#4717): once (core/db.init_db)
+fs_unshare_hooks.append(shs_fs_unshare)  # 2.623.0 (#4778)

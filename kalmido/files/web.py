@@ -25,6 +25,7 @@ from .fsref import (FSR, fs_ref_content, fs_ref_json, fs_ref_need_move, fs_ref_n
 from .fsroots import fs_area_root_need_free, fs_area_root_of  # 2.199.0 F (#2742, review G1)
 from .fsroots import fs_area_after, fs_area_before, fs_area_folder_name, fs_area_need_fit, fs_area_of, fs_area_open  # 2.200.0 A (#2747)
 from .fsroots import fs_area_share  # 2.200.0 B (#2747)
+from .fsref import fs_unshare_hooks  # 2.623.0 (#4778)
 from .fsviews import fsv_collections, fsv_drop, fsv_hidden  # 2.429.0 (#3580): the file store shows only its own folders
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 from ..accounts.orgs import visible_people  # 2.369.5 (#2517): pulled up from functions
@@ -928,7 +929,8 @@ def files_share_delete(sid):
         # 2.571.0 (#4766): the share of a core object's reference node is taken back like in the other areas -- the row goes
         # into obj_revoked under the object's kind / id (its restore finds it there); the log line as before
         obj_node_unshare(c, me(), n, sid, kind=n["ref_kind"], ref_id=n["ref_id"], org=n["org_id"] or None)
-    else:  # review F7: a folder / file share has no restore way (obj_revoked rows are found by kind / id): deleted as before
+    elif not any(f(c, me(), n, s) for f in fs_unshare_hooks):  # 2.623.0 (#4778): a table's / a knowledge card's own way first
+        # review F7: a folder / file share has no restore way (obj_revoked rows are found by kind / id): deleted as before
         c.execute("DELETE FROM fs_shares WHERE id=?", (sid,))
         fs_log_add(c, s["node_id"], "unshare", str(sid))
     bump(c)
