@@ -286,6 +286,7 @@ def admin_retention():
 # SO_REUSEPORT; the kernel hands every new connection to one of them. Threads and pool are shared out (core/pg.py).
 WRK_PROC_RESTART_S = 5  # a child that ended is started again after this
 WRK_PROC_GUARD_S = 3  # a child looks this often whether its first process is still there
+WRK_PROC_STOP_S = 4  # a stop waits this long for the children (role web: no queue rows of their own to wait for)
 _PROCS = {"kids": {}, "stopping": False}
 
 
@@ -325,9 +326,15 @@ def wrk_web_procs_start(script):
 
     def stop(signum, frame):
         _PROCS["stopping"] = True
-        for p in list(_PROCS["kids"].values()):
-            if p.poll() is None:
-                p.terminate()  # each one puts its own queue rows back (bgj_on_term) and ends
+        kids = [p for p in list(_PROCS["kids"].values()) if p.poll() is None]
+        for p in kids:
+            p.terminate()  # each one puts its own queue rows back (bgj_on_term) and ends
+        end = time.monotonic() + WRK_PROC_STOP_S  # as PID 1 of a container: its end would kill them before they are done
+        for p in kids:
+            try:
+                p.wait(max(0.1, end - time.monotonic()))
+            except Exception:  # noqa: BLE001 - subprocess.TimeoutExpired: Docker's SIGKILL ends it
+                pass
         if callable(prev):
             return prev(signum, frame)
         os._exit(128 + signal.SIGTERM)

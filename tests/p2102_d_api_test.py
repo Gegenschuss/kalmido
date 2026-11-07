@@ -135,7 +135,8 @@ check(th.get("configured") == 24 and th.get("busy", 0) >= 1 and th.get("peak", 0
 # 2.521.0 (#4475): the default pool is threads + 16 (was threads x 3 + 8 = 80)
 check(pl.get("max") == int(os.environ.get("KALMIDO_DB_POOL_MAX") or 40) and pl.get("min") == 4 and pl.get("timeouts") == 0
       and "pool_size" in pl and "requests_waiting" in pl, f"#1994: the pool's counters (4..40 = 24 + 16; 2.521.0 #4475) {pl}")
-check(cn.get("max_connections", 0) >= 100 and cn.get("replicas") == 1 and cn.get("need") == pl.get("max", 0) + 6 and cn.get("ok") is True,
+# 2.642.0 (#4975): + 7 direct connections per process (was 6: + the busy locks of core/ephem.py)
+check(cn.get("max_connections", 0) >= 100 and cn.get("replicas") == 1 and cn.get("need") == pl.get("max", 0) + 7 and cn.get("ok") is True,
       f"#1994: the connection budget {cn}")
 check(all(isinstance(v, (int, float)) for v in pl.values()), "#1994: pool = numbers only")
 low = r.text.lower()
