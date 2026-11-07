@@ -442,7 +442,7 @@ def docs_flow_undo(rid):
     _doc(c, row["node_id"], write=True)
     row = c.execute("SELECT * FROM doc_flow_runs WHERE id=? FOR UPDATE", (rid,)).fetchone()
     if row["undone_at"]:
-        return err(tr("This run was taken back already"), 409)
+        return err(tr("This run was undone already"), 409)
     d = S._jopen(c, row["ws"], CTX, row["data"], {})
     nid = row["node_id"]
     _IN.on = True

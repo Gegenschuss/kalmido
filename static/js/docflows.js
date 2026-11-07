@@ -58,7 +58,7 @@ function dfl_formHtml(s) {  // the form "New flow" (ids dcr-* as before for the 
       <label class="chkl"><input type="checkbox" id="dfl-tdue"> ${tr('Due on the due date of the document')}</label></div>
     ${(s.people || []).length ? `<p class="muted">${tr('Notify')}</p>${chk('notify', (s.people || []).map(p => [p.id, p.name]))}` : ''}
     ${s.hooks ? row('dfl-hook', tr('Webhook'), inp('dfl-hook', 2000, 'type="url" placeholder="https://"')) : ''}
-    <p class="muted">${tr('A flow never starts another one. Every run can be taken back in the document.')}</p>
+    <p class="muted">${tr('A flow never starts another one. Every run can be undone in the document.')}</p>
     <div class="foot"><span class="spacer"></span><button type="button" class="btn pri" data-dcs="radd">${tr('Add flow')}</button></div></details>`;
 }
 function dfl_change(e) {  // the parts of the form for the chosen trigger / the task
