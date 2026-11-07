@@ -101,7 +101,7 @@ const DESK = {'(hover:hover) and (pointer:fine)': true};
     check(await until(() => d.activeElement?.id === 'qinput'), tag + 'n focuses the add box');
     d.activeElement.blur();
     kd('/', {}, d.body);
-    check(await until(() => w.eval('S.route.mod') === 'search'), tag + '/ opens the search ' + w.eval('S.route.mod'));
+    check(await until(() => w.eval('S.route.key') === 'search'), tag + '/ opens the search ' + w.eval('S.route.key'));
 
     // ---- the help: n / q / m / a / / from the registry, in General right after '?', each once, no mark row left
     const gen = w.eval(`JSON.stringify((SHORTCUTS().find(([g]) => g === 'General') || [, []])[1].map(([k]) => k))`);
