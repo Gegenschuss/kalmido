@@ -138,8 +138,17 @@ def lyp_own(c, pid, key):
     return (r[0] if r else "") or ""
 
 
-def lyp_value(c, pid, key):
-    """(the arrangement the person sees as a dict, source own | standard | default)."""
+def lyp_ws(c, aid):
+    """2.627.0 (#4504, review F1): the workspace an agent reads the standard in: an organisation's agent always its own
+    organisation (never the one the person last chose, which may be another organisation of hers), a personal agent None
+    (the person's own setting counts)."""
+    a = c.execute("SELECT org_id FROM agents WHERE user_id=?", (aid,)).fetchone()
+    return f"org:{int(a['org_id'])}" if a and a["org_id"] else None
+
+
+def lyp_value(c, pid, key, ws=None):
+    """(the arrangement the person sees as a dict, source own | standard | default); ws: the workspace whose organisation's
+    standard counts (lyp_ws of the agent), None = the person's saved workspace."""
     own = _load(lyp_own(c, pid, key))
     if _has_layout(own):
         return own, "own"
@@ -147,7 +156,7 @@ def lyp_value(c, pid, key):
         r = c.execute("SELECT page_layout FROM lists WHERE id=?", (int(key[5:]),)).fetchone()
         std = _load(r[0] if r else "")
     else:
-        std = _load(wg_std_resolved(c, key, wg_std_org(c, pid)))  # 2.627.0 (#4504): the organisation's standard first
+        std = _load(wg_std_resolved(c, key, wg_std_org(c, pid, ws)))  # 2.627.0 (#4504): the organisation's standard first
     if _has_layout(std):
         return std, "standard"
     return dict(LYP_DEFAULTS.get(key) or {}), "default"
@@ -308,7 +317,7 @@ def v1_lyp_get(view):
     c = db()
     pid = lyp_person(c, aid, a.get("user_id"))
     cat = lyp_need(c, aid, pid, view)
-    o, src = lyp_value(c, pid, view)
+    o, src = lyp_value(c, pid, view, lyp_ws(c, aid))
     return jsonify(view=view, user_id=pid, source=src, layout=lyp_out(cat, o))
 
 
@@ -371,7 +380,7 @@ def lyp_validate(b, inp):
     if b.get("view") not in (None, key):
         raise BadInput(tr("Invalid value: {0}", "view"))
     cat = lyp_need(c, me(), pid, key)
-    lay = lyp_in(cat, b.get("layout"), lyp_out(cat, lyp_value(c, pid, key)[0]))
+    lay = lyp_in(cat, b.get("layout"), lyp_out(cat, lyp_value(c, pid, key, lyp_ws(c, me()))[0]))
     lyv_clean(key, lay)  # the same check as every stored arrangement
     return {"view": key, "name": _p_str(b.get("name"), "name", LYP_NAME_MAX, True), "layout": lay,
             "proposed": lyp_out(cat, lay)}

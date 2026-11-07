@@ -153,9 +153,18 @@ check(x.get("source") == "own" and x["layout"]["order"][0] == "inbox", f"#4504: 
 check(Ca.patch(B + "/api/settings", json={"view_today": ""}).ok, "carl: Reset to the standard (the own value goes)")
 x = ag()
 check(x.get("source") == "standard" and x["layout"]["hidden"] == ["brief"], f"#4504: after the reset Alpha's standard again, not the instance's {x.get('layout')}")
+# 2.627.0 (#4504, review F1): an organisation's agent reads its own organisation's standard, never the one of the workspace
+# carl last chose (Private, or Beta when he is in Beta too); before the fix Alpha's agent read Beta's arrangement
 Ca.patch(B + "/api/settings", json={"workspace": "private"})
 x = ag()
-check(x.get("source") == "standard" and x["layout"]["hidden"] == ["review"], f"#4504: carl in Private: the instance's standard (review hidden) {x.get('layout')}")
+check(x.get("source") == "standard" and x["layout"]["hidden"] == ["brief"], f"#4504 F1: carl in Private: Alpha's agent still reads Alpha's standard {x.get('layout')}")
+wdb("INSERT INTO org_members(org_id,user_id,role) VALUES(?,?,'member') ON CONFLICT DO NOTHING", (ORG2, CARL))
+check(Ca.patch(B + "/api/settings", json={"workspace": f"org:{ORG2}"}).ok and sv(Ca, f"org:{ORG2}") == J(LD), "carl in Beta too, Beta's Today counts for him there")
+x = ag()
+check(x.get("source") == "standard" and x["layout"]["hidden"] == ["brief"] and x["layout"]["order"][0] != "events",
+      f"#4504 F1: carl in Beta: Alpha's agent reads Alpha's standard, nothing of Beta's {x.get('layout')}")
+wdb("DELETE FROM org_members WHERE org_id=? AND user_id=?", (ORG2, CARL))
+Ca.patch(B + "/api/settings", json={"workspace": "private"})
 
 # ---- freelancer-matrix: settings -- frida without an organisation: own > instance
 g = std(Fr)
@@ -166,5 +175,13 @@ check(put(Fr, "view_today", LO, org_id=ORG).status_code == 404 and put(Fr, "view
 check(Fr.patch(B + "/api/settings", json={"view_today": LD}).ok and J(Fr.get(B + "/api/state").json()["settings"].get("view_today")) == J(LD),
       "#4504: frida keeps her own Today")
 check(J(kt.dbx("SELECT value FROM settings WHERE key='lystd_view_today'")[0][0]) == J(LI), "#4504: the instance standard is still unchanged")
+
+# 2.627.0 (#4504, review F2): deleting an organisation takes its standards along (they live in the global settings)
+check(kt.dbx(f"SELECT COUNT(*) FROM settings WHERE key IN ('lystd_o{ORG2}_view_today', 'lystd_at_o{ORG2}_view_today')")[0][0] == 2, "Beta has its Today standard + version")
+r = A.delete(B + f"/api/admin/orgs/{ORG2}?confirm=1")
+check(r.ok, "the instance admin deletes Beta " + r.text[:200])
+check(kt.dbx(f"SELECT COUNT(*) FROM settings WHERE key IN ('lystd_o{ORG2}_view_today', 'lystd_at_o{ORG2}_view_today')")[0][0] == 0, "#4504 F2: Beta's standards are gone with it")
+check(J(kt.dbx("SELECT value FROM settings WHERE key='lystd_view_today'")[0][0]) == J(LI) and sv(Ca, f"org:{ORG}") != J(LI),
+      "#4504 F2: the instance's and Alpha's standards stay")
 
 sys.exit(kt.done("p2627_d_lystd"))

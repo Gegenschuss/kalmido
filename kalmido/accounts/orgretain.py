@@ -24,6 +24,7 @@ from ..core.db import iso, local_now, now_utc  # 2.488.0 (#4004): local_now know
 from ..core.i18n import N_, tr, trn
 from ..core.merges import mg_fk_refs
 from ..core.pg import system_ctx
+from .layouts import WG_STD_KEYS, wg_org_k  # 2.627.0 (#4504, review F2)
 from ..core.env import env_bool  # 2.399.0 (#2687): the hosting switch (KALMIDO_HOSTED)
 from ..core.retention import ret_keep_years, ret_need_unheld, ret_on, ret_person_office, ret_report
 from ..core.orgcrypt import oc_drop_key  # 2.369.5 (#2517): pulled up from functions
@@ -418,6 +419,9 @@ def odl_dismantle(c, oid):
         from ..team.clients import cl_org_purge
         cl_org_purge(c, oid)
         c.execute("DELETE FROM time_sheets WHERE org_id=? AND user_id IS NULL", (oid,))  # 2.360.2 D (#2561): a deleted person's months end here
+        # 2.627.0 (#4504, review F2): the organisation's standard arrangements of the views (global settings) go with it
+        for k in WG_STD_KEYS:
+            c.execute("DELETE FROM settings WHERE key IN (?,?)", (wg_org_k(oid, k), wg_org_k(oid, k, True)))
         c.execute("DELETE FROM orgs WHERE id=?", (oid,))
 
     def after():
