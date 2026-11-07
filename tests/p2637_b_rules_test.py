@@ -14,6 +14,7 @@ Invented names only.
  - agents propose a rule with actions + conditions (the card names them, accepting stores them)
  - a person without an organisation (freelancer-matrix: lists): a chain with a condition in a private list
 usage: p2637_b_rules_test.py <datadir>      (KMT_NOSTART=1 / P2637B_NOSTART=1: a running server)"""
+import subprocess
 import sys
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -21,7 +22,7 @@ from zoneinfo import ZoneInfo
 import requests
 
 from freelancer_fixture import freelancer
-from kt import B, H, check, dbx, done, fresh, sess, until
+from kt import B, CT, H, check, dbx, done, fresh, sess, until
 
 V = B + "/api/v1"
 TODAY = datetime.now(ZoneInfo("Europe/Berlin")).date()  # the test server's time zone (start.sh)
@@ -239,4 +240,30 @@ check(dbx("SELECT section_id FROM tasks WHERE id=?", (fa,))[0][0] == FS and comm
       "freelancer: the chain runs when the condition holds")
 check(dbx("SELECT section_id FROM tasks WHERE id=?", (fb,))[0][0] != FS and comments(fb, "Mine") == [],
       "freelancer: nothing when it does not")
+# 2.637.0 (#4768, review): the import keeps "a move into another project only as the last action" (rules.py rul_clean);
+# a hand-built file with the move in the middle is left out, the same move as the last action comes along
+_imp = r"""import json, app
+from kalmido.admin import oi_team as o
+class C:
+    def execute(self, *a):
+        return self
+    def fetchone(self):
+        return (0,)
+class Run:
+    warned = []
+    def m(self, table, v):
+        return {"lists": {"7": 70}, "sections": {}}.get(table, {}).get(str(v)) if v else None
+    def warning(self, *a):
+        self.warned.append(a[0])
+def go(more):
+    src = {"name": "R", "trig": "done", "trig_val": "", "act": "comment", "act_val": json.dumps({"text": "x"}),
+           "more_acts": json.dumps(more)}
+    d = o.rule_ids(C(), Run(), lambda v: None, {}, src, {"list_id": 5})
+    return None if d is None else d["target_list_id"]
+print(json.dumps([go([{"kind": "move", "list_id": 7}, {"kind": "priority", "priority": "high"}]),
+                  go([{"kind": "priority", "priority": "high"}, {"kind": "move", "list_id": 7}])]))
+"""
+_out = subprocess.run(["docker", "exec", CT, "python", "-c", _imp], capture_output=True, text=True)
+check(_out.stdout.strip().splitlines()[-1:] == ["[null, 70]"],
+      f"import: a move into another project in the middle of the chain is left out, as the last one it comes along ({_out.stdout[-200:]} {_out.stderr[-300:]})")
 sys.exit(done("p2637_b_rules"))

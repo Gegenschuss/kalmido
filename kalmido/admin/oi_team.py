@@ -403,13 +403,18 @@ def rule_ids(c, run, who, types, src, d):
     if len(more) >= RUL_ACT_MAX or any(x.get("kind") not in RUL_ACTIONS for x in more):
         run.warning(_W_RULE_LEFT, name)
         return None
-    acts = []
+    acts, tgts = [], [target]
     for x in more:
         one = _rule_act_ids(run, who, types, name, lid, x["kind"], {k: y for k, y in x.items() if k != "kind"}, True)
         if one is None:
             return None
         acts.append({"kind": x["kind"], **one[0]})
-        target, pause = one[1] or target, pause or one[2]
+        tgts.append(one[1])
+        pause = pause or one[2]
+    if any(tgts[:-1]):  # 2.637.0 (#4768, review): a move into another project only as the last action, as rules.py rul_clean
+        run.warning(_W_RULE_LEFT, name)
+        return None
+    target = tgts[-1]
     cond, why = _rule_cond_ids(run, who, src.get("conds"))
     pause = pause or why
     d.update(name=name, trig=trig, trig_val=tv, act=act, act_val=json.dumps(v, separators=(",", ":")), target_list_id=target,

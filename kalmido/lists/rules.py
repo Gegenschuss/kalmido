@@ -25,6 +25,7 @@ the task when the rule runs. The first action stays in act / act_val, the others
 (migrations.d/4768_a.py): an older version runs such a rule with its first action and without conditions.
 """
 import contextlib
+import copy
 import json
 from datetime import timedelta
 from flask import g, has_request_context, jsonify, request
@@ -830,11 +831,14 @@ def _rul_body(c, r, tid, k, a):
 def _rul_side_keep():
     """What a rule run notes for after the request (pushes, webhooks, channel events): a chain that fails is rolled back
     as a whole (2.637.0, #4768), so are its notes."""
-    return {k: (list(v) if isinstance(v, list) else dict(v)) for k in ("pushes", "wh", "chn") if isinstance(v := g.get(k), (list, dict))}
+    return {k: copy.deepcopy(v) for k in _RUL_SIDE if isinstance(v := g.get(k), (list, dict))}  # review: wh_diff holds a dict per task
+
+
+_RUL_SIDE = ("pushes", "wh", "chn", "wh_diff")  # 2.637.0 (#4768, review): + the webhook diff of tasks/validation.py log_changes
 
 
 def _rul_side_back(keep):
-    for k in ("pushes", "wh", "chn"):
+    for k in _RUL_SIDE:
         if k in keep:
             setattr(g, k, keep[k])
         else:
