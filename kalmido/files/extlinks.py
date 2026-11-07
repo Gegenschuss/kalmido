@@ -54,6 +54,7 @@ from .fslock import FSL_MSG, fl_is_locked, fsl_of_chain  # 2.353.0 A (#2758)
 from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
 from .web import _expiry, _names  # 2.369.5 (#2517): pulled up from functions
 from .store import fs_mail_rows, fs_log_add  # 2.369.5 (#2517): pulled up from functions
+from .store import _fs_receipt_hidden, _fs_receipts_hidden_ids  # 2.649.0 A (#5049)
 from .scan import sc_guard  # 2.369.5 (#2517): pulled up from functions
 from .bulk import fs_zip_build, abm_send_zip, abm_drop  # 2.369.5 (#2517): pulled up from functions
 
@@ -204,6 +205,8 @@ def xl_in_tree(c, link, nid):
         from ..hub.hubmail import hbm_node_ok
         if any(r["hub_mail_id"] and not hbm_node_ok(c, link["created_by"], r["hub_mail_id"]) for r in part):
             return None
+    if link["org_id"] and _fs_receipt_hidden(c, link["created_by"], link["org_id"], part[0]):
+        return None  # 2.649.0 A (#5049): a receipt the link's creator may not read in the app (download, preview, ZIP)
     return part
 
 
@@ -294,12 +297,14 @@ def xl_render(c, link, chain, token, lg, cur):
                 f'<p class="xl-act"><a class="xl-btn" href="{base}/d/{root["id"]}" download rel="nofollow">{e(tr("Download", lg=lg))}</a></p>')
         return pub_html(f"{root['name']} · {APP_NAME}", main, lg)
     folder = cur[0]
-    rows = c.execute("""SELECT id, kind, name, size, mime, hub_mail_id FROM fs_nodes WHERE parent_id=? AND deleted_at IS NULL AND agent_id IS NULL
+    rows = c.execute("""SELECT id, kind, name, size, mime, hub_mail_id, org_id, owner_id, created_by FROM fs_nodes WHERE parent_id=? AND deleted_at IS NULL AND agent_id IS NULL
                         AND kind IN ('folder', 'file') AND (org_id=? OR (? IS NULL AND org_id IS NULL))
                         AND id NOT IN (SELECT node_id FROM fs_locks WHERE e2e IS NOT NULL)
                         ORDER BY kind='file', lower(name), id LIMIT ?""",
                      (folder["id"], link["org_id"], link["org_id"], XL_LIST_MAX + 1)).fetchall()
     rows = fs_mail_rows(c, link["created_by"], rows)
+    hid = _fs_receipts_hidden_ids(c, link["created_by"], rows)  # 2.649.0 A (#5049): receipts hidden from the link's creator
+    rows = [r for r in rows if r["id"] not in hid] if hid else rows
     more = len(rows) > XL_LIST_MAX
     rows = rows[:XL_LIST_MAX]
     from .upsafe import up_marks
