@@ -17326,6 +17326,7 @@
   "Select a column": "Kies een kolom",
   "Select a tag": "Kies een label",
   "Select a person": "Kies een persoon",
+  "The backup folder is being cleaned up right now, please try again in a moment.": "De back-upmap wordt nu opgeruimd, probeer het zo opnieuw.",
   "This is a lead: a person converts it into an enquiry": "Dit is een lead: een persoon maakt er een aanvraag van",
   "Daily limit": "Daglimiet",
   "Proposed with the first key: the agent pauses for the day once its runs used this many tokens, also the runs other people start through chat, mentions or assignments. Empty = no limit.": "Voorgesteld bij de eerste sleutel: de agent pauzeert voor de dag zodra zijn runs zoveel tokens hebben verbruikt, ook de runs die anderen via chat, vermeldingen of toewijzingen starten. Leeg = geen limiet.",

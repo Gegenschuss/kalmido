@@ -17326,6 +17326,7 @@
   "Select a column": "Spalte wählen",
   "Select a tag": "Tag wählen",
   "Select a person": "Person wählen",
+  "The backup folder is being cleaned up right now, please try again in a moment.": "Der Sicherungsordner wird gerade aufgeräumt, bitte gleich noch einmal versuchen.",
   "This is a lead: a person converts it into an enquiry": "Das steht noch unter Neu: eine Person macht daraus eine Anfrage",
   "Daily limit": "Tagesgrenze",
   "Proposed with the first key: the agent pauses for the day once its runs used this many tokens, also the runs other people start through chat, mentions or assignments. Empty = no limit.": "Vorschlag zum ersten Schlüssel: Der Agent pausiert für den Tag, sobald seine Läufe so viele Tokens verbraucht haben, auch die Läufe, die andere über Chat, Erwähnungen oder Zuweisungen starten. Leer = keine Grenze.",

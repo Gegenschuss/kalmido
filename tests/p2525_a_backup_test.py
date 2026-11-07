@@ -9,6 +9,7 @@
  - (3) a download of a format-3 backup holds the readers' lock of the shared store: a delete (or the rotation) meanwhile
    removes none of its store files, the file comes complete; the clean-up runs next time; while a clean-up holds the lock
    the download says "busy" (409) on the POST and the GET; a client that goes away frees the lock
+   2.644.0 (#4530): the code is "store_busy" now (its own text: the clean-up, not "another backup or restore")
 usage: p2525_a_backup_test.py <datadir>        (P2525A_NOSTART=1: the server already runs with the settings below)"""
 import glob
 import io
@@ -159,9 +160,9 @@ holder = ("import fcntl, os, time\n"
 subprocess.run(["docker", "exec", "-d", CT, "python", "-c", holder], check=True)
 check(until(lambda: os.path.exists(HELD), 15), "setup: a clean-up holds the readers' lock")
 r = A.post(url, json={"password": PASSWORD})
-check(r.status_code == 409 and r.json().get("code") == "busy", f"while a clean-up runs the download says busy (POST) {r.status_code} {r.text[:160]}")
+check(r.status_code == 409 and r.json().get("code") == "store_busy", f"while a clean-up runs the download says busy (POST) {r.status_code} {r.text[:160]}")  # 2.644.0 (#4530): store_busy, was busy
 r = A.get(url, params={"t": ticket})
-check(r.status_code == 409 and r.json().get("code") == "busy", f"... and on the GET with a ticket {r.status_code} {r.text[:160]}")
+check(r.status_code == 409 and r.json().get("code") == "store_busy", f"... and on the GET with a ticket {r.status_code} {r.text[:160]}")  # 2.644.0 (#4530): store_busy, was busy
 open(RELEASE, "w").close()
 check(until(lock_free, 15), "setup: the clean-up let go")
 

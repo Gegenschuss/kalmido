@@ -146,6 +146,8 @@ def bk_pack_dir():
 
 
 BK_ERR = {"busy": N_("Another backup or restore is running, please try again in a moment."),
+          # 2.644.0 (#4530): the readers' lock is taken by a clean-up of the shared store, not by a backup or restore
+          "store_busy": N_("The backup folder is being cleaned up right now, please try again in a moment."),
           "disk": N_("Not enough free disk space for the backup."),
           "io": N_("The backup could not be written ({0})."),
           "format": N_("This is not an Kalmido backup (or the file is damaged)."),
@@ -202,7 +204,7 @@ class BackupError(Exception):
 
 @app.errorhandler(BackupError)
 def backup_error(e):
-    code = {"busy": 409, "not_found": 404, "need_passphrase": 400, "passphrase": 400}.get(e.code, 400)
+    code = {"busy": 409, "store_busy": 409, "not_found": 404, "need_passphrase": 400, "passphrase": 400}.get(e.code, 400)
     return jsonify(error=e.text(), code=e.code), code
 
 
@@ -778,20 +780,25 @@ def bk_store_gc(c):
 def bk_read_lock():
     """2.525.0 (#4303): a download, check or restore that reads files of the shared store holds the readers' lock (shared,
     across processes): the clean-up (bk_store_gc, after the rotation or a delete) then removes nothing and runs again next
-    time; while a clean-up runs, the reader gets "busy" instead of a file that breaks off. -> a handle for bks.unlock()
-    (None without a store)."""
+    time; while a clean-up runs, the reader gets "store_busy" (2.644.0, #4530: was "busy", whose text names a backup or
+    restore) instead of a file that breaks off. -> a handle for bks.unlock() (None without a store)."""
     if not os.path.isdir(BK_STORE):
         return None
     fd = bks.lock(BK_STORE, wait=False, name=bks.READ_LOCK, shared=True)
     if fd is None:
-        raise BackupError("busy")
+        raise BackupError("store_busy")
     return fd
 
 
 def bk_test_gate(env="KALMIDO_TEST_BK_DL_GATE"):
     """Tests only (2.525.0, #4303): a download waits before its first shared file until the file KALMIDO_TEST_BK_DL_GATE
-    exists (the test deletes the backup meanwhile). 2.549.0 (#4529): env=KALMIDO_TEST_BKO_UP_GATE for the off-site upload."""
+    exists (the test deletes the backup meanwhile). 2.549.0 (#4529): env=KALMIDO_TEST_BKO_UP_GATE for the off-site upload.
+    2.644.0 (#4530): env=KALMIDO_TEST_BK_DL_TICKET_GATE: the GET of a download between the used ticket and the stream; the
+    file <gate>.at says the request waits there."""
     gate = os.environ.get(env) if os.environ.get("KALMIDO_TEST") == "1" else ""
+    if gate:
+        with contextlib.suppress(OSError):
+            open(gate + ".at", "w").close()
     end = time.monotonic() + 60
     while gate and not os.path.exists(gate) and time.monotonic() < end:
         time.sleep(0.05)
@@ -2338,13 +2345,21 @@ def backups_download(name):
     p = bk_path(name)
     enc = bool(bk_parse_name(name)["encrypted"])
     fmt3 = bk_meta(p, enc).get("format_version") == 3
-    if fmt3:  # 2.525.0 (#4303): a clean-up of the store runs: "busy" already on the POST (the dialog says it), not a broken file
-        bks.unlock(bk_read_lock())
-    e = stepup_download(db(), proxy_ok=True, ticket=(lambda: bk_download_pass(p)) if enc and fmt3 else None)
+    # 2.525.0 (#4303): a clean-up of the store runs: "store_busy" already on the POST (the dialog says it), not a broken file.
+    # 2.644.0 (#4530): taken ONCE before the step-up and handed on: a clean-up that starts between a check and the download
+    # can no longer use up the one-time ticket of the GET and then answer busy (the ticket stays for the next try)
+    rlock = bk_read_lock() if fmt3 else None
+    try:
+        e = stepup_download(db(), proxy_ok=True, ticket=(lambda: bk_download_pass(p)) if enc and fmt3 else None)
+        if e is None and fmt3:  # 2.432.0 (#3584): put together from the store, a complete file; it owns the lock from here
+            pw = (g.sudl.get("passphrase") or bk_passphrase(db())) if enc else ""
+            bk_test_gate("KALMIDO_TEST_BK_DL_TICKET_GATE")  # tests only: a clean-up tries to start here (it may not)
+            lk, rlock = rlock, None
+            return bk_download_assembled(p, name, enc, pw, rlock=lk)
+    finally:
+        bks.unlock(rlock)
     if e is not None:
         return e
-    if fmt3:  # 2.432.0 (#3584): put together from the store, a complete file
-        return bk_download_assembled(p, name, enc, (g.sudl.get("passphrase") or bk_passphrase(db())) if enc else "")
     return send_file(p, as_attachment=True, download_name=name, mimetype="application/octet-stream",
                      conditional=False, max_age=0)
 
@@ -2367,15 +2382,15 @@ def bk_download_pass(p):
     return {"passphrase": given} if given else {}
 
 
-def bk_download_assembled(p, name, enc, pw):
+def bk_download_assembled(p, name, enc, pw, rlock=None):
     """2.432.0 (#3584): the download of a format-3 backup is ONE complete archive of format 2 (every file inside, as
     every version can restore it), streamed while it is put together: the shared files come out of the store (checked
     against their SHA-256), an encrypted backup is encrypted again with the same passphrase. Nothing lands on the disk
     but the small zip of the backup (decrypted into a work folder that goes at the end).
     2.525.0 (#4303): it holds the readers' lock (bk_read_lock) from the start to the last byte, so the rotation or a
     delete meanwhile removes none of its store files (that clean-up runs next time); while a clean-up runs: "busy" (409).
-    The lock goes with the end of the stream, an error, or a client that went away (also before the first byte)."""
-    rlock = bk_read_lock()
+    The lock goes with the end of the stream, an error, or a client that went away (also before the first byte).
+    2.644.0 (#4530): rlock = the lock backups_download took before the ticket was used (this function owns it from the call)."""
     work = tempfile.mkdtemp(prefix=".tmp-dl-", dir=BK_DIR)
     held = {"z": None}
 
@@ -2474,16 +2489,27 @@ def backups_verify(name):
     c = db()
     if name.startswith("upload-"):
         bk_no_upload_hosted()  # 2.480.0 review (#3944, F6): hosted -> no uploaded archive at all
-    p = bk_path(name) if not name.startswith("upload-") else bk_upload_path(name)
+    own = not name.startswith("upload-")
+    p = bk_path(name) if own else bk_upload_path(name)
     given = str(body().get("passphrase") or "")
+    keys = _rate_keys(g.user["username"])
+    if given:  # 2.644.0 (#4530): a typed-in passphrase is a guess, as on the restore: the same gate and counter
+        e = login_wait(keys, g.user["username"])
+        if e:
+            return e
     pw = given or bk_passphrase(c)
+    # 2.525.0 (#4303): no clean-up of the store while its shared files are checked. 2.644.0 (#4530): only an own format-3
+    # backup reads the store; an uploaded or format-2 one checks without holding the lock (a clean-up is not held up)
+    fmt3 = own and bk_meta(p, bool(bk_parse_name(name)["encrypted"])).get("format_version") == 3
     work = tempfile.mkdtemp(prefix=".verify-", dir=BK_DIR)
     rlock = None
     try:
-        rlock = bk_read_lock()  # 2.525.0 (#4303): no clean-up of the store while its shared files are checked
+        rlock = bk_read_lock() if fmt3 else None
         man, _ = bk_prepare(p, pw, work)
     except BackupError as e:
-        raise bk_old_pass(e, given, not name.startswith("upload-")) from None
+        if e.code == "passphrase" and given:  # 2.644.0 (#4530): only a typed-in passphrase counts as a try (as the restore)
+            _rate_fail(keys)
+        raise bk_old_pass(e, given, own) from None
     finally:
         bks.unlock(rlock)
         shutil.rmtree(work, ignore_errors=True)
