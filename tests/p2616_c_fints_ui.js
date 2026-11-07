@@ -75,6 +75,9 @@ const PIN = 'UiPin-' + Math.random().toString(36).slice(2, 10);
     check(await ready(ev, `!!document.querySelector('.fntdlg #fn-pin')`, 60), 'the dialog opens (office_fints.js loaded on demand)');
     check(await ev(`document.querySelector('#fn-pin').type === 'password' && document.querySelector('#fn-pin').autocomplete === 'off' && /2051/.test(document.querySelector('#fn-acct').textContent)`),
       'the PIN is a password field; the account with its IBAN end is offered');
+    // 2.628.0 (#4986): the period is the app's own date fields (U23, ux1_ui), the values stay YYYY-MM-DD for the server
+    check(await ev(`['fn-from', 'fn-to'].every(id => { const i = document.getElementById(id); return i && i.type === 'hidden' && i.dataset.dp === 'date' && /^\\d{4}-\\d{2}-\\d{2}$/.test(i.value) && !!document.querySelector('.fntdlg [data-dpfor="' + id + '"]'); }) && !document.querySelector('.fntdlg input[type="date"]')`),
+      'the period: own date fields (no native date input), values YYYY-MM-DD');
     await ev(`window.__itc = []; const _itc0 = importTargetConfirm; importTargetConfirm = o => { __itc.push(o); return _itc0(o); }; 1`);
     await ev(set('#fn-login', 'decoupled')); await ev(set('#fn-pin', PIN)); await ev(set('#fn-server', 'https://fints.example.com/fints'));
     await ev(click(`document.querySelector('.fntdlg [data-fn="next"]')`));

@@ -30,8 +30,8 @@ async function fnt_open() {
       <div class="row"><label for="fn-login">${tr('Sign-in name')}</label><input id="fn-login" maxlength="64" autocomplete="off" spellcheck="false" value="${esc(a.login || '')}"></div>
       <div class="row"><label for="fn-pin">${tr('PIN')}</label><input id="fn-pin" type="password" maxlength="64" autocomplete="off" spellcheck="false"></div>
       <div class="row"><label for="fn-server">${tr('FinTS server of the bank')}</label><input id="fn-server" type="url" maxlength="300" autocomplete="off" spellcheck="false" placeholder="https://" value="${esc(a.server || '')}"><small class="muted">${tr('The address your bank gives for FinTS / HBCI with PIN/TAN.')}</small><small class="fn-srvchg" role="note">${srvNote(a)}</small></div>
-      <div class="row"><label for="fn-from">${tr('From')}</label><input id="fn-from" type="date" value="${esc(s.since)}"></div>
-      <div class="row"><label for="fn-to">${tr('To')}</label><input id="fn-to" type="date" value="${esc(today())}"></div>
+      <div class="row"><label id="fn-froml">${tr('From')}</label>${dateIn('fn-from', s.since || '', {label: tr('From'), clear: false})}</div>
+      <div class="row"><label id="fn-tol">${tr('To')}</label>${dateIn('fn-to', today(), {label: tr('To'), clear: false, after: 'fn-from'})}</div>
       <label class="chk"><input type="checkbox" id="fn-rem" checked> ${tr('Remember the sign-in name and the server for this account (never the PIN)')}</label>
       ${foot(tr('Connect'))}`;
     $(a.login ? '#fn-pin' : '#fn-login', md)?.focus();
