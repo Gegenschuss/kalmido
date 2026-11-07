@@ -551,7 +551,8 @@ def _p_letter_profile(c, run, src, d, ctx):
 # (i:<item> | s:<part>:<crew row uid>). Both are mapped to the new ids here, so after a move the positions find their tasks
 # again (not "new" and ticked: one click would make every task twice).
 _OI_ORIGIN = (("office_doc_items", "office/document_items.json"), ("office_doc_parts", "office/document_parts.json"))
-_OI_LINK_KEY = re.compile(r"i:([1-9][0-9]{0,17})|s:([1-9][0-9]{0,17}):([^\s]{1,80})")
+# the crew row uid is carried over as it is (only the part id is mapped), so any text of one line passes (Fable review job/3383)
+_OI_LINK_KEY = re.compile(r"i:([1-9][0-9]{0,17})|s:([1-9][0-9]{0,17}):([^\n]{0,200})")
 
 
 def _oi_origins(run, data):
