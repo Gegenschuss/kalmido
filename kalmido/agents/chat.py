@@ -10,6 +10,7 @@ from datetime import timedelta
 from flask import g, jsonify, request
 
 from ..core.config import app, ATT_DIR, MAX_FILE_MB
+from ..core.pgbus import bus_on, bus_send  # 2.622.0 (#3891)
 from ..core.pg import insert_id
 from ..core.i18n import tr
 from ..core.db import ag_cursor, ag_cursor_parse, ag_limit, body, bump, db, err, iso, iso_ms, now_utc
@@ -1360,7 +1361,7 @@ def agent_abort(aid):
 
 
 # ---- 2.22.0 (#693): "<name> is writing …" in a task's comments, for people and agents alike (like the chat's typing). A
-# signal lasts TASK_TYPING_S seconds (send it again while writing); kept in memory only (one process, nothing to store).
+# signal lasts TASK_TYPING_S seconds (send it again while writing); kept in memory only (nothing to store; 2.622.0 #3891: told to the other web processes over core/pgbus.py).
 # Everyone who sees the task's comments learns it with their next GET /api/version (field ty), never their own signal.
 TASK_TYPING_S = 8
 _TTYPE, _TTYPE_LOCK = {}, threading.Lock()
@@ -1374,7 +1375,19 @@ def task_typing_set(c, tid, uid):
             _TTYPE.pop(k, None)
         if len(_TTYPE) < 5000:
             _TTYPE[(tid, uid)] = now + TASK_TYPING_S
+    bus_send("ttype", [int(tid), int(uid)])  # 2.622.0 (#3891): the other web processes show it too
     return {"ok": True, "seconds": TASK_TYPING_S}
+
+
+def _ttype_heard(d):
+    """2.622.0 (#3891): a typing signal of another process (kept here as if it came in here; lost ones only miss seconds)."""
+    if isinstance(d, list) and len(d) == 2 and all(isinstance(x, int) for x in d):
+        with _TTYPE_LOCK:
+            if len(_TTYPE) < 5000:
+                _TTYPE[(d[0], d[1])] = time.time() + TASK_TYPING_S
+
+
+bus_on("ttype", _ttype_heard)
 
 
 def task_typing_for(c, uid):

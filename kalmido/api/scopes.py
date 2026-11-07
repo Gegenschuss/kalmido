@@ -10,6 +10,8 @@ import time
 from flask import g, jsonify, request, Response
 
 from ..core.config import API_PREFIX, app
+from ..core.pgbus import bus_active  # 2.622.0 (#3891)
+from ..core.ephem import eph_add, eph_total  # 2.622.0 (#3891)
 from ..core.pg import insert_id, st_ids
 from ..core.i18n import N_, tr, trn
 from ..core.db import bump, db, err, gsetting, iso, now_utc, usettings
@@ -713,6 +715,8 @@ def v1_task_batch():
             seen = [x for x in _BATCH_SEEN.get(me(), []) if now - x[0] < APPROVAL_BATCH_WINDOW]
             _BATCH_SEEN[me()] = seen
             recent = sum(x[1] for x in seen)
+        if bus_active():  # 2.622.0 (#3891): the batches of all processes count together; this process's own count is the floor
+            recent = max(recent, eph_total("abatch", me()))
     if vis and act == "update" and data.get("list_id"):  # 2.30.0 (#919): moving tasks to other people waits for approval
         from ..agents.safety import move_gate
         move_gate(c, [(i, data["list_id"]) for i in vis])
@@ -723,6 +727,8 @@ def v1_task_batch():
     if is_agent(g.user) and not g.get("approved_job") and vis:
         with _BATCH_LOCK:
             _BATCH_SEEN.setdefault(me(), []).append((time.time(), len(vis)))
+        if bus_active():
+            eph_add("abatch", me(), len(vis), APPROVAL_BATCH_WINDOW)
     if act == "wont_do":
         act, data = "complete", {"status": -1, "expect": expect}
     elif act == "complete":

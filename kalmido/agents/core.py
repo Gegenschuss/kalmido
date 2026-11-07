@@ -10,7 +10,8 @@ from flask import g, has_request_context
 
 from ..core.config import app, EMAIL_RE
 from ..core.pg import insert_id, WEB_THREADS
-from ..core.pgbus import bus_on, bus_send  # 2.622.0 (#3891)
+from ..core.pgbus import bus_active, bus_on, bus_send  # 2.622.0 (#3891)
+from ..core.ephem import eph_add  # 2.622.0 (#3891)
 from ..core.i18n import tr
 from ..core.db import inbox_default, iso, iso_ms, now_utc, parse_iso
 from ..accounts.session import me
@@ -565,7 +566,11 @@ def burst_hit(kind, lid):
         if len(_BURST) > 2000:
             for k in [k for k, v in _BURST.items() if now - v[-1] >= AGENT_BURST_S]:
                 _BURST.pop(k, None)
-        return len(ts) > AGENT_BURST
+        n = len(ts)
+    if bus_active():  # 2.622.0 (#3891): several processes count together (core/ephem.py); this process's own count is the floor
+        shared = eph_add("burst", f"{kind}:{a['id']}:{lid}", 1, AGENT_BURST_S)
+        n = max(n, shared or 0)
+    return n > AGENT_BURST
 
 
 def _burst_hold(c, lid, tid, how, from_lid, source):
@@ -669,7 +674,18 @@ def task_editing_set(c, tid, uid):
             _TEDIT.pop(k, None)
         if len(_TEDIT) < 5000:
             _TEDIT[tid] = now + TASK_EDIT_S
+    bus_send("tedit", int(tid))  # 2.622.0 (#3891): the tidy in another process waits for it too
     return {"ok": True, "seconds": TASK_EDIT_S}
+
+
+def _tedit_heard(tid):
+    if isinstance(tid, int):
+        with _TEDIT_LOCK:
+            if len(_TEDIT) < 5000:
+                _TEDIT[tid] = time.time() + TASK_EDIT_S
+
+
+bus_on("tedit", _tedit_heard)
 
 
 def task_being_edited(tid):

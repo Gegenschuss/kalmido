@@ -20,6 +20,7 @@ import time
 from flask import g, has_request_context
 
 from ..core.access import MANAGE_ROLES, Denied, WRITE_ROLES, acx_org_ok, list_role
+from ..core.pgbus import bus_on, bus_send  # 2.622.0 (#3891)
 from ..core.dlock import dl_of, dl_sheet_locked  # 2.560.0 B (#4699)
 from ..core.db import bump, iso_ms, now_utc
 from ..core.i18n import N_, lang, tr
@@ -911,7 +912,19 @@ def sh_presence_set(c, r, uid, cell_id):
     with _PRES_LOCK:
         if len(_PRES) < 5000 or (r["id"], uid) in _PRES:
             _PRES[(r["id"], uid)] = (cell_id, time.time() + SH_PRESENCE_S)
+    bus_send("shpres", [int(r["id"]), int(uid), cell_id])  # 2.622.0 (#3891): the other web processes show it too
     return {"ok": True, "seconds": SH_PRESENCE_S}
+
+
+def _shpres_heard(d):
+    """2.622.0 (#3891): presence in a table, told by another process."""
+    if isinstance(d, list) and len(d) == 3 and isinstance(d[0], int) and isinstance(d[1], int) and (d[2] is None or isinstance(d[2], int)):
+        with _PRES_LOCK:
+            if len(_PRES) < 5000 or (d[0], d[1]) in _PRES:
+                _PRES[(d[0], d[1])] = (d[2], time.time() + SH_PRESENCE_S)
+
+
+bus_on("shpres", _shpres_heard)
 
 
 def sh_batches(c, sid):
