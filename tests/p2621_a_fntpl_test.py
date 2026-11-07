@@ -90,7 +90,8 @@ for who, s in (("org", A), ("freelancer", Fr)):
         x, y = (j.get("items") or [{}, {}])[:2]
         check(st == 200 and all(x.get(k) == v for k, v in want.items()) and (j.get("template") or {}).get("name") == tpl,
               p + f"template {tpl} reads its example {st} {x}")
-        check(tpl == "client_number" or y.get("sure") is False, p + f"template {tpl}: a name that does not fit is not sure {y}")
+        check(y.get("sure") is False,  # 2.621.0 (#4600) review: also client_number (kind only guessed = not sure)
+              p + f"template {tpl}: a name that does not fit is not sure {y}")
         check(kept(s) == tpl, p + f"template {tpl} kept for the office area")
 
     # an own template from the fixed blocks

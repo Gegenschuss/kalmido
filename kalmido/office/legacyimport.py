@@ -1968,7 +1968,8 @@ def fnt_parse(name, clients=(), t=None):
     words = lambda v: re.sub(r"\s+", " ", (v or "").replace(sep, " ")).strip()  # noqa: E731
     out = {"file_name": base[:255], "kind": kind or "invoice", "number": (g.get("number") or stem)[:120], "project_no": (g.get("project_no") or "")[:120],
            "project": words(g.get("project")), "client_name": words(g.get("client")), "client_id": None, "date": d, "sure": False}
-    out["sure"] = bool(d) and not fi_date_open(raw_date) if "date" in fields else bool(g.get("number") or g.get("client"))
+    # 2.621.0 (#4600) review: "sure" only with a kind really read (block, number prefix or marker word), never the invoice fallback
+    out["sure"] = bool(kind) and (bool(d) and not fi_date_open(raw_date) if "date" in fields else bool(g.get("number") or g.get("client")))
     out["client_id"] = ofb_client_match(out["client_name"], clients)
     return out
 

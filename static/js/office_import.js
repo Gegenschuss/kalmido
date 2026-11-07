@@ -352,11 +352,10 @@ async function oim_fntChange(t) {
   if (t.dataset.oimFnt === 't') name = t.value;
   else if (t.dataset.oimFnt === 's') cu.sep = t.value;
   else { const fl = [...cu.fields]; fl[+t.dataset.i] = t.value; cu.fields = fl; }
-  cu.fields = cu.fields.filter(Boolean);
-  OIM.fntDraft = cu;
+  OIM.fntDraft = cu;  // 2.621.0 (#4600) review: the draft keeps its empty parts (no jump of the selects), only the request drops them
   const todo = OIM.arch.filter(x => !x.done);
   try {  // the choice is kept on the server; files not archived yet are read again with it
-    const j = await api('POST', '/api/office/legacy/archive/parse', {names: todo.map(x => x.file_name), template: name, ...(name === 'custom' ? cu : {})});
+    const j = await api('POST', '/api/office/legacy/archive/parse', {names: todo.map(x => x.file_name), template: name, ...(name === 'custom' ? {...cu, fields: cu.fields.filter(Boolean)} : {})});
     f.current = j.template.name; f.custom = j.template.custom; OIM.fntDraft = null;
     (j.items || []).forEach((p, i) => { const x = todo[i], {file_name, ...rest} = p; if (x && !x.swapped) Object.assign(x, rest, {paid: rest.kind === x.kind ? x.paid : rest.kind === 'invoice' ? 1 : 0}); });
   } catch (x) { toast(x.message || ''); }
