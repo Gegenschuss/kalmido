@@ -470,9 +470,11 @@ def _close(d):
 
 
 def _sweep():
-    """Expired dialogs go (called under _LOCK)."""
+    """Expired dialogs go (called under _LOCK). 2.616.0 (#2473, Fable re-check): a dialog in a running step (its lock held)
+    stays until the step is over -- the step is bounded by FNT_STEP_MAX, and closing the bank client under it would end the
+    step with "bank" instead of a clean result; the next tick takes it."""
     t = _now()
-    for k in [k for k, d in _DLG.items() if d.expired(t)]:
+    for k in [k for k, d in _DLG.items() if d.expired(t) and not d.lock.locked()]:
         _close(_DLG.pop(k))
 
 
@@ -487,7 +489,8 @@ def _sweep_delay():
             cap = min(cap, float(os.environ.get("KALMIDO_TEST_FINTS_SWEEP") or cap))
         except ValueError:
             pass
-    nxt = min((min(d.seen + FNT_TTL, d.born + FNT_MAX_AGE) - t for d in _DLG.values()), default=cap)
+    nxt = min((max(5.0, min(d.seen + FNT_TTL, d.born + FNT_MAX_AGE) - t) if d.lock.locked()
+               else min(d.seen + FNT_TTL, d.born + FNT_MAX_AGE) - t for d in _DLG.values()), default=cap)
     return max(0.5, min(cap, nxt + 0.5))
 
 
@@ -904,6 +907,22 @@ if _test():  # test containers only (tests/start.sh)
         with _LOCK:
             tm = _TICK["timer"]
             return jsonify(open=len(_DLG), armed=bool(tm is not None and tm.is_alive()))
+
+    @app.post("/api/test/fints/hold")
+    def _fnt_test_hold():
+        """Fable re-check: {id, on}: the dialog's step lock is held (on) or let go, as by a running step; then {sweep: true}
+        runs the sweep once -> {open: dialogs left}."""
+        b = request.get_json(silent=True) or {}
+        d = _DLG.get(str(b.get("id") or ""))
+        if d is not None and "on" in b:
+            if b["on"]:
+                d.lock.acquire(blocking=False)
+            elif d.lock.locked():
+                d.lock.release()
+        if b.get("sweep"):
+            with _LOCK:
+                _sweep()
+        return jsonify(open=len(_DLG))
 
     @app.get("/api/test/fints/lib")
     def _fnt_test_lib():

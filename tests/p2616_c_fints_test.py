@@ -182,6 +182,14 @@ check(d.get("state") == "decoupled" and o.get("open", 0) >= 1 and o.get("armed")
 check(A.post(B + "/api/test/fints/age", json={"seconds": 901}).ok, "finding 1: the test clock runs past 15 minutes")
 o = kt.until(lambda: (lambda x: x if x.get("open") == 0 else None)(A.get(B + "/api/test/fints/open").json()), 20) or {}
 check(o.get("open") == 0 and o.get("armed") is False, f"finding 1: without any FinTS request the expired dialog is gone (and the sweep rests): {o}")
+# 2.616.0 (#2473, Fable re-check): the sweep leaves a dialog in a running step alone (no "bank" mid-step), the next sweep takes it
+d = start(A, "decoupled").json().get("dialog") or {}
+A.post(B + "/api/test/fints/hold", json={"id": d.get("id"), "on": True})
+A.post(B + "/api/test/fints/age", json={"seconds": 901})
+o = A.post(B + "/api/test/fints/hold", json={"sweep": True}).json()
+check(o.get("open") == 1, f"re-check: an expired dialog in a running step stays until the step is over: {o}")
+o = A.post(B + "/api/test/fints/hold", json={"id": d.get("id"), "on": False, "sweep": True}).json()
+check(o.get("open") == 0, f"re-check: after the step the sweep takes it: {o}")
 
 # ---------------------------------------------------------------- the person without organisation (personal office)
 fs = keep(Fr.get(B + "/api/office/bank/fints")).json()
