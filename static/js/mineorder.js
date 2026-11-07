@@ -159,10 +159,14 @@ const mseList = () => S.mineSecs?.list || [];
 const mseName = s => s.name || tr(MSE_KIND[s.kind] || '');
 const mseOn = () => moOwn() && !moBoard() && mseList().length > 0;
 const moListCol = () => moOwn() && !isMobile() && LS.get('moListCol', false) === true;  // (4): "Project" as a column (this device)
+// #3506 (CI red of 2.614.0, p2569_a): a folding whose PATCH has not come back yet - an answer the server gave before it (the
+// DELETE of another section, a state load) carried the old value and folded the section again under the hand that opened it
+const mseFoldP = new Map();
+const mseKeepFold = ms => { for (const s of ms?.list || []) if (mseFoldP.has(s.id)) s.collapsed = mseFoldP.get(s.id); return ms; };
 function mseFromState(j) {
   if (!j.mine_sections) return;
   const q = OUT.q.some(e => e.url === '/api/tasks/mine-order');  // a drag waiting offline keeps its sections
-  S.mineSecs = {list: j.mine_sections.list || [], tasks: q && S.mineSecs ? S.mineSecs.tasks : j.mine_sections.tasks || {}};
+  S.mineSecs = {list: mseKeepFold(j.mine_sections).list || [], tasks: q && S.mineSecs ? S.mineSecs.tasks : j.mine_sections.tasks || {}};
 }
 let mseIniting = false;
 async function mseInit() {  // the first opening of the own order: the default sections (once; the server does nothing a second time)
@@ -215,7 +219,7 @@ async function mseDrop(t, head, targetId = null, after = false) {
 }
 const mseDropHead = async (t, el) => { const h = moActive() && mseOn() && el.closest?.('#view .ghead[data-key^="ms:"]'); return h ? mseDrop(t, h) : false; };
 async function mseCall(method, url, b) {
-  try { const j = await api(method, url, b); if (j?.mine_sections) S.mineSecs = {...j.mine_sections, ...(OUT.q.some(e => e.url === '/api/tasks/mine-order') ? {tasks: S.mineSecs.tasks} : {})}; if (j?.order_kept) toast(tr('The sections were changed on another device: that order stays.')); render(); return j; }
+  try { const j = await api(method, url, b); if (j?.mine_sections) S.mineSecs = {...mseKeepFold(j.mine_sections), ...(OUT.q.some(e => e.url === '/api/tasks/mine-order') ? {tasks: S.mineSecs.tasks} : {})}; if (j?.order_kept) toast(tr('The sections were changed on another device: that order stays.')); render(); return j; }
   catch (e) { if (e?.status === 409 || e?.status === 404) { await load(); render(); } return null; }  // api() showed the reason; the current state instead of an old one
 }
 async function mseRename(s) {
@@ -255,6 +259,7 @@ document.addEventListener('click', e => {
   const h = e.target.closest?.('#view .ghead[data-key^="ms:"]');  // folding: the server keeps it for every device (events.js toggles it here)
   if (!h || e.target.closest('.gact, .shandle') || h.dataset.key === 'ms:none') return;
   const s = mseList().find(x => x.id === +h.dataset.key.slice(3)); if (!s) return;
-  s.collapsed = !s.collapsed;
-  api('PATCH', `/api/mine-sections/${s.id}`, {collapsed: s.collapsed}).catch(() => {});
+  const v = s.collapsed = !s.collapsed;
+  mseFoldP.set(s.id, v);
+  api('PATCH', `/api/mine-sections/${s.id}`, {collapsed: v}).catch(() => {}).finally(() => { if (mseFoldP.get(s.id) === v) mseFoldP.delete(s.id); });
 }, true);
