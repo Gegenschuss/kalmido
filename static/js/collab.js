@@ -69,8 +69,10 @@ const remPx = () => parseFloat(getComputedStyle(document.documentElement).fontSi
 // 2.631.0 (#4993): the phone sheet grows at most to the height of its list (and the screen)
 function bellMaxH(pop) {
   const h = pop.style.height, m = pop.style.maxHeight;
+  pop.style.height = ''; pop.style.maxHeight = '';
+  const def = pop.getBoundingClientRect().height;  // the unsized sheet (its CSS minimum may be above the list)
   pop.style.height = 'auto'; pop.style.maxHeight = 'none';
-  const n = Math.ceil(Math.max(pop.scrollHeight, pop.getBoundingClientRect().height)) || 1e9;
+  const n = Math.ceil(Math.max(def, pop.scrollHeight, pop.getBoundingClientRect().height)) || 1e9;
   pop.style.height = h; pop.style.maxHeight = m;
   return Math.min(innerHeight - 8, n);
 }

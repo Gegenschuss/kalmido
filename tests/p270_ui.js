@@ -312,7 +312,8 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
           check(s0.gh >= 43.5, `${vw}px: the sheet's handle is >= 44 px high ${JSON.stringify(s0)}`);
           await drag(s0.gx, s0.gy, 0, -(s0.gy - 4), 'touch'); await sleep(300);
           const s1 = await ev(`(() => { const r = document.querySelector('#pop').getBoundingClientRect(), f = document.querySelector('#pop .bpfoot').getBoundingClientRect(); return {h: r.height, t: r.top, l: r.left, w: r.width, iw: document.documentElement.clientWidth, ih: innerHeight, fb: f.bottom, st: localStorage.getItem('tasks.bellSheetH')}; })()`);
-          check(s1.h > s0.h + 100 && s1.t <= 12 && s1.st, `${vw}px: the handle drags the sheet up to the full height ${JSON.stringify([s0, s1])}`);
+          // 2.631.0 (#4993): a short list is already as high as its content, so the handle pulls it no higher
+          check(s1.h <= s0.h + 2 && s1.t > 12 && s1.st, `${vw}px: the handle does not pull the sheet above its content ${JSON.stringify([s0, s1])}`);
           check(Math.abs(s1.l) < 1 && s1.w >= s1.iw - 1 && s1.fb >= s1.ih - 60, `${vw}px: the full sheet spans the width, its foot at the bottom ${JSON.stringify(s1)}`);
           await shot(`p270-bell-full-${vw}.png`);
           await ev(`localStorage.removeItem('tasks.bellSheetH'); closePop(); 1`);

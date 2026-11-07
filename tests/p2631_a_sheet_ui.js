@@ -34,8 +34,9 @@ const WN = path.join(DATA, 'whatsnew-test.json');
     check(await until(`!!document.querySelector('.wnmd > .card')`), 'the dialog is open');
     // natural height of the card (height auto), read from the page
     const NAT = `(() => { const c = document.querySelector('.wnmd > .card'), h = c.style.height, m = c.style.maxHeight; c.style.height = 'auto'; c.style.maxHeight = 'none'; const n = c.getBoundingClientRect().height; c.style.height = h; c.style.maxHeight = m; return n; })()`;
-    const H0 = await ev(`document.querySelector('.wnmd > .card').getBoundingClientRect().height`), nat = await ev(NAT);
+    const nat = await ev(NAT);
     check(nat < 844 * 0.6, 'setup: the content is short ' + nat);
+    await until(`document.querySelector('.wnmd > .card').getAnimations().length === 0 && document.querySelector('.wnmd > .card').getBoundingClientRect().bottom <= innerHeight + 1`);
     const top = await ev(`document.querySelector('.wnmd > .card').getBoundingClientRect().top`);
     await drag(195, top + 12, 0, -500, 'touch');
     await until(`!document.querySelector('.wnmd > .card').classList.contains('sd-drag')`);
@@ -49,8 +50,11 @@ const WN = path.join(DATA, 'whatsnew-test.json');
     await until(`!!document.querySelector('#kbar .bell, #top .bell')`);
     await ev(`document.querySelector('.wnmd')?.remove(); document.querySelector('#kbar .bell, #top .bell').click(); 1`);
     check(await until(`!!document.querySelector('#pop .bpop')`), 'the bell is open');
-    const bell = await ev(`(() => { const p = document.querySelector('.bpop'), h = p.style.height, m = p.style.maxHeight; const now = p.getBoundingClientRect().height; p.style.height = 'auto'; p.style.maxHeight = 'none'; const n = p.getBoundingClientRect().height; p.style.height = h; p.style.maxHeight = m; return {now, n, ih: innerHeight}; })()`);
+    let hp = -1; await until(async () => { const v = await ev(`(() => { const p = document.querySelector('.bpop'); p.style.height = 'auto'; p.style.maxHeight = 'none'; const n = p.getBoundingClientRect().height; p.style.height = ''; p.style.maxHeight = ''; return Math.round(n); })()`); const same = v === hp; hp = v; return same; }, {step: 400});  // the list has loaded
+    await ev(`bellSize(document.querySelector('#pop'))`);
+    const bell = await ev(`(() => { const p = document.querySelector('.bpop'), h = p.style.height, m = p.style.maxHeight; const now = p.getBoundingClientRect().height; p.style.height = ''; p.style.maxHeight = ''; const d0 = p.getBoundingClientRect().height; p.style.height = 'auto'; p.style.maxHeight = 'none'; const n = Math.max(d0, p.getBoundingClientRect().height); p.style.height = h; p.style.maxHeight = m; return {now, n, ih: innerHeight}; })()`);
     check(bell.now <= bell.n + 2, 'bell: a stored height above the list is capped on opening ' + JSON.stringify(bell));
+    await until(`document.querySelector('#pop').getAnimations().length === 0`);
     const bt = await ev(`document.querySelector('#pop').getBoundingClientRect().top`);
     await drag(195, await ev(`document.querySelector('[data-bpgrab]').getBoundingClientRect().top + 8`), 0, -500, 'touch');
     await until(`true`, {timeout: 300});
