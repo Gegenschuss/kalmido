@@ -148,8 +148,12 @@ def ush_mail_doomed(c, uid):
         if not gone:
             return roots, ids
         q = ",".join("?" * len(gone))
-        for (nid,) in c.execute(f"SELECT id FROM fs_nodes WHERE hub_mail_id IN ({q}) ORDER BY id", list(gone)).fetchall():
+        for nid, kind in c.execute(f"SELECT id, kind FROM fs_nodes WHERE hub_mail_id IN ({q}) ORDER BY id", list(gone)).fetchall():
             if nid in ids:
+                continue
+            if kind != "folder":  # 2.631.0 (#4584): a filed mail or attachment holds nothing - no subtree look per mail
+                roots.append(nid)
+                ids.add(nid)
                 continue
             sub = fs_subtree(c, nid)
             marks = c.execute(f"SELECT hub_mail_id FROM fs_nodes WHERE id IN ({','.join('?' * len(sub))})", sub).fetchall()
@@ -201,7 +205,7 @@ def _branch_counts(c, uid, x, doomed):
                                           "AND (expires_at IS NULL OR expires_at>?)", own, now))
     ends += sum(r[0] for r in _in_parts(c, "SELECT COUNT(*) FROM fs_upload_requests WHERE node_id IN ({q}) AND created_by<>? "
                                            "AND revoked_at IS NULL AND deleted_at IS NULL", own, x["heir"]))
-    agents = {r[0] for r in _in_parts(c, "SELECT s.user_id FROM fs_shares s JOIN agents a ON a.user_id=s.user_id WHERE s.node_id IN ({q}) "
+    agents = {r[0] for r in _in_parts(c, "SELECT s.agent_id FROM fs_shares s JOIN agents a ON a.user_id=s.agent_id WHERE s.node_id IN ({q}) "
                                          "AND (a.owner_id IS NULL OR a.owner_id<>?) AND (s.expires_at IS NULL OR s.expires_at>?)", own, uid, now)}
     return {"stay": stay, "ends": ends, "agents": len(agents)}
 
@@ -431,12 +435,13 @@ def _folders(c, uid, items, new_paths, old_paths, doomed=frozenset()):
                     c.execute(f"UPDATE fs_shares SET role='edit' WHERE node_id=? AND {col}=? AND {live}", (nid, k, stamp))
 
 
-def ush_hand_on(c, uid, new_paths):
+def ush_hand_on(c, uid, new_paths, mail=None):
     """The deletion of account uid (users._user_purge, after the lists are settled, before its file store and its key go):
     everything of ush_plan with a heir passes to it. -> the stored files to remove after the commit. new_paths: the sealed
-    copies made here are added, for the caller to remove if the deletion fails later on. The caller commits."""
+    copies made here are added, for the caller to remove if the deletion fails later on. The caller commits. mail: the
+    (roots, ids) of ush_mail_doomed the caller purges after it (2.631.0 #4584: one look, the same set both times)."""
     uid = int(uid)
-    doomed = _mail_doomed(c, uid)  # 2.631.0 (#4584): the mail copies that go right after (users._up_mail_nodes) are not handed on
+    doomed = mail[1] if mail is not None else _mail_doomed(c, uid)  # 2.631.0 (#4584): the mail copies that go right after (users._up_mail_nodes) are not handed on
     plan = {k: [x for x in v if x["heir"]] for k, v in ush_plan(c, uid, doomed).items()}
     old_paths = []
     with system_ctx(c):  # the rows of both people, whoever deletes the account

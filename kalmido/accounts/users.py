@@ -583,7 +583,8 @@ def _user_purge(c, uid, made):
     files = upg_personal(c, uid)
     files += upg_rest(c, uid)
     from ..admin.purgeshare import ush_hand_on, ush_mail_doomed
-    files += ush_hand_on(c, uid, made)  # 2.508.0 (#4301): what it shares privately goes to who may write it, before its tree and key go
+    mail = ush_mail_doomed(c, uid)  # 2.631.0 (#4584): the mail copies that go - computed once, for the hand-on and _up_mail_nodes
+    files += ush_hand_on(c, uid, made, mail)  # 2.508.0 (#4301): what it shares privately goes to who may write it, before its tree and key go
     from ..team.clients import cl_user_purge
     cl_user_purge(c, uid)  # 2.223.3 B (#2878): its private clients (kept ones with the retired office, anonymised)
     from ..admin.acctexport import umz_forget
@@ -602,7 +603,7 @@ def _user_purge(c, uid, made):
     a = c.execute("SELECT webhook_id FROM agents WHERE user_id=?", (uid,)).fetchone()
     if a and a["webhook_id"]:
         c.execute("DELETE FROM webhooks WHERE id=?", (a["webhook_id"],))
-    files += _up_mail_nodes(c, ush_mail_doomed(c, uid)[0])  # 2.148.1 H (#2488): before the tree is handed on
+    files += _up_mail_nodes(c, mail[0])  # 2.148.1 H (#2488): before the tree is handed on
     from ..files.store import fs_user_purge
     files += fs_user_purge(c, uid)  # 2.48.0 (#1207): the file store (organisation branches go to an admin, the own tree goes)
     c.execute("DELETE FROM doc_fields WHERE ws=?", (f"u{int(uid)}",))  # 2.153.0 (#2179): the own documents' custom fields

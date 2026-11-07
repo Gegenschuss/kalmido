@@ -100,7 +100,8 @@ assert A.put(B + "/api/admin/agent-policy", json={"user_agents": True}).ok
 AG = Xe.post(B + "/api/my/agents", json={"username": "xhelper", "display_name": "X helper", "scopes": ["read"]})
 check(AG.ok, "xena's agent " + AG.text[:120])
 AGID = AG.json()["id"]
-write("INSERT INTO fs_shares(node_id, user_id, role, created_by, created_at) VALUES(?,?,'view',?,?)", (F1, AGID, VERA, T0))
+# 2.631.0 (#4584, Fable): an agent share lives in fs_shares.agent_id (files/web.py), never in user_id
+write("INSERT INTO fs_shares(node_id, agent_id, role, created_by, created_at) VALUES(?,?,'view',?,?)", (F1, AGID, VERA, T0))
 
 BEFORE = subtree(GB)
 OWN = {n for n, o in BEFORE.items() if o == VERA}
@@ -122,7 +123,7 @@ check(len(missing) == 5 and {LK, LKF, TR, MC} <= missing, f"exactly the five cou
 check(AFTER[GB] == WIM and AFTER[F1] == WIM and AFTER[QF] == WIM, "the folder, its file and wim's contribution are wim's")
 check(not dbx("SELECT 1 FROM fs_ext_links WHERE token_hash IN ('p2631c-h1', 'p2631c-h2')"), "the public links ended")
 check(dbx("SELECT revoked_at FROM fs_upload_requests WHERE token_hash='p2631c-req-hash'")[0][0], "the file request ended")
-check(dbx("SELECT role FROM fs_shares WHERE node_id=? AND user_id=?", (F1, AGID)) == [("view",)], "xena's agent keeps its share")
+check(dbx("SELECT role FROM fs_shares WHERE node_id=? AND agent_id=?", (F1, AGID)) == [("view",)], "xena's agent keeps its share")
 check(not dbx("SELECT 1 FROM fs_versions WHERE node_id=?", (MC,)), "the mail copy went with the account")
 r = Wi.get(B + f"/api/files/nodes/{F1}/content")
 check(r.ok and r.content == b"the first file", f"wim reads the file sealed for him ({r.status_code})")
