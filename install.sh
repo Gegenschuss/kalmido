@@ -183,7 +183,8 @@ release_assets() {
     warn "Release $VERSION has no checksum list (older release): the download is not checked."
   else
     die "Could not fetch the checksum list of release $VERSION (answer: ${code:-none}). Nothing was changed.
-Is $VERSION an existing release? Otherwise try again later."
+Is $VERSION an existing release? Since 2.641 only one version per week gets a release page (the list:
+$GH/releases); a version in between has none - name the release of its week. Otherwise try again later."
   fi
 }
 # releases before 2.277 carry no SHA256SUMS (#2914)

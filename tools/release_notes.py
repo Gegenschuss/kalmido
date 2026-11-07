@@ -150,7 +150,19 @@ def render(text):
         cost = len("\n".join(sec)) + 120
         if cost > budget:
             skipped += 1
-            continue
+            # 2.641.0 (#5011): a weekly release merges many versions into one big area; it keeps the entries that fit
+            # (at line ends, no heading left without entries) instead of vanishing behind the link
+            part, used = [], 120
+            for l in sec:
+                if used + len(l) + 1 > budget:
+                    break
+                part.append(l)
+                used += len(l) + 1
+            while part and (not part[-1].strip() or part[-1].startswith("#")):
+                part.pop()
+            if not any(x.startswith("- ") for x in part):
+                continue
+            sec, cost = part, used
         budget -= cost
         if full > LONG and (title or hl):
             label = title[:1].upper() + title[1:] if title else "All changes"

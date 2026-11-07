@@ -94,7 +94,7 @@
     if (-not "$Sums".Trim()) {
       $Sums = $null
       if ($sumsCode -eq 404 -and $beforeSums) { Warn "Release $Version has no checksum list (older release): the download is not checked." }
-      else { Fail "Could not fetch the checksum list of release $Version (answer: $sumsCode). Nothing was changed.`nIs $Version an existing release? Otherwise try again later." }
+      else { Fail "Could not fetch the checksum list of release $Version (answer: $sumsCode). Nothing was changed.`nIs $Version an existing release? Since 2.641 only one version per week gets a release page (the list: $GH/releases); a version in between has none - name the release of its week. Otherwise try again later." }
     }
   }
   function Get-Checked([string]$name, [string]$out) {

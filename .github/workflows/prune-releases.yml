@@ -1,0 +1,97 @@
+name: Prune releases
+
+# 2.641.0 (#5011): thins out old GitHub release objects and ghcr image versions. What stays (tools/weekly_release.py prune): the
+# newest latest-ok version of each ISO week (weeks before the first latest-ok tag: the newest release of the week), the current
+# latest release, everything younger than 14 days; of the images only tagged versions whose tags are all X.Y.Z can go (never
+# :latest, never the untagged platform parts of a kept image). Standard: a dry run that only writes the list into the log; it
+# deletes only with dry_run false (by hand) or when weekly-release.yml calls it with the repository variable
+# KALMIDO_PRUNE_APPLY=1. Only release objects and package versions are deleted over the API - git tags are NEVER deleted or
+# moved (the script and the delete loop refuse any other path). The job with checkout reads only; the job that deletes runs
+# only download-artifact.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Only list what would go (nothing is deleted)"
+        type: boolean
+        default: true
+  workflow_call:
+    inputs:
+      dry_run:
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    name: Plan (what stays, what goes)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+      - name: Plan (tools/weekly_release.py prune)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          latest=$(gh release view --json tagName --jq .tagName)
+          git for-each-ref refs/tags/latest-ok --format '%(refname:strip=2) %(creatordate:iso-strict)' > tags.txt
+          gh api --paginate "repos/$GH_REPO/releases?per_page=100" --jq '.[] | {id, tag_name, created_at, draft}' > releases.jsonl
+          owner=$(printf '%s' "${GH_REPO%%/*}" | tr '[:upper:]' '[:lower:]')
+          case "$(gh api "repos/$GH_REPO" --jq .owner.type)" in
+            Organization) pkg="orgs/$owner/packages/container/kalmido" ;;
+            *) pkg="users/$owner/packages/container/kalmido" ;;
+          esac
+          gh api --paginate "$pkg/versions?per_page=100" --jq '.[] | {id, created_at, tags: .metadata.container.tags}' > images.jsonl
+          python3 tools/weekly_release.py prune --tags tags.txt --latest "$latest" --releases releases.jsonl --images images.jsonl \
+            --repo "$GH_REPO" --packages "$pkg" --plan delete.txt 2> plan.txt
+          cat plan.txt
+          { echo '### Prune plan'; echo; sed 's/^/    /' plan.txt; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: prune-plan
+          path: |
+            delete.txt
+            plan.txt
+          retention-days: 7
+
+  delete:
+    name: Delete (only release objects and image versions, never tags)
+    needs: plan
+    if: ${{ inputs.dry_run == false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: prune-plan
+      - name: Delete
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          n=0
+          while IFS= read -r p; do
+            [ -n "$p" ] || continue
+            case "$p" in
+              *refs*|*/git/*|*/tags*) echo "::error::refused: $p"; exit 1 ;;
+              repos/*/*/releases/[0-9]*|users/*/packages/container/*/versions/[0-9]*|orgs/*/packages/container/*/versions/[0-9]*) ;;
+              *) echo "::error::refused: $p"; exit 1 ;;
+            esac
+            printf '%s' "$p" | grep -Eq '/[0-9]+$' || { echo "::error::refused: $p"; exit 1; }
+            gh api -X DELETE "$p" >/dev/null
+            echo "deleted $p"
+            n=$((n + 1))
+          done < delete.txt
+          echo "::notice title=pruned::$n release objects / image versions deleted, no tag touched"

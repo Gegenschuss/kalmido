@@ -1,0 +1,130 @@
+name: Weekly release
+
+# 2.641.0 (#5011): ONE GitHub release per ISO week. release.yml builds the image :X.Y.Z of every tag vX.Y.Z (no release page any
+# more); the live train pushes latest-ok/X.Y.Z after the device test (promote.yml only checks it). On Sunday (and by hand) this
+# workflow picks the newest latest-ok version up to the end of the week that is above the current latest release
+# (tools/weekly_release.py pick) and publishes it on the tag vX.Y.Z - the update check of the servers and install.sh accept only
+# vX.Y.Z. The text holds all CHANGELOG sections since the last weekly release, with their "Action needed" sections collected on
+# top (the update hint reads only that section of the latest release); the assets are the same as before (installers, source
+# archives, image-digest.txt, SHA256SUMS). Then :latest moves to the digest of :X.Y.Z and the release becomes latest, in that
+# order. Afterwards prune-releases.yml thins out old releases and images - a dry run (only the list in the log) unless the
+# repository variable KALMIDO_PRUNE_APPLY is 1. Git tags are never created, moved or deleted here (--verify-tag).
+# Rights as in release.yml: the job with checkout reads only; the job that writes runs only download-artifact.
+on:
+  schedule:
+    - cron: "30 20 * * 0"   # Sunday evening (UTC), the ISO week ends at midnight
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: weekly-release
+  cancel-in-progress: false
+
+jobs:
+  pick:
+    name: Pick the version of the week and build the release assets
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.pick.outputs.version }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+      - name: Pick (tools/weekly_release.py)
+        id: pick
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          cur=$(gh release view --json tagName --jq .tagName 2>/dev/null || true)
+          git for-each-ref refs/tags/latest-ok --format '%(refname:strip=2) %(creatordate:iso-strict)' > tags.txt
+          cat tags.txt | tail -n 20
+          python3 tools/weekly_release.py pick --tags tags.txt --latest "$cur" --notes notes.md CHANGELOG.md docs/changelog/*.md | tee pick.txt
+          cat pick.txt >> "$GITHUB_OUTPUT"
+          ver=$(sed -n 's/^version=//p' pick.txt)
+          if [ -z "$ver" ]; then
+            echo "::notice title=nothing new::no latest-ok version above the latest release ${cur:-none}"
+            exit 0
+          fi
+          printf '%s' "$ver" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo "::error::no version: $ver"; exit 1; }
+          a=$(git rev-parse -q --verify "refs/tags/v$ver^{commit}") || { echo "::error::no tag v$ver"; exit 1; }
+          b=$(git rev-parse -q --verify "refs/tags/latest-ok/$ver^{commit}") || { echo "::error::no tag latest-ok/$ver"; exit 1; }
+          [ "$a" = "$b" ] || { echo "::error::latest-ok/$ver is on $b, v$ver on $a"; exit 1; }
+          cat notes.md
+      - name: Release assets (installers, source archives, image digest, SHA256SUMS)
+        if: steps.pick.outputs.version != ''
+        env:
+          VER: ${{ steps.pick.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir dist
+          git archive --format=tar.gz --prefix="kalmido-$VER/" -o "dist/kalmido-$VER.tar.gz" "v$VER"
+          git archive --format=zip --prefix="kalmido-$VER/" -o "dist/kalmido-$VER.zip" "v$VER"
+          git show "v$VER:install.sh" > dist/install.sh
+          git show "v$VER:install.ps1" > dist/install.ps1
+          digest=$(docker buildx imagetools inspect "ghcr.io/gegenschuss/kalmido:$VER" --format '{{.Manifest.Digest}}')
+          printf '%s' "$digest" | grep -Eq '^sha256:[0-9a-f]{64}$' || { echo "::error::no usable image digest for :$VER: $digest"; exit 1; }
+          printf '%s\n' "$digest" > dist/image-digest.txt
+          (cd dist && sha256sum -- * > SHA256SUMS && cat SHA256SUMS)
+      - name: Hand the assets to the job publish
+        if: steps.pick.outputs.version != ''
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: weekly-release
+          path: |
+            dist
+            notes.md
+          retention-days: 1
+
+  publish:
+    name: Publish the weekly release, move :latest
+    needs: pick
+    if: needs.pick.outputs.version != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: weekly-release
+      - name: Image :latest and the latest release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          GHCR_USER: ${{ github.actor }}
+          VER: ${{ needs.pick.outputs.version }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$VER" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo "::error::no version: $VER"; exit 1; }
+          tag="v$VER"
+          digest=$(tr -d '[:space:]' < dist/image-digest.txt)
+          printf '%s' "$digest" | grep -Eq '^sha256:[0-9a-f]{64}$' || { echo "::error::no usable image digest: $digest"; exit 1; }
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+          docker buildx imagetools create -t ghcr.io/gegenschuss/kalmido:latest "ghcr.io/gegenschuss/kalmido@$digest"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release edit "$tag" --notes-file notes.md
+            gh release upload "$tag" dist/* --clobber
+            gh release edit "$tag" --latest
+          else
+            gh release create "$tag" --title "Kalmido $VER" --notes-file notes.md --verify-tag --latest dist/*
+          fi
+          echo "::notice title=weekly release::$tag is the latest release"
+
+  prune:
+    name: Thin out old releases and images
+    needs: [pick, publish]
+    if: ${{ !cancelled() && needs.pick.result == 'success' && needs.publish.result != 'failure' }}
+    permissions:
+      contents: write
+      packages: write
+    uses: ./.github/workflows/prune-releases.yml
+    with:
+      dry_run: ${{ vars.KALMIDO_PRUNE_APPLY != '1' }}

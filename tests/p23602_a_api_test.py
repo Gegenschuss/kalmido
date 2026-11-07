@@ -47,8 +47,13 @@ head, jobs = rel.split("\njobs:\n", 1)
 check(not re.search(r"^\s+\S+: write", head, re.M), "#2912: no write right for the whole workflow")
 job = {m.group(1): m.group(2) for m in re.finditer(r"^  ([a-z-]+):\n((?:    .*\n|\n)+)", jobs, re.M)}
 check("packages: write" in job["release"] and "contents: write" not in job["release"], "#2912: the image job cannot write contents")
-check("contents: write" in job["publish"] and "packages: write" not in job["publish"], "#2912: the release job cannot write packages")
-check(len(re.findall(r"uses:", job["publish"])) == 1 and "gh release" not in job["release"], "#2912: publish runs only download-artifact, the GitHub release is only there")
+# 2.641.0 (#5011): release.yml has no job publish any more; the weekly release splits its rights the same way
+check("publish" not in job and "gh release" not in job["release"], "#5011: release.yml makes no release page")
+wk = read(".github", "workflows", "weekly-release.yml")
+wjob = {m.group(1): m.group(2) for m in re.finditer(r"^  ([a-z-]+):\n((?:    .*\n|\n)+)", wk.split("\njobs:\n", 1)[1], re.M)}
+check("write" not in wjob["pick"], "#5011: the weekly job with checkout cannot write")
+check(len(re.findall(r"uses:", wjob["publish"])) == 1 and "download-artifact@" in wjob["publish"] and "contents: write" in wjob["publish"],
+      "#5011: the weekly job that writes runs only download-artifact")
 
 # ------------------------------------------------------------------ #2913 notices
 notes = read("THIRD_PARTY_NOTICES.md").lower()

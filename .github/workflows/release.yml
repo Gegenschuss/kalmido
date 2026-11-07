@@ -1,7 +1,9 @@
 name: Release
 
-# A tag vX.Y.Z (pushed by the maintainer's export script) builds the multi-arch image, pushes it to
-# ghcr.io/gegenschuss/kalmido:X.Y.Z and creates the GitHub release with the notes from CHANGELOG.md.
+# A tag vX.Y.Z (pushed by the maintainer's export script) builds the multi-arch image and pushes it to
+# ghcr.io/gegenschuss/kalmido:X.Y.Z. 2.641.0 (#5011): no GitHub release page per tag any more - weekly-release.yml makes ONE
+# release per ISO week (on the tag vX.Y.Z of the newest version past the device test, with the notes of all versions since the last one and
+# the assets below) and moves :latest; the image of every version stays (the live update and a way back pull :X.Y.Z).
 # 2.513.0 (#4354): both WITHOUT "latest": the image :latest and the "latest release" (which admins' update check, the installers and
 # update.sh read) move only with promote.yml, after the device test of the live train passed.
 # 2.277 (#2914): the release also carries the installers, the source archives and SHA256SUMS (with the image digest);
@@ -87,44 +89,3 @@ jobs:
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.version=${{ steps.v.outputs.version }}
             org.opencontainers.image.licenses=AGPL-3.0-only
-      - name: Release assets (installers, source archives, SHA256SUMS)
-        env:
-          DIGEST: ${{ steps.build.outputs.digest }}
-        run: |
-          ver="${{ steps.v.outputs.version }}"
-          mkdir dist
-          git archive --format=tar.gz --prefix="kalmido-$ver/" -o "dist/kalmido-$ver.tar.gz" HEAD
-          git archive --format=zip --prefix="kalmido-$ver/" -o "dist/kalmido-$ver.zip" HEAD
-          cp install.sh install.ps1 dist/
-          case "$DIGEST" in sha256:*) printf '%s\n' "$DIGEST" > dist/image-digest.txt ;; *) echo "no image digest"; exit 1 ;; esac
-          (cd dist && sha256sum -- * > SHA256SUMS && cat SHA256SUMS)
-      - name: Hand the assets to the job publish
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: release-assets
-          path: |
-            dist
-            notes.md
-          retention-days: 1
-
-  publish:
-    needs: release
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          name: release-assets
-      - name: GitHub release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
-        run: |
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release edit "$GITHUB_REF_NAME" --notes-file notes.md
-            gh release upload "$GITHUB_REF_NAME" dist/* --clobber
-          else
-            gh release create "$GITHUB_REF_NAME" --title "Kalmido ${{ needs.release.outputs.version }}" --notes-file notes.md --verify-tag --latest=false dist/*
-          fi
