@@ -172,7 +172,9 @@ NOTE1 = r.json()["note"]["id"] if r.status_code == 201 else 0
 check(int(kt.dbx("SELECT value FROM settings WHERE key='version'")[0][0]) > ver0, "#4807 (d) other devices learn of it (db.bump)")
 check(Ca.post(B + NB, json={"text": "nope"}).status_code == 403, "#4807 (d) carol (view) writes none")
 # tenant-matrix: document
+# tenant: POST /api/docs/{}/notes
 check(Er.get(B + NB).status_code == 404 and Er.post(B + NB, json={"text": "x"}).status_code == 404, "#4807 (d) erin (no right) sees none, writes none")
+# tenant: DELETE /api/docs/{}/notes/{}
 check(Er.delete(B + f"{NB}/{NOTE1}").status_code == 404, "#4807 (d) erin deletes none of another organisation's notes")
 r = Bo.post(B + NB, json={"text": "Frist pruefen Kiefernzapfen"})
 check(r.status_code == 201, "#4807 (d) bob (owner) writes a second one")
