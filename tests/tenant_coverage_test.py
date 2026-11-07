@@ -1493,6 +1493,14 @@ API_HELPER_RX = re.compile(r"\bclass Api\b|^\s*from [\w.]+ import [^\n]*\bApi\b|
 METHOD_RX = re.compile(r"\.(get|post|put|patch|delete)\(|[\"'](GET|POST|PUT|PATCH|DELETE|PROPFIND|PROPPATCH|REPORT|MKCALENDAR|MKCOL|MOVE|COPY|OPTIONS)[\"']")
 DAV_METHODS = {"GET", "PUT", "DELETE", "PROPFIND", "PROPPATCH", "REPORT", "MKCALENDAR", "MKCOL", "MOVE", "COPY", "OPTIONS"}
 DENIED_RX = re.compile(r"\b40[34]\b")
+# 2.638.0 (#4641, review): a comment ("# not 404") or a negated check ("!= 404", "not in (403, 404)") is no probe
+_COMMENT_RX = re.compile(r"(?:^|\s)(?:#|//)\s.*$")
+_NEGATED_RX = re.compile(r"!==?\s*40[34]\b|\bnot\s+in\s*[(\[{][^)\]}]*[)\]}]")
+
+
+def probe_code(line):
+    """The part of a test line that can carry a 403 / 404 check: without its comment and without negated checks."""
+    return _NEGATED_RX.sub("", _COMMENT_RX.sub("", line))
 
 
 def line_method(line, pos):
@@ -1523,7 +1531,7 @@ def proves(route, text):
     denied = re.compile(DENIED_RX.pattern + (r"|\b(?:" + "|".join(map(re.escape, sorted(helpers))) + r")\(" if helpers else ""))
     for i, line in enumerate(lines):
         for m in rx.finditer(line):
-            if line_method(line, m.start()) in want and any(denied.search(x) for x in lines[i:i + 4]):
+            if line_method(line, m.start()) in want and any(denied.search(probe_code(x)) for x in lines[i:i + 4]):
                 return True
     return False
 
@@ -1535,7 +1543,7 @@ def probe_helpers(text):
     for line in text.splitlines() + ["end"]:
         m = re.match(r"(?:def|function)\s+(\w+)\s*\(", line)
         if m or (line[:1].strip() and not line.startswith((" ", "\t", ")", "}"))):
-            if name and DENIED_RX.search("\n".join(body)):
+            if name and any(DENIED_RX.search(probe_code(x)) for x in body):
                 out.add(name)
             name, body = (m.group(1), []) if m else (None, [])
             continue
@@ -1585,6 +1593,10 @@ check(proves("PATCH /api/things/{}", "# tenant: PATCH /api/things/{}\n") and not
       "#4641: the marker '# tenant: METHOD /path' proves exactly its method")
 check(proves("PATCH /api/things/{}", 'def no(r, what):\n    check(r.status_code in (403, 404), what)\n\n\nno(s.patch(B + f"/api/things/{tid}"), "x")\n'),
       "#4641: a check helper of the suite that tests 403 / 404 counts as the check of its line")
+check(not proves("GET /api/things/{}", 'r = A.get(B + f"/api/things/{tid}")\ncheck(r.ok)  # never 404\n')
+      and not proves("GET /api/things/{}", 'r = A.get(B + f"/api/things/{tid}")\ncheck(r.status_code != 404)\n')
+      and not proves("GET /api/things/{}", 'def ok(r):\n    check(r.status_code not in (403, 404))\n\n\nok(A.get(B + f"/api/things/{tid}"))\n'),
+      "#4641 (review): a 403 / 404 in a comment or a negated check is no probe")
 check(route_suites('\nROUTES = {\n    # all below: p1_test.py\n    "GET /a": "x",  # p2_test.py\n    "GET /b": "x",\n}\n')
       == {"GET /a": {"p2_test.py"}, "GET /b": set()}, "#4641: the comment block above a group names no suite for it any more")
 

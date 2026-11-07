@@ -137,7 +137,7 @@ check(r.ok and r.json().get("body") == "Text of Invoice question" and "body_shor
 check(not ({"can_write", "folder_id", "eml_id"} & set(r.json() if r.ok else {})), "agent: one mail without write flags / file ids")
 for mid, why in ((m_x, "a project not shared with it"), (m_un, "\"Not assigned\""), (m_del, "a deleted mail"), (m_beta, "another organisation")):
     check(get(AGH, f"/mails/{mid}").status_code == 404, f"agent: {why} = 404")
-check(get(AGH, "/mails", list_id=LX).status_code == 404, "agent: the list of a project not shared with it = 404")
+check(get(AGH, "/mails", list_id=LX).status_code == 404, "agent: the list of a project not shared with it = 404")  # tenant: GET /api/v1/mails
 check(get(AGH, "/mails", list_id=LE).status_code == 404 and get(AGH, "/mails", client_id=CE).status_code == 404,
       "agent: another organisation's project / client = 404")
 check(get(AG2H, "/mails", client_id=CB).status_code == 404 and get(AG2H, f"/mails/{m_client}").status_code == 404,
