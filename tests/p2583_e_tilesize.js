@@ -160,7 +160,10 @@ const saved = async k => (await call('GET', '/api/state')).settings?.[k];
     await set(7);
     await wait(`document.documentElement.classList.contains('dc-tsm')`);
     // (the one card the mouse may rest on shows its name: at most one with text)
-    const hid = await ev(`(() => { const cs = [...document.querySelectorAll('.dc-card')]; return {n: cs.length, shown: cs.filter(c => getComputedStyle(c.querySelector('.dc-ct')).opacity !== '0').length, mt: cs.filter(c => c.querySelector('.dc-mt') && getComputedStyle(c.querySelector('.dc-mt')).display !== 'none').length}; })()`);
+    // the style of the small cards follows the class a moment later: wait for it, then read it once more for the message
+    const hidQ = `(() => { const cs = [...document.querySelectorAll('.dc-card')]; return {n: cs.length, shown: cs.filter(c => getComputedStyle(c.querySelector('.dc-ct')).opacity !== '0').length, mt: cs.filter(c => c.querySelector('.dc-mt') && getComputedStyle(c.querySelector('.dc-mt')).display !== 'none').length}; })()`;
+    await wait(`(() => { const h = ${hidQ}; return h.n === 3 && h.shown <= 1 && h.mt === 0; })()`);
+    const hid = await ev(hidQ);
     check(hid && hid.n === 3 && hid.shown <= 1 && hid.mt === 0, 'Firefox: small cards show no text (picture only; the name only on hover / focus) ' + JSON.stringify(hid));
     await shot('p2583-tiles-7.png');
     // phone: no sideways scrolling even with a big size
