@@ -17027,6 +17027,8 @@
   "Please enter the address of the bank's FinTS server": "Saisis l'adresse du serveur FinTS de la banque",
   "The period may be at most {0} days and must not end before it starts": "La période peut durer au plus {0} jours et ne doit pas finir avant de commencer",
   "Bank access only when you fetch, with your PIN every time.": "Accès à la banque uniquement quand tu récupères, à chaque fois avec ton code PIN.",
+  "The bank sent more than one fetch may take. Please choose a shorter period.": "La banque a envoyé plus qu'une récupération ne peut accepter. Choisis une période plus courte.",
+  "The server address was changed by {0} on {1}. Please check it before you enter your PIN.": "L'adresse du serveur a été modifiée par {0} le {1}. Vérifie-la avant de saisir ton code PIN.",
   "Kind (R, KV, …)": "Type (R, KV, …)",
   "Document number": "Numéro du document",
   "Project number": "Numéro de projet",

@@ -1754,7 +1754,8 @@ does not belong into a public repository or a shared image, so Kalmido ships non
 - The library python-fints (LGPL-3.0-or-later) is part of the image and only loaded when a fetch runs; an own build without
   it keeps the button off (code `no_library`).
 - The PIN is never written anywhere (database, log, backup); a running bank connection lives only in the memory of the web
-  process (at most 15 minutes) - a restart ends it. With several web processes behind one address the steps of one fetch
+  process (at most 15 minutes; a background sweep ends it at its expiry) - a restart ends it. The log of the library
+  python-fints is switched off (it would name the bank's answers). With several web processes behind one address the steps of one fetch
   must reach the same process (sticky sessions); the standard setup runs one.
 - The server talks to the bank's FinTS address the person enters: https only, public addresses only (the same guard as the
   calendar subscriptions), no redirect to another host.

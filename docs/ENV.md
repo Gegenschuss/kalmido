@@ -364,6 +364,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_TEST_BK_ZIP_DELAY` | `(empty)` | Test containers only (with KALMIDO_TEST=1): seconds the backup waits after its ZIP (2.281.0, #3118). |
 | `KALMIDO_TEST_DUN_TICKS` | `10` | Test containers only (with KALMIDO_TEST=1): watchdog intervals between two runs of the payment reminder suggestions (2.192.0). |
 | `KALMIDO_TEST_FINTS_FAKE` | `0` | Test containers only (with KALMIDO_TEST=1): the FinTS bank fetch talks to a built-in stand-in bank instead of a real one (2.616.0, office/fints.py). |
+| `KALMIDO_TEST_FINTS_SWEEP` | `(empty)` | Test containers only (with KALMIDO_TEST=1): the background sweep of expired FinTS dialogs runs at least every that many seconds (default 60; 2.616.0, office/fints.py). |
 | `KALMIDO_TEST_FSREF` | `0` | Test containers only (with KALMIDO_TEST=1): registers the test kind 'probe' of the folder references (2.199.0, files/fsref.py). |
 | `KALMIDO_TEST_MODE` | `0` | Test containers only: allows the test switches of the organisation key tool (1); left alone in a server's .env it is ignored. |
 | `KALMIDO_TEST_NOW` | `(empty)` | Test containers only (with KALMIDO_TEST=1): the server clock starts at this ISO time and runs on from there. |

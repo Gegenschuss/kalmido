@@ -345,6 +345,7 @@ VARS = (
     _v("KALMIDO_TEST_BK_IDLE_TX_MS", "", "Test containers only (with KALMIDO_TEST=1): idle-in-transaction limit of the backup's connection (2.281.0, #3118).", "test"),
     _v("KALMIDO_TEST_PG_DUMP_VERSION", "", "Test containers only (with KALMIDO_TEST=1): plays the output of pg_dump --version in the check before a backup (2.359.3, #2945).", "test"),
     _v("KALMIDO_TEST_FINTS_FAKE", "0", "Test containers only (with KALMIDO_TEST=1): the FinTS bank fetch talks to a built-in stand-in bank instead of a real one (2.616.0, office/fints.py).", "test"),
+    _v("KALMIDO_TEST_FINTS_SWEEP", "", "Test containers only (with KALMIDO_TEST=1): the background sweep of expired FinTS dialogs runs at least every that many seconds (default 60; 2.616.0, office/fints.py).", "test"),
     _v("KALMIDO_TEST_DUN_TICKS", "10", "Test containers only (with KALMIDO_TEST=1): watchdog intervals between two runs of the payment reminder suggestions (2.192.0).", "test"),
     _v("KALMIDO_SHEET_RANGE_BUDGET", "15000000", "Tests: range cells one evaluation of a table may read (2.148.1).", "test"),
     _v("KALMIDO_SHEET_CELLS_MAX", "1000000", "Tests: stored cells over all sheets of one table (2.148.1).", "test"),

@@ -21,13 +21,15 @@ async function fnt_open() {
   const errEl = () => $('.aerr', md), err = m => { const e = errEl(); if (e) e.textContent = m || ''; };
   const foot = (ok, back) => `<div class="aerr" role="alert"></div><div class="foot">${back ? `<button class="btn" data-fn="back">${tr('Back')}</button>` : ''}<span class="spacer"></span><button class="btn" data-fn="close">${tr('Cancel')}</button>${ok ? `<button class="btn pri" data-fn="next">${esc(ok)}</button>` : ''}</div>`;
   const acct = () => s.accounts.find(a => a.id === +st.acct) || {};
+  // 2.616.0 (#2473, Fable finding 4): the remembered server address was set last by somebody else -> say so before the PIN goes there
+  const srvNote = a => a.server_changed ? esc(tr('The server address was changed by {0} on {1}. Please check it before you enter your PIN.', a.server_changed.by || tr('unknown'), a.server_changed.at ? fmtDateLoc(a.server_changed.at.slice(0, 10)) : '')) : '';
   const form = () => {
     const a = acct();
     card.innerHTML = `${head}<p class="muted">${tr('Kalmido asks your bank for the bookings of the account (FinTS). Your PIN is asked every time and never stored.')}</p>
       <div class="row"><label for="fn-acct">${tr('Bank account')}</label><select id="fn-acct">${s.accounts.map(x => `<option value="${x.id}" ${x.id === a.id ? 'selected' : ''} ${x.ok ? '' : 'disabled'}>${esc(x.label)} · … ${esc(x.iban_tail)}${x.ok ? '' : ' – ' + esc(tr('only German accounts'))}</option>`).join('')}</select></div>
       <div class="row"><label for="fn-login">${tr('Sign-in name')}</label><input id="fn-login" maxlength="64" autocomplete="off" spellcheck="false" value="${esc(a.login || '')}"></div>
       <div class="row"><label for="fn-pin">${tr('PIN')}</label><input id="fn-pin" type="password" maxlength="64" autocomplete="off" spellcheck="false"></div>
-      <div class="row"><label for="fn-server">${tr('FinTS server of the bank')}</label><input id="fn-server" type="url" maxlength="300" autocomplete="off" spellcheck="false" placeholder="https://" value="${esc(a.server || '')}"><small class="muted">${tr('The address your bank gives for FinTS / HBCI with PIN/TAN.')}</small></div>
+      <div class="row"><label for="fn-server">${tr('FinTS server of the bank')}</label><input id="fn-server" type="url" maxlength="300" autocomplete="off" spellcheck="false" placeholder="https://" value="${esc(a.server || '')}"><small class="muted">${tr('The address your bank gives for FinTS / HBCI with PIN/TAN.')}</small><small class="fn-srvchg" role="note">${srvNote(a)}</small></div>
       <div class="row"><label for="fn-from">${tr('From')}</label><input id="fn-from" type="date" value="${esc(s.since)}"></div>
       <div class="row"><label for="fn-to">${tr('To')}</label><input id="fn-to" type="date" value="${esc(today())}"></div>
       <label class="chk"><input type="checkbox" id="fn-rem" checked> ${tr('Remember the sign-in name and the server for this account (never the PIN)')}</label>
@@ -73,7 +75,7 @@ async function fnt_open() {
   const end = () => { const d = st.d; st.d = null; if (d) api('DELETE', `/api/office/bank/fints/${encodeURIComponent(d.id)}`).catch(() => 0); };
   const rm = md.remove; md.remove = () => { end(); rm(); };  // every way out (Cancel, the backdrop, Escape) ends the bank connection
   const close = () => md.remove();
-  md.addEventListener('change', e => { const t = /** @type {any} */ (e.target); if (t.id === 'fn-acct') { st.acct = t.value; const a = acct(); $('#fn-login', md).value = a.login || ''; $('#fn-server', md).value = a.server || ''; } });
+  md.addEventListener('change', e => { const t = /** @type {any} */ (e.target); if (t.id === 'fn-acct') { st.acct = t.value; const a = acct(); $('#fn-login', md).value = a.login || ''; $('#fn-server', md).value = a.server || ''; const n = $('.fn-srvchg', md); if (n) n.innerHTML = srvNote(a); } });
   md.addEventListener('keydown', e => { if (e.key === 'Enter' && /** @type {any} */ (e.target).matches?.('input:not([type=checkbox]):not([type=radio])')) { e.preventDefault(); $('button[data-fn="next"]', md)?.click(); } });
   md.addEventListener('click', async e => {
     const b = /** @type {any} */ (e.target).closest('button[data-fn]'); if (!b || st.busy) return;

@@ -11,8 +11,9 @@ A fetch is a dialog with the bank, held in the memory of this process only (wait
 login name, PIN, period) -> maybe the choice of the TAN method -> maybe the approval (in the banking app = decoupled, polled;
 or a TAN typed in) -> the statements -> the preview of the file import -> the import. A dialog belongs to the person and the
 office area that started it (anybody else: 404), lives FNT_TTL seconds after its last step (at most FNT_MAX_AGE), and is
-closed and forgotten at its end, on cancel and on expiry. The PIN and a TAN are never stored, logged, sent back, put in an
-error text, an event or the audit; the login name and the server address may be remembered per account (the PIN never).
+closed and forgotten at its end, on cancel and on expiry (a background timer sweeps at the expiry itself). The PIN and a TAN are never stored, logged, sent back, put in an
+error text, an event or the audit; the login name and the server address may be remembered per account (the PIN never),
+once the bank has sent the statements; a new server address is written to the office log.
 After a refusal of the bank (wrong PIN / login, locked access) nothing is tried again by itself, and FNT_FAIL_MAX refusals
 per account within FNT_FAIL_WINDOW seconds stop new starts for that account for the rest of the window (the bank locks the
 access after a few wrong PINs).
@@ -23,6 +24,7 @@ area, the person in a personal office); agents and kids 403 (office_gate): an ag
 Tests: KALMIDO_TEST=1 + KALMIDO_TEST_FINTS_FAKE=1 swaps the bank for _FakeBank (no network)."""
 import base64
 import importlib.util
+import logging
 import os
 import re
 import secrets
@@ -37,11 +39,17 @@ from ..core.db import body, bump, iso, local_now, now_utc
 from ..core.errors import BadInput, Denied
 from ..core.i18n import N_, tr
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
+from ..core.pg import write_lock
 from ..core import stmtfiles as sf
 from ..calendars.subscriptions import CalError, cal_http
 from .model import office_ctx_admin as _ctx
 from .bankacc import BKA_TABLE, bka_seed
 from . import bank as bnk
+from .ledger import ofx_log
+
+# 2.616.0 (#2473, Fable finding 3): the library's log (client._log_response names the bank's answer texts and parameters, its
+# debug output accounts and amounts) says nothing on this server -- set once here, not per bank object
+logging.getLogger("fints").setLevel(logging.CRITICAL + 1)
 
 FNT_ENV = "KALMIDO_FINTS_PRODUCT_ID"
 FNT_TTL = 300  # seconds a dialog lives after its last step
@@ -57,6 +65,10 @@ FNT_DAYS_DEFAULT = 90  # an account without bookings: the last 90 days (most ban
 FNT_POLL_MIN = 2.0  # seconds between two status questions to the bank (decoupled approval)
 FNT_HTTP_TIMEOUT = 60
 FNT_HTTP_MAX = 30 * 1024 * 1024
+FNT_STEP_MAX = 240  # 2.616.0 (Fable finding 2): seconds one step may talk to the bank in all (below FNT_TTL: no expiry mid-step)
+FNT_STEP_HOPS = 50  # requests to the bank within one step (the touchdowns of a long statement)
+FNT_STEP_BYTES = bnk.BNK_UNPACKED_MAX  # bytes the bank may send within one step, all answers together
+FNT_SWEEP = 60  # 2.616.0 (Fable finding 1): the background sweep runs at the latest after this many seconds
 LOGIN_MAX = 64
 SERVER_MAX = 300
 _PIN_MAX = 64
@@ -77,6 +89,7 @@ FNT_MSG = {
     "no_account": N_("The bank does not list this IBAN for this sign-in name."),
     "tan_method": N_("This TAN method cannot be used here (e.g. a flicker code). Please choose another one."),
     "bank": N_("The bank answered with an error. Please try again later."),
+    "too_large": N_("The bank sent more than one fetch may take. Please choose a shorter period."),
     "expired": N_("The bank connection has ended (time out). Please start again."),
     "state": N_("This step does not fit the state of the bank connection."),
 }
@@ -145,10 +158,8 @@ class _RealBank:
     """python-fints (FinTS 3.0 PIN/TAN). Every method may raise FintsError; nothing of the library leaves this class."""
 
     def __init__(self, blz, login, pin, server, product_id):
-        import logging
         from fints import client as fc  # noqa: PLC0415  the library only when a fetch runs
         from fints import exceptions as fe  # noqa: PLC0415
-        logging.getLogger("fints").setLevel(logging.WARNING)  # its debug output names accounts and amounts
         self.fc, self.fe = fc, fe
         self.server = server
         try:
@@ -157,6 +168,12 @@ class _RealBank:
         except Exception:  # noqa: BLE001  no text of the library (it may name what it got)
             raise FintsError("bank") from None
         self.stage, self.pending, self.entered, self.iban, self.frm, self.to = None, None, False, "", None, None
+
+    def begin(self):
+        """A new step: its own budget of time, requests and bytes (_Conn)."""
+        conn = getattr(self.c, "connection", None) if self.c is not None else None
+        if isinstance(conn, _Conn):
+            conn.begin()
 
     def _call(self, fn, *a):
         fe = self.fe
@@ -283,18 +300,38 @@ class _RealBank:
 
 
 class _Conn:
-    """The library's HTTPS connection, through cal_http (SSRF guard, no redirect to another host, size and time limits)."""
+    """The library's HTTPS connection, through cal_http (SSRF guard, no redirect to another host, size and time limits).
+    2.616.0 (Fable finding 2): per step (begin) at most FNT_STEP_HOPS requests, FNT_STEP_BYTES bytes of answers together and
+    FNT_STEP_MAX seconds in all -- a hostile "bank" with endless touchdowns or huge answers holds no thread and fills no memory.
+    http / msg_cls: test containers only (POST /api/test/fints/conn)."""
 
-    def __init__(self, url):
-        from fints.message import FinTSInstituteMessage  # noqa: PLC0415
-        self.url, self.msg_cls = url, FinTSInstituteMessage
+    def __init__(self, url, http=None, msg_cls=None):
+        if msg_cls is None:
+            from fints.message import FinTSInstituteMessage as msg_cls  # noqa: PLC0415,N813
+        self.url, self.msg_cls, self.http = url, msg_cls, http or cal_http
+        self.begin()
+
+    def begin(self, until=None):
+        self.hops, self.bytes, self.until = 0, 0, until if until is not None else time.monotonic() + FNT_STEP_MAX
 
     def send(self, msg):
+        if self.hops >= FNT_STEP_HOPS:
+            raise FintsError("too_large")
+        left = self.until - time.monotonic()
+        if left <= 0:
+            raise FintsError("connection")
+        self.hops += 1
         try:
-            status, _h, data, _u = cal_http(self.url, "POST", base64.b64encode(msg.render_bytes()), {"Content-Type": "text/plain"},
-                                            max_bytes=FNT_HTTP_MAX, timeout=FNT_HTTP_TIMEOUT, until=time.monotonic() + FNT_HTTP_TIMEOUT + 30)
+            status, _h, data, _u = self.http(self.url, "POST", base64.b64encode(msg.render_bytes()), {"Content-Type": "text/plain"},
+                                             max_bytes=max(1, min(FNT_HTTP_MAX, FNT_STEP_BYTES - self.bytes)),
+                                             timeout=min(FNT_HTTP_TIMEOUT, left), until=min(time.monotonic() + FNT_HTTP_TIMEOUT + 30, self.until))
         except CalError as x:
+            if x.code == "too_large":
+                raise FintsError("too_large") from None
             raise FintsError("blocked" if x.code in ("blocked", "redirect", "config") else "connection") from None
+        self.bytes += len(data or b"")
+        if self.bytes > FNT_STEP_BYTES:
+            raise FintsError("too_large")
         if not 200 <= status <= 299:
             raise FintsError("connection")
         return self.msg_cls(segments=base64.b64decode(data.decode("iso-8859-1")))
@@ -311,6 +348,9 @@ class _FakeBank:
 
     def __init__(self, blz, login, pin, server, product_id):
         self.login, self.pin, self.polls, self.pending, self.mech = login, pin, 0, None, None
+
+    def begin(self):
+        pass
 
     def mechanisms(self):
         if self.pin == "wrong":
@@ -360,6 +400,38 @@ class _FakeBank:
         self.pin = None
 
 
+# 2.616.0 (#2473, Fable finding 6): the inner parts of python-fints _RealBank uses beyond its public interface (a new
+# version may rename them; GET /api/test/fints/lib in the test containers lists what is missing, so a bump shows in the CI)
+_LIB_CLIENT = ("_find_highest_supported_command", "_fetch_with_touchdowns", "_get_dialog", "get_transactions_xml", "get_sepa_accounts",
+               "fetch_tan_mechanisms", "get_tan_mechanisms", "set_tan_mechanism", "is_tan_media_required", "get_tan_media",
+               "set_tan_medium", "send_tan", "__enter__", "__exit__")
+_LIB_OBJECT = ("connection", "init_tan_response", "selected_tan_medium")
+_LIB_EXC = ("FinTSClientPINError", "FinTSClientTemporaryAuthError", "FinTSConnectionError", "FinTSUnsupportedOperation")
+
+
+def fnt_lib_missing():
+    """The parts of the installed python-fints _RealBank needs that are not there ([] = all there; None = not installed)."""
+    if importlib.util.find_spec("fints") is None:
+        return None
+    from fints import client as fc, exceptions as fe, message as fm  # noqa: PLC0415
+    miss = [f"FinTS3PinTanClient.{n}" for n in _LIB_CLIENT if not callable(getattr(fc.FinTS3PinTanClient, n, None))]
+    miss += [f"client.{n}" for n in ("HKCAZ1", "HKKAZ5", "HKKAZ6", "HKKAZ7", "NeedTANResponse") if not hasattr(fc, n)]
+    miss += [f"exceptions.{n}" for n in _LIB_EXC if not hasattr(fe, n)]
+    miss += [] if hasattr(fm, "FinTSInstituteMessage") else ["message.FinTSInstituteMessage"]
+    for n in ("HKKAZ5", "HKKAZ6", "HKKAZ7"):
+        try:
+            if not callable(getattr(fc, n)._fields["account"].type.from_sepa_account):
+                miss.append(f"{n}._fields[account].type.from_sepa_account")
+        except Exception:  # noqa: BLE001
+            miss.append(f"{n}._fields[account].type.from_sepa_account")
+    try:  # no network: the constructor only keeps its arguments
+        cl = fc.FinTS3PinTanClient("12345678", "test", "test", "https://fints.invalid/", product_id="TEST")
+        miss += [f"FinTS3PinTanClient().{n}" for n in _LIB_OBJECT if not hasattr(cl, n)]
+    except Exception as x:  # noqa: BLE001
+        miss.append(f"FinTS3PinTanClient(): {type(x).__name__}")
+    return miss
+
+
 def _bank(blz, login, pin, server):
     return (_FakeBank if fnt_fake() else _RealBank)(blz, login, pin, server, fnt_product_id())
 
@@ -383,6 +455,7 @@ class _Dialog:
         self.uid, self.oid, self.acct, self.conn, self.frm, self.to = uid, oid, acct, conn, frm, to
         self.born = self.seen = _now()
         self.state, self.mechanisms, self.need, self.statements, self.polled = "new", [], None, [], 0.0
+        self.remember = None  # (login, server) to keep at the account once the sign-in worked
         self.lock = threading.Lock()
 
     def expired(self, t=None):
@@ -401,6 +474,39 @@ def _sweep():
     t = _now()
     for k in [k for k, d in _DLG.items() if d.expired(t)]:
         _close(_DLG.pop(k))
+
+
+_TICK = {"timer": None}
+
+
+def _sweep_delay():
+    """Seconds to the next expiry of an open dialog (at most FNT_SWEEP; test containers: KALMIDO_TEST_FINTS_SWEEP caps it)."""
+    t, cap = _now(), FNT_SWEEP
+    if _test():
+        try:
+            cap = min(cap, float(os.environ.get("KALMIDO_TEST_FINTS_SWEEP") or cap))
+        except ValueError:
+            pass
+    nxt = min((min(d.seen + FNT_TTL, d.born + FNT_MAX_AGE) - t for d in _DLG.values()), default=cap)
+    return max(0.5, min(cap, nxt + 0.5))
+
+
+def _arm():
+    """2.616.0 (#2473, Fable finding 1): the background sweep -- an expired dialog (the PIN in its bank object, the open bank
+    dialog) goes at its expiry, not only with the next FinTS request. One daemon timer while a dialog is open (under _LOCK)."""
+    tm = _TICK["timer"]
+    if _DLG and (tm is None or not tm.is_alive()):
+        tm = threading.Timer(_sweep_delay(), _tick)
+        tm.daemon, tm.name = True, "fints-sweep"
+        _TICK["timer"] = tm
+        tm.start()
+
+
+def _tick():
+    with _LOCK:
+        _TICK["timer"] = None
+        _sweep()
+        _arm()
 
 
 def _drop(d):
@@ -439,6 +545,7 @@ def _step(d, fn):
         try:
             if d.conn is None:
                 _fail("expired", 404)
+            d.conn.begin()
             res = fn()
         finally:
             d.lock.release()
@@ -448,7 +555,7 @@ def _step(d, fn):
                 _window(_FAILS, (d.oid, d.acct["id"]), FNT_FAIL_WINDOW).append(_now())
         _drop(d)
         print(f"fints: the bank fetch of office {d.oid} ended: {x.code}", flush=True)  # the code only, never a text of the bank
-        _fail(x.code, 502 if x.code in ("connection", "bank") else 409)
+        _fail(x.code, 502 if x.code in ("connection", "bank", "too_large") else 409)
     finally:
         _BUSY.release()
     d.seen = _now()
@@ -532,10 +639,15 @@ def _since(c, oid):
     return max(d, today - timedelta(days=FNT_DAYS_MAX)) if d else today - timedelta(days=FNT_DAYS_DEFAULT)
 
 
-def _acct_out(c, oid, r):
-    return {"id": r["id"], "label": r["label"], "iban_tail": (r["iban"] or "")[-4:], "blz": _blz(r["iban"] or ""),
-            "is_default": bool(r["is_default"]), "login": r.get("fints_login") or "", "server": r.get("fints_server") or "",
-            "ok": bool(_blz(r["iban"] or ""))}
+def _acct_out(c, uid, oid, r):
+    out = {"id": r["id"], "label": r["label"], "iban_tail": (r["iban"] or "")[-4:], "blz": _blz(r["iban"] or ""),
+           "is_default": bool(r["is_default"]), "login": r.get("fints_login") or "", "server": r.get("fints_server") or "",
+           "ok": bool(_blz(r["iban"] or ""))}
+    by = r.get("fints_server_by")
+    if out["server"] and by and by != uid:  # 2.616.0 (Fable finding 4): the address was set last by somebody else
+        u = c.execute("SELECT display_name, username FROM users WHERE id=?", (by,)).fetchone()
+        out["server_changed"] = {"by": (u["display_name"] or u["username"]) if u else "", "at": r.get("fints_server_at") or ""}
+    return out
 
 
 def fnt_server_clean(v):
@@ -569,6 +681,14 @@ def _secret(v, n, what):
     return v
 
 
+def _body():
+    """The JSON object of a request (anything else: 400, never a 500)."""
+    b = body()
+    if not isinstance(b, dict):
+        raise BadInput(tr("Invalid data"))
+    return b
+
+
 def _day(v, what):
     if v in (None, ""):
         return None
@@ -580,15 +700,35 @@ def _day(v, what):
         raise BadInput(tr("Invalid value: {0}", what)) from None
 
 
-def _remember(c, oid, a, login, server):
-    """The login name (sealed) and the server of the account, when they changed (the PIN never)."""
-    if (a.get("fints_login") or "") == login and (a.get("fints_server") or "") == server:
+def _remember(c, uid, oid, aid, login, server):
+    """The login name (sealed) and the server of the account, when they changed (the PIN never). 2.616.0 (#2473, Fable finding
+    4): only once the bank has sent the statements (the sign-in worked), and a new server address goes into the office log
+    (the address only, never the login name) with who set it and when (the dialog of the others shows that)."""
+    write_lock(c, f"{BKA_TABLE}_{int(oid)}")  # the lock of the bank accounts' own edits (bankacc.py)
+    r = c.execute(f"SELECT * FROM {BKA_TABLE} WHERE id=? AND org_id=? AND archived=0", (aid, oid)).fetchone()
+    if r is None:
         return
-    enc = oc_enc_fields(c, oid, BKA_TABLE, {"fints_login": login})
-    c.execute(f"UPDATE {BKA_TABLE} SET fints_login=?, fints_server=?, updated_at=? WHERE id=? AND org_id=?",
-              (enc["fints_login"], server, iso(now_utc()), a["id"], oid))
+    a = oc_dec_fields(c, oid, BKA_TABLE, r)
+    old = a.get("fints_server") or ""
+    if (a.get("fints_login") or "") == login and old == server:
+        return
+    enc, at = oc_enc_fields(c, oid, BKA_TABLE, {"fints_login": login}), iso(now_utc())
+    if old != server:
+        c.execute(f"UPDATE {BKA_TABLE} SET fints_login=?, fints_server=?, fints_server_by=?, fints_server_at=?, updated_at=? WHERE id=? AND org_id=?",
+                  (enc["fints_login"], server, uid, at, at, aid, oid))
+        ofx_log(c, oid, "update", target="bank_account", detail={"id": aid, "fints_server": {"before": old, "after": server}})
+    else:
+        c.execute(f"UPDATE {BKA_TABLE} SET fints_login=?, updated_at=? WHERE id=? AND org_id=?", (enc["fints_login"], at, aid, oid))
     bump(c)
     c.commit()
+
+
+def _settle(c, d):
+    """After a step: the statements are in -> the sign-in worked -> the login name and the server stay with the account."""
+    if d.state == "preview" and d.remember:
+        login, server = d.remember
+        d.remember = None
+        _remember(c, d.uid, d.oid, d.acct["id"], login, server)
 
 
 # ---------------------------------------------------------------- routes
@@ -602,7 +742,7 @@ def fnt_status():
         c.commit()
     rows = c.execute(f"SELECT * FROM {BKA_TABLE} WHERE org_id=? AND archived=0 ORDER BY is_default DESC, sort, id", (oid,)).fetchall()
     return jsonify(on=off is None, code=off, message=tr(FNT_MSG[off]) if off else "",
-                   accounts=[_acct_out(c, oid, oc_dec_fields(c, oid, BKA_TABLE, r)) for r in rows], since=_since(c, oid).isoformat(),
+                   accounts=[_acct_out(c, uid, oid, oc_dec_fields(c, oid, BKA_TABLE, r)) for r in rows], since=_since(c, oid).isoformat(),
                    ttl=FNT_TTL)
 
 
@@ -612,9 +752,7 @@ def fnt_start():
     -> 201 {dialog: {id, state mechanism | decoupled | tan | preview, ...}}. The PIN lives in the dialog's memory only."""
     c, uid, oid = _ctx()
     _need_on()
-    b = body()
-    if not isinstance(b, dict):
-        raise BadInput(tr("Invalid data"))
+    b = _body()
     a = _acct(c, oid, b.get("account_id"))
     blz = _blz(a["iban"] or "")
     if not blz:
@@ -645,8 +783,9 @@ def fnt_start():
         starts.append(_now())
         d = _Dialog(uid, oid, a, None, frm, to)
         _DLG[d.id] = d
+        _arm()
     if b.get("remember", True) is not False:
-        _remember(c, oid, a, login, server)
+        d.remember = (login, server)  # stored only once the bank has sent the statements (_settle)
     try:
         d.conn = _bank(blz, login, pin, server)
     except FintsError as x:
@@ -665,6 +804,7 @@ def fnt_start():
             d.conn.set_mechanism(want if isinstance(want, str) and any(m["id"] == want for m in ms) else ms[0]["id"])
         _apply(d, d.conn.run(a["iban"], frm, to))
     _step(d, first)
+    _settle(c, d)
     return jsonify(_out(c, d)), 201
 
 
@@ -674,7 +814,7 @@ def fnt_mechanism(did):
     c, uid, oid = _ctx()
     _need_on()
     d = _dialog(did, uid, oid)
-    mid = body().get("id")
+    mid = _body().get("id")
     if d.state != "mechanism":
         _fail("state")
     if not isinstance(mid, str) or not any(m["id"] == mid for m in d.mechanisms):
@@ -684,6 +824,7 @@ def fnt_mechanism(did):
         d.conn.set_mechanism(mid)
         _apply(d, d.conn.run(d.acct["iban"], d.frm, d.to))
     _step(d, go)
+    _settle(c, d)
     return jsonify(_out(c, d))
 
 
@@ -693,10 +834,11 @@ def fnt_tan(did):
     c, uid, oid = _ctx()
     _need_on()
     d = _dialog(did, uid, oid)
-    tan = _secret(body().get("tan"), _TAN_MAX, "TAN")
+    tan = _secret(_body().get("tan"), _TAN_MAX, "TAN")
     if d.state != "tan":
         _fail("state")
     _step(d, lambda: _apply(d, d.conn.tan(tan)))
+    _settle(c, d)
     return jsonify(_out(c, d))
 
 
@@ -710,6 +852,7 @@ def fnt_poll(did):
     if d.state == "decoupled" and (fnt_fake() or _now() - d.polled >= FNT_POLL_MIN):
         d.polled = _now()
         _step(d, lambda: _apply(d, d.conn.tan(None)))
+        _settle(c, d)
     return jsonify(_out(c, d))
 
 
@@ -754,3 +897,42 @@ if _test():  # test containers only (tests/start.sh)
         b = request.get_json(silent=True) or {}
         _SHIFT[0] += float(b.get("seconds") or 0)
         return jsonify(ok=True, open=len(_DLG))
+
+    @app.get("/api/test/fints/open")
+    def _fnt_test_open():
+        """The open dialogs, without the sweep of a FinTS request (Fable finding 1: the background sweep alone ends them)."""
+        with _LOCK:
+            tm = _TICK["timer"]
+            return jsonify(open=len(_DLG), armed=bool(tm is not None and tm.is_alive()))
+
+    @app.get("/api/test/fints/lib")
+    def _fnt_test_lib():
+        """Fable finding 6: the inner parts of the installed python-fints (missing: [] = all there, null = not installed)."""
+        return jsonify(missing=fnt_lib_missing(), level=logging.getLogger("fints.client").getEffectiveLevel())
+
+    @app.post("/api/test/fints/conn")
+    def _fnt_test_conn():
+        """Fable finding 2: the limits of _Conn against a stand-in bank server. {size: bytes per answer, count: answers wanted,
+        late: true = the time of the step is up} -> {sent: requests made, code: the FintsError or null}."""
+        b = request.get_json(silent=True) or {}
+        size, count = int(b.get("size") or 10), int(b.get("count") or 1)
+
+        def http(url, method, data, headers, max_bytes=None, timeout=None, until=None):
+            if size > max_bytes:
+                raise CalError("too_large")
+            return 200, {}, b"QUFB" * (size // 4), url  # base64 of "AAA..."
+
+        class _Msg:
+            def render_bytes(self):
+                return b"HNHBK:1:3+"
+        cn = _Conn("https://fints.example.com/", http=http, msg_cls=lambda segments: segments)
+        if b.get("late"):
+            cn.begin(until=time.monotonic() - 1)
+        sent = 0
+        try:
+            for _ in range(count):
+                cn.send(_Msg())
+                sent += 1
+        except FintsError as x:
+            return jsonify(sent=sent, code=x.code, hops=cn.hops, bytes=cn.bytes)
+        return jsonify(sent=sent, code=None, hops=cn.hops, bytes=cn.bytes)

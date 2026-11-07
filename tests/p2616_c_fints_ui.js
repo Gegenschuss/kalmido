@@ -6,6 +6,7 @@
 //   "Please approve in your banking app" -> it goes on by itself once approved -> the preview (2 new) -> "Import" asks for
 //   the target (importTargetConfirm) -> the two bookings are in the list; the PIN field is empty again after "Connect";
 //   the sign-in name is offered again the next time (never the PIN)
+// - 2.616.0 (#2473, Fable finding 4): another admin set the server address since -> the dialog says who and when
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {sleep, B, login} = require('./boot');
@@ -88,6 +89,23 @@ const PIN = 'UiPin-' + Math.random().toString(36).slice(2, 10);
     await ev(click(BTN));
     check(await ready(ev, `document.querySelector('.fntdlg #fn-login')?.value === 'decoupled' && document.querySelector('.fntdlg #fn-pin')?.value === '' && document.activeElement?.id === 'fn-pin'`, 60),
       'next time: the sign-in name is offered again, the PIN field is empty and has the focus');
+    check(await ev(`document.querySelector('.fntdlg .fn-srvchg')?.textContent === ''`), 'own server address: no note in the dialog');
+    await ev(click(`document.querySelector('.fntdlg [data-fn="close"]')`));
+    // 2.616.0 (#2473, Fable finding 4): Dave (another admin) fetches with another server address -> Alice's dialog names it
+    check((await call(CA, 'POST', '/api/users', {username: 'dave', display_name: 'Dave Admin', password: 'password123', email: 'dave@example.com'})).http === 200, 'dave');
+    check((await call(CA, 'PUT', `/api/orgs/${org.id}/members`, {email: 'dave@example.com', role: 'admin'})).http === 200, 'dave is an admin of the organisation');
+    const CD = await login('dave');
+    await call(CD, 'PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT, workspace: `org:${org.id}`});
+    const acc = (await call(CD, 'GET', '/api/office/bank/fints')).accounts[0];
+    const dv = await call(CD, 'POST', '/api/office/bank/fints/start', {account_id: acc.id, login: 'decoupled', pin: PIN, server: 'https://fints2.example.com/fints', mechanism: '921'});
+    let dd = dv.dialog || {};
+    for (let i = 0; i < 20 && dd.state === 'decoupled'; i++) dd = (await call(CD, 'POST', `/api/office/bank/fints/${dd.id}/poll`, {})).dialog || {};
+    check(dd.state === 'preview', 'dave: his fetch reaches the preview ' + dd.state);
+    await call(CD, 'DELETE', `/api/office/bank/fints/${dd.id}`);
+    await ev(click(BTN));
+    check(await ready(ev, `/changed by Dave Admin/.test(document.querySelector('.fntdlg .fn-srvchg')?.textContent || '') && document.querySelector('.fntdlg #fn-server')?.value === 'https://fints2.example.com/fints'`, 60),
+      'server changed by another admin: the dialog says who changed it');
+    await shot('p2616-c-srvchg.png');
     await ev(click(`document.querySelector('.fntdlg [data-fn="close"]')`));
   }, false);
   const st = await call(CA, 'GET', '/api/office/bank/fints');

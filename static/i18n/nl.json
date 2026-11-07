@@ -17027,6 +17027,8 @@
   "Please enter the address of the bank's FinTS server": "Voer het adres van de FinTS-server van de bank in",
   "The period may be at most {0} days and must not end before it starts": "De periode mag hoogstens {0} dagen duren en niet eindigen voordat ze begint",
   "Bank access only when you fetch, with your PIN every time.": "Alleen toegang tot de bank als je ophaalt, elke keer met je pincode.",
+  "The bank sent more than one fetch may take. Please choose a shorter period.": "De bank stuurde meer dan één ophaalactie aankan. Kies een kortere periode.",
+  "The server address was changed by {0} on {1}. Please check it before you enter your PIN.": "Het serveradres is op {1} gewijzigd door {0}. Controleer het voordat je je pincode invoert.",
   "Kind (R, KV, …)": "Soort (R, KV, …)",
   "Document number": "Documentnummer",
   "Project number": "Projectnummer",

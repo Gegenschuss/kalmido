@@ -1201,8 +1201,12 @@ server is set up for it) Kalmido fetches the bookings from the bank over FinTS w
   waits and goes on by itself) or type the TAN shown. The statement the bank sends (CAMT, else MT940) runs through exactly
   the way of a downloaded file: the same preview, duplicates, bank rules, matching and **Take back**. The **PIN is never
   stored**: it is asked at every fetch and lives only in the server's memory while the bank connection runs (at most 5
-  minutes after the last step, 15 minutes in all; closing the dialog ends it). The sign-in name and the server address may be
-  remembered per account (sealed like the IBAN). After a refusal of the bank (wrong PIN, locked access) Kalmido never tries
+  minutes after the last step, 15 minutes in all, ended by a background sweep at its expiry; closing the dialog ends it).
+  The sign-in name and the server address may be remembered per account (sealed like the IBAN), but only once the bank has
+  sent the statements (a refused sign-in keeps nothing). A new server address goes into the office log (who, when, the old
+  and the new address; never the sign-in name), and when another person of the office area set the address last, the
+  dialog says so ("The server address was changed by ... on ...") before you type your PIN. One step talks to the bank at
+  most 4 minutes, with at most 50 requests and 60 MB of answers (else `too_large`: choose a shorter period). After a refusal of the bank (wrong PIN, locked access) Kalmido never tries
   again by itself; after two refusals within an hour the account waits for the rest of that hour, so the bank does not lock
   your access. Flicker codes (chipTAN optic) cannot be shown; choose another TAN method. Agents cannot start a fetch (an
   agent never handles a PIN). The button stays switched off with the reason while the server has no FinTS product
@@ -1212,7 +1216,7 @@ server is set up for it) Kalmido fetches the bookings from the bank over FinTS w
   `{dialog: {id, state mechanism | decoupled | tan | preview, ...}}`, `POST .../{id}/mechanism {id}`, `.../{id}/tan {tan}`,
   `.../{id}/poll` (the approval in the app), `.../{id}/import` (201, the answer of the file import), `DELETE .../{id}`.
   Refusals answer with `code`: `pin`, `locked`, `wait` (429), `expired` (404), `connection`, `blocked`, `unsupported`,
-  `no_account`, `tan_method`, `bank`; off: 503 `no_product_id` / `no_library`.
+  `no_account`, `tan_method`, `bank`, `too_large`; off: 503 `no_product_id` / `no_library`.
 - **Duplicates**: a booking already imported into this office area (same day, amount, counterpart, purpose, reference)
   is skipped and counted; two equal bookings in one file stay two.
 - **Matching**: every open booking shows the best suggestion with its reason. Money in -> open invoices (same amount as
