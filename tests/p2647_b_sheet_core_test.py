@@ -182,4 +182,17 @@ check(Fi.get(B + f"/api/sheets/{P1}").status_code == 200, "... then the person w
 check(Fr.delete(B + f"/api/sheets/{P1}/shares/{cp}").ok and Fi.get(B + f"/api/sheets/{P1}").status_code == 404 and not core(P1, FIO),
       "ended: card and core share go together")
 
+# 2.647.0 (#5047, review): the forward copy binds a card to the core share the person already holds (file store dialog, with
+# an expiry) -- the core keeps its role and expiry, the card shows it; before: a time-limited read became a lasting write
+P2 = table(Fr, "Rates with expiry", "private")
+share(Fr, P2, FIO)
+c2 = dbx("SELECT id, core_id FROM sheet_shares WHERE sheet_id=? AND user_id=?", (P2, FIO))[0]
+dbx("UPDATE fs_shares SET role='view', expires_at='2099-01-01T00:00:00+00:00' WHERE id=?", (c2[1],))
+dbx("UPDATE sheet_shares SET core_id=NULL, role='write' WHERE id=?", (c2[0],))  # an unbound card next to the core share
+check(Fr.delete(B + f"/api/sheets/{P2}").ok and Fr.post(B + f"/api/sheets/{P2}/restore").ok, "trash and back (runs the forward copy)")
+check(dbx("SELECT role, expires_at FROM fs_shares WHERE id=?", (c2[1],)) == [("view", "2099-01-01T00:00:00+00:00")],
+      "#5047 review: the core share keeps its role and expiry")
+check(dbx("SELECT core_id, role FROM sheet_shares WHERE id=?", (c2[0],)) == [(c2[1], "read")] and core(P2, FIO) == [c2[1]],
+      "#5047 review: the card is bound to it and shows the core's role")
+
 sys.exit(kt.done("p2647_b_sheet_core"))
