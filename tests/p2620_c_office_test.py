@@ -7,6 +7,7 @@ freelancer-matrix: office
  - the moved task no longer counts in the old project (offer_tasks, the project's budget hours)
  - the next version's preview shows it as "moved" (not ticked, not offered anew); applying with its key ticked writes
    nothing on it (no new task in the old project, its budget value and its link stay)
+ - the link's list follows the moved task (review C M1, trigger of migrations.d/4586_a.py)
  - an office member who does not see the project gets offer_tasks 0 (L2), as a viewer of the project the count
  - two quotations (chains) in one project: the budget sums the hours and nets of both (L3)
  #4642 "Travel expenses" from the trip planning for a member without office groups ("Previous access", level "own"):
@@ -85,6 +86,9 @@ ts = live_tasks(L)
 TS = ts.get("Schnitt")
 check(A.patch(B + f"/api/tasks/{TS}", json={"list_id": L2}).ok, "#4586: 'Schnitt' moved into another project")
 check(sql("SELECT list_id FROM tasks WHERE id=?", (TS,))[0][0] == L2, "#4586: the task is in the other project now")
+# review C M1: the link's list follows the task (trigger kalmido_offer_link_list), so deleting the old project for good keeps it
+check(sql("SELECT list_id FROM task_offer_links WHERE task_id=?", (TS,))[0][0] == L2,
+      f"#4586 M1: the link follows the task into the other project {sql('SELECT list_id FROM task_offer_links WHERE task_id=?', (TS,))}")
 check(A.get(B + f"{D}/{Q}").json().get("offer_tasks") == 2, f"#4586: the quotation counts only the tasks in its project ({A.get(B + f'{D}/{Q}').json().get('offer_tasks')})")
 bud = A.get(B + f"/api/lists/{L}/office-docs").json().get("budget") or {}
 check(bud.get("hours") == 6.0, f"#4586: the project's budget without the moved task (2 + 4 h) {bud}")
