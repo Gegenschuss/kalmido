@@ -5,12 +5,14 @@
 // shows where it lands). Phones: one column, only the menu, the height applies. Every change is one undo step.
 // "Make this the standard for everyone" / "Reset to the standard" show while my own arrangement differs from the standard
 // and (the first) I may set it: the project page = owner / admins of the project, the other views = instance admins
-// (accounts/layouts.py; the server checks it). The pin board of the project page (#1346): pinboard.js.
+// (accounts/layouts.py; the server checks it); 2.627.0 (#4504): in an organisation's workspace its admins set the
+// organisation's standard ("Make this the default for <name>", org_id), which counts there before the instance's. The pin board of the project page (#1346): pinboard.js.
 const WG_W = [2, 3, 4, 6];
 const WG_WN = [[2, '⅓', N_('A third')], [3, '½', N_('Half')], [4, '⅔', N_('Two thirds')], [6, N_('Full'), N_('Full width')]];
 const WG_HN = [[1, N_('Compact')], [2, N_('Normal')], [3, N_('Tall')]];
 const WG = {pad: null, mv: null, rs: null};
 S.lyStd = null; S.lyStdCan = false; S.lyStdV = {};  // 2.570.0 (#4770): S.lyStdV = the standards' versions
+S.lyStdOrg = null;  // 2.627.0 (#4504): {id, name, admin} = the organisation of the active workspace (its standard counts first)
 
 // ---- the stored value: widths / heights live in opts (lw, lh); the other opts are a block's switches
 const wgHasLayout = o => !!(o && (o.order || o.hidden || o.half?.length || o.full?.length || o.mobile || Object.values(o.opts || {}).some(x => x && (x.lw != null || x.lh != null))));
@@ -52,11 +54,13 @@ const wgJ = s => { try { const o = JSON.parse(s || '{}'); return o && typeof o =
 
 // ---- the standard of the views without a project (GET once, again after a while when a view shows)
 function wgStdLoad(force) {
-  if (WG.stdBusy || (!force && S.lyStd && Date.now() - (WG.stdAt || 0) < 120000)) return;
+  const ws = wsCur();  // 2.627.0 (#4504): the standard of the workspace shown (another one: load again)
+  if (WG.stdBusy || (!force && S.lyStd && WG.stdWs === ws && Date.now() - (WG.stdAt || 0) < 120000)) return;
   WG.stdBusy = true;
-  api('GET', '/api/layouts/std').then(j => {
-    const ch = JSON.stringify(j.layouts) !== JSON.stringify(S.lyStd) || !!j.can !== S.lyStdCan;
+  api('GET', '/api/layouts/std?ws=' + encodeURIComponent(ws)).then(j => {
+    const ch = JSON.stringify(j.layouts) !== JSON.stringify(S.lyStd) || !!j.can !== S.lyStdCan || JSON.stringify(j.org || null) !== JSON.stringify(S.lyStdOrg);
     S.lyStd = j.layouts || {}; S.lyStdV = j.versions || {}; S.lyStdCan = !!j.can; WG.stdAt = Date.now();  // 2.570.0 (#4770): + their versions
+    S.lyStdOrg = j.org || null; WG.stdWs = ws;
     if (ch) viewSafeRender();
   }).catch(() => { WG.stdAt = Date.now(); S.lyStd ||= {}; }).finally(() => { WG.stdBusy = false; });
 }
@@ -133,7 +137,7 @@ function wgStdBar(v, o) {
   const hk = wgHideKey(v), hs = wgHideSig(v, own, std);
   if (hk && wgHideMap()[hk] === hs) return '';  // 2.46.2 (#1726): dismissed for exactly this arrangement and standard
   const can = d.src ? !!o.canStd : S.lyStdCan;
-  return `<div class="wgstd"><span class="muted">${tr('Your own arrangement differs from the default.')}</span><span class="spacer"></span>${can ? `<button type="button" class="btn sm" data-act="wg-promote" data-lyv="${v}">${ic('users', 's')}<span>${tr('Make this the default for everyone')}</span></button>` : ''}<button type="button" class="btn sm" data-act="wg-reset" data-lyv="${v}">${ic('undo', 's')}<span>${tr('Reset to the default')}</span></button><button type="button" class="iconbtn wgstdx" data-act="wg-hide" data-lyv="${v}" title="${esc(tr('Hide this note'))}" aria-label="${esc(tr('Hide this note'))}">${ic('x', 's')}</button></div>`;
+  return `<div class="wgstd"><span class="muted">${tr('Your own arrangement differs from the default.')}</span><span class="spacer"></span>${can ? `<button type="button" class="btn sm" data-act="wg-promote" data-lyv="${v}">${ic('users', 's')}<span>${!d.src && S.lyStdOrg?.admin ? esc(tr('Make this the default for {0}', S.lyStdOrg.name)) : tr('Make this the default for everyone')}</span></button>` : ''}<button type="button" class="btn sm" data-act="wg-reset" data-lyv="${v}">${ic('undo', 's')}<span>${tr('Reset to the default')}</span></button><button type="button" class="iconbtn wgstdx" data-act="wg-hide" data-lyv="${v}" title="${esc(tr('Hide this note'))}" aria-label="${esc(tr('Hide this note'))}">${ic('x', 's')}</button></div>`;
 }
 const wgStr = o => o && Object.keys(o).length ? JSON.stringify(o) : '';
 async function wgPromote(v) {
@@ -155,16 +159,20 @@ async function wgPromote(v) {
   // 2.570.0 (#4770): undo / redo against the version of the standard the step before left (versions[key]; core.js undoWrite):
   // another admin set the default since -> "Changed elsewhere, not undone", theirs stays
   const url = `/api/layouts/std/${d.key}`, lbl = tr('Default changed');
+  // 2.627.0 (#4504): an organisation's admin in its workspace sets the standard of that organisation (org_id)
+  const og = S.lyStdOrg?.admin ? S.lyStdOrg : null, xb = og ? {org_id: og.id} : {};
   let ver = '';
   const go = async (std, own, chk) => {
-    const j = chk ? await undoWrite(url, {layout: std}, ver, {method: 'PUT', label: lbl, hist: true}) : await api('PUT', url, {layout: std});
+    const j = chk ? await undoWrite(url, {layout: std, ...xb}, ver, {method: 'PUT', label: lbl, hist: true}) : await api('PUT', url, {layout: std, ...xb});
     if (j === null) return {none: true, skipped: [lbl]};
-    S.lyStd = j.layouts; S.lyStdV = j.versions || S.lyStdV; ver = j.versions?.[d.key] || ver; S.settings[d.key] = own; lyPatch(d.key, own); renderView(); return {};
+    S.lyStd = j.layouts; S.lyStdV = j.versions || S.lyStdV; ver = j.versions?.[d.key] || ver; S.settings[d.key] = own; lyPatch(d.key, own); renderView();
+    if (!og && S.lyStdOrg) wgStdLoad(true);  // the instance's standard set inside an organisation: what counts there comes from the server
+    return {};
   };
   const sw = wgSwitches(raw.opts), newStd = wgStr(wgLayoutOnly(raw)), newOwn = sw ? JSON.stringify({opts: sw}) : '';
   try { await go(newStd, newOwn); } catch { return; }
   const e = histAdd({label: lbl, undo: () => go(oldStd, oldOwn, true), redo: () => go(newStd, newOwn, true)});
-  histToast(tr('This is the default for everyone now'), e);
+  histToast(og ? tr('This is the default for {0} now', og.name) : tr('This is the default for everyone now'), e);
 }
 function wgReset(v) {
   const d = LY[v];

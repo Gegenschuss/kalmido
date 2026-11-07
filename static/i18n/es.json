@@ -17227,5 +17227,8 @@
   "(in the trash)": "(en la papelera)",
   "Enter balance by hand": "Introducir el saldo a mano",
   "Only needed for the month end without a bank statement": "Solo necesario para el fin de mes sin extracto bancario",
-  "Read are monthly statements as a PDF with a text layer in the line format (receipt date, booking date, text, amount) of {0}, up to {1} MB. Photos, scans without text and CSV files are not read: let an agent read them or enter the positions by hand.": "Se leen extractos mensuales en PDF con capa de texto en formato de líneas (fecha del recibo, fecha de contabilización, texto, importe) de {0}, hasta {1} MB. Las fotos, los escaneos sin texto y los archivos CSV no se leen: que los lea un agente o introduce las posiciones a mano."
+  "Read are monthly statements as a PDF with a text layer in the line format (receipt date, booking date, text, amount) of {0}, up to {1} MB. Photos, scans without text and CSV files are not read: let an agent read them or enter the positions by hand.": "Se leen extractos mensuales en PDF con capa de texto en formato de líneas (fecha del recibo, fecha de contabilización, texto, importe) de {0}, hasta {1} MB. Las fotos, los escaneos sin texto y los archivos CSV no se leen: que los lea un agente o introduce las posiciones a mano.",
+  "Make this the default for {0}": "Usar como estándar para {0}",
+  "This is the default for {0} now": "Ahora es el estándar para {0}",
+  "Only an admin of the organisation can change its default": "Solo un administrador de la organización puede cambiar su estándar"
 }

@@ -22,7 +22,7 @@ from flask import g, jsonify, request
 from ..core.config import app
 from ..core.pg import insert_id
 from ..core.i18n import N_, tr
-from ..core.db import bump, db, iso, now_utc, gsetting, parse_iso, uset
+from ..core.db import bump, db, iso, now_utc, parse_iso, uset
 from ..core.access import Denied, list_role, acx_of, is_project
 from ..accounts.session import me
 from ..core.errors import BadInput
@@ -35,6 +35,7 @@ from ..agents.core import need_agent, JOB_TITLE_MAX, job_dict  # 2.369.5 (#2517)
 from ..api.scopes import need_scope  # 2.369.5 (#2517): pulled up from functions
 from ..agents.usage import usage_block  # 2.369.5 (#2517): pulled up from functions
 from ..accounts import layoutsets  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.layouts import wg_std_org, wg_std_resolved  # 2.627.0 (#4504)
 
 LYP_KIND = "layout"
 LYP_DAYS = 14                 # an open proposal expires after this many days
@@ -146,7 +147,7 @@ def lyp_value(c, pid, key):
         r = c.execute("SELECT page_layout FROM lists WHERE id=?", (int(key[5:]),)).fetchone()
         std = _load(r[0] if r else "")
     else:
-        std = _load(gsetting(c, "lystd_" + key))
+        std = _load(wg_std_resolved(c, key, wg_std_org(c, pid)))  # 2.627.0 (#4504): the organisation's standard first
     if _has_layout(std):
         return std, "standard"
     return dict(LYP_DEFAULTS.get(key) or {}), "default"

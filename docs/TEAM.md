@@ -290,6 +290,12 @@ questions stays the classic form.
   News item ("For you", switched off together with the sharing News) with a preview and *Take over* / *Decline*; taken over,
   it is their own saved arrangement, named after the sender, with no link back.
 - Agents cannot use any of this (403); they propose arrangements their own way (2.55.0, #1066).
+- **A standard per organisation** (2.627.0). The admins of an organisation set the standard of the start page, Today, Time
+  tracking, the overviews and the review for its members: in the organisation's workspace, *Make this the default for
+  (name of the organisation)* shows next to an own arrangement that differs. What a person sees: their own arrangement, else the
+  standard of the organisation of the active workspace, else the server's standard (set by the instance admins); a view the
+  organisation has no standard for uses the server's. *Reset to the standard* leads back to the organisation's standard. In
+  *Private* (or with several organisations under *All*) and without an organisation only the server's standard counts.
 
 ## Sprints
 

@@ -2575,8 +2575,8 @@ shared with the agent (within its project limit) that the person sees (2.352.0: 
 | Propose an arrangement (kind `layout`) | `POST /api/v1/layouts/proposals` | `propose_layout` | layouts |
 
 - **Views**: `dashboard` (start page), `view_today`, `view_time`, `view_agents`, `view_projects`, `view_review`, further
-  views of the builder, `list:<id>`. `source` of the current arrangement: `own`, `standard` (the admins' standard) or
-  `default`.
+  views of the builder, `list:<id>`. `source` of the current arrangement: `own`, `standard` (the admins' standard: since 2.627.0
+  the one of the organisation of the person's active workspace, else the server's) or `default`.
 - **The layout**: `{order, hidden, widths, heights, mobile}`; widths in columns of six (2 = a third, 3 = half, 4 = two
   thirds, 6 = full), heights 1 compact / 2 normal / 3 tall, `mobile` = `{order, hidden}` for phones. It starts from what the
   person sees now: the blocks named in `order` come first, the others keep their order after them; `hidden`, a block's

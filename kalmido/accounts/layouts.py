@@ -5,16 +5,16 @@ override for themselves (table list_layouts). Only the person themselves change 
 import json
 import re
 
-from flask import g, jsonify
+from flask import g, jsonify, request
 
 from ..core.config import app
 from ..core.i18n import tr
-from ..core.db import body, bump, db, iso, iso_ms, now_utc, gset, gsetting
+from ..core.db import body, bump, db, iso, iso_ms, now_utc, gset, gsetting, usettings
 from ..core.conflict import ccf_check  # 2.570.0 (#4770)
 from ..core.access import Denied, need_list, WRITE_ROLES
 from ..accounts.session import me
 from ..core.errors import BadInput
-from ..core.pg import insert_id, write_lock  # 2.149.0 G (#2517): pulled up from functions
+from ..core.pg import insert_id, system_ctx, write_lock  # 2.149.0 G (#2517): pulled up from functions
 
 LAYOUT_KEYS = ("view_today", "view_time", "view_agents", "view_projects",
                "view_review",  # 2.43.0 (#1452): the review (and its journal) on the builder
@@ -163,8 +163,8 @@ def list_layout_get(lid):
 
 # ---------------------------------------------------------------- 2.43.0 (#1452): a standard for everyone of the other views
 # The start page, Today, Time tracking, the agents / projects overview and the review: the instance admins set a standard
-# (global settings lystd_<key>, same shape as the person's value) that everyone without an own arrangement sees. There is no
-# general per-organisation setting yet, so the standard is one for the instance. A person's own value wins when it has an
+# (global settings lystd_<key>, same shape as the person's value) that everyone without an own arrangement sees (2.627.0,
+# #4504: an organisation's standard comes before it, below). A person's own value wins when it has an
 # arrangement (the client merges: own switches stay, layout parts come from the standard while the own value has none).
 
 WG_STD_KEYS = ("dashboard",) + LAYOUT_KEYS
@@ -180,40 +180,105 @@ def wg_std_vers(c):
     return {k: gsetting(c, "lystd_at_" + k) or "" for k in WG_STD_KEYS}
 
 
+# 2.627.0 (#4504): a standard per organisation, set by its admins (global settings lystd_o<org id>_<key> / lystd_at_o<org id>_<key>,
+# same shape): the order is the person's own arrangement > the standard of the organisation of the active workspace > the
+# instance standard (per view: an organisation without a standard of that view falls back to the instance's). The active
+# workspace is the one of the workspace switch (?ws=org:<id> of the client, else the saved setting "workspace"; "All" with
+# exactly one organisation = that one). A person without an organisation: own > instance only.
+
+WG_WS_RE = re.compile(r"org:(\d{1,9})")
+
+
+def wg_org_k(oid, key, at=False):
+    return f"lystd_{'at_' if at else ''}o{int(oid)}_{key}"
+
+
+def wg_std_org(c, uid, ws=None):
+    """The organisation whose standard counts for uid (one uid is a member of, never another one), else None."""
+    from .orgs import user_orgs
+    mine = user_orgs(c, uid)
+    if not mine:
+        return None
+    v = ws if isinstance(ws, str) and ws else str(usettings(c, uid).get("workspace") or "")
+    m = WG_WS_RE.fullmatch(v.strip())
+    if m:
+        return int(m.group(1)) if int(m.group(1)) in mine else None
+    if v.strip() in ("", "all"):
+        return mine[0] if len(mine) == 1 else None
+    return None
+
+
+def wg_std_resolved(c, key, oid):
+    """The standard of view key that counts in organisation oid (its own, else the instance's)."""
+    return (gsetting(c, wg_org_k(oid, key)) if oid else "") or gsetting(c, "lystd_" + key) or ""
+
+
+def wg_std_payload(c, uid, ws=None):
+    """GET /api/layouts/std: layouts = the standard of each view that counts in the active workspace; versions = those of the
+    level the person writes (the organisation's for its admin there, else the instance's); can = may set it; org = {id, name,
+    admin} of the active workspace's organisation (None: private / several / none) -- org.admin: "the default for <name>"."""
+    from .orgs import is_org_admin
+    oid = wg_std_org(c, uid, ws)
+    adm = bool(oid) and is_org_admin(c, uid, oid)
+    out = {"layouts": {k: wg_std_resolved(c, k, oid) for k in WG_STD_KEYS},
+           "versions": {k: gsetting(c, wg_org_k(oid, k, True)) or "" for k in WG_STD_KEYS} if adm else wg_std_vers(c),
+           "can": adm or bool(g.user["is_admin"]), "org": None}
+    if oid:
+        with system_ctx(c):  # the name of the person's own organisation
+            r = c.execute("SELECT name FROM orgs WHERE id=?", (oid,)).fetchone()
+        out["org"] = {"id": oid, "name": (r[0] if r else "") or "", "admin": adm}
+    return out
+
+
 @app.get("/api/layouts/std")
 def wg_std_get():
     c = db()
-    return jsonify({"layouts": wg_std_all(c), "versions": wg_std_vers(c), "can": bool(g.user["is_admin"])})
+    return jsonify(wg_std_payload(c, me(), request.args.get("ws")))
 
 
 @app.put("/api/layouts/std/<key>")
 def wg_std_put(key):
-    """{layout: json | '' | null, promote: bool}: the standard of a view for everyone (instance admins only; agents 403).
-    promote: the admin's own value of that view goes back to '' as well (they follow the standard from now on).
-    2.570.0 (#4770): expect_updated_at = versions[key] of the last answer; set since -> 409 with the standards under "current"."""
+    """{layout: json | '' | null, promote: bool, org_id?: int}: the standard of a view for everyone (instance admins only;
+    agents 403). promote: the admin's own value of that view goes back to '' as well (they follow the standard from now on).
+    2.570.0 (#4770): expect_updated_at = versions[key] of the last answer; set since -> 409 with the standards under "current".
+    2.627.0 (#4504): org_id = the standard of that organisation (its admins only: a member 403, another organisation 404);
+    the answer is GET /api/layouts/std for that workspace."""
     need_person()
     if key not in WG_STD_KEYS:
         raise BadInput(tr("Invalid layout"))
-    if not g.user["is_admin"]:
-        raise Denied(403, tr("Only an admin can change the default"))
     b = body()
-    if set(b) - {"layout", "promote", "expect_updated_at"}:
+    if set(b) - {"layout", "promote", "expect_updated_at", "org_id"}:
         raise BadInput(tr("Invalid layout"))
+    c = db()
+    oid = b.get("org_id")
+    if oid is not None:
+        from .orgs import is_org_admin, user_orgs
+        if not isinstance(oid, int) or isinstance(oid, bool):
+            raise BadInput(tr("Invalid layout"))
+        if oid not in user_orgs(c, me()):
+            raise Denied(404, tr("Unknown organisation"))
+        if not is_org_admin(c, me(), oid):
+            raise Denied(403, tr("Only an admin of the organisation can change its default"))
+    elif not g.user["is_admin"]:
+        raise Denied(403, tr("Only an admin can change the default"))
     from ..accounts.settings import DASH_WIDGETS
     v = clean_layout(b.get("layout"), DASH_WIDGETS if key == "dashboard" else None)
-    c = db()
-    write_lock(c, f"lystd-{key}")
-    ccf_check(b, gsetting(c, "lystd_at_" + key), "current",
-              lambda: {"layouts": wg_std_all(c), "versions": wg_std_vers(c), "can": True})
-    gset(c, "lystd_" + key, v)
-    gset(c, "lystd_at_" + key, iso_ms(now_utc()))
+    sk, ak = (wg_org_k(oid, key), wg_org_k(oid, key, True)) if oid is not None else ("lystd_" + key, "lystd_at_" + key)
+    ws = f"org:{oid}" if oid is not None else None
+    write_lock(c, f"lystd-{key}" if oid is None else f"lystd-o{int(oid)}-{key}")
+    ccf_check(b, gsetting(c, ak), "current", lambda: wg_std_payload(c, me(), ws) if ws else
+              {"layouts": wg_std_all(c), "versions": wg_std_vers(c), "can": True})
+    gset(c, sk, v)
+    gset(c, ak, iso_ms(now_utc()))
     if b.get("promote"):
         c.execute("DELETE FROM user_settings WHERE user_id=? AND key=?", (me(), key))
         from .layoutsets import lyv_follow  # 2.55.0 (#1069)
         lyv_follow(c, me(), key, "")
     bump(c)
     c.commit()
-    return jsonify({"layouts": wg_std_all(c), "versions": wg_std_vers(c), "can": True})
+    if ws is None:  # the instance's standard: the answer as before (the instance level)
+        return jsonify({"layouts": wg_std_all(c), "versions": wg_std_vers(c), "can": True})
+    return jsonify(wg_std_payload(c, me(), ws))
 
 
 # ---------------------------------------------------------------- 2.43.0 (#1346): the project page as a pin board
