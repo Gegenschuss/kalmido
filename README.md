@@ -19,10 +19,10 @@
 
 ## What's new
 
-**2.643.0** (2026-11-07):
-- **Tables**: move rows and columns by dragging their head, on a phone after a long press.
-- **Statistics**: new blocks for contracts, health and travel when those areas are on.
-- **Agents**: command line `mcp/kalmido_cli.py` lists, shows, adds, comments and completes tasks with a token.
+**2.656.0** (2026-11-08):
+- **Sharing**: revoking a share in any dialog ends it in all places (calendars, address books, tables, knowledge pages).
+- **Software tickets**: columns can carry a status meaning, and saved views can be shared per project.
+- **Documents**: own mail addresses per area with a fixed target folder and tags.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 
