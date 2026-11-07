@@ -150,9 +150,12 @@ def om_admin_all(c, uid):
     return not in_org or bool(pending) or bool(shared)
 
 
-def user_orgs_public(c, uid):
+def user_orgs_public(c, uid, within=None):
+    """2.627.0 (#4526): within = the organisation ids of the caller (a set) -> only the shared ones (the people list of a
+    non-admin: the share dialog needs only the caller's own workspaces, never somebody's other organisations)."""
     with system_ctx(c):  # 2.37.0 (#1150): membership ids (structure)
-        return [r[0] for r in c.execute("SELECT org_id FROM org_members WHERE user_id=? ORDER BY org_id", (uid,))]
+        ids = [r[0] for r in c.execute("SELECT org_id FROM org_members WHERE user_id=? ORDER BY org_id", (uid,))]
+    return ids if within is None else [i for i in ids if i in within]
 
 
 @app.get("/api/users")
@@ -180,7 +183,10 @@ def users_list():
         ag_org = {r[0]: r[1] for r in c.execute("SELECT user_id, org_id FROM agents")}
         rows = c.execute("""SELECT * FROM users WHERE disabled=0 AND id NOT IN
                             (SELECT user_id FROM agents WHERE owner_id IS NOT NULL AND owner_id!=?) ORDER BY id""", (mine,)).fetchall()
-    return jsonify(users=[{**user_public(u), "orgs": user_orgs_public(c, u["id"]), **({"org_id": ag_org.get(u["id"])} if u["id"] in ag_org else {})}
+    from ..accounts.orgs import user_orgs
+    # 2.627.0 (#4526): the caller's organisations (not retired; an agent: its workspace), once; each person's list is cut to them
+    own = set(user_orgs(c, mine)) | ({ag_org[mine]} if ag_org.get(mine) else set())
+    return jsonify(users=[{**user_public(u), "orgs": user_orgs_public(c, u["id"], own), **({"org_id": ag_org.get(u["id"])} if u["id"] in ag_org else {})}
                           for u in rows if vis is None or u["id"] in vis])
 
 
