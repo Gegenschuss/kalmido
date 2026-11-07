@@ -306,6 +306,18 @@ def post_result(api, j, text, files, kind="result", appr=None, sugg=None):
                 body["job_parent"] = j["parent"]
             body["job_msg"] = kind
         if i == len(parts) - 1 and (appr or sugg):
+            if i == 0 and files:  # 2.615.0 (#3658 / M5): a one-part result with a card: the files first, as their own message
+                try:
+                    raw, ct = multipart({**{k: str(v) for k, v in body.items()}, "body": ""}, [("file", p) for p in files])
+                    api.req("POST", f"/agent/chats/{int(uid)}", raw=raw, ctype=ct, timeout=120)
+                except Exception as e:
+                    log(f"files of the result not posted: {str(e)[:150]}")
+                    try:  # an older server: without the job link
+                        raw, ct = multipart({"body": ""}, [("file", p) for p in files])
+                        api.req("POST", f"/agent/chats/{int(uid)}", raw=raw, ctype=ct, timeout=120)
+                    except Exception:
+                        pass
+                files = []
             try:
                 r = api.req("POST", f"/agent/chats/{int(uid)}", card_body(body, appr, sugg), timeout=60)
                 if appr and isinstance(r, dict) and r.get("id"):
@@ -353,12 +365,16 @@ def add_note(text):
 
 
 # kalmido-capability: job_wake (2.46.6, #1445)
-def add_wake(j, state, text="", hint=""):
+def add_wake(j, state, text="", hint="", posted=True, late=None):
     """2.46.6 (#1445): a finished, failed, stopped or lost job wakes the chat agent: ONE file per job in <state dir>/wakes/
     that the runner (agent_run.py) turns into a chat run for the job's person (at most one per job: an existing file or one
-    taken already is never written again). A job without a chat person leaves a note for the next run instead."""
+    taken already is never written again). A job without a chat person leaves a note for the next run instead.
+    2.615.0 (#3757 / M2): posted = its result reached the chat (else the wake never offers STILL); (#3658 / M6) late = messages
+    for the job that came after its end (inbox items): the wake run gets them, fenced, as messages of that person."""
+    late = [{k: it.get(k) for k in ("t", "kind", "uid", "text")} for it in late or []]
     if not j.get("chat_user"):
-        add_note(f"Job #{j['id']} \"{j['title']}\" is {state}: " + " ".join((hint + " " + text).split())[:300])
+        add_note(f"Job #{j['id']} \"{j['title']}\" is {state}: " + " ".join((hint + " " + text).split())[:300]
+                 + (f" ({len(late)} message(s) for it came after its end)" if late else ""))
         return False
     if j.get("woke"):
         return False
@@ -366,7 +382,7 @@ def add_wake(j, state, text="", hint=""):
     if os.path.exists(path):
         return False
     write_json(path, {"t": time.time(), "job": {"id": j["id"], "title": j["title"], "state": state}, "chat_user": j["chat_user"],
-                      "text": " ".join(redact(text).split())[:1500], "hint": hint})
+                      "text": " ".join(redact(text).split())[:1500], "hint": hint, "posted": bool(posted), "late": late})
     j["woke"] = time.time()
     save(j)
     return True
@@ -396,11 +412,19 @@ def inbox_dir(jid):
     return os.path.join(job_dir(jid), "inbox")
 
 
-def inbox_put(jid, text, kind="text", who=""):
-    """One message for job jid (kind text | approval; who = the person's name) as a file of its inbox."""
+def inbox_put(jid, text, kind="text", who="", uid=None):
+    """One message for job jid (kind text | approval; who = the person's name, uid = their account id; 2.615.0 #3658 / H1)
+    as a file of its inbox."""
     path = os.path.join(inbox_dir(jid), f"{time.time():.6f}-{uuid.uuid4().hex[:8]}.json")
-    write_json(path, {"t": time.time(), "kind": kind, "who": " ".join(str(who or "").split())[:80], "text": str(text or "")[:8000]})
+    write_json(path, {"t": time.time(), "kind": kind, "who": " ".join(str(who or "").split())[:80],
+                      "uid": int(uid) if str(uid or "").isdigit() else None, "text": str(text or "")[:8000]})
     return path
+
+
+def inbox_who(it):
+    """2.615.0 (#3658 / H1): who wrote an inbox item, for a prompt -- "user <id>" like fence(); a display name is never
+    put into a prompt unfenced (it is free text of that person)."""
+    return f"user {it['uid']}" if str(it.get("uid") or "").isdigit() else "the person"
 
 
 def inbox_take(jid):
@@ -427,14 +451,14 @@ def inbox_prompt(jid, items):
     out = []
     for i, it in enumerate(items):
         when = time.strftime("%H:%M", time.localtime(float(it.get("t") or time.time())))
-        who = it.get("who") or "the person"
+        who = inbox_who(it)
         if it.get("kind") == "approval":
             out.append(f"[{when}] {who} answered your approval card: {it.get('text')}. Only a yes is a yes: on no, leave it out and "
                        "say in your result what stays open.")
             continue
         t = str(it.get("text") or "").replace("<<<", "< < <")
         out += [f"[{when}] {who} sent a message to this job (from its card in Kalmido):",
-                f"<<<message job-{jid}-{i + 1}>>>", t, f"<<<end message job-{jid}-{i + 1}>>>"]
+                f"<<<message job-{jid}-{i + 1} from {who}>>>", t, f"<<<end message job-{jid}-{i + 1}>>>"]
     return ("(Launcher: messages for this job arrived while it runs. The person's message outranks your plan; the fixed rules, "
             "locks and permissions stay as they are. Answer the person, if needed, with "
             f"{sys.executable} {os.path.abspath(__file__)} say {int(jid)} \"...\", then go on.)\n\n" + "\n".join(out))
@@ -444,7 +468,7 @@ WAKE_PROMPT = ("(Launcher: your job had ended. It is woken in its session once m
                "do what follows from the answer, then end with your complete final answer as before.)")
 
 
-def deliver(jid, text, kind="text", who="", wake=False):
+def deliver(jid, text, kind="text", who="", wake=False, uid=None):
     """The runner's side: a message / card answer for job jid -> "into its inbox" (it runs and takes messages), "woke it"
     (wake=True: it has ended and has a session -- the answer goes in as its first message, once per answer), or "" (no
     such job / it cannot take it: the caller falls back to a chat run)."""
@@ -452,10 +476,17 @@ def deliver(jid, text, kind="text", who="", wake=False):
     if not j:
         return ""
     if is_open(j) and j.get("inbox"):
-        inbox_put(j["id"], text, kind, who)
+        path = inbox_put(j["id"], text, kind, who, uid)
+        cur = load(j["id"])
+        if cur and not is_open(cur):  # 2.615.0 (#3658 / M6): it ended meanwhile -- take the message back unless it was taken
+            try:
+                os.unlink(path)
+                return ""
+            except OSError:
+                pass
         return "into its inbox"
     if wake and not is_open(j) and j.get("session") and j.get("state") in ("done", "failed"):
-        inbox_put(j["id"], text, kind, who)
+        inbox_put(j["id"], text, kind, who, uid)
         j.update(state="starting", woken=time.time(), woke=None, cmd_pid=None, runner_pid=None)
         save(j)
         wp = os.path.join(state_dir(), "wakes", f"{int(j['id'])}.json")
@@ -993,7 +1024,7 @@ def cmd_run(argv):
                         api.soft("PATCH", f"/agent/jobs/{int(j['id'])}", {"append_log": f"{time.strftime('%H:%M')} message delivered ({len(items)})"})
                     except OSError:  # the pipe is gone: back into the inbox, the result names them
                         for it in items:
-                            inbox_put(j["id"], it.get("text"), it.get("kind") or "text", it.get("who") or "")
+                            inbox_put(j["id"], it.get("text"), it.get("kind") or "text", it.get("who") or "", it.get("uid"))
             if result and streaming and p.stdin and not state["sent_result"]:
                 state["sent_result"] = True  # the turn is over: closing stdin lets the command exit
                 try:
@@ -1044,7 +1075,7 @@ def cmd_run(argv):
             prompt += "\n\n" + inbox_prompt(j["id"], waited)
     j = load(j["id"]) or j
     if j["state"] == "stopped":
-        add_wake(j, "stopped", hint="It was stopped by a person.")
+        add_wake(j, "stopped", hint="It was stopped by a person.", late=inbox_take(j["id"]))  # 2.615.0 (#3658 / M6)
         return 0
     text = str((final or {}).get("result") or "").strip() if not (final or {}).get("is_error") else ""
     ok = bool(text)
@@ -1071,8 +1102,9 @@ def cmd_run(argv):
                                                       "append_log": f"{time.strftime('%H:%M')} {'done' if ok and not timed_out else 'ended'}"})
     j.update(state="done" if ok and not timed_out else "failed", ended=time.time())
     save(j)
+    late = inbox_take(j["id"])  # 2.615.0 (#3658 / M6): a message between the last take and the end goes to the wake run
     add_wake(j, "done" if ok and not timed_out else "failed", text,  # 2.46.6 (#1445): a wake run instead of a note
-             "" if posted else "Its result could not be posted into the chat.")
+             "" if posted else "Its result could not be posted into the chat.", posted=posted, late=late)
     return 0
 
 

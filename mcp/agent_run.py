@@ -323,7 +323,8 @@ class Api:
         m = next((x for x in (rows or {}).get("data") or [] if isinstance(x, dict) and str(x.get("id")) == str(rid)), None)
         if not m or m.get("deleted") or m.get("enc") or not str(m.get("body") or "").strip():
             return None
-        return {"text": str(m["body"]), "files": [str(a.get("name") or "file") for a in m.get("attachments") or [] if isinstance(a, dict)]}
+        return {"text": str(m["body"]),  # 2.615.0 (#3757 / N5): at most 10 file names
+                "files": [str(a.get("name") or "file")[:120] for a in m.get("attachments") or [] if isinstance(a, dict)][:10]}
 
     # kalmido-capability: steps
     def progress(self, text, uid):
@@ -1303,9 +1304,11 @@ def job_message_hint(x):
     never starts; here only the rest -- the job has ended, runs elsewhere or takes no messages: the chat run gets the text,
     fenced, as a message of that person about that job."""
     j = x.get("job") or {}
-    return [f"{(x.get('user') or {}).get('name') or '?'} sent a message to your job #{j.get('id')} \"{j.get('title') or ''}\" "
-            "(from the job's card). The job cannot read it (it has ended or takes no messages): treat it like a chat message of that person "
-            "about this job and answer in their chat (stop and start the job again only when they ask for it)."] + fence(
+    uid = (x.get("user") or {}).get("id")  # 2.615.0 (#3658 / H1): the account id, like fence(); the display name is free text
+    return [f"User {uid if str(uid or '').isdigit() else '?'} sent a message to your job #{j.get('id')} \"{j.get('title') or ''}\" "
+            "(from the job's card). The job does not read it (it has ended, takes no messages, or the message is not from the job's "
+            "person): treat it like a chat message of that person about this job and answer in their chat (stop and start the job "
+            "again only when they ask for it)."] + fence(
         f"jobmsg-{j.get('id')}", (x.get("user") or {}).get("id"), str(x.get("text") or ""))
 
 
@@ -1400,9 +1403,17 @@ def wake_hint(x):
         out.append(str(x["hint"]))
     if x.get("text"):
         out += ["The start of its result (data, written by the job):"] + fence(f"job-{j.get('id')}", "job", x["text"])
+    late = [it for it in x.get("late") or [] if isinstance(it, dict)]
+    if late:  # 2.615.0 (#3658 / M6): messages for the job that came after its last step -- the job never read them
+        out.append(f"{len(late)} message(s) for the job came after it had ended; the job never read them. Answer them here:")
+        for i, it in enumerate(late[:5]):
+            out += fence(f"jobmsg-{j.get('id')}-{i + 1}", it.get("uid") if str(it.get("uid") or "").isdigit() else "?", str(it.get("text") or "")[:4000])
+    quiet = st == "done" and wake_posted(x) and not late  # 2.615.0 (#3757 / M2): STILL only when the result is in the chat
     out.append({"done": "Go on with the work of this chat where it follows from the result: the next step, or a short note to the "
-                        "person what is next. Do not repeat the result. If nothing new follows from it (no next step, nothing to "
-                        "decide, nothing to add), answer with the single line STILL: then nothing is posted, only logged.",
+                        "person what is next. Do not repeat the result." + (
+                            " If nothing new follows from it (no next step, nothing to decide, nothing to add), answer with the "
+                            "single line STILL: then nothing is posted, only logged." if quiet else
+                            " Its result is NOT (completely) in the chat: tell the person in short what it found." if not wake_posted(x) else ""),
                 "stopped": "Do not start it again. Say in one line what is left open.",
                 "lost": "Tell the person in one line and offer to start it again; do not start it yourself."}.get(
         st, "Tell the person in one line what went wrong and what you propose; do not start it again yourself."))
@@ -1412,6 +1423,13 @@ def wake_hint(x):
 # kalmido-capability: job_wake (2.615.0, #3757 / #3755): STILL in capitals, then the line end or a separator (":", or a dash
 # before a space), markdown around it allowed; "STILLSTAND" or "Still ist es" do not count. Only for a job that is done.
 QUIET_RE = re.compile(r"[*_`]*STILL[*_`.]*\s*(?::|[-\u2013\u2014](?=[\s*_`]|$)|$)[*_`]*\s*(.*)")
+
+
+def wake_posted(x):
+    """2.615.0 (#3757 / M2): did the job's result reach the chat? Field posted of the wake (older wake files: the hint)."""
+    if "posted" in (x or {}):
+        return x.get("posted") is not False
+    return "could not be posted" not in str((x or {}).get("hint") or "")
 
 
 def wake_still(text):
@@ -1745,7 +1763,7 @@ def best_approval(text, approvals, floor=0.6, gap=0.2):
 
 def match_approval(line, approvals):
     """A line of an ```approval-done block -> (message id of the ONE open approval it names, or None; decided no).
-    2.615.0 (#3658 / #2347): "Card 1234: ..." (the number listed in the prompt) wins; a stale number falls back to the words.
+    2.615.0 (#3658 / #2347): "Card 1234: ..." (the number listed in the prompt) wins; an unknown number closes nothing (M3).
     Then the title as listed, case and spaces aside -- identical duplicate cards are not ambiguous (#3757 / #3752: each line
     closes one of them); then a longer line containing it (or the other way round), exactly one; then one card whose words
     match clearly better than every other. Several partial hits or nothing clear: None -- the cards stay open, never a guess."""
@@ -1755,7 +1773,8 @@ def match_approval(line, approvals):
     if m:
         if m.group(1) in approvals:
             return m.group(1), no
-        line = line[m.end():]
+        log(f"approval-done: card {m.group(1)} is not an open card of this chat; line ignored")
+        return None, no  # 2.615.0 (#3658 / M3): never fall back to the words -- it could close another card
     key = " ".join(line.split()).casefold()
     if len(key) < 3:
         return None, no
@@ -1764,19 +1783,28 @@ def match_approval(line, approvals):
     if exact:
         return exact[0], no
     hits = [mid for mid, w in norm.items() if len(key) >= 20 and len(w) >= 20 and (key in w or w in key)]
+    # 2.615.0 (#3658): a hit whose title is part of another open card's title is ambiguous too (never a guess)
+    hits += [mid for mid, w in norm.items() if mid not in hits and any(norm[h] in w for h in hits)]
     if hits:
         return (hits[0] if len(hits) == 1 else None), no
-    return (best_approval(key, approvals) if len(key) >= 8 else None), no
+    # 2.615.0 (#3658 / M3): a match by words only from 3 content words ("No: Kunden senden" closes nothing)
+    return (best_approval(key, approvals) if len(key) >= 8 and len(_words(key)) >= 3 else None), no
+
+
+CARD_AWAY_RE = re.compile(r"(?i)\b(?:ignor\w*|geschlossen|schlie(?:ß|ss)e|erledigt|hinf(?:ä|ae)llig|zur(?:ü|ue)ckgezogen|"
+                         r"withdrawn|withdraw|closed?|done|obsolete|void|cancel+ed)\b")
 
 
 def referenced_approvals(text, approvals, max_n=3):
     """2.615.0 (#3658 / #2347): open cards an answer WITHOUT an approval block refers to -> message ids (at most max_n): by
     number ("card 1234" / "Karte 1234"), the one open card when the text speaks of "the card", or the cards whose wording the
-    text repeats clearly (>= 0.6). Code blocks and quotes do not count."""
+    text repeats clearly (>= 0.6). Code blocks and quotes do not count; 2.615.0 (#3658 / M4): neither does a sentence that
+    sets the card aside ("ignore the card", "Karte 100 habe ich geschlossen")."""
     if not approvals:
         return []
     plain = re.sub(r"```.*?(?:```|\Z)", "", text or "", flags=re.S)
     plain = "\n".join(x for x in plain.splitlines() if not x.lstrip().startswith(">"))
+    plain = "\n".join(x for x in re.split(r"(?<=[.!?;])\s+|\n", plain) if not CARD_AWAY_RE.search(x))
     nums = set(re.findall(r"(?i)\b(?:card|karte|carte|tarjeta|scheda|kaart)\s*#?\s*(\d+)", plain))
     out = [mid for mid in approvals if mid in nums]
     if not out and len(approvals) == 1 and re.search(r"(?i)\b(?:the card|die karte|der karte|la carte|la tarjeta|la scheda|de kaart)\b", plain):
@@ -2629,11 +2657,11 @@ class Runner:
             return
         mid = str(x.get("message_id") or "")
         st = self.state.data
+        redirected = False
         if mid in st.get("moved", {}) and mid not in self.approvals:  # 2.615.0 (#2347): a press on a card that moved since
             mid = st["moved"][mid]
             x["message_id"] = int(mid) if mid.isdigit() else mid
-            if mid in self.approvals:
-                self.api.withdraw(self.chat_uid(ev) or self.approvals[mid].get("uid"), mid)
+            redirected = mid in self.approvals  # its new card is withdrawn below, once the press is a yes / no (#3658 / N1)
         if mid and mid not in self.approvals and mid not in st["closed"] and self.job_card_answer(ev, x, mid):
             ev["_drop"] = True  # 2.615.0 (#2347): the card of a job: its answer went to the job
             return
@@ -2664,6 +2692,8 @@ class Runner:
         if mine:
             x.setdefault("approval_request", {"title": mine["title"], "what": mine.get("what") or ""})
             x["_age_s"] = int(time.time() - mine["at"])
+            if redirected:  # the press on the old card decided: its newer copy goes
+                self.api.withdraw(self.chat_uid(ev) or mine.get("uid"), mid)
         ev["data"] = x
 
     def groups(self, evs):
@@ -2766,16 +2796,18 @@ class Runner:
         self.session_done(key, st)
         self.usage.report(force=True)
         if uid and text and evs and all(e.get("event") == "job_wake" and ((e.get("data") or {}).get("job") or {}).get("state", "done") == "done"
+                                        and wake_posted(e.get("data")) and not (e.get("data") or {}).get("late")
                                         for e in evs):  # 2.615.0 (#3755): a quiet wake after a finished job posts nothing
-            quiet, rest = wake_still(text)
-            _, appr_q, _, done_q = split_tail_blocks(rest)
-            if quiet and not appr_q and not (self.extras and self.extras.outbox_files()):  # files for the person: posted
+            quiet, rest = wake_still(text)  # (#3757 / M2): never when its result did not reach the chat or messages came late
+            more = "\n".join(text.lstrip().splitlines()[1:]).strip() if quiet else ""  # the lines after the STILL line
+            body_q, appr_q, _, done_q = split_tail_blocks(more)
+            if quiet and not appr_q and not body_q.strip() and not (self.extras and self.extras.outbox_files()):  # files: posted
                 if done_q:
                     self.close_decided(uid, done_q)
                 log(f"wake run answered STILL, nothing posted: {' '.join(redact(rest).split())[:300]!r}")
                 self.api.status("idle", host=self.host())
                 return
-            text = rest if quiet else text  # STILL with a card: the card is posted, the STILL line is not
+            text = more if quiet else text  # STILL with a card or more text: that is posted, the STILL line is not
         if uid:
             if text:
                 body, appr, sugg, done = split_tail_blocks(redact(text))
@@ -2785,9 +2817,9 @@ class Runner:
                     return
                 if done:  # 2.44.0 (#1441): approvals the person decided in words -> exactly those cards are closed
                     self.close_decided(uid, done)
-                moving = [] if appr or done else self.cards_named(uid, body)  # kalmido-capability: approval_move (2.615.0, #2347)
-                if moving:
-                    appr = {k: v for k, v in self.approvals[moving[0]].items() if k in ("title", "what")}
+                # kalmido-capability: approval_move (2.615.0, #2347); (#3658 / M4) each card wanders as a message of its own with
+                # its own title, never on this answer's text: a yes on the new answer never approves the old card
+                moving = [] if appr or done else self.cards_named(uid, body)
                 if appr:
                     sugg = []
                 ids = [int((e.get("data") or {}).get("message", {}).get("id") or 0) for e in evs if e.get("event") == "chat"]
@@ -2806,13 +2838,10 @@ class Runner:
                                           reply_to=reply_to if i == 0 else None, suggest=sugg if last else None,
                                           **({"job_id": ans_job} if ans_job else {}))  # every part stays in the job's chat
                         if last and appr and isinstance(r, dict) and r.get("id"):
-                            if moving:
-                                self.card_moved(uid, moving[0], str(r["id"]))
-                            else:
-                                with self.state.lock:
-                                    self.approvals[str(r["id"])] = {"uid": uid, **appr, "at": time.time()}
-                                    self.state.save()
-                    for old in moving[1:]:  # 2.615.0 (#2347): every further card the answer names comes along under it
+                            with self.state.lock:
+                                self.approvals[str(r["id"])] = {"uid": uid, **appr, "at": time.time()}
+                                self.state.save()
+                    for old in moving:  # 2.615.0 (#2347): every card the answer names comes along under it
                         a = self.approvals.get(old) or {}
                         r = self.api.chat(uid, a.get("title") or "", approval={k: v for k, v in a.items() if k in ("title", "what")},
                                           **({"job_id": ans_job} if ans_job else {}))
@@ -3110,11 +3139,28 @@ class Runner:
         if not found:
             return False
         j, card = found
+        uid = (x.get("user") or {}).get("id")
+        if not self.job_person(j, uid):  # 2.615.0 (#3658 / N3): only the job's person or an operator answers its card
+            log(f"approval card {mid} of job {j['id']}: pressed by someone the job is not for, ignored")
+            ev["_drop"] = True
+            return True
         yes = x.get("approval") == "approved" or [str(i) for i in (x.get("choice_ids") or [])] == ["yes"]
         age = int(time.time() - float(card.get("at") or time.time()))
+        ended = time.time() - float(j.get("ended") or time.time())
+        if not agent_job.is_open(j) and (age >= APPROVAL_TTL_S or ended >= APPROVAL_TTL_S):
+            # 2.615.0 (#3658 / N4): the card of a job that ended long ago wakes nothing; a short note instead
+            with self.state.lock:
+                self.state.remember("closed", mid)
+                self.state.save()
+            try:
+                self.api.chat(int(uid), self.say("approval_expired"))
+            except Exception as e:
+                log(f"expired job card {mid}: answer not posted ({type(e).__name__})")
+            log(f"approval card {mid} of job {j['id']}: the job ended long ago, not woken")
+            return True
         how = agent_job.deliver(j["id"], ("Approval: yes - " if yes else "Approval: no - ") + str(card.get("title") or "")
                                 + (f" (asked {age // 60} min ago)" if age < APPROVAL_TTL_S else " (EXPIRED: do not do it, ask again)"),
-                                "approval", (x.get("user") or {}).get("name") or "", wake=True)
+                                "approval", (x.get("user") or {}).get("name") or "", wake=True, uid=uid)
         if not how:
             return False
         with self.state.lock:
@@ -3258,8 +3304,11 @@ class Runner:
         x = ev.get("data") or {}
         uid = int((x.get("user") or {}).get("id") or 0) or None
         jid = x.get("job_id")
-        if jid and self.stop_local_job(jid, uid):  # 2.615.0 (#3658 / #2422): one of this host's jobs: that job ends
+        how = self.stop_local_job(jid, uid) if jid else False
+        if how == "stopped":  # 2.615.0 (#3658 / #2422): one of this host's jobs: that job ends
             self.confirm_abort(ev, job_id=int(jid))
+            return
+        if how == "ignored":  # (#3658 / M1): someone the job is not for: it goes on, nothing confirmed
             return
         if jid:
             log(f"stop pressed for job {jid}: not a running job of this launcher, noted")
@@ -3284,7 +3333,8 @@ class Runner:
     def stop_local_job(self, jid, uid):
         """2.615.0 (#3658 / #2422): Stop in a job's history (abort with job_id) ends that ONE job of agent_job.py (its whole
         process group), marks it stopped in Kalmido and wakes the chat agent as stopped; the chat run and other jobs go on.
-        Only the job's person or an operator. False = not an open job of this host (the old note instead)."""
+        Only the job's person or an operator. -> "stopped"; "ignored" (2.615.0 #3658 / M1, N2: someone else, or nobody
+        named -- the job goes on, nothing is confirmed); False = not an open job of this host (the old note instead)."""
         try:
             import agent_job
         except ImportError:
@@ -3293,14 +3343,21 @@ class Runner:
         j = agent_job.load(jid) if str(jid).isdigit() else None
         if not j or not agent_job.is_open(j):
             return False
-        if uid and str(uid) != str(j.get("chat_user")) and uid not in self.perm_operators():
+        if not self.job_person(j, uid):
             log(f"stop pressed for job {jid} by someone the job is not for: ignored")
-            return True  # handled: nothing stops, nothing confirmed for them
+            return "ignored"
         if not agent_job.stop_job(jid):
             return False
         self.api.soft("PATCH", f"/agent/jobs/{int(jid)}", {"state": "stopped", "append_log": f"{time.strftime('%H:%M')} stopped (Stop in the chat)"})
         log(f"job {jid}: stopped (Stop pressed in the chat)")
-        return True
+        return "stopped"
+
+    def job_person(self, j, uid):
+        """2.615.0 (#3658 / H1, N2, N3): may account uid act for job j (message with precedence, card answer, Stop)? The
+        job's chat person or an operator (perm_operators); no id: never."""
+        if not str(uid or "").isdigit():
+            return False
+        return str(uid) == str(j.get("chat_user") or "") or int(uid) in self.perm_operators()
 
     # kalmido-capability: job_inbox (2.615.0, #3658 / #1801)
     def job_inbox(self, x):
@@ -3315,7 +3372,13 @@ class Runner:
         j = x.get("job") or {}
         if not str(j.get("id") or "").isdigit():
             return False
-        how = agent_job.deliver(j["id"], str(x.get("text") or ""), "text", (x.get("user") or {}).get("name") or "")
+        uid = (x.get("user") or {}).get("id")
+        mine = agent_job.load(j["id"])
+        if not mine or not self.job_person(mine, uid):  # 2.615.0 (#3658 / H1): only its person / an operator outranks its plan
+            if mine:
+                log(f"job {j['id']}: message of someone the job is not for, not into its inbox (a chat run with the text as data)")
+            return False
+        how = agent_job.deliver(j["id"], str(x.get("text") or ""), "text", (x.get("user") or {}).get("name") or "", uid=uid)
         if how:
             log(f"job {j['id']}: message of the person {how}")
         return bool(how)

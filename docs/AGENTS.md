@@ -1766,7 +1766,9 @@ the same people as Stop; empty 400, an ended job 409) sends the `job` event with
 state, action fields and approval stay as they are. Hand the text to the running job if you can; else treat it as a chat
 message of that person about the job (the reference starter does the former since 2.615.0 for a running job that takes a
 stream of user messages -- its inbox, read after the next tool step -- and the latter otherwise; a yes / no on a card the job
-posted goes to that job too, and wakes it once in its session when it has ended).
+posted goes to that job too, and wakes it once in its session when it has ended; only from the job's person or an operator --
+the server lets everyone who may Stop the job write to it, so a starter checks the sender's id before it gives a message
+precedence).
 
 2.59.0 (#1827): **job names and colours.** Every message with a `job_id` also carries `job_name` (the job's name, `null`
 without), `job_parent` (the leader of a part job: the one sent with the message, else the one the job keeps) and

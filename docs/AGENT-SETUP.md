@@ -646,7 +646,7 @@ chat messages of one person that arrive together: one run). It does what a hoste
   process group; the Kalmido job is set to stopped and the chat agent is woken as stopped), the chat run and other jobs go on;
   a job this launcher does not run gets a note in its history as before. Only the person the
   running answer is for (or the agent's owner / `KALMIDO_OWNER_IDS` / `KALMIDO_PERM_USER`) can stop it; another person's
-  Stop is ignored.
+  Stop (or one without a person) is ignored -- for a job too: it goes on and nothing is confirmed.
 - **Plan usage ring** from the stream, with the time it was measured (step 10).
 - **Reply reference**: when the person answers an older message, its quote goes into the prompt. 2.615.0: the runner fetches
   the whole message (`GET /api/v1/agent/chats?since=<id-1>&user_id=<person>&limit=1`) and puts it in fenced, up to 4000
@@ -751,7 +751,10 @@ chat messages of one person that arrive together: one run). It does what a hoste
   stream-json`) has an inbox (`jobs/<id>/inbox/` in the state folder); a message of the person from the job's card (event `job`,
   action `message`) goes in there instead of a chat run and is played into the session as a user message, which the agent reads
   after its next tool step (a message during a plan-limit wait rides along with the resume; one after the last step is named in
-  the result). **Cards know their job**: a job's result, or a message of `agent_job.py say ID "text"`, that ends in
+  the result, one that comes while the job ends reaches the wake run). Only the job's person or an operator (owner,
+  `KALMIDO_OWNER_IDS`, `KALMIDO_PERM_USER`) reaches the inbox -- the job reads it with precedence over its plan, named by account
+  id only; anyone else's message is a chat run with the text as data. The same holds for a *Yes* / *No* on a job's card; the
+  card of a job that ended longer ago than `KALMIDO_APPROVAL_TTL` wakes nothing (a short note). **Cards know their job**: a job's result, or a message of `agent_job.py say ID "text"`, that ends in
   ` ```approval ` becomes a card linked to that job (` ```suggest ` buttons, ` ```approval-done ` closes the job's own cards);
   a result that asks without a card but has exactly one suggestion turns that suggestion into the card. *Yes* / *No* on a
   job's card goes to the job, never to the chat agent: into its inbox while it runs, or it wakes the ended job once in its
@@ -759,7 +762,8 @@ chat messages of one person that arrive together: one run). It does what a hoste
   tab with its steps and progress lines (`agent_job.py progress ID "..."`), and posts its complete result, with the files in its own
   outbox, into the chat. 2.46.6: then it **wakes the chat agent** -- exactly one chat run for that person with the outcome and the
   start of the result, in which the agent goes on (the next step or a short note; 2.615.0: after a job that is done, the single line
-  `STILL` when nothing new follows -- then nothing is posted, only logged; a card or files are posted anyway); a stopped job wakes it with the hint not to
+  `STILL` when nothing new follows -- then nothing is posted, only logged; a card, files or further lines after the STILL line are
+  posted anyway; not offered when the job's result could not be posted or messages for it came after its end); a stopped job wakes it with the hint not to
   restart it, a failed one with what went wrong (a job without a chat person leaves a note for the next run). *Stop* on the job stops the process. When the plan
   limit ends a run, the job waits for the reset (+ 2 minutes) and continues the **same session** (`--resume`, at most 3 times).
   `--worktree` gives it its own `git worktree` and branch `job/<id>` (at most `KALMIDO_JOB_WORKTREES` open, default 2); `list`,
