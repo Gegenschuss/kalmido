@@ -9,9 +9,14 @@
  (d) notes on a document: several with author and time, seen by everybody who sees the document (also in its view), written
      with edit (403 with view, 404 without any right), sealed with the area key, found by a word / a prefix and gone from the
      index when deleted; deleted by someone with edit or by the author (also after the right fell to view); db.bump
+ (b) the text recognition languages of an area (Settings > Documents): the installed ones (no osd), deu+eng by default,
+     KALMIDO_OCR_LANGS the cap (ocr.py loaded as a single file); a language not installed / too many are refused, only the
+     area's admins change it, none = the default again
  - a person without an organisation (the documents' area "files" of the freelancer matrix): the same for an .odt in the own space
 usage: p2635_c_docs_test.py <datadir>"""
+import importlib.util
 import io
+import os
 import sys
 import zipfile
 
@@ -197,5 +202,48 @@ check(nid in (found(Fr, "ringelblume") or []) and Fr.get(B + f"/api/docs/{nid}/n
       "#4807 (d) freelancer: found by it, she is its author")
 check(A.get(B + f"/api/docs/{nid}/notes").status_code == 404, "#4807 (d) freelancer: nobody else sees her notes")
 check(Fr.delete(B + f"/api/docs/{nid}/notes/{r.json()['note']['id']}").ok, "#4807 (d) freelancer: deletes it")
+
+# ---- (b) the text recognition languages of an area: from the installed ones, deu+eng by default, KALMIDO_OCR_LANGS the cap
+def ocr_mod(cap=None):
+    old = os.environ.pop("KALMIDO_OCR_LANGS", None)
+    if cap:
+        os.environ["KALMIDO_OCR_LANGS"] = cap
+    spec = importlib.util.spec_from_file_location("ocr_p2635", os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "kalmido", "docs", "ocr.py"))
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    os.environ.pop("KALMIDO_OCR_LANGS", None)
+    if old is not None:
+        os.environ["KALMIDO_OCR_LANGS"] = old
+    return m
+
+
+HAVE = {"List", "of", "available", "languages", "in", "/usr/share/tessdata", "(5):", "deu", "eng", "fra", "ita", "osd"}  # as --list-langs answers
+o1 = ocr_mod()
+check(o1.ocr_choices(HAVE) == ["deu", "eng", "fra", "ita"], f"#4807 (b) the choice: the installed languages, no osd {o1.ocr_choices(HAVE)}")
+check(o1.ocr_langs("fr", HAVE, base=["ita", "deu"]) == ("ita+deu", []), "#4807 (b) the area's languages are taken as they are (no app language)")
+check(o1.ocr_langs("de", HAVE, base=["ita", "xyz"]) == ("ita", ["xyz"]), "#4807 (b) a language that is not installed is left out and reported")
+check(o1.ocr_langs("fr", HAVE) == ("fra+deu+eng", []), "#4807 (b) without a choice: as before (app language + deu+eng)")
+o2 = ocr_mod("deu+fra")
+check(o2.ocr_choices(HAVE) == ["deu", "fra"] and o2.ocr_langs(None, HAVE, base=["ita", "fra"]) == ("fra", []),
+      "#4807 (b) KALMIDO_OCR_LANGS is the cap of the choice")
+
+st = A.get(B + "/api/docs/settings", params={"ws": "private"}).json()
+ol = st.get("ocr_langs") or {}
+if st.get("ocr"):
+    check([x["code"] for x in ol.get("choices") or []] == ["deu", "eng", "fra", "ita", "nld", "spa"] and ol.get("chosen") == ["deu", "eng"]
+          and ol.get("custom") is False and {"code": "fra", "name": "Français"} in ol["choices"], f"#4807 (b) settings: the installed languages, deu+eng by default {ol}")
+    r = A.put(B + "/api/docs/settings", json={"ws": "private", "ocr_langs": ["fra", "deu"]})
+    check(r.ok and r.json()["ocr_langs"]["chosen"] == ["fra", "deu"] and r.json()["ocr_langs"]["custom"] is True, f"#4807 (b) French + German chosen {r.text[:200]}")
+    for bad in (["xyz"], ["osd"], ["deu", "eng", "fra", "ita", "nld"], "deu"):
+        check(A.put(B + "/api/docs/settings", json={"ws": "private", "ocr_langs": bad}).status_code == 400, f"#4807 (b) refused: {bad}")
+    check(A.get(B + "/api/docs/settings", params={"ws": "private"}).json()["ocr_langs"]["chosen"] == ["fra", "deu"], "#4807 (b) ... and the choice stays")
+    check(A.put(B + "/api/docs/settings", json={"ws": "private", "ocr_langs": []}).json()["ocr_langs"] == {**ol}, "#4807 (b) none = the default again")
+    check(Ca.put(B + "/api/docs/settings", json={"ws": f"org:{ORG}", "ocr_langs": ["eng"]}).status_code in (403, 404), "#4807 (b) a member who is no admin changes nothing")
+    check(Bo.put(B + "/api/docs/settings", json={"ws": f"org:{ORG}", "ocr_langs": ["eng"]}).ok, "#4807 (b) the organisation's admin chooses for it")
+    # freelancer-matrix: files
+    r = Fr.put(B + "/api/docs/settings", json={"ws": "private", "ocr_langs": ["nld"]})
+    check(r.ok and r.json()["ocr_langs"]["chosen"] == ["nld"], f"#4807 (b) freelancer: her own area's languages {r.text[:160]}")
+else:
+    print("NOTE: no Tesseract in this image -- the settings checks of (b) are skipped", flush=True)
 
 sys.exit(kt.done("p2635_c_docs"))

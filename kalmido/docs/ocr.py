@@ -8,6 +8,7 @@ time limit PER PAGE, at most OCR_PAGES pages, at most OCR_PARALLEL documents at 
 (Pillow in a limited child process), a small JPEG."""
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -97,10 +98,35 @@ def ocr_installed():
     return _AVAIL["have"]
 
 
-def ocr_langs(app_lang=None, have=None):
-    """(the -l value, [missing Tesseract languages of the wanted ones]) for a person whose app language is app_lang: that
-    language first, then the base languages; only installed ones are taken, a missing one is reported, never an error."""
+# 2.635.0 (#4807 b): the languages an area may choose for its documents: the installed ones (not the script / orientation
+# models), within KALMIDO_OCR_LANGS when the server sets it (its upper bound); deu+eng stays the default of every area
+OCR_NOT_LANGS = {"osd", "equ", "snum"}
+OCR_LANG_MAX = 4           # languages of one area at most (every one makes the recognition slower)
+OCR_CAP = os.environ.get("KALMIDO_OCR_LANGS", "").strip()
+OCR_NAMES = {"deu": "Deutsch", "eng": "English", "fra": "Français", "ita": "Italiano", "spa": "Español", "nld": "Nederlands",
+             "por": "Português", "pol": "Polski", "ces": "Čeština", "dan": "Dansk", "swe": "Svenska", "nor": "Norsk", "fin": "Suomi",
+             "tur": "Türkçe", "rus": "Русский", "ukr": "Українська", "ell": "Ελληνικά", "hun": "Magyar", "ron": "Română",
+             "hrv": "Hrvatski", "slk": "Slovenčina", "slv": "Slovenščina", "deu_latf": "Deutsch (Fraktur)", "frk": "Fraktur"}
+
+
+def ocr_choices(have=None):
+    """2.635.0 (#4807 b): the Tesseract languages an area may choose (sorted codes)."""
     have = ocr_installed() if have is None else have
+    # the answer of --list-langs starts with a line of words ("List of available languages in ..."): only language codes
+    out = {x for x in have if x not in OCR_NOT_LANGS and re.fullmatch(r"[a-z]{3}(_[a-z]{3,4})?", x)}
+    if OCR_CAP:
+        out &= set(OCR_CAP.split("+"))
+    return sorted(out)
+
+
+def ocr_langs(app_lang=None, have=None, base=None):
+    """(the -l value, [missing Tesseract languages of the wanted ones]) for a person whose app language is app_lang: that
+    language first, then the base languages; only installed ones are taken, a missing one is reported, never an error.
+    2.635.0 (#4807 b): base = the languages the area chose (docs/store.py cfg_get ocr_langs): exactly those, no app language."""
+    have = ocr_installed() if have is None else have
+    if base:
+        use = [x for x in base if x in have and (not OCR_CAP or x in OCR_CAP.split("+"))]
+        return "+".join(use) or OCR_LANGS, [x for x in base if x not in have]
     want = []
     own = OCR_LANG_OF.get(str(app_lang or "").lower().split("-")[0].split("_")[0])
     for code in ([own] if own else []) + OCR_LANGS.split("+"):
@@ -128,14 +154,14 @@ def _tess(img, timeout, langs=OCR_LANGS):
     return p.stdout.decode("utf-8", "replace")
 
 
-def ocr_bytes(data, kind, lang=None):
+def ocr_bytes(data, kind, lang=None, base=None):
     """{"text", "pages", "pages_read", "truncated"} or {"error": "no_ocr" | "busy" | "too_complex" | "unreadable"}.
     kind = "pdf" | "image"; lang = the person's app language (2.122.0, #2101: read with its Tesseract language as well). Blocks while another document is being recognised (the caller is a background worker)."""
     if not ocr_available():
         return {"error": "no_ocr"}
     if not _SEM.acquire(timeout=OCR_PAGE_S * 2):
         return {"error": "busy"}
-    langs = ocr_langs(lang)[0]
+    langs = ocr_langs(lang, base=base)[0]  # 2.635.0 (#4807 b): base = the area's chosen languages
     try:
         with tempfile.TemporaryDirectory(prefix="kocr-") as tmp:
             src = os.path.join(tmp, "in.pdf" if kind == "pdf" else "in.img")
@@ -470,7 +496,7 @@ def qr_codes(data, kind, pages=1, want=None, budget=None):
         return []
 
 
-def doc_text(name, mime, data, owner=None, lang=None):
+def doc_text(name, mime, data, owner=None, lang=None, langs=None):
     """{"text", "method": "text" | "pdf" | "ocr" | "office" (2.635.0, #4807) | "none", "pages"?, "error"?} -- the text of one document's bytes."""
     kind = file_kind(name, mime, data[:2048])
     if kind == "text":
@@ -496,7 +522,7 @@ def doc_text(name, mime, data, owner=None, lang=None):
             data, e = heif_jpeg(data)
             if e:
                 return {"error": e, "kind": kind}
-    o = ocr_bytes(data, kind, lang)
+    o = ocr_bytes(data, kind, lang, langs)
     if o.get("error"):
         return {"error": o["error"], "kind": kind}
     return {"text": o["text"], "method": "ocr", "pages": o.get("pages"), "kind": kind}

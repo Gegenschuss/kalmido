@@ -37,6 +37,7 @@ from ..files.store import fs_folder, _free_name, fs_chain, safe_fs_name, fs_role
 from ..accounts.orgroles import org_role_key  # 2.369.5 (#2517): pulled up from functions
 from ..core.errors import BadInput  # 2.369.5 (#2517): pulled up from functions
 from .ocr import thumb_bytes, doc_text, qr_codes, OCR_PAGES, QR_DOC_S  # 2.369.5 (#2517): pulled up from functions
+from .ocr import OCR_LANG_MAX, ocr_choices  # 2.635.0 (#4807 b)
 from ..office.einvoice_in import ei_of_file, ei_text, ei_amount, ei_details, ei_compact, ei_receipt  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.attachtext import file_kind  # 2.369.5 (#2517): pulled up from functions
 
@@ -399,8 +400,10 @@ def cfg_get(c, ws):
     except ValueError:
         d = {}
     pre = str(d.get("asn_prefix") or "ASN")
+    ol = d.get("ocr_langs")  # 2.635.0 (#4807 b): the area's text recognition languages ([] = the default, deu+eng)
     return {"levels": RU.levels(d.get("levels")), "inbox": d.get("inbox", True) is not False,
-            "asn_prefix": pre if re.fullmatch(ASN_PREFIX_RE, pre) else "ASN"}
+            "asn_prefix": pre if re.fullmatch(ASN_PREFIX_RE, pre) else "ASN",
+            "ocr_langs": [str(x) for x in ol][:OCR_LANG_MAX] if isinstance(ol, list) else []}
 
 
 def cfg_set(c, ws, data):
@@ -414,6 +417,11 @@ def cfg_set(c, ws, data):
         if not re.fullmatch(ASN_PREFIX_RE, pre):
             raise ValueError("asn_prefix")
         cur["asn_prefix"] = pre
+    if "ocr_langs" in data:  # 2.635.0 (#4807 b): only installed languages within KALMIDO_OCR_LANGS, at most OCR_LANG_MAX
+        ol = data["ocr_langs"] or []
+        if not isinstance(ol, list) or len(ol) > OCR_LANG_MAX or not set(map(str, ol)) <= set(ocr_choices()):
+            raise ValueError("ocr_langs")
+        cur["ocr_langs"] = list(dict.fromkeys(str(x) for x in ol))
     rid = root_id(c, ws)  # 2.48.0 review: the mark of the documents folder stays
     if rid:
         cur["root_id"] = rid
@@ -1264,7 +1272,7 @@ def process(c, nid):
             ulang = _lang(c, uid=m["created_by"])  # 2.122.0 (#2101): the person's app language picks the OCR language
         except Exception:  # noqa: BLE001 -- the language is a hint only
             ulang = None
-        res = doc_text(node["name"], node["mime"], data, lang=ulang)
+        res = doc_text(node["name"], node["mime"], data, lang=ulang, langs=cfg_get(c, ws)["ocr_langs"] or None)  # 2.635.0 (#4807 b)
     if res.get("error") == "busy":
         return "wait"
     if ei and not res.get("error"):

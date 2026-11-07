@@ -41,6 +41,7 @@ from ..office.periodlock import pl_receipt_need_open  # 2.369.5 (#2517): pulled 
 from ..tasks.attachments import send_stored  # 2.369.5 (#2517): pulled up from functions
 from ..office.einvoice_in import ei_html  # 2.369.5 (#2517): pulled up from functions
 from .ocr import ocr_available as _av, ocr_langs  # 2.369.5 (#2517): pulled up from functions
+from .ocr import OCR_LANGS, OCR_NAMES, ocr_choices  # 2.635.0 (#4807 b)
 from ..accounts.orgs import is_org_admin  # 2.369.5 (#2517): pulled up from functions
 from .dups import dup_view, dup_on_done  # 2.369.5 (#2517): pulled up from functions
 from ..files.store import _free_name, safe_fs_name  # 2.369.5 (#2517): pulled up from functions
@@ -863,6 +864,13 @@ def _ocr_missing(c, uid):
     return [names.get(x, x) for x in ocr_langs(_lang(c, uid=uid))[1]]
 
 
+def _ocr_view(cfg):
+    """2.635.0 (#4807 b): the area's text recognition languages: chosen (the default deu+eng when none), the choice with names."""
+    have = ocr_choices() if _av() else []
+    return {"chosen": cfg["ocr_langs"] or OCR_LANGS.split("+"), "custom": bool(cfg["ocr_langs"]), "default": OCR_LANGS.split("+"),
+            "choices": [{"code": x, "name": OCR_NAMES.get(x, x)} for x in have], "max": S.OCR_LANG_MAX}
+
+
 def _settings_json(c, ws, uid):
     from ..integrations.mail import MAIL_IN_ON, mail_addr
     oid = S.ws_org(ws)
@@ -880,7 +888,7 @@ def _settings_json(c, ws, uid):
     from .fields import df_list  # 2.153.0 (#2179): the custom fields of the workspace
     return {"ws": f"org:{oid}" if oid else "private", "can_manage": can, "fields": df_list(c, ws), "levels": cfg["levels"], "inbox": cfg["inbox"],
             "rules": _rules_v(c, ws) if can else [], **_flow_extra(c, ws, can), **_settings_labels(c, ws, uid, can), "folders": folders,
-            "root_id": root, "inbox_path": S.inbox_path(c, root, uid), "ocr": ocr_available(), "ocr_missing": _ocr_missing(c, uid), "asn_prefix": cfg["asn_prefix"], "asn_next": S.asn_next(c, ws), "mail": {"enabled": MAIL_IN_ON, "address": mail_addr(tok[0]) if (tok and MAIL_IN_ON) else ""},
+            "root_id": root, "inbox_path": S.inbox_path(c, root, uid), "ocr": ocr_available(), "ocr_missing": _ocr_missing(c, uid), "ocr_langs": _ocr_view(cfg), "asn_prefix": cfg["asn_prefix"], "asn_next": S.asn_next(c, ws), "mail": {"enabled": MAIL_IN_ON, "address": mail_addr(tok[0]) if (tok and MAIL_IN_ON) else ""},
             "scan": _scan_json(c, uid, oid)}  # 2.207.0 A (#2763): scan inboxes, folder watcher downloads, the mail note
 
 
@@ -928,7 +936,9 @@ def docs_settings_put():
     _org, ws = ws_param(c, d.get("ws"), uid, manage=True)
     try:
         S.cfg_set(c, ws, d)
-    except ValueError:
+    except ValueError as e:
+        if str(e) == "ocr_langs":  # 2.635.0 (#4807 b)
+            return err(tr("Select at most {0} of the languages installed for the text recognition", S.OCR_LANG_MAX))
         return err(tr("The prefix takes letters, digits and dashes (at most 10, a letter first)"))
     c.commit()
     return jsonify(_settings_json(c, ws, uid))

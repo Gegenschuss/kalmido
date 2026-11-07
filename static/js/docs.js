@@ -822,7 +822,7 @@ function dc_sDraw(md) {
     const P = {head,
       auto: `<p class="shint">${tr('Per feature: rules first, then what Kalmido learnt from your corrections. Sure matches are set directly, unsure ones wait in “To review”. “Left to an agent”: a connected agent with access may fill it in.')}</p>
         ${DC_FEATS.map(([f, n]) => `<div class="row"><label for="dcs-l-${f}">${tr(n)}</label><select id="dcs-l-${f}" data-dcl="${f}" ${dis}>${DC_LEVELS.map(([v, l]) => `<option value="${v}" ${s.levels[f] === v ? 'selected' : ''}>${tr(l)}</option>`).join('')}</select></div>`).join('')}
-        ${s.ocr_missing?.length ? `<p class="muted">${esc(tr('Text recognition is missing: {0}', s.ocr_missing.join(', ')))}</p>` : ''}`,
+        ${s.ocr_missing?.length ? `<p class="muted">${esc(tr('Text recognition is missing: {0}', s.ocr_missing.join(', ')))}</p>` : ''}${dcs_ocrHtml(s, dis)}`,
       asn: `<div class="row"><label for="dcs-asn">${tr('Prefix of the archive numbers')}</label><input id="dcs-asn" data-dcs="asnprefix" value="${esc(s.asn_prefix || 'ASN')}" maxlength="10" autocomplete="off" ${dis}></div>
         <p class="muted">${esc(tr('Next free number: {0}. A QR code or text like {1} on a scan fills it in.', s.asn_next, `${s.asn_prefix || 'ASN'}${String(s.asn_next).padStart(5, '0')}`))}</p>
         <p class="muted">${esc(tr('A stack scan with several codes can be split into documents; a separator sheet between two letters splits there too.'))} <a href="/api/docs/split-sheet.pdf" target="_blank" rel="noopener">${tr('Separator sheet to print (PDF)')}</a></p>${'' /* 2.154.0 A (#1111) */}`,
@@ -847,6 +847,13 @@ function dc_sDraw(md) {
         <button type="button" class="iconbtn" data-dcs="ldel:${k}:${x.id}" aria-label="${esc(tr('Delete {0}', x.name))}" title="${esc(tr('Delete {0}', x.name))}">${ic('trash')}</button></span></li>`).join('')}</ul>` : ''}</details>`).join('')}` : ''}
     ${can ? dc_cfSettings(s) : ''}
     <div class="row dcs-to"><span class="muted">${tr('Sorting automatically, archive numbers and rules: Settings > Documents.')}</span><button type="button" class="btn sm" data-dcs="go-set">${ic('gear', 's')} ${tr('Settings of the documents')}</button></div>`;
+}
+// 2.635.0 (#4807 b): the languages of the text recognition of this workspace (the installed ones, deu+eng by default)
+function dcs_ocrHtml(s, dis) {
+  const o = s.ocr_langs; if (!o || !(o.choices || []).length) return '';
+  return `<fieldset class="dcs-ocr"><legend>${esc(tr('Languages of the text recognition'))}</legend>
+    <p class="shint">${esc(tr('Scans and photos are read in these languages (at most {0}; fewer read faster).', o.max))}${o.custom ? '' : ` ${esc(tr('Default: {0}.', o.default.join(', ')))}`}</p>
+    <div class="dcs-ocrl">${o.choices.map(x => `<label class="dcs-ocrc"><input type="checkbox" data-dco="${esc(x.code)}" ${o.chosen.includes(x.code) ? 'checked' : ''} ${dis}> ${esc(x.name)}</label>`).join('')}</div></fieldset>`;
 }
 function dc_cfSettings(s) {  // 2.153.0 (#2179): the custom fields of the workspace (nothing preset)
   const fs = s.fields || [];
@@ -919,6 +926,14 @@ async function dc_sChange(e) {
     return;
   }
   if (e.target.matches('[data-dcs="ftype"]')) { const o = md.querySelector('.dcf-opts'); if (o) o.hidden = e.target.value !== 'select'; return; }  // 2.153.0 (#2179)
+  if (e.target.matches('[data-dco]')) {  // 2.635.0 (#4807 b): the text recognition languages (none ticked = the default)
+    const box = e.target.closest('.dcs-ocr'), o = s.ocr_langs;
+    const from = o.custom ? o.chosen : [], to = [...box.querySelectorAll('[data-dco]:checked')].map(x => x.dataset.dco);
+    const val = to.length && to.join('+') !== o.default.join('+') ? to : [];
+    const put = v => async () => { DC.set = await api('PUT', '/api/docs/settings', {ws: s.ws, ocr_langs: v}); dc_sDraw(box.closest('.dcs-pane') || $('.dc-smd')); return {}; };
+    try { await put(val)(); } catch { e.target.checked = !e.target.checked; return; }
+    histToast(tr('Changed setting: {0}', tr('Languages of the text recognition')), histAdd({label: tr('Changed setting: {0}', tr('Languages of the text recognition')), sett: true, undo: put(from), redo: put(val)}));
+  }
 }
 async function dc_sClick(e) {
   const b = e.target.closest('[data-dcs]'); if (!b || b.matches('input')) return;
