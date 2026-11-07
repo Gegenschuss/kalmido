@@ -494,7 +494,7 @@ function sbb_btnHtml(id, cur, hid, aw) {
   if (!sbb_shown(id) || (!on && id !== 'tasks' && (a => a ? mg_sideHidden(id, hid) : hid('e:' + id))(mg_area(id)))) return '';  // Settings > Appearance > Sidebar per part
   const req = id === 'life' && famOn() ? (S.kids || []).reduce((n, k) => n + (k.requests || 0), 0) : 0, n = id === 'agents' ? aw : id === 'team' ? S.team?.unread || 0 : req;  // 2.479.0 (#2814)
   const dot = id === 'time' && (S.timer || S.pomo) ? '<span class="srbd recdot"></span>' : n ? `<span class="srbd nunread">${n}</span>` : id === 'wiki' && typeof wki_dotHtml === 'function' ? wki_dotHtml() : '';  // 2.350.0 C (#2744): a running import
-  return `<button type="button" class="srb ${on ? 'on' : ''}" data-go="${esc(on ? sbb_home(id) : sbb_target(id))}" data-sbb="${id}"${on ? ' aria-current="page"' : ''}${sbb_on() && !S.me?.kid ? ' draggable="true"' : '' /* 2.575.0 D (#4051) */}${sbb_nameAttr(tr(d[2]))}>${ic(d[1])}<span class="srbn">${esc(tr(d[2]))}</span>${dot}</button>`;
+  return `<button type="button" class="srb ${on ? 'on' : ''}" data-go="${esc(on ? sbb_home(id) : sbb_target(id))}" data-sbb="${id}"${on ? ' aria-current="page"' : ''}${sbb_on() && !S.me?.kid && !rowd_touch() ? ' draggable="true"' : '' /* 2.575.0 D (#4051); 2.627.0 (#4962): a finger by drag.js */}${sbb_nameAttr(tr(d[2]))}>${ic(d[1])}<span class="srbn">${esc(tr(d[2]))}</span>${dot}</button>`;
 }
 const sbb_aw = () => (S.agents || []).reduce((n, x) => n + x.waiting + x.chat_unread + (x.approvals_open || 0), 0);
 function sbb_railHtml(hid) {
@@ -568,7 +568,7 @@ function sbb_railMenu(b) {
   ].filter(Boolean), null, null, name);
 }
 const SBB_RMENU = '#srail .srb[data-sbb], #side .sbmr .srb[data-sbb]';
-ms_rowMenu(SBB_RMENU, sbb_railMenu);  // touch: a long press (the click ending it opens nothing)
+const SBB_RLP = ms_rowMenu(SBB_RMENU, sbb_railMenu);  // touch: a long press (the click ending it opens nothing)
 document.addEventListener('contextmenu', e => {
   const b = e.target.closest?.(SBB_RMENU); if (!b || S.me?.kid) return;
   e.preventDefault(); if (e.pointerType === 'touch' || isTouch()) return;  // touch: the long press above
@@ -594,6 +594,24 @@ document.addEventListener('drop', e => {
   e.preventDefault(); sbb_move(id, t.dataset.sbb, sbb_rzone(t, e.clientY), tr(sbb_def(id)?.[2] || id));
 });
 document.addEventListener('dragend', () => { if (!SBB_RDRAG && !$('#srail .srb.dragging')) return; SBB_RDRAG = null; sbb_rmark(null); $$('#srail .srb.dragging').forEach(x => x.classList.remove('dragging')); });
+// 2.627.0 (#4962): the finger by drag.js: hold an icon, then drag it before / after another one (the same sbb_move as the mouse);
+// a swipe without the hold scrolls the bar, a quick tap opens the area as before, held and let go without moving = its menu
+// (what the long press did). The mouse keeps the browser's drag above.
+const sbb_rfinger = (d, x, y) => { const t = /** @type {any} */ (document.elementFromPoint(x, y))?.closest?.('#srail .srb[data-sbb]'); return t && t.dataset.sbb !== d.id ? t : null; };
+const sbb_rfOff = d => { d.b.classList.remove('dragging'); sbb_rmark(null); };
+drg_attach(document, {
+  mouse: false, hold: ROWD_HOLD, holdMove: 8, onTarget: true, raf: true, ghost: {el: d => d.b, cls: 'ghost-drag'},
+  scroll: () => $('#srail'), edge: 40, step: 10,
+  start: t => {
+    const b = /** @type {any} */ (t).closest?.('#srail .srb[data-sbb]');
+    return b && sbb_on() && !S.me?.kid && sbb_def(b.dataset.sbb) ? {b, id: b.dataset.sbb} : null;
+  },
+  onHold: d => { ms_lpTake(SBB_RLP); d.b.classList.add('dragging'); if (navigator.vibrate) navigator.vibrate(12); },
+  onMove: (d, x, y) => { const t = sbb_rfinger(d, x, y); sbb_rmark(t, t && sbb_rzone(t, y)); },
+  onDrop: (d, x, y) => { const t = sbb_rfinger(d, x, y); sbb_rfOff(d); if (t) sbb_move(d.id, t.dataset.sbb, sbb_rzone(t, y), tr(sbb_def(d.id)?.[2] || d.id)); },
+  onTap: d => { sbb_rfOff(d); const b = d.b.isConnected ? d.b : $(`#srail .srb[data-sbb="${d.id}"]`); if (b) sbb_railMenu(b); },
+  onCancel: sbb_rfOff,
+});
 // 2.542.0 (#4610): another area than the one drawn last opens the panel again (LS sideFold back to false, the layout follows
 // at once; no extra render). The first drawing after a load keeps the hidden panel; folded for room (#3163) and areas
 // without a panel (SBB_NOPANEL) stay as they are
