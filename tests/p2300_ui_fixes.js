@@ -143,7 +143,9 @@ const NOOVER = sel => `(() => { const box = document.querySelector('${sel}'); if
     await shot('p2300-390-chat-code.png');
     const dx = await ev(`(async () => { const v = document.querySelector('#view .chview'), cp = v.querySelector('.chcomp') || v; const a = cp.getBoundingClientRect().left;
       v.classList.add('vvfix'); await new Promise(r => setTimeout(r, 400)); const cs = getComputedStyle(v), b = cp.getBoundingClientRect().left, r = {a: Math.round(a), b: Math.round(b), pl: cs.paddingLeft, cls: v.className, pos: cs.position, disp: cs.display, bs: cs.boxSizing, w: v.clientWidth}; v.classList.remove('vvfix'); return r; })()`);
-    check(dx && Math.abs(dx.a - dx.b) <= 1 && dx.a > 4, `${tag}: #1044 (d) the chat keeps its side margin with the keyboard up (vvfix) ` + JSON.stringify(dx));
+    // 2.651.0 (#5027): since 2.622.0 (#4946) the phone chat runs edge to edge (composer at x 0, no side margin, with and
+    // without the keyboard); #1044's point stays: the composer does not jump sideways when vvfix comes on
+    check(dx && Math.abs(dx.a - dx.b) <= 1 && dx.a <= 1 && dx.pl === '0px', `${tag}: #1044 (d) the chat composer does not jump sideways with the keyboard up (vvfix, edge to edge since #4946) ` + JSON.stringify(dx));
   }, true);
 
   console.log(`${ok} ok, ${F.length} failed`);
