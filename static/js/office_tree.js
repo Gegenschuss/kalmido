@@ -180,6 +180,11 @@ document.addEventListener('drop', async e => {
   const x = OFT_EXT, t = oft_extTo(e); OFT_EXT = null; $$('#side .sbbdin').forEach(y => y.classList.remove('sbbdin'));
   if (!t) return;
   e.preventDefault();
+  oft_extDrop(x, t);
+});
+document.addEventListener('dragend', () => { OFT_EXT = null; });
+// the move itself, shared by the mouse's drop above and the finger below (2.633.0, #4964)
+async function oft_extDrop(x, t) {
   const b = oft_id(t.dataset.sbbid);
   let doc = oft_doc(x.area, x.id);
   if (!doc) {  // not among the tree's documents: where it lies now (for the undo)
@@ -187,5 +192,23 @@ document.addEventListener('drop', async e => {
     doc = {id: x.id, title: (OFD.list || []).find(r => r.id === x.id)?.number || '', folder_id: cur?.node?.parent_id ?? null};
   }
   oft_place(x.area, doc, b.t === 'f' ? b.n : null);
+}
+// 2.633.0 (#4964): the finger by drag.js: hold a document row (data-ofdmv on touch), drag it onto a folder of the panel, let go =
+// the same oft_place as the mouse's drop. A swipe without the hold scrolls the list. The mouse keeps the browser's drag above.
+const oft_fingerT = (d, x, y) => {
+  const t = /** @type {any} */ (document.elementFromPoint(x, y))?.closest?.('#side .sbbt[data-sbbns="oft"][data-sbbdrop]');
+  return t && oft_id(t.dataset.sbbid).area === d.x.area ? t : null;
+};
+const oft_fingerOff = d => { d.r.classList.remove('dragging'); $$('#side .sbbdin').forEach(x => x.classList.remove('sbbdin')); };
+drg_attach(document, {
+  mouse: false, hold: ROWD_HOLD, holdMove: 8, onTarget: true, raf: true, ghost: {el: d => d.r, cls: 'ghost-drag'},
+  scroll: () => tdScroller($('#view')), edge: TD_EDGE, step: TD_MAX,
+  start: t => {
+    const li = /** @type {any} */ (t).closest?.('#view .ofdli[data-ofdmv]'), r = li?.querySelector('.ofdrow[data-id]');
+    return r ? {r: li, x: {area: typeof ofd_sec === 'function' ? ofd_sec() : 'offers', id: +r.dataset.id}} : null;
+  },
+  onHold: d => { d.r.classList.add('dragging'); if (navigator.vibrate) navigator.vibrate(12); },
+  onMove: (d, x, y) => { const t = oft_fingerT(d, x, y); $$('#side .sbbdin').forEach(b => b !== t && b.classList.remove('sbbdin')); t?.classList.add('sbbdin'); },
+  onDrop: (d, x, y) => { const t = oft_fingerT(d, x, y); oft_fingerOff(d); if (t) oft_extDrop(d.x, t); },
+  onCancel: oft_fingerOff,
 });
-document.addEventListener('dragend', () => { OFT_EXT = null; });
