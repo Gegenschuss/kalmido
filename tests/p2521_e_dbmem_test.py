@@ -169,13 +169,21 @@ pages[0].save(o, 'PDF', resolution=200, save_all=True, append_images=pages[1:])
 print(base64.b64encode(o.getvalue()).decode())
 """
     BODY = "\n".join(f"Position {k}: Beispiel Leistung Nummer {k} zum Preis von {k},00 EUR" for k in range(1, 24))
-    pages = []
+    # 2.628.0 (#4983): a cover page without an archive number code first -- since 2.580.0 (#4401) a clear stack (every
+    # document starting with a code) is split by the docs queue itself as soon as it is recognised, so the suite's own
+    # split below raced the queue and got 404 (the stack already in the trash) whenever the queue was first (the CI).
+    # With the cover page the stack stays "Stack - split?" (open) and only the route below splits it.
+    pages = ["Deckblatt Scan\nBeispiel Stapel ohne Nummer"]
     for p in range(PARTS):
         pages.append(f"qr:ASN{1000 + p:05d}\nRechnung {p + 1}\nBeispiel Lieferant {p + 1} GmbH\nDatum 0{1 + p % 9}.10.2026\n{BODY}")
         pages.append(f"Seite zwei der Rechnung {p + 1}\n{BODY}\nSumme {p + 10},00 EUR")
     pdf = base64.b64decode(subprocess.run(["docker", "exec", CT, "python", "-c", STACK_CODE, json.dumps(pages)],
                                           capture_output=True, text=True, check=True).stdout)
     print(f"PERF stack: {PARTS} parts, {len(pages)} pages, {len(pdf) // 1024} KB", flush=True)
+
+    def stack_state(nid):  # 2.628.0 (#4983): the stack's split state (doc_meta.split_scan) as the server keeps it
+        v = dbq(f"SELECT split_scan FROM doc_meta WHERE node_id={int(nid)}")
+        return (json.loads(v) if v else {}).get("state")
 
     def doc(nid):
         r = Fr.get(B + f"/api/docs/{nid}")
@@ -191,7 +199,9 @@ print(base64.b64encode(o.getvalue()).decode())
     d = until(lambda: (lambda x: x if x and x["state"] in ("done", "failed") else None)(doc(SID)), 600)
     check(d and d["state"] == "done" and d["pages"] == len(pages), f"stack recognised ({d and d['state']} {d and d.get('pages')})")
     T1 = time.monotonic()
-    parts = [[2 * p + 1, 2 * p + 2] for p in range(PARTS)]
+    s0 = stack_state(SID)
+    check(s0 == "open", f"the stack waits for a person, no automatic split ({s0})")
+    parts = [[2 * p + 2, 2 * p + 3] for p in range(PARTS)]  # 2.628.0 (#4983): page 1 is the cover page, left out
     r = Fr.post(B + f"/api/docs/{SID}/split", json={"parts": parts}, timeout=300)
     check(r.status_code == 201 and len(r.json().get("ids") or []) == PARTS, f"split into {PARTS} parts ({r.status_code} {r.text[:160]})")
     P = r.json().get("ids") or [] if r.status_code == 201 else []
