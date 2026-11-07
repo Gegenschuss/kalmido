@@ -12,6 +12,9 @@ of the match with its whitespace collapsed) - the line NUMBER does not count, so
 it new. Exit 1 and one `::error` annotation per NEW finding; exit 0 when every finding is known. An entry whose finding
 is gone (fixed, or the code line changed) is only reported as a notice: remove it, or re-add the finding with its reason
 when it is the same one on a changed line (--strict makes stale entries red too, for a check of the list itself).
+2.649.0 (#5056): a stale entry whose code line still stands in the file is told apart (split_stale): semgrep skips rules /
+files on a timeout, so a missing finding there is no change of the code - the check of a package's changed files
+(kalmido-semgrep.py) names only entries whose line is gone.
 
 --accept REASON writes every new finding into the baseline with that reason and today's date (--task N: the task that
 fixes it) - for the first run after a rule update, or when a reviewed finding was re-written; one reason per call, so a
@@ -107,6 +110,23 @@ def compare(found, entries):
     return new, stale, len(found) - len(new)
 
 
+def split_stale(stale, root=ROOT):
+    """2.649.0 (#5056): (gone, kept) of the stale entries - gone: the code line is not in the file any more (fixed or rewritten:
+    remove the entry or re-add the finding); kept: the line still stands word for word, semgrep only did not report it this
+    time. semgrep stops a rule after 5 s on a file and skips the file after three such timeouts (a warning, not an error):
+    on a busy machine a big file (kalmido/admin/acctimport.py ~2 s per rule) loses its findings now and then. A kept entry
+    is no work for a package; the full run names it as a notice, the check of the changed files says nothing."""
+    gone, kept = [], []
+    for e in stale:
+        try:
+            with open(os.path.join(root, e["file"]), encoding="utf-8", errors="replace") as f:
+                there = any(norm(x) == norm(e["code"]) for x in f)
+        except OSError:
+            there = False
+        (kept if there else gone).append(e)
+    return gone, kept
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("results", help="the JSON output of semgrep scan --json")
@@ -139,9 +159,14 @@ def main(argv=None):
         print(f"::error file={x['file']},line={x['line']},title=semgrep: new finding {x['rule'].rsplit('.', 1)[-1]}::"
               f"{x['rule']} - {x['message'] or 'see the semgrep output'} (known findings: tools/semgrep_baseline.json, SECURITY.md)")
         print(f"NEW  {x['file']}:{x['line']}  {x['rule']}  {x['severity']}\n     {x['code'][:160]}")
-    for e in stale:
+    gone, kept = split_stale(stale, a.root)  # 2.649.0 (#5056)
+    for e in gone:
         print(f"::{'error' if a.strict else 'notice'} file={e['file']},title=semgrep baseline: entry without a finding::"
               f"{e['rule']} - the code line is gone or changed; remove the entry or re-add the finding: {e['code'][:120]}")
+    for e in kept:
+        print(f"::{'error' if a.strict else 'notice'} file={e['file']},title=semgrep baseline: finding not reported::"
+              f"{e['rule']} - the code line still stands, semgrep did not report it (a rule timeout on a busy machine, or "
+              f"fixed elsewhere): {e['code'][:120]}")
     for e in errors[:20]:
         print(f"::warning title=semgrep error::{str(e.get('message') or '')[:300]}")
     print(f"semgrep_baseline: {len(found)} findings, {nknown} known, {len(new)} new, {len(stale)} stale entries, "

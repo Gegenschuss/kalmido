@@ -20,7 +20,7 @@ ROOT = os.path.join(N, "..")
 sys.path.insert(0, N)
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 from kt import FAILS, OKS, check  # noqa: E402
-from semgrep_baseline import norm  # noqa: E402
+from semgrep_baseline import norm, split_stale  # noqa: E402
 
 TOOL = os.path.join(ROOT, "tools", "semgrep_baseline.py")
 RULE = "python.flask.security.injection.tainted-sql-string.tainted-sql-string"
@@ -79,6 +79,20 @@ rc, out, _ = run([], [ENTRY])
 check(rc == 0 and "::notice" in out and "1 stale" in out, f"a stale entry is a notice only: {rc} {out[-300:]}")
 rc, out, _ = run([], [ENTRY], "--strict")
 check(rc == 1 and "::error" in out, f"--strict makes a stale entry red: {rc} {out[-300:]}")
+# 2.649.0 (#5056): an entry whose code line still stands in the file was only not reported (semgrep skips a rule / a big file
+# on a timeout under load): told apart from a gone line; the check of a package's changed files (kalmido-semgrep.py) names
+# only the gone ones
+rc, out, _ = run([], [ENTRY], files={"kalmido/a.py": "def f(c, where, args):\n" + KNOWN["extra"]["lines"] + "\n"})
+check(rc == 0 and "finding not reported" in out and "code line is gone" not in out, f"a still standing line: not reported, not gone: {rc} {out[-300:]}")
+rc, out, _ = run([], [ENTRY], files={"kalmido/a.py": "def f(c, where, args):\n    rows = c.execute(\"SELECT 1\")\n"})
+check(rc == 0 and "code line is gone" in out and "finding not reported" not in out, f"a changed line: gone: {rc} {out[-300:]}")
+with tempfile.TemporaryDirectory() as d5056:
+    os.makedirs(os.path.join(d5056, "kalmido"))
+    with open(os.path.join(d5056, "kalmido", "a.py"), "w", encoding="utf-8") as f:
+        f.write("x = 1\n" + KNOWN["extra"]["lines"] + "\n")
+    other = dict(ENTRY, file="kalmido/b.py")
+    g, k = split_stale([ENTRY, other], d5056)
+    check(k == [ENTRY] and g == [other], f"split_stale: the standing line is kept, a missing file is gone: {g} {k}")
 
 # 2.543.0 review: counted, a second occurrence of a known code line in the same file is new
 rc, out, _ = run([KNOWN, moved], [ENTRY])
