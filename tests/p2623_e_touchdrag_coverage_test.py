@@ -56,12 +56,12 @@ TD_SITES = {
     ("ablage.js", ".abrow[draggable"): ("drag.js", "ablage.js"),
     ("areas.js", "sbb_on() && !S.me?.kid"): ("drag.js", "areas.js"),
     ("areas.js", "#srail .srb"): ("drag.js", "areas.js"),
-    # ---- no finger way yet
-    ("office_banknorc.js", "bnrdrag"): ("ohne", 4963),              # a receipt onto a booking
-    ("office_banknorc.js", "closest?.('[data-bnr-rc]')"): ("ohne", 4963),
-    ("office_docs.js", 'class="ofdli"'): ("ohne", 4964),            # a document onto a folder of the pane
-    ("office_tree.js", ".ofdli[draggable"): ("ohne", 4964),
-    ("office_pipeline.js", "ppcard"): ("ohne", 4965),               # a pipeline card into another stage
+    # 2.633.0 (#4963 #4964 #4965): a receipt onto a booking, a document onto a folder of the panel, a pipeline card into a column
+    ("office_banknorc.js", "bnrdrag"): ("drag.js", "office_banknorc.js"),
+    ("office_banknorc.js", "closest?.('[data-bnr-rc]')"): ("drag.js", "office_banknorc.js"),
+    ("office_docs.js", 'class="ofdli"'): ("drag.js", "office_tree.js"),
+    ("office_tree.js", ".ofdli[draggable"): ("drag.js", "office_tree.js"),
+    ("office_pipeline.js", "ppcard"): ("drag.js", "office_pipeline.js"),
     # ---- not a drag of the app, or another finger way
     ("events.js", "bm-hint"): ("kein", "the bookmarklet goes into the browser's bookmark bar, not into the app"),
     ("integrations.js", "bmhint"): ("kein", "the bookmarklet goes into the browser's bookmark bar, not into the app"),
@@ -137,6 +137,13 @@ check("drg_attach(document, {" in SRC["basket.js"] and "kbGroupMove(d.id" in SRC
 check("rowd_touch() ? 'data-abmv=\"1\"' : 'draggable=\"true\"'" in SRC["ablage.js"] and "ab_move(n, t.dataset.abdrop" in SRC["ablage.js"] and "mouse: false" in SRC["ablage.js"],
       "ablage.js: the finger moves a file by drg_attach (the same ab_move), no browser drag on a touch screen")
 check("!rowd_touch() ? ' draggable=\"true\"'" in SRC["areas.js"] and "sbb_move(d.id, t.dataset.sbb" in SRC["areas.js"], "areas.js: the finger sorts the rail by drg_attach (the same sbb_move)")
+# 2.633.0 (#4963 #4964 #4965): the receipts, the office documents and the pipeline cards: the finger by drag.js, the mouse keeps the browser's drag
+check("drg_attach(document, {" in SRC["office_banknorc.js"] and "bnr_match(+t.dataset.bnrDrop, 'receipt'" in SRC["office_banknorc.js"] and "mouse: false" in SRC["office_banknorc.js"],
+      "office_banknorc.js: the finger matches a receipt by drg_attach (the same bnr_match)")
+check("drg_attach(document, {" in SRC["office_tree.js"] and "oft_extDrop(d.x, t)" in SRC["office_tree.js"] and "mouse: false" in SRC["office_tree.js"]
+      and "data-ofdmv" in SRC["office_docs.js"], "office_tree.js / office_docs.js: the finger files a document by drg_attach (the same oft_extDrop), no browser drag on a touch screen")
+check("drg_attach(document, {" in SRC["office_pipeline.js"] and "pp_move(d.id, c.dataset.pipcol)" in SRC["office_pipeline.js"] and "scrollX" in SRC["office_pipeline.js"] and "mouse: false" in SRC["office_pipeline.js"],
+      "office_pipeline.js: the finger moves a card by drg_attach (the same pp_move), the columns scroll sideways at the edge")
 for f, gone in (("sidebar.js", ("sdStart", "sdMove", "sdEnd", "'touchstart'")), ("areas.js", ("SBB_TD", "'touchstart'")), ("favtiles.js", ("fv2_touchEnd", "FV2.lp.timer"))):
     for g in gone:
         check(g not in SRC[f], f"{f}: the own touch path is gone ({g})")

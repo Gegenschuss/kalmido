@@ -10,6 +10,7 @@
 // - sections (secdrag.js, already on drag.js): held header dragged above the first = the first, as the mouse; a swipe moves
 //   nothing. The rows' order (rowd_attach) has its own test with the finger: tests/p2456_a_rowdrag_ui.js
 const {boot, errs, sleep, B, login} = require('./boot');
+const TC = require('./testclock');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
@@ -172,6 +173,86 @@ const closeMenus = d => { d.dispatchEvent(new d.defaultView.KeyboardEvent('keydo
   { const dt = store(); dev(w, heads()[2].querySelector('[data-sdrag]'), 'dragstart', dt); await sleep(40);
     dev(w, heads()[0], 'dragover', dt, 100, 105); dev(w, heads()[0], 'drop', dt, 100, 105); }
   check(await until(async () => (await secs()).join() === S1.join()), 'mouse: the same section order as the finger ' + (await secs()));
+  w.close();
+
+  // ================================================================ 2.633.0: the office (#4963 #4964 #4965), as a person WITHOUT an
+  // organisation (freelancer-matrix: office; the own personal office): a receipt onto a booking, a document onto a folder of the panel,
+  // a pipeline card into another column. Held, dragged, let go = the same action as the mouse's drop; a swipe without the hold does nothing
+  await call('POST', '/api/users', {orgs: [], username: 'frida', display_name: 'Frida', password: 'password123', email: 'frida@example.com'});
+  const CF = await login('frida');
+  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'cal,comments,office,clients', workspace: 'private'}, CF);
+  const location_ = w => w.location.hash;
+  const hold1 = async (w, el, x0, y0, x1, y1, what) => {  // the finger: down, the hold, a few moves, up
+    tc(w, el, 'touchstart', x0, y0);
+    check(await until(() => el.classList.contains('dragging'), 30), what + ': the hold lifts it');
+    for (let i = 1; i <= 5; i++) { tc(w, el, 'touchmove', x0 + (x1 - x0) * i / 5, y0 + (y1 - y0) * i / 5); await sleep(40); }
+    tc(w, el, 'touchend', x1, y1); after(w);
+  };
+  const swipe = async (w, el, x0, y0, x1, y1) => { tc(w, el, 'touchstart', x0, y0); await sleep(40); tc(w, el, 'touchmove', x0 + (x1 - x0) / 2, y0 + (y1 - y0) / 2); tc(w, el, 'touchmove', x1, y1); tc(w, el, 'touchend', x1, y1); await sleep(300); };
+
+  // ---- #4965 the pipeline
+  const DEAL = (await call('POST', '/api/office/deals', {title: 'Imagefilm', value: 1000, stage: 'inquiry'}, CF)).id;
+  const stageOf = async () => ((await call('GET', '/api/office/deals', null, CF)).items || []).find(x => x.id === DEAL)?.stage;
+  check(DEAL && await stageOf() === 'inquiry', 'setup: a deal in the stage Enquiry (without an organisation)');
+  w = await boot({user: 'frida', hash: 'office/pipeline', media: TOUCH}); d = w.document;
+  const card = () => d.querySelector('[data-pipcol="inquiry"] .ppcard[data-id="' + DEAL + '"]');
+  check(await until(() => card() && d.querySelector('[data-pipcol="won"]')), 'touch: the board shows the card and the column Order');
+  check(!card().getAttribute('draggable') || card().getAttribute('draggable') === 'true', 'touch: the card keeps the mouse\'s drag');
+  { const c = card(), won = d.querySelector('[data-pipcol="won"]'); box(c, 0, 100, 200, 60); box(won, 600, 80, 200, 300);
+    d.elementFromPoint = (x, y) => x >= 600 && y >= 80 && y < 380 ? won : x < 200 && y >= 100 && y < 160 ? c : d.body;
+    await swipe(w, c, 100, 130, 700, 140);
+    check(await stageOf() === 'inquiry' && !d.querySelector('.ghost-drag'), 'touch: a quick swipe over the card moves nothing');
+    await hold1(w, c, 100, 130, 700, 200, 'touch');
+    check(await until(async () => (await stageOf()) === 'won'), 'touch: the held card dragged into Order = the stage Order (as the mouse) ' + (await stageOf()));
+    check(await until(() => !d.querySelector('.ghost-drag, .pipcol.over, .ppcard.dragging')), 'touch: nothing of the drag stays behind'); }
+  w.close();
+
+  // ---- #4964 a document onto a folder of the panel
+  const cl = await call('POST', '/api/clients', {name: 'Example Ltd'}, CF);
+  const DOC = (await call('POST', '/api/office/docs', {kind: 'offer', client_id: cl.id, items: [{title: 'Day 1', qty: 1, rate: 100}]}, CF)).id;
+  const FOL = (await call('POST', '/api/office/docs/tree/folders', {name: 'Client Alpha'}, CF)).folder?.id;
+  const refOf = async () => ((await call('GET', `/api/files/refs/office_doc/${DOC}`, null, CF)).node || {}).parent_id || null;
+  check(DOC && FOL && !(await refOf()), 'setup: a quotation and a folder, the quotation in no folder');
+  w = await boot({user: 'frida', hash: 'office/offers', media: TOUCH}); d = w.document;
+  const li = () => d.querySelector('#view .ofdli');
+  const fnode = () => d.querySelector(`#side .sbbt[data-sbbid="f:offers:${FOL}"]`);
+  await until(() => d.querySelector('#side .sbbt[data-sbbid="a:offers"]'));
+  await until(() => { if (fnode()) return true; const a = d.querySelector('#side .sbbt[data-sbbid="a:offers"] [data-act="sbb-tree"]'); if (a && !a.dataset.open) a.click(); return false; }, 30);
+  check(await until(() => li() && fnode()), 'touch: the list row and the folder of the panel are there: ' + [!!li(), !!fnode(), d.querySelectorAll('#side .sbbt').length, [...d.querySelectorAll('#side .sbbt[data-sbbns="oft"]')].map(e => e.dataset.sbbid).join(','), location_(w)].join(' / '));
+  check(li() && li().hasAttribute('data-ofdmv') && !li().hasAttribute('draggable'), 'touch: the row has no browser drag (the hold is the app\'s)');
+  { const l = li();
+    d.elementFromPoint = (x, y) => { const f = fnode(); if (f) box(f, 0, 300, 200, 30); return f && x < 200 && y >= 300 && y < 330 ? f : x >= 300 && y >= 100 && y < 150 ? l : d.body; };
+    box(l, 300, 100, 500, 50);
+    await swipe(w, l, 400, 125, 100, 315);
+    check(!(await refOf()) && !d.querySelector('.ghost-drag'), 'touch: a quick swipe over the row files nothing');
+    await hold1(w, l, 400, 125, 100, 315, 'touch');
+    check(await until(async () => (await refOf()) === FOL), 'touch: the held row dragged onto the folder = filed there (as the mouse) ' + (await refOf()));
+    check(await until(() => !d.querySelector('.ghost-drag, #side .sbbdin, #view .ofdli.dragging')), 'touch: nothing of the drag stays behind'); }
+  w.close();
+
+  // ---- #4963 a receipt onto a booking
+  const day = n => { const x = new Date(TC.today() + 'T12:00:00'); x.setDate(x.getDate() - n); return x.toISOString().slice(0, 10); };
+  const ntry = (amt, ref, dd, name) => `<Ntry><Amt Ccy="EUR">${amt}</Amt><CdtDbtInd>DBIT</CdtDbtInd><Sts><Cd>BOOK</Cd></Sts><BookgDt><Dt>${dd}</Dt></BookgDt><AcctSvcrRef>${ref}</AcctSvcrRef><NtryDtls><TxDtls><RltdPties><Cdtr><Pty><Nm>${name}</Nm></Pty></Cdtr></RltdPties><RmtInf><Ustrd>Buchung ${ref}</Ustrd></RmtInf></TxDtls></NtryDtls></Ntry>`;
+  const xml = `<?xml version="1.0" encoding="UTF-8"?><Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.08"><BkToCstmrStmt><Stmt><Acct><Id><IBAN>DE02120300000000202051</IBAN></Id><Ccy>EUR</Ccy></Acct>${ntry('119.00', 'U-1', day(3), 'Software Beispiel GmbH')}</Stmt></BkToCstmrStmt></Document>`;
+  await call('PUT', '/api/office/settings', {company_fields: {name: 'Frida Film', street: 'Weg 3', zip: '10115', city: 'Berlin', country: 'DE'}}, CF);
+  const imp = await call('POST', '/api/office/bank/import', {text: xml, filename: 'konto.xml'}, CF);
+  check(imp.http === 201, 'setup: a booking imported ' + imp.http);
+  const TX = ((await call('GET', '/api/office/bank/tx?state=all', null, CF)).items || []).find(t => t.purpose === 'Buchung U-1')?.id;
+  const fd = new FormData(); fd.append('ws', 'private'); fd.append('files', new Blob(['Beleg Software Beispiel 119,00'], {type: 'text/plain'}), 'beleg.txt');
+  const up = await (await fetch(B + 'api/docs', {method: 'POST', headers: {'X-Requested-With': 'kalmido', Cookie: CF}, body: fd})).json().catch(() => ({}));
+  const RC = (up.ids || [])[0];
+  check(RC && (await call('PATCH', `/api/docs/${RC}`, {amount: '119.00', date: day(3)}, CF)).http === 200 && (await call('PUT', `/api/docs/${RC}/receipt`, {keep: true}, CF)).http === 200, 'setup: a receipt of 119.00 without a booking');
+  const matched = async () => ((await call('GET', '/api/office/bank/tx?state=matched', null, CF)).items || []).some(t => t.id === TX && t.match?.kind === 'receipt');
+  w = await boot({user: 'frida', hash: 'office/bank/norc', media: TOUCH}); d = w.document;
+  const rcEl = () => d.querySelector('.bnrdrag[data-bnr-rc]'), row = () => d.querySelector(`.bnkrow[data-bnr-drop="${TX}"]`);
+  check(await until(() => rcEl() && row()), 'touch: the receipt column and the booking are there');
+  { const r = rcEl(), b = row(); box(r, 900, 100, 250, 40); box(b, 100, 200, 700, 60);
+    d.elementFromPoint = (x, y) => x >= 900 && y >= 100 && y < 140 ? r : x < 800 && y >= 200 && y < 260 ? b : d.body;
+    await swipe(w, r, 1000, 120, 300, 230);
+    check(!(await matched()) && !d.querySelector('.ghost-drag'), 'touch: a quick swipe over the receipt matches nothing');
+    await hold1(w, r, 1000, 120, 300, 230, 'touch');
+    check(await until(matched), 'touch: the held receipt dragged onto the booking = matched (as the mouse)');
+    check(await until(() => !d.querySelector('.ghost-drag, .bnkrow.on, .bnrdrag.dragging')), 'touch: nothing of the drag stays behind'); }
   w.close();
 
   check(!errs.length, 'no script errors: ' + errs.join(' | ').slice(0, 300));
