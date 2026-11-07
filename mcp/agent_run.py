@@ -2492,6 +2492,7 @@ def guard_hook(argv):
 # kalmido-capability: perm_channel (2.625.0, #3661)
 PERM_MAX_REQ = 256 * 1024  # one request of the hook (tool name + input) at most 256 KB
 PERM_MAX_OPEN = 32  # at most 32 questions wait at once; more = denied at once (a flood of connections asks nobody)
+PERM_HS_S = 10  # 2.625 (Fable review of #3661): handshake + request within 10 s, else the connection gives its slot back
 
 
 def perm_family():
@@ -2575,19 +2576,52 @@ class PermChannel:
                 if not full:
                     self.busy += 1
             if full:
+                log(f"permission channel: {PERM_MAX_OPEN} connections open - one more refused")
                 c.close()
                 continue
             threading.Thread(target=self._serve, args=(c,), daemon=True).start()
 
+    def _release(self, st):
+        """Give the connection's slot back once (2.625, Fable review of #3661)."""
+        with self.lk:
+            if st["slot"]:
+                st["slot"] = False
+                self.busy -= 1
+
+    def _stall(self, c, st):
+        """2.625 (Fable review of #3661): a connection still in its handshake or without a request after PERM_HS_S gives its slot
+        back and is cut - silent connections (a local process that knows the address) must not use up all PERM_MAX_OPEN slots
+        and block every later permission question of this runner."""
+        if st["hs"]:
+            return
+        self._release(st)
+        log(f"permission channel: a connection sent no request within {PERM_HS_S} s - closed")
+        try:
+            import socket
+            socket.socket(fileno=os.dup(c.fileno())).shutdown(socket.SHUT_RDWR)  # unblocks a recv waiting in the handshake
+        except Exception:
+            pass
+        try:
+            c.close()
+        except Exception:
+            pass
+
     def _serve(self, c):
-        took = False
+        took, st = False, {"slot": True, "hs": False}
+        tm = threading.Timer(PERM_HS_S, self._stall, args=(c, st))
+        tm.daemon = True
+        tm.start()
         try:
             key = self.key
             self.mpc.deliver_challenge(c, key)  # the hook proves the run's key ...
             self.mpc.answer_challenge(c, key)  # ... and the runner proves it to the hook
-            if not c.poll(10):
+            if not c.poll(PERM_HS_S):
                 return
             rq = json.loads(c.recv_bytes(PERM_MAX_REQ).decode("utf-8"))
+            st["hs"] = True
+            tm.cancel()
+            if not st["slot"]:
+                return
             nonce = str(rq.get("nonce") or "") if isinstance(rq, dict) else ""
             if not re.fullmatch(r"[0-9a-f]{32}", nonce):
                 return
@@ -2596,8 +2630,8 @@ class PermChannel:
         except Exception:
             pass
         finally:
-            with self.lk:
-                self.busy -= 1
+            tm.cancel()
+            self._release(st)
             if not took:
                 try:
                     c.close()

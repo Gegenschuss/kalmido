@@ -185,6 +185,30 @@ c.close()
 d = result(p)
 check(d["behavior"] == "deny", f"an allow for another nonce: denied: {d}")
 
+# 2.625 (Fable review of #3661): silent connections (no handshake) must not use up the slots and block later questions;
+# regression: before, PERM_MAX_OPEN silent connections kept every slot and each real hook was refused at once
+if os.name != "nt":
+    import socket as _so
+    ar.PERM_HS_S = 1
+    r5 = runner("e")
+    env5 = hook_env(r5)
+    silent = []
+    for _ in range(ar.PERM_MAX_OPEN + 2):
+        s5 = _so.socket(_so.AF_UNIX, _so.SOCK_STREAM)
+        s5.connect(r5.perm_chan.address)
+        silent.append(s5)
+    check(until(lambda: r5.perm_chan.busy >= ar.PERM_MAX_OPEN, 10, 0.05), "all slots taken by silent connections")
+    check(until(lambda: r5.perm_chan.busy == 0, 15, 0.1), f"silent connections give their slot back: {r5.perm_chan.busy}")
+    p = hook(env5)
+    check(asked(r5, 1), "after silent connections a real hook is asked again")
+    mid = next(iter(r5.state.data["perms"]))
+    r5.intercept([{"event": "chat_choice", "data": {"message_id": int(mid), "permission": True, "approval": "approved", "choice_ids": ["allow"]}}])
+    check(result(p)["behavior"] == "allow", "and gets its answer")
+    for s5 in silent:
+        s5.close()
+    r5.perm_chan.close()
+    ar.PERM_HS_S = 10
+
 # no runner at all
 env4 = {k: v for k, v in os.environ.items() if not k.startswith("KALMIDO_PERM_")}
 d = result(hook(env4))

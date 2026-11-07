@@ -708,7 +708,8 @@ chat messages of one person that arrive together: one run). It does what a hoste
   2.625.0 (#3661): the hook gets the answer over a local connection of the runner (a Unix socket in a fresh 0700 folder,
   a named pipe on Windows; a key per run both ways, the runner's process checked, a one-time nonce per question), no
   longer through files in the state folder: nothing the agent writes there gives an allow. `KALMIDO_PERM_SOCK_DIR`
-  chooses the socket's parent folder (default: the temp folder); `KALMIDO_PERM_SHARED=1` lets Claude Code under an own
+  chooses the socket's parent folder (default: the temp folder; on macOS keep that path short, a socket path has at most
+  104 bytes - a longer one denies every question and logs why); `KALMIDO_PERM_SHARED=1` lets Claude Code under an own
   OS user connect ([AGENT-SECURITY.md](AGENT-SECURITY.md#4b-an-own-os-user-for-the-agents-tools)).
 - **Dangerous commands refused** (2.615.0, Claude Code only): the same run settings carry a `PreToolUse` hook for Bash that
   refuses force-push, deleting remote branches or tags, deleting or moving tags, `docker ... prune` and reboot / shutdown,

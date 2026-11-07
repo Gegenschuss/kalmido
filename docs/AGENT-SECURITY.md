@@ -346,12 +346,14 @@ commands (they have no such hook); `KALMIDO_PERM_RELAY=0` switches it off. What 
   the hook checks that the other end *is* the runner's own process (peer credentials on Linux / macOS, the pipe's server
   process on Windows) and sends a one-time nonce; only an answer on that same connection carrying that nonce counts.
   No runner, another process at the address, a wrong or old key, no answer in time or the connection gone: **no**.
-  Nothing in the state folder can give an allow any more, so a command that may write files there cannot answer its own
-  question (before 2.625.0 the answer was a file the agent could have written).
+  No permission answer comes from a file any more, so a command that may write files in the state folder cannot answer
+  its own question (before 2.625.0 the answer was a file the agent could have written). A connection that sends no
+  request within 10 seconds is closed, so silent connections cannot block later questions.
 - What stays: the hook gets address and key through its environment, and Claude Code hands that same environment to
   the agent's tools. An agent that may run programs can read the key and ask questions of its own (they only reach the
   chat; an *Allow* goes back to its own connection and opens nothing), but it cannot answer one. Running as **the same
-  OS user** it can still change its own Claude Code settings, the starter files or the runner itself. Against a hostile
+  OS user** it can still change its own Claude Code settings, the starter files or the runner itself (or stop the runner
+  and wait for its process number to come back). Against a hostile
   agent the allow list and `dontAsk` stay the real limit; the wall is the own OS user for the agent's tools below
   ([An own OS user for the agent's tools](#an-own-os-user-for-the-agents-tools)).
 
