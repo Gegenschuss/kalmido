@@ -80,16 +80,16 @@ document.addEventListener('click', async e => {
 // tick per position (title page = no section, a part = a section, a shoot part = one task per crew function), the hours per row
 // can be typed (piece / flat rate have none); on a quotation whose chain made tasks already it reads "Update budget from the
 // quotation": new rows, changed budgets (not the ones changed by hand) and positions no longer there (only marked).
-const OTK_STATE = {new: N_('New|position'), changed: N_('Changed'), manual: N_('Changed by hand'), same: N_('Unchanged'), back: N_('Back in the quotation'), gone: N_('No longer in the quotation')};
+const OTK_STATE = {new: N_('New|position'), changed: N_('Changed'), manual: N_('Changed by hand'), same: N_('Unchanged'), back: N_('Back in the quotation'), gone: N_('No longer in the quotation'), moved: N_('Moved to another project')};  // 2.620.0 (#4586): moved = shown, never written
 function otk_rowHtml(d) {
   const upd = (d.offer_tasks || 0) > 0;
   return `<div class="row otkrow"><span class="lacts"><button type="button" class="btn sm" data-dpj="tasks">${ic(upd ? 'sync' : 'plus', 's')}<span>${upd ? tr('Update budget from the quotation') : tr('Create tasks')}</span></button>${upd ? `<span class="muted">${esc(tr('Tasks in the project: {0}', d.offer_tasks))}</span>` : ''}</span></div>`;
 }
 function otk_hrs(v) { return v == null || v === '' ? '' : fmtNum(+v, 2); }
 function otk_line(x) {
-  const ck = x.state !== 'same', id = `otk-${x.key.replace(/[^a-z0-9]/gi, '_')}`;
+  const ck = x.state !== 'same' && x.state !== 'moved', id = `otk-${x.key.replace(/[^a-z0-9]/gi, '_')}`;
   const qty = x.unit ? `${esc(x.qty_text)} ${esc(typeof ofdUnit === 'function' ? ofdUnit(x.unit, OFD.doc) : x.unit)}` : '';
-  const hrs = x.state === 'gone' || x.state === 'back' ? `<span class="muted">${esc(otk_hrs(x.task_hours))}</span>`
+  const hrs = x.state === 'moved' ? (x.moved_to ? `<small class="muted">${esc(tr('Now in {0}', x.moved_to))}</small>` : '') : x.state === 'gone' || x.state === 'back' ? `<span class="muted">${esc(otk_hrs(x.task_hours))}</span>`
     : `<input type="text" inputmode="decimal" class="otkh" data-otkh="${esc(x.key)}" value="${esc(otk_hrs(x.hours))}" aria-label="${esc(tr('Budget h') + ': ' + x.title)}" ${ck ? '' : 'disabled'} placeholder="–">`;
   const was = x.state === 'changed' || x.state === 'manual' ? `<small class="muted">${esc(tr('now {0} h', otk_hrs(x.task_hours) || '–'))}</small>` : '';
   return `<tr class="otk-${x.state}"><td>${ck ? `<input type="checkbox" id="${id}" data-otk="${esc(x.key)}" ${x.pick ? 'checked' : ''}>` : ''}</td>

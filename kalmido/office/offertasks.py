@@ -22,7 +22,7 @@ import json
 import math
 from decimal import Decimal
 
-from flask import jsonify
+from flask import g, has_request_context, jsonify
 
 from ..core.config import app
 from ..core.db import body, bump, iso, now_utc
@@ -59,23 +59,46 @@ def otk_chain_ids(c, oid, root):
     return [x[0] for x in c.execute("SELECT id FROM office_docs WHERE org_id=? AND kind='offer' AND (id=? OR version_of=?)", (oid, root, root))]
 
 
-def otk_links(c, oid, r, lid):
-    """{item_key: link row} of the tasks this quotation's chain made in project lid (the chain's documents or its root)."""
+def _otk_chain_rows(c, oid, r, lid, moved=False):
     root = otk_root(r)
     ids = otk_chain_ids(c, oid, root) or [r["id"]]
     q = ",".join("?" * len(ids))
-    rows = c.execute(f"""SELECT k.*, t.title, t.deleted_at FROM task_offer_links k JOIN tasks t ON t.id=k.task_id
-                         WHERE k.list_id=? AND (k.root_id=? OR k.doc_id IN ({q})) ORDER BY k.task_id""", (lid, root, *ids)).fetchall()
+    # 2.620.0 (#4586, review #3433 M3): the project is the task's (tasks.list_id), never task_offer_links.list_id -- that
+    # column stays in the database but is not read any more (a moved task kept it of the old project)
+    on = "t.list_id<>? AND t.deleted_at IS NULL" if moved else "t.list_id=?"
+    return c.execute(f"""SELECT k.task_id, k.doc_id, k.root_id, k.item_key, k.auto_h, k.set_h, k.gone, k.created_at, k.updated_at,
+                                t.list_id, t.title, t.deleted_at FROM task_offer_links k JOIN tasks t ON t.id=k.task_id
+                         WHERE {on} AND (k.root_id=? OR k.doc_id IN ({q})) ORDER BY k.task_id""", (lid, root, *ids)).fetchall()
+
+
+def otk_links(c, oid, r, lid):
+    """{item_key: link row} of the tasks this quotation's chain made in project lid (the chain's documents or its root),
+    the tasks that are in lid now (2.620.0, #4586: a task moved to another project no longer counts here)."""
     out = {}
-    for x in rows:
+    for x in _otk_chain_rows(c, oid, r, lid):
         if x["item_key"] not in out or out[x["item_key"]]["deleted_at"] and not x["deleted_at"]:  # a living task wins
             out[x["item_key"]] = x
     return out
 
 
-def otk_count(c, r):
-    """doc_public: how many living tasks the chain of quotation r made in its project (0 without a project)."""
+def otk_moved(c, oid, r, lid):
+    """2.620.0 (#4586): {item_key: link row} of the chain's living tasks moved out of project lid into another one -- the
+    preview shows them ("moved to another project"), the update never writes them (nor offers their position anew)."""
+    out = {}
+    for x in _otk_chain_rows(c, oid, r, lid, moved=True):
+        out.setdefault(x["item_key"], x)
+    return out
+
+
+def otk_count(c, r, uid=None):
+    """doc_public: how many living tasks the chain of quotation r made in its project (0 without a project). 2.620.0 (#4586,
+    review #3433 L2): 0 as well for who does not see the project (uid: the caller; outside a request: nobody's)."""
     if r["kind"] != "offer" or not r["list_id"]:
+        return 0
+    if uid is None:
+        u = getattr(g, "user", None) if has_request_context() else None
+        uid = u["id"] if u is not None else None
+    if uid is None or not list_role(c, r["list_id"], uid):
         return 0
     return len([x for x in otk_links(c, r["org_id"], r, r["list_id"]).values() if not x["deleted_at"]])
 
@@ -172,6 +195,7 @@ def otk_preview(c, oid, uid, r):
     dh = otk_day_hours(c, lid if role else None)
     rows = otk_rows(c, oid, r, dh)
     links = otk_links(c, oid, r, lid) if role else {}
+    moved = otk_moved(c, oid, r, lid) if role else {}  # 2.620.0 (#4586)
     f = otk_budget_field(c, lid)[0] if role else None
     cur = {}
     if f is not None and links:
@@ -181,6 +205,11 @@ def otk_preview(c, oid, uid, r):
     for x in rows:
         k = links.get(x["key"])
         x.update(state="new", task_id=None, task_hours=None, pick=True)
+        m = moved.get(x["key"]) if k is None or k["deleted_at"] else None
+        if m is not None:  # 2.620.0 (#4586): its task is in another project now: shown, never written, not offered anew
+            ml = list_role(c, m["list_id"], uid)
+            x.update(state="moved", pick=False, task_id=m["task_id"] if ml else None, moved_to=_list_name(c, m["list_id"]) if ml else None)
+            continue
         if k is None:
             continue
         if k["deleted_at"]:  # the person deleted the task: offered again, not ticked
@@ -202,6 +231,11 @@ def otk_preview(c, oid, uid, r):
             "day_hours": dh, "linked": len([x for x in links.values() if not x["deleted_at"]]), "rows": rows, "gone": gone,
             "total_h": round(sum(x["hours"] or 0 for x in rows), 2), "net_text": fmt_money(t.get("net") or 0, lg, r["currency"]),
             "field": f["name"] if f is not None else None, "dispo": odp_preview(c, oid, uid, r, otk_root(r))}
+
+
+def _list_name(c, lid):
+    x = c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()
+    return (x[0] or "") if x else ""
 
 
 def otk_offer(c, oid, did):
@@ -300,7 +334,7 @@ def otk_apply(did):
     secs, n_new, n_upd, n_gone = {}, 0, 0, 0
     srt = c.execute("SELECT COALESCE(MAX(sort),0) FROM tasks WHERE list_id=?", (lid,)).fetchone()[0] or 0
     for x in pv["rows"]:
-        if x["key"] not in pick or x["state"] == "same":
+        if x["key"] not in pick or x["state"] in ("same", "moved"):  # 2.620.0 (#4586): a moved task is never written
             continue
         h = hin[x["key"]] if x["key"] in hin else x["hours"]
         if x["state"] == "new":
@@ -333,7 +367,8 @@ def otk_apply(did):
             log_act(c, x["task_id"], "offer_gone")
             n_gone += 1
     # the rows left as they are follow the new version too (doc_id: the project's budget shows this quotation's net)
-    c.execute("UPDATE task_offer_links SET doc_id=?, root_id=? WHERE list_id=? AND root_id=? AND (doc_id IS NULL OR doc_id<>?)", (r["id"], root, lid, root, r["id"]))  # 2.552.0 (#4647, review): a deleted version left NULL
+    c.execute("""UPDATE task_offer_links SET doc_id=?, root_id=? WHERE task_id IN (SELECT id FROM tasks WHERE list_id=?) AND root_id=?
+                 AND (doc_id IS NULL OR doc_id<>?)""", (r["id"], root, lid, root, r["id"]))  # 2.552.0 (#4647, review): a deleted version left NULL; 2.620.0 (#4586): the tasks in lid now
     ofx_log(c, oid, "tasks", doc_id=did, detail={"list_id": lid, "created": n_new, "updated": n_upd, "marked": n_gone, **({"dispo": dres} if dpick else {})})
     bump(c)
     c.commit()
@@ -342,20 +377,39 @@ def otk_apply(did):
 
 
 def otk_project_budget(c, oid, lid):
-    """GET /api/lists/<lid>/office-docs (office people only): the project's budget from its quotation -- {doc_id, number,
-    hours (the field values of the tasks it made, not gone), net_text (the quotation's net)} or None."""
-    k = c.execute("SELECT doc_id FROM task_offer_links WHERE list_id=? AND gone=0 AND doc_id IS NOT NULL ORDER BY updated_at DESC, task_id DESC LIMIT 1", (lid,)).fetchone()
-    if not k:
+    """GET /api/lists/<lid>/office-docs (office people only): the project's budget from its quotations -- {doc_id, number,
+    hours (the field values of the tasks they made, not gone), net_text (the quotations' net)} or None. 2.620.0 (#4586):
+    the tasks in lid now (tasks.list_id); review #3433 L3: every chain of the project, not only the one touched last
+    (doc_id = the newest one's, number / net of all chains like the head bar "tracked / budget" sums every field value);
+    only quotations of this project (a task moved here brings no budget of another project's quotation)."""
+    ks = c.execute("""SELECT k.doc_id, k.root_id FROM task_offer_links k JOIN tasks t ON t.id=k.task_id
+                      WHERE t.list_id=? AND k.gone=0 AND k.doc_id IS NOT NULL ORDER BY k.updated_at DESC, k.task_id DESC""", (lid,)).fetchall()
+    docs, roots = [], set()
+    for doc_id, root_id in ks:  # per chain the quotation its newest link was brought up to date from
+        if (root_id or doc_id) in roots:
+            continue
+        roots.add(root_id or doc_id)
+        r = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=? AND kind='offer' AND list_id=?", (doc_id, oid, lid)).fetchone()
+        if r is not None and all(otk_root(r) != otk_root(x) for x in docs):
+            docs.append(r)
+    if not docs:
         return None
-    r = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=? AND kind='offer'", (k[0], oid)).fetchone()
-    if r is None:
-        return None
-    links = [x for x in otk_links(c, oid, r, lid).values() if not x["deleted_at"] and not x["gone"]]
+    links = {}
+    for r in docs:
+        for x in otk_links(c, oid, r, lid).values():
+            if not x["deleted_at"] and not x["gone"]:
+                links[x["task_id"]] = x
     f = otk_budget_field(c, lid)[0]
     hours = 0.0
     if f is not None and links:
-        ids = [x["task_id"] for x in links]
+        ids = list(links)
         hours = sum(_num(v) or 0 for (v,) in c.execute(f"SELECT value FROM task_field_values WHERE field_id=? AND task_id IN ({','.join('?' * len(ids))})",
                                                       (f["id"], *ids)))
-    t = json.loads(r["totals"] or "{}") if isinstance(r["totals"], str) else {}
-    return {"doc_id": r["id"], "number": r["number"] or "", "hours": round(hours, 2), "net_text": fmt_money(t.get("net") or 0, calc_lang(r["lang"]), r["currency"])}
+    nets = {}
+    for r in docs:
+        t = json.loads(r["totals"] or "{}") if isinstance(r["totals"], str) else (r["totals"] or {})
+        cur = r["currency"]
+        nets[cur] = nets.get(cur, Decimal(0)) + Decimal(str(t.get("net") or 0))
+    lg = calc_lang(docs[0]["lang"])
+    return {"doc_id": docs[0]["id"], "number": ", ".join(r["number"] for r in docs if r["number"]), "hours": round(hours, 2),
+            "net_text": " + ".join(fmt_money(v, lg, cur) for cur, v in nets.items())}
