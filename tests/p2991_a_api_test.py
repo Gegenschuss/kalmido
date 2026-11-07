@@ -12,7 +12,7 @@ freelancer-matrix: videos
  - customer link (signoff kind video): the page with the player of the newest version, its own CSP (frame-src of the two
    players, script-src 'self'), the customer's comments + the team's answers only (internal comments stay internal), a
    comment with timecode (form check value, Sec-Fetch-Site, name >= 2, a stale version 409, the limit per address),
-   "Request changes" / "Approve" -> the review's state + a comment line, a new link stops the old one, revoked / deleted =
+   "Request changes" / "Approve" -> the review's state + a comment line, a new link keeps the old one (2.642.0), revoked / deleted =
    the same answer as unknown
  - rights: another organisation / a stranger / an agent: 404 (or an empty list) on every route; a member who sees the client
    works on a client's review; moving needs its creator or an admin; move-space private <-> organisation into a project
@@ -292,7 +292,8 @@ T2K = S2["url"].split("/s/q/")[1]
 r = A.post(B + f"{V}/{CV}/signoff", json={})
 S3 = r.json()
 T3K = S3["url"].split("/s/q/")[1]
-check(anon("/s/q/" + T2K).text == UNKNOWN.text and anon("/s/q/" + T2K).status_code == 404, "a new link stops the older open one (same answer as unknown)")
+# 2.642.0 (#4772): several client links per sign-off: a new link keeps the older open one running
+check(anon("/s/q/" + T2K).status_code == 200, "a new link keeps the older open one")
 pg = anon("/s/q/" + T3K)
 fk3, vk3 = keys(pg.text)
 r = ppost("/s/q/" + T3K, f=fk3[1], v=vk3[0], do="accept", name="Erika Beispiel", ok="1")

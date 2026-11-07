@@ -258,7 +258,7 @@ function vdr_cmsDraw(st) {
     return `<li class="vdrc ${c.done ? 'done' : ''} ${c.customer ? 'cust' : ''}" data-cid="${c.id}">
       <div class="vdrch">${!reply && c.at_sec != null ? `<button type="button" class="vdrtc" data-vdr="seek" data-at="${c.at_sec}" aria-label="${esc(tr('Jump to {0}', vdr_tc(c.at_sec)))}">${esc(vdr_tc(c.at_sec))}</button>` : ''}
         ${!reply && c.at_sec == null && (c.mark || c.page) ? `<button type="button" class="vdrtc vdrpb" data-vdr="pin" data-id="${c.id}" aria-label="${esc(c.mark ? tr('Show point {0}', c.mark) : tr('Page {0}', c.page))}">${esc([c.page ? tr('p. {0}|page', c.page) : '', c.mark ? String(c.mark) : ''].filter(Boolean).join(' · '))}</button>` : '' /* 2.641.0 (#4769) */}
-        <b>${esc(c.author || tr('Unknown'))}</b>${c.customer ? `<span class="rotag">${tr('Client')}</span>` : ''}<small class="muted">${esc(fmtWhen(c.created_at))}</small><span class="spacer"></span>
+        <b>${esc(c.author || tr('Unknown'))}${c.customer ? ` (${esc(tr('Guest'))})` : ''}</b><small class="muted">${esc(fmtWhen(c.created_at))}</small><span class="spacer"></span>
         ${!reply ? `<button type="button" class="iconbtn" data-vdr="reply" data-id="${c.id}" aria-label="${esc(tr('Reply'))}" title="${esc(tr('Reply'))}">${ic('reply', 's')}</button>` : ''}
         ${!reply && can ? `<button type="button" class="iconbtn vdrdone ${c.done ? 'on' : ''}" data-vdr="done" data-id="${c.id}" aria-pressed="${c.done}" aria-label="${esc(c.done ? tr('Mark as open') : tr('Mark as done'))}" title="${esc(c.done ? tr('Mark as open') : tr('Mark as done'))}">${ic('check', 's')}</button>` : ''}
         ${can ? `<button type="button" class="iconbtn" data-vdr="del" data-id="${c.id}" aria-label="${esc(tr('Delete'))}" title="${esc(tr('Delete'))}">${ic('trash', 's')}</button>` : ''}</div>
@@ -271,14 +271,20 @@ function vdr_sigDraw(st) {
   const r = st.r, el = $('.vdrsig', st.md);
   if (!r.can_write || vdr_media(r.versions[r.versions.length - 1])) { el.innerHTML = ''; return; }  // 2.641.0 (#4769): the client link is for videos
   const sw = {open: tr('Waiting for the client'), accepted: tr('Approved|video'), declined: tr('Changes requested')};
-  const rows = (r.signoffs || []).slice(0, 5).map(x => {
+  // 2.642.0 (#4772): several links: every running one, then the last five records (decisions, switched off, expired)
+  const all = r.signoffs || [], live = all.filter(x => x.live), rest = all.filter(x => !x.live).slice(0, 5);
+  const rows = [...live, ...rest].map(x => {
     const s = x.revoked_at && x.state === 'open' ? tr('Switched off') : !x.live && x.state === 'open' ? tr('Expired') : sw[x.state] || x.state;
-    return `<li class="sgrow st-${esc(x.state)}"><div class="sghead"><b>${esc(s)}</b><small class="muted"> · ${esc(fmtWhen(x.created_at))}</small>${x.signer_name ? ` <span class="muted">${esc(x.signer_name)}</span>` : ''}</div>
+    const ex = x.live && x.expires_at ? ` · ${esc(tr('until {0}', fmtDateNum(new Date(Date.parse(x.expires_at) - 1000))))}` : '', old = x.show_old ? ` · ${esc(tr('older versions too'))}` : '';
+    return `<li class="sgrow st-${esc(x.state)}"><div class="sghead"><b>${esc(s)}</b><small class="muted"> · ${esc(fmtWhen(x.created_at))}${ex}${old}</small>${x.signer_name ? ` <span class="muted">${esc(x.signer_name)}</span>` : ''}</div>
       ${x.live && x.url ? `<div class="row icalrow"><input readonly value="${esc(x.url)}" aria-label="${esc(tr('Client link'))}" data-vdrurl="${x.id}"><button type="button" class="btn sm pri" data-vdr="sigcopy" data-id="${x.id}">${ic('copy', 's')} ${tr('Copy')}</button><button type="button" class="btn sm danger" data-vdr="sigstop" data-id="${x.id}">${tr('Switch off')}</button></div>` : ''}
       ${x.reason ? `<div class="muted">${esc(tr('Reason: {0}', x.reason))}</div>` : ''}</li>`;
   }).join('');
   el.innerHTML = `<h4>${tr('Client link')}</h4><p class="muted mhint">${esc(tr('Your client watches the newest version without an account, comments at a time and approves or requests changes.'))}</p>
-    ${rows ? `<ul class="sglist" role="list">${rows}</ul>` : ''}<button type="button" class="btn sm" data-vdr="signew">${ic('link', 's')} ${(r.signoffs || []).some(x => x.live) ? tr('New client link') : tr('Create client link')}</button>`;
+    ${rows ? `<ul class="sglist" role="list">${rows}</ul>` : ''}
+    <div class="vdrsignew"><label class="vdrsigexp">${tr('Valid until (optional)')} <input type="date" class="vdrsigdate" min="${esc(new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10))}" aria-label="${esc(tr('Valid until (optional)'))}"></label>
+    ${r.versions.length > 1 ? `<label class="chk"><input type="checkbox" class="vdrsigold"> ${tr('The client may also see the older versions')}</label>` : ''}
+    <button type="button" class="btn sm" data-vdr="signew">${ic('link', 's')} ${live.length ? tr('New client link') : tr('Create client link')}</button></div>`;
 }
 
 // ---- actions
@@ -349,7 +355,10 @@ async function vdr_click(e, st) {
       histToast(tr(VDR_ST[b.dataset.st]), histAdd({label: tr(VDR_ST[b.dataset.st]), ids: [], snaps: [], lids: [],
         undo: async () => { await set(was); return {skipped: []}; }, redo: async () => { await set(b.dataset.st); return {skipped: []}; }}));
     }
-    if (a === 'signew') { await rawFetch('POST', `/api/videos/${rid}/signoff`, {expires: null}); await vdr_after(rid, 'GET', `/api/videos/${rid}`); toast(tr('Client link created')); }
+    if (a === 'signew') {  // 2.642.0 (#4772): expiry and "older versions too" set when the link is made
+      const d = $('.vdrsigdate', st.md)?.value || null, old = !!$('.vdrsigold', st.md)?.checked;
+      await rawFetch('POST', `/api/videos/${rid}/signoff`, {expires: d, show_old: old}); await vdr_after(rid, 'GET', `/api/videos/${rid}`); toast(tr('Client link created'));
+    }
     if (a === 'sigstop') {
       if (!await askConfirm(tr('Stop the client link?'), tr('It stops working at once.'), {ok: tr('Switch off'), danger: true})) return;
       await rawFetch('POST', `/api/videos/${rid}/signoffs/${id}/revoke`); await vdr_after(rid, 'GET', `/api/videos/${rid}`); toast(tr('Client link stopped'));

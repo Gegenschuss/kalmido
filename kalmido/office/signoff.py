@@ -230,6 +230,7 @@ def sig_public(c, r, full=True):
             "signer_name": d["signer_name"], "signer_email": d["signer_email"], "reason": d["reason"], "signed_at": d["signed_at"],
             "ip": d["ip"], "user_agent": d["user_agent"], "doc_hash": d["doc_hash"], "created_at": d["created_at"], "created_by": d["created_by"],
             "live": live, "url": sig_url(c, d) if live else None,
+            "show_old": bool(d.get("show_old")), "carried_from": d.get("carried_from"),  # 2.642.0 (#4772)
             **({} if full else {"signer_email": None, "ip": None, "user_agent": None})}
 
 
@@ -302,10 +303,11 @@ def sig_notify(c, r, st, name):
 # ---------------------------------------------------------------- managing (members of the organisation / list owner)
 def sig_create(c, oid, kind, title, doc_hash, uid, expires, doc_id=None, list_id=None, section_id=None, task_id=None, gen_doc_id=None,
                video_id=None):
-    """A new link (an open link of the same object is revoked first: one live link per object). -> (row, token)."""
+    """A new link (an open link of the same object is revoked first: one live link per object; 2.642.0 (#4772): a sign-off
+    keeps its other links, videos/review.vdr_sig_new caps them). -> (row, token)."""
     ts = iso(now_utc())
-    if video_id:  # 2.99.1 A (#1959): a video sign-off
-        c.execute("UPDATE office_signoffs SET revoked_at=? WHERE video_id=? AND state='open' AND revoked_at IS NULL", (ts, video_id))
+    if video_id:  # 2.99.1 A (#1959): a video sign-off; 2.642.0 (#4772): several live links, none stops here
+        pass
     elif gen_doc_id:  # 2.93.0 A (#1927): a document made from a template
         c.execute("UPDATE office_signoffs SET revoked_at=? WHERE gen_doc_id=? AND state='open' AND revoked_at IS NULL", (ts, gen_doc_id))
     elif doc_id:
@@ -650,13 +652,15 @@ def sig_page(c, r, token, lg, error=None, code=200):
            else tr("I approve this version of the video", lg=lg) if vid else tr("I confirm the acceptance", lg=lg))
     go = tr("Sign bindingly", lg=lg) if r["kind"] == "document" else tr("Approve|video", lg=lg) if vid else tr("Accept bindingly", lg=lg)
     no = tr("Request changes", lg=lg) if vid else tr("Reject", lg=lg)
-    ver = ""
+    ver = gname = ""
     if vid:
         from ..videos.review import vdr_sig_newest
+        from ..videos.vdlink import vdl_name
         ver = f'<input type="hidden" name="v" value="{vdr_sig_newest(c, r)["id"]}">'
+        gname = vdl_name()  # 2.642.0 (#4772): the name the client typed before on this link
     form = (f'<form method="post" action="{SIG_PREFIX}{e(token)}" class="fform sigf">'
             f'<input type="hidden" name="f" value="{sig_form_key(c, r)}">{ver}'
-            f'<label for="sg-name">{e(tr("Your name|public", lg=lg))}</label><input id="sg-name" name="name" maxlength="{NAME_MAX}" autocomplete="name" required>'
+            f'<label for="sg-name">{e(tr("Your name|public", lg=lg))}</label><input id="sg-name" name="name" maxlength="{NAME_MAX}" autocomplete="name" value="{e(gname)}" required>'
             f'<label for="sg-mail">{e(tr("E-mail (optional)", lg=lg))}</label><input id="sg-mail" name="email" type="email" maxlength="{EMAIL_MAX}" autocomplete="email">'
             f'<label class="ok"><input type="checkbox" name="ok" value="1"> {e(acc)}</label>'
             f'<button type="submit" name="do" value="accept">{e(go)}</button>'
@@ -665,6 +669,10 @@ def sig_page(c, r, token, lg, error=None, code=200):
             f'<button type="submit" name="do" value="decline" class="sec">{e(no)}</button></details>'
             + (f'<p class="err" role="alert">{e(error)}</p>' if error else "")
             + f'</form><p class="signote">{note}</p>')
+    if vid:  # 2.642.0 (#4772): an older version (a link that shows them) is read-only: no decision there
+        from ..videos.vdlink import vdl_old_shown
+        if vdl_old_shown(c, r):
+            form = ""
     resp = pub_html(f"{r['title']} · {APP_NAME}", head + form, lg, code)
     if vid:
         resp.headers["Content-Security-Policy"] = SIG_VIDEO_CSP
@@ -870,4 +878,7 @@ def sig_decide(token):
     if r["kind"] == "offer" and st == "accepted":
         qac_file(c, r)
     push_later(push)  # 2.370.2 (#2779): through the maintenance gate; 2.370.3 (#2760): a queue row
+    if r["kind"] == "video":  # 2.642.0 (#4772): the name stays for this link (the next version's comments)
+        from ..videos.vdlink import vdl_name_set
+        return vdl_name_set(redirect(SIG_PREFIX + token, 303), token, SIG_PREFIX, name)
     return redirect(SIG_PREFIX + token, 303)

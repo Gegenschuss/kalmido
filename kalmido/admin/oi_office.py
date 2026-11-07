@@ -338,6 +338,7 @@ def _p_purchase(c, run, src, d, ctx):
 def _p_signoff(c, run, src, d, ctx):
     _tok, h, sealed = sig_token_new(c, sig_purpose({k: d.get(k) for k in ("kind", "doc_id", "list_id", "gen_doc_id", "video_id")}))
     d["token_hash"], d["token"] = h, sealed  # a new secret nobody knows: the link of the old server ends here
+    d["carried_from"] = d["carried_ver"] = None  # 2.642.0 (#4772): the chain of a client link ends with its token
     if (d.get("state") or "open") == "open" and not d.get("revoked_at"):
         d["revoked_at"] = iso(now_utc())
         run.warning(N_("Open approval links of the export were ended; create a new link where it is still needed."))

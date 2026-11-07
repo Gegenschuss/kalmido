@@ -56,6 +56,10 @@
 .vdrempty{padding:1.5rem 1rem;text-align:center;font-size:var(--fs-m)}
 .vdrsig{margin-top:1rem}
 .vdrsig h4{margin:0 0 .25rem}
+/* 2.642.0 (#4772): a new client link with its expiry and "older versions too" */
+.vdrsignew{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem}
+.vdrsignew .vdrsigexp{display:flex;align-items:center;gap:.375rem;flex-wrap:wrap}
+.vdrsignew input[type=date]{min-height:44px}
 @media (max-width:767px){.vdrdlg .card{width:100%}.vdrin{flex-wrap:wrap}.vdrin textarea{flex-basis:100%;order:-1}}
 /* 2.240.0 D (#2886): placeholder before the player is loaded (no request to the provider yet) */
 .vdrgate{background:var(--bg2,var(--line2))}

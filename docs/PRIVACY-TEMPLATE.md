@@ -154,6 +154,7 @@ The app sets only cookies it needs to work (no consent banner needed for them, Â
 | `kalmido_pub<number>`, `kalmido_fsxl<number>` | opens a password-protected public project / file link once the password was entered | 30 days |
 | `kalmido_portal` | a customer signed in to the support portal by e-mail link | 7 days |
 | `kv<number>` | lets a guest change their own vote in a scheduling poll | 180 days |
+| `kgn` | the name a client typed on an approval link (only for that link's address) | 180 days |
 
 The app also keeps a copy of your data in the browser (local storage, IndexedDB, the service worker's cache), so it
 starts fast and works offline. Logging out, or a session that ended, removes it; if changes are still waiting to be sent, the stored data stays

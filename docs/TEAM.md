@@ -367,7 +367,14 @@ itself: the browser of the person who listens loads it (after *Load audio* when 
   needed) and *Approve* / *Request changes* (with a reason). The decision sets the state of the sign-off and stands in its
   comments; the creator of the link gets a push (notification switch *Client decisions*; if the creator has left: the office's admins; also for the customer's first
   comment within ten minutes). Comments of the team stay internal; only answers to the customer's comments are shown to
-  them. A new link stops the older one; deleting the sign-off stops it at once.
+  them. Deleting the sign-off stops its links at once.
+  2.642.0: several customer links per sign-off, each with its own expiry date (*Valid until*) and its own *Switch off*;
+  the list shows every running link and the last decisions. *The client may also see the older versions* (ticked when the
+  link is made) lets the customer open the older versions too, read-only - comments and the decision stay on the newest.
+  The customer types the name once (it stays for this link in the browser). A new version keeps every link working: the
+  customer sees the new version at the same address and decides again; the earlier decision stays in the list and as a
+  comment at its version. In the app the customer's comments show as *Name (Guest)*. The page shows nothing but this one
+  sign-off: no task, project, other sign-offs or contacts.
 - Rights: who sees the task / project / client sees the sign-off and may comment (like task comments); changing it, new
   versions, the customer link, moving and deleting need the right to edit there. A locked project (end-to-end) has none.
   At a client (2.122.4) that is an office role in the client's organisation (or, for a private client, its creator).

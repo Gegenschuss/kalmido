@@ -29,6 +29,7 @@ from ..core.config import app, PUBLIC_URL
 from ..collab.comments import lang_of, push_later  # 2.367.5 (#2980); 2.370.3 (#2760): push_later
 from ..core.access import Denied, FULL_ROLES, WRITE_ROLES, acx_org_ok, list_role, need_feat, task_visible  # 2.623.0 (#4765): need_feat
 from ..office.signoff import sig_people  # 2.266.0 (#2965)
+from .vdlink import VDL_LIVE_MAX, vdl_carry, vdl_live_count, vdl_name, vdl_name_set, vdl_nav, vdl_old_note, vdl_shown, vdl_uncarry  # 2.642.0 (#4772)
 from ..core.db import body, db, err, iso, now_utc
 from ..core.retention import ret_on, ret_report, ret_trash_cut, ret_trash_days  # 2.272.0 A (#3026); 2.549.0 (#4536): ret_trash_days
 from ..core.i18n import N_, csv_dialect, tr
@@ -334,8 +335,9 @@ def vdr_dict(c, r, uid, full=False, signoffs=True):
         d["comments"] = [vdr_comment_dict(x, names, mk) for x in cm]
         if d["can_write"] and signoffs:
             # 2.122.4 A (#2215 L3): the records keep their review across a move; only those of its current workspace show
-            rows = c.execute("SELECT * FROM office_signoffs WHERE video_id=? AND kind='video' AND org_id IS NOT DISTINCT FROM ? ORDER BY id DESC LIMIT 20",
-                             (r["id"], r["org_id"])).fetchall()
+            # 2.642.0 (#4772): several live links: the running ones first, then the newest records
+            rows = c.execute("SELECT * FROM office_signoffs WHERE video_id=? AND kind='video' AND org_id IS NOT DISTINCT FROM ? "
+                             "ORDER BY (state='open' AND revoked_at IS NULL) DESC, id DESC LIMIT 40", (r["id"], r["org_id"])).fetchall()
             adm = vdr_full(c, uid, r)
             d["signoffs"] = [sig_public(c, s, adm) for s in rows]
         else:
@@ -534,6 +536,7 @@ def vdr_version_new(vid):
     link = vdm_media(c, uid, r["org_id"], vdm_body(), vdr_parse)  # 2.641.0 (#4769): {url} | {file_id} | an upload (file)
     write_lock(c, f"video_review_{int(vid)}")
     nid = vdr_version_add(c, r, link, uid)
+    vdl_carry(c, r, nid)  # 2.642.0 (#4772): a decided client link goes on at the same URL with the new version
     if r["state"] != "open":
         c.execute("UPDATE video_reviews SET state='open' WHERE id=?", (vid,))
     vdr_touch(c, vid)
@@ -559,6 +562,7 @@ def vdr_version_del(vid, nid):
         raise Denied(409, tr("Only the newest version can be removed"))
     if c.execute("SELECT 1 FROM video_comments WHERE version_id=? AND deleted_at IS NULL LIMIT 1", (nid,)).fetchone():
         raise Denied(409, tr("This version already has comments"))
+    vdl_uncarry(c, vid, nid)  # 2.642.0 (#4772): before the version goes (its links carried on give the token back)
     c.execute("DELETE FROM video_versions WHERE id=? AND review_id=?", (nid, vid))
     vdr_touch(c, vid)
     c.commit()
@@ -689,7 +693,8 @@ def vdr_sig_hash(r):
 
 @app.post("/api/videos/<int:vid>/signoff")
 def vdr_sig_new(vid):
-    """{expires: YYYY-MM-DD | null} -> the customer link of the review (an open older one stops: one live link)."""
+    """{expires: YYYY-MM-DD | null, show_old?: bool} -> a customer link of the review. 2.642.0 (#4772): several live links
+    (VDL_LIVE_MAX), the others keep running; show_old = the client may open the older versions too."""
     c, uid = db(), me()
     r = vdr_need(c, vid, write=True)
     if not public_links_on(c, "signoff"):
@@ -705,7 +710,12 @@ def vdr_sig_new(vid):
     except BadInput as x:
         return err(str(x))
     write_lock(c, f"office_signoff_video_{int(vid)}")
+    if vdl_live_count(c, r) >= VDL_LIVE_MAX:  # 2.642.0 (#4772)
+        return err(tr("At most {0} client links at once: switch one off first", VDL_LIVE_MAX), 409)
     row, tok = sig_create(c, r["org_id"], "video", r["title"], vdr_sig_hash(r), uid, exp, video_id=vid)
+    if (b if isinstance(b, dict) else {}).get("show_old") is True:  # 2.642.0 (#4772): ticked when the link is made
+        c.execute("UPDATE office_signoffs SET show_old=1 WHERE id=?", (row["id"],))
+        row = c.execute("SELECT * FROM office_signoffs WHERE id=?", (row["id"],)).fetchone()
     c.commit()
     return jsonify(sig_public(c, row, vdr_full(c, uid, r)))
 
@@ -791,7 +801,9 @@ def vdr_player_html(v, origin, title, lg=None, token=None):
 def vdr_sig_html(c, s, lg, token, prefix):
     """The head of the customer page: title, the newest version's player, its time line, the comments and the comment form."""
     e = html.escape
-    r, v = vdr_sig_row(c, s), vdr_sig_newest(c, s)
+    r, vs = vdr_sig_row(c, s), vdr_versions(c, s["video_id"])
+    v, old = vdl_shown(c, s, vs)  # 2.642.0 (#4772): an older version only on a link that shows them (read-only)
+    gname = vdl_name()  # the name the client typed before on this link
     origin = "{0.scheme}://{0.netloc}".format(urlsplit(PUBLIC_URL))
     player = vdr_player_html(v, origin, r["title"], lg, token)
     if not player and v["provider"] == "audio" and v["file_name"]:  # 2.658.0 (#5015): the file left the file store
@@ -817,12 +829,15 @@ def vdr_sig_html(c, s, lg, token, prefix):
     timed = v["provider"] != "link"
     form = (f'<form method="post" action="{prefix}{e(token)}/comments" class="fform vdrf" id="vdr-f">'
             f'<input type="hidden" name="f" value="{vdr_pub_key(c, s)}"><input type="hidden" name="v" value="{v["id"]}">'
-            f'<label for="vd-name">{e(tr("Your name|public", lg=lg))}</label><input id="vd-name" name="name" maxlength="{VDR_NAME_MAX}" autocomplete="name" required>'
+            f'<label for="vd-name">{e(tr("Your name|public", lg=lg))}</label><input id="vd-name" name="name" maxlength="{VDR_NAME_MAX}" autocomplete="name" value="{e(gname)}" required>'
             + (f'<label for="vd-at">{e(tr("At (mm:ss, optional)", lg=lg))}</label><input id="vd-at" name="at" inputmode="numeric" maxlength="10" '
                f'placeholder="00:00" pattern="[0-9:.]*">' if timed else "")
             + f'<label for="vd-text">{e(tr("Comment", lg=lg))}</label><textarea id="vd-text" name="text" rows="3" maxlength="{VDR_BODY_MAX}" required></textarea>'
             f'<button type="submit">{e(tr("Send comment", lg=lg))}</button></form>')
+    if old:  # 2.642.0 (#4772): an older version takes no comment (and the page no decision, office/signoff.sig_page)
+        form = vdl_old_note(lg, token, prefix)
     return (f'<header><h1>{e(r["title"])}</h1><p class="sub">{e(tr("Version {0}", v["n"], lg=lg))} · {e(tr("Approval requested", lg=lg))}</p></header>'
+            + (vdl_nav(vs, v, lg, token, prefix) if s["show_old"] and len(vs) > 1 else "")
             + player + (f'<div class="vdr-tl" aria-hidden="true">{marks}</div>' if timed and marks else "")
             + f'<section class="vdr-cms"><h2>{e(tr("Comments", lg=lg))}</h2>'
             + (f'<p class="ok" role="status">{e(tr("Thank you, your comment has arrived.", lg=lg))}</p>' if sent else "")
@@ -886,7 +901,7 @@ def vdr_pub_comment(token):
     c.commit()
     print("video review customer comment", r["id"], flush=True)
     push_later(push)  # 2.370.2 (#2779): through the maintenance gate; 2.370.3 (#2760): a queue row
-    return pub_headers(redirect(f"{SIG_PREFIX}{token}?sent=1#vdr-f", 303))
+    return vdl_name_set(pub_headers(redirect(f"{SIG_PREFIX}{token}?sent=1#vdr-f", 303)), token, SIG_PREFIX, name)  # 2.642.0 (#4772)
 
 
 VDR_PUSHED = {}  # review id -> time of the last customer-comment push (per process)
