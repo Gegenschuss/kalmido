@@ -1520,7 +1520,7 @@ function aboutDevTxt() {
   const mm = q => { try { return matchMedia(q).matches; } catch { return false; } }, yn = v => tr(v ? 'yes' : 'no');
   const ptr = mm('(pointer:coarse)') ? tr('coarse') : mm('(pointer:fine)') ? tr('fine') : tr('none');
   return tr('{0} × {1} px · pixel ratio {2} · pointer {3} · hover {4} · phone layout {5} · finger operation {6}',
-    innerWidth, innerHeight, fmtNum(devicePixelRatio || 1, 2), ptr, yn(mm('(hover:hover)')), yn(isMobile()), yn(isTouchUi()));
+    innerWidth, innerHeight, fmtNum(window.devicePixelRatio || 1, 2), ptr, yn(mm('(hover:hover)')), yn(isMobile()), yn(isTouchUi()));
 }
 window.addEventListener('resize', () => { const el = document.getElementById('s-aboutdev'); if (el) el.textContent = aboutDevTxt(); });
 function aboutHtml(chk, hint) {
