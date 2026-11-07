@@ -54,13 +54,16 @@ const FEAT = 'cal,comments,collab,office,clients,docs,files';
   const CF = await login('frida');
   await call(CF, 'PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT});
   check(((await call(CF, 'GET', '/api/state')).me?.workspaces || []).length === 0, 'frida is in no organisation');
-  const STK = ['qr:ASN00201\nRechnung Eins\nBeispiel Strom GmbH', 'Seite zwei der Rechnung\nSumme 12,00 EUR', 'qr:ASN00202\nVertrag Zwei\nBeispiel Versicherung AG', 'Anlage zum Vertrag\nSeite vier'];
+  // 2.627.0 (#4981): a cover page without a code in front - since 2.580.0 (#4401) a stack whose every part starts with a fresh
+  // archive number code is "clear" and split by the queue without a person (the desktop stack was gone before its sheet
+  // opened: no box, the phone one only stayed because its numbers were taken by then); this one waits for a person
+  const STK = ['Deckblatt ohne Code\nBeispiel Poststelle', 'qr:ASN00201\nRechnung Eins\nBeispiel Strom GmbH', 'Seite zwei der Rechnung\nSumme 12,00 EUR', 'qr:ASN00202\nVertrag Zwei\nBeispiel Versicherung AG', 'Anlage zum Vertrag\nSeite vier'];
   const wait = async id => { let x; for (let i = 0; i < 240 && !['done', 'failed'].includes((x = await call(CF, 'GET', `/api/docs/${id}`)).state); i++) await sleep(500); return x; };
   const IDS = {};  // one stack and one letter per viewport (the steps change them)
   for (const t of ['desktop', 'phone']) {
     const sid = await up(CF, `stapel-${t}.pdf`, stackPdf(STK)), one = await up(CF, `brief-${t}.pdf`, stackPdf(['Ein Brief ' + t + '\nBeispiel Verein e.V.']));
     const x = await wait(sid), y = await wait(one);
-    check(x.split?.stack === true && x.review === true, t + ': the stack is marked and to review ' + JSON.stringify([x.split, x.review]));
+    check(x.split?.stack === true && x.review === true, t + ': the stack is marked and to review ' + JSON.stringify([x.state, x.http, x.split, x.review]));
     check(y.review === true, t + ': the letter is to review');
     IDS[t] = {sid, one};
   }
