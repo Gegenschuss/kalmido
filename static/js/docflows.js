@@ -157,7 +157,7 @@ async function dfl_runs(md, d) {
       const b = /** @type {HTMLElement} */ (e.target).closest('[data-dflundo]'); if (!b) return;
       try { await api('POST', `/api/docs/flowruns/${b.dataset.dflundo}/undo`); } catch { return; }
       toast(tr('Undone'));
-      if (typeof dc_open === 'function' && DC.doc) dc_open(DC.doc.id, {pane: !!md.classList.contains('dc-pane')});
+      if (typeof dc_open === 'function' && DC.doc) dc_open(DC.doc.id);  // 2.583.0 (#4835): the document view draws it anew
     });
   }
 }

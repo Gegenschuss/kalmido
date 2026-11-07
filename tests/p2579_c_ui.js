@@ -70,7 +70,8 @@ const docNew = async (name, text, ws = 'private', ck = CK) => {
   // (Documents itself brings back its own last search text when one comes back: viewmem.js, #3439)
   check(await until(() => w.eval(`DC.dv === null && DCV.applied === null && !DC.vsort && !DC.f.review && !DC.loading`)), 'back to Documents: the view is left (its sort and filters go) ' + st());
   click(w, d.querySelector(`#side [data-dcvid="${VID}"]`));
-  check(await until(() => w.eval(`location.hash === '#docs/v/${VID}' && DC.dv === ${VID} && DCV.applied?.id === ${VID} && ${listed('Koala')} && DC.total === 1`)),
+  // 2.583.0 (#4835): wait for the view itself (DC.dv), not only the text - viewmem.js brings 'Koala' back before the row's view applies
+  check(await until(() => w.eval(`location.hash === '#docs/v/${VID}' && DC.dv === ${VID} && DCV.applied?.id === ${VID} && ${listed('Koala')} && DC.total === 1 && !DC.loading`)),
     'the sidebar row applies the view again ' + st());
   // a changed search: "Update view" takes it over
   type('Emu');

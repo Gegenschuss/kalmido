@@ -708,7 +708,7 @@ def reindex_private(c, stop=None):
     removed so the preview catch-up (docs/thumbfill.py) makes them again. Texts, labels and files stay. Batches with a
     commit each. -> {"indexed": n, "previews": n, "failed": n}."""
     import json as _json
-    from ..docs.thumbfill import FILL_KEY
+    from ..docs.thumbfill import FILL_KEY, FILL_L_KEY
     S = _ds()
     out = {"indexed": 0, "previews": 0, "failed": 0}
     last = 0
@@ -734,12 +734,20 @@ def reindex_private(c, stop=None):
                                 S.thumb_drop(m["thumb"])
                                 c.execute("UPDATE doc_meta SET thumb='' WHERE node_id=?", (m["node_id"],))
                                 out["previews"] += 1
+                        if S.thumb_l_of(m):  # 2.583.0 (#4812): the sharp preview the same way (its catch-up makes it again)
+                            try:
+                                S.thumb_read(c, m["ws"], os.path.join(ATT_DIR, S.thumb_l_of(m)))
+                            except OSError:
+                                S.thumb_drop(S.thumb_l_of(m))
+                                c.execute("UPDATE doc_meta SET thumb_l='' WHERE node_id=?", (m["node_id"],))
+                                out["previews"] += 1
                 except Exception:  # noqa: BLE001 -- counted; the document keeps its old index
                     out["failed"] += 1
             if len(rows) < BATCH:
                 gset(c, DOCS_INDEX_MARK, _index_mark())
                 if out["previews"]:
                     gset(c, FILL_KEY, _json.dumps({}))  # the catch-up runs once more over the documents without a preview
+                    gset(c, FILL_L_KEY, _json.dumps({}))  # 2.583.0 (#4812): and the one of the sharp previews
         c.commit()
         if len(rows) < BATCH:
             return out

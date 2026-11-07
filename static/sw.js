@@ -58,15 +58,15 @@ const LAZY = ['/static/js/acctset.js', '/static/js/sesview.js', '/static/js/supp
   '/static/js/calview.js', '/static/js/caldrag.js', '/static/js/apptbook.js', '/static/js/calyear.js', '/static/js/listcal.js',
   '/static/js/calgest.js', '/static/js/calrrule.js', '/static/js/calabs.js', '/static/js/docviews.js', '/static/js/docs.js',
   '/static/js/paperless.js', '/static/js/receipts.js', '/static/js/letterdoc.js', '/static/js/letteragent.js', '/static/js/docsplit.js',
-  '/static/js/docscan.js', '/static/js/docfetch.js', '/static/js/abdocs.js', '/static/js/docread.js', '/static/js/docflows.js',
-  '/static/js/docnotes.js', '/static/js/life.js', '/static/js/devlink.js', '/static/js/budget.js', '/static/js/integrations.js',
-  '/static/js/playbook.js', '/static/js/timeline.js', '/static/js/roadmap.js', '/static/js/feeds.js', '/static/js/bookmarks.js',
-  '/static/js/readlater.js', '/static/js/cfkinds.js', '/static/js/mineboard.js', '/static/js/sectpl.js', '/static/js/objprop.js',
-  '/static/js/orgschema.js', '/static/js/asstprop.js', '/static/js/sheetprop.js', '/static/js/sheetpivot.js', '/static/js/sheetfold.js',
-  '/static/js/sheets.js', '/static/js/sheets2.js', '/static/js/sheetsio.js', '/static/js/sheetsize.js', '/static/js/sheetshare.js',
-  '/static/js/sheetchart.js', '/static/js/sheetkinds.js', '/static/js/sheetprint.js', '/static/js/sheetbook.js', '/static/js/sheetfmt.js',
-  '/static/js/sheetfill.js', '/static/js/sheetmove.js', '/static/js/sheetgroup.js', '/static/js/fslock.js', '/static/js/tagsel.js',
-  '/static/js/ablage.js', '/static/js/ablinks.js', '/static/js/family.js', '/static/js/filereq.js', '/static/js/fltdlg.js',
+  '/static/js/docscan.js', '/static/js/docfetch.js', '/static/js/abdocs.js', '/static/js/docview.js', '/static/js/tilesize.js',
+  '/static/js/docflows.js', '/static/js/docnotes.js', '/static/js/life.js', '/static/js/devlink.js', '/static/js/budget.js',
+  '/static/js/integrations.js', '/static/js/playbook.js', '/static/js/timeline.js', '/static/js/roadmap.js', '/static/js/feeds.js',
+  '/static/js/bookmarks.js', '/static/js/readlater.js', '/static/js/cfkinds.js', '/static/js/mineboard.js', '/static/js/sectpl.js',
+  '/static/js/objprop.js', '/static/js/orgschema.js', '/static/js/asstprop.js', '/static/js/sheetprop.js', '/static/js/sheetpivot.js',
+  '/static/js/sheetfold.js', '/static/js/sheets.js', '/static/js/sheets2.js', '/static/js/sheetsio.js', '/static/js/sheetsize.js',
+  '/static/js/sheetshare.js', '/static/js/sheetchart.js', '/static/js/sheetkinds.js', '/static/js/sheetprint.js', '/static/js/sheetbook.js',
+  '/static/js/sheetfmt.js', '/static/js/sheetfill.js', '/static/js/sheetmove.js', '/static/js/sheetgroup.js', '/static/js/fslock.js',
+  '/static/js/tagsel.js', '/static/js/ablage.js', '/static/js/ablinks.js', '/static/js/family.js', '/static/js/filereq.js', '/static/js/fltdlg.js',
   '/static/js/office_fints.js', '/static/js/fsshare.js', '/static/js/videorev.js', '/static/js/abscan.js', '/static/js/pubvideo.js',
   '/static/js/flow.js', '/static/js/hookin.js', '/static/js/polls.js', '/static/js/formq.js', '/static/js/navmenu.js', '/static/js/tourmods.js',
   '/static/js/office_undo.js', '/static/js/objsave.js', '/static/js/voice.js', '/static/js/hubmailbox.js', '/static/js/mailrules.js',
@@ -79,10 +79,11 @@ const LAZY = ['/static/js/acctset.js', '/static/js/sesview.js', '/static/js/supp
 // 2.65.0 (#1824): the stylesheets of the modules loaded on demand (static/css/, LD_CSS in lazyload.js, same order)
 const LAZY_CSS = ['/static/css/settings.css', '/static/css/contacts.css', '/static/css/office.css', '/static/css/agentchat.css',
   '/static/css/pdf.css', '/static/css/mindmap.css', '/static/css/wiki.css', '/static/css/stats.css', '/static/css/calendar.css',
-  '/static/css/docs.css', '/static/css/docviews.css', '/static/css/life.css', '/static/css/integrations.css', '/static/css/playbook.css',
-  '/static/css/timeline.css', '/static/css/feeds.css', '/static/css/bookmarks.css', '/static/css/sheets.css', '/static/css/videorev.css',
-  '/static/css/tagsel.css', '/static/css/filereq.css', '/static/css/fltdlg.css', '/static/css/abscan.css', '/static/css/ablage.css',
-  '/static/css/calabs.css', '/static/css/sideviews.css', '/static/css/navmenu.css', '/static/css/whatsnew.css', '/static/css/shoot.css'];
+  '/static/css/docs.css', '/static/css/docview.css', '/static/css/docviews.css', '/static/css/life.css', '/static/css/integrations.css',
+  '/static/css/playbook.css', '/static/css/timeline.css', '/static/css/feeds.css', '/static/css/bookmarks.css', '/static/css/sheets.css',
+  '/static/css/videorev.css', '/static/css/tagsel.css', '/static/css/filereq.css', '/static/css/fltdlg.css', '/static/css/abscan.css',
+  '/static/css/ablage.css', '/static/css/calabs.css', '/static/css/sideviews.css', '/static/css/navmenu.css', '/static/css/whatsnew.css',
+  '/static/css/shoot.css'];
 self.addEventListener('install', e => { e.waitUntil(swInstall().then(() => self.skipWaiting())); });
 // 2.149.0 B (#2506): the server names every precached static file with its content hash (/sw-manifest.json). A file is kept
 // under "<url>?v=<hash>" (the address index.html asks for), so an update copies every unchanged file from the old cache and

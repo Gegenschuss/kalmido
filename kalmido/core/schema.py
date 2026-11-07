@@ -4535,6 +4535,8 @@ USER_DEFAULTS = {
     "trial_hint_seen": "[]",    # 2.144.10 (#2576): the "try it first" hints dismissed: ["<org id>:offer", "<org id>:invoice"]
     "trial_mode": "[]",         # 2.417.0 C (#3445): the offices whose test mode I switched on (every new document is a trial one): ["<org id>"]
     "ab_cards": "[]",           # 2.353.0 D (#2759): the file store's folders shown as cards (all devices): ["n:<id>", "s:<space>"]
+    "dc_tile_d": "",            # 2.583.0 (#4812): the card width of documents / file store in rem on a computer ('' = standard)
+    "dc_tile_m": "",            # 2.583.0 (#4812): the same on a phone (each device kind keeps its own size)
     "mods_all": "1",            # 2.46.1 (#1591): "Switch on all modules" under "What do you use Kalmido for?" (0 = lists and tasks only)
     "show_done_new": "1",       # 2.49.0 (#1535): a new list hides its completed tasks (own entry in show_done_views at creation)
     "show_done_default": "1",   # 2.39.1 (#1214): views without an own entry (and without a folder default) show completed tasks

@@ -476,7 +476,8 @@ FS_THUMB_WAIT_S = 10
 def files_thumb(nid):
     """2.477.0 (#3936): a small JPEG of a picture file for the cards of the file store (instead of the original; ?v= the
     version: cached by the browser). Made on request, never stored (a private file's preview would lie unsealed on disk).
-    404: no picture, a locked folder (ciphertext), too big or unreadable; 429 (#4073 d): too many at once -- the card then shows the icon."""
+    404: no picture, a locked folder (ciphertext), too big or unreadable; 429 (#4073 d): too many at once -- the card then shows the icon.
+    2.583.0 (#4812): ?size=l 800 px wide for big cards (same checks, same limit, also made on request and never stored)."""
     c = db()
     n = need_node(c, nid)
     if n["kind"] != "file" or not str(n["mime"] or "").startswith("image/"):
@@ -490,12 +491,12 @@ def files_thumb(nid):
     sc_guard(c, "fs", nid, v["no"])
     if hit_limit(f"fsthumb:{me()}", FS_THUMB_RATE):
         raise Denied(429, tr("Too many requests, please slow down"))
-    from ..docs.ocr import _SEM, thumb_bytes
+    from ..docs.ocr import _SEM, THUMB_W, THUMB_WL, thumb_bytes
     data = fs_read(c, nid, v["no"])
     if not _SEM.acquire(timeout=FS_THUMB_WAIT_S):
         raise Denied(429, tr("Too many requests, please slow down"))
     try:
-        jpg = thumb_bytes(data, "image")
+        jpg = thumb_bytes(data, "image", THUMB_WL if request.args.get("size") == "l" else THUMB_W)  # 2.583.0 (#4812): big cards
     finally:
         _SEM.release()
     if not jpg:

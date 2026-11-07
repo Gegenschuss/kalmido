@@ -28,7 +28,7 @@ const get = async u => (await fetch(B + u)).text();
 // 2.557.0 (#4670): srvagent.js (the setup of a server agent) loads with agentchat
 const NEW = {agentchat: ['agentchat', 'agentsetup', 'agentrotate', 'agentwork', 'agentcontrol', 'agentlock', 'agentrules', 'srvagent'], pdf: ['pdfview', 'docpreview'],  // 2.92.0 (#1926): the Word / Excel preview
   // 2.155.0 C (#2078): calendar + calyear (the year view)
-  mindmap: ['mindmap'], wiki: ['wiki'], stats: ['stats'], calendar: ['calview', 'caldrag', 'apptbook', 'calyear', 'listcal', 'calgest'], docs: ['docs', 'paperless', 'receipts', 'letterdoc', 'letteragent', 'docsplit', 'docscan', 'docfetch', 'abdocs', 'docread', 'docflows', 'docnotes'],  // 2.635.0 (#4807): docnotes.js (notes on a document)  // 2.581.0 (#4803): docflows.js (the flows dialog)  // 2.521.0 (#4476): docread.js (the reading view)  // 2.425.0 (#3453): docfetch.js  // 2.353.0 D (#2759): abdocs.js; 2.153.0 (#2028, #2031): letter modules load with the documents
+  mindmap: ['mindmap'], wiki: ['wiki'], stats: ['stats'], calendar: ['calview', 'caldrag', 'apptbook', 'calyear', 'listcal', 'calgest'], docs: ['docs', 'paperless', 'receipts', 'letterdoc', 'letteragent', 'docsplit', 'docscan', 'docfetch', 'abdocs', 'docview', 'tilesize', 'docflows', 'docnotes'] /* 2.583.0 (#4812): tilesize.js; 2.581.0 (#4803): docflows.js; 2.635.0 (#4807): docnotes.js (notes on a document) */,  // 2.583.0 (#4835): docview.js (the document view) instead of docread.js  // 2.521.0 (#4476): docread.js (the reading view)  // 2.425.0 (#3453): docfetch.js  // 2.353.0 D (#2759): abdocs.js; 2.153.0 (#2028, #2031): letter modules load with the documents
   life: ['life'], integrations: ['integrations'], playbook: ['playbook'], timeline: ['timeline', 'roadmap'],
   polls: ['polls'], formq: ['formq']};  // 2.102.0 C (#2208): scheduling polls and questionnaires load on demand
 
@@ -162,7 +162,7 @@ const NEW = {agentchat: ['agentchat', 'agentsetup', 'agentrotate', 'agentwork', 
     check(fetched === '[]', 'Firefox: the start fetches no module and no module stylesheet ' + fetched);
     await nav(B + '#docs');
     for (let i = 0; i < 60 && !(await ev('!!document.querySelector("#view .dc-view")').catch(() => false)); i++) await sleep(150);
-    check(await ev(`(() => { const v = document.querySelector('#view .dc-view'); return !!v && getComputedStyle(v).position === 'relative'; })()`), 'Firefox: the documents view is drawn with its style (docs.css)');
+    check(await ev(`(() => { const v = document.querySelector('#view .dc-view'); return !!v && getComputedStyle(v).position === 'relative'; })()`), 'Firefox: the documents view is drawn with its style (docs.css)');  // 2.583.0 (#4840): the page has no width cap any more (--w-seite none), docs.css shows in its position
     const cached = await ev(`(async () => { const reg = await navigator.serviceWorker.ready; const want = ${JSON.stringify(LAZY.map(f => '/static/js/' + f + '.js').concat(LAZY_CSS.map(f => '/static/css/' + f + '.css')))};
       let c, miss = want; for (let i = 0; i < 60 && miss.length; i++) { const ks = (await caches.keys()).filter(k => k.startsWith('tasks-shell')); c = ks.length ? await caches.open(ks.pop()) : null;
         if (c) { const m = []; for (const u of want) if (!await c.match(u, {ignoreSearch: true})) m.push(u); miss = m; } if (miss.length) await new Promise(r => setTimeout(r, 250)); }

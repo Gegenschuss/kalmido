@@ -36,7 +36,7 @@
   --tabs-h:0px;--ui:1;--tabs-pb:var(--safe-b);--tabs-bot:calc(var(--tabs-h) + var(--tabs-pb));  /* 2.633.0 (#4994): the tab bar keeps only part of the home indicator room below (--tabs-pb, phones below); --tabs-bot = its top edge above the screen bottom, for everything that sits above it */
   /* 2.149.0 F (#2519): names some rules used without defining them (the property was dropped); aliases of the scale above, both themes */
   --shadow-s:0 1px .125rem rgba(0,0,0,.2);--fs:var(--fs-b);--fs-sm:var(--fs-s);--text3:var(--faint);--warn:var(--st-wait-t);
-  /* 2.534.0 A (#4551): the four page widths (only upper limits, centred: static/css/start-breite.css assigns every page one): reading text, a form section, lists / office, board / calendar / timeline / matrix / sheet / mind map */ --w-lesen:46rem;--w-form:40rem;--w-seite:96rem;--w-voll:none;--w-leiste:15rem;--w-leiste-min:14rem;  /* 2.602.0 (#4817): --w-leiste = ONE width for the lists that stay in the page (file store without sidebar B, team chat, contacts / clients, notes without the panel), as the panel (--sideW 15rem, at least 14rem) */
+  /* 2.534.0 A (#4551): the four page widths (only upper limits, centred: static/css/start-breite.css assigns every page one): reading text, a form section, lists / office, board / calendar / timeline / matrix / sheet / mind map */ --w-lesen:46rem;--w-form:40rem;--w-seite:none;--w-voll:none;--w-leiste:15rem;--w-leiste-min:14rem;  /* 2.602.0 (#4817): --w-leiste = ONE width for the lists that stay in the page (file store without sidebar B, team chat, contacts / clients, notes without the panel), as the panel (--sideW 15rem, at least 14rem) */
 }
 /* font size per device (Appearance): the root font size carries the whole rem scale */
 :root[data-fsize="s"]{--ui:.9}:root[data-fsize="l"]{--ui:1.12}:root[data-fsize="xl"]{--ui:1.25}
@@ -3706,10 +3706,10 @@ pre.mdpre code{font:inherit;background:none;padding:0;border:0}
 .lc-who{width:2.75rem;justify-content:center;overflow:visible}
 .lc-tags{width:9rem}
 .lc-tags .tag{flex:none}
-.lc-time{width:4rem;justify-content:flex-end;font-family:var(--mono)}
-.lc-progress{width:3.75rem;justify-content:flex-end;font-family:var(--mono)}
+.lc-time{width:6rem;white-space:nowrap;justify-content:flex-end;font-family:var(--mono)}
+.lc-progress{width:4.5rem;justify-content:flex-end;font-family:var(--mono)}
 .lc-deps{width:5.5rem}
-.lc-created{width:5rem;justify-content:flex-end}
+.lc-created{width:6rem;justify-content:flex-end}
 .lc-f{width:7rem}
 .lc-f.t-number{justify-content:flex-end}
 .lc-f.t-checkbox{width:3rem;justify-content:center}
@@ -3871,7 +3871,7 @@ pre.mdpre code{font:inherit;background:none;padding:0;border:0}
   .lc.o2{display:inline-flex}
   /* the same widths for the cells and the column titles (.lcols .lc{width:auto} of the phone rules above weighs more than .lc-due) */
   :is(.lcols,.lchead) .lc-due{width:6rem}:is(.lcols,.lchead) .lc-tags{width:6rem}:is(.lcols,.lchead) .lc-f{width:5.5rem}:is(.lcols,.lchead) .lc-prio{width:2.75rem}:is(.lcols,.lchead) .lc-deps{width:4.5rem}:is(.lcols,.lchead) .lc-created{width:4.5rem}
-  :is(.lcols,.lchead) .lc-who{width:2.75rem}:is(.lcols,.lchead) .lc-time{width:4rem}:is(.lcols,.lchead) .lc-progress{width:3.75rem}
+  :is(.lcols,.lchead) .lc-who{width:2.75rem}:is(.lcols,.lchead) .lc-time{width:6rem}:is(.lcols,.lchead) .lc-progress{width:4.5rem}
   .lcols .lc-prio .lbl,.lcols .lc-deps .lbl{display:none}
   .lc.o7{display:none}
   @container lrows (max-width:52rem){ .lc.o5{display:none} }

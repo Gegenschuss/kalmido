@@ -36,7 +36,7 @@ from ..files.store import fs_visible_sql_c as _fs_visible_sql  # 2.360.0 B (#249
 from ..files.store import fs_folder, _free_name, fs_chain, safe_fs_name, fs_role, DEPTH_MAX, fs_read  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgroles import org_role_key  # 2.369.5 (#2517): pulled up from functions
 from ..core.errors import BadInput  # 2.369.5 (#2517): pulled up from functions
-from .ocr import thumb_bytes, doc_text, qr_codes, OCR_PAGES, QR_DOC_S  # 2.369.5 (#2517): pulled up from functions
+from .ocr import thumb_bytes, doc_text, qr_codes, OCR_PAGES, QR_DOC_S, THUMB_WL  # 2.369.5 (#2517): pulled up from functions; 2.583.0 (#4812): THUMB_WL
 from .ocr import OCR_LANG_MAX, ocr_choices  # 2.635.0 (#4807 b)
 from ..office.einvoice_in import ei_of_file, ei_text, ei_amount, ei_details, ei_compact, ei_receipt  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.attachtext import file_kind  # 2.369.5 (#2517): pulled up from functions
@@ -1171,15 +1171,46 @@ def learn_back(c, nid, run):
 
 
 def thumb_store(c, m, node, data, kind):
-    """Make the preview image of a document (sealed like its file) and note its path in doc_meta.thumb."""
-    import os
-    import uuid
+    """Make the preview image of a document (sealed like its file) and note its path in doc_meta.thumb.
+    2.583.0 (#4812): and the sharper one of big cards (THUMB_WL, doc_meta.thumb_l), sealed the same way (pictures / PDFs only)."""
     if kind not in ("pdf", "image", "docx", "xlsx", "odt", "ods"):  # 2.635.0 (#4807): + Office files (from their preview model)
         return
-    jpg = thumb_bytes(data, kind)
-    if not jpg:
+    rel = _thumb_write(c, m, node, thumb_bytes(data, kind), "")
+    if not rel:
         return
-    rel = os.path.join(THUMB_DIR, f"{int(node['id'])}-{uuid.uuid4().hex[:10]}.jpg")
+    thumb_drop(m["thumb"])
+    c.execute("UPDATE doc_meta SET thumb=? WHERE node_id=?", (rel, node["id"]))
+    if not thumb_store_l(c, m, node, data, kind) and thumb_l_of(m):  # no sharp one of the new content: the old one never stays
+        thumb_drop(thumb_l_of(m))
+        c.execute("UPDATE doc_meta SET thumb_l=NULL WHERE node_id=?", (node["id"],))
+
+
+def thumb_store_l(c, m, node, data, kind):
+    """2.583.0 (#4812): only the sharper preview (THUMB_WL wide) into doc_meta.thumb_l -- the catch-up of documents from before
+    (docs/thumbfill.py). Nothing made (no tools, a damaged file): the column stays as it was, the card keeps the small one."""
+    if kind not in ("pdf", "image"):
+        return False
+    rel = _thumb_write(c, m, node, thumb_bytes(data, kind, THUMB_WL), "l")
+    if not rel:
+        return False
+    thumb_drop(thumb_l_of(m))
+    c.execute("UPDATE doc_meta SET thumb_l=? WHERE node_id=?", (rel, node["id"]))
+    return True
+
+
+def thumb_l_of(m):
+    """2.583.0 (#4812): the path of the sharper preview of doc_meta row m ('' when none, or the row was read without it)."""
+    return (m["thumb_l"] if "thumb_l" in m.keys() else "") or ""
+
+
+def _thumb_write(c, m, node, jpg, tag):
+    """A preview JPEG written below ATT_DIR/THUMB_DIR, sealed like the document (an organisation's key; a private one with the
+    space's derived key, 2.48.0 review L3) -> its relative path, None when there is nothing to write or the disk refused."""
+    import os
+    import uuid
+    if not jpg:
+        return None
+    rel = os.path.join(THUMB_DIR, f"{int(node['id'])}-{uuid.uuid4().hex[:10]}{'-' + tag if tag else ''}.jpg")
     try:
         os.makedirs(os.path.join(ATT_DIR, THUMB_DIR), exist_ok=True)
         if node["org_id"]:
@@ -1188,9 +1219,8 @@ def thumb_store(c, m, node, data, kind):
             from ..core.orgcrypt import _write_atomic
             _write_atomic(os.path.join(ATT_DIR, rel), thumb_seal(c, m["ws"], jpg))
     except OSError:
-        return
-    thumb_drop(m["thumb"])
-    c.execute("UPDATE doc_meta SET thumb=? WHERE node_id=?", (rel, node["id"]))
+        return None
+    return rel
 
 
 def _thumb_ctx(ws):

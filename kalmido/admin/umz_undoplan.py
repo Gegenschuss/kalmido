@@ -431,7 +431,7 @@ def undo_files_left(c, plan, paths, extra_rows=(), owners=None):
                 left.update(v for v in dict(r).values() if isinstance(v, str))
     nodes = [i for t, i in plan.exist if t == "fs_nodes" and plan.stays(t, i)]
     for part in _chunks(nodes):  # the preview of a document: its row has no id of its own
-        left.update(r[0] for r in c.execute(f"SELECT thumb FROM doc_meta WHERE node_id IN ({_qs(part)})", part).fetchall() if r[0])
+        left.update(v for r in c.execute(f"SELECT thumb, thumb_l FROM doc_meta WHERE node_id IN ({_qs(part)})", part).fetchall() for v in r if v)  # 2.583.0 (#4812): + thumb_l
     for r in extra_rows:
         left.update(v for v in dict(r).values() if isinstance(v, str))
     blob = "\0".join(left)

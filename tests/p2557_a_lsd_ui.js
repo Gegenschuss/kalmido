@@ -84,7 +84,8 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
       else if (wide) {
         check(ct.c.l >= ct.l.r && Math.abs(ct.c.t - ct.l.t) <= 4, `${vw}: contact card right of the list ` + JSON.stringify(ct));
         check(ct.l.w / ct.p.w > .33 && ct.l.w / ct.p.w < .45, `${vw}: the list takes about 40 % of the pair ` + JSON.stringify(ct));
-        check(ct.p.w > 96 * ct.rem && ct.p.w <= 160 * ct.rem + 2, `${vw}: the pair is wider than --w-seite and at most 160rem ` + JSON.stringify(ct));
+        // 2.583.0 (#4840): no 160rem limit any more, the pair uses the full width
+        check(ct.p.w > 96 * ct.rem, `${vw}: the pair is wider than 96rem ` + JSON.stringify(ct));
       } else check(ct.l.w <= 22 * ct.rem + 1 && ct.c.l >= ct.l.r, `${vw}: the narrow list beside the card as before (at most 22rem) ` + JSON.stringify(ct));
       await shots(`contacts-${vw}`);
       if (wide) {

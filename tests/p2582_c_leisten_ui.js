@@ -2,8 +2,8 @@
 // kalmido-suite:
 // own container (start.sh), jsdom + Firefox. Invented data only. P2582C_NOSTART=1 = the container runs.
 // - #4830: the task panel has no fixed 48 rem limit any more: its grip goes as far as the list keeps LIST_MIN_PX; a stored
-//   width above 48 rem stays; a double click = the standard width (at most 48 rem as before). Documents: the properties beside
-//   the preview keep the preview only a small rest (12 rem), no longer 20 rem.
+//   width above 48 rem stays; a double click = the standard width (at most 48 rem as before). (Documents: replaced by the document
+//   view in 2.583.0, #4835 / #4829, see p2583_a_docview.)
 // - #4827: Backups, Off-site backup and Check storage stand under Settings > Server > Backup (no longer Organisation > Data),
 //   for a server admin with and without an organisation; an organisation admin without server rights sees none of it; the old
 //   jump 'odata' and the settings search lead a server admin there.
@@ -24,18 +24,6 @@ const click = (w, el) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbl
 const width = (w, px) => Object.defineProperty(w, 'innerWidth', {configurable: true, value: px});
 const secOn = md => md.querySelector('.snav .on')?.dataset.sec;
 const subs = (md, sec) => [...md.querySelectorAll(`[data-pane="${sec}"] [data-admsub]`)].map(b => b.dataset.admsub).join();
-
-function pdf(lines) {  // a one-page PDF, written by hand
-  const esc = s => s.replace(/[\\()]/g, c => '\\' + c), st = 'BT /F1 12 Tf 60 740 Td 16 TL ' + lines.map(l => `(${esc(l)}) '`).join(' ') + ' ET';
-  const objs = ['<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [4 0 R] /Count 1 >>', '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
-    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 5 0 R /Resources << /Font << /F1 3 0 R >> >> >>', `<< /Length ${st.length} >>\nstream\n${st}\nendstream`];
-  let out = '%PDF-1.4\n'; const offs = [];
-  objs.forEach((o, i) => { offs.push(out.length); out += `${i + 1} 0 obj\n${o}\nendobj\n`; });
-  const x = out.length;
-  out += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n` + offs.map(o => String(o).padStart(10, '0') + ' 00000 n \n').join('');
-  out += `trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${x}\n%%EOF\n`;
-  return Buffer.from(out, 'latin1');
-}
 
 (async () => {
   await sleep(600);
@@ -70,14 +58,8 @@ function pdf(lines) {  // a one-page PDF, written by hand
   check(!l1.rail && l1.det >= 320 && 1440 - 240 - l1.det >= 319.5, '#4830: lay2209 with a stored 80 rem panel in 1440 px: the panel shrinks, the list keeps its room ' + L1);
   w.close();
 
-  // ================= #4830 jsdom: the properties grip of the documents
-  w = await boot({user: 'alice', hash: 'docs', media: {'(min-width:64rem)': true}}); d = w.document;
-  check(await until(() => w.eval(`typeof dcr_gripMax === 'function'`)), 'documents: the module loaded');
-  const gm = w.eval(`(() => { const wrap = document.createElement('div'), main = document.createElement('div'); wrap.className = 'dc-wrap'; main.className = 'dc-main'; wrap.appendChild(main); document.body.appendChild(wrap);
-    Object.defineProperty(main, 'clientWidth', {value: 1200}); Object.defineProperty(wrap, 'clientWidth', {value: 2400}); const r = dcr_gripMax(DCR_GRIPS.props, 'props', wrap); wrap.remove(); return r; })()`);
-  check(gm === 1200 - 13 * 16, '#4830: the properties may take all of the part but the preview rest (12 rem + the gap), not 20 rem: ' + gm);
-  check(w.eval(`DCR_GRIPS.pane.keep === 18 && DCR_GRIPS.list.keep === 30`), '#4830: the other two grips keep the neighbours\' minimums (list 18 rem, pane 30 rem)');
-  w.close();
+  // 2.583.0 (#4835): the documents' reading view and its grips (dcr_gripMax, DCR_GRIPS) are gone - the document view replaced
+  // them; its grips go up to the edge (#4829), p2583_a_docview checks them.
 
   // ================= #4827 jsdom: Server > Backup
   // the server admin with an organisation
@@ -123,12 +105,6 @@ function pdf(lines) {  // a one-page PDF, written by hand
   w.close();
 
   // ================= Firefox: the real layout
-  const fd = new FormData();
-  fd.append('files', new Blob([pdf(['Versicherung Beispiel AG', 'Brief'])], {type: 'application/pdf'}), 'one.pdf');
-  fd.append('ws', 'private');
-  const DOC = (await (await fetch(B + 'api/docs', {method: 'POST', headers: {'X-Requested-With': 'kalmido', Cookie: CK}, body: fd})).json()).ids[0];
-  await until(async () => ['done', 'failed'].includes((await call('GET', `/api/docs/${DOC}`)).state), 150);
-  await call('POST', `/api/docs/${DOC}/review`, {done: true});
   await firefox(async ({cmd, ev, nav, ctx, shot}) => {
     await nav(B + 'static/icon.svg');
     await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
@@ -148,18 +124,7 @@ function pdf(lines) {  // a one-page PDF, written by hand
     await ev(`(() => { document.querySelector('#pgrip-det').dispatchEvent(new MouseEvent('dblclick', {bubbles: true})); return 1; })()`);
     const back = await wait(`(() => { const d = ${R('#detail')}; return d && d.w <= 48 * 16 + 2 && !localStorage.getItem('tasks.pw.det') ? d : null; })()`);
     check(back, 'Firefox 2560: double click = the standard width again (at most 48 rem) ' + JSON.stringify(await ev(R('#detail'))));
-    // the documents' reading view at 2900 px: the properties grip up to the preview's small rest
-    await ev(`(() => { localStorage.setItem('tasks.dc.read', 'true'); return 1; })()`);
-    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 2900, height: 1400}});
-    await nav(B + 'static/icon.svg');  // a new page load (from #l/… only the hash would change)
-    await nav(B + '#docs/' + DOC);
-    check(await wait(`document.querySelectorAll('.dc-card').length === 1 && document.querySelector('.dc-pane .dc-body')?.dataset.id === '${DOC}'`, 80), 'Firefox 2900: the document opens in the pane ' + JSON.stringify(await ev(`({h: location.hash, cards: document.querySelectorAll('.dc-card').length, wrap: document.querySelector('.dc-wrap')?.className, pane: document.querySelector('.dc-pane .dc-body')?.dataset.id, read: localStorage.getItem('tasks.dc.read')})`).catch(() => null)));
-    check(await wait(`(() => { const p = document.querySelector('.dc-wrap.dc-read .dc-main.dc-rd > .dc-props'), t = document.querySelector('.dc-main.dc-rd > .dc-top'); return p && t && p.getBoundingClientRect().left >= t.getBoundingClientRect().right - 2; })()`, 80), 'Firefox 2900: the properties beside the preview ' + JSON.stringify(await ev(`({wrap: document.querySelector('.dc-wrap')?.className, main: document.querySelector('.dc-pane .dc-main')?.className, top: ${R('.dc-pane .dc-top')}, props: ${R('.dc-pane .dc-props')}, pane: ${R('.dc-pane')}})`).catch(() => null)));
-    await ev(`(() => { dcr_gripSet('props', 99999, true); return 1; })()`);
-    const pr = await wait(`(() => { const t = ${R('.dc-main.dc-rd > .dc-top')}, p = ${R('.dc-main.dc-rd > .dc-props')}, m = ${R('.dc-pane .dc-main')}; return t && p && m && p.w > 400 ? {t, p, m} : null; })()`);
-    check(pr && pr.t.w >= 12 * 16 - 2 && pr.t.w <= 14 * 16 && pr.p.w >= pr.m.w - 14 * 16, 'Firefox 2900: the properties dragged to the end, the preview keeps about 12 rem (no longer 20) ' + JSON.stringify(pr));
-    check(pr && pr.p.r <= pr.m.r + 2 && pr.t.l >= pr.m.l - 2, 'Firefox 2900: nothing runs out of the part ' + JSON.stringify(pr));
-    await shot('p2582c-docs-props.png');
+    // 2.583.0 (#4835): the reading view at 2900 px is gone (document view, p2583_a_docview)
   }, false);
 
   console.log(`p2582_c_leisten_ui: ${ok} passed, ${F.length} failed`);

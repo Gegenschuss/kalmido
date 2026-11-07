@@ -12,7 +12,10 @@ const abd_on = () => feat('docs') && !S.me?.kid;
 const abd_cardKeys = () => { try { const a = JSON.parse(S.settings?.ab_cards || '[]'); return Array.isArray(a) ? a : []; } catch { return []; } };
 // asked for by ablage.js with typeof before this file may be loaded: function declarations (window properties), never const -
 // a view drawn before the load kept seeing a const as missing (main red #3506: a new start showed the list, not the cards)
-function abd_cardsOn(key) { return abd_on() && abd_cardKeys().includes(key); }
+function abd_cardsOn(key) { return abd_on() && (abd_recogHere(key) || abd_cardKeys().includes(key)); }
+// 2.583.0 (#4832): a folder that recognises always shows its content as document cards, without the switch (ab_cards only for
+// the folders without recognition); known once the folder is loaded (its node), the cards load its documents' fields then
+function abd_recogHere(key) { const n = AB.data?.node; return !!(n && AB.dkey === key && n.kind === 'folder' && n.recog_on && !abd_locked(n)); }
 const abd_locked = n => !!n?.locked;  // part A (#2758): a locked folder and everything in it (a missing field = not locked)
 
 // ---- list / cards per folder (all devices of the person: the setting ab_cards, changed by single entries)
@@ -25,17 +28,20 @@ async function abd_setCards(key, on) {
 }
 function abd_toolsHtml(d, key) {
   if (!abd_on() || !d.items?.length) return '';
+  const ts = abd_cardsOn(key) && typeof ts_barHtml === 'function' ? ts_barHtml() : '';  // 2.583.0 (#4812): the card size, the same as the documents'
+  if (abd_recogHere(key)) return ts;  // 2.583.0 (#4832): a recognising folder: always cards
   const c = abd_cardsOn(key);
-  return `<div class="seg abviewseg" role="group" aria-label="${esc(tr('View'))}"><button type="button" data-abdv="list" aria-pressed="${!c}" class="${c ? '' : 'on'}" title="${esc(tr('List'))}">${ic('list', 's')}<span>${tr('List')}</span></button><button type="button" data-abdv="cards" aria-pressed="${c}" class="${c ? 'on' : ''}" title="${esc(tr('Cards'))}">${ic('grid', 's')}<span>${tr('Cards')}</span></button></div>`;
+  return ts + `<div class="seg abviewseg" role="group" aria-label="${esc(tr('View'))}"><button type="button" data-abdv="list" aria-pressed="${!c}" class="${c ? '' : 'on'}" title="${esc(tr('List'))}">${ic('list', 's')}<span>${tr('List')}</span></button><button type="button" data-abdv="cards" aria-pressed="${c}" class="${c ? 'on' : ''}" title="${esc(tr('Cards'))}">${ic('grid', 's')}<span>${tr('Cards')}</span></button></div>`;
 }
 // a card: a document = its tile of the documents (preview, sender, date, type, tags), other files and folders = name + picture
 function abd_card(n) {
   const menuBtn = `<span class="abcmenu"><button type="button" class="iconbtn" data-ab="menu" data-id="${n.id}" aria-label="${esc(tr('More actions for {0}', n.name))}" title="${esc(tr('More'))}">${ic('dots', 's')}</button></span>`;  // in a span: .dc-card>button is the tile
   const shc = typeof ab_shChip === 'function' ? ab_shChip(n, AB.data?.node?.owner_id) : '', sh = shc ? `<span class="abcshw">${shc}</span>` : '';  // 2.558.0 (#4693): the names, a click opens Share
-  if (n.doc?.id && !abd_locked(n) && typeof dc_card === 'function') return dc_card(n.doc).replace(/<\/li>$/, menuBtn + sh + '</li>');
-  const img = n.kind === 'file' && !abd_locked(n) && ab_isImg(n) && !upLocked(n) ? `<img src="${esc(abd_thumbUrl(n))}" alt="" loading="lazy">` : '';
+  if (n.doc?.id && !abd_locked(n)) return dc_card(n.doc).replace(/<\/li>$/, menuBtn + sh + '</li>');
+  const img = n.kind === 'file' && !abd_locked(n) && ab_isImg(n) && !upLocked(n) ? (typeof ts_img === 'function' ? ts_img(abd_thumbUrl(n), abd_thumbUrl(n) + '&size=l') /* 2.583.0 (#4812) */ : `<img src="${esc(abd_thumbUrl(n))}" alt="" loading="lazy">`) : '';
   const meta = abd_locked(n) ? '' : [n.kind === 'folder' ? '' : fmtSize(n.size || 0), ab_when(n.updated_at)].filter(Boolean).join(' · ');
-  return `<li class="dc-card abcf"><button type="button" data-ab="open" data-id="${n.id}" ${n.kind === 'folder' ? `data-abdrop="${n.id}"` : ''} aria-label="${esc(n.name)}"><span class="dc-th">${img || `<span class="dc-ph">${ab_icon(n)}</span>`}</span><span class="dc-ct"><b class="dc-nm">${esc(n.name)}</b>${meta ? `<span class="dc-mt">${esc(meta)}</span>` : ''}</span></button>${menuBtn}${sh}</li>`;
+  // 2.583.0 (#4832): the same card function as the documents (docs.js dc_card), a file opens the document view (ablage.js ab_openFile)
+  return dc_card(n, {file: {thumb: img || `<span class="dc-ph">${ab_icon(n)}</span>`, meta, attrs: `data-ab="open" data-id="${n.id}"${n.kind === 'folder' ? ` data-abdrop="${n.id}"` : ''}`, after: menuBtn + sh}});
 }
 // 2.477.0 (#3936): a picture card shows the server's small preview, never the original (the version keeps the browser's copy fresh)
 const abd_thumbUrl = n => `/api/files/nodes/${n.id}/thumb?v=${encodeURIComponent(n.version || 1)}`;
@@ -59,10 +65,10 @@ function abd_recogLine(d) {
 // through them (docs.js dc_nav: "3 of 48", the arrows, the swipe); before, the sheet of the file store could not leaf at all
 const abd_navIds = () => { const c = $$('.abview [data-dco]').map(x => +x.dataset.dco); return c.length ? c : (AB.data?.items || []).filter(n => n.doc?.id && !abd_locked(n)).map(n => n.id); };
 function abd_menuItems(n) {
-  if (!abd_on() || abd_locked(n) || !ab_canWrite(n.role)) return n.doc?.id && abd_on() ? [{label: tr('Open as document'), icon: 'file', fn: () => dc_open(n.id, {keep: true, list: abd_navIds()})}] : [];
+  if (!abd_on() || abd_locked(n) || !ab_canWrite(n.role)) return n.doc?.id && abd_on() ? [{label: tr('Open as document'), icon: 'file', fn: () => dc_open(n.id, {list: abd_navIds()})}] : [];
   if (n.kind === 'folder') return [{label: tr('Recognition…'), icon: 'sparkle', fn: () => setTimeout(() => abd_recogMenu(n), 0)}];  // after this menu closed
   if (n.kind !== 'file') return [];
-  if (n.doc) return [{label: tr('Open as document'), icon: 'file', fn: () => dc_open(n.id, {keep: true, list: abd_navIds()})}];
+  if (n.doc) return [{label: tr('Open as document'), icon: 'file', fn: () => dc_open(n.id, {list: abd_navIds()})}];
   return [{label: tr('Recognise'), icon: 'sparkle', fn: () => abd_recognise(n)}];  // a file outside a recognising folder
 }
 function abd_recogMenu(n, anchor) {
@@ -107,8 +113,8 @@ document.addEventListener('click', e => {
   const t = /** @type {HTMLElement} */ (e.target);
   const v = /** @type {HTMLElement|null} */ (t.closest?.('.abview [data-abdv]'));
   if (v) { abd_setCards(AB.key || (S.route.nid ? 'n:' + S.route.nid : 's:' + ab_curSpace()), v.dataset.abdv === 'cards'); return; }
-  const o = /** @type {HTMLElement|null} */ (t.closest?.('.abview [data-dco]'));  // a document's card: its sheet over the file store (the route stays)
-  if (o) { e.preventDefault(); dc_open(+o.dataset.dco, {keep: true, list: abd_navIds()}); return; }  // 2.683.0 (#5150): + the folder's documents to leaf through
+  const o = /** @type {HTMLElement|null} */ (t.closest?.('.abview [data-dco]'));  // a document's card: the document view (2.583.0, #4832/#4835; Back leads to the file store)
+  if (o) { e.preventDefault(); dc_open(+o.dataset.dco, {list: abd_navIds()}); return; }  // 2.683.0 (#5150): + the folder's documents to leaf through
   const r = /** @type {HTMLElement|null} */ (t.closest?.('.abview [data-abdr]'));
   if (r) { const n = AB.data?.node; if (n && n.id === +r.dataset.abdr) abd_recogMenu(n, r); }
 });

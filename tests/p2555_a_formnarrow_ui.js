@@ -54,7 +54,7 @@ function textPdf(lines) {  // a one-page PDF with a text layer, written by hand
   const mark = `(() => { DC.doc.auto = {...(DC.doc.auto || {}), type: 'rule', folder: 'rule'}; dc_mdDraw(document.querySelector('.dc-body').parentElement); return !!document.querySelector('.dc-f .dc-auto'); })()`;
   // each visible row with a label: label, field, row and the "automatic" mark
   const ROWS = `(() => { const vis = e => e.getClientRects().length > 0, b = e => { const r = e.getBoundingClientRect(); return {l: Math.round(r.left), r: Math.round(r.right), t: Math.round(r.top), b: Math.round(r.bottom), h: Math.round(r.height)}; };
-    const rows = [...document.querySelectorAll('.rc-slot .dc-f, .dc-form .dc-f')].filter(vis).filter(r => r.children[0].tagName === 'LABEL');
+    const rows = [...document.querySelectorAll('.rc-slot .dc-f, .dc-form .dc-f')].filter(vis).filter(r => r.children[0].tagName === 'LABEL' && !r.closest('details:not([open])'));  // 2.583.0 (#4835): not the folded "More fields" (Firefox gives their rows boxes)
     return JSON.stringify({w: Math.round(document.querySelector('.dc-props').clientWidth), rows: rows.map(r => { const a = r.querySelector('.dc-auto'); return {f: r.children[0].htmlFor, lab: b(r.children[0]), fld: b(r.children[1]), row: b(r), auto: a ? b(a) : null}; })}); })()`;
   const oneRight = rows => rows.length > 0 && rows.every(r => Math.abs(r.fld.r - rows[0].fld.r) <= 1);
   const above = rows => rows.every(r => r.lab.b <= r.fld.t + 1 && Math.abs(r.lab.l - r.fld.l) <= 1);

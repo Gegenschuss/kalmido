@@ -37,6 +37,7 @@ V1_FIELDS = ("date", "due", "amount", "currency", "sender", "type", "tags", "tex
 def _v1_doc(c, m, node, full=False, role=None):
     d = doc_json(c, m, node, full=full, role=role)
     d.pop("thumb", None)
+    d.pop("thumb_l", None)  # 2.583.0 (#4812): a view flag of the app, like thumb
     dup = d.pop("duplicate_of", None)  # 2.146.0 B (#2452): the duplicate warning is for the people of the app (agents: not in API v1)
     if "einvoice" in d:  # 2.440.0 (#2243): the fixed fields of an e-invoice; of a duplicate only the hint
         d["einvoice"] = ei_api(S.meta_json(c, m, "extracted", {})["_einv"], duplicate=bool(dup))

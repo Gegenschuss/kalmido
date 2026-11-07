@@ -39,6 +39,7 @@ OCR_LANGS = os.environ.get("KALMIDO_OCR_LANGS", "deu+eng")
 TEXT_CAP = 200_000
 THUMB_W = 320
 OFFICE_KINDS = ("docx", "xlsx", "odt", "ods")  # 2.635.0 (#4807): read through files/officeprev.py
+THUMB_WL = 800  # 2.583.0 (#4812): the sharper preview of big cards (docs/store.py thumb_store, doc_meta.thumb_l)
 _SEM = threading.BoundedSemaphore(OCR_PARALLEL)
 _AVAIL = {}
 
@@ -294,8 +295,10 @@ def office_thumb(data, kind):
     return p.stdout if p.returncode == 0 and p.stdout[:2] == b"\xff\xd8" else None
 
 
-def thumb_bytes(data, kind):
-    """A small JPEG of the first page / the image, or None (no tools, damaged file, timeout). 2.635.0 (#4807): + Office files."""
+def thumb_bytes(data, kind, w=THUMB_W):
+    """A small JPEG of the first page / the image, or None (no tools, damaged file, timeout). 2.635.0 (#4807): + Office files.
+    2.583.0 (#4812): w = THUMB_WL makes the sharper one of big cards: a page then w pixels wide (the small one fits the page
+    into w x w); Office files always get the small one."""
     try:
         if kind in OFFICE_KINDS:
             return office_thumb(data, kind)
@@ -307,14 +310,16 @@ def thumb_bytes(data, kind):
                 with open(src, "wb") as f:
                     f.write(data)
                 base = os.path.join(tmp, "t")
-                r = _run(["pdftoppm", "-f", "1", "-l", "1", "-singlefile", "-scale-to", str(THUMB_W), "-jpeg", "-jpegopt",
-                          "quality=72", src, base], 30, fsize=16 << 20)
+                scale = ["-scale-to", str(THUMB_W)] if w == THUMB_W else ["-scale-to-x", str(int(w)), "-scale-to-y", "-1"]
+                r = _run(["pdftoppm", "-f", "1", "-l", "1", "-singlefile", *scale, "-jpeg", "-jpegopt",
+                          "quality=72", src, base], 30, fsize=16 << 20 if w == THUMB_W else 4 << 20)
+                # 2.583.0 (#4812 review): the 800 one has no height cap (a very tall page): over 4 MB it fails, the 320 one stays
                 if r.returncode != 0 or not os.path.exists(base + ".jpg"):
                     return None
                 with open(base + ".jpg", "rb") as f:
                     return f.read()
         if kind == "image":
-            p = subprocess.run([sys.executable, "-I", "-c", THUMB_WORKER, str(THUMB_W)], input=data, capture_output=True,
+            p = subprocess.run([sys.executable, "-I", "-c", THUMB_WORKER, str(int(w))], input=data, capture_output=True,
                                timeout=30, close_fds=True, env={"PATH": os.environ.get("PATH", "/usr/bin:/bin")})
             return p.stdout if p.returncode == 0 and p.stdout[:2] == b"\xff\xd8" else None
     except (OSError, subprocess.SubprocessError):

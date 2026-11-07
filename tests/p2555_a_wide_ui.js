@@ -44,7 +44,7 @@ const today = new Date().toISOString().slice(0, 10);
     let over = 0; for (let i = 0; i < rows.length && over < 3; i++) for (let j = i + 1; j < rows.length; j++) { const a = r(rows[i]), b = r(rows[j]);
       if (rows[i].contains(rows[j]) || rows[j].contains(rows[i])) continue;
       if (a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1) { over++; break; } }
-    return JSON.stringify({cw: Math.round(r(card).width), cols: getComputedStyle(sp).columnCount, nl: left.length, nr: right.length,
+    return JSON.stringify({cw: Math.round(r(card).width), pw: Math.round(pr.width), cols: getComputedStyle(sp).columnCount, nl: left.length, nr: right.length,
       lt: left[0] ? Math.round(r(left[0]).top) : null, rt: right[0] ? Math.round(r(right[0]).top) : null, over,
       side: document.documentElement.scrollWidth > document.documentElement.clientWidth || card.scrollWidth > card.clientWidth + 1 || sps.scrollWidth > sps.clientWidth + 1}); })()`;
   // the office editor: the head section and the positions section
@@ -78,9 +78,9 @@ const today = new Date().toISOString().slice(0, 10);
         const s = JSON.parse(await ev(SET));
         wide[W] = s.cw;
         check(!s.side && !s.over, `${theme} ${W}: settings: nothing overlaps, no sideways scrolling ` + JSON.stringify(s));
-        if (W >= 1920 && W !== 390) {
-          check(s.cols === '2' && s.nl > 0 && s.nr > 0 && Math.abs(s.lt - s.rt) <= 32, `${theme} ${W}: Appearance in two columns, two parts side by side at the same height ` + JSON.stringify(s));
-        } else check(s.cols === 'auto' && s.nr === 0, `${theme} ${W}: one column as before ` + JSON.stringify(s));
+        // 2.583.0 (#4833): the settings stay ONE column on every width (no CSS columns); from 1920 px the column has form width (40rem)
+        check(s.cols === 'auto' && s.nr === 0, `${theme} ${W}: one column ` + JSON.stringify(s));
+        if (W >= 1920) check(s.pw <= 642, `${theme} ${W}: the column has form width (40rem) ` + JSON.stringify(s));
         await ready(ev, theme_(theme)); await shot(`p2555-a-settings-${W}-${theme}.png`);
         await ev(`document.querySelector('.smodal')?.remove()`);
 
@@ -106,7 +106,7 @@ const today = new Date().toISOString().slice(0, 10);
     // the area Organisation of an admin has the sub-tabs People / Agents / Data
     check(await openSet(ev, 'users', '.aisub'), '2560: Organisation with its sub-tabs');
     const strip = await ev(`(() => { const s = document.querySelector('.smodal .spane:not(.hidden) .aisub'); if (!s) return false; const p = s.closest('.spane'); return s.getBoundingClientRect().width >= p.getBoundingClientRect().width - 2; })()`);
-    check(strip, '2560: the sub-tabs span both columns');
+    check(strip, '2560: the sub-tabs span the column');  // 2.583.0 (#4833): one column
     await shot('p2555-a-settings-org-2560.png');
     // 2.630.0 (#4695): the contact form: at 2560 px the name parts and phone / e-mail / addresses side by side (each part at most
     // --w-form), at 1440 and 390 px one column as before; nothing overflows, the DOM order (name before phone) is the tab order

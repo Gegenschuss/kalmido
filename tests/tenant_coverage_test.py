@@ -858,7 +858,7 @@ ROUTES = {
     "POST /api/mine-sections": "own", "POST /api/mine-sections/init": "own", "PATCH /api/mine-sections/{}": "own", "DELETE /api/mine-sections/{}": "own", "PUT /api/mine-sections/order": "own",  # 2.569.0 (#4395): the own sections of My tasks
     "POST /api/onboarding": "own", "POST /api/sample": "own", "DELETE /api/sample": "own", "PATCH /api/settings": "own",
     "POST /api/ntfy/test": "own",  # 2.142.0 C (#2150); 2.574.0 (#3779): GET / PUT /api/me/ntfy-inbox are gone
-     "GET /api/push/vapid": "own", "GET /api/push/subs": "own", "POST /api/push/subs": "own",
+     "GET /api/push/vapid": "own", "GET /api/push/subs": "own", "GET /api/settings/defaults": "own", "POST /api/push/subs": "own",
     "DELETE /api/push/subs/{}": "own", "POST /api/push/unsubscribe": "own", "POST /api/push/handled": "own",
     "POST /api/push/test": "own", "GET /api/me": "own", "PATCH /api/me": "own", "POST /api/me/drop-token": "own",
     "GET /api/me/share/httpshortcuts.zip": "own", "PUT /api/me/avatar": "own", "POST /api/me/avatar": "own",

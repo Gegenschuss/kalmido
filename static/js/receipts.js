@@ -191,7 +191,7 @@ document.addEventListener('change', async e => {
 document.addEventListener('click', e => {  // 2.576.0 (#4487): a jump of "Also in" closes the document's sheet (a phone, the file store)
   const b = e.target.closest?.('.rc-also [data-rcgo]'); if (!b) return;
   e.preventDefault(); e.stopPropagation();
-  $('.dc-md:not(.dc-pane)')?.remove();
+  // 2.583.0 (#4835): the document view is a page of its own (its route goes with go)
   go(b.dataset.rcgo);
 }, true);
 document.addEventListener('click', async e => {

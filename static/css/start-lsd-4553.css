@@ -1,15 +1,15 @@
 /* 2.557.0 A (#4553): list and detail side by side on a wide content area. #view gets the class lsdw while it is at least
    100rem wide (render.js lsd_sync measures #view, not the window). Then the list takes about 40 % on the left, the open entry
-   the rest on the right, the pair together at most 160rem (instead of --w-seite) and in the middle. Below 100rem nothing
+   the rest on the right, the pair together over the full width (2.583.0 #4840: no limit any more). Below 100rem nothing
    changes: contacts / clients keep their narrow list beside the card, a quotation / invoice stands in place of its list, a
    receipt opens as the dialog in the middle. Phones (767 / 599 px) never get the class. Private and organisation alike. */
 
 /* contacts and clients: list + card (both drawn already) */
-#view.lsdw > .ofwrap:has(.ctview > .ctcols){max-width:160rem}
+#view.lsdw > .ofwrap:has(.ctview > .ctcols){max-width:none}
 #view.lsdw .ctview > .ctcols{grid-template-columns:minmax(16rem,2fr) minmax(0,3fr)}
 
 /* quotations and invoices (office_docs.js ofd_pairHtml): the rows of the list on the left, the document on the right */
-#view.lsdw > .ofwrap:has(.lsd2){max-width:160rem}
+#view.lsdw > .ofwrap:has(.lsd2){max-width:none}
 #view.lsdw .dash.office:has(.lsd2){max-width:none}  /* 2.571.0 (#4740): the office page (.dash, app.css) kept the pair at --w-seite = 96rem inside the wider .ofwrap */
 .lsd2{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr);gap:1rem;align-items:start}
 .lsd2 > .lsdl{position:sticky;top:0;max-height:calc(var(--vvh,100dvh) - 8rem);overflow-y:auto;overscroll-behavior:contain;min-width:0}
@@ -19,7 +19,7 @@
 
 /* receipts (office_receipts.js rcl_dock): the list keeps the left 40 % of the pair, the receipt's dialog stands right of it
    (its box is placed by rcl_dockSync), without the dark backdrop, so the list stays visible and clickable */
-body.rcldock #view.lsdw > .ofwrap{max-width:160rem}
+body.rcldock #view.lsdw > .ofwrap{max-width:none}
 body.rcldock #view.lsdw > .ofwrap > .ofbody{padding-right:60%}
 .modal.lsddock{display:block;background:none;padding:0;pointer-events:none}
 .modal.lsddock > .card{pointer-events:auto;position:absolute;inset:0 0 1rem 0;width:auto !important;max-width:none !important;height:auto !important;max-height:none !important}  /* !important: the dialog's own widths (office.css .ofcdlg, a size set with its grip) are for the dialog in the middle */

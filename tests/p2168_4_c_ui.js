@@ -41,7 +41,11 @@ const prep = async u => { CK = await login(u); const st = await call('GET', '/ap
   const r = await call('POST', `/api/files/nodes/${DOC}/shares`, {user_id: bob, role: 'view'});
   check(r.status < 300, 'share with bob: ' + r.status);
   d.querySelector('.abshdlg [data-m="close"]').click();
-  check(await until(() => d.querySelector('.dc-card .dc-shared')), 'card shows the shared mark after the dialog closed');
+  // 2.583.0 (#4835): the document is a view of its own (the cards are left); its list entry learns it at once, back in the
+  // list the card shows the mark
+  check(await until(() => w.eval(`DC.docs.find(x => x.id === ${DOC})?.shared === true`)), 'the list entry is shared after the dialog closed');
+  w.eval(`document.querySelector('.dc-md').remove()`);
+  check(await until(() => d.querySelector('.dc-card .dc-shared')), 'card shows the shared mark after the dialog closed (back in the list)');
 
   // the recipient: no buttons
   CK = bobCK;

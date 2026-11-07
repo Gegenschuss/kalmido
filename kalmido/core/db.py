@@ -294,6 +294,11 @@ def adopt_orphans(c, uid):
     return n
 
 
+# 2.583.0 (#4833): where a new account starts apart from USER_DEFAULTS (2.49.0 #1535: completed tasks hidden); the settings
+# dialog counts its "changed" settings against these start values (accounts/settings.py settings_defaults)
+NEW_ACCOUNT_VALUES = {"show_done_default": "0"}
+
+
 def create_user(c, username, display_name="", password=None, proxy_login=None, is_admin=False,
                 ntfy_topic=None, seed_global=False, drop_token=None, paperless_access=None, onboard=False, ask_purpose=None):
     """Inserts a user with settings (+ inbox unless the caller adopts an existing one). Returns the id.
@@ -312,7 +317,7 @@ def create_user(c, username, display_name="", password=None, proxy_login=None, i
         v = gsetting(c, gk)
         if v:
             vals[k] = v
-    vals["show_done_default"] = "0"  # 2.49.0 (#1535): a NEW account starts with completed tasks hidden (existing accounts keep their choice)
+    vals.update(NEW_ACCOUNT_VALUES)  # 2.49.0 (#1535): a NEW account starts with completed tasks hidden (existing accounts keep their choice)
     if seed_global:  # the single-user settings become this user's settings
         for r in c.execute("SELECT key, value FROM settings"):
             if r["key"] in USER_DEFAULTS:

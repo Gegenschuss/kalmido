@@ -676,6 +676,7 @@ ROUTES = {
     "GET /api/me/storage": "own", "GET /api/me/tokens": "own", "GET /api/me/wait-suggestions": "own",
     "GET /api/me/webhooks": "own", "GET /api/me/webhooks/{}/log": "own", "GET /api/orgs": "own", "POST /api/orgs": "own",  # 2.422.0 (#2937): p2422_orgself_test.py (a)
     "GET /api/push/subs": "own",
+    "GET /api/settings/defaults": "own",  # 2.583.0 (#4833)
     "GET /api/push/vapid": "own", "GET /api/v1/me": "own", "GET /api/v1/me/app-passwords": "own",
     "GET /api/v1/me/storage": "own", "PATCH /api/me": "own", "PATCH /api/me/tokens/{}": "own",
     "PATCH /api/me/webhooks/{}": "own", "PATCH /api/settings": "own", "PATCH /api/v1/me/notifications": "own",

@@ -56,7 +56,8 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
     await nav(B + '#home');
     await until(`!!S.booted && !!document.querySelector('#view .dash')`);
     const vars = await ev(`(() => { const s = getComputedStyle(document.documentElement); return ['--w-lesen', '--w-form', '--w-seite', '--w-voll'].map(k => s.getPropertyValue(k).trim()).join(' '); })()`);
-    check(vars === '46rem 40rem 96rem none', 'the four widths in :root ' + vars);
+    // 2.583.0 (#4840): --w-seite is none now (full width)
+    check(vars === '46rem 40rem none none', 'the four widths in :root ' + vars);
 
     // the box of the content area and of one element (px); rem = the root font size
     const MEASURE = sel => `(() => { const v = document.querySelector('#view'), e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null;
@@ -75,11 +76,12 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
         await nav(B + '?w=' + vw + hash);
         const m = await until(`!!S.booted && !!document.querySelector(${JSON.stringify(sel)}) && (${MEASURE(sel)})`);
         if (!m) { check(false, `${vw}px ${name}: ${sel} shows`); continue; }
-        const lim = kind === 'seite' ? Math.min(m.area, 96 * m.rem) : m.area;  // the phone's board runs out to the screen edges (as before)
+        const lim = m.area;  // 2.583.0 (#4840): lists / overviews use the full width of the content area too  // the phone's board runs out to the screen edges (as before)
         check(kind === 'voll' ? m.w >= lim - 2 : Math.abs(m.w - lim) <= 2, `${vw}px ${name}: width ${kind} = ${Math.round(lim)} px ` + JSON.stringify(m));
         check(Math.abs(m.l - m.r) <= 2, `${vw}px ${name}: in the middle (left = right) ` + JSON.stringify(m));
         check(m.over <= 1, `${vw}px ${name}: no sideways overflow ` + JSON.stringify(m));
-        if (vw === 3840 && kind === 'seite') check(m.w > 96 * m.rem - 2 && m.area - m.w > 2, `${vw}px ${name}: limited (narrower than the content area) ` + JSON.stringify(m));
+        // 2.583.0 (#4840): no limit any more: at 3840 px the list is as wide as the area and wider than 96rem
+        if (vw === 3840 && kind === 'seite') check(m.w > 96 * m.rem, `${vw}px ${name}: wider than 96rem ` + JSON.stringify(m));
         if (vw >= 1440) for (const theme of ['light', 'dark']) {
           await ev(`(() => { document.documentElement.dataset.theme = ${JSON.stringify(theme)}; return new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(1)))); })()`);  // painted before the shot
           await shot(`p2534a-${name}-${vw}-${theme}.png`);

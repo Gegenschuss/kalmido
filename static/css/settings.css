@@ -228,14 +228,17 @@
    the tabs fits two columns of about a form section each, its content flows into two columns (CSS columns: the order stays the
    DOM order, down the first column, then the second; the columns do not hang on heading levels, a heading only stays with what
    follows it). Sub-tabs span both columns; rows, hints, folded parts and lists never break apart. 1440 px and smaller stay as they were. */
-@media (min-width:112.5rem){ .smodal .card{width:min(var(--w-seite),100% - 4rem);height:min(85dvh,75rem)} }
-.smodal .spanes{container:spanes / inline-size}
-@container spanes (min-width:72rem){
-  .smodal .spane{columns:2;column-gap:3rem;column-rule:1px solid var(--line)}
-  .smodal .spane .aisub{column-span:all}
-  .smodal .spane :is(.row,.shint,details,fieldset,.navlist,table,ul,ol,li,.featgrid,.modrow,.card,section,form){break-inside:avoid}
-  .smodal .spane :is(h3,h4,h5){break-after:avoid}
-}
+@media (min-width:112.5rem){ .smodal .card{width:min(96rem,100% - 4rem);height:min(85dvh,75rem)} }
+/* 2.583.0 (#4833): the two CSS columns are gone again: on a wide monitor the content stays ONE column of form width (the wider
+   dialog stays); 1440 px and smaller as before */
+@media (min-width:112.5rem){ .smodal .spane{max-width:var(--w-form)} }
+/* 2.583.0 (#4833): "Further options" at the end of a tab (settings.js SET_MORE): the rarely changed part, folded; the count
+   names how many settings under it differ from the default */
+details.setmore{margin:1.25rem 0 .5rem;border-top:1px solid var(--line)}
+details.setmore>summary{cursor:pointer;min-height:2.75rem;display:flex;align-items:center;gap:.625rem;padding:.5rem 0;font-weight:600;color:var(--accent)}
+details.setmore>summary .setmorec{font-weight:400;color:var(--text2);font-size:var(--fs-s)}
+details.setmore>summary .setmorec:empty{display:none}
+details.setmore>.setmoreb{padding-top:.25rem}
 /* 2.575.0 (#3778): own module cards (settings.js mc_*) */
 .mcards .mcgrp{margin:.5rem 0 .75rem}.mcards h5{margin:.5rem 0 .25rem;font-size:var(--fs-m)}
 .mcwrap{position:relative;display:flex;min-width:0}.mcwrap>.ptcard{flex:1;padding-right:2.25rem}

@@ -369,6 +369,8 @@ def _meta(c, run, src, d, ctx):
         if isinstance(d.get(k), str) and d[k]:
             d[k] = S.doc_seal(c, ws, f"doc_meta.{k}", d[k])
     d.update({"suggest": "", "trained": "", "review": 0, "thumb": None})  # suggestions name the source's labels; made again
+    if "thumb_l" in d:
+        d["thumb_l"] = None  # 2.583.0 (#4812): the sharp preview is made again too (thumb_store below)
     if d.get("state") == "run":
         d["state"] = "wait"
     if d.get("asn") and S.asn_taken(c, ws, d["asn"]):
@@ -741,9 +743,11 @@ def _finish_docs(c, run):
             with c.savepoint():  # the preview, sealed like the file (docs/thumbfill.py makes the same)
                 data = fs_read(c, nid)
                 S.thumb_store(c, m, node, data, file_kind(node["name"], node["mime"], data[:2048]))
-                t = c.execute("SELECT thumb FROM doc_meta WHERE node_id=?", (nid,)).fetchone()
-                if t and t[0]:
-                    full = os.path.join(ATT_DIR, t[0])
+                t = c.execute("SELECT thumb, thumb_l FROM doc_meta WHERE node_id=?", (nid,)).fetchone()  # 2.583.0 (#4812): + thumb_l
+                for rel in (t or ()):
+                    if not rel:
+                        continue
+                    full = os.path.join(ATT_DIR, rel)
                     run.written.append(full)
                     run.created.setdefault("oi_files", []).append(full)
         except Exception as e:  # noqa: BLE001 -- no preview: the documents view shows the placeholder

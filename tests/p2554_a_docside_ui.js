@@ -73,9 +73,9 @@ const FEAT = 'cal,comments,collab,office,clients,docs,files';
   const BOX = `(() => { ${R} const b = q('.dc-rev'), t = q('.dc-rev .dc-revt'), a = q('.dc-rev .dc-revact'); if (!b || !t || !a) return 'null';
     return JSON.stringify({bh: Math.round(r(b).height), bw: Math.round(r(b).width), aw: Math.round(r(a).width), sameLine: r(a).top < r(t).bottom - 2, right: r(a).left > r(t).left + 40,
       below: r(a).top >= r(t).bottom - 1, checked: !!q('[data-dc="checked"]'), no: !!q('.dc-rev [data-dsp="dismiss"]'), split: !!q('.dc-rev [data-dsp="open"]'), alone: !!q('.dc-due.dsp-hint')}); })()`;
-  const ACTS = `(() => { ${R} const a = [...document.querySelectorAll('.dc-md .dc-acts > .btn, .dc-md .dc-acts > .iconbtn, .dc-md .dc-acts > a')].filter(e => e.getClientRects().length);
+  const ACTS = `(() => { ${R} const a = [...document.querySelectorAll('.dc-md .dv-hacts > .btn, .dc-md .dv-hacts > .iconbtn, .dc-md .dv-hacts > a, .dc-md .dv-actw > .btn')].filter(e => e.getClientRects().length);  // 2.583.0 (#4835): the head of the view
     const del = a[a.length - 1];
-    return JSON.stringify({n: a.length, tops: [...new Set(a.map(e => Math.round(r(e).top)))], lastDel: del.dataset.dc === 'del' && del.classList.contains('iconbtn') && del.classList.contains('danger'),
+    return JSON.stringify({n: a.length, tops: [...new Set(a.map(e => Math.round(r(e).top)))], lastDel: del.dataset.dc === 'del' && del.classList.contains('danger'),
       aria: del.getAttribute('aria-label'), title: del.getAttribute('title'), noText: del.textContent.trim() === '', atEnd: Math.abs(r(del).right - r(del.parentElement).right) <= 1}); })()`;
   const open = async (nav, ev, id, sel) => { await nav(B + 'static/icon.svg'); await nav(B + `#docs/${id}`); return ready(ev, `!!document.querySelector('.dc-md ${sel}')`); };
   const click = (ev, sel) => ev(`(() => { document.querySelector(${JSON.stringify(sel)}).click(); return 1; })()`);
@@ -91,21 +91,22 @@ const FEAT = 'cal,comments,collab,office,clients,docs,files';
       check(await open(nav, ev, SID, '.dc-rev'), tag + ': the box "To review" of the stack');
       let b = JSON.parse(await ev(BOX));
       check(b.no && b.split && !b.checked && !b.alone, tag + ': the stack question is the box\'s, no "Checked" yet ' + JSON.stringify(b));
-      check(ph ? b.below && b.aw >= b.bw - 40 : b.sameLine && b.right, tag + ': buttons ' + (ph ? 'below at full width' : 'right of the text') + ' ' + JSON.stringify(b));
+      check(ph ? b.below && b.aw >= b.bw - 40 : b.bw < 480 ? b.below /* 2.583.0 (#4835): a narrow fields column */ : b.sameLine && b.right, tag + ': buttons ' + (ph ? 'below at full width' : 'right of the text') + ' ' + JSON.stringify(b));
       check(await ev(`(() => { ${R} const s = q('.dc-rev .dc-ht svg'), t = q('.dc-rev .dc-ht > span'); return !!s && !!t && Math.abs(r(s).top - r(t).top) < 12 && r(s).right <= r(t).left + 2; })()`), tag + ': the symbol stays with its text');
       let a = JSON.parse(await ev(ACTS));
-      check(Math.max(...a.tops) - Math.min(...a.tops) <= 1 && a.lastDel && a.atEnd && a.noText && a.aria === 'Delete' && a.title === 'Delete', tag + ': one action line, red trash icon at the end ' + JSON.stringify(a));
+      // 2.583.0 (#4835): the head of the view (sketch): a red "Delete" with the trash icon at the end, the text hidden on phones
+      check(Math.max(...a.tops) - Math.min(...a.tops) <= 1 && a.lastDel && a.atEnd && a.aria === 'Delete' && a.title === 'Delete', tag + ': one action line, red Delete at the end ' + JSON.stringify(a));
       await shot(`p2554-a-stack-${tag}.png`);
       await click(ev, '.dc-md .dc-rev [data-dsp="dismiss"]');
       check(await ready(ev, `!!document.querySelector('.dc-md [data-dc="checked"]') && !document.querySelector('.dc-md [data-dsp="dismiss"]')`), tag + ': after "No stack" the box offers "Checked"');
       b = JSON.parse(await ev(BOX));
-      check(ph ? b.below : b.sameLine && b.right, tag + ': "Checked" ' + (ph ? 'below' : 'right') + ' ' + JSON.stringify(b));
+      check(ph ? b.below : b.bw < 480 ? b.below || (b.sameLine && b.right) /* 2.583.0 (#4835): the narrow fields column: right when it fits, else below */ : b.sameLine && b.right, tag + ': "Checked" ' + (ph ? 'below' : 'right') + ' ' + JSON.stringify(b));
       check(b.bh <= 130 || ph, tag + ': the box is a compact line ' + b.bh);
       await shot(`p2554-a-checked-${tag}.png`);
       // ---- a letter with a due date: one line "Due on …" + the button "Task…"
       await call(CF, 'PATCH', `/api/docs/${ONE}`, {due: '2026-12-01'});
       check(await open(nav, ev, ONE, '.dc-due [data-dsp="taskmenu"]'), tag + ': due date + "Task…"');
-      check(await ev(`(() => { ${R} const l = q('.dc-due'), bs = l.querySelectorAll('button'), t = l.querySelector('.dc-ht'); return bs.length === 1 && bs[0].dataset.dsp === 'taskmenu' && !q('[data-dc="task"]') && !q('[data-dsp="link"]') && /Due on/.test(t.textContent) && Math.abs(r(bs[0]).top + r(bs[0]).height / 2 - r(t).top - r(t).height / 2) < 20; })()`), tag + ': one line, one button "Task…"');
+      check(await ev(`(() => { ${R} const l = q('.dc-due'), bs = l.querySelectorAll('button'), t = l.querySelector('.dc-ht'); return bs.length === 1 && bs[0].dataset.dsp === 'taskmenu' && !q('[data-dc="task"]') && !q('[data-dsp="link"]') && /Due on/.test(t.textContent) && (Math.abs(r(bs[0]).top + r(bs[0]).height / 2 - r(t).top - r(t).height / 2) < 20 || (r(l).width < 480 && r(bs[0]).top >= r(t).bottom - 2)); })()`), tag + ': one line, one button "Task…" (2.583.0, #4835: in the narrow fields column it may wrap below the text)');
       await click(ev, '.dc-md [data-dsp="taskmenu"]');
       check(await ready(ev, `(() => { const m = [...document.querySelectorAll('#pop [role="menuitem"]')].map(x => x.textContent.trim()); return m.length === 2 && /New task/.test(m[0]) && /Link with a task/.test(m[1]); })()`, 20), tag + ': the menu has New task and Link with a task…');
       await shot(`p2554-a-taskmenu-${tag}.png`);
@@ -115,7 +116,7 @@ const FEAT = 'cal,comments,collab,office,clients,docs,files';
       check(await open(nav, ev, ONE, '.dc-due.dsp-link [data-dsp="taskmenu"]') && await ev(`document.querySelectorAll('.dc-md .dsp-link button').length === 1 && !document.querySelector('.dc-md .dsp-link .dc-ht')`), tag + ': without a due date only the button');
       // the letter's box (no stack): "Checked" in the line
       b = JSON.parse(await ev(BOX));
-      check(b.checked && !b.no && (ph ? b.below : b.sameLine && b.right), tag + ': plain review box ' + JSON.stringify(b));
+      check(b.checked && !b.no && (ph ? b.below : b.bw < 480 ? b.below || (b.sameLine && b.right) : b.sameLine && b.right), tag + ': plain review box ' + JSON.stringify(b));
       a = JSON.parse(await ev(ACTS));
       check(Math.max(...a.tops) - Math.min(...a.tops) <= 1 && a.lastDel, tag + ': the letter\'s action line ' + JSON.stringify(a));
       // "New task" really creates the task and shows its link

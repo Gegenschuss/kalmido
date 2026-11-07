@@ -11,7 +11,7 @@ from flask import g, jsonify, Response
 from ..core.config import app, APP_NAME, PUBLIC_URL
 from ..core.schema import USER_DEFAULTS
 from ..core.i18n import LANGS, N_, tr
-from ..core.db import body, bump, db, err, gsetting, iso, local_now, now_utc, uset, usettings
+from ..core.db import body, bump, db, err, gsetting, iso, local_now, now_utc, uset, usettings, NEW_ACCOUNT_VALUES  # 2.583.0 (#4833)
 from ..core.pg import write_lock  # 2.269.0 B (#3014)
 from ..accounts.session import me, user_public
 from ..lists.lists import clean_folder
@@ -30,6 +30,7 @@ SETTINGS_SERVER_ONLY = ("digest_sent", "digest_mail_sent", "digest_mail_try", "r
                         "brief_sent", "brief_read",  # 2.34.0 (#264)
                         "fav_asked",  # 2.46.1 (#1361): lists already offered as a favourite
                         "evmail_at", "evmail_day")  # 2.142.0 A (#2146): the bundled event mails sent
+USER_DEFAULTS.setdefault("settings_more", "[]")  # 2.583.0 (#4833): the settings tabs whose "Further options" are open (like modcards.py ws_mods_off)
 SIDE_GROUPS = ("focus", "clients", "lists", "filters", "tags", "views", "areas", "team")  # 2.25.0 (UX-03); 2.39.1 (#1185): areas
 # 2.575.0 D (#4051): start_page "a:<area>" = the app opens on that area (the ids of SBB_RAIL in static/js/areas.js; home stays "home")
 START_AREA_RE = re.compile(r"a:(tasks|cal|notes|office|time|review|life|reading|ablage|wiki|sheets|habits|team|agents)")
@@ -348,6 +349,24 @@ def clean_setting(k, v):
         if not isinstance(o, list) or len(o) > 200 or not all(isinstance(x, str) and re.fullmatch(r"\d{1,12}", x) for x in o):
             raise bad
         return json.dumps(list(dict.fromkeys(o)))
+    if k == "settings_more":  # 2.583.0 (#4833): ["<settings tab>", ...] whose "Further options" are open (all devices)
+        try:
+            o = json.loads(sv or "[]")
+        except ValueError:
+            raise bad from None
+        if not isinstance(o, list) or len(o) > 40 or not all(isinstance(x, str) and re.fullmatch(r"[a-z]{1,20}", x) for x in o):
+            raise bad
+        return json.dumps(list(dict.fromkeys(o)))
+    if k in ("dc_tile_d", "dc_tile_m"):  # 2.583.0 (#4812): the card width in rem, '' = standard (static/js/tilesize.js TS_MIN..TS_MAX)
+        if not sv:
+            return ""
+        try:
+            f = float(sv)
+        except ValueError:
+            raise bad from None
+        if not 7 <= f <= 28:
+            raise bad
+        return f"{round(f, 2):g}"
     if k == "ab_cards":  # 2.353.0 D (#2759): ["n:<folder id>" | "s:private" | "s:shared" | "s:org:<id>", ...] shown as cards
         try:
             o = json.loads(sv or "[]")  # a JSON string like trial_hint_seen
@@ -603,7 +622,7 @@ def clean_look_pref(v):
 
 # 2.269.0 B (#3014): keys a client changes by single entries (set_delta) instead of sending the whole stored value back
 SET_DELTA_CSV = ("hide_progress", "show_progress", "fav_lists", "agents_hidden", "side_people", "side_agents", "features", "news_kinds")
-SET_DELTA_JSON = ("folders", "folders_closed", "trial_hint_seen", "ab_cards", "trial_mode")  # 2.353.0 D (#2759): ab_cards; 2.417.0 C (#3445): trial_mode
+SET_DELTA_JSON = ("folders", "folders_closed", "trial_hint_seen", "ab_cards", "trial_mode", "settings_more")  # 2.353.0 D (#2759): ab_cards; 2.417.0 C (#3445): trial_mode; 2.583.0 (#4833): settings_more
 
 
 def set_delta_apply(cur, d):
@@ -848,6 +867,16 @@ def settings_reset():
     bump(c, "self")  # the other devices of the person load the standard
     c.commit()
     return jsonify(ok=True, items=rs_items(set(ch)), undo=True)
+
+
+@app.get("/api/settings/defaults")
+def settings_defaults():
+    """2.583.0 (#4833): the start value of every setting a person may change (what a new account gets: USER_DEFAULTS and
+    NEW_ACCOUNT_VALUES of core/db.py create_user); the settings dialog counts what differs from it under each "Further options".
+    No values of the person."""
+    me()
+    d = {**USER_DEFAULTS, **NEW_ACCOUNT_VALUES}
+    return jsonify(defaults={k: v for k, v in d.items() if k not in SETTINGS_SERVER_ONLY and not k.startswith("sup_key")})
 
 
 @app.post("/api/ntfy/test")

@@ -252,12 +252,13 @@ function ab_pvOpts(n) {
   return o;
 }
 // ---- opening a file: images in the lightbox, PDFs in the PDF view, text in the text view, the rest downloads
-function ab_openFile(n) {
+function ab_openFile(n, o = {}) {  // 2.583.0 (#4832): o.raw = the viewer of its kind (the document view's full screen)
   if (n.kind === 'ref' && FS_REF_VIEW[n.ref_kind] === 'pdf' && typeof pdfView === 'function') { pdfView({url: ab_url(n), name: n.name, size: n.size, dlUrl: ab_url(n, true)}); return; }  // 2.351.0 B (#2749)
   if (n.kind === 'ref' && FS_REF_VIEW[n.ref_kind] === 'text') { textView({url: ab_url(n, true), name: n.name, size: n.size, md: false, ext: 'txt'}); return; }
   if (n.kind === 'ref') { if (n.open) go(n.open); else toast(tr('No access')); return; }  // 2.199.0 A (#2742): a filed document opens in its area
   if (upLocked(n)) { toast(tr('Locked: malware was found in this file ({0})', n.up.sig || '?')); return; }  // 2.61.0 (#1818)
   if (n._enc && typeof fsl_open === 'function') { fsl_open(n); return; }  // 2.353.0 A (#2758): decrypted in the browser
+  if (n.kind === 'file' && !o.raw && typeof abd_on === 'function' && abd_on() && typeof dc_open === 'function') { dc_open(n.id); return; }  // 2.583.0 (#4832): a file opens the document view (one sheet for files and documents)
   if (ab_isImg(n)) { const imgs = (AB.data?.items || []).filter(x => ab_isImg(x) && !upLocked(x)); attLightbox(n.id, imgs, (a, dl) => ab_url(a, dl)); return; }
   if (n.kind === 'file' && dv_is(n)) { dpvOpen({url: `/api/files/nodes/${encodeURIComponent(n.id)}/preview`, name: n.name, size: n.size, dlUrl: ab_url(n, true)}); return; }  // 2.92.0 C (#1926)
   if (ab_isPdf(n)) { if (typeof pdfView === 'function') pdfView(ab_pvOpts(n)); else window.open(ab_url(n), '_blank', 'noopener'); return; }  // 2.652.0 (#5071): ab_pvOpts

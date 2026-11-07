@@ -2341,8 +2341,8 @@ n8n: an *HTTP Request* node, method POST, the URL, the header `X-Kalmido-Hook-To
 
 `PATCH /api/settings` takes the whole value of a setting as before. A list setting can also change by single entries:
 `{"set_delta": {"<key>": {"add": [...], "remove": [...]}}}` for `agents_hidden`, `features`, `fav_lists`, `hide_progress`,
-`show_progress`, `side_people`, `side_agents`, `news_kinds` (comma lists) and `folders`, `folders_closed`, `trial_hint_seen`, `ab_cards` (2.353.0: the file store's folders shown as cards), `trial_mode` (2.417.0: the offices whose test mode the person switched on, `["<office id>"]`)
-(json lists). The server applies it to the stored value under the account's lock, so two devices that add or remove an
+`show_progress`, `side_people`, `side_agents`, `news_kinds` (comma lists) and `folders`, `folders_closed`, `trial_hint_seen`, `ab_cards` (2.353.0: the file store's folders shown as cards), `trial_mode` (2.417.0: the offices whose test mode the person switched on, `["<office id>"]`), `settings_more` (2.583.0: the settings tabs whose "Further options" are open, `["general", "look", ...]`)
+(json lists). `GET /api/settings/defaults` (2.583.0) answers `{"defaults": {"<key>": "<value>"}}`: the default of every setting a person may change. The server applies it to the stored value under the account's lock, so two devices that add or remove an
 entry at the same time both keep their change; the result is checked like a whole value (`400`, nothing stored). The
 notification matrix takes a partial `{"notify": {"<event>": {"news"?: 0|1, "push"?: 0|1}}}` the same way.
 `PUT /api/office/settings` (partial body) and every other change of the office settings read and write under the office

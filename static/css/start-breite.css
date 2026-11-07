@@ -1,15 +1,16 @@
 /* 2.534.0 A (#4551): one width system for wide screens. Every page has exactly one of the four widths of :root (app.css):
    --w-lesen 46rem   reading text: news, agent chat, team chat history, note / knowledge page, feeds
    --w-form  40rem   a form section: the start page layout editor, the kids' page
-   --w-seite 96rem   lists and overviews: task lists (Today, project, week, all), projects start, start / home / workload
+   --w-seite none    (96rem until 2.582, #4840: full width) lists and overviews: task lists (Today, project, week, all), projects start, start / home / workload
                      dashboards, office (all its pages and tabs), contacts, clients, statistics, time, agents, file store,
                      budget, bookmarks, tags, archive, waiting
    --w-voll  none    board, calendar, timeline, matrix, sheet, mind map
    The widths are upper limits only: below them a page is 100 % wide as before (phone, 320 px, 1440 x 900 unchanged);
    a limited page stands in the middle, its tabs above it share its edges (.mgtabs = --w-seite like the page below). */
 
-/* --w-seite: the limit itself is set on the rule of each page (app.css); here the pages that stood left get centred and the
-   task lists / file store / archive (no limit before) get theirs */
+/* 2.583.0 (#4840): --w-seite is none now (app.css :root): lists and overviews use the full width of the content area (the page
+   margin stays). The name stays so that every page keeps its assignment and a limit can be set again in one place.
+   Reading text (--w-lesen, width switch #4808) and forms (--w-form) keep their limits; dialogs, menus and fields as well. */
 .pstart,.stats,.pov,.lwrap,.abview,.dc-wrap:not(.dc-paneon),.tgview,.mwv,.archv{max-width:var(--w-seite);margin-inline:auto}
 /* 2.580.0 (#4815): the rest of the lists and overviews: tables overview and folder (.shvov), a knowledge folder, Completed / Trash (.hview) */
 .shvwrap.shvov,.wkfolder,.hview{max-width:var(--w-seite);margin-inline:auto}
@@ -44,4 +45,25 @@
   .pstart > :not(.psg){grid-column:1/-1}
   /* schedule: my bookings in columns */
   .dpminel{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,22rem),1fr));column-gap:1rem}
+}
+
+/* 2.583.0 (#4840 Teil F): list rows like a table (rules beside app.css "list columns", #425). With few columns the title takes
+   the room as before; with many the text columns (.lcgw: tags, delivery state, text-like fields) share what the title leaves
+   above about 40rem (44rem with check circle and padding), each at most 15rem more than its standard width; numbers and dates
+   keep their width and sit right. --lcfix / --lcn = standard widths + gaps of all shown columns / the number of growing ones
+   (lcFit, render.js). Titles, rows and the sum row compute the same width from the list's width (cqw), so they stay lined up;
+   a dragged width (#lcw-style) wins. The delivery state gets a column width like the others. */
+.lc-delivery{width:7rem}
+.lc-f.t-date{justify-content:flex-end}
+@media (min-width:768px){
+  @container lrows (min-width:96rem){
+    /* --lw = the list's content width (lw_sync, render.js): Firefox kept a 100cqw behind var() at an earlier, narrower width
+       of the list when the window grew (the text columns stayed at their standard width, p2583_b_fullwidth) */
+    :is(.lcols,.lchead,.fxsum) .lc-tags.lcgw{width:calc(9rem + min(15rem,max(0rem,(var(--lw,100cqw) - 44rem - var(--lcfix,100cqw)) / var(--lcn,1))))}
+    :is(.lcols,.lchead,.fxsum) :is(.lc-f,.lc-delivery).lcgw{width:calc(7rem + min(15rem,max(0rem,(var(--lw,100cqw) - 44rem - var(--lcfix,100cqw)) / var(--lcn,1))))}
+  }
+  /* the lists run over the full width now: from 112rem on the 11th to 13th column, from 136rem up to the 16th stay in the
+     first line (the title keeps about 20rem); the 17th on always moves into the second line (app.css .lc.o10) */
+  @container lrows (min-width:112rem){ .lc.o10:not(.o13){display:inline-flex} .trow .meta .mlc.o10:not(.o13){display:none} }
+  @container lrows (min-width:136rem){ .lc.o13:not(.o16){display:inline-flex} .trow .meta .mlc.o13:not(.o16){display:none} }
 }

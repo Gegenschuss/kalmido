@@ -56,56 +56,56 @@ async function upload(name, lines) {
   const D2 = await upload('power.pdf', ['Stadtwerke Musterstadt', 'Abschlag Strom', 'Datum 03.10.2026']);
   const D3 = await upload('phone.pdf', ['Telefon Beispiel GmbH', 'Monatsrechnung', 'Datum 05.10.2026']);
 
-  // ================= computer: the pane beside the list
+  // ================= computer: 2.583.0 (#4835): the click opens the document view (the pane beside the list gave way to it)
   const w = await boot({user: 'alice', hash: 'docs'}), d = w.document;
   await until(() => d.querySelectorAll('.dc-card').length === 3);
   const order = w.eval('DC.docs.map(x => x.id)');
   check(order.length === 3, 'three documents listed');
   const card = id => d.querySelector(`.dc-view [data-dco="${id}"]`);
-  const paneId = () => +(d.querySelector('.dc-pane .dc-body')?.dataset.id || 0);
+  const paneId = () => +(d.querySelector('.dv-view .dc-body')?.dataset.id || 0);
   click(w, card(order[0]));
-  check(await until(() => paneId() === order[0] && d.querySelector('.dc-pane #dc-sender')), 'a click opens the document in the pane');
-  check(!d.querySelector('.modal') && d.querySelector('#view .dc-wrap.dc-paneon > .dc-view') && d.querySelector('#view .dc-wrap > .dc-pane'), '... beside the list, no dialog');
-  check(d.querySelector(`.dc-card[data-k="dc${order[0]}"]`)?.classList.contains('dc-cur') && card(order[0]).getAttribute('aria-current') === 'true', '... the card of the open document is marked');
+  check(await until(() => paneId() === order[0] && d.querySelector('.dv-view #dc-sender')), 'a click opens the document (2.583.0: in its view)');
+  check(!d.querySelector('.modal') && d.querySelector('#view .dv-view') && !d.querySelector('.dc-view'), '... a page of its own, no dialog');
+  check(d.querySelector(`.dv-strip [data-dvgo="${order[0]}"]`)?.classList.contains('on'), '... the open document is marked in the strip');
   check(w.location.hash === `#docs/${order[0]}`, '... the address names the document ' + w.location.hash);
-  const top = d.querySelector('.dc-pane .dc-top'), form = d.querySelector('.dc-pane .dc-form');
-  check(top && form && (top.compareDocumentPosition(form) & w.Node.DOCUMENT_POSITION_FOLLOWING) && top.querySelector('.dc-prev'), '... the preview on top, the fields below');
-  for (const f of ['sender', 'date', 'tags', 'folder']) check(d.querySelector(`.dc-pane #dc-${f}`), `... the field ${f}`);
+  check(d.querySelector('.dv-view .dv-pv .dv-pages') && d.querySelector('.dv-view .dv-mask .dc-form'), '... the preview and the fields');
+  for (const f of ['sender', 'date', 'tags', 'folder']) check(d.querySelector(`.dv-view #dc-${f}`), `... the field ${f}`);
 
-  // a field changed in the pane saves at once, the pane stays open
-  const snd = d.querySelector('.dc-pane #dc-sender');
+  // a field changed in the view saves at once, the view stays open
+  const snd = d.querySelector('.dv-view #dc-sender');
   snd.value = 'Beispiel Versicherung'; snd.dispatchEvent(new w.Event('change', {bubbles: true}));
-  check(await until(async () => (await call('GET', `/api/docs/${order[0]}`)).sender?.name === 'Beispiel Versicherung'), 'a field in the pane saves at once');
-  check(await until(() => d.querySelector('.dc-pane #dc-sender')?.value === 'Beispiel Versicherung' && paneId() === order[0]), '... the pane shows it and stays open');
+  check(await until(async () => (await call('GET', `/api/docs/${order[0]}`)).sender?.name === 'Beispiel Versicherung'), 'a field in the view saves at once');
+  check(await until(() => d.querySelector('.dv-view #dc-sender')?.value === 'Beispiel Versicherung' && paneId() === order[0]), '... the view shows it and stays open');
   check(w.eval('/Sender of/.test(HIST.undo[HIST.undo.length - 1].label)'), '... one undo step');
 
-  // another card, the arrow keys, Esc
-  click(w, card(order[2]));
-  check(await until(() => paneId() === order[2] && w.location.hash === `#docs/${order[2]}`), 'a click on another card switches the pane');
-  check(!d.querySelector(`.dc-card[data-k="dc${order[0]}"]`)?.classList.contains('dc-cur') && d.querySelector(`.dc-card[data-k="dc${order[2]}"]`)?.classList.contains('dc-cur'), '... the mark moves along');
+  // the strip, the arrow keys (2.583.0: left / right), Esc
+  click(w, d.querySelector(`.dv-strip [data-dvgo="${order[2]}"]`));
+  check(await until(() => paneId() === order[2] && w.location.hash === `#docs/${order[2]}`), 'a click in the strip switches the document');
   d.activeElement?.blur?.();
-  key(w, 'ArrowUp');
-  check(await until(() => paneId() === order[1]), 'arrow up: the document before');
-  key(w, 'ArrowUp');
+  key(w, 'ArrowLeft');
+  check(await until(() => paneId() === order[1]), 'arrow left: the document before');
+  key(w, 'ArrowLeft');
   check(await until(() => paneId() === order[0]), '... and the one before that');
-  key(w, 'ArrowUp');
+  key(w, 'ArrowLeft');
   await sleep(400);
   check(paneId() === order[0], '... the first stays at the top');
-  key(w, 'ArrowDown');
-  check(await until(() => paneId() === order[1] && w.location.hash === `#docs/${order[1]}`), 'arrow down: the next document');
-  d.querySelector('.dc-pane #dc-sender').focus();
-  d.querySelector('.dc-pane #dc-sender').dispatchEvent(new w.KeyboardEvent('keydown', {key: 'ArrowDown', bubbles: true, cancelable: true}));
+  key(w, 'ArrowRight');
+  check(await until(() => paneId() === order[1] && w.location.hash === `#docs/${order[1]}`), 'arrow right: the next document');
+  d.querySelector('.dv-view #dc-sender').focus();
+  d.querySelector('.dv-view #dc-sender').dispatchEvent(new w.KeyboardEvent('keydown', {key: 'ArrowRight', bubbles: true, cancelable: true}));
   await sleep(400);
   check(paneId() === order[1], '... not while typing in a field');
-  d.querySelector('.dc-pane #dc-sender').blur();
+  d.querySelector('.dv-view #dc-sender').blur();
   key(w, 'Escape');
-  check(await until(() => !d.querySelector('.dc-pane') && !d.querySelector('.dc-md') && w.location.hash === '#docs'), 'Esc closes the pane, the address is #docs again');
+  check(await until(() => !d.querySelector('.dv-view') && !d.querySelector('.dc-md') && w.location.hash === '#docs'), 'Esc leaves the view, the address is #docs again');
+  check(await until(() => d.querySelector(`.dc-card[data-k="dc${order[1]}"]`)?.classList.contains('dc-cur')), '... the card looked at last is marked');
   click(w, card(order[1]));
   await until(() => paneId() === order[1]);
-  click(w, d.querySelector('.dc-pane .dc-x[data-dc="close"]'));
-  check(await until(() => !d.querySelector('.dc-pane') && !w.eval('DC.paneId')), 'the close button closes the pane');
+  click(w, d.querySelector('.dv-view .dv-back[data-dc="close"]'));
+  check(await until(() => !d.querySelector('.dv-view') && d.querySelector('.dc-view .dc-card')), 'the back button leaves the view');
 
   // choosing: Ctrl-click and the box choose, a plain click opens also while choosing
+  await until(() => card(order[0]));
   click(w, card(order[0]), {ctrlKey: true});
   check(await until(() => w.eval('DC.selOn') && w.eval(`DC.sel.has(${order[0]})`) && !d.querySelector('.dc-md')), 'Ctrl-click chooses the card, nothing opens');
   click(w, d.querySelector(`[data-dcchk="${order[1]}"]`));
@@ -114,23 +114,24 @@ async function upload(name, lines) {
   click(w, card(order[2]));
   check(await until(() => paneId() === order[2] && !w.eval(`DC.sel.has(${order[2]})`)), 'a plain click opens even while choosing (and does not choose)');
   check(w.eval('DC.sel.size') === 2, '... the choice stays');
-  d.querySelector('.dc-pane [data-dc="close"]').click();
+  d.querySelector('.dv-view [data-dc="close"]').click();
+  await until(() => d.querySelector('.dc-view'));
   w.eval('DC.selOn = false; DC.sel = new Map(); dc_draw()');
   await sleep(200);
 
-  // an address #docs/<id> opens the pane
+  // an address #docs/<id> opens the view
   w.close();
   const w2 = await boot({user: 'alice', hash: `docs/${D2}`}), d2 = w2.document;
-  check(await until(() => +(d2.querySelector('.dc-pane .dc-body')?.dataset.id || 0) === D2 && !d2.querySelector('.modal')), 'the address #docs/<id> opens the document in the pane');
+  check(await until(() => +(d2.querySelector('.dv-view .dc-body')?.dataset.id || 0) === D2 && !d2.querySelector('.modal')), 'the address #docs/<id> opens the document view');
   w2.close();
 
-  // ================= phone: a whole page, Back to the list
+  // ================= phone: the same view, Back to the list
   const m = await boot({user: 'alice', hash: 'docs', mobile: true}), dm = m.document;
   await until(() => dm.querySelectorAll('.dc-card').length === 3);
   click(m, dm.querySelector(`[data-dco="${D3}"]`));
-  check(await until(() => dm.querySelector('.modal.dc-md #dc-sender') && !dm.querySelector('.dc-pane')), 'phone: the document opens as its own page, not as a pane');
-  check(dm.querySelector('.modal.dc-md .dc-back[data-dc="close"]'), 'phone: the page has a Back arrow');
-  click(m, dm.querySelector('.modal.dc-md .dc-back'));
+  check(await until(() => dm.querySelector('.dv-view #dc-sender') && !dm.querySelector('.modal.dc-md')), 'phone: the document opens as its own page');
+  check(dm.querySelector('.dv-view .dv-back[data-dc="close"]'), 'phone: the page has a Back button');
+  click(m, dm.querySelector('.dv-view .dv-back'));
   check(await until(() => !dm.querySelector('.dc-md') && dm.querySelector('.dc-view .dc-card')), 'phone: Back leads to the list');
   m.close();
 
@@ -144,27 +145,24 @@ async function upload(name, lines) {
     const wait = async (js, n = 50) => { for (let i = 0; i < n; i++) { if (await ev(js).catch(() => false)) return true; await sleep(250); } return false; };
     check(await wait(`document.querySelectorAll('.dc-card').length === 3`), 'Firefox: three cards');
     await ev(`(document.querySelector('.dc-view [data-dco="${D1}"]').click(), 1)`);
-    check(await wait(`!!document.querySelector('.dc-pane #dc-sender')`), 'Firefox: the pane opens');
-    const r = await ev(`(() => { const v = document.querySelector('.dc-wrap > .dc-view').getBoundingClientRect(), p = document.querySelector('.dc-pane').getBoundingClientRect(), c = document.querySelector('.dc-card').getBoundingClientRect();
-      return {vr: Math.round(v.right), pl: Math.round(p.left), pw: Math.round(p.width), cw: Math.round(c.width), top: Math.round(p.top)}; })()`);
-    check(r && r.pl >= r.vr && r.pw >= 300 && r.cw > 100, 'Firefox: the pane stands right of the list, the cards stay visible ' + JSON.stringify(r));
-    check(await wait(`!!document.querySelector('.dc-pane .dc-prev canvas') && document.querySelector('.dc-pane .dc-prev canvas').width > 300`, 80), 'Firefox: the first page of the PDF is drawn in the preview');
+    check(await wait(`!!document.querySelector('.dv-view #dc-sender')`), 'Firefox: the view opens');
+    const r = await ev(`(() => { const m = document.querySelector('.dv-mask').getBoundingClientRect(), p = document.querySelector('.dv-pv').getBoundingClientRect(); return {mr: Math.round(m.right), pl: Math.round(p.left), pw: Math.round(p.width)}; })()`);
+    check(r && r.pl >= r.mr && r.pw >= 300, 'Firefox: the preview stands right of the fields ' + JSON.stringify(r));
+    check(await wait(`!!document.querySelector('.dv-pages canvas') && document.querySelector('.dv-pages canvas').width > 300`, 80), 'Firefox: the first page of the PDF is drawn in the preview');
     await shot('p2430-docpane.png');
-    // the window narrowed to phone width and back: the document stays open (the pane closed itself, p2106_b_ui found it)
+    // the window narrowed to phone width and back: the document stays open (p2106_b_ui)
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
     await sleep(400); await ev(`(dc_draw(), 1)`); await sleep(400);
-    check(await wait(`!!document.querySelector('.dc-pane #dc-sender') && document.querySelector('.dc-pane').getBoundingClientRect().width >= 360 && getComputedStyle(document.querySelector('.dc-pane .dc-back')).display !== 'none'`), 'Firefox: narrowed to phone width the document stays open as the page');
+    check(await wait(`!!document.querySelector('.dv-view #dc-sender') && document.querySelector('.dv-view').getBoundingClientRect().width >= 360 && getComputedStyle(document.querySelector('.dv-view .dv-back')).display !== 'none'`), 'Firefox: narrowed to phone width the document stays open as the page');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 860}});
     await sleep(400); await ev(`(dc_draw(), 1)`);
-    check(await wait(`!!document.querySelector('.dc-pane #dc-sender') && !!document.querySelector('.dc-wrap.dc-paneon > .dc-view')`), '... and back at full width again beside the list');
+    check(await wait(`!!document.querySelector('.dv-view #dc-sender') && getComputedStyle(document.querySelector('.dv-strip')).display !== 'none'`), '... and at full width again with the strip');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
     await nav(B + '#docs');
     check(await wait(`document.querySelectorAll('.dc-card').length === 3`), 'Firefox phone: the cards');
     await ev(`(document.querySelector('.dc-view [data-dco="${D1}"]').click(), 1)`);
-    check(await wait(`!!document.querySelector('.modal.dc-md #dc-sender')`), 'Firefox phone: the document opens');
-    const p = await ev(`(() => { const c = document.querySelector('.modal.dc-md > .card').getBoundingClientRect(); return {w: Math.round(c.width), h: Math.round(c.height), back: getComputedStyle(document.querySelector('.dc-md .dc-back')).display, x: getComputedStyle(document.querySelector('.dc-md .dc-x')).display}; })()`);
-    check(p && p.w >= 388 && p.h >= 800 && p.back !== 'none' && p.x === 'none', 'Firefox phone: a whole page with the Back arrow ' + JSON.stringify(p));
-    const sx = await ev(`(() => { const c = document.querySelector('.modal.dc-md > .card'), cr = c.getBoundingClientRect(); const wide = [...c.querySelectorAll('*')].filter(x => x.getBoundingClientRect().right > cr.right + 1).slice(0, 4).map(x => x.tagName + '.' + [...x.classList].join('.') + ':' + Math.round(x.getBoundingClientRect().right)); return {sw: c.scrollWidth, cw: c.clientWidth, wide}; })()`);
+    check(await wait(`!!document.querySelector('.dv-view #dc-sender')`), 'Firefox phone: the document opens');
+    const sx = await ev(`(() => { const c = document.querySelector('.dv-view'); return {sw: c.scrollWidth, cw: c.clientWidth}; })()`);
     check(sx && sx.sw <= sx.cw + 1, 'Firefox phone: the page does not scroll sideways ' + JSON.stringify(sx));
     await shot('p2430-docpane-phone.png');
   }, true);

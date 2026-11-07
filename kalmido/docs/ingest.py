@@ -120,15 +120,14 @@ def _iso_day(v):
 def doc_on_delete(c, nid):
     """fs_on_delete hook: a document deleted for good leaves the models, its preview goes (rows: ON DELETE CASCADE).
     2.306.0 D3 (#2875): the preview file is returned for the caller to unlink after the commit (a failed delete keeps it)."""
-    m = c.execute("SELECT thumb FROM doc_meta WHERE node_id=?", (nid,)).fetchone()
+    m = c.execute("SELECT * FROM doc_meta WHERE node_id=?", (nid,)).fetchone()  # 2.583.0 (#4812): + thumb_l
     if not m:
         return []
     try:
         S.untrain(c, nid)
     except Exception as e:  # noqa: BLE001 -- deleting never fails because of a model
         print("docs: untrain", nid, type(e).__name__, flush=True)
-    rel = m["thumb"] or ""
-    return [rel] if rel.startswith(S.THUMB_DIR + os.sep) and ".." not in rel else []
+    return [rel for rel in (m["thumb"] or "", S.thumb_l_of(m)) if rel.startswith(S.THUMB_DIR + os.sep) and ".." not in rel]
 
 
 fs_on_delete.append(doc_on_delete)
@@ -217,10 +216,11 @@ def docs_run_once():
             except Exception as e:  # noqa: BLE001 -- the queue never dies
                 c.rollback()
                 print("docs: split scan", type(e).__name__, e, flush=True)
-            from .thumbfill import p61a_thumb_fill  # 2.66.1 (#1944): previews of imports from before, while nothing waits
+            from .thumbfill import p61a_thumb_fill, p2583_thumb_l_fill  # 2.66.1 (#1944): previews of imports from before, while nothing waits; 2.583.0 (#4812): + the sharp ones
             try:
                 with system_ctx(c):  # docs queue: server-side catch-up of every workspace's previews, nothing handed to a person
-                    p61a_thumb_fill(c)
+                    if not p61a_thumb_fill(c):
+                        p2583_thumb_l_fill(c)  # 2.583.0 (#4812): then the sharp previews of big cards
                 c.commit()
             except Exception as e:  # noqa: BLE001 -- the queue never dies
                 c.rollback()

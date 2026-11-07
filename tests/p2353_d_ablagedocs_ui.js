@@ -75,18 +75,22 @@ await until(() => d.querySelector(`.dc-view [data-dco="${DOC}"]`));
 
   // ================= list / cards per folder, recognition
   w = await boot({user: 'alice', hash: 'ablage/' + ROOT}); d = w.document;
-  check(await until(() => d.querySelector('.abview .ablist [data-abid="' + DOC + '"]')), 'the documents folder: a list first');
+  // 2.583.0 (#4832): a folder that recognises shows its content as document cards at once, without the list / cards switch
+  check(await until(() => d.querySelector(`.abview .abcards [data-dco="${DOC}"]`)), 'the documents folder (it recognises): the document as its tile at once');
+  check(!d.querySelector('.abview [data-abdv]'), '... no list / cards switch there');
   check(await until(() => /Recognition on/.test(d.querySelector('.abrecog')?.textContent || '')), 'the documents folder: Recognition on');
-  check(await until(() => d.querySelector(`[data-abid="${DOC}"] .abdoc`)), 'the list marks the document');
-  d.querySelector('[data-abdv="cards"]')?.click();
-  check(await until(() => d.querySelector(`.abview .abcards [data-dco="${DOC}"]`)), 'Cards: the document as its tile');
-  check(await until(async () => JSON.parse((await call('GET', '/api/state')).settings.ab_cards || '[]').includes('n:' + ROOT)), 'the choice is saved for the person');
   d.querySelector(`.abcards [data-dco="${DOC}"]`)?.closest('li')?.querySelector('[data-ab="menu"]')?.click();
   const cm = await until(() => menuItems(d).length && menuItems(d));
   check(cm && cm.includes('Share…') && cm.some(x => /Link for external people/.test(x)), 'the card\'s menu: Share… and the link for external people ' + JSON.stringify(cm));
   w.eval('closePop()');
   w.location.hash = '#ablage/' + PLAIN;
   check(await until(() => d.querySelector(`.abview .ablist [data-abid="${FILE}"]`) && !d.querySelector('.abview .abcards')), 'another folder: still a list');
+  check(d.querySelector('.abview [data-abdv="cards"]'), '... a folder without recognition keeps the list / cards switch');
+  // 2.583.0 (#4832): a plain file opens the same view as a document (no fields, "Recognise"); Back leads to the folder
+  d.querySelector(`[data-abid="${FILE}"] [data-ab="open"]`)?.click();
+  check(await until(() => w.location.hash === `#docs/${FILE}` && d.querySelector('.dv-view [data-dc="dvrecog"]') && !d.querySelector('.dv-view #dc-sender')), 'a plain file opens the document view (without fields, with Recognise)');
+  d.querySelector('.dv-view [data-dc="close"]')?.click();
+  check(await until(() => w.location.hash === `#ablage/${PLAIN}` && d.querySelector(`.abview [data-abid="${FILE}"]`)), '... back leads to its folder');
   d.querySelector(`[data-abid="${FILE}"] [data-ab="menu"]`)?.click();
   const fm = await until(() => menuItems(d).length && menuItems(d));
   check(fm && fm.includes('Recognise'), 'a plain file: Recognise in its menu ' + JSON.stringify(fm));
@@ -101,6 +105,8 @@ await until(() => d.querySelector(`.dc-view [data-dco="${DOC}"]`));
   check(await until(() => ['As the folder above', 'On', 'Off'].every(l => pick(d, l))), 'Recognition…: As the folder above / On / Off (with their hints)');
   pick(d, 'On')?.click();
   check(await until(async () => (await call('GET', `/api/files?parent=${PLAIN}`)).node?.recog_on === true), 'On: the folder recognises');
+  w.location.hash = '#ablage/' + PLAIN;
+  check(await until(() => d.querySelector(`.abview .abcards [data-dco="${FILE}"]`) && !d.querySelector('.abview [data-abdv]')), '2.583.0 (#4832): recognising now, the folder shows document cards without the switch');
   w.close();
   w = await boot({user: 'alice', hash: 'ablage/' + ROOT}); d = w.document;
   check(await until(() => d.querySelector(`.abview .abcards [data-dco="${DOC}"]`)), 'a new start: the documents folder shows its cards again');
@@ -128,7 +134,7 @@ await until(() => d.querySelector(`.dc-view [data-dco="${DOC}"]`));
       check(await wait(`!!document.querySelector('.abview .abcards .dc-card')`), `${tag}: the cards of the documents folder`);
       await sleep(500); await shot(`p2353-d-${tag}-cards.png`);
       await o.nav(B + '#ablage/' + PLAIN);
-      check(await wait(`!!document.querySelector('.abview .ablist .abrow')`), `${tag}: a plain folder as a list`);
+      check(await wait(`!!document.querySelector('.abview .abcards .dc-card')`), `${tag}: the folder that recognises now: cards (2.583.0, #4832)`);
       await sleep(400); await shot(`p2353-d-${tag}-list.png`);
       await o.nav(B + '#docs/review');
       check(await wait(`!!document.querySelector('.dc-view')`), `${tag}: the filter To review`);

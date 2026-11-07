@@ -77,14 +77,15 @@ function swipe(w, el, dx, dy = 0) {  // one finger from (200, 300) by dx / dy in
   check(await until(() => d.querySelectorAll('.dc-card').length === 2), 'a page of 2: two cards');
   check(/Load more \(2 of 5\)/.test(d.querySelector('.dc-moreld [data-dc="loadmore"]')?.textContent || '') && !/narrow the search/.test(d.body.textContent), 'the end of the list: "Load more (2 of 5)" instead of "narrow the search"');
   const order = m.eval('DC.docs.map(x => x.id)');
-  const shown = () => +(d.querySelector('.modal.dc-md .dc-body')?.dataset.id || 0);
-  const nav = () => d.querySelector('.modal.dc-md .dc-navn')?.textContent || '';
-  const prev = () => d.querySelector('.modal.dc-md .dc-prev');
+  const shown = () => +(d.querySelector('.dv-view .dc-body')?.dataset.id || 0);
+  const nav = () => d.querySelector('.dv-view .dc-navn')?.textContent || '';
+  const prev = () => d.querySelector('.dv-view .dv-pages');
   click(m, d.querySelector(`[data-dco="${order[0]}"]`));
   check(await until(() => shown() === order[0] && prev()), 'phone: the document opens as the page');
   check(nav() === '1 of 5', '"1 of 5" above the preview: ' + nav());
-  const top = d.querySelector('.modal.dc-md .dc-top');
-  check(top.firstElementChild?.classList.contains('dc-nav') && d.querySelector('.dc-nav').compareDocumentPosition(prev()) & m.Node.DOCUMENT_POSITION_FOLLOWING, '... above the preview');
+  // 2.583.0 (#4835): the view: "1 of 5" in its head, the preview below it
+  const top = d.querySelector('.dv-view .dv-navslot');
+  check(top?.firstElementChild?.classList.contains('dc-nav') && d.querySelector('.dc-nav').compareDocumentPosition(prev()) & m.Node.DOCUMENT_POSITION_FOLLOWING, '... above the preview');
   check(d.querySelector('.dc-nav [data-dc="step:-1"]').disabled && !d.querySelector('.dc-nav [data-dc="step:1"]').disabled, '... the arrow back is off at the first, the arrow forward on');
   check(d.querySelector('.dc-nav [data-dc="step:1"]').getAttribute('aria-label') === 'Next document', '... the arrows are named');
 
@@ -94,14 +95,14 @@ function swipe(w, el, dx, dy = 0) {  // one finger from (200, 300) by dx / dy in
   check(await until(() => shown() === order[1]), 'a swipe to the left on the preview: the next document');
   check(m.location.hash === `#docs/${order[1]}` && nav() === '2 of 5', '... the address and "2 of 5" follow ' + m.location.hash + ' ' + nav());
   // 2.727.0 (#5202): it snapped in with the swipe (the placeholder glided along, p2727_c_glide_ui): no glide-in afterwards
-  check(!d.querySelector('.modal.dc-md .dc-body').classList.contains('dc-in-n') && !d.querySelector('.dc-nb'), '... it stands in place, no glide-in afterwards');
+  check(!d.querySelector('.dv-view .dc-body').classList.contains('dc-in-n') && !d.querySelector('.dc-nb'), '... it stands in place, no glide-in afterwards');
   check(m.eval('window.__pv') === 0, '... the end of the swipe opens no viewer');
   swipe(m, prev(), 150);
   check(await until(() => shown() === order[0] && nav() === '1 of 5'), 'a swipe to the right: the document before');
   swipe(m, prev(), 150);
   await sleep(300);
-  check(shown() === order[0] && d.querySelector('.modal.dc-md .dc-body').classList.contains('dc-bnc-p'), 'before the first: it springs back, the first stays');
-  swipe(m, d.querySelector('.modal.dc-md #dc-sender'), -150);
+  check(shown() === order[0] && d.querySelector('.dv-view .dc-body').classList.contains('dc-bnc-p'), 'before the first: it springs back, the first stays');
+  swipe(m, d.querySelector('.dv-view #dc-sender'), -150);
   await sleep(300);
   check(shown() === order[0], 'a swipe on the fields below changes nothing');
   swipe(m, prev(), -20, -160);
@@ -109,20 +110,20 @@ function swipe(w, el, dx, dy = 0) {  // one finger from (200, 300) by dx / dy in
   check(shown() === order[0], 'a swipe up on the preview changes nothing (the page scrolls)');
 
   // past the loaded page: the next one loads
-  click(m, d.querySelector('.modal.dc-md [data-dc="step:1"]'));
+  click(m, d.querySelector('.dv-view [data-dc="step:1"]'));
   check(await until(() => shown() === order[1]), 'the arrow button forward: the next document');
   swipe(m, prev(), -150);
   check(await until(() => m.eval('DC.docs.length') === 4 && shown() === m.eval('DC.docs[2].id')), 'past the loaded page the swipe loads the next one and turns');
   check(nav() === '3 of 5', '... "3 of 5": ' + nav());
-  click(m, d.querySelector('.modal.dc-md [data-dc="step:1"]'));
+  click(m, d.querySelector('.dv-view [data-dc="step:1"]'));
   await until(() => shown() === m.eval('DC.docs[3].id'));
-  click(m, d.querySelector('.modal.dc-md [data-dc="step:1"]'));
+  click(m, d.querySelector('.dv-view [data-dc="step:1"]'));
   check(await until(() => m.eval('DC.docs.length') === 5 && shown() === m.eval('DC.docs[4].id') && nav() === '5 of 5'), 'the arrow button loads the next page too: "5 of 5"');
   check(d.querySelector('.dc-nav [data-dc="step:1"]').disabled, '... the arrow forward is off at the real end');
   const last = shown();
   swipe(m, prev(), -150);
   await sleep(300);
-  check(shown() === last && d.querySelector('.modal.dc-md .dc-body').classList.contains('dc-bnc-n'), 'at the real end: it springs back');
+  check(shown() === last && d.querySelector('.dv-view .dc-body').classList.contains('dc-bnc-n'), 'at the real end: it springs back');
   check(new Set(m.eval('DC.docs.map(x => x.id)')).size === 5, '... the list holds each document once');
 
   // two fingers enlarge the preview: one finger moves it then, no turn
@@ -131,18 +132,18 @@ function swipe(w, el, dx, dy = 0) {  // one finger from (200, 300) by dx / dy in
   touch(m, box, 'touchmove', [[110, 300], [240, 300]]);
   touch(m, box, 'touchmove', [[100, 300], [250, 300]]);
   touch(m, box, 'touchend', []);
-  check(m.eval(`document.querySelector('.modal.dc-md .dc-prev')._z.k`) > 2.5 && box.classList.contains('dc-zoomed'), 'two fingers enlarge the preview ' + m.eval(`document.querySelector('.modal.dc-md .dc-prev')._z.k`));
+  check(m.eval(`document.querySelector('.dv-view .dv-pages')._z.k`) > 2.5 && box.classList.contains('dc-zoomed'), 'two fingers enlarge the preview ' + m.eval(`document.querySelector('.dv-view .dv-pages')._z.k`));
   swipe(m, prev(), 150);
   await sleep(300);
   check(shown() === last && box.classList.contains('dc-zoomed'), '... enlarged a swipe moves the picture, the document stays');
   touch(m, box, 'touchstart', [[100, 300], [250, 300]]);
   touch(m, box, 'touchmove', [[150, 300], [200, 300]]);
   touch(m, box, 'touchend', []);
-  check(!box.classList.contains('dc-zoomed') && m.eval(`document.querySelector('.modal.dc-md .dc-prev')._z.k`) === 1, '... shrunk back: normal size');
+  check(!box.classList.contains('dc-zoomed') && m.eval(`document.querySelector('.dv-view .dv-pages')._z.k`) === 1, '... shrunk back: normal size');
   swipe(m, prev(), 150);
   check(await until(() => shown() === m.eval('DC.docs[3].id') && nav() === '4 of 5'), '... at normal size the swipe turns again');
-  click(m, d.querySelector('.modal.dc-md .dc-back'));
-  await until(() => !d.querySelector('.dc-md'));
+  click(m, d.querySelector('.dv-view .dv-back'));
+  await until(() => !d.querySelector('.dc-md') && m.location.hash === '#docs' && d.querySelector('.dc-view'));  // 2.583.0 (#4835): Back goes back in the history
 
   // "To review" on the phone: Checked -> the next one at once
   for (const id of IDS.slice(0, 3)) await call('POST', `/api/docs/${id}/review`, {done: false});
@@ -150,9 +151,9 @@ function swipe(w, el, dx, dy = 0) {  // one finger from (200, 300) by dx / dy in
   check(await until(() => d.querySelectorAll('.dc-card').length === 2 && m.eval('DC.f.review')), 'phone: "To review" (page of 2 of 3)');
   const rv = m.eval('DC.docs.map(x => x.id)');
   click(m, d.querySelector(`[data-dco="${rv[0]}"]`));
-  await until(() => shown() === rv[0] && d.querySelector('.modal.dc-md [data-dc="checked"]'));
-  click(m, d.querySelector('.modal.dc-md [data-dc="checked"]'));
-  check(await until(() => shown() === rv[1] && d.querySelector('.modal.dc-md [data-dc="checked"]')), 'phone: after "Checked" the next document to review comes at once');
+  await until(() => shown() === rv[0] && d.querySelector('.dv-view [data-dc="checked"]'));
+  click(m, d.querySelector('.dv-view [data-dc="checked"]'));
+  check(await until(() => shown() === rv[1] && d.querySelector('.dv-view [data-dc="checked"]')), 'phone: after "Checked" the next document to review comes at once');
   check(await until(async () => !(await call('GET', `/api/docs/${rv[0]}`)).review), '... the first is checked');
   m.close();
 
@@ -172,15 +173,15 @@ function swipe(w, el, dx, dy = 0) {  // one finger from (200, 300) by dx / dy in
   const w2 = await boot({user: 'alice', hash: 'docs/review'}), d2 = w2.document;
   await until(() => d2.querySelectorAll('.dc-card').length === 2);
   const rv2 = w2.eval('DC.docs.map(x => x.id)');
-  const pane = () => +(d2.querySelector('.dc-pane .dc-body')?.dataset.id || 0);
+  const pane = () => +(d2.querySelector('.dv-view .dc-body')?.dataset.id || 0);
   click(w2, d2.querySelector(`.dc-view [data-dco="${rv2[0]}"]`));
-  await until(() => pane() === rv2[0] && d2.querySelector('.dc-pane [data-dc="checked"]'));
-  check(/1 of 2/.test(d2.querySelector('.dc-pane .dc-navn')?.textContent || ''), 'computer: "1 of 2" in the pane too');
-  click(w2, d2.querySelector('.dc-pane [data-dc="checked"]'));
-  check(await until(() => pane() === rv2[1] && d2.querySelector('.dc-pane') && w2.location.hash === `#docs/${rv2[1]}`), 'computer: after "Checked" the pane shows the next document to review');
-  check(await until(() => /1 of 1/.test(d2.querySelector('.dc-pane .dc-navn')?.textContent || '')), '... the counter follows the shorter list: "1 of 1"');
-  click(w2, d2.querySelector('.dc-pane [data-dc="checked"]'));
-  check(await until(() => !d2.querySelector('.dc-pane')), '... the last one checked: the pane closes');
+  await until(() => pane() === rv2[0] && d2.querySelector('.dv-view [data-dc="checked"]'));
+  check(/1 of 2/.test(d2.querySelector('.dv-view .dc-navn')?.textContent || ''), 'computer: "1 of 2" in the pane too');
+  click(w2, d2.querySelector('.dv-view [data-dc="checked"]'));
+  check(await until(() => pane() === rv2[1] && d2.querySelector('.dv-view') && w2.location.hash === `#docs/${rv2[1]}`), 'computer: after "Checked" the pane shows the next document to review');
+  check(await until(() => /1 of 1/.test(d2.querySelector('.dv-view .dc-navn')?.textContent || '')), '... the counter follows the shorter list: "1 of 1"');
+  click(w2, d2.querySelector('.dv-view [data-dc="checked"]'));
+  check(await until(() => !d2.querySelector('.dv-view')), '... the last one checked: the pane closes');
   w2.close();
 
   // ================= Firefox: the real layout on phones (390 / 320 px), a touch screen
@@ -201,18 +202,18 @@ function swipe(w, el, dx, dy = 0) {  // one finger from (200, 300) by dx / dy in
       check(await wait(`DC.docs.length === 5 && document.querySelectorAll('.dc-card').length === 5 && !document.querySelector('.dc-moreld')`), `Firefox ${W}: the end of the list in view loads the next pages by itself`);
       const first = await ev(`DC.docs[0].id`);
       await ev(`(document.querySelector('.dc-view [data-dco="${first}"]').click(), 1)`);
-      check(await wait(`!!document.querySelector('.modal.dc-md .dc-nav') && !!document.querySelector('.modal.dc-md .dc-prev')`), `Firefox ${W}: the page with "x of N"`);
-      const r = await ev(`(() => { const n = document.querySelector('.modal.dc-md .dc-nav').getBoundingClientRect(), p = document.querySelector('.modal.dc-md .dc-prev'), c = document.querySelector('.modal.dc-md > .card');
+      check(await wait(`!!document.querySelector('.dv-view .dc-nav') && !!document.querySelector('.dv-view .dv-pages')`), `Firefox ${W}: the page with "x of N"`);
+      const r = await ev(`(() => { const n = document.querySelector('.dv-view .dc-nav').getBoundingClientRect(), p = document.querySelector('.dv-view .dv-pages'), c = document.querySelector('.dv-view');
         return {l: Math.round(n.left), r: Math.round(n.right), cw: Math.round(c.getBoundingClientRect().width), ta: getComputedStyle(p).touchAction, txt: document.querySelector('.dc-navn').textContent, sw: c.scrollWidth, ccw: c.clientWidth}; })()`);
       check(r && r.l >= 0 && r.r <= W && r.ta === 'pan-y' && r.txt === '1 of 5' && r.sw <= r.ccw + 1, `Firefox ${W}: the counter fits, the preview takes sideways swipes, no sideways scrolling ` + JSON.stringify(r));
-      await ev(`(() => { ${TOUCH} sw(document.querySelector('.modal.dc-md .dc-prev'), -${Math.round(W * .4)}); return 1; })()`);
-      check(await wait(`+document.querySelector('.modal.dc-md .dc-body').dataset.id === DC.docs[1].id && /^2 of /.test(document.querySelector('.dc-navn').textContent)`), `Firefox ${W}: a swipe on the preview turns to the next document`);
+      await ev(`(() => { ${TOUCH} sw(document.querySelector('.dv-view .dv-pages'), -${Math.round(W * .4)}); return 1; })()`);
+      check(await wait(`+document.querySelector('.dv-view .dc-body').dataset.id === DC.docs[1].id && /^2 of /.test(document.querySelector('.dc-navn').textContent)`), `Firefox ${W}: a swipe on the preview turns to the next document`);
       check(await ev(`location.hash === '#docs/' + DC.docs[1].id`), `Firefox ${W}: ... the address follows`);
-      await ev(`(() => { ${TOUCH} sw(document.querySelector('.modal.dc-md #dc-sender'), -${Math.round(W * .4)}); return 1; })()`);
+      await ev(`(() => { ${TOUCH} sw(document.querySelector('.dv-view #dc-sender'), -${Math.round(W * .4)}); return 1; })()`);
       await sleep(400);
-      check(await ev(`+document.querySelector('.modal.dc-md .dc-body').dataset.id === DC.docs[1].id`), `Firefox ${W}: a swipe on the fields does not turn`);
+      check(await ev(`+document.querySelector('.dv-view .dc-body').dataset.id === DC.docs[1].id`), `Firefox ${W}: a swipe on the fields does not turn`);
       await shot(`p2476a-docswipe-${W}.png`);
-      await ev(`(document.querySelector('.modal.dc-md .dc-back').click(), 1)`);
+      await ev(`(document.querySelector('.dv-view .dv-back').click(), 1)`);
       await wait(`!document.querySelector('.dc-md')`);
     }
   }, true);

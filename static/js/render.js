@@ -758,6 +758,23 @@ function lsd_sync() {
 }
 if (typeof ResizeObserver !== 'undefined') domReady(() => { const v = $('#view'); if (v) new ResizeObserver(() => dragRest('lsd', lsd_sync)).observe(v); lsd_sync(); });
 else addEventListener('resize', () => lsd_sync());
+// 2.583.0 (#4840): the content width of the list as --lw (px) on #view, for the growing text columns (start-breite.css).
+// Firefox kept a 100cqw behind var() at the list's width of an earlier layout when the list grew afterwards (the container
+// query stayed true, so nothing was styled again): a real variable that changes styles the rows again. The list itself is
+// watched (it is drawn anew with each render: a MutationObserver on #view hands the new one over); no list = no
+// variable, a list drawn later starts from 100cqw, never from an old width. While a grip is dragged dragRest (#4860, core.js).
+let lwRO = null, lwEl = null;
+function lw_watch() {  // a new list element: watch it (the observer measures it once right away), none: no variable
+  const v = $('#view'), w = v && v.querySelector('.lwrap'); if (!v || w === lwEl) return;
+  if (lwEl) lwRO?.unobserve(lwEl);
+  lwEl = w; if (w) lwRO?.observe(w); else v.style.removeProperty('--lw');
+}
+function lw_sync() {
+  const v = $('#view'), w = lwEl; if (!v || !w || !w.isConnected) return;
+  const cs = getComputedStyle(w), px = Math.round(w.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight));
+  if (px > 0 && v.style.getPropertyValue('--lw') !== px + 'px') v.style.setProperty('--lw', px + 'px');
+}
+if (typeof ResizeObserver !== 'undefined') domReady(() => { const v = $('#view'); if (!v) return; lwRO = new ResizeObserver(() => dragRest('lw', lw_sync)); new MutationObserver(() => lw_watch()).observe(v, {childList: true, subtree: true}); lw_watch(); });
 // Esc (events.js, nothing else open) closes the detail of the pair, the list stays
 function lsd_esc() {
   if (!lsd_wide() || S.sel) return false;
@@ -1278,7 +1295,7 @@ function taskRow(t, opts = {}) {
   let lcH = '';
   if (lc) {  // 2.14.0 (#425): the cells in the list's order; a cell the width has no room for shows in the second line
     const cells = lc.filter(k => k !== 'id').map(k => [k, lcCell(k, t, {kids, openKids, time, checklist: opts.checklist})]);
-    lcH = `<div class="lcols" id="tc-${t.id}" data-act="open">${cells.map(([k, c], i) => `<span class="lc ${lcCls(k)} ${lcOvf(i)}" data-k="${esc(k)}"${tcAttr(k, t)}>${c}</span>`).join('')}</div>`;  // 2.39.1 (#1327): tcAttr
+    lcH = `<div class="lcols" id="tc-${t.id}" data-act="open"${lcFit(lc)}>${cells.map(([k, c], i) => `<span class="lc ${lcCls(k)} ${lcOvf(i)}" data-k="${esc(k)}"${tcAttr(k, t)}>${c}</span>`).join('')}</div>`;  // 2.39.1 (#1327): tcAttr
     cells.forEach(([k, c], i) => { if (c && i >= 2) meta.push(`<span class="mlc ${lcOvf(i)}" data-lc="${esc(k)}">${c}</span>`); });
     meta.unshift(...cells.slice(0, 2).filter(([, c]) => c).map(([k, c]) => `<span class="mlc o0" data-lc="${esc(k)}">${c}</span>`));  // 2.290.0 C (#3163): the first two cells too, shown only in a narrow list on a computer (app.css), else hidden
   }
@@ -1574,8 +1591,22 @@ function colDefault(l) {  // what the default layout shows: the starting point o
   return [...((ticketsOn(l.id) || idsOn(l.id)) && pz_on(l, 'ticket') ? ['id'] : []), 'due', ...(acolOn(l.id) && on.has('who') ? ['who'] : []), ...(timeOn() && mtTime(l.id) && on.has('time') ? ['time'] : []),  // 2.41.0 (#1471): mtTime
     ...(all ? fs : fs.filter(f => f.pinned)).map(f => 'f:' + f.id), 'progress', ...(depsOn() && isProject(l.id) && on.has('deps') ? ['deps'] : []), ...(on.has('tags') ? ['tags'] : [])];
 }
-const lcCls = k => 'lc-' + (k.startsWith('f:') ? 'f t-' + ((S.fields || []).find(f => f.id === +k.slice(2))?.type || 'text') : k);
-const lcOvf = i => [2, 3, 5, 7, 10].filter(n => i >= n).map(n => 'o' + n).join(' ');
+// 2.583.0 (#4840 Teil F): list rows like a table. From a 96rem wide list on (app.css) the text columns (tags, delivery state,
+// text-like fields: class lcgw) share what the title leaves above about 40rem, each at most 15rem more than its standard
+// width; number and date columns keep their width. lcFit = the standard widths (rem, LC_BASE, the same as app.css) plus the
+// gaps of all shown columns and the number of growing ones, as variables for the column titles, the rows and the sum row
+const LC_BASE = {due: 7.5, prio: 5.5, who: 2.75, tags: 9, time: 6, progress: 4.5, deps: 5.5, created: 6, delivery: 7};
+const LC_GROW_T = ['text', 'select', 'multiselect', 'person', 'url', 'task'];
+const lcFtype = k => (S.fields || []).find(f => f.id === +k.slice(2))?.type || 'text';
+const lcGrows = k => k === 'tags' || k === 'delivery' || (k.startsWith('f:') && LC_GROW_T.includes(lcFtype(k)));
+function lcFit(lc) {
+  const ks = (lc || []).filter(k => k !== 'id'), n = ks.filter(lcGrows).length; if (!n) return '';
+  const fix = ks.reduce((a, k) => a + (k.startsWith('f:') ? (lcFtype(k) === 'checkbox' ? 3 : 7) : LC_BASE[k] || 7), 0) + .75 * (ks.length - 1);
+  return ` style="--lcfix:${Math.round(fix * 100) / 100}rem;--lcn:${n}"`;
+}
+const lcCls = k => 'lc-' + (k.startsWith('f:') ? 'f t-' + lcFtype(k) : k) + (lcGrows(k) ? ' lcgw' : '');
+// 2.583.0 (#4840 Teil F): + o13 / o16: on a very wide list the 11th to 16th column stay in the first line too (app.css)
+const lcOvf = i => [2, 3, 5, 7, 10, 13, 16].filter(n => i >= n).map(n => 'o' + n).join(' ');
 const colName = (l, k) => k === 'id' ? tr('Task number') : (colChoices(l).find(x => x[0] === k) || [0, ''])[1];
 const colShort = (l, k) => k === 'time' ? tr('Tracked') : colName(l, k);  // the title row's label (narrow columns)
 function lcCell(k, t, x) {
@@ -1696,7 +1727,7 @@ function lcHead(l, lc) {  // the column titles above the rows (wide layouts)
   // time = back to the list's sort (sortSet ''). The sorted column carries aria-sort and an arrow; a table with one row of
   // column headers for screen readers (the wrapper is display:contents, the layout stays the flex row)
   const cur = sortMode();
-  return `<div class="lchead" data-lid="${l.id}" role="table" aria-label="${esc(tr('Column titles'))}"><div class="lcrow" role="row"><span class="spacer" role="presentation"></span>${ks.map((k, i) => { const n = colName(l, k), p = colSorts(k), on = p.includes(cur), dir = on ? sortDir(cur) : '';
+  return `<div class="lchead" data-lid="${l.id}"${lcFit(lc)} role="table" aria-label="${esc(tr('Column titles'))}"><div class="lcrow" role="row"><span class="spacer" role="presentation"></span>${ks.map((k, i) => { const n = colName(l, k), p = colSorts(k), on = p.includes(cur), dir = on ? sortDir(cur) : '';
     const tip = on ? (cur === p[0] ? tr('Sorted by {0}. Click again to reverse the direction', n) : tr('Sorted by {0}. Click again to go back to the project sort', n)) : tr('Sort by {0}', n);
     return `<span class="lc ${lcCls(k)} ${lcOvf(i)}${on ? ' sorted' : ''}" data-k="${esc(k)}" role="columnheader"${on ? ` aria-sort="${dir}"` : ''} title="${esc(n)}"><button type="button" class="lcs" data-colsort="${esc(k)}" title="${esc(tip)}" aria-label="${esc(n)}"><span class="lcn" aria-hidden="true">${k === 'who' || k === 'prio' ? ic(COL_ICON[k], 's') : `<span>${esc(colShort(l, k))}</span>`}</span>${on ? `<span class="lcsa" aria-hidden="true">${ic('chev', dir === 'ascending' ? 's cup' : 's')}</span>` : ''}</button>${isTouch() ? '' : `<button type="button" class="lcmb" data-colmenu="${esc(k)}" tabindex="-1" aria-haspopup="menu" title="${esc(tr('Column menu: {0}', n))}" aria-label="${esc(tr('Column menu: {0}', n))}">${ic('chev', 's')}</button>`}${isTouch() ? '' : `<i class="lcg" data-lcg="${esc(k)}" title="${esc(tr('Drag the column width · double-click = default width'))}" role="separator" aria-orientation="vertical" tabindex="0" aria-label="${esc(tr('Width of the column {0}', n))}" ${lcwGet(l.id)[k] ? `aria-valuenow="${lcwGet(l.id)[k]}" aria-valuetext="${esc(tr('{0} rem', String(lcwGet(l.id)[k])))}"` : `aria-valuenow="7" aria-valuetext="${esc(tr('Default width'))}"`} aria-valuemin="${LCW_MIN}" aria-valuemax="${LCW_MAX}"></i>`}</span>`; }).join('')}</div></div>`;
 }

@@ -99,11 +99,11 @@ function textPdf(lines) {  // a one-page PDF with a text layer, written by hand
     const [wn, wa] = JSON.parse(widths);
     check(Math.abs(wn - wa) <= 2, 'the archive number row is as wide as the title ' + widths);
     // the actions
-    const acts = `(() => { const r = e => e.getBoundingClientRect(), a = [...document.querySelectorAll('.dc-acts .btn, .dc-acts .iconbtn')]  /* 2.554.0 (#4469): Delete is an icon button */.filter(e => e.getClientRects().length); const del = a[a.length - 1], prev = a[a.length - 2];
-      return JSON.stringify({n: a.length, last: del.dataset.dc, cl: del.classList.contains('dc-adel'), lines: new Set(a.map(e => Math.round(r(e).top))).size, apart: (r(del).top > r(prev).bottom || r(del).left - r(prev).right >= 16) && Math.abs(r(del).right - r(del.parentElement).right) <= 1}); })()`;
+    const acts = `(() => { const r = e => e.getBoundingClientRect(), a = [...document.querySelectorAll('.dv-hacts .btn, .dv-hacts .iconbtn')]  /* 2.554.0 (#4469): Delete is an icon button; 2.583.0 (#4835): the head of the view */.filter(e => e.getClientRects().length); const del = a[a.length - 1], prev = a[a.length - 2];
+      return JSON.stringify({n: a.length, last: del.dataset.dc, cl: del.classList.contains('dc-adel'), lines: new Set(a.map(e => Math.round(r(e).top))).size, apart: !!prev && Math.abs(r(del).right - r(del.parentElement).right) <= 1}); })()`;  // 2.583.0 (#4835): Delete at the right end of the head
     let g = JSON.parse(await ev(acts));
     check(g.last === 'del' && g.cl, 'Delete is the last action ' + JSON.stringify(g));
-    check(g.lines <= 2 && g.apart, 'closed: at most two lines of actions (it was three), Delete apart at the right edge ' + JSON.stringify(g));
+    check(g.lines <= 1 && g.apart, '2.583.0 (#4835): one line of actions in the head, Delete at its right edge ' + JSON.stringify(g));
     check(await ev(`document.querySelector('[data-dc="share"]')?.getClientRects().length === 0`), 'the rarer actions are folded behind More');
     await ev(`document.querySelector('[data-dc="actsmore"]')?.click()`);
     check(await ready(ev, `document.querySelector('[data-dc="actsmore"]')?.getAttribute('aria-expanded') === 'true' && document.querySelector('[data-dc="share"]')?.getClientRects().length > 0 && document.querySelector('[data-dc="xlink"]')?.getClientRects().length > 0`), 'More shows them');
@@ -112,12 +112,13 @@ function textPdf(lines) {  // a one-page PDF with a text layer, written by hand
     await shot('p2497-a-letter-more-desktop.png');
     await ev(`document.querySelector('[data-dc="actsmore"]')?.click()`);
     // the chips and the section
-    check(await ev(`!document.querySelector('.dc-form .linkbtn[data-dc^="showopt"]') && !!document.querySelector('[data-dc="showopt:due"]') && !!document.querySelector('[data-dc="showopt:amount"]')`), 'one chip per optional field');
-    check(await ev(`!!document.querySelector('.dc-text > summary h4')`), 'the recognised text is a section with a heading');
-    await ev(`document.querySelector('[data-dc="showopt:due"]')?.click()`);
-    check(await ready(ev, `!!document.querySelector('#dc-due') && document.querySelector('#dc-due').closest('.dc-f').getClientRects().length > 0 && !document.querySelector('[data-dc="showopt:due"]') && !!document.querySelector('[data-dc="showopt:amount"]')`), 'the chip opens its field only');
+    // 2.583.0 (#4835): the rare fields wait under "More fields" (the chips per field gave way to it), the text in the tab Content
+    check(await ev(`!document.querySelector('[data-dc^="showopt"]') && !!document.querySelector('.dv-more #dc-due') && !!document.querySelector('.dv-more #dc-amount')`), 'due date and amount under "More fields"');
+    check(await ev(`!!document.querySelector('.dc-text h4')`), 'the recognised text is a section with a heading');
+    await ev(`(() => { const m = document.querySelector('.dv-more'); if (m && !m.open) m.querySelector('summary').click(); return 1; })()`);
+    check(await ready(ev, `!!document.querySelector('#dc-due') && document.querySelector('#dc-due').closest('.dc-f').getClientRects().length > 0`), '"More fields" opens them');
     rows = JSON.parse(await ev(GRID));
-    check(same(rows, 'x'), 'the opened field stands in the grid ' + JSON.stringify(rows));
+    check(same(rows, 'x'), 'the opened fields stand in the grid ' + JSON.stringify(rows));
     // the button shows the fields, in the same grid
     await ev(`document.querySelector('.rc-slot [data-rc="open:0"]')?.click()`);
     check(await ready(ev, `!!document.querySelector('#rc-proj') && !document.querySelector('[data-rc="open:0"]')`), 'the button shows the receipt fields');
@@ -157,8 +158,8 @@ function textPdf(lines) {  // a one-page PDF with a text layer, written by hand
     await ev(`document.querySelector('[data-dc="actsmore"]')?.click()`);
     const sm = await ev(noSide); check(flat(sm), 'phone 320 px, More open: no sideways scrolling ' + sm);
     await ev(`document.querySelector('[data-dc="actsmore"]')?.click()`);
-    check(await ev(`[...document.querySelectorAll('.dc-acts .btn, .dc-acts .iconbtn')].pop().dataset.dc === 'del'`), 'phone: Delete is the last action');
-    await ev(`document.querySelector('.dc-acts').scrollIntoView()`);
+    check(await ev(`[...document.querySelectorAll('.dv-hacts .btn, .dv-hacts .iconbtn')].pop().dataset.dc === 'del'`), 'phone: Delete is the last action');  // 2.583.0 (#4835): the head
+    await ev(`document.querySelector('.dv-hacts').scrollIntoView()`);
     await shot('p2497-a-letter-phone.png');
   }, false);
 

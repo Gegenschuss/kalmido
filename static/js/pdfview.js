@@ -5,7 +5,7 @@
    as they scroll into view; turn pages, zoom (buttons, Ctrl+wheel, pinch), swipe on a phone. Safe: same origin only,
    isEvalSupported off, nothing in the PDF runs (no scripts, no forms, links are not followed). Used by attachments,
    project files, office documents, archive PDFs and the documents / file areas.
-   2.521.0 (#4476): o.step(dir) = leaf through a list without closing (documents: docread.js dcr_fullOpts) - two buttons with
+   2.521.0 (#4476): o.step(dir) = leaf through a list without closing (documents: docview.js dv_fullOpts, 2.583.0) - two buttons with
    o.pos ("3 of 48") and their names o.prevT / o.nextT (texts of the caller's module) and the arrow keys left / right go to the previous / next one (the pages then turn with Page up / down);
    o.img = an image instead of a PDF, o.kind 'file' = a file that cannot be shown (a hint and Download), both only with o.step.
    2.727.0 (#5202): o.peek(dir) -> {img} = the neighbour's (small) picture for the placeholder that glides along with a swipe. */

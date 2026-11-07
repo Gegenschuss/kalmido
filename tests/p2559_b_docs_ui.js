@@ -116,10 +116,11 @@ const ready = id => until(async () => { const d = await call('GET', `/api/docs/$
   check(w.eval(`DC.docs.find(x => x.id === ${A}).review === false`) && !d.querySelector(`.dc-card[data-k="dc${A}"]`)?.classList.contains('rev'), 'checked: the card is no longer "To review" at once');
   check(noState(w, i0), 'checked: no GET /api/state');
   w.__held[0].fail(500);
-  check(await until(() => w.eval(`DC.docs.find(x => x.id === ${A})?.review === true`) && d.querySelector(`.dc-card[data-k="dc${A}"]`)?.classList.contains('rev')), 'checked: a refusal marks it "To review" again');
+  // 2.583.0 (#4835): the document is a view of its own (no cards beside it): the list entry is marked again
+  check(await until(() => w.eval(`DC.docs.find(x => x.id === ${A})?.review === true`)), 'checked: a refusal marks it "To review" again');
   check((await call('GET', `/api/docs/${A}`)).review === true, 'checked: the server still has it to review');
   // a second try from its own sheet
-  click(w, d.querySelector(`[data-dco="${A}"]`));
+  w.eval(`dc_open(${A})`);  // 2.583.0 (#4835): in the view another document takes its place
   await until(() => w.eval(`DC.doc?.id === ${A}`) && d.querySelector('.dc-md [data-dc="checked"]'));
   hold(w, /^POST \/api\/docs\/\d+\/review$/);
   click(w, d.querySelector('.dc-md [data-dc="checked"]'));

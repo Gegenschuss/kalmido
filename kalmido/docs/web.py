@@ -161,7 +161,7 @@ def doc_json(c, m, node, full=False, role=None, pre=None):
          "sender": {"id": m["sender_id"], "name": S.label_name(c, ws, "sender", m["sender_id"])} if m["sender_id"] else None,
          "type": {"id": m["type_id"], "name": S.label_name(c, ws, "type", m["type_id"])} if m["type_id"] else None,
          "tags": pre["tags"].get(m["node_id"], []) if pre else S.node_tags(c, m["node_id"]), "folder": folder, "auto": auto, "suggest": out_sug, "review": bool(m["review"]),
-         "thumb": bool(m["thumb"]), "task_id": m["task_id"], "asn": m["asn"], "source": m["source"], "created_at": node["created_at"],
+         "thumb": bool(m["thumb"]), "thumb_l": bool(S.thumb_l_of(m)), "task_id": m["task_id"], "asn": m["asn"], "source": m["source"], "created_at": node["created_at"],
          "updated_at": m["updated_at"], "parent_id": node["parent_id"], "hand": hand,
          "edited_at": doc_ver(m)}  # 2.570.0 (#4770): the version of people's changes (expect_updated_at of PATCH)
     # 2.210 C (#2761): only a flag whether the document is shared (no names)
@@ -759,16 +759,19 @@ def docs_redo_undo(nid):
 
 @app.get("/api/docs/<int:nid>/thumb")
 def docs_thumb(nid):
+    """The preview image of a document (rights as the document: _doc). 2.583.0 (#4812): ?size=l the sharper one of big cards
+    (doc_meta.thumb_l); while it is not made yet the small one answers (same rights, same seal)."""
     from flask import Response
     c = db()
     m, _n = _doc(c, nid)
-    if not m["thumb"]:
+    rel = (S.thumb_l_of(m) if request.args.get("size") == "l" else "") or m["thumb"]
+    if not rel:
         raise Denied(404)
     v = fs_version_row(c, nid)
     if v:
         sc_guard(c, "fs", nid, v["no"])  # 2.148.1 E (#2496): no preview of a version found infected later
     try:
-        data = S.thumb_read(c, m["ws"], os.path.join(ATT_DIR, m["thumb"]))  # 2.48.0 review (L3): private ones sealed
+        data = S.thumb_read(c, m["ws"], os.path.join(ATT_DIR, rel))  # 2.48.0 review (L3): private ones sealed
     except (OSError, OrgCryptError):
         raise Denied(404) from None
     r = Response(data, mimetype="image/jpeg")

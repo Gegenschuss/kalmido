@@ -81,3 +81,47 @@ def p61a_thumb_fill(c):
             print("docs: preview catch-up", nid, type(e).__name__, e, flush=True)
     gset(c, FILL_KEY, json.dumps({"below": rows[-1][0]}))
     return len(rows)
+
+
+# 2.583.0 (#4812): the sharper preview (800 px, doc_meta.thumb_l) for documents from before -- the same catch-up pattern: only
+# while the queue is idle and after the catch-up above is done, a portion every FILL_S seconds, newest first, its own position
+# (FILL_L_KEY), "done" at the end. A document with a small preview but no sharp one gets it; one that fails is skipped (log),
+# its card keeps the small one. Each with its own workspace (fs_read / thumb_store_l seal like thumb_store).
+FILL_L_KEY = "docs_thumb_l_fill"  # settings: {"below": lowest node id handled so far} or {"done": 1}
+_QL = {"at": 0.0}
+
+
+def p2583_thumb_l_fill(c):
+    """One portion of the catch-up of the sharp previews (run like p61a_thumb_fill in the queue's system context, the caller
+    commits). Returns the number of documents looked at; 0 when it is not time yet, the small catch-up still runs, or done."""
+    if not FILL or time.monotonic() - _QL["at"] < FILL_S:
+        return 0
+    try:
+        if not json.loads(gsetting(c, FILL_KEY) or "{}").get("done"):
+            return 0  # the small previews first
+        st = json.loads(gsetting(c, FILL_L_KEY) or "{}")
+    except (ValueError, AttributeError):
+        st = {}
+    _QL["at"] = time.monotonic()
+    st = st if isinstance(st, dict) else {}
+    if st.get("done"):
+        return 0
+    below = int(st.get("below") or 2 ** 62)
+    rows = c.execute("""SELECT d.node_id FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id
+                        WHERE d.node_id < ? AND d.state='done' AND COALESCE(d.thumb, '')<>'' AND COALESCE(d.thumb_l, '')=''
+                          AND n.deleted_at IS NULL
+                        ORDER BY d.node_id DESC LIMIT ?""", (below, FILL_N)).fetchall()
+    if not rows:
+        gset(c, FILL_L_KEY, json.dumps({"done": 1}))
+        return 0
+    for (nid,) in rows:
+        try:
+            with c.savepoint():  # one broken document never stops the catch-up
+                m = S.meta_row(c, nid)
+                node = c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
+                data = fs_read(c, nid)
+                S.thumb_store_l(c, m, node, data, file_kind(node["name"], node["mime"], data[:2048]))
+        except Exception as e:  # noqa: BLE001 -- a missing file, a key that does not open, a broken image: skip it
+            print("docs: sharp preview catch-up", nid, type(e).__name__, e, flush=True)
+    gset(c, FILL_L_KEY, json.dumps({"below": rows[-1][0]}))
+    return len(rows)

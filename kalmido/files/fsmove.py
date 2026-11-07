@@ -369,12 +369,14 @@ def fsm_doc(c, nid, to, owner, uid, name, new_paths, old_paths, df_define=None):
     # 2.96.0 (#1941): the target's models learn the document at once (sender, type, folder, tags as
     # they are now); train() writes `trained` for the new ws, so a later correction or move takes exactly this out again
     S.train(c, nid)
-    if m["thumb"]:
-        c.execute("UPDATE doc_meta SET thumb=NULL WHERE node_id=?", (nid,))
-        src = os.path.join(ATT_DIR, m["thumb"])
+    for col, cur, tag in (("thumb", m["thumb"], ""), ("thumb_l", S.thumb_l_of(m), "-l")):  # 2.583.0 (#4812): + the sharp one
+        if not cur:
+            continue
+        c.execute(f"UPDATE doc_meta SET {col}=NULL WHERE node_id=?", (nid,))  # col: one of the two names above
+        src = os.path.join(ATT_DIR, cur)
         try:
             jpg = S.thumb_read(c, old, src)
-            rel = os.path.join(S.THUMB_DIR, f"{int(nid)}-{uuid.uuid4().hex[:10]}.jpg")
+            rel = os.path.join(S.THUMB_DIR, f"{int(nid)}-{uuid.uuid4().hex[:10]}{tag}.jpg")
             dst = os.path.join(ATT_DIR, rel)
             new_paths.append(dst)
             if to:
@@ -382,7 +384,7 @@ def fsm_doc(c, nid, to, owner, uid, name, new_paths, old_paths, df_define=None):
             else:
                 from ..core.orgcrypt import _write_atomic
                 _write_atomic(dst, S.thumb_seal(c, new, jpg))
-            c.execute("UPDATE doc_meta SET thumb=? WHERE node_id=?", (rel, nid))
+            c.execute(f"UPDATE doc_meta SET {col}=? WHERE node_id=?", (rel, nid))
             old_paths.append(src)  # 2.273.0 B (#3051): the old preview goes only once the new one is written
         except (OSError, OrgCryptError):
             pass  # no preview: the documents view shows the placeholder (docs/thumbfill.py makes it again)

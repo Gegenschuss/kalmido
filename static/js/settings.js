@@ -222,6 +222,79 @@ function settingsSync(keep = null) {
   md._tabDraw?.();
   md._sideDraw?.();
   if (typeof nav_pageDraw === 'function' && !$('#s-navmenus .navdrag', md)) nav_pageDraw($('#s-navmenus', md));  // 2.418.0 (#3560): after an undo / another device
+  som_sync(md);  // 2.583.0 (#4833): the counts under "Further options" and their open state from another device
+}
+// 2.583.0 (#4833): each tab shows the everyday settings first; the rarely changed part lies under ONE fold "Further options" at
+// the end of the tab. SET_MORE = what goes there, per tab: a heading (its whole section up to the next heading) or a single
+// control (its row and the hints right under it). Moving a point between "often" and "rare" = one entry here. Open / closed is
+// the person's setting settings_more (all devices); the search and a jump to a folded section open it without saving that.
+// Not folded: Account (sign-in and security), Menus, Modules (folded per group already), Access, the tabs with sub-tabs
+// (Organisation, Agents, Server), Company & office, Documents and Help (texts).
+const SET_MORE = {
+  general: ['#s-fmt-h', '#s-dates-h', '#s-wt-h'],
+  look: ['#s-wacc-h', '#s-lemo-h', '#s-sdd-h', '#s-tips-h', '#s-prbg-h', '#s-fav-h', '#s-sv-h'],
+  notify: ['#s-bl9ac', '#s-tbl-h', '#s-trd-h', '#s-kbd-h'],
+  integr: ['#s-dav-h', '#s-carddav-h', '#s-scan-h', '#s-fetch-h', '.pl-slot', '#s-kk-h', '#s-nwl-h', '#s-bmlet-h', '#s-apb-h', '#s-pep-h'],
+  data: ['#s-pmeta-h', '#s-vext-h', '#s-xlstd-h', '#s-umz-h', '#s-sample-h', '#s-ofdata-h'],
+};
+const SOM = {defs: null};  // the defaults of the settings (GET /api/settings/defaults, loaded once)
+const som_top = (el, p) => { while (el && el.parentElement !== p) el = el.parentElement; return el; };
+const som_head = n => n.matches('h3, h4, details.setmore') || !!n.querySelector('h3, h4');
+function som_block(p, sel) {  // the top-level nodes of one entry of SET_MORE in its tab (none: not drawn for this person)
+  const a = $(sel, p), t = a && som_top(a, p); if (!t) return [];
+  const out = [t];
+  for (let n = t.nextElementSibling; n && !som_head(n) && (t.matches('h4') || n.matches('.shint')); n = n.nextElementSibling) out.push(n);
+  return out;
+}
+const som_open = () => { try { const v = JSON.parse(S.settings?.settings_more || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } };
+function som_reveal(el) {  // a jump / search hit inside a closed fold opens it (only on screen, not saved)
+  const d = el?.closest?.('details.setmore'); if (d && !d.open) d.open = true;
+}
+function som_build(md) {
+  const open = som_open();
+  md._somSeen = S.settings?.settings_more || '';
+  for (const [k, sels] of Object.entries(SET_MORE)) {
+    const p = $(`.spane[data-pane="${k}"]`, md); if (!p) continue;
+    const ns = [...new Set(sels.flatMap(x => som_block(p, x)))].sort((a, b) => a.compareDocumentPosition(b) & 4 ? -1 : 1);
+    if (!ns.length) continue;
+    const d = document.createElement('details');
+    d.className = 'setmore'; d.dataset.more = k; d.open = open.includes(k);
+    d.innerHTML = `<summary><span>${esc(tr('Further options'))}</span><small class="setmorec"></small></summary><div class="setmoreb"></div>`;
+    $('.setmoreb', d).append(...ns);
+    p.append(d);
+    // a jump to a section in here (the focus of settingsModal, the integration cards, a test) opens the fold first
+    const own = Element.prototype.scrollIntoView;
+    for (const el of $$('[id]', d)) el.scrollIntoView = function (o) { som_reveal(this); return own ? own.call(this, o) : undefined; };
+  }
+  md.addEventListener('click', e => {
+    const sm = e.target.closest('details.setmore > summary'); if (!sm) return;
+    som_save(sm.parentElement.dataset.more, !sm.parentElement.open);  // the click toggles it right after this handler
+  });
+  md.addEventListener('change', () => setTimeout(() => som_count(md), 0));
+  som_count(md);
+  if (!SOM.defs && $('details.setmore', md)) som_defs().then(() => som_count(md));
+}
+async function som_defs() {
+  try { SOM.defs = (await api('GET', '/api/settings/defaults'))?.defaults || null; } catch { /* offline: no count until the next opening */ }
+  return SOM.defs;
+}
+async function som_save(k, on) {
+  const ks = som_open().filter(x => x !== k); if (on) ks.push(k);
+  if (S.settings) { S.settings.settings_more = JSON.stringify(ks); const md = $$('.smodal').pop(); if (md) md._somSeen = S.settings.settings_more; }
+  try { await api('PATCH', '/api/settings', {set_delta: {settings_more: on ? {add: [k]} : {remove: [k]}}}); } catch { /* shown; the local choice holds until the next load */ }
+}
+function som_count(md) {  // "2 changed" on a fold: its settings (SETS) whose stored value differs from the default
+  const D = SOM.defs;
+  for (const d of $$('details.setmore', md)) {
+    let n = 0;
+    if (D) for (const el of $$('[id]', d)) { const x = SETS[el.id]; if (x && x[0] in D && String(S.settings?.[x[0]] ?? '') !== String(D[x[0]] ?? '')) n++; }
+    const c = $('.setmorec', d); if (c) c.textContent = n ? tr('{0} changed', n) : '';
+    d.classList.toggle('chg', n > 0);
+  }
+}
+function som_sync(md) {
+  if ((S.settings?.settings_more || '') !== md._somSeen) { md._somSeen = S.settings?.settings_more || ''; const o = som_open(); for (const d of $$('details.setmore', md)) d.open = o.includes(d.dataset.more); }
+  som_count(md);
 }
 function ntfyShow(md) {  // U06: the ntfy details only when ntfy is (also) the channel
   const ch = $('#s-pushch', md)?.value || S.settings.push_channel || 'webpush';
@@ -745,7 +818,7 @@ function settingsModal(focus) {
       ${hint(tr('A new project hides its completed tasks; its “…” menu shows them again. A folder default goes first.'))}
       <h4 id="s-sdd-h">${tr('Completed tasks')}</h4><div class="row"><label for="s-sdd">${tr('In projects and views')}</label><select id="s-sdd"><option value="1">${tr('Show completed')}</option><option value="0" ${s.show_done_default === '0' ? 'selected' : ''}>${tr('Hide completed')}</option></select></div>
       ${hint(tr('The default for every project and view; a folder or a single project can choose otherwise.'))}
-      <h4>${tr('Tips')}</h4><div class="row"><label>${tr('Hints')}</label><button class="btn sm" data-m="hints-reset">${ic('undo', 's')} ${tr('Show tips again')}</button></div>
+      <h4 id="s-tips-h">${tr('Tips')}</h4><div class="row"><label>${tr('Hints')}</label><button class="btn sm" data-m="hints-reset">${ic('undo', 's')} ${tr('Show tips again')}</button></div>
       ${hint(tr('Brings back the one-time hints on this device (touch screens show helper texts once).'))}
       <h4 id="s-tabbar-h">${tr('Tab bar')}</h4>
       ${hint(tr('This device fits {0} tabs, the rest goes under “More”.', tabMax()))}
@@ -911,6 +984,7 @@ function settingsModal(focus) {
     <div class="sbody"><nav class="snav" role="tablist" aria-label="${tr('Settings')}">${secs.map(([k, i, n]) => `<button role="tab" id="st-${k}" aria-controls="sp-${k}" aria-selected="${k === cur}" data-sec="${k}" class="${k === cur ? 'on' : ''}"${k === 'access' && k !== cur && !acz_mine() ? ' hidden' : ''/* 2.364.0 C (#3044) */}>${ic(i, 's')}<span>${tr(n)}</span>${SET_DESC[k] ? `<small class="sndesc">${esc(tr(SET_DESC[k]))}</small>` : ''}</button>`).join('')}</nav>${mvOn() ? `<button type="button" class="snmv" data-mv="off">${ic('eye', 's')}<span>${tr('Show administration again')}</span></button>` : ''/* 2.436.0 (#3620): the way back, under the areas */}
       <div class="spanes">${secs.map(([k]) => `<section class="spane ${k === cur ? '' : 'hidden'}" role="tabpanel" id="sp-${k}" aria-labelledby="st-${k}" data-pane="${k}">${pane[k]}</section>`).join('')}</div></div>`);
   md.classList.add('smodal');
+  som_build(md);  // 2.583.0 (#4833): the rare part of each tab under "Further options"
   xl_stdLater(md, hint);  // 2.470.0 (#3596): the sharing defaults of a workspace (ablinks.js); 2.599.0 (#4907): after the module ablage loaded
   tty_mount(md);  // 2.609.0 (#3372): own ticket types (below)
   $('[data-mv]', md)?.addEventListener('click', () => mvSet(false));  // 2.436.0 (#3620)
