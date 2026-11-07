@@ -1044,8 +1044,11 @@ function renderView() { FL.vlast = Date.now(); return td_rcRun(() => { const r =
 const TOPW_MIN = 1700;
 function topw_sync() {
   const m = $('#main'), v = $('#view'); if (!m || !v) return;
+  const wide = innerWidth >= TOPW_MIN && !isMobile();
+  // below 1700 px nothing is measured: no forced layout on every redraw (the chats redraw often; --pw / --pw-sb only count from 1700 px)
+  if (!wide) { if (m.dataset.w !== 'voll' || m.style.getPropertyValue('--pw') || m.style.getPropertyValue('--pw-sb')) { m.dataset.w = 'voll'; $('#top')?.classList.remove('topw'); m.style.removeProperty('--pw'); m.style.removeProperty('--pw-sb'); topw_watch(null); } return; }
   let w = 'voll', px = 0;
-  if (innerWidth >= TOPW_MIN && !isMobile()) {
+  {
     const rs = getComputedStyle(document.documentElement), rem = parseFloat(rs.fontSize) || 16;
     const named = new Map(['lesen', 'form', 'seite'].map(k => [Math.round(parseFloat(rs.getPropertyValue('--w-' + k)) * rem), k]));
     const vr = v.getBoundingClientRect(), vs = getComputedStyle(v), l0 = vr.left + parseFloat(vs.paddingLeft), r0 = vr.left + v.clientWidth - parseFloat(vs.paddingRight);
