@@ -9,6 +9,7 @@
 //   34 px -> 22 px, 12 px -> 8 px, 0 -> 0 (no safe area: as before); it ends at the screen's bottom; the labels sit close to it
 // - everything above the bar follows the same edge (--tabs-bot): the "+" button, the office import foot (no second safe-area
 //   padding), the list's end (#view: --tabs-bot + 4.5rem) - the last row ends above the "+" button
+// - the phone drawer's stripe sits below the status bar too; a light design paints the area behind the white clock black
 // - the page canvas (html) has the tab bar colour = theme-color: no grey band below the bar when it bounces
 // - a computer with a mouse: no tab bar, --tabs-bot is the safe area alone (the old calc(--tabs-h + --safe-b))
 // freelancer-matrix: none (layout only)
@@ -60,6 +61,9 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
     check(top.ld === 47, 'the loading bar sits below the status bar, not behind the clock ' + JSON.stringify(top));
     // the workspace stripe on top of the head (4 px): below the status bar (47..51 px), the 47 px behind the clock in the page colour
     check(/0px 47px 0px 0px inset/.test(top.sh) && /0px 51px 0px 0px inset/.test(top.sh) && top.sh.indexOf('47px') < top.sh.indexOf('51px'), 'the workspace stripe sits below the status bar ' + top.sh);
+    // the phone drawer's stripe (6 px) likewise below the status bar: its sticky head paints it, the box has no top border then
+    const sd = await ev(`(() => { const sd = document.querySelector('#side'), m = sd?.querySelector('.sbmsrch'); return {has: !!m, bt: sd ? getComputedStyle(sd).borderTopWidth : '', sh: m ? getComputedStyle(m).boxShadow : ''}; })()`);
+    check(sd.has && sd.bt === '0px' && /0px 47px 0px 0px inset/.test(sd.sh) && /0px 53px 0px 0px inset/.test(sd.sh), 'the drawer\'s stripe sits below the status bar, not behind the clock ' + JSON.stringify(sd));
     // ---- the tab bar: only part of the home indicator room
     const g34 = await ev(GEO);
     check(g34.pb === 22 && g34.h === 56 + 22 && g34.bot === g34.vh, 'safe area 34 px: the bar keeps 22 px below (not 34) and ends at the screen bottom ' + JSON.stringify(g34));
@@ -90,6 +94,13 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
     const foot = await ev(`(() => { const d = document.createElement('div'); d.className = 'foot stfoot oimfoot'; d.id = 'p2633-oim'; (document.querySelector('#view')).appendChild(d); const cs = getComputedStyle(d); const o = {pb: parseFloat(cs.paddingBottom), bottom: cs.bottom}; d.remove(); return o; })()`);
     check(foot.pb === 12 && foot.bottom === '78px', 'the import foot: .75rem padding below (no --safe-b again), sticky right above the bar ' + JSON.stringify(foot));
     await shot('p2633b-office-34.png');
+    // ---- a light design: the white clock of black-translucent stays readable - black behind it, as the opaque bar was
+    const lt = await ev(`(() => { localStorage.setItem('tasks.theme', '"light"'); applyTheme(); const r = getComputedStyle(document.documentElement);
+      return {theme: document.documentElement.dataset.theme, sbar: r.getPropertyValue('--sbar-bg').trim(), bg: r.getPropertyValue('--bg').trim(), top: getComputedStyle(document.querySelector('#top')).boxShadow}; })()`);
+    // the head's colours ease over (a transition): wait for the settled shadow
+    lt.settled = await ready(ev, `(() => { const v = getComputedStyle(document.querySelector('#top')).boxShadow; return /^rgb\\(0, 0, 0\\) 0px 47px/.test(v); })()`, 40);
+    check(lt.settled, 'light design: black behind the clock (a white clock stays readable) ' + JSON.stringify(lt));
+    await ev(`(() => { localStorage.setItem('tasks.theme', '"dark"'); applyTheme(); return 1; })()`);
   }, true);
 
   // ---- a computer: the old values

@@ -95,7 +95,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   const css = await (await fetch(B + 'static/app.css')).text();
   check(!/#main\.wsc-on #top\{box-shadow/.test(css) && !/#side\.wsp-on\{--wsc/.test(css), '#2389: the list header stripe and the tint are gone (CSS)');
   // 2.490.0 (#4026): a wider stripe -- 6 px in the sidebar, 4 px on top of the header (4 px / 3 px before)
-  check(/#side\{border-top:\.375rem solid var\(--wbc\)\}/.test(css) && /#app\.side-rail #top\{box-shadow:inset 0 var\(--safe-t\) 0 var\(--bg\),inset 0 calc\(var\(--safe-t\) \+ \.25rem\) 0 var\(--wbc\)\}/.test(css) /* 2.633.0 (#4994): below the status bar's safe area */, '#2389 / #4026: 6 px stripe in the sidebar, 4 px on top of the header (rail / phone)');
+  check(/#side\{border-top:\.375rem solid var\(--wbc\)\}/.test(css) && /#app\.side-rail #top\{box-shadow:inset 0 var\(--safe-t\) 0 var\(--sbar-bg,var\(--bg\)\),inset 0 calc\(var\(--safe-t\) \+ \.25rem\) 0 var\(--wbc\)\}/.test(css) /* 2.633.0 (#4994): below the status bar's safe area */, '#2389 / #4026: 6 px stripe in the sidebar, 4 px on top of the header (rail / phone)');
   check(/@media \(hover:none\)\{ #side \.sbhead \.sbtools\{opacity:1\} \}/.test(css) && /#side \.sbhead:hover \.sbtools,#side \.sbhead:focus-within \.sbtools\{opacity:1\}/.test(css), '#2392: the tools on hover, keyboard focus and touch screens');
   w.close();
 

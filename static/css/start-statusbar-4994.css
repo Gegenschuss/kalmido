@@ -1,0 +1,11 @@
+/* 2.633.0 (#4994): the iPhone home-screen app (apple-mobile-web-app-status-bar-style black-translucent, index.html) reaches up
+   behind the status bar; that area stays calm, without the workspace stripe. --sbar-bg = the colour behind the clock (used by
+   #top in app.css): the page colour in dark designs, black in light ones as the opaque black bar was before (the clock is white) */
+:root{--sbar-bg:var(--bg)}
+:root[data-theme="light"]{--sbar-bg:#000}
+@media (prefers-color-scheme: light){ :root[data-theme="auto"]{--sbar-bg:#000} }
+/* 2.633.0 (#4994): phone drawer: the stripe sits below the status bar, the area behind the clock stays calm (as #top); the drawer's
+   sticky head (it reaches up over the safe area and never scrolls) paints it instead of the box's own border */
+/* only with a safe area on top (min / max of --safe-t * 100: 0 without one, so phones without it keep the border as before) */
+@media (max-width:767px){ #side:has(.sbmsrch){border-top-width:max(0px,calc(.375rem - var(--safe-t,0px) * 100))}
+  #side .sbmsrch{box-shadow:inset 0 var(--safe-t,0px) 0 var(--sbar-bg),inset 0 calc(var(--safe-t,0px) + min(.375rem,var(--safe-t,0px) * 100)) 0 var(--wbc)} }

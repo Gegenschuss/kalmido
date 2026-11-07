@@ -8422,8 +8422,8 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 :root[data-theme="light"] #app.wsb-on{--wbc:var(--wbl)}
 @media (prefers-color-scheme: light){ :root[data-theme="auto"] #app.wsb-on{--wbc:var(--wbl)} }
 #side{border-top:.375rem solid var(--wbc)}  /* the scroll box's own border: never scrolls, never covered by the sticky head */
-@media (max-width:767px){ #top{box-shadow:inset 0 var(--safe-t) 0 var(--bg),inset 0 calc(var(--safe-t) + .25rem) 0 var(--wbc)} }  /* 2.633.0 (#4994): the home-screen app reaches behind the status bar (black-translucent): the 4 px stripe sits below it, the area behind the clock stays calm (the first shadow paints it in the page colour; without a safe area it is empty) */
-#app.side-rail #top{box-shadow:inset 0 var(--safe-t) 0 var(--bg),inset 0 calc(var(--safe-t) + .25rem) 0 var(--wbc)}
+@media (max-width:767px){ #top{box-shadow:inset 0 var(--safe-t) 0 var(--sbar-bg,var(--bg)),inset 0 calc(var(--safe-t) + .25rem) 0 var(--wbc)} }  /* 2.633.0 (#4994): the home-screen app reaches behind the status bar (black-translucent): the 4 px stripe sits below it, the area behind the clock stays calm (the first shadow paints it in the page colour; without a safe area it is empty) */
+#app.side-rail #top{box-shadow:inset 0 var(--safe-t) 0 var(--sbar-bg,var(--bg)),inset 0 calc(var(--safe-t) + .25rem) 0 var(--wbc)}
 #side .sbhead{display:flex;align-items:center;gap:.25rem;min-height:2.25rem;margin:0 0 .5rem}
 #side .sbhead .spacer{flex:1}
 :root #side .sbhead .wsbar,:root:is([data-sdensity="compact"],[data-sbase="compact"]) #side .sbhead .wsbar{width:auto;max-width:100%;min-height:2.25rem;padding:0 .375rem;margin-left:-.125rem;gap:.5rem;border:0;border-radius:var(--radius);background:none;color:var(--text);font-size:var(--fs-l);font-weight:600;letter-spacing:-.01em}
