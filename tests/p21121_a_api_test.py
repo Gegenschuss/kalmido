@@ -13,6 +13,7 @@ Invented names only, generated file contents (pictures drawn here as PNG, no lib
 tenant-matrix: file
 freelancer-matrix: files
 usage: p21121_a_api_test.py <datadir>      (a fresh container; P21121A_NOSTART=1: the container runs already)"""
+import base64
 import io
 import os
 import re
@@ -218,6 +219,13 @@ r = scan(Ca, [IMG1] * 31, [("space", "private")])
 check(r.status_code == 400, f"31 pages: refused ({r.status_code})")
 r = scan(Ca, [b"no picture at all"], [("space", "private")])
 check(r.status_code == 400 and "Page 1" in (r.json().get("error") or ""), f"not a picture: 400 with the page ({r.status_code} {r.text[:200]})")
+# 2.635.0 (#4645): only phone formats (JPEG / PNG / WEBP / HEIF) - an EPS (Ghostscript) and a TIFF are "not a picture"
+TIFF_PAGE = base64.b64decode("SUkqAAgAAAAKAAABBAABAAAAAgAAAAEBBAABAAAAAgAAAAIBAwADAAAAhgAAAAMBAwABAAAAAQAAAAYBAwABAAAAAgAAABEBBAABAAAAjAAAABUB"
+                             "AwABAAAAAwAAABYBBAABAAAAAgAAABcBBAABAAAADAAAABwBAwABAAAAAQAAAAAAAAAIAAgACADICgrICgrICgrICgo=")
+EPS_PAGE = b"%!PS-Adobe-3.0 EPSF-3.0\n%%BoundingBox: 0 0 2 2\n0 0 moveto 2 2 lineto stroke\nshowpage\n%%EOF\n"
+for kind, page in (("TIFF", TIFF_PAGE), ("EPS", EPS_PAGE)):
+    r = scan(Ca, [page], [("space", "private")])
+    check(r.status_code == 400 and "Page 1" in (r.json().get("error") or ""), f"{kind} page: 400 with the page ({r.status_code} {r.text[:200]})")
 r = scan(Er, [IMG1], [("parent_id", str(SHF))])
 check(r.status_code == 403, f"erin with 'view' on the folder cannot scan into it ({r.status_code})")
 r = scan(Da, [IMG1], [("parent_id", str(PROJ))])

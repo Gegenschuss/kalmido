@@ -366,6 +366,9 @@ def files_zip():
 
 
 # ---- the phone scan: pages -> one PDF
+ABM_SCAN_FORMATS = ("JPEG", "PNG", "WEBP", "HEIF")  # 2.635.0 (#4645): Pillow format names a scan page may have
+
+
 def abm_pdf(pages, rots, bw):
     """The bytes of a PDF with one page per image (bytes): EXIF orientation applied, turned by rots[i] degrees (clockwise),
     the long edge at most ABM_SCAN_EDGE, grey + auto contrast when bw. Pillow's guard against decompression bombs stays on
@@ -374,9 +377,12 @@ def abm_pdf(pages, rots, bw):
     out = []
     with warnings.catch_warnings():
         warnings.simplefilter("error", Image.DecompressionBombWarning)
+        # 2.635.0 (#4645): only the formats a phone camera writes; an EPS (Ghostscript), TIFF and the rest are "not a picture".
+        # "HEIF" is the format name the HEIF plugin registers (pi_heif in kalmido/docs/ocr.py) - only when it is there.
+        fmts = [f for f in ABM_SCAN_FORMATS if f != "HEIF" or f in Image.OPEN]  # Pillow itself loads JPEG / PNG / WEBP on demand
         for i, data in enumerate(pages):
             try:
-                im = Image.open(io.BytesIO(data))
+                im = Image.open(io.BytesIO(data), formats=fmts)
                 im.load()
             except (Image.DecompressionBombWarning, Image.DecompressionBombError):
                 raise ValueError(tr("Page {0}: the picture is too large", i + 1)) from None
