@@ -891,6 +891,7 @@ ROUTES = {
     "GET /api/obj/{}/{}/history": "obj", "POST /api/obj/{}/{}/undo": "obj", "GET /api/obj/{}/{}/shares": "obj",
     "POST /api/obj/{}/{}/shares": "obj", "DELETE /api/obj/{}/{}/shares/{}": "obj", "POST /api/obj/{}/{}/shares/{}/restore": "obj",
     "GET /api/v1/agent/objects/{}": "obj", "GET /api/v1/agent/objects/{}/{}": "obj", "PATCH /api/v1/agent/objects/{}/{}": "obj",
+    "POST /api/v1/agent/objects/{}/{}/proposals": "obj",  # 2.623.0 (#4718): an agent's change proposal (p2623_c_objprop_test.py)
     "GET /api/sheets/{}/export.csv": "sheets", "GET /api/sheets/{}/export.xlsx": "sheets",
     "GET /api/sheets/{}/links": "sheets", "GET /api/sheets/{}/vars": "sheets", "GET /api/v1/sheets": "sheets",
     "GET /api/v1/sheets/{}": "sheets", "GET /api/v1/sheets/{}/vars": "sheets", "PATCH /api/sheets/{}": "sheets",

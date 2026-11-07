@@ -290,6 +290,7 @@ SCOPE_RULES = (
 SCOPES_READ_ONLY = frozenset(("read", "attachments:read", "files:read", "sheets:read", "wiki:read"))  # 2.200.0 C (#1781): + wiki:read
 AGENT_RO_REFUSED = (r"^/agent/chats/\{\}$", r"^/agent/chats/\{\}/messages/\{\}/(reactions|pin|withdraw)$", r"^/agent/proposals(/[a-z-]+)?$",
                     r"^/agent/jobs/\{\}/proposal$")  # 2.360.0 C (#2496): + withdraw
+AGENT_RO_REFUSED += (r"^/agent/objects/\{\}/\{\}/proposals$",)  # 2.623.0 (#4718): a change proposal for a core object reaches a person too
 # 2.360.0 C (#2496): its own jobs stay open (status / log), but not the parts that reach a person: a job for a person
 # (start line in their chat) or one that waits for them (News + push)
 AGENT_RO_JOBS = r"^/agent/jobs(/\{\})?$"

@@ -737,6 +737,7 @@ function propKeys(v) {
   if (dup_is(v)) return dup_keys(v);  // 2.70.0 B (#1357): the groups still mergeable (dupprop.js)
   if (ctr_is(v)) return ['0'];  // 2.70.0 C (#1359): one note (contractprop.js)
   if (typeof ast_is === 'function' && ast_is(v)) return ['0'];  // 2.126.1 A (#2123 #2124): one text (asstprop.js)
+  if (typeof objp_is === 'function' && objp_is(v)) return ['0'];  // 2.623.0 (#4718): one change of an object (objprop.js)
   if (v.kind === 'project') return p.tasks.flatMap((t, i) => [String(i), ...t.subtasks.map((s, k) => `${i}.${k}`)]);
   if (v.kind === 'dayplan') return p.items.map((x, i) => String(i));  // 2.10.0 (#440); 2.11.0: "does not fit" entries change nothing
   return (v.kind === 'extract' ? p.tasks : p.items).map((x, i) => String(i));
@@ -750,6 +751,7 @@ async function propOpen(jid) {
   if (aim_is(v) && typeof ofcMoney !== 'function') await loadModule('office').catch(() => {});  // 2.68.0 (#1839, review): the preview uses the office module (lazy)
   if (ctr_is(v) && typeof noticeWord !== 'function') await loadModule('life').catch(() => {});  // 2.70.0 C (#1359): the card uses life.js (loaded on demand since 2.65.0)
   if (['office_text', 'doc_summary', 'report', 'receipt_read', 'card_statement_read', 'sheet_tasks'].includes(v?.kind) && (typeof ast_is !== 'function' || typeof sht_is !== 'function')) await loadModule('asstprop').catch(() => {});  // 2.126.1 A (#2123 #2124): asstprop.js on demand
+  if (v?.kind === 'obj_patch' && typeof objp_is !== 'function') await loadModule('objprop').catch(() => {});  // 2.623.0 (#4718): objprop.js on demand
   if (v?.input?.assistant) v.agent = {...(v.agent || {}), name: tr('Assistant')};  // 2.75.0 (#1411): the built-in assistant, not an agent
   $('.ppm')?.remove();
   const md = modal('');
@@ -822,6 +824,7 @@ function propItemsHtml() {
   if (dup_is(v)) return '';  // 2.70.0 B (#1357): dup_draw shows it
   if (ctr_is(v)) return '';  // 2.70.0 C (#1359): ctr_draw shows it
   if (typeof ast_is === 'function' && ast_is(v)) return '';  // 2.126.1 A (#2123 #2124): ast_draw shows it
+  if (typeof objp_is === 'function' && objp_is(v)) return '';  // 2.623.0 (#4718): objp_draw shows it
   if (v.kind === 'dayplan') return propDayplanHtml();  // 2.10.0 (#440)
   if (v.kind === 'cleanup') return clnItemsHtml();  // 2.39.0 (#1151): cleanup.js
   if (AP_KINDS.includes(v.kind)) return ap_propItemsHtml();  // 2.51.0 C (#1353 #1355): agentplan.js
@@ -857,6 +860,7 @@ function propCount() {
   if (dup_is(P.v)) return dup_count(P);  // 2.70.0 B (#1357): groups to merge
   if (ctr_is(P.v)) return;  // 2.70.0 C (#1359): its own buttons
   if (typeof ast_is === 'function' && ast_is(P.v)) return;  // 2.126.1 A (#2123 #2124): its own buttons
+  if (typeof objp_is === 'function' && objp_is(P.v)) return;  // 2.623.0 (#4718): its own buttons
   $$('.ppcount', P.md).forEach(c => { c.textContent = tr('{0} of {1} selected', n, all); });
   if (b) { b.disabled = !n; b.innerHTML = `${ic('check', 's')} ${esc(trn('Apply {0} entry', 'Apply {0} entries', n))}`; }
 }
@@ -883,6 +887,7 @@ function propDraw() {
     if (ctr_is(v)) ({main, foot} = ctr_draw(v));  // 2.70.0 C (#1359): the contract, the sentence, note / remind me (contractprop.js)
     if (rul_is(v)) ({main, foot} = rul_draw(v));  // 2.71.0 A (#1457): the rule in one sentence, 👍 / 👎 (rules.js)
     if (typeof ast_is === 'function' && ast_is(v)) ({main, foot} = ast_draw(v));  // 2.126.1 A (#2123 #2124): the text to edit, copy / take over (asstprop.js)
+    if (typeof objp_is === 'function' && objp_is(v)) ({main, foot} = objp_draw(v));  // 2.623.0 (#4718): the object, old -> new, 👍 / 👎 (objprop.js)
   } else {
     main = `<div class="ppwait">${ic(st === 'applied' ? 'check' : 'x')}<p>${st === 'applied' ? (v.applied?.undone ? tr('Applied, then undone.') : tr('Applied.')) : tr('Discarded. {0} was told.', agent)}</p></div>`;
   }
@@ -915,6 +920,7 @@ async function propApply(b) {
   if (dup_is(v)) dup_hist(e);  // 2.70.0 B (#1357): the contacts view follows undo / redo
   if (ctr_is(v)) { histToast(ctr_toast(v, r), e); if (S.route.mod === 'agents') loadJobs(); return; }  // 2.70.0 C (#1359)
   if (typeof ast_is === 'function' && ast_is(v)) { ast_hist(v, e); histToast(ast_toast(v), e); ast_after(v, true); if (S.route.mod === 'agents') loadJobs(); return; }  // 2.126.1 A (#2123 #2124)
+  if (typeof objp_is === 'function' && objp_is(v)) { histToast(objp_toast(v, r), e); if (S.route.mod === 'agents') loadJobs(); return; }  // 2.623.0 (#4718)
   if (proj) go('l/' + r.list_id);  // first: the toast belongs to the new list's page (2.218.0 #2801 hides an undo message on a page change)
   histToast(dup_is(v) ? dup_toast(r) : lyp_is(v) ? lyp_toast(v, r) : rul_is(v) ? rul_toast(v) : aim_is(v) ? aim_toast(r) : pk2_is(v.kind) ? pk2_toast(v, r) : v.kind === 'cleanup' ? clnDone(r) : v.kind === 'dayplan' ? trn('{0} task planned', '{0} tasks planned', r.changed) : r.changed ? trn('{0} basket item sorted', '{0} basket items sorted', r.changed) : trn('{0} entry created', '{0} entries created', r.created), e, proj ? F8C_PROJ_TOAST_MS : undefined);
   if (S.route.mod === 'agents') loadJobs();

@@ -826,7 +826,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `list_sections`, `list_stale_tasks`, `list_subtasks`, `list_tags`, `list_tasks`, `list_team_channels`, `list_team_chats`, `list_templates`,
 `list_time_entries`, `list_trash`, `list_upkeep_presets`, `list_video_reviews`, `list_waiting`, `list_watchers`, `leave_team_channel`, `mark_news_read`, `mark_team_chat_read`,
 `move_task`, `pin_chat_message`, `pin_team_message`, `post_team_message`, `propose_contract_notice`, `propose_import`, `propose_layout`, `propose_playbook`,
-`propose_rule`, `propose_sheet_tasks`, `propose_shoot`, `propose_time_entries`, `propose_to_other_topic`,
+`propose_object_change`, `propose_rule`, `propose_sheet_tasks`, `propose_shoot`, `propose_time_entries`, `propose_to_other_topic`,
 `propose_to_person`, `react`, `react_team_message`, `react_to_chat`, `read_attachment`, `read_briefing`, `read_file`,
 `read_project_status`, `read_team_chat`, `related_tasks`, `remove_dependency`, `remove_relation`, `rename_folder`, `rename_section`, `reopen_task`,
 `reorder_project_links`, `reorder_sections`, `reply_to_event`, `report_plan_usage`, `report_progress`, `report_usage`,
@@ -846,6 +846,6 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `withdraw_chat_choices`, `withdraw_comment_choices`, `write_file`, `write_journal`, `write_status_pad`
 <!-- kalmido-tool-index:end -->
 
-2.558.0: areas built on the shared core (meetings, planners, team projects ...) share their objects with you through `list_objects` / `get_object` (a `kind` and the object's id); `update_object` changes only the fields you send and ALWAYS needs `expect_updated_at` from your last `get_object` (400 without it; 409 = a person changed it since: read it again, merge, retry). 2.579.0: kind `docview` = a saved view of the documents search a person shared with you (its `query` = the search; run it with `list_documents` and your own access).
+2.558.0: areas built on the shared core (meetings, planners, team projects ...) share their objects with you through `list_objects` / `get_object` (a `kind` and the object's id); `update_object` changes only the fields you send and ALWAYS needs `expect_updated_at` from your last `get_object` (400 without it; 409 = a person changed it since: read it again, merge, retry). 2.623.0: `propose_object_change` (the same arguments plus `summary`, `user_id`) PROPOSES the change instead: a person accepts or declines it on a card, accepting writes it as them with your version; use it when a person should check the change or your share is view only (not with a read-only token). 2.579.0: kind `docview` = a saved view of the documents search a person shared with you (its `query` = the search; run it with `list_documents` and your own access).
 
 2.391.0: the set-up tools `list_webhooks`, `create_webhook`, `update_webhook`, `delete_webhook`, `rotate_webhook_secret`, `test_webhook`, `get_webhook_log`, `list_api_tokens`, `create_api_token`, `revoke_api_token`, `add_repo_connection`, `update_repo_connection`, `remove_repo_connection`, `set_repo_version_field` need the scope `integrations`, which an agent never gets: they are for a person's own MCP client (toolset `integrations`), not for you - do not try them.

@@ -49,6 +49,7 @@ const LD_MODS = {
   cfkinds: ['cfkinds'],  // 2.156.0 B (#2069): editing multiple choice / rating cells, the task link picker, the field dialog's currency / rating part
   mineboard: ['mineboard'],  // 2.156.0 C (#2072): My tasks as a board
   sectpl: ['sectpl'],  // 2.156.0 C (#2073): the section templates dialog of a list
+  objprop: ['objprop'],  // 2.623.0 (#4718): the card of an agent's change proposal for a core object (agents.js propOpen)
   asstprop: ['asstprop', 'sheetprop'],  // 2.126.1 A (#2123 #2124): texts worded by an agent (office, documents, status report, the proposal card); B (#2125): sheetprop.js (table rows as tasks)
   sheets: ['sheetfold', 'sheets', 'sheets2', 'sheetsio', 'sheetsize', 'sheetshare', 'sheetchart', 'sheetkinds', 'sheetprint', 'sheetbook', 'sheetfmt', 'sheetfill'],  // 2.89.0 (#1916); D: sheets2.js (step 2), C: sheetsio.js (import/export); 2.98.0 C (#2181): sheetsize.js (the frame); 2.124.0 A (#2115): sheetchart.js; C (#2113): sheetshare.js; B (#2110): sheetkinds.js; E (#2116): sheetbook.js; 2.578.0 (#3462): sheetprint.js; 2.199.0 C (#2742): sheetfold.js (folders; 2.200.0 F: first, the overview calls it when sheets.js is in); 2.578.0 (#3462 C): sheetfmt.js (cell format, colour rules), sheetfill.js (the fill handle)
   fslock: ['fslock'],  // 2.353.0 A (#2758): locked folders of the file store (loaded by the file store's first view)

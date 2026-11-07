@@ -1118,6 +1118,7 @@ ROUTES = {
     "GET /api/obj/{}/{}/history": "obj", "POST /api/obj/{}/{}/undo": "obj", "GET /api/obj/{}/{}/shares": "obj",
     "POST /api/obj/{}/{}/shares": "obj", "DELETE /api/obj/{}/{}/shares/{}": "obj", "POST /api/obj/{}/{}/shares/{}/restore": "obj",
     "GET /api/v1/agent/objects/{}": "obj", "GET /api/v1/agent/objects/{}/{}": "obj", "PATCH /api/v1/agent/objects/{}/{}": "obj",
+    "POST /api/v1/agent/objects/{}/{}/proposals": "obj",  # 2.623.0 (#4718): an agent's change proposal (p2623_c_objprop_test.py, tenant-matrix: obj)
     # 2.96.0 B (#1941): a table to the other workspace (p296_b_api_test.py)
     "POST /api/sheets/{}/move-space": "sheet",
     # 2.401.0 (#2924): the dry run of a project's workspace change (p2401_a_api_test.py)

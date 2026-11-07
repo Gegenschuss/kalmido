@@ -17,7 +17,8 @@ Web app (the person's session; static/js/objsave.js saves through PATCH with exp
 Agents (API v1, the agent channel, scope agent + the kind's own scopes):
   GET    /api/v1/agent/objects/<kind>         what the agent sees (only what is shared with it)
   GET    /api/v1/agent/objects/<kind>/<id>
-  PATCH  /api/v1/agent/objects/<kind>/<id>    expect_updated_at required (400 without, 409 when changed meanwhile)"""
+  PATCH  /api/v1/agent/objects/<kind>/<id>    expect_updated_at required (400 without, 409 when changed meanwhile)
+  POST   /api/v1/agent/objects/<kind>/<id>/proposals   2.623.0 (#4718): the change as a proposal (agents/objprop.py)"""
 from flask import g, jsonify, request
 
 from ..accounts.session import me
@@ -227,3 +228,18 @@ def objects_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
                     body={"type": "object", "required": ["expect_updated_at"], "additionalProperties": True,
                           "properties": {"expect_updated_at": {"type": "string", "description": "updated_at of the object as read"}}},
                     scope="agent")}
+    # 2.623.0 (#4718): the change as a proposal a person accepts (route in agents/objprop.py)
+    paths["/agent/objects/{kind}/{id}/proposals"] = {"post": op(
+        "2.623.0: propose a change of the fields in values (a person accepts or declines it)", T,
+        ok({"type": "object"}, "Created", "201") | errs("400", "403", "404", "409", "413", "429"), [kp, pid(desc="Object id")],
+        body={"type": "object", "required": ["values", "expect_updated_at"], "additionalProperties": False, "properties": {
+            "values": {"type": "object", "description": "The fields to change and their new values (checked like a change)"},
+            "expect_updated_at": {"type": "string", "description": "updated_at of the object as read (409 when it changed since)"},
+            "summary": {"type": "string", "description": "Markdown: why"},
+            "user_id": {"type": "integer", "description": "The person who decides (needs write rights on the object; default: its owner)"}}},
+        scope="agent",
+        desc="Agents only; the object must be visible to you (a view share is enough), the token needs the kind's read scope "
+             "and one scope beyond reading (a read-only token sends no proposals). "
+             "Nothing changes until the person accepts: then the values are written AS THEM with exactly your version (their "
+             "rights; refused when anybody changed the object since). The answer comes as the event job (action approve / "
+             "reject); at most 100 per day.")}

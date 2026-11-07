@@ -213,8 +213,23 @@ organisations + a private person, read-only, guest, a group, an agent, an expire
 
 ## Not in stage 1
 
-- Agents' changes as a proposal a person accepts (proposal kind `obj_patch`): the first area that needs it adds it
-  (agents/proposals.py); stage 1 has the direct write with the version.
+- Agents' changes as a proposal a person accepts (proposal kind `obj_patch`): built in 2.623.0 (#4718), see below.
+
+## Agents' changes as a proposal (2.623.0, #4718)
+
+`POST /api/v1/agent/objects/<kind>/<id>/proposals` `{values, expect_updated_at, summary?, user_id?}` (agents/objprop.py,
+MCP `propose_object_change`) is the agent's second way next to the direct `PATCH`: no own write path, the proposal is a
+job of kind `obj_patch` of agents/proposals.py, and accepting it is `obj_write`.
+- Proposing: `obj_need(agent, 'view')` (only what the agent sees: its workspace, the data lock, `hidden`; a view share is
+  enough), the token needs the kind's read scope (`_agent_kind`) and is not read-only (api/scopes.py `AGENT_RO_REFUSED`). The values go through the kind's cleaners against the row
+  (`_clean`: unknown field / bad value 400), `expect_updated_at` is required (400 `version_required`) and must be the current
+  version (`ccf_check`, 409 with the current state); nothing would change = 400. At most 100 per agent and day.
+- The card goes to `user_id` (a person with `edit` / `manage` on the object, `obj_role`) or to the object's owner (the same
+  check); only that person opens, accepts and discards it (`need_prop`). The proposal stores the raw values, the cleaned
+  ones and the values before, and the version the agent read.
+- Accepting: `obj_write(person, kind, id, values, expect=version)` -- the person's write right, the write lock, the version
+  check (a change by anybody since: 409 with a plain message, nothing written), the history names the person. Undo / redo of
+  the proposal write the values back with the version the last step left (changed since: skipped).
 - Old areas: nothing moves yet (stage 2: office and clients #4711, stage 3: calendars and contacts #4712).
 - Stage 5 (#4719, 2.565.0): team chat channels and group conversations are the kind `tchat_room` (collab/tcxcore.py,
   listed=False); members are shares (person, agent, group), tchat_members stays the reader fallback (kept in step at every

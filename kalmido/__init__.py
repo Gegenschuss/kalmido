@@ -545,6 +545,7 @@ ORDER = (
     "agents.ideaprop",  # 2.156.0 A (#1201): "Add ideas" in the mind map -- an agent proposes sub-branches
     "lists.rules",  # 2.71.0 A (#1457): rules of a list (When ... then ...), after api.v1
     "core.objects", "core.writes", "core.objweb",  # 2.558.0 (#4709): the shared core (register, roles, write path) and its generic routes
+    "agents.objprop",  # 2.623.0 (#4718): an agent's change of a core object as a proposal a person accepts (after core.objweb)
     "collab.tcxcore",  # 2.565.0 (#4719): the team chat's channels and groups as a kind of the shared core (no routes of its own)
     "lists.lmcore",  # 2.568.0 (#4739): the projects as a kind of the shared core (shares, revocation, settings history)
     "events.evkern", "contacts.ctkern",  # 2.566.0 (#4712): calendars and address books as kinds of the shared core (stage 3)

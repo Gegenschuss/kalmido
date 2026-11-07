@@ -51,7 +51,7 @@ KNOWN = {
     "pl": ("guarded", {"render.js", "office_periods.js", "paperless.js"}),
     "pov": ("shared", {"trashui.js"}),
     "pp": ("guarded", {"agents.js", "asstprop.js", "contractprop.js", "dupprop.js", "importprop.js", "lyprop.js",
-                       "office_leads.js", "playbook.js", "rules.js", "sheetprop.js"}),
+                       "objprop.js", "office_leads.js", "playbook.js", "rules.js", "sheetprop.js"}),
     "rkf": ("shared", {"office_import.js"}),
     "rx": ("guarded", {"agents.js", "orgexport.js"}),
     "setgo": ("shared", {"office.js", "office_books.js", "office_cashbook.js", "office_import.js", "officeagents.js",

@@ -225,6 +225,10 @@ Run the commands as a user with sudo unless a step says *as the agent user* (`su
 10. Rules of a project (2.71.0): an agent with the permission *Structure* may propose a rule for a project shared with it; the
    project's owner or an admin accepts it with 👍 and the rule then runs with their rights
    ([AGENTS.md](AGENTS.md#rules-of-a-list-2710)).
+   2.623.0 (#4718): the same for objects of the shared core: instead of changing an object shared with it the agent may
+   propose the change (`propose_object_change`, a view share is enough; a token that may only read sends no proposals); the object's owner (or the person it
+   names) accepts it with 👍 and it is written with their rights, refused when someone changed the object since
+   ([AGENTS.md](AGENTS.md#objects-of-the-shared-core)). The reference starter needs no change.
 11. Tables and the basket (2.126.1): with *Read tables* the agent may propose rows of a table shared with it as tasks of a
    project shared with it (`propose_sheet_tasks`; the person applies the card, [AGENTS.md](AGENTS.md#table-rows-as-tasks)).
    A person may plan *Sort the basket* for the agent (Agents > *Plans* > Kind): it then gets a `job_request` of kind triage

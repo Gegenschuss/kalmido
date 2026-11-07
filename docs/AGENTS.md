@@ -4476,12 +4476,25 @@ stays hidden. The kind (`kind`) is the area's name for its objects.
 | The objects of a kind shared with you, newest change first | `GET /api/v1/agent/objects/{kind}` | `list_objects` |
 | One object with its fields, `role` (`view` / `edit`) and `updated_at` | `GET /api/v1/agent/objects/{kind}/{id}` | `get_object` |
 | Change the fields sent (only those) | `PATCH /api/v1/agent/objects/{kind}/{id}` | `update_object` |
+| Propose a change a person accepts (2.623.0) | `POST /api/v1/agent/objects/{kind}/{id}/proposals` | `propose_object_change` |
 
 Changing always needs `expect_updated_at` = the `updated_at` of your last read: without it `400`, when a person changed the
 object since `409` with the current state in `error.current` (read it, merge, try again). An unknown field is `400`, a share
 with `view` is `403`, everything else `404`. The token needs the area's scopes (read / write; most areas: `read` and
 `tasks:write`; the MCP server lists `update_object` only for a token with `tasks:write`). Every change of yours is in the
 object's history, marked as an agent's. Creating, deleting, the trash and sharing stay with people.
+
+*Since 2.623.0 (#4718):* instead of changing an object you may **propose** the change:
+`POST /api/v1/agent/objects/{kind}/{id}/proposals` (MCP `propose_object_change`) with `values` (the fields and their new
+values, checked like a change: unknown field / bad value `400`, nothing would change `400`), `expect_updated_at` (required,
+`409` with the current state when it is old), an optional `summary` (Markdown: why) and an optional `user_id` (the person
+who decides: they need write rights on the object; default the object's owner). The object must be visible to you; a view
+share is enough and the token needs the kind's read scope (a token that may only read sends no proposals, `403`, as
+everywhere). The answer is the proposal job (`201`, kind `obj_patch`);
+the person sees a card with the value now and your value per field and accepts or declines it. Accepting writes the values
+AS THAT PERSON with exactly your `expect_updated_at`: when anybody changed the object since, accepting is refused (nothing
+written; read it again and propose anew). You get the event `job` (action `approve` with `fields`, or `reject`). A proposal
+cannot be replaced (`409`): send a new one. At most 100 per day (`429`).
 
 *Since 2.579.0 (#4802):* the saved views of the documents search are the kind `docview` (fields `title`, `query` = the
 search's parameters as a query string, as `GET /api/v1/documents` (MCP `list_documents`) takes them, `ws` = the workspace it searches). A view is private

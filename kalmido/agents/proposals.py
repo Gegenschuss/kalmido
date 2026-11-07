@@ -74,6 +74,7 @@ PROP_AST = ("office_text", "doc_summary", "report", "receipt_read", "card_statem
 PROP_KINDS += PROP_AST
 PROP_KINDS += ("sheet_tasks",)  # 2.126.1 B (#2125): table rows -> tasks, proposed by the agent itself (agents/sheetprop.py)
 PROP_KINDS += ("ideas",)  # 2.156.0 A (#1201): sub-branches for a branch of the mind map, on request (agents/ideaprop.py)
+PROP_KINDS += ("obj_patch",)  # 2.623.0 (#4718): a change of a core object, proposed by the agent itself (agents/objprop.py)
 PROP_MAX_ITEMS = 200                    # entries one proposal may create / change (tasks + subtasks)
 PROP_MAX_BYTES = 256 * 1024             # JSON body of a proposal
 PROP_TITLE_MAX, PROP_NOTES_MAX, PROP_NAME_MAX, PROP_SUMMARY_MAX = 300, 5000, 120, 2000
@@ -531,6 +532,8 @@ def proposal_request():
         return err(tr("Invalid value: {0}", "kind"))
     if kind == "notice":  # 2.70.0 C (#1359): the agent proposes it after contract_notice, never on request
         return err(tr("Invalid value: {0}", "kind"))
+    if kind == "obj_patch":  # 2.623.0 (#4718): the agent proposes it itself (agents/objprop.py), never on request
+        return err(tr("Invalid value: {0}", "kind"))
     if kind in PROP_AST:  # 2.126.1 A (#2123 #2124): own agents (office switches / the list's), own input (agents/asstprop.py)
         from ..agents.asstprop import ast_request
         return ast_request(c, uid, b)
@@ -631,6 +634,9 @@ def prop_view(c, j):
         out.update(ast_view_extra(c, j))
     if j["kind"] == "ideas":  # 2.156.0 A (#1201): the mind map of this list shows them
         out["list_id"] = j["list_id"]
+    if j["kind"] == "obj_patch":  # 2.623.0 (#4718): the object as it is now, old -> new (agents/objprop.py)
+        from ..agents.objprop import objp_view_extra
+        out.update(objp_view_extra(c, j))
     return out
 
 
@@ -760,6 +766,10 @@ def prop_run(c, j, sel, ed, extra):
         from ..agents.asstprop import ast_run
         return ast_run(c, j, sel, ed, extra, {"at": iso(now_utc()), "sel": sel, "edits": {}, "extra": {}, "tasks": [], "sections": [],
                                               "changes": {}, "list": None, "undone": False})
+    if kind == "obj_patch":  # 2.623.0 (#4718): obj_write as the person with the agent's version (agents/objprop.py)
+        from ..agents.objprop import objp_run
+        return objp_run(c, j, {"at": iso(now_utc()), "sel": sel, "edits": {}, "extra": {}, "tasks": [], "sections": [],
+                               "changes": {}, "list": None, "undone": False})
     if kind == "ideas":  # 2.156.0 A (#1201): the selected ideas as tasks under the branch (agents/ideaprop.py)
         from ..agents.ideaprop import idp_run
         return idp_run(c, j, sel, ed, extra, {"at": iso(now_utc()), "sel": sel, "edits": {}, "extra": {}, "tasks": [], "sections": [],
@@ -1044,6 +1054,9 @@ def proposal_apply(jid):
     if j["kind"] in PROP_AST:  # 2.126.1 A (#2123 #2124)
         from ..agents.asstprop import ast_result
         counts.update(ast_result(rec))
+    if j["kind"] == "obj_patch":  # 2.623.0 (#4718): the fields written
+        from ..agents.objprop import objp_result
+        counts.update(objp_result(rec))
     prop_notify_agent(c, j, "approve", "applied", {**counts, "list_id": rec["list"] if j["kind"] in ("project", "cleanup") else None})
     c.execute("UPDATE notifications SET read_at=? WHERE user_id=? AND kind='proposal' AND read_at IS NULL AND data->>'job' = ?",
               (ts, me(), str(jid)))
@@ -1113,6 +1126,9 @@ def proposal_undo(jid):
     elif j["kind"] in PROP_AST:  # 2.126.1 A (#2123 #2124): the text before comes back (unless changed since)
         from ..agents.asstprop import ast_undo
         n, skipped = ast_undo(c, j, rec)
+    elif j["kind"] == "obj_patch":  # 2.623.0 (#4718): the values before come back (unless changed since)
+        from ..agents.objprop import objp_undo
+        n, skipped = objp_undo(c, j, rec)
     elif j["kind"] in ("triage", "dayplan"):
         for tid, ch in rec["changes"].items():
             try:
@@ -1227,6 +1243,10 @@ def proposal_redo(jid):
     elif j["kind"] in PROP_AST:  # 2.126.1 A (#2123 #2124)
         from ..agents.asstprop import ast_undo
         n, skipped = ast_undo(c, j, rec, back=False)
+    elif j["kind"] == "obj_patch":  # 2.623.0 (#4718): the proposal's values again (unless changed since)
+        from ..agents.objprop import objp_undo
+        n, skipped = objp_undo(c, j, rec, back=False)
+        rec.update(undone=False)
     elif j["kind"] in ("triage", "dayplan"):
         for tid, ch in rec["changes"].items():
             try:
@@ -1326,6 +1346,8 @@ def v1_agent_job_proposal(jid):
     if j["kind"] == "ideas":  # 2.156.0 A (#1201): the list still shared, nothing taken over yet
         from ..agents.ideaprop import idp_need_agent
         idp_need_agent(c, j, aid)
+    if j["kind"] == "obj_patch":  # 2.623.0 (#4718): no replacing - a new proposal with the version read (agents/objprop.py)
+        raise Denied(409, tr("Send a new proposal instead"))
     if j["prop_state"] not in ("requested", "ready") or j["state"] not in ("running", "waiting"):
         raise Denied(409, tr("This proposal was already applied or discarded"))
     if len(request.data or b"") > PROP_MAX_BYTES:

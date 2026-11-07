@@ -2700,6 +2700,15 @@ TOOLS += [  # 2.558.0 (#4709): objects of the areas built on the shared core (on
            "expect_updated_at": {"type": "string"}}, ["kind", "object_id", "values", "expect_updated_at"]),
      lambda api, a: api.call("PATCH", f"/agent/objects/{str(a['kind'])}/{_id(a, 'object_id')}",
                              body={**(a.get("values") or {}), "expect_updated_at": a["expect_updated_at"]})),
+    ("propose_object_change", "2.623.0: PROPOSE a change of the fields in values instead of writing it: a person (user_id, or the "
+                              "object's owner) accepts or declines it on a card; accepting writes it as them with your "
+                              "expect_updated_at (refused when anybody changed the object since). A view share is enough (not a read-only token). "
+                              "The answer comes as the event job (approve / reject).",
+     _obj({"kind": {"type": "string", "minLength": 1, "maxLength": 20}, "object_id": S_ID, "values": {"type": "object"},
+           "expect_updated_at": {"type": "string"}, "summary": {"type": "string", "maxLength": 2000}, "user_id": S_ID},
+          ["kind", "object_id", "values", "expect_updated_at"]),
+     lambda api, a: api.call("POST", f"/agent/objects/{str(a['kind'])}/{_id(a, 'object_id')}/proposals",
+                             body=_pick(a, ("values", "expect_updated_at", "summary", "user_id")))),
 ]
 TOOL_MAP = {t[0]: t for t in TOOLS}
 
@@ -2748,6 +2757,7 @@ TOOL_SCOPES["calendar"] += ("get_dispo", "get_dispo_free", "propose_shoot")  # 2
 TOOL_SCOPES["calendar"] += ("list_polls", "get_poll", "create_poll")  # 2.484.0 (#2200)
 TOOL_SCOPES["layouts"] = ("list_layout_blocks", "get_view_layout", "propose_layout")  # 2.55.0 (#1066)
 TOOL_SCOPES["agent"] += ("list_objects", "get_object")  # 2.558.0 (#4709): the agent routes of the core objects
+TOOL_SCOPES["agent"] += ("propose_object_change",)  # 2.623.0 (#4718): a proposal needs the kind's read scope only (the person writes)
 TOOL_SCOPES["tasks:write"] += ("update_object",)  # 2.558.0 (#4709, review F9): the server asks the kind's write scope (most: tasks:write)
 TOOL_SCOPES["structure"] += ("set_wip_limit",)  # 2.60.0 (#1510)
 TOOL_SCOPES["structure"] += ("set_dwell_limits",)  # 2.553.0 C (#3538)
@@ -2810,7 +2820,7 @@ TOOLSETS = {
         get_usage report_plan_usage get_plan_usage clear_plan_usage list_schedules list_rules get_me get_announcement list_news mark_news_read list_agents
         list_team_chats read_team_chat post_team_message list_team_channels leave_team_channel edit_team_message delete_team_message react_team_message
         pin_team_message mark_team_chat_read
-        list_objects get_object update_object
+        list_objects get_object update_object propose_object_change
     """,
     "office": """
         get_office list_office_data list_office_documents get_office_document create_offer_draft update_offer_draft draft_invoice_from_offer
