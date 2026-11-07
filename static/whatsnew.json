@@ -1,6 +1,28 @@
 {
  "versions": [
   {
+   "version": "2.639.0",
+   "date": "2026-11-07",
+   "items": [
+    {
+     "de": "Mit der Branche Film gibt es unter den Dokument-Mustern jetzt Drehgenehmigung, Location-Vertrag und Model-Release.",
+     "en": "With the industry Film & Video the document samples now include a filming permission, a location agreement and a model release."
+    },
+    {
+     "de": "Eigene Ticket-Typen wie Epic und Story, dazu Felder, Pflichtfelder und Labels für die ganze Organisation.",
+     "en": "Own ticket types such as Epic and Story, plus fields, required fields and labels for the whole organisation."
+    },
+    {
+     "de": "Später lesen, Verträge, Gesundheit und andere Bereiche erscheinen nicht mehr als Projekte, nur noch in ihrem Bereich.",
+     "en": "Read later, contracts, health and other areas no longer show up as projects, only in their own area."
+    },
+    {
+     "de": "Gelesenes zählt nicht mehr in Statistik und Wochenrückblick.",
+     "en": "What you read no longer counts in the statistics and the weekly review."
+    }
+   ]
+  },
+  {
    "version": "2.634.0",
    "date": "2026-11-07",
    "items": [
