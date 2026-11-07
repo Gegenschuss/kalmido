@@ -1737,7 +1737,7 @@ function go(hash) {
   if (typeof f8d_defer === 'function' && f8d_defer(() => goNow(hash))) return;  // #3506: after the Back of a closed menu on its way (backclose.js)
   goNow(hash);
 }
-function goNow(hash) { if (location.hash !== '#' + hash) location.hash = hash; else route(); }
+function goNow(hash) { const was = location.hash; if (was !== '#' + hash) { location.hash = hash; if (location.hash === was) route(); } else route(); }  // 2.619.0 (#4943): the same address in another spelling (a browser that keeps the hash decoded) fires no hashchange: route() itself (it closes the drawer)
 async function route() {
   vm_leave();  // 2.413.0 A (#3439): the view left keeps its place (viewmem.js)
   const r = parseHash();

@@ -662,7 +662,8 @@ const sbm_rowHtml = hid => { const cur = sbb_area(), aw = sbb_aw(), bs = sbb_ids
 const sbm_hold = () => { const k = SBM.keep; SBM.keep = false; return k && !!$('#side.open'); };
 function sbm_go(b) {
   const h = b.dataset.go; SBM.focus = b.dataset.sbb;
-  if (!h || '#' + h === location.hash) { b.focus({preventScroll: true}); return; }  // 2.417.0 A (#3559): the open area's icon leads to its start page (sbb_btnHtml), unless already there
+  if (!h) { b.focus({preventScroll: true}); return; }
+  if ('#' + h === location.hash) { closeSide(); return; }  // 2.619.0 (#4943): the icon of the page already open closes the drawer like any other entry (was: the focus only, the drawer stayed); 2.417.0 A (#3559): else the open area's icon leads to its start page (sbb_btnHtml)
   SBM.keep = true; setTimeout(() => { SBM.keep = false; }, 3000);  // no route followed (same page): never hold a later one
   // the entry the drawer was opened on forgets "reopen the drawer" (#953), so Back from the area lands closed
   if (!history.state?.sbm && history.state?.side) try { const {side, ...st} = history.state; history.replaceState(Object.keys(st).length ? st : null, '', location.href); } catch { /* old browser */ }

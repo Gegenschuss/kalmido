@@ -7,9 +7,12 @@ const f8d_open = () => {
   if ($('.palette:not(.an-out)')) return 'palette';
   if ($('.lightbox')) return 'lightbox';
   const pop = $('#pop');
-  if ((pop && !pop.classList.contains('hidden')) || $('.qadd.sheet')) return 'pop';
+  if (pop && !pop.classList.contains('hidden')) return 'pop';
   // 2.497.0 (#4040): shopping mode has its own history entry (family.js): a second one here stayed behind after closing it (a dead Back)
   if ($('.modal:not(.authscreen):not(.an-out):not(.shopmode)')) return 'modal';
+  // 2.619.0 (#4943): the quick add sheet on its own (was 'pop': closePop only closed it through popOnClose, which a menu opened
+  // in the sheet (list, template) had taken over: Back then closed nothing); a sheet still folding away (an-out) is closed already
+  if ($('.qadd.sheet:not(.an-out)')) return 'qsheet';
   if ($('.tsheet')) return 'tsheet';
   return '';
 };
@@ -18,6 +21,7 @@ function f8d_closeTop() {
   if (k === 'palette') closePalette();
   else if (k === 'lightbox') $('.lightbox').remove();
   else if (k === 'pop') closePop();
+  else if (k === 'qsheet') { closePop(); tch_overlaysClose(); }  // 2.619.0 (#4943): the scrim + whoever holds popOnClose, then the sheet (popovers.js)
   else if (k === 'modal') modalClose($$('.modal:not(.authscreen):not(.an-out)').pop());
   else if (k === 'tsheet') $('[data-ts="close"]', $('.tsheet'))?.click();
 }
