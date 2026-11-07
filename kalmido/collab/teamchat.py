@@ -342,8 +342,11 @@ def tchat_sig_q(uid):
     from .teamchan import tcx_sig_q
     from .tcxcore import tcx_core_rooms_sql
     # the list / DM conversations: newest id, count, pins, newest pin, newest edit (2.62.0 #1848: + the pins)
-    m = ("""SELECT COALESCE(MAX(m.id),0), COUNT(m.id), COUNT(m.pinned_at), COALESCE(MAX(m.pinned_at),''), COALESCE(MAX(m.edited_at),'')
-            FROM tchat_msgs m JOIN tchat_rooms r ON r.id=m.room_id
+    # 2.640.0 (#4183): from the counters per room (tchat_room_sig, kept by a trigger, migrations.d/4183_a.py) instead of COUNT / MAX
+    # over all their messages: newest id, count, pins, change counter, the number + id sum of the rooms (a room that becomes visible)
+    m = ("""SELECT COALESCE(MAX(s.max_id),0), COALESCE(SUM(s.n),0), COALESCE(SUM(s.pins),0), COALESCE(SUM(s.rev),0),
+                   COUNT(r.id) + COALESCE(SUM(r.id),0)
+            FROM tchat_rooms r LEFT JOIN tchat_room_sig s ON s.room_id=r.id
             WHERE (r.kind='dm' AND (r.a=? OR r.b=?)) OR (r.kind='list' AND r.list_id IN """ + vis_sql(ov=False) + ")")
     # 2.139.0 A (#2129, #2127): + the read marks of everyone (mine included) in the conversations I have read and in their
     # threads, so "Read by" shows without reloading
@@ -351,8 +354,9 @@ def tchat_sig_q(uid):
                    (SELECT COALESCE(SUM(last_id),0) + COUNT(*) FROM tchat_thread_reads
                     WHERE room_id IN (SELECT room_id FROM tchat_reads WHERE user_id=?))"""
     # 2.113.1 (#2059): + the messages of my channels / groups and their names, states, members
-    x = """SELECT COALESCE(MAX(m.id),0), COUNT(m.id), COALESCE(MAX(m.edited_at),''), COUNT(m.pinned_at) FROM tchat_msgs m
-           WHERE m.room_id IN (SELECT room_id FROM tchat_members WHERE user_id=? UNION """ + tcx_core_rooms_sql(uid) + ")"  # 2.565.0 (#4719)
+    # 2.640.0 (#4183): from the counters per room as above: newest id, count, change counter, pins (the rooms: tcx_sig_q)
+    x = """SELECT COALESCE(MAX(s.max_id),0), COALESCE(SUM(s.n),0), COALESCE(SUM(s.rev),0), COALESCE(SUM(s.pins),0) FROM tchat_room_sig s
+           WHERE s.room_id IN (SELECT room_id FROM tchat_members WHERE user_id=? UNION """ + tcx_core_rooms_sql(uid) + ")"  # 2.565.0 (#4719)
     tq, ta = tcx_sig_q(uid)
     return (f"SELECT * FROM ({m}) s1 CROSS JOIN ({rd}) s2 CROSS JOIN ({x}) s3 CROSS JOIN ({tq}) s4",
             (uid, uid, uid, uid, uid, uid, uid, *ta))
@@ -364,9 +368,8 @@ TCHAT_SIG_COLS = 16
 def tchat_sig_fmt(row):
     from .teamchan import tcx_sig_fmt
     r, rd, x, t = row[0:5], row[5:7], row[7:11], row[11:16]
-    e = r[4]
-    tx = f".{x[0]}.{x[1]}.{x[2][-6:]}.{x[3]}.{tcx_sig_fmt(t)}"
-    return f"{r[0]}.{r[1]}.{rd[0]}-{rd[1]}.{e[-6:] if e else ''}.{r[2]}{r[3][-6:]}{tx}"
+    tx = f".{x[0]}.{x[1]}.{x[2]}.{x[3]}.{tcx_sig_fmt(t)}"  # 2.640.0 (#4183): numbers of the counters (were the newest times)
+    return f"{r[0]}.{r[1]}.{rd[0]}-{rd[1]}.{r[3]}.{r[2]}.{r[4]}{tx}"
 
 
 def tchat_unread(c, uid):

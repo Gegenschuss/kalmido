@@ -116,6 +116,7 @@ UMZ_FREE_TABLES = {
     "mail_in_seen": "state of this server's mail intake", "oauth_clients": "programs registered with this server", "orgs": "the organisations: the organisation export",
     "purged_rows": "record of what was deleted for good", "rate_hits": "limits of this server", "rate_known": "limits of this server",
     "retention_log": "record of the retention runs of this server", "revoked_creds": "record of revoked sign-ins", "sev_known": "security watch of this server",
+    "tchat_room_sig": "change counters of the team chat rooms, kept by the database (2.640.0 #4183)",
 }
 
 # the office tables that are not in the retention export (admin/retexport.py RX_TABLES)
