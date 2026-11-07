@@ -199,7 +199,8 @@ b = {"items": {"bob": 1}, "extra": {"uid": {"2": 1}}, "n": 1}
 a = x._aa_build(None, "security", "2fa_on", b)
 print(a[3], a[5])
 """).strip().splitlines()
-check(out[-2].startswith("3 None 3 people turned on two-factor authentication: bob, dave, eve"), f"three people: one alert with the count, to everyone {out}")
+# 2.644.0 (#5028): wording "switched on" since #3894 (b0599d10e)
+check(out[-2].startswith("3 None 3 people switched on two-factor authentication: bob, dave, eve"), f"three people: one alert with the count, to everyone {out}")
 check(out[-1] == "1 2", f"one person: not told of the own step {out}")
 out = in_ct("""import app
 from kalmido.core.db import connect
