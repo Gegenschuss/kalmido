@@ -156,9 +156,11 @@ res = {}
 
 
 def poll():
+    # 2.651.0 (#5077): wait 60 s (AGENT_WAIT_MAX) and keep the moment of the answer: the second process' start (import of
+    # every module) takes seconds on a slow CI runner and is no part of the wake-up
     t = time.time()
-    rr = ag.get(B + "/api/v1/agent/events", params={"since": cur, "wait": 20})
-    res["r"] = (rr, time.time() - t)
+    rr = ag.get(B + "/api/v1/agent/events", params={"since": cur, "wait": 60})
+    res["r"] = (rr, time.time() - t, time.time())
 
 
 th = threading.Thread(target=poll)
@@ -167,10 +169,12 @@ th.start()
 check(kt.until(lambda: A.get(B + "/api/admin/health").json()["threads"]["busy"] >= 2, timeout=10), "setup: the agent's long-poll waits")
 out = box("from kalmido.agents.core import agent_emit\n"
           f"print('seq', agent_emit(c, {AID}, 'nudge', {{'text': 'p2622'}}, actor=None))")
-th.join(25)
-rr, dt = res.get("r", (None, 99))
-check("seq " in out and rr is not None and rr.ok and rr.json()["data"] and dt < 8,
-      f"#3891: the long-poll in the server wakes for an event of the second process ({dt:.1f}s of 20) {out[-200:]}")
+t_box = time.time()  # 2.651.0 (#5077): the event is committed before box() returns (its process has ended)
+th.join(65)
+rr, dt, t_woke = res.get("r", (None, 99, t_box + 99))
+late = t_woke - t_box  # negative: the server woke before the second process had even ended
+check("seq " in out and rr is not None and rr.ok and rr.json()["data"] and late < 3 and dt < 55,
+      f"#3891: the long-poll in the server wakes for an event of the second process ({late:.1f}s after its commit, {dt:.1f}s of 60) {out[-200:]}")
 
 check(A.get(B + "/api/about").json().get("collab_all") is True, "setup: collaboration on")
 out = box("from kalmido.core.db import gset\nfrom kalmido.core.pgbus import bus_send\n"
