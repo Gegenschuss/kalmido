@@ -440,6 +440,7 @@
   on('GET', '/api/servers', () => ({links: [], self: {name: 'Kalmido', short: 'K', color: '#6e56cf'}}));  // 2.73.0 (#661): no other servers in the demo
   on('GET', '/api/me', () => ({auth: 'session', avatar: DB.me.avatar, display_name: DB.me.display_name, has_password: true, id: 1, is_admin: false, username: DB.me.username, twofa: [], via: 'password', drop_token: '', proxy_login: '', ntfy_topic: ''}));
   on('PATCH', '/api/me', (q, b) => { for (const k of ['display_name', 'avatar']) if (k in b) DB.me[k] = b[k]; return {ok: true}; });
+  on('GET', '/api/settings/defaults', () => ({defaults: {...SETTINGS_DEF, lang: DB.settings.lang}}));  // 2.583.0 (#4833): the start values (settings dialog: what differs under "Further options")
   on('PATCH', '/api/settings', (q, b) => { for (const [k, v] of Object.entries(b)) DB.settings[k] = typeof v === 'string' ? v : typeof v === 'boolean' ? (v ? '1' : '0') : typeof v === 'object' ? JSON.stringify(v) : String(v); return {ok: true}; });
   on('GET', '/api/news', () => ({avatars: {}, enabled: true, items: [], sig: '0', unread: 0, users: {}}));
   on('GET', '/api/users', () => ({users: [{id: 1, username: DB.me.username, display_name: DB.me.display_name, avatar: '', kind: 'user', is_admin: false, disabled: false}]}));
