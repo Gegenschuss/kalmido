@@ -12,7 +12,7 @@ from collections import Counter
 from datetime import date, timedelta
 from decimal import Decimal
 
-from ..core.access import Denied, health_hidden, org_trips_hidden
+from ..core.access import Denied, health_hidden, org_trips_hidden, vis_sql
 from ..core.db import local_day, local_now
 from ..life.model import contract_end, feat_on, PER_MONTHS
 
@@ -51,16 +51,17 @@ def _fam(v):
 
 def _mine_sql(tw):
     """Tasks t of lists l that are mine (assigned to me, or unassigned in my own list), not deleted, not in an archived,
-    deleted or locked (e2e) project; tw = the workspace narrowing of stats.py."""
+    deleted or locked (e2e) project; tw = the workspace narrowing of stats.py. Four ? = uid: and only lists the request may
+    see (vis_sql: the token's list allowlist, an agent's data lock, the organisation boundary - Fable review 2.630)."""
     return f"""FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.deleted_at IS NULL AND l.archived=0 AND l.deleted_at IS NULL
-               AND l.e2e IS NULL AND (t.assignee_id=? OR (t.assignee_id IS NULL AND l.owner_id=?)){tw}"""
+               AND l.e2e IS NULL AND (t.assignee_id=? OR (t.assignee_id IS NULL AND l.owner_id=?)) AND t.list_id IN {vis_sql()}{tw}"""
 
 
 def stl_contracts(c, uid, today, tw):
     """The running contracts: how many, the cost per month / year, the deadlines to cancel of the next 90 days, by provider."""
     items = []
     for r in c.execute(f"SELECT t.id, t.title, t.due, t.fam {_mine_sql(tw)} AND t.status=0 AND t.fam LIKE ? ORDER BY t.id",
-                       (uid, uid, '%"kind":"contract"%')):
+                       (uid, uid, uid, uid, '%"kind":"contract"%')):
         f = _fam(r["fam"])
         if f.get("kind") != "contract":
             continue
@@ -104,7 +105,7 @@ def stl_health(c, uid, today, mon0, weeks, tw):
     sql = f"""SELECT t.id, t.title, t.due, t.due_time, t.status, t.completed_at, t.completed_by, t.repeat, t.fam {_mine_sql(tw)}
               AND l.life='health' AND t.fam LIKE ? AND (t.status=0 OR (t.status=2 AND t.completed_by=? AND t.completed_at IS NOT NULL)) ORDER BY t.id"""
     nxt = []
-    for r in c.execute(sql, (uid, uid, '%"kind":"health"%', uid)):
+    for r in c.execute(sql, (uid, uid, uid, uid, '%"kind":"health"%', uid)):
         f = _fam(r["fam"])
         if f.get("kind") != "health":
             continue
@@ -166,6 +167,10 @@ def stl_trip_costs(c, uid, trips):
     for k in c.execute(f"SELECT list_id, org_id, trip_id FROM life_trip_costs WHERE list_id IN ({ids})").fetchall():  # noqa: S608 (ints)
         lo = org[k["list_id"]]
         if lo not in offices:
+            from ..office.model import pb_personal
+            if lo is None and pb_personal(c, uid, create=False) is None:
+                offices[lo] = None  # no personal office yet: a GET makes none (Fable review 2.630)
+                continue
             try:
                 offices[lo] = ltc_office(c, uid, lo)
             except Denied:
@@ -185,11 +190,11 @@ def stl_trip_costs(c, uid, trips):
 def stl_travel(c, uid, today, sq):
     """My trips (the trip projects I own, archived ones too): trips and travel days of the last 12 months and of this year,
     their travel expenses, the next trip."""
-    where = " AND id IN " + sq if sq else ""
+    where = (" AND id IN " + sq if sq else "") + f" AND id IN {vis_sql()}"  # 2.630.0: the request's list scope (token allowlist)
     if org_trips_hidden():
         where += " AND org_id IS NULL"
     trips = []
-    for r in c.execute(f"SELECT id, name, org_id, trip FROM lists WHERE life='travel' AND owner_id=? AND deleted_at IS NULL{where} ORDER BY id", (uid,)):
+    for r in c.execute(f"SELECT id, name, org_id, trip FROM lists WHERE life='travel' AND owner_id=? AND deleted_at IS NULL{where} ORDER BY id", (uid, uid, uid)):
         t = _fam(r["trip"])
         try:
             a, z = date.fromisoformat(t["from"]).isoformat(), date.fromisoformat(t.get("to") or t["from"]).isoformat()

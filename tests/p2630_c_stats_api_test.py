@@ -146,6 +146,17 @@ for scopes, sees in ((["read"], False), (["read", "private"], True)):
     else:
         check({p["name"] for p in jv["health"]["people"]} == {"", "Anna"}, "with private: the same as the app")
 
+# ================ 2.630.0 (Fable review): a token limited to one list sees no contract, appointment or trip of other lists
+LONE = A.post(B + "/api/lists", json={"name": "Only this"}).json()["id"]
+tok = A.post(B + "/api/me/tokens", json={"name": "stats one list", "scopes": ["read", "private"], "list_ids": [LONE]}).json().get("token")
+r = requests.get(B + "/api/v1/stats", headers={"Authorization": "Bearer " + (tok or "x")})
+jl = r.json() if r.ok else {}
+check(r.ok and jl.get("contracts", {}).get("count") == 0 and jl["contracts"]["by_provider"] == [] and jl["contracts"]["notice"] == [],
+      f"token with one list: no contract of other lists {r.status_code} {str(jl.get('contracts'))[:200]}")
+check(jl.get("health", {}).get("people") == [] and jl["health"]["next"] == [], f"token with one list: no appointment {str(jl.get('health'))[:200]}")
+check(jl.get("travel", {}).get("last12", {}).get("trips") == 0 and jl["travel"]["next"] is None, f"token with one list: no trip {jl.get('travel')}")
+check("Strom" not in r.text and "Zahnarzt" not in r.text and "Rom" not in r.text, "token with one list: no title of another list")
+
 # ================================================================ a person without an organisation
 FR, Fr = freelancer(B, A, "frida")
 post(Fr, "/api/life/contracts", {"name": "Handy", "provider": "Funk AG", "cost": 20, "per": "month", "ends": D(60)}, "freelancer: a contract")
