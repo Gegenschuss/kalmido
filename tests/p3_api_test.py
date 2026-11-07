@@ -49,7 +49,7 @@ Bb, C, Dv = sess("bob"), sess("carol"), sess("dave")
 Bb.patch(B + "/api/settings", json={"lang": "de"})
 st = state(A)
 # 2.48.0 (#1207, #1111): features_rev 11 (file store + documents)
-check("progress" in st["settings"]["features"].split(",") and st["settings"]["features_rev"] == "11", "new user: progress module on, features_rev 11 (2.48.0)")
+check("progress" in st["settings"]["features"].split(",") and st["settings"]["features_rev"] == "12", "new user: progress module on, features_rev 12 (2.623.0)")  # 2.623.0 (#4765): features_rev 12 adds the module Approval (videos)
 check(st["settings"]["hide_blocked_today"] == "0" and st["settings"]["progress_subtasks"] == "0", "new settings defaults")
 check(st["fields"] == [], "state: fields []")
 

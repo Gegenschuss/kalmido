@@ -21,7 +21,7 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
   await call('POST', '/api/admin/setup', {org_name: 'Alpha', lang: 'en', collab_all: true, modules: ['comments']});
-  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'collab,comments,clients'});
+  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'collab,comments,clients,videos'});  // 2.623.0 (#4765): + videos, the module Approval (creating needs it)
   const L = await call('POST', '/api/lists', {name: 'Imagefilm', kind: 'project'});
   const T = await call('POST', '/api/tasks', {title: 'Rohschnitt', list_id: L.id});
   check(L.id && T.id, 'a project list and a task');
@@ -29,7 +29,7 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   // ================= the task panel: section, "Add video link", the dialog
   let w = await boot({user: 'alice', hash: 't/' + T.id}), d = w.document;
   const add = await until(() => d.querySelector('#detail [data-vdr="new"]'));
-  check(add && /Video sign-off/.test(d.querySelector('#d-vdr h5')?.textContent || ''), 'the section with "Add video link"');
+  check(add && /Approval/.test(d.querySelector('#d-vdr h5')?.textContent || ''), 'the section with "Add video link"');  // 2.623.0 (#4765): the section is called Approval
   d.querySelector('#d-more')?.setAttribute('open', '');
   add?.click();
   const form = await until(() => d.querySelector('.vdrform'));

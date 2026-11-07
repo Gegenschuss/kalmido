@@ -340,7 +340,11 @@ youtu.be, Shorts) or a direct video file over https (MP4, WebM, MOV, e.g. a file
 link has to end with the file name). Any other link (a Google Drive page, a Nextcloud share page) is a *link without time
 control*: it opens in a new tab and its comments carry no timecode.
 
-- Where: a task's panel (*More details* > *Video sign-off*), a project's overview and a client's card: *Add video link*.
+- Where: a task's panel (*More details* > *Approval*), a project's overview and a client's card: *Add video link*.
+  2.623.0: it is called *Approval* in the app and belongs to agency projects and projects without a type (not software or
+  private ones; switch it on there under the project's options > Properties). Settings > Modules > *Approval* switches it
+  off for you completely (also for a person without an organisation): no new ones, the existing ones stay visible and
+  readable, in the trash too; nothing is deleted.
 - Comments: typing pauses the player and keeps its time (*at 01:23*; a tap on it comments without a time). A tap on a
   timecode or on a mark of the time line under the player jumps there. Answers (one level), *done* and back, delete.
 - Versions: *New version…* in the menu adds the next cut (v1, v2 …); the version switch shows the older ones with their

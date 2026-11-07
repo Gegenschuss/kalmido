@@ -115,7 +115,8 @@ PURPOSE_ON = {"me": ("cal", "events", "contacts"),
 # 2.36.1 (#1021): "Office & finance" = Team + the business modules; they are switched ON by this purpose only and never
 # switched off by another purpose (clients, workload, forms stay as they are, see PURPOSE_MODS)
 # 2.217.0 B (#2797): Team and Office & finance switch the module Agents on too (new setups / a chosen purpose; nothing migrated)
-PURPOSE_EXTRA = {"office": ("clients", "workload", "forms", "office", "agents"), "team": ("agents",)}
+# 2.623.0 (#4765): + the module Approval (videos) for Team and Office & finance (the first start's package keeps it; the others drop it)
+PURPOSE_EXTRA = {"office": ("clients", "workload", "forms", "office", "agents", "videos"), "team": ("agents", "videos")}
 
 
 # 2.19.0: what a child account may change: tick / untick (and undo) the tasks it sees, ask for a reward, its own
@@ -1013,7 +1014,7 @@ PM_EXTRA_ALL = tuple(dict.fromkeys(x for v in PURPOSE_EXTRA.values() for x in v)
 PM_FULL = ("cal", "timeline", "matrix", "habits", "pomo", "kanban", "collab", "stats", "time", "progress", "deps", "fields",
            "agents", "comments", "family", "events", "contacts", "contracts", "home", "care", "health", "review", "travel",
            "reading", "budget", "feeds", "clients", "workload", "forms", "office", "wiki", "files", "dispo",
-           "sheets")
+           "sheets", "videos")  # 2.623.0 (#4765): + videos (the module Approval, last)
 
 
 def pma_full():

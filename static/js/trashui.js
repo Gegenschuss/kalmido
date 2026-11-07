@@ -196,10 +196,10 @@ function vtr_html() {
   vtr_load();
   const xs = (VTR.items || []).filter(x => wsObjIn({org_id: x.org_id}));
   if (!xs.length) return '';
-  return `<div class="group vtrlist"><div class="ghead">${esc(tr('Video sign-offs'))} <span class="c">${xs.length}</span></div>`
+  return `<div class="group vtrlist"><div class="ghead">${esc(tr('Approvals|sign-off'))} <span class="c">${xs.length}</span></div>`
     + xs.map(x => { const d = vtr_left(x); return `<div class="mrow otrrow vtrrow" data-vtr="${+x.id}"><span class="n"><b>${esc(x.title || tr('Video'))}</b><small class="muted">${esc([tr('In the trash since {0}', fmtDate((x.deleted_at || '').slice(0, 10))), vtr_place(x), x.version ? 'v' + x.version : '', x.org_id && wsLabel(x.org_id), d != null ? trn('Deleted for good in {0} day', 'Deleted for good in {0} days', d) : ''].filter(Boolean).join(' · '))}</small></span>`
       + `<span class="oadmb">${x.can_restore ? `<button type="button" class="btn sm" data-vtra="restore">${ic('undo', 's')}<span>${tr('Restore')}</span></button>` : ''}</span></div>`; }).join('')
-    + (VTR.days ? `<div class="muted otrnote">${esc(trashNote(trn('Video sign-offs in the trash are deleted for good after {0} day.', 'Video sign-offs in the trash are deleted for good after {0} days.', VTR.days), !VTR.purge))}</div>` : '') + '</div>';
+    + (VTR.days ? `<div class="muted otrnote">${esc(trashNote(trn('Approvals in the trash are deleted for good after {0} day.', 'Approvals in the trash are deleted for good after {0} days.', VTR.days), !VTR.purge))}</div>` : '') + '</div>';
 }
 async function vtr_restore(id) {
   const x = (VTR.items || []).find(y => y.id === id); if (!x) return;

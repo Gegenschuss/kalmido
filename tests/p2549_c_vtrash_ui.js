@@ -24,7 +24,7 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
   await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true, modules: ['comments']});
-  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'collab,comments'});
+  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'collab,comments,videos'});  // 2.623.0 (#4765): + videos, the module Approval (creating needs it)
   check(((await call('GET', '/api/state')).me.workspaces || []).length === 0, 'setup: alice has no organisation');
   const LG = (await call('POST', '/api/lists', {name: 'Old film', kind: 'project', org_id: null})).id;
   const V1 = (await call('POST', '/api/videos', {list_id: LG, url: 'https://vimeo.com/123456789', title: 'Lost cut'})).id;
@@ -43,7 +43,7 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   const t1 = row(V1)?.textContent || '', t2 = row(V2)?.textContent || '';
   check(/Lost cut/.test(t1) && /Without a place/.test(t1) && /v1/.test(t1), '#4536: the review without a place shows in the section: ' + t1);
   check(/Kept cut/.test(t2) && /New home/.test(t2), '#4536: the review at its project names the project: ' + t2);
-  check(/Video sign-offs/.test(d.querySelector('#view .vtrlist .ghead')?.textContent || ''), '#4536: the section is called "Video sign-offs"');
+  check(/Approvals/.test(d.querySelector('#view .vtrlist .ghead')?.textContent || ''), '#4536: the section is called "Approvals"');  // 2.623.0 (#4765): was Video sign-offs
   const note = d.querySelector('#view .vtrlist .otrnote')?.textContent || '';
   check(/stay in the trash until the deletion runs of the server are switched on/.test(note), '#4536: the hint of the trash period (runs off on the test server): ' + note);
   w.eval('S.trashPurge = true; VTR.purge = true; renderView()');

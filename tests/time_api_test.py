@@ -49,7 +49,7 @@ Bb.patch(B + "/api/settings", json={"lang": "de"})
 st = A.get(B + "/api/state").json()
 check(st["timer"] is None and st["time_totals"] == {}, "state: no timer, no totals")
 # 2.48.0 (#1207, #1111): features_rev 11 (file store + documents)
-check("time" in st["settings"]["features"].split(",") and st["settings"]["features_rev"] == "11", "new user: module time on, features_rev 11 (2.48.0)")
+check("time" in st["settings"]["features"].split(",") and st["settings"]["features_rev"] == "12", "new user: module time on, features_rev 12 (2.623.0)")  # 2.623.0 (#4765): features_rev 12 adds the module Approval (videos)
 check(st["settings"]["time_rounding"] == "0" and st["settings"]["time_focus"] == "1", "time settings defaults")
 WORK = A.post(B + "/api/lists", json={"name": "Work", "kind": "project", "time_tracking": True}).json()["id"]  # 2.41.0 (#1471): time tracking is a switch of the list
 HOME = A.post(B + "/api/lists", json={"name": "Home", "kind": "project", "time_tracking": True}).json()["id"]

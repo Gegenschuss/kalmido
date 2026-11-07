@@ -12,12 +12,16 @@
 // showing it (pz_show). A blank project ('') shows everything its modules allow.
 const PZ_KEYS = [['ticket', N_('Task number'), 'hash'], ['ttype', N_('Ticket type'), 'bug'], ['repo', N_('Repository and code'), 'git'],
   ['deps', N_('Dependencies'), 'deps'], ['who', N_('Assignee'), 'user'], ['points', N_('Story points'), 'hash'],
-  ['time', N_('Time tracking'), 'clock'], ['video', N_('Video sign-off'), 'film'], ['client', N_('Client and contacts'), 'users'],
+  ['time', N_('Time tracking'), 'clock'], ['video', N_('Approval'), 'film'] /* 2.623.0 (#4765): was Video sign-off */, ['client', N_('Client and contacts'), 'users'],
   ['docs', N_('Documents and invoices'), 'file'], ['tags', N_('Tags'), 'tag']];
 const PZ_OFF = {software: ['video', 'client', 'docs'], agency: ['repo', 'ttype'],
   private: ['ticket', 'ttype', 'repo', 'deps', 'who', 'points', 'time', 'video', 'client', 'docs']};
 // the list columns (render.js COLS) that belong to a property
 const PZ_COL = {who: 'who', time: 'time', deps: 'deps', tags: 'tags'};
+// 2.623.0 (#4765): a property that needs a module (Settings > Modules): module off = off in every project, the project's
+// properties do not offer it; what a task already has stays visible there (pz_show)
+const PZ_MOD = {video: 'videos'};
+const pz_modOn = k => !PZ_MOD[k] || feat(PZ_MOD[k]);
 const pz_name = k => tr((PZ_KEYS.find(x => x[0] === k) || [0, k])[1]);
 function pz_own(l) {  // the deviations of a list {key: 0 | 1}
   if (!l?.props) return {};
@@ -27,6 +31,7 @@ function pz_own(l) {  // the deviations of a list {key: 0 | 1}
 const pz_typeOn = (pt, k) => !(PZ_OFF[pt || ''] || []).includes(k);
 // the property k is on for the list lid (unknown lists, the basket, plain lists: on)
 function pz_on(lid, k) {
+  if (k && !pz_modOn(k)) return false;  // 2.623.0 (#4765)
   const l = typeof lid === 'object' ? lid : listById(lid); if (!l || !k) return true;
   const o = pz_own(l);
   return k in o ? !!+o[k] : pz_typeOn(l.ptype, k);
@@ -44,7 +49,7 @@ function pz_boxHtml(l) {
   if (!l || l.is_inbox || !canManage(l)) return '';
   const o = pz_own(l), own = Object.keys(o).length > 0;
   return `<div class="pzbox" id="l-pz"><div class="shint lhint">${esc(l.ptype ? tr('What the tasks of this project show. {0} switches off what it does not need; switch single ones back on here.', ptypeName(l.ptype)) : tr('What the tasks of this project show.'))} ${esc(tr('Hidden is display only: nothing is deleted.'))}</div>
-    <div class="pzlist" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(13rem,1fr));gap:.25rem .75rem">${PZ_KEYS.map(([k, n, i]) => `<label class="chkl pzrow"><input type="checkbox" data-pz="${k}" ${pz_on(l, k) ? 'checked' : ''}>${ic(i, 's')}<span>${esc(tr(n))}</span>${k in o ? `<span class="muted pzown" style="margin-inline-start:auto">${esc(tr('changed'))}</span>` : ''}</label>`).join('')}</div>
+    <div class="pzlist" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(13rem,1fr));gap:.25rem .75rem">${PZ_KEYS.filter(([k]) => pz_modOn(k)).map(([k, n, i]) => `<label class="chkl pzrow"><input type="checkbox" data-pz="${k}" ${pz_on(l, k) ? 'checked' : ''}>${ic(i, 's')}<span>${esc(tr(n))}</span>${k in o ? `<span class="muted pzown" style="margin-inline-start:auto">${esc(tr('changed'))}</span>` : ''}</label>`).join('')}</div>
     <div class="row pzreset"><span class="lmsum muted">${esc(own ? trn('{0} changed by hand', '{0} changed by hand', Object.keys(o).length) : tr('As the project type'))}</span><span class="spacer"></span>${own ? `<button type="button" class="btn sm" data-pz-reset>${ic('undo', 's')} ${esc(tr('As the project type'))}</button>` : ''}</div></div>`;
 }
 function pz_wire(md, id) {

@@ -31,7 +31,7 @@ s0.headers.update(H)
 assert s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice Admin", "password": "password123"}).ok
 A = sess("alice")
 A.post(B + "/api/admin/setup", json={"lang": "en", "collab_all": True})
-A.patch(B + "/api/settings", json={"lang": "en", "features": "comments,collab,clients", "tour": "done"})
+A.patch(B + "/api/settings", json={"lang": "en", "features": "comments,collab,clients,videos", "tour": "done"})  # 2.623.0 (#4765): + videos, the module Approval (creating needs it)
 FID, Fr = freelancer(B, A)
 
 

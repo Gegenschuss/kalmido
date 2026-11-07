@@ -57,7 +57,7 @@ check("agents" not in fs, f"#1591: Team + the switch off = lists and tasks only,
 
 # ---- the client tables say the same (static/js/account.js)
 src = open(os.path.join(N, "..", "static", "js", "account.js"), encoding="utf-8").read()
-check("const PURPOSE_EXTRA = {office: ['clients', 'workload', 'forms', 'office', 'agents'], team: ['agents']};" in src,
+check("const PURPOSE_EXTRA = {office: ['clients', 'workload', 'forms', 'office', 'agents', 'videos'], team: ['agents', 'videos']};" in src,  # 2.623.0 (#4765): + videos
       "#2797: the client's PURPOSE_EXTRA matches the server")
 
 print(f"{OKS[0]} ok, {len(FAILS)} failed")

@@ -52,22 +52,26 @@ function vdr_taskHtml(t, ro) {
   const rows = vdr_rows('task_id', t.id, () => vdr_redrawTask(t.id));
   if (!rows) return '';
   if (ro && !rows.length) return '';
-  return `<div class="dsec vdrsec" id="d-vdr"><h5>${tr('Video sign-off')}</h5>${vdr_listHtml(rows, 'task_id', t.id, !ro)}</div>`;
+  return `<div class="dsec vdrsec" id="d-vdr"><h5>${tr('Approval')}</h5>${vdr_listHtml(rows, 'task_id', t.id, !ro)}</div>`;  // 2.623.0 (#4765): ro also = off (detail.js)
 }
 const vdr_count = t => (VDR.by[vdr_key('task_id', t.id)] || []).length;  // detail.js: a task with reviews shows the section outside "More details"
+// 2.623.0 (#4765): "Add" only where the approval belongs: the module on and the project's property (props.js pz_on: agency and
+// projects without a type, not software / private unless switched on in the project); the existing ones show everywhere
 function vdr_projHtml(l) {
   if (!l || l.e2e) return '';
   const rows = vdr_rows('list_id', l.id, vdr_redrawView);
   if (!rows) return '';
-  const add = typeof canEditList === 'function' && canEditList(l.id);
+  const add = typeof canEditList === 'function' && canEditList(l.id) && pz_on(l, 'video');
   if (!rows.length && !add) return '';
-  return `<section class="povs vdrpov" id="pov-videos"><div class="povh"><h3>${tr('Video sign-offs')}</h3></div>${vdr_listHtml(rows, 'list_id', l.id, add)}</section>`;
+  return `<section class="povs vdrpov" id="pov-videos"><div class="povh"><h3>${tr('Approvals|sign-off')}</h3></div>${vdr_listHtml(rows, 'list_id', l.id, add)}</section>`;
 }
 function vdr_clientHtml(c) {
   if (!c || !c.id) return '';
   const rows = vdr_rows('client_id', c.id, vdr_redrawView);
   if (!rows) return '';
-  return `<div class="ctsec vdrcl"><h4>${tr('Video sign-offs')}</h4>${vdr_listHtml(rows, 'client_id', c.id, true)}</div>`;
+  const add = feat('videos');  // 2.623.0 (#4765): a client has no project type: the module alone; off = only the existing ones
+  if (!rows.length && !add) return '';
+  return `<div class="ctsec vdrcl"><h4>${tr('Approvals|sign-off')}</h4>${vdr_listHtml(rows, 'client_id', c.id, add)}</div>`;
 }
 // a review changed: the cached sections follow (it leaves every other place, its own place shows it)
 function vdr_cache(r, gone) {
@@ -103,7 +107,7 @@ function vdr_new(k, id) {
     const h = histAdd({label: tr('Created {0}', qn(r.title)), ids: [], snaps: [], lids: [],
       undo: async () => { await rawFetch('DELETE', `/api/videos/${r.id}`); vdr_cache(r, true); vdr_closeIf(r.id); return {skipped: []}; },
       redo: async () => { vdr_cache(await rawFetch('POST', `/api/videos/${r.id}/restore`)); return {skipped: []}; }});
-    histToast(tr('Video sign-off {0} created', qn(r.title)), h);
+    histToast(tr('Approval {0} created', qn(r.title)), h);
     vdr_open(r.id, r);
   });
 }
@@ -375,7 +379,7 @@ async function vdr_delete(st) {
   const r = st.r;
   try { await rawFetch('DELETE', `/api/videos/${r.id}`); } catch (e) { toast(e.message); return; }
   st.md.remove(); vdr_cache(r, true);
-  histToast(tr('Video sign-off {0} deleted', qn(r.title)), histAdd({label: tr('Deleted {0}', qn(r.title)), ids: [], snaps: [], lids: [],
+  histToast(tr('Approval {0} deleted', qn(r.title)), histAdd({label: tr('Deleted {0}', qn(r.title)), ids: [], snaps: [], lids: [],
     undo: async () => { vdr_cache(await rawFetch('POST', `/api/videos/${r.id}/restore`)); return {skipped: []}; },
     redo: async () => { await rawFetch('DELETE', `/api/videos/${r.id}`); vdr_cache(r, true); vdr_closeIf(r.id); return {skipped: []}; }}));
 }

@@ -13,7 +13,7 @@ const sql = (q, a = []) => JSON.parse(execFileSync('python3', [__dirname + '/dbx
 (async () => {
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   const CK = await login('alice');
-  await fetch(B + 'api/settings', {method: 'PATCH', headers: {...H, Cookie: CK}, body: JSON.stringify({lang: 'en', tour: 'done', features: 'time,collab'})});
+  await fetch(B + 'api/settings', {method: 'PATCH', headers: {...H, Cookie: CK}, body: JSON.stringify({lang: 'en', tour: 'done', features: 'time,collab,videos'})});  // 2.623.0 (#4765): + videos, the module Approval (creating needs it)
   const r0 = sql("SELECT id FROM users WHERE username='alice'")[0], me = r0.id ?? r0[0];
   sql(`INSERT INTO office_signoffs(org_id,kind,title,token_hash,token,state,created_by,created_at) VALUES(NULL,'video','Gone cut','h1','t1','open',?,'2026-10-01T10:00:00+00:00') RETURNING id`, [me]);
   const w = await boot({});

@@ -26,7 +26,7 @@ from flask import Response, jsonify, redirect, request
 
 from ..core.config import app, PUBLIC_URL
 from ..collab.comments import lang_of, push_later  # 2.367.5 (#2980); 2.370.3 (#2760): push_later
-from ..core.access import Denied, FULL_ROLES, WRITE_ROLES, acx_org_ok, list_role, task_visible
+from ..core.access import Denied, FULL_ROLES, WRITE_ROLES, acx_org_ok, list_role, need_feat, task_visible  # 2.623.0 (#4765): need_feat
 from ..office.signoff import sig_people  # 2.266.0 (#2965)
 from ..core.db import body, db, err, iso, now_utc
 from ..core.retention import ret_on, ret_report, ret_trash_cut, ret_trash_days  # 2.272.0 A (#3026); 2.549.0 (#4536): ret_trash_days
@@ -390,6 +390,9 @@ def vdr_create():
     c, uid = db(), me()
     if vdr_is_agent(c, uid):
         raise Denied(404)  # 2.99.1 C (#1959): like every other route of the app for agents (their API: videos/v1.py, no creating)
+    # 2.623.0 (#4765): the module Approval off (Settings > Modules, the person's own switch, also without an organisation) = no
+    # new review (409 like every module); the existing ones stay readable, keep their versions and comments, restore from the trash
+    need_feat("videos")
     b = body()
     b = b if isinstance(b, dict) else {}
     oid, tid, lid, cid = vdr_target(c, uid, b)

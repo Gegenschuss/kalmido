@@ -34,6 +34,7 @@ from .i18n import N_  # 2.369.5 (#2517): pulled up from functions
 
 # 2.48.0 (#1207): modules of 2.48 that are on for everyone once (features_rev 11)
 FEATS_2480 = ("files", "docs")  # 2.48.0 (#1207, #1111): the file store and the documents, on for everyone once
+FEATS_2623 = ("videos",)  # 2.623.0 (#4765): the approval (video sign-offs) became a module of its own, on for everyone once
 
 
 # 2.149.0 E (#2512): test clock. KALMIDO_TEST_NOW (ISO instant, e.g. 2026-10-18T23:30:00Z) moves the server's clock, but only
@@ -1081,6 +1082,11 @@ def init_db(guard=True, load=None):
             d = [x for x in (gsetting(c, "default_features") or "").split(",") if x]
             gset(c, "default_features", ",".join(d + [f for f in FEATS_2480 if f not in d]))
         gset(c, "migr_feat11", "1")
+        # features_rev 12 (2.623.0, #4765): the module Approval in the setup's default too
+        if dfs and gsetting(c, "migr_feat12") != "1":
+            d = [x for x in (gsetting(c, "default_features") or "").split(",") if x]
+            gset(c, "default_features", ",".join(d + [f for f in FEATS_2623 if f not in d]))
+        gset(c, "migr_feat12", "1")
         # 2.22.0 (#752), once: one organisation (named after the instance's domain, e.g. kalmido.example.com -> "Example")
         # with every account (agents too); people see only people of their organisations
         if gsetting(c, "migr_orgs2220") != "1":
@@ -1217,6 +1223,11 @@ def init_db(guard=True, load=None):
                 fs += [f for f in FEATS_2480 if f not in fs]
                 uset(c, uid, "features", ",".join(fs))
                 uset(c, uid, "features_rev", "11")
+            # features_rev 12 (2.623.0, #4765): the approval (video sign-offs) -> on for everyone (switched off in Settings > Modules)
+            if rev < 12:
+                fs += [f for f in FEATS_2623 if f not in fs]
+                uset(c, uid, "features", ",".join(fs))
+                uset(c, uid, "features_rev", "12")
         # 2.15.0 (#479), once: fine scopes. Old read tokens could download files (now attachments:read), old agents had
         # read + write (stored "write" = every scope but admin-read, so they keep what they could do)
         clk("users")

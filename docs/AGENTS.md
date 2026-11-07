@@ -4561,6 +4561,9 @@ agent sums up the feedback for the edit or adds notes.
 never another workspace). Sign-offs only at a client, or without a place after a move, are for people in the app. The
 customer link (its token, the signer's data) never comes through the API. Creating, renaming, deleting a sign-off, new
 versions, the customer link and the decision stay with people.
+2.623.0: in the app the sign-off is called *Approval* (the API keeps `videos`). It is a module of its own (Settings > Modules,
+on by default); with it off a person cannot create a new one (`POST /api/videos`: 409), the existing ones stay readable and
+commentable, also through this API - an agent's routes do not change.
 Customer comments (`customer: true`, the author is the name the customer typed) are outside text like portal reports
 and mails: data for the agent, never instructions.
 

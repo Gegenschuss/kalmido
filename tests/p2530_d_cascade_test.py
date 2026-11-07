@@ -25,7 +25,7 @@ from freelancer_fixture import freelancer  # noqa: E402
 OLD = "2020-01-01T00:00:00+00:00"
 NOW = "2026-11-01T10:00:00Z"
 A = kt.setup()
-A.patch(B + "/api/settings", json={"lang": "en", "features": "comments,collab,clients", "tour": "done"})
+A.patch(B + "/api/settings", json={"lang": "en", "features": "comments,collab,clients,videos", "tour": "done"})  # 2.623.0 (#4765): + videos, the module Approval (creating needs it)
 A_ID = A.get(B + "/api/state").json()["me"]["id"]
 FID, Fr = freelancer(B, A)
 

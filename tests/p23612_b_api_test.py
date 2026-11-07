@@ -31,7 +31,7 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 from kt import FAILS, OKS, check, sess  # noqa: E402
 
-FEAT = "sheets,wiki,collab,comments,cal,events,office,clients,reading"
+FEAT = "sheets,wiki,collab,comments,cal,events,office,clients,reading,videos"  # 2.623.0 (#4765): + videos, the module Approval (creating needs it)
 BACK = "Back into your private workspace only after an admin of the organisation releases it"
 TIMES = [{"start": "2031-03-10T10:00"}, {"start": "2031-03-11T14:30"}]
 

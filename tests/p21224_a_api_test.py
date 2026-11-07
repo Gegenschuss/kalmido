@@ -39,7 +39,7 @@ CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 FS = "http://127.0.0.1:8098"
 V = "/api/videos"
 KEY = base64.b64encode(os.urandom(32)).decode()
-FEAT = "cal,comments,collab,office,clients,feeds"
+FEAT = "cal,comments,collab,office,clients,feeds,videos"  # 2.623.0 (#4765): + videos, the module Approval (creating needs it)
 from kt import FAILS, OKS, check, sess  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 
 

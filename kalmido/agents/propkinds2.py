@@ -46,7 +46,7 @@ PK2_SHOOT_KEY, PK2_OFFER_KEY, PK2_LIST_KEY, PK2_PROJECT_KEY = 300, 400, 100, 200
 PK2_MODS = ("cal", "timeline", "matrix", "habits", "pomo", "kanban", "collab", "stats", "time", "progress", "deps", "fields",
             "agents", "comments", "family", "events", "contacts", "contracts", "home", "care", "health", "review", "travel",
             "reading", "clients", "workload", "forms", "office", "wiki", "files", "dispo",
-            "sheets")  # 2.89.0 (#1916)
+            "sheets", "videos")  # 2.89.0 (#1916); 2.623.0 (#4765): + videos (Approval)
 PK2_OPEN_MAX = 10   # open (ready, undecided) inquiry / setup proposals an agent made on its own per person
 PK2_OPEN_AGENT_MAX = 50   # 2.51.0 (#1351) review: ... and per agent in all
 

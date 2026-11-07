@@ -1161,7 +1161,7 @@ const PURPOSE_MODS = {me: ['cal', 'events', 'contacts'],
   office: ['cal', 'timeline', 'kanban', 'comments', 'collab', 'time', 'progress', 'deps', 'fields', 'events', 'contacts', 'clients', 'workload', 'forms', 'office', 'agents']};
 // 2.36.1 (#1021): the modules a purpose switches ON in addition (never off by another purpose; server: PURPOSE_EXTRA)
 // 2.217.0 B (#2797): Team and Office & finance switch the module Agents on too (server: PURPOSE_EXTRA)
-const PURPOSE_EXTRA = {office: ['clients', 'workload', 'forms', 'office', 'agents'], team: ['agents']};
+const PURPOSE_EXTRA = {office: ['clients', 'workload', 'forms', 'office', 'agents', 'videos'], team: ['agents', 'videos']};  // 2.623.0 (#4765): + videos (Approval), as the server
 // First-run setup, step 2 ("What do you want to use?"): only right after the first admin was created, never on
 // existing installs. Three presets (1.2: "Simple list"; "Just me" preselected; "Projects & team" = everything), then
 // the single modules to fine-tune. Collaboration + time tracking are the instance switches; the other modules

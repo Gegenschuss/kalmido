@@ -706,7 +706,7 @@ function renderDetail0() {
     snippets: ck || !pz_show(t, 'repo', snipCount(t)) ? '' : snipHtml(t, ro),  // 2.35.0 (#1095): code snippets
     family: ck ? '' : famDetailHtml(t, l, ro),  // 2.19.0 (#653)
     life: ck ? '' : lifeDetailHtml(t, l, ro),  // 2.22.0 (#663)
-    video: ck || typeof vdr_taskHtml !== 'function' || !pz_show(t, 'video', typeof vdr_count === 'function' && vdr_count(t)) ? '' : vdr_taskHtml(t, ro),  // 2.99.1 A (#1959): video sign-offs (videorev.js, loaded on demand)
+    video: ck || typeof vdr_taskHtml !== 'function' ? '' : vdr_taskHtml(t, ro || !pz_on(t.list_id, 'video')),  // 2.623.0 (#4765): off (type, project, module) = only the existing ones, no Add  // 2.99.1 A (#1959): video sign-offs (videorev.js, loaded on demand)
     links: ck ? '' : linksDetailHtml(t, ro)};  // 2.21.0 (#659 / #658): events + contacts of the task
   // 2.365.0 (#2824): on a phone (touch, below 900 px) Complete, the date with Today / Tomorrow and the project sit in a bar at the
   // bottom above the comment field (thumb reach); the header keeps Back, Priority and "…"

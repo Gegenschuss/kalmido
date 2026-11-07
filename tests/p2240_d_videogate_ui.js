@@ -28,7 +28,7 @@ async function openReview(user, hash, title) {
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
   await call('POST', '/api/admin/setup', {org_name: 'Alpha', lang: 'en', collab_all: true, modules: ['comments']});
-  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'collab,comments,clients'});
+  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'collab,comments,clients,videos'});  // 2.623.0 (#4765): + videos, the module Approval (creating needs it)
   const L = await call('POST', '/api/lists', {name: 'Imagefilm', kind: 'project'});
   const T = await call('POST', '/api/tasks', {title: 'Rohschnitt', list_id: L.id});
   const R = await call('POST', '/api/videos', {task_id: T.id, url: 'https://www.youtube.com/watch?v=AbCdEfGhI-9', title: 'Film Gate'});
@@ -79,7 +79,7 @@ async function openReview(user, hash, title) {
   // ================= a person without an organisation: same question at a private review
   const U = await call('POST', '/api/users', {username: 'frida', display_name: 'Frida', password: 'password123', email: 'frida@example.com', orgs: []});
   const FK = await login('frida');
-  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'collab,comments,clients'}, FK);
+  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'collab,comments,clients,videos'}, FK);  // 2.623.0 (#4765): + videos, the module Approval (creating needs it)
   const FL = await call('POST', '/api/lists', {name: 'Privat', kind: 'project'}, FK);
   const FT = await call('POST', '/api/tasks', {title: 'Privater Schnitt', list_id: FL.id}, FK);
   const FR = await call('POST', '/api/videos', {task_id: FT.id, url: 'https://vimeo.com/123456789', title: 'Privat Gate'}, FK);

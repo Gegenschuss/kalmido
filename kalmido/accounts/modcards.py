@@ -35,7 +35,7 @@ from .wsareas import WSA_KEY_RE, _req_org
 # fails when PM_FULL gains a module that is missing here
 _MC_MODS = ("cal", "timeline", "matrix", "habits", "pomo", "kanban", "collab", "stats", "time", "progress", "deps", "fields",
             "agents", "comments", "family", "events", "contacts", "contracts", "home", "care", "health", "review", "travel",
-            "reading", "budget", "feeds", "clients", "workload", "forms", "office", "wiki", "files", "dispo", "sheets", "docs")
+            "reading", "budget", "feeds", "clients", "workload", "forms", "office", "wiki", "files", "dispo", "sheets", "videos", "docs")  # 2.623.0 (#4765): + videos
 
 
 def mc_mods():

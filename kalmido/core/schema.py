@@ -4545,7 +4545,7 @@ USER_DEFAULTS = {
     #            @mentions, pushes and News
     # progress = progress bar in the list header + the "Where is it stuck?" overview
     # deps = dependencies ("waiting on", timeline arrows + linking, unblock notifications); fields = custom fields
-    "features": "cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,deps,fields,comments,events,contacts,files,docs",
+    "features": "cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,deps,fields,comments,events,contacts,files,docs,videos",  # 2.623.0 (#4765): + videos (Approval)
     "nav_order": "tasks,cal,matrix,habits,pomo",   # order of the mobile tab bar / desktop rail
     "folders": "[]",            # json list: folder order in the sidebar (also keeps empty folders); 2.4.0: paths "A/b"
     "folders_closed": "[]",     # 2.4.0 (#361): json list of the folder paths folded in the sidebar (all devices)
@@ -4563,7 +4563,7 @@ USER_DEFAULTS = {
     # "skip": {"<agent id>": [list ids I stopped sharing with it]}}; written only by /api/agents/<aid>/share-all + /autoshare
     # and the member routes (server-only)
     "agent_share": "{}",
-    "features_rev": "11",       # one-shot migrations of the features list
+    "features_rev": "12",       # one-shot migrations of the features list (12: 2.623.0 #4765, the module Approval)
     "lang": "en",               # UI + push language: en or a static/i18n/<code>.json
     "ical_scope": "all",        # calendar feed: all = every visible open task with a date, mine = mine / assigned to me
     "ical_alarms": "1",         # calendar feed: reminders as VALARM

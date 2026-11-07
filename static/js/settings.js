@@ -270,7 +270,8 @@ const MOD_DESC = {office: N_('Quotations, invoices, services, text blocks and PD
   travel: N_('Trips as projects with dates, bookings, things to do before you leave and a packing list'),
   reading: N_('Read later and bookmarks with a preview and tags – never for agents'),  // 2.97.0 A (#1950); 2.172.0 B (#2679)
   budget: N_('Income and expenses per month, with bank CSV – never for agents'),  // 2.72.0 (#1333)
-  feeds: N_('Blogs and news sites in one list – never for agents')};  // 2.85.0 B (#1162); 2.172.0 B (#2677)
+  feeds: N_('Blogs and news sites in one list – never for agents'),  // 2.85.0 B (#1162); 2.172.0 B (#2677)
+  videos: N_('Clients approve a cut by link, with comments at a timecode; in agency projects and projects without a type')};  // 2.623.0 (#4765)
 // 2.25.0 (UX-20): Integrations start with what people want to do, in plain words; a tap jumps to the part that does it
 // (the technical parts below stay for those who need them)
 function integrCardsHtml() {
@@ -819,8 +820,8 @@ function settingsModal(focus) {
       ${hint(tr('One file per project in a ZIP: Todoist CSV for the import of Todoist, Markdown as checklists for any notes app. Projects locked with a password stay out.'))}
       <h4 id="s-pmeta-h">${tr('Photos')}</h4><div class="row">${chk('s-pmeta', s.photo_meta_strip !== '0', tr('Remove location data from photos'))}</div>
       ${hint(tr('Also removes camera details and capture time. In an organisation its admins decide.'))}
-      <h4 id="s-vext-h">${tr('Videos')}</h4><div class="row">${chk('s-vext', s.video_ext_ok === '1', tr('Load YouTube and Vimeo videos without asking'))}</div>
-      ${hint(tr('Off: a video first shows a note and loads the player only after your click. Loading sends data such as your IP address to the provider.'))}
+      ${feat('videos') ? `<h4 id="s-vext-h">${tr('Videos')}</h4><div class="row">${chk('s-vext', s.video_ext_ok === '1', tr('Load YouTube and Vimeo videos without asking'))}</div>
+      ${hint(tr('Off: a video first shows a note and loads the player only after your click. Loading sends data such as your IP address to the provider.'))}` : ''}${''/* 2.623.0 (#4765): only with the module Approval */}
       ${xl_stdHtml(hint)}${''/* 2.470.0 (#3596) */}
       ${typeof umzHtml === 'function' ? umzHtml(hint) : ''}
       <h4 id="s-tpl-h">${tr('Templates')}</h4>

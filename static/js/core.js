@@ -140,7 +140,8 @@ const FEATS = [['cal', N_('Calendar')], ['timeline', N_('Timeline')], ['matrix',
   ['files', N_('File store')],  // 2.48.0 (#1207): folders and files with shares (ablage.js), on for everyone
   // 2.50.0 (#1194): resources and disposition (a tab of the workload view), off by default
   ['dispo', N_('Disposition')],
-  ['sheets', N_('Tables')]];  // 2.89.0 (#1916): tables with Kalmido variables (sheets.js), off by default
+  ['sheets', N_('Tables')],  // 2.89.0 (#1916): tables with Kalmido variables (sheets.js), off by default
+  ['videos', N_('Approval')]];  // 2.623.0 (#4765): the approval (video sign-offs, videorev.js), on for everyone once (features_rev 12)
 const FEAT_DESC = {deps: N_('“Blocked by” in the task details, arrows and linking in the timeline, what is stuck in the project status, a notice when a task is unblocked'),
   fields: N_('Own fields per project (text, number, selection, date, person, link), as columns and in the task details'),collab: N_('Comments, activity history, @mentions, News, sharing projects and assigning tasks'), stats: N_('Completed tasks, on-time rate, overdue trend, focus time and habit streaks'),
   time: N_('Timer on tasks, manual entries, reports per project and task, CSV export and a printable timesheet'),

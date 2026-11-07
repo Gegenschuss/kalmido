@@ -306,7 +306,10 @@ def admin_setup():
     e = _apply_instance(c, {k: b[k] for k in ("collab_all", "time_all") if k in b})
     if e:
         return e
-    fs = ",".join(f for f in USER_DEFAULTS["features"].split(",") + ["family"] if f in ("collab", "time") or f in mods)
+    # 2.623.0 (#4765): the module Approval (videos) has no switch in this setup: it stays in the default of new users with
+    # the purpose Team or Office & finance (the agency's work), else as chosen (modules)
+    keep = ("videos",) if b.get("purpose") in ("team", "office") else ()
+    fs = ",".join(f for f in USER_DEFAULTS["features"].split(",") + ["family"] if f in ("collab", "time") + keep or f in mods)
     gset(c, "default_features", fs)
     # 2.44.0 (#1187): the areas Review and Home bring the journal and Home & life: on for the admin only (as with a purpose)
     from ..family.family import _LIFE
