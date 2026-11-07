@@ -71,6 +71,7 @@ EXPECT_4XX = {
     "GET /api/tasks/{}/enc-note": (404, "no encrypted note on the own task"),
     "GET /api/tasks/{}/note-lock": (404, "the note of the own task is not locked"),
     "GET /api/trash/lists/{}/export.zip": (404, "the own list is not in the trash"),
+    "GET /api/lists/{}/shotlist.pdf": (404, "the own list is no shoot (project type Shoot only with Film & Video; p2636_c_dreh_api_test.py covers it)"),  # 2.636.0 (#4565)
     "GET /api/v1/office/letters/{}": (404, "an agent reads only the letters it drafted itself; the freelancer wrote this one"),
     # 2.557.0 (#4670): the own agent has no provider key stored (the provider would be an outside service)
     "GET /api/agents/{}/server/models": (409, "no API key of a model provider stored for the own agent (an outside service)"),

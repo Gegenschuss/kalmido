@@ -159,6 +159,7 @@ APP_TO_API = {
     "GET /api/time/export.csv": ["GET /time/entries"],
     "GET /api/time/export.xlsx": ["GET /time/entries"], "GET /api/workload/export.xlsx": ["GET /workload"],  # 2.125.0 C (#2122): Excel = the same data as the API
     "GET /api/lists/{}/export.csv": ["GET /tasks"],  # 2.116.0 (#2064): agents read the same tasks via GET /tasks?list_id=
+    "GET /api/lists/{}/shotlist.pdf": ["GET /tasks"],  # 2.636.0 (#4565): the shot list PDF is a person's download; agents read the same shots via GET /tasks?list_id=
     "GET /api/time/gaps": ["GET /time/gaps"],  # 2.34.0 (#269)
     "GET /api/stale": ["GET /stale"],  # 2.34.0 (#266)
     "GET /api/stats": ["GET /stats"],  # 2.630.0 (#4617): the statistics (health only with the scope private)

@@ -91,7 +91,7 @@ def sht_days(c, uid, lid):
 def sht_picture(c, tid):
     """(w, h, data) of the picture of shot tid for the PDF writer: its first image file the person may open, else None."""
     for a in c.execute("SELECT id FROM attachments WHERE task_id=? AND comment_id IS NULL AND deleted_at IS NULL AND COALESCE(enc, 0)=0 "
-                       "AND mime LIKE 'image/%' ORDER BY id LIMIT 3", (tid,)).fetchall():
+                       "AND mime ILIKE 'image/%' ORDER BY id LIMIT 3", (tid,)).fetchall():
         try:
             row = need_attachment(c, a["id"], False)
             raw = oc_read_file(c, os.path.join(ATT_DIR, row["path"]))
