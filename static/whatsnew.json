@@ -1,6 +1,16 @@
 {
  "versions": [
   {
+   "version": "2.648.0",
+   "date": "2026-11-07",
+   "items": [
+    {
+     "de": "Verbundene Agenten können Anfragen und Deals der Vertriebs-Pipeline lesen, anlegen und ihre Stufe setzen, wenn ein Büro-Admin es erlaubt.",
+     "en": "Connected agents can read the sales pipeline, add inquiries and deals and move them to another stage when an office admin allows it."
+    }
+   ]
+  },
+  {
    "version": "2.646.0",
    "date": "2026-11-07",
    "items": [
