@@ -66,6 +66,7 @@ async function upload(name, lines) {
       // the list scrolled a bit first (the list behind must stay where it is)
       await ev(`(document.getElementById('view').scrollTop = 120, 1)`);
       const v0 = await ev(`document.getElementById('view').scrollTop`);
+      await ev(`(history.replaceState({p2652b: ${W}}, '', location.href), 1)`);  // marks the entry of the list (#5070: the arrow comes back to it)
       await ev(`(document.querySelector('.dc-view [data-dco="' + DC.docs[0].id + '"]').click(), 1)`);
       // #5072: the whole page, also on the tablet (it was the sticky pane .dc-pane there)
       check(await wait(`!!document.querySelector('.modal.dc-md.dc-page .dc-prev')`), `${W}: the document opens as the whole page`);
@@ -97,6 +98,8 @@ async function upload(name, lines) {
       await shot(`p2652b-docpage-${W}.png`);
       await ev(`(document.querySelector('.modal.dc-md .dc-back').click(), 1)`);
       check(await wait(`!document.querySelector('.dc-md') && !history.state?.f8d && f8d_bk.pushed === 0 && !f8d_bk.skip`), `${W}: the arrow closes the page, its history entry goes`);
+      // 2.652.0 (#5070): back on the list's own entry, no dead entry left (docs.js replaced the state of its entry with null: Back did nothing once)
+      check(await wait(`history.state?.p2652b === ${W} && /^#docs$/.test(location.hash)`), `${W}: the arrow leaves no dead history entry ` + await ev(`JSON.stringify({s: history.state, h: location.hash})`));
     }
 
     // #5070: Back closes the top level only, list -> document -> full view (phone width, touch)

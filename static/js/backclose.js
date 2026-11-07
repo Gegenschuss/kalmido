@@ -5,7 +5,7 @@
    2.652.0 (#5070): one entry per open overlay level (pushed = how many, state.f8d = the level of the entry), pushed when the level
    opens. Back closes exactly the topmost level and pushes nothing anew: an entry pushed in the popstate handler (without a tap)
    is skipped by Chrome's Back, so the second Back of document preview -> full view left the app instead of closing the preview. */
-const f8d_bk = {pushed: 0, skip: false, queued: false, after: /** @type {Array<() => void>} */ ([]), t: 0};  // after / t: f8d_defer
+const f8d_bk = {pushed: 0, skip: false, queued: false, url: '', after: /** @type {Array<() => void>} */ ([]), t: 0};  // after / t: f8d_defer
 const f8d_open = () => {
   if ($('.palette:not(.an-out)')) return 'palette';
   if ($('.lightbox')) return 'lightbox';
@@ -44,7 +44,9 @@ function f8d_sync() {
     f8d_bk.pushed = n;
     // only our own entries above the open levels; after a route change (or a replaced entry) the current one is not ours
     const over = f8d_lvl() - n;
-    if (over > 0) { f8d_bk.skip = true; if (over === 1) history.back(); else history.go(-over); }
+    // 2.652.0 (#5070): the address the view has now (the closed overlay set it, e.g. docs.js '#docs') also on the entry Back
+    // lands on: that entry still had the overlay's address ('#docs/15'), its hashchange opened the document again
+    if (over > 0) { f8d_bk.skip = true; f8d_bk.url = location.href; if (over === 1) history.back(); else history.go(-over); }
   }
 }
 const f8d_queue = () => { if (!f8d_bk.queued) { f8d_bk.queued = true; setTimeout(f8d_sync, 0); } };
@@ -59,7 +61,9 @@ function f8d_defer(fn) {
   return true;
 }
 window.addEventListener('popstate', e => {
-  if (f8d_bk.skip) { f8d_bk.skip = false; e.stopImmediatePropagation(); f8d_queue(); if (f8d_bk.after.length) setTimeout(f8d_flush, 0); return; }
+  if (f8d_bk.skip) {
+    if (f8d_bk.url && location.href !== f8d_bk.url) history.replaceState(history.state, '', f8d_bk.url);
+    f8d_bk.url = ''; f8d_bk.skip = false; e.stopImmediatePropagation(); f8d_queue(); if (f8d_bk.after.length) setTimeout(f8d_flush, 0); return; }
   if (!f8d_bk.pushed) return;
   // 2.652.0 (#5070): landed below our top entry: close as many levels as were stepped back over (one per Back; an entry
   // whose state another module replaced counts as one step), nothing is pushed again; forward onto an entry is left alone

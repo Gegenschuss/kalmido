@@ -124,7 +124,7 @@ function p61b_dcReset() {
     sel: new Map(), selOn: false,  // 2.96.0 A (#1941): a choice of the old workspace goes
     f: dc_f0()});  // 2.122.0 B (#2294)
   const md = $('.dc-md');
-  if (md && DC.doc && !wsObjIn(DC.doc)) { if (dc_hashId()) history.replaceState(null, '', '#docs'); md.remove(); }
+  if (md && DC.doc && !wsObjIn(DC.doc)) { if (dc_hashId()) history.replaceState(history.state, '', '#docs'); md.remove(); }
 }
 function dc_pollSet() {  // while documents are being recognised, look again every few seconds
   clearTimeout(DC.poll);
@@ -227,7 +227,7 @@ async function dc_open(id, o = {}) {  // 2.353.0 D (#2759): o.keep = opened from
   const pane = o.pane ?? (!o.keep && dc_paneOk() && S.route.mod === 'docs' && !$('.dc-md:not(.dc-pane)'));  // 2.476.0 (#3935): o.pane = stay in the pane
   DC.opening = id;
   let d;
-  try { d = await api('GET', `/api/docs/${id}`); } catch { if (DC.opening === id) DC.opening = null; if (dc_hashId() === id) history.replaceState(null, '', DC.paneId ? `#docs/${DC.paneId}` : '#docs'); return; }
+  try { d = await api('GET', `/api/docs/${id}`); } catch { if (DC.opening === id) DC.opening = null; if (dc_hashId() === id) history.replaceState(history.state, '', DC.paneId ? `#docs/${DC.paneId}` : '#docs'); return; }
   // 2.603.0 (#4912): a redraw while the module still loads (docs.js runs before receipts.js ...) drew the sheet without its
   // later parts (receipt hints, suggestions) and a phone's sheet is never drawn again: first the whole module
   if (typeof LD_P === 'object' && LD_P.docs) await LD_P.docs.catch(() => {});
@@ -239,7 +239,7 @@ async function dc_open(id, o = {}) {  // 2.353.0 D (#2759): o.keep = opened from
   const ni = dc_navIdx(d); if (ni >= 0) DC.navAt = ni;  // 2.521.0 (#4476): where it stands in the list (it may leave it: checked, filtered)
   if (pane) {
     DC.paneId = id;
-    if (dc_hashId() !== id) history.replaceState(null, '', `#docs/${id}`);
+    if (dc_hashId() !== id) history.replaceState(history.state, '', `#docs/${id}`);
     dc_draw();
     const p = $('.dc-pane'); if (p) { dc_paneHook(p); dc_mdDraw(p); }
     return;
@@ -249,11 +249,13 @@ async function dc_open(id, o = {}) {  // 2.353.0 D (#2759): o.keep = opened from
     md = modal('<div class="dc-body"></div>');
     md.classList.add('dc-md');
     if (dc_pageOn()) md.classList.add('dc-page');  // 2.652.0 (#5072): the whole page also on a touch tablet (docs.css)
-    onRemove(md, () => { DC.doc = null; if (dc_hashId()) history.replaceState(null, '', '#docs'); if (o.keep && S.route.mod === 'ablage' && typeof ab_reload === 'function') ab_reload(); });
+    // 2.652.0 (#5070): every replaceState in this file keeps the entry's state (state.f8d of backclose.js): with null the
+    // arrow left the document's entry behind as a dead Back
+    onRemove(md, () => { DC.doc = null; if (dc_hashId()) history.replaceState(history.state, '', '#docs'); if (o.keep && S.route.mod === 'ablage' && typeof ab_reload === 'function') ab_reload(); });
     md.addEventListener('click', dc_mdClick);
     md.addEventListener('change', dc_mdChange);
-    if (dc_hashId() !== id && !o.keep) history.replaceState(null, '', `#docs/${id}`);
-  } else if (S.route.mod === 'docs' && dc_hashId() && dc_hashId() !== id) history.replaceState(null, '', `#docs/${id}`);  // 2.476.0 (#3935): leafed on
+    if (dc_hashId() !== id && !o.keep) history.replaceState(history.state, '', `#docs/${id}`);
+  } else if (S.route.mod === 'docs' && dc_hashId() && dc_hashId() !== id) history.replaceState(history.state, '', `#docs/${id}`);  // 2.476.0 (#3935): leafed on
   dc_mdDraw(md);
 }
 // 2.430.0 (#3582): the pane. Its remove() closes it (the sheet's callers -- Close, Delete, a split, a workspace switch -- call
@@ -280,7 +282,7 @@ function dc_paneClose(p) {
   const was = DC.paneId, back = !document.activeElement || document.activeElement === document.body || !document.activeElement.isConnected;
   DC.paneId = null; DC.doc = null; DC.opening = null;
   if (typeof dcr_free === 'function') dcr_free();  // 2.521.0 (#4476): the PDF of the reading view
-  if (dc_hashId()) history.replaceState(null, '', S.route.review ? '#docs/review' : '#docs');
+  if (dc_hashId()) history.replaceState(history.state, '', S.route.review ? '#docs/review' : '#docs');
   setTimeout(() => { dc_draw(); const c = back && $(`.dc-view [data-dco="${was}"]`); if (c) c.focus({preventScroll: true}); }, 0);  // the focus back on its card
 }
 // the next / previous document of the list in the pane (arrow keys); the card comes into view and keeps the focus
@@ -1047,7 +1049,7 @@ document.addEventListener('click', e => {
   const o = e.target.closest('[data-dco]');
   if (o && e.shiftKey && (DC.selOn || (typeof dt_rsMouse === 'function' && dt_rsMouse(e)))) { dc_rsClick(e, +o.dataset.dco); return; }
   if (o && (e.ctrlKey || e.metaKey)) { dc_selToggle(+o.dataset.dco); return; }
-  if (o) { history.replaceState(null, '', `#docs/${o.dataset.dco}`); dc_open(+o.dataset.dco); return; }
+  if (o) { history.replaceState(history.state, '', `#docs/${o.dataset.dco}`); dc_open(+o.dataset.dco); return; }
   const b = e.target.closest('[data-dc]'); if (!b) return;
   const a = b.dataset.dc;
   if (a === 'scan') { abm_scanOpen({docs: true}); return; }  // 2.112.1 A (#2058): photographed pages -> one PDF -> a document
@@ -1100,7 +1102,7 @@ function dc_selToggle(id) {  // 2.430.0 (#3582): tick / untick one card; the fir
 // with it), Open, favourite; while choosing runs a long press ticks the card; the click that ends the press does not open it (multisel.js)
 function dc_cardMenu(r) {
   const id = +r.dataset.dco, d = (DC.docs || []).find(x => x.id === id); if (!d) return false;
-  menu(r, [...cm_selHead(d.sender?.name || d.name, () => dc_selToggle(id)), {label: tr('Open'), icon: 'eye', fn: () => { history.replaceState(null, '', `#docs/${id}`); dc_open(id); }}, ...fv2_menuRow('doc:' + id)]);
+  menu(r, [...cm_selHead(d.sender?.name || d.name, () => dc_selToggle(id)), {label: tr('Open'), icon: 'eye', fn: () => { history.replaceState(history.state, '', `#docs/${id}`); dc_open(id); }}, ...fv2_menuRow('doc:' + id)]);
   return true;
 }
 if (typeof cm_bind === 'function') {
