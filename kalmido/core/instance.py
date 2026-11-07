@@ -66,7 +66,7 @@ def update_state(c):
     info = info if isinstance(info, dict) else {}
     latest, cur = semver(info.get("latest")), semver(APP_VERSION)
     if cur and (not latest or latest < cur) and info.get("latest"):
-        info = {**info, "latest": APP_VERSION, "url": ""}
+        info = {**info, "latest": APP_VERSION, "url": "", "action": ""}
     return info
 
 
@@ -83,6 +83,7 @@ def about_info(c, u):
         d.update(time_day_h=time_day_h(c), collab_all=collab_all(), time_all=time_all(), update_check=gsetting(c, "update_check") != "0", update_env=UPDATE_CHECK_ENV,
                  checked_at=info.get("checked_at") or "", latest=info.get("latest") or "", error=info.get("error") or "",
                  url=info.get("url") or "", available=bool(update_enabled(c) and latest and cur and latest > cur),
+                 update_action=str(info.get("action") or "") if latest and cur and latest > cur else "",  # 2.622.0 D (#4514)
                  cal_on=CAL_ON, cal_allow_hosts=gsetting(c, "cal_allow_hosts"),
                  allow_hosts_by_purpose=allow_by_purpose(c),  # 2.380 G (#3389): one line per purpose in the admin settings
                  cal_allow_env=cal_allow_text(cal_allow_parse(CAL_ALLOW_ENV)[0]),
@@ -110,6 +111,30 @@ def about_info(c, u):
     return d
 
 
+# 2.622.0 D (#4514): the "Action needed" section of the release text (manual steps for operators) is shown with the update hint
+UPDATE_ACTION_MAX = 1500
+_ACTION_HEAD = re.compile(r"^\s{0,3}(#{1,6})\s*action needed\s*:?\s*#*\s*$", re.I)
+
+
+def update_action(body):
+    """The section "Action needed" (any heading level, any case) of a release text -> plain text, at most
+    UPDATE_ACTION_MAX characters; never HTML (the UI escapes it), empty without such a section."""
+    lines, level, out = str(body or "").replace("\r", "").split("\n"), 0, []
+    for ln in lines:
+        m = re.match(r"^\s{0,3}(#{1,6})\s", ln)
+        if level:
+            if m and len(m.group(1)) <= level:
+                break
+            out.append(ln)
+        else:
+            m = _ACTION_HEAD.match(ln)
+            if m:
+                level = len(m.group(1))
+    txt = "\n".join(re.sub(r"[\x00-\x08\x0b-\x1f\x7f]", "", x).rstrip() for x in out).strip()
+    txt = re.sub(r"\n{3,}", "\n\n", txt)
+    return txt[:UPDATE_ACTION_MAX].rstrip()
+
+
 def update_fetch():
     """Latest release from UPDATE_URL -> {latest, url} (only a plain x.y.z tag and a github.com link are kept)."""
     req = urllib.request.Request(UPDATE_URL, headers={"Accept": "application/vnd.github+json",
@@ -125,7 +150,7 @@ def update_fetch():
     url = str(j.get("html_url") or "")
     if not url.startswith("https://github.com/"):
         url = ""
-    return {"latest": tag.lstrip("v"), "url": url[:300]}
+    return {"latest": tag.lstrip("v"), "url": url[:300], "action": update_action(j.get("body"))}
 
 
 def update_check(c, force=False):
@@ -144,9 +169,9 @@ def update_check(c, force=False):
         new.update(update_fetch())
     except urllib.error.HTTPError as e:
         # 404 = no release published yet: nothing to report, not an error
-        new.update(latest=info.get("latest") or "", url=info.get("url") or "", error="" if e.code == 404 else f"HTTP {e.code}")
+        new.update(latest=info.get("latest") or "", url=info.get("url") or "", action=info.get("action") or "", error="" if e.code == 404 else f"HTTP {e.code}")
     except Exception as e:  # noqa: BLE001  (network, json, anything: keep the last known release)
-        new.update(latest=info.get("latest") or "", url=info.get("url") or "", error=type(e).__name__)
+        new.update(latest=info.get("latest") or "", url=info.get("url") or "", action=info.get("action") or "", error=type(e).__name__)
     gset(c, "update_info", json.dumps(new))
     c.commit()
     latest, cur = semver(new.get("latest")), semver(APP_VERSION)

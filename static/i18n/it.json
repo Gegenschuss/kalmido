@@ -17091,6 +17091,8 @@
   "Action items": "Attività",
   "Minutes of this event as a knowledge page": "Verbale di questo appuntamento come pagina di conoscenza",
   "To change this, please sign in again to confirm (at most {0} minutes ago).": "Per modificarlo, accedi di nuovo per confermare (al massimo {0} minuti fa).",
+  "To do before the update": "Da fare prima dell'aggiornamento",
+  "Read the changelog of all versions in between.": "Leggi il registro delle modifiche di tutte le versioni intermedie.",
   "Fetch from bank": "Recupera dalla banca",
   "Kalmido asks your bank for the bookings of the account (FinTS). Your PIN is asked every time and never stored.": "Kalmido chiede alla tua banca i movimenti del conto (FinTS). Il PIN viene chiesto ogni volta e non viene mai salvato.",
   "only German accounts": "solo conti tedeschi",

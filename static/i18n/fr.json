@@ -17090,6 +17090,8 @@
   "Action items": "Actions",
   "Minutes of this event as a knowledge page": "Compte rendu de ce rendez-vous comme page de connaissances",
   "To change this, please sign in again to confirm (at most {0} minutes ago).": "Pour modifier ceci, reconnecte-toi pour confirmer (il y a au plus {0} minutes).",
+  "To do before the update": "À faire avant la mise à jour",
+  "Read the changelog of all versions in between.": "Lisez le journal des modifications de toutes les versions intermédiaires.",
   "Fetch from bank": "Récupérer auprès de la banque",
   "Kalmido asks your bank for the bookings of the account (FinTS). Your PIN is asked every time and never stored.": "Kalmido demande à ta banque les opérations du compte (FinTS). Ton code PIN est demandé à chaque fois et n'est jamais enregistré.",
   "only German accounts": "comptes allemands uniquement",
