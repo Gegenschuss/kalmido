@@ -17326,6 +17326,7 @@
   "Select a tag": "Kies een label",
   "Select a person": "Kies een persoon",
   "{0} public link, file request or agent access on it ends": ["{0} openbare link, bestandsverzoek of agenttoegang vervalt", "{0} openbare links, bestandsverzoeken of agenttoegangen vervallen"],
+  "The daily clean-up of old logs could not finish in {0} ({1}). The rows past their time stay until the next run; on a large table raise KALMIDO_DB_STATEMENT_TIMEOUT.": "De dagelijkse opschoning van oude logboeken kon in {0} niet afronden ({1}). De verlopen rijen blijven tot de volgende run; verhoog bij een grote tabel KALMIDO_DB_STATEMENT_TIMEOUT.",
   "The backup folder is being cleaned up right now, please try again in a moment.": "De back-upmap wordt nu opgeruimd, probeer het zo opnieuw.",
   "This is a lead: a person converts it into an enquiry": "Dit is een lead: een persoon maakt er een aanvraag van",
   "Daily limit": "Daglimiet",

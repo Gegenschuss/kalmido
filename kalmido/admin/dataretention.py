@@ -8,13 +8,21 @@
   office_archive_log) are never touched here (GoBD). Expired sessions, API tokens, invitations / reset links and agent setup
   codes are no data of a person any more and go without the switch.
 - orf_tick (kind "files"): see below.
-- ckd_tick (kind "chat", 2.186.0 C #2602): the day limit of the agent chat, daily."""
+- ckd_tick (kind "chat", 2.186.0 C #2602): the day limit of the agent chat, daily.
+
+2.644.0 (#4192): the old logs go in batches of LGC_BATCH rows, each committed on its own, until none is left: one DELETE of
+millions of rows ran into the statement limit (core/pg.py STATEMENT_TIMEOUT_S), nothing went and the next day the same. The
+time columns have indexes (core/migrations.d/4192_a.py). A table that still fails (time limit, error) no longer leaves only a
+log line: the instance admins get an alert of the kind "storage" (notify/alerts.py, switchable there); the batches deleted
+before stay deleted, the rest follows the next day."""
 import json
 import os
 import time
 from datetime import timedelta
 
 from ..core.db import gset, gsetting, iso, iso_ms, now_utc
+from ..core.i18n import N_
+from ..notify.alerts import aa_now  # 2.644.0 (#4192)
 from ..core.pg import system_ctx
 from ..core.retention import ret_days, ret_on, ret_report
 from ..core.serializers import unlink_files
@@ -44,14 +52,37 @@ LGC_LOGS = (
     ("agent_jobs", "updated_at", "state IN ('done','failed','stopped')", 180),
 )
 LGC_TOKEN_GRACE_DAYS = 30  # an expired API token keeps answering "has expired" for a while before it disappears
+LGC_FAILED = N_("The daily clean-up of old logs could not finish in {0} ({1}). The rows past their time stay until the next run; on a large table raise KALMIDO_DB_STATEMENT_TIMEOUT.")
+LGC_BATCH = 5000  # 2.644.0 (#4192): rows per DELETE of the clean-up, each batch committed (the tests set it lower)
 
 
 def lgc_count_del(c, table, col, cond, cut, kill):
+    """The rows of table older than cut (and cond); kill: deleted in batches (lgc_del_batches, commits). Returns the count."""
     where = f"{col}<?" + (f" AND {cond}" if cond else "")
     n = c.execute(f"SELECT count(*) FROM {table} WHERE {where}", (cut,)).fetchone()[0]
     if n and kill:
-        c.execute(f"DELETE FROM {table} WHERE {where}", (cut,))
+        lgc_del_batches(c, table, where, (cut,))
     return n
+
+
+def lgc_del_batches(c, table, where, args):
+    """2.644.0 (#4192): DELETE the rows of table matching where in batches of LGC_BATCH, committing each, until a batch
+    finds fewer. Each batch stays far below the statement limit; a failure keeps the batches before it. Returns the rows."""
+    size, done = max(1, int(LGC_BATCH)), 0
+    while True:
+        k = c.execute(f"DELETE FROM {table} WHERE ctid IN (SELECT ctid FROM {table} WHERE {where} LIMIT {size})", args).rowcount or 0
+        c.commit()
+        done += k
+        if k < size:
+            return done
+
+
+def lgc_failed(c, table, e):
+    """2.644.0 (#4192): one table of the clean-up failed: roll back the aborted batch, log it and tell the instance admins
+    (kind "storage", one alert per table within the cooldown; the error class only, never content)."""
+    c.heal()
+    print("retention: logs", table, type(e).__name__, flush=True)
+    aa_now("storage", f"retention:{table}", LGC_FAILED, [table, type(e).__name__])
 
 
 def lgc_portal_keep():
@@ -135,23 +166,22 @@ def lgc_tick(c, force=False):
     # system context: the clean-up works across organisations by design and shows no content to anybody
     with system_ctx(c):
         lgc_expired(c, now)
+        c.commit()  # 2.644.0 (#4192): the batches below commit on their own; a failed one rolls back only itself
         for table, col, cond, days in LGC_LOGS:
             if table == "activity":
                 cond = lgc_portal_keep()
             cut = iso(now - timedelta(days=days if days is not None else ret_days("logs")))
             try:
-                with c.savepoint():
-                    counts[table] = lgc_count_del(c, table, col, cond, cut, kill)
+                counts[table] = lgc_count_del(c, table, col, cond, cut, kill)
             except Exception as e:  # noqa: BLE001  one table must not stop the others
-                print("retention: logs", table, type(e).__name__, flush=True)
+                lgc_failed(c, table, e)
         cut = lgc_journal_cut(now, c)  # 2.312.0 B (#3264); 2.505.0 (#4302): with the off-site backups
         if cut:
-            try:
-                with c.savepoint():
-                    counts["deleted_accounts"] = lgc_count_del(c, "deleted_accounts", "at", "", cut, kill)
-                    counts["purged_rows"] = lgc_count_del(c, "purged_rows", "at", "", cut, kill)  # 2.360.4 (#3243)
-            except Exception as e:  # noqa: BLE001
-                print("retention: logs deleted_accounts", type(e).__name__, flush=True)
+            for table in ("deleted_accounts", "purged_rows"):  # 2.360.4 (#3243)
+                try:
+                    counts[table] = lgc_count_del(c, table, "at", "", cut, kill)
+                except Exception as e:  # noqa: BLE001
+                    lgc_failed(c, table, e)
         ret_report(c, "logs", counts, kill)
         c.commit()
     return sum(counts.values())

@@ -17327,6 +17327,7 @@
   "Select a tag": "Scegli un tag",
   "Select a person": "Scegli una persona",
   "{0} public link, file request or agent access on it ends": ["{0} link pubblico, richiesta di file o accesso di agente termina", "{0} link pubblici, richieste di file o accessi di agenti terminano"],
+  "The daily clean-up of old logs could not finish in {0} ({1}). The rows past their time stay until the next run; on a large table raise KALMIDO_DB_STATEMENT_TIMEOUT.": "La pulizia giornaliera dei vecchi registri non è riuscita a terminare in {0} ({1}). Le righe scadute restano fino alla prossima esecuzione; con una tabella grande aumenta KALMIDO_DB_STATEMENT_TIMEOUT.",
   "The backup folder is being cleaned up right now, please try again in a moment.": "La cartella dei backup è in fase di pulizia, riprova tra un momento.",
   "This is a lead: a person converts it into an enquiry": "È un lead: una persona lo trasforma in una richiesta",
   "Daily limit": "Limite giornaliero",
