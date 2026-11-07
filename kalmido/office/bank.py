@@ -308,14 +308,19 @@ def bnk_preview():
     with a mapping -> {fmt, rows, count, dup_count, skipped}. Nothing is stored."""
     c, uid, oid = _ctx()
     b = _req()  # 2.144.1 B (#2450): or a multipart upload (files, several / a ZIP)
-    fmt, rows, cols, parts, info = bnk_parse(c, oid, b)
+    return jsonify(bnk_preview_of(c, oid, b))
+
+
+def bnk_preview_of(c, oid, b, fs=None):
+    """The answer of the preview as a dict (2.616.0 #2473: shared with the FinTS fetch, office/fints.py, fs = its statements)."""
+    fmt, rows, cols, parts, info = bnk_parse(c, oid, b, fs)
     extra = cfb_preview(c, oid, fmt, b, cols, parts)  # 2.124.0 D (#2342): the statement's balances / the guessed balance column
     if rows is None:
-        return jsonify(fmt=fmt, **cols, **extra, **_info_out(info))
+        return dict(fmt=fmt, **cols, **extra, **_info_out(info))
     ok = [r for r in rows if not r["error"] and not r["pending"]]  # 2.146.0 C (#2469): pending ones counted apart
-    return jsonify(fmt=fmt, rows=[_row_out(r) for r in rows], count=sum(1 for r in ok if not r["dup"]),
-                   dup_count=sum(1 for r in ok if r["dup"]), pending_count=sum(1 for r in rows if not r["error"] and r["pending"]),
-                   skipped=sum(1 for r in rows if r["error"]), skipped_rows=dva_bnk_skipped(rows), **extra, **_info_out(info))
+    return dict(fmt=fmt, rows=[_row_out(r) for r in rows], count=sum(1 for r in ok if not r["dup"]),
+                dup_count=sum(1 for r in ok if r["dup"]), pending_count=sum(1 for r in rows if not r["error"] and r["pending"]),
+                skipped=sum(1 for r in rows if r["error"]), skipped_rows=dva_bnk_skipped(rows), **extra, **_info_out(info))
 
 
 def _import_public(r):
@@ -328,7 +333,11 @@ def bnk_import():
     preview's rows are never taken from the client); duplicates and unreadable rows are skipped."""
     c, uid, oid = _ctx()
     b = _req()  # 2.144.1 B (#2450): or a multipart upload (files, several / a ZIP)
-    fs = _uploads(b)
+    return jsonify(bnk_import_of(c, uid, oid, b, _uploads(b))), 201
+
+
+def bnk_import_of(c, uid, oid, b, fs):
+    """The import itself -> the answer as a dict (2.616.0 #2473: shared with the FinTS fetch, office/fints.py); commits."""
     if b.get("mapping") is None and any(not bnk_is_camt(f["text"]) and not bnk_is_mt940(f["text"]) for f in fs.files):
         raise BadInput(tr("Please choose the columns for the date and the amount"))
     write_lock(c, f"office_bank_import_{oid}")
@@ -352,10 +361,10 @@ def bnk_import():
     bump(c)
     c.commit()
     imp = c.execute("SELECT * FROM office_bank_imports WHERE id=?", (iid,)).fetchone()
-    return jsonify({"import": _import_public(imp), "count": len(new), "dup_count": dup,
-                    "pending_count": sum(1 for r in rows if not r["error"] and r["pending"]),
-                    "skipped": sum(1 for r in rows if r["error"]), "skipped_rows": dva_bnk_skipped(rows), "balances": bal_n, "ruled": ruled["applied"], "ruled_locked": ruled["locked"],
-                    **_info_out(info)}), 201
+    return {"import": _import_public(imp), "count": len(new), "dup_count": dup,
+            "pending_count": sum(1 for r in rows if not r["error"] and r["pending"]),
+            "skipped": sum(1 for r in rows if r["error"]), "skipped_rows": dva_bnk_skipped(rows), "balances": bal_n, "ruled": ruled["applied"], "ruled_locked": ruled["locked"],
+            **_info_out(info)}
 
 
 @app.get("/api/office/bank/imports")

@@ -219,6 +219,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 
 | Variable | Default | Meaning |
 |---|---|---|
+| `KALMIDO_FINTS_PRODUCT_ID` | `(empty)` | Product registration number of this server for the direct bank fetch over FinTS (2.616.0; given by the Deutsche Kreditwirtschaft to whoever runs the instance, never in a public repository; empty = the fetch is off). |
 | `KALMIDO_PACKS_ALLOW_HOSTS` | `(empty)` | Internal hosts that catalog may live on. |
 | `KALMIDO_PACKS_CATALOG` | `(empty)` | Address of an online catalog of office packs (empty = only the built-in packs). |
 
@@ -362,6 +363,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_TEST_BK_OWN_MOUNT` | `(empty)` | Test containers only (with KALMIDO_TEST=1): a restore treats the attachments folder as a mount of its own (2.370.2, #2779). |
 | `KALMIDO_TEST_BK_ZIP_DELAY` | `(empty)` | Test containers only (with KALMIDO_TEST=1): seconds the backup waits after its ZIP (2.281.0, #3118). |
 | `KALMIDO_TEST_DUN_TICKS` | `10` | Test containers only (with KALMIDO_TEST=1): watchdog intervals between two runs of the payment reminder suggestions (2.192.0). |
+| `KALMIDO_TEST_FINTS_FAKE` | `0` | Test containers only (with KALMIDO_TEST=1): the FinTS bank fetch talks to a built-in stand-in bank instead of a real one (2.616.0, office/fints.py). |
 | `KALMIDO_TEST_FSREF` | `0` | Test containers only (with KALMIDO_TEST=1): registers the test kind 'probe' of the folder references (2.199.0, files/fsref.py). |
 | `KALMIDO_TEST_MODE` | `0` | Test containers only: allows the test switches of the organisation key tool (1); left alone in a server's .env it is ignored. |
 | `KALMIDO_TEST_NOW` | `(empty)` | Test containers only (with KALMIDO_TEST=1): the server clock starts at this ISO time and runs on from there. |

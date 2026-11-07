@@ -87,7 +87,7 @@ FIELDS = {
     "office_bank_balances": ("amount", "account"),  # 2.124.0 D (#2342): balances of the imported statements
     "office_bank_rules": ("name", "counterpart", "iban", "purpose", "amount_min", "amount_max", "category"),  # 2.299.0 B (#3191): bank rules
     "office_bank_vendors": ("match", "name", "portal"),  # 2.425.0 B (#3451): recurring providers of the bank bookings
-    "office_bank_accounts": ("iban", "bic", "bank_name"),  # 2.470.0 (#3596): the bank accounts of an office
+    "office_bank_accounts": ("iban", "bic", "bank_name", "fints_login"),  # 2.470.0 (#3596): the bank accounts of an office; 2.616.0 (#2473): + the FinTS login name
     "office_cc_cards": ("holder_name", "last4", "account"), "office_cc_statements": ("total",),  # 2.444.0 (#3447): credit card statements
     "office_cc_lines": ("merchant", "amount", "orig_amount"),
     "office_payonline": ("secret_key", "webhook_secret", "hook_token"), "office_pay_links": ("token",),  # 2.469.0 (#3459): the provider key, the webhook secret, the public tokens

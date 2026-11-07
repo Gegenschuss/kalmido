@@ -63,6 +63,12 @@ Kalmido itself and only loaded when a page has a formula or a diagram; the brows
 - typing-extensions (PSF-2.0)
 - brotli (MIT), packs JS and CSS ahead of time while the image is built, not part of the image itself
 - Dependencies installed along with the above: Jinja2, MarkupSafe, itsdangerous, blinker, cffi, pycparser, six (BSD-3-Clause / MIT)
+- fints (python-fints, LGPL-3.0-or-later), the direct bank fetch over FinTS in the office (2.616.0), used unmodified as an
+  installed library and only imported when a fetch runs; source: [raphaelm/python-fints](https://github.com/raphaelm/python-fints).
+  Installed along with it: enum-tools (LGPL-3.0-or-later, source: [domdfcoding/enum_tools](https://github.com/domdfcoding/enum_tools)),
+  mt-940 (BSD-3-Clause), sepaxml, xmlschema, elementpath, charset-normalizer, urllib3 (MIT), requests, bleach (Apache-2.0),
+  lxml (BSD-3-Clause, its wheels bundle libxml2 and libxslt, MIT), idna, webencodings (BSD-3-Clause), pygments (BSD-2-Clause),
+  certifi (MPL-2.0), text-unidecode (Artistic License / GPL-2.0-or-later, used under the Artistic License)
 
 The version of every package is pinned with its hashes in `tools/requirements.lock`; each package carries its license file in the image.
 

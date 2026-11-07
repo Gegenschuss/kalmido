@@ -210,6 +210,7 @@ VARS = (
     # ---- office
     _v("KALMIDO_PACKS_CATALOG", "", "Address of an online catalog of office packs (empty = only the built-in packs).", "office"),
     _v("KALMIDO_PACKS_ALLOW_HOSTS", "", "Internal hosts that catalog may live on.", "office"),
+    _v("KALMIDO_FINTS_PRODUCT_ID", "", "Product registration number of this server for the direct bank fetch over FinTS (2.616.0; given by the Deutsche Kreditwirtschaft to whoever runs the instance, never in a public repository; empty = the fetch is off).", "office"),
 
     # ---- integrations, calendars, webhooks
     _v("KALMIDO_API", "1", "Switch: the REST API (/api/v1) with access tokens.", "integrations"),
@@ -343,6 +344,7 @@ VARS = (
     _v("KALMIDO_TEST_UMZ_END_DELAY", "", "Test containers only (with KALMIDO_TEST=1): seconds an account or wiki import's worker waits before it ends (2.308.0, #3261; 2.363.0, #3280).", "test"),
     _v("KALMIDO_TEST_BK_IDLE_TX_MS", "", "Test containers only (with KALMIDO_TEST=1): idle-in-transaction limit of the backup's connection (2.281.0, #3118).", "test"),
     _v("KALMIDO_TEST_PG_DUMP_VERSION", "", "Test containers only (with KALMIDO_TEST=1): plays the output of pg_dump --version in the check before a backup (2.359.3, #2945).", "test"),
+    _v("KALMIDO_TEST_FINTS_FAKE", "0", "Test containers only (with KALMIDO_TEST=1): the FinTS bank fetch talks to a built-in stand-in bank instead of a real one (2.616.0, office/fints.py).", "test"),
     _v("KALMIDO_TEST_DUN_TICKS", "10", "Test containers only (with KALMIDO_TEST=1): watchdog intervals between two runs of the payment reminder suggestions (2.192.0).", "test"),
     _v("KALMIDO_SHEET_RANGE_BUDGET", "15000000", "Tests: range cells one evaluation of a table may read (2.148.1).", "test"),
     _v("KALMIDO_SHEET_CELLS_MAX", "1000000", "Tests: stored cells over all sheets of one table (2.148.1).", "test"),
