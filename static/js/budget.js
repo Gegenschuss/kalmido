@@ -29,7 +29,7 @@ async function bg_load() {
     if (!BG.lid || !BG.home) { const h = await api('GET', '/api/budget'); BG.home = h; BG.lid = BG.lid || h.lists[0]?.id || null; }
     BG.month = BG.month || bg_month();
     const j = BG.lid ? await api('GET', `${bg_url()}?month=${BG.month}`) : null;
-    if (seq === BG.seq) { BG.data = j; BG.stale = false; }
+    if (seq === BG.seq) { BG.data = j; BG.stale = false; if (j) for (const p of OPT) p.put(); }  // 2.651.0 (#5025): own changes still on the way stay on top of the fresh rows (a load the closing dialog started put the old amount back)
   } catch (e) { if (seq === BG.seq) { BG.data = null; if (e.status === 404) { BG.lid = null; BG.home = null; } } }
   if (seq === BG.seq) { BG.loading = false; BG.done = true; }  // 2.607.0 (#4925): an outdated load must not mark a newer budget as loaded
   if (seq === BG.seq && S.route.mod === 'budget') { const el = $('#view'); if (el) keepFocus(el, () => setHtml(el, mg_wrap('budget', viewBudget()))); }
@@ -173,7 +173,7 @@ function bg_entryModal(e, cf) {
     md.remove();
     if (!e) {
       const tmp = -Date.now(), lid = BG.lid, row = {id: tmp, list_id: lid, ...body, amount: String(amount), recurring_id: null, source: null, files: [], updated_at: null};
-      const req = optWrite(bg_entPut(row), () => api('POST', `/api/budget/${lid}/entries`, body), bg_draw);
+      const req = optWrite(bg_entPut(row), () => api('POST', `/api/budget/${lid}/entries`, body), bg_draw, {mod: true});
       BG_PEND.set(tmp, req.then(r => r.id, () => null));  // a refusal: nothing to open (null), no unhandled rejection
       let r; try { r = await req; } catch { BG_PEND.delete(tmp); return; }
       BG_PEND.delete(tmp);
@@ -193,7 +193,7 @@ function bg_entryModal(e, cf) {
       ? () => saveDialog(url, o0, body, {key: 'entry', base, view: bg_view}).then(j => { if (j?.conflict) throw Object.assign(new Error('conflict'), {cf: j.conflict}); return j; })
       : () => rawFetch('PATCH', url, v0 ? {...body, expect_updated_at: v0} : body);  // 2.269.0 C (#3017)
     let r;
-    try { r = await optWrite(optSet(() => BG.data?.entries.find(x => x.id === id), {...body, amount: String(amount)}), req, bg_draw); }
+    try { r = await optWrite(optSet(() => BG.data?.entries.find(x => x.id === id), {...body, amount: String(amount)}), req, bg_draw, {mod: true}); }
     catch (x) {
       if (x?.cf) { bg_entryModal({...x.cf.cur, ...x.cf.mine}, x.cf); toast(tr('Changed by someone else in the meantime')); bg_refresh(); return; }
       if (x.message !== 'auth') toast(x.message || tr('Error'));  // rawFetch says nothing itself
@@ -252,7 +252,7 @@ function bg_entryModal(e, cf) {
 }
 // 2.559.0 (#4660): the row goes at once, a refusal brings it back (api() says why); the undo after the answer
 async function bg_delEntry(e) {
-  let r; try { r = await optWrite(bg_entCut(e.id), () => api('DELETE', `/api/budget/entries/${e.id}`), bg_draw); } catch { return; }
+  let r; try { r = await optWrite(bg_entCut(e.id), () => api('DELETE', `/api/budget/entries/${e.id}`), bg_draw, {mod: true}); } catch { return; }
   let cur = r.entry || e;
   // 2.567.0 A (#4707): the entry waits in the trash with its receipts; the undo takes it back out (another device too)
   offerUndo(tr('Deleted: {0}', e.title), histAdd({label: tr('Entry “{0}” deleted', e.title), undo: async () => { cur = r.trash ? await api('POST', `/api/budget/entries/${cur.id}/restore`) : await api('POST', `/api/budget/${cur.list_id}/entries`, bg_body(cur)); bg_after(); },

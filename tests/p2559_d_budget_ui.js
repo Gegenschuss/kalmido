@@ -114,6 +114,10 @@ async function round(who, ck) {
   dlg().querySelector('#bg-amt').value = '99'; click(w, dlg().querySelector('[data-m="save"]'));
   check(await until(() => w.__held.length === 3), `${who}: the third Save is held`);
   check(!dlg() && /99[.,]00/.test(rowOf(/Rent/)?.textContent || ''), `${who}: shown at once again`);
+  // 2.651.0 (#5025, CI red "shown at once again"): a reload of the rows while the save is on its way (the closing dialog
+  // starts one when a change elsewhere marked the view stale) keeps the own amount on top; it put the server's 850 back
+  await w.eval('bg_load()');
+  check(/99[.,]00/.test(rowOf(/Rent/)?.textContent || ''), `${who}: a reload while the save is on its way keeps the own amount`);
   w.__held[2].go();
   check(await until(async () => +(await onServer()).find(x => x.id === rent.id)?.amount === 99), `${who}: the server stores 99`);
   check(await until(() => toastHas(/Saved/)), `${who}: "Saved" after the answer`);
