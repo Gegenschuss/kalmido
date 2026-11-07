@@ -27,7 +27,7 @@ import kt
 from kt import B, H, check, dbx, sess
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from freelancer_fixture import freelancer, login, org_join  # noqa: E402
+from freelancer_fixture import freelancer, login  # noqa: E402
 
 KEY = "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA="  # a test server key (32 bytes, base64)
 PW = kt.PASSWORD
@@ -47,10 +47,8 @@ for u, role in (("bob", "member"), ("dora", "admin"), ("eve", "admin"), ("rita",
                                        "orgs": [{"id": ORG, "role": role}]})
     assert r.ok, r.text
     uid[u] = r.json()["id"]
-r = A.post(B + "/api/users", json={"username": "carl", "display_name": "Carl", "password": PW, "email": "carl@example.com"})
-assert r.ok, r.text
-Bo, Do, Ev, Ri, Gi, Cc, Ca = (login(B, u) for u in ("bob", "dora", "eve", "rita", "gina", "cara", "carl"))
-for s in (A, Bo, Do, Ev, Ri, Gi, Cc, Ca):
+Bo, Do, Ev, Ri, Gi, Cc = (login(B, u) for u in ("bob", "dora", "eve", "rita", "gina", "cara"))
+for s in (A, Bo, Do, Ev, Ri, Gi, Cc):
     assert s.patch(B + "/api/settings", json={"lang": "en", "tour": "done", "features": FEAT}).ok
 FID, Fr = freelancer(B, A)
 
@@ -133,13 +131,13 @@ r = Bo.post(B + f"/api/templates/{TP}/apply", json={"name": "Bob's desk"})
 check(r.ok and dbx("SELECT org_id FROM lists WHERE id=?", (r.json().get("list_id"),)) == [(ORG,)], f"F1: a member makes it in the organisation {r.text[:120]}")
 
 # F1 (not checked by the review): a support session and the organisation's fixed org_id
-r = Ca.post(B + "/api/orgs", json={"name": "Client Studio"})
+# cara makes the company herself: since 2.593.0 (#3570) an invitation from a company of one's own (POST /api/orgs) to an
+# account its maker may not see (cara is in another organisation) stays silent, so she could never accept it
+r = Cc.post(B + "/api/orgs", json={"name": "Client Studio"})
 assert r.status_code == 201, r.text
 CO = r.json()["id"]
-assert Ca.put(B + f"/api/orgs/{CO}/members", json={"email": "cara@example.com"}).ok
-assert org_join(B, "cara", CO)
-CL = mklist(Ca, "Studio board", CO)
-CT = tpl(Ca, list_id=CL, name="Studio project", space=f"org:{CO}")
+CL = mklist(Cc, "Studio board", CO)
+CT = tpl(Cc, list_id=CL, name="Studio project", space=f"org:{CO}")
 r = Cc.post(B + f"/api/templates/{CT}/apply", json={"name": "Cara's studio"})
 check(r.ok and dbx("SELECT org_id FROM lists WHERE id=?", (r.json().get("list_id"),)) == [(CO,)], f"F1: cara's own session makes it {r.text[:120]}")
 assert Cc.post(B + "/api/support-access", json={"hours": 1}).ok
