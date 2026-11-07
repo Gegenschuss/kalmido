@@ -9,7 +9,7 @@
 // a plain swipe scrolls and creates nothing, a quick tap does nothing, 44 px targets, nothing sideways, light + dark.
 const {execFileSync} = require('child_process');
 const path = require('path');
-const {boot, sleep, B, login} = require('./boot');
+const {boot, sleep, B, login, idle} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const firefox = require('./ff')({tag: 'p2180_tl_ui', check, shots: 'P2180_SHOTS'});
@@ -36,7 +36,7 @@ const state = async (ck = CK) => {
 const byTitle = async (t, ck = CK) => (await state(ck)).find(x => x.title === t);
 
 (async () => {
-  await sleep(600);
+  await until(async () => (await fetch(B).catch(() => null))?.status);
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
   await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true, modules: ALL.split(',').filter(x => x !== 'collab')});
@@ -66,10 +66,10 @@ const byTitle = async (t, ck = CK) => (await state(ck)).find(x => x.title === t)
   // fold a section (per device), keyboard: a real button with aria-expanded
   const fold = sid => d.querySelector(`.tl-secb[data-key="tlsec:${sid}"]`);
   check(fold(SD).tagName === 'BUTTON' && fold(SD).getAttribute('aria-expanded') === 'true', 'section fold = button, aria-expanded');
-  fold(SD).focus(); click(w, fold(SD)); await sleep(150);
+  fold(SD).focus(); click(w, fold(SD)); await until(() => fold(SD)?.getAttribute('aria-expanded') === 'false' && !d.querySelector(`.tl-bar[data-id="${A}"]`));
   check(!d.querySelector(`.tl-bar[data-id="${A}"]`) && fold(SD).getAttribute('aria-expanded') === 'false' && /tlsec:/.test(w.__store['tasks.collapsed'] || ''), '#462: folded: its tasks hidden, saved per device');
   check(d.activeElement === fold(SD), 'the focus stays on the fold button');
-  click(w, fold(SD)); await sleep(150);
+  click(w, fold(SD)); await until(() => d.querySelector(`.tl-bar[data-id="${A}"]`));
   check(d.querySelector(`.tl-bar[data-id="${A}"]`), 'unfolded again');
   // milestone diamond
   const dia = () => d.querySelector(`.tl-bar.tl-dia[data-id="${M}"]`);
@@ -81,9 +81,9 @@ const byTitle = async (t, ck = CK) => (await state(ck)).find(x => x.title === t)
   ptr(w, dia(), 'pointerdown', 100); ptr(w, d, 'pointermove', 100 + 2 * DW); ptr(w, d, 'pointerup', 100 + 2 * DW);
   check(await until(async () => (await state()).find(t => t.id === M)?.due === day(8)), 'milestone: dragging moves its date (+2 days)');
   await until(() => dia());
-  dia().focus(); key(w, dia(), 'Enter'); await sleep(200);
+  dia().focus(); key(w, dia(), 'Enter'); await until(() => w.eval('S.sel') === M); await idle(w);
   check(w.eval('S.sel') === M, 'milestone: Enter opens it like a bar');
-  w.eval('closeDetail()'); await sleep(100);
+  w.eval('closeDetail()'); await until(() => d.querySelector('#detail').classList.contains('hidden'));
 
   // review fixes (lane F1): no invalid inline style on timeline section / add rows (R10), month labels span their month
   // with a sticky text (R10), the footer tells how to create, a keyboard way to move a diamond (Shift+F10 menu, D)
@@ -91,13 +91,13 @@ const byTitle = async (t, ck = CK) => (await state(ck)).find(x => x.title === t)
   const tms = [...d.querySelectorAll('.tl-months .tl-m')];
   check(tms.length && tms.every(m => /width:\s*\d/.test(m.getAttribute('style')) && m.querySelector('span')?.textContent), 'review R10: month labels span their month, text in a sticky span: ' + tms.map(m => m.getAttribute('style')).join(' | '));
   check(/double-click a day/.test(d.querySelector('.tl-foot')?.textContent || ''), 'review: the footer tells how to create a task: ' + d.querySelector('.tl-foot')?.textContent);
-  dia().focus(); key(w, dia(), 'F10', {shiftKey: true}); await sleep(150);
+  dia().focus(); key(w, dia(), 'F10', {shiftKey: true}); await until(() => d.querySelector('#pop [role="menuitem"]'));
   const dmi = [...d.querySelectorAll('#pop [role="menuitem"]')].map(x => x.textContent);
   check(dmi.some(x => /Move to date…/.test(x)), 'review: the diamond menu (Shift+F10) offers "Move to date…": ' + dmi.join(' / '));
-  w.eval('closePop()'); await sleep(50);
-  await until(() => dia()); dia().focus(); key(w, dia(), 'd'); await sleep(150);
+  w.eval('closePop()'); await until(() => d.querySelector('#pop').classList.contains('hidden'));
+  await until(() => dia()); dia().focus(); key(w, dia(), 'd'); await until(() => !d.querySelector('#pop').classList.contains('hidden') && !d.querySelector('#pop [role="menu"]'));
   check(!d.querySelector('#pop').classList.contains('hidden') && !d.querySelector('#pop [role="menu"]'), 'review: D on a focused diamond opens the date popover');
-  w.eval('closePop()'); await sleep(100);
+  w.eval('closePop()'); await until(() => d.querySelector('#pop').classList.contains('hidden'));
 
   // drag across empty days of the "Design" section row -> ghost -> inline field
   const track = k => d.querySelector(`.tl-track.tl-cr[data-k="${k}"]`);
@@ -106,7 +106,7 @@ const byTitle = async (t, ck = CK) => (await state(ck)).find(x => x.title === t)
   ptr(w, track('tlsec:' + SD), 'pointerdown', 10 * DW + 5);
   ptr(w, d, 'pointermove', 11 * DW + 5);
   check(track('tlsec:' + SD).querySelector('.tl-ghost'), '#431: a ghost bar shows the range while dragging');
-  ptr(w, d, 'pointermove', 13 * DW + 5); ptr(w, d, 'pointerup', 13 * DW + 5); await sleep(150);
+  ptr(w, d, 'pointermove', 13 * DW + 5); ptr(w, d, 'pointerup', 13 * DW + 5); await until(() => d.querySelector('#tl-new-in') && d.activeElement === d.querySelector('#tl-new-in'));
   let inp = d.querySelector('#tl-new-in');
   check(inp && d.activeElement === inp && inp.closest('.tl-track').dataset.k === 'tlsec:' + SD, '#431: on release the title field opens in that row, focused');
   check(inp && /New task, /.test(d.querySelector('label[for="tl-new-in"]')?.textContent || ''), 'the field has a label');
@@ -118,54 +118,54 @@ const byTitle = async (t, ck = CK) => (await state(ck)).find(x => x.title === t)
   check(await until(() => d.activeElement?.dataset?.id === String(mb?.id)), '#431: the focus moves to the new bar');
   check(!d.querySelector('#tl-new-in') && w.eval('HIST.undo.length') > hist0, 'the field is gone, one history step (undo)');
   // a plain click on a row creates nothing
-  ptr(w, track('tlsec:' + SB), 'pointerdown', 9 * DW + 5); ptr(w, d, 'pointerup', 9 * DW + 5); await sleep(100);
+  ptr(w, track('tlsec:' + SB), 'pointerdown', 9 * DW + 5); ptr(w, d, 'pointerup', 9 * DW + 5); await sleep(100);  // 2.624.0 (#3943): kept: a window in which no field may open
   check(!d.querySelector('#tl-new-in'), 'a plain click opens nothing');
   // double-click a day of "Build" = one day
   track('tlsec:' + SB).dispatchEvent(new w.MouseEvent('dblclick', {bubbles: true, cancelable: true, clientX: 12 * DW + 5, clientY: 10}));
-  await sleep(150); inp = d.querySelector('#tl-new-in');
+  await until(() => d.querySelector('#tl-new-in')); inp = d.querySelector('#tl-new-in');
   check(inp && d.activeElement === inp, '#431: double-click opens the field');
   inp.value = 'Deploy script'; key(w, inp, 'Enter');
   const ds_ = await until(() => byTitle('Deploy script'));
   check(ds_ && !ds_.start && ds_.due === dayAt(12) && ds_.section_id === SB, '#431: one day: due only, no start, section Build: ' + JSON.stringify(ds_ && [ds_.start, ds_.due, ds_.section_id]));
   // the list row: no section
   track('g:' + P).dispatchEvent(new w.MouseEvent('dblclick', {bubbles: true, cancelable: true, clientX: 14 * DW + 5, clientY: 10}));
-  await sleep(150); inp = d.querySelector('#tl-new-in');
+  await until(() => d.querySelector('#tl-new-in')); inp = d.querySelector('#tl-new-in');
   inp.value = 'Loose end'; key(w, inp, 'Enter');
   const le = await until(() => byTitle('Loose end'));
   check(le && le.due === dayAt(14) && !le.section_id, '#431: on the list row: in the list, no section');
   // "+ Add task": keyboard path, Escape cancels, focus back to "+"
   const addb = () => d.querySelector(`.tl-addb[data-k="add:${P}"]`);
   check(addb() && addb().tagName === 'BUTTON' && /Add task/.test(addb().textContent) && /Add task to Relaunch/.test(addb().getAttribute('aria-label')), '"+ Add task" is a real button with a name');
-  addb().focus(); click(w, addb()); await sleep(150);
+  addb().focus(); click(w, addb()); await until(() => d.querySelector('#tl-new-in'));
   inp = d.querySelector('#tl-new-in');
   check(inp && d.activeElement === inp && w.eval('S.tlNew.d0') === w.eval('S.tlNew.d1'), '"+": the field opens on one day');
   const n0 = (await state()).length;
-  key(w, inp, 'Escape'); await sleep(200);
+  key(w, inp, 'Escape'); await until(() => !d.querySelector('#tl-new-in') && d.activeElement === addb());
   check(!d.querySelector('#tl-new-in') && d.activeElement === addb(), 'Escape cancels, the focus goes back to "+"');
   check((await state()).length === n0, 'Escape created nothing');
-  click(w, addb()); await sleep(150);
+  click(w, addb()); await until(() => d.querySelector('#tl-new-in'));
   inp = d.querySelector('#tl-new-in'); inp.value = 'From plus'; inp.dispatchEvent(new w.Event('input', {bubbles: true}));
   click(w, d.querySelector('.tl-new [data-act="tl-new-ok"]'));
   const fp = await until(() => byTitle('From plus'));
   check(fp && fp.due === day(0) && !fp.start, '"+": the ✓ button creates it on today: ' + fp?.due);
   // the "+" of a section (collapsed section opens)
-  click(w, fold(SE)); await sleep(150);
-  click(w, d.querySelector(`.tl-secadd[data-k="tlsec:${SE}"]`)); await sleep(150);
+  click(w, fold(SE)); await until(() => fold(SE)?.getAttribute('aria-expanded') === 'false');
+  click(w, d.querySelector(`.tl-secadd[data-k="tlsec:${SE}"]`)); await until(() => d.querySelector('#tl-new-in'));
   inp = d.querySelector('#tl-new-in');
   check(inp && fold(SE).getAttribute('aria-expanded') === 'true' && /Add task to Empty/.test(d.querySelector(`.tl-secadd[data-k="tlsec:${SE}"]`).getAttribute('aria-label')), 'section "+": named, opens a folded section');
   inp.value = 'In empty'; key(w, inp, 'Enter');
   const ie = await until(() => byTitle('In empty'));
   check(ie && ie.section_id === SE, 'section "+": created in that section');
   // a re-render while typing keeps the field and the text
-  click(w, addb()); await sleep(150);
+  click(w, addb()); await until(() => d.querySelector('#tl-new-in'));
   inp = d.querySelector('#tl-new-in'); inp.value = 'Half typed'; inp.dispatchEvent(new w.Event('input', {bubbles: true}));
-  w.eval('renderView()'); await sleep(100);
+  w.eval('renderView()'); await until(() => d.querySelector('#tl-new-in'));
   check(d.querySelector('#tl-new-in')?.value === 'Half typed', 'a re-render (sync) keeps the field and its text');
-  key(w, d.querySelector('#tl-new-in'), 'Escape'); await sleep(100);
+  key(w, d.querySelector('#tl-new-in'), 'Escape'); await until(() => !d.querySelector('#tl-new-in'));
   // offline: the normal create path (outbox), the range kept locally
   w.__offline = true;
-  ptr(w, track('tlsec:' + SD), 'pointerdown', 20 * DW + 5); ptr(w, d, 'pointermove', 22 * DW + 5); ptr(w, d, 'pointerup', 22 * DW + 5); await sleep(150);
-  inp = d.querySelector('#tl-new-in'); inp.value = 'Offline drawn'; key(w, inp, 'Enter'); await sleep(400);
+  ptr(w, track('tlsec:' + SD), 'pointerdown', 20 * DW + 5); ptr(w, d, 'pointermove', 22 * DW + 5); ptr(w, d, 'pointerup', 22 * DW + 5); await until(() => d.querySelector('#tl-new-in'));
+  inp = d.querySelector('#tl-new-in'); inp.value = 'Offline drawn'; key(w, inp, 'Enter'); await until(() => w.eval(`[...S.tasks.values()].some(x => x.title === 'Offline drawn')`) && [...d.querySelectorAll('.tl-bar span')].some(s => s.textContent === 'Offline drawn'));
   const off = w.eval(`(() => { const t = [...S.tasks.values()].find(x => x.title === 'Offline drawn'); return t ? [t.start, t.due, t.section_id] : null; })()`);
   check(off && off[0] === dayAt(20) && off[1] === dayAt(22) && off[2] === SD && d.querySelector('.tl-bar span') && [...d.querySelectorAll('.tl-bar span')].some(s => s.textContent === 'Offline drawn'), 'offline: created locally with its range, the bar is there: ' + JSON.stringify(off));
   w.__offline = false;
@@ -178,7 +178,7 @@ const byTitle = async (t, ck = CK) => (await state(ck)).find(x => x.title === t)
   await until(() => d.querySelector('#view .tl'));
   check(d.querySelectorAll('.tl-sec').length >= 3 && !d.querySelector('.tl-track.tl-cr') && !d.querySelector('.tl-addb') && !d.querySelector('.tl-secadd'), 'viewer: sections shown, no "+" and no drawing tracks');
   const vt = d.querySelector('.tl-sec .tl-track');
-  vt.dispatchEvent(new w.MouseEvent('dblclick', {bubbles: true, cancelable: true, clientX: 50, clientY: 10})); await sleep(150);
+  vt.dispatchEvent(new w.MouseEvent('dblclick', {bubbles: true, cancelable: true, clientX: 50, clientY: 10})); await sleep(150);  // 2.624.0 (#3943): kept: a window in which no field may open
   check(!d.querySelector('#tl-new-in'), 'viewer: double-click does nothing');
   check(d.querySelector(`.tl-bar.tl-dia[data-id="${M}"]`)?.classList.contains('ro'), 'viewer: the diamond is read-only');
   w.close();
@@ -191,7 +191,7 @@ const byTitle = async (t, ck = CK) => (await state(ck)).find(x => x.title === t)
   check(cs.includes('Design') && cs.includes('Build') && !cs.includes('Spare'), 'calendar timeline: sections (only those with tasks): ' + cs.join());
   const cDW = w.eval('tlDW()');
   d.querySelector(`.tl-track.tl-cr[data-k="tlsec:${SB}"]`).dispatchEvent(new w.MouseEvent('dblclick', {bubbles: true, cancelable: true, clientX: 16 * cDW + 5, clientY: 10}));
-  await sleep(150); inp = d.querySelector('#tl-new-in'); inp.value = 'From calendar'; key(w, inp, 'Enter');
+  await until(() => d.querySelector('#tl-new-in')); inp = d.querySelector('#tl-new-in'); inp.value = 'From calendar'; key(w, inp, 'Enter');
   const fc = await until(() => byTitle('From calendar'));
   check(fc && fc.section_id === SB && fc.due === w.eval('addDays(S.tlStart, 16)'), 'calendar timeline: creating works there too');
   w.close();
@@ -206,18 +206,18 @@ const byTitle = async (t, ck = CK) => (await state(ck)).find(x => x.title === t)
   check(d.querySelector(`#rm-rows .rm-t .tl-bar.tl-dia[data-id="${M}"]`) && !d.querySelector(`.rm-g[data-l="${P}"] .rm-ms`), 'roadmap: the milestone as a diamond row, no second marker on the open project row');
   const G = w.eval('({s: S.rmV.G.start, dw: S.rmV.G.dw})');
   d.querySelector(`.tl-track.tl-cr[data-k="tlsec:${SD}"]`).dispatchEvent(new w.MouseEvent('dblclick', {bubbles: true, cancelable: true, clientX: 30 * G.dw + 1, clientY: 10}));
-  await sleep(200); inp = d.querySelector('#tl-new-in');
+  await until(() => d.querySelector('#tl-new-in')); inp = d.querySelector('#tl-new-in');
   check(inp, 'roadmap: double-click on a section row opens the field');
   inp.value = 'From roadmap'; key(w, inp, 'Enter');
   const fr = await until(() => byTitle('From roadmap'));
   check(fr && fr.section_id === SD && fr.due === w.eval(`addDays('${G.s}', 30)`), 'roadmap: created in that section on that day');
   check(await until(() => d.activeElement?.dataset?.id === String(fr?.id)), 'roadmap: the focus on the new bar');
   // folding a section in the roadmap
-  click(w, d.querySelector(`#rm-rows .tl-secb[data-key="tlsec:${SD}"]`)); await sleep(200);
+  click(w, d.querySelector(`#rm-rows .tl-secb[data-key="tlsec:${SD}"]`)); await until(() => !d.querySelector(`#rm-rows .tl-bar[data-id="${A}"]`) && d.querySelector(`#rm-rows .tl-secb[data-key="tlsec:${SD}"]`)?.getAttribute('aria-expanded') === 'false');
   check(!d.querySelector(`#rm-rows .tl-bar[data-id="${A}"]`) && d.querySelector(`#rm-rows .tl-secb[data-key="tlsec:${SD}"]`)?.getAttribute('aria-expanded') === 'false', 'roadmap: a section folds');
-  click(w, d.querySelector(`#rm-rows .tl-secb[data-key="tlsec:${SD}"]`)); await sleep(200);
+  click(w, d.querySelector(`#rm-rows .tl-secb[data-key="tlsec:${SD}"]`)); await until(() => d.querySelector(`#rm-rows .tl-secb[data-key="tlsec:${SD}"]`)?.getAttribute('aria-expanded') === 'true');
   // collapsed project: the marker is back on its row
-  w.eval(`rmToggle('l${P}')`); await sleep(200);
+  w.eval(`rmToggle('l${P}')`); await until(() => d.querySelector(`.rm-g[data-l="${P}"] .rm-ms`) && !d.querySelector('#rm-rows .rm-s'));
   check(d.querySelector(`.rm-g[data-l="${P}"] .rm-ms`) && !d.querySelector('#rm-rows .rm-s'), 'roadmap: a collapsed project shows its milestone marker, no section rows');
   w.close();
   await call('PATCH', '/api/settings', {roadmap: JSON.stringify({v: 'list'})});
@@ -228,7 +228,8 @@ const byTitle = async (t, ck = CK) => (await state(ck)).find(x => x.title === t)
     await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"${theme}"'); localStorage.setItem('tasks.lookLocal', 'true'); return 1; })()`);
     return ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${user}', password: 'password123'})}).then(r => r.status)`);
   };
-  const ready = async (ev, n = 30) => { for (let i = 0; i < n && !(await ev(`!!document.querySelector('#view .tl')`).catch(() => false)); i++) await sleep(300); await sleep(800); };
+  // 2.624.0 (#3943): the timeline drawn, the page's requests done and two frames drawn, instead of fixed sleeps
+  const ready = async ({ev, until: fu, idle: fi}, n = 30) => { await fu(`!!document.querySelector('#view .tl')`, {timeout: n * 300}); await fi({quiet: 300}); await ev(`new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(1))))`).catch(() => 0); };
   const OVER = `(() => ({o: document.documentElement.scrollWidth - innerWidth, v: document.querySelector('#view').scrollWidth - document.querySelector('#view').clientWidth}))()`;
   // two points on the visible part of a row's track (k0 days in, then k1 days further) + the days they stand for
   const SPOT = (k, k0, k1) => `(() => { const tr = document.querySelector('.tl-track.tl-cr[data-k="${k}"]'); if (!tr) return null; tr.closest('.tl-row').scrollIntoView({block: 'center'});
@@ -241,23 +242,24 @@ const byTitle = async (t, ck = CK) => (await state(ck)).find(x => x.title === t)
 
   // 1440, mouse, light: drag-create, move a diamond
   await firefox(async o => {
-    const {cmd, ev, ctx, shot, drag} = o;
+    const {cmd, ev, ctx, shot, drag, until: fu} = o;
     check(await ffLogin(o, 'light') === 200, '1440: login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1440, height: 900}});
-    await o.nav(B + '#l/' + P); await ready(ev);
+    await o.nav(B + '#l/' + P); await ready(o);
     const sp = await ev(SPOT('tlsec:' + SB, 1, 3));
     check(sp && sp.x1 < sp.iw, '1440: a spot on the Build row ' + JSON.stringify(sp));
-    await drag(sp.x0, sp.y, sp.x1 - sp.x0, 0, 'mouse'); await sleep(400);
+    await drag(sp.x0, sp.y, sp.x1 - sp.x0, 0, 'mouse'); await fu(`document.activeElement?.id === 'tl-new-in'`);
     check(await ev(`document.activeElement?.id === 'tl-new-in'`), '1440: after a real mouse drag the field is focused');
     await shot('p2180-tl-new-1440.png');
-    await typeKeys(cmd, ctx, 'Real drag' + ENTER); await sleep(800);
+    await typeKeys(cmd, ctx, 'Real drag' + ENTER);
     const rd = await until(() => byTitle('Real drag'));
     check(rd && rd.start === sp.d0 && rd.due === sp.d1 && rd.section_id === SB, `1440: a real drag created the exact range ${rd && rd.start}..${rd && rd.due} (want ${sp.d0}..${sp.d1})`);
+    await fu(`document.activeElement?.dataset?.id === '${rd?.id}'`);
     check(await ev(`document.activeElement?.dataset?.id === '${rd?.id}'`), '1440: the focus on the new bar');
     // move the diamond with the mouse by 1 day
     const before = (await state()).find(t => t.id === M)?.due;
     const dp = await ev(`(() => { const b = document.querySelector('.tl-dia[data-id="${M}"]'); b.scrollIntoView({block: 'center', inline: 'center'}); const r = b.getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + r.height / 2, dw: tlDW()}; })()`);
-    await drag(dp.x, dp.y, dp.dw, 0, 'mouse'); await sleep(800);
+    await drag(dp.x, dp.y, dp.dw, 0, 'mouse'); await until(async () => (await state()).find(t => t.id === M)?.due === w_add(before, 1));
     const after = (await state()).find(t => t.id === M)?.due;
     check(after === w_add(before, 1), `1440: a real mouse drag moves the diamond by one day ${before} -> ${after}`);
     const ov = await ev(OVER);
@@ -267,10 +269,10 @@ const byTitle = async (t, ck = CK) => (await state(ck)).find(x => x.title === t)
 
   // touch: 390 (dark), 904 unfolded, 904 x 412 rotated / folded
   for (const [vw, vh, th] of [[390, 844, 'dark'], [904, 904, 'light'], [904, 412, 'dark']]) await firefox(async o => {
-    const {cmd, ev, ctx, shot} = o, tag = `${vw}x${vh} ${th}`;
+    const {cmd, ev, ctx, shot, until: fu} = o, tag = `${vw}x${vh} ${th}`;
     check(await ffLogin(o, th) === 200, tag + ': login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
-    await o.nav(B + '#l/' + P); await ready(ev);
+    await o.nav(B + '#l/' + P); await ready(o);
     const ov = await ev(OVER);
     check(ov.o <= 0, `${tag}: nothing sideways on the page ` + JSON.stringify(ov));
     const sm = await ev(SMALL);
@@ -279,23 +281,23 @@ const byTitle = async (t, ck = CK) => (await state(ck)).find(x => x.title === t)
     const n0 = (await state()).length;
     // a quick tap does nothing
     let sp = await ev(SPOT('tlsec:' + SD, 0, 2));
-    await T([{type: 'pointerMove', x: Math.round(sp.x0), y: Math.round(sp.y)}, {type: 'pointerDown', button: 0}, {type: 'pause', duration: 60}, {type: 'pointerUp', button: 0}]); await sleep(500);
+    await T([{type: 'pointerMove', x: Math.round(sp.x0), y: Math.round(sp.y)}, {type: 'pointerDown', button: 0}, {type: 'pause', duration: 60}, {type: 'pointerUp', button: 0}]); await sleep(500);  // 2.624.0 (#3943): kept: a window in which a quick tap must open nothing
     check(!(await ev(`!!document.querySelector('#tl-new-in')`)), `${tag}: a quick tap opens nothing`);
     // a plain swipe scrolls the timeline and creates nothing
     sp = await ev(SPOT('tlsec:' + SD, 3, 2));
-    await T([{type: 'pointerMove', x: Math.round(sp.x0), y: Math.round(sp.y)}, {type: 'pointerDown', button: 0}, {type: 'pointerMove', x: Math.round(sp.x0 - 60), y: Math.round(sp.y), duration: 60}, {type: 'pointerMove', x: Math.round(sp.x0 - 140), y: Math.round(sp.y), duration: 60}, {type: 'pointerUp', button: 0}]); await sleep(700);
+    await T([{type: 'pointerMove', x: Math.round(sp.x0), y: Math.round(sp.y)}, {type: 'pointerDown', button: 0}, {type: 'pointerMove', x: Math.round(sp.x0 - 60), y: Math.round(sp.y), duration: 60}, {type: 'pointerMove', x: Math.round(sp.x0 - 140), y: Math.round(sp.y), duration: 60}, {type: 'pointerUp', button: 0}]); await sleep(700);  // 2.624.0 (#3943): kept: a window in which a swipe must open nothing; the scroll it may cause is measured after it
     const sl = await ev(`document.querySelector('#tlscroll').scrollLeft`);
     check(!(await ev(`!!document.querySelector('#tl-new-in') || !!document.querySelector('.tl-ghost')`)), `${tag}: a swipe opens nothing`);
     // the same swipe on an empty spot of a plain task row (no drawing there): the drawing rows must scroll the same way
     const cp = await ev(`(() => { const row = document.querySelector('.tl-bar[data-id="${C}"]').closest('.tl-row'), tr = row.querySelector('.tl-track'); row.scrollIntoView({block: 'center'}); const r = row.getBoundingClientRect(), x = Math.min(innerWidth, tr.getBoundingClientRect().right, document.querySelector('#tlscroll').getBoundingClientRect().right) - 30, y = r.top + r.height / 2; return {x, y, ok: document.elementFromPoint(x, y) === tr, hit: document.elementFromPoint(x, y)?.className, sl: document.querySelector('#tlscroll').scrollLeft}; })()`);
-    await T([{type: 'pointerMove', x: Math.round(cp.x), y: Math.round(cp.y)}, {type: 'pointerDown', button: 0}, {type: 'pointerMove', x: Math.round(cp.x - 60), y: Math.round(cp.y), duration: 60}, {type: 'pointerMove', x: Math.round(cp.x - 140), y: Math.round(cp.y), duration: 60}, {type: 'pointerUp', button: 0}]); await sleep(700);
+    await T([{type: 'pointerMove', x: Math.round(cp.x), y: Math.round(cp.y)}, {type: 'pointerDown', button: 0}, {type: 'pointerMove', x: Math.round(cp.x - 60), y: Math.round(cp.y), duration: 60}, {type: 'pointerMove', x: Math.round(cp.x - 140), y: Math.round(cp.y), duration: 60}, {type: 'pointerUp', button: 0}]); await sleep(700);  // 2.624.0 (#3943): kept: the scroll a swipe may cause (or not, headless) is measured after it
     const cl = await ev(`document.querySelector('#tlscroll').scrollLeft`);
     check(cp.ok && (sl !== sp.sl) === (cl !== cp.sl), `${tag}: a swipe on a drawing row scrolls like one on a plain row (drawing row ${sp.sl} -> ${sl}, plain row ${cp.sl} -> ${cl}, ${cp.ok ? '' : 'hit ' + cp.hit}; headless Firefox may not pan synthetic touches at all)`);
     check((await state()).length === n0, `${tag}: tap + swipe created nothing`);
     // long-press, then drag
     sp = await ev(SPOT('tlsec:' + SB, 1, 2));
     await T([{type: 'pointerMove', x: Math.round(sp.x0), y: Math.round(sp.y)}, {type: 'pointerDown', button: 0}, {type: 'pause', duration: 700},
-      {type: 'pointerMove', x: Math.round((sp.x0 + sp.x1) / 2), y: Math.round(sp.y), duration: 150}, {type: 'pointerMove', x: Math.round(sp.x1), y: Math.round(sp.y), duration: 150}, {type: 'pointerUp', button: 0}]); await sleep(700);
+      {type: 'pointerMove', x: Math.round((sp.x0 + sp.x1) / 2), y: Math.round(sp.y), duration: 150}, {type: 'pointerMove', x: Math.round(sp.x1), y: Math.round(sp.y), duration: 150}, {type: 'pointerUp', button: 0}]); await fu(`!!document.querySelector('#tl-new-in')`);
     const f = await ev(`(() => { const i = document.querySelector('#tl-new-in'); if (!i) return null; const r = i.closest('.tl-new').getBoundingClientRect(), vv = visualViewport; return {d0: S.tlNew.d0, d1: S.tlNew.d1, l: r.left, r: r.right, b: r.bottom, vb: vv.offsetTop + vv.height, iw: innerWidth}; })()`);
     check(f && f.d0 === sp.d0 && f.d1 === sp.d1, `${tag}: long-press + drag: the field with the range ${f && f.d0}..${f && f.d1} (want ${sp.d0}..${sp.d1})`);
     check(f && f.l >= -0.5 && f.r <= f.iw + .5 && f.b <= f.vb + .5, `${tag}: the field is inside the visible viewport ` + JSON.stringify(f));
@@ -310,11 +312,11 @@ const byTitle = async (t, ck = CK) => (await state(ck)).find(x => x.title === t)
       // review R2: with the keyboard up (the visible area shrinks to ~470 px) tab bar and "+" step aside, the field is visible
       const hid = await ev(`(() => ({c: document.body.classList.contains('tl-typing'), t: getComputedStyle(document.querySelector('#tabs')).display, f: getComputedStyle(document.querySelector('#fab')).display}))()`);
       check(hid.c && hid.t === 'none' && hid.f === 'none', `${tag}: review R2: tab bar and FAB hidden while the field has the focus ` + JSON.stringify(hid));
-      await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: 470}}); await sleep(700);
+      await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: 470}}); await fu(`(() => { const i = document.querySelector('#tl-new-in'), b = i && i.closest('.tl-new').getBoundingClientRect(), vv = visualViewport; return innerHeight <= 470 && b && b.bottom <= vv.offsetTop + vv.height + .5 && b.top >= 0; })()`);
       const kb = await ev(`(() => { const i = document.querySelector('#tl-new-in'), b = i && i.closest('.tl-new').getBoundingClientRect(), vv = visualViewport, x = b && (b.left + b.right) / 2, y = b && (b.top + b.bottom) / 2, hit = b && document.elementFromPoint(x, y); return {act: document.activeElement === i, top: b && b.top, bot: b && b.bottom, vb: vv.offsetTop + vv.height, own: !!hit?.closest?.('.tl-new'), hit: hit?.id || hit?.className}; })()`);
       check(kb.act && kb.bot <= kb.vb + .5 && kb.top >= 0 && kb.own, `${tag}: review R2: in a ~470 px high view the field stays visible and uncovered ` + JSON.stringify(kb));
       await shot(`p2180-tl-${vw}-kb.png`);
-      await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}}); await sleep(400);
+      await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}}); await fu(`innerHeight > 470`);
     }
     await ev(`(() => { const i = document.querySelector('#tl-new-in'); i.value = 'Touch ${vw}x${vh}'; i.dispatchEvent(new Event('input', {bubbles: true})); i.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true, cancelable: true})); return 1; })()`);
     const tt = await until(() => byTitle(`Touch ${vw}x${vh}`));
@@ -328,10 +330,10 @@ const byTitle = async (t, ck = CK) => (await state(ck)).find(x => x.title === t)
       const nr = row.querySelector('.tl-name').getBoundingClientRect().right, r = tr.getBoundingClientRect(), rr = row.getBoundingClientRect(), dw = +tr.dataset.dw, x0 = nr + 6, i0 = Math.floor((x0 - r.left) / dw);
       const hit = document.elementFromPoint(x0, rr.top + rr.height / 2); return {x0, x1: x0 + 2 * dw, y: rr.top + rr.height / 2, d0: addDays(tr.dataset.s0, i0), d1: addDays(tr.dataset.s0, i0 + 2), sl: sc.scrollLeft, hit: hit && (hit.className + '|' + (hit.closest('.tl-bar')?.dataset.id || ''))}; })()`);
     await T([{type: 'pointerMove', x: Math.round(eg.x0), y: Math.round(eg.y)}, {type: 'pointerDown', button: 0}, {type: 'pause', duration: 700}, {type: 'pointerMove', x: Math.round(eg.x0 - 4), y: Math.round(eg.y), duration: 60},
-      {type: 'pointerMove', x: Math.round((eg.x0 + eg.x1) / 2), y: Math.round(eg.y), duration: 150}, {type: 'pointerMove', x: Math.round(eg.x1), y: Math.round(eg.y), duration: 150}, {type: 'pointerUp', button: 0}]); await sleep(700);
+      {type: 'pointerMove', x: Math.round((eg.x0 + eg.x1) / 2), y: Math.round(eg.y), duration: 150}, {type: 'pointerMove', x: Math.round(eg.x1), y: Math.round(eg.y), duration: 150}, {type: 'pointerUp', button: 0}]); await fu(`!!(S.tlNew && document.querySelector('#tl-new-in'))`);
     const eN = await ev(`(() => ({n: S.tlNew && [S.tlNew.d0, S.tlNew.d1], sl: document.querySelector('#tlscroll').scrollLeft}))()`);
     check(eN.n && eN.n[0] === eg.d0 && eN.n[1] === eg.d1, `${tag}: review R4: long-press at the left edge: range ${eN.n} (want ${eg.d0},${eg.d1}; scrollLeft ${eg.sl} -> ${eN.sl}; under the finger: ${eg.hit})`);
-    await ev(`(() => { const i = document.querySelector('#tl-new-in'); i?.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true, cancelable: true})); return 1; })()`); await sleep(300);
+    await ev(`(() => { const i = document.querySelector('#tl-new-in'); i?.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true, cancelable: true})); return 1; })()`); await fu(`!document.querySelector('#tl-new-in')`);
     // review R10: scrolled into the month, its name still shows at the left of the visible range (sticky)
     const mo = await ev(`(() => { const sc = document.querySelector('#tlscroll'), nr = document.querySelector('.tl-headrow .tl-name').getBoundingClientRect().right, dw = tlDW();
       const ms = [...document.querySelectorAll('.tl-headrow .tl-m')], into = x => { const r = x.getBoundingClientRect(); return r.left < nr + 1 && r.right > nr + 6 * dw; };
