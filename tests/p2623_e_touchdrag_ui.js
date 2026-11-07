@@ -175,6 +175,6 @@ const closeMenus = d => { d.dispatchEvent(new d.defaultView.KeyboardEvent('keydo
   w.close();
 
   check(!errs.length, 'no script errors: ' + errs.join(' | ').slice(0, 300));
-  console.log(`\n${ok} passed, ${F.length} failed`);
+  console.log(`\n${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });
