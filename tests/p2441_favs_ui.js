@@ -192,6 +192,9 @@ const items = async ck => JSON.parse((await call(ck, 'GET', '/api/state')).setti
     check(await ready(ev, `document.querySelectorAll('#favup .fv2-tile').length === 4 && !document.querySelector('#favrow') && !document.querySelector('#favgrip').classList.contains('hidden')`), 'phone: no row under the header, the grip over the tab bar, four tiles');
     await ev(`(() => { document.querySelector('#favgrip').click(); return 1; })()`);
     check(await ready(ev, `!document.querySelector('#favup').classList.contains('hidden') && document.querySelector('#favup').getBoundingClientRect().height > 0`), 'phone: the grip opens the row');
+    // 2.635.0 (#5005): the row slides in (an_up, translate 0 100% -> 0): measured mid-slide on a slow runner it still overlaps
+    // the tab bar ({"over":false} in CI v2.629.0) - measure once it stands (as p2572_b_favswipe_ui does)
+    await ready(ev, `!document.querySelector('#favup').getAnimations().some(a => a.playState === 'running')`, 20);
     const p = JSON.parse(await ev(`(() => { const r = document.querySelector('#favup').getBoundingClientRect(), t = document.querySelector('#tabs').getBoundingClientRect(), a = document.querySelector('#favup .fv2-tile').getBoundingClientRect(); return JSON.stringify({over: r.bottom <= t.top + 1, h: a.height}); })()`));
     check(p.over && p.h >= 44, 'phone: above the tab bar, a big enough target ' + JSON.stringify(p));
     check(await ev(NOSIDE), 'phone: the sidebar has no section Favourites (no heading, no entries)');
