@@ -3,7 +3,9 @@
 Messages carry tchat_msgs.enc = {"v":1|2,"g":<gen>,"iv","ct"} (body ''), AES-256-GCM with the list key of generation g,
 AAD "kalmido-chan:v1:<room_id>:<gen>:<sender_id>" (v 1) or, since 2.640.0 (#3388), "kalmido-chan:v2:<room_id>:<gen>:<sender_id>:
 <message id>" (v 2: a ciphertext opens only as its own message), padded like the list texts. A new v2 message is stored under
-the id the browser reserved before encrypting (POST /api/team/rooms/<rid>/msgid, collab/e2eresv.py). Post / edit guards, conversion when the lock
+the id the browser reserved before encrypting (POST /api/team/rooms/<rid>/msgid, collab/e2eresv.py). 2.652.0 (#5044): a NEW
+message takes v 2 only (v 1: 400 code e2e_v1_new, le2c_take); editing a message, the re-encryption and reading still take v 1
+(messages from before 2.640 keep opening). Post / edit guards, conversion when the lock
 goes on / off / after a key change, neutral push and agent events live here (part C). No plain copy of a channel message
 exists outside tchat_msgs: agent events and webhook deliveries of the list go with le2b_scrub (they carry the list id),
 search skips the channels of locked lists (msgsearch), a saved message (chatsave) is refused for a ciphertext."""
@@ -77,12 +79,13 @@ def le2c_check(c, r, b):
 
 
 def le2c_take(c, r, b, enc, uid):
-    """2.640.0 (#3388): the id a new v2 message is stored under (the one reserved for uid in this room, it is in the AAD), None
-    for a v1 message (an app tab from before 2.640), or an error response. 409 chan_resv_stale when another message of the
-    room came in after the reservation: the browser encrypts once more with a new id, so the ids keep the order of the room
-    (read marks and "unread" count by id)."""
+    """2.640.0 (#3388): the id a new v2 message is stored under (the one reserved for uid in this room, it is in the AAD), or an
+    error response. 409 chan_resv_stale when another message of the room came in after the reservation: the browser encrypts
+    once more with a new id, so the ids keep the order of the room (read marks and "unread" count by id). 2.652.0 (#5044): a
+    v1 message (an app tab from before 2.640, two versions later) is refused with 400 code e2e_v1_new -- only a new message:
+    editing one and the re-encryption still take v1."""
     if json.loads(enc)["v"] != 2:
-        return None
+        return jsonify(error=tr("Please reload the app."), code="e2e_v1_new"), 400
     mid = b.get("msg_id")
     if not e2r_ok(c, "chan", r["id"], uid, mid, b.get("resv")):
         return err(tr("Invalid value: {0}", "msg_id"))

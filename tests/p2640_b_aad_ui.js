@@ -4,6 +4,8 @@
 // without encryption, so no safety number dialog comes up):
 // - written is v 2: switching the lock on, a new page (id reserved first), a new / edited channel message, the conversion
 // - an old v 1 page / message (an app from before 2.640) still opens
+// - 2.652.0 (#5044): a NEW v 1 page / message is refused (400); an old tab may still edit one with v 1 (that is how the v 1
+//   page / message of this test comes about)
 // - a cipher the server puts under another page / message does not open there (nor a v 2 cipher relabelled as v 1)
 // - another message arriving between reservation and send: the browser encrypts once more with a new id (409 chan_resv_stale)
 // - the key change lifts every page / message (also the v 1 ones) to v 2 in the new generation
@@ -58,10 +60,17 @@ const cip = v => (typeof v === 'string' && v.startsWith('e2e1:')) ? JSON.parse(v
     let ps = await pages(), p0 = ps.find(x => x.id === P0);
     check(cip(p0?.path)?.v === 2 && cip(p0?.body)?.v === 2 && !JSON.stringify(ps).includes(M), 'wiki: switching on writes v 2 (path and text)');
     // a page of an app from before 2.640: v 1 ciphers, no reservation
-    const P1 = await ev(`(async () => { const sp = ${JSON.stringify(SP)}, s = WKE.st[sp], key = WKE.keys[sp][s.gen];
+    // 2.652.0 (#5044): a new v 1 page is refused (was: still taken); an older tab still edits a page with v 1, so the old page
+    // of this test is a new page whose text such a tab wrote
+    const old = await ev(`(async () => { const sp = ${JSON.stringify(SP)}, s = WKE.st[sp], key = WKE.keys[sp][s.gen];
       const seal = async (f, t) => { const b = await e2eSeal(key, le2ePad(e2eTEnc().encode(t)), wkeAad(s.space_id, s.gen, f)); return 'e2e1:' + JSON.stringify({v: 1, g: s.gen, iv: b.iv, ct: b.ct}); };
-      return (await rawFetch('POST', '/api/wiki/pages', {space: sp, path: await seal('path', 'Old app'), body: await seal('body', '${M} old app text')})).id; })().catch(e => 'ERR ' + e.message)`);
-    check(P1 > 0, 'wiki: a v 1 page of an older app is still taken ' + P1);
+      let refused = 0; try { await rawFetch('POST', '/api/wiki/pages', {space: sp, path: await seal('path', 'Old app new'), body: await seal('body', '${M} refused')}); } catch (e) { refused = e.status || ('ERR ' + e.message); }
+      await wk_load(sp, true); const p = await wkeCreate(sp, 'Old app', 0, 'placeholder');
+      const r = await rawFetch('PATCH', '/api/wiki/pages/' + p.id, {body: await seal('body', '${M} old app text')});
+      return {refused, id: p.id, v: JSON.parse(String(r.body || '').slice(5) || '{}').v}; })().catch(e => ({err: e.message}))`);
+    check(old.refused === 400, '#5044: wiki: a new v 1 page of an older app is refused 400 ' + JSON.stringify(old));
+    check(old.id > 0 && old.v === 1, '#5044: wiki: an older app still edits a page with a v 1 text ' + JSON.stringify(old));
+    const P1 = old.id;
     const mk = await ev(`(async () => { const sp = ${JSON.stringify(SP)}; await wk_load(sp, true);
       const a = await wkeCreate(sp, 'Bound A', 0, '${M} text A'); await wk_load(sp, true); const b = await wkeCreate(sp, 'Bound B', 0, '${M} text B');
       return {a: a.id, b: b.id, ab: a.body}; })().catch(e => ({err: e.message}))`);
@@ -101,13 +110,20 @@ const cip = v => (typeof v === 'string' && v.startsWith('e2e1:')) ? JSON.parse(v
     check(await waitFor(`S.tc.room?.id === ${RID} && le2eChanOn(S.tc.room)`), 'channel: the room knows the lock of its list');
     await unlock();
     await ev(`(async () => { await le2eKeys(${L}, true); return 1; })()`);
-    // a message of an app from before 2.640: v 1, no reservation
-    const V1 = await ev(`(async () => { const room = S.tc.room, g = listById(${L}).e2e_gen, key = await le2eChanKey(${L}, g);
-      const b = await e2eSeal(key, le2ePad(e2eTEnc().encode('${M} old message')), le2eChanAad(room.id, g, S.me.id));
-      return (await rawFetch('POST', '/api/team/rooms/${RID}/messages', {enc: {v: 1, g, iv: b.iv, ct: b.ct}})).id; })().catch(e => 'ERR ' + e.message)`);
-    check(V1 > 0, 'channel: a v 1 message of an older app is still taken ' + V1);
     const send = async t => { await ev(`(() => { const ta = document.querySelector('#tc-in'); ta.value = '${M} ${t}'; return 1; })()`); await ev(`tcSend().then(() => 1)`);
       return waitFor(`(S.tc.msgs || []).find(m => m.body === '${M} ${t}')?.id || 0`); };
+    // a message of an app from before 2.640: v 1, no reservation
+    // 2.652.0 (#5044): a new v 1 message is refused 400 e2e_v1_new (was: still taken); an older tab still edits a message with
+    // v 1, so the old message of this test is a new one such a tab edited
+    const V0 = await send('old placeholder');
+    const v1 = await ev(`(async () => { const room = S.tc.room, g = listById(${L}).e2e_gen, key = await le2eChanKey(${L}, g);
+      const b = await e2eSeal(key, le2ePad(e2eTEnc().encode('${M} old message')), le2eChanAad(room.id, g, S.me.id));
+      let refused = null; try { await rawFetch('POST', '/api/team/rooms/${RID}/messages', {enc: {v: 1, g, iv: b.iv, ct: b.ct}}); } catch (e) { refused = [e.status, e.data?.code]; }
+      const r = await rawFetch('PATCH', '/api/team/messages/${V0}', {enc: {v: 1, g, iv: b.iv, ct: b.ct}});
+      return {refused, v: r.enc?.v}; })().catch(e => ({err: e.message}))`);
+    check(JSON.stringify(v1.refused) === '[400,"e2e_v1_new"]', '#5044: channel: a new v 1 message of an older app is refused 400 e2e_v1_new ' + JSON.stringify(v1));
+    check(V0 > 0 && v1.v === 1, '#5044: channel: an older app still edits a message with v 1 ' + JSON.stringify(v1));
+    const V1 = V0;
     const MA = await send('message A'), MB = await send('message B');
     let ms = await rows();
     const ma = ms.find(x => x.id === MA), mb = ms.find(x => x.id === MB);
@@ -132,7 +148,8 @@ const cip = v => (typeof v === 'string' && v.startsWith('e2e1:')) ? JSON.parse(v
       window.rawFetch = async (m, u, b) => {
         if (m === 'POST' && u.endsWith('/messages') && b?.msg_id) {
           posts++;
-          if (!between) { const x = await e2eSeal(key, le2ePad(e2eTEnc().encode('${M} between')), le2eChanAad(room.id, g, S.me.id)); between = (await real('POST', u, {enc: {v: 1, g, iv: x.iv, ct: x.ct}})).id; }
+          // 2.652.0 (#5044): the message in between is v 2 under its own reservation (a new v 1 message is refused now)
+          if (!between) { const rv = await real('POST', '/api/team/rooms/${RID}/msgid'); const x = await e2eSeal(key, le2ePad(e2eTEnc().encode('${M} between')), le2eChanAad(room.id, g, S.me.id, rv.id, 2)); between = (await real('POST', u, {enc: {v: 2, g, iv: x.iv, ct: x.ct}, msg_id: rv.id, resv: rv.resv})).id; }
         }
         return real(m, u, b);
       };

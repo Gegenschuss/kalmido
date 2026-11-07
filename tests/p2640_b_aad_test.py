@@ -3,11 +3,12 @@
 """2.640.0 part B API test (#3388): the id reservation of the E2E record binding (AAD v2). Invented names only; the server
 never sees a key, the tests send ciphertext-shaped values.
  - list channel: POST /api/team/rooms/<rid>/msgid -> {id, resv}; a v 2 message is stored under exactly that id; the same
-   reservation twice, without one, another person's or a forged id 400; a v 1 message (older app) still taken; another message
-   after the reservation -> 409 chan_resv_stale (ids keep the order of the room); an open channel / a stranger refused
+   reservation twice, without one, another person's or a forged id 400; a v 1 message (older app) 400 e2e_v1_new since
+   2.652.0 (#5044), editing a message with v 1 still taken; another message after the reservation -> 409 chan_resv_stale
+   (ids keep the order of the room); an open channel / a stranger refused
  - knowledge pages: POST /api/wiki/e2e/newid -> {id, resv}; a new page with v 2 ciphers under exactly that id; reuse / none /
-   another person's 400; v 1 ciphers without one still taken; an open space 400, a space of another organisation 404; edit and
-   the re-encryption after a key change take v 2
+   another person's 400; v 1 ciphers 400 since 2.652.0 (#5044) (also a v 1 text beside a reserved v 2 path), editing a page with
+   v 1 still taken; an open space 400, a space of another organisation 404; edit and the re-encryption after a key change take v 2
 freelancer-matrix: team, wiki (frida: her private knowledge space; a list channel she has none of - nobody to share a list
 with - so she is the stranger to alice's channel there)
 usage: p2640_b_aad_test.py <datadir>      (a fresh container; P2640B_NOSTART=1 = the server already runs)"""
@@ -108,14 +109,19 @@ check(r.status_code == 400, "post: the reservation of another member 400")
 check(Ol.post(B + f"/api/team/rooms/{RID}/msgid").status_code in (403, 404), "msgid: a stranger 403/404 (not in the room)")
 check(Fr.post(B + f"/api/team/rooms/{RID}/msgid").status_code in (403, 404), "msgid: the freelancer, a stranger to the room, 403/404")
 check(A.post(B + f"/api/team/rooms/{RO}/msgid").status_code == 409, "msgid: an open channel 409")
-# a v 1 message of an app from before 2.640: no reservation needed (it binds no id)
+# 2.652.0 (#5044): a v 1 message of an app from before 2.640 (it binds no id) is refused for a NEW message (was: still taken)
+n0 = kt.dbx("SELECT COUNT(*) FROM tchat_msgs WHERE room_id=?", (RID,))[0][0]
 r = A.post(B + f"/api/team/rooms/{RID}/messages", json={"enc": chan(v=1)})
-V1 = r.json().get("id") if r.status_code == 201 else None
-check(V1 and r.json()["enc"]["v"] == 1, "post: a v 1 message still taken " + r.text[:200])
+check(r.status_code == 400 and code(r) == "e2e_v1_new", "#5044: post: a new v 1 message 400 e2e_v1_new " + r.text[:200])
+check(kt.dbx("SELECT COUNT(*) FROM tchat_msgs WHERE room_id=?", (RID,))[0][0] == n0, "#5044: post: nothing stored")
+V1 = R1.get("id")  # a known message: editing it with v 1 (an older app tab) goes on
+r = A.patch(B + f"/api/team/messages/{V1}", json={"enc": chan(v=1)})
+check(r.ok and r.json()["enc"]["v"] == 1, "#5044: edit: a v 1 cipher of a known message still taken " + r.text[:200])
 # another message after the reservation: the reserved id would land before it -> 409, nothing stored
 R3 = A.post(B + f"/api/team/rooms/{RID}/msgid").json()
-r = Bo.post(B + f"/api/team/rooms/{RID}/messages", json={"enc": chan(v=1)})
-check(r.status_code == 201 and r.json()["id"] > R3["id"], "setup: bob writes after the reservation")
+RB3 = Bo.post(B + f"/api/team/rooms/{RID}/msgid").json()
+r = Bo.post(B + f"/api/team/rooms/{RID}/messages", json={"enc": chan(), "msg_id": RB3.get("id"), "resv": RB3.get("resv")})
+check(r.status_code == 201 and r.json()["id"] > R3["id"], "setup: bob writes after the reservation " + r.text[:200])
 r = A.post(B + f"/api/team/rooms/{RID}/messages", json={"enc": chan(), "msg_id": R3["id"], "resv": R3["resv"]})
 check(r.status_code == 409 and code(r) == "chan_resv_stale", "post: a reservation older than the newest message 409 chan_resv_stale " + r.text[:200])
 check(not kt.dbx("SELECT 1 FROM tchat_msgs WHERE id=?", (R3["id"],)), "post: nothing stored under the stale id")
@@ -158,9 +164,18 @@ Ol.post(B + "/api/wiki/e2e/finish", json={"space": "private"})
 WO = Ol.post(B + "/api/wiki/e2e/newid", json={"space": "private"}).json()
 r = Fr.post(B + "/api/wiki/pages", json={"space": "private", "path": ct(), "id": WO.get("id"), "resv": WO.get("resv")})
 check(WO.get("id") and r.status_code == 400, "create: the reservation of another person (her own private space) 400 " + r.text[:200])
+# 2.652.0 (#5044): v 1 ciphers of an older app are refused for a NEW page (was: still taken), also a v 1 text beside a v 2 path
 r = Fr.post(B + "/api/wiki/pages", json={"space": "private", "path": ct(v=1), "body": ct(v=1)})
+check(r.status_code == 400, "#5044: create: v 1 ciphers of an older app 400 " + r.text[:200])
+W3 = Fr.post(B + "/api/wiki/e2e/newid", json={"space": "private"}).json()
+r = Fr.post(B + "/api/wiki/pages", json={"space": "private", "path": ct(), "body": ct(v=1), "id": W3.get("id"), "resv": W3.get("resv")})
+check(r.status_code == 400, "#5044: create: a v 1 text beside a reserved v 2 path 400 " + r.text[:200])
+check(not kt.dbx("SELECT 1 FROM wiki_pages WHERE id=?", (W3.get("id"),)), "#5044: create: nothing stored")
+r = Fr.post(B + "/api/wiki/pages", json={"space": "private", "path": ct(), "id": W3.get("id"), "resv": W3.get("resv")})
 P1 = r.json().get("id") if r.status_code == 201 else None
-check(P1, "create: v 1 ciphers of an older app still taken " + r.text[:200])
+check(P1 == W3.get("id"), "create: the reservation still serves a v 2 page after the refusal " + r.text[:200])
+r = Fr.patch(B + f"/api/wiki/pages/{P1}", json={"body": ct(v=1)})
+check(r.ok, "#5044: edit: a v 1 cipher of a known page still taken " + r.text[:200])
 r = Fr.patch(B + f"/api/wiki/pages/{P1}", json={"body": ct()})
 check(r.ok, "edit: a v 2 cipher of a known page (no reservation) " + r.text[:200])
 check(Fr.post(B + "/api/wiki/pages", json={"space": "private", "path": ct(v=3)}).status_code in (400, 409), "create: an unknown version refused")

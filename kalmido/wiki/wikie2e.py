@@ -13,6 +13,8 @@ space run in the browser; the server neither fills wiki_links nor answers search
 # - path / text: AES-256-GCM, AAD "kalmido-wiki:v1:<space_id>:<g>:path|body", stored as "e2e1:{v, g, iv, ct}" (body "" stays "").
 #   2.640.0 (#3388): v 2 = AAD "kalmido-wiki:v2:<space_id>:<g>:<page_id>:path|body" (a cipher opens only on its own page; a new
 #   page is created under an id reserved before the encryption, POST /api/wiki/e2e/newid); the browser writes v 2 only.
+#   2.652.0 (#5044): a NEW page takes v 2 only (v 1 400, wke_take); editing a page, the bulk re-encryption and reading still
+#   take v 1 (pages from before 2.640 keep opening and can be changed).
 # Who manages: the private space its owner, an organisation's space its admins. Agents and API tokens never take part.
 import json
 
@@ -135,13 +137,14 @@ def wke_guard(c, oid, uid, path=None, text=None, kind="update", template=False):
 
 
 def wke_take(c, oid, uid, b):
-    """2.640.0 (#3388): the id a new page of a locked space is created under when its path / text are v 2 ciphers (the page id
-    is in their AAD): the one reserved for uid in this space (POST /api/wiki/e2e/newid); None for v 1 ciphers (an app tab from
-    before 2.640). 400 otherwise."""
+    """2.640.0 (#3388): the id a new page of a locked space is created under (the page id is in the AAD of its v 2 ciphers):
+    the one reserved for uid in this space (POST /api/wiki/e2e/newid). 400 otherwise. 2.652.0 (#5044): a v 1 cipher (path or
+    text; an app tab from before 2.640, two versions later) is refused with 400 "Please reload the app." -- only a new page:
+    PATCH (wke_guard) and the bulk re-encryption (wke_bulk) still take v 1."""
     vs = [(le2e_parse(b.get(k), max_ct=WKE_PATH_MAX if k == "path" else wke_body_max(), vs=WKE_VS) or {}).get("v")
           for k in ("path", "body")]
-    if 2 not in vs:
-        return None
+    if 1 in vs or 2 not in vs:  # wke_guard let only ciphers through (path one, text one or ""): no v 2 = no page id in the AAD
+        raise BadInput(tr("Please reload the app."))
     pid = b.get("id")
     if not e2r_ok(c, "wiki", wiki_space_key(oid), uid, pid, b.get("resv")):
         raise BadInput(tr("Invalid value: {0}", "id"))
