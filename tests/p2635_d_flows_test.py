@@ -190,4 +190,19 @@ check("Nur Besitzer" not in pf, f"paperless: an owner not found gives no flow wi
 why = {(x["name"], x["why"]) for x in (j.get("res") or {}).get("unsupported") or []}
 check(("Rechte", "owner") in why and ("Nur Besitzer", "owner") in why, f"paperless: what was not found is reported as owner {why}")
 
+# ---- 2.635.0 E (#4856): a group as the share target (own group allowed, a foreign group 400, the run shares through the core)
+# (the admin cannot put organisation members into a group, so the admin alice makes the group and is the flow's author)
+A.patch(B + "/api/settings", json={"lang": "en", "features": FEATURES, "tour": "done"})
+g1 = A.post(B + "/api/admin/groups", json={"name": "Crew Eins"})
+GOWN = g1.json().get("id")
+check(GOWN, f"group: the group made {g1.status_code} {g1.text[:150]}")
+check(flow(Fr, "private", kind="any", match="x", share=[{"group_id": GOWN, "role": "view"}]).status_code == 400, "group: frida (not in it) cannot name a foreign group")
+r = flow(A, "private", name="Gruppe teilen", kind="any", match="Gruppenvertrag", share=[{"group_id": GOWN, "role": "view"}])
+check(r.status_code == 201, f"group: a flow with the own group saved {r.status_code} {r.text[:200]}")
+gp = upload(A, "gruppenvertrag.pdf", ["Gruppenvertrag Nummer 1", "Seite 1"])
+done(A, gp)
+rg = until(lambda: [x for x in runs(A, gp) or [] if x.get("shared")], 30)
+check(rg and rg[0]["shared"] == 1, f"group: the run shared the document once {rg}")
+check(len(dbx("SELECT id FROM fs_shares WHERE node_id=? AND group_id=?", (gp, GOWN))) == 1, "group: one share row of the core for the group")
+
 sys.exit(kt.done("p2635_d_flows"))
