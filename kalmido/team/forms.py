@@ -458,7 +458,8 @@ def form_send(token):
     email = vals["email"][:200]
     if email and (not re.fullmatch(r"[^@\s<>]+@[^@\s<>]+\.[^@\s<>]+", email) or re.search(r"[,;\"'()\[\]\\]", email)):
         return again(tr("Please check the e-mail address.", lg=lg))  # 2.63.0 (#1513): one address only (it may get a mail)
-    portal = bool(f["portal"]) and anon
+    # 2.638.0 (#4294): the kind portal off = a plain report (no status link that would not open, no mail with it)
+    portal = bool(f["portal"]) and anon and public_links_on(c, "portal")
     if portal and not email:
         return again(tr("Please enter your e-mail address: the link to the status of your report goes there.", lg=lg))
     answers, q_ups = {}, []
