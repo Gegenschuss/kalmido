@@ -133,6 +133,11 @@ and a commit message with `[full]` run every suite; other pushes and pull reques
 The job `plan` cuts the shards from the suite times of the last runs (`tools/shards.py`, `KALMIDO_SHARD_PLAN`), without
 the times of shards cancelled at their time limit.
 
+`stages.py --touched` (the small runs of a separate test runner) picks the suites whose test files name a changed file.
+A module no suite names by itself is declared in the test file of the suite that really checks it, in a comment line:
+`// stages-covers: static/js/NAME.js` (`# …` in Python; several paths, globs such as `static/js/cal*.js` allowed).
+That suite then runs for the file, on top of whatever else maps it. The marker line itself does not count as a name.
+
 There is no rerun: a suite red once makes the run red. A suite proven flaky (red and green on the same code, in CI or in
 two Mac runs) goes into `skip.txt` with a date at most 14 days ahead and the task that fixes it; `run_all.sh` skips it
 until that date (a run naming it with `ONLY=` still runs it), and the lint step `skip_test.py` turns red once the date has

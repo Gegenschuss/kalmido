@@ -3,6 +3,8 @@
 // the calendar's year view (#2078): twelve months, a day with an event is tinted, a tap on a day opens the day view, a tap on
 // a month name the month view, the arrows turn the year, the chosen mode is remembered.
 // 2.383.0 (#2587): in Italian the ordinals and the article agree with a feminine weekday (la prima domenica).
+// 2.628.0 (#4580): the repeat rule module names no suite by itself, --touched takes this one for it:
+// stages-covers: static/js/calrrule.js
 const {boot, sleep, B, login} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };

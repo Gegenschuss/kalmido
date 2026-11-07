@@ -11,7 +11,9 @@ container. Invented texts only.
  - a name only in a helper (nearly) every suite loads (tests/boot.js ...) does not pick the suites
  - 2.533.0 (#4332): a file that maps to too many suites takes the rarest-named ones (at most 10) instead of UNMAPPED
  - the CI basics and test helpers stay UNMAPPED (the CI's full run), the push stage still says full for all of them
- - a suite on tests/skip.txt stays out of the set"""
+ - a suite on tests/skip.txt stays out of the set
+ - 2.628.0 (#4580): a `stages-covers:` marker in a suite's test file takes that suite for the file (path or glob), on top of
+   the fixed set; the marker line itself is no name for the search"""
 import json
 import os
 import shutil
@@ -102,6 +104,10 @@ with tempfile.TemporaryDirectory() as tmp:
     open(os.path.join(tmp, "static", "js", "widgetmod.js"), "w").write("// nothing else\n")
     for n in names:
         open(os.path.join(tmp, "tests", n + ".js"), "a").write("require('./boot')\n")
+    # 2.628.0 (#4580): a module no suite names, declared by one suite's marker (a path and a glob)
+    open(os.path.join(tmp, "tests", "many0_ui.js"), "a").write("// stages-covers: static/js/quietcal.js static/js/cover*.js\n")
+    for n in ("quietcal.js", "coverme.js"):
+        open(os.path.join(tmp, "static", "js", n), "w").write("// nothing else\n")
     git(tmp, "init", "-q")
     git(tmp, "add", ".")
     git(tmp, "commit", "-qm", "base")
@@ -126,6 +132,16 @@ with tempfile.TemporaryDirectory() as tmp:
     order, why, unm = stages.touched(r, ["static/js/widgetmod.js"])
     stages.TOUCHED_FIXED["client_start"] = fx
     check(unm == [] and order == ["i18n"], f"named only by a helper every suite loads: the fixed set, not all suites: {order} {unm}")
+    # 2.628.0 (#4580): stages-covers - the marked suite comes along, on top of the fixed set; the marker itself is no name
+    stages.TOUCHED_FIXED["client_start"] = ("i18n",)
+    order, why, unm = stages.touched(r, ["static/js/quietcal.js"])
+    order2, why2, _ = stages.touched(r, ["static/js/coverme.js"])
+    stages.TOUCHED_FIXED["client_start"] = fx
+    check(unm == [] and "many0_ui" in order and "(#4580)" in why.get("many0_ui", ""), f"stages-covers: the marked suite runs: {order} {why}")
+    check("i18n" in order and "fixed set" in why.get("i18n", ""), f"stages-covers: on top of the fixed set: {order}")
+    check(not any(s.startswith("many") and s != "many0_ui" for s in order), f"stages-covers: no other suite: {order}")
+    check("many0_ui" in order2 and "cover*.js" in why2.get("many0_ui", ""), f"stages-covers: a glob matches: {why2}")
+    check(stages.classify(r, "static/js/quietcal.js")[0] == "full", "stages-covers: the marker path does not count as a name")
     check(r.skipped() == {"other_ui"}, f"skip.txt read as run_all.sh does: {r.skipped()}")
 
 # 2.553.0 (#4657): a too-broad file of tests/stages_areas.json takes the suites of its area instead of UNMAPPED
@@ -143,6 +159,14 @@ for f in ("kalmido/sheets/core.py", "static/css/docs.css", "static/css/office.cs
     check(want and want <= set(order), f"{f}: its area suites run: {sorted(want - set(order))}")
     check(any("(#4657)" in w for w in why.values()), f"{f}: --why names the area")
     check(len(order) < 40, f"{f}: not the whole run: {len(order)}")
+
+# 2.628.0 (#4580): the first real user - the calendar UI suite covers the repeat rule module (path built, so that this file names
+# it not itself)
+CAL = "static/js/" + "calr" + "rule.js"
+if os.path.exists(os.path.join(ROOT, CAL)):
+    order, why, unm = stages.touched(repo, [CAL])
+    check(unm == [] and "p2155_c_cal_ui" in order and "(#4580)" in why.get("p2155_c_cal_ui", ""), f"{CAL}: its calendar suite: {why.get('p2155_c_cal_ui')}")
+    check(any("client_start (#4016)" in w for w in why.values()), f"{CAL}: and the fixed set client_start")
 
 p = subprocess.run([sys.executable, os.path.join(N, "stages.py"), "--touched", "kalmido/core/schema.py", "static/app.css", "static/i18n/de.json"],
                    capture_output=True, text=True, cwd=ROOT)

@@ -22,6 +22,8 @@ test files and the changed files, nothing is started; Python standard library on
                      `UNMAPPED: FILE (reason)` lines, #3505: the train's check reads them - a package with such files is
                      "not checked", never green);
                      prints the suites in run order, exit 3 when none; --why lists the reasons on stderr
+                     2.628.0 (#4580): a test file that says `# stages-covers: PATH ...` (`// ...` in .js, globs allowed) is taken
+                     for a changed file that matches, on top of its other suites (a client module no suite names)
     --unmapped-out F #3505: with --touched also write the unmapped files to F, one `FILE<TAB>reason` line each (empty
                      file = every changed file has its suites)
   python3 tests/stages.py --ci                       CI mode (ci.yml job "plan"): the stage from the event (environment:
@@ -120,6 +122,7 @@ class Repo:
                             if n.endswith((".py", ".js")))
         self._corpus = None  # CI fix of 2.351.0: all test files joined once, a token is searched in it once (_files_with)
         self._hits = {}
+        self._covers = None  # 2.628.0 (#4580): [(path pattern, suite)] of the stages-covers markers
 
     def text(self, rel):
         if rel not in self._text:
@@ -167,6 +170,18 @@ class Repo:
                     queue.append((stem, f"{why} via tests/{os.path.basename(rel)}"))
         return hits
 
+    def covering(self, p):
+        """2.628.0 (#4580): {suite: why} of the suites whose own test file says `# stages-covers: PATH ...` (`// ...` in .js;
+        several paths or fnmatch globs, space separated) for the changed file p; a suite on tests/skip.txt stays out."""
+        if self._covers is None:
+            self._covers = []
+            for rel, ss in self.by_file.items():
+                for m in COVERS_LINE_RE.findall(self.text(rel)):
+                    self._covers += [(pat, s) for pat in m.split() for s in ss]
+        hit = {s: pat for pat, s in self._covers if fnmatch.fnmatchcase(p, pat)}
+        skip = self.skipped() if hit else set()
+        return {s: f"stages-covers {pat} (#4580)" for s, pat in hit.items() if s not in skip}
+
     def _files_with(self, tok):
         """The test files (in self.tests order) whose text holds tok. CI fix of 2.351.0: the live train's push of 204 files
         searched every route of every importer in all 1300 test files one by one (6+ min, the plan job's 5 min limit
@@ -177,7 +192,7 @@ class Repo:
             starts, parts, pos = [], [], 0
             for rel in self.tests:
                 starts.append(pos)
-                parts.append(self.text(rel))
+                parts.append(COVERS_LINE_RE.sub("", self.text(rel)))  # 2.628.0 (#4580): a marker path is no name (covering())
                 pos += len(parts[-1]) + 1
             self._corpus, self._starts = "\0".join(parts), starts
         out, i, c = [], 0, self._corpus
@@ -409,6 +424,10 @@ COVERAGE_SUITES = ("tenant_coverage", "freelancer_coverage")
 TOUCHED_BROAD = 60  # --touched: a file that maps to more suites than this is reported as not mapped instead
 STATE_RE = re.compile(r"\b[a-z_]*ids\.json\b")  # the files suites of one group hand data over with
 NEEDS_RE = re.compile(r"stages-needs:[ \t]*([\w \t]+)")  # 2.300.0 (#3198): a suite that needs data of earlier suites without a state file (accounts)
+# 2.628.0 (#4580): a file no suite names (a calendar helper module): the test file of its suite says so in a comment
+# line `# stages-covers: static/js/NAME.js` (`// ...` in .js; several paths, fnmatch globs allowed); --touched takes that
+# suite for the file on top of whatever else maps it (its fixed set). The marker line is no name for the search (_files_with).
+COVERS_LINE_RE = re.compile(r"^[ \t]*(?:#|//)[ \t]*stages-covers:[ \t]*(\S[^\n]*?)[ \t]*$", re.M)
 ROUTE_DEF_RE = re.compile(r"\.(?:route|get|post|put|patch|delete)\(\s*[rf]?['\"]/")
 # 2.381.0 (#2853): the static guards and the suites of the CI's script steps ("MCP server + usage hook", "New agents") - they
 # were red only in the CI (Audit F 23.10.2026: 5 of 12 red runs), because --touched took them only for a file they map to.
@@ -585,6 +604,10 @@ def touched(repo, files, base=None, head=None):
             fixed = touched_fixed(repo, f, res, base, head)
             if fixed:
                 kind, res = "suites", fixed
+        cov = repo.covering(f)  # 2.628.0 (#4580): the suites that declare they cover this file, on top of the rest
+        if cov:
+            res = {**(res if kind == "suites" else {}), **{s: w for s, w in cov.items() if kind != "suites" or s not in res}}
+            kind = "suites"
         if kind == "full":
             unmapped.append(f"{f} ({res})")
         elif kind == "suites":
