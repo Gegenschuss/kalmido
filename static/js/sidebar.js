@@ -608,73 +608,48 @@ document.addEventListener('contextmenu', e => {
   e.preventDefault();
   listMenu(r, +r.dataset.list);
 });
+// 2.627.0 (#4966): the finger by drag.js (was an own touch path): the same hold (380 ms; in sort mode the grip at once), the
+// same targets and marks as the mouse, the edge of the drawer (the Projects page: its scroller) scrolls, Esc and a second
+// finger cancel. sd = the running hold / drag (timeline.js swallows the browser's menu during it), sdHeld = just ended.
 let sd = null, sdHeld = false;
-document.addEventListener('touchstart', e => {
-  // 2.482.0 (#3951): + the rows of the Projects page in sort mode (only by the grip: its long press is the row's menu)
-  const r = e.target.closest?.('#side .srow[data-list]') || (S.listReorder ? e.target.closest?.('.pstart .psrow.reorder[data-list]') : null);
-  // 2.25.0 (UX-02): in sort mode the grip drags at once; elsewhere in sort mode a touch scrolls
-  const grip = S.listReorder && e.target.closest('.sgrip');
-  if ((S.listReorder && !grip) || !r || e.target.closest('.iconbtn') || listById(+r.dataset.list)?.archived) { sd = null; return; }
-  const p = e.touches[0];
-  sd = {el: r, list: +r.dataset.list, x: p.clientX, y: p.clientY, active: false, reorder: !!grip};
-  // CI of 2.223.2: a redraw of the sidebar during the hold replaces the touched row; a removed target's touchmove / touchend
-  // no longer reach the document, so the row itself listens too (one handling per event, _sd)
-  if (!sd.el._sdL) { sd.el._sdL = 1; sd.el.addEventListener('touchmove', sdMove, {passive: false}); sd.el.addEventListener('touchend', sdEnd); sd.el.addEventListener('touchcancel', sdEnd); }
-  if (grip) sdStart(); else sd.timer = setTimeout(sdStart, 380);
-}, {passive: true});
 // the element that scrolls a row of the Projects page (the view, or the document)
 function ps_scroller(el) { for (let p = el?.parentElement; p && p !== document.body; p = p.parentElement) { const o = getComputedStyle(p).overflowY; if ((o === 'auto' || o === 'scroll') && p.scrollHeight > p.clientHeight) return p; } return document.scrollingElement || document.documentElement; }
-function sdStart() {
-  if (!sd) return;
-  sd.active = true;
-  const rect = sd.el.getBoundingClientRect(), g = sd.el.cloneNode(true);
-  g.classList.add('ghost-drag', 'side-ghost');
-  g.style.cssText = `position:fixed;left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;z-index:96;pointer-events:none`;
-  document.body.appendChild(g);
-  sd.ghost = g; sd.dy = sd.y - rect.top;
-  sd.el.classList.add('dragging');
-  if (navigator.vibrate) navigator.vibrate(12);
-}
-function sdMove(e) {
-  if (!sd || e._sd) return;
-  e._sd = 1;
-  const p = e.touches[0];
-  if (!sd.active) { if (Math.hypot(p.clientX - sd.x, p.clientY - sd.y) > 8) { clearTimeout(sd.timer); sd = null; } return; }  // scrolling
-  e.preventDefault();
-  sd.moved = true; sd.lx = p.clientX; sd.ly = p.clientY;
-  sdFrame(p.clientX, p.clientY);
-}
-document.addEventListener('touchmove', sdMove, {passive: false});
-// 2.87.9 (#1965): once per frame: the ghost slides by transform, then one hit test (no layout forced by the move itself)
-const sdFrame = rafThrottle((x, y) => {
-  if (!sd?.active || !sd.ghost) return;
-  sd.ghost.style.transform = `translateY(${y - sd.y}px)`;
-  const t = sideDropTarget(document.elementFromPoint(x, y), y);
-  sideMark(t, sd, y);
-  const side = sd.el.closest('.pstart') ? ps_scroller(sd.el) : $('#side'), r = side.getBoundingClientRect();  // 2.482.0 (#3951): the page scrolls on the Projects page
-  if (r.height && side.scrollBy) { if (y < r.top + 48) side.scrollBy(0, -12); else if (y > r.bottom - 48) side.scrollBy(0, 12); }
-  // hovering a closed folder for a moment opens it
-  const fh = t && sd.list && t.classList.contains('fhead') && t.classList.contains('closed') ? t.dataset.folder : null;
-  if (fh !== sd.hover) { clearTimeout(sd.open); sd.hover = fh; if (fh) sd.open = setTimeout(() => { if (sd && sd.hover === fh) { foldSet(fh, false); renderSide(); } }, 600); }
-});
-function sdEnd(e) {
-  if (!sd || e?._sd) return;
-  if (e) e._sd = 1;
-  if (sd.active) sdFrame.flush();
-  clearTimeout(sd.timer); clearTimeout(sd.open);
-  const st = sd; sd = null;
-  if (!st.active) return;  // a tap: the row's own click (opens the list)
-  if (e && e.cancelable) e.preventDefault();
-  sdHeld = true; setTimeout(() => { sdHeld = false; }, 500);
-  st.ghost.remove(); st.el.classList.remove('dragging');
-  const t = st.moved ? sideDropTarget(document.elementFromPoint(st.lx, st.ly), st.ly) : null;
+// the held row, or the one drawn in its place (a redraw of the sidebar during the hold replaces it, CI of 2.223.2)
+const sdRow = d => d.el.isConnected ? d.el : $(`#side .srow[data-list="${d.list}"]`) || $(`.pstart .psrow.reorder[data-list="${d.list}"]`) || d.el;
+function sdOff(d, held) {
+  clearTimeout(d.open); if (sd === d) sd = null;
+  d.el.classList.remove('dragging'); sdRow(d).classList.remove('dragging');
   $$(SD_MARKS).forEach(x => x.classList.remove('dropbefore', 'dropafter', 'drop'));
-  if (!st.moved && st.reorder) return;  // a tap on the grip
-  if (!st.moved) { const el = $(`#side .srow[data-list="${st.list}"]`); if (el) listMenu(el, st.list); return; }
-  if (t && e?.type === 'touchend') sideDrop({list: st.list}, t, sideAfter(t, st.ly));
+  if (held) { sdHeld = true; setTimeout(() => { sdHeld = false; }, 500); }
 }
-document.addEventListener('touchend', sdEnd);
-document.addEventListener('touchcancel', sdEnd);
+domReady(() => drg_attach(document, {
+  mouse: false, raf: true, threshold: 1, hold: d => d.reorder ? 0 : 380, holdMove: 8,
+  onTarget: (t, d) => d.el,  // the row (not only the grip): a redraw that takes it out of the page keeps its events
+  ghost: {el: sdRow, cls: 'ghost-drag side-ghost'},
+  scroll: () => sd ? (sd.el.closest('.pstart') ? ps_scroller(sd.el) : $('#side')) : null, edge: 48, step: 12,
+  start: t => {
+    // 2.482.0 (#3951): + the rows of the Projects page in sort mode (only by the grip: its long press is the row's menu)
+    const r = /** @type {any} */ (t).closest?.('#side .srow[data-list]') || (S.listReorder ? /** @type {any} */ (t).closest?.('.pstart .psrow.reorder[data-list]') : null);
+    // 2.25.0 (UX-02): in sort mode the grip drags at once; elsewhere in sort mode a touch scrolls
+    const grip = S.listReorder && t.closest('.sgrip');
+    if ((S.listReorder && !grip) || !r || t.closest('.iconbtn') || listById(+r.dataset.list)?.archived) return null;
+    return (sd = {el: r, list: +r.dataset.list, reorder: !!grip});
+  },
+  onHold: d => { d.held = true; sdRow(d).classList.add('dragging'); if (navigator.vibrate) navigator.vibrate(12); },
+  onMove: (d, x, y) => {
+    const t = sideDropTarget(document.elementFromPoint(x, y), y);
+    sideMark(t, d, y);
+    // hovering a closed folder for a moment opens it
+    const fh = t && d.list && t.classList.contains('fhead') && t.classList.contains('closed') ? t.dataset.folder : null;
+    if (fh !== d.hover) { clearTimeout(d.open); d.hover = fh; if (fh) d.open = setTimeout(() => { if (sd === d && d.hover === fh) { foldSet(fh, false); renderSide(); } }, 600); }
+  },
+  onDrop: (d, x, y) => { const t = sideDropTarget(document.elementFromPoint(x, y), y); sdOff(d, true); if (t) sideDrop({list: d.list}, t, sideAfter(t, y)); },
+  onTap: d => {  // held without moving: the list's menu (a tap on the grip: nothing)
+    sdOff(d, true); if (d.reorder) return;
+    const el = $(`#side .srow[data-list="${d.list}"]`); if (el) listMenu(el, d.list);
+  },
+  onCancel: d => sdOff(d, !!d.held),  // a scroll, a quick tap (the row's own click opens the list), Esc, a second finger
+}));
 document.addEventListener('dragend', () => { listDrag = null; });
 // 2.220.0 B (#2807): a cut name in the sidebar shows in full as its tooltip (set on hover / focus, only while it is cut;
 // folder names have theirs, "Open …")

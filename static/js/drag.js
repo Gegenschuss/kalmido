@@ -16,8 +16,9 @@
  *   a press on t, or a falsy value (no drag here; the press stays the browser's)
  * @property {boolean} [touch]  drg_attach: follow touches (default true)
  * @property {boolean} [mouse]  drg_attach: follow mouse / pen (default true)
- * @property {boolean} [onTarget]  drg_attach, touch: follow the touch on the element it started on, not on document (a
- *   redraw that takes it out of the page would cut the events off from document; 2.193.0 B, #2219)
+ * @property {boolean|((t: HTMLElement, d: any) => EventTarget)} [onTarget]  drg_attach, touch: follow the touch on the element it
+ *   started on, not on document (a redraw that takes it out of the page would cut the events off from document; 2.193.0 B,
+ *   #2219). 2.627.0 (#4966): a function (t, d) => the element to follow on (e.g. the row around a grip: the row's events too)
  * @property {number} [hold]  drg_attach, touch: long press in ms before a move may drag (default 0 = at once); moving more
  *   than holdMove px before it ends the press (it was a scroll)
  * @property {number} [holdMove]  default 8
@@ -62,7 +63,8 @@ function drg_attach(root, o) {
       const d = o.start && o.start(/** @type {HTMLElement} */ (e.target), t[0].clientX, t[0].clientY, 'touch', e);
       if (!d) return;
       if (drg_cur) drg_end(drg_cur, false);
-      drg_open(o, d, 'touch', t[0].clientX, t[0].clientY, o.onTarget ? /** @type {HTMLElement} */ (e.target) : document, false);
+      const at = typeof o.onTarget === 'function' ? o.onTarget(/** @type {HTMLElement} */ (e.target), d) : o.onTarget ? /** @type {HTMLElement} */ (e.target) : document;
+      drg_open(o, d, 'touch', t[0].clientX, t[0].clientY, at || document, false);
     }, {passive: true});
   }
   if (o.mouse !== false) {

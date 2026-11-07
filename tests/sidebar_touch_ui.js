@@ -90,14 +90,17 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   // ---- a closed folder opens while hovered
   w.eval("S.collapsed.add('fold:Admin'); renderSide()");
   check(fold('Admin').classList.contains('closed'), 'Admin closed');
-  touch(w, row(L2), 'touchstart'); await sleep(420);
-  under = fold('Admin'); touch(w, row(L2), 'touchmove', 60); await sleep(700);
+  // 2.627.0 (#4966): the touch stays on the held row (as in a browser: a touch's events go to where it started), also after the
+  // opened folder drew the drawer anew; drag.js follows it there
+  const held = row(L2);
+  touch(w, held, 'touchstart'); await sleep(420);
+  under = fold('Admin'); touch(w, held, 'touchmove', 60); await sleep(700);
   check(!fold('Admin').classList.contains('closed'), 'hovering a closed folder opens it');
   // auto-scroll near the bottom edge
   let scrolled = 0; const sideEl = d.querySelector('#side'); sideEl.scrollBy = (x, y) => { scrolled += y; }; sideEl.getBoundingClientRect = () => ({top: 0, bottom: 800, left: 0, right: 300, width: 300, height: 800});
-  under = null; touch(w, row(L2), 'touchmove', 5000); await sleep(60);  // 2.87.9 (#1965): the drag draws in the next frame
+  under = null; touch(w, held, 'touchmove', 5000); await sleep(60);  // 2.87.9 (#1965): the drag draws in the next frame
   check(scrolled > 0, 'near the bottom edge the drawer scrolls');
-  touch(w, row(L2), 'touchcancel'); await sleep(100);
+  touch(w, held, 'touchcancel'); await sleep(100);
   check(!d.querySelector('.side-ghost'), 'cancel: nothing moved, ghost gone');
   // ---- held without moving: the list menu with "Move to folder…"
   touch(w, row(L2), 'touchstart'); await sleep(420);

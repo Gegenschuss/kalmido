@@ -440,41 +440,36 @@ document.addEventListener('click', e => {
   else fv2_moreMenu(m);
 }, true);
 
-// ---- touch: hold a tile = its menu (let go) or drag it (move after the hold); hold another row = its menu with the star
-document.addEventListener('touchstart', e => {
-  const t = e.target.closest?.(FV2_TILES), r = !t && !S.listReorder && e.target.closest?.(FV2_ROWS);
-  if (!t && !(r && fv2_rowKey(r))) { FV2.lp = null; return; }
-  const p = e.touches[0];
-  FV2.lp = {el: t || r, tile: !!t, x: p.clientX, y: p.clientY, active: false};
-  FV2.lp.timer = setTimeout(() => {
-    const lp = FV2.lp; if (!lp) return;
-    lp.active = true; FV2.held = Date.now();
+// ---- touch: hold a tile = its menu (let go) or drag it (move after the hold); hold another row = its menu with the star.
+// 2.627.0 (#4966): by drag.js (was an own touch path): the same hold (420 ms), a scroll before it ends the press, Esc and a
+// second finger cancel the drag (the tile goes back). FV2.lp = the running press.
+drg_attach(document, {
+  mouse: false, onTarget: true, hold: 420, holdMove: 8, threshold: 1,
+  start: el => {
+    const t = /** @type {any} */ (el).closest?.(FV2_TILES), r = !t && !S.listReorder && /** @type {any} */ (el).closest?.(FV2_ROWS);
+    if (!t && !(r && fv2_rowKey(r))) return null;
+    // the page's and the sidebar's rows have only the menu; 2.572.0 (#4747): the phone's row too (arranging by dragging stays the computer's)
+    return (FV2.lp = {el: t || r, tile: !!t, only: !t || !!t.closest('.fv2-page, .fv2side, #favup')});
+  },
+  onHold: lp => {
+    FV2.held = Date.now();
     if (navigator.vibrate) navigator.vibrate(12);
-    if (!lp.tile) { FV2.lp = null; fv2_rowMenu(lp.el); return; }
-    if (lp.el.closest('.fv2-page, .fv2side, #favup')) { FV2.lp = null; fv2_tileMenu(lp.el); return; }  // the page's and the sidebar's rows have only the menu; 2.572.0 (#4747): the phone's row too (arranging by dragging stays the computer's)
-    FV2.drag = lp.el.dataset.fv2; lp.el.classList.add('dragging');
-  }, 420);
-}, {passive: true});
-document.addEventListener('touchmove', e => {
-  const lp = FV2.lp; if (!lp) return;
-  const p = e.touches[0];
-  if (!lp.active) { if (Math.hypot(p.clientX - lp.x, p.clientY - lp.y) > 8) { clearTimeout(lp.timer); FV2.lp = null; } return; }  // scrolling
-  e.preventDefault();
-  lp.moved = true; lp.lx = p.clientX; lp.ly = p.clientY;
-  const out = !!FV2.drag && fv2_isOut(lp.el, p.clientY); fv2_outSet(lp.el, out);  // 2.551.0 (#4615)
-  if (!out) fv2_mark(fv2_target(p.clientX, p.clientY), p.clientX);
-}, {passive: false});
-function fv2_touchEnd(e) {
-  const lp = FV2.lp; FV2.lp = null; if (!lp) return;
-  clearTimeout(lp.timer); if (!lp.active) return;  // a tap: the tile's own click
-  if (e && e.cancelable) e.preventDefault();
-  FV2.held = Date.now();
-  if (lp.moved) { fv2_drop(FV2.out ? null : fv2_target(lp.lx, lp.ly), lp.lx, true); return; }
-  FV2.drag = null; lp.el.classList.remove('dragging');
-  fv2_tileMenu(lp.el);
-}
-document.addEventListener('touchend', fv2_touchEnd, {passive: false});
-document.addEventListener('touchcancel', () => { const lp = FV2.lp; FV2.lp = null; if (lp) { clearTimeout(lp.timer); if (lp.active && lp.tile) fv2_drop(null, 0); } });
+    if (lp.only) { FV2.lp = null; drg_cancel(); if (lp.tile) fv2_tileMenu(lp.el); else fv2_rowMenu(lp.el); return; }  // the menu at once
+    lp.on = true; FV2.drag = lp.el.dataset.fv2; FV2.out = null; lp.el.classList.add('dragging');
+  },
+  onMove: (lp, x, y) => {
+    if (!lp.on) return;
+    const out = !!FV2.drag && fv2_isOut(lp.el, y); fv2_outSet(lp.el, out);  // 2.551.0 (#4615)
+    if (!out) fv2_mark(fv2_target(x, y), x);
+  },
+  onDrop: (lp, x, y) => { if (FV2.lp === lp) FV2.lp = null; FV2.held = Date.now(); if (lp.on) fv2_drop(FV2.out ? null : fv2_target(x, y), x, true); },
+  onTap: lp => {  // held, let go without moving: the tile's menu
+    if (FV2.lp === lp) FV2.lp = null; FV2.held = Date.now();
+    FV2.drag = null; lp.el.classList.remove('dragging');
+    fv2_tileMenu(lp.el);
+  },
+  onCancel: lp => { if (FV2.lp === lp) FV2.lp = null; if (lp.on) fv2_drop(null, 0); },  // a quick tap: the tile's own click
+});
 
 // ---- the fixed head gets a fine line while the sidebar is scrolled below it
 document.addEventListener('scroll', e => { if (e.target?.id === 'side') e.target.classList.toggle('fv2-scrolled', e.target.scrollTop > 2); }, {capture: true, passive: true});

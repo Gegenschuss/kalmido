@@ -990,31 +990,23 @@ document.addEventListener('contextmenu', e => {
   if (e.pointerType === 'touch' || isTouch()) return;  // the long press below opens it (as the project rows, sidebar.js)
   sbb_tmenu(t, e.target.closest('.sbbtn') || t);
 });
-// touch: hold a node (380 ms) -- let go without moving: its menu; drag on: move / sort like the mouse
-let SBB_TD = null;
-document.addEventListener('touchstart', e => {
-  const t = e.target.closest?.('#side .sbbt[data-sbbns]'); if (!t || e.target.closest('.sbbtar') || !(t.dataset.sbbmenu || t.dataset.sbbdrag)) { SBB_TD = null; return; }
-  const p = e.touches[0];
-  SBB_TD = {t, x: p.clientX, y: p.clientY, active: false, d: {ns: t.dataset.sbbns, id: t.dataset.sbbid, par: t.dataset.sbbpar}};
-  SBB_TD.timer = setTimeout(() => { if (!SBB_TD) return; SBB_TD.active = true; t.classList.add('dragging'); if (navigator.vibrate) navigator.vibrate(12); }, 380);
-}, {passive: true});
-document.addEventListener('touchmove', e => {
-  if (!SBB_TD) return;
-  const p = e.touches[0];
-  if (!SBB_TD.active) { if (Math.hypot(p.clientX - SBB_TD.x, p.clientY - SBB_TD.y) > 8) { clearTimeout(SBB_TD.timer); SBB_TD = null; } return; }  // scrolling
-  if (!SBB_TD.t.dataset.sbbdrag && !SBB_TD.t.hasAttribute('draggable')) return;
-  e.preventDefault(); SBB_TD.moved = true; SBB_TD.ly = p.clientY;
-  const t = sbb_tnode(document.elementFromPoint(p.clientX, p.clientY));
-  SBB_TD.to = sbb_tok(SBB_TD.d, t) ? t : null; sbb_tmark(SBB_TD.to, SBB_TD.to && sbb_tzone(SBB_TD.to, p.clientY));
-}, {passive: false});
-document.addEventListener('touchend', e => {
-  const x = SBB_TD; SBB_TD = null; if (!x) return;
-  clearTimeout(x.timer); x.t.classList.remove('dragging'); sbb_tmark(null);
-  if (!x.active) return;
-  e.preventDefault();  // no click on the node after the hold
-  if (x.moved && x.to) sbb_tdrop(x.d, x.to, sbb_tzone(x.to, x.ly)); else if (!x.moved && x.t.dataset.sbbmenu) sbb_tmenu(x.t);
+// touch: hold a node (380 ms) -- let go without moving: its menu; drag on: move / sort like the mouse. 2.627.0 (#4966): by
+// drag.js (was an own touch path): the same hold and targets, the panel's edge scrolls, Esc and a second finger cancel. A
+// node with a menu only: moving after the hold drags nothing, letting go opens the menu.
+const sbb_tfOff = x => { x.t.classList.remove('dragging'); sbb_tmark(null); };
+drg_attach(document, {
+  mouse: false, onTarget: true, hold: ROWD_HOLD, holdMove: 8, scroll: () => $('#side'), edge: 48, step: 12,
+  accept: (x, dx, dy) => x.drag && Math.hypot(dx, dy) >= 1 ? true : null,
+  start: el => {
+    const t = sbb_tnode(el); if (!t || /** @type {any} */ (el).closest('.sbbtar') || !(t.dataset.sbbmenu || t.dataset.sbbdrag)) return null;
+    return {t, drag: !!(t.dataset.sbbdrag || t.hasAttribute('draggable')), d: {ns: t.dataset.sbbns, id: t.dataset.sbbid, par: t.dataset.sbbpar}};
+  },
+  onHold: x => { x.t.classList.add('dragging'); if (navigator.vibrate) navigator.vibrate(12); },
+  onMove: (x, px, py) => { const t = sbb_tnode(document.elementFromPoint(px, py)); x.to = sbb_tok(x.d, t) ? t : null; sbb_tmark(x.to, x.to && sbb_tzone(x.to, py)); },
+  onDrop: (x, px, py) => { const t = x.to; sbb_tfOff(x); if (sbb_tok(x.d, t)) sbb_tdrop(x.d, t, sbb_tzone(t, py)); },
+  onTap: x => { sbb_tfOff(x); if (x.t.dataset.sbbmenu) sbb_tmenu(x.t); },
+  onCancel: sbb_tfOff,
 });
-document.addEventListener('touchcancel', () => { if (SBB_TD) { clearTimeout(SBB_TD.timer); SBB_TD.t.classList.remove('dragging'); } SBB_TD = null; sbb_tmark(null); });
 document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-act="sbb-group"]'); if (!b) return;
   const g = b.dataset.g;
