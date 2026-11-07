@@ -52,6 +52,7 @@ const WS_VIEWS = {
   'static/js/agentview.js': 'helper',         // 2.361.4 (#2928): av_ownArea - whether the shown workspace is one's own area (texts and offers while drawing, no view keeping data)
   'static/js/clients.js': 'helper',           // 2.361 (#2938): wsCur only picks the empty-state text for Private (no view keeping data)
   'static/js/dispo.js': 'helper',             // 2.361 (#2938): wsCur only picks the empty-row text for Private (no view keeping data)
+  'static/js/sheetsio.js': 'helper',        // 2.633.0 (#4920): wsCur only picks the target space of a dropped / picked import file at that moment (no view keeping data)
   'static/js/ablinks.js': 'helper',           // 2.470.0 (#3596): wsCur only preselects the workspace of Settings > Data > Sharing defaults (the select has its own pick)
   'static/js/acctset.js': 'helper',           // 2.365.2 C (#2789): wsCur only preselects the organisation of Settings > Absences and holiday (the dialog has its own picker, no view keeping data)
   'static/js/polls.js': 'helper',            // 2.98.1: the default workspace of a new poll (the dialog shows all polls, with their workspace)
