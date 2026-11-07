@@ -9,7 +9,7 @@
 // screens, touch targets >= 44 px on phones, the milestone marker in the timeline; screenshots with P271_SHOTS=<dir>.
 const {spawn, execFileSync} = require('child_process');
 const fs = require('fs'), os = require('os'), path = require('path');
-const {boot, sleep, B, login, errs} = require('./boot');
+const {boot, B, login, errs, idle} = require('./boot');
 const WS = globalThis.WebSocket || require('ws');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
@@ -38,7 +38,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   return [e.className || e.tagName, (e.textContent || '').trim().slice(0, 16), Math.round(w), Math.round(h)]; }).filter(x => x[2] < 43.5 || x[3] < 43.5))()`;
 
 (async () => {
-  await sleep(600);
+  await until(async () => (await fetch(B + 'sw.js').catch(() => null))?.ok);
   const SW = await (await fetch(B + 'sw.js')).text();
   check(/const CACHE = 'tasks-shell-v(?:7[5-9]|8[0-9]|9[0-9]|[1-9][0-9]{2})'/.test(SW), 'service worker cache v75 (2.7.2: v76, 2.8.0: v77, 2.9.0: v78, 2.10.0: v79, 2.11.0: v80)');
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
@@ -64,9 +64,9 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   // 2.156.0 (#2071): + Calendar (module cal on)
   check(seg().join() === 'view-overview,view-list,view-kanban,view-timeline,view-mindmap,view-calendar', 'project (2.13.0: the overview first): Project overview / List / Kanban / Timeline / Mind map / Calendar: ' + seg());  // 2.49.0 (#1201): + Mind map
   check(d.querySelector('#top [data-act="view-overview"]').title === 'Project page', 'tab title "Project page" (2.25.0)');
-  w.eval(`go('l/${PL}')`); await sleep(300);
+  w.eval(`go('l/${PL}')`); await until(() => d.querySelector('#top h1 .ht')?.textContent === 'Groceries' && seg().length);
   check(seg().includes('view-overview'), '2.352.0 B (#2752): kind list is a project too: overview tab ' + seg());
-  w.eval(`go('l/${P}')`); await sleep(300);
+  w.eval(`go('l/${P}')`); await until(() => d.querySelector('#top h1 .ht')?.textContent === 'Website relaunch' && d.querySelector('#top [data-act="view-overview"]'));
   click(w, d.querySelector('#top [data-act="view-overview"]'));
   await until(() => d.querySelector('#view .pov .povs'));
   check(d.querySelector('#top [data-act="view-overview"]').classList.contains('on') && w.eval('isOverview()'), 'the overview is on');
@@ -80,7 +80,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   // status
   check(/Copy is late/.test(d.querySelector('#pov-status').textContent) && d.querySelector('#pov-status [data-act="status"]'), 'status updates + "Set status"');
   // description
-  click(w, d.querySelector('[data-pov="desc-edit"]')); await sleep(50);
+  click(w, d.querySelector('[data-pov="desc-edit"]')); await until(() => d.querySelector('#pov-desc-in'));
   d.querySelector('#pov-desc-in').value = '## Goal\nNew **site** by June\n- [ ] item';
   click(w, d.querySelector('[data-pov="desc-save"]'));
   await until(() => d.querySelector('#pov-desc-in') === null && d.querySelector('.povmd b'));
@@ -88,12 +88,12 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   check(d.querySelector('.povmd input[type="checkbox"]')?.disabled, 'checkboxes in the description are read-only');
   check((await call('GET', `/api/lists/${P}/overview`)).description.startsWith('## Goal'), 'saved on the server');
   // key links
-  click(w, d.querySelector('[data-pov="link-add"]')); await sleep(50);
+  click(w, d.querySelector('[data-pov="link-add"]')); await until(() => d.querySelector('.modal.povmodal #pl-url'));
   let md = d.querySelector('.modal.povmodal');
   md.querySelector('#pl-url').value = 'https://github.com/acme/site';
   click(w, md.querySelector('[data-m="save"]'));
   await until(() => d.querySelectorAll('#pov-links .povl').length === 1);
-  click(w, d.querySelector('[data-pov="link-add"]')); await sleep(50);
+  click(w, d.querySelector('[data-pov="link-add"]')); await until(() => d.querySelector('.modal.povmodal #pl-url'));
   md = d.querySelector('.modal.povmodal');
   md.querySelector('#pl-url').value = 'https://www.figma.com/file/x'; md.querySelector('#pl-ttl').value = 'Designs';
   click(w, md.querySelector('[data-m="save"]'));
@@ -108,7 +108,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   await until(() => d.querySelector('#pov-links .povl a')?.textContent.includes('Designs'));
   check(d.querySelector('#pov-links .povl a').textContent.includes('Designs'), 'move up');
   // milestones: the app's date picker, no native date input
-  click(w, d.querySelector('[data-pov="ms-add"]')); await sleep(50);
+  click(w, d.querySelector('[data-pov="ms-add"]')); await until(() => d.querySelector('.modal.povmodal #pm-name'));
   md = d.querySelector('.modal.povmodal');
   check(!md.querySelector('input[type="date"]') && md.querySelector('.dpbtn'), 'milestone dialog: the app\'s date picker');
   md.querySelector('#pm-name').value = 'Launch';
@@ -129,9 +129,9 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   const tf = d.querySelector('#pov-files .povtf');
   check(tf && /Attachments from tasks/.test(tf.querySelector('summary').textContent) && /notes\.txt/.test(tf.textContent) && tf.querySelector('[data-pov="task"]')?.textContent.includes('Wireframes'), 'task files with their task');
   check(!tf.querySelector('.povx'), 'task files are read-only here');
-  click(w, tf.querySelector('[data-pov="task"]')); await sleep(300);
+  click(w, tf.querySelector('[data-pov="task"]')); await until(() => w.eval('S.sel') === T1); await idle(w);
   check(w.eval('S.sel') === T1, 'a task file opens its task');
-  w.eval('closeDetail && closeDetail()'); await sleep(100);
+  w.eval('closeDetail && closeDetail()'); await idle(w);
   // members + time
   check(/Bob/.test(d.querySelector('#pov-people').textContent) && /Read-only/.test(d.querySelector('#pov-people').textContent), 'members with roles');  // 2.364.0 C (#3041): one role word
   // leave the overview: back to the list's own view
@@ -139,7 +139,10 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   await until(() => d.querySelector('#view .tl'));
   // 2.555.0: the view goes to the server in the background (outbox) - wait for the saved state, not for the first read
   let vw = null;
-  for (let i = 0; i < 40 && vw !== 'timeline'; i++) { vw = (await call('GET', '/api/state')).lists.find(l => l.id === P).view; if (vw !== 'timeline') await sleep(100); }
+  await until(async () => (vw = (await call('GET', '/api/state')).lists.find(l => l.id === P).view) === 'timeline');
+  // 2.624.0 (#3943, CI red 7x: 0 markers): the timeline draws the milestones from the list's state (l.milestones), which can
+  // arrive with a later load than the first timeline render - wait for the markers the next two checks read
+  await until(() => d.querySelectorAll('.tl-grp .tl-ms, .tl-dia').length === 2 && d.querySelectorAll('.tl-msl').length === 2 && d.querySelector('.tl-ms.done'));
   check(!w.eval('isOverview()') && vw === 'timeline', 'Timeline: overview off, the list\'s view changes ' + vw);
   // 2.18.0: an open milestone (a task now) is a diamond in its own row, the list row marks only the others
   check(d.querySelectorAll('.tl-grp .tl-ms, .tl-dia').length === 2 && d.querySelectorAll('.tl-msl').length === 2, 'milestones as markers / diamonds in the timeline: ' + d.querySelectorAll('.tl-ms, .tl-dia').length);
@@ -204,13 +207,13 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   // ================= Firefox: layout at 360 / 390 touch, 1280 / 1920 mouse
   await call('PATCH', `/api/lists/${P}`, {view: 'list'});
   for (const touch of [true, false]) {
-    await firefox(async ({cmd, ev, nav, ctx, shot}) => {
+    await firefox(async ({cmd, ev, nav, ctx, shot, until: fu, idle: fidle}) => {
       await nav(B + 'static/icon.svg');
       const lgi = await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`);
       check(lgi === 200, 'Firefox: login');
       await ev(`localStorage.setItem('tasks.pov', '[${P}]'); 1`);
       let nr = 0;
-      const open = async hash => { await nav(B + 'static/icon.svg'); await nav(B + '?v=' + (++nr) + '#' + hash); for (let i = 0; i < 30 && !(await ev(`!!document.querySelector('#view .pov .povs')`).catch(() => false)); i++) await sleep(300); await sleep(900); };
+      const open = async hash => { await nav(B + 'static/icon.svg'); await nav(B + '?v=' + (++nr) + '#' + hash); await fu(`!!document.querySelector('#view .pov .povs')`); await fidle({quiet: 300}); await fu(`document.querySelectorAll('#pov-links .povl').length === 2 && document.querySelectorAll('#pov-ms .povm').length === 2`); };
       for (const [vw, vh] of touch ? [[360, 780], [390, 844]] : [[1280, 800], [1920, 1080]]) {
         await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
         await open('l/' + P);
@@ -236,14 +239,14 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
         }
         await shot(`p271-overview-${vw}.png`);
         // the milestone dialog's date picker stays inside the viewport
-        await ev(`(() => { document.querySelector('[data-pov="ms-add"]').click(); return 1; })()`); await sleep(300);
-        await ev(`(() => { document.querySelector('.povmodal .dpbtn').click(); return 1; })()`); await sleep(300);
+        await ev(`(() => { document.querySelector('[data-pov="ms-add"]').click(); return 1; })()`); await fu(`!!document.querySelector('.povmodal .dpbtn')`);
+        await ev(`(() => { document.querySelector('.povmodal .dpbtn').click(); return 1; })()`); await fu(`!!document.querySelector('#dpop')`);
         const dp = await ev(`(() => { const p = document.querySelector('#dpop'); if (!p) return null; const r = p.getBoundingClientRect(); return {l: r.left, r: r.right, t: r.top, b: r.bottom, iw: innerWidth, ih: innerHeight}; })()`);
         check(dp && dp.l >= -0.5 && dp.r <= dp.iw + .5 && dp.b <= dp.ih + .5, `${vw}px: the date picker of a milestone inside the viewport ${JSON.stringify(dp)}`);
         await shot(`p271-ms-${vw}.png`);
         await ev(`(() => { dpClose(false); document.querySelectorAll('.modal').forEach(m => m.remove()); return 1; })()`);
         // the timeline with its markers
-        await ev(`(async () => { await setListView(listById(${P}), 'timeline'); return 1; })()`); await sleep(800);
+        await ev(`(async () => { await setListView(listById(${P}), 'timeline'); return 1; })()`); await fu(`!!document.querySelector('.tl-grp .tl-ms') && document.querySelectorAll('.tl-ms, .tl-dia').length === 2`); await fidle();
         const tl = await ev(`(() => { const m = document.querySelector('.tl-grp .tl-ms'); if (!m) return null; const r = m.getBoundingClientRect(), n = document.querySelector('.tl-row:not(.tl-headrow) .tl-name').getBoundingClientRect(); return {w: r.width, l: r.left, nr: n.right, n: document.querySelectorAll('.tl-ms, .tl-dia').length}; })()`);
         check(tl && tl.n === 2 && tl.w > 4, `${vw}px: milestone markers in the timeline ${JSON.stringify(tl)}`);
         await shot(`p271-timeline-${vw}.png`);
