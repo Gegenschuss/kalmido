@@ -19,10 +19,11 @@
 
 ## What's new
 
-**2.601.0** (2026-11-06):
-- **Settings**: backups, off-site backup and the storage check moved to Settings > Server > Backup.
-- **Agents**: reading time entries needs the `time` scope; sorting proposals never expose health or budget content.
-- **Tasks**: the task panel in lists can be dragged wider.
+**2.618.0** (2026-11-07):
+- **Dates**: type a date straight into every date picker (6.11., tomorrow, +3).
+- **Knowledge**: meeting minutes from a calendar event, with participants, agenda, decisions and action items.
+- **Documents**: "Apply what was learned" sorts selected documents again without new text recognition.
+- **Security**: opening the server (public links, registration, 2FA, OIDC) needs a fresh sign-in; organisation encryption covers preview images.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 
