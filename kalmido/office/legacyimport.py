@@ -52,6 +52,7 @@ from ..team.clients import cl_refs, cl_trash
 from .contacts_cl import fk_has_name, fk_add, fk_sync  # 2.369.5 (#2517): pulled up from functions
 from ..team.clients import clean_client  # 2.369.5 (#2517): pulled up from functions
 from .model import office_row  # 2.369.5 (#2517): pulled up from functions
+from .model import office_settings_lock, office_settings_save  # 2.621.0 (#4600): the kept file name template
 from ..files.upsafe import UploadRefused  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.attachtext import pdf_text, PDF_RATE  # 2.369.5 (#2517): pulled up from functions
 from .ledger import ofx_company, ofx_log  # 2.369.5 (#2517): pulled up from functions
@@ -1981,7 +1982,6 @@ def fnt_public(t):
 def fnt_remember(c, oid, b):
     """The template named in request body b (if any) is checked and kept for office area oid (only when it changed: the
     settings' version moves on only then) -> the template to read with."""
-    from .model import office_settings_lock, office_settings_save
     if "template" not in b:
         return fnt_stored(office_settings(c, oid))
     office_settings_lock(c, oid)  # the lock before the read (core: write_lock), as every read-change-write of the settings
