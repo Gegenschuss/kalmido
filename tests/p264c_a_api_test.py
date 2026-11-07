@@ -94,8 +94,8 @@ tok = A.post(B + "/api/me/tokens", json={"name": "script", "scopes": ["read", "w
 TH = {"Authorization": "Bearer " + tok.json()["token"], **H} if tok.ok else None
 
 T = A.post(B + "/api/tasks", json={"title": "Order the props"}).json()["id"]
-PG = {}
-for key, path, text in (("check", "Processes/Checklist", f"Hello world, see [[Other]] and #{T}"), ("other", "Other", "plain other text"),
+PG = {}  # 2.619.0 (#4947): a task link in a page is [[#N]], a bare #N stays text
+for key, path, text in (("check", "Processes/Checklist", f"Hello world, see [[Other]] and [[#{T}]]"), ("other", "Other", "plain other text"),
                         ("tpl", "Templates/Daily", "---\ntags: [daily]\n---\nDaily notes"), ("trash", "Trash me", "gone soon"),
                         ("empty", "Empty", "")):
     r = A.post(B + "/api/wiki/pages", json={"space": SP, "path": path, "body": text})
@@ -103,7 +103,7 @@ for key, path, text in (("check", "Processes/Checklist", f"Hello world, see [[Ot
     PG[key] = r.json()["id"]
 assert A.delete(B + f"/api/wiki/pages/{PG['trash']}").ok
 check(len(dbx("SELECT 1 FROM wiki_links WHERE from_id=?", (PG["check"],))) == 2, "open space: links are kept on the server")
-OWN = Bo.post(B + "/api/wiki/pages", json={"space": "private", "path": "Diary", "body": f"my plain diary #{T}"}).json()["id"]
+OWN = Bo.post(B + "/api/wiki/pages", json={"space": "private", "path": "Diary", "body": f"my plain diary [[#{T}]]"}).json()["id"]  # 2.619.0 (#4947): a task link in a page is [[#N]], a bare #N stays text
 
 
 def pages_of(sp=SP, s=A, **kw):
@@ -311,7 +311,7 @@ r = Bo.patch(B + f"/api/wiki/pages/{PG['other']}", json={"body": ct(2)})
 check(r.status_code == 409 and code(r) == "wiki_e2e_busy", "decrypting: page writes 409 busy")
 td = A.get(B + "/api/wiki/e2e/todo", params={"space": SP}).json()
 check(len(td["pages"]) == 6, "decrypting: todo lists the ciphertexts")
-PLAIN = {PG["check"]: ("Same", f"Hello again, see [[Other]] and #{T}"), PG["other"]: ("Same", "other page"),
+PLAIN = {PG["check"]: ("Same", f"Hello again, see [[Other]] and [[#{T}]]"), PG["other"]: ("Same", "other page"),
          PG["tpl"]: ("Templates/Daily", "---\ntags: [daily]\n---\nDaily notes"), PG["trash"]: ("Same", "in the trash"),
          PG["empty"]: ("Empty", None), NEWP: ("New page", "new")}
 check(A.post(B + "/api/wiki/e2e/bulk", json={"space": SP, "pages": [{"id": NEWP, "body": ct(2)}]}).status_code == 400, "decrypting: a ciphertext 400")

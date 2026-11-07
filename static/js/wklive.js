@@ -80,8 +80,8 @@ async function wklv_slashPick(ta, c) {
 }
 // ---- 2.371.3 (#3333): "/" -> "Task (#)" puts "#" and opens a search over the tasks the person sees: what follows the "#" is
 // the query (the tasks loaded here first, then from 2 characters the server's search GET /api/search, 250 ms after the last
-// key, a newer query drops the older answer); a pick puts "#id ". Only after the command: a "#word" typed by hand stays a tag.
-// Sealed spaces too (#id is plain text in the decrypted page).
+// key, a newer query drops the older answer); a pick puts "[[#id]] " (2.619.0, #4947). Only after the command: a "#word" typed by hand stays a tag.
+// Sealed spaces too ([[#id]] is plain text in the decrypted page).
 function wklv_tkHit(t) { return {tid: t.id, path: '#' + t.id, _label: '#' + t.id + ' ' + (t.title || '…'), _ic: 'check'}; }
 function wklv_tkLocal(q) {
   const n = /^\d+$/.test(q) ? +q : 0, w = q.toLowerCase(), out = [];
@@ -114,7 +114,7 @@ function wklv_tk(ta, box) {
   return true;
 }
 function wklv_tkPick(ta, h) {
-  const a = WK.ac.from, z = ta.selectionStart, txt = '#' + h.tid + ' ';
+  const a = WK.ac.from, z = ta.selectionStart, txt = '[[#' + h.tid + ']] ';  // 2.619.0 (#4947): the task link of a page
   WKLV.tk = null; WK.ac = null; $('#wk-ac')?.classList.add('hidden');
   wem_rep(ta, a, z, txt, a + txt.length, a + txt.length);
 }

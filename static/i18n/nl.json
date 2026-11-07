@@ -7753,8 +7753,6 @@
   "Processes, checklists, how-tos: write down what the team needs to know.": "Processen, checklists, handleidingen: schrijf op wat het team moet weten.",
   "Page": "Pagina",
   "Path": "Pad",
-  "Markdown: # heading, - list, [[Page]] links a page, #123 a task": "Markdown: # kop, - lijst, [[Pagina]] linkt een pagina, #123 een taak",
-  "Write … ([[Page]], #123)": "Schrijven … ([[Pagina]], #123)",
   "Empty page.": "Lege pagina.",
   "Linked from": "Gelinkt vanaf",
   "Create this page": "Deze pagina aanmaken",
@@ -13951,7 +13949,6 @@
   "Files not uploaded: {0}": "Niet geüploade bestanden: {0}",
   "Offline: the files are uploaded once the task is synced": "Offline: de bestanden worden geüpload zodra de taak is gesynchroniseerd",
   "Not saved yet, trying again": "Nog niet opgeslagen, wordt opnieuw geprobeerd",
-  "Write … ([[Page]], #123, / for commands)": "Schrijven … ([[Pagina]], #123, / voor opdrachten)",
   "Numbered list": "Genummerde lijst",
   "Picture or file": "Afbeelding of bestand",
   "Embed a table": "Tabel insluiten",
@@ -16988,5 +16985,8 @@
   "Minutes|folder": "Notulen",
   "Action items": "Actiepunten",
   "Minutes of this event as a knowledge page": "Notulen van deze afspraak als kennispagina",
-  "To change this, please sign in again to confirm (at most {0} minutes ago).": "Meld je opnieuw aan om dit te bevestigen (hoogstens {0} minuten geleden)."
+  "To change this, please sign in again to confirm (at most {0} minutes ago).": "Meld je opnieuw aan om dit te bevestigen (hoogstens {0} minuten geleden).",
+  "Markdown: # heading, - list, [[Page]] links a page, [[#123]] a task": "Markdown: # kop, - lijst, [[Pagina]] linkt een pagina, [[#123]] een taak",
+  "Write … ([[Page]], [[#123]])": "Schrijven … ([[Pagina]], [[#123]])",
+  "Write … ([[Page]], [[#123]], / for commands)": "Schrijven … ([[Pagina]], [[#123]], / voor opdrachten)"
 }

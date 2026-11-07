@@ -39,7 +39,9 @@ WIKI_ZIP_FILES, WIKI_ZIP_FILE_MAX, WIKI_ZIP_TOTAL = 2000, 1_000_000, 30_000_000
 WIKI_TEMPLATES = ("templates/", "vorlagen/")  # lower case; "Templates/…" (SilverBullet) and the German folder name
 # 2.123.0 C (#2107): [[datei:…]] / [[tabelle:…]] link the file store / a table (wkembed.py), not a page
 WIKI_LINK_RE = re.compile(r"\[\[(?!\s*(?i:datei|tabelle)\s*:)([^\[\]|#\n]{1,500})(?:#[^\[\]|\n]*)?(?:\|[^\[\]\n]*)?\]\]")
-WIKI_TASK_RE = re.compile(r"(?<![\w&/#])#(\d{1,12})\b")
+# 2.619.0 (#4947): a task link in a page is only [[#123]] (or [[#123|label]]); a bare #123 stays text (settings, numbers,
+# imported hashtags). Chat, comments and task texts keep #123 (chat.js mdTaskRefs).
+WIKI_TASK_RE = re.compile(r"\[\[#(\d{1,12})(?:\|[^\[\]\n]*)?\]\]")
 WIKI_BAD_CHARS = re.compile(r"[\x00-\x1f\x7f\[\]|#^\\]")
 
 

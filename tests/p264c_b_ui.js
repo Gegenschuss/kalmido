@@ -40,7 +40,7 @@ const gens = idx => (idx.pages || []).flatMap(p => [p.path, p.body]).filter(v =>
   await feats(CKB); await feats(CKC);
   const T = (await call('POST', '/api/tasks', {title: 'Task for the mention'})).j.id;
   const mk = async (p, body) => (await call('POST', '/api/wiki/pages', {space: SP, path: p, body})).j.id;
-  const START = await mk('Docs/Start', `${M} start page, see [[Docs/Other]] and #${T}`);
+  const START = await mk('Docs/Start', `${M} start page, see [[Docs/Other]] and [[#${T}]]`);  // 2.619.0 (#4947): a task link in a page is [[#N]], a bare #N stays text
   const OTHER = await mk('Docs/Other', `${M} other page`);
   const TPL = await mk('Templates/Meeting', `${M} template text`);
   check(START > 0 && OTHER > 0 && TPL > 0, 'setup: three pages in the organisation space');

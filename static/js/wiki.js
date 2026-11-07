@@ -505,7 +505,7 @@ function wk_pageHtml(p) {
     ${may && typeof wsh_btnHtml === 'function' ? wsh_btnHtml(p) : ''}
     ${may ? `<button type="button" class="iconbtn" data-wk="pmenu" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots')}</button>` : ''}
     ${mob ? '' : `<button type="button" class="iconbtn" data-wk="close" title="${esc(tr('Close'))}" aria-label="${esc(tr('Close'))}">${ic('x')}</button>`}</div>${wk_dayBar(p)}
-    ${edit ? `<div class="wkedwrap">${typeof wem_bar === 'function' ? wem_bar(p) : ''}${!asMd && cm ? wkcm_html(p) : `<textarea id="wk-body" class="ntbody" aria-label="${esc(tr('Text'))}" placeholder="${esc(tr('Write … ([[Page]], #123)'))}">${esc(p.body)}</textarea>`}<div id="wk-ac" class="wkac hidden" role="listbox" aria-label="${esc(tr('Pages'))}"></div></div>`
+    ${edit ? `<div class="wkedwrap">${typeof wem_bar === 'function' ? wem_bar(p) : ''}${!asMd && cm ? wkcm_html(p) : `<textarea id="wk-body" class="ntbody" aria-label="${esc(tr('Text'))}" placeholder="${esc(tr('Write … ([[Page]], [[#123]])'))}">${esc(p.body)}</textarea>`}<div id="wk-ac" class="wkac hidden" role="listbox" aria-label="${esc(tr('Pages'))}"></div></div>`
       : `${wk_attrsHtml(p.attrs, p.space)}<div class="md ntmd wkmd" id="wk-md">${wk_bodyStrip(p.body).trim() ? wk_render(p) : `<p class="muted">${tr('Empty page.')}</p>`}</div>`}
     ${wka_html(p, may)}${wko_cfHtml(p)}
     ${p.backlinks?.length ? `<section class="wkback" aria-label="${esc(tr('Linked from'))}"><h4>${ic('link', 's')}${tr('Linked from')}</h4><ul>${p.backlinks.map(b => `<li><a href="#wiki/${b.id}">${esc(b.path)}</a></li>`).join('')}</ul></section>` : ''}
@@ -549,14 +549,15 @@ function wk_render(p, ctx = {seen: new Set([p.id]), d: 0}) {
     .replace(WKT_RE, (_, t) => { tcs.push(t); return `\n\n\u2063WKT${tcs.length - 1}\u2063\n\n`; })
     .replace(typeof WKQ_RE === 'undefined' ? /(?!)/ : WKQ_RE, (_, t) => { qs.push(t); return `\n\n\u2063WKQ${qs.length - 1}\u2063\n\n`; }), fls), ems);
   wk_dgNeed(src, ims);
-  let h = mdTaskRefs(renderMd(src, true));
+  let h = mdTaskRefs(renderMd(src, true), false, true);  // 2.619.0 (#4947): a bare #123 stays text, a task is [[#123]] (below)
   if (ims.length) h = h.replace(/\u2063IM(\d+)\u2063/g, (_, n) => { const t = ims[+n] ?? ''; return `<span class="wkimath" data-tex="${esc(t)}">\\(${esc(t)}\\)</span>`; });
   // [[links]] only in text: every tag is passed whole (no match inside an attribute), nothing inside code / pre / links
   let skip = 0;
   const pgs = [];  // 2.371.2 (#3151): ![[Page]] / ![[Page#Heading]], drawn after the page's own boxes and ticks (they count its lines)
-  h = h.replace(/<(\/?)([a-zA-Z][\w-]*)[^>]*>|(!?)\[\[([^\[\]|#\n<>]{1,500})(#[^\[\]|\n<>]*)?(?:\|([^\[\]\n<>]*))?\]\]/g, (m, cl, tag, bang, path, _a, label) => {
+  h = h.replace(/<(\/?)([a-zA-Z][\w-]*)[^>]*>|(!?)\[\[([^\[\]|#\n<>]{1,500})(#[^\[\]|\n<>]*)?(?:\|([^\[\]\n<>]*))?\]\]|\[\[#(\d{1,12})(?:\|([^\[\]\n<>]*))?\]\]/g, (m, cl, tag, bang, path, _a, label, tid, tlb) => {
     if (tag) { if (/^(code|pre|a)$/i.test(tag)) skip = Math.max(0, skip + (cl ? -1 : 1)); return m; }
     if (skip > 0) return m;
+    if (tid) return wk_taskLink(+tid, tlb);  // 2.619.0 (#4947)
     const t = path.trim(), pg = wk_byPath(p.space, wk_unesc(t)), lb = label ? label : t;  // t is HTML already
     if (bang && typeof wem_pgHtml === 'function' && !/^\s*(datei|tabelle)\s*:/i.test(t)) { pgs.push({path: wk_unesc(t), part: wk_unesc((_a || '').slice(1)), label: label ? wk_unesc(label) : '', pg}); return `\u2063WKE${pgs.length - 1}\u2063`; }
     if (/^\s*(datei|tabelle)\s*:/i.test(t)) return wem_link(p, wk_unesc(t), label);  // 2.123.0 C (#2107): a file / table (wkembed.js)
@@ -567,6 +568,13 @@ function wk_render(p, ctx = {seen: new Set([p.id]), d: 0}) {
   h = h.replace(/(?:<p>)?\u2063WKQ(\d+)\u2063(?:<\/p>)?/g, (_, n) => wkq_html(p, qs[+n] || ''));  // 2.371 (#3150)
   h = wem_put(p, wka_put(h.replace(/(?:<p>)?MM(\d+)(?:<\/p>)?/g, (_, i) => typeof mm_blockHtml === 'function' ? mm_blockHtml(mms[+i] || '') : `<pre class="mdpre">${esc(mms[+i] || '')}</pre>`), fls), ems);  // 2.123.0 C (#2103, #2108)
   return pgs.length ? h.replace(/(?:<p>)?\u2063WKE(\d+)\u2063(?:<\/p>)?/g, (_, n) => pgs[+n] ? wem_pgHtml(p, pgs[+n], ctx) : '') : h;  // 2.371.2 (#3151)
+}
+// 2.619.0 (#4947): [[#123]] / [[#123|label]] -- the task link of a page: the task's link with its title for who may see it
+// (taskById: the tasks this browser has; the title of another task is never asked for), else plain "#123" (label = HTML already)
+function wk_taskLink(id, label) {
+  const t = typeof taskById === 'function' ? taskById(id) : null;
+  if (!t) return label ? label : '#' + id;
+  return label ? `<a href="#t/${t.id}" class="tref" data-tref="${t.id}" title="${esc(mdPlain(t.title))}">${label}</a>` : trefHtml(t, false);
 }
 // 2.376 (#3294): a ```seiten block (English ```pages): the pages of the page's space as a nested list of links sorted by path,
 // live from the index this browser has (WK.idx: so also in a space with the lock, only pages the reader sees); nothing is

@@ -31,7 +31,8 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   check(!((await call('GET', '/api/state')).me.workspaces || []).length, 'setup: frida has no organisation');
   await call('PATCH', '/api/settings', {tour: 'done', lang: 'en', features: feats});
   const T1 = (await call('POST', '/api/tasks', {title: 'Beta task'})).id;
-  const BODY = `# List\n\n- [ ] Alpha\n- [ ] Beta #${T1}\n\n\`\`\`\n- [ ] not a box\n\`\`\`\n\n- [x] Gamma\n`;
+  // 2.619.0 (#4947): a task link in a page is [[#N]], a bare #N stays text
+  const BODY = `# List\n\n- [ ] Alpha\n- [ ] Beta [[#${T1}]]\n\n\`\`\`\n- [ ] not a box\n\`\`\`\n\n- [x] Gamma\n`;
   const PG = (await call('POST', '/api/wiki/pages', {space: 'private', path: 'Checks', body: BODY})).id;
   check(PG > 0, 'setup: the page');
   const body = async () => (await call('GET', '/api/wiki/pages/' + PG)).body || '';
@@ -47,7 +48,7 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   box(2).click();
   check(await until(async () => (await body()).includes('- [ ] Gamma')), 'unticking Gamma writes [ ] into its line');
   const b1 = await body();
-  check(b1.includes('- [ ] Alpha') && b1.includes('- [ ] not a box') && b1.includes(`- [ ] Beta #${T1}`), 'the other lines and the code block stay');
+  check(b1.includes('- [ ] Alpha') && b1.includes('- [ ] not a box') && b1.includes(`- [ ] Beta [[#${T1}]]`), 'the other lines and the code block stay');
   check(!box(2).checked && !box(2).closest('li').classList.contains('on'), 'the box shows unticked');
   // quick clicks one after the other: both arrive
   box(0).click(); box(2).click();
@@ -56,12 +57,12 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
 
   // ================= a line with #123: the task along
   box(1).click();
-  check(await until(async () => (await body()).includes(`- [x] Beta #${T1}`)), 'Beta ticked in the text');
+  check(await until(async () => (await body()).includes(`- [x] Beta [[#${T1}]]`)), 'Beta ticked in the text');
   check(await until(async () => (await call('GET', '/api/tasks/' + T1)).status === 2), 'the linked task is done too');
   await idle(w);
   await until(() => box(1));
   box(1).click();
-  check(await until(async () => (await body()).includes(`- [ ] Beta #${T1}`)), 'Beta unticked in the text');
+  check(await until(async () => (await body()).includes(`- [ ] Beta [[#${T1}]]`)), 'Beta unticked in the text');
   check(await until(async () => (await call('GET', '/api/tasks/' + T1)).status === 0), 'the linked task is open again');
   await idle(w);
   // a task done elsewhere: its line shows ticked, the text stays
@@ -69,7 +70,7 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   w.close();
   w = await boot({user: 'frida', hash: 'wiki/' + PG, ls: {'tasks.wkSpace': JSON.stringify('private'), 'tasks.wkRo': '"1"'}}); d = w.document;
   check(await until(() => box(1)?.checked), 'a task done elsewhere: its line shows ticked');
-  check((await body()).includes(`- [ ] Beta #${T1}`), '… the text stays as it is');
+  check((await body()).includes(`- [ ] Beta [[#${T1}]]`), '… the text stays as it is');
 
   // ================= someone changed the page meanwhile: the conflict dialog asks
   const cur = await call('GET', '/api/wiki/pages/' + PG);

@@ -134,7 +134,7 @@ function wkcm_ext(p) {
     C.history(), C.drawSelection(), C.EditorView.lineWrapping, C.markdown(), C.search({top: true}),
     C.EditorState.phrases.of(wkcm_phrases()),
     C.EditorView.contentAttributes.of({'aria-label': tr('Text') + ': ' + wk_base(p.path), spellcheck: 'true', autocapitalize: 'sentences', autocorrect: 'on'}),
-    C.placeholder(tr('Write … ([[Page]], #123, / for commands)')),
+    C.placeholder(tr('Write … ([[Page]], [[#123]], / for commands)')),
     // files pasted / dropped: uploaded by wkembed.js (its document listener), CodeMirror must not insert their text
     C.Prec.highest(C.EditorView.domEventHandlers({mousedown: wkcm_down, click: wkcm_click,
       paste: e => !!e.clipboardData?.files?.length, drop: e => !!e.dataTransfer?.files?.length})),
@@ -286,7 +286,7 @@ function wkcm_md(txt, inline) {
 }
 const WKCM_BLK = /^(mindmap|math|mermaid|seiten|pages|abfrage|query)$/i;
 const WKCM_WL = /(!?)\[\[([^\[\]\n]{1,500})\]\]/g;
-const WKCM_REF = /(?<![&\w/#\\])#(\d{1,9})\b/g;
+const WKCM_REF = /^#(\d{1,12})$/;  // 2.619.0 (#4947): the inside of [[#123]] -- the task link of a page (a bare #123 is text)
 const WKCM_TAG = /(?<![\p{L}\p{N}_&/#\\])#(\p{L}[\p{L}\p{N}_/-]{0,59})/gu;
 function wkcm_build(st, foc, r) {  // 2.574.0 (#4681): r = {from, to}: only the lines of that part (null = all)
   const C = wkcm_C(), D = C.Decoration, W = wkcm_defs(), doc = st.doc, out = [], sel = st.selection.ranges;
@@ -347,7 +347,15 @@ function wkcm_build(st, foc, r) {  // 2.574.0 (#4681): r = {from, to}: only the 
       else out.push(D.replace({widget: new W.Html(wkcm_md(m[0], true), false, 'cm-wkemb')}).range(a, z));
       continue;
     }
-    const bar = body.indexOf('|'), path = (bar < 0 ? body : body.slice(0, bar)).replace(/#.*$/, '').trim(), sp = (WKCM.p || WK.pg)?.space;
+    const bar = body.indexOf('|'), tm = WKCM_REF.exec(bar < 0 ? body : body.slice(0, bar));
+    if (tm) {  // 2.619.0 (#4947): [[#123]] / [[#123|label]] = a task I see: its link with the title; else the text stays as it is
+      const t = typeof taskById === 'function' ? taskById(+tm[1]) : null; if (!t) continue;
+      const open = !near(a, z);
+      if (open) { hide(a, a + 2); if (bar >= 0) hide(a + 2, a + 3 + bar); hide(z - 2, z); }
+      mark(open ? a + (bar >= 0 ? 3 + bar : 2) : a, open ? z - 2 : z, 'cm-wkl cm-wkref', open ? {'data-wkgo': '#t/' + t.id, title: String(t.title || '')} : undefined);
+      continue;
+    }
+    const path = (bar < 0 ? body : body.slice(0, bar)).replace(/#.*$/, '').trim(), sp = (WKCM.p || WK.pg)?.space;
     const pg = sp ? wk_byPath(sp, path) : null, open = !near(a, z);
     const attrs = open ? (pg ? {'data-wkgo': '#wiki/' + pg.id} : {'data-wknew': path}) : null;
     if (open) { hide(a, a + 2); if (bar >= 0) hide(a + 2, a + 3 + bar); hide(z - 2, z); }
@@ -406,13 +414,8 @@ function wkcm_build(st, foc, r) {  // 2.574.0 (#4681): r = {from, to}: only the 
     }
     if (k === 'Table') { lines(a, z, 'cm-wkcode'); return false; }
   }});
-  // #123 (tasks I see) and #tags as links, \( … \) as formulas
+  // #tags as links, \( … \) as formulas (2.619.0, #4947: a bare #123 is text; the task link is [[#123]], above)
   const free = (a, z) => !inside(a, z, skip) && !inside(a, z, blocks) && !inside(a, z, wl) && a >= fmEnd;
-  for (const m of txt.matchAll(WKCM_REF)) {
-    const a = o + m.index, z = a + m[0].length; if (!free(a, z)) continue;
-    const t = typeof taskById === 'function' ? taskById(+m[1]) : null; if (!t) continue;
-    mark(a, z, 'cm-wkl cm-wkref', near(a, z) ? undefined : {'data-wkgo': '#t/' + t.id, title: String(t.title || '')});
-  }
   if (typeof wkt_go === 'function') for (const m of txt.matchAll(WKCM_TAG)) {
     const a = o + m.index, x = m[1].replace(/[/-]+$/, ''), z = a + 1 + x.length; if (!free(a, z)) continue;
     const sp = (WKCM.p || WK.pg)?.space; if (!sp) continue;

@@ -130,14 +130,14 @@ const K = {Enter: '', Escape: ''};
     check(m3 && m3[0] === `#${run.t1} Call the printer ${run.who}`, `${tag}: a title word filters the loaded tasks ${JSON.stringify(m3)}`);
     if (vw > 1000) await shot(`p2371_3_${vw}_task.png`);
     await press('Enter');
-    check(await saved(`Start\n#${run.t1} `) === `Start\n#${run.t1} `, `${tag}: Enter puts "#${run.t1} " (saved)`);
+    check(await saved(`Start\n[[#${run.t1}]] `) === `Start\n[[#${run.t1}]] `, `${tag}: Enter puts "[[#${run.t1}]] " (saved)`);  // 2.619.0 (#4947): a task link in a page is [[#N]], a bare #N stays text
     // a word only in a comment: the server's full-text search finds the task
     await press('Enter'); await type('/task'); await until(acList); await press('Enter');
     await type('zebrafinch');
     const m4 = await until(`(() => { const l = ${acList}; return l && l.some(x => x.startsWith('#${run.t2} ')) ? l : null; })()`);
     check(m4 && m4[0] === `#${run.t2} Order paper ${run.who}`, `${tag}: a word of a comment finds the task over the server's search ${JSON.stringify(m4)}`);
     await press('Enter');
-    const w2 = `Start\n#${run.t1} \n#${run.t2} `;
+    const w2 = `Start\n[[#${run.t1}]] \n[[#${run.t2}]] `;
     check(await saved(w2) === w2, `${tag}: the second pick saved (${JSON.stringify(await saved(w2))})`);
     // Esc while the search has no hits ends it: typing on opens nothing (review 2.371.3)
     await press('Enter'); await type('/task'); await until(acList); await press('Enter');

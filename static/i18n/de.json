@@ -7735,8 +7735,6 @@
   "Processes, checklists, how-tos: write down what the team needs to know.": "Abläufe, Checklisten, Anleitungen: Schreib auf, was das Team wissen muss.",
   "Page": "Seite",
   "Path": "Pfad",
-  "Markdown: # heading, - list, [[Page]] links a page, #123 a task": "Markdown: # Überschrift, - Liste, [[Seite]] verlinkt eine Seite, #123 eine Aufgabe",
-  "Write … ([[Page]], #123)": "Schreiben … ([[Seite]], #123)",
   "Empty page.": "Leere Seite.",
   "Linked from": "Verlinkt von",
   "Create this page": "Diese Seite anlegen",
@@ -13951,7 +13949,6 @@
   "Files not uploaded: {0}": "Nicht hochgeladene Dateien: {0}",
   "Offline: the files are uploaded once the task is synced": "Offline: Die Dateien werden hochgeladen, sobald die Aufgabe abgeglichen ist",
   "Not saved yet, trying again": "Noch nicht gespeichert, neuer Versuch folgt",
-  "Write … ([[Page]], #123, / for commands)": "Schreiben … ([[Seite]], #123, / für Befehle)",
   "Numbered list": "Nummerierte Liste",
   "Picture or file": "Bild oder Datei",
   "Embed a table": "Tabelle einbetten",
@@ -16988,5 +16985,8 @@
   "Minutes|folder": "Protokolle",
   "Action items": "Aufgaben",
   "Minutes of this event as a knowledge page": "Protokoll zu diesem Termin als Wissensseite",
-  "To change this, please sign in again to confirm (at most {0} minutes ago).": "Um das zu ändern, melde dich bitte zur Bestätigung neu an (höchstens vor {0} Minuten)."
+  "To change this, please sign in again to confirm (at most {0} minutes ago).": "Um das zu ändern, melde dich bitte zur Bestätigung neu an (höchstens vor {0} Minuten).",
+  "Markdown: # heading, - list, [[Page]] links a page, [[#123]] a task": "Markdown: # Überschrift, - Liste, [[Seite]] verlinkt eine Seite, [[#123]] eine Aufgabe",
+  "Write … ([[Page]], [[#123]])": "Schreiben … ([[Seite]], [[#123]])",
+  "Write … ([[Page]], [[#123]], / for commands)": "Schreiben … ([[Seite]], [[#123]], / für Befehle)"
 }

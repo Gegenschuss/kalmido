@@ -48,7 +48,7 @@ const PDF = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 
   const SH = (await call('POST', '/api/sheets', {title: 'Budget', space: SP})).id;
   check(TEAM && PIC && SEC && SH, 'setup: folder, files, table');
   const OLD = (await call('POST', '/api/tasks', {title: 'Already a task'})).id;
-  const BODY = `# Project\n\n![Plan](/api/files/nodes/${PIC}/content)\n\n![Pay](/api/files/nodes/${SEC}/content)\n\nSee [[datei:${SEC}|the list]] and [[tabelle:Budget]].\n\n- [ ] Offer to the client tomorrow !high #sales\n- [ ] Call the printer\n- [ ] Already done #${OLD}\n- [x] Closed\n`;
+  const BODY = `# Project\n\n![Plan](/api/files/nodes/${PIC}/content)\n\n![Pay](/api/files/nodes/${SEC}/content)\n\nSee [[datei:${SEC}|the list]] and [[tabelle:Budget]].\n\n- [ ] Offer to the client tomorrow !high #sales\n- [ ] Call the printer\n- [ ] Already done [[#${OLD}]]\n- [x] Closed\n`;  // 2.619.0 (#4947): a task link in a page is [[#N]], a bare #N stays text
   const PG = (await call('POST', '/api/wiki/pages', {space: SP, path: 'Project', body: BODY})).id;
   const PG2 = (await call('POST', '/api/wiki/pages', {space: SP, path: 'Scratch', body: ''})).id;
   check(PG > 0 && PG2 > 0, 'setup: the pages');
@@ -68,8 +68,8 @@ const PDF = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 
   const md = await until(() => d.querySelector('.modal.wemdlg #wem-list'));
   check(md && md.value === String(w.eval('inbox().id')), '#2108: the dialog offers the lists, the basket first');
   d.querySelector('.modal.wemdlg [data-m="ok"]')?.click();
-  const pg1 = await until(async () => { const p = await call('GET', '/api/wiki/pages/' + PG); return /tomorrow !high #sales #\d+/.test(p.body) && p; });
-  const tid = +(/#sales #(\d+)/.exec(pg1?.body || '') || [])[1];
+  const pg1 = await until(async () => { const p = await call('GET', '/api/wiki/pages/' + PG); return /tomorrow !high #sales \[\[#\d+\]\]/.test(p.body) && p; });  // 2.619.0 (#4947): a task link in a page is [[#N]], a bare #N stays text
+  const tid = +(/#sales \[\[#(\d+)\]\]/.exec(pg1?.body || '') || [])[1];
   const t = tid ? await call('GET', '/api/tasks/' + tid) : {};
   const tom = w.eval('addDays(today(), 1)');
   check(tid && t.title === 'Offer to the client' && t.due === tom && t.priority === 5 && (t.tags || []).includes('sales'),
@@ -79,7 +79,7 @@ const PDF = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 
   check(d.querySelectorAll('#wk-md li.cb .wemcb').length === 1, '#2108: one + less');
   // ONE undo step: the task and the #<id> go again
   await w.eval(`histStep('undo')`); await sleep(400);
-  const pg2 = await until(async () => { const p = await call('GET', '/api/wiki/pages/' + PG); return !/#sales #\d+/.test(p.body) && p; });
+  const pg2 = await until(async () => { const p = await call('GET', '/api/wiki/pages/' + PG); return !/#sales \[\[#\d+\]\]/.test(p.body) && p; });
   check(pg2 && pg2.body === BODY, '#2108: undo restores the line');
   const t2 = await call('GET', '/api/tasks/' + tid);
   check(t2.status === 404 || !!t2.deleted_at, '#2108: undo removes the task (' + t2.status + ')');

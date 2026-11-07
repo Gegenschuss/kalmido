@@ -8,7 +8,7 @@
      own routes (its rights). A locked space works the same: the ids come from the text decrypted here.
    - Read mode: an open checkbox line "- [ ] …" gets a + button (several: "Open items as tasks"): the line becomes a task
      with the quick add syntax (date, #tags, !priority), in a list to choose (default: the basket); the line then ends with
-     #<id> (the task link of the pages, which shows the task's state). Tasks + the page text = ONE undo step.
+     [[#<id>]] (2.619.0, #4947: the task link of the pages, which shows the task's state). Tasks + the page text = ONE undo step.
    - 2.350.0 C (#3148): with the right to write the page, a checkbox ticks in read mode: the line's [ ] / [x] is saved like a
      typed change (history, conflict, offline, a locked space); a line with #123 ticks the task along (done / reopened, only
      with the right to that task) and shows ticked while the task is done. Right click / a long press: "Create as task".
@@ -16,7 +16,7 @@
 'use strict';
 
 const WEM_EMBED_RE = /(!?)\[([^\[\]\n]*)\]\(\/api\/files\/nodes\/(\d{1,15})\/content\)/g;
-const WEM_TREF_RE = /(?<![\w&/#])#\d{1,12}\b/;
+const WEM_TREF_RE = /\[\[#(\d{1,12})(?:\|[^\[\]\n]*)?\]\]/;  // 2.619.0 (#4947): the task link of a page is [[#123]], a bare #123 is text
 // ---- what the reader may see (one question per page, more when the text gets new references)
 function wem_st(p) { return p._wem || (p._wem = {files: {}, links: {}, asked: new Set(), got: new Set(), qf: new Set(), ql: new Set(), t: 0}); }
 function wem_need(p, kind, key, ref) {
@@ -77,7 +77,7 @@ function wem_cbAll(body) {
     if (/^\s*```/.test(ln)) { code = !code; continue; }
     if (code || /^\s*>/.test(ln)) continue;
     const m = /^\s*[-*]\s+\[( |x|X)\]\s*(.*)/.exec(ln);
-    if (m) out.push({i, raw: ln, on: m[1] !== ' ', text: m[2].replace(/\r$/, '').trim(), has: WEM_TREF_RE.test(m[2]), tid: +((WEM_TREF_RE.exec(m[2]) || [''])[0].slice(1)) || 0});
+    if (m) out.push({i, raw: ln, on: m[1] !== ' ', text: m[2].replace(/\r$/, '').trim(), has: WEM_TREF_RE.test(m[2]), tid: +((WEM_TREF_RE.exec(m[2]) || [])[1] || 0)});
   }
   return out;
 }
@@ -193,7 +193,7 @@ async function wem_cbRun(p, lines, lid) {
       try { made.push({L, t: await createTask(body)}); } catch { break; }  // api() said why; what was made stays one step
     }
     if (!made.length) return;
-    const pairs = made.map(({L, t}) => [L.raw, L.raw.replace(/\s+$/, '') + ' #' + t.id + (L.raw.endsWith('\r') ? '\r' : '')]);
+    const pairs = made.map(({L, t}) => [L.raw, L.raw.replace(/\s+$/, '') + ' [[#' + t.id + ']]' + (L.raw.endsWith('\r') ? '\r' : '')]);
     try { await wem_swap(p, pairs, true); } catch (e) { toast(e.message); }
     const e = histAdd({label: tr('Create tasks'), ids: [], snaps: [], lids: [], wsp: p.space,
       undo: async () => { await wem_swap(p, pairs, false); return {skipped: []}; },
@@ -216,7 +216,7 @@ async function wem_swap(p, pairs, fwd) {
 }
 // ---- the editor: insert a picture / file (upload or from the file store), paste / drop files
 function wem_bar(p) {
-  return `<div class="wembar" role="toolbar" aria-label="${esc(tr('Formatting'))}">${wem_fmtBtns()}<button type="button" class="btn sm" data-wem="ins" aria-haspopup="menu">${ic('picture', 's')}<span class="wemlbl">${esc(tr('Insert picture or file'))}</span></button><span class="shint">${esc(tr('Markdown: # heading, - list, [[Page]] links a page, #123 a task'))}</span></div>`;  // 2.298.0 C (#3187): the syntax behind (i)
+  return `<div class="wembar" role="toolbar" aria-label="${esc(tr('Formatting'))}">${wem_fmtBtns()}<button type="button" class="btn sm" data-wem="ins" aria-haspopup="menu">${ic('picture', 's')}<span class="wemlbl">${esc(tr('Insert picture or file'))}</span></button><span class="shint">${esc(tr('Markdown: # heading, - list, [[Page]] links a page, [[#123]] a task'))}</span></div>`;  // 2.298.0 C (#3187): the syntax behind (i)
 }
 // 2.276.0 B (#3043): the formatting bar -- writes the same Markdown one would type (heading, bold, italic, list, checkbox, link);
 // a click wraps the selection or prefixes the selected lines, a second click takes it away again. Edits go through insertText,

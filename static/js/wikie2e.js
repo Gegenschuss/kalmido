@@ -248,7 +248,7 @@ function wkeDefuse(f, v) {
 const wkeKey = p => { try { return wkeClean(p).toLowerCase(); } catch { return ''; } };
 const WKE_LINK = /\[\[([^\[\]|#\n]{1,500})(?:#[^\[\]|\n]*)?(?:\|[^\[\]\n]*)?\]\]/g;
 const wkeLinks = text => new Set([...String(text || '').matchAll(WKE_LINK)].map(m => wkeKey(m[1])).filter(Boolean));
-const wkeTasks = text => new Set([...String(text || '').matchAll(/(^|[^\w&/#])#(\d{1,12})\b/g)].map(m => +m[2]));
+const wkeTasks = text => new Set([...String(text || '').matchAll(/\[\[#(\d{1,12})(?:\|[^\[\]\n]*)?\]\]/g)].map(m => +m[1]));  // 2.619.0 (#4947): only [[#123]], as wiki/pages.py WIKI_TASK_RE
 // a page object of an encrypted space: path / body opened in place (the ciphers kept in _enc), attrs and the template flag from
 // the plain text (the server sends {} / false); false when a cipher did not open (the page stays "locked")
 async function wkeOpen(sp, p, ks) {

@@ -162,7 +162,7 @@ FT = r.json()["id"]
 r = Bo.post(B + "/api/lists", json={"name": "Alpha work", "org_id": ORG})
 AL = r.json()["id"]
 OT = Bo.post(B + "/api/tasks", json={"title": "Own task", "list_id": AL}).json()["id"]
-r = Bo.post(B + "/api/wiki/pages", json={"space": SP, "path": "Links", "body": f"Mine #{OT}, foreign #{FT}"})
+r = Bo.post(B + "/api/wiki/pages", json={"space": SP, "path": "Links", "body": f"Mine [[#{OT}]], foreign [[#{FT}]]"})  # 2.619.0 (#4947): a task link in a page is [[#N]], a bare #N stays text
 LP = r.json()["id"]
 check("Secret merger" not in Bo.get(B + f"/api/wiki/pages/{LP}").text, "a page never carries the title of a linked task")
 check(Bo.get(B + "/api/wiki/mentions", params={"task": FT}).status_code == 404, "mentions of a task one cannot see: 404")

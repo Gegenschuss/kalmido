@@ -139,7 +139,7 @@ m = Bo.get(B + f"/api/sheets/{SID}").json().get("moved") or {}
 check(m.get("from") == "private" and m.get("from_name") == "Private", "bob: his own private workspace " + str(m))
 
 # ================================================================ #2050: private with the lock -> open organisation
-SEC = page(Ca, "Secret", "see [[Other]] and #5")
+SEC = page(Ca, "Secret", "see [[Other]] and [[#5]]")
 OTH = page(Ca, "Other", "")
 assert Ca.put(B + "/api/e2e/keys", json=e2e_keys()).ok
 lock(Ca, "private", [uid["carol"]])
@@ -154,7 +154,7 @@ check((e.get("from") or {}).get("mode") == "on" and (e.get("from") or {}).get("g
       "dry run: both states " + str(e))
 check(any("no longer end-to-end encrypted" in n for n in d.get("notes", [])), "dry run: the warning " + str(d.get("notes")))
 check(mv(Ca, folder="Plan", space="private", to=SP, dry=1).status_code == 400, "a folder by name: 400 (the browser names the pages)")
-good = {"id": SEC, "path": "Moved/Secret", "body": "see [[Other]] and #5"}
+good = {"id": SEC, "path": "Moved/Secret", "body": "see [[Other]] and [[#5]]"}
 check(mv(Ca, pages=[good], space="private", to=SP).status_code == 409, "without the generations of the dry run: 409")
 r = mv(Ca, pages=[good], space="private", to=SP, gens={"from": 2, "to": 0})
 check(r.status_code == 409 and r.json().get("code") == "wiki_e2e_gen", "another generation than now: 409 " + r.text[:200])
@@ -173,7 +173,7 @@ check(r.status_code in (401, 403), "an agent: refused " + str(r.status_code))
 r = mv(Ca, pages=[good], space="private", to=SP, gens=G)
 check(r.ok and r.json().get("space") == SP and [x["id"] for x in r.json().get("moved", [])] == [SEC], "locked -> open: moved " + r.text[:300])
 g = A.get(B + f"/api/wiki/pages/{SEC}").json()
-check(g.get("path") == "Moved/Secret" and g.get("body") == "see [[Other]] and #5", "alice reads the plain page in Alpha " + str(g)[:200])
+check(g.get("path") == "Moved/Secret" and g.get("body") == "see [[Other]] and [[#5]]", "alice reads the plain page in Alpha " + str(g)[:200])
 links = dbx("SELECT to_path, to_task FROM wiki_links WHERE from_id=?", (SEC,))
 check(any(x["to_task"] == 5 for x in links) and any(x["to_path"] == "other" for x in links), "links rebuilt in the open target " + str(links))
 hist = dbx("SELECT detail FROM space_moves WHERE kind='wiki' AND obj_id=? ORDER BY id DESC", (SEC,))

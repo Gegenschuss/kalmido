@@ -844,13 +844,14 @@ function ntReject(e, err) {
 // #123 -> a link to that task (only tasks I see; text inside code / links / buttons and inside tags stays)
 // 2.35.0 (#1096): also in chats, comments and the description, there compact (only "#123", the title in the tooltip);
 // every tag is skipped whole (no match inside an attribute), "&#39;" is no task number
-function mdTaskRefs(html, compact) {
+function mdTaskRefs(html, compact, noHash) {  // 2.619.0 (#4947): noHash = a bare #123 stays text (knowledge pages: [[#123]])
   let skip = 0;
   // 2.390.0 (#3353): + "APP-12" (the current key of a task I see)
   return html.replace(/<(\/?)([a-zA-Z][\w-]*)[^>]*>|\b[Jj][Oo][Bb] ?#?(\d{1,9})\b|(?<![&\w/#])#(\d{1,9})\b|(?<![\w-])([A-Z][A-Z0-9]{1,5}-\d{1,9})\b/g, (m, cl, tag, jid, id, key) => {
     if (tag) { if (/^(code|a|pre|button)$/i.test(tag)) skip = Math.max(0, skip + (cl ? -1 : 1)); return m; }
     if (skip > 0) return m;
     if (jid) return jobRefHtml(+jid, m);  // 2.36.2 (#1141): "Job #50" / "job 50" is a job, not task #50
+    if (id && noHash) return m;
     const t = key ? tkFind(key) : taskById(+id); if (!t) return m;  // not visible to me: stays text (no title leaks)
     return trefHtml(t, compact, key);
   });

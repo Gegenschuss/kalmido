@@ -12,8 +12,10 @@ Switch it on in **Settings > Modules > Knowledge pages**; it then has its own ro
   the knowledge pages open there.
 - **Name = path.** A page called `Processes/Shoot day/Checklist` sits in the folders *Processes* and *Shoot day*; the tree
   on the left comes from the names. On a phone the tree is a list, an open page shows its path as breadcrumbs.
-- **Markdown** like notes: headings, lists, check boxes, tables, code. `#123` links task 123 (only people who may see that
-  task get a link; nobody else sees its title).
+- **Markdown** like notes: headings, lists, check boxes, tables, code. `[[#123]]` links task 123 (only people who may see that
+  task get a link; nobody else sees its title); `[[#123|label]]` shows the label. 2.619.0 (#4947): a bare `#123` in a page
+  is plain text (settings, numbers, imported hashtags); chat, comments and task texts keep `#123`. The task search of the
+  `/` menu puts `[[#123]]`.
 - **Links between pages.** `[[Processes/Shoot day/Checklist]]` (or `[[…|label]]`) links another page of the same space.
   While typing `[[` the app suggests pages. A link to a page that does not exist yet is shown dashed; a tap creates it.
   Below each page, *Linked from* lists the pages that link to it. Renaming a page changes the links to it;
@@ -87,7 +89,7 @@ Switch it on in **Settings > Modules > Knowledge pages**; it then has its own ro
   file store list the pages under *Mentioned in*. The export keeps these links as they are.
 - **Check boxes as tasks (2.123.0).** In reading mode an open check box line `- [ ] …` has a **+** button; with several
   open lines *Open items as tasks* takes them all. The dialog chooses the list (the basket first); dates, `#tags` and
-  priorities in the line are read like in quick add. The line then ends with the task link `#123`, which shows the task's
+  priorities in the line are read like in quick add. The line then ends with the task link `[[#123]]`, which shows the task's
   state (struck through when done); ticking the box in the page does not change the task. Creating the tasks and changing
   the line are one undo step. In an encrypted space this works as well, but the task titles are stored with the lock of
   the chosen list (a hint says so when that list has none).
@@ -127,7 +129,7 @@ Switch it on in **Settings > Modules > Knowledge pages**; it then has its own ro
   Source / Preview button any more. The editor (CodeMirror 6, shipped with Kalmido in `static/vendor/codemirror`, loaded
   only when a page is edited) shows the page formatted and the Markdown marks (`**`, `_`, `#`, `` ` ``, the parts of
   `[text](address)` and `[[Page]]`) only where the cursor is. A check box ticks with the first click, links, `[[Page]]`
-  and `#123` open with the first click. A table stays a table: a click edits only that cell, Tab goes to the next one
+  and `[[#123]]` open with the first click. A table stays a table: a click edits only that cell, Tab goes to the next one
   (after the last a new row), the button next to it shows the table as text. Pictures, formulas, diagrams, mind maps,
   embedded pages and tables are drawn in place; a click into one shows its Markdown. The "/" commands, the `[[`
   suggestions, Ctrl/Cmd+K and Ctrl/Cmd+Shift+7 / 8 / 9 and the formatting bar work as before, undo / redo is the
@@ -137,7 +139,7 @@ Switch it on in **Settings > Modules > Knowledge pages**; it then has its own ro
   spaces are unchanged, and a page opened without typing is saved back byte for byte. Without a connection before the
   editor was ever loaded the plain text field is used.
 
-- **Tags (2.371).** `#word` in the text (starting with a letter: `#project`, `#customer/north`; `#123` stays a task) or
+- **Tags (2.371).** `#word` in the text (starting with a letter: `#project`, `#customer/north`; `#123` is no tag) or
   `tags: [a, b]` in the frontmatter tag a page. A tag in the text is a link to its list; the panel has the group *Tags*
   below the folders (on a phone: below the pages), most used first. Case is ignored. The server keeps no tag in plain text:
   the word index holds a keyed hash per tag, the names are read from the texts in memory when the list is shown. Routes:

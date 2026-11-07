@@ -143,7 +143,7 @@ const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown'
   await w.eval(`histStep('undo')`);
   check(await until(async () => (await tasks()).some(t => t.id === sec.id)), 'Undo brings it back');
   // the task names the pages that mention it; the command field finds pages
-  await call('POST', '/api/wiki/pages', {space: SP, path: 'Docs/Mentions', body: `About #${T1}`});
+  await call('POST', '/api/wiki/pages', {space: SP, path: 'Docs/Mentions', body: `About [[#${T1}]]`});  // 2.619.0 (#4947): a task link in a page is [[#N]], a bare #N stays text
   w.eval(`WK.men = {}; openDetail(${T1})`);
   const men = await until(() => d.querySelector('#detail .wkmen a.wklink'));
   check(men && men.textContent === 'Docs/Mentions', 'the task shows "Mentioned in" the page');

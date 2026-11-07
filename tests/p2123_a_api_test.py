@@ -132,7 +132,7 @@ g = Bo.get(B + f"/api/wiki/pages/{P1}").json()
 check(r.ok and r.json().get("relinked") == 1 and "[[Ablauf/Geraete]]" in g["body"] and raw(P1).startswith("kenc1:"),
       "#2105: a rename changes the [[link]] in the sealed text " + r.text[:200])
 TASK = Bo.post(B + "/api/tasks", json={"title": "Baum schneiden"}).json()["id"]
-MP = page(Bo, "private", "Erinnerung", f"Denk an #{TASK}")
+MP = page(Bo, "private", "Erinnerung", f"Denk an [[#{TASK}]]")  # 2.619.0 (#4947): a task link in a page is [[#N]], a bare #N stays text
 men = Bo.get(B + "/api/wiki/mentions", params={"task": TASK}).json().get("pages", [])
 check([p["id"] for p in men] == [MP], "#2105: mentions still find the page " + str(men))
 # export / import

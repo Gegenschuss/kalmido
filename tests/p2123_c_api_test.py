@@ -173,7 +173,7 @@ check(F_SECRET not in links(PG)["file"], "#2103: the backlink rows of a file del
 
 # ---------------------------------------------------------------- #2108: a converted checkbox line links its task
 T = A.post(B + "/api/tasks", json={"title": "Angebot schicken", "priority": 3}).json()
-r = A.patch(B + f"/api/wiki/pages/{PG}", json={"body": BODY + f"\n- [ ] Angebot schicken #{T['id']}\n- [ ] Noch offen\n"})
+r = A.patch(B + f"/api/wiki/pages/{PG}", json={"body": BODY + f"\n- [ ] Angebot schicken [[#{T['id']}]]\n- [ ] Noch offen\n"})  # 2.619.0 (#4947): a task link in a page is [[#N]], a bare #N stays text
 check(r.ok and links(PG)["task"] == [T["id"]], "#2108: the line links the task (to_task)")
 r = A.get(B + "/api/wiki/mentions", params={"task": T["id"]})
 check(r.ok and [p["id"] for p in r.json()["pages"]] == [PG], "#2108: the task shows the page under 'Mentioned in'")
