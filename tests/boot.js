@@ -118,11 +118,12 @@ exports.clientSource = async () => {
 // Only exactly that is ignored: a TypeError created in the realm of a window this suite closed, about a missing
 // object, thrown in the app's own scripts. Anything else (open windows, the suite's own code) still fails the run.
 const closedRealms = [];
+exports.lateErrs = 0;  // 2.655.0 (#5045): how many late app errors were ignored (a suite can count them: p2655_d_late_ui)
 const lateAppError = e => !!e && closedRealms.some(T => e instanceof T) && /Cannot read propert(y|ies) of (undefined|null)/.test(e.message || '')
   && /\/static\/(js\/)?[\w.-]+\.js/.test(String(e.stack || '').split('\n').slice(0, 2).join('\n'))
   || !!e && closedRealms.length > 0 && /reading '_location'/.test(e.message || '');  // 2.442.0 (#3744): jsdom's own location getter on a closed window; its TypeError is of this realm (p2440_d_ui)
 process.on('unhandledRejection', e => {
-  if (lateAppError(e)) { console.log('late app rejection after a window was closed (ignored):', String(e.stack).split('\n').slice(0, 8).join(' | ')); return; }  // 2.655.0 (#5045): 8 stack lines, so the caller of $() shows
+  if (lateAppError(e)) { exports.lateErrs++; console.log('late app rejection after a window was closed (ignored):', String(e.stack).split('\n').slice(0, 8).join(' | ')); return; }  // 2.655.0 (#5045): 8 stack lines, so the caller of $() shows
   console.error(e); process.exit(1);
 });
 // 2.504.0 (#4084): jsdom has no CSS object, the app uses it (office.js ost_find, core.js, ...: a ReferenceError when the path gets there).
@@ -227,7 +228,7 @@ exports.boot = async function boot({user = 'alice', mobile = false, hash = '', l
   // setting), p2170_ui passes ls: {'tasks.newsBundle': null} for the bundled default
   const store = Object.assign(shared ? shared.store : {}, {'tasks.newsBundle': 'false', ...(hash || 'tasks.lastKey' in ls ? {} : {'tasks.lastKey': '"today"'}), ...ls});
   for (const k of Object.keys(store)) if (store[k] === null) delete store[k];
-  const vc = new VirtualConsole(); vc.on('jsdomError', e => { if (lateAppError(e.detail)) return;  /* 2.577.0 (#3356): a MutationObserver callback queued before w.close() ends here, not in unhandledRejection (vm_try, p170_ui) */ if (!/navigation|Not implemented/.test(e.message)) { exports.errs.push(e.message); console.log('script error:', String((e.detail && e.detail.stack) || e.stack || '').split('\n').slice(0, 4).join(' | ')); } });
+  const vc = new VirtualConsole(); vc.on('jsdomError', e => { if (lateAppError(e.detail)) { exports.lateErrs++; return; }  /* 2.577.0 (#3356): a MutationObserver callback queued before w.close() ends here, not in unhandledRejection (vm_try, p170_ui) */ if (!/navigation|Not implemented/.test(e.message)) { exports.errs.push(e.message); console.log('script error:', String((e.detail && e.detail.stack) || e.stack || '').split('\n').slice(0, 4).join(' | ')); } });
   const dom = await JSDOM.fromURL(B + path + (hash ? '#' + hash : ''), {runScripts: 'dangerously', resources: new PooledLoader(), pretendToBeVisual: true, virtualConsole: vc,
     beforeParse(w) {
       w.matchMedia = q => ({matches: q in media ? media[q] : /max-width/.test(q) ? mobile : false, addEventListener() {}, addListener() {}});  // media: {'(prefers-reduced-motion: reduce)': true}

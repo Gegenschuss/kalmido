@@ -614,12 +614,15 @@ async function rawFetch0(method, url, body, key, osp) {
   else if (body !== undefined) { opt.body = JSON.stringify(body); opt.headers['Content-Type'] = 'application/json'; }
   let r;
   // 2.363.3 (#3134): a form with files of some size goes with a progress bar and Cancel (upbar.js); Cancel is no lost connection
-  try { r = await (body instanceof FormData && typeof upSend === 'function' && upWanted(body) ? upSend(url, opt, body) : fetch(url, opt)); } catch (e) { if (e.cancelled) throw e; const ch = OUT.down; OUT.down = false; setOnline(false); if (ch && S.booted) renderTop(); throw new Offline('offline'); }
+  // 2.655.0 (#5045): an answer that arrives after the page is gone (its window closed: no document) goes nowhere: it never settles,
+  // so no caller draws into a page that is not there (outFlush -> renderTop, chatReact, rel_load, ld_go -> applyState, ...)
+  try { r = await (body instanceof FormData && typeof upSend === 'function' && upWanted(body) ? upSend(url, opt, body) : fetch(url, opt)); } catch (e) { if (!globalThis.document) return new Promise(() => {}); if (e.cancelled) throw e; const ch = OUT.down; OUT.down = false; setOnline(false); if (ch && S.booted) renderTop(); throw new Offline('offline'); }
   // 2.21.0 (#673): the device is online but the server is not (a proxy answers 502 / 503 / 504 without Kalmido's JSON): the
   // same as offline (cached data, changes wait), the hint says "server not reachable"; never a reload loop on a proxy page
   // 2.24.0 (#907): 503 (the proxy's maintenance page) or a notice of the kind "maintenance": "server in maintenance"
   // 2.359.0 A (#3023): an HTML page with a server error (500, a database restart) the same way (the change waits, no reload)
   // 2.360.2 L (#2561): the write lock of a key rotation too (JSON for API clients, the header X-Kalmido-Maint marks it)
+  if (!globalThis.document) return new Promise(() => {});  // 2.655.0 (#5045)
   const ctype = r.headers.get('content-type') || '';
   if (([502, 503, 504].includes(r.status) || (r.status >= 500 && ctype.includes('text/html'))) && (!ctype.includes('application/json') || r.headers.get('X-Kalmido-Maint'))) { const ch = !OUT.down; OUT.down = true; OUT.maint = r.status === 503 || S.announce?.level === 'maintenance'; setOnline(false); if (ch && S.booted) renderTop(); throw new Offline('down'); }
   if (OUT.down) { OUT.down = false; if (S.booted && !OUT.online) renderTop(); }
@@ -636,6 +639,7 @@ async function rawFetch0(method, url, body, key, osp) {
     throw new Error('auth');
   }
   const j = await r.json().catch(() => ({}));
+  if (!globalThis.document) return new Promise(() => {});  // 2.655.0 (#5045): the page went while the body was read
   if (String(url).split('?')[0] === '/api/state' && (r.status === 401 || (r.status === 403 && j.auth))) await sessGone();  // 2.238.0 B (#2872); 2.369.2 (#3136): with its query (lz, auto)
   if ((r.status === 401 || r.status === 403) && j.auth) { keepW(); await authGone(); authScreen(j); throw new Error('auth'); }  // built-in login
   if (r.status === 401) { keepW(); await authGone(); location.reload(); throw new Error('auth'); }
