@@ -320,17 +320,17 @@ const lv = (k, v) => k === 'dep_shift' || k === 'archived' || k === 'tickets' ||
 // 2.46.2 (#1659): the list name while it is typed: sidebar and header show it at once (l._live, read by licName); it is
 // saved after the 0.9 s pause as before (one undo step); a state that arrives meanwhile gets it again (OPT, like optWrite)
 const FL_LIVE = new Map();
-let fl_liveRaf = 0;
+const fl_liveDraw = debounce(() => { renderSide(); renderTop(); }, 16);  // 2.599.0 (#4506): debounce instead of a clearTimeout / setTimeout pair
 function fl_nameLive(id, name) {
   let p = FL_LIVE.get(id);
   if (!p) { p = {v: null, put: () => { const l = listById(id); if (l) { if (p.v == null) delete l._live; else l._live = p.v; } }}; FL_LIVE.set(id, p); OPT.add(p); }
   p.v = name || null; p.put();
-  clearTimeout(fl_liveRaf); fl_liveRaf = setTimeout(() => { renderSide(); renderTop(); }, 16);
+  fl_liveDraw();
 }
 function fl_nameEnd(id) {
   const p = FL_LIVE.get(id); if (!p) return;
   OPT.delete(p); FL_LIVE.delete(id); const l = listById(id); if (l) delete l._live;
-  clearTimeout(fl_liveRaf); renderSide(); renderTop();
+  fl_liveDraw.cancel(); renderSide(); renderTop();
 }
 const lp_fieldName = f => tr({name: N_('Name'), color: N_('Colour'), folder: N_('Folder'), view: N_('View'), kind: N_('Type'), checklist: N_('Show completed at the bottom'), dep_shift: N_('Move dependent tasks along'), rate: N_('Hourly rate'), archived: N_('Archived')}[f] || f);
 // 2.474.0 (#3917): the writes of one list go out one after the other: a second quick choice on a slow connection could overtake

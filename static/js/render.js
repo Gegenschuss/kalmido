@@ -1409,12 +1409,13 @@ const cfkFxErr = v => typeof v === 'string' && v.startsWith('#') ? tr(CFK_FX_ERR
 // ---- the linked task: {title, status} | null (not visible to me) | {off: true} (could not ask) | undefined (asking)
 /** @type {Object<string, any>} */
 const CFK_T = {};
-let cfk_q = new Set(), cfk_tm = 0;
+let cfk_q = new Set();
+const cfk_later = debounce(() => cfk_fetch(), 30);  // 2.599.0 (#4506): debounce instead of a clearTimeout / setTimeout pair
 function cfk_task(id) {
   const t = taskById(+id);
   if (t && t.id > 0) return {title: t.title, status: t.status};
   if (id in CFK_T) return CFK_T[id];
-  if (!cfk_q.has(+id)) { cfk_q.add(+id); clearTimeout(cfk_tm); cfk_tm = setTimeout(cfk_fetch, 30); }
+  if (!cfk_q.has(+id)) { cfk_q.add(+id); cfk_later(); }
   return undefined;
 }
 async function cfk_fetch() {
