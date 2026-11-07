@@ -120,6 +120,8 @@ def chat_case(S, P, other, who, channel=None):
     return rid
 
 
+SHARED = A.post(B + "/api/lists", json={"name": "Shared plans"}).json()["id"]  # a direct conversation needs a common list
+check(A.put(B + f"/api/lists/{SHARED}/members", json={"user_id": uid["bob"], "role": "edit"}).ok, "bob joins alice's list")
 chat_case(A, Bo, uid["bob"], "direct alice -> bob")
 chat_case(A, Bo, uid["bob"], "channel of Alpha, alice + bob", channel={"org_id": ORG, "members": [uid["bob"]]})
 chat_case(Fr, Fr, uid["frida"], "own channel of frida (no organisation)", channel={})
