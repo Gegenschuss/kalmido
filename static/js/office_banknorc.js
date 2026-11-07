@@ -138,6 +138,22 @@ document.addEventListener('drop', e => {
   if (rc) bnr_match(tid, 'receipt', rc);
   else if (e.dataTransfer.files?.length) bnr_upload(tid, e.dataTransfer.files[0]);
 });
+// 2.633.0 (#4963): the finger by drag.js: hold a receipt of the right column, drag it onto a booking, let go = the same bnr_match
+// as the mouse's drop; a swipe without the hold scrolls. The mouse keeps the browser's drag above.
+const bnr_fingerT = (x, y) => /** @type {any} */ (document.elementFromPoint(x, y))?.closest?.('[data-bnr-drop]') || null;
+const bnr_fingerOff = d => { d.r.classList.remove('dragging'); $$('[data-bnr-drop].on').forEach(x => x.classList.remove('on')); };
+drg_attach(document, {
+  mouse: false, hold: ROWD_HOLD, holdMove: 8, onTarget: true, raf: true, ghost: {el: d => d.r, cls: 'ghost-drag'},
+  scroll: () => tdScroller($('#view')), edge: TD_EDGE, step: TD_MAX,
+  start: t => {
+    const r = /** @type {any} */ (t).closest?.('[data-bnr-rc]');
+    return r ? {r, id: r.dataset.bnrRc} : null;
+  },
+  onHold: d => { d.r.classList.add('dragging'); if (navigator.vibrate) navigator.vibrate(12); },
+  onMove: (d, x, y) => { const t = bnr_fingerT(x, y); $$('[data-bnr-drop].on').forEach(b => b !== t && b.classList.remove('on')); t?.classList.add('on'); },
+  onDrop: (d, x, y) => { const t = bnr_fingerT(x, y); bnr_fingerOff(d); if (t) bnr_match(+t.dataset.bnrDrop, 'receipt', d.id); },
+  onCancel: bnr_fingerOff,
+});
 
 // ---- the counter on the office start page (admins of the office only: the route answers others 403 = no counter)
 function bnr_startHtml() {
