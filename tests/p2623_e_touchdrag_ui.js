@@ -227,7 +227,18 @@ const closeMenus = d => { d.dispatchEvent(new d.defaultView.KeyboardEvent('keydo
     check(!(await refOf()) && !d.querySelector('.ghost-drag'), 'touch: a quick swipe over the row files nothing');
     await hold1(w, l, 400, 125, 100, 315, 'touch');
     check(await until(async () => (await refOf()) === FOL), 'touch: the held row dragged onto the folder = filed there (as the mouse) ' + (await refOf()));
-    check(await until(() => !d.querySelector('.ghost-drag, #side .sbbdin, #view .ofdli.dragging')), 'touch: nothing of the drag stays behind'); }
+    check(await until(() => !d.querySelector('.ghost-drag, #side .sbbdin, #view .ofdli.dragging')), 'touch: nothing of the drag stays behind');
+    // 2.633.0 (#4964, review): held without moving = the row's menu ONCE, on letting go; the row's long press (ms_longPress, 500 ms,
+    // pointer events as a real browser sends them beside the touch ones) must not open it as well while the finger still holds
+    const l2 = li(); box(l2, 300, 100, 500, 50);
+    const pe = new w.Event('pointerdown', {bubbles: true}); Object.assign(pe, {pointerType: 'touch', clientX: 400, clientY: 125}); l2.querySelector('.ofdrow').dispatchEvent(pe);
+    tc(w, l2, 'touchstart', 400, 125);
+    check(await until(() => l2.classList.contains('dragging'), 30), 'touch: held still lifts the row');
+    await sleep(700);  // past the long press's 500 ms: a negative check (nothing may open), no state to wait for
+    check(!items(d).length, 'touch: while the finger still holds, the long-press menu stays shut (the hold took the press)');
+    l2.querySelector('.ofdrow').dispatchEvent(new w.Event('pointerup', {bubbles: true})); tc(w, l2, 'touchend', 400, 125);  // a browser sends pointerup before touchend
+    check(await until(() => items(d).length, 20), 'touch: let go without moving = the row\'s menu ' + [l2.isConnected, l2.classList.contains('dragging'), w.eval('(OFD.list||[]).length'), w.eval('typeof ofdRowMenu'), !!d.querySelector('#pop'), (d.querySelector('#pop')||{}).className, d.querySelector('#view .ofdrow')?.dataset.id, d.querySelector('#view .ofdrow')?.dataset.arch].join(' / '));
+    closeMenus(d); }
   w.close();
 
   // ---- #4963 a receipt onto a booking

@@ -207,7 +207,10 @@ drg_attach(document, {
     const li = /** @type {any} */ (t).closest?.('#view .ofdli[data-ofdmv]'), r = li?.querySelector('.ofdrow[data-id]');
     return r ? {r: li, x: {area: typeof ofd_sec === 'function' ? ofd_sec() : 'offers', id: +r.dataset.id}} : null;
   },
-  onHold: d => { d.r.classList.add('dragging'); if (navigator.vibrate) navigator.vibrate(12); },
+  // the hold takes the press from the row's long-press menu (office_docs.js OFD.lp, multisel.js ms_lpTake, as ablage.js):
+  // without, both fire on a still finger (hold 380 ms, menu 500 ms); let go unmoved = the row's menu, as the long press did
+  onHold: d => { if (typeof ms_lpTake === 'function') ms_lpTake(OFD.lp); d.r.classList.add('dragging'); if (navigator.vibrate) navigator.vibrate(12); },
+  onTap: d => { oft_fingerOff(d); const r = d.r.isConnected ? d.r.querySelector('.ofdrow[data-id]') : $(`#view .ofdrow[data-id="${d.x.id}"]`); if (r) ofdRowMenu(r.dataset.id, r); },
   onMove: (d, x, y) => { const t = oft_fingerT(d, x, y); $$('#side .sbbdin').forEach(b => b !== t && b.classList.remove('sbbdin')); t?.classList.add('sbbdin'); },
   onDrop: (d, x, y) => { const t = oft_fingerT(d, x, y); oft_fingerOff(d); if (t) oft_extDrop(d.x, t); },
   onCancel: oft_fingerOff,
