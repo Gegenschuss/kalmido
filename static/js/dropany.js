@@ -16,7 +16,7 @@
 
 // the drop areas of modules with their own drop (documents, file store, project files, chats, bank without receipt)
 const DA_OWN = '.dc-view, .abview, #pov-files, .chview, #achat, .tcroom, [data-bnr-drop], [data-dropown]';
-const DA = {k: 0};
+const da_clearSoon = debounce(() => da_clear(), 1500);  // 2.599.0 (#4506): the frame goes 1.5 s after the last dragover (core.js debounce)
 const da_mouse = () => { try { return matchMedia('(hover: hover)').matches; } catch { return false; } };
 const da_files = (/** @type {DragEvent} */ e) => [...(e.dataTransfer?.types || [])].includes('Files');
 /** @param {Element|null} el */
@@ -87,7 +87,7 @@ window.addEventListener('dragover', e => {
   if (!da_files(e) || !da_mouse()) return;
   if (e.defaultPrevented) { da_clear(); return; }  // a module with its own drop has it
   const c = da_cands(); if (!c.length) { da_clear(); return; }
-  e.preventDefault(); clearTimeout(DA.k); DA.k = setTimeout(da_clear, 1500); document.documentElement.classList.add('dropany-on');
+  e.preventDefault(); da_clearSoon(); document.documentElement.classList.add('dropany-on');
   const dt = /** @type {DataTransfer} */ (e.dataTransfer);
   if (c.length === 1) { dt.dropEffect = 'copy'; da_hint(tr('Drop here: {0}', da_label(c[0].a)), true); return; }
   const hit = c.find(x => x.z?.contains(/** @type {Node} */ (e.target)));

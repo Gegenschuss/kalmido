@@ -832,7 +832,7 @@ function settingsModal(focus) {
       ${hint(tr('Also removes camera details and capture time. In an organisation its admins decide.'))}
       ${feat('videos') ? `<h4 id="s-vext-h">${tr('Videos')}</h4><div class="row">${chk('s-vext', s.video_ext_ok === '1', tr('Load YouTube and Vimeo videos without asking'))}</div>
       ${hint(tr('Off: a video first shows a note and loads the player only after your click. Loading sends data such as your IP address to the provider.'))}` : ''}${''/* 2.623.0 (#4765): only with the module Approval */}
-      ${xl_stdHtml(hint)}${''/* 2.470.0 (#3596) */}
+      ${S.me?.kid ? '' : '<div id="s-xlstd-sec"></div>'}${''/* 2.470.0 (#3596); 2.599.0 (#4907): drawn once the module ablage is there (xl_stdLater) */}
       ${tty_html(hint)}${''/* 2.609.0 (#3372): own ticket types (below) */}
       ${typeof umzHtml === 'function' ? umzHtml(hint) : ''}
       <h4 id="s-tpl-h">${tr('Templates')}</h4>

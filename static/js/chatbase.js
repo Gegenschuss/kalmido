@@ -148,7 +148,7 @@ const fmtUsd = v => v === null || v === undefined ? '–' : +v > 0 && +v < .01 ?
 // the task panel: "Agent usage" of a task agents reported usage for (only on tasks the viewer sees: it comes with the task)
 const aiuTaskLine = t => t.ai_usage ? `<label>${tr('Agent usage')}</label><div class="aiuse" title="${esc(tr('Model usage agents reported for this task'))}">${ic('chart', 's')}<span>${esc(tr('{0} tokens', fmtTok(t.ai_usage.tokens)))}${t.ai_usage.cost !== null && t.ai_usage.cost !== undefined ? ' · ' + esc(fmtUsd(t.ai_usage.cost)) : ''} · ${esc(trn('{0} report', '{0} reports', t.ai_usage.calls))}</span></div>` : '';
 // 2.65.0 (#1823): the pop-up button follows the window width also before the chat is loaded (agentchat.js redraws it too)
-{ let t = 0; window.addEventListener('resize', () => { clearTimeout(t); t = setTimeout(chatFabDraw, 150); }); }
+window.addEventListener('resize', debounce(() => chatFabDraw(), 150));  // 2.599.0 (#4506): core.js debounce
 
 // 2.235.0 D (#2899): phones: after sending, the keyboard closes so the answer has the whole screen (a tap into the box brings it back); per chat, default on
 // 2.380 E (#3449): a hardware keyboard (no on-screen keyboard open: the visual viewport is not shrunk) keeps the focus whatever the switch says
