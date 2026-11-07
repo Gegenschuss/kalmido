@@ -17204,5 +17204,15 @@
   "Read are monthly statements as a PDF with a text layer in the line format (receipt date, booking date, text, amount) of {0}, up to {1} MB. Photos, scans without text and CSV files are not read: let an agent read them or enter the positions by hand.": "Se leen extractos mensuales en PDF con capa de texto en formato de líneas (fecha del recibo, fecha de contabilización, texto, importe) de {0}, hasta {1} MB. Las fotos, los escaneos sin texto y los archivos CSV no se leen: que los lea un agente o introduce las posiciones a mano.",
   "Make this the default for {0}": "Usar como estándar para {0}",
   "This is the default for {0} now": "Ahora es el estándar para {0}",
-  "Only an admin of the organisation can change its default": "Solo un administrador de la organización puede cambiar su estándar"
+  "Only an admin of the organisation can change its default": "Solo un administrador de la organización puede cambiar su estándar",
+  "Completed → move to {0}": "Completada → mover a {0}",
+  "Opened again → move to {0}": "Reabierta → mover a {0}",
+  "Created → assign to me": "Creada → asignármela",
+  "Comes into {0} → assign to a person": "Llega a {0} → asignar a una persona",
+  "Due today → priority high": "Vence hoy → prioridad alta",
+  "Gets the tag {0} → priority high": "Recibe la etiqueta {0} → prioridad alta",
+  "Comes into {0} → mark as done": "Llega a {0} → marcar como hecha",
+  "Select a column": "Elegir una columna",
+  "Select a tag": "Elegir una etiqueta",
+  "Select a person": "Elegir una persona"
 }

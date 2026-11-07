@@ -144,6 +144,7 @@ function rul_dialog(lid, r, done) {
     <div class="calerr" role="alert" id="rul-err" hidden></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
   md.classList.add('rul-dlg');
+  if (!r) rul_tplMount(md, lid);  // 2.634.0 (#4774): the templates on top of a new rule
   const drawT = () => {
     const k = $('#rul-trig', md).value, x = $('#rul-tv', md);
     if (k === 'section') x.innerHTML = `<label for="rul-tsec">${tr('Column')}</label><select id="rul-tsec">${rul_secs(lid).map(s => opt(s.id, s.name, t.section_id)).join('') || opt('', tr('No columns yet'))}</select>`;
@@ -222,3 +223,85 @@ function rul_draw(v) {
   return {main, foot};
 }
 const rul_toast = v => tr('Rule {0} added', rul_q(v.proposal?.rule?.name || ''));
+
+// ---- 2.634.0 (#4774): templates on top of the dialog of a new rule. A click fills the dialog (name, when, then); the person
+// picks the column / person still open and saves: a normal rule, nothing stored as a template. Only triggers / actions the
+// dialog offers (RUL_TRIG / RUL_ACT): a template whose kind is missing is not shown (e.g. the action "done" before #4781).
+// Columns and tags are proposed by name (current language, English and German, case-insensitive); none fits = the field
+// stays empty with "Select …" and saving asks for it.
+const RUL_TPL = [
+  {k: 'done_move', t: N_('Completed → move to {0}'), trig: {kind: 'done'}, act: {kind: 'move', sec: 'done'}},
+  {k: 'reopen_move', t: N_('Opened again → move to {0}'), trig: {kind: 'reopen'}, act: {kind: 'move', sec: 'wip'}},
+  {k: 'created_me', t: N_('Created → assign to me'), trig: {kind: 'created'}, act: {kind: 'assign', me: true}},
+  {k: 'review_assign', t: N_('Comes into {0} → assign to a person'), trig: {kind: 'section', sec: 'review'}, act: {kind: 'assign'}},
+  {k: 'due_prio', t: N_('Due today → priority high'), trig: {kind: 'due'}, act: {kind: 'priority', priority: 'high'}},
+  {k: 'urgent_prio', t: N_('Gets the tag {0} → priority high'), trig: {kind: 'ltag', tag: 'urgent'}, act: {kind: 'priority', priority: 'high'}},
+  {k: 'done_mark', t: N_('Comes into {0} → mark as done'), trig: {kind: 'section', sec: 'done'}, act: {kind: 'done'}},
+];
+// role -> the section keys of the project types (lists/templates.py PTYPES), translated + English, and German words
+const RUL_TPL_NAMES = {review: ['Review'], done: ['Done|section'], wip: ['In progress'], approval: ['Approval'], billing: ['Billing'],
+  production: ['Production'], urgent: ['Urgent']};
+const RUL_TPL_DE = {review: ['Prüfung'], done: ['Fertig', 'Erledigt'], wip: ['In Arbeit'], approval: ['Abnahme', 'Freigabe'], billing: ['Abrechnung'],
+  production: ['Umsetzung', 'Produktion'], urgent: ['Dringend']};
+// project type -> the roles of a template's column, in the order tried; agency: Approval / Billing
+const RUL_TPL_ROLES = {agency: {review: ['approval', 'review'], done: ['billing', 'done'], wip: ['production', 'wip']}};
+const RUL_TPL_FIRST = ['review_assign', 'done_move', 'done_mark'];  // software / agency: review and done first
+const rul_tplNorm = s => String(s || '').trim().toLocaleLowerCase();
+function rul_tplFind(items, roles) {  // the first item whose name fits a name of the roles (in role order)
+  for (const ro of roles) {
+    const ns = new Set([...(RUL_TPL_NAMES[ro] || []).flatMap(n => [n.split('|')[0], tr(n)]), ...(RUL_TPL_DE[ro] || [])].map(rul_tplNorm));
+    const hit = items.find(x => ns.has(rul_tplNorm(x.name)));
+    if (hit) return hit;
+  }
+  return null;
+}
+function rul_tplList(lid) {  // the templates of a list: available kinds only, sorted by project type, with their proposals
+  const l = listById(lid), pt = l?.ptype || '', has = (xs, k) => xs.some(x => x[0] === k);
+  const roles = role => RUL_TPL_ROLES[pt]?.[role] || [role];
+  const out = RUL_TPL.filter(tp => has(RUL_TRIG, tp.trig.kind) && has(RUL_ACT, tp.act.kind)).map(tp => {
+    const sec = tp.trig.sec || tp.act.sec, s = sec ? rul_tplFind(rul_secs(lid), roles(sec)) : null;
+    const g = tp.trig.tag ? rul_tplFind(listTags(lid), [tp.trig.tag]) : null;
+    const nm = sec ? (s?.name || tr(RUL_TPL_NAMES[roles(sec)[0]][0])) : g?.name || tr(RUL_TPL_NAMES.urgent[0]);
+    return {...tp, sec: s, tag: g, label: tr(tp.t, rul_q(nm))};
+  });
+  if (pt === 'software' || pt === 'agency') out.sort((x, y) => (RUL_TPL_FIRST.indexOf(x.k) + 1 || 99) - (RUL_TPL_FIRST.indexOf(y.k) + 1 || 99));
+  return out;
+}
+function rul_tplMount(md, lid) {
+  const tps = rul_tplList(lid), h = $('h3', md); if (!tps.length || !h) return;
+  h.insertAdjacentHTML('afterend', `<div class="row rul-tpl"><span class="lbl">${tr('Templates')}</span><div class="mschips" role="group" aria-label="${esc(tr('Templates'))}">${tps.map(tp => `<button type="button" class="chip" data-rul-tpl="${tp.k}" aria-pressed="false">${esc(tp.label)}</button>`).join('')}</div></div>`);
+  md.addEventListener('click', e => {
+    const b = e.target.closest('[data-rul-tpl]'); if (!b) return;
+    const tp = tps.find(x => x.k === b.dataset.rulTpl); if (!tp) return;
+    md.querySelectorAll('[data-rul-tpl]').forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', String(x === b)); });
+    rul_tplFill(md, lid, tp);
+  });
+  md.addEventListener('click', e => {  // capture: before the dialog's save, a field the template left open must be chosen
+    const b = e.target.closest('[data-m="save"]'); if (!b) return;
+    const open = [...md.querySelectorAll('select')].find(s => s.selectedOptions[0]?.dataset.rulPick);
+    if (!open) return;
+    e.stopImmediatePropagation(); e.preventDefault();
+    const er = $('#rul-err', md); if (er) { er.textContent = open.selectedOptions[0].textContent; er.hidden = false; }
+    open.focus();
+  }, true);
+}
+function rul_tplFill(md, lid, tp) {
+  const sel = id => $('#' + id, md);
+  const kick = (id, v) => { const s = sel(id); if (!s) return; s.value = v; s.dispatchEvent(new Event('change', {bubbles: true})); };
+  const pick = (id, v, why) => {  // the proposal, or an empty "Select …" entry
+    const s = sel(id); if (!s) return;
+    s.querySelector('[data-rul-pick]')?.remove();
+    if (v != null && [...s.options].some(o => o.value === String(v))) { s.value = String(v); return; }
+    s.insertAdjacentHTML('afterbegin', `<option value="" data-rul-pick="1">${esc(why)}</option>`);
+    s.selectedIndex = 0;
+  };
+  sel('rul-name').value = tp.label.slice(0, 80);
+  const er = sel('rul-err'); if (er) er.hidden = true;
+  kick('rul-trig', tp.trig.kind);
+  if (tp.trig.kind === 'section') pick('rul-tsec', tp.sec?.id, tr('Select a column'));
+  if (tp.trig.kind === 'ltag') pick('rul-ttag', tp.tag?.id, tr('Select a tag'));
+  kick('rul-act', tp.act.kind);
+  if (tp.act.kind === 'assign') pick('rul-user', tp.act.me ? S.me?.id : null, tr('Select a person'));
+  if (tp.act.kind === 'priority') sel('rul-prio').value = tp.act.priority;
+  if (tp.act.kind === 'move') { kick('rul-list', String(lid)); pick('rul-sec', tp.sec?.id, tr('Select a column')); }
+}

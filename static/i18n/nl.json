@@ -17204,5 +17204,15 @@
   "Read are monthly statements as a PDF with a text layer in the line format (receipt date, booking date, text, amount) of {0}, up to {1} MB. Photos, scans without text and CSV files are not read: let an agent read them or enter the positions by hand.": "Gelezen worden maandafschriften als pdf met tekstlaag in regelformaat (documentdatum, boekingsdatum, tekst, bedrag) van {0}, tot {1} MB. Foto's, scans zonder tekst en csv-bestanden worden niet gelezen: laat ze door een agent lezen of voer de posten met de hand in.",
   "Make this the default for {0}": "Als standaard voor {0} overnemen",
   "This is the default for {0} now": "Dit is nu de standaard voor {0}",
-  "Only an admin of the organisation can change its default": "Alleen een beheerder van de organisatie kan de standaard ervan wijzigen"
+  "Only an admin of the organisation can change its default": "Alleen een beheerder van de organisatie kan de standaard ervan wijzigen",
+  "Completed → move to {0}": "Afgerond → verplaatsen naar {0}",
+  "Opened again → move to {0}": "Heropend → verplaatsen naar {0}",
+  "Created → assign to me": "Aangemaakt → aan mij toewijzen",
+  "Comes into {0} → assign to a person": "Komt in {0} → aan een persoon toewijzen",
+  "Due today → priority high": "Vandaag verlopen → prioriteit hoog",
+  "Gets the tag {0} → priority high": "Krijgt het label {0} → prioriteit hoog",
+  "Comes into {0} → mark as done": "Komt in {0} → als afgerond markeren",
+  "Select a column": "Kies een kolom",
+  "Select a tag": "Kies een label",
+  "Select a person": "Kies een persoon"
 }
