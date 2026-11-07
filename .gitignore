@@ -12,6 +12,8 @@ tests/ids.json
 tests/news_ids.json
 tests/cal_ids.json
 tests/timings*.csv
+# 2.625 D (#4005): the JUnit reports of tests/run_all.sh
+tests/.junit/
 tests/.demo/
 /demo/
 tests/.demo-quick/

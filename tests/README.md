@@ -153,7 +153,7 @@ first 15 lines of its file is enough, `python3 suites.py --check` validates it, 
 # kalmido-suite: now=wed10:00 nodata  # a fixed test time for the group; no data dir argument
 ```
 
-`run_all.sh` prints one summary line per suite and exits non-zero if anything failed. Single suites:
+`run_all.sh` prints one summary line per suite and exits non-zero if anything failed. It also writes a JUnit report per suite to `tests/.junit/<suite>.xml` (2.625, #4005: one case per `kt.check`, else per `FAIL` line; the CI uploads them as artifact `junit-shard-N`). Single suites:
 
 ```sh
 ./start.sh                      # fresh container on 127.0.0.1:3041 (proxy port) and :3048 (app port)

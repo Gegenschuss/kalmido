@@ -29,6 +29,9 @@
 #                                suites (N): c d" (passed, but their output has a skip line, SKIP_RE: Firefox part, no pwsh, a missing
 #                                tool); each passed suite with such a line prints the first three under its "== x: passed".
 #                                The last line stays "ALL SUITES PASSED" / "FAILED suites: ..." (the test runner and the release tooling read it).
+# 2.625 D (#4005): every suite that runs (or is skipped by skip.txt) leaves a JUnit report $KALMIDO_JUNIT_DIR/<suite>.xml (default
+#                                tests/.junit, emptied at the start; tests/junit.py: a case per kt.py check, else per FAIL line);
+#                                the CI uploads it per shard (artifact junit-shard-N), the flaky detection reads it. KALMIDO_JUNIT=0: none.
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$HERE"
@@ -75,6 +78,17 @@ shard() { [[ ${#PLAN[@]} -gt 0 ]] || CUR=$1; }
 # WANT_G = the groups ONLY_GROUPS asks for. Called from fresh, mine() opens the next group (timing, test time).
 GI=0; GT0=0; GRAN=; NEXT_NOW=; BASE_NOW=${KALMIDO_TEST_NOW:-}; GFIRST=(); WANT_G=
 TIMINGS=${KALMIDO_TIMINGS:-$HERE/timings.csv}
+JUNIT_DIR=${KALMIDO_JUNIT_DIR:-$HERE/.junit}  # 2.625 D (#4005): not under tests/.data (start.sh wipes it per group)
+[[ "${KALMIDO_JUNIT:-1}" == 0 || ! -f "$HERE/junit.py" ]] && JUNIT_DIR=
+if [[ -n "$JUNIT_DIR" && -z "${KALMIDO_LIST_ONLY:-}" ]]; then
+  mkdir -p "$JUNIT_DIR" 2>/dev/null && rm -f "$JUNIT_DIR"/*.xml "$JUNIT_DIR"/.*.steps 2>/dev/null || JUNIT_DIR=
+fi
+_junit() {  # _junit <suite> <rc> <ms> <output>  (2.625 D, #4005): the report, never the suite's result
+  [[ -n "$JUNIT_DIR" ]] || return 0
+  printf '%s\n' "$4" | "$PY" "$HERE/junit.py" "$JUNIT_DIR" "$1" "$2" "$3" "$JUNIT_DIR/.$1.steps" >/dev/null 2>&1 \
+    || echo "== $1: no JUnit report (tests/junit.py failed)"
+  rm -f "$JUNIT_DIR/.$1.steps"
+}
 while read -r g n; do
   [[ -n "${GFIRST[$g]:-}" ]] || GFIRST[$g]=$n
   [[ -n "${ONLY_GROUPS:-}" && " $ONLY_GROUPS " == *" $n "* && "$WANT_G " != *" $g "* ]] && WANT_G+=" $g"
@@ -145,15 +159,19 @@ run() {  # run <name> <cmd...>: prints the summary line, remembers failures
   [[ -n "${ONLY:-}" && " $ONLY " != *" $name "* ]] && return 0
   # #1315: a proven flaky suite is skipped until the date of its line in skip.txt (tests/skip_test.py: CI red after it);
   # a run naming it (ONLY=SUITE) runs it - that is how it gets fixed
-  [[ -z "${ONLY:-}" && "$SKIPS" == *" $name "* ]] && { SKIPPED+=("$name"); echo "== $name: SKIPPED (wackelt, tests/skip.txt)"; return 0; }
+  if [[ -z "${ONLY:-}" && "$SKIPS" == *" $name "* ]]; then SKIPPED+=("$name"); echo "== $name: SKIPPED (wackelt, tests/skip.txt)"
+    [[ -n "$JUNIT_DIR" && -z "${KALMIDO_LIST_ONLY:-}" ]] && { "$PY" "$HERE/junit.py" --skipped "$JUNIT_DIR" "$name" "wackelt, tests/skip.txt" >/dev/null 2>&1 || true; }
+    return 0; fi
   [[ -n "${KALMIDO_LIST_ONLY:-}" ]] && { echo "$name"; return 0; }
   [[ -n "${FRESH_DUE:-}" ]] && _fresh_start "$name"
   local out rc t0
   t0=$(_ms); GRAN=1
-  out=$("$@" 2>&1); rc=$?
+  [[ -n "$JUNIT_DIR" ]] && rm -f "$JUNIT_DIR/.$name.steps"
+  out=$(KALMIDO_JUNIT_STEPS=${JUNIT_DIR:+$JUNIT_DIR/.$name.steps} "$@" 2>&1); rc=$?
   _timing "$name" $(( $(_ms) - t0 )) $rc  # 2.149.0 E (#2514)
   # 2.623.0 (#4950): a summary line "... N failed" with N > 0 is red too, also at rc 0 (a suite that forgot sys.exit(done(...)))
   if [[ $rc -eq 0 ]] && grep -Eq "ok, [1-9][0-9]* failed" <<< "$out"; then rc=1; fi
+  _junit "$name" $rc $(( $(_ms) - t0 )) "$out"
   echo "$out" | grep -E "^FAIL|^PERF|ok, [0-9]+ failed|Error|Traceback" | head -40
   if [[ $rc -ne 0 ]]; then FAILED+=("$name"); echo "== $name: FAILED (exit $rc)"; echo "$out" | tail -15
     # GitHub Actions: an annotation, readable on the run page (and via the API) without the full log

@@ -62,8 +62,26 @@ def docker_logs_on_first_fail(tail=60, chars=6000):
     on_first_fail(show)
 
 
+STEPS = []  # 2.625 D (#4005): the open steps file of KALMIDO_JUNIT_STEPS (tests/run_all.sh -> tests/junit.py), once
+
+
+def _step(ok, what):
+    """2.625 D (#4005): one line per check into the steps file run_all.sh names (KALMIDO_JUNIT_STEPS) - a JUnit case each."""
+    p = os.environ.get("KALMIDO_JUNIT_STEPS")
+    if not p:
+        return
+    try:
+        if not STEPS:
+            STEPS.append(open(p, "a", encoding="utf-8"))
+        STEPS[0].write(("ok" if ok else "fail") + "\t" + " ".join(str(what).split())[:300] + "\n")
+        STEPS[0].flush()
+    except OSError:
+        pass
+
+
 def check(cond, what):
     """Count a passed check or print and remember a failed one (the suite ends with sys.exit(done(name)))."""
+    _step(cond, what)
     if cond:
         OKS[0] += 1
     else:

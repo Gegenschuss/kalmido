@@ -548,6 +548,16 @@ jobs:
           path: tests/timings*
           if-no-files-found: ignore
           retention-days: 30
+      # 2.625 D (#4005): one JUnit report per suite (tests/run_all.sh -> tests/.junit/<suite>.xml); the flaky detection of the
+      # release tooling reads which suite / which case was red (kalmido-ci-status.py junit)
+      - name: JUnit reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: junit-shard-${{ matrix.shard }}
+          path: tests/.junit/*.xml
+          if-no-files-found: ignore
+          retention-days: 30
       - name: Container log on failure
         if: failure()
         run: docker logs kalmido-test 2>&1 | tail -100 || true
