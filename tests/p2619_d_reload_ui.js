@@ -51,10 +51,14 @@ const until = fn => until0(fn, {timeout: 20000, step: 100});
   check(await until(() => w.eval('td_polling ? false : (td_polling = true)')), 'the poll held again');
   const appVer = d.querySelector('meta[name="kalmido-version"]')?.content;
   w.eval(`verReload = () => { window.__rl = (window.__rl || 0) + 1; }; VER_SPREAD_MS = 600000; document.activeElement?.blur?.(); verIdle = Date.now() - 60000; sessionStorage.removeItem('kalmido-reloaded'); window.__rl = 0`);
+  // quiet: no field, dialog, popover, draft or waiting change (verQuiet holds the reload back otherwise)
+  w.eval(`[...document.querySelectorAll('.modal')].forEach(m => m.remove()); const q = document.querySelector('#qinput'); if (q) q.value = ''`);
+  const why = () => JSON.stringify(w.eval(`({quiet: verQuiet(), editing: editing(), focused: editFocused(), modal: !!$('.modal'), pop: !!$('#pop:not(.hidden)'), sheet: !!$('.qadd.sheet'), q: OUT.q.length, multi: !!S.multiMode, draft: verDraft(), seen: S.verSeen})`));
+  check(await until(() => w.eval('verQuiet()')), `the window is quiet ${why()}`);
   w.eval(`verCheck('99.1.0'); verCheck('99.1.0'); verCheck('99.1.0')`);
   check(!w.__rl && d.querySelector('#newver'), `#3890: quiet, the new version reported three times: no reload yet, the bar shows (reloads ${w.__rl})`);
-  check(w.eval('S.verSpread?.v === "99.1.0" && S.verSpread.at > Date.now()'), '#3890: the window waits its own random time');
-  w.eval('S.verSpread.at = Date.now() - 1; verCheck("99.1.0")');
+  check(w.eval('S.verSpread?.v === "99.1.0" && S.verSpread.at > Date.now()'), `#3890: the window waits its own random time ${why()}`);
+  w.eval('if (S.verSpread) S.verSpread.at = Date.now() - 1; verCheck("99.1.0")');
   check(w.__rl === 1, `#3890: once its time has come it reloads by itself (${w.__rl})`);
   w.eval(`S.serverVer = '${appVer}'; verCheck('${appVer}'); td_polling = false`);
   w.close();
