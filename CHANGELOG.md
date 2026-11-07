@@ -16,6 +16,49 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.656.0] - 2026-11-08
+
+Package 2.647 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Fixed
+- Calendars and address books: a share taken back in the file store's share dialog (or one that expired) now really ends the person's access everywhere - reminders, the heir on account deletion, news, the agent workspace check, client contact links and the organisation export / import no longer read the old member row (#5046)
+- Tables and knowledge pages: an organisation import binds every share card to its core share, so ending a share in the table's dialog or in the file store's dialog ends it in both; undoing a table's move between workspaces gives the people back their access; a share card without a core share no longer grants access (#5047)
+### Security
+- Share revocation: no second, unconnected right on calendars, address books, tables and knowledge pages after a revocation, an expiry or an organisation import (#5046, #5047)
+
+Package 2.577 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Added
+- Software tickets: a column can carry a status meaning (open, in progress, review, done, rejected); dragging a task into "done" completes it, into "rejected" marks it won't do, out of them reopens it; the meaning is in API, MCP, filters and the new webhook task.status_changed; review takes the column with the meaning review first (#3354).
+- Software tickets: shared views per project - a saved filter can be hung on a project and shared; everyone who reads the project sees it, editors change it; GET /api/v1/tasks?filter_id=, /api/v1/lists/{id}/views, MCP list_views / create_view (#3356).
+- Documents: several named mail addresses per area (personal files, an organisation's office) in Settings > Integrations > Documents: inboxes > By e-mail, each with a name, a fixed target folder and fixed tags, switchable on/off, renewable (the old address stops working) and deletable; the existing address stays as "General" (#4466).
+- Office under "All workspaces": tapping an area in the overview opens it at its own address (#office/s/<area>) instead of switching the workspace; Back returns to the overview (#4638).
+
+### Changed
+- Event calendar links are stored only as a hash and shown once, like task feeds; existing plain links are hashed at start and keep working (#4708).
+- Dialogs keep their input over a reload, an ended session or a closed tab (#4708).
+- File versions: the app's version routes accept expect_version and answer 409 with the current file when someone else saved a newer version; agents must send it (#4708).
+- The wiki history marks versions written by agents; a letter's change goes into the office log with its diff (#4708).
+- The token / agent dialog says that a project limit (list_ids) covers projects and their tasks only (#4708).
+
+### Fixed
+- Contacts are deleted for good only by the address book's owner (#4708).
+- Wiki folder move / rename, contact group changes, online payment / Peppol setup and new list fields lock before they read, so parallel changes are not lost (#4708).
+- A waiting wiki text of a locked space is sealed again with the current key generation before it is sent (#4708).
+- "Stop reminding" from a push sends the previous state, a conflict opens the app (#4708).
+- Office undo/redo of a client leaves the invoicing fields as they are when the person may not change them any more (#3964).
+
+Package 2.649 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), CI-only rot: p274_b_demo, CI-only rot: p287b_a_freelancer_api u. 1 weitere).
+### Changed
+- Leaving an organisation, a demotion that takes the right away, and retiring now revoke the person's public file links and file requests (restorable like shares, listed in the revocation register); coming back no longer reopens them by itself. Restoring needs the creator to still share or write in the folder, else 409 (#5051)
+- An agent that moves to another workspace loses its shares in the old organisation through the revocation register; moving back opens nothing; withdrawing an invitation and the nightly boundary repair go through the register too (rows restorable, card and legacy rows cleaned on both sides) (#5051)
+- Docs: docs/dev/kern.md states how a folder share and the office groups work together (decision #2742) (#5048)
+### Fixed
+- Public file links no longer show, download, preview or zip receipts their creator may not see in the app (#5049)
+- Phone: tapping in a scrolled bottom sheet no longer jumps it to the top and hits another row (CI red p2150_ui, #5062)
+- Browser demo: answers the ticket-types request at start (CI red p274_b_demo, #5039)
+- Tests: p287b_a_freelancer_api expects 404 for mailbox rules without an own mailbox (CI red, #5061)
+- semgrep check: an exception entry whose code line still stands is no longer reported as "without a finding" in the partial run (#5056)
+
 ## [2.650.0] - 2026-11-07
 
 Package 2.547 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
@@ -431,7 +474,8 @@ Package 2.582 (Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher),
 
 Not released (the CI of this version was red); its changes are listed under 2.605.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.650.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.656.0...HEAD
+[2.656.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.656.0
 [2.650.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.650.0
 [2.648.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.648.0
 [2.646.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.646.0

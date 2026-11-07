@@ -1,6 +1,24 @@
 {
  "versions": [
   {
+   "version": "2.656.0",
+   "date": "2026-11-08",
+   "items": [
+    {
+     "de": "Spalten in Software-Projekten können eine Status-Bedeutung haben, und Ansichten lassen sich je Projekt teilen.",
+     "en": "Columns in software projects can carry a status meaning, and views can be shared per project."
+    },
+    {
+     "de": "Für Dokumente gibt es eigene Mail-Adressen mit festem Zielordner und Tags, etwa für Kontoauszüge.",
+     "en": "Documents get their own mail addresses with a fixed target folder and tags, for example for bank statements."
+    },
+    {
+     "de": "Unter „Alle Arbeitsbereiche“ öffnet ein Tipp im Büro den Bereich, ohne den Arbeitsbereich umzuschalten.",
+     "en": "Under \"All workspaces\" a tap in the office opens the area without switching the workspace."
+    }
+   ]
+  },
+  {
    "version": "2.648.0",
    "date": "2026-11-07",
    "items": [
