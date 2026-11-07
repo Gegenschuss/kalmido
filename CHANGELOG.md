@@ -16,6 +16,21 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.648.0] - 2026-11-07
+
+Package 2.644 (Bündel: CI-only rot: p2137_c_api, CI-only rot: p23674_b_org, CI-only rot: p2538_c_buero u. 3 weitere).
+### Added
+- Agents read the sales pipeline, add inquiries and deals and set a deal's stage: API v1 `GET/POST /office/deals`, `PATCH /office/deals/{id}` (stage only, needs `expect_updated_at`, 409 on a newer version; leads stay with people), MCP `list_office_deals`, `create_office_deal`, `set_office_deal_stage`; scope `office` and the same switches as leads, only for office admins, every call in the office log (#3663)
+- Log clean-up: time indexes on list_activity, fs_log, org_list_log and sheet_changes (#4192)
+### Changed
+- Log clean-up deletes in committed batches of 5,000 rows instead of one statement under the 30 s limit; a table that fails sends an admin alert (kind storage) instead of only a log line (#4192)
+- Backups: a store clean-up now answers with its own code `store_busy` and its own text instead of "Another backup or restore is running"; verifying takes the read lock only for own format-3 backups (#4530)
+### Fixed
+- Backups: downloading a format-3 backup takes the read lock before the one-time confirmation is used, so a clean-up starting in between no longer eats the confirmation; verifying with a typed passphrase counts failed attempts like restoring (#4530)
+- Deleting an account: agent shares on folders handed on to the heir end unless the agent belongs to the heir's space, like on a move; the delete dialog counts them as ending (#4999)
+- Account import: the importer locks the imported projects until it commits, so the share watchdog no longer removes a project's own member share in between (CI red p2137_c_api, #5024)
+- Tests: p2579_d_revoke counts a share the watchdog already ended as ended (CI red p2579_d_revoke, #5030); p23674_b_org and p2538_c_buero check the current wording after #3894 (CI red, #5028, #5029)
+
 ## [2.646.0] - 2026-11-07
 
 Package 2.599 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), CI-only rot: p271_ui, Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
@@ -394,7 +409,8 @@ Package 2.582 (Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher),
 
 Not released (the CI of this version was red); its changes are listed under 2.605.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.646.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.648.0...HEAD
+[2.648.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.648.0
 [2.646.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.646.0
 [2.645.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.645.0
 [2.643.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.643.0
