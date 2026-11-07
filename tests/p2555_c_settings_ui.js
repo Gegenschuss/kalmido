@@ -23,7 +23,7 @@ const click = (w, el) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbl
 const change = (w, el) => el && el.dispatchEvent(new w.Event('change', {bubbles: true}));
 const txt = el => (el?.textContent || '').replace(/\s+/g, ' ').trim();
 const count = (hay, needle) => hay.split(needle).length - 1;
-const FEATS = 'cal,timeline,matrix,kanban,collab,progress,deps,fields,comments,agents,reading,time';
+const FEATS = 'cal,timeline,matrix,kanban,collab,progress,deps,fields,comments,agents,reading,time,videos';  // 2.623.0 (#4765): the setting Videos shows with the module Approval on
 
 (async () => {
   await sleep(600);
