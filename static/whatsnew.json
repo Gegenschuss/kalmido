@@ -1,6 +1,24 @@
 {
  "versions": [
   {
+   "version": "2.626.0",
+   "date": "2026-11-07",
+   "items": [
+    {
+     "de": "Dokument-Regeln sind jetzt Abläufe: auch bei Änderungen oder X Tage nach Datum, mit Aufgabe, Benachrichtigung und Webhook.",
+     "en": "Document rules are now flows: also on changes or X days after a date, with task, notification and webhook."
+    },
+    {
+     "de": "Das Postfach eines Bereichs holt Anhänge per Mail-Regel als Dokumente ab und verschiebt oder markiert die Mail danach.",
+     "en": "A workspace mailbox fetches attachments as documents by mail rule and then moves or flags the mail."
+    },
+    {
+     "de": "In der Liquidität benennst du eine Fixkosten-Kategorie mit dem Stift auf einmal um oder legst zwei zusammen.",
+     "en": "In cash flow you rename a fixed cost category at once with the pencil or merge two."
+    }
+   ]
+  },
+  {
    "version": "2.621.0",
    "date": "2026-11-07",
    "items": [
