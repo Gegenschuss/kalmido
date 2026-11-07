@@ -115,7 +115,10 @@ with tempfile.TemporaryDirectory() as tmp:
     put(idx, h.replace(main, tag("zz-p2476") + tag("aa-p2476") + main))
     rc, out = lay()
     check(rc == 1 and "sorted by name" in out, "two new start scripts below the mark, not sorted: error " + out[-400:])
-    put(idx, h.replace(main, tag("aa-p2476") + tag("zz-p2476") + main))
+    # 2.635.0 (#5006): the part below the mark holds real start scripts now (2.591.0 #4889: dropany.js): "aa-" goes right
+    # under the mark, "zz-" right before main.js, so the two sort around whatever stands there
+    mark = re.search(r"<!-- [^\n]*new start scripts go below this line[^\n]*-->\n", h).group(0)
+    put(idx, h.replace(mark, mark + tag("aa-p2476")).replace(main, tag("zz-p2476") + main))
     rc, out = lay()
     check("sorted by name" not in out and "above the mark" not in out, "sorted below the mark: no order error " + out[-400:])
     first = '<script src="/static/js/reloadguard.js" defer></script>\n'
