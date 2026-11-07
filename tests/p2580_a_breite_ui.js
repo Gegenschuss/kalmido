@@ -6,6 +6,7 @@
 // - the calendar agenda has its own class .agendav (not the agents page's .agview) and stands at --w-seite
 // - the overview of tables (.shvwrap.shvov) = --w-seite, in the middle; at 3840 px limited
 // - Completed (.hview) = --w-seite; the news page (.nwview) = --w-lesen; the team chat channel list is limited to --w-seite
+// 2.583.0 (#4840): --w-seite is none now (lists and overviews use the full width of the content area): 'seite' = the content area
 // - 1440 x 900 and 390 px: the pages fill the content area, no sideways overflow
 // freelancer-matrix: Breiten (alice has no organisation; the widths do not depend on the workspace)
 const path = require('path');
@@ -65,7 +66,7 @@ async function upload(name, lines) {
     const MEASURE = sel => `(() => { const v = document.querySelector('#view'), e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null;
       const cs = getComputedStyle(v), vr = v.getBoundingClientRect(), l = vr.left + parseFloat(cs.paddingLeft), r = vr.left + v.clientWidth - parseFloat(cs.paddingRight), b = e.getBoundingClientRect();
       return {l: b.left - l, r: r - b.right, w: b.width, area: r - l, rem: parseFloat(getComputedStyle(document.documentElement).fontSize), over: v.scrollWidth - v.clientWidth}; })()`;
-    // [name, hash, selector, kind: seite (limit 96rem) | lesen (46rem)]
+    // [name, hash, selector, kind: seite (2.583.0 #4840: no limit, the content area) | lesen (46rem)]
     const PAGES = [
       ['documents', '#docs', '#view .dc-wrap', 'seite'],
       ['tables', '#sheets', '#view .shvwrap.shvov', 'seite'],
@@ -78,11 +79,11 @@ async function upload(name, lines) {
         await nav(B + '?w=' + vw + hash);
         const m = await wait(`!!S.booted && !!document.querySelector(${JSON.stringify(sel)}) && (${MEASURE(sel)})`);
         if (!m) { check(false, `${vw}px ${name}: ${sel} shows`); continue; }
-        const lim = Math.min(m.area, (kind === 'seite' ? 96 : 46) * m.rem);
+        const lim = kind === 'seite' ? m.area : Math.min(m.area, 46 * m.rem);
         check(Math.abs(m.w - lim) <= 2, `${vw}px ${name}: width ${kind} = ${Math.round(lim)} px ` + JSON.stringify(m));
         check(Math.abs(m.l - m.r) <= 2, `${vw}px ${name}: in the middle ` + JSON.stringify(m));
         check(m.over <= 1, `${vw}px ${name}: no sideways overflow ` + JSON.stringify(m));
-        if (vw === 3840 && kind === 'seite') check(m.area - m.w > 2, `${vw}px ${name}: limited (narrower than the content area) ` + JSON.stringify(m));
+        if (vw === 3840 && kind === 'lesen') check(m.area - m.w > 2, `${vw}px ${name}: limited (narrower than the content area) ` + JSON.stringify(m));
         if (name === 'documents' && vw >= 1440) {
           const g = await wait(`(() => { const v = document.querySelector('#view .dc-view'), bar = document.querySelector('#view .dc-bar'), c = document.querySelector('#view .dc-grid .dc-card'), gr = document.querySelector('#view .dc-grid');
             if (!v || !bar || !c || !gr) return null; const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
@@ -98,7 +99,7 @@ async function upload(name, lines) {
           await shot(`p2580a-${name}-${vw}-${theme}.png`);
         }
       }
-      // the calendar agenda: own class, no borrowed .agview, at --w-seite
+      // the calendar agenda: own class, no borrowed .agview, at --w-seite (2.583.0 #4840: the full content area)
       await nav(B + '?w=' + vw + '#cal');
       await wait(`!!S.booted && !!document.querySelector('#view .calbar')`);
       await ev(`(() => { S.calMode = 'agenda'; S.calSel = '2026-11-10'; renderView(); return 1; })()`);
@@ -106,7 +107,7 @@ async function upload(name, lines) {
       if (!ag) check(false, `${vw}px agenda shows`);
       else {
         check(await ev(`!!document.querySelector('#view .agenda.agendav') && !document.querySelector('#view .agenda.agview')`), `${vw}px agenda: its own class .agendav, not .agview`);
-        check(Math.abs(ag.w - Math.min(ag.area, 96 * ag.rem)) <= 2 && Math.abs(ag.l - ag.r) <= 2, `${vw}px agenda: --w-seite in the middle ` + JSON.stringify(ag));
+        check(Math.abs(ag.w - ag.area) <= 2 && Math.abs(ag.l - ag.r) <= 2, `${vw}px agenda: --w-seite in the middle ` + JSON.stringify(ag));
       }
       // the team chat's channel list on its own page (a phone shows it without a room)
       if (vw === 390) {
