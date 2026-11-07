@@ -90,10 +90,10 @@ def audio_flow(s, who):
           f"{who}: the customer's comment at 00:42 on v2 ({pc.status_code} {got})")
     page2 = requests.get(B + "/s/q/" + tok, headers={"Accept-Language": "en"}).text
     check('class="vdr-tl"' in page2 and 'class="vdr-mk" data-at="42.0"' in page2, f"{who}: the customer page's time line has the mark at 00:42")
-    return rid
+    return rid, lst
 
 
-RID = audio_flow(A, "org")
+RID, LST = audio_flow(A, "org")
 audio_flow(Fr, "freelancer")
 
 # every audio ending; capital letters; a Dropbox share page -> the file (raw=1) like a video file

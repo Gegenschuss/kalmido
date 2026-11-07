@@ -57,7 +57,7 @@ const FIT = sel => `(() => { const vw = document.documentElement.clientWidth, e 
       // ================= the app: the row, the placeholder, the <audio> player
       await o.nav(B + '#t/' + T.id); await idle();
       check(await until(`!!document.querySelector('#detail #d-vdr [data-vdr="open"]')`), tag + ' the task lists the audio review');
-      check(await ev(`document.querySelector('#detail #d-vdr [data-vdr="open"] svg')?.outerHTML === ic('music', 's')`),
+      check(await ev(`(() => { const d = document.createElement('div'); d.innerHTML = ic('music', 's'); return document.querySelector('#detail #d-vdr [data-vdr="open"] svg')?.innerHTML === d.firstChild.innerHTML; })()`),
         tag + ' the row carries the music symbol');
       check(await ev(`/Add video or audio link/.test(document.querySelector('#detail [data-vdr="new"]')?.textContent || '')`), tag + ' the button says "Add video or audio link"');
       await ev(`document.querySelector('#detail #d-vdr [data-vdr="open"]').click(), 1`);
@@ -83,10 +83,11 @@ const FIT = sel => `(() => { const vw = document.documentElement.clientWidth, e 
       check(cm && JSON.parse(cm).at_sec === 42.3, tag + ' the comment stored at 42.3 ' + cm);
       check(await until(`!!document.querySelector('.vdrdlg .vdrtl .vdrmk')`), tag + ' a mark on the time line');
       const left = await ev(`[...document.querySelectorAll('.vdrdlg .vdrtl .vdrmk')].map(m => m.style.left).join(' ')`);
-      check(/70\.50%/.test(left), tag + ' the mark at 42.3 / 60 = 70.5 % ' + left);
+      // two marks: the customer's comment at 42.0 (70 %) and this one at 42.3
+      check(/\b70\.5%/.test(left) && /\b70%/.test(left), tag + ' the marks at 42.0 and 42.3 / 60 = 70 % and 70.5 % ' + left);
       await ev(`(() => { document.querySelector('.vdrdlg .vdrplay audio').currentTime = 5; return 1; })()`);
       await until(`Math.abs(VDR.cur.ctl.cur - 5) < 0.05`);
-      await ev(`(() => { const b = [...document.querySelectorAll('.vdrdlg [data-vdr="seek"]')].find(x => x.textContent.trim() === '00:42'); b.click(); return 1; })()`);
+      await ev(`(() => { const b = document.querySelector('.vdrdlg .vdrtc[data-vdr="seek"][data-at="42.3"]'); b.click(); return 1; })()`);
       check(await until(`Math.abs(document.querySelector('.vdrdlg .vdrplay audio').currentTime - 42.3) < 0.1`), tag + ' a tap on the timecode jumps the <audio> to 00:42 '
         + await ev(`String(document.querySelector('.vdrdlg .vdrplay audio').currentTime)`));
       if (wd < 768) {
@@ -106,15 +107,22 @@ const FIT = sel => `(() => { const vw = document.documentElement.clientWidth, e 
       check(await ev(`/Load audio/.test(document.querySelector('.vdr-player')?.textContent || '') && !document.querySelector('audio, video, iframe')`), tag + ' customer page: "Load audio", no player before the click');
       await ev(`document.querySelector('[data-vdr-load]').click(), 1`);
       check(await until(`document.querySelector('.vdr-player audio')?.getAttribute('src') === 'https://media.example.com/folge/mix_v2.flac' && document.querySelector('.vdr-player audio').controls`), tag + ' customer page: the <audio> player of the newest version');
-      // v2 has no comment yet: the customer comments at 00:42 of v1 are not on the page; type one through the page form
+      // v2 has no comment yet: the customer comments at 00:42 of v1 are not on the page; type one through the page form.
+      // The https link cannot load in the test and the page's CSP allows https: media only (no blob:): the element's clock is
+      // stood in for (currentTime keeps its value and fires timeupdate, pause() is noted) - pubvideo.js talks to it as to any <audio>
+      const STUB = `(() => { const a = document.querySelector('.vdr-player audio'); let t = 0; window.__paused = 0;
+        Object.defineProperty(a, 'currentTime', {configurable: true, get: () => t, set: v => { t = +v; a.dispatchEvent(new Event('timeupdate')); }});
+        a.pause = () => { window.__paused = 1; }; return 1; })()`;
+      await ev(STUB);
       await ev(`(() => { const a = document.querySelector('.vdr-player audio'); a.currentTime = 42; return 1; })()`);
       await ev(`(() => { const t = document.getElementById('vd-text'); t.focus(); t.dispatchEvent(new FocusEvent('focus')); return 1; })()`);
       check(await until(`document.getElementById('vd-at')?.value === '00:42'`), tag + ' customer page: typing fills the timecode 00:42 ' + await ev(`String(document.getElementById('vd-at')?.value)`));
-      check(await ev(`document.querySelector('.vdr-player audio').paused`), tag + ' customer page: typing pauses the <audio>');
+      check(await ev(`window.__paused === 1`), tag + ' customer page: typing pauses the <audio>');
       await ev(`(() => { document.getElementById('vd-name').value = 'Kundin Example'; document.getElementById('vd-text').value = 'Ende zu kurz'; document.getElementById('vdr-f').submit(); return 1; })()`);
       check(await until(`/Thank you, your comment has arrived/.test(document.body.textContent) && !!document.querySelector('a.vdr-at[data-at="42.0"]')`), tag + ' customer page: the comment at 00:42 arrived');
       await ev(`document.querySelector('[data-vdr-load]').click(), 1`);
       await until(`!!document.querySelector('.vdr-player audio')`);
+      await ev(STUB);
       await ev(`document.querySelector('a.vdr-at').click(), 1`);
       check(await until(`Math.abs(document.querySelector('.vdr-player audio').currentTime - 42) < 0.1`), tag + ' customer page: a tap on the timecode seeks the <audio> '
         + await ev(`String(document.querySelector('.vdr-player audio')?.currentTime)`));
