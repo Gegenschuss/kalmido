@@ -92,7 +92,7 @@ function srv_starterHtml(d) {
   return `<fieldset class="srvst"><legend>${tr('Starter pack')}</legend>
     <div class="shint keep">${esc(tr('Each one only proposes; you decide. Later you change or remove each on its own (planned jobs, standing rules, documents).'))}</div>
     ${SRV_ST.map(([k, n, h]) => `<label class="chkl srvsti"><input type="checkbox" data-srv-st="${k}" ${k === 'office' ? '' : 'checked'}><span>${esc(tr(n))}<small class="muted">${esc(tr(h))}</small></span></label>${k === 'followup'
-      ? `<div class="row srvfd"><label for="srv-fdays">${tr('after|days')}</label><input id="srv-fdays" type="number" inputmode="numeric" class="numin" min="1" max="${d.followup_max || 60}" value="${d.followup_days || 5}"><span class="muted">${tr('days')}</span></div>` : ''}`).join('')}</fieldset>`;
+      ? `<div class="row srvfd"><label for="srv-fdays">${tr('after|days')}</label><input id="srv-fdays" type="number" inputmode="numeric" class="numin" min="1" max="${d.followup_max || 60}" value="${d.followup_days || 5}"><span class="muted">${tr('days')}</span></div>` : k === 'docs' ? '<div class="shint keep" id="srv-docsws" hidden></div>' : ''}`).join('')}</fieldset>`;
 }
 // "New agent" > "Runs on the Kalmido server". o.admin: from the administration (team agent or my own), else my personal agent
 async function srv_newModal(o = {}) {
@@ -107,6 +107,9 @@ async function srv_newModal(o = {}) {
     ${srv_starterHtml(d)}` : srv_offHtml()}
     <div class="foot"><div class="calerr" role="alert" id="srv-err" hidden></div><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button>${d.enabled_instance ? `<button class="btn pri" data-m="srv-ok">${tr('Create')}</button>` : ''}</div>`));
   userNameFollow(md, 'srv-name', 'srv-user', 'srv-userhint');
+  // 2.621.0 (#4715): which workspace "Sort receipts and documents" meets: private or the organisation of the chosen team agent
+  const dw = $('#srv-docsws', md), docsWs = () => { if (!dw) return; const v = $('#srv-own', md)?.value || 'me', w = (d.docs_scopes || []).find(x => x.key === v) || (d.docs_scopes || [])[0]; dw.textContent = w ? tr('Applies to: {0}', w.name) : ''; dw.hidden = !w; };
+  docsWs(); $('#srv-own', md)?.addEventListener('change', docsWs);
   const un0 = $('#srv-user', md); if (un0) un0.value = slugUser(d.default_name || '');
   const err = $('#srv-err', md), show = m => { err.textContent = m || ''; err.hidden = !m; };
   md.addEventListener('click', async e => {

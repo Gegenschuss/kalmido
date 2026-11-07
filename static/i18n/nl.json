@@ -16990,6 +16990,7 @@
   "Action items": "Actiepunten",
   "Minutes of this event as a knowledge page": "Notulen van deze afspraak als kennispagina",
   "To change this, please sign in again to confirm (at most {0} minutes ago).": "Meld je opnieuw aan om dit te bevestigen (hoogstens {0} minuten geleden).",
+  "Applies to: {0}": "Geldt voor: {0}",
   "Markdown: # heading, - list, [[Page]] links a page, [[#123]] a task": "Markdown: # kop, - lijst, [[Pagina]] linkt een pagina, [[#123]] een taak",
   "Write … ([[Page]], [[#123]])": "Schrijven … ([[Pagina]], [[#123]])",
   "Write … ([[Page]], [[#123]], / for commands)": "Schrijven … ([[Pagina]], [[#123]], / voor opdrachten)"

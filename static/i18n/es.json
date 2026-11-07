@@ -16990,6 +16990,7 @@
   "Action items": "Tareas",
   "Minutes of this event as a knowledge page": "Acta de esta cita como página de conocimiento",
   "To change this, please sign in again to confirm (at most {0} minutes ago).": "Para cambiar esto, vuelve a iniciar sesión para confirmar (hace como máximo {0} minutos).",
+  "Applies to: {0}": "Se aplica a: {0}",
   "Markdown: # heading, - list, [[Page]] links a page, [[#123]] a task": "Markdown: # título, - lista, [[Página]] enlaza una página, [[#123]] una tarea",
   "Write … ([[Page]], [[#123]])": "Escribe … ([[Página]], [[#123]])",
   "Write … ([[Page]], [[#123]], / for commands)": "Escribir … ([[Página]], [[#123]], / para comandos)"

@@ -70,6 +70,11 @@ check(d["default_name"] == "Kalmido AI" and "only" in d["default_instructions"] 
       "defaults: the name and the instructions (Kalmido only)")
 # 2.568.0 (#4673): + office (tests/p2568_b_ai_office_test.py)
 check(d["starter"] == ["briefing", "tidy", "docs", "meetings", "followup", "office"] and d["followup_days"] == 5, f"defaults: the starter pack {d['starter']}")
+# 2.621.0 (#4715): the workspace the item "documents" meets, per owner choice of the dialog: a person without an organisation
+# only "me" = Private; an organisation admin also org:<id> with its name
+check(d["docs_scopes"] == [{"key": "me", "name": "Private"}], f"defaults: a person without an organisation: Private only {d['docs_scopes']}")
+da = A.get(B + "/api/agents/server/defaults").json()["docs_scopes"]
+check(da[0] == {"key": "me", "name": "Private"} and any(x["key"] == f"org:{ORG}" and x["name"] for x in da), f"defaults: an admin also sees the organisation {da}")
 F.patch(B + "/api/settings", json={"lang": "de"})
 check(F.get(B + "/api/agents/server/defaults").json()["default_name"] == "Kalmido-KI", "defaults in German: Kalmido-KI")
 F.patch(B + "/api/settings", json={"lang": "en"})
@@ -117,6 +122,24 @@ pb = next(p for p in plans(F, KI) if p["title"] == "Morning briefing")
 check(F.patch(B + f"/api/agent-schedules/{pb['id']}", json={"enabled": False}).ok, "the briefing plan switched off on its own")
 check(F.delete(B + f"/api/agent-schedules/{pb['id']}").ok, "the briefing plan deleted on its own")
 check(len(plans(F, KI)) == n_p - 1, "the other plans stay")
+
+# 2.621.0 (#4715): the plans are found by a fixed marker, not by the translated title: a second call in another language adds nothing
+F.patch(B + "/api/settings", json={"lang": "de"})
+r = starter(F, KI, [x for x in ALL if x != "briefing"])  # (the briefing plan of KI was deleted above)
+check(r.ok and set(states(r).values()) == {"exists"}, f"other language: exists, no second plan {r.text[:300]}")
+check(len(plans(F, KI)) == n_p - 1 and len(rules(F, KI)) == n_r - 0, "other language: nothing added")
+r = starter(F, AG["briefing"], ["briefing"])
+check(states(r) == {"briefing": "exists"} and len(plans(F, AG["briefing"])) == 1, f"other language: the briefing plan of another agent stays one {r.text[:200]}")
+# a plan of an older pack (no marker) made by hand with the German title is still found
+DE = "Tagesüberblick"
+check(DE != "Morning briefing", "the German title differs")
+OLD = own_agent(F, "kioldplan")[0]
+r = F.post(B + f"/api/agents/{OLD}/schedules", json={"title": DE, "prompt": "x", "freq": "daily", "time": "07:30", "action": "chat", "enabled": True})
+if r.ok:
+    F.patch(B + "/api/settings", json={"lang": "en"})
+    r = starter(F, OLD, ["briefing"])
+    check(states(r) == {"briefing": "exists"} and len(plans(F, OLD)) == 1, f"an older plan by its German title is found {r.text[:200]}")
+F.patch(B + "/api/settings", json={"lang": "en"})
 
 # ================================================================ wrong input, rights
 for bad in ({"items": []}, {"items": ["web"]}, {"items": "briefing"}, {"items": ["followup"], "followup_days": 0},

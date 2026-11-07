@@ -16990,6 +16990,7 @@
   "Action items": "Aufgaben",
   "Minutes of this event as a knowledge page": "Protokoll zu diesem Termin als Wissensseite",
   "To change this, please sign in again to confirm (at most {0} minutes ago).": "Um das zu ändern, melde dich bitte zur Bestätigung neu an (höchstens vor {0} Minuten).",
+  "Applies to: {0}": "Gilt für: {0}",
   "Markdown: # heading, - list, [[Page]] links a page, [[#123]] a task": "Markdown: # Überschrift, - Liste, [[Seite]] verlinkt eine Seite, [[#123]] eine Aufgabe",
   "Write … ([[Page]], [[#123]])": "Schreiben … ([[Seite]], [[#123]])",
   "Write … ([[Page]], [[#123]], / for commands)": "Schreiben … ([[Seite]], [[#123]], / für Befehle)"

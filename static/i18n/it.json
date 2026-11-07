@@ -16991,6 +16991,7 @@
   "Action items": "Attività",
   "Minutes of this event as a knowledge page": "Verbale di questo appuntamento come pagina di conoscenza",
   "To change this, please sign in again to confirm (at most {0} minutes ago).": "Per modificarlo, accedi di nuovo per confermare (al massimo {0} minuti fa).",
+  "Applies to: {0}": "Vale per: {0}",
   "Markdown: # heading, - list, [[Page]] links a page, [[#123]] a task": "Markdown: # titolo, - elenco, [[Pagina]] collega una pagina, [[#123]] un'attività",
   "Write … ([[Page]], [[#123]])": "Scrivi … ([[Pagina]], [[#123]])",
   "Write … ([[Page]], [[#123]], / for commands)": "Scrivi … ([[Pagina]], [[#123]], / per i comandi)"

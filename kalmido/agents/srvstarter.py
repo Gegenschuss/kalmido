@@ -34,12 +34,12 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from flask import jsonify
 
 from ..core.config import app, TZ
-from ..core.i18n import N_, tr
+from ..core.i18n import LANGS, N_, tr
 from ..core.db import body, bump, db, err, gsetting, iso, now_utc, usettings
 from ..core.pg import insert_id
 from ..core.errors import BadInput, UnknownFields
 from ..accounts.session import me
-from ..accounts.orgs import is_org_admin
+from ..accounts.orgs import is_org_admin, user_orgs
 from ..agents.schedules import SCHED_MAX, _sched_set_next, sched_in
 from ..agents.agentrules import _insert as ar_insert, ar_changed
 from ..agents.core import agent_shares, need_person
@@ -103,12 +103,19 @@ def _tz(c, uid):
         return TZ.key
 
 
-def _plan(c, aid, uid, title, prompt, freq, hm, action="chat", days=None, flow=""):
+def _plan(c, aid, uid, title, prompt, freq, hm, action="chat", days=None, flow="", tit=""):
     """A planned job of uid for agent aid (agents/schedules.py, the same checks as the dialog) -> (state, id, reason).
-    2.565.0 D (#4674): flow = the starter routine it stands for (agent_schedules.srv_flow: its run uses the routine's model)."""
+    2.565.0 D (#4674): flow = the starter routine it stands for (agent_schedules.srv_flow: its run uses the routine's model).
+    2.621.0 (#4715): tit = the English title key (to find an older plan by its title in every language)."""
     if not agent_shares(c, aid, uid):
         return "skipped", None, tr("Share a project with the agent first")
-    r = c.execute("SELECT id FROM agent_schedules WHERE agent_id=? AND user_id=? AND title=? AND list_check=0", (aid, uid, title)).fetchone()
+    # 2.621.0 (#4715): a plan of the pack is found by its fixed marker (srv_flow), not by its translated title (a switch of the
+    # language made a second plan); a plan of an older pack has no marker yet and is found by its title in any language
+    r = c.execute("SELECT id FROM agent_schedules WHERE agent_id=? AND user_id=? AND srv_flow=? AND list_check=0 ORDER BY id", (aid, uid, flow)).fetchone() if flow else None
+    if not r and tit:
+        ts_ = list({title, *(tr(tit, lg=lg) for lg in LANGS)})
+        r = c.execute(f"SELECT id FROM agent_schedules WHERE agent_id=? AND user_id=? AND title IN ({','.join('?' * len(ts_))}) AND list_check=0 "
+                      "AND srv_flow IN ('', ?) ORDER BY id", (aid, uid, *ts_, flow)).fetchone()
     if r:
         if flow:  # a plan of an older starter pack learns its routine
             c.execute("UPDATE agent_schedules SET srv_flow=? WHERE id=? AND srv_flow=''", (flow, r[0]))
@@ -125,9 +132,11 @@ def _plan(c, aid, uid, title, prompt, freq, hm, action="chat", days=None, flow="
     return "created", sid, None
 
 
-def _rule(c, aid, text):
-    """A standing rule of agent aid added by the person (source manual, agents/agentrules.py) -> (state, id, reason)."""
-    r = c.execute("SELECT id FROM agent_rules WHERE agent_id=? AND body=?", (aid, text)).fetchone()
+def _rule(c, aid, text, key=""):
+    """A standing rule of agent aid added by the person (source manual, agents/agentrules.py) -> (state, id, reason).
+    2.621.0 (#4715): key = the English text; the rule is also found in any other language (no second rule after a language switch)."""
+    ts_ = list({text, *(tr(key, lg=lg) for lg in LANGS)}) if key else [text]
+    r = c.execute(f"SELECT id FROM agent_rules WHERE agent_id=? AND body IN ({','.join('?' * len(ts_))}) ORDER BY id", (aid, *ts_)).fetchone()
     if r:
         return "exists", r[0], None
     try:
@@ -138,7 +147,7 @@ def _rule(c, aid, text):
     return "created", row["id"], None
 
 
-def _docs(c, a, uid, text):
+def _docs(c, a, uid, text, key=""):
     """Level "agent" for sender, type and tags in the documents of the agent's workspace + the standing rule."""
     from ..docs import store as DS
     oid = a["org_id"]
@@ -150,7 +159,7 @@ def _docs(c, a, uid, text):
     if any(cur.get(k) != "agent" for k in SRV_DOC_FEATURES):
         DS.cfg_set(c, ws, {"levels": {k: "agent" for k in SRV_DOC_FEATURES}})
         st = "created"
-    rs, rid, why = _rule(c, a["user_id"], text)
+    rs, rid, why = _rule(c, a["user_id"], text, key)
     return ("created" if "created" in (st, rs) else "exists"), rid, why
 
 
@@ -180,10 +189,10 @@ def _office(c, a, uid):
     if why:
         return "skipped", None, tr(SRV_OFFICE_WHY[why])
     t, p, rule = SRV_TEXTS["office"]
-    ps = _plan(c, a["user_id"], uid, tr(t), tr(p), "weekly", SRV_OFFICE_AT, days=SRV_OFFICE_DAYS)
+    ps = _plan(c, a["user_id"], uid, tr(t), tr(p), "weekly", SRV_OFFICE_AT, days=SRV_OFFICE_DAYS, flow="office", tit=t)
     if ps[0] == "skipped":
         return ps
-    rs = _rule(c, a["user_id"], tr(rule))
+    rs = _rule(c, a["user_id"], tr(rule), rule)
     if rs[0] == "skipped":
         return rs
     return ("created" if "created" in (ps[0], rs[0]) else "exists"), ps[1], None
@@ -197,19 +206,19 @@ def srv_starter_apply(c, a, uid, items, days):
             continue
         if k == "briefing":
             t, p = SRV_TEXTS[k]
-            res = _plan(c, aid, uid, tr(t), tr(p), "daily", SRV_BRIEF_AT, flow=k)
+            res = _plan(c, aid, uid, tr(t), tr(p), "daily", SRV_BRIEF_AT, flow=k, tit=t)
         elif k == "tidy":
             t, p = SRV_TEXTS[k]
-            res = _plan(c, aid, uid, tr(t), tr(p), "daily", SRV_TIDY_AT, action="triage", flow=k)
+            res = _plan(c, aid, uid, tr(t), tr(p), "daily", SRV_TIDY_AT, action="triage", flow=k, tit=t)
         elif k == "docs":
-            res = _docs(c, a, uid, tr(SRV_TEXTS[k]))
+            res = _docs(c, a, uid, tr(SRV_TEXTS[k]), SRV_TEXTS[k])
         elif k == "meetings":
-            res = _rule(c, aid, tr(SRV_TEXTS[k]))
+            res = _rule(c, aid, tr(SRV_TEXTS[k]), SRV_TEXTS[k])
         elif k == "office":
             res = _office(c, a, uid)
         else:
             t, p = SRV_TEXTS[k]
-            res = _plan(c, aid, uid, tr(t), tr(p, days), "weekdays", SRV_FOLLOWUP_AT, flow=k)
+            res = _plan(c, aid, uid, tr(t), tr(p, days), "weekdays", SRV_FOLLOWUP_AT, flow=k, tit=t)
         out.append({"item": k, "state": res[0], "id": res[1], "reason": res[2]})
     return out
 
@@ -235,7 +244,13 @@ def srv_defaults():
     """What the dialog "New agent" offers for an agent on the Kalmido server (people only)."""
     c = db()
     need_person(403, tr("Agents cannot use this endpoint"))
-    return jsonify(enabled_instance=not srv_off(c), provider=SRV_PROVIDER, default_name=tr(SRV_DEFAULT_NAME),
+    # 2.621.0 (#4715): where "Sort receipts and documents" lands per owner choice of the dialog ("me" / "org:<id>" as in its select)
+    ws = [{"key": "me", "name": tr("Private")}]
+    for oid in user_orgs(c, me()):
+        if is_org_admin(c, me(), oid):
+            nm = c.execute("SELECT name FROM orgs WHERE id=?", (oid,)).fetchone()
+            ws.append({"key": f"org:{oid}", "name": nm[0] if nm else ""})
+    return jsonify(docs_scopes=ws, enabled_instance=not srv_off(c), provider=SRV_PROVIDER, default_name=tr(SRV_DEFAULT_NAME),
                    default_model=SRV_DEFAULT_MODEL, default_instructions=tr(SRV_DEFAULT_INSTRUCTIONS),
                    starter=list(SRV_STARTER), flows=list(SRV_FLOWS), followup_days=SRV_FOLLOWUP_DAYS, followup_max=SRV_FOLLOWUP_MAX)
 
