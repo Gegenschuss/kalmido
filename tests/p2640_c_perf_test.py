@@ -134,9 +134,11 @@ def progress_case(S, who):
     lid = S.post(B + "/api/lists", json={"name": f"Progress {who}"}).json()["id"]
     ids = [S.post(B + "/api/tasks", json={"title": f"Step {i}", "list_id": lid}).json()["id"] for i in range(5)]
     due = (datetime.now(timezone.utc) - timedelta(days=3)).date().isoformat()
-    for tid, b in ((ids[0], {"status": 2}), (ids[1], {"status": -1}), (ids[3], {"due": due})):  # done; won't do: not counted
-        r = S.patch(B + f"/api/tasks/{tid}", json=b)
+    for tid, b in ((ids[0], {"status": 2}), (ids[1], {"status": -1})):  # done; won't do: not counted
+        r = S.post(B + f"/api/tasks/{tid}/complete", json=b)
         check(r.ok, f"{who}: task {b} {r.status_code} {r.text[:160]}")
+    r = S.patch(B + f"/api/tasks/{ids[3]}", json={"due": due})
+    check(r.ok, f"{who}: a due date in the past {r.status_code} {r.text[:160]}")
     r = S.delete(B + f"/api/tasks/{ids[2]}")  # the trash: not counted
     check(r.ok, f"{who}: a task into the trash {r.status_code} {r.text[:160]}")
     # a done copy of a recurring task: same list, created_at and title as an older task (the original open, then deleted)
@@ -146,10 +148,9 @@ def progress_case(S, who):
     wdb("UPDATE tasks SET deleted_at=? WHERE id=?", ("2026-11-07T10:00:00Z", ids[4]))
     pr = lambda: next(x for x in S.get(B + "/api/state").json()["lists"] if x["id"] == lid)["progress"]  # noqa: E731
     p = pr()
-    print(f"{who}: tasks of the list {kt.dbx('SELECT id, title, status, created_at, deleted_at, parent_id FROM tasks WHERE list_id=? ORDER BY id', (lid,))}", flush=True)
     check(p["done"] == 1 and p["total"] == 2 and p["overdue"] == 1,
           f"{who}: #4185 progress: 1 done of 2 (won't do, trash, done copies out, also of a deleted original), 1 overdue {p}")
-    S.patch(B + f"/api/tasks/{ids[3]}", json={"status": 2})
+    S.post(B + f"/api/tasks/{ids[3]}/complete", json={"status": 2})
     p = pr()
     check(p["done"] == 2 and p["total"] == 2 and p["overdue"] == 0, f"{who}: the original done -> 2 of 2 {p}")
 
