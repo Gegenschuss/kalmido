@@ -902,7 +902,7 @@ function nt_panelHtml() {
 }
 // the page beside the panel: the open note, else the hint (the panel hidden: a button brings the list back)
 function nt_pageHtml(cur) {
-  if (cur) return `<div class="ntwrap"><div class="ntview ntsolo open"><article class="ntedit" aria-label="${esc(cur.title)}">${noteEditHtml(cur)}</article></div></div>`;
+  if (cur) return `<div class="ntwrap${pgw_cls('notes', cur.id)}"><div class="ntview ntsolo open" data-pw="1"><article class="ntedit" aria-label="${esc(cur.title)}">${noteEditHtml(cur)}</article></div></div>`;
   const hid = LS.get('sideFold', false) || $('#app')?.classList.contains('side-rail');  // the panel hidden or a drawer: its buttons here
   const nw = !hid || S.me?.kid ? '' : !S.nt.lid || S.nt.mayWrite ? `<button type="button" class="btn sm pri" ${S.nt.lid ? 'data-act="nt-new"' : 'data-sb="note-new"'}>${ic('plus', 's')}${tr('New note')}</button>` : '';
   const show = hid ? `<button type="button" class="btn sm" data-act="sbb-panel">${ic('panelhide', 's')}${tr('Show the sidebar')}</button>` : '';
@@ -934,7 +934,7 @@ function viewNotes() {
   return `<div class="ntwrap${cur ? pgw_cls('notes', cur.id) : ''}"><div class="ntview ${cur ? 'open' : ''}"${cur ? ' data-pw="1"' : ''}>${list}${cur ? `<article class="ntedit" aria-label="${esc(cur.title)}">${noteEditHtml(cur)}</article>` : ''}</div></div>`;  // 2.599.0 (#4808): its width (pgw_*), data-pw = the block reports its width to #top (render.js topw_sync)
 }
 // ---- 2.599.0 (#4808): the width of an open note / knowledge page: Read (--w-lesen, the default), Wide (--w-seite), Full (no
-// limit); a fixed choice, the class pgw-<key> on .ntwrap (static/css/start-blatt-4808.css). The default per area is the person's
+// limit); a fixed choice, the class pgw-<key> on .ntwrap (static/css/start-ntblatt-4808.css). The default per area is the person's
 // like the own reading style (#3152): LOOK_KEYS wkW (knowledge) / ntW (notes), the account's appearance on every device. A page
 // overrides it on this device (LS pgW {"w<page id>" | "n<note id>": key}, the newest PGW_MAX), so no page changes for others.
 const PGW = {lesen: N_('Read|page width'), breit: N_('Wide|page width'), voll: N_('Full|page width')};

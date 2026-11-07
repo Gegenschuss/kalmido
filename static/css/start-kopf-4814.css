@@ -8,12 +8,12 @@
   #top.topw{
     --pw-in:max(1.75rem,calc((100% - var(--pw-sb,0px) - var(--pw,100%)) / 2));
     padding-left:var(--pw-in);padding-right:calc(var(--pw-in) + var(--pw-sb,0px))}
-  /* calendar, agenda: its bar over the list (.agview = --w-seite, app.css) */
-  #view > .calbar:has(~ .agview){max-width:var(--w-seite);margin-inline:auto}
+  /* calendar, agenda: its bar over the list (.agendav = --w-seite, app.css, #4815) */
+  #view > .calbar:has(~ .agendav){max-width:var(--w-seite);margin-inline:auto}
   /* team chat: the room's head reads in the middle like the history and the composer (start-breite.css) */
   .tcroom .tcrhead{padding-inline:max(.75rem,calc((100% - var(--w-lesen)) / 2))}
-  /* office, a letter: the bar (back, PDF, ...) ends where the form / the paper ends (.lt-form / .lt-paper, office.css);
-     the rights page: the bar back into Settings over .orr (office.css). The widths themselves are those of office.css. */
-  .ofcbar:has(~ :is(.lt-form,.lt-paper)){max-width:46rem}
-  .ofcbar:has(+ .orr){max-width:60rem}
+  /* office, a letter: the bar (back, PDF, ...) stands over the form (.lt-form = --w-form in the middle, office.css #4815);
+     the rights page: the bar back into Settings over .orr (--w-form in the middle, office.css #4815). */
+  .ofcbar:has(~ .lt-form),.ofcbar:has(+ .orr){max-width:var(--w-form);margin-inline:auto}
+  .ofcbar:has(~ .lt-paper){max-width:var(--w-lesen);margin-inline:auto}  /* the letter as paper = --w-lesen */
 }

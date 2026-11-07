@@ -23,4 +23,7 @@
   .ntwrap > .ntview.open{grid-template-columns:minmax(14rem,22rem) minmax(0,var(--ntsheet));max-width:calc(23rem + var(--ntsheet));margin-inline:auto}
   .ntwrap.pgw-voll > .ntview.open{grid-template-columns:minmax(14rem,22rem) minmax(0,1fr);max-width:none}
   .ntwrap > .ntview.open > .ntedit{max-width:none}
+  /* the note alone beside the shared panel (#4817 .ntsolo, start-leisten-4817.css): one column, the sheet in the middle */
+  .ntwrap > .ntview.ntsolo.open{grid-template-columns:minmax(0,1fr);max-width:var(--ntsheet)}
+  .ntwrap.pgw-voll > .ntview.ntsolo.open{max-width:none}
 }

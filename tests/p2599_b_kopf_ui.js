@@ -199,7 +199,7 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
     await nav(B + '?w=2560#cal');
     await until(`!!S.booted && !!document.querySelector('#view .calbar [data-k="agenda"]')`);
     await ev(`(() => { document.querySelector('#view .calbar [data-k="agenda"]').click(); return 1; })()`);
-    const ag = await until(`(() => { const a = ${BOX('#view > .calbar')}, b = ${BOX('#view .agview')}; return a && b && document.querySelector('#view .agview') ? {a, b} : null; })()`);
+    const ag = await until(`(() => { const a = ${BOX('#view > .calbar')}, b = ${BOX('#view .agendav')}; return a && b && document.querySelector('#view .agendav') ? {a, b} : null; })()`);
     check(ag && Math.abs(ag.a[0] - ag.b[0]) <= 2 && Math.abs(ag.a[1] - ag.b[1]) <= 2, '#4814 2560px agenda: the bar has the edges of the list ' + JSON.stringify(ag));
     // the office: a new letter (bar over the form) and the rights page (bar over .orr)
     await nav(B + '?w=2560#office/letters/new');  // a new draft (p2106_a)
