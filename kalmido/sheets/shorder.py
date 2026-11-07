@@ -75,7 +75,7 @@ def sho_plan(c, sheet_row, kind, old, new, moved, uid):
     sheets = {r["id"]: r for r in c.execute("SELECT * FROM sheets WHERE (id=? OR book_id=?) AND deleted_at IS NULL", (bid, bid))}
     sheets[sid] = sheet_row
     books, out = {sid: book}, []
-    q = "SELECT id, sheet_id, row_id, col_id, raw FROM sheet_cells WHERE sheet_id IN (%s) AND raw LIKE ? ORDER BY id" % ",".join("?" * len(sheets))
+    q = "SELECT id, sheet_id, row_id, col_id, raw FROM sheet_cells WHERE sheet_id IN (%s) AND raw ILIKE ? ORDER BY id" % ",".join("?" * len(sheets))
     for x in c.execute(q, [*sheets, "=%:%"]).fetchall():
         raw, typ = x["raw"], "c" if x["sheet_id"] == sid else "x"
         if "{%s:" % typ not in raw:
