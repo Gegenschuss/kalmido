@@ -91,7 +91,8 @@ now wed 10:00; fresh; run p151_ui node p151_ui.js
 # 1.7.0: Flow sort, overdue in one click, the smart list "Now doable"
 fresh; run p170_ui node p170_ui.js
 # 1.7.1: every view scrolls on a phone (Firefox headless, skipped without firefox): last line clears the tab bar and +, no touch blocker
-fresh; run scroll_ui node scroll_ui.js
+# #3506 (CI red of 2.614.0): at the test time 10:00 - seeded "tomorrow" before 00:00 and looked at after it, the list was empty
+now 10:00; fresh; run scroll_ui node scroll_ui.js
 # 1.8.0: the sample project (create / idempotent / private / quiet / German / without project modules / remove exactly it),
 # then setup + Settings > Data + palette + the welcome tour offer (restarts the container itself, also with KALMIDO_ONBOARDING=1)
 fresh; run p180_api "$PY" p180_api_test.py "$KALMIDO_TEST_DATA"
