@@ -651,6 +651,10 @@ ROUTES = {
     "DAV /.well-known/carddav/": "dav", "DAV /dav": "dav", "DAV /dav/": "dav", "DAV /dav/{}": "dav",
     "DAV /api/test/boom": "test",  # 2.359.0 (#3023): tests/p2359_a_api_test.py
     "POST /api/test/fints/age": "test",  # 2.616.0 (#2473): tests/p2616_c_fints_test.py (the dialogs' clock)
+    "GET /api/test/fints/open": "test",  # 2.616.0 (#2473, Fable findings): tests/p2616_c_fints_test.py (the open dialogs)
+    "GET /api/test/fints/lib": "test",  # 2.616.0 (#2473, Fable findings): tests/p2616_c_fints_test.py (the library's inner parts)
+    "POST /api/test/fints/conn": "test",  # 2.616.0 (#2473, Fable findings): tests/p2616_c_fints_test.py (the limits of a step)
+    "POST /api/test/fints/hold": "test",  # 2.616.0 (#2473, Fable findings): tests/p2616_c_fints_test.py (a dialog in a running step)
     "DAV /test/boom": "test",  # 2.447.0 (#3761): tests/p2447_a_lang_test.py
     # ---- event (19)
     "GET /api/calendars/events": "event", "GET /api/v1/events": "event", "POST /api/v1/events": "event",
