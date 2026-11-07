@@ -37,6 +37,7 @@ from ..wiki.wkhist import wkh_seal, WKH_VCTX  # 2.369.5 (#2517): pulled up from 
 from ..wiki.pages import wiki_set_links  # 2.369.5 (#2517): pulled up from functions
 from ..wiki.wksearch import wks_index  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.attachtext import file_kind  # 2.369.5 (#2517): pulled up from functions
+from ..sheets.shshare import shs_core_move  # 2.647.0 (#5047)
 
 _LOCKED = "e2e1:"
 _FILE_CELL = re.compile(r"file:(\d{1,15})")
@@ -614,7 +615,6 @@ def _finish_sheet_shares(c, run, oi, uid):
     """2.647.0 (#5047): every imported table share card is bound to its core share -- the one that came with the store when it
     lies on the table's own node and names the same account, else a new one (shshare.py shs_core_move); never a card without
     a core share next to a core share of its own (two rights, the one ended in one dialog left open in the other)."""
-    from ..sheets.shshare import shs_core_move
     sheets = set()
     for r in oi.get("sheets/shares.json") or []:
         nid = run.m("sheet_shares", r.get("id"))
