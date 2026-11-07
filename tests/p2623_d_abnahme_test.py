@@ -66,7 +66,7 @@ def module_checks(s, who):
     check("videos" not in feats(s), f"{who}: the module switched off")
     for k, v in pl.items():
         r = s.post(B + "/api/videos", json={k: v, "title": "Neu", "url": URL})
-        check(r.status_code == 409 and "Approvals are turned off" in r.text, f"{who}: module off, no new review at the {k} {r.status_code} {r.text[:200]}")
+        check(r.status_code == 409 and "Approvals are switched off" in r.text, f"{who}: module off, no new review at the {k} {r.status_code} {r.text[:200]}")
         rows = s.get(B + f"/api/videos?{k}={v}").json().get("reviews") or []
         check([x["id"] for x in rows] == [made[k]], f"{who}: module off, the existing review at the {k} is still listed {[x['id'] for x in rows]}")
     vid = made["task_id"]
