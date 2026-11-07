@@ -65,6 +65,23 @@ r = requests.get(V + "/team/channels", headers=LIM)
 check(r.ok and not (r.json().get("data") or []), f"#4779: a token limited to lists lists no channel {r.status_code} {r.text[:200]}")
 check("General" not in r.text, "#4779: ... not even the channel's name")
 check(requests.get(V + f"/team/rooms/{CH}/messages", headers=LIM).status_code in (403, 404), "#4779: ... and reads none (need_room, unchanged)")
+# 2.633.0 (#4779, review): the channel's own routes (need_xroom: rename, open, archive, members) go through the same floor
+WS = ["read", "comments", "tasks:write", "structure"]
+def wtoken(name, lists=None):
+    j = {"name": name, "scopes": WS, "expires_days": None, **({"list_ids": lists} if lists is not None else {})}
+    r = A.post(B + "/api/me/tokens", json=j)
+    check(r.ok and r.json().get("token"), f"setup: token {name} {r.text[:160]}")
+    return {"Authorization": "Bearer " + (r.json().get("token") or "x")}
+WLIM, WFULL = wtoken("write only work", [LW]), wtoken("write all")
+r = requests.patch(V + f"/team/rooms/{CH}", headers=WLIM, json={"name": "Renamed"})
+check(r.status_code in (403, 404) and "General" not in r.text, f"#4779: a token limited to lists renames no channel by its id {r.status_code} {r.text[:160]}")
+r = requests.post(V + f"/team/rooms/{CH}/members", headers=WLIM, json={"user_id": BOB})
+check(r.status_code in (403, 404) and "General" not in r.text, f"#4779: ... and adds no member {r.status_code} {r.text[:160]}")
+names = [x["name"] for x in A.get(B + "/api/team/channels").json().get("channels") or [] if x["id"] == CH]
+check(names == ["General"], f"#4779: the channel kept its name {names}")
+r = requests.patch(V + f"/team/rooms/{CH}", headers=WFULL, json={"name": "General 2"})
+check(r.ok, f"#4779: a token without a limit still renames it (the floor only stops the limit) {r.status_code} {r.text[:160]}")
+A.patch(B + f"/api/team/rooms/{CH}", json={"name": "General"})
 
 
 # ================================================================ #4781 rules done / reopen

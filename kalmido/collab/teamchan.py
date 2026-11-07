@@ -332,6 +332,9 @@ def need_xroom(c, rid):
         raise Denied(404)
     if not tcx_room_ok(c, r, me()) and not tcx_can_manage(c, r, me()):
         raise Denied(404)
+    from ..core.objects import obj_gate  # 2.633.0 (#4779, review): the core's floor as in tcx_channels / need_room - a token limited
+    if not obj_gate(c, me(), "tchat_room", r):  # to lists renames, archives or adds members to no channel by a known id
+        raise Denied(404)
     return r
 
 
