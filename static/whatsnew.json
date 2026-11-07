@@ -1,6 +1,28 @@
 {
  "versions": [
   {
+   "version": "2.618.0",
+   "date": "2026-11-07",
+   "items": [
+    {
+     "de": "Im Termin-Fenster legt „Protokoll“ eine Wissensseite mit Teilnehmenden, Tagesordnung, Beschlüssen und Aufgaben an.",
+     "en": "\"Minutes\" in an event's window creates a knowledge page with participants, agenda, decisions and action items."
+    },
+    {
+     "de": "Ein Datum lässt sich jetzt auch tippen: Feld oben im Datums-Picker, z. B. 6.11. oder morgen, dann Enter.",
+     "en": "You can now type a date: field at the top of the date picker, e.g. 11/6 or tomorrow, then Enter."
+    },
+    {
+     "de": "Dokumente: „Gelerntes anwenden“ ordnet ausgewählte Dokumente und „Zu prüfen“ neu ein, ohne neue Texterkennung.",
+     "en": "Documents: \"Apply what was learned\" sorts selected documents and To review again, without new text recognition."
+    },
+    {
+     "de": "Langes Drücken in Ablage, Kontakten, Wissen, Kunden und Dokumenten öffnet das Menü, „Auswählen“ steht oben.",
+     "en": "A long press in files, contacts, knowledge, clients and documents opens the menu, with \"Select\" on top."
+    }
+   ]
+  },
+  {
    "version": "2.614.0",
    "date": "2026-11-06",
    "items": [
