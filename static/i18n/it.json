@@ -17361,6 +17361,7 @@
   "Make this the default for {0}": "Usa come standard per {0}",
   "This is the default for {0} now": "Ora è lo standard per {0}",
   "Only an admin of the organisation can change its default": "Solo un amministratore dell'organizzazione può modificarne lo standard",
+  "No text can be read from this kind of file (older Office formats, PowerPoint, RTF): it stays a file without text. Download it to open it.": "Da questo tipo di file non si può leggere alcun testo (vecchi formati Office, PowerPoint, RTF): resta un file senza testo. Scaricalo per aprirlo.",
   "Edit flow": "Modifica flusso",
   "Save flow": "Salva flusso",
   "Flow saved": "Flusso salvato",

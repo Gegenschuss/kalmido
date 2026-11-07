@@ -17360,6 +17360,7 @@
   "Make this the default for {0}": "Als standaard voor {0} overnemen",
   "This is the default for {0} now": "Dit is nu de standaard voor {0}",
   "Only an admin of the organisation can change its default": "Alleen een beheerder van de organisatie kan de standaard ervan wijzigen",
+  "No text can be read from this kind of file (older Office formats, PowerPoint, RTF): it stays a file without text. Download it to open it.": "Uit dit soort bestand kan geen tekst worden gelezen (oudere Office-formaten, PowerPoint, RTF): het blijft een bestand zonder tekst. Download het om het te openen.",
   "Edit flow": "Stroom bewerken",
   "Save flow": "Stroom opslaan",
   "Flow saved": "Stroom opgeslagen",

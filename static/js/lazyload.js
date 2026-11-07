@@ -463,7 +463,7 @@ function lexCsv(lid) {
 const pv_attr = o => ` data-pview="${esc(JSON.stringify(o))}"`;
 // 2.92.0 C (#1926): a Word / Excel file opens in the document preview (docpreview.js, module pdf) like a PDF:
 // <a href="…" data-dview='{"url": preview route, "name", "size", "dlUrl", "aid"?}'>; a modifier key keeps the download
-const dv_is = a => !!a && !a.enc && (/\.(docx|xlsx)$/i.test(String(a.name || '')) || /officedocument\.(wordprocessingml\.document|spreadsheetml\.sheet)$/.test(a.mime || ''));
+const dv_is = a => !!a && !a.enc && (/\.(docx|xlsx|odt|ods)$/i.test(String(a.name || '')) || /officedocument\.(wordprocessingml\.document|spreadsheetml\.sheet)$|opendocument\.(text|spreadsheet)$/.test(a.mime || ''));  // 2.635.0 (#4807): + odt / ods
 const dv_attr = o => ` data-dview="${esc(JSON.stringify(o))}"`;
 document.addEventListener('click', e => {
   const l = /** @type {HTMLElement} */ (e.target).closest?.('a[data-dview],button[data-dview]');

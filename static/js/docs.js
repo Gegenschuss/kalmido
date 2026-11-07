@@ -498,7 +498,7 @@ function dc_mdDraw(md) {
       ${rd ? dcr_prevHtml(d) : `<button type="button" class="dc-prev" data-dc="view" data-fl-fill aria-label="${esc(tr('Show {0}', d.name))}"></button>`}
       <div class="dc-acts">${dc_actsHtml(d, w) /* 2.497.0 A (#4046): grouped, Delete set apart at the end */}
       </div></div>${rd ? dcr_gripHtml('props', tr('Properties')) : ''}<div class="dc-props" id="dc-props">
-    <p class="dc-state ${esc(d.state)}" role="status">${esc(tr(DC_STATE[d.state] || d.state))}${d.state === 'failed' && d.error_text ? `: ${esc(d.error_text)}` : ''}${d.method === 'ocr' ? ` · ${tr('text recognition')}` : d.method === 'e-invoice' ? ` · ${tr('E-invoice')}` : ''}
+    <p class="dc-state ${esc(d.state)}" role="status">${esc(tr(DC_STATE[d.state] || d.state))}${d.state === 'failed' && d.error_text ? `: ${esc(d.error_text)}` : ''}${d.method === 'ocr' ? ` · ${tr('text recognition')}` : d.method === 'e-invoice' ? ` · ${tr('E-invoice')}` : ''}${d.state === 'done' && d.method === 'none' ? `<span class="dc-notext muted" role="note"> · ${tr('No text can be read from this kind of file (older Office formats, PowerPoint, RTF): it stays a file without text. Download it to open it.')}</span>` : '' /* 2.635.0 (#4807) */}
       ${w && (d.state === 'done' || d.state === 'failed') ? `<button type="button" class="linkbtn" data-dc="redo">${tr('Recognise again')}</button>` : ''}</p>
     ${sugHtml}${due}${typeof rx_html === 'function' ? rx_html(d) : ''}${typeof rc_slot === 'function' ? rc_slot(d) : ''}${typeof ltd_slot === 'function' ? ltd_slot(d) : ''}${typeof ast_docSlot === 'function' ? ast_docSlot(d) : '' /* 2.126.1 A (#2123) */}
     <div class="dc-form">
@@ -692,6 +692,7 @@ async function dc_mdClick(e) {
     if (typeof dcr_full === 'function' && dcr_full(d)) return;  // 2.521.0 (#4476): the full screen leafs through the list
     if (dc_isPdf(d) && typeof pdfView === 'function') pdfView({url: dc_fileUrl(d), name: d.name, size: d.size, dlUrl: dc_fileUrl(d, true)});
     else if (/^image\//.test(d.mime) && typeof attLightbox === 'function') attLightbox('d', [{id: 'd', name: d.name, size: d.size}], (a, dl) => dc_fileUrl(d, dl));  // 2.537.0 (#4574)
+    else if (typeof dv_is === 'function' && dv_is(d)) dpvOpen({url: `/api/files/nodes/${encodeURIComponent(d.id)}/preview`, name: d.name, size: d.size, dlUrl: dc_fileUrl(d, true)});  // 2.635.0 (#4807): Word / Excel / OpenDocument
     else window.open(dc_fileUrl(d), '_blank', 'noopener');
     return;
   }

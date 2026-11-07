@@ -46,6 +46,10 @@ DPV_SHEETS, DPV_ROWS, DPV_COLS = 5, 500, 50  # spreadsheet: sheets, rows per she
 DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 OLD_EXT = {"doc": "doc", "xls": "xls", "ppt": "ppt"}
+# 2.635.0 (#4807): OpenDocument text / spreadsheet (ZIP + XML like the Office Open XML files), read by the same worker
+ODT_MIME = "application/vnd.oasis.opendocument.text"
+ODS_MIME = "application/vnd.oasis.opendocument.spreadsheet"
+DPV_KINDS = ("docx", "xlsx", "odt", "ods")
 
 DPV_WORKER = r"""
 import io, json, re, resource, sys, zipfile, zlib
@@ -442,8 +446,174 @@ def xlsx():
     return {"type": "xlsx", "sheets": sheets, "sheets_total": total, "text": T.text(),
             "truncated": T.cut or total > len(sheets) or any(s["truncated"] for s in sheets)}
 
+# ---------------------------------------------------------------- OpenDocument (2.635.0, #4807)
+def otext(el):  # the text of a paragraph / heading: its own text, spans and links, spaces <text:s c=N/>, tabs, line breaks
+    out = [el.text or ""]
+    for ch in el:
+        t = loc(ch.tag)
+        if t == "s":
+            c = attr(ch, "c") or "1"
+            out.append(" " * min(int(c) if c.isdigit() else 1, 100))
+        elif t == "tab":
+            out.append("\t")
+        elif t == "line-break":
+            out.append("\n")
+        elif t not in ("note", "annotation", "annotation-end", "bookmark", "bookmark-start", "bookmark-end", "frame",
+                       "change-start", "change-end", "tracked-changes"):
+            out.append(otext(ch))
+        out.append(ch.tail or "")
+    return "".join(out)
+
+def obody_of(kind):
+    doc = part("content.xml")
+    if doc is None:
+        raise Stop("unreadable")
+    body = next((x for x in doc if loc(x.tag) == "body"), None)
+    inner = next((x for x in (body if body is not None else []) if loc(x.tag) == kind), None)
+    if inner is None:
+        raise Stop("unreadable")
+    return inner
+
+def ocell(c):
+    v = "\n".join(otext(p) for p in c if loc(p.tag) in ("p", "h"))
+    if not v.strip():
+        v = attr(c, "value") or attr(c, "date-value") or attr(c, "boolean-value") or attr(c, "time-value") or ""
+    return v[:2000]
+
+def orep(el, name):
+    v = attr(el, name) or "1"
+    return max(1, int(v)) if v.isdigit() else 1
+
+def odt():
+    T, blocks = Text(), []
+    def full():
+        return T.cut or len(blocks) >= BLOCKS
+    def plist(el, d):
+        for it in el:
+            if full():
+                return
+            if loc(it.tag) not in ("list-item", "list-header"):
+                continue
+            for x in it:
+                tx = loc(x.tag)
+                if tx in ("p", "h"):
+                    s = otext(x)
+                    if s.strip():
+                        blocks.append({"t": "li", "l": min(d, 8), "o": 0, "r": [{"x": s}]})
+                        T.add("  " * min(d, 8) + "- " + s)
+                elif tx == "list":
+                    plist(x, d + 1)
+    def table(tb):
+        rows = []
+        for r in tb.iter():
+            if loc(r.tag) != "table-row":
+                continue
+            cells = []
+            for c in r:
+                if loc(c.tag) not in ("table-cell", "covered-table-cell"):
+                    continue
+                v = ocell(c)
+                for _ in range(min(orep(c, "number-columns-repeated"), COLS - len(cells))):
+                    cells.append(v)
+                if len(cells) >= COLS:
+                    break
+            while cells and not cells[-1].strip():
+                cells.pop()
+            rows.append(cells)
+            if len(rows) >= ROWS:
+                break
+        if rows and any(any(x.strip() for x in r) for r in rows):
+            blocks.append({"t": "tbl", "rows": rows})
+            for r in rows:
+                T.add(" | ".join(x.replace("\n", " ") for x in r))
+    def body(el):
+        for ch in el:
+            if full():
+                return
+            t = loc(ch.tag)
+            if t == "h":
+                s = otext(ch)
+                if s.strip():
+                    lv = attr(ch, "outline-level") or "1"
+                    lv = min(max(int(lv) if lv.isdigit() else 1, 1), 6)
+                    blocks.append({"t": "h", "l": lv, "r": [{"x": s}]})
+                    T.add("#" * lv + " " + s)
+            elif t == "p":
+                s = otext(ch)
+                if s.strip():
+                    blocks.append({"t": "p", "r": [{"x": s}]})
+                    T.add(s)
+            elif t == "list":
+                plist(ch, 0)
+            elif t == "table":
+                table(ch)
+            elif t in ("section", "index-body", "table-of-content", "alphabetical-index", "illustration-index"):
+                body(ch)
+    body(obody_of("text"))
+    return {"type": "odt", "blocks": blocks, "text": T.text(), "truncated": full()}
+
+def ods():
+    T, sheets, total = Text(), [], 0
+    for tb in obody_of("spreadsheet"):
+        if loc(tb.tag) != "table":
+            continue
+        total += 1
+        if len(sheets) >= SHEETS or T.cut:
+            continue
+        name = (attr(tb, "name") or "")[:100]
+        rows, st = [], {"n": 0, "cut": False, "width": 0}
+        def row(r):
+            rep = orep(r, "number-rows-repeated")
+            cells, ci = [], 0
+            for c in r:
+                if loc(c.tag) not in ("table-cell", "covered-table-cell"):
+                    continue
+                k = orep(c, "number-columns-repeated")
+                v = ocell(c)
+                if not v.strip():
+                    ci += k  # empty cells (often repeated a million times) are only counted, never made
+                    continue
+                for _ in range(k):
+                    if ci >= COLS:
+                        st["cut"] = True
+                        break
+                    while len(cells) < ci:
+                        cells.append("")
+                    cells.append(v)
+                    ci += 1
+            if not cells:
+                st["n"] += rep
+                return True
+            st["width"] = max(st["width"], len(cells))
+            for _ in range(rep):
+                if len(rows) >= ROWS:
+                    st["cut"] = True
+                    return False
+                st["n"] += 1
+                rows.append({"n": st["n"], "c": list(cells)})
+                if not T.add(" | ".join(x.replace("\n", " ") for x in cells)):
+                    st["cut"] = True
+                    return False
+            return True
+        def walk(el):
+            for ch in el:
+                t = loc(ch.tag)
+                if t == "table-row":
+                    if not row(ch):
+                        return False
+                elif t in ("table-header-rows", "table-row-group", "table-rows"):
+                    if not walk(ch):
+                        return False
+            return True
+        walk(tb)
+        if rows:
+            T.parts.insert(len(T.parts) - len(rows), "## " + name)
+        sheets.append({"name": name, "rows": rows, "cols": st["width"], "truncated": st["cut"]})
+    return {"type": "ods", "sheets": sheets, "sheets_total": total, "text": T.text(),
+            "truncated": T.cut or total > len(sheets) or any(s["truncated"] for s in sheets)}
+
 try:
-    res = docx() if KIND == "docx" else xlsx()
+    res = {"docx": docx, "xlsx": xlsx, "odt": odt, "ods": ods}[KIND]()  # 2.635.0 (#4807): + odt / ods
 except Stop as e:
     out({"error": str(e)})
 except MemoryError:
@@ -466,7 +636,7 @@ DPV_ERR = {
 
 
 def dpv_kind(name, mime, head):
-    """'docx' | 'xlsx' (an Office Open XML archive), 'old' (.doc / .xls / .ppt or a password-protected Office file -- an
+    """'docx' | 'xlsx' (an Office Open XML archive), 'odt' | 'ods' (OpenDocument, 2.635.0 #4807), 'old' (.doc / .xls / .ppt or a password-protected Office file -- an
     OLE container), else None."""
     n, m = (name or "").lower(), (mime or "").lower()
     ole = head[:8] == b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
@@ -475,6 +645,10 @@ def dpv_kind(name, mime, head):
             return "docx"
         if n.endswith((".xlsx", ".xlsm")) or m == XLSX_MIME:
             return "xlsx"
+        if n.endswith(".odt") or m == ODT_MIME:  # 2.635.0 (#4807)
+            return "odt"
+        if n.endswith(".ods") or m == ODS_MIME:
+            return "ods"
         return None
     if ole and (n.endswith((".docx", ".xlsx")) or m in (DOCX_MIME, XLSX_MIME)):
         return "encrypted"  # Office stores a password-protected .docx / .xlsx as an OLE container
@@ -486,13 +660,13 @@ def dpv_kind(name, mime, head):
 def dpv_wanted(name, mime):
     """Could this be a Word / Excel file (by name / type, before the bytes are read)?"""
     n, m = (name or "").lower(), (mime or "").lower()
-    return n.endswith((".docx", ".docm", ".xlsx", ".xlsm")) or m in (DOCX_MIME, XLSX_MIME)
+    return n.endswith((".docx", ".docm", ".xlsx", ".xlsm", ".odt", ".ods")) or m in (DOCX_MIME, XLSX_MIME, ODT_MIME, ODS_MIME)
 
 
 def dpv_model(data, kind, owner=None):
-    """The JSON model of a .docx / .xlsx (bytes) or {error: too_large | unsafe | unreadable | too_complex | busy}. Runs in
+    """The JSON model of a .docx / .xlsx / .odt / .ods (bytes) or {error: too_large | unsafe | unreadable | too_complex | busy}. Runs in
     the limited worker (the PDF worker's slots: at most AT.PDF_PARALLEL files, one per account); cached per content."""
-    if kind not in ("docx", "xlsx"):
+    if kind not in DPV_KINDS:
         return {"error": kind if kind in ("old", "encrypted") else "type"}
     if len(data) > DPV_FILE_MB * 1024 * 1024:
         return {"error": "too_large"}

@@ -69,7 +69,7 @@ async function dpvOpen(o) {
     body.innerHTML = `<div class="pvfail dpvfail">${ic('file')}<p>${esc(msg)}</p><a class="btn pri" href="${esc(o.dlUrl || '')}" download="${esc(o.name || '')}">${ic('download')} ${esc(tr('Download'))}</a></div>`;
   };
   const draw = () => {
-    if (j.type === 'xlsx') {
+    if (j.type === 'xlsx' || j.type === 'ods') {  // 2.635.0 (#4807): an OpenDocument spreadsheet has the same model
       const sh = j.sheets || [];
       tabs.hidden = sh.length < 2;
       tabs.innerHTML = sh.map((s, i) => `<button type="button" role="tab" class="dpvtab${i === sheet ? ' on' : ''}" aria-selected="${i === sheet}" data-dpv="sheet" data-i="${i}">${esc(s.name || tr('Sheet {0}', i + 1))}</button>`).join('')

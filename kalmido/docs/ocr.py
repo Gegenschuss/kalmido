@@ -17,8 +17,9 @@ import time
 try:  # 2.369.5 (#2517): pulled up from functions; #3506: guarded, ocr.py is also loaded as a single file (tests, ocr_langs)
     from ..tasks.attachtext import file_kind, pdf_text, _decode
     from ..files.photometa import pm_kind
+    from ..files.officeprev import dpv_model  # 2.635.0 (#4807): the text / preview image of Office files
 except ImportError:  # loaded as a single file (tests, no package): only the pure helpers are used there
-    file_kind = pdf_text = _decode = pm_kind = None
+    file_kind = pdf_text = _decode = pm_kind = dpv_model = None
 
 
 def _env_int(name, default, lo, hi):
@@ -36,6 +37,7 @@ OCR_DPI = 300
 OCR_LANGS = os.environ.get("KALMIDO_OCR_LANGS", "deu+eng")
 TEXT_CAP = 200_000
 THUMB_W = 320
+OFFICE_KINDS = ("docx", "xlsx", "odt", "ods")  # 2.635.0 (#4807): read through files/officeprev.py
 _SEM = threading.BoundedSemaphore(OCR_PARALLEL)
 _AVAIL = {}
 
@@ -209,9 +211,68 @@ sys.stdout.buffer.write(b.getvalue())
 """
 
 
-def thumb_bytes(data, kind):
-    """A small JPEG of the first page / the image, or None (no tools, damaged file, timeout)."""
+# 2.635.0 (#4807): the preview image of a Word / Excel / OpenDocument file: the beginning of its preview model's text
+# (files/officeprev.py, never the file itself) drawn as a page -- headings bold, a sheet's rows as lines
+OFFICE_THUMB_WORKER = r"""
+import io, resource, sys
+for k, v in ((resource.RLIMIT_AS, 512 << 20), (resource.RLIMIT_CPU, 10), (resource.RLIMIT_FSIZE, 0)):
     try:
+        resource.setrlimit(k, (v, v))
+    except (ValueError, OSError):
+        pass
+from PIL import Image, ImageDraw, ImageFont
+W = int(sys.argv[1])
+H = int(W * 1.414)
+text = sys.stdin.buffer.read().decode("utf-8", "replace")
+im = Image.new("RGB", (W, H), "white")
+d = ImageDraw.Draw(im)
+def font(n):
+    try:
+        return ImageFont.load_default(size=n)
+    except Exception:
+        return ImageFont.load_default()
+f, fb = font(10), font(13)
+M, y = 16, 16
+for raw in text.splitlines()[:300]:
+    line = raw.replace("\t", " ").rstrip()
+    head = line.lstrip().startswith("#")
+    if head:
+        line = line.lstrip().lstrip("#").strip()
+    if not line.strip():
+        y += 5
+        continue
+    ft = fb if head else f
+    while line and y < H - 16:
+        n = len(line)
+        while n > 1 and d.textlength(line[:n], font=ft) > W - 2 * M:
+            n -= 1
+        d.text((M, y), line[:n], fill=(30, 30, 30) if head else (70, 70, 70), font=ft)
+        line = line[n:]
+        y += 18 if head else 13
+    if y >= H - 16:
+        break
+b = io.BytesIO()
+im.save(b, "JPEG", quality=72, optimize=True)
+sys.stdout.buffer.write(b.getvalue())
+"""
+
+
+def office_thumb(data, kind):
+    """2.635.0 (#4807): a small JPEG page of a Word / Excel / OpenDocument file from its preview model's text, or None."""
+    r = dpv_model(data, kind)  # cached per content: the recognition read it a moment ago
+    text = (r.get("text") or "").strip() if not r.get("error") else ""
+    if not text:
+        return None
+    p = subprocess.run([sys.executable, "-I", "-c", OFFICE_THUMB_WORKER, str(THUMB_W)], input=text[:6000].encode("utf-8"),
+                       capture_output=True, timeout=30, close_fds=True, env={"PATH": os.environ.get("PATH", "/usr/bin:/bin")})
+    return p.stdout if p.returncode == 0 and p.stdout[:2] == b"\xff\xd8" else None
+
+
+def thumb_bytes(data, kind):
+    """A small JPEG of the first page / the image, or None (no tools, damaged file, timeout). 2.635.0 (#4807): + Office files."""
+    try:
+        if kind in OFFICE_KINDS:
+            return office_thumb(data, kind)
         if kind == "pdf":
             if not shutil.which("pdftoppm"):
                 return None
@@ -410,7 +471,7 @@ def qr_codes(data, kind, pages=1, want=None, budget=None):
 
 
 def doc_text(name, mime, data, owner=None, lang=None):
-    """{"text", "method": "text" | "pdf" | "ocr", "pages"?, "error"?} -- the text of one document's bytes."""
+    """{"text", "method": "text" | "pdf" | "ocr" | "office" (2.635.0, #4807) | "none", "pages"?, "error"?} -- the text of one document's bytes."""
     kind = file_kind(name, mime, data[:2048])
     if kind == "text":
         return {"text": _decode(data)[:TEXT_CAP], "method": "text", "kind": kind}
@@ -422,6 +483,12 @@ def doc_text(name, mime, data, owner=None, lang=None):
             return {"text": r.get("text") or "", "method": "pdf", "pages": r.get("pages"), "kind": kind}
         if r.get("error") == "encrypted":
             return {"error": "encrypted", "kind": kind}
+    if kind in OFFICE_KINDS:  # 2.635.0 (#4807): Word / Excel / OpenDocument: the text of the preview model (limited worker)
+        r = dpv_model(data, kind, owner)
+        if r.get("error"):
+            e = r["error"]
+            return {"error": e if e in ("busy", "too_complex", "encrypted") else "unreadable", "kind": kind}
+        return {"text": (r.get("text") or "")[:TEXT_CAP], "method": "office", "kind": kind}
     if kind not in ("pdf", "image"):
         return {"text": "", "method": "none", "kind": kind}
     if kind == "image":

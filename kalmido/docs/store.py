@@ -1151,7 +1151,7 @@ def thumb_store(c, m, node, data, kind):
     """Make the preview image of a document (sealed like its file) and note its path in doc_meta.thumb."""
     import os
     import uuid
-    if kind not in ("pdf", "image"):
+    if kind not in ("pdf", "image", "docx", "xlsx", "odt", "ods"):  # 2.635.0 (#4807): + Office files (from their preview model)
         return
     jpg = thumb_bytes(data, kind)
     if not jpg:

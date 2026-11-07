@@ -327,7 +327,7 @@ def _process(c, row):
     except Exception:  # noqa: BLE001 -- a missing / damaged file or a key that cannot open it
         return _set(c, fid, "error", "unreadable")
     office = dpv_kind(ref["name"], ref["mime"], data[:16])
-    mime = "office" if office in ("docx", "xlsx") else _sniff(data)
+    mime = "office" if office in ("docx", "xlsx", "odt", "ods") else _sniff(data)  # 2.635.0 (#4807): + odt / ods
     if mime not in ("application/pdf", "image/jpeg", "image/png", "office"):
         # HEIC: neither Tesseract nor Pillow in the image read it -- no mark ("not readable" is no "no text found")
         return _set(c, fid, "skip", "heic" if mime == "image/heic" else "type")
