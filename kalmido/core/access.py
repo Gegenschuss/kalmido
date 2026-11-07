@@ -9,7 +9,7 @@ from flask import g, has_request_context, jsonify, request
 from ..core.config import app
 from ..core.schema import MAX_DEPTH
 from ..core.i18n import N_, tr
-from ..core.db import db, ensure_inbox, err, trigger_ensure, usettings
+from ..core.db import db, ensure_inbox, err, now_iso, trigger_ensure, usettings
 from ..core.ctx import me  # 2.149.0 G (#2517): was accounts.session
 from ..core.errors import Denied  # noqa: F401  2.149.0 G (#2517): moved to core/errors.py, re-exported here
 from .pg import set_ctx_hook, st_ids, system_ctx as pg_system  # 2.149.0 G (#2517): pulled up from functions
@@ -729,7 +729,6 @@ def lr_own_ran_out(c, lids, uid):
     ids = sorted({int(x) for x in lids or () if x})
     if not ids or not uid:
         return set()
-    from .db import now_iso
     with _sys(c):  # the node lies in the owner's tree
         return {r[0] for r in c.execute("""SELECT n.ref_id FROM fs_nodes n JOIN fs_shares s ON s.node_id=n.id WHERE n.kind='ref'
                                            AND n.ref_kind='list' AND n.ref_id = ANY(CAST(? AS BIGINT[])) AND s.list_own=1
