@@ -16,7 +16,7 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), status: r.status}; };
-const FEAT = 'cal,comments,collab,time,progress,wiki';
+const FEAT = 'cal,comments,collab,time,progress,wiki,reading,feeds';
 
 (async () => {
   await sleep(600);
@@ -79,12 +79,13 @@ const FEAT = 'cal,comments,collab,time,progress,wiki';
     check(nt === tablet, `${tag}: the menu editor ${tablet ? 'has' : 'has no'} navtouch (${nt})`);
     const arrow = await ev(`(() => { const h = document.createElement('div'); h.className = 'lchead'; h.innerHTML = '<div class="lc"><button class="lcmb" type="button"></button></div>'; document.body.appendChild(h); const d = getComputedStyle(h.querySelector('.lcmb')).display; h.remove(); return d; })()`);
     check(tablet ? arrow !== 'none' : arrow === 'none', `${tag}: the column arrow ${tablet ? 'is visible without hover' : 'waits for the hover'} (${arrow})`);
-    // the sidebar point: the long press opens the menu (a mouse has the right click)
+    // the sidebar point: the long press opens the menu (a mouse has the right click); the panel of an area with parts (reading)
+    await nav(B + '#reading'); await ready(ev); await until(ev, `!!document.querySelector('#side [data-navk]')`);
     const sp = await ev(`(() => { const b = document.querySelector('#side [data-navk]'); if (!b || !b.offsetParent) return null; const r = b.getBoundingClientRect(); return {x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2)}; })()`);
     if (tablet) {
       if (!sp) await ev(`(() => { document.querySelector('[data-act="side"], #menubtn, .menubtn')?.click(); return 1; })()`).catch(() => {});
       const sp2 = sp || await ev(`(() => { const b = document.querySelector('#side [data-navk]'); if (!b || !b.offsetParent) return null; const r = b.getBoundingClientRect(); return {x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2)}; })()`);
-      check(!!sp2, tag + ': a sidebar point is on screen');
+      check(!!sp2, tag + ': a sidebar point is on screen ' + await ev(`JSON.stringify({n: document.querySelectorAll('#side [data-navk]').length, cls: document.querySelector('#side')?.className, hash: location.hash, vis: !!document.querySelector('#side')?.offsetParent})`));
       if (sp2) {
         await touch([{type: 'pointerMove', x: sp2.x, y: sp2.y}, {type: 'pointerDown', button: 0}, {type: 'pause', duration: 800}, {type: 'pointerUp', button: 0}]);
         check(await until(ev, `[...document.querySelectorAll('#pop [role="menuitem"]')].some(b => /Hide from menu/.test(b.textContent))`), tag + ': the long press on a sidebar point opens "Hide from menu"');
