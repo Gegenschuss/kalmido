@@ -254,4 +254,22 @@ check(files("{5}") == [] and files("a%*") == ["1.eml"], f"moved from '{{5}}' int
 lg = imap_log()
 check('SELECT "{5}"' in lg and '"a%*"' in lg and "SELECT {5}" not in lg, "both names went out as quoted strings")
 
+# ---- 2.651.0 (#5033): folder names with umlauts (and '&') go out in modified UTF-7 (RFC 3501 5.1.3), still quoted; the rule
+# keeps and shows the plain name. Before: imaplib refused the non-ASCII name (nothing selected, nothing moved).
+for x in ("Entwürfe", "Büro & Ablage"):
+    os.makedirs(os.path.join(MB, x), exist_ok=True)
+r = Bo.post(B + "/api/hubmail/mailbox/rules", json={"ws": f"org:{ORG}", "name": "Umlaut", "folder": "Entwürfe", "need_att": True,
+                                                    "after": "move", "after_folder": "Büro & Ablage"})
+check(r.status_code == 201 and r.json()["rule"]["folder"] == "Entwürfe" and r.json()["rule"]["after_folder"] == "Büro & Ablage",
+      f"#5033: a rule on 'Entwürfe' moving into 'Büro & Ablage', stored in plain text ({r.status_code} {r.text[:200]})")
+drop("Entwürfe", "Shop <billing@shop.example.com>", "Umlaut folder", att="Umlaut-1")
+n0 = len(docs(WS))
+check(run(Bo, WS), "#5033: the rules ran with the umlaut folders")
+check(until(lambda: len(docs(WS)) == n0 + 1, 30) and "Umlaut-1.pdf" in [x[1] for x in docs(WS)],
+      f"#5033: the mail in 'Entwürfe' became a document ({[x[1] for x in docs(WS)][-3:]})")
+check(files("Entwürfe") == [] and files("Büro & Ablage") == ["1.eml"],
+      f"#5033: moved from 'Entwürfe' into 'Büro & Ablage' ({files('Entwürfe')} / {files('Büro & Ablage')})")
+lg = imap_log()
+check('SELECT "Entw&APw-rfe"' in lg and '"B&APw-ro &- Ablage"' in lg, "#5033: both names went out in modified UTF-7, quoted")
+
 sys.exit(done("p2581_d_mailrules"))

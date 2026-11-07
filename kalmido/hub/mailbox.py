@@ -22,6 +22,7 @@ else nothing (the dialog says why). The mail is filed first (direction out, send
 then sent; a failure leaves it "failed" with a note (never a sent mail that was not). Who may: the write right on the mail /
 the client / the project (hbm_can). Per person 30 mails an hour (through the server's SMTP also its daily e-mail limit). Agents and kid
 accounts get nothing (no v1 route, no MCP tool in 2.141.0)."""
+import base64
 import email
 import email.policy
 import email.utils
@@ -164,10 +165,32 @@ def _err_code(e):
     return "other"
 
 
+def _mutf7(name):
+    """2.651.0 (#5033): a folder name in RFC 3501 5.1.3 modified UTF-7, what IMAP servers expect on the wire (imaplib sends
+    only ASCII): printable ASCII stays, '&' becomes '&-', every other run goes as '&' + base64 of its UTF-16BE (',' for '/',
+    no padding) + '-'. 'Entwürfe' -> 'Entw&APw-rfe'. The app keeps and shows the plain name; only the command gets this."""
+    out, run = [], []
+
+    def flush():
+        if run:
+            b = "".join(run).encode("utf-16-be")
+            out.append("&" + base64.b64encode(b).decode("ascii").rstrip("=").replace("/", ",") + "-")
+            run.clear()
+    for ch in name:
+        if 0x20 <= ord(ch) <= 0x7E:
+            flush()
+            out.append("&-" if ch == "&" else ch)
+        else:
+            run.append(ch)
+    flush()
+    return "".join(out)
+
+
 def _folder_arg(folder):
     """A folder name as an RFC 3501 quoted string, always (#4852): unquoted, '{5}' would be read as a literal and '%' / '*'
-    as list wildcards; backslash and double quote escaped (the stored names refuse both, this stays safe anyway)."""
-    return '"' + folder.replace("\\", "\\\\").replace('"', '\\"') + '"'
+    as list wildcards; backslash and double quote escaped (the stored names refuse both, this stays safe anyway).
+    2.651.0 (#5033): non-ASCII (and '&') in modified UTF-7 (_mutf7), inside the quotes."""
+    return '"' + _mutf7(folder).replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
 # ---- the connections (every address checked, calendars/subscriptions.py) ------------------------------------------------

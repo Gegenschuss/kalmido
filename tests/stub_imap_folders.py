@@ -6,7 +6,10 @@ MOVE); every command goes to /data/mbr/imap.log. Only the commands imaplib sends
 STORE / COPY / MOVE / EXPUNGE, EXPUNGE). SEARCH UNSEEN = the mails without \\Seen; any other search = the mails without
 \\Deleted (SINCE is the client's own filter).
 2.638.0 (#4852): a folder name is read like a real server does - a quoted string (with \\" and \\\\) or a plain atom; an
-unquoted name with atom-specials ('{5}' = a literal, '%' / '*' = wildcards, a space, brackets) gets BAD."""
+unquoted name with atom-specials ('{5}' = a literal, '%' / '*' = wildcards, a space, brackets) gets BAD.
+2.651.0 (#5033): names come in modified UTF-7 like at a real server (RFC 3501 5.1.3, 'Entw&APw-rfe' = the folder
+/data/mbr/Entwürfe); raw 8-bit / a broken '&...-' gets BAD."""
+import base64
 import json
 import os
 import re
@@ -51,13 +54,38 @@ def uidset(s, folder):
     return out
 
 
+def mutf7_decode(s):
+    """2.651.0 (#5033): modified UTF-7 -> the plain name; None = not valid (8-bit, an open '&', bad base64)."""
+    if s is None or any(not 0x20 <= ord(ch) <= 0x7E for ch in s):
+        return None
+    out, i = [], 0
+    while i < len(s):
+        if s[i] != "&":
+            out.append(s[i])
+            i += 1
+            continue
+        j = s.find("-", i)
+        if j < 0:
+            return None
+        b = s[i + 1:j].replace(",", "/")
+        if not b:
+            out.append("&")
+        else:
+            try:
+                out.append(base64.b64decode(b + "=" * (-len(b) % 4), validate=True).decode("utf-16-be"))
+            except ValueError:
+                return None
+        i = j + 1
+    return "".join(out)
+
+
 def mbox(s):
     """The folder name of a command argument (RFC 3501 astring); None = what a real server would not read as that name."""
     s = s.strip()
     if s.startswith('"'):
         m = re.fullmatch(r'"((?:[^"\\]|\\["\\])*)"', s)
-        return re.sub(r'\\(["\\])', r"\1", m.group(1)) if m else None
-    return None if not s or re.search(r'[(){ %*"\\]', s) else s
+        return mutf7_decode(re.sub(r'\\(["\\])', r"\1", m.group(1))) if m else None
+    return None if not s or re.search(r'[(){ %*"\\]', s) else mutf7_decode(s)
 
 
 def log(line):
