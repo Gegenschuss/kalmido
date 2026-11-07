@@ -15,7 +15,35 @@ minor one, anything that needs action on your side a major one.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
-## [2.614.0] - 2026-11-06
+## [2.618.0] - 2026-11-07
+
+Package 2.611 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Security
+- #4019: An admin without a password (OIDC or passkey) turns the server-opening switches (public links, registration, 2FA requirement, OIDC settings) only with a fresh sign-in of the last 10 minutes; otherwise Settings offers "Sign in again" (passkey right in the dialog, OIDC via its confirmation step). A sign-in link does not count as fresh.
+- #4884: Turning organisation encryption on (or off, or deleting a key) now takes the documents' preview images along; before they stayed readable on disk.
+- #4784: Team proposals of a server agent: others with write rights no longer see the free text and images of an extract request, nor the task notes of a subtasks request once the task is out of their sight; "Waiting for me" checks the team rule in one go.
+### Fixed
+- #4865: Background encryption passes: a list skipped because it was busy is queued again (with a limit), rows are rewritten only when their content is unchanged, a wiki page moved meanwhile gets the key of its new space, a file deleted meanwhile is not written back.
+- #4866: The preview of undoing an account import counts exactly like the undo (trash, calendars, focus sessions, arrangements, billed time entries); the undo answer names what went for good (for_good).
+
+Package 2.384 (Besprechungen mit Protokoll).
+
+### Added
+- Meeting minutes as a knowledge page: "Minutes" in an event's window (calendar, phone and computer) makes the page "Minutes/YYYY-MM-DD <title>" in the workspace of the event's calendar (the private space without an organisation) and opens it for writing; title, date, time, place, participants and the agenda (the event's notes, one item per line) are filled in, decisions and action items are checkbox lines that "Open items as tasks" turns into tasks. A template "Templates/Besprechung" (or Protokoll / Meeting / Minutes) of the space is used when there is one, with the new placeholders {{termin}}, {{zeit}}, {{ort}}, {{teilnehmer}}, {{tagesordnung}} (English names too). The page keeps the event in its frontmatter, so "Minutes" on the same event opens that page again (#1958).
+
+Package 2.607 (Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), CI-only rot: p271_ui, Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Added
+- Date picker: a text field on top of every date picker and of the task's date dialog - type 6.11. / 06.11.2026 / 61126 / 2026-11-06 / 11/6/2026, today / tomorrow / +3 and press Enter; due dates without a year take the next matching day, min/max apply, invalid input turns red, the calendar follows the typing; on phones a number pad that does not open by itself (#4867)
+- Documents: "Apply what was learned" in the selection's Edit menu and as a button above To review - sorts again with the stored text only (no new text recognition, no new archive number, date and amount stay), fills empty sender / type / folder, adds learned tags, keeps hand-set values and tags; message "x documents sorted, y suggestions" with one undo step (#4872)
+### Changed
+- Files, contacts, knowledge, clients and documents: a long press or right click opens the row's menu with the name on top, then "Select", then the other entries; a long press no longer starts the selection directly (while selecting, it still ticks) (#4612)
+- Organisations: guests and read-only people only read in the organisation's objects - no comments, reactions, answers to choice buttons, video review comments or team chat posts (web and API v1 answer 403); the app shows a short lock hint instead of the input. Private lists, direct messages, people without an organisation and accounting are unchanged (#4549)
+- Documents: "Recognise again" adds learned tags instead of locking the tags as a whole, and may re-decide values that a rule or the learning set (#4872)
+### Fixed
+- Lists and other optimistic saves: a state load that was already on its way no longer puts back an own change that was just saved (e.g. a list switched to the timeline jumped back to the list view; CI red p271_ui) (#4901)
+- Budget: after "Create budget" the new budget opens at once instead of the empty start text until a reload (#4925)
+
+### Fixed - main: a restore tries again after a deadlock while it takes the foreign keys away (before, work outside the maintenance gate could end it with a database error; suite p2273_a_backup), twofa takes the step of its login code before the login (a 30-second edge made the replay check sign in), the demo test finds the note list in the panel (2.602.0) (CI red of 2.614.0)
 
 ### Fixed - main: test p4286_restore runs its hard stops alone on the database (server beside it frozen without an open transaction, like behind the maintenance gate) and names a failed pg_restore of the backup (CI red of 2.601.0)
 
@@ -48,6 +76,10 @@ Package 2.570 (part B: undo with a version check).
 ### Fixed
 - Undo and redo no longer silently overwrite a change made in another session: a bookmark, a document, an office archive correction and "Make this the default" for the dashboard and project page arrangements now check the version, keep the other change and say "Changed elsewhere, not undone" (#4770).
 - A bookmark preview fetch and a document recognition run no longer move the item's version, so undo after them works as before; documents carry their own edited_at, office archive entries an updated_at and the standard arrangements a version (#4770).
+
+## [2.614.0] - 2026-11-06
+
+Not released (the CI of this version was red); its changes are listed under 2.618.0.
 
 ## [2.605.0] - 2026-11-06
 
@@ -89,7 +121,8 @@ Package 2.582 (Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher),
 
 Not released (the CI of this version was red); its changes are listed under 2.605.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.614.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.618.0...HEAD
+[2.618.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.618.0
 [2.614.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.614.0
 [2.605.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.605.0
 [2.601.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.601.0
