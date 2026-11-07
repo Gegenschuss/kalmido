@@ -143,7 +143,8 @@ async function firefox(fn) {
   let md = d.querySelector('.modal.lnew');
   check(md && !md.querySelector('.lptype').hidden && md.querySelector('#l-kind').value === 'project', 'New project: type Project, picker shown');
   const cards = [...md.querySelectorAll('.ptcard')].map(b => b.dataset.pt);
-  check(cards.join(',').startsWith(',agency,software,private,tpl:'), 'Blank, Agency, Software, Personal, own template: ' + cards.join(','));
+  // 2.387.0 (#1957): + the type Social media plan before the own templates
+  check(cards.join(',').startsWith(',agency,software,private,social,tpl:'), 'Blank, Agency, Software, Personal, Social media plan, own template: ' + cards.join(','));
   check(await until(() => /Dates from the project start/.test(md.querySelector('[data-ptd]')?.textContent || '')), 'own template: says it is relative');
   md.querySelector('#l-kind').value = 'list'; change(w, md.querySelector('#l-kind'));
   // 2.352.0 B (#2752): no list / project difference any more - the picker stays for every new project

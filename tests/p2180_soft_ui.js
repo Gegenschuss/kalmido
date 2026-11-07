@@ -106,8 +106,8 @@ const lst = async (id, ck = CK) => (await call('GET', '/api/state', null, ck)).l
   w.eval(`listModal(${EM})`); await sleep(300);
   let md = d.querySelector('.modal.lmodal') || d.querySelector('.lmodal');
   let sel = md?.querySelector('#l-ptype');
-  check(sel && !sel.disabled && sel.options.length === 4 && sel.value === '' && md.querySelector('label[for="l-ptype"]')?.textContent === 'Project type', 'dialog: Project type with None / Agency / Software / Personal');
-  check(sel && [...sel.options].map(o => o.textContent).join('|') === 'None|Agency|Software / AI dev|Personal', 'the type names ' + [...(sel?.options || [])].map(o => o.textContent).join('|'));
+  check(sel && !sel.disabled && sel.options.length === 5 && sel.value === '' && md.querySelector('label[for="l-ptype"]')?.textContent === 'Project type', 'dialog: Project type with None / Agency / Software / Personal / Social media plan');  // 2.387.0 (#1957): + social
+  check(sel && [...sel.options].map(o => o.textContent).join('|') === 'None|Agency|Software / AI dev|Personal|Social media plan', 'the type names ' + [...(sel?.options || [])].map(o => o.textContent).join('|'));
   check(md.querySelector('.lrepo')?.hidden === true, 'a project without a type and without a repository: no Repository area');
   change(w, sel, 'software');
   check(await until(() => w.eval(`listById(${EM}).ptype === 'software'`)), 'changing the select saves the type');
