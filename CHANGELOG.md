@@ -16,7 +16,35 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
-## [2.632.0] - 2026-11-07
+## [2.634.0] - 2026-11-07
+
+Package 2.622 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Added
+- #4514: the update hint for admins (admin settings, Server > Updates) shows the "Action needed" section of the target release as plain text ("To do before the update"), so manual steps for operators are visible before updating.
+
+### Changed
+- #3891: short-lived state that broke with several web processes now lives in the database (table eph_state: sign-in steps for 2FA, passkeys and TOTP setup, OIDC states, ZIP download tickets, calendar undo; keys only as HMAC, content sealed, taken once) or goes over pg_notify (agents' long-polls, instance switches, typing / presence / editing markers, queue wake-ups). Without KALMIDO_REPLICAS > 1, KALMIDO_PGBUS=1 or a web/worker role nothing changes; KALMIDO_WEB_PROCS itself follows later.
+- #3894: English wording, the rest of #2991 (637 texts): "take over" by meaning (Apply / Import / Add / Use; taking over a project stays), "take back" -> Undo, "for good" -> permanently, "Switch on/off", "Read-only", "Select", "Reject", "Go to sign-in", "Other people" and the examples unified; where two old keys meet, the existing translation is kept; glossary in TRANSLATING.md and tools/i18n_check.py.
+
+### Fixed
+- #4946: phone: the header and the input line of the agent / job chat now reach the screen edges; the messages keep their padding, the desktop is unchanged.
+- #4948: phone: after opening a task from "Waiting for me" (and writing a comment), one system Back closes the task at the same list position, the next Back goes to the view before.
+
+### Fixed
+- main: CI red of 2.632.0 - p23674_a_office: the overdue run of the test sets the due dates of its invoices in one step, so the server's own watchdog tick in between no longer splits them into two items (#2972).
+
+Package 2.634 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), CI-only rot: p2579_c_ui, CI-only rot: p2430_c_ui u. 1 weitere).
+
+### Added
+- #4774: rules: the dialog for a new rule shows "Templates" on top - one click fills in when / then (done -> column Done, reopened -> In progress, new -> assign to me, enters Review -> assign a person, due today -> priority high, gets tag Urgent -> priority high; "enters Done -> mark as done" as soon as that action exists). Columns and tags are proposed by name; a missing one stays "Select ..." and must be chosen before saving. Sorted by project type (software, agency). Saving creates a normal rule.
+
+### Changed
+- #4797: project board (mouse, desktop / tablet): while dragging a card, a dashed placeholder shows where it will land and the neighbouring cards slide aside smoothly (off with reduced motion). Dropping into the free part of a column with cards puts the card at the end of that column.
+
+### Fixed
+- #4997: browser demo: "all modules" in the intro also switches on Approval (videos) - the demo takes its module lists from the server (CI red p2125_d_demo).
+- #4996: test p2430_c_ui reports the notepad's state when a save is missing (diagnostics for a rare CI red; no app change).
 
 Package 2.628 (Bündel: CI-only rot: p2350_a_api, CI-only rot: p2521_e_dbmem, CI-only rot: p253_a_ui u. 3 weitere).
 ### Changed
@@ -35,6 +63,10 @@ Package 2.627 (Bündel: Rot auf main allein: p2361_a_texts, Rot auf main allein:
 ### Fixed
 - People list: a member sees per person only the organisations they share with them, no longer the ids of all organisations of that person (#4526)
 - Tests: p2361_a_texts follows the removed clients text (#4980), p2554_a_docside_ui builds a stack that waits for a person since the auto split (#4981), p2579_c_ui and p2574_b_wkcm_ui wait for the end state instead of in-between states and are out of the skip list (#4976, #4977)
+
+## [2.632.0] - 2026-11-07
+
+Not released (the CI of this version was red); its changes are listed under 2.634.0.
 
 ## [2.629.0] - 2026-11-07
 
@@ -249,7 +281,8 @@ Package 2.582 (Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher),
 
 Not released (the CI of this version was red); its changes are listed under 2.605.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.632.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.634.0...HEAD
+[2.634.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.634.0
 [2.632.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.632.0
 [2.629.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.629.0
 [2.626.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.626.0
