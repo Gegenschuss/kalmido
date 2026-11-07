@@ -29,6 +29,7 @@ from ..accounts.bgjobs import bgj_active, bgj_add, bgj_busy, bgj_current, bgj_fn
 from ..core.zipread import base_name, is_zip, zip_read, ZipLimit  # 2.149.0 G (#2517): pulled up from functions
 from ..contacts.model import task_contacts  # 2.369.5 (#2517): pulled up from functions
 from ..contacts.model import BK_KERN, bk_has_node  # 2.566.0 (#4712): the shared core (contacts/ctkern.py fills it)
+from ..contacts.model import VC_BEGIN_RE  # 2.630.0 (#4593)
 from ..core.pages import too_large  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgs import obj_org_set  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgout import org_out  # 2.369.5 (#2517): pulled up from functions
@@ -318,7 +319,7 @@ def op_import(c, uid, bid, raw, bg=False, csv_ok=False, mapping=None, preview=Fa
         cards = ctx_cards(raw, mapping)
     else:
         text = _vcf_text(raw)
-        if "BEGIN:VCARD" not in text.upper():
+        if not VC_BEGIN_RE.search(text):  # 2.630.0 (#4593): no upper-case copy of up to 50 MB
             raise BadInput(tr("This is not a contacts file (vCard or CSV)") if csv_ok else tr("This is not a contacts file (vCard)"))
         if preview:
             return {"format": "vcard"}
@@ -574,7 +575,7 @@ def ct_gather(ups):
     def take(name, data):
         nonlocal total
         text = _vcf_text(data)
-        if "BEGIN:VCARD" not in text.upper():
+        if not VC_BEGIN_RE.search(text):  # 2.630.0 (#4593): no upper-case copy of up to 50 MB
             errors.append({"file": name, "error": tr("This is not a contacts file (vCard)")})
             return
         total += len(data)
