@@ -214,7 +214,7 @@ async function tcSend() {
     const lk = le2eChanOn(S.tc.room), ltext = lk ? tcMentions(text) : null;
     const enc = lk ? await le2eChanEnc(S.tc.room, ltext) : S.tc.room?.e2e ? await e2eDmEncrypt(rid, text) : null; if ((lk || S.tc.room?.e2e) && !enc) throw null;  // 2.62.0 (#1530): throw = the text goes back into the box
     if (!enc && !await e2eDownOk(rid)) throw null;  // 2.42.0 (#909): switched off by the server alone -> ask first
-    m = await rawFetch('POST', `/api/team/rooms/${rid}/messages`, files.length && !enc ? tcx_form(tcMentions(text), rto, p.cid, files) : {...(enc ? {enc} : {body: tcMentions(text)}), ...(lk ? {mentions: le2eChanMentions(ltext)} : {}), ...(rto ? {reply_to: rto} : {}), client_id: p.cid});
+    m = await (lk ? le2eChanPost(S.tc.room, ltext) : rawFetch)('POST', `/api/team/rooms/${rid}/messages`, files.length && !enc ? tcx_form(tcMentions(text), rto, p.cid, files) : {...(enc ? {enc} : {body: tcMentions(text)}), ...(lk ? {mentions: le2eChanMentions(ltext)} : {}), ...(rto ? {reply_to: rto} : {}), client_id: p.cid});
     if (enc) { m.body = lk ? ltext : text; m._dec = true; E2E.dec[m.id + ':'] = m.body; }
   }
   catch (e) {  // 2.62.0 (#1530): the text goes back into the box
@@ -278,7 +278,7 @@ async function tcEditSave(mid) {
   let r;
   try {
     const lk = le2eChanOn(S.tc.room), lv = lk ? tcMentions(v) : null;  // 2.64.2 (#1817): the list key, the current generation
-    const enc = lk ? await le2eChanEnc(S.tc.room, lv) : m.enc ? await e2eDmEncrypt(S.tc.rid, v) : null; if ((lk || m.enc) && !enc) return;  // 2.42.0 (#909): encrypted again
+    const enc = lk ? await le2eChanEnc(S.tc.room, lv, mid) : m.enc ? await e2eDmEncrypt(S.tc.rid, v) : null; if ((lk || m.enc) && !enc) return;  // 2.42.0 (#909): encrypted again
     // 2.564.0 D (#4701): with the version the box opened with; 409 (edited on another device) = the reason and the current message
     const ver = S.tc.edit === mid ? S.tc.editVer : null;
     r = await rawFetch('PATCH', `/api/team/messages/${mid}`, {...(enc ? {enc} : {body: tcMentions(v)}), ...(ver ? {expect_updated_at: ver} : {})});
@@ -474,7 +474,7 @@ async function tth_send() {
     const lk = le2eChanOn(S.tc.room), ltext = lk ? tcMentions(text) : null;
     const enc = lk ? await le2eChanEnc(S.tc.room, ltext) : S.tc.room?.e2e ? await e2eDmEncrypt(rid, text) : null; if ((lk || S.tc.room?.e2e) && !enc) throw null;
     if (!enc && !await e2eDownOk(rid)) throw null;
-    m = await rawFetch('POST', `/api/team/rooms/${rid}/messages`, {...(enc ? {enc} : {body: tcMentions(text)}), ...(lk ? {mentions: le2eChanMentions(ltext)} : {}), ...(rto ? {reply_to: rto} : {}), thread_of: th.id, client_id: p.cid});
+    m = await (lk ? le2eChanPost(S.tc.room, ltext) : rawFetch)('POST', `/api/team/rooms/${rid}/messages`, {...(enc ? {enc} : {body: tcMentions(text)}), ...(lk ? {mentions: le2eChanMentions(ltext)} : {}), ...(rto ? {reply_to: rto} : {}), thread_of: th.id, client_id: p.cid});
     if (enc) { m.body = lk ? ltext : text; m._dec = true; E2E.dec[m.id + ':'] = m.body; }
   } catch (e) {
     csdDone(ck, p); csdBack($('#tth-in'), text, 'tth:' + th.id); tth_patch();

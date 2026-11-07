@@ -51,16 +51,16 @@ def le2e_is_cipher(v):
     return isinstance(v, str) and v.startswith(LE2E_PREFIX)
 
 
-def le2e_parse(v, max_ct=LE2E_CT_MAX):
+def le2e_parse(v, max_ct=LE2E_CT_MAX, vs=(1,)):
     """A ciphertext "e2e1:{v, g, iv, ct}" -> the dict, else None. Only the shape is checked: the server cannot (and must not)
-    read it."""
+    read it. vs = the format versions taken (2.640.0, #3388: the wiki also takes v 2, the page id in the AAD)."""
     if not le2e_is_cipher(v):
         return None
     try:
         d = json.loads(v[len(LE2E_PREFIX):])
     except ValueError:
         return None
-    if not isinstance(d, dict) or set(d) != {"v", "g", "iv", "ct"} or d.get("v") != 1:
+    if not isinstance(d, dict) or set(d) != {"v", "g", "iv", "ct"} or isinstance(d.get("v"), bool) or d.get("v") not in vs:
         return None
     g = d.get("g")
     if isinstance(g, bool) or not isinstance(g, int) or g < 1:

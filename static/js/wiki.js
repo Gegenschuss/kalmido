@@ -686,7 +686,7 @@ function wk_preseal() {
   WK.sealT = setTimeout(async () => {
     const b = wk_src(p); if (!b || WK.pg !== p) return;
     const plain = b.value, seq = WK.seq || 0;  // review (#4304): the typing state this cipher belongs to
-    try { const o = await wkeSeal(p.space, {body: plain}); WK.seal = {id: p.id, plain, c: o.body, seq}; } catch { /* locked meanwhile */ }
+    try { const o = await wkeSeal(p.space, {body: plain}, p.id); WK.seal = {id: p.id, plain, c: o.body, seq}; } catch { /* locked meanwhile */ }
   }, 150);
 }
 function wk_stash() {
@@ -730,7 +730,7 @@ async function wk_flush(hide) {
 // 2.527.0 (#4304 A18): a text the server refused (403 no right any more, 413 too large, ...) waits at the page as a draft (the
 // copy's waiting record, wko_cfHtml, kept over a reload of the page), not only in the field: an encrypted space keeps its cipher
 async function wko_draft(p, body, why) {
-  const mine = wk_e2e(p.space) ? (await wkeSeal(p.space, {body})).body : body;
+  const mine = wk_e2e(p.space) ? (await wkeSeal(p.space, {body}, p.id)).body : body;
   WKO.cf[p.id] = {k: 'x:' + p.id, id: p.id, sp: p.space, mine, why, at: new Date().toISOString()};
   await wko_put(WKO.cf[p.id]);
 }
@@ -1276,7 +1276,7 @@ async function wko_queue(p, patch) {
   let b = {...patch};
   if (wk_e2e(p.space)) {
     if (typeof wkeReady !== 'function' || !wkeReady(p.space)) { WK.dirty = true; toast(tr('Unlock first: this workspace is encrypted in the browser.')); return; }
-    b = await wkeSeal(p.space, {body: patch.body}); b.expect_updated_at = patch.expect_updated_at;
+    b = await wkeSeal(p.space, {body: patch.body}, p.id); b.expect_updated_at = patch.expect_updated_at;
   }
   const q = outSync().find((x, i) => (i > 0 || !OUT.flushing) && !x.sending && !x.done && x.method === 'PATCH' && x.url === url);
   if (q) { outSave(() => { q.body = {...q.body, body: b.body}; }); renderTop(); }
@@ -1319,7 +1319,7 @@ async function wko_cfShow(p) {
   await wk_loadPage(p.id, true);
   const cur = WK.pg; if (!cur || cur.id !== p.id || cur._off) return;
   let mine = r.mine;
-  if (typeof wkeIs === 'function' && wkeIs(mine)) { mine = await wkeDec(cur.space, 'body', mine).catch(() => null); if (mine == null) { toast(tr('Unlock first: this workspace is encrypted in the browser.')); return; } }
+  if (typeof wkeIs === 'function' && wkeIs(mine)) { mine = await wkeDec(cur.space, 'body', mine, cur.id).catch(() => null); if (mine == null) { toast(tr('Unlock first: this workspace is encrypted in the browser.')); return; } }
   if (await wk_conflict(cur, {...cur}, {body: mine, expect_updated_at: cur.updated_at}) === true) { delete WKO.cf[p.id]; await wko_del(r.k); renderView(); }  // closed without a choice: mine keeps waiting
 }
 // 2.169.1 (#2672): a space with more pages than the index holds says that only the first ones are kept here

@@ -11,6 +11,8 @@ space run in the browser; the server neither fills wiki_links nor answers search
 # - space key: 32 random bytes per generation, wrapped by the browser for every member: ECDH -> HKDF-SHA256(salt
 #   "wiki:<space_id>:<gen>", info "kalmido-wikikey:v1") -> AES-256-GCM, AAD "kalmido-wikikey:v1:<space_id>:<gen>:<R>:<W>";
 # - path / text: AES-256-GCM, AAD "kalmido-wiki:v1:<space_id>:<g>:path|body", stored as "e2e1:{v, g, iv, ct}" (body "" stays "").
+#   2.640.0 (#3388): v 2 = AAD "kalmido-wiki:v2:<space_id>:<g>:<page_id>:path|body" (a cipher opens only on its own page; a new
+#   page is created under an id reserved before the encryption, POST /api/wiki/pages/newid); the browser writes v 2 only.
 # Who manages: the private space its owner, an organisation's space its admins. Agents and API tokens never take part.
 import json
 
@@ -31,11 +33,13 @@ from ..collab.comments import user_names  # 2.369.5 (#2517): pulled up from func
 from ..accounts.orgs import is_org_admin  # 2.369.5 (#2517): pulled up from functions
 from ..collab.e2e import e2e_blob, e2e_keys_of, e2e_reauth  # 2.369.5 (#2517): pulled up from functions
 from ..collab.news import news_add  # 2.369.5 (#2517): pulled up from functions
+from ..collab.e2eresv import e2r_new, e2r_ok  # 2.640.0 (#3388)
 
 WKE_BULK_MAX = 200     # pages per todo / bulk call
 WKE_KEYS_MAX = 500     # entries per start / keys / rotate call (an organisation may have more members than a list)
 WKE_WRAP_MAX = 200     # characters of a wrapped space key
 WKE_PATH_MAX = 4000    # characters of an encrypted path (finding L3; a plain path has at most WIKI_PATH_MAX)
+WKE_VS = (1, 2)        # 2.640.0 (#3388): cipher formats taken (v 2 binds the page id in the AAD; v 1 stays readable)
 WKE_MSG = {
     "wiki_e2e": N_("This workspace is encrypted in the browser. Pages can only be changed in the app."),
     "wiki_e2e_busy": N_("This workspace is being encrypted. Try again in a moment."),
@@ -89,7 +93,7 @@ def wke_cipher_ok(v, gen, field):
         return False
     if v == "":
         return field == "body"
-    d = le2e_parse(v, max_ct=mx)
+    d = le2e_parse(v, max_ct=mx, vs=WKE_VS)
     return bool(d) and d["g"] <= gen
 
 
@@ -124,10 +128,24 @@ def wke_guard(c, oid, uid, path=None, text=None, kind="update", template=False):
         raise wke_denied("wiki_e2e", 403)
     if not all(wke_cipher_ok(v, gen, k) for k, v in vals.items()):
         raise wke_denied("wiki_e2e")
-    if any((le2e_parse(v, max_ct=WKE_PATH_MAX if k == "path" else wke_body_max()) or {}).get("g", gen) < gen
+    if any((le2e_parse(v, max_ct=WKE_PATH_MAX if k == "path" else wke_body_max(), vs=WKE_VS) or {}).get("g", gen) < gen
            for k, v in vals.items() if v):
         wke_reenc_again(c, oid, uid)
     return mode
+
+
+def wke_take(c, oid, uid, b):
+    """2.640.0 (#3388): the id a new page of a locked space is created under when its path / text are v 2 ciphers (the page id
+    is in their AAD): the one reserved for uid in this space (POST /api/wiki/e2e/newid); None for v 1 ciphers (an app tab from
+    before 2.640). 400 otherwise."""
+    vs = [(le2e_parse(b.get(k), max_ct=WKE_PATH_MAX if k == "path" else wke_body_max(), vs=WKE_VS) or {}).get("v")
+          for k in ("path", "body")]
+    if 2 not in vs:
+        return None
+    pid = b.get("id")
+    if not e2r_ok(c, "wiki", wiki_space_key(oid), uid, pid, b.get("resv")):
+        raise BadInput(tr("Invalid value: {0}", "id"))
+    return pid
 
 
 # ---------------------------------------------------------------- people of a space
@@ -204,7 +222,7 @@ def _wke_todo_val(mode, gen, v):
         return mode != "decrypting"
     if mode != "on":
         return mode == "decrypting"
-    d = le2e_parse(v, max_ct=max(WKE_PATH_MAX, wke_body_max()))
+    d = le2e_parse(v, max_ct=max(WKE_PATH_MAX, wke_body_max()), vs=WKE_VS)
     return bool(d) and d["g"] < gen
 
 
@@ -348,6 +366,22 @@ def _wke_ensure_row(c, oid, uid):
     except IntegrityError:
         pass
     return wke_row(c, oid, uid)
+
+
+@app.post("/api/wiki/e2e/newid")
+def wke_newid():
+    """2.640.0 (#3388): {space} -> {id, resv}: the id of the next page I create in a locked space (its ciphers bind it)."""
+    c = db()
+    uid = _wke_person()
+    oid = wiki_space(c, uid, body().get("space"), write=True)
+    mode, _gen = wke_mode(c, oid, uid)
+    if mode is None:
+        raise wke_denied("wiki_e2e_open", 400)
+    if mode != "on":
+        raise wke_denied("wiki_e2e_busy")
+    out = e2r_new(c, "wiki", wiki_space_key(oid), uid)
+    c.commit()
+    return jsonify(out)
 
 
 @app.get("/api/wiki/e2e")
@@ -497,7 +531,7 @@ def wke_bulk():
                         if k == "path" or (row[k] or "") != "":  # an empty text only stands for an empty one
                             raise bad(k)
                         continue
-                    if not wke_cipher_ok(v, gen, k) or le2e_parse(v, max_ct=WKE_PATH_MAX if k == "path" else wke_body_max())["g"] != gen:
+                    if not wke_cipher_ok(v, gen, k) or le2e_parse(v, max_ct=WKE_PATH_MAX if k == "path" else wke_body_max(), vs=WKE_VS)["g"] != gen:
                         raise bad(k)
                     if _wke_todo_val(mode, gen, row[k]):  # a plain text or (on) an older generation; a current one stays
                         upd[k] = v

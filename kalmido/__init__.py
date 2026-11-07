@@ -248,6 +248,7 @@ ORDER = (
     "collab.liste2e",  # 2.64.1 (#1817): the lock per list (texts encrypted in the browser; needs collab.e2e)
     "collab.liste2eguard",  # 2.64.1 B (#1817): the lock per list on the other ways (API, agents, CalDAV, mail, push, copies)
     "collab.liste2efile",  # 2.64.2 B (#1817): files of lists with the lock, encrypted with the list key
+    "collab.e2eresv",  # 2.640.0 (#3388): id reservations of the E2E record binding (AAD v2: wiki pages, list channel)
     "collab.liste2echan",  # 2.64.2 C (#1817): the list channel (team chat of a list) with the lock
     "wiki.wikie2e",  # 2.64.3 (#1817): the lock per knowledge space (path + text encrypted in the browser)
     "wiki.wkmove",  # 2.96.0 B (#1941): wiki pages and folders to the other workspace (private <-> organisation)

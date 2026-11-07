@@ -1126,6 +1126,7 @@ ROUTES = {
     "GET /api/wiki/e2e": "wiki", "POST /api/wiki/e2e/start": "wiki", "GET /api/wiki/e2e/todo": "wiki",
     "POST /api/wiki/e2e/bulk": "wiki", "POST /api/wiki/e2e/finish": "wiki", "POST /api/wiki/e2e/stop": "wiki",
     "POST /api/wiki/e2e/keys": "wiki", "POST /api/wiki/e2e/rotate": "wiki",
+    "POST /api/wiki/e2e/newid": "wiki", "POST /api/team/rooms/{}/msgid": "team",  # 2.640.0 (#3388): wiki_space / need_room (p2640_b_aad_test.py)
     # 2.89.0 (#1916): tables (sheets/web.py; p289_a_api_test.py)
     "GET /api/sheets": "sheet", "POST /api/sheets": "sheet", "GET /api/sheets/{}": "sheet", "PATCH /api/sheets/{}": "sheet",
     # 2.558.0 (#4709): the core objects' generic routes (core/objweb.py; obj_core_test.py, obj_write_test.py)

@@ -2,11 +2,16 @@
    scope (load order: index.html, after liste2efile.js). Server side kalmido/collab/liste2echan.py. */
 'use strict';
 
-// A message of a list channel with the lock: tchat_msgs.enc = {v: 1, g, iv, ct}, AES-256-GCM with the list key of generation g,
-// AAD "kalmido-chan:v1:<room>:<gen>:<sender>", padded like the list texts (le2ePad). The plain text holds the mention tokens
+// A message of a list channel with the lock: tchat_msgs.enc = {v: 1|2, g, iv, ct}, AES-256-GCM with the list key of generation g,
+// AAD "kalmido-chan:v1:<room>:<gen>:<sender>" (v 1) or, since 2.640.0 (#3388), "kalmido-chan:v2:<room>:<gen>:<sender>:<message id>"
+// (v 2: a cipher the server put under another message does not open there), padded like the list texts (le2ePad).
+// Written is always v 2: a new message under an id the server reserved first (le2eChanEnc, le2eChanPost); read by the version
+// in the cipher - v 1 only for a cipher that says v 1 (a v 2 cipher relabelled as v 1 does not open under the v 1 AAD). The plain text holds the mention tokens
 // (<@id>) like a plain message; the browser names the mentioned members to the server (mentions) so their push still comes.
 // Decrypted texts live in E2E.dec (this session only, like the DMs of 2.42); nothing decrypted goes to localStorage (H1).
-const le2eChanAad = (rid, g, sender) => `kalmido-chan:v1:${rid}:${g}:${sender}`;
+const le2eChanAad = (rid, g, sender, mid, v) => v === 2 ? `kalmido-chan:v2:${rid}:${g}:${sender}:${mid}` : `kalmido-chan:v1:${rid}:${g}:${sender}`;
+// one message's cipher opened with the AAD of its version (m: {id, user_id, enc})
+const le2eChanOpenWith = async (key, rid, m) => e2eTDec().decode(le2eUnpad(await e2eOpen(key, {v: 1, iv: m.enc.iv, ct: m.enc.ct}, le2eChanAad(rid, m.enc.g, m.user_id, m.id, m.enc.v === 2 ? 2 : 1))));
 // the room is the channel of a list with the lock (the list in the state, else what the room answer said)
 function le2eChanOn(room) {
   if (!room || room.kind !== 'list' || !room.list_id) return false;
@@ -18,23 +23,41 @@ async function le2eChanKey(lid, g) {
   if (!ks[g]) ks = await le2eKeys(lid, true);
   return ks[g] || null;
 }
-// text (with <@id> tokens) -> {v, g, iv, ct} with the current generation; throws a clear error while the list is locked here
-async function le2eChanEnc(room, text) {
+// text (with <@id> tokens) -> {v: 2, g, iv, ct} with the current generation; throws a clear error while the list is locked here.
+// mid = the message (an edit); without it a new message: its id is reserved first and travels along in the (non-enumerable)
+// fields mid / resv, which le2eChanPost sends next to the cipher (2.640.0, #3388)
+async function le2eChanEnc(room, text, mid) {
   if (!await e2eEnsure()) return null;
   const lid = room.list_id, l = listById(lid), g = l?.e2e_gen || room.gen;
   if (l && l.e2e !== 'on') throw le2eErr(tr('This project is being encrypted. Try again in a moment.'), 'list_e2e_busy');
   const key = g && await le2eChanKey(lid, g);
   if (!key) throw le2eErr(tr('You do not have the key of this project yet.'), 'list_e2e_key');
-  const b = await e2eSeal(key, le2ePad(e2eTEnc().encode(text)), le2eChanAad(room.id, g, S.me.id));
-  return {v: 1, g, iv: b.iv, ct: b.ct};
+  let resv = null;
+  if (!mid) { const r = await rawFetch('POST', `/api/team/rooms/${room.id}/msgid`); mid = r.id; resv = r.resv; }
+  const b = await e2eSeal(key, le2ePad(e2eTEnc().encode(text)), le2eChanAad(room.id, g, S.me.id, mid, 2));
+  const o = {v: 2, g, iv: b.iv, ct: b.ct};
+  if (resv) Object.defineProperties(o, {mid: {value: mid}, resv: {value: resv}});
+  return o;
 }
+// chat.js: the POST of a new message of a list channel with the lock - msg_id / resv of the cipher go along; when another
+// message came in after the reservation (409 chan_resv_stale) the text is encrypted again with a new id (the room keeps its order)
+const le2eChanPost = (room, text) => async (method, url, body) => {
+  for (let i = 0; ; i++) {
+    const enc = body.enc;
+    try { return await rawFetch(method, url, enc?.resv ? {...body, msg_id: enc.mid, resv: enc.resv} : body); }
+    catch (e) {
+      if (e?.data?.code !== 'chan_resv_stale' || i >= 3) throw e;
+      body = {...body, enc: await le2eChanEnc(room, text)};
+    }
+  }
+};
 // the ids of the members named in a text with tokens (tcMentions output)
 const le2eChanMentions = text => [...String(text).matchAll(/<@(\d+)>/g)].map(x => +x[1]).filter((v, i, a) => a.indexOf(v) === i);
 async function le2eChanOpen(room, m) {
   const g = m.enc?.g; if (!Number.isInteger(g)) throw new Error('enc');
   const key = await le2eChanKey(room.list_id, g);
   if (!key) return undefined;
-  return e2eTDec().decode(le2eUnpad(await e2eOpen(key, {v: 1, iv: m.enc.iv, ct: m.enc.ct}, le2eChanAad(room.id, g, m.user_id))));
+  return le2eChanOpenWith(key, room.id, m);
 }
 // the messages of the open list channel: from this session's memory first, the rest decrypted (when unlocked)
 async function le2eChanDecrypt(rid) {
@@ -82,13 +105,14 @@ async function le2eChanConvert(lid, msg, mode) {
   if (msg.enc) {
     const g = msg.enc.g, key = await le2eChanKey(lid, g);
     if (!key) throw le2eErr(tr('You do not have the key of this project yet.'), 'list_e2e_key');
-    text = e2eTDec().decode(le2eUnpad(await e2eOpen(key, {v: 1, iv: msg.enc.iv, ct: msg.enc.ct}, le2eChanAad(room.id, g, msg.user_id))));
+    text = await le2eChanOpenWith(key, room.id, msg);
   }
   if (mode === 'decrypting') return {id: msg.id, body: text};
   const g = listById(lid)?.e2e_gen;  // the server's target generation is always the current one (le2c_bulk)
   const key = g && await le2eChanKey(lid, g);
   if (!key) throw le2eErr(tr('You do not have the key of this project yet.'), 'list_e2e_key');
-  // the original sender stays in the AAD: re-encrypting by the owner / an admin does not make the message theirs
-  const b = await e2eSeal(key, le2ePad(e2eTEnc().encode(text)), le2eChanAad(room.id, g, msg.user_id));
-  return {id: msg.id, enc: {v: 1, g, iv: b.iv, ct: b.ct}};
+  // the original sender stays in the AAD: re-encrypting by the owner / an admin does not make the message theirs;
+  // 2.640.0 (#3388): written as v 2 with the message id (a key change lifts the v 1 messages)
+  const b = await e2eSeal(key, le2ePad(e2eTEnc().encode(text)), le2eChanAad(room.id, g, msg.user_id, msg.id, 2));
+  return {id: msg.id, enc: {v: 2, g, iv: b.iv, ct: b.ct}};
 }

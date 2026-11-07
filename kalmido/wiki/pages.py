@@ -281,15 +281,15 @@ def wiki_body(b):
     return v
 
 
-def wiki_insert(c, oid, uid, path, text, ts):
-    """A new page; None when the path is taken in that space."""
+def wiki_insert(c, oid, uid, path, text, ts, pid=None):
+    """A new page; None when the path is taken in that space. pid (2.640.0, #3388): the id reserved for it (e2eresv)."""
     from .wkhist import wkh_seal  # 2.123.0 A (#2105, #2106): the text sealed at rest, the word index
     from .wksearch import wks_index
     try:
         with c.savepoint():
-            pid = insert_id(c, "INSERT INTO wiki_pages(org_id,owner_id,path,body,attrs,created_by,updated_by,created_at,updated_at) "
-                               "VALUES(?,?,?,?,?,?,?,?,?)",
-                            (oid, None if oid else uid, path, wkh_seal(c, oid, None if oid else uid, text),  # 2.123.0 A (#2105)
+            pid = insert_id(c, f"INSERT INTO wiki_pages({'id,' if pid else ''}org_id,owner_id,path,body,attrs,created_by,updated_by,created_at,updated_at) "
+                               f"VALUES({'?,' if pid else ''}?,?,?,?,?,?,?,?,?)",
+                            (*((pid,) if pid else ()), oid, None if oid else uid, path, wkh_seal(c, oid, None if oid else uid, text),  # 2.123.0 A (#2105)
                              json.dumps(wiki_frontmatter(text), ensure_ascii=False), uid, uid, ts, ts))
     except IntegrityError:
         return None
@@ -436,9 +436,11 @@ def wiki_create():
     uid = me()
     b = body()
     oid = wiki_space(c, uid, b.get("space"), write=True)
-    from .wikie2e import wke_guard  # 2.64.3 A (#1817): a locked space takes ciphertexts only (no template copy on the server)
+    from .wikie2e import wke_guard, wke_take  # 2.64.3 A (#1817): a locked space takes ciphertexts only (no template copy on the server)
+    pre = None
     if wke_guard(c, oid, uid, b.get("path"), b.get("body", ""), "create", template=bool(b.get("template_id"))):
         path, text = b.get("path"), b.get("body", "")
+        pre = wke_take(c, oid, uid, b)  # 2.640.0 (#3388): v 2 ciphers -> the reserved page id (it is in their AAD)
     else:
         path = wiki_clean_path(b.get("path"))
         text = wiki_body(b)
@@ -448,7 +450,7 @@ def wiki_create():
         text = wkh_body(c, t)  # 2.123.0 A (#2105)
         if text.startswith("e2e1:"):  # 2.64.3 (#1817, review M1): a template of an encrypted space opens only in the browser
             raise BadInput(tr("Invalid value: {0}", "template_id"))
-    pid = wiki_insert(c, oid, uid, path, text, iso_ms(now_utc()))
+    pid = wiki_insert(c, oid, uid, path, text, iso_ms(now_utc()), pid=pre)
     if pid is None:
         return wiki_taken()
     from .wkfolder import wkf_sync

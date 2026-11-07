@@ -619,9 +619,16 @@ def tchat_post(rid):
             return jsonify(tchat_msg_dict(c, dup, tchat_rx(c, [dup["id"]]))), 200
     if hit_limit(f"tchat:{me()}", TCHAT_RATE):  # 2.281.0 B (#3117): a soft limit per person (a resent duplicate is not counted)
         return err(tr("Too many requests, please slow down"), 429)
+    pre = None
+    if enc and r["kind"] == "list":  # 2.640.0 (#3388): a v2 message under the id reserved before the encryption (in its AAD)
+        from ..collab.liste2echan import le2c_take
+        pre = le2c_take(c, r, b, enc, me())
+        if isinstance(pre, tuple):
+            return pre
     ts = iso_ms(now_utc())
-    mid = insert_id(c, "INSERT INTO tchat_msgs(room_id,user_id,body,task_id,created_at,reply_to,enc,thread_of) VALUES(?,?,?,?,?,?,?,?)",
-                    (rid, me(), text, tid, ts, orig["id"] if orig else None, enc, root))
+    mid = insert_id(c, f"INSERT INTO tchat_msgs({'id,' if pre else ''}room_id,user_id,body,task_id,created_at,reply_to,enc,thread_of) "
+                       f"VALUES({'?,' if pre else ''}?,?,?,?,?,?,?,?)",
+                    (*((pre,) if pre else ()), rid, me(), text, tid, ts, orig["id"] if orig else None, enc, root))
     if cid:
         c.execute("UPDATE tchat_msgs SET client_id=? WHERE id=?", (cid, mid))
     if r["kind"] == "channel" and me() not in tcx_members(c, r):  # 2.113.1 (#2059): writing in an open channel joins it

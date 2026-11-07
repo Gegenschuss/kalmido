@@ -1039,10 +1039,16 @@ lock opened first.
   with the list key (AAD `kalmido-chan:v1:<room>:<gen>:<sender>`, padded like the texts); plain text is refused, the browser
   names @mentioned members for their push. Agents and API tokens read no text (`encrypted: true`) and cannot write;
   search and "save as task" skip it. Re-encryption by an admin keeps the original sender in the AAD.
+  Since 2.640 (#3388) the browser writes `v: 2` with AAD `kalmido-chan:v2:<room>:<gen>:<sender>:<message id>`: a new message
+  gets its id first (`POST /api/team/rooms/<id>/msgid`, an HMAC mark bound to person, room and id, `collab/e2eresv.py`) and
+  is stored under it; when another message came in meanwhile the post answers 409 `chan_resv_stale` and the browser encrypts
+  again (ids keep the room's order). Reading follows the `v` in the ciphertext; `v: 1` stays readable, a key change lifts it.
 - **Pushes** of such lists use the neutral word in the recipient's language; a comment push names the list, not the words.
 - **Safety numbers** of all members are reachable from the head of the list channel and of the attachments.
 - **Lock per knowledge space** (2.64.3, `wiki/wikie2e.py`). A whole space ("Private" or an organisation) can be encrypted:
-  `wiki_pages.path` and `.body` hold `e2e1:` ciphertexts with the space key (AAD `kalmido-wiki:v1:<space_id>:<g>:path|body`),
+  `wiki_pages.path` and `.body` hold `e2e1:` ciphertexts with the space key (AAD `kalmido-wiki:v1:<space_id>:<g>:path|body`;
+  since 2.640, #3388, `v: 2` = `kalmido-wiki:v2:<space_id>:<g>:<page_id>:path|body`, a new page under an id reserved by
+  `POST /api/wiki/e2e/newid`; `v: 1` stays readable and is lifted by the next key change),
   wrapped per member in `wiki_keys` (salt `wiki:<space_id>:<gen>`, info `kalmido-wikikey:v1`); `wiki_spaces` holds mode,
   generation, rotation and re-encryption like the list columns. Managers: the owner of a private space, the admins of an
   organisation. Routes `/api/wiki/e2e` (info), `/start` (`prepare: true` first creates the row: its id is in salt and AAD),

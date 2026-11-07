@@ -44,36 +44,46 @@ function wkeSetInfo(sp, j) {
 }
 
 // ------------------------------------------------------------------ content crypto
-// AES-256-GCM with the space key of generation g; AAD binds space, generation and field ("path" | "body"), no page id (M1:
-// templates and copies in the same space stay readable); padded to 64 bytes like the lists (le2ePad, L1)
-const wkeAad = (sid, g, f) => `kalmido-wiki:v1:${sid}:${g}:${f}`;
-async function wkeEnc(sp, field, text, keepEmpty) {
+// AES-256-GCM with the space key of generation g; padded to 64 bytes like the lists (le2ePad, L1). AAD v 1 binds space,
+// generation and field ("path" | "body"); 2.640.0 (#3388) v 2 also the page id: a cipher the server moved to another page does
+// not open there (templates / copies are copied as plain text here, M1). Written is always v 2 (a new page under an id the
+// server reserved first, wkeApi); read by the version in the cipher (v 1 only for a cipher that says v 1: a v 2 cipher
+// relabelled as v 1 does not open under the v 1 AAD, so there is no way down).
+const wkeAad = (sid, g, f, pid, v) => v === 2 ? `kalmido-wiki:v2:${sid}:${g}:${pid}:${f}` : `kalmido-wiki:v1:${sid}:${g}:${f}`;
+function wkeParse(c) {
+  if (!wkeIs(c)) return null;
+  try { const o = JSON.parse(c.slice(WKE_PRE.length)); return o && (o.v === 1 || o.v === 2) && Number.isInteger(o.g) && typeof o.iv === 'string' && typeof o.ct === 'string' ? o : null; } catch { return null; }
+}
+const wkeMk = (pid, f, c) => pid + '|' + f + '|' + c;  // the memo of opened ciphers per page and field (a v 2 cipher is only that page's)
+async function wkeEnc(sp, field, text, keepEmpty, pid) {
   if (text == null || (text === '' && !keepEmpty)) return '';
   if (field === 'body' && String(text).startsWith(WKE_PRE)) text = ' ' + text;  // 2.64.3 E (#1817, review 2 M1): a typed "e2e1:" stays a text on the way back
   const s = WKE.st[sp], g = s?.gen, sid = s?.space_id;
   let key = WKE.keys[sp]?.[g];
   if (!key && s?.mode) key = (await wkeKeys(sp))[g];
   if (!key || sid == null) throw wkeErrLocked();
-  const b = await e2eSeal(key, le2ePad(e2eTEnc().encode(String(text))), wkeAad(sid, g, field));
-  const c = WKE_PRE + JSON.stringify({v: 1, g, iv: b.iv, ct: b.ct});
-  WKE.memo.set(c, String(text));
+  if (!Number.isInteger(pid) || pid < 1) throw wkeErr(tr('Invalid value: {0}', 'id'), 'bad');  // 2.640.0 (#3388): v 2 needs the page
+  const b = await e2eSeal(key, le2ePad(e2eTEnc().encode(String(text))), wkeAad(sid, g, field, pid, 2));
+  const c = WKE_PRE + JSON.stringify({v: 2, g, iv: b.iv, ct: b.ct});
+  WKE.memo.set(wkeMk(pid, field, c), String(text));
   return c;
 }
 // one cipher with the keys at hand: the text, null (did not open) or undefined (no key of its generation here)
-async function wkeTry(sp, c, field, ks) {
-  if (WKE.memo.has(c)) return WKE.memo.get(c);
-  const o = le2eParse(c), sid = WKE.st[sp]?.space_id; if (!o || sid == null) return null;
+async function wkeTry(sp, c, field, ks, pid) {
+  const mk = wkeMk(pid, field, c);
+  if (WKE.memo.has(mk)) return WKE.memo.get(mk);
+  const o = wkeParse(c), sid = WKE.st[sp]?.space_id; if (!o || sid == null) return null;
   const key = ks?.[o.g]; if (!key) return undefined;
   try {
-    const s = e2eTDec().decode(le2eUnpad(await e2eOpen(key, {v: 1, iv: o.iv, ct: o.ct}, wkeAad(sid, o.g, field))));
-    WKE.memo.set(c, s);
+    const s = e2eTDec().decode(le2eUnpad(await e2eOpen(key, {v: 1, iv: o.iv, ct: o.ct}, wkeAad(sid, o.g, field, pid, o.v))));
+    WKE.memo.set(mk, s);
     return s;
   } catch { return null; }
 }
-async function wkeDec(sp, field, c) {
+async function wkeDec(sp, field, c, pid) {
   if (!wkeIs(c)) return c ?? '';
   if (typeof e2eUnlocked === 'function' && !e2eUnlocked()) throw wkeErrLocked();  // 2.64.3 E (#1817, review 2 L1): locked meanwhile, not "unreadable"
-  const s = await wkeTry(sp, c, field, await wkeKeys(sp));
+  const s = await wkeTry(sp, c, field, await wkeKeys(sp), pid);
   if (s == null) throw wkeErr(s === undefined ? tr('You do not have the key of this workspace yet.') : tr('The workspace key could not be opened.'), 'wiki_e2e_key');
   return s;
 }
@@ -258,7 +268,7 @@ async function wkeOpen(sp, p, ks) {
   for (const f of ['path', 'body']) {
     const c = p[f]; if (!wkeIs(c)) continue;
     enc[f] = c;
-    const s = await wkeTry(sp, c, f, ks);
+    const s = await wkeTry(sp, c, f, ks, p.id);
     if (s == null) { ok = false; p[f] = ''; } else p[f] = s;
   }
   if (Object.keys(enc).length) Object.defineProperty(p, '_enc', {value: enc, writable: true, configurable: true, enumerable: false});
@@ -321,17 +331,24 @@ async function wkeMentions(tid) {
 }
 
 // ------------------------------------------------------------------ writing (wiki.js): path and text leave encrypted
-async function wkeSeal(sp, b) {
+async function wkeSeal(sp, b, pid) {
   const o = {...b};
-  if (o.path != null) o.path = await wkeEnc(sp, 'path', wkeClean(o.path));
-  if (o.body != null) o.body = await wkeEnc(sp, 'body', o.body);
+  if (o.path != null) o.path = await wkeEnc(sp, 'path', wkeClean(o.path), false, pid);
+  if (o.body != null) o.body = await wkeEnc(sp, 'body', o.body, false, pid);
   return o;
 }
 // rawFetch for the page routes of a space: in an encrypted one path / body go out as ciphers and the answer's page (also the
 // one of a 409 "changed in the meantime") comes back opened
+// 2.640.0 (#3388): the page id comes from the URL; a new page (POST /api/wiki/pages) first gets its id reserved (in the AAD)
 async function wkeApi(method, url, body, sp) {
   if (!wkeOn(sp)) return rawFetch(method, url, body);
-  const b = body && typeof body === 'object' && !(body instanceof FormData) ? await wkeSeal(sp, body) : body;
+  const plainObj = body && typeof body === 'object' && !(body instanceof FormData);
+  let pid = +(/^\/api\/wiki\/pages\/(\d+)/.exec(url)?.[1] || 0), extra = {};
+  if (plainObj && !pid && method === 'POST' && url === '/api/wiki/pages' && (body.path != null || body.body != null)) {
+    const r = await rawFetch('POST', '/api/wiki/e2e/newid', {space: sp});
+    pid = r.id; extra = {id: r.id, resv: r.resv};
+  }
+  const b = plainObj ? {...await wkeSeal(sp, body, pid), ...extra} : body;
   try {
     const r = await rawFetch(method, url, b);
     if (r && typeof r === 'object') { await wkeOpen(sp, r, WKE.keys[sp]); r.backlinks = r._wke ? [] : wkeBacklinks(sp, r); }
@@ -530,11 +547,12 @@ async function wkeImport(sp, file, onProg = null) {  // 2.177.0 (#2685): onProg(
 // ------------------------------------------------------------------ switching on / off, re-encryption (todo / bulk / finish)
 // one value in the target format of mode: encrypting = a cipher of the current generation, decrypting = the plain text, on
 // (re-encryption after a key change) = an older cipher opened with its generation and encrypted with the current one
-async function wkeConv(sp, mode, gen, f, v) {
-  if (mode === 'decrypting') return wkeIs(v) ? wkeDefuse(f, await wkeDec(sp, f, v)) : v;
-  if (le2eParse(v)?.g === gen) return v;
-  if (wkeIs(v) && mode === 'on') return wkeEnc(sp, f, await wkeDec(sp, f, v));
-  return wkeEnc(sp, f, f === 'path' ? wkeClean(v) : String(v));
+// 2.640.0 (#3388): pid = the page; what is encrypted here is v 2 (the re-encryption after a key change lifts v 1 pages)
+async function wkeConv(sp, mode, gen, f, v, pid) {
+  if (mode === 'decrypting') return wkeIs(v) ? wkeDefuse(f, await wkeDec(sp, f, v, pid)) : v;
+  if (wkeParse(v)?.g === gen) return v;
+  if (wkeIs(v) && mode === 'on') return wkeEnc(sp, f, await wkeDec(sp, f, v, pid), false, pid);
+  return wkeEnc(sp, f, f === 'path' ? wkeClean(v) : String(v), false, pid);
 }
 async function wkeMigrate(sp, onProgress, opts = {}) {
   if (WKE.busy[sp]) return WKE.busy[sp];
@@ -566,12 +584,12 @@ async function wkeMigrate(sp, onProgress, opts = {}) {
           let n = 0;
           for (const f of ['path', 'body']) {
             let v = r[f]; if (v == null) continue;
-            try { v = await wkeConv(sp, mode, gen, f, v); }
+            try { v = await wkeConv(sp, mode, gen, f, v, r.id); }
             catch (e) {
               if (e?.code === 'wiki_e2e_locked') throw e;
               if (mode === 'encrypting' || !blank) { bad.add(r.id + ':' + f); continue; }
               v = f === 'path' ? tr('Unreadable page {0}', r.id) : '';  // taken over as empty (a path is never empty)
-              if (mode === 'on') v = await wkeEnc(sp, f, v, true);  // 2.64.3 E (#1817, review 2 M2): re-encryption takes ciphers only
+              if (mode === 'on') v = await wkeEnc(sp, f, v, true, r.id);  // 2.64.3 E (#1817, review 2 M2): re-encryption takes ciphers only
             }
             o[f] = v; n++;
           }
@@ -610,7 +628,7 @@ async function wkeLostNames(sp, lost) {
   const out = [];
   for (const [id, p] of lost) {
     let n = p;
-    if (wkeIs(p)) n = await wkeDec(sp, 'path', p).catch(() => null);
+    if (wkeIs(p)) n = await wkeDec(sp, 'path', p, id).catch(() => null);
     out.push(n ? wk_base(String(n)) : tr('Unreadable page {0}', id));
   }
   return out;
@@ -713,7 +731,7 @@ function wkeWipe() {
 // 2.64.3 E (#1817, review 2 L5): the space cannot be read any more (403 / 404): its opened pages, keys and undo steps go
 function wkeForget(sp) {
   if (typeof WK === 'object') {
-    for (const p of WK.idx[sp]?.pages || []) for (const c of Object.values(p._enc || {})) WKE.memo.delete(c);
+    for (const p of WK.idx[sp]?.pages || []) for (const [f, c] of Object.entries(p._enc || {})) WKE.memo.delete(wkeMk(p.id, f, c));
     if (WK.idx[sp]) WK.idx[sp].pages = null;
     if (WK.pg?.space === sp) { WK.pg = null; WK.edit = false; WK.dirty = false; }
     WK.men = {};
@@ -1002,7 +1020,7 @@ async function wkr_run(src, dst, plan, tries = 2) {
   for (const [x, p] of rows) {
     const body = wkr_relink(p.body, pairs);
     const exp = p.updated_at ? {expect_updated_at: p.updated_at} : {};  // 2.273.0 B (#3042): a page saved since = 409, not overwritten
-    pages.push(to.mode ? {id: x.id, path: await wkeEnc(dst, 'path', wkeClean(x.path)), body: await wkeEnc(dst, 'body', body), ...exp}
+    pages.push(to.mode ? {id: x.id, path: await wkeEnc(dst, 'path', wkeClean(x.path), false, x.id), body: await wkeEnc(dst, 'body', body, false, x.id), ...exp}
       : {id: x.id, path: wkeDefuse('path', x.path), body: wkeDefuse('body', body), ...exp});
   }
   try {

@@ -26,7 +26,7 @@ from ..accounts.spacemove import SMV_MAX, smv_answer, smv_refuse_agent, smv_same
 from ..core.errors import BadInput
 from ..core.serializers import unlink_files
 from .pages import wiki_clean_path, wiki_need, wiki_set_links, wiki_space, wiki_space_key, wiki_space_sql
-from .wikie2e import wke_mode, wke_space_sql, WKE_PATH_MAX, wke_body_max, wke_cipher_ok  # 2.369.5 (#2517): pulled up from functions
+from .wikie2e import wke_mode, wke_space_sql, WKE_PATH_MAX, WKE_VS, wke_body_max, wke_cipher_ok  # 2.369.5 (#2517): pulled up from functions
 from .pages import WIKI_BODY_MAX, wiki_frontmatter  # 2.369.5 (#2517): pulled up from functions
 from ..collab.liste2e import le2e_is_cipher, le2e_parse, le2e_writer_ok  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgroles import org_sees_all  # 2.369.5 (#2517): pulled up from functions
@@ -352,7 +352,7 @@ def wkr_value(v, field, tst, old):
         if v == "" and field == "body":
             return v
         if (not wke_cipher_ok(v, tst["gen"], field) or v in old
-                or le2e_parse(v, max_ct=WKE_PATH_MAX if field == "path" else wke_body_max())["g"] != tst["gen"]):
+                or le2e_parse(v, max_ct=WKE_PATH_MAX if field == "path" else wke_body_max(), vs=WKE_VS)["g"] != tst["gen"]):
             raise bad
         return v
     if le2e_is_cipher(v):

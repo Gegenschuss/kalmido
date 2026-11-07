@@ -1,28 +1,36 @@
 """Kalmido: the list channel (team chat room kind 'list') of a list with the lock (2.64.2, #1817, stage 2).
 
-Messages carry tchat_msgs.enc = {"v":1,"g":<gen>,"iv","ct"} (body ''), AES-256-GCM with the list key of generation g,
-AAD "kalmido-chan:v1:<room_id>:<gen>:<sender_id>", padded like the list texts. Post / edit guards, conversion when the lock
+Messages carry tchat_msgs.enc = {"v":1|2,"g":<gen>,"iv","ct"} (body ''), AES-256-GCM with the list key of generation g,
+AAD "kalmido-chan:v1:<room_id>:<gen>:<sender_id>" (v 1) or, since 2.640.0 (#3388), "kalmido-chan:v2:<room_id>:<gen>:<sender_id>:
+<message id>" (v 2: a ciphertext opens only as its own message), padded like the list texts. A new v2 message is stored under
+the id the browser reserved before encrypting (POST /api/team/rooms/<rid>/msgid, collab/e2eresv.py). Post / edit guards, conversion when the lock
 goes on / off / after a key change, neutral push and agent events live here (part C). No plain copy of a channel message
 exists outside tchat_msgs: agent events and webhook deliveries of the list go with le2b_scrub (they carry the list id),
 search skips the channels of locked lists (msgsearch), a saved message (chatsave) is refused for a ciphertext."""
 import json
 
-from ..core.db import err
+from flask import jsonify
+
+from ..core.config import app
+from ..core.db import db, err, write_lock
 from ..core.i18n import tr
 from .e2e import E2E_MSG_MAX, E2E_B64, e2e_msg_parse
 from .liste2e import le2a_gen, le2a_reenc_again, le2e_writer_ok
 from .teamchat import tchat_room_members, TCHAT_MAX  # 2.369.5 (#2517): pulled up from functions
+from .teamchat import need_room, need_room_say, need_tchat  # 2.640.0 (#3388)
+from .e2eresv import e2r_new, e2r_ok  # 2.640.0 (#3388)
+from ..accounts.session import me
 
 
 def le2c_blob(v, gen):
-    """A channel ciphertext {v: 1, g, iv, ct} (dict or its JSON) of a generation 1..gen -> the JSON text to store, else None.
-    Only the shape is checked."""
+    """A channel ciphertext {v: 1|2, g, iv, ct} (dict or its JSON) of a generation 1..gen -> the JSON text to store, else None.
+    Only the shape is checked (2.640.0, #3388: v 2 = the message id is in the AAD)."""
     if isinstance(v, str):
         try:
             v = json.loads(v)
         except ValueError:
             return None
-    if not isinstance(v, dict) or set(v) != {"v", "g", "iv", "ct"} or v.get("v") != 1:
+    if not isinstance(v, dict) or set(v) != {"v", "g", "iv", "ct"} or v.get("v") not in (1, 2) or isinstance(v.get("v"), bool):
         return None
     g = v.get("g")
     if isinstance(g, bool) or not isinstance(g, int) or not 1 <= g <= gen:
@@ -31,7 +39,7 @@ def le2c_blob(v, gen):
         x = v.get(k)
         if not isinstance(x, str) or not lo <= len(x) <= hi or not E2E_B64.match(x):
             return None
-    return json.dumps({"v": 1, "g": g, "iv": v["iv"], "ct": v["ct"]}, separators=(",", ":"))
+    return json.dumps({"v": v["v"], "g": g, "iv": v["iv"], "ct": v["ct"]}, separators=(",", ":"))
 
 
 def le2c_gen_of(enc):
@@ -66,6 +74,42 @@ def le2c_check(c, r, b):
     if enc and json.loads(enc)["g"] < gen:  # 2.64.2 review (M2): an older generation after a key change: re-encrypt again
         le2a_reenc_again(c, r["list_id"])
     return enc or err(tr("Invalid value: {0}", "enc"))
+
+
+def le2c_take(c, r, b, enc, uid):
+    """2.640.0 (#3388): the id a new v2 message is stored under (the one reserved for uid in this room, it is in the AAD), None
+    for a v1 message (an app tab from before 2.640), or an error response. 409 chan_resv_stale when another message of the
+    room came in after the reservation: the browser encrypts once more with a new id, so the ids keep the order of the room
+    (read marks and "unread" count by id)."""
+    if json.loads(enc)["v"] != 2:
+        return None
+    mid = b.get("msg_id")
+    if not e2r_ok(c, "chan", r["id"], uid, mid, b.get("resv")):
+        return err(tr("Invalid value: {0}", "msg_id"))
+    write_lock(c, f"le2c-room-{r['id']}")
+    newest = c.execute("SELECT MAX(id) FROM tchat_msgs WHERE room_id=?", (r["id"],)).fetchone()[0]
+    if newest and newest > mid:
+        return jsonify(error=tr("Another message arrived at the same moment. Please send again."), code="chan_resv_stale"), 409
+    return mid
+
+
+@app.post("/api/team/rooms/<int:rid>/msgid")
+def le2c_msgid(rid):
+    """2.640.0 (#3388): {id, resv} -- the id of the next message I write in the channel of a list with the lock (web app only)."""
+    c = db()
+    need_tchat(c)
+    r = need_room(c, rid)
+    need_room_say(c, r)
+    mode, _gen = le2c_mode(c, r)
+    if not mode:
+        return err(tr("This conversation is not encrypted"), 409)
+    if mode != "on":
+        return err(tr("This project is being encrypted. Try again in a moment."), 409)
+    if not le2e_writer_ok():
+        return _le2c_refuse()
+    out = e2r_new(c, "chan", r["id"], me())
+    c.commit()
+    return jsonify(out)
 
 
 def le2c_mentions(c, r, b):
