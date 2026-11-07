@@ -55,7 +55,11 @@ const BODY = Array.from({length: 100}, (_, i) => part(i)).join('\n');
     // 40 letters typed one by one at the end of line 1003 (a text line, not a $$ line) (each its own transaction, as a key press), then the decorations alone
     // (the cursor put there with the screen scrolled to it, as a click would; the decorations follow the screen first)
     const measure = async () => {
-      await ev(`(() => { const v = WKCM.view; v.focus(); v.dispatch({selection: {anchor: v.state.doc.line(1003).to}, scrollIntoView: true}); return 1; })()`);
+      // 2.640.0 (#5019): the cursor is put there WITHOUT CodeMirror's own scrollIntoView: that scroll is done in CodeMirror's next
+      // measure (a frame later) and lands at the end of this page (#4800); on a slow CI runner it came after the test's own
+      // scroll below and moved the screen away again (seen with delayed frames on the Mac: the test at 75 ms to line 1003,
+      // CodeMirror at 85 ms to the page end). The test's one scroll below is the only one.
+      await ev(`(() => { const v = WKCM.view; v.focus(); v.dispatch({selection: {anchor: v.state.doc.line(1003).to}}); return 1; })()`);
       // the page scrolls in #view (the editor has no scroller of its own): its line brought on screen there (CodeMirror's own
       // scrollIntoView lands at the end of this page, with the decorations of the whole text as well - seen 06.11.2026)
       // 2.627.0 (#4977): the scroll is set ONCE, then only waited for (it was moved again in every poll: on a slow CI run it
@@ -64,11 +68,20 @@ const BODY = Array.from({length: 100}, (_, i) => part(i)).join('\n');
       const to1003 = `(() => { const v = WKCM.view, at = v.state.doc.line(1003).from, sc = document.querySelector('#view');
         sc.scrollTop += v.documentTop + v.lineBlockAt(at).top - sc.getBoundingClientRect().top - 200; return 1; })()`;
       const on1003 = `(() => { const v = WKCM.view, at = v.state.doc.line(1003).from; return v.visibleRanges.some(x => x.from <= at && x.to >= at); })()`;
-      await ev(to1003);
-      let seen = await until(on1003, 10000);
-      if (!seen) { await ev(to1003); seen = await until(on1003); }
-      check(seen, 'line 1003 is on screen');
-      check(await until(`(() => { const v = WKCM.view, r = v.state.field(WKCM_FIELD).r, at = v.state.doc.line(1003).from; return !!r && r.from <= at && r.to >= at; })()`), 'the decorations followed the screen to line 1003');
+      // 2.640.0 (#5019): after each scroll the test waits until CodeMirror has drawn the place the screen shows (its viewport holds
+      // the line at the top of #view: the scroll is measured, the line heights there are real) - never a fixed time; only then, and
+      // only when line 1003 is still not on screen (the first scroll used estimated heights: on the phone it landed near line 1450,
+      // seen 07.11.2026), it is scrolled once more with the heights CodeMirror knows now; at most four times
+      const drawn = `(() => { const v = WKCM.view, sc = document.querySelector('#view'), at = v.lineBlockAtHeight(sc.getBoundingClientRect().top - v.documentTop + 1).from;
+        return v.viewport.from <= at && v.viewport.to >= at; })()`;
+      let seen = false;
+      for (let i = 0; i < 4 && !seen; i++) { await ev(to1003); await until(drawn, 10000); seen = !!(await until(on1003, 2000)); }
+      // 2.640.0 (#5019): a red check says where screen, CodeMirror's viewport and the decorated part stood (the CI log keeps only FAIL lines)
+      const where = `(() => { const v = WKCM.view, f = v.state.field(WKCM_FIELD), ln = p => v.state.doc.lineAt(Math.min(p, v.state.doc.length)).number;
+        return JSON.stringify({top: Math.round(document.querySelector('#view').scrollTop), viewport: [ln(v.viewport.from), ln(v.viewport.to)], told: [ln(f.vp.from), ln(f.vp.to)], part: f.r ? [ln(f.r.from), ln(f.r.to)] : null}); })()`;
+      check(seen, 'line 1003 is on screen' + (seen ? '' : ' ' + await ev(where)));
+      const fol = await until(`(() => { const v = WKCM.view, r = v.state.field(WKCM_FIELD).r, at = v.state.doc.line(1003).from; return !!r && r.from <= at && r.to >= at; })()`);
+      check(fol, 'the decorations followed the screen to line 1003' + (fol ? '' : ' ' + await ev(where)));
       return ev(`(() => {
       const v = WKCM.view, ts = [];
       for (let i = 0; i < 40; i++) { const h = v.state.selection.main.head, t = performance.now();
