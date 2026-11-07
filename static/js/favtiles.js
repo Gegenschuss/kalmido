@@ -158,7 +158,7 @@ function fv2_distinct(ts) {
   return ts;
 }
 function fv2_tileHtml(t, page) {
-  const drag = isMobile() ? '' : ' draggable="true"';
+  const drag = isTouch() ? '' : ' draggable="true"';  // 2.655.0 (#5085): was isMobile(); a finger by drag.js
   if (t.sep) return page ? '' : `<span class="fv2-sep" data-fv2="${esc(t.key)}" role="separator"${drag}></span>`;
   const m = fv2_meta()[t.key] || {}, dot = t.ws && wsOn() ? `<span class="fv2-wsd">${wsp_dot(t.ws)}</span>` : '';
   return `<button type="button" class="fv2-tile ${t.on ? 'on' : ''}" data-fv2="${esc(t.key)}" ${t.attrs} title="${esc(fv2_hint(t))}" aria-label="${esc(fv2_hint(t))}"${t.on ? ' aria-current="page"' : ''}${m.c || (!page && t.dk?.c) ? ` style="--fvc:${esc(m.c || t.dk.c)}"` : ''}${drag}>${m.i ? ic(m.i) : t.icon}${!page && t.dk?.b ? `<span class="fv2-bdg" aria-hidden="true">${esc(t.dk.b)}</span>` : ''}${dot}${page ? `<span class="fv2-pn">${esc(t.name)}</span>${t.place ? `<span class="fv2-pp">${esc(t.place)}</span>` : ''}` : ''}</button>`;

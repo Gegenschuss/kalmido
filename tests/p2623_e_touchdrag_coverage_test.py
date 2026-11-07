@@ -36,7 +36,7 @@ TD_SITES = {
     ("dnd.js", ".trow[draggable"): ("drag.js", "dnd.js"),            # task rows + calendar chips: tdStart (hold 380)
     ("dnd.js", "shandle"): ("drag.js", "secdrag.js"),               # sections: the header's long press, drg_begin
     ("dnd.js", "[data-sdrag]"): ("drag.js", "secdrag.js"),
-    ("render.js", "!opts.trash && !ro && !isMobile()"): ("drag.js", "dnd.js"),  # the task row
+    ("render.js", "!opts.trash && !ro && !isTouch() ? 'draggable"): ("drag.js", "dnd.js"),  # the task row; 2.655.0 (#5085): was !isMobile()
     ("dragmulti.js", "dgEnd();"): ("drag.js", "dnd.js"),  # several selected tasks: the grip in select mode
     ("calview.js", 'draggable="${t.status'): ("drag.js", "caldrag.js"),  # calendar chips (month, week, list)
     ("dashboard.js", "nat ?"): ("drag.js", "dashboard.js"),        # the start page's layout editor: rowd_attach on touch
@@ -49,7 +49,7 @@ TD_SITES = {
     ("sidebar.js", "#side .srow[data-list]"): ("drag.js", "sidebar.js"),
     ("areas.js", "n.drag && !isTouch()"): ("drag.js", "areas.js"),  # the areas' tree nodes
     ("areas.js", "#side .sbbt"): ("drag.js", "areas.js"),
-    ("favtiles.js", "const drag = isMobile()"): ("drag.js", "favtiles.js"),  # favourite tiles (see #4618)
+    ("favtiles.js", "const drag = isTouch()"): ("drag.js", "favtiles.js"),  # favourite tiles (see #4618); 2.655.0 (#5085): was isMobile()
     ("favtiles.js", ".fv2bar"): ("drag.js", "favtiles.js"),
     # 2.627.0 (#4961 #4962): a file onto a folder, the icons of the area rail
     ("ablage.js", 'class="abrow"'): ("drag.js", "ablage.js"),

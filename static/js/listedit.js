@@ -343,7 +343,7 @@ function dsStep() {
   }
   if (moved || Date.now() - DS.last < 400) DS.raf = requestAnimationFrame(dsStep);
 }
-document.addEventListener('dragstart', e => { if (isTouch() && isMobile()) return; if (e.target.closest?.('#view, #side')) { DS.on = true; DS.box = null; } }, true);
+document.addEventListener('dragstart', e => { if (isTouch()) return; /* 2.655.0 (#5085): was isTouch() && isMobile() */ if (e.target.closest?.('#view, #side')) { DS.on = true; DS.box = null; } }, true);
 document.addEventListener('dragover', e => {
   if (!DS.on) return;
   DS.x = e.clientX; DS.y = e.clientY; DS.last = Date.now();

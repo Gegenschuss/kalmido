@@ -479,7 +479,7 @@ function swipeEnd(e) {
   if (!swipe) return;
   const {r, dx, lock} = swipe; swipe = null;
   // 2.46.1 (#1559): a swipe that completes the task carries the row on out to the right (like a dismissed news item) instead of snapping back
-  const going = lock === 'x' && dx > 90 && e?.type !== 'touchcancel' && an_on();
+  const going = lock === 'x' && dx > 90 && e?.type !== 'touchcancel' && isTouch() && ui_motion();  // 2.655.0 (#5085): every touch screen (an_on = phones only)
   r.style.transition = going ? 'transform .18s ease-in, opacity .18s ease-in' : 'transform .18s'; r.style.transform = going ? 'translateX(110%)' : ''; r.style.background = going ? r.style.background : '';
   if (going) r.style.opacity = '0';
   setTimeout(() => { r.style.transition = ''; }, 200);
@@ -629,7 +629,7 @@ function tdOver(d, x, y) {
   else if (dsb_mark(dsb_spot(d.id, document.elementFromPoint(x, y), y))) mdLast = null;  // 2.380 F (#3436): among the task view's subtasks
   else if (!dgs_touchMark(p.at, d.id, p.y)) markDrop(p.at, d.id, p.y);  // 2.122.3 B (#2334): the middle of a row = its subtask (dragmulti.js)
   // hold at the left edge: open the list drawer so the task can be dropped on another list
-  if (isMobile() && x < 26 && !$('#side').classList.contains('open')) {
+  if (isTouch() && x < 26 && !$('#side').classList.contains('open')) {  // 2.655.0 (#5085): was isMobile(), the tablet too
     if (!d.edge) d.edge = setTimeout(() => { $('#side').classList.add('open'); if (S.sel) $('#detail').style.visibility = 'hidden'; d.opened = true; }, 450);
   } else if (d.edge && x >= 26) { clearTimeout(d.edge); d.edge = null; }
   kbEdge(x, y);
