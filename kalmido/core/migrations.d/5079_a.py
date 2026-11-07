@@ -2,6 +2,6 @@
 fields = the fields of a task the agent changed ("Priority changed", "Moved to another project"), count = how many tasks one
 batch step changed, ref = the reference an agent gave to a decision it wrote itself (POST /api/v1/agent/decisions). '' = nothing.
 New column only, with a default: an older version ignores it (its lines then read as before)."""
-MIGRATIONS = [
-    ("agent_decisions", "info", "ALTER TABLE agent_decisions ADD COLUMN IF NOT EXISTS info TEXT NOT NULL DEFAULT ''"),
+AFTER = [  # agent_decisions is made by core/schema.py after the MIGRATIONS steps (a fresh database): the column comes after it (#4300)
+    "ALTER TABLE agent_decisions ADD COLUMN IF NOT EXISTS info TEXT NOT NULL DEFAULT ''",
 ]
