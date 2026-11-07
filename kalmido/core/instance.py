@@ -16,6 +16,7 @@ from ..core.schema import USER_DEFAULTS
 from ..core.i18n import LANGS, N_, tr
 from ..core.db import body, bump, connect, db, err, gset, gsetting, iso, now_utc, parse_iso, uset, usettings
 from ..core.pg import write_lock  # 2.528.0 (#4305)
+from ..core.pgbus import bus_on, bus_send  # 2.622.0 (#3891)
 from ..accounts.session import GATE, me
 from ..accounts.oidc import oidc_public, oidc_reauth
 from ..core.access import _COLLAB_ALL, _TIME_ALL, collab_all, time_all
@@ -430,7 +431,22 @@ def _apply_instance(c, b):
             for r in c.execute("SELECT * FROM time_entries WHERE \"end\" IS NULL").fetchall():
                 stop_timer(c, r, now, ts)
         _TIME_ALL["on"] = b["time_all"]
+    if "collab_all" in b or "time_all" in b:
+        bus_send("flags", c=c)  # 2.622.0 (#3891): the other web processes read the switches again with the commit
     return None
+
+
+def _flags_heard(_d):
+    """2.622.0 (#3891): another process changed the instance switches: read them from the settings."""
+    c = connect()
+    try:
+        _COLLAB_ALL["on"] = gsetting(c, "collab_all") != "0"
+        _TIME_ALL["on"] = gsetting(c, "time_all") != "0"
+    finally:
+        c.close()
+
+
+bus_on("flags", _flags_heard)
 
 
 UPDATE_KICK = []  # 2.370.3 (#2760): f() -> queues the check (registered by admin/worker.py; the core imports no queue)

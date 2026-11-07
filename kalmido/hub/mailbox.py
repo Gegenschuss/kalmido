@@ -37,6 +37,7 @@ from flask import g, jsonify, request
 
 from ..core.config import EMAIL_RE, app
 from ..core.pg import insert_id, system_ctx
+from ..core.pgbus import bus_on, bus_send  # 2.622.0 (#3891)
 from ..core.i18n import N_, lang, tr
 from ..core.db import body, bump, db, err, iso, now_utc, connect
 from ..core.access import Denied, WRITE_ROLES, acx_of, list_role, need_list
@@ -508,7 +509,18 @@ def mbx_poll_now():
         raise Denied(404, tr("No mailbox is set up"))
     _DUE.add(ws)
     MBX_WAKE.set()
+    bus_send("mbx", ws)  # 2.622.0 (#3891): the mailbox loop may run in another process
     return jsonify(ok=True)
+
+
+def _mbx_heard(ws):
+    """2.622.0 (#3891): "Fetch now" in another process."""
+    if isinstance(ws, str) and re.fullmatch(r"[ou]\d{1,12}", ws):
+        _DUE.add(ws)
+    MBX_WAKE.set()
+
+
+bus_on("mbx", _mbx_heard)
 
 
 # ---- fetching -----------------------------------------------------------------------------------------------------------

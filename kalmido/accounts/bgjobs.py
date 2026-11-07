@@ -37,6 +37,7 @@ from ..core.db import connect, iso
 from ..core.env import env_int  # 2.370.3 (#2760)
 from ..core.db import db_log_err  # 2.239.0 B (#2888): no values of database errors in the log
 from ..core.pg import system_ctx
+from ..core.pgbus import bus_on, bus_send  # 2.622.0 (#3891)
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
@@ -209,7 +210,10 @@ def bgj_add(kind, *args, org_id=None, user_id=None, delay=0.0, once=False, lock=
 
 
 def bgj_kick():
-    """Wakes the loop (starts it when it does not run yet); nothing in the role web (the worker takes the row)."""
+    """Wakes the loop (starts it when it does not run yet); nothing in the role web (the worker takes the row).
+    2.622.0 (#3891): and tells the other processes (core/pgbus.py): the one that runs the queue now takes the row at once
+    instead of after its rest (BGJ_IDLE)."""
+    bus_send("bgjobs")
     if not bg_here():
         return
     with _LOCK:
@@ -217,6 +221,14 @@ def bgj_kick():
             _Q["thread"] = threading.Thread(target=_loop, daemon=True, name="bgjobs")
             _Q["thread"].start()
     _WAKE.set()
+
+
+def _bgj_heard(_d):
+    if _Q["thread"] is not None:  # 2.622.0 (#3891): another process added a row
+        _WAKE.set()
+
+
+bus_on("bgjobs", _bgj_heard)
 
 
 @app.before_request

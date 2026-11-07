@@ -10,6 +10,7 @@ from flask import g, has_request_context
 
 from ..core.config import app, EMAIL_RE
 from ..core.pg import insert_id, WEB_THREADS
+from ..core.pgbus import bus_on, bus_send  # 2.622.0 (#3891)
 from ..core.i18n import tr
 from ..core.db import inbox_default, iso, iso_ms, now_utc, parse_iso
 from ..accounts.session import me
@@ -180,10 +181,20 @@ _AGENT_GEN = [0]
 _AGENT_WAITERS = {}
 
 
-def agent_notify():
+def _agent_wake_here(_d=None):
     with _AGENT_COND:
         _AGENT_GEN[0] += 1
         _AGENT_COND.notify_all()
+
+
+def agent_notify():
+    """Wakes the agents' waiting long-polls (they look for new rows). 2.622.0 (#3891): in the other web processes too
+    (core/pgbus.py; the events are committed when this runs)."""
+    _agent_wake_here()
+    bus_send("agents")
+
+
+bus_on("agents", _agent_wake_here)
 
 
 @app.after_request
