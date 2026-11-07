@@ -163,18 +163,22 @@ out = box("from kalmido.core.config import app as fa\nfrom kalmido.accounts impo
           "with fa.test_request_context('/', environ_base={'REMOTE_ADDR': '198.51.100.7'}):\n"
           "    for _ in range(L.PEND_PER_IP + 10):\n        L.pend_new('pk', None, chal='x')\n"
           "with fa.test_request_context('/', environ_base={'REMOTE_ADDR': '198.51.100.8'}):\n    L.pend_new('pk', None, chal='y')\n"
-          "ips = [v.get('_ip') for v in L._PEND.values()]\nprint('per-ip', ips.count('198.51.100.7'), ips.count('198.51.100.8'), L.PEND_PER_IP)\n"
+          # 2.622.0 (#3891): the tickets live in the database (core/ephem.py), the address as an HMAC
+          "from kalmido.core.ephem import eph_hash\n"
+          "n = lambda ip: c.execute(\"SELECT COUNT(*) FROM eph_state WHERE ns='pend' AND ip=? AND exp > extract(epoch FROM now())\", (eph_hash('ip', ip),)).fetchone()[0]\n"
+          "print('per-ip', n('198.51.100.7'), n('198.51.100.8'), L.PEND_PER_IP)\n"
           "d = {'a': {'exp': 1, '_ip': 'x'}, 'b': {'exp': 2, '_ip': 'x'}, 'c': {'exp': 0, '_ip': 'y'}}\nL.pend_ip_cap(d, 'x', 2)\n"
           "print('cap', sorted(d))")
 m = re.search(r"per-ip (\d+) (\d+) (\d+)", out)
 check(m and m.group(1) == m.group(3) and m.group(2) == "1", "#2496: one address keeps at most PEND_PER_IP tickets, another one is untouched " + out[-300:])
 check("cap ['b', 'c']" in out, "#2496: the address's own oldest gives way " + out[-200:])
 # 2.190.0 R (#2496): IPv6 counts as its /64 network
-out = box("from kalmido.core.config import app as fa\nfrom kalmido.accounts import login as L\nL._PEND.clear()\n"
+# 2.622.0 (#3891): the tickets live in the database (core/ephem.py): emptied and counted there
+out = box("from kalmido.core.config import app as fa\nfrom kalmido.accounts import login as L\nc.execute(\"DELETE FROM eph_state WHERE ns='pend'\")\nc.commit()\n"
           "for i in range(L.PEND_PER_IP + 5):\n"
           "    with fa.test_request_context('/', environ_base={'REMOTE_ADDR': '2001:db8:1:2::%x' % (i + 1)}):\n"
           "        L.pend_new('pk', None, chal='x')\n"
-          "print('v6', len(L._PEND), L.PEND_PER_IP)")
+          "print('v6', c.execute(\"SELECT COUNT(*) FROM eph_state WHERE ns='pend'\").fetchone()[0], L.PEND_PER_IP)")
 m = re.search(r"v6 (\d+) (\d+)", out)
 check(m and m.group(1) == m.group(2), "#2496: addresses of one IPv6 /64 share the ticket cap " + out[-300:])
 

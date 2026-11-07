@@ -5,7 +5,6 @@ import json
 import os
 import re
 import secrets
-import threading
 import time
 import urllib.error
 import urllib.parse
@@ -22,7 +21,9 @@ from ..core.config import app, APP_NAME, APP_VERSION, COOKIE, PUBLIC_URL, SECRET
 from ..core.i18n import browser_lang, N_, tr
 from ..core.db import body, bump, create_user, db, ensure_inbox, err, gset, gsetting, iso, now_utc, uset
 from ..accounts.session import _rate_blocked, _rate_fail, _token_hash, client_ip, rate_ip, set_cookie, start_session
-from ..accounts.login import _reauth, _user, pend_ip_cap
+from ..accounts.login import _reauth, _user, seal, unseal
+from ..core.ephem import eph_put, eph_take  # 2.622.0 (#3891)
+from ..core.pgbus import bus_on, bus_send  # 2.622.0 (#3891)
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from ..core.env import env_bool  # 2.399.0 (#2687): the hosting switch (KALMIDO_HOSTED)
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
@@ -63,7 +64,22 @@ OIDC_LEEWAY = 60
 OIDC_STEPUP_AGE = 300  # 2.144.5 A (#2387): s an auth_time of the step-up sign-in may be old
 OIDC_ALGS = {"RS256", "RS384", "RS512", "PS256", "PS384", "PS512", "ES256", "ES384", "ES512", "EdDSA"}
 _OIDC = {"doc": None, "doc_at": 0.0, "jwks": None, "jwks_at": 0.0, "err": "", "err_at": ""}
-_OIDC_STATES, _OIDC_LOCK = {}, threading.Lock()
+OIDC_STATES_MAX = 1000  # open sign-ins on the server (its oldest give way first)
+EPH_OIDC = "oidc"  # 2.622.0 (#3891): core/ephem.py kind of the states (was the process dict _OIDC_STATES)
+
+
+def _oidc_state_take(state):
+    """2.622.0 (#3891): the state's content, taken once over all processes (None = unknown, used or expired)."""
+    if not state or len(state) > 200:
+        return None
+    v = eph_take(EPH_OIDC, state)
+    if not v:
+        return None
+    try:
+        st = json.loads(unseal(db(), "oidc:" + _token_hash(state), v))
+    except (InvalidTag, ValueError, TypeError):
+        return None
+    return st if isinstance(st, dict) else None
 OIDC_ERRORS = {"no_account": N_("There is no account for this sign-in yet. Please ask the admin to create one."),
                "disabled": N_("This account is disabled."),
                "group": N_("Your account at the sign-in provider is not allowed to use this app."),
@@ -129,9 +145,16 @@ def oidc_cfg(c=None):
     return cfg
 
 
-def oidc_reset():
+def oidc_reset(c=None):
+    """Forgets the settings in effect and the provider's documents. c: the settings changed in that transaction -- the other
+    web processes forget theirs with its commit (2.622.0, #3891: core/pgbus.py)."""
     _OIDC_CFG.clear()
     _OIDC.update(doc=None, doc_at=0.0, jwks=None, jwks_at=0.0, err="", err_at="")
+    if c is not None:
+        bus_send("oidc", c=c)
+
+
+bus_on("oidc", lambda _d: oidc_reset())  # 2.622.0 (#3891): another process changed the OIDC settings
 
 
 class OidcError(Exception):
@@ -477,16 +500,16 @@ def oidc_start():
             return _oidc_fail_redirect("org", True)
     state, nonce, verifier, bind = (secrets.token_urlsafe(32) for _ in range(4))
     now = time.time()
-    with _OIDC_LOCK:
-        for k in [k for k, v in _OIDC_STATES.items() if v["exp"] < now]:
-            del _OIDC_STATES[k]
-        pend_ip_cap(_OIDC_STATES, rate_ip(), OIDC_STATES_PER_IP)  # 2.190.0 R (#2496): the counter key, as for "_ip"
-        if len(_OIDC_STATES) >= 1000:
-            del _OIDC_STATES[min(_OIDC_STATES, key=lambda k: _OIDC_STATES[k]["exp"])]
-        _OIDC_STATES[state] = {"bind": _token_hash(bind), "nonce": nonce, "verifier": verifier, "exp": now + OIDC_STATE_TTL,
-                               "remember": request.args.get("remember", "1") != "0", "_ip": rate_ip()}
-        if stepup:
-            _OIDC_STATES[state].update(stepup=stepup, org=so, oid=soid, uid=sess_uid)
+    # 2.622.0 (#3891): in the database (core/ephem.py), so the provider's answer may land in another web process; the state
+    # only as an HMAC, the content (nonce, PKCE verifier) sealed with the server's sign-in key; caps as before (per address
+    # OIDC_STATES_PER_IP, OIDC_STATES_MAX on the server); the callback takes it once (DELETE ... RETURNING)
+    st = {"bind": _token_hash(bind), "nonce": nonce, "verifier": verifier, "exp": now + OIDC_STATE_TTL,
+          "remember": request.args.get("remember", "1") != "0"}
+    if stepup:
+        st.update(stepup=stepup, org=so, oid=soid, uid=sess_uid)
+    if not eph_put(EPH_OIDC, state, seal(c, "oidc:" + _token_hash(state), json.dumps(st)), OIDC_STATE_TTL, ip=rate_ip(),
+                   caps={"ip": OIDC_STATES_PER_IP, "all": OIDC_STATES_MAX}):  # 2.190.0 R (#2496): the counter key of rate_ip
+        return _oidc_fail_redirect("failed", bool(stepup))
     q = {"response_type": "code", "client_id": oidc_cfg(c)["client_id"], "redirect_uri": OIDC_REDIRECT, "scope": oidc_cfg(c)["scopes"],
          "state": state, "nonce": nonce, "code_challenge_method": "S256",
          "code_challenge": _b64u(hashlib.sha256(verifier.encode()).digest())}
@@ -505,8 +528,7 @@ def oidc_callback():
     if not oidc_cfg()["on"]:
         return err(tr("OIDC sign-in is not configured"), 404)
     state = request.args.get("state") or ""
-    with _OIDC_LOCK:
-        st = _OIDC_STATES.pop(state, None) if state else None
+    st = _oidc_state_take(state)  # 2.622.0 (#3891): once, from the database
     c = db()
     if g.get("auth_via") == "session" and g.get("user") is not None and _oidc_sess_uid(c) is None:
         # 2.536.0 (#4363): a support session never comes back from the provider: no link, no new session in its place
@@ -718,7 +740,7 @@ def _oidc_store(c, vals):
     """Writes provider fields into the settings in effect (the sign-in uses them at once)."""
     for k, v in vals.items():
         gset(c, "oidc_" + k, oidc_seal(v) if k == "client_secret" and v else v)
-    oidc_reset()
+    oidc_reset(c)
 
 
 @app.put("/api/admin/oidc")
@@ -854,7 +876,7 @@ def oidc_draft_apply():
         if os.environ.get(dict(OIDC_FIELDS)[k], "").strip():
             continue  # the environment wins (set after the draft)
         gset(c, "oidc_" + k, v)  # the client secret is sealed already
-    oidc_reset()
+    oidc_reset(c)
     gset(c, "oidc_draft", "")
     gset(c, "oidc_draft_ok", "")
     bump(c)

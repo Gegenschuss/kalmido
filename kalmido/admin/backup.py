@@ -34,8 +34,9 @@ from ..core.env import env_bool
 from ..core.retention import ret_on as bk_ret_on  # 2.186.0 C (#2602)
 from ..accounts.session import _rate_fail, _rate_keys, GATE, login_wait, set_cookie, start_session
 from ..accounts.bgjobs import BGJ_FNS, bgj_add, bgj_fn, bgj_pending
-from ..accounts.login import _AUTH_KEY, _PEND, _PEND_LOCK, seal, unseal
-from ..accounts.oidc import _OIDC_LOCK, _OIDC_STATES, oidc_reset
+from ..accounts.login import _AUTH_KEY, seal, unseal
+from ..accounts.oidc import oidc_reset
+from ..core.ephem import eph_clear  # 2.622.0 (#3891)
 from ..core.access import Denied, acx_drop
 from ..tasks.validation import valid_hm
 from ..tasks.lifecycle import UNDO_KEY
@@ -457,7 +458,8 @@ def bk_dump(dest):
             schema = int(r[0]) if r and str(r[0]).isdigit() else SCHEMA_VERSION
             # the snapshot stays valid while this transaction is open
             # 2.193.0 D (#2220): without the rows of the queue (a restored backup would run its own "Back up now" again)
-            _pg_run(["pg_dump", "-Fc", "-Z", "6", "--enable-row-security", f"--snapshot={snap}", "--exclude-table-data=bg_jobs", "-f", dest])
+            # 2.622.0 (#3891): nor the short-lived state of the processes (core/ephem.py: sign-in steps, tickets)
+            _pg_run(["pg_dump", "-Fc", "-Z", "6", "--enable-row-security", f"--snapshot={snap}", "--exclude-table-data=bg_jobs", "--exclude-table-data=eph_state", "-f", dest])
         return counts, schema
     finally:
         s.close()
@@ -1653,10 +1655,7 @@ def _reset_caches():
         d.clear()
     acx_drop()  # 2.149.0 review: cached access contexts belong to the old database
     _VAPID.clear()
-    with _PEND_LOCK:
-        _PEND.clear()
-    with _OIDC_LOCK:
-        _OIDC_STATES.clear()
+    eph_clear()  # 2.622.0 (#3891): sign-in steps, OIDC states, tickets of before (core/ephem.py) are gone with the old database
     oidc_reset()
     _DAV_INST.clear()
     with _DAV_CACHE_LOCK:

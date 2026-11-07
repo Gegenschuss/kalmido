@@ -7,7 +7,6 @@ import os
 import re
 import secrets
 import struct
-import threading
 import time
 import urllib.error
 import urllib.parse
@@ -25,6 +24,7 @@ from werkzeug.security import check_password_hash
 
 from ..core.config import app, APP_NAME, COOKIE, MIN_PASSWORD, NTFY_TOPIC, PUBLIC_URL, USERNAME_RE
 from ..core.pg import insert_id
+from ..core.ephem import eph_count_up, eph_drop, eph_get, eph_put, eph_set, eph_take  # 2.622.0 (#3891)
 from ..core.i18n import lang, languages, N_, tr, LANGS
 from ..core.usertz import tz_names
 from ..core.db import adopt_orphans, body, bump, create_user, db, ensure_inbox, err, gset, gsetting, iso, local_now, now_utc, parse_iso, uset, write_lock
@@ -293,7 +293,6 @@ PASSKEY_MAX = 20         # per user
 WA_TRANSPORTS = {"usb", "nfc", "ble", "internal", "hybrid", "smart-card", "cable"}
 WA_RP_ID_ENV = os.environ.get("KALMIDO_WEBAUTHN_RP_ID", "").strip().lower().rstrip(".")
 WA_ORIGINS_ENV = [o.strip().rstrip("/") for o in os.environ.get("KALMIDO_WEBAUTHN_ORIGINS", "").split(",") if o.strip()]
-_PEND, _PEND_LOCK = {}, threading.Lock()
 _AUTH_KEY = {}
 
 
@@ -321,19 +320,81 @@ def unseal(c, purpose, s):
     return AESGCM(auth_key(c)).decrypt(raw[:12], raw[12:], f"kalmido-auth:{purpose}".encode()).decode()
 
 
-# ---- tickets / challenges (in memory: a restart simply asks for the password again)
-def _pend_gc():
-    now = time.time()
-    for k in [k for k, v in _PEND.items() if v["exp"] < now]:
-        del _PEND[k]
-    if len(_PEND) > PEND_MAX:
-        for k in sorted(_PEND, key=lambda k: _PEND[k]["exp"])[:len(_PEND) - PEND_MAX]:
-            del _PEND[k]
+# ---- tickets / challenges
+# 2.622.0 (#3891): in the database (core/ephem.py, ns "pend"), so the second step of a sign-in may land in another web process
+# (KALMIDO_WEB_PROCS / KALMIDO_REPLICAS) than the first. Stored: the key only as an HMAC, the content sealed with the server's
+# sign-in key (seal, bound to the key), the end (PEND_TTL), the address as an HMAC (PEND_PER_IP) and the wrong tries (n, counted
+# atomically). A WebAuthn challenge has a row of its own (ns "pendc"): taking it is DELETE ... RETURNING, so one challenge
+# answers one request of all processes. A restart keeps them now (they still end after PEND_TTL).
+EPH_PEND, EPH_PEND_CHAL = "pend", "pendc"
+
+
+def _pend_json(o):
+    if isinstance(o, (bytes, bytearray)):  # a WebAuthn challenge
+        return {"__b64": base64.b64encode(bytes(o)).decode()}
+    raise TypeError(type(o).__name__)
+
+
+def _pend_hook(d):
+    return base64.b64decode(d["__b64"]) if set(d) == {"__b64"} else d
+
+
+def _pend_seal(key, d):
+    return seal(db(), "pend:" + key, json.dumps(d, ensure_ascii=False, separators=(",", ":"), default=_pend_json))
+
+
+def _pend_open(key, v):
+    try:
+        d = json.loads(unseal(db(), "pend:" + key, v), object_hook=_pend_hook) if v else None
+    except (InvalidTag, ValueError, TypeError):
+        return None  # another server key (a restore) or a damaged row: no ticket
+    return d if isinstance(d, dict) else None
+
+
+class PendTicket(dict):
+    """2.622.0 (#3891): a ticket as the callers knew it (a dict whose changes stick): every change is written back to its row;
+    "chal" lives in a row of its own and pop("chal") takes it once for all processes."""
+
+    def __init__(self, key, d, tries=0):
+        super().__init__(d)
+        self._key = key
+        dict.__setitem__(self, "tries", tries)
+
+    def _save(self):
+        eph_set(EPH_PEND, self._key, _pend_seal(self._key, {k: v for k, v in self.items() if k not in ("tries", "chal")}))
+
+    def __setitem__(self, k, v):
+        if k == "tries":  # counted in the row (pend_fail), not written from here
+            return dict.__setitem__(self, k, v)
+        if k == "chal":
+            eph_put(EPH_PEND_CHAL, self._key, _pend_seal("c:" + self._key, {"chal": v}), PEND_TTL)
+            return dict.__setitem__(self, k, v)
+        dict.__setitem__(self, k, v)
+        self._save()
+
+    def update(self, *a, **kw):
+        for k, v in dict(*a, **kw).items():
+            if k == "chal":
+                self["chal"] = v
+            else:
+                dict.__setitem__(self, k, v)
+        self._save()
+
+    def pop(self, k, *default):
+        if k == "chal":
+            dict.pop(self, k, None)
+            v = eph_take(EPH_PEND_CHAL, self._key)
+            d = _pend_open("c:" + self._key, v) if v else None
+            return d.get("chal") if d else (default[0] if default else None)
+        out = dict.pop(self, k, *default)
+        self._save()
+        return out
 
 
 def pend_ip_cap(store, ip, cap):
     """2.190.0 A (#2496): makes room for one more entry of address ip in store ({key: {"exp", "_ip"}}): its own oldest give
-    way, so many requests from one address never push out the tickets of others. The caller holds the lock."""
+    way, so many requests from one address never push out the tickets of others. The caller holds the lock.
+    2.622.0 (#3891): the tickets themselves keep this cap in the database (eph_put caps); this is for dicts of the callers."""
     mine = [k for k, v in store.items() if ip and v.get("_ip") == ip]
     for k in sorted(mine, key=lambda k: store[k]["exp"])[:max(0, len(mine) - cap + 1)]:
         del store[k]
@@ -342,10 +403,13 @@ def pend_ip_cap(store, ip, cap):
 def pend_new(kind, uid, **data):
     tok = secrets.token_urlsafe(32)
     ip = rate_ip()  # 2.190.0 R (#2496): the counter key (IPv6 as its /64), like the other address limits
-    with _PEND_LOCK:
-        _pend_gc()
-        pend_ip_cap(_PEND, ip, PEND_PER_IP)
-        _PEND["t:" + _token_hash(tok)] = {"kind": kind, "uid": uid, "exp": time.time() + PEND_TTL, "tries": 0, **data, "_ip": ip}
+    key = "t:" + _token_hash(tok)
+    chal = data.pop("chal", None)
+    if not eph_put(EPH_PEND, key, _pend_seal(key, {"kind": kind, "uid": uid, **data}), PEND_TTL, uid=uid, ip=ip,
+                   caps={"ip": PEND_PER_IP, "all": PEND_MAX}):
+        raise RuntimeError("sign-in ticket not stored")  # the database is away: the sign-in fails (500), nothing half-done
+    if chal is not None:  # the passkey sign-in's challenge: its own row, taken once (PendTicket.pop)
+        eph_put(EPH_PEND_CHAL, key, _pend_seal("c:" + key, {"chal": chal}), PEND_TTL)
     return tok
 
 
@@ -355,34 +419,52 @@ def pend_cookie(resp, tok):
     return resp
 
 
+def _pend_load(key):
+    r = eph_get(EPH_PEND, key)
+    d = _pend_open(key, r["v"]) if r else None
+    if d is None:
+        return None
+    return PendTicket(key, d, r["n"])
+
+
 def pend_get(kinds):
     """The ticket of this browser (dict, shared: changes stick) if it is one of `kinds`, else None."""
     tok = request.cookies.get(PEND_COOKIE) or ""
     if not tok:
         return None
-    with _PEND_LOCK:
-        _pend_gc()
-        p = _PEND.get("t:" + _token_hash(tok))
-    return p if p and p["kind"] in kinds else None
+    p = _pend_load("t:" + _token_hash(tok))
+    return p if p and p.get("kind") in kinds else None
+
+
+def pend_fail(p):
+    """2.622.0 (#3891): one more wrong try of ticket p (atomic over all processes); the ticket dies after PEND_TRIES."""
+    n = eph_count_up(EPH_PEND, p._key)
+    dict.__setitem__(p, "tries", n if n is not None else PEND_TRIES)
+    if n is None or n >= PEND_TRIES:
+        eph_drop(EPH_PEND, p._key)
+        eph_drop(EPH_PEND_CHAL, p._key)
 
 
 def pend_drop():
-    tok = request.cookies.get(PEND_COOKIE) or ""
-    with _PEND_LOCK:
-        _PEND.pop("t:" + _token_hash(tok), None)
+    key = "t:" + _token_hash(request.cookies.get(PEND_COOKIE) or "")
+    eph_drop(EPH_PEND, key)
+    eph_drop(EPH_PEND_CHAL, key)
 
 
 def pend_set(key, **data):
     """Per-user state of a logged-in user (TOTP enrolment secret, WebAuthn registration challenge)."""
-    with _PEND_LOCK:
-        _pend_gc()
-        _PEND[key] = {"exp": time.time() + PEND_TTL, **data}
+    eph_put(EPH_PEND, key, _pend_seal(key, data), PEND_TTL, caps={"all": PEND_MAX})
+
+
+def pend_peek(key):
+    """2.622.0 (#3891): the content of a pend_set row without taking it (None = none / expired)."""
+    r = eph_get(EPH_PEND, key)
+    return _pend_open(key, r["v"]) if r else None
 
 
 def pend_take(key):
-    with _PEND_LOCK:
-        _pend_gc()
-        return _PEND.pop(key, None)
+    v = eph_take(EPH_PEND, key)
+    return _pend_open(key, v) if v else None
 
 
 # ---- TOTP (RFC 6238 / RFC 4226)
@@ -490,9 +572,7 @@ def _code_fail(u, p=None):
     aa_count("security", "logins", client_ip(), user=u["username"])
     print("second factor failed for", login_log_name(u["username"]), "from", login_log_ip(client_ip()), flush=True)  # 2.148.1 C (#2494)
     if p is not None:
-        p["tries"] += 1
-        if p["tries"] >= PEND_TRIES:
-            pend_drop()
+        pend_fail(p)  # 2.622.0 (#3891): counted in the database (every process sees the same tries)
 
 
 def _ticket(kinds):
@@ -891,9 +971,8 @@ def me_totp_confirm():
     e = login_wait(keys, u["username"])  # 2.282.0 (#3111): signed in as this name
     if e:
         return e
-    with _PEND_LOCK:
-        p = _PEND.get(f"totp:{u['id']}")
-    if not p or p["exp"] < time.time():
+    p = pend_peek(f"totp:{u['id']}")  # 2.622.0 (#3891): from the database (an expired row is no row)
+    if not p:
         return err(tr("The setup has expired, please start again"), 409)
     st = totp_match(p["secret"], body().get("code"))
     if not st:
