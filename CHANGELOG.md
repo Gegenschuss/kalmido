@@ -16,6 +16,51 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.645.0] - 2026-11-07
+
+Package 2.638 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), CI-only rot: p2551_c_favout_ui, Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatche).
+### Added
+- Server agents: when the first key is stored for an agent without a limit, the dialog proposes a daily limit of 2 million tokens (visible, editable, empty = no limit) and stores it with the key; an agent with a key but no limit shows a hint (#4714)
+- Tests: a table test of the public-link switch for every kind (link opens, kind off = old link closed and no new one, kind on = open again) and a lint that every public_links_on() names a known kind (#4294)
+### Changed
+- API v1 `PATCH /comments/{id}` and `/team/messages/{id}` take `expect_updated_at` (or If-Match) and answer 409 on a newer version; agents must send it (400 `version_required`), MCP `update_comment` / `edit_team_message` pass it on; the template dialog sends the version it opened and reloads on 409 (#4775)
+- Tests: the tenant guard counts a route as proven only with the same method on the test line and a 403/404 check within three lines (or a `# tenant: METHOD /path` marker), no more proof from comment blocks; the legacy list grows once from 882 to 1429 and must not grow again (#4641)
+- Base image digests and lock files refreshed (#5010)
+### Fixed
+- Undo after dragging a favourite list out on a touch screen works again: the tap on Undo was swallowed by the drag guard, and star requests now run one after another (CI red p2551_c_favout_ui, #5013)
+- Answering a calendar invitation (app, API, CalDAV) takes the event's lock, so a parallel edit of the attendees no longer overwrites the answer (#4780)
+- Mailbox: IMAP folder names always go out quoted, so names like `{5}` or with `%` / `*` no longer break the own mailbox connection (#4852)
+- A portal form while public links of the kind portal are off makes a plain report without a status link that would not open (#4294)
+- p2619_b_starter checks the rules block for the current wording **read-only** (#5014)
+
+Package 2.633 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Angebots-Pipeline: Karte mit dem Finger in eine an, Bündel: Releases für Selbst-Hoste).
+
+### Added
+- #4777: video sign-off takes audio too: a direct https link to MP3, M4A/AAC, WAV, OGG/Opus or FLAC plays in the browser's own player; comments sit at a timecode as with video (tap pauses and takes the time, tap the time to jump), a simple timeline with marks, versions and the customer link as with video. Nothing is downloaded or stored by Kalmido.
+- #4781: list rules have two new actions, "Mark it as done" and "Open it again"; done goes the way of the tick (next repetition, dependants freed, notifications, history names the rule), a task done by a rule triggers no further rule. Agent API / MCP rule schema list both.
+- #4963 #4964 #4965: with the finger (hold, drag, let go): a receipt onto a booking in Bank > Without receipt, an office document onto a folder of the side panel, a quotation pipeline card into another column - the same action as the mouse's drop.
+
+### Changed
+- #4920: buttons that opened a file picker made on the click (bank import, meals, travel import, agreements, contacts import, profile / agent picture, project and organisation icon, file store "New version", wiki attachments and import, mindmap / sheet import, …) now have a fixed hidden file field, so a file dropped onto the window lands there too.
+
+### Fixed
+- #4994: iPhone home-screen app: the tab bar keeps only part of the home indicator room (no wide empty band below the labels), the list ends right above the "+" button, the office import foot no longer adds the bottom room twice; the status bar is translucent and nothing glows behind the clock (the workspace stripe of the header and of the drawer and the loading bar sit below it; black behind the white clock in light designs); the area below the bar has the bar's colour.
+- #4964: holding a document row with the finger no longer opens its menu while the drag starts; let go without moving opens the menu once.
+- #4779: a token limited to lists no longer sees team channels (names, member ids) in the channel list (app and API v1) and cannot rename, archive or change members of a channel by its id.
+
+Package 2.624 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Added
+- Calendar > Tasks > "Per project": lists grouped by folder like the sidebar, one switch per folder (hides all lists in it and its subfolders, also later ones; their own switches show "hidden by folder"), a search field from 8 lists on; new user setting `cal_folders_hidden` (#3946)
+- Agent API: every item of `GET /api/v1/agent/queue` carries `size` and `points` (S=1, M=2, L=3, none = 2); `?points=N` marks the next bundle (`bundle: true` + `bundle {points, sum, count}`); MCP `get_queue` takes `points` (#4521)
+
+### Changed
+- `kalmido/__init__.py` ORDER has a sorted block at its end for modules without an order need, checked by `tools/check_layout.py` (fewer merge conflicts) (#3941)
+- More UI suites wait for a real state instead of fixed sleeps (#3943)
+
+### Fixed
+- TRANSLATING.md: the first day of the week follows the locale or the setting, not always Monday (#4522)
+
 ## [2.643.0] - 2026-11-07
 
 Package 2.631 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
@@ -334,7 +379,8 @@ Package 2.582 (Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher),
 
 Not released (the CI of this version was red); its changes are listed under 2.605.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.643.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.645.0...HEAD
+[2.645.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.645.0
 [2.643.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.643.0
 [2.639.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.639.0
 [2.634.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.634.0
