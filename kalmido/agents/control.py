@@ -47,6 +47,7 @@ from ..notify.push import notify, push_prio, WD_TICKS
 from ..agents.core import agent_emit, agent_row, agent_shares, is_agent, need_agent
 from ..agents.chat import _jload, chat_choices_withdraw, choice_state
 from ..agents.workstyle import ws_need_editor
+from ..agents.steps import redact  # 2.653.0 (#5079): a decision line masks secrets like a step
 from ..collab.cmttrash import cmt_trash  # 2.530.0 A (#4315, B11): text and files into the trash like comment_delete
 
 CTL_LEVELS = ("approve_all", "routine", "free")
@@ -580,7 +581,6 @@ def ctl_decision_text(v, name, need):
         return ""
     if not isinstance(v, str) or len(v) > 4000:
         raise BadInput(tr("Invalid value: {0}", name))
-    from .steps import redact
     t = re.sub(r"\s+", " ", redact(v)[0]).strip()
     if need and not t:
         raise BadInput(tr("Invalid value: {0}", name))
