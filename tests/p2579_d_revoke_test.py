@@ -288,7 +288,12 @@ for kind, rid in (("evcal", X2["cal"]), ("address_book", X2["book"]), ("list", X
     sql("UPDATE fs_shares SET expires_at=? WHERE user_id=? AND node_id IN (SELECT id FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id=?)", (PAST, BOB, kind, rid))
 r = A.patch(B + f"/api/files/shares/{G2['fs']}", json={"expires_at": PAST})
 check(r.ok, "2 expired: the folder share ends in the past (the file store's own route) " + r.text[:160])
-check(sql("SELECT count(*) FROM fs_shares WHERE user_id=? AND expires_at=?", (BOB, PAST))[0][0] >= 5, "2 expired: every core share of bob has its end date in the past")
+# 2.644.0 (#5030): the watchdog (1 s here) may already have moved the project's own member share that ran out into obj_revoked
+# (lf_own_stale, reason 'expired') before this count - on a slow CI runner it did (5 -> 4): such a row counts as ended too
+ended = sql("SELECT count(*) FROM fs_shares WHERE user_id=? AND expires_at=?", (BOB, PAST))[0][0] + \
+    sql("SELECT count(*) FROM obj_revoked WHERE src='fs_shares' AND user_id=? AND reason='expired' AND row_json LIKE ?", (BOB, "%" + PAST[:10] + "%"))[0][0]
+check(ended >= 5 and not sql("SELECT 1 FROM fs_shares WHERE user_id=? AND (expires_at IS NULL OR expires_at > ?)", (BOB, PAST)),
+      f"2 expired: every core share of bob has its end date in the past (or ran out already) {ended}")
 after(X2, "2 expired", ("wiki", "cal", "book", "files"))  # at once
 # a project's role ends with the watchdog's next round (lists/lffolder.py lf_expire_tick: an expiry is no change the hooks see; every
 # TASKS_WATCHDOG_INTERVAL seconds, 1 s here, 30 s by default) - then every way of the project is closed
