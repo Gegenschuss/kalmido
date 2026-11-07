@@ -15,6 +15,48 @@ minor one, anything that needs action on your side a major one.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.629.0] - 2026-11-07
+
+Package 2.591 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Rot auf main allein: p2450_x).
+### Added
+- Files can be dragged onto the window wherever a view or an open dialog has an upload button (receipts, credit card statements, letterhead, imports ...): one button makes the whole window a drop area, several buttons make each row one; type and count rules of the button apply, areas with their own drop keep it, touch devices are unchanged (#4894).
+- A scan inbox (Settings > Integrations) can be edited afterwards with the pencil next to the trash: name, target folder and "extend by one year"; the key and the folder watcher stay the same, the area (private / organisation) does not change (route `PATCH /api/docs/scan-keys/<id>`) (#4886).
+- Credit cards: Visa and American Express as providers (same line reader, an agent or entering by hand as before when nothing is read) (#4909); a hint at the statement upload and in the card dialog says which statements are read (providers and size limit from the server) (#4904).
+### Changed
+- Accounting and receipts: "Take photo of receipt" only on touch devices; on a desktop "Upload files" is the main button (#4892).
+- Office lists: rows that open a view or a form end in the arrow to the right, only rows that unfold in place keep the arrow down (#4908).
+- Cash flow: when a month has a bank balance, the by-hand real balance is folded behind "Enter the balance by hand"; a value set by hand keeps it open; "Use as real balance" only for a balance of the month's last day (#4889).
+### Fixed
+- Archive numbers: codes are read on every page (up to the OCR page limit, a finer second try when none is found), a QR code of digits only ("00143") counts, and a number already taken shows a hint with the document that holds it instead of being skipped silently (#4863).
+- The fill handle of tables keeps the decimal sign of the source cell instead of a fixed comma (#4871).
+
+Package 2.623 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Added
+- Agents can propose a change to a shared core object instead of writing it: a proposal of kind obj_patch shows the old and new values on a card; a person with write access accepts it (written with the agent's version, 409 when someone changed it meanwhile) or rejects it; MCP tool propose_object_change (#4718)
+- Settings > Modules: new module "Approval" (the former video sign-off); off = no new approvals in tasks, project overview, client card and API (409), existing ones stay readable and restorable from the trash (#4765)
+- Touch: a sheet tab and a group header in My tasks (by project) can be held and dragged with a finger; a coverage test makes every mouse drag place in static/js need a finger way through drag.js or a listed reason (#4621)
+### Changed
+- The video sign-off is called "Approval" (de "Abnahme") and shows in agency projects and projects without a type, not in software or private projects - also in the project overview; data and API stay videos (#4765)
+### Fixed
+- Taking a share back in the file store's dialog on a table or knowledge page now ends its share card (revoked_at) and keeps the row in obj_revoked, so an older version cannot reopen it (#4778)
+- Tests: seven test files ended with a bare done() and never turned red; run_all.sh counts an "N failed" summary as red and a lint rejects a bare done() (#4950)
+
+Package 2.593.0 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), GitHub-Umbau Schritt 3: CI für die Merge-Queue vor).
+
+### Added
+- Settings > Account: "Reset settings…" shows a preview of the look and comfort settings that differ from the default (look, density, sidebar, start view, view options, notifications, modules, saved filters, workspace colours), resets them on the server and on this device, and offers one undo; account, sign-in, language and organisation / office settings stay; push channel and "title only" stay; agents and API tokens cannot call it (#4590)
+- Travel expenses: the per diem rates abroad of 2023 and 2024 (BMF letters of 23.11.2022 and 21.11.2023), so trips of these years are calculated; 2022 and earlier still show the note (#4893)
+- CI: the merge_group trigger (merge queue entries run the push stage against the queue's base, the release commit the full run) and the job "Pull request lint" (tools/pr_lint.py: task number in every commit subject, changelog part of an app change, privacy guard with the patterns from the repository secrets, one-way steps as warnings; the script runs from the base commit) (#4006)
+
+### Changed
+- Office year pickers (travel expenses, entertainment receipts, logbook, cash book, bookkeeping, VAT return, tax forms) list the years with data: from the oldest year up to this year without gaps, later years only with data in them; without data only this year (bookkeeping: also last year); the mileage allowance keeps next year for a rate in advance (#4891)
+
+### Fixed
+- Undoing an account import keeps documents that were imported as finalised, with their client, positions, payments, log, PDF / XML and the office's number counters; the undo preview names them under "stays" (#4864)
+
+### Security
+- Invitations no longer tell whether an address has an account: in a company someone created themselves, an account the inviting admin may not see gets a silent invitation (same answer and list row, no message, cannot be accepted); locked accounts and agents likewise; the daily invitation limit counts before the address lookup; the list shows every address in small letters with a reference of one length, an organisation admin's invitation mail goes through the background queue; a resend turns a silent invitation into an ordinary one once the admin may see the person; back to an older version: delete the silent invitations first (kalmido/core/migrations.d/3570_a.py) (#3570)
+
 ## [2.626.0] - 2026-11-07
 
 ### Fixed - main: pg_prepare knows that the second preview column of the documents comes with a later version (CI red of 2.614.0)
@@ -186,7 +228,8 @@ Package 2.582 (Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher),
 
 Not released (the CI of this version was red); its changes are listed under 2.605.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.626.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.629.0...HEAD
+[2.629.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.629.0
 [2.626.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.626.0
 [2.621.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.621.0
 [2.618.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.618.0
