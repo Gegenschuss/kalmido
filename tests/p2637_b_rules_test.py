@@ -84,7 +84,8 @@ W = mklist(A, "Work")
 W2 = mklist(A, "Archive")
 for who, role in ((BOB, "edit"), (CAROL, "admin")):
     check(A.put(B + f"/api/lists/{W}/members", json={"user_id": who, "role": role}).ok, f"setup: member {who} {role}")
-check(A.put(B + f"/api/lists/{W2}/members", json={"user_id": CAROL, "role": "edit"}).ok, "setup: carol may write in Archive")
+for who in (CAROL, BOB):  # everyone who sees Work sees Archive too: carol's rule may move tasks there (tasks.py can_move)
+    check(A.put(B + f"/api/lists/{W2}/members", json={"user_id": who, "role": "edit"}).ok, f"setup: {who} may write in Archive")
 TODO, REVIEW = section(A, W, "To do"), section(A, W, "Review")
 OLD = section(A, W2, "Old")
 TAG = A.post(B + f"/api/lists/{W}/tags", json={"name": "urgent"}).json()["id"]
