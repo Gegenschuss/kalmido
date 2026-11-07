@@ -11,6 +11,7 @@
 const {execFileSync} = require('child_process');
 const path = require('path');
 const {boot, sleep, B, login, idle, undoToast} = require('./boot');
+const settleW = w => idle(w, {quiet: 50});  // 2.641.0 (#4979): wait until the page's requests are done instead of a fixed pause
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const firefox = require('./ff')({tag: 'p2170_ui', check, shots: 'P2170_SHOTS', prefs: [['widget.gtk.overlay-scrollbars.enabled', true], ['ui.useOverlayScrollbars', 1]]});
@@ -57,10 +58,10 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   // ================= jsdom: #475 the dashboard
   let w = await boot({user: 'alice', hash: 'today', ls: {'tasks.newsBundle': null}}), d = w.document;
   // 2.138.2 (#2392): the logo left the sidebar -- the account menu (picture next to the search) has "Start"
-  click(w, d.querySelector('#kbar .kbacct')); await sleep(200);  // 2.152.3 (#2619): the account moved from the bottom of the bar into the head bar
+  click(w, d.querySelector('#kbar .kbacct')); await settleW(w);  // 2.152.3 (#2619): the account moved from the bottom of the bar into the head bar
   const logo = [...d.querySelectorAll('#pop [role="menuitem"]')].find(b => (b.querySelector('.ml') || b).textContent.trim() === 'Start');
   check(!!logo, '#475: the account menu opens the dashboard ("Start")');
-  click(w, logo); await sleep(600);
+  click(w, logo); await settleW(w);
   check(w.location.hash === '#home' && d.querySelector('#top h1')?.textContent.includes('Start'), '#475: #home, titled Start (2.25.0)');
   await until(() => d.querySelector('.dcard.dc-news .hpnl li'));  // 2.45.0 (#1504): News compact, one line per bundle
   const cards = [...d.querySelectorAll('.dgrid .dcard')].map(c => [...c.classList].find(x => x.startsWith('dc-')));
@@ -77,21 +78,21 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   check(await until(async () => (await call('GET', '/api/state')).tasks.find(t => t.id === T[2])?.status === 2), 'a task completes right from the card');
   await call('POST', `/api/tasks/${T[2]}/reopen`);
   // customize
-  click(w, d.querySelector('[data-act="dash-custom"]')); await sleep(200);
+  click(w, d.querySelector('[data-act="dash-custom"]')); await settleW(w);
   const rows = [...d.querySelectorAll('.dcust li')];
   // 2.45.0 (#1504): the default order starts with Today, then Agents, News
   check(rows.length === 10 && rows[0].dataset.k === 'today' && d.activeElement?.closest('.dcust'), 'Customize: every card with ↑ ↓ and a switch, the focus in the list');
-  click(w, d.querySelector('.dcust [data-act="dash-mv"][data-k="agents"][data-d="1"]')); await sleep(300);
+  click(w, d.querySelector('.dcust [data-act="dash-mv"][data-k="agents"][data-d="1"]')); await settleW(w);
   const sw = d.querySelector('.dcust [data-dshow="stats"]'); sw.checked = false; sw.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(300);
   const ds = JSON.parse((await call('GET', '/api/state')).settings.dashboard || '{}');
   check(ds.order[0] === 'today' && ds.order[1] === 'news' && ds.hidden.includes('stats'), '#475: order and hidden cards saved in the settings ' + JSON.stringify(ds));
-  click(w, d.querySelector('[data-act="dash-done"]')); await sleep(300);
+  click(w, d.querySelector('[data-act="dash-done"]')); await settleW(w);
   check(d.querySelector('.dgrid .dcard').classList.contains('dc-today') && !d.querySelector('.dc-stats'), 'Today first now, Statistics hidden');
   w.close();
-  w = await boot({user: 'alice', hash: 'home', mobile: true, ls: {'tasks.newsBundle': null}}); d = w.document; await sleep(400);
+  w = await boot({user: 'alice', hash: 'home', mobile: true, ls: {'tasks.newsBundle': null}}); d = w.document; await settleW(w);
   check(d.querySelector('.dgrid .dcard.dc-today'), '#475: the same order on another device (phone)');
   // the tab bar's "More" menu with the new views in it (Dashboard / Team chat / Notes are no module of MODS)
-  w.eval(`LS.set('tabbar', ['m:tasks', 'm:cal', 'm:habits', 'm:pomo', 'home', 'team', 'news', 'settings']); render()`); await sleep(300);
+  w.eval(`LS.set('tabbar', ['m:tasks', 'm:cal', 'm:habits', 'm:pomo', 'home', 'team', 'news', 'settings']); render()`); await settleW(w);
   let tmErr = null; try { w.eval(`tabsMore(document.querySelector('[data-act="tabs-more"]') || document.body)`); } catch (e) { tmErr = String(e); }
   await sleep(200);
   check(!tmErr && [...d.querySelectorAll('.menu-list button, .menu-list [role=menuitem]')].some(b => /Team chat|Start/.test(b.textContent)), '"More" of the tab bar opens with Dashboard / Team chat in it ' + (tmErr || ''));
@@ -111,9 +112,9 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   check(await until(() => /Marked read/.test(d.getElementById('srlive')?.textContent || '')), 'and that is announced');
   const tog = d.querySelector('[data-act="news-bundle"]');
   check(tog.getAttribute('aria-pressed') === 'true', 'bundled is on by default');
-  click(w, tog); await sleep(200);
+  click(w, tog); await settleW(w);
   check(!d.querySelector('.nbund') && d.querySelector('.nlist .nitem') && w.__store['tasks.newsBundle'] === 'false', '#452: the plain list, per device');
-  click(w, d.querySelector('[data-act="news-bundle"]')); await sleep(200);
+  click(w, d.querySelector('[data-act="news-bundle"]')); await settleW(w);
   // Summarize -> the agent's chat
   click(w, d.querySelector('[data-act="news-sum"]'));
   const msgs = await until(async () => { const j = await call('GET', `/api/agents/${ag.id}/chat`); return (j.messages || []).find(m => /summarise my \d+ unread news/.test(m.body)); });
@@ -127,14 +128,14 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   // 2.27.0 (#986): a channel shows once it has messages; "New message" offers the quiet channels of shared lists
   check(!d.querySelector('.tclist .tcrow'), '#986: no empty channels in the list');
   check(d.querySelector('[data-act="tc-new"]')?.getAttribute('aria-haspopup') === 'menu', 'a "Message…" button for direct messages');
-  click(w, d.querySelector('.tchead [data-act="tc-new"]')); await sleep(200);
+  click(w, d.querySelector('.tchead [data-act="tc-new"]')); await settleW(w);
   const tcm = [...d.querySelectorAll('#pop [role="menuitem"]')];
   check(tcm.some(b => b.textContent.includes('Website')) && !tcm.some(b => b.textContent.includes('Garden')), '#419: the shared project has a channel, the private one not');
   click(w, tcm.find(b => b.textContent.includes('Website'))); await until(() => d.querySelector('#tc-in') && w.eval('!!S.tc.room'));  // 2.24.0: the room's members are loaded (mentions)
   check(d.querySelector('#tc-msgs[role="log"]') && d.querySelector('.tcrhead').textContent.includes('Website'), 'the channel opens with a log and its name');
   const box = d.querySelector('#tc-in');
   type(w, box, 'Hi @Bob, the text is ready');
-  key(w, box, 'Enter', {ctrlKey: true}); await sleep(500);  // 2.94.0 (#2024)
+  key(w, box, 'Enter', {ctrlKey: true}); await settleW(w);  // 2.94.0 (#2024)
   const sent = (await call('GET', `/api/team/rooms/${w.eval('S.tc.rid')}/messages`)).messages.pop();
   check(sent && sent.body === `Hi <@${BOB}>, the text is ready`, '#419: Enter sends, @Bob becomes a mention ' + JSON.stringify(sent?.body));
   check(box.value === '' && d.activeElement === box, 'the box is empty and keeps the focus');
@@ -152,18 +153,18 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   click(w, bm.querySelector('.rxrow [data-e="heart"]'));  // 2.18.0 (#651): visible, one tap
   check(await until(() => d.querySelector('#tc-msgs .cmsg.ag .chrx .rx.on[data-e="heart"]')), '#419: a reaction');
   const mine = d.querySelector('#tc-msgs .cmsg.me');
-  click(w, mine.querySelector('[data-act="tc-msg-menu"]')); await sleep(80);
-  click(w, [...d.querySelectorAll('#pop [role="menuitem"]')].find(b => /Edit/.test(b.textContent))); await sleep(100);
+  click(w, mine.querySelector('[data-act="tc-msg-menu"]')); await settleW(w);
+  click(w, [...d.querySelectorAll('#pop [role="menuitem"]')].find(b => /Edit/.test(b.textContent))); await settleW(w);
   const ed = d.querySelector('#tc-msgs .tc-edit');
   check(ed && ed.value.includes('@Bob'), 'edit shows the text with @Bob');
   ed.value = 'Hi @Bob, the text is ready now'; key(w, ed, 'Enter', {ctrlKey: true});  // 2.94.0 (#2024)
   check(await until(async () => (await call('GET', `/api/team/rooms/${RID}/messages`)).messages.find(m => m.id === sent.id)?.edited_at), '#419: edited (Enter saves)');
   check(await until(() => /edited/.test(d.querySelector('#tc-msgs .cmsg.me .cmeta')?.textContent || '')), 'marked "edited"');
   // mute
-  click(w, d.querySelector('[data-act="tc-mute"]')); await sleep(300);
+  click(w, d.querySelector('[data-act="tc-mute"]')); await settleW(w);
   check(d.querySelector('[data-act="tc-mute"]').getAttribute('aria-pressed') === 'true', '#419: mute (pressed)');
   // DM via the menu
-  click(w, d.querySelector('[data-act="tc-new"]')); await sleep(80);
+  click(w, d.querySelector('[data-act="tc-new"]')); await settleW(w);
   click(w, [...d.querySelectorAll('#pop [role="menuitem"]')].find(b => /Bob/.test(b.textContent)));
   check(await until(() => w.eval('S.tc.room?.kind') === 'dm'), '#419: "Message…" > Bob opens the direct conversation');
   await call('POST', `/api/team/rooms/${w.eval('S.tc.rid')}/messages`, {body: 'Coffee later?'});
@@ -174,8 +175,8 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   await until(() => d.querySelector('#srail [data-sbb="team"]'));
   const tr0 = d.querySelector('#srail [data-sbb="team"]');
   check(tr0 && /\d/.test(tr0.querySelector('.srbd')?.textContent || ''), '#419: the sidebar row with the unread count');
-  w.eval(`go('l/${L}')`); await sleep(300);
-  w.eval(`menu(document.querySelector('#top h1'), listMenuItems(${L}, document.querySelector('#top h1')))`); await sleep(80);
+  w.eval(`go('l/${L}')`); await settleW(w);
+  w.eval(`menu(document.querySelector('#top h1'), listMenuItems(${L}, document.querySelector('#top h1')))`); await settleW(w);
   const lm = [...d.querySelectorAll('#pop [role="menuitem"]')].map(b => b.textContent.trim());
   check(lm.some(x => x.startsWith('Notes')) && lm.includes('Team chat'), '#442 #419: the list menu has Notes and Team chat ' + lm.join('|'));
   w.eval('closePop()'); w.close();
@@ -196,7 +197,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   type(w, d.querySelector('#nt-body'), `## Decisions\n- go live in May\n- see #${T[0]}`);
   d.querySelector('#nt-body').dispatchEvent(new w.FocusEvent('focusout', {bubbles: true}));
   check(await until(async () => { const n = await call('GET', `/api/notes/${NID}`); return n.title === 'Kick-off' && n.tags.join() === 'client,plan' && n.body.includes('go live'); }), '#442: typing saves by itself (title, tags, text)');
-  click(w, d.querySelector('[data-act="nt-mode"][data-m="read"]')); await sleep(200);
+  click(w, d.querySelector('[data-act="nt-mode"][data-m="read"]')); await settleW(w);
   const md = d.querySelector('#nt-md');
   check(md.querySelector('h4, h3, h5')?.textContent === 'Decisions' && md.querySelector(`a.tref[href="#t/${T[0]}"]`)?.textContent.includes('Write the homepage text'), '#442: Markdown with #123 as a task link');
   check(d.querySelector('.ntcard.on')?.textContent.includes('Kick-off'), 'the list of notes shows it');
@@ -205,22 +206,22 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   { const q = d.querySelector('#nt-q'); q.focus(); type(w, q, 'k'); await sleep(50);
     // CI red of 2.618.0: since 2.602.0 (#4817) the field sits in the panel #side; a page redraw while typing (the load after
     // the note's save, the poll - on the slower CI it landed here) drew the panel again and took the field away. Here on purpose
-    w.eval('renderView()'); await sleep(80);
+    w.eval('renderView()'); await settleW(w);
     type(w, d.querySelector('#nt-q'), 'kick'); await sleep(50);
     check(d.activeElement === q && q.isConnected && q.value === 'kick' && d.querySelectorAll('.ntcard').length === 1, 'notes search: the field keeps the focus while typing');
     type(w, q, 'zzzz'); await sleep(50);
     check(d.activeElement === q && /No notes match/.test(d.querySelector('#nt-res')?.textContent || ''), 'notes search: no match, the field still focused');
     type(w, q, ''); await sleep(50); }
   // the overview, the palette
-  w.eval(`go('l/${L}')`); await sleep(200);
-  w.eval(`S.pov.add(${L}); render()`); await sleep(600);
+  w.eval(`go('l/${L}')`); await settleW(w);
+  w.eval(`S.pov.add(${L}); render()`); await settleW(w);
   check(d.querySelector('.povnotes a[href="#note/' + NID + '"]'), '#442: the project overview lists the note');
   w.eval('openPalette()'); type(w, d.querySelector('.palette .pqin'), 'kick'); await until(() => !w.eval('PAL.tq'));  // 2.579.0 (#4199): the search after the pause in typing
   check([...d.querySelectorAll('.palette .pitem')].some(b => /Kick-off/.test(b.textContent) && /note/.test(b.textContent)), '#442: the command field finds notes');
   w.eval('closePalette()');
   // delete + Undo
-  w.eval(`go('note/${NID}')`); await sleep(300);
-  click(w, d.querySelector('[data-act="nt-menu"]')); await sleep(80);
+  w.eval(`go('note/${NID}')`); await settleW(w);
+  click(w, d.querySelector('[data-act="nt-menu"]')); await settleW(w);
   click(w, [...d.querySelectorAll('#pop [role="menuitem"]')].find(b => /Delete/.test(b.textContent)));
   check(await until(async () => (await call('GET', `/api/notes/${NID}`)).status === 404), '#442: delete');
   await sleep(150); check(d.activeElement?.id === 'nt-q', 'after Delete the focus is in the notes (search field)');
@@ -236,7 +237,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   w.close();
   w = await boot({user: 'alice', hash: 'note/' + NN}); d = w.document;
   await until(() => d.querySelector('#nt-title'));
-  click(w, d.querySelector('[data-act="nt-mode"][data-m="edit"]')); await sleep(200);
+  click(w, d.querySelector('[data-act="nt-mode"][data-m="edit"]')); await settleW(w);
   await sleep(1100);
   await call('PATCH', `/api/notes/${NN}`, {body: 'Bob rewrote it'}, CB);
   w.__dialogs = 'manual';
@@ -250,14 +251,14 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
 
   // ================= jsdom: #443 Settings
   w = await boot({user: 'alice', hash: 'today'}); d = w.document;
-  w.eval(`settingsModal('integr')`); await sleep(600);
+  w.eval(`settingsModal('integr')`); await settleW(w);
   check(d.querySelector('#s-mail-h') && /Not set up on this server/.test(d.querySelector('#s-mail')?.textContent || ''), '#443: Tasks by e-mail: not set up here, says how');
-  w.eval(`[...document.querySelectorAll('.modal')].forEach(m => m.remove()); settingsModal('notify')`); await sleep(600);
+  w.eval(`[...document.querySelectorAll('.modal')].forEach(m => m.remove()); settingsModal('notify')`); await settleW(w);
   check(/not set up on this server/.test(d.querySelector('#s-digmail-w')?.textContent || ''), '#443: the summary by e-mail: not set up here');
   w.close();
 
   // ================= German
-  w = await boot({user: 'carol', hash: 'home'}); d = w.document; await sleep(400);
+  w = await boot({user: 'carol', hash: 'home'}); d = w.document; await settleW(w);
   check(d.querySelector('#top h1')?.textContent.includes('Start'), 'German: the dashboard title');
   // 2.43.0 (#1452): the button is a small icon now (the blocks are changed at their "…" menu); its name says it
   check(d.querySelector('[data-act="dash-custom"]')?.getAttribute('aria-label') === 'Kacheln ordnen…', 'German: Kacheln ordnen…');  // 2.364.0 C (#3044): everyday words
