@@ -268,6 +268,7 @@ def op_rsvp(c, uid, eid, b):
     ps = b.get("partstat")
     if ps not in EV_PARTSTAT:
         raise BadInput(tr("Invalid value: {0}", "partstat"))
+    r = ev_lock(c, eid)  # 2.638.0 (#4780): the answer under the event's lock like every other write (web, API, CalDAV)
     if not c.execute("UPDATE event_attendees SET partstat=? WHERE event_id=? AND user_id=?", (ps, eid, uid)).rowcount:
         raise Denied(409, tr("You are not invited to this event"))
     c.execute("UPDATE events SET updated_at=? WHERE id=?", (iso_ms(now_utc()), eid))

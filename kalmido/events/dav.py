@@ -495,7 +495,7 @@ def _rsvp_mine(u, raw):
 def _rsvp_member(c, u, coll, name, missing=403):
     """(row, etag) of an invitation the person answers, or DavError 403 like before (read-only, no new objects);
     a DELETE of an unknown invitation gets 404 (review 2.155.0), so the device stops repeating it."""
-    have = member_now(c, u, coll, name)
+    have = member_now(c, u, coll, name, lock=True)  # 2.638.0 (#4780): the resource's lock, then the event's (as PUT / DELETE)
     if not have and missing == 404:
         raise DavError(404, "Not found")
     if not have or not c.execute("SELECT 1 FROM event_attendees WHERE event_id=? AND user_id=?", (have[0]["id"], u["id"])).fetchone():
