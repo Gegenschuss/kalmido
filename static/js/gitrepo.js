@@ -286,3 +286,5 @@ function gsy_actText(kind, d) {
   return (d.side === 'repo' ? tr('Conflict with {0} ({1}): the change here was newer. The version in the repository was: {2}', q(d.gsy || ''), esc(f), q(v || '–'))
     : tr('Conflict with {0} ({1}): the change in the repository was newer. The version here was: {2}', q(d.gsy || ''), esc(f), q(v || '–'))) + when;
 }
+// 2.620.0 (#4616): a long press (phone) / right click (computer) opens the row's "…" menu: the click on its button, which the click guard of the press lets through (st.done = 0 for that one click)
+let rp_lpS; if (typeof cm_bind === 'function') rp_lpS = cm_bind('.reporow', r => { const b = lm_btn(r, '[data-rp="menu"]'); if (!b) return false; const d = rp_lpS.done; rp_lpS.done = 0; b.click(); rp_lpS.done = d; return true; }, null, lm_keep);

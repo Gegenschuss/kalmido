@@ -118,3 +118,5 @@ document.addEventListener('error', e => {
   if (img?.tagName !== 'IMG' || !img.closest?.('.abcf .dc-th')) return;
   img.outerHTML = `<span class="dc-ph">${ic('picture')}</span>`;
 }, true);
+// 2.620.0 (#4616): a long press (phone) / right click (computer) opens the row's "…" menu: the click on its button, which the click guard of the press lets through (st.done = 0 for that one click)
+let abd_lpS; if (typeof cm_bind === 'function') abd_lpS = cm_bind('.abcards .dc-card', r => { const b = lm_btn(r, '[data-ab="menu"]'); if (!b) return false; const d = abd_lpS.done; abd_lpS.done = 0; b.click(); abd_lpS.done = d; return true; }, null, lm_keep);

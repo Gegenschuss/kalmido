@@ -277,3 +277,5 @@ document.addEventListener('click', e => {
   if (b.dataset.hbma === 'copy') hbm_addr(key, ws, false);
   else if (b.dataset.hbma === 'menu') hbm_addrMenu(b, key, ws);
 });
+// 2.620.0 (#4616): a long press (phone) / right click (computer) opens the row's "…" menu: the click on its button, which the click guard of the press lets through (st.done = 0 for that one click)
+let hbm_lpS; if (typeof cm_bind === 'function') hbm_lpS = cm_bind('#view .hbmspaces .hbmsp', r => { const b = lm_btn(r, '[data-hbma="menu"]'); if (!b) return false; const d = hbm_lpS.done; hbm_lpS.done = 0; b.click(); hbm_lpS.done = d; return true; }, null, lm_keep);

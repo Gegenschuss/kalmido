@@ -86,3 +86,5 @@ function whiMount(md, l) {
       }}]);
   });
 }
+// 2.620.0 (#4616): a long press (phone) / right click (computer) opens the row's "…" menu: the click on its button, which the click guard of the press lets through (st.done = 0 for that one click)
+let whi_lpS; if (typeof cm_bind === 'function') whi_lpS = cm_bind('.whi-row', r => { const b = lm_btn(r, '[data-whi-menu]'); if (!b) return false; const d = whi_lpS.done; whi_lpS.done = 0; b.click(); whi_lpS.done = d; return true; }, null, lm_keep);

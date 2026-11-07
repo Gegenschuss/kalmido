@@ -190,3 +190,6 @@ document.addEventListener('click', e => {
   if (a.dataset.shf === 'new') shvNew(null, f.id);
   else if (a.dataset.shf === 'fmenu') menu(a, shf_menuItems('f' + f.id).filter(Boolean), null, null, f.name);
 });
+// 2.620.0 (#4616): a long press (phone) / right click (computer) opens the row's "…" menu: the click on its button, which the click guard of the press lets through (st.done = 0 for that one click)
+// the whole folder card is a link, so only a selection keeps the browser's menu
+let shf_lpS; if (typeof cm_bind === 'function') shf_lpS = cm_bind('.shfcard', r => { const b = lm_btn(r, '[data-shf="fmenu"]'); if (!b) return false; const d = shf_lpS.done; shf_lpS.done = 0; b.click(); shf_lpS.done = d; return true; }, null, (e, r) => { const s = getSelection?.(); return !!s && !s.isCollapsed && r.contains(s.anchorNode); });

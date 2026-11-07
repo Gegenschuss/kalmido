@@ -109,3 +109,5 @@ Object.assign(AB_ACT, {frq_upload: N_('received through a file request'), frq_cr
 NOTIF_ROWS.push(['filereq', N_('Files from file requests'), N_('a client uploaded files through your link (one message per link every 10 minutes at most)')]);
 NM_NEWS_NEW.filereq = 1; NM_PUSH.filereq = 1;
 NEWS_ICON.filereq = 'upload';
+// 2.620.0 (#4616): a long press (phone) / right click (computer) opens the row's "…" menu: the click on its button, which the click guard of the press lets through (st.done = 0 for that one click)
+let frq_lpS; if (typeof cm_bind === 'function') frq_lpS = cm_bind('.frq-row', r => { const b = r.querySelector('[data-frq="menu"]'); if (!b) return false; const d = frq_lpS.done; frq_lpS.done = 0; b.click(); frq_lpS.done = d; return true; }, null, lm_keep);
