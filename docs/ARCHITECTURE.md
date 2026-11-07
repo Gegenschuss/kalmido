@@ -544,6 +544,13 @@ row, list)` saves with the same code as the arrows. `rowd_arrows` keeps the arro
 them out on a touch screen (no hover). Used by quotation positions and parts, form questions, budget categories, the
 arrangements, sidebar views, key links, scanned pages and the phone list of "Arrange blocks".
 
+2.623.0 (#4621): what the mouse drags, the finger drags too. `tests/p2623_e_touchdrag_coverage_test.py` finds every place
+in `static/js` a mouse drag starts from (`draggable="true"`, `dragstart`) and needs its finger way in `TD_SITES`: through
+`drag.js`, an own touch path that still moves onto it (with its task), no way yet (with its task) or a reason why none is
+needed. A new drag place without an entry turns the run red. The sheet tabs (`sheetbook.js`) and the groups of My tasks
+(`basket.js`) moved onto `drg_attach` (hold, drag; held without moving = the tap / the order menu); the mouse keeps the
+browser's drag there.
+
 2.193.0 C (#2219): task rows and chips (`dnd.js`, list / board / matrix / calendar, the selection's grip) drag by finger
 on `drg_attach`: the long press is `hold` (0.38 s, 8 px; 0 on the grip), `onHold` lifts the row at once (ghost, "Move to
 project", from then on the page does not scroll under the finger), let go without moving = `onTap` (select / "Move to
