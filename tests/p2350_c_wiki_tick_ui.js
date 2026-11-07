@@ -2,8 +2,8 @@
 // 2.350.0 C (#3148) UI tests (own container, start.sh), jsdom: checkboxes of a knowledge page tick in read mode.
 // - a click writes [x] / [ ] into the line it belongs to (code blocks do not count) and saves it like a typed change;
 //   quick clicks one after the other all arrive (no conflict); a change by someone else meanwhile asks (conflict dialog)
-// - a line with #123 ticks the task along (done / reopened); a task done elsewhere shows its line ticked (the text stays)
-// - right click on a line: "Create as task" (the list dialog), the line then ends with #<id>
+// - a line with [[#123]] ticks the task along (done / reopened); a task done elsewhere shows its line ticked (the text stays)
+// - right click on a line: "Create as task" (the list dialog), the line then ends with [[#<id>]] (2.619.0, #4947)
 // - without the right to write the page (a read-only member of an organisation) the checkboxes stay disabled
 // freelancer-matrix: wiki (the private workspace of a person without an organisation)
 const path = require('path');
@@ -96,7 +96,8 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   const ok1 = await until(() => d.querySelector('.modal.wemdlg [data-m="ok"]'));
   check(ok1, '… the dialog with the list choice');
   ok1?.click();
-  check(await until(async () => /^- \[ \] Order paper #\d+/.test(await body())), 'the line ends with the new task\'s #id ' + JSON.stringify(await body()));
+  // 2.619.0 (#4947): a task link in a page is [[#N]], a bare #N stays text
+  check(await until(async () => /^- \[ \] Order paper \[\[#\d+\]\]/.test(await body())), 'the line ends with the new task\'s [[#id]] ' + JSON.stringify(await body()));
   await idle(w);
   w.close();
 
