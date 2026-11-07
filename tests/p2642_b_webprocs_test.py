@@ -72,7 +72,10 @@ A.post(B + "/api/admin/setup", json={"lang": "en", "collab_all": True})
 
 # ================================================================== two processes on one port
 def health():
-    r = requests.get(B + "/api/admin/health", headers=H, cookies=A.cookies)  # a new connection each time
+    try:
+        r = requests.get(B + "/api/admin/health", headers=H, cookies=A.cookies, timeout=30)  # a new connection each time
+    except requests.ConnectionError:  # a connection queued at a process killed on purpose goes with it: not there (yet)
+        return {}
     return r.json() if r.ok else {}
 
 
