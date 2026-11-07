@@ -17308,5 +17308,8 @@
   "Comes into {0} → mark as done": "Arriva in {0} → segna come fatta",
   "Select a column": "Scegli una colonna",
   "Select a tag": "Scegli un tag",
-  "Select a person": "Scegli una persona"
+  "Select a person": "Scegli una persona",
+  "Daily limit": "Limite giornaliero",
+  "Proposed with the first key: the agent pauses for the day once its runs used this many tokens, also the runs other people start through chat, mentions or assignments. Empty = no limit.": "Proposto con la prima chiave: l’agente si ferma per la giornata appena le sue esecuzioni hanno usato questi token, anche quelle che altre persone avviano tramite chat, menzioni o assegnazioni. Vuoto = nessun limite.",
+  "No usage limit: every run, also those other people start through chat, mentions or assignments, is billed to this key without a cap. Set one under “Usage limit” in the agent’s settings.": "Nessun limite di utilizzo: ogni esecuzione, anche quelle che altre persone avviano tramite chat, menzioni o assegnazioni, va su questa chiave senza tetto. Impostane uno in «Limite di consumo» nelle impostazioni dell’agente."
 }

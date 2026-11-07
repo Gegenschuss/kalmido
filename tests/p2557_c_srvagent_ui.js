@@ -9,6 +9,8 @@
 // - the instance switch off (server_agents_off): the dialog says so and offers no Create
 // Everything real: part B's routes (/api/agents/<id>/server, …/models, …/runs) and a run, against tests/fake_anthropic.py (the
 // stand-in for the provider inside the test container, as p2557_b_srvagent_test.py); the window only records what it sent.
+// - 2.638.0 (#4714): the dialog proposes a day limit of 2 million tokens with the first key (sent as day_limit, stored as the hard day
+//   limit); with a limit the settings show nothing more, a key without one shows the hint "No usage limit"
 // - the same for a person without an organisation (freelancer-matrix: agents)
 const path = require('path');
 const {execFileSync} = require('child_process');
@@ -64,6 +66,8 @@ async function scenario(tag, user, ck) {
   check(md.querySelector('#srv-key').type === 'password', 'the key is a password field' + T);
   check(md.querySelector('#srv-model').value === 'claude-sonnet-5-5', 'the default model' + T);
   check(/outside Kalmido/.test(md.querySelector('#srv-ins').value), 'the instructions: Kalmido only' + T);
+  // 2.638.0 (#4714): a day limit is proposed with the first key (2 million tokens), visible and changeable
+  check(md.querySelector('#srv-daylim')?.value === '2000000' && /pauses for the day/.test(md.textContent), 'the proposed day limit: 2 million tokens' + T);
   const ticks = [...md.querySelectorAll('[data-srv-st]')];
   // 2.568.0 (#4673): + the office tick, off by default (it needs the agent's office rights)
   check(ticks.length === 6 && ticks.filter(x => x.dataset.srvSt !== 'office').every(x => x.checked) && !md.querySelector('[data-srv-st="office"]').checked
@@ -76,13 +80,15 @@ async function scenario(tag, user, ck) {
   md.querySelector('#srv-key').value = 'sk-test-ui-0000abcd';
   md.querySelector('[data-srv-st="tidy"]').checked = false;
   md.querySelector('#srv-fdays').value = '3';
+  md.querySelector('#srv-daylim').value = '1500000';  // 2.638.0 (#4714): changed in the dialog
   click(w, md.querySelector('[data-m="srv-ok"]'));
   const ag = await until(async () => ((await call('GET', '/api/my/agents', null, ck)).agents || []).find(a => a.username === un));
   check(ag && ag.provider === 'kalmido-server', 'the agent is created with provider kalmido-server' + T);
   if (!ag) { w.close(); return; }
   const put = await until(() => log.find(x => x.method === 'PUT' && x.url.endsWith(`/api/agents/${ag.id}/server`)));
-  check(put && put.body.api_key === 'sk-test-ui-0000abcd' && put.body.model === 'claude-sonnet-5-5' && put.body.provider === 'anthropic' && /Kalmido/.test(put.body.instructions),
-    'PUT …/server with key, model and instructions' + T);
+  // 2.638.0 (#4714): + the day limit of the dialog
+  check(put && put.body.api_key === 'sk-test-ui-0000abcd' && put.body.model === 'claude-sonnet-5-5' && put.body.provider === 'anthropic' && /Kalmido/.test(put.body.instructions)
+    && put.body.day_limit === 1500000, 'PUT …/server with key, model, instructions and the day limit' + T);
   const plans = await until(async () => { const p = (await call('GET', `/api/agents/${ag.id}/schedules`, null, ck)).data || []; return p.length >= 2 && p; });
   check(plans && plans.length === 2 && plans.some(p => p.title === 'Morning briefing') && plans.some(p => p.title === 'Follow up' && /3 days/.test(p.prompt)) && !plans.some(p => p.action === 'triage'),
     'the starter pack: only the ticked plans (briefing, follow-up after 3 days, no basket)' + T);
@@ -93,6 +99,7 @@ async function scenario(tag, user, ck) {
   const sv = await call('GET', `/api/agents/${ag.id}/server`, null, ck);
   check(sv.has_key && sv.key_hint === '…abcd' && sv.model === 'claude-sonnet-5-5' && /outside Kalmido/.test(sv.instructions) && !JSON.stringify(sv).includes('0000abcd'),
     'stored: the key only as its last four characters, model and instructions' + T);
+  check(sv.limits && sv.limits.period === 'day' && sv.limits.metric === 'tokens' && sv.limits.hard === 1500000, 'stored: the hard day limit of the dialog ' + JSON.stringify(sv.limits) + T);
   // a real run: a chat message, the stand-in answers
   await call('POST', `/api/agents/${ag.id}/chat`, {body: 'Hello'}, ck);
   const runs = await until(async () => { const r = (await call('GET', `/api/agents/${ag.id}/server/runs`, null, ck)).runs || []; return r.some(x => x.state === 'done') && r; }, 400);
@@ -105,6 +112,7 @@ async function scenario(tag, user, ck) {
     click(w, sb);
     const ed = await until(() => lastModal(d)?.querySelector('#srv-keyhint') && lastModal(d));
     check(ed && ed.querySelector('#srv-keyhint').textContent === '…abcd' && ed.querySelector('#srv-keyrow').hidden, 'only the last four characters, no key field' + T);
+    check(ed && !ed.querySelector('#srv-daylim') && !ed.querySelector('.srvnolim'), 'with a limit: no proposal, no hint (2.638.0, #4714)' + T);
     const opts = await until(() => ed && ed.querySelectorAll('#srv-model option').length === 3 && ed.querySelectorAll('#srv-model option'));
     check(opts && ed.querySelector('#srv-model').value === 'claude-sonnet-5-5', 'the models of the provider, the current one chosen' + T);
     const run = await until(() => ed && ed.querySelector('.srvrun'));
@@ -123,6 +131,13 @@ async function scenario(tag, user, ck) {
       const sv2 = await call('GET', `/api/agents/${ag.id}/server`, null, ck);
       check(sv2.key_hint === '…wxyz' && sv2.model === 'claude-haiku-5-5', 'stored: the new key and model' + T);
       click(w, ed.querySelector('[data-m="close"]'));
+      // 2.638.0 (#4714): a key without a limit: the dialog says so (and proposes nothing: the key is there)
+      check((await call('PATCH', `/api/my/agents/${ag.id}`, {limits: null}, ck)).status === 200, 'setup: the owner lifts the limit' + T);
+      click(w, sb);
+      const ed2 = await until(() => lastModal(d)?.querySelector('#srv-keyhint') && lastModal(d));
+      check(ed2 && ed2.querySelector('.srvnolim') && /No usage limit/.test(ed2.querySelector('.srvnolim').textContent) && !ed2.querySelector('#srv-daylim'),
+        'a key without a limit: the hint, no proposal' + T);
+      if (ed2) click(w, ed2.querySelector('[data-m="close"]'));
     }
   }
   w.close();

@@ -67,13 +67,24 @@ function srv_fieldsHtml(j, isNew) {
       <div class="row" id="srv-keyrow" hidden><label for="srv-key">${tr('New API key')}</label><input id="srv-key" type="password" autocomplete="off" spellcheck="false" autocapitalize="off" maxlength="300"></div>`
     : `<div class="row"><label for="srv-key">${tr('API key')}</label><input id="srv-key" type="password" autocomplete="off" spellcheck="false" autocapitalize="off" maxlength="300" placeholder="sk-ant-…"></div>`;
   const model = j.model || j.default_model || '';
+  // 2.638.0 (#4714): without limits a day limit is proposed with the first key (kept = the agent's hard day limit); a key that is there: a hint
+  const limRow = j.limits ? '' : isNew || !j.has_key
+    ? `<div class="row"><label for="srv-daylim">${tr('Daily limit')}</label><input id="srv-daylim" type="number" inputmode="numeric" class="numin" min="1" step="1" value="${+j.day_limit_default || 2000000}"><span class="muted">${tr('tokens')}</span></div>
+      <div class="shint keep">${esc(tr('Proposed with the first key: the agent pauses for the day once its runs used this many tokens, also the runs other people start through chat, mentions or assignments. Empty = no limit.'))}</div>`
+    : `<div class="shint keep srvnolim" role="note">${ic('alert', 's')} ${esc(tr('No usage limit: every run, also those other people start through chat, mentions or assignments, is billed to this key without a cap. Set one under “Usage limit” in the agent’s settings.'))}</div>`;
   return `<div class="row"><label for="srv-prov">${tr('Provider')}</label><select id="srv-prov"><option value="anthropic" selected>Anthropic (Claude)</option></select></div>
     ${keyRow}
     <div class="shint keep">${esc(tr('Your own key of the provider; its usage is billed to you by the provider. Kalmido stores it encrypted and never shows it again, only its last four characters.'))}</div>
+    ${limRow}
     <div class="row"><label for="srv-model">${tr('Model')}</label><select id="srv-model"><option value="${esc(model)}" selected>${esc(model)}</option></select></div>
     <div class="shint keep" id="srv-modelhint">${esc(isNew ? tr('The list of models comes from the provider once the key is saved; you can change the model later in the agent’s settings.') : tr('Loading…'))}</div>
     <div class="row"><label for="srv-ins">${tr('Instructions')}</label><textarea id="srv-ins" rows="7" maxlength="20000">${esc(j.instructions || j.default_instructions || '')}</textarea></div>
     <div class="shint keep">${esc(tr('Like a CLAUDE.md: how it works for you. It only uses the Kalmido tools within its permissions; no web, no terminal, no other services.'))}</div>`;
+}
+// 2.638.0 (#4714): the proposed day limit of the dialog ({} = none shown or emptied; the server takes it only with a first key)
+function srv_limBody(md) {
+  const v = $('#srv-daylim', md)?.value.trim() || '';
+  return v ? {day_limit: Math.round(+v)} : {};
 }
 // fills the model choice live from the provider (409 no_key: only the current one stays)
 async function srv_modelsFill(md, aid, cur) {
@@ -132,7 +143,7 @@ async function srv_newModal(o = {}) {
     } catch (x) { show(x.message); b.disabled = false; return; }
     // the agent exists from here on: a later step that fails is said, the agent stays (its settings open again from its row)
     const fails = [];
-    try { await calReq('PUT', `/api/agents/${r.id}/server`, {provider: $('#srv-prov', md).value, model: $('#srv-model', md).value, instructions: $('#srv-ins', md).value, api_key: key}); }
+    try { await calReq('PUT', `/api/agents/${r.id}/server`, {provider: $('#srv-prov', md).value, model: $('#srv-model', md).value, instructions: $('#srv-ins', md).value, api_key: key, ...srv_limBody(md)}); }
     catch (x) { fails.push(tr('Server settings: {0}', x.message)); }
     if (!fails.length && items.length) {
       try {
@@ -194,7 +205,7 @@ async function srv_editModal(a, notes) {
         const key = $('#srv-key', md)?.value.trim() || '';
         b.disabled = true; show('');
         const fm = srv_flowsBody(md), fw = srv_webBody(md);  // 2.565.0 D (#4674); 2.571.0 D (#4676)
-        await calReq('PUT', `/api/agents/${a.id}/server`, {provider: $('#srv-prov', md).value, model: $('#srv-model', md).value, instructions: $('#srv-ins', md).value, ...(key ? {api_key: key} : {}), ...(fm ? {flow_models: fm} : {}), ...(fw ? {flow_web: fw} : {})});
+        await calReq('PUT', `/api/agents/${a.id}/server`, {provider: $('#srv-prov', md).value, model: $('#srv-model', md).value, instructions: $('#srv-ins', md).value, ...(key ? {api_key: key, ...srv_limBody(md)} : {}), ...(fm ? {flow_models: fm} : {}), ...(fw ? {flow_web: fw} : {})});
         toast(tr('Saved')); await draw();
       }
     } catch (x) { show(x.message); } finally { b.disabled = false; }

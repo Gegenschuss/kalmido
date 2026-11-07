@@ -62,6 +62,9 @@ SRV_STARTER = ("briefing", "tidy", "docs", "meetings", "followup", "office")  # 
 # docs is no routine of its own here: a new document starts no run of a server agent (srvagent_run.py SRV_TRIGGERS).
 SRV_FLOWS = ("briefing", "tidy", "meetings", "followup")
 SRV_FOLLOWUP_DAYS = 5
+# 2.638.0 (#4714): the daily limit in tokens the dialog proposes with the first key of an agent without limits (Fable 2.557 F7:
+# everyone who reaches a server agent starts runs on its owner's key); stored as the agent's hard day limit when kept
+SRV_DAY_LIMIT_DEFAULT = 2_000_000
 SRV_FOLLOWUP_MAX = 60
 SRV_BRIEF_AT, SRV_TIDY_AT, SRV_FOLLOWUP_AT = "07:30", "07:00", "09:00"
 SRV_OFFICE_AT, SRV_OFFICE_DAYS = "08:00", [1]  # 2.568.0 (#4673): weekly on Mondays (ISO weekday 1)
@@ -252,7 +255,8 @@ def srv_defaults():
             ws.append({"key": f"org:{oid}", "name": nm[0] if nm else ""})
     return jsonify(docs_scopes=ws, enabled_instance=not srv_off(c), provider=SRV_PROVIDER, default_name=tr(SRV_DEFAULT_NAME),
                    default_model=SRV_DEFAULT_MODEL, default_instructions=tr(SRV_DEFAULT_INSTRUCTIONS),
-                   starter=list(SRV_STARTER), flows=list(SRV_FLOWS), followup_days=SRV_FOLLOWUP_DAYS, followup_max=SRV_FOLLOWUP_MAX)
+                   starter=list(SRV_STARTER), flows=list(SRV_FLOWS), followup_days=SRV_FOLLOWUP_DAYS, followup_max=SRV_FOLLOWUP_MAX,
+                   day_limit_default=SRV_DAY_LIMIT_DEFAULT)  # 2.638.0 (#4714)
 
 
 @app.post("/api/agents/<int:aid>/server/starter")

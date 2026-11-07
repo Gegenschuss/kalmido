@@ -43,7 +43,7 @@ import urllib.request
 from flask import g, jsonify, request
 
 from ..core.config import app
-from ..core.pg import system_ctx
+from ..core.pg import system_ctx, write_lock  # 2.638.0 (#4714): write_lock
 from ..core.i18n import N_, tr
 from ..core.db import body, db, err, gsetting, iso, now_utc
 from ..core.access import Denied
@@ -51,7 +51,7 @@ from ..core.errors import BadInput
 from ..core.env import env_int
 from ..accounts.session import me
 from ..accounts.supportgrant import sga_is_support  # 2.557.0 (2nd review)
-from .srvstarter import SRV_DEFAULT_INSTRUCTIONS, SRV_DEFAULT_MODEL, SRV_FLOWS  # 2.557.0: the bridge of the parts is gone
+from .srvstarter import SRV_DAY_LIMIT_DEFAULT, SRV_DEFAULT_INSTRUCTIONS, SRV_DEFAULT_MODEL, SRV_FLOWS  # 2.557.0: the bridge of the parts is gone; 2.638.0 (#4714): + the day limit
 from ..accounts.login import seal, unseal
 from ..accounts.orgs import is_org_admin
 from ..agents.core import agent_row, need_person, RUNTIME_MODEL_MAX, RUNTIME_MODEL_RE
@@ -268,6 +268,7 @@ def srv_flow_models_in(c, aid, v, row):
 
 
 def srv_dict(c, a, row=None):
+    from .usage import usage_limits  # 2.638.0 (#4714): at call time (usage.py imports this module)
     row = row if row is not None else srv_row(c, a["user_id"])
     dm, di = srv_defaults()
     return {"provider": (row["provider"] if row else "") or "anthropic", "model": (row["model"] if row else "") or dm,
@@ -276,7 +277,9 @@ def srv_dict(c, a, row=None):
             "enabled_instance": not srv_off(c), "default_model": dm, "default_instructions": tr(di),  # 2.557.0: in the person's language
             "server": bool(row) and (a["provider"] or "") == SRV_PROVIDER,
             "flow_models": srv_flow_models(row),  # 2.565.0 D (#4674)
-            "flow_web": srv_flow_web(row)}  # 2.571.0 D (#4676)
+            "flow_web": srv_flow_web(row),  # 2.571.0 D (#4676)
+            # 2.638.0 (#4714): the agent's usage limits (None = none: the dialog says so) and the day limit it proposes with a first key
+            "limits": usage_limits(a), "day_limit_default": SRV_DAY_LIMIT_DEFAULT}
 
 
 @app.get("/api/agents/<int:aid>/server")
@@ -295,7 +298,8 @@ def srv_put(aid):
     b = body()
     if not isinstance(b, dict):
         return err(tr("The body must be a JSON object"))
-    unknown = sorted(k for k in b if k not in ("provider", "model", "instructions", "api_key", "delete_key", "flow_models", "flow_web"))
+    unknown = sorted(k for k in b if k not in ("provider", "model", "instructions", "api_key", "delete_key", "flow_models", "flow_web",
+                                               "day_limit"))  # 2.638.0 (#4714)
     if unknown:
         return err(tr("Invalid value: {0}", ", ".join(unknown)))
     sets = {}
@@ -323,6 +327,16 @@ def srv_put(aid):
         if not isinstance(k, str) or not (SRV_KEY_MIN <= len(k.strip()) <= SRV_KEY_MAX) or not KEY_RE.fullmatch(k.strip()):
             return err(tr("Invalid value: {0}", "api_key"))  # never the value itself
         key = k.strip()
+    # 2.638.0 (#4714): day_limit (tokens, null = none) goes with the FIRST key of an agent without limits (the dialog proposes
+    # SRV_DAY_LIMIT_DEFAULT): its hard day limit, so the runs others start stop at it. A replaced key or an agent with limits
+    # (an admin's, the personal agents' default) keeps what it has.
+    from .usage import USAGE_INT_MAX, usage_limits, usage_limits_clean  # at call time (usage.py imports this module)
+    day_limit = None
+    if b.get("day_limit") is not None:
+        v = b["day_limit"]
+        if isinstance(v, bool) or not isinstance(v, int) or not 1 <= v <= USAGE_INT_MAX:
+            return err(tr("Invalid value: {0}", "day_limit"))
+        day_limit = v
     if b.get("flow_models") is not None:  # 2.565.0 D (#4674): checked against the live list of the key stored now
         try:
             sets["flow_models"] = srv_flow_models_in(c, aid, b["flow_models"], srv_row(c, aid))
@@ -336,6 +350,12 @@ def srv_put(aid):
         except BadInput as e:
             return err(str(e))
     with system_ctx(c):  # the agent's own row; srv_need decided who may
+        write_lock(c, f"agent_server-{aid}")  # 2.638.0 (#4714): "the first key" and "no limits" stay true until this commit
+        first_key = key is not None and not ((srv_row(c, aid) or {"key_sealed": ""})["key_sealed"])
+        if first_key and day_limit is not None and usage_limits(agent_row(c, aid)) is None:
+            c.execute("UPDATE agents SET usage_limits=?, usage_alerted='' WHERE user_id=?",
+                      (usage_limits_clean({"period": "day", "metric": "tokens", "hard": day_limit}), aid))
+            print("server agent", aid, "day limit", day_limit, "with its first key by user", me(), flush=True)
         c.execute("""INSERT INTO agent_server(agent_id, cursor, updated_at, updated_by)
                      VALUES(?, (SELECT COALESCE(MAX(id), 0) FROM agent_events WHERE agent_id=?), ?, ?)
                      ON CONFLICT (agent_id) DO NOTHING""", (aid, aid, iso(now_utc()), me()))  # older events are not worked off
