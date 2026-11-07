@@ -38,6 +38,7 @@ from ..agents.core import (
 from ..accounts.orgs import main_org, user_orgs, org_member_add  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.colors import ac_valid  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgroles import user_orgs_full, need_org_write  # 2.369.5 (#2517): pulled up from functions
+from ..core.objhooks import person_revoked  # 2.649.0 (#5051): an agent changing its workspace (the shared core, no upward import)
 from ..core.access import acx_drop  # 2.369.5 (#2517): pulled up from functions
 
 
@@ -577,6 +578,7 @@ def _agent_org_set(c, aid, v, main_org, user_orgs):
         if a["org_id"]:  # 2.46.0 (#1592, review fix): a private agent is no member of its former organisation
             c.execute("DELETE FROM org_members WHERE org_id=? AND user_id=?", (a["org_id"], aid))
             _agent_rgroups_drop(c, a["org_id"], aid)
+            person_revoked(c, aid, a["org_id"], "leave")  # 2.649.0 (#5051): its shares there go (obj_revoked): coming back opens nothing
             acx_drop()
         return
     if isinstance(v, bool) or not isinstance(v, int) or not c.execute("SELECT 1 FROM orgs WHERE id=? AND personal_of IS NULL AND retired_at IS NULL", (v,)).fetchone():  # 2.47.3 (#1360)
@@ -596,6 +598,7 @@ def _agent_org_set(c, aid, v, main_org, user_orgs):
     if a["org_id"] and a["org_id"] != v:
         c.execute("DELETE FROM org_members WHERE org_id=? AND user_id=?", (a["org_id"], aid))
         _agent_rgroups_drop(c, a["org_id"], aid)
+        person_revoked(c, aid, a["org_id"], "leave")  # 2.649.0 (#5051): as above
     org_member_add(c, v, aid)
 
 
