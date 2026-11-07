@@ -202,7 +202,11 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   check(d.querySelector('.ntcard.on')?.textContent.includes('Kick-off'), 'the list of notes shows it');
   // 2.17.2 (review): typing in the search keeps the focus in the field (only the cards re-render); the preview keeps "#123"
   check(/#\d+/.test(d.querySelector('.ntcard.on .ntx')?.textContent || ''), 'the card preview keeps "#123" ' + d.querySelector('.ntcard.on .ntx')?.textContent);
-  { const q = d.querySelector('#nt-q'); q.focus(); type(w, q, 'k'); await sleep(50); type(w, d.querySelector('#nt-q'), 'kick'); await sleep(50);
+  { const q = d.querySelector('#nt-q'); q.focus(); type(w, q, 'k'); await sleep(50);
+    // CI red of 2.618.0: since 2.602.0 (#4817) the field sits in the panel #side; a page redraw while typing (the load after
+    // the note's save, the poll - on the slower CI it landed here) drew the panel again and took the field away. Here on purpose
+    w.eval('renderView()'); await sleep(80);
+    type(w, d.querySelector('#nt-q'), 'kick'); await sleep(50);
     check(d.activeElement === q && q.isConnected && q.value === 'kick' && d.querySelectorAll('.ntcard').length === 1, 'notes search: the field keeps the focus while typing');
     type(w, q, 'zzzz'); await sleep(50);
     check(d.activeElement === q && /No notes match/.test(d.querySelector('#nt-res')?.textContent || ''), 'notes search: no match, the field still focused');

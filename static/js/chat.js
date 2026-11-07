@@ -1061,6 +1061,9 @@ document.addEventListener('input', e => {
     if (!r || S.nt.trash) return;  // 2.272.0 E1 (#3038): the trash stays
     const vis = q ? ns.filter(n => (n.title + ' ' + n.body + ' ' + n.tags.join(' ')).toLowerCase().includes(q)) : ns;
     fl_set(r, ntCardsHtml(vis, q, S.nt.id && ns.find(n => n.id === S.nt.id)));
+    // CI red of 2.618.0 (#4817): the panel's last HTML follows the typing, so a page redraw meanwhile (sbb_sync) no longer
+    // draws the panel again for the search alone (it took the field and its focus away)
+    if (typeof nt_inPanel === 'function' && nt_inPanel() && r.closest('#side')) SBB_LAST.notes = nt_panelHtml();
     clearTimeout(S.nt.qT); S.nt.qT = setTimeout(() => { if (document && q) announce(trn('{0} note', '{0} notes', vis.length)); }, 600);
     return;
   }
