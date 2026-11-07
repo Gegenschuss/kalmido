@@ -158,6 +158,8 @@ pg = G.get(B + "/s/q/" + T1)
 check(pg.status_code == 200 and "Version 2" in pg.text and "player.vimeo.com/video/987654321" in pg.text and 'name="text"' in pg.text and 'name="do"' in pg.text,
       "the same link shows the new version and takes comments and the decision again")
 check(pg.text.count('value="Erika Gast"') == 2, "the name is still there")
+pg1 = G.get(B + "/s/q/" + T1 + "?v=1")
+check("Version 2" in pg1.text.split("</header>")[0] and "youtube-nocookie.com/embed/AbCdEfGhI_9" not in pg1.text, "without the tick ?v=1 stays on the newest version")
 R = A.get(B + f"{V}/{VID}").json()
 old = next(x for x in R["signoffs"] if x["id"] == S1["id"])
 new = [x for x in R["signoffs"] if x.get("carried_from") == S1["id"]]
@@ -178,7 +180,8 @@ check(not [x for x in A.get(B + f"{V}/{VID}").json()["signoffs"] if x.get("carri
 
 # ---------------------------------------------------------------- older versions only with the tick
 pg = G.get(B + "/s/q/" + T1 + "?v=1")
-check("Version 2" in pg.text and "Version 1" not in pg.text.split("</header>")[0], "a link without the tick: ?v=1 shows nothing older")
+check(pg.status_code == 200 and "youtube-nocookie.com/embed/AbCdEfGhI_9" not in pg.text and 'class="vdr-vers"' not in pg.text,
+      "a link without the tick: ?v=1 shows nothing older")
 pg = G.get(B + "/s/q/" + T2)
 check('class="vdr-vers"' in pg.text and f'href="/s/q/{T2}?v=1"' in pg.text and "Version 2" in pg.text, "the link with the tick lists the versions")
 pg = G.get(B + "/s/q/" + T2 + "?v=1")
