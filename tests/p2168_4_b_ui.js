@@ -94,11 +94,13 @@ const paths = async () => ((await call('GET', '/api/wiki?space=private')).pages 
   // the phone: a long press (pointer events of a finger) opens it, the click ending the press opens nothing
   const pe = (type, el) => { const x = new w.MouseEvent(type, {bubbles: true, cancelable: true, clientX: 10, clientY: 10}); Object.defineProperty(x, 'pointerType', {value: 'touch'}); el.dispatchEvent(x); return x; };
   pe('pointerdown', deep); await sleep(700); pe('pointerup', deep);
+  // 2.630.0 (#4510): the click that ends the press comes right after pointerup, as on a phone (it came after "Select", over the
+  // 600 ms window of ms_lpRecent on a busy Mac, and then counted as a tap that unticked the folder)
+  const h0 = w.location.hash, cl = new w.MouseEvent('click', {bubbles: true, cancelable: true}); deep.dispatchEvent(cl);
+  check(cl.defaultPrevented && w.location.hash === h0, 'the click ending the long press does not open the folder');
   // 2.607.0 (#4612): a long press opens the row's menu (name, "Select" on top), it no longer selects at once (was 2.428.0 #3581)
   check(await until(() => items(d)[1] === 'Select' && items(d).includes('Rename…')) && !w.eval('WK.selOn'), 'a long press opens the menu with "Select" on top, nothing chosen yet ' + items(d));
   pick(d, /^Select$/);
-  const h0 = w.location.hash, cl = new w.MouseEvent('click', {bubbles: true, cancelable: true}); deep.dispatchEvent(cl);
-  check(cl.defaultPrevented && w.location.hash === h0, 'the click ending the long press does not open the folder');
   check(await until(() => w.eval('WK.selOn && WK.sel.size === 1')), '"Select" starts choosing with the folder (the click after the press does not untick it)');
   w.eval('wk_selEnd()'); shut(w); await sleep(700);  // a menu event right after a long press belongs to it (Android sends one more)
   // New page here: the dialog starts in the folder
