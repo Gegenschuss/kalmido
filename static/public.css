@@ -258,3 +258,7 @@ ul.xl-list .xl-off{color:var(--muted)}
 .xl-crumbs{font-size:.8125rem;color:var(--muted);margin:0 0 .75rem;overflow-wrap:anywhere}
 .xl-crumbs a{color:var(--accent)}
 .ptw .ptai{padding:0 .375rem;border:1px solid var(--line, #ccc);border-radius:.25rem;font-size:.75rem}  /* 2.482.0 (#3530): an AI agent's answer */
+/* 2.633.0 (#4777): an audio sign-off -- the browser's own <audio> player, no 16:9 box */
+.vdr-player.vdr-aud{aspect-ratio:auto;background:none;overflow:visible}
+.vdr-aud .vdr-gate{position:static;min-height:9rem;border-radius:.75rem}
+.vdr-aud audio{display:block;width:100%;max-width:100%}

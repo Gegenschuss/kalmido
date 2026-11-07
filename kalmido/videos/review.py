@@ -2,8 +2,9 @@
 
 Kalmido stores no video: a review holds links only -- Vimeo, YouTube (also unlisted, youtu.be), a direct video file over
 https (MP4 / WebM / MOV, e.g. a Nextcloud / NAS / Dropbox file link); anything else is a "link without time control" (it
-opens in a new tab, its comments carry no timecode). Each new link is a new version (v1, v2 ...); the comments stay at their
-version. A review hangs at a task, a project list or a client (after a move to the other workspace: at nothing).
+opens in a new tab, its comments carry no timecode). 2.633.0 (#4777): audio likewise -- a direct audio file over https (MP3,
+M4A / AAC, WAV, OGG / Opus, FLAC; provider "audio", recognised by the file name, nothing fetched) in the browser's <audio> player.
+Each new link is a new version (v1, v2 ...); the comments stay at their version. A review hangs at a task, a project list or a client (after a move to the other workspace: at nothing).
 Security: only https; the provider is recognised here (host whitelist) and the video id checked strictly -- the embed URL
 is built from the id, never from the pasted URL (vdr_embed). The app loads no script of a provider: the player is driven
 through its postMessage protocol (static/js/videorev.js, static/pubvideo.js). Rights like the neighbours: who sees the
@@ -52,6 +53,9 @@ VDR_AT_MAX = 86400.0                     # a timecode lies within 24 hours
 VDR_PUB_RATE, VDR_PUB_HOUR = 10, 60      # customer comments per client address and minute / per link and hour
 VDR_STATES = ("open", "approved", "changes")
 VDR_FILE_RE = re.compile(r"\.(mp4|m4v|webm|mov)$", re.I)
+# 2.633.0 (#4777): audio over a direct https link -- recognised by the file name only (Kalmido fetches no foreign URL), played by
+# the browser's own <audio> element (no script, no SoundCloud / Spotify); comments at a second like a video file
+VDR_AUDIO_RE = re.compile(r"\.(mp3|m4a|aac|wav|ogg|oga|opus|flac)$", re.I)
 VDR_YT_RE = re.compile(r"[A-Za-z0-9_-]{11}")
 VDR_VIMEO_RE = re.compile(r"[0-9]{1,12}")
 VDR_VIMEO_H_RE = re.compile(r"[0-9a-f]{6,20}")
@@ -66,7 +70,8 @@ VDR_NONE = N_("Kalmido stores no videos: paste a link from Vimeo, YouTube (also 
 # ---------------------------------------------------------------- links: provider, embed URL
 def vdr_parse(raw):
     """A pasted link -> {url, provider, embed_id}; BadInput for anything but a clean https URL. Providers: vimeo, youtube
-    (the video id checked by a strict pattern), file (the path ends in a video file name), link (no time control)."""
+    (the video id checked by a strict pattern), file (the path ends in a video file name), audio (2.633.0 #4777: the path ends
+    in an audio file name), link (no time control)."""
     url = raw.strip() if isinstance(raw, str) else ""
     if not url or len(url) > VDR_URL_MAX or any(ch.isspace() or ord(ch) < 32 or ord(ch) == 127 for ch in url):
         raise BadInput(tr(VDR_HTTPS))
@@ -98,16 +103,17 @@ def vdr_parse(raw):
                 i = seg.index("video") + 1
             h = (q.get("h") or [""])[0] or (seg[i + 1] if i + 1 < len(seg) else "")
             return {"url": url, "provider": "vimeo", "embed_id": seg[i] + (":" + h if VDR_VIMEO_H_RE.fullmatch(h) else "")}
-    if VDR_FILE_RE.search(u.path):
+    kind = "file" if VDR_FILE_RE.search(u.path) else "audio" if VDR_AUDIO_RE.search(u.path) else ""
+    if kind:
         if host == "dropbox.com" or host.endswith(".dropbox.com"):  # a Dropbox share page (dl=0) -> the file itself (raw=1)
             qs = [(k, v) for k, vs in q.items() for v in vs if k not in ("dl", "raw")] + [("raw", "1")]
             url = urlunsplit((u.scheme, u.netloc, u.path, urlencode(qs), ""))
-        return {"url": url, "provider": "file", "embed_id": ""}
+        return {"url": url, "provider": kind, "embed_id": ""}
     return {"url": url, "provider": "link", "embed_id": ""}
 
 
 def vdr_embed(v, origin=None):
-    """The player URL of a version (vimeo / youtube: built from the checked id; file: the file link itself), or None."""
+    """The player URL of a version (vimeo / youtube: built from the checked id; file / audio: the file link itself), or None."""
     p, e = v["provider"], v["embed_id"] or ""
     if p == "youtube" and VDR_YT_RE.fullmatch(e):
         return (f"{VDR_FRAME['youtube']}/embed/{e}?enablejsapi=1&rel=0&playsinline=1"
@@ -116,7 +122,7 @@ def vdr_embed(v, origin=None):
         vid, _, h = e.partition(":")
         if VDR_VIMEO_RE.fullmatch(vid) and (not h or VDR_VIMEO_H_RE.fullmatch(h)):
             return f"{VDR_FRAME['vimeo']}/video/{vid}?" + (f"h={h}&" if h else "") + "dnt=1&playsinline=1"
-    if p == "file":
+    if p in ("file", "audio"):  # 2.633.0 (#4777): audio
         return v["url"]
     return None
 
@@ -728,17 +734,18 @@ def vdr_player_html(v, origin, title, lg=None):
     if v["provider"] in ("youtube", "vimeo") and src:
         who = {"youtube": "YouTube", "vimeo": "Vimeo"}[v["provider"]]
         data = f'data-prov="{v["provider"]}" data-origin="{VDR_FRAME[v["provider"]]}"'
-    elif v["provider"] == "file" and src:
+    elif v["provider"] in ("file", "audio") and src:  # 2.633.0 (#4777): audio -> an <audio> element (static/js/pubvideo.js)
         who = urlsplit(src).hostname or ""
-        data = 'data-prov="file"'
+        data = f'data-prov="{v["provider"]}"'
     else:
         return ""
-    return (f'<div class="vdr-player" {data} data-src="{e(src)}" data-title="{e(title)}"><div class="vdr-gate">'
+    aud = v["provider"] == "audio"
+    return (f'<div class="vdr-player{" vdr-aud" if aud else ""}" {data} data-src="{e(src)}" data-title="{e(title)}"><div class="vdr-gate">'
             '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 4L16 10L6 16Z"/></svg>'
-            f'<p>{e(tr("Loading the video sends data (such as your IP address) to {0}.", who, lg=lg))}</p>'
-            f'<button type="button" class="btn" data-vdr-load>{e(tr("Load video", lg=lg))}</button>'
+            f'<p>{e(tr("Loading the audio sends data (such as your IP address) to {0}.", who, lg=lg) if aud else tr("Loading the video sends data (such as your IP address) to {0}.", who, lg=lg))}</p>'
+            f'<button type="button" class="btn" data-vdr-load>{e(tr("Load audio", lg=lg) if aud else tr("Load video", lg=lg))}</button>'
             # 2.240.0 D2 (#2886): without JavaScript the page offers the plain link
-            f'<noscript><p><a href="{e(v["url"])}" target="_blank" rel="noopener noreferrer">{e(tr("Open the video", lg=lg))}</a></p></noscript>'
+            f'<noscript><p><a href="{e(v["url"])}" target="_blank" rel="noopener noreferrer">{e(tr("Open the audio", lg=lg) if aud else tr("Open the video", lg=lg))}</a></p></noscript>'
             '</div></div>')
 
 

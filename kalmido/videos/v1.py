@@ -165,7 +165,7 @@ def vdr_v1_spec(paths, schemas, op, ok, errs, ref, pid, q):
         "id": {"type": "integer"}, "title": {"type": "string"}, "state": {"type": "string", "enum": ["open", "approved", "changes"],
                                                                          "description": "The customer's decision (changes = changes requested)"},
         "space": {"type": "string"}, "task_id": {"type": ["integer", "null"]}, "list_id": {"type": ["integer", "null"]},
-        "versions": {"type": "array", "items": {"type": "object", "description": "{id, n, url, provider vimeo|youtube|file|link, embed, timed, created_at}"}},
+        "versions": {"type": "array", "items": {"type": "object", "description": "{id, n, url, provider vimeo|youtube|file|audio|link, embed, timed, created_at}"}},
         "version": {"type": "integer", "description": "The newest version's number"}, "open_comments": {"type": "integer"},
         "can_write": {"type": "boolean"}, "comments": {"type": "array", "items": ref("VideoComment"), "description": "Only when reading one review"},
         "url": {"type": "string"}}}

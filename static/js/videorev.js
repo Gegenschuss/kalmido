@@ -2,7 +2,8 @@
    Classic script sharing the global scope with the others (load order: index.html, docs/ARCHITECTURE.md). */
 'use strict';
 
-// A video sign-off holds links only (Vimeo, YouTube, a direct video file over https; Kalmido stores no video), each new link
+// A video sign-off holds links only (Vimeo, YouTube, a direct video file over https; 2.633.0 #4777: also a direct audio file
+// over https in an <audio> element; Kalmido stores no video / audio), each new link
 // a version. Comments sit at a second of their version: typing pauses the player and keeps its time ("at 01:23", tap to drop
 // it), a tap on a timecode or a mark on the time line jumps there. The player is driven through its postMessage protocol:
 // no script of Vimeo / YouTube is loaded; messages count only from the player's own frame and origin. Sections: a task's
@@ -30,11 +31,11 @@ function vdr_rows(k, id, redraw) {
   return c || null;
 }
 function vdr_listHtml(rows, k, id, add) {
-  const li = rows.map(r => `<li><button type="button" class="vdrrow" data-vdr="open" data-id="${r.id}">${ic('film', 's')}<span class="vdrrt"><b>${esc(r.title)}</b>
+  const li = rows.map(r => `<li><button type="button" class="vdrrow" data-vdr="open" data-id="${r.id}">${ic(vdr_isAud(r.versions?.[r.versions.length - 1]) ? 'music' : 'film', 's')}<span class="vdrrt"><b>${esc(r.title)}</b>
     <small class="muted">${esc([`v${r.version}`, tr(VDR_ST[r.state] || r.state), r.open_comments ? trn('{0} open comment', '{0} open comments', r.open_comments) : ''].filter(Boolean).join(' · '))}</small></span>
     <span class="vdrst st-${esc(r.state)}" aria-hidden="true"></span></button></li>`).join('');
   return (li ? `<ul class="vdrrows" role="list">${li}</ul>` : '')
-    + (add ? `<button type="button" class="btn sm vdradd" data-vdr="new" data-k="${k}" data-i="${id}">${ic('plus', 's')} ${tr('Add video link')}</button>` : '');
+    + (add ? `<button type="button" class="btn sm vdradd" data-vdr="new" data-k="${k}" data-i="${id}">${ic('plus', 's')} ${tr('Add video or audio link')}</button>` : '');
 }
 // 2.96.3 (#1959): the section arrives after the detail - redraw it without taking the focus (comment box of #reply/<id>)
 function vdr_redrawTask(tid) {
@@ -87,9 +88,9 @@ const vdr_forget = () => { VDR.by = {}; };
 
 // ---- a new review: a link (+ an optional title)
 function vdr_new(k, id) {
-  const md = modal(`<form class="vdrform" novalidate><h3 id="vdr-nt">${tr('Add video link')}</h3><div class="shint">${esc(tr('Kalmido stores no videos. YouTube links may be unlisted; video files as MP4, WebM or MOV.'))}</div>
-    <p class="muted mhint">${esc(tr('Link from Vimeo, YouTube or a video file (https)'))}</p>
-    <label for="vdr-url">${tr('Video link')}</label><input id="vdr-url" type="url" inputmode="url" autocomplete="off" placeholder="https://" maxlength="2000" required>
+  const md = modal(`<form class="vdrform" novalidate><h3 id="vdr-nt">${tr('Add video or audio link')}</h3><div class="shint">${esc(tr('Kalmido stores no videos or audio. YouTube links may be unlisted; video files as MP4, WebM or MOV; audio files as MP3, M4A, AAC, WAV, OGG, Opus or FLAC.'))}</div>
+    <p class="muted mhint">${esc(tr('Link from Vimeo, YouTube or a video or audio file (https)'))}</p>
+    <label for="vdr-url">${tr('Link')}</label><input id="vdr-url" type="url" inputmode="url" autocomplete="off" placeholder="https://" maxlength="2000" required>
     <label for="vdr-ttl">${tr('Title')}</label><input id="vdr-ttl" maxlength="200" placeholder="${esc(tr('e.g. Rough cut'))}">
     <div class="calerr" role="alert" hidden></div>
     <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-m="close">${tr('Cancel')}</button><button type="submit" class="btn pri">${tr('Add')}</button></div></form>`);
@@ -117,31 +118,35 @@ function vdr_new(k, id) {
 // setting video_ext_ok = "1" (own switch in Settings) loads it straight away. A direct file from another host gets the same question.
 const VDR_PROV = {youtube: 'YouTube', vimeo: 'Vimeo'};
 const vdr_extHost = v => { try { const h = new URL(v.url).hostname; return h && h !== location.hostname ? h : ''; } catch { return ''; } };
-function vdr_gateName(v) { return v.provider === 'file' ? vdr_extHost(v) : VDR_PROV[v.provider] || ''; }
+// 2.633.0 (#4777): audio = a direct audio file over https, played by the browser's own <audio> element (no waveform, no foreign script)
+const vdr_isAud = v => !!v && v.provider === 'audio';
+const vdr_isFile = v => !!v && (v.provider === 'file' || v.provider === 'audio');
+function vdr_gateName(v) { return vdr_isFile(v) ? vdr_extHost(v) : VDR_PROV[v.provider] || ''; }
 function vdr_playerInner(v, title) {
   if (v.provider === 'youtube' || v.provider === 'vimeo') {
     const src = v.embed + (v.provider === 'youtube' ? '&origin=' + encodeURIComponent(location.origin) : '');
     return `<iframe src="${esc(src)}" title="${esc(title)}" allow="fullscreen; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
   }
+  if (vdr_isAud(v)) return `<audio src="${esc(v.embed)}" controls preload="metadata" aria-label="${esc(title)}"></audio>`;
   return `<video src="${esc(v.embed)}" controls playsinline preload="none"></video>`;
 }
 function vdr_playerHtml(v, title) {
   if (!v) return '';
-  const ext = v.provider === 'youtube' || v.provider === 'vimeo' || v.provider === 'file';
+  const ext = v.provider === 'youtube' || v.provider === 'vimeo' || vdr_isFile(v);
   // 2.240.0 D2 (#2886): video_ext_ok only covers YouTube/Vimeo; a direct file from another host always asks
-  if (ext && (v.provider === 'file' || S.settings?.video_ext_ok !== '1') && vdr_gateName(v)) {
-    const n = vdr_gateName(v);
+  if (ext && (vdr_isFile(v) || S.settings?.video_ext_ok !== '1') && vdr_gateName(v)) {
+    const n = vdr_gateName(v), aud = vdr_isAud(v);
     return `<div class="vdrplay vdrgate" data-prov="${v.provider}"><div class="vdrgate-in">${ic('play', 'l')}
-      <p>${esc(tr('Loading the video sends data (such as your IP address) to {0}.', n))}</p>
-      <button type="button" class="btn pri sm" data-vdr="gate">${tr('Load video')}</button>
-      ${v.provider === 'file' ? '' : `<label class="chkl"><input type="checkbox" class="vdrgate-ok"> ${tr('Do not ask again')}</label>`}</div></div>`;
+      <p>${esc(aud ? tr('Loading the audio sends data (such as your IP address) to {0}.', n) : tr('Loading the video sends data (such as your IP address) to {0}.', n))}</p>
+      <button type="button" class="btn pri sm" data-vdr="gate">${aud ? tr('Load audio') : tr('Load video')}</button>
+      ${vdr_isFile(v) ? '' : `<label class="chkl"><input type="checkbox" class="vdrgate-ok"> ${tr('Do not ask again')}</label>`}</div></div>`;
   }
   if (ext) return `<div class="vdrplay" data-prov="${v.provider}">${vdr_playerInner(v, title)}</div>`;
   return `<div class="vdrnolink">${ic('info', 's')}<p>${esc(tr('This link has no time control: it opens in a new tab, comments get no timecode.'))}</p>
     <a class="btn sm" href="${esc(v.url)}" target="_blank" rel="noopener noreferrer">${ic('link', 's')} ${tr('Open the video')}</a></div>`;
 }
 function vdr_ctl(box, prov, on) {
-  const fr = box && $('iframe', box), vid = box && $('video', box), origin = VDR_ORIGIN[prov] || '';
+  const fr = box && $('iframe', box), vid = box && $('video, audio', box), origin = VDR_ORIGIN[prov] || '';
   const c = {cur: 0, dur: 0, stop: () => {}};
   const send = o => { try { fr.contentWindow.postMessage(JSON.stringify(o), origin); } catch { /* the frame is gone */ } };
   const dur = d => { if (+d > 0 && !c.dur) { c.dur = +d; on('dur'); } };

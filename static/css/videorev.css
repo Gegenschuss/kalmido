@@ -61,3 +61,8 @@
 .vdrgate{background:var(--bg2,var(--line2))}
 .vdrgate-in{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.5rem;padding:1rem;text-align:center;color:var(--text2)}
 .vdrgate-in p{margin:0;max-width:26rem}
+/* 2.633.0 (#4777): an audio sign-off -- the browser's own <audio> player, no 16:9 box */
+.vdrplay[data-prov="audio"]{aspect-ratio:auto;background:none;overflow:visible}
+.vdrplay[data-prov="audio"] audio{display:block;width:100%;max-width:100%}
+.vdrgate[data-prov="audio"]{background:var(--bg2,var(--line2))}
+.vdrgate[data-prov="audio"] .vdrgate-in{position:static;min-height:9rem}

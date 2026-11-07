@@ -7,7 +7,7 @@
 (() => {
   const box = document.querySelector('.vdr-player'); if (!box) return;
   const prov = box.dataset.prov, origin = box.dataset.origin || '';
-  let fr = box.querySelector('iframe'), vid = box.querySelector('video');
+  let fr = box.querySelector('iframe'), vid = box.querySelector('video, audio');  // 2.633.0 (#4777): audio plays in <audio>
   let cur = 0, dur = 0;
   const p2 =n => String(n).padStart(2, '0');
   const tc = s => { s = Math.floor(s || 0); const h = Math.floor(s / 3600); return h ? `${h}:${p2(Math.floor(s / 60) % 60)}:${p2(s % 60)}` : `${p2(Math.floor(s / 60))}:${p2(s % 60)}`; };
@@ -47,13 +47,13 @@
   // 2.240.0 D (#2886): two clicks -- the placeholder first, the player (and the request to its host) only after "Load video"
   const gate = box.querySelector('[data-vdr-load]');
   if (gate) gate.addEventListener('click', () => {
-    const el = document.createElement(prov === 'file' ? 'video' : 'iframe');
+    const media = prov === 'file' || prov === 'audio', el = document.createElement(prov === 'audio' ? 'audio' : prov === 'file' ? 'video' : 'iframe');
     let src = box.dataset.src || '';
     // 2.122.4 A (#2215 L7): the page opened under another host than the configured address: YouTube talks only to the origin
     // named in the player URL, so name this page's own (never a host header of the request)
     if (prov === 'youtube') { try { const u = new URL(src); u.searchParams.set('origin', location.origin); src = u.href; } catch { /* keep the URL */ } }
     el.setAttribute('src', src);
-    if (prov === 'file') { el.controls = true; el.setAttribute('playsinline', ''); el.preload = 'none'; vid = el; }
+    if (media) { el.controls = true; el.setAttribute('playsinline', ''); el.preload = prov === 'audio' ? 'metadata' : 'none'; vid = el; }
     else { el.title = box.dataset.title || ''; el.allowFullscreen = true; el.allow = 'fullscreen; picture-in-picture'; el.referrerPolicy = 'strict-origin-when-cross-origin'; fr = el; }
     box.textContent = ''; box.appendChild(el);
     if (vid) {

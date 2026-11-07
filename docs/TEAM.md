@@ -346,7 +346,13 @@ youtu.be, Shorts) or a direct video file over https (MP4, WebM, MOV, e.g. a file
 link has to end with the file name). Any other link (a Google Drive page, a Nextcloud share page) is a *link without time
 control*: it opens in a new tab and its comments carry no timecode.
 
-- Where: a task's panel (*More details* > *Approval*), a project's overview and a client's card: *Add video link*.
+*Since 2.633.0:* **audio** works the same way: a direct audio file over https (MP3, M4A / AAC, WAV, OGG / Opus or FLAC; the
+link has to end with the file name). It plays in the browser's own audio player (no script of another service, no
+SoundCloud / Spotify, no waveform); comments sit at a second, the time line under the player shows their marks, versions,
+states and the customer link work as for a video. Kalmido stores nothing of the file and fetches nothing from the link
+itself: the browser of the person who listens loads it (after *Load audio* when the file lies on another host).
+
+- Where: a task's panel (*More details* > *Approval*), a project's overview and a client's card: *Add video link* (2.633.0: *Add video or audio link*).
   2.623.0: it is called *Approval* in the app and belongs to agency projects and projects without a type (not software or
   private ones; switch it on there under the project's options > Properties). Settings > Modules > *Approval* switches it
   off for you completely (also for a person without an organisation): no new ones, the existing ones stay visible and
