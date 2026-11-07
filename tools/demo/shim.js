@@ -741,7 +741,7 @@
       if (b.purpose === 'family') for (const [k, n] of [['shopping', 'Shopping list'], ['household', 'Household']]) if (!DB.lists.some(l => l.family === k)) famList(k, n);
     }
     DB.settings.features = fs.filter(x => !DEMO_OFF.has(x)).join(',');
-    if (b.project_type) { const n = {agency: 'Agency', software: 'Software / AI dev', private: 'Personal|project type'}[b.project_type] || 'Project';
+    if (b.project_type) { const n = {agency: 'Agency', software: 'Software / AI dev', private: 'Personal|project type', social: 'Social media plan'}[b.project_type] || 'Project';
       DB.lists.push({...clone(LIST_DEF), id: nid('list'), created_at: iso(), name: tx(n), kind: 'project', ptype: b.project_type, sort: Math.max(0, ...DB.lists.map(x => x.sort)) + 1}); }
     if (b.sample === true && !sampleState()) sampleMake(); else if ('sample' in b) DB.settings.sample_ask = '0';
     DB.settings.setup = 'done';

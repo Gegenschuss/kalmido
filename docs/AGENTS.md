@@ -1525,7 +1525,7 @@ project with the agent (also with *Proposals for: everyone*; a person it does no
 undecided ones per agent and person and 50 per agent (`429`).
 
 - **`inquiry`** (#1351): a customer inquiry (chat text, a mail as attachment) becomes a project. `proposal`: `name`,
-  `folder?`, `project_type?` (one of `input.project_types`: agency, software, private), `client?` (`{id}` from
+  `folder?`, `project_type?` (one of `input.project_types`: agency, software, private, social), `client?` (`{id}` from
   `input.clients`, or `{name}`: a suggestion, used when a client of that exact name exists, else shown as *New client:
   create it in the office*), `sections`, `tasks` (as kind `project`, at least one), `shoot_days: [{title, date,
   end_date?, start_time?, end_time?, location?, notes?}]` and `offer?: {title?, intro?, items: [{service_id?, text, qty,

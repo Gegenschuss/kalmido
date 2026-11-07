@@ -174,7 +174,14 @@ small **×** next to it (*Show progress* in the project's … menu or the projec
   from the project's earliest start or due date, together with sections, custom fields, dependencies, ticket types
   and *Move dependent tasks along*. Using it asks for the project start and, optionally, an end date: the dates are
   then stretched or squeezed so the last one falls on the end. Your templates also show up as cards next to the
-  project types (Agency, Software / AI dev, Personal) in *New project*.
+  project types (Agency, Software / AI dev, Personal, Social media plan) in *New project*.
+- **Social media plan** (2.387.0): a project type for an editorial calendar. A post is a task: its text is the
+  description, the picture an attachment, the publishing day the due date, the networks the selection field *Channel*
+  (Instagram, LinkedIn, Facebook, TikTok, YouTube, Newsletter, Other). It opens in the calendar view (the board is one
+  tap away); with the standard sections (*Idea, Draft, For approval, Approved, Scheduled, Published*) the review step is
+  on: moving a post into *For approval* asks its reviewer - for example the client, added to the project with the role
+  *View* - and a post is completed only after the approval. Kalmido publishes nothing: you post it yourself and move it
+  to *Published*.
 - **Undo and redo:** the ← / → buttons in the top bar (on phones and touch tablets: *Undo: …* / *Redo: …* at the top of the header's “…” menu) step back and forward through the
   history of this device: up to 30 steps, kept until you reload the page. Their tooltip names the step (*Undo:
   Completed “Pay invoice”*, *Redo: Moved 3 tasks to Work*); right-click or long-press ← (or →) lists the last ten

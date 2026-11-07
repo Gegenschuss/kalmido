@@ -196,15 +196,17 @@ const LKIND_ICON = {list: 'list', checklist: 'cart', project: 'pulse'};
 const PTYPE_UI = [['', N_('Blank'), 'list', N_('Sections and fields as needed')],
   ['agency', N_('Agency'), 'brief', N_('Client, budget, time tracking')],
   ['software', N_('Software / AI dev'), 'code', N_('Board, tickets, repository')],
-  ['private', N_('Personal|project type'), 'home', N_('No fields')]];
+  ['private', N_('Personal|project type'), 'home', N_('No fields')],
+  ['social', N_('Social media plan'), 'megaphone', N_('Calendar, channels, approval by the client')]];  // 2.387.0 (#1957)
 // 2.27.0 (#972): the standard sections of each built-in project type (kalmido/lists/templates.py PTYPES), named next to the
 // box "With the standard sections" in the New list dialog; a new project gets them only when the box is ticked
 const PTYPE_SECS = {agency: [N_('Request'), N_('Concept'), N_('Production'), N_('Approval'), N_('Billing')],
-  software: [N_('Backlog'), N_('Next|section'), N_('In progress'), N_('Review'), N_('Done|section')], private: [N_('Ideas'), N_('Planning'), N_('To do|section')]};
+  software: [N_('Backlog'), N_('Next|section'), N_('In progress'), N_('Review'), N_('Done|section')], private: [N_('Ideas'), N_('Planning'), N_('To do|section')],
+  social: [N_('Idea|section'), N_('Draft|section'), N_('For approval|section'), N_('Approved|section'), N_('Scheduled|section'), N_('Published|section')]};  // 2.387.0 (#1957)
 const PTYPE_KINDS = {software: ['open', 'open', 'progress', 'review', 'done']};  // 2.577.0 (#3354): as PTYPES section_kinds
 const ptSecKind = (k, n) => PTYPE_KINDS[k]?.[(PTYPE_SECS[k] || []).findIndex(x => tr(x) === n)] || '';
 const ptSecsLine = k => (PTYPE_SECS[k] || []).map(x => tr(x)).join(', ');
-const MOD_NAMES = {time: N_('Time tracking'), fields: N_('Custom fields'), kanban: N_('Kanban'), deps: N_('Dependencies')};
+const MOD_NAMES = {time: N_('Time tracking'), fields: N_('Custom fields'), kanban: N_('Kanban'), deps: N_('Dependencies'), cal: N_('Calendar')};  // 2.387.0 (#1957): + cal
 // after a project type switched modules on for this person: say which
 function modulesOnToast(on) { if (on?.length) toast(tr('Switched on for you: {0}', on.map(m => tr(MOD_NAMES[m] || m)).join(', '))); }
 // 2.4.0 (#243): a new Software / AI dev project: the next steps (repository of the 2.2.0 Git integration, a coding agent)
@@ -1198,6 +1200,8 @@ function listModal(id, folder = '', o = {}) {
       $('.ptdates', md).hidden = !tp;
       $('.ptsecs', md).hidden = !PTYPE_SECS[b.dataset.pt]; $('#l-ptsecsl', md).textContent = ptSecsLine(b.dataset.pt);  // 2.27.0 (#972)
       $('.ptbug', md).hidden = b.dataset.pt !== 'software';  // 2.473.0 (#3378)
+      // 2.387.0 (#1957): a social media plan works through its sections (the approval step sits on one): ticked for it
+      if (b.dataset.pt === 'social' && $('#l-ptsecs', md)) $('#l-ptsecs', md).checked = true;
       const pt = PTYPE_UI.find(x => x[0] === b.dataset.pt);
       // 2.22.0 (#749): every new list opens as a list (the board is one tap away)
       if ($('#l-tickets', md)) { $('#l-tickets', md).checked = b.dataset.pt === 'software'; $('#l-tickets', md).closest('.row').hidden = !!b.dataset.pt; }

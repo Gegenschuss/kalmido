@@ -597,7 +597,7 @@ TOOLS = [
                    "listen_agent_ids (2.13.1): agents that get a comment event for EVERY comment a person writes in the project "
                    "(\"Agent reads every comment\", set by the project owner / admins), not only on tasks they follow. "
                    "columns (2.14.0): the project's row columns in order (null = default layout), see set_list_columns. "
-                   "project_type (2.18.0): agency | software | private, null = none. "
+                   "project_type (2.18.0): agency | software | private | social (2.387.0), null = none. "
                    "favorite (2.46.1): a favourite project of your person (personal agents; put them first in overviews).",
      _obj({}), lambda api, a: api.call("GET", "/lists")),
     ("set_list_columns", "2.14.0: set which columns the rows of a project show and in which order, the same for every member "
@@ -1545,23 +1545,23 @@ TOOLS += [
      lambda api, a: api.call("POST", f"/lists/{_id(a, 'list_id')}/playbook/proposals", body=_pick(a, ("text", "note")))),
     ("create_list", "Create a project (you become its owner). kind is stored only, no longer evaluated (2.352.0: every project has dependencies, status, overview; tracked = has a status); time_tracking "
                     "true (2.41.0) = time tracking on (any type, default off). "
-                    "project_type agency | software | private = a project of that built-in type (fields, ticket types); "
+                    "project_type agency | software | private | social = a project of that built-in type (fields, ticket types); "
                     "sections true (2.27.0) = also the type's standard sections (default: none). "
                     "2.411.0: project_type left out in a folder = the folder's project type with its standard sections; \"\" = no type. "
                     "bug_inbox true (2.473.0, project_type software, not for agents: they only propose rules, 403) = also the project "
                     "\"<name> – Bugs\" with the field Release and a rule: a filled Release moves the task into this project; the answer carries bug_list_id.",
-     _obj({**LIST_PROPS, "project_type": {"type": "string", "enum": ["agency", "software", "private", ""]}, "sections": {"type": "boolean"}, "bug_inbox": {"type": "boolean"}}, ["name"]),
+     _obj({**LIST_PROPS, "project_type": {"type": "string", "enum": ["agency", "software", "private", "social", ""]}, "sections": {"type": "boolean"}, "bug_inbox": {"type": "boolean"}}, ["name"]),
      lambda api, a: api.call("POST", "/lists", body=a)),
     ("update_list", "Change a project: name, color, folder (moving your own project into another folder waits for approval), view, kind "
                     "(stored only, no longer evaluated since 2.352.0), archived (true = archive), done_at_bottom, nag, day_hours, time_tracking (2.41.0, owner), project_type (2.18.0, owner / project admins: "
-                    "agency | software | private, null = none; switches on what the type needs, never deletes anything); "
+                    "agency | software | private | social, null = none; switches on what the type needs, never deletes anything); "
                     "org_visibility (2.46.0, owner / project admins of an organisation project: \"\" = only invited people, \"org\" = everyone "
                     "in the organisation, read-only for them unless org_edit true; opening it waits for approval); "
                     "sort_mode and group_field (2.144.0, owner / project admins, the same for every member): the project's sort "
                     "(\"\" = default, prio, custom, date, title, created, cf:<field id> ...) and the list view grouped by a text / "
                     "select custom field (\"cf:<field id>\", \"\" = by sections again; the sections never change).",
      _obj({"list_id": S_ID, **LIST_PROPS, "archived": {"type": "boolean"},
-           "project_type": {"type": ["string", "null"], "enum": ["agency", "software", "private", "", None]},
+           "project_type": {"type": ["string", "null"], "enum": ["agency", "software", "private", "social", "", None]},
            "org_visibility": {"type": "string", "enum": ["", "org"]}, "org_edit": {"type": "boolean"},
            "sort_mode": {"type": "string"}, "group_field": {"type": ["string", "integer", "null"]},  # 2.144.0 (#2414)
            "ticket_key": {"type": ["string", "null"], "description": "2.390.0: the project's ticket key APP (2-6 capitals / digits, a letter "

@@ -519,7 +519,7 @@ def v1_list(d):
             "header_style": d.get("header_style") or "",  # 2.83.0 (#1427): the list's header strip in the app (read only)
             "nag": d.get("nag") or "", "day_hours": d.get("day_hours"),  # 2.7.0 (#413, #407)
             "columns": d.get("columns"),  # 2.14.0 (#425): the list's columns (null = default)
-            "project_type": d.get("ptype") or None,  # 2.18.0 (#408): agency | software | private, null = none
+            "project_type": d.get("ptype") or None,  # 2.18.0 (#408): agency | software | private | social, null = none
             "family": d.get("family") or None,  # 2.19.0 (#653): shopping | meals | birthdays | household | packing, null = none
             "life": d.get("life") or None, "trip": d.get("trip") or None,
             # 2.144.0 C (#2414): the list's sort and its grouping by a custom field, the same for every member

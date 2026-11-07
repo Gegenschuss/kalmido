@@ -1047,7 +1047,7 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                                        "(project type software); the owner can switch it per list"}
     schemas["List"]["properties"]["icon"] = {"type": "string", "description": "URL of the list's own icon (2.0.2), empty = none"}
     schemas["List"]["properties"]["project_type"] = nul("string", enum=[*PTYPES, None],
-                                                        description="2.18.0 (#408): agency | software | private; null = none (a plain list or project)")
+                                                        description="2.18.0 (#408): agency | software | private | social (2.387.0 #1957); null = none (a plain list or project)")
     schemas["Comment"]["properties"]["reactions"] = {"type": "array", "items": {"type": "object"}}
     schemas["Comment"]["properties"]["suggestion"] = {"oneOf": [{"type": "null"}, {"type": "object"}]}
     schemas["CommentInput"]["properties"]["suggestion"] = {"oneOf": [ref("TidyInput"), {"type": "object", "description":

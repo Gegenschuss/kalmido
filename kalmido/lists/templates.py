@@ -941,6 +941,14 @@ PTYPES = {
                  "section_kinds": ("open", "open", "progress", "review", "done")},  # 2.577.0 (#3354): new projects only
     "private": {"view": "list", "tickets": 0, "dep_shift": 0, "modules": (),
                 "sections": (N_("Ideas"), N_("Planning"), N_("To do|section")), "fields": ()},
+    # 2.387.0 (#1957): an editorial calendar for social media posts. A post = a task: text = its description, picture = its
+    # attachments, the publishing day = its due date (the calendar view shows it there), the channels = the selection field
+    # Channel. The client approves through the review step (switched on with the standard sections, PTYPE_REVIEW). Kalmido
+    # publishes nothing itself: a post goes into "Published" by hand.
+    "social": {"view": "calendar", "tickets": 0, "dep_shift": 0, "modules": ("cal", "kanban", "fields"),
+               "sections": (N_("Idea|section"), N_("Draft|section"), N_("For approval|section"), N_("Approved|section"),
+                            N_("Scheduled|section"), N_("Published|section")),
+               "fields": ((N_("Channel|field"), "multiselect"),)},
 }
 
 
@@ -950,7 +958,8 @@ PTYPES = {
 PROP_KEYS = ("ticket", "ttype", "repo", "deps", "who", "points", "time", "video", "client", "docs", "tags")
 PTYPE_PROPS_OFF = {"software": ("video", "client", "docs"),
                    "agency": ("repo", "ttype"),
-                   "private": ("ticket", "ttype", "repo", "deps", "who", "points", "time", "video", "client", "docs")}
+                   "private": ("ticket", "ttype", "repo", "deps", "who", "points", "time", "video", "client", "docs"),
+                   "social": ("ticket", "ttype", "repo", "deps", "points")}  # 2.387.0 (#1957)
 
 
 def props_clean(v):
@@ -1015,18 +1024,35 @@ def props_for_type(cur, k):
 PTYPE_WIP = {"software": {"In progress": 3, "Review": 3}}
 
 
-PTYPE_NAMES = {"agency": N_("Agency"), "software": N_("Software / AI dev"), "private": N_("Personal|project type")}
+PTYPE_NAMES = {"agency": N_("Agency"), "software": N_("Software / AI dev"), "private": N_("Personal|project type"),
+               "social": N_("Social media plan")}  # 2.387.0 (#1957)
 # 2.473.0 (#3378): field name -> its options (the choices of a selection field) / the fields of a type that are not pinned
-PTYPE_FIELD_OPTS = {"Size|field": {"options": [{"id": x.lower(), "name": x, "color": ""} for x in ("S", "M", "L")]}}
+# 2.387.0 (#1957): + Channel (the networks are names only, Kalmido connects to none of them)
+SOCIAL_CHANNELS = ("Instagram", "LinkedIn", "Facebook", "TikTok", "YouTube", "Newsletter")
+PTYPE_FIELD_OPTS = {"Size|field": {"options": [{"id": x.lower(), "name": x, "color": ""} for x in ("S", "M", "L")]},
+                    "Channel|field": {"options": [*({"id": x.lower(), "name": x, "color": ""} for x in SOCIAL_CHANNELS),
+                                                  {"id": "other", "name": N_("Other|channel"), "color": ""}]}}
+# 2.387.0 (#1957): the review step a new project of the type gets with its standard sections: the section (English source)
+# that asks for the approval, and "done only after approval" (lists.review_cfg, tasks/review.py)
+PTYPE_REVIEW = {"social": {"section": "For approval|section", "gate": True}}
 PTYPE_FIELD_UNPINNED = ("Release|field",)
 BUG_INBOX_FIELD = "Release|field"
+
+
+def _ptype_opts(n, lg):
+    """The options of the type's field n in the language lg (2.387.0 #1957: "Other" of Channel is a text; the names of
+    networks and S / M / L stay as they are)."""
+    o = PTYPE_FIELD_OPTS.get(n)
+    if not o:
+        return {}
+    return {**o, "options": [{**x, "name": tr(x["name"], lg=lg) if "|" in x["name"] else x["name"]} for x in o["options"]]}
 
 
 def ptype_template(k, lg, sections=False):
     p = PTYPES[k]
     return {"kind": "project", "view": p["view"], "sections": [tr(x, lg=lg) for x in p["sections"]] if sections else [],
             "section_kinds": list(p.get("section_kinds") or ()) if sections else [],
-            "fields": [{"name": tr(n, lg=lg), "type": t, "options": PTYPE_FIELD_OPTS.get(n, {}), "pinned": 0 if n in PTYPE_FIELD_UNPINNED else 1}
+            "fields": [{"name": tr(n, lg=lg), "type": t, "options": _ptype_opts(n, lg), "pinned": 0 if n in PTYPE_FIELD_UNPINNED else 1}
                        for n, t in p["fields"]],
             "tasks": [], "deps": [], "rel": True, "span": 0, "tickets": p["tickets"], "ticket_tpl": {}, "dep_shift": p["dep_shift"]}
 
@@ -1064,6 +1090,13 @@ def ptype_create(c, uid, k, name, folder="", color="", start=None, sections=Fals
         lg = lang(c, uid)
         for x, n in PTYPE_WIP[k].items():
             c.execute("UPDATE sections SET wip_limit=? WHERE list_id=? AND name=?", (n, lid, tr(x, lg=lg)))
+    if sections and PTYPE_REVIEW.get(k):  # 2.387.0 (#1957): the review step on its section, no default reviewer yet
+        rv = PTYPE_REVIEW[k]
+        sec = c.execute("SELECT id FROM sections WHERE list_id=? AND name=? ORDER BY id LIMIT 1",
+                        (lid, tr(rv["section"], lg=lang(c, uid)))).fetchone()
+        if sec:
+            c.execute("UPDATE lists SET review_cfg=? WHERE id=?",
+                      (json.dumps({"on": 1, "reviewer": None, "section": sec[0], "gate": 1 if rv["gate"] else 0}, separators=(",", ":")), lid))
     fs = [x for x in (usettings(c, uid).get("features") or "").split(",") if x]
     on = [m for m in PTYPES[k]["modules"] if m not in fs]
     if on:
@@ -1086,7 +1119,7 @@ def ptype_missing(c, lid, k, lg):
     def lacks(x, have):
         return tr(x, lg=lg).strip().casefold() not in have and x.split("|")[0].strip().casefold() not in have
     return {"sections": [tr(x, lg=lg) for x in PTYPES[k]["sections"] if lacks(x, have_s)],
-            "fields": [{"name": tr(n, lg=lg), "type": t, **({"options": PTYPE_FIELD_OPTS[n]} if n in PTYPE_FIELD_OPTS else {})}
+            "fields": [{"name": tr(n, lg=lg), "type": t, **({"options": _ptype_opts(n, lg)} if n in PTYPE_FIELD_OPTS else {})}
                        for n, t in PTYPES[k]["fields"] if lacks(n, have_f)]}
 
 
