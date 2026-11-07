@@ -17402,6 +17402,7 @@
   "Select a column": "Elegir una columna",
   "Select a tag": "Elegir una etiqueta",
   "Select a person": "Elegir una persona",
+  "At most {0} change proposals per day for one person": "Como máximo {0} propuestas de cambio al día para una persona",
   "Another message arrived at the same moment. Please send again.": "Otro mensaje llegó al mismo tiempo. Envíalo de nuevo.",
   "{0} public link, file request or agent access on it ends": ["{0} enlace público, solicitud de archivos o acceso de agente termina", "{0} enlaces públicos, solicitudes de archivos o accesos de agentes terminan"],
   "The daily clean-up of old logs could not finish in {0} ({1}). The rows past their time stay until the next run; on a large table raise KALMIDO_DB_STATEMENT_TIMEOUT.": "La limpieza diaria de registros antiguos no pudo terminar en {0} ({1}). Las filas vencidas se quedan hasta la próxima ejecución; en una tabla grande, aumenta KALMIDO_DB_STATEMENT_TIMEOUT.",

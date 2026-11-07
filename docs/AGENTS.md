@@ -4554,13 +4554,16 @@ object's history, marked as an agent's. Creating, deleting, the trash and sharin
 `POST /api/v1/agent/objects/{kind}/{id}/proposals` (MCP `propose_object_change`) with `values` (the fields and their new
 values, checked like a change: unknown field / bad value `400`, nothing would change `400`), `expect_updated_at` (required,
 `409` with the current state when it is old), an optional `summary` (Markdown: why) and an optional `user_id` (the person
-who decides: they need write rights on the object; default the object's owner). The object must be visible to you; a view
+who decides: they need write rights on the object; default the object's owner). *Since 2.641.0 (#4974):* `user_id` counts
+only for your owner or a member of your workspace who may change the object; any other id gets exactly the answer of a
+proposal without `user_id` (the card goes to the object's owner, the job's `user_id` says so), so no answer tells who may
+write. An id that is no number is still `400`. The object must be visible to you; a view
 share is enough and the token needs the kind's read scope (a token that may only read sends no proposals, `403`, as
 everywhere). The answer is the proposal job (`201`, kind `obj_patch`);
 the person sees a card with the value now and your value per field and accepts or declines it. Accepting writes the values
 AS THAT PERSON with exactly your `expect_updated_at`: when anybody changed the object since, accepting is refused (nothing
 written; read it again and propose anew). You get the event `job` (action `approve` with `fields`, or `reject`). A proposal
-cannot be replaced (`409`): send a new one. At most 100 per day (`429`).
+cannot be replaced (`409`): send a new one. At most 100 per day (`429`), of them at most 20 for one person (`429`, since 2.641.0).
 
 *Since 2.579.0 (#4802):* the saved views of the documents search are the kind `docview` (fields `title`, `query` = the
 search's parameters as a query string, as `GET /api/v1/documents` (MCP `list_documents`) takes them, `ws` = the workspace it searches). A view is private

@@ -4,7 +4,8 @@
 with the test kind 'objprobe' (KALMIDO_TEST_OBJ=1, tests/obj_probe.py). Invented names only.
  - proposing: only with the version read (400 without, 409 old), unknown field / nothing changes 400, nothing is written,
    a view share is enough, a token that may only read is refused (403); an unshared object or another organisation's 404; user_id must be a
-   person with write rights on the object (400)
+   person with write rights on the object the agent sees anyway (its owner, its organisation's members); 2.641.0 (#4974):
+   any other id gets the answer of a proposal without user_id (the owner's card), at most 20 a day for one person
  - accepting (the owner's card): written as the person (history: the person, not an agent), undo / redo; another person
    cannot open or accept the card (404); the agent gets the event job (approve / reject)
  - accepting after someone else changed the object: 409 with a plain message, nothing written, the card says stale
@@ -175,16 +176,45 @@ check(requests.post(B + f"/api/v1/agent/jobs/{J2}/proposal", headers=AG.h, json=
       "no replacing through the jobs route: 409")
 
 # ---------------------------------------------------------------- the person who decides (user_id)
+# 2.641.0 (#4974): was 400 for a read-only member, another organisation's person and an agent - that told the agent who
+# may write. Now every id it may not use gets the answer of a proposal without user_id: 201, the card at the owner (bob)
+
+
+def same_as_owner(r, what):
+    j = r.json() if r.status_code == 201 else {}
+    check(r.status_code == 201 and j.get("user_id") == uid["bob"] and set(j) == set(base) and j["proposal"]["after"] == base["proposal"]["after"],
+          f"{what}: the answer of a proposal without user_id ({r.status_code} {r.text[:160]})")
+    check(Bo.get(B + f"/api/proposals/{j.get('id')}").ok, f"{what}: the card is the owner's")
+    Bo.post(B + f"/api/proposals/{j.get('id')}/discard")
+
+
+r = propose(AG, O, {"values": {"size": 3}, "expect_updated_at": cur["updated_at"]})
+base = r.json() if r.status_code == 201 else {}
+check(r.status_code == 201 and base.get("user_id") == uid["bob"], f"without user_id: the owner's card ({r.status_code} {r.text[:160]})")
+Bo.post(B + f"/api/proposals/{base.get('id')}/discard")
 r = propose(AG, O, {"values": {"size": 3}, "expect_updated_at": cur["updated_at"], "user_id": uid["rita"]})
-check(r.status_code == 400, f"user_id of a read-only member (view only): 400 ({r.status_code})")
+same_as_owner(r, "user_id of a read-only member (view only)")
+check(Ri.get(B + f"/api/proposals/{r.json().get('id')}").status_code == 404, "rita gets no card")
 r = propose(AG, O, {"values": {"size": 3}, "expect_updated_at": cur["updated_at"], "user_id": uid["olga"]})
-check(r.status_code == 400, f"user_id of another organisation's person: 400 ({r.status_code})")
+same_as_owner(r, "user_id of another organisation's person")
+check(Ol.get(B + f"/api/proposals/{r.json().get('id')}").status_code == 404, "olga gets no card")
 r = propose(AG, O, {"values": {"size": 3}, "expect_updated_at": cur["updated_at"], "user_id": AG.id})
-check(r.status_code == 400, f"user_id of an agent: 400 ({r.status_code})")
+same_as_owner(r, "user_id of an agent")
+r = propose(AG, O, {"values": {"size": 3}, "expect_updated_at": cur["updated_at"], "user_id": 987654321})
+same_as_owner(r, "user_id of nobody")
+r = propose(AG, O, {"values": {"size": 3}, "expect_updated_at": cur["updated_at"], "user_id": "carl"})
+check(r.status_code == 400, f"a user_id that is no id: 400 (the form only) ({r.status_code})")
 r = propose(AG, O, {"values": {"size": 3}, "expect_updated_at": cur["updated_at"], "user_id": uid["carl"]})
 J3 = r.json().get("id") if r.status_code == 201 else None
 check(r.status_code == 201, f"a card for carl, a member who may change it ({r.status_code} {r.text[:160]})")
 check(Bo.get(B + f"/api/proposals/{J3}").status_code == 404, "the owner does not see a card addressed to carl")
+# 2.641.0 (#4974): at most 20 a day for one person (besides 100 for the agent); the owner's cards still go
+ALICE = A.get(B + "/api/state").json()["me"]["id"]
+codes = [propose(AG, O, {"values": {"size": 3}, "expect_updated_at": cur["updated_at"], "user_id": ALICE}).status_code for _ in range(21)]
+check(codes[:20] == [201] * 20 and codes[20] == 429, f"20 a day for alice (the agent's owner), then 429 {codes}")
+r = propose(AG, O, {"values": {"size": 3}, "expect_updated_at": cur["updated_at"]})
+check(r.status_code == 201 and r.json().get("user_id") == uid["bob"], f"the owner's count is their own ({r.status_code})")
+Bo.post(B + f"/api/proposals/{r.json().get('id')}/discard")
 check(A.put(B + f"/api/orgs/{ORG}/members", json={"user_id": uid["carl"], "role": "readonly"}).ok, "carl becomes read-only")
 r = Ca.post(B + f"/api/proposals/{J3}/apply", json={"select": ["0"]})
 check(r.status_code == 403 and get(Bo, O)["size"] == 2, f"carl lost the write right: he cannot accept, nothing written ({r.status_code} {r.text[:160]})")
@@ -217,6 +247,10 @@ FJ = r.json().get("id") if r.status_code == 201 else None
 check(r.status_code == 201, f"her agent proposes ({r.status_code} {r.text[:160]})")
 r = Fr.post(B + f"/api/proposals/{FJ}/apply", json={"select": ["0"]})
 check(r.ok and get(Fr, f["id"])["note"] == "b", f"she accepts, the value is written ({r.status_code} {r.text[:160]})")
+# 2.641.0 (#4974): her agent may name only her: another person's id gets her card (the answer of a proposal without user_id)
+r = propose(FA, f["id"], {"values": {"note": "c"}, "expect_updated_at": get(Fr, f["id"])["updated_at"], "user_id": uid["bob"]})
+check(r.status_code == 201 and r.json().get("user_id") == FID and Bo.get(B + f"/api/proposals/{r.json().get('id')}").status_code == 404,
+      f"user_id of a person her agent does not see: her card, not bob's ({r.status_code} {r.text[:160]})")
 check(propose(AG, f["id"], {"values": {"note": "c"}, "expect_updated_at": get(Fr, f["id"])["updated_at"]}).status_code == 404,
       "an organisation's agent never reaches her object: 404")
 

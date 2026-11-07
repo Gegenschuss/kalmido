@@ -12,7 +12,10 @@ Stage 1 of the shared core lets an agent write directly with the version it read
 - the values are checked like a write (the kind's cleaners: unknown field / bad value 400), expect_updated_at is required
   (400 version_required) and must still be the object's version (409 with the current state); nothing would change = 400.
 - the card goes to user_id (a person, never an agent, with write rights on the object) or to the object's owner; nobody
-  else sees, accepts or discards it (agents/proposals.py need_prop).
+  else sees, accepts or discards it (agents/proposals.py need_prop). 2.641.0 (#4974): user_id counts only for a person the
+  agent sees anyway (its owner, the members of its organisation) who may change the object; any other id gets the answer
+  of a proposal without user_id (the owner's card), so trying ids tells nothing about who may write. At most
+  OBJP_PERSON_DAY_MAX a day for one person (429), besides OBJP_DAY_MAX for the agent.
 - accepting = obj_write AS THAT PERSON with exactly the version the agent saw: their write right is checked then (403 / 404
   without), a change by anybody since = 409 with a plain message on the card (nothing written). Undo / redo of the proposal
   write the values back with the version the last step left (changed since = skipped).
@@ -34,9 +37,10 @@ from ..core.objects import obj_need, obj_public, obj_reg, obj_role, obj_title
 from ..core.objweb import _agent_kind
 from ..core.writes import NEED_VERSION, UNDO_CONFLICT, _clean, _same, obj_write
 from ..accounts.session import me
-from ..agents.core import JOB_TITLE_MAX, agent_ids, job_dict
+from ..agents.core import JOB_TITLE_MAX, agent_ids, agent_row, job_dict
 
 OBJP_DAY_MAX = 100  # obj_patch proposals one agent may make per day
+OBJP_PERSON_DAY_MAX = 20  # 2.641.0 (#4974): ... of them for one person (the cards and pushes one person gets from one agent)
 OBJP_STALE = N_("Changed by someone else since the proposal: open the object, check it and ask the agent again")
 OBJP_WHO = N_("Only a person who may change it can accept the proposal (user_id)")
 OBJP_NOTHING = N_("Nothing would change")
@@ -47,14 +51,27 @@ def _plain(v):
     return json.loads(json.dumps(v, default=str))
 
 
-def _person(c, kind, rid, row, uid_arg):
-    """Whose card: user_id (a person with write rights on the object) or the object's owner (needs them too)."""
-    if uid_arg in (None, ""):
-        pid = row["owner_id"]
-    elif isinstance(uid_arg, bool) or not isinstance(uid_arg, int):
-        raise BadInput(tr("Invalid value: {0}", "user_id"))
-    else:
-        pid = uid_arg
+def _objp_people(c, aid):
+    """2.641.0 (#4974): the persons agent aid may name as user_id: its owner and the active persons of its organisation."""
+    a = agent_row(c, aid)
+    if not a:
+        return set()
+    ids = {a["owner_id"]} if a["owner_id"] else set()
+    if a["org_id"]:
+        ids |= {r[0] for r in c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id "
+                                        "WHERE m.org_id=? AND u.kind<>'agent' AND u.disabled=0", (a["org_id"],))}
+    return ids
+
+
+def _person(c, aid, kind, rid, row, uid_arg):
+    """Whose card: user_id (a person the agent sees, with write rights on the object) or the object's owner (needs them too).
+    2.641.0 (#4974): an id the agent may not name or without the right gets the owner's card, like no user_id."""
+    pid = row["owner_id"]
+    if uid_arg not in (None, ""):
+        if isinstance(uid_arg, bool) or not isinstance(uid_arg, int):
+            raise BadInput(tr("Invalid value: {0}", "user_id"))  # the form only: says nothing about any person
+        if uid_arg in _objp_people(c, aid) and obj_role(c, uid_arg, kind, rid) in ("edit", "manage"):
+            pid = uid_arg
     if not pid or pid in agent_ids(c) or obj_role(c, pid, kind, rid) not in ("edit", "manage"):
         raise BadInput(tr(OBJP_WHO))
     return pid
@@ -88,12 +105,15 @@ def v1_obj_propose(kind, rid):
     if not changed:
         raise BadInput(tr(OBJP_NOTHING))
     summary = _p_str(b.get("summary"), "summary", PROP_SUMMARY_MAX, line=False)
-    pid = _person(c, kind, rid, row, b.get("user_id"))
+    pid = _person(c, aid, kind, rid, row, b.get("user_id"))
     if usage_block(c, aid):
         return v1_err(409, tr("You reached your usage limit"))
     if c.execute("SELECT COUNT(*) FROM agent_jobs WHERE agent_id=? AND kind='obj_patch' AND created_at>=?",
                  (aid, iso(now_utc() - timedelta(days=1)))).fetchone()[0] >= OBJP_DAY_MAX:
         return v1_err(429, tr("At most {0} change proposals per day", OBJP_DAY_MAX))
+    if c.execute("SELECT COUNT(*) FROM agent_jobs WHERE agent_id=? AND user_id=? AND kind='obj_patch' AND created_at>=?",
+                 (aid, pid, iso(now_utc() - timedelta(days=1)))).fetchone()[0] >= OBJP_PERSON_DAY_MAX:  # 2.641.0 (#4974)
+        return v1_err(429, tr("At most {0} change proposals per day for one person", OBJP_PERSON_DAY_MAX))
     keys = sorted(changed)
     p = {"kind": "obj_patch", "summary": summary, "object_kind": kind, "object_id": int(rid), "version": str(row["updated_at"]),
          "values": _plain({k: vals[k] for k in keys}), "before": _plain({k: row[k] for k in keys}), "after": _plain({k: changed[k] for k in keys})}
