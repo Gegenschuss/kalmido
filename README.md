@@ -19,11 +19,11 @@
 
 ## What's new
 
-**2.618.0** (2026-11-07):
-- **Dates**: type a date straight into every date picker (6.11., tomorrow, +3).
-- **Knowledge**: meeting minutes from a calendar event, with participants, agenda, decisions and action items.
-- **Documents**: "Apply what was learned" sorts selected documents again without new text recognition.
-- **Security**: opening the server (public links, registration, 2FA, OIDC) needs a fresh sign-in; organisation encryption covers preview images.
+**2.621.0** (2026-11-07):
+- **Office**: fetch a bank account's transactions directly over FinTS (needs your own FinTS product ID); choose how your file names are built when importing old documents.
+- **Documents**: clear stacks with archive number codes are split automatically, with Undo.
+- **Wiki**: task links are written `[[#123]]`; a bare `#123` stays text.
+- **Agents**: read-only audit jobs, a hook that refuses dangerous commands, and project search for token and agent limits.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 
