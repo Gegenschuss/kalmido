@@ -45,6 +45,11 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   check(await w.eval(`sbp_pin('side_people', ${P[0]}, true, 'Pia')`), 'pin Pia');
   check(await until(async () => await server() === want([P[0]])), 'the server holds Pia');
   w.eval('applyState(window.__old)');  // ... arrives after the save (what an overlapping load puts in)
+  // CI red of 2.618.0: since 2.607.0 (#4901) a finished own write stays on top of a state that arrives within two minutes
+  // (OPT_DONE): the older state no longer drops Pia on the page. A page that lags behind all the same (a state after that
+  // window, another tab) is what the single-entry pin below guards against: drop the kept write and apply the old state again
+  check(want(w.eval(`sbp_ids('side_people')`)) === want([P[0]]), 'an older state right after the save keeps the own pin (#4901)');
+  w.eval('OPT_DONE.clear(); applyState(window.__old)');
   check(w.eval(`sbp_ids('side_people').length`) === 0, 'the page state is the older one (no pins)');
   check(await w.eval(`sbp_pin('side_people', ${P[1]}, true, 'Paul')`), 'pin Paul');
   check(await until(async () => await server() === want([P[0], P[1]])), 'the server keeps Pia and adds Paul ' + await server());
