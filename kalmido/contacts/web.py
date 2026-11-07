@@ -37,7 +37,7 @@ from ..collab.comments import user_names  # 2.369.5 (#2517): pulled up from func
 from ..core.conflict import Conflict  # 2.564.0 (#4701/#4702)
 
 # 2.41.0 (#1437): never above the request limit (MAX_CONTENT_LENGTH answers 413 before the route), whole MB for the message
-VCF_MAX = min(20, (app.config.get("MAX_CONTENT_LENGTH") or 0) // (1024 * 1024) or 20) * 1024 * 1024
+VCF_MAX = min(50, (app.config.get("MAX_CONTENT_LENGTH") or 0) // (1024 * 1024) or 50) * 1024 * 1024
 
 
 @app.errorhandler(RequestEntityTooLarge)
