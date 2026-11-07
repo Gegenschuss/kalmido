@@ -16,6 +16,39 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.643.0] - 2026-11-07
+
+Package 2.631 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Added
+- Tables: rows and columns move by dragging their head (row number, column letter) - with the mouse at once, with a finger after a long press on the head (the row / column follows the finger, the table scrolls at the edge); the head menu also has "Move up / down / left / right"; several marked rows or columns move together, every move is one Undo step, other editors see the new order live, readers cannot move, a filtered view says to reset the filters instead. Formula ranges keep their rows and columns when one of them is moved; new route `POST /api/sheets/<id>/columns/order` next to `rows/order` (#4620).
+- Delete account: the dialog names for every folder handed on to an heir what stays behind and goes with the account (locked folders, shortcuts, agent folders, trash, mail copies), how many public links and file requests end, and how many agents of other people keep their share in it (#4584).
+### Fixed
+- Phone: a sheet dragged up at its grip grows at most to the height of its content (at most 94 % of the screen) instead of leaving an empty area below it; snapping to "full" uses the same height, the bell's own grip and a stored bell height follow the same rule (#4993).
+- Delete account: mail copies that go with the account are no longer sealed again for the heir only to be deleted right after (#4584).
+
+Package 2.595 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Changed
+- #4905: The release gate also accepts a green full CI run of a commit with the same files (same git tree, push / schedule / dispatch runs of the own repository only); release.yml can be started again by hand on a release tag.
+### Fixed
+- #4881: "Move to ..." no longer lists folders that are in the trash, or below a folder in the trash; the server refuses a move into such a folder.
+- #4906: Letters: "Send by e-mail" right after typing the e-mail address saves the letter first, the recipient is filled in.
+- #4903: Credit card import: the conversion fee line ("2,5% für Währungsumrechnung" and its other names) is its own fee position, so the sum fits the statement; an unknown line with an amount of its own under a position is kept instead of dropped (footer lines stay out); the rate after the foreign amount is no longer part of the merchant name.
+- #4896: Command palette (Mod+K): parts that arrive after opening (shared tables, document facets, folders) are found when typing.
+- #4900 #4902 #4911: tests p2579_c_ui, p287b_b_ui and p287b_a_freelancer_api follow the app again (wait for the applied view, palette set reset, own objects for new GET routes).
+
+Package 2.630 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Added
+- Statistics: three new blocks Contracts (running contracts, cost per month / year, notice periods in the next 90 days, per provider), Health (per person: appointments, check-ups and vaccinations of the last 12 weeks, next due, overdue; medication intakes counted apart) and Travel (trips and travel days in the last 12 months and this year, travel costs, next trip), each only with its module on; `GET /api/v1/stats` and the MCP tool `get_stats` give agents the same numbers, health only with the scope private (#4617).
+- Command line `mcp/kalmido_cli.py` for scripts: `list`, `show`, `add`, `comment`, `done` over the REST API with `KALMIDO_URL` / `KALMIDO_TOKEN`, `--json` on every command, part of the starter files (#4520).
+- Image build: `tools/pins.py --wheels` checks the libraries inside the Pillow wheel (libjpeg-turbo, zlib-ng, libtiff, libwebp, freetype, openjpeg, lcms2) against minimum versions and stops the build when one is older (#4671).
+### Changed
+- Keyboard: one key registry (`static/js/keys.js`) with a stack of open things; Escape closes only the innermost open dialog, menu or sheet, the most recently opened first; the shortcut help also lists the keys registered there (#4510).
+- Hints that name a settings path, e.g. "(Settings > Modules)", are now a link that opens the settings at that section (#4519).
+- Contacts: the contact form shows names and phone / e-mail / addresses side by side on wide monitors (#4695).
+- vCard import takes files up to 50 MB (was 20 MB) (#4593).
+### Fixed
+- CI red p2391_k_ui: the text key "Scan inbox" is the scan inbox, not an old name of the basket (#4992).
+
 ## [2.639.0] - 2026-11-07
 
 Package 2.385 (Film: document samples).
@@ -301,7 +334,8 @@ Package 2.582 (Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher),
 
 Not released (the CI of this version was red); its changes are listed under 2.605.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.639.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.643.0...HEAD
+[2.643.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.643.0
 [2.639.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.639.0
 [2.634.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.634.0
 [2.632.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.632.0
