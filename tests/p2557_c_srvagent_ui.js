@@ -132,7 +132,8 @@ async function scenario(tag, user, ck) {
       check(sv2.key_hint === '…wxyz' && sv2.model === 'claude-haiku-5-5', 'stored: the new key and model' + T);
       click(w, ed.querySelector('[data-m="close"]'));
       // 2.638.0 (#4714): a key without a limit: the dialog says so (and proposes nothing: the key is there)
-      check((await call('PATCH', `/api/my/agents/${ag.id}`, {limits: null}, ck)).status === 200, 'setup: the owner lifts the limit' + T);
+      await call('PATCH', `/api/my/agents/${ag.id}`, {limits: null}, ck);  // (its answer carries the agent's own "status")
+      check((await call('GET', `/api/agents/${ag.id}/server`, null, ck)).limits === null, 'setup: the owner lifts the limit' + T);
       click(w, sb);
       const ed2 = await until(() => lastModal(d)?.querySelector('#srv-keyhint') && lastModal(d));
       check(ed2 && ed2.querySelector('.srvnolim') && /No usage limit/.test(ed2.querySelector('.srvnolim').textContent) && !ed2.querySelector('#srv-daylim'),

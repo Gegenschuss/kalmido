@@ -24,10 +24,11 @@ kt.fresh(prefix="P2638B")
 kt.docker_logs_on_first_fail()
 A = kt.setup()
 A.patch(B + "/api/settings", json={"lang": "en", "tour": "done", "features": "cal,events,contacts"})
-ORG = A.get(B + "/api/state").json()["me"]["workspaces"][0]["id"]
-r = A.post(B + "/api/users", json={"orgs": [ORG], "username": "bob", "display_name": "Bob", "password": "password123", "email": "bob@example.com"})
+r = A.post(B + "/api/users", json={"username": "bob", "display_name": "Bob", "password": "password123", "email": "bob@example.com"})
 assert r.ok, r.text
-BOB = r.json()["id"]
+BOB, ALICE = r.json()["id"], kt.me_id(A)
+ORG = A.post(B + "/api/admin/orgs", json={"name": "Alpha", "admin_id": ALICE}).json()["id"]
+assert A.patch(B + f"/api/admin/orgs/{ORG}", json={"members": [ALICE, BOB], "admins": [ALICE]}).ok
 Bo = kt.sess("bob")
 Bo.patch(B + "/api/settings", json={"lang": "en", "tour": "done", "features": "cal,events,contacts"})
 FID, Fr = freelancer(B, A, "frida")
