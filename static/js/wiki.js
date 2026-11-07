@@ -497,11 +497,11 @@ function wk_attrsHtml(a, sp) {
 const wk_ro = () => !!LS.get('wkRo', '');
 const wk_typing = () => !!document.activeElement?.closest?.('#wk-cm, #wk-body');
 function wk_pageHtml(p) {
-  const may = WK.idx[p.space]?.mayWrite !== false, mob = isMobile(), asMd = WK.mdFor === p.id, cm = typeof wkcm_html === 'function' && wkcm_can();
-  const edit = WK.edit = may && (asMd || ((!wk_ro() || WK.fresh === p.id) && (WK.edit || !mob)));  // a page just made opens for writing, also with the lock
+  const may = WK.idx[p.space]?.mayWrite !== false, mob = isMobile(), tch = isTouch(), asMd = WK.mdFor === p.id, cm = typeof wkcm_html === 'function' && wkcm_can();
+  const edit = WK.edit = may && (asMd || ((!wk_ro() || WK.fresh === p.id) && (WK.edit || !tch)));  // 2.655.0 (#5082): touch reads first (pen), also a tablet; a page just made opens for writing, also with the lock
   return `<div class="nthead">${mob ? `<button type="button" class="iconbtn" data-wk="close" aria-label="${esc(tr('Back'))}">${ic('back')}</button>` : ''}
     <div class="wktitle">${wk_crumbs(p)}<h2>${esc(wk_base(p.path))}${typeof wsh_markHtml === 'function' ? wsh_markHtml(p.shares) : ''}</h2></div>
-    ${mob && may && !wk_ro() && !asMd ? `<button type="button" class="iconbtn wkpen" data-wk="pen" aria-pressed="${edit}" title="${esc(edit ? tr('Done') : tr('Edit'))}" aria-label="${esc(edit ? tr('Done') : tr('Edit'))}">${ic(edit ? 'check' : 'edit')}</button>` : ''}
+    ${tch && may && !wk_ro() && !asMd ? `<button type="button" class="iconbtn wkpen" data-wk="pen" aria-pressed="${edit}" title="${esc(edit ? tr('Done') : tr('Edit'))}" aria-label="${esc(edit ? tr('Done') : tr('Edit'))}">${ic(edit ? 'check' : 'edit')}</button>` : ''}
     ${may && typeof wsh_btnHtml === 'function' ? wsh_btnHtml(p) : ''}
     ${may ? `<button type="button" class="iconbtn" data-wk="pmenu" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots')}</button>` : ''}
     ${mob ? '' : `<button type="button" class="iconbtn" data-wk="close" title="${esc(tr('Close'))}" aria-label="${esc(tr('Close'))}">${ic('x')}</button>`}</div>${wk_dayBar(p)}
