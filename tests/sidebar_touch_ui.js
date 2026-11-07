@@ -33,10 +33,13 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   const fold = f => d.querySelector(`#side .fhead[data-folder="${f}"]`);
   d.querySelector('[data-act="side"]').click();
   check(d.querySelector('#side.open'), 'drawer open');
+  // 2.627.0 (#4966): drag.js swallows the browser's click that follows a drag (a touchend kept from the browser brings none in a
+  // real browser); the test sends that click, so the next click of the test (the toast's Undo) is not the swallowed one
+  const swallow = () => d.body.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
   const drag = async (el, target, {hold = 420, end = 'touchend'} = {}) => {
     touch(w, el, 'touchstart'); await sleep(hold);
     under = target; const mv = touch(w, el, 'touchmove', 60);
-    const e = touch(w, el, end, 60); under = null;
+    const e = touch(w, el, end, 60); under = null; swallow();
     return {mv, e};
   };
   // ---- reorder: Car before Home
@@ -45,7 +48,7 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   under = row(L1); const mv = touch(w, row(L3), 'touchmove', 60); await sleep(60);  // 2.87.9 (#1965): the drag draws in the next frame
   check(mv.defaultPrevented && row(L1).classList.contains('dropbefore'), 'dragging over a list: insert mark (the drawer does not scroll)');
   calls.length = 0;
-  const te = touch(w, row(L3), 'touchend', 60); under = null;
+  const te = touch(w, row(L3), 'touchend', 60); under = null; swallow();
   check(te.defaultPrevented && !d.querySelector('.side-ghost'), 'drop: no click after the hold, ghost gone');
   check(await until(async () => { const o = await order(); return o.indexOf(L3) < o.indexOf(L1); }), 'Car now before Home (server)');
   check(calls.filter(c => c[0] !== 'GET').length === 1, 'one request per drop');
@@ -64,7 +67,7 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   await sleep(300);
   { const el = row(L3); touch(w, el, 'touchstart'); await sleep(200); w.eval('renderSide()'); await sleep(220);
     check(!el.isConnected && d.querySelector('.side-ghost'), 'a redraw during the hold: the row was replaced, the drag lifted');
-    under = fold('Hobby'); touch(w, el, 'touchmove', 60); touch(w, el, 'touchend', 60); under = null; }
+    under = fold('Hobby'); touch(w, el, 'touchmove', 60); touch(w, el, 'touchend', 60); under = null; swallow(); }
   check(await until(async () => (await folderOf(L3)) === 'Hobby'), 'a redraw during the hold: the drop still moves into the folder');
   check(!d.querySelector('.side-ghost'), 'a redraw during the hold: ghost gone after the drop');
   check(await until(() => /Moved to folder Hobby/.test(toastText(d)) && d.querySelector('#toast button')), `a redraw during the hold: toast with Undo: ${toastText(d)}`);
