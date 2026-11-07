@@ -1095,7 +1095,7 @@ relies on the session).
   the archive (the archive itself is encrypted). Content encrypted in the browser by its author (encrypted task notes
   and files) stays ciphertext; the manifest lists it under `client_encrypted`. Personal key bundles are never in the
   organisation archive: a person's encrypted notes and files open after a move only with the keys from their own account
-  export, and projects encrypted in the browser are not taken over by the import. Locked folders of the file store:
+  export, and projects encrypted in the browser are not imported. Locked folders of the file store:
   see "Moving locked folders of the file store" above.
 - **Opening it.** The archive is encrypted with AES-256-GCM under the organisation's key. You need the organisation's
   recovery key that was valid when the archive was made (*Settings > Organisation > Data > Encryption*; the archive carries

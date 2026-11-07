@@ -108,7 +108,7 @@ UMZ_NOT_INCLUDED = (
 UMZ_ENC_NOTE = ("Encrypted in the browser: stored here as ciphertext. Your key bundle (e2e_keys, wrapped with your passphrase and "
                 "recovery code) comes along: after an import into an account without its own keys, locked notes and your encrypted "
                 "files open with the same passphrase. Into an account that already has keys they arrive unreadable. Projects "
-                "encrypted in the browser are not taken over by the import (switch their encryption off before the export). "
+                "encrypted in the browser are not imported (switch their encryption off before the export). "
                 "Locked folders of the file store come along with your own folder key (private_lock_keys, it opens only with "
                 "your key bundle) and open with the same passphrase; into an account with other keys the import leaves them out.")
 
