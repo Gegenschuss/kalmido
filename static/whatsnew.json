@@ -1,6 +1,24 @@
 {
  "versions": [
   {
+   "version": "2.632.0",
+   "date": "2026-11-07",
+   "items": [
+    {
+     "de": "Am Handy lassen sich Dateien der Ablage mit dem Finger in einen Ordner ziehen und die Symbole der Bereichs-Leiste umsortieren.",
+     "en": "On a phone you can drag files of the file storage into a folder and sort the icons of the area rail with your finger."
+    },
+    {
+     "de": "Neben der geschätzten Dauer einer Aufgabe steht jetzt die erfasste Zeit.",
+     "en": "The tracked time now stands next to a task's estimated duration."
+    },
+    {
+     "de": "Admins einer Organisation legen fest, wie die Ansichten für alle Mitglieder standardmäßig angeordnet sind.",
+     "en": "Organisation admins set how the views are arranged by default for all members."
+    }
+   ]
+  },
+  {
    "version": "2.629.0",
    "date": "2026-11-07",
    "items": [
