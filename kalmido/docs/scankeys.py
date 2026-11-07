@@ -301,7 +301,7 @@ def docs_scan_key_edit(kid):
         except Denied as e:
             if pid and e.code == 409 and e.text() == tr(LOCKED_MSG):
                 return err(e.text(), 409)
-            return err(tr("Choose a folder of these documents you may add to") if pid else e.text(), 400 if pid else e.code)
+            return err(tr("Select a folder of these documents you may add to") if pid else e.text(), 400 if pid else e.code)
         sets["upload_target"] = json.dumps(nt)
     if "extend" in b:
         if not isinstance(b["extend"], bool):

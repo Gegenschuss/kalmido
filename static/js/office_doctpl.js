@@ -5,7 +5,7 @@
 // signature, office/signoff.py). Server: kalmido/office/doctpl.py. The task templates (templates.js) are something else.
 const DT = {data: null, undo: null, loading: false, err: null, view: 'docs', fClient: '', fList: '', fStatus: '', pv: null, pvSeq: 0, sg: null, oid: undefined, preset: null};
 OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, ['gendocs', 'file', N_('Letters & contracts'), 1, () => dtTabHtml(), 'sell']);  // admins only; 'sell' = the group of 2.92.1's tab menu (#1917)
-const DT_ST = {draft: N_('Draft'), final: N_('Finished'), signed: N_('Signed'), declined: N_('Declined')};
+const DT_ST = {draft: N_('Draft'), final: N_('Finished'), signed: N_('Signed'), declined: N_('Rejected')};
 const dtReload = () => { DT.data = null; DT.pv = null; DT.sg = null; ofcDraw(); };
 const dtDoc = id => (DT.data?.docs || []).find(d => d.id === id);
 const dtTpl = id => (DT.data?.templates || []).find(t => t.id === id);
@@ -117,7 +117,7 @@ function dtDocHtml(d) {
 }
 function dtRefsHtml(cid, lid, did) {
   const d = DT.data, offers = (d.offers || []).filter(o => o.client_id === +cid);
-  return `${ofcRowF('dt-client', tr('Client'), ofcSel('dt-client', cid || '', (d.clients || []).map(c => [c.id, cdn_label(c)]), tr('Choose a client')))}
+  return `${ofcRowF('dt-client', tr('Client'), ofcSel('dt-client', cid || '', (d.clients || []).map(c => [c.id, cdn_label(c)]), tr('Select a client')))}
     ${ofcRowF('dt-list', tr('Project'), ofcSel('dt-list', lid || '', (d.lists || []).map(l => [l.id, l.name]), tr('none')))}
     ${ofcRowF('dt-offer', tr('Quotation'), ofcSel('dt-offer', did || '', offers.map(o => [o.id, [o.number || tr('Draft'), o.project_title].filter(Boolean).join(' · ')]), tr('none')))}`;
 }
@@ -154,9 +154,9 @@ async function dtSignImage(x) {
 function dtSigHtml(d) {
   if (!DT.sg || DT.sg.id !== d.id) { setTimeout(() => dtSigLoad(d.id), 0); return `<section class="ofdsec dtp-sg"><h3>${tr('Signature by the client')}</h3><p class="muted">${tr('Loading…')}</p></section>`; }
   const rows = DT.sg.rows, live = rows.some(x => x.live), can = d.status === 'final' && !d.archived;
-  const st = x => x.revoked_at && x.state === 'open' ? tr('Turned off') : !x.live && x.state === 'open' ? tr('Expired') : x.state === 'accepted' ? tr('Signed') : x.state === 'declined' ? tr('Declined') : tr('Waiting for the client');
+  const st = x => x.revoked_at && x.state === 'open' ? tr('Switched off') : !x.live && x.state === 'open' ? tr('Expired') : x.state === 'accepted' ? tr('Signed') : x.state === 'declined' ? tr('Rejected') : tr('Waiting for the client');
   const row = x => `<li class="sgrow st-${esc(x.state)}"><div class="sghead"><b>${esc(st(x))}</b><small class="muted"> · ${esc(fmtWhen(x.created_at))}</small></div>
-    ${x.live && x.url ? `<div class="row icalrow"><input readonly value="${esc(x.url)}" aria-label="${esc(tr('Signature link'))}" data-dturl="${x.id}"><button type="button" class="btn sm pri" data-dt="sgcopy" data-id="${x.id}">${ic('copy', 's')} ${tr('Copy')}</button><button type="button" class="btn sm danger" data-dt="sgstop" data-id="${x.id}">${tr('Turn off')}</button></div>` : ''}
+    ${x.live && x.url ? `<div class="row icalrow"><input readonly value="${esc(x.url)}" aria-label="${esc(tr('Signature link'))}" data-dturl="${x.id}"><button type="button" class="btn sm pri" data-dt="sgcopy" data-id="${x.id}">${ic('copy', 's')} ${tr('Copy')}</button><button type="button" class="btn sm danger" data-dt="sgstop" data-id="${x.id}">${tr('Switch off')}</button></div>` : ''}
     ${x.state !== 'open' ? `<div class="sgproto">${esc([x.signer_name, x.signer_email].filter(Boolean).join(' · '))}<br>${esc(fmtWhen(x.signed_at))} · ${esc(tr('IP address {0}', x.ip || '?'))}${x.reason ? `<br>${esc(tr('Reason: {0}', x.reason))}` : ''}<details class="sgproof"><summary>${tr('Proof')}</summary><small class="muted">SHA-256 ${esc(x.doc_hash || '')}</small></details></div>` : ''}</li>`;  // 2.298.0 A2 (#3186): like signoff.js
   return `<section class="ofdsec dtp-sg"><h3>${tr('Signature by the client')}</h3>${rows.length ? `<ul class="sglist" role="list">${rows.map(row).join('')}</ul>` : ''}
     ${can ? `<div class="row"><label for="dt-exp">${tr('Valid until')}</label>${dateIn('dt-exp', '', {min: today(), label: tr('Valid until'), empty: tr('no expiry')})}</div>
@@ -175,7 +175,7 @@ function dtNewModal(p = {}) {
   const tid = p.template_id || (p.kind ? ts.find(t => t.kind === p.kind)?.id : null) || ts[0]?.id || '';
   const md = modal(`<h3>${tr('New document')}</h3>
     ${ofcRowF('dt-tpl', tr('Template'), ofcSel('dt-tpl', tid, ts.map(t => [t.id, `${t.name} · ${t.kind_label}`]), tr('empty document')))}
-    ${!ts.length ? `<p class="muted ofchint">${esc(tr('No templates yet. Take over a sample under Templates.'))}</p>` : ''}
+    ${!ts.length ? `<p class="muted ofchint">${esc(tr('No templates yet. Add a sample under Templates.'))}</p>` : ''}
     ${dtRefsHtml(p.client_id || '', p.list_id || '', p.doc_id || '')}
     ${ofcRowF('dt-ntitle', tr('Title'), ofcIn('dt-ntitle', p.title || '', {max: 300, ph: tr('as the template')}))}
     <div class="aerr" role="alert"></div>
@@ -254,7 +254,7 @@ async function dtStartersModal() {
   try { j = await api('GET', '/api/office/doc-templates/starters'); } catch (x) { toast(x.message || ''); return; }
   const md = modal(`<h3>${tr('Use sample')}</h3><p class="muted">${esc(j.note || '')}</p>
     ${ofcRowF('dt-slang', tr('Language'), ofcSel('dt-slang', j.lang, (S.languages || []).map(L => [L.code, L.name])))}
-    <ul class="ofclist dtp-starters" role="list">${j.starters.map(s => `<li><div class="ofcrow dtp-srow"><span class="ofcn"><b>${esc(s.name)}</b><small class="muted">${esc([s.kind !== 'other' ? s.kind_label : '', s.legal ? tr('Legal text: please have it checked') : '', s.machine ? tr('Machine translated, check before use') : ''].filter(Boolean).join(' · '))}</small></span><button type="button" class="btn sm pri" data-m="take" data-k="${esc(s.key)}">${tr('Take over')}</button></div></li>`).join('')}</ul>
+    <ul class="ofclist dtp-starters" role="list">${j.starters.map(s => `<li><div class="ofcrow dtp-srow"><span class="ofcn"><b>${esc(s.name)}</b><small class="muted">${esc([s.kind !== 'other' ? s.kind_label : '', s.legal ? tr('Legal text: please have it checked') : '', s.machine ? tr('Machine translated, check before use') : ''].filter(Boolean).join(' · '))}</small></span><button type="button" class="btn sm pri" data-m="take" data-k="${esc(s.key)}">${tr('Add')}</button></div></li>`).join('')}</ul>
     <div class="aerr" role="alert"></div><div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button></div>`);
   md.classList.add('ofcdlg');
   const close = fgModal(md);
@@ -373,7 +373,7 @@ document.addEventListener('click', async e => {
     const i = $(`[data-dturl="${b.dataset.id}"]`);
     try { await navigator.clipboard.writeText(i.value); toast(tr('Link copied')); } catch { i.focus(); i.select(); toast(tr('Copy the selected link')); }
   } else if (a === 'sgstop') {
-    if (!await askConfirm(tr('Stop the signature link?'), tr('It stops working at once.'), {ok: tr('Turn off'), danger: true})) return;
+    if (!await askConfirm(tr('Stop the signature link?'), tr('It stops working at once.'), {ok: tr('Switch off'), danger: true})) return;
     try { await api('POST', `/api/office/signoffs/${b.dataset.id}/revoke`); toast(tr('Signature link stopped')); DT.sg = null; ofcDraw(); } catch (x) { toast(x.message || tr('unknown')); }
   }
 });
@@ -442,7 +442,7 @@ function dsb_menu(b, x) {
     x.review ? {label: x.review === 2 ? tr('Checked: reply handled') : tr('Checked: signature is fine'), icon: 'check',  /* 2.154.0 E (#2192): review 2 = a reply that was not filed (office log) */ fn: async () => { try { await api('POST', `${DSB_API}/${x.id}/confirm`); dsb_clReload(); } catch (e) { toast(e.message || ''); } }} : null,
     !draft && !(x.sign && x.status === 'signed') ? {label: tr('Send by e-mail…'), icon: 'mail', fn: () => dsb_mail(x)} : null,
     !draft && x.sign && x.status !== 'signed' ? {label: tr('Upload the signed sheet…'), icon: 'upload', fn: () => dsb_upload(x)} : null,
-    ...(draft ? [] : x.sign ? [st('signed', tr('Mark as signed')), st('declined', tr('Mark as declined')), x.review === 1 ? st('sent', tr('Not the signed sheet: back to sent')) : null]
+    ...(draft ? [] : x.sign ? [st('signed', tr('Mark as signed')), st('declined', tr('Mark as rejected')), x.review === 1 ? st('sent', tr('Not the signed sheet: back to sent')) : null]
       : [st('handed', tr('Mark as handed over'))]),
     done || x.status === 'declined' ? st('open', tr('Mark as open')) : null,
     {label: tr('Archive'), icon: 'archive', fn: async () => {
