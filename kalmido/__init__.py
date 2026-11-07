@@ -562,6 +562,9 @@ ORDER = (
     "assistant.core",  # 2.75.0 (#1411): the built-in assistant -- configuration, model call, prompts (off unless configured)
     "assistant.web",  # 2.75.0 (#1411): the routes of the built-in assistant
     "admin.worker",  # 2.102.0 D (#1994 / #1997): health numbers, the process role, one runner per background loop
+    # -- sorted block (2.624.0, #3941): a new module WITHOUT an order need goes here, one per line, sorted by name (tools/check_layout.py)
+    # (it loads after every module above, so it may use their names at import time; one with an order need goes above instead)
+    # -- end of the sorted block: only core.idem and startup follow, they stay last
     "core.idem",  # 2.270.0 C (#3022): idempotency keys of write requests (after every other before_request hook, its after_request runs first)
     "startup",
 )

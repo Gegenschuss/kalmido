@@ -289,9 +289,11 @@ The most used helpers:
 
 1. Create the file in the folder of its area with a one-line docstring (what it holds).
 2. Add it to `ORDER` in `kalmido/__init__.py` **after** every module it imports at the top; names of later modules are
-   imported inside functions (see above). The folder `__init__.py` files stay empty.
+   imported inside functions (see above). The folder `__init__.py` files stay empty. A module without an order need (it
+   only imports what loads before it, and nothing must load after it) goes into the sorted block at the end of `ORDER`
+   (one per line, sorted by name; 2.624.0): two packages then add different lines instead of conflicting.
 3. Database changes are additive migrations (one file per task in `core/migrations.d/`, run by `init_db` in `core/db.py`).
-4. `python3 tools/check_layout.py` checks that `ORDER` and the files agree (CI runs it).
+4. `python3 tools/check_layout.py` checks that `ORDER` and the files agree and that the sorted block is sorted (CI runs it).
 5. Layers (2.102.0): every package sits in one of five layers, lowest first -- `core`, `accounts`, `domain` (tasks,
    lists, calendars, office, ...), `integrations` (api, admin, mail, webhooks, importers, ...) and `agents` (`LAYERS` in
    `kalmido/__init__.py`, `LAYER_OF` for a single module). At module level a module imports only from its own or a lower

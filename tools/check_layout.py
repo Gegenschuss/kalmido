@@ -123,6 +123,23 @@ mods = sorted(os.path.relpath(p, os.path.join(ROOT, "kalmido"))[:-3].replace(os.
               if not p.endswith("__init__.py") and "migrations.d" not in p)  # 2.485.0 (#3939): fragments are data, not modules
 if sorted(order) != mods or len(set(order)) != len(order):
     ERR.append(f"kalmido/__init__.py ORDER vs the package: missing {sorted(set(mods) - set(order))}, unknown {sorted(set(order) - set(mods))}")
+# 2.624.0 (#3941): new modules no longer land all over ORDER (the most frequent conflict in kalmido/__init__.py): one without
+# an order need goes into the sorted block at its end (one per line, sorted by name, like the start scripts of index.html);
+# after the block only core.idem and startup, which must stay last. The modules above the block keep their order.
+ORDER_TAIL = ["core.idem", "startup"]
+_om = re.search(r"\n    # -- sorted block [^\n]*\n(.*?)    # -- end of the sorted block[^\n]*\n(.*)", m.group(1) + "\n" if m else "", re.S)
+if not _om:
+    ERR.append("kalmido/__init__.py ORDER: the marks of the sorted block (# -- sorted block ... / # -- end of the sorted block) are missing")
+else:
+    _blk = [ln for ln in _om.group(1).splitlines() if not re.match(r"\s*#", ln)]
+    _sorted = [re.match(r'    "([\w.]+)",(  #.*)?$', ln) for ln in _blk]
+    if not all(_sorted):
+        ERR.append(f"kalmido/__init__.py ORDER: in the sorted block one module per line (    \"pkg.mod\",  # comment): {[ln for ln, x in zip(_blk, _sorted) if not x]}")
+    _names = [x.group(1) for x in _sorted if x]
+    if _names != sorted(_names):
+        ERR.append(f"kalmido/__init__.py ORDER: the sorted block is sorted by name: {_names} -> {sorted(_names)}")
+    if re.findall(r'"([\w.]+)"', _om.group(2)) != ORDER_TAIL:
+        ERR.append(f"kalmido/__init__.py ORDER: after the sorted block only {ORDER_TAIL}: a new module goes into the block, sorted by name")
 for p in glob.glob(os.path.join(ROOT, "kalmido", "*", "__init__.py")):
     body = re.sub(r'^""".*?"""\s*', "", read(p), flags=re.S).strip()
     if body:
