@@ -132,6 +132,7 @@ check(r.ok, f"frida's own session deletes the project {r.status_code}")
 ALPHA = A.get(B + "/api/orgs").json()["orgs"][0]["id"]
 r = A.post(B + "/api/users", json={"username": "carl", "display_name": "Carl", "password": "password123", "email": "carl@example.com"})
 assert r.ok, r.text
+CARL = r.json()["id"]
 r = A.post(B + "/api/users", json={"username": "cara", "display_name": "Cara", "password": "password123", "email": "cara@example.com",
                                    "orgs": [{"id": ALPHA, "role": "member"}]})
 assert r.ok, r.text
@@ -142,6 +143,9 @@ for s in (Ca, Cc):
 r = Ca.post(B + "/api/orgs", json={"name": "Client Studio"})
 assert r.status_code == 201, r.text
 CO = r.json()["id"]
+# 2.635.0 (#5008): since 2.593.0 (#3570) an invitation by e-mail into a company of its own (orgs.self_made) reaches only a
+# person its admin may see (else it is dropped): carl and cara are connected first, as colleagues who know each other
+kt.dbx("INSERT INTO conn_links(a_id, b_id, created_at) VALUES(?, ?, '2026-01-01T00:00:00Z')", tuple(sorted((CARL, CID))))
 assert Ca.put(B + f"/api/orgs/{CO}/members", json={"email": "cara@example.com"}).ok
 assert org_join(B, "cara", CO)
 assert Cc.patch(B + "/api/settings", json={"workspace": f"org:{CO}"}).ok  # her chosen workspace: the default of a new object
