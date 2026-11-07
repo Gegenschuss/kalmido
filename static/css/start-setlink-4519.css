@@ -1,0 +1,3 @@
+/* 2.630.0 (#4519): the way "(Settings > Modules)" in a hint as a link that opens the settings there (setLinkHtml in
+   static/js/setcore.js). A start file: such hints stand in many views. */
+.setlink{color:var(--accent);text-underline-offset:2px}
