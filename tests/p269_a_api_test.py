@@ -344,7 +344,8 @@ run = ((j or {}).get("zip") or {}).get("run") or {}
 check(run.get("new") == 2 and run.get("failed") == 0 and run.get("total") == 2 and not run.get("error"), f"ZIP import: 2 new ({run})")
 le = run.get("learn") or {}
 check(le.get("rules_new") == 2 and le.get("trained") == 2 and "unsupported" not in le, f"ZIP import: 2 rules taken over, 2 documents learnt ({le})")
-zr = [{k: v for k, v in x.items() if k != "id"} for x in Bo.get(B + f"/api/docs/settings?ws=org:{ORG}").json().get("rules") or []]
+zr = [{k: v for k, v in x.items() if k not in ("id", "updated_at")} for x in  # 2.635.0 (#4856): rules carry updated_at
+      Bo.get(B + f"/api/docs/settings?ws=org:{ORG}").json().get("rules") or []]
 check({"kind": "exact", "match": "utility", "case": True, "sender": "Example Utility"} in zr
       and {"kind": "any", "match": "tax office", "tags": ["Taxes"]} in zr, f"ZIP import: the rules with the mapped targets ({zr})")
 check(sh(f"test -e /data/paperless-zip/{zid} && echo yes") == "", "the upload is gone after the run")

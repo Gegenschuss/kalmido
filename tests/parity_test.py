@@ -731,6 +731,10 @@ APP_ONLY = [
     ("2.547.0 (#4434): a person moves the old receipts of the own documents into the office once (preview, undo 30 days); "
      "agents get 403", ("=GET /api/docs/office-move", "=POST /api/docs/office-move", "=POST /api/docs/office-move/hide",
                         "=POST /api/docs/office-move/{}/undo")),
+    # 2.635.0 (#4807): notes on a document - agents read them as `notes` of GET /documents/{id}; writing is its own step (list Agents)
+    ("2.635.0 (#4807): notes on a document are written and deleted by people in the app; agents read them as `notes` of "
+     "GET /documents/{id} (same visibility as the document); agents writing notes is its own step of the agents list",
+     ("=GET /api/docs/{}/notes", "=POST /api/docs/{}/notes", "=DELETE /api/docs/{}/notes/{}")),
     ("2.146.0 A (#2451): the readable HTML view of a received e-invoice is for people in the browser; agents read the same values "
      "as `extracted` of GET /documents/{id} and the file itself", ("=GET /api/docs/{}/einvoice",)),
     # 2.121.0 (#2095): the hint on a receipt which cash entries point at it -- part of the cash book, which is office admins only

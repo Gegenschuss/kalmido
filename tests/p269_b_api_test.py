@@ -151,8 +151,8 @@ def rules(s, ws="private"):
     return s.get(B + f"/api/docs/settings?ws={ws}").json().get("rules") or []
 
 
-def strip(r):
-    return {k: v for k, v in r.items() if k != "id"}
+def strip(r):  # 2.635.0 (#4856): a rule carries its version updated_at (edit with expect_updated_at)
+    return {k: v for k, v in r.items() if k not in ("id", "updated_at")}
 
 
 def import_all(s, ws="private", mapping=MAP):
