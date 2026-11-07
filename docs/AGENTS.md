@@ -181,6 +181,9 @@ per document with *Insert label* ("Created with AI support"); nothing is blocked
   dialog. Like every agent it is never an admin and cannot sign in to the web app; the usage
   limits and the audit log apply as for every agent. **The owner (2.361.4)** reads its log and sets its usage limits
   (*Settings > Agents > Set up*, the chart button of the agent) and gets the News when it reaches one, as admins do.
+- **Changing its owner** (`PATCH /api/admin/agents/{id} {"owner_id": …}`, also to the team) moves its private scheduling
+  polls into the former owner's trash (2.625.0, #3961): their links close, the former owner reads them there without
+  restoring them, the new owner sees only the polls the agent makes from then on.
 - **Changing its workspace** (`org_id`) works only when it is in no project, calendar or address book of another
   workspace (400 with the number; 2.361.4: also from an organisation into the private area).
 - **Admins keep control.** *Settings > Agents* lists every agent with its owner. Admins pause one
