@@ -243,12 +243,15 @@ check(pub(FP).status_code == 200, "restored: the link works again")
 assert A.put(B + f"/api/orgs/{ORG}/members", json={"user_id": ids["carol"], "role": "admin"}).ok
 r = mk(Ca, OUT, label="von Carol")
 check(r.ok, "an admin of the organisation may make a link " + r.text[:200])
-CP = path_of(r.json()["links"][0]["url"])
+CP, CL = path_of(r.json()["links"][0]["url"]), r.json()["links"][0]["id"]
 check(pub(CP).status_code == 200 and "intern.txt" in pub(CP).text, "carol's link works")
 assert A.put(B + f"/api/orgs/{ORG}/members", json={"user_id": ids["carol"], "role": "member"}).ok
 check(pub(CP).status_code == 404, "creator no longer admin: the link is dead")
 assert A.put(B + f"/api/orgs/{ORG}/members", json={"user_id": ids["carol"], "role": "admin"}).ok
-check(pub(CP).status_code == 200, "admin again: works again")
+# 2.649.0 (#5051): losing the right revokes the link (obj_revoked, reason role): admin again it stays dead until restored
+check(pub(CP).status_code == 404, "admin again: the revoked link stays dead")
+r = A.post(B + f"/api/files/ext-links/{CL}/restore")
+check(r.ok and pub(CP).status_code == 200, "admin again + restored: works again " + r.text[:160])
 A.patch(B + f"/api/users/{ids['carol']}", json={"disabled": True})
 check(pub(CP).status_code == 404, "creator disabled: dead")
 A.patch(B + f"/api/users/{ids['carol']}", json={"disabled": False})
