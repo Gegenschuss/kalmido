@@ -1720,8 +1720,8 @@ Newsletter…* an organisation's admin connects the service for the organisation
   own books outside every organisation -- never a member's private book), only with an e-mail address and the consent
   *Consented* (with a source, e.g. the sign-up form). Option for listmonk: also *Double opt-in pending* -- they go as
   unconfirmed and listmonk sends its opt-in mail.
-- **Segments:** groups, companies and address books (any match within one kind, all kinds must match) -> one list at the
-  service (an existing one, or a new one named like the segment).
+- **Segments:** conditions on groups, companies and address books, each "is" or "is not" (any match within one kind, all
+  kinds must match; "is not" takes a contact out) -> one list at the service (an existing one, or a new one named like the segment).
 - **Both directions:** each run first takes unsubscriptions, bounces and confirmed opt-ins from the service back to the
   contacts, then adds, renames and takes off the list what Kalmido put there and no longer matches. An unsubscribed or
   bounced address is never subscribed again by Kalmido and stays blocked in Kalmido; if the person

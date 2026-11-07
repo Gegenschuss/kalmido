@@ -76,9 +76,13 @@ execFileSync('docker', ['exec', '-d', CT, 'python', '/data/fake_newsletter.py'])
   const sm = await until(() => d.querySelector('.nwl-smd'));
   await until(() => sm.querySelector('#ns-list option[value="__new"]'));
   sm.querySelector('#ns-name').value = 'VIP list';
-  const vip = [...sm.querySelectorAll('.nwl-chips[data-k="tags"] [data-v]')].find(b => b.dataset.v === 'VIP');
-  vip?.click();
-  check(vip?.classList.contains('on'), 'a group can be picked');
+  // 2.625.0 (#4486): condition rows instead of one button per group: "+ Condition" (Group is ...), the value menu picks VIP
+  sm.querySelector('[data-ns="cond-add"]').click();
+  sm.querySelector('.nwl-conds .fcond .fc-v')?.click();
+  const pop = await until(() => d.querySelector('#pop:not(.hidden) [role="menuitemcheckbox"]') && d.querySelector('#pop'));
+  [...(pop?.querySelectorAll('[role="menuitemcheckbox"]') || [])].find(b => b.textContent.trim() === 'VIP')?.click();
+  w.eval('closePop()');
+  check(sm.querySelector('.nwl-conds .fcond .fc-f')?.value === 'tags' && /VIP/.test(sm.querySelector('.nwl-conds .fcond .fc-v')?.textContent || ''), 'a group can be picked');
   sm.querySelector('[data-ns="save"]').click();
   await until(() => body()?.querySelector('.nwl-segs li'));
   check(/VIP list/.test(body()?.querySelector('.nwl-segs')?.textContent || ''), 'the segment is listed with its list');

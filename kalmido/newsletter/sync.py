@@ -175,33 +175,52 @@ def nwl_facets(c, ws):
     return {"tags": sorted(tags, key=str.lower)[:500], "companies": sorted(orgs, key=str.lower)[:500], "books": nwl_books(c, ws)}
 
 
+# 2.625.0 (#4486): + the exclusions not_tags / not_companies / not_books (the condition rows "is not"); they are stored only
+# when set, so an old segment reads, saves and matches exactly as before
+NWL_RULE_KEYS = ("tags", "companies", "books", "not_tags", "not_companies", "not_books")
+
+
 def nwl_clean_rule(c, ws, rule):
-    """{tags: [..], companies: [..], books: [ids]} -- only the workspace's own books; None when invalid."""
-    if not isinstance(rule, dict) or set(rule) - {"tags", "companies", "books"}:
+    """{tags: [..], companies: [..], books: [ids], not_tags?, not_companies?, not_books?} -- only the workspace's own books;
+    None when invalid."""
+    if not isinstance(rule, dict) or set(rule) - set(NWL_RULE_KEYS):
         return None
     out = {}
-    for k in ("tags", "companies"):
+    own = None
+    for k in NWL_RULE_KEYS:
         v = rule.get(k) or []
-        if not isinstance(v, list) or len(v) > 100 or not all(isinstance(x, str) and 0 < len(x.strip()) <= 200 for x in v):
+        if not isinstance(v, list) or len(v) > 100:
             return None
-        out[k] = sorted({x.strip() for x in v})
-    b = rule.get("books") or []
-    own = {x["id"] for x in nwl_books(c, ws)}
-    if not isinstance(b, list) or not all(isinstance(x, int) and not isinstance(x, bool) and x in own for x in b):
-        return None
-    out["books"] = sorted(set(b))
+        if k.endswith("books"):
+            own = {x["id"] for x in nwl_books(c, ws)} if own is None else own
+            if not all(isinstance(x, int) and not isinstance(x, bool) and x in own for x in v):
+                return None
+            val = sorted(set(v))
+        else:
+            if not all(isinstance(x, str) and 0 < len(x.strip()) <= 200 for x in v):
+                return None
+            val = sorted({x.strip() for x in v})
+        if val or not k.startswith("not_"):
+            out[k] = val
     return out
 
 
 def nwl_match(rule, r):
-    """AND between the kinds, OR within one; an empty rule takes every contact of the workspace."""
+    """AND between the kinds, OR within one; an excluded group / company / address book takes the contact out (#4486);
+    an empty rule takes every contact of the workspace."""
     if rule.get("books") and r["book_id"] not in rule["books"]:
         return False
-    if rule.get("tags"):
-        mine = {str(g).lower() for g in _jl(r["groups"])}
-        if not any(t.lower() in mine for t in rule["tags"]):
-            return False
-    if rule.get("companies") and (r["org"] or "").strip().lower() not in {x.lower() for x in rule["companies"]}:
+    if rule.get("not_books") and r["book_id"] in rule["not_books"]:
+        return False
+    mine = {str(g).lower() for g in _jl(r["groups"])} if rule.get("tags") or rule.get("not_tags") else set()
+    if rule.get("tags") and not any(t.lower() in mine for t in rule["tags"]):
+        return False
+    if rule.get("not_tags") and any(t.lower() in mine for t in rule["not_tags"]):
+        return False
+    org = (r["org"] or "").strip().lower()
+    if rule.get("companies") and org not in {x.lower() for x in rule["companies"]}:
+        return False
+    if rule.get("not_companies") and org in {x.lower() for x in rule["not_companies"]}:
         return False
     return True
 

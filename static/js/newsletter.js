@@ -108,37 +108,77 @@ function nwl_ruleTxt(r) {
   if (r.tags?.length) p.push(tr('Groups: {0}', r.tags.join(', ')));
   if (r.companies?.length) p.push(tr('Companies: {0}', r.companies.join(', ')));
   if (r.books?.length) p.push(tr('Address books: {0}', r.books.map(id => NWL.d.facets.books.find(b => b.id === id)?.name || '?').join(', ')));
+  // 2.625.0 (#4486): the exclusions of the condition rows ("is not")
+  if (r.not_tags?.length) p.push(tr('Without groups: {0}', r.not_tags.join(', ')));
+  if (r.not_companies?.length) p.push(tr('Without companies: {0}', r.not_companies.join(', ')));
+  if (r.not_books?.length) p.push(tr('Without address books: {0}', r.not_books.map(id => NWL.d.facets.books.find(b => b.id === id)?.name || '?').join(', ')));
   return p.length ? p.join(' · ') : tr('All contacts of this workspace');
 }
 async function nwl_put(body) {
   NWL.d = await api('PUT', '/api/newsletter', {ws: NWL.ws, ...body}); nwl_draw(); return {};
 }
 // the segment sheet: name, groups / companies / address books (OR within, AND between), the list at the service
+// 2.625.0 (#4486): the choice is condition rows "what / is | is not / value / x" (the row and value menu of the filter dialog,
+// fltdlg.js flt_rowHtml / flt_valMenu with an own spec) instead of one button per group, company and address book. Rows of
+// one kind add up (any match within it), "is not" goes to not_tags / not_companies / not_books (takes a contact out); an old
+// segment opens as one "is" row per kind and is saved as before.
+const NWL_KINDS = [['tags', N_('Group')], ['companies', N_('Company')], ['books', N_('Address book')]];
+function nwl_segConds(r) {
+  const cs = [];
+  for (const [k] of NWL_KINDS) for (const [op, key] of [['is', k], ['isnot', 'not_' + k]]) if ((r?.[key] || []).length) cs.push({f: k, op, v: [...r[key]]});
+  return cs;
+}
+function nwl_segRule(cs) {
+  const out = {tags: [], companies: [], books: []};
+  for (const c of cs) {
+    const key = c.op === 'isnot' ? 'not_' + c.f : c.f;
+    out[key] = [...new Set([...(out[key] || []), ...(c.v || [])])];
+  }
+  return out;
+}
 async function nwl_segEdit(s) {
   const f = NWL.d.facets, r = s?.rule || {tags: [], companies: [], books: []};
-  const chips = (k, items, on) => items.length ? `<div class="fpeople nwl-chips" role="group" data-k="${k}">${items.map(x => { const v = typeof x === 'object' ? x.id : x, t = typeof x === 'object' ? x.name : x, a = on.includes(v); return `<button type="button" class="fperson ${a ? 'on' : ''}" aria-pressed="${a}" data-v="${esc(String(v))}">${esc(t)}</button>`; }).join('')}</div>` : `<p class="muted">${tr('None')}</p>`;
+  await loadModule('fltdlg');
+  const cs = nwl_segConds(r);
+  const spec = {what: NWL_KINDS.filter(([k]) => (k === 'books' ? f.books : f[k]).length || cs.some(c => c.f === k)), ops: () => ['is', 'isnot'],
+    vals: c => c.f === 'books' ? [...f.books.map(b => [b.id, b.name]), ...(c.v || []).filter(id => !f.books.some(b => b.id === id)).map(id => [id, '?'])]
+      : [...f[c.f], ...(c.v || []).filter(x => !f[c.f].includes(x))].map(x => [x, x])};
   const md = modal(`<div class="lhdr"><h3>${s ? tr('Edit segment') : tr('New segment')}</h3><span class="spacer"></span><button class="iconbtn" data-ns="close" aria-label="${esc(tr('Close'))}">${ic('x')}</button></div>
     <div class="row"><label for="ns-name">${tr('Name')}</label><input id="ns-name" maxlength="120" value="${esc(s?.name || '')}"></div>
-    <h4>${tr('Groups')}</h4>${chips('tags', f.tags, r.tags || [])}
-    <h4>${tr('Companies')}</h4>${chips('companies', f.companies, r.companies || [])}
-    <h4>${tr('Address books')}</h4>${chips('books', f.books, r.books || [])}
-    <p class="muted">${tr('Nothing picked = every contact of this workspace. Within one kind any match counts, across kinds all must match.')}</p>
+    <div class="fconds nwl-conds" role="group" aria-label="${esc(tr('Conditions'))}"></div>
+    <div><button type="button" class="btn sm" data-ns="cond-add" ${spec.what.length ? '' : 'disabled'}>${ic('plus', 's')} ${tr('Condition')}</button></div>
+    <p class="muted">${tr('No condition = every contact of this workspace. Within one kind any match counts, across kinds all must match; “is not” takes a contact out.')}</p>
     <div class="row"><label for="ns-list">${tr('List at the service')}</label><select id="ns-list"><option value="">${tr('Loading…')}</option></select></div>
     <p class="nwl-err" role="alert"></p>
     <div class="foot"><button type="button" class="btn" data-ns="close">${tr('Cancel')}</button><span class="spacer"></span><button type="button" class="btn pri" data-ns="save">${tr('Save')}</button></div>`);
   md.classList.add('nwl-smd');
+  const draw = (focus = null) => {
+    $('.nwl-conds', md).innerHTML = cs.map((c, i) => flt_rowHtml(c, i, cs, [], 0, spec)).join('');
+    if (focus) $(`.fcond[data-i="${focus[0]}"] ${focus[1]}`, md)?.focus();
+  };
+  draw();
+  md.addEventListener('change', e => {
+    const el = e.target, i = +(el.dataset?.i ?? -1), c = cs[i]; if (!c || !el.closest('.nwl-conds')) return;
+    if (el.classList.contains('fc-f')) { cs[i] = {f: el.value, op: c.op, v: []}; draw([i, '.fc-f']); }
+    if (el.classList.contains('fc-op')) { c.op = el.value === 'isnot' ? 'isnot' : 'is'; draw([i, '.fc-op']); }
+  });
   api('GET', `/api/newsletter/lists?ws=${encodeURIComponent(NWL.ws)}`).then(j => {
     const sel = $('#ns-list', md); if (!sel) return;
     sel.innerHTML = `<option value="__new">${tr('Create a new list with the segment’s name')}</option>` + j.lists.map(l => `<option value="${esc(l.id)}" ${s?.list_id === l.id ? 'selected' : ''}>${esc(l.name)}</option>`).join('');
   }).catch(() => { const sel = $('#ns-list', md); if (sel) sel.innerHTML = `<option value="${esc(s?.list_id || '')}">${esc(s?.list_name || tr('No list'))}</option>`; });
   md.addEventListener('click', async e => {
-    const ch = e.target.closest('.nwl-chips [data-v]');
-    if (ch) { const on = !ch.classList.contains('on'); ch.classList.toggle('on', on); ch.setAttribute('aria-pressed', on); return; }
+    const cb = e.target.closest('.nwl-conds button');
+    if (cb?.classList.contains('fc-v')) {
+      const i = +cb.dataset.i, c = cs[i];
+      flt_valMenu(cb, c, cs, () => { const t = flt_sum(c, cs, spec), x = $(`.fcond[data-i="${i}"] .fc-v`, md); if (x) { $('.fc-vs', x).textContent = t || tr('Choose') + '…'; x.classList.toggle('fc-v0', !t); x.setAttribute('aria-label', `${tr('Value')}: ${t || tr('Choose')}`); } }, spec);
+      return;
+    }
+    if (cb?.classList.contains('fc-x')) { cs.splice(+cb.dataset.i, 1); draw(cs.length ? [Math.max(0, +cb.dataset.i - 1), '.fc-x'] : null); if (!cs.length) $('[data-ns="cond-add"]', md)?.focus(); return; }
     const b = e.target.closest('[data-ns]'); if (!b) return;
     if (b.dataset.ns === 'close') { md.remove(); return; }
-    const pick = k => $$(`.nwl-chips[data-k="${k}"] .on`, md).map(x => k === 'books' ? +x.dataset.v : x.dataset.v);
+    if (b.dataset.ns === 'cond-add') { cs.push({f: spec.what.find(([k]) => !cs.some(c => c.f === k))?.[0] || spec.what[0][0], op: 'is', v: []}); draw([cs.length - 1, '.fc-f']); return; }
     const lid = $('#ns-list', md).value;
-    const body = {ws: NWL.ws, name: $('#ns-name', md).value.trim(), rule: {tags: pick('tags'), companies: pick('companies'), books: pick('books')}};
+    const body = {ws: NWL.ws, name: $('#ns-name', md).value.trim(), rule: nwl_segRule(cs)};
     if (lid === '__new') body.create_list = true; else body.list_id = lid;
     b.disabled = true;
     try {

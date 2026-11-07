@@ -222,7 +222,7 @@ def _seg_in(c, ws, conn, d, seg=None):
 
 @app.post("/api/newsletter/segments")
 def nwl_seg_new():
-    """{ws, name, rule: {tags, companies, books}, list_id? | create_list?: true} -- a new segment."""
+    """{ws, name, rule: {tags, companies, books, not_tags?, not_companies?, not_books?}, list_id? | create_list?: true} -- a new segment."""
     c = db()
     d = body()
     _uid, org, ws = _ws(c, d.get("ws"))

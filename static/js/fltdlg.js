@@ -14,7 +14,8 @@ const FLT_WHAT = [['list', N_('Project')], ['folder', N_('Folder')], ['date', N_
   ['who', N_('Assignee')], ['sec', N_('Column')], ['sprint', N_('Sprint')], ['ms', N_('Milestone')], ['dlv', N_('Delivery state')], ['text', N_('Text')]];
 FLT_WHAT.splice(FLT_WHAT.length - 1, 0, ['kind', N_('Column meaning')]);  // 2.577.0 (#3354): the state (section_kind); only offered while a column has a meaning
 const FLT_OPN = {in: N_('is one of'), nin: N_('is none of'), empty: N_('is empty'), has: N_('contains'), nhas: N_('does not contain'),
-  gt: N_('greater than'), lt: N_('less than'), eq: N_('equals'), set: N_('has a value')};
+  gt: N_('greater than'), lt: N_('less than'), eq: N_('equals'), set: N_('has a value'),
+  is: N_('is'), isnot: N_('is not')};  // 2.625.0 (#4486): the comparisons of a newsletter segment's rows (a value list)
 const FLT_CFT = ['select', 'checkbox', 'date', 'number', 'multiselect', 'currency', 'rating'];  // the field types the engine reads
 
 const flt_live = id => { const l = listById(id); return l && !l.archived ? l : null; };
@@ -85,33 +86,38 @@ function flt_vals(c, cs) {
   for (const v of c.v || []) if (!have.has(String(v))) o.push([v, typeof v === 'number' ? '#' + v : String(v) || tr('empty')]);
   return o;
 }
-const flt_sum = (c, cs) => { const on = new Set((c.v || []).map(String)); const n = flt_vals(c, cs).filter(([v]) => on.has(String(v))).map(x => x[1]); return n.length ? n.join(', ') : ''; };
+// 2.625.0 (#4486): a caller with its own kinds (the newsletter segment, newsletter.js nwl_segEdit) passes spec = {what: [[key,
+// label]], ops: c => [ops], vals: c => [[value, label]]}: the same row and value menu with its own "what", comparisons and
+// values (a value list); without spec everything is the filter's as before
+const flt_valsOf = (c, cs, /** @type {any} */ spec) => (spec ? spec.vals(c) : flt_vals(c, cs));
+const flt_sum = (c, cs, /** @type {any} */ spec = null) => { const on = new Set((c.v || []).map(String)); const n = flt_valsOf(c, cs, spec).filter(([v]) => on.has(String(v))).map(x => x[1]); return n.length ? n.join(', ') : ''; };
 // a fresh condition for a "what" key
 function flt_new(key) {
   if (key.startsWith('cfid|')) { const fd = fieldById(+key.slice(5)); const c = {f: 'cf', fid: fd?.id, op: 'in', v: []}; c.op = flt_ops(c)[0]; c.v = /** @type {any} */ (flt_isList(c) ? [] : ''); return c; }
   if (key.startsWith('cf|')) { const g = flt_cfGroups().find(x => x.key === key); const c = {f: 'cf', name: g?.name || '', ft: g?.ft || 'select', op: 'in', v: []}; c.op = flt_ops(c)[0]; c.v = /** @type {any} */ (flt_isList(c) ? [] : ''); return c; }
   return key === 'text' ? {f: 'text', op: 'has', v: ''} : {f: key, op: 'in', v: []};
 }
-function flt_rowHtml(c, i, cs, groups, lid = 0) {
-  const key = flt_key(c), sprOn = S.lists.some(l => !l.archived && spr_on(l)), kindOn = S.sections.some(s => s.kind && (!lid || s.list_id === lid));
+function flt_rowHtml(c, i, cs, groups, lid = 0, /** @type {any} */ spec = null) {
+  const key = spec ? c.f : flt_key(c), sprOn = S.lists.some(l => !l.archived && spr_on(l)), kindOn = !spec && S.sections.some(s => s.kind && (!lid || s.list_id === lid));
   // 2.577.0 (#3354): + the column meaning while a column has one; (#3356) a shared view (lid) is its project: no project / folder
-  const std = FLT_WHAT.filter(([k]) => k === c.f || (k !== 'type' || ticketsAny()) && (k !== 'sprint' || sprOn) && (k !== 'kind' || kindOn) && (!lid || !['list', 'folder'].includes(k)));
-  const own = c.fid ? (() => { const fd = fieldById(+c.fid); return fd ? [[key, `${lname(listById(fd.list_id))} › ${fd.name}`]] : []; })() : [];
-  const cfo = [...groups.map(g => [g.key, g.label]), ...own];
+  // 2.625.0 (#4486): spec = an own row vocabulary (newsletter segment): its own conditions and comparisons, no custom fields
+  const std = spec ? spec.what : FLT_WHAT.filter(([k]) => k === c.f || (k !== 'type' || ticketsAny()) && (k !== 'sprint' || sprOn) && (k !== 'kind' || kindOn) && (!lid || !['list', 'folder'].includes(k)));
+  const own = !spec && c.fid ? (() => { const fd = fieldById(+c.fid); return fd ? [[key, `${lname(listById(fd.list_id))} › ${fd.name}`]] : []; })() : [];
+  const cfo = spec ? [] : [...groups.map(g => [g.key, g.label]), ...own];
   const opt = (/** @type {any} */ [k, n], t = true) => `<option value="${esc(k)}" ${k === key ? 'selected' : ''}>${esc(t ? tr(n) : n)}</option>`;
   const what = `<select class="fc-f" data-i="${i}" aria-label="${esc(tr('Condition'))}">${std.map(x => opt(x)).join('')}${cfo.length ? `<optgroup label="${esc(tr('Custom fields'))}">${cfo.map(x => opt(x, false)).join('')}</optgroup>` : ''}</select>`;
-  const ops = `<select class="fc-op" data-i="${i}" aria-label="${esc(tr('Comparison'))}">${flt_ops(c).map(o => `<option value="${o}" ${o === c.op ? 'selected' : ''}>${esc(tr(FLT_OPN[o]))}</option>`).join('')}</select>`;
+  const ops = `<select class="fc-op" data-i="${i}" aria-label="${esc(tr('Comparison'))}">${(spec ? spec.ops(c) : flt_ops(c)).map(o => `<option value="${o}" ${o === c.op ? 'selected' : ''}>${esc(tr(FLT_OPN[o]))}</option>`).join('')}</select>`;
   const unit = c.fid ? fieldById(+c.fid)?.options?.unit : null;
   const val = c.op === 'empty' || c.op === 'set' ? '<span class="fc-vn"></span>'
     : c.op === 'has' || c.op === 'nhas' ? `<input class="fc-t" data-i="${i}" value="${esc(c.v || '')}" placeholder="${esc(tr('Title or notes contain …'))}" aria-label="${esc(tr('Value'))}" autocomplete="off">`
     : !flt_isList(c) ? `<span class="fc-num"><input class="fc-n" data-i="${i}" inputmode="decimal" value="${esc(c.v ?? '')}" aria-label="${esc(tr('Value'))}">${unit ? `<span class="muted">${esc(unit)}</span>` : ''}</span>`
-    : (s => `<button type="button" class="btn sm fc-v${s ? '' : ' fc-v0'}" data-i="${i}" aria-haspopup="menu" aria-label="${esc(tr('Value'))}: ${esc(s || tr('Select'))}"><span class="fc-vs">${esc(s || tr('Select') + '…')}</span>${ic('chev', 's')}</button>`)(flt_sum(c, cs));
+    : (s => `<button type="button" class="btn sm fc-v${s ? '' : ' fc-v0'}" data-i="${i}" aria-haspopup="menu" aria-label="${esc(tr('Value'))}: ${esc(s || tr('Select'))}"><span class="fc-vs">${esc(s || tr('Select') + '…')}</span>${ic('chev', 's')}</button>`)(flt_sum(c, cs, spec));
   return `<div class="fcond" data-i="${i}">${what}${ops}${val}<button type="button" class="iconbtn fc-x" data-i="${i}" aria-label="${esc(tr('Remove condition'))}" title="${esc(tr('Remove condition'))}">${ic('x', 's')}</button></div>`;
 }
 // the value menu: the app's menu (with its search from 8 entries), a click switches one value and keeps the menu open
-function flt_valMenu(btn, c, cs, done) {
-  const opts = flt_vals(c, cs), on = new Set((c.v || []).map(String));
-  const p = menu(btn, opts.map(([v, n]) => ({label: n, on: on.has(String(v)), fn: () => {}})), null, null, tr(FLT_WHAT.find(x => x[0] === c.f)?.[1] || 'Value'));
+function flt_valMenu(btn, c, cs, done, /** @type {any} */ spec = null) {
+  const opts = flt_valsOf(c, cs, spec), on = new Set((c.v || []).map(String));
+  const p = menu(btn, opts.map(([v, n]) => ({label: n, on: on.has(String(v)), fn: () => {}})), null, null, tr((spec ? spec.what : FLT_WHAT).find(x => x[0] === c.f)?.[1] || 'Value'));
   if (opts.length >= 8) tch_menuSearch(p);
   const items = () => $$('[data-i]', p).filter(b => !b.closest('[hidden]') && !b.hidden);
   for (const b of $$('[data-i]', p)) { b.setAttribute('role', 'menuitemcheckbox'); b.setAttribute('aria-checked', String(b.classList.contains('on'))); }
