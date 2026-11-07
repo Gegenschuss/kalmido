@@ -1030,8 +1030,12 @@ def _boundary_share(c, n, s):
         obj_node_unshare(c, None, n, s["id"], kind=reg["kind"], ref_id=n["ref_id"], org=n["org_id"] or None, reason="boundary")
         if s["user_id"]:
             _boundary_old(c, reg, n["ref_id"], s["user_id"], n["org_id"] or None)
-    elif n is None or not any(f(c, None, n, s) for f in fs_unshare_hooks):
-        _take(c, "fs_shares", "id=?", (s["id"],), "boundary", None, (n["org_id"] if n is not None else None) or None, "user_id")
+    else:
+        top = c.execute("SELECT COALESCE(MAX(id), 0) FROM obj_revoked").fetchone()[0]
+        if n is not None and any(f(c, None, n, s) for f in fs_unshare_hooks):  # the hooks write reason 'unshare': this one is the repair's
+            c.execute("UPDATE obj_revoked SET reason='boundary' WHERE id>? AND src='fs_shares' AND reason='unshare'", (top,))
+        else:
+            _take(c, "fs_shares", "id=?", (s["id"],), "boundary", None, (n["org_id"] if n is not None else None) or None, "user_id")
     return 1
 
 
