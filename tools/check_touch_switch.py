@@ -39,7 +39,7 @@ LAYOUT_NOTE = re.compile(r"(?://|/\*).*\blayout:")
 
 def line_key(text):
     """Hash of the line text with the white space folded: stays when lines above move, changes when the line is edited."""
-    return hashlib.sha1(" ".join(text.split()).encode("utf-8")).hexdigest()[:12]
+    return hashlib.sha256(" ".join(text.split()).encode("utf-8")).hexdigest()[:12]
 
 
 def is_hit(text):
