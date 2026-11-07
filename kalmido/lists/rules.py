@@ -3,7 +3,7 @@
 A rule has ONE trigger (a task comes into column X, is completed, is opened again, gets the list tag Y, its due day is
 today) and ONE action (assign it to a person of the list, set / clear the due date relative to today, write a fixed
 comment, move it to a list and / or column). 2.138.0 D (#2060): triggers created / assigned / field (a custom field changes),
-actions priority / tag (a list tag) / field (a custom field gets a fixed value). It runs with the rights of the person who created it (created_by), checked
+actions priority / tag (a list tag) / field (a custom field gets a fixed value). 2.633.0 (#4781): actions done / reopen (the tick's own way, rul_status). It runs with the rights of the person who created it (created_by), checked
 again every time it runs: that person must still be owner / admin of the list, and a move needs write access to the target
 list too (same organisation / private as the source, never a health list, never a locked list). If a right is missing the
 rule does not run and pauses itself (paused_reason), it never goes on with other rights.
@@ -26,14 +26,15 @@ from ..core.config import app
 from ..core.pg import insert_id, system_ctx as pg_system
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc, iso_ms
-from ..core.access import Denied, list_people, list_role, MANAGE_ROLES, need_list, WRITE_ROLES, collab_all
+from ..core.access import Denied, list_people, list_role, MANAGE_ROLES, need_list, need_task, WRITE_ROLES, collab_all
 from ..accounts.session import me
 from ..core.errors import BadInput, reject_unknown
 from ..api.common import v1_args, v1_err, v1_json, v1_view
 from ..tasks.tasks import can_move, check_assignee  # 2.369.5 (#2517): pulled up from functions
 from .fields import field_value, field_act  # 2.369.5 (#2517): pulled up from functions
 from ..collab.comments import user_names, comment_pushes, clean_mentions, send_pushes  # 2.369.5 (#2517): pulled up from functions
-from ..tasks.lifecycle import apply_update  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.lifecycle import apply_update, tsk_finish, tsk_reopen  # 2.369.5 (#2517): pulled up from functions; 2.633.0 (#4781): + tsk_*
+from ..tasks.validation import lock_done_problem  # 2.633.0 (#4781)
 from ..notify.channels import chn_list_events  # 2.369.5 (#2517): pulled up from functions
 
 RUL_LIST_MAX = 50           # rules per list
@@ -44,7 +45,8 @@ RUL_DAYS_MAX = 365          # due date: today + 0..365 days
 RUL_DUE_BATCH = 500         # tasks per watchdog tick (due date reached)
 RUL_PROP_DAY_MAX = 20       # rule proposals of one agent per 24 hours
 RUL_TRIGGERS = ("section", "done", "reopen", "ltag", "due", "created", "assigned", "field")  # 2.138.0 D (#2060): + created, assigned, field
-RUL_ACTIONS = ("assign", "due", "comment", "move", "priority", "tag", "field")  # 2.138.0 D (#2060): + priority, tag, field
+RUL_ACTIONS = ("assign", "due", "comment", "move", "priority", "tag", "field",  # 2.138.0 D (#2060): + priority, tag, field
+               "done", "reopen")  # 2.633.0 (#4781): mark it done / open it again (the tick's own way)
 RUL_PRIO = {"none": 0, "low": 1, "medium": 3, "high": 5, "urgent": 7}  # 2.138.0 D (#2060): action priority (names as in API v1)
 RUL_PAUSE = {  # paused_reason -> the text the settings show
     "creator": N_("the person who set it up has no access to the project any more"),
@@ -175,6 +177,8 @@ def rul_clean(c, lid, b, partial=None, see_only=False):
             v = {"text": text.strip()}
         elif k in ("priority", "tag", "field"):
             v = rul_act_clean(c, lid, a)
+        elif k in ("done", "reopen"):  # 2.633.0 (#4781): no value
+            reject_unknown(a, ("kind",))
         else:  # move: into a list and / or a column (the column belongs to the target list)
             reject_unknown(a, ("kind", "list_id", "section_id"))
             dst = _int(a["list_id"], "action.list_id") if a.get("list_id") not in (None, "", 0) else lid
@@ -640,6 +644,9 @@ def rul_exec(c, r, tid):
                 with c.savepoint():
                     if r["act"] == "comment":
                         rul_comment(c, r, tid, a["text"])
+                    elif r["act"] in ("done", "reopen"):  # 2.633.0 (#4781)
+                        if not rul_status(c, tid, r["act"]):
+                            return False
                     else:
                         if r["act"] == "assign":
                             b = {"assignee_id": a["user_id"]}
@@ -670,6 +677,28 @@ def rul_exec(c, r, tid):
     if pause:
         rul_pause(c, r, pause)
         return False
+    return True
+
+
+def rul_status(c, tid, act):
+    """2.633.0 (#4781): the actions done / reopen, as the rule's creator and through the same way as the tick in the app
+    (lifecycle.py tsk_finish / tsk_reopen: a recurring task gets its next occurrence, dependants are set free, the history
+    says "Rule <name>", notifications as by hand). Open subtasks do not stop it (as the tick). False = nothing to do: done
+    already / open already, locked, waiting for its approval. The rule's own guard (g.rul_run) keeps the change from
+    triggering another rule. Denied of need_task (the creator may not change it) pauses the rule like the other actions."""
+    need_task(c, tid)
+    t = c.execute("SELECT status, completed_at, completed_by, locked, deleted_at FROM tasks WHERE id=?", (tid,)).fetchone()
+    if not t or t["deleted_at"] or (t["status"] != 0 if act == "done" else t["status"] == 0) or lock_done_problem(t):
+        return False
+    try:
+        if act == "done":
+            tsk_finish(c, tid, 2)
+        else:
+            tsk_reopen(c, tid, t)
+    except Denied as e:
+        if e.code == 409:  # "done only after approval" and the like: not a question of rights, this time nothing happens
+            raise BadInput(e.text()) from None
+        raise
     return True
 
 
@@ -899,7 +928,9 @@ def rul_spec(paths, schemas, op, ok, errs, ref, pid):
                    f"{RUL_DAYS_MAX}, null = clear), comment (text, at most {RUL_TEXT_MAX} characters), move (list_id and / or section_id; 2.473.0: "
                    "values of text, number, currency, rating, date and checkbox fields go along into the target's field of the same name and type), "
                    "priority (priority none | low | medium | high), tag (adds the list tag tag_id), field (sets the list's custom "
-                   "field field_id to value, checked like a normal field value; null = clear it)",
+                   "field field_id to value, checked like a normal field value; null = clear it), "
+                   "done (2.633.0: marks an open task done the way the tick does: a recurring task gets its next occurrence, "
+                   "dependants are set free; open subtasks do not stop it), reopen (opens a done task again); both without a value",
                    "properties": {"kind": {"type": "string", "enum": list(RUL_ACTIONS)}, "user_id": {"type": "integer"},
                                   "days": {"type": ["integer", "null"]}, "text": {"type": "string"}, "list_id": {"type": "integer"},
                                   "section_id": {"type": ["integer", "null"]}, "priority": {"type": "string", "enum": list(RUL_PRIO)},

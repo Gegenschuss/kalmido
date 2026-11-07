@@ -396,9 +396,6 @@ def need_live(c, tid):
 
 @app.post("/api/tasks/<int:tid>/complete")
 def task_complete(tid):
-    from ..collab.comments import task_event
-    from ..tasks.dependencies import completed_ids, unblock_events
-    from ..notify.push import push_handled
     c = db()
     need_task(c, tid)
     need_live(c, tid)  # 2.126.0 D (#1992 A3)
@@ -413,6 +410,18 @@ def task_complete(tid):
     if t["locked"] and t["status"] == st:  # 2.542.0 (#4609, review): a locked task already in that state - nothing changes,
         return jsonify({**one_task(c, tid), "next_due": None, "undo": None})  # no history, no event (agents may repeat it)
     undo = {}
+    nxt = tsk_finish(c, tid, st, undo)
+    bump(c)
+    c.commit()
+    return jsonify({**one_task(c, tid), "next_due": nxt, "undo": signed(tid, undo)})
+
+
+def tsk_finish(c, tid, st=2, undo=None):
+    """The tick of task_complete after its checks (2.633.0, #4781: also a list rule's action "done"): do_complete, the
+    history, the event, the dependants set free and my notification of it closed. Returns the next due day (a recurring task)."""
+    from ..collab.comments import task_event
+    from ..tasks.dependencies import completed_ids, unblock_events
+    from ..notify.push import push_handled
     nxt = do_complete(c, tid, st, undo)
     log_act(c, tid, "wont" if st == -1 else "reopen" if st == 0 else "complete", {"next": nxt} if nxt else None)
     if st == 2:
@@ -420,9 +429,7 @@ def task_complete(tid):
     if st != 0:
         unblock_events(c, completed_ids(c, tid))
         push_handled(c, me(), [tid])  # 2.0.5: close its notification on my other devices
-    bump(c)
-    c.commit()
-    return jsonify({**one_task(c, tid), "next_due": nxt, "undo": signed(tid, undo)})
+    return nxt
 
 
 def complete_stale(c, tid, due, status=0):
@@ -816,15 +823,10 @@ def task_skip(tid):
     return jsonify({**one_task(c, tid), "next_due": nxt})
 
 
-@app.post("/api/tasks/<int:tid>/reopen")
-def task_reopen(tid):
+def tsk_reopen(c, tid, old):
+    """The reopen of task_reopen after its checks (2.633.0, #4781: also a list rule's action "reopen"); old = the task's
+    status, completed_at, completed_by before."""
     from ..family.family import stars_revoke
-    c = db()
-    need_task(c, tid)
-    need_live(c, tid)  # 2.126.0 D (#1992 A3)
-    old = c.execute("SELECT status, completed_at, completed_by, locked FROM tasks WHERE id=?", (tid,)).fetchone()
-    if old["status"] != 0 and lock_done_problem(old):  # 2.542.0 (#4609): reopened only after unlocking
-        raise Denied(409, lock_done_problem(old))
     from ..lists.rules import rul_fire, rul_snap
     rb = rul_snap(c, tid)  # 2.71.0 A (#1457)
     if old["status"] != 0:
@@ -833,6 +835,17 @@ def task_reopen(tid):
     c.execute("UPDATE tasks SET status=0, completed_at=NULL, completed_by=NULL, updated_at=? WHERE id=?", (iso(now_utc()), tid))
     rsn_clear(c, tid)  # 2.556.0 C review (#4583, finding 3)
     rul_fire(c, tid, rb)
+
+
+@app.post("/api/tasks/<int:tid>/reopen")
+def task_reopen(tid):
+    c = db()
+    need_task(c, tid)
+    need_live(c, tid)  # 2.126.0 D (#1992 A3)
+    old = c.execute("SELECT status, completed_at, completed_by, locked FROM tasks WHERE id=?", (tid,)).fetchone()
+    if old["status"] != 0 and lock_done_problem(old):  # 2.542.0 (#4609): reopened only after unlocking
+        raise Denied(409, lock_done_problem(old))
+    tsk_reopen(c, tid, old)
     bump(c)
     c.commit()
     undo = {"op": "reopen", "status": old["status"], "completed_at": old["completed_at"], "completed_by": old["completed_by"]}

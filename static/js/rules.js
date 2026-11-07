@@ -12,7 +12,8 @@ const RUL_TRIG = [['section', N_('A task comes into a column')], ['done', N_('A 
   // 2.138.0 D (#2060): + created, assigned, custom field changed
   ['created', N_('A task is created')], ['assigned', N_('A task is assigned')], ['field', N_('A custom field changes')]];
 const RUL_ACT = [['assign', N_('Assign to')], ['due', N_('Set the due date')], ['comment', N_('Write a comment')], ['move', N_('Move to')],
-  ['priority', N_('Set the priority')], ['tag', N_('Add a project tag')], ['field', N_('Set a custom field')]];  // 2.138.0 D (#2060)
+  ['priority', N_('Set the priority')], ['tag', N_('Add a project tag')], ['field', N_('Set a custom field')],  // 2.138.0 D (#2060)
+  ['done', N_('Mark it as done')], ['reopen', N_('Open it again')]];  // 2.633.0 (#4781)
 const RX_PRIO = [['none', N_('None')], ['low', N_('Low')], ['medium', N_('Medium')], ['high', N_('High')], ['urgent', N_('Urgent')]];
 const RUL_DAYS = [0, 1, 2, 3, 7, 14, 30];
 const rul_on = l => !!l && !l.is_inbox && l.life !== 'health' && canManage(l);
@@ -42,6 +43,8 @@ function rul_actText(r) {
   if (a.kind === 'priority') return tr('set its priority to {0}', tr((RX_PRIO.find(x => x[0] === a.priority) || RX_PRIO[0])[1]));
   if (a.kind === 'tag') return tr('add the tag {0}', rul_q(n.tag_to || rul_gone()));
   if (a.kind === 'field') return rxActField(a, n);
+  if (a.kind === 'done') return tr('mark it as done');  // 2.633.0 (#4781)
+  if (a.kind === 'reopen') return tr('open it again');
   const where = [n.list, n.section_to].filter(Boolean).join(' › ') || (a.section_id ? rul_gone() : '');
   return tr('move it to {0}', where);
 }
@@ -172,6 +175,7 @@ function rul_dialog(lid, r, done) {
       x.innerHTML = `<div class="row"><label for="rul-afld">${tr('Field')}</label><select id="rul-afld">${fs.map(f => opt(f.id, f.name, fid)).join('') || opt('', tr('No custom fields yet'))}</select></div>
         <div class="row" id="rul-afv">${rxActValHtml(l, fid, a.kind === 'field' && +fid === a.field_id ? a.value : '')}</div>`;
     }
+    else if (k === 'done' || k === 'reopen') x.innerHTML = '';  // 2.633.0 (#4781): no value
     else {
       const to = lst || a.list_id || lid;
       x.innerHTML = `<div class="row"><label for="rul-list">${tr('Project')}</label><select id="rul-list">${rul_targets(lid).map(y => opt(y.id, y.id === lid ? tr('This project') : lname(y), to)).join('')}</select></div>
@@ -195,7 +199,8 @@ function rul_dialog(lid, r, done) {
       : tk === 'assigned' ? {user_id: +v('rul-tuser') || null} : tk === 'field' ? {field_id: +v('rul-tfld') || null, value: v('rul-tfv') || null} : {})};
     const act = {kind: ak, ...(ak === 'assign' ? {user_id: +v('rul-user') || null} : ak === 'due' ? {days: v('rul-days') === 'none' ? null : +v('rul-days')}
       : ak === 'comment' ? {text: v('rul-text')} : ak === 'priority' ? {priority: v('rul-prio')} : ak === 'tag' ? {tag_id: +v('rul-atag') || null}
-      : ak === 'field' ? {field_id: +v('rul-afld') || null, value: v('rul-fval').trim() || null} : {list_id: +v('rul-list') || lid, section_id: +v('rul-sec') || null})};
+      : ak === 'field' ? {field_id: +v('rul-afld') || null, value: v('rul-fval').trim() || null}
+      : ak === 'done' || ak === 'reopen' ? {} : {list_id: +v('rul-list') || lid, section_id: +v('rul-sec') || null})};
     const q = {name: v('rul-name').trim() || tr(RUL_TRIG.find(x => x[0] === tk)[1]), trigger: trig, action: act};
     b.disabled = true;
     try { await calReq(r ? 'PATCH' : 'POST', r ? `/api/rules/${r.id}` : `/api/lists/${lid}/rules`, q); }

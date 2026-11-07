@@ -2682,6 +2682,11 @@ when set to that option id / `"1"` checked / `"0"` unchecked / 2.473.0 `"*"` has
 (`field_id` + `value`, checked like a normal field value, null clears it). A deleted field or project tag pauses the rule
 (`paused_reason` `field` / `tag`). The loop protection stays: a value set by a rule never triggers a `field` rule.
 
+2.633.0 (#4781): new actions `done` (marks an open task done the same way as the tick: a recurring task gets its next
+occurrence, dependants are set free, notifications as by hand; open subtasks do not stop it) and `reopen` (opens a done task
+again), both without a value. A task that is already done / open, locked or waiting for its approval stays as it is. A task
+completed by a rule triggers no further rule (so no `done` rule after it). Example: "comes into column Done -> `done`".
+
 ### Table rows as tasks
 
 *Since 2.126.1.*

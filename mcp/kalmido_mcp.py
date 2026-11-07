@@ -2566,7 +2566,8 @@ _RULE_TRIG = {"type": "object", "description": "{kind: section (a task comes int
 _RULE_ACT = {"type": "object", "description": "{kind: assign (user_id, a person of the project) | due (days from today 0..365, null = clear) | "
                                               "comment (text, at most 2000 characters) | move (list_id and / or section_id) | priority "
                                               "(2.138.0: priority none / low / medium / high / urgent) | tag (2.138.0: tag_id, a project tag) | field "
-                                              "(2.138.0: field_id + value of a custom field, null = clear)}"}
+                                              "(2.138.0: field_id + value of a custom field, null = clear) | done (2.633.0: marks it "
+                                              "done like the tick; no value) | reopen (2.633.0: opens it again; no value)}"}
 TOOLS += [
     ("list_rules", "2.71.0: the rules of a project you may change (trigger, action, active, paused_reason, who set it up). A rule runs with the rights "
                    "of the person who set it up; a change made by a rule never triggers another rule.",
