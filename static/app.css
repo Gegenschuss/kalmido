@@ -33,8 +33,7 @@
   --row-py:.375rem;--row-fs:.875rem;--srow-h:2rem;--meta-fs:.75rem;--row-h:2.5rem;
   --shadow:0 1rem 3rem rgba(0,0,0,.55),0 0 0 1px var(--line2);
   --safe-b:env(safe-area-inset-bottom,0px);--safe-t:env(safe-area-inset-top,0px);
-  --tabs-h:0px;--ui:1;
-  --tabs-pb:var(--safe-b);--tabs-bot:calc(var(--tabs-h) + var(--tabs-pb));  /* 2.633.0 (#4994): the tab bar keeps only part of the home indicator room below (--tabs-pb, phones below); --tabs-bot = its top edge above the screen bottom, for everything that sits above it */
+  --tabs-h:0px;--ui:1;--tabs-pb:var(--safe-b);--tabs-bot:calc(var(--tabs-h) + var(--tabs-pb));  /* 2.633.0 (#4994): the tab bar keeps only part of the home indicator room below (--tabs-pb, phones below); --tabs-bot = its top edge above the screen bottom, for everything that sits above it */
   /* 2.149.0 F (#2519): names some rules used without defining them (the property was dropped); aliases of the scale above, both themes */
   --shadow-s:0 1px .125rem rgba(0,0,0,.2);--fs:var(--fs-b);--fs-sm:var(--fs-s);--text3:var(--faint);--warn:var(--st-wait-t);
   /* 2.534.0 A (#4551): the four page widths (only upper limits, centred: static/css/start-breite.css assigns every page one): reading text, a form section, lists / office, board / calendar / timeline / matrix / sheet / mind map */ --w-lesen:46rem;--w-form:40rem;--w-seite:96rem;--w-voll:none;--w-leiste:15rem;--w-leiste-min:14rem;  /* 2.602.0 (#4817): --w-leiste = ONE width for the lists that stay in the page (file store without sidebar B, team chat, contacts / clients, notes without the panel), as the panel (--sideW 15rem, at least 14rem) */
