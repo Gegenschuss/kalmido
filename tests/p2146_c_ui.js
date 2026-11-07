@@ -62,12 +62,12 @@ const D2 = c052('R-2', [ntry('12.50', '2026-09-02', 'BOOK', 'REF-A1', 'Bakery ag
   // the dialog lists the import and takes it back after the question
   click(w, d.querySelector('[data-bg="csv"]'));
   const undo = await until(() => dlg()?.querySelector('.bgruns [data-csundo]'), 60);
-  check(undo && /Take this import back/.test(undo.textContent), '#2455: "Last imports" offers to take the import back');
+  check(undo && /Undo this import/.test(undo.textContent), '#2455: "Last imports" offers to take the import back');
   let asked = '';
   w.confirm = t => { asked = t; return true; };  // boot.js dialogBridge answers the app's question with w.confirm
   click(w, undo);
   await until(() => asked, 60);
-  check(/Take this import back/.test(asked) && /2 entries of this import/.test(asked), '#2455: the question names how many entries go ' + asked.slice(0, 160));
+  check(/Undo this import/.test(asked) && /2 entries of this import/.test(asked), '#2455: the question names how many entries go ' + asked.slice(0, 160));
   await until(async () => ((await call('GET', `/api/budget/${LID}/import/runs`)).items || [])[0]?.left === 0, 60);
   check(((await call('GET', `/api/budget/${LID}/import/runs`)).items || [])[0]?.left === 0, '#2455: the import is taken back');
   await until(() => !dlg()?.querySelector('.bgruns [data-csundo]'), 60);

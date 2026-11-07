@@ -145,7 +145,7 @@ TXT = [w.get("text", "") for w in W]
 row = kt.dbx("SELECT approver_id, wait_by, reviewer_id, assignee_group_id FROM tasks WHERE title='Rollen' AND created_by=?", (GID,))
 check(row and row[0][0] == GID and row[0][1] == GID, f"F6 approver and who set waiting come along {row}")
 check(row and row[0][2] is None and row[0][3] is None, f"F6 a reviewer not here and a group of the old server stay empty {row}")
-roles = {t for t in TXT if t.startswith("Role on tasks not taken over")}
+roles = {t for t in TXT if t.startswith("Role on tasks not imported")}
 check(any(t.endswith(": Reviewer") for t in roles) and any(t.endswith(": Group") for t in roles), f"F6 ... with a warning naming the role {roles}")
 
 # F11: the refused row

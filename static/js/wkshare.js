@@ -99,7 +99,7 @@ function wsh_fill(md, tgt, sp, folder, legacy) {
     // 2.380 H (#2356): new shares show the pictures of the file store embedded in the page only with this switch (default off)
     const imgRow = `<div class="row"><label for="wsh-img">${tr('Show embedded pictures')}</label><label class="swc"><input type="checkbox" id="wsh-img"><span class="swt" aria-hidden="true"></span><span class="sr">${esc(tr('Show embedded pictures'))}</span></label></div><div class="shint">${esc(tr('Only pictures from the file store that are embedded in the page and that you may see. Other files stay hidden.'))}</div>`;
     const aiph = tgt.page_id && WSH_AI === tgt.page_id && j.enabled && typeof aiphHtml === 'function' ? aiphHtml('wiki', tgt.page_id) : '';  // 2.482.0 (#3530)
-    box.innerHTML = (people ? `<h4 id="wsh-ppl-h">${tr(legacy ? 'Read only by e-mail address' : 'People')}</h4>${people}` : '') + `<h4>${tr('Public link')}</h4>${aiph}<div id="wsh-pub">${pub}</div>` + imgRow;
+    box.innerHTML = (people ? `<h4 id="wsh-ppl-h">${tr(legacy ? 'Read-only by e-mail address' : 'People')}</h4>${people}` : '') + `<h4>${tr('Public link')}</h4>${aiph}<div id="wsh-pub">${pub}</div>` + imgRow;
   };
   const load = async () => {
     try { j = await calReq('GET', '/api/wiki/shares?' + q); } catch (x) { const b = wsh$('.wsh-body', md); if (b) b.innerHTML = `<div class="muted mhint">${esc(x.status === 404 ? tr('No links yet: a public link can be made once the folder holds a page.') : x.message)}</div>`; return; }
