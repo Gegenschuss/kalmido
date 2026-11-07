@@ -749,6 +749,8 @@ their rights. A change made by a rule never triggers another rule. After a decli
 2.138.0: triggers also `created`, `assigned` (a person or anybody), `field` (a custom field changes, optionally to one value);
 actions also `priority`, `tag` (a project tag) and `field` (a custom field gets a fixed value).
 2.633.0: actions also `done` (marks the task done like the tick, a recurring task moves on) and `reopen` (opens it again).
+2.637.0: `due` takes `when` before | overdue + `days` 0..30; up to 5 `actions` in a row instead of one `action` (a move into
+another project only last); optional `conditions` (priority, user_id, tag_id, section_id: all must hold).
 
 ### Table rows as tasks (2.126.1)
 When a person asks you to turn rows of a table into tasks (or it clearly helps), use `propose_sheet_tasks`: the table must

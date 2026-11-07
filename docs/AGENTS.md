@@ -2722,6 +2722,16 @@ occurrence, dependants are set free, notifications as by hand; open subtasks do 
 again), both without a value. A task that is already done / open, locked or waiting for its approval stays as it is. A task
 completed by a rule triggers no further rule (so no `done` rule after it). Example: "comes into column Done -> `done`".
 
+2.637.0 (#4768): the trigger `due` takes a distance: `when` = `before` (default) with `days` 0..30 (that many days before the
+due day; 0 = on the due day, as before) or `when` = `overdue` with `days` 0..30 (overdue for that many days); it runs once per
+rule, task and due day, a moved due date runs again. A rule has up to 5 actions (`actions`: a list of action objects, run one
+after the other, all or nothing; write either `action` or `actions`; a move into another project only as the last one); a
+missing right in any of them pauses the whole rule. Optional `conditions` "only when" (all must hold on the task when the rule
+runs): `priority` (none / low / medium / high / urgent), `user_id` (assigned to that person of the project), `tag_id` (has
+that project tag), `section_id` (is in that column). `GET .../rules` gives `action` (the first) and `actions` (all),
+`conditions` (`{}` = none) and the names per action in `names.acts`, of the conditions in `names.cond`. A rule of an older
+version is a chain of one action without conditions and runs unchanged.
+
 ### Table rows as tasks
 
 *Since 2.126.1.*

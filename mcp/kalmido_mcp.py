@@ -2635,7 +2635,7 @@ TOOLS += [
 ]
 # 2.71.0 A (#1457): rules of a list (When ... then ...): read them, propose one (the owner / an admin accepts it)
 _RULE_TRIG = {"type": "object", "description": "{kind: section (a task comes into column section_id) | done | reopen | ltag (gets the project "
-                                               "tag tag_id) | due (its due day is today) | created (2.138.0: a task is created in the project) | "
+                                               "tag tag_id) | due (its due day is today; 2.637.0: when before | overdue + days 0..30 = that many days before / overdue for) | created (2.138.0: a task is created in the project) | "
                                                "assigned (2.138.0: user_id = only that person, null = anybody) | field (2.138.0: custom field "
                                                "field_id changes; value = option id / \"1\" checked / \"0\" unchecked / \"*\" has a value (2.473.0), null = any change), "
                                                "section_id?, tag_id?, user_id?, field_id?, value?}"}
@@ -2644,17 +2644,22 @@ _RULE_ACT = {"type": "object", "description": "{kind: assign (user_id, a person 
                                               "(2.138.0: priority none / low / medium / high / urgent) | tag (2.138.0: tag_id, a project tag) | field "
                                               "(2.138.0: field_id + value of a custom field, null = clear) | done (2.633.0: marks it "
                                               "done like the tick; no value) | reopen (2.633.0: opens it again; no value)}"}
+_RULE_ACTS = {"type": "array", "maxItems": 5, "items": _RULE_ACT,  # 2.637.0 (#4768)
+              "description": "2.637.0: instead of action, 1..5 actions run one after the other (all or nothing); a move into another project only as the last"}
+_RULE_COND = {"type": "object", "description": "2.637.0: only when ALL hold on the task: {priority?: none | low | medium | high | urgent, "
+                                               "user_id? (assigned to that person), tag_id? (has that project tag), section_id? (is in that column)}"}
 TOOLS += [
     ("list_rules", "2.71.0: the rules of a project you may change (trigger, action, active, paused_reason, who set it up). A rule runs with the rights "
                    "of the person who set it up; a change made by a rule never triggers another rule.",
      _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{int(a['list_id'])}/rules")),
-    ("propose_rule", "2.71.0 (scope structure): PROPOSE ONE rule for a project shared with you (name, trigger, action, a short summary why). "
+    ("propose_rule", "2.71.0 (scope structure): PROPOSE ONE rule for a project shared with you (name, trigger, action or actions, conditions?, a short summary why). "
                      "The project's owner (or user_id: an owner / admin of the project) accepts or declines it; accepted, it belongs to them and "
                      "runs with their rights. You never create or change rules yourself. At most 20 per day; the answer comes as the event job.",
      _obj({"list_id": S_ID, "name": {"type": "string", "maxLength": 80}, "trigger": _RULE_TRIG, "action": _RULE_ACT,
-           "summary": {"type": "string"}, "title": {"type": "string"}, "user_id": S_ID}, ["list_id", "name", "trigger", "action"]),
+           "actions": _RULE_ACTS, "conditions": _RULE_COND,  # 2.637.0 (#4768)
+           "summary": {"type": "string"}, "title": {"type": "string"}, "user_id": S_ID}, ["list_id", "name", "trigger"]),
      lambda api, a: api.call("POST", f"/lists/{int(a['list_id'])}/rules/proposals",
-                             body=_pick(a, ("name", "trigger", "action", "summary", "title", "user_id")))),
+                             body=_pick(a, ("name", "trigger", "action", "actions", "conditions", "summary", "title", "user_id")))),
 ]
 # 2.99.1 C (#1959): video sign-offs (links only) at tasks / lists shared with you: read the feedback, comment at a timecode
 TOOLS += [

@@ -233,7 +233,8 @@ Run the commands as a user with sudo unless a step says *as the agent user* (`su
    tables in a folder shared with exactly it; every write call can be taken back as a whole ([AGENTS.md](AGENTS.md#tables)).
 10. Rules of a project (2.71.0): an agent with the permission *Structure* may propose a rule for a project shared with it; the
    project's owner or an admin accepts it with 👍 and the rule then runs with their rights
-   ([AGENTS.md](AGENTS.md#rules-of-a-list-2710)).
+   ([AGENTS.md](AGENTS.md#rules-of-a-list-2710)). 2.637.0 (#4768): up to 5 actions per rule, conditions "only when"
+   (priority, person, project tag, column) and the due trigger with a distance (days before / overdue).
    2.623.0 (#4718): the same for objects of the shared core: instead of changing an object shared with it the agent may
    propose the change (`propose_object_change`, a view share is enough; a token that may only read sends no proposals); the object's owner (or the person it
    names) accepts it with 👍 and it is written with their rights, refused when someone changed the object since
