@@ -10,6 +10,7 @@ from flask import jsonify
 
 from ..core.config import _origin, app
 from ..core.pg import insert_id
+from ..core.ephem import eph_busy_give, eph_busy_take  # 2.642.0 (#4975)
 from ..core.i18n import lang, N_, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc, parse_iso
 from ..accounts.session import GATE, me
@@ -458,6 +459,10 @@ def contacts_sync(c, sid):
         if sid in _CONTACT_BUSY:
             return False
         _CONTACT_BUSY.add(sid)
+    if not eph_busy_take(f"contacts:{sid}"):  # 2.642.0 (#4975): another process (or replica) syncs it right now
+        with _CAL_LOCK:
+            _CONTACT_BUSY.discard(sid)
+        return False
     try:
         s = c.execute("SELECT * FROM contact_srcs WHERE id=?", (sid,)).fetchone()
         if not s:
@@ -548,6 +553,7 @@ def contacts_sync(c, sid):
     finally:
         with _CAL_LOCK:
             _CONTACT_BUSY.discard(sid)
+        eph_busy_give(f"contacts:{sid}")
 
 
 def contacts_due(c):

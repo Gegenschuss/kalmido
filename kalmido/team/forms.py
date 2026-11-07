@@ -13,6 +13,7 @@ from flask import g, jsonify, request
 
 from ..core.config import app, APP_NAME, PUBLIC_URL
 from ..core.pg import insert_id, system_ctx
+from ..core.ephem import eph_within  # 2.642.0 (#4975)
 from ..core.i18n import browser_lang, lang, N_, tr
 from ..core.db import body, bump, db, err, iso, now_utc, usettings
 from ..accounts.session import _accept_lang, _token_hash, me, rate_ip
@@ -70,7 +71,11 @@ _FRM_BYTES, _FRM_BYTES_LOCK = {}, threading.Lock()
 
 def h6d_form_bytes(form_id, n):
     """2.86.0 (N24): True (= refuse) when n more bytes would exceed FRM_BYTES_HOUR of the form in the last hour; else
-    the bytes are counted."""
+    the bytes are counted. 2.642.0 (#4975): counted in the database (eph_state) for every web process; this process' own count
+    only when that fails."""
+    shared = eph_within("frm_bytes", form_id, n, FRM_BYTES_HOUR, 3600)
+    if shared is not None:
+        return not shared
     now = time.time()
     with _FRM_BYTES_LOCK:
         arr = [(t, b) for t, b in _FRM_BYTES.get(form_id, ()) if now - t < 3600]

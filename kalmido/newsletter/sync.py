@@ -23,6 +23,7 @@ from datetime import timedelta
 from ..core.db import connect, iso, now_utc, parse_iso
 from ..core.i18n import N_, tr
 from ..core.pg import system_ctx
+from ..core.ephem import eph_busy_give, eph_busy_take  # 2.642.0 (#4975)
 from .adapters import NWL_KINDS, NwlError, nwl_adapter
 from ..core.config import SECRET_KEY  # 2.149.0 G (#2517): pulled up from functions
 from ..core.orgcrypt import oc_dec_k, oc_enc_k, OrgCryptError  # 2.149.0 G (#2517): pulled up from functions
@@ -329,12 +330,16 @@ def nwl_start(c, conn, kind="manual", by=None, wait=False):
         if conn["id"] in _BUSY:
             return None
         _BUSY.add(conn["id"])
+    if not eph_busy_take(f"newsletter:{conn['id']}"):  # 2.642.0 (#4975): another process starts / runs it right now (the
+        _BUSY.discard(conn["id"])                       # check of nl_runs above and the insert below are not one step)
+        return None
     try:
         rid = c.execute("INSERT INTO nl_runs(conn_id, org_id, kind, by_id, state, started_at) VALUES(?,?,?,?,?,?) RETURNING id",
                         (conn["id"], conn["org_id"], kind, by, "busy", _now())).fetchone()[0]
         c.commit()
     except Exception:
         _BUSY.discard(conn["id"])
+        eph_busy_give(f"newsletter:{conn['id']}")
         raise
     if wait:
         _run(conn["id"], rid)
@@ -356,6 +361,7 @@ def _run(conn_id, rid):
         print("newsletter: run", type(e).__name__, flush=True)
     finally:
         _BUSY.discard(conn_id)
+        eph_busy_give(f"newsletter:{conn_id}")
 
 
 def _run_conn(c, conn_id, rid):

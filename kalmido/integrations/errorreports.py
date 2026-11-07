@@ -12,6 +12,7 @@ from flask import g, jsonify, request
 
 from ..core.config import app, APP_VERSION, PUBLIC_URL
 from ..core.pg import insert_id, system_ctx
+from ..core.ephem import eph_within  # 2.642.0 (#4975)
 from ..core.i18n import lang, tr
 from ..core.db import body, bump, db, err, gset, gsetting, iso, iso_ms, now_utc
 from ..accounts.session import me
@@ -450,11 +451,18 @@ def cer_stack(s):
 
 
 def cer_rate_ok(uid):
+    """2.642.0 (#4975): the hour counts in the database (eph_state) for every web process; the minute stays per process (short
+    limits in memory, #2875), as does the hour when the database count fails."""
     now = time.time()
     with _ERR_LOCK:
         lst = [t for t in _CER_RATE.get(uid, []) if t > now - 3600]
-        if len(lst) >= CER_PER_HOUR or len([t for t in lst if t > now - 60]) >= CER_PER_MIN:
-            _CER_RATE[uid] = lst
+        _CER_RATE[uid] = lst
+        if len([t for t in lst if t > now - 60]) >= CER_PER_MIN:
+            return False
+    shared = eph_within("cer_hour", uid, 1, CER_PER_HOUR, 3600)
+    with _ERR_LOCK:
+        lst = _CER_RATE.get(uid, [])
+        if shared is False or (shared is None and len(lst) >= CER_PER_HOUR):
             return False
         _CER_RATE[uid] = lst + [now]
         if len(_CER_RATE) > 5000:

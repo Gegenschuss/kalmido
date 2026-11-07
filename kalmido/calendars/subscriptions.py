@@ -28,6 +28,7 @@ from flask import jsonify, request
 
 from ..core.config import _origin, app, APP_NAME, APP_VERSION, TZ
 from ..core.pg import insert_id, write_lock
+from ..core.ephem import eph_busy_give, eph_busy_take  # 2.642.0 (#4975)
 from ..core.i18n import lang, N_, tr
 from ..core.db import bump, ALLOW_PURPOSES, body, connect, db, err, gsetting, iso, iso_ms, local_now, now_utc, parse_iso
 from ..accounts.session import FAIL_WINDOW, GATE, me
@@ -906,6 +907,10 @@ def cal_sync(c, sid, force=False):
         if sid in _CAL_BUSY:
             return False
         _CAL_BUSY.add(sid)
+    if not eph_busy_take(f"calsub:{sid}"):  # 2.642.0 (#4975): another process (or replica) syncs it right now
+        with _CAL_LOCK:
+            _CAL_BUSY.discard(sid)
+        return False
     try:
         s = c.execute("SELECT s.*, u.username AS u_login FROM cal_subs s JOIN users u ON u.id=s.user_id WHERE s.id=?",
                       (sid,)).fetchone()
@@ -972,6 +977,7 @@ def cal_sync(c, sid, force=False):
     finally:
         with _CAL_LOCK:
             _CAL_BUSY.discard(sid)
+        eph_busy_give(f"calsub:{sid}")
 
 
 def cal_due(r, now):

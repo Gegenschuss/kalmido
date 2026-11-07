@@ -18,6 +18,7 @@ from ..api.common import v1_args, v1_err, v1_json, v1_view
 from ..api.scopes import need_scope  # 2.360.0 A (#2496)
 from ..core.env import env_bool
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
+from ..core.ephem import eph_within  # 2.642.0 (#4975)
 from ..files.store import fs_bytes_of  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.users import need_admin  # 2.369.5 (#2517): pulled up from functions
 from ..collab.news import news_add, notif_ok  # 2.369.5 (#2517): pulled up from functions
@@ -70,7 +71,12 @@ def upr_guard(uid):
     if not n:
         return
     now, cap = time.time(), UPLOAD_HOURLY_MB * 1024 * 1024
-    with _UPR_LOCK:
+    shared = eph_within("upr", uid, n, cap, 3600)  # 2.642.0 (#4975): one count for every web process (eph_state)
+    if shared is False:
+        raise Denied(429, tr("Upload limit reached: at most {0} per hour. Please try again later.", fmt_bytes(cap)))
+    if shared:
+        return
+    with _UPR_LOCK:  # the database failed: this process' own count
         arr = [x for x in _UPR.get(uid, ()) if now - x[0] < 3600]
         if arr and sum(x[1] for x in arr) + n > cap:
             _UPR[uid] = arr

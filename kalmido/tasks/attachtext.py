@@ -17,6 +17,7 @@ from flask import jsonify, request
 from ..core.config import app, ATT_DIR, DB
 from ..core.i18n import N_, tr
 from ..core.db import db, err
+from ..core.ephem import eph_busy_give, eph_busy_take  # 2.642.0 (#4975)
 from ..core.access import Denied, need_task
 from ..tasks.attachments import file_ext, need_attachment, TEXT_MIME
 from ..tasks.validation import as_int
@@ -149,6 +150,10 @@ def pdf_text(data, owner=None):
             if owner in _RUNNING:
                 return {"error": "busy"}
             _RUNNING.add(owner)
+        if not eph_busy_take(f"pdftext:{owner}"):  # 2.642.0 (#4975): one PDF per account across the web processes
+            with _RUN_LOCK:
+                _RUNNING.discard(owner)
+            return {"error": "busy"}
     try:
         if not _SEM.acquire(timeout=PDF_WAIT):
             return {"error": "busy"}
@@ -173,6 +178,7 @@ def pdf_text(data, owner=None):
         if owner is not None:
             with _RUN_LOCK:
                 _RUNNING.discard(owner)
+            eph_busy_give(f"pdftext:{owner}")
     if "error" not in out:
         out["no_text_layer"] = len("".join((out.get("text") or "").split())) < NO_TEXT_MIN
     if clean:

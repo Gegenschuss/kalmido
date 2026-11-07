@@ -14,10 +14,11 @@ wrong code never takes the counted try back. A failing database answers "nothing
 import hashlib
 import hmac
 import secrets
+import threading
 import time
 
 from .db import connect
-from .pg import system_ctx
+from .pg import connect_direct, system_ctx
 from . import config
 
 EPH_HOUSE_S = 60  # expired rows are deleted at most this often per process
@@ -165,3 +166,83 @@ def eph_clear(ns=None):
         _run(lambda c, now: c.execute("DELETE FROM eph_state").rowcount, 0)
     else:
         _run(lambda c, now: c.execute("DELETE FROM eph_state WHERE ns=?", (ns,)).rowcount, 0)
+
+
+def eph_within(ns, grp, n, cap, ttl):
+    """2.642.0 (#4975): a limit over a sliding window shared by every process: n more for grp are counted when the live rows of
+    grp plus n stay within cap. True = counted, False = over the limit (nothing counted), None = the count failed (the caller
+    falls back to its own process' count). Check and count are one step under a lock per grp: two processes never both pass
+    the last free amount."""
+    def fn(c, now):
+        c.execute("SELECT pg_advisory_xact_lock(hashtext(?))", ("eph:" + ns + ":" + str(grp),)).fetchone()
+        have = int(c.execute("SELECT COALESCE(SUM(n), 0) FROM eph_state WHERE ns=? AND grp=? AND exp > ?",
+                             (ns, str(grp), now)).fetchone()[0])
+        if have + int(n) > cap:
+            return False
+        c.execute("INSERT INTO eph_state(ns, k, grp, n, at, exp) VALUES(?,?,?,?,?,?)",
+                  (ns, eph_hash(ns, f"{grp}:{secrets.token_hex(12)}"), str(grp), int(n), now, now + ttl))
+        return True
+    return _run(fn)
+
+
+# 2.642.0 (#4975): "already running" across processes (a sync of a calendar / an address book / a newsletter connection, the
+# PDF text of one account). Session-level pg_try_advisory_lock on ONE direct connection per process: Postgres releases them when
+# a process ends or its connection drops, so a crash never leaves a sync marked as running. The same session may take a lock
+# twice, so the keys this process holds are kept beside it (two threads of one process are told "busy" as well).
+EPH_BUSY_CLASS = 21021  # two-key advisory locks: a key space of its own next to admin/worker.py's loop locks (21020)
+_BUSY_HELD = set()
+_BUSY_CONN = {"c": None}
+_BUSY_LOCK = threading.Lock()
+
+
+def _busy_conn_drop():
+    c, _BUSY_CONN["c"] = _BUSY_CONN["c"], None
+    if c is not None:
+        try:
+            c.close()
+        except Exception:  # noqa: BLE001
+            pass
+
+
+def eph_busy_take(key):
+    """True when this caller now runs `key` (no other thread of any process of the instance does), False = busy. Without the
+    database only this process is asked (the work itself needs the database anyway). Give it back with eph_busy_give(key)."""
+    with _BUSY_LOCK:
+        if key in _BUSY_HELD:
+            return False
+        if config.DATABASE_URL:
+            for attempt in (0, 1):  # a dropped connection is opened once more
+                try:
+                    if _BUSY_CONN["c"] is None:
+                        c = _BUSY_CONN["c"] = connect_direct(config.DATABASE_URL)
+                        for k in _BUSY_HELD:  # what this process still runs, held again on the new session
+                            c.execute("SELECT pg_try_advisory_lock(?, hashtext(?))", (EPH_BUSY_CLASS, k)).fetchone()
+                        c.commit()
+                    c = _BUSY_CONN["c"]
+                    ok = c.execute("SELECT pg_try_advisory_lock(?, hashtext(?))", (EPH_BUSY_CLASS, key)).fetchone()[0]
+                    c.commit()  # session-level: the lock outlives the transaction
+                    if not ok:
+                        return False
+                    break
+                except Exception as e:  # noqa: BLE001
+                    _busy_conn_drop()
+                    if attempt:
+                        print("ephem: busy lock", type(e).__name__, "- this process only", flush=True)
+        _BUSY_HELD.add(key)
+        return True
+
+
+def eph_busy_give(key):
+    with _BUSY_LOCK:
+        if key not in _BUSY_HELD:
+            return
+        _BUSY_HELD.discard(key)
+        c = _BUSY_CONN["c"]
+        if c is None:
+            return
+        try:
+            c.execute("SELECT pg_advisory_unlock(?, hashtext(?))", (EPH_BUSY_CLASS, key)).fetchone()
+            c.commit()
+        except Exception as e:  # noqa: BLE001 -- a lost connection released it already
+            print("ephem: busy unlock", type(e).__name__, flush=True)
+            _busy_conn_drop()

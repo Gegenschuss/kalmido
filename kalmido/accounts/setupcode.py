@@ -5,7 +5,10 @@ in constant time and dropped once the first account exists. Wrong codes count ag
 logins. A restart prints a new code. KALMIDO_SETUP_CODE=<code> sets a fixed code, KALMIDO_SETUP_CODE=off turns the check
 off (only for tests and automation that create the first account themselves).
 2.144.0 D2 (#797): a code the hosting operator asks for (admin/operator.py) is kept as a hash with an end (24 h) in the
-database (settings), so every web process of the instance knows it; it is deleted with the first account."""
+database (settings), so every web process of the instance knows it; it is deleted with the first account.
+2.642.0 (#4975): the start code's hash goes to the database as well (setting setup_code_start_hash): the first web process of a
+container prints it (app.py, KALMIDO_WEB_PROCS) and every other process -- and replica -- accepts it and prints none of its own;
+a restart of the first process makes a new one. It is deleted with the first account (in the same transaction)."""
 import hmac
 import os
 import secrets
@@ -31,6 +34,7 @@ def sh_code_required():
 
 SH_OP_TTL = 24 * 3600  # 2.144.0 D2 (#797): lifetime of an operator's code
 SH_OP_HASH, SH_OP_UNTIL = "setup_code_op_hash", "setup_code_op_until"  # settings keys
+SH_START_HASH = "setup_code_start_hash"  # 2.642.0 (#4975): the printed start code's hash, for every process
 
 
 def _sh_make():
@@ -39,20 +43,36 @@ def _sh_make():
 
 def sh_code_op_new(c):
     """2.144.0 D2 (#797): the operator's code -- hash + end in the database (the caller commits), not printed; it
-    replaces this process's start code (other processes keep theirs, as before)."""
+    replaces the start code (2.642.0 #4975: in every process; before only in this one)."""
     code = _sh_make()
     gset(c, SH_OP_HASH, _token_hash(code.replace("-", "")))
     gset(c, SH_OP_UNTIL, str(int(time.time()) + SH_OP_TTL))
+    c.execute("DELETE FROM settings WHERE key=?", (SH_START_HASH,))  # 2.642.0 (#4975): the printed one goes in every process
     with _SH_LOCK:
         _SH["hash"] = ""
     return code
 
 
+def _sh_store(h):
+    """2.642.0 (#4975): the start code's hash for the other processes (an own short transaction; without the database only
+    this process knows the code, as before)."""
+    try:
+        c = connect()
+        try:
+            gset(c, SH_START_HASH, h)
+            c.commit()
+        finally:
+            c.close()
+    except Exception as e:  # noqa: BLE001
+        print("first setup: setup code only in this process:", type(e).__name__, flush=True)
+
+
 def sh_code_new():
-    """A fresh code (3 x 4 characters, ~59 bits); printed to the log, only its hash is kept."""
+    """A fresh code (3 x 4 characters, ~59 bits); printed to the log, only its hash is kept (here and in the database)."""
     code = _sh_make()
     with _SH_LOCK:
         _SH["hash"] = _token_hash(code.replace("-", ""))
+        _sh_store(_SH["hash"])
     bar = "=" * 64
     print(f"\n{bar}\n  Kalmido first setup: no account exists yet.\n  Setup code: {code}\n"
           "  Enter it on the setup page to create the first (admin) account.\n"
@@ -60,12 +80,14 @@ def sh_code_new():
     return code
 
 
-def sh_code_ensure(c):
-    """Start and first request: a code exists while the server has no user (nothing with a fixed or no code)."""
+def sh_code_ensure(c, start=False):
+    """Start and first request: a code exists while the server has no user (nothing with a fixed or no code).
+    2.642.0 (#4975): a code another process of the instance printed (its hash in settings) counts here too; start=True (the first
+    web process at its start) prints a new one all the same."""
     if SH_CODE_OFF or SH_CODE_ENV or c.execute("SELECT 1 FROM users").fetchone():
         return
     with _SH_LOCK:  # 2.81.0 (#1627): check and make in one go, two first requests print one code
-        if _SH["hash"]:
+        if _SH["hash"] or (not start and gsetting(c, SH_START_HASH)):
             return
         sh_code_new()
 
@@ -76,7 +98,7 @@ def sh_code_startup():
         return
     c = connect()
     try:
-        sh_code_ensure(c)
+        sh_code_ensure(c, start=True)
     finally:
         c.close()
 
@@ -102,7 +124,7 @@ def sh_code_check(c, code):
         op_hash = gsetting(c, SH_OP_HASH)  # 2.144.0 D2 (#797): the operator's code, valid in every process
         if not op_hash:
             sh_code_ensure(c)
-        wants = [_SH["hash"], op_hash]
+        wants = [_SH["hash"], op_hash, gsetting(c, SH_START_HASH)]  # 2.642.0 (#4975): + the code another process printed
     if got and op_hash and hmac.compare_digest(got, op_hash):
         try:
             until = int(gsetting(c, SH_OP_UNTIL) or 0)
@@ -117,6 +139,7 @@ def sh_code_check(c, code):
         _rate_fail(keys)
         print("first setup: wrong or missing setup code from", login_log_ip(client_ip()), flush=True)
         return tr("Wrong setup code. It is in the server log (docker compose logs kalmido)."), 403
+    c.execute("DELETE FROM settings WHERE key=?", (SH_START_HASH,))  # 2.642.0 (#4975): used once: goes with the first account
     return None
 
 
