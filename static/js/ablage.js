@@ -236,7 +236,7 @@ function ab_rowHtml(n, trash) {
     : `<button type="button" class="abopen" data-ab="open" data-id="${n.id}" ${n.kind === 'folder' ? `data-abdrop="${n.id}"` : ''}>${ab_icon(n)}<span class="abtxt"><span class="abname">${esc(n.name)}</span>${meta ? `<span class="abmeta2 muted">${esc(meta)}</span>` : ''}</span></button>`;  // abmeta2: the details below the name on phones
   const acts = trash ? `<button type="button" class="btn sm" data-ab="restore" data-id="${n.id}">${ic('undo', 's')} ${tr('Restore')}</button>${n.role === 'owner' ? `<button type="button" class="btn sm danger" data-ab="purge" data-id="${n.id}">${ic('trash', 's')} ${tr('Delete for good')}</button>` : ''}`  // 2.589.0 (#4875): + for good (owners)
     : `<button type="button" class="iconbtn" data-ab="menu" data-id="${n.id}" aria-label="${esc(tr('More actions for {0}', n.name))}" title="${esc(tr('More'))}">${ic('dots')}</button>`;
-  return `<div class="abrow" role="listitem" data-abid="${n.id}" ${!trash && ab_canWrite(n.role) ? 'draggable="true"' : ''}>${ab_smvBox(n)}${main}${typeof dt_abTags === 'function' ? dt_abTags(n) : ''}<span class="abmeta muted">${esc(meta)}</span><span class="abbadges">${badges}</span>${acts}</div>`;
+  return `<div class="abrow" role="listitem" data-abid="${n.id}" ${!trash && ab_canWrite(n.role) ? (rowd_touch() ? 'data-abmv="1"' : 'draggable="true"') : '' /* 2.627.0 (#4961): a finger by drag.js */}>${ab_smvBox(n)}${main}${typeof dt_abTags === 'function' ? dt_abTags(n) : ''}<span class="abmeta muted">${esc(meta)}</span><span class="abbadges">${badges}</span>${acts}</div>`;
 }
 const ab_item = id => (AB.data?.items || []).find(x => x.id === +id) || (AB.data?.node?.id === +id ? AB.data.node : null) || (typeof ftxtItem === 'function' ? ftxtItem(id) : null) || (typeof dt_abItem === 'function' ? dt_abItem(id) : null);  // 2.61.0 (#1820): + search hits; 2.122.0 B: + tag filter hits
 
@@ -465,12 +465,13 @@ function ab_ctxNode(id) {  // the panel's folders: from its cache, else asked fo
 // 2.607.0 (#4612): a long press too opens the menu, "Select" on top (a row of the list where choosing is offered); while choosing runs
 // a long press ticks the row (like a tap)
 const ab_canPickRow = r => AB.selHere && !!r.closest('.ablist') && !!ab_item(+r.dataset.abid);
-cm_bind('#view .abview .abrow', r => {  // the panel's folders: sbb_treeReg('ab') menu (2.199.0)
+const ab_rowCm = r => {  // the panel's folders: sbb_treeReg('ab') menu (2.199.0)
   const m = r.querySelector('[data-ab="menu"]'), id = m && m.dataset.id; if (!id) return false;  // trash rows: no menu
   const pick = ab_canPickRow(r) ? (rid => () => ab_smvPick(rid))(+r.dataset.abid) : null;
   ab_ctxNode(id).then(n => { if (n && r.isConnected) ab_menu(m || r.querySelector('.sbbtn') || r, n, pick); });
   return true;
-}, r => { if (!AB.selOn || !ab_canPickRow(r)) return false; ab_smvPick(+r.dataset.abid); return true; });
+}, ab_rowPick = r => { if (!AB.selOn || !ab_canPickRow(r)) return false; ab_smvPick(+r.dataset.abid); return true; };
+const AB_LP = cm_bind('#view .abview .abrow', ab_rowCm, ab_rowPick);
 document.addEventListener('change', e => { if (e.target.id === 'ab-file') { const fs = e.target.files; ab_upload(fs, S.route.nid || null); e.target.value = ''; } });
 // dropping files from the computer into the open folder / onto a folder row; dragging a row onto a folder (or the path) moves it
 document.addEventListener('dragstart', e => { const r = e.target.closest?.('.abrow[draggable="true"]'); if (!r) return; AB.drag = +r.dataset.abid; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', ab_item(r.dataset.abid)?.locked ? '' : r.querySelector('.abname')?.textContent || ''); });  // 2.353.0 F (#2758, review N9): no plain name of a locked folder
@@ -489,6 +490,31 @@ document.addEventListener('drop', e => {
   if (AB.drag) { const n = ab_item(AB.drag); AB.drag = null; if (n && t) ab_move(n, t.dataset.abdrop === 'top' ? null : +t.dataset.abdrop); return; }
   const fs = e.dataTransfer?.files; if (!fs?.length || !v.classList.contains('abdropok')) return;
   ab_upload(fs, t && t.dataset.abdrop !== 'top' ? +t.dataset.abdrop : S.route.nid || null);
+});
+
+// 2.627.0 (#4961): the finger by drag.js: hold a row, then drag it onto a folder (a row, the path, the panel's folders) = the
+// same ab_move as the mouse's drop; a swipe without the hold scrolls, a quick tap opens as before, held and let go without
+// moving = what the long press did (the menu, or a tick while choosing). The mouse keeps the browser's drag above.
+const ab_fingerT = (d, x, y) => {
+  const t = /** @type {any} */ (document.elementFromPoint(x, y))?.closest?.('#view .abview [data-abdrop], #side [data-abdrop]');
+  return t && t.dataset.abdrop !== String(d.id) ? t : null;
+};
+const ab_fingerOff = d => { d.r.classList.remove('dragging'); $$('.abdrop').forEach(x => x.classList.remove('abdrop')); };
+drg_attach(document, {
+  mouse: false, hold: ROWD_HOLD, holdMove: 8, onTarget: true, raf: true, ghost: {el: d => d.r, cls: 'ghost-drag'},
+  scroll: () => tdScroller($('#view')), edge: TD_EDGE, step: TD_MAX,
+  start: t => {
+    const r = /** @type {any} */ (t).closest?.('#view .abview .abrow[data-abmv]');
+    return r && !t.closest('input, textarea, select') && ab_item(+r.dataset.abid) ? {r, id: +r.dataset.abid} : null;
+  },
+  onHold: d => { ms_lpTake(AB_LP); d.r.classList.add('dragging'); if (navigator.vibrate) navigator.vibrate(12); },
+  onMove: (d, x, y) => { const t = ab_fingerT(d, x, y); $$('.abdrop').forEach(b => b !== t && b.classList.remove('abdrop')); t?.classList.add('abdrop'); },
+  onDrop: (d, x, y) => {
+    const t = ab_fingerT(d, x, y), n = ab_item(d.id); ab_fingerOff(d);
+    if (t && n) ab_move(n, t.dataset.abdrop === 'top' ? null : +t.dataset.abdrop);
+  },
+  onTap: d => { ab_fingerOff(d); const r = d.r.isConnected ? d.r : $(`#view .abview .abrow[data-abid="${d.id}"]`); if (r) ab_rowPick(r) || ab_rowCm(r); },
+  onCancel: ab_fingerOff,
 });
 
 // 2.152.3 B (#2621): a folder in the panel takes a dragged file row (moves it) or files from the computer (upload into it)

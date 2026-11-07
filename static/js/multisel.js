@@ -28,11 +28,15 @@ function ms_longPress(sel, active, start) {
   return st;
 }
 const ms_lpRecent = st => Date.now() - st.done < 600;
+// 2.627.0 (#4961): a drag's hold (drag.js) took the press: the long press of st opens nothing now, and the browser's menu
+// event of the same press (Android) is swallowed as after a long press; the drag opens the menu itself when let go unmoved
+const ms_lpTake = st => { if (!st) return; clearTimeout(st.lp?.t); st.lp = null; st.done = Date.now(); };
 // 2.452.0 (#3836): a long press opens the menu of a row (open(row) calls menu()); the click that ends the press does nothing,
 // a click of the menu on a button of the row (detail 0) goes through
 function ms_rowMenu(sel, open) {
   const st = ms_longPress(sel, () => false, open);
   window.addEventListener('click', e => { if (e.detail && ms_lpRecent(st) && /** @type {any} */ (e.target).closest?.(sel)) { e.preventDefault(); e.stopPropagation(); } }, true);
+  return st;  // 2.627.0 (#4962): ms_lpTake
 }
 // Shift-click: the ids between the last ticked one and id in the shown order (both included); id alone without an anchor
 function ms_range(order, from, id) {

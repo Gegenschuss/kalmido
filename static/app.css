@@ -6848,6 +6848,7 @@ button.lnph:hover{border-color:var(--accent)}
 .abrow:first-child{border-top:0}
 .abrow:hover{background:var(--bg2)}
 .abrow[draggable="true"]{cursor:grab}
+.abrow.dragging{opacity:.5}  /* 2.627.0 (#4961): held by a finger */
 .abopen{display:flex;align-items:center;gap:.625rem;flex:1 1 auto;min-width:0;min-height:3rem;padding:0 .75rem;border:0;background:none;color:inherit;text-align:left;cursor:pointer;border-radius:var(--radius)}
 .abopen.abdrop{background:var(--accent-soft);box-shadow:inset 0 0 0 2px var(--accent)}
 .abname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
