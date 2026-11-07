@@ -37,7 +37,7 @@ from ..tasks.attachments import file_ext, safe_name, send_stored
 from .pages import (WIKI_ZIP_FILES, WIKI_ZIP_FILE_MAX, wiki_clean_path, wiki_fit_paths, wiki_path_parts, wiki_frontmatter, wiki_insert, wiki_need,
                     wiki_set_links, wiki_space, wiki_space_key, wiki_space_sql)
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
-from .wikie2e import wke_page_mode  # 2.369.5 (#2517): pulled up from functions
+from .wikie2e import wke_mode, wke_page_mode  # 2.369.5 (#2517): pulled up from functions; 2.637.0 (#4745): wke_mode
 
 WKA_LANG = threading.local()  # 2.177.0 (#2685): the language of the person a background import (wkimport.py) works for
 WKA_TOO_LARGE = N_("The archive is too large")
@@ -250,7 +250,6 @@ def wka_space_files():
     from .wkfolder import wkf_base
     if wkf_base(c, uid, {"org_id": oid, "owner_id": uid}) is None:
         raise Denied(404)  # an agent's token, guests (the same as wka_need for every file of the space)
-    from .wikie2e import wke_mode
     if wke_mode(c, oid, uid)[0]:
         return jsonify(space=wiki_space_key(oid), files=[], bytes=0, more=False, e2e=True)
     w, a = wiki_space_sql(oid, uid)
