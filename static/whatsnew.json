@@ -1,6 +1,32 @@
 {
  "versions": [
   {
+   "version": "2.634.0",
+   "date": "2026-11-07",
+   "items": [
+    {
+     "de": "Im Chat auf dem Handy reichen Kopfzeile und Eingabe jetzt bis an den Rand.",
+     "en": "On the phone, the chat header and input now reach the screen edges."
+    },
+    {
+     "de": "Die Zurück-Taste des Handys schließt eine Aufgabe aus „Wartet auf mich“ jetzt mit einem Druck.",
+     "en": "The phone's Back button now closes a task opened from \"Waiting for me\" in one press."
+    },
+    {
+     "de": "Der Update-Hinweis für Admins zeigt, was vor dem Update zu tun ist.",
+     "en": "The update hint for admins shows what to do before updating."
+    },
+    {
+     "de": "Regeln lassen sich jetzt aus fertigen Vorlagen mit einem Klick anlegen.",
+     "en": "Rules can now be created from ready-made templates with one click."
+    },
+    {
+     "de": "Beim Ziehen im Board machen die anderen Karten weich Platz und ein Platzhalter zeigt die Zielstelle.",
+     "en": "When dragging in the board, the other cards make room smoothly and a placeholder shows where the card lands."
+    }
+   ]
+  },
+  {
    "version": "2.632.0",
    "date": "2026-11-07",
    "items": [
