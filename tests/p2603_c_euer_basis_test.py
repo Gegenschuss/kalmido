@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # kalmido-suite: fresh
 """2.603.0 (#4927) API tests: the basis of the income statement per year -- "receipts" (as before) or "bank and cash" (strict),
-the same data in both. Own container (start.sh, org encryption on). Invented companies, people and figures only.
+the same data in both (2.610.0, #4932: the neutral export and the DATEV hints follow). Own container (start.sh, org encryption on). Invented companies, people and figures only.
 Data of the year before (Y): R1 119.00 at 19 % paid by bank; R2 59.50 at 19 % without a bank line; a bank line of 30.00 without
 a receipt; 500.00 private; 200.00 withdrawn into the cash box (match kind cash), out of it R3 23.80 at 19 % and 10.00 without a
 receipt; a meal (gross 150.40) paid by a bank line without a receipt and linked to it; a card statement of 32.50 (cafe 12.50 at
@@ -17,9 +17,12 @@ invoice 2 (595.00) paid by hand, 50.00 received without an invoice.
  - a person without an organisation (freelancer-matrix: office): the same in the personal office
 usage: p2603_c_euer_basis_test.py <datadir>"""
 import base64
+import csv
+import io
 import os
 import subprocess
 import sys
+import zipfile
 from datetime import date
 
 import requests
@@ -28,7 +31,7 @@ import testclock
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 from freelancer_fixture import freelancer  # noqa: E402
-from kt import FAILS, OKS, B, H, DATA, check, sess, until  # noqa: E402
+from kt import CT, FAILS, OKS, B, H, DATA, check, sess, until  # noqa: E402
 
 KEY = base64.b64encode(os.urandom(32)).decode()
 O = "/api/office"
@@ -130,6 +133,22 @@ def inc(eu, key):
     return next((x for x in eu.get("income", []) if x["key"] == key), None)
 
 
+def bx(s, frm, to):
+    """2.610.0 (#4932): the neutral export of [frm, to] -> (check, [(type, gross)] of the CSV, missing.txt of the ZIP)."""
+    q = f"{O}/books/export?from={frm}&to={to}"
+    chk = s.get(B + q + "&check=1").json()
+    txt = s.get(B + q).content.decode("utf-8-sig")
+    rows = list(csv.reader(io.StringIO(txt), delimiter=";" if ";" in txt.splitlines()[0] else ","))[1:]
+    z = zipfile.ZipFile(io.BytesIO(s.get(B + q + "&zip=1").content))
+    miss = "".join(z.read(n).decode("utf-8") for n in z.namelist() if n.endswith(".txt"))
+    return chk, [(r[0], r[9].replace(",", ".")) for r in rows], miss
+
+
+def dv_hints(s, frm, to):
+    r = s.get(B + O + f"/datev/extf?from={frm}&to={to}&check=1")
+    return {h["key"]: h for h in r.json().get("hints", [])} if r.ok else {"_error": r.text[:200]}
+
+
 def office(s, who, ws, me):
     """The whole flow in the office s works in (an organisation or the personal office)."""
     check(s.put(B + O + "/settings", json={"lang": "de", "currency": "EUR",
@@ -211,6 +230,13 @@ def office(s, who, ws, me):
     check(u["kz"]["66"] == "53.52" and u.get("euer_basis") == "receipts", f"{who}: receipts: field 66 {u['kz']['66']}")
     ei = s.get(B + O + f"/books/euer?year={TODAY.year}").json()
     check(inc(ei, "vat19") and inc(ei, "vat19")["net"] == "1500.00" and inc(ei, "bank") is None, f"{who}: receipts: both invoices count {ei['income']}")
+    # 2.610.0 (#4932): the neutral export by receipts as before (all four receipts, no rows of the bank lines, nothing open)
+    check(s.put(B + O + "/settings", json={"datev_extf": {"advisor_no": "1234567", "client_no": "12345", "fy_start": 1, "acct_len": 4, "chart": "SKR03"}}).ok,
+          f"{who}: DATEV numbers")
+    chk, rows, miss = bx(s, f"{Y}-01-01", f"{Y}-12-31")
+    check(chk.get("receipts") == 4 and chk.get("open") == 0 and chk.get("outside") == 0, f"{who}: export receipts: all four receipts {chk}")
+    check(not any(t in ("Booking", "Buchung") for t, _ in rows), f"{who}: export receipts: no booking rows {rows}")
+    check("open_strict" not in dv_hints(s, f"{Y}-01-01", f"{Y}-12-31"), f"{who}: DATEV receipts: no open-receipt hint")
 
     # ---- basis bank and cash (from Y on: this year inherits)
     r = s.put(B + "/api/office/books/basis", json={"year": Y, "basis": "bank"})
@@ -245,11 +271,74 @@ def office(s, who, ws, me):
     # the cash flow follows (the bank line without receipt is money out)
     cf = s.get(B + O + f"/cashflow?from={Y}-05&months=1").json()
     check(any(e["kind"] == "norc" and e["amount"] == "30.00" for e in cf.get("entries", [])), f"{who}: strict: the cash flow has the booking without receipt")
+    # 2.610.0 (#4932): the neutral export follows the basis of the year: R1 (bank), R3 (cash), cafe (card); R2 open and named;
+    # the bank line 30.00 and the cash entry 10.00 without receipt as booking rows; the meal once through its line (70 / 30)
+    chk, rows, miss = bx(s, f"{Y}-01-01", f"{Y}-12-31")
+    check(chk.get("receipts") == 3 and chk.get("open") == 1, f"{who}: export strict: three receipts with their line, R2 open {chk}")
+    bk = sorted(g for t, g in rows if t in ("Booking", "Buchung"))
+    check(bk == ["-10.00", "-30.00"], f"{who}: export strict: the bank / cash lines without receipt (not the meal's line) {bk} {rows}")
+    rec = sorted(g for t, g in rows if t in ("Receipt", "Beleg"))
+    check(rec == ["-119.00", "-12.50", "-23.80"], f"{who}: export strict: the receipts with the amounts of their lines {rec}")
+    ml = [g for t, g in rows if t in ("Entertainment receipt", "Bewirtungsbeleg")]
+    check(len(ml) == 4 and round(sum(float(x) for x in ml), 2) == -150.40, f"{who}: export strict: the meal once (70 / 30 of the bill, one row per VAT rate and the tip, #4563) {ml}")
+    check("r2-ohne-bank.pdf" in miss, f"{who}: export strict: missing.txt names the open receipt {miss[:300]}")
+    h = dv_hints(s, f"{Y}-01-01", f"{Y}-12-31")
+    check(h.get("open_strict", {}).get("count") == 1 and r2 in h["open_strict"].get("ids", []), f"{who}: DATEV strict: the open receipt as a hint {h}")
+    chk, rows, miss = bx(s, f"{TODAY.year}-01-01", T0)
+    check(chk.get("outside") == 1 and sorted(g for t, g in rows if t in ("Payment", "Zahlung")) == ["1190.00"],
+          f"{who}: export strict: only the bank-paid invoice, the payment by hand named {chk} {rows}")
+    check([g for t, g in rows if t in ("Booking", "Buchung")] == ["50.00"], f"{who}: export strict: 50.00 received without invoice {rows}")
+    check(i2 and "\n- " in miss and str(TODAY.year) in miss, f"{who}: export strict: missing.txt names the payment by hand {miss[:300]}")
+    h = dv_hints(s, f"{TODAY.year}-01-01", T0)
+    check(h.get("pay_outside", {}).get("count") == 1, f"{who}: DATEV strict: the payment by hand as a hint {h}")
     # taking the meal's line off: the line is a booking without receipt again, the meal does not count
     check(s.put(B + f"/api/office/meals/{mid}/payment", json={"kind": None}).ok, f"{who}: the link taken off")
     eu2 = s.get(B + O + f"/books/euer?year={Y}").json()
     check(line(eu2, "m:") is None and line(eu2, "b:")["net"] == "210.40", f"{who}: strict: no line, no meal; the line counts without receipt {line(eu2, 'b:')}")
     check(s.put(B + f"/api/office/meals/{mid}/payment", json={"kind": "bank", "id": tx["MEAL"]}).ok, f"{who}: linked again")
+    # ---- 2.610.0 (#4932 review M1 / M2 / N3)
+    # M1: a meal paid by card, its position without a receipt of its own (open): the meal's rows carry the amount, the position not
+    lines = [f"Kreditkartenabrechnung vom 15.11.{Y}", "Beispielbank Mastercard Business", "Karte 5232 12XX XXXX 4711", "Saldo Vormonat 0,00",
+             "08.11. 08.11. Trattoria Esempio 150,40-", "Neuer Saldo 150,40-"]
+    r = s.post(B + f"{K}/{card}/statements", files={"file": ("stmt-nov.pdf", pdf(lines), "application/pdf")})
+    check(r.status_code == 201, f"{who}: M1: the November statement read {r.text[:300]}")
+    sid2 = r.json()["statement"]["id"]
+    cl2 = s.get(B + f"{K}/statements/{sid2}").json()["lines"]
+    check([x["amount"] for x in cl2] == ["150.40"], f"{who}: M1: one position {[(x['merchant'], x['amount']) for x in cl2]}")
+    check(s.post(B + f"{K}/statements/{sid2}/confirm", json={}).ok, f"{who}: M1: statement confirmed")
+    r = s.post(B + O + "/meals", json=meal(me, f"{Y}-11-08"))
+    mid3 = r.json()["id"]
+    check(s.post(B + O + f"/meals/{mid3}/approve").ok, f"{who}: M1: the second meal approved")
+    r = s.put(B + f"/api/office/meals/{mid3}/payment", json={"kind": "card", "id": cl2[0]["id"]})
+    check(r.ok and r.json()["current"]["amount"] == "150.40", f"{who}: M1: the meal takes the open card position {r.text[:200]}")
+    # M2: R4 of 28.03. paid on 02.04., R5 of 28.12. paid on 01.01. of this year (both years "bank and cash")
+    r4 = doc(s, ws, "r4-maerz-april.pdf", "35.70", f"{Y}-03-28", "19")
+    r5 = doc(s, ws, "r5-dezember.pdf", "47.60", f"{Y}-12-28", "19")
+    r = s.post(B + O + "/bank/import", json={"text": camt([ntry("35.70", f"{Y}-04-02", "RVIER"), ntry("47.60", f"{TODAY.year}-01-01", "RFUENF")]),
+                                             "filename": "konto2.xml"})
+    check(r.status_code == 201, f"{who}: M2: bank import {r.status_code} {r.text[:200]}")
+    tx = {t["purpose"].split()[-1]: t["id"] for t in s.get(B + O + "/bank/tx?state=all").json()["items"]}
+    check(m(tx["RVIER"], {"kind": "receipt", "id": r4}).ok and m(tx["RFUENF"], {"kind": "receipt", "id": r5}).ok, f"{who}: M2: R4 / R5 matched")
+    # N3: a receipt without an amount and without a line in the strict year (Z0); N2: one without any date (U0)
+    for name, patch in (("z0-ohne-betrag.pdf", {"date": f"{Y}-07-01"}), ("u0-ohne-datum.pdf", {"amount": "5.00"})):
+        r = s.post(B + "/api/docs", data={"ws": ws}, files={"files": (name, pdf(["Beleg " + name]), "application/pdf")})
+        nid = r.json()["ids"][0]
+        until(lambda: s.get(B + f"/api/docs/{nid}").json().get("state") in ("done", "failed"), 30)
+        check(s.patch(B + f"/api/docs/{nid}", json=patch).ok and s.put(B + f"/api/docs/{nid}/receipt", json={"category": "Material", "keep": True}).ok,
+              f"{who}: {name} as a receipt")
+    chk, rows, miss = bx(s, f"{Y}-01-01", f"{Y}-12-31")
+    cards = [g for t, g in rows if t in ("Credit card", "Kreditkarte")]
+    check("-150.40" not in cards and "-20.00" in cards, f"{who}: M1: the meal's card position without its amount, the other open one with {cards}")
+    ml = [g for t, g in rows if t in ("Entertainment receipt", "Bewirtungsbeleg")]
+    check(len(ml) == 8 and round(sum(float(x) for x in ml), 2) == -300.80, f"{who}: M1: both meals once (70 / 30 each, four rows per meal since #4563) {ml}")
+    check("z0-ohne-betrag.pdf" in miss and "r2-ohne-bank.pdf" in miss, f"{who}: N3: the receipt without amount and line is named as open {miss[:400]}")
+    check("r4-maerz-april.pdf" not in miss, f"{who}: M2: R4 has its line (April) and is not open {miss[:400]}")
+    check("open_strict" not in dv_hints(s, f"{Y}-03-01", f"{Y}-03-31"), f"{who}: M2: the March DATEV export names no open receipt (R4 paid in April)")
+    chk, rows, miss = bx(s, f"{Y}-03-01", f"{Y}-03-31")
+    check(chk.get("open") == 0, f"{who}: M2: the March export: nothing open {chk}")
+    chk, rows, miss = bx(s, f"{Y}-12-01", T0)
+    check("r5-dezember.pdf" not in miss and "-47.60" in [g for t, g in rows if t in ("Receipt", "Beleg")],
+          f"{who}: M2: R5 (December, paid in January) in the export and not open {miss[:400]} {rows}")
     # ---- a locked month keeps the basis of its year
     r = s.post(B + O + "/periods/lock", json={"through": f"{Y}-01", "confirm": f"01/{Y}"})
     check(r.ok, f"{who}: January of {Y} locked {r.text[:200]}")
@@ -275,6 +364,18 @@ check(Fr.get(B + f"/api/office/meals/{MID}/payment").status_code == 404, "anothe
 check(Fr.put(B + f"/api/office/meals/{MID}/payment", json={"kind": None}).status_code == 404, "another office's meal cannot be unlinked: 404")
 check(A.get(B + f"/api/office/meals/{MID}/payment").json()["current"]["kind"] == "bank", "the organisation's link stays")
 check(A.get(B + f"/api/office/books/basis?year={Y}").json()["years"] == {str(Y): "bank", str(TODAY.year): "receipts"}, "the organisation keeps its own setting")
+# 2.610.0 (#4932 review N2): over two years (one strict), a receipt without any date in a folder the person cannot open counts
+# once in "hidden" (the freelancer sees none of the organisation's receipts: hidden = all dated ones + the undated ones)
+out = subprocess.run(["docker", "exec", CT, "python", "-c",
+                      "import app\nfrom kalmido.core.db import connect\nfrom kalmido.core.pg import system_ctx\n"
+                      "from kalmido.office.books import bk_receipts, bk_receipts_basis\nc = connect()\nwith system_ctx(c):\n"
+                      f"    g, u = {{}}, {{}}\n    bk_receipts_basis(c, {ORG}, '{Y}-01-01', '{T0}', uid={FID}, gaps=g)\n"
+                      f"    n = len(bk_receipts_basis(c, {ORG}, '{Y}-01-01', '{T0}', uid=0))\n"
+                      f"    bk_receipts(c, {ORG}, '9999-01-01', '9999-01-01', uid={FID}, gaps=u)\n"
+                      "    print('N2', g.get('hidden', 0), n + u.get('hidden', 0), u.get('hidden', 0))\nc.close()"],
+                     capture_output=True, text=True)
+n2 = (out.stdout.split("N2 ")[-1].split() + ["", "", ""])[:3] if "N2 " in out.stdout else ["?", "!", "0"]
+check(n2[0] == n2[1] and n2[2] not in ("", "0"), f"N2: hidden counts the undated receipt once {n2} {out.stdout[-200:]} {out.stderr[-300:]}")
 
 print(f"p2603_c_euer_basis: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

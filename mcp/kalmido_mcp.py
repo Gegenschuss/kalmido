@@ -1808,6 +1808,9 @@ TOOLS += [
      lambda api, a: api.call("POST", f"/tasks/{int(a['task_id'])}/attachments/text", body=_pick(a, ("name", "content")))),
     ("delete_attachment", "Remove a file of a task (or of your comment). It goes to the trash (people restore it in the app) and is deleted for good after the trash period.", _obj({"attachment_id": S_ID}, ["attachment_id"]),
      lambda api, a: api.call("DELETE", f"/attachments/{_id(a, 'attachment_id')}")),
+    ("restore_attachment", "2.610.0: bring a task / comment file back from the trash (the same rights as deleting it; only files of "
+                           "projects shared with you, else 404).", _obj({"attachment_id": S_ID}, ["attachment_id"]),
+     lambda api, a: api.call("POST", f"/attachments/{_id(a, 'attachment_id')}/restore")),
     ("delete_chat_attachment", "Remove a file you sent in a chat.", _obj({"attachment_id": S_ID}, ["attachment_id"]),
      lambda api, a: api.call("DELETE", f"/chat-attachments/{_id(a, 'attachment_id')}")),
     ("update_comment", "Edit your comment (Markdown). 2.638.0: expect_updated_at = the comment's edited_at, else its created_at, as "
@@ -1875,6 +1878,9 @@ TOOLS += [
           ["list_id", "name", "base64"]), t_upload_project_file),
     ("delete_project_file", "Remove a project file. It goes to the project's trash (people restore it in the app) and is deleted for good after the trash period.", _obj({"list_id": S_ID, "file_id": S_ID}, ["list_id", "file_id"]),
      lambda api, a: api.call("DELETE", f"/lists/{_id(a, 'list_id')}/files/{_id(a, 'file_id')}")),
+    ("restore_project_file", "2.610.0: bring a project file back from the trash (the same rights as deleting it; 409 when the project "
+                             "holds its maximum of files).", _obj({"file_id": S_ID}, ["file_id"]),
+     lambda api, a: api.call("POST", f"/list-files/{_id(a, 'file_id')}/restore")),
     # ---- time tracking
     ("get_timer", "The running timer (null = none).", _obj({}), lambda api, a: api.call("GET", "/time/timer")),
     ("start_timer", "Start the timer on a task (or a project) of a project with time tracking on (2.41.0: the project's switch time_tracking, "
@@ -2833,7 +2839,8 @@ TOOL_SCOPES = {
     "delete": ("delete_reward", "delete_note", "delete_list", "delete_section", "delete_task", "restore_task", "empty_trash", "delete_field", "delete_template",
                "delete_filter", "delete_habit"),
     "attachments:read": ("get_attachment", "read_attachment"),
-    "attachments:write": ("upload_attachment", "create_text_file", "delete_attachment", "upload_project_file", "delete_project_file"),
+    "attachments:write": ("upload_attachment", "create_text_file", "delete_attachment", "upload_project_file", "delete_project_file",
+                          "restore_attachment", "restore_project_file"),  # 2.610.0 (#4010)
     "time": ("start_timer", "stop_timer", "add_time_entry", "update_time_entry", "delete_time_entry"),
     "export": ("export_data",),
     "calendar": ("list_event_calendars", "create_event_calendar", "update_event_calendar", "delete_event_calendar", "share_event_calendar",
@@ -2909,6 +2916,7 @@ TOOLSETS = {
         create_filter update_filter delete_filter upload_attachment create_text_file delete_attachment update_comment delete_comment set_project_overview
         add_project_link update_project_link delete_project_link reorder_project_links add_milestone update_milestone delete_milestone list_sprints list_ticket_types
         get_sprint set_task_sprint set_project_status list_project_files upload_project_file delete_project_file export_data request_approval review_task
+        restore_attachment restore_project_file
         set_list_review list_forms create_form update_form delete_form list_files read_file search_files write_file create_file_folder list_documents
         get_document update_document create_document list_notepads create_notepad update_notepad delete_notepad write_status_pad get_weekly_status
         list_layout_blocks get_view_layout propose_layout set_wip_limit set_dwell_limits get_velocity list_flow propose_import propose_rule list_video_reviews get_video_review

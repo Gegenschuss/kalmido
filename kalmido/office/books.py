@@ -125,7 +125,7 @@ def _uid_filter(uid):
 
 
 # ---------------------------------------------------------------- receipts (contract with part B)
-def bk_receipts(c, oid, frm, to, uid=None, by="paid", gaps=None, paid=None):
+def bk_receipts(c, oid, frm, to, uid=None, by="paid", gaps=None, paid=None, with_undated=True, zero=False):
     """The receipts of office area oid in [frm, to] (ISO days, both included) ->
     [{node_id, date, amount (Decimal gross, office currency), vat_pct, net, vat, category, title, paid_at, doc_date, checked_at,
     checked_by (2.420.0 C, #3448: a person's tick, the user id)}].
@@ -136,7 +136,10 @@ def bk_receipts(c, oid, frm, to, uid=None, by="paid", gaps=None, paid=None):
     this person sees: no amount in the period, no date at all) and "hidden" (count of receipts in folders uid cannot open).
     2.603.0 (#4927): paid = {node id: {day, amount, src, ref}} of the strict basis (office/euerbasis.py eb_flows): only these
     receipts, on the day of their bank / card / cash line and with its amount as the gross (frm / to: the caller's flows);
-    each row then carries "src" / "ref" (the line)."""
+    each row then carries "src" / "ref" (the line).
+    2.610.0 (#4932 review N2 / N3): with_undated=False leaves the receipts without any date out of gaps (a later segment of
+    bk_receipts_basis: they were named once already); zero=True keeps the receipts without an amount as rows of amount 0
+    (instead of gaps "no_amount": the open receipts of a strict year name them too)."""
     from ..docs.store import doc_opener  # 2.546.0 (#4186)
     ws = bk_ws(c, oid)
     s = office_settings(c, oid)
@@ -160,13 +163,14 @@ def bk_receipts(c, oid, frm, to, uid=None, by="paid", gaps=None, paid=None):
             opener[r["ws"]] = doc_opener(c, r["ws"], "doc_meta.amount")
         raw = opener[r["ws"]](r["amount"]) or ""
         amts[r["node_id"]] = dec(raw, "0") if raw else dec(0)
-    acc = fs_roles_many(c, [i for i, a in amts.items() if a != 0 or gaps is not None or (paid is not None and paid[i].get("amount"))], uid)
+    keep0 = gaps is not None or zero
+    acc = fs_roles_many(c, [i for i, a in amts.items() if a != 0 or keep0 or (paid is not None and paid[i].get("amount"))], uid)
     for r in rows:
         a = amts[r["node_id"]]
         pl = paid.get(r["node_id"]) if paid is not None else None
         if pl is not None and pl.get("amount"):
             a = pl["amount"]  # 2.603.0 (#4927): the line's amount (home currency) is the gross
-        if a == 0 and gaps is None:
+        if a == 0 and not keep0:
             continue
         if acc[r["node_id"]][0]:
             continue  # a folder above it is in the trash
@@ -174,7 +178,7 @@ def bk_receipts(c, oid, frm, to, uid=None, by="paid", gaps=None, paid=None):
             if gaps is not None and a != 0:
                 gaps["hidden"] = gaps.get("hidden", 0) + 1
             continue
-        if a == 0:
+        if a == 0 and not zero:
             gaps.setdefault("no_amount", []).append(r["name"] or "")
             continue
         cur, rate = bk_home_rate(r["currency"], s)
@@ -194,7 +198,7 @@ def bk_receipts(c, oid, frm, to, uid=None, by="paid", gaps=None, paid=None):
                     "unrated": cur if rate is None else None,  # 2.189.0 B (#2475): a foreign receipt without office rate
                     "checked_at": r["checked_at"], "checked_by": r["checked_by"] if r["checked_at"] else None,  # 2.420.0 C (#3448)
                     **({"src": pl["src"], "ref": pl["ref"]} if pl is not None else {})})  # 2.603.0 (#4927)
-    if gaps is not None:  # 2.356.0 (#3097): receipts without any date belong to no period -- every export names them
+    if gaps is not None and with_undated:  # 2.356.0 (#3097): receipts without any date belong to no period -- every export names them
         undated = c.execute("SELECT r.node_id, n.name FROM rc_receipts r JOIN doc_meta d ON d.node_id=r.node_id JOIN fs_nodes n ON n.id=r.node_id "
                            "WHERE d.ws=? AND n.kind='file' AND n.deleted_at IS NULL AND COALESCE(NULLIF(r.paid_at, ''), NULLIF(d.doc_date, '')) IS NULL "
                            "ORDER BY r.node_id LIMIT 1000", (ws,)).fetchall()  # review N4: bounded (named, not all of them)
@@ -209,15 +213,33 @@ def bk_receipts(c, oid, frm, to, uid=None, by="paid", gaps=None, paid=None):
     return out
 
 
-def bk_receipts_basis(c, oid, frm, to, by="doc", uid=None):
+def bk_receipts_basis(c, oid, frm, to, by="doc", uid=None, gaps=None, open_=None, prep=None):
     """2.603.0 (#4927): the receipts of [frm, to] by the basis of each year (office/euerbasis.py): "receipts" = bk_receipts(by);
-    "bank and cash" = only those with a bank / card / cash line, on its day with its amount (the DATEV export)."""
+    "bank and cash" = only those with a bank / card / cash line, on its day with its amount (the DATEV export).
+    2.610.0 (#4932, the neutral export and the DATEV hints): gaps as bk_receipts (the receipts without a date named once);
+    open_ (a list) gets the receipts of a strict year without a bank / card / cash line (by day `by`) -- they do not count and
+    the exports name them instead of leaving them out silently (review M2: "without a line" means no line on any day, so a
+    receipt of 28.03. paid on 02.04. is not open in March; review N3: receipts without an amount as well, amount 0); prep(a, b, flows) runs before the receipts of a strict
+    segment are read (the neutral export takes the entertainment receipts off their lines there, as books.bk_euer)."""
     segs = eb_segments(office_settings(c, oid), frm, to)
     if not any(x[2] for x in segs):
-        return bk_receipts(c, oid, frm, to, uid=uid, by=by)
-    out = []
-    for a, b, strict in segs:
-        out += bk_receipts(c, oid, a, b, uid=uid, paid=eb_flows(c, oid, a, b)["paid"]) if strict else bk_receipts(c, oid, a, b, uid=uid, by=by)
+        return bk_receipts(c, oid, frm, to, uid=uid, by=by, gaps=gaps)
+    out, linked = [], None
+    for i, (a, b, strict) in enumerate(segs):
+        one = i == 0  # review N2: the receipts without any date belong to no period -- named (and counted as hidden) once
+        if strict:
+            flows = eb_flows(c, oid, a, b)
+            if open_ is not None:
+                if linked is None:  # review M2: the lines of every day, read once
+                    linked = set(eb_flows(c, oid, "0001-01-01", "9999-12-31")["paid"])
+                open_ += [rc for rc in bk_receipts(c, oid, a, b, uid=uid, by=by, zero=True) if rc["node_id"] not in linked]
+            if prep is not None:
+                prep(a, b, flows)
+            out += bk_receipts(c, oid, a, b, uid=uid, paid=flows["paid"], gaps=gaps, with_undated=one)
+        else:
+            out += bk_receipts(c, oid, a, b, uid=uid, by=by, gaps=gaps, with_undated=one)
+    if gaps is not None and not gaps.get("no_amount"):
+        gaps.pop("no_amount", None)
     return out
 
 

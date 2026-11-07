@@ -23,9 +23,11 @@ from ..core.db import db, local_now
 from ..core.i18n import N_, tr
 from ..core.errors import BadInput
 from .books import bk_gaps_text, ofc_meals_euer, ofc_meals_home  # 2.534.0 (#4333): ofc_meals_*
+from .books import bk_meals_strict, bk_receipts_basis  # 2.610.0 (#4932)
+from .euerbasis import EB_NORC_LABEL, eb_income_payment_ids, eb_segments  # 2.610.0 (#4932)
 from .calc import dec, dstr, money
 from .model import office_gate, office_need_feature, office_org, office_settings
-from .books import _fx as bk_fx, _home, _split, bk_payments, bk_receipts, bk_csv_cell  # 2.369.5 (#2517): pulled up from functions
+from .books import _fx as bk_fx, _home, _split, bk_payments, bk_csv_cell  # 2.369.5 (#2517): pulled up from functions
 from .pdfweb import epdf_name, epdf_doc_files  # 2.369.5 (#2517): pulled up from functions
 from .travel import rk_cat_label, rk_trips  # 2.369.5 (#2517): pulled up from functions
 from ..files.bulk import abm_zip_name, abm_send_zip, ABM_BUSY, ABM_ZIP_MAX_FILES, ABM_ZIP_MAX_MB, abm_too_big, abm_unique  # 2.369.5 (#2517): pulled up from functions
@@ -37,7 +39,10 @@ from .meals import BW_SHARE  # 2.616.0 (#4563): bx_meal_parts
 BX_COLS = ("type", "date", "number", "counterparty", "text", "category", "tax_pct", "net", "tax", "gross", "currency", "file")
 BX_DAYS_MAX = 3 * 366  # one export covers at most three years
 BX_TYPES = {"invoice": N_("Invoice"), "credit": N_("Credit note"), "payment": N_("Payment"), "receipt": N_("Receipt"), "travel": N_("Travel expenses"),
-            "card": N_("Credit card"), "meal": N_("Entertainment receipt")}  # 2.444.0 (#3447): positions of the statements (the total leaves the bank account, office/cardnorc.py)
+            "card": N_("Credit card"), "meal": N_("Entertainment receipt"),  # 2.444.0 (#3447): positions of the statements (the total leaves the bank account, office/cardnorc.py)
+            "booking": N_("Booking")}  # 2.610.0 (#4932): a year "bank and cash": bank / cash lines without receipt, money received without invoice
+BX_OPEN = N_("Receipts without a bank, cash or card booking (basis bank and cash: they do not count and are not in the export):")
+BX_OUTSIDE = N_("Payments without a bank or cash booking (basis bank and cash: they do not count and are not in the export):")
 
 
 def _ctx():
@@ -85,9 +90,26 @@ def _fx(r, home):
 
 def bx_rows(c, oid, frm, to, gaps=None):
     """-> (rows, docs, receipts): rows = dicts of BX_COLS (amounts as Decimal), docs = [(doc id, row, [its list rows])] of the
-    issued documents, receipts = [(node id, row)] of the receipt files. gaps: see books.bk_receipts (2.356.0, #3097)."""
+    issued documents, receipts = [(node id, row)] of the receipt files. gaps: see books.bk_receipts (2.356.0, #3097).
+    2.610.0 (#4932): each year by the basis of the income statement (office/euerbasis.py), as books.bk_euer counts it: in a
+    year "bank and cash" only payments of a bank / cash booking, the receipts with their line (its day and amount), the
+    entertainment receipts through their line, the bank / cash lines without receipt and the money received without invoice
+    as rows of their own (type booking); what does not count is named in gaps (open, outside) -> missing.txt."""
     s = office_settings(c, oid)
     home = _home(s)
+    gx = {} if gaps is None else gaps  # what a strict year does not count (open, outside); gaps itself stays as the caller gave it
+    segs = eb_segments(s, frm, to)
+    strict = any(x[2] for x in segs)
+    inc_ids = eb_income_payment_ids(c, oid) if strict else None
+    small = bool(s.get("small_business"))
+    meals, lines, meal_cards = [], [], set()
+
+    def prep(a, b, flows):  # a strict year: the meals leave their lines first (no second expense), then the rest of the lines
+        cards = {x["ref"] for x in flows["norc"] if x["src"] == "card"}
+        meals.extend(bk_meals_strict(c, oid, flows, a, b, s))
+        meal_cards.update(cards - {x["ref"] for x in flows["norc"] if x["src"] == "card"})  # review M1: a meal on an open card position
+        lines.extend(x for x in flows["norc"] if x["src"] != "card")  # card positions: cardnorc.cc_bk_rows has them
+        lines.extend(dict(x, income=True) for x in flows["income_open"])
     rows, docs, recs = [], [], []
     for r in c.execute("SELECT d.*, cl.name AS bx_client FROM office_docs d LEFT JOIN clients cl ON cl.id=d.client_id WHERE d.org_id=? "
                        "AND d.kind IN ('invoice','credit') AND d.locked_at IS NOT NULL AND d.number != '' AND d.date>=? AND d.date<=? "
@@ -108,14 +130,26 @@ def bx_rows(c, oid, frm, to, gaps=None):
             mine.append(rows[-1])
         docs.append((r["id"], r, mine))
     for p, r in bk_payments(c, oid, frm, to, home):
+        if inc_ids is not None and p["id"] not in inc_ids and any(a_ <= p["date"] <= b_ for a_, b_, x in segs if x):
+            gx.setdefault("outside", []).append(f"{p['date']} {r['number']}")  # 2.610.0 (#4932): typed by hand, no bank / cash booking
+            continue
         a = money(dec(p["amount"]) / _fx(r, home)) * (-1 if r["kind"] == "credit" else 1)
         rows.append({"type": "payment", "date": p["date"], "number": r["number"], "counterparty": (_j(r["recipient"]).get("name") or "").strip(),
                      "text": "", "category": "", "tax_pct": "", "net": "", "tax": "", "gross": a, "currency": home, "file": ""})
-    for rc in bk_receipts(c, oid, frm, to, by="doc", gaps=gaps):
+    opened = []
+    for rc in bk_receipts_basis(c, oid, frm, to, by="doc", gaps=gaps, open_=opened, prep=prep):  # 2.610.0 (#4932)
         rows.append({"type": "receipt", "date": rc["date"], "number": "", "counterparty": "", "text": rc["title"], "category": rc["category"],
                      "tax_pct": dec(rc["vat_pct"]) if rc["vat_pct"] is not None else "", "net": -rc["net"], "tax": -rc["vat"],
                      "gross": -rc["amount"], "currency": home, "file": rc["title"] or ""})
         recs.append((rc["node_id"], rows[-1]))
+    if opened:
+        gx["open"] = [f"{rc['date']} {rc['title']}" for rc in opened]
+    for x in lines:  # 2.610.0 (#4932): the bank / cash lines of a strict year without receipt (gross, no input tax)
+        a = money(x["amount"]) * (1 if x.get("income") else -1)
+        txt = tr("Money received without invoice") if x.get("income") else tr(EB_NORC_LABEL) if x.get("missing") else tr("No receipt needed")
+        rows.append({"type": "booking", "date": x["day"], "number": "", "counterparty": x.get("text") or "",
+                     "text": f"{tr('Cash book') if x.get('src') == 'cash' else tr('Bank booking')}: {txt}", "category": x.get("category") or "",
+                     "tax_pct": "", "net": a, "tax": "", "gross": a, "currency": home, "file": ""})
     seen = set()
     for y in range(int(frm[:4]), int(to[:4]) + 1):
         for tr_ in rk_trips(c, oid, year=str(y)):
@@ -132,8 +166,11 @@ def bx_rows(c, oid, frm, to, gaps=None):
                              "gross": -a, "currency": home, "file": ""})
     # 2.534.0 (#4333): the approved entertainment receipts, two rows each: the deductible 70 % with the full input tax and
     # the 30 % that are not deductible (a small business: 70 / 30 of the gross amount, no input tax) -- gross adds up to the bill
-    small = bool(s.get("small_business"))
-    for m in ofc_meals_home(c, oid, frm, to, s):
+    if strict:  # 2.610.0 (#4932): the years by receipts as before, the strict ones through their lines (prep)
+        meals += [m for a_, b_, x in segs if not x for m in ofc_meals_home(c, oid, a_, b_, s)]
+    else:
+        meals = ofc_meals_home(c, oid, frm, to, s)
+    for m in meals:
         v, sm = ofc_meals_euer([m], small)
         nd = dec(sm["not_deductible"])
         ded = [(tr("Entertainment (70 % deductible)"), pct, net, tax) for pct, net, tax in bx_meal_parts(m, v)]  # 2.616.0 (#4563): per VAT rate
@@ -141,7 +178,7 @@ def bx_rows(c, oid, frm, to, gaps=None):
             rows.append({"type": "meal", "date": m["date"], "number": "", "counterparty": "", "text": m["title"], "category": cat, "tax_pct": pct,
                          "net": -net, "tax": -tax if tax else "", "gross": -(net + tax), "currency": home, "file": ""})
     from .cardnorc import cc_bk_rows
-    rows += cc_bk_rows(c, oid, frm, to)  # 2.444.0 (#3447)
+    rows += cc_bk_rows(c, oid, frm, to, meals=meal_cards)  # 2.444.0 (#3447); review M1: the meal's position without its amount
     rows.sort(key=lambda x: (x["date"] or "", list(BX_TYPES).index(x["type"]), x["number"]))
     return rows, docs, recs
 
@@ -196,7 +233,8 @@ def bx_export():
     rows, docs, recs = bx_rows(c, oid, frm, to, gaps)
     if request.args.get("check"):  # 2.356.0 (#3097): + what the export leaves out
         return jsonify(**{"from": frm, "to": to}, rows=len(rows), documents=len(docs), receipts=len(recs),
-                       no_date=len(gaps.get("no_date") or ()), no_amount=len(gaps.get("no_amount") or ()), hidden=gaps.get("hidden", 0))
+                       no_date=len(gaps.get("no_date") or ()), no_amount=len(gaps.get("no_amount") or ()), hidden=gaps.get("hidden", 0),
+                       open=len(gaps.get("open") or ()), outside=len(gaps.get("outside") or ()))  # 2.610.0 (#4932)
     stem = f"{tr('bookings')}-{frm}-{to}"
     want_zip = request.args.get("zip") == "1"
     ofx_log(c, oid, "export", target="books", detail={"what": "export.zip" if want_zip else "export.csv", "from": frm, "to": to, "rows": len(rows)})
@@ -277,6 +315,9 @@ def bx_zip(c, oid, rows, docs, recs, stem, gaps=None):
                 row["file"] = done[nid]
             z.writestr(stem + ".csv", bx_csv(c, oid, rows).encode("utf-8"))
             note = bk_gaps_text(gaps or {}, missing)
+            for key, head in (("open", BX_OPEN), ("outside", BX_OUTSIDE)):  # 2.610.0 (#4932): a year "bank and cash"
+                if (gaps or {}).get(key):
+                    note += "\r\n".join([tr(head)] + [f"- {n}" for n in gaps[key]]) + "\r\n"
             if note:
                 z.writestr(tr("missing") + ".txt", note.encode("utf-8"))
     except BaseException:

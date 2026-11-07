@@ -17,6 +17,7 @@ from ..tasks.validation import log_act
 from ..collab.comments import user_names
 from ..core.errors import BadInput
 from ..core.conflict import Conflict  # 2.564.0 (#4701)
+from ..core.objparts import part_kind, part_write  # 2.610.0 (#4762): the core's write layer of side objects
 from ..core.numtext import user_num  # 2.263.0 (#2976)
 from ..core.retention import ret_trash_days  # 2.550.0 (#4528)
 from .formula import fx_check_cycles, fx_compile, fx_display
@@ -368,6 +369,10 @@ def field_create(lid):
     return jsonify({**field_dict(c.execute("SELECT * FROM list_fields WHERE id=?", (fid,)).fetchone(), c), "modules_on": on})
 
 
+FIELD_KIND = "list_field"  # 2.610.0 (#4762): a custom field, a side object of the core (core/objparts.py); its lock since #4701
+part_kind(FIELD_KIND, "list_fields", lock="field-{id}")
+
+
 @app.patch("/api/fields/<int:fid>")
 def field_update(fid):
     """{name?, options?, pinned?, sort?}: owner and list admins (2.39.1); the type cannot change. Removed select options
@@ -379,13 +384,9 @@ def field_update(fid):
     b = body()
     c = db()
     need_field(c, fid)
-    write_lock(c, f"field-{fid}")
-    r = c.execute("SELECT * FROM list_fields WHERE id=?", (fid,)).fetchone()  # read again: the state the lock protects
-    seen = fd_seen_options(b)
-    if seen is not None and r["type"] in ("select", "multiselect") and "options" in b:
-        have = json.loads(r["options"] or "{}").get("options") or []
-        if fd_opt_sig(have) != fd_opt_sig(seen):
-            raise Conflict("field", field_dict(r, c))
+    # read again under the lock (the state it protects) and checked against what the client saw: the core's write path
+    # (2.610.0 #4762, core/objparts.py part_write); the writes below follow under the same lock
+    r, _ = part_write(c, FIELD_KIND, fid, b, check=lambda c, r: fd_check_seen(c, r, b))
     name, _, opts = field_clean_def(b, r)
     if fd_col(r, "org_field_id") and (name != r["name"] or opts != json.loads(r["options"] or "{}")):
         # 2.609.0 (#3373): name and options of a linked field are the organisation's (changed there for every project)
@@ -430,6 +431,16 @@ def field_prune_opts(c, fid, ftype, opts):
                     c.execute("UPDATE task_field_values SET value=? WHERE field_id=? AND value=?", (left, fid, val))
                 else:
                     c.execute("DELETE FROM task_field_values WHERE field_id=? AND value=?", (fid, val))
+
+
+def fd_check_seen(c, r, b):
+    """2.564.0 (#4701): a select / multiselect whose options changed since the client read them (_prev.options) -> 409
+    {"field": the current field}. 2.610.0 (#4762): the check of the core's part_write."""
+    seen = fd_seen_options(b)
+    if seen is not None and r["type"] in ("select", "multiselect") and "options" in b:
+        have = json.loads(r["options"] or "{}").get("options") or []
+        if fd_opt_sig(have) != fd_opt_sig(seen):
+            raise Conflict("field", field_dict(r, c))
 
 
 def fd_seen_options(b):

@@ -19,6 +19,7 @@ from ..core.pg import insert_id, write_lock
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, iso_ms, local_day, local_now, now_utc
 from ..core.conflict import ccf_check  # 2.564.0 D (#4701)
+from ..core.objparts import part_kind, part_write  # 2.610.0 (#4762): the core's write layer of side objects
 from ..accounts.session import me
 from ..core.access import Denied, is_project, list_role, need_list, pvis, WRITE_ROLES
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
@@ -59,6 +60,11 @@ def spr_cfg(raw):
 def spr_ver(s):
     """2.564.0 D (#4701): the version of a sprint (updated_at, else created_at for one never edited)."""
     return (s["updated_at"] if "updated_at" in s.keys() else None) or s["created_at"]
+
+
+SPR_KIND = "sprint"  # 2.610.0 (#4762): a side object of the core (core/objparts.py): the dialog's version (409 key "sprint"), the
+# trash copy (lists/parttrash.py, the kind in list_part_trash); agents never take one back
+part_kind(SPR_KIND, "sprints", lock="sprint-{id}", version=spr_ver, key="sprint", agent=False)
 
 
 def spr_today():
@@ -473,11 +479,9 @@ def sprint_update(sid):
     b = body()
     c = db()
     s = need_sprint(c, sid, write=True)
-    write_lock(c, f"sprints:{s['list_id']}")  # 2.273.0 B (#3051): checked and written under the list's sprint lock (start / close)
-    s = spr_row(c, sid)
-    if not s:
-        raise Denied(404)
-    ccf_check(b, spr_ver(s), "sprint", lambda: spr_dict(c, s, me()))  # 2.564.0 D (#4701): saved meantime elsewhere -> 409 + the sprint
+    # 2.273.0 B (#3051): checked and written under the list's sprint lock (start / close); 2.564.0 D (#4701): saved meantime
+    # elsewhere -> 409 + the sprint; 2.610.0 (#4762): lock, row and version check through the core (core/objparts.py part_write)
+    s, _ = part_write(c, SPR_KIND, sid, b, lock=f"sprints:{s['list_id']}", read=spr_row, public=lambda c, s: spr_dict(c, s, me()))
     if s["state"] == "closed" and ("start" in b or "end" in b):
         return err(tr("A closed sprint keeps its dates"), 409)
     f = spr_clean_fields(b, s)

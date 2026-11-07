@@ -83,6 +83,9 @@ DV_IN_DATEV_1 = N_("1 travel receipt already in DATEV is not exported again")
 # 2.146.0 B (#2452): a possible duplicate (docs/dups.py) stays out unless the export asks for it (?dups=1)
 DV_DUP = N_("{0} possibly duplicate receipts are not exported")
 DV_DUP_1 = N_("1 possibly duplicate receipt is not exported")
+# 2.610.0 (#4932): a year "bank and cash" (office/euerbasis.py): a receipt without a bank, cash or card booking does not count
+DV_OPEN_STRICT = N_("{0} receipts without a bank, cash or card booking are not exported (basis bank and cash): match them under Office > Bank")
+DV_OPEN_STRICT_1 = N_("1 receipt without a bank, cash or card booking is not exported (basis bank and cash): match it under Office > Bank")
 DV_DUP_IN = N_("{0} possibly duplicate receipts are exported")
 DV_DUP_IN_1 = N_("1 possibly duplicate receipt is exported")
 DV_CC_OPEN = N_("{0} card positions without a receipt are not exported")  # 2.444.0 (#3447)
@@ -267,7 +270,8 @@ def dv_receipt_rows(c, oid, d_from, d_to, st, s):
     small = bool(s.get("small_business"))
     from .cardnorc import cc_dv_nodes
     gegen = dv_counter(st)
-    receipts = bk_receipts_basis(c, oid, d_from, d_to, by="doc")  # 2.603.0 (#4927): a year "bank and cash": only receipts with their line
+    opened = []  # 2.610.0 (#4932): the receipts a strict year leaves out are named as a hint, not left out silently
+    receipts = bk_receipts_basis(c, oid, d_from, d_to, by="doc", open_=opened)  # 2.603.0 (#4927): a year "bank and cash": only receipts with their line
     own = dv_supplier_accounts(c, oid, st, [rc["node_id"] for rc in receipts])  # 2.148.0 D (#2458)
     own.update(dict.fromkeys(cc_dv_nodes(c, oid), dv_card_account(st)))  # 2.444.0 (#3447): paid by card: the card account, not the creditor
     bu_in = {**DV_BU_IN, **(st.get("bu_in") or {})}
@@ -303,6 +307,11 @@ def dv_receipt_rows(c, oid, d_from, d_to, st, s):
         hints.append({"key": "no_vat", "count": no_vat, "text": tr(DV_NO_VAT_1) if no_vat == 1 else tr(DV_NO_VAT, no_vat)})
     if rc13b:
         hints.append({"key": "rc13b", "count": rc13b, "text": tr(DV_RC13B_1) if rc13b == 1 else tr(DV_RC13B, rc13b)})
+    opened = [rc for rc in opened if rc["amount"] != 0]
+    if opened:
+        n = len(opened)
+        hints.append({"key": "open_strict", "count": n, "ids": [rc["node_id"] for rc in opened][:50],
+                      "text": tr(DV_OPEN_STRICT_1) if n == 1 else tr(DV_OPEN_STRICT, n)})
     if dup_ids:
         n = len(dup_ids)
         txt = (tr(DV_DUP_IN_1) if n == 1 else tr(DV_DUP_IN, n)) if with_dups else (tr(DV_DUP_1) if n == 1 else tr(DV_DUP, n))

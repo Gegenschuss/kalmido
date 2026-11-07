@@ -132,7 +132,6 @@ DELETE /api/users/{}
 DELETE /api/v1/address-books/{}
 DELETE /api/v1/address-books/{}/members/{}
 DELETE /api/v1/agent/quota
-DELETE /api/v1/attachments/{}
 DELETE /api/v1/chat-attachments/{}
 DELETE /api/v1/clients/{}
 DELETE /api/v1/comments/{}
@@ -559,7 +558,6 @@ GET /api/v1/agent/rules
 GET /api/v1/agent/schedules
 GET /api/v1/agent/usage
 GET /api/v1/agents
-GET /api/v1/attachments/{}
 GET /api/v1/briefing
 GET /api/v1/clients
 GET /api/v1/clients/{}
@@ -591,7 +589,6 @@ GET /api/v1/lists/{}/environments
 GET /api/v1/lists/{}/error-hook
 GET /api/v1/lists/{}/fields
 GET /api/v1/lists/{}/files
-GET /api/v1/lists/{}/files/{}
 GET /api/v1/lists/{}/flow
 GET /api/v1/lists/{}/forms
 GET /api/v1/lists/{}/groups

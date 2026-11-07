@@ -34,7 +34,7 @@ KINDS = {
     "task": ("matrix", "p2280_api_test.py, p2300_tenant_test.py: a task by id (read, change, complete, comment, subtasks, dependencies)"),
     "favtarget": ("matrix", "p2441_favs_api_test.py, p2441_favs_ui.js: the favourites of a person resolved to objects of any area (2.441.0, #3592)"),
     "comment": ("matrix", "p2300_tenant_test.py: a comment by id (change, delete, react)"),
-    "attachment": ("matrix", "p2300_tenant_test.py: a task's attachment / a list's file by id"),
+    "attachment": ("matrix", "p2300_tenant_test.py: a task's attachment / a list's file by id; p2610_c_v1restore_test.py: restoring them over the API v1 (2.610.0)"),
     "chatfile": ("matrix", "p2300_tenant_test.py: a file of an agent chat by id"),
     "chatsave": ("matrix", "p2370_u_api_test.py: saving a chat message of another conversation / into a list of another person (#1159)"),
     "list": ("matrix", "p2280_api_test.py, p2300_tenant_test.py: a list by id (read, change, members, sections, fields, notes, owner)"),
@@ -387,6 +387,7 @@ ROUTES = {
     "GET /api/v1/lists/{}/files/{}": "attachment", "DELETE /api/v1/lists/{}/files/{}": "attachment",
     "POST /api/v1/tasks/{}/attachments": "attachment", "POST /api/v1/tasks/{}/attachments/text": "attachment",
     "DELETE /api/v1/attachments/{}": "attachment",
+    "POST /api/v1/attachments/{}/restore": "attachment", "POST /api/v1/list-files/{}/restore": "attachment",  # 2.610.0 (#4010): p2610_c_v1restore_test.py
     "POST /api/lists/{}/files": "attachment", "GET /api/list-files/{}": "attachment",
     "DELETE /api/list-files/{}": "attachment", "POST /api/tasks/{}/attachments": "attachment",
     "GET /api/attachments/{}": "attachment", "DELETE /api/attachments/{}": "attachment",
@@ -1632,7 +1633,7 @@ check(route_suites('\nROUTES = {\n    # all below: p1_test.py\n    "GET /a": "x"
 
 LEGACY_FILE = os.path.join(N, "tenant_coverage_legacy.txt")
 LEGACY = [ln.strip() for ln in open(LEGACY_FILE, encoding="utf-8") if ln.strip() and not ln.startswith("#")]
-LEGACY_COUNT = 1429  # 2.546.0 (#4291): the length of tenant_coverage_legacy.txt; lower it together with the file, never raise it
+LEGACY_COUNT = 1426  # 2.610.0 (#4010): 1429 -> 1426, the API v1 file routes proven by p2610_c_v1restore; 2.546.0 (#4291): the length of tenant_coverage_legacy.txt; lower it together with the file, never raise it
 # 2.638.0 (#4641): 882 -> 1429 once, with the stricter proof (method + 403 / 404 probe, no comment-block suites); kalmido-livezug.py
 # einreihen compares it and the file with main and turns a rise red
 UNPROVEN = unproven(ROUTES, KINDS, open(__file__, encoding="utf-8").read())

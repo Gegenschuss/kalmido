@@ -52,6 +52,9 @@ DX_DEFAULTS = {"advisor_no": "", "client_no": "", "fy_start": 1, "acct_len": 4, 
                "accounts": {}, "bu": {}, "debtor": "", "bank": "", "cash": ""}
 DX_NEED_IDS = N_("Enter the advisor number and the client number of the DATEV export in the settings first")
 DX_NEED_EUR = N_("The DATEV export is in EUR only; this office keeps its books in {0}.")  # 2.189.0 B (#2475)
+# 2.610.0 (#4932): a year "bank and cash": an invoice payment without its bank / cash booking does not count
+DX_PAY_OUTSIDE = N_("{0} invoice payments without a bank or cash booking are not exported (basis bank and cash): match them under Office > Bank")
+DX_PAY_OUTSIDE_1 = N_("1 invoice payment without a bank or cash booking is not exported (basis bank and cash): match it under Office > Bank")
 DX_FY_SPAN = N_("The period must lie within one fiscal year (DATEV): {0} to {1}")
 
 # the header line: 31 fields, the column line: 125 fields (DATEV format 700, booking batch format version 13)
@@ -313,8 +316,10 @@ def dx_rows(c, oid, d_from, d_to, s=None, inside=True, hints_out=None):
                      "cl.name AS dx_client_name FROM office_payments p JOIN office_docs d ON d.id=p.doc_id "
                      "LEFT JOIN clients cl ON cl.id=d.client_id WHERE p.org_id=? AND d.org_id=? AND p.date>=? AND p.date<=? "
                      "AND d.trial=0 ORDER BY p.date, p.id", (oid, oid, d_from, d_to)).fetchall()
+    outside = 0
     for r in pays:
         if inc_ids is not None and r["p_id"] not in inc_ids and any(a <= r["p_date"] <= b for a, b, x in segs if x):
+            outside += 1  # 2.610.0 (#4932): named as a hint below, not left out silently
             continue
         t = _j(r["totals"])
         amount = money(dec(r["p_amount"] or 0) / _fx(r, t, home))
@@ -328,6 +333,8 @@ def dx_rows(c, oid, d_from, d_to, s=None, inside=True, hints_out=None):
                     "Belegdatum": _ddmm(r["p_date"]), "Belegfeld 1": dx_beleg(r["number"]),
                     "Buchungstext": ("Zahlung " + (r["number"] or "") + " " + name).strip()[:60], "Festschreibung": "0",
                     "_date": r["p_date"], "_kind": "payment", "_pay": r["p_id"]})  # 2.685.0 (#5128): _pay = the payment (the ledger's bank account)
+    if outside and hints_out is not None:
+        hints_out.append({"key": "pay_outside", "count": outside, "text": tr(DX_PAY_OUTSIDE_1) if outside == 1 else tr(DX_PAY_OUTSIDE, outside)})
     if inside:  # 2.120.0 C (#2090): receipts and travel expenses in the same batch (office/datevin.py)
         from .datevin import dv_rows
         rows, hints = dv_rows(c, oid, d_from, d_to, st, s)

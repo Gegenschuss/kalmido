@@ -31,7 +31,7 @@ from ..tasks.validation import as_int
 from ..tasks.tasks import task_update
 from ..tasks.lifecycle import task_restore, task_skip, trash_empty, tre_plan  # 2.530.0 D (#4316): tre_plan
 from ..tasks.attachments import attachment_upload, text_attachment_create, TEXT_MAX
-from ..tasks.batch import attachment_delete, task_batch
+from ..tasks.batch import attachment_delete, attachment_restore, task_batch
 from ..collab.comments import collab_user, comment_delete, comment_update, lang_of, user_names, need_live_comment
 from ..collab.news import news_add, news_list, news_read, news_read_job
 from ..personal.habits import habit_create, habit_delete, habit_update, need_habit
@@ -41,7 +41,7 @@ from ..accounts.settings import export_json
 from ..lists.templates import list_duplicate, task_duplicate, template_apply, template_create, template_delete, template_update, templates_list
 from ..lists.seckind import SEC_KINDS
 from ..tasks.dependencies import dep_add, dep_remove, deps_get
-from ..lists.projects import list_status_set, LIST_STATUSES
+from ..lists.projects import list_file_restore, list_status_set, ov_file_dict, LIST_STATUSES  # 2.610.0 (#4010): + list_file_restore, ov_file_dict
 from ..lists.fields import field_create, field_delete, field_dict, field_update, need_field
 from ..api.v1 import (
     _V1_FIELD_OUT, _v1_live, API_SCOPES, api_scopes, SCOPES, SCOPES_AGENT_DEFAULT, SCOPES_AGENT_NEVER, SCOPES_WRITE, STATUS_NAMES, v1_comment, v1_entry, v1_habit, v1_limit, v1_one, v1_prev_in, v1_task,
@@ -975,6 +975,37 @@ def v1_attachment_delete(aid):
     return Response(status=204)
 
 
+@app.post("/api/v1/attachments/<int:aid>/restore")
+@v1_view
+def v1_attachment_restore(aid):
+    """2.610.0 (#4010, audit E2-N7): a task / comment file from the trash back -- the web's restore (tasks/batch.py
+    attachment_restore), so the same rights as deleting it (need_attachment: may change the task, a comment file its author
+    or the project's owner / admins); an agent only on projects shared with it, everything else 404 -> the file."""
+    v1_args(())
+    c = db()
+    v1_call(attachment_restore, aid, body={})
+    r = c.execute("SELECT id, task_id, comment_id, name, mime, size, created_at FROM attachments WHERE id=?", (aid,)).fetchone()
+    if not r:
+        raise Denied(404)  # review H2: purged for good between the restore and this read
+    return jsonify({**dict(r), "url": f"/api/v1/attachments/{aid}"})
+
+
+@app.post("/api/v1/list-files/<int:fid>/restore")
+@v1_view
+def v1_list_file_restore(fid):
+    """2.610.0 (#4010, audit E2-N7): a project file from the trash back -- the web's restore (lists/projects.py
+    list_file_restore): the same rights as deleting it (need_list_file: may change the project), the files limit counts (409)
+    -> the file with its list_id."""
+    v1_args(())
+    c = db()
+    v1_call(list_file_restore, fid, body={})
+    r = c.execute("SELECT * FROM list_files WHERE id=?", (fid,)).fetchone()
+    if not r:
+        raise Denied(404)  # review H2
+    return jsonify({**ov_file_dict(r, user_names(c, [r["user_id"]])), "list_id": r["list_id"],
+                    "url": f"/api/v1/lists/{r['list_id']}/files/{fid}"})
+
+
 @app.patch("/api/v1/comments/<int:cid>")
 @v1_view
 def v1_comment_update(cid):
@@ -1543,6 +1574,18 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
                  "version next to it (report (v2).md; version + replaces in the answer), the old file stays.")},
         "/attachments/{id}": {"delete": op("Remove a file of a task or comment", T, nobody | errs("403", "404"), [pid("id", "Attachment id")],
                                            scope="attachments:write")},
+        # 2.610.0 (#4010, audit E2-N7): restore = the same rights and scope as deleting
+        "/attachments/{id}/restore": {"post": op("Restore a task / comment file from the trash", T, ok(obj) | errs("400", "403", "404"),
+                                                 [pid("id", "Attachment id")], scope="attachments:write",
+                                                 desc="2.610.0: the same rights as deleting it (a comment file: its author or the project's "
+                                                      "owner / admins). Agents: only files of projects shared with them, else 404 (also when "
+                                                      "the file is not in the trash or was deleted for good). -> {id, task_id, comment_id, name, "
+                                                      "mime, size, created_at, url}.")},
+        "/list-files/{id}/restore": {"post": op("Restore a project file from the trash", "Lists", ok(obj) | errs("400", "403", "404", "409"),
+                                                [pid("id", "Project file id")], scope="attachments:write",
+                                                desc="2.610.0: the same rights as deleting it (may change the project). 409 when the project "
+                                                     "holds its maximum of files. -> {id, list_id, name, mime, size, created_at, user_id, "
+                                                     "user_name, url}.")},
         "/comments/{id}": {
             "patch": op("Edit your comment", "Comments", ok(ref("Comment")) | errs("400", "403", "404"), [pid("id", "Comment id")], scope="comments",
                         body={"type": "object", "required": ["body"], "properties": {"body": {"type": "string"}}}),

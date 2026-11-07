@@ -2269,6 +2269,14 @@ Agents read files like this:
 its task / project: a person restores it in the app, it is deleted for good after the trash period (when the operator has the retention switch on; `KALMIDO_TRASH_DAYS`,
 30 days). A file in the trash is `404` for every reader, agents included.
 
+**Restoring a file (2.610.0).** `POST /api/v1/attachments/{id}/restore` (MCP `restore_attachment`) and
+`POST /api/v1/list-files/{id}/restore` (`restore_project_file`) bring a file back from the trash, with the same rights and the
+same scope as deleting it (`attachments:write`; a comment file: its author or the project's owner / admins). An agent restores
+only files of projects shared with it; a file of another project or organisation, a live file and one deleted for good are
+`404`. The answer is the file: `{id, task_id, comment_id, name, mime, size, created_at, url}` for a task file,
+`{id, list_id, name, mime, size, created_at, user_id, user_name, url}` for a project file; `409` when the project holds its
+maximum of files.
+
 **Deleting a section, a template or a key link (2.567.0).** `DELETE /api/v1/sections/{id}` (`delete_section`),
 `DELETE /api/v1/templates/{id}` (`delete_template`) and `DELETE /api/v1/lists/{id}/links/{link_id}` (`delete_project_link`)
 answer as before, but nothing is deleted for good at once: the section (with its limits and which tasks were in it), the
@@ -4027,10 +4035,10 @@ with the scope it needs). The tools:
 - decisions and one-way steps (2.392.0): `add_decision`, `update_task` with `irreversible`
 - delivery state (2.392.2): `set_delivery` (in progress, parked with a reason, waiting for a task), `list_tasks` with `delivery`
 - files: `list_attachments`, `get_attachment` (task, chat or project files), `read_attachment` (2.34.0: PDF / text as text; 2.92.0: Word / Excel too), `upload_attachment`, `create_text_file` (2.30.0), `delete_attachment`,
-  `delete_chat_attachment`
+  `restore_attachment` (2.610.0), `delete_chat_attachment`
 - projects: `get_project_overview`, `set_project_overview`, `set_project_status`, `add_project_link`,
   `update_project_link`, `delete_project_link`, `reorder_project_links`, `add_milestone`, `update_milestone`,
-  `delete_milestone`, `list_project_files`, `upload_project_file`, `delete_project_file`, `list_repos`, `list_build_status` (2.151.0), `list_environments` (2.60.0), `set_deployment` (2.60.0)
+  `delete_milestone`, `list_project_files`, `upload_project_file`, `delete_project_file`, `restore_project_file` (2.610.0), `list_repos`, `list_build_status` (2.151.0), `list_environments` (2.60.0), `set_deployment` (2.60.0)
   (2.270.0: pass `expect_updated_at` = `description_at` from `get_project_overview` to `set_project_overview`; when someone saved
   the description since, the call is refused with 409 and the current overview in `error.current`: read it, merge, send again;
   2.555.0: its `time` carries `budget_level` `none` / `ok` / `warn` from 80 % / `over` from 100 % of `budget_h` and `budget_pct`,
@@ -4093,7 +4101,7 @@ endpoint is named somewhere in this guide or in [AGENT-SETUP.md](AGENT-SETUP.md)
 `rename_folder`, `rename_section`, `reopen_task`, `reorder_project_links`, `reorder_sections`, `reply_to_event`,
 `log_decision`, `report_plan_usage`, `report_progress`, `report_usage`, `request_approval`, `request_chat_approval`,
 `request_comment_approval`, `request_deploy_approval`, `request_integration_approval`, `request_merge_approval`,
-`request_reward`, `restore_event`, `restore_note`, `restore_task`, `review_task`, `search_contacts`, `search_files`, `search_messages`, `search_notes`,
+`request_reward`, `restore_attachment`, `restore_event`, `restore_note`, `restore_project_file`, `restore_task`, `review_task`, `search_contacts`, `search_files`, `search_messages`, `search_notes`,
 `search_tasks`, `send_chat`, `set_contact_care`, `set_delivery`, `set_list_columns`, `set_list_review`, `set_office_deal_stage`, `set_project_overview`, `set_project_status`,
 `set_status`,
 `set_waiting`, `set_working`, `share_address_book`, `share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`,

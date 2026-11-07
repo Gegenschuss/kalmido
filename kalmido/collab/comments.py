@@ -22,7 +22,7 @@ from ..tasks.oneway import dec_list, gate_irreversible
 from .replies import reply_check, with_replies
 from ..core.errors import BadInput, web_fields  # 2.149.0 G (#2517): pulled up from functions
 from .cmttrash import cmt_trash, cmt_restore
-from ..core.conflict import ccf_check  # 2.564.0 D (#4701)
+from ..core.objparts import part_kind, part_write  # 2.610.0 (#4762): the core's write layer of side objects
 
 
 # ---------------------------------------------------------------- comments + activity timeline
@@ -405,6 +405,10 @@ def comment_create(tid):
     return jsonify({**r.get_json(), **extra}) if extra else r
 
 
+CMT_KIND = "comment"  # 2.610.0 (#4762): a side object of the core (core/objparts.py); lock and 409 key as since #4701
+part_kind(CMT_KIND, "comments", lock="comment-{id}", version=lambda r: r["edited_at"] or r["created_at"], key="comment", live="deleted_at IS NULL")
+
+
 @app.patch("/api/comments/<int:cid>")
 def comment_update(cid):
     """Only the author edits a comment; people mentioned for the first time are notified (with collaboration on)."""
@@ -419,10 +423,9 @@ def comment_update(cid):
     need_task_say(c, r["task_id"])  # 2.607.0 (#4549): a guest / read-only person changes no comment (deleting one's own stays)
     t = c.execute("SELECT * FROM tasks WHERE id=?", (r["task_id"],)).fetchone()
     b = web_fields(body(), {"body", "mentions", "expect_updated_at"}, "PATCH /api/comments/{cid}")
-    # 2.564.0 D (#4701): the version the edit box opened with (edited_at, else created_at); changed meantime -> 409 + the comment
-    write_lock(c, f"comment-{cid}")
-    r = c.execute("SELECT * FROM comments WHERE id=?", (cid,)).fetchone()
-    ccf_check(b, r["edited_at"] or r["created_at"], "comment", lambda: comment_dict(r, att_dicts(c, "comment_id=?", (cid,))))
+    # 2.564.0 D (#4701): the version the edit box opened with (edited_at, else created_at); changed meantime -> 409 + the comment.
+    # 2.610.0 (#4762): lock, row and version check through the core (core/objparts.py part_write); the writes follow under the lock
+    r, _ = part_write(c, CMT_KIND, cid, b, public=lambda c, r: comment_dict(r, att_dicts(c, "comment_id=?", (cid,))))
     text = (b.get("body") or "").strip()
     from .liste2e import le2a_comment_in, le2a_text_max, le2e_mode
     if len(text) > le2a_text_max(text, MAX_COMMENT):  # 2.64.1 (#1817)

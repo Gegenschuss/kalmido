@@ -216,9 +216,11 @@ def cc_norc_lines(c, oid, frm, to):
     return [x for x in _lines(c, oid, frm, to) if x["state"] == "noreceipt" and x["amount"]]
 
 
-def cc_bk_rows(c, oid, frm, to, uid=None):
+def cc_bk_rows(c, oid, frm, to, uid=None, meals=()):
     """The rows of the neutral export (bkexport.py type card): one per position (minus = money out), one without an amount per
-    statement of the period with its PDF. _node = the file behind a row (only files the person sees)."""
+    statement of the period with its PDF. _node = the file behind a row (only files the person sees).
+    2.610.0 (#4932 review M1): meals = ids of open positions an entertainment receipt counts through (a strict year,
+    books.bk_meals_strict): the meal's rows carry the amount, the position only the link (as a matched one)."""
     uid = _uid_filter(uid)
     rows, seen = [], set()
 
@@ -230,8 +232,10 @@ def cc_bk_rows(c, oid, frm, to, uid=None):
         if home is None:
             home = hc_home(office_settings(c, oid))
         # a position with its receipt: the receipt's own row carries the amount, this one only the link (the rows of a type add up)
-        rows.append({"type": "card", "date": x["day"], "number": f"{x['s_month']} ·· {x['last4']}", "counterparty": x["merchant"] or "", "text": labels.get(x["state"], ""),
-                     "category": "", "tax_pct": "", "net": "", "tax": "", "gross": "" if x["state"] == "matched" else -x["amount"], "currency": home, "file": "", "_node": see(x["node_id"])})
+        meal = x["state"] == "open" and x["id"] in meals
+        rows.append({"type": "card", "date": x["day"], "number": f"{x['s_month']} ·· {x['last4']}", "counterparty": x["merchant"] or "",
+                     "text": tr("Entertainment receipt") if meal else labels.get(x["state"], ""),
+                     "category": "", "tax_pct": "", "net": "", "tax": "", "gross": "" if x["state"] == "matched" or meal else -x["amount"], "currency": home, "file": "", "_node": see(x["node_id"])})
         if x["statement_id"] not in seen:
             seen.add(x["statement_id"])
             rows.append({"type": "card", "date": f"{x['s_month']}-01", "number": f"{x['s_month']} ·· {x['last4']}", "counterparty": "", "text": tr("Credit card statement"),

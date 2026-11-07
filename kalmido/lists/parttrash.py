@@ -10,66 +10,49 @@ into another section or sprint meanwhile stays there and is reported in skipped)
 task trash already keep its name (tasks.trash_section) and find it again on their own restore (tasks/lifecycle.py).
 
 Who: whoever may change the list (as deleting); agents never (the way back stays with people, tests/parity_test.py).
-After the trash period files/trashpurge.py (TP_PLAIN) deletes the copies. Not the trash of whole lists (lists/listtrash.py)."""
+After the trash period files/trashpurge.py (TP_PLAIN) deletes the copies. Not the trash of whole lists (lists/listtrash.py).
+2.610.0 (#4762): the copy, the check who may take it back and putting the row back are the core's (core/objparts.py
+part_copy / part_copy_take / part_copy_back); what hangs on a section / sprint stays here."""
 import json
-import re
 
 from flask import jsonify
 
 from ..core.config import app
 from ..core.db import bump, db, iso, now_utc
 from ..core.i18n import tr
-from ..core.pg import write_lock
+from ..core.objparts import part_copy, part_copy_back, part_copy_take, part_kind
 from ..accounts.session import me
 from ..accounts.orgroles import user_orgs_full  # 2.609.0 (#3373, review F5)
 from ..core.access import Denied, acx_of, list_role, need_list, wr_sql, WRITE_ROLES
 from ..tasks.validation import log_changes
 from ..collab.comments import user_names
 from .listtrash import OTR_TRASH_DAYS
-from .sprints import spr_dict, spr_row
+from .sprints import SPR_KIND, spr_dict, spr_row
 from .templates import tpl_may_write  # 2.609.0 (#3373, review F5)
 
-LPT_COL = re.compile(r"^[a-z_][a-z0-9_]*$")
 LPT_LIST_MAX = 300  # the trash view shows the newest ones
-
-
-def lpt_put(c, lid, kind, ref_id, snap, held, uid):
-    """Keeps the copy of a section / sprint (the caller deletes the row afterwards, in the same transaction)."""
-    c.execute("INSERT INTO list_part_trash(list_id,kind,ref_id,snap,held,deleted_by,deleted_at) VALUES(?,?,?,?,?,?,?)",
-              (lid, kind, int(ref_id), json.dumps(dict(snap), ensure_ascii=False, default=str),
-               json.dumps(held, ensure_ascii=False, default=str), uid, iso(now_utc())))
+LPT_SECTION, LPT_SPRINT = "section", SPR_KIND  # the kinds of list_part_trash, side objects of the core (2.610.0 #4762)
+part_kind(LPT_SECTION, "sections", lock="section-{id}", agent=False)
 
 
 def lpt_section_put(c, sid, uid):
     """The copy of section sid with its open tasks, the placements of other lists' tasks in it and its shopping memory."""
-    row = c.execute("SELECT * FROM sections WHERE id=?", (sid,)).fetchone()
+    lid = c.execute("SELECT list_id FROM sections WHERE id=?", (sid,)).fetchone()[0]
     held = {"tasks": [r[0] for r in c.execute("SELECT id FROM tasks WHERE section_id=? AND deleted_at IS NULL ORDER BY id", (sid,))],
             "links": [[r[0], r[1]] for r in c.execute("SELECT task_id, list_id FROM task_links WHERE section_id=?", (sid,))],
             "shop": [[r[0], r[1]] for r in c.execute("SELECT item, at FROM shop_memory WHERE section_id=?", (sid,))]}
-    lpt_put(c, row["list_id"], "section", sid, row, held, uid)
+    part_copy(c, LPT_SECTION, sid, lid, held, uid)
 
 
 def lpt_sprint_put(c, sid, uid):
     """The copy of planned sprint sid with its tasks (and when each was planned into it)."""
-    row = c.execute("SELECT * FROM sprints WHERE id=?", (sid,)).fetchone()
+    lid = c.execute("SELECT list_id FROM sprints WHERE id=?", (sid,)).fetchone()[0]
     held = {"tasks": [[r[0], r[1]] for r in c.execute("SELECT id, sprint_at FROM tasks WHERE sprint_id=? ORDER BY id", (sid,))]}
-    lpt_put(c, row["list_id"], "sprint", sid, row, held, uid)
+    part_copy(c, LPT_SPRINT, sid, lid, held, uid)
 
 
-def lpt_need(c, kind, ref_id):
-    """The newest copy of kind / ref_id the current person may restore (edit rights on its live list); 404 otherwise."""
-    if acx_of(c, me()).role == "agent":  # agents never restore (core/access.py: the account kind, through its token too)
-        raise Denied(404)
-    r = c.execute("SELECT * FROM list_part_trash WHERE kind=? AND ref_id=? ORDER BY id DESC LIMIT 1", (kind, int(ref_id))).fetchone()
-    if not r:
-        raise Denied(404)
-    need_list(c, r["list_id"])
-    return r
-
-
-def lpt_insert(c, table, snap):
-    cols = [k for k in snap if LPT_COL.match(k)]
-    c.execute(f"INSERT INTO {table}({','.join(cols)}) VALUES({','.join('?' * len(cols))})", [snap[k] for k in cols])
+def _need_edit(c, lid):
+    need_list(c, lid)  # edit rights on its live list, as deleting
 
 
 @app.post("/api/sections/<int:sid>/restore")
@@ -77,15 +60,9 @@ def section_restore(sid):
     """A deleted section comes back with the same id, its limits and its tasks that are still without a section in the list
     -> the section + {moved, skipped} (like POST /api/sections, the undo of the app). 404: not in the trash."""
     c = db()
-    r = lpt_need(c, "section", sid)
+    r = part_copy_take(c, LPT_SECTION, sid, me(), _need_edit)
     lid = r["list_id"]
-    write_lock(c, f"sections:{lid}")  # like the order of the sections (sections.py)
-    if c.execute("SELECT 1 FROM sections WHERE id=?", (sid,)).fetchone() or \
-            not c.execute("SELECT 1 FROM list_part_trash WHERE id=?", (r["id"],)).fetchone():
-        raise Denied(404)  # restored meanwhile
-    snap, held = json.loads(r["snap"] or "{}"), json.loads(r["held"] or "{}")
-    snap.update(id=sid, list_id=lid)
-    lpt_insert(c, "sections", snap)
+    _, held = part_copy_back(c, LPT_SECTION, r, f"sections:{lid}")  # like the order of the sections (sections.py)
     moved, skipped = [], []
     for tid in held.get("tasks") or []:
         t = c.execute("SELECT list_id, section_id, deleted_at FROM tasks WHERE id=?", (tid,)).fetchone()
@@ -101,7 +78,6 @@ def section_restore(sid):
     for item, at in held.get("shop") or []:
         c.execute("INSERT INTO shop_memory(list_id,item,section_id,at) VALUES(?,?,?,?) ON CONFLICT (list_id, item) DO NOTHING",
                   (lid, item, sid, at))
-    c.execute("DELETE FROM list_part_trash WHERE id=?", (r["id"],))
     bump(c)
     c.commit()
     return jsonify({**dict(c.execute("SELECT * FROM sections WHERE id=?", (sid,)).fetchone()), "moved": moved, "skipped": skipped})
@@ -112,16 +88,9 @@ def sprint_restore(sid):
     """A removed planned sprint comes back with the same id (a number taken meanwhile: the next free one) and its tasks that
     are in no sprint now -> {sprint, moved, skipped}. 404: not in the trash."""
     c = db()
-    r = lpt_need(c, "sprint", sid)
+    r = part_copy_take(c, LPT_SPRINT, sid, me(), _need_edit)
     lid = r["list_id"]
-    write_lock(c, f"sprints:{lid}")  # like starting / closing (sprints.py)
-    if spr_row(c, sid) or not c.execute("SELECT 1 FROM list_part_trash WHERE id=?", (r["id"],)).fetchone():
-        raise Denied(404)
-    snap, held = json.loads(r["snap"] or "{}"), json.loads(r["held"] or "{}")
-    snap.update(id=sid, list_id=lid, state="planned")
-    if c.execute("SELECT 1 FROM sprints WHERE list_id=? AND num=?", (lid, snap.get("num"))).fetchone():
-        snap["num"] = c.execute("SELECT COALESCE(MAX(num),0)+1 FROM sprints WHERE list_id=?", (lid,)).fetchone()[0]
-    lpt_insert(c, "sprints", snap)
+    _, held = part_copy_back(c, LPT_SPRINT, r, f"sprints:{lid}", fix=_spr_fix)  # like starting / closing (sprints.py)
     moved, skipped = [], []
     for tid, at in held.get("tasks") or []:
         if c.execute("UPDATE tasks SET sprint_id=?, sprint_at=? WHERE id=? AND list_id=? AND sprint_id IS NULL AND deleted_at IS NULL",
@@ -129,10 +98,16 @@ def sprint_restore(sid):
             moved.append(tid)
         else:
             skipped.append(tid)
-    c.execute("DELETE FROM list_part_trash WHERE id=?", (r["id"],))
     bump(c)
     c.commit()
     return jsonify(sprint=spr_dict(c, spr_row(c, sid), me()), moved=moved, skipped=skipped)
+
+
+def _spr_fix(c, snap):
+    """A sprint comes back planned; its number taken meanwhile -> the next free one."""
+    snap["state"] = "planned"
+    if c.execute("SELECT 1 FROM sprints WHERE list_id=? AND num=?", (snap["list_id"], snap.get("num"))).fetchone():
+        snap["num"] = c.execute("SELECT COALESCE(MAX(num),0)+1 FROM sprints WHERE list_id=?", (snap["list_id"],)).fetchone()[0]
 
 
 def _writable(c, uid, lid, cache):

@@ -5,6 +5,7 @@ from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app, PUBLIC_URL
 from ..core.pg import insert_id, st_ids, write_lock
+from ..core.objparts import part_kind, part_write  # 2.610.0 (#4762): the core's write layer of side objects
 from ..core.schema import MAX_DEPTH, USER_DEFAULTS
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, inbox_default, iso, now_utc
@@ -382,17 +383,19 @@ def task_create():
 # person gets a push "Follow up" + a News item, and every agent that follows the task (assignee, creator, commented) the
 # event followup_due. Once per date; a new date fires again. Clearing it is one call (DELETE).
 WAIT_NOTE_MAX = 300
+WAIT_KIND = "task_waiting"  # 2.610.0 (#4762): waiting on, a side object of the core (core/objparts.py) under the task's lock (apply_update)
+part_kind(WAIT_KIND, "tasks", lock="task-{id}")
 
 
 def set_waiting(c, tid, b):
     """{note?, until?} -> sets / changes the waiting state (caller commits). BadInput on invalid values.
     2.564.0 (#4701): only the fields sent change: a task already waiting keeps its note / follow-up day when the body leaves it
-    out (an empty note / until null still clears it); under write_lock('task-<id>') like apply_update."""
+    out (an empty note / until null still clears it); under write_lock('task-<id>') like apply_update (2.610.0 #4762: through
+    core/objparts.py part_write)."""
     unknown = sorted(k for k in b if k not in ("note", "until"))
     if unknown:
         raise UnknownFields(unknown)
-    write_lock(c, f"task-{tid}")
-    cur = c.execute("SELECT waiting_at, wait_note, wait_until, wait_fired FROM tasks WHERE id=?", (tid,)).fetchone()
+    cur, _ = part_write(c, WAIT_KIND, tid, b)  # 2.610.0 (#4762): lock and row through the core (no version: only the fields sent change)
     note = b.get("note") if "note" in b or not cur["waiting_at"] else cur["wait_note"]
     if note is not None and not isinstance(note, str):
         raise BadInput(tr("Invalid value: {0}", "note"))

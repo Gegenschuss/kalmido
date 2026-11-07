@@ -21,6 +21,7 @@ from ..tasks.tasks import ms_target, one_task, set_tags
 from ..core.errors import BadInput
 from ..core.conflict import ccf_check  # 2.564.0 (#4701)
 from ..accounts.onboarding import app_industry  # 2.636.0 (#4565)
+from ..core.objparts import part_kind, part_restore, part_trash, part_write  # 2.610.0 (#4762): the core's write layer of side objects
 from ..core.serializers import unlink_files
 from ..core.dlock import dl_of, dl_tasks_locked  # 2.574.0 (#3376): data lock of a copying agent
 from .tplextra import tx_apply, tx_collect, tx_keys, tx_of_template, tx_paths, tx_prune, tx_reown, tx_same_list, tx_state, tx_store
@@ -335,6 +336,10 @@ def tpl_dict(r):
             "created_at": r["created_at"], "updated_at": r["updated_at"], **tpl_org_of(r)}
 
 
+TPL_KIND = "template"  # 2.610.0 (#4762): a side object of the core (core/objparts.py); the lock of before (#4701), "template" of a 409
+part_kind(TPL_KIND, "templates", lock="template-{id}", version=lambda r: r["updated_at"], key="template", live="deleted_at IS NULL")
+
+
 # 2.609.0 (#3373): a template of an organisation (templates.org_id): every member with the full view reads and uses it, its
 # admins add, change and delete it; org_id NULL = the person's own as before. Never a template of another organisation (404).
 def tpl_org_of(r):
@@ -524,13 +529,12 @@ def template_update(tid):
     c = db()
     r = need_template(c, tid, write=True)
     # 2.564.0 (#4701): the merge into the stored data (tpl_merge) sees no other change in between; expect_updated_at (optional)
-    # = the version the client read: changed meanwhile -> 409 {"template": the current one}
-    write_lock(c, f"template-{tid}")
-    r = c.execute("SELECT * FROM templates WHERE id=?", (tid,)).fetchone()
-    ccf_check(b, r["updated_at"], "template", lambda: tpl_dict(r))
+    # = the version the client read: changed meanwhile -> 409 {"template": the current one}. 2.610.0 (#4762): lock, row (live only)
+    # and version check through the core (core/objparts.py part_write); 2.609.0 (#3373): an error answer or a failure rolls back
+    # and removes the file copies made for a new owner
     gone, made = [], []
     try:
-        res = _tpl_update(c, tid, r, b, gone, made)
+        _, res = part_write(c, TPL_KIND, tid, b, lambda c, r: _tpl_update(c, tid, r, b, gone, made), public=lambda c, r: tpl_dict(r))
     except Exception:
         c.rollback()
         unlink_files(made)
@@ -539,12 +543,15 @@ def template_update(tid):
         c.rollback()
         unlink_files(made)
         return res
+    bump(c)
+    c.commit()
     unlink_files(gone)
     return jsonify(tpl_dict(c.execute("SELECT * FROM templates WHERE id=?", (tid,)).fetchone()))
 
 
 def _tpl_update(c, tid, r, b, gone, made):
-    """The changes of template_update (committed here) -> None, or an error answer (the caller rolls back)."""
+    """The changes of template_update on row r (2.610.0 #4762: read again under the core's lock) -> None, or an error answer
+    (the caller rolls back); bump and commit are the caller's."""
     if "space" in b:  # 2.609.0 (#3373): into an organisation (its admin) / back to private (an admin of the old one, logged)
         try:
             to = tpl_space(c, b["space"])
@@ -574,8 +581,6 @@ def _tpl_update(c, tid, r, b, gone, made):
         c.execute("UPDATE templates SET data=? WHERE id=?", (json.dumps(data, ensure_ascii=False), tid))
         gone += tx_prune(c, tid, r["extra"], tx_keys(data))
     c.execute("UPDATE templates SET updated_at=? WHERE id=?", (iso(now_utc()), tid))
-    bump(c)
-    c.commit()
     return None
 
 
@@ -585,7 +590,7 @@ def template_delete(tid):
     POST /api/templates/<id>/restore, after the trash period tpl_trash_tick deletes it for good -> {ok, id, trash}."""
     c = db()
     need_template(c, tid, write=True)
-    c.execute("UPDATE templates SET deleted_at=?, deleted_by=? WHERE id=?", (iso(now_utc()), me(), tid))
+    part_trash(c, TPL_KIND, tid, me())  # 2.610.0 (#4762): the core's trash of a side object (deleted_at, under its lock)
     bump(c)
     c.commit()
     return jsonify(ok=True, id=tid, trash=True)
@@ -596,18 +601,20 @@ def template_restore(tid):
     """2.567.0 A (#4707): a template of the person's trash comes back -> the template (404: not theirs / not in the trash)."""
     c = db()
     uid = me()
-    write_lock(c, f"templates-{int(tid)}")
-    r = c.execute("SELECT * FROM templates WHERE id=? AND deleted_at IS NOT NULL", (tid,)).fetchone()
-    # 2.609.0 (#3373): an organisation's template: its admins (who may delete it) bring it back too
-    if not r or not (r["user_id"] == uid if r["org_id"] is None else r["org_id"] in user_orgs_full(c, uid) and tpl_may_write(c, r)):
-        raise Denied(404)
-    full = tpl_room(c, r["org_id"], uid)  # 2.609.0 (#3373, review F4): the limit of the template's own space
-    if full:
-        return full
-    c.execute("UPDATE templates SET deleted_at=NULL, deleted_by=NULL, updated_at=? WHERE id=?", (iso(now_utc()), tid))
+    # 2.610.0 (#4762): through the core (core/objparts.py part_restore), under the template's lock; 2.609.0 (#3373): the own one,
+    # or an organisation's template whose admin (who may delete it) brings it back, within its space's limit (review F4)
+    def guard(c, r):
+        if not (r["user_id"] == uid if r["org_id"] is None else r["org_id"] in user_orgs_full(c, uid) and tpl_may_write(c, r)):
+            raise Denied(404)
+        return tpl_room(c, r["org_id"], uid)
+
+    row, stop = part_restore(c, TPL_KIND, tid, uid, guard=guard)
+    if stop is not None:
+        return stop
     bump(c)
     c.commit()
-    return jsonify(tpl_dict(c.execute("SELECT * FROM templates WHERE id=?", (tid,)).fetchone()))
+    return jsonify(tpl_dict(row))
+
 
 
 def tpl_trash_tick(c, cut, purge):

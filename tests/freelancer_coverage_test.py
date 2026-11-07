@@ -833,6 +833,7 @@ ROUTES = {
     "GET /api/trash/lists/{}/export.zip": "office",  # 2.186.1 (#2732): a kept project for its custodian (p2146_d_api)
     "POST /api/trash/lists/{}/export.zip": "office",  # 2.223.2 C (#2871): its step-up (a one-time ticket)
     "DELETE /api/v1/attachments/{}": "tasks",
+    "POST /api/v1/attachments/{}/restore": "tasks", "POST /api/v1/list-files/{}/restore": "lists",  # 2.610.0 (#4010): p2610_c_v1restore_test.py
     "DELETE /api/v1/chat-attachments/{}": "tasks", "DELETE /api/v1/comments/{}": "tasks",
     "DELETE /api/v1/comments/{}/reactions/{}": "tasks", "DELETE /api/v1/notepads/{}": "tasks",
     "DELETE /api/v1/notes/{}": "tasks", "DELETE /api/v1/tasks/{}": "tasks", "DELETE /api/v1/tasks/{}/contacts/{}": "tasks",
@@ -1334,7 +1335,6 @@ DELETE /api/tasks/{}/links/{}
 DELETE /api/tasks/{}/note-lock
 DELETE /api/v1/address-books/{}
 DELETE /api/v1/address-books/{}/members/{}
-DELETE /api/v1/attachments/{}
 DELETE /api/v1/chat-attachments/{}
 DELETE /api/v1/clients/{}
 DELETE /api/v1/comments/{}/reactions/{}
@@ -1345,7 +1345,6 @@ DELETE /api/v1/events/{}
 DELETE /api/v1/family/rewards/{}
 DELETE /api/v1/forms/{}
 DELETE /api/v1/lists/{}
-DELETE /api/v1/lists/{}/files/{}
 DELETE /api/v1/lists/{}/groups/{}
 DELETE /api/v1/lists/{}/links/{}
 DELETE /api/v1/lists/{}/members/{}

@@ -145,5 +145,21 @@ check(rc == 0, "main: no run of the tag yet, but the same tree is green = go (rc
 check(re.search(r"^on:\n(?:  .*\n)*  workflow_dispatch:", rel, re.M) is not None, "#4905: release.yml can be re-run on a tag (workflow_dispatch)")
 check("if: startsWith(github.ref, 'refs/tags/v')" in gtxt, "#4905: a dispatch on a branch is skipped (only refs/tags/v...)")
 
+# 2.610.0 (#4926): a start by hand on an existing tag (the live train, after a soft red full CI was made green) - same gate
+head = rel.split("\njobs:\n", 1)[0]
+check("workflow_dispatch:" in head and re.search(r"^      tag:\n(?:        .*\n)*?        required: false", head, re.M) is not None,
+      "#4926: release.yml can be started by hand with the input tag (optional, #4905 on a tag ref needs none)")
+check(re.search(r"^  push:\n    tags: \[\"v\*\.\*\.\*\"\]", head, re.M) is not None, "#4926: a pushed tag still starts it")
+runs = re.findall(r"^\s+run: [|>]?\n((?:\s{10,}.*\n)+)|^\s+run: (.+)$", jobs, re.M)
+check(all("inputs." not in (a or b) for a, b in runs), "#4926: the input reaches no shell line as an expression, only as env")
+check("IN_TAG: ${{ inputs.tag }}" in gtxt and "grep -Eq '^v[0-9]+" in gtxt, "#4926: ci-gate checks the input is vX.Y.Z")
+check("refs/tags/$tag^{commit}" in gtxt and 'TAG_SHA: ${{ steps.t.outputs.sha }}' in gtxt,
+      "#4926: the gate waits for the green full CI of the TAG's commit, not of main")
+check("ref: ${{ needs.ci-gate.outputs.sha }}" in rtxt and "TAG: ${{ needs.ci-gate.outputs.tag }}" in rtxt,
+      "#4926: the image is built from the tag's commit and its version comes from the tag")
+check("GITHUB_REF_NAME" not in rel.split("  release:\n", 1)[1], "#4926: release and publish no longer read the ref of the start")
+check("if: startsWith(github.ref, 'refs/tags/v') || inputs.tag != ''" in gtxt and '[ -n "$IN_TAG" ]' in gtxt,
+      "#4905 + #4926: a dispatch runs on a tag ref or with the input tag, otherwise it is skipped")
+
 print("release_ci_gate: %d ok, %d failed" % (OKS[0], len(FAILS)))
 sys.exit(1 if FAILS else 0)

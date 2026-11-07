@@ -272,3 +272,22 @@ switch "show pictures") with `core_id` (+ `core_id2`) and give nothing themselve
 read as before for one release (core first, then the old row). The one-shot `migr_core4717` (core/db.py) and the areas
 (`shs_core_move`, `wsh_core_move`) copy them forward. Public links of pages stay rows of `wiki_shares` (no share with an
 account). Not moved yet: the tables' and pages' own fields (title, name) still save through their areas, not `obj_write`.
+
+## Stage 6b: the side objects of a project (2.610.0, #4762)
+
+Custom field options, the people of a task, waiting on, templates, comments, a sprint's dialog and the trash of sections,
+planned sprints and templates write through `kalmido/core/objparts.py` instead of the pieces each route had since 2.564
+(#4701, versions) and 2.567 (#4707, trash). Like the office's rows they have no `owner_id` / `rev` and the project's rights,
+so they are no registered kinds: `part_kind(kind, table, lock=..., version=..., key=..., agent=...)` names one (its lock
+keeps the name the area's other writes use, e.g. `task-<id>` of `apply_update`, `sprints:<list>` of start / close).
+- `part_write(c, kind, id, body, apply)`: the lock, the row again under it (gone = 404), the area's own check of what the
+  client saw (`check`: a field's option list), the version check (`expect_updated_at` -> 409 with the current state under
+  the kind's key, `template` / `comment` / `sprint` as before), then the area's writer. The caller bumps and commits.
+- `part_merge(have, seen, mine)`: a list sent whole against `_prev` (a person another device added stays).
+- `part_trash` / `part_restore` for rows with `deleted_at` (templates); `part_copy` / `part_copy_take` / `part_copy_back`
+  for the copy in `list_part_trash` (sections, planned sprints: restored with their id). Agents never take a section or a
+  sprint back (`agent=False`).
+- The routes, their answers and their rights stay as they were. No history and no undo steps of their own yet: these rows
+  are deleted for good without the core knowing (a field, a comment, the trash period), an `obj_history` row would outlive
+  them. A custom field's values (`set_field_values`) stay part of the task's write (`apply_update`: under the task's lock,
+  compared per field against `_prev`).
