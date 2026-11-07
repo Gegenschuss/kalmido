@@ -149,6 +149,14 @@ check(all(re.fullmatch(r"repos/o/r/releases/\d+|users/o/packages/container/kalmi
       f"the plan holds only release and package version paths {plan}")
 keep2, plan2 = wr.prune_plan(TG, "v2.629.0", REL, IMG, "o/r", "users/o/packages/container/kalmido", NOW)
 check((2, 629, 0) in keep2 and not any(x[1] == "2.629.0" for x in plan2), "the current latest always stays")
+# 2.641.0 (#5011, review): a train that stood still for weeks - the live version and the next ones keep their image
+IMG3 = IMG + [{"id": 30, "created_at": "2026-11-07T15:00:00Z", "tags": ["2.639.0"]},
+              {"id": 31, "created_at": "2026-11-08T10:00:00Z", "tags": ["2.640.0"]}]
+REL3 = REL + [{"id": 40, "tag_name": "v2.640.0", "created_at": "2026-11-08T10:00:00Z"}]
+_, plan3 = wr.prune_plan(TG, "v2.635.0", REL3, IMG3, "o/r", "users/o/packages/container/kalmido", d("2026-12-30T21:00:00Z"))
+gone3 = {x[1] for x in plan3}
+check(not gone3 & {"2.639.0", "2.640.0"} and "2.629.0" in gone3,
+      f"weeks later: the newest latest-ok version and all above it stay, older ones still go {sorted(gone3)}")
 for what, kw in (("no latest-ok tag", dict(tags={})), ("no latest release", dict(latest=""))):
     try:
         wr.prune_plan(kw.get("tags", TG), kw.get("latest", "v2.639.0"), REL, IMG, "o/r", "users/o/packages/container/kalmido", NOW)

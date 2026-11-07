@@ -207,10 +207,12 @@ def prune_plan(tags, latest, releases, images, repo, packages, now, days=KEEP_DA
         raise SystemExit(f"no current latest release ({latest!r}): refusing to plan")
     keep = keep_set(tags, releases, latest)
     young = now - dt.timedelta(days=days)
+    top = max(max(tags), ver(latest))  # 2.641.0 (#5011, review): the newest checked version and all above it (the live one
+    # and the next ones) stay even when the train stood still for longer than `days` - the server pulls :X.Y.Z of them
     out = []
     for r in releases:
         v = ver(r.get("tag_name"))
-        if not v or v in keep or r.get("draft") or not r.get("id") or not r.get("created_at"):
+        if not v or v in keep or v >= top or r.get("draft") or not r.get("id") or not r.get("created_at"):
             continue
         if when(r["created_at"]) >= young:
             continue
@@ -218,7 +220,7 @@ def prune_plan(tags, latest, releases, images, repo, packages, now, days=KEEP_DA
     for im in images:
         tl = [str(t) for t in (im.get("tags") or [])]
         vs = [ver(t) for t in tl]
-        if not tl or any(v is None or t.startswith("v") for v, t in zip(vs, tl)) or any(v in keep for v in vs):
+        if not tl or any(v is None or t.startswith("v") for v, t in zip(vs, tl)) or any(v in keep or v >= top for v in vs):
             continue  # untagged parts of a kept image, :latest or another name, a kept version
         if not im.get("id") or not im.get("created_at") or when(im["created_at"]) >= young:
             continue
