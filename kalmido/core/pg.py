@@ -592,6 +592,11 @@ def connect_direct(url, timeout=10):
     return Conn(pg)
 
 
+def connect_listen(url, timeout=10):
+    """2.622.0 (#3891): a plain autocommit connection for LISTEN (core/pgbus.py): psycopg's own, not a Conn (no pool, no context)."""
+    return psycopg.connect(url, autocommit=True, connect_timeout=timeout)
+
+
 def wait_ready(url, seconds=60):
     """At start the database container may still be starting: try for a while."""
     t0, last = time.time(), None

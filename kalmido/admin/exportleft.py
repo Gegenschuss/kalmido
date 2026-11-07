@@ -89,6 +89,7 @@ UMZ_LEFT_TABLES = {
     "list_bell": _VIEW, "list_folder_skip": _VIEW, "list_mine_hide": _VIEW, "rss_reads": _VIEW, "task_seen": _VIEW, "tchat_reads": _VIEW,
     "tchat_thread_reads": _VIEW, "user_task_order": _VIEW, "wait_hidden": _VIEW,
     "user_mine_sections": _VIEW,  # 2.569.0 (#4395): the own sections of "My tasks", like user_task_order
+    "eph_state": _SERVER,  # 2.622.0 (#3891): sign-in steps, tickets, typing markers of minutes (core/ephem.py)
 }
 
 # 2.531.0 (#4317 F12): the readable name of every table that is not yet in the account export (_LATER): the export page names
