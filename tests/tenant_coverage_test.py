@@ -1454,37 +1454,94 @@ for k, (what, why) in KINDS.items():
 # 2.546.0 (#4291, Fable review finding 3): only test file names count as a named suite - a source file named in a comment
 # (files/web.py, v1.py, ...) must not become proof the day a tests/ file of that name appears
 SUITE_RX = re.compile(r"\b(\w+_(?:test|ui)\.(?:py|js))\b")
+# 2.638.0 (#4641, Fable review of 2.546): the path alone is no proof either -- see proves(): the route's method on the line and
+# a 403 / 404 check on it or the next 3 lines (or the marker '# tenant: METHOD /path'); suites only from the route's own line
+# and its kind's reason; a v1 path without /api/v1 only in a suite with the Api helper.
 
 
 def route_suites(src):
-    """{route: {suite file names}} from the source of ROUTES: the suites named on the route's line and in the comment block above it."""
+    """{route: {suite file names}} from the source of ROUTES: the suites named in the comment on the route's own line.
+    2.638.0 (#4641, Fable review of 2.546): the comment block above a group no longer counts (a suite named once for a group
+    proved every route below it)."""
     body = src[src.index("\nROUTES = {"):]
     body = body[:body.index("\n}\n")]
-    out, block, in_block = {}, set(), False
+    out = {}
     for line in body.splitlines():
-        s = line.strip()
-        if s.startswith("#"):
-            if not in_block:
-                block = set()
-            in_block = True
-            block |= set(SUITE_RX.findall(s))
+        if line.strip().startswith("#"):
             continue
-        in_block = False
         here = set(SUITE_RX.findall(line.split("#", 1)[1])) if "#" in line else set()
         for r in re.findall(r'"((?:GET|POST|PUT|PATCH|DELETE|DAV) [^"]+)"\s*:', line):
-            out[r] = block | here
+            out[r] = here
     return out
 
 
-def path_rx(route):
+def path_rx(route, v1_helper=True):
     """The path of a route as a pattern for a test's source: {} = an f-string field or a literal id; a v1 route also without
-    its /api/v1 prefix (the suites' Api helper adds it); the path ends at a quote or a query."""
+    its /api/v1 prefix (the suites' Api helper adds it) -- 2.638.0 (#4641): only when v1_helper (the suite has that helper,
+    API_HELPER_RX); the path ends at a quote or a query."""
     p = route.split(" ", 1)[1]
     seg = r"(?:\{[^{}\n]*\}|[^/\"'\s{}?#]+)"
     rx = seg.join(re.escape(x) for x in p.split("{}"))
-    if p.startswith("/api/v1/"):
+    if p.startswith("/api/v1/") and v1_helper:
         rx = r"(?:" + rx + r"|(?<=[\"'])" + seg.join(re.escape(x) for x in p[len("/api/v1"):].split("{}")) + r")"
     return re.compile(rx + r"(?=[\"'?#]|$)", re.M)
+
+
+# 2.638.0 (#4641): a suite with the Api helper of the REST API (a class / import Api, or a base "/api/v1" its calls add)
+API_HELPER_RX = re.compile(r"\bclass Api\b|^\s*from [\w.]+ import [^\n]*\bApi\b|\bApi\(|[\"']/api/v1/?[\"']", re.M)
+# the method of a call in a test line: .get( / .delete( ... (requests, sessions, the Api helper) or a quoted method name
+METHOD_RX = re.compile(r"\.(get|post|put|patch|delete)\(|[\"'](GET|POST|PUT|PATCH|DELETE|PROPFIND|PROPPATCH|REPORT|MKCALENDAR|MKCOL|MOVE|COPY|OPTIONS)[\"']")
+DAV_METHODS = {"GET", "PUT", "DELETE", "PROPFIND", "PROPPATCH", "REPORT", "MKCALENDAR", "MKCOL", "MOVE", "COPY", "OPTIONS"}
+DENIED_RX = re.compile(r"\b40[34]\b")
+
+
+def line_method(line, pos):
+    """The method of the call the path at pos belongs to: the nearest method before it on the line, else the nearest after
+    it (fetch(url, {method: 'DELETE'}), request(url, "PATCH")); None without one."""
+    before = after = None
+    for m in METHOD_RX.finditer(line):
+        meth = (m.group(1) or m.group(2)).upper()
+        if m.start() < pos:
+            before = meth
+        elif after is None:
+            after = meth
+    return before or after
+
+
+def proves(route, text):
+    """2.638.0 (#4641, Fable review of 2.546): a suite proves a matrix route only when its path is called with the route's
+    method on a line and a 403 / 404 is checked on that line or the next 3 (the stranger's probe, not the owner's call), or
+    the suite carries the marker "# tenant: METHOD /path" (// in JS) next to a check it makes in another way."""
+    meth, path = route.split(" ", 1)
+    rx = path_rx(route, v1_helper=bool(API_HELPER_RX.search(text)))
+    want = DAV_METHODS if meth == "DAV" else {meth}
+    mk = re.compile(r"(?:#|//)\s*tenant:\s*" + re.escape(meth) + r"\s+" + re.escape(path).replace(re.escape("{}"), r"(?:\{[^{}\n]*\}|[^/\s{}]+)") + r"\s*$", re.M)
+    if mk.search(text):
+        return True
+    lines = text.splitlines()
+    helpers = probe_helpers(text)
+    denied = re.compile(DENIED_RX.pattern + (r"|\b(?:" + "|".join(map(re.escape, sorted(helpers))) + r")\(" if helpers else ""))
+    for i, line in enumerate(lines):
+        for m in rx.finditer(line):
+            if line_method(line, m.start()) in want and any(denied.search(x) for x in lines[i:i + 4]):
+                return True
+    return False
+
+
+def probe_helpers(text):
+    """The suite's own check helpers whose body checks a 403 / 404 (p2300_tenant_test.py no(r, what)): a call of one counts as
+    the 403 / 404 check of its line."""
+    out, name, body = set(), None, []
+    for line in text.splitlines() + ["end"]:
+        m = re.match(r"(?:def|function)\s+(\w+)\s*\(", line)
+        if m or (line[:1].strip() and not line.startswith((" ", "\t", ")", "}"))):
+            if name and DENIED_RX.search("\n".join(body)):
+                out.add(name)
+            name, body = (m.group(1), []) if m else (None, [])
+            continue
+        if name:
+            body.append(line)
+    return out
 
 
 SRC_TEXT = {}
@@ -1498,7 +1555,7 @@ def suite_text(name):
 
 
 def unproven(routes, kinds, src):
-    """The matrix routes whose path appears in none of their named suites."""
+    """The matrix routes that none of their named suites proves (proves(): method + 403 / 404 probe, or the marker)."""
     named = route_suites(src)
     out = set()
     for r, k in routes.items():
@@ -1506,15 +1563,37 @@ def unproven(routes, kinds, src):
         if what != "matrix":
             continue
         suites = set(SUITE_RX.findall(why)) | named.get(r, set())
-        rx = path_rx(r)
-        if not any(rx.search(suite_text(s)) for s in suites):
+        if not any(proves(r, suite_text(s)) for s in suites):
             out.add(r)
     return out
 
 
+# 2.638.0 (#4641): the rules of the proof on invented test lines (each was a proof before #4641, none is one now)
+_PROBE = 'r = S.get(B + f"/api/things/{tid}")\ncheck(r.status_code == 404, "another organisation: 404")\n'
+check(not proves("DELETE /api/things/{}", _PROBE), "#4641: a GET does not prove the DELETE of the same path")
+check(proves("GET /api/things/{}", _PROBE), "#4641: a GET with a 404 three lines on proves the GET")
+check(proves("DELETE /api/things/{}", _PROBE.replace("S.get(", "S.delete(")), "#4641: the DELETE with its 404 proves the DELETE")
+check(not proves("GET /api/things/{}", 'r = A.get(B + f"/api/things/{tid}")\ncheck(r.ok, "the owner reads it")\n'),
+      "#4641: the owner's call without a 403 / 404 check proves nothing")
+check(not proves("GET /api/things/{}", 'r = A.get(B + f"/api/things/{tid}")\n\n\n\n\ncheck(r.status_code == 404)\n'),
+      "#4641: a 404 further than 3 lines away proves nothing")
+check(not proves("GET /api/v1/things/{}", 'r = A.get(B + f"/things/{tid}")\ncheck(r.status_code == 404)\n'),
+      "#4641: a web path without /api/v1 proves no v1 route in a suite without the Api helper")
+check(proves("GET /api/v1/things/{}", 'V = B + "/api/v1"\nr = ag.get(f"/things/{tid}")\ncheck(r.status_code == 404)\n'),
+      "#4641: the same path proves the v1 route in a suite with the Api helper")
+check(proves("PATCH /api/things/{}", "# tenant: PATCH /api/things/{}\n") and not proves("PATCH /api/things/{}", "# tenant: GET /api/things/{}\n"),
+      "#4641: the marker '# tenant: METHOD /path' proves exactly its method")
+check(proves("PATCH /api/things/{}", 'def no(r, what):\n    check(r.status_code in (403, 404), what)\n\n\nno(s.patch(B + f"/api/things/{tid}"), "x")\n'),
+      "#4641: a check helper of the suite that tests 403 / 404 counts as the check of its line")
+check(route_suites('\nROUTES = {\n    # all below: p1_test.py\n    "GET /a": "x",  # p2_test.py\n    "GET /b": "x",\n}\n')
+      == {"GET /a": {"p2_test.py"}, "GET /b": set()}, "#4641: the comment block above a group names no suite for it any more")
+
+
 LEGACY_FILE = os.path.join(N, "tenant_coverage_legacy.txt")
 LEGACY = [ln.strip() for ln in open(LEGACY_FILE, encoding="utf-8") if ln.strip() and not ln.startswith("#")]
-LEGACY_COUNT = 882  # 2.546.0 (#4291): the length of tenant_coverage_legacy.txt; lower it together with the file, never raise it
+LEGACY_COUNT = 1429  # 2.546.0 (#4291): the length of tenant_coverage_legacy.txt; lower it together with the file, never raise it
+# 2.638.0 (#4641): 882 -> 1429 once, with the stricter proof (method + 403 / 404 probe, no comment-block suites); kalmido-livezug.py
+# einreihen compares it and the file with main and turns a rise red
 UNPROVEN = unproven(ROUTES, KINDS, open(__file__, encoding="utf-8").read())
 check(len(LEGACY) == len(set(LEGACY)) and LEGACY == sorted(LEGACY), "tenant_coverage_legacy.txt: sorted, no entry twice")
 for r in sorted(UNPROVEN - set(LEGACY)):
