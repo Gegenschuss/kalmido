@@ -170,7 +170,7 @@ async function nwl_segEdit(s) {
     const cb = e.target.closest('.nwl-conds button');
     if (cb?.classList.contains('fc-v')) {
       const i = +cb.dataset.i, c = cs[i];
-      flt_valMenu(cb, c, cs, () => { const t = flt_sum(c, cs, spec), x = $(`.fcond[data-i="${i}"] .fc-v`, md); if (x) { $('.fc-vs', x).textContent = t || tr('Choose') + '…'; x.classList.toggle('fc-v0', !t); x.setAttribute('aria-label', `${tr('Value')}: ${t || tr('Choose')}`); } }, spec);
+      flt_valMenu(cb, c, cs, () => { const t = flt_sum(c, cs, spec), x = $(`.fcond[data-i="${i}"] .fc-v`, md); if (x) { $('.fc-vs', x).textContent = t || tr('Select') + '…'; x.classList.toggle('fc-v0', !t); x.setAttribute('aria-label', `${tr('Value')}: ${t || tr('Select')}`); } }, spec);
       return;
     }
     if (cb?.classList.contains('fc-x')) { cs.splice(+cb.dataset.i, 1); draw(cs.length ? [Math.max(0, +cb.dataset.i - 1), '.fc-x'] : null); if (!cs.length) $('[data-ns="cond-add"]', md)?.focus(); return; }
