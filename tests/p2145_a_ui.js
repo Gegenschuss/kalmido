@@ -68,7 +68,13 @@ const FEAT = 'cal,comments,collab';
     check(await ready(ev, `S.route.mod === 'home'`), '#2437: Start opens the start page');
     await ev(`(() => { document.documentElement.style.setProperty('--accent', '#d4541b'); return 1; })()`);
     // 2.233.0 (#3195): with a workspace colour (#app.wsb-on) the plate wears it, without one the accent colour
-    check(await ev(`!document.querySelector('#app.wsb-on') || getComputedStyle(document.querySelector('#kbar .kbbrand svg.logo')).color !== 'rgb(212, 84, 27)'`), '#3195: with a workspace colour the plate wears it, not the accent');
+    // 2.651.0 (#5075): a workspace colour of its own and a wait for the drawn colour: the plate's colour changes in a transition
+    // (one read right after a change saw the old colour), and since #4026 (2.490.0 B) #app.wsb-on can carry the accent itself
+    // (Private without a choice, a workspace without a colour), so "wsb-on = not the accent" depended on what the app had drawn
+    await ev(`(() => { lp_put(document.querySelector('#app'), 'wsb-on', '--wbd:#1b7fd4;--wbl:#1b7fd4', WSB_VARS); return 1; })()`);
+    const PLATE = `getComputedStyle(document.querySelector('#kbar .kbbrand svg.logo')).color`;
+    check(await ready(ev, `${PLATE} === 'rgb(27, 127, 212)'`, 20), '#3195: with a workspace colour the plate wears it, not the accent ' + await ev(PLATE));
+    await ev(`(() => { lp_put(document.querySelector('#app'), 'wsb-on', '', WSB_VARS); return 1; })()`);
     await ev(`(() => { document.querySelector('#app').classList.remove('wsb-on'); return 1; })()`);
     check(await ready(ev, `getComputedStyle(document.querySelector('#kbar .kbbrand svg.logo')).color === 'rgb(212, 84, 27)'`, 20), '#3195: the logo plate follows the accent colour ' + await ev(`getComputedStyle(document.querySelector('#kbar .kbbrand svg.logo')).color`));  // was "ignores the accent colour" (#2433)
     // ===== #2438 desktop
