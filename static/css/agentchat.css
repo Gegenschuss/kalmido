@@ -526,3 +526,7 @@ body.kb-open .acsug-l{max-height:min(30vh,9rem)}
   #achat .chcomp .chtools > .iconbtn::after{content:attr(aria-label)}
   #achat .chcomp .chtools > .iconbtn.hidden{display:none}
 }
+/* 2.622.0 A (#4946): on a phone the agent / job chat runs edge to edge like the tab bar and the team chat (.tcview): header,
+   switch row and composer reach both screen edges (#view's side padding is taken back), the messages keep their own
+   padding (.chmsgs); fixed over the keyboard (vvfix, app.css) the same without a side margin. The desktop keeps its centred width */
+@media (max-width:767px){ .chview{max-width:none;margin-inline:-.75rem} .chview.vvfix{margin-inline:0;padding-left:0;padding-right:0} }
