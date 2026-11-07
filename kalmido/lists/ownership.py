@@ -141,6 +141,9 @@ def owner_transfer(c, lr, new, force=False):
         from ..admin.orgcrypt_cli import oc_settle_kick
         oc_settle_kick([lid])
     grp_sync(c, [lid])  # 2.10.0 (#441): the old owner's folder shares no longer reach it, the new owner's may
+    if old:  # 2.654.0 (#5050): the old owner's own share (list admin / an agent's edit) gets the core's row too
+        from .lmcore import lmc_mirror
+        lmc_mirror(c, me(), lid, old)
     le2a_owner_restore(c, lid, le2_keep)  # 2.64.1 (#1817): the new owner's keys stay (their member row went, no rotation)
     names = user_names(c, [old, new, me()])
     c.execute("INSERT INTO list_activity(list_id,user_id,kind,data,created_at) VALUES(?,?,?,?,?)",

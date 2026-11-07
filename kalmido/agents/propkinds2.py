@@ -356,8 +356,10 @@ def _pk2_share(c, aid, lid, rec):
     from ..agents.safety import bridge_blocks
     if agent_active(agent_row(c, aid)) and not list_other_agent(c, lid, aid) and not ws_member_problem(c, lid, aid) \
             and not bridge_blocks(c, lid, aid):
-        c.execute("INSERT INTO list_members(list_id,user_id,role,sort,added_at) VALUES(?,?,?,?,?) ON CONFLICT DO NOTHING",
-                  (lid, aid, "edit", my_max_sort(c, aid) + 1, iso(now_utc())))
+        if c.execute("INSERT INTO list_members(list_id,user_id,role,sort,added_at) VALUES(?,?,?,?,?) ON CONFLICT DO NOTHING",
+                     (lid, aid, "edit", my_max_sort(c, aid) + 1, iso(now_utc()))).rowcount:
+            from ..lists.lmcore import lmc_mirror
+            lmc_mirror(c, c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()[0], lid, aid)  # 2.654.0 (#5050): the core's row
         rec["shared"] = True
 
 

@@ -680,19 +680,20 @@ def list_roles(c, uid, ids):
     ids = [int(x) for x in ids or ()]
     cache = _lr_cache(c)
     miss = sorted({x for x in ids if cache is None or _lr_key(c, x, uid) not in cache})
-    pre_r, pre_m = {}, {}
+    pre_r, pre_m, pre_g = {}, {}, _LR_NO
     if len(miss) > 1:
         q = st_ids(miss)
         pre_r = {r[7]: r for r in c.execute("SELECT owner_id, life, org_id, family, org_visibility, org_edit, deleted_at, id FROM lists "
                                             "WHERE id = ANY(CAST(? AS BIGINT[]))", (q,)).fetchall()}
         pre_m = {r[1]: r for r in c.execute("SELECT role, list_id FROM list_members WHERE list_id = ANY(CAST(? AS BIGINT[])) AND user_id=?",
                                             (q, uid)).fetchall()}
+        pre_g = lr_own_ran_out(c, pre_m, uid) if pre_m else set()  # 2.654.0 (#5050)
     out = {}
     for x in ids:
         if x in out:
             continue
         if x in miss and len(miss) > 1:
-            role = _list_role(c, x, uid, pre_r.get(x), pre_m.get(x))
+            role = _list_role(c, x, uid, pre_r.get(x), pre_m.get(x), pre_g)
             if cache is not None:
                 cache[_lr_key(c, x, uid)] = role
             if role and has_request_context() and g.get("audit_aid") == uid:
@@ -718,7 +719,40 @@ def list_role(c, lid, uid=None):
     return role
 
 
-def _list_role(c, lid, uid, r=_LR_NO, m=_LR_NO):
+_LR_RANK = {"participant": 1, "view": 2, "edit": 3, "admin": 4}  # = lists/groups.py ROLE_RANK
+
+
+def lr_own_ran_out(c, lids, uid):
+    """2.654.0 (#5050): {list id} of lids where uid's own member share (the core's row on the project's node, fs_shares.list_own;
+    lists/lmcore.py lmc_share) ran out -- the same rows lffolder.lf_own_expired finds for grp_sync, read here directly so an
+    expiry needs no watchdog tick to take effect."""
+    ids = sorted({int(x) for x in lids or () if x})
+    if not ids or not uid:
+        return set()
+    from .db import now_iso
+    with _sys(c):  # the node lies in the owner's tree
+        return {r[0] for r in c.execute("""SELECT n.ref_id FROM fs_nodes n JOIN fs_shares s ON s.node_id=n.id WHERE n.kind='ref'
+                                           AND n.ref_kind='list' AND n.ref_id = ANY(CAST(? AS BIGINT[])) AND s.list_own=1
+                                           AND (s.user_id=? OR s.agent_id=?) AND s.expires_at IS NOT NULL AND s.expires_at <= ?""",
+                                        (st_ids(ids), int(uid), int(uid), now_iso())).fetchall()}
+
+
+def _lr_without_own(c, lid, uid, role, r):
+    """2.654.0 (#5050): uid's role in list lid once the own share ran out -- the higher of the roles through groups / folders
+    (grole, frole; groups.grp_sync computes the same on its next run), a child's / the lock's participant rule kept; None
+    without them (then an organisation-wide list's reader role decides, ov_role)."""
+    m = c.execute("SELECT grole, frole FROM list_members WHERE list_id=? AND user_id=?", (lid, uid)).fetchone()
+    rs = [x for x in (m or ()) if x in _LR_RANK]
+    out = max(rs, key=_LR_RANK.get) if rs else None
+    if out and role == "participant":
+        out = "participant"  # a child stays a participant (grp_sync, #653)
+    if out == "participant" and c.execute("SELECT 1 FROM lists WHERE id=? AND COALESCE(e2e, '') != ''", (lid,)).fetchone():
+        out = None  # 2.64.1 (#1817): the lock has no participants
+    return out or ov_role(c, lid, uid, r)
+
+
+def _list_role(c, lid, uid, r=_LR_NO, m=_LR_NO, gone=_LR_NO):
+    # gone (2.654.0, #5050): {list id} whose own share of uid ran out (lr_own_ran_out), read by list_roles for all at once
     # r / m (2.280.0 B, #3116): the list row / uid's membership row (None = none) already read by list_roles
     if r is _LR_NO:
         r = c.execute("SELECT owner_id, life, org_id, family, org_visibility, org_edit, deleted_at FROM lists WHERE id=?", (lid,)).fetchone()
@@ -744,6 +778,10 @@ def _list_role(c, lid, uid, r=_LR_NO, m=_LR_NO):
         if m is _LR_NO:
             m = c.execute("SELECT role FROM list_members WHERE list_id=? AND user_id=?", (lid, uid)).fetchone()
         role = m[0] if m and collab_all() else None
+        if role and (lid in gone if gone is not _LR_NO else lr_own_ran_out(c, [lid], uid)):
+            # 2.654.0 (#5050): the own member share (the core's row, list_own) ran out -- it ends at once, not only with the
+            # watchdog's next tick (lffolder.lf_expire_tick): what is left are the roles through groups / folders
+            role = _lr_without_own(c, lid, uid, role, r)
         if not m:
             role = ov_role(c, lid, uid, r)  # 2.46.0 (#1603): a reader of an organisation-wide list (not shared with them)
     if role and r[2]:

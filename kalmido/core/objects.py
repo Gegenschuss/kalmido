@@ -782,6 +782,8 @@ def obj_share_restore(c, uid, kind, rid, revoked_id):
         c.execute(f"UPDATE fs_shares SET {k}=? WHERE id=?", (v, sid))
     c.execute("DELETE FROM obj_revoked WHERE id=?", (r["id"],))
     obj_forget()
+    if not own:  # 2.654.0 (#5050): like obj_share -- the node's history and its hooks (lists: _on_change -> grp_sync gives the role)
+        fs_log_add(c, n["id"], "share", f"{key[:-3]}:{int(s[key])}:{s.get('role') if s.get('role') in ('view', 'edit') else 'view'}")
     if own:
         s2 = dict(s, id=sid)
         reg["on_restore"](c, uid, int(rid), s2)

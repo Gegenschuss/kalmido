@@ -213,6 +213,9 @@ def kid_force_participant(c, kid):
                  own_role=CASE WHEN own_role IS NULL THEN NULL ELSE 'participant' END,
                  grole=CASE WHEN grole IS NULL THEN NULL ELSE 'participant' END,
                  frole=CASE WHEN frole IS NULL THEN NULL ELSE 'participant' END WHERE user_id=?""", (kid,))  # 2.352.0 A (#2748): frole
+    from ..lists.lmcore import lmc_mirror
+    for (lid,) in c.execute("SELECT list_id FROM list_members WHERE user_id=? AND own_role IS NOT NULL", (kid,)).fetchall():
+        lmc_mirror(c, None, lid, kid)  # 2.654.0 (#5050): the core's row of the kid's own share says participant too
 
 
 def _jparse(v):

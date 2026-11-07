@@ -153,7 +153,14 @@ def make_agent(c, uid):
     # 2.236.0 (#2909): a new agent disturbs only at its limits (agents/workstyle.py WS_NEW)
     c.execute("INSERT INTO agents(user_id,enabled,status,created_at,work_style) VALUES(?,1,'idle',?,?) ON CONFLICT DO NOTHING",
               (uid, iso(now_utc()), json.dumps(WS_NEW)))
-    grp_sync(c, [r[0] for r in c.execute("SELECT list_id FROM list_members WHERE user_id=?", (uid,))])  # 2.352.0 F (#2748, review N6)
+    lids = [r[0] for r in c.execute("SELECT list_id FROM list_members WHERE user_id=?", (uid,))]
+    grp_sync(c, lids)  # 2.352.0 F (#2748, review N6)
+    # 2.654.0 (#5050): the core's rows of its own project shares follow -- an agent's row (agent_id), the role it has now
+    from ..lists.lmcore import lmc_mirror
+    with system_ctx(c):
+        c.execute("UPDATE fs_shares SET agent_id=user_id, user_id=NULL WHERE user_id=? AND list_own=1", (uid,))
+    for lid in lids:
+        lmc_mirror(c, me() if has_request_context() and getattr(g, "user", None) else None, lid, uid)
     if ctl_new():
         c.execute("UPDATE agents SET control=? WHERE user_id=? AND control=''", (json.dumps(ctl_new()), uid))
 

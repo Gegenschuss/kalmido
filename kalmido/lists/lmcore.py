@@ -104,13 +104,27 @@ def lmc_share(c, actor, lid, uid, role, expires_at=_KEEP):
                          extra={"list_role": role, "list_own": 1}, checked=True)
 
 
+def _own_role(c, lid, uid):
+    """uid's own role in project lid (list_members.own_role; a member from before 2.352 / a row no group / folder gave: role)."""
+    m = c.execute("SELECT own_role, role, grole, frole FROM list_members WHERE list_id=? AND user_id=?", (int(lid), int(uid))).fetchone()
+    return (m["own_role"] or (m["role"] if m["grole"] is None and m["frole"] is None else None)) if m else None
+
+
+def lmc_mirror(c, actor, lid, uid):
+    """2.654.0 (#5050): the core's row of uid's own role in project lid follows list_members after a way that wrote the member row
+    itself (joining an organisation-wide project, the old owner of a transfer, an agent's share of a proposal, an account becoming
+    an agent, a child made a participant): lmc_share with the role the row holds now; no own role: nothing. The caller checked the
+    right. -> share id | None."""
+    role = _own_role(c, lid, uid)
+    return lmc_share(c, actor, lid, uid, role) if role else None
+
+
 def lmc_unshare(c, actor, lid, uid):
     """uid's own share of project lid goes (into obj_revoked, restorable); a member from before 2.568.0 gets the row from
     list_members first. The caller removed / lowered the list_members row (member_remove). -> obj_revoked id | None."""
     s = _own_row(c, lid, uid)
     if s is None:
-        m = c.execute("SELECT own_role, role, grole, frole FROM list_members WHERE list_id=? AND user_id=?", (int(lid), int(uid))).fetchone()
-        role = (m["own_role"] or (m["role"] if m["grole"] is None and m["frole"] is None else None)) if m else None
+        role = _own_role(c, lid, uid)
         if not role or lmc_share(c, actor, lid, uid, role) is None:
             return None
         s = _own_row(c, lid, uid)
