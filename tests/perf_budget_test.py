@@ -8,6 +8,7 @@
 usage: python3 tests/perf_budget_test.py"""
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -92,7 +93,9 @@ with tempfile.TemporaryDirectory() as tmp:
     open(extra, "w").write("// clearTimeout(x) in a comment does not count\n")
     rc, out = run("--root", root)
     check(rc == 0 and "Too many hand-made delays" not in out, "(d) a comment is not counted: " + out[-300:])
-    open(extra, "w").write("let zz_t = 0;\nfunction zz_go() { clearTimeout(zz_t); zz_t = setTimeout(() => {}, 9); }\n")
+    # the copy may be below the limit (the tool then only asks to lower it): add as many as it takes to go over it
+    lim = int(re.search(r"^CLEARTIMEOUT_MAX = (\d+)", open(TOOL, encoding="utf-8").read(), re.M).group(1))
+    open(extra, "w").write("let zz_t = 0;\n" + "function zz_go() { clearTimeout(zz_t); zz_t = setTimeout(() => {}, 9); }\n" * max(1, lim - ct + 1))
     rc, out = run("--root", root)
     check(rc == 1 and "Too many hand-made delays" in out and "debounce(fn, ms)" in out, "(d) one more clearTimeout( is red and names debounce: " + out[-300:])
     os.remove(extra)
