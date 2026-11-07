@@ -1,4 +1,3 @@
 # Proven flaky suites, skipped by run_all.sh until their date (#1315, Allison 25.10.2026: red never counts as green).
 # One line per suite: <suite> <until YYYY-MM-DD, at most 14 days ahead> #<task> <evidence>. Proven = red and green on the same
 # code (CI or two Mac runs). tests/skip_test.py (CI lint) is red once a date has passed: fix the suite (its task), delete the line.
-p2574_b_wkcm_ui 2026-11-21 #4977 rot und grün in der CI auf gleichem Code 4361584aab45: red CI v2.618.0; green Nachtlauf 2026-11-07

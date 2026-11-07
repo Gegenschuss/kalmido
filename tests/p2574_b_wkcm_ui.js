@@ -58,9 +58,16 @@ const BODY = Array.from({length: 100}, (_, i) => part(i)).join('\n');
       await ev(`(() => { const v = WKCM.view; v.focus(); v.dispatch({selection: {anchor: v.state.doc.line(1003).to}, scrollIntoView: true}); return 1; })()`);
       // the page scrolls in #view (the editor has no scroller of its own): its line brought on screen there (CodeMirror's own
       // scrollIntoView lands at the end of this page, with the decorations of the whole text as well - seen 06.11.2026)
-      check(await until(`(() => { const v = WKCM.view, at = v.state.doc.line(1003).from, sc = document.querySelector('#view');
-        if (v.visibleRanges.some(x => x.from <= at && x.to >= at)) return true;
-        sc.scrollTop += v.documentTop + v.lineBlockAt(at).top - sc.getBoundingClientRect().top - 200; return false; })()`), 'line 1003 is on screen');
+      // 2.627.0 (#4977): the scroll is set ONCE, then only waited for (it was moved again in every poll: on a slow CI run it
+      // kept moving while the decorations were still following the last one); a second scroll only when the first one did
+      // not bring the line on screen (the line heights below were estimates until drawn)
+      const to1003 = `(() => { const v = WKCM.view, at = v.state.doc.line(1003).from, sc = document.querySelector('#view');
+        sc.scrollTop += v.documentTop + v.lineBlockAt(at).top - sc.getBoundingClientRect().top - 200; return 1; })()`;
+      const on1003 = `(() => { const v = WKCM.view, at = v.state.doc.line(1003).from; return v.visibleRanges.some(x => x.from <= at && x.to >= at); })()`;
+      await ev(to1003);
+      let seen = await until(on1003, 10000);
+      if (!seen) { await ev(to1003); seen = await until(on1003); }
+      check(seen, 'line 1003 is on screen');
       check(await until(`(() => { const v = WKCM.view, r = v.state.field(WKCM_FIELD).r, at = v.state.doc.line(1003).from; return !!r && r.from <= at && r.to >= at; })()`), 'the decorations followed the screen to line 1003');
       return ev(`(() => {
       const v = WKCM.view, ts = [];
@@ -85,7 +92,9 @@ const BODY = Array.from({length: 100}, (_, i) => part(i)).join('\n');
     check(d.typed, 'desktop: the 40 letters are in the text');
     // a formula far below the visible part (lines 1990 and 1998-2000) is drawn as one once scrolled to, its $$ source hidden
     await ev(`(() => { WKCM.view.contentDOM.blur(); return 1; })()`);
-    const far = `(() => { const v = WKCM.view; v.dispatch({effects: CM6.EditorView.scrollIntoView(v.state.doc.line(1999).from, {y: 'center'})});
+    // 2.627.0 (#4977): scrolled to line 1999 once, then only waited for (no new scroll in every poll)
+    await ev(`(() => { const v = WKCM.view; v.dispatch({effects: CM6.EditorView.scrollIntoView(v.state.doc.line(1999).from, {y: 'center'})}); return 1; })()`);
+    const far = `(() => { const v = WKCM.view;
       const ws = [...document.querySelectorAll('#wk-cm .cm-wkwb')].filter(w => /x_99|a_99/.test(w.textContent) || (w.querySelector('.wkdgmath') && /99/.test(w.textContent)));
       const r = v.state.field(WKCM_FIELD).r;  // 2.574.0 (#4681): the part followed the scroll to the end
       return ws.length >= 1 && !!r && r.to === v.state.doc.length && r.from > 0 && ![...document.querySelectorAll('#wk-cm .cm-line')].some(l => /\\$\\$/.test(l.textContent) && /99/.test(l.textContent)); })()`;
