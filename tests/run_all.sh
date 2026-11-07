@@ -152,6 +152,8 @@ run() {  # run <name> <cmd...>: prints the summary line, remembers failures
   t0=$(_ms); GRAN=1
   out=$("$@" 2>&1); rc=$?
   _timing "$name" $(( $(_ms) - t0 )) $rc  # 2.149.0 E (#2514)
+  # 2.623.0 (#4950): a summary line "... N failed" with N > 0 is red too, also at rc 0 (a suite that forgot sys.exit(done(...)))
+  if [[ $rc -eq 0 ]] && grep -Eq "ok, [1-9][0-9]* failed" <<< "$out"; then rc=1; fi
   echo "$out" | grep -E "^FAIL|^PERF|ok, [0-9]+ failed|Error|Traceback" | head -40
   if [[ $rc -ne 0 ]]; then FAILED+=("$name"); echo "== $name: FAILED (exit $rc)"; echo "$out" | tail -15
     # GitHub Actions: an annotation, readable on the run page (and via the API) without the full log
