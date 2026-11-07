@@ -17,7 +17,7 @@ from ..tasks.validation import as_int
 from ..collab.comments import collab_on, comment_plain, lang_of, MENTION_RE, push_gate, push_gate_due, push_gate_reset, user_names
 from ..collab.news import list_bells, notif_ok
 from ..core.errors import reject_unknown, BadInput
-from ..core.conflict import ccf_check  # 2.564.0 D (#4701)
+from ..core.conflict import ccf_check, take_version  # 2.564.0 D (#4701); 2.638.0 (#4775): take_version
 from ..notify.push import notify, push_handled, push_prio, push_reachable_many, WD_TICKS
 from ..api.common import hit_limit, v1_args, v1_call, v1_json, v1_view
 from ..agents.core import agent_emit, AGENT_EVENT_COMMENT_CHARS, agent_ids, is_agent, listen_agents_of, need_person
@@ -1145,7 +1145,6 @@ def v1_tchat_post(rid):
 def v1_tchat_edit(mid):
     """{body, expect_updated_at?}. 2.638.0 (#4775): expect_updated_at (or If-Match) = the message's edited_at, else its
     created_at, as read; edited meantime -> 409 with the message; agents must send it (core/conflict.py take_version)."""
-    from ..core.conflict import take_version
     v1_args(())
     b = dict(v1_json())
     reject_unknown(b, ("body", "expect_updated_at"))
