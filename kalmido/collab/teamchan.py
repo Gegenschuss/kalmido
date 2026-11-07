@@ -355,6 +355,8 @@ def tcx_channels():
     rows = c.execute(f"""SELECT * FROM tchat_rooms WHERE kind='channel' AND (id IN (SELECT room_id FROM tchat_members WHERE user_id=? UNION {tcx_core_rooms_sql(uid)})
                          OR created_by=? {('OR org_id IN (' + ','.join('?' * len(orgs)) + ')') if orgs else ''}) ORDER BY lower(name), id""",
                      (uid, uid, *orgs)).fetchall()
+    from ..core.objects import obj_gate  # 2.633.0 (#4779): the core's floor per row, as need_room (a token limited to lists sees none)
+    rows = [r for r in rows if obj_gate(c, uid, "tchat_room", r)]
     mm = tcx_members_of(c, rows)  # 2.281.0 B (#3110): the members of every channel at once
     who = {"uid": uid, "orgs": set(orgs)}  # 2.369.3 (#3199): the organisations read above, once for every channel
     chans = [tcx_out(c, r, uid, mm[r["id"]]) for r in rows
