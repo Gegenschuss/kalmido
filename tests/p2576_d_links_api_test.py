@@ -16,6 +16,7 @@ usage: p2576_d_links_api_test.py <datadir>      (P2576DL_NOSTART=1 = the server 
 # freelancer-matrix: tasks
 import os
 import sys
+import time
 
 import requests
 
@@ -196,7 +197,9 @@ TD = mk(A, LA, "Duplicate with a notification")
 kt.dbx("INSERT INTO push_subs(user_id,endpoint,p256dh,auth,label,created_at) VALUES(?,?,?,?,?,?)",
        (AID, "https://push.example.com/p2576dl", "k", "a", "Phone", "2026-01-01T00:00:00+00:00"))
 SUBID = kt.dbx("SELECT id FROM push_subs WHERE endpoint=?", ("https://push.example.com/p2576dl",))[0][0]
-kt.dbx("INSERT INTO push_tags(sub_id,tag,sent_at,handled_at) VALUES(?,?,?,NULL)", (SUBID, f"t-{TD}", 1.0))
+# 2.628.0 (#4985): sent now, not at 1.0 (1970) -- the watchdog (notify/push.py push_dismiss_tick) deletes every tag sent
+# more than DISMISS_KEEP ago at each tick, so a tick between this insert and the check below took the row away (CI: IndexError)
+kt.dbx("INSERT INTO push_tags(sub_id,tag,sent_at,handled_at) VALUES(?,?,?,NULL)", (SUBID, f"t-{TD}", time.time()))
 r = A.post(B + f"/api/tasks/{TD}/relations", json={"other_id": T1, "kind": "duplicate", "close": True})
 check(r.ok and r.json()["task"]["status"] == -1, f"N2: closed as duplicate {r.status_code} {r.text[:160]}")
 check(kt.dbx("SELECT handled_at FROM push_tags WHERE sub_id=? AND tag=?", (SUBID, f"t-{TD}"))[0][0] is not None,
