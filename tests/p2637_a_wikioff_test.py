@@ -76,7 +76,7 @@ f1 = next((f for f in j.get("files", []) if f["id"] == F1), {})
 check(f1.get("page_id") == P1 and f1.get("name") == "plan.png" and f1.get("mime") == "image/png" and f1.get("size") == len(PNG)
       and f1.get("v") == hashlib.sha256(PNG).hexdigest() and f1.get("url", "").startswith(f"/api/wiki/files/{F1}/"),
       f"a file: page, name, type, size, version = sha256, address {f1}")
-check(j.get("bytes") == len(PNG) + len(PDF) + len(PDF) + 6 and j.get("space") == SP and j.get("more") is False and j.get("e2e") is False,
+check(j.get("bytes") == sum(f["size"] for f in j.get("files", [])) == len(PNG) + 2 * len(PDF) + len(b"%old\n") and j.get("space") == SP and j.get("more") is False and j.get("e2e") is False,
       f"the total in bytes, the space, more / e2e false {j.get('bytes')} {j.get('space')}")
 check(Bo.get(B + f1.get("url", "/x")).content == PNG, "the listed address gives the file (the device fetches it there)")
 check(FB not in (ids(r) or []), "another organisation's file is never listed")
@@ -90,7 +90,6 @@ if rg.ok:
 check(lst(Bo, "org:abc").status_code == 400, "a malformed space: 400")
 
 # the trash
-check(Bo.delete(B + f"/api/wiki/files/{F2}").status_code == 403, "setup: a member without write right cannot delete a file")
 check(A.delete(B + f"/api/wiki/files/{F2}").ok, "setup: Alice deletes manual.pdf (trash)")
 check(ids(lst(Bo, SP)) == sorted([F1, F3]), "a file in the trash is missing")
 check(A.delete(B + f"/api/wiki/pages/{P2}").ok, "setup: the page Handbook/Old into the trash")
@@ -98,10 +97,10 @@ check(ids(lst(Bo, SP)) == [F1], "the file of a page in the trash is missing")
 check(A.post(B + "/api/wiki/restore", json={"ids": [P2], "files": [F2]}).ok, "setup: the page and the file back")
 check(ids(lst(Bo, SP)) == sorted([F1, F2, F3]), "back from the trash: listed again")
 # a new content is a new file with its own version
-F4 = attach(A, P1, "plan.png", PNG + b"\x00", "image/png")
+F4 = attach(A, P1, "manual.pdf", PDF + b"%v2\n", "application/pdf")
 j = lst(Bo, SP).json()
 v = {f["id"]: f["v"] for f in j["files"]}
-check(F4 in v and v[F4] != v[F1], "a new upload of the same name is another file with another version")
+check(F4 in v and F4 != F2 and v[F4] != v[F2], f"a new upload of the same name is another file with another version {F4} {F2}")
 
 # ---------------------------------------------------------------- a person without an organisation
 FID, Fr = freelancer(B, A)

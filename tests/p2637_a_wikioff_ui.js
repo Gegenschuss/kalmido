@@ -38,9 +38,17 @@ function browser() {
   return {db, fs, store, shared: {store: {}, wins: []}};
 }
 // a window: est = what navigator.storage.estimate answers; gate(url) = a promise a file's download waits for (null = at once)
-function win(br, {est = {quota: 5e9, usage: 1e6}, ck = null} = {}) {
+// every window of the browser uses the same session (CKW): another sign-in would empty the copy (#2872, p2238_b)
+let CKW;
+function win(br, {est = {quota: 5e9, usage: 1e6}} = {}) {
+  const ck = CKW;
   const setup = w => {
     w.__wkoStore = br.store;
+    w.fetch = (u, o = {}) => {
+      if (w.__offline) return Promise.reject(new TypeError('Failed to fetch'));
+      const sg = o.signal && (ac => { if (o.signal.aborted) ac.abort(); else o.signal.addEventListener('abort', () => ac.abort()); return ac.signal; })(new AbortController());
+      return fetch(new URL(String(u), B), {...o, headers: {...(o.headers || {}), Cookie: ck}, ...(sg ? {signal: sg} : {})});
+    };
     w.__est = est; w.__persist = 0; w.__gate = null; w.__opened = []; w.__blobs = [];
     Object.defineProperty(w.navigator, 'storage', {configurable: true, value: {estimate: async () => w.__est, persist: async () => { w.__persist++; return true; }}});
     w.URL.createObjectURL = b => { w.__blobs.push(b); return 'blob:kalmido/' + w.__blobs.length; };
@@ -80,6 +88,8 @@ async function menuPick(w) {
   const F1 = await attach(P1, 'plan.png', PNG, 'image/png');
   const F2 = await attach(P1, 'manual.pdf', PDF, 'application/pdf');
   const F3 = await attach(P2, 'old.pdf', Buffer.concat([PDF, Buffer.from('%old\n')]), 'application/pdf');
+  CKW = await login('frida');
+  const ME = (await (await fetch(B + 'api/state', {headers: {...H, Cookie: CKW}})).json()).me;
   check(P1 && P2 && F1 && F2 && F3, `setup: two pages with three files ${P1} ${P2} ${F1} ${F2} ${F3}`);
 
   // ================= too little space: a hint, nothing loaded
@@ -105,10 +115,10 @@ async function menuPick(w) {
   check(/Keep this workspace offline/.test(asked[0] || '') && /3 files/.test(asked[0] || '') && /Free on this device/.test(asked[0] || ''), 'the dialog names the files, their size and the free space ' + asked[0]);
   check(await until(() => /Offline copy: 0 of 3 files/.test(bar(w))), 'the bar shows the progress (0 of 3 files) ' + bar(w));
   check(w.__persist === 1, 'navigator.storage.persist() is asked for');
-  check(meta(br)?.on && meta(br)?.st === 'load' && meta(br)?.uid === st0.me.id && meta(br)?.g === (st0.me.sgen || ''), 'the state is in the copy with the sign-in mark');
+  check(meta(br)?.on && meta(br)?.st === 'load' && meta(br)?.uid === ME.id && meta(br)?.g === (ME.sgen || ''), 'the state is in the copy with the sign-in mark');
   await until(() => release); release(); release = null;
   check(await until(() => br.fs.size === 1 && /Offline copy: 1 of 3 files/.test(bar(w))), 'one file in: 1 of 3 ' + bar(w));
-  check([...br.fs.values()][0]?.blob && [...br.fs.values()][0]?.uid === st0.me.id, 'the file is kept as a blob with the account');
+  check([...br.fs.values()][0]?.blob && [...br.fs.values()][0]?.uid === ME.id, 'the file is kept as a blob with the account');
   await until(() => release);
   d.querySelector('#view .wkofbar [data-wkof="stop"]')?.click();
   release(); release = null;  // the download that waited ends cut off
@@ -157,8 +167,8 @@ async function menuPick(w) {
   check(await until(() => !br.fs.has('f:' + F3) && !br.fs.has('f:' + F4) && br.fs.has('f:' + F1)), 'the files of a page in the trash leave the copy');
 
   // ================= no right any more: 404 removes the space's copy
-  br.db.set('o:org:999999', {k: 'o:org:999999', sp: 'org:999999', on: true, st: 'ok', list: [{id: 9999, v: 'x', size: 1, name: 'x.pdf', mime: 'application/pdf', page_id: 1}], have: {9999: 'x'}, uid: st0.me.id, g: st0.me.sgen || ''});
-  br.fs.set('f:9999', {k: 'f:9999', blob: new Blob(['x']), uid: st0.me.id, g: st0.me.sgen || ''});
+  br.db.set('o:org:999999', {k: 'o:org:999999', sp: 'org:999999', on: true, st: 'ok', list: [{id: 9999, v: 'x', size: 1, name: 'x.pdf', mime: 'application/pdf', page_id: 1}], have: {9999: 'x'}, uid: ME.id, g: ME.sgen || ''});
+  br.fs.set('f:9999', {k: 'f:9999', blob: new Blob(['x']), uid: ME.id, g: ME.sgen || ''});
   await w.eval(`wkoffSync('org:999999', true)`);
   check(await until(() => !br.db.has('o:org:999999') && !br.fs.has('f:9999')), 'a space without access (404): its copy is removed');
 
@@ -186,7 +196,7 @@ async function menuPick(w) {
   await w.eval('wko_reset()');
   check(br.fs.size === 0 && br.db.size === 0, 'another sign-in (wko_reset): texts and files gone');
   await w.eval(`(WKO.dead = false, WKOF.m = {}, wko_put({k: 'o:private', sp: 'private', on: true, st: 'ok', list: [], have: {}}))`);
-  br.fs.set('f:1', {k: 'f:1', blob: new Blob(['x']), uid: st0.me.id, g: st0.me.sgen || ''});
+  br.fs.set('f:1', {k: 'f:1', blob: new Blob(['x']), uid: ME.id, g: ME.sgen || ''});
   await w.eval('clearLocal()');
   check(await until(() => br.fs.size === 0 && br.db.size === 0), 'logout (clearLocal): texts and files gone');
   w.close();
