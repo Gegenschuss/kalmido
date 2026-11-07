@@ -551,6 +551,12 @@ needed. A new drag place without an entry turns the run red. The sheet tabs (`sh
 (`basket.js`) moved onto `drg_attach` (hold, drag; held without moving = the tap / the order menu); the mouse keeps the
 browser's drag there.
 
+2.627.0 (#4961 #4962 #4966): the file rows of the file store (onto a folder, the path, the panel's folders) and the icons of
+the area rail moved onto `drg_attach` the same way (held without moving = the menu of the long press, `ms_lpTake` stops the
+long press's own timer), and the three own touch paths are gone: the sidebar's list rows (`sidebar.js`), the areas' tree
+(`areas.js`) and the favourite tiles (`favtiles.js`) hold, drag, scroll at the edge and cancel (Esc, a second finger) by
+`drag.js`. `onTarget` may name the element to follow on (the row around a grip).
+
 2.193.0 C (#2219): task rows and chips (`dnd.js`, list / board / matrix / calendar, the selection's grip) drag by finger
 on `drg_attach`: the long press is `hold` (0.38 s, 8 px; 0 on the grip), `onHold` lifts the row at once (ghost, "Move to
 project", from then on the page does not scroll under the finger), let go without moving = `onTap` (select / "Move to

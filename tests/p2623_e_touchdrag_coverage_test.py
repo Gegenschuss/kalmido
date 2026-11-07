@@ -43,19 +43,20 @@ TD_SITES = {
     ("dashboard.js", ".lyed .dcust"): ("drag.js", "dashboard.js"),
     ("basket.js", "kbgrip"): ("drag.js", "basket.js"),              # 2.623.0 E (#4621): the group's header, held
     ("sheetbook.js", 'data-shb="tab"'): ("drag.js", "sheetbook.js"),  # 2.623.0 E (#4621): the sheet tabs, held
-    # ---- an own touch path today, onto drag.js with #4966
-    ("render.js", 'reorder" data-list'): ("eigen", "sidebar.js", 4966),        # list rows of the sidebar / start page: sdStart
-    ("render.js", "sideOD("): ("eigen", "sidebar.js", 4966),
-    ("sidebar.js", "#side .srow[data-list]"): ("eigen", "sidebar.js", 4966),
-    ("areas.js", "n.drag && !isTouch()"): ("eigen", "areas.js", 4966),  # the areas' tree nodes: SBB_TD
-    ("areas.js", "#side .sbbt"): ("eigen", "areas.js", 4966),
-    ("favtiles.js", "const drag = isMobile()"): ("eigen", "favtiles.js", 4966),  # favourite tiles: FV2.lp (see #4618)
-    ("favtiles.js", ".fv2bar"): ("eigen", "favtiles.js", 4966),
+    # 2.627.0 (#4966): the former own touch paths, now by drag.js
+    ("render.js", 'reorder" data-list'): ("drag.js", "sidebar.js"),        # list rows of the sidebar / start page
+    ("render.js", "sideOD("): ("drag.js", "sidebar.js"),
+    ("sidebar.js", "#side .srow[data-list]"): ("drag.js", "sidebar.js"),
+    ("areas.js", "n.drag && !isTouch()"): ("drag.js", "areas.js"),  # the areas' tree nodes
+    ("areas.js", "#side .sbbt"): ("drag.js", "areas.js"),
+    ("favtiles.js", "const drag = isMobile()"): ("drag.js", "favtiles.js"),  # favourite tiles (see #4618)
+    ("favtiles.js", ".fv2bar"): ("drag.js", "favtiles.js"),
+    # 2.627.0 (#4961 #4962): a file onto a folder, the icons of the area rail
+    ("ablage.js", 'class="abrow"'): ("drag.js", "ablage.js"),
+    ("ablage.js", ".abrow[draggable"): ("drag.js", "ablage.js"),
+    ("areas.js", "sbb_on() && !S.me?.kid"): ("drag.js", "areas.js"),
+    ("areas.js", "#srail .srb"): ("drag.js", "areas.js"),
     # ---- no finger way yet
-    ("ablage.js", 'class="abrow"'): ("ohne", 4961),                 # a file onto a folder
-    ("ablage.js", ".abrow[draggable"): ("ohne", 4961),
-    ("areas.js", "sbb_on() && !S.me?.kid"): ("ohne", 4962),         # the icons of the area rail
-    ("areas.js", "#srail .srb"): ("ohne", 4962),
     ("office_banknorc.js", "bnrdrag"): ("ohne", 4963),              # a receipt onto a booking
     ("office_banknorc.js", "closest?.('[data-bnr-rc]')"): ("ohne", 4963),
     ("office_docs.js", 'class="ofdli"'): ("ohne", 4964),            # a document onto a folder of the pane
@@ -131,6 +132,14 @@ for (f, mk), way in TD_SITES.items():
 check("drg_attach(document, {" in SRC["sheetbook.js"] and "mouse: false" in SRC["sheetbook.js"], "sheetbook.js: the finger by drg_attach, the mouse keeps the browser's drag")
 check("!rowd_touch() ? 'draggable=\"true\"'" in SRC["sheetbook.js"], "sheetbook.js: no browser drag on a touch screen (the hold is the app's)")
 check("drg_attach(document, {" in SRC["basket.js"] and "kbGroupMove(d.id" in SRC["basket.js"], "basket.js: the finger moves a group by drg_attach, the same kbGroupMove")
+# 2.627.0 (#4961 #4962 #4966): the file rows and the rail icons keep the mouse's drag and get the finger from drag.js; the
+# sidebar's list rows, the areas' tree and the favourite tiles lost their own touch path
+check("rowd_touch() ? 'data-abmv=\"1\"' : 'draggable=\"true\"'" in SRC["ablage.js"] and "ab_move(n, t.dataset.abdrop" in SRC["ablage.js"] and "mouse: false" in SRC["ablage.js"],
+      "ablage.js: the finger moves a file by drg_attach (the same ab_move), no browser drag on a touch screen")
+check("!rowd_touch() ? ' draggable=\"true\"'" in SRC["areas.js"] and "sbb_move(d.id, t.dataset.sbb" in SRC["areas.js"], "areas.js: the finger sorts the rail by drg_attach (the same sbb_move)")
+for f, gone in (("sidebar.js", ("sdStart", "sdMove", "sdEnd", "'touchstart'")), ("areas.js", ("SBB_TD", "'touchstart'")), ("favtiles.js", ("fv2_touchEnd", "FV2.lp.timer"))):
+    for g in gone:
+        check(g not in SRC[f], f"{f}: the own touch path is gone ({g})")
 
 # 4. the scanner: a probe place without an entry is found, one with an entry is not, a selector is no place
 probe = "const x = `<li class=\"zz\" draggable=\"true\">`;\ndocument.addEventListener('dragstart', e => {\n  e.target.closest?.('.zz[draggable=\"true\"]');\n});\n"
