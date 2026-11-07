@@ -101,43 +101,8 @@ UMZ_NOT_INCLUDED = (
     N_("tasks in the trash with their comments and files: they are in the file, but an import does not take them over (restore them before the export)"),
 )
 
-# 2.455.0 (#3469): every table with a person column (user_id) that is NOT in the queries of the account export, with the reason (the
-# static guard tests/export_coverage_test.py fails on a new such table until it is exported or here -- so nothing goes missing silently)
-_U_SECRET = "credentials, keys and link secrets"
-_U_VIEW = "what a person has seen or hidden, the order of their rows"
-_U_SERVER = "state of this server (queues, limits, sign-in records, import records)"
-_U_AGENT = "agents and their logs (agents are set up anew, UMZ_NOT_INCLUDED)"
-_U_DERIVED = "derived or working data, rebuilt on the target"
-_U_SHARE = "who shares what with whom (a share is made anew on the target)"
-_U_ORG = "data of an organisation or an office: the organisation export"
-_U_LATER = "not part of the decision of #3469, not in the account export yet"
-UMZ_LEFT_USERS = {
-    "abs_cal_feeds": _U_SECRET, "app_passwords": _U_SECRET, "contact_srcs": _U_SECRET, "disc_profiles": _U_SECRET, "disc_tokens": _U_SECRET,
-    "doc_fetchers": _U_SECRET, "doc_mail": _U_SECRET, "ev_cal_feeds": _U_SECRET, "hub_tokens": _U_SECRET,
-    "list_key_pending": _U_SECRET, "list_keys": _U_SECRET, "mail_tokens": _U_SECRET, "notify_channels": _U_SECRET,
-    "org_invites": _U_SECRET, "pl_conn_users": _U_SECRET, "pl_tokens": _U_SECRET, "recovery_codes": _U_SECRET, "user_invites": _U_SECRET,
-    "user_keys": _U_SECRET, "webauthn_creds": _U_SECRET, "wiki_key_pending": _U_SECRET, "wiki_keys": _U_SECRET, "wiki_shares": _U_SECRET,
-    "list_bell": _U_VIEW, "list_folder_skip": _U_VIEW, "list_mine_hide": _U_VIEW, "rss_reads": _U_VIEW, "task_seen": _U_VIEW, "tchat_reads": _U_VIEW,
-    "tchat_thread_reads": _U_VIEW, "user_task_order": _U_VIEW, "wait_hidden": _U_VIEW,
-    "user_mine_sections": _U_VIEW,  # 2.569.0 (#4395): the own sections of "My tasks", like user_task_order
-    "push_gate": _U_SERVER, "quiet_push_held": _U_SERVER,  # 2.463.0: the two tables of #2966
-    "admin_login_ips": _U_SERVER, "agent_push_held": _U_SERVER, "bg_jobs": _U_SERVER, "conn_blocks": _U_SERVER, "deleted_accounts": _U_SERVER,
-    "disc_quota": _U_SERVER, "support_grants": _U_SERVER, "ev_invite_day": _U_SERVER, "ev_reminded": _U_SERVER, "idem_keys": _U_SERVER, "imports": _U_SERVER, "login_ips": _U_SERVER,
-    "notify_mail_queue": _U_SERVER, "sample_items": _U_SERVER, "task_push": _U_SERVER,
-    "agent_jobs": _U_AGENT, "job_watch": _U_AGENT, "agents": _U_AGENT,
-    # #3363 (main red 03.11.2026): one-time authorization codes (10 min) and accesses of MCP clients to an agent: credentials of this server, given
-    # anew on the target (consent page); on deleting the account (or the agent) both go by foreign key (ON DELETE CASCADE)
-    "oauth_codes": _U_SECRET, "oauth_grants": _U_SECRET,
-    "time_wipes": _U_DERIVED,  # 2.530.0 B (#4315): the Undo copy of "Delete all times" (until the trash period ends)
-    "obj_history": _U_DERIVED, "obj_undo": _U_DERIVED, "obj_revoked": _U_SHARE,  # 2.558.0 (#4709): the core's history / undo steps, revoked shares
-    "dav_sync": _U_DERIVED, "dav_sync2": _U_DERIVED, "dl_changes": _U_DERIVED, "list_activity": _U_DERIVED, "rss_items": _U_DERIVED, "sheet_lastvals": _U_DERIVED,
-    "book_members": _U_SHARE, "ev_cal_members": _U_SHARE, "folder_people": _U_SHARE, "fs_shares": _U_SHARE, "group_members": _U_SHARE, "sheet_shares": _U_SHARE,
-    "office_archive_log": _U_ORG, "office_doc_log": _U_ORG, "office_drives": _U_ORG, "office_letter_profiles": _U_ORG, "office_meal_log": _U_ORG,
-    "office_rgroup_members": _U_ORG, "office_sub_reminders": _U_ORG, "office_undo": _U_ORG, "org_joins": _U_ORG, "org_members": _U_ORG, "tchat_files": _U_ORG,
-    "budget_files": "the receipt files of household budgets (UMZ_NOT_INCLUDED)",
-    "chat_saves": _U_LATER, "ctr_notices": _U_LATER, "fs_log": _U_LATER, "section_templates": _U_LATER,
-    "module_card_people": _U_ORG,  # 2.575.0 (#3778): which module cards of an organisation a member has
-}
+# 2.619.0 (#3862): the tables that stay out of the account export, with the reason, are in admin/exportleft.py UMZ_LEFT_TABLES (one list;
+# #3469: every table with a person column; the guards tools/check_export_tables.py and tests/export_coverage_test.py fail on a new one)
 
 # 2.278.0 C (#3091): what the manifest says about browser-encrypted content (only what the import really does)
 UMZ_ENC_NOTE = ("Encrypted in the browser: stored here as ciphertext. Your key bundle (e2e_keys, wrapped with your passphrase and "

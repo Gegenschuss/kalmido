@@ -60,7 +60,7 @@ RX_TABLES = (
     ("invoices/clients.csv", "clients"),
     ("invoices/company.csv", "office_company"),
     ("invoices/bank-accounts.csv", "office_bank_accounts"),  # 2.470.0 (#3596)
-    # 2.362.2 (#3105): every other record of the office the books and the tax office ask for; RX_LEFT names the rest with its reason
+    # 2.362.2 (#3105): every other record of the office the books and the tax office ask for; exportleft.RX_LEFT_TABLES names the rest with its reason
     ("invoices/client-contacts.csv", "office_client_contacts"),
     ("invoices/document-parts.csv", "office_doc_parts"),
     ("invoices/dunning.csv", "office_dunning_marks"),
@@ -115,24 +115,8 @@ RX_WHERE = {"office_letters": "org_id=? AND status<>'draft'",  # 2.184.0 A (#262
             "office_letter_links": "org_id=? AND letter_id IN (SELECT id FROM office_letters WHERE org_id=? AND status<>'draft')"}
 # 2.372.0 (#3316): the signature snapshot of a receipt stays on its PDF, not in the CSV
 RX_DROP = {"office_signoffs": ("ip", "user_agent"), "office_meals": ("sign_pic",)}  # 2.362.2 (#3105, review): a signer's network address is no business record
-# 2.362.2 (#3105): every office table that is NOT in RX_TABLES, with the reason (the static guard tests/export_coverage_test.py
-# fails on a new office_* table until it is in RX_TABLES or here -- so no record goes missing silently)
-_RX_SETUP = "settings and working data of the office, no record to keep (in the organisation export)"
-RX_LEFT = {
-    "office_settings": _RX_SETUP, "office_services": _RX_SETUP, "office_roles": _RX_SETUP, "office_sets": _RX_SETUP, "office_texts": _RX_SETUP,
-    "office_doc_templates": _RX_SETUP, "office_letter_blocks": _RX_SETUP, "office_letter_profiles": _RX_SETUP, "office_inv_series": _RX_SETUP,
-    "office_fixed_costs": _RX_SETUP, "office_cf_actual": _RX_SETUP, "office_cf_adjust": _RX_SETUP, "office_cf_start": _RX_SETUP,
-    "office_bank_rules": _RX_SETUP, "office_bank_rule_nos": _RX_SETUP, "office_bank_vendors": _RX_SETUP, "office_deals": _RX_SETUP,
-    "office_sub_reminders": _RX_SETUP, "office_trip_purposes": _RX_SETUP, "office_pack_installs": _RX_SETUP, "office_rgroups": _RX_SETUP,
-    "office_rgroup_members": _RX_SETUP, "office_meal_choices": _RX_SETUP, "office_pay_props": "agents' suggestions, not the booked payments",
-    "office_peppol": "the Peppol connection and its key (a secret; the sends are in the export)",
-    "office_payonline": "the online payment connection and its keys (a secret; the payments are in the export)",
-    "office_pay_links": "the public pay links (secrets; the payments are in the export)",
-    "office_pay_sessions": "the online provider's working data (the payments are in the export)",
-    "office_pay_events": "the online provider's working data (the payments are in the export)",
-    "office_pay_payouts": "the online provider's working data (the payments are in the export)",
-    "office_trash": "the trash (deleted items are not in the export)", "office_undo": "undo steps of one day",
-}
+# 2.619.0 (#3862): the office tables that are NOT in RX_TABLES, with the reason, are in admin/exportleft.py RX_LEFT_TABLES (one list;
+# the static guards tools/check_export_tables.py and tests/export_coverage_test.py fail on a new office_* table until it is in RX_TABLES or there)
 
 
 # ---------------------------------------------------------------- the subject: whose records, who may download them
