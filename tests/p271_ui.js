@@ -240,7 +240,9 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
         await shot(`p271-overview-${vw}.png`);
         // the milestone dialog's date picker stays inside the viewport
         await ev(`(() => { document.querySelector('[data-pov="ms-add"]').click(); return 1; })()`); await fu(`!!document.querySelector('.povmodal .dpbtn')`);
-        await ev(`(() => { document.querySelector('.povmodal .dpbtn').click(); return 1; })()`); await fu(`!!document.querySelector('#dpop')`);
+        await ev(`(() => { document.querySelector('.povmodal .dpbtn').click(); return 1; })()`);
+        // 2.624.0 (#3943): on phones the picker is a bottom sheet that slides up (an_up): wait until its animation is over
+        await fu(`(() => { const p = document.querySelector('#dpop'); return !!p && !p.getAnimations().some(a => a.playState === 'running'); })()`);
         const dp = await ev(`(() => { const p = document.querySelector('#dpop'); if (!p) return null; const r = p.getBoundingClientRect(); return {l: r.left, r: r.right, t: r.top, b: r.bottom, iw: innerWidth, ih: innerHeight}; })()`);
         check(dp && dp.l >= -0.5 && dp.r <= dp.iw + .5 && dp.b <= dp.ih + .5, `${vw}px: the date picker of a milestone inside the viewport ${JSON.stringify(dp)}`);
         await shot(`p271-ms-${vw}.png`);
