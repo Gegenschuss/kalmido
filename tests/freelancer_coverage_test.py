@@ -582,6 +582,7 @@ ROUTES = {
     "POST /api/office/fixed-costs/import": "office", "POST /api/office/fixed-costs/import/preview": "office",
     "POST /api/office/import": "office", "POST /api/office/legacy/archive": "office",
     "POST /api/office/legacy/archive/address": "office", "POST /api/office/legacy/archive/parse": "office",
+    "GET /api/office/legacy/archive/templates": "office",  # 2.621.0 (#4600): p2621_a_fntpl_test.py
     "POST /api/office/legacy/archive/run": "office", "POST /api/office/legacy/counter": "office",
     "POST /api/office/legacy/import": "office", "POST /api/office/legacy/preview": "office",
     "POST /api/office/legacy/runs/{}/undo": "office", "POST /api/office/legacy/split": "office",

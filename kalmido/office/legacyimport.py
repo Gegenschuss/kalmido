@@ -1853,6 +1853,150 @@ def fi_parse_filename(name, clients=()):
     return out
 
 
+# 2.621.0 (#4600): file name templates of the archive import -- fixed building blocks + one separator, never a pattern of
+# the person (no regex from outside, so no catastrophic backtracking). "standard" = fi_parse_filename above, unchanged.
+# The choice is kept per office area in office_settings.data["legacy_fn_template"] ({name, custom: {fields, sep}}).
+FNT_FIELDS = ("kind", "number", "project_no", "project", "client", "date", "skip")
+FNT_SEPS = ("_", "-", " ", ".")
+FNT_CUSTOM_MAX = 6  # building blocks of an own template
+FNT_TEMPLATES = {"standard": None,
+                 "date_number_client": {"fields": ("date", "number", "client"), "sep": "_"},
+                 "number_client_date": {"fields": ("number", "client", "date"), "sep": "_"},
+                 "client_number": {"fields": ("client", "number"), "sep": "_"},
+                 "custom": None}  # built from FNT_FIELDS + FNT_SEPS (fnt_clean)
+# the word of a kind block / a marker anywhere in the name -> the kind (lower case; de, en, fr, es, it)
+FNT_KIND_WORDS = {"r": "invoice", "re": "invoice", "rg": "invoice", "rechnung": "invoice", "invoice": "invoice", "inv": "invoice",
+                  "facture": "invoice", "factura": "invoice", "fattura": "invoice",
+                  "kv": "offer", "an": "offer", "ang": "offer", "angebot": "offer", "offer": "offer", "quote": "offer", "quotation": "offer",
+                  "devis": "offer", "presupuesto": "offer", "preventivo": "offer"}
+FNT_DATE_RE = r"\d{4}-\d{1,2}-\d{1,2}|\d{1,2}\.\d{1,2}\.\d{2,4}|\d{1,2}-\d{1,2}-\d{2,4}|\d{8}|\d{6}"
+
+
+def fnt_custom_clean(v):
+    """{fields: [block, ...], sep} of an own template, checked -> the clean dict; BadInput for anything else."""
+    if not isinstance(v, dict):
+        raise BadInput(tr("Invalid value: {0}", "fields"))
+    f, sep = v.get("fields"), v.get("sep", "_")
+    if not isinstance(f, list) or not 1 <= len(f) <= FNT_CUSTOM_MAX or not all(isinstance(x, str) and x in FNT_FIELDS for x in f):
+        raise BadInput(tr("Invalid value: {0}", "fields"))
+    real = [x for x in f if x != "skip"]
+    if not real or len(set(real)) != len(real):
+        raise BadInput(tr("Own file name template: each part only once"))
+    if sep not in FNT_SEPS:
+        raise BadInput(tr("Invalid value: {0}", "sep"))
+    return {"fields": list(f), "sep": sep}
+
+
+def fnt_clean(b, cur=None):
+    """The template a request names ({template: name, fields?, sep?}) -> {name, custom}; an unknown name or a broken own
+    template is BadInput (400). cur: the kept choice (its own template stays when another one is chosen)."""
+    name = b.get("template")
+    if not isinstance(name, str) or name not in FNT_TEMPLATES:
+        raise BadInput(tr("Unknown file name template"))
+    custom = (cur or {}).get("custom")
+    if name == "custom":
+        custom = fnt_custom_clean({"fields": b.get("fields"), "sep": b.get("sep", "_")})
+    return {"name": name, "custom": custom if isinstance(custom, dict) else None}
+
+
+def fnt_stored(s):
+    """The kept choice of the office settings s -> {name, custom} (anything broken or unknown = the standard)."""
+    v = s.get("legacy_fn_template") if isinstance(s.get("legacy_fn_template"), dict) else {}
+    name = v.get("name") if v.get("name") in FNT_TEMPLATES else "standard"
+    try:
+        custom = fnt_custom_clean(v["custom"]) if v.get("custom") else None
+    except BadInput:
+        custom = None
+    if name == "custom" and not custom:
+        name = "standard"
+    return {"name": name, "custom": custom}
+
+
+def fnt_spec(t):
+    """{name, custom} -> (fields, sep) of the template, or None for the standard."""
+    if t["name"] == "custom":
+        return tuple(t["custom"]["fields"]), t["custom"]["sep"]
+    x = FNT_TEMPLATES.get(t["name"])
+    return (tuple(x["fields"]), x["sep"]) if x else None
+
+
+def fnt_regex(fields, sep):
+    """The pattern of a template, built only from the fixed blocks: every block one piece without the separator, a date one
+    of the known date forms, the client (else the project) may hold the separator -- only ONE such open block."""
+    s = re.escape(sep)
+    wide = "client" if "client" in fields else ("project" if "project" in fields else None)
+    parts = []
+    for f in fields:
+        if f == "date":
+            parts.append(f"(?P<date>{FNT_DATE_RE})")
+        elif f == "skip":
+            parts.append(f"[^{s}]+")
+        elif f == wide:
+            parts.append(f"(?P<{f}>.+?)")
+        else:
+            parts.append(f"(?P<{f}>[^{s}]+)")
+    return re.compile(s.join(parts), re.I)
+
+
+def fnt_parse(name, clients=(), t=None):
+    """The key data a file name suggests under template t ({name, custom}; None = the standard): the same keys as
+    fi_parse_filename. A name that does not fit the template gets the standard's reading, never "sure"."""
+    spec = fnt_spec(t) if t else None
+    if not spec:
+        return fi_parse_filename(name, clients)
+    fields, sep = spec
+    base = os.path.basename((name or "").replace("\\", "/"))
+    stem = re.sub(r"\.pdf$", "", base, flags=re.I).strip()
+    m = fnt_regex(fields, sep).fullmatch(stem[:300])
+    g = m.groupdict() if m else {}
+    raw_date = g.get("date") or ""
+    d = fi_parse_date(raw_date)
+    kind = FNT_KIND_WORDS.get((g.get("kind") or "").lower(), "") if "kind" in fields else ""
+    if not m or ("date" in fields and not d) or ("kind" in fields and not kind):
+        out = fi_parse_filename(name, clients)
+        out["sure"] = False
+        return out
+    if not kind:  # no kind block: the number's prefix (KV12, RE-104), a marker word outside client / project (the last one counts), else an invoice
+        pre = re.match(r"([^\W\d_]+)[-.]?\d", g.get("number") or "")
+        kind = FNT_KIND_WORDS.get(pre.group(1).lower(), "") if pre else ""
+        rest = stem[:300]
+        for f in sorted((f for f in ("client", "project") if g.get(f)), key=m.start, reverse=True):
+            rest = rest[:m.start(f)] + " " + rest[m.end(f):]
+        for tok in re.split(r"[_\-. ]+", rest):
+            kind = FNT_KIND_WORDS.get(tok.lower(), kind)
+    words = lambda v: re.sub(r"\s+", " ", (v or "").replace(sep, " ")).strip()  # noqa: E731
+    out = {"file_name": base[:255], "kind": kind or "invoice", "number": (g.get("number") or stem)[:120], "project_no": (g.get("project_no") or "")[:120],
+           "project": words(g.get("project")), "client_name": words(g.get("client")), "client_id": None, "date": d, "sure": False}
+    out["sure"] = bool(d) and not fi_date_open(raw_date) if "date" in fields else bool(g.get("number") or g.get("client"))
+    out["client_id"] = ofb_client_match(out["client_name"], clients)
+    return out
+
+
+def fnt_public(t):
+    """The templates for the import page: the fixed ones with their blocks, the blocks and separators of an own one, the choice."""
+    return {"templates": [{"name": k, **({"fields": list(v["fields"]), "sep": v["sep"]} if v else {})} for k, v in FNT_TEMPLATES.items()],
+            "fields": list(FNT_FIELDS), "seps": list(FNT_SEPS), "custom_max": FNT_CUSTOM_MAX, "current": t["name"], "custom": t["custom"]}
+
+
+def fnt_remember(c, oid, b):
+    """The template named in request body b (if any) is checked and kept for office area oid (only when it changed: the
+    settings' version moves on only then) -> the template to read with."""
+    from .model import office_settings_lock, office_settings_save
+    if "template" not in b:
+        return fnt_stored(office_settings(c, oid))
+    office_settings_lock(c, oid)  # the lock before the read (core: write_lock), as every read-change-write of the settings
+    s = office_settings(c, oid)
+    cur = fnt_stored(s)
+    t = fnt_clean(b, cur)
+    if t != cur:  # the standard never stored on its own (a new office keeps its first-visit country question)
+        s["legacy_fn_template"] = t
+        office_settings_save(c, oid, s)
+        ofx_log(c, oid, "update", target="settings", detail={"legacy_fn_template": t["name"]})
+        bump(c)
+        c.commit()
+    return t
+
+
 def ofb_client_match(name, clients):
     """The id of the client [(id, name)] a file name's client field means (the same name, else a prefix of 4+), or None."""
     cn = fi_norm(name)
@@ -2455,18 +2599,29 @@ def imr_renumber_post():
 
 @app.post("/api/office/legacy/archive/parse")
 def fi_parse_post():
-    """Org admin. {names: [file name, ...]} -> {items: [the key data each name suggests]} (nothing stored)."""
+    """Org admin. {names: [file name, ...], template?, fields?, sep?} -> {items: [the key data each name suggests], template}.
+    2.621.0 (#4600): template = a name of FNT_TEMPLATES ("custom": fields + sep from the fixed blocks); given, it is kept for
+    the office area (an unknown name: 400); left out, the kept one reads. Nothing else is stored."""
     c, uid, oid = _ctx()
-    names = (body() or {}).get("names")
+    b = body() or {}
+    names = b.get("names") if isinstance(b, dict) else None
     if not isinstance(names, list) or len(names) > 500 or not all(isinstance(n, str) for n in names):
         raise BadInput(tr("Invalid data"))
+    t = fnt_remember(c, oid, b)
     cl = [(r["id"], r["name"]) for r in c.execute(f"SELECT id, name FROM clients WHERE {pb_cl_sql(c, oid)} AND archived=0 AND deleted_at IS NULL ORDER BY id")]
     items = []
     for n in names:
-        p = fi_parse_filename(n[:300], cl)
+        p = fnt_parse(n[:300], cl, t)
         p["taken"] = _number_used(c, oid, p["number"])
         items.append(p)
-    return jsonify(items=items)
+    return jsonify(items=items, template=t)
+
+
+@app.get("/api/office/legacy/archive/templates")
+def fnt_get():
+    """2.621.0 (#4600) org admin: the file name templates of the archive import and the one kept for this office area."""
+    c, uid, oid = _ctx()
+    return jsonify(fnt_public(fnt_stored(office_settings(c, oid))))
 
 
 @app.post("/api/office/legacy/archive/address")
@@ -2487,7 +2642,9 @@ def fk_archive_address_post():
     out = fk_pdf_address(c, oid, raw, uid, cid)
     # 2.533.0 (#4499): file_name (optional): client / project of the name checked against the company of the PDF -> swap
     fn = str(request.form.get("file_name") or "")[:300]
-    if fn and out.get("status") == "ok":
+    if fn and out.get("status") == "ok" and fnt_stored(office_settings(c, oid))["name"] != "standard":
+        out["swap"] = None  # 2.621.0 (#4600): the swap knows only the standard names (Project_Client_KV..)
+    elif fn and out.get("status") == "ok":
         cl = [(r["id"], r["name"]) for r in c.execute(f"SELECT id, name FROM clients WHERE {pb_cl_sql(c, oid)} AND archived=0 AND deleted_at IS NULL ORDER BY id")]
         p = fi_parse_filename(fn, cl)
         # the company found among the clients counts only when the PDF's name led there (not the file name's client_id)

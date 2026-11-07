@@ -12,6 +12,7 @@ if (typeof fgWatch === 'function') fgWatch(() => !!OIM.pv || OIM.arch.some(x => 
 async function oimLoad() {
   try { const j = await api('GET', '/api/office/legacy/runs'); OIM.runs = j.runs || []; } catch (x) { OIM.runs = []; }
   try { OIM.counter = await api('GET', '/api/office/legacy/counter'); } catch { OIM.counter = null; }
+  try { OIM.fnt = await api('GET', '/api/office/legacy/archive/templates'); } catch { OIM.fnt = null; }  // 2.621.0 (#4600)
   await fx8a_oimClients();
 }
 // 2.80.0 (#1836): the client choice is read again on every visit of the import page and whenever the clients change
@@ -41,7 +42,7 @@ function oimHtml() {
     <section class="oimsec" id="oim-archive"><h4>${ic('archive', 's')} ${tr('Old invoices and quotations')}</h4>
     <p class="muted">${tr('Only archived, never renumbered or sent. Add amount and payment afterwards.')}</p>
     <div class="lacts"><input type="file" id="oim-pdf" accept="application/pdf,.pdf" multiple hidden><button type="button" class="btn sm" data-oim="pick-pdf" ${OIM.archBusy ? 'disabled' : ''}>${ic('upload', 's')} ${tr('Choose PDF files')}</button></div>
-    ${oimArchHtml()}</section>
+    ${oim_fntHtml()}${oimArchHtml()}</section>
     <section class="oimsec"><h4>${ic('hash', 's')} ${tr('Number counters')}</h4>${oimCounterHtml()}${ofcSetLink('docs', tr('Number schemes and the next numbers'))}</section>
     <section class="oimsec"><h4>${ic('clock', 's')} ${tr('Import runs')}</h4>${imr_archivedHtml()}${oimRunsHtml()}</section></div>`;
 }
@@ -329,6 +330,38 @@ async function oimImport() {
   } catch (x) { const el = $('.oimpv .aerr'); if (el) el.textContent = x.message || ''; else toast(x.message || ''); }
   OIM.busy = false; ofcDraw();
 }
+// 2.621.0 (#4600): the file name template of the archive (fixed ones + an own one from fixed blocks), kept per office area
+const OIM_FNT_BLOCKS = {kind: N_('Kind (R, KV, …)'), number: N_('Document number'), project_no: N_('Project number'), project: N_('Project'), client: N_('Client'), date: N_('Date'), skip: N_('(ignore)')};
+const oim_fntSep = k => k === ' ' ? tr('space') : k;
+const oim_fntLabel = x => x.name === 'standard' ? tr('Standard (Project_Client_KV1_Date, Project_Client_Title_Date_R)')
+  : x.name === 'custom' ? tr('Own template') : x.fields.map(f => tr(OIM_FNT_BLOCKS[f])).join(x.sep);
+function oim_fntHtml() {
+  const f = OIM.fnt; if (!f) return '';
+  const dis = OIM.archBusy ? 'disabled' : '', cu = OIM.fntDraft || f.custom || {fields: ['number', 'client', 'date'], sep: '_'};
+  const sel = `<label class="oimfl"><span>${tr('File names')}</span><select data-oim-fnt="t" ${dis}>${f.templates.map(x => `<option value="${esc(x.name)}" ${x.name === f.current ? 'selected' : ''}>${esc(oim_fntLabel(x))}</option>`).join('')}</select></label>`;
+  if (f.current !== 'custom') return `<div class="oimgrid">${sel}</div>`;
+  const blk = i => `<select data-oim-fnt="f" data-i="${i}" aria-label="${esc(tr('Part {0}', i + 1))}" ${dis}><option value="">-</option>${f.fields.map(k => `<option value="${k}" ${cu.fields[i] === k ? 'selected' : ''}>${esc(tr(OIM_FNT_BLOCKS[k]))}</option>`).join('')}</select>`;
+  return `<div class="oimgrid">${sel}<label class="oimfl"><span>${tr('Separator')}</span><select data-oim-fnt="s" ${dis}>${f.seps.map(k => `<option value="${esc(k)}" ${cu.sep === k ? 'selected' : ''}>${esc(oim_fntSep(k))}</option>`).join('')}</select></label></div>
+    <div class="lacts">${Array.from({length: f.custom_max}, (_, i) => blk(i)).join('')}</div>
+    <p class="muted">${esc(tr('Example: {0}', cu.fields.filter(Boolean).map(k => tr(OIM_FNT_BLOCKS[k])).join(cu.sep) + '.pdf'))}</p>`;
+}
+async function oim_fntChange(t) {
+  const f = OIM.fnt; if (!f) return;
+  const cu = OIM.fntDraft || {...(f.custom || {fields: ['number', 'client', 'date'], sep: '_'})};
+  let name = f.current;
+  if (t.dataset.oimFnt === 't') name = t.value;
+  else if (t.dataset.oimFnt === 's') cu.sep = t.value;
+  else { const fl = [...cu.fields]; fl[+t.dataset.i] = t.value; cu.fields = fl; }
+  cu.fields = cu.fields.filter(Boolean);
+  OIM.fntDraft = cu;
+  const todo = OIM.arch.filter(x => !x.done);
+  try {  // the choice is kept on the server; files not archived yet are read again with it
+    const j = await api('POST', '/api/office/legacy/archive/parse', {names: todo.map(x => x.file_name), template: name, ...(name === 'custom' ? cu : {})});
+    f.current = j.template.name; f.custom = j.template.custom; OIM.fntDraft = null;
+    (j.items || []).forEach((p, i) => { const x = todo[i], {file_name, ...rest} = p; if (x && !x.swapped) Object.assign(x, rest, {paid: rest.kind === x.kind ? x.paid : rest.kind === 'invoice' ? 1 : 0}); });
+  } catch (x) { toast(x.message || ''); }
+  ofcDraw();
+}
 async function oimPickPdf(files) {
   const fs = [...(files || [])];
   if (!fs.length) return;
@@ -404,6 +437,7 @@ document.addEventListener('click', async e => {
 });
 document.addEventListener('change', e => {
   const t = e.target;
+  if (t.dataset?.oimFnt !== undefined) { oim_fntChange(t); return; }  // 2.621.0 (#4600)
   if (t.dataset?.e46Map && OIM.pv) { e46_remap(t.dataset.e46Map, t.value); return; }  // 2.146.0 E (#2456)
   if (t.dataset?.oimArea && OIM.pv) { OIM.pv.off = {...OIM.pv.off, [t.dataset.oimArea]: !t.checked}; ofcDraw(); return; }  // 2.46.1 (#1557)
   if (t.dataset?.oimOn && OIM.pv) {

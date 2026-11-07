@@ -653,7 +653,11 @@ where they are used.
   bytes). The file name proposes the key data: `<project no>_<client>_<project>__<date>_R.pdf` is an invoice,
   `<project>_<client>_KV<n>_<date>_<initials>.pdf` a quotation; dates as `dd.mm.yy`, `dd.mm.yyyy`, `yyyy-mm-dd` or
   `yyyymmdd`. The client is proposed by name and can be changed; amount and "paid" are entered by hand. The number is the
-  file name without `.pdf`. An archived document is read-only: the original PDF is stored unchanged (folder 0700, file
+  file name without `.pdf`. 2.621.0: the choice "File names" picks another template for the names: the standard above,
+  `<date>_<number>_<client>`, `<number>_<client>_<date>`, `<client>_<number>` or an own template put together from fixed
+  parts (kind, number, project number, project, client, date, ignore) and one separator (`_`, `-`, space, `.`); the choice is
+  kept per office area and reads the files not archived yet again. A name that does not fit the template is read as before
+  and marked "not recognised". An archived document is read-only: the original PDF is stored unchanged (folder 0700, file
   0600, part of every backup) and is never re-rendered, renumbered, sent or turned into an e-invoice. The Quotes & invoices tab
   lists it under "Archive" with the sum of the archived invoices and of the paid ones; the other lists and the reminders
   do not count it. 2.40.0: Kalmido also reads the recipient's address from the text layer of page 1 (not the own sender
@@ -696,7 +700,11 @@ crew / services / equipment, the others are neither written nor checked), `GET /
 areas of a data run, `409` for an area undone already; the whole undo afterwards takes the areas left; 2.138.0: `archived` =
 `[{kind, id, name, used}]`), `POST /api/office/legacy/runs/<id>/tidy` (2.138.0: archives the leftovers of an undone run,
 `409` for a run not undone; the runs list `leftover` per data run), `POST /api/office/services/renumber` (2.138.0: 1..n in
-the list's order, or `{sorts: {id: sort}}` = exactly these values; answers `changed` and `before`), `POST /api/office/legacy/archive/parse` `{names}`,
+the list's order, or `{sorts: {id: sort}}` = exactly these values; answers `changed` and `before`), `POST /api/office/legacy/archive/parse` `{names}`
+(2.621.0: `template` = `standard | date_number_client | number_client_date | client_number | custom`, for `custom` with
+`fields` (1-6 of `kind, number, project_no, project, client, date, skip`, each but `skip` once) and `sep` (`_ - . ` or a
+space); given, it is kept for the office area, an unknown name or a broken own template `400`; the answer carries `template`),
+`GET /api/office/legacy/archive/templates` (2.621.0: `{templates, fields, seps, custom_max, current, custom}`),
 `POST /api/office/legacy/archive/run`, `POST /api/office/legacy/archive` (multipart `file` + `run_id`, `kind`, `number`,
 `project_no`, `project`, `client_id`, `client_name`, `date`, `amount`, `paid`; 409 for a used number or the same PDF
 twice), `GET /api/office/legacy/archive?kind=&client_id=`, `PATCH /api/office/legacy/archive/<id>` (only `amount`, `paid`,
