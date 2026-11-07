@@ -12,6 +12,7 @@ from ..core.config import _origin, app, TZ
 from ..core.i18n import tr
 from ..core.db import body, db, err, iso_ms, now_utc
 from ..accounts.session import FAIL_WINDOW, me
+from ..accounts.login import seal, unseal  # 2.622.0 (#3891, review)
 from ..core.access import Denied
 from ..core.ephem import eph_put, eph_take  # 2.622.0 (#3891)
 from ..calendars.icalfeed import ics_text, ics_utc
@@ -481,7 +482,9 @@ def cdw_delete(sid):
         return jsonify(ok=True, undo=None)
     tok = uuidlib.uuid4().hex
     keep = {"href": res["href"], "data": data.decode("utf-8", "replace") if isinstance(data, bytes) else data}
-    if not eph_put(EPH_CDW, f"{sid}:{tok}", json.dumps(keep, ensure_ascii=False), CDW_UNDO_S, uid=me(), caps={"all": CDW_UNDO_KEEP}):
+    # 2.622.0 (#3891, review): the event's text is sealed in eph_state, never in clear
+    if not eph_put(EPH_CDW, f"{sid}:{tok}", seal(c, f"cdw:{sid}:{me()}", json.dumps(keep, ensure_ascii=False)), CDW_UNDO_S,
+                   uid=me(), caps={"all": CDW_UNDO_KEEP}):
         return jsonify(ok=True, undo=None)  # not kept (the database is away): no undo
     return jsonify(ok=True, undo=tok)
 
@@ -494,7 +497,10 @@ def cdw_restore(sid):
     tok = b.get("undo")
     # 2.622.0 (#3891): taken once over all processes; another person / another subscription finds nothing and leaves it
     v = eph_take(EPH_CDW, f"{sid}:{tok}", uid=me()) if isinstance(tok, str) and len(tok) <= 64 else None
-    kept = json.loads(v) if v else None
+    try:
+        kept = json.loads(unseal(c, f"cdw:{sid}:{me()}", v)) if v else None
+    except Exception:  # noqa: BLE001  (another key / a damaged row: nothing to put back)
+        kept = None
     u = (None, None, sid, kept["href"], kept["data"]) if kept else None
     if not u:
         return err(tr("This can no longer be undone"), 410)

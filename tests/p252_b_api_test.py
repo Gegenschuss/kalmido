@@ -196,6 +196,9 @@ n0 = len(stub_log())
 r = A.delete(B + f"/api/calendars/{RW}/events?uid={NEW}")
 check(r.ok and r.json().get("undo"), f"delete ({r.status_code})")
 TOK = r.json().get("undo")
+# 2.622.0 (#3891, review): the kept event lies sealed in eph_state, never as clear text
+_kv = [x[0] for x in q("SELECT v FROM eph_state WHERE ns='cdwundo'")]
+check(_kv and all(v.startswith("v1.") and "VCALENDAR" not in v and NEW not in v for v in _kv), "undo: the kept event is sealed")
 dl = [x for x in stub_log()[n0:] if x["method"] == "DELETE"]
 check(len(dl) == 1 and dl[0]["im"], f"DELETE with If-Match ({dl})")
 check(f"{NEW}.ics" not in store()["rw"] and not any(e.get("uid") == NEW for e in events(A)["events"]), "deleted on the server and in Kalmido")

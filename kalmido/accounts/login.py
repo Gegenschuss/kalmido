@@ -367,7 +367,7 @@ class PendTicket(dict):
         if k == "tries":  # counted in the row (pend_fail), not written from here
             return dict.__setitem__(self, k, v)
         if k == "chal":
-            eph_put(EPH_PEND_CHAL, self._key, _pend_seal("c:" + self._key, {"chal": v}), PEND_TTL)
+            eph_put(EPH_PEND_CHAL, self._key, _pend_seal("c:" + self._key, {"chal": v}), PEND_TTL, caps={"all": PEND_MAX})
             return dict.__setitem__(self, k, v)
         dict.__setitem__(self, k, v)
         self._save()
@@ -409,7 +409,7 @@ def pend_new(kind, uid, **data):
                    caps={"ip": PEND_PER_IP, "all": PEND_MAX}):
         raise RuntimeError("sign-in ticket not stored")  # the database is away: the sign-in fails (500), nothing half-done
     if chal is not None:  # the passkey sign-in's challenge: its own row, taken once (PendTicket.pop)
-        eph_put(EPH_PEND_CHAL, key, _pend_seal("c:" + key, {"chal": chal}), PEND_TTL)
+        eph_put(EPH_PEND_CHAL, key, _pend_seal("c:" + key, {"chal": chal}), PEND_TTL, caps={"all": PEND_MAX})
     return tok
 
 
@@ -453,7 +453,9 @@ def pend_drop():
 
 def pend_set(key, **data):
     """Per-user state of a logged-in user (TOTP enrolment secret, WebAuthn registration challenge)."""
-    eph_put(EPH_PEND, key, _pend_seal(key, data), PEND_TTL, caps={"all": PEND_MAX})
+    if not eph_put(EPH_PEND, key, _pend_seal(key, data), PEND_TTL, caps={"all": PEND_MAX}):
+        # 2.622.0 (#3891, review): the database is away - never show a secret or challenge that was not kept
+        raise RuntimeError("enrolment state not stored")
 
 
 def pend_peek(key):
