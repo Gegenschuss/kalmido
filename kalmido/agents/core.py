@@ -188,11 +188,11 @@ def _agent_wake_here(_d=None):
         _AGENT_COND.notify_all()
 
 
-def agent_notify():
+def agent_notify(c=None):
     """Wakes the agents' waiting long-polls (they look for new rows). 2.622.0 (#3891): in the other web processes too
-    (core/pgbus.py; the events are committed when this runs)."""
+    (core/pgbus.py). c: the events are still in that connection's transaction -- the others hear it with its commit."""
     _agent_wake_here()
-    bus_send("agents")
+    bus_send("agents", c=c)
 
 
 bus_on("agents", _agent_wake_here)
@@ -285,7 +285,7 @@ def agent_emit(c, aid, event, data, actor="auto", via=None):
     if has_request_context():
         g.agent_wake = True
     else:
-        agent_notify()
+        agent_notify(c)  # 2.622.0 (#3891): the other processes hear it with the caller's commit
     return seq
 
 

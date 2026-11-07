@@ -224,7 +224,7 @@ def docs_zip_ticket():
     # review: at most three open tickets per account; 2.622.0 (#3891): in the database, the ticket only as an HMAC
     if not eph_put(EPH_DSR, tok, json.dumps({"ids": [r["id"] for r in rows], "until": now + DSR_TICKET_S}), DSR_TICKET_S, uid=uid,
                    caps={"uid": DSR_TICKET_MAX}):
-        raise Denied(503, tr("Please try again in a minute"))
+        raise Denied(503)  # the database is away
     return jsonify(files=len(rows), size=sum(int(r["size"] or 0) for r in rows), url=f"/api/docs/zip/{tok}")
 
 
