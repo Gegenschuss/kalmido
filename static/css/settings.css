@@ -246,3 +246,5 @@
 /* 2.574.0 (#3376): the read-only task view of an organisation admin (Settings > Workspaces, loads with the settings) */
 .otkbar{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}.otkbar input{flex:1 1 10rem;min-width:8rem}.otkbar select{max-width:100%}
 .otkrow{padding:.5rem 2px;border-bottom:1px solid var(--line)}.otkrow .n{display:flex;flex-direction:column;gap:.125rem;min-width:0;white-space:normal;overflow-wrap:anywhere}.otkrow .n small{font-size:var(--fs-s)}
+/* 2.593.0 (#4590): Settings > Account > Reset settings, the preview list (setreset.js) */
+.rslist{margin:.375rem 0;padding-left:1.125rem;max-height:45vh;overflow:auto}.rslist>li{margin:.25rem 0}.rslist ul{margin:.125rem 0;padding-left:1rem;color:var(--muted)}

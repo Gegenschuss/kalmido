@@ -9,6 +9,12 @@ on:
     # hotfix branches
     branches: [main, "hotfix/**"]
   pull_request:
+  # #4006 (GitHub step 3 of 6, decision 29.10.2026): an entry of the merge queue runs the push stage like a pull request
+  # (tests/stages.py: against the queue's base commit); the release commit (VERSION changed) still gets the full run there.
+  # The job "pr-lint" checks the commits of a pull request / queue entry. The concurrency group hangs on github.ref: every
+  # queue entry has its own gh-readonly-queue/... ref, so entries never cancel each other.
+  merge_group:
+    types: [checks_requested]
   # 2.180.0 A (#2695): the nightly full run (23:30 UTC = 01:30 / 00:30 in Berlin, the window of the night flakes) and runs by
   # hand (stage full by default); both in their own concurrency group: a push never cancels them, they never cancel a push
   schedule:
@@ -67,7 +73,8 @@ jobs:
         env:
           CI_BEFORE: ${{ github.event.before }}
           CI_INPUT_STAGE: ${{ inputs.stage }}
-          CI_MESSAGE: ${{ github.event.head_commit.message || github.event.pull_request.title }}
+          CI_MESSAGE: ${{ github.event.head_commit.message || github.event.pull_request.title || github.event.merge_group.head_commit.message }}
+          CI_BASE_SHA: ${{ github.event.merge_group.base_sha }}  # #4006: the queue entry's base (the target branch before it)
         run: |
           # 2.321 (#1368): a package branch (job/**) is tested against its merge base with main (tests/stages.py fetches main)
           # CI fix of 2.351.0: stages.py searched 6+ min for the 204 files of a live train push and the job limit cancelled the
@@ -486,6 +493,42 @@ jobs:
       - name: Container log on failure
         if: failure()
         run: docker logs kalmido-test 2>&1 | tail -100 || true
+
+  # #4006: the checks einreihen makes before a package lands, on the commits of a pull request / merge queue entry
+  # (tools/pr_lint.py): #<task> in every commit subject, the changelog part of an app change, the privacy guard (patterns
+  # and allowed identities from the secrets - they are private themselves; a fork's pull request gets none: notice) and the
+  # one-way rules as warnings. A required check of the branch protection later (step 4); runs only on pull_request / merge_group.
+  pr-lint:
+    name: Pull request lint (task number, changelog part, privacy, one-way steps)
+    if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0  # the commits between the base and the head
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+      - name: Lint of the change (tools/pr_lint.py)
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
+          KALMIDO_PRIVACY_DENY: ${{ secrets.KALMIDO_PRIVACY_DENY }}
+          KALMIDO_PRIVACY_ALLOW: ${{ secrets.KALMIDO_PRIVACY_ALLOW }}
+          KALMIDO_PRIVACY_IDENT: ${{ secrets.KALMIDO_PRIVACY_IDENT }}
+          KALMIDO_ALLOWED_EMAILS: ${{ secrets.KALMIDO_ALLOWED_EMAILS }}
+        # review F9: the script comes from the BASE commit (the target branch), never from the change itself - a queue entry of
+        # a pull request that edits tools/pr_lint.py runs with the secrets, its own copy could print them. Without the script in
+        # the base (the change that brings it) the change's copy runs without the secrets (no line scan, a notice).
+        run: |
+          if git cat-file -e "$PR_BASE:tools/pr_lint.py" 2>/dev/null; then
+            git show "$PR_BASE:tools/pr_lint.py" > "$RUNNER_TEMP/pr_lint.py"
+            python "$RUNNER_TEMP/pr_lint.py" --repo "$GITHUB_WORKSPACE" --base "$PR_BASE" --head "$PR_HEAD"
+          else
+            env -u KALMIDO_PRIVACY_DENY -u KALMIDO_PRIVACY_ALLOW -u KALMIDO_PRIVACY_IDENT -u KALMIDO_ALLOWED_EMAILS \
+              python tools/pr_lint.py --base "$PR_BASE" --head "$PR_HEAD"
+          fi
 
   tests-done:
     # one required check for all shards (branch protection / the overall result): green only if every shard passed

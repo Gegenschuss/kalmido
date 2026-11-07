@@ -79,8 +79,7 @@ function bkTabHtml() {
   if (BK.err) return `<div class="empty">${esc(BK.err)}</div>`;
   if (!BK.info || !BK.euer || !BK.ustva) { if (!BK.loadingT) BK.loadingT = setTimeout(() => { BK.loadingT = 0; bkLoad(); }, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
   if (bkSub() === 'ustva' && !BK.jumped) { BK.jumped = true; setTimeout(() => $('#bk-ustva')?.scrollIntoView({block: 'start'}), 0); }
-  const yNow = new Date().getFullYear(), years = [];
-  for (let y = yNow + 1; y >= yNow - 6; y--) years.push([y, String(y)]);
+  const years = ofcYearOpts(BK.info?.years, BK.year, 1).map(y => [y, y]);  // 2.593.0 (#4891): the years with receipts / invoices + last year (was this year +1 .. -6)
   const head = `<div class="ofcbar bk-bar"><label class="bk-year"><span class="muted">${tr('Year')}</span>${ofcSel('bk-year', BK.year, years)}</label><span class="spacer"></span>
     ${ofcFeat('books.datev') ? `<a class="btn sm ghost" href="#office/books/archive" data-bk-archive>${ic('archive', 's')}<span>${tr('Booking archive')}</span></a>` : ''}
     ${ofcFeat('books.vat_return') ? `<a class="btn sm ghost" href="#office/books/taxforms/euer" data-bk-taxforms>${ic('file', 's')}<span>${tr('Tax forms')}</span></a>` : ''}
@@ -185,8 +184,7 @@ function bkPeriods(mode) {
   return [1, 2, 3, 4].map(q => ['q' + q, tr('Quarter {0}', q)]);
 }
 function bkUstvaHtml() {
-  const d = BK.ustva, yNow = new Date().getFullYear(), years = [];
-  for (let y = yNow; y >= yNow - 3; y--) years.push([y, String(y)]);
+  const d = BK.ustva, years = ofcYearOpts(BK.info?.years, BK.pyear).map(y => [y, y]);  // 2.593.0 (#4891): from the oldest receipt / invoice (was this year .. -3)
   const bar = `<div class="ofcbar bk-ubar"><div class="seg" role="group" aria-label="${esc(tr('Period'))}">${[['month', tr('Month')], ['quarter', tr('Quarter')], ['year', tr('Whole year')]].map(([k, n]) => `<button type="button" data-bk="mode" data-v="${k}" class="${BK.mode === k ? 'on' : ''}" aria-pressed="${BK.mode === k}">${esc(n)}</button>`).join('')}</div>
     ${BK.mode === 'year' ? '' : ofcSel('bk-period', BK.period, bkPeriods(BK.mode), null, tr('Period'))}${ofcSel('bk-pyear', BK.pyear, years, null, tr('Year'))}</div>`;
   let body;
@@ -240,10 +238,10 @@ async function ebSetUndo(basis) {
 
 // ---- 2.467.0 (#3456): the Anlage EUeR and the annual VAT return line by line (#office/books/taxforms/euer|ust); server: office/taxforms.py
 const TF = {oid: null, kind: null, year: null, d: null, err: null, seq: 0, t: 0};
-const tfYears = () => { const y = new Date().getFullYear(), out = []; for (let i = y; i >= y - 6; i--) out.push([i, String(i)]); return out; };
+const tfYears = () => ofcYearOpts(TF.ys, TF.year, 1).map(y => [y, y]);  // 2.593.0 (#4891): the books' years + last year (was this year .. -6)
 async function tfLoad() {
   const seq = ++TF.seq;
-  try { const d = await api('GET', `/api/office/books/taxform/${TF.kind}?year=${TF.year}`); if (seq === TF.seq) Object.assign(TF, {d, err: null}); }
+  try { const d = await api('GET', `/api/office/books/taxform/${TF.kind}?year=${TF.year}`); if (seq === TF.seq) Object.assign(TF, {d, err: null, ys: d.years ?? TF.ys}); }
   catch (x) { if (seq === TF.seq) TF.err = x.message || tr('unknown'); }
   ofcDraw();
 }
@@ -258,7 +256,7 @@ function tfVatHtml(d) {
 function tfHtml() {
   if (!ofcFeat('books.vat_return')) return `<div class="empty">${tr('The VAT return figures are switched off for this office.')}</div>`;
   const kind = location.hash.split('/')[3] === 'ust' ? 'ust' : 'euer';
-  if (TF.oid !== OFC.info?.org_id || TF.kind !== kind) Object.assign(TF, {oid: OFC.info?.org_id, kind, d: null, err: null, year: TF.year || new Date().getFullYear() - 1});
+  if (TF.oid !== OFC.info?.org_id || TF.kind !== kind) Object.assign(TF, {oid: OFC.info?.org_id, kind, d: null, err: null, ys: TF.oid === OFC.info?.org_id ? TF.ys : null, year: TF.year || new Date().getFullYear() - 1});
   const back = `<a class="btn sm ghost" href="#office/books">${ic('back', 's')}<span>${tr('Bookkeeping')}</span></a>`;
   const tabs = `<div class="seg" role="group" aria-label="${esc(tr('Tax forms'))}">${[['euer', tr('Anlage EÜR')], ['ust', tr('Annual VAT return')]].map(([k, n]) => `<a class="btn sm${kind === k ? ' on' : ''}" href="#office/books/taxforms/${k}"${kind === k ? ' aria-current="page"' : ''}>${esc(n)}</a>`).join('')}</div>`;
   const bar = `<div class="ofcbar bk-bar">${back}${tabs}<a class="btn sm ghost" href="#office/books/taxcheck" data-bk-taxcheck>${ic('check', 's')}<span>${tr('Tax check')}</span></a><span class="spacer"></span><label class="bk-year"><span class="muted">${tr('Year')}</span>${ofcSel('tf-year', TF.year, tfYears())}</label></div>`;  // 2.589.0 (#3458): + the tax check

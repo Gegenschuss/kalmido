@@ -1342,6 +1342,7 @@ function impInit(md) {
     toast([trn('Import undone: {0} task moved to the trash', 'Import undone: {0} tasks moved to the trash', j.tasks || 0),
       j.kept_tasks ? trn('{0} changed task stays', '{0} changed tasks stay', j.kept_tasks) : '',
       j.kept_rows ? trn('{0} entry changed since the import stays', '{0} entries changed since the import stay', j.kept_rows) : '',
+      j.kept_final_docs ? trn('{0} finalised document stays', '{0} finalised documents stay', j.kept_final_docs) : '',  // 2.593.0 (#4864)
       j.trash_rows ? trn('{0} file, page or table moved to its trash', '{0} files, pages or tables moved to their trash', j.trash_rows) : '',
       j.kept_lists ? trn('{0} project stays because something was added to it', '{0} projects stay because something was added to them', j.kept_lists) : ''].filter(Boolean).join('. '));
     out.innerHTML = ''; await load(); render(); hist();

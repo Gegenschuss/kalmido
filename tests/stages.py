@@ -25,7 +25,7 @@ test files and the changed files, nothing is started; Python standard library on
     --unmapped-out F #3505: with --touched also write the unmapped files to F, one `FILE<TAB>reason` line each (empty
                      file = every changed file has its suites)
   python3 tests/stages.py --ci                       CI mode (ci.yml job "plan"): the stage from the event (environment:
-                     GITHUB_EVENT_NAME, CI_BEFORE, CI_INPUT_STAGE, CI_MESSAGE) and the changed files; prints "stage=" /
+                     GITHUB_EVENT_NAME, CI_BEFORE, CI_BASE_SHA, CI_INPUT_STAGE, CI_MESSAGE) and the changed files; prints "stage=" /
                      "reason=" lines, writes the groups of the push stage to --groups-out
 
 With a separate test runner, only the suites a branch touches (exit 3 = the change needs the full run):
@@ -639,6 +639,15 @@ def ci_base():
         return "full", "commit message asks for [full]", None
     if ev == "pull_request":
         return None, "pull request", "HEAD^1"  # the merge commit: its first parent is the target branch
+    if ev == "merge_group":
+        # #4006: an entry of the merge queue (gh-readonly-queue/...): the push stage against the queue's base commit (the
+        # target branch with the entries before it); a release commit in the queue changes VERSION = the full stage below
+        base = os.environ.get("CI_BASE_SHA", "")
+        if not base:
+            return "full", "merge queue entry without a base commit: full run", None
+        if git_ok("cat-file", "-e", base + "^{commit}") is None:
+            git_ok("fetch", "--no-tags", "--depth=1", "origin", base)
+        return None, "merge queue entry", base
     if ev == "push" and os.environ.get("GITHUB_REF", "").startswith("refs/heads/hotfix/"):
         # 2.285.0 (#2830): a hotfix branch (the fast lane of the live train, a patch on the last live tag) goes live
         # without the train's release push: always every suite

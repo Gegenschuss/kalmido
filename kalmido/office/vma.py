@@ -2,7 +2,8 @@
 
 Rates: Germany 28 EUR (a full day of 24 hours) / 14 EUR (the day of arrival / departure of a trip with an overnight stay,
 or a single day of more than 8 hours) (section 9 (4a) EStG); abroad the rates of the BMF letter of the year:
-2025 = BMF letter of 2 December 2024 (BStBl I 2024 p. 1549), 2026 = BMF letter of 5 December 2025
+2023 = BMF letter of 23 November 2022 (BStBl I 2022 p. 1654), 2024 = BMF letter of 21 November 2023 (BStBl I 2023 p. 2076)
+(2.593.0 #4893), 2025 = BMF letter of 2 December 2024 (BStBl I 2024 p. 1549), 2026 = BMF letter of 5 December 2025
 (IV C 5 - S 2353/00094/007/012). The tables below are taken over from those letters line by line, never estimated; a year
 without a table gives no amount but a hint (VMA_YEARS). Countries the letter does not name: the rate of Luxembourg; the
 overseas / outer territories: the rate of the mother country; the letter's own extensions (Micronesia = Philippines,
@@ -27,8 +28,10 @@ from .countries import fk_country_names
 
 
 # The tables: CODE;place ('' = the whole country / "im Uebrigen");full day;partial day (EUR). Germany is the law's rate.
-VMA_YEARS = {2025: "BMF 02.12.2024 (BStBl I 2024 S. 1549)", 2026: "BMF 05.12.2025 (IV C 5 - S 2353/00094/007/012)"}
-VMA_HOME = {2025: (28, 14), 2026: (28, 14)}
+VMA_YEARS = {2023: "BMF 23.11.2022 (IV C 5 - S 2353/19/10010 :004, BStBl I 2022 S. 1654)",  # 2.593.0 (#4893)
+             2024: "BMF 21.11.2023 (IV C 5 - S 2353/19/10010 :005, BStBl I 2023 S. 2076)",
+             2025: "BMF 02.12.2024 (BStBl I 2024 S. 1549)", 2026: "BMF 05.12.2025 (IV C 5 - S 2353/00094/007/012)"}
+VMA_HOME = {2023: (28, 14), 2024: (28, 14), 2025: (28, 14), 2026: (28, 14)}  # section 9 (4a) sentence 3 EStG, unchanged since 2020
 VMA_DEFAULT = "LU"  # the letter: countries it does not name get the rate of Luxembourg
 VMA_ALIAS = {  # the letter's own extensions and the overseas / outer territories (rate of the mother country)
     "FM": "PH", **{k: "TT" for k in ("AG", "DM", "GD", "GY", "KN", "LC", "VC", "SR")},
@@ -43,6 +46,459 @@ VMA_PLACE_ALIAS = {"HK": ("CN", "Hongkong")}  # the letter lists Hong Kong under
 VMA_CUT = {"b": Decimal("0.2"), "l": Decimal("0.4"), "d": Decimal("0.4")}  # breakfast / lunch / dinner of the full day's rate
 VMA_MAX_DAYS = 400
 
+# 2.593.0 (#4893): BMF letter of 23 November 2022 (from 1 January 2023)
+Y2023 = """
+AD;;41;28
+AE;;65;44
+AF;;30;20
+AL;;27;18
+AM;;24;16
+AO;;52;35
+AR;;35;24
+AT;;40;27
+AU;Canberra;51;34
+AU;Sydney;68;45
+AU;;51;34
+AZ;;44;29
+BA;;23;16
+BB;;52;35
+BD;;50;33
+BE;;59;40
+BF;;38;25
+BG;;22;15
+BH;;48;32
+BI;;36;24
+BJ;;52;35
+BN;;52;35
+BO;;46;31
+BR;Brasilia;57;38
+BR;Rio de Janeiro;57;38
+BR;Sao Paulo;53;36
+BR;;51;34
+BW;;46;31
+BY;;20;13
+CA;Ottawa;47;32
+CA;Toronto;51;34
+CA;Vancouver;50;33
+CA;;47;32
+CD;;70;47
+CF;;46;31
+CG;;62;41
+CH;Genf;66;44
+CH;;64;43
+CI;;59;40
+CL;;44;29
+CM;;50;33
+CN;Chengdu;41;28
+CN;Hongkong;74;49
+CN;Kanton;36;24
+CN;Peking;30;20
+CN;Shanghai;58;39
+CN;;48;32
+CO;;46;31
+CR;;47;32
+CU;;46;31
+CV;;30;20
+CY;;42;28
+CZ;;32;21
+DJ;;65;44
+DK;;75;50
+DO;;45;30
+DZ;;47;32
+EC;;27;18
+EE;;29;20
+EG;;50;33
+ER;;50;33
+ES;Barcelona;34;23
+ES;Kanarische Inseln;40;27
+ES;Madrid;40;27
+ES;Palma de Mallorca;35;24
+ES;;34;23
+ET;;39;26
+FI;;50;33
+FJ;;34;23
+FR;Paris sowie die Departments 77, 78, 91 bis 95;58;39
+FR;;53;36
+GA;;52;35
+GB;London;66;44
+GB;;52;35
+GE;;35;24
+GH;;46;31
+GM;;40;27
+GN;;46;31
+GQ;;36;24
+GR;Athen;40;27
+GR;;36;24
+GT;;34;23
+GW;;32;21
+HN;;57;38
+HR;;35;24
+HT;;58;39
+HU;;32;21
+ID;;36;24
+IE;;58;39
+IL;;66;44
+IN;Bangalore;42;28
+IN;Chennai;32;21
+IN;Kalkutta;35;24
+IN;Mumbai;50;33
+IN;Neu Delhi;38;25
+IN;;32;21
+IR;;33;22
+IS;;62;41
+IT;Mailand;45;30
+IT;Rom;40;27
+IT;;40;27
+JM;;57;38
+JO;;57;38
+JP;Tokio;66;44
+JP;;52;35
+KE;;51;34
+KG;;27;18
+KH;;38;25
+KP;;28;19
+KR;;48;32
+KW;;56;37
+KZ;;45;30
+LA;;33;22
+LB;;59;40
+LI;;56;37
+LK;;42;28
+LS;;28;19
+LT;;26;17
+LU;;63;42
+LV;;35;24
+LY;;63;42
+MA;;42;28
+MC;;52;35
+MD;;26;17
+ME;;32;21
+MG;;34;23
+MH;;63;42
+MK;;27;18
+ML;;38;25
+MM;;35;24
+MN;;27;18
+MR;;35;24
+MT;;46;31
+MU;;54;36
+MV;;52;35
+MW;;41;28
+MX;;48;32
+MY;;36;24
+MZ;;38;25
+NA;;30;20
+NE;;42;28
+NG;;46;31
+NI;;46;31
+NL;;47;32
+NO;;80;53
+NP;;36;24
+NZ;;56;37
+OM;;64;43
+PA;;41;28
+PE;;34;23
+PG;;59;40
+PH;;33;22
+PK;Islamabad;23;16
+PK;;34;23
+PL;Breslau;33;22
+PL;Danzig;30;20
+PL;Krakau;27;18
+PL;Warschau;29;20
+PL;;29;20
+PT;;32;21
+PW;;51;34
+PY;;38;25
+QA;;56;37
+RO;Bukarest;32;21
+RO;;27;18
+RS;;27;18
+RU;Jekaterinburg;28;19
+RU;Moskau;30;20
+RU;St. Petersburg;26;17
+RU;;24;16
+RW;;44;29
+SA;Djidda;57;38
+SA;Riad;56;37
+SA;;56;37
+SD;;33;22
+SE;;66;44
+SG;;54;36
+SI;;38;25
+SK;;33;22
+SL;;48;32
+SM;;34;23
+SN;;42;28
+SS;;34;23
+ST;;47;32
+SV;;65;44
+SY;;38;25
+TD;;64;43
+TG;;39;26
+TH;;38;25
+TJ;;27;18
+TM;;33;22
+TN;;40;27
+TO;;39;26
+TR;Istanbul;26;17
+TR;Izmir;29;20
+TR;;17;12
+TT;;45;30
+TW;;46;31
+TZ;;44;29
+UA;;26;17
+UG;;41;28
+US;Atlanta;77;52
+US;Boston;63;42
+US;Chicago;65;44
+US;Houston;62;41
+US;Los Angeles;64;43
+US;Miami;65;44
+US;New York City;66;44
+US;San Francisco;59;40
+US;Washington, D. C.;66;44
+US;;59;40
+UY;;48;32
+UZ;;34;23
+VA;;52;35
+VE;;45;30
+VN;;41;28
+WS;;39;26
+XK;;24;16
+YE;;24;16
+ZA;Kapstadt;33;22
+ZA;Johannesburg;36;24
+ZA;;29;20
+ZM;;38;25
+ZW;;45;30
+"""
+# 2.593.0 (#4893): BMF letter of 21 November 2023 (from 1 January 2024)
+Y2024 = """
+AD;;41;28
+AE;;65;44
+AF;;30;20
+AL;;27;18
+AM;;24;16
+AO;;52;35
+AR;;35;24
+AT;;50;33
+AU;Canberra;74;49
+AU;Sydney;57;38
+AU;;57;38
+AZ;;44;29
+BA;;23;16
+BB;;54;36
+BD;;50;33
+BE;;59;40
+BF;;38;25
+BG;;22;15
+BH;;48;32
+BI;;36;24
+BJ;;52;35
+BN;;52;35
+BO;;46;31
+BR;Brasilia;51;34
+BR;Rio de Janeiro;69;46
+BR;Sao Paulo;46;31
+BR;;46;31
+BW;;46;31
+BY;;20;13
+CA;Ottawa;62;41
+CA;Toronto;54;36
+CA;Vancouver;63;42
+CA;;54;36
+CD;;70;47
+CF;;53;36
+CG;;62;41
+CH;Genf;66;44
+CH;;64;43
+CI;;59;40
+CL;;44;29
+CM;;56;37
+CN;Chengdu;41;28
+CN;Hongkong;71;48
+CN;Kanton;36;24
+CN;Peking;30;20
+CN;Shanghai;58;39
+CN;;48;32
+CO;;46;31
+CR;;47;32
+CU;;51;34
+CV;;38;25
+CY;;42;28
+CZ;;32;21
+DJ;;77;52
+DK;;75;50
+DO;;50;33
+DZ;;47;32
+EC;;27;18
+EE;;29;20
+EG;;50;33
+ER;;50;33
+ES;Barcelona;34;23
+ES;Kanarische Inseln;36;24
+ES;Madrid;42;28
+ES;Palma de Mallorca;44;29
+ES;;34;23
+ET;;39;26
+FI;;54;36
+FJ;;32;21
+FR;Paris sowie die Departments 77, 78, 91 bis 95;58;39
+FR;;53;36
+GA;;52;35
+GB;London;66;44
+GB;;52;35
+GE;;45;30
+GH;;46;31
+GM;;40;27
+GN;;59;40
+GQ;;42;28
+GR;Athen;40;27
+GR;;36;24
+GT;;34;23
+GW;;32;21
+HN;;57;38
+HR;;35;24
+HT;;58;39
+HU;;32;21
+ID;;36;24
+IE;;58;39
+IL;;66;44
+IN;Chennai;32;21
+IN;Kalkutta;35;24
+IN;Mumbai;50;33
+IN;Neu Delhi;38;25
+IN;;32;21
+IR;;33;22
+IS;;62;41
+IT;Mailand;42;28
+IT;Rom;48;32
+IT;;42;28
+JM;;39;26
+JO;;57;38
+JP;Tokio;50;33
+JP;;52;35
+KE;;51;34
+KG;;27;18
+KH;;38;25
+KP;;28;19
+KR;;48;32
+KW;;56;37
+KZ;;45;30
+LA;;35;24
+LB;;69;46
+LI;;56;37
+LK;;36;24
+LS;;28;19
+LT;;26;17
+LU;;63;42
+LV;;35;24
+LY;;63;42
+MA;;41;28
+MC;;52;35
+MD;;26;17
+ME;;32;21
+MG;;33;22
+MH;;63;42
+MK;;27;18
+ML;;38;25
+MM;;35;24
+MN;;23;16
+MR;;35;24
+MT;;46;31
+MU;;44;29
+MV;;52;35
+MW;;41;28
+MX;;48;32
+MY;;36;24
+MZ;;51;34
+NA;;30;20
+NE;;42;28
+NG;;46;31
+NI;;46;31
+NL;;47;32
+NO;;75;50
+NP;;36;24
+NZ;;58;39
+OM;;64;43
+PA;;41;28
+PE;;34;23
+PG;;59;40
+PH;;41;28
+PK;Islamabad;23;16
+PK;;34;23
+PL;Breslau;33;22
+PL;Danzig;30;20
+PL;Krakau;27;18
+PL;Warschau;29;20
+PL;;29;20
+PT;;32;21
+PW;;51;34
+PY;;39;26
+QA;;56;37
+RO;Bukarest;32;21
+RO;;27;18
+RS;;27;18
+RU;Jekaterinburg;28;19
+RU;Moskau;30;20
+RU;St. Petersburg;26;17
+RU;;24;16
+RW;;44;29
+SA;Djidda;57;38
+SA;Riad;56;37
+SA;;56;37
+SD;;33;22
+SE;;66;44
+SG;;54;36
+SI;;38;25
+SK;;33;22
+SL;;57;38
+SM;;34;23
+SN;;42;28
+SS;;51;34
+ST;;47;32
+SV;;65;44
+SY;;38;25
+TD;;42;28
+TG;;39;26
+TH;;38;25
+TJ;;27;18
+TM;;33;22
+TN;;40;27
+TO;;39;26
+TR;Istanbul;26;17
+TR;Izmir;29;20
+TR;;17;12
+TT;;66;44
+TW;;46;31
+TZ;;44;29
+UA;;26;17
+UG;;41;28
+US;Atlanta;77;52
+US;Boston;63;42
+US;Chicago;65;44
+US;Houston;62;41
+US;Los Angeles;64;43
+US;Miami;65;44
+US;New York City;66;44
+US;San Francisco;59;40
+US;Washington, D. C.;66;44
+US;;59;40
+UY;;48;32
+UZ;;34;23
+VA;;48;32
+VE;;45;30
+VN;;41;28
+WS;;39;26
+XK;;24;16
+YE;;24;16
+ZA;Kapstadt;33;22
+ZA;Johannesburg;36;24
+ZA;;29;20
+ZM;;38;25
+ZW;;45;30
+"""
 # BMF letter of 2 December 2024 (from 1 January 2025)
 Y2025 = """
 AD;;41;28
@@ -684,7 +1140,7 @@ def _table(txt):
     return out
 
 
-VMA_TABLES = {2025: _table(Y2025), 2026: _table(Y2026)}
+VMA_TABLES = {2023: _table(Y2023), 2024: _table(Y2024), 2025: _table(Y2025), 2026: _table(Y2026)}
 VMA_NAMES = {}  # code -> (German name, English name, the letter's own name or '')
 for _ln in NAMES.strip().splitlines():
     _c, _de, _en, _bmf = _ln.split(";")

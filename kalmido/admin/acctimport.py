@@ -2589,9 +2589,13 @@ def _umz_undo_rows(c, uid, r):
     commits nor touches files nor settings. -> (answer, cr, template file paths, area rows removed)."""
     cr = json.loads(r["created"] or "{}")
     since = parse_iso(r["created_at"])
-    from .orgimport import oi_undo, oi_undo_plan, oi_undo_preview
+    from .orgimport import oi_undo, oi_undo_final, oi_undo_numbers_kept, oi_undo_plan, oi_undo_preview
     there = _umz_there(c, uid, cr)
     plan = oi_undo_plan(c, cr, since)  # 2.506.0 (#4299): before anything goes: only what is unchanged since and has nothing new below it
+    final = oi_undo_final(plan, _UMZ_GONE_AREAS)  # 2.593.0 (#4864): what stays with a finalised document of the import
+    nums = len(oi_undo_numbers_kept(c, cr, plan))  # 2.593.0 (#4864, review F7): their office's number counters stay too (oi_undo)
+    if nums:
+        final.append({"what": N_("Number ranges"), "count": nums})
     n_oi, kept_rows = oi_undo(c, uid, cr, since, plan)  # 2.137.0 (#2344): the areas first (they point at the lists and tasks)
     kept_rows += umz_undo_parts(c, cr, plan, since, uid)  # 2.455.0 (#3469)
     from .umz_more import umz_more_undo
@@ -2662,7 +2666,8 @@ def _umz_undo_rows(c, uid, r):
     kept_rows += plan.kept_n  # final after undo_trash (oi_undo): a folder that could not go into the trash stays
     out = {"tasks": len(back), "lists": n_lists, "sections": 0, "kept_lists": kept_lists, "kept_tasks": len(kept),
            "kept_cals": kept_cals, "kept_books": kept_books, "kept_rows": kept_rows, "trash_rows": plan.trashed, "trash": True,
-           "for_good": umz_areas_tr(oi_undo_preview(there - _umz_there(c, uid, cr), _UMZ_GONE_AREAS))}
+           "for_good": umz_areas_tr(oi_undo_preview(there - _umz_there(c, uid, cr), _UMZ_GONE_AREAS)),
+           "kept_final": umz_areas_tr(final), "kept_final_docs": len(plan.final)}  # 2.593.0 (#4864): inside kept_rows
     return out, cr, tpl_paths, n_oi
 
 
@@ -2730,7 +2735,9 @@ def umz_undo_preview(c, uid, iid):
     p = got[0]
     return {"id": r["id"], "at": r["created_at"], "undo_until": iso(until), "for_good": p["for_good"], "trash_tasks": p["tasks"],
             "trash_rows": p["trash_rows"], "kept_tasks": p["kept_tasks"], "kept_rows": p["kept_rows"], "lists": p["lists"],
-            "kept_lists": p["kept_lists"], "kept_cals": p["kept_cals"], "kept_books": p["kept_books"]}
+            "kept_lists": p["kept_lists"], "kept_cals": p["kept_cals"], "kept_books": p["kept_books"],
+            # 2.593.0 (#4864): the finalised documents stay with their client, files ... (named by area, inside kept_rows)
+            "kept_final": p["kept_final"], "kept_final_docs": p["kept_final_docs"]}
 
 
 class _UmzDryRun(Exception):

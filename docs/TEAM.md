@@ -801,6 +801,13 @@ the mail failed); *Resend* works three times a day per invitation. Since 2.453 s
 as long as the invitation, two weeks, and *Resend* renews both; whoever sets the password late still has two weeks to answer.
 Accounts invited before stay members.
 
+Since 2.593 the list of open invitations shows both kinds alike as well (the same fields, *Invited*, no account number;
+*Resend* and *Withdraw* use a neutral reference), and the daily limit counts before the address is looked up. In a company
+somebody created themselves, an invitation of an existing account goes out only to a person its admin may see anyway; for
+anybody else, and for a disabled account, it stays silent: it stands in the list like any other, but the person gets no
+News item, mail or push and cannot answer it. *Add by e-mail address* in such a company adds nobody its admin may not see,
+with the same answer.
+
 Related changes in the same release:
 
 - A new project without a chosen workspace (from an import, the REST API, a template or a proposal) goes to the organisation

@@ -1487,11 +1487,14 @@ def org_icon_get(oid, tok):
 
 
 @app.put("/api/orgs/<int:oid>/members")
-def org_member_put(oid):
+def org_member_put(oid, ghost=False):
     """2.28.0 (#935): {user_id | email, role?: member | admin | guest | readonly | accounting (2.143.0 A, #2151)} -- an organisation admin adds a person (one they may see, or by
     e-mail address: the answer never says whether the address has an account) or changes a member's role. 2.148.1 A (#2480):
     a person who is not a member yet gets an invitation to accept (accounts/orginvite.py ojn_*); only an instance admin adds
-    directly."""
+    directly. 2.593.0 (#3570): ghost = called by POST /api/orgs/<id>/invites for an address with an account: in a company of
+    its own (orgs.self_made) an account the admin may not see, and anywhere a disabled account or an agent, gets a silent
+    invitation (ojn_silent: in the list like a new address, nothing for the person); without ghost (this route) a company of
+    its own drops such an invitation, with the same answer."""
     c, b = db(), body()
     _need_org_admin(c, oid)
     if instance_mode(c) != "workspaces":
@@ -1502,12 +1505,27 @@ def org_member_put(oid):
     uid, by_mail = b.get("user_id"), False
     if "email" in b and uid is not None:
         return err(tr("Invalid value: {0}", "user_id"))
+    silent = False
     if b.get("email"):
         em = str(b["email"]).strip().lower()[:200]
-        r = c.execute("SELECT id FROM users WHERE lower(email)=? AND disabled=0 AND COALESCE(kind,'user')!='agent'", (em,)).fetchone()
-        if not r:
+        r = c.execute("SELECT id, disabled, kind FROM users WHERE lower(email)=?", (em,)).fetchone()
+        dead = r is not None and (r["disabled"] or (r["kind"] or "user") == "agent")
+        if not r or dead and not ghost:
             return jsonify(ok=True, by_email=True)
         uid, by_mail = r[0], True
+        # 2.593.0 (#3570): the same answer and list whether the address has an account or not (orginvite.py ojn_silent)
+        if uid != me() and not (g.user["is_admin"] and not _operator_apart()) and not c.execute(
+                "SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (oid, uid)).fetchone():
+            selfm = c.execute("SELECT self_made FROM orgs WHERE id=?", (oid,)).fetchone()
+            silent = dead or bool(selfm and selfm[0]) and not may_see(c, me(), uid)
+        if dead and not silent or silent and not ghost:
+            return jsonify(ok=True, by_email=True)  # dropped: an invitation into a company of its own only to people one may see
+        if silent:
+            from .orginvite import ojn_silent
+            ojn_silent(c, oid, uid, role)
+            bump(c)
+            c.commit()
+            return jsonify(ok=True, by_email=True)
     if not isinstance(uid, int) or isinstance(uid, bool):
         return err(tr("Invalid value: {0}", "user_id"))
     u = c.execute("SELECT id, kind FROM users WHERE id=? AND disabled=0", (uid,)).fetchone()

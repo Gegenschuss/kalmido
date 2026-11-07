@@ -102,7 +102,9 @@ async function umzUndoAsk(id) {
     + (p.for_good.length ? `<p><b>${esc(tr('Deleted for good:'))}</b></p><ul>${p.for_good.map(li).join('')}</ul>` : `<p>${esc(tr('Nothing is deleted for good.'))}</p>`)
     + (p.trash_tasks || p.trash_rows ? `<p>${esc(tr('Into the trash (restorable): {0} tasks, {1} files, pages, tables or clients.', p.trash_tasks, p.trash_rows))}</p>` : '')
     + (p.kept_tasks || p.kept_rows ? `<p>${esc(tr('Stays because it changed since the import: {0} tasks, {1} other entries.', p.kept_tasks, p.kept_rows))}</p>` : '')
-    + `<p class="muted">${esc(tr('The imported tasks nobody changed since go into the trash, where you can restore them; a new project only when nothing else is in it. Tasks changed since then or with new comments, files or times stay, and so does everything others added.') + ' ' + tr('Calendars are removed only if nothing changed in them; address books nothing changed in go to the trash.') + ' ' + tr('The imported clients, files, knowledge pages and tables go to their trash; the other imported office data, times, habits and journal entries are deleted for good. Whatever changed since the import or got something new stays.'))}</p>`;
+    // 2.593.0 (#4864): finalised documents never go with the undo; they stay with their client, PDF / XML and files (inside kept_rows)
+    + ((p.kept_final || []).length ? `<p><b>${esc(tr('Stays because it is finalised (with its client, PDF and files):'))}</b></p><ul>${p.kept_final.map(li).join('')}</ul>` : '')
+    + `<p class="muted">${esc(tr('The imported tasks nobody changed since go into the trash, where you can restore them; a new project only when nothing else is in it. Tasks changed since then or with new comments, files or times stay, and so does everything others added.') + ' ' + tr('Calendars are removed only if nothing changed in them; address books nothing changed in go to the trash.') + ' ' + tr('The imported clients, files, knowledge pages and tables go to their trash; the other imported office data, times, habits and journal entries are deleted for good. Whatever changed since the import or got something new stays.') + ' ' + tr('Finalised documents always stay, with their client and files.'))}</p>`;
   return askConfirm(tr('Undo this import?'), '', {html, ok: tr('Undo'), danger: true});
 }
 function umzResultHtml(j) {
@@ -218,6 +220,7 @@ function umzInit(md) {
         toast([trn('Import undone: {0} task moved to the trash', 'Import undone: {0} tasks moved to the trash', r.tasks || 0),
           r.kept_tasks ? trn('{0} changed task stays', '{0} changed tasks stay', r.kept_tasks) : '',
           r.kept_rows ? trn('{0} entry changed since the import stays', '{0} entries changed since the import stay', r.kept_rows) : '',
+          r.kept_final_docs ? trn('{0} finalised document stays', '{0} finalised documents stay', r.kept_final_docs) : '',  // 2.593.0 (#4864)
           r.trash_rows ? trn('{0} file, page or table moved to its trash', '{0} files, pages or tables moved to their trash', r.trash_rows) : '',
           r.kept_lists ? trn('{0} project stays because something was added to it', '{0} projects stay because something was added to them', r.kept_lists) : '',
           r.kept_cals || r.kept_books ? trn('{0} calendar or address book stays', '{0} calendars or address books stay', (r.kept_cals || 0) + (r.kept_books || 0)) : ''].filter(Boolean).join('. '));

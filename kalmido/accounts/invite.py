@@ -23,6 +23,7 @@ from .orgs import op_apart_deny, op_foreign_account, op_support_only  # 2.399.0 
 from ..accounts.orgs import org_names  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.login import twofa_methods  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.users import om_admin_all as admin_sees, need_admin  # 2.369.5 (#2517): pulled up from functions
+from .bgjobs import BGJ_FNS, bgj_add  # 2.593.0 (#3570)
 
 
 # ---------------------------------------------------------------- 2.22.0 (#697): invitations
@@ -47,11 +48,13 @@ def invite_state(c, uid):
     return "invited" if parse_iso(r["expires_at"]) > now_utc() else "expired"
 
 
-def invite_new(c, uid, by, send=True, kind=None, days=None):
+def invite_new(c, uid, by, send=True, kind=None, days=None, bg=False):
     """A new link for uid (replaces an older one) -> {link, expires_at, sent, kind, error?}. send: by e-mail when SMTP is
     set up and the person has an address. kind: invite / reset (by the password), 2.23.0: signup (#711, a registration
     to confirm), login (#444, a sign-in link without a password: never sent by mail, shown as a link + QR code).
-    2.453.0 (#3780): days = how long the link lives (default INVITE_DAYS)."""
+    2.453.0 (#3780): days = how long the link lives (default INVITE_DAYS). 2.593.0 (#3570, review F3): bg = the mail goes
+    through the background queue (bgjobs "mail:security", like the mail of an existing account's invitation), not within the
+    request: an organisation admin's answer takes no longer for a new address than for one with an account."""
     u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
     if not u or (u["kind"] or "user") == "agent":
         raise Denied(404)
@@ -84,10 +87,13 @@ def invite_new(c, uid, by, send=True, kind=None, days=None):
                 logo = {"logo": (open(os.path.join(APP_DIR, "static", "icon-192.png"), "rb").read(), "png")}
             except OSError:
                 logo = {}
-            # 2.37.0 (#1150): the link is stored before the mail goes out (it stayed on a mail error before, too), so no
-            # transaction is open while the mail server is asked; every caller committed right after this anyway
-            c.commit()
-            mail_send(u["email"], subject, text, body_html, images=logo, from_name=APP_NAME)
+            if bg and "mail:security" in BGJ_FNS:  # registered by integrations/mail.py with outgoing mail; after the caller's commit
+                bgj_add("mail:security", u["email"], subject, text, body_html, logo, delay=1.0)  # no user_id: a new account is not committed yet
+            else:
+                # 2.37.0 (#1150): the link is stored before the mail goes out (it stayed on a mail error before, too), so no
+                # transaction is open while the mail server is asked; every caller committed right after this anyway
+                c.commit()
+                mail_send(u["email"], subject, text, body_html, images=logo, from_name=APP_NAME)
             c.execute("UPDATE user_invites SET sent_at=? WHERE user_id=?", (iso(now_utc()), uid))
             out["sent"] = True
         except Exception as e:  # noqa: BLE001  (the link still works: the admin can copy it)

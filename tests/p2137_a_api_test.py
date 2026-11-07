@@ -4,7 +4,8 @@
    with positions, finalised invoice with a payment, invoice series, cash book with a closed day, trip with a receipt,
    framework contract with its file) is exported and imported into an empty second organisation of another admin: the
    values, the references, the finalised state and the numbers come along, the files are readable and sealed at rest
-   where the app seals them; the source organisation stays unchanged; the undo removes everything again
+   where the app seals them; the source organisation stays unchanged; the undo removes everything again but the finalised
+   invoice with its position, payment, client and PDF (2.593.0 #4864)
  - the same export into the source organisation itself: existing document numbers are skipped with a warning, never twice
  - a person without an organisation imports it into the private workspace: it lands in the personal office
  - that person exports the personal office (only the owner; others 404) and an admin imports it into an organisation:
@@ -262,6 +263,7 @@ check(enc and str(enc[0]["iban"]).startswith("kenc1:"), "the bank data is encryp
 n1 = dbx("SELECT kind, period, last FROM office_numbers WHERE org_id=? ORDER BY kind, period", (ORG,))
 n2 = dbx("SELECT kind, period, last FROM office_numbers WHERE org_id=? ORDER BY kind, period", (ORG2,))
 check([dict(x) for x in n1] == [dict(x) for x in n2] and n1, f"the number ranges came along {n2}")
+N_NUMS = len(n2)  # 2.593.0 (#4864): they stay with the finalised invoice on the undo (review F7)
 OT = [r["table_name"] for r in dbx("""SELECT table_name FROM information_schema.columns WHERE table_schema=current_schema()
                                       AND column_name='org_id' AND table_name LIKE 'office_%' ORDER BY table_name""")]
 diff = {}
@@ -279,9 +281,14 @@ r = Ca.post(B + f"/api/imports/{IMP}/undo")
 check(r.ok, f"undo {r.status_code} {r.text[:160]}")
 left = {k: v for k, v in office_counts(ORG2).items() if v}
 # 2.370.4 (#3089): the imported clients lie in the client trash (restorable), the rest of the office is gone
-check(not left and not dbx("SELECT 1 FROM clients WHERE org_id=? AND deleted_at IS NULL", (ORG2,))
-      and dbx("SELECT COUNT(*) AS n FROM clients WHERE org_id=? AND deleted_at IS NOT NULL", (ORG2,))[0]["n"] == SRC_CLIENTS,
-      f"the undo removed the office {left}")
+# 2.593.0 (#4864): ... except the invoice imported as finalised: it stays with its position, its payment and its client
+kept = dbx("SELECT id, client_id FROM office_docs WHERE org_id=? AND locked_at IS NOT NULL", (ORG2,))
+# 2.593.0 (#4864): review F7 - and with it the office's number counters (the next invoice goes on after its number)
+check(left == {"office_docs": 1, "office_doc_items": 1, "office_payments": 1, "office_numbers": N_NUMS} and [x["id"] for x in kept] == [INV2]
+      and [x["id"] for x in dbx("SELECT id FROM clients WHERE org_id=? AND deleted_at IS NULL", (ORG2,))] == [CL2]
+      and dbx("SELECT COUNT(*) AS n FROM clients WHERE org_id=? AND deleted_at IS NOT NULL", (ORG2,))[0]["n"] == SRC_CLIENTS - 1,
+      f"the undo removed the office but the finalised invoice {left} {kept}")
+check(Ca.get(B + f"{D}/{INV2}/pdf").content == INV_PDF, "#4864: the finalised invoice still opens with its PDF")
 check(not p or not os.path.exists(p), "the undo removed the files")
 Ca.delete(B + f"/api/account/import/{iid}")
 

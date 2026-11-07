@@ -60,6 +60,7 @@ from .travel import rk_cat_label, rk_trips  # 2.369.5 (#2517): pulled up from fu
 from .meals import BW_SHARE, ofc_bw_booked  # 2.534.0 (#4333): the approved entertainment receipts (layers budget: module level)
 from ..core.serializers import csv_cell  # 2.369.5 (#2517): pulled up from functions
 from .ledger import ofx_log  # 2.369.5 (#2517): pulled up from functions
+from .years import ofc_years, ofc_years_join, ofc_years_sql  # 2.593.0 (#4891): the years with data
 from .euerbasis import EB_NORC_LABEL, eb_basis_of, eb_flows, eb_income_payment_ids, eb_segments  # 2.603.0 (#4927): the basis of the EUeR per year
 
 
@@ -764,7 +765,37 @@ def bk_get():
                    accounts=ca_accounts(c, oid, cats) if office_feature(c, oid, "books.datev", s) else None,
                    small_business=bool(s.get("small_business")), month=mo, receipts=month, year=year, einvoices=einv,
                    missing=[] if s.get("small_business") else missing, note=tr(BK_NOTE),
-                   incomplete=len(gaps.get("no_date") or ()) + len(gaps.get("no_amount") or ()))
+                   incomplete=len(gaps.get("no_date") or ()) + len(gaps.get("no_amount") or ()),
+                   years=bk_years(c, oid))  # 2.593.0 (#4891): the year pickers of the books and the VAT return
+
+
+def bk_years(c, oid, uid=None):
+    """2.593.0 (#4891): {min, max} of the years with data of the books: the receipts the person sees (bk_receipts' trash and
+    rights; the paid day and the document date both count, the income statement takes one, the VAT return the other), the
+    issued invoices / credit notes (no trial ones) and their payments; None: nothing yet. Only the oldest and the newest
+    year's receipts are checked for rights, year by year until one is visible (no full run over every receipt)."""
+    uid = _uid_filter(uid)
+    by = {}
+    for r in c.execute("SELECT r.node_id, r.paid_at, d.doc_date FROM rc_receipts r JOIN doc_meta d ON d.node_id=r.node_id "
+                       "JOIN fs_nodes n ON n.id=r.node_id WHERE d.ws=? AND n.kind='file' AND n.deleted_at IS NULL",
+                       (bk_ws(c, oid),)).fetchall():
+        for v in (r["paid_at"], r["doc_date"]):
+            y = ofc_years([v])
+            if y:
+                by.setdefault(y["min"], set()).add(r["node_id"])
+
+    def seen(y):
+        acc = fs_roles_many(c, list(by[y]), uid)
+        return any(not a[0] and (not uid or a[1]) for a in acc.values())
+    ys = sorted(by)
+    lo = next((y for y in ys if seen(y)), None)
+    hi = next((y for y in reversed(ys) if seen(y)), None) if lo is not None else None
+    rcs = {"min": lo, "max": hi} if lo is not None else None
+    docs = ofc_years_sql(c, "SELECT MIN(date), MAX(date) FROM office_docs WHERE org_id=? AND kind IN ('invoice', 'credit') "
+                            "AND locked_at IS NOT NULL AND trial=0 AND number != '' AND date>='1900'", (oid,))
+    pays = ofc_years_sql(c, f"SELECT MIN({BK_PAY_DAY}), MAX({BK_PAY_DAY}) FROM office_payments p LEFT JOIN office_payments o "
+                            f"ON o.id=p.reverses_id AND o.org_id=p.org_id WHERE p.org_id=? AND {BK_PAY_DAY}>='1900'", (oid,))
+    return ofc_years_join(rcs, docs, pays)
 
 
 @app.get("/api/office/books/euer")

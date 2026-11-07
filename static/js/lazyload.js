@@ -7,7 +7,7 @@
 
 // module -> its files in static/js/, in load order (the same files as LAZY in sw.js)
 const LD_MODS = {
-  settings: ['acctset', 'sesview', 'supportview', 'oinvview', 'servers', 'selfdelete', 'settings'],  // 2.149.0 F (#2518): servers.js (Settings > Account > other servers); 2.485.0 (#3939): supportview.js; 2.553.0 (#1413): selfdelete.js
+  settings: ['acctset', 'sesview', 'supportview', 'oinvview', 'servers', 'selfdelete', 'setreset', 'settings'],  // 2.149.0 F (#2518): servers.js (Settings > Account > other servers); 2.485.0 (#3939): supportview.js; 2.553.0 (#1413): selfdelete.js; 2.593.0 (#4590): setreset.js
    // 2.65.0 (#1823): acctset.js = the settings sections of account.js; 2.115.0 B (#2062): sessions, organisation invitations
   contacts: ['contacts', 'ctfold', 'newsletter'],  // 2.65.0 (#1823): newsletter.js; 2.351.0 B (#2749): ctfold.js (folders)
   office: ['office', 'office_docs', 'office_tree', 'office_import', 'office_sheet', 'office_parts', 'office_travel', 'office_cashflow', 'office_doctpl', 'office_logbook', 'office_cashbook',  // 2.93.0 (#1927, #1928); 2.121.0 B (#2095): office_cashbook; 2.351.0 A (#3312): office_tree

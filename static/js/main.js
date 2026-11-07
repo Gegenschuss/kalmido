@@ -35,6 +35,7 @@ function bootDone() {
   if (!MW_ON) setTimeout(msvvBoot, 0);  // 2.73.0 C (#661): the other servers (msvview.js), after the own state
   setTimeout(chatFabDraw, 0);  // 2.29.0 (#363)
   if (LS.get('after2fa', false)) { LS.set('after2fa', false); setTimeout(() => settingsModal('account'), 400); }  // 2.22.0 (#697)
+  { const rs = LS.get('rsToast', ''); if (rs) { LS.del('rsToast'); setTimeout(() => loadModule('settings').then(() => rs_after(rs)).catch(() => {}), 600); } }  // 2.593.0 (#4590): after a reset of the settings: the message with Undo (setreset.js)
   if (!MW_ON) setTimeout(() => { if (document && !document.hidden) wpSweep(); }, 2500);
   // 2.280.0 C (#3114): no start sync of the knowledge pages' offline copy any more (2.169.0 #2671): a space syncs when it is opened (wiki.js wk_load)
   if (!MW_ON) setTimeout(() => { if (!document.hidden && !S.setupPending && !S.me?.kid) lc_favSuggest(); }, 8000);  /* 2.49.0 (#1537): not for a child */  // 2.46.1 (#1361): a favourite suggestion, once  // 2.19.0 (#668): opening the app tidies the shade  // render in the server-side language

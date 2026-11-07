@@ -73,6 +73,7 @@ def cb_log_fk_migrate(c):
 
 from .model import office_ctx_admin as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
 from .homecur import hc_home  # noqa: E402  2.189.0 B (#2475)
+from .years import ofc_years  # 2.593.0 (#4891): the years with data
 
 
 def _today():
@@ -454,13 +455,14 @@ def cb_closings(c, oid, bid, frm="0000-01-01", to="9999-12-31"):
 
 @app.get("/api/office/cashbooks/<int:bid>/entries")
 def cb_entries_get(bid):
-    """?year=YYYY | ?from=&to= -> {entries (newest first, balance = after the entry), closings, last_closed, balance, year}."""
+    """?year=YYYY | ?from=&to= -> {entries (newest first, balance = after the entry), closings, last_closed, balance, year, years}."""
     c, uid, oid = _ctx()
     book = _book(c, oid, bid)
     frm, to, y = _range()
     ents, rows, last = cb_list(c, oid, uid, book, frm, to)
     return jsonify(entries=list(reversed(ents)), closings=cb_closings(c, oid, bid, frm, to), last_closed=last,
-                   balance=dstr(cb_balance(book["opening"], rows)), year=y, opening=dstr(book["opening"]), opening_day=book["opening_day"])
+                   balance=dstr(cb_balance(book["opening"], rows)), year=y, opening=dstr(book["opening"]), opening_day=book["opening_day"],
+                   years=ofc_years(r["day"] for r in rows))  # 2.593.0 (#4891): the years of the box's entries (all of them)
 
 
 @app.post("/api/office/cashbooks/<int:bid>/entries")

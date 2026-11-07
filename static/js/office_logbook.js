@@ -64,7 +64,7 @@ function lbHtml() {
   const ready = LB.base && (LB.view === 'report' ? LB.rep && LB.rep.year === +lbYear() : !LB.vid || (LB.drives && LB.q === q));
   if (!ready) { if (!LB.loading) setTimeout(lbLoad, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
   const vs = LB.base.vehicles, act = vs.filter(v => !v.archived || v.id === LB.vid);
-  const y0 = new Date().getFullYear(), years = [y0 + 1, y0, y0 - 1, y0 - 2, y0 - 3].map(String);
+  const years = ofcYearOpts(LB.base.years, lbYear());  // 2.593.0 (#4891): the years of the drives (was this year +1 .. -3)
   const note = `<details class="lgb-note"><summary>${ic('alert', 's')}<span>${tr('Note on the logbook')}</span></summary><p class="muted">${esc(LB.base.note)}</p></details>`;
   if (!vs.length) return `<div class="empty nempty eact">${ic('car')}<span>${tr('No vehicle yet. Add the car you drive for business first.')}</span>
     <button class="btn pri" data-lgb="vnew">${ic('plus', 's')}<span>${tr('Add vehicle')}</span></button></div>` + note;
@@ -320,9 +320,13 @@ document.addEventListener('change', e => {
 const lb_rateOf = y => { const s = OFC.info?.settings || {}, v = (s.km_rates || {})[String(y)]; return v != null && v !== '' ? v : s.km_rate || '0.30'; };
 function lb_rateSetHtml() {
   if (ofr_grp() && ofr_lvOf('logbook') !== 'manage') return '';  // 2.187.1 B (#2735): the rate needs "manage"
-  const y0 = new Date().getFullYear(), y = LB.rateY || y0;
+  const y0 = new Date().getFullYear(), y = LB.rateY || y0, s = OFC.info?.settings || {};
+  // 2.593.0 (#4891): the years of the drives (when the logbook of this office is loaded) and of the rates already set (was this year +1 .. -3);
+  // the next year stays, so next year's rate can be set in advance (a rate is an input, not a filter of data)
+  const lby = LB.oid === OFC.info?.org_id ? LB.base?.years : null, ys = [y0 + 1, lby?.min, lby?.max, ...Object.keys(s.km_rates || {})].map(Number).filter(Boolean);
+  const yr = ys.length ? {min: Math.min(...ys), max: Math.max(...ys)} : null;
   return `<section class="lgb-rset" aria-labelledby="lgb-rh"><h3 id="lgb-rh">${tr('Mileage allowance')}</h3>
-    <div class="row"><label for="lgb-ry">${tr('Year')}</label>${ofcSel('lgb-ry', y, [y0 + 1, y0, y0 - 1, y0 - 2, y0 - 3].map(x => [x, String(x)]))}</div>
+    <div class="row"><label for="lgb-ry">${tr('Year')}</label>${ofcSel('lgb-ry', y, ofcYearOpts(yr, y).map(x => [x, x]))}</div>
     ${ofcRowF('lgb-rate', tr('Mileage allowance per business km in {0}', y), `<span class="lacts"><input id="lgb-rate" inputmode="decimal" class="numin" value="${esc(fmtNum(+lb_rateOf(y), 2))}"><span class="muted">${ofcSym(ofcHome())}</span></span>`, tr('For a private car used for business (logbook); goes into the income/expense statement.'))}</section>`;
 }
 async function lb_ratePut(year, km_rate) {

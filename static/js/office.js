@@ -298,6 +298,17 @@ const ofcRowBtn = (kind, r, title, sub, extra = '') => `<li><button type="button
 
 // ---- the dialogs (one per kind; members get a read-only view)
 const ofcSel = (id, cur, opts, empty, label) => `<select id="${id}"${label ? ` aria-label="${esc(label)}"` : ''}>${empty != null ? `<option value="">${esc(empty)}</option>` : ''}${opts.map(([v, n]) => `<option value="${esc(v)}" ${String(v) === String(cur ?? '') ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>`;
+// 2.593.0 (#4891): the years of a year picker of the office from the data, newest first: from the oldest year with data
+// (yr = the server's years {min, max}, null: no data) up to this year without gaps, later years only when data lies there;
+// back = years before this one shown even without data (books: the annual return of last year); sel = the chosen year stays
+// a choice even outside the span (a jump to an imported year)
+const ofcYearOpts = (yr, sel, back = 0) => {
+  const now = new Date().getFullYear(), lo = Math.max(1900, Math.min(now - back, +yr?.min || now)), hi = Math.min(9999, Math.max(now, +yr?.max || now)), out = [];
+  for (let y = hi; y >= lo; y--) out.push(String(y));
+  const s = String(sel ?? '');
+  if (/^\d{4}$/.test(s) && !out.includes(s)) { out.push(s); out.sort((a, b) => b - a); }
+  return out;
+};
 const ofcIn = (id, v, o = {}) => `<input id="${id}" value="${esc(v ?? '')}" maxlength="${o.max || 200}" ${o.num ? 'inputmode="decimal" class="numin"' : ''} ${o.ph ? `placeholder="${esc(o.ph)}"` : ''} ${o.list ? `list="${o.list}"` : ''}>`;
 // 2.298.0 A1 (#3186): the help of a field is a .shint: infoize() puts it behind the (i) of the label; o.keep = it stays
 // visible under the field (only follow-ups, one-way steps, a state - and units like % or the currency)

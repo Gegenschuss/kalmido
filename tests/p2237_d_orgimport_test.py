@@ -9,6 +9,7 @@ Invented names only.
  - undo as an admin who is no admin of the target any more: 403, nothing removed
  - undo after a document of the import was finalised in the target: 409, nothing removed
  - undo by the admin of another target (the finalised invoice of the file was finalised there before): works, nothing left
+   but that invoice with its client and its log entry (2.593.0 #4864: a document imported as finalised stays)
  - a person without organisation (freelancer) imports it privately: unchanged (no rows of others)
  - 2.459.0 (#3849): the organisation's symbol, a list icon and a header picture come back from files/pictures (new tokens, sealed,
    served): a target with a symbol keeps it, into the private workspace the list pictures only, the undo removes them (a picture
@@ -291,12 +292,16 @@ j = run(A, opened(A, OX, RK), ORG4, people={EH("bob@example.com"): {"share": Tru
 check(one("SELECT COUNT(*) FROM office_docs WHERE org_id=? AND locked_at IS NOT NULL", (ORG4,)) == 1, "the invoice finalised in the file came along")
 r = A.post(B + f"/api/imports/{(j.get('result') or {}).get('import_id')}/undo")
 check(r.ok, f"undo by the admin {r.status_code} {r.text[:160]}")
-check(not any(counts(ORG4).values()), f"the undo removed everything {counts(ORG4)}")
+# 2.593.0 (#4864): ... but the invoice that came finalised, with its client
+FIN4 = [x[0] for x in dbx("SELECT id FROM office_docs WHERE org_id=? AND locked_at IS NOT NULL", (ORG4,))]
+check(counts(ORG4) == {"lists": 0, "office_docs": 1, "clients": 1, "hub_absences": 0, "time_sheets": 0} and len(FIN4) == 1,
+      f"the undo removed everything but the finalised invoice and its client {counts(ORG4)}")
 L4 = one("SELECT id FROM lists WHERE org_id=? AND name='Alpha Projekt'", (ORG4,))
 p4 = pics(L4)
 check(icon_of(ORG4) == "" and not p4["icon"] and p4["header_file"] == "" and p4["header_style"] == "", f"#3849: the undo clears the pictures {icon_of(ORG4)!r} {dict(p4)}")
 check(not stored(f"listicons/o{ORG4}-*") + stored(f"listicons/l{L4}-*") + stored(f"listheads/l{L4}-*"), "#3849: ... and removes their files")
-check(not dbx("SELECT 1 FROM office_doc_log WHERE org_id=? AND action='import'", (ORG4,)), "... and its 'imported' log entries")
+check([x[0] for x in dbx("SELECT doc_id FROM office_doc_log WHERE org_id=? AND action='import'", (ORG4,))] == FIN4,
+      "... and its 'imported' log entries (2.593.0 #4864: but that of the finalised invoice)")
 
 # ---------------------------------------------------------------- a freelancer imports it privately (unchanged)
 FID, Fr = freelancer(B, A)

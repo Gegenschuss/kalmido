@@ -642,10 +642,11 @@ def mail_send(to, subject, text, html_body=None, images=None, from_name=None, at
     return m
 
 
-def _sec_mail_send(to, subject, text, html_body):
-    """2.266.0 (#2963): the background part of a security mail (accounts/secmail.py queues it by its kind, one try)."""
+def _sec_mail_send(to, subject, text, html_body, images=None):
+    """2.266.0 (#2963): the background part of a security mail (accounts/secmail.py queues it by its kind, one try).
+    2.593.0 (#3570): images = the logo of an organisation's invitation mail (accounts/invite.py invite_new bg)."""
     try:
-        mail_send(to, subject, text, html_body, from_name=APP_NAME)
+        mail_send(to, subject, text, html_body, images=images or None, from_name=APP_NAME)
     except Exception as e:  # noqa: BLE001  (nobody waits for it)
         print("security mail failed:", type(e).__name__, flush=True)
 

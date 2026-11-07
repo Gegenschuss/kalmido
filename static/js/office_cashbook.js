@@ -36,7 +36,7 @@ function cbHtml() {
   if (CB.err) return `<div class="empty">${esc(CB.err)}<p><button type="button" class="btn sm" data-cb="retry">${tr('Try again')}</button></p></div>`;  // 2.144.11 (#2354, N5)
   if (!CB.base || !CB.list || CB.q !== `${CB.bid}:${CB.year}`) { if (!CB.loading) setTimeout(cbLoad, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
   const bs = CB.base.books, act = bs.filter(b => !b.archived || b.id === CB.bid), b = cbBook(CB.bid);
-  const y0 = new Date().getFullYear(), years = [y0, y0 - 1, y0 - 2, y0 - 3, y0 - 4].map(String);
+  const years = ofcYearOpts(CB.list.years, CB.year);  // 2.593.0 (#4891): the years of the box's entries (was this year .. -4)
   const q = `book_id=${CB.bid}&year=${CB.year}`;
   const bar = `<div class="ofcbar cb-bar">${act.length > 1 ? `<select id="cb-book" aria-label="${esc(tr('Cash box'))}">${act.map(x => `<option value="${x.id}" ${x.id === CB.bid ? 'selected' : ''}>${esc(x.name + (x.archived ? ` · ${tr('archived')}` : ''))}</option>`).join('')}</select>` : ''}
     <select id="cb-year" aria-label="${esc(tr('Year'))}">${years.map(y => `<option ${y === CB.year ? 'selected' : ''}>${y}</option>`).join('')}</select>

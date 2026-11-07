@@ -4,10 +4,10 @@ own container (start.sh, org encryption on). Invented companies, people and figu
 tables in kalmido/office/vma.py (Germany 28 / 14, Greece outside Athens 2025 36 / 24, Czechia 2025 32 / 21).
  - the trip answers vma {amount per participant, total, lines, hints, source}: Germany over several days, a single day with
    times (more than 8 hours = 14), without times (no amount, hint "times"), 8 hours or less (0, hint "short"), abroad with
-   days in two countries, meals provided cut the rate (breakfast 20 %, lunch 40 %), 2027 = the 2026 table + hint "older" (#3522), 2024 = no table (no amount + hint
-   "year"), "no per diem" (0, hint "off"), several participants (total = amount x participants), a trip over the turn of
+   days in two countries, meals provided cut the rate (breakfast 20 %, lunch 40 %), 2027 = the 2026 table + hint "older" (#3522), 2022 = no table (no amount + hint
+   "year"; 2.593.0 #4893: 2024 has its table), "no per diem" (0, hint "off"), several participants (total = amount x participants), a trip over the turn of
    the year counts its days per year; invalid fields are refused
- - GET /api/office/trips/vma-rates: countries and cities of a year, 2027 = the 2026 table + hint "older", 2024 = none + hint
+ - GET /api/office/trips/vma-rates: countries and cities of a year, 2027 = the 2026 table + hint "older", 2022 = none + hint
  - GET /api/office/trips/vma: the sums per person (one entry per participant, "No person" for a trip without), open trips
    listed but not summed, "no per diem" left out, ?person= filters; vma.pdf / vma.xlsx (one sheet per person) / vma.csv
  - rights: a member sees the own per diem only (#4592) and gets 403 on rates and files, another organisation sees none of the trips and gets 404 on them; a person without an
@@ -105,13 +105,18 @@ t5 = trip(A, date_from="2025-05-01", date_to="2025-05-04", dest="Thessaloniki - 
 check(t5["country"] == "GR" and t5["vma"]["amount"] == "113.00", f"Greece 24 + 36, Czechia 32 + 21 = 113 {t5['vma']}")
 check([x["country"] for x in t5["vma"]["lines"]] == ["GR", "GR", "CZ", "CZ"], "the lines follow the days")
 # 2.428.0 (#3522): 2027 has no table yet: the newest table (2026) counts, always with the hint "older"; before the first
-# table (2024) still no amount and the hint "year", never an estimate
+# table (2022) still no amount and the hint "year", never an estimate
+# 2.593.0 (#4893): 2023 / 2024 have their tables now (BMF letters of 23.11.2022 / 21.11.2023): the year before the first is 2022
 t6 = trip(A, date_from="2027-03-01", date_to="2027-03-02", dest="Köln", overnight=True, people=[{"id": ALICE}])
 check(t6["vma"]["amount"] == "28.00" and {"key": "older", "year": 2027, "used": 2026} in t6["vma"]["hints"]
       and len(t6["vma"]["source"]) == 1 and "BMF" in t6["vma"]["source"][0], f"2027: the 2026 rates with the hint {t6['vma']}")
-t6b = trip(A, date_from="2024-03-01", date_to="2024-03-02", dest="Köln", overnight=True)
-check(t6b["vma"]["amount"] is None and {"key": "year", "year": 2024} in t6b["vma"]["hints"], f"2024: no amount, hint year {t6b['vma']}")
+t6b = trip(A, date_from="2022-03-01", date_to="2022-03-02", dest="Köln", overnight=True)
+check(t6b["vma"]["amount"] is None and {"key": "year", "year": 2022} in t6b["vma"]["hints"], f"2022: no amount, hint year {t6b['vma']}")
 check(A.delete(B + f"{T}/{t6b['id']}").ok, "cleanup")
+t6c = trip(A, date_from="2024-03-04", date_to="2024-03-06", dest="Wien", overnight=True, country="AT")  # 2.593.0 (#4893)
+check(t6c["vma"]["amount"] == "116.00" and not [h for h in t6c["vma"]["hints"] if h["key"] == "year"]
+      and "21.11.2023" in t6c["vma"]["source"][0], f"2024 Austria (BMF 21.11.2023): 33 + 50 + 33 = 116 {t6c['vma']}")
+check(A.delete(B + f"{T}/{t6c['id']}").ok, "cleanup")
 # no per diem for this trip
 t7 = trip(A, date_from="2025-07-01", date_to="2025-07-03", dest="Dresden", overnight=True, people=[{"id": BOB}], vma_off=1)
 check(t7["vma"]["amount"] == "0.00" and {"key": "off"} in t7["vma"]["hints"] and t7["vma_off"] == 1, "no per diem: 0 and hint off")
@@ -127,13 +132,15 @@ check(next(x for x in j["trips"] if x["id"] == t5["id"])["vma"]["amount"] == "11
 # ---------------------------------------------------------------- the rates of a year
 j = A.get(B + T + "/vma-rates?year=2025").json()
 gr = next((c for c in j["countries"] if c["code"] == "GR"), None)
-check(j["years"] == [2025, 2026] and j["home"] == {"full": 28, "partial": 14} and gr and gr["places"][0] == "" and "Athen" in gr["places"] and gr["full"] == 36 and gr["partial"] == 24
+check(j["years"] == [2023, 2024, 2025, 2026] and j["home"] == {"full": 28, "partial": 14} and gr and gr["places"][0] == "" and "Athen" in gr["places"] and gr["full"] == 36 and gr["partial"] == 24
       and "BMF" in j["source"], f"the rates of 2025 {gr}")
 j = A.get(B + T + "/vma-rates?year=2027").json()  # 2.428.0 (#3522): the 2026 table with the hint
 check(len(j["countries"]) > 100 and j["home"] == {"full": 28, "partial": 14} and j["hint"] == {"key": "older", "year": 2027, "used": 2026}
       and "BMF" in j["source"], f"2027: the 2026 rates, a hint {j['hint']}")
+j = A.get(B + T + "/vma-rates?year=2022").json()  # 2.593.0 (#4893): 2024 has its table, 2022 is before the first
+check(j["countries"] == [] and j["hint"] == {"key": "year", "year": 2022}, f"2022: no rates, a hint {j}")
 j = A.get(B + T + "/vma-rates?year=2024").json()
-check(j["countries"] == [] and j["hint"] == {"key": "year", "year": 2024}, f"2024: no rates, a hint {j}")
+check(j["hint"] is None and len(j["countries"]) == 171 and "21.11.2023" in j["source"], f"2024: its own rates {j['hint']} {j['source']}")
 check(A.get(B + T + "/vma-rates?year=20x5").status_code == 400, "an invalid year is refused")
 
 # ---------------------------------------------------------------- the report

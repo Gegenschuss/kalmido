@@ -57,6 +57,7 @@ from ..core.serializers import csv_cell  # 2.369.5 (#2517): pulled up from funct
 from .docs import doc_items, recalc, ofd_free_receipts  # 2.369.5 (#2517): pulled up from functions
 from .otrash import otb_gone_out, otb_put, otb_restore  # 2.530.0 C (#4315, B17)
 from .owrite import ow_history_answer, ow_kind, ow_need_row, ow_write  # noqa: E402  2.567.0 D (#4711): the saves go through the core's write layer
+from .years import ofc_years, ofc_years_sql  # 2.593.0 (#4891): the years with data
 
 ow_kind("office_trip", "office_trips")
 ow_kind("office_trip_item", "office_trip_items")
@@ -475,7 +476,19 @@ def rk_trips_get():
         projects = sorted({t["project"] for t in trips if t.get("project")})
     return jsonify(trips=trips, people=rk_people(c, oid, uid), clients=clients, projects=projects, currency=rk_home_cur(c, oid),
                    categories=[{"key": k, "label": tr(n)} for k, n in RK_CATS], missing=missing,
-                   purposes=rka_purposes(c, oid), real_projects=rk_real_projects(c, oid, uid))  # 2.117.0 A (#2292); 2.489.0 (#2652)
+                   purposes=rka_purposes(c, oid), real_projects=rk_real_projects(c, oid, uid),  # 2.117.0 A (#2292); 2.489.0 (#2652)
+                   years=rk_years(c, oid))  # 2.593.0 (#4891)
+
+
+def rk_years(c, oid):
+    """2.593.0 (#4891): {min, max} of the years of the trips the person sees (rk_trips' rights: level "own" = the person's
+    own trips), from the first day to the last day (a trip over New Year counts in both, as ?year= does); None: no trip."""
+    own = ofr_own_uid("travel")
+    if own is None:
+        return ofc_years_sql(c, "SELECT MIN(date_from), MAX(COALESCE(NULLIF(date_to, ''), date_from)) FROM office_trips "
+                                "WHERE org_id=? AND date_from>='1900'", (oid,))
+    rows = rk_own_rows(c, oid, c.execute("SELECT id, created_by, people, date_from, date_to FROM office_trips WHERE org_id=?", (oid,)).fetchall(), own)
+    return ofc_years([d for t in rows for d in (t["date_from"], t["date_to"])])
 
 
 @app.post("/api/office/trips")

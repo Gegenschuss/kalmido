@@ -53,6 +53,7 @@ from .packs import office_pack_for, pack_retention  # 2.369.5 (#2517): pulled up
 from ..files.upsafe import UploadRefused  # 2.369.5 (#2517): pulled up from functions
 from .mealpdf import bw_meal_pdf_data, bw_report_pdf  # 2.369.5 (#2517): pulled up from functions
 from .owrite import ow_history_answer, ow_kind, ow_write  # 2.567.0 D (#4711): the saves go through the core's write layer
+from .years import ofc_years, ofc_years_sql  # 2.593.0 (#4891): the years with data
 
 ow_kind("office_meal", "office_meals")
 ow_kind("office_meal_choice", "office_meal_choices")
@@ -594,7 +595,18 @@ def bw_meals_get():
         c.commit()
         bw_rm(paths)
     return jsonify(meals=bw_rows(c, oid, year=y or None), people=bw_people(c, oid, uid), choices=bw_choices(c, oid),
-                   currency=rk_home_cur(c, oid), me=uid, company=bw_company(c, oid), my_sig=1 if bw_sig_raw(c, oid, uid) else 0)
+                   currency=rk_home_cur(c, oid), me=uid, company=bw_company(c, oid), my_sig=1 if bw_sig_raw(c, oid, uid) else 0,
+                   years=bw_years_span(c, oid))  # 2.593.0 (#4891)
+
+
+def bw_years_span(c, oid):
+    """2.593.0 (#4891): {min, max} of the years of the meals the person sees (bw_rows' rights and trash: level "own" =
+    entered by the person or with the person as host); None: no meal."""
+    own = ofr_own_uid("meals")
+    if own is None:
+        return ofc_years_sql(c, "SELECT MIN(date), MAX(date) FROM office_meals WHERE org_id=? AND deleted_at IS NULL AND date>='1900'", (oid,))
+    rows = c.execute("SELECT id, created_by, host, date FROM office_meals WHERE org_id=? AND deleted_at IS NULL", (oid,)).fetchall()
+    return ofc_years(r["date"] for r in bw_own_rows(c, oid, rows, own))
 
 
 @app.get("/api/office/meals/<int:mid>")

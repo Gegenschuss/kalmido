@@ -41,7 +41,7 @@ from ..files.scan import sc_needs_retry  # 2.369.5 (#2517): pulled up from funct
 from ..tasks.attachments import safe_name  # 2.369.5 (#2517): pulled up from functions
 from ..office.model import pb_personal  # 2.369.5 (#2517): pulled up from functions
 from .acctexport import umz_user_conn  # 2.369.5 (#2517): pulled up from functions
-from .umz_undoplan import undo_files_left, undo_key, undo_key_stays, undo_plan, undo_prints, undo_trash  # 2.506.0 (#4299)
+from .umz_undoplan import undo_final_top, undo_files_left, undo_key, undo_key_stays, undo_plan, undo_prints, undo_trash  # 2.506.0 (#4299)
 from ..core.orgcrypt import _write_atomic  # 2.369.5 (#2517): pulled up from functions
 
 
@@ -441,6 +441,7 @@ def oi_undo(c, uid, cr, since, plan):
     keyed = oi_key_tables()
     undo_trash(c, uid, plan)
     stayed, stay_keys, roots_kept = [], set(), set()
+    nums_kept = oi_undo_numbers_kept(c, cr, plan)  # 2.593.0 (#4864, review F7)
     for item in cr.get("oi") or []:  # first: a stored file named by a setting that stays stays too
         if isinstance(item, list) and len(item) == 3 and item[0] in keyed and isinstance(item[1], dict):
             r = undo_key_stays(c, item[0], item[1], since, cr.get("prints"))
@@ -463,6 +464,9 @@ def oi_undo(c, uid, cr, since, plan):
                 continue
             if item[0] == "fs_area_roots" and undo_key(item[1]) in roots_kept:
                 continue
+            if item[0] == "office_numbers" and undo_key(item[1]) in nums_kept:
+                kept_keys += 1  # 2.593.0 (#4864, review F7): the counter of an office that keeps a finalised document stays
+                continue
             n += _oi_undo_key(c, item[0], keyed[item[0]], item[1], item[2], (space_cols.get(item[0]) or (None,))[0])
             continue
         if not (isinstance(item, list) and len(item) == 3 and item[0] in tables and isinstance(item[1], int)):
@@ -471,14 +475,17 @@ def oi_undo(c, uid, cr, since, plan):
         if not plan.goes(table, rid):
             continue
         col = (space_cols.get(table) or (None,))[0]
-        with ofx_release(c, table):  # 2.542.0 (#4598): a document imported as finalised goes with its import (oi_undo_check)
+        # 2.593.0 (#4864): a document imported as finalised never goes (umz_undoplan._keep_final); the release stays for what
+        # a delete here sets null on a finalised document, the condition is the second guard of the plan
+        fin = " AND locked_at IS NULL" if table == "office_docs" else ""
+        with ofx_release(c, table):  # 2.542.0 (#4598)
             if col and col in umz_cols(c, table)[0]:
                 if space is None:
-                    n += c.execute(f"DELETE FROM {table} WHERE id=? AND {col} IS NULL", (rid,)).rowcount
+                    n += c.execute(f"DELETE FROM {table} WHERE id=? AND {col} IS NULL{fin}", (rid,)).rowcount
                 else:
-                    n += c.execute(f"DELETE FROM {table} WHERE id=? AND {col}=?", (rid, space)).rowcount
+                    n += c.execute(f"DELETE FROM {table} WHERE id=? AND {col}=?{fin}", (rid, space)).rowcount
             else:
-                n += c.execute(f"DELETE FROM {table} WHERE id=?", (rid,)).rowcount
+                n += c.execute(f"DELETE FROM {table} WHERE id=?{fin}", (rid,)).rowcount
     _oi_undo_pics(c, cr)
     return n, kept_keys
 
@@ -581,6 +588,27 @@ def _oi_undo_options(c, fid, ws, added):
         c.execute("UPDATE doc_fields SET options=? WHERE id=?", (json.dumps(o, ensure_ascii=False), fid))
 
 
+def oi_undo_numbers_kept(c, cr, plan):
+    """2.593.0 (#4864, review F7): the number counters (office_numbers) the run recorded for an office that keeps a finalised
+    document of it (plan.final): they stay, or the next invoice would start below the number that stays and the series run
+    into it later. -> {undo_key(vals)} of the counters still there (the undo and its preview count them as staying)."""
+    if not plan.final:
+        return set()
+    ids, spaces = plan.of("office_docs", plan.final), set()
+    for i in range(0, len(ids), 500):
+        part = ids[i:i + 500]
+        spaces |= {r[0] for r in c.execute(f"SELECT DISTINCT org_id FROM office_docs WHERE id IN ({','.join('?' * len(part))})", part).fetchall()}
+    out = set()
+    for item in cr.get("oi") or []:
+        if not (isinstance(item, list) and len(item) == 3 and item[0] == "office_numbers" and isinstance(item[1], dict) and item[2] in spaces):
+            continue
+        v = item[1]
+        if all(isinstance(v.get(k), (int, str)) for k in ("org_id", "kind")) and isinstance(v.get("period", ""), str) and c.execute(
+                "SELECT 1 FROM office_numbers WHERE org_id=? AND kind=? AND period=?", (v["org_id"], v["kind"], v.get("period") or "")).fetchone():
+            out.add(undo_key(v))
+    return out
+
+
 def _oi_undo_key(c, table, key, vals, space, col):
     """2.137.0 A (#2344): removes one row recorded by its key (only the spec's key columns, only in its space)."""
     cols = umz_cols(c, table)[0]
@@ -608,13 +636,23 @@ def oi_undo_preview(gone, more=None):
     2.611.0 (#4866): gone = {(table, key)} the undo really removed (acctimport._umz_undo_rows compares before / after, also in
     its preview, a run rolled back), no second way of counting from the plan. Reads nothing. Ties by name: the same order in the
     preview and in the undo's answer."""
+    return _oi_by_area(gone, more)
+
+
+def _oi_by_area(keys, more=None):
     labels, out = dict(more or {}), {}
     for spec in oi_specs():
         labels.setdefault(spec.table, _OI_AREA.get(spec.table) or spec.label)
-    for table, _key in gone:
+    for table, _key in keys:
         k = labels.get(table) or N_("Other entries")
         out[k] = out.get(k, 0) + 1
     return sorted(({"what": k, "count": n} for k, n in out.items()), key=lambda x: (-x["count"], x["what"]))
+
+
+def oi_undo_final(plan, more=None):
+    """2.593.0 (#4864): what stays because a document of the import is finalised (the documents, their client, contract, files
+    ...), by area like oi_undo_preview -> [{what (N_ key), count}]; it is counted in plan.kept_n as well."""
+    return _oi_by_area(undo_final_top(plan), {"office_docs": N_("Finalised documents"), **(more or {})})
 
 
 def oi_prints(c, created):
@@ -632,5 +670,5 @@ def oi_undo_files(cr):
                 pass
 
 
-__all__ = ["OiT", "OiFix", "OiCtx", "oi_specs", "oi_covers", "oi_write", "oi_pictures", "oi_prepare", "oi_drop_empty_pb", "oi_counts", "oi_undo", "oi_undo_check", "oi_undo_files", "oi_undo_files_left", "oi_undo_plan", "oi_prints",
+__all__ = ["OiT", "OiFix", "OiCtx", "oi_specs", "oi_covers", "oi_write", "oi_pictures", "oi_prepare", "oi_drop_empty_pb", "oi_counts", "oi_undo", "oi_undo_check", "oi_undo_files", "oi_undo_files_left", "oi_undo_plan", "oi_undo_final", "oi_undo_numbers_kept", "oi_prints",
            "_BAD", "_coerce", "_oid", "_read_entry", "_txt", "umz_cols", "umz_insert", "umz_row"]

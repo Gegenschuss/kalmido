@@ -10,8 +10,8 @@ from flask import g, jsonify, Response
 
 from ..core.config import app, APP_NAME, PUBLIC_URL
 from ..core.schema import USER_DEFAULTS
-from ..core.i18n import LANGS, tr
-from ..core.db import body, bump, db, err, iso, local_now, now_utc, uset, usettings
+from ..core.i18n import LANGS, N_, tr
+from ..core.db import body, bump, db, err, gsetting, iso, local_now, now_utc, uset, usettings
 from ..core.pg import write_lock  # 2.269.0 B (#3014)
 from ..accounts.session import me, user_public
 from ..lists.lists import clean_folder
@@ -661,8 +661,7 @@ def settings_update():
             if v is not None:
                 vals[k] = v
     if "show_done_views" in vals:  # 2.46.1 (#1422): an own choice against a folder's "Hide completed" is marked
-        from ..lists.folders import lc_done_sync
-        lc_done_sync(c, me(), usettings(c, me()).get("show_done_views"), vals["show_done_views"])
+        rs_done_sync(c, me(), usettings(c, me()).get("show_done_views"), vals["show_done_views"])  # 2.593.0 (#4590): one import for both
     for k, v in vals.items():
         uset(c, me(), k, v)
         if k == "dashboard" or k in LAYOUT_KEYS:  # 2.55.0 (#1069): the active saved arrangement follows
@@ -671,6 +670,174 @@ def settings_update():
     bump(c)
     c.commit()
     return jsonify(ok=True)
+
+
+# ---------------------------------------------------------------- 2.593.0 (#4590): reset the look and comfort settings
+# A POSITIVE list: only these keys go back to the standard. Never the server-only keys, the account, the sign-in (password,
+# 2FA, tokens, app passwords), the language and formats, the organisation / office settings, privacy choices or data
+# (favourites, saved sidebar views, folders). (group, readable name, keys); the readable names are N_ keys of the i18n.
+RS_GROUPS = (("look", N_("Appearance")), ("side", N_("Sidebar")), ("start", N_("Start view")), ("views", N_("View options")),
+             ("notify", N_("Notifications")), ("mods", N_("Modules")), ("filters", N_("Remembered filters")),
+             ("colours", N_("Area colours")))
+RS_ITEMS = (
+    ("look", N_("Colour scheme, density, font size and accent"), ("look",)),
+    ("look", N_("Interface in the colour of the workspace"), ("ws_accent",)),
+    ("look", N_("Colours of people and lists"), ("person_colors", "list_color_dot")),
+    ("look", N_("Priority as the row colour"), ("prio_bg",)),
+    ("look", N_("Symbols in the task row"), ("row_icons", "row_icons_custom")),
+    ("side", N_("Order and hidden entries of the sidebar"), ("sidebar",)),
+    ("side", N_("List icons in the sidebar"), ("side_icons",)),
+    ("side", N_("Counts, status dots, progress and share marks"), ("side_progress", "side_count", "side_dots", "side_share")),
+    ("side", N_("Only favourites in the sidebar"), ("fav_only",)),
+    ("side", N_("Folded folders"), ("folders_closed",)),
+    ("side", N_("Active sidebar view"), ("side_view",)),
+    ("side", N_("Shown workspace"), ("workspace",)),
+    ("start", N_("Start page"), ("start_page",)),
+    ("views", N_("Arrangement and block settings of the views"), ("dashboard", *LAYOUT_KEYS, "wgstd_hide")),
+    ("views", N_("Menus and tab bar"), ("nav_order", "nav_menus")),
+    ("views", N_("Task panel layout"), ("detail_split", "detail_cm_fold", "detail_fold", "comment_order")),
+    ("views", N_("My tasks as a list or board"), ("mine_view", "mine_board", "mine_board_by")),
+    ("views", N_("Roadmap view"), ("roadmap",)),
+    ("views", N_("What Today shows"), ("today_inbox", "hide_blocked_today", "cal_today")),
+    ("views", N_("Progress bars"), ("progress_subtasks", "show_progress")),
+    ("views", N_("What the calendar shows"), ("cal_tasks", "cal_holidays", "cal_abs", "cal_abs_team")),
+    ("views", N_("Chat display"), ("agent_steps_live", "agent_steps_always", "agent_quota_show", "chat_kbd_agent", "chat_kbd_team")),
+    ("notify", N_("What notifies you (bell and push)"), ("notify", "news_kinds")),
+    # review F10: the push channel (the way of delivery) and "title only" (no text on the lock screen) are privacy choices, never reset
+    ("notify", N_("Push priority"), ("push_priority",)),
+    ("notify", N_("Daily summary, briefing and review"), ("digest_time", "digest_mail", "review_time", "brief_time")),
+    ("notify", N_("Quiet hours"), ("quiet_from", "quiet_to")),
+    ("notify", N_("Pushes about agents, quiet lists and urgent tasks"), ("agent_push", "agent_comments", "fav_quiet", "tbl_accept")),
+    ("notify", N_("E-mails about assignments and mentions"), ("mail_assign", "mail_mention")),
+    ("notify", N_("The dialog “New for you” after an update"), ("whatsnew_on",)),
+    ("mods", N_("Switched-on modules"), ("features", "mods_all")),
+    ("mods", N_("Modules and areas per workspace"), ("ws_mods_off", "ws_areas_off")),
+    ("filters", N_("Show completed per view"), ("show_done_views", "show_done_default", "show_done_new")),
+    ("filters", N_("Order of the groups in views"), ("group_order",)),
+    ("filters", N_("Folded sections"), ("sections_closed",)),
+    ("filters", N_("Hidden calendars and lists"), ("cal_lists_hidden", "today_cals_hidden")),
+    ("colours", N_("Colours of the workspaces"), ("ws_colors",)),
+)
+RS_KEYS = tuple(k for _, _, ks in RS_ITEMS for k in ks)
+SETTINGS_SERVER_ONLY += ("reset_undo",)  # the values before the last reset (json {at, vals: {key: raw | null}, lyv: {key: id}})
+USER_DEFAULTS.setdefault("reset_undo", "")
+RS_EMPTY = ("", "{}", "[]")
+
+
+def rs_default(c, k):
+    """The standard of key k after a reset = what a new account of this server starts with (core/db.py create_user stores
+    it): features = the server's default_features, show_done_default "0" (completed hidden, 2.49.0 #1535); look = "{}"
+    (saved, empty: every device takes its defaults; '' would let the next device upload its own look again)."""
+    if k == "look":
+        return "{}"
+    if k == "features":
+        return gsetting(c, "default_features") or USER_DEFAULTS["features"]
+    if k == "show_done_default":
+        return "0"
+    return USER_DEFAULTS.get(k, "")
+
+
+def rs_same(k, v, d):
+    v, d = str(v if v is not None else "").strip(), str(d or "").strip()
+    if v == d or (v in RS_EMPTY and d in RS_EMPTY):
+        return True
+    if k in ("features", "news_kinds", "show_progress"):  # comma lists: the order does not matter
+        return set(filter(None, v.split(","))) == set(filter(None, d.split(",")))
+    return False
+
+
+def rs_changed(c, uid):
+    """{key: stored raw value | None (no row)} of the reset keys whose value differs from their standard (a key without a
+    row reads as USER_DEFAULTS, which may differ from a new account's standard: features, show_done_default)."""
+    raw = {r["key"]: r["value"] for r in c.execute("SELECT key, value FROM user_settings WHERE user_id=? AND key = ANY(CAST(? AS TEXT[]))",
+                                                   (uid, list(RS_KEYS)))}
+    out = {}
+    for k in RS_KEYS:
+        if k == "look" and k not in raw:
+            continue  # never saved: nothing differs on the account (this device's own look is the client's part)
+        if not rs_same(k, raw.get(k, USER_DEFAULTS.get(k, "")), rs_default(c, k)):
+            out[k] = raw.get(k)
+    return out
+
+
+def rs_items(keys):
+    """The readable list of what the keys cover, in the order of RS_ITEMS: [{group, group_label, label, keys}]."""
+    gl = dict(RS_GROUPS)
+    return [{"group": g, "group_label": tr(gl[g]), "label": tr(n), "keys": [k for k in ks if k in keys]}
+            for g, n, ks in RS_ITEMS if any(k in keys for k in ks)]
+
+
+def rs_undo_get(c, uid):
+    r = c.execute("SELECT value FROM user_settings WHERE user_id=? AND key='reset_undo'", (uid,)).fetchone()
+    try:
+        o = json.loads(r[0]) if r and r[0] else None
+    except ValueError:
+        o = None
+    return o if isinstance(o, dict) and isinstance(o.get("vals"), dict) else None
+
+
+def rs_put(c, uid, k, v):
+    """Store raw value v of key k (None = no row: the standard)."""
+    if v is None:
+        c.execute("DELETE FROM user_settings WHERE user_id=? AND key=?", (uid, k))
+    else:
+        uset(c, uid, k, v)
+
+
+def rs_done_sync(c, uid, old, new):
+    """The folders' "differs from the folder" marks follow the changed show_done_views (as PATCH /api/settings does)."""
+    from ..lists.folders import lc_done_sync
+    lc_done_sync(c, uid, old, new)
+
+
+@app.post("/api/settings/reset")
+def settings_reset():
+    """2.593.0 (#4590): {dry_run: true} = the preview (what differs from the standard and would go back); {} = reset it and keep
+    the old values for one undo; {undo: true} = put the values of the last reset back. Only the person in the web app: an
+    agent or an API token never (the route is not under /api/v1/, and a session / proxy sign-in is required here)."""
+    from .layoutsets import lyv_active_id, lyv_follow, lyv_set_active
+    u = g.get("user")  # a session / proxy sign-in is never an agent's (session.authenticate); checked again here (agents.core is_agent)
+    if g.get("auth_via") not in ("session", "proxy") or not u or (u["kind"] or "user") == "agent":
+        return err(tr("Only you can reset your settings"), 403)
+    b = body()
+    if not isinstance(b, dict):
+        return err(tr("Invalid data"))
+    c, uid = db(), int(me())
+    write_lock(c, f"usettings-{uid}")  # the same lock as PATCH /api/settings: no change of another device in between
+    if b.get("undo"):
+        un = rs_undo_get(c, uid)
+        if not un:
+            return err(tr("Nothing to undo"), 404)
+        vals = {k: (v if isinstance(v, str) else None) for k, v in un["vals"].items() if k in RS_KEYS}
+        cur_sdv = usettings(c, uid).get("show_done_views")
+        for k, v in vals.items():
+            rs_put(c, uid, k, v)
+        for k, sid in (un.get("lyv") or {}).items():
+            if k in RS_KEYS and isinstance(sid, int):
+                lyv_set_active(c, uid, k, sid)
+        if "show_done_views" in vals:
+            rs_done_sync(c, uid, cur_sdv, vals["show_done_views"] or "{}")
+        uset(c, uid, "reset_undo", "")  # one step only (a new account has the row with '' already)
+        bump(c, "self")
+        c.commit()
+        return jsonify(ok=True, items=rs_items(set(vals)))
+    ch = rs_changed(c, uid)
+    if b.get("dry_run"):
+        return jsonify(items=rs_items(set(ch)), undo=rs_undo_get(c, uid) is not None)
+    if not ch:
+        return jsonify(ok=True, items=[], undo=rs_undo_get(c, uid) is not None)
+    lyv = {k: lyv_active_id(c, uid, k) for k in ch if k == "dashboard" or k in LAYOUT_KEYS}
+    uset(c, uid, "reset_undo", json.dumps({"at": iso(now_utc()), "vals": ch, "lyv": {k: v for k, v in lyv.items() if v}},
+                                          ensure_ascii=False, separators=(",", ":")))
+    for k in ch:
+        uset(c, uid, k, rs_default(c, k))  # stored like create_user does (no row would read USER_DEFAULTS)
+        if k in lyv:
+            lyv_follow(c, uid, k, "")  # the active saved arrangement ends (it stays saved)
+    if "show_done_views" in ch:
+        rs_done_sync(c, uid, ch["show_done_views"], "{}")
+    bump(c, "self")  # the other devices of the person load the standard
+    c.commit()
+    return jsonify(ok=True, items=rs_items(set(ch)), undo=True)
 
 
 @app.post("/api/ntfy/test")

@@ -276,6 +276,8 @@ APP_TO_API = {
 }
 # app routes with no API counterpart on purpose (prefix match on "METHOD /api/path"; reason first)
 APP_ONLY = [
+    # 2.593.0 (#4590): reset the look and comfort settings with one undo: only the person in the app, agents and API tokens never (decision 04.11.2026)
+    ("resetting the own settings is the person's step only", ("POST /api/settings/reset",)),
     ("2.575.0 (#3778): module cards are how a person arranges Settings > Modules and how an organisation's admins cap the modules of its "
      "members -- people only; an agent's setup proposal switches the main switches and never reaches past a card's cap", ("* /api/modcards",)),
     ("2.570.0 A (#4783): the history of a client (who changed which field when, office/owrite.py ow_history) is read in the app like "

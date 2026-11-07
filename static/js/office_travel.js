@@ -101,7 +101,7 @@ function rk_travelHtml() {
   const views = `<div class="seg" role="group" aria-label="${esc(tr('View'))}">${[['trips', tr('Trips')], ['logbook', tr('Logbook')], ['report', tr('Evaluation')]].filter(([k]) => k !== 'logbook' || !ofr_legOwn('travel')).map(([k, n]) => `<button type="button" data-rk="view" data-v="${k}" class="${RK.view === k ? 'on' : ''}" aria-pressed="${RK.view === k}">${n}</button>`).join('')}</div>`;  // 2.93.0 B (#1928): the logbook
   if (RK.view === 'logbook' && ofr_legOwn('travel')) RK.view = 'trips';  // 2.545.0 (#4592): a member's own trips without the logbook
   if (RK.view === 'logbook') return `<div class="ofcbar rkbar">${views}</div>` + lbHtml();
-  const y0 = new Date().getFullYear(), years = [y0 + 1, y0, y0 - 1, y0 - 2, y0 - 3].map(String);
+  const years = ofcYearOpts(RK.data.years, RK.year);  // 2.593.0 (#4891): the years of the trips (was this year +1 .. -3)
   const miss = RK.data.missing || 0;
   if (!rk_dv()) RK.filter = 'all';  // 2.147.0 (#2460): without DATEV there is no "not in DATEV"
   const bar = `<div class="ofcbar rkbar"><select id="rk-year" aria-label="${esc(tr('Year'))}"><option value="">${tr('All years')}</option>${years.map(y => `<option ${y === RK.year ? 'selected' : ''}>${y}</option>`).join('')}</select>

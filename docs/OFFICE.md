@@ -1625,8 +1625,9 @@ The GUID of a document stays the same in every export of the office area (a repe
 
 Every trip computes the German per diem (*Verpflegungsmehraufwand*) per participant with the flat rates of its year:
 Germany 28 EUR for a full day and 14 EUR for the day of arrival / departure (or a single day of more than 8 hours), abroad
-the rates of the BMF letter of that year (2025: BMF letter of 2 December 2024, 2026: BMF letter of 5 December 2025). A
-year before the first table gives **no amount but a hint**. A later year whose BMF letter is not entered yet **uses the
+the rates of the BMF letter of that year (2023: BMF letter of 23 November 2022, 2024: BMF letter of 21 November 2023,
+both since 2.593; 2025: BMF letter of 2 December 2024, 2026: BMF letter of 5 December 2025). A year before the first table
+(2022 and earlier) gives **no amount but a hint**. A later year whose BMF letter is not entered yet **uses the
 rates of the newest table, with a hint** that names the year they come from (2.428); check such amounts against the letter
 once it is out.
 

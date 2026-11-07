@@ -55,6 +55,7 @@ from .homecur import hc_home  # noqa: E402  2.189.0 B (#2475)
 from .books import _year as bk_year, bk_csv_cell  # 2.369.5 (#2517): pulled up from functions
 from .ledger import ofx_diff, ofx_log, _log_public, ofx_company  # 2.369.5 (#2517): pulled up from functions
 from .travel import rk_cl_where, rk_home_cur, rk_people, rk_real_projects, _client_ok, _one as rk_one, rk_trip_clean  # 2.369.5 (#2517): pulled up from functions
+from .years import ofc_years_sql  # 2.593.0 (#4891): the years with data
 
 
 def _body():
@@ -213,7 +214,18 @@ def lb_vehicles_get():
         projects = sorted({d["project"] for d in lb_drives(c, oid, uid) if d.get("project")})
     return jsonify(vehicles=lb_vehicles(c, oid), people=rk_people(c, oid, uid), clients=clients, projects=projects, km_rate=lb_rate(c, oid, _year(None)),
                    currency=rk_home_cur(c, oid), me=uid, kinds=[{"key": k, "label": tr(n)} for k, n in LB_KINDS], note=tr(LB_NOTE),
-                   real_projects=rk_real_projects(c, oid, uid))  # 2.489.0 (#2652)
+                   real_projects=rk_real_projects(c, oid, uid), years=lb_years(c, oid))  # 2.489.0 (#2652); 2.593.0 (#4891)
+
+
+def lb_years(c, oid):
+    """2.593.0 (#4891): {min, max} of the years of the drives (all vehicles, not deleted) the person sees (lb_drives' rights:
+    level "own" = entered or driven by the person); None: no drive."""
+    sql, args = "SELECT MIN(day), MAX(day) FROM office_drives WHERE org_id=? AND deleted_at IS NULL AND day>='1900'", [oid]
+    own = ofr_own_uid("logbook")
+    if own is not None:
+        sql += " AND (created_by=? OR user_id=?)"
+        args += [own, own]
+    return ofc_years_sql(c, sql, args)
 
 
 @app.post("/api/office/vehicles")

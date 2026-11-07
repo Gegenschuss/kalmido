@@ -93,7 +93,7 @@ function bw_html() {
   if (!ofcAdmin()) return `<div class="empty">${tr('Only for admins of the office.')}</div>`;
   if (BW.err) return `<div class="empty">${esc(BW.err)}</div>`;
   if (!BW.data) { if (!BW.loading) setTimeout(bw_load, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
-  const y0 = new Date().getFullYear(), years = [y0 + 1, y0, y0 - 1, y0 - 2, y0 - 3].map(String);
+  const years = ofcYearOpts(BW.data.years, BW.year);  // 2.593.0 (#4891): the years of the meals (was this year +1 .. -3)
   const ps = bw_persons();
   const views = `<div class="seg" role="group" aria-label="${esc(tr('View'))}">${[['list', tr('Receipts')], ['report', tr('Evaluation')]].map(([k, n]) => `<button type="button" data-bw="view" data-v="${k}" class="${BW.view === k ? 'on' : ''}" aria-pressed="${BW.view === k}">${n}</button>`).join('')}</div>`;
   const bar = `<div class="ofcbar rkbar bwbar"><select id="bw-year" aria-label="${esc(tr('Year'))}"><option value="">${tr('All years')}</option>${years.map(y => `<option ${y === BW.year ? 'selected' : ''}>${y}</option>`).join('')}</select>

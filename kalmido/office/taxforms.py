@@ -23,7 +23,7 @@ from ..core.config import app
 from ..core.db import body, bump
 from ..core.errors import BadInput
 from ..core.i18n import N_, csv_dialect, lang, tr
-from .books import BK_NOTE, _ctx, _year, bk_csv_cell, bk_euer, bk_ustva
+from .books import BK_NOTE, _ctx, _year, bk_csv_cell, bk_euer, bk_ustva, bk_years
 from .calc import calc_lang, dec, dstr, money
 from .ledger import ofx_company, ofx_log
 from .model import ofx_name1, office_need_feature, office_settings, office_settings_lock, office_settings_save
@@ -335,7 +335,7 @@ def tf_euer_get():
     """?year=YYYY -> tf_euer."""
     c, uid, oid = _ctx()
     office_need_feature(c, oid, TF_FEATURE)
-    return jsonify(tf_euer(c, oid, _year(request.args.get("year"))))
+    return jsonify(dict(tf_euer(c, oid, _year(request.args.get("year"))), years=bk_years(c, oid)))  # 2.593.0 (#4891): the year picker
 
 
 @app.get("/api/office/books/taxform/ust")
@@ -343,7 +343,7 @@ def tf_ust_get():
     """?year=YYYY -> tf_ust."""
     c, uid, oid = _ctx()
     office_need_feature(c, oid, TF_FEATURE)
-    return jsonify(tf_ust(c, oid, _year(request.args.get("year"))))
+    return jsonify(dict(tf_ust(c, oid, _year(request.args.get("year"))), years=bk_years(c, oid)))  # 2.593.0 (#4891): the year picker
 
 
 @app.get("/api/office/books/taxform/euer.csv")

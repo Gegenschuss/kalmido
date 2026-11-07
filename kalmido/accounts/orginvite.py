@@ -17,7 +17,11 @@ e-mails count against the daily mail budget (admin/hosting.py). Resend and withd
 invited (org_invites) that never signed in (no password, no session, the link unused); withdrawing deletes that account.
 2.360.2 M (#2561): the list of open invitations has one form for both kinds: an opaque "ref" (sealed, different on every
 read) instead of an account or invitation id; resend and withdraw take it for both, and withdrawing an org_joins row needs no
-org_invites switch (its admins still see and end what is open)."""
+org_invites switch (its admins still see and end what is open).
+2.593.0 (#3570): in a company of its own (orgs.self_made) an existing account the inviting admin may not see (may_see), a
+disabled account or an agent gets no invitation: a silent org_joins row (ojn_silent) stands in the list like any other (the
+answer, the list, Resend and Withdraw stay the same as for a new address), the person never hears of it. The day limit counts
+before the address is looked up, for both kinds."""
 import json
 import re
 from datetime import timedelta
@@ -35,7 +39,7 @@ from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from function
 from ..core.schema import USER_DEFAULTS  # 2.149.0 G (#2517): pulled up from functions
 from ..core.serializers import unlink_files  # 2.149.0 G (#2517): pulled up from functions
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
-from ..accounts.orgs import _need_org_admin, ORG_ROLES, _operator_apart, org_member_add, org_member_put  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgs import _need_org_admin, ORG_ROLES, _operator_apart, may_see, org_member_add, org_member_put  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.invite import invite_state, invite_new  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.users import user_purge  # 2.369.5 (#2517): pulled up from functions
 
@@ -45,7 +49,8 @@ OJN_DAYS = 14  # 2.148.1 A (#2480): an invitation of an existing account stays o
 # 2.453.0 (#3780): open: young enough, or the person set up the account with its link lately (a new account's link lasts as
 # long as the invitation: whoever uses it on the last day still gets the full time to accept). Params: the same cut twice.
 # Only a link of this invitation or newer counts (created_at): an older link does not bring an expired invitation back.
-OJN_LIVE = "(j.created_at>? OR EXISTS (SELECT 1 FROM user_invites v WHERE v.user_id=j.user_id AND v.kind='invite' AND v.used_at>? AND v.created_at>=j.created_at))"
+# 2.593.0 (#3570): + never a silent invitation (ojn_silent): it does not exist for the invited person
+OJN_LIVE = "j.silent=0 AND (j.created_at>? OR EXISTS (SELECT 1 FROM user_invites v WHERE v.user_id=j.user_id AND v.kind='invite' AND v.used_at>? AND v.created_at>=j.created_at))"
 OINV_REF = "org-invite"  # 2.360.2 M (#2561): purpose of the sealed row reference
 
 
@@ -84,8 +89,10 @@ def _acct_join(c, oid, uid):
 
 
 def oinv_ref(c, oid, kind, rid):
-    """2.360.2 M (#2561): a row of the open invitations for the client: kind u = a new account (id), j = org_joins (id)."""
-    return seal(c, f"{OINV_REF}:{oid}", f"{kind}{rid}")
+    """2.360.2 M (#2561): a row of the open invitations for the client: kind u = a new account (id), j = org_joins (id).
+    2.593.0 (#3570, review F2): the id with a fixed number of digits: the sealed text's length tells nothing of the kind
+    (oinv_unref reads a reference of before the same way)."""
+    return seal(c, f"{OINV_REF}:{oid}", f"{kind}{rid:018d}")
 
 
 def oinv_unref(c, oid, ref):
@@ -97,6 +104,12 @@ def oinv_unref(c, oid, ref):
         return v[0], int(v[1:])
     except Exception:  # noqa: BLE001  (not one of ours, or for another organisation)
         raise Denied(404) from None
+
+
+def oinv_addr(r):
+    """2.593.0 (#3570, review F1): an invited address as the list, Resend and Withdraw show it: in small letters, whether it
+    is the one typed (a new account) or the one an account holder saved in their own spelling."""
+    return (r["email"] or "").strip().lower()
 
 
 def oinv_list(c, oid):
@@ -114,14 +127,14 @@ def oinv_list(c, oid):
             continue
         j = joins.pop(r["user_id"], None)  # 2.453.0 (#3780): one row per account: the ref of a new account (withdrawing deletes it), the values of its org_joins row
         if j:
-            out.append({"ref": oinv_ref(c, oid, "u", r["user_id"]), "user_id": r["user_id"] if keep_id else None, "email": j["email"] or "", "name": j["email"] or "",
+            out.append({"ref": oinv_ref(c, oid, "u", r["user_id"]), "user_id": r["user_id"] if keep_id else None, "email": oinv_addr(j), "name": oinv_addr(j),
                         "role": j["role"], "created_at": j["created_at"], "state": "invited" if j["created_at"] > since else "expired"})
         elif oinv_on(c) and c.execute("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (oid, r["user_id"])).fetchone():
-            out.append({"ref": oinv_ref(c, oid, "u", r["user_id"]), "user_id": r["user_id"] if keep_id else None, "email": r["email"] or "",
-                        "name": r["email"] or r["display_name"] or r["username"], "role": r["role"], "created_at": r["created_at"],
+            out.append({"ref": oinv_ref(c, oid, "u", r["user_id"]), "user_id": r["user_id"] if keep_id else None, "email": oinv_addr(r),
+                        "name": oinv_addr(r) or r["display_name"] or r["username"], "role": r["role"], "created_at": r["created_at"],
                         "state": invite_state(c, r["user_id"]) or "expired"})
     # 2.148.1 H (#2480): the open invitations of existing accounts are listed, too (same form, no account id)
-    out += [{"ref": oinv_ref(c, oid, "j", r["id"]), "user_id": None, "email": r["email"] or "", "name": r["email"] or "", "role": r["role"],
+    out += [{"ref": oinv_ref(c, oid, "j", r["id"]), "user_id": None, "email": oinv_addr(r), "name": oinv_addr(r), "role": r["role"],
              "created_at": r["created_at"], "state": "invited" if r["created_at"] > since else "expired"} for r in joins.values()]
     out.sort(key=lambda v: v["created_at"] or "", reverse=True)
     return out
@@ -155,17 +168,18 @@ def org_invite_new(oid):
     if hit_limit(f"oinv:{me()}", OINV_DAY, 86400):
         return err(tr("Too many invitations today (at most {0}). Try again tomorrow.", OINV_DAY), 429)
     write_lock(c, "accounts")  # user names and addresses are checked and taken in one go
+    since = iso(now_utc() - timedelta(days=1))
+    # 2.593.0 (#3570): before the lookup as well, so a full day answers the same for an address with an account and without
+    if c.execute("SELECT COUNT(*) FROM org_invites WHERE created_by=? AND created_at>?", (me(), since)).fetchone()[0] >= OINV_DAY:
+        c.rollback()
+        return err(tr("Too many invitations today (at most {0}). Try again tomorrow.", OINV_DAY), 429)
     if c.execute("SELECT 1 FROM users WHERE lower(email)=lower(?)", (email,)).fetchone():
         c.rollback()
-        r = org_member_put(oid)  # the existing path with the same body (an invitation to accept, accounts/orgs.py)
+        r = org_member_put(oid, ghost=True)  # the existing path with the same body (an invitation to accept, accounts/orgs.py)
         code = r[1] if isinstance(r, tuple) else r.status_code  # 2.148.1 H (#2480): err() answers (body, code)
         if code >= 400:
             return r
         return jsonify(ok=True, by_email=True, invites=oinv_list(c, oid))  # 2.148.1 A (#2480): the same answer as a new account
-    since = iso(now_utc() - timedelta(days=1))
-    if c.execute("SELECT COUNT(*) FROM org_invites WHERE created_by=? AND created_at>?", (me(), since)).fetchone()[0] >= OINV_DAY:
-        c.rollback()
-        return err(tr("Too many invitations today (at most {0}). Try again tomorrow.", OINV_DAY), 429)
     name = re.sub(r"\s+", " ", str(b.get("name") or "")).strip()[:60]
     username = _username(c, email)
     uid = create_user(c, username, name or username, None, onboard=True, ask_purpose=me())  # 2.364.0 A (#3032)
@@ -181,7 +195,8 @@ def org_invite_new(oid):
     else:
         ojn_invite(c, oid, uid, role)
     c.execute("INSERT INTO org_invites(user_id,org_id,role,created_by,created_at) VALUES(?,?,?,?,?)", (uid, oid, role, me(), iso(now_utc())))
-    inv = _no_link_if_sent(invite_new(c, uid, me(), send=True, days=None if direct else OJN_DAYS), uid)  # job #692 review: always by mail (no "send": false - the link would go to the admin)
+    # 2.593.0 (#3570, review F3): an organisation admin's mail goes through the background queue like an existing account's
+    inv = _no_link_if_sent(invite_new(c, uid, me(), send=True, days=None if direct else OJN_DAYS, bg=not g.user["is_admin"]), uid)  # job #692 review: always by mail (no "send": false - the link would go to the admin)
     bump(c)
     c.commit()
     print("organisation invitation: an account into organisation", oid, "by", login_log_who(g.user), flush=True)
@@ -208,7 +223,7 @@ def _no_link_if_sent(inv, uid=None):
 def _join(c, oid, jid):
     """2.360.2 M (#2561): the open org_joins row jid of organisation oid with the address (404: none)."""
     with system_ctx(c):  # the invited person is no member yet; the caller checked the organisation admin
-        r = c.execute("""SELECT j.id, j.user_id, j.role, u.email FROM org_joins j JOIN users u ON u.id=j.user_id WHERE j.id=? AND j.org_id=?
+        r = c.execute("""SELECT j.id, j.user_id, j.role, j.silent, u.email FROM org_joins j JOIN users u ON u.id=j.user_id WHERE j.id=? AND j.org_id=?
                          AND NOT EXISTS (SELECT 1 FROM org_members m WHERE m.org_id=j.org_id AND m.user_id=j.user_id)""", (jid, oid)).fetchone()
     if not r:
         raise Denied(404)
@@ -228,18 +243,22 @@ def org_invite_resend(oid, ref):
     if hit_limit(f"oinv-resend-u:{oid}:{kind}{uid}", OINV_RESEND_DAY, 86400):  # 2.148.1 A (#2486): per invitation
         return err(tr("This invitation was sent again too often today (at most {0}). Try again tomorrow.", OINV_RESEND_DAY), 429)
     if kind == "j":
-        ojn_invite(c, oid, r["user_id"], r["role"])
-        inv = {"sent": True, "email": r["email"] or ""}
+        if r["silent"] and ojn_hidden(c, oid, r["user_id"]):  # 2.593.0 (#3570): starts again for the list only, the person still hears nothing
+            with system_ctx(c):  # the row of a person who is no member
+                c.execute("UPDATE org_joins SET created_at=? WHERE id=?", (iso(now_utc()), r["id"]))
+        else:
+            ojn_invite(c, oid, r["user_id"], r["role"])
+        inv = {"sent": True, "email": oinv_addr(r)}
     else:
         joined = _acct_join(c, oid, uid)
         if joined:  # 2.453.0 (#3780): the invitation starts again with the link (the News item it has stays the one)
             with system_ctx(c):  # the row of a person who is no member
                 c.execute("UPDATE org_joins SET created_at=? WHERE org_id=? AND user_id=?", (iso(now_utc()), oid, uid))
-        inv = _no_link_if_sent(invite_new(c, uid, me(), send=True, days=OJN_DAYS if joined else None), uid)
+        inv = _no_link_if_sent(invite_new(c, uid, me(), send=True, days=OJN_DAYS if joined else None, bg=not g.user["is_admin"]), uid)  # review F3
         if not g.user["is_admin"]:  # 2.453.0 (#3780): the answer of an existing account, it must not tell the two apart (a failed mail: log only)
             if inv.get("error"):
                 print("organisation invitation: resend for account", uid, "not mailed:", inv["error"], flush=True)
-            inv = {"sent": True, "email": inv.get("email") or ""}
+            inv = {"sent": True, "email": (inv.get("email") or "").strip().lower()}
     bump(c)
     c.commit()
     return jsonify(ok=True, invitation=inv, invites=oinv_list(c, oid))
@@ -262,7 +281,7 @@ def org_invite_withdraw(oid, ref):
         bump(c)
         c.commit()
         print("organisation invitation withdrawn: account", j["user_id"], "organisation", oid, "by", login_log_who(g.user), flush=True)
-        return jsonify(ok=True, email=j["email"] or "", name=j["email"] or "", role=j["role"], invites=oinv_list(c, oid))
+        return jsonify(ok=True, email=oinv_addr(j), name=oinv_addr(j), role=j["role"], invites=oinv_list(c, oid))
     joined = _acct_join(c, oid, uid)  # 2.453.0 (#3780): like an org_joins row above, an open invitation can end with invitations switched off
     if not joined:
         _need(c, oid)
@@ -272,7 +291,9 @@ def org_invite_withdraw(oid, ref):
         other_org = c.execute("SELECT 1 FROM org_members WHERE user_id=? AND org_id!=?", (uid, oid)).fetchone()
         owns = c.execute("SELECT 1 FROM lists WHERE owner_id=? AND is_inbox=0", (uid,)).fetchone()
         cut = iso(now_utc() - timedelta(days=OJN_DAYS))
-        other_join = c.execute(f"SELECT 1 FROM org_joins j JOIN orgs o ON o.id=j.org_id WHERE j.user_id=? AND j.org_id!=? AND {OJN_LIVE} AND o.retired_at IS NULL", (uid, oid, cut, cut)).fetchone()
+        # 2.593.0 (#3570, review F4): a silent invitation of another organisation counts too (also an old one): the account stays,
+        # so that row does not vanish from the other admin's list and tell that an account was there
+        other_join = c.execute(f"SELECT 1 FROM org_joins j JOIN orgs o ON o.id=j.org_id WHERE j.user_id=? AND j.org_id!=? AND (j.silent=1 OR {OJN_LIVE}) AND o.retired_at IS NULL", (uid, oid, cut, cut)).fetchone()
     if other_org:
         raise Denied(409, tr("The person belongs to another organisation as well"))  # never delete across the boundary
     if owns:
@@ -291,7 +312,7 @@ def org_invite_withdraw(oid, ref):
     c.commit()
     unlink_files(files)
     print("organisation invitation withdrawn: account", uid, "organisation", oid, "by", login_log_who(g.user), flush=True)
-    return jsonify(ok=True, email=u["email"] or "", name=u["email"] or u["display_name"] or "", role=(joined or r)["role"], invites=oinv_list(c, oid))
+    return jsonify(ok=True, email=oinv_addr(u), name=oinv_addr(u) or u["display_name"] or "", role=(joined or r)["role"], invites=oinv_list(c, oid))
 
 
 # ---- 2.148.1 A (#2480): an existing account invited into an organisation joins only when the person accepts
@@ -302,11 +323,11 @@ def ojn_invite(c, oid, uid, role, by=None):
     2.278.0 A (#3095): by = the inviting admin outside a request (the org import's thread)."""
     now = now_utc()
     by = by or me()
-    old = c.execute("SELECT created_at FROM org_joins WHERE org_id=? AND user_id=?", (oid, uid)).fetchone()
+    old = c.execute("SELECT created_at, silent FROM org_joins WHERE org_id=? AND user_id=?", (oid, uid)).fetchone()
     c.execute("""INSERT INTO org_joins(org_id,user_id,role,created_by,created_at) VALUES(?,?,?,?,?)
-                 ON CONFLICT(org_id, user_id) DO UPDATE SET role=excluded.role, created_by=excluded.created_by, created_at=excluded.created_at""",
+                 ON CONFLICT(org_id, user_id) DO UPDATE SET role=excluded.role, created_by=excluded.created_by, created_at=excluded.created_at, silent=0""",
               (oid, uid, role, by, iso(now)))
-    if old and old[0] > iso(now - timedelta(days=1)):
+    if old and not old["silent"] and old["created_at"] > iso(now - timedelta(days=1)):  # 2.593.0 (#3570): a silent one was never told
         return
     with system_ctx(c):  # the invitation reaches the person whatever their News settings say (they must answer it)
         name = c.execute("SELECT name FROM orgs WHERE id=?", (oid,)).fetchone()[0]
@@ -318,6 +339,32 @@ def ojn_invite(c, oid, uid, role, by=None):
         sec_mail(c, uid, "orgjoin", who, name)
     ojn_push(c, uid, who, name)
     print("organisation", oid, "invited account", uid, "to join, by", login_log_who(by), flush=True)
+
+
+def ojn_silent(c, oid, uid, role):
+    """2.593.0 (#3570): the invitation of an existing account the inviting admin may not see (org_member_put, a company of its
+    own): an org_joins row with silent=1 -- in the list of open invitations like any other, nothing for the person (no News item,
+    mail or push; ojn_open / ojn_mine / ojn_waiting skip it). An ordinary invitation stays as it is (review F5: an expired one
+    is not opened again without the person hearing of it - like a new address invited again). The caller commits."""
+    with system_ctx(c):  # the row of a person who is no member and whom the admin may not see
+        c.execute("""INSERT INTO org_joins(org_id,user_id,role,created_by,created_at,silent) VALUES(?,?,?,?,?,1)
+                     ON CONFLICT(org_id, user_id) DO UPDATE SET role=excluded.role, created_by=excluded.created_by, created_at=excluded.created_at
+                     WHERE org_joins.silent=1""",
+                  (oid, uid, role, me(), iso(now_utc())))
+    print("organisation", oid, "invitation of an account the admin may not see kept silent, by", login_log_who(g.user), flush=True)
+
+
+def ojn_hidden(c, oid, uid):
+    """2.593.0 (#3570, review F5): a silent invitation stays silent on Resend: a disabled account or an agent, or in a company
+    of its own (orgs.self_made) a person the inviting admin may not see (the test of org_member_put). Otherwise -- the admin
+    may see the person by now -- Resend makes it an ordinary invitation (ojn_invite)."""
+    u = c.execute("SELECT disabled, kind FROM users WHERE id=?", (uid,)).fetchone()
+    if not u or u["disabled"] or (u["kind"] or "user") == "agent":
+        return True
+    if g.user["is_admin"] and not _operator_apart():
+        return False
+    selfm = c.execute("SELECT self_made FROM orgs WHERE id=?", (oid,)).fetchone()
+    return bool(selfm and selfm[0]) and not may_see(c, me(), uid)
 
 
 def ojn_push(c, uid, who, org):

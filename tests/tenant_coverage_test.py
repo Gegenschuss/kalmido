@@ -213,6 +213,8 @@ KINDS = {
 }
 
 ROUTES = {
+    # 2.593.0 (#4590): reset the own look and comfort settings (only the own user_settings rows, uid = me()): p2593_d_reset_test.py
+    "POST /api/settings/reset": "own",
     # 2.575.0 (#3778): module cards (private: the owner only; an organisation's: its members read, its admins write): p2575_a_api_test.py
     "GET /api/modcards": "modcard", "POST /api/modcards": "modcard", "PATCH /api/modcards/{}": "modcard", "DELETE /api/modcards/{}": "modcard",
     # 2.570.0 (#4783): the history of an office row / a client (office/owrite.py ow_history, the rights of the save route): p2570_a_office_test.py

@@ -164,6 +164,7 @@ class UndoPlan:
     def __init__(self):
         self.exist, self.keep, self.pin, self.held, self.roots, self.kids, self.ups = set(), set(), set(), set(), set(), {}, {}
         self.in_trash, self.kept_n, self.trashed = set(), 0, 0
+        self.final, self.final_with = set(), set()  # 2.593.0 (#4864): the finalised documents, they with what they hang on / hold
 
     def goes(self, table, rid):
         """Deleted for good by the undo."""
@@ -209,6 +210,38 @@ def _judge_rows(c, plan, rows, since, prints, space_cols):
                     full = {**dict(r), "_logs": logs.get(r["id"], [])} if table == "habits" else r
                     if pr.get(str(r["id"])) != undo_print(full, skip):
                         plan.keep.add(k)
+
+
+def _keep_final(c, plan):
+    """2.593.0 (#4864): a document the import brought as finalised (locked_at set, also before the import) never goes: often the
+    only GoBD copy once the source is gone. It stays with its import log entries (doc_id without a foreign key: linked here
+    as if they cascaded, so they stay with it and count as part of it); what it points at and what cascades on it stay by
+    _spread (its client, contract, positions, payments), its stored PDF / XML by undo_files_left / oi_office_files_left."""
+    for part in _chunks(plan.of("office_docs", plan.exist)):
+        plan.final.update(("office_docs", r[0]) for r in c.execute(
+            f"SELECT id FROM office_docs WHERE id IN ({_qs(part)}) AND locked_at IS NOT NULL AND locked_at!=''", part).fetchall())
+    if not plan.final:
+        return
+    plan.keep |= plan.final
+    for part in _chunks(plan.of("office_doc_log", plan.exist)):
+        for r in c.execute(f"SELECT id, doc_id FROM office_doc_log WHERE id IN ({_qs(part)})", part).fetchall():
+            pk, ck = ("office_docs", r["doc_id"]), ("office_doc_log", r["id"])
+            if pk in plan.final:
+                plan.ups.setdefault(ck, []).append((pk, "c"))
+                plan.kids.setdefault(pk, []).append(ck)
+
+
+def _final_reach(plan):
+    """2.593.0 (#4864): the finalised documents with what stays because of them (the same walk as _spread), for the preview."""
+    reach, todo = set(plan.final), list(plan.final)
+    while todo:
+        k = todo.pop()
+        nxt = [p for p, _a in plan.ups.get(k, ())] + [ck for ck in plan.kids.get(k, ()) if not (k[0] == "fs_nodes" and ck[0] == "fs_nodes")]
+        for x in nxt:
+            if x not in reach and x in plan.keep:
+                reach.add(x)
+                todo.append(x)
+    plan.final_with = reach
 
 
 def _refs(c, table):
@@ -287,9 +320,11 @@ def undo_plan(c, cr, since, tracked, space_cols):
     rows = {t: v for t, v in undo_rows(cr).items() if t in tracked or t in _BASE or t in _PARTS}  # never a name from elsewhere in a statement
     _judge_rows(c, plan, rows, since, prints, space_cols)
     _judge_kids(c, plan, since, tracked)
+    _keep_final(c, plan)  # 2.593.0 (#4864): after the kids are known (its log entries are linked to it here)
     _spread(plan)
     while _keep_nodes_of_kept(c, plan):
         _spread(plan)
+    _final_reach(plan)
     plan.kept_n = sum(1 for k in plan.keep if k not in plan.in_trash and not any(p in plan.keep and a == "c" for p, a in plan.ups.get(k, ())))
     go = plan.exist - plan.keep
     # the top folder of an area (knowledge, tables ...) never goes into the trash, as in the app (fs_area_root_need_free): it stays,
@@ -366,6 +401,12 @@ def undo_trash(c, uid, plan):
             plan.trashed += 1  # 2.611.0 (#4866): a client in its trash counts like a file, page or table (the undo dialog names them)
 
 
+def undo_final_top(plan):
+    """2.593.0 (#4864): [(table, id)] of what stays because of a finalised document, without what is part of a row in that set
+    (positions, payments, log entries): the rows the preview names under "stays"."""
+    return sorted(k for k in plan.final_with if not any(p in plan.final_with and a == "c" for p, a in plan.ups.get(k, ())))
+
+
 def undo_files_left(c, plan, paths, extra_rows=(), owners=None):
     """The stored files of paths that may go: not the ones a row that stays names (in the trash or kept). Called before the rows
     go; any text column counts, the names are unique (a random part). 2.516.0 (#4364): owners = {path: [[table, id], ...]}, the
@@ -397,4 +438,4 @@ def undo_files_left(c, plan, paths, extra_rows=(), owners=None):
     return [p for p in paths if not (isinstance(p, str) and os.path.basename(p) in blob)]
 
 
-__all__ = ["UndoPlan", "undo_plan", "undo_prints", "undo_trash", "undo_files_left", "undo_key", "undo_key_stays", "undo_rows"]
+__all__ = ["UndoPlan", "undo_plan", "undo_final_top", "undo_prints", "undo_trash", "undo_files_left", "undo_key", "undo_key_stays", "undo_rows"]

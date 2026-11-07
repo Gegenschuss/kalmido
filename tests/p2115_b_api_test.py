@@ -204,10 +204,19 @@ m = DB.execute("SELECT role FROM org_joins WHERE org_id=? AND user_id=?", (ORG, 
 check(m and m["role"] == "admin", "invited into the organisation in the chosen role")
 check(not DB.execute("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (ORG, NU)).fetchone(), "no member before accepting")
 check(not DB.execute("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (ORG2, NU)).fetchone(), "not in the other organisation")
-ml = until(lambda: [x for x in mails() if any(a.lower() == "nina.new@example.com" for a in x["to"])], 10)  # "to" is a list
-msg = email.message_from_string(ml[0]["raw"]) if ml else None
-txt = "".join(p.get_payload(decode=True).decode() for p in msg.walk() if p.get_content_type() == "text/plain") if msg else ""
 LINK_RE = re.compile(r"https://kalmido\.example/#invite/[A-Za-z0-9_-]+")
+
+
+def plain(m):
+    return "".join(p.get_payload(decode=True).decode() for p in m.walk() if p.get_content_type() == "text/plain")
+
+
+# 2.593.0 (#3570): the invitation mail goes through the background queue (review F3), like the "invites you to join" mail
+# queued before it: the one with the link, whichever comes first
+ml = until(lambda: [x for x in mails() if any(a.lower() == "nina.new@example.com" for a in x["to"])
+                    and LINK_RE.search(plain(email.message_from_string(x["raw"])))], 10)  # "to" is a list
+msg = email.message_from_string(ml[0]["raw"]) if ml else None
+txt = plain(msg) if msg else ""
 mlink = LINK_RE.search(txt)
 check(mlink, f"the invitation mail with the link ({len(ml)} mail(s))")
 check(re.search(r"\b14\b", txt), "#3780: the link lives as long as the invitation " + txt[:400])
