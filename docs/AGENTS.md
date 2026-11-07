@@ -2160,6 +2160,9 @@ organisation's agent: of the organisation), named like the agent; the agent may 
 (an organisation's admins) sees it. Put results people should read there instead of a local work folder. Every access of
 an agent (listing, reading, downloading, writing) is written into the file's history, which its owner sees. Nothing
 crosses a workspace: an organisation's folder is never shared with a private agent or an agent of another organisation.
+**Deleted accounts (2.644.0, #4999):** when an account is deleted and its shared folders are handed on to an heir, an
+agent's share on them ends unless the agent belongs to the heir's space (the same rule as moving a folder there); the
+agent can no longer read those files.
 Scopes: `files:read` (list, read) and `files:write` (add files and folders, new versions); new agents get both.
 **Receipts of an organisation (2.187.1):** a file the office keeps as a receipt needs the office area *Receipts* in the
 agent's [office rights groups](#office-drafts-only) on top of the share (level *own*: only the receipts the agent
