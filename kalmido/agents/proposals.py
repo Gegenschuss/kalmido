@@ -1068,7 +1068,9 @@ def proposal_apply(jid):
 @app.post("/api/proposals/<int:jid>/discard")
 def proposal_discard(jid):
     c = db()
-    j = need_prop(c, jid)  # 2.569.0 (#4675 review): only the one who asked discards; the project's writers see and apply
+    j = need_prop(c, jid, lock=True)  # 2.569.0 (#4675 review): only the one who asked discards; the project's writers see and apply
+    # 2.623.0 (#4718, review C): the row lock as apply / undo take it - discarding while an apply holds it waits and then sees
+    # "applied" (409) instead of overwriting it with "discarded"
     if j["prop_state"] in ("applied", "discarded"):
         return err(tr("This proposal was already applied or discarded"), 409)
     ts = iso(now_utc())

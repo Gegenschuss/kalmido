@@ -10,7 +10,7 @@ with the test kind 'objprobe' (KALMIDO_TEST_OBJ=1, tests/obj_probe.py). Invented
  - accepting after someone else changed the object: 409 with a plain message, nothing written, the card says stale
  - a person who lost the write right since (now read-only in the organisation) cannot accept (403), nothing written; discarding
  - review C: undo / redo after someone else's change 409 (the card keeps its state); discarding while accepting holds the
-   proposal's row waits for it and answers 409 (next commit)
+   proposal's row waits for it and answers 409
 tenant-matrix: obj (another organisation's agent: 404 on a proposal)
 freelancer-matrix: obj (a person without an organisation: her agent proposes, she accepts)
 usage: p2623_c_objprop_test.py <datadir>"""
@@ -130,6 +130,27 @@ r = Bo.post(B + f"/api/proposals/{J4}/redo")
 x = Bo.get(B + f"/api/proposals/{J4}").json()
 check(r.status_code == 409 and get(Bo, O)["note"] == "carl again" and x["applied"]["undone"] is True,
       f"redo after someone else's change: 409, nothing written, the card stays undone ({r.status_code} {r.text[:160]} {x.get('applied')})")
+
+# ---------------------------------------------------------------- review C: discarding while accepting holds the row (409)
+cur = AG.get(O).json()
+r = propose(AG, O, {"values": {"note": "race"}, "expect_updated_at": cur["updated_at"]})
+J5 = r.json().get("id") if r.status_code == 201 else None
+dbc, dbn = _dbx._target(DATA)
+hold = subprocess.Popen(["docker", "exec", "-i", dbc, "psql", "-U", "kalmido", "-d", dbn, "-X", "-q", "-v", "ON_ERROR_STOP=1"], stdin=subprocess.PIPE,
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, text=True)
+hold.stdin.write(f"BEGIN; SELECT id FROM agent_jobs WHERE id={int(J5)} FOR UPDATE; UPDATE agent_jobs SET prop_state='applied', state='done' "
+                 f"WHERE id={int(J5)}; SELECT pg_sleep(2.5); COMMIT;\n")
+hold.stdin.close()
+held = False
+for _ in range(100):  # until the other transaction holds the row (it sleeps inside it)
+    held = dbx("SELECT count(*) FROM pg_stat_activity WHERE query LIKE ? AND state='active' AND pid<>pg_backend_pid()", ("%pg_sleep(2.5)%",))[0][0] > 0
+    if held:
+        break
+    time.sleep(0.05)
+r = Bo.post(B + f"/api/proposals/{J5}/discard")
+hold.wait(timeout=30)
+check(held and r.status_code == 409 and dbx("SELECT prop_state FROM agent_jobs WHERE id=?", (J5,))[0][0] == "applied",
+      f"discarding while the proposal is being accepted: 409, it stays applied (held {held}, {r.status_code} {r.text[:120]})")
 
 # ---------------------------------------------------------------- accepting after someone else changed it: 409
 cur = AG.get(O).json()
