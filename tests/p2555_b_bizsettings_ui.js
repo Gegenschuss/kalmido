@@ -69,7 +69,9 @@ async function openBiz(who) {
     // the head: the area as text, no workspace menu
     check(!box.querySelector('[data-act="ws-menu"]'), `${who}: no workspace menu in Company & office`);
     check(txt(box.querySelector('.sbizws')) === `Workspace: ${area}` && box.querySelector('.sbizws')?.tagName === 'P', `${who}: the head names the area once as text: ` + txt(box.querySelector('.sbizws')));
-    check(!/Applies to/.test(box.textContent), `${who}: no "Applies to"`);
+    // #3506 (CI red of 2.614.0): the label of the workspace menu; the hint of the income statement's basis (2.603.0, #4927)
+    // says "Applies to the whole year" about the year, not the workspace
+    check(!/Applies to(?! the whole year)/.test(box.textContent), `${who}: no "Applies to"`);
     // heading levels
     const groups = [...form.querySelectorAll(':scope > h3')].map(h => h.id);
     check(groups[0] === 's-biz-company' && groups.includes('s-biz-docs') && groups.includes('s-biz-packs') && !form.querySelector(':scope > h4'), `${who}: the groups are h3 ` + groups.join());
