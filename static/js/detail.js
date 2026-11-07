@@ -25,8 +25,9 @@ function openDetail(id, o = {}) {
   $$(`.trow[data-id="${id}"]`).forEach(r => r.classList.add('sel'));
   // 2.26.x (#953): touch tablets / the unfolded Fold too: the open task is its own history entry, so Back (Android's key /
   // gesture) closes only the task and keeps the view + sidebar; phones as before (one entry per opened task)
-  if (isMobile()) history[o.replace && history.state?.detail ? 'replaceState' : 'pushState']({detail: id}, '', location.hash);  // 2.32.0 (#1071): a swipe to the next task replaces the entry (Back closes the task)
-  else if (isTouch() && !history.state?.detail) history.pushState({detail: id}, '', location.hash);
+  // 2.622.0 (#4948): o.here = route() opened the task from a link inside the app: the link's new entry becomes the task's entry
+  if (isMobile()) history[(o.replace && history.state?.detail) || o.here ? 'replaceState' : 'pushState']({detail: id}, '', location.hash);  // 2.32.0 (#1071): a swipe to the next task replaces the entry (Back closes the task)
+  else if (isTouch() && !history.state?.detail) history[o.here ? 'replaceState' : 'pushState']({detail: id}, '', location.hash);
   if (cmtOn() && id > 0 && S.tl.id !== id) S.tl = {id};
   loadTimeline(id);
   loadTaskTime(id);

@@ -1781,7 +1781,12 @@ async function route() {
   if (history.state?.side && !r.task && (isMobile() || $('#app')?.classList.contains('side-rail'))) setTimeout(() => { if (!history.state?.side) return; try { const {side, ...st} = history.state; history.replaceState(Object.keys(st).length ? st : null, '', location.href); } catch { /* old browser */ } if (!$('#side.open')) sideDrawerOpen(); }, 0);  // 2.534.0 (#4344): side is used up once - a later route() without a Back does not reopen the drawer
   if (!(typeof sbm_hold === 'function' && sbm_hold())) closeSide();  // 2.196.0 A (#2737): an area icon in the phone's drawer keeps it open
   tch_overlaysClose();  // 2.38.0 (#1155)
-  if (r.task) { render(); if (taskById(r.task)?.unread || r.reply) S.tlScroll = r.task; openDetail(r.task); history.replaceState(null, '', '#' + keyToHash(S.route.key)); if (r.reply) replyFocus(r.task); return; }
+  // 2.622.0 (#4948): the #t/<id> entry becomes the list's own entry BEFORE the task opens. It used to stay behind as a second entry
+  // (the task's {detail} entry got the list's address and lost its mark): the phone's system Back landed on #t/<id>, which opened
+  // the task again (or, after the Back of an overlay, did nothing). A link / go() inside the app (a new entry without a state) puts
+  // the task into that entry (here: one Back closes it, the next one is the view before); a page load or a step onto an old
+  // #t/<id> keeps the list entry and the task gets its own entry on top (openDetail)
+  if (r.task) { render(); if (taskById(r.task)?.unread || r.reply) S.tlScroll = r.task; const here = history.state == null; history.replaceState(null, '', '#' + keyToHash(S.route.key)); openDetail(r.task, {here}); if (r.reply) replyFocus(r.task); return; }
   if (r.prop) { history.replaceState(null, '', '#' + keyToHash(S.route.key)); render(); propOpen(r.prop); return; }
   if (r.msg) { history.replaceState(null, '', '#' + keyToHash(S.route.key)); render(); msgJump({art: r.msg.art, id: r.msg.id, chat: r.msg.art === 't' ? r.msg.place : null, agent: r.msg.art === 'a' ? r.msg.place : null}); return; }  // 2.37.0 (#1159)
   if (r.snooze || r.complete || r.nagoff) {
