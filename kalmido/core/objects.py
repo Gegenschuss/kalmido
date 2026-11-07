@@ -1047,7 +1047,7 @@ def _boundary_old(c, reg, rid, uid, org):
 
 
 def obj_boundary_take(c, table, oid, uid):
-    """accounts/tenancy.py boundary_repair (core/objhooks.BOUNDARY): person uid's rows of table on object oid -- a person no
+    """accounts/tenancy.py boundary_repair (core/objhooks.BOUNDARY): person uid's rows of table on the given object -- a person no
     member of the object's organisation -- go through the core instead of a bare DELETE: into obj_revoked (restorable for
     OBJ_REVOKED_DAYS), and both sides of a share that has a card / an old member row (the core share on the reference node
     and the area's row), so neither side reopens the other. None = not a table of the core (the caller deletes as before)."""
