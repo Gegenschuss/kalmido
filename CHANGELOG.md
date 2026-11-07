@@ -3,7 +3,8 @@
 All notable changes to Kalmido are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and Kalmido uses
 [semantic versioning](https://semver.org/): every published change gets at least a new patch version, new features a
-minor one, anything that needs action on your side a major one.
+minor one. Releases in which operators have to do something carry a fixed section "Action needed"; the update notice
+in Settings > Help shows that section of the target version.
 
 ## Older versions
 
@@ -14,6 +15,26 @@ minor one, anything that needs action on your side a major one.
 - [2.100-2.199](docs/changelog/2.100-2.199.md)
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
+
+## [2.632.0] - 2026-11-07
+
+Package 2.628 (Bündel: CI-only rot: p2350_a_api, CI-only rot: p2521_e_dbmem, CI-only rot: p253_a_ui u. 3 weitere).
+### Changed
+- Test selection: a test file can say `stages-covers: PATH` (globs allowed) for a client file no suite names; `tests/stages.py --touched` then takes that suite on top of the fixed set, first user the calendar UI suite for the recurrence helper (#4580).
+### Fixed
+- Bank fetch over FinTS: the period From / To uses the app's own date fields instead of the browser's native date inputs (#4986).
+- CI red suites since 2.621: the reply test expects the full fenced quote the agent runner loads since #3757 (#4982); the split load test starts its stack with a cover page so the docs queue does not split the clear stack itself first (#4983); the office cold start test checks the files of the module office, the FinTS dialog is its own on-demand module (#4984); the push tag test row is sent now instead of 1970, the dismiss sweep no longer removes it (#4985).
+
+Package 2.627 (Bündel: Rot auf main allein: p2361_a_texts, Rot auf main allein: p2554_a_docside_ui, Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Added
+- Views: organisation admins save the standard arrangement of Start, Today, Time tracking, Overviews and Review for their organisation ("Use as standard for <organisation>" in the organisation's workspace); order: own arrangement > organisation standard > instance standard, "Reset to standard" goes to the organisation's; `PUT /api/layouts/std/<key>` takes an optional `org_id` (members 403, other organisations 404), agents read the same order (#4504)
+- Time tracking: the tracked time stands next to the task's duration (the estimate), e.g. "1:30 h / 2:00 h", in the time chip of the row, the column "Tracked time" and the task panel; the window "Tracked time" warns from 80 % of the budget like the head bar (#4503)
+- Touch: a file row of the file storage can be held and dragged onto a folder or the path with a finger (#4961); the icons of the area rail can be sorted with a finger (#4962)
+### Changed
+- The finger drags of the sidebar's list rows, the areas' tree and the favourite tiles run on the shared drag code (edge scroll, Esc, a second finger cancels); the tree now scrolls at the edge while dragging (#4966)
+### Fixed
+- People list: a member sees per person only the organisations they share with them, no longer the ids of all organisations of that person (#4526)
+- Tests: p2361_a_texts follows the removed clients text (#4980), p2554_a_docside_ui builds a stack that waits for a person since the auto split (#4981), p2579_c_ui and p2574_b_wkcm_ui wait for the end state instead of in-between states and are out of the skip list (#4976, #4977)
 
 ## [2.629.0] - 2026-11-07
 
@@ -228,7 +249,8 @@ Package 2.582 (Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher),
 
 Not released (the CI of this version was red); its changes are listed under 2.605.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.629.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.632.0...HEAD
+[2.632.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.632.0
 [2.629.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.629.0
 [2.626.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.626.0
 [2.621.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.621.0
