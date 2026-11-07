@@ -285,16 +285,16 @@ def folder_ptype(c, owner, folder):
     if not folder:
         return ""
     eff = folder_effective(c, owner, folder)[0]
+    from ..lists.templates import PTYPES, ptype_ok
     if eff.get("ptype"):
-        return eff["ptype"]
-    from ..lists.templates import PTYPES
+        return eff["ptype"] if ptype_ok(c, owner, eff["ptype"]) else ""  # 2.636.0 (#4565): a shoot only with Film & Video
     ts = [r[1] or "" for r in c.execute("SELECT folder, ptype FROM lists WHERE owner_id=? AND is_inbox=0 AND archived=0 AND family=''", (owner,))
           if folder_under(r[0] or "", folder)]
     typed = {t for t in ts if t}
     if len(typed) != 1 or 2 * sum(1 for t in ts if t) <= len(ts):
         return ""
     t = typed.pop()
-    return t if t in PTYPES else ""
+    return t if t in PTYPES and ptype_ok(c, owner, t) else ""
 
 
 def _norm(props):

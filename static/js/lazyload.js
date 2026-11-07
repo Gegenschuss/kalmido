@@ -95,6 +95,7 @@ const LD_MODS = {
   clientpage: ['clientpage'],  // 2.563.0 (#4742): Office > Clients (the list and the client's card), on its view; the office, the contacts and the trash use its globals (LD_NEED)
   whatsnew: ['whatsnew'],  // 2.556.0 (#4685): the dialog "New for you" after an update (wn_boot below loads it only when there is news)
   offcache: ['offcache'],  // 2.663.0 (#4200): the offline start state in IndexedDB (core.js startSave / startRead)
+  shoot: ['shoot'],  // 2.636.0 (#4565): the storyboard of a shoot (picture tiles on the board, the button Shot list)
 };
 // 2.65.0 (#1823): modules a module needs before its own files (their globals are used while it draws): the settings dialog
 // draws the agent panes (agentchat.js), the calendars (calview.js) and the tokens / webhooks (integrations.js), the agent chat
@@ -138,7 +139,7 @@ const LD_NOP = {agentchat: ['chatLoad', 'chatPatch', 'chatFit', 'stepsChanged', 
 // them next to the scripts and resolves only once they apply (no unstyled flash when the area opens)
 const LD_CSS = {settings: ['settings'], contacts: ['contacts'], office: ['office'], agentchat: ['agentchat'], pdf: ['pdf'], mindmap: ['mindmap'],
   wiki: ['wiki'], stats: ['stats'], calendar: ['calendar'], docs: ['docs'], docviews: ['docviews'], life: ['life'],
-  integrations: ['integrations'], playbook: ['playbook'], timeline: ['timeline'], feeds: ['feeds'], bookmarks: ['bookmarks'], sheets: ['sheets'], videos: ['videorev'], tagsel: ['tagsel'], filereq: ['filereq'], fltdlg: ['fltdlg'], abscan: ['abscan'], ablage: ['ablage'] /* 2.558.0 (#4693) */, calabs: ['calabs'], sideviews: ['sideviews'], navmenu: ['navmenu'], whatsnew: ['whatsnew']};  // 2.418.0 (#3560): + navmenu  // 2.97.0 A (#1950): + bookmarks  // 2.85.0 B (#1162): + feeds
+  integrations: ['integrations'], playbook: ['playbook'], timeline: ['timeline'], feeds: ['feeds'], bookmarks: ['bookmarks'], sheets: ['sheets'], videos: ['videorev'], tagsel: ['tagsel'], filereq: ['filereq'], fltdlg: ['fltdlg'], abscan: ['abscan'], ablage: ['ablage'] /* 2.558.0 (#4693) */, calabs: ['calabs'], sideviews: ['sideviews'], navmenu: ['navmenu'], whatsnew: ['whatsnew'], shoot: ['shoot']};  /* 2.636.0 (#4565) */  // 2.418.0 (#3560): + navmenu  // 2.97.0 A (#1950): + bookmarks  // 2.85.0 B (#1162): + feeds
 const LD_VIEW = {viewFamily: ['family', 1], viewAblage: ['ablage', 1], viewContacts: ['contacts', 1], viewOffice: ['office', 1], kp_tile: ['office'], ux_info: ['office'], ofcII: ['office'],
   dpj_projHtml: ['office'],  // 2.168.0 A (#2665): a project page's quotations & invoices (only while the office is on)
   // 2.65.0 (#1823)
@@ -158,6 +159,7 @@ const LD_VIEW = {viewFamily: ['family', 1], viewAblage: ['ablage', 1], viewConta
   vtr_html: ['trashui'],  // 2.549.0 (#4536): the video sign-offs in the trash view
   ptr_html: ['trashui'],  // 2.567.0 A (#4707): sections, sprints, links, templates and budget rows in the trash view
   tsl_card: ['timesheet'], hbm_hubView: ['hubmail', 1],  // 2.149.0 F (#2518): the time page's timesheet card (it fetches the month itself)
+  sht_pic: ['shoot'], sht_bar: ['shoot'],  // 2.636.0 (#4565): the board of a shoot (calendar.js viewKanban)
   ms_clView: ['clientpage', 1]};  // 2.563.0 (#4742): Office > Clients (clients.js viewClients)
 // 2.556.0 (#4685) "New for you": once per new version (the version seen last is a user setting, accounts/whatsnew.py) the
 // server is asked what is new since then; only when there is something the dialog's module loads (whatsnew.js). Nothing at

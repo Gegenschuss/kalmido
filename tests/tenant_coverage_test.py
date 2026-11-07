@@ -748,6 +748,7 @@ ROUTES = {
     "GET /ical/abs/{}.ics": "ical",  # 2.155.0 B (#2076): own absences + holidays
     # ---- list (100)
     "GET /api/lists/{}/export.csv": "list",  # 2.116.0 C (#2064): the list CSV, role of the list + tvis
+    "GET /api/lists/{}/shotlist.pdf": "list",  # 2.636.0 (#4565): the shot list of a shoot, role of the list + tvis (p2636_c_dreh_api_test.py)
     "GET /api/lists/{}/agent-access": "list",  # 2.30.0 (#919): the agents' access log of a list (its members)
     "PUT /api/lists/{}/favorite": "list", "DELETE /api/lists/{}/favorite": "list", "PUT /api/lists/{}/in-mine": "list",  # 2.41.0 (#1365)
     "PUT /api/lists/{}/icon": "list", "POST /api/lists/{}/icon": "list", "DELETE /api/lists/{}/icon": "list",

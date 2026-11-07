@@ -31,7 +31,7 @@ from ..api.common import v1_err  # 2.149.0 G (#2517): pulled up from functions
 from ..accounts.orgs import org_role, ws_default_org, ws_member_problem  # 2.369.5 (#2517): pulled up from functions
 from ..agents.core import agent_row, agent_active, agent_shares, job_dict, JOB_TITLE_MAX  # 2.369.5 (#2517): pulled up from functions
 from ..api.v1 import SCOPES_AGENT_DEFAULT  # 2.369.5 (#2517): pulled up from functions
-from ..lists.templates import PTYPES, ptype_create  # 2.369.5 (#2517): pulled up from functions
+from ..lists.templates import PTYPES, ptype_create, ptype_ok  # 2.369.5 (#2517): pulled up from functions; 2.636.0 (#4565): ptype_ok
 from .proposals import _p_keys, _p_str, _p_int, PROP_TEXT_MAX, _p_list, _p_date, prop_validate, PROP_TITLE_MAX, PROP_NOTES_MAX, PROP_NAME_MAX, PROP_SECTIONS_MAX, prop_insert, prop_titles, prop_run, prop_agent_ok, prop_ready_notify, PROP_MAX_BYTES  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.validation import valid_hm, log_act  # 2.369.5 (#2517): pulled up from functions
 from ..lists.projects import list_row_purge  # 2.369.5 (#2517): pulled up from functions
@@ -146,10 +146,10 @@ def pk2_make_input(c, uid, aid, kind, text=None, file_name=None, offer_id=None):
     """The job input of an inquiry / setup proposal: only what the agent may see."""
     if kind == "setup":
         fs = set(x for x in (usettings(c, uid).get("features") or "").split(",") if x)
-        return {"modules": [{"key": k, "on": k in fs} for k in PK2_MODS], "project_types": list(PTYPES)}
+        return {"modules": [{"key": k, "on": k in fs} for k in PK2_MODS], "project_types": [k for k in PTYPES if ptype_ok(c, uid, k)]}
     org, oid = pk2_area(c, uid, aid)
     ok, why = pk2_office(c, uid, aid, oid)
-    inp = {"text": text, "file_name": file_name, "area": "org" if org else "private", "project_types": list(PTYPES),
+    inp = {"text": text, "file_name": file_name, "area": "org" if org else "private", "project_types": [k for k in PTYPES if ptype_ok(c, uid, k)],
            "office": {"ok": ok, **({"reason": why} if why else {})}, "clients": []}
     if ok:
         inp["clients"] = [{"id": r["id"], "name": r["name"]} for r in _pk2_clients(c, uid, oid)]

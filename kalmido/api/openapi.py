@@ -375,7 +375,8 @@ def openapi_spec():
             "project_type": {"type": ["string", "null"], "enum": [*PTYPES, "", None], "description": "2.4.0: a project of a built-in type (sections, "
                              "custom fields, view, ticket types; switches the modules it needs on for you); kind / checklist / tickets are ignored. "
                              "2.411.0 (#3516): left out in a folder = the folder's project type (its default, or the type its projects share) with "
-                             "its standard sections; null / \"\" = no type"},
+                             "its standard sections; null / \"\" = no type. 2.636.0 (#4565): shoot (a card per shot with Scene, Shot size, Lens, "
+                             "Location; a column per shooting day; GET /api/lists/{id}/shotlist.pdf in the app) only with the industry Film & Video, else 400"},
             "sections": {"type": "boolean", "default": False, "description": "2.27.0: with project_type: create the type's standard sections "
                          "(e.g. Backlog … Done); without it the project starts without sections"},
             "bug_inbox": {"type": "boolean", "default": False, "description": "2.473.0: with project_type software (no effect on another type): also creates "
@@ -432,7 +433,8 @@ def openapi_spec():
             "project_type": {"type": ["string", "null"], "enum": [*PTYPES, "", None],
                              "description": "2.18.0 (#408): the project type (owner / project admins); null / \"\" = none. Switches on what the "
                                             "type needs (Progress and status, ticket types for software, the type's view while the project has no "
-                                            "tasks, its modules for you) and never deletes anything; sections are not added"}}},
+                                            "tasks, its modules for you) and never deletes anything; sections are not added. 2.636.0 (#4565): shoot only "
+                                            "with the industry Film & Video (400)"}}},
         "ListPage": page("ListDetail"),  # 2.0.8: the list page carries each list's sections too
         "Roadmap": {"type": "object", "properties": {
             "from": {"type": "string", "format": "date"}, "to": {"type": "string", "format": "date"}, "projects_only": {"type": "boolean"},

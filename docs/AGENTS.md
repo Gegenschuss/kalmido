@@ -1038,6 +1038,11 @@ went to every agent of the project).
 
 - **Default by project type:** projects of the type *Software / AI development* (`project_type: software`): every agent of
   the project listens in. All other projects (agency, personal, no project type): off.
+- **Project type Shoot** (2.636.0, #4565): `project_type: shoot` (create / change a list over the API) exists only while the
+  app of the person (for an agent: of its workspace) has the industry Film & Video, else `400`. Every task is one shot with the
+  custom fields Scene, Shot size (a selection: wide shot … extreme close-up), Lens and Location; the sections are the shooting
+  days, the picture of a shot is its first image attachment. The shot list PDF (`GET /api/lists/{id}/shotlist.pdf`) is an app
+  route for people only (agents `403`); agents read the shots with `GET /api/v1/tasks` and their fields.
 - **A switch in every project:** the project dialog (Share > Agents) has *Agent listens in*, on or off whatever the type; the
   project's "…" menu and the share summary say *Agent listens in* or *Agent only via @*. Folder settings (2.29.0) can set it
   for all projects of a folder (`agent_listen: true | false` in `PUT /api/folders/props`); 2.41.0: per agent of the folder in
@@ -1532,7 +1537,7 @@ project with the agent (also with *Proposals for: everyone*; a person it does no
 undecided ones per agent and person and 50 per agent (`429`).
 
 - **`inquiry`** (#1351): a customer inquiry (chat text, a mail as attachment) becomes a project. `proposal`: `name`,
-  `folder?`, `project_type?` (one of `input.project_types`: agency, software, private, social), `client?` (`{id}` from
+  `folder?`, `project_type?` (one of `input.project_types`: agency, software, private, social; shoot only when the person's app has the industry Film & Video, 2.636.0), `client?` (`{id}` from
   `input.clients`, or `{name}`: a suggestion, used when a client of that exact name exists, else shown as *New client:
   create it in the office*), `sections`, `tasks` (as kind `project`, at least one), `shoot_days: [{title, date,
   end_date?, start_time?, end_time?, location?, notes?}]` and `offer?: {title?, intro?, items: [{service_id?, text, qty,

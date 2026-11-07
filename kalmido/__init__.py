@@ -361,6 +361,7 @@ ORDER = (
     "office.einvoice",  # 2.38.0 (#1021 P5, F2): e-invoice XML (CII EN 16931 / XRechnung) from the snapshot, used by office.pdfweb
     "office.einvoice_in",  # 2.146.0 A (#2451): incoming e-invoices (UBL / CII, embedded in ZUGFeRD PDFs; no routes, used by docs.store)
     "office.pdfweb",  # 2.36.1 (#1021): quotation PDF + company logo routes (D; the writer office.pdf has no routes)
+    "lists.shoot",  # 2.636.0 (#4565): the shot list PDF of a shoot (after the PDF writer, office.pdf)
     "office.docref",  # 2.199.0 B (#2742): quotations / invoices filed in folders (reference kind office_doc, the folder routes)
     "office.oftref",  # 2.351.0 A (#2823): generated documents, letters, receipts filed in folders (reference kinds)
     "office.oftree",  # 2.351.0 A (#3312): the office's document areas as trees in the panel (folders + 20 newest)

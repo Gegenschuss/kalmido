@@ -16,7 +16,8 @@ const PZ_KEYS = [['ticket', N_('Task number'), 'hash'], ['ttype', N_('Ticket typ
   ['docs', N_('Documents and invoices'), 'file'], ['tags', N_('Tags'), 'tag']];
 const PZ_OFF = {software: ['video', 'client', 'docs'], agency: ['repo', 'ttype'],
   private: ['ticket', 'ttype', 'repo', 'deps', 'who', 'points', 'time', 'video', 'client', 'docs'],
-  social: ['ticket', 'ttype', 'repo', 'deps', 'points']};  // 2.387.0 (#1957): kalmido/lists/templates.py PTYPE_PROPS_OFF
+  social: ['ticket', 'ttype', 'repo', 'deps', 'points'],  // 2.387.0 (#1957): kalmido/lists/templates.py PTYPE_PROPS_OFF
+  shoot: ['ticket', 'ttype', 'repo', 'deps', 'points', 'client', 'docs']};  // 2.636.0 (#4565)
 // the list columns (render.js COLS) that belong to a property
 const PZ_COL = {who: 'who', time: 'time', deps: 'deps', tags: 'tags'};
 // 2.623.0 (#4765): a property that needs a module (Settings > Modules): module off = off in every project, the project's

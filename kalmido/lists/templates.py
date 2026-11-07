@@ -20,6 +20,7 @@ from ..tasks.ttypes import tt_check  # 2.609.0 (#3372)
 from ..tasks.tasks import ms_target, one_task, set_tags
 from ..core.errors import BadInput
 from ..core.conflict import ccf_check  # 2.564.0 (#4701)
+from ..accounts.onboarding import app_industry  # 2.636.0 (#4565)
 from ..core.serializers import unlink_files
 from ..core.dlock import dl_of, dl_tasks_locked  # 2.574.0 (#3376): data lock of a copying agent
 from .tplextra import tx_apply, tx_collect, tx_keys, tx_of_template, tx_paths, tx_prune, tx_reown, tx_same_list, tx_state, tx_store
@@ -949,7 +950,22 @@ PTYPES = {
                "sections": (N_("Idea|section"), N_("Draft|section"), N_("For approval|section"), N_("Approved|section"),
                             N_("Scheduled|section"), N_("Published|section")),
                "fields": ((N_("Channel|field"), "multiselect"),)},
+    # 2.636.0 (#4565): a shoot (only with the industry Film & Video, PTYPE_INDUSTRY): every card is one shot, the columns are
+    # the shooting days, the board with the picture tiles is the storyboard, GET /api/lists/<id>/shotlist.pdf the shot list
+    "shoot": {"view": "kanban", "tickets": 0, "dep_shift": 0, "modules": ("kanban", "fields"),
+              "sections": (N_("Shooting day 1"), N_("Shooting day 2")),
+              "fields": ((N_("Scene|shot"), "text"), (N_("Shot size"), "select"), (N_("Lens|shot"), "text"), (N_("Location|shot"), "text"))},
 }
+# 2.636.0 (#4565): types of one industry (kalmido/accounts/onboarding.py app_industry): offered, created and set only with it
+PTYPE_INDUSTRY = {"shoot": "film"}
+
+
+def ptype_ok(c, uid, k):
+    """2.636.0 (#4565): may uid have a project of type k (a type of one industry only while uid's app has that industry)?"""
+    need = PTYPE_INDUSTRY.get(k)
+    if not need:
+        return True
+    return app_industry(c, uid) == need
 
 
 # 2.412.0 (#3552): the properties of a task a project can show (client static/js/props.js PZ_KEYS) and the cut of each
@@ -959,7 +975,8 @@ PROP_KEYS = ("ticket", "ttype", "repo", "deps", "who", "points", "time", "video"
 PTYPE_PROPS_OFF = {"software": ("video", "client", "docs"),
                    "agency": ("repo", "ttype"),
                    "private": ("ticket", "ttype", "repo", "deps", "who", "points", "time", "video", "client", "docs"),
-                   "social": ("ticket", "ttype", "repo", "deps", "points")}  # 2.387.0 (#1957)
+                   "social": ("ticket", "ttype", "repo", "deps", "points"),  # 2.387.0 (#1957)
+                   "shoot": ("ticket", "ttype", "repo", "deps", "points", "client", "docs")}  # 2.636.0 (#4565); the client side: static/js/props.js PZ_OFF
 
 
 def props_clean(v):
@@ -1025,7 +1042,7 @@ PTYPE_WIP = {"software": {"In progress": 3, "Review": 3}}
 
 
 PTYPE_NAMES = {"agency": N_("Agency"), "software": N_("Software / AI dev"), "private": N_("Personal|project type"),
-               "social": N_("Social media plan")}  # 2.387.0 (#1957)
+               "social": N_("Social media plan"), "shoot": N_("Shoot|project type")}  # 2.387.0 (#1957), 2.636.0 (#4565)
 # 2.473.0 (#3378): field name -> its options (the choices of a selection field) / the fields of a type that are not pinned
 # 2.387.0 (#1957): + Channel (the networks are names only, Kalmido connects to none of them)
 SOCIAL_CHANNELS = ("Instagram", "LinkedIn", "Facebook", "TikTok", "YouTube", "Newsletter")
@@ -1035,13 +1052,19 @@ PTYPE_FIELD_OPTS = {"Size|field": {"options": [{"id": x.lower(), "name": x, "col
 # 2.387.0 (#1957): the review step a new project of the type gets with its standard sections: the section (English source)
 # that asks for the approval, and "done only after approval" (lists.review_cfg, tasks/review.py)
 PTYPE_REVIEW = {"social": {"section": "For approval|section", "gate": True}}
-PTYPE_FIELD_UNPINNED = ("Release|field",)
+PTYPE_FIELD_UNPINNED = ("Release|field", "Lens|shot", "Location|shot")
+# 2.636.0 (#4565): the shot sizes of a shoot (option id, English source; the names in the language of the person creating it)
+SHOT_SIZES = (("ws", N_("Wide shot")), ("mws", N_("Medium wide shot")), ("ms", N_("Medium shot")), ("as", N_("American shot")),
+              ("mcu", N_("Medium close-up")), ("cu", N_("Close-up")), ("ecu", N_("Extreme close-up")))
+PTYPE_FIELD_OPTS_TR = {"Shot size": SHOT_SIZES}
 BUG_INBOX_FIELD = "Release|field"
 
 
 def _ptype_opts(n, lg):
     """The options of the type's field n in the language lg (2.387.0 #1957: "Other" of Channel is a text; the names of
-    networks and S / M / L stay as they are)."""
+    networks and S / M / L stay as they are; 2.636.0 #4565: the shot sizes are translated ones)."""
+    if n in PTYPE_FIELD_OPTS_TR:
+        return {"options": [{"id": i, "name": tr(x, lg=lg), "color": ""} for i, x in PTYPE_FIELD_OPTS_TR[n]]}
     o = PTYPE_FIELD_OPTS.get(n)
     if not o:
         return {}
@@ -1082,7 +1105,7 @@ def ptype_create(c, uid, k, name, folder="", color="", start=None, sections=Fals
     sections only when asked for (sections=True: the box "With the default sections" / API sections: true); without them
     the project starts empty (modules, ticket types, fields and the view still come with the type). 2.473.0 (#3378): bug_inbox
     (type software, no effect on another type): + the list "<name> – Bugs", its id in made["bug_list_id"]."""
-    if k not in PTYPES:
+    if k not in PTYPES or not ptype_ok(c, uid, k):  # 2.636.0 (#4565): a type of another industry is no type here
         raise BadInput(tr("Invalid value: {0}", tr("Project type")))
     lid = tpl_apply_list(c, uid, ptype_template(k, lang(c, uid), sections), name, folder, start or local_now().date(), color=color, org_id=org_id)
     c.execute("UPDATE lists SET ptype=? WHERE id=?", (k, lid))  # 2.18.0 (#408): the type is kept (list dialog, API)
@@ -1119,7 +1142,7 @@ def ptype_missing(c, lid, k, lg):
     def lacks(x, have):
         return tr(x, lg=lg).strip().casefold() not in have and x.split("|")[0].strip().casefold() not in have
     return {"sections": [tr(x, lg=lg) for x in PTYPES[k]["sections"] if lacks(x, have_s)],
-            "fields": [{"name": tr(n, lg=lg), "type": t, **({"options": _ptype_opts(n, lg)} if n in PTYPE_FIELD_OPTS else {})}
+            "fields": [{"name": tr(n, lg=lg), "type": t, **({"options": _ptype_opts(n, lg)} if n in PTYPE_FIELD_OPTS or n in PTYPE_FIELD_OPTS_TR else {})}
                        for n, t in PTYPES[k]["fields"] if lacks(n, have_f)]}
 
 
@@ -1137,6 +1160,8 @@ def list_ptype_set(c, lid, role, k, skip=()):
     cur = c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone()
     if cur["is_inbox"]:
         raise BadInput(tr("The basket cannot be a project"))
+    if k and (cur["ptype"] or "") != k and not ptype_ok(c, me(), k):  # 2.636.0 (#4565): a type of one industry only with it
+        raise BadInput(tr("Invalid value: {0}", tr("Project type")))
     out = {"ptype_prev": {}, "modules_on": [], "ptype_missing": {"sections": [], "fields": []}}
     if (cur["ptype"] or "") == k:
         if k:

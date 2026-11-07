@@ -73,7 +73,7 @@ const LAZY = ['/static/js/acctset.js', '/static/js/sesview.js', '/static/js/supp
   '/static/js/listprint.js', '/static/js/evinvite.js', '/static/js/projtime.js', '/static/js/envs.js', '/static/js/dpmodal.js',
   '/static/js/gitrepo.js', '/static/js/timesheet.js', '/static/js/absence.js', '/static/js/leave.js', '/static/js/dispo.js', '/static/js/hubmail.js',
   '/static/js/msvview.js', '/static/js/sprints2.js', '/static/js/sideviews.js', '/static/js/notetrash.js', '/static/js/trashui.js',
-  '/static/js/clientpage.js', '/static/js/whatsnew.js', '/static/js/offcache.js'];
+  '/static/js/clientpage.js', '/static/js/whatsnew.js', '/static/js/offcache.js', '/static/js/shoot.js'];
 // 2.45.0 (#1529): the new cache is filled completely first (addAll fails on any non-2xx -> this install is dropped and the
 // old worker and cache stay); old caches are deleted only when the new one holds the whole shell
 // 2.65.0 (#1824): the stylesheets of the modules loaded on demand (static/css/, LD_CSS in lazyload.js, same order)
@@ -82,7 +82,7 @@ const LAZY_CSS = ['/static/css/settings.css', '/static/css/contacts.css', '/stat
   '/static/css/docs.css', '/static/css/docviews.css', '/static/css/life.css', '/static/css/integrations.css', '/static/css/playbook.css',
   '/static/css/timeline.css', '/static/css/feeds.css', '/static/css/bookmarks.css', '/static/css/sheets.css', '/static/css/videorev.css',
   '/static/css/tagsel.css', '/static/css/filereq.css', '/static/css/fltdlg.css', '/static/css/abscan.css', '/static/css/ablage.css',
-  '/static/css/calabs.css', '/static/css/sideviews.css', '/static/css/navmenu.css', '/static/css/whatsnew.css'];
+  '/static/css/calabs.css', '/static/css/sideviews.css', '/static/css/navmenu.css', '/static/css/whatsnew.css', '/static/css/shoot.css'];
 self.addEventListener('install', e => { e.waitUntil(swInstall().then(() => self.skipWaiting())); });
 // 2.149.0 B (#2506): the server names every precached static file with its content hash (/sw-manifest.json). A file is kept
 // under "<url>?v=<hash>" (the address index.html asks for), so an update copies every unchanged file from the old cache and

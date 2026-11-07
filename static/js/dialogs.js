@@ -198,11 +198,15 @@ const PTYPE_UI = [['', N_('Blank'), 'list', N_('Sections and fields as needed')]
   ['software', N_('Software / AI dev'), 'code', N_('Board, tickets, repository')],
   ['private', N_('Personal|project type'), 'home', N_('No fields')],
   ['social', N_('Social media plan'), 'megaphone', N_('Calendar, channels, approval by the client')]];  // 2.387.0 (#1957)
+// 2.636.0 (#4565): the shoot (server PTYPE_INDUSTRY): offered only with the industry Film & Video; keep = the list's own type
+const PTYPE_SHOOT = ['shoot', N_('Shoot|project type'), 'film', N_('One card per shot, one column per shooting day, shot list as PDF')];
+const ptypeUi = keep => S.industry?.code === 'film' || keep === 'shoot' ? [...PTYPE_UI, PTYPE_SHOOT] : PTYPE_UI;
 // 2.27.0 (#972): the standard sections of each built-in project type (kalmido/lists/templates.py PTYPES), named next to the
 // box "With the standard sections" in the New list dialog; a new project gets them only when the box is ticked
 const PTYPE_SECS = {agency: [N_('Request'), N_('Concept'), N_('Production'), N_('Approval'), N_('Billing')],
   software: [N_('Backlog'), N_('Next|section'), N_('In progress'), N_('Review'), N_('Done|section')], private: [N_('Ideas'), N_('Planning'), N_('To do|section')],
-  social: [N_('Idea|section'), N_('Draft|section'), N_('For approval|section'), N_('Approved|section'), N_('Scheduled|section'), N_('Published|section')]};  // 2.387.0 (#1957)
+  social: [N_('Idea|section'), N_('Draft|section'), N_('For approval|section'), N_('Approved|section'), N_('Scheduled|section'), N_('Published|section')],  // 2.387.0 (#1957)
+  shoot: [N_('Shooting day 1'), N_('Shooting day 2')]};  // 2.636.0 (#4565)
 const PTYPE_KINDS = {software: ['open', 'open', 'progress', 'review', 'done']};  // 2.577.0 (#3354): as PTYPES section_kinds
 const ptSecKind = (k, n) => PTYPE_KINDS[k]?.[(PTYPE_SECS[k] || []).findIndex(x => tr(x) === n)] || '';
 const ptSecsLine = k => (PTYPE_SECS[k] || []).map(x => tr(x)).join(', ');
@@ -242,8 +246,8 @@ function projectParts() {
 // 2.18.0 (#408): the project type of an existing list ('' = none), shown and changed in the list dialog (owner / list
 // admins). The server switches on what the type needs (type Project, ticket types for software, the type's view while
 // the list is empty, its modules for this person) and never deletes anything; one history step takes all of it back.
-const ptypeName = k => k ? tr(PTYPE_UI.find(x => x[0] === k)?.[1] || k) : tr('None|project type');
-const ptypeHint = k => tr(PTYPE_UI.find(x => x[0] === (k || ''))?.[3] || PTYPE_UI[0][3]);
+const ptypeName = k => k ? tr(ptypeUi('shoot').find(x => x[0] === k)?.[1] || k) : tr('None|project type');
+const ptypeHint = k => tr(ptypeUi('shoot').find(x => x[0] === (k || ''))?.[3] || PTYPE_UI[0][3]);
 // the Repository area of a project: for software projects and for every list that already has a repository
 const repoShown = l => l.ptype === 'software' || !!(l.repos || []).length;  // 2.352.0 B (#2752): kind is not read
 // 2.22.0 (#746): the software parts of a list's properties (ticket types, repository) only for a software project or a list
@@ -252,7 +256,7 @@ const swArea = l => repoShown(l);
 const swOffer = l => !!l && !l.is_inbox && !l.family && !l.life && !S.me?.kid && !['family', 'home'].includes(S.settings.purpose || '') && !swArea(l);
 function ptypeRowHtml(l) {
   const may = canManage(l), why = may ? '' : tr('Only the owner and project admins can switch progress and status');
-  return `<div class="row lptrow"><label for="l-ptype">${tr('Project type')}</label><select id="l-ptype" ${may ? '' : `disabled title="${esc(why)}"`}>${PTYPE_UI.map(([k, n]) => `<option value="${k}" ${(l.ptype || '') === k ? 'selected' : ''}>${k ? tr(n) : tr('None|project type')}</option>`).join('')}</select></div>
+  return `<div class="row lptrow"><label for="l-ptype">${tr('Project type')}</label><select id="l-ptype" ${may ? '' : `disabled title="${esc(why)}"`}>${ptypeUi(l.ptype).map(([k, n]) => `<option value="${k}" ${(l.ptype || '') === k ? 'selected' : ''}>${k ? tr(n) : tr('None|project type')}</option>`).join('')}</select></div>
     <div class="shint lhint" id="l-pthint">${esc(ptypeHint(l.ptype || ''))}</div><div id="l-ptoffer" aria-live="polite"></div>`;
 }
 async function setListPtype(id, pt, o = {}) {  // o.post: runs after an undo / redo (the open dialog follows)
@@ -962,7 +966,7 @@ function listModal(id, folder = '', o = {}) {
     ${id ? rul_boxHtml(l) /* 2.71.0 A (#1457): rules of the list (rules.js) */ : ''}`, fown)}
     ${lmSec('sec', tr('Security|project'), `${id && typeof le2u_listRowHtml === 'function' ? le2u_listRowHtml(l) : ''}${''/* 2.64.1 (#1817): the lock of the list (liste2eui.js) */}`, fown)}
     ${l.is_inbox ? '' : lmSec('proj', tr('Project features'), `
-    ${id ? '' : `<div class="lptype"><div class="ptlab">${tr('Start from')}</div><div class="ptcards" role="radiogroup" aria-label="${esc(tr('Start from'))}">${PTYPE_UI.map(([k, n, i, dsc]) => `<button type="button" class="ptcard ${k === (o.ptype || '') ? 'on' : ''}" role="radio" aria-checked="${k === (o.ptype || '')}" data-pt="${k}">${ic(i, 's')}<b>${tr(n)}</b><small class="muted">${tr(dsc)}</small></button>`).join('')}${tplOf('list').map(tp => `<button type="button" class="ptcard" role="radio" aria-checked="false" data-pt="tpl:${tp.id}">${ic('copy', 's')}<b>${esc(tp.name)}</b><small class="muted" data-ptd="${tp.id}">${tr('Your template')}</small></button>`).join('')}</div>
+    ${id ? '' : `<div class="lptype"><div class="ptlab">${tr('Start from')}</div><div class="ptcards" role="radiogroup" aria-label="${esc(tr('Start from'))}">${ptypeUi().map(([k, n, i, dsc]) => `<button type="button" class="ptcard ${k === (o.ptype || '') ? 'on' : ''}" role="radio" aria-checked="${k === (o.ptype || '')}" data-pt="${k}">${ic(i, 's')}<b>${tr(n)}</b><small class="muted">${tr(dsc)}</small></button>`).join('')}${tplOf('list').map(tp => `<button type="button" class="ptcard" role="radio" aria-checked="false" data-pt="tpl:${tp.id}">${ic('copy', 's')}<b>${esc(tp.name)}</b><small class="muted" data-ptd="${tp.id}">${tr('Your template')}</small></button>`).join('')}</div>
       <div class="row ptsecs" ${PTYPE_SECS[o.ptype || ''] ? '' : 'hidden'}><label class="chkl"><input type="checkbox" id="l-ptsecs"> ${tr('With the default sections')}</label><span class="muted" id="l-ptsecsl">${esc(ptSecsLine(o.ptype || ''))}</span></div>
       <div class="row ptbug" ${o.ptype === 'software' ? '' : 'hidden'}><label class="chkl"><input type="checkbox" id="l-ptbug"> ${tr('With a bug inbox')}</label><span class="muted">${tr('A second project; bugs with a release move here by themselves')}</span></div>${''/* 2.473.0 (#3378) */}
       <div class="ptdates" hidden><div class="row"><label>${tr('Project start')}</label>${dateIn('l-pstart', today(), {label: tr('Project start'), clear: false})}</div><div class="row"><label>${tr('End (optional)')}</label>${dateIn('l-pend', '', {label: tr('End (optional)'), empty: tr('none')})}<span class="muted">${tr('stretches or squeezes the dates')}</span></div></div></div>`}
@@ -1202,7 +1206,7 @@ function listModal(id, folder = '', o = {}) {
       $('.ptbug', md).hidden = b.dataset.pt !== 'software';  // 2.473.0 (#3378)
       // 2.387.0 (#1957): a social media plan works through its sections (the approval step sits on one): ticked for it
       if (b.dataset.pt === 'social' && $('#l-ptsecs', md)) $('#l-ptsecs', md).checked = true;
-      const pt = PTYPE_UI.find(x => x[0] === b.dataset.pt);
+      const pt = ptypeUi('shoot').find(x => x[0] === b.dataset.pt);
       // 2.22.0 (#749): every new list opens as a list (the board is one tap away)
       if ($('#l-tickets', md)) { $('#l-tickets', md).checked = b.dataset.pt === 'software'; $('#l-tickets', md).closest('.row').hidden = !!b.dataset.pt; }
       if (!$('#l-name', md).value.trim() && (tp || (pt && pt[0]))) $('#l-name', md).value = tp ? $('b', b).textContent : tr(pt[1]);
