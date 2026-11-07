@@ -11795,7 +11795,6 @@
   "The address book stays with the organisation. Export or copy the contacts instead.": "Het adresboek blijft bij de organisatie. Exporteer of kopieer in plaats daarvan de contacten.",
   "{0} moved {1} out of the organisation": "{0} heeft {1} uit de organisatie verplaatst",
   "{0} moved {1} out of the organisation {2}": "{0} heeft {1} uit de organisatie {2} verplaatst",
-  "A restore needs a single server process (KALMIDO_ROLE=all, KALMIDO_REPLICAS=1). Stop the other processes first, see SELF-HOSTING.md.": "Een herstel heeft één serverproces nodig (KALMIDO_ROLE=all, KALMIDO_REPLICAS=1). Stop eerst de andere processen, zie SELF-HOSTING.md.",
   "Too many imports are running on this server right now. Please try again in a few minutes.": "Er lopen nu te veel imports op deze server. Probeer het over een paar minuten opnieuw.",
   "{0} exported {1} with the account export": "{0} heeft {1} geëxporteerd met de accountexport",
   "New notification in {0}": "Nieuwe melding in {0}",

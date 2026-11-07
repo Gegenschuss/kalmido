@@ -11795,7 +11795,6 @@
   "The address book stays with the organisation. Export or copy the contacts instead.": "La libreta de direcciones se queda en la organización. Exporta o copia los contactos en su lugar.",
   "{0} moved {1} out of the organisation": "{0} sacó {1} de la organización",
   "{0} moved {1} out of the organisation {2}": "{0} sacó {1} de la organización {2}",
-  "A restore needs a single server process (KALMIDO_ROLE=all, KALMIDO_REPLICAS=1). Stop the other processes first, see SELF-HOSTING.md.": "Una restauración necesita un único proceso de servidor (KALMIDO_ROLE=all, KALMIDO_REPLICAS=1). Detén primero los demás procesos, consulta SELF-HOSTING.md.",
   "Too many imports are running on this server right now. Please try again in a few minutes.": "Ahora mismo hay demasiadas importaciones en este servidor. Inténtalo de nuevo en unos minutos.",
   "{0} exported {1} with the account export": "{0} exportó {1} con la exportación de la cuenta",
   "New notification in {0}": "Nueva notificación en {0}",
