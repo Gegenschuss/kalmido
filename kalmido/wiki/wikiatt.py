@@ -252,10 +252,17 @@ def wka_space_files():
         raise Denied(404)  # an agent's token, guests (the same as wka_need for every file of the space)
     if wke_mode(c, oid, uid)[0]:
         return jsonify(space=wiki_space_key(oid), files=[], bytes=0, more=False, e2e=True)
-    w, a = wiki_space_sql(oid, uid)
-    rows = c.execute(f"SELECT id, page_id, name, mime, size, sha256, created_at FROM wiki_files WHERE deleted_at IS NULL AND {w} "
-                     f"AND page_id IN (SELECT id FROM wiki_pages WHERE deleted_at IS NULL AND {w}) ORDER BY id LIMIT {WKA_SPACE_LIST + 1}",
-                     [*a, *a]).fetchall()
+    # the space's condition as wiki_space_sql, written out (fixed SQL text, only parameters)
+    if oid:
+        q = ("SELECT id, page_id, name, mime, size, sha256, created_at FROM wiki_files WHERE deleted_at IS NULL AND org_id=? "
+             "AND page_id IN (SELECT id FROM wiki_pages WHERE deleted_at IS NULL AND org_id=?) ORDER BY id LIMIT ?")
+        args = [oid, oid, WKA_SPACE_LIST + 1]
+    else:
+        q = ("SELECT id, page_id, name, mime, size, sha256, created_at FROM wiki_files WHERE deleted_at IS NULL AND org_id IS NULL "
+             "AND owner_id=? AND page_id IN (SELECT id FROM wiki_pages WHERE deleted_at IS NULL AND org_id IS NULL AND owner_id=?) "
+             "ORDER BY id LIMIT ?")
+        args = [uid, uid, WKA_SPACE_LIST + 1]
+    rows = c.execute(q, args).fetchall()
     more = len(rows) > WKA_SPACE_LIST
     rows = rows[:WKA_SPACE_LIST]
     from ..files.upsafe import up_marks
