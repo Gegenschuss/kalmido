@@ -1,6 +1,48 @@
 {
  "versions": [
   {
+   "version": "2.629.0",
+   "date": "2026-11-07",
+   "items": [
+    {
+     "de": "Dateien lassen sich am Computer überall, wo es einen Hochladen-Knopf gibt, direkt aufs Fenster ziehen.",
+     "en": "On a computer you can drag files onto the window wherever there is an upload button."
+    },
+    {
+     "de": "Scan-Eingänge lassen sich nachträglich umbenennen, in einen anderen Ordner lenken und verlängern.",
+     "en": "Scan inboxes can be renamed, pointed to another folder and extended afterwards."
+    },
+    {
+     "de": "Kreditkarten gibt es jetzt auch für Visa und American Express, mit Hinweis, welche Abrechnungen gelesen werden.",
+     "en": "Credit cards now also cover Visa and American Express, with a hint which statements are read."
+    },
+    {
+     "de": "Die Video-Abnahme heißt jetzt „Abnahme“, gehört zu Agentur-Projekten und lässt sich unter Einstellungen > Module abschalten.",
+     "en": "The video sign-off is now called \"Approval\", belongs to agency projects and can be switched off in Settings > Modules."
+    },
+    {
+     "de": "Tabellen-Reiter und Gruppen in „Meine Aufgaben“ lassen sich mit dem Finger halten und verschieben.",
+     "en": "Sheet tabs and groups in My tasks can be held and moved with a finger."
+    },
+    {
+     "de": "Agenten können Änderungen an geteilten Objekten vorschlagen, die du annimmst oder ablehnst.",
+     "en": "Agents can propose changes to shared objects that you accept or reject."
+    },
+    {
+     "de": "Unter Einstellungen > Konto lassen sich Darstellung und Komfort-Einstellungen mit Vorschau zurücksetzen, ein Rückgängig inklusive.",
+     "en": "Under Settings > Account you can reset the look and comfort settings with a preview, one undo included."
+    },
+    {
+     "de": "Die Jahres-Auswahl im Büro zeigt die Jahre, in denen es Einträge gibt, auch ältere Reisen und Belege.",
+     "en": "The year picker in the office shows the years that have entries, older trips and receipts included."
+    },
+    {
+     "de": "Reisekosten rechnen jetzt auch Auslandsreisen aus 2023 und 2024.",
+     "en": "Travel expenses now also calculate trips abroad from 2023 and 2024."
+    }
+   ]
+  },
+  {
    "version": "2.626.0",
    "date": "2026-11-07",
    "items": [
