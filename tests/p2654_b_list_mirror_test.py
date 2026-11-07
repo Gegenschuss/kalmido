@@ -83,11 +83,13 @@ dbx("DELETE FROM list_members WHERE list_id=? AND user_id=?", (L1, uid["carl"]))
 RV = dbx("INSERT INTO obj_revoked(src,org_id,user_id,kind,ref_id,row_json,reason,by_id,created_at) VALUES('fs_shares',?,?,'list',?,?,'leave',?,?) RETURNING id",
          (ORG, uid["carl"], L1, json.dumps(rowj), ALICE, "2026-11-05T08:00:00Z"))[0][0]
 check(not sees(S["carl"], L1), "setup: carl does not see the project")
+LOGS = dbx("SELECT COUNT(*) FROM fs_log WHERE node_id=? AND action='share'", (N1,))[0][0]
 r = A.post(B + f"/api/lists/{L1}/shares/{RV}/restore")
 m = dbx("SELECT own_role, frole FROM list_members WHERE list_id=? AND user_id=?", (L1, uid["carl"]))
 check(r.ok and m == [(None, "view")], f"the restored file store row gives the role through the node at once (frole view) {m} {r.text[:160]}")
 check(sees(S["carl"], L1) and core_row(L1, uid["carl"]) is None, "carl sees the project again, no own membership row")
-check(dbx("SELECT 1 FROM fs_log WHERE node_id=? AND action='share' AND detail=?", (N1, f"user:{uid['carl']}:view")) == [(1,)],
+check(dbx("SELECT COUNT(*) FROM fs_log WHERE node_id=? AND action='share'", (N1,))[0][0] == LOGS + 1
+      and dbx("SELECT detail FROM fs_log WHERE node_id=? AND action='share' ORDER BY id DESC LIMIT 1", (N1,)) == [(f"user:{uid['carl']}:view",)],
       "the node's history notes the restore as a share")
 
 # ---------------------------------------------------------------- (2) joining an organisation-wide project
