@@ -1195,8 +1195,9 @@ ROUTES = {
     "POST /api/v1/fetcher/documents": "document",
     # 2.577.0 C (#4466): named document addresses (only one's own; another person / organisation sees and changes nothing,
     # every delivery checked with the rights at that moment, p2577_c_docmail_test.py)
-    "GET /api/docs/mail-addresses": "document", "POST /api/docs/mail-addresses": "document", "PATCH /api/docs/mail-addresses/{}": "document",
-    "POST /api/docs/mail-addresses/{}/renew": "document", "DELETE /api/docs/mail-addresses/{}": "document",
+    "GET /api/docs/mail-addresses": "document", "POST /api/docs/mail-addresses": "document",  # p2577_c_docmail_test.py
+    "PATCH /api/docs/mail-addresses/{}": "document", "POST /api/docs/mail-addresses/{}/renew": "document",  # p2577_c_docmail_test.py
+    "DELETE /api/docs/mail-addresses/{}": "document",  # p2577_c_docmail_test.py
     # 2.154.0 A (#1111): a stack split into documents, the link with an existing task, the documents of a task; the separator
     # sheet is the same PDF for everyone (no data)
     "GET /api/docs/{}/split": "document", "GET /api/docs/{}/split/thumbs": "document", "POST /api/docs/{}/split": "document",
