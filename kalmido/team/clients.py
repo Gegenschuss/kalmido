@@ -299,8 +299,9 @@ def clients_brief(c, uid):
         return []
     rows = client_rows(c, uid)
     labels = cdn_labels(rows)  # 2.97.0 B (#1951): the name pickers show
+    lids = client_lists_many(c, uid, [r["id"] for r in rows])  # 2.640.0 (#4185): one query for all clients (was one per client)
     return [{"id": r["id"], "name": r["name"], "name_extra": r["name_extra"], "display_name": r["display_name"], "label": labels[r["id"]], "icon": r["icon"],
-             "color": r["color"], "org_id": r["org_id"], "archived": bool(r["archived"]), "lists": client_lists(c, uid, r["id"])}
+             "color": r["color"], "org_id": r["org_id"], "archived": bool(r["archived"]), "lists": lids[int(r["id"])]}
             for r in rows]
 
 

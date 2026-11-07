@@ -333,7 +333,7 @@ def state():
     from ..personal.habits import habits_trash, pomo_stats
     from ..personal.timetrack import time_day_h, time_list_totals, time_running, time_totals
     from ..accounts.onboarding import ind_state, sample_state  # 2.578.0 (#4573): + the app's industry
-    from ..lists.fields import field_dict
+    from ..lists.fields import field_dicts  # 2.640.0 (#4185)
     from ..calendars.caldav import dav_info
     from ..notify.push import vapid_public, webpush_count, WEBPUSH_ON
     from ..calendars.subscriptions import CAL_ON
@@ -404,8 +404,8 @@ def state():
         filters=[{**dict(r), "rules": json.loads(r["rules"] or "{}")}
                  for r in c.execute("SELECT * FROM filters WHERE user_id=? ORDER BY sort, id", (uid,))],
         sections=visible_sections(c, uid),
-        fields=[field_dict(r, c) for r in c.execute(f"SELECT * FROM list_fields WHERE list_id IN {vis_sql()} ORDER BY sort, id",
-                                                    (uid, uid)).fetchall()],  # 2.43.0 (#1328): c = formula text with names
+        fields=field_dicts(c.execute(f"SELECT * FROM list_fields WHERE list_id IN {vis_sql()} ORDER BY sort, id",
+                                     (uid, uid)).fetchall()),  # 2.43.0 (#1328): formula text with names; 2.640.0 (#4185): from these rows
         tasks=td_lean(tasks) if td else tasks,  # 2.575.0 B (#3966): the later keys read only the ids
         habits=habits,
         habits_trash=habits_trash(c, uid),  # 2.530.0 B (#4315): deleted habits until the trash period ends

@@ -39,14 +39,27 @@ COLOR_RE = re.compile(r"#[0-9a-fA-F]{3,8}")
 FIELD_STAGE_SPECIAL = ("red", "orange")  # 2.410.0 A (#3514): the signal colours of a special state of a stage field
 
 
-def field_dict(r, c=None):
+def field_dict(r, c=None, names=None):
+    """names (2.640.0, #4185): the (id, name) rows of the fields of r's list when the caller has them (field_dicts: the state
+    reads the fields of all lists once), else a formula field reads them itself."""
     d = {"id": r["id"], "list_id": r["list_id"], "name": r["name"], "type": r["type"],
          "options": json.loads(r["options"] or "{}"), "pinned": int(r["pinned"] or 0), "sort": r["sort"],
          "org_field_id": fd_col(r, "org_field_id"),  # 2.609.0 (#3373): linked to a field of the organisation (lists/orgfields.py)
          "required": bool(fd_col(r, "required", 0))}  # 2.609.0 (#3373): needed when a task is created (field_required_check)
-    if r["type"] == "formula" and c is not None:  # 2.43.0 (#1328): the formula with today's field names
-        d["options"]["formula"] = fx_display(d["options"].get("expr"), c.execute("SELECT id, name FROM list_fields WHERE list_id=?", (r["list_id"],)).fetchall())
+    if r["type"] == "formula" and (c is not None or names is not None):  # 2.43.0 (#1328): the formula with today's field names
+        if names is None:
+            names = c.execute("SELECT id, name FROM list_fields WHERE list_id=?", (r["list_id"],)).fetchall()
+        d["options"]["formula"] = fx_display(d["options"].get("expr"), names)
     return d
+
+
+def field_dicts(rows):
+    """2.640.0 (#4185): field_dict of every row, the formulas named from the same rows (rows = ALL the fields of each of their
+    lists, as the state's query reads them) instead of one query per formula field."""
+    by = {}
+    for r in rows:
+        by.setdefault(r["list_id"], []).append(r)
+    return [field_dict(r, names=by[r["list_id"]]) for r in rows]
 
 
 def fd_col(r, k, default=None):
