@@ -175,11 +175,19 @@ CHECKS = {
     # client: a book the organisation owns; a client without one: its creator's own private books). (client, its creator);
     # boundary_repair drops such a link (the contact person stays)
     # 2.126.0 C (#1992 K10): a client without organisation: also a private book shared with its creator (as office/contacts_cl.py)
+    # 2.652.0 (#5089): "shared with its creator" as the core has it (contacts/model.py bk_member_role): a book with a reference
+    # node only by a live share of that node to the creator (not expired; a node in the file store's trash holds the link back
+    # as core/objects.py obj_share_rows_sql trash=True), a book without one by its old member row. The time from the database's
+    # own clock (CHECKS is read once at import; no "?": boundary_repair adds its own)
     "client_contact": ("SELECT DISTINCT cl.id, cl.created_by FROM office_client_contacts k JOIN clients cl ON cl.id=k.client_id "
                        "JOIN contacts ct ON ct.id=k.contact_id JOIN books b ON b.id=ct.book_id WHERE CASE WHEN cl.org_id IS NOT NULL "
                        "THEN b.owner_org_id IS DISTINCT FROM cl.org_id OR b.org_id IS DISTINCT FROM cl.org_id "
                        "ELSE b.owner_org_id IS NOT NULL OR b.org_id IS NOT NULL OR (b.owner_id IS DISTINCT FROM cl.created_by "
-                       "AND NOT EXISTS (SELECT 1 FROM book_members bm WHERE bm.book_id=b.id AND bm.user_id=cl.created_by)) END"),
+                       "AND CASE WHEN EXISTS (SELECT 1 FROM fs_nodes bn WHERE bn.kind='ref' AND bn.ref_kind='address_book' AND bn.ref_id=b.id) "
+                       "THEN NOT EXISTS (SELECT 1 FROM fs_shares bs JOIN fs_nodes bn ON bn.id=bs.node_id WHERE bn.kind='ref' "
+                       "AND bn.ref_kind='address_book' AND bn.ref_id=b.id AND bs.user_id=cl.created_by AND bs.role IN ('view', 'edit') "
+                       "AND (bs.expires_at IS NULL OR bs.expires_at > to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"'))) "
+                       "ELSE NOT EXISTS (SELECT 1 FROM book_members bm WHERE bm.book_id=b.id AND bm.user_id=cl.created_by) END) END"),
     # 2.473.0 (#3357): someone who watches a task of an organisation without being a member of it (boundary_repair removes the row)
     "task_watcher_person": ("SELECT w.task_id, w.user_id FROM task_watchers w JOIN tasks t ON t.id=w.task_id JOIN lists l ON l.id=t.list_id "
                             "JOIN users u ON u.id=w.user_id WHERE l.org_id IS NOT NULL AND u.kind!='agent' AND NOT EXISTS (SELECT 1 FROM org_members m "
