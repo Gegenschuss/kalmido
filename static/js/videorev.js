@@ -569,8 +569,8 @@ function vdr_newFile(k, id, st) {
     if (!st) { fd.append(k, String(id)); if (title()) fd.append('title', title()); }
     send(fd);
   });
-  let qt = 0;
-  $('#vdr-fq', md).addEventListener('input', e => { clearTimeout(qt); qt = setTimeout(() => { ps.q = e.target.value.trim(); load(); }, 250); });
+  const qSoon = debounce(v => { ps.q = v; load(); }, 250);  // 2.641.0 (#4769): core.js debounce, no hand-made delay (#4506)
+  $('#vdr-fq', md).addEventListener('input', e => qSoon(e.target.value.trim()));
   md.addEventListener('submit', e => e.preventDefault());
   md.addEventListener('click', e => {
     if (e.target.closest('[data-m="close"]')) { md.remove(); return; }
