@@ -81,7 +81,8 @@ ROUTES = {
     "PATCH /api/v1/lists/{}/links/{}": "change", "PATCH /api/v1/lists/{}/milestones/{}": "change",
     "PATCH /api/v1/lists/{}/overview": "change", "PATCH /api/v1/lists/{}/tags/{}": "change",
     "PATCH /api/v1/me/notifications": "change", "PATCH /api/v1/notepads/{}": "change", "PATCH /api/v1/notes/{}": "change",
-    "PATCH /api/v1/office/leads/{}": "change", "PATCH /api/v1/office/letters/{}": "change",
+    "PATCH /api/v1/office/leads/{}": "change", "PATCH /api/v1/office/deals/{}": "change", "POST /api/v1/office/deals": "change",  # 2.644.0 (#3663)
+    "PATCH /api/v1/office/letters/{}": "change",
     "PATCH /api/v1/office/offers/{}": "change", "PATCH /api/v1/sections/{}": "change", "PATCH /api/v1/sheets/{}": "change",
     "PATCH /api/v1/tasks/{}": "change", "PATCH /api/v1/team/messages/{}": "change", "PATCH /api/v1/team/rooms/{}": "change",
     "PATCH /api/v1/templates/{}": "change", "PATCH /api/v1/time/entries/{}": "change",

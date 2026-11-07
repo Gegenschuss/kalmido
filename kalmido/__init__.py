@@ -386,6 +386,7 @@ ORDER = (
     "office.cfbank",  # 2.124.0 D (#2342): the balances of the bank statements in the cash flow (no routes)
     "office.pipeline",  # 2.50.0 B (#1196): the sales pipeline
     "office.leads",  # 2.94.0 A (#1930): leads before the pipeline (stage lead): convert, CSV import, agents
+    "office.agentdeals",  # 2.644.0 (#3663): agents read / add inquiries and deals, set a stage
     "office.kpi",  # 2.50.0 B (#1197): the business figures
     "office.datev",  # 2.47.3 (#1460): DATEV booking batch (EXTF) of invoices, credit notes and payments
     "office.periodlock",  # 2.148.0 A (#2471): locked accounting periods (GoBD)

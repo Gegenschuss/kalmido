@@ -1160,6 +1160,7 @@ Read first, send the version back:
 | Events, contacts | `PATCH /api/v1/events/{id}`, `/contacts/{id}` (MCP `update_event`, `update_contact`) | `expect_updated_at` (or `expect`, `If-Match`) | `updated_at` of the event / contact |
 | Office drafts | quotation draft, letter draft, lead (MCP `update_offer_draft`, `update_letter_draft`, `update_office_lead`) | `expect_updated_at` | `updated_at` of the draft / lead |
 | Own comments, team chat messages (2.638.0) | `PATCH /api/v1/comments/{id}`, `/team/messages/{id}` (MCP `update_comment`, `edit_team_message`) | `expect_updated_at` or `If-Match` | `edited_at` of the comment / message, `created_at` when it was never edited |
+| Office pipeline (2.644.0) | the stage of an inquiry / deal (MCP `set_office_deal_stage`) | `expect_updated_at` | `updated_at` of the deal |
 
 Events and contacts carry `updated_by` (2.571.0): the account that changed them last - in the app, through the API (an
 agent's own id), over CalDAV / CardDAV or an import; `null` for rows nobody changed since then.
@@ -2442,6 +2443,8 @@ it: an agent never gets more than that person. An agent never manages office rig
 | Suggest an incoming payment / your suggestions | `POST` / `GET /api/v1/office/payment-suggestions` | `suggest_payment` / `list_payment_suggestions` |
 | 2.94.0: the leads (stage lead, by follow-up day; `due=1` = the day has come) / add a lead (source `agent` by default) | `GET` / `POST /api/v1/office/leads` | `list_office_leads` / `create_office_lead` |
 | 2.94.0: change a lead's next step, follow-up day or note (only while it is a lead; `409` once converted; 2.567.0: `expect_updated_at` = the `updated_at` you read is required, `400` without, `409` with the current lead under `current` when a person changed it since) | `PATCH /api/v1/office/leads/{id}` | `update_office_lead` |
+| 2.644.0: the inquiries and deals of the pipeline (stages `inquiry`, `offer`, `won`, `lost`; `stage=open` = inquiry + offer; leads only over `/office/leads`) with value, probability, client, expected date, `updated_at` / add an inquiry or a deal (`title`, `stage` default `inquiry`, `client_id` of the office, `value`, `probability`, `expected_date`, contact data, `next_step`, `follow_up`, `note`, `source` default `agent`); the person (`requested_by`) must be an admin of the office | `GET` / `POST /api/v1/office/deals` | `list_office_deals` / `create_office_deal` |
+| 2.644.0: set the stage of an inquiry / deal (`stage`, `lost_reason`; the probability follows the stage's preset unless a person set its own; a lead `409`, a person converts it; `expect_updated_at` required, `400` without, `409` with the deal under `current` when a person changed it since). Never delete, convert or another field | `PATCH /api/v1/office/deals/{id}` | `set_office_deal_stage` |
 | 2.153.0: your letters (status `draft` by default; `sent`, `delivered`, `all`) / create a letter draft (`answers`, `client_id`, `rcpt_name`, `rcpt_address`, `rcpt_email`, `letter_date`, `subject`, `body`, `ref_line`, `greeting`, `lang`, `notify`) | `GET` / `POST /api/v1/office/letters` | `list_letter_drafts` / `create_letter_draft` |
 | 2.153.0: one of your letters / change your own draft (only while it is a draft; `400` once sent; 2.567.0: `expect_updated_at` = the `updated_at` you read is required, `400` without, `409` with the current letter under `current` when a person changed it since) | `GET` / `PATCH /api/v1/office/letters/{id}` | -- / `update_letter_draft` |
 | 2.153.0: link your draft with a document shared with you (`node_id`, `kind` answers / reply) | `POST /api/v1/office/letters/{id}/links` | `link_letter_document` |
@@ -4022,7 +4025,7 @@ endpoint is named somewhere in this guide or in [AGENT-SETUP.md](AGENT-SETUP.md)
 `chat_typing`, `check_in_habit`, `clear_plan_usage`, `clear_waiting`, `comment_typing`, `complete_task`, `confirm_abort`,
 `create_address_book`, `create_client`, `create_contact`, `create_document`, `create_event`, `create_event_calendar`, `create_field`,
 `create_file_folder`, `create_filter`, `create_form`, `create_habit`, `create_invoice_draft`, `create_job`, `create_letter_draft`, `create_list`, `create_list_tag`,
-`create_note`, `create_offer_draft`, `create_office_lead`, `create_packing_list`, `create_poll`, `create_section`, `create_task`, `create_template`,
+`create_note`, `create_offer_draft`, `create_office_deal`, `create_office_lead`, `create_packing_list`, `create_poll`, `create_section`, `create_task`, `create_template`,
 `create_text_file`, `create_trip`, `decide_reward`, `delete_address_book`, `delete_attachment`,
 `delete_chat_attachment`, `delete_client`, `delete_comment`, `delete_contact`, `delete_event`, `delete_event_calendar`,
 `delete_field`, `delete_filter`, `delete_folder`, `delete_form`, `delete_habit`, `delete_list`, `delete_list_tag`,
@@ -4038,7 +4041,7 @@ endpoint is named somewhere in this guide or in [AGENT-SETUP.md](AGENT-SETUP.md)
 `list_clients`, `list_deadline_types`, `list_documents`, `list_event_calendars`, `list_events`, `list_fields`,
 `list_filed_mails`, `list_files`, `list_filters`, `list_folders`, `list_forms`, `list_groups`, `list_habits`, `list_invoice_series`, `list_jobs`, `list_kids`,
 `list_letter_drafts`, `list_list_groups`, `list_list_tags`, `list_lists`, `list_members`, `list_news`, `list_notes`, `list_office_data`,
-`list_office_documents`, `list_office_leads`, `list_packing_templates`, `list_payment_suggestions`, `list_polls`, `list_project_files`,
+`list_office_deals`, `list_office_documents`, `list_office_leads`, `list_packing_templates`, `list_payment_suggestions`, `list_polls`, `list_project_files`,
 `list_receipt_suggestions`, `list_relations`, `list_repos`, `list_schedules`, `list_sections`, `list_stale_tasks`, `list_subtasks`,
 `list_tags`, `list_tasks`, `list_team_channels`, `list_team_chats`, `list_templates`, `list_time_entries`, `list_trash`,
 `list_upkeep_presets`, `list_waiting`, `leave_team_channel`, `mark_news_read`, `mark_team_chat_read`, `move_task`, `pin_chat_message`, `pin_team_message`, `post_team_message`,
@@ -4048,7 +4051,7 @@ endpoint is named somewhere in this guide or in [AGENT-SETUP.md](AGENT-SETUP.md)
 `report_plan_usage`, `report_progress`, `report_usage`, `request_approval`, `request_chat_approval`,
 `request_comment_approval`, `request_deploy_approval`, `request_integration_approval`, `request_merge_approval`,
 `request_reward`, `restore_event`, `restore_note`, `restore_task`, `review_task`, `search_contacts`, `search_files`, `search_messages`, `search_notes`,
-`search_tasks`, `send_chat`, `set_contact_care`, `set_delivery`, `set_list_columns`, `set_list_review`, `set_project_overview`, `set_project_status`,
+`search_tasks`, `send_chat`, `set_contact_care`, `set_delivery`, `set_list_columns`, `set_list_review`, `set_office_deal_stage`, `set_project_overview`, `set_project_status`,
 `set_status`,
 `set_waiting`, `set_working`, `share_address_book`, `share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`,
 `partial_task`, `skip_occurrence`, `start_timer`, `stop_timer`, `submit_proposal`, `suggest_payment`, `suggest_receipt`,

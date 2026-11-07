@@ -17326,6 +17326,7 @@
   "Select a column": "Spalte wählen",
   "Select a tag": "Tag wählen",
   "Select a person": "Person wählen",
+  "This is a lead: a person converts it into an enquiry": "Das steht noch unter Neu: eine Person macht daraus eine Anfrage",
   "Daily limit": "Tagesgrenze",
   "Proposed with the first key: the agent pauses for the day once its runs used this many tokens, also the runs other people start through chat, mentions or assignments. Empty = no limit.": "Vorschlag zum ersten Schlüssel: Der Agent pausiert für den Tag, sobald seine Läufe so viele Tokens verbraucht haben, auch die Läufe, die andere über Chat, Erwähnungen oder Zuweisungen starten. Leer = keine Grenze.",
   "No usage limit: every run, also those other people start through chat, mentions or assignments, is billed to this key without a cap. Set one under “Usage limit” in the agent’s settings.": "Keine Verbrauchsgrenze: Jeder Lauf, auch die, die andere über Chat, Erwähnungen oder Zuweisungen starten, geht ohne Deckel auf diesen Schlüssel. Eine Grenze setzt du unter „Verbrauchslimit“ in den Einstellungen des Agenten."

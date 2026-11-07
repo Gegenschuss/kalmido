@@ -59,7 +59,7 @@ OFA_ITEM_KEYS += ("id",)  # 2.270.0 D (#3028): the stored position it changes (f
 OFA_DATA_KEYS = ("client_id", "title", "intro", "items", "list_id")
 OFA_CONF = ("high", "medium", "low")
 OFA_MASTER = ("services", "texts", "contracts")
-OFA_LOG_TARGETS = ("office", "services", "texts", "contracts", "clients", "docs", "doc", "pdf", "offer", "invoice", "reminder", "payment", "leads", "letter", "series", "subs")  # 2.94.0 A (#1930): + leads; 2.153.0 (#2031): + letter; 2.483.0 (#2007): + series, subs
+OFA_LOG_TARGETS = ("office", "services", "texts", "contracts", "clients", "docs", "doc", "pdf", "offer", "invoice", "reminder", "payment", "leads", "letter", "series", "subs", "deals")  # 2.644.0 (#3663): + deals; 2.94.0 A (#1930): + leads; 2.153.0 (#2031): + letter; 2.483.0 (#2007): + series, subs
 # link buttons in the chat (agents/chat.py): only the office document view, a list, and a document's PDF preview -- no other
 # app route (some do something when opened), no outside address; 2.153.0 (#2031): + a letter (#office/letters/<id>)
 NOTIFY_HREF_RE = re.compile(r"^(#office/offers/\d{1,12}|#office/letters/\d{1,12}|#l/\d{1,12}|/api/office/docs/\d{1,12}/pdf\?inline=1)$")
@@ -86,7 +86,7 @@ def ofa_area(c, a):
 OFA_TARGET_AREA = {"services": "services", "texts": "texts", "contracts": "contracts", "clients": "offers", "docs": "offers",
                    "doc": "offers", "pdf": "offers", "offer": "offers", "invoice": "offers", "reminder": "offers",
                    "payment": "bank", "leads": "pipeline", "letter": "letters",
-                   "series": "offers", "subs": "subs"}  # 2.483.0 (#2007): invoice series, subscriptions (read only)
+                   "series": "offers", "subs": "subs", "deals": "pipeline"}  # 2.483.0 (#2007): invoice series, subscriptions (read only); 2.644.0 (#3663): + deals
 
 
 # 2.223.2 B (#2862): what an organisation's agent without a row in the office groups reaches with its switch office_drafts

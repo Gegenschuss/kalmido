@@ -2409,6 +2409,32 @@ TOOLS += [
      lambda api, a: api.call("PATCH", f"/office/leads/{int(a['lead_id'])}",
                              body=_pick(a, ("next_step", "follow_up", "note", "requested_by", "expect_updated_at")))),
 ]
+# 2.644.0 (#3663): the inquiries and deals of the sales pipeline (stages inquiry, offer, won, lost): list, add, set the stage.
+# Same switches and rule as the leads: the person you act for must be an admin of the office. Never a lead (its own tools),
+# never convert, delete or change another field.
+_DSTAGE = {"type": "string", "enum": ["inquiry", "offer", "won", "lost"]}
+_DEAL = {"title": {"type": "string", "maxLength": 200}, "stage": {**_DSTAGE, "description": "Default: inquiry"}, "client_id": S_ID,
+         "contact": {"type": "string", "maxLength": 200}, "company": {"type": "string", "maxLength": 200},
+         "email": {"type": "string", "maxLength": 200}, "phone": {"type": "string", "maxLength": 60},
+         "value": {"type": "string", "description": "Net value in the office currency, decimal text, e.g. 2500.00"},
+         "probability": {"type": "integer", "minimum": 0, "maximum": 100, "description": "Default: the stage's preset"},
+         "expected_date": D, "next_step": {"type": "string", "maxLength": 300}, "follow_up": D, "note": {"type": "string", "maxLength": 4000},
+         "source": _LEAD["source"], **_RB}
+TOOLS += [
+    ("list_office_deals", "2.644.0: the inquiries and deals of the office's sales pipeline (not the leads: list_office_leads): stage, value, "
+                          "probability, client, expected date, next step, note, updated_at. stage = inquiry, offer, won, lost or open (inquiry + offer).",
+     _obj({"stage": {"type": "string", "enum": ["inquiry", "offer", "won", "lost", "open"]}, **_RB}),
+     lambda api, a: api.call("GET", "/office/deals", _pick(a, ("stage", "requested_by")))),
+    ("create_office_deal", "2.644.0: add an inquiry (default) or a deal in another stage to the pipeline (title required; client_id = a client "
+                           "of the office). Source agent by default.",
+     _obj(_DEAL, ["title"]), lambda api, a: api.call("POST", "/office/deals", body=_pick(a, tuple(_DEAL)))),
+    ("set_office_deal_stage", "2.644.0: set the stage of an inquiry / deal (inquiry, offer, won, lost; lost_reason with lost). Not for a lead "
+                              "(409: a person converts it). expect_updated_at (the deal's updated_at as you read it) is required; 409 = a person changed it since.",
+     _obj({"deal_id": S_ID, "stage": _DSTAGE, "lost_reason": {"type": "string", "maxLength": 500}, **_RB,
+           "expect_updated_at": {"type": "string", "description": "updated_at of the deal as you read it"}}, ["deal_id", "stage", "expect_updated_at"]),
+     lambda api, a: api.call("PATCH", f"/office/deals/{int(a['deal_id'])}",
+                             body=_pick(a, ("stage", "lost_reason", "requested_by", "expect_updated_at")))),
+]
 
 # 2.153.0 (#2031): letter drafts (correspondence) -- you write subject and text, a person checks, signs and sends. The person
 # you act for must be an admin of the office; answers / links only to documents shared with you (else 404).
@@ -2776,6 +2802,7 @@ TOOL_SCOPES = {
                "draft_invoice_from_offer", "draft_reminder", "suggest_payment", "list_payment_suggestions",
                "create_invoice_draft",  # 2.568.0 (#4673)
                "list_office_leads", "create_office_lead", "update_office_lead",
+               "list_office_deals", "create_office_deal", "set_office_deal_stage",  # 2.644.0 (#3663)
                "create_letter_draft", "list_letter_drafts", "update_letter_draft", "link_letter_document",
                "list_invoice_series", "get_office_subscriptions"),  # 2.51.0 (#1348, #1350); 2.94.0 (#1930): leads; 2.153.0 (#2031): letters; 2.483.0 (#2007): series, subscriptions
     "pinboard": ("create_notepad", "update_notepad", "delete_notepad", "write_status_pad"),  # 2.51.0 (#1352)
@@ -2854,6 +2881,7 @@ TOOLSETS = {
         get_office list_office_data list_office_documents get_office_document create_offer_draft update_offer_draft draft_invoice_from_offer
         create_invoice_draft
         draft_reminder suggest_payment list_payment_suggestions list_office_leads create_office_lead update_office_lead create_letter_draft
+        list_office_deals create_office_deal set_office_deal_stage
         list_letter_drafts update_letter_draft link_letter_document suggest_receipt list_receipt_suggestions
         list_invoice_series get_office_subscriptions list_filed_mails get_filed_mail
         list_clients get_client create_client update_client delete_client bulk_clients

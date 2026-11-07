@@ -871,6 +871,8 @@ def openapi_spec():
     ofv_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.568.0 B (#4673): an agent's invoice draft without a quotation
     from ..office.leads import lead_spec
     lead_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.94.0 A (#1930): leads for agents
+    from ..office.agentdeals import dla_spec
+    dla_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.644.0 (#3663): inquiries and deals for agents
     from ..office.letteragent import lta_spec
     lta_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.153.0 (#2031): letter drafts of agents
     hmv_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.483.0 (#1902): filed e-mails, read only

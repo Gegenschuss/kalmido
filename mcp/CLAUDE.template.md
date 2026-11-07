@@ -612,6 +612,16 @@ switches as the office tools and for a person who is an **admin** of the office:
 note; source `agent` by default) and `update_office_lead` (only the next step, the follow-up day and the note, only while
 it is a lead; 2.567.0: always with `expect_updated_at` from your last read, `409` = a person changed it since). A person converts a lead into a client; you never convert, delete or move it to another stage.
 
+### Inquiries and deals in the office (2.644.0)
+
+The later stages of the sales pipeline (inquiry, offer = quotation sent, won, lost), with the same switches and only for a
+person who is an **admin** of the office: `list_office_deals` (`stage` = one stage or `open` = inquiry + offer; value,
+probability, client, expected date, `updated_at`), `create_office_deal` (a title, stage `inquiry` by default, optional
+client of the office, value, probability, expected date, contact data, next step, follow-up day, note; source `agent` by
+default) and `set_office_deal_stage` (only the stage and, with `lost`, `lost_reason`; always with `expect_updated_at` from
+your last read, `409` = a person changed it since). Leads stay with the lead tools: a lead's stage you never set (`409`),
+a person converts it. You never delete a deal, make its quotation or project, or change other fields.
+
 Clients are managed by people (2.370.4): for you `list_clients` is empty, and `create_client`, `update_client`,
 `delete_client` and `bulk_clients` (also `untrash` out of the trash) answer `403`. The office area's clients you read with
 `list_office_data`; deleting or restoring a client you leave to the person.
@@ -808,7 +818,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `chat_typing`, `check_in_habit`, `check_time_entries`, `clear_plan_usage`, `clear_waiting`, `client_id`,
 `comment_typing`, `complete_task`, `confirm_abort`, `create_address_book`, `create_client`, `create_contact`, `create_document`, `create_event`,
 `create_event_calendar`, `create_field`, `create_file_folder`, `create_filter`, `create_form`, `create_habit`,
-`create_invoice_draft`, `create_job`, `create_letter_draft`, `create_list`, `create_list_tag`, `create_note`, `create_notepad`, `create_offer_draft`, `create_office_lead`,
+`create_invoice_draft`, `create_job`, `create_letter_draft`, `create_list`, `create_list_tag`, `create_note`, `create_notepad`, `create_offer_draft`, `create_office_deal`, `create_office_lead`,
 `create_packing_list`, `create_poll`, `create_section`, `create_task`, `create_template`, `create_text_file`, `create_trip`,
 `decide_reward`, `delete_address_book`, `delete_attachment`, `delete_chat_attachment`, `delete_client`,
 `delete_comment`, `delete_contact`, `delete_event`, `delete_event_calendar`, `delete_field`, `delete_filter`,
@@ -826,7 +836,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `list_calendar_events`, `list_chats`, `list_clients`, `list_deadline_types`, `list_documents`, `list_event_calendars`,
 `list_events`, `list_fields`, `list_filed_mails`, `list_files`, `list_filters`, `list_flow`, `list_folders`, `list_forms`, `list_groups`, `list_habits`,
 `list_invoice_series`, `list_jobs`, `list_kids`, `list_layout_blocks`, `list_letter_drafts`, `list_list_groups`, `list_list_tags`, `list_lists`, `list_members`, `list_news`,
-`list_notepads`, `list_notes`, `list_objects`, `list_office_data`, `list_office_documents`, `list_office_leads`, `list_packing_templates`,
+`list_notepads`, `list_notes`, `list_objects`, `list_office_data`, `list_office_deals`, `list_office_documents`, `list_office_leads`, `list_packing_templates`,
 `list_payment_suggestions`, `list_polls`, `list_project_files`, `list_receipt_suggestions`, `list_relations`, `list_repos`, `list_rules`, `list_schedules`,
 `list_sections`, `list_stale_tasks`, `list_subtasks`, `list_tags`, `list_tasks`, `list_team_channels`, `list_team_chats`, `list_templates`,
 `list_time_entries`, `list_trash`, `list_upkeep_presets`, `list_video_reviews`, `list_waiting`, `list_watchers`, `leave_team_channel`, `mark_news_read`, `mark_team_chat_read`,
@@ -839,7 +849,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `request_integration_approval`, `request_merge_approval`, `request_reward`, `restore_event`, `restore_note`, `restore_task`, `review_task`, `search_contacts`,
 `search_files`, `search_messages`, `search_notes`, `search_tasks`, `send_chat`, `sheet_add_column`, `sheet_append_rows`,
 `sheet_add_tab`, `sheet_create`, `sheet_read`, `sheet_set_cells`, `sheet_set_rules`, `sheet_tabs`, `sheet_undo_batch`, `sheet_update`, `sheet_vars`, `sheets_list`, `set_contact_care`, `set_dwell_limits`, `set_list_columns`, `set_list_review`,
-`set_project_overview`, `set_project_status`, `set_queue_order`, `set_status`, `set_video_comment_done`, `set_waiting`, `set_wip_limit`, `share_address_book`,
+`set_office_deal_stage`, `set_project_overview`, `set_project_status`, `set_queue_order`, `set_status`, `set_video_comment_done`, `set_waiting`, `set_wip_limit`, `share_address_book`,
 `share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`, `partial_task`, `skip_occurrence`, `start_timer`,
 `stop_timer`, `submit_proposal`, `suggest_payment`, `suggest_receipt`, `sync_read_later`, `take_task`, `tidy_task`,
 `time_from_events`, `unlink_contact`, `unlink_task_from_list`, `unshare_address_book`, `unshare_event_calendar`, `unshare_list`,

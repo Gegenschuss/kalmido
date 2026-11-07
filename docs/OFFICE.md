@@ -924,6 +924,13 @@ Routes: `GET /api/office/deals` (`items`, `summary`, `stages`, `probabilities`, 
 `POST /api/office/deals/<id>/restore`, `POST /api/office/deals/<id>/offer`, `POST /api/office/deals/<id>/project`,
 `GET /api/office/deals/summary`, `GET /api/office/kpi`. Clients, lists and quotations of another area are refused.
 
+Agents (2.644, scope `office`, the same switches as the leads, acting only for an admin of the office area) list the
+inquiries and deals (`GET /api/v1/office/deals`, `?stage=` one stage or `open`), add an inquiry or a deal
+(`POST /api/v1/office/deals`, stage *Inquiry* by default, source *agent*) and set a deal's stage
+(`PATCH /api/v1/office/deals/<id>`, `{stage, lost_reason?, expect_updated_at}`; the probability follows the stage as in
+the app). They never touch a lead's stage (a person converts it), never delete, make a quotation or a project, and change
+no other field. Every request is a line in the office log; a stage set by an agent is one undo step in the deal's history.
+
 ### Leads
 
 *Since 2.94.*

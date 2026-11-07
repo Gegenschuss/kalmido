@@ -7,7 +7,8 @@ where it is (the view shows a note; the admin sets "lost").
 2.94.0 A (#1930): a stage lead before inquiry (office/leads.py: convert, CSV import, agents) with source, next step,
 follow-up day and the lead's contact data; leads are never counted in the sums or the forecast.
 Every route: office_gate + office_org with the admin of the office area (a personal office: its owner). Agents: none (the
-office is for people only). value / contact / note / lost_reason (+ next_step / email / phone / company) encrypted at rest (orgcrypt)."""
+office is for people only). 2.644.0 (#3663): agents read / add inquiries and deals and set a stage over
+office/agentdeals.py (the leads' switches). value / contact / note / lost_reason (+ next_step / email / phone / company) encrypted at rest (orgcrypt)."""
 import re
 from datetime import date
 
