@@ -23,6 +23,7 @@ from kt import B, DATA, check  # noqa: E402
 
 kt.fresh(env={"KALMIDO_API_RATE": "100000"}, prefix="P2652D")
 PAST = "2020-01-01T00:00:00+00:00"
+FUTURE = "2099-01-01T00:00:00+00:00"
 TS = "2026-11-01T00:00:00+00:00"
 
 
@@ -83,6 +84,13 @@ for url, kind, rid, lst in (("evcals", "evcal", K, "/api/evcals"), ("books", "ad
     s = share(kind, rid, FIONA)
     check(r.ok and s and s[1] == "edit" and s[2] is None and rid in ids(Fi.get(B + lst)),
           f"#5089: shared again with another role: the new role, without end date ({s})")
+    sql("UPDATE fs_shares SET expires_at=? WHERE id=?", (FUTURE, s[0]), write=True)  # a deliberate end date, still valid
+    r = Do.put(B + f"/api/{url}/{rid}/members", json={"user_id": FIONA, "role": "view"})
+    s = share(kind, rid, FIONA)
+    check(r.ok and s and s[1] == "view" and s[2] == FUTURE and rid in ids(Fi.get(B + lst)),
+          f"#5089 review: a role change keeps a still valid end date (regression: it was lifted) ({s})")
+    Do.put(B + f"/api/{url}/{rid}/members", json={"user_id": FIONA, "role": "edit"})  # back to the state the next block expects
+    sql("UPDATE fs_shares SET expires_at=NULL WHERE id=?", (s[0],), write=True)
 
 # ================================================================== tenancy client_contact: the core's share counts
 sql("INSERT INTO clients(org_id,name,created_by,created_at,updated_at) VALUES(NULL,'Example Client P2652D',?,?,?)", (FIONA, TS, TS), write=True)
