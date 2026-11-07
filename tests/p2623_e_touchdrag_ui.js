@@ -231,13 +231,15 @@ const closeMenus = d => { d.dispatchEvent(new d.defaultView.KeyboardEvent('keydo
     // 2.633.0 (#4964, review): held without moving = the row's menu ONCE, on letting go; the row's long press (ms_longPress, 500 ms,
     // pointer events as a real browser sends them beside the touch ones) must not open it as well while the finger still holds
     const l2 = li(); box(l2, 300, 100, 500, 50);
+    const calls = []; w.eval('window.__ofdRM = ofdRowMenu'); w.ofdRowMenu = id => { calls.push(id); };  // counts the row menu's openings
     const pe = new w.Event('pointerdown', {bubbles: true}); Object.assign(pe, {pointerType: 'touch', clientX: 400, clientY: 125}); l2.querySelector('.ofdrow').dispatchEvent(pe);
     tc(w, l2, 'touchstart', 400, 125);
     check(await until(() => l2.classList.contains('dragging'), 30), 'touch: held still lifts the row');
     await sleep(700);  // past the long press's 500 ms: a negative check (nothing may open), no state to wait for
-    check(!items(d).length, 'touch: while the finger still holds, the long-press menu stays shut (the hold took the press)');
+    check(!calls.length, 'touch: while the finger still holds, the long-press menu stays shut (the hold took the press) ' + calls.length);
     l2.querySelector('.ofdrow').dispatchEvent(new w.Event('pointerup', {bubbles: true})); tc(w, l2, 'touchend', 400, 125);  // a browser sends pointerup before touchend
-    check(await until(() => items(d).length, 20), 'touch: let go without moving = the row\'s menu ' + [l2.isConnected, l2.classList.contains('dragging'), w.eval('(OFD.list||[]).length'), w.eval('typeof ofdRowMenu'), !!d.querySelector('#pop'), (d.querySelector('#pop')||{}).className, d.querySelector('#view .ofdrow')?.dataset.id, d.querySelector('#view .ofdrow')?.dataset.arch].join(' / '));
+    check(await until(() => calls.length === 1, 20), 'touch: let go without moving = the row\'s menu, once ' + calls.length);
+    w.ofdRowMenu = w.__ofdRM;
     closeMenus(d); }
   w.close();
 
