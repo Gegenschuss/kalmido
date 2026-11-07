@@ -1972,6 +1972,7 @@ GUARD_HEREDOC = re.compile(r"(?<!<)<<(?!<)-?[ \t]*(['\"]?)([A-Za-z_][A-Za-z0-9_]
 GUARD_FEEDS = re.compile(r"(?i)(?<![a-z0-9_.-])(sh|bash|zsh|dash|ksh|ash|fish|eval|su|sudo|doas|ssh|pwsh|powershell|"
                          r"python[0-9.]*|node|perl|ruby|xargs)(?![a-z0-9_-])")
 GUARD_SUB = re.compile(r"@ksub([0-9a-f]*)@")  # a $( ) / backtick / <( ) as ONE word of the outer command, its text in hex
+GUARD_MAX_SUBST = 400  # 2.615.0 (#3758, Fable re-check): deeper nesting is quadratic; past it only guard_suspicious
 GUARD_MAX = 256 * 1024  # longer command lines are not taken apart (time), only checked for a guarded name
 # 2.615.0 E (#3758): what a wrapper runs is the first word after its options; these options take a value (next word),
 # GUARD_WPOS words come before the program (timeout DURATION, ssh HOST, flock FILE, chroot DIR, chrt PRIO),
@@ -2266,7 +2267,12 @@ def _guard_wrapped(exe, w, i):
         return None, lines + [" ".join(rest)]
     if shc:
         return None, lines + rest[:1]
-    if exe == "su":  # its further words are arguments of the shell, no program
+    if exe in ("su", "runuser"):  # its further words are arguments of the shell, no program; -c may come after the user
+        for j, a in enumerate(rest):  # 2.615.0 (#3758, Fable re-check): su root -c reboot, su - root -c 'x'
+            if a in ("-c", "--command") and j + 1 < len(rest):
+                lines.append(rest[j + 1])
+            elif a.startswith("--command="):
+                lines.append(a.split("=", 1)[1])
         return None, lines
     return (i if rest else None), lines
 
@@ -2299,7 +2305,7 @@ def _guard_code(exe, word, depth):
     """2.615.0 E (#3758): a word of awk / sed / an interpreter that runs commands: system("reboot"), print | "sh",
     os.system('git push -f'), subprocess.run(['git', 'push', '-f']), the e flag of sed (s/x/reboot/e)."""
     if exe == "sed":
-        if re.search(r"(?:^|[;{}\s])e(?:[\s;}]|$)|/[gpiImM0-9]*e[gpiImM0-9w]*(?:[\s;}]|$)", word) and guard_suspicious(word):
+        if re.search(r"(?:^|[0-9$/;{}\s])e(?:[\s;}]|$)|/[gpiImM0-9]*e[gpiImM0-9w]*(?:[\s;}]|$)", word) and guard_suspicious(word):
             return GUARD_NO + "sed code that runs a guarded command."
         return None
     if exe in ("awk", "gawk", "mawk", "nawk"):
@@ -2311,6 +2317,21 @@ def _guard_code(exe, word, depth):
         why = guard_reason(t, depth + 1, True)
         if why:
             return why
+    return None
+
+
+GUARD_GIT_SEARCH = {"grep", "log", "shortlog", "rev-list", "blame", "show", "whatchanged"}
+
+
+def _guard_git_sub(w, i):
+    """2.615.0 (#3758): the index of git's subcommand in w from i on (past -C dir, -c x=y, --git-dir ..., other options)."""
+    while i < len(w):
+        if w[i] in ("-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path"):
+            i += 2
+        elif w[i].startswith("-"):
+            i += 1
+        else:
+            return i
     return None
 
 
@@ -2337,6 +2358,9 @@ def _guard_words(w, fed, depth):
         elif exe == "git":  # -m MSG, -am / -qm / -sm / -anm MSG (2.615.0 E), -mMSG, -amMSG, --message[=MSG]
             text = {i + 1 for i in range(s + 1, len(w) - 1) if w[i] == "--message" or re.fullmatch(r"-[A-Za-z]*m", w[i])} | {
                 i for i in range(s + 1, len(w)) if w[i].startswith("--message=") or re.fullmatch(r"-[A-Za-z]*m.+", w[i], re.S)}
+            sub = _guard_git_sub(w, s + 1)  # 2.615.0 (#3758, Fable re-check): git grep / log -S / --grep search text
+            if sub is not None and w[sub] in GUARD_GIT_SEARCH:
+                text |= set(range(sub + 1, len(w)))
     for i, a in enumerate(w):
         if i in text:
             continue
@@ -2356,7 +2380,7 @@ def guard_reason(cmd, depth=0, fed=False):
     cmd = str(cmd or "")
     if not cmd.strip():
         return None
-    if depth > 8 or len(cmd) > GUARD_MAX:
+    if depth > 8 or len(cmd) > GUARD_MAX or cmd.count("$(") + cmd.count("`") > GUARD_MAX_SUBST:  # 2.615.0: subst cap
         return (GUARD_NO + "a command nested too deeply or too long to check that names a guarded command.") if guard_suspicious(cmd) else None
     cmd = _guard_heredocs(cmd.replace("\\\r\n", " ").replace("\\\n", " "))
     cmd, inner = _guard_subst(cmd)

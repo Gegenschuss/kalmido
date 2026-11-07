@@ -374,14 +374,14 @@ then`); a `$( )`, backtick or `<( )` stays ONE word of the outer command (`git p
 (`$(which git) push -f`) gets the rules of the guarded programs. Through wrappers in front it takes the first word after
 their options as the program (`sudo -u x`, `env`, `VAR=1`, `timeout 60`, `nice -n 5`, `nohup`, `xargs -n 1`, `ssh -p 22
 host ...`), so `sudo cat /sbin/reboot` or `xargs grep -l reboot` pass; command lines of wrappers are checked as such
-(`sh -c "..."`, `bash -lc`, `su -c`, `env -S`, `eval ...`, `ssh host ...`, `watch ...`, `cmd /c`, `pwsh -Command`), the value of `alias x='...'` / `FOO="..."`, and a heredoc
+(`sh -c "..."`, `bash -lc`, `su -c` (also after the user: `su root -c ...`), `env -S`, `eval ...`, `ssh host ...`, `watch ...`, `cmd /c`, `pwsh -Command`), the value of `alias x='...'` / `FOO="..."`, and a heredoc
 that a shell, `ssh`, `sudo` or an interpreter reads (`bash <<EOF`, `cat <<EOF | sh`); options in any order and joined
 short options (`-uf`). It errs on the side of refusing: the words of a line with unbalanced quotes are read plainly, and
 a quoted text that is itself a command line counts as one (`echo "please reboot"` passes, but `echo 'git push -f' | sh`
 and `python3 -c "import os; os.system('git push -f')"` are refused). Text stays text: the words of `echo` / `printf` and of
 search and text tools (`grep`, `rg`, `ag`, `ack`, `sed`, `awk`, `jq`, `cut`, `tr`, `sort`, `wc`, `head`, `tail`, `less`,
 `diff`, `test`: `grep -rn 'git push -f' docs/` passes), a git message (`-m`, `--message`, also in a bundle: `-am`,
-`-qm`, `-sm`, `-anm`) and a heredoc read by `cat` / `tee` / `git commit -F -`, as long as nothing on the same
+`-qm`, `-sm`, `-anm`), the search words of `git grep` / `git log -S` / `--grep` / `git show` / `git blame` and a heredoc read by `cat` / `tee` / `git commit -F -`, as long as nothing on the same
 line hands them to a shell (`echo git push -f | sh` is refused). Code that runs commands is no text: a quoted command
 in awk `system("...")` / `print | "sh"`, in `os.system('...')` / `subprocess.run(['git', 'push', '-f'])` of an
 interpreter, and a sed `e` flag that names a guarded command. A command line longer than 256 KB is not taken apart

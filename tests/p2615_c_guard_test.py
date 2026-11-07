@@ -208,6 +208,9 @@ REFUSED_E = [
     "git config remote.origin.push +main:main",
     # 8: very long input with unbalanced quotes: not taken apart, refused because it names a guarded command
     "git push -f \"" + "a " * 200000,
+    # 2.615.0 (#3758, Fable re-check): su USER -c ONEWORD, sed address + e, git search followed by a real command
+    "su root -c reboot", "su - root -c 'reboot'", "su -l root -c reboot", "runuser root -c reboot", "su root --command=reboot",
+    "sed '1e reboot' f", "sed -e '1e reboot' f", "git grep x; git push -f", "git log -S x && reboot",
 ]
 ALLOWED_E = [
     # 3: search / text tools: their quoted words are text
@@ -244,6 +247,9 @@ ALLOWED_E = [
     "git -c alias.co=checkout co main",
     "git config alias.st status",
     "git -c remote.origin.push=refs/heads/main:refs/heads/main push",
+    # 2.615.0 (#3758, Fable re-check): searching with git is text
+    "git grep 'git push -f'", "git grep -n 'systemctl reboot' -- docs", "git log -S 'docker system prune'",
+    "git log --grep 'git push -f'", "git -C x log --grep 'reboot now'", "su root -c 'ls'", "sed 's/a/e/' f",
 ]
 for c in REFUSED_E:
     t0 = time.time()
@@ -258,6 +264,11 @@ for c, refused in (("git push \"" + "x " * 420000, True), ("echo \"" + "x " * 42
     t0 = time.time()
     why = ar.guard_reason(c)
     check(bool(why) == refused and time.time() - t0 < 5, f"long input ({len(c)} bytes): refused {refused} in {time.time() - t0:.1f} s")
+# Fable re-check: deeply nested substitutions are answered in time (past GUARD_MAX_SUBST only guard_suspicious)
+for c, refused in (("$(" * 90000 + "reboot" + ")" * 90000, True), ("$(" * 90000 + "ls" + ")" * 90000, False)):
+    t0 = time.time()
+    why = ar.guard_reason(c)
+    check(bool(why) == refused and time.time() - t0 < 5, f"deep substitutions: refused {refused} in {time.time() - t0:.1f} s")
 # the whole table of C again: no form refused before passes now (REFUSED above runs on the fixed code too)
 check(all(ar.guard_reason(c) for c in REFUSED), "every command line of the C table stays refused")
 
