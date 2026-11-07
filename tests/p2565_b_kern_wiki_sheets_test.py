@@ -8,8 +8,8 @@ core shares (fs_shares on the reference node, core/objects.py obj_node_share), t
    (the fallback reopens nothing)
  - knowledge: a person share of a page / a folder lands on the node(s); the folder share covers a page renamed below it and
    stops for a page moved out; #4668: a page restored as "Name (2)" keeps its share; revoke / restore (Undo)
- - the fallback: an old row not moved yet (core_id NULL) is read as before; the one-shot migr_core4717 (and the knowledge
-   index) copy it forward, then it works through the core
+ - the fallback: 2.647.0 (#5047): an old row not moved yet (core_id NULL) gives nothing any more; the one-shots
+   migr_core4717 / migr_core5047 (and the knowledge index) copy it forward, then it works through the core
  - a public link stays a link with the maker's rule of #4698 (maker made read-only: the link ends)
  - tenant-matrix: wiki, sheet_share (a person of no organisation / another workspace: 404, no share; an agent: only what is
    shared with it, never a knowledge person share)
@@ -210,12 +210,14 @@ A.put(B + f"/api/orgs/{ORG}/members", json={"email": "bob@example.com", "role": 
 TS = "2026-11-05T10:00:00.000+00:00"
 T2 = table(Bo, "Old share", SP)
 dbx("INSERT INTO sheet_shares(sheet_id,org_id,user_id,role,created_by,created_at) VALUES(?,?,?,'read',?,?)", (T2, ORG, GINA, BOB, TS))
-check(Gi.get(B + f"/api/sheets/{T2}").status_code == 200, "fallback: an old table share not moved yet reads as before")
+# 2.647.0 (#5047): the fallback is gone -- an old table share not moved yet gives nothing until the forward copy hangs it on the core
+check(Gi.get(B + f"/api/sheets/{T2}").status_code == 404, "no fallback: an old table share not moved yet reads nothing")
 W6 = page(Fr, "Legacy")
 dbx("INSERT INTO wiki_shares(org_id,owner_id,path,is_folder,kind,user_id,token,created_by,created_at,page_id,images) "
     "VALUES(NULL,?,'Legacy',0,'person',?,'',?,?,?,0)", (FID, FIO, FID, TS, W6))
-check(Fi.get(B + f"/api/wiki/shared/pages/{W6}").status_code == 200, "fallback: an old page share not moved yet reads as before")
-dbx("DELETE FROM settings WHERE key IN ('migr_core4717','migr_core4717_wiki')")  # 2.565.0: one key per area (core/objhooks.START)
+check(Fi.get(B + f"/api/wiki/shared/pages/{W6}").status_code == 404, "no fallback: an old page share not moved yet reads nothing")  # 2.647.0 (#5047)
+# 2.565.0: one key per area (core/objhooks.START); 2.647.0 (#5047): + the second forward copy before the fallback went
+dbx("DELETE FROM settings WHERE key IN ('migr_core4717','migr_core4717_wiki','migr_core5047','migr_core5047_wiki')")
 kt.fresh(prefix="P2565B", env={"KALMIDO_API_RATE": "100000"}, keep=True)  # the start runs the one-shot again
 Bo, Gi, Fr, Fi = sess("bob"), sess("gina"), sess("frida"), sess("fiona")
 check(core("sheet", T2, GINA) == ["view"] and dbx("SELECT core_id IS NOT NULL FROM sheet_shares WHERE sheet_id=?", (T2,)) == [(True,)],

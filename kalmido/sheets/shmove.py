@@ -107,7 +107,7 @@ def sheets_move_space(sid):
     if b.get("dry"):
         return jsonify(smv_answer(notes, None, count=1))
     ts = iso_ms(now_utc())
-    back, revived, sback = None, [], 0
+    back, revived, sback, sback_ids = None, [], 0, []
     if b.get("undo") not in (None, "", 0):
         u = b.get("undo")
         if isinstance(u, bool) or not isinstance(u, int):
@@ -138,10 +138,21 @@ def sheets_move_space(sid):
         for x in c.execute("SELECT id, org_id, user_id FROM sheet_shares WHERE sheet_id=? AND revoked_at IS NOT NULL", (sid,)).fetchall():
             if x["id"] in back["shares"] and (x["org_id"] or None) == (to or None) and (
                     x["user_id"] is None or shs_fits(c, x["user_id"], r2, _agent_row(c, x["user_id"]))):  # 2.360.2 M (#2561): an open address row
-                c.execute("UPDATE sheet_shares SET revoked_at=NULL WHERE id=?", (x["id"],))
+                # 2.647.0 (#5047): its core share went with the move (shs_end): the card gets a new one below
+                c.execute("UPDATE sheet_shares SET revoked_at=NULL, core_id=NULL WHERE id=?", (x["id"],))
                 sback += 1
+                sback_ids.append(x["id"])
         shs_drop_cache()
     shf_after_move(c, sid)  # 2.199.0 C (#2742): its folder belongs to the old workspace
+    if sback_ids:  # 2.647.0 (#5047): the cards back get their core shares on the table's node in this workspace (the old one went)
+        from .shshare import shs_core_put
+        r2 = sh_reload(c, sid)
+        for i in sback_ids:
+            try:
+                with c.savepoint():
+                    shs_core_put(c, uid, r2, i, event=False)
+            except Denied:  # no room on the node: the card stays without a right (listed, the owner sees it)
+                print(f"WARNING sheet share card {i} found no room after the undo of a move (#5047)", flush=True)
     new_paths, old_paths = [], []  # 2.363.3 (#3133): sealed into new stored files, the old ones go after the commit
     try:
         shk_move_files(c, sid, to, uid, new_paths, old_paths)  # 2.124.0 B (#2110): the files of file cells go along, sealed with the target's key

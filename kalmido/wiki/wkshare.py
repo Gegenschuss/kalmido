@@ -22,8 +22,9 @@ reference node, a folder share on the folder's node (+ the node of the page of t
 covered by its path too): wiki_shares.core_id / core_id2 (core/objects.py obj_node_share). So it follows the page / the folder
 through renames, moves within the tree and a restore as "Name (2)" (#4668), and "Shared with me" reads it like every share of
 the knowledge trees (wkfshare.py wkfs_rows). The person row stays the share's card (the dialog's id, the address typed in,
-the switch "show pictures", the News item) and gives nothing itself; a card not moved yet (core_id NULL) is read as before for
-one release (fallback: wsh_guest_rows, wsh_person_shares). Revoking takes the core share back (obj_revoked) and marks the
+the switch "show pictures", the News item) and gives nothing itself; 2.647.0 (#5047): a card not moved yet (core_id NULL) gives
+nothing either (the fallback of one release is gone; migr_core5047_wiki, wsh_core_settle, hung every card it could on the core
+first). Revoking takes the core share back (obj_revoked) and marks the
 card; a core share taken back elsewhere (the file store's dialog) ends the card too (wsh_cut). Link shares stay rows of
 wiki_shares (a public link is no share with an account), with the maker's rule of 2.560.0 (#4698 c, WSH_MAKER)."""
 import html
@@ -318,8 +319,31 @@ def wsh_core_move(c, owner=None):
             try:
                 with c.savepoint():
                     n += bool(wsh_core_put(c, x["created_by"] or x["owner_id"], x["id"]))
-            except Denied:  # too many shares on the node: the old row keeps working (fallback)
-                pass
+            except Denied:  # too many shares on the node: the card stays listed without a right (2.647.0, #5047: no fallback)
+                print(f"WARNING knowledge share card {x['id']} found no room on its node (#5047)", flush=True)
+    return n
+
+
+def wsh_core_settle(c):
+    """2.647.0 (#5047), once before the fallback went (migr_core5047_wiki, core/db.py init_db): the private spaces that still
+    hold person cards without a core share get their knowledge tree checked (wkf_sync: the page / folder nodes) and the cards
+    hung on the core (wsh_core_move). Idempotent; a card whose page / folder has no node even then (a locked space, a page in
+    the trash) gives nothing from now on. Returns how many cards moved."""
+    from .wkfolder import WKF_SEEN, wkf_sync
+    n = 0
+    with system_ctx(c):  # every person's private space (a start-up step)
+        owners = [x[0] for x in c.execute(
+            "SELECT DISTINCT s.owner_id FROM wiki_shares s JOIN users u ON u.id=s.owner_id AND u.disabled=0 WHERE s.kind='person' "
+            "AND s.org_id IS NULL AND s.user_id IS NOT NULL AND s.revoked_at IS NULL AND s.core_id IS NULL AND s.core_id2 IS NULL "
+            "ORDER BY 1").fetchall()]
+        for o in owners:
+            try:
+                with c.savepoint():
+                    WKF_SEEN.pop(f"u{int(o)}", None)
+                    wkf_sync(c, o, None)
+            except Exception as e:  # noqa: BLE001  a tree that cannot be checked: its cards wait for the owner's next index
+                print(f"WARNING knowledge tree of account {int(o)} not checked (#5047): {type(e).__name__}", flush=True)
+            n += wsh_core_move(c, o)
     return n
 
 
@@ -583,23 +607,12 @@ def wsh_restore(sid):
 
 
 # ---------------------------------------------------------------- the guest: pages shared with me (person shares)
-def wsh_guest_rows(c, uid, pid=None):
-    """The pages live person shares give uid (private spaces of active owners, open spaces only, not in the trash)."""
-    a = ([pid] if pid else []) + [uid, iso(now_utc())]
-    return c.execute(f"SELECT p.* FROM wiki_pages p WHERE p.org_id IS NULL AND p.deleted_at IS NULL AND {wsh_open_sql()}" + (" AND p.id=?" if pid else "")
-                     + f" AND EXISTS (SELECT 1 FROM wiki_shares s JOIN users o ON o.id=s.owner_id AND o.disabled=0 WHERE s.kind='person' "
-                     f"AND s.user_id=? AND s.org_id IS NULL AND {wsh_live()} AND {WSH_COVER} AND s.core_id IS NULL AND s.core_id2 IS NULL) "
-                     f"ORDER BY p.owner_id, lower(p.path) LIMIT {WSH_PAGES}", a).fetchall()  # 2.565.0 (#4717): only cards not moved (fallback)
-
-
 def wsh_reach(c, uid):
-    """2.200.0 B (#2747): the pages shared with uid -- person shares (wsh_guest_rows) and the folder / page shares of the
-    knowledge trees uid does not read through the space anyway (wkfshare.py) -> (rows, {page id: folder info})."""
+    """2.200.0 B (#2747): the pages shared with uid -- the folder / page shares of the knowledge trees uid does not read
+    through the space anyway (wkfshare.py; a person card's core share is one of them) -> (rows, {page id: folder info}).
+    2.647.0 (#5047): the fallback for person cards not moved yet (core_id NULL, by their path) is gone."""
     from .wkfshare import wkfs_rows
-    rows = list(wsh_guest_rows(c, uid))
-    seen = {r["id"] for r in rows}
-    more, info = wkfs_rows(c, uid)
-    return rows + [r for r in more if r["id"] not in seen], info
+    return wkfs_rows(c, uid)
 
 
 @app.get("/api/wiki/shared")
@@ -665,12 +678,10 @@ def wsh_shared_file(fid, name=None):
 
 def wsh_person_shares(c, uid, pid):
     """2.380 H (#2356): the live person shares that give uid the page pid (their switch "show embedded pictures").
-    2.565.0 (#4717): a moved card counts when its core share's node is the page's node or a folder above it; a card not moved
-    yet by its path (fallback)."""
+    2.565.0 (#4717): a moved card counts when its core share's node is the page's node or a folder above it; 2.647.0 (#5047):
+    a card not moved yet (core_id NULL) no longer counts by its path."""
     ts = iso(now_utc())
-    out = c.execute(f"SELECT s.* FROM wiki_shares s JOIN wiki_pages p ON p.id=? JOIN users o ON o.id=s.owner_id AND o.disabled=0 "
-                    f"WHERE s.kind='person' AND s.user_id=? AND s.org_id IS NULL AND {wsh_live()} AND {WSH_COVER} "
-                    f"AND s.core_id IS NULL AND s.core_id2 IS NULL", (pid, uid, ts)).fetchall()
+    out = []
     core = c.execute("SELECT s.*, f.node_id AS core_node FROM wiki_shares s JOIN fs_shares f ON f.id IN (s.core_id, s.core_id2) "
                      "JOIN users o ON o.id=s.owner_id AND o.disabled=0 WHERE s.kind='person' AND s.user_id=? AND s.org_id IS NULL "
                      "AND s.revoked_at IS NULL AND (f.expires_at IS NULL OR f.expires_at>?)", (uid, ts)).fetchall()
@@ -1044,4 +1055,5 @@ def wsh_md(text, link, file, depth=0, node=None):
 
 
 objhooks.START.append(("migr_core4717_wiki", True, wsh_core_move))  # 2.565.0 (#4717): once (core/db.init_db)
+objhooks.START.append(("migr_core5047_wiki", True, wsh_core_settle))  # 2.647.0 (#5047): once more, before the fallback is gone
 fs_unshare_hooks.append(wsh_fs_unshare)  # 2.623.0 (#4778)

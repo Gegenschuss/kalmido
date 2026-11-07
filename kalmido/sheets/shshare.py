@@ -22,7 +22,7 @@ along, an address row stays open without access (shs_forget): a row that goes wo
 agent_id; read = view, write = edit) on the table's reference node (core/objects.py obj_node_share; a table in no folder gets
 its node at the top of its workspace's tree, shs_node, as core objects do). A row of sheet_shares is the share's card (the
 dialog's id, an address typed in) and names its core share (core_id); it gives nothing itself any more. Reading: the core
-share first, else -- one release long, for rows not moved yet (core_id NULL) -- the old row (shs_roles_of). Ending a share
+share only (2.647.0, #5047: the fallback to the old row with core_id NULL is gone, shs_roles_of). Ending a share
 takes the core share back (obj_node_unshare: obj_revoked) and marks / removes the card, so the old row reopens nothing.
 """
 from flask import g, has_request_context, jsonify
@@ -49,7 +49,8 @@ SHS_SEAL = "sheet-share"  # purpose of email_seal / email_key
 SHS_CORE = {"read": "view", "write": "edit"}  # 2.565.0 (#4717): the card's role -> the core share's
 SHS_CARD = {"view": "read", "edit": "write"}
 # 2.565.0 (#4717): a card counts while it is not revoked and its core share is still there (one taken back elsewhere -- the
-# file store's dialog, obj_revoke_person -- ends it too); a card not moved yet (core_id NULL) as before
+# file store's dialog, obj_revoke_person -- ends it too); a card not moved yet (core_id NULL) stays listed (2.647.0, #5047: it
+# gives nothing any more -- the owner sees it and ends it, or a change of its role hangs it on the core, sheets_shares_patch)
 SHS_LIVE = "{a}revoked_at IS NULL AND ({a}core_id IS NULL OR EXISTS (SELECT 1 FROM fs_shares f WHERE f.id={a}core_id))"
 
 
@@ -84,9 +85,9 @@ def _core_roles(c, uid):
 def shs_roles_of(c, uid):
     got = _cache(uid)
     if got is None:
-        got = _core_roles(c, uid)  # 2.565.0 (#4717): the core first, then the old rows not moved yet (one release)
-        for sid, role in c.execute("SELECT sheet_id, role FROM sheet_shares WHERE user_id=? AND revoked_at IS NULL AND core_id IS NULL", (uid,)):
-            got.setdefault(sid, role)
+        # 2.565.0 (#4717): the core share is the right; 2.647.0 (#5047): the old row not moved yet (core_id NULL) gives nothing
+        # any more -- the forward copy migr_core5047 (shs_core_move) hung every one it could on the core first
+        got = _core_roles(c, uid)
         if has_request_context():
             g.setdefault("shs_cache", {})[uid] = got
     return got
@@ -357,10 +358,12 @@ def shs_fs_unshare(c, uid, n, s):
     return True
 
 
-def shs_core_move(c, sheet_id=None):
+def shs_core_move(c, sheet_id=None, by=None):
     """The forward copy (one-shot migr_core4717 in core/db.py init_db, and for a table coming back from the trash or handed
     on to an heir): every live card bound to an account without a core share gets one. Idempotent; a table in the trash
-    waits (its fallback row reads as before until it comes back). Returns how many."""
+    waits (it gets its core shares when it comes back, sheets/web.py). Returns how many. 2.647.0 (#5047): also after an
+    organisation's import (admin/oi_store.py, by = who imports: the cards come without their maker) and once more before the
+    fallback went (migr_core5047): a card without a core share gives nothing any more."""
     q = ("SELECT s.id, s.sheet_id, s.created_by FROM sheet_shares s JOIN sheets t ON t.id=s.sheet_id WHERE s.revoked_at IS NULL "
          "AND s.core_id IS NULL AND s.user_id IS NOT NULL AND t.deleted_at IS NULL AND t.book_id IS NULL")
     n = 0
@@ -369,9 +372,9 @@ def shs_core_move(c, sheet_id=None):
             r = c.execute("SELECT * FROM sheets WHERE id=?", (x["sheet_id"],)).fetchone()
             try:
                 with c.savepoint():
-                    n += bool(shs_core_put(c, x["created_by"], r, x["id"], event=False))
-            except Denied:  # too many shares on the node: the old row keeps working (fallback)
-                pass
+                    n += bool(shs_core_put(c, by or x["created_by"], r, x["id"], event=False))
+            except Denied:  # too many shares on the node: the card stays listed without a right (2.647.0, #5047: no fallback)
+                print(f"WARNING sheet share card {x['id']} found no room on its table's node (#5047)", flush=True)
     return n
 
 
@@ -550,4 +553,5 @@ def sheets_shares_delete(sid, shid):
 
 
 objhooks.START.append(("migr_core4717", True, shs_core_move))  # 2.565.0 (#4717): once (core/db.init_db)
+objhooks.START.append(("migr_core5047", True, shs_core_move))  # 2.647.0 (#5047): once more, before the fallback is gone
 fs_unshare_hooks.append(shs_fs_unshare)  # 2.623.0 (#4778)

@@ -555,8 +555,8 @@ def _sheet_link(c, run, src, d, ctx):
 
 
 def _sheet_share(c, run, src, d, ctx):
-    if "core_id" in d:  # 2.565.0 (#4717): the id of the source's core share means nothing here (its fs_shares row comes with the store)
-        d["core_id"] = None
+    if "core_id" in d:  # 2.565.0 (#4717): the source's core share came with the store (fs_shares, imported before): 2.647.0
+        d["core_id"] = run.m("fs_shares", src.get("core_id"))  # (#5047) the card names it again (checked in _finish_sheet_shares)
     return d if d["user_id"] is not None and _not_agent(c, d["user_id"]) else None  # 2.360.2 M (#2561): an open address row never
 
 
@@ -608,6 +608,26 @@ def _finish_sheets(c, run, oi, who):
             ys = ch.get("y") if isinstance(ch.get("y"), list) else []
             ch["y"] = [y for y in (run.m("sheet_columns", v) for v in ys if not isinstance(v, (list, dict))) if y]
         c.execute("UPDATE sheets SET chart=? WHERE id=?", (json.dumps(ch) if isinstance(ch, dict) and ch["y"] else "", nid))
+
+
+def _finish_sheet_shares(c, run, oi, uid):
+    """2.647.0 (#5047): every imported table share card is bound to its core share -- the one that came with the store when it
+    lies on the table's own node and names the same account, else a new one (shshare.py shs_core_move); never a card without
+    a core share next to a core share of its own (two rights, the one ended in one dialog left open in the other)."""
+    from ..sheets.shshare import shs_core_move
+    sheets = set()
+    for r in oi.get("sheets/shares.json") or []:
+        nid = run.m("sheet_shares", r.get("id"))
+        x = c.execute("SELECT id, sheet_id, user_id, core_id FROM sheet_shares WHERE id=?", (nid,)).fetchone() if nid else None
+        if x is None:
+            continue
+        sheets.add(x["sheet_id"])
+        if x["core_id"] and not c.execute("SELECT 1 FROM fs_shares f JOIN fs_nodes n ON n.id=f.node_id WHERE f.id=? AND n.kind='ref' "
+                                          "AND n.ref_kind='sheet' AND n.ref_id=? AND ? IN (f.user_id, f.agent_id)",
+                                          (x["core_id"], x["sheet_id"], x["user_id"])).fetchone():
+            c.execute("UPDATE sheet_shares SET core_id=NULL WHERE id=?", (x["id"],))
+    for sid in sorted(sheets):
+        shs_core_move(c, sid, by=uid)
 
 
 def _body(run, text):
@@ -711,6 +731,7 @@ def _finish(c, run, uid, data, who):
     _finish_docs(c, run)
     _finish_auto(c, run)
     _finish_sheets(c, run, oi, who)
+    _finish_sheet_shares(c, run, oi, uid)  # 2.647.0 (#5047)
     _finish_wiki(c, run, oi)
 
 
