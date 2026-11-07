@@ -415,7 +415,12 @@
     'GET /api/me/channels': () => ({enabled: false, channels: [], mail: {}}),
     'GET /api/account/export': () => ({state: 'none'}), 'GET /api/account/import': () => ({current: null}), 'GET /api/videos/signoffs/orphaned': () => ({signoffs: []}),
     'GET /api/hubmail/mailboxes': () => ({spaces: []}),
-    'GET /api/ticket-types': () => ({types: []}),  // 2.649.0 (#5039): core.js loads the own ticket types at the start (ttypes.js tty_load) - the demo has none
+    // 2.649.0 (#5039): core.js loads the own ticket types at the start (ttypes.js tty_load) - the demo has none. 2.651.0 (#5037):
+    // Settings > Ticket types asks the same path with ?space= and reads space / can_edit / max / suggestions (settings.js
+    // tty_draw: j.space.slice crashed office/settings) - one answer for both (the key has no query); Office > Receipts asks for
+    // the receipts still in the documents (office_receipts.js amv_load, #4434) - none in the demo
+    'GET /api/ticket-types': () => ({space: 'private', can_edit: false, max: 20, types: [], suggestions: [], builtin: []}),
+    'GET /api/docs/office-move': () => ({n: 0, hidden: false, undo: null, office: null, items: [], more: 0}),
     // 2.575.0 (#3778 #4802, #3506 CI red): own module cards (Settings > Modules) and saved document views - none in the demo
     'GET /api/modcards': () => ({space: 'private', admin: true, cap: null, cards: []}), 'GET /api/docs/views': () => ({items: []}),
     'GET /api/proposals/agents': () => ({agents: []}),  // 2.126.3 (#2123 #2124): the office / documents / status report ask which agents may draft - none in the demo
