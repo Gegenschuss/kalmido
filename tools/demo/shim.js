@@ -694,11 +694,12 @@
   const TEAM = ['cal', 'timeline', 'kanban', 'comments', 'collab', 'time', 'progress', 'deps', 'fields', 'events', 'contacts'];
   const PURPOSE = {me: ['cal', 'events', 'contacts'], home: ['cal', 'events', 'contacts', 'habits', ...LIFE],
     family: ['cal', 'habits', 'comments', 'collab', 'family', 'events', 'contacts', 'contracts', 'home', 'travel'], team: TEAM, software: TEAM, office: TEAM};
-  const PURPOSE_EXTRA = {office: ['clients', 'workload', 'forms', 'office']};
+  // 2.634.0 (#4997): PURPOSE_EXTRA and PM_FULL come from kalmido/family/family.py (tools/build_demo.py fills them in), one list
+  // with the server: the copies here had fallen behind (no agents / videos), "all modules" left Approval off
+  const PURPOSE_EXTRA = {/* build_demo: family.py PURPOSE_EXTRA */};
   // 2.125.0 D (#1653): every module runs in the demo now; PM_FULL = kalmido/family/family.py PM_FULL
   const DEMO_OFF = new Set();
-  const PM_FULL = ['cal', 'timeline', 'matrix', 'habits', 'pomo', 'kanban', 'collab', 'stats', 'time', 'progress', 'deps', 'fields', 'agents', 'comments',
-    'family', 'events', 'contacts', ...LIFE, 'budget', 'feeds', 'clients', 'workload', 'forms', 'office', 'wiki', 'files', 'dispo', 'sheets'];
+  const PM_FULL = [/* build_demo: family.py PM_FULL */];
   on('POST', '/api/me/purpose', (q, b) => {
     const p = b.purpose, am = b.all_modules; if (!PURPOSE[p]) bad('Invalid purpose');
     const extra = PURPOSE_EXTRA[p] || [], onS = new Set(am == null ? [...PURPOSE[p], ...extra] : am ? PM_FULL : []);  // 2.125.0 D (#1653): all = PM_FULL like the server

@@ -10,6 +10,7 @@ usage: build_demo.py [out_dir]     (default: demo/ next to app.py; the folder is
 
 Every text replacement in the copied app must match (else the app changed and this script needs a look): the build
 fails instead of shipping a demo that silently talks to a server."""
+import ast
 import json
 import os
 import re
@@ -64,6 +65,23 @@ def shim_unknown(js, shim):
         if not any(rm == m and r.match(p) for rm, r in routes):
             out.append((m, p, n))
     return out
+
+
+def server_list(name):
+    """2.634.0 (#4997): a module list of kalmido/family/family.py (PM_FULL, PURPOSE_EXTRA) as the server has it."""
+    tree = ast.parse(open(os.path.join(ROOT, "kalmido", "family", "family.py"), encoding="utf-8").read())
+    for n in tree.body:
+        if isinstance(n, ast.Assign) and any(isinstance(t, ast.Name) and t.id == name for t in n.targets):
+            return ast.literal_eval(n.value)
+    fail(f"kalmido/family/family.py has no {name}")
+
+
+def shim_lists(shim):
+    """2.634.0 (#4997): the shim's "all modules" (PM_FULL) and the purposes' extras (PURPOSE_EXTRA) = the server's lists."""
+    pm = json.dumps(list(server_list("PM_FULL")))[1:-1]
+    ex = json.dumps({k: list(v) for k, v in server_list("PURPOSE_EXTRA").items()})[1:-1]
+    shim = replace(shim, "[/* build_demo: family.py PM_FULL */]", f"[{pm}]", "shim.js")
+    return replace(shim, "{/* build_demo: family.py PURPOSE_EXTRA */}", "{" + ex + "}", "shim.js")
 
 
 def main(argv):
@@ -142,8 +160,9 @@ def main(argv):
     quips = json.load(open(os.path.join(STATIC, "quips.json"), encoding="utf-8"))
     write(os.path.join(st, "demo-quips.js"), "window.KDEMO_QUIPS = " + json.dumps(quips, ensure_ascii=False, separators=(",", ":")) + ";\n")
     write(os.path.join(st, "demo-site.js"), "window.KDEMO_SITE = " + json.dumps(site) + ";\n")
-    for f in ("shim.js", "texts.js", "demo.css"):
+    for f in ("texts.js", "demo.css"):
         shutil.copy2(os.path.join(DEMO_SRC, f), st)
+    write(os.path.join(st, "shim.js"), shim_lists(read(os.path.join(DEMO_SRC, "shim.js"))))
     texts = read(os.path.join(DEMO_SRC, "texts.js"))
     for code in ["en"] + langs:
         if not re.search(rf"^  {code}: \{{", texts, re.M):
