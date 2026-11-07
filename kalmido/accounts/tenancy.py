@@ -13,6 +13,7 @@ from ..core.db import gset, gsetting, iso, local_now, now_utc
 from ..accounts.orgs import PRIVATE_FOLDER_RE, _operator_apart, has_workspaces, op_foreign_account, op_foreign_org
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 from ..core.access import dlg_gone  # 2.473.0 (#3357)
+from ..core.objhooks import obj_boundary  # 2.649.0 (#5051)
 from ..accounts.orgs import INSTANCE_ENV  # 2.369.5 (#2517): pulled up from functions
 
 # when the check runs: once a day at this local hour or later; KALMIDO_TENANT_CHECK=always = at every watchdog tick (tests)
@@ -333,6 +334,7 @@ REPAIR = {"list_person": ("list_members", "list_id"), "group": ("list_members", 
           "hub_token_person": ("hub_tokens", "org_id"),  # 2.84.0 A (#1198)
           "sheet_share_person": ("sheet_shares", "sheet_id"),  # 2.124.0 C (#2113)
           "tchat_person": ("tchat_members", "room_id")}  # 2.113.1 B (#2059)
+RP_CORE = ("fs_shares", "sheet_shares", "tchat_members", "ev_cal_members", "book_members")  # 2.649.0 (#5051): core/objhooks.obj_boundary
 TENANT_REPAIRED = N_("Workspace boundary check: {0} memberships across the boundary between organisations were removed ({1}). Settings > Organisation > People")
 
 
@@ -396,7 +398,9 @@ def boundary_repair(c, keep=None):
         for oid_, uid in rows:
             if skip(k, oid_, uid):
                 continue
-            c.execute(f"DELETE FROM {table} WHERE {col}=? AND user_id=?", (oid_, uid))
+            # 2.649.0 (#5051): shares, table cards, room / calendar / book members through the core (obj_revoked, both sides)
+            if table not in RP_CORE or obj_boundary(c, table, oid_, uid) is None:
+                c.execute(f"DELETE FROM {table} WHERE {col}=? AND user_id=?", (oid_, uid))
             if table == "list_members":
                 c.execute("UPDATE tasks SET assignee_id=NULL WHERE list_id=? AND assignee_id=?", (oid_, uid))
                 dlg_gone(c, oid_, uid)  # 2.473.0 (#3357): delegated tasks and watching of this list end

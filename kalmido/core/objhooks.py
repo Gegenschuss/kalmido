@@ -17,6 +17,7 @@ START = []
 REVOKE = []
 SETTLE = []  # 2.568.0 (#4739): f(c, kind, rid) -- an area's own core rows follow its member table again (lists/lmcore.py)
 FOLLOW = []
+BOUNDARY = []  # 2.649.0 (#5051): f(c, table, object id, user id) -> rows taken | None (core/objects.obj_boundary_take)
 GONE = {}  # review 2.578 F2: kind -> table of an area's kind outside OBJ whose rows in obj_revoked / obj_history / obj_undo go
 #            with its objects when an account goes (contacts: contacts/ctfolder.py, cascade over their book)
 
@@ -28,6 +29,16 @@ def person_revoked(c, uid, org, reason, heir=None, role=None):
     for f in REVOKE:
         out.update(f(c, uid, org, reason, heir=heir, role=role) or {})
     return out
+
+
+def obj_boundary(c, table, oid, uid):
+    """2.649.0 (#5051): the nightly boundary repair (accounts/tenancy.py) takes a row through the core (obj_revoked, both
+    sides of a card). None = no hook knows the table: the caller deletes as before."""
+    for f in BOUNDARY:
+        n = f(c, table, oid, uid)
+        if n is not None:
+            return n
+    return None
 
 
 def obj_settle(c, kind, rid):

@@ -92,23 +92,26 @@ from flask import g, has_request_context, request
 from ..accounts.orgroles import FULL_READ, RO_MSG, org_role_key
 from .access import Denied, acx_of, acx_org_ok, collab_all, need_feat, token_lists
 from .db import LV_AREA_KEYS, insert_id, iso, now_iso, now_utc
+from .db import iso_ms  # 2.649.0 (#5051): a table's card (sheet_shares.revoked_at)
 from .errors import BadInput
 from .i18n import tr
 from .pg import system_ctx, table_columns
 from ..files.fsref import FSR, _api_way as fsr_api_way, fs_ref_node, fs_ref_node_role, fs_ref_register
 from ..files.store import _free_name, _FsPre, fs_chain, fs_chains, fs_log_add, fs_visible_sql_c, safe_fs_name
 from ..files.store import fs_role  # 2.649.0 (#5051): _take_public
+from ..files.fsref import fs_unshare_hooks  # 2.649.0 (#5051): obj_boundary_take
 from ..files.web import _agent_event, _inherited_shares, _share_targets, _shares
 from .dlock import dl_of
 from ..files.fslock import fl_is_locked, fsl_denied
 from ..accounts.orgretain import upg_heir
 
+from .objhooks import BOUNDARY  # 2.649.0 (#5051)
 from .objhooks import FOLLOW, OBJ, REVOKE  # kind -> the registered hooks; what a person loses (core/objhooks.py: accounts reads them)
 OBJ_RANK = {None: 0, "view": 1, "edit": 2, "manage": 3}
 OBJ_ROLES = ("view", "edit", "manage")
 OBJ_REVOKED_DAYS = 30  # rows taken away stay restorable this long (obj_revoked)
 OBJ_SHARE_MAX = 200
-OBJ_REASONS = ("leave", "role", "retire", "delete", "unshare", "expired")  # 2.568.0 (#4739, review F4): + an expiry ran out
+OBJ_REASONS = ("leave", "role", "retire", "delete", "unshare", "expired", "boundary")  # 2.568.0 (#4739, review F4): + an expiry ran out; 2.649.0 (#5051): + the nightly boundary repair
 OBJ_COLS = ("id", "org_id", "owner_id", "rev", "created_at", "created_by", "updated_at", "updated_by", "deleted_at", "deleted_by")
 _NAME = re.compile(r"[a-z][a-z0-9_]{0,19}")
 _TABLE = re.compile(r"[a-z][a-z0-9_]{0,62}")
@@ -931,7 +934,7 @@ def _actor():
 def obj_revoke_person(c, uid, org, reason, heir=None, role=None):
     """What a person (and their agents) loses in one place (module docstring); runs beside the old loops of org_leave /
     org_member_put / odl_retire / the account deletion, which stay as they are. Returns {what: number of rows}."""
-    if reason not in OBJ_REASONS or reason in ("unshare", "expired"):  # the two of one share (obj_unshare, an area's expiry)
+    if reason not in OBJ_REASONS or reason in ("unshare", "expired", "boundary"):  # the two of one share (obj_unshare, an area's expiry); #5051: obj_boundary_take
         raise ValueError(f"obj_revoke_person: unknown reason {reason!r}")
     out = {}
     by = _actor()
@@ -1016,6 +1019,68 @@ def obj_revoke_person(c, uid, org, reason, heir=None, role=None):
     return out
 
 
+# ---------------------------------------------------------------- 2.649.0 (#5051): the nightly boundary repair through the core
+def _boundary_share(c, n, s):
+    """Share row s of node n (a person outside the node's organisation) goes the way the file store's dialog takes it back
+    (files/web.py files_share_delete): a core object's node -> obj_revoked under its kind + its old member row (calendar,
+    address book, room); a table's / a knowledge page's card -> the area's hook (card ended, core share in obj_revoked); any
+    other node -> obj_revoked without a kind. Returns 1."""
+    if n is not None and n["kind"] == "ref" and n["ref_kind"] in OBJ:
+        reg = OBJ[n["ref_kind"]]
+        obj_node_unshare(c, None, n, s["id"], kind=reg["kind"], ref_id=n["ref_id"], org=n["org_id"] or None, reason="boundary")
+        if s["user_id"]:
+            _boundary_old(c, reg, n["ref_id"], s["user_id"], n["org_id"] or None)
+    elif n is None or not any(f(c, None, n, s) for f in fs_unshare_hooks):
+        _take(c, "fs_shares", "id=?", (s["id"],), "boundary", None, (n["org_id"] if n is not None else None) or None, "user_id")
+    return 1
+
+
+def _boundary_old(c, reg, rid, uid, org):
+    """The old member row of core object rid (a calendar's / book's member table, a room's tchat_members) of person uid."""
+    mt, key = reg["members"] or (("tchat_members", "room_id") if reg["kind"] == "tchat_room" else (None, None))
+    if not mt:
+        return 0
+    return _take(c, mt, f"{key}=? AND user_id=?", (int(rid), int(uid)), "boundary", None, org, "user_id",
+                 kind=reg["kind"] if reg["members"] else None)
+
+
+def obj_boundary_take(c, table, oid, uid):
+    """accounts/tenancy.py boundary_repair (core/objhooks.BOUNDARY): person uid's rows of table on object oid -- a person no
+    member of the object's organisation -- go through the core instead of a bare DELETE: into obj_revoked (restorable for
+    OBJ_REVOKED_DAYS), and both sides of a share that has a card / an old member row (the core share on the reference node
+    and the area's row), so neither side reopens the other. None = not a table of the core (the caller deletes as before)."""
+    oid, uid = int(oid), int(uid)
+    with system_ctx(c):  # a nightly round over every organisation
+        _revoked_prune(c)
+        if table == "fs_shares":
+            n = c.execute("SELECT * FROM fs_nodes WHERE id=?", (oid,)).fetchone()
+            out = sum(_boundary_share(c, n, s) for s in c.execute("SELECT * FROM fs_shares WHERE node_id=? AND user_id=?", (oid, uid)).fetchall())
+        elif table == "sheet_shares":  # the card and its core share (sheets/shshare.py shs_leave, one table)
+            out = 0
+            for x in c.execute("SELECT * FROM sheet_shares WHERE sheet_id=? AND user_id=? AND revoked_at IS NULL", (oid, uid)).fetchall():
+                n = c.execute("SELECT n.* FROM fs_nodes n JOIN fs_shares f ON f.node_id=n.id WHERE f.id=?", (x["core_id"],)).fetchone() \
+                    if x["core_id"] else None
+                if n is not None:
+                    obj_node_unshare(c, None, n, x["core_id"], kind="sheet", ref_id=oid, org=x["org_id"] or None, reason="boundary")
+                if x["email_key"]:  # 2.360.2 M (#2561): an address row stays listed, open again (no account, no right)
+                    c.execute("UPDATE sheet_shares SET user_id=NULL, core_id=NULL WHERE id=?", (x["id"],))
+                else:
+                    c.execute("UPDATE sheet_shares SET revoked_at=? WHERE id=?", (iso_ms(now_utc()), x["id"]))
+                out += 1
+        else:
+            reg = next((r for r in OBJ.values() if (r["members"] or (None,))[0] == table), None) if table != "tchat_members" \
+                else OBJ.get("tchat_room")
+            if reg is None:
+                return None
+            org = c.execute(f"SELECT org_id FROM {reg['table']} WHERE id=?", (oid,)).fetchone()
+            org = (org[0] if org else None) or None
+            out = _boundary_old(c, reg, oid, uid, org)
+            out += _take(c, "fs_shares", "user_id=? AND node_id IN (SELECT id FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id=?)",
+                         (uid, reg["kind"], oid), "boundary", None, org, "user_id", kind=reg["kind"])
+    obj_forget()
+    return out
+
+
 # ---------------------------------------------------------------- the object as the client sees it
 def obj_public(c, uid, kind, row, role=None):
     """The object for the client / the API: its fields, workspace, version and what uid may do."""
@@ -1030,6 +1095,7 @@ def obj_public(c, uid, kind, row, role=None):
     return out
 
 
+BOUNDARY.append(obj_boundary_take)  # 2.649.0 (#5051): accounts/tenancy.py boundary_repair
 REVOKE.append(obj_revoke_person)  # core/objhooks.person_revoked (accounts calls it without importing the domain layer)
 FOLLOW.append(obj_node_follow)  # 2.566.0 (#4712, review F1): accounts/orgretain.py obj_nodes_follow
 
