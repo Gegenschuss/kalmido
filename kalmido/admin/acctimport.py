@@ -2643,7 +2643,10 @@ def umz_undo_tasks(c, uid, cr):
 _UMZ_GONE_AREAS = {"habits": N_("Habits"), "filters": N_("Filters"), "templates": N_("Templates"), "template_files": N_("Templates"),
                    "time_entries": N_("Time entries"), "bookmarks": N_("Bookmarks"), "sprints": N_("Sprints"), "list_rules": N_("Rules"),
                    "ev_cals": N_("Calendars"), "pomos": N_("Focus sessions"), "view_layouts": N_("Saved arrangements"),
-                   "list_layouts": N_("Saved arrangements"), "journal": N_("Journal")}
+                   "list_layouts": N_("Saved arrangements"), "journal": N_("Journal"),
+                   # 2.584.0 (#3965): a folder's playbooks and the household budget rows (umz_more)
+                   "playbooks": N_("Playbooks"), "budget_cats": N_("Household budget"), "budget_entries": N_("Household budget"),
+                   "budget_recurring": N_("Household budget")}
 
 
 def _umz_there(c, uid, cr):

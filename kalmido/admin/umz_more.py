@@ -353,7 +353,8 @@ def umz_more_there(c, uid, cr):
         col, ids = _UNDO[table], sorted(ids)
         for i in range(0, len(ids), 500):
             p = ids[i:i + 500]
-            out.update((table, r[0]) for r in c.execute(f"SELECT {col} FROM {table} WHERE {col} IN ({','.join('?' * len(p))}) AND user_id=?",
+            mine = _UNDO_MINE.get(table, "user_id=?")  # 2.584.0 (#3965): budget rows / folder playbooks have no person column
+            out.update((table, r[0]) for r in c.execute(f"SELECT {col} FROM {table} WHERE {col} IN ({','.join('?' * len(p))}) AND {mine}",
                                                          p + [uid]).fetchall())
     return out
 
