@@ -380,6 +380,7 @@ for t in ("Die Karte kannst du ignorieren, ich habe es anders gelöst.", "Karte 
           "Card 100 is done, nothing to approve."):
     check(ar.referenced_approvals(t, c4) == [], f"M4: no move: {t!r}")
 check(ar.referenced_approvals("Die Karte wartet noch auf dich.", c4) == ["100"], "M4: a plain mention still moves it")
+check(ar.referenced_approvals("Please look close at card 100 and decide today.", c4) == ["100"], "M4: 'close' as an adverb still moves it")
 
 # M5: a one-part result with a card sends its files too
 REQS.clear()

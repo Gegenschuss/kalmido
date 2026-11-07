@@ -1792,7 +1792,7 @@ def match_approval(line, approvals):
 
 
 CARD_AWAY_RE = re.compile(r"(?i)\b(?:ignor\w*|geschlossen|schlie(?:ß|ss)e|erledigt|hinf(?:ä|ae)llig|zur(?:ü|ue)ckgezogen|"
-                         r"withdrawn|withdraw|closed?|done|obsolete|void|cancel+ed)\b")
+                         r"withdrawn|withdraw|closed|(?:is|are|ist|sind)\s+done|obsolete|void|cancel+ed)\b")  # 2.615.0: not "look close", "done" only as a state
 
 
 def referenced_approvals(text, approvals, max_n=3):
