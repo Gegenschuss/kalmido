@@ -415,6 +415,7 @@
     'GET /api/me/channels': () => ({enabled: false, channels: [], mail: {}}),
     'GET /api/account/export': () => ({state: 'none'}), 'GET /api/account/import': () => ({current: null}), 'GET /api/videos/signoffs/orphaned': () => ({signoffs: []}),
     'GET /api/hubmail/mailboxes': () => ({spaces: []}),
+    'GET /api/ticket-types': () => ({types: []}),  // 2.649.0 (#5039): core.js loads the own ticket types at the start (ttypes.js tty_load) - the demo has none
     // 2.575.0 (#3778 #4802, #3506 CI red): own module cards (Settings > Modules) and saved document views - none in the demo
     'GET /api/modcards': () => ({space: 'private', admin: true, cap: null, cards: []}), 'GET /api/docs/views': () => ({items: []}),
     'GET /api/proposals/agents': () => ({agents: []}),  // 2.126.3 (#2123 #2124): the office / documents / status report ask which agents may draft - none in the demo
