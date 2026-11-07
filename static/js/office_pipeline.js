@@ -206,3 +206,22 @@ document.addEventListener('drop', e => {
   const id = PPS.drag; PPS.drag = null;
   pp_move(id, col.dataset.pipcol);
 });
+// 2.633.0 (#4965): the finger by drag.js: hold a card (not a lead card), drag it into another column, let go = the same pp_move as
+// the mouse's drop; near the left / right edge the columns scroll sideways. The dialog's stage and the mouse stay as they were.
+const pp_fingerT = (d, x, y) => {
+  const c = /** @type {any} */ (document.elementFromPoint(x, y))?.closest?.('.pipcol');
+  return c && c.dataset.pipcol !== 'lead' ? c : null;
+};
+const pp_fingerOff = d => { d.r.classList.remove('dragging'); $$('.pipcol.over').forEach(x => x.classList.remove('over')); };
+drg_attach(document, {
+  mouse: false, hold: ROWD_HOLD, holdMove: 8, onTarget: true, raf: true, ghost: {el: d => d.r, cls: 'ghost-drag'},
+  scroll: () => tdScroller($('#view')), scrollX: () => $('.pipcols'), edge: TD_EDGE, step: TD_MAX,
+  start: t => {
+    const r = /** @type {any} */ (t).closest?.('.ppcard[data-id]');
+    return r && !r.classList.contains('lead-card') && r.closest('.pipcol') && pp_item(+r.dataset.id) ? {r, id: +r.dataset.id} : null;
+  },
+  onHold: d => { d.r.classList.add('dragging'); if (navigator.vibrate) navigator.vibrate(12); },
+  onMove: (d, x, y) => { const c = pp_fingerT(d, x, y); $$('.pipcol.over').forEach(b => b !== c && b.classList.remove('over')); c?.classList.add('over'); },
+  onDrop: (d, x, y) => { const c = pp_fingerT(d, x, y); pp_fingerOff(d); if (c) pp_move(d.id, c.dataset.pipcol); },
+  onCancel: pp_fingerOff,
+});
