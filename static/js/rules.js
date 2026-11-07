@@ -30,13 +30,29 @@ function rul_trigText(r) {
   if (t.kind === 'created') return tr('a task is created');
   if (t.kind === 'assigned') return t.user_id ? tr('a task is assigned to {0}', n.trig_user || rul_gone()) : tr('a task is assigned to someone');
   if (t.kind === 'field') return rxTrigField(t, n);
+  if (t.days && t.when === 'overdue') return trn('a task is overdue for {0} day', 'a task is overdue for {0} days', t.days);  // 2.637.0 (#4768)
+  if (t.days) return trn('a task is due in {0} day', 'a task is due in {0} days', t.days);
   return tr('the due date of a task is reached');
 }
 function rul_dueText(d) {
   return d == null ? tr('remove its due date') : d === 0 ? tr('make it due today') : trn('make it due in {0} day', 'make it due in {0} days', d);
 }
+// 2.637.0 (#4768): a chain of up to five actions ("A, B and C") and the conditions "only if"
+const RUL_ACT_MAX = 5, RUL_DUE_OFF_MAX = 30;
+const rul_acts = r => (r.actions?.length ? r.actions : [r.action || {}]);
 function rul_actText(r) {
-  const a = r.action || {}, n = r.names || {};
+  const n = r.names || {}, xs = rul_acts(r).map((a, i) => rul_actOne(a, n.acts?.[i] || (i ? {} : n)));
+  return xs.length > 1 ? tr('{0} and {1}', xs.slice(0, -1).join(', '), xs[xs.length - 1]) : xs[0];
+}
+function rul_condText(r) {
+  const c = r.conditions || {}, n = r.names?.cond || {}, xs = [];
+  if (c.priority) xs.push(tr('the priority is {0}', tr((RX_PRIO.find(x => x[0] === c.priority) || RX_PRIO[0])[1])));
+  if (c.user_id) xs.push(tr('it is assigned to {0}', n.user || rul_gone()));
+  if (c.tag_id) xs.push(tr('it has the tag {0}', rul_q(n.tag || rul_gone())));
+  if (c.section_id) xs.push(tr('it is in the column {0}', rul_q(n.section || rul_gone())));
+  return xs.join(', ');
+}
+function rul_actOne(a, n) {
   if (a.kind === 'assign') return tr('assign it to {0}', n.user || rul_gone());
   if (a.kind === 'due') return rul_dueText(a.days);
   if (a.kind === 'comment') return tr('comment {0}', rul_q((a.text || '').length > 60 ? a.text.slice(0, 59) + '…' : a.text || ''));
@@ -78,7 +94,7 @@ function rxActValHtml(l, fid, cur) {  // the fixed value, as the field type asks
   if (f.type === 'date') return lab + dateIn('rul-fval', c, {label: tr('Value')});
   return lab + `<input id="rul-fval" ${['number', 'currency', 'rating'].includes(f.type) ? 'inputmode="decimal"' : ''} maxlength="1000" value="${esc(String(c))}" placeholder="${esc(tr('Empty|value'))}">`;
 }
-const rul_sentence = r => tr('When {0}, then {1}.', rul_trigText(r), rul_actText(r));
+const rul_sentence = r => { const c = rul_condText(r); return c ? tr('When {0} and {1}, then {2}.', rul_trigText(r), c, rul_actText(r)) : tr('When {0}, then {1}.', rul_trigText(r), rul_actText(r)); };
 
 // ---- the section in the list settings (dialogs.js listModal)
 function rul_boxHtml(l) {
@@ -134,74 +150,110 @@ function rul_targets(lid) {
   return [l, ...S.lists.filter(x => x.id !== lid && !x.archived && !x.is_inbox && x.life !== 'health' && (x.org_id || null) === org && canEditList(x.id))].filter(Boolean);
 }
 function rul_dialog(lid, r, done) {
-  const l = listById(lid), t = r?.trigger || {kind: 'section'}, a = r?.action || {kind: 'assign'};
+  const l = listById(lid), t = r?.trigger || {kind: 'section'};
+  const acts = (r ? rul_acts(r) : [{kind: 'assign'}]).map(x => ({...x}));  // 2.637.0 (#4768): up to five, block i has the ids rul-act-<i> (i = 0: rul-act)
+  const cond = {...(r?.conditions || {})};
   const opt = (v, n, cur) => `<option value="${esc(String(v))}" ${String(v) === String(cur ?? '') ? 'selected' : ''}>${esc(n)}</option>`;
+  const any = tr('Any|condition');
   const md = modal(`<h3>${r ? tr('Edit rule') : tr('New rule')}</h3>
     <div class="row"><label for="rul-name">${tr('Name')}</label><input id="rul-name" maxlength="80" value="${esc(r?.name || '')}" placeholder="${esc(tr('e.g. Review'))}"></div>
     <div class="row"><label for="rul-trig">${tr('When')}</label><select id="rul-trig">${RUL_TRIG.map(([k, n]) => opt(k, tr(n), t.kind)).join('')}</select></div>
     <div class="row" id="rul-tv"></div>
     <div class="row" id="rul-tv2" hidden></div>
-    <div class="row"><label for="rul-act">${tr('Then|rule')}</label><select id="rul-act">${RUL_ACT.map(([k, n]) => opt(k, tr(n), a.kind)).join('')}</select></div>
-    <div id="rul-av"></div>
+    <details class="rul-cond" id="rul-cond" ${Object.keys(cond).length ? 'open' : ''}><summary>${tr('Only if')}</summary>
+      <div class="row"><label for="rul-cprio">${tr('Priority')}</label><select id="rul-cprio">${opt('', any, cond.priority)}${RX_PRIO.map(([v, n]) => opt(v, tr(n), cond.priority)).join('')}</select></div>
+      <div class="row"><label for="rul-cuser">${tr('Assigned to')}</label><select id="rul-cuser">${opt('', any, cond.user_id)}${listPeople(l).map(p => opt(p.user_id, p.name, cond.user_id)).join('')}</select></div>
+      <div class="row"><label for="rul-ctag">${tr('Tag')}</label><select id="rul-ctag">${opt('', any, cond.tag_id)}${listTags(lid).map(g => opt(g.id, g.name, cond.tag_id)).join('')}</select></div>
+      <div class="row"><label for="rul-csec">${tr('Column')}</label><select id="rul-csec">${opt('', any, cond.section_id)}${rul_secs(lid).map(x => opt(x.id, x.name, cond.section_id)).join('')}</select></div>
+    </details>
+    <div id="rul-acts"></div>
+    <div class="row"><span class="lbl"></span><button type="button" class="btn sm" data-rul-addact="1">${ic('plus', 's')} ${tr('Add action')}</button></div>
     <div class="shint">${tr('The rule runs with your rights. A change made by a rule never starts another rule.')}</div>
     <div class="calerr" role="alert" id="rul-err" hidden></div>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
   md.classList.add('rul-dlg');
   if (!r) rul_tplMount(md, lid);  // 2.634.0 (#4774): the templates on top of a new rule
+  const sx = i => (i ? '-' + i : '');
   const drawT = () => {
     const k = $('#rul-trig', md).value, x = $('#rul-tv', md);
     if (k === 'section') x.innerHTML = `<label for="rul-tsec">${tr('Column')}</label><select id="rul-tsec">${rul_secs(lid).map(s => opt(s.id, s.name, t.section_id)).join('') || opt('', tr('No columns yet'))}</select>`;
     else if (k === 'ltag') x.innerHTML = `<label for="rul-ttag">${tr('Tag')}</label><select id="rul-ttag">${listTags(lid).map(g => opt(g.id, g.name, t.tag_id)).join('') || opt('', tr('No project tags yet'))}</select>`;
     else if (k === 'assigned') x.innerHTML = `<label for="rul-tuser">${tr('Person')}</label><select id="rul-tuser">${opt('', tr('Anyone'), t.user_id)}${listPeople(l).map(p => opt(p.user_id, p.name, t.user_id)).join('')}</select>`;
     else if (k === 'field') x.innerHTML = `<label for="rul-tfld">${tr('Field')}</label><select id="rul-tfld">${rxFields(lid).map(f => opt(f.id, f.name, t.field_id)).join('') || opt('', tr('No custom fields yet'))}</select>`;
+    else if (k === 'due') x.innerHTML = `<label for="rul-dwhen">${tr('Due date|rule')}</label><select id="rul-dwhen">${opt('before', tr('Before the due date'), t.when || 'before')}${opt('overdue', tr('Overdue|rule'), t.when)}</select>`;  // 2.637.0 (#4768)
     else x.innerHTML = '';
     x.hidden = !x.innerHTML;
     drawTV();
   };
-  const drawTV = () => {  // 2.138.0 D (#2060): the value of a field trigger
+  const drawTV = () => {  // 2.138.0 D (#2060): the value of a field trigger; 2.637.0 (#4768): the days of the due trigger
     const x = $('#rul-tv2', md), k = $('#rul-trig', md).value, fid = $('#rul-tfld', md)?.value;
-    x.innerHTML = k === 'field' ? rxTrigValHtml(lid, fid, +fid === t.field_id ? t.value : '') : '';
+    x.innerHTML = k === 'field' ? rxTrigValHtml(lid, fid, +fid === t.field_id ? t.value : '')
+      : k === 'due' ? `<label for="rul-ddays">${tr('Days')}</label><input id="rul-ddays" type="number" inputmode="numeric" min="0" max="${RUL_DUE_OFF_MAX}" step="1" value="${esc(String(t.kind === 'due' ? t.days || 0 : 0))}"><span class="muted">${esc(tr('0 = on the due date'))}</span>` : '';
     x.hidden = !x.innerHTML;
   };
-  const drawA = (lst) => {
-    const k = $('#rul-act', md).value, x = $('#rul-av', md);
-    if (k === 'assign') x.innerHTML = `<div class="row"><label for="rul-user">${tr('Person')}</label><select id="rul-user">${listPeople(l).map(p => opt(p.user_id, p.name, a.user_id)).join('')}</select></div>`;
-    else if (k === 'due') x.innerHTML = `<div class="row"><label for="rul-days">${tr('Due')}</label><select id="rul-days">${RUL_DAYS.map(d => opt(d, d ? trn('in {0} day', 'in {0} days', d) : tr('today'), a.days)).join('')}${opt('none', tr('No date|clear'), a.kind === 'due' && a.days == null ? 'none' : '')}</select></div>`;
-    else if (k === 'comment') x.innerHTML = `<div class="row"><label for="rul-text">${tr('Comment')}</label><textarea id="rul-text" rows="3" maxlength="2000">${esc(a.text || '')}</textarea></div>`;
-    else if (k === 'priority') x.innerHTML = `<div class="row"><label for="rul-prio">${tr('Priority')}</label><select id="rul-prio">${RX_PRIO.map(([v, n]) => opt(v, tr(n), a.priority || 'high')).join('')}</select></div>`;
-    else if (k === 'tag') x.innerHTML = `<div class="row"><label for="rul-atag">${tr('Tag')}</label><select id="rul-atag">${listTags(lid).map(g => opt(g.id, g.name, a.tag_id)).join('') || opt('', tr('No project tags yet'))}</select></div>`;
+  const actHtml = (i, lst) => {
+    const a = acts[i] || {kind: 'assign'}, k = a.kind, z = sx(i);
+    let h;
+    if (k === 'assign') h = `<div class="row"><label for="rul-user${z}">${tr('Person')}</label><select id="rul-user${z}">${listPeople(l).map(p => opt(p.user_id, p.name, a.user_id)).join('')}</select></div>`;
+    else if (k === 'due') h = `<div class="row"><label for="rul-days${z}">${tr('Due')}</label><select id="rul-days${z}">${RUL_DAYS.map(d => opt(d, d ? trn('in {0} day', 'in {0} days', d) : tr('today'), a.days)).join('')}${opt('none', tr('No date|clear'), a.kind === 'due' && a.days == null ? 'none' : '')}</select></div>`;
+    else if (k === 'comment') h = `<div class="row"><label for="rul-text${z}">${tr('Comment')}</label><textarea id="rul-text${z}" rows="3" maxlength="2000">${esc(a.text || '')}</textarea></div>`;
+    else if (k === 'priority') h = `<div class="row"><label for="rul-prio${z}">${tr('Priority')}</label><select id="rul-prio${z}">${RX_PRIO.map(([v, n]) => opt(v, tr(n), a.priority || 'high')).join('')}</select></div>`;
+    else if (k === 'tag') h = `<div class="row"><label for="rul-atag${z}">${tr('Tag')}</label><select id="rul-atag${z}">${listTags(lid).map(g => opt(g.id, g.name, a.tag_id)).join('') || opt('', tr('No project tags yet'))}</select></div>`;
     else if (k === 'field') {
-      const fs = rxFields(lid), fid = lst || (a.kind === 'field' && a.field_id) || fs[0]?.id;
-      x.innerHTML = `<div class="row"><label for="rul-afld">${tr('Field')}</label><select id="rul-afld">${fs.map(f => opt(f.id, f.name, fid)).join('') || opt('', tr('No custom fields yet'))}</select></div>
-        <div class="row" id="rul-afv">${rxActValHtml(l, fid, a.kind === 'field' && +fid === a.field_id ? a.value : '')}</div>`;
+      const fs = rxFields(lid), fid = lst || a.field_id || fs[0]?.id;
+      h = `<div class="row"><label for="rul-afld${z}">${tr('Field')}</label><select id="rul-afld${z}">${fs.map(f => opt(f.id, f.name, fid)).join('') || opt('', tr('No custom fields yet'))}</select></div>
+        <div class="row" id="rul-afv${z}">${rxActValHtml(l, fid, +fid === a.field_id ? a.value : '').replaceAll('rul-fval', 'rul-fval' + z)}</div>`;
     }
-    else if (k === 'done' || k === 'reopen') x.innerHTML = '';  // 2.633.0 (#4781): no value
+    else if (k === 'done' || k === 'reopen') h = '';  // 2.633.0 (#4781): no value
     else {
       const to = lst || a.list_id || lid;
-      x.innerHTML = `<div class="row"><label for="rul-list">${tr('Project')}</label><select id="rul-list">${rul_targets(lid).map(y => opt(y.id, y.id === lid ? tr('This project') : lname(y), to)).join('')}</select></div>
-        <div class="row"><label for="rul-sec">${tr('Column')}</label><select id="rul-sec">${opt('', tr('No column'), a.section_id)}${rul_secs(+to).map(s => opt(s.id, s.name, a.section_id)).join('')}</select></div>`;
+      h = `<div class="row"><label for="rul-list${z}">${tr('Project')}</label><select id="rul-list${z}">${rul_targets(lid).map(y => opt(y.id, y.id === lid ? tr('This project') : lname(y), to)).join('')}</select></div>
+        <div class="row"><label for="rul-sec${z}">${tr('Column')}</label><select id="rul-sec${z}">${opt('', tr('No column'), a.section_id)}${rul_secs(+to).map(s => opt(s.id, s.name, a.section_id)).join('')}</select></div>`;
     }
+    const del = acts.length > 1 ? `<button type="button" class="iconbtn" data-rul-delact="${i}" title="${esc(tr('Remove action'))}" aria-label="${esc(tr('Remove action'))}">${ic('x', 's')}</button>` : '';
+    return `<div class="rul-ablk" data-i="${i}"><div class="row"><label for="rul-act${z}">${i ? tr('And then|rule') : tr('Then|rule')}</label><select id="rul-act${z}">${RUL_ACT.map(([kk, n]) => opt(kk, tr(n), k)).join('')}</select>${del}</div>
+      <div id="rul-av${z}">${h}</div></div>`;
   };
-  drawT(); drawA();
-  md.addEventListener('change', e => {
-    if (e.target.id === 'rul-trig') drawT();
-    if (e.target.id === 'rul-act') drawA();
-    if (e.target.id === 'rul-list') drawA(+e.target.value);
-    if (e.target.id === 'rul-tfld') drawTV();
-    if (e.target.id === 'rul-afld') drawA(+e.target.value);
-  });
-  md.addEventListener('click', async e => {
-    const b = e.target.closest('[data-m]'); if (!b) return;
-    if (b.dataset.m === 'close') { md.remove(); return; }
-    if (b.dataset.m !== 'save') return;
-    const tk = $('#rul-trig', md).value, ak = $('#rul-act', md).value, v = id => $('#' + id, md)?.value || '';
-    const trig = {kind: tk, ...(tk === 'section' ? {section_id: +v('rul-tsec') || null} : tk === 'ltag' ? {tag_id: +v('rul-ttag') || null}
-      : tk === 'assigned' ? {user_id: +v('rul-tuser') || null} : tk === 'field' ? {field_id: +v('rul-tfld') || null, value: v('rul-tfv') || null} : {})};
-    const act = {kind: ak, ...(ak === 'assign' ? {user_id: +v('rul-user') || null} : ak === 'due' ? {days: v('rul-days') === 'none' ? null : +v('rul-days')}
+  const drawAll = () => {
+    $('#rul-acts', md).innerHTML = acts.map((_, i) => actHtml(i)).join('');
+    const ab = $('[data-rul-addact]', md); ab.disabled = acts.length >= RUL_ACT_MAX; ab.closest('.row').hidden = acts.length >= RUL_ACT_MAX;
+  };
+  const drawA = (i, lst) => {  // one block again (its kind / target list / field changed)
+    const b = $(`.rul-ablk[data-i="${i}"]`, md); if (!b) return;
+    acts[i] = {...acts[i], kind: $('#rul-act' + sx(i), md).value};
+    b.outerHTML = actHtml(i, lst);
+  };
+  const read = i => {  // the action of block i as the dialog shows it
+    const z = sx(i), ak = $('#rul-act' + z, md)?.value, v = id => $('#' + id + z, md)?.value || '';
+    return {kind: ak, ...(ak === 'assign' ? {user_id: +v('rul-user') || null} : ak === 'due' ? {days: v('rul-days') === 'none' ? null : +v('rul-days')}
       : ak === 'comment' ? {text: v('rul-text')} : ak === 'priority' ? {priority: v('rul-prio')} : ak === 'tag' ? {tag_id: +v('rul-atag') || null}
       : ak === 'field' ? {field_id: +v('rul-afld') || null, value: v('rul-fval').trim() || null}
       : ak === 'done' || ak === 'reopen' ? {} : {list_id: +v('rul-list') || lid, section_id: +v('rul-sec') || null})};
-    const q = {name: v('rul-name').trim() || tr(RUL_TRIG.find(x => x[0] === tk)[1]), trigger: trig, action: act};
+  };
+  const readAll = () => acts.forEach((_, i) => { acts[i] = read(i); });
+  drawT(); drawAll();
+  md.addEventListener('change', e => {
+    const id = e.target.id || '', m = /^rul-(act|list|afld)(?:-(\d))?$/.exec(id), i = m ? +(m[2] || 0) : -1;
+    if (id === 'rul-trig') drawT();
+    if (id === 'rul-tfld') drawTV();
+    if (m && m[1] === 'act') { acts[i] = {kind: e.target.value}; drawA(i); }
+    if (m && m[1] !== 'act') { acts[i] = read(i); drawA(i, +e.target.value); }
+  });
+  md.addEventListener('click', async e => {
+    const ad = e.target.closest('[data-rul-addact]'), dl = e.target.closest('[data-rul-delact]');
+    if (ad) { readAll(); if (acts.length < RUL_ACT_MAX) acts.push({kind: 'comment'}); drawAll(); $(`#rul-act-${acts.length - 1}`, md)?.focus(); return; }
+    if (dl) { readAll(); acts.splice(+dl.dataset.rulDelact, 1); drawAll(); return; }
+    const b = e.target.closest('[data-m]'); if (!b) return;
+    if (b.dataset.m === 'close') { md.remove(); return; }
+    if (b.dataset.m !== 'save') return;
+    const tk = $('#rul-trig', md).value, v = id => $('#' + id, md)?.value || '';
+    const trig = {kind: tk, ...(tk === 'section' ? {section_id: +v('rul-tsec') || null} : tk === 'ltag' ? {tag_id: +v('rul-ttag') || null}
+      : tk === 'assigned' ? {user_id: +v('rul-tuser') || null} : tk === 'field' ? {field_id: +v('rul-tfld') || null, value: v('rul-tfv') || null}
+      : tk === 'due' ? {when: v('rul-dwhen') || 'before', days: Math.max(0, Math.min(RUL_DUE_OFF_MAX, parseInt(v('rul-ddays'), 10) || 0))} : {})};
+    readAll();
+    const conditions = {...(v('rul-cprio') ? {priority: v('rul-cprio')} : {}), ...(+v('rul-cuser') ? {user_id: +v('rul-cuser')} : {}),
+      ...(+v('rul-ctag') ? {tag_id: +v('rul-ctag')} : {}), ...(+v('rul-csec') ? {section_id: +v('rul-csec')} : {})};
+    const q = {name: v('rul-name').trim() || tr(RUL_TRIG.find(x => x[0] === tk)[1]), trigger: trig, actions: acts.slice(0, RUL_ACT_MAX), conditions};
     b.disabled = true;
     try { await calReq(r ? 'PATCH' : 'POST', r ? `/api/rules/${r.id}` : `/api/lists/${lid}/rules`, q); }
     catch (x) { const er = $('#rul-err', md); er.textContent = x.message; er.hidden = false; b.disabled = false; return; }
