@@ -268,17 +268,22 @@ def agb_offer_pdf(c, oid, r, pdf):
 OFC_AGB_OK_FIELD = "agb_ok_without"  # 2.534.0 (#4339): the send body's confirmation "send without the terms"
 
 
-def ofc_agb_missing(c, oid, r, t, b):
+def ofc_agb_missing(c, oid, r, t, b, want=False):
     """2.534.0 (#4339), agb_mail_files: the mail would go out WITHOUT terms although they are due - a quotation whose PDF
     prints "see attachment" (its frozen state, a draft the current one) but its pages could not be joined and the sender
     left them out (reason "join"), or the sender / the quotation wants them and their file is gone (reason "gone"). Then
     409 with the reason in plain words (code "terms_missing", reason, terms {lang, date}, field), unless the body carries
-    agb_ok_without: true (the sender saw it and decided). No terms at all (none uploaded for the language) stays silent."""
+    agb_ok_without: true (the sender saw it and decided). No terms at all (none uploaded for the language) stays silent.
+    2.616.0 (#4563): an invoice (any kind but a quotation) asked for with terms: true whose frozen state's file is gone and
+    no current state of its language is there answers the same 409 (reason gone) instead of going out silently without."""
     if b.get(OFC_AGB_OK_FIELD) in (1, True, "1", "true"):
         return
     due = t
     if not due and r["kind"] == "offer":
         due = agb_doc_terms(c, oid, r) or agb_frozen(r["terms"] if "terms" in r.keys() else None)
+    elif not due and want:
+        fz = agb_frozen(r["terms"] if "terms" in r.keys() else None)
+        due = fz if fz and not agb_path(oid, fz.get("file")) else None  # only a gone file; another language stays silent
     if not due:
         return
     gone = not agb_path(oid, due.get("file"))
@@ -313,7 +318,7 @@ def agb_mail_files(c, oid, r, b, files):
     t = agb_doc_terms(c, oid, r) if want else None
     a = agb_attachment(c, oid, t) if t else None
     if not a:
-        ofc_agb_missing(c, oid, r, t, b)  # 2.534.0 (#4339): never without a word when terms were due
+        ofc_agb_missing(c, oid, r, t, b, want)  # 2.534.0 (#4339): never without a word when terms were due
         return files, None
     if sum(len(f[1]) for f in files) + len(a[1]) > AGB_MAIL_MAX_MB * 1024 * 1024:
         raise DeniedKey(413, N_("The attachments are too large for one e-mail (at most {0} MB)"), AGB_MAIL_MAX_MB)

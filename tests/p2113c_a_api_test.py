@@ -8,7 +8,8 @@ in mode workspaces, organisation encryption on, the SMTP sink of stub_mail.py. I
    the finalised one, its PDF line and its mail attachment as they were; a draft follows the current state; a copy takes
    none along; terms in the other language only = no line, no attachment
  - 2.534.0 (#4339): due terms that cannot go along (pages not joined + terms=false, or the file gone) answer 409
-   terms_missing; agb_ok_without: true sends without them
+   terms_missing; agb_ok_without: true sends without them; 2.616.0 (#4563): also an invoice with terms: true whose frozen
+   file is gone and no current state is there
  - sending: a quotation attaches them by default ("AGB-Stand-<date>.pdf"), terms=false leaves them out, an invoice only on
    request; the log entry "send" names the state (lang, date, sha256)
  - approval link: /s/q/<token>/terms serves the state of the link's quotation (noindex, no-referrer), a wrong token and
@@ -54,6 +55,18 @@ def sql(q, args=()):
         return c.execute(q, args).fetchall()
     finally:
         c.close()
+
+
+def gone_terms(doc):
+    """2.616.0 (#4563): point the frozen terms state of document doc at a file that is not there."""
+    c = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    try:
+        fz = json.loads(c.execute("SELECT terms FROM office_docs WHERE id=?", (doc,)).fetchone()[0] or "{}")
+        c.execute("UPDATE office_docs SET terms=? WHERE id=?", (json.dumps({**fz, "file": "terms-de-0000000000000000.pdf"}), doc))
+        c.commit()
+    finally:
+        c.close()
+    check(fz.get("file"), f"setup: document {doc} froze its terms")
 
 
 def anon(path):
@@ -295,6 +308,19 @@ REM = r.json()["removed"]
 check(A.get(B + f"{T}/de/file").status_code == 404 and A.get(B + f"{D}/{Q2}/terms").json()["terms"] is None, "removed: no file, a draft has none")
 check(A.get(B + f"{D}/{Q}/terms").json()["terms"]["sha256"] == SHA1 and anon(f"/s/q/{TOK}/terms").status_code == 200, "the finalised quotation and its link keep theirs")
 check(A.delete(B + f"{T}/de").status_code == 404, "nothing to remove: 404")
+# 2.616.0 (#4563): an invoice asked for its terms (terms: true) whose frozen file is gone and no current German state is
+# there used to go out silently without them - now 409 terms_missing (gone), then only with agb_ok_without
+gone_terms(INV)
+n5 = len(mails())
+r = A.post(B + f"{D}/{INV}/send", json={"to": "kunde@example.com", "datev": False, "terms": True})
+j = r.json() if r.status_code == 409 else {}
+check(r.status_code == 409 and j.get("code") == "terms_missing" and j.get("reason") == "gone" and "15.10.2026" in (j.get("error") or "")
+      and len(mails()) == n5, f"#4563: an invoice, terms: true, the frozen file gone, none current: 409 (gone) {r.status_code} {r.text[:200]}")
+r = A.post(B + f"{D}/{INV}/send", json={"to": "kunde@example.com", "datev": False, "terms": True, "agb_ok_without": True})
+m = mails()[n5:]
+check(r.ok and len(m) == 1 and "AGB-Stand" not in m[0]["raw"], f"#4563: agb_ok_without: the invoice goes without {r.status_code} {r.text[:160]}")
+r = A.post(B + f"{D}/{INV}/send", json={"to": "kunde@example.com", "datev": False})
+check(r.ok, f"#4563: an invoice without terms: true stays silent {r.status_code} {r.text[:160]}")
 check(Ca.post(B + f"{T}/de/restore", json=REM).status_code == 404, "another organisation cannot restore a state of this one (404)")
 check(A.post(B + f"{T}/de/restore", json=dict(REM, sha256="0" * 64)).status_code == 404, "an unknown state: 404")
 check(A.post(B + f"{T}/en/restore", json=REM).status_code == 404, "a state of the other language: 404")
@@ -342,7 +368,18 @@ check(r.status_code == 409 and r.json().get("code") == "terms_missing", f"freela
 n4 = len(mails())
 r = Fr.post(B + f"{D}/{FQ}/send", json={"to": "client@example.com", "terms": False, "agb_ok_without": True})
 check(r.ok and "Terms-2026" not in (mails()[n4:] or [{"raw": "Terms-2026"}])[0]["raw"], "freelancer: agb_ok_without sends without the terms")
+# 2.616.0 (#4563): the invoice case as a person without an organisation (frozen file gone, the English terms removed)
+r = Fr.post(B + D, json={"kind": "invoice", "client_id": FCL, "lang": "en", "service_from": "2026-10-01", "items": [{"title": "Edit", "qty": 1, "rate": 100}]})
+FI = r.json()["id"] if r.status_code == 201 else 0
+check(Fr.put(B + O + "/settings", json={"company_fields": {"name": "Pia Privat Film", "street": "Ufer 3", "zip": "10115", "city": "Berlin", "country": "DE",
+                                                       "tax_number": "12/345/67891", "iban": "DE02120300000000202051"}}).ok, "setup: freelancer sender data")
+r = Fr.post(B + f"{D}/{FI}/finalize")
+check(FI and r.ok, f"setup: freelancer invoice finalised {r.status_code} {r.text[:200]}")
+gone_terms(FI)
 r = Fr.delete(B + f"{T}/en")
+rf = Fr.post(B + f"{D}/{FI}/send", json={"to": "client@example.com", "datev": False, "terms": True})
+check(rf.status_code == 409 and rf.json().get("code") == "terms_missing" and rf.json().get("reason") == "gone",
+      f"#4563: freelancer invoice, terms: true, file gone: 409 (gone) {rf.status_code} {rf.text[:160]}")
 check(r.ok and Fr.post(B + f"{T}/en/restore", json=r.json()["removed"]).ok and Fr.get(B + T).json()["terms"]["en"], "freelancer: remove + undo")
 check(Fr.get(B + f"{D}/{Q}/terms").status_code == 404, "freelancer: a document of an organisation is 404")
 
