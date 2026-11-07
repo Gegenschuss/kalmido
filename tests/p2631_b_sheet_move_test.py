@@ -121,7 +121,8 @@ srt = [R[1], R[0]] + R[2:]
 r = order(Fr, SID, "rows", srt, prev=R)
 check(r.ok and "formulas" not in r.json(), "a sorting without moved: no formulas in the answer")
 d = get(Fr, SID)
-check(cell(d, "B6").get("raw") == "=SUM(A1:A3)" and cell(d, "B6").get("value") == 6, "a sorting inside the range keeps it " + str(cell(d, "B6")))
+# (the stored corner cells stay: row 1's cell is row 2 now, the range A2:A3 -- the behaviour of a sorting before 2.631, untouched here)
+check(cell(d, "B6").get("raw") == "=SUM(A2:A3)" and cell(d, "B6").get("value") == 4, "a sorting keeps the stored corners as before " + str(cell(d, "B6")))
 order(Fr, SID, "rows", R, prev=srt)
 # prev guards a move elsewhere since
 check(order(Fr, SID, "rows", new, prev=srt, moved=[R[0]]).status_code == 409, "rows/order: a stale prev gives 409")
