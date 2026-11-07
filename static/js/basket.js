@@ -113,6 +113,36 @@ document.addEventListener('touchend', e => {
   else clearTimeout(kbLp);
   kbLp = null;
 }, {passive: false});
+// 2.623.0 E (#4621): the finger drags a group too, by drag.js: hold the header, then drag it onto another group (the same
+// kbGroupMove as the mouse's grip); a swipe without the hold scrolls; held and let go without moving opens the order menu
+// (as the long press above did, now at the release). The mouse keeps the grip's browser drag above.
+drg_attach(document, {
+  mouse: false, hold: ROWD_HOLD, holdMove: 8, onTarget: true, raf: true,
+  ghost: {el: d => d.h, cls: 'ghost-drag'}, scroll: () => tdScroller($('#view')), edge: TD_EDGE, step: TD_MAX,
+  start: t => {
+    const h = /** @type {any} */ (t).closest?.('#view .group[data-kbg] > .ghead');
+    return h && !t.closest('input, textarea, a, button:not(.kbgrip)') ? {h, id: h.parentElement.dataset.kbg} : null;
+  },
+  onHold: d => {
+    if (kbLp && kbLp !== 'fired') clearTimeout(kbLp);
+    kbLp = null;  // the drag's hold, not the menu's timer
+    d.h.parentElement?.classList.add('kbdragging');
+    if (navigator.vibrate) navigator.vibrate(12);
+  },
+  onMove: (d, x, y) => {
+    const t = /** @type {any} */ (document.elementFromPoint(x, y))?.closest?.('#view .group[data-kbg]');
+    $$('#view .kbdrop').forEach(g => { if (g !== t) g.classList.remove('kbdrop'); });
+    if (t && t.dataset.kbg !== d.id) t.classList.add('kbdrop');
+  },
+  onDrop: (d, x, y) => {
+    const t = /** @type {any} */ (document.elementFromPoint(x, y))?.closest?.('#view .group[data-kbg]');
+    kbTouchOff();
+    if (t && t.dataset.kbg !== d.id) kbGroupMove(d.id, kbShownGroups().indexOf(t.dataset.kbg));
+  },
+  onTap: d => { kbTouchOff(); const h = d.h.isConnected ? d.h : $(`#view .group[data-kbg="${CSS.escape(d.id)}"] > .ghead`); if (h) kbGroupMenu(h, d.id); },
+  onCancel: () => kbTouchOff(),
+});
+function kbTouchOff() { $$('#view .kbdrop, #view .kbdragging').forEach(x => x.classList.remove('kbdrop', 'kbdragging')); }
 
 // ---- #1219: the basket
 // the basket's number in the sidebar reads "to sort"
