@@ -286,6 +286,10 @@ for _w in _kt_warn:
 import check_done_exit  # noqa: E402
 ERR += check_done_exit.errors()
 
+# 2.638.0 (#4294): every public_links_on(c, KIND) names a kind of PUB_KINDS (tools/check_pubkinds.py)
+import check_pubkinds  # noqa: E402
+ERR += check_pubkinds.errors()
+
 for e in ERR:
     print("ERROR:", e)
 print(f"check_layout: {len(tags)} client modules, {len(order)} server modules, {n_people} tables with people, {len(ERR)} error(s)")
