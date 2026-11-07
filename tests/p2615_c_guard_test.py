@@ -336,7 +336,8 @@ args, hs = job_run("1")
 check(args is not None and "--settings" in args and "--guard-hook" in json.dumps((hs.get("hooks") or {}).get("PreToolUse")),
       f"a job's start command carries the settings with the PreToolUse guard: {args} {hs}")
 args, hs = job_run("0")
-check(args is not None and "--settings" not in args, f"KALMIDO_BLOCK_DANGEROUS=0: a job starts without the settings: {args}")
+# 2.619.0 (#3267): a job also gets the usage hook, so with KALMIDO_BLOCK_DANGEROUS=0 the settings stay, only without the guard
+check(args is not None and "PreToolUse" not in (hs.get("hooks") or {}), f"KALMIDO_BLOCK_DANGEROUS=0: a job starts without the guard: {args} {hs}")
 
 
 # ---- the per-run settings: PreToolUse / Bash, also without the permission relay; switched off with the variable
