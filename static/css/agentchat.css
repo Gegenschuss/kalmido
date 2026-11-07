@@ -338,6 +338,12 @@ button.chmode .pmlong::after{content:"\a0\25BE";font-size:.75em}
 .ainsunc{display:flex;gap:.5rem;margin-top:.375rem}
 .ainsuncmd{flex:1;min-width:0;font-family:var(--mono);font-size:var(--fs-s)}
 .jpart .jobtag i{background:color-mix(in srgb,var(--jcol) 70%,var(--bg))}
+/* 2.622.0 A (#4946): on a phone the agent / job chat runs edge to edge like the tab bar and the team chat (.tcview): header,
+   switch row and composer reach both screen edges (#view's side padding is taken back), the messages keep their own
+   padding (.chmsgs); fixed over the keyboard (vvfix, app.css) the same without a side margin. The desktop keeps its centred width.
+   2.651.0 (#5026 #5031): stands before the 2.96.0 C block - its breakpoint must stay 767px like #view's padding (app.css), the
+   blocks from 2.96.0 C on are checked for rem sizes only (p2107_ui, p296_c_ui) */
+@media (max-width:767px){ .chview{max-width:none;margin-inline:-.75rem} .chview.vvfix{margin-inline:0;padding-left:0;padding-right:0} }
 /* 2.96.0 C (#2015): one card per job in the agent chat (jobchat.js jcd_*): a tap unfolds the job's messages; the end
    result and errors stay visible under it; the filter All / Only me and <agent> / Jobs (a menu on a phone) */
 .jcd{display:flex;flex-direction:column;gap:.375rem;align-self:stretch;max-width:min(100%,40rem)}
@@ -526,7 +532,3 @@ body.kb-open .acsug-l{max-height:min(30vh,9rem)}
   #achat .chcomp .chtools > .iconbtn::after{content:attr(aria-label)}
   #achat .chcomp .chtools > .iconbtn.hidden{display:none}
 }
-/* 2.622.0 A (#4946): on a phone the agent / job chat runs edge to edge like the tab bar and the team chat (.tcview): header,
-   switch row and composer reach both screen edges (#view's side padding is taken back), the messages keep their own
-   padding (.chmsgs); fixed over the keyboard (vvfix, app.css) the same without a side margin. The desktop keeps its centred width */
-@media (max-width:767px){ .chview{max-width:none;margin-inline:-.75rem} .chview.vvfix{margin-inline:0;padding-left:0;padding-right:0} }
