@@ -47,7 +47,7 @@ from ..office.signoff import sig_create, sig_expiry, sig_public, SIG_PREFIX, sig
 from ..lists.public import public_links_on, pub_gone, pub_headers, pub_html, pub_limited  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgout import oo_denied, oo_into_note, org_out, org_out_ok  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.spacemove import smv_answer, smv_refuse_agent, smv_same, smv_target  # 2.369.5 (#2517): pulled up from functions
-from .vdmedia import vdm_body, vdm_files_ok, vdm_has_files, vdm_marks, vdm_media, vdm_need_movable, vdm_pos, vdm_pos_dict, vdm_pos_text  # 2.641.0 (#4769)
+from .vdmedia import vdm_body, vdm_files_ok, vdm_has_files, vdm_marks, vdm_media, vdm_need_movable, vdm_pos, vdm_pos_dict, vdm_pos_text, vdm_send, vdm_version_row  # 2.641.0 (#4769)
 
 VDR_URL_MAX, VDR_TITLE_MAX, VDR_BODY_MAX, VDR_NAME_MAX = 2000, 200, 2000, 120
 VDR_AT_MAX = 86400.0                     # a timecode lies within 24 hours
@@ -417,7 +417,7 @@ def vdr_create():
     need_feat("videos")
     b = vdm_body()  # 2.641.0 (#4769): JSON {url | file_id} or a multipart upload (file)
     oid, tid, lid, cid = vdr_target(c, uid, b)
-    link = vdm_media(c, uid, oid, b)
+    link = vdm_media(c, uid, oid, b, vdr_parse)
     title = vdr_clean(b.get("title"), VDR_TITLE_MAX) or (link.get("file_name") or tr("Video"))[:VDR_TITLE_MAX]
     ts = iso(now_utc())
     vid = insert_id(c, "INSERT INTO video_reviews(org_id, owner_id, task_id, list_id, client_id, title, state, created_by, created_at, updated_at) "
@@ -525,7 +525,7 @@ def vdr_version_new(vid):
     """{url} -> a new version (the next number); the comments of the older ones stay at them."""
     c, uid = db(), me()
     r = vdr_need(c, vid, write=True)
-    link = vdm_media(c, uid, r["org_id"], vdm_body())  # 2.641.0 (#4769): {url} | {file_id} | an upload (file)
+    link = vdm_media(c, uid, r["org_id"], vdm_body(), vdr_parse)  # 2.641.0 (#4769): {url} | {file_id} | an upload (file)
     write_lock(c, f"video_review_{int(vid)}")
     nid = vdr_version_add(c, r, link, uid)
     if r["state"] != "open":
@@ -533,6 +533,14 @@ def vdr_version_new(vid):
     vdr_touch(c, vid)
     c.commit()
     return jsonify(dict(vdr_dict(c, vdr_reload(c, vid), uid, full=True), new_version=nid))
+
+
+@app.get("/api/videos/<int:vid>/versions/<int:nid>/file")
+def vdr_version_file(vid, nid):
+    """2.641.0 (#4769): the image / PDF of a version (?dl=1: as a download) for who sees the review AND its file (vdmedia)."""
+    c = db()
+    r = vdr_need(c, vid)
+    return vdm_send(c, vdm_version_row(c, r["id"], nid))
 
 
 @app.delete("/api/videos/<int:vid>/versions/<int:nid>")

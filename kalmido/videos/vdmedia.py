@@ -20,11 +20,14 @@ from urllib.parse import quote
 
 from flask import Response, request
 
-from ..core.config import app, MAX_FILE_MB
+from ..core.config import MAX_FILE_MB
 from ..core.access import Denied
-from ..core.db import body, db
+from ..core.db import body
 from ..core.errors import BadInput
 from ..core.i18n import N_, tr
+from ..files.store import fs_folder, fs_log_add, fs_put, fs_read, fs_role, fs_version_row, need_node, safe_fs_name
+from ..files.upsafe import h6d_read
+from ..files.web import _send_headers
 
 VDM_KINDS = ("video", "image", "pdf")
 VDM_PAGE_MAX = 9999
@@ -57,7 +60,6 @@ def vdm_kind(mime):
 def vdm_file_version(c, org_id, file_id):
     """A version dict (as review.vdr_parse's, plus kind / file_id / file_no / file_name / mime) of file file_id of the file
     store: the signed-in person must see it (need_node), a plain file of the review's workspace, an image or PDF by content."""
-    from ..files.store import fs_read, fs_version_row, need_node
     if isinstance(file_id, bool) or not isinstance(file_id, int) or not 0 < file_id < 2 ** 62:
         raise BadInput(tr("Invalid value: {0}", "file_id"))
     n = need_node(c, file_id)
@@ -78,8 +80,6 @@ def vdm_file_version(c, org_id, file_id):
 def vdm_upload(c, uid, org_id, f):
     """An uploaded image / PDF -> into the folder "Approvals" at the top of workspace org_id (the person's own space when
     None) -> its version dict. The type is checked by content BEFORE anything is stored."""
-    from ..files.store import fs_folder, fs_log_add, fs_put, safe_fs_name
-    from ..files.upsafe import h6d_read
     data = h6d_read(f)  # at most MAX_FILE_MB + 1 bytes in memory (fs_put refuses more)
     if len(data) > MAX_FILE_MB * 1024 * 1024:
         raise BadInput(tr("{0}: larger than {1} MB", safe_fs_name(f.filename or "") or "file", MAX_FILE_MB))
@@ -106,10 +106,9 @@ def vdm_body():
     return b
 
 
-def vdm_media(c, uid, org_id, b):
+def vdm_media(c, uid, org_id, b, vdr_parse):
     """What a new review / a new version shows: an uploaded file (multipart "file"), a file of the file store {file_id} or a
-    video link {url} (review.vdr_parse)."""
-    from .review import vdr_parse
+    video link {url} (vdr_parse: review.py's, handed in -- review.py imports this module)."""
     f = request.files.get("file") if request.mimetype == "multipart/form-data" else None
     if f is not None:
         return vdm_upload(c, uid, org_id, f)
@@ -121,7 +120,6 @@ def vdm_media(c, uid, org_id, b):
 # ---------------------------------------------------------------- rights
 def vdm_files_ok(c, uid, rid):
     """Every file of review rid's versions is visible to uid (a file removed for good: file_id NULL, no hindrance)."""
-    from ..files.store import fs_role
     ids = [r[0] for r in c.execute("SELECT DISTINCT file_id FROM video_versions WHERE review_id=? AND file_id IS NOT NULL", (rid,))]
     return all(fs_role(c, i, uid) for i in ids)
 
@@ -195,8 +193,6 @@ def vdm_pos_text(x, mark=None):
 def vdm_send(c, v):
     """The image / PDF of version row v (the review was checked by the caller): the file store decides again (need_node:
     rights, trash, locked folder); served only as the type its content has, sandboxed."""
-    from ..files.store import fs_log_add, fs_read, need_node
-    from ..files.web import _send_headers
     if not v or not v["file_id"]:
         raise Denied(404)
     n = need_node(c, v["file_id"])
@@ -217,12 +213,3 @@ def vdm_send(c, v):
 
 def vdm_version_row(c, rid, nid):
     return c.execute("SELECT * FROM video_versions WHERE id=? AND review_id=?", (nid, rid)).fetchone()
-
-
-@app.get("/api/videos/<int:vid>/versions/<int:nid>/file")
-def vdm_content(vid, nid):
-    """The image / PDF of a version (?dl=1: as a download) for who sees the review and the file."""
-    from .review import vdr_need
-    c = db()
-    r = vdr_need(c, vid)
-    return vdm_send(c, vdm_version_row(c, r["id"], nid))
