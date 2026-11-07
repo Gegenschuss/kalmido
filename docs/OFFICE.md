@@ -1199,7 +1199,7 @@ server is set up for it) Kalmido fetches the bookings from the bank over FinTS w
   (default: from the day of the newest booking of the office area, else the last 90 days; at most 730 days). If the bank
   offers several TAN methods you choose one; then you approve in your banking app (pushTAN and other app approvals: Kalmido
   waits and goes on by itself) or type the TAN shown. The statement the bank sends (CAMT, else MT940) runs through exactly
-  the way of a downloaded file: the same preview, duplicates, bank rules, matching and **Take back**. The **PIN is never
+  the way of a downloaded file: the same preview, duplicates, bank rules, matching and **Undo**. The **PIN is never
   stored**: it is asked at every fetch and lives only in the server's memory while the bank connection runs (at most 5
   minutes after the last step, 15 minutes in all, ended by a background sweep at its expiry; closing the dialog ends it).
   The sign-in name and the server address may be remembered per account (sealed like the IBAN), but only once the bank has

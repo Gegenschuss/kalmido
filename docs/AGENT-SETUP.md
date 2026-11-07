@@ -928,7 +928,7 @@ acts **once per reset** (keep a stamp of the reset it handled), removes only sto
 and has a dry run that only says what it would do.
 
 **Reviews in their own area (2.619.0).** Give audits and reviews a small area of their own (a few places) that never
-blocks a building agent, and make **read only** a hard rule in their brief: no commit, merge, push, tag, deploy or server
+blocks a building agent, and make **read-only** a hard rule in their brief: no commit, merge, push, tag, deploy or server
 change; a needed change becomes a finding. The reference starter does this with `agent_job.py start --audit`.
 
 **Plan usage ring (2.33.0, optional).** The chat header can show how much of the agent's plan is used (Claude's 5-hour and

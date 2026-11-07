@@ -22,7 +22,7 @@ function dfl_ruleHtml(r, can) {  // one flow in the list: trigger, filters, acti
     r.fields && Object.keys(r.fields).length && `${tr('Custom fields')}: ${Object.entries(r.fields).map(([k, v]) => `${k} = ${v ?? ''}`).join(', ')}`,
     r.task && tr('Create task'), r.notify?.length && `${tr('Notify')}: ${r.notify.length}`, r.webhook && `${tr('Webhook')}: ${r.webhook}`].filter(Boolean);
   return `<li class="dc-rule${r.off ? ' muted' : ''}"><span>${r.name ? `<b>${esc(r.name)}</b> · ` : ''}<span class="muted">${esc(when)}</span>${ifs.length ? ` · ${ifs.join(' · ')}` : ''} → ${esc(does.join(' · '))}${r.off ? ` <span class="muted">(${tr('off')})</span>` : ''}</span>${can ? `<span>
-    <button type="button" class="iconbtn" data-dcs="rtog:${r.id}" aria-label="${esc(r.off ? tr('Turn on') : tr('Turn off'))}" title="${esc(r.off ? tr('Turn on') : tr('Turn off'))}">${ic(r.off ? 'play' : 'pause')}</button>
+    <button type="button" class="iconbtn" data-dcs="rtog:${r.id}" aria-label="${esc(r.off ? tr('Switch on') : tr('Switch off'))}" title="${esc(r.off ? tr('Switch on') : tr('Switch off'))}">${ic(r.off ? 'play' : 'pause')}</button>
     <button type="button" class="iconbtn" data-dcs="rdel:${r.id}" aria-label="${esc(tr('Delete rule'))}">${ic('trash')}</button></span>` : ''}</li>`;
 }
 function dfl_formHtml(s) {  // the form "New flow" (ids dcr-* as before for the words and the sorting)
@@ -34,7 +34,7 @@ function dfl_formHtml(s) {  // the form "New flow" (ids dcr-* as before for the 
   return `<details class="dc-radd dfl-add"><summary>${tr('New flow')}</summary>
     ${row('dfl-name', tr('Name'), inp('dfl-name', 120))}
     ${row('dfl-trig', tr('Trigger'), `<select id="dfl-trig" data-dcs="dfltrig">${DFL_TRIGGERS.map(([v, l]) => `<option value="${v}">${tr(l)}</option>`).join('')}</select>`)}
-    <div class="dfl-t dfl-t-changed" hidden><p class="muted">${tr('Only when this changes (nothing chosen: any of them)')}</p>${chk('on', DFL_ON)}</div>
+    <div class="dfl-t dfl-t-changed" hidden><p class="muted">${tr('Only when this changes (nothing selected: any of them)')}</p>${chk('on', DFL_ON)}</div>
     <div class="dfl-t dfl-t-scheduled" hidden>${row('dfl-days', tr('Days after'), `<input id="dfl-days" type="number" min="0" max="3650" value="30">`)}
       ${row('dfl-from', tr('Date'), `<select id="dfl-from">${DFL_FROM.map(([v, l]) => `<option value="${v}">${tr(l)}</option>`).join('')}</select>`)}
       <p class="muted">${tr('Runs once per document and date, for dates from today on.')}</p></div>
@@ -95,14 +95,14 @@ async function dfl_runs(md, d) {
   if (!box.isConnected || !j.runs.length) { box.innerHTML = ''; return; }
   box.innerHTML = `<details class="dc-text"><summary><h4>${tr('Flows')} (${j.runs.length})</h4>${ic('chev', 's dc-chev')}</summary><ul class="dc-rules">${j.runs.map(r => {
     const what = [...r.did.map(k => tr(DFL_DID[k] || k)), r.task_id && tr('Task'), r.told && tr('{0} notified', r.told), r.hook && tr('Webhook')].filter(Boolean).join(', ');
-    return `<li class="dc-rule"><span>${esc(r.name || tr('Flow'))} <span class="muted">${esc(fmtWhen(r.at))} · ${esc(what)}${r.undone ? ` · ${tr('taken back')}` : ''}</span></span>${j.can_undo && !r.undone ? `<button type="button" class="btn sm" data-dflundo="${r.id}">${tr('Undo')}</button>` : ''}</li>`;
+    return `<li class="dc-rule"><span>${esc(r.name || tr('Flow'))} <span class="muted">${esc(fmtWhen(r.at))} · ${esc(what)}${r.undone ? ` · ${tr('undone')}` : ''}</span></span>${j.can_undo && !r.undone ? `<button type="button" class="btn sm" data-dflundo="${r.id}">${tr('Undo')}</button>` : ''}</li>`;
   }).join('')}</ul></details>`;
   if (!box._on) {
     box._on = true;
     box.addEventListener('click', async e => {
       const b = /** @type {HTMLElement} */ (e.target).closest('[data-dflundo]'); if (!b) return;
       try { await api('POST', `/api/docs/flowruns/${b.dataset.dflundo}/undo`); } catch { return; }
-      toast(tr('Taken back'));
+      toast(tr('Undone'));
       if (typeof dc_open === 'function' && DC.doc) dc_open(DC.doc.id, {pane: !!md.classList.contains('dc-pane')});
     });
   }

@@ -941,7 +941,7 @@ async function dc_sClick(e) {
     const id = +a.slice(5), r = s.rules.find(x => x.id === id); if (!r) return;
     const put = off => async () => { const x = await api('PATCH', `/api/docs/rules/${id}`, {...r, id: undefined, off}); if (DC.set) { DC.set.rules = x.rules; dc_sDraw($('.dc-smd')); } return {}; };
     try { await put(!r.off)(); } catch { return; }
-    histToast(r.off ? tr('Turned on') : tr('Turned off'), histAdd({label: r.off ? tr('Turned on') : tr('Turned off'), sett: true, undo: put(!!r.off), redo: put(!r.off)}));
+    histToast(r.off ? tr('Switched on') : tr('Switched off'), histAdd({label: r.off ? tr('Switched on') : tr('Switched off'), sett: true, undo: put(!!r.off), redo: put(!r.off)}));
     return;
   }
   if (a.startsWith('rdel:')) {

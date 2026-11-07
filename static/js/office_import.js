@@ -37,7 +37,7 @@ function oimHtml() {
   return `<div class="oim">${back}<h3>${tr('Import legacy data')}</h3><p class="muted">${tr('You see everything before it is saved. Undo an import under Import runs; some imports only within 24 hours.')}</p>
     <section class="oimsec" id="oim-master"><h4>${ic('list', 's')} ${tr('Master data from a spreadsheet')}</h4><div class="shint">${tr('Contacts: the address in one cell or in the columns street, postcode, city.')}</div>
     <p class="muted">${tr('Excel or CSV with the sheets Contacts, Services, Equipment.')}</p>
-    <div class="lacts"><input type="file" id="oim-xlsx" accept=".xlsx,.csv,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" hidden><button type="button" class="btn sm pri" data-oim="pick-xlsx" ${OIM.busy ? 'disabled' : ''}>${ic('upload', 's')} ${tr('Choose file')}</button>${OIM.busy ? `<span class="muted">${tr('Reading…')}</span>` : ''}</div>
+    <div class="lacts"><input type="file" id="oim-xlsx" accept=".xlsx,.csv,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" hidden><button type="button" class="btn sm pri" data-oim="pick-xlsx" ${OIM.busy ? 'disabled' : ''}>${ic('upload', 's')} ${tr('Select file')}</button>${OIM.busy ? `<span class="muted">${tr('Reading…')}</span>` : ''}</div>
     ${OIM.pv ? oimPreviewHtml() : ''}</section>${oim_moreHtml()}
     <section class="oimsec" id="oim-archive"><h4>${ic('archive', 's')} ${tr('Old invoices and quotations')}</h4>
     <p class="muted">${tr('Only archived, never renumbered or sent. Add amount and payment afterwards.')}</p>
@@ -98,9 +98,9 @@ const bk_off = (p, k) => !!p.off?.[k];
 const bk_areasOn = p => BK_AREAS.filter(k => (p[k] || []).length && !bk_off(p, k));
 function bk_areaHead(p, k, title) {
   const list = p[k] || [], on = !bk_off(p, k), take = list.filter(s => s.action !== 'skip').length, allSkip = !take;
-  return `<div class="oimarea ${on ? '' : 'off'}"><h4>${esc(title)} <span class="muted">${on ? esc(tr('{0} of {1}', take, list.length)) : esc(tr('not taken over'))}</span></h4><span class="spacer"></span>
-    ${on && (!allSkip || list.some(x => bk_back(x) !== 'skip')) ? `<button type="button" class="btn sm ghost" data-oim="area-skip" data-area="${k}">${esc(allSkip ? tr('Take over all') : tr('Skip all'))}</button>` : ''}
-    <label class="chkl swl"><span class="swc"><input type="checkbox" role="switch" data-oim-area="${k}" ${on ? 'checked' : ''}><span class="swt" aria-hidden="true"></span></span><span>${esc(tr('Take over'))}</span></label></div>`;
+  return `<div class="oimarea ${on ? '' : 'off'}"><h4>${esc(title)} <span class="muted">${on ? esc(tr('{0} of {1}', take, list.length)) : esc(tr('not imported'))}</span></h4><span class="spacer"></span>
+    ${on && (!allSkip || list.some(x => bk_back(x) !== 'skip')) ? `<button type="button" class="btn sm ghost" data-oim="area-skip" data-area="${k}">${esc(allSkip ? tr('Import all') : tr('Skip all'))}</button>` : ''}
+    <label class="chkl swl"><span class="swc"><input type="checkbox" role="switch" data-oim-area="${k}" ${on ? 'checked' : ''}><span class="swt" aria-hidden="true"></span></span><span>${esc(tr('Import'))}</span></label></div>`;
 }
 const bk_back = x => x.was && x.was !== 'skip' ? x.was : x.dup ? sr_fillAct(x) : 'new';  // a duplicate stays skipped unless it was chosen before
 function bk_skipAll(k) {  // "Skip all" of an area (and back: every row gets the action it had before, a duplicate its proposal)
@@ -116,12 +116,12 @@ function bk_skipAll(k) {  // "Skip all" of an area (and back: every row gets the
 // column, or company / street / postcode / city / country in columns of their own. A change reads the file again.
 const E46_FIELDS = [['name', N_('Company')], ['contact', N_('Contact person')], ['address', N_('Whole address')], ['street', N_('Street')],
   ['house', N_('House number')], ['zip', N_('Postcode')], ['city', N_('City')], ['country', N_('Country')],
-  ['email', N_('E-mail')], ['phone', N_('Phone')], ['customer_no', N_('Client number|customer')], ['vat_id', N_('VAT ID')]];  // 2.363.0 (#3103)
+  ['email', N_('E-mail')], ['phone', N_('Phone')], ['customer_no', N_('Client no.|customer')], ['vat_id', N_('VAT ID')]];  // 2.363.0 (#3103)
 function e46_mapHtml(p) {
   const c = p.columns; if (!c?.head?.length) return '';
   const m = c.map || {}, opts = cur => `<option value="">${esc(tr('not in the file'))}</option>` + c.head.map((h, j) => `<option value="${j}" ${m[cur] === j ? 'selected' : ''}>${esc(h || tr('Column {0}', j + 1))}</option>`).join('');
   return `<details class="e46map" ${c.mode === 'columns' || !(p.clients || []).length ? 'open' : ''}><summary>${esc(tr('Columns'))} <span class="muted">${esc(c.mode === 'columns' ? tr('Address in separate columns') : tr('Address in one column'))}</span></summary>
-    <div class="oimgrid">${E46_FIELDS.map(([k, t]) => `<label class="oimfl"><span>${esc(tr(t))}</span><select data-e46-map="${k}" ${OIM.busy ? 'disabled' : ''}>${opts(k)}</select></label>`).join('')}</div>${c.unused?.length ? `<p class="muted">${esc(tr('Not taken over: {0}', c.unused.join(', ')))}</p>` : ''}</details>${c.cut ? `<p class="oimwarn">${ic('alert', 's')} ${esc(tr('At most {0} rows per sheet are read: please split a longer file.', c.cut))}</p>` : ''}`;
+    <div class="oimgrid">${E46_FIELDS.map(([k, t]) => `<label class="oimfl"><span>${esc(tr(t))}</span><select data-e46-map="${k}" ${OIM.busy ? 'disabled' : ''}>${opts(k)}</select></label>`).join('')}</div>${c.unused?.length ? `<p class="muted">${esc(tr('Not imported: {0}', c.unused.join(', ')))}</p>` : ''}</details>${c.cut ? `<p class="oimwarn">${ic('alert', 's')} ${esc(tr('At most {0} rows per sheet are read: please split a longer file.', c.cut))}</p>` : ''}`;
 }
 function e46_remap(k, v) {
   const p = OIM.pv; if (!p?.columns || !OIM.file) return;
@@ -139,7 +139,7 @@ function oimClientCard(c, i) {
   return `<li class="oimcard ${on ? '' : 'off'} ${c.flags?.length ? 'warn' : ''}"><div class="oimhd"><label class="chkl"><input type="checkbox" data-oim-on="c" data-i="${i}" ${on ? 'checked' : ''}> <b>${esc(c.name || tr('(no name)'))}</b></label><span class="muted">${tr('row {0}', c.row)}</span></div>
     ${c.reasons?.length ? `<p class="oimwarn">${ic('alert', 's')} ${esc(c.reasons.join(' · '))}</p>` : ''}${dup}
     <div class="oimgrid">${fld('name', tr('Company'), 80, 'w2')}${fld('contact', tr('Contact person'), 120, 'w2')}${fld('street', tr('Street'), 200, 'w2')}${fld('zip', tr('Postcode'), 20)}${fld('city', tr('City'), 120)}<div class="oimfl"><span>${esc(tr('Country'))}</span>${ctyField('oim-cty-' + i, c.country, {attrs: `data-oim-c="${i}" data-k="country"`, dis: on ? '' : 'disabled', label: tr('Country')})}</div></div>
-    ${xf('email', tr('E-mail'), 200)}${xf('phone', tr('Phone'), 60)}${xf('customer_no', tr('Client number|customer'), 40)}${xf('vat_id', tr('VAT ID'), 20)}<details class="oimraw"><summary>${tr('Original text')}</summary><pre>${esc(c.address || '')}</pre></details></li>`;
+    ${xf('email', tr('E-mail'), 200)}${xf('phone', tr('Phone'), 60)}${xf('customer_no', tr('Client no.|customer'), 40)}${xf('vat_id', tr('VAT ID'), 20)}<details class="oimraw"><summary>${tr('Original text')}</summary><pre>${esc(c.address || '')}</pre></details></li>`;
 }
 
 function oimSimpleCard(kind, s, i, title, sub) {

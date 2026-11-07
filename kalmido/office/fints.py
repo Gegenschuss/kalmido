@@ -87,9 +87,9 @@ FNT_MSG = {
     "blocked": N_("This server address is not allowed (only https addresses on the internet)."),
     "unsupported": N_("The bank does not offer the statement over FinTS for this account."),
     "no_account": N_("The bank does not list this IBAN for this sign-in name."),
-    "tan_method": N_("This TAN method cannot be used here (e.g. a flicker code). Please choose another one."),
+    "tan_method": N_("This TAN method cannot be used here (e.g. a flicker code). Please select another one."),
     "bank": N_("The bank answered with an error. Please try again later."),
-    "too_large": N_("The bank sent more than one fetch may take. Please choose a shorter period."),
+    "too_large": N_("The bank sent more than one fetch may take. Please select a shorter period."),
     "expired": N_("The bank connection has ended (time out). Please start again."),
     "state": N_("This step does not fit the state of the bank connection."),
 }

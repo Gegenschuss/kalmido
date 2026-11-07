@@ -4623,7 +4623,7 @@ Everything longer or freer (code, research, long jobs, working tickets, chat) st
   the project of every task.
 - The reference starter passes them: `agent_job.py start --parent ID --continue-of ID --task 12 --task 13`.
 - Reviews in their own read-only area (2.619.0, #2792): audits run in a small area of their own that never blocks a
-  building agent, with **read only** as a hard rule in their brief (no commit, merge, push, tag, deploy, nothing written but
+  building agent, with **read-only** as a hard rule in their brief (no commit, merge, push, tag, deploy, nothing written but
   comments and the result). The reference starter: `agent_job.py start --audit` (at most `KALMIDO_AUDIT_MAX`, default 3,
   open; not with `--worktree` / `--parent`; `list` and `status` mark it). Kalmido itself counts such a job like any running
   job against your work style's `max_parallel`.

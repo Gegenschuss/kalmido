@@ -929,8 +929,8 @@ def _rule_save(c, ws, d, rid=None):
                "backref": tr("Back references are not allowed in patterns"), "long": tr("The pattern is too long"),
                "invalid": tr("The pattern is not a valid regular expression"), "empty": tr("The condition is empty"),
                "nothing": tr("The rule does not set anything"), "days": tr("Invalid value: {0}", "days"),
-               "person": tr("Only people of this workspace can be chosen"), "field": tr("Unknown field: {0}", ", ".join(d.get("fields") or {})[:60] if isinstance(d.get("fields"), dict) else ""),
-               "hooks_off": tr("Webhooks are turned off on this server")}.get(why, tr("Invalid value: {0}", "rule"))
+               "person": tr("Only people of this workspace can be selected"), "field": tr("Unknown field: {0}", ", ".join(d.get("fields") or {})[:60] if isinstance(d.get("fields"), dict) else ""),
+               "hooks_off": tr("Webhooks are switched off on this server")}.get(why, tr("Invalid value: {0}", "rule"))
         return None, err(msg)
     if shown:
         g.fl_secret = shown  # 2.581.0 (#4803): the webhook's secret, shown once

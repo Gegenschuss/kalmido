@@ -310,7 +310,7 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
   branch; `get_task` shows the same as `build` (`state` released / main / branch / none, `branches`, `stale` = open
   although published). The reference starter (2.619.0) sets `repo.git_author` itself for each task run.
 - **Reviews in their own read-only area (2.619.0).** Audits and reviews run in a small area of their own (a few places)
-  that never takes the place of a building agent. Their brief says **read only** as a hard rule: no commit, merge, push,
+  that never takes the place of a building agent. Their brief says **read-only** as a hard rule: no commit, merge, push,
   tag, deploy or server change, nothing written but comments and the result; a needed change becomes a finding.
 
 ### When you are stuck

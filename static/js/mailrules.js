@@ -39,7 +39,7 @@ function mbr_statusHtml(st) {
 function mbr_draw(el) {
   const j = MBR.j || {rules: []};
   el.innerHTML = `<h4>${tr('Documents from this mailbox')}</h4>
-    <p class="muted">${tr('Rules pick e-mails of this mailbox whose attachments become documents of this workspace; each e-mail only once.')}</p>
+    <p class="muted">${tr('Rules select e-mails of this mailbox whose attachments become documents of this workspace; each e-mail only once.')}</p>
     <ul class="mbrrules" role="list">${(j.rules || []).map(mbr_ruleLine).join('') || `<li class="muted">${tr('No rules yet')}</li>`}</ul>
     <div class="mbrstat">${mbr_statusHtml(j.status)}</div><div class="mbrform"></div><p class="mbr-err" role="alert"></p>
     <div class="row mbrbtns"><button type="button" class="btn" data-mbra="new">${ic('plus', 's')} ${tr('New rule')}</button>

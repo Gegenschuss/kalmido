@@ -126,7 +126,7 @@ def _vals(c, d, cur, ws):
     if v["after"] == "move" and not v["after_folder"]:
         return tr("Please name the folder the e-mails are moved to")
     if not v["take_files"] and not v["take_mail"]:
-        return tr("Please choose what becomes a document")
+        return tr("Please select what becomes a document")
     tags = d.get("tags", json.loads(cur["tags"] or "[]"))
     if not isinstance(tags, list) or len(tags) > 10 or any(not isinstance(t, str) or not t.strip() or len(t.strip()) > 60 or _CTRL.search(t) for t in tags):
         return tr("Invalid value: {0}", "tags")
@@ -137,7 +137,7 @@ def _vals(c, d, cur, ws):
     elif isinstance(tid, bool) or not isinstance(tid, int):
         return tr("Invalid value: {0}", "target_id")
     elif tid != cur["target_id"] and not _target_ok(c, ws, tid):  # a stored one stays when it is not changed
-        return tr("This folder cannot be chosen")
+        return tr("This folder cannot be selected")
     v["target_id"] = tid
     pos = d.get("pos", cur["pos"])
     if isinstance(pos, bool) or not isinstance(pos, int) or not 0 <= pos <= 10000:
