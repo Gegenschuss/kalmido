@@ -39,12 +39,11 @@ BEGIN
   SELECT ref_kind, ref_id INTO nk, nr FROM fs_nodes WHERE id = OLD.node_id AND kind = 'ref' AND ref_kind IN ('evcal', 'address_book');
   IF nk IS NOT NULL THEN
     PERFORM set_config('app.kern_sync', '1', true);
-    IF TG_OP = 'UPDATE' THEN
-      best := NEW.role;
-    ELSE
-      ts := to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"+00:00"');
-      SELECT s.role INTO best FROM fs_shares s WHERE s.node_id = OLD.node_id AND COALESCE(s.user_id, s.agent_id) = who
-        AND s.role IN ('view', 'edit') AND (s.expires_at IS NULL OR s.expires_at > ts) ORDER BY (s.role = 'edit') DESC LIMIT 1;
+    ts := to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"+00:00"');
+    SELECT s.role INTO best FROM fs_shares s WHERE s.node_id = OLD.node_id AND COALESCE(s.user_id, s.agent_id) = who
+      AND s.role IN ('view', 'edit') AND (s.expires_at IS NULL OR s.expires_at > ts) ORDER BY (s.role = 'edit') DESC LIMIT 1;
+    IF TG_OP = 'UPDATE' AND best IS NULL THEN
+      best := NEW.role;  -- review: an UPDATE takes the best live share of the person (a second edit share wins), else its own
     END IF;
     IF nk = 'evcal' THEN
       IF best IS NULL THEN

@@ -813,14 +813,15 @@ def obj_token_lists(uid):
     return _req_token_lists(uid)
 
 
-def obj_share_rows_sql(kind):
+def obj_share_rows_sql(kind, trash=False):
     """The live shares of the reference nodes of kind as an SQL subquery (no ? parameters) with the columns ref_id, user_id,
     group_id, agent_id, role, created_by -- for an area that reads its members in bulk (team chat: collab/teamchan.py
-    tcx_members_of). Not in the trash, not expired; the area applies its own rules to the people it names."""
+    tcx_members_of). Not in the trash, not expired; the area applies its own rules to the people it names. 2.647.0 (#5046,
+    review): trash=True also counts nodes in the trash (a check that holds back while a share could come back)."""
     reg = obj_reg(kind)
     now = now_iso().replace("'", "")
     return (f"(SELECT n.ref_id, s.user_id, s.group_id, s.agent_id, s.role, s.created_by FROM fs_shares s JOIN fs_nodes n ON n.id = s.node_id "
-            f"WHERE n.kind = 'ref' AND n.ref_kind = '{reg['kind']}' AND n.deleted_at IS NULL "
+            f"WHERE n.kind = 'ref' AND n.ref_kind = '{reg['kind']}'{'' if trash else ' AND n.deleted_at IS NULL'} "
             f"AND (s.expires_at IS NULL OR s.expires_at > '{now}'))")
 
 

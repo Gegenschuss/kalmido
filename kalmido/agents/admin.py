@@ -553,7 +553,7 @@ def _agent_ws_check(c, aid, v):
     from ..core.objects import obj_share_rows_sql  # loads after this module (ORDER)
     with system_ctx(c):  # numbers only (the calendar / book may lie in a tree the admin does not see)
         n = sum(c.execute(f"SELECT COUNT(*) FROM {tb} k WHERE COALESCE(k.org_id,0)!=? AND (k.id IN (SELECT ref_id FROM "
-                          f"{obj_share_rows_sql(kd)} x WHERE x.user_id=? OR x.agent_id=?) OR (k.id IN (SELECT {col} FROM {mt} WHERE "
+                          f"{obj_share_rows_sql(kd, trash=True)} x WHERE x.user_id=? OR x.agent_id=?) OR (k.id IN (SELECT {col} FROM {mt} WHERE "
                           f"user_id=?) AND NOT EXISTS (SELECT 1 FROM fs_nodes n WHERE n.kind='ref' AND n.ref_kind='{kd}' AND n.ref_id=k.id)))",
                           (v or 0, aid, aid, aid)).fetchone()[0]
                 for kd, tb, mt, col in (("evcal", "ev_cals", "ev_cal_members", "cal_id"), ("address_book", "books", "book_members", "book_id")))
