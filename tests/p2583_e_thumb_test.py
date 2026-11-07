@@ -138,4 +138,4 @@ for bad in ("40", "3", "abc", "nan"):
     check(Fr.patch(B + "/api/settings", json={"dc_tile_d": bad}).status_code == 400, f"(e) {bad!r} is refused")
 check(Fr.patch(B + "/api/settings", json={"dc_tile_d": ""}).ok and Fr.get(B + "/api/state").json()["settings"].get("dc_tile_d") == "", "(e) '' = the standard size again")
 
-done("p2583_e_thumb")
+sys.exit(done("p2583_e_thumb"))
