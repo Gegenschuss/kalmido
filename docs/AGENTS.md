@@ -118,9 +118,12 @@ needs no permission; 2.190.0: a token that may only read (no permission beyond *
   shows `token.list_ids`. Other projects answer `404`, queries leave them out, and no events about them arrive (2.86.0: also
   events queued before the project was taken away or limited are left out when polled; 2.351.0: also a quotation or
   invoice of another project filed in a folder shared with the agent). Documents made from a template (office documents) are
-  not tied to the limit, neither through the office routes nor through a folder. 2.577.0 (#4708): the wiki, tables,
+  not tied to the limit, neither through the office routes nor through a folder. 2.577.0 (#4708): tables,
   calendars, contacts and the file store are not limited by `list_ids` either (the agent's data lock keeps it out of an
-  area). See
+  area). 2.654.0 (#5053): a limited token finds no message of a team chat channel or group in the message search
+  (`GET /api/v1/search?scope=messages`) and lists no channel, as reading the room answers `404`; and it reaches no
+  knowledge page (a page belongs to no project: `/api/v1/wiki/pages` lists none, reading or creating one answers `404`).
+  See
   [AGENT-SECURITY.md](AGENT-SECURITY.md#server-enforced-boundaries).
 
 ## Personal agents

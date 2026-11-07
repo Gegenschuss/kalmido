@@ -197,6 +197,7 @@ def search_messages(c, uid, q, arts=None, sender=None, room=None, agent=None, ta
                          "chat_name": r["title"], "sender_id": r["user_id"], "created_at": r["created_at"], "_body": r["body"]})
     if "t" in arts and (collab_all() if agent_me else tchat_on(c, uid)):
         from .tcxcore import tcx_core_rooms_sql  # 2.565.0 (#4719): + the channels shared with a group of uid
+        from ..core.objects import obj_gate  # 2.654.0 (#5053)
         rows = c.execute(f"""SELECT m.id, m.room_id, m.user_id, m.body, m.created_at, r.kind, r.list_id, r.a, r.b
             FROM tchat_msgs m JOIN tchat_rooms r ON r.id=m.room_id
             WHERE {mcond} AND m.deleted_at IS NULL AND m.enc IS NULL AND ((r.kind='dm' AND (r.a=? OR r.b=?)) OR (r.kind='list' AND r.list_id IN {vis_sql()}
@@ -209,6 +210,8 @@ def search_messages(c, uid, q, arts=None, sender=None, room=None, agent=None, ta
             if r["room_id"] not in ok:
                 rr = rrows[r["room_id"]] = c.execute("SELECT * FROM tchat_rooms WHERE id=?", (r["room_id"],)).fetchone()
                 ok[r["room_id"]] = tchat_room_ok(c, rr, uid) and (r["kind"] != "list" or role(r["list_id"]) in FULL_ROLES)  # 2.113.1 (#2059)
+                if ok[r["room_id"]] and r["kind"] in ("channel", "group"):  # 2.654.0 (#5053): the core's floor as need_room / tcx_channels
+                    ok[r["room_id"]] = obj_gate(c, uid, "tchat_room", rr)  # (a token limited to lists finds no channel's messages)
             if not ok[r["room_id"]]:
                 continue
             d = {"art": "t", "chat_type": r["kind"] if r["kind"] in ("dm", "channel", "group") else "list", "id": r["id"], "room_id": r["room_id"],

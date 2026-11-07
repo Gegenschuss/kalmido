@@ -108,9 +108,16 @@ def _space_locked(c, oid, uid):
     return bool(wke_mode(c, oid, uid)[0])
 
 
+def wkf_token_listed(uid):
+    """2.654.0 (#5053): uid asks through its own API token limited to lists. A page belongs to no list (project), so such a
+    token reaches no page -- like the calendar and the books; the app's session and unlimited tokens are unchanged."""
+    from ..core.objects import obj_token_lists
+    return obj_token_lists(uid) is not None
+
+
 def wkf_base(c, uid, r):
     """The area's own role on page row r (module docstring)."""
-    if not uid or r is None or acx_of(c, uid).role == "agent":
+    if not uid or r is None or acx_of(c, uid).role == "agent" or wkf_token_listed(uid):  # 2.654.0 (#5053)
         return None
     if r["org_id"] is None:
         return "edit" if r["owner_id"] == uid else None
@@ -121,6 +128,8 @@ def wkf_base(c, uid, r):
 
 def wkf_role(c, uid, r):
     """The higher one of the area's role and the folder shares (module docstring)."""
+    if wkf_token_listed(uid):
+        return None  # 2.654.0 (#5053): a token limited to lists, not even through a share
     base = wkf_base(c, uid, r)
     if base == "edit" or r is None or wkf_locked(c, r):
         return base
@@ -172,7 +181,7 @@ def _hidden(c, uid):
     parts = []
     if c.execute("SELECT 1 FROM wiki_spaces WHERE e2e IS NOT NULL LIMIT 1").fetchone():
         parts.append(f"NOT ({wke_open_sql('p')})")
-    if _token_lacks(uid, "wiki:read"):
+    if _token_lacks(uid, "wiki:read") or wkf_token_listed(uid):  # 2.654.0 (#5053): + a token limited to lists
         parts.append("TRUE")
     else:
         x = wkf_agent_private_sql(c, uid)
@@ -656,7 +665,7 @@ def _share_starts(c, uid):
 
 def wkf_shared(c, uid):
     """{page id: {node, top, folder}} -- the pages uid reaches through shares (module docstring)."""
-    if not uid:
+    if not uid or wkf_token_listed(uid):  # 2.654.0 (#5053)
         return {}
     starts = _share_starts(c, uid)
     ids = {n["id"] for n, _ in starts}
@@ -717,6 +726,8 @@ def wkf_shared_ids(c, uid):
 def wkf_visible_sql(c, uid, alias="p"):
     """A condition on wiki_pages <alias>: the pages uid may read (module docstring); ids inlined."""
     a = alias
+    if wkf_token_listed(uid):
+        return "FALSE"  # 2.654.0 (#5053)
     parts = []
     if uid and acx_of(c, uid).role != "agent":
         parts.append(f"({a}.org_id IS NULL AND {a}.owner_id={int(uid)})")

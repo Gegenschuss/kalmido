@@ -34,6 +34,7 @@ from ..files.store import _shares_role, fs_chain, fs_deleted, fs_log_add, fs_rol
 from .pages import wiki_body, wiki_clean_path, wiki_insert, wiki_space_key, wiki_update, wiki_create
 from .wikie2e import wke_mode
 from .wkfolder import WKF_KIND, wkf_base, wkf_folder_path, wkf_locked, wkf_node_of, wkf_role, wkf_shared_ids, wkf_visible_sql
+from .wkfolder import wkf_token_listed  # 2.654.0 (#5053)
 from .wkhist import wkh_body
 from .wikiatt import SVG, wka_locked, wka_send  # 2.488.0 B (#2209): the files of a page
 from ..core.orgcrypt import OrgCryptError, oc_read_file
@@ -300,6 +301,8 @@ def wkv_create():
     b = v1_json()
     c = db()
     uid = me()
+    if wkf_token_listed(uid):
+        raise Denied(404)  # 2.654.0 (#5053): a token limited to lists has no knowledge space (nothing is made)
     agent = _is_agent(c, uid)
     if "folder_id" in b or agent:
         reject_unknown(b, ("folder_id", "name", "body"))
