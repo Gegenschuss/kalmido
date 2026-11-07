@@ -31,6 +31,7 @@
 .ofcrow .ofcn b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ofcrow .ofcn small{font-size:var(--fs-s);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ofcrow>svg{color:var(--muted);flex:none}
+.ofcrow[aria-expanded]>svg:last-child{transition:transform .15s}.ofcrow[aria-expanded="true"]>svg:last-child{transform:rotate(180deg)}  /* 2.591.0 (#4908): a row that opens a view ends in › (ic right), only a row that unfolds in place (aria-expanded) keeps ˅, turning when open */
 .ofcdlg .card{width:min(40rem,100%)}
 .ofcdlg .row textarea{flex:1;min-width:0;width:100%}
 .ofchint{font-size:var(--fs-s);flex-basis:100%}

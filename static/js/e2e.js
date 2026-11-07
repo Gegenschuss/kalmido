@@ -513,7 +513,7 @@ async function e2eAttOpen(aid) {
 function e2eAttHtml(a, del) {
   return `<div class="att file e2eatt"><button type="button" class="attx" data-e2e="att-open" data-att="${a.id}" title="${esc(a.enc_mine ? tr('Decrypt and download') : tr('Only the person who attached it can open it'))}">${ic('lock')}<span class="atxt"><span class="an">${esc(tr('Encrypted file'))}</span><span class="as">${esc(fmtSize(a.size || 0))}${a.enc_mine ? '' : ' · ' + esc(tr('not yours'))}</span></span></button>${del}</div>`;
 }
-const e2eAttAddHtml = t => !globalThis.crypto?.subtle || !E2E.st?.set || !(t.id > 0) ? '' : `<label class="attadd e2eattadd" title="${esc(tr('Encrypted in your browser; no preview, not searched'))}" aria-label="${esc(tr('Attach encrypted'))}">${ic('lock', 's')}<span>${tr('Attach encrypted')}</span><input type="file" id="d-efile" multiple hidden aria-label="${esc(tr('Attach encrypted'))}"></label>`;  // 2.64.1 (#1518): aria-label
+const e2eAttAddHtml = t => !globalThis.crypto?.subtle || !E2E.st?.set || !(t.id > 0) ? '' : `<label class="attadd e2eattadd" title="${esc(tr('Encrypted in your browser; no preview, not searched'))}" aria-label="${esc(tr('Attach encrypted'))}">${ic('lock', 's')}<span>${tr('Attach encrypted')}</span><input type="file" id="d-efile" multiple hidden data-nodrop aria-label="${esc(tr('Attach encrypted'))}"></label>`;  // 2.64.1 (#1518): aria-label
 document.addEventListener('change', e => { if (e.target.id === 'd-efile' && S.sel) { const fs = [...e.target.files]; e.target.value = ''; e2eUpload(S.sel, fs); } });
 
 // ------------------------------------------------------------------ #909 encrypted direct messages

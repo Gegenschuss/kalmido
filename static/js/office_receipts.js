@@ -101,7 +101,7 @@ function rclRow(r) {
   }
   return `<li><button type="button" class="ofcrow" data-rcl="rc" data-id="${r.node_id}"${RCL.dockId === r.node_id ? ' aria-current="true"' : '' /* 2.557.0 A (#4553) */}><span class="ofcn"><b>${esc(r.title || tr('Receipt'))}</b>
     <small class="muted">${esc(sub)}</small></span>${chk}${r.einvoice ? `<span class="rotag">${tr('E-invoice')}</span>` : ''}${r.dup ? `<span class="rotag bk-dup">${tr('Possible duplicate')}</span>` : ''}${r.hints > (r.dup ? 1 : 0) ? `<span class="rotag rcl-hint">${tr('With hints')}</span>` : ''}${r.paid_at || !RCL.paidMark ? '' : `<span class="rotag rcl-open">${tr('Not paid')}</span>`}${r.submitted_by ? `<span class="rotag rcl-sub">${esc(tr('Handed in by {0}', r.submitted_by))}</span>` : ''}
-    <span class="rksum">${ofcMoney(r.amount)}${orig}</span>${ic('chev', 's')}</button></li>`;
+    <span class="rksum">${ofcMoney(r.amount)}${orig}</span>${ic('right', 's')}</button></li>`;
 }
 // 2.420.0 C (#3448): the bar of the multiple choice: "Select" -> {n} selected, Mark as checked, Remove check, Cancel
 // 2.557.0 A (#4553): a content area of 100rem and more (#view.lsdw, render.js lsd_sync): the receipt opens on the right beside
@@ -272,8 +272,8 @@ function rsb_tabHtml() {
     : `<ul class="ofclist rsb-list" role="list" aria-labelledby="rsb-mine">${RSB.rows.map(r => `<li class="ofcrow rsb-row"><span class="ofcn"><b>${esc(r.name || tr('Receipt'))}</b><small class="muted">${esc(fmtDateLoc(String(r.submitted_at || '').slice(0, 10)))}</small></span>${st(r)}</li>`).join('')}</ul>`;
   return `<div class="rsb"><h3 class="ofcgrp">${tr('Submit receipt')}</h3>
     <p class="muted rsb-hint">${tr('Photograph a receipt or upload the file: it goes to the bookkeeping. You only see your own receipts here.')}</p>
-    <div class="bk-photo rsb-up"><label class="btn pri">${ic('camera')}<span>${tr('Photograph receipt')}</span><input type="file" id="rsb-shot" accept="image/*,application/pdf" capture="environment" multiple hidden></label>
-    <label class="btn">${ic('upload')}<span>${tr('Upload files')}</span><input type="file" id="rsb-files" accept="${typeof BK_ACCEPT === 'string' ? BK_ACCEPT : 'image/*,application/pdf'}" multiple hidden></label></div>
+    <div class="bk-photo rsb-up">${isTouch() ? `<label class="btn pri">${ic('camera')}<span>${tr('Photograph receipt')}</span><input type="file" id="rsb-shot" accept="image/*,application/pdf" capture="environment" multiple hidden></label>` : ''}
+    <label class="btn${isTouch() ? '' : ' pri'}">${ic('upload')}<span>${tr('Upload files')}</span><input type="file" id="rsb-files" accept="${typeof BK_ACCEPT === 'string' ? BK_ACCEPT : 'image/*,application/pdf'}" multiple hidden></label></div>
     <h3 class="ofcgrp" id="rsb-mine">${tr('My receipts handed in')}</h3>${list}</div>`;
 }
 async function rsb_upload(files) {
@@ -303,7 +303,7 @@ function rsb_inHtml() {
   if (!RSB.inRows.length) return '';
   return `<section class="rsb-in"><h3 class="ofcgrp" id="rsb-in-h">${tr('Handed in by members')} <span class="rotag">${RSB.inRows.length}</span></h3>
     <ul class="ofclist" role="list" aria-labelledby="rsb-in-h">${RSB.inRows.map(r => `<li><button type="button" class="ofcrow" data-rsb="open" data-id="${+r.node_id}"><span class="ofcn"><b>${esc(r.name || tr('Receipt'))}</b>
-    <small class="muted">${esc([tr('Handed in by {0}', r.by?.name || '?'), fmtDateLoc(String(r.submitted_at || '').slice(0, 10))].join(' · '))}</small></span>${ic('chev', 's')}</button></li>`).join('')}</ul></section>`;
+    <small class="muted">${esc([tr('Handed in by {0}', r.by?.name || '?'), fmtDateLoc(String(r.submitted_at || '').slice(0, 10))].join(' · '))}</small></span>${ic('right', 's')}</button></li>`).join('')}</ul></section>`;
 }
 document.addEventListener('change', e => {
   const t = /** @type {any} */ (e.target);

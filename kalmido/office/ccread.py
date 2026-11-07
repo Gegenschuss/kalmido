@@ -99,7 +99,7 @@ def _fx(text):
 
 
 def ccr_mastercard(text):
-    """The text of a Mastercard statement -> see the module's text (error None here; no lines = not readable)."""
+    """The text of a card statement in the line layout (Mastercard, Visa, American Express) -> see the module's text (error None here; no lines = not readable)."""
     rows = [re.sub(r"\s+", " ", x[:CCR_ROW_MAX * 16]).strip()[:CCR_ROW_MAX] for x in text[:CCR_ALL_MAX].splitlines()]
     # (review 2.523.0: the raw cut is wide, a layout page pads its columns with spaces; the amount at the right edge stays)
     head = next((d for d in (_iso(m.group(1)) for x in rows for m in [HEAD_DAY_RE.search(x)] if m) if d), None)
@@ -162,7 +162,8 @@ def ccr_mastercard(text):
             "lines": out, "error": None}
 
 
-CCR_READERS = {"mastercard": ccr_mastercard}  # one more provider: one more layout
+# 2.591.0 (#4909): Visa and American Express statements come in the same line layout (dates, text, amount): the same reader
+CCR_READERS = {"mastercard": ccr_mastercard, "visa": ccr_mastercard, "amex": ccr_mastercard}  # one more provider with its own layout: one more reader
 
 
 def ccr_text(data):

@@ -55,9 +55,9 @@ from ..core.pg import write_lock  # 2.369.5 (#2517): pulled up from functions
 from ..files.store import _free_name  # 2.369.5 (#2517): pulled up from functions
 from .ingest import docs_ingest, docs_kick  # 2.580.0 (#4401): pulled up from functions (ingest loads this module only inside its functions)
 
-SP_PAGES = O._env_int("KALMIDO_SPLIT_PAGES", 100, 2, 500)  # pages of a stack at most
+SP_PAGES = O.QR_PAGES       # pages of a stack at most (KALMIDO_SPLIT_PAGES; 2.591.0 B #4863: the same cap as the archive number's codes)
 SP_SEP = "KALMIDO-SPLIT"     # the text of the separator sheet's QR code
-SP_DPI = 200                 # like the archive number of the first page (ocr.qr_codes)
+SP_DPI = 200                 # like the archive number's first pass (ocr.QR_DPI)
 SP_INK = 0.004               # share of dark pixels below which a page may be blank (text recognition decides)
 SP_INK_SURE = 0.0008         # ... and without text recognition: only this little
 SP_TEXT = 12                 # visible characters at most on a blank page
@@ -237,7 +237,7 @@ def _sp_pages(w, tmp, src, n, prefix):
         codes = [str(t) for t in (x.get("codes") or [])][:20]
         ink = float(x.get("ink") or 0)
         sep = any(t.strip().upper() == SP_SEP for t in codes)
-        asn = None if sep else S.EX.find_asn(prefix, codes)
+        asn = None if sep else S.EX.find_asn(prefix, (), codes=codes)  # 2.591.0 B (#4863): + a code of digits only
         blank = False
         if not sep and asn is None and ink < SP_INK:
             if ocr:

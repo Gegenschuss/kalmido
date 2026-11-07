@@ -42,7 +42,7 @@ from .owrite import ow_history_answer, ow_kind, ow_write  # 2.567.0 D (#4711): t
 ow_kind("office_cc_card", "office_cc_cards")
 ow_kind("office_cc_line", "office_cc_lines")
 
-CC_PROVIDERS = {"mastercard": "Mastercard"}
+CC_PROVIDERS = {"mastercard": "Mastercard", "visa": "Visa", "amex": "American Express"}  # 2.591.0 (#4909): all read with the same line layout (ccread.py)
 CC_KINDS = ("purchase", "fee", "credit")
 CC_STATES = ("open", "matched", "noreceipt", "private")
 CC_FILE_MAX = 20 * 1024 * 1024
@@ -158,7 +158,7 @@ def cc_list():
     c, uid, oid, every = cc_ctx()
     q = "SELECT * FROM office_cc_cards WHERE org_id=? AND deleted_at IS NULL" + ("" if every else " AND holder_id=?") + " ORDER BY id"
     rows = [oc_dec_fields(c, oid, "office_cc_cards", r) for r in c.execute(q, (oid,) if every else (oid, uid)).fetchall()]
-    out = {"items": [_card_public(c, oid, r) for r in rows], "manage": every, "currency": _home(c, oid), "providers": [{"id": k, "name": v} for k, v in CC_PROVIDERS.items()]}
+    out = {"items": [_card_public(c, oid, r) for r in rows], "manage": every, "currency": _home(c, oid), "providers": [{"id": k, "name": v} for k, v in CC_PROVIDERS.items()], "file_max": CC_FILE_MAX}
     if every:
         out.update(people=_members(c, oid), accounts=_accounts(c, oid) if ofr_allows(c, uid, oid, "bank", "view") else [])  # the accounts: the bank's area
     return jsonify(out)

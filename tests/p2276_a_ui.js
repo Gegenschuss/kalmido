@@ -104,7 +104,7 @@ const today = TC.today();
 
     // ================= Receipts: upload + list
     await nav(B + '#office/receipts');
-    check(await ready(ev, `!!document.querySelector('.office[data-ofctab="receipts"] .bk-photo #bk-file') && !!document.querySelector('#side [data-ofm="receipts"][aria-current="page"]')`, 80), '#3039: Office > Receipts with the upload');
+    check(await ready(ev, `!!document.querySelector('.office[data-ofctab="receipts"] .bk-photo #bk-files') && !!document.querySelector('#side [data-ofm="receipts"][aria-current="page"]')`, 80), '#3039: Office > Receipts with the upload');
     check(await ev(`/Office > Receipts/.test(document.querySelector('.bk-photohint')?.textContent || '') && /Documents/.test(document.querySelector('.bk-photohint').textContent)`)  /* 2.368.0 (#2987): the folder in the app language */, '#3039: the hint says where the receipt goes');
     check(await ev(`!!document.querySelector('.rcp-kinds a[href="#office/meals"]') && !!document.querySelector('.rcp-kinds a[href="#office/travel"]') && !document.querySelector('.rcl-top')`), '#3039: entertainment / travel as kinds, no way back to the bookkeeping');
     check(await ready(ev, `!!document.querySelector('#rcl-h') && !document.querySelector('[data-rcl="rc"]')`, 60), 'the list, still empty');
@@ -118,7 +118,7 @@ const today = TC.today();
       out += 'trailer\\n<< /Size ' + (o.length + 1) + ' /Root 1 0 R >>\\nstartxref\\n' + xr + '\\n%%EOF\\n';
       window.__p2276 = null; const f0 = window.fetch; window.fetch = (u, x) => { const p = f0(u, x); if (String(u).endsWith('/api/docs') && x?.method === 'POST') p.then(r => r.clone().json()).then(j => { window.__p2276 = j; }, () => 0); return p; };
       const dt = new DataTransfer(); dt.items.add(new File([out], 'receipt-2276.pdf', {type: 'application/pdf'}));
-      const i = document.querySelector('#bk-file'); i.files = dt.files; i.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
+      const i = document.querySelector('#bk-files'); i.files = dt.files; i.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
     check(await ready(ev, `!!window.__p2276 && (window.__p2276.ids || []).length === 1`, 60), '#3039: the upload answers from /api/docs ' + await ev('JSON.stringify(window.__p2276)'));
     check(await ready(ev, `!!document.querySelector('.bk-sheet #bk-vat')`, 60), 'the receipt sheet opens after the upload');
     await ev(`(() => { const m = document.querySelector('.bk-sheet'); m.querySelector('#bk-cat').value = 'Software'; m.querySelector('#bk-vat').value = '19'; m.querySelector('#bk-amount').value = '119.00';

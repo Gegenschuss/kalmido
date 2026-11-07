@@ -2,7 +2,7 @@
 // 2.207.0 A (#2763): "Scans from your computer" in the document settings (docs.js dc_sDraw): the folder watcher (downloads,
 // the scan inboxes of this workspace, a new inbox shows its setup code once) and the forwarding address with a copy button and
 // the note, shown big once per person, that mail is not end-to-end encrypted.
-const DSCN = {code: '', ws: '', md: null, es: /** @type {any} */ (null)};  // the setup code just made: only while this settings dialog is open
+const DSCN = {code: '', ws: '', md: null, es: /** @type {any} */ (null), edit: 0};  // edit: the inbox whose edit form is open (#4886)  // the setup code just made: only while this settings dialog is open
 // 2.353.0 B (#2773): the folder watcher lives in Settings > Integrations (dsc_integrDraw)
 // 2.365.2 B (#2789): the whole block "Documents: inboxes" is there now (the folder of the file store, the folder watcher with
 // the scan inboxes, the forwarding address); the document settings only point to it
@@ -32,7 +32,8 @@ function dsc_watcherHtml(s, host) {
   const small = d => `<a class="linkbtn" href="/api/docs/folder-watcher/${encodeURIComponent(d.file)}" download="${esc(d.file)}">${esc(d.label)}</a>`;
   const main = sc.downloads.filter(d => d.id.startsWith('mac') || d.id === 'windows'), more = sc.downloads.filter(d => !main.includes(d));
   const key = k => `<li class="dc-rule dsc-key${k.ok ? '' : ' off'}"><span><b>${esc(k.name)}</b> <span class="muted">${esc(k.target)}</span><small class="muted">${k.last_used_at ? esc(tr('last used {0}', relTime(k.last_used_at))) : tr('never used')}${k.expires_at ? ' · ' + esc(k.expired ? tr('expired') : tr('expires {0}', fmtDateLoc(k.expires_at.slice(0, 10)))) : ''}</small></span>
-    <button type="button" class="iconbtn danger" data-dsc="del:${k.id}" aria-label="${esc(tr('Revoke {0}', k.name))}" title="${esc(tr('Revoke'))}">${ic('trash')}</button></li>`;
+    <button type="button" class="iconbtn" data-dsc="edit:${k.id}" aria-label="${esc(tr('Edit {0}', k.name))}" title="${esc(tr('Edit'))}" aria-expanded="${DSCN.edit === k.id}">${ic('edit')}</button>
+    <button type="button" class="iconbtn danger" data-dsc="del:${k.id}" aria-label="${esc(tr('Revoke {0}', k.name))}" title="${esc(tr('Revoke'))}">${ic('trash')}</button></li>${DSCN.edit === k.id ? dsc_editHtml(k, s) : ''}`;
   const folders = [{id: 0, name: tr('Documents (directly)')}, ...(s.folders || [])];
   const watcher = `<div class="dsc-way"><h5>${ic('folder', 's')} ${tr('Folder watcher')}</h5>
     <p class="muted">${tr('Watches a folder on your Mac or Windows PC and uploads new scans here; afterwards they lie in its subfolder “Uploaded”.')}</p>
@@ -48,6 +49,15 @@ function dsc_watcherHtml(s, host) {
       <p class="muted">${tr('Two scanner profiles = two inboxes, for example your own documents and those of your organisation.')}</p>
       <div class="foot"><span class="spacer"></span><button type="button" class="btn pri" data-dsc="new">${tr('Create inbox')}</button></div></details>`}</div>`;
   return watcher;
+}
+// 2.591.0 B (#4886): edit a scan inbox below its row: name, folder (only folders one may add to), extend by a year; the key stays
+function dsc_editHtml(k, s) {
+  const fs = [{id: 0, name: tr('Documents (directly)')}, ...(s.folders || []).filter(f => f.role === 'owner' || f.role === 'edit' || f.id === k.parent_id)];
+  return `<li class="dc-radd dsc-edit" data-dsc-edit="${k.id}"><div class="row"><label for="dsc-ename">${tr('Name')}</label><input id="dsc-ename" maxlength="60" value="${esc(k.name)}" autocomplete="off"></div>
+    <div class="row"><label for="dsc-efolder">${tr('Into folder')}</label><select id="dsc-efolder">${fs.map(f => `<option value="${f.id}"${(k.parent_id || 0) === f.id ? ' selected' : ''}>${esc(f.path || f.name)}</option>`).join('')}</select></div>
+    <label class="chkl"><input type="checkbox" id="dsc-eext"${k.expired ? ' checked' : ''}> ${tr('Extend by 1 year')}</label>
+    <p class="muted">${tr('The setup code stays the same; the folder watcher goes on without a new setup.')}</p>
+    <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-dsc="ecancel">${tr('Cancel')}</button><button type="button" class="btn pri" data-dsc="esave:${k.id}">${tr('Save')}</button></div></li>`;
 }
 function dsc_codeHtml() {
   return `<div class="dsc-code" role="status"><p><b>${tr('Setup code')}</b> <span class="muted">${tr('Only visible now')}</span></p>
@@ -110,6 +120,18 @@ document.addEventListener('click', async e => {
     DSCN.code = j.code; DSCN.ws = s.ws; DSCN.md = md;
     await dsc_reload(md);
     /** @type {HTMLElement|null} */ (md.querySelector('#dsc-code'))?.focus();
+    return;
+  }
+  if (a.startsWith('edit:')) { const id = +a.slice(5); DSCN.edit = DSCN.edit === id ? 0 : id; dsc_embedDraw(md); /** @type {HTMLElement|null} */ (md.querySelector('#dsc-ename'))?.focus(); return; }  // 2.591.0 B (#4886)
+  if (a === 'ecancel') { DSCN.edit = 0; dsc_embedDraw(md); return; }
+  if (a.startsWith('esave:')) {
+    const id = +a.slice(6), name = (/** @type {HTMLInputElement|null} */ (md.querySelector('#dsc-ename'))?.value || '').trim();
+    if (!name) { /** @type {HTMLElement|null} */ (md.querySelector('#dsc-ename'))?.focus(); return; }
+    const pid = +(/** @type {HTMLSelectElement|null} */ (md.querySelector('#dsc-efolder'))?.value || 0);
+    const extend = !!(/** @type {HTMLInputElement|null} */ (md.querySelector('#dsc-eext'))?.checked);
+    b.setAttribute('disabled', ''); try { await api('PATCH', `/api/docs/scan-keys/${id}`, {name, parent_id: pid || null, extend}); } catch { b.removeAttribute('disabled'); return; }
+    DSCN.edit = 0; toast(tr('Saved'));
+    await dsc_reload(md);
     return;
   }
   if (a.startsWith('del:')) {

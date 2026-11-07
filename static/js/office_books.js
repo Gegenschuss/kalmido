@@ -95,8 +95,9 @@ function bkTabHtml() {
   return head + bkReceiptsHtml() + bkEuerHtml() + (BK.ustva?.off ? '' : bkUstvaHtml()) + bkExportHtml() + set + dob + plk + bkNote();
 }
 // the upload of receipts (camera / files); 2.276.0 A (#3039): also on top of Office > Receipts (office_receipts.js rcp_tabHtml)
-const bkPhotoHtml = () => `<div class="bk-photo"><label class="btn pri bk-shot">${ic('camera')}<span>${tr('Photograph receipt')}</span><input type="file" id="bk-file" accept="image/*,application/pdf,.xml,application/xml,text/xml" capture="environment" multiple hidden></label>
-    <label class="btn bk-files">${ic('upload')}<span>${tr('Upload files')}</span><input type="file" id="bk-files" accept="${BK_ACCEPT}" multiple hidden></label>
+// 2.591.0 (#4892): the camera button only on touch devices (capture= does nothing on a desktop); there "Upload files" is the main button
+const bkPhotoHtml = () => `<div class="bk-photo">${isTouch() ? `<label class="btn pri bk-shot">${ic('camera')}<span>${tr('Photograph receipt')}</span><input type="file" id="bk-file" accept="image/*,application/pdf,.xml,application/xml,text/xml" capture="environment" multiple hidden></label>` : ''}
+    <label class="btn${isTouch() ? '' : ' pri'} bk-files">${ic('upload')}<span>${tr('Upload files')}</span><input type="file" id="bk-files" accept="${BK_ACCEPT}" multiple hidden></label>
     ${(typeof BK !== 'undefined' && BK.info?.receipts || []).length ? '' : `<span class="muted bk-photohint">${tr('The receipt is saved in the file store (folder “{0}”) and listed under Office > Receipts; amount and date are recognised.', tr('Documents|folder'))}</span>`}</div>`;  // 2.298.0 A2 (#3186): only while empty
 // 2.147.0 (#2461): the export for any tax advisor -- the booking list of the year as CSV, or with invoices and receipts as ZIP
 function bkExportHtml() {
@@ -110,7 +111,7 @@ function bkExportHtml() {
 function bkRcRow(r) {
   return `<li><button type="button" class="ofcrow" data-bk="rc" data-id="${r.node_id}"><span class="ofcn"><b>${esc(r.title || tr('Receipt'))}</b>
     <small class="muted">${esc([fmtDateLoc(r.date), r.category, bkVatLabel(r.vat_pct), bkBilledTxt(BK.billed[r.node_id])].filter(Boolean).join(' · '))}</small></span>
-    ${r.vat_pct == null && !BK.info.small_business ? `<span class="rotag bk-miss">${tr('without VAT rate')}</span>` : ''}${r.dup ? `<span class="rotag bk-dup">${tr('Possible duplicate')}</span>` : ''}<span class="rksum">${ofcMoney(r.amount)}</span>${ic('chev', 's')}</button></li>`;
+    ${r.vat_pct == null && !BK.info.small_business ? `<span class="rotag bk-miss">${tr('without VAT rate')}</span>` : ''}${r.dup ? `<span class="rotag bk-dup">${tr('Possible duplicate')}</span>` : ''}<span class="rksum">${ofcMoney(r.amount)}</span>${ic('right', 's')}</button></li>`;
 }
 // 2.237.0 C (#2865): an incoming e-invoice is a suggestion until a person takes it over (one tap; the row opens the sheet)
 function bkEinvHtml(ei) {
@@ -136,7 +137,7 @@ function bkReceiptsHtml() {
   return `<section class="bk-sec" aria-labelledby="bk-rch"><h3 class="ofcgrp" id="bk-rch">${tr('Receipts this month')}</h3>${bkEinvHtml(d.einvoices || [])}${missHtml}
     ${billable ? `<p><button type="button" class="btn" data-bk="bill">${tr('Bill receipts on to a client …')}</button></p>` : ''}
     ${rs.length ? `<ul class="ofclist" role="list">${rs.slice(-30).reverse().map(bkRcRow).join('')}</ul>` : `<p class="muted lempty">${tr('No receipts this month yet.')}</p>`}
-    <p class="bk-all"><a class="btn ghost" href="#office/books/receipts">${ic('list', 's')}<span>${tr('All receipts')}</span>${ic('chev', 's')}</a></p></section>`;  // 2.153.0 (#2055)
+    <p class="bk-all"><a class="btn ghost" href="#office/books/receipts">${ic('list', 's')}<span>${tr('All receipts')}</span>${ic('right', 's')}</a></p></section>`;  // 2.153.0 (#2055)
 }
 
 function bkTable(rows, total, count) {
@@ -201,11 +202,11 @@ function bkUstvaHtml() {
   return `<section class="bk-sec" id="bk-ustva" aria-labelledby="bk-uh"><h3 class="ofcgrp" id="bk-uh">${tr('VAT return (figures to type in)')}</h3>${bar}${body}</section>`;
 }
 function bkItemRow(it) {
-  if (it.kind === 'meal') return `<li><a class="ofcrow" href="#office/meals"><span class="ofcn"><b>${esc(it.title || tr('Entertainment receipt'))}</b><small class="muted">${esc([fmtDateLoc(it.date), tr('Entertainment receipt')].join(' · '))}</small></span><span class="rksum">${ofcMoney(it.gross)}</span>${ic('chev', 's')}</a></li>`;  // 2.534.0 (#4333)
+  if (it.kind === 'meal') return `<li><a class="ofcrow" href="#office/meals"><span class="ofcn"><b>${esc(it.title || tr('Entertainment receipt'))}</b><small class="muted">${esc([fmtDateLoc(it.date), tr('Entertainment receipt')].join(' · '))}</small></span><span class="rksum">${ofcMoney(it.gross)}</span>${ic('right', 's')}</a></li>`;  // 2.534.0 (#4333)
   const rc = it.kind === 'receipt';
   const t = rc ? (it.title || tr('Receipt')) : `${it.kind === 'credit' ? tr('Credit note') : tr('Invoice')} ${it.number || ''}`;
   const sub = [fmtDateLoc(it.date), rc ? bkVatLabel(it.vat_pct) : it.source === 'payment' ? tr('Payment') : it.source === 'skonto' ? tr('Cash discount') /* 2.355.0 C (#2840) */ : ''].filter(Boolean).join(' · ');
-  return `<li><a class="ofcrow" href="${rc ? `#docs/${it.node_id}` : `#office/invoices/${it.doc_id}`}"><span class="ofcn"><b>${esc(t)}</b><small class="muted">${esc(sub)}</small></span><span class="rksum">${ofcMoney(it.gross)}</span>${ic('chev', 's')}</a></li>`;
+  return `<li><a class="ofcrow" href="${rc ? `#docs/${it.node_id}` : `#office/invoices/${it.doc_id}`}"><span class="ofcn"><b>${esc(t)}</b><small class="muted">${esc(sub)}</small></span><span class="rksum">${ofcMoney(it.gross)}</span>${ic('right', 's')}</a></li>`;
 }
 function bkSettingsHtml() {
   const s = OFC.info?.settings || {};
@@ -363,7 +364,7 @@ function bkDups(dups) {
   if (!dups.length) return;
   if (dups.length === 1) { toast(tr('This file already exists: {0}', dups[0].name), () => bkSheet(dups[0].id, false), 8000, tr('Open')); return; }
   toast(trn('{0} file already exists', '{0} files already exist', dups.length), () => {
-    const md = modal(`<h3>${tr('Already there')}</h3><ul class="ofclist" role="list">${dups.map(d => `<li><button type="button" class="ofcrow" data-bk="rc" data-id="${+d.id}"><span class="ofcn"><b>${esc(d.name)}</b></span>${ic('chev', 's')}</button></li>`).join('')}</ul>
+    const md = modal(`<h3>${tr('Already there')}</h3><ul class="ofclist" role="list">${dups.map(d => `<li><button type="button" class="ofcrow" data-bk="rc" data-id="${+d.id}"><span class="ofcn"><b>${esc(d.name)}</b></span>${ic('right', 's')}</button></li>`).join('')}</ul>
       <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button></div>`);
     md.classList.add('ofcdlg'); fgModal(md);
     md.addEventListener('click', e => { if (e.target.closest('[data-bk="rc"]')) md.remove(); });

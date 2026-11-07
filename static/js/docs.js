@@ -509,7 +509,7 @@ function dc_mdDraw(md) {
       ${field('folder', tr('Folder'), `<select id="dc-folder" data-dcp="folder" ${ro}><option value="">${tr('Documents (no subfolder)')}</option>${(set.folders || []).map(f => `<option value="${f.id}" ${d.folder?.id === f.id ? 'selected' : ''}>${esc(tr('Documents') + ' / ' + (f.path || f.name))}</option>`).join('')}${w ? `<option value="new">${tr('New folder…')}</option>${d.folder?.id ? `<option value="newsub">${esc(tr('New subfolder in {0}…', d.folder.name))}</option>` : ''}` : ''}</select>`)}
       ${field('date', tr('Date'), dateIn('dc-date', d.date || '', {label: tr('Date'), ro: !!ro, attrs: 'data-dcp="date"'}))}${typeof pmeta_takenHtml === 'function' ? pmeta_takenHtml(d) : ''}
       ${opt('due', tr('Due'), dateIn('dc-due', d.due || '', {label: tr('Due'), ro: !!ro, attrs: 'data-dcp="due"'}), noDue)}
-      ${field('asn', tr('Archive number'), `<span class="dc-amt"><input type="number" min="1" id="dc-asn" data-dcp="asn" value="${esc(d.asn || '')}" ${ro}>${w && !d.asn ? `<button type="button" class="btn sm" data-dc="asnnext">${tr('Next free number')}</button>` : ''}</span>`)}
+      ${field('asn', tr('Archive number'), `<span class="dc-amt"><input type="number" min="1" id="dc-asn" data-dcp="asn" value="${esc(d.asn || '')}" ${ro}>${w && !d.asn ? `<button type="button" class="btn sm" data-dc="asnnext">${tr('Next free number')}</button>` : ''}</span>${dc_asnTakenHtml(d)}`)}
       ${opt('amount', tr('Amount'), `<span class="dc-amt"><input id="dc-amount" data-dcp="amount" inputmode="decimal" value="${esc(d.amount ? numField(d.amount, 6, 2) : '')}" ${ro}><input id="dc-currency" data-dcp="currency" value="${esc(d.currency || '')}" maxlength="3" aria-label="${esc(tr('Currency'))}" placeholder="EUR" ${ro}></span>`, noAmt)}
       ${!ro && (noDue || noAmt) ? `<div class="dc-optbtn" role="group" aria-label="${esc(tr('Add'))}">${noDue ? `<button type="button" class="dc-chip" data-dc="showopt:due">${ic('plus', 's')} ${tr('Due')}</button>` : ''}${noAmt ? `<button type="button" class="dc-chip" data-dc="showopt:amount">${ic('plus', 's')} ${tr('Amount')}</button>` : ''}</div>` : '' /* 2.497.0 A (#4046): one chip per field */}
       ${(d.custom_fields || []).map(f => dc_cfRow(d, f, ro)).join('')}
@@ -550,6 +550,13 @@ async function dc_pvDraw(md, d) {
       if (live()) { box.replaceChildren(cv); dc_zoomSet(box, 1, 0, 0); }  // 2.476.0 (#3935): the sharp page starts at normal size
     } finally { doc.destroy(); }
   } catch { /* the small picture stays */ }
+}
+// 2.591.0 B (#4863): a code on the document carries an archive number another document has already (docs/web.py asn_taken_view)
+function dc_asnTakenHtml(d) {
+  const t = d.asn_taken; if (!t || d.asn) return '';
+  const no = `${DC.set?.asn_prefix || 'ASN'} ${+t.asn}`, o = t.doc;
+  const who = !o ? esc(tr('a document you cannot open')) : o.trash ? `<b>${esc(o.name)}</b> ${esc(tr('(in the trash)'))}` : `<a href="#docs/${+o.id}">${esc(o.name)}</a>`;
+  return `<p class="dc-asnt muted" role="note">${ic('info', 's')} ${esc(tr('Archive number {0} found, already used by', no))} ${who}</p>`;
 }
 function dc_cfRow(d, f, ro) {  // 2.153.0 (#2179): one custom field of the document
   const id = `dc-cf${f.id}`, v = f.value ?? '', a = `data-dcf="${f.id}"`;

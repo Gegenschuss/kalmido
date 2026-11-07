@@ -1775,7 +1775,7 @@ expiry date.
 Web routes of the settings: `GET /api/docs/scan-keys?ws=private|org:<id>` -> `{api, downloads: [{id, label, file, size}], keys:
 [{id, name, prefix, target, parent_id, ok, created_at, last_used_at, expires_at, expired}], encrypted, mail_notice}` (also as `scan` in `GET
 /api/docs/settings`); `POST /api/docs/scan-keys {ws, name, parent_id?}` -> `201 {id, name, target, code}` (`409` while the API is
-off); `DELETE /api/docs/scan-keys/{id}` (one's own); `POST /api/docs/mail-notice` (the note that mail is not end-to-end encrypted
+off); `PATCH /api/docs/scan-keys/{id} {name?, parent_id?, extend?}` (2.591.0, one's own: another name, another folder of the same place checked like a new inbox, `extend: true` = it runs a year from now; the key and the place stay) -> the listed row; `DELETE /api/docs/scan-keys/{id}` (one's own); `POST /api/docs/mail-notice` (the note that mail is not end-to-end encrypted
 was read); `GET /api/docs/folder-watcher/{file}` (signed in) sends one of `kalmido-folder-watcher-mac-arm64.zip`,
 `kalmido-folder-watcher-mac-amd64.zip`, `kalmido-folder-watcher-windows.exe`, `kalmido-folder-watcher-linux-amd64`,
 `kalmido-folder-watcher-linux-arm64`, `SHA256SUMS` from `KALMIDO_FOLDERWATCH_DIR` (default `/app/folderwatch`, built by the image;

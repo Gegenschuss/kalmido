@@ -13,7 +13,7 @@ const BROWSER = [
   'getSelection', 'matchMedia', 'innerHeight', 'innerWidth', 'outerHeight', 'outerWidth', 'addEventListener',
   'removeEventListener', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'requestAnimationFrame',
   'cancelAnimationFrame', 'queueMicrotask', 'structuredClone', 'Blob', 'CSS', 'ClipboardItem', 'CustomEvent',
-  'DecompressionStream', 'CompressionStream', 'Element', 'ErrorEvent', 'Event', 'File', 'FileReader', 'FormData', 'Headers',
+  'DecompressionStream', 'CompressionStream', 'DataTransfer', 'Element', 'ErrorEvent', 'Event', 'File', 'FileReader', 'FormData', 'Headers',
   'Audio', 'Image', 'IntersectionObserver', 'MediaRecorder', 'MutationObserver', 'NodeFilter', 'Notification', 'Option', 'ResizeObserver', 'Request', 'Response',
   'TextDecoder', 'TextEncoder', 'URL', 'URLSearchParams', 'XMLHttpRequest', 'AbortController', 'HTMLElement', 'Node',
   'IDBRequest', 'IDBKeyRange', 'BroadcastChannel',

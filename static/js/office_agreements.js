@@ -56,7 +56,7 @@ function agrRow(a) {
   const sum = a.monthly != null ? `<span class="rksum agr-sum"><span>${ofcMoney(a.monthly)} <small class="muted">${tr('per month')}</small></span>${a.per !== 'month' ? `<small class="muted">${ofcMoney(a.cost)} ${esc(agrPer(a.per))}</small>` : ''}</span>` : '';
   const doc = a.doc ? `<a class="iconbtn agr-doc" href="#docs/${a.doc.id}" aria-label="${esc(tr('Open document {0}', a.doc.name))}" title="${esc(a.doc.name)}">${ic('file', 's')}</a>` : '';
   const fold = !a.archived && typeof fsr_fileMenu === 'function' ? `<button type="button" class="iconbtn agr-fold" data-agrfold="${a.id}" aria-haspopup="menu" title="${esc(tr('Move to folder…'))}" aria-label="${esc(tr('Move to folder…'))}: ${esc(a.name)}">${ic('folder', 's')}</button>` : '';  // 2.351.0 B (#2749)
-  return `<li class="agr-li${a.archived ? ' agr-arch' : ''}"><button type="button" class="ofcrow" data-agr="open" data-id="${a.id}"><span class="ofcn"><b>${esc(a.name)}</b>${sub ? `<small class="muted">${sub}</small>` : ''}<small class="agr-dl">${agrDeadline(a)}</small></span>${sum}${ic('chev', 's')}</button>${doc}${fold}</li>`;
+  return `<li class="agr-li${a.archived ? ' agr-arch' : ''}"><button type="button" class="ofcrow" data-agr="open" data-id="${a.id}"><span class="ofcn"><b>${esc(a.name)}</b>${sub ? `<small class="muted">${sub}</small>` : ''}<small class="agr-dl">${agrDeadline(a)}</small></span>${sum}${ic('right', 's')}</button>${doc}${fold}</li>`;
 }
 // 2.452.0 (#3836): on a phone the row has no symbols (office.css), a long press opens what they did
 ms_rowMenu('.agr-li .ofcrow', r => {
@@ -198,7 +198,7 @@ function agrDocPick(done) {
     try { const j = await api('GET', `/api/docs?ws=${encodeURIComponent(ws)}&facets=0&limit=30${q ? '&q=' + encodeURIComponent(q) : ''}`); if (s !== seq) return; docs = j.docs || []; }
     catch (x) { if (s === seq) docs = []; }
     const ul = $('.agr-docs', md); if (!ul) return;
-    ul.innerHTML = docs.length ? docs.map(d => `<li><button type="button" class="ofcrow" data-m="pick" data-id="${d.id}"><span class="ofcn"><b>${esc(d.name)}</b><small class="muted">${esc(fmtDateLoc((d.date || d.created_at || '').slice(0, 10)))}</small></span>${ic('chev', 's')}</button></li>`).join('')
+    ul.innerHTML = docs.length ? docs.map(d => `<li><button type="button" class="ofcrow" data-m="pick" data-id="${d.id}"><span class="ofcn"><b>${esc(d.name)}</b><small class="muted">${esc(fmtDateLoc((d.date || d.created_at || '').slice(0, 10)))}</small></span>${ic('right', 's')}</button></li>`).join('')
       : `<li class="muted lempty">${tr('No documents found.')}</li>`;
   };
   let t = null;

@@ -34,7 +34,7 @@ const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/st
   '/static/js/review.js', '/static/js/wip.js', '/static/js/swimlanes.js', '/static/js/points.js', '/static/js/oneway.js', '/static/js/photometa.js',
   '/static/js/filetext.js', '/static/js/depchain.js', '/static/js/importprop.js', '/static/js/meetprop.js', '/static/js/dupprop.js',
   '/static/js/contractprop.js', '/static/js/multilist.js', '/static/js/rules.js', '/static/js/supporter.js', '/static/js/assistant.js',
-  '/static/js/main.js'];
+  '/static/js/dropany.js', '/static/js/main.js'];
 // 2.53.0 (#1410): the modules loaded on demand (static/js/lazyload.js LD_MODS; no script tag in index.html, tools/check_layout.py
 // compares): cached right after the shell, so they open offline too; a failure there does not drop the install
 const LAZY = ['/static/js/acctset.js', '/static/js/sesview.js', '/static/js/supportview.js', '/static/js/oinvview.js', '/static/js/servers.js',

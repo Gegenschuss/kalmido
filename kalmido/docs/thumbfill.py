@@ -71,7 +71,7 @@ def p61a_thumb_fill(c):
                 S.thumb_store(c, m, node, data, kind)
                 if not m["asn"]:
                     from .ocr import qr_codes
-                    code = S.EX.find_asn(S.cfg_get(c, m["ws"])["asn_prefix"], qr_codes(data, kind))
+                    code = S.EX.find_asn(S.cfg_get(c, m["ws"])["asn_prefix"], (), codes=qr_codes(data, kind))  # 2.591.0 B (#4863): codes apart
             if code:
                 c.commit()  # 2.363.3 (#3133): the number lock is held for this one write, not over the next documents of the portion
                 with c.savepoint():

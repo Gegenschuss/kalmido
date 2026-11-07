@@ -17147,5 +17147,17 @@
   "Applies to: {0}": "Gilt für: {0}",
   "Markdown: # heading, - list, [[Page]] links a page, [[#123]] a task": "Markdown: # Überschrift, - Liste, [[Seite]] verlinkt eine Seite, [[#123]] eine Aufgabe",
   "Write … ([[Page]], [[#123]])": "Schreiben … ([[Seite]], [[#123]])",
-  "Write … ([[Page]], [[#123]], / for commands)": "Schreiben … ([[Seite]], [[#123]], / für Befehle)"
+  "Write … ([[Page]], [[#123]], / for commands)": "Schreiben … ([[Seite]], [[#123]], / für Befehle)",
+  "Drop here: {0}": "Hier ablegen: {0}",
+  "Drag onto a row": "Auf eine Zeile ziehen",
+  "Only one file fits here": "Hier passt nur eine Datei",
+  "This file type does not fit here": "Dieser Dateityp passt hier nicht",
+  "Extend by 1 year": "Um 1 Jahr verlängern",
+  "The setup code stays the same; the folder watcher goes on without a new setup.": "Der Einrichtungscode bleibt gleich; der Ordner-Wächter läuft ohne neue Einrichtung weiter.",
+  "Archive number {0} found, already used by": "Archivnummer {0} gefunden, schon vergeben bei",
+  "a document you cannot open": "einem Dokument, das du nicht öffnen kannst",
+  "(in the trash)": "(im Papierkorb)",
+  "Enter balance by hand": "Kontostand von Hand eintragen",
+  "Only needed for the month end without a bank statement": "Nur nötig für das Monatsende ohne Kontoauszug",
+  "Read are monthly statements as a PDF with a text layer in the line format (receipt date, booking date, text, amount) of {0}, up to {1} MB. Photos, scans without text and CSV files are not read: let an agent read them or enter the positions by hand.": "Gelesen werden PDF-Monatsabrechnungen mit Textebene im Zeilenformat (Belegdatum, Buchungsdatum, Text, Betrag) von {0}, bis {1} MB. Fotos, Scans ohne Text und CSV-Dateien werden nicht gelesen: von einem Agenten lesen lassen oder die Positionen von Hand eintragen."
 }

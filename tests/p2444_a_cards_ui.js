@@ -63,6 +63,8 @@ const upload = async (ck, url, field, name, text, extra = {}) => { const fd = ne
     check(await ready(ev, `document.querySelectorAll('.bnkrow .ccopen').length === 2`, 100), 'the two cards are listed');
     await shot('p2444-cards.png');
     await ev(click(`document.querySelector('[data-cc="card"]')`));
+    // 2.591.0 (#4904): the hint names the providers and the limit from the server
+    check(await ready(ev, `(() => { const h = document.querySelector('[data-cc-hint]'); return !!h && /Visa/.test(h.textContent) && /American Express/.test(h.textContent) && /20 MB/.test(h.textContent) && /PDF/.test(h.textContent); })()`), 'the upload hint names the providers and the limit');
     check(await ready(ev, `!!document.querySelector('[data-cc="stmt"]')`), 'the card lists its statement');
     await ev(click(`document.querySelector('[data-cc="stmt"]')`));
     check(await ready(ev, `document.querySelectorAll('.ccl .bnkrow').length === 3 && !!document.querySelector('[data-cc="confirm"]')`), 'three positions, waiting for the confirmation');

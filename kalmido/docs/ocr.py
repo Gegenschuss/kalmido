@@ -13,6 +13,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 try:  # 2.369.5 (#2517): pulled up from functions; #3506: guarded, ocr.py is also loaded as a single file (tests, ocr_langs)
     from ..tasks.attachtext import file_kind, pdf_text, _decode
     from ..files.photometa import pm_kind
@@ -296,7 +297,7 @@ for fn, res, args in (("zbar_image_scanner_create", P, []), ("zbar_image_scanner
                       ("zbar_image_set_size", None, [P, ctypes.c_uint, ctypes.c_uint]),
                       ("zbar_image_set_data", None, [P, ctypes.c_void_p, ctypes.c_ulong, ctypes.c_void_p]),
                       ("zbar_scan_image", ctypes.c_int, [P, P]), ("zbar_image_first_symbol", P, [P]),
-                      ("zbar_symbol_next", P, [P]), ("zbar_symbol_get_data", ctypes.c_char_p, [P]),
+                      ("zbar_symbol_next", P, [P]), ("zbar_symbol_get_data", ctypes.c_char_p, [P]), ("zbar_symbol_get_type", ctypes.c_int, [P]),
                       ("zbar_image_destroy", None, [P]), ("zbar_image_scanner_destroy", None, [P])):
     f = getattr(lib, fn)
     f.restype, f.argtypes = res, args
@@ -317,7 +318,11 @@ out = []
 if lib.zbar_scan_image(sc, img) > 0:
     sym = lib.zbar_image_first_symbol(img)
     while sym and len(out) < 20:
-        out.append((lib.zbar_symbol_get_data(sym) or b"").decode("utf-8", "replace")[:200])
+        t = (lib.zbar_symbol_get_data(sym) or b"").decode("utf-8", "replace")[:200]
+        # 2.591.0 (#4863, review): digits only count from a QR code (ZBAR_QRCODE = 64) -- an EAN / UPC / Code 128 number of a
+        # product or a parcel is no archive number sticker
+        if lib.zbar_symbol_get_type(sym) == 64 or not t.strip().isdigit():
+            out.append(t)
         sym = lib.zbar_symbol_next(sym)
 lib.zbar_image_destroy(img)
 lib.zbar_image_scanner_destroy(sc)
@@ -334,29 +339,72 @@ def qr_available():
     return _QR["ok"]
 
 
-def qr_codes(data, kind):
-    """The texts of the QR / bar codes on the first page of a PDF or on an image ([] without zbar or on any trouble)."""
+QR_PAGES = _env_int("KALMIDO_SPLIT_PAGES", 100, 2, 500)  # 2.591.0 B (#4863): pages read for codes at most (= docs/split.py SP_PAGES)
+QR_DPI = (200, 300)        # 2.591.0 B (#4863): a second try finer when the first found no code at all (a small sticker)
+QR_DPI_PAGES = 10          # ... over this many pages at most (the finer pass costs about twice the time per page)
+QR_DOC_S = 120             # 2.591.0 (#4863, review): wall-clock budget of the codes of ONE uploaded document (the queue is serial)
+
+
+def _qr_read(img):
+    """The texts of the QR / bar codes zbar finds on one image (bytes), [] on any trouble."""
+    p = subprocess.run([sys.executable, "-I", "-c", QR_WORKER], input=img, capture_output=True, timeout=30, close_fds=True,
+                       env={"PATH": os.environ.get("PATH", "/usr/bin:/bin")})
+    out = json.loads(p.stdout or b"[]") if p.returncode == 0 else []
+    return [str(x) for x in out][:20] if isinstance(out, list) else []
+
+
+def _qr_page(src, tmp, i, dpi):
+    """Page i (1-based) of the PDF file src as a gray PNG (bytes) at dpi, None when it cannot be rendered."""
+    base = os.path.join(tmp, f"p{i}-{dpi}")
+    r = _run(["pdftoppm", "-r", str(dpi), "-gray", "-f", str(i), "-l", str(i), "-singlefile", "-png", src, base], 30, fsize=128 << 20)
+    if r.returncode != 0 or not os.path.exists(base + ".png"):
+        return None
+    with open(base + ".png", "rb") as f:
+        img = f.read()
+    os.unlink(base + ".png")
+    return img
+
+
+def qr_pages(n, page, read, want=None, budget=None, clock=time.monotonic):
+    """2.591.0 B (#4863): the codes of pages 1..n of a document in page order: page(i, dpi) -> image bytes | None, read(image)
+    -> [texts]. First at QR_DPI[0]; when no page had any code, once more at QR_DPI[1] over the first QR_DPI_PAGES pages.
+    want(codes so far) -> True stops early (the archive number is found). At most 20 texts. budget: seconds in all, then
+    what was found so far (2.591.0 review: a long scan without any code must not hold the document queue for an hour)."""
+    n = max(1, min(int(n or 1), QR_PAGES))
+    end = None if budget is None else clock() + budget
+    for k, dpi in enumerate(QR_DPI):
+        out = []
+        for i in range(1, (n if k == 0 else min(n, QR_DPI_PAGES)) + 1):
+            if end is not None and clock() > end:
+                return out[:20]
+            img = page(i, dpi)
+            if img is None:
+                continue
+            out += read(img)
+            if out and want is not None and want(out):
+                return out[:20]
+            if len(out) >= 20:
+                return out[:20]
+        if out:
+            return out[:20]
+    return []
+
+
+def qr_codes(data, kind, pages=1, want=None, budget=None):
+    """The texts of the QR / bar codes of a PDF (its first pages, 2.591.0 B #4863: up to pages / QR_PAGES, a finer second try
+    when none is found, qr_pages) or of an image ([] without zbar or on any trouble)."""
     if kind not in ("pdf", "image") or not qr_available():
         return []
     try:
-        img = data
-        if kind == "pdf":
-            if not shutil.which("pdftoppm"):
-                return []
-            with tempfile.TemporaryDirectory(prefix="kqr-") as tmp:
-                src = os.path.join(tmp, "in.pdf")
-                with open(src, "wb") as f:
-                    f.write(data)
-                base = os.path.join(tmp, "p")
-                r = _run(["pdftoppm", "-r", "200", "-gray", "-f", "1", "-l", "1", "-singlefile", "-png", src, base], 30, fsize=128 << 20)
-                if r.returncode != 0 or not os.path.exists(base + ".png"):
-                    return []
-                with open(base + ".png", "rb") as f:
-                    img = f.read()
-        p = subprocess.run([sys.executable, "-I", "-c", QR_WORKER], input=img, capture_output=True, timeout=30, close_fds=True,
-                           env={"PATH": os.environ.get("PATH", "/usr/bin:/bin")})
-        out = json.loads(p.stdout or b"[]") if p.returncode == 0 else []
-        return [str(x) for x in out][:20] if isinstance(out, list) else []
+        if kind == "image":
+            return _qr_read(data)
+        if not shutil.which("pdftoppm"):
+            return []
+        with tempfile.TemporaryDirectory(prefix="kqr-") as tmp:
+            src = os.path.join(tmp, "in.pdf")
+            with open(src, "wb") as f:
+                f.write(data)
+            return qr_pages(pages, lambda i, dpi: _qr_page(src, tmp, i, dpi), _qr_read, want, budget)
     except (OSError, subprocess.SubprocessError, ValueError):
         return []
 

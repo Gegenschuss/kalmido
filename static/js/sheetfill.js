@@ -26,11 +26,11 @@ function shfl_shift(f, dr, dc) {  // a formula's relative references moved (kalm
 function shfl_numOf(s) {
   s = String(s ?? '').trim();
   if (!/^-?\d+([.,]\d+)?$/.test(s)) return null;
-  return {n: Number(s.replace(',', '.')), comma: s.includes(','), dec: (s.split(/[.,]/)[1] || '').length};
+  return {n: Number(s.replace(',', '.')), sep: s.match(/[.,]/)?.[0] || '.', dec: (s.split(/[.,]/)[1] || '').length};
 }
 function shfl_numText(x, like) {  // as many decimals as the source shows (1,5 -> 2,5), whole numbers stay whole
   const s = like.dec ? x.toFixed(like.dec) : String(+x.toFixed(10));
-  return like.comma ? s.replace('.', ',') : s;
+  return s.replace('.', like.sep || '.');  // the source's decimal sign (#4871), never a fixed comma
 }
 function shfl_cyc(s) {  // -> {li, i, up: 'upper' | 'title' | 'lower', dot} or null
   const t = String(s ?? '').trim(), dot = t.endsWith('.'), w = (dot ? t.slice(0, -1) : t).toLowerCase();
@@ -68,7 +68,7 @@ function shfl_series(src, n, vertical, plain) {  // plain: the column kind takes
   const nums = src.map(shfl_numOf);
   if (nums.every(Boolean)) {
     if (k === 1) return rep();  // one number is copied (like Excel); two give the step
-    const step = (nums[k - 1].n - nums[0].n) / (k - 1), like = {comma: nums[0].comma, dec: Math.max(...nums.map(x => x.dec))};
+    const step = (nums[k - 1].n - nums[0].n) / (k - 1), like = {sep: nums[0].sep, dec: Math.max(...nums.map(x => x.dec))};
     for (let i = 1; i <= n; i++) out.push(shfl_numText(nums[k - 1].n + step * i, like));
     return out;
   }

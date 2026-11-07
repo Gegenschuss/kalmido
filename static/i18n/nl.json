@@ -17147,5 +17147,17 @@
   "Applies to: {0}": "Geldt voor: {0}",
   "Markdown: # heading, - list, [[Page]] links a page, [[#123]] a task": "Markdown: # kop, - lijst, [[Pagina]] linkt een pagina, [[#123]] een taak",
   "Write … ([[Page]], [[#123]])": "Schrijven … ([[Pagina]], [[#123]])",
-  "Write … ([[Page]], [[#123]], / for commands)": "Schrijven … ([[Pagina]], [[#123]], / voor opdrachten)"
+  "Write … ([[Page]], [[#123]], / for commands)": "Schrijven … ([[Pagina]], [[#123]], / voor opdrachten)",
+  "Drop here: {0}": "Hier neerzetten: {0}",
+  "Drag onto a row": "Sleep naar een regel",
+  "Only one file fits here": "Hier past maar één bestand",
+  "This file type does not fit here": "Dit bestandstype past hier niet",
+  "Extend by 1 year": "Met 1 jaar verlengen",
+  "The setup code stays the same; the folder watcher goes on without a new setup.": "De installatiecode blijft gelijk; de mapbewaker werkt zonder nieuwe installatie verder.",
+  "Archive number {0} found, already used by": "Archiefnummer {0} gevonden, al toegekend aan",
+  "a document you cannot open": "een document dat je niet kunt openen",
+  "(in the trash)": "(in de prullenbak)",
+  "Enter balance by hand": "Saldo handmatig invoeren",
+  "Only needed for the month end without a bank statement": "Alleen nodig voor het einde van de maand zonder bankafschrift",
+  "Read are monthly statements as a PDF with a text layer in the line format (receipt date, booking date, text, amount) of {0}, up to {1} MB. Photos, scans without text and CSV files are not read: let an agent read them or enter the positions by hand.": "Gelezen worden maandafschriften als pdf met tekstlaag in regelformaat (documentdatum, boekingsdatum, tekst, bedrag) van {0}, tot {1} MB. Foto's, scans zonder tekst en csv-bestanden worden niet gelezen: laat ze door een agent lezen of voer de posten met de hand in."
 }

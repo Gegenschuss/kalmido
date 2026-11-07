@@ -1165,7 +1165,7 @@ ROUTES = {
     "PATCH /api/v1/documents/{}": "document", "POST /api/v1/documents": "document", "POST /api/docs/export.csv": "document",  # 2.122.0 (#2098)
     # 2.207.0 A (#2763): scan inboxes (only one's own; the place checked with the rights at every upload, p2207_a_scan_keys_test.py),
     # the upload key's place, the mail note (one's own setting); the folder watcher programs are the same files for everyone (no data)
-    "GET /api/docs/scan-keys": "document", "POST /api/docs/scan-keys": "document", "DELETE /api/docs/scan-keys/{}": "document",
+    "GET /api/docs/scan-keys": "document", "POST /api/docs/scan-keys": "document", "DELETE /api/docs/scan-keys/{}": "document", "PATCH /api/docs/scan-keys/{}": "document",  # 2.591.0 (#4886)
     "GET /api/v1/documents/upload-target": "document", "POST /api/docs/mail-notice": "document", "GET /api/docs/folder-watcher/{}": "public",
     # 2.425.0 C (#3453): receipt fetchers (only one's own; the place checked with the rights at every upload / report,
     # p2425_c_api_test.py: another person sees, switches and deletes nothing, a stranger's key reaches nothing)

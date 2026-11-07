@@ -83,7 +83,7 @@ function ltListHtml() {
     <span class="spacer"></span><button class="btn sm ghost" data-lt="profile">${ic('edit', 's')}<span>${tr('Signature')}</span></button><button class="btn sm pri" data-lt="new">${ic('plus', 's')}<span>${tr('New letter')}</span></button></div>`;
   const list = !rows.length ? `<div class="empty nempty eact">${ic('mail')}<span>${all.length ? tr('No letters match the filter.') : tr('No letters yet. Write one to an authority, an insurer or a client.')}</span>${all.length ? '' : `<button class="btn pri" data-lt="new">${tr('New letter')}</button>`}</div>`
     : `<ul class="ofclist dtp-list lt-list" role="list">${rows.map(x => `<li><button type="button" class="ofcrow" data-lt="open" data-id="${x.id}"><span class="ofcn"><b>${esc(x.rcpt_name || tr('No recipient'))}</b>
-    <small class="muted">${esc([fmtDateLoc(x.letter_date) || x.letter_date, x.subject, tr(LT_CH[x.channel] || x.channel)].filter(Boolean).join(' · '))}</small></span>${ltStTag(x)}${ic('chev', 's')}</button></li>`).join('')}</ul>`;
+    <small class="muted">${esc([fmtDateLoc(x.letter_date) || x.letter_date, x.subject, tr(LT_CH[x.channel] || x.channel)].filter(Boolean).join(' · '))}</small></span>${ltStTag(x)}${ic('right', 's')}</button></li>`).join('')}</ul>`;
   return bar + list + (typeof oft_sharedHtml === 'function' ? oft_sharedHtml('letters') : '') + ltHooks('sections', null);  // 2.351.0 A (#2823): + shared through a folder
 }
 function ltHead(d) {

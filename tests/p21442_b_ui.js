@@ -151,9 +151,10 @@ const dstr = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate()
   const rb = w.eval(`(() => { const r = {month: '2026-05', account: 100, real: null, bank: {amount: 1234, day: '2026-05-31', diff: 0}};
     const box = document.createElement('div'); box.innerHTML = '<table><tbody>' + cfb_rows(r) + '</tbody></table>' + cfb_realBar(r);
     return JSON.stringify({inCell: !!box.querySelector('td [data-cfb="real"]'), bar: !!box.querySelector(':scope > .cfb-real [data-cfb="real"]'),
-      none: cfb_realBar({...r, real: 5}) === '' && cfb_realBar({...r, bank: null}) === ''}); })()`);
+      none: cfb_realBar({...r, real: 5}) === '' && cfb_realBar({...r, bank: null}) === '',
+      mid: cfb_realBar({...r, bank: {...r.bank, day: '2026-05-05'}}) === ''}); })()`);  // 2.591.0 (#4889): a balance of 5 May is no month end
   const rbj = JSON.parse(rb || '{}');
-  check(rbj.bar && !rbj.inCell && rbj.none, '#2372: "Use as real balance" in its own bar below the table ' + rb);
+  check(rbj.bar && !rbj.inCell && rbj.none && rbj.mid, '#2372 #4889: "Use as real balance" in its own bar below the table ' + rb);
   w.close();
 
   // ================= #2375 vacation: Undo in the hint, accounts stay open; time zone button

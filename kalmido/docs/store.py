@@ -36,7 +36,7 @@ from ..files.store import fs_visible_sql_c as _fs_visible_sql  # 2.360.0 B (#249
 from ..files.store import fs_folder, _free_name, fs_chain, safe_fs_name, fs_role, DEPTH_MAX, fs_read  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgroles import org_role_key  # 2.369.5 (#2517): pulled up from functions
 from ..core.errors import BadInput  # 2.369.5 (#2517): pulled up from functions
-from .ocr import thumb_bytes, doc_text, qr_codes  # 2.369.5 (#2517): pulled up from functions
+from .ocr import thumb_bytes, doc_text, qr_codes, OCR_PAGES, QR_DOC_S  # 2.369.5 (#2517): pulled up from functions
 from ..office.einvoice_in import ei_of_file, ei_text, ei_amount, ei_details, ei_compact, ei_receipt  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.attachtext import file_kind  # 2.369.5 (#2517): pulled up from functions
 
@@ -478,6 +478,12 @@ def asn_next(c, ws):
 
 def asn_taken(c, ws, n, nid=None):
     return c.execute("SELECT 1 FROM doc_meta WHERE ws=? AND asn=? AND node_id<>?", (ws, int(n), int(nid or 0))).fetchone() is not None
+
+
+def asn_holder(c, ws, n, nid=None):
+    """2.591.0 B (#4863): the document of ws (other than nid) that has archive number n, also one in the trash -- or None."""
+    r = c.execute("SELECT node_id FROM doc_meta WHERE ws=? AND asn=? AND node_id<>? ORDER BY node_id LIMIT 1", (ws, int(n), int(nid or 0))).fetchone()
+    return r[0] if r else None
 
 
 def asn_lock(c, ws, nid):
@@ -1254,7 +1260,11 @@ def process(c, nid):
     if not m["asn"]:
         # 2.273.0 F2 (#3047): only found here; written under the workspace lock just before the final write (the lock is not
         # held over classifying / recognising, a save with "next" does not wait for them)
-        asn_found = EX.find_asn(cfg_get(c, ws)["asn_prefix"], [*qr_codes(data, res.get("kind")), text[:20000]])
+        # 2.591.0 B (#4863): the codes of every page (up to ocr.QR_PAGES, a finer second try), kept apart from the text
+        pre = cfg_get(c, ws)["asn_prefix"]
+        # review: at most as many pages as the text recognition (ocr.OCR_PAGES) and ocr.QR_DOC_S seconds in all
+        codes = qr_codes(data, res.get("kind"), pages=min(int(res.get("pages") or 1), OCR_PAGES), budget=QR_DOC_S, want=lambda cs: EX.find_asn(pre, (), codes=cs) is not None)
+        asn_found = EX.find_asn(pre, [text[:20000]], codes=codes)
     ex = EX.extract(text, guess=False)
     if m["source"] == "paperless":           # an import keeps due date and amount empty (only a monetary field fills them)
         ex["due"] = ex["amount"] = ex["currency"] = None
@@ -1320,11 +1330,15 @@ def process(c, nid):
     m2 = c.execute("SELECT * FROM doc_meta WHERE node_id=? FOR UPDATE", (nid,)).fetchone()
     if not m2:  # #3090: deleted along while the run went (users.user_delete / orgs.org_delete lock its row first)
         return None
+    auto_all.pop("_asn_taken", None)         # 2.591.0 B (#4863): a fresh run, a fresh hint
     if asn_found and not m2["asn"]:
         asn_lock(c, ws, nid)                 # 2.273.0 C (#3047); F2: only around the write
-        if not asn_taken(c, ws, asn_found, nid):
+        holder = asn_holder(c, ws, asn_found, nid)
+        if holder is None:
             c.execute("UPDATE doc_meta SET asn=? WHERE node_id=?", (asn_found, nid))
             auto_all["asn"] = "code"
+        else:  # 2.591.0 B (#4863): not silently skipped - the document says which one has the number (doc_json asn_taken)
+            auto_all["_asn_taken"] = {"n": int(asn_found), "by": int(holder)}
     hand = hand_fields(meta_json(c, m2, "auto", {}))
     was = meta_json(c, m2, "auto", {}).get("_was")
     was = {f: w for f, w in was.items() if f in hand} if isinstance(was, dict) else {}

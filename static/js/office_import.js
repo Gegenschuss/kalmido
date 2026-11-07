@@ -401,8 +401,8 @@ async function oimArchiveGo() {
 document.addEventListener('click', async e => {
   const b = e.target.closest?.('[data-oim]'); if (!b) return;
   const a = b.dataset.oim;
-  if (a === 'pick-xlsx') { const i = $('#oim-xlsx'); if (i) { i.onchange = () => { oimPreview(i.files[0]); i.value = ''; }; i.click(); } }
-  else if (a === 'pick-pdf') { const i = $('#oim-pdf'); if (i) { i.onchange = () => { oimPickPdf(i.files); i.value = ''; }; i.click(); } }
+  if (a === 'pick-xlsx') $('#oim-xlsx')?.click();  // 2.591.0 (#4894): the inputs' change (below) reads the file, so a drop onto the window (dropany.js) works too
+  else if (a === 'pick-pdf') $('#oim-pdf')?.click();
   else if (a === 'filter') { OIM.filter = b.dataset.f || ''; ofcDraw(); }
   else if (a === 'cancel') { OIM.pv = null; OIM.file = null; ofcDraw(); }
   else if (a === 'import') oimImport();
@@ -436,6 +436,8 @@ document.addEventListener('click', async e => {
 });
 document.addEventListener('change', e => {
   const t = e.target;
+  if (t.id === 'oim-xlsx' && t.files?.length) { oimPreview(t.files[0]); t.value = ''; return; }  // 2.591.0 (#4894)
+  if (t.id === 'oim-pdf' && t.files?.length) { oimPickPdf(t.files); t.value = ''; return; }
   if (t.dataset?.oimFnt !== undefined) { oim_fntChange(t); return; }  // 2.621.0 (#4600)
   if (t.dataset?.e46Map && OIM.pv) { e46_remap(t.dataset.e46Map, t.value); return; }  // 2.146.0 E (#2456)
   if (t.dataset?.oimArea && OIM.pv) { OIM.pv.off = {...OIM.pv.off, [t.dataset.oimArea]: !t.checked}; ofcDraw(); return; }  // 2.46.1 (#1557)

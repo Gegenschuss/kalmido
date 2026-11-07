@@ -294,7 +294,7 @@ function ofcGrouped(rows, keyOf, rowHtml, order) {
   const keys = order ? [...order.filter(k => g.has(k)), ...[...g.keys()].filter(k => !order.includes(k))] : [...g.keys()];
   return keys.map(k => `<h3 class="ofcgrp">${esc(k)}<span class="c muted">${g.get(k).length}</span></h3><ul class="ofclist" role="list">${g.get(k).map(rowHtml).join('')}</ul>`).join('');
 }
-const ofcRowBtn = (kind, r, title, sub, extra = '') => `<li><button type="button" class="ofcrow ${r.archived ? 'arch' : ''}" data-ofc="open" data-kind="${kind}" data-id="${r.id}"><span class="ofcn"><b>${esc(title)}</b>${sub ? `<small class="muted">${esc(sub)}</small>` : ''}</span>${extra}${r.archived ? `<span class="rotag">${ic('archive', 's')}${tr('Archived')}</span>` : ''}${ic('chev', 's')}</button></li>`;  // 2.117.0 B (#2285): extra = the paper clip of a contract
+const ofcRowBtn = (kind, r, title, sub, extra = '') => `<li><button type="button" class="ofcrow ${r.archived ? 'arch' : ''}" data-ofc="open" data-kind="${kind}" data-id="${r.id}"><span class="ofcn"><b>${esc(title)}</b>${sub ? `<small class="muted">${esc(sub)}</small>` : ''}</span>${extra}${r.archived ? `<span class="rotag">${ic('archive', 's')}${tr('Archived')}</span>` : ''}${ic('right', 's')}</button></li>`;  // 2.117.0 B (#2285): extra = the paper clip of a contract
 
 // ---- the dialogs (one per kind; members get a read-only view)
 const ofcSel = (id, cur, opts, empty, label) => `<select id="${id}"${label ? ` aria-label="${esc(label)}"` : ''}>${empty != null ? `<option value="">${esc(empty)}</option>` : ''}${opts.map(([v, n]) => `<option value="${esc(v)}" ${String(v) === String(cur ?? '') ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>`;
@@ -1141,7 +1141,7 @@ document.addEventListener('click', async e => {
   if (a === 'new') { e.preventDefault(); ofcModal(b.dataset.kind, null); }
   else if (a === 'open') { e.preventDefault(); const r = ofcRow(b.dataset.kind, +b.dataset.id); if (r) ofcModal(b.dataset.kind, r); }
   else if (a === 'log-all' || a === 'log-ag') { e.preventDefault(); OFC.logAg = a === 'log-ag'; ofcDraw(); }  // 2.51.0 A (#1348)
-  else if (a === 'import') { e.preventDefault(); const inp = $('#os-import'); if (inp) { inp.onchange = () => { ofcImport(inp.files[0], $('#os-overwrite')?.checked); inp.value = ''; }; inp.click(); } }
+  else if (a === 'import') { e.preventDefault(); $('#os-import')?.click(); }  // 2.591.0 (#4894): the input's change reads the file (a drop onto the window too, dropany.js)
   else if (a === 'chain') { e.preventDefault(); try { OFC.chain = await api('GET', '/api/office/log/chain'); } catch (x) { toast(x.message || ''); OFC.chain = null; } ofcDraw(); }  // 2.531.0 (#4497)
   else if (a === 'log') { e.preventDefault(); try { const j = await api('GET', '/api/office/log?limit=50'); OFC.log = j.log || []; } catch (x) { toast(x.message || ''); OFC.log = []; } ofcDraw(); }
   else if (a === 'scheme-reset') { e.preventDefault(); const inp = $('#' + b.dataset.for); if (!inp || inp.disabled) return;  // 2.114.2 (#2264): last saved valid scheme (the server fills the default when none is saved)
@@ -1195,5 +1195,6 @@ document.addEventListener('change', e => {
   const t = e.target;
   if (t.id === 'ofc-arch') { OFC.arch = t.checked; ofcDraw(); }
   else if (t.id === 'os-logo') { ofcLogoUpload(t.files[0]); t.value = ''; }
+  else if (t.id === 'os-import' && t.files?.length) { ofcImport(t.files[0], $('#os-overwrite')?.checked); t.value = ''; }  // 2.591.0 (#4894)
   else if (t.id === 'os-counter') { const sc = $('#os-scheme'); if (sc) ofcSchemePv(sc, true); }  // 2.118.0 A (#2265): the preview of the counter chosen
 });

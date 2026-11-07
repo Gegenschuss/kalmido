@@ -150,7 +150,7 @@ function bnr_startHtml() {
   }
   const n = BNR.cnt?.out || 0;
   if (!n) return '';
-  return `<button type="button" class="oflr bnrcnt" data-bnr="open">${ic('receipt')}<span>${esc(trn('{0} booking without a receipt', '{0} bookings without a receipt', n))}</span>${ic('chev', 's')}</button>`;
+  return `<button type="button" class="oflr bnrcnt" data-bnr="open">${ic('receipt')}<span>${esc(trn('{0} booking without a receipt', '{0} bookings without a receipt', n))}</span>${ic('right', 's')}</button>`;
 }
 
 // ---- the reminder (office settings, area Data): off / weekly / monthly, the responsible person; every field saves itself

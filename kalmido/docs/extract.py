@@ -259,15 +259,23 @@ def extract(text, today=None, guess=True, details=False):
     return out
 
 
-def find_asn(prefix, texts):
+ASN_DIGITS_RE = re.compile(r"\s*0*(\d{1,9})\s*")
+
+
+def find_asn(prefix, texts, codes=()):
     """The archive serial number in codes / texts: prefix + digits ("ASN00042", "ASN 42", "asn-42") -> 42, the first one
-    found (texts in their order: the QR codes first, then the recognised text). None without one."""
+    found (the QR / bar codes first, then the recognised texts, each in their order). 2.591.0 B (#4863, decision of 06.11.2026):
+    then a code whose whole content is digits ("00143" -> 143, 1-9 digits after leading zeros, > 0) -- only from codes,
+    never from the text (too many false hits there). None without one."""
     prefix = (prefix or "ASN").strip()
-    if not prefix:
-        return None
-    rx = re.compile(r"(?<![A-Za-z0-9])" + re.escape(prefix) + r"[\s:#-]?0*(\d{1,9})(?!\d)", re.I)
-    for t in texts:
-        m = rx.search((t or "")[:TEXT_CAP])
+    if prefix:
+        rx = re.compile(r"(?<![A-Za-z0-9])" + re.escape(prefix) + r"[\s:#-]?0*(\d{1,9})(?!\d)", re.I)
+        for t in (*codes, *texts):
+            m = rx.search((t or "")[:TEXT_CAP])
+            if m and int(m.group(1)) > 0:
+                return int(m.group(1))
+    for t in codes:
+        m = ASN_DIGITS_RE.fullmatch((t or "")[:64])
         if m and int(m.group(1)) > 0:
             return int(m.group(1))
     return None

@@ -43,6 +43,7 @@ def _v1_doc(c, m, node, full=False, role=None):
     if "e-invoice" in d.get("auto", {}).values():  # the stored mark; API v1 says einvoice
         d["auto"] = {k: "einvoice" if v == "e-invoice" else v for k, v in d["auto"].items()}
     d.pop("split", None)  # 2.154.0 A (#1111): the stack mark is for the people of the app (agents never split)
+    d.pop("asn_taken", None)  # 2.591.0 B (#4863): the hint "archive number already used by ..." is for the people of the app like the duplicate
     d["url"] = f"/api/v1/documents/{m['node_id']}"
     d["content_url"] = f"/api/v1/files/{m['node_id']}/content"
     if full:  # 2.420.0 C (#3448): whether a person ticked the receipt as checked (read only: agents never tick it)

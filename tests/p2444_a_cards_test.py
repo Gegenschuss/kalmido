@@ -114,6 +114,15 @@ r = A.post(B + K, json={"holder_name": "Fremder Name", "last4": "9999"})
 check(r.status_code == 201 and r.json()["holder"] == "Fremder Name", f"a card with a free name, no account {r.text[:200]}")
 CARD2 = r.json()["id"]
 check(A.post(B + K, json={"holder_name": "X", "last4": "12"}).status_code == 400, "four digits or 400")
+# 2.591.0 (#4909): Visa and American Express cards; an unknown provider stays refused; the line layout is read for both
+for prov in ("visa", "amex"):
+    r = A.post(B + K, json={"holder_name": "Anbieter " + prov, "last4": "5555", "provider": prov})
+    check(r.status_code == 201 and sql("SELECT provider FROM office_cc_cards WHERE id=?", (r.json()["id"],))[0][0] == prov, f"a {prov} card {r.text[:200]}")
+    r2 = up(A, r.json()["id"], pdf(LINES))
+    check(r2.status_code == 201 and r2.json()["read"] is True, f"a {prov} statement in the line layout is read {r2.text[:200]}")
+check(A.post(B + K, json={"holder_name": "X", "last4": "5555", "provider": "diners"}).status_code == 400, "an unknown provider 400")
+check({p["id"] for p in A.get(B + K).json()["providers"]} >= {"mastercard", "visa", "amex"}, "the list names the providers")
+check(A.get(B + K).json().get("file_max", 0) > 0, "the list names the file limit")
 check(A.post(B + K, json={"last4": "1234"}).status_code == 400, "a holder or 400")
 check(A.post(B + K, json={"holder_id": CAROL, "last4": "1234"}).status_code == 400, "a person of another area is no holder")
 check(sql("SELECT last4 FROM office_cc_cards WHERE id=?", (CARD,))[0][0] != "4711", "the digits are encrypted at rest")

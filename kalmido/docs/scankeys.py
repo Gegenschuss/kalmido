@@ -256,6 +256,66 @@ def docs_scan_key_del(kid):
     return jsonify(ok=True)
 
 
+def _sk_pid(b):
+    """The parent_id of a scan inbox body: None (the documents directly) or a folder id; BadInput otherwise."""
+    pid = b.get("parent_id")
+    if pid in (None, "", 0):
+        return None
+    if not isinstance(pid, int) or isinstance(pid, bool):
+        raise BadInput(tr("Invalid value: {0}", "parent_id"))
+    return pid
+
+
+@app.patch("/api/docs/scan-keys/<int:kid>")
+def docs_scan_key_edit(kid):
+    """2.591.0 B (#4886): {name?, parent_id?, extend?} -> one of my scan inboxes as listed: a new name, another folder of the
+    same place (checked like a new inbox: sk_resolve, only folders I may add to, not locked, not in the trash), extend = it
+    runs SK_DAYS from now. The key stays (the folder watcher goes on without a new setup code); the place (own documents /
+    an organisation) cannot change - a key belongs to one place."""
+    _no_agent()
+    V = _v1()
+    V.need_api()
+    b = body()
+    unknown = sorted(k for k in b if k not in ("name", "parent_id", "extend"))
+    if unknown:
+        return err(tr("Invalid value: {0}", ", ".join(unknown)))
+    c, uid = db(), me()
+    r = c.execute("SELECT * FROM api_tokens WHERE id=? AND user_id=? AND token_hash ILIKE ?", (kid, uid, V.UPLOAD_HASH_PREFIX + "%")).fetchone()
+    t = sk_target(r)
+    if not r or not t:
+        raise Denied(404)
+    oid = t["org"]
+    if oid and not _sk_org_ok(c, uid, oid):  # like a new inbox of the organisation (_sk_web write=True)
+        raise Denied(403, tr(GONE_MSG))
+    sets = {}
+    if "name" in b:
+        name = str(b.get("name") or "").strip()[:SK_NAME_MAX]
+        if not name:
+            return err(tr("Name missing"))
+        sets["name"] = name
+    if "parent_id" in b:
+        pid = _sk_pid(b)
+        nt = {"org": oid, "parent_id": pid}  # the organisation of the key, never one from the body
+        try:
+            sk_resolve(c, uid, nt)
+        except Denied as e:
+            if pid and e.code == 409 and e.text() == tr(LOCKED_MSG):
+                return err(e.text(), 409)
+            return err(tr("Choose a folder of these documents you may add to") if pid else e.text(), 400 if pid else e.code)
+        sets["upload_target"] = json.dumps(nt)
+    if "extend" in b:
+        if not isinstance(b["extend"], bool):
+            return err(tr("Invalid value: {0}", "extend"))
+        if b["extend"]:
+            sets["expires_at"] = iso(now_utc() + timedelta(days=SK_DAYS))
+    if not sets:
+        return err(tr("Nothing to change"))
+    c.execute("UPDATE api_tokens SET " + ", ".join(k + "=?" for k in sets) + " WHERE id=? AND user_id=?", (*sets.values(), kid, uid))
+    c.commit()
+    print("scan inbox", kid, "of user", uid, "changed:", ",".join(sorted(sets)), flush=True)
+    return jsonify(next((k for k in _sk_rows(c, uid, oid) if k["id"] == kid), {"id": kid}))
+
+
 @app.post("/api/docs/mail-notice")
 def docs_mail_notice():
     """The person has read the note that mail is not end-to-end encrypted (shown big only once)."""

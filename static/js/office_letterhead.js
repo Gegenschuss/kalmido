@@ -62,7 +62,7 @@ async function bp_upload(file) {
   BPL.busy = false; bp_draw();
 }
 async function bp_act(a) {
-  if (a === 'pick') { const inp = $('#bp-file'); if (inp) { inp.onchange = () => { bp_upload(inp.files[0]); inp.value = ''; }; inp.click(); } }
+  if (a === 'pick') $('#bp-file')?.click();  // 2.591.0 (#4894): the upload is the input's change (below), so a file dropped onto the window (dropany.js) uploads too
   else if (a === 'preview') {
     const u = '/api/office/letterhead/preview?v=' + Date.now();
     typeof pdfView === 'function' ? pdfView({url: u, name: tr('Letterhead') + '.pdf', dlUrl: u}) : window.open(u, '_blank', 'noopener');
@@ -73,6 +73,7 @@ async function bp_act(a) {
   }
 }
 document.addEventListener('click', e => { const b = e.target.closest?.('[data-bp-act]'); if (!b || !b.closest('#bpset')) return; e.preventDefault(); bp_act(b.dataset.bpAct); });
+document.addEventListener('change', e => { const t = e.target; if (t.id === 'bp-file' && t.files?.length) { bp_upload(t.files[0]); t.value = ''; } });  // 2.591.0 (#4894)
 document.addEventListener('change', e => {
   const t = e.target; if (!t.closest?.('#bpset') || !BPL.st) return;
   if (t.id === 'bp-hide-head' || t.id === 'bp-hide-foot') {

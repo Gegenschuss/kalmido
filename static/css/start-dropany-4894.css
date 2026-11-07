@@ -1,0 +1,8 @@
+/* 2.591.0 (#4894): files dragged onto the window (static/js/dropany.js). One upload button in the view / dialog: a frame around
+   the window and the button's text; several: each button's row is framed, the one under the pointer stands out. A start file:
+   the drop works on every view. */
+#dahint{position:fixed;left:50%;top:1rem;transform:translateX(-50%);z-index:10050;pointer-events:none;padding:.5rem .875rem;border-radius:.5rem;background:var(--bg);box-shadow:0 0 0 1px var(--line),0 .25rem 1rem rgba(0,0,0,.16);font-weight:500;white-space:nowrap}
+#dahint>span{display:inline-flex;align-items:center;gap:.5rem}
+html.dropany-one::after{content:'';position:fixed;inset:.5rem;z-index:10040;border:.1875rem dashed var(--accent);border-radius:.75rem;background:color-mix(in srgb,var(--accent) 6%,transparent);pointer-events:none}
+.dropany-zone{outline:2px dashed color-mix(in srgb,var(--accent) 55%,transparent);outline-offset:2px;border-radius:.375rem}
+.dropany-zone.dropany-over{outline:2px solid var(--accent);background:color-mix(in srgb,var(--accent) 8%,transparent)}

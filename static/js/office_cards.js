@@ -30,23 +30,29 @@ function ccHtml() {
   if (CC.card) return ccCardHtml();
   const d = CC.data, items = d.items || [];
   const rows = items.length ? `<ul class="bnklist" role="list">${items.map(k => `<li class="bnkrow"><button type="button" class="ccopen" data-cc="card" data-id="${k.id}"><span class="bnkn"><b>${esc(k.holder || ccName(k))}</b><small class="muted">${esc([ccName(k), k.account && cfb_acct(k.account)].filter(Boolean).join(' · '))}</small></span>
-    ${k.open ? `<span class="rotag">${esc(trn('{0} receipt missing', '{0} receipts missing', k.open))}</span>` : ''}${ic('chev', 's')}</button></li>`).join('')}</ul>`
+    ${k.open ? `<span class="rotag">${esc(trn('{0} receipt missing', '{0} receipts missing', k.open))}</span>` : ''}${ic('right', 's')}</button></li>`).join('')}</ul>`
     : `<div class="empty">${ic('card')}<span>${d.manage ? tr('No cards yet. Add a card, then upload its monthly statement as a PDF.') : tr('No card of yours here yet.')}</span></div>`;
   return `<div class="ofcbar">${d.manage && ofcCan('cards', 'edit') ? `<button class="btn pri" data-cc="add">${ic('plus', 's')}<span>${tr('Add card')}</span></button>` : ''}</div>${rows}
     <p class="muted ofchint">${tr('Only the total leaves the business account. Upload the statement and every position gets its receipt.')}</p>`;
+}
+// 2.591.0 (#4904): what a statement may look like -- the providers and the limit come from the server's list, nothing fixed here
+function ccReadHint() {
+  const d = CC.data || {}, names = (d.providers || []).map(p => p.name).join(', '), mb = d.file_max ? Math.floor(d.file_max / 1048576) : 0;
+  return tr('Read are monthly statements as a PDF with a text layer in the line format (receipt date, booking date, text, amount) of {0}, up to {1} MB. Photos, scans without text and CSV files are not read: let an agent read them or enter the positions by hand.', names, String(mb));
 }
 function ccCardHtml() {
   const k = (CC.data.items || []).find(x => x.id === CC.card);
   if (!k) { CC.card = null; return ccHtml(); }
   if (CC.stmts === null) { setTimeout(ccStmts, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
   const rows = CC.stmts.length ? `<ul class="bnklist" role="list">${CC.stmts.map(s => `<li class="bnkrow"><button type="button" class="ccopen" data-cc="stmt" data-id="${s.id}"><span class="bnkn"><b>${esc(ccMon(s.month))}</b><small class="muted">${esc(s.state === 'draft' ? tr('Waiting for confirmation') : s.open ? trn('{0} receipt missing', '{0} receipts missing', s.open) : tr('Every position has its receipt.'))}</small></span>
-    <span class="bnkamt">${ofcMoney(s.total)}</span>${ic('chev', 's')}</button></li>`).join('')}</ul>`
+    <span class="bnkamt">${ofcMoney(s.total)}</span>${ic('right', 's')}</button></li>`).join('')}</ul>`
     : `<div class="empty">${ic('file')}<span>${tr('No statement yet. Upload the PDF of a month.')}</span></div>`;
   const edit = CC.data.manage && ofcCan('cards', 'edit');
   return `<div class="ofcbar"><button class="btn ghost" data-cc="back">${ic('back', 's')}<span>${tr('Back')}</span></button>
     <label class="btn pri">${ic('upload', 's')}<span>${tr('Upload statement')}</span><input type="file" data-cc-up="${k.id}" accept="application/pdf,.pdf" hidden></label><span class="spacer"></span>
     ${edit ? `<button class="btn ghost" data-cc="edit" data-id="${k.id}">${tr('Edit')}</button><button class="btn ghost" data-cc="delcard" data-id="${k.id}">${tr('Delete')}</button>` : ''}</div>
-    <h3 class="ofcgrp">${esc(k.holder)} · ${esc(ccName(k))}</h3>${rows}`;
+    <h3 class="ofcgrp">${esc(k.holder)} · ${esc(ccName(k))}</h3>${rows}
+    <p class="muted ofchint" data-cc-hint="1">${esc(ccReadHint())}</p>`;
 }
 function ccSheetHtml() {
   if (!CC.sheet) { setTimeout(ccSheet, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
@@ -101,7 +107,7 @@ function ccCardDlg(k) {
   const d = CC.data, ppl = d.people || [], ac = d.accounts || [];
   const md = ofdDlg(k ? tr('Edit card') : tr('Add card'), `${ofcRowF('cc-h', tr('Holder'), `<select id="cc-h"><option value="">${esc(tr('Other person (name)'))}</option>${ppl.map(p => `<option value="${p.id}" ${k?.holder_id === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select>`)}
     ${ofcRowF('cc-n', tr('Name'), ofcIn('cc-n', k?.holder_name, {max: 120}), tr('only when the holder has no account here'))}
-    ${ofcRowF('cc-p', tr('Provider'), ofcSel('cc-p', k?.provider || 'mastercard', (d.providers || []).map(p => [p.id, p.name])))}
+    ${ofcRowF('cc-p', tr('Provider'), ofcSel('cc-p', k?.provider || 'mastercard', (d.providers || []).map(p => [p.id, p.name])), ccReadHint())}
     ${ofcRowF('cc-l', tr('Last four digits'), ofcIn('cc-l', k?.last4, {max: 4, num: true}))}
     ${ofcRowF('cc-a', tr('Business account'), ofcIn('cc-a', k?.account, {max: 120, list: 'cc-al'}) + `<datalist id="cc-al">${ac.map(a => `<option value="${esc(a)}">`).join('')}</datalist>`, tr('the total of the statements leaves this account'))}`, tr('Save'), async m => {
     const v = id => $('#' + id, m).value.trim(), h = v('cc-h');

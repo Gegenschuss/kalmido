@@ -17148,5 +17148,17 @@
   "Applies to: {0}": "Vale per: {0}",
   "Markdown: # heading, - list, [[Page]] links a page, [[#123]] a task": "Markdown: # titolo, - elenco, [[Pagina]] collega una pagina, [[#123]] un'attività",
   "Write … ([[Page]], [[#123]])": "Scrivi … ([[Pagina]], [[#123]])",
-  "Write … ([[Page]], [[#123]], / for commands)": "Scrivi … ([[Pagina]], [[#123]], / per i comandi)"
+  "Write … ([[Page]], [[#123]], / for commands)": "Scrivi … ([[Pagina]], [[#123]], / per i comandi)",
+  "Drop here: {0}": "Rilascia qui: {0}",
+  "Drag onto a row": "Trascina su una riga",
+  "Only one file fits here": "Qui va un solo file",
+  "This file type does not fit here": "Questo tipo di file non va bene qui",
+  "Extend by 1 year": "Prolunga di 1 anno",
+  "The setup code stays the same; the folder watcher goes on without a new setup.": "Il codice di configurazione resta lo stesso; il controllo cartella continua senza nuova configurazione.",
+  "Archive number {0} found, already used by": "Numero d’archivio {0} trovato, già assegnato a",
+  "a document you cannot open": "un documento che non puoi aprire",
+  "(in the trash)": "(nel cestino)",
+  "Enter balance by hand": "Inserisci il saldo a mano",
+  "Only needed for the month end without a bank statement": "Necessario solo per la fine del mese senza estratto conto",
+  "Read are monthly statements as a PDF with a text layer in the line format (receipt date, booking date, text, amount) of {0}, up to {1} MB. Photos, scans without text and CSV files are not read: let an agent read them or enter the positions by hand.": "Vengono letti gli estratti conto mensili in PDF con livello di testo nel formato a righe (data del documento, data di registrazione, testo, importo) di {0}, fino a {1} MB. Foto, scansioni senza testo e file CSV non vengono letti: fai leggere a un agente o inserisci le posizioni a mano."
 }

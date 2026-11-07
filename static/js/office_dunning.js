@@ -11,7 +11,7 @@ function dun_listHint(k) {
   if (!n || (k !== 'invoice' && k !== 'reminder')) return '';
   const txt = n === 1 ? tr('1 payment reminder suggested') : tr('{0} payment reminders suggested', n);
   if (k === 'reminder') return `<p class="dun-hint" role="status">${ic('clock', 's')}<span>${esc(txt)} · ${esc(tr('Check the drafts and send them yourself - nothing goes out automatically.'))}</span></p>`;
-  return `<button type="button" class="dun-hint dun-go" data-ofd="dun-open">${ic('clock', 's')}<span>${esc(txt)}</span><span class="muted">${esc(tr('Show drafts'))}</span>${ic('chev', 's')}</button>`;
+  return `<button type="button" class="dun-hint dun-go" data-ofd="dun-open">${ic('clock', 's')}<span>${esc(txt)}</span><span class="muted">${esc(tr('Show drafts'))}</span>${ic('right', 's')}</button>`;
 }
 // a suggested draft in the reminder list
 const dun_rowTag = r => r.suggested ? `<small class="rotag dun-tag">${esc(tr('suggested'))}</small>` : '';

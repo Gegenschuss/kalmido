@@ -60,7 +60,7 @@ function rk_cfEntries(k) {
   const go = e => e.doc_id ? `href="#office/invoices/${e.doc_id}"` : e.series_id ? `href="#office/invoices" data-rin-go="${e.series_id}"` : e.trip_id ? `href="#office/travel" data-rkf="trip" data-id="${e.trip_id}"` : e.fixed_id ? `href="#" data-rkf="fixed" data-id="${e.fixed_id}"` : e.agreement_id ? `href="#office/agreements/${e.agreement_id}"` : e.node_id ? `href="#docs/${e.node_id}"` : e.statement_id ? 'href="#office/cards"' : '';  // 2.92.0 A (#1925); 2.114.1 B (#2018): a receipt opens the document
   // 2.88.0 (#1915): a sent quotation = an open quotation (dashed, lighter); a chain with an invoice no longer shows a rest
   return `<ul class="ofclist rkcfents" role="list">${es.map(e => `<li${e.open_offer ? ' class="rkcfopen"' : ''}><a class="ofcrow" ${go(e)}><span class="ofcn"><b>${esc(e.open_offer ? tr('Open quotation|cashflow') : tr(RK_CF_KINDS[e.kind] || e.kind))}${e.number ? ` ${esc(e.number)}` : ''}</b>
-    <small class="muted">${esc([fmtDateLoc(e.date), e.label, e.overdue ? tr('Overdue') : ''].filter(Boolean).join(' · '))}</small></span><span class="rksum">${ofcMoney(e.amount)}</span>${ic('chev', 's')}</a></li>`).join('')}</ul>`;
+    <small class="muted">${esc([fmtDateLoc(e.date), e.label, e.overdue ? tr('Overdue') : ''].filter(Boolean).join(' · '))}</small></span><span class="rksum">${ofcMoney(e.amount)}</span>${ic('right', 's')}</a></li>`).join('')}</ul>`;
 }
 // 2.88.0 (#1915): the share of open (sent, not yet accepted) quotations in a month's planned income, marked apart
 function rk_cfOpenHtml(mo) {
@@ -99,7 +99,7 @@ function rk_fixedHtml() {
   // 2.67.0 (#1838): grouped by category (without one last), net and gross per row; import from a spreadsheet + its template
   // 2.122.3 A (#2335): template + import moved to Settings > Import legacy data (office_import.js), here only a link to it
   const cats = [...new Set(fx.map(f => f.category || ''))].sort((a, b) => !a - !b || a.localeCompare(b, undefined, {sensitivity: 'base'}));
-  const row = f => `<li><button type="button" class="ofcrow" data-rkf="fixed" data-id="${f.id}"><span class="ofcn"><b>${esc(f.label)}${f.sub ? ` <span class="abo-tag">${tr('Subscription')}</span>` : ''}</b><small class="muted">${esc([rp(f.repeat), tr('from {0}', fmtDateLoc(f.start)), f.until ? tr('until {0}', fmtDateLoc(f.until)) : '', +f.vat_rate ? tr('VAT {0} %', f.vat_rate) : tr('without VAT')].filter(Boolean).join(' · '))}</small></span>${rk_fixedSum(f)}${ic('chev', 's')}</button></li>`;
+  const row = f => `<li><button type="button" class="ofcrow" data-rkf="fixed" data-id="${f.id}"><span class="ofcn"><b>${esc(f.label)}${f.sub ? ` <span class="abo-tag">${tr('Subscription')}</span>` : ''}</b><small class="muted">${esc([rp(f.repeat), tr('from {0}', fmtDateLoc(f.start)), f.until ? tr('until {0}', fmtDateLoc(f.until)) : '', +f.vat_rate ? tr('VAT {0} %', f.vat_rate) : tr('without VAT')].filter(Boolean).join(' · '))}</small></span>${rk_fixedSum(f)}${ic('right', 's')}</button></li>`;
   return `<div class="ofcbar fcibar"><h3 class="ofcgrp">${tr('Fixed costs')}</h3><span class="spacer"></span>${fx.some(f => f.sub) ? `<a class="btn sm ghost" href="#office/subs" data-abo="go">${ic('repeat', 's')}<span>${tr('Subscriptions & tools')}</span></a>` : ''}<button class="btn sm pri" data-rkf="fnew">${ic('plus', 's')}<span>${tr('New fixed cost')}</span></button></div>`
     + (fx.length ? cats.map(k => `${cats.length > 1 || k ? `<h4 class="fcicat">${esc(k || tr('Without category'))}${k ? `<button type="button" class="iconbtn fcicatren" data-rkf="fcat" data-k="${esc(k)}" title="${esc(tr('Rename category'))}" aria-label="${esc(tr('Rename category {0}', k))}">${ic('edit', 's')}</button>` : ''}</h4>` : ''}<ul class="ofclist" role="list">${fx.filter(f => (f.category || '') === k).map(row).join('')}</ul>`).join('')
       : `<p class="muted lempty">${tr('No fixed costs yet, e.g. rent or software subscriptions.')}</p>`) + oim_link('fixed', !fx.length) + rk_agrFixedHtml();
@@ -127,7 +127,7 @@ function rk_fixedSum(f) {
 function rk_agrFixedHtml() {
   const ag = RKF.agr || [], rp = k => tr(RK_CF_REPEATS.find(x => x[0] === k)?.[1] || k);
   if (!ag.length) return '';
-  return `<h4 class="fcicat">${tr('From contracts')}</h4><ul class="ofclist agr-fixed" role="list">${ag.map(f => `<li><a class="ofcrow" href="#office/agreements/${f.id}"><span class="ofcn"><b>${esc(f.label)}</b><small class="muted">${esc([rp(f.repeat), tr('from {0}', fmtDateLoc(f.start)), f.until ? tr('until {0}', fmtDateLoc(f.until)) : '', f.vat_rate ? tr('VAT {0} %', f.vat_rate) : ''].filter(Boolean).join(' · '))}</small></span><span class="rksum fcisum"><span>${ofcMoney(f.amount)}${f.vat_rate ? ` <small class="muted">${tr('net')}</small>` : ''}</span>${f.vat_rate ? `<small class="muted">${ofcMoney(f.gross)} ${tr('gross')}</small>` : ''}</span>${ic('chev', 's')}</a></li>`).join('')}</ul>`;
+  return `<h4 class="fcicat">${tr('From contracts')}</h4><ul class="ofclist agr-fixed" role="list">${ag.map(f => `<li><a class="ofcrow" href="#office/agreements/${f.id}"><span class="ofcn"><b>${esc(f.label)}</b><small class="muted">${esc([rp(f.repeat), tr('from {0}', fmtDateLoc(f.start)), f.until ? tr('until {0}', fmtDateLoc(f.until)) : '', f.vat_rate ? tr('VAT {0} %', f.vat_rate) : ''].filter(Boolean).join(' · '))}</small></span><span class="rksum fcisum"><span>${ofcMoney(f.amount)}${f.vat_rate ? ` <small class="muted">${tr('net')}</small>` : ''}</span>${f.vat_rate ? `<small class="muted">${ofcMoney(f.gross)} ${tr('gross')}</small>` : ''}</span>${ic('right', 's')}</a></li>`).join('')}</ul>`;
 }
 function rk_fixedModal(f) {
   const md = modal(`<h3>${f ? tr('Edit fixed cost') : tr('New fixed cost')}</h3>
@@ -278,21 +278,23 @@ document.addEventListener('click', e => {
 // ---- 2.123.0 D (#2341): the account balance -- start balance (office settings), corrections by hand per month, the real
 // balance at the end of a month against the computed one. Server: kalmido/office/cfstart.py. Without a start balance and
 // without corrections the cards stay as before. Every change = one undo step.
-const CFS = {st: undefined, oid: null, day: ''};  // day: a reference date picked before the amount (job/2299: a redraw kept it)
+const CFS = {st: undefined, oid: null, day: '', hand: new Set()};  // hand: months whose by-hand balance row was opened (2.591.0, #4889)  // day: a reference date picked before the amount (job/2299: a redraw kept it)
 const CFS_DIRS = [['in', N_('Other money in|cashflow')], ['out', N_('Other money out|cashflow')]];
 const cfs_amt = v => { const n = ofcNum(v); return n == null ? null : n; };
 // the account rows of a month card: computed balance at the month's end, the real one (by hand, optional) and the difference
 function cfs_accRows(r) {
   if (r.account == null) return '';
   const real = r.real != null ? fmtNum(+r.real, 2) : '', d = r.diff != null ? +r.diff : null;
+  // 2.591.0 (#4889): a month with a bank balance folds "Real balance (by hand)" behind a link (only needed for a month end without a statement); a value set by hand keeps the row open
+  const fold = r.bank && r.real == null && !CFS.hand.has(r.month);
   return `<tr class="cfs-acc"><th>${tr('Account balance at the end of the month')} <small class="muted">${tr('computed')}</small></th><td class="num ${+r.account < 0 ? 'neg' : ''}" colspan="2">${ofcMoney(r.account)}</td></tr>
-      <tr class="cfs-real"><th><label for="cfs-real-${r.month}">${tr('Real balance')} <span class="cfs-hand">${tr('by hand')}</span></label></th><td class="num" colspan="2"><input id="cfs-real-${r.month}" class="numin cfs-realin" inputmode="decimal" maxlength="20" data-cfs-real="${r.month}" value="${esc(real)}" placeholder="${esc(tr('optional'))}" aria-describedby="cfs-diff-${r.month}"></td></tr>
+      ${fold ? `<tr class="cfs-handfold"><td colspan="3"><button type="button" class="linkbtn" data-cfs="hand" data-month="${r.month}">${tr('Enter balance by hand')}</button> <small class="muted">${tr('Only needed for the month end without a bank statement')}</small></td></tr>` : `<tr class="cfs-real"><th><label for="cfs-real-${r.month}">${tr('Real balance')} <span class="cfs-hand">${tr('by hand')}</span></label></th><td class="num" colspan="2"><input id="cfs-real-${r.month}" class="numin cfs-realin" inputmode="decimal" maxlength="20" data-cfs-real="${r.month}" value="${esc(real)}" placeholder="${esc(tr('optional'))}" aria-describedby="cfs-diff-${r.month}"></td></tr>`}
       ${d != null ? `<tr class="cfs-diff"><th>${tr('Difference')}</th><td class="num ${d ? 'cfs-off' : ''}" colspan="2" id="cfs-diff-${r.month}">${d > 0 ? '+' : ''}${ofcMoney(d)}</td></tr>` : ''}`;
 }
 // the corrections by hand of a month (marked "by hand"), a tap edits one; "+ Correction" adds one
 function cfs_adjHtml(mo) {
   const es = (RKF.data?.adjust || []).filter(a => a.month === mo);
-  const row = a => `<li><button type="button" class="ofcrow" data-cfs="edit" data-id="${a.id}"><span class="ofcn"><b>${esc(tr(CFS_DIRS.find(x => x[0] === a.dir)?.[1] || a.dir))} <span class="cfs-hand">${tr('by hand')}</span></b>${a.note ? `<small class="muted">${esc(a.note)}</small>` : ''}</span><span class="rksum">${a.dir === 'out' ? '−' : '+'}${ofcMoney(a.amount)}</span>${ic('chev', 's')}</button></li>`;
+  const row = a => `<li><button type="button" class="ofcrow" data-cfs="edit" data-id="${a.id}"><span class="ofcn"><b>${esc(tr(CFS_DIRS.find(x => x[0] === a.dir)?.[1] || a.dir))} <span class="cfs-hand">${tr('by hand')}</span></b>${a.note ? `<small class="muted">${esc(a.note)}</small>` : ''}</span><span class="rksum">${a.dir === 'out' ? '−' : '+'}${ofcMoney(a.amount)}</span>${ic('right', 's')}</button></li>`;
   return `${es.length ? `<ul class="ofclist cfs-adj" role="list" aria-label="${esc(tr('Corrections by hand'))}">${es.map(row).join('')}</ul>` : ''}<div class="cfs-add"><button type="button" class="btn sm ghost" data-cfs="new" data-month="${mo}">${ic('plus', 's')}<span>${tr('Correction')}</span></button></div>`;
 }
 function cfs_modal(a, mo) {
@@ -347,6 +349,7 @@ document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-cfs]'); if (!b) return;
   e.preventDefault();
   if (b.dataset.cfs === 'new') cfs_modal(null, b.dataset.month);
+  else if (b.dataset.cfs === 'hand') { CFS.hand.add(b.dataset.month); ofcDraw(); setTimeout(() => document.getElementById(`cfs-real-${b.dataset.month}`)?.focus(), 0); }
   else if (b.dataset.cfs === 'edit') { const a = (RKF.data?.adjust || []).find(x => x.id === +b.dataset.id); if (a) cfs_modal(a); }
 });
 // the real balance at the end of a month: saved on change (empty = removed), one undo step
@@ -425,7 +428,9 @@ function cfb_rows(r) {
 }
 // 2.144.2 B (#2372): "Use as real balance" in its own bar below the month's table (a table cell cannot stick above the
 // phone's tab bar; the bar can)
-const cfb_realBar = r => r.bank && r.account != null && r.real == null ? `<div class="cfs-add cfb-real"><button type="button" class="btn sm ghost" data-cfb="real" data-month="${r.month}">${tr('Use as real balance')}</button></div>` : '';
+// 2.591.0 (#4889): only when the bank balance is from the last day of the month (else the difference is skewed)
+const cfb_monthEnd = r => { const [y, m] = String(r.month).split('-').map(Number); return !!y && r.bank?.day === `${r.month}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`; };
+const cfb_realBar = r => r.bank && r.account != null && r.real == null && cfb_monthEnd(r) ? `<div class="cfs-add cfb-real"><button type="button" class="btn sm ghost" data-cfb="real" data-month="${r.month}">${tr('Use as real balance')}</button></div>` : '';
 document.addEventListener('click', async e => {
   const t = e.target.closest?.('[data-cfb]'); if (!t) return;
   e.preventDefault();

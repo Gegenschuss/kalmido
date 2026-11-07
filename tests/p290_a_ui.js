@@ -62,8 +62,9 @@ const today = TC.today();
     await ev(`(() => { const p = document.querySelector('#bk-period'); p.value = '${quarter}'; p.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
     await ready(ev, `BK.ustva && BK.ustva.period === '${quarter}' && BK.ustva.year === ${+year}`);
     check(await ev(`!!document.querySelector('#side [data-ofm="books"][aria-current="page"]')`), 'the tab "Bookkeeping" is selected');  // 2.98.0 (#2180): the office rail  // 2.152.2 (#2617): the office points sit in the panel #side
-    check(await ev(`(() => { const i = document.querySelector('#bk-file'); return !!i && i.getAttribute('capture') === 'environment' && /image\\/\\*/.test(i.accept) && /pdf/.test(i.accept); })()`),
-      'the photo button: a file field with capture=environment, images and PDF');
+    // 2.591.0 (#4892): on the desktop only "Upload files" (main button), the camera button is for touch devices (checked below on the phone)
+    check(await ev(`(() => { const i = document.querySelector('#bk-files'); return !document.querySelector('#bk-file') && !document.querySelector('.bk-shot') && !!i && i.closest('label').classList.contains('pri') && /image\\/\\*/.test(i.accept) && /pdf/.test(i.accept); })()`),
+      'desktop: no camera button, "Upload files" is the main button and takes images and PDF');
     check(await ev(`[...document.querySelectorAll('.bk-note')].some(n => /No tax advice/.test(n.textContent))`), 'the note "no tax advice"');  // 2.298.0 (R7): once at the end of the page, not in every section
     check(await ready(ev, `/1,000/.test(document.querySelector('#bk-ustva .bk-kz').textContent) && /Field 81/.test(document.querySelector('#bk-ustva .bk-kz').textContent)`),
       'field 81 with the paid invoice ' + await ev(`document.querySelector('#bk-ustva .bk-kz')?.textContent`));
@@ -82,7 +83,7 @@ const today = TC.today();
       const xr = out.length; out += 'xref\\n0 ' + (o.length + 1) + '\\n0000000000 65535 f \\n' + offs.map(n => String(n).padStart(10, '0') + ' 00000 n \\n').join('');
       out += 'trailer\\n<< /Size ' + (o.length + 1) + ' /Root 1 0 R >>\\nstartxref\\n' + xr + '\\n%%EOF\\n';
       const dt = new DataTransfer(); dt.items.add(new File([out], 'beleg.pdf', {type: 'application/pdf'}));
-      const i = document.querySelector('#bk-file'); i.files = dt.files; i.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
+      const i = document.querySelector('#bk-files'); i.files = dt.files; i.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('.modal.bk-sheet #bk-vat') || !!document.querySelector('.bk-sheet #bk-vat')`, 60), 'the receipt sheet opens after the upload');
     await ev(`(() => { const m = document.querySelector('.bk-sheet'); m.querySelector('#bk-cat').value = 'Software'; m.querySelector('#bk-vat').value = '19'; m.querySelector('#bk-amount').value = '119.00';
       const d = m.querySelector('#bk-date'); d.value = '${today}'; m.querySelector('[data-m="save"]').click(); return 1; })()`);
@@ -102,6 +103,9 @@ const today = TC.today();
     // phone width
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
     await sleep(400);
+    await ev(`(() => { bkReload(); return 1; })()`);  // (the office does not redraw on a resize)
+    check(await ready(ev, `!!document.querySelector('.bk-shot')`, 60), '#4892: on a phone the camera button is there');
+    check(await ev(`document.querySelector('#bk-file').getAttribute('capture') === 'environment'`), '#4892: it is a file field with capture=environment');
     check(await ev(noSide), 'on a phone nothing sticks out to the side');
     check(await ev(`document.querySelector('.bk-shot').getBoundingClientRect().height >= 44`), 'on a phone the photo button is large');
     await shot('p290-a-books-phone.png');

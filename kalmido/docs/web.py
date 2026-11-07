@@ -19,7 +19,7 @@ from ..core.access import Denied, acx_of
 from ..core.orgcrypt import OrgCryptError
 from ..accounts.session import me
 from ..files.scan import sc_guard  # 2.306.0: pulled up from functions (layers budget)
-from ..files.store import fs_log_add, fs_role, fs_visible_ids, fs_visible_sql, fs_version_row, need_node
+from ..files.store import fs_chain, fs_deleted, fs_log_add, fs_role, fs_visible_ids, fs_visible_sql, fs_version_row, need_node
 from . import store as S
 from .ingest import docs_ingest, docs_kick
 from .area import ar_sql, ar_view  # 2.522.0 (#4433)
@@ -97,6 +97,21 @@ def _agent_folder(c, aid, node, r):
 
 
 # ---- serializing ------------------------------------------------------------------------------------------------------
+def asn_taken_view(c, ws, t, uid):
+    """2.591.0 B (#4863): {asn, doc: {id, name, trash} | None} -- the archive number a code on the document carries and the
+    document of the same workspace that has it already; its name and id only when uid may see it (fs_role, the trash
+    counts: asn_taken does not skip it), else doc None. Nothing when that document gave the number away since."""
+    if not isinstance(t, dict) or not isinstance(t.get("n"), int) or not isinstance(t.get("by"), int):
+        return None
+    if not c.execute("SELECT 1 FROM doc_meta WHERE node_id=? AND ws=? AND asn=?", (t["by"], ws, t["n"])).fetchone():
+        return None
+    ch = fs_chain(c, t["by"])
+    doc = None
+    if ch and fs_role(c, t["by"], uid, chain=ch):
+        doc = {"id": t["by"], "name": ch[0]["name"], "trash": fs_deleted(ch)}
+    return {"asn": t["n"], "doc": doc}
+
+
 def doc_ver(m):
     """2.570.0 (#4770): the version a document's PATCH checks (fragment 4770_b): the last change of a person, never edited =
     created_at. Not updated_at: the background moves that (recognition, thumbnails) without anybody changing a value."""
@@ -111,6 +126,7 @@ def doc_json(c, m, node, full=False, role=None, pre=None):
     hand = S.hand_fields(auto)  # 2.273.0 C (#3047): own key, not a feature of "automatic"
     auto.pop("_hand", None)
     auto.pop("_was", None)      # 2.273.0 F2 (#3047): the recognised values behind the hand values (doc_update)
+    asn_t = auto.pop("_asn_taken", None)  # 2.591.0 B (#4863): the code's number has another document (asn_taken_view)
     sug = S.meta_json(c, m, "suggest", {})
     sug.pop("_given", None)
     out_sug = {}
@@ -164,6 +180,11 @@ def doc_json(c, m, node, full=False, role=None, pre=None):
         if full and sp.get("auto") and _hrc() and getattr(g, "user", None):  # 2.580.0 (#4401, review C 7b): the undo while it can be done
             from .split import sp_undo_ok
             sp["undo"] = sp_undo_ok(c, sp, me())
+    if asn_t and not m["asn"]:
+        from flask import has_request_context
+        at = asn_taken_view(c, ws, asn_t, me()) if has_request_context() and getattr(g, "user", None) else None
+        if at:
+            d["asn_taken"] = at
     if role:
         d["role"] = role
     if full:
@@ -535,6 +556,7 @@ def doc_update_values(c, nid, d, uid, by=None):
         if "asn" in sets:
             auto = S.meta_json(c, m, "auto", {})
             auto.pop("asn", None)
+            auto.pop("_asn_taken", None)  # 2.591.0 B (#4863): the person decided about the number
             S.meta_set_json(c, nid, ws, "auto", auto)
             _reindex(c, nid)
         if "doc_date" in sets and by is None:  # 2.61.0 B (#1819): a date set by hand is no longer "from the photo"
