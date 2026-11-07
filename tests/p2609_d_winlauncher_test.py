@@ -138,7 +138,10 @@ for k, want, what in ((K32(5, code=259), False, "a running process (STILL_ACTIVE
 real_name, real_probe = ar.os.name, ar.win_pid_gone
 asked = []
 try:
-    ar.win_pid_gone = lambda pid: asked.append(pid) or True
+    def probe_gone(pid):  # a stand-in for the Windows probe: notes the number it was asked for and says "gone"
+        asked.append(pid)
+        return True
+    ar.win_pid_gone = probe_gone
     ar.os.name = "nt"
     os.environ["KALMIDO_LAUNCHER_PID"] = "4711"
     check(ar.launcher_gone() is True and asked == [4711], f"launcher_gone on Windows asks win_pid_gone (was: always False): {asked}")
