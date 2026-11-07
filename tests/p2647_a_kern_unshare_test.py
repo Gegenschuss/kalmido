@@ -2,7 +2,7 @@
 # kalmido-suite: fresh
 """2.647.0 part A (#5046): a share of a calendar / an address book taken back IN the core (the file store's share dialog,
 DELETE /api/files/shares) or run out there (expires_at in the past) ends what the old member tables ev_cal_members /
-book_members still opened. Own container (mode workspaces, no server key: the organisation export is a plain ZIP). Invented
+book_members still opened. Own container (no server key: the organisation export is a plain ZIP). Invented
 names only.  freelancer-matrix: pim
  - the trigger kalmido_kern_back (core -> old): a share deleted in the core takes the old member row with it, another
    person's row stays; a role changed in the core gives the old row the same role (regression: the row stood)
@@ -33,16 +33,14 @@ from freelancer_fixture import freelancer  # noqa: E402
 from kt import B, DATA, check, sess, su_get, until  # noqa: E402
 
 FEAT = "cal,events,contacts,comments,collab,files"
-kt.fresh(env={"KALMIDO_INSTANCE_MODE": "workspaces", "KALMIDO_API_RATE": "100000"}, prefix="P2647A")
+kt.fresh(env={"KALMIDO_API_RATE": "100000"}, prefix="P2647A")
 
 
 def sql(q, args=(), write=False, quiet=False):
     """quiet: the write as an older version could leave it -- without the mirror triggers (app.kern_sync, 4712_a.py)."""
     c = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
     try:
-        if quiet:
-            c.execute("SELECT set_config('app.kern_sync', '1', true)")
-        r = c.execute(q, args)
+        r = c.execute(("SET app.kern_sync = '1'; " if quiet else "") + q, args)  # dbx: one psql per statement
         if write:
             c.commit()
             return None
@@ -122,9 +120,20 @@ DORA, Do = freelancer(B, A, "dora")
 FIONA, Fi = freelancer(B, A, "fiona")
 HANK, Ha = freelancer(B, A, "hank")
 IVY, Iv = freelancer(B, A, "ivy")
+JUNO, Ju = freelancer(B, A, "juno")
+
+
+def connect(a, b):  # an accepted connection request (accounts/discover.py): people without an organisation see each other
+    sql("INSERT INTO conn_links(a_id,b_id,created_at) VALUES(?,?,'2026-11-01T00:00:00+00:00') ON CONFLICT DO NOTHING", (min(a, b), max(a, b)), write=True)
+
+
+for owner_ in (DORA, JUNO):
+    for who in (FIONA, HANK, IVY):
+        connect(owner_, who)
 KR = Do.post(B + "/api/evcals", json={"name": "Dora's rota", "org_id": None}).json()["id"]
 for who in (FIONA, HANK, IVY):
-    check(Do.put(B + f"/api/evcals/{KR}/members", json={"user_id": who, "role": "view"}).ok, f"setup: dora's calendar shared with {who}")
+    r = Do.put(B + f"/api/evcals/{KR}/members", json={"user_id": who, "role": "view"})
+    check(r.ok, f"setup: dora's calendar shared with {who} {r.status_code} {r.text[:120]}")
 r = Do.delete(B + f"/api/files/shares/{sid('evcal', KR, FIONA)}")
 check(r.ok and old_row("ev_cal_members", "cal_id", KR, FIONA) is None, f"fiona taken back in the core ({r.status_code})")
 sql("UPDATE fs_shares SET expires_at='2020-01-01T00:00:00+00:00' WHERE id=?", (sid("evcal", KR, IVY),), write=True)  # ivy's ran out
@@ -146,12 +155,12 @@ check(not sql("SELECT 1 FROM ev_reminded WHERE event_id=? AND user_id=?", (EV, I
       "#5046: no reminder for ivy, whose share ran out (regression: her old row was read)")
 
 # ================================================================== the heir of a deleted account (people without an organisation)
-JUNO, Ju = freelancer(B, A, "juno")
 KH = Ju.post(B + "/api/evcals", json={"name": "Juno's plan", "org_id": None}).json()["id"]
 BH = Ju.post(B + "/api/books", json={"name": "Juno's people"}).json()["id"]
 for url, rid in (("evcals", KH), ("books", BH)):
     for who in (FIONA, HANK):
-        check(Ju.put(B + f"/api/{url}/{rid}/members", json={"user_id": who, "role": "edit"}).ok, f"setup: juno's {url} shared with {who}")
+        r = Ju.put(B + f"/api/{url}/{rid}/members", json={"user_id": who, "role": "edit"})
+        check(r.ok, f"setup: juno's {url} shared with {who} {r.status_code} {r.text[:120]}")
 # fiona is the longest-standing one (she would be the heir)
 for kind, rid, t, col in (("evcal", KH, "ev_cal_members", "cal_id"), ("address_book", BH, "book_members", "book_id")):
     sql("UPDATE fs_shares SET created_at='2020-01-01T00:00:00+00:00' WHERE id=?", (sid(kind, rid, FIONA),), write=True)
