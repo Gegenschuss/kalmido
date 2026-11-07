@@ -11,7 +11,7 @@ document.addEventListener('dragstart', e => {
   setTimeout(() => { if (dragId) document.body.classList.add('tdrag'); }, 0);
   requestAnimationFrame(() => r.classList.add('dragging'));
 });
-document.addEventListener('dragend', () => { dragId = null; DSE.v = 0; document.body.classList.remove('tdrag'); $$('.dragging,.dropbefore,.dropafter,.drop').forEach(x => x.classList.remove('dragging', 'dropbefore', 'dropafter', 'drop')); });
+document.addEventListener('dragend', () => { dragId = null; DSE.v = 0; kph_clear(); document.body.classList.remove('tdrag'); $$('.dragging,.dropbefore,.dropafter,.drop').forEach(x => x.classList.remove('dragging', 'dropbefore', 'dropafter', 'drop')); });
 const DROP_SEL = '.trow, .kcol, .quad, .cal .cell, .srow[data-drop], .wcol, .wad, .wh, #view .ghead[data-section], #view .sdrop, #view .sprh[data-sprdrop], #view .ghead[data-key^="ms:"]';  // 2.60.0 (#343): + the sprint header; 2.569.0 (#4395): + the own sections of My tasks
 // lower half of a row = drop after it (so the end of a block / list is reachable)
 const dropAfter = (row, y) => { const r = row.getBoundingClientRect(); return y != null && r.height > 0 && y > r.top + r.height / 2; };
@@ -32,8 +32,9 @@ function markDrop(el, id, y) {
 }
 document.addEventListener('dragover', e => {
   if (!dragId) return;
-  if (ml_altOver(e, dragId)) { mdLast = null; dsEdge(e.clientY); return; }  // 2.320.0 (#3289): Alt onto a project in the sidebar = show also there
-  if (dgOver(e, dragId)) { mdLast = null; e.preventDefault(); dsEdge(e.clientY); return; }  // 2.43.0 (#1330, #1003): Alt = dependency, a selection, the panel's drop fields
+  if (ml_altOver(e, dragId)) { mdLast = null; kph_off(); dsEdge(e.clientY); return; }  // 2.320.0 (#3289): Alt onto a project in the sidebar = show also there
+  if (dgOver(e, dragId)) { mdLast = null; kph_off(); e.preventDefault(); dsEdge(e.clientY); return; }  // 2.43.0 (#1330, #1003): Alt = dependency, a selection, the panel's drop fields
+  if (kph_over(e, dragId)) { e.preventDefault(); dsEdge(e.clientY); return; }  // 2.634.0 (#4797): the board's placeholder
   if (markDrop(e.target, dragId, e.clientY)) e.preventDefault();
   dsEdge(e.clientY);
 });
@@ -53,9 +54,88 @@ document.addEventListener('drop', async e => {
   e.preventDefault();
   const id = dragId; dragId = null;
   if (ml_altDrop(e, id)) return;  // 2.320.0 (#3289): multilist.js
-  if (dgDrop(e, id)) return;  // 2.43.0 (#1330, #1003): dragmulti.js
+  if (dgDrop(e, id)) { kph_clear(); return; }  // 2.43.0 (#1330, #1003): dragmulti.js
+  const kp = kph_drop();  // 2.634.0 (#4797): on the board the placeholder is the spot (before the card after it, else after the one before)
+  if (kp) { const r = kp.el.getBoundingClientRect(); dropTask(id, kp.el, kp.row ? (kp.after ? r.bottom - 1 : r.top + 1) : e.clientY); return; }
   dropTask(id, e.target, e.clientY);
 });
+// 2.634.0 (#4797) computer / tablet (mouse): on the board the other cards make room for the dragged one. A placeholder (.kph,
+// the dragged card's height) stands where it will land. The spot is measured against the cards' resting places (taken once
+// per column before anything in it moved, in the column's own coordinates), never against the cards moving right now - else
+// the spot flickered between before / after; a few px around a boundary keep the spot (KPH_HY). A move of the placeholder
+// slides the neighbours with FLIP (transform only, app.css block "2.634.0 (#4797)", only while an_desk()); reduced motion =
+// the placeholder alone. The spots right before / after the dragged card itself change nothing: no placeholder there. The
+// drop reads its target from the placeholder. My tasks' board (.mbcol, its own columns) and touch (long press) unchanged.
+const KPH = {el: null, kc: null, i: -1, h: 0, rest: new WeakMap()};
+const KPH_HY = 6;
+const kph_cards = kc => [...kc.children].filter(c => c.classList.contains('trow'));
+const kph_top = kc => kc.getBoundingClientRect().top - kc.scrollTop;
+function kph_rest(kc) {
+  let r = KPH.rest.get(kc);
+  if (!r) { const top = kph_top(kc); r = kph_cards(kc).map(c => { const b = c.getBoundingClientRect(); return {c, mid: b.top - top + b.height / 2}; }); KPH.rest.set(kc, r); }
+  return r;
+}
+// the cards of these columns slide from where they were drawn to where mutate() put them
+function kph_flip(kcs, mutate) {
+  kcs = [...new Set(kcs.filter(k => k && k.isConnected))];
+  if (!an_desk()) { mutate(); return; }
+  const cards = kcs.flatMap(kph_cards), old = cards.map(c => c.getBoundingClientRect().top);
+  mutate();
+  cards.forEach(c => { c.classList.remove('kflip'); c.style.transform = ''; });
+  const moved = cards.filter((c, j) => { const d = old[j] - c.getBoundingClientRect().top; if (Math.abs(d) < .5) return false; c.style.transform = `translateY(${d}px)`; return true; });
+  if (!moved.length) return;
+  void document.body.offsetWidth;
+  for (const c of moved) { c.classList.add('kflip'); c.style.transform = ''; clearTimeout(c._kphT); c._kphT = setTimeout(() => c.classList.remove('kflip'), 260); }
+}
+function kph_place(kc, i, id) {
+  const rest = kph_rest(kc), s = rest.findIndex(r => +r.c.dataset.id === id), noop = s >= 0 && (i === s || i === s + 1);
+  const was = KPH.el?.isConnected ? KPH.el.parentElement : null;
+  KPH.kc = kc; KPH.i = i;
+  if (noop && !was) return;
+  kph_flip([was, kc], () => {
+    if (noop) { KPH.el.remove(); return; }
+    if (!KPH.el) { KPH.el = document.createElement('div'); KPH.el.className = 'kph'; KPH.el.setAttribute('aria-hidden', 'true'); }
+    if (!KPH.h) { const d = document.querySelector(`#view .trow.dragging[data-id="${id}"], #view .trow[data-id="${id}"]`); KPH.h = d ? d.getBoundingClientRect().height : 40; }
+    KPH.el.style.height = KPH.h + 'px';
+    const ref = rest[i]?.c;
+    if (ref && ref.parentElement === kc) kc.insertBefore(KPH.el, ref); else kc.appendChild(KPH.el);
+  });
+}
+// dragover: true = the board's column under the mouse took it (placeholder placed, the column marked)
+function kph_over(e, id) {
+  const t = e.target, col = t && t.closest && !t.closest('#detail') ? t.closest('#view .kanban .kcol[data-kcol]:not(.mbcol)') : null;
+  const kc = col && col.querySelector(':scope > .kcards');
+  if (!kc || !S.tasks.has(id)) { kph_off(); return false; }
+  const rest = kph_rest(kc), rel = e.clientY - kph_top(kc);
+  let i = rest.filter(r => r.mid < rel).length;
+  if (KPH.kc === kc && Math.abs(i - KPH.i) === 1 && Math.abs(rel - rest[Math.min(i, KPH.i)].mid) < KPH_HY) i = KPH.i;
+  if (KPH.kc !== kc || KPH.i !== i) kph_place(kc, i, id);
+  if (!col.classList.contains('drop') || $('.dropbefore,.dropafter')) { $$('.dropbefore,.dropafter,.drop').forEach(x => x.classList.remove('dropbefore', 'dropafter', 'drop')); col.classList.add('drop'); }
+  mdLast = null;
+  return true;
+}
+// the mouse left the board's columns: the cards slide back
+function kph_off() {
+  if (KPH.el?.isConnected) { const kc = KPH.el.parentElement; kph_flip([kc], () => KPH.el.remove()); }
+  KPH.kc = null; KPH.i = -1;
+}
+// the drag ended (drop, Esc, elsewhere): all gone at once
+function kph_clear() {
+  if (KPH.el) KPH.el.remove();
+  KPH.el = null; KPH.kc = null; KPH.i = -1; KPH.h = 0; KPH.rest = new WeakMap();
+  $$('#view .kcards > .trow.kflip, #view .kcards > .trow[style*="transform"]').forEach(c => { clearTimeout(c._kphT); c.classList.remove('kflip'); c.style.transform = ''; });
+}
+// the drop: the spot the placeholder stands on -> {el, row, after}, or null without one
+function kph_drop() {
+  const ph = KPH.el?.isConnected ? KPH.el : null;
+  if (!ph) { kph_clear(); return null; }
+  let n = ph.nextElementSibling, p = ph.previousElementSibling;
+  while (n && !n.classList.contains('trow')) n = n.nextElementSibling;
+  while (p && !p.classList.contains('trow')) p = p.previousElementSibling;
+  const col = ph.closest('.kcol');
+  kph_clear();
+  return n ? {el: n, row: true, after: false} : p ? {el: p, row: true, after: true} : col ? {el: col, row: false, after: false} : null;
+}
 // one drop = one history step (a subtask made standalone and moved counts once)
 function dropTask(id, el, clientY) { return histGroup(async () => { if (await swlDrop(id, el)) return dropTask0(id, el, clientY); }); }  // 2.138.0 D (#2060): a swimlane's value first (same step)
 async function dropTask0(id, el, clientY) {

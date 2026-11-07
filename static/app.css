@@ -8864,3 +8864,7 @@ time,.meta .dt,.dpbtn,.remchips button,.dprow .dpt,.dprow .dps,.fwhen{font-famil
 .aiph .aipht{flex:1 1 14rem;min-width:0}
 .abadge.abai{white-space:nowrap}
 
+/* 2.634.0 (#4797) board (mouse): the placeholder where the dragged card will land (dnd.js kph_*); the neighbours slide to
+   make room (FLIP, transform only, class kflip while it runs). Reduced motion: the placeholder alone, nothing slides */
+#view .kcards>.kph{flex-shrink:0;border:2px dashed var(--accent);border-radius:var(--radius);background:color-mix(in srgb,var(--accent) 8%,transparent);pointer-events:auto}
+@media (prefers-reduced-motion:no-preference){ #view .kcards>.trow.kflip{transition:transform .18s cubic-bezier(.2,.8,.2,1)} }
