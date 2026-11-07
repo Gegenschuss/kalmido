@@ -3,7 +3,14 @@
 // with one tap: money in -> an open invoice (a payment is recorded; less than open = partly paid), money out -> a receipt
 // (its payment day), or private / ignore. Every step has its undo; an import can be taken back while none of it is matched.
 // Server: kalmido/office/bank.py. No bank access.
-const BNK = {oid: null, state: 'open', data: null, q: '', err: null, imports: null, showImp: false, other: null, cand: null, candQ: '', busy: false, split: false};
+const BNK = {oid: null, fints: null, state: 'open', data: null, q: '', err: null, imports: null, showImp: false, other: null, cand: null, candQ: '', busy: false, split: false};
+// 2.616.0 (#2473): the direct bank fetch over FinTS (office_fints.js, loaded on its first use): BNK.fints = GET /api/office/bank/fints
+// ({on, message}); off (no product registration on the server) the button stays, switched off, with the reason
+const bnkFntHtml = () => {
+  const f = BNK.fints;
+  if (!f) { if (f === null) { BNK.fints = false; api('GET', '/api/office/bank/fints').then(j => { BNK.fints = j; }, () => { BNK.fints = {on: false, message: ''}; }).then(() => ofcDraw()); } return ''; }
+  return `<button class="btn" data-bnk="fints" ${f.on ? '' : `disabled aria-describedby="bnk-fnt-off"`}>${ic('download', 's')}<span>${tr('Fetch from bank')}</span></button>${f.on ? '' : `<small class="muted bnkfnt-off" id="bnk-fnt-off">${esc(f.message || '')}</small>`}`;
+};
 OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, ['bank', 'bank', N_('Bank'), 1, () => bnkHtml(), 'money']);  // admins only; 2.92.1 (#1917): in the menu group Money
 const BNK_KIND = {invoice: N_('Invoice'), receipt: N_('Receipt'), private: N_('Private'), ignored: N_('Ignored'), noreceipt: N_('No receipt needed'), card: N_('Credit card statement'), payout: N_('Collective payout'), cash: N_('Cash box transfer')};  // 2.299.0 C (#3192): noreceipt; 2.444.0 (#3447): card; 2.603.0 (#4927): cash
 
@@ -30,7 +37,7 @@ const bnkReload = () => { BNK.data = null; BNK.imports = BNK.showImp ? BNK.impor
 const bnkAmt = v => `${+v > 0 ? '+' : '−'}${ofcMoney(Math.abs(+v))}`;
 
 function bnkHtml() {
-  if (BNK.oid !== OFC.info?.org_id) Object.assign(BNK, {oid: OFC.info?.org_id, data: null, imports: null, err: null, other: null, cand: null});  // another office area
+  if (BNK.oid !== OFC.info?.org_id) Object.assign(BNK, {oid: OFC.info?.org_id, data: null, imports: null, err: null, other: null, cand: null, fints: null});  // 2.616.0 (#2473): + fints  // another office area
   if (!ofcAdmin()) return ofcLockedHtml();  // 2.356.0 D (#3006): why, and the way to hand in receipts
   if (BNK.err) return `<div class="empty">${esc(BNK.err)}</div>`;
   const norc = typeof BNR === 'object' && bnr_route() && BNK.state === 'norc';  // 2.299.0 C (#3192): #office/bank/norc (the reminder task's link)
@@ -38,14 +45,14 @@ function bnkHtml() {
   const d = BNK.data || {}, n = d.counts || {};
   const segs = [['open', tr('Open|payment state'), n.open], ['matched', tr('Matched'), n.matched], ['all', tr('All'), null]];
   if (typeof BNR === 'object') segs.splice(1, 0, ['norc', tr('Without receipt'), BNR.data?.counts?.out]);  // 2.299.0 C (#3192)
-  const bar = `<div class="ofcbar bnkbar"><button class="btn pri" data-bnk="imp">${ic('upload', 's')}<span>${tr('Import bank statement')}</span></button><span class="spacer"></span>
+  const bar = `<div class="ofcbar bnkbar"><button class="btn pri" data-bnk="imp">${ic('upload', 's')}<span>${tr('Import bank statement')}</span></button>${bnkFntHtml()}<span class="spacer"></span>
     <div class="seg" role="group" aria-label="${esc(tr('Show'))}">${segs.map(([k, t, c]) => `<button type="button" data-bnk="state" data-v="${k}" class="${BNK.state === k ? 'on' : ''}" aria-pressed="${BNK.state === k}">${esc(t)}${c ? ` <small>${c}</small>` : ''}</button>`).join('')}</div>
     <button class="btn ghost" data-bnk="imps" aria-expanded="${BNK.showImp}">${ic('list', 's')}<span>${tr('Imports')}</span></button></div>`;
   if (norc) return bar + (BNK.showImp ? bnkImpHtml() : '') + bnr_html();
   const items = d.items || [];
   const list = items.length ? `<ul class="bnklist" role="list">${items.map(bnkRow).join('')}</ul>`
     : `<div class="empty">${ic('bank')}<span>${BNK.state === 'open' && (n.open || 0) + (n.matched || 0) ? tr('Every booking is matched.') : tr('No bookings yet. Import the statement you download from your bank (CSV, CAMT or MT940).')}</span></div>`;
-  return bar + (BNK.showImp ? bnkImpHtml() : '') + (typeof brl_sugHtml === 'function' ? brl_sugHtml() : '') + list + `<div class="muted ofchint">${tr('No bank access: only the file you download yourself.')}<div class="shint">${tr('A match with an invoice records a payment; with a receipt it sets its payment day.')}</div></div>`;  // 2.298.0 A2 (#3186): the matching rule behind (i)
+  return bar + (BNK.showImp ? bnkImpHtml() : '') + (typeof brl_sugHtml === 'function' ? brl_sugHtml() : '') + list + `<div class="muted ofchint">${BNK.fints?.on ? tr('Bank access only when you fetch, with your PIN every time.') : tr('No bank access: only the file you download yourself.')/* 2.616.0 (#2473) */}<div class="shint">${tr('A match with an invoice records a payment; with a receipt it sets its payment day.')}</div></div>`;  // 2.298.0 A2 (#3186): the matching rule behind (i)
 }
 function bnkRow(t) {
   const inn = +t.amount > 0;
@@ -269,6 +276,7 @@ document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-bnk]'); if (!b) return;
   const a = b.dataset.bnk, id = +b.dataset.id;
   if (a === 'imp') bnkPick();
+  else if (a === 'fints') fnt_open();  // 2.616.0 (#2473): office_fints.js (lazyload.js LD_CALL)
   else if (a === 'state') { BNK.state = b.dataset.v; BNK.other = null; ofcDraw(); }
   else if (a === 'imps') { BNK.showImp = !BNK.showImp; ofcDraw(); }
   else if (a === 'impundo') bnkImpUndo(id);

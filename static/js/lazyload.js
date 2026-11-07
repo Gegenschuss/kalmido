@@ -57,6 +57,7 @@ const LD_MODS = {
   family: ['family'],  // 2.501.0 (#4198): the module Family, on its view, a family list, a task panel while it is on
   filereq: ['filereq'],
   fltdlg: ['fltdlg'],  // 2.521.0 (#4479): the dialog of a saved filter (condition rows)  // 2.122.0 A (#2097): file request links of a folder (dialog on demand)
+  fints: ['office_fints'],  // 2.616.0 (#2473): the direct bank fetch over FinTS (the office's tab Bank)
   fsshare: ['fsshare'],  // 2.199.0 A (#2742): the one Share dialog of folders / files (file store, office, tables)
   videos: ['videorev'],  // 2.99.1 A (#1959): video sign-offs
   abscan: ['abscan'],  // 2.112.1 (#2058): the phone scan dialog of the file store and the documents
@@ -99,6 +100,7 @@ const LD_NEED = {settings: ['agentchat', 'calendar', 'integrations', 'playbook',
 const LD_CALL = {settings: ['settingsModal', 'setApply', 'settingsSync', 'modCountsSync', 'setSaved', 'setLocal', 'ojn_open', 'otkOpen'],  // 2.149.0 F (#2519): setLocal (the command bar's "Theme: …"); bundle B: ojn_open (2.148.1 #2480, bell item of an invitation); 2.574.0 (#3376): otkOpen (acctset.js)
   ablage: ['ab_linkFile'],  // 2.501.0 (#4198): the button of a file row in a task / project
   fltdlg: ['filterModal'],  // 2.521.0 (#4479): the filter dialog (sidebar, palette, a filter's menu)
+  fints: ['fnt_open'],  // 2.616.0 (#2473): the button "Fetch from bank" (office_bank.js)
   family: ['occModal', 'dlModal', 'famPack', 'shopModeOpen', 'paskOpen', 'kd_pinAsk'],  // 2.501.0 (#4198): the palette, the first start, a child's PIN
   contacts: ['ctRoute', 'ctEditor'], filereq: ['frq_open'], fsshare: ['fs_shareDialog'],  // 2.199.0 A (#2742): fsshare
   // 2.65.0 (#1823)
