@@ -12,7 +12,7 @@ function modal(html) {
   document.body.appendChild(m);
   kb_push('dialog', m);  // 2.630.0 (#4510): on the key registry's scope stack (keys.js): Esc closes the innermost open thing
   document.body.classList.add('modal-open');  // 2.28.0 (#976): the grips step aside while a dialog is open
-  onRemove(m, () => { const dc = m.ownerDocument; if (dc && dc.body && !dc.querySelector('.modal')) dc.body.classList.remove('modal-open'); });
+  onRemove(m, () => { kb_pop(m); /* 2.630.0 (#4510) */ const dc = m.ownerDocument; if (dc && dc.body && !dc.querySelector('.modal')) dc.body.classList.remove('modal-open'); });
   vvSync();
   modalA11y(m);
   queueMicrotask(() => dlg_resizable(m));  // after the caller added its classes (they name the dialog kind)

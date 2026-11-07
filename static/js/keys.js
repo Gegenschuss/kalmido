@@ -41,7 +41,7 @@ function kb_on(/** @type {string} */ scope, /** @type {string} */ key, /** @type
 }
 /** puts an open dialog / popover (el) on top of the scope stack; the same element again moves it to the top */
 function kb_push(/** @type {string} */ scope, /** @type {any} */ el, /** @type {{close?: () => any}} */ opt = {}) {
-  if (el) kb_pop(el);
+  KBR.st = KBR.st.filter(s => s.el !== el && (!s.el || s.el.isConnected));  // the same element moves up; gone ones drop off
   const s = {scope, el, close: opt.close || null}; KBR.st.push(s); return s;
 }
 /** takes an element (or the entry kb_push returned) off the stack */

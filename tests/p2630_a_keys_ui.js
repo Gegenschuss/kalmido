@@ -63,7 +63,7 @@ const DESK = {'(hover:hover) and (pointer:fine)': true};
     check(await until(() => !popOpen()) && dlgs() === 1, tag + 'Escape: the menu over the dialog closed, the dialog stays');
     esc();
     check(await until(() => dlgs() === 0), tag + 'Escape: then the dialog closed');
-    check(w.eval('KBR.st.length') === 0, tag + 'nothing stays on the stack ' + w.eval('JSON.stringify(KBR.st.map(s => s.scope))'));
+    check(await until(() => w.eval('KBR.st.length') === 0), tag + 'nothing stays on the stack ' + w.eval('JSON.stringify(KBR.st.map(s => s.scope))'));
 
     // ---- the old way of a test: a key sent to the document (bubbles) still reaches the registry
     w.eval(`modal('<h3>Third p2630</h3>')`);
