@@ -373,7 +373,8 @@ function dfSum(k, t, ncm) {
   if (k === 'time') {
     const sec = typeof taskTime === 'function' ? taskTime(t.id)[0] : 0, f = fieldsOf(t.list_id).find(x => x.type === 'number' && DFOLD_BUDGET.includes(String(x.name || '').trim().toLowerCase()));
     const b = f ? +((t.fields || {})[f.id]) || 0 : 0, hm = `${Math.floor(sec / 3600)}:${pad(Math.floor(sec % 3600 / 60))}`;
-    if (!b) return sec >= 60 ? [hm, ''] : ['', ''];
+    const em = typeof tEstMin === 'function' ? tEstMin(t) : 0;  // 2.627.0 (#4503): the estimate (duration) next to it
+    if (!b) return em ? [`${hm} / ${Math.floor(em / 60)}:${pad(em % 60)}`, sec > em * 60 ? 'dfbad' : ''] : sec >= 60 ? [hm, ''] : ['', ''];
     return [tr('{0} of {1} h', hm, fmtNum(b, 1)), sec > b * 3600 ? 'dfbad' : ''];
   }
   return ['', ''];

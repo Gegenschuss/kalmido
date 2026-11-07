@@ -20,6 +20,11 @@ function taskTime(id) {  // [everyone I can see, mine] in seconds, incl. my runn
   const [a, m] = (S.timeTotals || {})[id] || [0, 0], run = S.timer && S.timer.task_id === id ? timerElapsed() : 0;
   return [a + run, m + run];
 }
+// 2.627.0 (#4503): the task's duration is its estimate (no field of its own): the tracked time stands next to it,
+// "1:30 h / 2:00 h" in the time chip, the column "Tracked time" and the task's time area; '' without a duration
+const tEstMin = t => +(t?.duration || 0) > 0 ? +t.duration : 0;
+const tIstEst = (sec, t) => tEstMin(t) ? `${fmtDur(sec)} / ${fmtH(tEstMin(t))}` : fmtDur(sec);
+const tEstTip = t => tEstMin(t) ? ` · ${tr('Estimate')}: ${fmtH(tEstMin(t))}` : '';
 function addLocalTotal(tid, sec) {  // offline: keep the task chips right until the next sync
   if (!tid || !(sec > 0)) return;
   const [a, m] = (S.timeTotals ||= {})[tid] || [0, 0];
@@ -192,7 +197,8 @@ function drawTaskTime() { const el = $('#d-time'), t = taskById(S.sel); if (el &
 function taskTimeHtml(t) {
   const [all, mine] = taskTime(t.id), run = S.timer && S.timer.task_id === t.id;
   const items = S.te.tid === t.id ? S.te.items : null;
-  let h = `<h5>${tr('Time|tracked')}${all >= 60 ? ` <span class="muted h5note">${all - mine >= 60 ? tr('{0} in total, {1} by you', fmtDur(all), fmtDur(mine)) : fmtDur(all)}</span>` : ''}</h5>
+  // 2.627.0 (#4503): + the estimate (duration) next to the tracked time, also with nothing tracked yet
+  let h = `<h5>${tr('Time|tracked')}${all >= 60 || tEstMin(t) ? ` <span class="muted h5note" data-ist-est="${t.id}">${all - mine >= 60 ? tr('{0} in total, {1} by you', fmtDur(all), fmtDur(mine)) + (tEstMin(t) ? ` / ${fmtH(tEstMin(t))}` : '') : tIstEst(all, t)}</span>` : ''}</h5>
     <div class="tebtns"><button class="btn sm ${run ? 'recon' : ''}" data-act="timer-toggle" data-id="${t.id}">${run ? `${ic('stop', 's')} ${tr('Stop')} <span data-timer-live>${fmtT(timerElapsed())}</span>` : `${ic('play', 's')} ${tr('Start timer')}`}</button><button class="btn sm" data-act="te-add" data-id="${t.id}">${ic('plus', 's')} ${tr('Add time')}</button></div>`;
   h += te_budgetHtml(t);
   if (items === null) return h + (S.te.err === 'offline' ? `<div class="muted mhint">${tr('Time entries are only available online.')}</div>` : '');

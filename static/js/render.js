@@ -1151,10 +1151,11 @@ function taskRow(t, opts = {}) {
   if (tFor(t) && t.id > 0) {
     const [ta, tm] = taskTime(t.id), live = S.timer && S.timer.task_id === t.id;
     if (ta >= 60 || live) {
-      const tip = esc(live ? tr('Timer running') : ta - tm >= 60 ? tr('{0} in total, {1} by you', fmtDur(ta), fmtDur(tm)) : tr('Tracked: {0}', fmtDur(ta)));
-      if (!lc && rs('tracked')) meta.push(`<span class="tchip ${live ? 'live' : ''}${mc}" data-tt="${t.id}" title="${tip}">${ic('clock', 's')}<b>${fmtDur(ta)}</b></span>`);
-      time = {live, tip, txt: fmtDur(ta)};
-    }
+      const tip = esc((live ? tr('Timer running') : ta - tm >= 60 ? tr('{0} in total, {1} by you', fmtDur(ta), fmtDur(tm)) : tr('Tracked: {0}', fmtDur(ta))) + tEstTip(t));
+      const itx = esc(tIstEst(ta, t));  // 2.627.0 (#4503): "1:30 h / 2:00 h" = tracked / estimate (the duration)
+      if (!lc && rs('tracked')) meta.push(`<span class="tchip ${live ? 'live' : ''}${mc}" data-tt="${t.id}" title="${tip}">${ic('clock', 's')}<b>${itx}</b></span>`);
+      time = {live, tip, txt: itx};
+    } else if (tEstMin(t)) time = {live: false, tip: esc(tr('Estimate') + ': ' + fmtH(tEstMin(t))), txt: esc(tIstEst(0, t))};  // 2.627.0 (#4503): the column shows the estimate before the first minute
   }
   if (planOf(t) && !opts.trash && rs('plan')) meta.push(`<span class="pchip" title="${esc(tr('Planned: {0}', planLabel(t)))}">${ic('clock', 's')}<b>${esc(planLabel(t, true))}</b></span>`);  // 2.11.0
   if (t.code?.prs?.length && !opts.trash && rs('code')) meta.push(codeChip(t));  // 2.2.0 (#271)
