@@ -205,4 +205,14 @@ rg = until(lambda: [x for x in runs(A, gp) or [] if x.get("shared")], 30)
 check(rg and rg[0]["shared"] == 1, f"group: the run shared the document once {rg}")
 check(len(dbx("SELECT id FROM fs_shares WHERE node_id=? AND group_id=?", (gp, GOWN))) == 1, "group: one share row of the core for the group")
 
+# ---- 2.635.0 E (#4856): on / off sends the flow's version -- an old version -> 409, nothing changed
+r = flow(Fr, "private", name="Umschalten", kind="any", match="Umschalt", type="U")
+TID = r.json()["id"]
+t0 = [x for x in rules(Fr, "private") if x["id"] == TID][0]
+r = Fr.patch(B + f"/api/docs/rules/{TID}", json={**t0, "id": None, "off": True, "expect_updated_at": t0["updated_at"]})
+check(r.ok and [x for x in r.json()["rules"] if x["id"] == TID][0].get("off"), f"toggle: off with the current version {r.status_code}")
+r = Fr.patch(B + f"/api/docs/rules/{TID}", json={**t0, "id": None, "off": True, "name": "Anders", "expect_updated_at": t0["updated_at"]})
+check(r.status_code == 409 and isinstance(r.json().get("rules"), list), f"toggle: a stale version -> 409 {r.status_code} {r.text[:150]}")
+check([x for x in rules(Fr, "private") if x["id"] == TID][0].get("name") == "Umschalten", "toggle: the 409 changed nothing")
+
 sys.exit(kt.done("p2635_d_flows"))
