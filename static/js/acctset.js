@@ -1032,7 +1032,7 @@ function ua8PurgeHtml(p) {
   // 2.631.0 (#4584): per folder handed on, what of it does not go along and which links end (purgeshare._branch_counts)
   for (const b of p.shared?.branches || []) {
     const parts = [b.stay && trn('{0} entry in it does not go along and goes with the account (locked folders, shortcuts, agent folders, the trash, e-mail copies)', '{0} entries in it do not go along and go with the account (locked folders, shortcuts, agent folders, the trash, e-mail copies)', b.stay),
-      b.ends && trn('{0} public link or file request on it ends', '{0} public links or file requests on it end', b.ends),
+      b.ends && trn('{0} public link, file request or agent access on it ends', '{0} public links, file requests or agent accesses on it end', b.ends),  // 2.644.0 (#4999): agents outside the heir's space end too
       b.agents && trn('{0} agent of another person keeps its access', '{0} agents of other people keep their access', b.agents)].filter(Boolean);
     if (parts.length) rows.push([!!(b.stay || b.ends), tr('A shared folder or file that is handed on: {0}.', parts.join('; '))]);
   }

@@ -3,6 +3,7 @@
 """2.631.0 (#4584): the account's delete dialog says per shared folder that is handed on what of it does not go along (a
 locked folder with what lies in it, a shortcut, the trash, the copy of a mail that goes with the account) and how many
 public links and file requests of others on it end; an agent of another person with a share in it keeps it (only said).
+2.644.0 (#4999): an agent outside the heir's own space (xena's) loses its share (counted under 'ends'); one of the heir keeps it.
 The numbers are exactly what the deletion then does: the entries counted are the ones missing afterwards, the links and
 requests counted are the ones ended. The mail copy is never handed on (it went right after anyway). People without an
 organisation throughout (freelancer-matrix: files). Invented names only.
@@ -10,6 +11,8 @@ usage: p2631_c_purge_branches_test.py <datadir>"""
 import base64
 import os
 import sys
+
+import requests
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import dbx as dbxm  # noqa: E402
@@ -95,13 +98,20 @@ write("INSERT INTO fs_ext_links(node_id, created_by, token_hash, token, expires_
       (F1, XENA, "p2631c-h2", "p2631c-t2", "2020-01-01T00:00:00Z", T0))
 write("""INSERT INTO fs_upload_requests(node_id, created_by, token, token_hash, title, expires_at, created_at)
          VALUES(?,?,?,?,?,?,?)""", (GB, XENA, "p2631c-req", "p2631c-req-hash", "For the studio", "2099-01-01T00:00:00Z", T0))
-# an agent of xena with a share of the file: it keeps it (as built), the dialog says so
+# 2.644.0 (#4999): an agent of xena with a share of the file: it ends with the hand-over (as a move into wim's own space);
+# an agent of wim, the heir, with a share of it keeps it
 assert A.put(B + "/api/admin/agent-policy", json={"user_agents": True}).ok
-AG = Xe.post(B + "/api/my/agents", json={"username": "xhelper", "display_name": "X helper", "scopes": ["read"]})
+AG = Xe.post(B + "/api/my/agents", json={"username": "xhelper", "display_name": "X helper", "scopes": ["read", "files:read"]})
 check(AG.ok, "xena's agent " + AG.text[:120])
-AGID = AG.json()["id"]
+AGID, AGH = AG.json()["id"], {"Authorization": "Bearer " + AG.json()["token"], "X-Requested-With": "kalmido"}
+WAG = Wi.post(B + "/api/my/agents", json={"username": "whelper", "display_name": "W helper", "scopes": ["read", "files:read"]})
+check(WAG.ok, "wim's agent " + WAG.text[:120])
+WAGID, WAGH = WAG.json()["id"], {"Authorization": "Bearer " + WAG.json()["token"], "X-Requested-With": "kalmido"}
 # 2.631.0 (#4584, Fable): an agent share lives in fs_shares.agent_id (files/web.py), never in user_id
 write("INSERT INTO fs_shares(node_id, agent_id, role, created_by, created_at) VALUES(?,?,'view',?,?)", (F1, AGID, VERA, T0))
+write("INSERT INTO fs_shares(node_id, agent_id, role, created_by, created_at) VALUES(?,?,'view',?,?)", (F1, WAGID, VERA, T0))
+r = requests.get(B + f"/api/v1/files/{F1}", headers=AGH)
+check(r.status_code == 200, f"setup: xena's agent reads the shared file ({r.status_code} {r.text[:120]})")
 
 BEFORE = subtree(GB)
 OWN = {n for n, o in BEFORE.items() if o == VERA}
@@ -109,8 +119,9 @@ check({GB, F1, QF, LK, LKF, TR, MC} <= OWN and len(OWN) == 8, f"setup: eight ent
 sh = A.get(B + f"/api/users/{VERA}/delete-info").json()["purge"]["shared"]
 check(sh["to"] == {"folders": 1} and not sh["gone"], f"the folder is handed on: {sh}")
 # without #4584 there is no "branches": the dialog said nothing about what stays behind
-check(sh.get("branches") == [{"stay": 5, "ends": 2, "agents": 1}],
-      f"per folder: 5 entries stay behind (locked folder + its file, shortcut, trash, mail copy), 2 links / requests end, 1 agent keeps it: {sh.get('branches')}")
+# 2.644.0 (#4999): xena's agent share ends (3 instead of 2 under 'ends'), wim's agent keeps its (1)
+check(sh.get("branches") == [{"stay": 5, "ends": 3, "agents": 1}],
+      f"per folder: 5 entries stay behind (locked folder + its file, shortcut, trash, mail copy), 2 links / requests and xena's agent end, wim's agent keeps it: {sh.get('branches')}")
 # the person themselves sees the same numbers in their own delete dialog
 me = Ve.get(B + "/api/account/delete")
 check(me.ok and me.json().get("purge", {}).get("shared", {}).get("branches") == sh["branches"], "the own delete dialog counts the same " + me.text[:200])
@@ -123,7 +134,13 @@ check(len(missing) == 5 and {LK, LKF, TR, MC} <= missing, f"exactly the five cou
 check(AFTER[GB] == WIM and AFTER[F1] == WIM and AFTER[QF] == WIM, "the folder, its file and wim's contribution are wim's")
 check(not dbx("SELECT 1 FROM fs_ext_links WHERE token_hash IN ('p2631c-h1', 'p2631c-h2')"), "the public links ended")
 check(dbx("SELECT revoked_at FROM fs_upload_requests WHERE token_hash='p2631c-req-hash'")[0][0], "the file request ended")
-check(dbx("SELECT role FROM fs_shares WHERE node_id=? AND agent_id=?", (F1, AGID)) == [("view",)], "xena's agent keeps its share")
+# 2.644.0 (#4999): without the fix xena's agent kept reading a file that is now wim's private one
+check(not dbx("SELECT 1 FROM fs_shares WHERE agent_id=?", (AGID,)), "xena's agent share ended")
+r = requests.get(B + f"/api/v1/files/{F1}", headers=AGH)
+check(r.status_code in (403, 404), f"xena's agent no longer reads the file ({r.status_code})")
+check(dbx("SELECT role FROM fs_shares WHERE node_id=? AND agent_id=?", (F1, WAGID)) == [("view",)], "wim's agent keeps its share")
+r = requests.get(B + f"/api/v1/files/{F1}", headers=WAGH)
+check(r.status_code == 200, f"wim's agent still reads it ({r.status_code} {r.text[:120]})")
 check(not dbx("SELECT 1 FROM fs_versions WHERE node_id=?", (MC,)), "the mail copy went with the account")
 r = Wi.get(B + f"/api/files/nodes/{F1}/content")
 check(r.ok and r.content == b"the first file", f"wim reads the file sealed for him ({r.status_code})")

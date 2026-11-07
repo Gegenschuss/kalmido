@@ -31,7 +31,11 @@ ush_plan is the one place that decides: the dialog counts what the deletion then
 2.631.0 (#4584): the dialog says per branch handed on what of it does not go along (locked folders, links, agent folders, the
 trash, the copies of mails that go with the account) and how many public links and file requests of others on it end; agents
 of other people with a share in it keep it (as built, only said). _branch_walk is the one rule for that and for _folders. The
-mail copies (ush_mail_doomed, also for accounts/users.py _up_mail_nodes) are no longer sealed again for the heir only to be deleted right after."""
+mail copies (ush_mail_doomed, also for accounts/users.py _up_mail_nodes) are no longer sealed again for the heir only to be deleted right after.
+
+2.644.0 (#4999): the agent shares on a branch handed on follow the rule of a move into the heir's own space (files/fsmove.py
+fsm_share_ends): an agent that does not belong there (another person's, an organisation's) loses its share, the dialog
+counts it under 'ends'; only an agent of the heir's own space keeps it ('agents')."""
 import os
 
 from ..collab.comments import user_names
@@ -46,7 +50,7 @@ from ..core.pg import insert_id, system_ctx
 from ..core.orgcrypt import OrgCryptError
 from ..files.extlinks import xl_space_moved
 from ..files.fslock import fsl_map, fsl_of_chain
-from ..files.fsmove import fsm_doc, fsm_text, fsm_versions, fsm_walk
+from ..files.fsmove import fsm_doc, fsm_share_ends, fsm_text, fsm_versions, fsm_walk
 from ..files.fstags import dt_move
 from ..files.fsref import fs_ref_node
 from ..files.store import _free_name, _now, fs_chain, fs_deleted, fs_space, fs_subtree
@@ -192,7 +196,8 @@ def _in_parts(c, sql, ids, *args):
 def _branch_counts(c, uid, x, doomed):
     """2.631.0 (#4584): {stay, ends, agents} of branch item x handed on (_fs_branches): entries of the deleted person in it
     that do not go along (filed objects count as themselves above), the live public links and the file requests of others
-    that end (_folders), the agents of other people with a live share in it (they keep it). Numbers only."""
+    that end (_folders), the agents of other people with a live share in it: 2.644.0 (#4999) those outside the heir's own
+    space end (counted in ends, _heir_agents), the others keep it (agents). Numbers only."""
     root = c.execute("SELECT * FROM fs_nodes WHERE id=?", (x["id"],)).fetchone()
     if root is None:
         return {"stay": 0, "ends": 0, "agents": 0}
@@ -207,7 +212,14 @@ def _branch_counts(c, uid, x, doomed):
                                            "AND revoked_at IS NULL AND deleted_at IS NULL", own, x["heir"]))
     agents = {r[0] for r in _in_parts(c, "SELECT s.agent_id FROM fs_shares s JOIN agents a ON a.user_id=s.agent_id WHERE s.node_id IN ({q}) "
                                          "AND (a.owner_id IS NULL OR a.owner_id<>?) AND (s.expires_at IS NULL OR s.expires_at>?)", own, uid, now)}
-    return {"stay": stay, "ends": ends, "agents": len(agents)}
+    keep = _heir_agents(c, agents, x["heir"])
+    return {"stay": stay, "ends": ends + len(agents - keep), "agents": len(keep)}
+
+
+def _heir_agents(c, aids, heir):
+    """2.644.0 (#4999): the agents of aids that keep their share of a branch handed on to heir: the rule of a move into the
+    heir's own space (fsm_share_ends; an organisation's agent or another person's private agent ends)."""
+    return {a for a in aids if not fsm_share_ends(c, {"agent_id": a}, None, heir)}
 
 
 def _fs_branches(c, uid, doomed=frozenset()):
@@ -420,6 +432,11 @@ def _folders(c, uid, items, new_paths, old_paths, doomed=frozenset()):
             # review #4347: into another owner's workspace, as fsm_apply: external links end, so do the file requests of others
             c.execute(f"""UPDATE fs_upload_requests SET revoked_at=? WHERE node_id IN ({pq}) AND created_by<>?
                           AND revoked_at IS NULL AND deleted_at IS NULL""", (stamp, *part, heir))
+            # 2.644.0 (#4999): as a move into the heir's own space, the agents that do not belong there lose their share
+            aids = {r[0] for r in c.execute(f"SELECT DISTINCT agent_id FROM fs_shares WHERE agent_id IS NOT NULL AND node_id IN ({pq})", part)}
+            ends = sorted(aids - _heir_agents(c, aids, heir))
+            if ends:
+                c.execute(f"DELETE FROM fs_shares WHERE node_id IN ({pq}) AND agent_id IN ({','.join('?' * len(ends))})", (*part, *ends))
         xl_space_moved(c, done)
         live = "(expires_at IS NULL OR expires_at>?)"
         for col, want in (("user_id", x["others"]), ("group_id", x.get("groups") or {})):
