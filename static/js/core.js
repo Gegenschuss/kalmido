@@ -1436,6 +1436,7 @@ async function ld_go(auto) {
     flush(); return;
   }
   applyState(j, ld_w0);
+  if (j?.lva && !S.lpA) S.lpA = j.lva;  // 2.619.0 (#3890): the areas of this state (read before its v): the first poll takes a delta, not the whole state again
   if (S.qfWait && typeof qfSend === 'function') qfSend();  // 2.376.1 CI fix: files of a quick add whose new task was not loaded yet
   LS.set('cache', j); S.lpCache = j;  // 2.42.0 (#1376): the delta keeps the cache current (liveparts.js)
   if (S.extra) await loadExtra().catch(() => {});
@@ -1573,12 +1574,20 @@ async function verReload() {
 // 2.35.0 (#1094): the automatic reload waits until /api/version reported the new version twice in a row (not in the middle of
 // an update, while single requests still fail); after a reload the language file is checked against the code (i18nRetry)
 S.verSeen = {v: '', n: 0};
+// 2.619.0 (#3890): an update makes every open window reload by itself within the same poll (all start pages and whole
+// states at once): each window waits a random part of VER_SPREAD_MS first (once per new version; the bar shows meanwhile,
+// "Reload" works at once). Tests set it to 0.
+let VER_SPREAD_MS = 30000;
+function verSpreadDue() {
+  if (S.verSpread?.v !== S.serverVer) S.verSpread = {v: S.serverVer, at: Date.now() + Math.random() * VER_SPREAD_MS};
+  return Date.now() >= S.verSpread.at;
+}
 function verCheck(app) {
   if (app) { if (app === S.verSeen.v) S.verSeen.n++; else S.verSeen = {v: app, n: 1}; S.serverVer = app; }
   let el = $('#newver');
   if (!verStale()) { if (el) el.remove(); if (typeof I18N !== 'undefined' && I18N.stale) i18nRetry(); return; }
   let once = ''; try { once = sessionStorage.getItem('kalmido-reloaded') || ''; } catch { /* private mode */ }
-  if (once !== S.serverVer && S.verSeen.n >= 2 && verQuiet() && (document.hidden || Date.now() - verIdle > 20000)) { verReload(); return; }
+  if (once !== S.serverVer && S.verSeen.n >= 2 && verQuiet() && (document.hidden || Date.now() - verIdle > 20000) && verSpreadDue()) { verReload(); return; }  // 2.619.0 (#3890): + the spread
   if (!el) {
     el = document.createElement('div'); el.id = 'newver'; el.setAttribute('role', 'status');
     el.innerHTML = `${ic('sync', 's')}<span>${esc(tr('New version available'))}</span><button type="button" class="btn sm pri" data-nv="go">${esc(tr('Reload'))}</button>`;

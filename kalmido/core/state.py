@@ -1,5 +1,6 @@
 """GET /api/state: everything the web client loads at start and after a change."""
 import json
+import threading  # 2.619.0 (#3890): the herd brake
 import time
 from datetime import timedelta
 from flask import g, has_request_context, jsonify, request
@@ -9,7 +10,7 @@ from ..core.i18n import languages, tr
 from ..core.schema import MAX_DEPTH
 from ..core.retention import ret_on
 from ..core.dlock import dl_list_hidden  # 2.235.0 B (#2902)
-from ..core.db import ag_cursor, ag_cursor_parse, db, err, gsetting, inbox_names, iso, like_escape, local_now, now_utc, usettings
+from ..core.db import ag_cursor, ag_cursor_parse, db, err, gsetting, inbox_names, iso, like_escape, local_now, lv_versions, now_utc, usettings  # 2.619.0 (#3890): + lv_versions
 from ..accounts.session import me, session_gen, user_public
 from ..accounts.pictures import avatar_map, list_icon_url
 from ..accounts.colors import ac_color_map
@@ -265,6 +266,42 @@ def visible_sections(c, uid, tasks=None):
 # held back by each other, only the tabs of one browser
 ST_BRAKE_S = 8
 _st_auto = {}
+# 2.619.0 (#3890): the herd brake. A change everyone sees (a list's members, an organisation, an area without delta such as
+# "other") makes every open client load its whole state at its next poll (within the 4 s of the poll, all at once on one
+# core: /api/version waited up to 19 s in the measurement of #3137). At most KALMIDO_STATE_AUTO_MAX of these reloads
+# (?auto=1) run at the same time in this process; one more answers {brake: true} like the brake above (the client keeps
+# its state and asks again with its next poll), so the wave is spread over a few polls. Loads after an own action, the
+# start of the app and agents (no auto) are never held. 0 = off.
+_st_herd = {"n": 0}
+_st_herd_lock = threading.Lock()
+
+
+def st_herd_max():
+    return env_int("KALMIDO_STATE_AUTO_MAX", 4, lo=0)
+
+
+def st_herd_take(m=None):
+    """2.619.0 (#3890): a place for one reload of the live update: None = the brake is off, True = taken (st_herd_give
+    gives it back at the end of the request), False = all places busy (the caller answers brake)."""
+    m = st_herd_max() if m is None else m
+    if not m:
+        return None
+    with _st_herd_lock:
+        if _st_herd["n"] >= m:
+            return False
+        _st_herd["n"] += 1
+        return True
+
+
+def st_herd_give():
+    with _st_herd_lock:
+        _st_herd["n"] = max(0, _st_herd["n"] - 1)
+
+
+@app.teardown_request
+def st_herd_end(_exc=None):
+    if g.pop("st_herd", None):
+        st_herd_give()
 
 
 @app.get("/api/state")
@@ -274,6 +311,10 @@ def state():
         t, k = time.monotonic(), (me(), g.get("auth_via"), hash(request.cookies.get(COOKIE) or request.headers.get("User-Agent", "")))
         if t - _st_auto.get(k, -ST_BRAKE_S) < ST_BRAKE_S:
             return jsonify(brake=True, v=int(gsetting(db(), "version")))
+        took = st_herd_take()  # 2.619.0 (#3890): the herd brake (not counted as loaded: this sign-in comes again at once)
+        if took is False:
+            return jsonify(brake=True, v=int(gsetting(db(), "version")))
+        g.st_herd = bool(took)
         if len(_st_auto) > 5000:
             _st_auto.clear()
         _st_auto[k] = t
@@ -305,6 +346,10 @@ def state():
     from ..tasks.mineorder import mt_mine_hidden, vw_mine_order, vw_mine_sections
     c = db()
     uid = me()
+    # 2.619.0 (#3890): the change counters per area (as /api/version "a"), read BEFORE the version: a window takes them as
+    # the areas of its first poll (liveparts.js lpChanged), which then fetches a delta instead of the whole state again;
+    # read first, a change in between counts as changed (never missed)
+    lva = lv_versions(c)
     v0 = int(gsetting(c, "version"))  # 2.42.0 (#1376): before the tasks: they are at least this new (the delta starts here)
     s = usettings(c, uid)
     cutoff = iso(now_utc() - timedelta(days=14))
@@ -334,7 +379,7 @@ def state():
     # 2.65.0 (#1505): stays jsonify with sorted keys: the client compares parts of it as text with the delta's answer
     # (liveparts.js lpSideCnt), so the key order is part of the contract
     return jsonify(
-        v=v0,
+        v=v0, lva=lva,  # 2.619.0 (#3890): + lva
         me={**user_public(u), "orgs": _org_names(c, u["id"]), "is_admin": bool(u["is_admin"]), "auth": g.auth_via, "has_password": bool(u["password_hash"]),
             # 2.138.0 C (#1907): only whether an upload token is set (the token itself is shown once, when created)
             "drop_token_set": bool(not u["kid"] and u["drop_token_hash"]), "drop_token_at": "" if u["kid"] else (u["drop_token_at"] or ""),
