@@ -270,7 +270,8 @@ check(r.status_code == 201 and r.json()["comment"]["pos"] == {"page": 2, "x": 0.
       f"the agent comments at page 2 + point {r.status_code} {r.text[:300]}")
 r = ag.get(B + f"/api/v1/videos/{RP}/versions/{pv['id']}/file")
 check(r.ok and r.content == PDF, f"the agent reads the PDF's bytes {r.status_code}")
-check(ag.get(B + f"{V}/{RP}").status_code == 404, "the app's routes stay closed to agents")
+web = [ag.get(B + f"{V}/{RP}").status_code, ag.get(B + f"/api/videos/{RP}/versions/{pv['id']}/file").status_code]
+check(all(x in (401, 403, 404) for x in web), f"the app's routes stay closed to agents {web}")
 check(ag.get(B + f"/api/v1/videos/{RID}").status_code == 404, "the agent: the image review (its folder not shared) 404")
 
 # ---- a person without an organisation
