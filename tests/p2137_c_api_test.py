@@ -158,9 +158,11 @@ def open_archive(ox, rk):
             return zipfile.ZipFile(io.BytesIO(f.read()))
 
 
-def norm_rows(rows, skip=()):
+def norm_rows(rows, skip=(), entry=""):
     out = collections.Counter()
     for r in rows:
+        if entry == "store/history.json" and isinstance(r, dict) and r.get("action") in ("move", "moved_space"):
+            r = {k: v for k, v in r.items() if k != "detail"}  # 2.636.0 (#4854): the detail is a node id of the server it is on
         if isinstance(r, dict) and r.get("action") == "recovery_key" and r.get("target") == "org":
             continue  # 2.137.0 (#2344, with 2.138.0 #1972): the target's own recovery key, made by its first export
         if isinstance(r, dict):
@@ -176,7 +178,7 @@ def norm_archive(zf):
             continue
         raw = zf.read(n)
         if n.endswith(".json") and not n.startswith("files/"):
-            rows[n] = norm_rows(json.loads(raw.decode("utf-8")), SKIP_IN.get(n, ()))
+            rows[n] = norm_rows(json.loads(raw.decode("utf-8")), SKIP_IN.get(n, ()), n)
         else:
             files[n.rsplit("/", 1)[0]][hashlib.sha256(raw).hexdigest()] += 1
     return rows, files
@@ -351,6 +353,11 @@ ok(A.post(B + "/api/office/docs", json={"kind": "offer", "client_id": CL, "proje
 FD = ok(A.post(B + "/api/files/folders", json={"name": "Kunden", "space": f"org:{ORG}"}), "a folder").get("id")
 ok(A.post(B + "/api/files/upload", data={"parent_id": FD}, files=[("file", ("brief.txt", b"Briefing " + os.urandom(6).hex().encode(), "text/plain"))]),
    "a file in the store")
+# 2.636.0 (#4854): history lines with ids of this server: a move (the parent folder; one that does not come along) and a move
+# into another workspace ("org:<id>->org:<id>")
+FD2 = ok(A.post(B + "/api/files/folders", json={"name": "Archiv", "space": f"org:{ORG}"}), "a second folder").get("id")
+for act, det in (("move", str(FD2)), ("move", "987654321"), ("moved_space", f"org:987654321->org:{ORG}")):
+    dbx("INSERT INTO fs_log(node_id,user_id,agent,action,detail,at) VALUES(?,?,0,?,?,?)", (FD, ALICE, act, det, NOW))
 ok(A.post(B + "/api/wiki/pages", json={"space": f"org:{ORG}", "path": "Ablauf", "body": "# Ablauf\nErst planen."}), "a knowledge page")
 SH = ok(A.post(B + "/api/sheets", json={"title": "Budget", "space": f"org:{ORG}"}), "a table")
 if SH.get("id"):
@@ -420,6 +427,13 @@ check(T("SELECT user_id FROM time_entries WHERE list_id=? AND note LIKE 'Bob Mit
 check(one("SELECT COUNT(*) FROM time_sheets WHERE org_id=?", (ORG3,)) == 0 or
       one("SELECT COUNT(*) FROM time_sheets WHERE org_id=? AND user_id=?", (ORG3, DORA)) == 0, "dora's timesheet not")
 check("not selected were not imported" in W, f"the warning names the left-out rows {W[:300]}")
+# 2.636.0 (#4854): the history's ids point at the target: the move names the target's folder, the folder that did not come
+# along and the source's workspaces leave the detail empty
+NFD = one("SELECT id FROM fs_nodes WHERE org_id=? AND kind='folder' AND name='Kunden' AND deleted_at IS NULL", (ORG3,))
+NFD2 = one("SELECT id FROM fs_nodes WHERE org_id=? AND kind='folder' AND name='Archiv' AND deleted_at IS NULL", (ORG3,))
+hist = sorted(T("SELECT action, detail FROM fs_log WHERE node_id=? AND action IN ('move','moved_space')", (NFD,)))
+check(NFD and NFD2 and hist == sorted([("move", str(NFD2)), ("move", ""), ("moved_space", "")]),
+      f"history of the imported folder: move -> the target's folder, no id of the source {hist} (folder {NFD2}, source {FD2})")
 # 2.237.0 (#2870): rows of one other person (encrypted notes, timesheets) are not put under their account
 check(one("SELECT COUNT(*) FROM task_enc_notes WHERE task_id=?", (NT,)) == 0 and "belong to other people" in W, "bob's encrypted note not taken over")
 check(one("SELECT user_id FROM task_people WHERE task_id=?", (NT,)) == BOB, "bob comes along to the new task")
