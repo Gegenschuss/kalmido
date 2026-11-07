@@ -198,6 +198,14 @@ organisations + a private person, read-only, guest, a group, an agent, an expire
   (`migr_kern4712`) gave every calendar / book with members its node, a new member gets it first. With a live node only the
   core's share counts, so a share taken back in the core (the file store's dialog, `obj_revoke_person`) stays taken back;
   without one the old row is still read. Stage 7 removes the old tables and the trigger.
+- The way back (2.647.0, #5046): the trigger `kalmido_kern_back` (core/migrations.d/5046_a.py) on `fs_shares` deletes the
+  old member row when a person's / agent's share of the node is deleted in the core (unless another live share of theirs
+  stays) and gives it the core's role when that changes; it writes with `app.kern_sync`, so the mirror does not run back. An
+  expiry is no event of the database: everything that asks who is a member besides the rights reads the core's live shares
+  (`cal_members(..., live=True)` / `ev_member_role`, `book_members_of(..., live=True)` / `bk_member_role`): reminders, the
+  heir of a deleted account, news, the agent's workspace check, the client contact link. The organisation export writes
+  `members.json` only for people with a live share on the node, and the import drops an archive's member row whose node in
+  the archive has no live share of that person.
 - The node is the truth as soon as it exists (review of 2.566.0): a node made by any path (the first member, a share in the
   core, filing it in a folder) mirrors all member rows the object has at that moment; a node in the file store's trash is
   still the node (no share counts then, the old rows are not read again), and while it carries shares it does not go there

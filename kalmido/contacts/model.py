@@ -161,15 +161,26 @@ def bk_has_node(c, bid):
         return c.execute(BK_NODE_SQL.format("?"), (int(bid),)).fetchone() is not None
 
 
-def book_members_of(c, bid):
-    """[{user_id, role}] of the book's members: the shares of its live node (people and agents), else the old rows."""
+def book_members_of(c, bid, live=False):
+    """[{user_id, role}] of the book's members: the shares of its live node (people and agents), else the old rows.
+    2.647.0 (#5046): live=True = only shares not expired, each with added_at (the heir of a deleted account): never the old
+    rows of a book with a node (a share taken back or run out in the core is no member any more)."""
     if bk_has_node(c, bid):
+        exp = " AND (s.expires_at IS NULL OR s.expires_at>?)" if live else ""
         with system_ctx(c):  # the manager's view of its own book's shares (the node may lie in an organisation's tree)
-            return [{"user_id": m[0], "role": m[1]} for m in c.execute(
-                "SELECT COALESCE(s.user_id, s.agent_id), s.role FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id WHERE n.kind='ref' "
-                "AND n.ref_kind='address_book' AND n.ref_id=? AND n.deleted_at IS NULL AND (s.user_id IS NOT NULL OR s.agent_id IS NOT NULL) "
-                "ORDER BY s.created_at, s.id", (int(bid),)).fetchall()]
-    return [{"user_id": m[0], "role": m[1]} for m in c.execute("SELECT user_id, role FROM book_members WHERE book_id=? ORDER BY added_at", (bid,))]
+            rows = c.execute(
+                "SELECT COALESCE(s.user_id, s.agent_id), s.role, s.created_at FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id WHERE n.kind='ref' "
+                "AND n.ref_kind='address_book' AND n.ref_id=? AND n.deleted_at IS NULL AND (s.user_id IS NOT NULL OR s.agent_id IS NOT NULL)"
+                f"{exp} ORDER BY s.created_at, s.id", (int(bid), *((iso(now_utc()),) if live else ()))).fetchall()
+    else:
+        rows = c.execute("SELECT user_id, role, added_at FROM book_members WHERE book_id=? ORDER BY added_at", (bid,)).fetchall()
+    if not live:
+        return [{"user_id": m[0], "role": m[1]} for m in rows]
+    out = {}
+    for m in rows:  # two live shares of one person: the higher role
+        if m[1] in BOOK_ROLES and (m[0] not in out or m[1] == "edit"):
+            out[m[0]] = {"user_id": m[0], "role": m[1], "added_at": m[2]}
+    return list(out.values())
 
 
 def need_book(c, bid, write=False, manage=False, uid=None, trash=False):

@@ -40,7 +40,7 @@ import os
 
 from ..collab.comments import user_names
 from ..contacts.ctfolder import CTF_BOOK, ctf_dropped
-from ..contacts.model import book_touch
+from ..contacts.model import book_members_of, book_touch
 from ..contacts.orgbooks import obk_hand_on
 from ..core.access import Denied, list_role
 from ..core.objhooks import OBJ  # 2.566.0 (#4712): the kinds whose reference node is the object's own (counted as itself)
@@ -48,6 +48,7 @@ from ..core.db import iso, iso_ms, now_utc
 from ..core.i18n import tr
 from ..core.pg import insert_id, system_ctx
 from ..core.orgcrypt import OrgCryptError
+from ..events.model import cal_members
 from ..files.extlinks import xl_space_moved
 from ..files.fslock import fsl_map, fsl_of_chain
 from ..files.fsmove import fsm_doc, fsm_share_ends, fsm_text, fsm_versions, fsm_walk
@@ -275,11 +276,12 @@ def _plan(c, uid, doomed):
     out = {"calendars": [], "books": [], "sheets": [], "wiki": [], "folders": []}
     with system_ctx(c):  # the deleted person's objects, whoever deletes the account
         for (cid,) in c.execute("SELECT id FROM ev_cals WHERE owner_id=? AND org_id IS NULL", (uid,)).fetchall():
-            direct = c.execute("SELECT added_at, user_id, role FROM ev_cal_members WHERE cal_id=?", (cid,)).fetchall()
-            out["calendars"].append(_item(c, uid, None, cid, [tuple(x) for x in direct], [], "edit"))
+            # 2.647.0 (#5046): the live members as the core has them (a share taken back / run out there is no heir)
+            direct = [(m["added_at"], m["user_id"], m["role"]) for m in cal_members(c, cid, live=True)]
+            out["calendars"].append(_item(c, uid, None, cid, direct, [], "edit"))
         for bid, oid in c.execute("SELECT id, org_id FROM books WHERE owner_id=? AND owner_org_id IS NULL AND deleted_at IS NULL", (uid,)).fetchall():
-            direct = c.execute("SELECT added_at, user_id, role FROM book_members WHERE book_id=?", (bid,)).fetchall()
-            out["books"].append(_item(c, uid, oid, bid, [tuple(x) for x in direct], _folder_shares(c, uid, CTF_BOOK, bid), "edit"))
+            direct = [(m["added_at"], m["user_id"], m["role"]) for m in book_members_of(c, bid, live=True)]  # 2.647.0 (#5046)
+            out["books"].append(_item(c, uid, oid, bid, direct, _folder_shares(c, uid, CTF_BOOK, bid), "edit"))
         for sid, lid in c.execute("SELECT id, list_id FROM sheets WHERE owner_id=? AND org_id IS NULL AND book_id IS NULL AND deleted_at IS NULL", (uid,)).fetchall():
             direct = c.execute("SELECT created_at, user_id, role FROM sheet_shares WHERE sheet_id=? AND user_id IS NOT NULL AND revoked_at IS NULL", (sid,)).fetchall()
             lr = c.execute("SELECT owner_id FROM lists WHERE id=? AND org_id IS NULL", (lid,)).fetchone() if lid else None

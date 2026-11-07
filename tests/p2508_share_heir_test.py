@@ -103,6 +103,9 @@ for who, role in ((DORA, "view"), (CARA, "edit"), (BERT, "edit")):
     assert An.put(B + f"/api/books/{B1}/members", json={"user_id": who, "role": role}).ok
 # within one second the lower id wins: cara's share is made the older one, so the date is what decides here
 write("UPDATE book_members SET added_at='2020-01-01T00:00:00Z' WHERE book_id=? AND user_id=?", (B1, CARA))
+# 2.647.0 (#5046): the heir is read from the core's shares of the book's node (its created_at), no longer from book_members
+write("UPDATE fs_shares SET created_at='2020-01-01T00:00:00Z' WHERE user_id=? AND node_id IN (SELECT id FROM fs_nodes WHERE kind='ref' "
+      "AND ref_kind='address_book' AND ref_id=?)", (CARA, B1))
 r = Be.post(B + "/api/contacts", json={"book_id": B1, "fn": "Olaf Example"})
 check(r.ok, "bert enters a contact " + r.text[:120])
 CT = r.json().get("id") or r.json().get("contact", {}).get("id")

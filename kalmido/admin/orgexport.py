@@ -236,6 +236,13 @@ RSQ = f"SELECT id FROM tchat_rooms WHERE (kind='list' AND list_id IN ({LSQ})) OR
 # 2.362.0 (#3096): the booking pages billed by the organisation's office (a business record); ox_apq: + the exporting admin's
 # own page on a calendar of the organisation (another member's bookings only their owner reads in the app: calendars/apptbook.py)
 APQ = "SELECT user_id FROM appt_pages WHERE office_org_id=?"
+# 2.647.0 (#5046): a member row of a calendar / an address book counts only as the core has it: the object has no reference node
+# (the old row is the share), or the person / agent of the row has a live share on that node (not expired; core/objects.py
+# obj_share_rows_sql). No "?" (every "?" of OX_AREAS is the organisation id): the time from the database's own clock.
+_OX_CORE_MEMBER = ("(NOT EXISTS (SELECT 1 FROM fs_nodes n WHERE n.kind='ref' AND n.ref_kind='{k}' AND n.ref_id={t}.{col}) OR EXISTS ("
+                   "SELECT 1 FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id WHERE n.kind='ref' AND n.ref_kind='{k}' AND n.ref_id={t}.{col} "
+                   "AND COALESCE(s.user_id, s.agent_id)={t}.user_id AND s.role IN ('view', 'edit') AND (s.expires_at IS NULL OR s.expires_at > "
+                   "to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"+00:00\"'))))")
 # (archive name, table, where; every "?" is the organisation id) -- the order of the archive
 OX_AREAS = (
     ("lists.json", "lists", f"id IN ({LSQ})"),  # 2.223.3 B (#2879, #2880): the lists of LSQ (ox_lsq), not the trash
@@ -295,11 +302,14 @@ OX_AREAS = (
     ("chat/reactions.json", "tchat_rx", f"message_id IN (SELECT id FROM tchat_msgs WHERE room_id IN ({RSQ}))"),  # 2.137.0 C (#2344)
     ("chat/files.json", "tchat_files", f"room_id IN ({RSQ})"),
     ("calendars.json", "ev_cals", "org_id=?"),
-    ("calendars/members.json", "ev_cal_members", "cal_id IN (SELECT id FROM ev_cals WHERE org_id=?)"),
+    # 2.647.0 (#5046): the members as the core has them -- a calendar / book with a reference node only the people / agents with a
+    # live share on it; without a node the old rows. A share taken back or run out in the
+    # core never comes back through the archive.
+    ("calendars/members.json", "ev_cal_members", "cal_id IN (SELECT id FROM ev_cals WHERE org_id=?) AND " + _OX_CORE_MEMBER.format(k="evcal", t="ev_cal_members", col="cal_id")),
     ("events.json", "events", "cal_id IN (SELECT id FROM ev_cals WHERE org_id=?)"),
     ("events/attendees.json", "event_attendees", "event_id IN (SELECT id FROM events WHERE cal_id IN (SELECT id FROM ev_cals WHERE org_id=?))"),
     ("books.json", "books", "org_id=?"),
-    ("books/members.json", "book_members", "book_id IN (SELECT id FROM books WHERE org_id=?)"),
+    ("books/members.json", "book_members", "book_id IN (SELECT id FROM books WHERE org_id=?) AND " + _OX_CORE_MEMBER.format(k="address_book", t="book_members", col="book_id")),  # 2.647.0 (#5046)
     ("books/contacts.json", "contacts", "book_id IN (SELECT id FROM books WHERE org_id=?)"),
     # 2.362.0 (#3096): contacts on tasks of the lists (waiting for / responsible / about)
     ("books/contact_tasks.json", "contact_tasks", f"contact_id IN (SELECT id FROM contacts WHERE book_id IN (SELECT id FROM books WHERE org_id=?)) AND task_id IN ({TSQ})"),

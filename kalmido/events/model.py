@@ -207,17 +207,33 @@ def _ev_core_ids(c, uid, have, hidden=True):
     return out
 
 
-def cal_members(c, cid):
+def cal_members(c, cid, live=False):
     """[{user_id, role}] of the calendar's members: 2.566.0 (#4712) the shares of its live node (people and agents), else the
-    old member rows."""
+    old member rows. 2.647.0 (#5046): live=True = only shares not expired, each with added_at -- the one reader of who is a
+    member for the areas besides the rights (reminders, the heir of a deleted account), never the old rows of a calendar
+    with a node (a share taken back or run out in the core is no member any more)."""
     if ev_has_node(c, cid):
+        exp = " AND (s.expires_at IS NULL OR s.expires_at>?)" if live else ""
         with system_ctx(c):  # the owner's view of its own calendar's shares (the node may lie in an organisation's tree)
-            return [{"user_id": m[0], "role": m[1]} for m in c.execute(
-                "SELECT COALESCE(s.user_id, s.agent_id), s.role FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id WHERE n.kind='ref' "
-                "AND n.ref_kind='evcal' AND n.ref_id=? AND n.deleted_at IS NULL AND (s.user_id IS NOT NULL OR s.agent_id IS NOT NULL) "
-                "ORDER BY s.created_at, s.id", (int(cid),)).fetchall()]
-    return [{"user_id": m["user_id"], "role": m["role"]} for m in
-            c.execute("SELECT user_id, role FROM ev_cal_members WHERE cal_id=? ORDER BY added_at", (cid,))]
+            rows = c.execute(
+                "SELECT COALESCE(s.user_id, s.agent_id), s.role, s.created_at FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id WHERE n.kind='ref' "
+                "AND n.ref_kind='evcal' AND n.ref_id=? AND n.deleted_at IS NULL AND (s.user_id IS NOT NULL OR s.agent_id IS NOT NULL)"
+                f"{exp} ORDER BY s.created_at, s.id", (int(cid), *((iso(now_utc()),) if live else ()))).fetchall()
+    else:
+        rows = c.execute("SELECT user_id, role, added_at FROM ev_cal_members WHERE cal_id=? ORDER BY added_at", (cid,)).fetchall()
+    if not live:
+        return [{"user_id": m[0], "role": m[1]} for m in rows]
+    out = {}
+    for m in rows:  # two live shares of one person (review: a re-share beside an old one): the higher role
+        if m[1] in ("view", "edit") and (m[0] not in out or m[1] == "edit"):
+            out[m[0]] = {"user_id": m[0], "role": m[1], "added_at": m[2]}
+    return list(out.values())
+
+
+def ev_member_role(c, cid, uid):
+    """2.647.0 (#5046): uid's own live share of calendar cid (view | edit | None), what an ev_cal_members row was: a calendar
+    with a node -- the share of exactly that node, not expired; without one the old row. No owner, no organisation floor."""
+    return next((m["role"] for m in cal_members(c, cid, live=True) if m["user_id"] == int(uid)), None)
 
 
 def cal_public(c, r, uid, names=None):
@@ -1238,8 +1254,9 @@ def _wd_events(c, users, S, LG, now):
         try:
             cal = c.execute("SELECT * FROM ev_cals WHERE id=?", (r["cal_id"],)).fetchone()
             # 2.126.0 C (#1992 K7): members as ev_role sees them: none while the owner is disabled, only inside the organisation
-            who = {cal["owner_id"]} | ({m[0] for m in c.execute("SELECT user_id FROM ev_cal_members WHERE cal_id=?", (cal["id"],))
-                                        if ev_att_ok(c, m[0], cal["org_id"])} if collab_all() and cal["owner_id"] in users else set())
+            # 2.647.0 (#5046): the live members (the core's shares of a calendar with a node), never a row the core took back
+            who = {cal["owner_id"]} | ({m["user_id"] for m in cal_members(c, cal["id"], live=True)
+                                        if ev_att_ok(c, m["user_id"], cal["org_id"])} if collab_all() and cal["owner_id"] in users else set())
             if collab_all():
                 who |= {a[0] for a in c.execute("SELECT user_id FROM event_attendees WHERE event_id=? AND user_id IS NOT NULL "
                                                 "AND partstat!='declined'", (r["id"],)) if ev_att_ok(c, a[0], cal["org_id"])}  # 2.87.0 (#1983)

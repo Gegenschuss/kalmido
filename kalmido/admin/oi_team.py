@@ -543,6 +543,32 @@ def _not_me(c, run, src, d, ctx):
     return d
 
 
+def _core_member(c, run, src, d, ctx):
+    """2.647.0 (#5046): a member row of a calendar / an address book whose object has a reference node in the archive comes
+    along only while that node has a live share (not expired) of the same person / agent in the archive: the node's shares
+    are the truth (core/migrations.d/4712_a.py), a row its share was taken back from (an archive of a version before 2.647,
+    which wrote the old rows as they stood) never reopens the object here. Then _not_me."""
+    kind, col = {"ev_cal_members": ("evcal", "cal_id"), "book_members": ("address_book", "book_id")}[ctx.spec.table]
+    idx = getattr(run, "oi_core_members", None)
+    if idx is None:
+        oi = ctx.data.get("oi") or {}
+        nodes = {}
+        for r in oi.get("store/nodes.json") or []:
+            if r.get("kind") == "ref" and r.get("ref_kind") in ("evcal", "address_book"):
+                nodes[_oid(r.get("id"))] = (r.get("ref_kind"), _oid(r.get("ref_id")))
+        now, live = iso(now_utc()), set()
+        for r in oi.get("store/shares.json") or []:
+            ref = nodes.get(_oid(r.get("node_id")))
+            who = _oid(r.get("user_id")) or _oid(r.get("agent_id"))
+            if ref and who and r.get("role") in ("view", "edit") and (not r.get("expires_at") or str(r.get("expires_at")) > now):
+                live.add((*ref, who))
+        idx = run.oi_core_members = ({ref for ref in nodes.values()}, live)
+    obj = (kind, _oid(src.get(col)))
+    if obj in idx[0] and (*obj, _oid(src.get("user_id"))) not in idx[1]:
+        return False
+    return _not_me(c, run, src, d, ctx)
+
+
 def _modcard(c, run, src, d, ctx):
     """2.575.0 (#3778): a module card of the organisation: only known modules (accounts/modcards.py), never a person's
     private card; a module unknown here is dropped (it counts as new on the card, off)."""
@@ -661,11 +687,11 @@ SPECS = [
         people={"user_id": "null"}, space=(), enc=False, label=N_("Team chat"), prep=_chat_file),
     # shares of calendars and address books (only with ticked people)
     OiT("calendars/members.json", "ev_cal_members", refs={"cal_id": "ev_cals"}, need=("cal_id",), people={"user_id": "member"}, space=(),
-        rid=False, prep=_not_me),
+        rid=False, prep=_core_member),  # 2.647.0 (#5046)
     OiT("books/contact_tasks.json", "contact_tasks", refs={"contact_id": "contacts", "task_id": "tasks"}, need=("contact_id", "task_id"),
         people={"added_by": "null"}, space=(), rid=False, label=N_("Contacts")),  # 2.362.0 (#3096)
     OiT("books/members.json", "book_members", refs={"book_id": "books"}, need=("book_id",), people={"user_id": "member"}, space=(),
-        rid=False, prep=_not_me),
+        rid=False, prep=_core_member),  # 2.647.0 (#5046)
     # newsletter
     OiT("newsletter/connection.json", "nl_conns", people={"created_by": "null"}, label=N_("Newsletter"), prep=_nl_conn),
     OiT("newsletter/segments.json", "nl_segments", refs={"conn_id": "nl_conns"}, need=("conn_id",), label=N_("Newsletter"), prep=_nl_seg),

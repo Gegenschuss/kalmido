@@ -576,12 +576,20 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
                 dd = json.loads(r["data"] or "{}")
             except ValueError:
                 dd = {}
-            q = {"evinvite": "SELECT 1 FROM event_attendees a JOIN events e ON e.id=a.event_id WHERE a.event_id=? AND a.user_id=? AND e.deleted_at IS NULL",
-                 "evshare": "SELECT 1 FROM ev_cal_members WHERE cal_id=? AND user_id=?",
-                 "abshare": "SELECT 1 FROM book_members WHERE book_id=? AND user_id=?"}[kind]
             key = {"evinvite": "event_id", "evshare": "cal_id", "abshare": "book_id"}[kind]
-            if not c.execute(q, (dd.get(key), uid)).fetchone():
-                continue
+            try:
+                ref = int(dd.get(key) or 0)
+            except (ValueError, TypeError):
+                ref = 0
+            if kind == "evinvite":
+                if not c.execute("SELECT 1 FROM event_attendees a JOIN events e ON e.id=a.event_id WHERE a.event_id=? AND a.user_id=? "
+                                 "AND e.deleted_at IS NULL", (ref, uid)).fetchone():
+                    continue
+            else:  # 2.647.0 (#5046): a member as the core has it (a share taken back / run out there ends the news too)
+                from ..contacts.model import bk_member_role
+                from ..events.model import ev_member_role
+                if not ref or not (ev_member_role(c, ref, uid) if kind == "evshare" else bk_member_role(c, ref, uid)):
+                    continue
             if kind == "evinvite":  # 2.87.0 (#1983): only while the invitation counts (former members of the calendar's organisation)
                 from ..events.model import ev_att_ok
                 k = c.execute("SELECT k.org_id FROM events e JOIN ev_cals k ON k.id=e.cal_id WHERE e.id=?", (dd.get("event_id"),)).fetchone()

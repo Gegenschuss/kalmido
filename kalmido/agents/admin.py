@@ -548,9 +548,15 @@ def _agent_ws_check(c, aid, v):
     if n:
         raise BadInput(tr("The agent is still in {0} projects of another workspace: take it out of them first", n))
     # 2.30.0 (#1036): calendars and address books follow the same rule
-    n = c.execute("""SELECT (SELECT COUNT(*) FROM ev_cal_members m JOIN ev_cals k ON k.id=m.cal_id WHERE m.user_id=? AND COALESCE(k.org_id,0)!=?)
-                          + (SELECT COUNT(*) FROM book_members m JOIN books b ON b.id=m.book_id WHERE m.user_id=? AND COALESCE(b.org_id,0)!=?)""",
-                  (aid, v or 0, aid, v or 0)).fetchone()[0]
+    # 2.647.0 (#5046): the members as the core has them -- the live shares of a node, the old row only without one (a share
+    # taken back / run out in the core does not hold the agent back)
+    from ..core.objects import obj_share_rows_sql
+    with system_ctx(c):  # numbers only (the calendar / book may lie in a tree the admin does not see)
+        n = sum(c.execute(f"SELECT COUNT(*) FROM {tb} k WHERE COALESCE(k.org_id,0)!=? AND (k.id IN (SELECT ref_id FROM "
+                          f"{obj_share_rows_sql(kd)} x WHERE x.user_id=? OR x.agent_id=?) OR (k.id IN (SELECT {col} FROM {mt} WHERE "
+                          f"user_id=?) AND NOT EXISTS (SELECT 1 FROM fs_nodes n WHERE n.kind='ref' AND n.ref_kind='{kd}' AND n.ref_id=k.id)))",
+                          (v or 0, aid, aid, aid)).fetchone()[0]
+                for kd, tb, mt, col in (("evcal", "ev_cals", "ev_cal_members", "cal_id"), ("address_book", "books", "book_members", "book_id")))
     if n:
         raise BadInput(tr("The agent is still in {0} calendars or address books of another workspace: take it out of them first", n))
 

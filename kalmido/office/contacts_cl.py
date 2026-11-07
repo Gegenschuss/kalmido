@@ -212,8 +212,10 @@ def ckl_book_fits(cl, b, c=None, book_id=None):
     # books shared with them (review: not every private book; same rule as the nightly check in accounts/tenancy.py)
     if b["owner_id"] == cl["created_by"]:
         return True
-    return bool(c is not None and book_id and c.execute("SELECT 1 FROM book_members WHERE book_id=? AND user_id=?",
-                                                         (book_id, cl["created_by"])).fetchone())
+    if c is None or not book_id or not cl["created_by"]:
+        return False
+    from ..contacts.model import bk_member_role  # 2.647.0 (#5046): the share as the core has it (taken back / run out = none)
+    return bool(bk_member_role(c, book_id, cl["created_by"]))
 
 
 def ckl_contact_ok(c, uid, cl, kid):

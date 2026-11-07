@@ -114,7 +114,8 @@ check(A.put(B + f"/api/evcals/{K}/members", json={"user_id": BOB, "role": "edit"
 
 # a share taken back in the core: the old row must not reopen it (regression of the fallback)
 sql("DELETE FROM fs_shares WHERE node_id=? AND user_id=?", (node("evcal", K), BOB), write=True)
-check(sql("SELECT role FROM ev_cal_members WHERE cal_id=? AND user_id=?", (K, BOB)) == [("edit",)], "the old member row is still there")
+# 2.647.0 (#5046): the old member row goes with the core share (trigger kalmido_kern_back, core -> old); before it stood there
+check(not sql("SELECT role FROM ev_cal_members WHERE cal_id=? AND user_id=?", (K, BOB)), "#5046: the old member row goes with the core share")
 check(K not in ids(Bo.get(B + "/api/evcals")), "#4712: the core share is gone -> bob no longer sees the calendar (old row not read)")
 check(Bo.get(B + f"/api/events/{E1['id']}").status_code == 404, "#4712: nor its event")
 check(Bo.get(B + "/api/events", params={"from": D, "to": D, "calendar_id": K}).status_code == 404, "#4712: nor its range")
@@ -351,7 +352,7 @@ check(A.patch(B + f"/api/evcals/{K7}", json={"org_id": ORG2}).ok and sql("SELECT
 K6 = A.post(B + "/api/evcals", json={"name": "Team rota", "org_id": ORG}).json()["id"]
 check(A.put(B + f"/api/evcals/{K6}/members", json={"user_id": BOB, "role": "edit"}).ok, "F1: the organisation's calendar shared with bob")
 N7 = node("evcal", K6)
-sql("DELETE FROM fs_shares WHERE node_id=? AND user_id=?", (N7, BOB), write=True)  # taken back in the core, his old row stays
+sql("DELETE FROM fs_shares WHERE node_id=? AND user_id=?", (N7, BOB), write=True)  # taken back in the core (2.647.0, #5046: his old row goes with it)
 sql("INSERT INTO fs_shares(node_id,user_id,role,created_at) VALUES(?,?,'view','2026-11-05T00:00:00+00:00')", (N7, IVY), write=True)  # only in the core
 check(K6 not in ids(Bo.get(B + "/api/evcals")) and K6 in ids(Iv.get(B + "/api/evcals")), "F1: bob taken back, ivy shared in the core only")
 r = A.patch(B + f"/api/users/{ALICE}", json={"orgs": []})  # the only admin takes herself out: no heir, the calendar becomes private
