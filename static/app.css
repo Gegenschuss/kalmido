@@ -1174,6 +1174,7 @@ svg.chart{display:block;max-width:100%;overflow:visible}
 .terow .teacts{display:flex;flex:none;opacity:.35;transition:opacity .1s}
 .terow:hover .teacts,.terow .teacts:focus-within{opacity:1}
 .terow .teacts .iconbtn{width:1.75rem;height:1.75rem}
+@media (max-width:767px),(hover:none){ .terow .teacts{opacity:1} }  /* 2.652.0 (#5086): no hover (touch tablet) = fully visible */
 .telink{margin-top:.375rem}
 .timev .tmvbar{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin:0 0 .625rem}
 .timev .tvseg{flex-wrap:wrap}
@@ -1208,7 +1209,6 @@ svg.chart{display:block;max-width:100%;overflow:visible}
   .terow{flex-wrap:wrap;row-gap:2px}
   .terow .ted{min-width:0}
   .terow .ten{flex-basis:100%;order:9;white-space:normal}
-  .terow .teacts{opacity:1}
   .timev .tmvbar .spacer{display:none}
   .tmini .tmt{display:none}
 }
@@ -6898,13 +6898,13 @@ button.lnph:hover{border-color:var(--accent)}
   .abview{grid-template-columns:1fr;gap:.5rem}
   .abspaces{flex-direction:row;overflow-x:auto;scrollbar-width:none;position:static;gap:.375rem;padding-bottom:.25rem}
   .abspaces::-webkit-scrollbar{display:none}
-  .abspace{flex:0 0 auto;min-height:2.75rem;border:1px solid var(--line);border-radius:99rem}
+  .abspace{flex:0 0 auto;border:1px solid var(--line);border-radius:99rem}
   .abmeta{display:none}
   .abrow{min-height:3.25rem}
   .abtools .btn{min-height:2.75rem}
   .abrow .iconbtn{width:2.75rem;height:2.75rem}
 }
-@media (prefers-reduced-motion:reduce){.abview{transition:none}}
+@media (prefers-reduced-motion:reduce){.abview{transition:none}} @media (max-width:767px),(pointer:coarse){ .abspace{min-height:2.75rem} }  /* 2.652.0 (#5086): the finger size at the pointer, not only the width */
 
 /* 2.48.0 D (#1356) receipts in the document sheet: project, category, an agent's suggestion with Accept / Reject */
 /* 2.48.0 A (#1207) "Show in the file store" on file tiles: next to the remove button (shown like it: hover, always on touch) */

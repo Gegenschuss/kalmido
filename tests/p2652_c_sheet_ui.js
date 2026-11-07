@@ -7,6 +7,10 @@
 //   scrolled to the top neither shrinks nor closes it (before: it closed); the head still swipes it closed. Tablet width with
 //   touch (840 x 1100): a dialog is a centred card, a pull down in its content leaves it alone; the quick-add sheet still
 //   closes with a swipe down at its head.
+// - #5086 touch tablet (840, touch): the finger rules that stood at max-width:767px only - filter chips of the files (.tsp,
+//   .tsfx), the spaces (.abspace), the roadmap chips and list rows (.rm-chips button, .rm-lrow) are 44 px high, the buttons of
+//   a time entry (.terow .teacts) are fully visible without hover; the long-press rows of the office have
+//   -webkit-touch-callout:none at the pointer (Firefox drops that property, so the stylesheet text is checked)
 const {errs, B, login} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
@@ -91,6 +95,25 @@ const call = async (method, url, body, ck = CK) => { const r = await fetch(B + u
     const q = await ev(`(() => { const r = document.querySelector('.qadd.sheet').getBoundingClientRect(); return {top: r.top, h: r.height}; })()`);
     await drag(420, q.top + 6, 0, Math.min(600, 1090 - q.top - 6), 'touch');
     check(await until(`!document.querySelector('.qadd.sheet')`) === true, '840: a swipe down at the head closes the quick-add sheet');
+
+    // ---- #5086 touch CSS at 840 with touch
+    await ev(`Promise.all(['tagsel', 'timeline', 'office'].map(f => loadCss(f))).then(() => 1)`);
+    const css = await ev(`(() => {
+      const box = document.createElement('div'); box.className = 'p2652c-css'; box.style.cssText = 'position:fixed;left:0;top:0;width:800px';
+      box.innerHTML = '<button class="tsp">Tag</button><span class="tsfx">Filter</span><div class="abspaces"><button class="abspace">Space</button></div>'
+        + '<div class="tl rm"><div class="rm-chips"><button type="button">Chip</button></div><div class="rm-lpop"><label class="rm-lrow rm-lf">List</label><label class="rm-lrow">Item</label></div></div>'
+        + '<div class="terow"><span class="ted">1 h</span><div class="teacts"><button class="iconbtn">x</button></div></div>';
+      document.body.appendChild(box);
+      const h = sel => Math.round(box.querySelector(sel).getBoundingClientRect().height * 10) / 10;
+      const r = {tsp: h('.tsp'), tsfx: h('.tsfx'), abspace: h('.abspace'), chip: h('.rm-chips button'), lrow: h('.rm-lrow:not(.rm-lf)'), teacts: getComputedStyle(box.querySelector('.teacts')).opacity};
+      box.remove(); return r; })()`);
+    for (const k of ['tsp', 'tsfx', 'abspace', 'chip', 'lrow']) check(css[k] >= 43.5, `840 touch #5086: ${k} is at least 44 px (${css[k]})`);
+    check(css.teacts === '1', `840 touch #5086: the buttons of a time entry are fully visible without hover (${css.teacts})`);
+    const oc = await ev(`fetch('/static/css/office.css').then(r => r.text())`);
+    const blocks = [...oc.matchAll(/@media([^{]*)\{((?:[^{}]*\{[^{}]*\})*[^{}]*)\}/g)].filter(m => /touch-callout/.test(m[2]));
+    const sels = ['.oimarch a.ofdrow', '.agr-li .ofcrow', '.rin-it', '.brlrow', '.bkarow', '.dma-open', '.dsbsec .ctlinks li'];
+    check(sels.every(x => blocks.some(m => /pointer:\s*coarse|hover:\s*none/.test(m[1]) && m[2].split('}').some(rule => rule.includes(x) && /-webkit-touch-callout:\s*none/.test(rule)))),
+      '840 touch #5086: the long-press rows of the office have -webkit-touch-callout:none at the pointer ' + JSON.stringify(blocks.map(m => m[1])));
   }, true);
 
   check(!errs.length, 'no script errors: ' + errs.join(' | '));

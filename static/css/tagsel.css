@@ -22,9 +22,12 @@
 .abpathl{font-size:var(--fs-xs)}
 .abdtags{display:flex;flex-wrap:wrap;gap:.375rem;align-items:center}
 .ablist.abselon,.dc-grid.dc-selon{-webkit-user-select:none;user-select:none}
-@media (max-width:767px){
+/* 2.652.0 (#5086): finger rules follow the pointer, not only the width (a touch tablet ~840 px gets them too) */
+@media (max-width:767px),(pointer:coarse){
   .tsp{min-height:2.75rem}
   .tsfx{min-height:2.75rem}  /* 2.138.4 A (#2362) */
+}
+@media (max-width:767px){
   .abtags{max-width:30%}
   .abtag:nth-child(n+2){display:none}
 }

@@ -102,11 +102,15 @@
   .rm-bar .iconbtn,.rm-bar .calnav .btn{min-width:2.75rem;min-height:2.75rem;justify-content:center}
   .rm-chips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
   .rm-chips::-webkit-scrollbar{display:none}
-  .rm-chips button{min-height:2.5rem;padding:.3125rem .75rem;white-space:nowrap;flex:none}
+  .rm-chips button{padding:.3125rem .75rem;white-space:nowrap;flex:none}
   .rm-chips .rm-ce .iconbtn{min-width:2.5rem;min-height:2.5rem;justify-content:center}
   .rm-hint{flex:none;white-space:nowrap}
   .rm-go{display:none}
   .rm-t .tl-name{padding-left:1rem}
+}
+/* 2.652.0 (#5086): finger rules follow the pointer, not only the width (a touch tablet ~840 px gets them too) */
+@media (max-width:767px),(pointer:coarse) {
+  .rm-chips button{min-height:2.75rem}
   .rm-lrow{min-height:2.75rem}
 }
 .tl-ndhead .tl-name{cursor:pointer;gap:.375rem}

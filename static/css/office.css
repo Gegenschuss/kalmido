@@ -16,7 +16,6 @@
 @media (max-width:767px){
   li>.ofdrmore,.oimarch .oimdl{position:absolute!important;width:1px;min-width:0;height:1px;min-height:0;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);clip-path:inset(50%);border:0}
   .oimarch .ofcrow>svg:last-child,.oimarch .rotag svg{display:none}
-  .oimarch a.ofdrow{-webkit-touch-callout:none}
   .lst-sortb span{display:none}
   .lst-sortb{min-height:2.75rem}
 }
@@ -1186,7 +1185,10 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 @media (max-width:767px){
   .agr-doc,.agr-fold,.rin-acts,.brlrow>.swl,.brlrow>.btn,.bkarow[data-acct]>.btn,.dma-f[data-fid] .dma-acts,.dimpsup .ib,.rkplist .iconbtn,.dsbsec .ctlinks li>.iconbtn{position:absolute!important;width:1px;min-width:0;height:1px;min-height:0;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);clip-path:inset(50%);border:0}
   .agr-li .ofcrow>svg:last-child{display:none}
-  .agr-li .ofcrow,.rin-it,.brlrow,.bkarow,.dma-open,.dsbsec .ctlinks li{-webkit-touch-callout:none}
+}
+/* 2.652.0 (#5086): finger rules follow the pointer, not only the width (a touch tablet ~840 px gets them too) */
+@media (max-width:767px),(pointer:coarse){
+  .oimarch a.ofdrow,.agr-li .ofcrow,.rin-it,.brlrow,.bkarow,.dma-open,.dsbsec .ctlinks li{-webkit-touch-callout:none}
 }
 /* 2.459.0 (#3853): phone 320 px - the long ZIP button takes the whole row; the meal dialog's lines fit (kind on its own row) */
 @media (max-width:420px){
