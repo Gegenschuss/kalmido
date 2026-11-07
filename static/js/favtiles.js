@@ -264,8 +264,9 @@ function fv2_listFollow(id, on) {
   const st = fv2_stored().filter(x => x !== key);
   S.settings.fav_items = JSON.stringify(on ? [...st, key] : st);
 }
-function fv2_set(key, on, to, after) {
-  if (key.startsWith('l:')) { favSet(+key.slice(2), on); if (on && to) fv2_move(key, to, after); return; }
+async function fv2_set(key, on, to, after) {
+  // 2.638.0 (#5013): a list's place only after the answer of its star (that answer sets fav_items: the place would be lost)
+  if (key.startsWith('l:')) { await favSet(+key.slice(2), on); if (on && to) fv2_move(key, to, after); return; }
   const arr = fv2_keys().filter(x => x !== key);
   if (on) { const i = to ? arr.indexOf(to) : -1; arr.splice(i < 0 ? arr.length : i + (after ? 1 : 0), 0, key); }
   fv2_change(arr, on ? tr('Added to favourites') : tr('Removed from favourites'));

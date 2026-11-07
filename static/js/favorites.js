@@ -16,15 +16,23 @@ const favViewOn = (k = S.route.key) => FAV_VIEWS.includes(k) && (S.settings?.fav
 // a task of a view filtered to favourites: only from a starred list (or a list below a starred one is not a thing: lists only)
 const favKeep = (t, k = S.route.key) => !favViewOn(k) || favIs(t.list_id);
 
-async function favSet(id, on) {
+// 2.638.0 (#5013): the star requests go out one after the other (FAV_Q): a DELETE still on its way can no longer reach the
+// server after the PUT of its Undo and take the list out again; only the answer of the last one sets the stored state
+let FAV_Q = Promise.resolve(), FAV_N = 0;
+function favSet(id, on) {
   const ids = favIds().filter(x => x !== +id);
   if (on) ids.push(+id);
   S.settings.fav_lists = ids.join(',');
   fv2_listFollow(id, on);  // 2.57.0 (#1798): its place among the favourite tiles
   render();
   toast(on ? tr('Added to favourites') : tr('Removed from favourites'));
-  try { const r = await api(on ? 'PUT' : 'DELETE', `/api/lists/${+id}/favorite`, on ? {on: true} : undefined); if (r && typeof r.fav_lists === 'string') S.settings.fav_lists = r.fav_lists; if (r && typeof r.fav_items === 'string') S.settings.fav_items = r.fav_items; }
-  catch { try { await load(); } catch { /* offline */ } render(); }
+  const n = ++FAV_N;
+  const p = FAV_Q.then(async () => {
+    try { const r = await api(on ? 'PUT' : 'DELETE', `/api/lists/${+id}/favorite`, on ? {on: true} : undefined); if (n !== FAV_N) return; if (r && typeof r.fav_lists === 'string') S.settings.fav_lists = r.fav_lists; if (r && typeof r.fav_items === 'string') S.settings.fav_items = r.fav_items; }
+    catch { try { await load(); } catch { /* offline */ } render(); }
+  });
+  FAV_Q = p;
+  return p;
 }
 async function favSetting(key, val) {
   S.settings[key] = val;

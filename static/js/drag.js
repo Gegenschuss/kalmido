@@ -235,10 +235,12 @@ function drg_end(s, drop, e) {
 }
 
 /** The drag is not a tap: the click that follows it does not press the button under the pointer. */
+// 2.638.0 (#5013): a click on the message the drop just showed (#toast, its Undo) is no follow-up of the drag: it goes through
 function drg_noClick() {
-  const stop = e => { e.stopPropagation(); e.preventDefault(); };
-  document.addEventListener('click', stop, {capture: true, once: true});
-  setTimeout(() => document.removeEventListener('click', stop, {capture: true}), 350);
+  const off = () => document.removeEventListener('click', stop, {capture: true});
+  const stop = e => { if (e.target?.closest?.('#toast')) return; off(); e.stopPropagation(); e.preventDefault(); };
+  document.addEventListener('click', stop, {capture: true});
+  setTimeout(off, 350);
 }
 
 // ---- 2.331.0 E (#3311): a surface with its own zoom (the timelines, the picture view). Two fingers, Ctrl + wheel (a
