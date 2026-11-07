@@ -238,4 +238,20 @@ check(run(Er, WSE), "erin's rules ran again")
 de = until(lambda: docs(WSE) if len(docs(WSE)) >= 2 else None, 30) or docs(WSE)
 check(sorted(x[1] for x in de) == ["Letter-1.pdf", "Letter-3.pdf"], f"no size: that mail skipped, the next one taken ({de})")
 
+# ---- 2.638.0 (#4852): folder names with IMAP specials - '{5}' (unquoted = a literal) and 'a%*' (unquoted = wildcards) are always
+# sent as quoted strings; the stub answers BAD to an unquoted one like a real server would not read it as that name
+for x in ("{5}", "a%*"):
+    os.makedirs(os.path.join(MB, x), exist_ok=True)
+r = Bo.post(B + "/api/hubmail/mailbox/rules", json={"ws": f"org:{ORG}", "name": "Specials", "folder": "{5}", "need_att": True,
+                                                    "after": "move", "after_folder": "a%*"})
+check(r.status_code == 201, f"a rule on folder '{{5}}' moving into 'a%*' ({r.status_code} {r.text[:200]})")
+drop("{5}", "Shop <billing@shop.example.com>", "Special folder", att="Special-1")
+n0 = len(docs(WS))
+check(run(Bo, WS), "the rules ran with the special folders")
+check(until(lambda: len(docs(WS)) == n0 + 1, 30) and "Special-1.pdf" in [x[1] for x in docs(WS)],
+      f"the mail in '{{5}}' became a document ({[x[1] for x in docs(WS)][-3:]})")
+check(files("{5}") == [] and files("a%*") == ["1.eml"], f"moved from '{{5}}' into 'a%*' ({files('{5}')} / {files('a%*')})")
+lg = imap_log()
+check('SELECT "{5}"' in lg and '"a%*"' in lg and "SELECT {5}" not in lg, "both names went out as quoted strings")
+
 sys.exit(done("p2581_d_mailrules"))

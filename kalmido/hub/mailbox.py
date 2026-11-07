@@ -165,7 +165,9 @@ def _err_code(e):
 
 
 def _folder_arg(folder):
-    return f'"{folder}"' if re.search(r'[\s()]', folder) else folder
+    """A folder name as an RFC 3501 quoted string, always (#4852): unquoted, '{5}' would be read as a literal and '%' / '*'
+    as list wildcards; backslash and double quote escaped (the stored names refuse both, this stays safe anyway)."""
+    return '"' + folder.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
 # ---- the connections (every address checked, calendars/subscriptions.py) ------------------------------------------------

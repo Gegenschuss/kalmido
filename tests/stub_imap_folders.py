@@ -4,7 +4,9 @@ login kalmido / secret) for the document rules of a workspace mailbox (tests/p25
 /data/mbr/flags.json ({"<folder>/<uid>": ["\\Seen", ...]}); /data/mbr/caps = the capabilities (default IMAP4rev1 UIDPLUS
 MOVE); every command goes to /data/mbr/imap.log. Only the commands imaplib sends for Kalmido (SELECT, UID SEARCH / FETCH /
 STORE / COPY / MOVE / EXPUNGE, EXPUNGE). SEARCH UNSEEN = the mails without \\Seen; any other search = the mails without
-\\Deleted (SINCE is the client's own filter)."""
+\\Deleted (SINCE is the client's own filter).
+2.638.0 (#4852): a folder name is read like a real server does - a quoted string (with \\" and \\\\) or a plain atom; an
+unquoted name with atom-specials ('{5}' = a literal, '%' / '*' = wildcards, a space, brackets) gets BAD."""
 import json
 import os
 import re
@@ -49,6 +51,15 @@ def uidset(s, folder):
     return out
 
 
+def mbox(s):
+    """The folder name of a command argument (RFC 3501 astring); None = what a real server would not read as that name."""
+    s = s.strip()
+    if s.startswith('"'):
+        m = re.fullmatch(r'"((?:[^"\\]|\\["\\])*)"', s)
+        return re.sub(r'\\(["\\])', r"\1", m.group(1)) if m else None
+    return None if not s or re.search(r'[(){ %*"\\]', s) else s
+
+
 def log(line):
     with open(os.path.join(D, "imap.log"), "a") as lg:
         lg.write(line + "\n")
@@ -76,8 +87,8 @@ class Imap(socketserver.StreamRequestHandler):
             with LOCK:
                 self.one(tag, cmd, args, text, caps, folder)
                 if cmd == "SELECT":
-                    name = " ".join(args).strip('"')
-                    folder = name if os.path.isdir(os.path.join(D, name)) else None
+                    name = mbox(text.split(" ", 2)[2] if len(parts) > 2 else "")
+                    folder = name if name and os.path.isdir(os.path.join(D, name)) else None
                 if cmd == "LOGOUT":
                     return
 
@@ -88,7 +99,10 @@ class Imap(socketserver.StreamRequestHandler):
             ok = [a.strip('"') for a in args[:2]] == ["kalmido", "secret"]
             self.w(f"{tag} OK LOGIN done\r\n" if ok else f"{tag} NO wrong login\r\n")
         elif cmd == "SELECT":
-            name = " ".join(args).strip('"')
+            name = mbox(text.split(" ", 2)[2] if len(parts) > 2 else "")
+            if name is None:
+                self.w(f"{tag} BAD not a folder name\r\n")
+                return
             if not os.path.isdir(os.path.join(D, name)):
                 self.w(f"{tag} NO no such folder\r\n")
                 return
@@ -144,7 +158,10 @@ class Imap(socketserver.StreamRequestHandler):
             if args[0].upper() == "MOVE" and "MOVE" not in caps.split():
                 self.w(f"{tag} BAD unknown\r\n")
                 return
-            dest = " ".join(args[2:]).strip('"')
+            dest = mbox(text.split(" ", 4)[4] if len(parts) > 4 else "")
+            if dest is None:
+                self.w(f"{tag} BAD not a folder name\r\n")
+                return
             if not os.path.isdir(os.path.join(D, dest)):
                 self.w(f"{tag} NO [TRYCREATE] no such folder\r\n")
                 return
