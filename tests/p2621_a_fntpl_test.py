@@ -23,6 +23,7 @@ from freelancer_fixture import freelancer  # noqa: E402
 from kt import B, FAILS, OKS, check, sess  # noqa: E402
 
 L = "/api/office/legacy"
+TPL = "/api/office/legacy/archive/templates"  # the route of the templates (tenant_coverage_test.py looks for its path)
 FEAT = "cal,comments,collab,clients,office,docs,files,contacts"
 
 kt.fresh(prefix="P2621A")
@@ -53,14 +54,14 @@ def parse(s, names, **tpl):
 
 
 def kept(s):
-    r = s.get(B + L + "/archive/templates")
+    r = s.get(B + TPL)
     return r.json().get("current") if r.ok else f"http {r.status_code}"
 
 
 for who, s in (("org", A), ("freelancer", Fr)):
     p = f"{who}: "
     nw = s.post(B + "/api/clients", json={"name": f"Nordwind {who} GmbH", "city": "Andersstadt", "country": "DE"}).json()["id"]
-    r = s.get(B + L + "/archive/templates")
+    r = s.get(B + TPL)
     j = r.json() if r.ok else {}
     check(r.ok and j.get("current") == "standard" and {t["name"] for t in j.get("templates") or []}
           >= {"standard", "date_number_client", "number_client_date", "client_number", "custom"}
@@ -97,7 +98,7 @@ for who, s in (("org", A), ("freelancer", Fr)):
     x = (j.get("items") or [{}])[0]
     check(st == 200 and x.get("kind") == "offer" and x.get("number") == "0815" and x.get("client_id") == nw and x.get("date") == "2026-01-05"
           and x.get("sure") is True, p + f"own template kind-number-client-date reads its example {st} {x}")
-    j = s.get(B + L + "/archive/templates").json()
+    j = s.get(B + TPL).json()
     check(j.get("current") == "custom" and j.get("custom") == {"fields": ["kind", "number", "client", "date"], "sep": "-"}, p + f"own template kept {j}")
 
     # wrong input: 400, the kept choice stays
@@ -112,7 +113,7 @@ for who, s in (("org", A), ("freelancer", Fr)):
     x = (j.get("items") or [{}])[0]
     check(st == 200 and x.get("kind") == "invoice" and x.get("number") == "77" and x.get("date") == "2026-02-03", p + f"no template sent: the kept one reads {x}")
     parse(s, [], template="standard")
-    j = s.get(B + L + "/archive/templates").json()
+    j = s.get(B + TPL).json()
     check(j.get("current") == "standard" and (j.get("custom") or {}).get("sep") == "-", p + f"back to the standard, the own blocks stay {j}")
 
 # per office area: the organisation's choice is not another one's
@@ -125,7 +126,7 @@ A.patch(B + "/api/settings", json={"workspace": "private"})
 check(kept(A) == "standard", "the admin's own Private office keeps its own template")
 A.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
 check(kept(A) == "client_number", "back in the organisation: its choice")
-check(Bo.get(B + L + "/archive/templates").status_code == 403 and parse(Bo, [], template="standard")[0] == 403 and kept(A) == "client_number",
+check(Bo.get(B + TPL).status_code == 403 and parse(Bo, [], template="standard")[0] == 403 and kept(A) == "client_number",
       "a member (no admin): 403, nothing kept")
 
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
