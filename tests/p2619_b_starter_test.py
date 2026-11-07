@@ -160,7 +160,8 @@ check(re.search(r"never set a field of type `formula`", flat), "#1521: formula f
 for what in ("kind `extract`", "kind `merge`", "`contract_notice`", "`propose_contract_notice`"):
     check(what in flat, f"#1870: the 2.70 flows in the rules block: {what}")
 check("weekly limit (`seven_day`)" in flat and "never guess it" in flat, "#2196: the two plan limits in the rules block")
-check("**read only**" in flat, "#2792: reviews read only in the rules block")
+# 2.638.0 (#5014): the template says **read-only** since #3894
+check("**read-only**" in flat, "#2792: reviews read only in the rules block")
 check("also background jobs" in flat, "#3267: the usage hook in jobs in the rules block")
 js = read("static", "js", "agentchat.js")
 am = re.search(r"^const AG_RULES = (\".*\");$", js, re.M)
