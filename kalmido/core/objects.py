@@ -1031,10 +1031,8 @@ def _boundary_share(c, n, s):
         if s["user_id"]:
             _boundary_old(c, reg, n["ref_id"], s["user_id"], n["org_id"] or None)
     else:
-        top = c.execute("SELECT COALESCE(MAX(id), 0) FROM obj_revoked").fetchone()[0]
-        if n is not None and any(f(c, None, n, s) for f in fs_unshare_hooks):  # the hooks write reason 'unshare': this one is the repair's
-            c.execute("UPDATE obj_revoked SET reason='boundary' WHERE id>? AND src='fs_shares' AND reason='unshare'", (top,))
-        else:
+        # 2.649.0 (#5051, Fable 2): the hooks write the repair's reason themselves (no renaming afterwards)
+        if not (n is not None and any(f(c, None, n, s, reason="boundary") for f in fs_unshare_hooks)):
             _take(c, "fs_shares", "id=?", (s["id"],), "boundary", None, (n["org_id"] if n is not None else None) or None, "user_id")
     return 1
 

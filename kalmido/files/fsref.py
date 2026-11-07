@@ -79,7 +79,8 @@ FSR = {}  # ref_kind -> the registered hooks
 FSR_RESERVED = ("att", "list_file")  # the kinds of link nodes (files/store.py fs_link_target)
 fs_protect_hooks = []
 # 2.623.0 (#4778): f(c, uid, n, s) -> True when an area took share row s of node n back itself (its card marked, the row in
-# obj_revoked); files/web.py files_share_delete deletes the row only when no hook took it (sheets/shshare.py, wiki/wkshare.py)
+# obj_revoked); files/web.py files_share_delete deletes the row only when no hook took it (sheets/shshare.py, wiki/wkshare.py).
+# 2.649.0 (#5051): optional reason= (default "unshare") for the register row; core/objects.py _boundary_share passes "boundary"
 fs_unshare_hooks = []
 
 

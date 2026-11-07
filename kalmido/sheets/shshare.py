@@ -344,7 +344,7 @@ def shs_core_drop(c, uid, x, reason="unshare"):
     shs_drop_cache()
 
 
-def shs_fs_unshare(c, uid, n, s):
+def shs_fs_unshare(c, uid, n, s, reason="unshare"):  # 2.649.0 (#5051): reason (the boundary repair passes "boundary")
     """2.623.0 (#4778): the file store's dialog takes share row s of a table's node n back (files/web.py files_share_delete,
     files/fsref.py fs_unshare_hooks; the caller checked who may): the row goes into obj_revoked like in the table's own dialog
     and the card bound to it is marked ended (revoked_at; one with a typed address goes, as in sheets_shares_delete) -- so an
@@ -354,7 +354,7 @@ def shs_fs_unshare(c, uid, n, s):
     from ..core.objects import obj_node_unshare
     x = c.execute("SELECT * FROM sheet_shares WHERE core_id=? AND sheet_id=? AND revoked_at IS NULL", (s["id"], n["ref_id"])).fetchone()
     t = c.execute("SELECT org_id FROM sheets WHERE id=?", (n["ref_id"],)).fetchone()
-    obj_node_unshare(c, uid, n, s["id"], kind="sheet", ref_id=n["ref_id"], org=(t["org_id"] if t else n["org_id"]) or None)
+    obj_node_unshare(c, uid, n, s["id"], kind="sheet", ref_id=n["ref_id"], org=(t["org_id"] if t else n["org_id"]) or None, reason=reason)
     if x is not None:
         if x["email_key"]:  # 2.360.2 M (#2561): the address is not kept
             c.execute("DELETE FROM sheet_shares WHERE id=?", (x["id"],))

@@ -285,7 +285,7 @@ def wsh_core_drop(c, uid, r, reason="unshare"):
             obj_node_unshare(c, uid, n, fid, kind="wiki", ref_id=n["ref_id"] if n["kind"] == "ref" else None, reason=reason)
 
 
-def wsh_fs_unshare(c, uid, n, s):
+def wsh_fs_unshare(c, uid, n, s, reason="unshare"):  # 2.649.0 (#5051): reason (the boundary repair passes "boundary")
     """2.623.0 (#4778): the file store's dialog takes share row s of node n back (files/web.py files_share_delete,
     files/fsref.py fs_unshare_hooks; the caller checked who may). A page's node or a core share of a person card: the row goes
     into obj_revoked like in the knowledge dialog, and the card ends as a whole (its other core share goes too, revoked_at) --
@@ -296,10 +296,10 @@ def wsh_fs_unshare(c, uid, n, s):
         return False  # a folder share of no card: the file store's way (deleted as before)
     from ..core.objects import obj_node_unshare
     # review F1 (2.623.0): the row of an organisation's page lies under that organisation in obj_revoked (as files/web.py does)
-    obj_node_unshare(c, uid, n, s["id"], kind="wiki", ref_id=n["ref_id"] if n["kind"] == "ref" else None, org=n["org_id"] or None)
+    obj_node_unshare(c, uid, n, s["id"], kind="wiki", ref_id=n["ref_id"] if n["kind"] == "ref" else None, org=n["org_id"] or None, reason=reason)
     ts = iso(now_utc())
     for r in cards:
-        wsh_core_drop(c, uid, r)  # the card's other core share (the one just taken is gone already)
+        wsh_core_drop(c, uid, r, reason)  # the card's other core share (the one just taken is gone already)
         c.execute("UPDATE wiki_shares SET revoked_at=? WHERE id=?", (ts, r["id"]))
     return True
 
