@@ -367,7 +367,7 @@ function povLinkModal(l, x) {
     } catch { return; }
     md.remove();
   });
-  if (!isMobile()) setTimeout(() => $('#pl-url', md)?.focus(), 30);
+  setTimeout(() => focusIfKeyboard($('#pl-url', md)), 30);  // 2.655.0 (#5081): was !isMobile()
 }
 function povMsModal(l, m) {
   const md = modal(`<h3>${m ? tr('Edit milestone') : tr('Add milestone')}</h3>
@@ -388,7 +388,7 @@ function povMsModal(l, m) {
     } catch { return; }
     md.remove(); await load(); render();  // the timeline markers come with the list
   });
-  if (!isMobile()) setTimeout(() => $('#pm-name', md)?.focus(), 30);
+  setTimeout(() => focusIfKeyboard($('#pm-name', md)), 30);  // 2.655.0 (#5081): was !isMobile()
 }
 async function povUpload(l, files) {
   files = noEmpty(files);
@@ -584,7 +584,7 @@ function depPicker(tid, dir) {
       depOpt(dir === 'by' ? tid : x, dir === 'by' ? x : tid, true).catch(() => {});
     }
   });
-  setTimeout(() => { if (!isMobile()) $('#dp-q', md).focus(); }, 50);
+  setTimeout(() => focusIfKeyboard($('#dp-q', md)), 50);  // 2.655.0 (#5081): was !isMobile()
 }
 const blockedNames = t => { const n = (t.blockers || []).map(id => S.tasks.get(id)?.title).filter(Boolean); const h = Math.max(0, (t.blocked || 0) - n.length); return [...n.map(x => tr('“{0}”|quoted', x)), ...(h ? [trn('{0} task you cannot see', '{0} tasks you cannot see', h)] : [])].join(', '); };
 

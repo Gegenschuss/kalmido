@@ -456,6 +456,9 @@ try { matchMedia('(prefers-color-scheme: light)').addEventListener('change', app
 // density per device: compact (default on desktop) | comfortable (default on phones and touch screens)
 const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform || '');
 const isTouch = () => td_rc('touch', () => { try { return isMobile() || matchMedia('(hover: none)').matches; } catch { return false; } });
+// 2.655.0 (#5081): autofocus into a text field only without touch (finger: the screen keyboard would pop up and cover the
+// dialog, calendar or hits); {select: true} also selects the text. Returns whether it focused.
+const focusIfKeyboard = (el, o) => { if (!el || isTouch()) return false; el.focus(); if (o?.select) el.select?.(); return true; };
 // 2.16.0 (#642): "Custom" = the sidebar (lists, folders, filters) and the task rows each compact or comfortable; Compact /
 // Comfortable set both (before, the sidebar ignored the density)
 const DENS_OK = v => v === 'compact' || v === 'comfortable';

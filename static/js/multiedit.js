@@ -173,7 +173,7 @@ function meWaitDialog() {
   const save = () => { const v = {note: $('#mw-note', md).value.trim(), until: $('#mw-until', md).value || null}; md.remove(); meWait(v); };
   md.addEventListener('click', e => { const b = e.target.closest('[data-m]'); if (!b) return; if (b.dataset.m === 'close') md.remove(); else if (b.dataset.m === 'ok') save(); });
   $('#mw-note', md).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); save(); } });
-  if (!isMobile()) setTimeout(() => $('#mw-note', md).focus(), 50);
+  setTimeout(() => focusIfKeyboard($('#mw-note', md)), 50);  // 2.655.0 (#5081): was !isMobile()
 }
 // ---- the panel
 function meRow(f, ts) {

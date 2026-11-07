@@ -105,7 +105,7 @@ function dgPick(o) {
     if (b.dataset.m === 'close') { md.remove(); return; }
     if (b.dataset.pick) { const x = S.tasks.get(+b.dataset.pick); md.remove(); if (x) o.pick(x); }
   });
-  setTimeout(() => { if (!isMobile()) $('#dg-q', md).focus(); }, 50);
+  setTimeout(() => focusIfKeyboard($('#dg-q', md)), 50);  // 2.655.0 (#5081): was !isMobile()
 }
 
 // 2.559.0 (#4659): a change of tasks shown at once, as optWrite's put (core.js): ch = Map id -> fn(t) that changes the task

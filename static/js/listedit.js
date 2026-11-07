@@ -102,7 +102,7 @@ function secAddOpen(sec) {
   // 2.13.4: phones get the quick sheet (its box sits above the keyboard) with the section set; the inline field under the
   // section head ended up behind the keyboard (Android: keyboard up, no box to type into)
   const rl = routeList();
-  if (isMobile() && rl) {
+  if (isTouch() && rl) {  // 2.655.0 (#5081): every touch screen (tablet keyboard covered the inline field too)
     const g = S.sections.find(x => x.id === sec);
     openQuickSheet('', {list_id: rl.id, section_id: sec || null, section_name: g ? g.name : ''});
     return;

@@ -276,7 +276,7 @@ function datePop(anchor, id) {
     const cur = rrBase(st.repeat), end = rrEnd(st.repeat);
     const custom = cur && !presets.some(p => p[0] === cur);
     const cu = st.cust ? rrForm(cur) : null;
-    return `<div class="dpk"><input id="p-din" class="tpin" value="${esc(dpTxt(st.due))}" inputmode="${isMobile() ? 'numeric' : 'text'}" autocomplete="off" enterkeyhint="done" spellcheck="false" placeholder="${esc(dpTxt(today()))}" aria-label="${esc(tr('Date'))}"></div>
+    return `<div class="dpk"><input id="p-din" class="tpin" value="${esc(dpTxt(st.due))}" inputmode="${isTouch() ? 'numeric' : 'text'}" autocomplete="off" enterkeyhint="done" spellcheck="false" placeholder="${esc(dpTxt(today()))}" aria-label="${esc(tr('Date'))}"></div>
       <div class="quick">
         <button data-q="0">${ic('sun')}${tr('Today')}</button><button data-q="1">${ic('sunrise')}${tr('Tomorrow')}</button><button data-q="w">${ic('week')}${tr('Next week')}</button><button data-q="x">${ic('ban')}${tr('No date|clear')}</button></div>
       ${calHtml()}
@@ -306,7 +306,7 @@ function datePop(anchor, id) {
   // computer focused with the day selected, on a phone not (no keyboard on its own); typing moves the month, an invalid
   // text turns red; Enter takes the day and closes like Done / OK (invalid: nothing taken, the dialog stays)
   const dinParse = inp => parseDMY(inp.value, {future: true});
-  setTimeout(() => { const f = $('#p-din', p); if (f && !p.classList.contains('hidden') && !p.classList.contains('sheet')) { f.focus(); f.select(); } }, 20);
+  setTimeout(() => { const f = $('#p-din', p); if (f && !p.classList.contains('hidden') && !p.classList.contains('sheet')) focusIfKeyboard(f, {select: true}); }, 20);  // 2.655.0 (#5081): not on touch
   p.oninput = e => {
     if (e.target.id !== 'p-din') return;
     const v = dinParse(e.target); e.target.classList.toggle('bad', v === null); e.target.setAttribute('aria-invalid', v === null ? 'true' : 'false');
@@ -570,7 +570,8 @@ function dpOpen(anchor, o) {
     if (DP.el !== el) return;
     if (o.kind !== 'date') { $('#dp-tin', el)?.focus(); return; }
     const din = $('#dp-din', el);
-    if (din && !el.classList.contains('sheet')) { din.focus(); din.select(); } else $('.dpg [tabindex="0"]', el)?.focus();
+    if (din && !el.classList.contains('sheet') && focusIfKeyboard(din, {select: true})) return;  // 2.655.0 (#5081): touch takes the grid
+    $('.dpg [tabindex="0"]', el)?.focus();
   }, 20);
   return el;
 }
@@ -592,7 +593,7 @@ function dpTxt(v) {
   const t = fmtDateNum(pd(v)); return parseDMY(t) === v ? t : `${v.slice(8)}.${v.slice(5, 7)}.${v.slice(0, 4)}`;
 }
 function dpDateShell(v) {
-  const el = DP.el, mob = matchMedia('(max-width:767px)').matches, ph = dpTxt(today());
+  const el = DP.el, mob = isTouch(), ph = dpTxt(today());  // 2.655.0 (#5081): numeric keypad on every touch screen
   el.innerHTML = `<div class="dpk"><input id="dp-din" class="tpin" value="${esc(dpTxt(v))}" inputmode="${mob ? 'numeric' : 'text'}" autocomplete="off" enterkeyhint="done" spellcheck="false" placeholder="${esc(ph)}" aria-label="${esc(tr('Date'))}" aria-describedby="dp-t"></div><div class="dpcal"></div>`;
 }
 const dpParse = inp => parseDMY(inp.value, {min: DP.st?.min, max: DP.st?.max, future: dpFuture(DP.st || {})});
@@ -772,7 +773,7 @@ function waitDialog(id) {
     else if (b.dataset.m === 'clear') { md.remove(); waitClear(id); }
   });
   $('#w-note', md).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); save(); } });
-  if (!isMobile()) setTimeout(() => $('#w-note', md).focus(), 50);
+  setTimeout(() => focusIfKeyboard($('#w-note', md)), 50);  // 2.655.0 (#5081): was !isMobile()
 }
 // ---- 2.41.0 (#1205): "Waiting on": the person's recent entries below the field (GET /api/me/wait-suggestions, newest
 // first, only their own). They open when typing into the field (on phones also when the dialog opens), filter while
@@ -826,7 +827,7 @@ function mtWaitSugg(md, inp) {
     if (md.isConnected) { draw(); if (box.hidden) inp.focus(); }
   });
   md.addEventListener('focusout', e => { const r = e.relatedTarget; if (open && r && r !== inp && !box.contains(r)) close(); });  // e.g. Tab to the date
-  if (isMobile()) show(); else mtWsLoad();
+  if (isTouch()) show(); else mtWsLoad();  // 2.655.0 (#5081): touch has no focus on open, so the suggestions show at once
 }
 // 2.559.0 (#4660): "Waiting on someone" set (body {note, until}) or ended (body null) shows at once (optWrite as #1501): the task
 // carries it before the answer, no GET /api/state afterwards; the server's task follows; an error (api() says why) takes it back

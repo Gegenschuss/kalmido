@@ -115,7 +115,7 @@ function dsp_pick(d) {
     const label = tr('{0} linked with a task', d.name);
     histToast(label, histAdd({label, undo: go(prev), redo: go(tid)}));
   });
-  setTimeout(() => { if (!isMobile()) /** @type {any} */ ($('#dsp-q', md))?.focus(); }, 50);
+  setTimeout(() => focusIfKeyboard($('#dsp-q', md)), 50);  // 2.655.0 (#5081): was !isMobile()
 }
 
 // ---- the preview of a stack

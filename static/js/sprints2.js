@@ -94,7 +94,7 @@ function spr_editModal(l, s) {
     md.remove();
     offerUndo(tr('Saved'), histAdd({label: tr('{0} changed', spr_name(s)), undo: () => spr_patch(s.id, before), redo: () => spr_patch(s.id, after)}));
   });
-  if (!isMobile()) setTimeout(() => $('#se-g', md)?.focus(), 30);
+  setTimeout(() => focusIfKeyboard($('#se-g', md)), 30);  // 2.655.0 (#5081): was !isMobile()
 }
 async function spr_plan(l) {
   let j; try { j = await api('POST', `/api/lists/${l.id}/sprints`, {}); } catch { return; }

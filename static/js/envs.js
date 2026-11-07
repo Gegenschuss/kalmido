@@ -121,7 +121,7 @@ function env_editModal(l, e, j) {
       md.remove(); env_load(l.id, true);
     } catch { /* api() said it */ }
   });
-  if (!isMobile()) setTimeout(() => $('#env-name', md)?.focus(), 30);
+  setTimeout(() => focusIfKeyboard($('#env-name', md)), 30);  // 2.655.0 (#5081): was !isMobile()
 }
 document.addEventListener('click', async ev => {
   const b = ev.target.closest('[data-env]'); if (!b) return;

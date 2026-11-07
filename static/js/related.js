@@ -197,7 +197,7 @@ function rel_picker(tid) {
     if (b.dataset.m === 'close') { md.remove(); return; }
     if (b.dataset.pick) { const k = $('input[name="rel-k"]:checked', md)?.value || 'relates'; if (await rel_post(tid, +b.dataset.pick, k)) md.remove(); }
   });
-  setTimeout(() => { if (!isMobile()) $('#rel-q', md).focus(); }, 50);
+  setTimeout(() => focusIfKeyboard($('#rel-q', md)), 50);  // 2.655.0 (#5081): was !isMobile()
 }
 document.addEventListener('click', async e => {
   const b = e.target.closest?.('[data-rel]'); if (!b) return;

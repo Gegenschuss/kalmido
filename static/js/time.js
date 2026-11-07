@@ -97,7 +97,7 @@ function tv_startPick() {
     if (b.dataset.m === 'close') { md.remove(); return; }
     if (b.dataset.tvs) { md.remove(); tv_startTask(taskById(+b.dataset.tvs)); }
   });
-  setTimeout(() => { if (!isMobile()) /** @type {HTMLInputElement} */ ($('#tvs-q', md)).focus(); }, 50);
+  setTimeout(() => focusIfKeyboard($('#tvs-q', md)), 50);  // 2.655.0 (#5081): was !isMobile()
 }
 async function tv_startTask(t) {
   if (!t) return;

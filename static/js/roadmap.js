@@ -375,7 +375,7 @@ function rmMoveDialog(lid) {
     if (b.id === 'rm-ok') { const d = days(); if (!d) return; md.remove(); rmShift(lid, d); }
   });
   md.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'rm-n') { e.preventDefault(); $('#rm-ok', md).click(); } });
-  setTimeout(() => { const i = $('#rm-n', md); if (i && !isMobile()) { i.focus(); i.select?.(); } }, 30);
+  setTimeout(() => focusIfKeyboard($('#rm-n', md), {select: true}), 30);  // 2.655.0 (#5081): was !isMobile()
 }
 async function rmShift(lid, days) {
   if (!canEditList(lid)) { roToast(); renderView(); return; }

@@ -1158,7 +1158,7 @@ function renderView0() {
   renderMultiBar();
   const f2 = fk && fk();
   if (f2 && f2 !== fa && document.activeElement !== f2) { if (fv != null && 'value' in f2) f2.value = fv; f2.focus({preventScroll: true}); try { if (fs[0] != null) f2.setSelectionRange(fs[0], fs[1]); } catch { /* no caret */ } }
-  if (S.route.key === 'search') { const i = $('#searchq'); if (i && document.activeElement !== i) { i.value = S.searchQ || ''; if (!isMobile() || S.searchFocus) i.focus(); } S.searchFocus = false; }
+  if (S.route.key === 'search') { const i = $('#searchq'); if (i && document.activeElement !== i) { i.value = S.searchQ || ''; if (!isTouch() || S.searchFocus) i.focus(); } S.searchFocus = false; }  // 2.655.0 (#5081): touch: only on opening Search, not back after every render
 }
 
 // ------------------------------------------------------------------ render: task rows
@@ -2105,7 +2105,7 @@ function searchEnterOpen(q) {
   const nm = q.trim().match(/^#?(\d{1,9})$/), r = S.searchResQ === q ? S.searchRes || [] : [];
   const t = nm ? (r.find(x => x.id === +nm[1]) || taskById(+nm[1])) : tkFind(q) || (r.length === 1 ? r[0] : null);  // 2.390.0 (#3353): + "APP-12"
   if (!t) return false;
-  if (isMobile()) $('#searchq')?.blur();
+  if (isTouch()) $('#searchq')?.blur();  // 2.655.0 (#5081): was isMobile()
   openDetail(t.id); return true;
 }
 document.addEventListener('keydown', e => {

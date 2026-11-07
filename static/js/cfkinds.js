@@ -43,7 +43,7 @@ function cfkPick(t, f, done) {
     if (b.dataset.m === 'close') { md.remove(); return; }
     if (b.dataset.cfkp) { md.remove(); done(b.dataset.cfkp); }
   });
-  setTimeout(() => { if (!isMobile()) /** @type {HTMLInputElement} */ ($('#cfk-q', md)).focus(); }, 50);
+  setTimeout(() => focusIfKeyboard($('#cfk-q', md)), 50);  // 2.655.0 (#5081): was !isMobile()
 }
 
 // ---- the "New field" dialog (projects.js fieldModal): the settings of currency and rating
