@@ -8,6 +8,7 @@
 // first weekday, 12 / 24 h, typing a time); phones: undo / redo in the header "…" menu, no ← →; the Fold layout (sidebar
 // folds into the rail while the task panel is open, the rail opens it as an overlay); the touch-target rules in the CSS.
 const {boot, errs, sleep, B, login, clientSource} = require('./boot');
+const settle = w => require('./boot').idle(w, {quiet: 50});  // 2.641.0 (#4979): wait until the page's requests are done instead of a fixed pause
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
@@ -17,7 +18,7 @@ const st = (ck = CK) => call('GET', '/api/state', null, ck);
 const until = (fn, ms) => require('./boot').until(fn, {timeout: ms || 15000, step: 80});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const click = (w, el) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown', {key: k, bubbles: true, cancelable: true, ...o}));
-const closeW = async w => { try { w.eval('if (S.sel) closeDetail()'); } catch { /* gone */ } await sleep(1000); w.close(); };  // let late loads (timeline, deps, time) finish first
+const closeW = async w => { try { w.eval('if (S.sel) closeDetail()'); } catch { /* gone */ } await require("./boot").idle(w); w.close(); };  // let late loads (timeline, deps, time) finish first
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = new Date(y, m - 1, d + n); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`; };
 
@@ -41,7 +42,7 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   let w = await boot({user: 'alice', hash: 'today'}), d = w.document;
   w.__dialogs = 'manual';
   const smd = () => d.querySelector('.modal.smodal');
-  w.eval(`settingsModal('notify')`); await sleep(300);
+  w.eval(`settingsModal('notify')`); await settle(w);
   check(!smd().querySelector('[data-m="save"]') && !smd().querySelector('.sfoot') && !smd().querySelector('.sdirty'), 'no Save / Close footer, no "unsaved" marker');
   const defrem = smd().querySelector('#s-defrem'), before = (await st()).settings.default_reminder;
   defrem.value = '15'; defrem.dispatchEvent(new w.Event('change', {bubbles: true}));
@@ -59,10 +60,10 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   check(await until(async () => (await st()).settings.digest_time === '06:45'), 'time field saves at once');
   // numbers: on change (blur), invalid ones are refused and reverted
   smd().remove();
-  w.eval(`settingsModal('modules')`); await sleep(300);
+  w.eval(`settingsModal('modules')`); await settle(w);
   let md = [...d.querySelectorAll('.modal.smodal')].pop();
   const pf = md.querySelector('#s-pf'), pf0 = (await st()).settings.pomo_focus;
-  pf.value = '0'; pf.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(400);
+  pf.value = '0'; pf.dispatchEvent(new w.Event('change', {bubbles: true})); await settle(w);
   check((await st()).settings.pomo_focus === pf0 && pf.value === String(pf0), 'invalid number (0 minutes) not saved, field reverted');
   pf.value = '42'; pf.dispatchEvent(new w.Event('input', {bubbles: true}));
   check(await until(async () => (await st()).settings.pomo_focus === '42', 3000), 'number saves after a short pause while typing');
@@ -79,7 +80,7 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   const undoOk = await until(async () => (await st()).settings.features.split(',').includes('habits') && !!d.querySelector('#srail [data-sbb="habits"]'));
   check(undoOk, 'undo (← / Ctrl+Z path) brings the module back ' + JSON.stringify({set: (await st()).settings.features, bar: [...d.querySelectorAll('#srail [data-sbb]')].map(b => b.dataset.sbb).join()}));  // 2.152.2 (#2622): the bar
   // display name: pending text is saved when the dialog closes
-  w.eval(`settingsModal('account')`); await sleep(300); md = [...d.querySelectorAll('.modal.smodal')].pop();
+  w.eval(`settingsModal('account')`); await settle(w); md = [...d.querySelectorAll('.modal.smodal')].pop();
   check(!md.querySelector('[data-acc="name"]'), 'no separate "Save" for the display name');
   const nm = md.querySelector('#a-name'); nm.value = 'Alice B.'; nm.dispatchEvent(new w.Event('input', {bubbles: true}));
   md.remove();
@@ -88,7 +89,7 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   await w.eval(`histStep('undo')`);
   check((await call('GET', '/api/me')).display_name === 'Alice', 'undo of the display name');
   // appearance (per device) goes into the history too
-  w.eval(`settingsModal('look')`); await sleep(300); md = [...d.querySelectorAll('.modal.smodal')].pop();
+  w.eval(`settingsModal('look')`); await settle(w); md = [...d.querySelectorAll('.modal.smodal')].pop();
   click(w, md.querySelector('[data-look="theme"][data-v="light"]'));
   check(d.documentElement.dataset.theme === 'light' && /Colour scheme/.test(w.eval('HIST.undo[HIST.undo.length - 1].label')), 'theme applies at once and is a history step');
   await w.eval(`histStep('undo')`);
@@ -96,7 +97,7 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   md.remove();
 
   // ================= Settings > Modules (U04, U05, U06)
-  w.eval(`settingsModal('layout')`); await sleep(300); md = [...d.querySelectorAll('.modal.smodal')].pop();
+  w.eval(`settingsModal('layout')`); await settle(w); md = [...d.querySelectorAll('.modal.smodal')].pop();
   const secs = [...md.querySelectorAll('.snav [data-sec]')].map(b => b.dataset.sec);
   // 2.418.0 (#3560): the new section Navigation (Settings > Navigation) after Appearance
   check(JSON.stringify(secs) === JSON.stringify(['account', 'org', 'general', 'look', 'nav', 'modules', 'notify', 'integr', 'access', 'data', 'users', 'help']), 'sections (2.7.0: no Agents page without the module and agents): ' + secs);  // 2.46.0 (#1592): a server without an organisation shows no Organisation page  // 2.166.0 (#2633): + Access  // 2.364.0 C (#3041): + Organisation for a server admin
@@ -128,7 +129,7 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   // ================= 2.7.2 (#414): the checklist type is gone (U07's slim panel with it): an item of a list with
   // "Show completed at the bottom" is a full task
   w = await boot({user: 'alice', hash: 'l/' + SHOP}); d = w.document;
-  w.eval(`openDetail(${milk})`); await sleep(300);
+  w.eval(`openDetail(${milk})`); await settle(w);
   const det = d.querySelector('#detail');
   check(det.querySelector('#d-title') && det.querySelector('#d-content')?.getAttribute('placeholder') === 'Description', 'item: title and description (2.7.2)');
   check(det.querySelector('#d-sub') && det.querySelector('[data-act="crumb-menu"][data-k="list"]') && det.querySelector('[data-act="date"]') && det.querySelector('[data-act="prio"]'),
@@ -136,44 +137,44 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   check(!det.querySelector('.dwho'), 'not shared: no assignee');
   const m0 = (await st()).tasks.find(t => t.id === milk);
   check(m0.tags.includes('dairy') && m0.url === 'https://example.org/milk' && m0.content === 'the good one', 'the data stays (tags, link, note)');
-  click(w, det.querySelector('[data-act="task-menu"]')); await sleep(80);
+  click(w, det.querySelector('[data-act="task-menu"]')); await settle(w);
   // 2.445.0 (#3008): Duplicate lives under "More…": both levels are read
   let ckm = [...d.querySelectorAll('#pop .menu-list button')].map(b => b.textContent);
-  d.querySelector('#pop .mtmore')?.click(); await sleep(80);
+  d.querySelector('#pop .mtmore')?.click(); await settle(w);
   ckm = ckm.concat([...d.querySelectorAll('#pop .menu-list button')].map(b => b.textContent));
   // 2.31.0 (#1056): in the panel the menu leaves out date and priority (the panel's header has both)
   // 2.152.2 (#2624): project instead of list
   check(ckm.some(x => /Duplicate/i.test(x)) && ckm.some(x => /Move to project/i.test(x)) && !ckm.some(x => /New date/i.test(x)), 'the full task menu (2.7.2; 2.31.0: without date / priority in the panel): ' + ckm);
   w.eval('closePop()');
   await call('PUT', `/api/lists/${SHOP}/members`, {user_id: BOB, role: 'edit'});
-  await w.eval('load()'); w.eval('render(); renderDetail()'); await sleep(200);
+  await w.eval('load()'); w.eval('render(); renderDetail()'); await settle(w);
   check(d.querySelector('#detail .dmeta .dwho'), 'shared (collaboration on): the assignee shows');
   await call('DELETE', `/api/lists/${SHOP}/members/${BOB}`);
   await closeW(w);
 
   // ================= comments in shared lists + U19 toggle state (2.0.6: private lists below)
   w = await boot({user: 'alice', hash: 'l/' + TEAM}); d = w.document;
-  w.eval(`openDetail(${plan})`); await sleep(500);
+  w.eval(`openDetail(${plan})`); await settle(w);
   check(d.querySelector('#detail #d-tl') && d.querySelector('#detail .dcomp #c-input'), 'shared list: comments with composer (2.0.6: the box at the bottom edge)');
   check(!d.querySelector('#detail #d-hist'), 'shared list: no separate history (it lives between the comments)');
   check(d.querySelector('#detail #d-content')?.getAttribute('placeholder') === 'Description' && d.querySelector('#detail #d-content').getAttribute('aria-label') === 'Description', '1.7.1: plain "Description" placeholder (Markdown explained in Help)');
   // 2.31.0 (#1054): the switch is a checked entry in the "…" of the comment head; "Comments only" shows in the head
-  click(w, d.querySelector('#detail [data-act="tl-menu"]')); await sleep(50);
+  click(w, d.querySelector('#detail [data-act="tl-menu"]')); await settle(w);
   const tg = d.querySelector('#pop .mtlact');
   check(tg && tg.classList.contains('on') && /With activity/.test(tg.textContent) && !/Comments only/.test(d.querySelector('#d-tl .cmhead').textContent), 'activity entry names its state (checked)');
-  click(w, tg); await sleep(80);
+  click(w, tg); await settle(w);
   check(/Comments only/.test(d.querySelector('#d-tl .cmhead .cmmode')?.textContent || ''), 'toggled: "Comments only"');
   await call('POST', `/api/tasks/${plan}/comments`, {body: 'Ping from the old days'});
   await closeW(w);
   await call('DELETE', `/api/lists/${TEAM}/members/${BOB}`);
   w = await boot({user: 'alice', hash: 'l/' + WORK}); d = w.document;
-  w.eval(`openDetail(${t1})`); await sleep(400);
+  w.eval(`openDetail(${t1})`); await settle(w);
   // 2.0.6 (#315) replaces U18: private lists get comments too (personal notes): no list yet, only the box (one line)
   // 2.31.0 (#344): on a desktop the comments area stays (split) and says "No comments yet."
   check(d.querySelector('#detail.dsplit #d-cpane #d-tl .cmempty') && d.querySelector('#detail .dcomp #c-input')?.placeholder === 'Write a comment…' && !d.querySelector('#detail .cmmode'), 'private list, no comments: the empty comments area + the box, without the @ hint');
   const hist = d.querySelector('#detail #d-hist');
   check(hist && hist.tagName === 'DETAILS' && !hist.open && /^History/.test(hist.querySelector('summary').textContent) && !hist.closest('#d-tl'), '2.0.7: private list keeps the folded history of 2.0.5, outside the notes');
-  w.eval(`go('l/${TEAM}'); openDetail(${plan})`); await sleep(600);
+  w.eval(`go('l/${TEAM}'); openDetail(${plan})`); await settle(w);
   const ro = d.querySelector('#detail #d-tl');
   check(ro && d.querySelector('#detail .dcomp #c-input') && /Ping from the old days/.test(ro.textContent), 'now private, old comments: a normal list again, with the box');
   check(ro.querySelector('[data-act="c-edit"]') && ro.querySelector('[data-act="c-del"]') && !ro.querySelector('[data-act="tl-act"]') && !ro.querySelector('.actl'), 'editable, no activity (private list)');
@@ -182,7 +183,7 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   // ================= Archive instead of Delete (U12, owner decision 7) + the own dialog
   w = await boot({user: 'alice', hash: 'l/' + WORK}); d = w.document;
   w.__dialogs = 'manual'; w.confirm = () => { throw new Error('native confirm'); }; w.prompt = () => { throw new Error('native prompt'); };
-  w.eval(`listModal(${WORK})`); await sleep(200);
+  w.eval(`listModal(${WORK})`); await settle(w);
   let lm = d.querySelector('.modal:not(.smodal)');
   check(!lm.querySelector('[data-m="del"]') && /Archive/.test(lm.querySelector('[data-m="arch"]').textContent), 'list dialog: "Archive", no "Delete"');
   click(w, lm.querySelector('[data-m="arch"]'));
@@ -195,14 +196,14 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   await w.eval(`histStep('redo')`);
   check((await st()).lists.find(l => l.id === WORK).archived, 'redo archives it again');
   // header "…" of an archived list: restore / delete permanently
-  w.eval(`go('l/${WORK}')`); await sleep(300);
-  click(w, d.querySelector('#top [data-act="top-more"]')); await sleep(80);
+  w.eval(`go('l/${WORK}')`); await settle(w);
+  click(w, d.querySelector('#top [data-act="top-more"]')); await settle(w);
   const lab = [...d.querySelectorAll('#pop .menu-list button')].map(b => b.textContent);
   // 2.152.2 (#2624): project instead of list
   check(lab.includes('Restore project from the archive') && lab.includes('Delete project…') && !lab.includes('Archive project'), 'archived list menu: restore / delete (2.102.0 #1988: into the trash): ' + lab);
   w.eval('closePop()');
   // delete for good: the dialog names what is lost; Esc = no
-  let p = w.eval(`listDeleteForGood(${WORK})`); await sleep(100);
+  let p = w.eval(`listDeleteForGood(${WORK})`); await settle(w);
   let cd = d.querySelector('.modal.cdlg');
   // 2.102.0 (#1988): the list goes into the trash with everything (restorable), the dialog says so
   check(cd && cd.getAttribute('role') === 'alertdialog' && cd.querySelector('.btn.danger.solid[data-cd="yes"]') && /Delete “/.test(cd.querySelector('h3').textContent), 'own dialog: alertdialog, red action');
@@ -218,12 +219,12 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   // other confirms: the own dialog, never window.confirm; undoable things ask nothing
   const S1 = (await call('POST', '/api/lists', {name: 'Scratch'})).id;
   const s1 = await mk('Throwaway', S1), s2 = await mk('Second', S1);
-  w.eval(`go('l/${S1}')`); await w.eval('load()'); w.eval('render()'); await sleep(200);
+  w.eval(`go('l/${S1}')`); await w.eval('load()'); w.eval('render()'); await settle(w);
   w.eval(`S.multi = new Set([${s1}, ${s2}])`); click(w, (() => { const b = d.createElement('button'); b.dataset.act = 'mb-del'; d.body.appendChild(b); return b; })());
   check(await until(async () => (await st()).tasks.filter(t => t.id === s1 || t.id === s2).length === 0), 'deleting selected tasks: no question (undo instead)');
   check(!d.querySelector('.modal.cdlg') && /deleted/.test(d.querySelector('#toast')?.textContent || ''), 'toast with undo');
   // prompt: a new section through the own dialog
-  const sb = d.createElement('button'); sb.dataset.act = 'section-new'; d.body.appendChild(sb); click(w, sb); await sleep(100);
+  const sb = d.createElement('button'); sb.dataset.act = 'section-new'; d.body.appendChild(sb); click(w, sb); await settle(w);
   cd = d.querySelector('.modal.cdlg');
   check(cd && cd.querySelector('#cdlg-in') && d.activeElement === cd.querySelector('#cdlg-in'), 'prompt: own dialog with the field focused');
   cd.querySelector('#cdlg-in').value = 'Later'; click(w, cd.querySelector('[data-cd="yes"]'));
@@ -239,16 +240,16 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   // 2.89.1 (#1916): wait for the loaded state and the list route (the bigger client of 2.89 made opening before it a race)
   // 2.91.0: S may not exist yet right after boot (the bigger client of 2.91 loads later) - typeof guard instead of a ReferenceError
   await until(() => w.eval(`typeof S !== 'undefined' && !!S.tasks && !!S.tasks.get(${plan}) && S.route.key === 'l:${TEAM}'`));
-  w.eval(`openDetail(${plan})`); await sleep(200);
-  w.eval(`datePop(document.querySelector('#detail [data-act="date"]'), ${plan})`); await sleep(100);
-  click(w, d.querySelector('#pop [data-dpfor="p-start"]')); await sleep(80);
+  w.eval(`openDetail(${plan})`); await settle(w);
+  w.eval(`datePop(document.querySelector('#detail [data-act="date"]'), ${plan})`); await settle(w);
+  click(w, d.querySelector('#pop [data-dpfor="p-start"]')); await settle(w);
   let dp = d.querySelector('#dpop');
   check(dp && dp.getAttribute('role') === 'dialog' && dp.querySelector('.dpg[role="grid"]'), 'date picker opens (grid)');
   const hdr = [...dp.querySelectorAll('.dpwd span')].map(x => x.textContent);
   check(hdr[0] === (new Intl.Locale(w.navigator.language || 'en').maximize().region === 'US' ? 'Sun' : 'Mon'), 'English: first weekday from the locale: ' + hdr[0]);
   check(/\d{4}$/.test(dp.querySelector('.dpt').textContent) && !/[A-Z][a-z]+ \d{4}/.test('') , 'month title');
   const f0 = dp.querySelector('.dpg [tabindex="0"]');
-  f0.focus(); key(w, f0, 'ArrowRight'); await sleep(20);
+  f0.focus(); key(w, f0, 'ArrowRight'); await settle(w);
   let foc = d.activeElement;
   check(foc?.dataset.d === addD(f0.dataset.d, 1), 'ArrowRight moves one day');
   key(w, foc, 'ArrowDown'); foc = d.activeElement;
@@ -259,47 +260,47 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   const pick = foc.dataset.d;
   key(w, foc, 'Escape');
   check(!d.querySelector('#dpop') && !d.querySelector('#pop').classList.contains('hidden'), 'Esc closes only the picker, the date dialog stays');
-  click(w, d.querySelector('#pop [data-dpfor="p-start"]')); await sleep(60);
+  click(w, d.querySelector('#pop [data-dpfor="p-start"]')); await settle(w);
   foc = d.querySelector('#dpop .dpg [tabindex="0"]'); foc.focus(); key(w, foc, 'Enter');
   check(d.querySelector('#p-start')?.value === foc.dataset.d || d.querySelector('#pop #p-start')?.value, 'Enter picks the day');
   // touch: a tap on a day
-  click(w, d.querySelector('#pop [data-dpfor="p-start"]')); await sleep(60);
+  click(w, d.querySelector('#pop [data-dpfor="p-start"]')); await settle(w);
   // the start may not be after the due date: on the 1st of a month only one day of the month may be enabled -> take the last enabled one
   const tapDay = [...d.querySelectorAll('#dpop .dpd:not(.out):not([disabled])')].at(-1);
   tapDay.dispatchEvent(new w.Event('touchstart', {bubbles: true})); click(w, tapDay);
   check(d.querySelector('#pop #p-start')?.value === tapDay.dataset.d && /\w/.test(d.querySelector('#pop [data-dpfor="p-start"]').textContent), 'tap picks the day, the button shows it');
   // time: typing and the 12 / 24 h display
-  click(w, d.querySelector('#pop [data-dpfor="p-time"]')); await sleep(60);
+  click(w, d.querySelector('#pop [data-dpfor="p-time"]')); await settle(w);
   const tin = d.querySelector('#dpop #dp-tin');
   check(tin && d.activeElement === tin, 'time picker: the text field has the focus');
-  tin.value = '930'; key(w, tin, 'Enter'); await sleep(60);
+  tin.value = '930'; key(w, tin, 'Enter'); await settle(w);
   check(d.querySelector('#pop #p-time')?.value === '09:30', 'typed "930" -> 09:30');
   const tl = d.querySelector('#pop [data-dpfor="p-time"]').textContent;
   check(/9:30/.test(tl), 'time shown in the app language: ' + tl);
-  click(w, d.querySelector('#pop [data-dpfor="p-time"]')); await sleep(60);
-  click(w, d.querySelector('#dpop [data-th="14"]')); click(w, d.querySelector('#dpop [data-tm="45"]')); await sleep(40);
+  click(w, d.querySelector('#pop [data-dpfor="p-time"]')); await settle(w);
+  click(w, d.querySelector('#dpop [data-th="14"]')); click(w, d.querySelector('#dpop [data-tm="45"]')); await settle(w);
   check(d.querySelector('#pop #p-time')?.value === '14:45', 'tap hour + minutes -> 14:45');
   click(w, d.querySelector('#pop [data-q="ok"]') || d.querySelector('#pop [data-q="done"]'));  // 2.6.1 (#401): saved at once, "Done" closes
   check(await until(async () => (await st()).tasks.find(t => t.id === plan).due_time === '14:45'), 'saved with the task (stored format HH:MM)');
   check(w.eval(`parseHM('9:30 pm')`) === '21:30' && w.eval(`parseHM('21 Uhr')`) === '21:00' && w.eval(`parseHM('25:00')`) === null, 'time parser (pm, "Uhr", invalid)');
   // custom repeat: a small form, RRULE only as expert field (U06)
-  w.eval(`datePop(document.querySelector('#detail [data-act="date"]'), ${plan})`); await sleep(80);
-  const rep = d.querySelector('#p-rep'); rep.value = '__custom'; rep.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(60);
+  w.eval(`datePop(document.querySelector('#detail [data-act="date"]'), ${plan})`); await settle(w);
+  const rep = d.querySelector('#p-rep'); rep.value = '__custom'; rep.dispatchEvent(new w.Event('change', {bubbles: true})); await settle(w);
   check(d.querySelector('#pop .rrcust #p-rn') && d.querySelector('#pop .rrcust #p-rf') && d.querySelector('#pop details.rrx #p-rrule'), 'custom repeat: interval + unit, RRULE folded away');
-  const rn = d.querySelector('#p-rn'); rn.value = '3'; rn.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(40);
-  click(w, d.querySelector('#pop [data-rwd="TH"]')); await sleep(40);
+  const rn = d.querySelector('#p-rn'); rn.value = '3'; rn.dispatchEvent(new w.Event('change', {bubbles: true})); await settle(w);
+  click(w, d.querySelector('#pop [data-rwd="TH"]')); await settle(w);
   check(/INTERVAL=3/.test(w.eval(`document.querySelector('#p-rrule').value`)) && /TH/.test(w.eval(`document.querySelector('#p-rrule').value`)), 'form builds the rule: ' + w.eval(`document.querySelector('#p-rrule').value`));
   w.eval('closePop()');
   await closeW(w);
   // German
   wb = await boot({user: 'bob', hash: 'today'}); db = wb.document;
-  wb.eval(`dpOpen(document.querySelector('#top h1'), {kind: 'date', value: '2026-03-10', onPick: v => { window.__v = v; }})`); await sleep(60);
+  wb.eval(`dpOpen(document.querySelector('#top h1'), {kind: 'date', value: '2026-03-10', onPick: v => { window.__v = v; }})`); await settle(wb);
   dp = db.querySelector('#dpop');
   check(/März 2026/.test(dp.querySelector('.dpt').textContent) && dp.querySelector('.dpwd span').textContent === 'Mo', 'German: "März 2026", week starts on Monday');
   check(/Heute/.test(dp.querySelector('[data-dq="today"]').textContent), 'German buttons');
   click(wb, dp.querySelector('.dpd[data-d="2026-03-12"]'));
   check(wb.__v === '2026-03-12', 'German picker returns the stored format');
-  wb.eval(`dpOpen(document.querySelector('#top h1'), {kind: 'time', value: '21:05', onPick: v => { window.__t = v; }})`); await sleep(60);
+  wb.eval(`dpOpen(document.querySelector('#top h1'), {kind: 'time', value: '21:05', onPick: v => { window.__t = v; }})`); await settle(wb);
   check(db.querySelector('#dp-tin').value === '21:05' && db.querySelector('#dpop [data-th="21"]').textContent === '21', 'German: 24 h clock');
   await closeW(wb);
 
@@ -307,8 +308,8 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   w = await boot({user: 'alice', mobile: true, hash: 'l/' + TEAM}); d = w.document;
   check(!d.querySelector('#top [data-act="hist-undo"]') && !d.querySelector('#top [data-act="hist-redo"]'), 'phone: no ← → in the header');
   check(!d.querySelector('#top [data-act="multi"]') && !d.querySelector('#top [data-act="sort"]'), 'select / sort not in the header');
-  await w.eval(`patchTask(${plan}, {priority: 5})`); await sleep(100);
-  click(w, d.querySelector('#top [data-act="top-more"]')); await sleep(80);
+  await w.eval(`patchTask(${plan}, {priority: 5})`); await settle(w);
+  click(w, d.querySelector('#top [data-act="top-more"]')); await settle(w);
   let items = [...d.querySelectorAll('#pop .menu-list button')];
   check(items[0]?.textContent.startsWith('Undo: ') && !/redo/i.test(items[1]?.textContent || ''), 'menu starts with "Undo: …", no dead "Redo" row (2.25.0, UX-12): ' + items.slice(0, 2).map(b => b.textContent));
   // 2.152.2 (#2624): project instead of list
@@ -316,7 +317,7 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   click(w, items[0]);
   check(await until(async () => (await st()).tasks.find(t => t.id === plan).priority === 0), 'undo from the menu');
   await until(() => !w.eval('HIST.busy') && w.eval('HIST.redo.length') === 1);
-  click(w, d.querySelector('#top [data-act="top-more"]')); await sleep(80);
+  click(w, d.querySelector('#top [data-act="top-more"]')); await settle(w);
   items = [...d.querySelectorAll('#pop .menu-list button')];
   check(items.some(b => b.textContent.startsWith('Redo: ') && !b.disabled) && !items.some(b => /^Undo: |Nothing to undo/.test(b.textContent)), '"Redo: …" offered, no dead "Undo" row');
   w.eval('closePop()');
@@ -329,22 +330,22 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   // ================= Fold (U02, owner decision 1)
   w = await boot({user: 'alice', hash: 'l/' + TEAM, media: {'(hover: none)': true}, setup: x => { Object.defineProperty(x, 'innerWidth', {configurable: true, value: 1000}); }}); d = w.document;
   check(!d.querySelector('#app').classList.contains('side-rail'), 'no panel: sidebar stays');
-  w.eval(`openDetail(${plan})`); await sleep(100);
+  w.eval(`openDetail(${plan})`); await settle(w);
   // 2.209.0 (#2772): at 1000 px the task panel and the list get narrower first, the sidebar stays; it floats only when even
   // that does not fit (~900 px)
   // 2.290.0 C (#3163): below 1200 px a task open folds the panel into the drawer (never bar | panel | list | task), the task keeps its width
   check(d.querySelector('#app').classList.contains('side-rail') && parseFloat(d.documentElement.style.getPropertyValue('--detW')) === 25.5, 'panel open at 1000 px: the sidebar becomes the drawer, the task keeps its width');
   Object.defineProperty(w, 'innerWidth', {configurable: true, value: 904}); w.eval('fitLayout()');
   check(d.querySelector('#app').classList.contains('side-rail') && d.querySelector('#top .menu'), 'panel open at 904 px: the sidebar becomes a drawer (menu button)');
-  click(w, d.querySelector('#top .menu')); await sleep(50);
+  click(w, d.querySelector('#top .menu')); await settle(w);
   check(d.querySelector('#side').classList.contains('open') && !d.querySelector('#scrim').classList.contains('hidden'), 'the menu button opens the sidebar as an overlay');
-  click(w, d.querySelector('#scrim')); await sleep(50);
+  click(w, d.querySelector('#scrim')); await settle(w);
   check(!d.querySelector('#side').classList.contains('open'), 'tap next to it closes it');
   check(d.querySelector('#top [data-act="hist-undo"]'), '2.7.0 (#405): touch tablet with room: undo / redo in the header (they fold into "…" when tight)');
-  w.eval('closeDetail()'); await sleep(50);
+  w.eval('closeDetail()'); await settle(w);
   check(!d.querySelector('#app').classList.contains('side-rail'), 'panel closed: sidebar back');
   Object.defineProperty(w, 'innerWidth', {configurable: true, value: 1600});
-  w.eval(`openDetail(${plan})`); await sleep(50);
+  w.eval(`openDetail(${plan})`); await settle(w);
   check(!d.querySelector('#app').classList.contains('side-rail'), 'wide screen: all side by side');
   await closeW(w);
 
