@@ -301,4 +301,26 @@ check(dbx("SELECT 1 FROM hub_mailbox_docs WHERE mid=?", (KZ,)) and "\\Seen" in f
 rz = next((x for x in Bo.get(B + f"/api/hubmail/mailbox/rules?ws=org:{ORG}").json().get("rules", []) if x["id"] == RZ.get("id")), {})
 check(rz.get("error") == "" and rz.get("hits") == 1, f"#4853: the error is gone after a document ({rz.get('error')!r}, hits {rz.get('hits')})")
 
+# ---- 2.636.0 (#4853, review): a mail whose files are refused for what they are (a ZIP with an empty PDF) stays remembered - it is
+# not fetched again every round - and the rule says so
+m = email.message.EmailMessage()
+m["From"], m["To"], m["Subject"] = "Shop <billing@shop.example.com>", "office@example.com", "Invoice with an empty file"
+m["Message-ID"] = "<p2581d-empty@example.org>"
+m["Date"] = email.utils.formatdate(time.time(), localtime=False)
+m.set_content("Mail with an empty attachment")
+import io  # noqa: E402
+import zipfile  # noqa: E402
+zb = io.BytesIO()
+with zipfile.ZipFile(zb, "w") as z:  # an attachment that unpacks to one empty PDF: the store refuses it (ValueError)
+    z.writestr("Leer.pdf", b"")
+m.add_attachment(zb.getvalue(), maintype="application", subtype="zip", filename="Belege.zip")
+open(os.path.join(MB, "Ziel", "2.eml"), "wb").write(bytes(m))
+KE = hashlib.sha256(m["Message-ID"].encode()).hexdigest()
+ne = len(docs(WS))
+check(run(Bo, WS), "#4853: the run with a mail whose only file is refused")
+check(dbx("SELECT 1 FROM hub_mailbox_docs WHERE mid=?", (KE,)), "#4853: a refused file -> the mail stays remembered (not tried every round)")
+check(len(docs(WS)) == ne, f"#4853: no document from the empty file ({len(docs(WS))} vs {ne})")
+rz = next((x for x in Bo.get(B + f"/api/hubmail/mailbox/rules?ws=org:{ORG}").json().get("rules", []) if x["id"] == RZ.get("id")), {})
+check(rz.get("error") == "refused" and rz.get("error_text"), f"#4853: the rule shows the refusal ({rz.get('error')!r} {rz.get('error_text')!r})")
+
 sys.exit(done("p2581_d_mailrules"))

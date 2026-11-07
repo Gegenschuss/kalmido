@@ -17429,6 +17429,7 @@
   "One card per shot, one column per shooting day; the first picture of a card is its frame.": "Eén kaart per shot, één kolom per draaidag; de eerste afbeelding van een kaart is het beeld.",
   "The mailbox's holder cannot file into the folder of this rule": "De houder van de mailbox kan niet in de map van deze regel archiveren",
   "The last e-mail of this rule became no document (storage full, a locked folder or the hour's limit); it is tried again": "De laatste e-mail van deze regel werd geen document (opslag vol, vergrendelde map of uurlimiet); hij wordt opnieuw geprobeerd",
+  "The last e-mail of this rule became no document: its files were refused (type or content); it is not tried again": "De laatste e-mail van deze regel werd geen document: de bestanden werden geweigerd (type of inhoud); hij wordt niet opnieuw geprobeerd",
   "Tap to comment without a point": "Tik om zonder punt te reageren",
   "Tap on the image to set a point": "Tik op de afbeelding om een punt te zetten",
   "at point {0}": "bij punt {0}",

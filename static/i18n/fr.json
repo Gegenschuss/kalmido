@@ -17429,6 +17429,7 @@
   "One card per shot, one column per shooting day; the first picture of a card is its frame.": "Une carte par plan, une colonne par jour de tournage ; la première image d'une carte est son image.",
   "The mailbox's holder cannot file into the folder of this rule": "Le titulaire de la boîte mail ne peut pas classer dans le dossier de cette règle",
   "The last e-mail of this rule became no document (storage full, a locked folder or the hour's limit); it is tried again": "Le dernier e-mail de cette règle n'est devenu aucun document (stockage plein, dossier verrouillé ou limite horaire) ; il sera retenté",
+  "The last e-mail of this rule became no document: its files were refused (type or content); it is not tried again": "Le dernier e-mail de cette règle n'a produit aucun document : ses fichiers ont été refusés (type ou contenu) ; il ne sera pas réessayé",
   "Tap to comment without a point": "Touchez pour commenter sans point",
   "Tap on the image to set a point": "Touchez l'image pour placer un point",
   "at point {0}": "au point {0}",

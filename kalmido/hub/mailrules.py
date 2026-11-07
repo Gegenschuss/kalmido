@@ -50,7 +50,9 @@ MBR_HOUR = {"links": 30, "eml": 60}  # per mailbox and hour: invoice link downlo
 MBR_NO_HOLDER = N_("Nobody can receive documents for this mailbox (no admin of the workspace)")
 # 2.636.0 (#4853): the state of a rule whose mail became no document (hub_mailbox_rules.last_error; the mail is tried again)
 MBR_RULE_ERR = {"target": N_("The mailbox's holder cannot file into the folder of this rule"),
-                "nodoc": N_("The last e-mail of this rule became no document (storage full, a locked folder or the hour's limit); it is tried again")}
+                "nodoc": N_("The last e-mail of this rule became no document (storage full, a locked folder or the hour's limit); it is tried again"),
+                # 2.636.0 (#4853, review): every file of the mail refused for what it is (type, content): kept, not fetched again
+                "refused": N_("The last e-mail of this rule became no document: its files were refused (type or content); it is not tried again")}
 _CTRL = re.compile(r"[\x00-\x1f\x7f]")
 _MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 _BUDGET = {}            # (box id, kind) -> [hour, used]: this process (the mailbox round runs in one process)
@@ -421,8 +423,15 @@ def _take(box, holder, rule, key, raw):
         if c.execute("INSERT INTO hub_mailbox_docs(box_id, mid, rule_id, at) VALUES(?,?,?,?) ON CONFLICT DO NOTHING RETURNING box_id",
                      (box["id"], key, rule["id"], _now())).fetchone() is None:
             return None, 0
+        why = []
         first, made = docs_mailbox_import(c, holder, box["org_id"] or None, msg, raw, meta=meta, parent_id=rule["target_id"],
-                                          take_files=bool(rule["take_files"]), take_mail=bool(rule["take_mail"]), budget=budget, pre=pre)
+                                          take_files=bool(rule["take_files"]), take_mail=bool(rule["take_mail"]), budget=budget, pre=pre,
+                                          why=why)
+        if not made and why and all(w == "ValueError" for w in why):
+            # 2.636.0 (#4853, review): refused for good (file type / content): the claim stays, else such a mail would be
+            # fetched every round and fill the round's limit
+            c.execute("UPDATE hub_mailbox_rules SET last_error='refused' WHERE id=?", (rule["id"],))
+            return False, 0
         if not made:
             # 2.636.0 (#4853): no document (the holder may not file into the folder, storage full, a locked folder, the hour's
             # limit): the claim goes again, so the next run tries this mail once more, and the rule shows why
