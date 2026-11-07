@@ -178,7 +178,7 @@ function viewWiki() {
     ${all && op ? `<div class="ntbar wkspbar"><a href="#wiki" class="iconbtn" aria-label="${esc(tr('Back'))}">${ic('back')}</a><b>${esc(wk_spaceName(op))}</b>${sel}</div>` : sel ? `<div class="ntbar">${sel}</div>` : ''}
     <div class="ntbar"><div class="ctsearch">${ic('search', 's')}<input id="wk-q" type="search" value="${esc(WK.q)}" placeholder="${esc(tr('Find a page'))}" aria-label="${esc(tr('Find a page'))}" autocomplete="off"></div>
       <button type="button" class="btn pri" data-wk="new">${ic('plus', 's')}${tr('New page')}</button>${!all || op ? wk_dayBtn() : ''}${wk_canFolder(sp) && (!all || op) ? wk_folderBtn() + wk_selBtn(sp, !q && vis.length) : ''}</div>
-    ${op && d?.off ? wko_offHtml(d.off, d.more) : op ? wk_moreHtml(d) : ''}${op && typeof wkeBarHtml === 'function' ? wkeBarHtml(sp) : ''}${all && q ? wk_allHitsHtml(q) : all && !op ? `<nav id="wk-res" aria-label="${esc(tr('Pages'))}">${wk_spacesHtml()}</nav>` : `<nav id="wk-res" aria-label="${esc(tr('Pages'))}">${typeof wkeLockHtml === 'function' && d?.pages && wkeLockHtml(sp) ? wkeLockHtml(sp) : !d?.pages ? `<div class="muted mhint">${d?.err ? esc(d.err) : tr('Loading…')}</div>`
+    ${op && d?.off ? wko_offHtml(d.off, d.more) : op ? wk_moreHtml(d) : ''}${op && typeof wkeBarHtml === 'function' ? wkeBarHtml(sp) : ''}${op && typeof wkoffBar === 'function' ? wkoffBar(sp) : ''}${all && q ? wk_allHitsHtml(q) : all && !op ? `<nav id="wk-res" aria-label="${esc(tr('Pages'))}">${wk_spacesHtml()}</nav>` : `<nav id="wk-res" aria-label="${esc(tr('Pages'))}">${typeof wkeLockHtml === 'function' && d?.pages && wkeLockHtml(sp) ? wkeLockHtml(sp) : !d?.pages ? `<div class="muted mhint">${d?.err ? esc(d.err) : tr('Loading…')}</div>`
       : vis.length ? (q ? `<ul class="wktree">${vis.map((p, i) => `<li><a href="#wiki/${p.id}" class="wkitem">${ic('note', 's')}${wk_hitName(p, i)}</a></li>`).join('')}</ul>` : wk_treeHtml(wk_treeOf(sp), cur, vis.length > 30))  // 2.200.0 A (#2747): with the folders
       : q ? `<div class="empty">${tr('No page matches.')}</div>` : symEmpty('book', tr('No pages yet.'), (sp === 'private' ? tr('Processes, checklists, how-tos: write down what you need to know.') : tr('Processes, checklists, how-tos: write down what the team needs to know.')))}${q && d?.pages && !d.off && typeof wks_html === 'function' ? wks_html(sp, WK.q, vis) : ''}</nav>${wk_selBar(sp)}`}${!q && (!all || op) && typeof wkt_sideHtml === 'function' ? wkt_sideHtml(sp) : ''}${typeof wsh_sideHtml === 'function' ? wsh_sideHtml() : ''}</div>`;  // 2.123.0 A (#2106): + found in the text (wkhist.js); 2.371 (#3150): + the tags
   const tagv = !id && S.route.wtag != null && typeof wkt_viewHtml === 'function' && (!all || op);  // 2.371 (#3150): a tag's pages
@@ -417,7 +417,7 @@ function wk_deskHtml(sp, d, id, cur, sel, op) {
   if (all && !op) d = null;  // 2.198.0 A (#2743): no space open: no space's menu, offline mark or lock bar
   const bar = `<div class="wkbar">${sel}<div class="ctsearch">${ic('search', 's')}<input id="wk-q" type="search" value="${esc(WK.q)}" placeholder="${esc(tr('Find a page'))}" aria-label="${esc(tr('Find a page'))}" autocomplete="off"></div>
     <button type="button" class="btn pri" data-wk="new">${ic('plus', 's')}${tr('New page')}</button>${!all || op ? wk_dayBtn() : ''}${wk_canFolder(sp) && (!all || op) ? wk_folderBtn() + wk_selBtn(sp, !q && !id && !!pages.length) : ''}
-    ${S.me?.kid || !op ? '' : `${!id && WK.idx[wk_cur()]?.mayWrite !== false ? '<input type="file" id="wk-zip-file" accept=".zip,application/zip" hidden>' : ''}<button type="button" class="iconbtn" data-wk="amenu" aria-haspopup="menu" title="${esc(tr('Workspace'))}" aria-label="${esc(tr('Workspace'))}">${ic('dots')}</button>`}</div>${d?.off ? wko_offHtml(d.off, d.more) : wk_moreHtml(d)}${d && typeof wkeBarHtml === 'function' ? wkeBarHtml(sp) : ''}`;  // 2.169 (#2671): the offline mark; 2.210 A (#2755): the cap online
+    ${S.me?.kid || !op ? '' : `${!id && WK.idx[wk_cur()]?.mayWrite !== false ? '<input type="file" id="wk-zip-file" accept=".zip,application/zip" hidden>' : ''}<button type="button" class="iconbtn" data-wk="amenu" aria-haspopup="menu" title="${esc(tr('Workspace'))}" aria-label="${esc(tr('Workspace'))}">${ic('dots')}</button>`}</div>${d?.off ? wko_offHtml(d.off, d.more) : wk_moreHtml(d)}${d && typeof wkeBarHtml === 'function' ? wkeBarHtml(sp) : ''}${d && typeof wkoffBar === 'function' ? wkoffBar(sp) : ''}`;  // 2.637.0 (#4745): wkoffBar; 2.169 (#2671): the offline mark; 2.210 A (#2755): the cap online
   const hits = all && q ? wk_allHitsHtml(q, 'wkdlist') : q && d?.pages ? `<nav id="wk-res" class="wkdlist" aria-label="${esc(tr('Pages'))}">${(v => v.length ? `<ul class="wktree">${v.map((p, i) => `<li><a href="#wiki/${p.id}" class="wkitem">${ic('note', 's')}${wk_hitName(p, i)}</a></li>`).join('')}</ul>` : `<div class="empty">${tr('No page matches.')}</div>`)(pages.filter(p => p.path.toLowerCase().includes(q) || d.off && String(p.body || '').toLowerCase().includes(q)))}${!d.off && typeof wks_html === 'function' ? wks_html(sp, WK.q, pages.filter(p => p.path.toLowerCase().includes(q))) : ''}</nav>` : '';  // 2.169 (#2671): offline the texts are searched here
   if (id && !hits) return `<div class="ntwrap wkwrap wkdesk wkpgo${(typeof pgw_cls === 'function' ? pgw_cls('wiki', id) : '')}">${bar}<article class="ntedit wkpage${typeof wkst_cls === 'function' ? wkst_cls(cur?.space || sp) : ''}" data-pw="1" aria-label="${esc(cur ? wk_base(cur.path) : tr('Page'))}">${cur ? (cur._wke && typeof wkeLockHtml === 'function' ? wkeLockHtml(cur.space, true) : wk_pageHtml(cur)) : (WK.pgErr && WK.pgLost === id ? wk_lostHtml() : `<div class="muted mhint">${WK.pgErr ? esc(WK.pgErr) : tr('Loading…')}</div>`)}</article></div>`;
   if (!hits && S.route.wtag != null && typeof wkt_viewHtml === 'function' && (!all || op)) return `<div class="ntwrap wkwrap wkdesk">${bar}<section class="wkfolder wktagview" aria-label="${esc(tr('Tags'))}">${wkt_viewHtml(sp, S.route.wtag)}</section></div>`;  // 2.371 (#3150): a tag's pages
@@ -1013,7 +1013,8 @@ function wk_acPick(i) {
 function w299_areaItems() {
   return [{head: tr('Workspace')}, {label: tr('Export as ZIP'), icon: 'download', fn: wk_export}, ...(WK.idx[wk_cur()]?.mayWrite !== false ? [{label: tr('Import ZIP…'), icon: 'upload', fn: wk_import}, {label: tr('Trash'), icon: 'trash', fn: () => wk_trashDlg()}] : []),  // 2.143.0 B (#2211): + Trash
     ...(typeof wkeDlg === 'function' && S.me?.kind !== 'agent' && globalThis.crypto?.subtle ? [{label: tr('Encryption…'), icon: 'lock', fn: () => wkeDlg(wk_cur())}] : []),
-    ...(typeof wkst_items === 'function' && WK.idx[wk_cur()]?.may_style ? wkst_items({space: wk_cur()}) : [])];  // 2.371.3 (#3152): the space's reading style
+    ...(typeof wkst_items === 'function' && WK.idx[wk_cur()]?.may_style ? wkst_items({space: wk_cur()}) : []),
+    ...(typeof wkoffItems === 'function' ? wkoffItems(wk_cur()) : [])];  // 2.637.0 (#4745): "Offline available" (wikioff.js)  // 2.371.3 (#3152): the space's reading style
 }
 // ---- events (own listeners: data-wk)
 document.addEventListener('click', async e => {
@@ -1170,7 +1171,7 @@ if (typeof sbb_sync === 'function') sbb_sync('wiki');  // 2.152.3 B: loaded late
 // e:<space> = the lock's state of a locked space (wrapped keys only, wikie2e.js wkeInfo), x:<page> = an offline change the server
 // refused (changed elsewhere in the meantime): it waits at the page until mine or theirs is picked. A sync asks only for the texts
 // changed since the newest one here; offline the view reads the copy ("Offline · as of …") and a changed text waits in the outbox
-// (core.js) like a task's. Files stay online-only. Logout empties the database (icons.js clearLocal); a space this account
+// (core.js) like a task's. Files stay online-only (2.637.0 #4745: unless the space is "Offline available", wikioff.js). Logout empties the database (icons.js clearLocal); a space this account
 // no longer has, and another account's records, go at the next sync (wko_syncAll). 2.238.0 B (#2872): every record carries the
 // sign-in mark (me.sgen); another sign-in, a lost session or 14 days without an online sync empty it (core.js sessGuard).
 const WKO = {st: null, cf: {}, syncP: null, dead: false, swept: null};
@@ -1180,16 +1181,18 @@ function wko_idb() {
   if (!globalThis.indexedDB) return null;
   let dbp = null;
   const db = () => dbp ||= new Promise((ok, no) => {
-    const r = indexedDB.open('kalmido-wiki', 1);
-    r.onupgradeneeded = () => { if (!r.result.objectStoreNames.contains('c')) r.result.createObjectStore('c', {keyPath: 'k'}); };
+    const r = indexedDB.open('kalmido-wiki', 2);  // 2.637.0 (#4745): version 2 = + store "f", the files of a space kept offline (wikioff.js)
+    r.onupgradeneeded = () => { for (const n of ['c', 'f']) if (!r.result.objectStoreNames.contains(n)) r.result.createObjectStore(n, {keyPath: 'k'}); };
     r.onsuccess = () => { r.result.onversionchange = () => { r.result.close(); dbp = null; }; ok(r.result); };  // logout in another tab deletes it
     r.onerror = () => no(r.error); r.onblocked = () => no(new Error('blocked'));
   }).catch(e => { dbp = null; throw e; });
-  const os = async mode => (await db()).transaction('c', mode).objectStore('c');
+  const os = async (mode, n = 'c') => (await db()).transaction(n, mode).objectStore(n);
   return {get: async k => wko_rq((await os('readonly')).get(k)), put: async v => wko_rq((await os('readwrite')).put(v)), del: async k => wko_rq((await os('readwrite')).delete(k)),
     all: async () => wko_rq((await os('readonly')).getAll()),
     pre: async x => wko_rq((await os('readonly')).getAll(IDBKeyRange.bound(x, x + '\uffff'))),  // 2.169.1 (#2672): only the keys starting with x
-    clear: async () => wko_rq((await os('readwrite')).clear()), close: async () => { const p = dbp; dbp = null; if (p) (await p.catch(() => null))?.close(); }};
+    fget: async k => wko_rq((await os('readonly', 'f')).get(k)), fput: async v => wko_rq((await os('readwrite', 'f')).put(v)),  // 2.637.0 (#4745)
+    fdel: async k => wko_rq((await os('readwrite', 'f')).delete(k)), fkeys: async () => wko_rq((await os('readonly', 'f')).getAllKeys()),
+    clear: async () => { const t = (await db()).transaction(['c', 'f'], 'readwrite'); await Promise.all(['c', 'f'].map(n => wko_rq(t.objectStore(n).clear()))); }, close: async () => { const p = dbp; dbp = null; if (p) (await p.catch(() => null))?.close(); }};
 }
 const wko_st = () => WKO.dead ? null : WKO.st ||= globalThis.__wkoStore || wko_idb();  // after logout nothing is written again (a sync still on its way)
 async function wko_get(k) { try { const r = S.me ? await wko_st()?.get(k) : null; return r && r.uid === S.me.id && (r.g || '') === (S.me.sgen || '') ? r : null; } catch { return null; } }  // private mode: no copy, as before; 2.238.0 B (#2872): only this sign-in's records
@@ -1203,9 +1206,9 @@ async function wko_all() { try { return (await wko_st()?.all()) || []; } catch {
 // 2.169.1 (#2672): the records of one kind (x: = waiting conflicts) without reading the whole copy; a store without pre() filters all()
 async function wko_pre(x) { try { const st = wko_st(); return (st?.pre ? await st.pre(x) : (await st?.all() || []).filter(r => r.k.startsWith(x))) || []; } catch { return []; } }
 // 2.238.0 B (#2872): another sign-in or too old (core.js sessGuard): everything out, a new copy may follow
-async function wko_reset() { WKO.cf = {}; try { await wko_st()?.clear(); } catch { /* gone */ } }
+async function wko_reset() { WKO.cf = {}; try { await wko_st()?.clear(); await wko_st()?.fclear?.(); } catch { /* gone */ } }  // 2.637.0 (#4745): clear() empties the files too (fclear: a test's stand-in)
 // logout (icons.js clearLocal): everything out, the database closed (clearLocal deletes it then)
-async function wko_wipe() { const st = WKO.st; WKO.cf = {}; WKO.dead = true; if (!st) return; try { await st.clear(); } catch { /* gone */ } try { await st.close?.(); } catch { /* closed */ } WKO.st = null; }
+async function wko_wipe() { const st = WKO.st; WKO.cf = {}; WKO.dead = true; if (typeof WKOF !== 'undefined') WKOF.run?.ac.abort('off'); if (!st) return; try { await st.clear(); await st.fclear?.(); } catch { /* gone */ } try { await st.close?.(); } catch { /* closed */ } WKO.st = null; }
 const wko_sig = e => e?.mode ? `${e.mode}:${e.gen || 0}:${e.reenc || 0}` : '';
 const wko_clone = v => JSON.parse(JSON.stringify(v));
 // the index of a space with its texts: from the server (only the texts changed since the copy's newest), the copy kept; offline the copy
@@ -1237,8 +1240,9 @@ async function wko_sync(sp) {
     }
     await wko_put({k: 's:' + sp, sp, at: new Date().toISOString(), space: j.space, may_write: j.may_write, e2e: j.e2e || null, more: !!j.more, pages: wko_clone(j.pages), folders: wko_clone(j.folders || []), root: j.root || null});  // 2.200.0 A (#2747): + the folders
     if (!WKO.dead && S.me) LS.set('wko', {g: S.me.sgen || '', at: new Date().toISOString()});  // 2.238.0 B (#2872): the last online sync (core.js sessGuard)
+    if (typeof wkoffSync === 'function') wkoffSync(sp).catch(() => {});  // 2.637.0 (#4745): the files of a space kept offline (wikioff.js)
   } catch (e) {
-    if ([403, 404].includes(e.status)) { wko_del('s:' + sp); wko_del('e:' + sp); }  // no access any more: the copy goes too
+    if ([403, 404].includes(e.status)) { wko_del('s:' + sp); wko_del('e:' + sp); if (typeof wkof_drop === 'function') wkof_drop(sp); }  // no access any more: the copy goes too (2.637.0 #4745: its files too)
     if (!(e instanceof Offline) || !c) throw e;
     j = {space: c.space, may_write: c.may_write, e2e: c.e2e, more: !!c.more, pages: wko_clone(c.pages), folders: wko_clone(c.folders || []), root: c.root || null, _off: c.at};
   }
@@ -1268,7 +1272,7 @@ async function wko_page(id) {
   if (!f) { await Promise.all(wk_spaces().filter(sp => !WK.idx[sp]?.pages).map(sp => wk_load(sp, true))); f = find(); }
   if (!f) return null;
   const [sp, p] = f, d = WK.idx[sp];
-  return {...p, space: sp, files: [], moved: null, backlinks: typeof wkeBacklinks === 'function' ? wkeBacklinks(sp, p) : [], _off: d?.off || new Date().toISOString()};
+  return {...p, space: sp, files: typeof wkoffPageFiles === 'function' ? await wkoffPageFiles(sp, p.id) : [], moved: null, backlinks: typeof wkeBacklinks === 'function' ? wkeBacklinks(sp, p) : [], _off: d?.off || new Date().toISOString()};  // 2.637.0 (#4745): + the files of a space kept offline (wikioff.js)
 }
 // a changed text into the outbox: a locked space's text only as its cipher; a waiting change of the page takes the newer text
 async function wko_queue(p, patch) {
