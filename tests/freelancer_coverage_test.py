@@ -693,7 +693,8 @@ ROUTES = {
     "GET /api/servers/{}/data": "personal", "GET /api/servers/{}/events": "personal", "GET /api/servers/{}/news": "personal",
     "GET /api/servers/{}/search": "personal", "GET /api/servers/{}/tasks/{}": "personal", "GET /api/supporter": "personal",
     "GET /api/v1/family": "personal", "GET /api/v1/family/deadline-types": "personal", "GET /api/v1/family/kids": "personal",
-    "GET /api/v1/family/packing": "personal", "GET /api/v1/life": "personal", "GET /api/v1/life/review": "personal",
+    "GET /api/v1/family/packing": "personal", "GET /api/v1/life": "personal", "GET /api/v1/stats": "personal",  # 2.630.0 (#4617)
+    "GET /api/v1/life/review": "personal",
     "GET /api/v1/life/upkeep-presets": "personal", "PATCH /api/budget/cats/{}": "personal",
     "PATCH /api/budget/entries/{}": "personal", "PATCH /api/budget/recurring/{}": "personal",
     "PATCH /api/family/contacts/{}": "personal", "PATCH /api/family/rewards/{}": "personal",

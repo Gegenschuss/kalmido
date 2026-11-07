@@ -135,6 +135,7 @@ ORDER = (
     "lists.orgfields",  # 2.609.0 (#3373): the field schema of an organisation (linked custom fields)
     "lists.orglabels",  # 2.609.0 (#3373): labels of an organisation (linked project tags)
     "personal.stats",
+    "personal.statslife",  # 2.630.0 (#4617)
     "calendars.icalfeed",
     "calendars.caldav",
     "integrations.importers",

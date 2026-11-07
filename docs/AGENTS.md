@@ -4015,7 +4015,7 @@ endpoint is named somewhere in this guide or in [AGENT-SETUP.md](AGENT-SETUP.md)
 `get_agent`, `get_announcement`, `get_attachment`, `get_client`, `get_contact`, `get_day_plan`, `get_day_review`,
 `get_delivery_report`, `get_dependencies`, `get_document`, `get_event`, `get_family`, `get_filed_mail`, `get_group`, `get_habit_stats`, `get_job`, `get_life`, `get_list`, `get_me`,
 `get_milestone`, `get_note`, `get_office`, `get_office_document`, `get_office_subscriptions`, `get_plan_usage`, `get_playbook`, `get_poll`,
-`get_project_overview`, `get_review`, `get_roadmap`, `get_storage`, `get_task`, `get_task_events`, `get_time_gaps`,
+`get_project_overview`, `get_review`, `get_roadmap`, `get_stats`, `get_storage`, `get_task`, `get_task_events`, `get_time_gaps`,
 `get_timer`, `get_usage`, `get_waiting`, `get_workload`, `give_stars`, `import_ics`, `import_vcards`, `ingredients_to_shopping`,
 `freebusy`, `link_contact`, `link_letter_document`, `link_task_to_list`, `list_address_books`, `list_agents`, `list_attachments`, `list_build_status`, `list_calendar_events`, `list_chats`,
 `list_clients`, `list_deadline_types`, `list_documents`, `list_event_calendars`, `list_events`, `list_fields`,

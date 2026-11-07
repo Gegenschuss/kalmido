@@ -161,6 +161,7 @@ APP_TO_API = {
     "GET /api/lists/{}/export.csv": ["GET /tasks"],  # 2.116.0 (#2064): agents read the same tasks via GET /tasks?list_id=
     "GET /api/time/gaps": ["GET /time/gaps"],  # 2.34.0 (#269)
     "GET /api/stale": ["GET /stale"],  # 2.34.0 (#266)
+    "GET /api/stats": ["GET /stats"],  # 2.630.0 (#4617): the statistics (health only with the scope private)
     "GET /api/news": ["GET /news"],
     "POST /api/news/read": ["POST /news/read"],
     "GET /api/roadmap": ["GET /roadmap"],
@@ -573,7 +574,7 @@ APP_ONLY = [
     ("2.83.0 (#1427): the header strip of a list (style, own picture) and of a person's folder is set by people in the app; "
      "agents read header_style in GET /lists", ("* /api/lists/{}/header", "GET /api/list-header/", "* /api/folder-heads")),
     ("views computed for the screen (the data is in /tasks, /tasks/{id}/dependencies, /time/entries)", (
-        "GET /api/stats", "GET /api/occurrences", "GET /api/deps", "GET /api/imports")),
+        "GET /api/occurrences", "GET /api/deps", "GET /api/imports")),  # 2.630.0 (#4617): GET /api/stats is mapped (GET /stats)
     ("app conveniences: undo of a completion (= reopen), read markers, News removal, sidebar order, folder of a person's "
      "tag (personal tags change with the task's tags), list owner lookup, icon pictures", (
         "POST /api/tasks/{}/undo", "POST /api/tasks/{}/seen", "POST /api/news/dismiss", "POST /api/lists/reorder", "* /api/tags/",

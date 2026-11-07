@@ -879,6 +879,7 @@ ROUTES = {
     "POST /api/account/import/{}/run": "own", "POST /api/account/import/{}/key": "own",
     # 2.96.0 D (#1941 / #1918): an organisation export into the private workspace (p296_d_api_test.py)
     "POST /api/me/mail/token": "own", "DELETE /api/me/mail/token": "own", "POST /api/me/mail/test": "own",
+    "GET /api/v1/stats": "own",  # 2.630.0 (#4617)
     "GET /api/v1/life": "own", "GET /api/v1/life/upkeep-presets": "own",
     "POST /api/v1/life/contracts": "own", "POST /api/v1/life/devices": "own", "POST /api/v1/life/upkeep": "own",
     "POST /api/v1/life/health": "own", "POST /api/v1/life/trips": "own", "GET /api/v1/life/review": "own",

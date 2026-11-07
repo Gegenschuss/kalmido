@@ -21,3 +21,12 @@
   .sthabits .shh,.sthabits .shr{grid-template-columns:minmax(0,1fr) 6rem 4rem 1.875rem;gap:.375rem}
   .sthabits .rate svg{width:2.5rem}
 }
+/* 2.630.0 (#4617): statistics of Home & life -- a short list (deadlines, next trip) and the rows per person (health) */
+.stlist{list-style:none;margin:0;padding:0}
+.stlist li{display:flex;align-items:baseline;gap:.5rem;padding:.25rem 0;border-bottom:1px solid var(--line2);font-size:var(--fs-m)}
+.stlist li:last-child{border-bottom:0}
+.stlrows{display:grid;grid-template-columns:minmax(6rem,auto) auto minmax(0,1fr) auto auto;gap:.25rem .875rem;font-size:var(--fs-m);align-items:baseline}
+.stlr{display:contents}
+.stlr .n{font-weight:600}
+.stlr .od{color:var(--p5)}
+@media (max-width:767px){ .stlrows{grid-template-columns:1fr 1fr} }

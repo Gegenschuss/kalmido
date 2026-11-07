@@ -2056,6 +2056,10 @@ TOOLS += [
      lambda api, a: api.call("POST", "/life/trips", body=_pick(a, ("name", "from", "to", "where", "packing", "event", "folder")))),
     ("get_review", "2.22.0: the day or week in review: done, still open, moved, the next seven days (the journal only with the scope private).",
      _obj({"period": {"type": "string", "enum": ["day", "week"]}, "date": D}), lambda api, a: api.call("GET", "/life/review", _pick(a, ("period", "date")))),
+    ("get_stats", "2.630.0: the person's statistics (last 12 weeks: completed, on time, streak, overdue, focus, tracked time) and, while "
+                  "their modules are on, contracts (count, cost per month / year, deadlines to cancel of the next 90 days, by provider), "
+                  "health (only with the scope private) and travel (trips, travel days, the next trip). space = private | org:<id>.",
+     _obj({"space": {"type": "string"}}), lambda api, a: api.call("GET", "/stats", _pick(a, ("space",)))),
     ("write_journal", "2.22.0 (scope private): write the journal entry of a day (text, mood 1-5; empty = deleted).",
      _obj({"day": D, "text": {"type": "string"}, "mood": {"type": ["integer", "null"], "minimum": 1, "maximum": 5}}, ["day"]),
      lambda api, a: api.call("PUT", f"/life/journal/{a['day']}", body=_pick(a, ("text", "mood")))),
@@ -2863,7 +2867,7 @@ TOOLSETS = {
     "life": """
         list_habits create_habit update_habit delete_habit check_in_habit get_habit_stats get_family add_occasion list_deadline_types add_deadline
         ingredients_to_shopping add_shop_areas list_packing_templates create_packing_list list_kids give_stars add_reward update_reward delete_reward
-        request_reward decide_reward get_life list_upkeep_presets add_contract add_device add_upkeep add_health_entry create_trip get_review
+        request_reward decide_reward get_life list_upkeep_presets add_contract add_device add_upkeep add_health_entry create_trip get_review get_stats
         write_journal sync_read_later propose_contract_notice
     """,
     "integrations": """

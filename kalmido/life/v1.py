@@ -12,6 +12,7 @@ from ..life.model import (
     trip_create, upkeep_create,
 )
 from ..life.web import life_get, life_review, life_upkeep_presets
+from ..personal.stats import stats_api  # 2.630.0 (#4617)
 from ..life.karakeep import kk_sync
 from ..core.access import Denied
 from ..contacts.model import contact_visible
@@ -105,6 +106,14 @@ def v1_life_trip():
 def v1_life_review():
     v1_args(("period", "date"))
     return jsonify(v1_call(life_review))
+
+
+@app.get("/api/v1/stats")
+@v1_view
+def v1_stats():
+    """2.630.0 (#4617): the statistics of the token's person (as in the app); health only with the scope private."""
+    v1_args(("ws", "space"))
+    return jsonify(v1_call(stats_api))
 
 
 @app.put("/api/v1/life/journal/<day>")
@@ -206,6 +215,13 @@ def life_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
     paths["/life/review"] = {"get": op("The day / week in review: done, still open, moved, the next seven days (the journal only with "
                                        "the scope private)", T, ok({"type": "object"}) | errs("400", "409"),
                                        [q("period", "day (default) or week", {"type": "string", "enum": ["day", "week"]}), q("date", "A day (default today)", d)])}
+    paths["/stats"] = {"get": op("2.630.0 (#4617): the person's statistics of the last 12 weeks (completed, on time, streak, overdue, focus, "
+                                 "tracked time) and of the switched-on modules contracts (count, cost per month / year, deadlines to "
+                                 "cancel of the next 90 days, by provider), health (only with the scope private: per person) and travel "
+                                 "(trips and travel days of the last 12 months and this year, the next trip)", "Statistics",
+                                 ok({"type": "object"}) | errs("400", "404"),
+                                 [q("ws", "First weekday, 0 Sunday .. 6 Saturday (default 1)", {"type": "string"}),
+                                  q("space", "private or org:<id> (default: all workspaces)", {"type": "string"})])}
     paths["/life/journal/{day}"] = {"put": op("Write the journal entry of a day (private; empty = deleted)", T, ok({"type": "object"}) | errs("400", "409"),
                                               [{"name": "day", "in": "path", "required": True, "schema": d}],
                                               body={"type": "object", "properties": {"text": {"type": "string"},

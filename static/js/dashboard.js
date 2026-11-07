@@ -333,7 +333,8 @@ LY.review = {key: 'view_review', grid: 'dgrid', title: () => tr('Customise the r
 // 2.55.0 (#1067): statistics, the client card and family on the builder (same order and widths as before: the default shows what it did)
 LY.stats = {key: 'view_stats', title: () => tr('Customise statistics'), blocks: () => [['tiles', N_('Totals'), 'chart', 'full'], ['done', N_('Completed tasks'), 'done', 'full'],
   ['bylist', N_('By project'), 'list', 'full'], ['overdue', N_('Overdue'), 'alert', 'full'], ['focus', N_('Focus time'), 'timer', 'full'], ['time', N_('Tracked time'), 'clock', 'full'],
-  ['habits', N_('Habits'), 'repeat', 'full']]};
+  ['habits', N_('Habits'), 'repeat', 'full'],
+  ...[['contracts', N_('Contracts'), 'file'], ['health', N_('Health'), 'heart'], ['travel', N_('Travel'), 'plane']].filter(b => feat(b[0])).map(b => [...b, 'full'])]};  // 2.630.0 (#4617): Home & life, while the module is on
 // 2.435.0 A (#3600): month = "Time tracking", gendocs = "Documents", letters a block of their own; the blocks the client's
 // office switched off (office/model.py CLIENT_BLOCKS, clientpage.js ms_clOff) are no blocks of the card
 const LY_CL_BLOCKS = [['details', N_('Details'), 'brief', 'full'], ['persons', N_('Contact persons'), 'users', 'full'],

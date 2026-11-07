@@ -10,6 +10,7 @@ from ..core.state import visible_lists
 from ..accounts.wsareas import wsa_space_lists
 from ..personal.habits import pomo_elapsed
 from ..personal.timetrack import entry_secs
+from ..personal.statslife import stl_blocks  # 2.630.0 (#4617)
 
 
 # ---------------------------------------------------------------- statistics (per user)
@@ -138,4 +139,5 @@ def stats_api():
         time=None if not time_all() else {"per_week": [round(v / 60) for v in t_week], "total": round(sum(t_week) / 60), "this_week": round(t_week[-1] / 60),
               "by_list": sorted(({**lst(k), "minutes": round(v / 60)} for k, v in t_list.items() if round(v / 60)),
                                 key=lambda x: -x["minutes"])},
+        **stl_blocks(c, uid, today, mon0, STATS_WEEKS, sq, org),  # 2.630.0 (#4617): contracts / health / travel (their modules on)
     )

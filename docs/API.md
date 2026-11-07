@@ -1365,7 +1365,8 @@ while one is off its routes answer 409. `GET /life` returns the switched-on part
 sums and `due` = the last day to cancel, devices + upkeep, contacts to get in touch with, health with the scope
 `private`, trips, the reading list). Create: `POST /life/contracts`, `/life/devices`, `/life/upkeep` (`tasks:write`; `GET /life/upkeep-presets` = suggested upkeep tasks, `read`), `/life/health`
 (`private`), `/life/trips` (`structure`); `GET /life/review?period=day|week&date=` (the journal only with `private`),
-`PUT /life/journal/{day}` (`private`), `PUT /contacts/{id}/care` (`contacts`), `POST /life/karakeep/sync` (`tasks:write`; 2.97.0: links come in
+`PUT /life/journal/{day}` (`private`), `GET /stats?space=` (2.630.0: the statistics as in the app, with the blocks contracts /
+travel of the switched-on modules and health only with `private`; `read`), `PUT /contacts/{id}/care` (`contacts`), `POST /life/karakeep/sync` (`tasks:write`; 2.97.0: links come in
 as bookmarks of the app, notes stay tasks; bookmarks themselves have no REST API, docs/BOOKMARKS.md). Projects carry
 `life` (`contracts | home | health | travel | reading`) and `trip` (`{from, to, where}`). The Karakeep connection itself
 (its API key) is set up in the app only.

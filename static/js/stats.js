@@ -69,8 +69,40 @@ function viewStats() {
       <div class="shh muted"><span></span><span>${tr('rate')}</span><span>${tr('streak')}</span><span>${tr('best')}</span></div>
       ${hs.map(x => { const s = habitStats(x), col = cssColor(x.color) || HCOLORS[0]; return `<div class="shr" data-act="habit-open" data-id="${x.id}" title="${esc(x.per_week ? tr('Share of the last 4 weeks that reached the target') : tr('Share of the scheduled days of the last 30 days'))}"><span class="n"><i class="sw" style="background:${col}"></i>${esc(x.name)}</span>
         <span class="rate"><svg width="64" height="8" viewBox="0 0 64 8" preserveAspectRatio="none" aria-hidden="true"><rect class="ch-track" width="64" height="8" rx="4"/><rect class="ch-bar" width="${Math.round(64 * s.rate / 100)}" height="8" rx="4"/></svg><b>${s.rate}%</b></span><span><b>${s.streak}</b> ${esc(streakUnit(x))}</span><span>${s.best}</span></div>`; }).join('')}</div></section>`;
+  // 2.630.0 (#4617): Home & life -- the API sends a block's key only while its module is on (health never to an organisation's view)
+  if (j.contracts) P.contracts = stl_contracts(j.contracts);
+  if (j.health) P.health = stl_health(j.health, wl, tipW);
+  if (j.travel) P.travel = stl_travel(j.travel);
   // 2.39.1 (#1180): the long note sits behind the (i) next to the first heading (infoize, icons.js), closed by default
   return `<div class="stats">${S.ly.view === 'stats' ? '' : `<div class="lybar"><span class="spacer"></span>${lyCustomBtn('stats')}</div>`}${lyHtml('stats', P)}</div>`;
+}
+// 2.630.0 (#4617): the blocks contracts, health and travel (kalmido/personal/statslife.py)
+const stl_tiles = ts => `<div class="sttiles">${ts.map(([v, l, x]) => `<div><b>${esc(String(v))}</b><span>${esc(l)}</span><small>${esc(x)}</small></div>`).join('')}</div>`;
+const stl_when = d => esc(dayLabel(d));
+function stl_contracts(c) {
+  const rows = c.notice.map(x => `<li><a href="#t/${x.task_id}">${esc(x.name)}</a>${x.provider ? ` <span class="muted">${esc(x.provider)}</span>` : ''}<span class="spacer"></span><span class="muted">${stl_when(x.due)}</span></li>`).join('');
+  return `<section class="stcard stl-contracts"><div class="sthead"><h3>${tr('Contracts')}</h3></div>
+    ${stl_tiles([[c.count, trn('running contract', 'running contracts', c.count), tr('Deadlines to cancel in the next {0} days: {1}', c.notice_days, c.notice.length)],
+      [fmtMoney(c.monthly), tr('per month'), tr('{0} per year', fmtMoney(c.yearly))]])}
+    <h4>${tr('Deadlines to cancel')}</h4>${rows ? `<ul class="stlist">${rows}</ul>` : `<div class="muted stempty">${tr('No deadline to cancel in the next {0} days.', c.notice_days)}</div>`}
+    <h4>${tr('By provider')}</h4>${hbarChart(c.by_provider.map(x => ({name: `${x.name || tr('No provider')} (${x.n})`, v: x.monthly})), {fmt: fmtMoney, label: tr('Cost per month by provider')})}</section>`;
+}
+function stl_health(h, wl, tipW) {
+  const rows = h.people.map(p => `<div class="stlr"><span class="n">${esc(p.name || tr('Me'))}</span><span>${tr('{0} done', p.done)}</span>
+    <span>${p.next ? `<a href="#t/${p.next.task_id}">${esc(p.next.title)}</a> <span class="muted">${stl_when(p.next.due)}</span>` : `<span class="muted">${tr('nothing due')}</span>`}</span>
+    <span class="${p.overdue ? 'od' : 'muted'}">${trn('{0} overdue', '{0} overdue', p.overdue)}</span>
+    <span class="muted">${p.med_due ? esc(tr('Intakes done {0} of {1}', p.med_done, p.med_due)) : ''}</span></div>`).join('');
+  return `<section class="stcard stl-health"><div class="sthead"><h3>${tr('Health')}</h3><span class="muted">${trn('{0} in 12 weeks', '{0} in 12 weeks', h.done)}</span></div>
+    ${barChart(h.per_week, wl, {tip: i => tipW(i, tr('{0} done', h.per_week[i])), label: tr('Appointments, check-ups and vaccinations done per week')})}
+    <h4>${tr('By person')}</h4>${rows ? `<div class="stlrows">${rows}</div>` : `<div class="muted stempty">${tr('Nothing in this period.')}</div>`}</section>`;
+}
+function stl_travel(t) {
+  const cost = w => w.costs.map(x => curMoney(x.amount, x.currency)).join(' + ');
+  const n = t.next, tiles = [[t.last12.trips, trn('trip in the last 12 months', 'trips in the last 12 months', t.last12.trips), trn('{0} travel day', '{0} travel days', t.last12.days)],
+    [t.year.trips, tr('trips in {0}', t.year.year), trn('{0} travel day', '{0} travel days', t.year.days)]];
+  if (t.last12.costs.length || t.year.costs.length) tiles.push([cost(t.year) || '–', tr('travel expenses {0}', t.year.year), tr('12 months: {0}', cost(t.last12) || '–')]);
+  return `<section class="stcard stl-travel"><div class="sthead"><h3>${tr('Travel')}</h3></div>${stl_tiles(tiles)}
+    <h4>${tr('Next trip')}</h4>${n ? `<ul class="stlist"><li><a href="#l/${n.list_id}">${esc(n.name)}</a>${n.where ? ` <span class="muted">${esc(n.where)}</span>` : ''}<span class="spacer"></span><span class="muted">${esc(fmtDate(n.from))} – ${esc(fmtDate(n.to))}</span></li></ul>` : `<div class="muted stempty">${tr('No trip planned.')}</div>`}</section>`;
 }
 let statsResize;
 window.addEventListener('resize', () => { if (S.route.mod !== 'stats') return; clearTimeout(statsResize); statsResize = setTimeout(renderView, 150); });
