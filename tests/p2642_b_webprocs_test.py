@@ -105,7 +105,9 @@ check("single False bus True" in out, "#4975: no restore with two web processes;
 
 # a process 1 that ends is started again by process 0
 old = p1.get("proc", {}).get("pid")
-subprocess.run(["docker", "exec", CT, "kill", "-9", str(old)], capture_output=True)
+k = subprocess.run(["docker", "exec", CT, "python", "-c", f"import os, signal; os.kill({int(old or 0)}, signal.SIGKILL); print('killed')"],
+                   capture_output=True, text=True)
+check("killed" in k.stdout, "setup: process 1 killed " + (k.stdout + k.stderr)[-200:])
 
 
 def back():
@@ -119,7 +121,8 @@ check(kt.until(back, timeout=40, step=0.2), "#4975: process 0 starts an ended pr
 # ================================================================== busy lock across processes (calendar sync)
 aid = dbx("SELECT id FROM users WHERE username='alice'")[0][0]
 now = time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime())
-sid = dbx("INSERT INTO cal_subs(user_id, kind, url, interval, tried_at) VALUES(?, 'ics', 'x', 60, ?) RETURNING id", (aid, now))[0][0]
+sid = dbx("INSERT INTO cal_subs(user_id, kind, url, interval, tried_at, created_at) VALUES(?, 'ics', 'x', 60, ?, ?) RETURNING id",
+          (aid, now, now))[0][0]
 hold = subprocess.Popen(["docker", "exec", "-i", CT, "python", "-c", PRE + "import sys\nfrom kalmido.core.ephem import eph_busy_take\n"
                          f"print('taken', eph_busy_take('calsub:{sid}'), flush=True)\nsys.stdin.readline()\n"],
                         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
