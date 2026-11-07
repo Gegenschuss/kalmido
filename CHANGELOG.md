@@ -16,6 +16,26 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.639.0] - 2026-11-07
+
+Package 2.385 (Film: document samples).
+### Added
+- #2293 Document templates: three film samples for the industry Film & Video - filming permission, location agreement and model release (German and English, signable, marked as legal texts to check before use). Find them in the office document templates under "Use sample"; only listed while the industry Film & Video is on.
+
+Package 2.609 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Added
+- Own ticket types per organisation (private: per person): Settings > Data > Ticket types - name, symbol, colour, a note template; Bug / Feature / Task stay the fixed base types, Epic and Story come along (an epic shows the progress of its subtasks); a project chooses which types it offers in "Types and templates…"; quick add `!epic` / `!<own type>`, type filter and chip; API v1 `/ticket-types`, `/lists/{id}/ticket-types`, MCP `list_ticket_types` (read only) (#3372)
+- The organisation's field schema, required fields, labels and templates: projects take over fields of the organisation's schema (linked, changed together), a field can be required per ticket type (checked on create in the app, API v1 and MCP), organisation labels for organisation projects (personal tags stay private), organisation templates with trash; v1 filter `fkey_<key>` across projects (#3373)
+- CI: the Windows launcher (mcp/agent_launcher.ps1) runs for real on windows-latest when something under mcp/ changed (also nightly / by hand) against a stub server with a stand-in for claude - event, answer, run time limit, pause, runner lock, hard stop; the event runner ends on Windows too when its launcher was killed hard (launcher_gone) (#3660)
+### Changed
+- The lists an area keeps its entries in (Read later, contracts, home & devices, health, household budget, trips) are no projects any more: not in the sidebar, the archived view, "Move to project", list pickers, quick add, the palette, filters and project overviews; #l/<id> of such a list opens its area (a trip stays its trip view); the buttons "Show as project" and "Reading list" are gone (#4613)
+- Read later no longer counts in the statistics (done per day / week, on time, by project, streaks), the day / week review and the start page's done tiles; the other areas still count (#4613)
+- The sidebar is drawn anew only when what it shows changed: scroll position, focus and hover stay, a changed open view only moves the marks (#4509)
+- Tests: the suites' state files (ids.json, cal_ids.json, news_ids.json) live in the test data folder, the own user id is looked up instead of /api/users/1 (#4512)
+### Fixed
+- Renaming a big knowledge folder writes its pages' renames into the history in a few statements instead of three to four per page (CI red p2280_c_api, #4928)
+- p248_d_ui: a regression test for the document sheet opened while receipts.js still loads (the cause was fixed on main in #4912), failed phone checks print the page's history, dialogs and failed requests; the sync chip no longer touches a closed window (CI red p248_d_ui, #4929)
+
 ## [2.634.0] - 2026-11-07
 
 Package 2.622 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
@@ -281,7 +301,8 @@ Package 2.582 (Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher),
 
 Not released (the CI of this version was red); its changes are listed under 2.605.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.634.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.639.0...HEAD
+[2.639.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.639.0
 [2.634.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.634.0
 [2.632.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.632.0
 [2.629.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.629.0
