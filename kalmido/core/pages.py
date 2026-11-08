@@ -579,7 +579,23 @@ def sw_manifest():
     return r
 
 
-_CM = {}
+_CM, _CM_LOCK = {}, threading.Lock()  # one rebuild at a time; the others take the body of the last one
+
+
+def _cm_build():
+    """2.742.0 (#5217): the body of /api/code-manifest (code_manifest)."""
+    from ..core.i18nparts import i18np_parts  # the language parts as they go out
+    files = {}
+    for rel in cm_static_rels(os.path.realpath(app.static_folder)):
+        h = static_hash_full(rel)
+        if h:
+            files["/static/" + rel] = h
+    with open(os.path.join(app.static_folder, "sw.js"), "rb") as f:
+        files["/sw.js"] = cm_sha(f.read())
+    for url, data in i18np_parts().items():
+        files[url] = cm_sha(data)
+    files["/"] = cm_sha(index_page().get_data())
+    return cm_json(APP_VERSION, files)
 
 
 @app.get("/api/code-manifest")
@@ -588,19 +604,12 @@ def code_manifest():
     computed from what goes out here - static files (st_asset), /sw.js, the language parts (core/i18nparts.py), the app page
     (index_page). Without signing in and without the database, only hashes; the same bytes as web-manifest-X.Y.Z.json of the
     release when this server runs that version unchanged. Built again at most every 5 seconds."""
-    if _CM.get("body") is None or time.monotonic() - _CM.get("at", 0) > 5:
-        from ..core.i18nparts import i18np_parts  # the language parts as they go out
-        files = {}
-        for rel in cm_static_rels(os.path.realpath(app.static_folder)):
-            h = static_hash_full(rel)
-            if h:
-                files["/static/" + rel] = h
-        with open(os.path.join(app.static_folder, "sw.js"), "rb") as f:
-            files["/sw.js"] = cm_sha(f.read())
-        for url, data in i18np_parts().items():
-            files[url] = cm_sha(data)
-        files["/"] = cm_sha(index_page().get_data())
-        _CM.update(at=time.monotonic(), body=cm_json(APP_VERSION, files))
+    if (_CM.get("body") is None or time.monotonic() - _CM.get("at", 0) > 5) and _CM_LOCK.acquire(blocking=_CM.get("body") is None):
+        try:  # only the first request builds; while it does, the others answer with the last body (the very first ones wait)
+            if _CM.get("body") is None or time.monotonic() - _CM.get("at", 0) > 5:
+                _CM.update(at=time.monotonic(), body=_cm_build())
+        finally:
+            _CM_LOCK.release()
     r = Response(_CM["body"], mimetype="application/json")
     r.headers["Cache-Control"] = "no-store"
     return r
