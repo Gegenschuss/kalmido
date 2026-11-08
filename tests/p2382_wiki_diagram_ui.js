@@ -109,7 +109,7 @@ const K = {Enter: '\uE007', Escape: '\uE00C'};
     await ev(`(() => { WKCM.view.dispatch({selection: {anchor: 0}}); return 1; })()`);  // the cursor elsewhere: the new block is drawn
     check(await until(`document.querySelectorAll('#wk-cm .wkdgmath .katex').length === 3`, 80), `${tag}: drawn when the cursor left it (three formula blocks)`);
     if (vw > 1000) await shot(`p2382_${vw}_live.png`);
-  });
+  }, false);  // 2.680.0 (#5143): a mouse on purpose - headless Firefox reports hover: none without a pointer setting (CI and the Mac's VM), and since #5082 / #5085 the app then runs in finger mode
   console.log(`p2382_wiki_diagram_ui: ${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });

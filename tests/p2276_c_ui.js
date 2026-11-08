@@ -79,7 +79,7 @@ const WANT = '## Intro\n[[Other]]\n![pic](/api/files/nodes/999/content)\n- Alpha
     let saved = '';
     for (let i = 0; i < 40 && saved !== WANT; i++) { await sleep(250); saved = (await call(run.ck, 'GET', `/api/wiki/pages/${run.id}`)).body; }
     check(saved === WANT, `${tag}: the saved text is the formatted Markdown: ${JSON.stringify(saved)}`);
-  });
+  }, false);  // 2.680.0 (#5139): a mouse on purpose - headless Firefox reports hover: none without a pointer setting (CI and the Mac's VM), and since #5082 / #5085 the app then runs in finger mode
   console.log(`p2276_c_ui: ${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });

@@ -121,7 +121,7 @@ const K = {Enter: '', Escape: '', ArrowUp: '', ArrowDown: '', Contro
     check(await saved(WANT + '\n## Next') === WANT + '\n## Next', `${tag}: "/head" + Enter writes a heading, saved`);
     const p2 = await menuPick('/^Back to the editor$/');
     check(p2 && await until(`!!document.querySelector('#wk-cm .cm-wkh2') && ${line('Next')}?.textContent === 'Next'`), `${tag}: "Back to the editor": drawn, the new heading too`);
-  });
+  }, false);  // 2.680.0 (#5141): a mouse on purpose - headless Firefox reports hover: none without a pointer setting (CI and the Mac's VM), and since #5082 / #5085 the app then runs in finger mode
   console.log(`p2350_b_wikilive_ui: ${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });

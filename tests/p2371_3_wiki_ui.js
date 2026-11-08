@@ -151,7 +151,7 @@ const K = {Enter: '', Escape: ''};
     // a "#" typed by hand opens no task search (a tag stays a tag)
     await type('#abc');
     check(!(await ev(acList)), `${tag}: "#abc" typed by hand opens no list`);
-  });
+  }, false);  // 2.680.0 (#5142): a mouse on purpose - headless Firefox reports hover: none without a pointer setting (CI and the Mac's VM), and since #5082 / #5085 the app then runs in finger mode
   console.log(`p2371_3_wiki_ui: ${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });

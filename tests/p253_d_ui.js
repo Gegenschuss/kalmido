@@ -198,7 +198,7 @@ window.__fake = html => { const d = document.createElement('div'); d.innerHTML =
     check(await ev(`!PAL.items.some(x => x.id === 'rf:c:${BC}' || x.id === 'rf:l:${BL}')`), 'phone: nothing of bob in the search');
     await ev(`(() => { const e = new KeyboardEvent('keydown', {key: 'Escape', bubbles: true, cancelable: true}); document.querySelector('.palette .pqin').dispatchEvent(e); return 1; })()`);
     check(await ready(ev, `!document.querySelector('.palette')`), 'phone: Escape closes the search (not the normal palette)');
-  });
+  }, false);  // 2.680.0 (#5144): a mouse on purpose - headless Firefox reports hover: none without a pointer setting (CI and the Mac's VM), and since #5082 / #5085 the app then runs in finger mode
   console.log(`p253_d_ui: ${ok} passed, ${F.length} failed`);
   if (F.length) process.exit(1);
 })().catch(e => { console.error(e); process.exit(1); });

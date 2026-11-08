@@ -159,7 +159,7 @@ const SAFE_JS = `(() => {
     check(await openTile(ev, '.chatts', 'chat-report.md'), `${tag}: #1035 a chat file .md opens the viewer`);
     check(await waitFor(ev, `!!document.querySelector('.tview .tvmd table')`), `${tag}: ... with its table`);
     await shot(`p2300-${th}-1440-chat-md.png`);
-  });
+  }, false);  // 2.680.0 (#5140): a mouse on purpose - headless Firefox reports hover: none without a pointer setting (CI and the Mac's VM), and since #5082 / #5085 the app then runs in finger mode
 
   await firefox(async o => {
     const {cmd, ev, ctx, shot} = o, tag = '390';
