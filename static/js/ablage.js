@@ -289,12 +289,19 @@ function ab_pvOpts(n) {
 }
 const ab_navFiles = () => (AB.data?.items || []).filter(x => x.kind === 'file' && !x._enc && !upLocked(x) && (ab_isPdf(x) || ab_isImg(x))).map(x => x.id);  // 2.583.0 + 2.652.0 (#5071): the folder's PDFs and pictures the view leafs through (as ab_pvOpts)
 // ---- opening a file: images in the lightbox, PDFs in the PDF view, text in the text view, the rest downloads
+function ab_openDoc(n) {  // 2.750.0 (#5228): dc_open / abd_navIds are in the documents' module (lazyload.js docs): loaded first when needed
+  const open = () => dc_open(n.id, {list: abd_navIds()});
+  if (typeof dc_open === 'function' && typeof abd_navIds === 'function') open(); else loadModule('docs').then(open, () => {});
+}
 function ab_openFile(n, o = {}) {  // 2.583.0 (#4832): o.raw = the viewer of its kind (the document view's full screen)
   if (n.kind === 'ref' && FS_REF_VIEW[n.ref_kind] === 'pdf' && typeof pdfView === 'function') { pdfView({url: ab_url(n), name: n.name, size: n.size, dlUrl: ab_url(n, true)}); return; }  // 2.351.0 B (#2749)
   if (n.kind === 'ref' && FS_REF_VIEW[n.ref_kind] === 'text') { textView({url: ab_url(n, true), name: n.name, size: n.size, md: false, ext: 'txt'}); return; }
   if (n.kind === 'ref') { if (n.open) go(n.open); else toast(tr('No access')); return; }  // 2.199.0 A (#2742): a filed document opens in its area
   if (upLocked(n)) { toast(tr('Locked: malware was found in this file ({0})', n.up.sig || '?')); return; }  // 2.61.0 (#1818)
   if (n._enc && typeof fsl_open === 'function') { fsl_open(n); return; }  // 2.353.0 A (#2758): decrypted in the browser
+  // 2.750.0 (#5228): a recognised document (n.doc) opens the document view in the list as in the cards (abdocs.js), leafing
+  // through the folder's documents - before, the list opened the plain PDF viewer while the documents' module was not loaded yet
+  if (n.kind === 'file' && n.doc && !o.raw && !n.locked && feat('docs') && !S.me?.kid) { ab_openDoc(n); return; }
   // 2.583.0 (#4832): a file opens the document view (one sheet for files and documents); 2.652.0 (#5071): it leafs through the
   // folder's documents, PDFs and pictures in the order shown (the view's arrows, its full screen with the swipe)
   if (n.kind === 'file' && !o.raw && typeof abd_on === 'function' && abd_on() && typeof dc_open === 'function') { const l = ab_navFiles(); dc_open(n.id, l.length > 1 && l.includes(n.id) ? {list: l} : {}); return; }

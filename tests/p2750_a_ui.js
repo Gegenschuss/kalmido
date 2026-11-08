@@ -1,10 +1,13 @@
-// 2.750.0 part A UI tests (#4879), own container (start.sh; P2750A_NOSTART=1: the container runs already), jsdom
+// 2.750.0 part A UI tests (#4879 #5228), own container (start.sh; P2750A_NOSTART=1: the container runs already), jsdom
 // kalmido-suite: fresh
 // freelancer-matrix: files, docs (frida has no organisation, as tests/freelancer_fixture.py).
 // - #4879 a drag that begins in Kalmido never uploads: a card of the file store dragged by its picture (not the row) onto a
 //   folder card moves the file (before: the browser's own drag carried a file, the drop uploaded it as a new version); dropped
 //   on the empty view nothing happens; any other drag begun on the page (only the shared type of dropany.js) uploads nothing,
 //   not in the panel either; a file from the computer (no dragstart) still uploads into the folder; the own folder takes nothing
+// - #5228 a recognised document in the LIST opens the document view (#docs/<id>, leafing through the folder's documents) like
+//   the cards, leafing through the folder's DOCUMENTS (before: the PDFs and pictures, one of them = no leafing), never the
+//   plain viewer; ab_openDoc loads the documents' module first when a click comes before it
 const {execFileSync} = require('child_process');
 const path = require('path');
 const {boot, sleep, B, login} = require('./boot');
@@ -37,8 +40,9 @@ const upload = async (name, parent) => {
   const PLAIN = (await call('POST', '/api/files/folders', {name: 'Plain', space: 'private'})).id;
   const SUB = (await call('POST', '/api/files/folders', {name: 'Sub', parent_id: PLAIN})).id;
   const ARC = (await call('POST', '/api/files/folders', {name: 'Archive', space: 'private'})).id;
+  const LIST = (await call('POST', '/api/files/folders', {name: 'Letters', space: 'private'})).id;
   const NOTE = await upload('note.txt', PLAIN), NOTE2 = await upload('memo.txt', PLAIN);
-  check(PLAIN && SUB && ARC && NOTE && NOTE2, 'folders Plain/Sub, Archive and two files in Plain');
+  check(PLAIN && SUB && ARC && LIST && NOTE && NOTE2, 'folders Plain/Sub, Archive, Letters and two files in Plain');
   const v0 = (await call('GET', `/api/files/nodes/${NOTE}`)).version;
   // Plain as cards (the person's setting ab_cards, as abdocs.js abd_setCards)
   await call('PATCH', '/api/settings', {set_delta: {ab_cards: {add: ['n:' + PLAIN]}}});
@@ -102,6 +106,24 @@ const upload = async (name, parent) => {
     dnd(w, subT(), 'drop', dt);
     check(await until(() => w.__up.length === 1 && w.__up[0] === SUB), 'it is uploaded into Sub: ' + JSON.stringify(w.__up));
   }
+  w.close();
+
+  // ================= #5228: a document in the list opens the document view, also before docs.js loaded
+  const fd = new FormData(); fd.append('ws', 'private'); fd.append('files', new Blob(['Brief Beispiel Nummer 7']), 'brief.txt');
+  const DOC = (await (await fetch(B + 'api/docs', {method: 'POST', headers: {'X-Requested-With': 'kalmido', Cookie: CK}, body: fd})).json()).ids?.[0];
+  check(DOC, 'a document ' + DOC);
+  await until(async () => ['done', 'failed'].includes((await call('GET', `/api/docs/${DOC}`)).state), 300);
+  check((await call('PATCH', `/api/files/nodes/${DOC}`, {parent_id: LIST})).http < 300, 'the document moved into Letters (no recognition there: a list)');
+  // a phone, the modules left to the app (lazy: ablage.js loads the documents' module itself; a click before that loads it first)
+  w = await boot({user: 'frida', hash: 'ablage/' + LIST, lazy: true, mobile: true}); d = w.document;
+  const row = await until(() => d.querySelector(`#view .abview .abrow[data-abid="${DOC}"] [data-ab="open"]`));
+  check(row, 'Letters shows the document as a row of the list');
+  check(await until(() => w.eval(`!!(AB.data?.items || []).find(x => x.id === ${DOC})?.doc`)), 'the row knows it is a document (doc)');
+  w.eval('window.__tv = 0; window.__pv = 0; textView = () => { window.__tv++; }; pdfView = () => { window.__pv++; };');
+  row?.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
+  check(await until(() => w.location.hash === '#docs/' + DOC), 'the click opens the document view #docs/' + DOC + ' (got ' + w.location.hash + ')');
+  check(!w.__tv && !w.__pv, 'not the plain viewer');
+  check(await until(() => w.eval(`typeof DC !== 'undefined' && (DC.navSrc?.docs || []).some(x => x.id === ${DOC})`)), 'it leafs through the folder\'s documents');
   w.close();
 
   console.log(`\n${ok} passed, ${F.length} failed`);

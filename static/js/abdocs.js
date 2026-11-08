@@ -63,7 +63,7 @@ function abd_recogLine(d) {
 }
 // 2.683.0 (#5150): the documents of the folder in the order shown (its cards; in the list view its entries), the sheet leafs
 // through them (docs.js dc_nav: "3 of 48", the arrows, the swipe); before, the sheet of the file store could not leaf at all
-const abd_navIds = () => { const c = $$('.abview [data-dco]').map(x => +x.dataset.dco); return c.length ? c : (AB.data?.items || []).filter(n => n.doc?.id && !abd_locked(n)).map(n => n.id); };
+const abd_navIds = () => { const c = $$('.abview [data-dco]').map(x => +x.dataset.dco); return c.length ? c : (AB.data?.items || []).filter(n => n.doc && !abd_locked(n)).map(n => n.id); };  // 2.750.0 (#5228): the list's entries carry doc {state, review} without an id
 function abd_menuItems(n) {
   if (!abd_on() || abd_locked(n) || !ab_canWrite(n.role)) return n.doc?.id && abd_on() ? [{label: tr('Open as document'), icon: 'file', fn: () => dc_open(n.id, {list: abd_navIds()})}] : [];
   if (n.kind === 'folder') return [{label: tr('Recognition…'), icon: 'sparkle', fn: () => setTimeout(() => abd_recogMenu(n), 0)}];  // after this menu closed
