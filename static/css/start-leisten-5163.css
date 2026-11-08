@@ -1,0 +1,9 @@
+.ntbar>.btn,.ntbar>.iconbtn,.ntbar>select,.ntbar>b{flex:none;max-width:100%}
+.ntbar>b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:0 1 auto}
+@media (max-width:767px),(pointer:coarse){ .ntbar .ssearch,.ntbar .ctsearch{flex:1 1 100%;min-width:0} }
+/* 2.725.0 (#5163): phone header: the chips (agents, status, workspace, timer) share one height, one rounding and one border logic
+   (a transparent 1 px border; the accent border only where a chip shows a state: .attn). A start file: app.css takes no new rules. */
+@media (max-width:767px){
+  #top .achip,#top .stchip,#top .wschip,#top .tmini,#top .cfpill{box-sizing:border-box;min-height:2.75rem;border-radius:99rem;border:1px solid transparent;align-items:center}
+  #top .achip.attn,#top .stchip.attn{border-color:color-mix(in srgb,var(--p3) 60%,transparent)}
+}

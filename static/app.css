@@ -4178,7 +4178,7 @@ button.trdline:hover,button.trdline:focus-visible{background:var(--bg3);color:va
 /* #442 notes */
 .ntview{display:grid;grid-template-columns:minmax(0,1fr);gap:1rem}
 .ntview.open{grid-template-columns:minmax(var(--w-leiste-min),var(--w-leiste)) minmax(0,1fr)}  /* 2.602.0 (#4817): --w-leiste (was 14-22rem) */
-.ntbar{display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem}
+.ntbar{display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;flex-wrap:wrap}  /* 2.725.0 (#5163): always wraps; buttons below keep their size */
 .ntbar .ssearch,.ntbar .ctsearch{flex:1 1 auto}
 .ntcards{list-style:none;margin:0;padding:0;display:grid;gap:.375rem}
 .ntcard{display:flex;flex-direction:column;gap:.25rem;padding:.625rem .75rem;border:1px solid var(--line2);border-radius:var(--radius);color:var(--text2);text-decoration:none;background:var(--bg)}
