@@ -274,6 +274,38 @@ web = [ag.get(B + f"{V}/{RP}").status_code, ag.get(B + f"/api/videos/{RP}/versio
 check(all(x in (401, 403, 404) for x in web), f"the app's routes stay closed to agents {web}")
 check(ag.get(B + f"/api/v1/videos/{RID}").status_code == 404, "the agent: the image review (its folder not shared) 404")
 
+# ---- 2.658.0 (#5043): streamed like the file store (range requests), the type from the first 1024 bytes only
+r = A.get(B + V1.get("content", "/x"), headers={"Range": "bytes=2-9"})
+check(r.status_code == 206 and r.content == PNG1[2:10] and r.headers.get("Content-Range", "").startswith(f"bytes 2-9/{len(PNG1)}"),
+      f"a range request: 206 with the right part {r.status_code} {r.headers.get('Content-Range')} {r.content[:12]!r}")
+check("sandbox" in r.headers.get("Content-Security-Policy", "") and r.headers.get("X-Content-Type-Options") == "nosniff"
+      and r.headers.get("Content-Type", "").startswith("image/png"), f"the part sandboxed, nosniff, as image/png {dict(r.headers)}")
+CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
+HEAD_PROBE = """import os, tempfile
+import app
+from kalmido.videos import vdmedia
+p = os.path.join(tempfile.mkdtemp(), "big.png")
+with open(p, "wb") as f:
+    f.write(b"\\x89PNG\\r\\n\\x1a\\n" + b"\\0" * (4 << 20))
+seen = []
+class Counting:
+    def __init__(self, f):
+        self.f = f
+    def __enter__(self):
+        return self
+    def __exit__(self, *a):
+        self.f.close()
+    def read(self, n=-1):
+        b = self.f.read(n)
+        seen.append(len(b))
+        return b
+vdmedia.open = lambda path, mode="r": Counting(open(path, mode))
+head = vdmedia.vdm_head(None, p)
+print("HEAD", len(head), sum(seen), vdmedia.vdm_sniff(head))
+"""
+out = subprocess.run(["docker", "exec", CT, "python", "-c", HEAD_PROBE], capture_output=True, text=True)
+check("HEAD 1024 1024 image/png" in out.stdout, f"the type of a 4 MB file from 1024 read bytes {out.stdout[-300:]} {out.stderr[-600:]}")
+
 # ---- a person without an organisation
 FRI, Fr = freelancer(B, A)
 FL = Fr.post(B + "/api/lists", json={"name": "Eigenes Projekt"}).json()["id"]

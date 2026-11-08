@@ -16,20 +16,23 @@ comments and states as a video, no second way. Columns: core/migrations.d/4769_a
   their order (page, then oldest first), the export the same.
 - The customer link (signoff kind video) stays for videos: an image / PDF version is no public file (sharing outside = a task
   of its own). A review with files does not move to another workspace (its files stay in theirs)."""
-from urllib.parse import quote
+import os
 
-from flask import Response, request
+from flask import request
 
-from ..core.config import MAX_FILE_MB
+from ..core.config import ATT_DIR, MAX_FILE_MB
 from ..core.access import Denied
 from ..core.db import body
 from ..core.errors import BadInput
 from ..core.i18n import N_, tr
-from ..files.store import fs_folder, fs_log_add, fs_put, fs_read, fs_role, fs_version_row, need_node, safe_fs_name
+from ..core.orgcrypt import oc_is_sealed_file, oc_read_file, oc_send_file
+from ..files.scan import sc_guard
+from ..files.store import fs_folder, fs_log_add, fs_put, fs_role, fs_version_row, need_node, safe_fs_name
 from ..files.upsafe import h6d_read
 from ..files.web import _send_headers
 
 VDM_KINDS = ("video", "image", "pdf")
+VDM_HEAD = 1024  # 2.658.0 (#5043): the type is read from the first VDM_HEAD bytes only (never the whole file)
 VDM_PAGE_MAX = 9999
 VDM_FOLDER = N_("Approvals|sign-off")
 VDM_TYPES = N_("Please select an image (JPG, PNG, WebP) or a PDF.")
@@ -40,7 +43,7 @@ VDM_NOMOVE = N_("An approval of images or PDFs stays in the workspace of its fil
 def vdm_sniff(data):
     """The type of the bytes by their first bytes: image/jpeg | image/png | image/webp | application/pdf, else None (SVG,
     HTML, anything else). The PDF header may sit within the first 1024 bytes (the PDF rule)."""
-    d = bytes(data[:1024]) if data else b""
+    d = bytes(data[:VDM_HEAD]) if data else b""
     if d[:3] == b"\xff\xd8\xff":
         return "image/jpeg"
     if d[:8] == b"\x89PNG\r\n\x1a\n":
@@ -70,7 +73,7 @@ def vdm_file_version(c, org_id, file_id):
     v = fs_version_row(c, file_id)
     if not v:
         raise Denied(404)
-    mime = vdm_sniff(fs_read(c, file_id, v["no"]))
+    mime = vdm_sniff(vdm_head(c, vdm_path(c, file_id, v["no"])))
     if not mime:
         raise BadInput(tr(VDM_TYPES))
     return {"url": "", "provider": "store", "embed_id": "", "kind": vdm_kind(mime), "file_id": file_id, "file_no": v["no"],
@@ -190,24 +193,46 @@ def vdm_pos_text(x, mark=None):
 
 
 # ---------------------------------------------------------------- the bytes of a version
+def vdm_path(c, file_id, no):
+    """2.658.0 (#5043): the stored file of version no of file file_id (no rights check: need_node first); a version found
+    infected later is locked (sc_guard), a missing one is 404."""
+    v = fs_version_row(c, file_id, no)
+    if not v:
+        raise Denied(404)
+    sc_guard(c, "fs", file_id, v["no"])
+    full = os.path.join(ATT_DIR, v["path"])
+    if not os.path.isfile(full):
+        raise Denied(404)
+    return full
+
+
+def vdm_head(c, full):
+    """2.658.0 (#5043): the first VDM_HEAD plain bytes of a stored file -- a plain file reads only those; a sealed one
+    (core/orgcrypt.py: AES-GCM opens the file only whole) is opened as files/web.py's send does."""
+    if oc_is_sealed_file(full):
+        return oc_read_file(c, full)[:VDM_HEAD]
+    with open(full, "rb") as f:
+        return f.read(VDM_HEAD)
+
+
 def vdm_send(c, v):
-    """The image / PDF of version row v (the review was checked by the caller): the file store decides again (need_node:
-    rights, trash, locked folder); served only as the type its content has, sandboxed."""
+    """The image / PDF / audio of version row v (the review was checked by the caller): the file store decides again
+    (need_node: rights, trash, locked folder); served only as the type its first bytes have, sandboxed. 2.658.0 (#5043):
+    streamed through the file store's way (files/web.py _send: oc_send_file, range requests, 206), not read into memory."""
     if not v or not v["file_id"]:
         raise Denied(404)
     n = need_node(c, v["file_id"])
     if n["kind"] != "file":
         raise Denied(404)
-    data = fs_read(c, v["file_id"], v["file_no"])
-    mime = vdm_sniff(data)
+    full = vdm_path(c, v["file_id"], v["file_no"])
+    mime = vdm_sniff(vdm_head(c, full))
     if not mime:
         raise Denied(404)
     fs_log_add(c, v["file_id"], "read", f"approval {int(v['review_id'])}")
     c.commit()
-    name = v["file_name"] or n["name"] or "file"
     dl = request.args.get("dl") == "1"
-    resp = Response(data, mimetype=mime)
-    resp.headers["Content-Disposition"] = f"{'attachment' if dl else 'inline'}; filename*=UTF-8''{quote(name)}"
+    resp = oc_send_file(c, full, mimetype=mime, as_attachment=dl, download_name=v["file_name"] or n["name"] or "file",
+                        conditional=True, max_age=0)
     return _send_headers(resp, mime)
 
 
