@@ -135,7 +135,7 @@ def _listen():
             try:
                 if pg is not None:
                     pg.close()
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa: BLE001 -- closing a lost listener: it may be gone, the loop connects again
                 pass
             time.sleep(BUS_RETRY_S)
 

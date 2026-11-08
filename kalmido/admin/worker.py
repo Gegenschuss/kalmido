@@ -104,7 +104,7 @@ def wrk_hold(name):
             if c is not None:
                 try:
                     c.close()
-                except Exception:  # noqa: BLE001
+                except Exception:  # noqa: BLE001 -- closing a lost lock connection: it may be gone already, it is dropped anyway
                     pass
             _LCONN["c"] = None
             return False
@@ -253,7 +253,7 @@ def wrk_health(c):
         try:
             from ..core.db import parse_iso
             hb["age_s"] = int((now_utc() - parse_iso(hb["at"])).total_seconds())
-        except Exception:  # noqa: BLE001
+        except Exception:  # noqa: BLE001 -- a broken heartbeat time only leaves age_s out of the status display
             pass
     return {"ok": True, "version": APP_VERSION, "role": WRK_ROLE, "loop_locks": WRK_LOCKS_ON, "loops": wrk_loops(),
             "worker": hb if isinstance(hb, dict) else None,

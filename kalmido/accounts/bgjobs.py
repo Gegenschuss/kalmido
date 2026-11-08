@@ -188,7 +188,7 @@ def bgj_add(kind, *args, org_id=None, user_id=None, delay=0.0, once=False, lock=
         if c is not None:
             try:
                 c.rollback()
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa: BLE001 -- rollback after an error: the connection may be gone
                 pass
         if refused:
             raise refused[0]  # (the connection is closed below)

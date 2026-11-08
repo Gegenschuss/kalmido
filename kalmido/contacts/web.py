@@ -456,7 +456,7 @@ def lv_import_run(st, ctx, uid, bid, cards, since=None, photos=True):
         try:
             if c:
                 c.rollback()
-        except Exception:  # noqa: BLE001
+        except Exception:  # noqa: BLE001 -- rollback after an error: the failed state counts
             pass
         _lv_put(st, state="failed", error=msg, ended_at=time.time())
     finally:

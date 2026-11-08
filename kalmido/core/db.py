@@ -1722,7 +1722,7 @@ def lv_auto_bump(resp):
     except Exception as e:  # noqa: BLE001
         try:
             c.rollback()
-        except Exception:  # noqa: BLE001
+        except Exception:  # noqa: BLE001 -- rollback after an error: the warning below is printed
             pass
         print("WARNING lv_auto_bump failed:", request.method, request.path, type(e).__name__, str(e)[:200], flush=True)
     return resp

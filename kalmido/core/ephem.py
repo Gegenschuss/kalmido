@@ -60,7 +60,7 @@ def _run(fn, fail=None):
         if c is not None:
             try:
                 c.rollback()
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa: BLE001 -- rollback after an error: the database is away, the caller gets the fallback
                 pass
         return fail
     finally:

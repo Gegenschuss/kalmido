@@ -229,7 +229,7 @@ def _imap_open(c, r, secret, timeout=30, allow=None):
     except BaseException as e:
         try:
             M.shutdown()
-        except Exception:  # noqa: BLE001
+        except Exception:  # noqa: BLE001 -- closing after a failed login: the login error below counts
             pass
         if isinstance(e, imaplib.IMAP4.error) and not isinstance(e, imaplib.IMAP4.abort):
             raise _AuthFailed() from None  # the server's own words may echo the user name: never kept
@@ -268,7 +268,7 @@ def mbx_check(c, r, secret=None):
             finally:
                 try:
                     M.logout()
-                except Exception:  # noqa: BLE001
+                except Exception:  # noqa: BLE001 -- logout after the test: the server may have closed the connection already
                     pass
         except _NoPassword:
             out["imap"] = "password"
@@ -283,7 +283,7 @@ def mbx_check(c, r, secret=None):
                 S_ = smtp_open(cfg)
                 try:
                     S_.quit()
-                except Exception:  # noqa: BLE001
+                except Exception:  # noqa: BLE001 -- quit after the test: the server may have closed the connection already
                     pass
                 out["smtp"] = ""
             except Exception as e:  # noqa: BLE001
@@ -665,7 +665,7 @@ def mbx_poll_one(box, hold=None):
         finally:
             try:
                 M.logout()
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa: BLE001 -- logout after the poll: the server may have closed the connection already
                 pass
     except _NoPassword:
         code = "password"
@@ -720,7 +720,7 @@ def _poll_in_time(box):
         for M in hold:
             try:
                 M.shutdown()
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa: BLE001 -- cutting off a box over time: its socket may be gone already
                 pass
         t.join(10)
     return out[0]

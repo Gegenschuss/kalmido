@@ -175,7 +175,7 @@ def oi_drop_empty_pb(c, run, uid):
         print(f"orgimport: empty personal office left: {type(e).__name__}", flush=True)
         try:
             c.rollback()
-        except Exception:  # noqa: BLE001
+        except Exception:  # noqa: BLE001 -- rollback after an error: the import's error counts
             pass
         return False
     if n:

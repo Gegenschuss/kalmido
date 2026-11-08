@@ -363,7 +363,7 @@ def _create(c, org_id):
         if c2 is not None:
             try:
                 c2.rollback()
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa: BLE001 -- rollback of the side connection: it may be gone, the fallback below runs anyway
                 pass
         with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
             with c.savepoint():

@@ -1099,7 +1099,7 @@ def oc_migrate_once():
     finally:
         try:
             c.rollback()
-        except Exception:  # noqa: BLE001
+        except Exception:  # noqa: BLE001 -- rollback before close: the connection may be gone, close() follows anyway
             pass
         c.close()
         _RUN.release()
@@ -1142,7 +1142,7 @@ def oc_settle_lists(list_ids, again=0):
         if c is not None:
             try:
                 c.rollback()
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa: BLE001 -- rollback before close: the connection may be gone, close() follows anyway
                 pass
             c.close()
 

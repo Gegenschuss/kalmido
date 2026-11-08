@@ -1129,7 +1129,7 @@ def ox_run(oid, uid):
     except Exception as e:  # noqa: BLE001 -- the state says it failed; never a key or content in the message
         try:
             c.rollback()
-        except Exception:  # noqa: BLE001
+        except Exception:  # noqa: BLE001 -- rollback after an error: the failed state counts
             pass
         print(f"org export {oid} failed: {type(e).__name__}", flush=True)
         st = _state(oid) or {}

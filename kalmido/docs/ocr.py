@@ -225,7 +225,7 @@ Image.MAX_IMAGE_PIXELS = 80_000_000
 try:  # 2.146.0 B (#2454): HEIC / HEIF photos; #4168: pi-heif left the image (its libheif / libde265 have known holes), so no preview of them for now
     import pi_heif
     pi_heif.register_heif_opener()
-except Exception:
+except Exception:  # noqa: BLE001 -- HEIC support is optional: without it HEIC files simply get no preview
     pass
 W = int(sys.argv[1])
 im = Image.open(io.BytesIO(sys.stdin.buffer.read()))
@@ -380,7 +380,7 @@ Image.MAX_IMAGE_PIXELS = 80_000_000
 try:  # 2.146.0 B (#2454): HEIC / HEIF photos
     import pi_heif
     pi_heif.register_heif_opener()
-except Exception:
+except Exception:  # noqa: BLE001 -- HEIC support is optional: without it HEIC files are simply not scanned
     pass
 lib = ctypes.CDLL(ctypes.util.find_library("zbar") or "libzbar.so.0")
 P = ctypes.c_void_p

@@ -461,7 +461,7 @@ def mail_fetch(M, folder, importer, max_bytes=None, box="", delete=False, prefet
                     print("mail: skipped one mail:", type(e).__name__, flush=True)  # 2.240.0 A (#2883): no message text (addresses)
                     try:
                         c.rollback()
-                    except Exception:  # noqa: BLE001
+                    except Exception:  # noqa: BLE001 -- rollback after an error: the next mail starts fresh
                         pass
                 finally:
                     c.close()
@@ -509,7 +509,7 @@ def mail_poll_once():
     finally:
         try:
             M.logout()
-        except Exception:  # noqa: BLE001
+        except Exception:  # noqa: BLE001 -- logout after the fetch: the server may have closed the connection already
             pass
 
 
@@ -597,7 +597,7 @@ def smtp_open(smtp=None):
     except BaseException:
         try:
             S_.close()
-        except Exception:  # noqa: BLE001
+        except Exception:  # noqa: BLE001 -- closing a half-open SMTP connection before the error is raised again
             pass
         raise
     return S_
@@ -638,7 +638,7 @@ def mail_deliver(m, smtp=None):
     finally:
         try:
             S_.quit()
-        except Exception:  # noqa: BLE001
+        except Exception:  # noqa: BLE001 -- quit after sending: the mail is out, a server that already closed does not matter
             pass
 
 

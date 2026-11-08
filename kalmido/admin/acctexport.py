@@ -833,7 +833,7 @@ def umz_run(uid, export_id):
     except Exception as e:  # noqa: BLE001 -- the state says it failed; never content in the message
         try:
             c.rollback()
-        except Exception:  # noqa: BLE001
+        except Exception:  # noqa: BLE001 -- rollback after an error: the failed state counts
             pass
         print(f"account export of user {uid} failed: {type(e).__name__}", flush=True)
         st = _state(uid) or {}

@@ -398,7 +398,7 @@ class Conn:
         try:
             if not self._pg.closed and self._pg.info.transaction_status != TransactionStatus.IDLE:
                 self._pg.rollback()  # like sqlite3.close(): what was not committed is gone
-        except Exception:
+        except Exception:  # noqa: BLE001 -- close() never raises (like sqlite3): a broken link has nothing to roll back
             pass
         if self._release:
             self._release(self._pg)

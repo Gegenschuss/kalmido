@@ -529,7 +529,7 @@ def chn_flush(resp):
         except Exception as e:  # noqa: BLE001  (never fail the request that already succeeded)
             try:
                 db().heal()
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa: BLE001 -- heal() is best effort in an error path; the failure is printed below
                 pass
             print("channels: list events failed:", type(e).__name__, flush=True)  # 2.360.5 (#3245): the name only, never the text
     return resp

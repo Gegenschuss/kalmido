@@ -106,7 +106,7 @@ def aa_now(kind, key, text, args=(), n=None, click=None, skip=None):
         with _AA_LOCK:
             if len(_AA["q"]) < 200:
                 _AA["q"].append((kind, str(key)[:200], text, list(args), n, click, skip))
-    except Exception:  # noqa: BLE001
+    except Exception:  # noqa: BLE001 -- queuing an admin alert never breaks the caller's request
         pass
 
 
@@ -161,7 +161,7 @@ def aa_count(kind, key, item=None, **extra):
                 v = str(v)[:120]
                 if v in d or len(d) < 200:
                     d[v] = d.get(v, 0) + 1
-    except Exception:  # noqa: BLE001
+    except Exception:  # noqa: BLE001 -- counting for the admin alert never breaks the caller's request
         pass
 
 
@@ -172,7 +172,7 @@ def aa_fail(name, err):
             s = _AA["int"].setdefault(name, {"since": time.time(), "n": 0, "alerted": 0.0})
             s["n"] += 1
             s["err"] = str(err)[:80]
-    except Exception:  # noqa: BLE001
+    except Exception:  # noqa: BLE001 -- counting an integration failure never breaks the caller's request
         pass
 
 

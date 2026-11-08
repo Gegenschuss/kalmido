@@ -1,0 +1,10 @@
+# 2.755.0 (#5294): ruff as a lint gate for NEW code only. The findings of the existing code stand in tools/ruff_baseline.json
+# (rule, file, code line - no line number); tools/ruff_baseline.py compares. Pinned version: the CI step installs ruff==0.17.4.
+line-length = 130
+target-version = "py312"
+extend-exclude = ["static", "embed/models", "tests/node_modules"]
+
+[lint]
+select = ["E", "F", "BLE"]
+# unknown codes in old noqa markers (S608, B018, PLC0415, ...) are not an error
+external = ["S", "B", "PLC", "ARG", "SIM", "N", "PLW", "PLR", "UP", "RUF", "C"]

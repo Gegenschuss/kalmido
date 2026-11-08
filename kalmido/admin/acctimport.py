@@ -2255,7 +2255,7 @@ def umz_run(uid, iid, opts):
     except Exception as e:  # noqa: BLE001 -- the state says it failed; never content in the message
         try:
             c.rollback()
-        except Exception:  # noqa: BLE001
+        except Exception:  # noqa: BLE001 -- rollback after an error: the failed state counts
             pass
         umz_unwrite(run)
         from .orgimport import oi_drop_empty_pb

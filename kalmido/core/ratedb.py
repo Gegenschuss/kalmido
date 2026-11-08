@@ -55,7 +55,7 @@ def _run(fn):
         if c is not None:
             try:
                 c.rollback()
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa: BLE001 -- rollback after an error: the caller falls back to the process count
                 pass
         return None
     finally:

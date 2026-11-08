@@ -400,7 +400,7 @@ try:
     if r.is_encrypted:
         try:
             r.decrypt("")
-        except Exception:
+        except Exception:  # noqa: BLE001 -- no empty password: reading the attachments below fails cleanly and the file has none
             pass
     att = r.attachments
     names = list(att.keys())[:50]

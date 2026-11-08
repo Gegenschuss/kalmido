@@ -111,7 +111,7 @@ def ml_links(msg):
             try:
                 lp.feed(txt[:2_000_000])
                 lp.close()
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa: BLE001 -- the HTML parser gives up on strange input: the links found so far are kept
                 pass
             cands += lp.out
         else:

@@ -900,7 +900,7 @@ def gsy_flush(resp):
         except Exception as e:  # noqa: BLE001  (never fail the request that already succeeded)
             try:
                 db().heal()
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa: BLE001 -- heal() is best effort; the watchdog count below records the failure
                 pass
             aa_count("watchdog", f"git|syncq|{type(e).__name__}", "queue")
     return resp
