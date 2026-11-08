@@ -343,6 +343,15 @@ for name, s in (("carol", Ca), ("dave", Da)):
     no(s.get(B + f"/api/me/webhooks/{WA}/log"), f"matrix {name}: webhook log")
     no(s.get(B + f"/api/lists/{LA}/public-link"), f"matrix {name}: public link of a foreign list")
     no(s.get(B + f"/api/lists/{LA}/owner"), f"matrix {name}: list GET")
+    # 2.663.0 (#4341): hidden() now asks the one right code (200: the stranger's own, empty view, nothing of the first
+    # organisation) instead of 200/207/403/404 alike; that is the tenant proof of these routes, named for tenant_coverage:
+    # tenant: GET /api/folders/props
+    # tenant: GET /api/folders/people
+    # tenant: GET /api/export.json
+    # tenant: GET /api/stats
+    # tenant: GET /api/dayplan
+    # tenant: GET /api/roadmap
+    # tenant: POST /api/ical
     hidden(s.get(B + "/api/folders/props?folder=Proj"), f"matrix {name}: folder settings are only the own folder's")
     hidden(s.get(B + "/api/folders/people?folder=Proj"), f"matrix {name}: folder people are only the own folder's")
     # aggregates: export, statistics, feed, day plan, roadmap, occurrences, tags
