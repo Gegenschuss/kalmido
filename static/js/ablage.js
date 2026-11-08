@@ -589,12 +589,24 @@ const ab_rowCm = r => {  // the panel's folders: sbb_treeReg('ab') menu (2.199.0
 const AB_LP = cm_bind('#view .abview .abrow', ab_rowCm, ab_rowPick);
 document.addEventListener('change', e => { if (e.target.id === 'ab-file') { const fs = e.target.files; ab_upload(fs, S.route.nid || null); e.target.value = ''; } });
 // dropping files from the computer into the open folder / onto a folder row; dragging a row onto a folder (or the path) moves it
-document.addEventListener('dragstart', e => { const r = e.target.closest?.('.abrow[draggable="true"]'); if (!r) return; AB.drag = +r.dataset.abid; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', ab_item(r.dataset.abid)?.locked ? '' : r.querySelector('.abname')?.textContent || ''); });  // 2.353.0 F (#2758, review N9): no plain name of a locked folder
+// 2.750.0 (#4879): every part of a row or card starts the move (its picture and link too - their own drag carried a file and
+// uploaded it as a new version onto itself); the drag carries the node id as KN_MIME (dropany.js kn_dragSet, shared with the
+// documents' cards later), the drops below move by it and upload only a drag that did not begin in Kalmido (kn_has)
+const ab_dragSrc = t => /** @type {any} */ (t)?.closest?.('.abview .abrow[data-abid], .abview .dc-card [data-dco], .abview .dc-card [data-ab="open"][data-id]');
+const ab_dragId = r => +(r.dataset.abid || r.dataset.dco || r.dataset.id) || 0;
+const ab_canMove = n => !!n && ab_canWrite(n.role) && !(!S.route.nid && ab_curSpace() === 'trash');
+const ab_moveTo = (n, to) => !!n && to !== n.id && (to ?? null) !== (n.parent_id ?? null);  // not onto itself, not into its own folder (nothing to do)
+document.addEventListener('dragstart', e => {
+  const r = ab_dragSrc(e.target); if (!r || !e.dataTransfer) return;
+  const id = ab_dragId(r), n = ab_item(id); kn_dragSet(e, [id]);
+  if (!ab_canMove(n)) return;  // read-only / the trash: no move (KN_MIME still keeps it from uploading)
+  AB.drag = id; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', n?.locked ? '' : n?.name || '');  // 2.353.0 F (#2758, review N9): no plain name of a locked folder
+});
 document.addEventListener('dragend', () => { AB.drag = null; $$('.abdrop').forEach(x => x.classList.remove('abdrop')); });
 document.addEventListener('dragover', e => {
   const v = e.target.closest?.('.abview'); if (!v) { ab_sideOver(e); return; }
-  const files = [...(e.dataTransfer?.types || [])].includes('Files'), t = e.target.closest('[data-abdrop]');
-  if (AB.drag && t && +t.dataset.abdrop !== AB.drag) { e.preventDefault(); $$('.abdrop').forEach(x => x !== t && x.classList.remove('abdrop')); t.classList.add('abdrop'); return; }
+  const files = [...(e.dataTransfer?.types || [])].includes('Files') && !kn_has(e), t = e.target.closest('[data-abdrop]');  // 2.750.0 (#4879)
+  if (AB.drag && t && ab_moveTo(ab_item(AB.drag), t.dataset.abdrop === 'top' ? null : +t.dataset.abdrop)) { e.preventDefault(); $$('.abdrop').forEach(x => x !== t && x.classList.remove('abdrop')); t.classList.add('abdrop'); return; }  // 2.750.0 (#4879): its own folder takes nothing
   if (files && v.classList.contains('abdropok')) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; v.classList.add('abdrop'); }
 });
 document.addEventListener('dragleave', e => { if (e.target.classList?.contains('abview') && !e.target.contains(e.relatedTarget)) e.target.classList.remove('abdrop'); });
@@ -602,7 +614,7 @@ document.addEventListener('drop', e => {
   const v = e.target.closest?.('.abview'); if (!v) { ab_sideDrop(e); return; }
   e.preventDefault(); $$('.abdrop').forEach(x => x.classList.remove('abdrop'));
   const t = e.target.closest('[data-abdrop]');
-  if (AB.drag) { const n = ab_item(AB.drag); AB.drag = null; if (n && t) ab_move(n, t.dataset.abdrop === 'top' ? null : +t.dataset.abdrop); return; }
+  if (AB.drag || kn_has(e)) { const n = ab_item(AB.drag || kn_ids(e)[0]); AB.drag = null; const to = t ? (t.dataset.abdrop === 'top' ? null : +t.dataset.abdrop) : undefined; if (n && t && ab_canMove(n) && ab_moveTo(n, to)) ab_move(n, to); return; }  // 2.750.0 (#4879): a drag from Kalmido never uploads
   const fs = e.dataTransfer?.files; if (!fs?.length || !v.classList.contains('abdropok')) return;
   ab_upload(fs, t && t.dataset.abdrop !== 'top' ? +t.dataset.abdrop : S.route.nid || null);
 });
@@ -633,7 +645,7 @@ drg_attach(document, {
 });
 
 // 2.152.3 B (#2621): a folder in the panel takes a dragged file row (moves it) or files from the computer (upload into it)
-const ab_sideT = e => { const t = e.target.closest?.('#side [data-abdrop]'); return t && (AB.drag ? +t.dataset.abdrop !== AB.drag : [...(e.dataTransfer?.types || [])].includes('Files')) ? t : null; };
+const ab_sideT = e => { const t = e.target.closest?.('#side [data-abdrop]'); return t && (AB.drag ? ab_moveTo(ab_item(AB.drag), +t.dataset.abdrop) : [...(e.dataTransfer?.types || [])].includes('Files') && !kn_has(e)) ? t : null; };  // 2.750.0 (#4879): + not a drag from Kalmido
 function ab_sideOver(e) {
   const t = ab_sideT(e); $$('#side .abdrop').forEach(x => x !== t && x.classList.remove('abdrop')); if (!t) return;
   e.preventDefault(); e.dataTransfer.dropEffect = AB.drag ? 'move' : 'copy'; t.classList.add('abdrop');
@@ -641,8 +653,8 @@ function ab_sideOver(e) {
 function ab_sideDrop(e) {
   const t = ab_sideT(e); if (!t) return;
   e.preventDefault(); $$('.abdrop').forEach(x => x.classList.remove('abdrop'));
-  if (AB.drag) { const n = ab_item(AB.drag); AB.drag = null; if (n) ab_move(n, +t.dataset.abdrop); return; }
-  if (e.dataTransfer?.files?.length) ab_upload(e.dataTransfer.files, +t.dataset.abdrop);
+  if (AB.drag) { const n = ab_item(AB.drag); AB.drag = null; if (n && ab_moveTo(n, +t.dataset.abdrop)) ab_move(n, +t.dataset.abdrop); return; }
+  if (e.dataTransfer?.files?.length && !kn_has(e)) ab_upload(e.dataTransfer.files, +t.dataset.abdrop);
 }
 // ---- "Show in the file store" for a task / project file: a link at the top of the file's workspace (no copy; the original's
 // rights stay). The button sits on the file tiles of tasks (attachments.js) and project pages (projects.js).

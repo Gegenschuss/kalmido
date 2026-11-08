@@ -18,7 +18,21 @@
 const DA_OWN = '.dc-view, .abview, #pov-files, .chview, #achat, .tcroom, [data-bnr-drop], [data-dropown]';
 const da_clearSoon = debounce(() => da_clear(), 1500);  // 2.599.0 (#4506): the frame goes 1.5 s after the last dragover (core.js debounce)
 const da_mouse = () => { try { return matchMedia('(hover: hover)').matches; } catch { return false; } };
-const da_files = (/** @type {DragEvent} */ e) => [...(e.dataTransfer?.types || [])].includes('Files');
+const da_files = (/** @type {DragEvent} */ e) => [...(e.dataTransfer?.types || [])].includes('Files') && !kn_has(e);  // 2.750.0 (#4879): not a drag begun in Kalmido
+// 2.750.0 (#4879): a drag that begins in Kalmido never uploads (the browser adds a file when a picture or link is dragged).
+// Every drag begun on the page carries KN_IN_MIME (window, capture: before the modules' own dragstart); the file store's rows and
+// cards (and later the documents' cards, the choice) add KN_MIME with the node ids (kn_dragSet) - the drops (ablage.js,
+// docs.js, this file) move by it and upload only when neither type is there. The type travels with the drag: no state to reset.
+const KN_MIME = 'application/x-kalmido-node', KN_IN_MIME = 'application/x-kalmido-inside';
+/** @param {DragEvent} e @param {number[]} ids */
+function kn_dragSet(e, ids) { try { e.dataTransfer?.setData(KN_MIME, ids.filter(i => i > 0).join(',')); } catch { /* old browsers */ } }
+/** @param {DragEvent} e */
+const kn_has = e => { const t = [...(e?.dataTransfer?.types || [])]; return t.includes(KN_MIME) || t.includes(KN_IN_MIME); };
+/** @param {DragEvent} e */
+const kn_node = e => [...(e?.dataTransfer?.types || [])].includes(KN_MIME);
+/** @param {DragEvent} e @returns {number[]} the node ids (only readable on drop) */
+function kn_ids(e) { let s = ''; try { s = e.dataTransfer?.getData(KN_MIME) || ''; } catch { /* none */ } return s.split(',').map(Number).filter(i => i > 0); }
+window.addEventListener('dragstart', e => { try { e.dataTransfer?.setData(KN_IN_MIME, '1'); } catch { /* old browsers */ } }, true);
 /** @param {Element|null} el */
 const da_seen = el => !!el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden' && !el.closest('[inert], [aria-hidden="true"]');
 // where to look: the topmost open dialog (it covers the view), else the view

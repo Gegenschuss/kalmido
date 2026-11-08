@@ -1109,7 +1109,7 @@ document.addEventListener('input', e => {
   clearTimeout(dc_qTimer); dc_qTimer = setTimeout(dc_load, 300);
 });
 // dragging files onto the view adds them as documents (the drop zone shows while dragging)
-const dc_hasFiles = e => [...(e.dataTransfer?.types || [])].includes('Files');
+const dc_hasFiles = e => [...(e.dataTransfer?.types || [])].includes('Files') && !kn_has(e);  // 2.750.0 (#4879): a drag begun in Kalmido never uploads
 // 2.752.0 (#4887): a folder's documents (.dc-infold) take a drop the file store's way (ablage.js: ab_upload into the folder)
 const dc_dropV = e => { const v = e.target.closest?.('.dc-view'); return v && !v.classList.contains('dc-infold') ? v : null; };
 document.addEventListener('dragenter', e => { const v = dc_dropV(e); if (!v || !dc_hasFiles(e)) return; DC.drag++; v.classList.add('dragging'); });
