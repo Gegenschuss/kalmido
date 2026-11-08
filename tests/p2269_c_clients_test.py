@@ -89,7 +89,9 @@ def master(s, who):
     r = s.patch(B + f"/api/office/services/{sv['id']}", json={"daily_rate": 900, "expect_updated_at": sv["updated_at"]})
     check(r.ok and r.json()["daily_rate"] == 900, f"{who}: master data saved with its base ({r.status_code} {r.text[:200]})")
     r = s.patch(B + f"/api/office/services/{sv['id']}", json={"daily_rate": 700, "expect_updated_at": sv["updated_at"]})
-    check(r.status_code == 409 and r.json().get("row", {}).get("daily_rate") == 900, f"{who}: master data, old base -> 409 with the row ({r.status_code} {r.text[:200]})")
+    # 2.747.0 (#5246): the master data save on the core's write layer (ow_write) -> the state under "current", the key "row" went
+    check(r.status_code == 409 and r.json().get("current", {}).get("daily_rate") == 900 and "row" not in r.json(),
+          f"{who}: master data, old base -> 409 with the current row ({r.status_code} {r.text[:200]})")
     check(s.patch(B + f"/api/office/services/{sv['id']}", json={"daily_rate": 650}).ok, f"{who}: master data without expect as before")
 
 

@@ -36,6 +36,8 @@ from .model import pb_owner  # 2.369.5 (#2517): pulled up from functions
 from ..core.pg import write_lock  # 2.369.5 (#2517): pulled up from functions
 from ..core.conflict import ccf_check  # 2.528.0 (#4305 A3)
 from .model import oxa_settings_at  # 2.528.0 (#4305 A3)
+from .model import MD  # 2.747.0 (#5246)
+from .owrite import ow_write  # 2.747.0 (#5246): the master data on the core's write layer
 
 
 @app.get("/api/office/settings")
@@ -363,9 +365,13 @@ def office_row_patch(kind, rid):
         return err(tr("Invalid data"))
     old = office_row(c, oid, kind, rid)
     _ltx_need(c, uid, oid, old)
-    from .undo import oun_post, oun_pre
-    oun_pre(c, uid, oid, kind, rid)  # 2.111.0 A (#2233): the state before, for "Saved · Undo"
-    r = office_update(c, oid, kind, rid, b)
+    # 2.747.0 (#5246): the master data on the core's write layer (office/owrite.py ow_write): lock, version (409 "current"),
+    # only the fields that differ, the undo step (kind office_md_<kind>, header X-Kalmido-Undo), updated_by, the history;
+    # office_update stays the writer (it checks, cleans and seals: write=)
+    upd = lambda c, cur, new: office_update(c, oid, kind, rid, new)  # noqa: E731
+    r, _ = ow_write(c, uid, f"office_md_{kind}", rid, b, lambda c, b, cur: {k: v for k, v in b.items() if k != "expect_updated_at"},
+                    oid=oid, dec=lambda c, raw: office_row(c, oid, kind, raw["id"]), public=lambda c, cur: cur,
+                    lock=f"{MD[kind]['table']}-{int(rid)}", write=upd)
     from .legacyimport import imr_restored
     imr_restored(c, oid, kind, old, r)  # 2.144.6 B (#2400 F4): restored on purpose -> "Archive leftover entries" skips it
     diff = ofx_diff(_ltx_log(old), _ltx_log(r))
@@ -373,7 +379,6 @@ def office_row_patch(kind, rid):
     diff["before"].pop("updated_at", None)
     if diff["after"]:
         ofx_log(c, oid, "update", target=kind, detail={"id": r["id"], **diff})
-    oun_post(c)
     bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
     return jsonify(r)

@@ -462,11 +462,11 @@ function ofcModal(kind, r) {
       if (['services', 'roles', 'crew', 'equipment', 'texts', 'contracts'].includes(kind)) body.trans = ofcTransBody(md);  // 2.460.0 (#3767)
       if ($('#of-archived', md)) body.archived = $('#of-archived', md).checked ? 1 : 0;
       // 2.576.0 (#4764): a change through objsave.js (saveDialog: only the fields that differ from the row as opened, with
-      // expect_updated_at; saved elsewhere meanwhile -> 409 "row" -> the merge bar on this dialog, what was typed stays)
+      // expect_updated_at; saved elsewhere meanwhile -> 409 "current" (2.747.0, #5246: was "row") -> the merge bar on this dialog, what was typed stays)
       let sv;
       if (r?.updated_at) {
         await loadModule('objsave');
-        const base = md._objBase || r, j = await saveDialog(`/api/office/${kind}/${r.id}`, base, body, {key: 'row'});
+        const base = md._objBase || r, j = await saveDialog(`/api/office/${kind}/${r.id}`, base, body);
         if (j?.conflict) { $('.aerr', md).textContent = ''; objMerge(md, j.conflict, cur => { md._objBase = cur; }, {field: k => $('#of-' + k, md)}); return; }
         if (j === base) { md.remove(); return; }  // nothing changed
         sv = j;
