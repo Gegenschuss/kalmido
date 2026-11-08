@@ -40,6 +40,7 @@ from ..accounts.colors import ac_valid  # 2.369.5 (#2517): pulled up from functi
 from ..accounts.orgroles import user_orgs_full, need_org_write  # 2.369.5 (#2517): pulled up from functions
 from ..core.objhooks import person_revoked  # 2.649.0 (#5051): an agent changing its workspace (the shared core, no upward import)
 from ..core.access import acx_drop  # 2.369.5 (#2517): pulled up from functions
+from ..core.fkeys import AGENT_ORPHANED  # 2.755.0 (#4978)
 
 
 # ---- agents: admin (Settings > Users > Agents)
@@ -547,6 +548,9 @@ def agent_polls_retire(c, aid, keeper):
     with system_ctx(c):  # the agent's private rows (no organisation to bind to)
         c.execute("UPDATE sched_polls SET deleted_at=COALESCE(deleted_at, ?), trash_owner=?, updated_at=? "
                   "WHERE user_id=? AND org_id IS NULL AND trash_owner IS NULL", (iso(ts), keeper, iso_ms(ts), aid))
+
+
+AGENT_ORPHANED.append(lambda c, aid: agent_polls_retire(c, aid, aid))  # 2.755.0 (#4978): core/fkeys.py, the agent keeps them itself
 
 
 def agent_org_set(c, aid, v):

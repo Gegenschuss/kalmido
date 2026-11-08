@@ -37,6 +37,9 @@ FK_2103 = (
     ("pomos", "user_id", "users", "CASCADE"),
     ("task_offer_links", "doc_id", "office_docs", "SET NULL"),  # 2.552.0 (#4647): the table of 2.537 came without it
 )
+# 2.755.0 (#4978): f(c, agent id) for an agent whose owner is gone (the repair below), filled by agents/admin.py when it loads
+# (agent_polls_retire: its private polls into the trash) -- the core does not import the agents layer
+AGENT_ORPHANED = []
 FK_INDEXED = {("rc_receipts", "list_id"), ("habits", "user_id"), ("pomos", "user_id")}  # schema.py has an index on these
 
 
@@ -75,7 +78,12 @@ def fk_ensure(c):
                 elif (table, col) == ("agents", "owner_id"):
                     # 2.152.0 (#2174, review B-M6): an agent of a gone person does not become a team agent that runs on: it
                     # is paused by the admin, without office drafts, until an admin decides
-                    c.execute(f"UPDATE agents SET owner_id=NULL, admin_paused=1, office_drafts=0 WHERE {cond}")
+                    gone = c.execute(f"UPDATE agents SET owner_id=NULL, admin_paused=1, office_drafts=0 WHERE {cond} RETURNING user_id").fetchall()
+                    # 2.755.0 (#4978): its private polls go into the trash like at a change of owner (their links close); the
+                    # agent itself keeps them there (its former owner is gone)
+                    for (aid,) in gone:
+                        for f in AGENT_ORPHANED:
+                            f(c, aid)
                 else:
                     c.execute(f"UPDATE {table} SET {col}=NULL WHERE {cond}")
             c.execute(f"ALTER TABLE {table} ADD CONSTRAINT fk2103_{table}_{col} FOREIGN KEY ({col}) REFERENCES {ref}(id) ON DELETE {act}")

@@ -8,6 +8,8 @@
  - owner -> team: the new owner's polls go into his trash; the former owner's kept polls stay with her
  - the owner deleted: her personal agent goes with its polls, their links 404; the kept polls in her trash go along
  - a person without an organisation (freelancer-matrix: polls) with a personal agent alike
+ - 2.755.0 (#4978): the repair of an old database (core/fkeys.py) finds an agent whose owner is gone: its private polls go into
+   the trash (kept by the agent), their links 404
 usage: p2625_c_poll_owner_test.py"""
 # kalmido-suite: fresh
 import json
@@ -157,6 +159,28 @@ check(link(OPL) == 404 and not rows(OPP), "his personal agent's poll went with h
 r = A.delete(B + f"/api/users/{CLARA}")
 check(r.ok, f"Clara deleted: {r.status_code} {r.text[:200]}")
 check(not rows(PP) and not rows(PD) and link(PL) == 404, "the polls kept in Clara's trash went with her account")
+
+# ---- 2.755.0 (#4978): the repair of an old database (core/fkeys.py fk_ensure) finds an agent whose owner is gone: its
+# private polls go into the trash like at a change of owner (the agent keeps them), their links 404
+import subprocess  # noqa: E402
+GUS, Gu = freelancer(B, A, "gus", features=MODS)
+GP, GPH = agent(Gu, "gusbot")
+GPP, GPL = v1_poll(GPH, "Gus slots")
+check(link(GPL) == 200, "#4978: the link of the agent's poll opens")
+FKN = kt.dbx("SELECT con.conname FROM pg_constraint con JOIN pg_class cl ON cl.oid=con.conrelid JOIN pg_attribute a "
+             "ON a.attrelid=con.conrelid AND a.attnum=con.conkey[1] WHERE con.contype='f' AND cl.relname='agents' AND a.attname='owner_id'")
+for (n,) in FKN:  # an old database: the key is not there yet, the owner's row is gone
+    kt.dbx(f"ALTER TABLE agents DROP CONSTRAINT {n}")
+kt.dbx("UPDATE agents SET owner_id=? WHERE user_id=?", (987654321, GP))
+out = subprocess.run(["docker", "exec", kt.CT, "python", "-c", "import app\nfrom kalmido.core.db import connect\n"
+                      "from kalmido.core.fkeys import fk_ensure\nc = connect()\nprint(fk_ensure(c))\nc.commit()\nc.close()"],
+                     capture_output=True, text=True)
+check(out.returncode == 0, f"#4978: the repair runs {out.stdout[-300:]} {out.stderr[-800:]}")
+check(kt.dbx("SELECT owner_id, admin_paused FROM agents WHERE user_id=?", (GP,)) == [(None, 1)], "#4978: the agent is ownerless and paused")
+pr = kt.dbx("SELECT deleted_at IS NOT NULL, trash_owner FROM sched_polls WHERE id=?", (GPP,))
+check(pr == [(True, GP)], f"#4978: its private poll lies in the trash, kept by the agent itself {pr}")
+check(link(GPL) == 404, "#4978: the poll's link answers 404")
+check(kt.dbx("SELECT 1 FROM pg_constraint WHERE conname='fk2103_agents_owner_id'"), "#4978: the key is in place again")
 
 print(f"p2625_c_poll_owner: {kt.OKS[0]} ok, {len(kt.FAILS)} failed")
 sys.exit(1 if kt.FAILS else 0)
