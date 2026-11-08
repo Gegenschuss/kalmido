@@ -6,6 +6,8 @@ freelancer-matrix: n/a (no route: a start option of the local MCP server, nothin
  - tools/list shows only the tools of the active packages; tools/call of another one: "not in the active toolsets"
  - the default (no option) lists every tool as before; both launchers hand KALMIDO_TOOLSETS on (capability toolsets)
 Pure Python, no container, no server."""
+# stages-covers: mcp/kalmido_mcp.py
+# 2.658.0 (#5095): every new MCP tool needs a TOOLSETS entry - this suite runs whenever the MCP server changes
 # kalmido-suite: after=launcher_parity nodata
 import collections
 import importlib.util
