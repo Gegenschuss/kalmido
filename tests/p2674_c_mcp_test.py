@@ -28,7 +28,7 @@ from freelancer_fixture import freelancer, login
 
 KEY = "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA="  # a test server key (32 bytes, base64), kept over the restarts
 PUB = "https://kalmido.example"
-fresh(env={"KALMIDO_SECRET_KEY": KEY}, prefix="P2674C")
+fresh(env={"KALMIDO_SECRET_KEY": KEY, "PUBLIC_URL": ""}, prefix="P2674C")  # first without PUBLIC_URL (tests/start.sh sets one)
 A = setup()
 CB = "http://127.0.0.1:9/cb"
 
@@ -139,8 +139,8 @@ class Big(io.RawIOBase):
     def readinto(self, b):
         if Big.n >= 50_000_000: return 0
         k = len(b); b[:k] = b"x" * k; Big.n += k; return k
-with fl.test_request_context("/mcp", method="POST", input_stream=io.BufferedReader(Big()), headers={"Transfer-Encoding": "chunked"},
-                             environ_overrides={"wsgi.input_terminated": True}):
+with fl.test_request_context("/mcp", method="POST", headers={"Transfer-Encoding": "chunked"},
+                             environ_overrides={"wsgi.input": io.BufferedReader(Big()), "wsgi.input_terminated": True}):
     raw = mr.mcpr_body()
 print(json.dumps({"len": len(raw), "read": Big.n, "max": mr.MCPR_MAX_BODY}))
 """)
