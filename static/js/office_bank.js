@@ -167,8 +167,14 @@ function dvaBnkSkipHtml(p, many) {
   const rs = p.skipped_rows || [];
   return rs.length ? `<p class="shint lhint keep dvabnkskip" role="status">${ic('alert', 's')} ${esc(trn('{0} row will be skipped', '{0} rows will be skipped', p.skipped || rs.length))}: ${esc(dvaBnkSkipText(rs, many, 20))}</p>` : '';
 }
+// 2.702.0 (#5183): a CSV statement names no account: with two or more bank accounts the dialog asks which one (required)
+const bnkAccName = a => [a.label, a.iban_end ? `… ${a.iban_end}` : ''].filter(Boolean).join(' ') || tr('Bank account');
+function bnkAccPickHtml(st) {
+  if (!st.banks.length) return '';
+  return `<div class="row"><label for="bi-bank">${tr('Bank account')}</label><select id="bi-bank" required aria-required="true"><option value="">${tr('Choose the bank account this statement belongs to')}</option>${st.banks.map(a => `<option value="${a.id}" ${st.bank === a.id ? 'selected' : ''}>${esc(bnkAccName(a))}</option>`).join('')}</select></div>`;
+}
 function bnkImpModal(text, name, after) {  // text + name: one statement read already (as before); without them the start step
-  const md = modal(''), card = $('.card', md), st = {p: null, mapping: null, rows: null, account: null};  // 2.124.0 D (#2342): account = the name for a CSV balance
+  const md = modal(''), card = $('.card', md), st = {p: null, mapping: null, rows: null, account: null, bank: null, banks: []};  // 2.124.0 D (#2342): account = the name for a CSV balance; 2.702.0 (#5183): bank = the chosen bank account
   md.classList.add('ofcdlg', 'bnkdlg');
   let files = typeof text === 'string' ? [new File([text], name || 'statement.txt', {type: 'text/plain'})] : [];
   const label = () => files.length === 1 ? files[0].name : trn('{0} file', '{0} files', files.length);
@@ -177,6 +183,7 @@ function bnkImpModal(text, name, after) {  // text + name: one statement read al
     for (const f of files) fd.append('files', f, f.name);
     if (mapping) fd.append('mapping', JSON.stringify(mapping));
     if (st.account) fd.append('account', st.account);
+    if (st.bank) fd.append('bank_account', st.bank);
     return fd;
   };
   const errEl = () => $('.aerr', md), err = m => { const e = errEl(); if (e) e.textContent = m || ''; };
@@ -190,7 +197,7 @@ function bnkImpModal(text, name, after) {  // text + name: one statement read al
       <div class="row"><label>${tr('Amount')}</label><div class="seg" role="radiogroup" id="bi-am" aria-label="${esc(tr('Amount'))}"><button type="button" role="radio" data-am="one" aria-checked="${!two}" class="${two ? '' : 'on'}">${tr('One column (minus = expense)')}</button><button type="button" role="radio" data-am="two" aria-checked="${two}" class="${two ? 'on' : ''}">${tr('Income and expense apart')}</button></div></div>
       <div class="bi-one" ${two ? 'hidden' : ''}>${sel('bi-amt', tr('Amount'), g.amount)}${sel('bi-sign', tr('Column with S/H (debit/credit), if the bank gives amounts without a minus'), g.sign, true)}</div>
       <div class="bi-two" ${two ? '' : 'hidden'}>${sel('bi-in', tr('Income'), g.amount_in, true)}${sel('bi-out', tr('Expense'), g.amount_out, true)}</div>
-      ${sel('bi-title', tr('Purpose'), g.title, true)}${sel('bi-cp', tr('Paid to / from'), g.counterpart, true)}${cfb_mapHtml(st, sel, g)}
+      ${bnkAccPickHtml(st)}${sel('bi-title', tr('Purpose'), g.title, true)}${sel('bi-cp', tr('Paid to / from'), g.counterpart, true)}${cfb_mapHtml(st, sel, g)}
       <div class="row"><label for="bi-dec">${tr('Decimal separator')}</label><select id="bi-dec"><option value="," ${g.decimal !== '.' ? 'selected' : ''}>${tr('comma (1.234,56)')}</option><option value="." ${g.decimal === '.' ? 'selected' : ''}>${tr('point (1,234.56)')}</option></select></div>
       <div class="row"><label for="bi-df">${tr('Date format')}</label><select id="bi-df">${BNK_DATE_FORMATS.map(f => `<option ${g.date_format === f ? 'selected' : ''}>${f}</option>`).join('')}</select></div>
       <div class="bgtblw"><table class="bgtbl"><thead><tr>${st.p.columns.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${st.p.sample.map(r => `<tr>${r.map(x => `<td>${esc(x)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
@@ -199,6 +206,7 @@ function bnkImpModal(text, name, after) {  // text + name: one statement read al
   const mapOf = () => {
     const n = id => { const v = $(id, md)?.value; return v === '' || v == null ? null : +v; }, two = $('#bi-am [aria-checked="true"]', md)?.dataset.am === 'two';
     st.account = $('#bi-accname', md)?.value.trim() || null;  // 2.124.0 D (#2342): balance + own account column (optional)
+    if ($('#bi-bank', md)) st.bank = +$('#bi-bank', md).value || null;  // 2.702.0 (#5183)
     return {date: n('#bi-date'), amount: two ? null : n('#bi-amt'), amount_in: two ? n('#bi-in') : null, amount_out: two ? n('#bi-out') : null, sign: two ? null : n('#bi-sign'), title: n('#bi-title'), counterpart: n('#bi-cp'), decimal: $('#bi-dec', md).value, date_format: $('#bi-df', md).value, balance: n('#bi-bal'), account: n('#bi-acc')};
   };
   const start = () => {
@@ -224,7 +232,7 @@ function bnkImpModal(text, name, after) {  // text + name: one statement read al
       else { start(); err(x.message || tr('unknown')); }  // 2.144.1 B (#2446): e.g. MT940 -> the message in the start step
       $$('button[data-bi]', md).forEach(b => { b.disabled = false; }); return;
     }
-    if (st.p.columns) cols(); else rowsView();
+    if (st.p.columns) { st.banks = st.p.bank_accounts || []; cols(); } else rowsView();
   };
   const take = fl => {
     files = [...(fl || [])]; if (!files.length) return;
@@ -237,10 +245,15 @@ function bnkImpModal(text, name, after) {  // text + name: one statement read al
     if (b.dataset.bi === 'close') { md.remove(); return; }
     if (b.dataset.bi === 'pick') { $('#bi-file', md)?.click(); return; }  // 2.633.0 (#4920): fixed hidden file input, its change uploads (a drop onto the window too, dropany.js)
     if (b.dataset.bi === 'back') { await preview(null); return; }
-    if (st.p?.columns) { st.mapping = mapOf(); b.disabled = true; await preview(st.mapping); return; }
+    if (st.p?.columns) {
+      st.mapping = mapOf();
+      if (st.banks.length && !st.bank) { err(tr('Choose the bank account this statement belongs to')); $('#bi-bank', md)?.focus(); return; }  // 2.702.0 (#5183): never silently the default
+      b.disabled = true; await preview(st.mapping); return;
+    }
     // 2.356.0 B (#2934): the target before the start, in words: the office area of the account(s) + the account (#1940)
     const accts = [...new Set((st.p?.balances || []).map(x => x.account).filter(Boolean))].map(cfb_acct);
-    if (!await importTargetConfirm({what: trn('{0} booking', '{0} bookings', st.p?.count || 0), ws: ofcWs(), place: st.account || accts.join(', ') || tr('Bank account')})) return;
+    const bk = st.banks.find(x => x.id === st.bank);  // 2.702.0 (#5183): the chosen bank account names the place
+    if (!await importTargetConfirm({what: trn('{0} booking', '{0} bookings', st.p?.count || 0), ws: ofcWs(), place: (bk && bnkAccName(bk)) || st.account || accts.join(', ') || tr('Bank account')})) return;
     b.disabled = true;
     try {
       const j = await api('POST', '/api/office/bank/import', form(st.mapping)), iid = j.import.id;

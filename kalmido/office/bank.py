@@ -22,7 +22,7 @@ from ..core import mt940 as mt  # 2.299.0 A (#3190)
 from ..core import stmtfiles as sf  # 2.146.0 C (#2455): uploads, several files / a ZIP
 from ..core.pg import insert_id, write_lock
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
-from ..core.i18n import tr
+from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, iso, local_now, now_utc
 from ..core.access import Denied
 from ..core.errors import BadInput
@@ -315,12 +315,46 @@ def bnk_preview_of(c, oid, b, fs=None):
     """The answer of the preview as a dict (2.616.0 #2473: shared with the FinTS fetch, office/fints.py, fs = its statements)."""
     fmt, rows, cols, parts, info = bnk_parse(c, oid, b, fs)
     extra = cfb_preview(c, oid, fmt, b, cols, parts)  # 2.124.0 D (#2342): the statement's balances / the guessed balance column
-    if rows is None:
-        return dict(fmt=fmt, **cols, **extra, **_info_out(info))
+    if rows is None:  # 2.702.0 (#5183): + the bank accounts to choose from (two or more)
+        return dict(fmt=fmt, **cols, **extra, bank_accounts=bnk_accounts(c, oid), **_info_out(info))
     ok = [r for r in rows if not r["error"] and not r["pending"]]  # 2.146.0 C (#2469): pending ones counted apart
     return dict(fmt=fmt, rows=[_row_out(r) for r in rows], count=sum(1 for r in ok if not r["dup"]),
                 dup_count=sum(1 for r in ok if r["dup"]), pending_count=sum(1 for r in rows if not r["error"] and r["pending"]),
                 skipped=sum(1 for r in rows if r["error"]), skipped_rows=dva_bnk_skipped(rows), **extra, **_info_out(info))
+
+
+BNK_PICK_ACCOUNT = N_("Choose the bank account this statement belongs to")
+
+
+def bnk_accounts(c, oid):
+    """2.702.0 (#5183): the active bank accounts of the office to choose from at a CSV import ([{id, label, iban_end,
+    default}]) -- only when there are two or more; with one account every line belongs to it, nothing is asked."""
+    from .bankacc import bka_rows
+    rows = bka_rows(c, oid)
+    if len(rows) < 2:
+        return []
+    return [{"id": r["id"], "label": r.get("label") or "", "iban_end": re.sub(r"\s+", "", r.get("iban") or "")[-4:],
+             "default": bool(r["is_default"])} for r in rows]
+
+
+def _bnk_account_pick(c, oid, b, parts):
+    """2.702.0 (#5183): the bank account chosen for this import (body bank_account) -> its row, or None. A CSV statement
+    names no account of its own: with two or more bank accounts the choice is required (400), never silently the default."""
+    v = b.get("bank_account")
+    if isinstance(v, str) and v.strip().isdigit():
+        v = int(v.strip())
+    accts = bnk_accounts(c, oid)
+    if v in (None, "", 0):
+        if accts and any(p["fmt"] == "csv" for p in parts):
+            raise BadInput(tr(BNK_PICK_ACCOUNT))
+        return None
+    if isinstance(v, bool) or not isinstance(v, int):
+        raise BadInput(tr("Invalid value: {0}", "bank_account"))
+    from .bankacc import bka_rows
+    row = next((r for r in bka_rows(c, oid) if r["id"] == v), None)
+    if row is None:
+        raise BadInput(tr("Invalid value: {0}", "bank_account"))
+    return row
 
 
 def _import_public(r):
@@ -346,10 +380,13 @@ def bnk_import_of(c, uid, oid, b, fs):
     dup = sum(1 for r in rows if not r["error"] and r["dup"])
     if not new and not dup:
         raise BadInput(tr("Nothing to import"))
+    acct = _bnk_account_pick(c, oid, b, parts)  # 2.702.0 (#5183)
+    if acct is not None:  # the balance of a CSV names the chosen account (the cash flow and the ledger read it so)
+        b = {**b, "account": re.sub(r"\s+", "", acct.get("iban") or "").upper() or acct.get("label") or b.get("account")}
     ts = iso(now_utc())
     fname = _clean(info["label"], 200)
-    iid = insert_id(c, "INSERT INTO office_bank_imports(org_id, filename, fmt, count, dup_count, created_by, created_at) VALUES(?,?,?,?,?,?,?)",
-                    (oid, fname, fmt, len(new), dup, uid, ts))
+    iid = insert_id(c, "INSERT INTO office_bank_imports(org_id, filename, fmt, count, dup_count, created_by, created_at, bank_account_id) VALUES(?,?,?,?,?,?,?,?)",
+                    (oid, fname, fmt, len(new), dup, uid, ts, acct["id"] if acct else None))
     for r in new:
         row = {"org_id": oid, "import_id": iid, "day": r["day"], "amount": dstr(r["amount"]), "currency": r["currency"],
                "counterpart": r["counterpart"], "purpose": r.get("purpose_full") or r["purpose"], "iban": r["iban"], "ref": r["ref"], "hash": r["hash"],

@@ -149,4 +149,6 @@ def stmt_req(upload_max=STMT_LIMITS["upload_max"]):
             raise _bad(tr("Invalid data")) from None
     if request.form.get("account"):
         b["account"] = request.form.get("account")
+    if request.form.get("bank_account"):  # 2.702.0 (#5183): the bank account a CSV statement belongs to (office/bank.py)
+        b["bank_account"] = request.form.get("bank_account")
     return b
