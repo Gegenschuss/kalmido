@@ -178,7 +178,9 @@ def _booking_offer(run, src, d, ctx):
     if not part:
         d.update(offer_root=None, offer_doc=None, offer_pos="", offer_mark="")
         return
-    d.update(offer_root=root, offer_doc=doc or root, offer_pos=f"d:{part}:{m.group(2)}:{m.group(3)}")
+    # review F1: the mark only as the disposition writes it (offerdispo.py odp_book), anything else from the file counts as none
+    mark = src.get("offer_mark") if src.get("offer_mark") in ("changed", "gone") else ""
+    d.update(offer_root=root, offer_doc=doc or root, offer_pos=f"d:{part}:{m.group(2)}:{m.group(3)}", offer_mark=mark)
 
 
 def _booking(c, run, src, d, ctx):

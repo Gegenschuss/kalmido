@@ -146,6 +146,8 @@ check(pv2["linked"] == 4 and all(x["state"] == "same" and not x["pick"] for x in
 N_LINKS = sql("SELECT COUNT(*) FROM task_offer_links WHERE list_id=?", (L,))[0][0]
 check(N_LINKS == 4, f"four links {N_LINKS}")
 
+# 2.671.0 (#5097, review F1): a mark the disposition never writes does not come along (it would count the day as done)
+sql("UPDATE hub_bookings SET offer_mark='xyz' WHERE org_id=? AND resource_kind='slot' AND title<>'Fremd'", (ORG,))
 OX, RK = export(A, ORG)
 
 
