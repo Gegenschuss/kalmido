@@ -769,7 +769,8 @@ Since 2.37.0 Kalmido runs on PostgreSQL 17 only (`DATABASE_URL`); SQLite is gone
   5 min and `jit=off`. Network calls (mail, calendar and contact sync, Web Push) run outside open transactions.
   `init_db` and the backup lift the statement limit for themselves.
 - **Schema.** `core/schema.py` in the PostgreSQL dialect (one source): identity ids, integers as `BIGINT`, booleans
-  stay 0/1, timestamps stay ISO text, office amounts `NUMERIC(14,4)`, four `jsonb` columns. `init_db` runs in one
+  stay 0/1, timestamps stay ISO text, office amounts `NUMERIC(14,2)` (rates / quantities `NUMERIC(14,4)`; the money
+  convention in docs/dev/geld.md, 2.755.0 #5293), four `jsonb` columns. `init_db` runs in one
   transaction under an advisory lock, creates the extensions `unaccent` and `pg_trgm`, adds missing columns and keeps the
   schema version in `kalmido_meta`; a database newer than the image refuses the start.
 - **Errors.** Postgres aborts the whole transaction on an error: code that catches a database error and goes on uses

@@ -59,6 +59,7 @@ from ..core.config import app, SECRET_KEY, COOKIE
 from ..core.i18n import N_, tr
 from ..core.pg import system_ctx, write_lock
 from ..core.db import body, bump, connect, db, err, gset, iso, iso_ms, now_utc  # 2.149.0 G (#2517): pulled up from functions
+from .moneycol import mc_fields  # 2.755.0 (#5293): the NUMERIC money columns back as the text the office code reads
 
 PREFIX = "kenc1:"
 MAGIC = b"KENC1\n"
@@ -471,7 +472,8 @@ def oc_plain_safe(value):
 def oc_dec_fields(c, org_id, table, row):
     """A dict copy of row with every protected column of table decrypted (the load helper for exports / serializers):
     whole columns (FIELDS), the protected keys inside JSON columns (JSON_KEYS, the column stays JSON text) and
-    office_doc_items.cost_enc -> cost (cost_enc dropped)."""
+    office_doc_items.cost_enc -> cost (cost_enc dropped). 2.755.0 (#5293): the plain money columns (core/moneycol.py MC_COLS,
+    NUMERIC) as two-place text, as they were stored before."""
     d = dict(row)
     key = None
     for k in FIELDS.get(table, ()):
@@ -489,7 +491,7 @@ def oc_dec_fields(c, org_id, table, row):
                 d[col] = json.dumps(j, ensure_ascii=False)
     if table == "office_doc_items" and "cost_enc" in d:
         oc_item_load(c, org_id, d)
-    return d
+    return mc_fields(table, d)  # 2.755.0 (#5293): office_doc_items.net / tax_amount, cash book and ledger amounts: "23.80" as before
 
 
 oc_dec_row = oc_dec_fields  # the name agent C asked for (#833)

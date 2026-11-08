@@ -30,6 +30,7 @@ from .pg import pool_refresh, system_ctx as pg_system_ctx  # 2.149.0 G (#2517): 
 from . import config  # 2.369.5 (#2517): pulled up from functions
 from . import objhooks  # 2.565.0 (#4717 #4719): START, the areas' forward copies onto the shared core
 from .i18n import N_  # 2.369.5 (#2517): pulled up from functions
+from .moneycol import mc_migrate  # 2.755.0 (#5293): the plain money columns of the office as NUMERIC(14,2)
 
 
 # 2.48.0 (#1207): modules of 2.48 that are on for everyone once (features_rev 11)
@@ -997,6 +998,8 @@ def init_db(guard=True, load=None):
         from ..office.cashbook import cb_log_fk_migrate
         cb_log_fk_migrate(c)  # 2.144.11 (#2354): cash book log lines outlive their entry (SET NULL, was CASCADE)
         clk("cb_log_fk_migrate")
+        mc_migrate(c, iso(now_utc()))  # 2.755.0 (#5293): TEXT -> NUMERIC(14,2) where every value fits (else the column stays, the log says why)
+        clk("mc_migrate")
         from ..office.contacts_cl import fk_migrate
         fk_migrate(c)  # 2.40.0 (#1380): the contact field of a client becomes its default contact person
         clk("contact_fk_migrate")

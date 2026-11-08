@@ -26,6 +26,7 @@ from flask import jsonify, request, Response
 
 from ..core.config import app
 from ..core.pg import insert_id, write_lock
+from ..core.moneycol import mc_fields  # 2.755.0 (#5293)
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.i18n import N_, csv_dialect, lang, tr
 from ..core.db import bump, db, iso, local_day, local_stamp, now_utc
@@ -125,7 +126,7 @@ def _rows(c, oid, bid, full=False):
     balance, the counts and the checks need only the plain columns (default: no text at all); full=True = every column, the
     text still encrypted (cb_list decrypts just the entries it shows)."""
     cols = "*" if full else "id, no, day, dir, amount, storno_of, created_by"
-    return [dict(r) for r in
+    return [mc_fields("office_cash_entries", dict(r)) for r in  # 2.755.0 (#5293): amount NUMERIC -> "23.80" as before
             c.execute(f"SELECT {cols} FROM office_cash_entries WHERE org_id=? AND book_id=? ORDER BY day, no", (oid, bid))]
 
 

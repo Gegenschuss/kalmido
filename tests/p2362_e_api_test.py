@@ -172,7 +172,8 @@ r = A.post(B + f"{D}/{DOC}/status", json={"status": "sent"})
 check(r.ok and r.json()["status"] == "sent", "finalised quotation: status still changes")
 # 2.417.0 C (#2604): the test phase of 2.144.8 (#2573) is over: a sent quotation stays; undo finalising stays 409
 check(A.get(B + f"{D}/{DOC}").json()["can_delete"] is False and A.post(B + f"{D}/{DOC}/unlock").status_code == 409, "finalised + sent: no delete (#2604), unlock 409")
-items = dbx("SELECT tax_pct, net, tax_amount FROM office_doc_items WHERE doc_id=? ORDER BY sort", (DOC,))
+# 2.755.0 (#5293): net / tax_amount are NUMERIC(14,2) now -- ::text gives the same two-place text as the stored text before
+items = dbx("SELECT tax_pct, net::text, tax_amount::text FROM office_doc_items WHERE doc_id=? ORDER BY sort", (DOC,))
 check(items == [("19", "3000.00", "570.00"), ("7", "100.00", "7.00")], f"positions carry tax_pct / net / tax_amount as decimal text: {items}")
 snap = dbx("SELECT pack_version, sender IS NOT NULL AS s1, recipient_snapshot IS NOT NULL AS s2, tax_snapshot IS NOT NULL AS s3 FROM office_docs WHERE id=?", (DOC,))[0]
 check(snap[0] and snap[1] == 1 and snap[2] == 1 and snap[3] == 1, f"snapshot columns written: {snap}")

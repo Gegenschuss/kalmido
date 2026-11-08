@@ -25,6 +25,7 @@ import hashlib
 import json
 from decimal import Decimal
 
+from ..core.moneycol import mc_fields  # 2.755.0 (#5293)
 from ..core.orgcrypt import oc_dec_fields
 from ..core.pg import write_lock
 from .model import num_kind, office_settings, ofx_release  # 2.542.0 (#4598): freeing a copied place passes the trigger
@@ -71,7 +72,8 @@ def hch_canon(c, oid, r):
         out["totals"] = {k: v for k, v in out["totals"].items() if k not in HCH_TOTALS_SKIP}
     tax = _json(d.get("tax_snapshot"), {})
     out["tax"] = {k: tax.get(k) for k in HCH_TAX_KEYS} if isinstance(tax, dict) else {}
-    out["items"] = [{k: it[k] for k in HCH_ITEM_FIELDS} for it in c.execute(
+    # 2.755.0 (#5293): net / tax_amount are NUMERIC now: the same text as before ("23.80", None), the checksums stay
+    out["items"] = [mc_fields("office_doc_items", {k: it[k] for k in HCH_ITEM_FIELDS}) for it in c.execute(
         f"SELECT {', '.join(HCH_ITEM_FIELDS)} FROM office_doc_items WHERE doc_id=? ORDER BY sort, id", (d["id"],))]
     return json.dumps(_plain(out), sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str)
 
