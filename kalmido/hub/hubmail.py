@@ -46,7 +46,7 @@ from ..core.access import Denied, MANAGE_ROLES, WRITE_ROLES, acx_of, list_role, 
 from ..core.orgcrypt import FIELDS, OrgCryptError, PREFIX, oc_active_for, oc_dec_fields, oc_enc_fields, oc_is_enc, oc_plain_safe
 from ..accounts.session import me
 from ..accounts.orgroles import need_org_write  # 2.674.0 (#4382 finding 3)
-from ..accounts.mailtok import mtk_new, mtk_plain, mtk_where  # 2.674.0 (#4382 finding 5)
+from ..accounts.mailtok import mtk_new, mtk_plain, mtk_row_where, mtk_where  # 2.674.0 (#4382 finding 5); 2.705.0 (#5151): mtk_row_where
 from ..files.fslock import fsl_need_plain  # 2.353.0 F (#2758)
 from ..accounts.orgs import is_org_admin
 
@@ -866,11 +866,13 @@ def hbm_user_purge(c, uid):
             o = c.execute("SELECT owner_id FROM lists WHERE id=?", (r["list_id"],)).fetchone()
             h = o[0] if o and o[0] != uid else hbm_heir(c, {**dict(r), "kind": "list"}, not_uid=uid)
             if h:
-                c.execute("UPDATE hub_tokens SET user_id=? WHERE token=?", (h, r["token"]))
+                w, a = mtk_row_where(r)  # 2.705.0 (#5151): also when the row was sealed in between
+                c.execute(f"UPDATE hub_tokens SET user_id=? WHERE {w}", (h, *a))
             continue
         h = hbm_heir(c, r, not_uid=uid)
         if h:
-            c.execute("UPDATE hub_tokens SET user_id=? WHERE token=?", (h, r["token"]))
+            w, a = mtk_row_where(r)  # 2.705.0 (#5151): also when the row was sealed in between
+            c.execute(f"UPDATE hub_tokens SET user_id=? WHERE {w}", (h, *a))
 
 
 def hbm_trash_holder(c, uid, cid):
@@ -893,7 +895,8 @@ def _import(c, r, msg, raw, mail_text):
     if not ok and r["kind"] != "inbox":
         h = hbm_heir(c, r)  # 2.84.0 review: the shared address passes on instead of losing the mails for everybody
         if h:
-            c.execute("UPDATE hub_tokens SET user_id=? WHERE token=?", (h, r["token"]))
+            w, a = mtk_row_where(r)  # 2.705.0 (#5151): also when the row was sealed in between
+            c.execute(f"UPDATE hub_tokens SET user_id=? WHERE {w}", (h, *a))
             uid, ok = h, _holder_ok(c, r["kind"], h, r["org_id"], cid, lid)
     if not ok and r["kind"] == "client":
         ok = hbm_trash_holder(c, r["user_id"], cid)

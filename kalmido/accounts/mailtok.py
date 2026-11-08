@@ -59,6 +59,12 @@ def mtk_where(tok, alias=""):
     return f"({p}token_hash=? OR ({p}token_hash IS NULL AND {p}token=?))", (mtk_hash(tok), str(tok or ""))
 
 
+def mtk_row_where(r):
+    """2.705.0 (#5151, review F1): (SQL condition, args) of the row r read before: by its stored token, or by its hash when
+    mtk_reseal_tick sealed it in between (the token is the primary key and changes then)."""
+    return "(token=? OR token_hash=?)", (r["token"], r["token_hash"] or mtk_hash(r["token"]))
+
+
 def mtk_reseal_tick(c, force=False):
     """2.705.0 (#5151): daily (watchdog, system context). The first run notes its time (MTK_SINCE) and changes nothing;
     from MTK_RESEAL_DAYS after it, every row of MTK_TABLES still in plain text (token_hash NULL) gets its token sealed and

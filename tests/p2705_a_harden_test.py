@@ -150,9 +150,16 @@ with system_ctx(c):
     r = I._doc_mail_row(c, [%r])
     out["doc"] = r["user_id"] if r else None
     out["mine"] = list(mail_tokens(c, %d).values())
+    from kalmido.accounts.mailtok import mtk_row_where
+    from kalmido.docs.maillink import ml_budget
+    w, a = mtk_row_where({"token": %r, "token_hash": None})  # a row read before the reseal (review F1)
+    out["stale"] = c.execute(f"UPDATE hub_tokens SET created_at=created_at WHERE {w}", a).rowcount
+    out["budget"] = ml_budget(c, %r, "links", 1)
 c.rollback()
 print(json.dumps(out))
-''' % (OLD["mail_tokens"], OLD["hub_tokens"], OLD["doc_mail"], FID))
+''' % (OLD["mail_tokens"], OLD["hub_tokens"], OLD["doc_mail"], FID, OLD["hub_tokens"], OLD["doc_mail"]))
+check(j.get("stale") == 1, f"a hub address row read before the reseal is still found for the hand-over (review F1) {j}")
+check(j.get("budget") == 1, f"the download budget of a sealed old document address still counts {j}")
 check(j.get("task") == FID and j.get("hub") == FID and j.get("doc") == FID, f"a mail still finds the sealed old addresses {j}")
 check(j.get("mine") == [OLD["mail_tokens"]], f"the settings show the same address {j}")
 
