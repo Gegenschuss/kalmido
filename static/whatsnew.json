@@ -1,6 +1,16 @@
 {
  "versions": [
   {
+   "version": "2.710.0",
+   "date": "2026-11-08",
+   "items": [
+    {
+     "de": "Unter Einstellungen > Organisation > Agenten siehst du die verbundenen Apps deiner Team-Agenten und kannst sie trennen.",
+     "en": "Settings > Organisation > Agents shows the connected apps of your team agents and lets you disconnect them."
+    }
+   ]
+  },
+  {
    "version": "2.693.0",
    "date": "2026-11-08",
    "items": [
