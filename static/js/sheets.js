@@ -215,7 +215,7 @@ function shvSheetHtml(sh) {
   const back = sh.list_id ? `<a class="btn sm" href="#sheets/l/${sh.list_id}" title="${esc(tr('Attached to {0}', sh.list_title || ''))}">${ic('back', 's')}<span class="shvbk">${esc(sh.list_title || tr('Project'))}</span></a>` : `<a class="btn sm" href="#sheets">${ic('back', 's')}<span class="shvbk">${tr('Tables')}</span></a>`;
   const top = `<div class="shvtop">${back}<h2 class="shvh"><button type="button" class="shvtitle" data-shv="rename" ${w ? '' : 'disabled'} title="${esc(w ? tr('Rename…') : '')}">${esc((sh.book_title ?? sh.title) || tr('Untitled table'))}</button></h2>
     ${w ? '' : `<span class="shvro">${ic('eye', 's')}${tr('Read-only')}</span>`}<span class="spacer"></span>
-    ${nf ? `<button type="button" class="btn sm" data-shv="unfilter" title="${esc(tr('Reset filters'))}">${ic('filter', 's')}${trn('{0} filter', '{0} filters', nf)}${ic('x', 's')}</button>` : ''}
+    ${typeof shg_btnHtml === 'function' ? shg_btnHtml(sh) : ''}${nf ? `<button type="button" class="btn sm" data-shv="unfilter" title="${esc(tr('Reset filters'))}">${ic('filter', 's')}${trn('{0} filter', '{0} filters', nf)}${ic('x', 's')}</button>` : ''}
     <button type="button" class="btn sm ${SHV.deps ? 'on' : ''}" data-shv="deps" aria-haspopup="menu" aria-pressed="${!!SHV.deps}">${ic('deps', 's')}<span class="shvbk">${tr('Dependencies')}</span></button>${typeof shz_btnsHtml === 'function' ? shz_btnsHtml(sh) : ''}
     <button type="button" class="iconbtn" data-shv="menu" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots')}</button></div>`;
   const c0 = SHV.cur && sh._col.has(SHV.cur.c) && sh._rowNo.has(SHV.cur.r) ? SHV.cur : null, cc = c0 && shvCell(c0.r, c0.c, sh);
@@ -224,7 +224,7 @@ function shvSheetHtml(sh) {
   const shz = typeof shz_plan === 'function' && shz_plan(sh);  // 2.98.0 C (#2181): sheetsize.js
   const colgroup = `<colgroup><col class="shvrhc">${cols.map(c => `<col data-c="${c.id}" style="width:${shvW(c) / 16}rem">`).join('')}${w ? '<col class="shvaddcc">' : ''}${shz ? shz_colsHtml(sh) : ''}</colgroup>`;  // 2.98.0 C (#2181): + the empty columns that fill the frame
   const head = `<thead><tr><th class="shvcorner" scope="col"><span class="sr">${tr('Row')}</span></th>${cols.map(c => shvTh(sh, c, filt)).join('')}${w ? `<th class="shvaddc"><button type="button" class="iconbtn" data-shv="coladd" title="${esc(tr('Add column'))}" aria-label="${esc(tr('Add column'))}">${ic('plus', 's')}</button></th>` : ''}${shz ? shz_headHtml(sh) : ''}</tr></thead>`;
-  const body = `<tbody>${rows.map(r => shvTr(sh, r)).join('')}</tbody>${shz ? shz_bodyHtml(sh) : ''}`;
+  const body = `<tbody>${typeof shg_on === 'function' && shg_on(sh) ? shg_bodyHtml(sh) /* 2.671.0 (#3463): groups + subtotals (sheetgroup.js) */ : rows.map(r => shvTr(sh, r)).join('')}</tbody>${shz ? shz_bodyHtml(sh) : ''}`;
   const foot = `<div class="shvfoot">${w ? `<button type="button" class="btn sm" data-shv="rowadd">${ic('plus', 's')}${tr('Add row')}</button>` : ''}${nf ? `<span class="muted">${tr('{0} of {1} rows shown', rows.length, all)}</span>` : ''}</div>`;
   return `<div class="shvwrap shvsheet" data-k="shv-${sh.id}">${top}${pres}${shvRefsHtml(sh)}${typeof shc_html === 'function' ? shc_html(sh) : ''}${bar}${typeof shfm_barHtml === 'function' ? shfm_barHtml(sh) : '' /* 2.578.0 (#3462 C) */}
     <div class="shvbody"><div class="shvgridw"><div class="shzbox"${typeof shz_boxAttr === 'function' ? shz_boxAttr(sh) : ''}><div class="shvscroll" id="shv-scroll" tabindex="0" role="grid" aria-label="${esc(sh.title || tr('Table'))}" aria-rowcount="${all + 1}" aria-colcount="${cols.length + 1}" aria-multiselectable="true" ${c0 ? `aria-activedescendant="shv-c-${c0.r}-${c0.c}"` : ''}>
@@ -344,7 +344,7 @@ function shvPass(sh, r, filt) {
 }
 function shvVisRows(sh = SHV.sh) { const f = shvFilt(sh); return Object.keys(f).length ? sh.rows.filter(r => shvPass(sh, r, f)) : sh.rows; }
 function shvGrid() {  // [rows ids], [col ids] in their shown order
-  const sh = SHV.sh; return sh ? [shvVisRows(sh).map(r => r.id), sh.columns.map(c => c.id)] : [[], []];
+  const sh = SHV.sh; return sh ? [(typeof shg_rows === 'function' ? shg_rows(sh) : shvVisRows(sh)).map(r => r.id), sh.columns.map(c => c.id)] : [[], []];  // 2.671.0 (#3463): grouped = the rows in their groups' order
 }
 function shvRect() {  // the selected rectangle {r0, r1, c0, c1} in shown indexes (null without a choice)
   if (!SHV.cur) return null;
@@ -394,7 +394,7 @@ function shvAfter() { shvBarSync(); shvDepsDraw(); if (typeof shz_fill === 'func
 function shvPatchAll() {
   const sh = SHV.sh, tb = $('#shv-scroll tbody'); if (!sh || !tb) return;
   SHV.rset = shvRangeSet();
-  const want = shvVisRows(sh).map(r => r.id).join(','), have = [...tb.children].map(t => t.dataset.id).join(',');
+  const want = (typeof shg_rows === 'function' ? shg_rows(sh) : shvVisRows(sh)).map(r => r.id).join(','), have = [...tb.children].filter(t => t.dataset.id).map(t => t.dataset.id).join(',');  // 2.671.0 (#3463): group heads / subtotals are no data rows
   const heads = [...($('#shv-scroll thead tr')?.querySelectorAll('th.shvch') || [])].map(t => t.dataset.c).join(',');
   if (want !== have || heads !== sh.columns.map(c => c.id).join(',')) { if (!SHV.ed) { viewSafeRender(); requestAnimationFrame(shvAfter); } else SHV.stale = true; return; }
   for (const r of shvVisRows(sh)) {
@@ -409,6 +409,7 @@ function shvPatchAll() {
   }
   const p = $('#shv-scroll')?.closest('.shvsheet')?.querySelector('.shvpres');
   if (p || shvOthers(sh).length) { const t = document.createElement('template'); t.innerHTML = shvPresHtml(sh); const np = t.content.firstElementChild; if (p && np) p.replaceWith(np); else if (p) p.remove(); else if (np) $('.shvsheet .shvtop')?.after(np); }
+  if (typeof shg_patch === 'function' && !shg_patch(sh) && !SHV.ed) { viewSafeRender(); requestAnimationFrame(shvAfter); return; }  // 2.671.0 (#3463): the subtotals follow
   shvBarSync(); shvSideSync(); shvDepsDraw();
   if (typeof shc_patch === 'function') shc_patch(sh);  // 2.124.0 A (#2115): the chart follows the cells (sheetchart.js)
 }

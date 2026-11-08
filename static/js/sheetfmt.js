@@ -69,14 +69,15 @@ function shfm_hit(sh, r, col, c, rid) {
 // ---- merged cells: their spans in the rows / columns shown (worked out once per drawing)
 function shfm_merges(sh) {
   if (SHFM.mm && SHFM.mmSh === sh) return SHFM.mm;
-  const rs = shvVisRows(sh).map(r => r.id), cs = sh.columns.map(c => c.id);
+  const grp = typeof shg_on === 'function' && shg_on(sh);  // 2.671.0 (#3463): grouped = the rows on screen, a block keeps only its columns
+  const rs = (grp ? shg_rows(sh) : shvVisRows(sh)).map(r => r.id), cs = sh.columns.map(c => c.id);
   const ri = new Map(rs.map((x, i) => [x, i])), ci = new Map(cs.map((x, i) => [x, i]));
   const span = new Map(), hid = new Set(), own = new Map();  // 2.589.0 (#4825): own = covered cell -> its block's anchor
   for (const c of sh.cells || []) {
     const m = c.fmt?.merge; if (!m) continue;
     const i = ri.get(c.row_id), j = ci.get(c.col_id), k = c.row_id + ':' + c.col_id;
     if (i == null || j == null || hid.has(k)) continue;
-    const h = Math.min(m[0], rs.length - i), w = Math.min(m[1], cs.length - j); if (h * w < 2) continue;
+    const h = grp ? 1 : Math.min(m[0], rs.length - i), w = Math.min(m[1], cs.length - j); if (h * w < 2) continue;
     span.set(k, [h, w]);
     for (let a = 0; a < h; a++) for (let b = 0; b < w; b++) if (a || b) { hid.add(rs[i + a] + ':' + cs[j + b]); own.set(rs[i + a] + ':' + cs[j + b], [c.row_id, c.col_id]); }
   }

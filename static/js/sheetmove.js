@@ -13,7 +13,8 @@
 /** @type {{d: any, line: HTMLElement|null, st: HTMLStyleElement|null}} the running drag, its drop line, its style */
 const SHMV = {d: null, line: null, st: null};
 
-const shmv_filtered = (sh = SHV.sh) => !!sh && Object.keys(shvFilt(sh)).length > 0;
+const shmv_filtered = (sh = SHV.sh) => !!sh && (Object.keys(shvFilt(sh)).length > 0 || (typeof shg_on === 'function' && shg_on(sh)));  // 2.671.0 (#3463): + grouped
+const shmv_why = (sh = SHV.sh) => typeof shg_on === 'function' && shg_on(sh) ? tr('Remove the grouping to move rows') : tr('Reset the filters to move rows');
 // the ids of the block that moves with id: the chosen rows / columns when id is one of them, else id alone
 function shmv_block(sh, kind, id) {
   const q = shvRect(), [rs, cs] = shvGrid();
@@ -36,7 +37,7 @@ function shmv_order(all, block, at) {
 // their text back). prev = the order this device saw: a move / sorting elsewhere meanwhile is refused (409, shvStep reloads)
 async function shmv_go(kind, block, at) {
   const sh = SHV.sh; if (!sh?.can_write || !block.length) return;
-  if (kind === 'row' && shmv_filtered(sh)) { toast(tr('Reset the filters to move rows')); return; }
+  if (kind === 'row' && shmv_filtered(sh)) { toast(shmv_why()); return; }
   const sid = sh.id, all = kind === 'row' ? sh.rows.map(r => r.id) : sh.columns.map(c => c.id), ids = shmv_order(all, block, at); if (!ids) return;
   const url = `/api/sheets/${sid}/${kind === 'row' ? 'rows' : 'columns'}/order`;
   const msg = kind === 'row' ? trn('{0} row moved', '{0} rows moved', block.length) : trn('{0} column moved', '{0} columns moved', block.length);
@@ -79,7 +80,7 @@ function shmv_lift(d) {
   if (d.lifted) return;
   d.lifted = true;
   d.th.classList.add('drag');
-  if (d.blocked) { toast(tr('Reset the filters to move rows')); return; }
+  if (d.blocked) { toast(shmv_why()); return; }
   shmv_mark(d);
 }
 function shmv_clear(d) {

@@ -355,3 +355,19 @@ input.shvmx{color:transparent!important;caret-color:var(--text);background:trans
 .shvgrid th.drag{outline:.125rem solid var(--accent);outline-offset:-.125rem}
 .shmv-line{position:fixed;z-index:96;pointer-events:none;background:var(--accent);border-radius:.125rem}
 .shmv-ghost{display:flex;align-items:center;justify-content:center}
+/* 2.671.0 (#3463): groups of rows (sheetgroup.js): a head per group (open / closed, its number of rows) and a subtotal row;
+   both are no data rows (calmer background, no cell look of their own) */
+.shvgrid tr.shgh>*{background:var(--bg2);font-weight:500}
+.shvgrid tr.shgh th.shgrh>button{cursor:pointer;color:var(--text)}
+.shghc{padding:0!important}
+.shgt{display:flex;align-items:center;gap:.5rem;width:100%;height:2rem;padding:0 .5rem;text-align:left;color:var(--text);font:inherit}
+.shgt:hover{background:var(--bg3)}
+.shgn{font-size:var(--fs-s);font-weight:400}
+.shvgrid tr.shgs>*{background:var(--bg2);border-bottom-color:var(--line2)}
+.shvgrid tr.shgs th.shgsh{cursor:default;color:var(--muted);font-weight:600}
+.shgsc{padding:0!important}
+.shgag{display:flex;align-items:baseline;justify-content:flex-end;gap:.375rem;width:100%;height:2rem;padding:0 .5rem;font:inherit;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums}
+.shgag small{font-size:var(--fs-xs);font-weight:400;color:var(--muted)}
+.shgag:hover{background:var(--bg3)}
+#shv-scroll tr.an-rowin>*{animation:an_rowin .25s cubic-bezier(.2,.8,.2,1)}
+@media (prefers-reduced-motion: reduce){#shv-scroll tr.an-rowin>*{animation:none}}
