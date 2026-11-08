@@ -182,4 +182,4 @@ function spl_check() {
   if (MW_ON) return;
   if (spl_on() || typeof spl_sync === 'function') loadModule('splitview').then(() => spl_sync()).catch(() => {});
 }
-if (!MW_ON) { let splT = 0; window.addEventListener('resize', () => { clearTimeout(splT); splT = setTimeout(spl_check, 150); }); }
+if (!MW_ON) window.addEventListener('resize', debounce(() => spl_check(), 150));  // core.js debounce (perf_budget: no new clearTimeout pairs)

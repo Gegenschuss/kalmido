@@ -11,7 +11,7 @@
 // layNow / panelMax, the popovers) measures the room it really has. The grip in between: drag (applied on release, the view
 // does not jump while dragging), arrow keys (Shift: 4 rem), Home / End, Enter or a double click = half and half; each side
 // keeps only its minimum (rule #4830). The width (rem) and the right route are the person's (LOOK_KEYS splW / splR).
-const SPL = {el: null, fr: null, px: 0, iw: null, saveT: 0, drag: false};
+const SPL = {el: null, fr: null, px: 0, iw: null, drag: false};
 const SPL_MIN_L = 40, SPL_MIN_R = 26;  // rem: the left app (bar, sidebar, list) / the right copy keep at least this
 const spl_vw = () => document.documentElement.clientWidth;
 const spl_std = () => Math.round(spl_vw() / spl_rem() / 2 * 4) / 4;  // half and half
@@ -24,7 +24,7 @@ const spl_route = r => typeof r === 'string' && /^#[\w/:.,%-]{0,39}$/.test(r) ? 
 // innerWidth of this window = the left half while the pane is up (the own property shadows the browser's; put back on unmount)
 function spl_iw(on) {
   if (on && !SPL.iw) {
-    const own = Object.getOwnPropertyDescriptor(window, 'innerWidth'), d = own || Object.getOwnPropertyDescriptor(Window.prototype, 'innerWidth');
+    const own = Object.getOwnPropertyDescriptor(window, 'innerWidth'), d = own || Object.getOwnPropertyDescriptor(Object.getPrototypeOf(window), 'innerWidth');
     if (!d?.get || (own && !own.configurable)) return;
     SPL.iw = {own, d};
     try { Object.defineProperty(window, 'innerWidth', {configurable: true, enumerable: d.enumerable, get() { const w = d.get.call(window); return SPL.el ? Math.max(0, w - SPL.px) : w; }, set: d.set}); } catch { SPL.iw = null; }
@@ -63,7 +63,7 @@ function spl_mount(route) {
 }
 function spl_unmount() {
   if (!SPL.el) return;
-  clearTimeout(SPL.saveT);
+  spl_save.cancel();
   SPL.el.remove(); SPL.el = SPL.fr = null; SPL.px = 0;
   document.documentElement.classList.remove('split-on');
   document.documentElement.style.removeProperty('--splW');
@@ -74,9 +74,9 @@ function spl_unmount() {
 function spl_watch() {
   let w = null; try { w = SPL.fr?.contentWindow; w?.location.hash; } catch { return; /* not the app (another origin) */ }
   if (!w) return;
-  const save = () => { clearTimeout(SPL.saveT); SPL.saveT = setTimeout(() => { let h = ''; try { h = spl_route(SPL.fr?.contentWindow?.location.hash || ''); } catch { return; } if (h && h !== LS.get('splR', '')) LS.set('splR', h); }, 400); };
-  w.addEventListener('hashchange', save); save();
+  w.addEventListener('hashchange', spl_save); spl_save();
 }
+const spl_save = debounce(() => { let h = ''; try { h = spl_route(SPL.fr?.contentWindow?.location.hash || ''); } catch { return; } if (h && h !== LS.get('splR', '')) LS.set('splR', h); }, 400);  // core.js debounce
 // miniwin.js spl_check: the switch / the window's width decide
 function spl_sync() {
   if (!spl_on()) { spl_unmount(); return; }
