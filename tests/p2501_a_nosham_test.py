@@ -38,18 +38,8 @@ ALLOWED = {
     ("p21481_c_api_test.py", "push.ntfy = lambda"): "a stub that returns true, no check",
 }
 # 2.501.0 (#4296): the old ones, one by one into real checks (task in the job's result); (file, status codes)
-MIXED_OLD = {
-    ("p180_api_test.py", "200, 403"), ("p2100_api_test.py", "200, 400"), ("p2103_a_api_test.py", "200, 400, 403, 404"), ("p2120_d_api_test.py", "200, 400"),
-    ("p2122_c_api_test.py", "201, 409"), ("p2123_b_api_test.py", "201, 404"), ("p2150_api_test.py", "200, 403, 404"), ("p2126_a_api_test.py", "200, 401, 403"),
-    ("p21481_e_api_test.py", "200, 409"), ("p2250_a_officesearch_test.py", "200, 403"), ("p2351_c_officerights_test.py", "200, 409"),
-    ("p2282_a_api_test.py", "200, 401"), ("p21481_d_api_test.py", "200, 400"), ("p221_api_test.py", "200, 400"), ("p2362_a_api_test.py", "200, 409"),
-    ("p2238_a_fsref_gate_test.py", "200, 302, 303"), ("p2187_1_b_own_test.py", "200, 403"), ("p2300_agentsafe_api_test.py", "200, 404"), ("p2439_a_mailsig_test.py", "200, 400"),
-    ("p2465_a_api_test.py", "201, 409"), ("p2280_api_test.py", "200, 404"), ("p2357_d_wording_test.py", "200, 302, 303"), ("p2360_c_api_test.py", "200, 400"),
-    ("p250_a_api_test.py", "201, 404"), ("p2360_0_d_hardening_test.py", "200, 303"), ("p2300_tenant_test.py", "200, 207, 403, 404"), ("p2300_tenant_test.py", "201, 403"),
-    ("p264a_b_api_test.py", "200, 403, 404"), ("p264a_b_api_test.py", "200, 404"), ("p2360_0_b_office_docs_test.py", "200, 401, 403"), ("p2461_d_api_test.py", "200, 400"),
-    ("p2460_c_api_test.py", "200, 404"), ("p252_c_api_test.py", "200, 404"), ("p255_e_api_test.py", "202, 409"), ("p288_b_api_test.py", "200, 403, 404"),
-    ("p271_b_api_test.py", "200, 403"), ("p290_dav_test.py", "201, 403"), ("p289_a_api_test.py", "201, 400"),
-}
+# 2.663.0 (#4341): emptied - every old list now names the one right code (or < 500 where only 'no crash' is meant)
+MIXED_OLD = set()
 
 
 def sham(fn, line):
