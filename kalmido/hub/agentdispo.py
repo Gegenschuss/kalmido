@@ -404,9 +404,10 @@ def adz_undo(c, rec, back=True):
     """Undo: drafts that are still drafts go (deleted_at: restorable), tasks to the trash, option bookings go; what a person
     confirmed or changed since stays (skipped). Redo brings them back."""
     n, skipped, ts = 0, [], iso(now_utc())
+    for e in sorted({int(i) for kind, i in rec.get("made") or [] if kind == "event"}):  # 2.657.0 (#5052): the check and the write under the events' locks (events/model.py ev_lock), in one order (review: no deadlock)
+        write_lock(c, f"event-{e}")
     for kind, i in rec.get("made") or []:
         if kind == "event":
-            write_lock(c, f"event-{int(i)}")  # 2.657.0 (#5052): the check and the write under the event's lock (events/model.py ev_lock)
             r = c.execute("SELECT status, deleted_at, title FROM events WHERE id=?", (i,)).fetchone()
             if not r:
                 continue

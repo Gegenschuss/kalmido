@@ -575,8 +575,9 @@ def pk2_undo(c, j, rec):
                 skipped.append(r["name"][:40])
         return n, skipped
     ev_stayed = False
+    for e in sorted({int(x) for x in rec.get("events") or []}):  # 2.657.0 (#5052): the check and the delete under the events' locks (events/model.py ev_lock), in one order like pk2_redo (review: no deadlock)
+        write_lock(c, f"event-{e}")
     for eid in rec.get("events") or []:  # event drafts: only while still a draft nobody changed
-        write_lock(c, f"event-{int(eid)}")  # 2.657.0 (#5052): the check and the delete under the event's lock (events/model.py ev_lock)
         r = c.execute("SELECT * FROM events WHERE id=?", (eid,)).fetchone()
         if not r or r["deleted_at"]:
             continue
