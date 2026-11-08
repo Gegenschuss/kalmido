@@ -19,10 +19,10 @@
 
 ## What's new
 
-**2.739.0** (2026-11-08):
-- **Industries**: new packs Film & Video and Agency & services; project type Shoot with storyboard tiles and a shot list PDF (Film & Video only).
-- **Backup**: off-site backup lets several servers share one folder (instance id in the names); S3 only over https; SFTP with optional expected fingerprint.
-- **Tasks**: deleted custom fields go to a trash and can be restored; removed members can get their assignments back when added again.
+**2.748.0** (2026-11-08):
+- **Documents**: a document opens in its own view with every PDF page drawn sharp, the fields beside it and arrow keys to leaf through; card size slider for documents and files.
+- **Settings**: one column again, rarely used options under "Further options".
+- **Agents**: agents can take deleted files back out of the trash (API v1 / MCP `restore_attachment`, `restore_project_file`).
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 
