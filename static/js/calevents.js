@@ -608,8 +608,8 @@ async function evCalsModal() {
       const c = evCal(+m.dataset.evcmenu); if (!c) return;
       const own = c.role === 'owner';
       menu(m, [own && {label: tr('Rename…'), icon: 'edit', fn: async () => { const n = await askPrompt(tr('Rename the calendar'), c.name, {input: {max: 100}}); if (n && n.trim()) evCalRename(c.id, n.trim(), redraw); }},  // 2.46.2 (#1659): at once
-        own && {label: tr('Colour…'), icon: 'palette', fn: () => calColorPop(m, LCOLORS.filter(Boolean), c.color, async col => { try { await evcPatch(c.id, {color: col}); } catch { return; } refresh(); })},
-        own && wsOn() && {label: tr('Workspace…'), icon: 'brief', fn: () => wsMoveMenu(m, c.org_id, async org => { try { await evcPatch(c.id, {org_id: org}); } catch { return; } refresh(); })},
+        own && {label: tr('Colour…'), icon: 'palette', next: 1, fn: () => calColorPop(m, LCOLORS.filter(Boolean), c.color, async col => { try { await evcPatch(c.id, {color: col}); } catch { return; } refresh(); })},
+        own && wsOn() && {label: tr('Workspace…'), icon: 'brief', next: 1, fn: () => wsMoveMenu(m, c.org_id, async org => { try { await evcPatch(c.id, {org_id: org}); } catch { return; } refresh(); })},
         own && collab() && {label: tr('Share…'), icon: 'users', fn: () => evShareModal(c, users, refresh)},
         evWrite(c) && {label: tr('Import a calendar file (ICS)…'), icon: 'upload', fn: () => evImport(c, refresh)},
         {label: tr('Export (ICS)'), icon: 'download', fn: () => { location.href = `/api/evcals/${c.id}/export.ics`; }},

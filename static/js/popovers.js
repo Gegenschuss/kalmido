@@ -68,7 +68,9 @@ const mpo_posItem = moves => ({label: tr('Change position…'), icon: 'sort', di
 function menu(anchor, items, back, fsel, title) {
   items = menuTidy(items);  // 2.27.0: no doubled / edge separators
   const tt = title || tchSheetT, hd = isMobile() ? tch_sheetHead(tt) : '';
-  const btn = (it, i, j) => `<button role="menuitem" data-i="${i}" ${j != null ? `data-j="${j}"` : ''} class="${it.on ? 'on' : ''} ${it.cls || ''}${it.more ? ' msubm' : ''}" ${it.more ? 'aria-haspopup="menu"' : ''} ${it.dis ? 'disabled aria-disabled="true"' : ''} ${it.title ? `title="${esc(it.title)}"` : ''}${it.act ? ` data-act="${esc(it.act)}"` : '' /* 2.551.0 (#4607): a test anchor */}>${it.swc !== undefined ? `<span class="mswc" style="background:${cssColor(it.swc) || 'var(--bg4)'}"></span>` : it.lic && listIconHtml(it.lic, {cls: 'mlic'}) ? listIconHtml(it.lic, {cls: 'mlic'}) : it.dot ? `<span class="mdot">${hdot(it.dot)}</span>` : it.icon ? ic(it.icon, 's') : ''}<span class="ml">${esc(it.label)}${it.sub ? `<small class="msub">${esc(it.sub)}</small>` : ''}</span>${it.keys && !isTouch() ? kb(it.keys) : ''}${it.on ? `<span class="mchk" aria-hidden="true">${ic('check', 's')}</span>` : ''}${it.more ? `<span class="mchev" aria-hidden="true">${ic('right', 's')}</span>` : ''}</button>`;
+  // 2.726.0 (#5164): {next: 1} = the entry's fn opens a menu / choice sheet / picker of its own: the same arrow as {more}
+  // (tools/check_menu_next.py finds entries without it); a dialog with input keeps its "…" and no arrow
+  const btn = (it, i, j) => `<button role="menuitem" data-i="${i}" ${j != null ? `data-j="${j}"` : ''} class="${it.on ? 'on' : ''} ${it.cls || ''}${it.more ? ' msubm' : ''}${it.next ? ' mnext' : ''}" ${it.more || it.next ? 'aria-haspopup="menu"' : ''} ${it.dis ? 'disabled aria-disabled="true"' : ''} ${it.title ? `title="${esc(it.title)}"` : ''}${it.act ? ` data-act="${esc(it.act)}"` : '' /* 2.551.0 (#4607): a test anchor */}>${it.swc !== undefined ? `<span class="mswc" style="background:${cssColor(it.swc) || 'var(--bg4)'}"></span>` : it.lic && listIconHtml(it.lic, {cls: 'mlic'}) ? listIconHtml(it.lic, {cls: 'mlic'}) : it.dot ? `<span class="mdot">${hdot(it.dot)}</span>` : it.icon ? ic(it.icon, 's') : ''}<span class="ml">${esc(it.label)}${it.sub ? `<small class="msub">${esc(it.sub)}</small>` : ''}</span>${it.keys && !isTouch() ? kb(it.keys) : ''}${it.on ? `<span class="mchk" aria-hidden="true">${ic('check', 's')}</span>` : ''}${it.more || it.next ? `<span class="mchev" aria-hidden="true">${ic('right', 's')}</span>` : ''}</button>`;
   // {row: [item, item]} = one line of equal buttons (1.5.1: "Today" / "Tomorrow" on top of the task menu)
   let html = '', grp = false;
   items.forEach((it, i) => {
@@ -948,7 +950,7 @@ function taskMenu(anchor, id, o = {}) {
     ...tp_menuItems(t, anchor),  // 2.46.4 (#1751): "Open details" in a list where a tap ticks off
     {head: tr('Plan|nav')},
     // date
-    ...(inPanel ? [] : [quickDueRow(id), {label: tr('New date…'), icon: 'clock', keys: 's', fn: () => snoozeSheet(id, anchor)}]),
+    ...(inPanel ? [] : [quickDueRow(id), {label: tr('New date…'), icon: 'clock', keys: 's', next: 1, fn: () => snoozeSheet(id, anchor)}]),
     ...(t.repeat && t.due && open ? [{label: tr('Skip this occurrence'), icon: 'skip', fn: async () => {
       const b0 = snapTask(t);
       // 2.528.0 (#4305 B1): the date seen + one key per press; skipped elsewhere already = the current date (the server's hint shows)
@@ -959,7 +961,7 @@ function taskMenu(anchor, id, o = {}) {
     }}] : []),
     // priority, assignee
     ...(inPanel ? [] : [PRIO_ROW(id)]),
-    ...(!(inPanel && $('#detail .dmeta [data-act="assign"]')) && collab() && l?.shared && t.id > 0 && !t.context && canAssign(t) && pz_show(t, 'who', t.assignee_id || t.assignee_group_id) ? [{label: tr('Assign…'), icon: 'user', fn: () => assignMenu(anchor, id)}] : []),
+    ...(!(inPanel && $('#detail .dmeta [data-act="assign"]')) && collab() && l?.shared && t.id > 0 && !t.context && canAssign(t) && pz_show(t, 'who', t.assignee_id || t.assignee_group_id) ? [{label: tr('Assign…'), icon: 'user', next: 1, fn: () => assignMenu(anchor, id)}] : []),
     {head: tr('Time|menu')},
     // time
     ...(tFor(t) ? [...(inHead('[data-act="timer-toggle"]') ? [] : [S.timer && S.timer.task_id === id ? {label: tr('Stop timer'), icon: 'stop', fn: timerStop} : {label: tr('Start time tracking'), icon: 'clock', fn: () => timerStart({task_id: id})}]),
@@ -969,7 +971,7 @@ function taskMenu(anchor, id, o = {}) {
     // where it lives
     ...(open ? [moveListItem(anchor, id), moveWsItem(anchor, id)] : []),
     ...(open ? ml_menuItems(anchor, t) : []),  // 2.71.0 B (#1459): show also in another list / remove from it
-    ...(open && !t.parent_id && (S.sections.some(x => x.list_id === t.list_id) || canEditList(t.list_id)) ? [{label: tr('Move to section…'), icon: 'columns', fn: () => sectionPicker(anchor, id)}] : []),
+    ...(open && !t.parent_id && (S.sections.some(x => x.list_id === t.list_id) || canEditList(t.list_id)) ? [{label: tr('Move to section…'), icon: 'columns', next: 1, fn: () => sectionPicker(anchor, id)}] : []),
     // waiting
     ...(open ? [t.waiting_at ? {label: tr('No longer waiting'), icon: 'hourglass', fn: () => waitClear(id)}
       : hasPeers() ? {label: tr('Waiting on someone…'), icon: 'hourglass', fn: () => waitDialog(id)} : null].filter(Boolean) : []),  // 2.364.0 D (#3036): alone: no "Waiting on someone…" 
@@ -1000,7 +1002,7 @@ function snoozeSheet(id, anchor, extra = [], head = false, pre = []) {
     {label: tr('Tomorrow'), icon: 'sunrise', fn: () => go2({due: addDays(today(), 1), due_time: t.due_time}, tr('tomorrow'))},
     {label: tr('Tomorrow 9 am'), icon: 'sunrise', fn: () => go2({due: addDays(today(), 1), due_time: '09:00'}, tr('tomorrow 9 am'))},
     {label: tr('Next week (Mon)'), icon: 'week', fn: () => go2({due: nextWeekday(1), due_time: t.due_time}, dayLabel(nextWeekday(1)))},
-    {label: tr('Select a date…'), icon: 'cal', fn: () => datePop(anchor || $('#top h1'), id)},
+    {label: tr('Select a date…'), icon: 'cal', next: 1, fn: () => datePop(anchor || $('#top h1'), id)},
     ...extra,
   ]);
 }

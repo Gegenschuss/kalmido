@@ -63,7 +63,7 @@ ms_rowMenu('.agr-li .ofcrow', r => {
   const a = (AGR.data?.items || []).find(x => x.id === +r.dataset.id), li = r.closest('li'); if (!a) return;
   menu(r, [{label: tr('Open'), icon: 'eye', fn: () => r.click()},
     a.doc ? {label: tr('Open document {0}', a.doc.name), icon: 'file', fn: () => $('.agr-doc', li).click()} : null,
-    $('.agr-fold', li) ? {label: tr('Move to folder…'), icon: 'folder', fn: () => fsr_fileMenu(r, 'office_agreement', a.id, a.name)} : null]);
+    $('.agr-fold', li) ? {label: tr('Move to folder…'), icon: 'folder', next: 1, fn: () => fsr_fileMenu(r, 'office_agreement', a.id, a.name)} : null]);
 });
 function agrHtml() {
   if (AGR.oid !== OFC.info?.org_id) Object.assign(AGR, {oid: OFC.info?.org_id, data: null, err: null, opened: null});  // another office area

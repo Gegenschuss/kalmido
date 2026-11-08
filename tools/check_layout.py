@@ -325,6 +325,11 @@ ERR += _ts_err
 for _w in _ts_warn:
     print(_w)
 
+# 2.726.0 (#5164): a menu entry that opens a further menu / sheet / picker shows the arrow ({next: 1} or {more}),
+# tools/check_menu_next.py; runs here so the CI lint and the Mac lint both have it
+import check_menu_next  # noqa: E402
+ERR += check_menu_next.errors()
+
 for e in ERR:
     print("ERROR:", e)
 print(f"check_layout: {len(tags)} client modules, {len(order)} server modules, {n_people} tables with people, {len(ERR)} error(s)")

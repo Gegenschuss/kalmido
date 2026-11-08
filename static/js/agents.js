@@ -229,7 +229,7 @@ function stChipMenu(a) {
   if (!it.length) return agentChipMenu(a);
   const albl = ab ? [ab.busy.length === 1 ? ab.busy[0].name : tr('Agents'), ...[ab.run && trn('{0} running', '{0} running', ab.run), ab.wait && trn('{0} waiting', '{0} waiting', ab.wait), ab.unread && trn('{0} new message', '{0} new messages', ab.unread)].filter(Boolean)].join(' · ') : tr('Agents');
   menu(a, [...it.map(r => ({label: `${tr(RUN_KIND[r.k][1])} · ${r.txt} · ${r.title}`, icon: RUN_KIND[r.k][0], fn: () => runPop($('#top [data-act="st-chip"]') || a)})),
-    '-', {label: albl, icon: 'bot', fn: () => agentChipMenu($('#top [data-act="st-chip"]') || a)}]);
+    '-', {label: albl, icon: 'bot', next: 1, fn: () => agentChipMenu($('#top [data-act="st-chip"]') || a)}]);
 }
 // 2.6.1 (#402): every agent with its dot and state (shown ones; all of them while none is shown), then the Agents view,
 // the chats and where to choose the dots

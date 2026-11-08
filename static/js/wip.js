@@ -22,7 +22,7 @@ const SK_KINDS = [['open', N_('Open|state')], ['progress', N_('In progress')], [
 const sk_name = k => { const x = SK_KINDS.find(y => y[0] === k); return x ? tr(x[1]) : tr('No meaning'); };
 // a task's state, as the server's section_kind: status first, then its column, the rest open
 const sk_task = t => (t.status === 2 ? 'done' : t.status === -1 ? 'rejected' : S.sections.find(s => s.id === t.section_id)?.kind || 'open');
-const sk_menuItem = (sid, a) => ({label: wip_sec(sid)?.kind ? tr('Meaning: {0}', sk_name(wip_sec(sid).kind)) : tr('Meaning…'), icon: 'tag', fn: () => sk_menu(a, sid)});
+const sk_menuItem = (sid, a) => ({label: wip_sec(sid)?.kind ? tr('Meaning: {0}', sk_name(wip_sec(sid).kind)) : tr('Meaning…'), icon: 'tag', next: 1, fn: () => sk_menu(a, sid)});
 function sk_menu(a, sid) {
   const cur = wip_sec(sid)?.kind || '';
   menu(a, [...SK_KINDS.map(([k]) => k), ''].map(k => ({label: sk_name(k), icon: k === cur ? 'check' : 'tag', fn: () => sk_set(sid, k)})));

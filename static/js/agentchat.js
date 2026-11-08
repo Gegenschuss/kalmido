@@ -846,13 +846,13 @@ function chatHeadInfo(b) {
   const m = a.permission_mode || '', run = a.host?.permission_mode || '', want = m || a.host?.host_permission_mode || '';
   if (m || a.may_set_mode || a.host?.host_permission_mode) {
     const l = tr('Permissions: {0}', a.host?.permission_fixed ? agFixedLbl(a) : agModeLbl(a) + (run && want && run !== want ? ' · ' + tr('runs: {0}', tr(AG_PMODES[run])) : ''));
-    it.push(agModeFree(a) ? {label: l, icon: 'lock', cls: 'chmi-mode', fn: () => chatModeMenu(b)} : {...info(l), icon: 'lock'});
+    it.push(agModeFree(a) ? {label: l, icon: 'lock', cls: 'chmi-mode', next: 1, fn: () => chatModeMenu(b)} : {...info(l), icon: 'lock'});
   }
   const mr = a.host?.model || '', ms = a.runtime_model || '';
   if (mr) it.push({...info(tr('Model: {0}', ms && !modelSame(ms, mr) ? tr('set: {0} · runs: {1}', ms, mr) : mr)), icon: 'bot'});
-  it.push({...info(chatKindLbl(a)), icon: 'folder', cls: 'chmi-kind'});  // 2.407.0 B (#3493): what kind of agent, always
+  it.push({...info(chatKindLbl(a)), icon: 'folder', cls: 'minfo chmi-kind'});  // 2.726.0 (#5164): keeps minfo (looked greyer than the other info lines)  // 2.407.0 B (#3493): what kind of agent, always
   const u = chatUseInfo(a);  // 2.407.0 B (#3493): also with the ring switched off; costs of API-key agents
-  if (u) it.push(u.lines.length ? {label: u.t, icon: 'chart', cls: 'chmi-use', more: u.lines.map(info)} : {...info(u.t), icon: 'chart', cls: 'chmi-use'});
+  if (u) it.push(u.lines.length ? {label: u.t, icon: 'chart', cls: 'chmi-use', more: u.lines.map(info)} : {...info(u.t), icon: 'chart', cls: 'minfo chmi-use'});
   const fl = !S.chat.job && !chatFull() && !!$('#achat.float'), mn = fl && $('#achat')?.classList.contains('min');
   return [...it, ...it.length ? ['-'] : [], {label: tr('Search in this chat'), icon: 'search', fn: () => msSearchToggle('a', a.id)},
     ...fl ? [{label: mn ? tr('Unfold') : tr('Fold'), icon: 'chev', fn: () => chatFloatMin(!mn)}] : [],

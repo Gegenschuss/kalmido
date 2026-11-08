@@ -57,7 +57,8 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   const css = require('./boot').allCssSync();
   check(!/\.chring:is\(\.q-ok/.test(css) && !/\.chring\.q-ok\{display:none/.test(css), '#3493: the CSS no longer hides the ring in the green');
   let m = menu();
-  check(m.some(x => x.label === 'Team agent · Alpha' && x.cls === 'chmi-kind') && !m.some(x => /^Workspace: /.test(x.label)), '#3493: ⋯ names the kind of agent instead of the workspace ' + JSON.stringify(m.map(x => x.label)));
+  // 2.726.0 (#5164): the kind line carries minfo too (cls 'minfo chmi-kind')
+  check(m.some(x => x.label === 'Team agent · Alpha' && /\bchmi-kind\b/.test(x.cls || '')) && !m.some(x => /^Workspace: /.test(x.label)), '#3493: ⋯ names the kind of agent instead of the workspace ' + JSON.stringify(m.map(x => x.label)));
   check(m.some(x => x.label === 'Usage: 41 %' && x.more.some(l => /^Week: 41 %/.test(l))), '#3493: ⋯ keeps the usage with its windows ' + JSON.stringify(m));
 
   // ================= the switch: off in the ⋯ menu entry, on again in the chat settings
@@ -93,8 +94,18 @@ const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { const x = aw
   check(w.eval(`chatKindLbl({org_id: ${ORG}, owner_id: ${BOB}})`) === 'Personal agent of Bob · Alpha', '#3493: the personal agent of someone else, with the name ' + w.eval(`chatKindLbl({org_id: ${ORG}, owner_id: ${BOB}})`));
   check(w.eval(`chatKindLbl({org_id: null, owner_id: S.me.id})`) === 'Private' && w.eval(`chatKindLbl({org_id: null, owner_id: null})`) === 'Private', '#3493: an agent in the private area');
   check(w.eval(`chatKindLbl({org_id: ${ORG}, owner_id: null})`) === 'Team agent · Alpha', '#3493: a team agent');
-  w.eval(`(() => { const o = S.me.workspaces; S.me.workspaces = []; window._k = chatHeadInfo(document.body).some(x => x.cls === 'chmi-kind'); S.me.workspaces = o; })()`);
+  w.eval(`(() => { const o = S.me.workspaces; S.me.workspaces = []; window._k = chatHeadInfo(document.body).some(x => /\\bchmi-kind\\b/.test(x.cls || '')); S.me.workspaces = o; })()`);
   check(w.eval('window._k'), '#3493: the kind stands there also without the workspace switcher (not tied to wsOn)');
+  // 2.726.0 (#5164): an entry whose fn opens a further menu ({next: 1}) shows the arrow like a second level; a plain entry not;
+  // the info lines of the chat menu all look the same (minfo, before the kind line lost it and was greyer than the others)
+  await open(plan.id);
+  w.eval(`menu(document.body, [{label: 'Pick one', next: 1, fn() {}}, {label: 'Do it', fn() {}}])`);
+  const nx = d.querySelector('#pop .mnext');
+  check(nx && nx.querySelector('.mchev') && nx.getAttribute('aria-haspopup') === 'menu' && ![...d.querySelectorAll('#pop [role="menuitem"]')].find(b => b.textContent.includes('Do it'))?.querySelector('.mchev'),
+    '#5164: {next: 1} draws the arrow, a plain entry none ' + (d.querySelector('#pop .menu-list')?.innerHTML || '').slice(0, 200));
+  w.eval('closePop()');
+  const infos = menu().filter(x => /\bchmi-(kind|use)\b/.test(x.cls) && !x.more.length);
+  check(infos.length && infos.every(x => /\bminfo\b/.test(x.cls)), '#5164: every info line of the chat menu carries minfo ' + JSON.stringify(infos));
   w.close();
 
   console.log(`${ok} ok, ${F.length} failed`);

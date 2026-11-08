@@ -96,7 +96,7 @@ function spr_rowChip(t, opts = {}) {
 function spr_menuItems(t, anchor) {
   const l = t && spr_list(t.list_id);
   if (!t || t.id < 0 || t.context || isMs(t) || !spr_on(l) || !canEditList(l.id) || !spr_open(l).length) return [];
-  return [{label: tr('Sprint…'), icon: 'target', fn: () => spr_pick(anchor, [t.id])}];
+  return [{label: tr('Sprint…'), icon: 'target', next: 1, fn: () => spr_pick(anchor, [t.id])}];
 }
 // multiedit.js: the "Sprint" field when all selected tasks are in one list with sprints on
 function spr_meField(lid) {

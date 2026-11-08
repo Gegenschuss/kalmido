@@ -812,7 +812,7 @@ function topMoreItems0() {
   if (m === 'time') out.push({label: tr('Customise…'), icon: 'sliders', fn: () => lyOpen('time', true)});
   if (m === 'tasks' && !NOLIST_KEYS.includes(k) && !isKanban() && !isTimeline() && !isRoadmap() && !isOverview())
     sec.push({label: S.multiMode ? tr('End selection') : tr('Select multiple'), icon: 'select', on: S.multiMode, fn: () => { S.multiMode = !S.multiMode; if (!S.multiMode) S.multi.clear(); render(); }},
-      {label: tr('Sort…'), icon: 'sort', fn: () => sortMenu($('#top [data-act="top-more"]') || $('#top h1'))});
+      {label: tr('Sort…'), icon: 'sort', next: 1, fn: () => sortMenu($('#top [data-act="top-more"]') || $('#top h1'))});
   // 2.445.0 (#3008): what the header shows is not repeated here (a folded header button comes back through fold)
   const inTop = a => !!$(`#top [data-act="${a}"]`);
   { const cl = m === 'tasks' ? routeList() : null; if (cl && !cl.archived && listView(cl) === 'list' && !isOverview() && !inTop('cols')) sec.push(colItem(cl.id)); }  // 2.14.0 (#425)

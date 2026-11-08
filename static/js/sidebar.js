@@ -148,7 +148,7 @@ function multiMoreMenu(a) {
   menu(a, [
     ...(ids.length >= 2 ? [{label: tr('Edit'), icon: 'edit', fn: () => { ME.sheet = true; meSync(); }}] : []),
     ...tp_menuItems(one, a),  // 2.46.4 (#1751): "Open details" in a list where a tap ticks off
-    ...(one && one.id > 0 && canEdit(one) ? [{label: tr('More actions'), icon: 'dots', fn: () => taskMenu($(`#view .trow[data-id="${one.id}"] .ttl`) || a, one.id)}] : []),
+    ...(one && one.id > 0 && canEdit(one) ? [{label: tr('More actions'), icon: 'dots', next: 1, fn: () => taskMenu($(`#view .trow[data-id="${one.id}"] .ttl`) || a, one.id)}] : []),
     ...(ids.length && ids.some(i => canEdit(taskById(i))) ? dgMenuItems(ids) : []),  // 2.43.0 (#1003): Subtasks of… / Out of the parent task
     ...ml_multiItems(ids, a),  // 2.320.0 (#3289): Show also in project…
     {label: tr('Select all'), icon: 'all', fn: () => { vl_ids().forEach(i => S.multi.add(i)); render(); }},  // 2.65.0 (#1825): also the rows a long list does not draw
@@ -433,7 +433,7 @@ function folderMenuItems(f, anchorOf = () => $(`#side .fhead[data-folder="${rmEs
       folderMove(f, sub ? fParent(f) + FSEP + n : n);
     }}]),
     // move into another folder (subfolders, and folders without subfolders) / out to the top level
-    ...(into.length && !theirs ? [{label: sub ? tr('Move to another folder…') : tr('Move into a folder…'), icon: 'folder', fn: () => menu(anchorOf(), into.map(t => ({label: fDisp(t), icon: 'folder', fn: () => lf_moveInto(f, t)})))}] : []),
+    ...(into.length && !theirs ? [{label: sub ? tr('Move to another folder…') : tr('Move into a folder…'), icon: 'folder', next: 1, fn: () => menu(anchorOf(), into.map(t => ({label: fDisp(t), icon: 'folder', fn: () => lf_moveInto(f, t)})))}] : []),
     ...(sub && !theirs ? [{label: tr('Move to the top level'), icon: 'outdent', fn: () => lf_moveInto(f, '')}] : []),
     ...(theirs ? [] : ['-', {label: tr('Dissolve folder (projects stay)'), icon: 'trash', cls: 'flag-5', fn: async () => {
       if (!await askConfirm(tr('Dissolve folder “{0}”?', fDisp(f)), hasSubs ? (sub ? tr('Its projects and subfolders move up to {0}.', fDisp(fParent(f))) : tr('The projects stay; its subfolders become top-level folders.')) : sub ? tr('Its projects move up to {0}.', fDisp(fParent(f))) : tr('The projects stay.'), {ok: tr('Dissolve')})) return;

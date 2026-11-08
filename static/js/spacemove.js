@@ -40,8 +40,8 @@ function mv_wsItem(anchor, ids, o) {
   const ls = S.lists.filter(l => !l.is_inbox && !l.archived && o.filter(l)), tos = mv_wss(ls).filter(w => w !== from);
   if (!tos.length) return null;
   const pick = async l => { if (await mv_ask(ids, l)) return o.pick(l); };
-  return {label: tr('Move to another workspace…'), icon: 'brief', fn: () => menu(anchor, tos.map(w => ({label: wsName(w), icon: w === 'private' ? 'home' : 'brief',
-    ...(ls.some(l => wsOf(l) === w) ? {fn: () => tch_listPicker(anchor, {ws: w, filter: l => !l.is_inbox && o.filter(l), pick, title: wsName(w)})} : {dis: true, title: tr('No projects')})})),
+  return {label: tr('Move to another workspace…'), icon: 'brief', next: 1, fn: () => menu(anchor, tos.map(w => ({label: wsName(w), icon: w === 'private' ? 'home' : 'brief',
+    ...(ls.some(l => wsOf(l) === w) ? {next: 1, fn: () => tch_listPicker(anchor, {ws: w, filter: l => !l.is_inbox && o.filter(l), pick, title: wsName(w)})} : {dis: true, title: tr('No projects')})})),
   null, null, tr('Move to another workspace'))};
 }
 // o: filter(list) = where these tasks may go, pick(list) = the move (after the question, if one is due)

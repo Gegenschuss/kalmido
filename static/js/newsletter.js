@@ -284,7 +284,7 @@ async function nwl_consentSet(ids, status, source) {
 // the entry in the contact's menu (contacts.js cmenu): only with an address, a writable book and no unsub / bounce
 function nwl_ctItem(c, w, anchor) {
   if (!w || !c.newsletter || !(c.emails || []).length || ['unsub', 'bounce'].includes(c.newsletter.status)) return null;
-  return {label: tr('Newsletter consent…'), icon: 'mail', fn: () => nwl_ctPick(anchor, c)};
+  return {label: tr('Newsletter consent…'), icon: 'mail', next: 1, fn: () => nwl_ctPick(anchor, c)};
 }
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-nwlct]'); if (!b) return;

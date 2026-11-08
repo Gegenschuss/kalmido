@@ -1066,7 +1066,7 @@ function noteMenu(anchor, id) {
         renderView(); }).catch(err => toast(err instanceof Offline ? tr('Offline: only works again with a connection') : err.message))}] : [])] : []),
     {label: tr('Copy link'), icon: 'link', act: 'm-copy-link', fn: () => { navigator.clipboard?.writeText(`${location.origin}${location.pathname}#note/${n.id}`).then(() => toast(tr('Link copied'))); }},
     ...(card ? [] : pgw_items('notes', n.id)),  // 2.599.0 (#4808): the open note's width
-    ...(others.length ? [{label: tr('Move to project…'), icon: 'folder', act: 'm-move', fn: () => tch_listPicker(anchor, {filter: l => others.includes(l), pick: async l => {  // 2.38.0 (#1177)
+    ...(others.length ? [{label: tr('Move to project…'), icon: 'folder', act: 'm-move', next: 1, fn: () => tch_listPicker(anchor, {filter: l => others.includes(l), pick: async l => {  // 2.38.0 (#1177)
       let r; try { r = await rawFetch('PATCH', `/api/notes/${n.id}`, {list_id: l.id}); } catch (e) {
         // 2.477.0 (#3881): out of the private list "Notes" to other people only after the warning that names them
         if (!(e.status === 409 && e.data?.code === 'quicknote_share')) { toast(e.message); return; }

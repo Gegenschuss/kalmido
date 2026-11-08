@@ -33,7 +33,7 @@ function tbl_btnHtml(t, ck) {
 }
 // the item of the task's menu "…" (popovers.js taskMenu)
 const tbl_menuItems = (t, anchor) => t?.id > 0 && !t.context && typeof collab === 'function' && collab()
-  ? [{label: tr('Notifications for this task…'), icon: TBL_ICON[tbl_state(t.id)?.mine?.level] || 'bell', fn: () => tbl_menu(anchor?.isConnected ? anchor : $('#detail .dtop') || document.body, t.id)}] : [];
+  ? [{label: tr('Notifications for this task…'), icon: TBL_ICON[tbl_state(t.id)?.mine?.level] || 'bell', next: 1, fn: () => tbl_menu(anchor?.isConnected ? anchor : $('#detail .dtop') || document.body, t.id)}] : [];
 function tbl_load(tid, force) {
   const C = tbl_cache();
   if (TBL_LOADING.has(tid)) return TBL_LOADING.get(tid);

@@ -46,7 +46,7 @@ function ml_rowMark(t) {
 function ml_menuItems(anchor, t) {
   if (!t || t.parent_id || t.id < 0 || !canEdit(t) || t.deleted_at) return [];
   const al = ml_also(t);
-  const add = ml_canAdd(t) ? [{label: tr('Show also in project…'), icon: 'link', fn: () => ml_pick(anchor, t)}] : [];
+  const add = ml_canAdd(t) ? [{label: tr('Show also in project…'), icon: 'link', next: 1, fn: () => ml_pick(anchor, t)}] : [];
   return [...add, ...al.map(a => ({label: tr('Remove from {0}', lname(listById(a.list_id))), icon: 'x', fn: () => ml_remove(t.id, a.list_id)}))];
 }
 
@@ -139,7 +139,7 @@ function ml_multiPick(anchor, ids) {
   if (!ml_multiOk(ids)) { toast(tr('Not possible for the selected tasks')); return; }
   tch_listPicker(anchor, {title: tr('Show also in project'), filter: l => ts.some(t => !ml_why(t, l)), pick: l => ml_addMany(ids, l.id)});
 }
-const ml_multiItems = (ids, anchor) => ml_multiOk(ids) ? [{label: tr('Show also in project…'), icon: 'link', fn: () => ml_multiPick(anchor, ids)}] : [];
+const ml_multiItems = (ids, anchor) => ml_multiOk(ids) ? [{label: tr('Show also in project…'), icon: 'link', next: 1, fn: () => ml_multiPick(anchor, ids)}] : [];
 function ml_meHtml(ts) {
   const ids = ts.map(t => t.id);
   return ml_multiOk(ids) ? `<div class="dsec mlme"><h5>${ic('link', 's')}${tr('Projects')}</h5><div class="dgmeb"><button type="button" class="btn sm" data-act="ml-multi">${ic('link', 's')} ${esc(tr('Show also in project…'))}</button></div></div>` : '';

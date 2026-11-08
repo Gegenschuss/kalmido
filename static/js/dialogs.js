@@ -435,7 +435,7 @@ function listMenuItems(id, anchor) {
   if (feat('sheets') && !l.is_inbox && !l.archived && !l.e2e) items.push({label: tr('Attached tables'), icon: 'sheet', cls: 'msheets', fn: () => go('sheets/l/' + id)});  // 2.89.0 (#1916): the tables attached to it
   if (!l.archived && typeof mw_ok === 'function' && mw_ok()) items.push({label: tr('Open in its own window'), icon: 'panel', cls: 'mminiwin', fn: () => mw_open(id)});  // 2.39.1 (#1294): desktop, miniwin.js
   if (!l.archived && typeof spl_item === 'function') items.push(...spl_item('#l/' + id));  // 2.742.0 (#4858): the split view's right half
-  if (!l.is_inbox && !l.archived) items.push({label: tr('Move to folder…'), icon: 'folder', fn: () => folderPick(at(), id)});
+  if (!l.is_inbox && !l.archived) items.push({label: tr('Move to folder…'), icon: 'folder', next: 1, fn: () => folderPick(at(), id)});
   if (!l.is_inbox && !l.archived && !S.listReorder && typeof listReorderSet === 'function') items.push({label: tr('Sort projects'), icon: 'sort', cls: 'mlsort', fn: () => listReorderSet(true)});  // 2.482.0 (#3951): the sort mode of sidebar + Projects page
   // 2.116.0 C (#2064): the list as a CSV file / a printable page (listprint.js); a list with the lock has only ciphertext on the server
   items.push({label: tr('Export as CSV'), icon: 'download', cls: 'mlexcsv', fn: () => lexCsv(id), ...(l.e2e ? {dis: true, title: tr('Not available in encrypted projects')} : {})},
@@ -452,7 +452,7 @@ function listMenuItems(id, anchor) {
   // 2.13.0 (#453 A7): not a second "List"; 2.18.0 review: "As a list / As a project", "Type: Project" read like the project type
   // 2.25.0 (UX-52): list or project is the switch "Project features" in "Edit list…" (no "As a list / As a project" here)
   void k;
-  if (collab() && l.shared) items.push({label: tr('Notifications: {0}', bellLabel(l.bell)), icon: BELL_ICON[l.bell || 'default'], rare: 1, fn: () => bellMenu(at(), id)});
+  if (collab() && l.shared) items.push({label: tr('Notifications: {0}', bellLabel(l.bell)), icon: BELL_ICON[l.bell || 'default'], rare: 1, next: 1, fn: () => bellMenu(at(), id)});
   { const fv = favMenuItem(l), o = items.findIndex(x => x && x.label === tr('Open')), c = items.findIndex(x => x?.rcls === 'mcols'); if (fv) items.splice(o >= 0 ? o + 1 : c >= 0 ? c + 2 : 0, 0, fv); }  // 2.40.0 (#1361): the personal star; 2.441.0 (#3592): second, right after Open
   if (progressFor(l) && !l.is_inbox) items.push(progHidden(id) ? {label: tr('Show progress'), icon: 'eye', rare: 1, fn: () => setProgHidden(id, false)} : {label: tr('Hide progress'), icon: 'x', rare: 1, fn: () => setProgHidden(id, true)});
   // U12: archive (with undo) instead of delete; deleting for good only from the archive

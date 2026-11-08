@@ -124,7 +124,7 @@ async function fsr_fileMenu(anchor, kind, id, name) {
 ms_rowMenu('.dma-f[data-fid] .dma-open', r => {
   const li = r.closest('.dma-f'), f = (DMA.items || []).find(x => x.id === +li.dataset.fid), by = k => $(`[data-dma="${k}"]`, li); if (!f) return;
   menu(r, [{label: tr('Open'), icon: 'eye', fn: () => r.click()},
-    by('file') ? {label: tr('Move to folder…'), icon: 'folder', fn: () => fsr_fileMenu(r, 'contract_file', f.id, f.name)} : null,
+    by('file') ? {label: tr('Move to folder…'), icon: 'folder', next: 1, fn: () => fsr_fileMenu(r, 'contract_file', f.id, f.name)} : null,
     by('replace') ? {label: tr('Replace'), icon: 'upload', fn: () => by('replace').click()} : null,
     by('rm') ? '-' : null, by('rm') ? {label: tr('Remove'), icon: 'trash', cls: 'danger', fn: () => by('rm').click()} : null]);
 });

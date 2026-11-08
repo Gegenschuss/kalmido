@@ -304,7 +304,7 @@ function tlBarMenu(el) {
   const id = +el.dataset.id, t = S.tasks.get(id); if (!t) return;
   const items = [{label: tr('Open'), icon: 'edit', fn: () => openDetail(id)}];
   // 2.18.0 review: a keyboard way to move a bar / milestone diamond to another day (D, or this menu: Shift+F10)
-  if (canEdit(t) && t.status === 0) items.push({label: t.ms ? tr('Move to date…') : tr('Select a date…'), icon: 'cal', keys: 'D', fn: () => datePop(el, id)});
+  if (canEdit(t) && t.status === 0) items.push({label: t.ms ? tr('Move to date…') : tr('Select a date…'), icon: 'cal', keys: 'D', next: 1, fn: () => datePop(el, id)});
   if (canEdit(t) && t.due) items.push({label: tr('Remove date'), icon: 'ban', fn: () => tlUndate(id)});
   if (dFor(t)) {
     if (canEdit(t)) items.push({label: tr('Connect to…'), icon: 'deps', keys: 'C', fn: () => tlPickStart(id)}, {label: tr('Select from a list…'), icon: 'search', fn: () => depPicker(id, 'blocking')});

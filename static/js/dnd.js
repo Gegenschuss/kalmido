@@ -414,7 +414,7 @@ function secHeadMenu(anchor, sid) {
   const ids = secIds(s.list_id), i = ids.indexOf(sid);
   menu(anchor, [...(i > 0 ? [{label: tr('Move section up'), icon: 'left', fn: () => moveSection(sid, -1)}] : []),
     ...(i < ids.length - 1 ? [{label: tr('Move section down'), icon: 'right', fn: () => moveSection(sid, 1)}] : []),
-    '-', {label: tr('Section menu…'), icon: 'dots', fn: () => sectionMenu(anchor, sid)}]);
+    '-', {label: tr('Section menu…'), icon: 'dots', next: 1, fn: () => sectionMenu(anchor, sid)}]);
 }
 let secDrag = null;
 const secOf = el => el.classList.contains('kcol') ? el.dataset.kcol : el.dataset.section;
@@ -499,7 +499,7 @@ function swipeEnd(e) {
   else if (dx < -90) {  // 2.25.0 (UX-37): emptying the inbox = putting tasks into lists: there "Move to list…" leads the menu
     const inb = S.tasks.get(id)?.list_id === inbox()?.id;
     // 2.31.0 (#1056): the same entries, in two groups with a small heading (Snooze / Task), delete last and set apart
-    snoozeSheet(id, r, [{head: tr('Task')}, ...(inb ? [] : [moveListItem(r, id), moveWsItem(r, id)]), {label: tr('Completed'), icon: 'done', fn: () => toggleTask(id)}, {label: tr('All…'), icon: 'dots', fn: () => taskMenu(r, id)}, '-', {label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => deleteTask(id)}], true, [...(inb ? [moveListItem(r, id), moveWsItem(r, id)] : []), {head: tr('Snooze')}]);
+    snoozeSheet(id, r, [{head: tr('Task')}, ...(inb ? [] : [moveListItem(r, id), moveWsItem(r, id)]), {label: tr('Completed'), icon: 'done', fn: () => toggleTask(id)}, {label: tr('All…'), icon: 'dots', next: 1, fn: () => taskMenu(r, id)}, '-', {label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => deleteTask(id)}], true, [...(inb ? [moveListItem(r, id), moveWsItem(r, id)] : []), {head: tr('Snooze')}]);
   }
 }
 document.addEventListener('touchend', swipeEnd);

@@ -329,7 +329,7 @@ document.addEventListener('click', async e => {
   if (ls) {
     e.preventDefault(); e.stopPropagation();
     const id = +ls.dataset.lsort;
-    menu(ls, [...listMoveItems(id), {label: tr('Move to folder…'), icon: 'folder', fn: () => folderPick(ls, id)}]);  // 2.27.0 (#991): + top / bottom
+    menu(ls, [...listMoveItems(id), {label: tr('Move to folder…'), icon: 'folder', next: 1, fn: () => folderPick(ls, id)}]);  // 2.27.0 (#991): + top / bottom
     return;
   }
   const fs = e.target.closest('[data-fsort]');

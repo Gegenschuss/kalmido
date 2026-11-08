@@ -143,7 +143,7 @@ async function o3c_upload(id, f) {
   o3c_undo(id, was === 'image' ? '' : was, 'image');  // the old picture is replaced: undo goes back to no picture
 }
 // a folder's strip (sidebar folder menu): the style only, mine
-function o3c_folderMenuRow(f) { return [{label: tr('Header…'), icon: 'picture', fn: () => o3c_folderPick(f)}]; }
+function o3c_folderMenuRow(f) { return [{label: tr('Header…'), icon: 'picture', next: 1, fn: () => o3c_folderPick(f)}]; }
 async function o3c_folderPick(f) {
   if (O3C_FH === null) { O3C_FH = {}; await o3c_fhLoad(); }
   const cur = O3C_FH[f] || '', anchor = $(`.fhead[data-folder="${CSS.escape(f)}"]`) || $('#side');
@@ -216,6 +216,6 @@ function lv_menu(anchor, l) {
 // the "…" menu: the way to the views where the header has no button (phones), the first view of a project
 function lv_items(l, inTop) {
   if (l.is_inbox || l.archived || inTop) return [];
-  if (lv_of(l.id).length) return [{label: tr('Shared views'), icon: 'filter', fn: () => lv_menu($('#top [data-act="top-more"]') || $('#top h1'), l)}];
+  if (lv_of(l.id).length) return [{label: tr('Shared views'), icon: 'filter', next: 1, fn: () => lv_menu($('#top [data-act="top-more"]') || $('#top h1'), l)}];
   return canEditList(l.id) ? [{label: tr('New shared view…'), icon: 'filter', fn: () => filterModal(0, l.id)}] : [];
 }
