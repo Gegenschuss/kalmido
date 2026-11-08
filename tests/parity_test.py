@@ -368,6 +368,9 @@ APP_ONLY = [
     ("2.124.0 A (#2115): the chart of a table is how a person looks at it in the app (kind and columns of the drawing); an agent "
      "reads it with the table (GET /sheets/{id} answers chart) and works on the values, the drawing itself stays with people",
      ("=PUT /api/sheets/{}/chart",)),
+    ("2.671.0 (#3463): the setting of a pivot sheet (rows, column, values, filter) is set by a person in the app; an agent reads "
+     "the result with the sheet (GET /sheets/{id} answers pivot); setting it through the API follows in #5149",
+     ("=PUT /api/sheets/{}/tabs/{}/pivot",)),
     ("2.578.0 (#3462): the print view of a table is a PDF for a person to print or keep (page layout of the app); an agent reads "
      "the same values with the table (GET /sheets/{id}) and writes its own documents",
      ("=POST /api/sheets/{}/print.pdf",)),
