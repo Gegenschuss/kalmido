@@ -5,9 +5,9 @@
 // the module could run before keys.js ("kb_on is not defined", then broken until a reload).
 const fs = require('fs');
 const path = require('path');
-const {JSDOM, ResourceLoader} = require('jsdom');
-// data: URLs load (the start scripts), a module's own file does not (no server): its tag stays, without load or error
-class DataOnly extends ResourceLoader { fetch(url, o) { return url.startsWith('data:') ? super.fetch(url, o) : null; } }
+const {JSDOM, requestInterceptor} = require('jsdom');
+// data: URLs load (the start scripts), a module's own file never answers (no server): its tag stays, without load or error
+const DataOnly = {interceptors: [requestInterceptor(req => /^https?:/.test(req.url) ? new Promise(() => {}) : undefined)]};
 const SRC = process.env.KALMIDO_SRC || path.join(__dirname, '..');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
@@ -27,7 +27,7 @@ const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL
   const s3 = `window.__keys = !document.querySelector('script[data-ld]');`;  // the stand-in for keys.js, the last start script
   const html = `<!doctype html><html><head><script src="${data(s1)}" defer></script><script src="${data(s2)}" defer></script>` +
     `<script src="${data(s3)}" defer></script></head><body><p>text</p></body></html>`;
-  const dom = new JSDOM(html, {runScripts: 'dangerously', resources: new DataOnly(), url: 'http://example.test/'});
+  const dom = new JSDOM(html, {runScripts: 'dangerously', resources: DataOnly, url: 'http://example.test/'});
   const w = dom.window;
   for (let i = 0; i < 200 && (w.__keys === undefined || w.document.readyState === 'loading'); i++) await new Promise(r => setTimeout(r, 25));
   check(w.__state === 'interactive', `the defer script ran with readyState interactive (${w.__state})`);
