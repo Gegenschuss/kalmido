@@ -15,8 +15,8 @@
 'use strict';
 
 const OC_DB = 'kalmido-start', OC_KEY = 'state';
-/** @type {{dbp: Promise<IDBDatabase> | null, t: number, off: boolean, warned: boolean, wrote: number}} */
-const OC = {dbp: null, t: 0, off: false, warned: false, wrote: 0};
+/** @type {{dbp: Promise<IDBDatabase> | null, t: number, off: boolean, warned: boolean, wrote: number, gen: number}} */
+const OC = {dbp: null, t: 0, off: false, warned: false, wrote: 0, gen: 0};  // gen: counted up by oc_drop, a write planned before it is void
 function oc_req(r) { return new Promise((ok, no) => { r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); }); }
 function oc_db() {
   if (OC.dbp) return OC.dbp;
@@ -56,13 +56,13 @@ async function oc_put(c) {
   }
 }
 // the write itself (idle): the newest S.lpCache; refused -> localStorage as before (LS.set), the reason logged
-async function oc_write() {
+async function oc_write(gen = OC.gen) {
   OC.t = 0;
-  const c = S.lpCache; if (!c) return;
+  const c = S.lpCache; if (!c || gen !== OC.gen) return;
   if (!OC.off) {
     try {
       await oc_db();
-      if (S.lpCache !== c) return;  // dropped (sign-out, another sign-in) or replaced meanwhile: that one has its own write
+      if (S.lpCache !== c || gen !== OC.gen) return;  // dropped (sign-out, another sign-in) or replaced meanwhile: that one has its own write
       await oc_put(c);
       OC.wrote++;
       try { localStorage.removeItem('tasks.cache'); } catch { /* private mode */ }  // the old copy (taken over) goes
@@ -76,8 +76,9 @@ async function oc_write() {
 function oc_soon() {
   if (OC.t) return;
   OC.t = 1;
-  if (typeof requestIdleCallback === 'function') requestIdleCallback(() => { oc_write(); }, {timeout: 10000});
-  else setTimeout(() => { oc_write(); }, 300);
+  const g = OC.gen;
+  if (typeof requestIdleCallback === 'function') requestIdleCallback(() => { if (g === OC.gen) oc_write(g); }, {timeout: 10000});
+  else setTimeout(() => { if (g === OC.gen) oc_write(g); }, 300);
 }
 // core.js startRead: the old / fallback localStorage copy first (it is the newest, see above; then moved here), else the record
 async function oc_get() {
@@ -100,4 +101,4 @@ async function oc_get() {
 }
 // core.js startDrop / icons.js clearLocal: the record goes (the connection stays open: a clear, not a deleteDatabase)
 function oc_del() { return oc_tx('readwrite', st => st.delete(OC_KEY)); }
-function oc_drop() { OC.t = 0; return oc_del().catch(() => {}); }
+function oc_drop() { OC.t = 0; OC.gen++; return oc_del().catch(() => {}); }

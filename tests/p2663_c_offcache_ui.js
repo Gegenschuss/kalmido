@@ -19,7 +19,8 @@ const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 let CK;
 const call = async (method, url, body) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: CK}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
 
-// the record in IndexedDB, read with an own open() of the database: 'o' (structured clone), 's' (JSON) or null
+// the record in IndexedDB, read with an own open() of the database: 'o' (structured clone), 's' (JSON) or null (undefined
+// after ff.js: a null comes back as undefined, hence == null)
 const REC = `new Promise(res => { const r = indexedDB.open('kalmido-start'); r.onupgradeneeded = () => r.result.createObjectStore('s');
   r.onsuccess = () => { const d = r.result; const g = d.transaction('s').objectStore('s').get('state'); g.onsuccess = () => { const x = g.result; d.close();
     res(x ? {kind: x.o ? 'o' : 's', tasks: (x.o || JSON.parse(x.s)).tasks.map(t => t.title)} : null); }; g.onerror = () => { d.close(); res('err'); }; };
@@ -55,9 +56,10 @@ const OFF = `() => { try { if (localStorage.getItem('t2663off') !== '1') return;
     check(await ev(`localStorage.getItem('tasks.cache') === null`), 'online: no copy of the state in localStorage');
 
     // ---- a browser of before 2.663: only the old localStorage copy (a title only it has), then a start without network
-    await ev(`(async () => { await oc_drop(); const c = JSON.parse(JSON.stringify(S.lpCache)); c.tasks = c.tasks.map(t => t.id === ${T} ? {...t, title: 'From the old copy'} : t);
+    await ev(`(async () => { const c = JSON.parse(JSON.stringify(S.lpCache)); S.lpCache = null; await oc_drop(); c.tasks = c.tasks.map(t => t.id === ${T} ? {...t, title: 'From the old copy'} : t);
       localStorage.setItem('tasks.cache', JSON.stringify(c)); localStorage.setItem('t2663off', '1'); return 1; })()`);
-    check((await ev(REC)) === null, 'setup: no record in IndexedDB, only the old localStorage copy');
+    const r0 = await ev(REC);
+    check(r0 == null, 'setup: no record in IndexedDB, only the old localStorage copy ' + JSON.stringify(r0) + ' ' + JSON.stringify(await ev(`({gen: OC.gen, t: OC.t, off: OC.off, wrote: OC.wrote})`)));
     await nav(B + `#l/${L}`); await cmd('browsingContext.reload', {context: ctx, wait: 'complete'});
     check(await pu(`typeof S !== 'undefined' && S.booted && OUT.online === false`), 'offline start: the app started and knows it is offline');
     check(await pu(`document.querySelector('#view .trow[data-id="${T}"]')?.textContent.includes('From the old copy')`), 'offline start: the old localStorage copy is shown');
@@ -92,9 +94,13 @@ const OFF = `() => { try { if (localStorage.getItem('t2663off') !== '1') return;
 
     // ---- sign-out: the record goes
     await ev(`(async () => { OC.off = false; OC.t = 0; await oc_write(); return 1; })()`);
+    // a write planned before the sign-out (idle) must not bring the record back afterwards
+    await ev(`(oc_soon(), 1)`);
     check(!!(await ev(REC)), 'setup: a record before the sign-out');
     await ev(`clearLocal().then(() => 1)`);
-    check((await ev(REC)) === null, 'sign-out (clearLocal): the record is gone');
+    await ev(`new Promise(r => (globalThis.requestIdleCallback || setTimeout)(() => setTimeout(() => r(1), 50), {timeout: 2000}))`);  // the idle callback planned above has run (a state of the page)
+    const r4 = await ev(REC);
+    check(r4 == null && (await ev(`S.lpCache === null`)), 'sign-out (clearLocal): the record is gone and stays gone (a planned write is void) ' + JSON.stringify(r4));
 
     // ---- the open table: polled unchanged = nothing drawn again; changed = loaded and drawn
     await nav(B + `#sheets/${SID}`);

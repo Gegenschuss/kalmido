@@ -441,6 +441,7 @@ function clearLocal() {
   } catch { /* no storage */ }
   // 2.169.0 (#2671): the offline copy of the knowledge pages (wiki.js) goes too
   const wk = (typeof wko_wipe === 'function' ? wko_wipe() : Promise.resolve()).then(() => { try { indexedDB.deleteDatabase('kalmido-wiki'); indexedDB.deleteDatabase('kalmido-qfiles'); } catch { /* no IndexedDB */ } });
+  if (typeof S !== 'undefined') S.lpCache = null;  // 2.663.0 (#4200): no later write of the offline start state (core.js startSave) after this
   const st = typeof oc_drop === 'function' ? oc_drop() : new Promise(ok => { try { const r = indexedDB.deleteDatabase('kalmido-start'); r.onsuccess = r.onerror = r.onblocked = () => ok(); } catch { ok(); } });  // 2.663.0 (#4200): the offline start state  // 2.359.0 A (#3023): + the quick add's offline files
   return Promise.all([wk, st, typeof obxClear === 'function' ? obxClear() : Promise.resolve()]);  // 2.143.0 C (#2153): the offline queue in IndexedDB (C2: awaitable)
 }
