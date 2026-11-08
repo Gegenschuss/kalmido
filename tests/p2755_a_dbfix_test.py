@@ -2,6 +2,7 @@
 # kalmido-suite: fresh now=2026-12-15T10:00:00Z
 """2.755.0 part A API tests, own container: the database clean-ups of the package. Invented names only.
  - #5265: the table paperless_links is gone after the start (migrations.d/5265_a.py), pl_conns stays
+ - #5299: the indexes lists(deleted_at), fs_nodes(parent_id, deleted_at), list_activity(list_id, created_at) exist
  - #5263: a deleted comment of a video review is not in the organisation export (admin/orgexport.py ox_live), the live one is;
    the trash run (videos/review.py vdr_trash_prune, switch on) deletes a comment after the trash period, not before; the
    one-off clean-up (migrations.d/5263_a.py) removes at the next start the comments deleted before its cut-off -- of an
@@ -113,6 +114,13 @@ check(not dbx("SELECT 1 FROM information_schema.tables WHERE table_schema=curren
       "#5265: the start dropped the table paperless_links")
 check(dbx("SELECT 1 FROM information_schema.tables WHERE table_schema=current_schema() AND table_name='pl_conns'"),
       "#5265: the other old Paperless tables stay")
+
+# ================================================================== #5299: three indexes
+IX = {r[0]: r[1] for r in dbx("SELECT indexname, indexdef FROM pg_indexes WHERE schemaname=current_schema() AND indexname LIKE 'ix5299_%'")}
+check("lists USING btree (deleted_at)" in IX.get("ix5299_lists_deleted", ""),
+      f"#5299: lists(deleted_at) {IX}")
+check("fs_nodes USING btree (parent_id, deleted_at)" in IX.get("ix5299_fs_nodes_parent_deleted", ""), f"#5299: fs_nodes(parent_id, deleted_at) {IX}")
+check("list_activity USING btree (list_id, created_at)" in IX.get("ix5299_list_activity_list_created", ""), f"#5299: list_activity(list_id, created_at) {IX}")
 
 # ================================================================== #5263 (a): the organisation export
 VO = review(A, ORG)
