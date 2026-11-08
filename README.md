@@ -19,10 +19,10 @@
 
 ## What's new
 
-**2.656.0** (2026-11-08):
-- **Sharing**: revoking a share in any dialog ends it in all places (calendars, address books, tables, knowledge pages).
-- **Software tickets**: columns can carry a status meaning, and saved views can be shared per project.
-- **Documents**: own mail addresses per area with a fixed target folder and tags.
+**2.658.0** (2026-11-08):
+- **Documents**: Word, Excel and OpenDocument files are searchable with a preview image; notes on documents; document flows can be edited and can share documents.
+- **Approvals**: images and PDFs with comments at a point in the image or on a PDF page.
+- **Self-hosting**: release pages and the :latest image move once per week; pin a version to get a day in between.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 
