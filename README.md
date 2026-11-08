@@ -19,11 +19,10 @@
 
 ## What's new
 
-**2.682.0** (2026-11-08):
-- **Bookkeeping**: optional double-entry bookkeeping for GmbH/UG next to the EÜR (SKR03/SKR04, trial balance, P&L, HGB balance sheet small/micro, year-end closing).
-- **Contacts**: the contact card is built from blocks you can show, hide, fold and order, like the client card.
-- **Approvals**: images and PDFs uploaded in an approval are visible to project colleagues.
-- **Self-hosting**: `PUBLIC_URL` must be set for the receipt fetcher, the scan inbox setup code and hosted MCP (otherwise 503).
+**2.710.0** (2026-11-08):
+- **Agents**: hosted MCP connected apps expire after 90 days; Settings > Organisation > Agents shows and revokes them.
+- **Security**: audit hardening (sealed mail plus tokens, stricter http checks, narrower agent scopes).
+- **Exports**: DATEV, GoBD and knowledge exports use temporary files and limited export slots.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 
