@@ -57,10 +57,11 @@ function dcv_close(v) {
   v = v || $('.dv-view');
   if (v?.isConnected) Element.prototype.remove.call(v);
   if (S.route.mod !== 'docs' || !dc_hashId()) return;  // the route left already (a redraw took it away)
-  const b = DVW.back;
+  const b = DVW.back, cur = DC.doc?.id ?? DC.opening, listed = cur != null && (DC.docs || []).some(x => x.id === cur);
   dcv_left();
   if (b?.pushed && history.length > 1) history.back();
-  else location.hash = b?.hash && !dcv_isDocHash(b.hash) ? b.hash : DVW.par ? '#ablage/' + DVW.par : DC.f.review ? '#ablage/review' : '#ablage/docs';  // 2.752.0 (#4887): opened by a link / reload: its folder
+  // 2.752.0 (#4887): opened by a link / a reload: the list it leafs through (its "3 of 128"), a file outside it: its folder
+  else location.hash = b?.hash && !dcv_isDocHash(b.hash) ? b.hash : !listed && DVW.par ? '#ablage/' + DVW.par : DC.f.review ? '#ablage/review' : '#ablage/docs';
 }
 // the view was left (Esc, Back, another area): free the PDF, the list comes back at the same place with its card in view
 function dcv_left() {

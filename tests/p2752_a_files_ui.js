@@ -101,14 +101,18 @@ const up = async (ck, url, field, name, text, extra = {}) => {
   check(w.history.length <= hist + 4, 'the old address is replaced, not kept as an extra entry (' + (w.history.length - hist) + ')');
   w.close();
 
-  // a new start on the address of a file: its document view; Close leads into its folder
+  // a new start on the address of a file: its document view; Close leads to the list it leafs through, a plain file (no
+  // document, not in that list) into its folder
   w = await boot({user: 'alice', hash: 'ablage/' + DOC}); d = w.document;
-  check(await until(() => d.querySelector(`.dv-view .dc-body[data-id="${DOC}"]`) && w.location.hash === '#ablage/' + DOC, 80), 'reload of #ablage/<id of a file>: the document view');
+  check(await until(() => d.querySelector(`.dv-view .dc-body[data-id="${DOC}"]`) && w.location.hash === '#ablage/' + DOC && /of \d/.test(d.querySelector('.dv-view .dc-navn')?.textContent || ''), 80), 'reload of #ablage/<id of a file>: the document view (its place in All documents)');
   d.querySelector('.dv-view [data-dc="close"]')?.click();
-  check(await until(() => w.location.hash === '#ablage/' + ROOT && d.querySelector('.dc-infold')), 'Close without a way back: its folder');
+  check(await until(() => w.location.hash === '#ablage/docs' && d.querySelector(`.dc-view [data-dco="${DOC}"]`)), 'Close without a way back: All documents');
   w.close();
   w = await boot({user: 'alice', hash: 'ablage/' + FILE}); d = w.document;
   check(await until(() => d.querySelector(`.dv-view .dc-body[data-id="${FILE}"]`), 80), 'reload of a plain file: the same view');
+  check(await until(() => w.eval('!DC.loading && !!DC.docs')), '... the list behind it loaded');
+  d.querySelector('.dv-view [data-dc="close"]')?.click();
+  check(await until(() => w.location.hash === '#ablage/' + PLAIN && d.querySelector(`.abview .ablist [data-abid="${FILE}"]`)), '... Close: its folder');
   w.close();
 
   // ================= a reader: no writing buttons

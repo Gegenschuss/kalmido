@@ -61,11 +61,12 @@ const up = async (url, field, name, text, extra = {}) => {
   check(await until(() => w.eval('S.route.mod') === 'docs' && d.querySelector('#view .dc-view [data-dco]')), 'old link #docs: the documents');
   check(d.querySelector('#srail [data-sbb="ablage"].on') && d.querySelector('#side .abfilt [data-go="ablage/docs"][aria-current="page"]'), 'old link #docs: inside the file store, the filter Documents marked');
   w.location.hash = '#docs/review';
-  check(await until(() => d.querySelector('#side .abfilt [data-go="ablage/review"][aria-current="page"]') && d.querySelector('[data-dc="review"][aria-selected="true"]')), 'old link #docs/review: the filter To review');
-  d.querySelector('[data-dc="all"]')?.click();
-  check(await until(() => w.location.hash === '#ablage/docs' && d.querySelector('#side .abfilt [data-go="ablage/docs"][aria-current="page"]')), 'the button All of the view = the filter Documents');
-check(await until(() => d.querySelector(`.dc-view [data-dco="${DOC}"]`) && d.querySelector('[data-dc="all"][aria-selected="true"]')), 'All: the list is loaded again (the document is back)');
-d.querySelector('[data-dc="review"]')?.click();
+  // 2.752.0 (#4887): on a computer the panel's rows are the switch (the bar's "All | To review" stays on phones only)
+  check(await until(() => d.querySelector('#side .abfilt [data-go="ablage/review"][aria-current="page"]') && w.eval('DC.f.review') && !d.querySelector('.dc-bar .dc-seg')), 'old link #docs/review: the filter To review');
+  d.querySelector('#side .abfilt [data-go="ablage/docs"]')?.click();
+  check(await until(() => w.location.hash === '#ablage/docs' && d.querySelector('#side .abfilt [data-go="ablage/docs"][aria-current="page"]')), 'the row All documents = the filter Documents');
+check(await until(() => d.querySelector(`.dc-view [data-dco="${DOC}"]`) && w.eval('!DC.f.review')), 'All: the list is loaded again (the document is back)');
+d.querySelector('#side .abfilt [data-go="ablage/review"]')?.click();
 check(await until(() => w.location.hash === '#ablage/review' && w.eval('DC.f.review && !DC.loading') && [...d.querySelectorAll('.dc-view .dc-card')].every(c => c.classList.contains('rev'))),
   'the button To review: the filter loads (only documents to review)');
 w.location.hash = '#docs';

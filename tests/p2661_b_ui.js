@@ -196,14 +196,14 @@ function scan() {
   await sleep(300);
   await sw(WA);
   check(await until(has(['alpha-letter', 'alpha-bill'], ['private-letter']), 60), 'docs: Private -> Alpha without opening again shows Alpha\'s documents: ' + view().slice(0, 200));
-  check(w.eval('DC.f.tag') === '', 'docs: the filter of the old workspace is reset');
-  check(await until(() => /\b2\b/.test(d.querySelector('#view [data-dc="review"] .dc-count')?.textContent || '')), 'docs: "To review" counts Alpha\'s (2)');
+  check(w.eval('DC.f.tag') === '', 'docs: the filter of the old workspace is reset');  // 2.752.0 (#4887): the counter of "To review" is the panel's row (#side) on a computer
+  check(await until(() => /\b2\b/.test(d.querySelector('#side [data-go="ablage/review"] .c')?.textContent || '')), 'docs: "To review" counts Alpha\'s (2)');
   w.eval(`dc_open(${DA1})`);
   check(await until(() => d.querySelector('.dc-md')), 'docs: a document of Alpha is open');
   await sw('private');
   check(await until(() => !d.querySelector('.dc-md'), 30), 'docs: switching to Private closes the open document of Alpha');
   check(await until(has(['private-letter'], ['alpha-letter', 'alpha-bill']), 60), 'docs: Alpha -> Private shows Private\'s documents again: ' + view().slice(0, 200));
-  check(await until(() => /\b1\b/.test(d.querySelector('#view [data-dc="review"] .dc-count')?.textContent || '')), 'docs: "To review" counts Private\'s (1)');
+  check(await until(() => /\b1\b/.test(d.querySelector('#side [data-go="ablage/review"] .c')?.textContent || '')), 'docs: "To review" counts Private\'s (1)');
   // a late answer for the old workspace is dropped: start a load, switch before it returns
   w.eval('dc_load()'); await sw(WA);
   check(await until(has(['alpha-letter'], ['private-letter']), 60) && w.eval('DC.atWs') === WA, 'docs: a load started in Private and answered after the switch does not show Private\'s list');
