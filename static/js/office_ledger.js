@@ -66,11 +66,15 @@ function ldbHtml() {
   if (d.settings?.method !== 'balance') return bar + `<div class="empty">${esc(tr('Switch the profit determination to the balance sheet first.'))} ${ofcSetLink('tax', tr('Profit determination'))}</div>`;
   const ok = d.checks.balanced && +d.checks.difference === 0;
   const state = `<p class="${ok ? 'muted ofchint' : 'bk-warn'}" data-ldb-check="${ok ? 'ok' : 'off'}">${esc(ok ? tr('Debit = credit, assets = equity and liabilities.') : tr('The balance sheet does not balance (difference {0}).', ldbMoney(d.checks.difference)))}${d.closed ? ` <b>${esc(tr('The year {0} is closed.', d.year))}</b>` : ''}</p>`;
-  const hints = (d.hints || []).map(h => `<p class="bk-warn" data-ldb-hint="${esc(h.key || '')}">${esc(h.text)}</p>`).join('');
+  const hints = (d.hints || []).map(h => `<p class="bk-warn" data-ldb-hint="${esc(h.key || '')}">${esc(h.text)}</p>`).join('')
+    // 2.685.0 (#5128, Fable review 2.666): an opening that does not balance (a balance on account 9000) blocks the closing: shown before
+    + (+(d.checks.opening || 0) ? `<p class="bk-warn" data-ldb-opening>${esc(tr('The opening entries do not balance (difference {0}): the year cannot be closed.', ldbMoney(d.checks.opening)))}</p>` : '');
   return bar + state + hints + ldbBsHtml(d) + ldbPlHtml(d) + ldbSusaHtml(d) + ldbEntriesHtml(d) + ldbCloseHtml(d) + `<p class="muted bk-note">${esc(d.note)}</p>`;
 }
 
 const ldbCsv = (what, y) => `<a class="btn sm ghost" href="${ldbBase()}/${what}.csv?year=${y}" download>${ic('download', 's')}<span>CSV</span></a>`;
+// 2.685.0 (#5128): the balance sheet / the profit and loss account as PDF (the way of the income statement's PDF)
+const ldbPdf = (what, y) => `<a class="btn sm ghost" href="${ldbBase()}/${what}.pdf?year=${y}" download data-ldb-pdf="${what}">${ic('download', 's')}<span>PDF</span></a>`;
 
 function ldbBsHtml(d) {
   const side = s => {
@@ -79,14 +83,14 @@ function ldbBsHtml(d) {
     return `<h4 class="bk-h">${esc(s === 'a' ? tr('Assets') : tr('Equity and liabilities'))}</h4><table class="bk-tab ldb-bs" data-ldb-side="${s}"><thead><tr><th>${esc(s === 'a' ? tr('Assets') : tr('Equity and liabilities'))}</th><th class="num">${tr('Amount')}</th></tr></thead><tbody>${rows}
       <tr class="bk-tot"><th scope="row">${tr('Total')}</th><td class="num" data-ldb-total="${s}">${ldbMoney(tot)}</td></tr></tbody></table>`;
   };
-  return `<section class="bk-sec" aria-labelledby="ldb-bsh"><div class="ofcbar"><h3 class="ofcgrp" id="ldb-bsh">${tr('Balance sheet as of {0}', fmtDay('year', pd(`${d.year}-12-31`)))}</h3><span class="spacer"></span>${ldbCsv('bs', d.year)}</div>
+  return `<section class="bk-sec" aria-labelledby="ldb-bsh"><div class="ofcbar"><h3 class="ofcgrp" id="ldb-bsh">${tr('Balance sheet as of {0}', fmtDay('year', pd(`${d.year}-12-31`)))}</h3><span class="spacer"></span>${ldbCsv('bs', d.year)}${ldbPdf('bs', d.year)}</div>
     ${side('a')}${side('p')}</section>`;
 }
 
 function ldbPlHtml(d) {
   const rows = d.pl.filter(r => +r.amount).map(r => `<tr><th scope="row">${esc(r.label)}</th><td class="num">${r.kind === 'e' ? '- ' : ''}${ldbMoney(r.amount)}</td></tr>`).join('')
     || `<tr><td colspan="2" class="muted">${tr('None')}</td></tr>`;
-  return `<section class="bk-sec" aria-labelledby="ldb-plh"><div class="ofcbar"><h3 class="ofcgrp" id="ldb-plh">${tr('Profit and loss account {0}', d.year)}</h3><span class="spacer"></span>${ldbCsv('pl', d.year)}</div>
+  return `<section class="bk-sec" aria-labelledby="ldb-plh"><div class="ofcbar"><h3 class="ofcgrp" id="ldb-plh">${tr('Profit and loss account {0}', d.year)}</h3><span class="spacer"></span>${ldbCsv('pl', d.year)}${ldbPdf('pl', d.year)}</div>
     <table class="bk-tab ldb-pl"><tbody>${rows}</tbody></table>
     <div class="bk-profit"><span>${tr('Net income / net loss for the year')}</span><b class="${+d.result < 0 ? 'neg' : ''}" data-ldb-result>${ldbMoney(d.result)}</b></div></section>`;
 }
@@ -104,7 +108,7 @@ function ldbSusaHtml(d) {
 function ldbEntriesHtml(d) {
   const rows = d.entries.map(e => `<li class="ofcrow" data-ldb-entry="${e.id}"><span class="ofcn"><b>${esc(e.text || (e.kind === 'open' ? tr('Opening entry') : tr('Adjusting entry')))}</b>
     <small class="muted">${esc([fmtDateLoc(e.day), `${tr('Debit')} ${e.debit}`, `${tr('Credit')} ${e.credit}`, e.kind === 'open' ? tr('Opening entry') : ''].filter(Boolean).join(' · '))}</small></span>
-    <span class="rksum">${ldbMoney(e.amount)}</span>${d.closed || e.ref ? '' : `<button type="button" class="btn sm ghost" data-ldb="del" data-id="${e.id}" aria-label="${esc(tr('Delete'))}">${ic('trash', 's')}</button>`}</li>`).join('');
+    <span class="rksum">${ldbMoney(e.amount)}</span>${d.closed || e.ref ? '' : `<button type="button" class="btn sm ghost" data-ldb="edit" data-id="${e.id}" aria-label="${esc(tr('Edit booking'))}">${ic('edit', 's')}</button><button type="button" class="btn sm ghost" data-ldb="del" data-id="${e.id}" aria-label="${esc(tr('Delete'))}">${ic('trash', 's')}</button>`}</li>`).join('');
   return `<section class="bk-sec" aria-labelledby="ldb-enh"><div class="ofcbar"><h3 class="ofcgrp" id="ldb-enh">${tr('Entries by hand')}</h3><span class="spacer"></span>
     ${d.closed ? '' : `<button type="button" class="btn sm" data-ldb="add">${ic('plus', 's')}<span>${tr('New entry')}</span></button>`}</div>
     <p class="muted ofchint">${esc(tr('Accruals, provisions and corrections as an adjusting entry; the opening balances of the first year as opening entries against account {0}.', d.susa.find(r => r.class === 'open')?.account || '9000'))}</p>
@@ -118,19 +122,23 @@ function ldbCloseHtml(d) {
     <p class="muted ofchint">${esc(tr('Carries the balances into {0}, the result onto the profit / loss carried forward, and locks every month of {1} (GoBD).', d.year + 1, d.year))}</p></section>`;
 }
 
-function ldbEntryDialog() {
+// e = an entry by hand of the list: the dialog edits it (2.685.0 #5128: PUT with its version, 409 when it moved on), else a new one
+function ldbEntryDialog(e) {
   const y = LDB.year;
-  ofdDlg(tr('New entry'), `<div class="row"><label for="ldb-ekind">${tr('Kind')}</label>${ofcSel('ldb-ekind', 'manual', [['manual', tr('Adjusting entry')], ['open', tr('Opening entry')]])}</div>
-    <div class="row"><label id="ldb-edl">${tr('Date')}</label>${dateIn('ldb-eday', `${y}-12-31`, {label: tr('Date'), clear: false})}</div>
-    ${ofcRowF('ldb-edebit', tr('Debit account'), `<input id="ldb-edebit" inputmode="numeric" autocomplete="off" maxlength="9">`)}
-    ${ofcRowF('ldb-ecredit', tr('Credit account'), `<input id="ldb-ecredit" inputmode="numeric" autocomplete="off" maxlength="9">`)}
-    ${ofcRowF('ldb-eamt', tr('Amount'), `<input id="ldb-eamt" inputmode="decimal" class="numin" autocomplete="off">`)}
-    ${ofcRowF('ldb-etext', tr('Text'), `<input id="ldb-etext" maxlength="200" autocomplete="off">`)}`,
+  const amt = e ? fmtNum(+e.amount, 2, 2) : '';
+  ofdDlg(e ? tr('Edit booking') : tr('New entry'), `<div class="row"><label for="ldb-ekind">${tr('Kind')}</label>${ofcSel('ldb-ekind', e?.kind || 'manual', [['manual', tr('Adjusting entry')], ['open', tr('Opening entry')]])}</div>
+    <div class="row"><label id="ldb-edl">${tr('Date')}</label>${dateIn('ldb-eday', e?.day || `${y}-12-31`, {label: tr('Date'), clear: false})}</div>
+    ${ofcRowF('ldb-edebit', tr('Debit account'), `<input id="ldb-edebit" inputmode="numeric" autocomplete="off" maxlength="9" value="${esc(e?.debit || '')}">`)}
+    ${ofcRowF('ldb-ecredit', tr('Credit account'), `<input id="ldb-ecredit" inputmode="numeric" autocomplete="off" maxlength="9" value="${esc(e?.credit || '')}">`)}
+    ${ofcRowF('ldb-eamt', tr('Amount'), `<input id="ldb-eamt" inputmode="decimal" class="numin" autocomplete="off" value="${esc(amt)}">`)}
+    ${ofcRowF('ldb-etext', tr('Text'), `<input id="ldb-etext" maxlength="200" autocomplete="off" value="${esc(e?.text || '')}">`)}`,
   tr('Save'), async m => {
     const v = id => /** @type {HTMLInputElement} */ ($('#' + id, m)).value.trim();
     const n = ofcNum(v('ldb-eamt'));
     if (n == null || n <= 0) throw new Error(tr('Invalid value: {0}', tr('Amount')));
-    await api('POST', `${ldbBase()}/entries`, {kind: v('ldb-ekind'), day: v('ldb-eday'), debit: v('ldb-edebit'), credit: v('ldb-ecredit'), amount: n.toFixed(2), text: v('ldb-etext')});
+    const b = {kind: v('ldb-ekind'), day: v('ldb-eday'), debit: v('ldb-edebit'), credit: v('ldb-ecredit'), amount: n.toFixed(2), text: v('ldb-etext')};
+    if (e) await api('PUT', `${ldbBase()}/entries/${e.id}`, {...b, expect_updated_at: e.updated_at});
+    else await api('POST', `${ldbBase()}/entries`, b);
     toast(tr('Saved')); ldbReload();
   });
 }
@@ -159,6 +167,7 @@ document.addEventListener('click', e => {
   const a = b.dataset.ldb;
   if (a === 'susa') { LDB.susa = !LDB.susa; ofcDraw(); }
   else if (a === 'add') ldbEntryDialog();
+  else if (a === 'edit') { const x = LDB.d?.entries.find(y => y.id === +b.dataset.id); if (x) ldbEntryDialog(x); }
   else if (a === 'del') ldbEntryDelete(+b.dataset.id);
   else if (a === 'close') ldbCloseDialog();
 });

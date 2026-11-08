@@ -17717,5 +17717,6 @@
   "Mentions and replies from the chat arrive here too.": "Las menciones y respuestas del chat también llegan aquí.",
   "All areas in the menu": "Todas las áreas en el menú",
   "PUBLIC_URL is not set on this server, so the setup command cannot name its address: ask the server admin to set PUBLIC_URL to the address people open (.env) and restart.": "PUBLIC_URL no está configurada en este servidor, así que el comando de instalación no puede indicar su dirección: pide a la administración del servidor que configure PUBLIC_URL con la dirección que se abre (.env) y reinicie.",
+  "Edit booking": "Editar asiento",
   "Only changes of others": "Solo cambios de otros"
 }
