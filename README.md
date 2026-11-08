@@ -19,10 +19,10 @@
 
 ## What's new
 
-**2.658.0** (2026-11-08):
-- **Documents**: Word, Excel and OpenDocument files are searchable with a preview image; notes on documents; document flows can be edited and can share documents.
-- **Approvals**: images and PDFs with comments at a point in the image or on a PDF page.
-- **Self-hosting**: release pages and the :latest image move once per week; pin a version to get a day in between.
+**2.667.0** (2026-11-08):
+- **Projects**: a fourth built-in project type "Social media plan" (editorial calendar with channels and approval by the client; Kalmido does not post anything).
+- **Approvals**: audio files from the file store can be played and commented on, also through the customer link.
+- **Tablets and phones**: swipe to the next task, document or picture; dialogs are dragged by their grip only.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 

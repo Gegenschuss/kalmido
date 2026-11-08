@@ -1,6 +1,40 @@
 {
  "versions": [
   {
+   "version": "2.668.0",
+   "date": "2026-11-08",
+   "items": [
+    {
+     "de": "Auf dem Tablet wischt man im Aufgaben-Detail zur nächsten Aufgabe, und Dialoge öffnen ohne ungefragte Bildschirmtastatur.",
+     "en": "On a tablet you swipe to the next task in its details, and dialogs open without the screen keyboard popping up."
+    },
+    {
+     "de": "Wiki-Seiten öffnen auf dem Tablet zum Lesen, der Stift schaltet zum Schreiben.",
+     "en": "On a tablet wiki pages open for reading; the pen switches to writing."
+    },
+    {
+     "de": "Wischen blättert jetzt auch in der Vollansicht eines Dokuments und im Bildbetrachter zum nächsten Bild.",
+     "en": "Swiping now also leafs through documents in full screen and through pictures in the image viewer."
+    },
+    {
+     "de": "Dialoge und Menüs zieht man nur noch am Griff oben, im Inhalt wird immer gescrollt.",
+     "en": "Dialogs and menus are now dragged only by the grip at the top; the content always scrolls."
+    },
+    {
+     "de": "Neuer Projekttyp „Social-Media-Plan“: Beiträge im Kalender planen, Kanäle wählen und vom Kunden freigeben lassen.",
+     "en": "New project type \"Social media plan\": plan posts in a calendar, pick the channels and let your client approve them."
+    },
+    {
+     "de": "In der Abnahme lässt sich eine Audiodatei aus der Dateiablage abspielen und kommentieren, auch über den Kunden-Link.",
+     "en": "Approvals play and comment on an audio file from your file store, also through the customer link."
+    },
+    {
+     "de": "Sortieren in Tabellen lässt Summen-Bereiche an ihrem Platz.",
+     "en": "Sorting a sheet keeps sum ranges in place."
+    }
+   ]
+  },
+  {
    "version": "2.659.0",
    "date": "2026-11-08",
    "items": [

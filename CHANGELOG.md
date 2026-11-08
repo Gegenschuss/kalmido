@@ -16,6 +16,71 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.668.0] - 2026-11-08
+
+Package 2.655 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), CI-only rot: p2551_c_favout_ui).
+
+### Changed
+- Tablets with touch (over 767 px): swiping sideways in a task's details (and in a news task) goes to the next / previous task, like on a phone (#5080).
+- Tablets with touch: a wiki page opens for reading with the pen to switch to writing, like on a phone; a page just created still opens for writing (#5082).
+- Tablets with touch: "Edit menu" shows the hide buttons, the column arrow in a list header is always visible, and sidebar menu points have "Hide from menu / Customise" on a long press (#5083).
+- Touch screens without a mouse no longer show keyboard hints (the "Keyboard shortcuts" button and text in Settings > Help, shortcut chips in menus, "(Alt+←)" on Back); gesture hints in the timeline and the start page editor say "hold, then drag" on touch. The shortcuts keep working with a keyboard (#5084).
+- Touch screens: date picker, "Waiting on", milestone and other dialogs no longer focus a text field on opening (no screen keyboard covering the calendar or buttons); the date field uses the number pad on every touch screen; Search does not take the focus back after every update; "+" on a section opens the quick sheet (#5081).
+- Touch screens: rows, calendar events and favourite tiles are no longer browser-draggable (a long press in Chrome no longer cancels the app's hold, selection or finger drag); the edge drawer while dragging a task and the swipe-to-complete animation work on tablets too (#5085).
+- Keyboard: the remaining global Escape listeners (tooltip, drags, timeline connect mode, link preview, document preview, favourites bar, chat) and the letter keys n / q / m / a / / run through the shared key registry; the shortcut help reads the letters from there. n and / no longer act behind an open dialog (#4998).
+
+### Fixed
+- A server answer that arrives after the app's window was closed no longer draws into a page without a document (late test errors in p2170_ui); test runs print 8 stack lines for such late errors and count them (#5045).
+
+Package 2.652 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Dokumente Handy/Tablet: Wischen auf der Vorschau i).
+
+### Changed
+- Documents and images: a swipe sideways leafs to the next / previous document in the full screen of a document and to the next / previous picture in the image viewer, on phones and touch tablets alike (shared helper `static/js/swipenav.js`, loaded on demand); a PDF opened from a file store folder leafs through the folder's PDFs and pictures (#5071, #5073)
+- Sheets (dialogs, menus, date picker, quick add) are dragged, resized and swiped away only at their grip / head; a swipe in the content always scrolls (#5078)
+- Touch screens wider than a phone get the finger sizes, visible row actions and the long-press guard of the phone (touch rules follow the pointer, not only the width) (#5086)
+- New knowledge pages and new list channel messages in an end-to-end locked space are taken as v2 ciphers only (v1 is refused with 400); editing, re-encryption and reading still take v1 (#5044)
+
+### Fixed
+- Android / Chrome: Back closes one level at a time (full view -> document -> list) instead of leaving the app on the second Back; closing a document with its arrow leaves no dead Back behind (#5070)
+- Documents on phones and touch tablets: the open document covers the whole screen; pulling down or scrolling on the preview no longer shrinks it to half a window with the list showing below; the preview no longer jumps when the sharp page replaces the small picture (#5072)
+- Sheets: a dialog scrolled down no longer jumps back to the top when the finger lifts (#5078)
+- Calendar / address book: sharing again with someone whose share had run out lets them in again; a still valid end date stays; the organisation boundary check counts a private address book's contact person only while its share is live (#5089)
+
+Package 2.387 (Social-Media-Planer (ohne Veröffentlichen)).
+### Added
+- Project type "Social media plan" in New project (card with the megaphone icon): opens in the calendar view, field Channel (several values: Instagram, LinkedIn, Facebook, TikTok, YouTube, Newsletter, Other), with the standard sections Idea, Draft, For approval, Approved, Scheduled, Published; with them the review step is on for "For approval" and a post is completed only after the approval (the client as reviewer, e.g. with the role View). A post = a task: text = description, picture = attachment, publishing day = due date. Kalmido publishes nothing itself (#1957)
+- API v1 / MCP: `project_type: social` (#1957)
+
+Package 2.658 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: CI-only rot: p2399_hosting_apart, CI-only rot: p2441_favs_ui, CI-only rot: p2).
+
+### Added
+- Approvals: an audio file from the file store can be a version of an approval and plays like an audio link (built-in player, comments at a second, versions, customer link); the file's own access applies, the customer link plays it only while the link is open (#5015).
+
+### Changed
+- Sheets: sorting rows or columns keeps formula ranges on their positions (=SUM(A1:A3) stays A1:A3); single references still follow their cell, dragging rows keeps its own rule (#5000).
+- Approval files (images, PDF, audio) are typed from their first bytes and streamed with range requests instead of being read whole into memory (#5043).
+- Background work: reminder and nag runs read only the columns and due days they need; a webhook that fails waits for the next run with the rest of its deliveries, and deliveries are taken in turns over all webhooks; the git poll holds no database transaction while the provider answers; an agent event wakes only that agent's waiting long-polls (#4193).
+- Release cleanup (prune-releases): the untagged platform images of a removed release go with it, unless a kept release still names them; dry run stays the default (#5042).
+
+### Fixed
+- Undo: a finished write on bookmarks, read later, pipeline, travel, logbook, books and receipts no longer comes back with an older app state after an undo (#5092).
+- Document flows: "X days after it came in" also picks up documents added between midnight and 1 am local time (#5099).
+- MCP: list_views, create_view, set_section_kind and set_task_state are in the tickets toolset (#5095).
+- Tests: CI-only failures of p2554_c_wikicm_ui, p2633_d_audiorev_ui and p220_api (waiting on a real state) and a migration lint note (#5091, #5102, #5101).
+
+### Security
+- The approval customer page's audio route: limited per address and per link, a sealed file is decrypted once per request, files of a disabled account's link are not served, a UTF-16 text is not taken for MP3 (#5015).
+
+Package 2.654 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Bündel: Samm).
+
+### Fixed
+- Receipts sorted into documents under "All workspaces" land in the office area that is open (header X-Kalmido-Office-Space now also on /api/docs); without an open area, and in the background queue, the setting decides as before (#4823).
+- Project core share rows mirror list_members on every way (organisation join, owner transfer, agent share proposals, making an agent, child participant); restoring a share from the file store or a group grants the role at once; an own share that ran out ends at once instead of after the next watchdog tick (#5050).
+- Organisation export and import keep the links between tasks and quotation positions (task_offer_links, origin_id on the new ids): after a move the positions are no longer offered as new and one click no longer doubles the tasks (#4585).
+
+### Security
+- An API token limited to certain projects no longer finds channel or group messages in the message search, and sees no knowledge pages (wiki pages belong to no project); session logins and unlimited tokens are unchanged (#5053).
+
 ## [2.659.0] - 2026-11-08
 
 Package 2.635 (Bündel: CI-only rot: p2399_hosting_apart, CI-only rot: p2441_favs_ui, CI-only rot: p2476_b_appcss u. 6 weitere).
@@ -511,7 +576,8 @@ Package 2.582 (Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher),
 
 Not released (the CI of this version was red); its changes are listed under 2.605.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.659.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.668.0...HEAD
+[2.668.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.668.0
 [2.659.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.659.0
 [2.656.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.656.0
 [2.650.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.650.0
