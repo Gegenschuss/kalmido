@@ -213,7 +213,8 @@ assert A.post(B + "/api/wiki/restore", json={"ids": [intro]}).ok
 check("Client X/Intro" in shared(Da), "#2104: back from the trash, shared again")
 wander = page(A, "private", "Wander", "moves to the organisation")
 r = share(A, page_id=wander, kind="person", user_id=DAVE)
-check(r.status_code in (201, 404), "#2104: share by id (404 when the person is not visible) " + r.text[:200])
+# 2.663.0 (#4341): 404 - wsh_person: dave is in none of alice's organisations and no connection (a wiki share is none)
+check(r.status_code == 404, "#2104: share by id: 404, the person is not visible " + r.text[:200])
 if r.status_code != 201:
     r = share(A, page_id=wander, kind="person", email="dave@example.com")
 wtok = share(A, page_id=wander, kind="link").json().get("url", "").rsplit("/", 1)[-1]

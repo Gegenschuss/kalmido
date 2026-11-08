@@ -67,12 +67,14 @@ if db_:
     check(Bo.post(B + f"/api/office/docs/{db_}/number", json={}).status_code == 403, "the number route: a plain member is refused")
 if da:
     r = A.post(B + f"/api/office/docs/{da}/number", json={})
-    check(r.status_code in (200, 409), f"the number route: the office admin is not refused ({r.status_code} {r.text[:120]})")
+    # 2.663.0 (#4341): 200 - a draft quotation (offer_number_at "create" by default) gets the next number (docs.odoc_number)
+    check(r.status_code == 200, f"the number route: the office admin is not refused: 200 ({r.status_code} {r.text[:120]})")
 fd = doc_id(Fr.post(B + "/api/office/docs", json={"project_title": "Own job"}))
 check(fd, "freelancer-matrix: office - a document in the own office")
 if fd:
     r = Fr.post(B + f"/api/office/docs/{fd}/number", json={})
-    check(r.status_code in (200, 409), f"freelancer-matrix: office - the own office numbers itself ({r.status_code} {r.text[:120]})")
+    # 2.663.0 (#4341): 200 - the freelancer is the admin of the personal office, a draft quotation gets its number
+    check(r.status_code == 200, f"freelancer-matrix: office - the own office numbers itself: 200 ({r.status_code} {r.text[:120]})")
 
 # ================================================================ #2496: time entries answer 400
 check(Bo.post(B + "/api/time/stop", json={"id": "abc"}).status_code in (400, 404, 409), "a bad entry id is no server error")

@@ -144,7 +144,8 @@ dbx("INSERT INTO user_settings(user_id,key,value) VALUES(?,'features',?) ON CONF
 # legacy import: a table range far beyond the columns is capped (fast answer), an encrypted file is a 400
 t0 = time.time()
 r = Fr.post(B + "/api/office/legacy/preview", files={"file": ("old.xlsx", book("A1:ZZZZZ2000"), "application/octet-stream")})
-check(r.status_code in (200, 400) and time.time() - t0 < 20, f"a huge table range: quick answer {r.status_code} {time.time() - t0:.1f}s {r.text[:160]}")
+# 2.663.0 (#4341): 200 - _range caps the table's columns at FI_COLS_MAX and the rows at FI_ROWS_MAX, the preview answers
+check(r.status_code == 200 and time.time() - t0 < 20, f"a huge table range: quick answer {r.status_code} {time.time() - t0:.1f}s {r.text[:160]}")
 r = Fr.post(B + "/api/office/legacy/preview", files={"file": ("old.xlsx", encrypted(book("A1:A2")), "application/octet-stream")})
 check(r.status_code == 400, f"an encrypted .xlsx: 400 {r.status_code} {r.text[:160]}")
 r = Fr.post(B + "/api/office/legacy/preview", files={"file": ("old.xlsx", book("A1:A2"), "application/octet-stream")})

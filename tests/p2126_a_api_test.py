@@ -208,8 +208,14 @@ sql("INSERT INTO upload_scan(kind, ref_id, ver, org_id, state, sig, why, created
 r = Fr.get(B + f"/api/budget/files/{BF}")
 check(r.status_code == 403, f"L1: a locked receipt is not handed out ({r.status_code})")
 # L7: a person's list of receipt suggestions (only documents they see)
+# 2.663.0 (#4341): two cases - /api/v1 takes a bearer token only (api_authenticate: 401 for a web session); with her own
+# token (files:read) the person gets 200 and only suggestions in documents she sees (none here)
 r = Fr.get(B + "/api/v1/receipt-suggestions?state=all")
-check(r.status_code in (200, 401, 403) and (r.status_code != 200 or r.json()["data"] == []), f"L7: the person's list answers ({r.status_code}) " + r.text[:120])
+check(r.status_code == 401, f"L7: a web session gets no API answer: 401 ({r.status_code}) " + r.text[:120])
+r = Fr.post(B + "/api/me/tokens", json={"name": "l7", "scopes": ["read", "files:read"]})
+assert r.status_code == 201, r.text
+r = requests.get(B + "/api/v1/receipt-suggestions?state=all", headers={"Authorization": "Bearer " + r.json()["token"]})
+check(r.status_code == 200 and r.json()["data"] == [], f"L7: the person's list with her token: 200, empty ({r.status_code}) " + r.text[:120])
 
 # ================================================================ #1971 / #1970 the documents' values (freelancer-matrix: files)
 start(keep=True)  # now with a server key

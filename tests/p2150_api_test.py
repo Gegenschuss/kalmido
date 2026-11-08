@@ -318,7 +318,9 @@ full.post("/tasks/batch", {"ids": T[:12], "action": "reopen"})
 # the personal agent: its owner approves
 pa_tok = Api(Bo.post(B + f"/api/my/agents/{PA}/token").json()["token"])
 Bo.patch(B + f"/api/my/agents/{PA}", json={"scopes": ["read", "tasks:write", "structure"]})
-assert A.put(B + f"/api/lists/{L}/members", json={"user_id": PA, "role": "edit"}).status_code in (200, 403, 404)
+# 2.663.0 (#4341): 404 - only its owner shares a list with a personal agent (lists.member_set: personal_agent_foreign)
+check(A.put(B + f"/api/lists/{L}/members", json={"user_id": PA, "role": "edit"}).status_code == 404,
+      "somebody else's personal agent cannot be added to a list: 404")
 PL = pa_tok.post("/lists", {"name": "Bot list"}).json()["id"]
 pa_tok.patch(f"/lists/{PL}", {"folder": ""})
 r = pa_tok.patch(f"/lists/{PL}", {"folder": "Work"})

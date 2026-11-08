@@ -146,7 +146,8 @@ DA = r.json().get("id") if r.ok else 0
 check(DA and dbx("SELECT 1 FROM fs_log WHERE node_id=? AND agent=1 AND action='upload'", (DA,)), "the agent's creation is in the history")
 check(DA in [x["id"] for x in A.get(B + "/api/docs").json()["docs"]], "alice sees the agent's document")
 r = AGS.post(B + "/api/v1/documents", json={"name": "own.pdf", "content_base64": b64(["Agent result"])})
-check(r.status_code in (201, 409), f"agent without parent_id: its own result folder ({r.status_code})")
+# 2.663.0 (#4341): 201 - the agent has an owner (alice), fs_agent_folder makes its result folder; 409 is only for an agent without one
+check(r.status_code == 201, f"agent without parent_id: its own result folder ({r.status_code})")
 # review (2.122.0): an agent's sender on level "agent" is a suggestion to review, not a set value (like PATCH)
 check(A.put(B + "/api/docs/settings", json={"ws": "private", "levels": {"sender": "agent"}}).ok, "level sender = agent")
 r = AGS.post(B + "/api/v1/documents", json={"name": "s.pdf", "content_base64": b64(["Agent sender"]), "parent_id": root, "sender": "Agentur Muster"})

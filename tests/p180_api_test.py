@@ -184,7 +184,8 @@ check(L2["kind"] == "list" and not L2.get("status"), "plain list without the pro
 check(not any(t["blockers"] for t in TT) and not [f for f in S["fields"] if f["list_id"] == L2["id"]], "no dependencies / fields")
 check(len(TT) == 18 and any(t["start"] for t in TT) and any(t["repeat"] for t in TT), "still 18 tasks with dates, start and repeat")
 tlr = A.get(B + f"/api/tasks/{TT[0]['id']}/timeline")
-check(tlr.status_code in (200, 403), "timeline endpoint fine")
+# 2.663.0 (#4341): 200 - alice owns the sample task; the timeline route (collab/comments.py timeline) has no module gate
+check(tlr.status_code == 200, "timeline endpoint fine: 200")
 check(A.delete(B + "/api/sample").json().get("lists") == 2, "removed (both lists)")
 
 # ---- setup flag: sample: true creates it, false stops the tour from asking

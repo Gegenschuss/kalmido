@@ -175,7 +175,8 @@ INV3 = A.post(B + D, json={"kind": "invoice", "items": [item("x", 1, 1)]}).json(
 check(A.get(B + f"{D}/{INV3}").json()["timesheet_ok"] is False and A.get(B + f"{D}/{INV3}/timesheet.pdf").status_code == 400, "without client / period: 400")
 check(A.get(B + f"{D}/{OFF}/timesheet.pdf").status_code == 400 and A.get(B + f"{D}/{LS}/timesheet.pdf").status_code == 400, "only invoices: 400")
 check("timesheet_ok" not in A.get(B + f"{D}/{OFF}").json(), "no flag on a quotation")
-check(Bo.get(B + f"{D}/{INV}/timesheet.pdf").status_code in (200, 400), "a member: what they see only (no error 500)")
+# 2.663.0 (#4341): 400 - a plain member sees only own time entries in lists they do not administer (n43_own_sql), bob has none
+check(Bo.get(B + f"{D}/{INV}/timesheet.pdf").status_code == 400, "a member: what they see only (no own entries: 400)")
 
 # ================================================================ a person without organisation (freelancer-matrix: office)
 FID, Fr = freelancer(B, A)

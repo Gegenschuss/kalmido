@@ -148,7 +148,8 @@ SECRET = "TOPSECRET-TITLE-4711"
 
 check(cl.get("/me").ok, "agent: GET /me")
 check(cl.get(f"/tasks/{T}").ok, "agent: GET a task")
-check(cl.get("/tasks", params={"list_id": L, "q": "SEARCH-WORD-0815"}).status_code in (200, 400), "agent: a list of tasks with query values")
+# 2.663.0 (#4341): 200 - the agent is an edit member of L and the words of q make a valid full-text query (v1_tasks)
+check(cl.get("/tasks", params={"list_id": L, "q": "SEARCH-WORD-0815"}).status_code == 200, "agent: a list of tasks with query values: 200")
 r = cl.post("/tasks", json={"title": SECRET, "list_id": L})
 check(r.status_code == 201, f"agent: create a task ({r.status_code})")
 NT = r.json()["id"]

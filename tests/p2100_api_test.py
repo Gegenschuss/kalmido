@@ -147,7 +147,9 @@ check(r.headers.get("Strict-Transport-Security") == "max-age=31536000", "https f
 r = login("alice", "password123", "198.51.100.10")
 check(r.ok and "Secure" not in r.headers.get("Set-Cookie", ""), "plain http: no Secure flag")
 check("Strict-Transport-Security" not in r.headers, "plain http: no HSTS header")
-check(login("alice", "password123", "not-an-ip").status_code in (200, 400), "a malformed X-Forwarded-For does not crash the app")
+# 2.663.0 (#4341): 200 - waitress takes a bare token as the client address (no MalformedProxyHeader), login_log_ip /
+# rate_key_ip cope with text that is no address, alice's password is right
+check(login("alice", "password123", "not-an-ip").status_code == 200, "a malformed X-Forwarded-For does not crash the app: 200")
 # the proxy login still trusts the DIRECT peer (+ its port), not a forwarded address
 pp = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PROXY_PORT", "3041")
 A.patch(B + "/api/users/2", json={"proxy_login": "bobsso"})

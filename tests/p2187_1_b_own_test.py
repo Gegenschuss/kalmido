@@ -98,7 +98,8 @@ r = Sa.get(B + O + "/time-open", params={"client_id": C1, **P})
 check(r.ok and r.json().get("open_seconds") == 1800 and "clients" not in r.json(), "(2a) with the client as before " + r.text[:160])
 r = A.get(B + O + "/time-open", params=P)
 check(r.ok and r.json().get("open_seconds") == 9000, "(2a) the admin without a client: all hours " + r.text[:160])
-check(Sa.get(B + "/api/clients").status_code in (200, 403), "(2a) the client list stays as it is")
+# 2.663.0 (#4341): 200 - sam has the module clients and is a full member of the organisation (team/clients.clients_list)
+check(Sa.get(B + "/api/clients").status_code == 200, "(2a) the client list stays as it is: 200")
 
 # ---------------------------------------------------------------- (2b) trips entered for the person
 T_FOR = made(A.post(B + O + "/trips", json={"date_from": TD, "date_to": TD, "dest": "Messe Beispiel", "country": "DE",

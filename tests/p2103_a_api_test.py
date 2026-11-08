@@ -301,7 +301,8 @@ check(not sql("SELECT 1 FROM org_members WHERE org_id=?", (GAM,)) and sql("SELEC
 check(sql("SELECT active FROM hub_mailboxes WHERE org_id=?", (GAM,)) == [(0,)] and sql("SELECT auto FROM nl_conns WHERE org_id=?", (GAM,)) == [(0,)],
       "review A7: retired Gamma polls no mailbox and syncs no newsletter any more")
 check(all(w.get("id") != GAM for w in (Bo.get(B + "/api/me").json().get("workspaces") or [])), "bob no longer sees Gamma")
-check(Bo.patch(B + "/api/settings", json={"workspace": f"org:{GAM}"}).status_code in (200, 400, 403, 404)
+# 2.663.0 (#4341): 400 - clean_setting("workspace") refuses an org that is not in user_orgs (bob is out, Gamma retired)
+check(Bo.patch(B + "/api/settings", json={"workspace": f"org:{GAM}"}).status_code == 400
       and Bo.get(B + O + "/settings").json().get("org_id") != GAM, "bob cannot open Gamma's office")
 
 # 2.152.0 (#2167, review A4): the instance admin (no member) exports the retired organisation and downloads the file
