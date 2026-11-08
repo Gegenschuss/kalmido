@@ -208,7 +208,9 @@ def cal_purge(who, s, agid):
     e = s.post(B + "/api/events", json={"cal_id": k, "title": "Planung", "start": "2026-12-03T09:00", "end": "2026-12-03T10:00"})
     check(e.ok, f"4 {who}: setup: an event {e.text[:160]}")
     check(s.post(B + f"/api/evcals/{k}/feed", json={"action": "create"}).ok, f"4 {who}: setup: a feed")
-    check(s.delete(B + f"/api/evcals/{k}/members/{agid}").ok, f"4 {who}: setup: the agent's share taken back (obj_revoked)")
+    # a revoked share of the calendar (the members dialog's removal is not on the core yet, 7b: the row as the core writes it)
+    sql("INSERT INTO obj_revoked(src, org_id, user_id, kind, ref_id, row_json, reason, by_id, created_at) VALUES(?,?,?,?,?,?,?,?,?)",
+        ("fs_shares", None, agid, "evcal", k, "{}", "unshare", None, "2026-11-08T10:00:00Z"), write=True)
     node = sql("SELECT id FROM fs_nodes WHERE kind='ref' AND ref_kind='evcal' AND ref_id=?", (k,))
     have = {t: sql(f"SELECT COUNT(*) FROM {t} WHERE kind='evcal' AND ref_id=?", (k,))[0][0] for t in ("obj_history", "obj_undo", "obj_revoked")}
     check(node and all(have.values()), f"4 {who}: setup: a node, history, an undo step and a revoked share {node} {have}")

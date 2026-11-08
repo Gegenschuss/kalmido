@@ -755,13 +755,13 @@ def _answer(c, oid, did, admin, part=None):
     return out
 
 
-def _done(c, oid, r, admin, part=None, code=200):
+def _done(c, oid, r, admin, part=None, code=200, extra=None):
     from .undo import oun_post
     recalc(c, oid, r["id"])
     bump(c)
     oun_post(c)
     c.commit()
-    return jsonify(_answer(c, oid, r["id"], admin, part)), code
+    return jsonify({**_answer(c, oid, r["id"], admin, part), **(extra or {})}), code  # 2.747.0 (#5246): extra = trash_id of a deleted part
 
 
 @app.post("/api/office/docs/<int:did>/parts")
@@ -858,12 +858,12 @@ def tp_part_delete(did, pid):
     # more=), restorable while the quotation is a draft (OTB_CHECK "part"); the answer names it (trash_id)
     its = [x[0] for x in c.execute("SELECT id FROM office_doc_items WHERE doc_id=? AND org_id=? AND (part_id=? OR (kind='part' AND ref_part_id=?))",
                                    (did, oid, pid, pid)).fetchall()]
-    otb_put(c, oid, uid, "part", "office_doc_parts", pid, " · ".join(x for x in (p["title"], r["number"] or r["project_title"]) if x),
+    tid = otb_put(c, oid, uid, "part", "office_doc_parts", pid, " · ".join(x for x in (p["title"], r["number"] or r["project_title"]) if x),
             sub=str(did), more=[("office_doc_items", its)])
     c.execute("DELETE FROM office_doc_items WHERE doc_id=? AND org_id=? AND (part_id=? OR (kind='part' AND ref_part_id=?))", (did, oid, pid, pid))
     c.execute("DELETE FROM office_doc_parts WHERE id=? AND doc_id=? AND org_id=?", (pid, did, oid))
     ofx_log(c, oid, "part", doc_id=did, detail={"before": {"part": pid, "kind": p["kind"], "title": p["title"]}})
-    return _done(c, oid, r, admin)
+    return _done(c, oid, r, admin, extra={"trash_id": tid})
 
 
 def _part_back(c, oid, pid):
