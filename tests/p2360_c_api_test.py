@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """2.36.0 API tests, part C (#1116): the Paperless connection is removed, its data stays.
- - an instance that used Paperless (rows in paperless_links, pl_conns, pl_conn_users, pl_tokens, list_paperless and
+ - an instance that used Paperless (rows in pl_conns, pl_conn_users, pl_tokens, list_paperless and
    users.paperless_access = 1, written here with sqlite) starts and runs with the old PAPERLESS_* variables still set
  - every former Paperless route answers 404 (for an admin too); no answer carries Paperless data (task, state, project
    overview, users list, export)
@@ -26,7 +26,7 @@ CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 from kt import FAILS, OKS, check, sess, su_get  # 2.192.0 (#2514): shared helpers (tests/kt.py)
 PL_ENV = ["-e PAPERLESS_TOKEN=pl-old-env-token", "-e PAPERLESS_API=http://127.0.0.1:8082",
           "-e PAPERLESS_PUBLIC_URL=https://paperless.example.test", "-e KALMIDO_SECRET_KEY=" + "B" * 43 + "="]
-PL_TABLES = ("paperless_links", "pl_conns", "pl_conn_users", "pl_tokens", "list_paperless")
+PL_TABLES = ("pl_conns", "pl_conn_users", "pl_tokens", "list_paperless")  # 2.755.0 (#5265): paperless_links is dropped (migrations.d/5265_a.py)
 
 
 def start(keep=False):
@@ -74,15 +74,15 @@ dbx("INSERT INTO pl_conns(id,kind,owner_id,name,url,created_at) VALUES(2,'person
 dbx("INSERT INTO pl_conn_users(conn_id,user_id) VALUES(1,?)", (ids["bob"],))
 dbx("INSERT INTO pl_tokens(conn_id,user_id,token,updated_at) VALUES(1,?,'v1.sealed-a',?)", (ids["bob"], now))
 dbx("INSERT INTO pl_tokens(conn_id,user_id,token,updated_at) VALUES(2,?,'v1.sealed-b',?)", (ids["bob"], now))
-dbx("INSERT INTO paperless_links(task_id,doc_id,title,correspondent,created,status,added_at,conn_id,added_by) "
-    "VALUES(?,4711,'Salary slip 2026','Employer','2026-01-01','ok',?,1,1)", (T, now))
-dbx("INSERT INTO paperless_links(task_id,doc_id,title,status,added_at,att_id) VALUES(?,NULL,'offer.pdf','pending',?,?)", (T, now, AT))
+# 2.755.0 (#5265): the table paperless_links is gone (dropped at the start, migrations.d/5265_a.py): no task links any more
+check(not dbx("SELECT 1 FROM information_schema.tables WHERE table_schema=current_schema() AND table_name='paperless_links'"),
+      "#5265: the table paperless_links does not exist")
 dbx("INSERT INTO list_paperless(list_id,conn_id,doc_id,title,correspondent,created,added_by,added_at) "
     "VALUES(?,NULL,42,'Building permit','City','2026-02-02',1,?)", (P, now))
 dbx("INSERT INTO list_paperless(list_id,conn_id,doc_id,title,added_by,added_at) VALUES(?,NULL,43,'Old plan',1,?)", (L2, now))
 dbx("INSERT INTO activity(task_id,user_id,kind,data,created_at) VALUES(?,1,'paperless','{\"title\": \"Salary slip 2026\", \"conn\": 1}',?)", (T, now))
 before = counts()
-check(before == {"paperless_links": 2, "pl_conns": 2, "pl_conn_users": 1, "pl_tokens": 2, "list_paperless": 2}, f"rows written: {before}")
+check(before == {"pl_conns": 2, "pl_conn_users": 1, "pl_tokens": 2, "list_paperless": 2}, f"rows written: {before}")
 
 # ---- restart with the old PAPERLESS_* variables: the app starts and ignores them
 ok, out = start(keep=True)
@@ -149,8 +149,8 @@ check(r.ok, f"a person with old connections and tokens can be deleted: {r.status
 check(dbx("SELECT COUNT(*) FROM pl_tokens WHERE user_id=?", (ids["bob"],))[0][0] == 0
       and dbx("SELECT COUNT(*) FROM pl_conns WHERE kind='personal' AND owner_id=?", (ids["bob"],))[0][0] == 0,
       "... their own connection and tokens go with them (as before)")
-check(dbx("SELECT COUNT(*) FROM pl_conns WHERE kind='server'")[0][0] == 1 and dbx("SELECT COUNT(*) FROM paperless_links")[0][0] == 2,
-      "the shared connection and the task links stay")
+check(dbx("SELECT COUNT(*) FROM pl_conns WHERE kind='server'")[0][0] == 1,
+      "the shared connection stays")  # 2.755.0 (#5265): the task links (paperless_links) are dropped
 mid = counts()
 
 # ================================================================== backup + restore keep the tables

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # kalmido-suite: fresh now=2026-12-15T10:00:00Z
 """2.755.0 part A API tests, own container: the database clean-ups of the package. Invented names only.
+ - #5265: the table paperless_links is gone after the start (migrations.d/5265_a.py), pl_conns stays
  - #5263: a deleted comment of a video review is not in the organisation export (admin/orgexport.py ox_live), the live one is;
    the trash run (videos/review.py vdr_trash_prune, switch on) deletes a comment after the trash period, not before; the
    one-off clean-up (migrations.d/5263_a.py) removes at the next start the comments deleted before its cut-off -- of an
@@ -106,6 +107,12 @@ def comment(s, vid, text, **kw):
     check(r.ok, f"setup: comment {text} {r.text[:200]}")
     return r.json()["comment_id"]
 
+
+# ================================================================== #5265: the dead table paperless_links is dropped
+check(not dbx("SELECT 1 FROM information_schema.tables WHERE table_schema=current_schema() AND table_name='paperless_links'"),
+      "#5265: the start dropped the table paperless_links")
+check(dbx("SELECT 1 FROM information_schema.tables WHERE table_schema=current_schema() AND table_name='pl_conns'"),
+      "#5265: the other old Paperless tables stay")
 
 # ================================================================== #5263 (a): the organisation export
 VO = review(A, ORG)

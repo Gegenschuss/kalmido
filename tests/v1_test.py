@@ -165,13 +165,11 @@ r = subprocess.run(["docker", "exec", "-e", "TASKS_WATCHDOG=0", "-e", "KALMIDO_U
 check(r.stdout.strip().splitlines()[-1:] == ["False False"], f"KALMIDO_UPDATE_CHECK=0 turns it off: {r.stdout} {r.stderr[-300:]}")
 
 # ------------------------------------------------------------------ Paperless rows stay in the database, never in an answer
-# 2.36.0 (#1116): the Paperless connection is removed; linked documents stay in paperless_links (the way back) but no task,
-# state or export answer carries them any more
+# 2.36.0 (#1116): the Paperless connection is removed; no task, state or export answer carries its data any more
+# 2.755.0 (#5265): the table of the linked documents (paperless_links) is dropped; the answers stay without Paperless fields
 lid = A.post(B + "/api/lists", json={"name": "Shared", "kind": "project", "time_tracking": True}).json()["id"]  # 2.41.0 (#1471): time tracking is a switch of the list
 A.put(B + f"/api/lists/{lid}/members", json={"user_id": ids["bob"], "role": "edit"})
 tid = A.post(B + "/api/tasks", json={"title": "with document", "list_id": lid}).json()["id"]
-dbx("INSERT INTO paperless_links(task_id,doc_id,title,correspondent,created,status,added_at) VALUES(?,?,?,?,?,'ok',?)",
-    (tid, 4711, "Salary 2026", "Employer", "2026-01-01", "2026-09-01T00:00:00Z"))
 ta = A.get(B + f"/api/tasks/{tid}").json()
 tb = Bo.get(B + f"/api/tasks/{tid}").json()
 check("paperless" not in ta and "paperless" not in tb, "task: no Paperless field")
@@ -179,12 +177,11 @@ sb = [t for t in Bo.get(B + "/api/state").json()["tasks"] if t["id"] == tid][0]
 check("paperless" not in sb and "Salary 2026" not in Bo.get(B + "/api/state").text, "state: no Paperless data")
 blid = Bo.post(B + "/api/lists", json={"name": "Bob own", "kind": "project", "time_tracking": True}).json()["id"]
 btid = Bo.post(B + "/api/tasks", json={"title": "bob doc", "list_id": blid}).json()["id"]
-dbx("INSERT INTO paperless_links(task_id,doc_id,title,status,added_at) VALUES(?,?,?,'ok',?)", (btid, 815, "Contract", "2026-09-01T00:00:00Z"))
 ex = Bo.get(B + "/api/export.json").json()
 check("paperless_links" not in ex and "paperless_connections" not in ex, "export: no Paperless data")
 exa = A.get(B + "/api/export.json")
 check("Salary 2026" not in exa.text, "export of the owner: no Paperless titles")
-check(dbx("SELECT COUNT(*) FROM paperless_links")[0][0] == 2, "the rows stay in the database")
+check(not dbx("SELECT 1 FROM information_schema.tables WHERE table_name='paperless_links'"), "#5265: the table paperless_links is gone")
 tl = A.post(B + f"/api/tasks/{tid}/comments", json={"body": "see doc"})
 check(tl.ok, "comment while collaboration is on")
 
