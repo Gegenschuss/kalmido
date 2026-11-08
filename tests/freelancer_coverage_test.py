@@ -1651,7 +1651,6 @@ PUT /api/newsletter/consent
 PUT /api/office/cashflow/actual
 PUT /api/office/cashflow/check
 PUT /api/office/logbook/settings
-PUT /api/paperless
 PUT /api/supporter/{}
 PUT /api/tasks/{}/bell
 PUT /api/tasks/{}/enc-note
