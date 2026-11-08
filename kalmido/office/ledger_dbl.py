@@ -30,6 +30,11 @@ The journal of a year is worked out on every look from what is there -- nothing 
  - 2.685.0 (#5128): every bank account of the office (office/bankacc.py) is a ledger account of its own: its DATEV account, else
    the next free one after the default (SKR03 1200ff / SKR04 1800ff); the default account stays the DATEV settings' one. A
    bank line belongs to the account whose IBAN (or name) its statement carries (office_bank_balances), else to the default
+ - 2.702.0 (#5183): a CSV import names its bank account (office_bank_imports.bank_account_id, asked for in the import dialog
+   when the office has more than one); that choice comes first. The collective payout of the online payment provider moves
+   the money from the default account (where the payments of the invoices are booked, as DATEV does) onto the account whose
+   statement carries it. An approved entertainment receipt whose line also pays a receipt counts once: the meal books the
+   expense, the receipt drops out (as the strict income statement does, books.bk_meals_strict)
 Stored (office_ledger_entries, migrations.d/3461_a.py) are only the entries made by hand ("manual": accruals, provisions,
 corrections) and the opening entries ("open": by hand for the first year, else written by the closing of the year before;
 without them the opening balances of the DATEV import, office/datevimp.py). The year-end closing checks that the balance sheet
@@ -274,7 +279,7 @@ class _Banks:
         rows = bka_rows(c, oid) + bka_rows(c, oid, archived=True)
         own = {r["id"]: (r.get("datev_account") or "") for r in rows}
         used = {self.default} | {v.ljust(n, "0") for v in own.values() if v and len(v) <= n}
-        base, nxt, keys = LD_BANK_BASE[_chart(st)], 0, {}
+        base, nxt, keys, by_id = LD_BANK_BASE[_chart(st)], 0, {}, {}
         for r in rows:
             if r["is_default"] and not r["archived"]:
                 a = self.default
@@ -288,16 +293,23 @@ class _Banks:
                 used.add(a)
             if a != self.default:
                 self.labels[a] = " - ".join(x for x in (tr(LD_ACC_LABELS["bank"]), r.get("label") or ("… " + _iban_key(r.get("iban"))[-4:] if r.get("iban") else "")) if x)
+            by_id[r["id"]] = a
             for k in (_iban_key(r.get("iban")), (r.get("label") or "").strip().casefold()):
                 if k:
                     keys.setdefault(k, a)
         self.keys = keys
+        self.by_id = by_id
 
     def of_import(self, iid):
-        """The ledger account of the bank lines of import iid."""
+        """The ledger account of the bank lines of import iid: the bank account chosen at the import (2.702.0, #5183), else
+        the one its statement's balance names, else the default."""
         if self._imp is None:
             self._imp = {}
             if len(set(self.keys.values()) - {self.default}):  # one bank account only: every line on the default
+                for r in self.c.execute("SELECT id, bank_account_id FROM office_bank_imports WHERE org_id=? AND bank_account_id IS NOT NULL",
+                                        (self.oid,)):
+                    if r["bank_account_id"] in self.by_id:
+                        self._imp[r["id"]] = self.by_id[r["bank_account_id"]]
                 for b in cfb_balances(self.c, self.oid):
                     a = self.keys.get(_iban_key(b["account"])) or self.keys.get((b["account"] or "").strip().casefold())
                     if a:
@@ -356,9 +368,10 @@ def _vat_split(gross, pct):
     return gross - vat, vat
 
 
-def _receipt_side(c, oid, j, st, s, y0, y1, banks=None):
+def _receipt_side(c, oid, j, st, s, y0, y1, banks=None, meal_nodes=frozenset()):
     """The receipts, travel expenses and card lines of the DATEV input side, split into net and input tax; the receipts of
-    depreciated devices onto the fixed asset account. -> (node ids of the receipts paid by card, hints)."""
+    depreciated devices onto the fixed asset account; 2.702.0 (#5183): not the receipts in meal_nodes (an entertainment
+    receipt books them, _meal_side). -> (node ids of the receipts paid by card, hints)."""
     small = bool(s.get("small_business"))
     bu_rate = {v: k for k, v in {**DV_BU_IN, **(st.get("bu_in") or {})}.items() if v}  # tax key -> "19" / "7"
     afa_ids = set() if small else ast_afa_year(c, oid, int(y0[:4]))["receipt_ids"]
@@ -373,6 +386,8 @@ def _receipt_side(c, oid, j, st, s, y0, y1, banks=None):
             gross = -gross
         node = r.get("_node")
         doc = r.get("Belegfeld 1") or ""
+        if node and doc.startswith("B") and node in meal_nodes:
+            continue  # 2.702.0 (#5183): the same bill as an approved entertainment receipt: the meal counts, once
         if banks and doc.startswith("KA") and doc[2:].isdigit() and gegen == banks.default:
             gegen = banks.of_card(int(doc[2:]))  # 2.685.0 (#5128): the card total leaves the bank account of its bank line
         if node and doc.startswith("B") and node in afa_ids:
@@ -448,7 +463,19 @@ def _meal_lines(c, oid):
                                             "AND pay_kind IN ('bank', 'cash') AND pay_id IS NOT NULL", (oid,))}
 
 
-def _money_side(c, oid, j, st, s, y0, y1, card_nodes, banks=None):
+def _meal_nodes(c, oid):
+    """2.702.0 (#5183): the receipt node ids whose bank line, cash entry or card position also paid an approved entertainment
+    receipt (office_meals.pay_kind / pay_id): the same bill twice -- the meal wins (books.bk_meals_strict does the same), the
+    receipt is not booked a second time."""
+    w = "SELECT pay_id FROM office_meals WHERE org_id=? AND status='approved' AND deleted_at IS NULL AND pay_kind=? AND pay_id IS NOT NULL"
+    out = {r[0] for r in c.execute(f"SELECT match_id FROM office_bank_tx WHERE org_id=? AND match_kind='receipt' AND match_id IS NOT NULL "
+                                   f"AND deleted_at IS NULL AND id IN ({w})", (oid, oid, "bank"))}
+    out |= {r[0] for r in c.execute(f"SELECT node_id FROM office_cash_entries WHERE org_id=? AND node_id IS NOT NULL AND id IN ({w})", (oid, oid, "cash"))}
+    out |= {r[0] for r in c.execute(f"SELECT node_id FROM office_cc_lines WHERE org_id=? AND node_id IS NOT NULL AND id IN ({w})", (oid, oid, "card"))}
+    return out
+
+
+def _money_side(c, oid, j, st, s, y0, y1, card_nodes, banks=None, meal_nodes=frozenset()):
     """The bank lines and cash entries that the DATEV export leaves to the tax advisor, and the payments of the receipts
     (whatever year their receipt was booked in)."""
     banks = banks or _Banks(c, oid, st)
@@ -465,8 +492,16 @@ def _money_side(c, oid, j, st, s, y0, y1, card_nodes, banks=None):
         txt = t.get("counterpart") or t.get("purpose") or ""
         doc = f"BK{t['id']}"
         bank = banks.of_line(t)
+        if k == "payout" and a and bank != bank0:
+            # 2.702.0 (#5183): the payments of the online provider are booked on the default account (DATEV lines); its
+            # collective payout lands on the account whose statement carries it: the money moves over
+            j.add(t["day"], doc, txt, bank, bank0, a, "bank")
+            continue
         if not a or k in ("invoice", "card", "payout"):
             continue  # the payment of the invoice / the card total / the payout of the online payments: the DATEV lines book them
+        if ("bank", t["id"]) in meal_paid and k == "receipt":  # its receipt is in meal_nodes
+            j.add(t["day"], doc, txt, bank, clearing, a, "bank")  # 2.702.0 (#5183): the meal books the expense, not its receipt too
+            continue
         if k == "receipt":
             if t["match_id"] in cred:
                 j.add(t["day"], doc, txt, cred[t["match_id"]], bank, -a, "bank")
@@ -493,6 +528,8 @@ def _money_side(c, oid, j, st, s, y0, y1, card_nodes, banks=None):
         txt = oc_dec_fields(c, oid, "office_cash_entries", {"text": e["text"]})["text"] or ""
         if e["dir"] == "in":
             j.add(e["day"], doc, txt, cash, transit, a, "cash")
+        elif ("cash", e["id"]) in meal_paid:  # with a receipt: it is in meal_nodes, not booked
+            j.add(e["day"], doc, txt, clearing, cash, a, "cash")  # 2.685.0 (#5128), 2.702.0 (#5183): the meal books the expense
         elif e["node_id"]:
             if e["node_id"] in cred and e["node_id"] not in paid:
                 j.add(e["day"], doc, txt, cred[e["node_id"]], cash, a, "cash")
@@ -501,8 +538,6 @@ def _money_side(c, oid, j, st, s, y0, y1, card_nodes, banks=None):
                 # 2.685.0 (#3461 review, #5128): the receipt was booked against the bank (counter account bank), the money left the cash box
                 j.add(e["day"], doc, txt, bank0, cash, a, "cash")
                 paid.add(e["node_id"])
-        elif ("cash", e["id"]) in meal_paid:
-            j.add(e["day"], doc, txt, clearing, cash, a, "cash")  # 2.685.0 (#5128): the entertainment receipt books the expense
         else:
             konto = dv_cat_account(st, e["category"] or "")
             j.label(konto, e["category"] or "")
@@ -516,7 +551,8 @@ def _money_side(c, oid, j, st, s, y0, y1, card_nodes, banks=None):
     # a receipt with only a payment day (set by hand, no bank / cash line): paid from the bank on that day
     if st.get("in_counter") != "bank":
         rcs = [rc for rc in bk_receipts(c, oid, y0, y1, by="paid") if rc["paid_at"] and y0 <= rc["paid_at"] <= y1
-               and rc["node_id"] not in paid and rc["node_id"] not in card_nodes and not _flowed(c, oid, rc["node_id"])]
+               and rc["node_id"] not in paid and rc["node_id"] not in card_nodes and rc["node_id"] not in meal_nodes
+               and not _flowed(c, oid, rc["node_id"])]
         cr = _creditors(c, oid, st, [rc["node_id"] for rc in rcs], card_nodes)
         for rc in rcs:
             j.add(rc["paid_at"], f"B{rc['node_id']}", rc["title"], cr[rc["node_id"]], bank0, rc["amount"], "receipt_paid")
@@ -630,8 +666,9 @@ def ld_journal(c, oid, year):
     banks = _Banks(c, oid, st)  # 2.685.0 (#5128): an account per bank account
     opening = _opening(c, oid, j, st, year)
     _doc_side(c, oid, j, st, s, y0, y1, banks)
-    card_nodes, hints = _receipt_side(c, oid, j, st, s, y0, y1, banks)
-    _money_side(c, oid, j, st, s, y0, y1, card_nodes, banks)
+    meal_nodes = _meal_nodes(c, oid)  # 2.702.0 (#5183): a bill that is an entertainment receipt counts once
+    card_nodes, hints = _receipt_side(c, oid, j, st, s, y0, y1, banks, meal_nodes)
+    _money_side(c, oid, j, st, s, y0, y1, card_nodes, banks, meal_nodes)
     _afa_side(c, oid, j, st, s, year)
     _meal_side(c, oid, j, st, s, y0, y1)  # 2.685.0 (#5128): entertainment, mileage allowance, reminder fees as in bk_euer
     _km_side(c, oid, j, st, year)
