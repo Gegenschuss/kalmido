@@ -152,7 +152,7 @@ function calEditModal(x, colors, done) {
     <div class="row"><label for="ce-name">${tr('Name')}</label><input id="ce-name" maxlength="100" value="${esc(x.name)}"></div>
     <div class="row"><label>${tr('Colour')}</label><div class="cpal inline">${colors.map(c => `<button data-c="${c}" style="--cc:${c}" class="${c === color ? 'on' : ''}" aria-label="${c}"></button>`).join('')}</div></div>
     <div class="row"><label for="ce-int">${tr('Refresh')}</label><select id="ce-int"><option value="15">${tr('every 15 minutes')}</option><option value="60" ${x.interval === 60 ? 'selected' : ''}>${tr('every hour')}</option></select></div>
-    ${x.kind === 'ics' ? `<div class="row"><label for="ce-url">${tr('Link')}</label><input id="ce-url" type="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${tr('saved ({0}), empty = keep', x.url_hint)}"></div>`
+    ${x.kind === 'ics' ? `<div class="row"><label for="ce-url">${tr('Link')}</label><input id="ce-url" type="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${trh('saved ({0}), empty = keep', x.url_hint)}"></div>`
     : `<div class="row"><label for="ce-user">${tr('Username')}</label><input id="ce-user" autocomplete="off" autocapitalize="off" value="${esc(x.username)}"></div>
       <div class="row"><label for="ce-pw">${tr('Password')}</label><input id="ce-pw" type="password" autocomplete="new-password" placeholder="${x.password_saved ? tr('saved, empty = keep') : ''}"></div>`}
     ${dvw_editRow(x)}

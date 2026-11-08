@@ -268,6 +268,13 @@ function trn(one, other, n, ...a) {
   if (v === undefined) i18nPyAsk();
   return i18nFmt(Array.isArray(v) ? v[i] : i18nKey(i ? other : one), [n, ...a]);
 }
+// 2.666.0 (#4074 8): tr() / trn() for HTML: the translation keeps its own markup (<b>, <code>), every inserted value is escaped
+// (a name, a title, a host typed by someone). For values that are HTML already (an esc()-wrapped <b>…</b>) keep tr().
+const i18nEsc = x => String(x ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+/** @param {string} key @param {...any} a @returns {string} */
+function trh(key, ...a) { return tr(key, ...a.map(i18nEsc)); }
+/** @param {string} one @param {string} other @param {number} n @param {...any} a @returns {string} */
+function trnh(one, other, n, ...a) { return trn(one, other, n, ...a.map(i18nEsc)); }
 /** @type {(s: string) => string} */
 const N_ = s => s;
 // weekday / month names of the active language (index like Date.getDay() / getMonth())
