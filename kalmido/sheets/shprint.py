@@ -10,6 +10,8 @@ pages (down first, then across, like spreadsheets), each with the row numbers ag
 until every column fits (at least SHP_FS_MIN, longer texts end with "…"). Read right only (the export routes' rule).
 2.589.0 (#4825): a cell's own format goes along -- bold, italic (the regular font slanted), alignment and fill (the palette's
 fill colours of sheets/shfmt.py SHFM_XL_FILL, as in the .xlsx export); colour rules and merged blocks stay screen only.
+2.693.0 (#5148): a pivot sheet (no cells of its own) prints its computed table with the total row, like its view and its
+export; rows / cols do not apply there.
 """
 import re
 
@@ -24,7 +26,9 @@ from ..office.pdf import A4_H, A4_W, C_INK2, C_RULE, C_RULE2, _Page, pdf_text_wi
 from .core import ShBook, sh_eval, sh_need
 from .formula import sh_col_letter
 from .io import _disposition, shx_file_name
+from .shbook import shb_is_pivot  # 2.693.0 (#5148)
 from .shfmt import SHFM_XL_FILL, shfm_load  # 2.589.0 (#4825)
+from .shpivot import shp_compute  # 2.693.0 (#5148)
 
 SHP_FS = 8.0  # the font size of the cells (points)
 SHP_FS_MIN = 3.5  # "fit": never smaller
@@ -74,8 +78,8 @@ def _shp_text(pg, x, y, s, size, bold, italic, align, width):
         pg.ops[-1] = re.sub(r"(-?[\d.]+) (-?[\d.]+) Td ", lambda m: f"1 0 {SHP_SLANT} 1 {m.group(1)} {m.group(2)} Tm ", pg.ops[-1], count=1)
 
 
-def shp_pdf(c, sheet, opts):
-    """The PDF bytes of sheet for the current person with opts (see the module doc)."""
+def _shp_cells(c, sheet, opts):
+    """(titles, grid, formats, row numbers, right-aligned) of an ordinary sheet: its evaluated cells (rows / cols chosen)."""
     book = ShBook(c, sheet)
     res = sh_eval(c, sheet, book, me())
     rows = _ids(opts.get("rows"), book.row_idx, "rows")
@@ -85,11 +89,6 @@ def shp_pdf(c, sheet, opts):
     cols = [col for col in book.cols if cols is None or col["id"] in cset]
     if not rows or not cols:
         raise BadInput(tr("Nothing to print"))
-    land, fit = opts.get("orient") == "landscape", bool(opts.get("fit", True))
-    head, numbers = bool(opts.get("head", True)), bool(opts.get("numbers", True))
-    P = _Wide if land else _Page
-    pw, ph = P.W, P.H
-    uw = pw - 2 * SHP_MARGIN
     at = {(x["row_id"], x["col_id"]): x for x in book.cells.values() if book.live(x)}
 
     def text(rid, col):
@@ -116,11 +115,43 @@ def shp_pdf(c, sheet, opts):
             vals = [res.get(at[(r["id"], col["id"])]["id"], {}).get("vtype") for r in rows if (r["id"], col["id"]) in at]
             vals = [v for v in vals if v not in (None, "empty")]
             right[ci] = bool(vals) and all(v == "number" for v in vals)
+    return titles, grid, fmts, nums, right
+
+
+def _shp_pivot(c, sheet):
+    """2.693.0 (#5148): (titles, grid, formats, row numbers, right-aligned) of a pivot sheet: its computed table as the view
+    shows it (sheets/shpivot.py shp_compute, the viewer's values), the total row bold, no row numbers (the rows are groups)."""
+    res = shp_compute(c, sheet)
+    if res["error"]:
+        raise BadInput(res["error"])
+    hd, rows, total = res["header"], res["rows"], res["total"]
+    lines = rows + ([total] if total else [])
+    if not lines:
+        raise BadInput(tr("Nothing to print"))
+    width = len(hd)
+    titles = [str(h or "") for h in hd]
+    grid = [[str(x["d"] or "").replace("\n", " ") for x in line[:width]] + [""] * (width - len(line)) for line in lines]
+    fmts = [[None] * width for _ in rows] + ([[{"bold": True}] * width] if total else [])
+    right = [ci >= res["keys"] for ci in range(width)]  # the values right, the row fields left (as the view)
+    return titles, grid, fmts, [], right
+
+
+def shp_pdf(c, sheet, opts):
+    """The PDF bytes of sheet for the current person with opts (see the module doc)."""
+    land, fit = opts.get("orient") == "landscape", bool(opts.get("fit", True))
+    head, numbers = bool(opts.get("head", True)), bool(opts.get("numbers", True))
+    P = _Wide if land else _Page
+    pw, ph = P.W, P.H
+    uw = pw - 2 * SHP_MARGIN
+    if shb_is_pivot(sheet):  # 2.693.0 (#5148): a pivot sheet has no cells -- its computed table with the total row
+        titles, grid, fmts, nums, right = _shp_pivot(c, sheet)
+    else:
+        titles, grid, fmts, nums, right = _shp_cells(c, sheet, opts)
     pad = 4.0
 
     def natural(size):
         ws = []
-        for ci in range(len(cols)):
+        for ci in range(len(titles)):
             w = pdf_text_width(titles[ci], size, True)
             for ri, row in enumerate(grid):
                 if row[ci]:
@@ -128,7 +159,7 @@ def shp_pdf(c, sheet, opts):
                     if w >= SHP_COL_MAX * size / SHP_FS:
                         break
             ws.append(min(SHP_COL_MAX * size / SHP_FS, max(18.0 * size / SHP_FS, w)) + 2 * pad)
-        nw = max(pdf_text_width(n, size) for n in nums + ["0"]) + 2 * pad
+        nw = max(pdf_text_width(n, size) for n in nums + ["0"]) + 2 * pad if nums else 0.0  # 2.693.0 (#5148): a pivot has none
         return ws, nw
 
     fs = SHP_FS
@@ -189,7 +220,8 @@ def shp_pdf(c, sheet, opts):
                 pg, y = new_page(False)
                 if head:
                     y = head_row(pg, y, chunk)
-            pg.text(SHP_MARGIN + pad, y + (lh - fs) / 2, nums[ri], fs, color=C_INK2, align="r", width=nw - 2 * pad)
+            if nums:
+                pg.text(SHP_MARGIN + pad, y + (lh - fs) / 2, nums[ri], fs, color=C_INK2, align="r", width=nw - 2 * pad)
             x = SHP_MARGIN + nw
             for ci in chunk:
                 f = fmts[ri][ci] or {}

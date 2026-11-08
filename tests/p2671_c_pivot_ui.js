@@ -4,6 +4,7 @@
 // the source, "Create" adds the pivot sheet and opens it: a read-only table with its header, one row per client and the
 // totals bold; the tab carries its mark. A change of the source shows in the open pivot by itself (the live way). "Edit
 // pivot…" changes the calculation (average), Undo brings the sum back in one step. A pivot sheet draws no grid, no editor.
+// 2.693.0 (#5148): its menu offers "Print / PDF…"; the dialog has no cell choice and no browser print, the PDF holds the table.
 // P2671C_NOSTART=1 = the server already runs.
 const path = require('path');
 const {execFileSync} = require('child_process');
@@ -72,6 +73,18 @@ const cells = d => [...d.querySelectorAll('#view .spv-grid tbody tr')].map(tr =>
   check(await until(() => w.eval('HIST.undo.length') > h0), 'the change is an Undo step');
   await w.eval(`histStep('undo')`);
   check(await until(() => JSON.stringify(cells(d)) === JSON.stringify(['Acme|17', 'Beta|8'])), 'Undo: the sum again ' + JSON.stringify(cells(d)));
+  // ================= 2.693.0 (#5148): print / PDF of the pivot sheet (was: an empty sheet)
+  w.eval(`window.__pv = []; pdfView = o => { window.__pv.push(o); }; loadModule = () => Promise.resolve();`);
+  d.querySelector('#view [data-spv="menu"]')?.click();
+  const pr = await until(() => items(d).find(b => /Print \/ PDF/.test(b.textContent)));
+  check(pr, 'the pivot menu offers "Print / PDF…" ' + items(d).map(b => b.textContent.trim()).join(' | '));
+  pr?.click();
+  const pm = await until(() => d.querySelector('.modal.shpmd'));
+  check(pm && !pm.querySelector('input[name="shp-w"]') && !pm.querySelector('button[data-m="quick"]'), 'the print dialog: no cell choice, no browser print');
+  pm?.querySelector('button[data-m="pdf"]')?.click();
+  check(await until(() => w.eval('window.__pv.length') === 1), 'Show PDF opens the PDF view');
+  const pdf = w.eval('window.__pv[0]');
+  check(pdf && pdf.data && pdf.data.length > 1000 && !d.querySelector('.modal.shpmd'), 'the PDF of the pivot sheet ' + JSON.stringify({n: pdf?.name, l: pdf?.data?.length}));
   w.close();
 
   check(errs.length === 0, 'no JS errors: ' + errs.slice(0, 3).join(' | '));

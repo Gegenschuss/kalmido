@@ -122,6 +122,7 @@ document.addEventListener('click', e => {
   const a = e.target instanceof Element ? /** @type {HTMLElement|null} */ (e.target.closest('[data-spv]')) : null, sh = SHV.sh;
   if (!a || !sh || sh.kind !== 'pivot' || !$('#view')?.contains(a)) return;
   if (a.dataset.spv === 'edit') spv_dialog(sh, sh.pivot);
-  else if (a.dataset.spv === 'menu') menu(a, [{label: tr('Export as Excel (.xlsx)'), icon: 'download', fn: () => shxUiExport(sh, 'xlsx')},
+  else if (a.dataset.spv === 'menu') menu(a, [...typeof shp_dialog === 'function' ? [{label: tr('Print / PDF…'), icon: 'printer', fn: () => shp_dialog(sh)}] : [],  // 2.693.0 (#5148)
+    {label: tr('Export as Excel (.xlsx)'), icon: 'download', fn: () => shxUiExport(sh, 'xlsx')},
     {label: tr('Export as CSV'), icon: 'download', fn: () => shxUiExport(sh, 'csv')}]);
 });

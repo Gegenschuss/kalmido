@@ -9,6 +9,7 @@
  - a pivot sheet takes no write of its own (cells, rows, columns: 409); its kind in the sheet bar (tabs)
  - rights are the table's: a stranger 404 (read, setting), a read share reads it and changes nothing (403)
  - .xlsx of the table writes the pivot's computed values; CSV of the pivot sheet = its table
+ - 2.693.0 (#5148): the print view (print.pdf) of a pivot sheet = its computed table with the total row (was: nothing to print)
  - API v1: an agent reads kind / pivot.result of a pivot sheet, its write is refused (409)
 freelancer-matrix: sheets
 usage: p2671_c_pivot_test.py <datadir>      (a fresh container; P2671C_NOSTART=1 = the server already runs)"""
@@ -17,6 +18,7 @@ import os
 import re
 import sys
 import zipfile
+import zlib
 
 import requests
 
@@ -200,6 +202,33 @@ check("Sum of Amount" in ws and "<v>535</v>" in ws and "<v>250</v>" in ws and "<
 r = Bo.get(B + f"/api/sheets/{P}/export.csv")
 check(r.ok and "Acme" in r.text and "Sum of Amount" in r.text and "Total" in r.text, "CSV of the pivot sheet: its table " + r.text[:200])
 
+
+# ================================================================ 2.693.0 (#5148): the print view of a pivot sheet
+def pdf_text(raw):
+    """The unpacked page contents of a PDF from shprint (FlateDecode streams)."""
+    out = b""
+    for m in re.finditer(rb"stream\n(.*?)\nendstream", raw, re.S):
+        try:
+            out += zlib.decompress(m.group(1)) + b"\n"
+        except zlib.error:
+            pass
+    return out
+
+
+def hx(s):
+    return ("<" + s.encode("cp1252").hex() + ">").encode()
+
+
+tot = [c["d"] for c in res(Bo, P).get("total") or []]
+r = Bo.post(B + f"/api/sheets/{P}/print.pdf", json={"orient": "landscape", "fit": True, "head": True, "numbers": True})
+check(r.ok and r.content.startswith(b"%PDF"), f"print: a PDF of the pivot sheet {r.status_code} " + (r.text[:200] if not r.ok else ""))
+txt = pdf_text(r.content) if r.ok else b""
+check(all(hx(s) in txt for s in ("Client", "Sum of Amount", "Average of Amount", "Acme", "Gamma", "Total", tot[1] if len(tot) > 1 else "?")),
+      "print: the pivot's table with header, rows and the total " + str(tot))
+check(Bo.post(B + f"/api/sheets/{P}/print.pdf", json={"rows": [1], "cols": [1]}).ok, "print: rows / cols do not apply to a pivot sheet")
+check(Ca.post(B + f"/api/sheets/{P}/print.pdf", json={}).ok and Er.post(B + f"/api/sheets/{P}/print.pdf", json={}).status_code == 404,
+      "print: a read share prints it, a stranger 404")
+
 # ================================================================ a person without an organisation + her agent (API v1)
 # freelancer-matrix: sheets
 FID, Fl = freelancer(B, A, features=FEATURES + ",sheets")
@@ -221,6 +250,8 @@ ver = get(Fl, FP)["pivot"]["updated_at"]
 check(Fl.put(B + f"/api/sheets/{DT}/tabs/{FP}/pivot", json={"source": DT, "rows": [dc[0]], "values": [{"col": dc[1], "agg": "avg"}], "expect_updated_at": ver}).ok
       and vals(res(Fl, FP).get("rows")) == [["Ann", "3.5"], ["Ben", "2"]], "freelancer: the average")
 check(Bo.get(B + f"/api/sheets/{FP}").status_code == 404, "another person never sees it")
+r = Fl.post(B + f"/api/sheets/{FP}/print.pdf", json={})
+check(r.ok and hx("Ann") in pdf_text(r.content) and hx("3.5") in pdf_text(r.content), "freelancer: the print view of her pivot sheet (#5148)")
 d = da.get(V + f"/sheets/{FP}")
 check(d.ok and d.json().get("kind") == "pivot" and vals(d.json()["pivot"]["result"]["rows"]) == [["Ann", "3.5"], ["Ben", "2"]],
       "API v1: the agent reads the pivot sheet's table " + d.text[:300])

@@ -24,19 +24,20 @@ async function shp_make(sh, o) {  // the PDF's bytes (throws with the server's m
 }
 function shp_dialog(sh) {
   if (!sh) return;
-  const sel = shp_sel(sh), vis = shvVisRows(sh), last = SHP.last;
+  // 2.693.0 (#5148): a pivot sheet has no cells, rows or selection: the server prints its computed table (with the total)
+  const pv = sh.kind === 'pivot', sel = pv ? null : shp_sel(sh), vis = pv ? [] : shvVisRows(sh), last = SHP.last;
   const chk = (k, label) => `<label class="chkl"><input type="checkbox" data-shp="${k}" ${last[k] ? 'checked' : ''}> ${label}</label>`;
   const md = modal(`<h3>${tr('Print / PDF')}</h3>
     <fieldset class="shp-set"><legend>${tr('Page')}</legend>
       <label class="chkl"><input type="radio" name="shp-o" value="portrait" ${last.orient !== 'landscape' ? 'checked' : ''}> ${tr('Portrait')}</label>
       <label class="chkl"><input type="radio" name="shp-o" value="landscape" ${last.orient === 'landscape' ? 'checked' : ''}> ${tr('Landscape')}</label></fieldset>
-    <fieldset class="shp-set"><legend>${tr('Print')}</legend>
+    ${pv ? '' : `<fieldset class="shp-set"><legend>${tr('Print')}</legend>
       <label class="chkl"><input type="radio" name="shp-w" value="all" ${sel ? '' : 'checked'}> ${tr('Whole sheet')}${vis.length < sh.rows.length ? ` <small class="muted">${esc(tr('{0} of {1} rows shown', vis.length, sh.rows.length))}</small>` : ''}</label>
       <label class="chkl"><input type="radio" name="shp-w" value="sel" ${sel ? 'checked' : 'disabled'}> ${sel ? esc(tr('Selection ({0} × {1} cells)', sel.rows.length, sel.cols.length)) : tr('Selection')}</label>
-      ${sel ? '' : `<small class="muted shp-hint">${tr('Select cells in the table first to print only them.')}</small>`}</fieldset>
+      ${sel ? '' : `<small class="muted shp-hint">${tr('Select cells in the table first to print only them.')}</small>`}</fieldset>`}
     <fieldset class="shp-set shp-opts"><legend>${tr('Options')}</legend>${chk('fit', tr('Fit to page width'))}${chk('head', tr('Repeat the header row on every page'))}${chk('numbers', tr('Page numbers'))}</fieldset>
     <p class="muted mhint" id="shp-err" role="alert"></p>
-    <div class="foot"><button type="button" class="btn ghost" data-m="quick" title="${esc(tr('The browser prints the shown rows directly'))}">${ic('printer', 's')}${tr('Browser print')}</button><span class="spacer"></span>
+    <div class="foot">${pv ? '' : `<button type="button" class="btn ghost" data-m="quick" title="${esc(tr('The browser prints the shown rows directly'))}">${ic('printer', 's')}${tr('Browser print')}</button>`}<span class="spacer"></span>
       <button type="button" class="btn" data-m="close">${tr('Cancel')}</button><button type="button" class="btn pri" data-m="pdf">${ic('pdf', 's')}${tr('Show PDF')}</button></div>`);
   md.classList.add('shpmd');
   md.addEventListener('click', async e => {
@@ -49,7 +50,7 @@ function shp_dialog(sh) {
     const on = (/** @type {string} */ k) => !!(/** @type {HTMLInputElement|null} */ (md.querySelector(`input[data-shp="${k}"]`)))?.checked;
     const o = {orient: val('input[name="shp-o"]:checked') === 'landscape' ? 'landscape' : 'portrait', fit: on('fit'), head: on('head'), numbers: on('numbers')};
     SHP.last = {...o};
-    const pick = val('input[name="shp-w"]:checked') === 'sel' && sel ? sel : {rows: vis.length < sh.rows.length ? vis.map(r => r.id) : null, cols: null};
+    const pick = pv ? {rows: null, cols: null} : val('input[name="shp-w"]:checked') === 'sel' && sel ? sel : {rows: vis.length < sh.rows.length ? vis.map(r => r.id) : null, cols: null};
     const err = md.querySelector('#shp-err');
     b.disabled = true;
     let data;
