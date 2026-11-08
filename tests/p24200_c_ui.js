@@ -125,6 +125,25 @@ async function receipt(ck, ws, name, amount, day) {
     check(await ev(`[...document.querySelectorAll('.rcl-selbar .btn')].every(b => b.getBoundingClientRect().height >= 44)`), 'on a phone its targets are large');
     await shot('p24200-c-phone.png');
   }, false);
+  // 2.735.0 (#5208): on a touch phone of 320 / 460 px every segment button of the filters holds its word (German: "Ungeprüft"
+  // was 69 px in a button of 62 px - the touch rule's min-width of 2.75rem allowed the shrink below the text)
+  await call(CA, 'PATCH', '/api/settings', {lang: 'de'});
+  await firefox(async ({cmd, ev, ctx, nav}) => {
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 320, height: 800}});
+    await nav(B + 'static/icon.svg');
+    await ev(`(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
+    await signIn(ev, 'alice');
+    await nav(B + '#office/books/receipts');
+    check(await ready(ev, `!!document.querySelector('.rcl-chkf [data-rcl="checked"][data-v="no"]')`, 80), 'touch phone: the filter Ungeprüft is there');
+    const fits = `(() => { document.querySelector('.rcl-filters').open = true; const bs = [...document.querySelectorAll('.rcl-f .seg button')]; const bad = bs.filter(b => { const r = document.createRange(); r.selectNodeContents(b); const cs = getComputedStyle(b);
+      return r.getBoundingClientRect().width > b.getBoundingClientRect().width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) + 0.5; }).map(b => b.textContent);
+      const W = document.documentElement.clientWidth; const out = bs.filter(b => b.getBoundingClientRect().right > W + 1).map(b => b.textContent);
+      return bs.length >= 7 && /Ungeprüft/.test(document.querySelector('.rcl-chkf').textContent) && !bad.length && !out.length ? 'ok' : JSON.stringify({n: bs.length, bad, out}); })()`;
+    for (const w of [320, 460]) {
+      await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: w, height: 800}});
+      check(await ready(ev, `${fits} === 'ok'`), `touch ${w} px: every segment button holds its word ` + await ev(fits).catch(e => String(e)));
+    }
+  }, true);
 
   console.log(`p24200_c_ui: ${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);

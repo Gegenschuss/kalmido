@@ -994,7 +994,7 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
   .rcl-grid{flex-direction:column;align-items:stretch}
   .rcl-f select,.rcl-q{width:100%}
   .rcl-f .seg{display:flex}
-  .rcl-f .seg button{flex:1}
+  .rcl-f .seg button{flex:1 1 auto;justify-content:center;min-width:max-content}  /* 2.735.0 (#5208): a button is never narrower than its word (the touch rule's min-width:2.75rem let 'Ungeprüft' outgrow it at 320/460 px) */
   .rcl-exp{justify-content:stretch}
   .rcl-exp .btn{flex:1;justify-content:center}
 }
