@@ -507,7 +507,7 @@ function wk_pageHtml(p) {
     ${mob ? '' : `<button type="button" class="iconbtn" data-wk="close" title="${esc(tr('Close'))}" aria-label="${esc(tr('Close'))}">${ic('x')}</button>`}</div>${wk_dayBar(p)}
     ${edit ? `<div class="wkedwrap">${typeof wem_bar === 'function' ? wem_bar(p) : ''}${!asMd && cm ? wkcm_html(p) : `<textarea id="wk-body" class="ntbody" aria-label="${esc(tr('Text'))}" placeholder="${esc(tr('Write … ([[Page]], [[#123]])'))}">${esc(p.body)}</textarea>`}<div id="wk-ac" class="wkac hidden" role="listbox" aria-label="${esc(tr('Pages'))}"></div></div>`
       : `${wk_attrsHtml(p.attrs, p.space)}<div class="md ntmd wkmd" id="wk-md">${wk_bodyStrip(p.body).trim() ? wk_render(p) : `<p class="muted">${tr('Empty page.')}</p>`}</div>`}
-    ${wka_html(p, may)}${wko_cfHtml(p)}
+    ${wka_html(p, may, edit)}${wko_cfHtml(p)}
     ${p.backlinks?.length ? `<section class="wkback" aria-label="${esc(tr('Linked from'))}"><h4>${ic('link', 's')}${tr('Linked from')}</h4><ul>${p.backlinks.map(b => `<li><a href="#wiki/${b.id}">${esc(b.path)}</a></li>`).join('')}</ul></section>` : ''}
     <div class="ntfoot muted"><span id="wk-saved" role="status" aria-live="polite"></span><span class="spacer"></span>${p._off ? `<span class="wkoff">${esc(tr('Offline · as of {0}', fmtWhen(p._off)))}</span> · ` : ''}<span>${esc(tr('Changed {0}', fmtWhen(p.updated_at)))}${p.updated_by_name ? ' · ' + esc(p.updated_by_name) : ''}</span></div>${wk_smvLine(p.moved)}`;
 }
@@ -621,12 +621,12 @@ function wka_put(h, fls) {
       : `<a href="${esc(url)}" target="_blank" rel="noopener" class="wklink">${esc(f.label || wka_dec(f.name))}</a>`;
   });
 }
-function wka_html(p, may) {
+function wka_html(p, may, edit) {  // 2.750.0 (#5229): attach, drop and delete only while the page is in edit mode (WK.edit); reading keeps open + copy link
   const fs = p.files || [], open = !wk_e2e(p.space);
-  if (!fs.length && !(may && open)) return '';
-  return `<section class="wkfiles" aria-label="${esc(tr('Files'))}"><h4>${ic('file', 's')}${tr('Files')}${fs.length ? ` · ${fs.length}` : ''}<span class="spacer"></span>${may && open ? `<input type="file" id="wka-file" multiple accept="${WKA_ACCEPT}" hidden><button type="button" class="btn" data-wka="add">${ic('upload', 's')}${tr('Attach files')}</button>` : ''}</h4>
+  if (!fs.length && !(may && open && edit)) return '';
+  return `<section class="wkfiles" aria-label="${esc(tr('Files'))}"><h4>${ic('file', 's')}${tr('Files')}${fs.length ? ` · ${fs.length}` : ''}<span class="spacer"></span>${may && open && edit ? `<input type="file" id="wka-file" multiple accept="${WKA_ACCEPT}" hidden><button type="button" class="btn" data-wka="add">${ic('upload', 's')}${tr('Attach files')}</button>` : ''}</h4>
     ${fs.length ? `<ul>${fs.map(f => `<li><a class="wkfile" href="${esc(f.url)}" target="_blank" rel="noopener" title="${esc(f.name)}">${f.image ? `<img src="${esc(f.url)}" alt="" loading="lazy">` : ic('pdf')}<span class="an">${esc(f.name)}</span><span class="as">${fmtSize(f.size)}</span></a>
-      <button type="button" class="iconbtn" data-wka="copy" data-id="${f.id}" title="${esc(tr('Copy link'))}" aria-label="${esc(tr('Copy link'))}">${ic('link')}</button>${may ? `<button type="button" class="iconbtn" data-wka="del" data-id="${f.id}" title="${esc(tr('Delete'))}" aria-label="${esc(tr('Delete'))}">${ic('trash')}</button>` : ''}</li>`).join('')}</ul>` : ''}</section>`;
+      <button type="button" class="iconbtn" data-wka="copy" data-id="${f.id}" title="${esc(tr('Copy link'))}" aria-label="${esc(tr('Copy link'))}">${ic('link')}</button>${may && edit ? `<button type="button" class="iconbtn" data-wka="del" data-id="${f.id}" title="${esc(tr('Delete'))}" aria-label="${esc(tr('Delete'))}">${ic('trash')}</button>` : ''}</li>`).join('')}</ul>` : ''}</section>`;
 }
 const wka_md = f => `${f.image ? '!' : ''}[${f.name.replace(/[[\]]/g, '')}](${f.url})`;
 // 2.633.0 (#4920): fixed hidden file input before "Attach files" (wka_html), its change uploads (a drop onto the window too, dropany.js)
@@ -666,10 +666,14 @@ function wka_report(r) {
 document.addEventListener('click', e => {
   const a = e.target.closest?.('[data-wka]'); if (!a || !$('#view')?.contains(a)) return;
   const p = WK.pg, f = p?.files?.find(x => x.id === +a.dataset.id); if (!p) return;
-  if (a.dataset.wka === 'add') $('#wka-file')?.click();  // 2.633.0 (#4920): the input's change uploads
+  if (a.dataset.wka === 'add') { if (WK.edit) $('#wka-file')?.click(); }  // 2.633.0 (#4920): the input's change uploads
   else if (a.dataset.wka === 'copy' && f) navigator.clipboard?.writeText(wka_md(f)).then(() => toast(tr('Link copied')));
-  else if (a.dataset.wka === 'del' && f) wka_del(p, f);
+  else if (a.dataset.wka === 'del' && f && WK.edit) wka_del(p, f);
 });
+// 2.750.0 (#5229): a file dropped onto a page that is only being read uploads nothing (dropany.js would fall onto another file input): a hint instead
+const wka_readOnly = () => !!(WK.pg && !WK.edit && $('#wk-md') && $('#view')?.contains($('#wk-md')));
+document.addEventListener('dragover', e => { if ([...(e.dataTransfer?.types || [])].includes('Files') && wka_readOnly()) e.preventDefault(); });
+document.addEventListener('drop', e => { if ([...(e.dataTransfer?.types || [])].includes('Files') && wka_readOnly() && ![...document.querySelectorAll('.modal:not(.closing):not(.hidden):not(.authscreen)')].some(m => m.getClientRects().length)) { e.preventDefault(); toast(tr('Edit first to attach files')); } });
 // ---- saving (like notes: debounced, a change by someone else in between asks)
 // 2.350.0 B (#3147): the field one writes in; 2.554.0 (#4052): the plain field (Edit as Markdown) or the editor's stand-in (wkcm.js wkcm_ta)
 const wk_ta = () => /** @type {any} */ ($('#wk-body') || (typeof wkcm_ta === 'function' ? wkcm_ta() : null));
