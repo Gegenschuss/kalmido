@@ -27,7 +27,7 @@ BEFORE = 4
 
 # attribute -> (kind, files that may emit it besides the listener's own file); checked 04.11.2026 (#4281)
 KNOWN = {
-    "ab": ("shared", {"abdocs.js", "filetext.js", "tagsel.js"}),
+    "ab": ("shared", {"abdocs.js", "docs.js", "filetext.js", "tagsel.js"}),  # 2.752.0 (#4887): docs.js dc_headHtml (Add / Scan into a folder with recognition = ablage.js upload / scan)
     "abo": ("shared", {"office_cashflow.js"}),
     "absel": ("shared", {"tagsel.js"}),
     "bk": ("guarded", {"account.js"}),
