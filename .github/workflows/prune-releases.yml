@@ -3,7 +3,8 @@ name: Prune releases
 # 2.641.0 (#5011): thins out old GitHub release objects and ghcr image versions. What stays (tools/weekly_release.py prune): the
 # newest latest-ok version of each ISO week (weeks before the first latest-ok tag: the newest release of the week), the current
 # latest release, everything younger than 14 days; of the images only tagged versions whose tags are all X.Y.Z can go (never
-# :latest, never the untagged platform parts of a kept image). Standard: a dry run that only writes the list into the log; it
+# :latest, never the untagged platform parts of a kept image; 2.658.0 #5042: the untagged parts of a manifest that goes go with it
+# when no kept manifest names them, read with imagetools inspect --raw). Standard: a dry run that only writes the list into the log; it
 # deletes only with dry_run false (by hand) or when weekly-release.yml calls it with the repository variable
 # KALMIDO_PRUNE_APPLY=1. Only release objects and package versions are deleted over the API - git tags are NEVER deleted or
 # moved (the script and the delete loop refuse any other path). The job with checkout reads only; the job that deletes runs
@@ -50,9 +51,21 @@ jobs:
             Organization) pkg="orgs/$owner/packages/container/kalmido" ;;
             *) pkg="users/$owner/packages/container/kalmido" ;;
           esac
-          gh api --paginate "$pkg/versions?per_page=100" --jq '.[] | {id, created_at, tags: .metadata.container.tags}' > images.jsonl
+          gh api --paginate "$pkg/versions?per_page=100" --jq '.[] | {id, name, created_at, tags: .metadata.container.tags}' > images.jsonl
+          # 2.658.0 (#5042): the children (platform images, attestations) of every tagged manifest; an unreadable one is left
+          # out, and then the script deletes no untagged part at all (it might belong to a kept image)
+          : > children.jsonl
+          jq -r 'select((.tags // []) | length > 0) | .name' images.jsonl | while IFS= read -r dg; do
+            case "$dg" in sha256:*) ;; *) continue ;; esac
+            if raw=$(docker buildx imagetools inspect --raw "ghcr.io/$owner/kalmido@$dg" 2>/dev/null); then
+              printf '%s' "$raw" | jq -c --arg d "$dg" '{digest: $d, children: [(.manifests // [])[].digest]}' >> children.jsonl \
+                || echo "::warning::children of $dg unreadable"
+            else
+              echo "::warning::imagetools inspect failed for $dg"
+            fi
+          done
           python3 tools/weekly_release.py prune --tags tags.txt --latest "$latest" --releases releases.jsonl --images images.jsonl \
-            --repo "$GH_REPO" --packages "$pkg" --plan delete.txt 2> plan.txt
+            --repo "$GH_REPO" --packages "$pkg" --children children.jsonl --plan delete.txt 2> plan.txt
           cat plan.txt
           { echo '### Prune plan'; echo; sed 's/^/    /' plan.txt; } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

@@ -157,6 +157,30 @@ _, plan3 = wr.prune_plan(TG, "v2.635.0", REL3, IMG3, "o/r", "users/o/packages/co
 gone3 = {x[1] for x in plan3}
 check(not gone3 & {"2.639.0", "2.640.0"} and "2.629.0" in gone3,
       f"weeks later: the newest latest-ok version and all above it stay, older ones still go {sorted(gone3)}")
+# 2.658.0 (#5042): the untagged children of a manifest that goes go with it; a child a kept manifest names stays; one kept
+# manifest with unknown children = no part goes
+IMG5 = [{"id": 1, "name": "sha256:a1", "created_at": "2026-10-20T10:00:00Z", "tags": ["2.629.0"]},
+        {"id": 2, "name": "sha256:a2", "created_at": "2026-10-21T10:00:00Z", "tags": ["2.630.0"]},
+        {"id": 50, "name": "sha256:c1", "created_at": "2026-10-20T10:00:00Z", "tags": []},
+        {"id": 51, "name": "sha256:c2", "created_at": "2026-10-20T10:00:00Z", "tags": []},
+        {"id": 52, "name": "sha256:shared", "created_at": "2026-10-20T10:00:00Z", "tags": []},
+        {"id": 53, "name": "sha256:c9", "created_at": "2026-10-21T10:00:00Z", "tags": []},
+        {"id": 54, "name": "sha256:loose", "created_at": "2026-09-01T10:00:00Z", "tags": []}]
+KIDS = {"sha256:a1": ["sha256:c1", "sha256:c2", "sha256:shared"], "sha256:a2": ["sha256:c9", "sha256:shared"]}
+_, plan5 = wr.prune_plan(TG, "v2.639.0", REL, IMG5, "o/r", "users/o/packages/container/kalmido", NOW, children=KIDS)
+parts = sorted(int(p.rsplit("/", 1)[1]) for k, _, p in plan5 if k == "part")
+check(any(k == "image" and p.endswith("/versions/1") for k, _, p in plan5) and parts == [50, 51],
+      f"the platform parts of the manifest that goes go with it, the shared one, the kept image's and a loose one stay {parts}")
+check(all(re.fullmatch(r"users/o/packages/container/kalmido/versions/\d+", p) for k, _, p in plan5 if k == "part"),
+      "parts are package version paths only")
+_, plan6 = wr.prune_plan(TG, "v2.639.0", REL, IMG5, "o/r", "users/o/packages/container/kalmido", NOW,
+                         children={"sha256:a1": KIDS["sha256:a1"]})
+check(not any(k == "part" for k, _, _ in plan6) and any(k == "image" for k, _, _ in plan6),
+      "the children of a kept manifest unknown: no part goes (it might be shared), the tagged image still goes")
+_, plan7 = wr.prune_plan(TG, "v2.639.0", REL, IMG5, "o/r", "users/o/packages/container/kalmido", NOW)
+check(not any(k == "part" for k, _, _ in plan7), "without --children nothing untagged goes (as before)")
+check(wr.read_children([{"digest": "sha256:x", "children": ["sha256:y", None]}, {"x": 1}]) == {"sha256:x": ["sha256:y"]},
+      "read_children")
 for what, kw in (("no latest-ok tag", dict(tags={})), ("no latest release", dict(latest=""))):
     try:
         wr.prune_plan(kw.get("tags", TG), kw.get("latest", "v2.639.0"), REL, IMG, "o/r", "users/o/packages/container/kalmido", NOW)
@@ -179,12 +203,17 @@ with open(os.path.join(TMP, "r.jsonl"), "w") as f:
     f.write('{"id": 1, "tag_name": "v2.629.0", "created_at": "2026-10-20T10:00:00Z", "draft": false}\n'
             '{"id": 2, "tag_name": "v2.630.0", "created_at": "2026-10-21T10:00:00Z", "draft": false}\n')
 with open(os.path.join(TMP, "i.jsonl"), "w") as f:
-    f.write('{"id": 5, "created_at": "2026-10-20T10:00:00Z", "tags": ["2.629.0"]}\n')
+    # 2.658.0 (#5042): with the digest (name) and an untagged child that goes with it
+    f.write('{"id": 5, "name": "sha256:m5", "created_at": "2026-10-20T10:00:00Z", "tags": ["2.629.0"]}\n'
+            '{"id": 6, "name": "sha256:p6", "created_at": "2026-10-20T10:00:00Z", "tags": []}\n')
+with open(os.path.join(TMP, "c.jsonl"), "w") as f:
+    f.write('{"digest": "sha256:m5", "children": ["sha256:p6"]}\n')
 r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "weekly_release.py"), "prune", "--tags", "tags.txt", "--latest", "v2.630.0",
                     "--releases", "r.jsonl", "--images", "i.jsonl", "--repo", "o/r", "--packages", "users/o/packages/container/kalmido",
-                    "--today", "2026-11-20", "--plan", "delete.txt"], cwd=TMP, capture_output=True, text=True)
+                    "--today", "2026-11-20", "--plan", "delete.txt", "--children", "c.jsonl"], cwd=TMP, capture_output=True, text=True)
 plan_txt = open(os.path.join(TMP, "delete.txt")).read() if os.path.exists(os.path.join(TMP, "delete.txt")) else ""
-check(r.returncode == 0 and plan_txt == "repos/o/r/releases/1\nusers/o/packages/container/kalmido/versions/5\n",
+check(r.returncode == 0 and plan_txt == "repos/o/r/releases/1\nusers/o/packages/container/kalmido/versions/5\n"
+      "users/o/packages/container/kalmido/versions/6\n",
       f"prune on the command line: the plan file {r.returncode} {plan_txt!r} {r.stderr[-300:]}")
 check("delete releases (1): 2.629.0" in r.stderr and "delete images (1): 2.629.0" in r.stderr and "keep (" in r.stderr,
       f"the lists for the log {r.stderr[-300:]}")
@@ -238,6 +267,8 @@ pj = jobs(pr)
 check("write" not in pj["plan"] and "tools/weekly_release.py prune" in pj["plan"], "the plan job reads only")
 check("inputs.dry_run == false" in pj["delete"] and pj["delete"].count("uses:") == 1 and "actions/download-artifact@" in pj["delete"],
       "the delete job runs only when asked and only download-artifact")
+check("imagetools inspect --raw" in pj["plan"] and "--children children.jsonl" in pj["plan"] and "{id, name, created_at" in pj["plan"],
+      "2.658.0 (#5042): the plan job reads the children of the tagged manifests and hands them to the script")
 check("gh api -X DELETE" in pj["delete"] and "*refs*|*/git/*|*/tags*" in pj["delete"] and "git push" not in code(pr) and "git tag" not in code(pr)
       and "--cleanup-tag" not in pr, "the delete loop refuses refs and tags; no git tag is ever touched")
 for name, t in (("weekly-release.yml", wk), ("prune-releases.yml", pr), ("promote.yml", pro)):

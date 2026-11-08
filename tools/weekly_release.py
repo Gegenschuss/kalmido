@@ -4,7 +4,7 @@
     python3 tools/weekly_release.py pick  --tags TAGS --latest vX.Y.Z [--today YYYY-MM-DD] [--notes notes.md] [CHANGELOG ...]
     python3 tools/weekly_release.py prune --tags TAGS --latest vX.Y.Z --releases R.jsonl --images I.jsonl
                                           --repo OWNER/NAME --packages users/OWNER/packages/container/NAME
-                                          [--today YYYY-MM-DD] [--days 14] [--plan delete.txt]
+                                          [--today YYYY-MM-DD] [--days 14] [--plan delete.txt] [--children C.jsonl]
 
 TAGS: one line per tag "latest-ok/X.Y.Z <ISO date>" (git for-each-ref --format '%(refname:strip=2) %(creatordate:iso-strict)').
 The tag latest-ok/X.Y.Z (pushed by the live train after the device test) only CHOOSES a version; the release itself hangs on
@@ -18,7 +18,8 @@ pick: the newest latest-ok version up to the end of the ISO week of --today that
 prune: which GitHub release objects and ghcr image versions go. A version stays when it is the newest latest-ok version of
   its ISO week (weeks before the first latest-ok tag: the newest release of the week), the current latest release, or the
   object is younger than --days days. Images: only tagged versions whose tags are all plain X.Y.Z go (never :latest, never
-  the untagged platform parts of a kept image). Prints the lists for the log; --plan writes the API paths to DELETE, one
+  the untagged platform parts of a kept image; --children: the untagged parts of an image that goes go with it, 2.658.0
+  #5042). Prints the lists for the log; --plan writes the API paths to DELETE, one
   per line. Only release objects and package versions: git tags are NEVER deleted or moved (safe_path refuses everything
   else). No latest-ok tag or no latest release (a failed listing) = exit 2, nothing is planned.
 Standard library only (the workflows run it with the runner's python3).
@@ -199,8 +200,13 @@ def safe_path(p):
     return p
 
 
-def prune_plan(tags, latest, releases, images, repo, packages, now, days=KEEP_DAYS):
-    """-> (keep versions, [(kind, version text, api path)]) - kind 'release' or 'image'."""
+def prune_plan(tags, latest, releases, images, repo, packages, now, days=KEEP_DAYS, children=None):
+    """-> (keep versions, [(kind, version text, api path)]) - kind 'release', 'image' or 'part'.
+
+    2.658.0 (#5042): children = {manifest digest: [child digests]} (imagetools inspect --raw of each tagged image). The
+    untagged package versions (platform images, attestations) named by a manifest that goes are deleted with it - only when
+    no tagged manifest that stays names them, and only when the children of EVERY tagged manifest that stays are known
+    (one unknown = no part is deleted: it might be shared). Images need their digest in "name" for that."""
     if not tags:
         raise SystemExit("no latest-ok tag listed: refusing to plan (a failed listing must not delete anything)")
     if not ver(latest):
@@ -225,7 +231,48 @@ def prune_plan(tags, latest, releases, images, repo, packages, now, days=KEEP_DA
         if not im.get("id") or not im.get("created_at") or when(im["created_at"]) >= young:
             continue
         out.append(("image", ",".join(tl), safe_path(f"{packages}/versions/{int(im['id'])}")))
+    out += prune_parts(images, out, packages, children)
     return keep, out
+
+
+def prune_parts(images, plan, packages, children):
+    """2.658.0 (#5042): the untagged children of the manifests that go, never one a kept tagged manifest names."""
+    if not children:
+        return []
+    gone_paths = {p for k, _, p in plan if k == "image"}
+    path = lambda im: f"{packages}/versions/{int(im['id'])}"  # noqa: E731
+    tagged = [im for im in images if im.get("tags") and im.get("id")]
+    gone = [im for im in tagged if path(im) in gone_paths]
+    kept = [im for im in tagged if path(im) not in gone_paths]
+    if any(im.get("name") not in children for im in kept):
+        unknown = ",".join(",".join(map(str, im["tags"])) for im in kept if im.get("name") not in children)
+        print(f"parts: children of a kept image unknown ({unknown}) - no untagged part is deleted", file=sys.stderr)
+        return []
+    shared = set()
+    for im in kept:
+        shared.update(children[im["name"]])
+    untagged = {}
+    for im in images:
+        if not im.get("tags") and im.get("id") and im.get("name"):
+            untagged.setdefault(im["name"], []).append(im)
+    out, seen = [], set()
+    for im in gone:
+        for c in children.get(im.get("name"), ()):
+            if c in shared or c in seen:
+                continue
+            seen.add(c)
+            for part in untagged.get(c, ()):
+                out.append(("part", f"{','.join(map(str, im['tags']))}@{c[:19]}", safe_path(path(part))))
+    return out
+
+
+def read_children(rows):
+    """{"digest": "sha256:...", "children": ["sha256:...", ...]} per line -> {digest: [children]}."""
+    out = {}
+    for r in rows:
+        if isinstance(r, dict) and r.get("digest"):
+            out[str(r["digest"])] = [str(c) for c in (r.get("children") or []) if c]
+    return out
 
 
 def read_json_lines(path):
@@ -257,6 +304,7 @@ def main(argv=None):
     p.add_argument("--packages", required=True)
     p.add_argument("--days", type=int, default=KEEP_DAYS)
     p.add_argument("--plan", default="")
+    p.add_argument("--children", default="", help="2.658.0 (#5042): JSON lines {digest, children} of the tagged images")
     a = ap.parse_args(argv)
     with open(a.tags, encoding="utf-8") as f:
         tags = read_tags(f.read())
@@ -281,9 +329,11 @@ def main(argv=None):
         print(f"prev={(a.latest or '').lstrip('v')}")
         print(f"count={len(vs)}")
         return 0
-    keep, plan = prune_plan(tags, a.latest, read_json_lines(a.releases), read_json_lines(a.images), a.repo, a.packages, now, a.days)
+    kids = read_children(read_json_lines(a.children)) if a.children else None
+    keep, plan = prune_plan(tags, a.latest, read_json_lines(a.releases), read_json_lines(a.images), a.repo, a.packages, now, a.days,
+                            kids)
     print(f"keep ({len(keep)}): " + " ".join(vstr(v) for v in sorted(keep)), file=sys.stderr)
-    for kind in ("release", "image"):
+    for kind in ("release", "image", "part"):
         rows = [x for x in plan if x[0] == kind]
         print(f"delete {kind}s ({len(rows)}): " + " ".join(x[1] for x in rows), file=sys.stderr)
     if a.plan:
