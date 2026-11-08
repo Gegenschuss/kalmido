@@ -23,6 +23,8 @@ from flask import g, jsonify, request
 
 from ..core.config import app
 from ..core.pg import insert_id, system_ctx
+from ..core.pg import write_lock  # 2.657.0 (#5052)
+from ..core.db import iso_ms  # 2.657.0 (#5052)
 from ..core.i18n import tr
 from ..core.db import bump, db, iso, local_now, now_utc, usettings
 from ..core.access import Denied, list_role, need_feat, WRITE_ROLES, FEAT_OFF, token_lists, vis_sql
@@ -404,14 +406,15 @@ def adz_undo(c, rec, back=True):
     n, skipped, ts = 0, [], iso(now_utc())
     for kind, i in rec.get("made") or []:
         if kind == "event":
+            write_lock(c, f"event-{int(i)}")  # 2.657.0 (#5052): the check and the write under the event's lock (events/model.py ev_lock)
             r = c.execute("SELECT status, deleted_at, title FROM events WHERE id=?", (i,)).fetchone()
             if not r:
                 continue
-            if back and not r["deleted_at"] and r["status"] == "tentative":
-                c.execute("UPDATE events SET deleted_at=? WHERE id=?", (ts, i))
+            if back and not r["deleted_at"] and r["status"] == "tentative":  # 2.657.0 (#5052): + updated_at (a new version)
+                c.execute("UPDATE events SET deleted_at=?, updated_at=? WHERE id=?", (ts, iso_ms(now_utc()), i))
                 n += 1
             elif not back and r["deleted_at"] and r["deleted_at"] >= rec.get("undone_at", ""):
-                c.execute("UPDATE events SET deleted_at=NULL WHERE id=?", (i,))
+                c.execute("UPDATE events SET deleted_at=NULL, updated_at=? WHERE id=?", (iso_ms(now_utc()), i))
                 n += 1
             elif back and not r["deleted_at"]:
                 skipped.append(r["title"][:40])

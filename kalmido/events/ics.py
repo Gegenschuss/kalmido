@@ -675,6 +675,12 @@ def import_ics(c, uid, cal_id, raw, dry=False):
             res["errors"] += 1
             continue
         old = c.execute("SELECT * FROM events WHERE cal_id=? AND uid=? AND deleted_at IS NULL", (cal_id, v["uid"])).fetchone()
+        if old and not dry:  # 2.657.0 (#5052): the update by UID from the row as it is now, locked: every other writer takes it
+            # FOR UPDATE under ev_lock (events/model.py), so it waits for this import and this import for it. The row lock only
+            # (no advisory 'event-<id>' per event): an import of thousands of events would fill the shared lock table.
+            old = c.execute("SELECT * FROM events WHERE id=? FOR UPDATE", (old["id"],)).fetchone()
+            if old is not None and old["deleted_at"]:
+                old = None  # deleted by the writer we waited for: imported as a new event
         if old:
             lm = _ics_mod(cs[ms[0]] if len(ms) == 1 else cs[0])
             upd = str(old["updated_at"] or "")  # 2.273.0 F2 (#3048): the own last import write is no change here (imp_at / imp_rev)
