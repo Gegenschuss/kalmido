@@ -6,7 +6,7 @@
  3. the known finding on another line (code shifted by an edit above it) is green
  4. an entry whose finding is gone is a notice only (green), red with --strict
  5. --accept writes the new finding into the baseline with the reason, the date and the task
- 6. the baseline of the repo: every entry complete (rule, file, code, reason, date), no entry twice, every file exists
+ 6. the baseline of the repo: every entry complete, no entry more often than its line, each file exists
     and its code line is still in the file (else the entry is stale and the finding would be new)
 usage: python3 tests/semgrep_baseline_test.py"""
 import json
@@ -171,7 +171,18 @@ with open(os.path.join(ROOT, "tools", "semgrep_baseline.json"), encoding="utf-8"
     real = json.load(f)["entries"]
 keys = [(e.get("rule"), e.get("file"), e.get("code")) for e in real]
 check(real and all(all(str(e.get(k) or "").strip() for k in ("rule", "file", "code", "reason", "date")) for e in real), "every entry of the repo's baseline is complete")
-check(len(keys) == len(set(keys)), f"no entry twice: {[k for k in keys if keys.count(k) > 1][:2]}")
+# 2.755.0 (#5296): matching counts occurrences, so a code line that stands twice in its file has two entries; an entry
+# more often than its line is in the file stays an error
+def _times(rel, code):
+    try:
+        with open(os.path.join(ROOT, rel), encoding="utf-8", errors="replace") as f:
+            return sum(1 for x in f if norm(x) == norm(code))
+    except OSError:
+        return 0
+
+
+twice = [k for k in set(keys) if keys.count(k) > max(1, _times(k[1], k[2]))]
+check(not twice, f"no entry more often than its code line stands in the file: {twice[:2]}")
 check(all(len(str(e["date"])) == 10 and str(e["date"])[4] == "-" for e in real), "every date is YYYY-MM-DD")
 check(all(not str(e.get("task") or "").strip() or isinstance(e["task"], int) for e in real), "a task is a number")
 missing, gone = [], []
