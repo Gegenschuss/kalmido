@@ -1,6 +1,20 @@
 {
  "versions": [
   {
+   "version": "2.719.0",
+   "date": "2026-11-08",
+   "items": [
+    {
+     "de": "Beim Import eines CSV-Kontoauszugs fragt Kalmido jetzt, zu welchem Bankkonto er gehört, wenn du mehrere Konten hast.",
+     "en": "When you import a CSV bank statement and have several bank accounts, Kalmido now asks which account it belongs to."
+    },
+    {
+     "de": "Beleg-Abholer lassen sich auf bestimmte IP-Adressen beschränken (Schloss-Knopf beim Abholer).",
+     "en": "Receipt fetchers can be limited to certain IP addresses (lock button next to the fetcher)."
+    }
+   ]
+  },
+  {
    "version": "2.710.0",
    "date": "2026-11-08",
    "items": [

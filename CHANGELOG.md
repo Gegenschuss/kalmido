@@ -17,6 +17,30 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.719.0] - 2026-11-08
+
+Package 2.702 (Bündel: Bilanz: Auszahlungen der Online-Zahlungen und CSV-).
+
+### Changed
+- Bank reconciliation: importing a CSV statement now asks which bank account it belongs to when the office has two or more bank accounts (Office > Bank > Import, step "columns"). Without a choice the import is refused instead of putting the lines silently on the default account; the balance sheet books the lines on the chosen account (#5183).
+
+### Fixed
+- Balance sheet: the collective payout of the online payment provider now lands on the bank account whose statement carries it; before, it stayed on the default account when it arrived on a second account (#5183).
+- Balance sheet: a restaurant bill that is both an approved entertainment receipt and a receipt on the same bank, cash or card booking now counts once (the entertainment receipt wins, as the strict income statement does); before, the expense and the input tax were booked twice (#5183).
+
+Package 2.689 (Bündel: Bündel: Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher), CI-only rot: p2191_c_perf, CI-only rot: p2290_c_fold_ui u. ).
+
+### Changed
+- Task search: the server tests the search word only on the tasks of the projects you can see. Since tasks stand under row-level security (2.662), the database could no longer use its text indexes for the search and read every task of the instance once per field; with 32,000 tasks a search took 29 ms in the database, now 2.5 ms, and it no longer grows with other workspaces' tasks. Same results as before (#5116).
+
+### Security
+- Names, titles and other typed values that a translated sentence puts into the page (for example "SSO: {0}", "row {0}", "Access data set (…{0})") are now always escaped: 88 places moved from tr() / trn() to trh() / trnh(). A new lint step (tools/check_trh.py, in the CI) reports any new tr() with an unescaped value inside an HTML template; values that are HTML on purpose stand in tools/trh_ok.txt (#5125).
+
+Package 2.705 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Security
+- #5151: Receipt fetcher keys (kbh_...) get an optional address rule like API tokens and scan inbox keys: Settings > Integrations > Receipt fetcher, lock button "Only from" (IPs / networks); from any other address the key answers 403 (PATCH /api/docs/fetchers/{id} {allowed_ips}).
+- #5151: The plus address tokens of an older version (mail_tokens, hub_tokens, doc_mail still in plain text) are sealed with the server key and hashed by the daily watchdog run, 14 days after the first start of this version (one-way: a version before 2.674 no longer finds those old addresses after that; 2.674 and later still do). The address rule helpers moved to core/ipallow.py (api/scopes.py re-exports them).
+
 ## [2.710.0] - 2026-11-08
 
 Package 2.674 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
@@ -65,5 +89,6 @@ Package 2.685 (Bündel: Kommentare: Aktivität in drei Stufen (nur Kommenta, Bü
 - Office: switching "Office & finance" on no longer leaves the office saying it is switched off when it loaded before the switch was saved (#5176).
 - Balance sheet: a receipt booked against the bank (counter account "bank") and paid from the cash box is now booked bank to cash instead of being left out (#5128).
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.710.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.719.0...HEAD
+[2.719.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.719.0
 [2.710.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.710.0
