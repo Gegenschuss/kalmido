@@ -1,6 +1,16 @@
 {
  "versions": [
   {
+   "version": "2.681.0",
+   "date": "2026-11-08",
+   "items": [
+    {
+     "de": "Die Einführungen der Bereiche zeigen jetzt Schritt für Schritt auf die echten Knöpfe, Notizen und Chat haben eine eigene.",
+     "en": "The area introductions now walk you step by step through the real buttons, and Notes and Chat have their own."
+    }
+   ]
+  },
+  {
    "version": "2.675.0",
    "date": "2026-11-08",
    "items": [

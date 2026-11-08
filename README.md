@@ -19,10 +19,10 @@
 
 ## What's new
 
-**2.675.0** (2026-11-08):
-- **Storage**: large encrypted files are stored in chunks, so downloads and video seeking no longer decrypt the whole file in memory.
-- **Agents**: an agent's history reads in plain words, groups similar steps and shows the newest five lines in the dialog.
-- **Sync**: calendar and contact sync (CalDAV / CardDAV) re-renders only the changed list or address book.
+**2.681.0** (2026-11-08):
+- **Guided tours**: every area's short introduction walks you through the real controls, Notes and Chat have their own.
+- **Agents**: calendar, address book and project settings need the object's version like tasks and events; the setup code needs `PUBLIC_URL` on the server.
+- **Sync**: calendar queries with a time range and contact photos in CardDAV are lighter.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 
