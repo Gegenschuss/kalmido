@@ -662,8 +662,12 @@ function sbb_fit() {
     }
   }
   if (far) {
-    const c = +row.style.getPropertyValue('--sbmc'), w = [];
-    $$('.srbn', row).forEach((n, i) => { w[i % c] = Math.max(w[i % c] || 0, Math.ceil(wide(n)) + 4); });
+    // 2.660.0 (#5103): a column needs its widest name's text plus the tile's padding and border - no longer the box a fitting
+    // name fills (its scrollWidth) plus 4 px: that widened every column that already fitted, 11 areas scrolled 5 px at 320 px
+    const c = +row.style.getPropertyValue('--sbmc'), w = [], t = $('.srb', row), ts = getComputedStyle(t);
+    const pad = t.offsetWidth - t.clientWidth + parseFloat(ts.paddingLeft) + parseFloat(ts.paddingRight);
+    const text = n => { if (n.scrollWidth > n.clientWidth + .5) return wide(n); const rg = document.createRange(); rg.selectNodeContents(n); return rg.getBoundingClientRect?.().width || n.scrollWidth; };
+    $$('.srbn', row).forEach((n, i) => { w[i % c] = Math.max(w[i % c] || 0, Math.ceil(text(n) + pad)); });
     row.style.gridTemplateColumns = w.map(x => `minmax(${x}px,1fr)`).join(' '); row.style.overflow = 'auto hidden';
     row.closest('#side').scrollTop = y;  // measuring moved the row's height: the drawer stays where it was
   }
