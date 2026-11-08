@@ -82,8 +82,11 @@ BOB, CAROL, EVE = ids["bob"], ids["carol"], ids["eve"]
 Bo, Ca, Ev = sess("bob"), sess("carol"), sess("eve")
 for x in (A, Bo, Ca, Ev):
     x.patch(B + "/api/settings", json={"lang": "en"})
-r = A.post(B + "/api/admin/agents", json={"scopes": ["read", "comments"], "username": "claude", "display_name": "Claude", "org_id": ORG})
+# 2.730.0 (#5195): a chat file download needs attachments:read since 2.674.0 (#4382 finding 8); RO reads without it
+r = A.post(B + "/api/admin/agents", json={"scopes": ["read", "comments", "attachments:read"], "username": "claude", "display_name": "Claude", "org_id": ORG})
 CL, CLH = r.json()["id"], {"Authorization": "Bearer " + r.json()["token"]}
+r = A.post(B + "/api/admin/agents", json={"scopes": ["read", "comments"], "username": "reader", "display_name": "Reader", "org_id": ORG})
+RO, ROH = r.json()["id"], {"Authorization": "Bearer " + r.json()["token"]}
 TEAM = A.post(B + "/api/lists", json={"name": "Team", "org_id": ORG}).json()["id"]
 for uid in (BOB, CAROL):
     assert A.put(B + f"/api/lists/{TEAM}/members", json={"user_id": uid, "role": "edit"}).ok
@@ -167,6 +170,7 @@ check(r.status_code == 201 and att(r).get("voice") is False, "plain file: voice 
 
 # ================================================================== agents: read it, cannot send one
 assert A.post(B + f"/api/team/rooms/{CH}/members", json={"user_id": CL}).ok
+assert A.post(B + f"/api/team/rooms/{CH}/members", json={"user_id": RO}).ok
 cur = requests.get(V + "/agent/events?since=latest", headers=CLH).json()["cursor"]
 r = voice(Bo, CH, M4A, body=f"<@{CL}> please listen", ms="1500")
 ev = [e for e in requests.get(V + f"/agent/events?since={cur}&limit=50", headers=CLH).json()["data"] if e.get("event") == "team_message"]
@@ -177,7 +181,9 @@ rr = requests.get(V + f"/team/rooms/{CH}/messages", headers=CLH)
 va = [f for x in rr.json()["data"] for f in x["attachments"] if f["voice"]]
 check(rr.ok and len(va) >= 3 and all("duration_ms" in f for f in va), "agent: REST messages carry voice / duration_ms")
 r = requests.get(V + f"/team/files/{VF}", headers={**CLH, "Range": "bytes=0-3"})
-check(r.status_code == 206 and r.content == M4A[:4], "agent: downloads a voice message (Range too) " + str(r.status_code))
+check(r.status_code == 206 and r.content == M4A[:4], "agent: downloads a voice message (Range too) " + str(r.status_code) + " " + r.text[:200])
+r = requests.get(V + f"/team/files/{VF}", headers=ROH)
+check(r.status_code == 403, "agent without attachments:read: no download of the voice message " + str(r.status_code))
 r = requests.post(V + f"/team/rooms/{CH}/messages", headers=CLH, data={"body": "x", "voice": "1"}, files=[("file", ("v.m4a", M4A, "audio/mp4"))])
 check(r.status_code == 400, "agent: the REST API takes no voice field " + r.text[:200])
 
