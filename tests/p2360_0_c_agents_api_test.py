@@ -103,7 +103,9 @@ check(r.status_code == 201, f"an agent with comments: a waiting job for a person
 r = requests.post(V + "/lists", headers=CLH, json={"name": "Agent scratch"})
 check(r.status_code == 201, "setup: the agent's own list " + r.text[:120])
 AL = r.json().get("id")
-check(requests.patch(V + f"/lists/{AL}", headers=CLH, json={"archived": True}).ok, "setup: the agent archives it")
+# 2.725.0 (#5174): an agent sends the version it read (2.657.0, #5052: else 400 version_required)
+check(requests.patch(V + f"/lists/{AL}", headers=CLH, json={"archived": True, "expect_updated_at": requests.get(V + f"/lists/{AL}", headers=CLH).json()["updated_at"]}).ok,
+      "setup: the agent archives it")
 r = requests.delete(V + f"/lists/{AL}", headers=CLH)
 check(r.status_code == 202 and r.json().get("job", {}).get("state") == "waiting", f"deleting a list waits for an approval ({r.status_code} {r.text[:150]})")
 JA = (r.json().get("job") or {}).get("id")
