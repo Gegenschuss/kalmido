@@ -517,7 +517,7 @@ async function dc_snap(s, dir) {
   try {
     b.style.transition = ms ? `transform ${ms}ms ease-out` : 'none';
     b.style.transform = `translateX(${-dir * (w + DC_NBGAP)}px)`;
-    if (ms) await new Promise(ok => { const t = setTimeout(ok, ms + 60); b.addEventListener('transitionend', ev => { if (ev.target === b) { clearTimeout(t); ok(); } }, {once: true}); });
+    if (ms) await new Promise(ok => { setTimeout(ok, ms + 60); b.addEventListener('transitionend', ev => { if (ev.target === b) ok(); }, {once: true}); });  // a promise settles once: the late timer does nothing
     await dc_step(dir, true);
   } catch { /* api() shows its own error */ } finally {
     DCW.snap = false;

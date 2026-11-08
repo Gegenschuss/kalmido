@@ -66,7 +66,7 @@ function swn_attach(root, o) {
     el.style.transition = tz; el.style.transform = `translateX(${-dir * (c.w + SWN_GAP)}px)`;
     for (const nb of c.nb) { nb.style.transition = tz; nb.style.transform = `translateX(${(+nb.dataset.dir - dir) * (c.w + SWN_GAP)}px)`; }
     try {
-      if (ms) await new Promise(ok => { const t = setTimeout(ok, ms + 60); el.addEventListener('transitionend', ev => { if (ev.target === el) { clearTimeout(t); ok(null); } }, {once: true}); });
+      if (ms) await new Promise(ok => { setTimeout(ok, ms + 60, null); el.addEventListener('transitionend', ev => { if (ev.target === el) ok(null); }, {once: true}); });  // a promise settles once: the late timer does nothing
       await o.go(dir);
     } catch { /* the caller shows its own error */ } finally {
       snap = false; clear(c);
