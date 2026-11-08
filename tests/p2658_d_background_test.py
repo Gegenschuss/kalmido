@@ -12,6 +12,9 @@ freelancer-matrix: own
  - git: the poll holds no open database transaction while the provider answers (every call of git_http sees an idle
    connection), and it still stores what came (the linked pull request, polled_at)
  - agents: an event wakes only the long-polls of its agent (own condition per agent); a wake-up without ids wakes all
+ - 2.665.0 (#5113) channels: like the webhooks - after a failed send the rest of that channel waits (also for the next
+   chn_tick of the same round of chn_loop), the batch takes the messages in turns over the channels: 40 waiting ones of a
+   dead channel are tried once, a second channel (of a person without an organisation) is still served, in its order
 usage: p2658_d_background_test.py <datadir>"""
 import json
 import os
@@ -25,7 +28,8 @@ import kt  # noqa: E402
 from kt import B, CT, check, done  # noqa: E402
 
 HOOK = "http://127.0.0.1:8099"
-kt.fresh({"KALMIDO_WEBHOOK_ALLOW_HOSTS": "127.0.0.1:8099", "KALMIDO_WEBHOOK_TICK": "3600"})
+kt.fresh({"KALMIDO_WEBHOOK_ALLOW_HOSTS": "127.0.0.1:8099", "KALMIDO_WEBHOOK_TICK": "3600",
+          "KALMIDO_CHANNEL_TICK": "3600", "KALMIDO_GIT_TICK": "3600"})  # 2.665.0 (#5113): the loops never take the suite's rows
 A = kt.setup()
 FU, Fr = freelancer(B, A, "fenja")
 
@@ -213,6 +217,52 @@ check(len(seen) >= 3 and not any(x[1] for x in seen),
       f"the git poll holds no database transaction while the provider answers ({len(seen)} calls, open at {[x[0] for x in seen if x[1]]})")
 check(j.get("polled") and j.get("fails") == 0 and j.get("err") == "" and j.get("link") == 1,
       f"the poll still stores what came: the linked pull request, polled_at ({j})")
+
+# ---------------------------------------------------------------- 5. #5113 channels: a dead one does not hold up the others
+CIDS = []
+for name in ("Dead", "Alive"):
+    r = Fr.post(B + "/api/me/channels", json={"kind": "slack", "name": name, "url": HOOK + "/chn-" + name.lower()})
+    check(r.status_code in (200, 201), f"the freelancer's channel {name} {r.status_code} {r.text[:200]}")
+    CIDS.append((r.json() or {}).get("id") if r.ok else 0)
+CHT = r"""
+import json, time, app
+from kalmido.core.db import connect
+from kalmido.core.pg import system_ctx
+from kalmido.notify import channels as CH
+DEAD, ALIVE = %d, %d
+c = connect()
+with system_ctx(c):
+    c.execute("DELETE FROM notify_channel_queue WHERE channel_id IN (?, ?)", (DEAD, ALIVE))
+    t0 = time.time() - 60
+    for i in range(40):
+        c.execute("INSERT INTO notify_channel_queue(channel_id,text,created_at) VALUES(?,?,?)", (DEAD, f"d{i}", t0 + i * 0.001))
+    for i in range(2):
+        c.execute("INSERT INTO notify_channel_queue(channel_id,text,created_at) VALUES(?,?,?)", (ALIVE, f"a{i}", t0 + 1 + i * 0.001))
+c.commit()
+calls = []
+CH.chn_send = lambda kind, t, text, allow: calls.append(text) or ((True, 200, "") if text.startswith("a") else (False, 500, "http"))
+skip, n = set(), 0
+while CH.chn_tick(skip) >= CH.CH_BATCH and n < 5:  # one round of chn_loop
+    n += 1
+out = {"calls": calls, "batch": CH.CH_BATCH}
+with system_ctx(c):
+    out["dead"] = [[r[0], r[1] > 0] for r in c.execute("SELECT text, retry_at FROM notify_channel_queue WHERE channel_id=? ORDER BY created_at, id", (DEAD,))]
+    out["alive"] = c.execute("SELECT COUNT(*) FROM notify_channel_queue WHERE channel_id=?", (ALIVE,)).fetchone()[0]
+    out["fails"] = [c.execute("SELECT fails FROM notify_channels WHERE id=?", (x,)).fetchone()[0] for x in (DEAD, ALIVE)]
+    c.execute("DELETE FROM notify_channel_queue WHERE channel_id IN (?, ?)", (DEAD, ALIVE))
+c.commit()
+c.close()
+print(json.dumps(out))
+"""
+j = py(CHT % (int(CIDS[0] or 0), int(CIDS[1] or 0)))
+calls = j.get("calls") or []
+dead = j.get("dead") or []
+check([x for x in calls if x.startswith("d")] == ["d0"] and len(dead) == 40 and dead[0] == ["d0", True]
+      and all(not x[1] for x in dead[1:]) and j.get("fails") == [1, 0],
+      f"#5113: a channel that failed (an error status, not a timeout) is tried once per round, the rest waits unchanged "
+      f"({[x for x in calls if x.startswith('d')]}, {dead[:3]}..., fails {j.get('fails')}, batch {j.get('batch')})")
+check([x for x in calls if x.startswith("a")] == ["a0", "a1"] and j.get("alive") == 0,
+      f"#5113: a second channel is still served, in its order, though 40 of the dead one wait before it ({calls}, left {j.get('alive')})")
 
 # ---------------------------------------------------------------- 4. agents: an event wakes only its agent's long-polls
 AG = r"""

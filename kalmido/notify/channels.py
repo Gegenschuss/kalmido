@@ -31,7 +31,7 @@ import urllib.request
 from flask import g, has_request_context, jsonify
 
 from ..core.config import app, APP_NAME, APP_VERSION, PUBLIC_URL
-from ..core.pg import insert_id, system_ctx
+from ..core.pg import insert_id, st_ids, system_ctx
 from ..core.i18n import LANGS, md_plain, N_, tr, trn
 from ..core.db import body, connect, db, err, inbox_default, iso, local_now, now_utc, uset, usettings
 from ..accounts.session import GATE, me
@@ -230,9 +230,15 @@ def chn_enqueue(c, cid, text):
     return True
 
 
-def chn_tick():
-    """Sends what waits (one try each); returns the number of messages handled."""
+def chn_tick(skip=None):
+    """Sends what waits (one try each); returns the number of messages handled.
+    2.665.0 (#5113, like webhooks.wh_tick since 2.658.0): the batch takes the waiting messages in turns over the channels
+    (the first of each, then the second of each, ...; in their own order within a channel), so many waiting messages of a
+    dead channel no longer stand in front of all others; after any failed send (was: only a timeout / network error) the
+    rest of that channel waits, unchanged, for the next run. skip = the channels that failed earlier in this round of
+    chn_loop (it calls chn_tick again while the batch is full): their messages are not even taken."""
     from ..accounts.login import unseal
+    skip = set() if skip is None else skip
     with GATE.bg():
         c = connect()
         try:
@@ -241,9 +247,13 @@ def chn_tick():
                              AND user_id IN (SELECT id FROM users WHERE disabled<>0)""", (iso(now_utc()),))  # 2.240.0 B2 (#2867): visible to its admins
                 c.execute("""DELETE FROM notify_channel_queue WHERE channel_id IN (SELECT n.id FROM notify_channels n JOIN users u ON u.id=n.user_id
                              WHERE n.enabled=0 OR u.disabled<>0)""")  # 2.240.0 B (#2867): nor what waits for a disabled account
-                rows = [dict(r) for r in c.execute("""SELECT q.id, q.channel_id, q.text, q.created_at, q.retry_at, n.kind, n.target
-                                                      FROM notify_channel_queue q JOIN notify_channels n ON n.id=q.channel_id
-                                                      WHERE q.retry_at<=? ORDER BY q.id LIMIT ?""", (time.time(), CH_BATCH))]
+                rows = [dict(r) for r in c.execute("""SELECT x.id, x.channel_id, x.text, x.created_at, x.retry_at, x.kind, x.target FROM
+                                                      (SELECT q.id, q.channel_id, q.text, q.created_at, q.retry_at, n.kind, n.target,
+                                                              ROW_NUMBER() OVER (PARTITION BY q.channel_id ORDER BY q.created_at, q.id) AS ch_rn
+                                                       FROM notify_channel_queue q JOIN notify_channels n ON n.id=q.channel_id
+                                                       WHERE q.retry_at<=? AND NOT (q.channel_id = ANY(CAST(? AS BIGINT[])))) x
+                                                      ORDER BY x.ch_rn, x.created_at, x.id LIMIT ?""",
+                                                   (time.time(), st_ids(sorted(skip)), CH_BATCH))]
                 for r in rows:
                     try:
                         r["t"] = json.loads(unseal(c, f"channel:{r['channel_id']}", r["target"]) or "{}")
@@ -254,15 +264,15 @@ def chn_tick():
             c.commit()
         finally:
             c.close()
-    res, slow, later = [], set(), []
+    res, later = [], []
     for r in rows:
-        if r["channel_id"] in slow:  # 2.539.0 (#4379): a channel that timed out is not tried again in this tick: its other
-            later.append(r)          # messages go back into the queue as they were (no failure counted)
+        if r["channel_id"] in skip:  # 2.539.0 (#4379): a channel that failed is not tried again in this tick: its other
+            later.append(r)          # messages go back into the queue as they were (no failure counted; keep created_at = their order)
             continue
         res.append((r, chn_send(r["kind"], r["t"], r["text"], allow) if r["t"] else (False, None, "config")))
-        if res[-1][1][2] in ("timeout", "network"):
-            slow.add(r["channel_id"])
-    if res:
+        if not res[-1][1][0]:  # 2.665.0 (#5113): after any failure (was: only timeout / network) the rest of this channel waits
+            skip.add(r["channel_id"])
+    if res or later:
         with GATE.bg():
             c = connect()
             try:
@@ -326,7 +336,8 @@ def chn_loop():
         _CH_WAKE.wait(CH_TICK)
         _CH_WAKE.clear()
         try:
-            while chn_tick() >= CH_BATCH:
+            skip = set()  # 2.665.0 (#5113): a channel that failed in this round waits for the next one (CH_TICK)
+            while chn_tick(skip) >= CH_BATCH:
                 pass
         except Exception as e:  # noqa: BLE001
             print("channels error:", type(e).__name__, flush=True)  # 2.360.5 (#3245): the name only, never the text
