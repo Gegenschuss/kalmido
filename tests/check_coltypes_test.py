@@ -53,7 +53,8 @@ check(len(out) == 3 and all(k in " ".join(out) for k in ("meetings.closed_at", "
 check(any("meetings.closed_at (kalmido/core/migrations.d/9999_x.py:2)" in x for x in out), f"a step's finding names its line: {out}")
 BASE = {"meetings.closed_at": "time", "meetings.has_room": "bool", "meetings.layout": "json"}
 check(not run(STEP, base=BASE), "the same columns on the baseline stay quiet")
-check(len(run(STEP, base=dict(BASE, **{"meetings.closed_at": "bool"}))) == 2, "a baseline line with another rule does not cover the column")
+out = run(STEP, base=dict(BASE, **{"meetings.closed_at": "bool"}))
+check(len(out) == 1 and "meetings.closed_at (" in out[0], f"a baseline line with another rule does not cover the column: {out}")
 MOVED = frag('AFTER = ["ALTER TABLE meetings ALTER COLUMN closed_at TYPE TIMESTAMPTZ USING closed_at::timestamptz",\n'
              '         "ALTER TABLE meetings DROP COLUMN IF EXISTS has_room"]\n', "9999_y.py")
 out = run(STEP, MOVED, base=BASE)
