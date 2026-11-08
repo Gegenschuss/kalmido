@@ -262,6 +262,15 @@ def _target(c, b):
     return "inbox", int(m.group(1)), None, None
 
 
+def _client_addr_write(c, kind, uid, org_id):
+    """2.674.0 (#4382 finding 3): making, renewing or deleting a client's address changes the client (the old address stops,
+    the one who renews receives its mail): the write right on the client like need_client on a change (a read-only person of
+    the organisation only reads the address that is there), as a project's address needs the write role (_target)."""
+    if kind == "client" and org_id:
+        from ..accounts.orgroles import need_org_write
+        need_org_write(c, uid, org_id)
+
+
 def _address_of(c, kind, uid, org_id, cid, lid):
     from ..integrations.mail import mail_addr
     w, a = _token_where(kind, uid, org_id, cid, lid)
@@ -298,6 +307,7 @@ def hbm_address_new():
     old = c.execute(f"SELECT token FROM hub_tokens WHERE {w}", a).fetchone()
     if old and not b.get("renew"):
         return jsonify(address=_address_of(c, kind, uid, org, cid, lid), kind=kind)
+    _client_addr_write(c, kind, uid, org)  # 2.674.0 (#4382 finding 3)
     tok = secrets.token_urlsafe(12).replace("-", "x").replace("_", "y")
     c.execute(f"DELETE FROM hub_tokens WHERE {w}", a)
     c.execute("INSERT INTO hub_tokens(token,kind,user_id,org_id,client_id,list_id,created_at) VALUES(?,?,?,?,?,?,?)",
@@ -312,6 +322,7 @@ def hbm_address_del():
     c = db()
     _gate()
     kind, org, cid, lid = _target(c, _args_target())
+    _client_addr_write(c, kind, me(), org)  # 2.674.0 (#4382 finding 3)
     w, a = _token_where(kind, me(), org, cid, lid)
     c.execute(f"DELETE FROM hub_tokens WHERE {w}", a)
     c.commit()
