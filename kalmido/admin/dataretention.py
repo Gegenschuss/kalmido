@@ -53,6 +53,9 @@ LGC_LOGS = (
     ("agent_jobs", "updated_at", "state IN ('done','failed','stopped')", 180),
 )
 LGC_TOKEN_GRACE_DAYS = 30  # an expired API token keeps answering "has expired" for a while before it disappears
+# 2.674.0 (#4028, review F13): ended hosted MCP accesses and revoked_creds rows of ended tokens (lgc_expired); never below
+# agents/mcpremote.py MCPR_REFRESH_DAYS (tests/p2674_c_mcp_test.py checks it), else a restore could bring a live refresh token back
+LGC_REVOKED_DAYS = 30
 LGC_FAILED = N_("The daily clean-up of old logs could not finish in {0} ({1}). The rows past their time stay until the next run; on a large table raise KALMIDO_DB_STATEMENT_TIMEOUT.")
 LGC_BATCH = 5000  # 2.644.0 (#4192): rows per DELETE of the clean-up, each batch committed (the tests set it lower)
 
@@ -96,14 +99,21 @@ def lgc_portal_keep():
 
 
 def lgc_expired(c, now):
-    """Credentials past their end (no switch). Returns {"what": n}."""
+    """Credentials past their end (no switch). Returns {"what": n}.
+    2.674.0 (#4028, review F13): + the hosted MCP accesses revoked (or whose refresh token ran out) LGC_REVOKED_DAYS ago and
+    the rows of revoked_creds whose token had ended that long ago (core/migrations.d/4028_a.py). A restore stays safe without
+    them (admin/backup.py bkr_creds_after): a backup's copy of such a token has expired, and the refresh token of such an
+    access in a backup ended at the latest MCPR_REFRESH_DAYS after that backup, so before the cut (LGC_REVOKED_DAYS >= it)."""
     old = iso(now - timedelta(days=LGC_TOKEN_GRACE_DAYS))
+    gone = iso(now - timedelta(days=LGC_REVOKED_DAYS))
     out = {}
     for name, sql, args in (
             ("sessions", "DELETE FROM sessions WHERE expires_at<?", (iso(now),)),
             # 2.190.0 A (#1991): push subscriptions of sessions that are gone ('' = made before 2.115, unknown session: stay)
             ("push_subs", "DELETE FROM push_subs WHERE session_hash<>'' AND session_hash NOT IN (SELECT token_hash FROM sessions)", ()),
             ("api_tokens", "DELETE FROM api_tokens WHERE expires_at IS NOT NULL AND expires_at<?", (old,)),
+            ("oauth_grants", "DELETE FROM oauth_grants WHERE revoked_at<? OR (revoked_at IS NULL AND refresh_expires_at<?)", (gone, gone)),
+            ("revoked_creds", "DELETE FROM revoked_creds WHERE exp<?", (gone,)),  # 2.674.0 (#4028): rows without exp stay
             ("invites", "DELETE FROM user_invites WHERE (used_at IS NULL AND expires_at<?) OR (used_at IS NOT NULL AND used_at<?)", (old, old)),
             ("setup_codes", "DELETE FROM agent_setup_codes WHERE expires_at<? OR (used_at IS NOT NULL AND used_at<?)", (old, old)),
             # 2.273.0 F1 (#3042): the move memos of tasks / lists / files (people, tag and file names) once their day for the

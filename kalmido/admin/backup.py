@@ -1713,6 +1713,11 @@ def bkr_read(c):
 def bkr_creds_read(c):
     """The revoked token / app password hashes now [(hash, at)]; caller is in system_ctx."""
     try:
+        with c.savepoint():  # 2.674.0 (#4028): + exp (core/migrations.d/4028_a.py), so the clean-up can still take the row later
+            return [tuple(r) for r in c.execute("SELECT hash, at, exp FROM revoked_creds")]
+    except _pg.Error:
+        pass
+    try:
         with c.savepoint():
             return [tuple(r) for r in c.execute("SELECT hash, at FROM revoked_creds")]
     except _pg.Error:  # a database from before 2.360 (no table yet): nothing to keep revoked
@@ -1722,8 +1727,8 @@ def bkr_creds_read(c):
 def bkr_creds_after(c, creds):
     """After pg_restore and init_db (system_ctx, caller commits): the list back, then the restored tokens / app
     passwords it names go again."""
-    for h, at in creds:
-        c.execute("INSERT INTO revoked_creds(hash, at) VALUES(?,?) ON CONFLICT (hash) DO NOTHING", (h, at))
+    for h, at, *exp in creds:  # 2.674.0 (#4028): (hash, at, exp) or (hash, at) of a database before it
+        c.execute("INSERT INTO revoked_creds(hash, at, exp) VALUES(?,?,?) ON CONFLICT (hash) DO NOTHING", (h, at, exp[0] if exp else None))
     for t, q in (("api_tokens", "DELETE FROM api_tokens WHERE token_hash IN (SELECT hash FROM revoked_creds)"),
                  ("app_passwords", "DELETE FROM app_passwords WHERE pw_hash IN (SELECT hash FROM revoked_creds)")):
         n = c.execute(q).rowcount  # plain statements: pg_prepare checks them
