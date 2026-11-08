@@ -173,7 +173,7 @@ function dcv_nbTake(d, old) {
   const was = /** @type {any} */ (old)._dcv, pdf = DVW.pdf?.box && old.contains(DVW.pdf.box) ? DVW.pdf : null;
   old.replaceWith(el);
   DVW.pdf = e.pdf || null;
-  if (e.pdf) e.pdf.nb = false;
+  if (e.pdf) { e.pdf.nb = false; setTimeout(() => dcv_textFill(e.pdf), 0); }  // 2.742.0 (#4861): its pages drawn ahead get their text layers now
   if (was?.d && was.d.id !== d.id && !DC_PEND.has(was.d.id) && $('.dv-pages', old)?._base) {  // its preview finished
     const o = {id: was.d.id, d: was.d, set: was.set, at: Date.now(), ctrl: new AbortController(), el: old, pdf};
     if (pdf) pdf.nb = true;
@@ -413,6 +413,17 @@ function dcv_layout(box, keep, force) {
   pdf.io = new IntersectionObserver(es => es.forEach(en => { if (en.isIntersecting) dcv_page(pdf, en.target); else if (en.target.firstChild) { en.target.textContent = ''; en.target.dataset.s = ''; } }), {root: box, rootMargin: '600px 0px'});
   pages.forEach(p => pdf.io.observe(p));
 }
+// 2.742.0 (#4861): a neighbour taken over (dcv_nbTake) was drawn without text layers (only the open one gets them): the pages
+// already drawn at the current scale get theirs, the canvas stays as it is
+function dcv_textFill(pdf) {
+  if (typeof pv_text !== 'function' || DVW.pdf !== pdf || !pdf.box) return;
+  for (const x of pdf.box.querySelectorAll('.dv-pg[data-s]')) {
+    const p = /** @type {HTMLElement} */ (x), s = pdf.s, my = pdf.gen;
+    if (!s || p.dataset.s !== String(s) || !p.querySelector(':scope > canvas') || p.querySelector(':scope > .textLayer')) continue;
+    pdf.doc.getPage(+(p.dataset.i || 0) + 1).then(page => pv_text(typeof pv_libNow === 'undefined' ? null : pv_libNow, page, page.getViewport({scale: s}), p,
+      () => my === pdf.gen && DVW.pdf === pdf && p.dataset.s === String(s) && p.isConnected)).catch(() => {});
+  }
+}
 async function dcv_page(pdf, p) {
   const s = pdf.s, my = pdf.gen, i = +p.dataset.i;
   if (p.dataset.s === String(s)) return;
@@ -430,9 +441,9 @@ async function dcv_page(pdf, p) {
     if (my !== pdf.gen || pdf.off || p.dataset.s !== String(s)) return;
     p.replaceChildren(cv);
     // 2.742.0 (#4861): the text layer over the page (pdfview.js pv_text); page 1 without any text = a scan: "Copy text"
-    if (typeof pv_text === 'function') await pv_text(typeof pv_libNow === 'undefined' ? null : pv_libNow, page, vp, p, () => my === pdf.gen && !pdf.off && p.dataset.s === String(s) && p.isConnected);
+    if (typeof pv_text === 'function') await pv_text(typeof pv_libNow === 'undefined' ? null : pv_libNow, page, vp, p, () => my === pdf.gen && DVW.pdf === pdf && p.dataset.s === String(s) && p.isConnected);
     const d = DC.doc;
-    if (i === 0 && p._pvnt && d && DVW.notext !== d.id && pdf.box.closest('.dv-view') && $('.dc-body', pdf.box.closest('.dv-view'))?.dataset.id === String(d.id)) { DVW.notext = d.id; if (dcv_copyOn(d)) dc_mdDraw(pdf.box.closest('.dv-view')); }
+    if (i === 0 && p._pvnt && !pdf.nb && d && DVW.notext !== d.id && pdf.box.closest('.dv-view') && $('.dc-body', pdf.box.closest('.dv-view'))?.dataset.id === String(d.id)) { DVW.notext = d.id; if (dcv_copyOn(d)) dc_mdDraw(pdf.box.closest('.dv-view')); }
   } catch { if (my === pdf.gen) p.dataset.s = ''; }
 }
 function dcv_pgn(box) {  // "Page 3 / 12": the page at the upper third of the box
