@@ -109,7 +109,10 @@ const ds = n => { const d = new Date(); d.setDate(d.getDate() + n); return  /* 2
   await until(() => /number expected/.test(d.querySelector('#toast').textContent) && !w.eval('OUT.q.length') && !w.eval('OUT.flushing')); await idle(w);
   check(/number expected/.test(d.querySelector('#toast').textContent) && (await call('GET', '/api/state')).tasks.find(t => t.id === t2).fields[FB.id] === '1234.5', 'invalid number: message, value kept');
   const row = () => d.querySelector(`#view .trow[data-id="${t2}"]`);
-  check(row().querySelector('.fchip.sel')?.textContent === 'Doing' && /Budget\s*1,234\.5 €/.test(row().querySelector('.meta').textContent), 'row chips: Stage + Budget: ' + row().querySelector('.meta').textContent);
+  // 2.750.0 (#4502): a list without its own columns shows its default columns; the pinned fields Stage and Budget are
+  // columns there (the name in the column title), no longer chips with the name in the second line
+  const lcTxt = k => row().querySelector(`.lcols .lc[data-k="f:${k}"]`)?.textContent.trim() || '';
+  check(lcTxt(FS.id) === 'Doing' && /^1,234\.5 €$/.test(lcTxt(FB.id)) && [...d.querySelectorAll('#view .lchead .lc[data-k]')].some(c => c.dataset.k === 'f:' + FB.id && /Budget/.test(c.textContent)), 'row chips: Stage + Budget: ' + lcTxt(FS.id) + ' | ' + lcTxt(FB.id));
   // activity lines
   await w.eval(`loadTimeline(${t2})`); await until(() => /Alice set Reviewer to Bob/.test(d.querySelector('#d-tl-items')?.textContent || ''));  // 2.624.0 (#3943)
   const tl = d.querySelector('#d-tl-items').textContent;
@@ -337,7 +340,9 @@ const ds = n => { const d = new Date(); d.setDate(d.getDate() + n); return  /* 2
 
   // ================= mobile: no columns
   const wm = await boot({user: 'alice', mobile: true, hash: 'l/' + WORK, ls: {['tasks.fcols.' + WORK]: 'true'}});
-  check(!wm.document.querySelector('.fcolhead') && !wm.document.querySelector('[data-act="cols"]'), 'mobile: no column view, no header button (Columns… is in the list menu)');
+  // 2.750.0 (#4502): the list shows its default columns, on a phone as the strip of names (.lcbar, #3551) with its
+  // "Fields" button; there is still no field column view and no other header button
+  check(!wm.document.querySelector('.fcolhead') && [...wm.document.querySelectorAll('[data-act="cols"]')].every(b => b.closest('.lcbar')), 'mobile: no column view, no header button (Columns… is in the list menu)');
   check(wm.document.querySelector('.lhead .lprog'), 'mobile: progress header');
   wm.close();
 

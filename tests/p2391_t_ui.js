@@ -33,6 +33,9 @@ const FEAT = 'comments,collab,fields';
   const L = (await call(CA, 'POST', '/api/lists', {name: 'Receipts'})).id;
   const PLAIN = (await call(CA, 'POST', '/api/lists', {name: 'Shopping'})).id;
   await call(CA, 'POST', '/api/tasks', {title: 'Milk', list_id: PLAIN});
+  // 2.750.0 (#4502): a plain list shows its default columns now; a checklist keeps the plain rows (#1217 is checked there)
+  const CHK = (await call(CA, 'POST', '/api/lists', {name: 'Packing', checklist: true})).id;
+  await call(CA, 'POST', '/api/tasks', {title: 'Socks', list_id: CHK});
   const FA = (await call(CA, 'POST', `/api/lists/${L}/fields`, {name: 'Amount', type: 'number', options: {unit: 'EUR'}})).id;
   const FS = await call(CA, 'POST', `/api/lists/${L}/fields`, {name: 'State', type: 'select', options: {options: [{name: 'Open', color: '#e5484d'}, {name: 'Paid', color: '#30a46c'}]}});
   const FC = (await call(CA, 'POST', `/api/lists/${L}/fields`, {name: 'Refunded', type: 'checkbox'})).id;
@@ -182,6 +185,8 @@ const FEAT = 'comments,collab,fields';
 
     // ================= #1217: a list without columns has no lines; #1327: a viewer gets no editable cells
     await nav(B + '#l/' + PLAIN); await ready(`!!document.querySelector('#view .trow')`); await sleep(300);
+    check(await ev(`!!document.querySelector('#view .lchead .lc[data-k="due"]')`), '#4502: a list without its own columns shows its default columns');
+    await nav(B + '#l/' + CHK); await ready(`location.hash === '#l/${CHK}' && !!document.querySelector('#view .trow')`); await sleep(300);
     check(await ev(`!document.querySelector('#view .lcols') && !document.querySelector('#view .lchead')`), '#1217: a list without columns: no column lines');
     await signIn('bob');
     // a new page load: a hash change alone keeps alice's loaded state in the page

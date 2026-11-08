@@ -241,7 +241,9 @@ const V = B + 'api/v1';
       await o.nav(B + '#l/' + AGY); await ready(ev); await sleep(600);
       if (await ev(`location.hash === '#l/${AGY}' && !!document.querySelector('#view .trow')`)) break;
     }
-    const cell = await ev(`(() => { const rows = [...document.querySelectorAll('#view .trow')]; for (const r of rows) { const c = r.querySelector('[data-act="assign"]'); if (c) { const b = c.getBoundingClientRect(); return {x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2), w: b.width}; } } return null; })()`);
+    // 2.750.0 (#4502): the list shows its default columns now; the cell's hidden copy in the second line (.mlc.o0, narrow
+    // lists only) comes first in the row, so the visible one is taken
+    const cell = await ev(`(() => { const rows = [...document.querySelectorAll('#view .trow')]; for (const r of rows) { const c = [...r.querySelectorAll('[data-act="assign"]')].find(x => x.getBoundingClientRect().width > 0); if (c) { const b = c.getBoundingClientRect(); return {x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2), w: b.width}; } } return null; })()`);
     if (cell && cell.w > 0) {
       await cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 'm', parameters: {pointerType: 'mouse'}, actions: [{type: 'pointerMove', x: cell.x, y: cell.y}, {type: 'pointerDown', button: 0}, {type: 'pointerUp', button: 0}]}]});
       await cmd('input.releaseActions', {context: ctx}); await sleep(500);

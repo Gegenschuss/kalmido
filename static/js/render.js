@@ -1287,9 +1287,12 @@ function taskRow(t, opts = {}) {
   if (!lc && !opts.trash && dv_chip(t)) meta.push(dv_chip(t));  // 2.392.2 (#3365): parked / waiting (a column shows it otherwise)
   if (t.comment_count && cmtOn() && rs('cmt')) meta.push(`<span class="cmc ${t.unread ? 'unread' : ''}" title="${esc(t.unread ? trn('{0} new comment', '{0} new comments', t.unread) : trn('{0} comment', '{0} comments', t.comment_count))}">${ic('comment', 's')}${t.comment_count}</span>`);
   if (t.approvals_open) meta.push(`<span class="apvc" title="${esc(apvCount(t.approvals_open))}">${ic('lock', 's')}${t.approvals_open}<span class="sr"> ${esc(apvCount(t.approvals_open))}</span></span>`);  // 2.41.0 (#1383): open approval cards in its comments
+  const lcFb = !!lc && !opts.vc && !colCfg(t.list_id);
   const ac = !lc && !opts.trash && t.id > 0 && acolOn(t.list_id) && pz_on(t.list_id, 'who');  // 1.10.0: assignee column (own cell, click = assign); 2.412.0 (#3552): the property
   if (ac) who = whoCell(t);
-  else if (lc) { /* 2.14.0: the assignee is a column or not shown */ }
+  // 2.750.0 (#4502): a list without its own columns (lcFallback) keeps in the second line what its default columns leave out, as before
+  // (the hidden assignee column: the picture; sorted by Created: the date)
+  else if (lc && !(lcFb && !lc.includes('who'))) { /* 2.14.0: the assignee is a column or not shown */ }
   else if (t.assignee_group_id && collab()) {  // 2.10.0 (#441): assigned to a group
     const gc = grpChip(t);
     if (rs('person')) meta.push(gc);
@@ -1304,7 +1307,7 @@ function taskRow(t, opts = {}) {
   if (!lc && rs('tags')) for (const g of t.ltags || []) meta.push(ltagChip(g, t.list_id));
   if (!lc && rs('tags')) for (const g of t.tags) meta.push(ptagChip(g, t.list_id));
   // 2.0.8 (#319): sorted by "Created": a small creation date on the row
-  if (!lc && !opts.trash && !opts.checklist && t.created_at && opts.crd && rs('created')) meta.push(`<span class="crd" title="${esc(tr('Created {0}', fmtWhen(t.created_at)))}">${ic('plus', 's')}${dayLabel(ds(new Date(t.created_at)))}</span>`);
+  if ((!lc || lcFb && !lc.includes('created')) && !opts.trash && !opts.checklist && t.created_at && opts.crd && rs('created')) meta.push(`<span class="crd" title="${esc(tr('Created {0}', fmtWhen(t.created_at)))}">${ic('plus', 's')}${dayLabel(ds(new Date(t.created_at)))}</span>`);
   if (opts.trash) meta.push(`<span>${trh('deleted {0}', dayLabel(t.deleted_at.slice(0, 10)))}</span>`);
   if (opts.trash) { const l = ttpLeft(t); if (l != null) meta.push(`<span class="ttpleft">${esc(l ? trn('{0} day left', '{0} days left', l) : tr('deleted soon'))}</span>`); }  // 2.116.0 A (#2063)
   const msvb = msvvSelfBadge(opts); if (msvb) meta.unshift(msvb);  // 2.73.0 C (#661): merged views, a server linked

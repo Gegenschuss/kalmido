@@ -90,6 +90,9 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   click(w, d.querySelector('#view .lchead [data-colsort="due"]'));
   check(await until(() => ids().indexOf(TA) > -1 && ids().indexOf(TA) < ids().indexOf(TA2) && !!d.querySelector('#view .lchead .lc[data-k="due"][aria-sort]')), 'the list: a click on Due sorts by the date');
   check((await call(CF, 'GET', '/api/state')).lists.find(l => l.id === A).columns == null, 'the list keeps no own columns from sorting');
+  // job/2754: what the default columns leave out stays in the second line: sorted by Created, the creation date
+  w.eval(`sortSet('created')`);
+  check(await until(() => !!d.querySelector(`#view .trow[data-id="${TA}"] .meta .crd`)), 'the list: sorted by Created, the row shows its creation date');
   w.close();
 
   const shown = sel => `(() => { const e = document.querySelector('${sel}'); return !!e && getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().height > 0; })()`;
