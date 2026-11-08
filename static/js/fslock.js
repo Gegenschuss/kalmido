@@ -197,8 +197,13 @@ async function fsl_open(n, dl, v) {
     const du = await fslDataUrl(blob);
     if (du) {
       // 2.683.0 (#5150): all pictures of the folder (an older version: only it); each one decrypted when it is turned to
-      const imgs = v ? [] : fslLeaf(ab_isImg), got = new Map([[n.id, du]]);
-      const prep = async x => { if (got.has(x.id)) return; const g = await fslDec(x).catch(e => { fslToast(e); throw e; }); got.set(x.id, await fslDataUrl(new Blob([g.data], {type: g.type}))); };
+      // (review) one decryption per picture also when it is turned to again while it still runs: `wip` holds the running one
+      const imgs = v ? [] : fslLeaf(ab_isImg), got = new Map([[n.id, du]]), wip = new Map();
+      const prep = x => {
+        if (got.has(x.id)) return Promise.resolve();
+        if (!wip.has(x.id)) wip.set(x.id, fslDec(x).then(async g => { got.set(x.id, await fslDataUrl(new Blob([g.data], {type: g.type}))); }).catch(e => { fslToast(e); throw e; }).finally(() => wip.delete(x.id)));
+        return wip.get(x.id);
+      };
       if (imgs.some(x => x.id === n.id)) attLightbox(n.id, imgs, x => got.get(x.id) || '', prep);
       else attLightbox(n.id, [a], () => du);
       return;

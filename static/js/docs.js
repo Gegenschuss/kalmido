@@ -320,6 +320,7 @@ function dc_navHtml(d) {
 }
 function dc_navSync() {  // the list changed (loaded again, the next page): the counter of the open document follows
   dc_navSeek();
+  const fi = dc_navIdx(DC.doc); if (fi >= 0) { DC.navAt = fi; DC.navFor = DC.doc.id; }  // 2.683.0 (#5150, review): found later, it may leave the list too
   for (const md of $$('.dc-md')) {
     const top = $('.dc-top', md), d = DC.doc;
     if (!top || !d || $('.dc-body', md)?.dataset.id !== String(d.id)) continue;
@@ -339,7 +340,8 @@ function dc_navSeek() {
   const d = DC.doc;
   if (!d || S.route.mod !== 'docs' || !DC.docs || DC.loading || DC.moreP || DC.docs.length >= DC.total || dc_navIdx(d) >= 0) return;
   if (DC.navAt != null && DC.navFor === d.id) return;  // it stood in the list and left it (checked, filtered): no search
-  if (DC.seekFor !== d.id) { DC.seekFor = d.id; DC.seekN = 0; }
+  const sk = d.id + '|' + DC.key;  // (review) per document and list: the same list loaded again (the poll) searches no more
+  if (DC.seekFor !== sk) { DC.seekFor = sk; DC.seekN = 0; }
   if (DC.seekN >= DC_SEEK) return;
   DC.seekN++;
   dc_more().then(ok => { if (ok) dc_navSeek(); });  // the next page while it is still missing (its dc_draw already drew the counter)
