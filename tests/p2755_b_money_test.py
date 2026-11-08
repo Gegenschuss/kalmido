@@ -27,7 +27,7 @@ from freelancer_fixture import freelancer  # noqa: E402
 from kt import CT, FAILS, OKS, B, H, DATA, check, sess, until  # noqa: E402
 
 KEY = base64.b64encode(os.urandom(32)).decode()
-O = "/api/office"
+OFC = "/api/office"
 FEAT = "cal,comments,collab,office,clients,docs"
 TODAY = testclock.today()
 Y = TODAY.year
@@ -74,27 +74,27 @@ def py(code):
 
 def office(s, who):
     """The answers in the office s works in (an organisation or the personal office) -> (invoice id, cash entry id, draft id)."""
-    check(s.put(B + O + "/settings", json={"lang": "de", "currency": "EUR",
+    check(s.put(B + OFC + "/settings", json={"lang": "de", "currency": "EUR",
                                            "company_fields": {"name": f"{who} Beispiel GmbH", "street": "Musterweg 1", "zip": "12345", "city": "Musterstadt",
                                                               "country": "DE", "tax_number": "12/345/67890", "iban": "DE02120300000000202051"}}).ok,
           f"{who}: office settings")
     cl = s.post(B + "/api/clients", json={"name": f"{who} Kunde GmbH", "street": "Kundenweg 2", "zip": "54321", "city": "Kundenstadt", "country": "DE"}).json()["id"]
-    r = s.post(B + O + "/docs", json={"kind": "invoice", "client_id": cl, "project_title": "Job", "service_from": T0,
+    r = s.post(B + OFC + "/docs", json={"kind": "invoice", "client_id": cl, "project_title": "Job", "service_from": T0,
                                        "items": [{"title": "Schnitt", "qty": 1, "rate": 1000}, {"title": "Farbe", "qty": 1.5, "rate": 33.33}]})
     check(r.status_code == 201, f"{who}: an invoice {r.text[:200]}")
     did = r.json()["id"]
-    check(s.post(B + O + f"/docs/{did}/finalize").ok, f"{who}: finalised")
-    d = s.get(B + O + f"/docs/{did}").json()
+    check(s.post(B + OFC + f"/docs/{did}/finalize").ok, f"{who}: finalised")
+    d = s.get(B + OFC + f"/docs/{did}").json()
     its = [(x.get("net"), x.get("tax_amount")) for x in d.get("items", [])]
     check(its == [("1000.00", "190.00"), ("50.00", "9.50")], f"{who}: the positions carry net / tax as text with two places {its}")
-    r = s.post(B + O + "/docs", json={"kind": "invoice", "client_id": cl, "project_title": "Entwurf", "items": [{"title": "Alt", "qty": 1, "rate": 10}]})
+    r = s.post(B + OFC + "/docs", json={"kind": "invoice", "client_id": cl, "project_title": "Entwurf", "items": [{"title": "Alt", "qty": 1, "rate": 10}]})
     draft = r.json()["id"] if r.status_code == 201 else None
-    check(draft and [x.get("net") for x in s.get(B + O + f"/docs/{draft}").json().get("items", [])] == [None], f"{who}: a draft: no net yet {r.text[:200]}")
-    ch = s.get(B + O + "/log/chain").json()
+    check(draft and [x.get("net") for x in s.get(B + OFC + f"/docs/{draft}").json().get("items", [])] == [None], f"{who}: a draft: no net yet {r.text[:200]}")
+    ch = s.get(B + OFC + "/log/chain").json()
     check(ch.get("ok") is True and ch.get("count", 0) >= 1, f"{who}: the hash chain is intact {ch}")
-    r = s.post(B + O + "/cashbooks", json={"name": "Handkasse", "opening": "0.00", "opening_day": f"{Y}-01-01"})
+    r = s.post(B + OFC + "/cashbooks", json={"name": "Handkasse", "opening": "0.00", "opening_day": f"{Y}-01-01"})
     check(r.status_code == 201, f"{who}: a cash box {r.text[:200]}")
-    E = O + f"/cashbooks/{r.json()['id']}/entries"
+    E = OFC + f"/cashbooks/{r.json()['id']}/entries"
     check(s.post(B + E, json={"day": f"{Y}-01-01", "dir": "in", "amount": "200", "text": "Einlage"}).status_code == 201, f"{who}: cash in")
     r = s.post(B + E, json={"day": f"{Y}-01-01", "dir": "out", "amount": "23.8", "vat_pct": "19", "text": "Porto"})
     check(r.status_code == 201 and r.json().get("amount") == "23.80", f"{who}: a cash entry answers 23.80 {r.text[:200]}")
@@ -102,7 +102,7 @@ def office(s, who):
     lst = s.get(B + E).json()
     am = sorted(x["amount"] for x in lst.get("entries", lst.get("items", [])))
     check(am == ["200.00", "23.80"], f"{who}: the list carries the amounts as text {am} {str(lst)[:300]}")
-    lg = s.get(B + O + f"/cash-entries/{eid}/log").json()
+    lg = s.get(B + OFC + f"/cash-entries/{eid}/log").json()
     check(lg.get("log") is not None, f"{who}: the change log of the entry reads {str(lg)[:200]}")
     # the balance sheet: an entry by hand
     check(s.put(B + "/api/office/books/ledger/settings", json={"method": "balance", "size": "small"}).ok, f"{who}: balance sheet chosen")

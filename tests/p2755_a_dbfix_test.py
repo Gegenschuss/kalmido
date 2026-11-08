@@ -37,7 +37,7 @@ def sql(q, args=()):
         c.commit()
         try:
             return r.fetchall()
-        except Exception:  # a statement without rows to read
+        except Exception:  # noqa: BLE001 - a statement without rows to read
             return []
     finally:
         c.close()

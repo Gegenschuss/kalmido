@@ -61,7 +61,7 @@ from .meals import BW_SHARE, ofc_bw_booked  # 2.534.0 (#4333): the approved ente
 from ..core.serializers import csv_cell  # 2.369.5 (#2517): pulled up from functions
 from .ledger import ofx_log  # 2.369.5 (#2517): pulled up from functions
 from .years import ofc_years, ofc_years_join, ofc_years_sql  # 2.593.0 (#4891): the years with data
-from .euerbasis import EB_NORC_LABEL, eb_basis_of, eb_flows, eb_income_payment_ids, eb_map, eb_segments  # 2.603.0 (#4927): the basis of the EUeR per year
+from .euerbasis import EB_NORC_LABEL, eb_basis_of, eb_flows, eb_income_payment_ids, eb_map, eb_segments  # noqa: E402 - 2.603.0 (#4927): the basis of the EUeR per year
 # 2.755.0 (#5241): eb_map -- an office that never chose "bank and cash" has no edge between two bases
 
 
