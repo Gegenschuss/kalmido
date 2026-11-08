@@ -1,8 +1,8 @@
 """2.111.0 A (#2233): Undo for the office editors that save every field at once (documents with their parts, clients, the
 master data like services). 2.567.0 (#4711, the shared core stage 2): the steps live in the core's obj_undo (core/writes.py
 obj_undo_pre / obj_undo_post / obj_undo_run), one tracked kind per object kind (OUN_KINDS: its tables = the scope) instead of
-the hand list of office_undo; the letters and the office rows of office/owrite.py ow_write have their steps there too. The
-table office_undo stays (read by nothing any more, its rows go after a day; the way back = the old code).
+the hand list of office_undo; the letters and the office rows of office/owrite.py ow_write have their steps there too.
+2.747.0 (#5246): the table office_undo is gone (migrations.d/5246.py).
 
 The app sends the header X-Kalmido-Undo: <session token> with the saves of an open editor (static/js/office_undo.js). The
 write routes call oun_pre() before they change anything (raw copy of the object's rows = the state before the step, its
@@ -81,13 +81,12 @@ OUN_PRUNE = {"at": 0.0}
 
 def oun_prune(c):
     """The watchdog (at most hourly, system context): copies older than KEEP_H go, also those of deleted documents and
-    clients (nothing of a deleted object stays longer than a day); the old table office_undo drains the same way."""
+    clients (nothing of a deleted object stays longer than a day)."""
     import time
     if time.time() - OUN_PRUNE["at"] < 3600:
         return
     OUN_PRUNE["at"] = time.time()
     lim = iso(now_utc() - timedelta(hours=KEEP_H))
-    c.execute("DELETE FROM office_undo WHERE created_at<?", (lim,))
     c.execute("DELETE FROM obj_undo WHERE created_at<?", (lim,))
     c.commit()
 

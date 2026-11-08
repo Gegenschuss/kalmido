@@ -68,7 +68,6 @@ office_signoffs.task_id
 office_sub_reminders.task_id
 office_sub_reminders.user_id
 office_trip_items.billed_doc_id
-office_undo.ref_id
 pl_conn_users.user_id
 pl_conns.owner_id
 pl_imported.pl_id

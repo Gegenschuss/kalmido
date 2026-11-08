@@ -499,7 +499,7 @@ OX_LEFT = {
     "office_payonline": _SECRET, "office_pay_links": _SECRET, "office_pay_sessions": _ONLINEPAY, "office_pay_events": _ONLINEPAY, "office_pay_payouts": _ONLINEPAY,
     "office_trash": "the trash (not_included)",
     "org_fields": _LATER2, "org_tags": _LATER2, "templates": _LATER2,  # 2.609.0 (#3373): the organisation's schema, labels, templates; follow-up #4031
-    "office_undo": "undo steps of one day", "org_invites": "invitations (not_included)", "org_joins": "join requests (not_included)",
+    "org_invites": "invitations (not_included)", "org_joins": "join requests (not_included)",
     "org_keys": _SERVER, "org_members": "members.json (with the role)", "org_out_requests": "requests of one person, short-lived",
     "pl_imported": _SECRET, "pl_rules": _SECRET, "pl_sources": _SECRET, "pl_uploads": _SECRET, "portal_logins": _SECRET,
     "rc_suggest": _DERIVED, "task_bell": _PERSONAL, "time_wipes": _DERIVED,  # 2.530.0 B (#4315): the Undo copy of "Delete all times"

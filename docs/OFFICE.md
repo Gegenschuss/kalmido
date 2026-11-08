@@ -1914,8 +1914,10 @@ the object in the meantime (their change stays), when the document was finalised
 moved to another workspace. Tables check the table's revision the same way.
 
 How it works: the editor sends its saves with the header `X-Kalmido-Undo: <session token>`; the write routes keep a
-copy of the stored rows before the step and a fingerprint of the state after it (table `office_undo`, one day).
-`POST /api/office/undo/<doc|client|services|texts|contracts|sets|roles|crew>/<id>` with `{sess, op}` (`undo` = the newest
+copy of the stored rows before the step and a fingerprint of the state after it (the core's table `obj_undo`, one day;
+the old table `office_undo` is gone since 2.747.0).
+`POST /api/office/undo/<doc|client|services|texts|contracts|sets|roles|crew>/<id>` (since 2.747.0 also `POST <save url>/undo`
+of a client / master data row, the dialogs' "… saved · Undo") with `{sess, op}` (`undo` = the newest
 step, `all` = back to the opening, `redo`, `redoall`) writes a copy back in one transaction, only while the object is
 exactly as this person's last step left it; rights as for the normal change. Saves without the header (agents, the
 API, other apps) record nothing.
@@ -2982,7 +2984,7 @@ Since 2.36.2 also `office_company` and `office_doc_log`, the columns `locked_at`
 the billing columns of `clients` - all nullable or with a default, so the previous release runs on with them.
 Unfinished logo uploads (`*.tmp`) are not part of backups.
 Since 2.138.1 also `office_undo` (the copies for the editors' undo, see "Undo in the editors"; `org_id` nullable for a
-private client, rows live one day); 2.110 runs on with it.
+private client, rows live one day); 2.110 runs on with it. Dropped again in 2.747.0 (#5246; the copies live in `obj_undo`), a one-way step.
 Since 2.37.0 (PostgreSQL) amounts, rates and quantities are `NUMERIC(14,4)` (exact decimals; read back as numbers as
 before), and every `office_*` table is under row-level security by `org_id`: a request only ever gets rows of its own
 organisations, even if a route forgot a check.
