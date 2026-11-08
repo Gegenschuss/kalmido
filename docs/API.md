@@ -1032,6 +1032,17 @@ MCP endpoint `/mcp` ([AGENTS.md, Hosted MCP](AGENTS.md#hosted-mcp)). Off, every 
 - `/mcp` without a valid token answers 401 with `WWW-Authenticate: Bearer resource_metadata="<server>/.well-known/oauth-protected-resource"`.
 - Settings > Agents: `GET /api/my/mcp-grants` (the accesses you gave or that use one of your agents, plus the connector
   address) and `DELETE /api/my/mcp-grants/{id}` (web session only).
+- 2.674.0 (#4028): an access ends **90 days** after it was made, used or not: no access or refresh token runs past that day
+  (`expires_in` can then be below 3600), and the refresh after it answers `invalid_grant` ("connect again"); the app goes
+  through the consent page again. Revoked or run-out accesses are deleted 30 days later.
+- 2.674.0 (#4028): with `PUBLIC_URL` set, `issuer`, the endpoints and `resource` always use it and `/mcp` / the consent
+  form accept only that `Origin` (plus `KALMIDO_WEBAUTHN_ORIGINS`); without it they follow the address of the request,
+  and *Administration > Agents* warns.
+- 2.674.0 (#4028): a request body without `Content-Length` (chunked) is read up to the same limit (1 MB, else 413).
+- Administration > Agents (instance admins, web session only): `GET /api/admin/mcp-grants` lists the apps connected to
+  team agents (`agent`, `client`, `redirect_host`, `given_by`, `created_at`, `last_used_at`, `ends_at`),
+  `DELETE /api/admin/mcp-grants/{id}` ends one. The consent page writes a line into the agent's log (`POST /oauth/authorize`,
+  201 = the agent was made there, 200 = an existing agent was given to the app).
 
 ## Setting up integrations through the API
 

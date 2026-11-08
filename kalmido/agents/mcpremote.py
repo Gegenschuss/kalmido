@@ -64,6 +64,7 @@ from ..api.v1 import API_ON
 MCPR_SWITCH = "mcp_remote"           # instance setting, "1" = on (default off)
 MCPR_ACCESS_S = 3600                 # the access token's life
 MCPR_REFRESH_DAYS = 30               # a refresh token not used within this runs out (every use gives a new one)
+MCPR_GRANT_MAX_DAYS = 90             # 2.674.0 (#4028, review F12): an access ends this long after its first token, used or not
 MCPR_CODE_S = 600                    # an authorization code / the consent form
 MCPR_REG_PER_HOUR = 20               # client registrations per address and hour
 MCPR_REG_KEEP_DAYS = 7               # a registered client without any access is forgotten after this
@@ -257,17 +258,26 @@ def mcpr_may(c, uid, aid, support=False):
         return not op_foreign_account(c, aid, note=False, grant=support)
 
 
+def mcpr_grant_end(created_at):
+    """2.674.0 (#4028, review F12): when an access made at created_at (its first token) ends for good."""
+    return parse_iso(created_at) + timedelta(days=MCPR_GRANT_MAX_DAYS)
+
+
 def _issue(c, grant_id, aid, cname):
     """A new access token (an API token of the agent, MCPR_ACCESS_S) + a new refresh token for grant grant_id -> answer dict.
-    The caller removed the old access token and commits."""
+    The caller removed the old access token and commits. 2.674.0 (#4028, review F12): neither outlives MCPR_GRANT_MAX_DAYS
+    after the access was made."""
     with system_ctx(c):  # the grant's own agent: agent_token_new copies its scopes, address rule and projects (no content)
         tok = agent_token_new(c, aid, name=("MCP: " + (cname or "client"))[:80])
-    exp = now_utc() + timedelta(seconds=MCPR_ACCESS_S)
+    now = now_utc()
+    end = mcpr_grant_end(c.execute("SELECT created_at FROM oauth_grants WHERE id=?", (grant_id,)).fetchone()[0])
+    exp = min(now + timedelta(seconds=MCPR_ACCESS_S), end)
     tid = c.execute("UPDATE api_tokens SET expires_at=? WHERE token_hash=? RETURNING id", (iso(exp), _token_hash(tok))).fetchone()[0]
     rt = "kmr_" + secrets.token_urlsafe(32)
     c.execute("UPDATE oauth_grants SET token_id=?, refresh_hash=?, refresh_expires_at=?, last_used_at=? WHERE id=?",
-              (tid, _token_hash(rt), iso(now_utc() + timedelta(days=MCPR_REFRESH_DAYS)), iso(now_utc()), grant_id))
-    return {"access_token": tok, "token_type": "Bearer", "expires_in": MCPR_ACCESS_S, "refresh_token": rt, "scope": MCPR_SCOPE}
+              (tid, _token_hash(rt), iso(min(now + timedelta(days=MCPR_REFRESH_DAYS), end)), iso(now), grant_id))
+    return {"access_token": tok, "token_type": "Bearer", "expires_in": max(1, int((exp - now).total_seconds())), "refresh_token": rt,
+            "scope": MCPR_SCOPE}
 
 
 def mcpr_revoke(c, gid):
@@ -494,8 +504,11 @@ def mcpr_authorize_post():
     c.execute("""INSERT INTO oauth_codes(code_hash,client_id,user_id,agent_id,redirect_uri,challenge,resource,created_at,expires_at)
                  VALUES(?,?,?,?,?,?,?,?,?)""", (_token_hash(code), cl["client_id"], u["id"], aid, req["r"], req["ch"],
                                                  req.get("res") or "", iso(now), iso(now + timedelta(seconds=MCPR_CODE_S))))
+    from .usage import audit_note  # 2.674.0 (#4028, review F12): in the agent's log (Administration > Agents > Log): 201 = made here
+    audit_note(c, aid, "POST", "/oauth/authorize", 201 if pick == "new" else 200, MCPR_SCOPE)
     c.commit()
-    print("hosted MCP: access for agent", aid, "given by", u["id"], "to client", cl["id"], flush=True)
+    print("hosted MCP: access for agent", aid, "given by", u["id"], "to client", cl["id"],
+          "(agent made on the consent page)" if pick == "new" else "", flush=True)
     return redirect(_with_query(req["r"], {"code": code, "state": req.get("s"), "iss": mcpr_base()}), 303)
 
 
@@ -583,6 +596,12 @@ def _token_refresh(c, cl, f, fail):
         mcpr_revoke(c, gr["id"])
         print("hosted MCP: the access token of access", gr["id"], "was removed, access revoked", flush=True)
         return fail(desc="the access was ended")
+    if mcpr_grant_end(gr["created_at"]) <= now_utc():
+        # 2.674.0 (#4028, review F12): the longest life of an access is over (also one given before 2.674 with a later refresh
+        # end): it ends; the app connects again through the consent page
+        mcpr_revoke(c, gr["id"])
+        print("hosted MCP: access", gr["id"], "reached its longest life, revoked", flush=True)
+        return fail(desc=f"the access ended after {MCPR_GRANT_MAX_DAYS} days, connect again")
     if not gr["refresh_expires_at"] or parse_iso(gr["refresh_expires_at"]) <= now_utc():
         return fail(desc="the refresh token has expired")
     if not mcpr_may(c, gr["user_id"], gr["agent_id"], support=True):
@@ -860,4 +879,56 @@ def mcpr_grant_delete(gid):
         raise Denied(404)
     mcpr_revoke(c, gid)
     c.commit()
+    return jsonify(ok=True)
+
+
+# ---------------------------------------------------------------- 2.674.0 (#4028, review F12): Administration > Agents
+
+def _team_grants(c):
+    """The open accesses of team agents (no owner) this instance admin may hand out (never a client's agent on a hosted
+    server, as mcpr_agents), newest first per agent."""
+    with system_ctx(c):  # names, times and the app of the accesses only, no content
+        rows = c.execute("""SELECT g.id, g.created_at, g.last_used_at, g.agent_id, g.user_id, cl.name AS client, cl.redirect_uris,
+                                   ua.display_name AS agent_name, ua.username AS agent_user, up.display_name AS person_name,
+                                   up.username AS person_user
+                            FROM oauth_grants g JOIN oauth_clients cl ON cl.client_id=g.client_id JOIN agents a ON a.user_id=g.agent_id
+                            JOIN users ua ON ua.id=g.agent_id JOIN users up ON up.id=g.user_id
+                            WHERE g.revoked_at IS NULL AND a.owner_id IS NULL ORDER BY g.agent_id, g.id DESC""").fetchall()
+    may = {}
+    for r in rows:
+        if r["agent_id"] not in may:
+            may[r["agent_id"]] = not op_foreign_account(c, r["agent_id"], note=False, grant=False)
+    return [r for r in rows if may[r["agent_id"]]]
+
+
+def _need_inst_admin():
+    need_person(403, tr("Agents cannot use this endpoint"))
+    if not g.user["is_admin"]:
+        raise Denied(403)
+
+
+@app.get("/api/admin/mcp-grants")
+def mcpr_admin_grants():
+    """The apps connected to team agents (hosted MCP access): agent, app, who gave the access, when, last used, its end."""
+    c = db()
+    _need_inst_admin()
+    out = []
+    for r in _team_grants(c):
+        uris = _uris(r)
+        out.append({"id": r["id"], "client": r["client"], "redirect_host": urllib.parse.urlsplit(uris[0]).netloc if uris else "",
+                    "agent": {"id": r["agent_id"], "name": r["agent_name"] or r["agent_user"]},
+                    "given_by": {"id": r["user_id"], "name": r["person_name"] or r["person_user"]},
+                    "created_at": r["created_at"], "last_used_at": r["last_used_at"], "ends_at": iso(mcpr_grant_end(r["created_at"]))})
+    return jsonify(on=mcpr_on(c), grants=out)
+
+
+@app.delete("/api/admin/mcp-grants/<int:gid>")
+def mcpr_admin_grant_delete(gid):
+    c = db()
+    _need_inst_admin()
+    if gid not in {r["id"] for r in _team_grants(c)}:
+        raise Denied(404)
+    mcpr_revoke(c, gid)
+    c.commit()
+    print("hosted MCP: access", gid, "of a team agent revoked by admin", me(), flush=True)
     return jsonify(ok=True)

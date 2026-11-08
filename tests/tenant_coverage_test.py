@@ -250,6 +250,7 @@ ROUTES = {
     "POST /api/admin/agents/{}/avatar": "admin", "POST /api/admin/agents/{}/token": "admin",
     "POST /api/admin/agents/{}/secret": "admin", "POST /api/admin/agents/{}/test": "admin",
     "GET /api/admin/agent-policy": "admin", "PUT /api/admin/agent-policy": "admin", "DELETE /api/admin/agents/{}": "admin",
+    "GET /api/admin/mcp-grants": "admin", "DELETE /api/admin/mcp-grants/{}": "admin",  # 2.674.0 (#4028): the apps of team agents
     "GET /api/admin/agents/audit": "admin", "GET /api/admin/agents/{}/audit": "admin",
     "GET /api/v1/admin/agents/{}/audit": "admin", "GET /api/v1/admin/status": "admin", "GET /api/v1/admin/orgs/activity": "admin", "GET /api/admin/orgs/activity": "admin",
     "PATCH /api/admin/settings": "admin", "POST /api/admin/setup": "admin", "POST /api/admin/mail/poll": "admin",

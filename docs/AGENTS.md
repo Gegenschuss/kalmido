@@ -4162,6 +4162,10 @@ Kalmido starts no agent and runs no model; it only answers the tool calls of the
 - **Revoke.** *Settings > Agents > Connected apps* lists every access (app, agent, given, last used); *Disconnect* ends
   the access token and the refresh token at once. A new API token for the agent (*New API token*) also ends the current
   access token (the app gets a new one with its refresh token); deleting the agent ends everything.
+- **Longest life** (2.674.0, #4028). An access ends 90 days after it was made, even when the app uses it every day; the
+  app then asks you to connect again through the consent page. Instance admins see the apps connected to team agents
+  (who gave the access, when, last used, end) under *Settings > Organisation > Agents* and can disconnect them there.
+  Connecting through the consent page is noted in the agent's log.
 - **Tools.** The same tools as the starter's MCP server (`mcp/kalmido_mcp.py`, which the image carries for this; without
   it `/mcp` answers 503), filtered by the agent's permissions. `wait_for_events` works too, but a connector usually calls
   tools only while you chat with it: for an agent that reacts to events on its own, keep using the starter.

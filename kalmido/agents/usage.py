@@ -565,6 +565,17 @@ def audit_flush():
         return len(rows)
 
 
+def audit_note(c, aid, method, route, status, scope=""):
+    """2.674.0 (#4028, review F12): one row of the agent's log written at once, in the caller's transaction (the caller commits):
+    a step about the agent that is no request with its token, e.g. the consent page of the hosted MCP access
+    (agents/mcpremote.py) that created it or gave an app its access."""
+    if AUDIT_DAYS <= 0:
+        return
+    t = now_utc()
+    c.execute("INSERT INTO agent_audit(agent_id,at,day,method,route,status,task_id,list_id,ms,scope) VALUES(?,?,?,?,?,?,?,?,?,?)",
+              (aid, iso_ms(t), t.astimezone(TZ).date().isoformat(), method[:8], route[:120], status, None, None, 0, scope[:20]))
+
+
 def audit_loop():
     while True:
         _AUDIT_EVT.wait(AUDIT_FLUSH_S)

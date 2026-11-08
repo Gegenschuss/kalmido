@@ -164,6 +164,7 @@ ROUTES = {
     "DELETE /api/admin/alerts": "admin", "DELETE /api/admin/backups/{}": "admin", "DELETE /api/admin/groups/{}": "admin",
     "DELETE /api/admin/groups/{}/avatar": "admin", "GET /api/admin/agent-policy": "admin", "GET /api/admin/agents": "admin",
     "GET /api/admin/agents/audit": "admin", "GET /api/admin/agents/{}/audit": "admin",
+    "GET /api/admin/mcp-grants": "admin", "DELETE /api/admin/mcp-grants/{}": "admin",  # 2.674.0 (#4028): the apps of team agents
     "GET /api/admin/agents/{}/machines": "admin", "GET /api/admin/alerts": "admin", "GET /api/admin/assistant": "admin",
     "GET /api/admin/backups": "admin", "GET /api/admin/backups/{}/download": "admin", "POST /api/admin/backups/{}/download": "admin", "GET /api/admin/client-ip": "admin",
     "GET /api/admin/health": "admin",  # 2.102.0 D (#1994): the server's capacity numbers

@@ -427,6 +427,7 @@ function agAdminPaneHtml(hint) {
     <h4 id="s-mcpr-h">${tr('Hosted MCP access')}</h4>
     <div class="row"><label class="chkl swl"><span class="swc"><input type="checkbox" id="s-mcpr" ${S.about?.mcp_remote ? 'checked' : ''}><span class="swt" aria-hidden="true"></span></span><span>${tr('Apps may connect to agents with a sign-in (OAuth)')}</span></label></div>
     ${hint(tr('On: apps with an MCP connector connect to this server at /mcp; a signed-in person chooses one of their agents, and the app gets exactly its permissions (revocable under Settings > Agents). Off: /mcp and the sign-in addresses do not exist.'))}
+    ${S.about?.public_url_set === false ? `<div class="shint warn shmcpurl" role="status"><b>${tr('PUBLIC_URL is not set')}</b> ${esc(tr('Apps then learn the address of this server from each request (its Host header). Set PUBLIC_URL in .env to the address people open and restart before apps connect (SELF-HOSTING.md).'))}</div>` : ''}${''/* 2.674.0 (#4028, review F11) */}<div id="s-mcpadm"></div>${''/* 2.674.0 (#4028, review F12): the accesses of team agents */}
     ${typeof srv_adminHtml === 'function' ? srv_adminHtml(hint) : ''}${''/* 2.557.0 C (#4670) */}
     <h4 id="s-sclim-h">${tr('Permission limit')}</h4>
     ${hint(tr('What agents and API tokens may get at most on this server. A permission switched off here applies to every existing token at once.'))}
@@ -464,9 +465,29 @@ async function mcpGrantsDraw(md) {
     <div class="row"><label for="s-mcpurl">${tr('Connector address')}</label><input id="s-mcpurl" readonly value="${esc(j.url)}"></div>` : ''}
     <div class="members" aria-labelledby="s-mcpgr-h">${j.grants.map(row).join('') || `<div class="muted mhint">${tr('No app is connected.')}</div>`}</div>`;
 }
+// 2.674.0 (#4028, review F12): Administration > Agents - the apps connected to team agents (who gave the access, when, last used), revocable
+async function mcpAdmDraw(md) {
+  const box = $('#s-mcpadm', md); if (!box) return;
+  let j; try { j = await api('GET', '/api/admin/mcp-grants'); } catch { box.innerHTML = ''; return; }
+  if (!j.on && !j.grants.length) { box.innerHTML = ''; return; }
+  const when = v => v ? fmtStamp(new Date(v)) : tr('never');
+  const row = x => `<div class="mrow" data-mcpa="${x.id}"><span class="n"><b>${esc(x.agent.name)}</b> <span class="muted">${esc(x.client)} · ${esc(x.redirect_host)}</span>
+      <small class="muted">${esc(tr('given by {0}', x.given_by.name))} · ${esc(tr('given {0}', when(x.created_at)))} · ${esc(tr('last used {0}', when(x.last_used_at)))} · ${esc(tr('ends {0}', when(x.ends_at)))}</small></span>
+    <button class="btn sm danger" data-mcpa-act="revoke" aria-label="${esc(tr('Disconnect {0}', x.client))}">${tr('Disconnect')}</button></div>`;
+  box.innerHTML = `<h4 id="s-mcpadm-h">${tr('Apps connected to team agents')}</h4>
+    <div class="members" aria-labelledby="s-mcpadm-h">${j.grants.map(row).join('') || `<div class="muted mhint">${tr('No app is connected.')}</div>`}</div>`;
+  box.onclick = async e => {
+    const b = e.target.closest('[data-mcpa-act="revoke"]'); if (!b) return;
+    const name = b.closest('[data-mcpa]').querySelector('.muted')?.textContent.split(' · ')[0] || '';
+    if (!await askConfirm(tr('Disconnect {0}?', name), tr('The app loses its access at once; it can only connect again through the consent page.'), {ok: tr('Disconnect'), danger: true})) return;
+    try { await api('DELETE', `/api/admin/mcp-grants/${b.closest('[data-mcpa]').dataset.mcpa}`); toast(tr('Disconnected')); } catch { /* shown */ }
+    mcpAdmDraw(md);
+  };
+}
 // 2.46.6 (#1710): the admins' agent rules (Administration > Agents), filled wherever the pane is
 async function ad_agPolicyDraw(md) {
   if (!$('#s-uag', md)) return;
+  mcpAdmDraw(md);  // 2.674.0 (#4028)
   try {
     const p = await api('GET', '/api/admin/agent-policy'); const sw = $('#s-uag', md), mx = $('#s-uagmax', md); if (sw) sw.checked = p.user_agents; if (mx) { mx.value = p.max_per_user; mx.disabled = !p.user_agents; }
     const lb = $('#s-sclim', md);  // 2.15.0 (#479): the admin's limit, one grid for agents and one for personal tokens

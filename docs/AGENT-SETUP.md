@@ -999,6 +999,7 @@ hosts and connections to LAN addresses time out; only DNS, Kalmido and public HT
 2.488.0 (#3363): when an admin has switched on *Hosted MCP access*, a client with MCP connectors needs no setup on a
 computer: add a connector with the address shown under *Settings > Agents > Connected apps* (your server followed by
 `/mcp`), sign in when the client opens Kalmido, choose the agent (or create one) and confirm. Disconnect it there again.
+An access ends after 90 days (2.674.0); the client then asks you to connect once more.
 Details: [AGENTS.md, Hosted MCP](AGENTS.md#hosted-mcp).
 
 ## Other tools: Codex CLI, Cursor, Windsurf, Gemini CLI
