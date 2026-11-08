@@ -2,11 +2,12 @@
 // kalmido-suite:
 // container (start.sh), Firefox as a touch screen in phone width (390 px, a folded Fold / an iPhone) and tablet width (840 px, an
 // unfolded Fold). Invented data only. P2652B_NOSTART=1 = the container runs.
-// - #5072: on a touch screen below 64rem the document opens as the whole page (not the pane beside the list), it covers the screen,
-//   a pull down on its preview leaves it whole (it was dragged to half a window like a bottom sheet, the list below), scrolling the
-//   page does not move the list (#view) behind it; the small picture of the preview stands in the size of the sharp page (no jump)
-// - #5070: list -> document -> full view: one history entry per level; Back closes the full view, Back closes the document (no
-//   entry pushed again in between: Chrome skips such an entry and the second Back left the app), Back leaves the documents
+// - #5072: on a touch screen below 64rem the document opens as a page of its own (not the pane beside the list; 2.583.0, #4835:
+//   the document view #docs/<id>), it fills the content area, a pull down on its preview leaves it whole (it was dragged to half
+//   a window like a bottom sheet), Back brings the list at the same place
+// - #5070: list -> document -> full view: one history entry per level (the view its address, the full view an overlay entry);
+//   Back closes the full view, Back closes the document (no entry pushed again in between: Chrome skips such an entry and the
+//   second Back left the app), Back leaves the documents
 // P4: alice works without an organisation (private documents): the person without an organisation
 const {execFileSync} = require('child_process');
 const path = require('path');
@@ -63,43 +64,31 @@ async function upload(name, lines) {
       await go(B + '#docs');
       check(await wait(`document.querySelectorAll('.dc-card').length === 14`, {timeout: 20000}), `${W}: fourteen cards`);
       check(await ev(`isTouch()`), `${W}: Firefox counts as a touch screen`);
-      // the list scrolled a bit first (the list behind must stay where it is)
+      // the list scrolled a bit first (2.583.0: Back from the view brings it back at the same place)
       await ev(`(document.getElementById('view').scrollTop = 120, 1)`);
       const v0 = await ev(`document.getElementById('view').scrollTop`);
       await ev(`(history.replaceState({p2652b: ${W}}, '', location.href), 1)`);  // marks the entry of the list (#5070: the arrow comes back to it)
       await ev(`(document.querySelector('.dc-view [data-dco="' + DC.docs[0].id + '"]').click(), 1)`);
-      // #5072: the whole page, also on the tablet (it was the sticky pane .dc-pane there)
-      check(await wait(`!!document.querySelector('.modal.dc-md.dc-page .dc-prev')`), `${W}: the document opens as the whole page`);
-      check(await ev(`!document.querySelector('.dc-pane')`), `${W}: no pane beside the list on a touch screen`);
-      const cover = `(() => { const c = document.querySelector('.modal.dc-md > .card'); if (!c) return null; const r = c.getBoundingClientRect();
-        return {t: Math.round(r.top), b: Math.round(r.bottom), l: Math.round(r.left), r: Math.round(r.right), ih: innerHeight, iw: innerWidth, h: c.style.height,
-          ok: r.top <= 1 && r.bottom >= innerHeight - 1 && r.left <= 1 && r.right >= innerWidth - 1, bg: getComputedStyle(c.parentElement).backgroundColor}; })()`;
+      // #5072: the whole page, also on the tablet (it was the sticky pane .dc-pane there); 2.583.0 (#4835): the document view
+      check(await wait(`!!document.querySelector('.dv-view .dv-pages') && /^#docs\\/\\d+$/.test(location.hash)`), `${W}: the document opens as a page of its own`);
+      check(await ev(`!document.querySelector('.dc-pane') && !document.querySelector('.dc-view [data-dco]')`), `${W}: no pane beside the list, the list is not drawn behind it`);
+      const cover = `(() => { const c = document.querySelector('.dv-view'), v = document.getElementById('view'); if (!c || !v) return null; const r = c.getBoundingClientRect(), q = v.getBoundingClientRect();
+        return {l: Math.round(r.left), r: Math.round(r.right), vl: Math.round(q.left), vr: Math.round(q.right), iw: innerWidth, ok: r.left <= q.left + 24 && r.right >= q.right - 24}; })()`;
       let c = await ev(cover);
-      check(c && c.ok, `${W}: the page covers the screen ` + JSON.stringify(c));
-      // the preview: the small picture, then the sharp page in the same place (no jump of the preview and the buttons below it)
-      const pv = `(() => { const p = document.querySelector('.modal.dc-md .dc-prev'), e = p && p.firstElementChild; return e ? {tag: e.tagName, h: Math.round(p.getBoundingClientRect().height), w: Math.round(e.getBoundingClientRect().width), pw: Math.round(p.clientWidth)} : null; })()`;
-      const p1 = await wait(`(() => { const e = document.querySelector('.modal.dc-md .dc-prev')?.firstElementChild; return !!e && (e.tagName === 'CANVAS' || (e.tagName === 'IMG' && e.complete && e.naturalWidth > 0)); })()`);
-      const a = p1 ? await ev(pv) : null;
-      check(await wait(`document.querySelector('.modal.dc-md .dc-prev')?.firstElementChild?.tagName === 'CANVAS'`, {timeout: 20000}), `${W}: the sharp first page is drawn`);
-      const b = await ev(pv);
-      check(a && b && Math.abs(a.w - a.pw) <= 2 && Math.abs(b.w - b.pw) <= 2 && Math.abs(a.h - b.h) <= 3, `${W}: the small picture stands in the width and height of the sharp page ` + JSON.stringify({a, b}));
-      // a pull down on the preview (the page scrolled to its top): the page stays whole (was: a bottom sheet dragged to half)
-      const box = await ev(`(() => { const r = document.querySelector('.modal.dc-md .dc-prev').getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + 30}; })()`);
+      check(c && c.ok, `${W}: the view fills the content area ` + JSON.stringify(c));
+      check(await wait(`!!document.querySelector('.dv-view .dv-pg canvas')`, {timeout: 20000}), `${W}: the sharp first page is drawn`);
+      // a pull down on the preview: the view stays whole (was: a bottom sheet dragged to half)
+      const box = await ev(`(() => { const r = document.querySelector('.dv-view .dv-pages').getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + 30}; })()`);
       await drag(box.x, box.y, 0, Math.round(Hh * .35), 'touch');
       await wait(`!document.querySelector('.sd-drag')`, {timeout: 2000});
       c = await ev(cover);
-      check(c && c.ok && !c.h, `${W}: after a pull down on the preview the page still covers the screen ` + JSON.stringify(c));
-      // scrolling the page up / down by finger moves only the page
-      await drag(box.x, Math.round(Hh * .8), 0, -Math.round(Hh * .5), 'touch');
-      await drag(box.x, Math.round(Hh * .3), 0, Math.round(Hh * .5), 'touch');
-      c = await ev(cover);
-      check(c && c.ok, `${W}: after scrolling the page it still covers the screen ` + JSON.stringify(c));
-      check(await ev(`document.getElementById('view').scrollTop`) === v0, `${W}: the list behind did not scroll`);
+      check(c && c.ok, `${W}: after a pull down on the preview the view still fills the content area ` + JSON.stringify(c));
       await shot(`p2652b-docpage-${W}.png`);
-      await ev(`(document.querySelector('.modal.dc-md .dc-back').click(), 1)`);
-      check(await wait(`!document.querySelector('.dc-md') && !history.state?.f8d && f8d_bk.pushed === 0 && !f8d_bk.skip`), `${W}: the arrow closes the page, its history entry goes`);
-      // 2.652.0 (#5070): back on the list's own entry, no dead entry left (docs.js replaced the state of its entry with null: Back did nothing once)
+      await ev(`(document.querySelector('.dv-view .dv-back').click(), 1)`);
+      check(await wait(`!document.querySelector('.dv-view') && !history.state?.f8d && f8d_bk.pushed === 0 && !f8d_bk.skip`), `${W}: the arrow closes the view, no overlay entry left`);
+      // 2.652.0 (#5070): back on the list's own entry, no dead entry left
       check(await wait(`history.state?.p2652b === ${W} && /^#docs$/.test(location.hash)`), `${W}: the arrow leaves no dead history entry ` + await ev(`JSON.stringify({s: history.state, h: location.hash})`));
+      check(await wait(`document.querySelectorAll('.dc-card').length === 14 && Math.abs(document.getElementById('view').scrollTop - ${v0}) <= 2`), `${W}: the list is back at the same place ` + await ev(`document.getElementById('view').scrollTop`));
     }
 
     // #5070: Back closes the top level only, list -> document -> full view (phone width, touch)
@@ -107,19 +96,19 @@ async function upload(name, lines) {
     await go(B + '#today');
     await ev(`(location.hash = '#docs', 1)`);
     check(await wait(`document.querySelectorAll('.dc-card').length === 14`, {timeout: 20000}), 'Back: the list');
-    await ev(`(() => { window.__push = 0; const p = history.pushState; history.pushState = function () { window.__push++; return p.apply(this, arguments); }; return 1; })()`);
     await ev(`(document.querySelector('.dc-view [data-dco="' + DC.docs[0].id + '"]').click(), 1)`);
-    check(await wait(`!!document.querySelector('.modal.dc-md .dc-prev') && history.state?.f8d === 1`), 'Back: the document open, one entry of its own');
-    await sleep(800);  // the end-of-swipe guard of the preview (700 ms) is no state of the page: a tap within it is ignored on purpose
-    await ev(`(document.querySelector('.modal.dc-md .dc-prev').click(), 1)`);
-    check(await wait(`!!document.querySelector('.lightbox') && history.state?.f8d === 2 && f8d_bk.pushed === 2`), 'Back: the full view open, a second entry of its own ' + await ev(`JSON.stringify({s: history.state, p: f8d_bk.pushed, lb: !!document.querySelector('.lightbox')})`));
+    check(await wait(`!!document.querySelector('.dv-view .dv-pages') && /^#docs\\/\\d+$/.test(location.hash) && !history.state?.f8d`), 'Back: the document open with its own address (2.583.0: an entry of its own, no overlay)');
+    await sleep(800);  // the end-of-swipe guard of the preview (700 ms): a tap within it is ignored on purpose
+    await ev(`(() => { window.__push = 0; const p = history.pushState; history.pushState = function () { window.__push++; return p.apply(this, arguments); }; return 1; })()`);
+    await ev(`(document.querySelector('.dv-view [data-dc="view"]').click(), 1)`);
+    check(await wait(`!!document.querySelector('.lightbox') && history.state?.f8d === 1 && f8d_bk.pushed === 1`), 'Back: the full view open, an entry of its own ' + await ev(`JSON.stringify({s: history.state, p: f8d_bk.pushed, lb: !!document.querySelector('.lightbox')})`));
     const pushes = await ev(`window.__push`);
     await ev(`(history.back(), 1)`);
-    check(await wait(`!document.querySelector('.lightbox') && !!document.querySelector('.modal.dc-md:not(.an-out)') && f8d_bk.pushed === 1 && history.state?.f8d === 1`), 'Back 1: the full view closes, the document stays');
+    check(await wait(`!document.querySelector('.lightbox') && !!document.querySelector('.dv-view') && f8d_bk.pushed === 0 && /^#docs\\/\\d+$/.test(location.hash)`), 'Back 1: the full view closes, the document stays');
     await sleep(300);
-    check(await ev(`window.__push`) === pushes && await ev(`history.state?.f8d === 1`), 'Back 1: no history entry pushed again (Chrome skips it on the next Back)');
+    check(await ev(`window.__push`) === pushes, 'Back 1: no history entry pushed again (Chrome skips it on the next Back)');
     await ev(`(history.back(), 1)`);
-    check(await wait(`!document.querySelector('.dc-md') && f8d_bk.pushed === 0 && /^#docs/.test(location.hash) && document.querySelectorAll('.dc-card').length === 14`), 'Back 2: the document closes, the list is there');
+    check(await wait(`!document.querySelector('.dv-view') && f8d_bk.pushed === 0 && /^#docs$/.test(location.hash) && document.querySelectorAll('.dc-card').length === 14`), 'Back 2: the document closes, the list is there');
     await ev(`(history.back(), 1)`);
     check(await wait(`!/^#docs/.test(location.hash) && location.href.startsWith(${JSON.stringify(B)})`), 'Back 3: back to the view before the documents, still in Kalmido');
   }, true);

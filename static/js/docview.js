@@ -407,30 +407,30 @@ function dcv_menuClose() {
   const b = $('.dv-view [data-dc="actsmore"]'); if (b) b.setAttribute('aria-expanded', 'false');
   const m = $('.dv-view #dc-amore'); if (m) m.hidden = true;
 }
-document.addEventListener('keydown', e => {
-  const v = $('.dv-view'); if (!v || S.route.mod !== 'docs' || !dc_hashId() || e.altKey || e.ctrlKey || e.metaKey) return;
-  if ($('.modal') || $('.lightbox') || $('#pop:not(.hidden)')) return;
+// 2.655.0 (#4998): the view's keys sit in the key registry (keys.js, scope view:docs): an open dialog / menu (the stack) has
+// them first; returning false hands the key on (selection, detail, global)
+const dcv_keyView = (/** @type {any} */ e) => { const v = $('.dv-view'); return v && S.route.mod === 'docs' && dc_hashId() && !e.altKey && !e.ctrlKey && !e.metaKey && !$('.modal') && !$('.lightbox') && !$('#pop:not(.hidden)') && !e.target?.closest?.('[data-dvgrip]') ? v : null; };
+kb_on('view:docs', 'Escape', e => {
+  const v = dcv_keyView(e); if (!v) return false;
   const t = /** @type {any} */ (e.target);
-  if (t.closest?.('[data-dvgrip]')) return;
-  if (e.key === 'Escape') {
-    e.preventDefault();
-    if (DC.actsMore) { dcv_menuClose(); $('.dv-view [data-dc="actsmore"]')?.focus(); return; }
-    if (dcv_in(t)) { t.blur(); return; }  // the first Esc leaves the field (it saves), the next one the view
-    dcv_close(v);
-    return;
-  }
-  if (e.shiftKey || dcv_in(t)) return;
-  const box = t.closest?.('.dv-pages');
-  if (box && box._s && (e.key === '+' || e.key === '=' || e.key === '-' || e.key === '0')) { e.preventDefault(); dcv_zoomSet(box, e.key === '0' ? 'width' : box._s * (e.key === '-' ? 1 / 1.25 : 1.25)); return; }
-  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  if (DC.actsMore) { dcv_menuClose(); $('.dv-view [data-dc="actsmore"]')?.focus(); return; }
+  if (dcv_in(t)) { t.blur(); return; }  // the first Esc leaves the field (it saves), the next one the view
+  dcv_close(v);
+});
+for (const k of ['+', '=', '-', '0']) kb_on('view:docs', k, e => {  // + / - / 0 on the preview zoom it (0 = the width)
+  const box = dcv_keyView(e) && /** @type {any} */ (e.target).closest?.('.dv-pages'); if (!box || !box._s) return false;
+  dcv_zoomSet(box, e.key === '0' ? 'width' : box._s * (e.key === '-' ? 1 / 1.25 : 1.25));
+});
+for (const k of ['ArrowLeft', 'ArrowRight']) kb_on('view:docs', k, e => {
+  const v = dcv_keyView(e), t = /** @type {any} */ (e.target); if (!v || dcv_in(t)) return false;
   const dir = e.key === 'ArrowRight' ? 1 : -1, tab = t.closest?.('[role="tab"]');
   if (tab) {  // the tabs: left / right moves among them
     const ts = $$('[data-dvtab]', v), i = ts.indexOf(tab), n = ts[(i + dir + ts.length) % ts.length];
-    e.preventDefault(); if (n) dcv_tab(v, n.dataset.dvtab, true);
+    if (n) dcv_tab(v, n.dataset.dvtab, true);
     return;
   }
-  if (box && box.scrollWidth > box.clientWidth + 2) return;  // zoomed wider than the box: the keys scroll it sideways
-  e.preventDefault();
+  const box = t.closest?.('.dv-pages');
+  if (box && box.scrollWidth > box.clientWidth + 2) return false;  // zoomed wider than the box: the keys scroll it sideways
   dc_step(dir);
 });
 

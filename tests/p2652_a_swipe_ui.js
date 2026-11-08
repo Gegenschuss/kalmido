@@ -91,8 +91,8 @@ function swipe(w, el, dx, dy = 0, x0 = 200) {  // one finger from (x0, 300) by d
     await until(() => d.querySelectorAll('.dc-card').length === 3);
     const order = m.eval('DC.docs.map(x => x.id)');
     click(m, d.querySelector(`.dc-view [data-dco="${order[0]}"]`));
-    check(await until(() => d.querySelector(`.dc-md .dc-body[data-id="${order[0]}"] .dc-prev`)), `${label}: the document opens with its preview`);
-    click(m, d.querySelector('.dc-md [data-dc="view"]'));
+    check(await until(() => d.querySelector(`.dv-view .dc-body[data-id="${order[0]}"] .dv-pages`)), `${label}: the document opens with its preview`);
+    click(m, d.querySelector('.dv-view [data-dc="view"]'));
     const lb = () => d.querySelector('.lightbox.pview'), no = () => lb()?.querySelector('.pvdno')?.textContent || '', body = () => lb()?.querySelector('.pvbody');
     check(await until(() => lb() && no() === '1 of 3'), `${label}: the full screen leafs through the list: "1 of 3" (${no()})`);
     swipe(m, body(), -150);
@@ -173,8 +173,8 @@ function swipe(w, el, dx, dy = 0, x0 = 200) {  // one finger from (x0, 300) by d
       check(await wait(`document.querySelectorAll('.dc-card').length === 3 && !!DC.docs`), `Firefox ${W}: three cards`);
       check(await ev(`isTouch()`), `Firefox ${W}: a touch screen`);
       await ev(`(document.querySelector('.dc-view [data-dco="' + DC.docs[0].id + '"]').click(), 1)`);
-      check(await wait(`!!document.querySelector('.dc-md [data-dc="view"]')`), `Firefox ${W}: the document is open`);
-      await ev(`(document.querySelector('.dc-md [data-dc="view"]').click(), 1)`);
+      check(await wait(`!!document.querySelector('.dv-view [data-dc="view"]')`), `Firefox ${W}: the document is open`);
+      await ev(`(document.querySelector('.dv-view [data-dc="view"]').click(), 1)`);
       const NO = `(document.querySelector('.lightbox.pview .pvdno')?.textContent || '')`;
       check(await wait(`${NO} === '1 of 3' && !!document.querySelector('.lightbox.pview .pvpage canvas')`, 80), `Firefox ${W}: the full screen "1 of 3", the page drawn`);
       const bar = await ev(`(() => { const b = document.querySelector('.lightbox.pview .pvbar'), p = document.querySelector('.lightbox.pview .pvdocs').getBoundingClientRect(); return {sw: b.scrollWidth, cw: b.clientWidth, r: Math.round(p.right), ta: getComputedStyle(document.querySelector('.lightbox.pview .pvbody')).touchAction}; })()`);

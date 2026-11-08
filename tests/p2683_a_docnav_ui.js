@@ -1,8 +1,9 @@
 // kalmido-suite:
 // 2.683.0 UI test (#5150: every document view on the phone can leaf), own container (start.sh), jsdom (phone). Invented data only.
 // P2683A_NOSTART=1 = the container runs.
-// - the file store: a document card of a folder opens its sheet with "x of N", the arrows and the swipe through the folder's
-//   documents in the order shown; the route stays on the folder; the list view's "Open as document" leafs the same way
+// - the file store: a document card of a folder opens the document view (2.583.0, #4832/#4835: #docs/<id>) with "x of N", the
+//   arrows and the swipe through the folder's documents in the order shown; Back leads to the folder again; the list view's
+//   "Open as document" leafs the same way
 // - the documents opened by address (#docs/<id>) when the document stands further down than the loaded page: the next
 //   pages load until it is found, then "4 of 4" and the arrows are there
 // - a locked folder (decryption simulated in the page): a picture opens with all pictures of the folder, each one is
@@ -72,30 +73,31 @@ function swipe(w, el, dx) {
   const m = await boot({user: 'alice', hash: 'ablage/' + pid, mobile: true}), d = m.document;
   check(await until(() => d.querySelectorAll('.abview [data-dco]').length === 4), 'the folder shows four document cards');
   const order = [...d.querySelectorAll('.abview [data-dco]')].map(x => +x.dataset.dco);
-  const shown = () => +(d.querySelector('.modal.dc-md .dc-body')?.dataset.id || 0);
-  const nav = () => d.querySelector('.modal.dc-md .dc-navn')?.textContent || '';
-  const prev = () => d.querySelector('.modal.dc-md .dc-prev');
+  const shown = () => +(d.querySelector('.dv-view .dc-body')?.dataset.id || 0);
+  const nav = () => d.querySelector('.dv-view .dc-navn')?.textContent || '';
+  const prev = () => d.querySelector('.dv-view .dv-pages');
   click(m, d.querySelector(`.abview [data-dco="${order[1]}"]`));
-  check(await until(() => shown() === order[1] && prev()), 'a card opens the document sheet');
-  check(await until(() => nav() === '2 of 4'), 'the sheet over the file store: "2 of 4" (the folder as shown): ' + nav());
+  check(await until(() => shown() === order[1] && prev()), 'a card opens the document view');
+  check(await until(() => nav() === '2 of 4'), 'the view from the file store: "2 of 4" (the folder as shown): ' + nav());
   check(!d.querySelector('.dc-nav [data-dc="step:-1"]').disabled && !d.querySelector('.dc-nav [data-dc="step:1"]').disabled, '... both arrows on');
   swipe(m, prev(), -150);
   check(await until(() => shown() === order[2] && nav() === '3 of 4'), 'a swipe to the left: the next document of the folder ' + nav());
-  check(m.location.hash === '#ablage/' + pid && m.eval('S.route.mod') === 'ablage', '... the route stays on the folder: ' + m.location.hash);
-  click(m, d.querySelector('.modal.dc-md [data-dc="step:1"]'));
+  check(m.location.hash === '#docs/' + order[2] && m.eval('S.route.mod') === 'docs', '... the address follows (2.583.0: the view has its own): ' + m.location.hash);
+  click(m, d.querySelector('.dv-view [data-dc="step:1"]'));
   check(await until(() => shown() === order[3] && nav() === '4 of 4'), 'the arrow forward: the last one, "4 of 4"');
   check(d.querySelector('.dc-nav [data-dc="step:1"]').disabled, '... the arrow forward is off at the end');
   swipe(m, prev(), 150);
   check(await until(() => shown() === order[2]), 'a swipe to the right: the one before');
-  click(m, d.querySelector('.modal.dc-md .dc-back'));
-  check(await until(() => !d.querySelector('.dc-md') && !m.eval('DC.navSrc')), 'closed: the sheet and its list are gone');
+  click(m, d.querySelector('.dv-view .dv-back'));
+  check(await until(() => !d.querySelector('.dv-view') && !m.eval('DC.navSrc') && m.location.hash === '#ablage/' + pid), 'closed: the view and its list are gone, back on the folder ' + m.location.hash);
+  await until(() => d.querySelectorAll('.abview [data-dco]').length === 4);
   // the list view: "Open as document" of the row's menu leafs through the folder's documents too
   m.eval(`S.settings.ab_cards = '[]'; ab_draw(); 1`);
   await until(() => !d.querySelector('.abview [data-dco]') && d.querySelector('.ablist'));
   m.eval(`abd_menuItems(ab_item(${order[0]})).find(x => x.label === 'Open as document').fn(); 1`);
   check(await until(() => shown() === order[0] && nav() === '1 of 4'), 'the list view: "Open as document" shows "1 of 4" ' + nav());
-  click(m, d.querySelector('.modal.dc-md .dc-back'));
-  await until(() => !d.querySelector('.dc-md'));
+  click(m, d.querySelector('.dv-view .dv-back'));
+  await until(() => !d.querySelector('.dv-view'));
   m.close();
 
   // ================= the documents opened by address: the document stands behind the loaded page
@@ -105,11 +107,11 @@ function swipe(w, el, dx) {
   w.eval('DC.page = 1; DC.docs = null; DC.at = 0; dc_load()');
   check(await until(() => dw.querySelectorAll('.dc-card').length === 1), 'a page of 1: one card');
   w.location.hash = '#docs/' + all[3];
-  const navW = () => dw.querySelector('.modal.dc-md .dc-navn')?.textContent || '';
-  check(await until(() => +(dw.querySelector('.modal.dc-md .dc-body')?.dataset.id || 0) === all[3]), 'the address opens the fourth document');
+  const navW = () => dw.querySelector('.dv-view .dc-navn')?.textContent || '';
+  check(await until(() => +(dw.querySelector('.dv-view .dc-body')?.dataset.id || 0) === all[3]), 'the address opens the fourth document');
   check(await until(() => navW() === '4 of 4' && w.eval('DC.docs.length') === 4), 'the next pages load until it is found: "4 of 4" ' + navW());
-  click(w, dw.querySelector('.modal.dc-md [data-dc="step:-1"]'));
-  check(await until(() => +(dw.querySelector('.modal.dc-md .dc-body')?.dataset.id || 0) === all[2] && navW() === '3 of 4'), '... and leafs back: "3 of 4"');
+  click(w, dw.querySelector('.dv-view [data-dc="step:-1"]'));
+  check(await until(() => +(dw.querySelector('.dv-view .dc-body')?.dataset.id || 0) === all[2] && navW() === '3 of 4'), '... and leafs back: "3 of 4"');
   w.close();
 
   // ================= a locked folder (simulated): pictures and PDFs leaf, each decrypted only when turned to

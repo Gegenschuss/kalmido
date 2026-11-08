@@ -3,7 +3,7 @@
 // - 'first' (what was a capture listener on the document): asked before every field and area and not held by an open dialog:
 //   the icon tooltip hides on Esc and the dialog under it stays; the timeline's pick mode ends on Esc and the dialog stays;
 //   the link preview hides and lets the key go on (the dialog closes with the same Esc, as before)
-// - the docs pane's Esc is the view's (view:docs): an open menu closes first, the next Esc closes the pane
+// - the document view's Esc is the view's (view:docs, 2.583.0: docview.js): an open menu closes first, the next Esc closes the view
 // - the letters n and / of the shell are the registry's: they work, not while typing, not under an open dialog, and the
 //   shortcut help lists n / q / m / a / / in the group General right after '?', from the registry, each once
 // run as the admin of an organisation AND as a person without organisation (freelancer parity). Invented names only.
@@ -72,19 +72,20 @@ const DESK = {'(hover:hover) and (pointer:fine)': true};
     check(w.eval('RFH.el') === null, tag + 'Esc hides the link preview');
     check(await until(() => dlgs() === 0), tag + 'the same Esc closes the dialog too (the preview only watches)');
 
-    // ---- view:docs: an open menu closes first, the next Esc closes the docs pane (route and pane set by hand, the module is loaded)
-    check(w.eval('typeof dc_paneClose') === 'function', tag + 'the docs module is loaded');
-    w.eval(`window.__p2655r = S.route; S.route = {...S.route, mod: 'docs'}; window.__p2655c = 0; window.__p2655s = 0; window.__p2655pc = dc_paneClose; window.__p2655ps = dc_step;
-      dc_paneClose = () => { window.__p2655c++; DC.paneId = null; }; dc_step = d => { window.__p2655s += d; }; DC.paneId = 1;`);
+    // ---- view:docs: an open menu closes first, the next Esc closes the document view (route, address and view set by hand, the module is loaded)
+    check(w.eval('typeof dcv_close') === 'function', tag + 'the docs module is loaded');
+    w.eval(`window.__p2655r = S.route; window.__p2655h = location.hash; S.route = {...S.route, mod: 'docs'}; window.__p2655c = 0; window.__p2655s = 0; window.__p2655pc = dcv_close; window.__p2655ps = dc_step;
+      history.replaceState(history.state, '', '#docs/1'); dcv_close = () => { window.__p2655c++; document.querySelector('.p2655-dv')?.remove(); }; dc_step = d => { window.__p2655s += d; };
+      (() => { const v = document.createElement('div'); v.className = 'dv-view p2655-dv'; document.body.appendChild(v); })()`);
     w.eval(`openPop(document.body, '<div class="p2655-menu"><button>One</button></div>')`);
-    check(popOpen() && w.eval('kb_scopes().map(s => s.scope).join()').includes('view:docs'), tag + 'docs: a menu over the pane, view:docs among the scopes');
+    check(popOpen() && w.eval('kb_scopes().map(s => s.scope).join()').includes('view:docs'), tag + 'docs: a menu over the view, view:docs among the scopes');
     esc(d.body);
-    check(await until(() => !popOpen()) && w.eval('window.__p2655c') === 0, tag + 'docs: Esc 1 closes the menu, the pane stays');
-    kd('ArrowDown', {}, d.body); kd('ArrowUp', {}, d.body); kd('ArrowUp', {}, d.body);
-    check(w.eval('window.__p2655s') === -1, tag + 'docs: the arrows step through the pane ' + w.eval('window.__p2655s'));
+    check(await until(() => !popOpen()) && w.eval('window.__p2655c') === 0, tag + 'docs: Esc 1 closes the menu, the view stays');
+    kd('ArrowRight', {}, d.body); kd('ArrowLeft', {}, d.body); kd('ArrowLeft', {}, d.body);
+    check(w.eval('window.__p2655s') === -1, tag + 'docs: the arrows step through the list ' + w.eval('window.__p2655s'));
     esc(d.body);
-    check(w.eval('window.__p2655c') === 1, tag + 'docs: Esc 2 closes the pane');
-    w.eval(`S.route = window.__p2655r; dc_paneClose = window.__p2655pc; dc_step = window.__p2655ps; DC.paneId = null;`);
+    check(w.eval('window.__p2655c') === 1, tag + 'docs: Esc 2 closes the view');
+    w.eval(`S.route = window.__p2655r; dcv_close = window.__p2655pc; dc_step = window.__p2655ps; history.replaceState(history.state, '', window.__p2655h || '#');`);
 
     // ---- the letters of the shell: n focuses the add box, not while typing and not under a dialog; / opens the search
     if (d.activeElement && d.activeElement !== d.body) d.activeElement.blur();
