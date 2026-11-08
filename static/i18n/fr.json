@@ -17485,7 +17485,7 @@
   "Please select an image (JPG, PNG, WebP), a PDF or an audio file (MP3, M4A, AAC, WAV, OGG, Opus, FLAC).": "Veuillez choisir une image (JPG, PNG, WebP), un PDF ou un fichier audio (MP3, M4A, AAC, WAV, OGG, Opus, FLAC).",
   "The server could not be reached, or its address lies in a private network that an admin has not allowed": "Le serveur est injoignable, ou son adresse se trouve dans un réseau privé qu'aucun administrateur n'a autorisé",
   "Only https:// addresses work here (http:// only for hosts an admin allowed)": "Seules les adresses https:// fonctionnent ici (http:// uniquement pour les hôtes autorisés par un administrateur)",
-  "You may not address this agent in this project": "Vous ne pouvez pas vous adresser à cet agent dans ce projet",
+  "You may not address this agent in this project": "Tu ne peux pas t’adresser à cet agent dans ce projet",
   "Switched off, photos keep their location, also for anyone who opens them through a public link or a shared knowledge page.": "Désactivé, les photos conservent leur lieu de prise de vue, y compris pour toute personne qui les ouvre via un lien public ou une page de connaissances partagée.",
   "PUBLIC_URL is not set": "PUBLIC_URL n’est pas définie",
   "Apps then learn the address of this server from each request (its Host header). Set PUBLIC_URL in .env to the address people open and restart before apps connect (SELF-HOSTING.md).": "Les applications apprennent alors l’adresse de ce serveur à chaque requête (son en-tête Host). Définissez PUBLIC_URL dans .env avec l’adresse que les gens ouvrent et redémarrez avant que des applications se connectent (SELF-HOSTING.md).",
