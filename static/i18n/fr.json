@@ -17482,6 +17482,8 @@
   "Add image, PDF or audio": "Ajouter une image, un PDF ou un audio",
   "Images (JPG, PNG, WebP), PDFs and audio files (MP3, M4A, AAC, WAV, OGG, Opus, FLAC). The file stays in the file store; comments sit at a point or, for audio, at a second.": "Images (JPG, PNG, WebP), PDF et fichiers audio (MP3, M4A, AAC, WAV, OGG, Opus, FLAC). Le fichier reste dans l’espace fichiers ; les commentaires se placent à un point ou, pour l’audio, à une seconde.",
   "Please select an image (JPG, PNG, WebP), a PDF or an audio file (MP3, M4A, AAC, WAV, OGG, Opus, FLAC).": "Veuillez choisir une image (JPG, PNG, WebP), un PDF ou un fichier audio (MP3, M4A, AAC, WAV, OGG, Opus, FLAC).",
+  "Customise the contact card": "Personnaliser la fiche contact",
+  "Merge history": "Historique des fusions",
   "This area in the bar": "Cet espace dans la barre",
   "Right-click its icon to move it, hide it or open Kalmido on it. Settings > Modules switches the area off.": "Clic droit sur son icône pour le déplacer, le masquer ou ouvrir Kalmido dessus. Paramètres > Modules désactive l’espace.",
   "The menu at the top left lists all areas: a long press on an icon moves or hides it. Settings > Modules switches the area off.": "Le menu en haut à gauche liste tous les espaces : un appui long sur une icône la déplace ou la masque. Paramètres > Modules désactive l’espace.",

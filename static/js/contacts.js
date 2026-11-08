@@ -203,10 +203,12 @@ function ctCardHtml(c) {
   const adr = (c.addresses || []).map(a => { const t = [a.street, [a.code, a.city].filter(Boolean).join(' '), a.region, a.country].filter(Boolean).join(', ');
     return `<div class="ctf">${ic('mappin', 's')}<span class="ctfl muted">${esc(ctTypeWord('addresses', a))}</span>${ctk_mapLink(t)}</div>`; }).join('');  // 2.119.1 B (#2086): a map link
   const kinds = Object.fromEntries(CT_LINK);
+  const hist0 = ctk_histHtml(c), hist = CTK.items.length ? hist0 : '';  // starts the load of a newly opened card
   return `<article class="ctcard" aria-labelledby="ct-h" data-ck="${c.id}">
     <div class="cthead">${isMobile() ? `<button class="iconbtn" data-ct="back" aria-label="${esc(tr('Back'))}">${ic('back')}</button>` : ''}${ctAv(c, 'avatar ctav big')}<div class="cthn"><h3 id="ct-h">${esc(c.fn || c.org || '?')}</h3>${feat('clients') ? `<div class="mstags">${ms_tag('contact')}</div>` : ''}${[c.title, c.org !== c.fn ? c.org : '', c.dept].filter(Boolean).length ? `<div class="muted">${esc([c.title, c.org !== c.fn ? c.org : '', c.dept].filter(Boolean).join(' · '))}</div>` : ''}</div>
       <span class="ctacts">${w ? `<button class="btn sm" data-ct="edit">${ic('edit', 's')} ${tr('Edit')}</button>` : `<span class="rotag">${ic('eye', 's')}${tr('Read-only')}</span>`}<button class="iconbtn" data-ct="cmenu" aria-haspopup="menu" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('dots')}</button></span></div>
-    <div class="ctfields">
+    <div class="ctly">${S.ly.view === 'contacts' ? '' : `<div class="lybar"><span class="spacer"></span>${lyCustomBtn('contacts')}</div>`}${lyHtml('contacts', ct_foldAll(c, {  // 2.666.0 D (#3624): the card's sections are blocks of the view builder
+      details: `<div class="ctfields">
       ${it('phones', 'phone', x => `<a href="tel:${esc(x.value.replace(/[^\d+]/g, ''))}">${esc(x.value)}</a>`)}
       ${it('emails', 'at', x => `<a href="mailto:${esc(x.value)}">${esc(x.value)}</a>`)}
       ${adr}
@@ -217,15 +219,28 @@ function ctCardHtml(c) {
       ${(c.groups || []).length ? `<div class="ctf">${ic('tag', 's')}<span class="ctfl muted">${tr('Groups')}</span><span>${c.groups.map(g => `<button type="button" class="tagchip" data-ctgroup="${esc(g)}">${esc(g)}</button>`).join(' ')}</span></div>` : ''}
       ${b ? `<div class="ctf">${ic('folder', 's')}<span class="ctfl muted">${tr('Address book')}</span><span>${esc(b.name)}</span></div>` : ''}
       ${typeof nwl_ctf === 'function' ? nwl_ctf(c, w) : ''}${''/* 2.55.0 (#1455): the newsletter consent (newsletter.js) */}
-    </div>
-    ${c.note ? `<div class="ctnote md">${renderMd(c.note, false, {})}</div>` : ''}
-    ${lifeCareHtml(c)}
-    ${(c.clients || []).length ? `<div class="ctsec cklsec"><h4>${tr('Contact person at')}</h4><ul class="ctlinks">${c.clients.map(x => `<li><a class="linkbtn" href="#client/${x.client_id}">${ic('brief', 's')} ${esc(x.name)}</a>${x.role ? `<span class="muted"> · ${esc(x.role)}</span>` : ''}</li>`).join('')}</ul></div>` : ''}${''/* 2.59.0 (#1735): the clients this contact is a contact person of (only who may open them) */}
-    <div class="ctsec"><h4>${tr('Tasks')}</h4>${(c.tasks || []).length ? `<ul class="ctlinks">${c.tasks.map(t => `<li><button type="button" class="linkbtn ${t.status ? 'done' : ''}" data-cttask="${t.task_id}">${ic(t.status ? 'done' : 'list', 's')} ${esc(t.title)}</button><span class="muted"> · ${esc(tr(kinds[t.kind] || 'About'))}</span></li>`).join('')}</ul>` : `<p class="muted">${tr('No linked tasks yet: “Link a contact” in a task’s panel.')}</p>`}</div>
-    ${(c.events || []).length ? `<div class="ctsec"><h4>${tr('Events')}</h4><ul class="ctlinks">${c.events.map(e => `<li><button type="button" class="linkbtn" data-evopen="${e.event_id}">${ic('cal', 's')} ${esc(e.title)}</button><span class="muted"> · ${esc(e.all_day ? fmtDayAbs(e.start.slice(0, 10)) : fmtDayAbs(e.start.slice(0, 10)) + ' ' + fmtTimeLoc(e.start.slice(11, 16)))}</span></li>`).join('')}</ul></div>` : ''}
-    ${ctk_histHtml(c)}
-    ${w && (c.merges || []).length ? ctm_histHtml(c) : ''}
+    </div>`,
+      note: c.note ? `<div class="ctnote md">${renderMd(c.note, false, {})}</div>` : '',
+      care: typeof lifeCareHtml === 'function' ? lifeCareHtml(c) : '',
+      clients: (c.clients || []).length ? `<div class="ctsec cklsec"><h4>${tr('Contact person at')}</h4><ul class="ctlinks">${c.clients.map(x => `<li><a class="linkbtn" href="#client/${x.client_id}">${ic('brief', 's')} ${esc(x.name)}</a>${x.role ? `<span class="muted"> · ${esc(x.role)}</span>` : ''}</li>`).join('')}</ul></div>` : '',  // 2.59.0 (#1735): the clients this contact is a contact person of (only who may open them)
+      tasks: `<div class="ctsec"><h4>${tr('Tasks')}</h4>${(c.tasks || []).length ? `<ul class="ctlinks">${c.tasks.map(t => `<li><button type="button" class="linkbtn ${t.status ? 'done' : ''}" data-cttask="${t.task_id}">${ic(t.status ? 'done' : 'list', 's')} ${esc(t.title)}</button><span class="muted"> · ${esc(tr(kinds[t.kind] || 'About'))}</span></li>`).join('')}</ul>` : `<p class="muted">${tr('No linked tasks yet: “Link a contact” in a task’s panel.')}</p>`}</div>`,
+      events: (c.events || []).length ? `<div class="ctsec"><h4>${tr('Events')}</h4><ul class="ctlinks">${c.events.map(e => `<li><button type="button" class="linkbtn" data-evopen="${e.event_id}">${ic('cal', 's')} ${esc(e.title)}</button><span class="muted"> · ${esc(e.all_day ? fmtDayAbs(e.start.slice(0, 10)) : fmtDayAbs(e.start.slice(0, 10)) + ' ' + fmtTimeLoc(e.start.slice(11, 16)))}</span></li>`).join('')}</ul></div>` : '',
+      history: hist,  // 2.119.1 B (#2083): the block shows once the history has items
+      merges: w && (c.merges || []).length ? ctm_histHtml(c) : ''}))}</div>
   </article>`;
+}
+// 2.666.0 D (#3624): the contact card on the view builder like the client card (2.435.0 #3600): each person shows / hides
+// its blocks and folds them open / closed, kept per person in view_contacts, alike for every contact; all shown and open by
+// default (as before). No office switch: contacts are no office module
+const LY_CT_BLOCKS = [['details', N_('Details'), 'user', 'full'], ['note', N_('Note'), 'edit', 'full'], ['care', N_('Stay in touch'), 'heart', 'full'],
+  ['clients', N_('Contact person at'), 'brief', 'full'], ['tasks', N_('Tasks'), 'list', 'full'], ['events', N_('Events'), 'cal', 'full'],
+  ['history', N_('Contact history'), 'clock', 'full'], ['merges', N_('Merge history'), 'undo', 'full']];
+LY.contacts = {key: 'view_contacts', title: () => tr('Customise the contact card'), blocks: () => LY_CT_BLOCKS.filter(b => b[0] !== 'care' || feat('care'))};
+const ct_open = k => !!lyOpt('contacts', k, 'open', true);
+function ct_foldAll(c, parts) {
+  const num = {clients: (c.clients || []).length, tasks: (c.tasks || []).length, events: (c.events || []).length,
+    history: CTK.card === c && CTK.items.length ? `${CTK.items.length}${CTK.more ? '+' : ''}` : null, merges: (c.merges || []).length};
+  return Object.fromEntries(Object.entries(parts).map(([k, h]) => [k, lyFold('contacts', k, h, num[k], ct_open(k), 'data-ct="fold"')]));
 }
 // 2.119.1 B (#2083): "History" on the card -- filed mails from / to the contact, the quotations / invoices / credit notes of
 // its clients and its events, newest first (GET /api/contacts/<id>/history, only what the person may see; "Show more"
@@ -250,6 +265,7 @@ async function ctk_histLoad(c, offset) {
   CTK.loading = false;
   if (CTK.card !== c || !j) return;
   CTK.items = offset ? [...CTK.items, ...j.items] : j.items; CTK.more = !!j.more;
+  if (CTK.items.length) { ctDraw(); return; }  // 2.666.0 D (#3624): the block (and the number in its title) appears
   const el = $('#view [data-ctkh]'); if (el) el.outerHTML = ctk_histHtml(c);
 }
 // 2.119.1 B (#2082): "Create as client" in the card's menu (people with the module Clients): a client with the contact's
@@ -334,6 +350,10 @@ document.addEventListener('click', async e => {
   if (k === 'pick') { CT.pick = CT.pick ? null : new Set(); ctDraw(); return; }
   if (k === 'tback') { CT.trash = null; ctDraw(); return; }  // 2.272.0 E1 (#3038)
   if (k === 'tempty') { ctt_act('call'); return; }
+  if (k === 'fold') {  // 2.666.0 D (#3624): fold a block of the card open / closed (kept per person)
+    const bk = b.dataset.k; lyOptSet('contacts', bk, 'open', !ct_open(bk)); ctDraw();
+    setTimeout(() => $(`#view [data-ct="fold"][data-k="${bk}"]`)?.focus({preventScroll: true}), 0); return;
+  }
   if (k === 'new') ctEditor(null);
   else if (k === 'edit' && CT.card) ctEditor(CT.card);
   else if (k === 'back') { CT.sel = null; CT.card = null; go('contacts'); }

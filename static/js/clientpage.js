@@ -123,11 +123,7 @@ function ms_clView() {
 const MSC_OPEN = ['details', 'persons', 'invoices', 'note'];
 const ms_clOff = () => new Set(CLV.data && !CLV.data.error ? CLV.data.blocks_off || [] : []);
 const ms_clOpen = k => !!lyOpt('clients', k, 'open', MSC_OPEN.includes(k));
-function ms_clFold(k, html, n) {
-  if (!html || S.ly.view === 'clients') return html;  // the editor shows the blocks themselves
-  const b = LY_CL_BLOCKS.find(x => x[0] === k), open = ms_clOpen(k);
-  return `<div class="ctfw${open ? ' on' : ''}"><h4 class="ctfh"><button type="button" class="ctfb" data-mscl="fold" data-k="${k}" aria-expanded="${open}">${ic('chev', 's fcar')}<span>${esc(tr(b?.[1] || k))}</span>${n != null ? `<span class="ctfn">(${esc(String(n))})</span>` : ''}</button></h4>${open ? html : ''}</div>`;
-}
+const ms_clFold = (k, html, n) => lyFold('clients', k, html, n, ms_clOpen(k), 'data-mscl="fold"');  // 2.666.0 D (#3624): the shared fold (dashboard.js)
 function ms_clFoldAll(c, ks, inv, parts) {
   const st = c.stats || {}, num = {persons: ks.length, invoices: inv.length, month: st.month_seconds ? fmtHours(st.month_seconds) : null,
     lists: (c.per_list || []).length, tickets: (c.tickets || []).length, gendocs: MSC.gd?.id === c.id ? MSC.gd.docs?.length : null,

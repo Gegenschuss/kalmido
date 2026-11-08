@@ -342,6 +342,13 @@ const LY_CL_BLOCKS = [['details', N_('Details'), 'brief', 'full'], ['persons', N
   ['tickets', N_('Client reports'), 'megaphone', 'full'], ['gendocs', N_('Letters & contracts'), 'file', 'full'], ['letters', N_('Letters'), 'mail', 'full'],
   ['privacy', N_('Data protection'), 'shield', 'full']];  // 2.489.0 (#2664): gendocs = Letters & contracts; 2.63.0 B (#1513); 2.93.0 A (#1927): gendocs; 2.154.0 C (#2192): privacy
 LY.clients = {key: 'view_clients', title: () => tr('Customise the client card'), blocks: () => LY_CL_BLOCKS.filter(b => !(typeof ms_clOff === 'function' && ms_clOff().has(b[0])))};
+// 2.666.0 D (#3624): a block of a card that folds open / closed at its title (the client card 2.435.0 #3600, the contact card):
+// attr = the button's data attribute of the view's own click (data-mscl="fold" / data-ct="fold"), n = the number in the title
+function lyFold(v, k, html, n, open, attr) {
+  if (!html || S.ly.view === v) return html;  // the editor shows the blocks themselves
+  const b = lyBlocks(v).find(x => x[0] === k);
+  return `<div class="ctfw${open ? ' on' : ''}"><h4 class="ctfh"><button type="button" class="ctfb" ${attr} data-k="${k}" aria-expanded="${open}">${ic('chev', 's fcar')}<span>${esc(tr(b?.[1] || k))}</span>${n != null ? `<span class="ctfn">(${esc(String(n))})</span>` : ''}</button></h4>${open ? html : ''}</div>`;
+}
 LY.family = {key: 'view_family', grid: 'dgrid', title: () => tr('Customise Family'), blocks: () => [['occ', N_('Birthdays & anniversaries'), 'cake', 'half', false, 3], ['rot', N_('Whose turn'), 'turns', 'half', false, 3],
   ['meals', N_('Meal plan'), 'meal', 'half', false, 3], ['shop', N_('Shopping'), 'cart', 'half', false, 3], ['dl', N_('Deadlines'), 'hourglass', 'half', false, 3],
   ['kids', N_('Kids'), 'star', 'half', false, 3], ['pack', N_('Packing lists'), 'bag', 'half', false, 3]]};

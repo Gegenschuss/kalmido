@@ -15,10 +15,13 @@ from ..core.access import Denied, need_list, WRITE_ROLES
 from ..accounts.session import me
 from ..core.errors import BadInput
 from ..core.pg import insert_id, system_ctx, write_lock  # 2.149.0 G (#2517): pulled up from functions
+from ..core.schema import USER_DEFAULTS  # 2.666.0 D (#3624)
 
 LAYOUT_KEYS = ("view_today", "view_time", "view_agents", "view_projects",
                "view_review",  # 2.43.0 (#1452): the review (and its journal) on the builder
-               "view_stats", "view_clients", "view_family")  # 2.55.0 (#1067): statistics, the client card, family
+               "view_stats", "view_clients", "view_family",  # 2.55.0 (#1067): statistics, the client card, family
+               "view_contacts")  # 2.666.0 D (#3624): the contact card
+USER_DEFAULTS.setdefault("view_contacts", "")  # 2.666.0 D (#3624): '' = the default (every block shown and open)
 LAYOUT_BLOCK_RE = re.compile(r"[a-z][a-z0-9_]{0,23}")
 LAYOUT_BLOCKS_MAX = 40
 LAYOUT_OPTS_MAX = 10          # saved switches per block
