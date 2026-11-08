@@ -75,9 +75,13 @@ const camt = es => `<?xml version="1.0" encoding="UTF-8"?><Document xmlns="urn:i
     await ev(`(() => { histStep('undo'); return 1; })()`);
     check(await ready(ev, `${rows} === 7 && ${hints}.length === 5`), 'undo brings them back ' + await ev(`${rows}`));
     // the days
+    // 2.665.0 (#5110): day(8) and day(38) can lie in the same month (on 08.11: 31.10 and 01.10) - then the hints of S-2 and S-3
+    // have the same text; the hint of eight days ago going = one hint with that text less, not none left
+    const t3n = `${hints}.filter(e => e.textContent.includes(${JSON.stringify(t3)})).length`;
+    const n3 = await ev(t3n);
     await ev(`(() => { const i = document.querySelector('#bnv-days'); i.value = '9'; i.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
     check(await ready(ev, `fetch('/api/office/bank/vendors', {headers: {'X-Requested-With': 'kalmido'}}).then(r => r.json()).then(j => j.days === 9)`), 'days saved');
-    check(await ready(ev, `${hints}.length === 4 && !${hints}.some(e => e.textContent.includes(${JSON.stringify(t3)}))`), 'days 9: the hint of eight days ago goes ' + await ev(`${hints}.length`));
+    check(n3 >= 1 && await ready(ev, `${hints}.length === 4 && ${t3n} === ${n3 - 1}`), 'days 9: the hint of eight days ago goes ' + await ev(`${hints}.length`) + ' ' + n3);
     // phone width
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
     await nav(B + '#office/bank/norc');
