@@ -611,7 +611,12 @@ function tourSteps() {
   if ((S.agents || []).length) s.push({id: 'agents', sel: '#srail [data-sbb="agents"], #tabs [data-go="agents"]', t: N_('Agents'), d: N_('Your connected agents work in the projects you share and answer in the chat.'), r: rect(agEl)});
   s.push({id: 'settings', sel: m ? '#tabs [data-act="tabs-more"]' : '#side .sset', t: N_('Settings and modules'), d: N_('Modules, language and appearance.'),  // 2.352.0 B (#2752): no switch to point at
     r: rect(m ? () => $('#tabs [data-act="tabs-more"]') || $('#tabs [data-act="settings"]') || $('#top .menu') : '#side .sset')});
-  return s.slice(0, 8);  // 2.365.0 (#2802): with the step of the chosen start; 2.466.0 (#3314): 8 with the areas' bar
+  // 2.365.0 (#2802): with the step of the chosen start; 2.466.0 (#3314): 8 with the areas' bar. 2.726.0 (#5160): a computer with a
+  // mouse has 9 (the keyboard step too) and the cut took the last one, Settings: over 8 the keyboard step goes first (the shortcuts
+  // stay under "?"), then the steps before Settings - Settings always stays the last card
+  const cut = () => { const k = s.findIndex(x => x.id === 'keys'); s.splice(k >= 0 ? k : s.length - 2, 1); };
+  while (s.length > 8) cut();
+  return s;
 }
 // 2.466.0 (#3314): the short introduction of an area: once, the first time the area opens (tours_seen, per account), never
 // for a child, a second window or after "Show more introductions" is unticked; the welcome tour goes first. Restart: Settings > Help.
