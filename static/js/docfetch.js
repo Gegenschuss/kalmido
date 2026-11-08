@@ -30,7 +30,7 @@ function fx_bodyHtml(j) {
   const intro = `<p class="muted">${tr('A helper program on your computer fetches invoices from portals like Amazon and uploads them as PDFs into these documents; they are recognised like any upload. You sign in to the portals only in the helper: Kalmido never stores passwords, cookies or sign-ins.')}</p>`;
   if (!j.api) return intro + `<p class="muted">${tr('The API is switched off on this server, so there are no receipt fetchers.')}</p>`;
   const one = f => `<div class="dsc-way fx-one${f.ok ? '' : ' off'}"><div class="fx-head"><span><b>${esc(f.name)}</b> <span class="muted">${esc(f.target)}</span>
-      <small class="muted">${f.last_seen_at ? esc(tr('last report {0}', relTime(f.last_seen_at))) : tr('not connected yet')}</small></span>
+      <small class="muted">${f.last_seen_at ? esc(tr('last report {0}', relTime(f.last_seen_at))) : tr('not connected yet')}${f.expires_at ? ' · ' + esc(f.expired ? tr('expired') : tr('expires {0}', fmtDateLoc(f.expires_at.slice(0, 10)))) : ''}</small></span>
       <button type="button" class="iconbtn danger" data-fx="del:${f.id}" aria-label="${esc(tr('Disconnect {0}', f.name))}" title="${esc(tr('Disconnect'))}">${ic('trash')}</button></div>
     ${f.portals.length ? `<ul class="dc-rules">${f.portals.map(p => fx_portalHtml(f, p)).join('')}</ul>` : `<p class="muted">${tr('The portals appear here after the first report of the helper.')}</p>`}</div>`;
   return `${intro}${j.fetchers.map(one).join('')}${FXS.code ? fx_codeHtml() : ''}

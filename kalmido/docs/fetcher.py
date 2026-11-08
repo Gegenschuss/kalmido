@@ -16,6 +16,7 @@ import json
 import os
 import re
 import secrets
+from datetime import timedelta
 
 from flask import g, jsonify, request
 
@@ -44,6 +45,7 @@ FX_MAX = 10              # fetchers per person
 FX_PORTALS_MAX = 50      # portals per fetcher
 FX_RATE = 120            # requests of one fetcher per minute
 FX_USED_EVERY = 60       # s between two last_seen_at updates
+FX_DAYS = 365            # 2.674.0 (#4382 finding 12): a key runs out after a year (like a scan inbox key, scankeys.SK_DAYS)
 FX_NAME_MAX, FX_ERR_MAX, FX_ORDER_MAX = 60, 300, 100
 FX_KEY_PORTAL = re.compile(r"[a-z0-9][a-z0-9_.-]{0,39}")
 FX_PORTAL_FIELDS = ("key", "name", "last_run", "new", "error")
@@ -61,6 +63,9 @@ def fx_authenticate(c, tok, bad):
         with system_ctx(c):  # the key's row by its hash across organisations (its place is checked with the person's rights later)
             row = c.execute("SELECT * FROM doc_fetchers WHERE token_hash=?", (_token_hash(tok),)).fetchone()
     u = c.execute("SELECT * FROM users WHERE id=?", (row["user_id"],)).fetchone() if row else None
+    expired = bool(row and row["expires_at"] and parse_iso(row["expires_at"]) <= now_utc())  # 2.674.0 (#4382 finding 12)
+    if expired:
+        return v1_err(401, tr("The API token has expired"), {"WWW-Authenticate": 'Bearer realm="kalmido", error="invalid_token"'})
     if not u or u["disabled"] or u["kid"] or (u["kind"] if "kind" in u.keys() else "user") == "agent":
         if _rate_blocked(bad):
             return v1_err(429, tr("Too many invalid tokens, please wait a few minutes"), {"Retry-After": str(FAIL_WINDOW)})
@@ -72,9 +77,12 @@ def fx_authenticate(c, tok, bad):
         return v1_err(429, tr("Too many requests, please slow down"), {"Retry-After": "60"})
     g.user, g.auth_via, g.token, g.scopes, g.fetcher = u, "token", None, frozenset(), row
     last = row["last_seen_at"]
-    if not last or (now_utc() - parse_iso(last)).total_seconds() >= FX_USED_EVERY:
+    if not last or not row["expires_at"] or (now_utc() - parse_iso(last)).total_seconds() >= FX_USED_EVERY:
         with system_ctx(c):  # the fetcher's own row (its place may be an organisation)
             c.execute("UPDATE doc_fetchers SET last_seen_at=? WHERE id=?", (iso(now_utc()), row["id"]))
+            if not row["expires_at"]:  # 2.674.0 (#4382 finding 12): a key of an older version gets its year from now on
+                c.execute("UPDATE doc_fetchers SET expires_at=? WHERE id=? AND expires_at IS NULL",
+                          (iso(now_utc() + timedelta(days=FX_DAYS)), row["id"]))
         c.commit()
     return None
 
@@ -268,7 +276,9 @@ def fx_list(c, uid, oid):
         except Denied as e:
             place, ok = e.text(), False
         out.append({"id": r["id"], "name": r["name"], "prefix": r["prefix"], "target": place, "ok": ok, "created_at": r["created_at"],
-                    "last_seen_at": r["last_seen_at"], "portals": [_portal_out(p, True) for p in _portals(c, r["id"])]})
+                    "last_seen_at": r["last_seen_at"], "portals": [_portal_out(p, True) for p in _portals(c, r["id"])],
+                    # 2.674.0 (#4382 finding 12): the key's end (None = an older key, it gets its year at its next use)
+                    "expires_at": r["expires_at"], "expired": bool(r["expires_at"] and parse_iso(r["expires_at"]) <= now_utc())})
     return out
 
 
@@ -301,8 +311,9 @@ def docs_fetcher_new():
     if not PUBLIC_URL_SET:  # 2.666.0 (#4074 5): the code names the server; never the Host header of this request (key to another host)
         return err(tr("PUBLIC_URL is not set on this server: ask the server admin to set it to the address people open (.env) and restart."), 503)
     tok = FX_PREFIX + secrets.token_urlsafe(32)
-    fid = insert_id(c, "INSERT INTO doc_fetchers(user_id,org_id,name,token_hash,prefix,created_at) VALUES(?,?,?,?,?,?)",
-                    (uid, oid, name, _token_hash(tok), tok[:12], iso(now_utc())))
+    fid = insert_id(c, "INSERT INTO doc_fetchers(user_id,org_id,name,token_hash,prefix,created_at,expires_at) VALUES(?,?,?,?,?,?,?)",
+                    (uid, oid, name, _token_hash(tok), tok[:12], iso(now_utc()),
+                     iso(now_utc() + timedelta(days=FX_DAYS))))  # 2.674.0 (#4382 finding 12): runs out after a year
     c.commit()
     print("receipt fetcher", fid, "created for user", uid, "org", oid, flush=True)
     url = PUBLIC_URL.rstrip("/")
