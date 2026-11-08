@@ -19,10 +19,10 @@
 
 ## What's new
 
-**2.667.0** (2026-11-08):
-- **Projects**: a fourth built-in project type "Social media plan" (editorial calendar with channels and approval by the client; Kalmido does not post anything).
-- **Approvals**: audio files from the file store can be played and commented on, also through the customer link.
-- **Tablets and phones**: swipe to the next task, document or picture; dialogs are dragged by their grip only.
+**2.675.0** (2026-11-08):
+- **Storage**: large encrypted files are stored in chunks, so downloads and video seeking no longer decrypt the whole file in memory.
+- **Agents**: an agent's history reads in plain words, groups similar steps and shows the newest five lines in the dialog.
+- **Sync**: calendar and contact sync (CalDAV / CardDAV) re-renders only the changed list or address book.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 
