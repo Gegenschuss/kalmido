@@ -35,9 +35,10 @@ const files = who => ({
 const STORE = [/^\/api\/office\/fixed-costs\/import$/, /^\/api\/office\/legacy\/import$/, /^\/api\/office\/trips\/import$/, /^\/api\/budget\/\d+\/import\/commit$/,
   /^\/api\/paperless(\/zip)?\/import$/, /^\/api\/account\/import\/[^/]+\/run$/, /^\/api\/feeds\/opml$/, /^\/api\/evcals\/\d+\/import$/, /^\/api\/books\/\d+\/import$/,
   /^\/api\/wiki\/import\/upload$/, /^\/api\/sheets\/import$/];
+// (not __store: tests/boot.js keeps the localStorage stand-in under that name and would overwrite it)
 const watch = x => { x.__log = [];
-  x.__store = (method, u) => { const url = String(u); return String(method || 'GET').toUpperCase() === 'POST' && !/preview/.test(url) && STORE.some(r => r.test(url.replace(/^\w+:\/\/[^/]+/, '').split('?')[0])); };
-  const f0 = x.fetch; x.fetch = (u, o = {}) => { if (x.__store(o.method, u)) x.__log.push('post ' + String(u)); return f0(u, o); }; };
+  x.__p2663store = (method, u) => { const url = String(u); return String(method || 'GET').toUpperCase() === 'POST' && !/preview/.test(url) && STORE.some(r => r.test(url.replace(/^\w+:\/\/[^/]+/, '').split('?')[0])); };
+  const f0 = x.fetch; x.fetch = (u, o = {}) => { if (x.__p2663store(o.method, u)) x.__log.push('post ' + String(u)); return f0(u, o); }; };
 
 async function importer(w, who, name, open, go, url) {
   const d = w.document;
@@ -126,7 +127,7 @@ async function all(user, who, isOrg, ORG, ids) {
   shut(d);
   // the contacts upload goes by XMLHttpRequest (progress): a stand-in records it and answers "not stored", nothing reaches the server
   w.eval(`window.__XHR0 = XMLHttpRequest; XMLHttpRequest = class { open(m, u) { this.m = m; this.u = u; } setRequestHeader() {} get upload() { return {}; }
-    send() { if (__store(this.m, this.u)) __log.push('post ' + this.u); this.status = 400; this.responseText = '{"error": "test"}'; setTimeout(() => this.onload(), 0); } };`);
+    send() { if (__p2663store(this.m, this.u)) __log.push('post ' + this.u); this.status = 400; this.responseText = '{"error": "test"}'; setTimeout(() => this.onload(), 0); } };`);
   ws('contacts', await importer(w, who, 'contacts', () => {}, trigger(w, 'ct', `ctImport(${ids.book}, 'vcf', __f.vcf)`), /books\/\d+\/import/));
   w.eval(`XMLHttpRequest = __XHR0;`);
   shut(d);

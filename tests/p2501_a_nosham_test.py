@@ -36,6 +36,7 @@ ALLOWED = {
     ("p290_c_api_test.py", "if due30.month != d30.month else True"): "only a due date in another month has this rule",
     ("p2239_d_aufbewahrung_test.py", "list_purge(c, {LID}, None)[0] is None or True"): "a line of Python for the container, it only prints",
     ("p21481_c_api_test.py", "push.ntfy = lambda"): "a stub that returns true, no check",
+    ("p2641_c_weekly_test.py", 'check(True, f"safe_path refuses {bad}")'): "counts the expected ValueError; the try fails with check(False)",  # 2.663.0 (#4341)
 }
 # 2.501.0 (#4296): the old ones, one by one into real checks (task in the job's result); (file, status codes)
 # 2.663.0 (#4341): emptied - every old list now names the one right code (or < 500 where only 'no crash' is meant)
