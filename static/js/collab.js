@@ -1172,7 +1172,11 @@ function replyBarHtml(ctx) {
 function replyBarDraw(ctx) { const b = $(`[data-rbar="${ctx}"]`); if (b) b.outerHTML = replyBarHtml(ctx); }
 function replyStart(art, id) {
   const ctx = replyCtx(art), r = ctx && replyMsg(art, id); if (!r) return;
+  // 2.670.0 (#4898): the bar takes height from the box above it; a box that was at its end stays at its end (else the next
+  // send counts as "scrolled up" (chatReplyUp) and keeps the view with the pill - the bar is taller than 3rem on some fonts)
+  const bs = {a: '#chat-msgs', t: '#tc-msgs', h: '#tth-msgs'}[art], box = bs ? $(bs) : null, end = !!box && typeof chatNear === 'function' && chatNear(box);
   S.reply[ctx] = r; replyBarDraw(ctx);
+  if (end && !chatNear(box)) box.scrollTop = box.scrollHeight;
   const ta = replyIn(art); if (!ta) return;
   ta.closest('.ccomp')?.classList.add('used');
   try { ta.focus({preventScroll: true}); } catch { ta.focus(); }

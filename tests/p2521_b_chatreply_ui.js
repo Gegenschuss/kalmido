@@ -107,7 +107,10 @@ const LONG = '\n\nwith a second paragraph so the list is tall enough to scroll';
     await ev(`(() => { document.querySelector('#chat-new').click(); return 1; })()`);
     check(await ready(ev, `${A}.gap <= 3 && !${A}.pill`, 20), `#4393 agent: the pill goes to the end ${JSON.stringify(await ev(A))}`);
     // at the end, a reply: the end as before
-    await ev(send('#chat-msgs', '#chat-in', 'chat-send', 'Reply at the end', true));
+    // 2.670.0 (#4898): the reply bar opening at the end keeps the box at its end (it was red in the CI: the bar's height counted as scrolled up)
+    await ev(`(async () => { document.querySelector('#chat-msgs [data-mid] [data-act="msg-reply"]').click(); await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); return 1; })()`);
+    check(await ready(ev, `!!document.querySelector('[data-rbar^="a:"]:not(.hidden)') && ${A}.gap <= 3`, 20), `#4898 agent: the reply bar at the end keeps the end ${JSON.stringify(await ev(A))}`);
+    await ev(send('#chat-msgs', '#chat-in', 'chat-send', 'Reply at the end', false));
     check(await ready(ev, sent('#chat-msgs', 'Reply at the end') + ` && ${A}.gap <= 3`, 40), `#4393 agent: a reply at the end stays at the end ${JSON.stringify(await ev(A))}`);
     // scrolled up without a reply: the end as before
     await ev(scrollTo('#chat-msgs', 120));
