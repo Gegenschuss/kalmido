@@ -137,7 +137,8 @@ async function swCheck() {
   check(!w.eval(`ld_url('settings')`).includes(APPV), 'ld_url: never the version of the code (two versions with the same module = one address)');
   await w.eval(`loadModule('settings')`);
   check(d.querySelector('script[data-ld="settings"]')?.getAttribute('src') === `/static/js/settings.js?v=${JS.settings}`, 'the loaded script carries the hash');
-  check(d.querySelector('link[data-ldcss="settings"]')?.getAttribute('href') === `/static/css/settings.css?v=${CSS.settings}`, 'loadCss: the stylesheet carries the hash');
+  const cssHref = [...d.querySelectorAll('link[rel="stylesheet"]')].map(l => l.getAttribute('href')).filter(h => /^\/static\/css\/settings\.css/.test(h || ''));
+  check(cssHref.length === 1 && cssHref[0] === `/static/css/settings.css?v=${CSS.settings}`, 'loadCss: the stylesheet carries the hash ' + cssHref);
   check(w.eval(`(delete LD_HASH.js.settings, ld_url('settings'))`) === `/static/js/settings.js?v=${encodeURIComponent(APPV)}`, 'a file without a hash: the version of the code');
   // the language parts with their own version
   const i18n = seen.filter(u => /\/static\/i18n\//.test(u));
