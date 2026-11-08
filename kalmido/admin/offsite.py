@@ -66,7 +66,7 @@ from ..calendars.subscriptions import _cal_connector, CalError, cal_ip_public
 from ..core.orgcrypt import RCK_FRESH_MIN, rck_step, rck_stepup
 from .hosting import hosted
 from ..notify.alerts import _clamp_int, _env_int, aa_now  # 2.662.0 (#4587): + _clamp_int
-from .backup import BK_DIR, BK_NAME_RE, BK_STORE, bk_instance, bk_list, bk_passphrase, bk_test_gate, need_backups
+from .backup import BK_DIR, BK_STORE, bk_instance, bk_list, bk_passphrase, bk_test_gate, need_backups
 from .backup import BK_KEEP_WEEKLY_CAP, bk_parse_name  # 2.662.0 (#4587)
 from ..core.pg import write_lock  # 2.662.0 (#4587)
 from . import bkstore as bks  # 2.432.0 (#3584)
