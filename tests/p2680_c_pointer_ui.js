@@ -1,4 +1,4 @@
-// p2680_c_pointer_ui -- what tests/ff.js's touch switch gives Firefox, and what the machine's own Firefox reports
+// p2680_c_pointer_ui -- what tests/ff.js's touch switch gives Firefox: a mouse unless a suite asks for a finger
 // kalmido-suite: nodata
 // 2.680.0 C (#5138 #5139 #5140 #5141 #5142 #5143 #5144): six UI suites were red in the CI of 2.668 (and on the Mac's VM). ff.js
 // starts Firefox without a pointer setting when a suite passes no `touch`, so Firefox takes the machine's own: headless, without
@@ -8,6 +8,8 @@
 // - touch: false matches (hover: hover) and (pointer: fine) - the mouse the six suites ask for
 // - touch: true matches (pointer: coarse) and (hover: none)
 // - the machine's own values (touch undefined) stand on the summary line, so a CI log shows what the runner reports
+// 2.725.0 (#5169): ff.js starts Firefox as a mouse when a suite passes no `touch` (the machine's own values are gone): touch
+// undefined matches (hover: hover) and (pointer: fine) like false; only touch: true is a finger
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const firefox = require('./ff')({tag: 'p2680_c_pointer_ui', check, lazy: true, allWs: true});
@@ -18,12 +20,14 @@ const probe = touch => firefox(async ({ev}) => { seen[String(touch)] = await ev(
 
 (async () => {
   for (const t of [undefined, false, true]) await probe(t);
-  const m = seen.false || {};
-  check(m.hover === true && m.nohover === false, `touch false: (hover: hover), not (hover: none) ${JSON.stringify(m)}`);
-  check(m.fine === true && m.coarse === false && m.none === false, `touch false: (pointer: fine) ${JSON.stringify(m)}`);
+  for (const k of ['false', 'undefined']) {
+    const m = seen[k] || {};
+    check(m.hover === true && m.nohover === false, `touch ${k}: (hover: hover), not (hover: none) ${JSON.stringify(m)}`);
+    check(m.fine === true && m.coarse === false && m.none === false, `touch ${k}: (pointer: fine) ${JSON.stringify(m)}`);
+  }
   const t = seen.true || {};
   check(t.coarse === true && t.nohover === true && t.hover === false, `touch true: a finger (pointer: coarse, hover: none) ${JSON.stringify(t)}`);
   // on the summary line: run_all.sh keeps only FAIL and summary lines
-  console.log(`p2680_c_pointer_ui: ${ok} ok, ${F.length} failed (this machine's Firefox without pointer prefs: ${JSON.stringify(seen.undefined)})`);
+  console.log(`p2680_c_pointer_ui: ${ok} ok, ${F.length} failed (Firefox without touch: ${JSON.stringify(seen.undefined)})`);
   process.exit(F.length ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });

@@ -3,7 +3,9 @@
 // KALMIDO_SKIP_FIREFOX=1 leaves the browser part out on purpose, with a line that run_all.sh counts as partly skipped.
 //   const firefox = require('./ff')({tag: 'p272', check, shots: 'P272_SHOTS'});
 //   await firefox(async ({cmd, ev, nav, ctx, shot, drag, until, idle, officeWs}) => { ... }, touch);
-// touch: true = a touch screen (coarse pointer, touch events), false = a mouse, undefined = Firefox's defaults.
+// touch: true = a touch screen (coarse pointer, touch events); false or left out = a mouse (fine pointer, hover). 2.725.0 (#5169):
+// left out used to be Firefox's own values - headless without an input device that is hover: none, the app's finger mode, so most
+// suites checked the finger UI unnoticed and the mouse UI not at all; a suite that means a finger passes touch: true.
 // A Firefox that does not answer in time (seen on CI runners) gets new tries on another port with a new profile (2.7.1, first in
 // p221; #4346: connectS, the seconds each try waits). Every Firefox has really ended before the next one starts and before its
 // folder goes; a Firefox that ended by itself with an error costs no wait.
@@ -62,7 +64,7 @@ module.exports = ({tag, check, shots, prefs: extra = [], lazy = false, connectS 
   const base = fs.mkdtempSync(path.join(process.env.TMPDIR || os.tmpdir(), `kalmido-${tag}-`));
   const prefs = [['browser.shell.checkDefaultBrowser', false], ['datareporting.policy.dataSubmissionEnabled', false], ['ui.prefersReducedMotion', 1],
     ...(touch === true ? [['ui.primaryPointerCapabilities', 1], ['ui.allPointerCapabilities', 1], ['dom.w3c_touch_events.enabled', 1]]
-      : touch === false ? [['ui.primaryPointerCapabilities', 6], ['ui.allPointerCapabilities', 6]] : []), ...extra];
+      : [['ui.primaryPointerCapabilities', 6], ['ui.allPointerCapabilities', 6]]), ...extra];
   const userJs = prefs.map(([k, v]) => `user_pref("${k}", ${JSON.stringify(v)});`).join('\n') + '\n';
   // CI of 2.496.1: three starts of p2151_ui stayed without a connection and nothing said why: Firefox's messages go to a file, each
   // start notes how it ended, and the FAIL line carries it all (run_all.sh shows only FAIL lines)
