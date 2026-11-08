@@ -95,6 +95,21 @@ def private_term_errors(d, name=""):
     return out
 
 
+# 2.727.0 (#5197): "Freigabe" is the approval only; sharing is "Teilen", "geteilt mit" or "Zugriff" (a key about approval is exempt)
+def share_term_errors(d, name=""):
+    """(#5197) "name: key: Freigabe in a text about sharing" for a German value."""
+    out = []
+    if not name.startswith("de"):
+        return out
+    for k, v in d.items():
+        if k.startswith("_") or re.search(r"approv", k, re.I) or not re.search(r"\bshar(?:e|es|ed|ing)\b", k, re.I):
+            continue
+        for x in (v if isinstance(v, list) else [v]):
+            if isinstance(x, str) and "Freigabe" in x:
+                out.append(f"{name}: {k[:60]!r}: “Freigabe” in a text about sharing, say Teilen / geteilt mit / Zugriff (#5197)")
+    return out
+
+
 def extract():
     """-> keys {key: (kind, other, where)}, dynamic [where], errors [str]"""
     keys, dynamic, errors = {}, [], []
@@ -204,7 +219,8 @@ def main(argv):
     files = sorted(glob.glob(os.path.join(I18N_DIR, "*.json")))
     for fn in files:
         try:
-            for e in private_term_errors(json.load(open(fn, encoding="utf-8")), os.path.basename(fn)):
+            dj = json.load(open(fn, encoding="utf-8"))
+            for e in private_term_errors(dj, os.path.basename(fn)) + share_term_errors(dj, os.path.basename(fn)):
                 print("  ERROR", e)
                 ok = False
         except ValueError:

@@ -150,6 +150,10 @@ the wording of an office pack (key ending in `|pack`) is checked by the pack, no
 | Mahnung | payment reminder (the level names keep "Reminder" / "Final reminder") | reminder alone in new texts |
 | Erinnerung (Aufgabe) | reminder | |
 | Storno, Freigabe, Abnahme | cancellation, approval, sign-off | |
+| Freigabe (nur Genehmigung) | approval | not for sharing; `tools/i18n_check.py` refuses "Freigabe" in a German text whose key is about share / sharing |
+| Teilen, geteilt mit, Zugriff | share, sharing, access | German: never "Freigabe" (#5197), e.g. "Links und Zugriffe" |
+| Bankkonto | bank account | a bare "Konto" in a bank text; Kontoauszug / Kontostand stay |
+| Teil {0} von {1} | part {0} of {1} | an agent bundle is "Teil", not "Paket" (a pack stays "Paket") |
 | Papierkorb | trash | bin |
 | Zeiteintrag, Einstellungen | time entry, settings | |
 | E-Mail | e-mail | mail, email |

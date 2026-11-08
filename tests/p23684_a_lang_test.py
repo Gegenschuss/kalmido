@@ -101,6 +101,10 @@ check(ck.glossary_errors(["Private|workspace", "Your private office", "Move to P
       "#4605: private office, Private and what a person owns pass")
 check(len(ck.private_term_errors({"x": "Meine Ablage", "y": "Dein persönliches Büro"}, "de.json")) == 2
       and ck.private_term_errors({"x": "Privat", "y": "Persönlicher Agent von {0}"}, "de.json") == [], "#4605: German third names are refused")
+# 2.727.0 (#5197): "Freigabe" only for approval, not for sharing
+check(len(ck.share_term_errors({"A share ends": "Die Freigabe endet", "Sharing defaults": ["Standards für Freigaben"]}, "de.json")) == 2
+      and ck.share_term_errors({"Sharing waits for your approval": "Teilen wartet auf deine Freigabe", "Send for approval": "Zur Freigabe", "The share applies": "Der Zugriff gilt"}, "de.json") == []
+      and ck.share_term_errors({"A share ends": "Die Freigabe endet"}, "fr.json") == [], "#5197: Freigabe in a text about sharing is refused")
 keys, _, _ = ck.extract()
 check(ck.glossary_errors(keys) == [], "no variant in the code " + str(ck.glossary_errors(keys))[:300])
 check("Client no.|customer" in keys and "Payment reminder|dunning" in keys and "Sign-in" in keys, "the renamed keys are in the code")

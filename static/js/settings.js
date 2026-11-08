@@ -256,7 +256,7 @@ function fmtSetHtml(s, hint) {
 const MOD_DESC = {office: N_('Quotations, invoices, services, text blocks and PDF documents'),  // 2.36.1 (#1021)
   cal: N_('Month, week and day view of your tasks'), timeline: N_('Tasks with start and end as bars over time'), kanban: N_('Projects as boards with columns'),
   matrix: N_('Urgent and important in four quadrants'), habits: N_('Daily and weekly habits with streaks'), pomo: N_('Pomodoro timer and stopwatch'),
-  stats: N_('Completions, on-time rate, focus time and streaks'), collab: N_('Share projects, assign tasks, @mentions, activity and News'),
+  stats: N_('Completions, on-time rate, focus time and streaks'), collab: N_('Share projects, assign tasks, @mentions, history and News'),
   comments: N_('Timestamped notes on tasks'),
   time: N_('Timers and manual time entries on tasks, reports and CSV export'), progress: N_('Progress per project and the project status (“Where is it stuck?”)'),
   deps: N_('Tasks blocked by other tasks, with arrows in the timeline (Gantt)'), fields: N_('Own fields per project, such as budget, client or phase'),

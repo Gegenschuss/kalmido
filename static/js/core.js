@@ -157,7 +157,7 @@ const FEATS = [['cal', N_('Calendar')], ['timeline', N_('Timeline')], ['matrix',
   ['sheets', N_('Tables')],  // 2.89.0 (#1916): tables with Kalmido variables (sheets.js), off by default
   ['videos', N_('Approval')]];  // 2.623.0 (#4765): the approval (video sign-offs, videorev.js), on for everyone once (features_rev 12)
 const FEAT_DESC = {deps: N_('“Blocked by” in the task details, arrows and linking in the timeline, what is stuck in the project status, a notice when a task is unblocked'),
-  fields: N_('Own fields per project (text, number, selection, date, person, link), as columns and in the task details'),collab: N_('Comments, activity history, @mentions, News, sharing projects and assigning tasks'), stats: N_('Completed tasks, on-time rate, overdue trend, focus time and habit streaks'),
+  fields: N_('Own fields per project (text, number, selection, date, person, link), as columns and in the task details'),collab: N_('Comments, history, @mentions, News, sharing projects and assigning tasks'), stats: N_('Completed tasks, on-time rate, overdue trend, focus time and habit streaks'),
   time: N_('Timer on tasks, manual entries, reports per project and task, CSV export and a printable timesheet'),
   clients: N_('Clients above the projects: contact, hourly rate, budget in hours or money, estimate vs. actual and the timesheet per client and month (only within the workspace)'),
   workload: N_('How much each person of the workspace has on their plate per week, against their hours per week'),

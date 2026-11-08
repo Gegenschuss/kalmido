@@ -1195,7 +1195,7 @@ const PURPOSE_EXTRA = {office: ['clients', 'workload', 'forms', 'office', 'agent
 // existing installs. Three presets (1.2: "Simple list"; "Just me" preselected; "Projects & team" = everything), then
 // the single modules to fine-tune. Collaboration + time tracking are the instance switches; the other modules
 // become the default of new users (the admin gets them too). "Skip" leaves everything on. All changeable later.
-const SETUP_MAIN = [['collab', N_('Collaboration'), N_('Share projects, assign tasks, @mentions, activity and News')],
+const SETUP_MAIN = [['collab', N_('Collaboration'), N_('Share projects, assign tasks, @mentions, history and News')],
   ['a:time', N_('Time|area'), N_('Time tracking on tasks with reports, and the focus timer')]];  // 2.44.0 (#1187): the area Time
 // 2.44.0 (#1187): the areas offered here and the modules each one switches (Office: contacts here; clients and the office come
 // with the purpose "Office & finance", server PURPOSE_EXTRA); with a matching purpose only the modules the purpose holds
