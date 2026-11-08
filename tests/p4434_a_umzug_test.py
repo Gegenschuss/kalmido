@@ -147,7 +147,11 @@ RUN3 = r.json()["id"]
 dbx("UPDATE doc_office_moves SET created_at=? WHERE id=?", ((datetime.now(timezone.utc) - timedelta(days=31)).isoformat(timespec="seconds"), RUN3))
 check(preview(Fr, count="1")["undo"] is None, "after 30 days no undo line")
 r = Fr.post(MV + f"/{RUN3}/undo")
-check(r.status_code == 409 and row(f2)[0] == "office", f"after 30 days: 409, it stays in the office {r.status_code} {row(f2)}")
+# 2.665.0 (#5111): the watchdog tick amv_prune (every TASKS_WATCHDOG_INTERVAL s) deletes the backdated run between the UPDATE and
+# the undo now and then (CI v2.656.0: 404) - expired = 409 while the row is there, 404 once the watchdog removed it; never an undo
+gone = not dbx("SELECT 1 FROM doc_office_moves WHERE id=?", (RUN3,))
+check((r.status_code == 409 or (r.status_code == 404 and gone)) and row(f2)[0] == "office",
+      f"after 30 days: 409 (404 once pruned: {gone}), it stays in the office {r.status_code} {row(f2)}")
 
 g_hidden = preview(G, count="1").get("hidden")
 r = Fr.post(B + "/api/docs/office-move/hide")
