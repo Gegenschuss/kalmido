@@ -43,7 +43,7 @@ async function shmv_go(kind, block, at) {
   const srt = kind === 'row' && SHV.sorted?.sid === sid ? sh._col.get(SHV.sorted.c) : null;  // the arrow of a sorting does not hold any more
   if (srt) SHV.sorted = null;
   await shvStep(msg, () => rawFetch('POST', url, {ids, prev: all, moved: block}),
-    res => rawFetch('POST', url, {ids: all, prev: ids, ...(res?.formulas?.length ? {formulas: res.formulas} : {})}),
+    res => rawFetch('POST', url, {ids: all, prev: ids, formulas: res?.formulas || []}),  // 2.658.0 (#5000): always named, else the server takes it for a sorting
     srt ? msg + ' · ' + tr('No longer sorted by {0}', srt.title || srt.letter) : msg);
 }
 const shmv_rows = (block, at) => shmv_go('row', block, at);

@@ -10,8 +10,8 @@ them; a moved block dropped between them belongs to it, members dragged to right
 from the top of summed rows to just above their total), ones taken further away do not any more; a range that moved as a
 whole (all its members in the block) simply follows its corners.
 
-Only for a move with its block named (moved = the ids that were dragged): a sorting or any other new order keeps the stored
-corners as before (sheets.web rows/order without "moved"). The answer names the changed formulas with their text before and
+Only for a move with its block named (moved = the ids that were dragged). 2.658.0 (#5000): a sorting (any new order without
+"moved", sheets.web rows/order) keeps each range's span on its positions instead (sho_sort_plan): SUM(A1:A3) stays A1:A3. The answer names the changed formulas with their text before and
 after, so the Undo of a move (the old order, without "moved") can put them back exactly (PUT /cells, prev = after).
 """
 from ..core.errors import BadInput
@@ -64,7 +64,34 @@ def sho_plan(c, sheet_row, kind, old, new, moved, uid):
     if not moved or old == new:
         return []
     if [x for x in old if x not in moved] != [x for x in new if x not in moved]:
-        return []  # not one block moved (a sorting): the corners stay as stored
+        return []  # not one block moved: the corners stay as stored
+    return _sho_ranges(c, sheet_row, kind, old, new, lambda oi, ni, a, b: _span(oi, ni, old, moved, a, b), uid)
+
+
+def _keep(old_idx, new_idx, a, b):
+    """2.658.0 (#5000): a sorting keeps the span of a range where it was (the same positions, like every spreadsheet): the new
+    (first, last) index = the old one, or None when its corners still stand there. A range one line deep along the sorted
+    dimension (SUM(A1:C1) when rows are sorted: the total of its own row) follows its line like a single reference does."""
+    if a not in old_idx or b not in old_idx or a == b:
+        return None
+    span = tuple(sorted((old_idx[a], old_idx[b])))
+    return None if span == tuple(sorted((new_idx[a], new_idx[b]))) else span
+
+
+def sho_sort_plan(c, sheet_row, kind, old, new, uid):
+    """2.658.0 (#5000): before rows / columns of sheet_row are sorted from order old to new (any new order without a block
+    named): the formulas whose ranges reaching into this sheet change so that each range keeps its span (the positions it
+    covered before; a sorting moves contents, not the rectangle) -- plan like sho_plan, stored by sho_apply. Single references
+    follow their cell as always (stored by id). Before 2.658 a range followed its two corner cells, so SUM(A1:A3) became
+    SUM(A2:A3) when rows 1 and 2 swapped."""
+    if old == new:
+        return []
+    return _sho_ranges(c, sheet_row, kind, old, new, _keep, uid)
+
+
+def _sho_ranges(c, sheet_row, kind, old, new, span_of, uid):
+    """The formulas of the table whose ranges on sheet_row get the new span span_of(old_idx, new_idx, a, b) (row / column ids of
+    the corners) -> plan of sho_plan."""
     sid = sheet_row["id"]
     old_idx, new_idx = {x: i for i, x in enumerate(old)}, {x: i for i, x in enumerate(new)}
     book = ShBook(c, sheet_row)  # still the old order
@@ -92,7 +119,7 @@ def sho_plan(c, sheet_row, kind, old, new, moved, uid):
             ca, cb = book.cells.get(t1[1][1]), book.cells.get(t3[1][1])
             if not book.live(ca) or not book.live(cb):
                 continue  # not a range of this sheet (or a corner in the trash: it keeps its error as before)
-            span = _span(old_idx, new_idx, old, moved, line(ca), line(cb))
+            span = span_of(old_idx, new_idx, line(ca), line(cb))
             if span is None:
                 continue
             ends = span if old_idx[line(ca)] <= old_idx[line(cb)] else (span[1], span[0])  # the corner that came first stays first

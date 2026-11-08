@@ -23,7 +23,7 @@ from ..core.retention import ret_on, ret_trash_days
 from ..core.serializers import unlink_files
 from ..accounts.orgs import is_org_admin
 from .core import sh_list_title, sh_may, sh_space, sh_space_key, sh_to_display
-from .shorder import sho_apply, sho_moved, sho_plan, sho_restore_apply, sho_restore_plan  # 2.631.0 (#4620)
+from .shorder import sho_apply, sho_moved, sho_plan, sho_restore_apply, sho_restore_plan, sho_sort_plan  # 2.631.0 (#4620), 2.658.0 (#5000)
 from .shhist import shh_meta_write  # 2.564.0 (#4701/#4702); 2.571.0 (#4766): shh_meta_write
 
 
@@ -372,7 +372,9 @@ def sheets_rows_order(sid):
     elsewhere since (or a row of it deleted) gives 409 {error, rows: the current order, rev} instead of a silent overwrite (rows
     added since: fine). 2.631.0 (#4620): with moved the ranges of formulas keep their rows (sheets/shorder.py) -> also
     {formulas: [{sheet_id, row_id, col_id, raw, now}]} (the changed ones); the Undo sends them back as formulas (with the old
-    order, without moved): the ones still as the move left them get their text again."""
+    order, without moved): the ones still as the move left them get their text again. 2.658.0 (#5000): without moved and without
+    formulas it is a sorting: every range keeps its span on the same positions (SUM(A1:A3) stays A1:A3, shorder.sho_sort_plan),
+    single references follow their cells; inserting rows at a place is a move of the new rows (moved)."""
     return _sh_order(sid, "row")
 
 
@@ -404,7 +406,11 @@ def _sh_order(sid, kind):
     given = set(ids)
     order = ids + [x for x in live if x not in given]
     back = sho_restore_plan(c, r0, b.get("formulas"), me())  # 2.631.0 (#4620): the Undo of a move puts its formulas back
-    plan = sho_plan(c, r0, kind, live, order, sho_moved(b, live), me())  # before the new order is stored
+    mv = sho_moved(b, live)
+    if mv is None and b.get("formulas") is None:  # 2.658.0 (#5000): a sorting keeps the spans of ranges on their positions
+        plan = sho_sort_plan(c, r0, kind, live, order, me())
+    else:  # a move (or its Undo, which names its formulas, maybe none): the ranges keep their members
+        plan = sho_plan(c, r0, kind, live, order, mv, me())  # before the new order is stored
     for i, x in enumerate(order):
         c.execute(f"UPDATE {table} SET pos=? WHERE id=?", (float(i + 1), x))
     fx = sho_apply(c, plan, me())

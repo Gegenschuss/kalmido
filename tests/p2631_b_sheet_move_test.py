@@ -7,7 +7,7 @@
    last row stays in it (SUM(A1:A5) above a total), a block of two rows taken out leaves it; the answer names the changed
    formulas (raw before, now after)
  - the Undo (old order + formulas, without moved) gives back every formula and value exactly
- - a sorting (rows/order without moved) keeps the stored corners as before (no rule applied)
+ - a sorting (rows/order without moved) keeps each range's span (2.658.0, #5000: SUM(A1:A3) stays A1:A3)
  - columns/order (new): the same for columns, a range in another sheet of the table ('Sheet 1'!A1:B1) too; prev guards (409)
  - moved / formulas malformed: 400; only reading (a share to read): 403 for both routes; another person's table: refused
 All as a person without an organisation (frida), the reader is bob with a read share on alice's table.
@@ -116,14 +116,14 @@ check(r.ok and cell(d, "B6").get("value") == 3,
 order(Fr, SID, "rows", R, prev=new3, formulas=r.json().get("formulas") or [])
 d = get(Fr, SID)
 check(rows(d) == R and cell(d, "B6").get("raw") == "=SUM(A1:A3)", "Undo of the block: as before " + str(cell(d, "B6")))
-# a sorting (no moved) keeps the stored corners (as before 2.631)
+# 2.658.0 (#5000): a sorting (no moved) keeps each range's span on its positions (was: the corners followed, =SUM(A2:A3) = 4)
 srt = [R[1], R[0]] + R[2:]
 r = order(Fr, SID, "rows", srt, prev=R)
 check(r.ok and "formulas" not in r.json(), "a sorting without moved: no formulas in the answer")
 d = get(Fr, SID)
-# (the stored corner cells stay: row 1's cell is row 2 now, the range A2:A3 -- the behaviour of a sorting before 2.631, untouched here)
-check(cell(d, "B6").get("raw") == "=SUM(A2:A3)" and cell(d, "B6").get("value") == 4, "a sorting keeps the stored corners as before " + str(cell(d, "B6")))
+check(cell(d, "B6").get("raw") == "=SUM(A1:A3)" and cell(d, "B6").get("value") == 6, "a sorting keeps the range's span " + str(cell(d, "B6")))
 order(Fr, SID, "rows", R, prev=srt)
+check(cell(get(Fr, SID), "B6").get("raw") == "=SUM(A1:A3)", "sorting back: the span as before")
 # prev guards a move elsewhere since
 check(order(Fr, SID, "rows", new, prev=srt, moved=[R[0]]).status_code == 409, "rows/order: a stale prev gives 409")
 check(order(Fr, SID, "rows", new, prev=R, moved=[999999]).status_code == 400, "rows/order: moved with an unknown row: 400")

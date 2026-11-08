@@ -570,7 +570,7 @@ async function shvRowAdd(afterId, above) {
   const doIt = async () => {
     await rawFetch('POST', `/api/sheets/${sid}/rows`, above ? {} : {after_row_id: afterId ?? sh.rows[sh.rows.length - 1]?.id ?? null, count: 1});
     const j = await rawFetch('GET', '/api/sheets/' + sid); const ids = (j.rows || []).map(r => r.id).filter(x => !before.has(x));
-    if (above && ids.length) { const o = order0.slice(); o.splice(Math.max(0, o.indexOf(afterId)), 0, ...ids); await rawFetch('POST', `/api/sheets/${sid}/rows/order`, {ids: o, prev: (j.rows || []).map(r => r.id)}); }
+    if (above && ids.length) { const o = order0.slice(); o.splice(Math.max(0, o.indexOf(afterId)), 0, ...ids); await rawFetch('POST', `/api/sheets/${sid}/rows/order`, {ids: o, prev: (j.rows || []).map(r => r.id), moved: ids}); }  // 2.658.0 (#5000): a move of the new rows, not a sorting
     return ids;
   };
   const res = await shvStep(tr('Row added'), doIt, async ids => { for (const x of ids || []) await rawFetch('DELETE', `/api/sheets/${sid}/rows/${x}`); }, null,
