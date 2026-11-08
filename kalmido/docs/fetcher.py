@@ -298,12 +298,14 @@ def docs_fetcher_new():
         return err(e.text(), e.code)
     if c.execute("SELECT COUNT(*) FROM doc_fetchers WHERE user_id=?", (uid,)).fetchone()[0] >= FX_MAX:
         return err(tr("At most {0} receipt fetchers", FX_MAX), 409)
+    if not PUBLIC_URL_SET:  # 2.666.0 (#4074 5): the code names the server; never the Host header of this request (key to another host)
+        return err(tr("PUBLIC_URL is not set on this server: ask the server admin to set it to the address people open (.env) and restart."), 503)
     tok = FX_PREFIX + secrets.token_urlsafe(32)
     fid = insert_id(c, "INSERT INTO doc_fetchers(user_id,org_id,name,token_hash,prefix,created_at) VALUES(?,?,?,?,?,?)",
                     (uid, oid, name, _token_hash(tok), tok[:12], iso(now_utc())))
     c.commit()
     print("receipt fetcher", fid, "created for user", uid, "org", oid, flush=True)
-    url = (PUBLIC_URL if PUBLIC_URL_SET else request.host_url).rstrip("/")
+    url = PUBLIC_URL.rstrip("/")
     raw = json.dumps({"url": url, "key": tok, "name": name}, ensure_ascii=False, separators=(",", ":")).encode()
     return jsonify(id=fid, name=name, target=place, code=FX_CODE_PREFIX + base64.urlsafe_b64encode(raw).decode().rstrip("=")), 201
 

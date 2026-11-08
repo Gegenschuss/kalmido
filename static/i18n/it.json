@@ -17483,6 +17483,7 @@
   "Add image, PDF or audio": "Aggiungi immagine, PDF o audio",
   "Images (JPG, PNG, WebP), PDFs and audio files (MP3, M4A, AAC, WAV, OGG, Opus, FLAC). The file stays in the file store; comments sit at a point or, for audio, at a second.": "Immagini (JPG, PNG, WebP), PDF e file audio (MP3, M4A, AAC, WAV, OGG, Opus, FLAC). Il file resta nell’archivio file; i commenti stanno su un punto o, per l’audio, su un secondo.",
   "Please select an image (JPG, PNG, WebP), a PDF or an audio file (MP3, M4A, AAC, WAV, OGG, Opus, FLAC).": "Scegli un’immagine (JPG, PNG, WebP), un PDF o un file audio (MP3, M4A, AAC, WAV, OGG, Opus, FLAC).",
+  "PUBLIC_URL is not set on this server: ask the server admin to set it to the address people open (.env) and restart.": "PUBLIC_URL non è impostata su questo server: chiedi all'amministratore del server di impostarla sull'indirizzo che si apre (.env) e di riavviare.",
   "Customise the contact card": "Personalizza la scheda contatto",
   "Merge history": "Cronologia delle unioni",
   "This area in the bar": "Quest’area nella barra",

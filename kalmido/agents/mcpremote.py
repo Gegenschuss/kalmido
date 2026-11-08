@@ -95,8 +95,11 @@ def mcpr_on(c):
 
 
 def mcpr_base():
-    """The issuer / the address clients use: PUBLIC_URL when set, else the address of this request."""
-    return (PUBLIC_URL if PUBLIC_URL_SET else request.host_url).rstrip("/")
+    """The issuer / the address clients use: PUBLIC_URL. 2.666.0 (#4074 5): without it refused (503), never the address of this
+    request (a forged Host header would put another host into the OAuth metadata / the issuer)."""
+    if not PUBLIC_URL_SET:
+        raise Denied(503, tr("PUBLIC_URL is not set on this server: ask the server admin to set it to the address people open (.env) and restart."))
+    return PUBLIC_URL.rstrip("/")
 
 
 def mcpr_resource():
@@ -822,7 +825,7 @@ def mcpr_grants():
         out.append({"id": r["id"], "client": r["client"], "redirect_host": urllib.parse.urlsplit(uris[0]).netloc if uris else "",
                     "agent": {"id": r["agent_id"], "name": r["display_name"] or r["username"]}, "given_by_me": r["user_id"] == me(),
                     "created_at": r["created_at"], "last_used_at": r["last_used_at"]})
-    return jsonify(on=mcpr_on(c), url=mcpr_resource(), grants=out)
+    return jsonify(on=mcpr_on(c), url=mcpr_resource() if PUBLIC_URL_SET else "", grants=out)  # 2.666.0 (#4074 5)
 
 
 @app.delete("/api/my/mcp-grants/<int:gid>")
