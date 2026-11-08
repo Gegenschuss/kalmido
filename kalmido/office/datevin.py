@@ -37,6 +37,7 @@ from ..files.store import fs_chain, fs_deleted, fs_role  # 2.369.5 (#2517): pull
 from .legacyimport import fi_norm  # 2.369.5 (#2517): pulled up from functions
 from .model import pb_owner, office_gate, office_need_feature, office_org, office_settings  # 2.369.5 (#2517): pulled up from functions
 from .travel import rk_cat_label, rk_trips  # 2.369.5 (#2517): pulled up from functions
+from .meals import BW_SHARE  # 2.386.0 (#2328)
 
 # keyword (casefolded, part of the category) -> (SKR03, SKR04); the first match wins
 DV_CAT_DEFAULTS = (
@@ -407,7 +408,6 @@ def dv_meal_rows(c, oid, d_from, d_to, st, s):
     if not meals:
         return [], []
     from .books import bk_receipts_basis
-    from .meals import BW_SHARE
     small = bool(s.get("small_business"))
     gegen = dv_counter(st)
     ded_acc, nd_acc = dv_meal_accounts(st)
