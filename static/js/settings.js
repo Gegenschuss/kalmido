@@ -852,7 +852,7 @@ function settingsModal(focus) {
       <div class="row" role="group" aria-labelledby="s-exp-h"><a class="btn sm" href="/api/export.json" download>${ic('download', 's')} ${tr('Download JSON')}</a><a class="btn sm" href="/api/export/todoist.zip" download>${ic('download', 's')} ${tr('Todoist CSV')}</a><a class="btn sm" href="/api/export/markdown.zip" download>${ic('download', 's')} ${tr('Markdown')}</a></div>
       ${hint(tr('One file per project in a ZIP: Todoist CSV for the import of Todoist, Markdown as checklists for any notes app. Projects locked with a password stay out.'))}
       <h4 id="s-pmeta-h">${tr('Photos')}</h4><div class="row">${chk('s-pmeta', s.photo_meta_strip !== '0', tr('Remove location data from photos'))}</div>
-      ${hint(tr('Also removes camera details and capture time. In an organisation its admins decide.'))}
+      ${hint(tr('Also removes camera details and capture time. In an organisation its admins decide.') + ' ' + tr('Switched off, photos keep their location, also for anyone who opens them through a public link or a shared knowledge page.'))}
       ${feat('videos') ? `<h4 id="s-vext-h">${tr('Videos')}</h4><div class="row">${chk('s-vext', s.video_ext_ok === '1', tr('Load YouTube and Vimeo videos without asking'))}</div>
       ${hint(tr('Off: a video first shows a note and loads the player only after your click. Loading sends data such as your IP address to the provider.'))}` : ''}${''/* 2.623.0 (#4765): only with the module Approval */}
       ${S.me?.kid ? '' : '<div id="s-xlstd-sec"></div>'}${''/* 2.470.0 (#3596); 2.599.0 (#4907): drawn once the module ablage is there (xl_stdLater) */}

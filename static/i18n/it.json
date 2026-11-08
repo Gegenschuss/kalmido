@@ -17487,6 +17487,7 @@
   "The server could not be reached, or its address lies in a private network that an admin has not allowed": "Il server non è raggiungibile, oppure il suo indirizzo si trova in una rete privata che nessun amministratore ha consentito",
   "Only https:// addresses work here (http:// only for hosts an admin allowed)": "Qui funzionano solo indirizzi https:// (http:// solo per host consentiti da un amministratore)",
   "You may not address this agent in this project": "Non puoi rivolgerti a questo agente in questo progetto",
+  "Switched off, photos keep their location, also for anyone who opens them through a public link or a shared knowledge page.": "Se disattivato, le foto mantengono la loro posizione, anche per chiunque le apra tramite un link pubblico o una pagina di conoscenza condivisa.",
   "PUBLIC_URL is not set": "PUBLIC_URL non è impostato",
   "Apps then learn the address of this server from each request (its Host header). Set PUBLIC_URL in .env to the address people open and restart before apps connect (SELF-HOSTING.md).": "Le app ricavano allora l’indirizzo di questo server da ogni richiesta (la sua intestazione Host). Imposta PUBLIC_URL in .env sull’indirizzo che le persone aprono e riavvia prima che le app si colleghino (SELF-HOSTING.md).",
   "given by {0}": "concesso da {0}",

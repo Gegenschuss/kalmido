@@ -17,7 +17,7 @@ function pmeta_paneDraw(box) {
     row.innerHTML = `<label class="chkl"><input type="checkbox" id="${id}" ${o.photo_meta_strip !== false ? 'checked' : ''} ${adm ? '' : 'disabled'}> ${tr('Remove location data from photos')}</label>`;
     const hint = document.createElement('div');
     hint.className = 'shint keep';
-    hint.textContent = tr('Also removes camera details and capture time from the stored file.') + (adm ? '' : ' ' + tr('Only an admin of this organisation can change it.'));
+    hint.textContent = tr('Also removes camera details and capture time from the stored file.') + ' ' + tr('Switched off, photos keep their location, also for anyone who opens them through a public link or a shared knowledge page.') + (adm ? '' : ' ' + tr('Only an admin of this organisation can change it.'));  // 2.674.0 (#4382 finding 14)
     (det.querySelector('.wscpick + .shint') || det.querySelector('summary')).after(row); row.after(hint);
     if (!adm) continue;
     const cb = $('#' + id, row);
