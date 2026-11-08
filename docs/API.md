@@ -1873,7 +1873,9 @@ Its key (`kbh_…`) is a kind of its own: stored only as a hash in its own table
 tokens and no other route knows it: every other API route answers `403` "This key may only upload receipts and report the state
 of its portals", the web app `401`). Ordinary tokens and scan inbox keys reach none of the three routes (`403`). A password
 reset or change disconnects every receipt fetcher of the person; disconnecting it in the settings stops the key at once
-(`401`). At most 10 per person, 120 requests per minute.
+(`401`). At most 10 per person, 120 requests per minute. A key runs out a year after it was made (2.674.0). Optional address rule
+(2.705.0): set in the settings, the key works only from those IPs / networks; from anywhere else every route answers `403`
+"This token may not be used from this address" (behind a reverse proxy this relies on its trusted-proxy setting).
 
 | Route | Answer |
 |---|---|
@@ -1887,9 +1889,11 @@ left, `400` not a PDF, unknown field or portal, `429` slow down. The documents a
 `abholer:<portal>:<order>` as their external id and are recognised like an upload (date, amount, sender, sorting).
 
 Web routes of the settings: `GET /api/docs/fetchers?ws=private|org:<id>` -> `{api, fetchers: [{id, name, prefix, target, ok,
-created_at, last_seen_at, portals: [{key, name, enabled, last_run, new, error, error_at, updated_at}]}]}` (one's own only);
+created_at, last_seen_at, expires_at, expired, allowed_ips, portals: [{key, name, enabled, last_run, new, error, error_at,
+updated_at}]}]}` (one's own only; `allowed_ips` `[]` = any address);
 `POST /api/docs/fetchers {ws, name}` -> `201 {id, name, target, code}` (`409` while the API is off); `PATCH
-/api/docs/fetchers/{id}/portals/{key} {enabled: true|false}`; `DELETE /api/docs/fetchers/{id}` (the documents stay). The setup
+/api/docs/fetchers/{id}/portals/{key} {enabled: true|false}`; `PATCH /api/docs/fetchers/{id} {allowed_ips: ["203.0.113.0/24"]}`
+(or comma separated text; `[]` / `""` = any address; `400` a wrong address, at most 20) -> the fetcher as listed; `DELETE /api/docs/fetchers/{id}` (the documents stay). The setup
 code is shown once: `kalmido-fetch:1:` + base64url without padding of `{"url": "https://example.com", "key": "kbh_…", "name":
 "My computer"}`.
 

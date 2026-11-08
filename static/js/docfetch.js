@@ -30,7 +30,8 @@ function fx_bodyHtml(j) {
   const intro = `<p class="muted">${tr('A helper program on your computer fetches invoices from portals like Amazon and uploads them as PDFs into these documents; they are recognised like any upload. You sign in to the portals only in the helper: Kalmido never stores passwords, cookies or sign-ins.')}</p>`;
   if (!j.api) return intro + `<p class="muted">${tr('The API is switched off on this server, so there are no receipt fetchers.')}</p>`;
   const one = f => `<div class="dsc-way fx-one${f.ok ? '' : ' off'}"><div class="fx-head"><span><b>${esc(f.name)}</b> <span class="muted">${esc(f.target)}</span>
-      <small class="muted">${f.last_seen_at ? esc(tr('last report {0}', relTime(f.last_seen_at))) : tr('not connected yet')}${f.expires_at ? ' · ' + esc(f.expired ? tr('expired') : tr('expires {0}', fmtDateLoc(f.expires_at.slice(0, 10)))) : ''}</small></span>
+      <small class="muted">${f.last_seen_at ? esc(tr('last report {0}', relTime(f.last_seen_at))) : tr('not connected yet')}${f.expires_at ? ' · ' + esc(f.expired ? tr('expired') : tr('expires {0}', fmtDateLoc(f.expires_at.slice(0, 10)))) : ''}${f.allowed_ips?.length ? ' · ' + esc(tr('only from {0}', f.allowed_ips.join(', '))) : ''}</small></span>
+      <button type="button" class="iconbtn" data-fx="ips:${f.id}" aria-label="${esc(tr('Permissions of {0}', f.name))}" title="${esc(tr('Only from'))}">${ic('lock')}</button>
       <button type="button" class="iconbtn danger" data-fx="del:${f.id}" aria-label="${esc(tr('Disconnect {0}', f.name))}" title="${esc(tr('Disconnect'))}">${ic('trash')}</button></div>
     ${f.portals.length ? `<ul class="dc-rules">${f.portals.map(p => fx_portalHtml(f, p)).join('')}</ul>` : `<p class="muted">${tr('The portals appear here after the first report of the helper.')}</p>`}</div>`;
   return `${intro}${j.fetchers.map(one).join('')}${FXS.code ? fx_codeHtml() : ''}
@@ -56,6 +57,7 @@ document.addEventListener('click', async e => {
     /** @type {HTMLElement|null} */ (md.querySelector('#fx-code'))?.focus();
     return;
   }
+  if (a.startsWith('ips:')) { fx_ipsModal(md, +a.slice(4)); return; }  // 2.705.0 (#5151)
   if (a.startsWith('del:')) {
     const id = +a.slice(4), f = (FXS.j?.fetchers || []).find(x => x.id === id); if (!f) return;
     if (!await askConfirm(tr('Disconnect the receipt fetcher “{0}”?', f.name), tr('Its key stops working at once; the receipts it brought stay.'), {ok: tr('Disconnect'), danger: true})) return;
@@ -64,6 +66,20 @@ document.addEventListener('click', async e => {
     await fx_draw(md);
   }
 });
+// 2.705.0 (#5151): the addresses a fetcher's key may be used from (the same row and hint as an API token, integrations.js ipsRow)
+function fx_ipsModal(/** @type {ParentNode} */ md, /** @type {number} */ id) {
+  const f = (FXS.j?.fetchers || []).find(x => x.id === id); if (!f) return;
+  const m = modal(`<h3>${esc(tr('Permissions of {0}', f.name))}</h3>${ipsRow((f.allowed_ips || []).join(', '), 'fx-ips')}
+    <div class="foot stfoot"><div class="calerr" role="alert" id="fx-ips-err" hidden></div><span class="spacer"></span><button type="button" class="btn" data-m="close">${tr('Cancel')}</button><button type="button" class="btn pri" data-m="ok">${tr('Save')}</button></div>`);
+  m.addEventListener('click', async e => {
+    const b = /** @type {HTMLButtonElement|null} */ (/** @type {HTMLElement} */ (e.target).closest('button[data-m]')); if (!b) return;
+    if (b.dataset.m === 'close') { m.remove(); return; }
+    const er = /** @type {HTMLElement} */ (m.querySelector('#fx-ips-err')), v = /** @type {HTMLInputElement} */ (m.querySelector('#fx-ips')).value.trim();
+    b.disabled = true;
+    try { await calReq('PATCH', `/api/docs/fetchers/${id}`, {allowed_ips: v}); m.remove(); toast(tr('Saved')); await fx_draw(md); }
+    catch (x) { er.textContent = /** @type {Error} */ (x).message; er.hidden = false; } finally { b.disabled = false; }
+  });
+}
 document.addEventListener('change', async e => {
   const el = /** @type {HTMLInputElement} */ (e.target); if (!el.matches?.('#s-fetch [data-fxp]')) return;
   const [id, key] = String(el.dataset.fxp).split(/:(.*)/s);

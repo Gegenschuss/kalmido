@@ -25,8 +25,9 @@ from ..core.db import body, bump, db, err, iso, iso_ms, now_utc, parse_iso
 from ..core.errors import BadInput, Denied, UnknownFields
 from ..core.i18n import N_, lang, tr
 from ..core.pg import insert_id, system_ctx
-from ..accounts.session import _rate_blocked, _rate_fail, _token_hash, FAIL_WINDOW, me
+from ..accounts.session import _rate_blocked, _rate_fail, _token_hash, client_ip, FAIL_WINDOW, me
 from ..api.common import hit_limit, v1_err, v1_json, v1_view, V1_KEY_KINDS
+from ..api.scopes import ips_clean, token_ip_ok  # 2.705.0 (#5151): the address rule of a key, as for API tokens
 from ..collab.comments import collab_user
 from ..collab.news import notif_ok
 from ..files.store import fs_log_add
@@ -71,6 +72,8 @@ def fx_authenticate(c, tok, bad):
             return v1_err(429, tr("Too many invalid tokens, please wait a few minutes"), {"Retry-After": str(FAIL_WINDOW)})
         _rate_fail(bad)
         return v1_err(401, tr("Missing or invalid API token"), {"WWW-Authenticate": 'Bearer realm="kalmido"'})
+    if not token_ip_ok(row, client_ip()):  # 2.705.0 (#5151): optional address rule, like a scan inbox key (api/v1.py)
+        return v1_err(403, tr("This token may not be used from this address"))
     if (request.method, request.url_rule.rule if request.url_rule else "") not in FX_ROUTES:
         return v1_err(403, tr("This key may only upload receipts and report the state of its portals"))
     if hit_limit(f"fx:{row['id']}", FX_RATE):
@@ -278,7 +281,8 @@ def fx_list(c, uid, oid):
         out.append({"id": r["id"], "name": r["name"], "prefix": r["prefix"], "target": place, "ok": ok, "created_at": r["created_at"],
                     "last_seen_at": r["last_seen_at"], "portals": [_portal_out(p, True) for p in _portals(c, r["id"])],
                     # 2.674.0 (#4382 finding 12): the key's end (None = an older key, it gets its year at its next use)
-                    "expires_at": r["expires_at"], "expired": bool(r["expires_at"] and parse_iso(r["expires_at"]) <= now_utc())})
+                    "expires_at": r["expires_at"], "expired": bool(r["expires_at"] and parse_iso(r["expires_at"]) <= now_utc()),
+                    "allowed_ips": [x for x in (r["allowed_ips"] or "").split(",") if x]})  # 2.705.0 (#5151): [] = any address
     return out
 
 
@@ -330,6 +334,29 @@ def docs_fetcher_del(fid):
         raise Denied(404, tr(GONE))
     c.commit()
     return jsonify(ok=True)
+
+
+@app.patch("/api/docs/fetchers/<int:fid>")
+def docs_fetcher_edit(fid):
+    """2.705.0 (#5151): {allowed_ips} -> one of my receipt fetchers as listed: the addresses its key may be used from (a list
+    or comma separated text of IPs / networks, checked like an API token's, api/scopes.py ips_clean; [] / '' = any address).
+    The key stays: the helper goes on without a new setup code."""
+    _no_agent()
+    c, uid = db(), me()
+    if not office_on(c, uid):
+        raise Denied(403, tr(OFF_MSG))
+    b = body()
+    if not isinstance(b, dict) or sorted(b) != ["allowed_ips"]:
+        return err(tr("Invalid value: {0}", ", ".join(sorted(b)) if isinstance(b, dict) and b else "allowed_ips"))
+    r = c.execute("SELECT * FROM doc_fetchers WHERE id=? AND user_id=?", (fid, uid)).fetchone()
+    if not r:
+        raise Denied(404, tr(GONE))
+    ips = ips_clean(b["allowed_ips"])
+    with system_ctx(c):  # the person's own row (its place may be an organisation), as fx_authenticate writes it
+        c.execute("UPDATE doc_fetchers SET allowed_ips=? WHERE id=? AND user_id=?", (ips, fid, uid))
+    c.commit()
+    print("receipt fetcher", fid, "of user", uid, "address rule", "set" if ips else "removed", flush=True)
+    return jsonify(next((f for f in fx_list(c, uid, r["org_id"]) if f["id"] == fid), {"id": fid}))
 
 
 @app.patch("/api/docs/fetchers/<int:fid>/portals/<key>")

@@ -365,7 +365,9 @@ ROUTES = {
     "POST /api/docs/mail-addresses/{}/renew": "files", "DELETE /api/docs/mail-addresses/{}": "files",
     # 2.425.0 C (#3453): receipt fetchers of the personal office (p2425_c_api_test.py, freelancer-matrix: files)
     "GET /api/docs/fetchers": "files", "POST /api/docs/fetchers": "files", "DELETE /api/docs/fetchers/{}": "files",
-    "PATCH /api/docs/fetchers/{}/portals/{}": "files", "GET /api/v1/fetcher": "files", "PUT /api/v1/fetcher/status": "files",
+    "PATCH /api/docs/fetchers/{}/portals/{}": "files", "GET /api/v1/fetcher": "files",
+    "PUT /api/v1/fetcher/status": "files",
+    "PATCH /api/docs/fetchers/{}": "files",  # 2.705.0 (#5151): the address rule of a fetcher key (p2705_a_harden_test.py)
     "POST /api/v1/fetcher/documents": "files",
     "POST /api/docs/{}/receipt/einvoice": "files",  # 2.185.0 A (#2583)
     "POST /api/docs/{}/area": "files",  # 2.522.0 (#4433): "Move to office" / "Wrong area" in the personal office (p4433_a_area_test.py)
