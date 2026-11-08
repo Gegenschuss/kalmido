@@ -25,14 +25,17 @@ function f8d_closeTop() {
   else if (k === 'lightbox') $('.lightbox').remove();
   else if (k === 'pop') closePop();
   else if (k === 'qsheet') { closePop(); tch_overlaysClose(); }  // 2.619.0 (#4943): the scrim + whoever holds popOnClose, then the sheet (popovers.js)
-  else if (k === 'modal') modalClose($$('.modal:not(.authscreen):not(.an-out)').pop());
+  else if (k === 'modal') { const m = $$('.modal:not(.authscreen):not(.an-out)').pop(); if (!(m?._stk?.length && m._back?.())) modalClose(m); }  // 2.736.0 (#5214): a view inside the dialog first (settings areas)
   else if (k === 'tsheet') $('[data-ts="close"]', $('.tsheet'))?.click();
 }
+// 2.736.0 (#5214): a dialog with views of its own (md._stk = the views before the shown one, md._back() shows the last of them,
+// e.g. the areas of the settings) counts one level per view: Back steps back through them, only the last Back closes it.
+// The dialog calls f8d_queue() itself when it adds a view (no node is added or removed then); see settings.js stp_nav.
 // 2.652.0 (#5070): how many overlay levels are open (a dialog under a lightbox under a menu = 3); one history entry each
 const f8d_depth = () => {
   const pop = $('#pop');
   return ($('.palette:not(.an-out)') ? 1 : 0) + $$('.lightbox').length + (pop && !pop.classList.contains('hidden') ? 1 : 0)
-    + $$('.modal:not(.authscreen):not(.an-out):not(.shopmode)').length + ($('.qadd.sheet:not(.an-out)') ? 1 : 0) + ($('.tsheet') ? 1 : 0);
+    + $$('.modal:not(.authscreen):not(.an-out):not(.shopmode)').reduce((n, m) => n + 1 + (m._stk?.length || 0), 0) + ($('.qadd.sheet:not(.an-out)') ? 1 : 0) + ($('.tsheet') ? 1 : 0);
 };
 const f8d_lvl = () => { const v = history.state?.f8d; return typeof v === 'number' ? v : 0; };
 function f8d_sync() {

@@ -1005,6 +1005,11 @@ function settingsModal(focus) {
   const idx = on => { md.classList.toggle('sidx', on); if (on) $('.snav [data-sec].on', md)?.setAttribute('aria-selected', 'false'); head(); };
   if (isMobile() && !focus) idx(true); else head();
   md._idx = idx;
+  // 2.736.0 (#5214): every change of the shown area (tab, overview, search hit, a jump like go-access) is one step of Back
+  // (backclose.js): md._stk holds the views before the shown one, Back and the arrow in the header show the last of them; folding
+  // inside an area is none. A phone opened straight into an area has the overview below it (the arrow always led there), Back too.
+  md._stk = isMobile() && focus ? [{k: cur, i: true}] : [];
+  md._back = () => { const v = md._stk.pop(); if (!v) return false; if (v.k !== cur) show(v.k); idx(v.i); return true; };
   // 2.13.2 (#478 F13): phones: a "More ›" at the right end of the cut tab strip while more tabs are hidden to the right
   { const nav = $('.snav', md); nav.insertAdjacentHTML('afterend', `<button type="button" class="snmore hidden" data-snmore tabindex="-1" aria-hidden="true">${tr('More')} ›</button>`);
     $('[data-snmore]', md).addEventListener('click', () => nav.scrollBy({left: nav.clientWidth * .7, behavior: reducedMotion() ? 'auto' : 'smooth'}));
@@ -1027,6 +1032,9 @@ function settingsModal(focus) {
   // 2.7.0 (#405 S8): the module keys land on their row (and open its options), not just on top of Modules
   const modFocus = {layout: 'cal', collab: 'collab', focus: 'pomo', time: 'time'}[focus];
   if (modFocus) setTimeout(() => { const r = $(`[data-pane="modules"] [data-modrow="${modFocus}"]`, md); if (!r) return; const gd = r.closest('details.modgrp'); if (gd) gd.open = true; const gp = r.closest('details.mgparts'); if (gp) gp.open = true; const o = $('details.mopt', r); if (o) o.open = true; r.scrollIntoView?.({block: 'start'}); r.classList.add('flash'); }, 0);
+  // 2.736.0 (#5214): fn changes the shown view; a real change leaves the view before it as a step of Back
+  const stp_nav = fn => { const a = {k: cur, i: md.classList.contains('sidx')}; fn(); if (a.k === cur && a.i === md.classList.contains('sidx')) return;
+    md._stk.push(a); if (isTouch() && typeof f8d_queue === 'function') f8d_queue(); };
   const show = k => {
     cur = k; LS.set('settingsSec', k); head();
     $$('.snav button', md).forEach(b => { b.classList.toggle('on', b.dataset.sec === k); b.setAttribute('aria-selected', b.dataset.sec === k); });
@@ -1138,8 +1146,12 @@ function settingsModal(focus) {
   };
   addEventListener('pagehide', leave);
   onRemove(md, () => { removeEventListener('pagehide', leave); if (!md._noflush) flush(); });
-  $('.snav', md).addEventListener('click', e => { const b = e.target.closest('[data-sec]'); if (b) { show(b.dataset.sec); if (md.classList.contains('sidx')) { idx(false); setTimeout(() => $('.spane:not(.hidden) h4, .spane:not(.hidden) button, .spane:not(.hidden) input', md)?.focus?.({preventScroll: true}), 0); } } });
-  md.addEventListener('click', e => { if (e.target.closest('[data-m="s-index"]')) { idx(true); $('.snav [data-sec]', md)?.focus(); } });
+  $('.snav', md).addEventListener('click', e => { const b = e.target.closest('[data-sec]'); if (b) stp_nav(() => { show(b.dataset.sec); if (md.classList.contains('sidx')) { idx(false); setTimeout(() => $('.spane:not(.hidden) h4, .spane:not(.hidden) button, .spane:not(.hidden) input', md)?.focus?.({preventScroll: true}), 0); } }); });
+  // 2.736.0 (#5214): the arrow = Back (one view back, through its history entry on a touch screen); without a view before: the overview
+  md.addEventListener('click', e => { if (!e.target.closest('[data-m="s-index"]')) return;
+    if (md._stk.length) { if (isTouch() && typeof f8d_bk !== 'undefined' && f8d_bk.pushed) history.back(); else md._back(); }
+    else stp_nav(() => idx(true));
+    if (md.classList.contains('sidx')) $('.snav [data-sec]', md)?.focus(); });
   // 2.13.0 (#453 P20): search every tab's headings, labels and options; a hit opens its tab and scrolls to it
   // 2.24.0 (UX-16): full text: also buttons, helper lines, the small texts of switches, select options and table heads,
   // plus a few synonyms (words people search for that the labels do not use); a hit inside a sub-tab (Administration,
@@ -1171,7 +1183,7 @@ function settingsModal(focus) {
     const h = sres._hits[+b.dataset.hit]; sres.classList.add('hidden'); $('#s-search', md).value = ''; $('.sbody', md).classList.remove('snores');
     if (h.act === 'area') { $('[data-m="close"]', md)?.click(); ss_areaOpen(h); return; }  // 2.353.0 E (#2775): the area's own window
     if (h.act === 'absence') { $('[data-m="close"]', md)?.click(); Promise.resolve(AB2.data || ab2_load()).then(() => ab2_sheet(null)); return; }  // 2.250.0 C (#2994): no setting for it: the sheet itself
-    show(h.k); idx(false);
+    stp_nav(() => { show(h.k); idx(false); });  // 2.736.0 (#5214): a step of Back
     const ap = h.el.closest('[data-admp]'); if (ap) admSubShow(md, ap.dataset.admp, true);
     const ai = h.el.closest('[data-aisp]'); if (ai) aiSubShow(md, ai.dataset.aisp, true);
     for (let det = h.el.closest('details'); det; det = det.parentElement?.closest('details')) if (!(det === h.el.closest('details') && h.el.matches('summary') && !det.matches('.introw'))) det.open = true;  // 2.25.0: also the folded module group around it
@@ -1191,7 +1203,7 @@ function settingsModal(focus) {
   asst_setWire(md);  // 2.75.0 (#1411)
   if (cur === 'notify') wpDraw(md);
   ntfyShow(md);
-  md._show = show;  // 2.364.0 C (#3041): a sub-tab of the other area opens that area (admSubShow)
+  md._show = k => stp_nav(() => show(k));  // 2.364.0 C (#3041); 2.736.0 (#5214): a step of Back: a sub-tab of the other area opens that area (admSubShow)
   if (cur === 'users' || cur === 'org') { ad_secDraw(md); Promise.resolve(admSubShow(md, ad_admFocus(focus), false, cur)).then(() => { if (focus === 'activity') $('#s-adlog-h', md)?.scrollIntoView({block: 'start'}); }); }  // 2.42.0 (#828): + ocAdminDraw  // 2.46.6 (#1710): + the shown sub-tab's data; 'activity' = its log, once the rules above it are drawn
   aiTblWire(md);
   if (cur === 'ai') aiSubShow(md, {agents: 'agents', usage: 'usage', agentsafe: 'safe', agentsetup: 'setup', assistant: 'assistant'}[focus]);  // 2.5.1 (#393)
@@ -1199,7 +1211,7 @@ function settingsModal(focus) {
   md.addEventListener('click', e => { const b = e.target.closest('[data-admsub]'); if (b) admSubShow(md, b.dataset.admsub, true); });  // 2.24.0 (#826)
   md.addEventListener('click', e => {  // 2.46.6 (#1710): "Open in Administration" next to an admin switch
     const b = e.target.closest('[data-adopen]'), el = b && $('#' + b.dataset.adopen, md); if (!el) return;
-    const ap = el.closest('[data-admp]'); if (ap) admSubShow(md, ap.dataset.admp, true); else { show('users'); idx(false); }  // 2.364.0 C (#3041): its area
+    const ap = el.closest('[data-admp]'); if (ap) admSubShow(md, ap.dataset.admp, true); else stp_nav(() => { show('users'); idx(false); });  // 2.364.0 C (#3041): its area; 2.736.0 (#5214): a step of Back
     const r = el.closest('label') || el;
     setTimeout(() => { r.scrollIntoView?.({block: 'center'}); r.classList.add('flash'); setTimeout(() => r.classList.remove('flash'), 1600); }, 30);
   });
