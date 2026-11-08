@@ -75,7 +75,10 @@ def statements(r):
     return int(m.group(1)) if m else -1
 
 
-A = kt.setup()
+assert requests.post(B + "/api/auth/setup", headers=kt.H, json={"username": "alice", "display_name": "Alice",
+                                                                  "password": kt.PASSWORD}).ok
+A = sess("alice")
+A.post(B + "/api/admin/setup", json={"org_name": "Alpha", "lang": "en", "collab_all": True, "modules": ["comments"]})
 A.patch(B + "/api/settings", json={"lang": "en", "features": "cal,comments,events,contacts"})
 ME = A.get(B + "/api/state").json()["me"]
 ORG = ME["workspaces"][0]["id"]
@@ -104,15 +107,17 @@ H1, H2 = f"/dav/calendars/alice/{L1}/", f"/dav/calendars/alice/{L2}/"
 _, r0 = al.home(PF_BOTH)
 _, r1 = al.home(PF_BOTH)
 assert A.patch(B + f"/api/tasks/{SEED[L2][0]}", json={"title": "Seed changed"}).ok
-_, r2 = al.home(PF_BOTH)
-_, r3 = al.home(PF_CTAG)
-print(f"MESSUNG PROPFIND Depth 1 home (20 Listen x 10 Aufgaben, getctag+sync-token): kalt gerendert={rendered(r0)} "
-      f"Statements={statements(r0)}; warm gerendert={rendered(r1)} Statements={statements(r1)}; nach Aenderung in einer "
-      f"Liste gerendert={rendered(r2)} Statements={statements(r2)}; nur getctag gerendert={rendered(r3)} "
-      f"Statements={statements(r3)}", flush=True)
+_, r2 = al.home(PF_CTAG)
+assert A.patch(B + f"/api/tasks/{SEED[L2][1]}", json={"title": "Seed changed too"}).ok
+_, r3 = al.home(PF_BOTH)
+# PERF lines are kept in the run log (tests/run_all.sh)
+for what, r in (("kalt, getctag+sync-token", r0), ("warm, getctag+sync-token", r1),
+                ("nach Aenderung in einer Liste, nur getctag", r2), ("nach Aenderung in einer Liste, getctag+sync-token", r3)):
+    print(f"PERF p2665_d PROPFIND Depth 1 Home, 20 Listen x 10 Aufgaben, {what}: gerendert={rendered(r)} "
+          f"Statements={statements(r)} Server-Timing={r.headers.get('Server-Timing', '-')}", flush=True)
 check(rendered(r1) == 0, f"a second PROPFIND renders nothing ({rendered(r1)})")
-check(0 <= rendered(r2) <= 11, f"a change in ONE list renders at most that list, not all 200 tasks ({rendered(r2)})")
-check(rendered(r3) == 0, f"PROPFIND with only getctag renders no object ({rendered(r3)})")
+check(rendered(r2) == 0, f"PROPFIND with only getctag renders no object, also after a change ({rendered(r2)})")
+check(0 <= rendered(r3) <= 10, f"a change in ONE list renders at most that list, not all 200 tasks ({rendered(r3)})")
 
 
 # ================================================================== the ctag of a task list
