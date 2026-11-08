@@ -968,6 +968,9 @@ def init_db(guard=True, load=None):
         from ..tasks.multilist import ml_setup
         ml_setup(c)  # 2.71.0 B (#1459): links never cross a workspace boundary
         clk("ml_setup")
+        from .orgrows import orw_setup
+        orw_setup(c)  # 2.662.0 (#4602): tasks / comments / events / contacts carry their parent's organisation (row-level security)
+        clk("orw_setup")
         # 2.410.0 B (#3515): when a task came into its board column (a test server: on its test clock)
         c.executescript(trigger_skip_present(c, SEC_AT_TRIGGER.replace("{off}", str(round(_TEST_OFFSET.total_seconds()) if _TEST_OFFSET is not None else 0))))
         clk("sec_at_trigger")

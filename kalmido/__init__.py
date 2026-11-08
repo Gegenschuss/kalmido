@@ -45,6 +45,7 @@ ORDER = (
     "api.common",  # 2.149.0 G (#2517): the /api/v1 route helpers (core layer, see LAYER_OF)
     "core.tokenhash",  # 2.138.0 C (#1907): upload / calendar tokens as hashes
     "core.rls",  # 2.37.0 (#1150): row-level security, applied by init_db
+    "core.orgrows",  # 2.662.0 (#4602): the organisation of tasks / comments / events / contacts (triggers, set up by init_db)
     "core.retention",  # 2.152.0 (#2165): deletion periods + the switch of the retention runs
     "core.fkeys",  # 2.152.0 C (#2174): foreign keys of references that had none (orphans cleaned first)
     "core.orgcrypt",  # 2.42.0 (#828): keys per organisation, encryption at rest

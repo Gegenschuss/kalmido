@@ -127,6 +127,7 @@ TABLES = (
     "obj_history", "obj_undo", "obj_revoked",  # 2.558.0 (#4709): the core's history, undo steps and revoked rows (NULL = a private object)
     "module_cards",  # 2.575.0 (#3778): module cards (NULL = a person's private card, the app checks user_id)
     "doc_views",  # 2.579.0 (#4802): saved views of the documents search (NULL = private, the core checks owner_id)
+    "tasks", "comments", "events", "contacts",  # 2.662.0 (#4602): the parent's organisation, filled by triggers (core/orgrows.py; NULL = a private list / calendar / address book)
 )
 OWN_POLICY = ("orgs", "org_members")
 POLICY = "kalmido_org"

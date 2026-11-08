@@ -200,6 +200,7 @@ check(count("org_members", f"org_id={ALPHA}", role="user", orgs=str(ALPHA), uid=
 check(count("lists", f"org_id IS NULL AND owner_id={CAROL}", role="user", orgs=str(BETA), uid=CAROL) >= 1, "lists: private rows (org_id NULL) stay visible")
 
 # ---- writing
+ORW_FILLED = ("tasks", "comments", "events", "contacts")  # 2.662.0 (#4602): org_id comes from the parent (core/orgrows.py)
 for t in ORG_T:
     # 2.369.6 (#3139): the watchdog's upload clean-up (files/scan.py _sc_gc, every 10 min) deletes upload_scan rows without a
     # file - the made-up rows of this suite. On a busy runner the suite passes the 10 minutes and the write checks met an
@@ -207,8 +208,14 @@ for t in ORG_T:
     for o in (ALPHA, BETA):
         if not sql(f"SELECT 1 FROM {t} WHERE org_id=?", (o,)):
             fill_row(t, o)
-    out, e = as_app([f"UPDATE {t} SET org_id={ALPHA} WHERE org_id={BETA};"], role="user", orgs=str(BETA), uid=CAROL)
-    check(e is not None and "row-level security" in e, f"{t}: moving a row into a foreign organisation is refused ({(e or '')[:80]})")
+    if t in ORW_FILLED:  # 2.662.0 (#4602): the trigger puts the parent's organisation back (the row stays in Beta, nothing refused)
+        before = sql(f"SELECT COUNT(*) FROM {t} WHERE org_id=?", (ALPHA,))[0][0]
+        out, e = as_app([f"UPDATE {t} SET org_id={ALPHA} WHERE org_id={BETA};"], role="user", orgs=str(BETA), uid=CAROL)
+        check(e is None and sql(f"SELECT COUNT(*) FROM {t} WHERE org_id=?", (ALPHA,))[0][0] == before,
+              f"{t}: a row cannot be written into a foreign organisation (its parent's stays) ({(e or '')[:80]})")
+    else:
+        out, e = as_app([f"UPDATE {t} SET org_id={ALPHA} WHERE org_id={BETA};"], role="user", orgs=str(BETA), uid=CAROL)
+        check(e is not None and "row-level security" in e, f"{t}: moving a row into a foreign organisation is refused ({(e or '')[:80]})")
     out, e = as_app([f"WITH u AS (UPDATE {t} SET org_id=org_id WHERE org_id={ALPHA} RETURNING 1) SELECT COUNT(*) FROM u;"],
                     role="user", orgs=str(BETA), uid=CAROL)
     check(e is None and out and out[-1] == "0", f"{t}: updating a foreign organisation's rows touches nothing ({e or out})")
