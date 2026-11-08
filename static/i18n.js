@@ -45,6 +45,25 @@ function i18nStatic() { document.documentElement.lang = I18N.code; const sk = do
 // draws again); i18nWarm fetches every part after each language load on its own; without a service worker the copy in
 // localStorage keeps the parts fetched so far too (a module opened once stays translated offline).
 const I18N_VER = () => (typeof document !== 'undefined' && (document.querySelector?.('meta[name="kalmido-i18n"]')?.content || document.querySelector?.('meta[name="kalmido-version"]')?.content)) || '';
+// 2.660.0 (#4197): the version of one part of a language (index.html meta kalmido-i18nv, kalmido/core/i18nparts.py i18np_table:
+// "core,<module>,…;<code>=<12 hex digits per part, in that order>;…"): a new text changes only the address of its own part, every
+// other part stays in the caches; without one (an older server, the split off) the version of all split texts
+let I18N_PV = null;
+function i18nV(code, part) {
+  if (!I18N_PV) {
+    I18N_PV = {};
+    const [names, ...rows] = ((typeof document !== 'undefined' && document.querySelector?.('meta[name="kalmido-i18nv"]')?.content) || '').split(';');
+    const ns = (names || '').split(',');
+    for (const r of rows) {
+      const [c, hx] = r.split('=');
+      if (c && /^[0-9a-f]+$/.test(hx || '') && hx.length === ns.length * 12) { const o = I18N_PV[c] = {}; ns.forEach((n, i) => { o[n === 'core' ? n : 'mod-' + n] = hx.slice(i * 12, i * 12 + 12); }); }
+    }
+  }
+  return I18N_PV[code]?.[part] || I18N_VER();
+}
+// 2.660.0 (#4197): data saver / a slow mobile connection: nothing is fetched in the background (i18nWarm, lazyload.js ld_idle)
+const netLite = () => typeof navigator !== 'undefined' && !!(navigator.connection?.saveData || /2g/.test(navigator.connection?.effectiveType || ''));
+const I18N_CACHE_VKEY = 'tasks.i18n.v';  // 2.660.0 (#4197): "<code>@<version>" of the copy in localStorage (written only when it changes)
 const I18N_MODS = new Set();  // the modules loaded so far (their part belongs to every language loaded later)
 const I18N_MISS = new Set();  // parts of the active language that failed
 let I18N_RT = null, I18N_RTN = 0;
@@ -76,9 +95,10 @@ async function i18nPartsInto(t, names) {
   let whole = null;
   await Promise.all(names.filter(m => want.has(m) && !t.parts.has(m) && !t.whole).map(async m => {
     try {
-      const {dict, old} = await i18nFetch(t.code, 'mod-' + m, ver);
-      Object.assign(t.dict, dict); t.parts.add(m);
-      if (old && ver) t.stale = true;
+      const pv = i18nV(t.code, 'mod-' + m);  // 2.660.0 (#4197): the version of this part
+      const {dict, old} = await i18nFetch(t.code, 'mod-' + m, pv);
+      Object.assign(t.dict, dict); t.parts.add(m); (t.pv = t.pv || {})[m] = pv;
+      if (old && pv) t.stale = true;
     } catch (e) {
       if (e.status !== 404) { miss.push(m); return; }
       try { const f = await (whole = whole || i18nFetch(t.code, '', ver)); Object.assign(t.dict, f.dict); t.whole = true; } catch (e2) { if (e2.status === 404) t.parts.add(m); else miss.push(m); }
@@ -90,8 +110,11 @@ async function i18nPartsInto(t, names) {
 // 2.191.0 F2: without a service worker the copy in localStorage holds the parts fetched so far (with the core of this version)
 const i18nSw = () => !!navigator.serviceWorker && typeof caches !== 'undefined';
 function i18nMirror(t) {
-  if (i18nSw() || !t.ver || t.stale || t.ver !== I18N_VER() || !(t.parts?.size || t.whole)) return;
-  try { localStorage.setItem(I18N_CACHE_KEY, JSON.stringify({code: t.code, dict: t.dict, ver: t.ver, parts: [...(t.parts || [])], whole: !!t.whole})); } catch { /* full, private mode */ }
+  if (i18nSw() || !t.ver || t.stale || t.ver !== i18nV(t.code, 'core') || !(t.parts?.size || t.whole)) return;
+  try {  // 2.660.0 (#4197): + pv = the version of each part kept (a changed part is fetched again, the others stay)
+    localStorage.setItem(I18N_CACHE_KEY, JSON.stringify({code: t.code, dict: t.dict, ver: t.ver, parts: [...(t.parts || [])], pv: t.pv || {}, whole: !!t.whole}));
+    localStorage.setItem(I18N_CACHE_VKEY, t.code + '@' + t.ver);
+  } catch { /* full, private mode */ }
 }
 async function i18nParts(names) {
   const t = I18N, miss = await i18nPartsInto(t, names);
@@ -144,6 +167,7 @@ function i18nWarmSoon(ms = 8000) { clearTimeout(I18N_WT); I18N_WT = setTimeout((
 async function i18nWarm() {
   const t = I18N, ver = I18N_VER(), sw = navigator.serviceWorker, done = t.code + '@' + ver;
   if (t.code === 'en' || t.whole || t.warming || I18N_WARMED.has(done) || !Array.isArray(t.dict._mods) || !i18nSw()) return;
+  if (netLite()) return;  // 2.660.0 (#4197): not with the data saver / a slow mobile connection (the parts come with their modules)
   t.warming = true;
   try {
     await sw.ready;
@@ -152,7 +176,7 @@ async function i18nWarm() {
     for (const m of t.dict._mods) {
       while (document.hidden) await new Promise(res => document.addEventListener('visibilitychange', res, {once: true}));
       if (I18N !== t) return;
-      const u = i18nUrl(t.code, 'mod-' + m, ver);
+      const u = i18nUrl(t.code, 'mod-' + m, i18nV(t.code, 'mod-' + m));  // 2.660.0 (#4197): an unchanged part is in the cache already
       if (!(await caches.match(u))) {
         let r = null;
         try { r = await fetch(u); } catch { /* offline */ }
@@ -169,23 +193,27 @@ function i18nLoad(code, again) {
   if (code === 'en') { I18N = {code: 'en', dict: {}}; I18N_MISS.clear(); i18nStatic(); return Promise.resolve(true); }
   if (!/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$/.test(code)) return Promise.resolve(false);
   return I18N_PENDING[code] || (I18N_PENDING[code] = (async () => {
-    const ver = I18N_VER();
+    const ver = i18nV(code, 'core');  // 2.660.0 (#4197): the version of the core of this language
     let next;
     try {
       let f;
       try { f = await i18nFetch(code, 'core', ver); } catch (e) {
         if (e.status !== 404) throw e;
-        f = await i18nFetch(code, '', ver);  // a server without the split (a proxy serving /static/ itself): the whole file
+        f = await i18nFetch(code, '', I18N_VER());  // a server without the split (a proxy serving /static/ itself): the whole file
       }
       const {dict, old} = f;
       if (!dict._meta) throw new Error('no language file');
       const c0 = old ? i18nCached(code) : null;
-      const c1 = old ? null : i18nCached(code);  // 2.191.0 F2: the copy of this version keeps the parts it holds (no service worker)
+      // 2.191.0 F2: the copy of this version keeps the parts it holds (no service worker); 2.660.0 (#4197): with a service worker it
+      // never holds parts (i18nMirror), so it is not read at all
+      const c1 = old || i18nSw() ? null : i18nCached(code);
+      if (c1) c1.parts = new Set([...c1.parts].filter(m => c1.pv?.[m] === i18nV(code, 'mod-' + m)));  // 2.660.0 (#4197): a changed part comes again
       if (c0 && c0.ver === ver) next = c0;
       else if (c1 && ver && c1.ver === ver && (c1.parts.size || c1.whole)) next = c1;
       else {
         next = {code, dict, ver: old ? '' : ver, ...(old && ver ? {stale: true} : {})};
-        if (!old) try { localStorage.setItem(I18N_CACHE_KEY, JSON.stringify(next)); } catch { /* private mode */ }
+        // 2.660.0 (#4197): the copy is written only when its language or version changed (not the whole core on every start)
+        if (!old && (!ver || i18nKept() !== code + '@' + ver)) try { localStorage.setItem(I18N_CACHE_KEY, JSON.stringify(next)); localStorage.setItem(I18N_CACHE_VKEY, code + '@' + ver); } catch { /* private mode */ }
       }
     } catch {
       const c = i18nCached(code);
@@ -201,6 +229,7 @@ function i18nLoad(code, again) {
     } finally { delete I18N_PENDING[code]; }
   })());
 }
+function i18nKept() { try { return localStorage.getItem(I18N_CACHE_VKEY) || ''; } catch { return ''; } }
 function i18nCached(code) {
   try { const c = JSON.parse(localStorage.getItem(I18N_CACHE_KEY)); if (c && c.code === code && c.dict) { delete c.stale; c.parts = new Set(Array.isArray(c.parts) ? c.parts : []); return c; } } catch { /* none */ }
   return null;

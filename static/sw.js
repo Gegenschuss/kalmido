@@ -92,9 +92,13 @@ async function swManifest() {
     const r = await fetch('/sw-manifest.json', {cache: 'no-store', credentials: 'same-origin'});
     if (!r.ok || r.redirected || !/json/.test(r.headers.get('content-type') || '')) return null;
     const m = await r.json();
-    return m && m.v === 1 && m.files && typeof m.files === 'object' ? m.files : null;
+    if (!(m && m.v === 1 && m.files && typeof m.files === 'object')) return null;
+    SW_I18N = new Set(Array.isArray(m.i18n) ? m.i18n.filter(h => SW_HASH.test(h)) : []);  // 2.660.0 (#4197)
+    return m.files;
   } catch { return null; }
 }
+// 2.660.0 (#4197): the current version of every language part (sw-manifest.json "i18n"), for swKeepI18n
+let SW_I18N = new Set();
 // one precached file: an unchanged copy from an old cache, else from the network (non-2xx = an error, like addAll)
 async function swPrecache(c, url, files) {
   const h = files[url];
@@ -111,7 +115,7 @@ async function swInstall() {
   if (!files) return c.addAll(SHELL).then(() => c.addAll(LAZY.concat(LAZY_CSS)).catch(() => 0)).then(() => swDone(c));
   await Promise.all(SHELL.map(u => swPrecache(c, u, files)));  // a failure drops this install (the old worker and cache stay)
   await Promise.all(LAZY.concat(LAZY_CSS).map(u => swPrecache(c, u, files).catch(() => 0)));
-  await swKeepI18n(c, files['/static/i18n/de.core.json']).catch(() => 0);
+  await swKeepI18n(c, new Set([...SW_I18N, files['/static/i18n/de.core.json']])).catch(() => 0);
   await swDone(c);
 }
 // 2.209.0 E (#1627): a marker written last by a finished install; a fallback never reads a half-filled cache (swAnyCache)
@@ -119,14 +123,17 @@ const SW_DONE = '/sw-install-done';
 async function swDone(c) { try { await c.put(SW_DONE, new Response('1')); } catch { /* no marker = no fallback to this cache */ } }
 // 2.191.0 F2 (#2518): the texts of the modules (<code>.mod-<name>.json, fetched by i18n.js i18nWarm) move from an old cache
 // while their version (?v=) is still the current one, so an update keeps every module translated offline
-async function swKeepI18n(c, ver) {
-  if (!SW_HASH.test(ver || '')) return;
+// 2.660.0 (#4197): vers = the current versions (each part has its own, i18n.js i18nV): every unchanged part and core moves over,
+// so a new text loads only its own part again
+async function swKeepI18n(c, vers) {
+  vers = new Set([...vers].filter(v => SW_HASH.test(v || '')));
+  if (!vers.size) return;
   for (const k of await caches.keys()) {
     if (k === CACHE) continue;
     const old = await caches.open(k);
     for (const req of await old.keys()) {
       const u = new URL(req.url);
-      if (/^\/static\/i18n\/[\w-]+\.mod-[\w-]+\.json$/.test(u.pathname) && u.searchParams.get('v') === ver && !(await c.match(req))) {
+      if (/^\/static\/i18n\/[\w-]+\.(core|mod-[\w-]+)\.json$/.test(u.pathname) && vers.has(u.searchParams.get('v')) && !(await c.match(req))) {
         const r = await old.match(req);
         if (r) await c.put(req, r);
       }
@@ -237,6 +244,12 @@ self.addEventListener('fetch', e => {
 });
 
 async function swI18n(req) {
+  // 2.660.0 (#4197): a part asked for with its version (12 hex digits) that the server confirmed (immutable) never changes: the
+  // kept copy answers without the network (i18n.js i18nV)
+  if (SW_HASH.test(new URL(req.url).searchParams.get('v') || '')) {
+    const hit = await caches.match(req);
+    if (hit && /immutable/.test(hit.headers?.get?.('cache-control') || '')) return hit;
+  }
   try {
     const r = await fetch(req);
     if (r.ok && !r.redirected && r.type === 'basic' && /json/.test(r.headers.get('content-type') || '')) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {}); }  // 2.138.0 A (#2257): a refused put is no uncaught error

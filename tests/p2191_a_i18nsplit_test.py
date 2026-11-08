@@ -148,7 +148,9 @@ for u in ("/static/i18n/xx.core.json", "/static/i18n/en.core.json", "/static/i18
 r = anon.get(B + "/static/i18n/de.json")
 check(r.ok and len(r.json()) == len(json.load(open(os.path.join(I18N, "de.json"), encoding="utf-8"))), "the whole file stays (older clients, the server)")
 man = anon.get(B + "/sw-manifest.json").json().get("files", {})
-check(man.get("/static/i18n/de.core.json") == V, f"sw-manifest: the precached core texts with the version {man.get('/static/i18n/de.core.json')!r}")
+# 2.660.0 (#4197): with the version of the German core itself (meta kalmido-i18nv, "core,…;de=<12 hex per part>"), was: V of all
+pv = re.search(r'<meta name="kalmido-i18nv" content="core,[^";]*;(?:[^"]*;)?de=([0-9a-f]{12})', html)
+check(pv and man.get("/static/i18n/de.core.json") == pv.group(1), f"sw-manifest: the precached core texts with their version {man.get('/static/i18n/de.core.json')!r}")
 check("/static/i18n/de.json" not in man, "sw-manifest: the whole file is no longer precached")
 
 print(f"\np2191_a_i18nsplit: {OKS[0]} ok, {len(FAILS)} failed")

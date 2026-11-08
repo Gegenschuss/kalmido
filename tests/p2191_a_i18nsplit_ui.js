@@ -19,6 +19,8 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
 const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 // a plain text of a part: no placeholder, no markup, translated differently, long enough not to occur by chance
 const plain = part => Object.entries(part).filter(([k, v]) => typeof v === 'string' && v !== k && k.length > 14 && !/[{<|]/.test(k) && !/[{<]/.test(v));
+// 2.660.0 (#4197): the version of one language part from the page (meta kalmido-i18nv: "core,<module>,…;<code>=<12 hex per part>")
+const pvOf = (html, code, part) => { const [n, ...rows] = ((html.match(/name="kalmido-i18nv" content="([^"]*)"/) || [])[1] || '').split(';'); const ns = (n || '').split(','), i = ns.indexOf(part), hx = (rows.find(r => r.startsWith(code + '=')) || '').slice(code.length + 1); return i >= 0 ? hx.slice(i * 12, i * 12 + 12) : ''; };
 const rec = seen => x => { const f0 = x.fetch; x.fetch = (u, o) => { seen.push(String(u)); return f0(u, o); }; };
 
 (async () => {
@@ -32,6 +34,8 @@ const rec = seen => x => { const f0 = x.fetch; x.fetch = (u, o) => { seen.push(S
   const html = await (await fetch(B, {headers: {Cookie: CK}})).text();
   const V = (html.match(/name="kalmido-i18n" content="([0-9a-f]{12})"/) || [])[1] || '';
   check(V, 'the page names the version of the split texts ' + V);
+  const PV = (code, m) => pvOf(html, code, m);  // 2.660.0 (#4197)
+  check(/^[0-9a-f]{12}$/.test(PV('de', 'core')) && /^[0-9a-f]{12}$/.test(PV('fr', 'settings')), 'the page names the version of each part ' + PV('de', 'core'));
   const part = async (code, m) => (await fetch(B + `static/i18n/${code}.mod-${m}.json?v=${V}`)).json();
   const setDe = await part('de', 'settings'), setFr = await part('fr', 'settings'), offDe = await part('de', 'office');
   const [sk, sv] = plain(setDe)[0] || [];
@@ -42,17 +46,18 @@ const rec = seen => x => { const f0 = x.fetch; x.fetch = (u, o) => { seen.push(S
   let seen = [];
   let w = await boot({user: 'alice', lazy: true, ls: {'tasks.lang': '"de"'}, setup: rec(seen)}), d = w.document;
   const i18n = seen.filter(u => /\/static\/i18n\//.test(u));
-  check(i18n.some(u => u.includes(`/static/i18n/de.core.json?v=${V}`)), 'the start fetches the core texts with the version ' + i18n.slice(0, 3).join(' '));
+  // 2.660.0 (#4197): each part with its own version (was: the version of all split texts)
+  check(i18n.some(u => u.includes(`/static/i18n/de.core.json?v=${PV('de', 'core')}`)), 'the start fetches the core texts with its version ' + i18n.slice(0, 3).join(' '));
   check(!i18n.some(u => /\/static\/i18n\/de\.json/.test(u)), 'the start never fetches the whole language file');
   check(w.eval('I18N.code') === 'de' && w.eval('tr("Basket")') === 'Eingang' && /Eingang/.test(d.querySelector('#side')?.textContent || ''), 'the start shows German texts');
   const ls = JSON.parse(w.__store['tasks.i18n'] || '{}');
-  check(ls.code === 'de' && ls.ver === V && ls.dict && !(sk in ls.dict) && Array.isArray(ls.dict._mods), 'the copy in localStorage holds the core only, with the version');
+  check(ls.code === 'de' && ls.ver === PV('de', 'core') && ls.dict && !(sk in ls.dict) && Array.isArray(ls.dict._mods), 'the copy in localStorage holds the core only, with the version');
   check(w.eval(`tr(${JSON.stringify(sk)})`) === sk, 'a text of the settings is not loaded before the settings');
   // the settings dialog loads its part with the module
   w.eval('settingsModal()');
   await until(() => d.querySelector('.modal') && w.eval(`tr(${JSON.stringify(sk)})`) === sv, 60);
   check(w.eval(`tr(${JSON.stringify(sk)})`) === sv, `the settings' texts in German (${sv})`);
-  check(seen.some(u => u.includes(`/static/i18n/de.mod-settings.json?v=${V}`)), 'the settings part is fetched with the version');
+  check(seen.some(u => u.includes(`/static/i18n/de.mod-settings.json?v=${PV('de', 'settings')}`)), 'the settings part is fetched with its version');  // 2.660.0 (#4197)
   await sleep(400);
   const txt = () => d.querySelector('.modal')?.textContent || '';
   const de = plain(setDe), shownDe = de.filter(([, v]) => txt().includes(v)), leftEn = de.filter(([k, v]) => txt().includes(k) && !txt().includes(v));
@@ -66,7 +71,7 @@ const rec = seen => x => { const f0 = x.fetch; x.fetch = (u, o) => { seen.push(S
   const n0 = seen.length;
   check(await w.eval(`i18nLoad('fr')`), 'French loaded');
   const frSeen = seen.slice(n0);
-  check(['fr.core.json', 'fr.mod-settings.json', 'fr.mod-office.json'].every(f => frSeen.some(u => u.includes('/static/i18n/' + f + '?v=' + V))), 'the switch fetches the core and the parts of the loaded modules ' + frSeen.filter(u => /i18n/.test(u)).length);
+  check([['core', 'fr.core.json'], ['settings', 'fr.mod-settings.json'], ['office', 'fr.mod-office.json']].every(([m, f]) => frSeen.some(u => u.includes('/static/i18n/' + f + '?v=' + PV('fr', m)))), 'the switch fetches the core and the parts of the loaded modules ' + frSeen.filter(u => /i18n/.test(u)).length);
   check(w.eval(`tr(${JSON.stringify(sk)})`) === setFr[sk] && w.eval('tr("Basket")') !== 'Eingang', `the settings' texts in French (${setFr[sk]})`);
   d.querySelector('.modal')?.remove(); w.eval('settingsModal()'); await sleep(800);
   const shownFr = plain(setFr).filter(([, v]) => txt().includes(v)), leftDe = shownDe.filter(([k, v]) => setFr[k] !== v && v.length > 10 && txt().includes(v));

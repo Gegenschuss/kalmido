@@ -150,7 +150,8 @@ check("/" not in files and "/manifest.json" not in files, "#2506: the dynamic pa
 check(all(re.fullmatch(r"[0-9a-f]{12}", h) for h in files.values()), "#2506: 12 hex digits each")
 # 2.191.0 (#2518): the start's German texts are the core (de.core.json, split by the server): named with the version of the
 # split texts (index.html meta kalmido-i18n), not the hash of a file; the whole de.json is no longer precached
-i18nv = re.search(r'<meta name="kalmido-i18n" content="([0-9a-f]{12})">', html)
+# 2.660.0 (#4197): the version of the German core itself (meta kalmido-i18nv "core,…;de=<12 hex per part>"), was: of all split texts
+i18nv = re.search(r'<meta name="kalmido-i18nv" content="core,[^";]*;(?:[^"]*;)?de=([0-9a-f]{12})', html)
 check(i18nv and files.get("/static/i18n/de.core.json") == i18nv.group(1) and "/static/i18n/de.json" not in files,
       f"#2518: the core texts in the manifest with the version of the split texts {files.get('/static/i18n/de.core.json')!r}")
 for u in ("/static/js/core.js", "/static/icon-192.png", "/static/css/office.css", "/static/js/office.js"):

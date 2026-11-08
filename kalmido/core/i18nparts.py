@@ -80,12 +80,12 @@ def _i18np_build(sig):
                     h.update(os.path.basename(p).encode() + b"\0" + f.read())
     except Exception as e:  # noqa: BLE001
         return _i18np_off(sig, repr(e))
-    return {"sig": sig, "mod_of": mod_of, "mods": set(mods), "uses": uses, "ver": h.hexdigest()[:12], "langs": {}}
+    return {"sig": sig, "mod_of": mod_of, "mods": set(mods), "uses": uses, "ver": h.hexdigest()[:12], "langs": {}, "vers": {}}
 
 
 def _i18np_off(sig, why):
     print("i18n parts: the split is off, the client loads the whole language files:", why, flush=True)
-    return {"sig": sig, "mod_of": {}, "mods": set(), "uses": {}, "ver": "", "langs": {}}
+    return {"sig": sig, "mod_of": {}, "mods": set(), "uses": {}, "ver": "", "langs": {}, "vers": {}}
 
 
 def i18np_ver():
@@ -99,9 +99,73 @@ def i18np_ver():
 
 
 def i18np_url_ver(url):
-    """sw-manifest.json: the version of a split language file (/static/i18n/<code>.core.json, .mod-<name>.json); None: none."""
+    """sw-manifest.json: the version of a split language file (/static/i18n/<code>.core.json, .mod-<name>.json); None: none.
+    2.660.0 (#4197): the version of that one part (i18np_vers), the version of all split texts while it has none."""
     m = re.fullmatch(r"/static/i18n/([\w-]+)\.(core|mod-\w+)\.json", url)
-    return (i18np_ver() or None) if m else None
+    if not m:
+        return None
+    try:
+        return i18np_vers(m.group(1)).get(m.group(2)) or i18np_ver() or None
+    except Exception as e:  # noqa: BLE001 - never a failing manifest
+        print("i18n parts:", e, flush=True)
+        return i18np_ver() or None
+
+
+def i18np_langs():
+    """2.660.0 (#4197): the codes of the language files (static/i18n/<code>.json)."""
+    return sorted(f[:-5] for f in os.listdir(I18N_DIR) if f.endswith(".json") and _I18NP_CODE.fullmatch(f[:-5]))
+
+
+def i18np_vers(code, st=None):
+    """2.660.0 (#4197): {"core": hash, "mod-<name>": hash} of one language: the first 12 hex digits of the SHA-256 of each part
+    as it goes out, so a new text changes only the version of its own part; {} = the split is off / no such language. Only the
+    hashes are kept (not the parts: a language nobody reads costs no memory)."""
+    st = st or i18np_state()
+    if not st["ver"]:
+        return {}
+    hit = st["vers"].get(code)
+    if hit is not None:
+        return hit
+    path = os.path.join(I18N_DIR, code + ".json")
+    if not _I18NP_CODE.fullmatch(code) or not os.path.isfile(path):
+        return {}
+    with open(path, encoding="utf-8") as f:
+        d = json.load(f)
+    core, parts = split_lang(d, st["mod_of"])
+    h = lambda o: hashlib.sha256(json.dumps(o, ensure_ascii=False, separators=(",", ":")).encode()).hexdigest()[:12]  # noqa: E731 (the bytes of _i18np_lang)
+    out = {"core": h(core)} | {"mod-" + m: h(parts.get(m, {})) for m in st["mods"]}
+    with _I18NP_LOCK:
+        st["vers"][code] = out
+    return out
+
+
+def i18np_table():
+    """2.660.0 (#4197): the app page's meta kalmido-i18nv: "core,<module>,…;<code>=<12 hex digits per part, in that order>;…" for
+    every language file (i18n.js i18nV); '' = the split is off (the client takes the version of all split texts)."""
+    try:
+        st = i18np_state()
+        if not st["ver"]:
+            return ""
+        names = ["core"] + sorted(st["mods"])
+        rows = []
+        for code in i18np_langs():
+            v = i18np_vers(code, st)
+            if v:
+                rows.append(code + "=" + "".join(v.get(n if n == "core" else "mod-" + n, "0" * 12) for n in names))
+        return ";".join([",".join(names)] + rows)
+    except Exception as e:  # noqa: BLE001 - never a failing page
+        print("i18n parts:", e, flush=True)
+        return ""
+
+
+def i18np_all_vers():
+    """2.660.0 (#4197): sw-manifest.json "i18n": the current version of every part of every language (sorted, no duplicates)."""
+    try:
+        st = i18np_state()
+        return sorted({h for code in i18np_langs() for h in i18np_vers(code, st).values()}) if st["ver"] else []
+    except Exception as e:  # noqa: BLE001
+        print("i18n parts:", e, flush=True)
+        return []
 
 
 def _i18np_lang(st, code):
@@ -141,7 +205,9 @@ def _i18np_send(code, part):
     if lang is None or part not in lang:
         abort(404)
     v = request.args.get("v")
-    if v and v != st["ver"] and part.startswith("mod-"):
+    # 2.660.0 (#4197): current = the version of all split texts or the version of this one part (i18np_vers)
+    cur = bool(v) and (v == st["ver"] or v == i18np_vers(code, st).get(part))
+    if v and not cur and part.startswith("mod-"):
         part = "old-" + part[4:]
     plain, gz, etag = lang[part]
     zipped = request.accept_encodings["gzip"] > 0 and len(plain) >= 1024
@@ -153,7 +219,7 @@ def _i18np_send(code, part):
             r.headers["Content-Encoding"] = "gzip"
     r.headers["ETag"] = etag
     r.vary.add("Accept-Encoding")
-    r.headers["Cache-Control"] = "public, max-age=31536000, immutable" if v == st["ver"] else "no-cache"
+    r.headers["Cache-Control"] = "public, max-age=31536000, immutable" if cur else "no-cache"
     return r
 
 
@@ -169,6 +235,7 @@ def i18np_mod(code, name):
 
 def i18np_warm():
     i18np_ver()
+    i18np_table()  # 2.660.0 (#4197): the versions of the parts of every language, before the first page asks
     st_warm()  # 2.191.0 (#1824): the stripped start files too, in the same thread
 
 

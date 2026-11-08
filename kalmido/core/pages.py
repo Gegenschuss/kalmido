@@ -75,7 +75,7 @@ def headers(resp):
 _SHASH, _SHASH_LOCK = {}, threading.Lock()
 ST_PACK_DIR = os.path.join(app.root_path, "static_packed")  # 2.442.0 (#2808): tools/pack_static.py, in the Docker image
 _ASSET_RE = re.compile(r'(<(?:script|link)\b[^>]*?\b(?:src|href)="/static/)([\w./-]+\.(?:js|css))"')
-_SW_LISTS_RE = re.compile(r"const (?:SHELL|LAZY|LAZY_CSS) = \[(.*?)\];", re.S)
+_SW_LIST_RE = re.compile(r"const (SHELL|LAZY|LAZY_CSS) = \[(.*?)\];", re.S)  # 2.660.0 (#4197): with the name of the list
 
 
 def static_hash(rel):
@@ -213,12 +213,15 @@ def index_page():
     path = os.path.join(app.static_folder, "index.html")
     mt = os.path.getmtime(path)
     if _INDEX.get("mt") != mt or time.monotonic() - _INDEX.get("at", 0) > 5:  # 2.149.0 B (#2505): the hashes follow changed files
-        from ..core.i18nparts import i18np_ver  # 2.191.0 A (#1410 #2518): the version of the split texts (i18n.js ?v=)
+        from ..core.i18nparts import i18np_ver, i18np_table  # 2.191.0 A (#1410 #2518): the version of the split texts (i18n.js ?v=)
         with open(path, encoding="utf-8") as f:
+            # 2.660.0 (#4197): + the content hashes of the modules loaded on demand (lazyload.js ld_url / loadCss) and the version of
+            # each language part (i18n.js i18nV): an update loads only what changed
             _INDEX.update(mt=mt, at=time.monotonic(),
                           html=_versioned(f.read().replace('<meta name="kalmido-version" content="">',
                                                            f'<meta name="kalmido-version" content="{APP_VERSION}">', 1)
-                                          .replace('<meta name="kalmido-i18n" content="">', f'<meta name="kalmido-i18n" content="{i18np_ver()}">', 1)))
+                                          .replace('<meta name="kalmido-i18n" content="">', f'<meta name="kalmido-i18n" content="{i18np_ver()}">'
+                                                   + ld_hash_metas() + f'\n<meta name="kalmido-i18nv" content="{i18np_table()}">', 1)))
     r = Response(_INDEX["html"], mimetype="text/html")
     r.headers["Cache-Control"] = "no-cache"
     return r
@@ -541,24 +544,45 @@ def sw():
 _SWM = {}
 
 
+def sw_urls():
+    """The static files of the lists SHELL / LAZY / LAZY_CSS in static/sw.js ({list: [urls]}), read again when sw.js changes."""
+    path = os.path.join(app.static_folder, "sw.js")
+    mt = os.path.getmtime(path)
+    if _SWM.get("mt") != mt or time.monotonic() - _SWM.get("at", 0) > 5:
+        with open(path, encoding="utf-8") as f:
+            lists = {m.group(1): re.findall(r"'(/static/[\w./-]+)'", m.group(2)) for m in _SW_LIST_RE.finditer(f.read())}
+        _SWM.update(mt=mt, at=time.monotonic(), lists=lists, urls=list(dict.fromkeys(u for v in lists.values() for u in v)))
+    return _SWM
+
+
+def ld_hash_metas():
+    """2.660.0 (#4197): two meta tags of the app page with the content hash of every module file loaded on demand (LAZY /
+    LAZY_CSS of sw.js = LD_MODS / LD_CSS of lazyload.js): "<name>=<hash> …". lazyload.js asks for them with ?v=<hash>, the
+    form the service worker knows (its precache answers without the network, a new version loads only changed files)."""
+    out = ""
+    for meta, lst, rx in (("kalmido-ldjs", "LAZY", r"/static/js/([\w-]+)\.js"), ("kalmido-ldcss", "LAZY_CSS", r"/static/css/([\w-]+)\.css")):
+        pairs = []
+        for u in sw_urls()["lists"].get(lst, []):
+            m, h = re.fullmatch(rx, u), static_hash(u[8:])
+            if m and h:
+                pairs.append(f"{m.group(1)}={h}")
+        out += f'\n<meta name="{meta}" content="{" ".join(pairs)}">'
+    return out
+
+
 @app.get("/sw-manifest.json")
 def sw_manifest():
     """2.149.0 B (#2506): what the service worker precaches (the lists SHELL / LAZY / LAZY_CSS in static/sw.js stay the one
     source), each static file with its content hash. The worker keeps a file under "<url>?v=<hash>" and takes an unchanged
     one over from its old cache on an update instead of loading it again. Computed here, so it can never be out of date."""
-    path = os.path.join(app.static_folder, "sw.js")
-    mt = os.path.getmtime(path)
-    if _SWM.get("mt") != mt or time.monotonic() - _SWM.get("at", 0) > 5:
-        with open(path, encoding="utf-8") as f:
-            urls = [u for blk in _SW_LISTS_RE.findall(f.read()) for u in re.findall(r"'(/static/[\w./-]+)'", blk)]
-        _SWM.update(mt=mt, at=time.monotonic(), urls=list(dict.fromkeys(urls)))
     files = {}
-    from ..core.i18nparts import i18np_url_ver  # 2.191.0 A (#1410 #2518)
-    for u in _SWM["urls"]:
+    from ..core.i18nparts import i18np_url_ver, i18np_all_vers  # 2.191.0 A (#1410 #2518)
+    for u in sw_urls()["urls"]:
         h = static_hash(u[8:]) or i18np_url_ver(u)
         if h:
             files[u] = h
-    r = jsonify(v=1, files=files)
+    # 2.660.0 (#4197): i18n = the current version of every language part: an update keeps the parts of an old cache that did not change
+    r = jsonify(v=1, files=files, i18n=i18np_all_vers())
     r.headers["Cache-Control"] = "no-cache"
     return r
 

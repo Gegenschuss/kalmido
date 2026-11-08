@@ -7,8 +7,8 @@
 // - a part that hangs: the module opens after about 3 seconds anyway (English), its texts follow and the app draws again
 // - a part that answers 404 (the split turned off on the server): the whole file once, German, no retry every minute
 // - warming with a service worker: starts on its own after the language load (not the idle chain), waits until the worker
-//   controls the page (a first visit), pauses while the tab is hidden, runs with the data saver, fetches every part; after a
-//   language switch the parts of the new language
+//   controls the page (a first visit), pauses while the tab is hidden, fetches every part (each with its own version); after a
+//   language switch the parts of the new language; 2.660.0 (#4197): never with the data saver / on 2G (was: also with it)
 // - a person without an organisation gets the same
 // KMT_NOSTART=1 = the container is running.
 const path = require('path');
@@ -21,6 +21,8 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 const call = async (ck, method, url, body) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, ...(ck ? {Cookie: ck} : {})}, body: body ? JSON.stringify(body) : undefined}); return {...(await r.json().catch(() => ({}))), status: r.status}; };
 const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 15000, step: 150});  // 2.358.0 (#3286): the shared wait of tests/boot.js (default at least 15 s); an explicit n/ms keeps its window
 const plain = part => Object.entries(part).filter(([k, v]) => typeof v === 'string' && v !== k && k.length > 14 && !/[{<|]/.test(k) && !/[{<]/.test(v));
+// 2.660.0 (#4197): the version of one language part from the page (meta kalmido-i18nv: "core,<module>,…;<code>=<12 hex per part>")
+const pvOf = (html, code, part) => { const [n, ...rows] = ((html.match(/name="kalmido-i18nv" content="([^"]*)"/) || [])[1] || '').split(';'); const ns = (n || '').split(','), i = ns.indexOf(part), hx = (rows.find(r => r.startsWith(code + '=')) || '').slice(code.length + 1); return i >= 0 ? hx.slice(i * 12, i * 12 + 12) : ''; };
 const wrap = (seen, fn) => x => { const f0 = x.fetch; x.fetch = (u, o) => { seen.push(String(u)); return (fn && fn(String(u))) || f0(u, o); }; };
 
 (async () => {
@@ -47,7 +49,7 @@ const wrap = (seen, fn) => x => { const f0 = x.fetch; x.fetch = (u, o) => { seen
   check(!w.eval('LD_P.timeline'), 'the timeline is not loaded');
   await w.eval(`loadModule('settings')`);
   let ls = JSON.parse(w.__store['tasks.i18n'] || '{}');
-  check(ls.code === 'de' && ls.ver === V && ls.dict?.[sk] === sv && (ls.parts || []).includes('settings') && ls.dict.Collapse, 'without a service worker the copy in localStorage holds the core and the settings part');
+  check(ls.code === 'de' && ls.ver === pvOf(html, 'de', 'core') && ls.dict?.[sk] === sv && (ls.parts || []).includes('settings') && ls.dict.Collapse, 'without a service worker the copy in localStorage holds the core and the settings part');
   const store = {...w.__store};
   w.close();
   // a new page offline: the settings from the copy, German
@@ -86,15 +88,24 @@ const wrap = (seen, fn) => x => { const f0 = x.fetch; x.fetch = (u, o) => { seen
   w.close();
 
   // ================= warming with a service worker (a first visit: no controller yet), hidden tab, data saver
-  const swSetup = sn => x => {
+  // 2.660.0 (#4197): lite = the data saver on a 2G line (the warming then stays off); was: always with it, the warming ran anyway
+  const swSetup = (sn, lite) => x => {
     wrap(sn)(x);
     const sw = {register: () => Promise.resolve(), controller: null, ready: Promise.resolve({}), cl: [], addEventListener(t, f) { if (t === 'controllerchange') this.cl.push(f); }};
     Object.defineProperty(x.navigator, 'serviceWorker', {configurable: true, value: sw});
-    Object.defineProperty(x.navigator, 'connection', {configurable: true, value: {saveData: true, effectiveType: '2g'}});
+    Object.defineProperty(x.navigator, 'connection', {configurable: true, value: lite ? {saveData: true, effectiveType: '2g'} : {saveData: false, effectiveType: '4g'}});
     x.caches = {match: async () => undefined};
     x.__hidden = false;
     Object.defineProperty(x.document, 'hidden', {configurable: true, get: () => x.__hidden});
   };
+  // 2.660.0 (#4197): the data saver on 2G: the warming fetches nothing (the worker controls the page, the tab is visible)
+  seen = [];
+  w = await boot({user: 'alice', lazy: true, ls: {'tasks.lang': '"de"'}, setup: swSetup(seen, true)});
+  w.ld_idle = () => {};
+  w.navigator.serviceWorker.controller = {};
+  await w.eval('i18nWarm()');
+  check(!seen.some(u => /\/static\/i18n\/de\.mod-/.test(u)) && !w.eval(`I18N_WARMED.size`), 'data saver: no part is warmed ' + seen.filter(u => /mod-/.test(u)).slice(0, 2));
+  w.close();
   seen = [];
   w = await boot({user: 'alice', lazy: true, ls: {'tasks.lang': '"de"'}, setup: swSetup(seen)});
   w.ld_idle = () => {};  // no module loads in the background meanwhile (their parts would count here)
@@ -108,8 +119,9 @@ const wrap = (seen, fn) => x => { const f0 = x.fetch; x.fetch = (u, o) => { seen
   check(!warm().length, 'hidden tab: paused ' + warm().slice(0, 3));
   w.__hidden = false; w.document.dispatchEvent(new w.Event('visibilitychange'));
   await until(() => warm().length >= core._mods.length, 100);
-  check(new Set(warm()).size === core._mods.length && core._mods.every(m => warm().includes(m)), `visible again: every part fetched with the data saver too (${new Set(warm()).size} of ${core._mods.length})`);
-  check(seen.filter(u => /de\.mod-/.test(u)).every(u => u.includes('?v=' + V)), 'with the version');
+  check(new Set(warm()).size === core._mods.length && core._mods.every(m => warm().includes(m)), `visible again: every part fetched (${new Set(warm()).size} of ${core._mods.length})`);
+  // 2.660.0 (#4197): each part with its own version (an unchanged part keeps its address over an update); was: the version of all
+  check(seen.filter(u => /de\.mod-/.test(u)).every(u => { const m = u.match(/mod-([\w-]+)\.json/)[1], pv = pvOf(html, 'de', m); return pv && u.includes('?v=' + pv); }), 'each part with its own version');
   check(w.eval(`I18N_WARMED.has('de@${V}')`), 'done for this language and version');
   // a language switch: the parts of the new language
   await call(CK, 'PATCH', '/api/settings', {lang: 'fr'});

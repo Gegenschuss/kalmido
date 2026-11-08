@@ -463,6 +463,13 @@ About shows the window size, pixel ratio, pointer, hover and both switches of th
   (computed by the server, never out of date; the lists in `sw.js` stay the one source). The service worker keeps each
   file as `<url>?v=<hash>`, copies unchanged files from the old cache on an update and loads only the changed ones.
   `CACHE` is still bumped once per version: it is what makes the browser install the new worker.
+- *2.660.0:* the modules loaded on demand use the same hashes: the served `index.html` carries
+  `<meta name="kalmido-ldjs">` / `<meta name="kalmido-ldcss">` (`<name>=<hash> …`, `core/pages.py` `ld_hash_metas`),
+  `lazyload.js` `ld_url` / `loadCss` ask with `?v=<hash>` (the version of the code only for a file without one), so the
+  precache answers without the network and a new version loads only the changed modules. The language parts have a version
+  each: `<meta name="kalmido-i18nv">` (`core/i18nparts.py` `i18np_table`, read by `i18n.js` `i18nV`); a new text changes
+  only its own part, the manifest's `i18n` list lets the worker keep every unchanged part. The idle preload no longer
+  loads the settings, and neither it nor the language warm-up runs with the data saver or on 2G.
 - Static files, `/sw.js`, `/sw-manifest.json` and `/robots.txt` are served without a session lookup (no database access).
 - Every answer carries `Server-Timing: app;dur=…, db;dur=…;desc="n=<statements>"` (`core/reqtime.py`, counted per
   thread in `core/pg.py`). A request slower than `KALMIDO_SLOW_REQUEST_MS` (default 500, 0 = off) logs one line with

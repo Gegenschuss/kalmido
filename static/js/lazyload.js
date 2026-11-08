@@ -249,13 +249,28 @@ function ld_bar(d) {  // the thin bar at the top: only when loading takes longer
     el.getBoundingClientRect?.(); el.classList.add('on');
   }, 300);
 }
-const ld_url = f => `/static/js/${f}.js` + (APP_VER ? '?v=' + encodeURIComponent(APP_VER) : '');
+// 2.660.0 (#4197): the content hash of each module file (index.html meta kalmido-ldjs / kalmido-ldcss, written by the server,
+// core/pages.py ld_hash_metas): asked for with ?v=<hash>, the service worker answers from its precache without the network and a
+// new version loads only the files that changed; a file without a hash (an older server) keeps the version of the code
+/** @type {Record<string, Record<string, string>>} */
+const LD_HASH = {js: ld_hashes('js'), css: ld_hashes('css')};
+/** @param {string} k @returns {Record<string, string>} */
+function ld_hashes(k) {
+  /** @type {Record<string, string>} */
+  const o = {};
+  const el = /** @type {HTMLMetaElement | null} */ (document.querySelector?.(`meta[name="kalmido-ld${k}"]`));
+  for (const p of (el?.content || '').split(' ')) { const [f, h] = p.split('='); if (f && /^[0-9a-f]{12}$/.test(h || '')) o[f] = h; }
+  return o;
+}
+/** @param {string} k @param {string} f */
+const ld_q = (k, f) => { const v = LD_HASH[k][f] || APP_VER; return v ? '?v=' + encodeURIComponent(v) : ''; };
+const ld_url = f => `/static/js/${f}.js` + ld_q('js', f);
 const LD_CSSP = {};  // stylesheet -> the promise of its link (each once)
 function loadCss(f) {  // 2.65.0 (#1824): one stylesheet of static/css/; also usable alone (an area that is no module)
   if (LD_CSSP[f]) return LD_CSSP[f];
   return LD_CSSP[f] = new Promise((res, rej) => {
     const l = document.createElement('link');
-    l.rel = 'stylesheet'; l.href = `/static/css/${f}.css` + (APP_VER ? '?v=' + encodeURIComponent(APP_VER) : ''); l.dataset.ldcss = f;
+    l.rel = 'stylesheet'; l.href = `/static/css/${f}.css` + ld_q('css', f);  // 2.660.0 (#4197): its content hash l.dataset.ldcss = f;
     l.onload = () => res();
     l.onerror = () => { l.remove(); delete LD_CSSP[f]; rej(new Error('could not load ' + f + '.css')); };
     document.head.appendChild(l);
@@ -474,18 +489,18 @@ document.addEventListener('click', e => {
   e.preventDefault(); e.stopPropagation();
   dpvOpen(o);
 }, true);
-// the settings dialog is opened most often: loaded in the background once the app has started and is idle
-// 2.65.0 (#1823): then, one per idle moment, the areas this person has switched on (not all modules: no office, contacts,
+// 2.65.0 (#1823): one per idle moment, the areas this person has switched on (not all modules: no office, contacts,
 // statistics, PDF, playbooks), so their first click stays quick without slowing the start
+// 2.660.0 (#4197): no longer the settings first (with their dependencies about a third of all modules, on every start): they load
+// on their first opening like the other dialogs
 /** @type {[string, () => boolean][]} */
-const LD_IDLE = [['settings', () => true], ['calendar', () => feat('cal')], ['timeline', () => feat('timeline')], ['wiki', () => feat('wiki')],
+const LD_IDLE = [['calendar', () => feat('cal')], ['timeline', () => feat('timeline')], ['wiki', () => feat('wiki')],
   ['docs', () => feat('docs')], ['life', () => lifeOn() || feat('budget')]];  // 2.149.0 F (#2518): + the budget
 function ld_idle(i) {
   const m = LD_IDLE[i]; if (!m) return;  // 2.191.0 F2 (#2518): the texts of every module load on their own (i18n.js i18nWarm)
   (window.requestIdleCallback || (f => setTimeout(f, 0)))(() => {
     if (!S.me || document.hidden) return;
-    // data saver / a slow mobile connection: only the settings, the areas load on their first click
-    if (i && (navigator.connection?.saveData || /2g/.test(navigator.connection?.effectiveType || ''))) return;
+    if (netLite()) return;  // data saver / a slow mobile connection: nothing in the background, the areas load on their first click
     (m[1]() ? loadModule(m[0]) : Promise.resolve()).catch(() => {}).then(() => ld_idle(i + 1));
   });
 }

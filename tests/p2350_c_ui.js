@@ -50,7 +50,9 @@ const FEAT = 'cal,comments,collab,agents';
   const appVer = (await (await fetch(B)).text()).match(/name="kalmido-version" content="([^"]*)"/)?.[1] || '';
   check(/^\d+\.\d+\.\d+/.test(appVer), '#1094: the page names its version ' + appVer);
   // 2.191.0 (#2518): the core texts (de.core.json) come with the version of the split texts (meta kalmido-i18n), not the code's
-  const i18nVer = (await (await fetch(B)).text()).match(/name="kalmido-i18n" content="([^"]*)"/)?.[1] || appVer;
+  // 2.660.0 (#4197): the version of the German core itself (meta kalmido-i18nv, "core,…;de=<12 hex per part>": core is the first)
+  const page = await (await fetch(B)).text();
+  const i18nVer = ((page.match(/name="kalmido-i18nv" content="[^";]*;(?:[^"]*;)?de=([0-9a-f]{12})/) || [])[1]) || page.match(/name="kalmido-i18n" content="([^"]*)"/)?.[1] || appVer;
 
   // ================= #1094 an old language file in localStorage, the first fetch fails
   await call('PATCH', '/api/settings', {lang: 'de'});
