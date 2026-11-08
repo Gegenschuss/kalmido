@@ -203,6 +203,8 @@ def docs_scan_key_new():
     V = _v1()
     V.need_api()
     b = body()
+    if not isinstance(b, dict):  # 2.666.0 (#4074 review): a list / a string as the body is 400, not 500
+        return err(tr("Invalid data"))
     unknown = sorted(k for k in b if k not in ("ws", "name", "parent_id"))
     if unknown:
         return err(tr("Invalid value: {0}", ", ".join(unknown)))
@@ -224,6 +226,8 @@ def docs_scan_key_new():
         return err(tr("Select a folder of these documents you may add to") if pid else e.text(), 400 if pid else e.code)
     if c.execute("SELECT COUNT(*) FROM api_tokens WHERE user_id=?", (uid,)).fetchone()[0] >= V.API_TOKEN_MAX:
         return err(tr("At most {0} tokens", V.API_TOKEN_MAX), 409)
+    if not PUBLIC_URL_SET:  # 2.666.0 (#4074 5 review): the code names the server; never the Host header of this request (as docs_fetcher_new)
+        return err(tr("PUBLIC_URL is not set on this server: ask the server admin to set it to the address people open (.env) and restart."), 503)
     tok = "abk_" + secrets.token_urlsafe(32)
     kid = insert_id(c, "INSERT INTO api_tokens(user_id,name,token_hash,prefix,scopes,expires_at,created_at,allowed_ips,list_ids,upload_target) "
                        "VALUES(?,?,?,?,?,?,?,?,?,?)",
@@ -231,7 +235,7 @@ def docs_scan_key_new():
                      iso(now_utc()), "", "", json.dumps(t)))
     c.commit()
     print("scan inbox", kid, "created for user", uid, "org", oid, flush=True)
-    url = (PUBLIC_URL if PUBLIC_URL_SET else request.host_url).rstrip("/")
+    url = PUBLIC_URL.rstrip("/")
     raw = json.dumps({"url": url, "key": tok, "name": name}, ensure_ascii=False, separators=(",", ":")).encode()
     code = SK_CODE_PREFIX + base64.urlsafe_b64encode(raw).decode().rstrip("=")
     return jsonify(id=kid, name=name, target=place, code=code), 201

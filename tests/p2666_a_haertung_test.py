@@ -12,7 +12,7 @@ freelancer-matrix: office
  - 13) a point of Money switched off: somebody without the right gets 403, not the feature's 404 (no answer about the switch);
    the admin still 404 (a guest without office groups; a group person is stopped by the path gate before already)
  - 15) POST /api/office/receipt-mail with a list as the body: 400 (organisation and a person without organisation)
- - 5) without PUBLIC_URL: a new receipt fetcher is refused (503, no row, never the request's Host in a code), the hosted MCP
+ - 5) without PUBLIC_URL: a new receipt fetcher and a new scan inbox are refused (503, no row, never the request's Host in a code), the hosted MCP
    metadata answer 503 instead of naming the request's Host as issuer; the connected apps list still answers (no address)
  (2) IMAP expunge: p2240_a_mail_test.py; (3) org import undo: p2237_d_orgimport_test.py; #5112: p2658_c_audiofile_test.py)
 usage: p2666_a_haertung_test.py <datadir>      (P2666A_NOSTART=1 / KMT_NOSTART=1: the first container runs already)"""
@@ -197,6 +197,11 @@ code = r.json().get("code", "") if r.status_code == 201 else ""
 raw = code.split(":", 2)[-1] if code else ""
 url = json.loads(base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4))).get("url") if raw else ""
 check(r.status_code == 201 and url == "https://kalmido.example", f"with PUBLIC_URL: the code names it {r.status_code} {url}")
+r = Fr.post(B + "/api/docs/scan-keys", json={"ws": "private", "name": "Scanner"})  # review E: the scan inbox's code as well
+code = r.json().get("code", "") if r.status_code == 201 else ""
+raw = code.split(":", 2)[-1] if code else ""
+url = json.loads(base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4))).get("url") if raw else ""
+check(r.status_code == 201 and url == "https://kalmido.example", f"with PUBLIC_URL: the scan inbox code names it {r.status_code} {url}")
 r = A.patch(B + "/api/admin/settings", json={"mcp_remote": True, "password": PASSWORD})
 check(r.ok and r.json().get("mcp_remote") is True, f"hosted MCP switched on {r.status_code} {r.text[:120]}")
 j = requests.get(B + "/.well-known/oauth-authorization-server", headers={"Host": "evil.example"}).json()
@@ -211,6 +216,13 @@ if kt.fresh(env={**ENV, "PUBLIC_URL": ""}, keep=True):
     check(r.status_code == 503 and "code" not in r.json() and "PUBLIC_URL" in r.text,
           f"#4074 5: no PUBLIC_URL: no receipt fetcher (503, no code with the request's address) {r.status_code} {r.text[:160]}")
     check(one("SELECT COUNT(*) FROM doc_fetchers WHERE user_id=?", (FRI,)) == n, "#4074 5: and no row was made")
+    # review E: the scan inbox's setup code (docs/scankeys.py) carried the same fallback to the request's Host
+    n = one("SELECT COUNT(*) FROM api_tokens WHERE user_id=?", (FRI,))
+    r = Fr.post(B + "/api/docs/scan-keys", json={"ws": "private", "name": "Scanner"})
+    check(r.status_code == 503 and "code" not in r.json() and "PUBLIC_URL" in r.text,
+          f"#4074 5 review: no PUBLIC_URL: no scan inbox (503, no code with the request's address) {r.status_code} {r.text[:160]}")
+    check(one("SELECT COUNT(*) FROM api_tokens WHERE user_id=?", (FRI,)) == n, "#4074 5 review: and no key was made")
+    check(Fr.post(B + "/api/docs/scan-keys", json=[1]).status_code == 400, "#4074 review: a list as the body of a new scan inbox: 400")
     for p in ("/.well-known/oauth-authorization-server", "/.well-known/oauth-protected-resource"):
         r = requests.get(B + p, headers={"Host": "evil.example"})
         check(r.status_code == 503 and "evil.example" not in r.text, f"#4074 5: {p} without PUBLIC_URL: 503, no foreign issuer {r.status_code} {r.text[:160]}")

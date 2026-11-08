@@ -1832,7 +1832,8 @@ was read); `GET /api/docs/folder-watcher/{file}` (signed in) sends one of `kalmi
 `kalmido-folder-watcher-mac-amd64.zip`, `kalmido-folder-watcher-windows.exe`, `kalmido-folder-watcher-linux-amd64`,
 `kalmido-folder-watcher-linux-arm64`, `SHA256SUMS` from `KALMIDO_FOLDERWATCH_DIR` (default `/app/folderwatch`, built by the image;
 `404` when missing). The setup code is shown once: `kalmido-scan:1:` + base64url without padding of
-`{"url": "https://example.com", "key": "abk_…", "name": "Scanner"}`. A version before 2.207 does not know such a key (`401`).
+`{"url": "https://example.com", "key": "abk_…", "name": "Scanner"}`; `url` is `PUBLIC_URL` (2.666.0 #4074: `503` while it is not set, never
+the address of the request). A version before 2.207 does not know such a key (`401`).
 
 2.577.0 (#4466): named document addresses beside the general one (`/api/docs/mail`, shown as "General"): each with a name, a
 fixed target folder below the documents folder and fixed tags, on / off and renewable; the same plus address scheme, the hourly
