@@ -749,9 +749,10 @@ def v1_admin_agent_audit(aid):
     """The same for a token with scope admin-read (checked in api_authenticate): {data, next_cursor}."""
     a = v1_args(("status", "day", "cursor", "limit"))
     c = db()
-    if not agent_row(c, aid):
+    only = op_own_agents(c)  # 2.674.0 (#4382 finding 11): hosted -- like the web route, never a client's agent
+    if not agent_row(c, aid) or (only is not None and aid not in only):
         raise Denied(404)
-    rows, more = audit_query(c, a, aid)
+    rows, more = audit_query(c, a, aid, only=only)
     names = audit_names(c)
     return jsonify(data=[audit_dict(r, names) for r in rows], next_cursor=str(rows[-1]["id"]) if more and rows else None)
 
