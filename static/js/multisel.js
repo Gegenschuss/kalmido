@@ -168,6 +168,15 @@ function cm_selHead(name, pick) {
 const lm_btn = (r, sel) => r.querySelector('textarea, input') ? null : r.querySelector(sel);
 const lm_keep = (e, r) => { const a = e.target.closest?.('a[href]'); if (a && a !== r) return true; const s = getSelection?.(); return !!s && !s.isCollapsed && r.contains(s.anchorNode); };
 const lm_open = (sel, fn) => r => { const b = lm_btn(r, sel); if (!b) return false; return fn(b, r) !== false; };  // the menu sits at the row (its "…" button can be hidden)
+// 2.695.0 (#4619): a long press (phone) / a right click (computer) on a row (sel) opens what its "…" button (btn) opens: the
+// click on that button, which the click guard of the press lets through for that one click (as #4616). Every row's "…" button
+// carries data-rowmenu="<a word of sel>": tests/p2695_a_rowmenu_coverage_test.py finds a "…" without it or without a binding.
+// keep: as cm_bind (default lm_keep: a link or a selection inside the row keeps the browser's menu)
+function lm_btnMenu(sel, btn, keep = lm_keep) {
+  const st = cm_bind(sel, r => { const b = r.querySelector(btn); if (!b) return false; const d = st.done; st.done = 0; b.click(); st.done = d; return true; }, null, keep);
+  return st;
+}
+const lm_selKeep = (e, r) => { const s = getSelection?.(); return !!s && !s.isCollapsed && r.contains(s.anchorNode); };  // a row that is a link as a whole
 cm_bind('#tc-msgs .cmsg, .tthview .cmsg', lm_open('[data-act="tc-msg-menu"]', (b, r) => tcMsgMenu(r, +b.dataset.mid)), null, lm_keep);
 cm_bind('#detail .cm:not(.cedit)', lm_open('[data-act="cm-copy"]', (b, r) => cmCopyMenu(b, r)), null, lm_keep);
 cm_bind('#chat-msgs .cmsg', lm_open('[data-act="chat-msg-menu"]', (b, r) => { const m = (S.chat?.msgs || []).find(x => x.id === +b.dataset.mid); if (!m) return false; acMsgMenu(r, m); }), null, lm_keep);

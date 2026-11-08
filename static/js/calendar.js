@@ -258,7 +258,7 @@ function tlCalRows(start, end, DW) {  // calendar timeline: one row per calendar
       const inLane = placed.filter(p => p.l === l).sort((a, b) => a.s.localeCompare(b.s));
       // #1127: a tap on the name hides the calendar (toast with Undo), "…" offers "Only this one" / "Show all"
       const nm = l ? '' : inv ? `<i class="cevdot"></i><span class="tln">${esc(name)}</span>`
-        : `<button type="button" class="cvxtln" data-act="cvx-tlhide" data-key="${key}" data-name="${esc(name)}" title="${esc(tr('Hide this calendar'))}"><i class="cevdot"></i><span class="tln">${esc(name)}</span></button><button type="button" class="iconbtn cvxtlm" data-act="cvx-tlmenu" data-key="${key}" data-name="${esc(name)}" aria-haspopup="menu" aria-label="${esc(tr('More for {0}', name))}" title="${esc(tr('More'))}">${ic('dots', 's')}</button>`;
+        : `<button type="button" class="cvxtln" data-act="cvx-tlhide" data-key="${key}" data-name="${esc(name)}" title="${esc(tr('Hide this calendar'))}"><i class="cevdot"></i><span class="tln">${esc(name)}</span></button><button data-rowmenu="tl-name" type="button" class="iconbtn cvxtlm" data-act="cvx-tlmenu" data-key="${key}" data-name="${esc(name)}" aria-haspopup="menu" aria-label="${esc(tr('More for {0}', name))}" title="${esc(tr('More'))}">${ic('dots', 's')}</button>`;
       h += `<div class="tl-row tl-cal" style="--cc:${cc}"><div class="tl-name">${nm}</div><div class="tl-track">${inLane.map((p, i) => {
         // #1126: the bar is as wide as the event; its title stays inside the element and may only run on over the free
         // track up to the next bar of the same lane (cut with "…" there), never outside the row

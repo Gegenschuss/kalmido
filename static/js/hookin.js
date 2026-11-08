@@ -25,7 +25,7 @@ function whiRowsHtml(lid) {
       <div class="whi-ex"><span class="muted">${tr('Example')}</span> <code>${esc(whiCurl(u))}</code> <button type="button" class="linkbtn" data-whi-copy="curl">${ic('copy', 's')} ${tr('Copy')}</button></div></div>` : '';
     return `<div class="mrow rul-row whi-row${h.paused_reason ? ' off' : ''}" data-whi="${h.id}">${ic('zap', 's')}
       <div class="rul-txt"><b>${esc(nm)}</b><span class="muted">${esc(st)}</span>${h.paused_text ? `<span class="rul-paused">${esc(tr('Paused: {0}', h.paused_text))}</span>` : ''}</div>
-      <button type="button" class="iconbtn" data-whi-menu="${h.id}" title="${esc(nm)}: ${esc(tr('More'))}" aria-label="${esc(nm)}: ${esc(tr('More'))}">${ic('dots', 's')}</button></div>${shown}`;
+      <button data-rowmenu="whi-row" type="button" class="iconbtn" data-whi-menu="${h.id}" title="${esc(nm)}: ${esc(tr('More'))}" aria-label="${esc(nm)}: ${esc(tr('More'))}">${ic('dots', 's')}</button></div>${shown}`;
   }).join('');
   return rows + `<div class="mrow"><button type="button" class="btn sm" data-whi-add="1" ${d.hooks.length >= d.limit ? 'disabled' : ''}>${ic('plus', 's')} ${tr('Add inbound webhook')}</button></div>
     <div class="shint lhint">${tr('Each request creates one task in this project with your rights: JSON with title (required), notes, due, priority, tags and fields, or plain text.')}</div>`;

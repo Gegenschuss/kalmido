@@ -201,7 +201,7 @@ function mseGroups(arr) {
   return out;
 }
 // render.js: the "…" of an own section in its head; the button "New section" under the last one
-const mseHeadHtml = g => g.mosec && g.mosec.kind !== 'recent' ? `<button type="button" class="iconbtn gact" data-mse-menu="${g.mosec.id}" title="${esc(tr('More') + ': ' + g.name)}" aria-label="${esc(tr('More') + ': ' + g.name)}">${ic('dots', 's')}</button>` : '';
+const mseHeadHtml = g => g.mosec && g.mosec.kind !== 'recent' ? `<button data-rowmenu="mosec" type="button" class="iconbtn gact" data-mse-menu="${g.mosec.id}" title="${esc(tr('More') + ': ' + g.name)}" aria-label="${esc(tr('More') + ': ' + g.name)}">${ic('dots', 's')}</button>` : '';
 const mseAddHtml = () => mseOn() ? `<button type="button" class="linkbtn msenew" data-mse-add="1">${ic('plus', 's')}<span>${esc(tr('New section'))}</span></button>` : '';
 // a drop into an own section (moDrop: onto a row of it; dnd.js: onto its head = on top of it). Only the tasks shown in own
 // sections are sent (with their places); "Recently assigned" takes nothing.
@@ -263,3 +263,5 @@ document.addEventListener('click', e => {
   mseFoldP.set(s.id, v);
   api('PATCH', `/api/mine-sections/${s.id}`, {collapsed: v}).catch(() => {}).finally(() => { if (mseFoldP.get(s.id) === v) mseFoldP.delete(s.id); });
 }, true);
+// 2.695.0 (#4619): a long press (phone) / right click (computer) on a row opens what its "…" opens (multisel.js lm_btnMenu)
+if (typeof lm_btnMenu === 'function') lm_btnMenu('#view .ghead.mosec', '[data-mse-menu]');  // the head of an own section of My tasks

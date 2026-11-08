@@ -215,7 +215,7 @@ const wk_folderBtn = () => `<button type="button" class="btn" data-wk="newfolder
 const wk_kidsN = n => wk_dirs(n).length + wk_leaves(n).length;
 function wk_rowMore(sp, nid, when) {
   const w = when ? `<small class="muted wkwhen">${esc(fmtDay('short', new Date(when)))}</small>` : '';
-  return w + (nid && wk_canFolder(sp) ? `<button type="button" class="iconbtn sm wkmore" data-wk="rmenu" data-nid="${nid}" data-wsp="${esc(sp)}" aria-haspopup="menu" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('dots', 's')}</button>` : '');
+  return w + (nid && wk_canFolder(sp) ? `<button data-rowmenu="wkrow" type="button" class="iconbtn sm wkmore" data-wk="rmenu" data-nid="${nid}" data-wsp="${esc(sp)}" aria-haspopup="menu" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('dots', 's')}</button>` : '');
 }
 function wk_dnd(sp, k, page) {  // the sbb_treeHtml marks of a folder / a page that has its node
   const d = WK.idx[sp]; if (!wk_canFolder(sp) || !d?.root) return {};

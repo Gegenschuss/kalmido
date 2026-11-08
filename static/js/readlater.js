@@ -54,7 +54,7 @@ function viewReading() {
     const tick = x.can_edit && x.id > 0 ? `<button type="button" class="iconbtn" data-rl="tick" data-id="${x.id}" aria-pressed="${x.done}" title="${esc(x.done ? tr('Unread') : tr('Read|done'))}" aria-label="${esc((x.done ? tr('Unread') : tr('Read|done')) + ': ' + x.title)}">${ic(x.done ? 'undo' : 'check', 's')}</button>` : '';
     return `<li class="bmrow rlrow ${x.done ? 'st-read' : ''}" data-id="${x.id}"><span class="bmthumb bmnopic" aria-hidden="true">${ic(u ? 'link' : 'book', 's')}</span>
       <div class="bmbody">${t}<span class="muted bmsite">${esc([x.site, fmtWhen(x.done ? x.completed_at : x.created_at)].filter(Boolean).join(' · '))}</span>${x.summary ? `<p class="bmdesc">${esc(x.summary)}</p>` : ''}</div>
-      <span class="bmacts">${u ? `<a class="iconbtn" href="${esc(u)}" target="_blank" rel="noopener noreferrer" title="${esc(tr('Open the link'))}" aria-label="${esc(tr('Open {0}', x.title))}">${ic('link', 's')}</a>` : ''}${tick}${x.id > 0 ? `<a class="iconbtn" href="#t/${x.id}" title="${esc(tr('Details'))}" aria-label="${esc(tr('Details: {0}', x.title))}">${ic('dots', 's')}</a>` : ''}</span></li>`;  // 2.559.0 (#4660): a row still on its way (negative id) has no actions yet
+      <span class="bmacts">${u ? `<a class="iconbtn" href="${esc(u)}" target="_blank" rel="noopener noreferrer" title="${esc(tr('Open the link'))}" aria-label="${esc(tr('Open {0}', x.title))}">${ic('link', 's')}</a>` : ''}${tick}${x.id > 0 ? `<a data-rowmenu="rlrow" class="iconbtn" href="#t/${x.id}" title="${esc(tr('Details'))}" aria-label="${esc(tr('Details: {0}', x.title))}">${ic('dots', 's')}</a>` : ''}</span></li>`;  // 2.559.0 (#4660): a row still on its way (negative id) has no actions yet
   };
   return `<div class="bmview rlview">${head}<ul class="bmlist rllist">${RDL.items.map(row).join('')}</ul>${RDL.more ? `<button type="button" class="btn bmmore" data-rl="more">${tr('Show more')}</button>` : ''}</div>`;
 }
@@ -144,3 +144,5 @@ document.addEventListener('click', async e => {
   } catch { /* api() showed it */ }
   a.disabled = false;
 });
+// 2.695.0 (#4619): a long press (phone) / right click (computer) on a row opens what its "…" opens (multisel.js lm_btnMenu)
+if (typeof lm_btnMenu === 'function') lm_btnMenu('#view .rlrow', 'a.iconbtn[href^="#t/"]');  // the details of a read-later entry (its task)

@@ -914,7 +914,7 @@ async function ctBooksModal() {
   const draw = () => {
     const bs = S.books || [];
     $('#cb-body', md).innerHTML = bs.length ? `<ul class="evclist">${bs.map(b => `<li class="evcrow" style="--cc:${cssColor(b.color) || 'var(--accent)'}"><i class="cevdot"></i><span class="evcn">${esc(b.name)} <span class="muted">· ${esc(trn('{0} contact', '{0} contacts', b.count))}${wsOn() && b.role === 'owner' ? ' · ' + esc(wsLabel(b.org_id)) : ''}${b.org_owned ? ' · ' + esc(tr('Belongs to {0}', wsLabel(b.org_id))) : ''}${b.role !== 'owner' ? (b.org_owned ? '' : ' · ' + esc(b.owner_name || '')) + ' · ' + esc(b.role === 'edit' ? tr('can edit') : tr('can view')) : b.members?.length ? ' · ' + esc(trn('shared with {0} person', 'shared with {0} people', b.members.length)) : ''}${b.imported ? ' · ' + esc(tr('imported')) : ''}</span></span>
-      <button class="iconbtn" data-cbmenu="${b.id}" aria-haspopup="menu" aria-label="${esc(tr('More for {0}', b.name))}" title="${esc(tr('More'))}">${ic('dots')}</button></li>`).join('')}</ul>` : `<p class="muted">${tr('No address book yet. A new contact creates one.')}</p>`;
+      <button data-rowmenu="evcrow" class="iconbtn" data-cbmenu="${b.id}" aria-haspopup="menu" aria-label="${esc(tr('More for {0}', b.name))}" title="${esc(tr('More'))}">${ic('dots')}</button></li>`).join('')}</ul>` : `<p class="muted">${tr('No address book yet. A new contact creates one.')}</p>`;
   };
   draw();
   const refresh = async () => { await load().catch(() => {}); draw(); ctLoad(); };
@@ -1079,3 +1079,5 @@ async function ctm_undoCard(rid, el) {
   await load().catch(() => {}); ctLoad();
   if (CT.sel) ctOpen(CT.sel);
 }
+// 2.695.0 (#4619): a long press (phone) / right click (computer) on a row opens what its "…" opens (multisel.js lm_btnMenu)
+if (typeof lm_btnMenu === 'function') lm_btnMenu('#cb-body .evcrow', '[data-cbmenu]');  // the rows of the dialog Address books

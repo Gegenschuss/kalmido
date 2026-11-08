@@ -25,7 +25,7 @@ function repoWire(md, lid, folder) {
         <span class="muted rpm">${esc(GIT_PROV.find(x => x[0] === r.provider)?.[1] || r.provider)}${r.default_branch ? ' · ' + esc(r.default_branch) : ''}${j.may ? ' · ' + esc(r.token ? tr('Token set') : tr('No token')) + (r.hook ? ' · ' + esc(tr('Webhook on')) : '') : ''}${listById(lid)?.ticket_key ? ' · ' + esc(r.hash_ids ? tr('#number and {0}-123', listById(lid).ticket_key) : tr('only {0}-123', listById(lid).ticket_key)) : ''}${r.author_name || r.author_email ? ' · ' + esc(tr('Git author: {0}', [r.author_name, r.author_email ? '<' + r.author_email + '>' : ''].filter(Boolean).join(' '))) : ''}</span>
         <span class="rst rst-${esc(r.status)}">${esc(r.status === 'error' ? r.error : r.status === 'new' ? tr('Waiting for the first check') : tr('Checked {0}', relTime(r.polled_at)))}</span></span>
         <button class="iconbtn" data-rp="refresh" title="${esc(tr('Check the repository now'))}" aria-label="${esc(tr('Check the repository now'))}">${ic('sync', 's')}</button>
-        ${j.may ? `<button class="iconbtn" data-rp="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots', 's')}</button>` : ''}</div>
+        ${j.may ? `<button data-rowmenu="reporow" class="iconbtn" data-rp="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots', 's')}</button>` : ''}</div>
       ${edit === r.id ? `<div class="mrow repoedit"><input id="rp-tok2" type="password" autocomplete="new-password" placeholder="${esc(tr('New access token (empty = remove)'))}" aria-label="${esc(tr('Access token'))}"><button class="btn sm" data-rp="tok-save">${tr('Save')}</button></div>` : ''}
       ${aedit === r.id ? rpAuthorHtml(r) : ''}
       ${iss && iss.id === r.id ? rpIssHtml(iss) : ''}
@@ -87,7 +87,7 @@ function repoWire(md, lid, folder) {
   const errHookHtml = () => {
     const eh = j.errors; if (!eh || !isProject(lid) || (!eh.may && !eh.on)) return '';
     const st = eh.on ? [tr('On'), tr('{0} received', eh.received || 0), eh.open ? trn('{0} open ticket', '{0} open tickets', eh.open) : '', eh.last_at ? tr('last {0}', relTime(eh.last_at)) : ''].filter(Boolean).join(' · ') : tr('Off');
-    const ctl = !eh.may ? '' : eh.on ? `<button class="iconbtn" data-rp="err-menu" title="${esc(tr('Error reports'))}: ${esc(tr('More'))}" aria-label="${esc(tr('Error reports'))}: ${esc(tr('More'))}">${ic('dots', 's')}</button>`
+    const ctl = !eh.may ? '' : eh.on ? `<button data-rowmenu="reporow" class="iconbtn" data-rp="err-menu" title="${esc(tr('Error reports'))}: ${esc(tr('More'))}" aria-label="${esc(tr('Error reports'))}: ${esc(tr('More'))}">${ic('dots', 's')}</button>`
       : `<button class="btn sm" data-rp="err-on">${tr('Switch on')}</button>`;
     return `<div class="errhook" id="rp-err"><div class="mrow reporow errrow">${ic('bug', 's')}<span class="n"><b>${tr('Error reports')}</b><span class="muted rpm">${esc(st)}</span></span>${ctl}</div>
       <div class="shint lhint">${tr('Sentry or any service that sends JSON: a new error becomes a bug ticket, the same error again only counts up at its open ticket.')}</div>
@@ -287,4 +287,4 @@ function gsy_actText(kind, d) {
     : tr('Conflict with {0} ({1}): the change in the repository was newer. The version here was: {2}', q(d.gsy || ''), esc(f), q(v || '–'))) + when;
 }
 // 2.620.0 (#4616): a long press (phone) / right click (computer) opens the row's "…" menu: the click on its button, which the click guard of the press lets through (st.done = 0 for that one click)
-let rp_lpS; if (typeof cm_bind === 'function') rp_lpS = cm_bind('.reporow', r => { const b = lm_btn(r, '[data-rp="menu"]'); if (!b) return false; const d = rp_lpS.done; rp_lpS.done = 0; b.click(); rp_lpS.done = d; return true; }, null, lm_keep);
+let rp_lpS; if (typeof cm_bind === 'function') rp_lpS = cm_bind('.reporow', r => { const b = lm_btn(r, '[data-rp="menu"], [data-rp="err-menu"]' /* 2.695.0 (#4619): + the error reports' row */); if (!b) return false; const d = rp_lpS.done; rp_lpS.done = 0; b.click(); rp_lpS.done = d; return true; }, null, lm_keep);

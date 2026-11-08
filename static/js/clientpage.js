@@ -361,7 +361,7 @@ function dsb_clHtml(c) {
   if (typeof officeOn !== 'function' || !officeOn()) return '';
   if (DSB.cl?.id !== c.id) { if (!DSB.cl?.busy) { DSB.cl = {id: c.id, busy: 1}; dsb_clLoad(c.id); } return ''; }
   const ss = DSB.cl.sheets; if (!ss) return '';
-  const li = x => `<li data-dsb="row" data-id="${x.id}">${ic('shield', 's')} <b>${esc(x.kind_label)}</b> <span class="rotag dsb-st dsb-st-${esc(x.status)}${x.review ? ' dsb-rev' : ''}">${esc(x.gen_status === 'draft' ? tr('Draft') : x.status_label)}</span><button type="button" class="iconbtn" data-dsb="menu" data-id="${x.id}" aria-haspopup="menu" aria-label="${esc(tr('More'))}: ${esc(x.kind_label)}" title="${esc(tr('More'))}">${ic('dots', 's')}</button>${dsb_replyHtml(x.reply)}</li>`;
+  const li = x => `<li data-dsb="row" data-id="${x.id}">${ic('shield', 's')} <b>${esc(x.kind_label)}</b> <span class="rotag dsb-st dsb-st-${esc(x.status)}${x.review ? ' dsb-rev' : ''}">${esc(x.gen_status === 'draft' ? tr('Draft') : x.status_label)}</span><button data-rowmenu="dsbsec" type="button" class="iconbtn" data-dsb="menu" data-id="${x.id}" aria-haspopup="menu" aria-label="${esc(tr('More'))}: ${esc(x.kind_label)}" title="${esc(tr('More'))}">${ic('dots', 's')}</button>${dsb_replyHtml(x.reply)}</li>`;
   return `<div class="ctsec dsbsec"><h4>${tr('Data protection')}</h4>${ss.length ? `<ul class="ctlinks">${ss.map(li).join('')}</ul>` : ''}<button type="button" class="btn sm" data-dsb="new" data-cl="${c.id}">${ic('plus', 's')} ${tr('Data protection sheet')}</button></div>`;
 }
 // 2.209.0 C (#2589): the newest reply mail that was not filed (e.g. a revocation) at its sheet -- the customer's text, escaped

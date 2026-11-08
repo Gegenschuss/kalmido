@@ -561,12 +561,12 @@ async function evCalsModal() {
       <i class="cevdot"></i><span class="evcn">${esc(c.name)}${wsOn() && c.role === 'owner' ? `<span class="muted wslbl"> · ${esc(wsLabel(c.org_id))}</span>` : ''}${c.role !== 'owner' ? `<span class="muted"> · ${esc(c.owner_name || '')} · ${esc(c.role === 'edit' ? tr('can edit') : tr('can view'))}</span>` : c.members?.length ? `<span class="muted"> · ${esc(trn('shared with {0} person', 'shared with {0} people', c.members.length))}</span>` : ''}</span>
       <label class="swc" title="${esc(tr('Show in my calendar'))}"><input type="checkbox" data-evcshow="${c.id}" ${c.hidden ? '' : 'checked'}><span class="swt" aria-hidden="true"></span><span class="sr">${esc(tr('Show {0} in my calendar', c.name))}</span></label>
       ${three({key: `e:${c.id}`, name: c.name, on: !c.hidden})}
-      <button class="iconbtn" data-evcmenu="${c.id}" aria-haspopup="menu" aria-label="${esc(tr('More for {0}', c.name))}" title="${esc(tr('More'))}">${ic('dots')}</button></li>`).join('')}</ul>`
+      <button data-rowmenu="evcrow" class="iconbtn" data-evcmenu="${c.id}" aria-haspopup="menu" aria-label="${esc(tr('More for {0}', c.name))}" title="${esc(tr('More'))}">${ic('dots')}</button></li>`).join('')}</ul>`
       : `<p class="muted">${tr('No calendar yet. A new event creates one.')}</p>`}`;
     const subs = cvxVisibleCals(true).filter(c => !c.own);
     const sb = !S.calendars?.enabled ? '' : `<div class="cvxgrp">${tr('Subscriptions')}</div>${subs.length ? (cs.length && feat('events') ? '' : head) + subs.map(c => `<div class="cvxrow" style="--cc:${cssColor(c.color)}">
       <i class="cevdot"></i><span class="evcn">${esc(c.name)}</span>${sw(c.key, 'show', c.on, false, tr('Show {0} in my calendar', c.name))}${three(c)}
-      <button class="iconbtn" data-cvxmenu="${c.key}" data-name="${esc(c.name)}" aria-haspopup="menu" aria-label="${esc(tr('More for {0}', c.name))}" title="${esc(tr('More'))}">${ic('dots')}</button></div>`).join('')
+      <button data-rowmenu="cvxrow" class="iconbtn" data-cvxmenu="${c.key}" data-name="${esc(c.name)}" aria-haspopup="menu" aria-label="${esc(tr('More for {0}', c.name))}" title="${esc(tr('More'))}">${ic('dots')}</button></div>`).join('')
       : `<p class="muted">${tr('No subscriptions yet. Add one under Settings > Integrations > Calendars.')}</p>`}`;
     // 2.566.0 (#4707): the calendars in the trash (the shared core's trash): opened on demand, restore with their events
     const tr2 = !feat('events') ? '' : `<button type="button" class="btn sm evctrbtn" data-evc="trash" aria-expanded="${!!st.trash}">${ic('trash', 's')} ${tr('Trash')}</button>${!st.trash ? ''
@@ -776,3 +776,6 @@ document.addEventListener('click', e => {
   if (m) { evCalsModal(); return; }
   if (e.target.closest('[data-act="dav-guide"]')) davGuide();
 });
+// 2.695.0 (#4619): a long press (phone) / right click (computer) on a row opens what its "…" opens (multisel.js lm_btnMenu)
+// calevents.js loads before multisel.js (index.html): bound once every start script ran
+domReady(() => { if (typeof lm_btnMenu === 'function') lm_btnMenu('.evcmodal .evcrow, .evcmodal .cvxrow', '[data-evcmenu], [data-cvxmenu]'); });  // the rows of the dialog Calendars

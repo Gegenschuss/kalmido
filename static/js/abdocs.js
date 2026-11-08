@@ -35,7 +35,7 @@ function abd_toolsHtml(d, key) {
 }
 // a card: a document = its tile of the documents (preview, sender, date, type, tags), other files and folders = name + picture
 function abd_card(n) {
-  const menuBtn = `<span class="abcmenu"><button type="button" class="iconbtn" data-ab="menu" data-id="${n.id}" aria-label="${esc(tr('More actions for {0}', n.name))}" title="${esc(tr('More'))}">${ic('dots', 's')}</button></span>`;  // in a span: .dc-card>button is the tile
+  const menuBtn = `<span class="abcmenu"><button data-rowmenu="dc-card" type="button" class="iconbtn" data-ab="menu" data-id="${n.id}" aria-label="${esc(tr('More actions for {0}', n.name))}" title="${esc(tr('More'))}">${ic('dots', 's')}</button></span>`;  // in a span: .dc-card>button is the tile
   const shc = typeof ab_shChip === 'function' ? ab_shChip(n, AB.data?.node?.owner_id) : '', sh = shc ? `<span class="abcshw">${shc}</span>` : '';  // 2.558.0 (#4693): the names, a click opens Share
   if (n.doc?.id && !abd_locked(n)) return dc_card(n.doc).replace(/<\/li>$/, menuBtn + sh + '</li>');
   const img = n.kind === 'file' && !abd_locked(n) && ab_isImg(n) && !upLocked(n) ? (typeof ts_img === 'function' ? ts_img(abd_thumbUrl(n), abd_thumbUrl(n) + '&size=l') /* 2.583.0 (#4812) */ : `<img src="${esc(abd_thumbUrl(n))}" alt="" loading="lazy">`) : '';

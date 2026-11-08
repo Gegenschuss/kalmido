@@ -597,6 +597,13 @@ it; a section let go below the last one = the end. The mouse keeps HTML5 drag: i
 sidebar's lists / smart lists / trash, the open task's dependency fields, Alt = dependency, the native drag image) and
 the browser's own drag scrolls with `dsEdge`.
 
+2.695.0 (#4619): the row menu by a long press. Every row with a "…" button opens the same menu by a long press (phone) and
+a right click (computer): `multisel.js` `ms_rowMenu` / `cm_bind` / `lm_btnMenu(rowSel, btnSel)` (the last one clicks the
+row's own "…"). The "…" of a row carries `data-rowmenu="<a word of the row selector>"`; `tests/p2695_a_rowmenu_coverage_test.py`
+turns red for a "…" without the marker or without a binding (head, bar and page menus stand in its list `RM_LEFT` with the
+reason), `tests/p2695_a_longpress_ui.js` presses for real (same menu, the click after it opens nothing, a swipe cancels).
+A start script that loads before `multisel.js` binds in `domReady`.
+
 2.193.0 B (#2219): `scrollX` (with `scrollXInset` for a sticky column at the left) scrolls a scroller sideways at its
 left / right edge, every frame while the pointer stays there, together with `scroll`; it scrolls towards an edge only
 once the pointer has moved that way. `onTarget` follows a touch on the element it started on (a redraw during the hold

@@ -84,14 +84,14 @@ function bm_card(x) {
     <div class="bmbody"><a class="bmtitle" href="${esc(u)}" target="_blank" rel="noopener noreferrer" data-bm-link="${x.id}">${esc(x.title)}</a>
     <span class="muted bmsite">${esc(x.site)}${x.state === 'archived' ? ' · ' + esc(tr('Archived')) : ''}</span>${bm_pend(x)}
     ${x.description ? `<p class="bmdesc">${esc(x.description)}</p>` : ''}${x.note ? `<p class="bmnote">${ic('note', 's')} ${esc(x.note)}</p>` : ''}
-    <div class="bmfoot">${bm_tagsHtml(x)}<span class="spacer"></span>${bm_acts(x)}<button type="button" class="iconbtn" data-bm="open" data-id="${x.id}" title="${esc(tr('Details'))}" aria-label="${esc(tr('Details: {0}', x.title))}">${ic('dots', 's')}</button></div></div></li>`;
+    <div class="bmfoot">${bm_tagsHtml(x)}<span class="spacer"></span>${bm_acts(x)}<button data-rowmenu="bmcard" type="button" class="iconbtn" data-bm="open" data-id="${x.id}" title="${esc(tr('Details'))}" aria-label="${esc(tr('Details: {0}', x.title))}">${ic('dots', 's')}</button></div></div></li>`;
 }
 function bm_row(x) {
   const u = bm_href(x.url);
   return `<li class="bmrow st-${x.state}" data-id="${x.id}">${x.image ? `<img class="bmthumb" src="${esc(x.image)}" alt="" loading="lazy" decoding="async">` : `<span class="bmthumb bmnopic" aria-hidden="true">${ic('bookmark', 's')}</span>`}
     <div class="bmbody"><a class="bmtitle" href="${esc(u)}" target="_blank" rel="noopener noreferrer" data-bm-link="${x.id}">${esc(x.title)}</a>
     <span class="muted bmsite">${esc(x.site)}${x.note ? ' · ' + esc(x.note.slice(0, 80)) : ''}</span>${bm_pend(x)}${bm_tagsHtml(x)}</div>
-    ${bm_acts(x)}<button type="button" class="iconbtn" data-bm="open" data-id="${x.id}" title="${esc(tr('Details'))}" aria-label="${esc(tr('Details: {0}', x.title))}">${ic('dots', 's')}</button></li>`;
+    ${bm_acts(x)}<button data-rowmenu="bmrow" type="button" class="iconbtn" data-bm="open" data-id="${x.id}" title="${esc(tr('Details'))}" aria-label="${esc(tr('Details: {0}', x.title))}">${ic('dots', 's')}</button></li>`;
 }
 
 // ---- actions (each one undo step)
@@ -289,3 +289,5 @@ document.addEventListener('click', async e => {
   } catch { /* api() showed it */ }
   a.disabled = false;
 });
+// 2.695.0 (#4619): a long press (phone) / right click (computer) on a row opens what its "…" opens (multisel.js lm_btnMenu)
+if (typeof lm_btnMenu === 'function') lm_btnMenu('#view .bmcard, #view .bmrow:not(.rlrow)', '.iconbtn[data-bm="open"]');  // the details of a bookmark (card and row)

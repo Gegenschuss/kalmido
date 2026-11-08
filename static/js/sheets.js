@@ -187,7 +187,7 @@ function shvOverview(lid) {
 function shvCardHtml(x, lid) {
   return `<li class="shvcard" data-id="${x.id}"><a href="#sheets/${x.id}" class="shvcl">${ic('sheet')}<span class="shvct"><b>${esc(x.title || tr('Untitled table'))}</b>
       <span class="muted">${x.list_title && !lid ? esc(x.list_title) + ' · ' : ''}${x.updated_at ? esc(relTime(x.updated_at)) : ''}${x.updated_by_name ? ' · ' + esc(x.updated_by_name) : ''}${x.agent ? ' · ' + esc(tr('changed by an agent')) : ''}${x.sheets > 1 ? ' · ' + esc(trn('{0} sheet', '{0} sheets', x.sheets)) : ''}${x.shared && !x.shared_in ? ` · <span class="shs-mark">${ic('users', 's')}${tr('Shared')}</span>` : ''}</span></span></a>
-    <button type="button" class="iconbtn" data-shv="cmenu" data-id="${x.id}" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More') + ': ' + (x.title || ''))}">${ic('dots')}</button></li>`;
+    <button data-rowmenu="shvcard" type="button" class="iconbtn" data-shv="cmenu" data-id="${x.id}" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More') + ': ' + (x.title || ''))}">${ic('dots')}</button></li>`;
 }
 // 2.152.3 B (#2619): the panel of tables (sidebar B on a computer): "All tables" (the overview) and "New table", then the
 // tables of the shown workspace in the overview's order; tables attached to a project as one group per project, the shared
@@ -1366,3 +1366,6 @@ async function shxSheetTrashDlg(sh) {
   });
   await draw();
 }
+// 2.695.0 (#4619): a long press (phone) / right click (computer) on a row opens what its "…" opens (multisel.js lm_btnMenu)
+// the whole table card is a link, so only a selection keeps the browser's menu (as the folder cards, sheetfold.js)
+if (typeof lm_btnMenu === 'function') lm_btnMenu('.shvcard:not(.shfcard)', '[data-shv="cmenu"]', lm_selKeep);

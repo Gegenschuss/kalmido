@@ -167,7 +167,7 @@ sbb_treeReg('sh', {
 function shf_cardsHtml(sp, fid) {
   return shf_kids(sp, fid).map(f => `<li class="shvcard shfcard" data-fid="${f.id}"><a href="#sheets/f/${f.id}" class="shvcl">${ic(f.shared ? 'users' : 'folder')}<span class="shvct"><b>${esc(f.name)}</b>
       <span class="muted">${esc(trn('{0} table', '{0} tables', shf_tables(shf_items(), sp, f.id).length))}</span></span></a>
-    <button type="button" class="iconbtn" data-shf="fmenu" data-id="${f.id}" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More') + ': ' + f.name)}">${ic('dots')}</button></li>`).join('');
+    <button data-rowmenu="shfcard" type="button" class="iconbtn" data-shf="fmenu" data-id="${f.id}" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More') + ': ' + f.name)}">${ic('dots')}</button></li>`).join('');
 }
 // the overview's tables of sp at its top: those in no folder the person sees
 const shf_topItems = (xs, sp) => { const known = new Set(shf_data().folders.map(f => f.id)); return xs.filter(x => x.shared_in || x.space !== sp || !known.has(x.folder_id)); };

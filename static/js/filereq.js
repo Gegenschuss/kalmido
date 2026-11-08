@@ -20,7 +20,7 @@ async function frq_open(n) {
   md.classList.add('frqdlg'); md.setAttribute('aria-labelledby', 'frq-t');
   const draw = () => {
     const rows = j.requests.map(r => `<div class="frq-row frq-${esc(r.state)}" data-rid="${r.id}">
-        <div class="frq-head"><b>${esc(r.title)}</b><span class="spacer"></span>${r.manage ? `<button type="button" class="iconbtn" data-frq="menu" aria-label="${esc(tr('More actions for {0}', r.title))}" title="${esc(tr('More'))}">${ic('dots')}</button>` : ''}</div>
+        <div class="frq-head"><b>${esc(r.title)}</b><span class="spacer"></span>${r.manage ? `<button data-rowmenu="frq-row" type="button" class="iconbtn" data-frq="menu" aria-label="${esc(tr('More actions for {0}', r.title))}" title="${esc(tr('More'))}">${ic('dots')}</button>` : ''}</div>
         <div class="muted frq-facts"><span>${esc(frq_stateText(r))}</span><span>${esc(trn('{0} file arrived', '{0} files arrived', r.count))}</span>${r.mine ? '' : `<span>${esc(tr('by {0}', r.created_by_name))}</span>`}</div>
         ${r.url && r.state === 'active' ? `<div class="frq-link"><input readonly value="${esc(r.url)}" aria-label="${esc(tr('Upload link'))}"><button type="button" class="btn sm" data-frq="copy">${ic('copy', 's')} ${esc(tr('Copy'))}</button><button type="button" class="iconbtn" data-frq="qr" aria-label="${esc(tr('QR code'))}" title="${esc(tr('QR code'))}">${ic('grid', 's')}</button></div><div class="frq-qr" hidden></div>` : ''}</div>`).join('');
     $('.frq-body', md).innerHTML = `<div class="shint lhint keep">${esc(tr('Clients upload files into this folder through the link, without an account. They never see what is in it.'))}</div>

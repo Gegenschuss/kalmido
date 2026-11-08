@@ -30,7 +30,7 @@ function ftxtResults() {
   // lazy-ok-begin: ftxtResults draws inside the file store's view (ablage.js is loaded)
   const fsRows = items.map(n => {
     const meta = [why(n.hit), n.folder ? tr('in {0}', n.folder) : ''].filter(Boolean).join(' · ');
-    return `<div class="abrow ftxtrow" role="listitem" data-abid="${n.id}"><button type="button" class="abopen" data-ab="open" data-id="${n.id}">${ab_icon(n)}<span class="abtxt"><span class="abname">${esc(n.name)}</span>${meta ? `<span class="abmeta2 muted">${esc(meta)}</span>` : ''}</span></button><span class="abmeta muted">${esc(meta)}</span><span class="abbadges"></span><button type="button" class="iconbtn" data-ab="menu" data-id="${n.id}" aria-label="${esc(tr('More actions for {0}', n.name))}" title="${esc(tr('More'))}">${ic('dots')}</button></div>`;
+    return `<div class="abrow ftxtrow" role="listitem" data-abid="${n.id}"><button type="button" class="abopen" data-ab="open" data-id="${n.id}">${ab_icon(n)}<span class="abtxt"><span class="abname">${esc(n.name)}</span>${meta ? `<span class="abmeta2 muted">${esc(meta)}</span>` : ''}</span></button><span class="abmeta muted">${esc(meta)}</span><span class="abbadges"></span><button data-rowmenu="abrow" type="button" class="iconbtn" data-ab="menu" data-id="${n.id}" aria-label="${esc(tr('More actions for {0}', n.name))}" title="${esc(tr('More'))}">${ic('dots')}</button></div>`;
   }).join('');
   // lazy-ok-end
   const lfRows = lfs.map(f => {
