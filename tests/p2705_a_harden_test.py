@@ -3,6 +3,7 @@
 """2.705.0 A (#5151): the rest of the hardening of #4382 (audit #2483, low findings 5 and 12). Own container with a server
 key and a mail-in address (no IMAP server needed). Invented data.
 freelancer-matrix: files
+tenant-matrix: document
  - a receipt fetcher key (kbh_...) gets an optional address rule like an API token / scan inbox key: PATCH
    /api/docs/fetchers/<id> {allowed_ips}; the key from another address answers 403 and reaches nothing; from an allowed
    network it works; [] = any address again; a wrong address 400, an unknown field 400, another person's fetcher 404,

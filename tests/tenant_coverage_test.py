@@ -1201,6 +1201,7 @@ ROUTES = {
     # p2425_c_api_test.py: another person sees, switches and deletes nothing, a stranger's key reaches nothing)
     "GET /api/docs/fetchers": "document", "POST /api/docs/fetchers": "document", "DELETE /api/docs/fetchers/{}": "document",
     "PATCH /api/docs/fetchers/{}/portals/{}": "document", "GET /api/v1/fetcher": "document", "PUT /api/v1/fetcher/status": "document",
+    "PATCH /api/docs/fetchers/{}": "document",  # 2.705.0 (#5151): only one's own (p2705_a_harden_test.py: another person 404)
     "POST /api/v1/fetcher/documents": "document",
     # 2.577.0 C (#4466): named document addresses (only one's own; another person / organisation sees and changes nothing,
     # every delivery checked with the rights at that moment, p2577_c_docmail_test.py)
