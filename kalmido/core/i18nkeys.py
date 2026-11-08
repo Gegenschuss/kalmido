@@ -15,7 +15,8 @@ import json
 import os
 import re
 
-KEY_FNS = ("trn", "tr", "Nn_", "N_")
+KEY_FNS = ("trn", "tr", "Nn_", "N_", "trnh", "trh")  # 2.666.0 (#4074 8): trh / trnh (escaped values) read as tr / trn
+KEY_FN_AS = {"trh": "tr", "trnh": "trn"}
 _LIT = {"'": re.compile(r"'(?:[^'\\]|\\.)*'", re.S), '"': re.compile(r'"(?:[^"\\]|\\.)*"', re.S),
         "`": re.compile(r"`(?:[^`\\]|\\.)*`", re.S)}
 _WS = re.compile(r"[ \t\r\n]*")
@@ -143,12 +144,13 @@ def key_calls(src, py, bad=None):
             if not c or not (c.isalnum() or c in "_.$"):
                 calls.append((i, fn))
             i = src.find(fn + "(", i + 1)
-    for pos, fn in sorted(calls):
+    for pos, call in sorted(calls):
         if src[max(0, pos - 9):pos].endswith(("function ", "def ")) or comment_line(src, pos, py):
             continue
         key = other = None
+        fn = KEY_FN_AS.get(call, call)
         try:
-            key, i = key_literal(src, skip_ws(src, pos + len(fn) + 1), py)
+            key, i = key_literal(src, skip_ws(src, pos + len(call) + 1), py)
             if key is not None and fn in ("trn", "Nn_"):
                 i = skip_ws(src, i)
                 if src[i:i + 1] == ",":
