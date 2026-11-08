@@ -58,6 +58,11 @@ a test for what you change; security fixes need a regression test in `tests/secu
   cleaned). Fix a new finding (or mark a deliberate one with `# noqa: CODE -- reason`); after a reviewed clean-up or a
   ruff update `python3 tools/ruff_baseline.py /tmp/ruff.json --update` writes the list anew. A silent
   `except Exception: pass` names its reason after the `noqa` marker (`tests/p2755_d_ruff_baseline_test.py` checks it).
+- **SQL names only through `qi()`** (2.755.0, #5296): values always go as `?` parameters; where a table or column NAME
+  varies, it goes through `qi(name, allowlist)` (`kalmido/core/pg.py`: a fixed set of the caller, `table_names(c)` or
+  `table_columns(c, t)`; the name comes back double-quoted, anything else is a `ValueError`). The semgrep rule
+  `.semgrep/sql_ident.yml` flags a new f-string with `FROM / JOIN / INTO / UPDATE / SET {...}` without `qi(`; the existing
+  places are listed in `tools/semgrep_baseline.json` (SECURITY.md "Scanner exception lists").
 - **Push tests** (`webpush`, `webpush_ui`) decrypt the payloads with `http-ece` from `tests/requirements.txt`;
   install that file, not only `requests`.
 - **Anchors in new UI tests (data-act).** New UI tests click buttons and menu items through their `data-act` anchor, not

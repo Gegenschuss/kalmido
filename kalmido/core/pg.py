@@ -710,6 +710,26 @@ def table_columns(c, table):
                                     "AND table_name=?", (table,))}
 
 
+_QI_RE = re.compile(r"[a-z_][a-z0-9_]{0,62}")
+
+
+def qi(name, allowed):
+    """2.755.0 (#5296): a table / column name for SQL text, only from the allowlist `allowed` (a set / list / dict of names:
+    a fixed set of the caller, table_names(c), table_columns(c, t)) and double-quoted; anything else is a ValueError. Values
+    never go through here (they are `?` parameters); this is for the few places where the NAME itself varies. The name must
+    be a plain lower-case identifier too (Postgres folds unquoted names to lower case, so quoting keeps the meaning)."""
+    if isinstance(allowed, (str, bytes)):  # `"x" in "ab_x"` would be a substring test, not an allowlist
+        raise TypeError("qi: allowed must be a collection of names, not a string")
+    if not isinstance(name, str) or not _QI_RE.fullmatch(name) or name not in allowed:
+        raise ValueError(f"qi: SQL identifier not allowed: {str(name)[:64]!r}")
+    return f'"{name}"'
+
+
+def table_names(c):
+    """2.755.0 (#5296): the tables of the current schema (the allowlist of qi() for a table name that comes from the schema)."""
+    return {r[0] for r in c.execute("SELECT table_name FROM information_schema.tables WHERE table_schema=current_schema()")}
+
+
 def table_exists(c, table):
     return c.execute("SELECT to_regclass(?)", (table,)).fetchone()[0] is not None
 

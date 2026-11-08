@@ -46,7 +46,7 @@ from .db import bump, insert_id, iso, iso_ms, now_utc
 from .errors import BadInput, UnknownFields
 from .i18n import N_, tr
 from .objects import OBJ_COLS, obj_need, obj_node_follow, obj_public, obj_reg, obj_row, obj_title, obj_forget
-from .pg import system_ctx, table_columns, write_lock
+from .pg import qi, system_ctx, table_columns, write_lock  # 2.755.0 (#5296): qi
 from ..collab.comments import user_names
 from ..accounts.orgroles import need_org_write, org_role_key
 from ..accounts.orgout import org_out  # 2.579.0 (#4802): obj_space_set
@@ -430,28 +430,34 @@ def _write_back(c, sc, snap, uid, keep=None):
     """Copy snap back: the main row's own columns (not its identity, version, trash), the other tables' rows replaced.
     keep {table: {column}}: columns that stay as they are now (obj_track undo_keep)."""
     keep = keep or {}
+    # 2.755.0 (#5296): the table and column names only from the schema (qi): the snapshot's keys are data read back
+    cols_of = {t: table_columns(c, t) for t, _w, _a, _m in sc}
+    tabs = {t for t, cols in cols_of.items() if cols}
     for t, where, args, many in reversed(sc):
         if many:
-            c.execute(f"DELETE FROM {t} WHERE {where}", args)
+            c.execute(f"DELETE FROM {qi(t, tabs)} WHERE {where}", args)
     for i, (t, where, args, many) in enumerate(sc):
-        cols = table_columns(c, t)
+        cols = cols_of[t]
         rows = snap.get(t) or []
         if not many:
             if not rows:
                 continue
             row = {k: _unval(v) for k, v in rows[0].items() if k in cols and k not in UNDO_FIXED and k not in keep.get(t, ())}
             if i == 0 and {"rev", "updated_at", "updated_by"} <= cols:
-                c.execute(f"UPDATE {t} SET {','.join(k + '=?' for k in row)}{',' if row else ''} rev=rev+1, updated_at=?, updated_by=? WHERE {where}",
-                          [*row.values(), _now(), uid, *args])
+                c.execute(f"UPDATE {qi(t, tabs)} SET {','.join(qi(k, cols) + '=?' for k in row)}{',' if row else ''} "
+                          f"rev=rev+1, updated_at=?, updated_by=? WHERE {where}", [*row.values(), _now(), uid, *args])
             elif i == 0 and "updated_at" in cols:  # 2.567.0 (#4711): an old area's row (obj_track): a new version for the next save
                 row.update(updated_at=_now(), **({"updated_by": uid} if "updated_by" in cols else {}))
-                c.execute(f"UPDATE {t} SET {','.join(k + '=?' for k in row)} WHERE {where}", [*row.values(), *args])
+                c.execute(f"UPDATE {qi(t, tabs)} SET {','.join(qi(k, cols) + '=?' for k in row)} WHERE {where}",
+                          [*row.values(), *args])
             elif row:
-                c.execute(f"UPDATE {t} SET {','.join(k + '=?' for k in row)} WHERE {where}", [*row.values(), *args])
+                c.execute(f"UPDATE {qi(t, tabs)} SET {','.join(qi(k, cols) + '=?' for k in row)} WHERE {where}",
+                          [*row.values(), *args])
             continue
         for r in rows:
             row = {k: _unval(v) for k, v in r.items() if k in cols}
-            c.execute(f"INSERT INTO {t}({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
+            c.execute(f"INSERT INTO {qi(t, tabs)}({','.join(qi(k, cols) for k in row)}) VALUES({','.join('?' * len(row))})",
+                      list(row.values()))
 
 
 def _token():

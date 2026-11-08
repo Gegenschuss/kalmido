@@ -16,7 +16,7 @@ import json
 from datetime import timedelta
 
 from .db import insert_id, IntegrityError, iso, now_utc
-from .pg import table_columns  # 2.149.0 G (#2517): pulled up from functions
+from .pg import qi, table_columns  # 2.149.0 G (#2517): pulled up from functions; 2.755.0 (#5296): qi
 
 MG_UNDO_DAYS = 30
 MG_MAX = 10  # records in one merge (target included)
@@ -72,19 +72,26 @@ def mg_repoint(c, table, col, from_ids, to_id, where="", args=()):
     if not from_ids:
         return rec
     pk = _pk_cols(c, table) or ["id"]
+    # 2.755.0 (#5296): table / column names only from the schema: the table's own columns (none = no such table)
+    cols = table_columns(c, table)
+    tabs = {table} if cols else ()
     extra = f" AND ({where})" if where else ""
     qs = ",".join("?" * len(from_ids))
-    rows = [dict(r) for r in c.execute(f"SELECT * FROM {table} WHERE {col} IN ({qs}){extra}", [*from_ids, *args]).fetchall()]
+    rows = [dict(r) for r in c.execute(f"SELECT * FROM {qi(table, tabs)} WHERE {qi(col, cols)} IN ({qs}){extra}",
+                                       [*from_ids, *args]).fetchall()]
     for r in rows:
         key = {k: r[k] for k in pk}
         if col in pk:
             probe = {**key, col: to_id}
-            hit = c.execute(f"SELECT 1 FROM {table} WHERE {' AND '.join(k + '=?' for k in probe)}", list(probe.values())).fetchone()
+            hit = c.execute(f"SELECT 1 FROM {qi(table, tabs)} WHERE {' AND '.join(qi(k, cols) + '=?' for k in probe)}",
+                            list(probe.values())).fetchone()
             if hit:
-                c.execute(f"DELETE FROM {table} WHERE {' AND '.join(k + '=?' for k in key)}", list(key.values()))
+                c.execute(f"DELETE FROM {qi(table, tabs)} WHERE {' AND '.join(qi(k, cols) + '=?' for k in key)}",
+                          list(key.values()))
                 rec["dropped"].append(r)
                 continue
-        c.execute(f"UPDATE {table} SET {col}=? WHERE {' AND '.join(k + '=?' for k in key)}", [to_id, *key.values()])
+        c.execute(f"UPDATE {qi(table, tabs)} SET {qi(col, cols)}=? WHERE {' AND '.join(qi(k, cols) + '=?' for k in key)}",
+                  [to_id, *key.values()])
         rec["moved"].append({**key, "_from": r[col]})
     return rec
 

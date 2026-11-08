@@ -7,7 +7,7 @@ from flask import g, has_request_context, jsonify, request
 
 from ..core.objhooks import obj_settle, person_revoked  # 2.558.0 (#4709): the shared core without importing the domain layer
 from ..core.config import app, OFFICE_DIR
-from ..core.pg import insert_id, like_escape, system_ctx
+from ..core.pg import insert_id, like_escape, qi, system_ctx
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, gset, gsetting, iso, now_utc
 from ..core.db import usettings, uset  # 2.356.0 B (#2932)
@@ -507,11 +507,15 @@ def ws_chosen_org(c, uid):
     return mine[0] if len(mine) == 1 else None
 
 
+_OBJ_ORG_TABLES, _OBJ_ORG_MEMBERS, _OBJ_ORG_KEYS = {"ev_cals", "books"}, {"ev_cal_members", "book_members"}, {"cal_id", "book_id"}
+
+
 def obj_org_set(c, table, oid_col, members, obj_id, v, kind):
     """2.30.0 (#1036): the owner moves calendar / address book obj_id (table ev_cals | books, its member table + key column)
     into workspace v (clean_org_id). Refused (409) while a member (person or agent) does not fit the new workspace (named).
     Returns True when it changed. The caller commits."""
-    r = c.execute(f"SELECT owner_id, org_id FROM {table} WHERE id=?", (obj_id,)).fetchone()
+    # 2.755.0 (#5296): the names only from the allowlist
+    r = c.execute(f"SELECT owner_id, org_id FROM {qi(table, _OBJ_ORG_TABLES)} WHERE id=?", (obj_id,)).fetchone()
     if not r or r["owner_id"] != me():
         raise Denied(403, tr("Only the owner can change the workspace"))
     if (None if v in (None, "", 0, "0", "private") else v) == r["org_id"]:
@@ -531,8 +535,8 @@ def obj_org_set(c, table, oid_col, members, obj_id, v, kind):
                 raise Denied(409, p)
     from .orgout import org_out  # 2.148.1 H (#2483): out of an organisation only through its admin (logged)
     org_out(c, r["org_id"], oid, "book" if table == "books" else "calendar",
-            c.execute(f"SELECT name FROM {table} WHERE id=?", (obj_id,)).fetchone()[0])
-    c.execute(f"UPDATE {table} SET org_id=? WHERE id=?", (oid, obj_id))
+            c.execute(f"SELECT name FROM {qi(table, _OBJ_ORG_TABLES)} WHERE id=?", (obj_id,)).fetchone()[0])
+    c.execute(f"UPDATE {qi(table, _OBJ_ORG_TABLES)} SET org_id=? WHERE id=?", (oid, obj_id))
     return True
 
 
@@ -545,7 +549,8 @@ def _obj_sharers(c, table, members, oid_col, obj_id):
     with system_ctx(c):  # structure: the node may lie in the organisation's tree, its shares are the owner's own object's
         n = c.execute("SELECT id FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id=?", (ref, int(obj_id))).fetchone()
         if n is None:
-            return [r[0] for r in c.execute(f"SELECT user_id FROM {members} WHERE {oid_col}=? ORDER BY user_id", (obj_id,)).fetchall()]
+            sql = f"SELECT user_id FROM {qi(members, _OBJ_ORG_MEMBERS)} WHERE {qi(oid_col, _OBJ_ORG_KEYS)}=? ORDER BY user_id"
+            return [r[0] for r in c.execute(sql, (obj_id,)).fetchall()]
         rows = c.execute("SELECT user_id, agent_id, group_id FROM fs_shares WHERE node_id=? ORDER BY id", (n[0],)).fetchall()
     if any(r["group_id"] for r in rows):
         raise Denied(409, tr("Shared with a group: remove that share before the workspace changes"))

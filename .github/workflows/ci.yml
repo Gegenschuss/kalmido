@@ -470,7 +470,7 @@ jobs:
         run: python tests/p2609_d_winlauncher_test.py
 
   semgrep:
-    # 2.543.0 (#4625): red for NEW findings only. The known, reviewed findings stand in tools/semgrep_baseline.json (rule, file,
+    # 2.543.0 (#4625): red for NEW findings only (2.755.0, #5296: plus the own rule .semgrep/sql_ident.yml, qi()). The known, reviewed findings stand in tools/semgrep_baseline.json (rule, file,
     # code line, reason, date; SECURITY.md "Scanner exception lists"); tools/semgrep_baseline.py compares the JSON output
     # against it. A real gap gets a task and is fixed, not only listed.
     name: semgrep
@@ -483,7 +483,7 @@ jobs:
           python-version: "3.12"
       - run: pip install semgrep==1.183.0
       - name: semgrep scan
-        run: semgrep scan --config p/python --config p/flask --config p/javascript --metrics=off --exclude tests --exclude static/vendor --json --output /tmp/semgrep.json app.py kalmido static tools
+        run: semgrep scan --config p/python --config p/flask --config p/javascript --config .semgrep/sql_ident.yml --metrics=off --exclude tests --exclude static/vendor --json --output /tmp/semgrep.json app.py kalmido static tools
       - name: New findings against the exception list
         run: python3 tools/semgrep_baseline.py /tmp/semgrep.json
 
