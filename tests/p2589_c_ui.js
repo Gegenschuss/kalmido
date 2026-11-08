@@ -30,7 +30,9 @@ const until = fn => require('./boot').until(fn, {timeout: 15000, step: 150});
   w.location.hash = 'office/books/taxforms/euer';
   check(await until(() => d.querySelector('#tf-year') && d.querySelector('[data-bk-taxcheck]')), 'the tax forms link it too');
   w.location.hash = 'office/books/taxcheck';
-  check(await until(() => d.querySelector('#tc-year') && d.querySelector('.tc-list')), 'the page with the points');
+  // 2.670.0 (#5009): red in the CI only (the page did not come); the failure names the state of the page and of the load
+  const tcState = () => w.eval("JSON.stringify({hash: location.hash, tc: {year: TC.year, d: !!TC.d, err: TC.err, seq: TC.seq, t: !!TC.t, oid: TC.oid}, org: OFC.info?.org_id, view: (document.querySelector('#view')?.textContent || '').replace(/\\s+/g, ' ').slice(0, 200)})");
+  check(await until(() => d.querySelector('#tc-year') && d.querySelector('.tc-list')), 'the page with the points ' + (d.querySelector('.tc-list') ? '' : tcState()));
   w.eval("TC.year = 2026; TC.d = null; ofcDraw()");
   check(await until(() => d.querySelector('#tc-year')?.value === '2026' && d.querySelector('.tc-pt[data-tc="tax_number"]')), 'the year 2026');
   const tn = d.querySelector('.tc-pt[data-tc="tax_number"]');
