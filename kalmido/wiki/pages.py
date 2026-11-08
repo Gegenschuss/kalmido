@@ -937,9 +937,9 @@ def wiki_mentions():
     from .wikie2e import wke_open_sql  # 2.64.3 A (#1817): mentions in a locked space are found in the browser
     rows = c.execute("SELECT p.* FROM wiki_pages p WHERE p.id IN (SELECT k.from_id FROM wiki_links k WHERE k.to_task=?) "
                      f"AND {wke_open_sql('p')} AND p.deleted_at IS NULL AND ((p.org_id IS NULL AND p.owner_id=?)"
-                     + (f" OR p.org_id IN ({','.join(str(int(x)) for x in orgs)})" if orgs else "") + ") ORDER BY p.path LIMIT 50",
+                     + (f" OR p.org_id IN ({','.join(str(int(x)) for x in orgs)})" if orgs else "") + ") ORDER BY p.path LIMIT 200",
                      (tid, uid)).fetchall()
-    rows = [r for r in rows if wiki_may_read(c, uid, r)]  # 2.750.0 (#5264): the page's own role (wkf_role), not the membership
+    rows = [r for r in rows if wiki_may_read(c, uid, r)][:50]  # 2.750.0 (#5264): the page's own role (wkf_role), not the membership; 200 read so the hidden ones take no place of the 50
     return jsonify(pages=[{"id": r["id"], "path": r["path"], "space": wiki_space_key(r["org_id"])} for r in rows])
 
 
