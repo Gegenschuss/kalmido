@@ -474,7 +474,9 @@ def _doc_v1(c, oid, r, items=True):
         d.pop(k, None)
     for it in d.get("items") or []:  # 2.144.5 C (#1523): the source list of a position is internal
         it.pop("list_id", None)
-    oil_agent_filter(d, lambda x: ofa_doc_in_lists(c, g.user["id"], x))  # 2.356.0 C (#3003): linked documents only inside the agent's projects
+    # 2.674.0 (#4382 finding 9): the agent's list restriction -- after _v1ctx g.user is the person it acts for, the agent is g.ofa_agent
+    aid = (g.get("ofa_agent") or g.user)["id"]
+    oil_agent_filter(d, lambda x: ofa_doc_in_lists(c, aid, x))  # 2.356.0 C (#3003): linked documents only inside the agent's projects
     d["app_url"] = f"#office/offers/{r['id']}"  # every kind opens in the tab "Quotations & invoices"
     return d
 
