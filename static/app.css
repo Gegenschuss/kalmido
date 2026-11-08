@@ -3930,9 +3930,9 @@ input:focus-visible,select:focus-visible,textarea:focus-visible{box-shadow:0 0 0
 /* the focused element is never hidden under the sticky group headers / the docked composer (2.4.11) */
 #view{scroll-padding:2.75rem 0 6.5rem}
 .modal .card{scroll-padding:1rem 0 5rem}
-/* reduced motion everywhere: no animations, no slides (the few explicit rules above stay) */
+/* reduced motion everywhere: no animations, no slides (the few explicit rules above stay); 2.665.0 (#5115): only visual properties keep a .01 ms transition (transitionend still fires), sizes / places none: with "all" every style change was one and a measurement in the same frame (fitTop, sbb_fit) read the old value */
 @media (prefers-reduced-motion: reduce){
-  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;transition-delay:0s!important;scroll-behavior:auto!important}
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;transition-delay:0s!important;scroll-behavior:auto!important;transition-property:opacity,transform,translate,scale,rotate,color,background-color,border-color,outline-color,text-decoration-color,box-shadow,fill,stroke,stroke-width,stroke-dashoffset,filter,backdrop-filter,visibility!important}
 }
 /* Windows high contrast / forced colours: states that were only a background or a colour get a border / outline */
 @media (forced-colors: active){
