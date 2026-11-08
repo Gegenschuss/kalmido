@@ -17485,6 +17485,7 @@
   "Please select an image (JPG, PNG, WebP), a PDF or an audio file (MP3, M4A, AAC, WAV, OGG, Opus, FLAC).": "Elige una imagen (JPG, PNG, WebP), un PDF o un archivo de audio (MP3, M4A, AAC, WAV, OGG, Opus, FLAC).",
   "The server could not be reached, or its address lies in a private network that an admin has not allowed": "No se pudo acceder al servidor, o su dirección está en una red privada que ningún administrador ha permitido",
   "Only https:// addresses work here (http:// only for hosts an admin allowed)": "Aquí solo funcionan direcciones https:// (http:// solo para hosts que un administrador haya permitido)",
+  "You may not address this agent in this project": "No puedes dirigirte a este agente en este proyecto",
   "PUBLIC_URL is not set": "PUBLIC_URL no está definida",
   "Apps then learn the address of this server from each request (its Host header). Set PUBLIC_URL in .env to the address people open and restart before apps connect (SELF-HOSTING.md).": "Las apps conocen entonces la dirección de este servidor por cada solicitud (su cabecera Host). Define PUBLIC_URL en .env con la dirección que abren las personas y reinicia antes de que se conecten apps (SELF-HOSTING.md).",
   "given by {0}": "concedido por {0}",

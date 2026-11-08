@@ -159,6 +159,13 @@ def agent_job_action(jid):
     if j["state"] in ("done", "failed", "stopped"):
         return err(tr("This job has already ended"), 409)
     if action == "message":  # 2.56.0 (#1791)
+        # 2.674.0 (#4382 finding 7): writing to the agent needs, besides the right to stop the job, the right to address the
+        # agent in the task's list (agent_usable, like a mention or a comment to it); the person the job is for always may
+        if j["user_id"] != me() and j["task_id"]:
+            from ..agents.core import agent_usable
+            t = c.execute("SELECT list_id FROM tasks WHERE id=?", (j["task_id"],)).fetchone()
+            if not t or not t["list_id"] or not agent_usable(c, j["agent_id"], me(), t["list_id"]):
+                raise Denied(403, tr("You may not address this agent in this project"))
         from ..agents.jobchat import jc_job_message
         return jc_job_message(c, j)
     if j["approval"] and action == "approve":  # 2.15.0 (#479): run the agent's stored request now

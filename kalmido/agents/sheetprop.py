@@ -99,7 +99,8 @@ def ast2_person(c, aid, sheet, lid, want):
     cands = [r[0] for r in c.execute("SELECT created_by FROM sheet_shares WHERE sheet_id=? AND user_id=? AND revoked_at IS NULL "
                                      "ORDER BY id DESC", (rr["id"], aid)).fetchall()]
     for pid in cands + [rr["owner_id"], rr["created_by"]]:
-        if pid and pid != aid and ast2_person_ok(c, pid, sheet, lid):
+        # 2.674.0 (#4382 finding 13): also without for_user_id only a person who may address the agent in that list
+        if pid and pid != aid and ast2_person_ok(c, pid, sheet, lid) and agent_usable(c, aid, pid, lid):
             return pid
     raise BadInput(tr(SHT_NO_PERSON))
 
