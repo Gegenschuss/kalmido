@@ -264,8 +264,9 @@ AG, AGH = r.json()["id"], bearer(r.json()["token"])
 r = A.post(B + "/api/admin/agents", json={"scopes": ["read"], "username": "leser", "display_name": "Leser", "org_id": ORG})
 RO, ROH = r.json()["id"], bearer(r.json()["token"])
 L = A.post(B + "/api/lists", json={"name": "Projekt 2674"}).json()["id"]
-for u_, role in ((uid["bob"], "edit"), (AG, "edit"), (RO, "view")):
-    r = A.put(B + f"/api/lists/{L}/members", json={"user_id": u_, "role": role})
+L2 = A.post(B + "/api/lists", json={"name": "Projekt Leser"}).json()["id"]  # one agent per project
+for lid_, u_, role in ((L, uid["bob"], "edit"), (L, AG, "edit"), (L2, RO, "view")):
+    r = A.put(B + f"/api/lists/{lid_}/members", json={"user_id": u_, "role": role})
     check(r.ok, f"7: share the project with {u_} as {role} ({r.status_code} {r.text[:200]})")
 A.patch(B + f"/api/lists/{L}", json={"agent_members": False})
 TID = A.post(B + "/api/tasks", json={"title": "Aufgabe 2674", "list_id": L}).json()["id"]
@@ -348,7 +349,7 @@ check(j.get("f11") == 404, f"11: the API's audit route hides an agent outside op
 check(j.get("f13") == "refused" and j.get("f13_ok") == ALICE, f"13: without for_user_id only a person who may address the agent {j}")
 
 # ================================================================== 10: a read-only agent and the Playbook
-r = requests.post(V + f"/lists/{L}/playbook/proposals", headers=ROH, json={"text": "Neue Regeln", "note": "Vorschlag"})
+r = requests.post(V + f"/lists/{L2}/playbook/proposals", headers=ROH, json={"text": "Neue Regeln", "note": "Vorschlag"})
 check(r.status_code == 403, f"10: a read-only agent token sends no Playbook proposal ({r.status_code} {r.text[:200]})")
 r = requests.post(V + f"/lists/{L}/playbook/proposals", headers=AGH, json={"text": "Neue Regeln", "note": "Vorschlag"})
 check(r.status_code == 201, f"10: an agent that may write still does ({r.status_code} {r.text[:200]})")
