@@ -335,6 +335,7 @@ document.addEventListener('keydown', e => {
   if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey || (e.key || '').toLowerCase() !== 'a' || !DVW.pdf || typeof pv_selAll !== 'function') return;
   const box = DVW.pdf.box, t = /** @type {any} */ (e.target), an = getSelection()?.anchorNode;
   if (!box?.isConnected || !(box.contains(t) || (an && box.contains(an)))) return;
+  if (t?.closest?.('input, textarea, select, [contenteditable]')) return;  // a field keeps its own select-all (the tag field next to the preview)
   e.preventDefault(); e.stopPropagation();
   pv_selAll(DVW.pdf.doc, $('.dv-pgcol', box));
 });
