@@ -91,7 +91,18 @@ def sheets_get(sid):
     from .shbook import shb_rights_row
     d.update(shs_flags(c, shb_rights_row(c, r) or r, me()))  # 2.124.0 E (#2116): the shares of the whole table
     c.commit()  # sheet_lastvals of the viewer
+    # 2.663.0 (#4200): etag = a hash of the whole answer (cells with their Kalmido values, presence, rights); the open table's
+    # poll sends the one it has (?etag=): unchanged -> only {unchanged, etag}, no cells over the wire, nothing drawn again
+    tag = _sh_etag(d)
+    if request.args.get("etag") == tag:
+        return jsonify(unchanged=True, etag=tag)
+    d["etag"] = tag
     return jsonify(d)
+
+
+def _sh_etag(d):
+    import hashlib
+    return hashlib.sha256(json.dumps(d, sort_keys=True, default=str, separators=(",", ":")).encode()).hexdigest()[:24]
 
 
 @app.patch("/api/sheets/<int:sid>")

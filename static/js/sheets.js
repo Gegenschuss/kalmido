@@ -70,13 +70,22 @@ async function shvLoad(id, force) {
   SHV.busy['s' + id] = true;
   let changed = false;
   try {
-    const sh = await rawFetch('GET', '/api/sheets/' + id);
-    // 2.517.0 (#3714): a load that comes back after the route moved on does not replace the sheet of the route
-    if (S.route.mod === 'sheets' && S.route.sh && S.route.sh !== id && SHV.sh?.id === S.route.sh) return;
-    if (SHV.sh?.id !== id) { SHV.cur = SHV.anc = null; SHV.ed = null; }
-    changed = !SHV.sh || SHV.sh.id !== id || SHV.sh.rev !== sh.rev || JSON.stringify(SHV.sh.presence || []) !== JSON.stringify(sh.presence || []) || shvKalSig(SHV.sh) !== shvKalSig(sh);
-    shvPrep(sh); sh._v = S.v; SHV.sh = sh; SHV.err = ''; SHV.errFor = null;
-    shvRefs(id);
+    // 2.663.0 (#4200): the sheet shown asks with its etag first (only while its rev is still the one it came with: an own write
+    // moved it); unchanged = a small answer, nothing parsed or drawn again
+    const old = SHV.sh?.id === id && SHV.sh.etag && SHV.sh.rev === SHV.sh._etRev ? SHV.sh : null;
+    let sh = await rawFetch('GET', '/api/sheets/' + id + (old ? '?etag=' + encodeURIComponent(old.etag) : ''));
+    if (sh?.unchanged) {
+      if (SHV.sh === old && old.etag === sh.etag && old.rev === old._etRev) { old._v = S.v; SHV.err = ''; SHV.errFor = null; SHV.n304 = (SHV.n304 || 0) + 1; sh = null; }
+      else sh = await rawFetch('GET', '/api/sheets/' + id);  // the sheet here changed meanwhile: the whole one
+    }
+    if (sh) {
+      // 2.517.0 (#3714): a load that comes back after the route moved on does not replace the sheet of the route
+      if (S.route.mod === 'sheets' && S.route.sh && S.route.sh !== id && SHV.sh?.id === S.route.sh) return;
+      if (SHV.sh?.id !== id) { SHV.cur = SHV.anc = null; SHV.ed = null; }
+      changed = !SHV.sh || SHV.sh.id !== id || SHV.sh.rev !== sh.rev || JSON.stringify(SHV.sh.presence || []) !== JSON.stringify(sh.presence || []) || shvKalSig(SHV.sh) !== shvKalSig(sh);
+      shvPrep(sh); sh._v = S.v; sh._etRev = sh.rev; SHV.sh = sh; SHV.err = ''; SHV.errFor = null;
+      shvRefs(id);
+    }
   } catch (e) {
     if (e.message === 'auth') return;
     SHV.errFor = id + ':' + S.v; changed = true;
