@@ -278,6 +278,7 @@ const COL_KEY = {
   progress: t => { const k = children(t.id); return k.length ? k.filter(x => x.status !== 0).length / k.length : null; },
   deps: t => t.blocked && t.status === 0 ? 1 : null,
   delivery: t => ({in_progress: 1, waiting: 2, parked: 3})[dv_state(t)] ?? null,  // 2.392.2 (#3365)
+  list: t => { const l = listById(t.list_id); return l ? lname(l) : null; },  // 2.750.0 (#4502): the column "Project" of the collected views
 };
 function sortTasks(arr, m = sortMode()) {
   if (m === 'flow') return flowSort(arr);
@@ -302,7 +303,8 @@ function sortTasks(arr, m = sortMode()) {
   return arr.sort(f);
 }
 function groupTasks(v) {
-  const all = v.mine ? moSort(v.open.slice()) : sortTasks(v.open.slice()), pinned = all.filter(t => t.pinned);  // 2.40.0 (#1344): My tasks in the own order
+  // 2.750.0 (#4502): an own sort of My tasks (a column title, the sort menu) wins over the own order until it is reset
+  const all = v.mine && !LS.get('sort2.' + S.route.key, null) ? moSort(v.open.slice()) : sortTasks(v.open.slice()), pinned = all.filter(t => t.pinned);  // 2.40.0 (#1344): My tasks in the own order
   // 1.7.0: Flow shows one sequence instead of date groups (sections and the folder's lists stay)
   if (v.mine) mseInit();  // 2.569.0 (#4395): the first opening makes the default sections
   const g = v.mine && mseOn() ? mseGroups(all.filter(t => !t.pinned)) : kbOrderGroups(groupRest(v.group === 'date' && sortMode() === 'flow' ? {...v, group: 'none'} : v, all.filter(t => !t.pinned), v.inSec || []));  // 2.39.1 (#1221): own order; 2.569.0 (#4395): own sections

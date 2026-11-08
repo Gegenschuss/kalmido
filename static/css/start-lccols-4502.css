@@ -1,0 +1,10 @@
+/* 2.750.0 (#4502): the column "Project" (key list) of the collected views' column layout (render.js lcCell, lcHead).
+   A start file: Today / My tasks / filters render with the start scripts. */
+.lc-list{width:8rem}
+.lc-list .lst{display:inline-flex;align-items:center;min-width:0;overflow:hidden}
+.lc-list .lst>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lc-list .lst .lic.lsm{flex:none;width:.8125rem;height:.8125rem;margin-right:.25rem}
+.lc-list .lst .lic.lsm svg.i{width:var(--ic-s);height:var(--ic-s)}
+.lc-list .lst .lic.lsm .licd{width:.4375rem;height:.4375rem}
+/* the same width for the cells and the title between 600 and 767 px (app.css: the other columns' widths there) */
+@media (min-width:600px) and (max-width:767px){ :is(.lcols,.lchead) .lc-list{width:6rem} }

@@ -56,16 +56,16 @@ const menuItems = d => [...d.querySelectorAll('.menu-list [role="menuitem"]')];
   // ---- assignee column (desktop): picture or dashed circle, click -> menu -> assigned
   await w.eval('load()'); w.eval('render()'); await sleep(300);
   const row3 = d.querySelector(`.trow[data-id="${T3}"]`);
-  const cw = row3.querySelector('.tcols .c-who .whob');
+  const cw = row3.querySelector('.lcols .lc-who .whob');  // 2.750.0 (#4502): the default columns (was .tcols .c-who)
   check(cw && cw.tagName === 'BUTTON' && cw.querySelector('.who.none') && cw.dataset.act === 'assign', 'unassigned row: dashed circle button');
-  check(d.querySelector(`.trow[data-id="${T1}"] .c-who .whob .who:not(.none)`)?.textContent === 'P', 'assigned row: avatar (initials)');
-  check(!row3.querySelector('.meta .who'), 'no duplicate avatar in the meta line');
+  check(d.querySelector(`.trow[data-id="${T1}"] .lc-who .whob .who:not(.none)`)?.textContent === 'P', 'assigned row: avatar (initials)');
+  check(![...row3.querySelectorAll('.meta .who')].some(x => !x.closest('.mlc')), 'no duplicate avatar in the meta line');  // 2.750.0 (#4502): .mlc = the hidden copy for narrow widths
   cw.click(); await sleep(300);
   let items = menuItems(d);
   check(items.map(b => b.textContent.trim()).join('|') === 'Nobody|Alice (me)|Bob|Carol|Pete · Participant', 'assign menu: nobody + people (roles noted): ' + items.map(b => b.textContent.trim()).join('|'));
   items.find(b => /Carol/.test(b.textContent)).click(); await sleep(900);
   check((await call('alice', 'GET', `/api/tasks/${T3}`)).assignee_id === id.carol, 'assigned from the column');
-  check(d.querySelector(`.trow[data-id="${T3}"] .c-who .who`)?.textContent === 'C', 'column shows the new assignee');
+  check(d.querySelector(`.trow[data-id="${T3}"] .lc-who .who`)?.textContent === 'C', 'column shows the new assignee');
   // subtask in the detail panel: own assign cell
   w.eval(`openDetail(${T2})`); await sleep(800);
   // 2.6.0 (K11): an unassigned subtask shows no circle; it is assigned from its menu (here: the assign menu itself)
@@ -85,7 +85,7 @@ const menuItems = d => [...d.querySelectorAll('.menu-list [role="menuitem"]')];
 
   // ---- phone: compact cell at the row end
   w = await boot({user: 'alice', hash: 'l/' + L, mobile: true}); d = w.document; await sleep(300);
-  const pc = d.querySelector(`.trow[data-id="${T1}"] .wcell .whob`);
+  const pc = d.querySelector(`.trow[data-id="${T1}"] .lcols .lc-who .whob`);  // 2.750.0 (#4502): the default columns (was .wcell): the first two cells sit at the row end
   check(pc && pc.querySelector('.who')?.textContent === 'P', 'phone: assignee cell at the row end');
   pc.click(); await sleep(300);
   check(menuItems(d).length === 6 && /Show/.test(menuItems(d)[0].textContent), 'phone: the same assign menu (2.7.2: "Show …" first)');

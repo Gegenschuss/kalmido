@@ -257,11 +257,13 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
         await open('today');
         const hd = await ev(HEAD);
         check(hd.more && hd.bell && hd.more[1] <= vw + .5 && hd.bell[1] <= vw + .5 && !hd.out.length, `${vw}px: "…" and the bell in view ${JSON.stringify(hd)}`);
-        const rows = await ev(`(() => { const r = document.querySelector('#view .trow.hascols') || document.querySelector('#view .trow'); if (!r) return null; const c = r.querySelector('.tcols'), m = r.querySelector('.meta .m-col'), t = r.querySelector('.ttl');
-          return {cols: !!c && getComputedStyle(c).display !== 'none', meta: !!m && getComputedStyle(m).display !== 'none', tw: Math.round(t.getBoundingClientRect().width), lw: Math.round(document.querySelector('.lwrap').getBoundingClientRect().width), dl: !!r.querySelector('.dlc')}; })()`);
+        const rows = await ev(`(() => { const r = document.querySelector('#view .trow.hascols') || document.querySelector('#view .trow'); if (!r) return null; const c = r.querySelector('.tcols, .lcols'), m = r.querySelector('.meta .m-col, .meta .mlc.o2'), t = r.querySelector('.ttl'), h = document.querySelector('#view .lchead');
+          return {cols: !!c && getComputedStyle(c).display !== 'none', meta: !!m && getComputedStyle(m).display !== 'none', tw: Math.round(t.getBoundingClientRect().width), lw: Math.round(document.querySelector('.lwrap').getBoundingClientRect().width), dl: !!r.querySelector('.dlc'), head: !!h && getComputedStyle(h).display !== 'none'}; })()`);
         if (vw >= 1900) check(rows && rows.cols && !rows.meta, `${vw}px: wide list: columns on the right ${JSON.stringify(rows)}`);
-        if (vw === 904) check(rows && !rows.cols && rows.meta && rows.tw > 300, `Fold inside (904): the rows in two lines (container ${rows?.lw}px), the title gets room ${JSON.stringify(rows)}`);
-        if (vw < 900) check(rows && !rows.cols, `${vw}px: phone rows ${JSON.stringify(rows)}`);
+        // 2.750.0 (#4502): Today has the column layout (.lcols, as a list with its own columns): narrow widths keep two compact
+        // cells at the end of the row and hide the column titles (was: no columns at all below 900 px)
+        if (vw === 904) check(rows && rows.tw > 300, `Fold inside (904): the title gets room (container ${rows?.lw}px) ${JSON.stringify(rows)}`);
+        if (vw < 900) check(rows && !rows.head && rows.tw > 120, `${vw}px: phone rows: no column titles, the title keeps room ${JSON.stringify(rows)}`);
         await shot(`p270-today-${vw}.png`);
         // the date popover with the new rows
         await ev(`datePop(document.querySelector('#top h1'), ${D2}); 1`); await sleep(400);

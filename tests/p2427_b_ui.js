@@ -93,7 +93,8 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
     // no strip without shown fields, none in a board
     await nav(B + '#l/' + P);
     check(await ready(`!!document.querySelector('#view .trow[data-id="${TP}"]')`), 'the list without shown fields');
-    check(!(await ev(`!!document.querySelector('#view .lcbar')`)), '#3551: no strip without shown fields');
+    // 2.750.0 (#4502): a list without its own columns shows its default columns, the strip names them too (was: no strip)
+    check(await ready(`[...document.querySelectorAll('#view .lcbar .lcbn')].some(x => x.dataset.k === 'due')`), '#4502: a list without its own columns: the strip with the default columns');
     await nav(B + '#l/' + K);
     check(await ready(`!!document.querySelector('.kanban') && !!document.querySelector('.kanban .trow[data-id="${TK}"]')`), 'the board');
     check(!(await ev(`!!document.querySelector('#view .lcbar')`)), '#3551: no strip in a board');

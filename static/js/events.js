@@ -214,6 +214,8 @@ async function submitQuick(input, extra = {}) {
   const raw = input.value; let created;
   input.dataset.qbusy = '1';
   try { created = await createTask(body); } catch { return; } finally { delete input.dataset.qbusy; }  // api() said why
+  // 2.750.0 (#4502): the render after the save may have put a new composer in place (renderView copies the text over): clear that one
+  if (!input.isConnected && input.id) input = document.getElementById(input.id) || input;
   if (input.value === raw) { input.value = ''; S.quick.ignore = new Set(); if (o.win) delete o.win; updateChips(input); }  // 2.380.2 (#3403): the chips stay, their win over the text not
   if (pasted.length) { S.qfiles[input.id] = []; qFilesDraw(input); }
   if (input.id === 'qsheet' && (cap || S.quickPreset.content || S.quickPreset.url || S.quickPreset.due_time || S.quickPreset.files?.length)) { S.quickPreset = {}; closePop(); }

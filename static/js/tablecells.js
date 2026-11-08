@@ -7,7 +7,9 @@
 let tcMoved = 0;
 document.addEventListener('pointerdown', e => {
   const b = e.target.closest?.('.lchead .lcs[data-colsort]'); if (!b || e.button !== 0 || e.pointerType === 'touch' || isTouch()) return;
-  const head = b.closest('.lchead'), l = listById(+head.dataset.lid); if (!l || !canManage(l) || !Array.isArray(l.columns)) return;
+  // 2.750.0 (#4502): also a list without its own columns (its default ones become its columns) and a collected view (VC: the person's own)
+  const head = b.closest('.lchead'), l = lcCtx(head.dataset.lid); if (!l || (!l.virtual && !canManage(l))) return;
+  const base = l.virtual ? vcCols() : Array.isArray(l.columns) ? l.columns : lcFallback(l); if (!base) return;
   const cell = b.closest('.lc'), k = cell.dataset.k, x0 = e.clientX, y0 = e.clientY;
   let on = false, guide = null, to = null, cover = null;
   const cells = () => [...head.querySelectorAll('.lc[data-k]')].filter(c => c.getClientRects().length);
@@ -36,8 +38,8 @@ document.addEventListener('pointerdown', e => {
     guide?.remove(); cover?.remove(); cell.classList.remove('lcmove'); document.body.classList.remove('lcmoving');  // 2.331.0 B (#3304): the cover carries the cursor
     if (!on) return;
     tcMoved = Date.now();
-    const next = tcColMove(l.columns, k, to);
-    if (next) colSave(l.id, next);
+    const next = tcColMove(base, k, to);
+    if (next) { if (l.virtual) vcSave(next); else colSave(l.id, next); }
   };
   document.addEventListener('pointermove', mv);
   document.addEventListener('pointerup', up);

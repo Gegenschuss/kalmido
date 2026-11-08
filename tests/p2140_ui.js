@@ -105,7 +105,8 @@ const lst = async id => (await call('GET', '/api/state')).lists.find(l => l.id =
   check(!d.querySelector('#top [data-act="field-cols"]'), 'the old per-device field-columns switch is gone');
   const items = w.eval(`listMenuItems(${P}, document.body)`).map(x => x.label);
   check(items.includes('Shown fields…') && !items.includes('Show task numbers') && !items.some(x => /assignee column/.test(x || '')), 'list "…": "Columns…" replaces "Show task numbers" / "Hide assignee column" ' + items.join(' | '));
-  check(row(T1).querySelector('.tcols') && !row(T1).querySelector('.lcols'), 'default layout: the old date / assignee columns');
+  // 2.750.0 (#4502): a list without its own columns shows its default columns with the title row (was: the old .tcols)
+  check(row(T1).querySelector('.lcols .lc-due') && !row(T1).querySelector('.tcols') && !!d.querySelector('#view .lchead .lc[data-k="due"]'), 'default layout: the default columns with their titles');
   click(w, d.querySelector('#top [data-act="cols"]')); await sleep(200);
   let md = d.querySelector('.modal.colmd');
   check(md && md.getAttribute('role') === 'dialog', 'the Columns dialog opens');
@@ -142,7 +143,7 @@ const lst = async id => (await call('GET', '/api/state')).lists.find(l => l.id =
   check((o0 => o0.length >= 1 && o0.every(k => saved.filter(x => x !== 'id').slice(0, 2).includes(k)))([...r.querySelectorAll('.meta .mlc.o0')].map(x => x.dataset.lc)), '2.290.0 C (#3163): the first two cells have hidden copies for a narrow list ' + [...r.querySelectorAll('.meta .mlc.o0')].map(x => x.dataset.lc).join());
   // Undo
   click(w, d.querySelector('#toast button')); await sleep(900);
-  check((await lst(P)).columns === null && row(T1).querySelector('.tcols'), 'Undo: back to the default layout');
+  check((await lst(P)).columns === null && row(T1).querySelector('.lcols .lc-due') && !row(T1).querySelector('.lcols .lc-prio'), 'Undo: back to the default layout');  // 2.750.0 (#4502): the default columns
   w.eval(`colSave(${P}, ${JSON.stringify(saved)}, true)`); await sleep(500);
   // Default button
   w.eval(`colModal(${P})`); await sleep(150); md = d.querySelector('.modal.colmd');

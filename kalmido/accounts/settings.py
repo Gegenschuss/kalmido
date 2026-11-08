@@ -32,6 +32,7 @@ SETTINGS_SERVER_ONLY = ("digest_sent", "digest_mail_sent", "digest_mail_try", "r
                         "evmail_at", "evmail_day")  # 2.142.0 A (#2146): the bundled event mails sent
 USER_DEFAULTS.setdefault("settings_more", "[]")  # 2.583.0 (#4833): the settings tabs whose "Further options" are open (like modcards.py ws_mods_off)
 USER_DEFAULTS.setdefault("col_widths", "{}")  # 2.742.0 (#4857): the dragged column widths per list (accounts/colwidths.py)
+USER_DEFAULTS.setdefault("view_cols", "")  # 2.750.0 (#4502): the columns of the collected views (Today, My tasks, filters, ...): json list of keys, '' = the default (not in schema.py)
 SIDE_GROUPS = ("focus", "clients", "lists", "filters", "tags", "views", "areas", "team")  # 2.25.0 (UX-03); 2.39.1 (#1185): areas
 # 2.575.0 D (#4051): start_page "a:<area>" = the app opens on that area (the ids of SBB_RAIL in static/js/areas.js; home stays "home")
 START_AREA_RE = re.compile(r"a:(tasks|cal|notes|office|time|review|life|reading|ablage|wiki|sheets|habits|team|agents)")
@@ -99,6 +100,7 @@ def fv2_clean_meta(v):
     return json.dumps(out, ensure_ascii=False, separators=(",", ":"))
 
 
+VIEW_COLS = ("due", "prio", "who", "tags", "time", "progress", "deps", "created", "delivery", "list")  # 2.750.0 (#4502): static/js/render.js COLS
 SETTINGS_FMT = {"week_start": ("", "mon", "sun"), "time_format": ("", "24", "12"), "date_order": ("", "dmy", "mdy", "ymd")}  # 2.368.0 B (#2982)
 
 
@@ -337,6 +339,16 @@ def clean_setting(k, v):
         if not isinstance(o, dict) or len(o) > 200 or not all(isinstance(a, str) and 0 < len(a) <= 80 and isinstance(b, str) and len(b) <= 40 for a, b in o.items()):
             raise bad
         return json.dumps(o, ensure_ascii=False)
+    if k == "view_cols":  # 2.750.0 (#4502): the shown columns of the collected views, in their order ('' = the default)
+        if sv == "":
+            return ""
+        try:
+            o = json.loads(sv)
+        except ValueError:
+            raise bad from None
+        if not isinstance(o, list) or not 0 < len(o) <= len(VIEW_COLS) or not all(isinstance(x, str) and x in VIEW_COLS for x in o):
+            raise bad
+        return json.dumps(list(dict.fromkeys(o)))
     if k == "trial_hint_seen":  # 2.144.10 (#2576): ["<org id>:offer" | "<org id>:invoice", ...]
         try:
             o = json.loads(sv or "[]")  # a JSON string like wgstd_hide (lists are refused above)

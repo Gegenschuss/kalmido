@@ -1257,6 +1257,7 @@ function taskRow(t, opts = {}) {
   if (t.also && !opts.trash && !opts.depth) { const m = ml_rowMark(t); if (m) meta.push(m); }  // 2.71.0 B (#1459): also in / from another list
   if (lst && !rs('list') && !(rsyProjToday() && !opts.trash)) { /* 2.56.1 (#1799): the list is switched off */ }
   else if (lst && moOwn() && !opts.depth && !moListCol()) meta.unshift(moSubHtml(t));  // 2.40.0 (#1344): My tasks, own order: "List › Section"; 2.569.0 (#4395): or the column
+  else if (lst && lc?.includes('list')) { /* 2.750.0 (#4502): the column "Project" shows it */ }
   else if (lst && ws_isOrigin(listById(t.list_id))) meta.push(ws_originHtml(listById(t.list_id), lst, 'lst' + mc));  // 2.580.0 (#4821): under "All" + Bereich · Liste
   else if (lst) meta.push(`<span class="lst${mc}" title="${esc(lst)}">${licMark(listById(t.list_id), 'lsm')}${esc(lst)}</span>`);  // 2.36.2 (#1135)
   // 2.16.0 (#473): overdue is not only red: the alert icon + a word for screen readers
@@ -1314,7 +1315,7 @@ function taskRow(t, opts = {}) {
   const chk = (t.status === 2 ? 'on' : t.status === -1 ? 'wont' : 'p' + (opts.checklist ? 0 : t.priority)) + (work ? ' work' : '') + (isMs(t) ? ' ms' : '');
   let lcH = '';
   if (lc) {  // 2.14.0 (#425): the cells in the list's order; a cell the width has no room for shows in the second line
-    const cells = lc.filter(k => k !== 'id').map(k => [k, lcCell(k, t, {kids, openKids, time, checklist: opts.checklist})]);
+    const cells = lc.filter(k => k !== 'id').map(k => [k, lcCell(k, t, {kids, openKids, time, checklist: opts.checklist, vc: opts.vc, inDay})]);
     lcH = `<div class="lcols" id="tc-${t.id}" data-act="open"${lcFit(lc)}>${cells.map(([k, c], i) => `<span class="lc ${lcCls(k)} ${lcOvf(i)}" data-k="${esc(k)}"${tcAttr(k, t)}>${c}</span>`).join('')}</div>`;  // 2.39.1 (#1327): tcAttr
     cells.forEach(([k, c], i) => { if (c && i >= 2) meta.push(`<span class="mlc ${lcOvf(i)}" data-lc="${esc(k)}">${c}</span>`); });
     meta.unshift(...cells.slice(0, 2).filter(([, c]) => c).map(([k, c]) => `<span class="mlc o0" data-lc="${esc(k)}">${c}</span>`));  // 2.290.0 C (#3163): the first two cells too, shown only in a narrow list on a computer (app.css), else hidden
@@ -1592,11 +1593,13 @@ const fieldCols = lid => td_colsWide() && !!LS.get('fcols.' + lid, false) && fie
 // moves into the second line (classes o2 … o10: the cell's index needs at least that many columns of room).
 const PRIO_NAMES = {1: N_('Low'), 3: N_('Medium'), 5: N_('High'), 7: N_('Urgent')};
 const COLS = [['due', N_('Due')], ['prio', N_('Priority')], ['who', N_('Assignee')], ['tags', N_('Tags')], ['time', N_('Tracked time')],
-  ['progress', N_('Subtasks')], ['deps', N_('Blocked by')], ['created', N_('Created')], ['delivery', N_('Delivery state')]];  // 2.392.2 (#3365): delivery
-const COL_ICON = {due: 'cal', prio: 'flag', who: 'user', tags: 'tag', time: 'clock', progress: 'sub', deps: 'deps', created: 'plus', delivery: 'pause'};
+  ['progress', N_('Subtasks')], ['deps', N_('Blocked by')], ['created', N_('Created')], ['delivery', N_('Delivery state')],  // 2.392.2 (#3365): delivery
+  ['list', N_('Project')]];  // 2.750.0 (#4502): the task's project, only in collected views (vcChoices; a single list has no such column)
+const COL_ICON = {due: 'cal', prio: 'flag', who: 'user', tags: 'tag', time: 'clock', progress: 'sub', deps: 'deps', created: 'plus', delivery: 'pause', list: 'list'};
 function colChoices(l) {  // [key, name] of the columns this list can show (the task number separately)
+  if (l?.virtual) return vcChoices();  // 2.750.0 (#4502): the collected views' own set
   // 2.412.0 (#3552): a property the project switched off (props.js) is no column either
-  const ok = k => !pz_on(l, PZ_COL[k] || '') ? false : k === 'who' ? collab() && !!l.shared : k === 'time' ? timeOn() && mtTime(l.id) : k === 'deps' ? depsOn() && isProject(l.id) : true;
+  const ok = k => k === 'list' || !pz_on(l, PZ_COL[k] || '') ? false : k === 'who' ? collab() && !!l.shared : k === 'time' ? timeOn() && mtTime(l.id) : k === 'deps' ? depsOn() && isProject(l.id) : true;
   return [...COLS.filter(([k]) => ok(k)).map(([k, n]) => [k, tr(n)]), ...fieldsOf(l.id).map(f => ['f:' + f.id, f.name])];
 }
 const colCfg = lid => { const l = listById(lid); return l && Array.isArray(l.columns) ? l.columns : null; };
@@ -1615,7 +1618,7 @@ function colDefault(l) {  // what the default layout shows: the starting point o
 // text-like fields: class lcgw) share what the title leaves above about 40rem, each at most 15rem more than its standard
 // width; number and date columns keep their width. lcFit = the standard widths (rem, LC_BASE, the same as app.css) plus the
 // gaps of all shown columns and the number of growing ones, as variables for the column titles, the rows and the sum row
-const LC_BASE = {due: 7.5, prio: 5.5, who: 2.75, tags: 9, time: 6, progress: 4.5, deps: 5.5, created: 6, delivery: 7};
+const LC_BASE = {due: 7.5, prio: 5.5, who: 2.75, tags: 9, time: 6, progress: 4.5, deps: 5.5, created: 6, delivery: 7, list: 8};  // 2.750.0 (#4502): + list (start-lccols-4502.css)
 const LC_GROW_T = ['text', 'select', 'multiselect', 'person', 'url', 'task'];
 const lcFtype = k => (S.fields || []).find(f => f.id === +k.slice(2))?.type || 'text';
 const lcGrows = k => k === 'tags' || k === 'delivery' || (k.startsWith('f:') && LC_GROW_T.includes(lcFtype(k)));
@@ -1627,13 +1630,50 @@ function lcFit(lc) {
 const lcCls = k => 'lc-' + (k.startsWith('f:') ? 'f t-' + lcFtype(k) : k) + (lcGrows(k) ? ' lcgw' : '');
 // 2.583.0 (#4840 Teil F): + o13 / o16: on a very wide list the 11th to 16th column stay in the first line too (app.css)
 const lcOvf = i => [2, 3, 5, 7, 10, 13, 16].filter(n => i >= n).map(n => 'o' + n).join(' ');
+// ---- 2.750.0 (#4502): the column titles (sort by a click, the column menu) in every list view. A list without its own
+// columns shows its default layout as columns (lcFallback = the starting point of "Columns…"; checklists, shopping lists
+// and archived lists keep the plain rows). The collected views (Today, My tasks, filters, tags, folders, …) show the
+// person's own choice (user setting view_cols: json list of keys, '' = vcDefault; the same in every collected view and on
+// every device), with the column "Project"; their title row carries data-lid="v" (VC instead of a list)
+function lcFallback(l) {
+  if (!l || l.checklist || l.family === 'shopping' || l.archived) return null;
+  const c = colDefault(l).filter(k => k === 'id' || colChoices(l).some(y => y[0] === k));
+  return c.some(k => k !== 'id') ? c : null;  // nothing but the number: the plain rows
+}
+const VC = {id: 'v', virtual: true, name: ''};
+const lcCtx = lid => lid === 'v' ? VC : listById(+lid);
+const vcOk = k => k === 'who' ? collab() : k === 'time' ? timeOn() : k === 'deps' ? depsOn() : true;
+const vcChoices = () => COLS.filter(([k]) => vcOk(k)).map(([k, n]) => [k, tr(n)]);
+const vcDefault = () => ['due', 'who', 'time', 'list', 'progress', 'deps', 'tags'].filter(vcOk);
+function vcCols() {
+  let c = null; try { c = JSON.parse(S.settings?.view_cols || 'null'); } catch { c = null; }
+  const av = new Set(vcChoices().map(x => x[0])), out = Array.isArray(c) ? c.filter(k => av.has(k)) : [];
+  return out.length ? out : vcDefault();
+}
+async function vcSave(next, quiet) {  // next = the keys in their order, null = the default
+  const prev = S.settings.view_cols || '', v = next && next.length ? JSON.stringify(next) : '';
+  if (v === prev) return;
+  S.settings.view_cols = v; render();
+  try { await api('PATCH', '/api/settings', {view_cols: v}); } catch { S.settings.view_cols = prev; render(); return; }
+  if (quiet) return;
+  const go = x => async () => { await vcSave(x ? JSON.parse(x) : null, true); return {}; };
+  offerUndo(tr('Shown columns saved'), histAdd({label: tr('Shown columns'), sett: true, undo: go(prev), redo: go(v)}));
+}
+function vcItems() {  // the shown columns of the collected views: tick on / off (the last one stays), back to the default
+  const cur = vcCols();
+  return [...vcChoices().map(([k, n]) => { const on = cur.includes(k); return {label: n, icon: COL_ICON[k], on, dis: on && cur.length < 2, fn: () => vcSave(on ? cur.filter(x => x !== k) : [...cur, k])}; }),
+    '-', {label: tr('Default columns'), icon: 'undo', fn: () => vcSave(null)}];
+}
+document.addEventListener('click', e => { const b = e.target.closest?.('[data-act="vcols"]'); if (!b) return; e.preventDefault(); e.stopPropagation(); menu(b, [{label: tr('Shown columns'), dis: true, cls: 'mhead'}, '-', ...vcItems()]); }, true);
 const colName = (l, k) => k === 'id' ? tr('Task number') : (colChoices(l).find(x => x[0] === k) || [0, ''])[1];
 const colShort = (l, k) => k === 'time' ? tr('Tracked') : colName(l, k);  // the title row's label (narrow columns)
 function lcCell(k, t, x) {
   switch (k) {
-    case 'due': return t.due && !x.checklist ? `<span class="dt ${dueClass(t)}" title="${esc(dueLabel(t))}">${dueClass(t) === 'over' ? ic('alert', 's') + `<span class="sr">${tr('Overdue')}: </span>` : ''}${t.start && t.start < t.due ? ic('timeline', 's rngi') : ''}<span class="cdt">${esc(dueLabel(t, false))}</span></span>` : '<span class="lcnil" aria-hidden="true">\u2013</span>';  // 2.87.9 (#1914): dim dash for an empty cell
+    case 'due': if (x.inDay) return t.due_time ? `<span class="dt today" title="${esc(dueLabel(t))}">${ic('clock', 's')}<span class="cdt">${esc(t.due_time)}</span></span>` : '<span class="lcnil" aria-hidden="true">\u2013</span>';  // 2.750.0 (#4502): Today shows the time only, like its date column did (#1051)
+      return t.due && !x.checklist ? `<span class="dt ${dueClass(t)}" title="${esc(dueLabel(t))}">${dueClass(t) === 'over' ? ic('alert', 's') + `<span class="sr">${tr('Overdue')}: </span>` : ''}${t.start && t.start < t.due ? ic('timeline', 's rngi') : ''}<span class="cdt">${esc(dueLabel(t, false))}</span></span>` : '<span class="lcnil" aria-hidden="true">\u2013</span>';  // 2.87.9 (#1914): dim dash for an empty cell
     case 'prio': return t.priority && !x.checklist && PRIO_NAMES[t.priority] ? `<span class="lcp flag-${t.priority}" title="${esc(tr(PRIO_NAMES[t.priority]))}">${ic('flag', 's')}<span class="lbl">${esc(tr(PRIO_NAMES[t.priority]))}</span></span>` : '';
-    case 'who': return t.id > 0 && collab() ? whoCell(t) : '';
+    case 'who': return t.id > 0 && collab() && (!x.vc || listById(t.list_id)?.shared) ? whoCell(t) : '';  // 2.750.0 (#4502): a collected view: only shared lists have someone to assign
+    case 'list': { const l = listById(t.list_id); return l ? `<span class="lst" title="${esc(lname(l))}">${licMark(l, 'lsm')}<span>${esc(lname(l))}</span></span>` : ''; }  // 2.750.0 (#4502): like the project chip (.lst)
     case 'tags': return [...(t.ltags || []).map(g => ltagChip(g, t.list_id)), ...t.tags.map(g => ptagChip(g, t.list_id))].join('');
     case 'time': return x.time ? `<span class="tchip ${x.time.live ? 'live' : ''}" data-tt="${t.id}" title="${x.time.tip}">${ic('clock', 's')}<b>${x.time.txt}</b></span>` : '';
     case 'progress': return x.kids.length ? `<span class="subc" title="${esc(tr('{0} of {1} subtasks done', x.kids.length - x.openKids, x.kids.length))}">${ic('sub', 's')}${x.kids.length - x.openKids}/${x.kids.length}</span>` : '';
@@ -1759,7 +1799,7 @@ function lcBar(l, lc) {
   if (!ks.length || l.archived || isOverview()) return '';
   const cur = sortMode();
   return `<div class="lcbar" data-lid="${l.id}" role="toolbar" aria-label="${esc(tr('Shown fields'))}"><div class="lcbs">${ks.map(k => { const n = colName(l, k), on = colSorts(k).includes(cur), dir = on ? sortDir(cur) : '';
-    return `<button type="button" class="lcbn${on ? ' sorted' : ''}" data-k="${esc(k)}" aria-haspopup="menu" title="${esc(tr('Column menu: {0}', n))}"><span>${esc(n)}</span>${on ? `<span class="lcsa" aria-hidden="true">${ic('chev', dir === 'ascending' ? 's cup' : 's')}</span>` : ''}</button>`; }).join('')}</div><button type="button" class="lcbf" data-act="cols" data-id="${l.id}" aria-haspopup="dialog" title="${esc(tr('Shown fields…'))}">${ic('columns', 's')}<span>${esc(tr('Fields'))}</span></button></div>`;
+    return `<button type="button" class="lcbn${on ? ' sorted' : ''}" data-k="${esc(k)}" aria-haspopup="menu" title="${esc(tr('Column menu: {0}', n))}"><span>${esc(n)}</span>${on ? `<span class="lcsa" aria-hidden="true">${ic('chev', dir === 'ascending' ? 's cup' : 's')}</span>` : ''}</button>`; }).join('')}</div>${l.virtual ? `<button type="button" class="lcbf" data-act="vcols" aria-haspopup="menu" title="${esc(tr('Shown columns'))}">${ic('columns', 's')}<span>${esc(tr('Columns'))}</span></button>` /* 2.750.0 (#4502) */ : `<button type="button" class="lcbf" data-act="cols" data-id="${l.id}" aria-haspopup="dialog" title="${esc(tr('Shown fields…'))}">${ic('columns', 's')}<span>${esc(tr('Fields'))}</span></button>`}</div>`;
 }
 document.addEventListener('click', e => { const b = e.target.closest?.('.lcbar .lcbn[data-k]'); if (!b) return; e.preventDefault(); lcMenu(b); });
 // 2.31.0 (#354): first click = the column's natural order, second = reversed, third = the list's sort again
@@ -1777,21 +1817,22 @@ let sortSharedHint = false;
 // 2.31.0 (#354): right-click on a column title: both directions, hide the column (owner / list admins), "Shown fields…"
 document.addEventListener('contextmenu', e => {
   const c = e.target.closest?.('.lchead .lc[data-k]'); if (!c || e.shiftKey) return;
-  if (!listById(+c.closest('.lchead').dataset.lid)) return;
+  if (!lcCtx(c.closest('.lchead').dataset.lid)) return;  // 2.750.0 (#4502): or a collected view
   e.preventDefault(); lcMenu(c);
 });
 // 2.39.1 (#1327): the same menu from the small arrow in the column title (hover / focus)
 document.addEventListener('click', e => { const b = e.target.closest?.('.lchead [data-colmenu]'); if (!b) return; e.preventDefault(); e.stopPropagation(); lcMenu(b.closest('.lc')); }, true);
 function lcMenu(c) {
-  const l = listById(+c.closest('.lchead,.lcbar').dataset.lid); if (!l) return;  // 2.427.0 B (#3551): + the phone strip
-  const k = c.dataset.k, p = colSorts(k), cur = sortMode(), lc = listCols(l) || [];
+  const l = lcCtx(c.closest('.lchead,.lcbar').dataset.lid); if (!l) return;  // 2.427.0 B (#3551): + the phone strip; 2.750.0 (#4502): lcCtx
+  const k = c.dataset.k, p = colSorts(k), cur = sortMode(), lc = l.virtual ? vcCols() : listCols(l) || lcFallback(l) || [];
   const dirName = m => sortDir(m) === 'ascending' ? tr('Sort ascending') : tr('Sort descending');
   const pick = m => { LS.del('sortback.' + S.route.key); sortSet(m); };
   menu(c, [{label: colName(l, k), dis: true, cls: 'mhead'}, '-',
     ...[p[0], p[1]].map(m => ({label: dirName(m), icon: 'sort', on: cur === m, fn: () => pick(m)})),
-    ...sgColMenu(l, k, c),  // 2.43.0 (#1331): filter by a value of the column
-    '-', ...(canManage(l) ? [{label: tr('Hide column'), icon: 'eyeoff', fn: () => colSave(l.id, lc.filter(x => x !== k))}] : []),
-    {label: tr('Shown fields…'), icon: 'columns', fn: () => colModal(l.id)}]);
+    ...(l.virtual ? [] : sgColMenu(l, k, c)),  // 2.43.0 (#1331): filter by a value of the column
+    // 2.750.0 (#4502): a collected view: the person's own columns (the last one stays)
+    '-', ...(l.virtual ? (lc.length > 1 ? [{label: tr('Hide column'), icon: 'eyeoff', fn: () => vcSave(lc.filter(x => x !== k))}] : []) : canManage(l) ? [{label: tr('Hide column'), icon: 'eyeoff', fn: () => colSave(l.id, lc.filter(x => x !== k))}] : []),
+    l.virtual ? {label: tr('Shown columns'), icon: 'columns', more: vcItems()} : {label: tr('Shown fields…'), icon: 'columns', fn: () => colModal(l.id)}]);
 }
 // 2.31.0: a focusable separator needs a value (axe aria-required-attr): the standard width says 7 rem, read out as "Standard width"
 // ---- 2.16.0 (#634): column widths per device and list (localStorage lcw.<list>: {key: rem}), applied as one style sheet
@@ -1840,7 +1881,7 @@ function lcwSet(lid, k, v) {
 document.addEventListener('pointerdown', e => {
   const g = e.target.closest?.('.lchead .lcg'); if (!g || e.button !== 0) return;
   e.preventDefault(); e.stopPropagation();
-  const lid = +g.closest('.lchead').dataset.lid, k = g.dataset.lcg, cell = g.closest('.lc');
+  const lid = g.closest('.lchead').dataset.lid, k = g.dataset.lcg, cell = g.closest('.lc');  // 2.750.0 (#4502): 'v' = a collected view
   const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16, x0 = e.clientX, w0 = cell.getBoundingClientRect().width / rem;
   // 2.39.1 (#1217): the grip sits on the line left of its column (the columns hang on the right edge, so this line moves
   // with the mouse): dragging left widens the column; the title keeps at least LC_TITLE_MIN; an accent line runs down the list
@@ -1875,10 +1916,10 @@ function td_lcSweep() {
   document.querySelectorAll('body > .lcguide, body > .lccover').forEach(x => x.remove());
   if (document.body.classList.contains('pgdrag') && !document.querySelector('.drag')) { document.body.classList.remove('pgdrag', 'lcwdrag'); dragRestFlush(); }
 }
-document.addEventListener('dblclick', e => { const g = e.target.closest?.('.lchead .lcg'); if (g) lcwSet(+g.closest('.lchead').dataset.lid, g.dataset.lcg, null); });
+document.addEventListener('dblclick', e => { const g = e.target.closest?.('.lchead .lcg'); if (g) lcwSet(g.closest('.lchead').dataset.lid, g.dataset.lcg, null); });
 document.addEventListener('keydown', e => {
   const g = e.target.closest?.('.lchead .lcg'); if (!g) return;
-  const lid = +g.closest('.lchead').dataset.lid, k = g.dataset.lcg, rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+  const lid = g.closest('.lchead').dataset.lid, k = g.dataset.lcg, rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
   const cur = g.closest('.lc').getBoundingClientRect().width / rem || lcwGet(lid)[k] || parseFloat(getComputedStyle(g.closest('.lc')).width) / rem || 7;
   const to = {ArrowLeft: cur + (e.shiftKey ? 2 : .5), ArrowRight: cur - (e.shiftKey ? 2 : .5)}[e.key];  // 2.39.1 (#1217): the arrow moves the line
   if (to != null) { e.preventDefault(); e.stopPropagation(); lcwSet(lid, k, Math.min(to, lcwRoom(g.closest('.lchead'), k))); }  // 2.742.0 (#4857)
@@ -2010,7 +2051,8 @@ function viewListBody() {
   const groups = msvvMerge(groupTasks(v), v), flow = sortMode() === 'flow', crd = sortMode().startsWith('created');  // 2.73.0 C (#661): + other servers
   const showList = !v.list;
   const rl = v.list && listById(v.list), ro = rl && !canEditList(rl.id), ck = !!(rl && rl.checklist);
-  const lc = rl ? listCols(rl) : null;  // 2.14.0 (#425)
+  // 2.14.0 (#425); 2.750.0 (#4502): a list without its own columns shows its default ones, a collected view the person's own
+  const vc = !rl && !NOLIST_KEYS.includes(S.route.key), lc = rl ? listCols(rl) || lcFallback(rl) : vc ? vcCols() : null;
   const cols = rl && !lc && fieldCols(rl.id) ? fieldsOf(rl.id).slice(0, 6) : null;
   let h = (rl ? listHead(rl) : v.folder ? folderHead(v.folder) : agBandHtml()) + (rl?.org_reader ? ovJoinBar(rl) : ro ? `<div class="rohint">${ic(isPart(rl.id) ? 'user' : 'eye', 's')}${esc(isPart(rl.id) ? tr('Only your tasks · shared by {0}', rl.owner_name) : tr('Read-only, shared by {0}', rl.owner_name))}</div>` : '');
   // 2.25.0 (UX-54): "Now doable" explains itself once
@@ -2034,7 +2076,7 @@ function viewListBody() {
   h += sgFilterNote(rl);  // 2.43.0 (#1331): a column filter of the list says so (sheetgrid.js)
   if (rl && sortOwn()) h += `<div class="onehint sortown">${ic('sort', 's')}<span>${esc(tr('You see your own sort of this shared project.'))}</span><button type="button" class="btn sm" data-act="sort-shared">${tr('Back to the shared sort')}</button></div>`;  // 2.27.0 (#988)
   if (flow && FLOW.cyc) h += `<div class="flowhint">${ic('deps', 's')}${esc(tr('Some tasks block each other in a circle; they are ordered by date.'))}</div>`;
-  if (lc && total0(groups)) h += lcHead(rl, lc) + lcBar(rl, lc);  // 2.427.0 B (#3551): + the strip for narrow layouts
+  if (lc && total0(groups)) h += lcHead(rl || VC, lc) + lcBar(rl || VC, lc);  // 2.427.0 B (#3551): + the strip for narrow layouts
   if (cols) h += `<div class="fcolhead"><span class="spacer"></span>${cols.map(f => `<span class="fcell t-${esc(f.type)}" title="${esc(f.name)}">${esc(f.name)}</span>`).join('')}</div>`;
   const total = groups.reduce((n, g) => n + g.tasks.length, 0);
   const flowDeps = flow && depsOn() && (() => {
@@ -2067,7 +2109,7 @@ function viewListBody() {
     // 1.7.0 Flow: the first task of each group that waits on nothing is marked "Next" (2.0.4: "Ready to start", and only
     // when some open task shown here waits on something; without dependencies the badge would say nothing)
     const nx = flow && flowDeps ? g.tasks.find(t => t.status === 0 && !t.context && !(t.blocked && dFor(t)))?.id : 0;
-    if (!closed) { const n = Math.max(0, Math.min(g.tasks.length, budget)), row = (t, i) => (g.byList && (!i || g.tasks[i - 1].list_id !== t.list_id) ? mtListHead(t.list_id) : '') + (t._msv ? msvvRow(t._msv.sid, t._msv.t, {showList: true}) : taskRow(t, {showList: showList && !g.lic, tree: true, cols, lc, tcols: {list: showList && !g.lic && (!moOwn() || moListCol())}, next: t.id === nx, crd, inToday: S.route.key === 'today', ...(v.dsx ? {dsx: showDone(), ...(t.status ? {drag: false} : {})} : {})}));  /* 2.73.0 C (#661): a task of another server */ h += vl ? vl_seg(g.id ?? '-', g.tasks, row, vl_tree(!!v.dsx && showDone())) : g.tasks.slice(0, n).map(row).join(''); budget -= n; cut += g.tasks.length - n; }
+    if (!closed) { const n = Math.max(0, Math.min(g.tasks.length, budget)), row = (t, i) => (g.byList && (!i || g.tasks[i - 1].list_id !== t.list_id) ? mtListHead(t.list_id) : '') + (t._msv ? msvvRow(t._msv.sid, t._msv.t, {showList: true}) : taskRow(t, {showList: showList && !g.lic, tree: true, cols, lc, vc, tcols: {list: showList && !g.lic && (!moOwn() || moListCol())}, next: t.id === nx, crd, inToday: S.route.key === 'today', ...(v.dsx ? {dsx: showDone(), ...(t.status ? {drag: false} : {})} : {})}));  /* 2.73.0 C (#661): a task of another server */ h += vl ? vl_seg(g.id ?? '-', g.tasks, row, vl_tree(!!v.dsx && showDone())) : g.tasks.slice(0, n).map(row).join(''); budget -= n; cut += g.tasks.length - n; }
     // 2.46.2 (#1662): no drop field under an empty section any more; the section name takes the drop (.ghead.drop)
     if (g.name) h += '</div>';
   }
@@ -2090,7 +2132,7 @@ function viewListBody() {
   if (v.done.length && showDone()) {
     const closed = !S.collapsed.has('done-open');
     h += `<div class="group"><div class="ghead ${closed ? 'closed' : ''}" data-act="collapse" data-key="done-open">${ic('chev', 's')}${tr('Completed')} <span class="c">${v.done.length}</span></div>`;
-    if (!closed) { const dn = v.done.sort((a, b) => (b.completed_at || '').localeCompare(a.completed_at || '')), row = t => taskRow(t, {showList, drag: false, cols, lc, tcols: {list: showList}}); h += vl ? vl_seg('done-open', dn, row) : dn.map(row).join(''); }
+    if (!closed) { const dn = v.done.sort((a, b) => (b.completed_at || '').localeCompare(a.completed_at || '')), row = t => taskRow(t, {showList, drag: false, cols, lc, vc, tcols: {list: showList}}); h += vl ? vl_seg('done-open', dn, row) : dn.map(row).join(''); }
     h += '</div>';
   }
   if (tdc) { const i = h.indexOf('\u0001'); return h.slice(0, i) + lyHtml('today', {...tdc, tasks: h.slice(i + 1), inbox: tdc.inbox || ''}); }

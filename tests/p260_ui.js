@@ -92,7 +92,8 @@ const TOUCH = `(() => {
     for (const p of ['::before', '::after']) { const ps = getComputedStyle(e, p); if (ps.content !== 'none' && ps.position === 'absolute' && ps.pointerEvents !== 'none') { w = Math.max(w, parseFloat(ps.width) || 0); h = Math.max(h, parseFloat(ps.height) || 0); } }
     const lab = e.closest('label'); if (lab) { const lr = lab.getBoundingClientRect(); w = Math.max(w, lr.width); h = Math.max(h, lr.height); }
     // 2.16.0 (#473): a task's title is a keyboard / screen-reader stop; on touch the whole row is the target that opens it
-    const row = e.matches('.ttl[data-kt]') && e.closest('.trow'); if (row) { const rr = row.getBoundingClientRect(); w = Math.max(w, rr.width); h = Math.max(h, rr.height); }
+    // 2.750.0 (#4502): the same for the cells of the column layout (.lcols, data-act=open: a tap opens the task like the row)
+    const row = e.matches('.ttl[data-kt], .lcols[data-act="open"]') && e.closest('.trow'); if (row) { const rr = row.getBoundingClientRect(); w = Math.max(w, rr.width); h = Math.max(h, rr.height); }
     if (w >= 43.5 && h >= 43.5) continue;
     // 2.31.0 (#1053, decided): the view tabs of a list header (.vsegm) are a compact segmented control, 36 px high, 44 wide
     if (e.closest('.vsegm') && w >= 43.5 && h >= 35.5) continue;
@@ -204,10 +205,10 @@ const TOUCH = `(() => {
   // 2.368.0 (#2982): English dates in the British order of en-GB ("28 Sep", was "Sep 28")
   check(w.eval('fmtTok(59100)') === '59.1k' && w.eval(`weekTitle('2026-09-28')`) === '28 Sep – 4 Oct · Week 40' && w.eval(`weekTitle('2026-12-28')`) === '28 Dec 2026 – 3 Jan 2027 · Week 53', 'English: 59.1k, week titles: ' + w.eval(`weekTitle('2026-12-28')`));
   const rowT = d.querySelector(`#view .trow[data-id="${T}"]`), rowT2 = d.querySelector(`#view .trow[data-id="${T2}"]`);
-  const cd = rowT.querySelector('.c-date');
+  const cd = rowT.querySelector('.lc-due .dt');  // 2.750.0 (#4502): the default columns (was .c-date)
   check(cd && cd.querySelector('.cdt') && cd.querySelector('.rngi') && / – /.test(cd.title) && !/ – /.test(cd.querySelector('.cdt').textContent), 'date column: own text span, a range icon, the whole range in the tooltip: ' + cd?.title);
-  check(rowT2.querySelector('.c-date .cdt').textContent.endsWith(', ' + w.eval(`fmtTimeLoc('10:00')`)),  // 2.368.0 (#2982): the time as the app shows times
-    'a time after a comma, as in the panel: ' + rowT2.querySelector('.c-date .cdt').textContent);
+  check(rowT2.querySelector('.lc-due .cdt').textContent.endsWith(', ' + w.eval(`fmtTimeLoc('10:00')`)),  // 2.368.0 (#2982): the time as the app shows times
+    'a time after a comma, as in the panel: ' + rowT2.querySelector('.lc-due .cdt').textContent);
   w.eval(`openDetail(${T2})`); await idle(w);
   check(d.querySelector('#detail .dchip .dct').textContent === w.eval(`dueLabel(taskById(${T2}))`), 'the panel uses the same text');
   // ================= K11: the assignee circle only where it means something
@@ -340,7 +341,7 @@ const TOUCH = `(() => {
           if (theme === 'dark') await shot(`p260-toast-${Wd}.png`);
           // K07: the date column is never cut on the left (desktop columns)
           if (Wd >= 1280) {
-            const cut = await ev(`[...document.querySelectorAll('#view .tcols .c-date')].filter(c => c.offsetWidth && c.querySelector('.cdt')).filter(c => c.querySelector('.cdt').getBoundingClientRect().left < c.getBoundingClientRect().left - 0.5).length`);
+            const cut = await ev(`[...document.querySelectorAll('#view .lcols .lc-due')].filter(c => c.offsetWidth && c.querySelector('.cdt')).filter(c => c.querySelector('.cdt').getBoundingClientRect().left < c.getBoundingClientRect().left - 0.5).length`);
             check(cut === 0, `${Wd}px ${theme}: no date cut on the left`);
           }
           // K25: the week title on one line

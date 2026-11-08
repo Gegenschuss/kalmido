@@ -17846,6 +17846,8 @@
   "Only changes of others": "Seulement les modifications des autres",
   "Select the bank account this statement belongs to": "Choisis le compte bancaire de ce relevé",
   "Import CSV files on their own when you select a bank account: XML and MT940 statements name their account themselves": "Importe les fichiers CSV séparément si tu sélectionnes un compte bancaire : les relevés XML et MT940 indiquent eux-mêmes leur compte",
+  "Shown columns": "Colonnes affichées",
+  "Shown columns saved": "Colonnes affichées enregistrées",
   "Rights group": "Groupe de droits",
   "Changed: {0}": "Modifié : {0}",
   "You may not change it any more, so it cannot be undone": "Tu ne peux plus le modifier, il ne peut donc pas être annulé",

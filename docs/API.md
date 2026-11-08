@@ -1645,6 +1645,10 @@ tasks: {task id: section id}}` (the tasks put into an own section by hand). The 
 person put it into a section by hand; a task with a position but no section stands in the topmost section. Personal: lists,
 their sections and their order never change; agents have none (403).
 
+2.750.0 (#4502): the column titles of the collected views (Today, My tasks, filters, tags, folders) show the person's own
+columns: the setting `view_cols` is a json list of keys in their order (`due`, `prio`, `who`, `tags`, `time`, `progress`,
+`deps`, `created`, `delivery`, `list` = the task's project), `""` = the default; anything else is `400`.
+
 2.156.0 C (#2072): "My tasks" as a board: `mine_board` is `0` (the project, default) or `1`; `mine_board_by` names its columns:
 `due` (Overdue / Today / This week / Later / No date, default), `prio` or `list`. Dropping a card on a column is a plain task
 change (date, priority or project). 2.156.0 C (#2071): a project's `view` may also be `calendar` (the calendar with only that project's

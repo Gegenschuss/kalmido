@@ -1036,7 +1036,7 @@ function sortMenu(anchor) {
   // 1.7.0: "Flow" = in the order the dependencies allow (only with the dependencies module)
   // 2.0.8 (#319): "Created" newest first; picking it again while it is on flips to oldest first (and back)
   const crOn = cur === 'created' || cur === 'created_asc';
-  menu(anchor, [...(cc ? [{label: tr('Column: {0}', (l && colName(l, cc)) || cc) + ' · ' + ccDir, icon: 'sort', on: true, cls: 'sortcol', title: tr('Click again to reverse the direction'), fn: () => { const p = colSorts(cc); set(cur === p[0] ? p[1] : p[0]); }}, '-'] : []),
+  menu(anchor, [...(cc ? [{label: tr('Column: {0}', colName(l || VC, cc) || cc) + ' · ' + ccDir, icon: 'sort', on: true, cls: 'sortcol', title: tr('Click again to reverse the direction'), fn: () => { const p = colSorts(cc); set(cur === p[0] ? p[1] : p[0]); }}, '-'] : []),
     ...[['prio', N_('Priority, then manual')], ['custom', N_('Manual only')], ['date', N_('Date')], ['title', N_('Title')], ['creator', N_('Creator|sort')], ...(depsOn() ? [['flow', N_('Flow|sort')]] : [])].map(([m, n]) => ({label: tr(n), on: cur === m, fn: () => set(m)})),
     {label: !crOn ? tr('Created|sort') : cur === 'created' ? tr('Created: newest first') : tr('Created: oldest first'), on: crOn, cls: 'sortcr', title: crOn ? tr('Click again to reverse the direction') : '', fn: () => set(cur === 'created' ? 'created_asc' : 'created')},
     ...(cfs.length ? ['-', ...cfs.map(f => ({label: tr('Field: {0}', f.name), icon: FT_ICON[f.type], on: cur === 'cf:' + f.id, fn: () => set('cf:' + f.id)}))] : []),
