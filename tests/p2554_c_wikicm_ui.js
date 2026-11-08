@@ -123,22 +123,23 @@ const ROUND = '---\ntags: demo\n---\n# Title  \n\nSome **bold** word and `code`.
 
     // ---- "Edit as Markdown" (the way out) and back
     await ev(`(() => { document.querySelector('[data-wk="pmenu"]').click(); return 1; })()`);
-    await click(`[...document.querySelectorAll('#pop [role="menuitem"]')].find(b => /Edit as Markdown/.test(b.textContent))`);
+    check(await until(`!![...document.querySelectorAll('#pop [role="menuitem"]')].find(b => /Edit as Markdown/.test(b.textContent))`) && await click(`[...document.querySelectorAll('#pop [role="menuitem"]')].find(b => /Edit as Markdown/.test(b.textContent))`), 'the menu entry is there and clicked');
     check(await until(`!!document.querySelector('#wk-body') && !document.querySelector('#wk-cm')`), 'markdown: the plain field');
     check(await ev(`document.querySelector('#wk-body').value.includes('- [x] Box one') && document.querySelector('#wk-body').value.includes('| pear | 4 |')`), 'markdown: the field holds the saved text');
     await ev(`(() => { const t = document.querySelector('#wk-body'); t.focus(); t.setSelectionRange(t.value.length, t.value.length); return 1; })()`);
     await type('Plain end');
     check(await saved(b => b.endsWith('Plain end')), 'markdown: typing there saves too');
     await ev(`(() => { document.querySelector('[data-wk="pmenu"]').click(); return 1; })()`);
-    await click(`[...document.querySelectorAll('#pop [role="menuitem"]')].find(b => /Back to the editor/.test(b.textContent))`);
+    check(await until(`!![...document.querySelectorAll('#pop [role="menuitem"]')].find(b => /Back to the editor/.test(b.textContent))`) && await click(`[...document.querySelectorAll('#pop [role="menuitem"]')].find(b => /Back to the editor/.test(b.textContent))`), 'the menu entry is there and clicked');
     check(await until(`!!${cm} && !document.querySelector('#wk-body') && WKCM.view.state.doc.toString().endsWith('Plain end')`), 'markdown: back in the editor with the new text');
 
     // ---- "Read-only" lock and back
+    // 2.658.0 (#5091): a menu entry is clicked only once it is there (click() returned false silently before, CI v2.646)
     await ev(`(() => { document.querySelector('[data-wk="pmenu"]').click(); return 1; })()`);
-    await click(`[...document.querySelectorAll('#pop [role="menuitem"]')].find(b => /^Read-only/.test(b.textContent.trim()))`);
+    check(await until(`!![...document.querySelectorAll('#pop [role="menuitem"]')].find(b => /^Read-only/.test(b.textContent.trim()))`) && await click(`[...document.querySelectorAll('#pop [role="menuitem"]')].find(b => /^Read-only/.test(b.textContent.trim()))`), 'the menu entry is there and clicked');
     check(await until(`!!document.querySelector('#wk-md') && !document.querySelector('#wk-cm')`), 'read only: the read view on this device');
     await ev(`(() => { document.querySelector('[data-wk="pmenu"]').click(); return 1; })()`);
-    await click(`[...document.querySelectorAll('#pop [role="menuitem"]')].find(b => /^Read-only/.test(b.textContent.trim()))`);
+    check(await until(`!![...document.querySelectorAll('#pop [role="menuitem"]')].find(b => /^Read-only/.test(b.textContent.trim()))`) && await click(`[...document.querySelectorAll('#pop [role="menuitem"]')].find(b => /^Read-only/.test(b.textContent.trim()))`), 'the menu entry is there and clicked');
     check(await until(`!!${cm}`), 'read only: off again, the editor');
 
     // ---- a [[link]] opens with the first click
