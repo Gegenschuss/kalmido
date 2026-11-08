@@ -149,7 +149,8 @@ J = r.json()["job"]["id"]
 ev = events(cl, "job_request")[-1]["data"]
 inp = ev["input"]
 it = {i["task_id"]: i for i in inp["items"]}
-check(ev["list_id"] == W and inp["list"]["id"] == W and {"id": SEC, "name": "Later"} in inp["list"]["sections"], f"input.list with sections {inp['list']}")
+# 2.665.0 (#5109): since 2.577.0 (#3354) every section carries its column meaning section_kind (None = no meaning)
+check(ev["list_id"] == W and inp["list"]["id"] == W and {"id": SEC, "name": "Later", "section_kind": None} in inp["list"]["sections"], f"input.list with sections {inp['list']}")
 check(inp["package"]["n"] == 1 and inp["package"]["of"] == 1 and inp["snapshot_at"], f"package 1 of 1 {inp['package']}")
 check(len(it[T["dup2"]]["notes"]) == 2000 and it[T["dup2"]]["comments_count"] == 1 and SUB not in it, "notes cut at 2000, comments counted, no subtasks")
 check(all(set(x) >= {"task_id", "title", "notes", "section_id", "sort", "due", "priority", "list_tags", "assignee_id", "created_at",
