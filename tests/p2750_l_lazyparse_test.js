@@ -30,13 +30,22 @@ const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL
   const dom = new JSDOM(html, {runScripts: 'dangerously', resources: DataOnly, url: 'http://example.test/'});
   const w = dom.window;
   for (let i = 0; i < 200 && (w.__keys === undefined || w.document.readyState === 'loading'); i++) await new Promise(r => setTimeout(r, 25));
-  check(w.__state === 'interactive', `the defer script ran with readyState interactive (${w.__state})`);
+  // (jsdom runs defer scripts while readyState is still 'loading'; a browser says 'interactive' - that case is played below)
   check(w.__early === 0, `#5307: no module tag while the page is parsed (${w.__early})`);
   check(w.__keys === true, '#5307: the later start script ran before any module tag');
   await new Promise(r => setTimeout(r, 20));
   const tags = [...w.document.querySelectorAll('script[data-ld]')];
   check(tags.length === 1 && tags[0].getAttribute('src') === '/static/js/mod1.js', `after DOMContentLoaded the module's tag is there (${tags.length})`);
   check(w.eval("LDP('mod1')") === w.__pending, 'a second ask while it loads gets the same promise (no second tag)');
+  // the browser's case: parsed (readyState no longer 'loading'), DOMContentLoaded not fired yet (domLoaded false) - no tag
+  w.eval('domLoaded = false');
+  check(w.document.readyState !== 'loading', `played: the page is parsed (${w.document.readyState})`);
+  w.eval("LDP('mod3')");
+  await new Promise(r => setTimeout(r, 20));
+  check(!w.document.querySelector('script[data-ld="mod3"]'), '#5307: parsed but before DOMContentLoaded (a defer start script): no tag yet');
+  w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
+  await new Promise(r => setTimeout(r, 20));
+  check(!!w.document.querySelector('script[data-ld="mod3"]'), '... DOMContentLoaded: now the tag is there');
   // a page already parsed: the tag comes at once (no wait)
   w.eval("LDP('mod2')");
   await new Promise(r => setTimeout(r, 0));
