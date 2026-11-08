@@ -218,6 +218,8 @@ CASES = [
     ("get_project_overview", {"list_id": 4}, "GET", "/api/v1/lists/4/overview", None, {}),  # 2.7.1 (#410)
     ("set_list_columns", {"list_id": 4, "columns": ["id", "due", "f:3"]}, "PATCH", "/api/v1/lists/4", {"columns": ["id", "due", "f:3"]}, {}),  # 2.14.0
     ("set_list_columns", {"list_id": 4, "columns": None}, "PATCH", "/api/v1/lists/4", {"columns": None}, {}),
+    # 2.657.0 (#5052): the version read goes along
+    ("set_list_columns", {"list_id": 4, "columns": None, "expect_updated_at": "v1"}, "PATCH", "/api/v1/lists/4", {"columns": None, "expect_updated_at": "v1"}, {}),
     ("request_merge_approval", {"task_id": 7, "pr_url": "https://github.com/acme/app/pull/12", "summary": "Adds X"}, "POST", "/api/v1/tasks/7/comments",
      {"body": "Ready to merge: https://github.com/acme/app/pull/12\n\nAdds X",
       "suggestion": {"kind": "merge_request", "pr_url": "https://github.com/acme/app/pull/12", "summary": "Adds X"}}, {}),    # 2.3.0 (#260-#263) proposals

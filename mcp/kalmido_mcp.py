@@ -606,8 +606,10 @@ TOOLS = [
                          "(custom fields; ids in the fields of list_lists). A key that is not listed is not shown. columns: null = the "
                          "default layout. Phones show the first two as columns, the rest in the second line. 2.39.1: f:<id> columns switch the "
                          "module Custom fields on for the project's owner (modules_on in the answer).",
-     _obj({"list_id": S_ID, "columns": {"type": ["array", "null"], "items": {"type": "string"}, "maxItems": 40}}, ["list_id", "columns"]),
-     lambda api, a: api.call("PATCH", f"/lists/{int(a['list_id'])}", body={"columns": a["columns"]})),
+     _obj({"list_id": S_ID, "columns": {"type": ["array", "null"], "items": {"type": "string"}, "maxItems": 40},
+           "expect_updated_at": {"type": "string", "description": "2.657.0: the project's updated_at of list_lists; required (400 version_required "
+                                 "without it), changed since = 409 conflict: read it again"}}, ["list_id", "columns", "expect_updated_at"]),
+     lambda api, a: api.call("PATCH", f"/lists/{int(a['list_id'])}", body={"columns": a["columns"], **_pick(a, ("expect_updated_at",))})),
     ("list_repos", "Repositories connected to a project (provider github | gitlab | gitea (also Forgejo) | bitbucket (Bitbucket Cloud), "
                    "web_url, owner/repo (GitLab owners can be nested groups: group/sub), default branch, poll status). Never a token: "
                    "clone and push with your own git credentials.",
@@ -1230,9 +1232,11 @@ TOOLS += [
      lambda api, a: api.call("GET", "/event-calendars")),
     ("create_event_calendar", "2.21.0: a new own calendar (2.30.0: org_id = its workspace; default: yours).", _obj({"name": {"type": "string"}, "color": {"type": "string"}, "description": {"type": "string"}, "org_id": {"type": ["integer", "null"], "description": "2.30.0: its workspace (an organisation id of yours; null = private)"}}, ["name"]),
      lambda api, a: api.call("POST", "/event-calendars", body=_pick(a, ("name", "color", "description", "org_id")))),
-    ("update_event_calendar", "2.21.0: rename / recolour a calendar (owner) or hide it from your own views (hidden).",
-     _obj({"calendar_id": S_ID, "name": {"type": "string"}, "color": {"type": "string"}, "description": {"type": "string"}, "hidden": {"type": "boolean"}, "org_id": {"type": ["integer", "null"], "description": "2.30.0: its workspace (an organisation id of yours; null = private)"}}, ["calendar_id"]),
-     lambda api, a: api.call("PATCH", f"/event-calendars/{int(a['calendar_id'])}", body=_pick(a, ("name", "color", "description", "hidden", "org_id")))),
+    ("update_event_calendar", "2.21.0: rename / recolour a calendar (owner) or hide it from your own views (hidden). "
+                              "2.657.0: expect_updated_at = the calendar's updated_at of list_event_calendars, required with name / "
+                              "color / description / org_id (hidden alone needs none).",
+     _obj({"calendar_id": S_ID, "name": {"type": "string"}, "color": {"type": "string"}, "description": {"type": "string"}, "hidden": {"type": "boolean"}, "org_id": {"type": ["integer", "null"], "description": "2.30.0: its workspace (an organisation id of yours; null = private)"}, **_XV}, ["calendar_id"]),
+     lambda api, a: api.call("PATCH", f"/event-calendars/{int(a['calendar_id'])}", body=_pick(a, ("name", "color", "description", "hidden", "org_id", "expect_updated_at")))),
     ("delete_event_calendar", "2.21.0: delete a calendar with all its events (owner).", _obj({"calendar_id": S_ID}, ["calendar_id"]),
      lambda api, a: api.call("DELETE", f"/event-calendars/{int(a['calendar_id'])}")),
     ("share_event_calendar", "2.21.0: share a calendar with a person: view or edit (owner).",
@@ -1280,9 +1284,10 @@ TOOLS += [
      lambda api, a: api.call("GET", "/address-books")),
     ("create_address_book", "2.21.0: a new own address book (2.30.0: org_id = its workspace; default: yours).", _obj({"name": {"type": "string"}, "color": {"type": "string"}, "org_id": {"type": ["integer", "null"], "description": "2.30.0: its workspace (an organisation id of yours; null = private)"}}, ["name"]),
      lambda api, a: api.call("POST", "/address-books", body=_pick(a, ("name", "color", "org_id")))),
-    ("update_address_book", "2.21.0: rename / recolour an address book, or choose the project for its birthdays (owner).",
-     _obj({"book_id": S_ID, "name": {"type": "string"}, "color": {"type": "string"}, "birthdays_list_id": {"type": ["integer", "null"]}, "org_id": {"type": ["integer", "null"], "description": "2.30.0: its workspace (an organisation id of yours; null = private)"}}, ["book_id"]),
-     lambda api, a: api.call("PATCH", f"/address-books/{int(a['book_id'])}", body=_pick(a, ("name", "color", "birthdays_list_id", "org_id")))),
+    ("update_address_book", "2.21.0: rename / recolour an address book, or choose the project for its birthdays (owner). "
+                            "2.657.0: expect_updated_at = the address book's updated_at of list_address_books (required).",
+     _obj({"book_id": S_ID, "name": {"type": "string"}, "color": {"type": "string"}, "birthdays_list_id": {"type": ["integer", "null"]}, "org_id": {"type": ["integer", "null"], "description": "2.30.0: its workspace (an organisation id of yours; null = private)"}, **_XV}, ["book_id", "expect_updated_at"]),
+     lambda api, a: api.call("PATCH", f"/address-books/{int(a['book_id'])}", body=_pick(a, ("name", "color", "birthdays_list_id", "org_id", "expect_updated_at")))),
     ("delete_address_book", "2.21.0: delete an address book with its contacts (owner). 2.148.1: waits for a person's approval "
                             "(202 + a waiting job; the result comes as a job event). 2.272.0: it goes to the trash (the person restores it "
                             "in the app until the trash period ends).", _obj({"book_id": S_ID}, ["book_id"]),
@@ -1573,7 +1578,10 @@ TOOLS += [
            "org_visibility": {"type": "string", "enum": ["", "org"]}, "org_edit": {"type": "boolean"},
            "sort_mode": {"type": "string"}, "group_field": {"type": ["string", "integer", "null"]},  # 2.144.0 (#2414)
            "ticket_key": {"type": ["string", "null"], "description": "2.390.0: the project's ticket key APP (2-6 capitals / digits, a letter "
-                          "first; owner / project admins; \"\" / null = none): its tasks get keys like APP-12"}}, ["list_id"]),
+                          "first; owner / project admins; \"\" / null = none): its tasks get keys like APP-12"},
+           "expect_updated_at": {"type": "string", "description": "2.657.0: the project's updated_at of list_lists / get_list; required "
+                                 "(400 version_required without it). Changed since = 409 conflict with error.current: read it again, then decide"}},
+          ["list_id", "expect_updated_at"]),
      lambda api, a: api.call("PATCH", f"/lists/{_id(a, 'list_id')}", body=_without(a, "list_id"))),
     ("delete_list", "Delete an ARCHIVED project for good (owner; archive it first with update_list archived=true); its tasks go to the "
                     "trash." + APPROVAL_NOTE, _obj({"list_id": S_ID}, ["list_id"]),

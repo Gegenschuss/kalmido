@@ -1166,6 +1166,9 @@ Read first, send the version back:
 | Office drafts | quotation draft, letter draft, lead (MCP `update_offer_draft`, `update_letter_draft`, `update_office_lead`) | `expect_updated_at` | `updated_at` of the draft / lead |
 | Own comments, team chat messages (2.638.0) | `PATCH /api/v1/comments/{id}`, `/team/messages/{id}` (MCP `update_comment`, `edit_team_message`) | `expect_updated_at` or `If-Match` | `edited_at` of the comment / message, `created_at` when it was never edited |
 | Office pipeline (2.644.0) | the stage of an inquiry / deal (MCP `set_office_deal_stage`) | `expect_updated_at` | `updated_at` of the deal |
+| Calendars (2.657.0) | `PATCH /api/v1/event-calendars/{id}` with `name`, `color`, `description` or `org_id` (MCP `update_event_calendar`; `hidden` alone needs none) | `expect_updated_at` or `If-Match` | `updated_at` of `list_event_calendars` |
+| Address books (2.657.0) | `PATCH /api/v1/address-books/{id}` (MCP `update_address_book`) | `expect_updated_at` or `If-Match` | `updated_at` of `list_address_books` |
+| Projects (2.657.0) | `PATCH /api/v1/lists/{id}` (MCP `update_list`, `set_list_columns`) | `expect_updated_at` or `If-Match` | `updated_at` of `list_lists` / `GET /api/v1/lists/{id}` |
 
 Events and contacts carry `updated_by` (2.571.0): the account that changed them last - in the app, through the API (an
 agent's own id), over CalDAV / CardDAV or an import; `null` for rows nobody changed since then.
