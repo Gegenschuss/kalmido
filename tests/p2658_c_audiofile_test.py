@@ -76,7 +76,7 @@ from kalmido.videos.vdmedia import vdm_sniff, vdm_kind
 cases = {"mp3id3": b"ID3\x04" + bytes(20), "mp3frame": b"\xff\xfb\x90\x64" + bytes(20), "wav": b"RIFF\x00\x00\x00\x00WAVEfmt ",
          "ogg": b"OggS\x00\x02" + bytes(20), "flac": b"fLaC\x00\x00\x00\x22", "m4a": b"\x00\x00\x00\x20ftypM4A \x00\x00\x00\x00",
          "aac": b"\xff\xf1\x50\x80" + bytes(20), "jpeg": b"\xff\xd8\xff\xe0" + bytes(20), "mp4video": b"\x00\x00\x00\x20ftypisom",
-         "html": b"<html>", "zero": bytes(32)}
+         "html": b"<html>", "zero": bytes(32), "utf16": b"\xff\xfeA\x00<\x00h\x00t\x00" + bytes(16)}
 print("SNIFF", sorted((k, vdm_sniff(v), vdm_kind(vdm_sniff(v))) for k, v in cases.items()))
 """
 out = subprocess.run(["docker", "exec", CT, "python", "-c", PROBE], capture_output=True, text=True)
@@ -86,6 +86,8 @@ check(got.get("mp3id3") == ("audio/mpeg", "video") and got.get("mp3frame") == ("
       and got.get("aac") == ("audio/aac", "video"), f"audio by its first bytes {got} {out.stderr[-500:]}")
 check(got.get("jpeg") == ("image/jpeg", "image") and got.get("mp4video") == (None, None) and got.get("html") == (None, None)
       and got.get("zero") == (None, None), f"a JPEG stays an image, a video file / HTML / zeros are nothing {got}")
+# 2.658.0 (Fable review): a UTF-16 LE text (byte order mark FF FE: the bits of a layer I frame) is no MP3
+check(got.get("utf16") == (None, None), f"UTF-16 LE text is no audio {got.get('utf16')}")
 
 s0 = requests.Session()
 s0.headers.update(H)
@@ -201,5 +203,9 @@ m = media(FTOK)
 if m.status_code != 200:
     app_log()
 check(m.status_code == 200 and m.content == MP3, f"frida's customer plays the file {m.status_code}")
+# 2.658.0 (Fable review): the account of the person who made the link is disabled -> the link no longer gives the file
+check(A.patch(B + f"/api/users/{FRI}", json={"disabled": True}).ok, "frida disabled by the admin")
+check(media(FTOK).status_code == 404, "a disabled account's link does not give the file")
+A.patch(B + f"/api/users/{FRI}", json={"disabled": False})
 
 sys.exit(kt.done("p2658_c_audiofile"))

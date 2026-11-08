@@ -53,6 +53,7 @@ from .vdmedia import vdm_pub_send  # 2.658.0 (#5015)
 VDR_URL_MAX, VDR_TITLE_MAX, VDR_BODY_MAX, VDR_NAME_MAX = 2000, 200, 2000, 120
 VDR_AT_MAX = 86400.0                     # a timecode lies within 24 hours
 VDR_PUB_RATE, VDR_PUB_HOUR = 10, 60      # customer comments per client address and minute / per link and hour
+VDR_MEDIA_LINK_RATE = 600               # 2.658.0 (Fable review): requests for one link's audio file per minute over all addresses
 VDR_MEDIA_RATE = 240                     # 2.658.0 (#5015): requests for the customer page's audio file per client address and minute (seeking = ranges)
 VDR_STATES = ("open", "approved", "changes")
 VDR_FILE_RE = re.compile(r"\.(mp4|m4v|webm|mov)$", re.I)
@@ -832,7 +833,8 @@ def vdr_pub_media(token):
     the page shows), only while the link is open (sig_open: not revoked, not expired, the review there; state open = not
     decided) and only while the file may be read (vdmedia.vdm_pub_send). Everything else: the answer of an unknown link."""
     c = db()
-    if hit_limit("vdrm:" + rate_ip(), VDR_MEDIA_RATE):
+    # 2.658.0 (Fable review): per address AND per link, so many addresses cannot pull one (large, sealed) file without end
+    if hit_limit("vdrm:" + rate_ip(), VDR_MEDIA_RATE) or hit_limit("vdrml:" + str(token)[:64], VDR_MEDIA_LINK_RATE):
         return pub_limited(_accept_lang())
     s, bad = sig_open(c, token)
     if bad:

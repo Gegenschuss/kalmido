@@ -16,6 +16,7 @@ comments and states as a video, no second way. Columns: core/migrations.d/4769_a
   their order (page, then oldest first), the export the same.
 - The customer link (signoff kind video) stays for videos: an image / PDF version is no public file (sharing outside = a task
   of its own). A review with files does not move to another workspace (its files stay in theirs)."""
+import io
 import os
 
 from flask import request
@@ -76,7 +77,10 @@ def vdm_sniff_audio(d):
     if len(d) >= 4 and d[0] == 0xFF:
         if d[1] & 0xF6 == 0xF0:  # ADTS: sync, layer 00
             return "audio/aac"
-        if d[1] & 0xE0 == 0xE0 and d[1] & 0x06 and d[2] & 0xF0 not in (0x00, 0xF0):  # an MPEG audio frame: layer set, a bit rate
+        # an MPEG audio frame: sync, a version (not the reserved 01), layer III or II (2.658.0 Fable review: layer I / the
+        # bits of a UTF-16 LE byte order mark FF FE are no MP3), a bit rate, a sample rate (not the reserved 11)
+        if (d[1] & 0xE0 == 0xE0 and d[1] & 0x18 != 0x08 and d[1] & 0x06 in (0x02, 0x04)
+                and d[2] & 0xF0 not in (0x00, 0xF0) and d[2] & 0x0C != 0x0C):
             return "audio/mpeg"
     return None
 
@@ -235,13 +239,29 @@ def vdm_path(c, file_id, no):
     return full
 
 
-def vdm_head(c, full):
-    """2.658.0 (#5043): the first VDM_HEAD plain bytes of a stored file -- a plain file reads only those; a sealed one
-    (core/orgcrypt.py: AES-GCM opens the file only whole) is opened as files/web.py's send does."""
+def vdm_open(c, full):
+    """2.658.0 (#5043): (head, data) of a stored file: head = its first VDM_HEAD plain bytes; a plain file reads only those
+    (data None: streamed later), a sealed one (core/orgcrypt.py: AES-GCM opens the file only whole) is decrypted ONCE here
+    and data = its plain bytes for the answer (Fable review: was decrypted twice per request, the head and the send)."""
     if oc_is_sealed_file(full):
-        return oc_read_file(c, full)[:VDM_HEAD]
+        data = oc_read_file(c, full)
+        return data[:VDM_HEAD], data
     with open(full, "rb") as f:
-        return f.read(VDM_HEAD)
+        return f.read(VDM_HEAD), None
+
+
+def vdm_head(c, full):
+    """The first VDM_HEAD plain bytes of a stored file (vdm_open)."""
+    return vdm_open(c, full)[0]
+
+
+def vdm_stream(c, full, data, **kw):
+    """The answer for a stored file opened with vdm_open: a plain file streamed (range requests), a sealed one from the bytes
+    already decrypted (range requests on them, no ETag: as core/orgcrypt.py oc_send_file)."""
+    if data is None:
+        return oc_send_file(c, full, conditional=True, **kw)
+    from flask import send_file
+    return send_file(io.BytesIO(data), conditional=True, etag=False, last_modified=os.path.getmtime(full), **kw)
 
 
 def vdm_send(c, v):
@@ -254,14 +274,15 @@ def vdm_send(c, v):
     if n["kind"] != "file":
         raise Denied(404)
     full = vdm_path(c, v["file_id"], v["file_no"])
-    mime = vdm_sniff(vdm_head(c, full))
+    head, data = vdm_open(c, full)
+    mime = vdm_sniff(head)
     if not mime:
         raise Denied(404)
     fs_log_add(c, v["file_id"], "read", f"approval {int(v['review_id'])}")
     c.commit()
     dl = request.args.get("dl") == "1"
-    resp = oc_send_file(c, full, mimetype=mime, as_attachment=dl, download_name=v["file_name"] or n["name"] or "file",
-                        conditional=True, max_age=0)
+    resp = vdm_stream(c, full, data, mimetype=mime, as_attachment=dl, download_name=v["file_name"] or n["name"] or "file",
+                      max_age=0)
     return _send_headers(resp, mime)
 
 
@@ -275,17 +296,19 @@ def vdm_pub_send(c, v, s):
     with system_ctx(c):  # the public page reads as "anon"; the checks below bind it to exactly this link's file and workspace
         chain = fs_chain(c, v["file_id"])
         if (not chain or chain[0]["kind"] != "file" or fs_deleted(chain) or fsl_of_chain(c, chain) is not None
-                or (chain[0]["org_id"] or None) != (s["org_id"] or None) or not fs_role(c, v["file_id"], s["created_by"], chain=chain)):
+                or (chain[0]["org_id"] or None) != (s["org_id"] or None) or not fs_role(c, v["file_id"], s["created_by"], chain=chain)
+                # 2.658.0 (Fable review): a disabled account's link no longer serves the file (as the list links, signoff.py)
+                or not c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0", (s["created_by"],)).fetchone()):
             return None
         try:
             full = vdm_path(c, v["file_id"], v["file_no"])
         except Denied:
             return None
-        mime = vdm_sniff(vdm_head(c, full))
+        head, data = vdm_open(c, full)
+        mime = vdm_sniff(head)
         if not mime or not mime.startswith("audio/"):
             return None
-        resp = oc_send_file(c, full, mimetype=mime, as_attachment=False, download_name=v["file_name"] or "audio",
-                            conditional=True, max_age=0)
+        resp = vdm_stream(c, full, data, mimetype=mime, as_attachment=False, download_name=v["file_name"] or "audio", max_age=0)
     return _send_headers(resp, mime)
 
 
