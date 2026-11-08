@@ -510,11 +510,31 @@ def pdf_logo_fit(logo, max_w, max_h):
     return w * sc, h * sc
 
 
+PDF_ICC_MAX = 1 << 20  # 2.666.0 (#4074 14): bytes of an embedded colour profile handed to littlecms (big print profiles ~0.5 MB)
+_ICC_SPACE = {"RGB": b"RGB ", "RGBA": b"RGB ", "CMYK": b"CMYK"}
+_ICC_CLASS = (b"scnr", b"mntr", b"prtr", b"spac")
+
+
+def pdf_icc_ok(icc, mode):
+    """2.666.0 (#4074 14): an embedded profile of a foreign picture (signature, letterhead, logo) only goes to the native
+    littlecms parser when it looks like one: at most PDF_ICC_MAX bytes, the header's size equals the data, the 'acsp'
+    signature, an input / display / output / colour space class, the colour space of the picture and a tag count that
+    fits the data. Anything else: the picture is printed without its profile (as sRGB, CMYK the plain way)."""
+    if not isinstance(icc, (bytes, bytearray)) or not 132 <= len(icc) <= PDF_ICC_MAX:
+        return False
+    tags = int.from_bytes(icc[128:132], "big")
+    return int.from_bytes(icc[0:4], "big") == len(icc) and icc[36:40] == b"acsp" and icc[12:16] in _ICC_CLASS \
+        and icc[16:20] == _ICC_SPACE.get(mode) and 0 < tags <= 200 and 132 + 12 * tags <= len(icc)
+
+
 def pdf_to_srgb(im):
     """2.357.0 B (#3179): a picture with an embedded colour profile (Adobe RGB, a CMYK JPEG) converted to sRGB (the
-    OutputIntent of the PDF); without ImageCms or on any error the picture comes back as it was."""
+    OutputIntent of the PDF); without ImageCms or on any error the picture comes back as it was.
+    2.666.0 (#4074 14): a profile that fails pdf_icc_ok never reaches littlecms (the picture comes back as it was)."""
     icc = im.info.get("icc_profile")
     if not icc or im.mode not in ("RGB", "RGBA", "CMYK"):
+        return im
+    if not pdf_icc_ok(icc, im.mode):
         return im
     try:
         from PIL import ImageCms
