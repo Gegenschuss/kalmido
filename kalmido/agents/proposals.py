@@ -7,6 +7,8 @@ from flask import g, jsonify, request
 
 from ..core.config import app, PUBLIC_URL
 from ..core.pg import insert_id, write_lock  # 2.528.0 (#4305 A8): write_lock
+from ..core.pg import st_ids  # 2.674.0 B (#4194)
+from ..agents.core import agents_shared  # 2.674.0 B (#4194)
 from ..core.i18n import N_, lang, tr
 from ..core.db import body, bump, db, err, iso, now_utc, iso_ms
 from ..accounts.session import me
@@ -119,12 +121,20 @@ def prop_agents(c, uid):
     rows = c.execute("""SELECT a.*, u.username, u.display_name, u.avatar, u.disabled FROM agents a JOIN users u ON u.id=a.user_id
                         WHERE u.kind='agent' ORDER BY u.id""").fetchall()
     out = []
+    # 2.674.0 B (#4194): prop_agent_ok for all agents with the account read once and agent_shares for all at once
+    me_u = c.execute("SELECT kind, disabled FROM users WHERE id=?", (uid,)).fetchone()
+    if not me_u or me_u["kind"] == "agent" or me_u["disabled"]:
+        return []
+    rows = [a for a in rows if agent_active(a)]
+    sh = agents_shared(c, [a["user_id"] for a in rows if prop_mode(a) == "shared"], uid)
+    rows = [a for a in rows if prop_mode(a) == "all" or (prop_mode(a) == "shared" and a["user_id"] in sh)]
+    pics = {r["id"]: r for r in c.execute("SELECT id, avatar, kind FROM users WHERE id = ANY(CAST(? AS BIGINT[]))",
+                                          (st_ids([a["user_id"] for a in rows]),))} if rows else {}
     for a in rows:
-        if prop_agent_ok(c, a, uid):
-            u = c.execute("SELECT * FROM users WHERE id=?", (a["user_id"],)).fetchone()
-            out.append({"id": a["user_id"], "name": a["display_name"] or a["username"], "avatar": avatar_url(u),
-                        "limit_reached": bool(usage_block(c, a["user_id"])),
-                        "online": agent_online(a) is not False})  # 2.10.0 (#440): offers "Let an agent plan" only when online
+        u = pics.get(a["user_id"])
+        out.append({"id": a["user_id"], "name": a["display_name"] or a["username"], "avatar": avatar_url(u) if u else "",
+                    "limit_reached": bool(usage_block(c, a["user_id"], a)),
+                    "online": agent_online(a) is not False})  # 2.10.0 (#440): offers "Let an agent plan" only when online
     return out
 
 

@@ -18,6 +18,8 @@ from ..accounts.session import me
 from ..accounts.pictures import avatar_url
 from ..core.dlock import dl_list_locked
 from ..core.access import acx_task_ok, Denied, joined_lists_sql, list_people, list_role, MANAGE_ROLES, need_list, need_task, org_trip_sql, reading_sql, task_visible, vis_sql, WRITE_ROLES
+from ..core.access import tasks_visible  # 2.674.0 B (#4194)
+from ..core.pg import st_ids  # 2.674.0 B (#4194)
 from ..core.state import visible_sections
 from ..tasks.oneway import dec_list
 from ..tasks.validation import valid_hm
@@ -953,12 +955,13 @@ def agent_contact_age(c, a):
 AGENT_NO_SERVICE_S = 600
 
 
-def _no_service(c, a):
+def _no_service(c, a, age=False):
     """2.26.0 (#933): True when the agent made an API call in the last AGENT_NO_SERVICE_S but polled no events for that long
-    (or never) -- "connected, but no service running". Webhook agents: never."""
+    (or never) -- "connected, but no service running". Webhook agents: never. 2.674.0 B (#4194): age = agent_contact_age
+    when the caller has it (False: ask)."""
     if a["webhook_id"]:
         return False
-    age = agent_contact_age(c, a)
+    age = agent_contact_age(c, a) if age is False else age
     if age is None or age > AGENT_NO_SERVICE_S:
         return False
     return not a["last_poll_at"] or (now_utc() - parse_iso(a["last_poll_at"])).total_seconds() > AGENT_NO_SERVICE_S
@@ -1114,9 +1117,16 @@ def job_task_ids(c, j):
     return ids or ([j["task_id"]] if j["task_id"] else [])
 
 
-def job_links(c, j, viewer=None):
+def job_links(c, j, viewer=None, pre=None):
     """2.392.2 (#3366): task_ids (only the tasks the viewer sees, an agent its own shares), continue_of / continued_by (the
-    job it continues, the job that continues it) and parts (its part jobs, parent_id = j)."""
+    job it continues, the job that continues it) and parts (its part jobs, parent_id = j).
+    2.674.0 B (#4194): pre = jobs_pre() of a job list (the same answers, read for all jobs at once)."""
+    if pre is not None:
+        ids = pre["jtasks"].get(j["id"]) or ([j["task_id"]] if j["task_id"] else [])
+        if viewer and len(ids) > 1:
+            ids = [x for x in ids if x == j["task_id"] or x in pre["tvis"]]
+        return {"task_ids": ids, "continue_of": j["continue_of"] if "continue_of" in j.keys() else None,
+                "continued_by": pre["next"].get(j["id"]), "parts": pre["parts"].get(j["id"], [])}
     ids = job_task_ids(c, j)
     if viewer and len(ids) > 1:
         ids = [x for x in ids if x == j["task_id"] or task_visible(c, x, viewer, full=True)]
@@ -1127,24 +1137,80 @@ def job_links(c, j, viewer=None):
             "continued_by": nxt, "parts": parts}
 
 
-def job_dict(c, j, names=None):
+def jobs_pre(c, rows, viewer):
+    """2.674.0 B (#4194): what job_dict / job_links read per job, read once for a whole job list: the tasks (title, list),
+    which of them the viewer sees (full), the tasks of jobs of several, the visible job that continues each and its visible
+    part jobs (same order and limits as job_links)."""
+    jids = [j["id"] for j in rows]
+    q = st_ids(jids) if jids else "{}"
+    jt = {}
+    for r in c.execute("SELECT job_id, task_id FROM agent_job_tasks WHERE job_id = ANY(CAST(? AS BIGINT[])) ORDER BY job_id, pos, task_id", (q,)):
+        jt.setdefault(r[0], []).append(r[1])
+    tids = {j["task_id"] for j in rows if j["task_id"]} | {x for v in jt.values() for x in v}
+    tasks = {r["id"]: r for r in c.execute("SELECT id, title, list_id FROM tasks WHERE id = ANY(CAST(? AS BIGINT[]))", (st_ids(sorted(tids)) if tids else "{}",))}
+    tvis = tasks_visible(c, tids, viewer, full=True) if viewer else set(tids)
+    nx = c.execute("""SELECT * FROM (SELECT id, agent_id, user_id, task_id, continue_of, row_number() OVER (PARTITION BY continue_of ORDER BY id) AS rn
+                      FROM agent_jobs WHERE continue_of = ANY(CAST(? AS BIGINT[]))) x WHERE rn<=5 ORDER BY continue_of, id""", (q,)).fetchall()
+    pa = c.execute("""SELECT * FROM (SELECT id, agent_id, user_id, task_id, parent_id, row_number() OVER (PARTITION BY parent_id ORDER BY id) AS rn
+                      FROM agent_jobs WHERE parent_id = ANY(CAST(? AS BIGINT[]))) x WHERE rn<=50 ORDER BY parent_id, id""", (q,)).fetchall()
+    seen = jobs_seen(c, list(nx) + list(pa), viewer) if viewer else {x["id"] for x in list(nx) + list(pa)}
+    nxt, parts = {}, {}
+    for x in nx:
+        if x["id"] in seen and x["continue_of"] not in nxt:
+            nxt[x["continue_of"]] = x["id"]
+    for x in pa:
+        if x["id"] in seen:
+            parts.setdefault(x["parent_id"], []).append(x["id"])
+    return {"jtasks": jt, "tasks": tasks, "tvis": tvis, "next": nxt, "parts": parts}
+
+
+def job_dict(c, j, names=None, pre=None):
     names = names or user_names(c, [j["agent_id"], j["user_id"], j["action_by"]])
-    t = c.execute("SELECT title, list_id FROM tasks WHERE id=?", (j["task_id"],)).fetchone() if j["task_id"] else None
     viewer = g.user["id"] if has_request_context() and getattr(g, "user", None) else None
-    if t and viewer and viewer != j["agent_id"] and not task_visible(c, j["task_id"], viewer, full=True):
+    if pre is not None:  # 2.674.0 B (#4194): read once for the whole list (jobs_pre)
+        t = pre["tasks"].get(j["task_id"]) if j["task_id"] else None
+        if t and viewer and viewer != j["agent_id"] and j["task_id"] not in pre["tvis"]:
+            t = None
+    else:
+        t = c.execute("SELECT title, list_id FROM tasks WHERE id=?", (j["task_id"],)).fetchone() if j["task_id"] else None
+    if pre is None and t and viewer and viewer != j["agent_id"] and not task_visible(c, j["task_id"], viewer, full=True):
         t = None  # 2.306.0 D3 (#2875): the task's title / list only for who sees the task (the job itself stays visible)
     if t and viewer and viewer == j["agent_id"] and not _jd_sees(c, j["task_id"], t["list_id"], j["agent_id"]):
         t = None  # 2.223.7 D (#2941): the agent no longer sees the task (share withdrawn): the job stays, without its title / list
     return {"id": j["id"], "agent_id": j["agent_id"], "agent_name": names.get(j["agent_id"], ""), "task_id": j["task_id"],
             "task_title": t["title"] if t else None, "list_id": t["list_id"] if t else None, "user_id": j["user_id"],
-            "title": j["title"], "state": j["state"], "log": j["log"], "action": j["action"], "action_by": j["action_by"],
+            "title": j["title"], "state": j["state"], "action": j["action"], "action_by": j["action_by"],
+            **jl_log(j),  # 2.674.0 B (#4194): a job list carries only the log's last line (the whole log: ?id=)
             "action_by_name": names.get(j["action_by"], "") if j["action_by"] else "", "action_at": j["action_at"],
             "created_at": j["created_at"], "updated_at": j["updated_at"],
             "kind": j["kind"], "proposal_state": j["prop_state"] or None,  # 2.3.0: proposal jobs
             "approval": bool(j["approval"]) if "approval" in j.keys() else False,  # 2.15.0 (#479): a request waiting for approval
             "name": jc_job_name(j["title"], j["name"] if "name" in j.keys() else None),  # 2.56.0 (#1793), 2.58.0 (#1803): own field first: "Clara" of "Clara: Release 2.50" (null without)
             "parent_id": j["parent_id"] if "parent_id" in j.keys() else None,  # 2.59.0 (#1827): the leading job of a part job
-            **job_links(c, j, viewer)}  # 2.392.2 (#3366): task_ids, continue_of, continued_by, parts
+            **job_links(c, j, viewer, pre)}  # 2.392.2 (#3366): task_ids, continue_of, continued_by, parts
+
+
+def jl_log(j):
+    """2.674.0 B (#4194): {log} of a job row with its log; a row of a job list (JL_COLS: without the log) gives {log: null,
+    log_last: the log's last line (at most 140 characters, what the list shows folded), has_log}."""
+    if "log" in j.keys():
+        return {"log": j["log"]}
+    return {"log": None, "log_last": j["log_last"] or "", "has_log": bool(j["has_log"])}
+
+
+_JL_COLS = []
+
+
+def jl_cols(c):
+    """2.674.0 B (#4194): the SELECT list of agent_jobs for job lists: every column but the log, plus its last line and
+    whether there is one (the columns are read once per process; migrations only add columns at start-up)."""
+    if not _JL_COLS:
+        cols = [r[0] for r in c.execute("SELECT column_name FROM information_schema.columns WHERE table_name='agent_jobs' "
+                                        "AND table_schema=current_schema() ORDER BY ordinal_position")]
+        _JL_COLS.append(", ".join(f'"{x}"' for x in cols if x != "log")
+                        + r", left(substring(btrim(COALESCE(log, ''), E' \t\r\n') from '[^\n]*$'), 140) AS log_last"
+                        + ", COALESCE(log, '')<>'' AS has_log")
+    return _JL_COLS[0]
 
 
 # 2.59.0 (#1827): name + leading job of the jobs ids that uid may see ({id: {"name", "parent_id", "parent_name"}}; jobs
@@ -1183,6 +1249,70 @@ def job_visible(c, j, uid):
     return bool(j["task_id"]) and task_visible(c, j["task_id"], uid, full=True)
 
 
+def agents_shared(c, aids, uid):
+    """2.674.0 B (#4194): {agent id} among aids that share a list with uid -- agent_shares for many: the owners of all in one
+    query (a personal agent: only its owner); a team agent asks its lists as agent_shares does. The same answers."""
+    ids = sorted({int(x) for x in aids or () if x})
+    if not ids:
+        return set()
+    own = {r[0]: r[1] for r in c.execute("SELECT user_id, owner_id FROM agents WHERE user_id = ANY(CAST(? AS BIGINT[]))", (st_ids(ids),))}
+    out = set()
+    for aid in ids:
+        o = own.get(aid)
+        if o is not None:
+            if o == uid:
+                out.add(aid)
+        elif c.execute(f"""SELECT 1 FROM lists l WHERE l.id IN {vis_sql()} AND {_OPEN_SQL} AND l.id IN {joined_lists_sql()} LIMIT 1""",
+                       (aid, aid, uid, aid, uid, uid, uid)).fetchone():
+            out.add(aid)
+    return out
+
+
+def jobs_seen(c, rows, uid, u=None):
+    """2.674.0 B (#4194): {job id} of the agent_jobs rows that uid may see -- job_visible for many rows at once (the account
+    once, agent_shares once per agent, the tasks with tasks_visible). The same answers as job_visible row by row.
+    u = uid's users row (is_admin, kind) when the caller has read it already."""
+    rows = list(rows or ())
+    if not rows or not uid:
+        return set()
+    u = u or c.execute("SELECT is_admin, kind FROM users WHERE id=?", (uid,)).fetchone()
+    if not u:
+        return set()
+    if u["kind"] == "agent":
+        return {j["id"] for j in rows if j["agent_id"] == uid}
+    out = {j["id"] for j in rows if j["user_id"] == uid}
+    rest = [j for j in rows if j["id"] not in out]
+    if u["is_admin"] and rest:  # 2.28.0 (#965): an admin sees the jobs of agents it reaches
+        sh = agents_shared(c, {j["agent_id"] for j in rest}, uid)
+        out.update(j["id"] for j in rest if j["agent_id"] in sh)
+        rest = [j for j in rest if j["id"] not in out]
+    tv = tasks_visible(c, [j["task_id"] for j in rest if j["task_id"]], uid, full=True)
+    out.update(j["id"] for j in rest if j["task_id"] and j["task_id"] in tv)
+    return out
+
+
+def job_vis_sql(c, uid):
+    """2.674.0 B (#4194): (SQL condition on agent_jobs, args) that keeps every job uid may see and leaves out most others, so
+    a job list filters in the database before it checks: a person's own jobs, (an admin) the jobs of the agents it reaches,
+    jobs on tasks of lists the person owns, is a member of or sees through its organisation. Only a pre-filter (a superset):
+    the exact check stays job_visible / jobs_seen."""
+    u = c.execute("SELECT is_admin, kind FROM users WHERE id=?", (uid,)).fetchone() if uid else None
+    if not u:
+        return "FALSE", []
+    if u["kind"] == "agent":
+        return "agent_id=?", [uid]
+    cond, args = ["user_id=?"], [uid]
+    if u["is_admin"]:
+        sh = agents_shared(c, [r[0] for r in c.execute("SELECT user_id FROM agents")], uid)
+        if sh:
+            cond.append(f"agent_id IN ({','.join(str(int(x)) for x in sorted(sh))})")
+    cond.append("task_id IN (SELECT t.id FROM tasks t WHERE t.list_id IN (SELECT id FROM lists WHERE owner_id=? UNION "
+                "SELECT list_id FROM list_members WHERE user_id=? UNION SELECT l.id FROM lists l JOIN org_members om "
+                "ON om.org_id=l.org_id AND om.user_id=? WHERE l.org_visibility='org'))")
+    args += [uid, uid, uid]
+    return "(" + " OR ".join(cond) + ")", args
+
+
 def job_may_act(c, j, uid, action):
     u = c.execute("SELECT is_admin, kind FROM users WHERE id=?", (uid,)).fetchone()
     if not u or u["kind"] == "agent":
@@ -1199,64 +1329,93 @@ def job_may_act(c, j, uid, action):
     return is_approver(c, t, uid) or (action == "stop" and task_visible(c, t["id"], uid, write=True))
 
 
+def jobs_may_act(c, rows, uid):
+    """2.674.0 B (#4194): {job id: (may approve, may stop)} for a job list -- job_may_act(..., "approve") and (..., "stop")
+    with the account read once and agent_shares once per agent; only a job someone else started on a task is asked one by
+    one (job_may_act). The same answers."""
+    u = c.execute("SELECT is_admin, kind FROM users WHERE id=?", (uid,)).fetchone() if uid else None
+    if not u or u["kind"] == "agent":
+        return {j["id"]: (False, False) for j in rows}
+    sh = agents_shared(c, {j["agent_id"] for j in rows if j["user_id"] != uid}, uid) if u["is_admin"] else set()
+    out, memo = {}, {}
+    for j in rows:
+        if j["user_id"] == uid or j["agent_id"] in sh:
+            out[j["id"]] = (True, True)
+        elif not j["task_id"]:
+            out[j["id"]] = (False, False)
+        else:  # the rest depends on the task, whether it is an approval job and (then) its agent only: once per such key
+            k = (j["task_id"], bool(j["approval"]), j["agent_id"] if j["approval"] else None)
+            if k not in memo:
+                memo[k] = (job_may_act(c, j, uid, "approve"), job_may_act(c, j, uid, "stop"))
+            out[j["id"]] = memo[k]
+    return out
+
+
 def agent_is_ai(a):
     """2.482.0 (#3530): an agent counts as AI unless it is marked as a bot without AI (agents.ai = 0)."""
     return not (a is not None and "ai" in a.keys() and a["ai"] is not None and int(a["ai"]) == 0)
 
 
-def agent_public(c, a, uid=None):
-    """An agent as the people who share lists with it see it: status + their visible running / waiting jobs + unread chat."""
+def agent_public(c, a, uid=None, pre=None):
+    """An agent as the people who share lists with it see it: status + their visible running / waiting jobs + unread chat.
+    2.674.0 B (#4194): pre = ag_pre() of agents_for (what is asked per agent, read for all of them at once; same answers)."""
     from ..agents.usage import usage_block, usage_cost_public, usage_flows_public
-    jobs = c.execute("SELECT * FROM agent_jobs WHERE agent_id=? AND state IN ('running','waiting') ORDER BY id DESC LIMIT 200",
-                     (a["user_id"],)).fetchall()
-    if uid is not None:
-        jobs = [j for j in jobs if job_visible(c, j, uid)]
-    unread = c.execute("SELECT COUNT(*) FROM agent_chat WHERE agent_id=? AND user_id=? AND sender='agent' AND read_at IS NULL",
-                       (a["user_id"], uid)).fetchone()[0] if uid else 0
+    if pre is not None:
+        jobs, unread = pre["jobs"].get(a["user_id"], []), pre["unread"].get(a["user_id"], 0)
+    else:
+        jobs = c.execute("SELECT * FROM agent_jobs WHERE agent_id=? AND state IN ('running','waiting') ORDER BY id DESC LIMIT 200",
+                         (a["user_id"],)).fetchall()
+        if uid is not None:
+            jobs = [j for j in jobs if job_visible(c, j, uid)]
+        unread = c.execute("SELECT COUNT(*) FROM agent_chat WHERE agent_id=? AND user_id=? AND sender='agent' AND read_at IS NULL",
+                           (a["user_id"], uid)).fetchone()[0] if uid else 0
+    p = pre or {}
+    age = p["age"].get(a["user_id"]) if pre is not None else agent_contact_age(c, a)
+    may_rt = (p["may_rt"](a) if pre is not None else may_set_runtime(c, a, uid)) if uid else False
     return {"id": a["user_id"], "username": a["username"], "name": a["display_name"] or a["username"],
             "display_name": a["display_name"] or a["username"],
             "ai": agent_is_ai(a),  # 2.482.0 (#3530): labelled "AI agent" (EU AI Act Art. 50); 0 = a bot without AI
             # 2.28.0 (#935 / #965): the workspace it works in (null = private) and whose personal agent it is (null = team)
             "org_id": a["org_id"] if "org_id" in a.keys() else None, "owner_id": a["owner_id"] if "owner_id" in a.keys() else None,
-            "avatar": avatar_url(c.execute("SELECT * FROM users WHERE id=?", (a["user_id"],)).fetchone()),
+            "avatar": avatar_url(p["avatars"].get(a["user_id"]) if pre is not None else c.execute("SELECT * FROM users WHERE id=?", (a["user_id"],)).fetchone()),
             "enabled": agent_active(a), "status": a["status"] or "idle", "status_text": a["status_text"] or "", "status_at": a["status_at"],
             "status_key": (a["status_key"] or "") if a["status_text"] else "", "status_key_at": (a["status_key_at"] or "") if a["status_text"] else "",  # 2.450.0 (#3769)
             # 2.26.0 (#949): paused with a reason (the agent itself, its owner or an admin)
             "paused": a["status"] == "paused", "pause_reason": (a["status_text"] or "") if a["status"] == "paused" else "",
             # 2.0.2: the task it says it works on (only when the viewer may see it) + the tasks of its running jobs
-            "status_task": a["status_task"] if a["status_task"] and (uid is None or task_visible(c, a["status_task"], uid, full=True)) else None,
+            "status_task": a["status_task"] if a["status_task"] and (uid is None or (a["status_task"] in p["tvis"] if pre is not None else task_visible(c, a["status_task"], uid, full=True))) else None,
             "job_tasks": sorted({j["task_id"] for j in jobs if j["state"] == "running" and j["task_id"]}),
             "running": sum(1 for j in jobs if j["state"] == "running"), "waiting": sum(1 for j in jobs if j["state"] == "waiting"),
-            "chat_unread": unread, "limit_reached": bool(usage_block(c, a["user_id"])),  # 2.1.1 (#326): its hard usage limit
+            "chat_unread": unread, "limit_reached": bool(usage_block(c, a["user_id"], a if pre is not None else None)),  # 2.1.1 (#326): its hard usage limit
             # 2.4.1 (#375): the chat header: offline (no event poll for 5 minutes; null = cannot tell), its typing signal to
             # the viewer (seconds left), a running job for the viewer
             "online": agent_online(a), "last_poll_at": a["last_poll_at"], "typing": agent_typing_to(a, uid),
             # 2.6.0 (K08): seconds since its last contact (an event poll or any API call with its token; null = never): the
             # app shows "not connected" after 5 minutes without one. A webhook agent is told about events, so for it only
             # "online": false counts
-            "webhook": bool(a["webhook_id"]), "contact_age": agent_contact_age(c, a),
+            "webhook": bool(a["webhook_id"]), "contact_age": age,
             "poll_age": round((now_utc() - parse_iso(a["last_poll_at"])).total_seconds()) if a["last_poll_at"] else None,
             # 2.26.0 (#933): its token is in use (an interactive session) but nothing collects its events -- the setup is not
             # finished until a service (launcher / LaunchAgent / task) keeps polling
-            "no_service": _no_service(c, a),
+            "no_service": _no_service(c, a, age),
             "my_job": bool(uid) and any(j["state"] == "running" and j["user_id"] == uid for j in jobs),
             # 2.29.0 (#1029): the chat header's badge (Auto / Ask) and whether the viewer may switch it
-            "permission_mode": agent_runtime(a)["permission_mode"], "may_set_mode": bool(uid) and may_set_runtime(c, a, uid),
+            "permission_mode": agent_runtime(a)["permission_mode"], "may_set_mode": bool(uid) and may_rt,
             # 2.32.0 (#1079): what its host reports it really runs with (model as the host names it, the mode of the current
             # run, the host's own default); the runtime's wished model next to it (set: … · runs: …)
             "host": _host_info(a), "runtime_model": agent_runtime(a)["model"],
             # 2.33.0 (#1045): its plan usage (the ring in the chat header; null = never reported)
             "quota": _quota(a),
             # 2.407.0 B (#3493): its costs (API-key agents: the ring against its cost limit; amounts only for owner / admins)
-            "cost": usage_cost_public(c, a, uid),
+            "cost": usage_cost_public(c, a, uid, **({"sums": p["cost"].get(a["user_id"], (None, None)), "admin": p["admin"]} if pre is not None else {})),
             # 2.565.0 D (#4674): a server agent's tokens per starter routine this month (owner / admins; the ring's list)
-            "flows": usage_flows_public(c, a, uid),
+            "flows": usage_flows_public(c, a, uid, **({"admin": p["admin"]} if pre is not None else {})),
             # 2.35.0 (#1103): open approval requests + permission questions to the viewer (the badge "1 approval open")
-            "approvals_open": _approvals_open(c, a["user_id"], uid),
+            "approvals_open": p["appr"].get(a["user_id"], 0) if pre is not None and uid else _approvals_open(c, a["user_id"], uid),
             # 2.58.0 (#1761): its list limit, only for the people who manage it (owner / admin); [] = all its lists
-            **({"list_ids": f8c_list_ids(a)} if uid and may_set_runtime(c, a, uid) else {}),
+            **({"list_ids": f8c_list_ids(a)} if uid and may_rt else {}),
             # 2.83.0 (#1775): the viewer may change its colour (same rule as PATCH /api/agents/<id>/color)
-            "can_color": o3b_can_color(c, a, uid)}
+            "can_color": p["color"](a) if pre is not None and uid else o3b_can_color(c, a, uid)}
 
 
 def o3b_can_color(c, a, uid):
@@ -1297,4 +1456,55 @@ def _host_info(a):
 def agents_for(c, uid):
     rows = c.execute("""SELECT a.*, u.username, u.display_name, u.avatar, u.disabled FROM agents a JOIN users u ON u.id=a.user_id
                         WHERE u.kind='agent' ORDER BY u.id""").fetchall()
-    return [agent_public(c, a, uid) for a in rows if agent_shares(c, a["user_id"], uid)]
+    sh = agents_shared(c, [a["user_id"] for a in rows], uid)  # 2.674.0 B (#4194): agent_shares for all at once
+    rows = [a for a in rows if a["user_id"] in sh]
+    pre = ag_pre(c, rows, uid) if rows and uid else None
+    return [agent_public(c, a, uid, pre) for a in rows]
+
+
+def ag_pre(c, rows, uid):
+    """2.674.0 B (#4194): what agent_public asks per agent, read once for the agents rows of agents_for: their running /
+    waiting jobs (the newest 200 each) that uid sees, the unread chat, pictures, last API use, which status tasks uid sees,
+    this month's costs, open approval cards, and the viewer's own row for the runtime / colour rights."""
+    from ..agents.chat import CHAT_CARD_SQL, choice_state, _jload
+    from ..agents.usage import usage_cost_sums
+    ids = [a["user_id"] for a in rows]
+    q = st_ids(ids)
+    u = c.execute("SELECT is_admin, kind, disabled FROM users WHERE id=?", (uid,)).fetchone()
+    jobs = c.execute("""SELECT * FROM (SELECT id, agent_id, user_id, task_id, state, row_number() OVER (PARTITION BY agent_id ORDER BY id DESC) AS rn
+                        FROM agent_jobs WHERE agent_id = ANY(CAST(? AS BIGINT[])) AND state IN ('running','waiting')) x
+                        WHERE rn<=200 ORDER BY agent_id, id DESC""", (q,)).fetchall()
+    seen = jobs_seen(c, jobs, uid, u) if u else set()
+    by = {}
+    for j in jobs:
+        if j["id"] in seen:
+            by.setdefault(j["agent_id"], []).append(j)
+    unread = {r[0]: r[1] for r in c.execute("""SELECT agent_id, COUNT(*) FROM agent_chat WHERE agent_id = ANY(CAST(? AS BIGINT[])) AND user_id=?
+                                               AND sender='agent' AND read_at IS NULL GROUP BY agent_id""", (q, uid))}
+    avatars = {r["id"]: r for r in c.execute("SELECT id, avatar, kind FROM users WHERE id = ANY(CAST(? AS BIGINT[]))", (q,))}
+    used = {r[0]: r[1] for r in c.execute("SELECT user_id, MAX(last_used_at) FROM api_tokens WHERE user_id = ANY(CAST(? AS BIGINT[])) "
+                                          "GROUP BY user_id", (q,))}
+    age = {}
+    for a in rows:  # = agent_contact_age
+        last = max([x for x in (a["last_poll_at"], used.get(a["user_id"])) if x] or [None], key=lambda x: x or "")
+        age[a["user_id"]] = round((now_utc() - parse_iso(last)).total_seconds()) if last else None
+    appr = {}
+    for r in c.execute(f"SELECT * FROM agent_chat WHERE agent_id = ANY(CAST(? AS BIGINT[])) AND user_id=? AND {CHAT_CARD_SQL} ORDER BY id", (q, uid)):
+        if choice_state(r, _jload(r["choices"]), None) == "open":  # = chat_approvals_open
+            appr[r["agent_id"]] = appr.get(r["agent_id"], 0) + 1
+    admin = bool(u and u["is_admin"] and not u["disabled"] and (u["kind"] or "user") != "agent")  # = usage.is_admin_id
+    oadm = {}
+
+    def color(a):  # = o3b_can_color
+        if "owner_id" in a.keys() and a["owner_id"] == uid:
+            return True
+        if u and u["is_admin"]:
+            return True
+        org = a["org_id"] if "org_id" in a.keys() else None
+        if org and org not in oadm:
+            oadm[org] = bool(is_org_admin(c, uid, org))
+        return bool(org and oadm[org])
+    return {"jobs": by, "unread": unread, "avatars": avatars, "age": age, "appr": appr, "admin": admin, "color": color,
+            "tvis": tasks_visible(c, [a["status_task"] for a in rows if a["status_task"]], uid, full=True),
+            "cost": usage_cost_sums(c, ids),
+            "may_rt": lambda a: a["owner_id"] == uid if a["owner_id"] else bool(u and u["is_admin"])}  # = may_set_runtime

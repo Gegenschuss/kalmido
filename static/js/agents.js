@@ -545,8 +545,31 @@ function jobFocusShow() {
 // 2.41.0 (#1479): a job log stays open (and keeps its scroll position, bottom stays bottom) when the list redraws on live updates
 S.jobLogOpen = {}; S.jobLogPos = {};
 const jobLogEl = e => e.target instanceof Element && e.target.matches?.('details.joblog, details.joblog > pre') ? e.target.closest('details.joblog') : null;
+// 2.674.0 B (#4194): the job list no longer brings the whole log (only log_last / has_log): an opened log is read once
+// with ?id= and kept (with the last line it had, so a newer last line reads it again)
+S.jobLogs = {};
+function jl_text(j) {
+  if (j.log != null) return j.log;
+  const k = S.jobLogs[j.id];
+  if (S.jobLogOpen[j.id] && (!k || k.last !== (j.log_last || ''))) setTimeout(() => jl_load(j.id), 0);  // open and newer: read again
+  return k && k.log != null ? k.log : tr('Loading…');
+}
+async function jl_load(jid) {
+  const j = (S.jobs.items || []).concat(S.jobs.older || []).find(x => x.id === +jid);
+  if (!j || j.log != null) return;
+  const k = S.jobLogs[j.id];
+  if (k && (k.last === (j.log_last || '') || k.busy)) return;
+  S.jobLogs[j.id] = {...(k || {}), busy: true};
+  try {
+    const one = ((await api('GET', '/api/agents/jobs?id=' + j.id)).jobs || [])[0];
+    S.jobLogs[j.id] = {log: one ? String(one.log || '') : '', last: j.log_last || ''};
+  } catch { S.jobLogs[j.id] = {...(k || {}), busy: false}; return; }
+  const pre = document.querySelector(`details.joblog[data-jid="${j.id}"] > pre`);
+  if (pre) { const bottom = pre.scrollHeight - pre.scrollTop - pre.clientHeight < 4; pre.textContent = S.jobLogs[j.id].log; if (bottom) pre.scrollTop = pre.scrollHeight; }
+}
 document.addEventListener('toggle', e => {
   const d = jobLogEl(e); if (!d) return;
+  if (d.open) jl_load(d.dataset.jid);
   S.jobLogOpen[d.dataset.jid] = d.open;
   const pos = S.jobLogPos[d.dataset.jid], pre = d.querySelector('pre');
   if (d.open && pos && pre) pre.scrollTop = pos.bottom ? pre.scrollHeight : pos.top;
@@ -575,13 +598,13 @@ function jobHtml(j) {
     !j.kind && j.can_act && j.state === 'waiting' && `<button class="btn sm" data-act="job-do" data-jid="${j.id}" data-a="reject">${thumbIc(false)} ${tr('Reject')}</button>`,
     jc_cardBtn(j),  // 2.56.0 (#1791): Message to a running job
     j.can_stop && ['running', 'waiting'].includes(j.state) && `<button class="btn sm danger" data-act="job-do" data-jid="${j.id}" data-a="stop">${ic('stop', 's')} ${tr('Stop')}</button>`].filter(Boolean).join('');
-  const last = String(j.log || '').trim().split('\n').pop();
+  const lg = jl_text(j), last = j.log != null ? String(j.log || '').trim().split('\n').pop() : String(j.log_last || '');  // 2.674.0 B (#4194): a list carries only the last line
   // 2.136.0 (#2193): a running job shows the bot at work (the antenna sways), one waiting for me the bot waiting (antenna up)
   const fo = S.jobFocus === j.id;  // 2.36.2 (#1141): opened by a "Job #id" link: highlighted, log + history unfolded
   return `<div class="job st-${esc(j.state)}${fo ? ' jfocus' : ''}" id="job-${j.id}"${fo ? ' tabindex="-1"' : ''}><div class="jobh">${j.state === 'running' || j.state === 'waiting' ? botFig(j.state === 'running' ? 'arbeitet' : 'wartet', 'bjob') : ''}<span class="jst">${esc(tr(JOB_ST[j.state] || j.state))}</span><b>${esc(j.title)}</b><span class="spacer"></span><span class="muted">${ac_mk(j.agent_id) ? `<i class="acjob"${ac_mk(j.agent_id)} aria-hidden="true"></i>` : ''}${esc(j.kind && j.agent_id === j.user_id ? tr('Assistant') : j.agent_name)} · ${esc(relTime(j.updated_at))}</span></div>
     ${j.task_id ? `<button class="runtask" data-act="open-id" data-id="${j.task_id}">${ic('arrow', 's')}<span>${esc(j.task_title || '')}</span></button>` : ''}
     ${jobMoreTasks(j)}${jobChain(j)}${''/* 2.392.2 (#3366): its other tasks, continuation and part jobs */}
-    ${j.log ? `<details class="joblog" data-jid="${j.id}"${S.jobLogOpen[j.id] ?? fo ? ' open' : ''}><summary>${esc(last.slice(0, 140))}</summary><pre>${esc(j.log)}</pre></details>` : ''}
+    ${j.log || j.has_log ? `<details class="joblog" data-jid="${j.id}"${S.jobLogOpen[j.id] ?? fo ? ' open' : ''}><summary>${esc(last.slice(0, 140))}</summary><pre>${esc(lg)}</pre></details>` : ''}
     ${jth_html(j)}
     ${j.steps ? jobStepsHtml(j.id, j.steps) : ''}
     ${j.action && !(j.action === 'approve' && j.state === 'waiting') ? `<div class="muted jact">${j.action === 'approve' ? thumbIc(true) + ' ' : j.action === 'reject' ? thumbIc(false) + ' ' : ''}${esc({approve: tr('Approved by {0}', j.action_by_name), reject: tr('Rejected by {0}', j.action_by_name), stop: tr('Stopped by {0}', j.action_by_name)}[j.action] || '')}</div>` : ''}

@@ -8,12 +8,14 @@ from flask import g, jsonify, request
 
 from ..core.config import app, PUBLIC_URL
 from ..core.pg import system_ctx  # 2.367.5 (#2980)
+from ..core.pg import st_ids  # 2.674.0 B (#4194)
 from ..core.schema import USER_DEFAULTS
 from ..core.i18n import tr
 from ..core.db import body, db, err, iso, iso_ms, now_utc, usettings
 from ..accounts.session import me
 from ..accounts.pictures import avatar_map
 from ..core.access import acx_task_ok, list_role, plists, pvis
+from ..core.access import list_roles  # 2.674.0 B (#4194)
 from ..collab.comments import collab_on, collab_user, lang_of, MENTION_RE, user_names
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from ..core.access import list_people  # 2.369.5 (#2517): pulled up from functions
@@ -511,6 +513,41 @@ def news_org_mine(c, uid, data, memo):
         return not c.execute("SELECT 1 FROM orgs WHERE name=? LIMIT 1", (name,)).fetchone()
 
 
+def nw_prop_jobs(rows):
+    """2.674.0 B (#4194): the job ids of the proposal items among the feed rows."""
+    out = set()
+    for r in rows:
+        if r["kind"] == "proposal":
+            try:
+                out.add(int(json.loads(r["data"] or "{}").get("job") or 0))
+            except (ValueError, TypeError, AttributeError):
+                pass
+    return sorted(out)
+
+
+def nw_int(v):
+    """2.674.0 B (#4194): an id of an item's data as int (also "12"), else None."""
+    if isinstance(v, bool):
+        return None
+    if isinstance(v, int):
+        return v
+    return int(v) if isinstance(v, str) and v.isdigit() else None
+
+
+def nw_data(r):
+    try:
+        d = json.loads(r["data"] or "{}")
+    except ValueError:
+        return {}
+    return d if isinstance(d, dict) else {}
+
+
+def nw_attending(c, uid):
+    """2.674.0 B (#4194): {event id} uid is invited to (an attendee) whose event is not deleted -- one query for the feed."""
+    return {r[0] for r in c.execute("SELECT a.event_id FROM event_attendees a JOIN events e ON e.id=a.event_id WHERE a.user_id=? "
+                                    "AND e.deleted_at IS NULL", (uid,))}
+
+
 def news_items(c, uid, s=None, mentions_only=False, to_me=False):
     """My visible feed, newest first, consecutive comments on one task grouped. [] if collab is off."""
     from ..agents.usage import is_admin_id
@@ -521,6 +558,16 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
                         FROM notifications n LEFT JOIN tasks t ON t.id=n.task_id LEFT JOIN comments k ON k.id=n.comment_id
                         WHERE n.user_id=? ORDER BY n.id DESC LIMIT ?""", (uid, NEWS_KEEP_MAX)).fetchall()
     roles, pl, pv = {}, set(plists(c, uid)), {}
+    # 2.674.0 B (#4194): the roles of every list the rows name, read at once (list_roles, two queries) instead of one by one;
+    # the per-item checks below ask the database once per feed (proposal jobs, invitations, offices, admin) -- same answers
+    lids = sorted({int(x) for r in rows for x in (r["t_list"], r["list_id"]) if x})
+    roles.update({k: bool(v) for k, v in (list_roles(c, uid, lids) if lids else {}).items()})
+    memo = {}
+
+    def nw_once(key, fn):
+        if key not in memo:
+            memo[key] = fn()
+        return memo[key]
 
     def sees(lid):
         if lid not in roles:
@@ -554,7 +601,7 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
             if not sees(r["list_id"]):
                 continue
         elif kind == "usage":  # 2.1.1 (#326): an agent's usage limit, for admins (no task, no list)
-            if not is_admin_id(c, uid) and not ws_budget_news_mine(c, uid, r):  # 2.236.0 B (#2904): + the owner's budget
+            if not nw_once("admin", lambda: is_admin_id(c, uid)) and not ws_budget_news_mine(c, uid, r):  # 2.236.0 B (#2904): + the owner's budget
                 continue
         elif kind == "signup":  # 2.23.0 (#711): for admins, while the registration still waits
             try:
@@ -562,14 +609,16 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
             except (ValueError, TypeError, AttributeError):
                 su = 0
             so = news_org_data(r)  # 2.367.4 (#2974): an organisation's admin, by the person's domain
-            if not (news_org_admin(c, uid, so) if so else is_admin_id(c, uid)) or not c.execute("SELECT 1 FROM users WHERE id=? AND signup='pending'", (su,)).fetchone():
+            if not (news_org_admin(c, uid, so) if so else nw_once("admin", lambda: is_admin_id(c, uid))) or not c.execute("SELECT 1 FROM users WHERE id=? AND signup='pending'", (su,)).fetchone():
                 continue
         elif kind == "proposal":  # 2.3.0: while the proposal job (mine) exists
             try:
                 pj = int(json.loads(r["data"] or "{}").get("job") or 0)
             except (ValueError, TypeError, AttributeError):
                 pj = 0
-            if not c.execute("SELECT 1 FROM agent_jobs WHERE id=? AND user_id=? AND kind IS NOT NULL", (pj, uid)).fetchone():
+            if pj not in nw_once("propjobs", lambda: {x[0] for x in c.execute(  # 2.674.0 B (#4194): my proposal jobs, once
+                    "SELECT id FROM agent_jobs WHERE user_id=? AND kind IS NOT NULL AND id = ANY(CAST(? AS BIGINT[]))",
+                    (uid, st_ids(nw_prop_jobs(rows))))}):
                 continue
         elif kind in ("evinvite", "evshare", "abshare"):  # 2.21.0 (#659 / #658): while I am still invited / a member
             try:
@@ -582,8 +631,7 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
             except (ValueError, TypeError):
                 ref = 0
             if kind == "evinvite":
-                if not c.execute("SELECT 1 FROM event_attendees a JOIN events e ON e.id=a.event_id WHERE a.event_id=? AND a.user_id=? "
-                                 "AND e.deleted_at IS NULL", (ref, uid)).fetchone():
+                if ref not in nw_once("attending", lambda: nw_attending(c, uid)):  # 2.674.0 B (#4194): once per feed
                     continue
             else:  # 2.647.0 (#5046): a member as the core has it (a share taken back / run out there ends the news too)
                 from ..contacts.model import bk_member_role
@@ -598,10 +646,8 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
         elif kind == "evchange":  # 2.367.2 (#2969): a cancellation stands; a change while I am invited, the newest only
             dd = json.loads(r["data"] or "{}")
             if dd.get("what") in ("time", "place"):
-                if dd.get("event_id") in evc_seen or not c.execute(
-                        """SELECT 1 FROM event_attendees a JOIN events e ON e.id=a.event_id
-                           WHERE a.event_id=? AND a.user_id=? AND e.deleted_at IS NULL""", (dd.get("event_id"), uid)).fetchone():
-                    continue
+                if dd.get("event_id") in evc_seen or nw_int(dd.get("event_id")) not in nw_once("attending", lambda: nw_attending(c, uid)):
+                    continue  # 2.674.0 B (#4194): my invitations once per feed
                 evc_seen.add(dd.get("event_id"))
         elif kind == "apbooking":  # 2.367.2 (#2969): my booking page (no task, no list)
             pass
@@ -673,7 +719,7 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
                 continue
         elif kind in ("docpaid", "docoverdue"):  # 2.367.4 (#2972): while I am still in that office
             from ..office.dunning import dun_news_live
-            if not dun_news_live(c, uid, r["data"]):
+            if not nw_once(("dun", nw_int(nw_data(r).get("org_id"))), lambda: dun_news_live(c, uid, r["data"])):  # 2.674.0 B (#4194): once per office
                 continue
         elif kind in ("ptlimit", "apblimit"):  # 2.138.4 C (#2380): the portal's sign-in mails of my space were used up (no task, no list); 2.360.2 L (#2561): the booking page's
             pass
@@ -797,6 +843,12 @@ def news_unread(c, uid, s=None):
     return sum(1 for x in news_items(c, uid, s)[0] if not x["read"])
 
 
+def news_counts(c, uid):
+    """2.674.0 B (#4194): {unread, unread_me, sig} for the answers of read / dismiss -- the feed computed once (not twice)."""
+    items = news_items(c, uid)[0]
+    return {"unread": sum(1 for x in items if not x["read"]), "unread_me": news_unread_me(c, uid, None, items), "sig": news_sig(c, uid)}
+
+
 def news_unread_me(c, uid, s=None, items=None):
     """2.28.0 (#987): unread items from people for me (the bell's number)."""
     items = news_items(c, uid, s)[0] if items is None else items
@@ -810,13 +862,17 @@ def news_list():
     uid = me()
     s = usettings(c, uid)
     f = request.args.get("filter")
-    items, names = news_items(c, uid, s, mentions_only=f == "mentions", to_me=f == "me")
-    unread_me = news_unread_me(c, uid, s, items if not f else None)  # 2.28.0 (#987)
+    # 2.674.0 B (#4194): the feed is computed once: the counters from the whole feed, a filter keeps its kinds (mentions /
+    # NEWS_TO_ME never group with other rows, so the filtered feed is exactly these items of the whole one)
+    full, names = news_items(c, uid, s)
+    items = [x for x in full if x["kind"] == "mention"] if f == "mentions" else \
+        [x for x in full if x["kind"] in NEWS_TO_ME] if f == "me" else full
+    unread_me = news_unread_me(c, uid, s, full)  # 2.28.0 (#987)
     try:
         page, nxt = ag_news_page(items, request.args.get("limit"), request.args.get("before"))
     except ValueError:
         return err(tr("Invalid data"))
-    return jsonify(items=page, users={str(k): v for k, v in names.items()}, unread=news_unread(c, uid, s),
+    return jsonify(items=page, users={str(k): v for k, v in names.items()}, unread=sum(1 for x in full if not x["read"]),
                    unread_me=unread_me, next=nxt,
                    sig=news_sig(c, uid), enabled=collab_on(s), avatars=avatar_map(c, uid))
 
@@ -851,7 +907,7 @@ def news_dismiss():
         part = ids[i:i + 500]
         c.execute(f"DELETE FROM notifications WHERE user_id=? AND id IN ({','.join('?' * len(part))})", (uid, *part))
     c.commit()
-    return jsonify(ok=True, unread=news_unread(c, uid), unread_me=news_unread_me(c, uid), sig=news_sig(c, uid))
+    return jsonify(ok=True, **news_counts(c, uid))
 
 
 @app.post("/api/news/read")
@@ -873,7 +929,7 @@ def news_read():
             part = ids[i:i + 500]
             c.execute(f"UPDATE notifications SET read_at=NULL WHERE user_id=? AND id IN ({','.join('?' * len(part))})", (uid, *part))
         c.commit()
-        return jsonify(ok=True, unread=news_unread(c, uid), unread_me=news_unread_me(c, uid), sig=news_sig(c, uid))
+        return jsonify(ok=True, **news_counts(c, uid))
     if b.get("all"):
         tids |= {r[0] for r in c.execute("SELECT DISTINCT task_id FROM notifications WHERE user_id=? AND read_at IS NULL "
                                          "AND task_id IS NOT NULL", (uid,))}
@@ -893,7 +949,7 @@ def news_read():
                       (ts, uid, *part))
     push_handled(c, uid, sorted(tids), ("*",) if b.get("all") else ())  # 2.19.0 (#668): "all read" closes them all
     c.commit()
-    return jsonify(ok=True, unread=news_unread(c, uid), unread_me=news_unread_me(c, uid), sig=news_sig(c, uid), **({"marked": marked} if b.get("all") else {}))
+    return jsonify(ok=True, **news_counts(c, uid), **({"marked": marked} if b.get("all") else {}))
 
 
 def news_forget_comment(c, cid):

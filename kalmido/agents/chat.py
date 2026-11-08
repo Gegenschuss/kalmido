@@ -35,6 +35,7 @@ from ..collab.reactions import clean_emoji
 from ..collab.news import news_read_job  # 2.369.5 (#2517): pulled up from functions
 from ..collab.replies import reply_quotes, reply_check  # 2.369.5 (#2517): pulled up from functions
 from ..agents.core import jn9_job_names, agent_shares, need_agent, may_set_runtime, task_editing_set  # 2.369.5 (#2517): pulled up from functions
+from ..agents.core import jl_cols, job_vis_sql, jobs_may_act, jobs_pre, jobs_seen  # 2.674.0 B (#4194)
 from ..collab.comments import comment_plain  # 2.369.5 (#2517): pulled up from functions
 from ..core.orgcrypt import oc_seal_path, oc_user_space  # 2.369.5 (#2517): pulled up from functions
 
@@ -48,10 +49,11 @@ def agents_get():
 
 @app.get("/api/agents/jobs")
 def agent_jobs_get():
-    """Jobs I can see (the linked task, or jobs for me; admins all), newest first. ?agent_id= ?state=open|all ?id= (one job)"""
+    """Jobs I can see (the linked task, or jobs for me; admins all), newest first. ?agent_id= ?state=open|all ?id= (one job)
+    2.674.0 B (#4194): the list filters in the database (job_vis_sql) and checks the rows in batches (jobs_seen), so older
+    visible jobs no longer go missing behind 500 newer foreign ones; only ?id= (one job) carries the whole log."""
     c = db()
-    q, args = "SELECT * FROM agent_jobs", []
-    where = []
+    where, args = [], []
     if request.args.get("agent_id"):
         where.append("agent_id=?")
         args.append(as_int(request.args["agent_id"], "agent_id", 1))
@@ -60,23 +62,38 @@ def agent_jobs_get():
             jid = as_int(request.args["id"], "id", 1, 2147483647)
         except BadInput:  # 2.284.2: "Job 0" / NaN from a chat text is no job either: an empty list, not a 400 (older apps toasted it on every drawing)
             return jsonify(jobs=[])
-        where.append("id=?")
-        args.append(jid)
-    if not request.args.get("id") and ("limit" in request.args or "before" in request.args):
+        if request.args.get("state", "all") == "open":
+            where.append("state IN ('running','waiting')")
+        j = c.execute("SELECT * FROM agent_jobs WHERE id=?" + "".join(" AND " + x for x in where), [jid, *args]).fetchone()
+        return jsonify(jobs=ag_jobs_out(c, [j] if j and job_visible(c, j, me()) else []))
+    vc, va = job_vis_sql(c, me())  # 2.674.0 B (#4194)
+    where.append(vc)
+    args += va
+    if "limit" in request.args or "before" in request.args:
         return ag_jobs_page(c, where, args)  # 2.40.0 (#1432): "Load more"; without ?limit / ?before as before
     if request.args.get("state", "all") == "open":
         where.append("state IN ('running','waiting')")
-    rows = c.execute(q + (" WHERE " + " AND ".join(where) if where else "") + " ORDER BY updated_at DESC, id DESC LIMIT 500", args).fetchall()
-    rows = [j for j in rows if job_visible(c, j, me())][:200]
-    return jsonify(jobs=ag_jobs_out(c, rows))
+    rows, cur = [], None
+    while len(rows) < 200:  # newest first, up to 200 visible jobs (no fixed window of rows any more)
+        a = list(args) + ([cur[0], cur[1]] if cur else [])
+        batch = c.execute(f"SELECT {jl_cols(c)} FROM agent_jobs WHERE " + " AND ".join(where) + (" AND (updated_at, id) < (?, ?)" if cur else "")
+                          + " ORDER BY updated_at DESC, id DESC LIMIT 500", a).fetchall()
+        seen = jobs_seen(c, batch, me())
+        rows += [j for j in batch if j["id"] in seen]
+        if len(batch) < 500:
+            break
+        cur = (batch[-1]["updated_at"], batch[-1]["id"])
+    return jsonify(jobs=ag_jobs_out(c, rows[:200]))
 
 
 def ag_jobs_out(c, rows):
     names = user_names(c, [x for j in rows for x in (j["agent_id"], j["user_id"], j["action_by"])])
     from ..agents.steps import job_steps_count
     jc = job_steps_count(c, me(), [j["id"] for j in rows if j["user_id"] == me()])  # 2.32.0 (#1081): only my own jobs' history
-    return [{**job_dict(c, j, names), "can_act": job_may_act(c, j, me(), "approve"),
-             "can_stop": job_may_act(c, j, me(), "stop"), "steps": jc.get(j["id"], 0) if j["user_id"] == me() else 0} for j in rows]
+    pre = jobs_pre(c, rows, me()) if rows else None  # 2.674.0 B (#4194): tasks, links and part jobs read once for all
+    acts = jobs_may_act(c, rows, me())  # 2.674.0 B (#4194)
+    return [{**job_dict(c, j, names, pre), "can_act": acts[j["id"]][0],
+             "can_stop": acts[j["id"]][1], "steps": jc.get(j["id"], 0) if j["user_id"] == me() else 0} for j in rows]
 
 
 AG_JOBS_FIRST, AG_JOBS_MAX, AG_JOBS_SCAN = 20, 200, 5000
@@ -86,27 +103,32 @@ def ag_jobs_page(c, where, args):
     """2.40.0 (#1432): ?limit=20 (at most 200) &before=<next>: one page of the ended jobs, newest first; the first page
     (no before) also brings every running / waiting job (no limit, they stay on top). next = the cursor of the following
     page, null at the end. Visibility is checked per row while the page fills (at most AG_JOBS_SCAN rows per request;
-    then next continues behind the last row read)."""
+    then next continues behind the last row read). 2.674.0 B (#4194): where holds job_vis_sql (the database leaves out
+    most foreign jobs), each batch is checked at once (jobs_seen)."""
     try:
         lim = ag_limit(request.args.get("limit"), AG_JOBS_FIRST, AG_JOBS_MAX)
         cur = ag_cursor_parse(request.args.get("before"))
     except ValueError:
         return err(tr("Invalid value: {0}", "before"))
     uid, cond = me(), " AND ".join(where) + " AND " if where else ""
+    cols = jl_cols(c)
     top = []
     if not cur:
-        top = [j for j in c.execute(f"SELECT * FROM agent_jobs WHERE {cond}state IN ('running','waiting') "
-                                    "ORDER BY updated_at DESC, id DESC", args).fetchall() if job_visible(c, j, uid)]
+        top = c.execute(f"SELECT {cols} FROM agent_jobs WHERE {cond}state IN ('running','waiting') "
+                        "ORDER BY updated_at DESC, id DESC", args).fetchall()
+        vis = jobs_seen(c, top, uid)
+        top = [j for j in top if j["id"] in vis]
     if request.args.get("state", "all") == "open":
         return jsonify(jobs=ag_jobs_out(c, top), next=None)
     page, nxt, seen = [], None, 0
     while True:
         a = list(args) + ([cur[0], cur[1]] if cur else [])
-        batch = c.execute(f"SELECT * FROM agent_jobs WHERE {cond}state NOT IN ('running','waiting')"
+        batch = c.execute(f"SELECT {cols} FROM agent_jobs WHERE {cond}state NOT IN ('running','waiting')"
                           + (" AND (updated_at, id) < (?, ?)" if cur else "") + " ORDER BY updated_at DESC, id DESC LIMIT 200", a).fetchall()
+        vis = jobs_seen(c, batch, uid)
         for j in batch:
             seen += 1
-            if job_visible(c, j, uid):
+            if j["id"] in vis:
                 if len(page) == lim:  # one more visible row: there is a next page
                     nxt = ag_cursor(page[-1]["updated_at"], page[-1]["id"])
                     break

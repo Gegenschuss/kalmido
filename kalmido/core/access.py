@@ -14,6 +14,7 @@ from ..core.ctx import me  # 2.149.0 G (#2517): was accounts.session
 from ..core.errors import Denied  # noqa: F401  2.149.0 G (#2517): moved to core/errors.py, re-exported here
 from .pg import set_ctx_hook, st_ids, system_ctx as pg_system  # 2.149.0 G (#2517): pulled up from functions
 from .dlock import DL_FEAT_AREA, dl_area_locked, dl_list_hidden, dl_lists_sql, dl_task_hidden, dl_task_sql  # 2.235.0 B (#2902): an agent's data lock
+from .dlock import dl_tasks_locked  # 2.674.0 B (#4194)
 from ..core.pg import system_ctx as _sys, LOOKUP  # 2.369.5 (#2517): pulled up from functions
 
 
@@ -634,6 +635,25 @@ def task_visible(c, tid, uid, write=False, full=False):
             return False  # 2.143.0 A (#2151): read-only in the list's organisation
         return tid in (wr if write or full else vis)
     return bool(role) and (not write or role in WRITE_ROLES)
+
+
+def tasks_visible(c, tids, uid, full=False):
+    """2.674.0 B (#4194): {task id} among tids that uid may see (full: as task_visible(full=True)) -- the read check of
+    task_visible for many tasks: their lists in one query, the roles with list_roles (two queries for all), the data lock in
+    one read; only tasks in a participant list are asked one by one (task_visible). The same answers as task_visible."""
+    ids = sorted({int(x) for x in tids or () if x})
+    if not ids or not uid:
+        return set()
+    tl = {r[0]: r[1] for r in c.execute("SELECT id, list_id FROM tasks WHERE id = ANY(CAST(? AS BIGINT[]))", (st_ids(ids),))}
+    roles = list_roles(c, uid, sorted({x for x in tl.values() if x is not None}))
+    whole = [t for t, lid in tl.items() if roles.get(lid) and roles.get(lid) != "participant"]
+    if has_request_context() and request.method in ("GET", "HEAD"):
+        hidden = {t for t in whole if dl_task_hidden(c, t, uid)}  # the request's cached set (as task_visible)
+    else:
+        hidden = dl_tasks_locked(c, uid, whole)  # = dl_task_hidden one by one outside a GET
+    out = {t for t in whole if t not in hidden}
+    out.update(t for t, lid in tl.items() if roles.get(lid) == "participant" and task_visible(c, t, uid, full=full))
+    return out
 
 
 def acx_task_ok(c, tid, uid):

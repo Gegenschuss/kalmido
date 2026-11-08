@@ -9,7 +9,7 @@ from datetime import date, datetime, timedelta, timezone
 from flask import g, jsonify, request, Response
 
 from ..core.config import API_PREFIX, app, MAX_FILE_MB, PUBLIC_URL, TZ
-from ..core.pg import insert_id, system_ctx
+from ..core.pg import insert_id, st_ids, system_ctx  # 2.674.0 B (#4194): st_ids
 from ..core.i18n import dec_comma, fmt_int, lang, tr
 from ..core.db import bump, connect, db, inbox_default, iso, iso_ms, local_now, now_utc, parse_iso, usettings
 from ..accounts.session import GATE, me
@@ -152,34 +152,48 @@ def usage_state(c, a):
             "reached": lim["hard"] is not None and used >= lim["hard"], "resets_at": iso(end.astimezone(timezone.utc))}
 
 
-def usage_cost_public(c, a, uid=None):
+def usage_cost_sums(c, aids):
+    """2.674.0 B (#4194): {agent id: (cost this month, cost today)} of many agents in one query (usage_cost_public's sums)."""
+    ids = sorted({int(x) for x in aids or () if x})
+    if not ids:
+        return {}
+    today = local_now().date().isoformat()
+    return {r["agent_id"]: (r["m"], r["d"]) for r in c.execute(
+        """SELECT agent_id, SUM(cost_usd) AS m, SUM(CASE WHEN day=? THEN cost_usd END) AS d FROM agent_usage
+           WHERE agent_id = ANY(CAST(? AS BIGINT[])) AND day>=? GROUP BY agent_id""", (today, st_ids(ids), usage_period("month")[1]))}
+
+
+def usage_cost_public(c, a, uid=None, sums=None, admin=None):
     """2.407.0 B (#3493): the costs of agent a for its chat header -- agents with an API key report costs, not a plan quota.
     {period, pct}: the cost so far in the period of its cost limit against that limit (the hard one, else the soft one;
     both None without a cost limit = no ring). Who may read its usage numbers (the owner of a personal agent, instance
     admins: #2928) also gets {today, month, limit} in USD. None = no cost reported this month and no cost limit."""
     lim = usage_limits(a)
     lim = lim if lim and lim["metric"] == "cost" else None
-    today = local_now().date().isoformat()
-    r = c.execute("""SELECT SUM(cost_usd) AS m, SUM(CASE WHEN day=? THEN cost_usd END) AS d FROM agent_usage
-                     WHERE agent_id=? AND day>=?""", (today, a["user_id"], usage_period("month")[1])).fetchone()
-    month, day = (r["m"], r["d"]) if r else (None, None)
+    if sums is not None:  # 2.674.0 B (#4194): read for many agents at once (usage_cost_sums); admin = is_admin_id(c, uid)
+        month, day = sums
+    else:
+        today = local_now().date().isoformat()
+        r = c.execute("""SELECT SUM(cost_usd) AS m, SUM(CASE WHEN day=? THEN cost_usd END) AS d FROM agent_usage
+                         WHERE agent_id=? AND day>=?""", (today, a["user_id"], usage_period("month")[1])).fetchone()
+        month, day = (r["m"], r["d"]) if r else (None, None)
     if month is None and not lim:
         return None
     cap = (lim["hard"] if lim["hard"] is not None else lim["soft"]) if lim else None
     used = ((day if lim["period"] == "day" else month) or 0) if lim else None
     out = {"period": lim["period"] if lim else None, "pct": round(100 * used / cap, 1) if cap else None}
-    if uid and (a["owner_id"] == uid or is_admin_id(c, uid)):
+    if uid and (a["owner_id"] == uid or (is_admin_id(c, uid) if admin is None else admin)):
         out.update(today=round(day or 0, 6), month=round(month or 0, 6), limit=cap)
     return out
 
 
-def usage_flows_public(c, a, uid=None):
+def usage_flows_public(c, a, uid=None, admin=None):
     """2.565.0 D (#4674): the tokens of server agent a per starter routine this month [{flow, tokens, model}] for its chat header
     (the usage ring's list) -- only for who may read its usage numbers (its owner, instance admins: as usage_cost_public);
     model = the routine's own model ('' = the agent's). None for others and for agents that are no server agents."""
     k = a.keys()
     if not uid or "provider" not in k or (a["provider"] or "") != "kalmido-server" or \
-            not (("owner_id" in k and a["owner_id"] == uid) or is_admin_id(c, uid)):
+            not (("owner_id" in k and a["owner_id"] == uid) or (is_admin_id(c, uid) if admin is None else admin)):  # 2.674.0 B (#4194): admin given
         return None
     fm = srv_flow_models(srv_row(c, a["user_id"]))
     rows = c.execute("""SELECT flow, SUM(input_tokens + output_tokens + cache_write_tokens) AS t FROM agent_usage
@@ -226,10 +240,11 @@ def budget_state(c, a, now=None):
             "resets_at": iso(end.astimezone(timezone.utc))}
 
 
-def usage_block(c, aid):
+def usage_block(c, aid, row=None):
     """The limit state when agent aid's hard limit is reached (its calls are refused), else None.
-    2.236.0 B (#2904): also when its owner's budget is used up (then with "budget": True, hard = the budget)."""
-    a = c.execute("SELECT user_id, usage_limits, work_style FROM agents WHERE user_id=?", (aid,)).fetchone()
+    2.236.0 B (#2904): also when its owner's budget is used up (then with "budget": True, hard = the budget).
+    2.674.0 B (#4194): row = the agent's agents row when the caller has read it (user_id, usage_limits, work_style)."""
+    a = row if row is not None else c.execute("SELECT user_id, usage_limits, work_style FROM agents WHERE user_id=?", (aid,)).fetchone()
     if not a:
         return None
     st = usage_state(c, a) if a["usage_limits"] else None

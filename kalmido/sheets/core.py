@@ -19,7 +19,7 @@ import time
 
 from flask import g, has_request_context
 
-from ..core.access import MANAGE_ROLES, Denied, WRITE_ROLES, acx_org_ok, list_role
+from ..core.access import MANAGE_ROLES, Denied, WRITE_ROLES, acx_org_ok, list_role, list_roles
 from ..core.pgbus import bus_on, bus_send  # 2.622.0 (#3891)
 from ..core.dlock import dl_of, dl_sheet_locked  # 2.560.0 B (#4699)
 from ..core.db import bump, iso_ms, now_utc
@@ -1570,6 +1570,14 @@ SH_FN_HELP = {"SUMME": N_("Sum of the values (SUM)"), "MITTELWERT": N_("Average 
               "TAGE": N_("Days between two dates: DAYS(end; start)")}
 
 
+def sh_lids_seen(c, uid, rows):
+    """2.674.0 B (#4194): the list ids of rows ([(list_id,)]) uid has a role in -- list_roles for all at once (two queries)
+    instead of list_role per list; the same answers."""
+    ids = [r[0] for r in rows]
+    roles = list_roles(c, uid, ids) if ids else {}
+    return [x for x in ids if roles.get(int(x))]
+
+
 def sh_index(c, uid, space=None, list_id=None):
     """The sheets uid may read: of a space ("private" | "org:N" | "all") or attached to a list."""
     agent = sh_is_agent(c, uid)
@@ -1585,8 +1593,7 @@ def sh_index(c, uid, space=None, list_id=None):
             orgs = str(int(a[0])) if a and a[0] else ""
         else:
             orgs = ",".join(str(int(x)) for x in user_orgs(c, uid) if x in user_orgs_full(c, uid))  # 2.143.0 A (#2151)
-        lids = [r[0] for r in c.execute("SELECT DISTINCT list_id FROM sheets WHERE deleted_at IS NULL AND list_id IS NOT NULL").fetchall()
-                if list_role(c, r[0], uid)]
+        lids = sh_lids_seen(c, uid, c.execute("SELECT DISTINCT list_id FROM sheets WHERE deleted_at IS NULL AND list_id IS NOT NULL").fetchall())
         cond = "(org_id IS NULL AND owner_id=?)" + (f" OR org_id IN ({orgs})" if orgs else "")
         if lids:
             cond += f" OR list_id IN ({','.join(str(int(x)) for x in lids)})"
@@ -1596,8 +1603,8 @@ def sh_index(c, uid, space=None, list_id=None):
     else:
         oid = sh_space(c, uid, space)
         if oid is None:
-            lids = [r[0] for r in c.execute("SELECT DISTINCT list_id FROM sheets WHERE deleted_at IS NULL AND org_id IS NULL "
-                                            "AND list_id IS NOT NULL").fetchall() if list_role(c, r[0], uid)]
+            lids = sh_lids_seen(c, uid, c.execute("SELECT DISTINCT list_id FROM sheets WHERE deleted_at IS NULL AND org_id IS NULL "
+                                                  "AND list_id IS NOT NULL").fetchall())
             cond = "owner_id=?" + (f" OR list_id IN ({','.join(str(int(x)) for x in lids)})" if lids else "")
             rows = c.execute(f"SELECT * FROM sheets WHERE deleted_at IS NULL AND org_id IS NULL AND ({cond}) "
                              f"ORDER BY lower(title), id LIMIT 2000", (owner,)).fetchall()
