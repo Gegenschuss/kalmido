@@ -77,7 +77,8 @@ def mail_addr(token):
 
 
 def mail_tokens(c, uid):
-    return {r["list_id"]: r["token"] for r in c.execute("SELECT * FROM mail_tokens WHERE user_id=?", (uid,))}
+    from .mailtok import mtk_plain  # 2.674.0 (#4382 finding 5): a new token is stored sealed
+    return {r["list_id"]: mtk_plain(c, r["token"]) for r in c.execute("SELECT * FROM mail_tokens WHERE user_id=?", (uid,))}
 
 
 @app.get("/api/me/mail")
@@ -120,7 +121,9 @@ def mail_token_new():
             return jsonify(error=le2b_off(), code="list_e2e"), 409
     tok = secrets.token_urlsafe(12).replace("-", "x").replace("_", "y")
     c.execute("DELETE FROM mail_tokens WHERE user_id=? AND list_id IS NOT DISTINCT FROM ?", (me(), lid))
-    c.execute("INSERT INTO mail_tokens(token,user_id,list_id,created_at) VALUES(?,?,?,?)", (tok, me(), lid, iso(now_utc())))
+    from .mailtok import mtk_new
+    c.execute("INSERT INTO mail_tokens(token,token_hash,user_id,list_id,created_at) VALUES(?,?,?,?,?)",
+              (*mtk_new(c, tok), me(), lid, iso(now_utc())))  # 2.674.0 (#4382 finding 5): sealed + its hash, no plain text
     c.commit()
     return jsonify(address=mail_addr(tok), list_id=lid)
 
@@ -244,8 +247,10 @@ def mail_target(c, msg):
     """(user id, list id or None, how) the mail is for, or (None, None, None): how "token" = a token in To / Cc / Delivered-To /
     X-Original-To, how "from" = (mail_from_me) the sender's address of a person who allowed that, which anyone can forge."""
     hdrs = " ".join(str(msg.get_all(h, [])) for h in ("To", "Cc", "Delivered-To", "X-Original-To", "Envelope-To"))
+    from .mailtok import mtk_where
     for tok in MAIL_TOKEN_RE.findall(hdrs):
-        r = c.execute("SELECT * FROM mail_tokens WHERE token=?", (tok,)).fetchone()
+        w, a = mtk_where(tok)  # 2.674.0 (#4382 finding 5): by the hash (a row of an older version by the plain token)
+        r = c.execute(f"SELECT * FROM mail_tokens WHERE {w}", a).fetchone()
         if r:
             u = c.execute("SELECT disabled FROM users WHERE id=?", (r["user_id"],)).fetchone()
             if not u or u["disabled"]:

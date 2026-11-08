@@ -200,9 +200,13 @@ def ml_budget(c, token, kind, n=1):
     address `token` may still have this hour (ML_HOUR_LINKS / ML_HOUR_EML), taken from its budget at once. Counted on
     the doc_mail row (hits_hour = the hour, hits_links / hits_eml); call inside system_ctx, the caller commits."""
     col, cap = ("hits_links", ML_HOUR_LINKS) if kind == "links" else ("hits_eml", ML_HOUR_EML)
-    r = c.execute(f"SELECT hits_hour, {col} AS used FROM doc_mail WHERE token=? FOR UPDATE", (token,)).fetchone()
+    # 2.674.0 (#4382 finding 5): token = the row's stored value (sealed or an old plain one) or the plain token of a sealed row
+    from ..integrations.mailtok import mtk_hash
+    r = c.execute(f"SELECT token, hits_hour, {col} AS used FROM doc_mail WHERE token=? OR token_hash=? FOR UPDATE",
+                  (token, mtk_hash(token))).fetchone()
     if not r or n <= 0:
         return 0
+    token = r["token"]
     hour = now_iso()[:13]
     used = int(r["used"] or 0) if r["hits_hour"] == hour else 0
     k = max(0, min(n, cap - used))
@@ -227,5 +231,6 @@ def ml_token_new(c, uid, org):
     Used by the documents settings (POST /api/docs/mail) and the office settings (POST /api/office/receipt-mail)."""
     tok = "d" + secrets.token_urlsafe(14).replace("-", "x").replace("_", "y")
     c.execute("DELETE FROM doc_mail WHERE user_id=? AND org_id IS NOT DISTINCT FROM ? AND aid=''", (uid, org))  # 2.577.0 C (#4466): the named ones stay
-    c.execute("INSERT INTO doc_mail(token, user_id, org_id, created_at) VALUES(?,?,?,?)", (tok, uid, org, now_iso()))
+    from ..integrations.mailtok import mtk_new  # 2.674.0 (#4382 finding 5): sealed + its hash, no plain text
+    c.execute("INSERT INTO doc_mail(token, token_hash, user_id, org_id, created_at) VALUES(?,?,?,?,?)", (*mtk_new(c, tok), uid, org, now_iso()))
     return tok

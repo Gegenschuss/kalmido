@@ -85,7 +85,8 @@ def rq_address(c, lid):
     """The request address of list lid while its switch is on ('' otherwise)."""
     l = c.execute("SELECT req_mail FROM lists WHERE id=?", (lid,)).fetchone()
     r = rq_token(c, lid) if l and l["req_mail"] else None
-    return M.mail_addr(r["token"]) if r and M.MAIL_IN_ON else ""
+    from .mailtok import mtk_plain  # 2.674.0 (#4382 finding 5)
+    return M.mail_addr(mtk_plain(c, r["token"])) if r and M.MAIL_IN_ON else ""
 
 
 def _addr(v):
@@ -382,8 +383,9 @@ def rq_set(lid):
     if (b.get("on") and not old) or (b.get("renew") and old):
         tok = secrets.token_urlsafe(12).replace("-", "x").replace("_", "y")
         c.execute("DELETE FROM hub_tokens WHERE kind='ticket' AND list_id=?", (lid,))
-        c.execute("INSERT INTO hub_tokens(token,kind,user_id,org_id,client_id,list_id,created_at) VALUES(?,?,?,?,?,?,?)",
-                  (tok, "ticket", me(), l["org_id"], None, lid, iso(now_utc())))
+        from .mailtok import mtk_new  # 2.674.0 (#4382 finding 5): sealed + its hash, no plain text
+        c.execute("INSERT INTO hub_tokens(token,token_hash,kind,user_id,org_id,client_id,list_id,created_at) VALUES(?,?,?,?,?,?,?,?)",
+                  (*mtk_new(c, tok), "ticket", me(), l["org_id"], None, lid, iso(now_utc())))
     bump(c)
     c.commit()
     return jsonify(rq_state(c, lid))

@@ -216,7 +216,10 @@ from kalmido.docs.maillink import ml_budget
 c = connect()
 with system_ctx(c):
     ml_budget(c, %r, "eml", 3)
-    rows = [[r[0], r[1]] for r in c.execute("SELECT token, hits_eml FROM doc_mail WHERE token IN (?, ?)", (%r, %r)).fetchall()]
+    # 2.674.0 (#4382): the tokens are stored sealed, found by their hash
+    from kalmido.integrations.mailtok import mtk_hash
+    hs = {mtk_hash(t): t for t in (%r, %r)}
+    rows = [[hs[r[0]], r[1]] for r in c.execute("SELECT token_hash, hits_eml FROM doc_mail WHERE token_hash IN (?, ?)", list(hs)).fetchall()]
 c.commit()
 print(json.dumps({"rows": rows}))
 c.close()

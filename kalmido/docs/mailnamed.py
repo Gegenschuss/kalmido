@@ -15,6 +15,7 @@ from ..core.i18n import tr
 from ..core.pg import write_lock
 from ..accounts.session import me
 from ..integrations.mail import MAIL_IN_ON, mail_addr
+from ..integrations.mailtok import mtk_new, mtk_plain  # 2.674.0 (#4382 finding 5)
 from .mailaddr import DMN_MAX, DMN_NAME_MAX, GENERAL, OFF_MSG, dmn_row_tags, dmn_folder, dmn_tags, dmn_token
 from .web import _no_agent, ws_param
 
@@ -30,7 +31,7 @@ def _dmn_out(c, r, uid):
     if not r["active"]:
         note = tr(OFF_MSG)
     return {"id": r["aid"] or "general", "general": general, "name": tr(GENERAL) if general else r["name"],
-            "address": mail_addr(r["token"]) if MAIL_IN_ON else "", "active": bool(r["active"]),
+            "address": mail_addr(mtk_plain(c, r["token"])) if MAIL_IN_ON else "", "active": bool(r["active"]),  # 2.674.0 (#4382 finding 5)
             "target_folder": None if general else r["target_folder"], "target": path, "ok": ok, "note": note,
             "tags": dmn_row_tags(r), "created_at": r["created_at"], "updated_at": r["updated_at"] or r["created_at"]}
 
@@ -110,8 +111,9 @@ def docs_mail_address_new():
     if c.execute("SELECT COUNT(*) FROM doc_mail WHERE user_id=? AND org_id IS NOT DISTINCT FROM ? AND aid<>''", (uid, oid)).fetchone()[0] >= DMN_MAX:
         return err(tr("At most {0} addresses", DMN_MAX), 409)
     aid, ts = "a" + secrets.token_hex(8), now_iso()
-    c.execute("INSERT INTO doc_mail(token, user_id, org_id, created_at, aid, name, target_folder, tags, active, updated_at) "
-              "VALUES(?,?,?,?,?,?,?,?,?,?)", (dmn_token(), uid, oid, ts, aid, v["name"], v.get("target_folder"), v.get("tags", "[]"), True, ts))
+    c.execute("INSERT INTO doc_mail(token, token_hash, user_id, org_id, created_at, aid, name, target_folder, tags, active, updated_at) "
+              "VALUES(?,?,?,?,?,?,?,?,?,?,?)", (*mtk_new(c, dmn_token()), uid, oid, ts, aid, v["name"], v.get("target_folder"),
+                                               v.get("tags", "[]"), True, ts))  # 2.674.0 (#4382 finding 5): sealed + its hash
     r = c.execute("SELECT * FROM doc_mail WHERE aid=?", (aid,)).fetchone()
     c.commit()
     print("docs: named mail address", aid, "made for user", uid, "org", oid, flush=True)
@@ -154,7 +156,8 @@ def docs_mail_address_renew(aid):
     if not _dmn_mail_on():
         return err(tr("E-mail to tasks is not set up on this server"), 409)
     write_lock(c, f"doc_mail-{r['aid']}")
-    c.execute("UPDATE doc_mail SET token=?, updated_at=? WHERE aid=? AND user_id=?", (dmn_token(), now_iso(), r["aid"], uid))
+    c.execute("UPDATE doc_mail SET token=?, token_hash=?, updated_at=? WHERE aid=? AND user_id=?",
+              (*mtk_new(c, dmn_token()), now_iso(), r["aid"], uid))  # 2.674.0 (#4382 finding 5): sealed + its hash
     r = c.execute("SELECT * FROM doc_mail WHERE aid=?", (r["aid"],)).fetchone()
     c.commit()
     return jsonify(_dmn_out(c, r, uid))

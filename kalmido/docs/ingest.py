@@ -350,6 +350,18 @@ def _mail_parts(files, ei_is, mid):
     return out
 
 
+def _doc_mail_row(c, toks):
+    """2.674.0 (#4382 finding 5): the doc_mail row of the first of the tokens toks that is a document address (by the hash;
+    a row of an older version by its plain token), None without one."""
+    from ..integrations.mailtok import mtk_where
+    for t in toks:
+        w, a = mtk_where(t)
+        r = c.execute(f"SELECT * FROM doc_mail WHERE {w}", a).fetchone()
+        if r:
+            return r
+    return None
+
+
 def docs_mail_prefetch(msg):
     """2.424.0 B2 (#3450, review): the invoice link downloads of a documents mail BEFORE its database transaction
     (integrations/mail.py mail_fetch prefetch, outside the gate): a slow server never holds a transaction open nor the
@@ -365,7 +377,7 @@ def docs_mail_prefetch(msg):
         c = connect()
         try:
             with system_ctx(c):  # resolving the secret address token, like docs_mail_import
-                r = next((x for x in (c.execute("SELECT * FROM doc_mail WHERE token=?", (t,)).fetchone() for t in toks) if x), None)
+                r = _doc_mail_row(c, toks)  # 2.674.0 (#4382 finding 5): by the hash
                 u = r and c.execute("SELECT disabled FROM users WHERE id=?", (r["user_id"],)).fetchone()
                 if u and not u["disabled"] and r["active"] and (not r["org_id"] or int(r["org_id"]) in acx_of(c, r["user_id"]).org_ids):
                     k = ml_budget(c, r["token"], "links", len(links))  # 2.577.0 C (#4466): r["active"] -- a switched-off address fetches nothing
@@ -387,7 +399,7 @@ def docs_mail_import(c, msg, raw, pre=None):
     if not toks:
         return None
     with system_ctx(c):  # docs mail: resolving a secret address token (like a public link), membership checked below
-        r = next((x for x in (c.execute("SELECT * FROM doc_mail WHERE token=?", (t,)).fetchone() for t in toks) if x), None)
+        r = _doc_mail_row(c, toks)  # 2.674.0 (#4382 finding 5): by the hash
         letter = None
         if r:
             uid, org = r["user_id"], r["org_id"]

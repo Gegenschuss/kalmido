@@ -262,6 +262,13 @@ def _target(c, b):
     return "inbox", int(m.group(1)), None, None
 
 
+def _hub_tok_row(c, tok):
+    """2.674.0 (#4382 finding 5): the hub_tokens row of the token tok of an incoming mail (by its hash), None without one."""
+    from ..integrations.mailtok import mtk_where
+    w, a = mtk_where(tok)
+    return c.execute(f"SELECT * FROM hub_tokens WHERE {w}", a).fetchone()
+
+
 def _client_addr_write(c, kind, uid, org_id):
     """2.674.0 (#4382 finding 3): making, renewing or deleting a client's address changes the client (the old address stops,
     the one who renews receives its mail): the write right on the client like need_client on a change (a read-only person of
@@ -275,7 +282,8 @@ def _address_of(c, kind, uid, org_id, cid, lid):
     from ..integrations.mail import mail_addr
     w, a = _token_where(kind, uid, org_id, cid, lid)
     r = c.execute(f"SELECT token FROM hub_tokens WHERE {w}", a).fetchone()
-    return mail_addr(r[0]) if r else ""
+    from ..integrations.mailtok import mtk_plain  # 2.674.0 (#4382 finding 5)
+    return mail_addr(mtk_plain(c, r[0])) if r else ""
 
 
 def _args_target():
@@ -310,8 +318,9 @@ def hbm_address_new():
     _client_addr_write(c, kind, uid, org)  # 2.674.0 (#4382 finding 3)
     tok = secrets.token_urlsafe(12).replace("-", "x").replace("_", "y")
     c.execute(f"DELETE FROM hub_tokens WHERE {w}", a)
-    c.execute("INSERT INTO hub_tokens(token,kind,user_id,org_id,client_id,list_id,created_at) VALUES(?,?,?,?,?,?,?)",
-              (tok, kind, uid, org, cid, lid, _now()))
+    from ..integrations.mailtok import mtk_new  # 2.674.0 (#4382 finding 5): sealed + its hash, no plain text
+    c.execute("INSERT INTO hub_tokens(token,token_hash,kind,user_id,org_id,client_id,list_id,created_at) VALUES(?,?,?,?,?,?,?,?)",
+              (*mtk_new(c, tok), kind, uid, org, cid, lid, _now()))
     c.commit()
     return jsonify(address=_address_of(c, kind, uid, org, cid, lid), kind=kind, old=bool(old))
 
@@ -766,7 +775,7 @@ def hbm_mail_import(c, msg, raw):
     if not toks:
         return None
     with system_ctx(c):  # hub mail: resolving a secret address token (like a public link), the rights are checked below
-        r = next((x for x in (c.execute("SELECT * FROM hub_tokens WHERE token=?", (t,)).fetchone() for t in toks) if x), None)
+        r = next((x for x in (_hub_tok_row(c, t) for t in toks) if x), None)  # 2.674.0 (#4382 finding 5): by the hash
         if not r:
             return None
         if r["kind"] == "ticket":  # 2.553.0 B (#3460): a list's request address -> a portal ticket (integrations/reqmail.py)
@@ -914,7 +923,8 @@ def _import(c, r, msg, raw, mail_text):
         subj = re.sub(r"^\s*((fwd?|wg|tr|fw|doorst)\s*:\s*)+", "", subj, flags=re.I).strip() or subj
     if r["kind"] == "inbox":
         from ..integrations.mail import mail_addr
-        own_addrs = {own, mail_addr(r["token"]).lower()}
+        from ..integrations.mailtok import mtk_plain
+        own_addrs = {own, mail_addr(mtk_plain(c, r["token"])).lower()}  # 2.674.0 (#4382 finding 5)
         if mine and not fwd:
             cand = []  # audit I4: unproven -> "Not assigned", the person assigns it by hand
         elif fwd and from_addr == own:

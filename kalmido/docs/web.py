@@ -878,6 +878,7 @@ def _settings_json(c, ws, uid):
     if oid:
         can = is_org_admin(c, uid, oid)
     tok = c.execute("SELECT token FROM doc_mail WHERE user_id=? AND org_id IS NOT DISTINCT FROM ? AND aid=''", (uid, oid)).fetchone()  # 2.577.0 C (#4466): the general one
+    from ..integrations.mailtok import mtk_plain  # 2.674.0 (#4382 finding 5): a new token is stored sealed
     root = S.root_id(c, ws)  # 2.48.0 review: the marked documents folder; only the folders uid can see (L4)
     vis = fs_visible_ids(c, uid) if root else set()
     # 2.199.0 B (#2742): the whole tree below the documents folder (path, depth, parent), not only the first level
@@ -888,7 +889,7 @@ def _settings_json(c, ws, uid):
     from .fields import df_list  # 2.153.0 (#2179): the custom fields of the workspace
     return {"ws": f"org:{oid}" if oid else "private", "can_manage": can, "fields": df_list(c, ws), "levels": cfg["levels"], "inbox": cfg["inbox"],
             "rules": _rules_v(c, ws) if can else [], **_flow_extra(c, ws, can), **_settings_labels(c, ws, uid, can), "folders": folders,
-            "root_id": root, "inbox_path": S.inbox_path(c, root, uid), "ocr": ocr_available(), "ocr_missing": _ocr_missing(c, uid), "ocr_langs": _ocr_view(cfg), "asn_prefix": cfg["asn_prefix"], "asn_next": S.asn_next(c, ws), "mail": {"enabled": MAIL_IN_ON, "address": mail_addr(tok[0]) if (tok and MAIL_IN_ON) else ""},
+            "root_id": root, "inbox_path": S.inbox_path(c, root, uid), "ocr": ocr_available(), "ocr_missing": _ocr_missing(c, uid), "ocr_langs": _ocr_view(cfg), "asn_prefix": cfg["asn_prefix"], "asn_next": S.asn_next(c, ws), "mail": {"enabled": MAIL_IN_ON, "address": mail_addr(mtk_plain(c, tok[0])) if (tok and MAIL_IN_ON) else ""},
             "scan": _scan_json(c, uid, oid)}  # 2.207.0 A (#2763): scan inboxes, folder watcher downloads, the mail note
 
 

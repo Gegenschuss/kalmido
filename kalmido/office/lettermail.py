@@ -63,7 +63,8 @@ def ltm_reply_address(c, oid, uid, lid=None, info=None):
     r = c.execute("SELECT token FROM doc_mail WHERE user_id=? AND org_id IS NOT DISTINCT FROM ? AND aid=''", (who, org)).fetchone()  # 2.577.0 C (#4466): the general one
     if r and lid:
         return mail_addr(ltm_letter_token(c, lid, uid))
-    return mail_addr(r[0]) if r else ""
+    from ..integrations.mailtok import mtk_plain  # 2.674.0 (#4382 finding 5): a new token is stored sealed
+    return mail_addr(mtk_plain(c, r[0])) if r else ""
 
 
 # 2.424.0 B (#3450): the forwarding address for receipts in the office settings = the document address of the office's

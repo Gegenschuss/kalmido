@@ -409,9 +409,11 @@ try:
     with system_ctx(c):
         out["b_links"] = [ML.ml_budget(c, T, "links", 25), ML.ml_budget(c, T, "links", 25), ML.ml_budget(c, T, "links", 1)]
         out["b_eml"] = sum(ML.ml_budget(c, T, "eml") for _ in range(61))
-        c.execute("UPDATE doc_mail SET hits_hour='2000-01-01T00' WHERE token=?", (T,))
+        # 2.674.0 (#4382): a new address is stored sealed, found by the hash of its token
+        TH = __import__("hashlib").sha256(T.encode()).hexdigest()
+        c.execute("UPDATE doc_mail SET hits_hour='2000-01-01T00' WHERE token_hash=?", (TH,))
         out["b_hour"] = [ML.ml_budget(c, T, "links", 3), ML.ml_budget(c, T, "eml")]
-        c.execute("UPDATE doc_mail SET hits_hour=?, hits_links=30, hits_eml=60 WHERE token=?", (now_iso()[:13], T))
+        c.execute("UPDATE doc_mail SET hits_hour=?, hits_links=30, hits_eml=60 WHERE token_hash=?", (now_iso()[:13], TH))
     c.commit()
 finally:
     c.close()

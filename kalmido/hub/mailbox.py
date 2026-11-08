@@ -606,7 +606,9 @@ def mbx_import(c, box, raw):
         r = None
         hdrs = " ".join(str(msg.get_all(h, [])) for h in ("To", "Cc", "Delivered-To", "X-Original-To", "Envelope-To"))
         for t in MAIL_TOKEN_RE.findall(hdrs):  # a hub address of this workspace (another workspace's token counts as none)
-            x = c.execute("SELECT * FROM hub_tokens WHERE token=?", (t,)).fetchone()
+            from ..integrations.mailtok import mtk_where  # 2.674.0 (#4382 finding 5): by the hash
+            w, a = mtk_where(t)
+            x = c.execute(f"SELECT * FROM hub_tokens WHERE {w}", a).fetchone()
             if x and fits(x["kind"], x["user_id"], x["org_id"], x["client_id"], x["list_id"]):
                 r = dict(x)
                 break
