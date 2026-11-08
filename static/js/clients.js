@@ -184,7 +184,7 @@ function clientModal(c, o = {}) {  // 2.80.0 (#1842): o.org_id (the office's are
       let r, gone = false;
       // 2.576.0 (#4794): a change through objsave.js (only the fields that differ from the client as opened, with
       // expect_updated_at; saved elsewhere meanwhile -> the merge bar, never overwritten)
-      const send = async () => { if (!c) return rawFetch('POST', '/api/clients', body); await loadModule('objsave'); return (await objSaveForm(md, `/api/clients/${c.id}`, c, body)) || c; };
+      const send = async () => { if (!c) return rawFetch('POST', '/api/clients', body); await loadModule('objsave'); objSess(`/api/clients/${c.id}`, c.updated_at); return (await objSaveForm(md, `/api/clients/${c.id}`, c, body)) || c; };  // 2.747.0 (#5246): objSess = the undo session of this save
       try { r = await send(); }
       catch (x) {
         // 2.81.0 (#1852): a linked contact was deleted elsewhere -> drop that link, save once more, tell the person
@@ -194,7 +194,7 @@ function clientModal(c, o = {}) {  // 2.80.0 (#1842): o.org_id (the office's are
         gone = true;
       }
       md.remove(); await load(); render(); clReload();
-      if (gone || !(c && typeof oun_saved === 'function' && oun_saved('client:' + c.id, r.name))) toast(gone ? tr('The linked contact no longer exists; link removed.') : c ? tr('Saved') : tr('Added: {0}', r.name));  // 2.111.0 A (#2233)
+      if (gone || !(c && r !== c && typeof objSaved === 'function' && objSaved(`/api/clients/${c.id}`, r.name, async () => { await load(); render(); clReload(); }))) toast(gone ? tr('The linked contact no longer exists; link removed.') : c ? tr('Saved') : tr('Added: {0}', r.name));  // 2.111.0 A (#2233); 2.747.0 (#5246): objsave.js objSaved
       if (!c && !o.stay) go('client/' + r.id);
       if (o.done) await o.done(r);
     } catch (x) {

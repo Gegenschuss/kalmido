@@ -464,16 +464,18 @@ function ofcModal(kind, r) {
       // 2.576.0 (#4764): a change through objsave.js (saveDialog: only the fields that differ from the row as opened, with
       // expect_updated_at; saved elsewhere meanwhile -> 409 "current" (2.747.0, #5246: was "row") -> the merge bar on this dialog, what was typed stays)
       let sv;
+      const ourl = r ? `/api/office/${kind}/${r.id}` : '';
+      if (r && kind !== 'equipment') { await loadModule('objsave'); objSess(ourl, r.updated_at); }  // 2.747.0 (#5246): the undo session of this save (was office_undo.js)
       if (r?.updated_at) {
         await loadModule('objsave');
-        const base = md._objBase || r, j = await saveDialog(`/api/office/${kind}/${r.id}`, base, body);
+        const base = md._objBase || r, j = await saveDialog(ourl, base, body);
         if (j?.conflict) { $('.aerr', md).textContent = ''; objMerge(md, j.conflict, cur => { md._objBase = cur; }, {field: k => $('#of-' + k, md)}); return; }
-        if (j === base) { md.remove(); return; }  // nothing changed
+        if (j === base) { objClose(ourl); md.remove(); return; }  // nothing changed
         sv = j;
       } else sv = await api(r ? 'PATCH' : 'POST', r ? `/api/office/${kind}/${r.id}` : `/api/office/${kind}`, body);
       md.remove(); ofcReload(kind);
       if (kind === 'contracts' && !r && sv?.id && typeof dmaAfterSave === 'function') dmaAfterSave(sv.id);  // 2.117.0 B (#2285): the chosen PDFs
-      if (kind === 'equipment' && r && ofcAdmin()) astUndo(r, body, sv); else if (!(r && typeof oun_saved === 'function' && oun_saved(kind + ':' + r.id, body.name_de || body.name || body.key || r.name_de || r.name || r.key))) toast(r ? tr('Saved') : tr('Added'));  // 2.92.0 B (#1931): one undo step; 2.111.0 A (#2233): "… saved · Undo"
+      if (kind === 'equipment' && r && ofcAdmin()) astUndo(r, body, sv); else if (!(r && typeof objSaved === 'function' && objSaved(ourl, body.name_de || body.name || body.key || r.name_de || r.name || r.key, () => ofcReload(kind)))) toast(r ? tr('Saved') : tr('Added'));  // 2.92.0 B (#1931): one undo step; 2.111.0 A (#2233): "… saved · Undo"; 2.747.0 (#5246): objsave.js
     } catch (x) {
       const el = $('.aerr', md); if (!el) return;
       el.textContent = x.message || '';

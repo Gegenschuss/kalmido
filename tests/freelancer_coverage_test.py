@@ -112,6 +112,8 @@ KINDS = {
 ROUTES = {
     # 2.593.0 (#4590): reset the look and comfort settings, with preview and one undo (p2593_d_reset_test.py, freelancer-matrix: own)
     "POST /api/settings/reset": "own",
+    # 2.747.0 (#5246): the session undo of a master data / client dialog under its save url (objsave.js objUndo; p2747_a_buero_test.py, freelancer-matrix: office)
+    "POST /api/office/{}/{}/undo": "office", "POST /api/clients/{}/undo": "office",
     # 2.585.0 (#4350): what the undo of an account import would take back, before the confirm (p2585_d_api_test.py)
     "GET /api/imports/{}/undo-plan": "tasks",
     # 2.575.0 (#3778): own module cards of the private workspace (p2575_a_api_test.py, freelancer-matrix: modcards)

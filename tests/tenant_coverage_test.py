@@ -302,6 +302,7 @@ ROUTES = {
     # (2.98.0 spacer D)
     # 2.111.0 A (#2233): undo of the office editors (p2111_a_api_test.py) - routes below this line
     "POST /api/office/undo/{}/{}": "office",
+    "POST /api/office/{}/{}/undo": "office", "POST /api/clients/{}/undo": "client",  # 2.747.0 (#5246): objsave.js objUndo of the master data / client dialog (p2747_a_buero_test.py)
     # (2.111.0 spacer A)
     # 2.272.0 E2 (#3038): the trash of task / project files and of the office (p2272_e2_attach_trash_test.py) - routes below this line
     "POST /api/attachments/{}/restore": "attachment", "POST /api/list-files/{}/restore": "attachment",

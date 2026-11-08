@@ -102,7 +102,8 @@ const FEAT = 'cal,comments,collab,office,clients,sheets';
     await nav(B + '#office/offers');
     await ready(ev, `typeof clientModal === 'function' && (S.clients || []).some(c => c.id === ${cl.id})`, 80);
     await ev(`(() => { clientModal(S.clients.find(c => c.id === ${cl.id})); return 1; })()`);
-    check(await ready(ev, `!!document.querySelector('.cldlg #cl-name') && typeof oun_saved === 'function'`), 'the client dialog');
+    // 2.747.0 (#5246): the dialog's "… saved · Undo" comes from objsave.js (objSaved, loaded with the save) instead of office_undo.js
+    check(await ready(ev, `!!document.querySelector('.cldlg #cl-name')`), 'the client dialog');
     await ev(`(() => { document.querySelector('.cldlg #cl-name').value = 'Example Studio Ltd'; document.querySelector('.cldlg [data-m="save"]').click(); return 1; })()`);
     check(await ready(ev, toastOn), 'client saved: "… saved · Undo"');
     check((await call(CA, 'GET', `/api/clients/${cl.id}`)).name === 'Example Studio Ltd', 'the new name is saved');

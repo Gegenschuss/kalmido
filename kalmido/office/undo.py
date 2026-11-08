@@ -129,6 +129,21 @@ def _ctx(kind, ref):
     return c, uid, oid, lambda c: sr_public(kind, office_row(c, oid, kind, ref), office_role(c, uid, oid) == "admin")
 
 
+@app.post("/api/office/<kind>/<int:ref>/undo")
+def oun_restore_md(kind, ref):
+    """2.747.0 (#5246): the browser's objsave.js objUndo of a master data dialog (POST <its save url>/undo) -- the same as
+    /api/office/undo/<kind>/<id>, only for the master data kinds."""
+    if kind not in MD:
+        raise Denied(404)
+    return oun_restore(kind, ref)
+
+
+@app.post("/api/clients/<int:ref>/undo")
+def oun_restore_client(ref):
+    """2.747.0 (#5246): objsave.js objUndo of the client dialog (POST <its save url>/undo)."""
+    return oun_restore("client", ref)
+
+
 @app.post("/api/office/undo/<kind>/<int:ref>")
 def oun_restore(kind, ref):
     """{sess, op}: undo = the newest own step back, all = every own step of the session (back to the opening), redo /

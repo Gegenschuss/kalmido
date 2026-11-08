@@ -1,12 +1,11 @@
 // @ts-check
-// 2.111.0 A (#2233): Undo for the editors that save every change at once: office documents (with their parts), clients,
-// the office master data (services, texts, contracts, ...) and tables. Every own saved change is one step of the history
+// 2.111.0 A (#2233): Undo for the editors that save every change at once: office documents (with their parts) and tables
+// (2.747.0, #5246: clients and the office master data moved to objsave.js objSess / objSaved). Every own saved change is one step of the history
 // (Ctrl/Cmd+Z, undo.js); leaving a changed document or table turns its steps into ONE entry and shows "... saved · Undo"
 // for 10 seconds, which takes back everything since it was opened. The server (kalmido/office/undo.py) keeps a copy before
 // each step that came with the header X-Kalmido-Undo and refuses (409) when someone else changed it in between or it is
 // finalised / sent meanwhile. Finalising, sending, payments, status and DATEV stay final: they end the session (barrier).
 const OUN = {s: {}, ms: 10000};
-const OUN_MD = ['services', 'sets', 'texts', 'contracts', 'roles', 'crew'];  // equipment has its own undo (office_assets.js)
 const OUN_DOC_RE = /^\/api\/office\/docs\/(\d+)(\/items|\/parts(?:\/\d+(?:\/items)?)?)?$/;
 const OUN_FREE = /^\/api\/office\/docs\/\d+\/(duplicate|invoice|credit|pdf|xml|render|log)\b/;  // makes another document / reads: no barrier
 const oun_tok = () => [...crypto.getRandomValues(new Uint8Array(16))].map(b => b.toString(16).padStart(2, '0')).join('');
@@ -19,10 +18,7 @@ function oun_key(method, url) {  // the editor a write belongs to: 'doc:5' | 'cl
       : /\/items$/.test(sub) ? method === 'PUT' : method === 'PATCH' || method === 'DELETE';
     return ok ? 'doc:' + m[1] : null;
   }
-  let k = u.match(/^\/api\/clients\/(\d+)$/);
-  if (k && method === 'PATCH') return 'client:' + k[1];
-  k = u.match(/^\/api\/office\/([a-z]+)\/(\d+)$/);
-  if (k && method === 'PATCH' && OUN_MD.includes(k[1])) return k[1] + ':' + k[2];
+  // 2.747.0 (#5246): clients and the master data left for objsave.js (objSess / objSaved, the core's session undo)
   return null;
 }
 // core.js rawFetch0: the header of a write (the session token of its editor); another write of an open document ends it
@@ -38,7 +34,7 @@ function oun_hdr(method, url) {
   s.busy = (s.busy || 0) + 1; s.busyAt = Date.now();
   return s.tok;
 }
-// core.js rawFetch0: the write went through -> one step (documents) or the "Saved · Undo" of a dialog (oun_saved)
+// core.js rawFetch0: the write went through -> one step (documents)
 function oun_ok(method, url, j) {
   if (typeof SHV !== 'undefined') oun_sheetWrite(url, j);
   const key = oun_key(method, url), s = key && OUN.s[key]; if (!s) return;
@@ -82,18 +78,6 @@ function oun_leave(key) {
     undo: () => oun_run(key, s.tok, 'all'), redo: () => oun_run(key, s.tok, 'redoall')});
   histToast(msg, e, OUN.ms);
 }
-// a dialog (client, service, ...) saved: one entry with "Saved · Undo" (the values from before the dialog). true = shown
-function oun_saved(key, name) {
-  const s = OUN.s[key]; if (!s) return false;
-  delete OUN.s[key];
-  if (!s.n) return false;
-  const msg = tr('{0} saved', name || s.name || tr('Saved'));
-  const e = histAdd({label: msg, ids: [], snaps: [], lids: [], ounAll: key,
-    undo: () => oun_run(key, s.tok, 'all'), redo: () => oun_run(key, s.tok, 'redoall')});
-  histToast(msg, e, OUN.ms);
-  return true;
-}
-
 // ---- tables (sheets.js): their steps are in the history already (tagged by oun_tag); the session keeps the table's rev
 // as this person's own last write left it (the answers carry it)
 const OUN_SHEET_RE = /^\/api\/sheets\/(\d+)(?:\/|$)/;
