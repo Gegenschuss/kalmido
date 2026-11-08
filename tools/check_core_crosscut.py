@@ -61,7 +61,8 @@ def sources(root=ROOT):
 def columns(body):
     """{column: its definition} of a CREATE TABLE body (top level only, constraints left out)."""
     flat, depth = "", 0
-    for ch in re.sub(r"--[^\n]*", "", body):  # REFERENCES users(id), NUMERIC(14,2): the brackets' content goes
+    body = re.sub(r"'(?:[^'\n]|'')*'", "''", re.sub(r"--[^\n]*", "", body))  # a DEFAULT 'a,b' is no second column
+    for ch in body:  # REFERENCES users(id), NUMERIC(14,2): the brackets' content goes
         depth += (ch == "(") - (ch == ")")
         flat += ch if depth == 0 and ch != ")" else ""
     out = {}
