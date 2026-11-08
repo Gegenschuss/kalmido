@@ -550,6 +550,30 @@ def safe_fs_name(name):
     return safe_name(name)[:150]
 
 
+# 2.750.0 (#4876): the ending a type gets when its name has none (the first of mimetypes is not always the usual one)
+DL_EXT = {"application/pdf": ".pdf", "image/jpeg": ".jpg", "image/png": ".png", "image/heic": ".heic", "image/heif": ".heif",
+          "image/tiff": ".tif", "image/webp": ".webp", "image/gif": ".gif", "text/plain": ".txt"}
+
+
+def download_name(name, mime):
+    """2.750.0 (#4876): the name a download gives a file: its own name, the ending of its type added when the name has none,
+    one nobody knows ("Rechnung 2026.11"), or - for a PDF / picture - the ending of another type. A fitting ending is never
+    doubled ("Brief.pdf" stays); without a known type the name stays as it is."""
+    name = (name or "").strip() or "download"
+    mime = (mime or "").split(";")[0].strip().lower()
+    want = DL_EXT.get(mime) or (mimetypes.guess_extension(mime) if mime and mime != "application/octet-stream" else None)
+    if not want:
+        return name
+    ext = os.path.splitext(name)[1].lower()
+    if ext and (ext == want or ext in mimetypes.guess_all_extensions(mime) or (ext in (".jpeg", ".jpe") and mime == "image/jpeg")
+                or (ext in (".tiff",) and mime == "image/tiff")):
+        return name
+    known = mimetypes.guess_type("x" + ext)[0] if ext else None
+    if known and not (mime == "application/pdf" or mime.startswith("image/")):
+        return name  # "notes.md" sent as text/plain: its own ending fits well enough
+    return name + want
+
+
 def _is_agent(c, uid):
     return bool(uid) and acx_of(c, uid).role == "agent"
 

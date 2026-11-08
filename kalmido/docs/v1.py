@@ -6,7 +6,7 @@ workspace has on level "agent" is not set directly: the value lands as a suggest
 Every access of an agent goes into the file's history (fs_log). Documents are never moved by an agent."""
 import base64
 import binascii
-import os
+import re
 
 from flask import g, jsonify, request
 
@@ -17,7 +17,7 @@ from ..core.access import Denied
 from ..accounts.session import me
 from ..api.v1 import BadInput, UnknownFields, v1_limit
 from ..api.common import cursor_dec, cursor_enc, v1_args, v1_json, v1_view
-from ..files.store import fs_log_add, need_node
+from ..files.store import download_name, fs_log_add, need_node, safe_fs_name  # 2.750.0 (#4876): + download_name, safe_fs_name
 from . import store as S
 from .web import doc_json, doc_query, doc_update
 from .scankeys import sk_upload
@@ -31,7 +31,7 @@ from ..core.pg import write_lock  # 2.564.0 (#4701/#4702)
 from ..core.db import iso_ms, now_utc  # 2.564.0 (#4701/#4702)
 
 CREATE_FIELDS = ("name", "title", "mime", "content_base64", "parent_id", "ws", "sender", "type", "tags", "date", "due", "amount", "currency")
-V1_FIELDS = ("date", "due", "amount", "currency", "sender", "type", "tags", "text", "custom_fields")  # 2.153.0 (#2179): + custom_fields
+V1_FIELDS = ("title", "date", "due", "amount", "currency", "sender", "type", "tags", "text", "custom_fields")  # 2.153.0 (#2179): + custom_fields; 2.750.0 (#4876): + title
 
 
 def _v1_doc(c, m, node, full=False, role=None):
@@ -108,10 +108,11 @@ def v1_doc_create():
     extra = sorted(k for k in b if k not in CREATE_FIELDS)
     if extra:
         raise UnknownFields(extra)
-    title = str(b.get("title") or "").strip()
-    if title:  # the title names the file; the file's own ending stays (the type detection and the preview go by it)
-        ext = os.path.splitext(name)[1]
-        name = title if not ext or title.lower().endswith(ext.lower()) else title + ext
+    title = re.sub(r"\s+", " ", str(b.get("title") or "")).strip()[:S.TITLE_MAX]
+    # 2.750.0 (#4876): the title is the document's own field, the file name stays (was: the title renamed the file); only a
+    # file sent without a name is named after it, with the ending of its type
+    if title and not (b.get("name") if not request.files else f.filename):
+        name = download_name(safe_fs_name(title), mime)
     meta = {k: b[k] for k in ("date", "due", "amount", "currency", "sender", "type", "tags") if b.get(k) not in (None, "", [])}
     if "tags" in meta and not isinstance(meta["tags"], (list, str)):
         raise BadInput(tr("Invalid value: {0}", "tags"))
@@ -140,6 +141,8 @@ def v1_doc_create():
     try:
         with c.savepoint():
             nid = docs_ingest(c, uid, org, name, data, mime, "api", meta, parent_id=pid)
+            if title:  # 2.750.0 (#4876)
+                c.execute("UPDATE doc_meta SET title=? WHERE node_id=?", (title, nid))
             fs_log_add(c, nid, "upload")
     except QuotaExceeded:
         raise Denied(413, tr("{0}: no space left in your storage", name)) from None
@@ -209,7 +212,9 @@ def docs_spec(paths, schemas, op, ok, errs, ref, pid, q):
     """OpenAPI of the documents (called from api/openapi.py)."""
     label = {"type": ["object", "null"], "properties": {"id": {"type": "integer"}, "name": {"type": "string"}}}
     schemas["Document"] = {"type": "object", "properties": {
-        "id": {"type": "integer", "description": "The file's id in the file store (/files/{id})"}, "name": {"type": "string"},
+        "id": {"type": "integer", "description": "The file's id in the file store (/files/{id})"}, "name": {"type": "string", "description": "The file name (downloads, ZIPs)"},
+        "title": {"type": "string", "description": "2.750.0: the document's title (its own, else the file name without its ending)"},
+        "title_own": {"type": "boolean", "description": "2.750.0: a title was set (false: it is taken from the file name)"},
         "mime": {"type": "string"}, "size": {"type": "integer"}, "org_id": {"type": ["integer", "null"]},
         "state": {"type": "string", "enum": list(S.STATES), "description": "Recognition: wait, run, done, failed (error says why)"},
         "error": {"type": "string"}, "method": {"type": "string", "description": "pdf (text layer), ocr, text, import, e-invoice, office (2.635.0: Word / Excel / OpenDocument), none (no text reader for the kind of file)"},
@@ -249,6 +254,7 @@ def docs_spec(paths, schemas, op, ok, errs, ref, pid, q):
     T = "Documents"
     did = pid("id", "Document (file) id")
     patch = {"type": "object", "properties": {
+        "title": {"type": "string", "description": "2.750.0: the document's own title (\"\" = the file name without its ending); never renames the file, may repeat"},
         "date": {"type": ["string", "null"], "format": "date"}, "due": {"type": ["string", "null"], "format": "date"},
         "amount": {"type": ["string", "null"]}, "currency": {"type": ["string", "null"]}, "sender": {"type": ["string", "null"]},
         "type": {"type": ["string", "null"]}, "tags": {"type": "array", "items": {"type": "string"}},
@@ -276,7 +282,7 @@ def docs_spec(paths, schemas, op, ok, errs, ref, pid, q):
                                           "shared with it (the file or a folder above it); every access is in the file's history.")}
     created = {"type": "object", "properties": {
         "content_base64": {"type": "string", "description": "The file (or send multipart with the field file)"}, "name": {"type": "string"},
-        "title": {"type": "string", "description": "Name of the document (default: the file name)"}, "mime": {"type": "string"},
+        "title": {"type": "string", "description": "2.750.0: the document's own title (default: the file name without its ending); the file keeps its name"}, "mime": {"type": "string"},
         "parent_id": {"type": "integer", "description": "A folder you may edit; an agent without it: its own result folder"},
         "ws": {"type": "string", "description": "A person without parent_id only: private (default) or org:<id>"},
         "sender": {"type": "string"}, "type": {"type": "string"}, "tags": {"type": "array", "items": {"type": "string"}},

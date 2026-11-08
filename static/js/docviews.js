@@ -164,7 +164,7 @@ function dcv_todayCard(id) {
   if (!h || Date.now() - h.at > 60000) dcv_hitsLoad(id);
   if (h?.gone) return '';
   const v = h?.view || dcv_get(id), name = v?.title || tr('Saved view');
-  const rows = (h?.docs || []).map(d => `<li><a href="#ablage/${d.id}">${ic('file', 's')}<span class="dwt"><b>${esc(d.name || '')}</b>${d.date ? ` <span class="muted">${esc(dayLabel(d.date, true))}</span>` : ''}</span></a></li>`).join('');
+  const rows = (h?.docs || []).map(d => `<li><a href="#ablage/${d.id}">${ic('file', 's')}<span class="dwt"><b>${esc((typeof dc_title === 'function' ? dc_title(d) : d.title || d.name) || '')}</b>${d.date ? ` <span class="muted">${esc(dayLabel(d.date, true))}</span>` : ''}</span></a></li>`).join('');
   return `<section class="dcard dcv-today" aria-labelledby="dcvh-${id}"><h3 id="dcvh-${id}">${ic('filter', 's')}<span>${esc(name)}</span>${h && !h.busy ? `<span class="dcn">${h.total}</span>` : ''}<span class="spacer"></span><a class="linkbtn" href="#ablage/v/${id}">${esc(tr('Show all'))}</a></h3>
     ${h && !h.busy ? rows ? `<ul class="dwl">${rows}</ul>` : `<p class="muted">${esc(tr('No documents in this view.'))}</p>` : `<p class="muted">${esc(tr('Loading…'))}</p>`}</section>`;
 }

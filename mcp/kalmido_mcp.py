@@ -2276,7 +2276,8 @@ TOOLS += [
 ]
 
 # 2.48.0 (#1111): documents (files of the file store with recognised text, date, amount, sender, type, tags)
-_DOC = {"date": D, "due": D, "amount": {"type": "string", "description": "Decimal text, e.g. 119.00"},
+_DOC = {"title": {"type": "string", "description": "2.750.0: the document's own title (\"\" = the file name without its ending); never renames the file"},
+        "date": D, "due": D, "amount": {"type": "string", "description": "Decimal text, e.g. 119.00"},
         "currency": {"type": "string"}, "sender": {"type": "string"}, "type": {"type": "string", "description": "Document type"},
         "tags": {"type": "array", "items": {"type": "string"}}, "text": {"type": "string", "description": "Only while none was recognised"},
         "custom_fields": {"type": "object", "description": "2.153.0: custom field name (or id) -> value, null clears it; only fields "
@@ -2303,7 +2304,7 @@ TOOLS += [
     ("get_document", "2.48.0: one document with its fields, open suggestions and the recognised text (OCR / text layer).",
      _obj({"document_id": S_ID}, ["document_id"]),
      lambda api, a: api.call("GET", f"/documents/{int(a['document_id'])}")),
-    ("update_document", "2.48.0: set fields of a document (needs edit): date, due, amount, currency, sender, type, tags, custom_fields (2.153.0). Your values "
+    ("update_document", "2.48.0: set fields of a document (needs edit): title (2.750.0), date, due, amount, currency, sender, type, tags, custom_fields (2.153.0). Your values "
                         "are marked as set by an agent; where the workspace leaves a feature to an agent they become suggestions "
                         "in To review for a person to accept. Never moves a document. 2.564.0: expect_updated_at (updated_at from "
                         "get_document) is required; someone changed it since -> 409 with the current document.",
@@ -2314,7 +2315,8 @@ TOOLS += [
 TOOLS += [
     ("create_document", "2.122.0: put a new document (scan, invoice, letter) into the documents: name + base64 (the file), into folder_id "
                         "(role edit) or, without it, your own result folder. Kalmido recognises it like an upload (text, date, amount, "
-                        "sorting); title / sender / type / tags / date / due / amount / currency are optional and taken as given.",
+                        "sorting); title / sender / type / tags / date / due / amount / currency are optional and taken as given (2.750.0: title is "
+                        "the document's own title, the file keeps its name).",
      _obj({"name": {"type": "string", "minLength": 1}, "base64": {"type": "string"}, "mime": {"type": "string"}, "title": {"type": "string"},
            "folder_id": S_ID, "sender": {"type": "string"}, "type": {"type": "string"}, "tags": {"type": "array", "items": {"type": "string"}},
            "date": D, "due": D, "amount": {"type": "string"}, "currency": {"type": "string"}}, ["name", "base64"]),

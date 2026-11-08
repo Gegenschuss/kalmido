@@ -25,6 +25,11 @@ const dc_hashId = () => { try { const m = location.hash.match(/^#(docs|ablage)\/
 const dc_money = (a, cur) => curMoney(a, cur);  // 2.189.0 (#2475): + £; 2.368.0 C (#2983): one money format (i18n.js curMoney)
 const dc_day = d => { const s = String(d || '').slice(0, 10); return /^\d{4}-\d\d-\d\d$/.test(s) ? fmtDateNum(pd(s)) : ''; };  // 2.583.0 (#4877): always the whole date with the year (06.11.2026), no Today / weekday
 const dc_isPdf = d => d && (d.mime === 'application/pdf' || /\.pdf$/i.test(d.name));
+// 2.750.0 (#4876): what a document is called: its own title, else its file name without the ending of a known type (the
+// server sends title so, docs/store.py doc_title - the same endings). The file name (name) is for downloads, ZIPs, the file store
+const DC_TITLE_EXT = /\.(pdf|jpe?g|png|heic|heif|tiff?|webp|gif|bmp|txt|md|csv|xml|json|eml|msg|html?|rtf|odt|ods|odp|docx?|xlsx?|pptx?|zip)$/i;
+const dc_title = d => (d?.title || '').trim() || (d?.name || '').replace(DC_TITLE_EXT, '').trim() || d?.name || '';
+const dc_fileExt = name => (/\.[^.\s/]{1,8}$/.exec(name || '') || [''])[0];  // "Brief.pdf" -> ".pdf"
 const dc_fileUrl = (d, dl) => d.file ? `/api/files/nodes/${d.id}/content?v=${d.version || 1}${dl ? '&dl=1' : ''}` : `/api/docs/${d.id}/file?v=${d.size}${dl ? '&dl=1' : ''}`;  // 2.583.0 (#4832): a plain file of the file store too
 // 2.583.0 (#4832): the small picture of a document or of a plain file (the file store's own, its version keeps it fresh)
 const dc_thumbUrl = (d, l) => (d.file ? `/api/files/nodes/${d.id}/thumb?v=${encodeURIComponent(d.version || 1)}` : `/api/docs/${d.id}/thumb?v=${encodeURIComponent(d.updated_at || '')}`) + (l ? '&size=l' : '');  // 2.583.0 (#4812): l = the sharp preview of big cards
@@ -254,8 +259,8 @@ function dc_card(d, o = {}) {
   const meta = [d.date ? dc_day(d.date) : '', d.type?.name || '', d.asn ? `${DC.set?.asn_prefix || 'ASN'} ${d.asn}` : ''].filter(Boolean).map(esc).join(' · ');
   // 2.430.0 (#3582): a click always opens; the box (shown on hover, while choosing, or ticked) chooses, like Ctrl-/Shift-click and a long press
   const on = AB.selOn && AB.sel.has(d.id), cur = DC.lastId === d.id;  // 2.583.0 (#4835): the one looked at last; 2.768.0 (#4888): the area's one selection
-  return `<li class="dc-card${d.review ? ' rev' : ''}${on ? ' dc-on' : ''}${cur ? ' dc-cur' : ''}" data-k="dc${d.id}"${dc_dragAttr(d)}>${dc_selMark(d)}<button type="button" data-dco="${d.id}" aria-label="${esc(d.name)}">
-    <span class="dc-th">${thumb}</span><span class="dc-ct"><b class="dc-nm" title="${esc(d.name)}">${esc(d.name)}</b>${d.sender?.name ? `<span class="dc-snd" title="${esc(d.sender.name)}">${esc(d.sender.name)}</span>` : '' /* 2.583.0 (#4870): always the title, the sender below it */}
+  return `<li class="dc-card${d.review ? ' rev' : ''}${on ? ' dc-on' : ''}${cur ? ' dc-cur' : ''}" data-k="dc${d.id}"${dc_dragAttr(d)}>${dc_selMark(d)}<button type="button" data-dco="${d.id}" aria-label="${esc(dc_title(d))}">
+    <span class="dc-th">${thumb}</span><span class="dc-ct"><b class="dc-nm" title="${esc(dc_title(d))}">${esc(dc_title(d))}</b>${d.sender?.name ? `<span class="dc-snd" title="${esc(d.sender.name)}">${esc(d.sender.name)}</span>` : '' /* 2.583.0 (#4870): always the title, the sender below it */}
     <span class="dc-mt">${meta}${d.amount ? ` · ${esc(dc_money(d.amount, d.currency))}` : ''}</span>
     ${d.tags.length ? `<span class="dc-tags">${d.tags.map(t => `<span class="dc-tag">${esc(t.name)}</span>`).join('')}</span>` : ''}
     ${d.shared ? `<span class="dc-shared abbadge" title="${esc(tr('Shared'))}" aria-label="${esc(tr('Shared'))}">${ic('users', 's')}</span>` : ''}${st}${d.review ? `<span class="dc-revdot">${tr('To review')}</span>` : ''}${d.split?.stack ? `<span class="dc-revdot dsp-dot">${tr('Stack - split?')}</span>` : '' /* 2.154.0 A (#1111) */}</span></button></li>`;
@@ -673,6 +678,7 @@ function dc_cur(d, f, only) {  // the value of a field as the server takes it ba
   if (f === 'tags') return d.tags.map(t => t.name);
   if (f === 'folder') return d.folder?.id || '';
   if (f === 'asn') return d.asn || null;
+  if (f === 'title') return d.title_own === false ? '' : d.title ?? '';  // 2.750.0 (#4876): a title taken from the file name comes back as none
   if (f === 'custom_fields') return Object.fromEntries((d.custom_fields || []).filter(x => !only || String(x.id) in only).map(x => [x.id, x.value ?? null]));  // only the changed ones (their marks stay)
   return d[f] ?? '';
 }
@@ -685,6 +691,8 @@ function dc_localDoc(d, body) {
     else if (k === 'tags') x.tags = (v || []).map(n => (d.tags || []).find(t => t.name === n) || (set.tags || []).find(t => t.name === n) || {name: n});
     else if (k === 'folder') { if (v === '' || v == null) x.folder = null; else if (typeof v === 'number') { const f = (set.folders || []).find(y => y.id === v); if (f) x.folder = f; } }
     else if (k === 'custom_fields') x.custom_fields = (d.custom_fields || []).map(f => String(f.id) in v ? {...f, value: v[f.id]} : f);
+    else if (k === 'title') { x.title_own = !!String(v || '').trim(); x.title = x.title_own ? String(v).trim() : dc_title({name: x.name}); }  // 2.750.0 (#4876)
+    else if (k === 'name') { x.name = v; if (x.title_own === false) x.title = dc_title({name: v}); }  // the file name; a title from it follows
     else if (!(k === 'asn' && v === 'next')) x[k] = v;
   }
   return x;
@@ -758,7 +766,8 @@ async function dc_mdChange(e) {
   }
   if (f === 'currency') return dc_patch(id, {currency: el.value.trim().toUpperCase()}, tr('Edited {0}', DC.doc.name));
   const label = {sender: tr('Sender of {0} changed', DC.doc.name), type: tr('Type of {0} changed', DC.doc.name), tags: tr('Tags of {0} changed', DC.doc.name),
-    folder: tr('Folder of {0} changed', DC.doc.name), asn: tr('Archive number of {0}', DC.doc.name)}[f] || tr('Edited {0}', DC.doc.name);
+    folder: tr('Folder of {0} changed', DC.doc.name), asn: tr('Archive number of {0}', DC.doc.name),
+    title: tr('Title of {0} changed', dc_title(DC.doc)), name: tr('File name of {0} changed', dc_title(DC.doc))}[f] || tr('Edited {0}', DC.doc.name);  // 2.750.0 (#4876)
   await dc_patch(id, {[f]: dc_val(f, el)}, label);
 }
 async function dc_c168Refresh(id) {  // 2.210 C (#2761): re-read the open document and the list ("shared" mark)
@@ -814,6 +823,11 @@ async function dc_mdClick(e) {
     b.remove();
     const ob = md.querySelector('.dc-optbtn'); if (ob && !ob.children.length) ob.hidden = true;
     row?.querySelector('input')?.focus();
+    return;
+  }
+  if (a === 'nametitle') {  // 2.750.0 (#4876): the file name from the title, its ending stays (the server keeps it unique in its folder)
+    const nm = (dc_title(d).replace(/[\\/]/g, '-') + dc_fileExt(d.name)).trim();
+    if (nm && nm !== d.name) await dc_patch(d.id, {name: nm}, tr('File name of {0} changed', dc_title(d)));
     return;
   }
   if (a === 'asnnext') { await dc_patch(d.id, {asn: 'next'}, tr('Archive number of {0}', d.name)); return; }

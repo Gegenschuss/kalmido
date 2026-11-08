@@ -42,7 +42,7 @@ def dcx_rows(c, ids, de):
         amount = d["amount"] or ""
         if de:
             amount = amount.replace(".", ",")
-        out.append([d["date"] or "", (d["created_at"] or "")[:10], re.sub(r"\.[A-Za-z0-9]{1,5}$", "", d["name"] or ""),
+        out.append([d["date"] or "", (d["created_at"] or "")[:10], d.get("title") or re.sub(r"\.[A-Za-z0-9]{1,5}$", "", d["name"] or ""),  # 2.750.0 (#4876): the own title
                     (d["sender"] or {}).get("name") or "", (d["type"] or {}).get("name") or "",
                     ", ".join(t["name"] if isinstance(t, dict) else str(t) for t in d["tags"]), amount, d["currency"] or "",
                     (d["folder"] or {}).get("name") or "", d["name"] or "", tr("Yes") if d["review"] else ""])

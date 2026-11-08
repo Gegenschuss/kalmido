@@ -118,7 +118,7 @@ async function qfDownload(tmp) {
   if (!r) { toast(tr('The file is no longer on this device')); return; }
   for (const f of r.files) {
     const u = URL.createObjectURL(f.blob), a = document.createElement('a');
-    a.href = u; a.download = f.name; document.body.appendChild(a); a.click(); a.remove();
+    a.href = u; a.download = attDlName(f.name, f.blob?.type); document.body.appendChild(a); a.click(); a.remove();  // 2.750.0 (#4876)
     setTimeout(() => URL.revokeObjectURL(u), 60000);
   }
 }
@@ -182,6 +182,18 @@ const TV_EXT = new Set(('md markdown txt text log csv tsv json jsonl ndjson xml 
   'js mjs cjs jsx ts tsx py pyi rb go rs java kt kts scala swift c h cc cpp cxx hpp cs php pl lua r dart ex exs erl hs ml clj sql graphql proto ' +
   'tf diff patch vue svelte rst adoc tex bib srt vtt sh bash zsh fish ps1 bat cmd mk cmake gradle lock gitignore dockerfile').split(' '));
 const attExt = a => { const n = String(a?.name || ''), i = n.lastIndexOf('.'); return i > 0 && i < n.length - 1 ? n.slice(i + 1).toLowerCase() : ''; };
+// 2.750.0 (#4876): the name a download gives a file: the ending of its type added when the name has none, or - a PDF / picture -
+// one that does not fit ("Rechnung" -> "Rechnung.pdf", "Foto" -> "Foto.jpg"); a fitting one is never doubled. The server's
+// Content-Disposition does the same (files/store.py download_name)
+const ATT_DL_EXT = {'application/pdf': 'pdf', 'image/jpeg': 'jpg', 'image/png': 'png', 'image/heic': 'heic', 'image/heif': 'heif', 'image/tiff': 'tif', 'image/webp': 'webp', 'image/gif': 'gif', 'text/plain': 'txt'};
+function attDlName(name, mime) {
+  const n = String(name || '').trim() || 'download', m = String(mime || '').split(';')[0].trim().toLowerCase(), want = ATT_DL_EXT[m];
+  if (!want) return n;
+  const e = attExt({name: n});
+  if (e === want || (want === 'jpg' && (e === 'jpeg' || e === 'jpe')) || (want === 'tif' && e === 'tiff')) return n;
+  if (e && !(m === 'application/pdf' || m.startsWith('image/'))) return n;  // "notes.md" as text/plain keeps its own
+  return n + '.' + want;
+}
 const isMdFile = a => ['md', 'markdown'].includes(attExt(a)) || a?.mime === 'text/markdown';
 const isTextFile = a => !!a && !isImg(a) && a.mime !== 'application/pdf' && (TV_EXT.has(attExt(a)) || /^text\//.test(a.mime || '')
   || /^application\/(json|xml|yaml|x-yaml|javascript|x-sh|sql|toml|x-ndjson)\b/.test(a.mime || ''));

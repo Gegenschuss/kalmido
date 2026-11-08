@@ -25,7 +25,7 @@ from ..core.access import Denied
 from ..core.ephem import eph_put, eph_take  # 2.622.0 (#3891)
 from ..core.orgcrypt import OrgCryptError
 from ..accounts.session import me
-from ..files.store import fs_log_add, fs_read, fs_role, fs_visible_sql
+from ..files.store import download_name, fs_log_add, fs_read, fs_role, fs_visible_sql  # 2.750.0 (#4876): + download_name
 from . import store as S
 from .web import doc_update  # 2.369.5 (#2517): pulled up from functions
 
@@ -259,7 +259,7 @@ def docs_zip_get(tok):
                     data = fs_read(c, r["id"])
                 except Exception:  # noqa: BLE001 -- damaged / missing / locked: left out, the rest still comes
                     continue
-                p = dsr_zipname(r["name"], taken)
+                p = dsr_zipname(download_name(r["name"], r["mime"]), taken)  # 2.750.0 (#4876): the file name, its ending added when it lost it
                 ext = p.rsplit(".", 1)[-1].lower() if "." in p else ""
                 packed = ext in DSR_PACKED or (r["mime"] or "").startswith(("image/", "video/", "audio/"))
                 z.writestr(p, data, compress_type=zipfile.ZIP_STORED if packed else zipfile.ZIP_DEFLATED)

@@ -58,14 +58,14 @@ function ftxtSet(q) {
 // 2.537.0 (#4574): a picture opens in the app's preview (lightbox), never in a new tab; dl = the download address
 function ftxtImgView(f, url, dl) {
   if (typeof attLightbox === 'function') { attLightbox('f', [{id: 'f', name: f.name, size: f.size}], (a, d) => d ? dl : url); return; }
-  const a = document.createElement('a'); a.href = dl; a.download = f.name; document.body.appendChild(a); a.click(); a.remove();
+  const a = document.createElement('a'); a.href = dl; a.download = attDlName(f.name, f.mime); document.body.appendChild(a); a.click(); a.remove();  // 2.750.0 (#4876)
 }
 function ftxtOpenLf(f) {
   const url = `/api/list-files/${f.id}`;
   if (f.mime === 'application/pdf' && typeof pdfView === 'function') { pdfView({url, name: f.name, size: f.size, dlUrl: url + '?dl=1'}); return; }
   if (/^image\//.test(f.mime || '')) { ftxtImgView(f, url, url + '?dl=1'); return; }
   if (dv_is(f)) { dpvOpen({url: url + '/preview', name: f.name, size: f.size, dlUrl: url + '?dl=1'}); return; }  // 2.92.0 C (#1926)
-  const a = document.createElement('a'); a.href = url + '?dl=1'; a.download = f.name; document.body.appendChild(a); a.click(); a.remove();
+  const a = document.createElement('a'); a.href = url + '?dl=1'; a.download = attDlName(f.name, f.mime); document.body.appendChild(a); a.click(); a.remove();  // 2.750.0 (#4876)
 }
 document.addEventListener('input', e => { if (e.target.id === 'ftxt-q') ftxtSet(e.target.value); });
 document.addEventListener('keydown', e => { if (e.target.id === 'ftxt-q' && e.key === 'Escape' && FTXT.q) { e.preventDefault(); e.target.value = ''; ftxtSet(''); } });

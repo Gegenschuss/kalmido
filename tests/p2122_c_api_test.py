@@ -110,7 +110,8 @@ r = TA.post(B + "/api/v1/documents", json={"name": "plan.pdf", "content_base64":
 check(r.status_code == 201, f"person token creates a document ({r.status_code} {r.text[:150]})")
 D1 = r.json().get("id") if r.ok else 0
 j = done(TA, D1) if D1 else None
-check(j and j["state"] == "done" and j["name"].startswith("Stromrechnung Oktober"), f"recognised like an upload ({j and j['state']} {j and j['name']})")
+# 2.750.0 (#4876): the title is the document's own field, the file keeps its name (was: the title renamed the file)
+check(j and j["state"] == "done" and j["title"] == "Stromrechnung Oktober" and j["name"] == "plan.pdf", f"recognised like an upload ({j and j['state']} {j and j['name']} {j and j.get('title')})")
 check(j and j["sender"] and j["sender"]["name"] == "Stadtwerke Musterstadt" and [t["name"] for t in j["tags"]] == ["Energie"]
       and j["date"] == "2026-10-05" and j["amount"] == "119.00", "the given fields are taken")
 check(any(x["id"] == D1 for x in A.get(B + "/api/docs").json()["docs"]), "the web list shows it")

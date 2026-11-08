@@ -65,7 +65,7 @@ function textPdf(lines) {  // a one-page PDF with a text layer, written by hand
     return JSON.stringify(rows.map(r => { const a = r.children[0].getBoundingClientRect(), b = r.children[1].getBoundingClientRect(); return {f: r.children[0].htmlFor, l: Math.round(a.left), x: Math.round(b.left), r: Math.round(b.right)}; })); })()`;
   const same = (rows, k) => rows.length > 0 && rows.every(r => Math.abs(r[k] - rows[0][k]) <= 1);
   // a real page load (a hash alone leaves an open sheet as it is) and this very document
-  const open = async (nav, ev, doc) => { await nav(B + 'static/icon.svg'); await nav(B + `#docs/${doc.id}`); return ready(ev, `document.querySelector('.dc-form #dc-name')?.value === ${JSON.stringify(doc.name)}`); };
+  const open = async (nav, ev, doc) => { await nav(B + 'static/icon.svg'); await nav(B + `#docs/${doc.id}`); return ready(ev, `document.querySelector('.dc-form #dc-name')?.value === ${JSON.stringify(doc.title)}`); };  // 2.750.0 (#4876): the field Title shows the title (the file name without its ending)
   const noSide = `(() => { const W = document.documentElement.clientWidth, b = document.querySelector('.dc-body'), card = b.closest('.card') || b.parentElement, br = b.getBoundingClientRect().right;
     const out = [...b.querySelectorAll('*')].filter(e => e.getClientRects().length && e.getBoundingClientRect().right > br + .5).map(e => e.tagName + '.' + String(e.className).slice(0, 30) + ':' + Math.round(e.getBoundingClientRect().right - br));
     return JSON.stringify({W, sw: document.documentElement.scrollWidth, cs: card.scrollWidth, cc: card.clientWidth, bs: b.scrollWidth, bc: b.clientWidth, br: Math.round(br), out: out.slice(0, 8)}); })()`;

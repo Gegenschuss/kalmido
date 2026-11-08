@@ -49,7 +49,7 @@ function textPdf(lines) {  // a one-page PDF with a text layer, written by hand
   check(pr.receipt?.is_receipt === true, 'setup: a receipt ' + pr.http);
 
   const ready = async (ev, expr, n = 80) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
-  const open = async (nav, ev, doc) => { await nav(B + 'static/icon.svg'); await nav(B + `#docs/${doc.id}`); return ready(ev, `document.querySelector('.dc-form #dc-name')?.value === ${JSON.stringify(doc.name)} && !!document.querySelector('#rc-cat')`); };
+  const open = async (nav, ev, doc) => { await nav(B + 'static/icon.svg'); await nav(B + `#docs/${doc.id}`); return ready(ev, `document.querySelector('.dc-form #dc-name')?.value === ${JSON.stringify(doc.title)} && !!document.querySelector('#rc-cat')`); };  // 2.750.0 (#4876): the field Title shows the title (the file name without its ending)
   // two fields marked "automatic" (as a rule sets them), drawn by the page itself
   const mark = `(() => { DC.doc.auto = {...(DC.doc.auto || {}), type: 'rule', folder: 'rule'}; dc_mdDraw(document.querySelector('.dc-body').parentElement); return !!document.querySelector('.dc-f .dc-auto'); })()`;
   // each visible row with a label: label, field, row and the "automatic" mark

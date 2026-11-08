@@ -209,7 +209,7 @@ function dcv_nbTake(d, old) {
 function dcv_headHtml(d, w) {
   const fromAb = /^#ablage/.test(DVW.back?.hash || '');
   return `<header class="dv-head"><button type="button" class="btn dv-back" data-dc="close" aria-keyshortcuts="Escape" title="${esc(tr('Back to the list (Esc)'))}">${ic('back', 's')} <span>${esc(fromAb ? tr('File store') : tr('Documents'))}</span></button>
-    <h2 id="dc-h" class="dv-title" title="${esc(d.name)}">${esc(d.name)}</h2><span class="dv-navslot">${dc_navHtml(d)}</span>
+    <h2 id="dc-h" class="dv-title" title="${esc(d.file ? d.name : dc_title(d))}">${esc(d.file ? d.name : dc_title(d))}</h2><span class="dv-navslot">${dc_navHtml(d)}</span>
     <span class="dv-keys muted" aria-hidden="true">${esc(tr('Arrow keys ← → leaf through, Esc back'))}</span><span class="spacer"></span>
     <span class="dv-saved" role="status" data-fl-fill></span><span class="dv-hacts">${dcv_actsHtml(d, w)}</span></header>`;
 }
@@ -234,8 +234,8 @@ function dcv_stripHtml(d, off) {
   const ds = DC.docs || [], i = DC.navSrc ? -1 : dc_navIdx(d), list = i < 0 ? [d] : ds.slice(Math.max(0, i - 15), i + 16);  // 2.683.0 (#5150): a file store folder's list has ids only
   const t = off ? tr('Show the list') : tr('Hide the list');
   return `<nav class="dv-strip" aria-label="${esc(tr('In the list'))}"><div class="dv-sthd"><span class="dv-stt">${tr('In the list')}</span><button type="button" class="iconbtn" data-dc="dvstrip" aria-expanded="${!off}" aria-label="${esc(t)}" title="${esc(t)}">${ic(off ? 'panelshow' : 'panelhide', 's')}</button></div>${off ? '' : `<ul>${list.map(x => {
-    const on = x.id === d.id, nm = x.sender?.name || x.name;
-    return `<li data-k="s${x.id}"><button type="button" class="dv-th${on ? ' on' : ''}" data-dvgo="${x.id}"${on ? ' aria-current="true"' : ''} aria-label="${esc(nm)}" title="${esc(x.name)}"><span class="dv-thi">${x.thumb ? `<img src="${esc(dc_thumbUrl(x))}" alt="" loading="lazy">` : `<span class="dc-ph">${ic(dc_isPdf(x) ? 'file' : 'picture', 's')}</span>`}</span><span class="dv-tn">${esc(nm)}</span></button></li>`;
+    const on = x.id === d.id, nm = x.sender?.name || dc_title(x);  // 2.750.0 (#4876): the title
+    return `<li data-k="s${x.id}"><button type="button" class="dv-th${on ? ' on' : ''}" data-dvgo="${x.id}"${on ? ' aria-current="true"' : ''} aria-label="${esc(nm)}" title="${esc(dc_title(x))}"><span class="dv-thi">${x.thumb ? `<img src="${esc(dc_thumbUrl(x))}" alt="" loading="lazy">` : `<span class="dc-ph">${ic(dc_isPdf(x) ? 'file' : 'picture', 's')}</span>`}</span><span class="dv-tn">${esc(nm)}</span></button></li>`;
   }).join('')}</ul>`}</nav>`;
 }
 // Details: what is used often first; due date, archive number, amount, custom fields and the capture date under "More fields"
@@ -255,7 +255,8 @@ function dcv_detailsHtml(d, w, nb) {  // 2.736.0 (#5212): nb = a neighbour drawn
   const task = typeof dsp_sheetHtml === 'function' && (d.task !== undefined || !d.task_id) ? dsp_sheetHtml(d, w) : d.due && !d.task_id && w ? `<div class="dc-due"><span class="dc-ht">${ic('alarm', 's')} <span>${esc(tr('Due on {0}', dc_day(d.due)))}</span></span><button type="button" class="btn sm" data-dc="task">${tr('Create task')}</button></div>`
     : d.task_id ? `<div class="dc-due muted">${ic('done', 's')} <a href="#t/${d.task_id}">${tr('Task created')}</a></div>` : '';
   const busy = d.state !== 'done' ? `<p class="dc-state ${esc(d.state)}" role="status">${esc(tr(DC_STATE[d.state] || d.state))}${d.state === 'failed' && d.error_text ? `: ${esc(d.error_text)}` : ''}</p>` : '';
-  const main = [field('name', tr('Title'), `<input id="dc-name" data-dcp="name" value="${esc(d.name)}" maxlength="150" ${ro}>`),
+  // 2.750.0 (#4876): the title is the document's own field (may repeat, never renames the file); the file name below, "More fields"
+  const main = [field('name', tr('Title'), `<input id="dc-name" data-dcp="title" value="${esc(dc_title(d))}" maxlength="200" ${ro}>`),
     field('date', tr('Date'), dateIn('dc-date', d.date || '', {label: tr('Date'), ro: !!ro, attrs: 'data-dcp="date"'})),
     // 2.761.0 (#4868): sender and type with the suggestion field of the tags (tagsel.js tf_html, one value)
     field('sender', tr('Sender'), typeof tf_html === 'function' ? tf_html({id: 'dc-sender', vals: [d.sender?.name || ''], all: set.senders, ro: !!ro, single: true, attrs: 'data-dcp="sender"'})
@@ -265,7 +266,8 @@ function dcv_detailsHtml(d, w, nb) {  // 2.736.0 (#5212): nb = a neighbour drawn
     field('folder', tr('Folder'), `<select id="dc-folder" data-dcp="folder" ${ro}><option value="">${tr('Documents (no subfolder)')}</option>${(set.folders || []).map(f => `<option value="${f.id}" ${d.folder?.id === f.id ? 'selected' : ''}>${esc(tr('Documents') + ' / ' + (f.path || f.name))}</option>`).join('')}${w ? `<option value="new">${tr('New folder…')}</option>${d.folder?.id ? `<option value="newsub">${esc(tr('New subfolder in {0}…', d.folder.name))}</option>` : ''}` : ''}</select>`),
     field('tags', tr('Tags'), typeof tf_html === 'function' ? tf_html({id: 'dc-tags', vals: d.tags.map(t => t.name), all: set.tags, ro: !!ro, attrs: 'data-dcp="tags"', ph: tr('Add a tag…')})  // 2.742.0 (#4862): the tag field (tagsel.js)
       : `<input id="dc-tags" data-dcp="tags" value="${esc(d.tags.map(t => t.name).join(', '))}" list="dc-gl" autocomplete="off" placeholder="${esc(tr('comma-separated'))}" ${ro}>${dl('dc-gl', set.tags)}`)].join('');
-  const rare = [field('due', tr('Due'), dateIn('dc-due', d.due || '', {label: tr('Due'), ro: !!ro, attrs: 'data-dcp="due"'})),
+  const rare = [field('file', tr('File name'), `<span class="dc-amt"><input id="dc-file" data-dcp="name" value="${esc(d.name)}" maxlength="150" ${ro}>${w && dc_title(d) + dc_fileExt(d.name) !== d.name ? `<button type="button" class="btn sm" data-dc="nametitle" title="${esc(tr('The ending stays'))}">${tr('File name from title')}</button>` : ''}</span>`),  // 2.750.0 (#4876)
+    field('due', tr('Due'), dateIn('dc-due', d.due || '', {label: tr('Due'), ro: !!ro, attrs: 'data-dcp="due"'})),
     field('amount', tr('Amount'), `<span class="dc-amt"><input id="dc-amount" data-dcp="amount" inputmode="decimal" value="${esc(d.amount ? numField(d.amount, 6, 2) : '')}" ${ro}><input id="dc-currency" data-dcp="currency" value="${esc(d.currency || '')}" maxlength="3" aria-label="${esc(tr('Currency'))}" placeholder="EUR" ${ro}></span>`),
     field('asn', tr('Archive number'), `<span class="dc-amt"><input type="number" min="1" id="dc-asn" data-dcp="asn" value="${esc(d.asn || '')}" ${ro}>${w && !d.asn ? `<button type="button" class="btn sm" data-dc="asnnext">${tr('Next free number')}</button>` : ''}</span>${typeof dc_asnTakenHtml === 'function' ? dc_asnTakenHtml(d) : '' /* 2.591.0 B (#4863) */}`),
     ...(d.custom_fields || []).map(f => dc_cfRow(d, f, ro)), typeof pmeta_takenHtml === 'function' ? pmeta_takenHtml(d) : ''].join('');

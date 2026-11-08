@@ -66,6 +66,19 @@ def folder_in_sql(col, names):
 PREFIXES = (4, 6, 8)        # prefix lengths kept in the word index
 WORDS_MAX = 4000            # distinct words of one document in the index
 NAME_MAX = 120
+TITLE_MAX = 200  # 2.750.0 (#4876): a document's own title (doc_meta.title)
+# 2.750.0 (#4876): the endings a title leaves off when it comes from the file name ("Brief.pdf" -> "Brief")
+_TITLE_EXT = re.compile(r"\.(pdf|jpe?g|png|heic|heif|tiff?|webp|gif|bmp|txt|md|csv|xml|json|eml|msg|html?|rtf|odt|ods|odp|docx?|xlsx?|pptx?|zip)$", re.I)
+
+
+def doc_title(name, title=None):
+    """2.750.0 (#4876): what a document is called: its own title, else its file name without the ending of a known type."""
+    t = (title or "").strip()
+    if t:
+        return t
+    name = name or ""
+    base = _TITLE_EXT.sub("", name).strip()
+    return base or name
 ASN_PREFIX_RE = r"[A-Za-z][A-Za-z0-9-]{0,9}"  # the prefix of archive serial numbers (letters first, at most 10)
 THUMB_DIR = "docthumbs"   # below ATT_DIR: the preview images (sealed like the file)
 ERRORS = {
@@ -527,7 +540,8 @@ def index_text(c, m, name, text, cf=None, notes=None):
     sender = label_name(c, m["ws"], "sender", m["sender_id"]) or ""
     asn = f"{cfg_get(c, m['ws'])['asn_prefix']}{m['asn']} {m['asn']}" if m.get("asn") else ""
     nt = notes_texts(c, m["ws"], [m["node_id"]]).get(int(m["node_id"]), "") if notes is None else notes
-    return f"{name}\n{sender}\n{asn}\n{df_index_text(c, m['node_id'], m['ws']) if cf is None else cf}\n{text}\n{nt}"
+    title = (m.get("title") or "").strip() if hasattr(m, "get") else ""  # 2.750.0 (#4876): the own title as well (the file name stays findable)
+    return f"{name}{chr(10) + title if title else ''}\n{sender}\n{asn}\n{df_index_text(c, m['node_id'], m['ws']) if cf is None else cf}\n{text}\n{nt}"
 
 
 def notes_texts(c, ws, nids):

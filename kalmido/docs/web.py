@@ -45,7 +45,7 @@ from .ocr import ocr_available as _av, ocr_langs  # 2.369.5 (#2517): pulled up f
 from .ocr import OCR_LANGS, OCR_NAMES, ocr_choices  # 2.635.0 (#4807 b)
 from ..accounts.orgs import is_org_admin  # 2.369.5 (#2517): pulled up from functions
 from .dups import dup_view, dup_on_done  # 2.369.5 (#2517): pulled up from functions
-from ..files.store import _free_name, safe_fs_name  # 2.369.5 (#2517): pulled up from functions
+from ..files.store import _free_name, download_name, safe_fs_name  # 2.369.5 (#2517): pulled up from functions
 from ..files.fstags import dt_ws_nodes  # 2.369.5 (#2517): pulled up from functions
 
 
@@ -153,7 +153,8 @@ def doc_json(c, m, node, full=False, role=None, pre=None):
         if r and acx_of(c, me()).role == "agent":  # 2.223.7 D (#2941): an agent gets only the part of the path it sees
             folder = _agent_folder(c, me(), node, r)
     err_key = m["error"] or ""
-    d = {"id": m["node_id"], "name": node["name"], "mime": node["mime"], "size": node["size"], "org_id": node["org_id"], "ws": ws,
+    d = {"id": m["node_id"], "name": node["name"], "title": S.doc_title(node["name"], m.get("title")), "title_own": bool((m.get("title") or "").strip()),  # 2.750.0 (#4876)
+         "mime": node["mime"], "size": node["size"], "org_id": node["org_id"], "ws": ws,
          "state": m["state"], "error": err_key, "error_text": tr(S.ERRORS[err_key]) if err_key in S.ERRORS else "",
          "method": m["method"], "pages": m["pages"], "date": m["doc_date"], "due": m["due_date"],
          "taken_at": m["taken_at"] or None,  # 2.61.0 B (#1819): the capture date of a photo (EXIF)
@@ -244,7 +245,7 @@ def _doc(c, nid, write=False):
 # 2.428.0 (#3579): the sort of the list (?sort=&dir=), only from this list. SQL for the plain columns; sender names and amounts
 # are sealed at rest and sorted here after opening (None = sealed in Python).
 DOC_SORTS = {"date": "COALESCE(d.doc_date, substr(n.created_at, 1, 10))", "added": "n.created_at", "due": "NULLIF(d.due_date, '')",
-             "title": "lower(n.name)", "sender": None, "amount": None}
+             "title": "lower(COALESCE(NULLIF(d.title, ''), n.name))", "sender": None, "amount": None}  # 2.750.0 (#4876): the own title, else the file name
 
 
 def doc_sort(args):
@@ -575,11 +576,16 @@ def doc_update_values(c, nid, d, uid, by=None):
         sets["currency"] = re.sub(r"[^A-Za-z€$£]", "", str(d["currency"] or ""))[:8].upper()
     if "text" in d and by == "agent" and not S.meta_text(c, m).strip():
         sets["text"] = S.doc_seal(c, ws, "doc_meta.text", str(d["text"] or "")[:200_000])
-    if "name" in d and by is None:
+    if "title" in d:  # 2.750.0 (#4876): only the title (may be the same as another's; empty = the file name without its ending)
+        t = re.sub(r"\s+", " ", str(d["title"] or "")).strip()[:S.TITLE_MAX]
+        c.execute("UPDATE doc_meta SET title=?, updated_at=? WHERE node_id=?", (t, _now(), nid))
+        _reindex(c, nid)
+    if "name" in d and by is None:  # the file name (unique in its folder: "x (2).pdf")
         name = str(d["name"] or "").strip()
         if name:
             c.execute("UPDATE fs_nodes SET name=?, updated_at=? WHERE id=?",
                       (_free_name(c, node["parent_id"], node["owner_id"], node["org_id"], safe_fs_name(name), skip=nid), _now(), nid))
+            _reindex(c, nid)  # 2.750.0 (#4876): the word index holds the file name (and the title it gives while none is set)
     if any(k in sets for k in ("doc_date", "amount", "currency")):  # 2.148.0 A (#2471): a receipt of a locked month stays as it is
         new_amt = doc_amount(d["amount"]) if "amount" in d else None
         if (("doc_date" in sets and (sets["doc_date"] or None) != (m["doc_date"] or None))
@@ -685,8 +691,9 @@ def _reindex(c, nid):
 
 @app.patch("/api/docs/<int:nid>")
 def docs_patch(nid):
-    """{name?, date?, due?, amount?, currency?, sender? (name | id | null), type?, tags? [names | ids], folder? (name | id | ""),
+    """{title?, name?, date?, due?, amount?, currency?, sender? (name | id | null), type?, tags? [names | ids], folder? (name | id | ""),
     custom_fields? {field id: value | null} (2.153.0), expect_updated_at?}
+    2.750.0 (#4876): title = the document's own title (may repeat, "" = the file name without its ending), name = the file name.
     2.570.0 (#4770): expect_updated_at = the document's edited_at; set and changed since -> 409 with it under "doc" (2.564.0 D
     #4701; an undo never overwrites another session's change; a recognition run in the background is no change); missing
     -> the old behaviour. Every change through doc_update stamps edited_at (also name, tags, folder, custom fields)."""
@@ -822,7 +829,7 @@ def docs_file(nid):
     sc_guard(c, "fs", nid, v["no"])  # 2.61.0 (#1818): a version found infected later is locked
     fs_log_add(c, nid, "download" if request.args.get("dl") == "1" else "read")
     c.commit()
-    return send_stored({"id": nid, "path": v["path"], "name": n["name"], "mime": v["mime"] or n["mime"], "size": v["size"]})
+    return send_stored({"id": nid, "path": v["path"], "name": download_name(n["name"], v["mime"] or n["mime"]), "mime": v["mime"] or n["mime"], "size": v["size"]})  # 2.750.0 (#4876)
 
 
 @app.get("/api/docs/<int:nid>/einvoice")

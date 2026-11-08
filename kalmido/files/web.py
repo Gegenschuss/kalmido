@@ -18,6 +18,7 @@ from ..core.access import Denied, acx_of, collab_all
 from ..core.orgcrypt import oc_send_file
 from .upsafe import h6d_one_file_request, h6d_read
 from .scan import sc_guard  # 2.477.0 (#3936): pulled up from functions
+from .store import download_name  # 2.750.0 (#4876)
 from .store import (fs_chain, fs_chains, fs_deleted, fs_link_target, fs_log_add, fs_new_version, fs_purge, fs_purge_files, fs_put, fs_read,
                     fs_height, fs_mail_rows, fs_role, fs_version_row, DEPTH_MAX, fs_visible_ids, need_node, safe_fs_name, _free_name,
                     _now, _place, ROLE_RANK)
@@ -423,7 +424,7 @@ def _send(c, n, version=None, dl=False):
         data, name, mime = fs_ref_content(c, me(), n)
         inline = mime in INLINE_TYPES and request.args.get("dl") != "1" and not dl
         resp = Response(data, mimetype=mime if inline else "application/octet-stream")
-        resp.headers["Content-Disposition"] = f"{'inline' if inline else 'attachment'}; filename*=UTF-8''{quote(name)}"
+        resp.headers["Content-Disposition"] = f"{'inline' if inline else 'attachment'}; filename*=UTF-8''{quote(download_name(name, mime))}"  # 2.750.0 (#4876)
         return _send_headers(resp, mime)
     if n["kind"] == "link":
         t = fs_link_target(c, n)
@@ -439,7 +440,7 @@ def _send(c, n, version=None, dl=False):
         return err(tr("File damaged or missing"), 404)
     inline = mime in INLINE_TYPES and request.args.get("dl") != "1" and not dl
     resp = oc_send_file(c, full, mimetype=mime if inline else "application/octet-stream", as_attachment=not inline,
-                        download_name=name, conditional=True, max_age=0)
+                        download_name=download_name(name, mime), conditional=True, max_age=0)  # 2.750.0 (#4876): + the ending of its type
     return _send_headers(resp, mime)
 
 

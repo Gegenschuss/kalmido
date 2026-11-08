@@ -1,4 +1,4 @@
-// 2.750.0 part A UI tests (#4879 #5228), own container (start.sh; P2750A_NOSTART=1: the container runs already), jsdom
+// 2.750.0 part A UI tests (#4879 #5228 #4876), own container (start.sh; P2750A_NOSTART=1: the container runs already), jsdom
 // kalmido-suite: fresh
 // freelancer-matrix: files, docs (frida has no organisation, as tests/freelancer_fixture.py).
 // - #4879 a drag that begins in Kalmido never uploads: a card of the file store dragged by its picture (not the row) onto a
@@ -8,6 +8,7 @@
 // - #5228 a recognised document in the LIST opens the document view (#docs/<id>, leafing through the folder's documents) like
 //   the cards, leafing through the folder's DOCUMENTS (before: the PDFs and pictures, one of them = no leafing), never the
 //   plain viewer; ab_openDoc loads the documents' module first when a click comes before it
+// - #4876 the document view: Title = the file name without its ending, the file name its own field, "File name from title"
 const {execFileSync} = require('child_process');
 const path = require('path');
 const {boot, sleep, B, login} = require('./boot');
@@ -124,6 +125,24 @@ const upload = async (name, parent) => {
   check(await until(() => w.location.hash === '#docs/' + DOC), 'the click opens the document view #docs/' + DOC + ' (got ' + w.location.hash + ')');
   check(!w.__tv && !w.__pv, 'not the plain viewer');
   check(await until(() => w.eval(`typeof DC !== 'undefined' && (DC.navSrc?.docs || []).some(x => x.id === ${DOC})`)), 'it leafs through the folder\'s documents');
+
+  // ================= #4876: the title in the view without the ending, the file name apart, "File name from title"
+  const ttl = await until(() => d.querySelector('.dv-view #dc-name[data-dcp="title"]'));
+  check(ttl && ttl.value === 'brief', '#4876: the field Title shows the file name without its ending: ' + ttl?.value);
+  check(d.querySelector('.dv-view #dc-h')?.textContent.trim() === 'brief', '#4876: the head shows the title');
+  const fil = d.querySelector('.dv-view #dc-file[data-dcp="name"]');
+  check(fil && fil.value === 'brief.txt', '#4876: the file name is its own field (More fields): ' + fil?.value);
+  if (ttl) {
+    ttl.value = 'Mein Brief'; ttl.dispatchEvent(new w.Event('change', {bubbles: true}));
+    check(await until(async () => (await call('GET', `/api/docs/${DOC}`)).title === 'Mein Brief'), '#4876: the title is saved');
+    const dd = await call('GET', `/api/docs/${DOC}`);
+    check(dd.name === 'brief.txt', '#4876: the file keeps its name: ' + dd.name);
+    const btn = await until(() => d.querySelector('.dv-view [data-dc="nametitle"]'));
+    check(btn, '#4876: the button "File name from title"');
+    btn?.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
+    check(await until(async () => (await call('GET', `/api/docs/${DOC}`)).name === 'Mein Brief.txt'), '#4876: the file name from the title, the ending stays');
+    check(await until(() => d.querySelector('.dv-view #dc-file')?.value === 'Mein Brief.txt'), '#4876: the view shows the new file name');
+  }
   w.close();
 
   console.log(`\n${ok} passed, ${F.length} failed`);

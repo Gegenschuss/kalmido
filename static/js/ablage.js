@@ -309,7 +309,7 @@ function ab_openFile(n, o = {}) {  // 2.583.0 (#4832): o.raw = the viewer of its
   if (n.kind === 'file' && dv_is(n)) { dpvOpen({url: `/api/files/nodes/${encodeURIComponent(n.id)}/preview`, name: n.name, size: n.size, dlUrl: ab_url(n, true)}); return; }  // 2.92.0 C (#1926)
   if (ab_isPdf(n)) { if (typeof pdfView === 'function') pdfView(ab_pvOpts(n)); else window.open(ab_url(n), '_blank', 'noopener'); return; }  // 2.652.0 (#5071): ab_pvOpts
   if (isTextFile(n) && (n.size || 0) <= TV_MAX) { textView({url: ab_url(n, true), name: n.name, size: n.size, md: isMdFile(n), ext: attExt(n)}); return; }
-  const a = document.createElement('a'); a.href = ab_url(n, true); a.download = n.name; document.body.appendChild(a); a.click(); a.remove();
+  const a = document.createElement('a'); a.href = ab_url(n, true); a.download = attDlName(n.name, n.mime); document.body.appendChild(a); a.click(); a.remove();  // 2.750.0 (#4876)
 }
 
 // ---- actions (each one = ONE undo step)
@@ -428,7 +428,7 @@ function ab_menuItems(n, tree) {
     f ? {label: tr('Open'), icon: 'eye', fn: () => n._open ? n._open() : ab_openFile(n)} : null,  // 2.768.0 (#4888): _open = a document card's own way (its list to leaf through)
     ...(f && n._spl && typeof spl_item === 'function' ? spl_item(n._spl) : []),  // 2.742.0 (#4858): a document card: Open on the right
     ...(ref ? [] : fv2_menuRow('file:' + n.id)),  // 2.441.0 (#3592)
-    f && !ref ? {label: tr('Download'), icon: 'download', fn: () => { if (n._enc && typeof fsl_open === 'function') return fsl_open(n, true); const a = document.createElement('a'); a.href = ab_url(n, true); a.download = n.name; document.body.appendChild(a); a.click(); a.remove(); }} : null,
+    f && !ref ? {label: tr('Download'), icon: 'download', fn: () => { if (n._enc && typeof fsl_open === 'function') return fsl_open(n, true); const a = document.createElement('a'); a.href = ab_url(n, true); a.download = attDlName(n.name, n.mime); document.body.appendChild(a); a.click(); a.remove(); }} : null,  // 2.750.0 (#4876): + the ending
     tree && w && !f ? {label: tr('New folder…'), icon: 'plus', fn: () => ab_newFolder(n.id)} : null,
     n.kind === 'folder' ? {label: tr('Download as ZIP'), icon: 'download', fn: () => abm_download([n])} : null,  // 2.112.1 A (#2058)
     {label: tr('Details and history'), icon: 'info', fn: () => ab_detailsOf(n)},  // 2.768.0 (#4888): a file: the document view's tab History
@@ -960,7 +960,7 @@ async function abm_purge(ns) {
 async function abm_download(ns) {
   ns = ns.filter(abm_dlOk); if (!ns.length) return;
   const a = document.createElement('a');
-  if (ns.length === 1 && ns[0].kind === 'file') { a.href = ab_url(ns[0], true); a.download = ns[0].name; }
+  if (ns.length === 1 && ns[0].kind === 'file') { a.href = ab_url(ns[0], true); a.download = attDlName(ns[0].name, ns[0].mime); }  // 2.750.0 (#4876)
   else {
     const q = ns.map(n => n.id).join(',');
     try { await api('GET', `/api/files/zip?ids=${q}&check=1`); } catch { return; }  // the limits first: the refusal as a message, not as a file

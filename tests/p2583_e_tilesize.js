@@ -71,9 +71,9 @@ const saved = async k => (await call('GET', '/api/state')).settings?.[k];
   await until(() => d.querySelectorAll('.dc-card').length === 3);
   // #4870: the title always, the sender below it
   const c1 = d.querySelector(`.dc-view [data-dco="${D1}"]`), c3 = d.querySelector(`.dc-view [data-dco="${D3}"]`);
-  check(c1?.querySelector('.dc-nm')?.textContent === 'water-bill-2026.pdf' && c1.querySelector('.dc-nm').title === 'water-bill-2026.pdf', '#4870: bold the title, not the sender ' + c1?.querySelector('.dc-nm')?.textContent);
+  check(c1?.querySelector('.dc-nm')?.textContent === 'water-bill-2026' && c1.querySelector('.dc-nm').title === 'water-bill-2026', '#4870: bold the title, not the sender ' + c1?.querySelector('.dc-nm')?.textContent);  // 2.750.0 (#4876): the title without the file's ending
   check(c1?.querySelector('.dc-snd')?.textContent === 'Wasserwerk Beispielstadt' && c1.querySelector('.dc-snd').title === 'Wasserwerk Beispielstadt', '#4870: the sender on its own line below it, full text as title');
-  check(c3 && !c3.querySelector('.dc-snd') && c3.querySelector('.dc-nm')?.textContent === 'notes.pdf', '#4870: no sender = no sender line');
+  check(c3 && !c3.querySelector('.dc-snd') && c3.querySelector('.dc-nm')?.textContent === 'notes', '#4870: no sender = no sender line');  // 2.750.0 (#4876): 'notes', the title
   const mt2 = d.querySelector(`.dc-view [data-dco="${D2}"] .dc-mt`)?.textContent || '';
   check(mt2.includes(String(YEAR)) && /15/.test(mt2) && !/Today|Yesterday|Mon|Tue|Wed|Thu|Fri|Sat|Sun/.test(mt2), '#4877: a date of the running year with its year, in numbers ' + mt2);
   // the slider
