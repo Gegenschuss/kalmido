@@ -1854,7 +1854,8 @@ A receipt fetcher is a helper program on the person's own computer that fetches 
 phone company) and hands them to Kalmido. The person signs in to the portals only in the helper: Kalmido never stores
 passwords, cookies or logins, has no fields for them and refuses every field it does not know (`400`, nothing stored). People
 with the office (also the own office of a person without an organisation) connect one in Settings > Integrations > *Receipt
-fetcher* with a setup code (web session only, never an agent); without the office the routes answer `403`.
+fetcher* with a setup code (web session only, never an agent); without the office the routes answer `403`. The code names the
+server by `PUBLIC_URL`; a server without it makes no fetcher (`503`, 2.666.0 #4074: never the address of the request).
 
 Its key (`kbh_…`) is a kind of its own: stored only as a hash in its own table, never an API token (it is not listed under API
 tokens and no other route knows it: every other API route answers `403` "This key may only upload receipts and report the state

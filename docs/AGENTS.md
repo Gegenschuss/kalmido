@@ -4148,7 +4148,8 @@ Kalmido starts no agent and runs no model; it only answers the tool calls of the
 
 - **Switch.** An instance admin turns it on under *Settings > Organisation > Agents > Hosted MCP access* (off by
   default; switching it on asks for the password). Off: `/mcp`, every `/oauth/...` address and the OAuth metadata answer 404.
-  The REST API must be on as well (`KALMIDO_API`).
+  The REST API must be on as well (`KALMIDO_API`), and `PUBLIC_URL` must be set: it is the issuer and the address in the
+  metadata; without it they answer `503` (2.666.0 #4074, never the address of the request).
 - **Connect.** Enter the address `/mcp` of your server as the connector (*Settings > Agents* shows it under *Connected
   apps*). The client registers itself, opens Kalmido's consent page in the browser (sign in first if needed) and you
   choose **which agent** it works as: one of your personal agents, a new personal agent made right there, or (instance
