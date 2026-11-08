@@ -37,6 +37,8 @@ EXCEPT = {
     ("files/scan.py", "AND ver="): "2.61.0: ver={cur} is a number expression; the stand-in TRUE makes it bigint = boolean",
     ("tasks/ftsearch.py", "ts_rank(TRUE, q)"): "2.139.1 (#2065): {TASK_VEC} / {CMT_VEC} is a tsvector expression; the stand-in TRUE makes it ts_rank(boolean, tsquery)",
     ("tasks/ftsearch.py", "SELECT id, TRUE FROM"): "2.281.0 C (#3113): {TASK_VEC} / {CMT_VEC} fill the tsvector column vec; the stand-in TRUE makes it boolean",
+    ("admin/orgcrypt_cli.py", "AND substr(TRUE, 1, TRUE)=?"): "2.742.0 (#4949): {col} is a text column and {len(oc.PREFIX)} a number; the stand-ins make it substr(boolean, integer, boolean) - visible since the stand-in table tasks has org_id (#4602)",
+    ("office/books.py", "MAX(TRUE) FROM office_payments"): "2.742.0 (#4949): {BK_PAY_DAY} is a date expression; the stand-in TRUE makes it max(boolean)",
     ("admin/orgcrypt_cli.py", "AND TRUE LIKE ?"): "2.138.0 (#1972): {col} is a text column name; the stand-in TRUE makes it boolean LIKE text",
     ("admin/orgcrypt_cli.py", "d.thumb_l AS path"): "2.611.0 (#4884): doc_meta.thumb_l comes with a later version (#4812); space_rows skips this entry while _thumb_cols does not see the column",
     ("files/fslock.py", "dn.lvl < TRUE"): "2.353 (#2758): {DEPTH_MAX * 2} is a number constant; the stand-in TRUE makes it integer < boolean",
@@ -75,6 +77,11 @@ for dp, _, fns in os.walk(ROOT):
         rel = os.path.relpath(p, ROOT)
         tree = ast.parse(open(p, encoding="utf-8").read())
         inner = {id(v) for n in ast.walk(tree) if isinstance(n, ast.JoinedStr) for v in n.values}
+        # 2.742.0 (#4949): the first argument of tr() is user text, not SQL - "Select an agent" (#3894) planned as SELECT an AS agent
+        inner |= {id(n.args[0]) for n in ast.walk(tree) if isinstance(n, ast.Call) and n.args
+                  and getattr(n.func, "id", getattr(n.func, "attr", "")) == "tr"}
+        # 2.742.0 (#4949): the arguments of str.replace() are pieces of a statement (q.replace("SELECT *", "SELECT id", 1)), not one
+        inner |= {id(a) for n in ast.walk(tree) if isinstance(n, ast.Call) and getattr(n.func, "attr", "") == "replace" for a in n.args}
         for n in ast.walk(tree):
             if isinstance(n, ast.Constant) and isinstance(n.value, str) and id(n) not in inner:
                 s, is_f = n.value, False
