@@ -54,7 +54,7 @@ from ..core.db import db, gsetting, iso, now_utc, parse_iso
 from ..core.access import Denied
 from ..core.errors import BadInput
 from ..accounts.session import _rate_blocked, _rate_fail, _token_hash, client_ip, me, rate_ip
-from ..accounts.login import seal, unseal
+from ..accounts.login import seal, unseal, WA_ORIGINS_ENV
 from ..accounts.orgs import op_foreign_account
 from ..agents.core import agent_row, is_agent, need_person
 from ..agents.admin import agent_policy, agent_token_new, agent_ws_allowed_any, my_agent_make
@@ -100,6 +100,16 @@ def mcpr_base():
     if not PUBLIC_URL_SET:
         raise Denied(503, tr("PUBLIC_URL is not set on this server: ask the server admin to set it to the address people open (.env) and restart."))
     return PUBLIC_URL.rstrip("/")
+
+
+def mcpr_origin_ok(origin):
+    """2.674.0 (#4028, review F11): an Origin header the consent form / /mcp accept. With PUBLIC_URL set only it (and the extra
+    passkey addresses KALMIDO_WEBAUTHN_ORIGINS, the same server under another name), never the Host header of the request;
+    without PUBLIC_URL the address of this request (Administration > Agents warns, static/js/settings.js)."""
+    o = origin.rstrip("/")
+    if not PUBLIC_URL_SET:
+        return o == request.host_url.rstrip("/")
+    return o == mcpr_base() or o in WA_ORIGINS_ENV
 
 
 def mcpr_resource():
@@ -447,7 +457,7 @@ def mcpr_authorize_post():
         return _gone()
     # a form of this page only: never from another site (the sealed request is the check value, this the second fence)
     if request.headers.get("Sec-Fetch-Site", "") == "cross-site" or \
-            (request.headers.get("Origin") and request.headers["Origin"].rstrip("/") not in (mcpr_base(), request.host_url.rstrip("/"))):
+            (request.headers.get("Origin") and not mcpr_origin_ok(request.headers["Origin"])):  # 2.674.0 (#4028, review F11)
         return _msg_page(tr("Connection not possible"), tr("Request blocked"), 403)
     u = g.get("user")
     if not u or g.get("auth_via") not in ("session", "proxy") or not _person_ok(u):
@@ -750,7 +760,7 @@ def mcpr_mcp():
     if mod is None:
         return jsonify(error="the hosted MCP access is not available: mcp/kalmido_mcp.py is missing in this installation"), 503
     origin = request.headers.get("Origin")
-    if origin and origin.rstrip("/") not in (mcpr_base(), request.host_url.rstrip("/")):  # MCP 2025-06-18: Origin is checked
+    if origin and not mcpr_origin_ok(origin):  # MCP 2025-06-18: Origin is checked; 2.674.0 (#4028, review F11): PUBLIC_URL when set
         return jsonify(error="origin not allowed"), 403
     auth = request.headers.get("Authorization", "")
     tok = auth[7:].strip() if auth[:7].lower() == "bearer " else ""
