@@ -33,6 +33,7 @@ import hmac
 import io
 import json
 import os
+import re
 import secrets
 import shutil
 import struct
@@ -499,6 +500,29 @@ def _put(zf, out, name, data):
     out.files.append({"path": name, "size": len(data), "sha256": hashlib.sha256(data).hexdigest()})
 
 
+UMZ_PAGE = 1000  # 2.674.0 (#4190): rows per page of an export query (umz_paged)
+_UMZ_ORDER_ID = re.compile(r"\s+ORDER\s+BY\s+id\s*$", re.I)
+
+
+def umz_paged(c, sql, args):
+    """2.674.0 (#4190): the rows of one export query in keyset pages on id, as orgexport._rows: a big table never sits in
+    memory whole. Paged only when the query has no order of its own (or orders by id alone) and its rows carry exactly one
+    column id (one probe with LIMIT 0); any other query is read as before."""
+    base = _UMZ_ORDER_ID.sub("", sql)
+    if not re.search(r"\bORDER\s+BY\b", base, re.I):
+        names = [d[0] for d in (c.execute(f"SELECT * FROM ({base}) _umz LIMIT 0", args).description or ())]
+        if names.count("id") == 1:
+            last = None
+            while True:
+                rs = c.execute(f"SELECT * FROM ({base}) _umz" + (" WHERE id>?" if last is not None else "") + f" ORDER BY id LIMIT {UMZ_PAGE}",
+                               (*args, last) if last is not None else tuple(args)).fetchall()
+                yield from rs
+                if len(rs) < UMZ_PAGE:
+                    return
+                last = rs[-1]["id"]
+    yield from c.execute(sql, args)
+
+
 def _put_rows(zf, out, table, rows):
     """data/<table>.json streamed into the ZIP (one row per line)."""
     name = f"data/{table}.json"
@@ -641,7 +665,7 @@ def umz_build(c, uid, stream, export_id):
         umz_put_page_files(c, zf, out, uid, files, inf, locked)  # 2.362.2 (#3099)
         for table, (sql, args) in q.items():
             def rows(table=table, sql=sql, args=args):
-                for r in c.execute(sql, args):
+                for r in umz_paged(c, sql, args):  # 2.674.0 (#4190): keyset pages
                     d = umz_clean(table, r)
                     if d is None:
                         continue
