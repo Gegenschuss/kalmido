@@ -5,7 +5,8 @@ freelancer-matrix: agents (a person without an organisation connects her own age
  - F10: an /mcp body without Content-Length (Transfer-Encoding: chunked) is read in pieces up to the limit (mcpr_body): a small
    one works, a large one is 413, and the server never reads more than the limit from the stream
  - F11: with PUBLIC_URL set the issuer and the accepted Origin come from it only, never from the Host header; the admin's
-   about says whether PUBLIC_URL is set (Administration > Agents warns without it)
+   about says whether PUBLIC_URL is set (Administration > Agents warns without it); without it the hosted access is refused
+   (503, #4074 on main), so F10, F12 and F13 run with PUBLIC_URL set
  - F12: an access ends 90 days after it was made (refresh refused, access revoked; no token outlives that day); the consent
    page writes a line into the agent's log (agent_audit: 201 = agent made there, 200 = an existing one); Administration >
    Agents lists the apps of team agents (who, when, last used, end) and revokes them, nobody else sees or revokes them
@@ -69,6 +70,10 @@ def pt(v):
 
 
 check(A.get(B + "/api/about").json().get("public_url_set") is False, "F11: about: PUBLIC_URL not set (the admin pane warns)")
+r = requests.get(B + "/.well-known/oauth-authorization-server")
+check(r.status_code == 503, f"#4074: without PUBLIC_URL the hosted MCP metadata is refused, never the Host header ({r.status_code})")
+fresh(env={"KALMIDO_SECRET_KEY": KEY, "PUBLIC_URL": PUB}, prefix="P2674C", keep=True)  # the hosted access needs PUBLIC_URL (#4074)
+A = sess("alice")
 r = A.patch(B + "/api/admin/settings", json={"mcp_remote": True, "password": PASSWORD})
 check(r.ok and r.json().get("mcp_remote") is True, f"the hosted MCP access switched on ({r.status_code})")
 check(A.put(B + "/api/admin/agent-policy", json={"user_agents": True}).ok, "personal agents allowed")
