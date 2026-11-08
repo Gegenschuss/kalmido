@@ -44,9 +44,16 @@ def ct(gen=1, n=48):
     return "e2e1:" + json.dumps({"v": 1, "g": gen, "iv": b64(12), "ct": b64(n)}, separators=(",", ":"))
 
 
-def chan(gen=1):
-    """A channel ciphertext (shape only)."""
-    return {"v": 1, "g": gen, "iv": b64(12), "ct": b64(64)}
+def chan(gen=1, v=1):
+    """A channel ciphertext (shape only). 2.680.0 (#5145): v 2 for a new message (since 2.652.0, #5044, v 1 only for an edit
+    and the re-encryption)."""
+    return {"v": v, "g": gen, "iv": b64(12), "ct": b64(64)}
+
+
+def resv(s, rid):
+    """2.680.0 (#5145): the reserved id of my next v 2 message in the room -> the fields of the POST."""
+    j = s.post(B + f"/api/team/rooms/{rid}/msgid").json()
+    return {"msg_id": j.get("id"), "resv": j.get("resv")}
 
 
 def wrapped():
@@ -128,8 +135,14 @@ r = A.post(B + f"/api/team/rooms/{RID}/messages", json={"enc": {"v": 1, "iv": b6
 check(r.status_code == 400, "channel: a DM-shaped ciphertext (no generation) refused")
 r = A.post(B + f"/api/team/rooms/{RID}/messages", json={"enc": chan(2)})
 check(r.status_code == 400, "channel: a generation the list does not have refused")
+# 2.680.0 (#5145): since 2.652.0 (#5044) a NEW v 1 message is refused 400 e2e_v1_new, nothing stored (the rest of this test
+# writes new messages as v 2 under a reserved id; edits and the re-encryption below keep v 1)
+n0 = dbx("SELECT COUNT(*) FROM tchat_msgs WHERE room_id=?", (RID,))[0][0]
+r = A.post(B + f"/api/team/rooms/{RID}/messages", json={"enc": chan(1)})
+check(r.status_code == 400 and code(r) == "e2e_v1_new", "#5044: channel: a new v 1 message 400 e2e_v1_new " + r.text[:200])
+check(dbx("SELECT COUNT(*) FROM tchat_msgs WHERE room_id=?", (RID,))[0][0] == n0, "#5044: channel: the v 1 message is not stored")
 clear()
-r = A.post(B + f"/api/team/rooms/{RID}/messages", json={"enc": chan(1), "mentions": [BOB, 999]})
+r = A.post(B + f"/api/team/rooms/{RID}/messages", json={"enc": chan(1, v=2), "mentions": [BOB, 999], **resv(A, RID)})
 check(r.status_code == 201 and r.json()["enc"]["g"] == 1 and r.json()["body"] == "", "channel: a ciphertext of the list key " + r.text[:200])
 M1 = r.json().get("id")
 p = until(lambda: [x for x in pushes() if x.get("topic") == "t-bob"], 6.0)
