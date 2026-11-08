@@ -13,17 +13,34 @@ async function rc_load() {
   RC.d = d; rc_draw();
   if (d) rc_cbHint(id, seq);
 }
+// ---- 2.755.0 (#5236): a neighbour drawn ahead (docview.js dcv_nbDraw) gets its receipt and cash book hint filled in its own
+// frames with its own data (e.rc, nothing of RC); after the snap rc_take hands them to RC, so rc_slot draws the same and loads nothing
+async function rc_nbFill(e, el) {
+  const id = e.d.id, sig = e.ctrl.signal;
+  let d = null, cb = null; try { d = await rawFetch('GET', `/api/docs/${id}/receipt`); } catch { return; }
+  if (d) { try { cb = (await rawFetch('GET', `/api/docs/${id}/cashbook`))?.entries || []; } catch { cb = []; } }
+  if (sig.aborted || e.taken) return;
+  e.rc = {d, cb: cb || []};
+  const s = el.querySelector('.rc-slot'), c = el.querySelector('.rc-cb');
+  if (s) dcv_nbSet(s, rc_html({id, d, doc: e.d}));
+  if (c) { c.hidden = !e.rc.cb.length; c.textContent = rc_cbText(e.rc.cb); }
+}
+function rc_take(id, x) { RC.seq++; RC.id = id; RC.d = x.d; RC.cb = x.cb; }  // a request of the open one still on its way is dropped
+const rc_now = id => RC.id === id && RC.d ? {d: RC.d, cb: RC.cb || []} : null;  // what the open one shows (it waits as a neighbour after a swipe); not there yet: null (loaded when taken)
 // 2.121.0 B (#2095): "In the cash book no. X" under the receipt (the server answers office admins only; else an empty list)
 async function rc_cbHint(id, seq) {
   let j = null; try { j = await rawFetch('GET', `/api/docs/${id}/cashbook`); } catch { j = null; }
   if (seq !== RC.seq) return;
   RC.cb = j?.entries || [];
-  const el = $('.rc-cb'); if (el) { el.hidden = !RC.cb.length; el.textContent = rc_cbText(); }
+  const el = rc_el('.rc-cb'); if (el) { el.hidden = !RC.cb.length; el.textContent = rc_cbText(); }
 }
-const rc_cbText = () => (RC.cb || []).map(e => tr('In the cash book {0} no. {1}', e.book, e.no)).join(' · ');
-function rc_draw() { const el = $('.rc-slot'); if (el) el.innerHTML = rc_html(); }
-function rc_html() {
-  const d = RC.d; if (!d) return '';
+const rc_cbText = (cb = RC.cb) => (cb || []).map(e => tr('In the cash book {0} no. {1}', e.book, e.no)).join(' · ');
+function rc_draw() { const el = rc_el('.rc-slot'); if (el) el.innerHTML = rc_html(); }
+// 2.755.0 (#5236): the open document's slot, never the one of a neighbour drawn ahead (docview.js: .dc-nb, it may lie inside the open body mid-swipe)
+const rc_el = sel => $$(sel).find(x => !x.closest('.dc-nb')) || null;
+// 2.755.0 (#5236): nb = a neighbour drawn ahead ({id, d, doc}: its own receipt and document, RC stays the open one's)
+function rc_html(nb) {
+  const d = nb ? nb.d : RC.d; if (!d) return '';
   const r = d.receipt, w = d.can_edit;
   const sug = d.suggestions.map(s => `<div class="rc-sug" role="group" aria-label="${esc(tr('Suggestion of {0}', s.agent?.name || ''))}">
       <span><span class="muted">${esc(tr('Suggestion of {0}', s.agent?.name || tr('an agent')))}:</span> ${[s.project && `<b>${esc(s.project.name || tr('Project #{0}', s.project.id))}</b>`, s.category && `<b>${esc(s.category)}</b>`].filter(Boolean).join(' · ')}
@@ -36,12 +53,12 @@ function rc_html() {
   // 2.497.0 A (#4046): the fields only at a receipt (a row in rc_receipts), an open suggestion, an e-invoice to take over or
   // recognised invoice values; any other document (a letter) gets the button "Record as receipt" that shows them
   // 2.522.0 (#4433): a person with an office records receipts only in the office; the private space offers "Move to office"
-  const ar = rc_area(), wrong = rc_wrongHtml(ar);
+  const ar = rc_area(nb), wrong = rc_wrongHtml(ar);
   if (ar?.area === 'private' && !d.receipt?.is_receipt) {
     return wrong || (ar.can_move ? `<div class="rc-add"><button type="button" class="btn sm" data-rc="area:office">${ic('receipt', 's')} ${tr('Move to office')}</button></div>` : '');
   }
-  if (!rc_isReceipt(d) && RC.open !== RC.id) {
-    if (typeof DC !== 'undefined' && DC.doc?.id === RC.id && DC.doc.split?.stack) return wrong;  // 2.522.0 (#4468): a stack becomes no receipt
+  if (!rc_isReceipt(d, nb) && (nb || RC.open !== RC.id)) {
+    if (nb ? nb.doc.split?.stack : typeof DC !== 'undefined' && DC.doc?.id === RC.id && DC.doc.split?.stack) return wrong;  // 2.522.0 (#4468): a stack becomes no receipt
     return wrong + (w ? `<div class="rc-add"><button type="button" class="btn sm" data-rc="open:0">${ic('receipt', 's')} ${tr('Record as receipt')}</button></div>` : '');
   }
   return `${wrong}<h4 class="rc-h">${tr('Receipt')}</h4>${einv}${sug}${rc_confHtml(d)}
@@ -82,13 +99,13 @@ document.addEventListener('click', e => {
 });
 // 2.497.0 A (#4046): is the document a receipt (or about to become one)? DC.doc.extracted = what the recognition read off an
 // invoice; a gross amount alone is no sign (a fee in an official letter), such a document gets the button
-function rc_isReceipt(d) {
-  const x = typeof DC !== 'undefined' && DC.doc?.id === RC.id ? DC.doc.extracted : null;
-  if (rc_area()?.area === 'private') return !!d.receipt?.is_receipt;  // 2.522.0 (#4433): in the private space only an old receipt
+function rc_isReceipt(d, nb) {
+  const x = nb ? nb.doc.extracted : typeof DC !== 'undefined' && DC.doc?.id === RC.id ? DC.doc.extracted : null;
+  if (rc_area(nb)?.area === 'private') return !!d.receipt?.is_receipt;  // 2.522.0 (#4433): in the private space only an old receipt
   return !!(d.receipt?.is_receipt || d.suggestions?.length || d.einvoice_offer || (x && (x.net || x.vat_pct || x.invoice_no)));
 }
 // 2.522.0 (#4433): the area of the open document (docs/area.py ar_view: null = no office, everything as before)
-const rc_area = () => (typeof DC !== 'undefined' && DC.doc?.id === RC.id ? DC.doc.area : null) || null;
+const rc_area = nb => (nb ? nb.doc.area : typeof DC !== 'undefined' && DC.doc?.id === RC.id ? DC.doc.area : null) || null;  // 2.755.0 (#5236): + a neighbour's
 // 2.576.0 (#4487, decision 04.11.2026): Office > Receipts and the file store apart, a document in both points to the other
 // place instead of a copy: an office document (docs/area.py ar_view area 'office') lies in a folder of the file store as well
 // -> "Also in: Office > Receipts" (outside the office) and "Also in: File store" (its folder); nothing for the private ones
@@ -108,7 +125,7 @@ async function rc_areaMove(id, to, b) {
     await api('POST', `/api/docs/${id}/area`, undo ? {to: t, undo: true} : {to: t});
     if (typeof dc_c168Refresh === 'function') await dc_c168Refresh(id);
     if (typeof dc_load === 'function' && typeof DC !== 'undefined' && DC.docs) dc_load();
-    if (RC.id === id) { RC.id = null; const el = $('.rc-slot'); if (el && typeof DC !== 'undefined' && DC.doc?.id === id) { el.previousElementSibling?.classList.contains('rc-also') && el.previousElementSibling.remove(); el.nextElementSibling?.classList.contains('rc-cb') && el.nextElementSibling.remove(); el.outerHTML = rc_slot(DC.doc); } }  // 2.576.0 (#4487): + the "Also in" line, no second hint
+    if (RC.id === id) { RC.id = null; const el = rc_el('.rc-slot'); if (el && typeof DC !== 'undefined' && DC.doc?.id === id) { el.previousElementSibling?.classList.contains('rc-also') && el.previousElementSibling.remove(); el.nextElementSibling?.classList.contains('rc-cb') && el.nextElementSibling.remove(); el.outerHTML = rc_slot(DC.doc); } }  // 2.576.0 (#4487): + the "Also in" line, no second hint
     return {};
   };
   try { await go(to, false)(); } catch { if (b) b.disabled = false; return; }

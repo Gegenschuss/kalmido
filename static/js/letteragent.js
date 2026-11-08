@@ -14,10 +14,18 @@ async function lta_load() {
   const id = LTA.id, seq = ++LTA.seq;
   let j = null; try { j = await rawFetch('GET', `/api/office/letters/doc/${id}/agents`); } catch { j = null; }
   if (seq !== LTA.seq) return;
-  LTA.d = j; const el = $('.lta-slot'); if (el) el.innerHTML = lta_html();
+  LTA.d = j; const el = $$('.lta-slot').find(x => !x.closest('.dc-nb')); if (el) el.innerHTML = lta_html();  // 2.755.0 (#5236): not a neighbour's
 }
-function lta_html() {
-  const j = LTA.d; if (!j) return '';
+// 2.755.0 (#5236): a neighbour drawn ahead (letterdoc.js ltd_nbFill): its agents fetched on its own (undefined = no office,
+// no slot), drawn by the same lines; after the snap lta_take hands them to LTA (nothing loads again)
+async function lta_nbLoad(id) {
+  if (typeof officeOn === 'function' && !officeOn()) return undefined;
+  try { return await rawFetch('GET', `/api/office/letters/doc/${id}/agents`); } catch { return null; }
+}
+const lta_slotHtml = j => `<div class="lta-slot">${lta_html(j)}</div>`;
+function lta_take(id, j) { LTA.seq++; LTA.id = id; LTA.d = j; LTA.at = Date.now(); }
+function lta_html(j = LTA.d) {
+  if (!j) return '';
   if (j.data?.length) return `<button type="button" class="btn sm" data-lta="ask">${ic('bot', 's')} ${tr('Let an agent draft the answer')}</button>`;
   return j.others ? `<p class="muted lta-hint">${tr('An agent can draft the answer once you share the document with it.')}</p>` : '';
 }

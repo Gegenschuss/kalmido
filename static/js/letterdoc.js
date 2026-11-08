@@ -14,12 +14,28 @@ async function ltd_load() {
   if (seq !== LTD.seq) return;
   LTD.info = x && x.available ? x : null; ltd_draw();
 }
-function ltd_draw() { const el = $(`.ltd[data-nid="${LTD.id}"]`); if (el) el.innerHTML = ltd_html(); }
+function ltd_draw() { const el = $$(`.ltd[data-nid="${LTD.id}"]`).find(x => !x.closest('.dc-nb')); if (el) el.innerHTML = ltd_html(); }  // 2.755.0 (#5236): not a neighbour's frame
+// ---- 2.755.0 (#5236): a neighbour drawn ahead (docview.js dcv_nbDraw) gets its letters in its own frame with its own data
+// (e.ltd, nothing of LTD); after the snap ltd_take hands them over, so ltd_slot draws the same and loads nothing
+async function ltd_nbFill(e, el) {
+  const id = e.d.id, sig = e.ctrl.signal;
+  const ag = typeof lta_nbLoad === 'function' ? lta_nbLoad(id) : Promise.resolve(undefined);  // letteragent.js: its own "draft the answer"
+  let x = null; try { x = await rawFetch('GET', `/api/office/letters/doc/${id}`); } catch { x = null; }
+  const a = await ag;
+  if (sig.aborted || e.taken) return;
+  e.ltd = {info: x && x.available ? x : null, lta: a};
+  const box = el.querySelector(`.ltd[data-nid="${id}"]`); if (box) dcv_nbSet(box, ltd_html(e.ltd.info, e.d, a === undefined ? '' : lta_slotHtml(a)));
+}
+function ltd_take(id, x) {
+  LTD.seq++; LTD.id = id; LTD.info = x.info;
+  if (x.lta !== undefined && typeof lta_take === 'function') lta_take(id, x.lta);
+}
+const ltd_now = id => LTD.id === id && LTD.info ? {info: LTD.info, lta: typeof LTA === 'object' && LTA.id === id && LTA.d ? LTA.d : undefined} : null;
 const ltd_day = v => typeof dc_day === 'function' ? dc_day(v) : (v || '');
 const LTD_STATUS = {draft: 'Draft', sent: 'Sent', delivered: 'Delivered'};
-function ltd_html() {
-  const x = LTD.info, d = LTD.d; if (!x || !d) return '';
-  const ext = typeof lta_docBtn === 'function' ? lta_docBtn(d) : '';
+function ltd_html(x = LTD.info, d = LTD.d, nbExt) {  // 2.755.0 (#5236): or a neighbour's (nbExt: its agents' slot, LTA stays the open one's)
+  if (!x || !d) return '';
+  const ext = nbExt !== undefined ? nbExt : typeof lta_docBtn === 'function' ? lta_docBtn(d) : '';
   const acts = `<div class="ltd-acts"><button type="button" class="btn sm" data-ltd="answer">${ic('mail', 's')} ${tr('Write an answer')}</button>${ext}</div>`;
   const list = x.letters.length ? `<ul class="ltd-list" aria-label="${esc(tr('Linked letters'))}">${x.letters.map(l => `<li><a href="${esc(l.href)}">${esc(l.subject || tr('Letter'))}</a>
       <span class="muted">${esc([l.kind === 'reply' ? tr('Answer to our letter') : tr('Our answer'), ltd_day(l.date), tr(LTD_STATUS[l.status] || l.status)].filter(Boolean).join(' · '))}</span></li>`).join('')}</ul>` : '';

@@ -143,9 +143,10 @@ function dfl_secret(sec) {  // a new webhook secret: shown once
 }
 // ---- the document sheet: the runs of flows, each with "Undo"
 const DFL_DID = {sender: N_('Sender'), type: N_('Document type'), folder: N_('Folder'), tags: N_('Tags'), fields: N_('Custom fields')};
-async function dfl_runs(md, d) {
+async function dfl_runs(md, d, nb) {  // 2.755.0 (#5236): nb = a neighbour drawn ahead ({ctrl}): quietly, its own box
   const box = md.querySelector('.dc-flows'); if (!box || !d) return;
-  let j; try { j = await api('GET', `/api/docs/${d.id}/flowruns`); } catch { return; }
+  let j; try { j = nb ? await rawFetch('GET', `/api/docs/${d.id}/flowruns`) : await api('GET', `/api/docs/${d.id}/flowruns`); } catch { return; }
+  if (nb?.ctrl.signal.aborted || !j?.runs) return;
   if (!box.isConnected || !j.runs.length) { box.innerHTML = ''; return; }
   box.innerHTML = `<details class="dc-text"><summary><h4>${tr('Flows')} (${j.runs.length})</h4>${ic('chev', 's dc-chev')}</summary><ul class="dc-rules">${j.runs.map(r => {
     const what = [...r.did.map(k => tr(DFL_DID[k] || k)), r.task_id && tr('Task'), r.told && tr('{0} notified', r.told), r.hook && tr('Webhook'), r.shared && tr('Shared')].filter(Boolean).join(', ');

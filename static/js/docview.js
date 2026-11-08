@@ -153,6 +153,19 @@ function dcv_nbDraw(e) {
   dcv_nbPark(el);
   dcv_pvDraw(el, e.d, e);
   const box = el.querySelector('.dv-pages'); if (box) DVW.ro?.observe(box);
+  // 2.755.0 (#5236): its receipt, its letters and the runs of its flows filled ahead too, each with its own data (e.rc / e.ltd:
+  // nothing of the open one's state; dcv_nbTake hands them over after the snap), so nothing comes later after the swap
+  if (!e.d.file) {
+    if (typeof rc_nbFill === 'function') rc_nbFill(e, el);
+    if (typeof ltd_nbFill === 'function') ltd_nbFill(e, el);
+    if (typeof dfl_runs === 'function') dfl_runs(el, e.d, e);
+  }
+}
+// 2.755.0 (#5236): a part of a neighbour filled later: while it waits its new ids go aside as well (dcv_nbPark)
+function dcv_nbSet(box, html) {
+  box.innerHTML = html;
+  if (!box.closest('.dc-nb')) return;
+  for (const x of box.querySelectorAll('[id]')) { /** @type {HTMLElement} */ (x).dataset.dvid = x.id; x.removeAttribute('id'); }
 }
 // the neighbour gone (no direct neighbour any more, the view closed): its file freed, its body away
 function dcv_nbFree(e) {
@@ -166,7 +179,13 @@ function dcv_nbFree(e) {
 function dcv_nbTake(d, old) {
   const e = DCW.nb?.get(d.id); if (!e?.el || e.d !== d || !e.el.firstChild) return null;
   DCW.nb.delete(d.id); e.taken = true;  // a preview still on its way becomes the view's (dcv_pvDraw)
-  const el = e.el;
+  const el = e.el, wd = /** @type {any} */ (old)._dcv?.d;
+  // 2.755.0 (#5236): what the open one's receipt / letters show goes with its body (it waits as the neighbour); the new one's
+  // filled ahead become the open state (rc_slot / ltd_slot draw the same and load nothing; fetched a while ago: quietly again)
+  const keep = {rc: wd && typeof rc_now === 'function' ? rc_now(wd.id) : null, ltd: wd && typeof ltd_now === 'function' ? ltd_now(wd.id) : null};
+  const late = Date.now() - e.at > DC_NBOLD;
+  if (e.rc && typeof rc_take === 'function') { rc_take(d.id, e.rc); if (late) rc_load(); }
+  if (e.ltd && typeof ltd_take === 'function') { ltd_take(d.id, e.ltd); if (late) ltd_load(); }
   for (const x of el.querySelectorAll('[data-dvid]')) { const y = /** @type {HTMLElement} */ (x); y.id = y.dataset.dvid || ''; delete y.dataset.dvid; }
   el.classList.remove('dc-nb', 'dc-nb-n', 'dc-nb-p'); el.classList.add('dc-body');
   el.removeAttribute('aria-hidden'); el.inert = false; /** @type {any} */ (el)._dcnb = false;
@@ -175,7 +194,7 @@ function dcv_nbTake(d, old) {
   DVW.pdf = e.pdf || null;
   if (e.pdf) { e.pdf.nb = false; setTimeout(() => dcv_textFill(e.pdf), 0); }  // 2.742.0 (#4861): its pages drawn ahead get their text layers now
   if (was?.d && was.d.id !== d.id && !DC_PEND.has(was.d.id) && $('.dv-pages', old)?._base) {  // its preview finished
-    const o = {id: was.d.id, d: was.d, set: was.set, at: Date.now(), ctrl: new AbortController(), el: old, pdf};
+    const o = {id: was.d.id, d: was.d, set: was.set, at: Date.now(), ctrl: new AbortController(), el: old, pdf, rc: keep.rc, ltd: keep.ltd};
     if (pdf) pdf.nb = true;
     const pz = $('.dv-pages', old); if (pz && typeof dc_zoomSet === 'function') dc_zoomSet(pz, 1, 0, 0);
     dcv_nbPark(old);

@@ -249,6 +249,9 @@ function ab_pvOpts(n) {
   if (i < 0 || list.length < 2) return o;
   Object.assign(o, {pos: tr('{0} of {1}', i + 1, list.length), first: i <= 0, last: i >= list.length - 1, prevT: tr('Previous document'), nextT: tr('Next document'),
     step: async dir => (list[i + dir] ? ab_pvOpts(list[i + dir]) : null), peek: dir => ({img: list[i + dir] && ab_isImg(list[i + dir]) ? ab_url(list[i + dir]) : ''})});  // 2.727.0 (#5202): a picture glides in as itself
+  // 2.755.0 (#5236): on a touch screen (where the swipe is) the direct neighbours are made ready ahead by pdfview.js (o.near:
+  // their file opened, the first page drawn, a picture decoded): a swipe shows them as they will stand, no placeholder
+  if (navigator.maxTouchPoints > 0 || isTouch()) o.near = dir => (list[i + dir] ? ab_pvOpts(list[i + dir]) : null);
   return o;
 }
 const ab_navFiles = () => (AB.data?.items || []).filter(x => x.kind === 'file' && !x._enc && !upLocked(x) && (ab_isPdf(x) || ab_isImg(x))).map(x => x.id);  // 2.583.0 + 2.652.0 (#5071): the folder's PDFs and pictures the view leafs through (as ab_pvOpts)
