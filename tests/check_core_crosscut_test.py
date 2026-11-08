@@ -6,7 +6,7 @@
  - quiet: the core's own tables (obj_*), a share link (token_hash), a plain table, a join table with a column of its own
  - a table a fragment drops (DROP TABLE IF EXISTS) does not count
  - code outside kalmido/core: a new *_react( / need_*_say( / MENTION_RE red, a new *_search( only a hint
- - the repository: a finding only for tables that a fragment of this package still drops (paperless_links, #5265)
+ - the repository: no finding
 usage: check_core_crosscut_test.py"""
 import os
 import shutil
@@ -81,10 +81,9 @@ bad, hints = cc.findings(tmp, allow={"code": {"kalmido/meet/routes.py:meeting_re
 check(len(bad) == 1 and "gone_react is gone" in bad[0] and not hints, f"code: allowed ones are quiet, a gone one is red: {bad} {hints}")
 shutil.rmtree(tmp, ignore_errors=True)
 
-# the repository: every finding is a table that a fragment of the package still drops (#5265 paperless_links), nothing else
+# the repository: no finding (paperless_links dropped by #5265 counts no more)
 bad, hints = cc.findings()
-rest = [x for x in bad if "table paperless_links " not in x]
-check(not rest, f"the repository: {rest}")
+check(not bad, f"the repository: {bad}")
 check("paperless_links" not in cc.load_allow()["tables"], "paperless_links is not an exception (#5265 drops it)")
 
 print(f"check_core_crosscut: {OKS[0]} ok, {len(FAILS)} failed")

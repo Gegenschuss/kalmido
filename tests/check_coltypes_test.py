@@ -5,7 +5,7 @@
    with file:line and the real type; the same with TIMESTAMPTZ / DATE / BOOLEAN / JSONB, a count, a plain text: quiet
  - a column on the baseline: quiet; a baseline line whose column was moved (ALTER COLUMN ... TYPE), dropped or is gone: red
  - a DEFAULT 'a,b' text is no second column; the marker coltype-ok on the line lets one column through
- - the repository: a finding only for paperless_links, which a fragment of this package drops (#5265)
+ - the repository: no finding
 usage: check_coltypes_test.py"""
 import os
 import sys
@@ -66,10 +66,9 @@ MARKED = frag('MIGRATIONS = [\n    ("meetings", "label_on", "ALTER TABLE meeting
 check(not run(MARKED), f"the marker coltype-ok lets one column through: {run(MARKED)}")
 check(len(run(base={"meetings.gone_at": "time"})) == 1, "a baseline line of a column that never was is red")
 
-# the repository: only paperless_links, which #5265 (part A of this package) drops; nothing else
+# the repository: no finding (paperless_links dropped by #5265 counts no more)
 bad = ct.findings()
-rest = [x for x in bad if "paperless_links." not in x]
-check(not rest, f"the repository: {rest}")
+check(not bad, f"the repository: {bad}")
 check(not any(k.startswith("paperless_links.") for k in ct.baseline()), "paperless_links is not on the baseline (#5265 drops it)")
 
 print(f"check_coltypes: {OKS[0]} ok, {len(FAILS)} failed")
