@@ -55,7 +55,7 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
       ...[15, 30, 45, 60].map(d => ({type: 'pointerMove', x: Math.round(g.x - d), y: Math.round(g.y), duration: 30}))]}]);
     check(await ready(`Math.abs(document.querySelector('.lchead .lc[data-k="${K}"]').getBoundingClientRect().width - ${h0.w + 60}) <= 2`), '#3304: while dragging the column title follows the mouse');
     const mid1 = await ev(`(() => { const h = document.querySelector('.lchead .lc[data-k="${K}"]').getBoundingClientRect(), gl = document.querySelector('body > .lcguide');
-      return {rw: ${rowW}, gx: gl ? parseFloat(gl.style.left) : null, hl: h.left, stored: localStorage.getItem('tasks.lcw.${L}'), style: document.getElementById('lcw-style')?.textContent || ''}; })()`);
+      return {rw: ${rowW}, gx: gl ? parseFloat(gl.style.left) : null, hl: h.left, stored: lcwGet(${L})['${K}'] || null, style: document.getElementById('lcw-style')?.textContent || ''}; })()`);
     check(Math.abs(mid1.rw - r0) <= 1, `#3304: while dragging the rows keep their width (${r0} -> ${mid1.rw})`);
     check(mid1.gx != null && Math.abs(mid1.gx - (g.x - 60)) <= 2 && Math.abs(mid1.gx - (mid1.hl - (h0.l - g.x))) <= 2, `#3304: the guide line follows the column's left edge (${mid1.gx}, title from ${mid1.hl})`);
     check(!mid1.stored && !/data-k/.test(mid1.style), '#3304: nothing stored or applied to the rows before the release');
@@ -64,7 +64,7 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
     await cmd('input.releaseActions', {context: ctx});
     check(await ready(`!document.querySelector('body > .lcguide') && !document.body.classList.contains('pgdrag')`), 'the guide line is gone after the release');
     const end = await ev(`(() => { const h = document.querySelector('.lchead .lc[data-k="${K}"]'); return {hw: h.getBoundingClientRect().width, rw: ${rowW}, inline: h.style.width,
-      w: (JSON.parse(localStorage.getItem('tasks.lcw.${L}') || '{}'))['${K}'] || 0, rem: parseFloat(getComputedStyle(document.documentElement).fontSize)}; })()`);
+      w: lcwGet(${L})['${K}'] || 0, rem: parseFloat(getComputedStyle(document.documentElement).fontSize)}; })()`);
     check(Math.abs(end.hw - end.rw) <= 1 && Math.abs(end.rw - (r0 + 60)) <= 2, `#3304: after the release title and rows have the same new width (${end.hw} / ${end.rw}, was ${r0})`);
     check(!end.inline, '#3304: the title keeps no width of its own (the stored one applies)');
     check(Math.abs(end.w * end.rem - (h0.w + 60)) <= 2, `#3304: the width is stored for the list (${end.w} rem)`);

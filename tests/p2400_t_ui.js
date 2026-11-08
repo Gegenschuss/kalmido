@@ -73,7 +73,7 @@ const FEAT = 'comments,collab,fields,habits';
     await sleep(150);
     check(await ev(`!document.querySelector('body > .lcguide') && !document.body.classList.contains('pgdrag')`), '#1430: a render during the drag removes the guide line and pgdrag');
     await act([{type: 'pointer', id: 'm', parameters: {pointerType: 'mouse'}, actions: [{type: 'pointerUp', button: 0}]}]); await release();
-    await ev(`(() => { localStorage.removeItem('tasks.lcw.${L}'); lcwApply(${L}); return 1; })()`);
+    await ev(`(() => { for (const k of Object.keys(lcwGet(${L}))) lcwSet(${L}, k, null); return 1; })()`);  // 2.742.0 (#4857): the account keeps the widths
     // a stray line (and pgdrag) without a drag: the next render takes it away
     await ev(`(() => { document.body.appendChild(Object.assign(document.createElement('div'), {className: 'lcguide'})); document.body.classList.add('pgdrag'); renderView(); return 1; })()`);
     check(await ev(`!document.querySelector('body > .lcguide') && !document.body.classList.contains('pgdrag')`), '#1430: a stray guide line goes with the next render');

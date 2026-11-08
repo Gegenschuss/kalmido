@@ -110,6 +110,7 @@ ORDER = (
     "personal.timewipe",  # 2.43.0 (#1434)
     "personal.budgetwarn",  # 2.555.0 (#4570): the budget warning at 80 / 100 % (no routes)
     "accounts.settings",
+    "accounts.colwidths",  # 2.742.0 (#4857): the column widths of the lists per person (user setting col_widths)
     "accounts.whatsnew",  # 2.556.0 (#4685): "New for you" after an update (user settings whatsnew_seen / whatsnew_on)
     "lists.favorites",  # 2.40.0 (#1361)
     "lists.listexport",  # 2.116.0 C (#2064)

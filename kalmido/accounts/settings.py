@@ -31,6 +31,7 @@ SETTINGS_SERVER_ONLY = ("digest_sent", "digest_mail_sent", "digest_mail_try", "r
                         "fav_asked",  # 2.46.1 (#1361): lists already offered as a favourite
                         "evmail_at", "evmail_day")  # 2.142.0 A (#2146): the bundled event mails sent
 USER_DEFAULTS.setdefault("settings_more", "[]")  # 2.583.0 (#4833): the settings tabs whose "Further options" are open (like modcards.py ws_mods_off)
+USER_DEFAULTS.setdefault("col_widths", "{}")  # 2.742.0 (#4857): the dragged column widths per list (accounts/colwidths.py)
 SIDE_GROUPS = ("focus", "clients", "lists", "filters", "tags", "views", "areas", "team")  # 2.25.0 (UX-03); 2.39.1 (#1185): areas
 # 2.575.0 D (#4051): start_page "a:<area>" = the app opens on that area (the ids of SBB_RAIL in static/js/areas.js; home stays "home")
 START_AREA_RE = re.compile(r"a:(tasks|cal|notes|office|time|review|life|reading|ablage|wiki|sheets|habits|team|agents)")
@@ -113,6 +114,9 @@ def clean_setting(k, v):
     if k in ("side_views", "side_view"):  # 2.156.0 D (#2186): the sidebar's saved views and the active one (accounts/sideviews.py)
         from .sideviews import sv_clean
         return sv_clean(k, v)
+    if k == "col_widths":  # 2.742.0 (#4857): {list id: {column: rem}} (accounts/colwidths.py)
+        from .colwidths import lcw_clean
+        return lcw_clean(v)
     if isinstance(v, (dict, list)) and k not in ("folders", "folders_closed", "show_done_views", "group_order", "folder_colors", *CAL_LIST_KEYS):
         raise bad
     sv = "" if v is None else str(v).strip()
@@ -667,6 +671,9 @@ def settings_update():
     if "set_delta" in b:
         sd = set_delta_apply(usettings(c, me()), b["set_delta"])
         b = {**{k: x for k, x in b.items() if k != "set_delta"}, **{k: x for k, x in sd.items() if k not in b}}
+    if "col_widths" in b:  # 2.742.0 (#4857): a patch {list id: widths | null}, merged into the stored value under the lock
+        from .colwidths import lcw_merge
+        b = {**b, "col_widths": lcw_merge(usettings(c, me()).get("col_widths"), b["col_widths"])}
     vals = {}
     if "notify" in b:  # 2.1.0 (#317): the notification matrix
         cur = usettings(c, me())
@@ -724,6 +731,7 @@ RS_ITEMS = (
     ("start", N_("Start page"), ("start_page",)),
     ("views", N_("Arrangement and block settings of the views"), ("dashboard", *LAYOUT_KEYS, "wgstd_hide")),
     ("views", N_("Menus and tab bar"), ("nav_order", "nav_menus")),
+    ("views", N_("Column widths of the lists"), ("col_widths",)),  # 2.742.0 (#4857)
     ("views", N_("Task panel layout"), ("detail_split", "detail_cm_fold", "detail_fold", "comment_order")),
     ("views", N_("My tasks as a list or board"), ("mine_view", "mine_board", "mine_board_by")),
     ("views", N_("Roadmap view"), ("roadmap",)),

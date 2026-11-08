@@ -1775,7 +1775,10 @@ function lcMenu(c) {
 }
 // 2.31.0: a focusable separator needs a value (axe aria-required-attr): the standard width says 7 rem, read out as "Standard width"
 // ---- 2.16.0 (#634): column widths per device and list (localStorage lcw.<list>: {key: rem}), applied as one style sheet
-const LCW_MIN = 2.5, LCW_MAX = 24;
+// 2.742.0 (#4857): per person on every device (the user setting col_widths, accounts/colwidths.py; the former localStorage
+// lcw.<list> of this device is read until the list's first drag moves it to the account) and without an upper limit (#4830):
+// a column gets as wide as the title column's minimum allows (lcwRoom); phones / narrow lists keep their rows (app.css scope)
+const LCW_MIN = 2.5, LCW_MAX = 1000;
 const LC_TITLE_MIN = 12;  // 2.39.1 (#1217): rem the title column keeps while a column gets wider
 // 2.39.1 (#1217): a thin accent line from the column titles down the list (width drag, column move); x = the element's centre
 function lcGuide(el, line, x) {
@@ -1786,16 +1789,33 @@ function lcGuide(el, line, x) {
   line.style.height = Math.max(0, Math.round(Math.min(innerHeight, v ? v.bottom : innerHeight) - (h ? h.top : b.top))) + 'px';
   return line;
 }
-const lcwGet = lid => LS.get('lcw.' + lid, {}) || {};
+const lcwAll = () => { try { const o = JSON.parse(S.settings?.col_widths || '{}'); return o && typeof o === 'object' && !Array.isArray(o) ? o : {}; } catch { return {}; } };
+const lcwGet = lid => ({...(lcwAll()[lid] || LS.get('lcw.' + lid, {}) || {})});
+// 2.742.0 (#4857): the widest column k of list lid may get now (rem): its width plus what the title keeps above LC_TITLE_MIN
+function lcwRoom(head, k) {
+  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16, sp = head?.querySelector('.spacer');
+  const cell = head?.querySelector(`.lc[data-k="${window.CSS?.escape ? CSS.escape(k) : k.replace(/["\\]/g, '')}"]`);
+  if (!sp || !cell) return LCW_MAX;
+  return Math.max(LCW_MIN, cell.getBoundingClientRect().width / rem + Math.max(0, sp.getBoundingClientRect().width / rem - LC_TITLE_MIN));
+}
 function lcwApply(lid, w = lcwGet(lid)) {  // 2.87.9 (#1965): w = the widths shown while a grip is dragged (stored on release)
   let st = $('#lcw-style'); if (!st) { st = document.createElement('style'); st.id = 'lcw-style'; document.head.appendChild(st); }
-  st.textContent = Object.entries(w).filter(([, v]) => v > 0).map(([k, v]) => `#view .lc[data-k="${window.CSS?.escape ? CSS.escape(k) : k.replace(/["\\]/g, '')}"]{width:${+v}rem;max-width:none}`).join('\n');
+  // 2.742.0 (#4857): only where the column titles show (from 768 px and a list wider than 48 rem, app.css); never wider than
+  // the list minus the title's minimum, should the window have got narrower since the drag
+  const css = Object.entries(w).filter(([, v]) => v > 0).map(([k, v]) => `#view .lc[data-k="${window.CSS?.escape ? CSS.escape(k) : k.replace(/["\\]/g, '')}"]{width:min(${+v}rem,max(${LCW_MIN}rem,var(--lw,100cqw) - ${LC_TITLE_MIN + 2}rem));max-width:none}`).join('\n');
+  st.textContent = css ? `@media (min-width:768px){@container lrows (width > 48rem){\n${css}\n}}` : '';
 }
 function lcwSet(lid, k, v) {
   const w = lcwGet(lid);
   if (v == null) delete w[k]; else w[k] = Math.round(Math.max(LCW_MIN, Math.min(LCW_MAX, v)) * 100) / 100;  // 2.39.1 (#1217): no snapping
-  Object.keys(w).length ? LS.set('lcw.' + lid, w) : LS.del('lcw.' + lid);
+  // 2.742.0 (#4857): the account keeps it (only this list is sent, merged on the server); this device's old copy goes
+  const all = lcwAll(); if (Object.keys(w).length) all[lid] = w; else delete all[lid];
+  if (S.settings) S.settings.col_widths = JSON.stringify(all);
+  LS.del('lcw.' + lid);
   lcwApply(lid);
+  const g = document.querySelector(`#view .lchead[data-lid="${lid}"] .lcg[data-lcg="${window.CSS?.escape ? CSS.escape(k) : k.replace(/["\\]/g, '')}"]`);
+  if (g) { g.setAttribute('aria-valuenow', String(w[k] ?? 7)); g.setAttribute('aria-valuetext', w[k] ? tr('{0} rem', String(w[k])) : tr('Default width')); }
+  api('PATCH', '/api/settings', {col_widths: {[lid]: Object.keys(w).length ? w : null}}).catch(() => { /* shown; the local choice holds until the next load */ });
 }
 document.addEventListener('pointerdown', e => {
   const g = e.target.closest?.('.lchead .lcg'); if (!g || e.button !== 0) return;
@@ -1841,7 +1861,7 @@ document.addEventListener('keydown', e => {
   const lid = +g.closest('.lchead').dataset.lid, k = g.dataset.lcg, rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
   const cur = g.closest('.lc').getBoundingClientRect().width / rem || lcwGet(lid)[k] || parseFloat(getComputedStyle(g.closest('.lc')).width) / rem || 7;
   const to = {ArrowLeft: cur + (e.shiftKey ? 2 : .5), ArrowRight: cur - (e.shiftKey ? 2 : .5)}[e.key];  // 2.39.1 (#1217): the arrow moves the line
-  if (to != null) { e.preventDefault(); e.stopPropagation(); lcwSet(lid, k, to); }
+  if (to != null) { e.preventDefault(); e.stopPropagation(); lcwSet(lid, k, Math.min(to, lcwRoom(g.closest('.lchead'), k))); }  // 2.742.0 (#4857)
   else if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); lcwSet(lid, k, null); }
 }, true);
 // ---- dependencies: "waiting on" (blocked by open tasks)

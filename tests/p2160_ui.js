@@ -89,10 +89,11 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   check(!d.querySelector('.lchead[aria-hidden="true"]') && d.querySelector('.lchead .lc .lcn[aria-hidden="true"]'), 'the titles stay hidden from screen readers, the grips are reachable');
   check(d.querySelector(`#view .trow .lc[data-k="due"]`), 'the cells carry their column key');
   key(w, lg, 'ArrowLeft', {shiftKey: true}); await sleep(50);  // 2.39.1 (#1217): the grip is the line left of the column, ← moves it = wider
-  const lw = JSON.parse(w.__store['tasks.lcw.' + L] || '{}');
-  check(lw.due > 0 && /\.lc\[data-k="due"\]\{width:[\d.]+rem/.test(d.getElementById('lcw-style')?.textContent || ''), '#634: Shift+← widens the column (per device and list) ' + JSON.stringify(lw));
+  // 2.742.0 (#4857): the widths live in the account (user setting col_widths, lcwGet), the style sheet caps them with min()
+  const lw = w.eval(`lcwGet(${L})`);
+  check(lw.due > 0 && /\.lc\[data-k="due"\]\{width:min\([\d.]+rem/.test(d.getElementById('lcw-style')?.textContent || ''), '#634: Shift+← widens the column (per device and list) ' + JSON.stringify(lw));
   lg.dispatchEvent(new w.MouseEvent('dblclick', {bubbles: true}));
-  check(!('tasks.lcw.' + L in w.__store) && !d.getElementById('lcw-style').textContent, '#634: a double-click = the standard width');
+  check(!('tasks.lcw.' + L in w.__store) && !Object.keys(w.eval(`lcwGet(${L})`)).length && !d.getElementById('lcw-style').textContent, '#634: a double-click = the standard width');  // 2.742.0 (#4857): lcwGet
   w.close();
 
   // #642: density "Custom"

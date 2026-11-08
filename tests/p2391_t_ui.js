@@ -82,7 +82,7 @@ const FEAT = 'comments,collab,fields';
     const g = await mid(`.lchead .lcg[data-lcg="f:${FA}"]`), c0 = await mid(`.lchead .lc[data-k="f:${FA}"]`);
     check(g && Math.abs(g.w - 12) <= 1 && Math.abs(g.x - (c0.l - 6)) <= 2, `#1217: the grip is 12 px, centred on the line left of the column (${g && g.w} px at ${g && g.x}, cell from ${c0.l})`);
     await drag(g.x, g.y, -37, 0, 'mouse'); await sleep(300);
-    const w1 = await ev(`(JSON.parse(localStorage.getItem('tasks.lcw.${L}') || '{}'))['f:${FA}'] || 0`);
+    const w1 = await ev(`lcwGet(${L})['f:${FA}'] || 0`);  // 2.742.0 (#4857): the account keeps the widths
     const rem = await ev(`parseFloat(getComputedStyle(document.documentElement).fontSize)`);
     const want = c0.w / rem + 37 / rem;
     check(Math.abs(w1 - want) < 0.15 && Math.abs(w1 * 4 - Math.round(w1 * 4)) > 0.01, `#1217: the width follows the mouse without snapping to 0.25 rem (${w1} rem, expected ${want.toFixed(2)})`);

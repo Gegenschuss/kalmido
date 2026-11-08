@@ -91,7 +91,7 @@ const N = 300, STEPS = 60;
       await act([{type: 'pointer', id: 'p1', parameters: {pointerType: 'mouse'}, actions: steps(g.x, g.y, xs)}]);
       await sleep(300);
       report(`width drag run ${run} (${STEPS} steps)`, await ev('__m.stop()'));
-      const c1 = await mid(`.lchead .lc[data-k="f:${FT}"]`), w = await ev(`(JSON.parse(localStorage.getItem('tasks.lcw.${L}') || '{}'))['f:${FT}'] || 0`);
+      const c1 = await mid(`.lchead .lc[data-k="f:${FT}"]`), w = await ev(`lcwGet(${L})['f:${FT}'] || 0`);
       check(c1 && Math.abs(c1.w - (c0.w + 40)) <= 3 && w > 0, `the width drag worked (${c0.w} -> ${c1 && c1.w} px, stored ${w} rem)`);
       await ev(`(() => { lcwSet(${L}, 'f:${FT}', null); return 1; })()`); await sleep(300);
     }
