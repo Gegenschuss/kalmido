@@ -610,11 +610,21 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Start PostgreSQL
         # 2.37.0: Kalmido needs PostgreSQL 17
+        # 2.707.0 (#5185): a short registry hang while docker run pulled the image failed this step in 20 s twice (runs
+        # 40192975983, 42478203214) and held the live train. The image is pulled first, up to 3 tries with a growing pause;
+        # a start that still fails prints the container log. Only the setup is retried - the ZAP finding itself stays hard.
+        # tests/p2707_zap_db_start_test.py runs this script with a stand-in docker.
         run: |
+          for try in 1 2 3; do
+            docker pull -q postgres:17 && break
+            if [ "$try" = 3 ]; then echo "::error::docker pull postgres:17 failed 3 times"; exit 1; fi
+            echo "docker pull postgres:17 failed (try $try of 3), again in $((try * 10)) s"; sleep $((try * 10))
+          done
+          zapdb_log() { echo "::error::PostgreSQL for ZAP did not start"; docker logs kalmido-zap-db 2>&1 | tail -40 || true; exit 1; }
           docker run -d --name kalmido-zap-db -e POSTGRES_USER=kalmido -e POSTGRES_PASSWORD=zap -e POSTGRES_DB=kalmido \
-            -e POSTGRES_INITDB_ARGS=--data-checksums postgres:17 -c max_connections=100
+            -e POSTGRES_INITDB_ARGS=--data-checksums postgres:17 -c max_connections=100 || zapdb_log
           for i in $(seq 1 60); do docker exec kalmido-zap-db pg_isready -U kalmido -d kalmido -q && break; sleep 1; done
-          docker exec kalmido-zap-db pg_isready -U kalmido -d kalmido
+          docker exec kalmido-zap-db pg_isready -U kalmido -d kalmido || zapdb_log
       # 2.180.0 A (#2692): the image of the job "image" (same key) when it is in the cache, else built here
       - name: Image key
         id: imgkey
