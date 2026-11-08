@@ -16,6 +16,43 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.659.0] - 2026-11-08
+
+Package 2.635 (Bündel: CI-only rot: p2399_hosting_apart, CI-only rot: p2441_favs_ui, CI-only rot: p2476_b_appcss u. 6 weitere).
+
+### Added
+- Documents: Word and Excel files (.docx, .xlsx) and OpenDocument text / spreadsheets (.odt, .ods) get their text recognised (searchable, date / amount, rules and sorter apply) and a preview image; older formats (.doc, .xls, .ppt, .pptx, .rtf) stay files without text, with a hint in the document view. Existing ones follow with "Recognise again" (#4807).
+- Documents: notes on a document - several notes with author and time, visible to everyone who sees the document, written with edit rights, sealed with the workspace key and searchable; the Paperless import brings notes as notes; agents read them with the document (#4807).
+- Settings > Documents: the text recognition languages of the workspace can be chosen from the installed ones (default German + English, at most 4, KALMIDO_OCR_LANGS stays the upper limit) (#4807).
+- Documents: custom field types "Long text" and "Link to documents" (only documents of the same workspace the person sees; a click opens it); the Paperless import maps both (#4807).
+- Settings > Documents: every document flow has an edit button that opens the same form filled in; saving checks the version (conflict message when someone else changed it meanwhile), the on/off switch too (#4856).
+- Document flows: new action "Share" - shares the document with people or groups through the shared approvals core, only with targets the person who set it up may share with (checked again on every run); undo takes these shares back. The Paperless import maps owner / permissions of its workflows onto it (#4856).
+
+### Fixed
+- Phone scan: pages are opened only as JPEG, PNG, WEBP or HEIF; other image formats (e.g. EPS, TIFF) get "not a picture" (#4645).
+- CI: p2399_hosting_apart, p2485_a_support, p2538_a_support followed the e-mail invitation rule of #3570 (people get connected first); p2476_b_appcss places its probe scripts around dropany.js; p2441_favs_ui waits until the favourites row stopped sliding in (#5004, #5005, #5006, #5007, #5008).
+
+Package 2.651 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), CI-only rot: p2559_d_budget_ui, CI-only rot: p2107_ui u. 7 weitere).
+
+### Fixed
+- Mailbox: IMAP folder names with umlauts (e.g. "Entwürfe") are sent in modified UTF-7 (RFC 3501), so rules and fetching work on such folders (#5033)
+- Undo: an older app state no longer brings back a finished step on feeds, meals and budget data ("Mark all read" undo, a duplicated meal's provisional row); a budget reload keeps the own amount still being saved (#5064, #5076, #5025)
+- Drawer: an area name that grows after the fonts load is fitted again, no word split at 320 px (#5063)
+- Windows starter: pausing an agent ends its process tree on Windows PowerShell 5.1 too (#5038)
+- Browser demo: Settings > Ticket types and Office > Receipts answer in the demo (#5037)
+- CSS: the 767px breakpoint of the phone chat moved out of the rem-checked agentchat.css blocks; .amv-row on the 1 px grid (#5026, #5031)
+- CI: stable tests for the long-poll wake-up of a second process, the demo print view, the Windows launcher stub, the drawer search and the phone chat composer (#5077, #5036, #5032, #5027, #5075)
+
+Package 2.641 (Bündel: CI-only rot: p23674_a_office, Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Added
+- #4769: Approvals take images (JPG, PNG, WebP) and PDFs from the file store or as an upload, next to video links. Comments sit at a numbered point in the image or on a PDF page; tapping a comment's number jumps to its point. A new file is a new version, older versions keep their comments; states as for videos. Who may not see the file does not see the approval. The agent API shows kind, position and point number and reads the file at /api/v1/videos/{id}/versions/{v}/file.
+### Changed
+- #5011: GitHub release pages come once per ISO week (Sunday, weekly-release.yml): the newest checked version of the week, on its vX.Y.Z tag, with the notes and "Action needed" of every version of that week; the image :latest moves with it. Every version still gets its image :X.Y.Z. prune-releases.yml (dry run by default) thins out old release pages and image versions - the newest of each week, the last 14 days and the current latest stay; git tags are never touched.
+### Fixed
+- #5012: Overdue invoices and the "invoice series need you" task are told once when two runs meet (test p23674_a_office, red only in the CI).
+- #4974: Agent change proposals: a user_id of a person the agent does not see answers like a proposal without user_id (card to the owner), so it no longer tells who has write access; at most 20 proposals per day for one person.
+- #4979: Tests ux1_ui, p2170_ui and p270_ui wait for the page's state instead of fixed pauses; the eight suites changed in 2.624 are proven green on the test runner.
+
 ## [2.656.0] - 2026-11-08
 
 Package 2.647 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
@@ -474,7 +511,8 @@ Package 2.582 (Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher),
 
 Not released (the CI of this version was red); its changes are listed under 2.605.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.656.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.659.0...HEAD
+[2.659.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.659.0
 [2.656.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.656.0
 [2.650.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.650.0
 [2.648.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.648.0

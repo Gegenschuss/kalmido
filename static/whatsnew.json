@@ -1,6 +1,28 @@
 {
  "versions": [
   {
+   "version": "2.659.0",
+   "date": "2026-11-08",
+   "items": [
+    {
+     "de": "Word-, Excel- und OpenDocument-Dateien sind in Dokumente jetzt durchsuchbar und haben ein Vorschaubild.",
+     "en": "Word, Excel and OpenDocument files in Documents are now searchable and have a preview image."
+    },
+    {
+     "de": "An Dokumenten lassen sich Notizen schreiben, sichtbar für alle, die das Dokument sehen.",
+     "en": "You can write notes on documents, visible to everyone who sees the document."
+    },
+    {
+     "de": "Dokument-Abläufe lassen sich bearbeiten und können Dokumente automatisch freigeben.",
+     "en": "Document flows can be edited and can share documents automatically."
+    },
+    {
+     "de": "Abnahmen gehen jetzt auch für Bilder und PDFs: Kommentare sitzen an einem Punkt im Bild oder auf der PDF-Seite.",
+     "en": "Approvals now work for images and PDFs too: comments sit at a point in the image or on the PDF page."
+    }
+   ]
+  },
+  {
    "version": "2.656.0",
    "date": "2026-11-08",
    "items": [
