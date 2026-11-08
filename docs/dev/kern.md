@@ -291,3 +291,27 @@ keeps the name the area's other writes use, e.g. `task-<id>` of `apply_update`, 
   are deleted for good without the core knowing (a field, a comment, the trash period), an `obj_history` row would outlive
   them. A custom field's values (`set_field_values`) stay part of the task's write (`apply_update`: under the task's lock,
   compared per field against `_prev`).
+
+## Cross-cutting parts (2.755.0, #5267)
+
+Links between objects, tags, comments, reactions, read marks, versions and following / notifying exist **once**, in the
+shared core (the stages Q1-Q9 of the cross-cutting analysis move them there one by one: reactions `obj_reactions`, links
+`obj_links`, comments, tags, the shared search, versions, read marks, `obj_follow`). A new area builds none of them itself.
+
+`tools/check_core_crosscut.py` (CI lint, seconds, no database) reads schema.py and the fragments of migrations.d and is red on a
+new table that looks like one of them:
+- its name ends in `_links`, `_tags`, `_comments`, `_notes`, `_reactions`, `_rx`, `_trash_text`, `_reads`, `_seen`,
+  `_versions`, `_hist`, `_notif`, `_watchers`, `_bell`, `_follow` or `_subscriptions`, or
+- it has an `*_id` column and one of `tag`, `tag_id`, `body`, `seen_id`, `last_id`, `read_at`, `seen_at`, `emoji`, `follow`,
+  `muted`, `no`, or
+- it only joins two tables (two `*_id` columns with `REFERENCES` to different tables, besides them at most `id`,
+  `created_at`, `created_by`, `sort`).
+
+Not counted: the core's own tables (`obj_*`), tables with `token_hash`, `url`, `base_url` or `role` (share links, address
+lists, roles), and a table a fragment drops (`DROP TABLE IF EXISTS` in AFTER). In the code outside `kalmido/core/` a new
+`MENTION_RE`, `need_*_say(` or `*_react(` is red, a new `*_search(` a hint.
+
+What is there today stands in `tools/core_crosscut_allow.json` with its reason: the stage that takes it down, or the area's own
+logic (a task's placement in lists, a mail's text, an IMAP de-duplication ...). The list grows only with a decision of the product owner.
+A stage that takes a table or a function down takes its line out in the same commit; a line whose table or function is gone is
+red.

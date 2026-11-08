@@ -256,6 +256,8 @@ jobs:
         run: python tools/check_fk_comment.py
       - name: No check in tests/ that cannot fail (2.755.0, #5261)
         run: python tools/check_nosham.py
+      - name: Links, tags, comments, read marks, versions, following only in the shared core (2.755.0, #5267)
+        run: python tools/check_core_crosscut.py
       - name: Translations complete
         run: |
           python tools/i18n_check.py
