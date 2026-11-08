@@ -6,6 +6,10 @@ red in 20 s (runs 40192975983, 42478203214), which held the live train.
  1. the registry fails twice, then answers: the step pulls up to 3 times and is green (without the fix: red at once)
  2. the registry fails three times: the step is red and says so (no endless retry)
  3. the image is there but the database never gets ready: red, and the container log is printed
+2.715.0 (#5187): the real cause of run 42478203214 - the image's setup server is ready on the socket, then restarts:
+ 4. socket ready at once, then "rejecting" during the restart, TCP ready only after it: the step waits over TCP and is
+    green (the socket check of 2.707 broke out at once and its one final check met the restart: red)
+ 5. the readiness check names -h 127.0.0.1 on every call (TCP, never the socket)
 The pauses between the tries go to a stand-in sleep (recorded, not waited). Standard library only.
 usage: python3 tests/p2707_zap_db_start_test.py"""
 import os
@@ -42,6 +46,9 @@ def step_script(name="Start PostgreSQL", job="zap"):
 
 # The stand-in docker: the registry fails the first FAIL_NET network accesses (pull, or a run that has to pull itself);
 # exec pg_isready answers READY (1/0); logs prints a marker line. Every call is written to calls.log.
+# 2.715.0 (#5187): with SETUP=1 the image behaves like postgres:17 at its first start, counted per exec call: the setup
+# server answers on the socket at call 1, the socket rejects during the restart (calls 2-3), from call 4 on the real
+# server answers on the socket and over TCP (-h 127.0.0.1); TCP never answers before call 4.
 DOCKER = r"""#!/bin/bash
 d="$STUB_DIR"
 echo "$*" >> "$d/calls.log"
@@ -53,7 +60,13 @@ net() {
 case "$1" in
   pull) net ;;
   run) [ -e "$d/image" ] || net || exit 125; echo cafe ;;
-  exec) [ "$READY" = 1 ] ;;
+  exec)
+    [ "$READY" = 1 ] || exit 1
+    [ "$SETUP" = 1 ] || exit 0
+    e=$(cat "$d/exec" 2>/dev/null || echo 0); e=$((e + 1)); echo "$e" > "$d/exec"
+    [ "$e" -ge 4 ] && exit 0
+    case " $* " in *" -h 127.0.0.1 "*) exit 2 ;; esac
+    [ "$e" = 1 ] ;;
   logs) echo "STUB-LOG: FATAL could not start database" ;;
   *) exit 0 ;;
 esac
@@ -63,7 +76,7 @@ echo "$1" >> "$STUB_DIR/sleeps.log"
 """
 
 
-def run_step(fail_net, ready):
+def run_step(fail_net, ready, setup=False):
     d = tempfile.mkdtemp(prefix="p2707-")
     try:
         for name, body in (("docker", DOCKER), ("sleep", SLEEP)):
@@ -75,7 +88,7 @@ def run_step(fail_net, ready):
         with open(script, "w") as f:
             f.write(step_script())
         env = dict(os.environ, PATH=d + os.pathsep + os.environ.get("PATH", ""), STUB_DIR=d,
-                   FAIL_NET=str(fail_net), READY="1" if ready else "0")
+                   FAIL_NET=str(fail_net), READY="1" if ready else "0", SETUP="1" if setup else "0")
         # the shell of a GitHub run: step on ubuntu-latest
         r = subprocess.run(["bash", "--noprofile", "--norc", "-eo", "pipefail", script], env=env,
                            capture_output=True, text=True, timeout=60)
@@ -106,6 +119,16 @@ check(not any(c.startswith("run") for c in calls), "2: no start without the imag
 r, calls, sleeps = run_step(0, False)
 check(r.returncode != 0, "3: database not ready -> red")
 check("STUB-LOG: FATAL" in r.stdout, f"3: the container log is printed ({r.stdout[-300:]!r})")
-check(sum(c.startswith("exec") for c in calls) == 61, f"3: 60 waits on the state + the final check ({len(calls)} calls)")
+# 2.715.0 (#5187): 90 checks, the loop is the final check (was 60 + one one-shot check)
+check(sum(c.startswith("exec") for c in calls) == 90, f"3: 90 checks of the state, no extra one-shot ({len(calls)} calls)")
+
+# 4. the setup server of the image: socket ready, restart, then the real server (run 42478203214)
+r, calls, sleeps = run_step(0, True, setup=True)
+check(r.returncode == 0, f"4: setup server + restart -> green, waits for the real server (exit {r.returncode}, {r.stdout[-300:]!r})")
+check(sum(c.startswith("exec") for c in calls) == 4, f"4: ready at the 4th check, after the restart ({calls})")
+
+# 5. every readiness check goes over TCP
+ex = [c for c in calls if c.startswith("exec")]
+check(ex and all(" -h 127.0.0.1 " in f" {c} " for c in ex), f"5: pg_isready -h 127.0.0.1 on every call ({ex})")
 
 sys.exit(done("p2707_zap_db_start"))

@@ -623,8 +623,17 @@ jobs:
           zapdb_log() { echo "::error::PostgreSQL for ZAP did not start"; docker logs kalmido-zap-db 2>&1 | tail -40 || true; exit 1; }
           docker run -d --name kalmido-zap-db -e POSTGRES_USER=kalmido -e POSTGRES_PASSWORD=zap -e POSTGRES_DB=kalmido \
             -e POSTGRES_INITDB_ARGS=--data-checksums postgres:17 -c max_connections=100 || zapdb_log
-          for i in $(seq 1 60); do docker exec kalmido-zap-db pg_isready -U kalmido -d kalmido -q && break; sleep 1; done
-          docker exec kalmido-zap-db pg_isready -U kalmido -d kalmido || zapdb_log
+          # 2.715.0 (#5187): readiness over TCP, not the socket. The image first runs a setup server that listens on the
+          # socket only and then restarts; a socket check saw that server as ready and the one final check met the restart
+          # ("rejecting connections", run 42478203214). TCP answers only once the real server runs; the wait loop itself
+          # is the final check, there is no second one-shot check that can fail in a gap.
+          zapdb_ready=0
+          for i in $(seq 1 90); do
+            if docker exec kalmido-zap-db pg_isready -h 127.0.0.1 -U kalmido -d kalmido -q; then zapdb_ready=1; break; fi
+            sleep 1
+          done
+          [ "$zapdb_ready" = 1 ] || zapdb_log
+          echo "PostgreSQL for ZAP accepts TCP connections after $i s"
       # 2.180.0 A (#2692): the image of the job "image" (same key) when it is in the cache, else built here
       - name: Image key
         id: imgkey
