@@ -277,11 +277,15 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   const top = [...d.querySelector('#view').children].find(x => !x.classList.contains('mgtabs'));
   check(!!card() && top && top.firstElementChild === card(), 'running: card on top of the page');
   check(/Write offer/.test(card().querySelector('.tvr-task').textContent) && /Client X/.test(card().querySelector('.tvr-list').textContent) && /since \d{1,2}:\d\d/.test(card().textContent), 'card: task, project, start time');  // 2.368.0 (#2982): the time as the app shows times (12 h in an en-US browser)
+  // 2.724.0 (#5186): the server keeps an entry only from a full second on (shorter = a misclick, discarded); on a fast runner
+  // the steps up to Stop took under a second, the entry went and with it the hint below - so Stop waits for that second
+  const t0 = Date.parse(w.eval('S.timer.start'));
   w.eval(`S.timer.start = new Date(Date.now() - 3723e3).toISOString()`); await until(() => /1:02:0\d/.test(card()?.querySelector('[data-timer-live]')?.textContent || ''));
   check(/1:02:0\d/.test(card().querySelector('[data-timer-live]').textContent), 'card: live time ticks: ' + card().querySelector('[data-timer-live]').textContent);
   click(w, card().querySelector('.tvr-task')); await until(() => w.eval('S.sel') === tt); await idle(w);
   check(w.eval('S.sel') === tt, 'task title opens the task');
   w.eval('closeDetail()');
+  await until(() => Date.now() - t0 >= 1500);  // 2.724.0 (#5186): the timer ran a full second on the server's clock too
   click(w, card().querySelector('[data-act="tv-stop"]'));
   check(await until(async () => !(await call('GET', '/api/state')).timer && !card()), 'Stop ends the timer, the card goes');
   check(await until(() => !!d.querySelector(`.tvrun.idle [data-act="timer-toggle"][data-id="${tt}"]`)), 'hint offers the task just tracked');
