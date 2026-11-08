@@ -69,7 +69,9 @@ class _Base:
         return res
 
     def _req1(self, method, path, data, headers, form, ok404, until):
-        from ..calendars.subscriptions import CalError, _cal_opener, cal_left
+        from ..calendars.subscriptions import CalError, _cal_opener, cal_http_refused, cal_left
+        if cal_http_refused(self.allow, self.url):  # 2.674.0 (#4382 finding 6): a stored http:// address of a host not allowed
+            raise NwlError("needs_https")
         hdr = {"Accept": "application/json", "User-Agent": "Kalmido"}
         hdr.update(headers if headers is not None else self._headers())
         body = None

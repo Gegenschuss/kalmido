@@ -119,6 +119,9 @@ def nwl_put_conn():
             url = pl_norm_url(d["url"])
             if not url:
                 return err(tr("Invalid value: {0}", tr("Address")))
+            from ..calendars.subscriptions import cal_allow, cal_http_refused
+            if cal_http_refused(cal_allow(c, "newsletter"), url):  # 2.674.0 (#4382 finding 6): access data never in plain text
+                return err(N.nwl_err_text("needs_https"))
     if kind == "listmonk" and not url:
         return err(tr("Please enter the address of the newsletter service"))
     # the stored access data only ever go to the address they were entered for: another service or address needs them again

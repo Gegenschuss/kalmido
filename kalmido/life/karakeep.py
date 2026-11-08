@@ -102,6 +102,9 @@ def kk_set(c, uid, b):
     url = kk_norm_url(b["url"]) if "url" in b else (r["url"] if r else None)
     if not url:
         raise BadInput(tr("Invalid value: {0}", "URL"))
+    from ..calendars.subscriptions import cal_allow, cal_http_refused
+    if "url" in b and cal_http_refused(cal_allow(c, "karakeep"), url):  # 2.674.0 (#4382 finding 6): the key never in plain text
+        raise BadInput(kk_err_text("needs_https"))
     tok = r["token"] if r else ""
     if r and kk_origin(url) != kk_origin(r["url"]):
         tok = ""  # 2.190.0 D (#2496): the stored key only ever goes to the server it was entered for
@@ -150,6 +153,9 @@ def kk_req(c, r, path, method="GET", body=None):
         key = ""
     if not key:
         raise KkError("key")
+    from ..calendars.subscriptions import cal_http_refused
+    if cal_http_refused(cal_allow(c, "karakeep"), r["url"]):  # 2.674.0 (#4382 finding 6): a stored http:// address of a host not allowed
+        raise KkError("needs_https")
     hdr = {"Authorization": f"Bearer {key}", "Accept": "application/json"}
     data = None
     if body is not None:
@@ -186,7 +192,8 @@ def kk_req(c, r, path, method="GET", body=None):
 
 KK_ERR = {"key": N_("The API key is not set (or the server key changed): enter it again"),
           "auth": N_("Karakeep refused the API key"), "network": N_("Karakeep could not be reached"),
-          "redirect": N_("Karakeep answered with a redirect: check the address")}
+          "redirect": N_("Karakeep answered with a redirect: check the address"),
+          "needs_https": N_("Only https:// addresses work here (http:// only for hosts an admin allowed)")}  # 2.674.0 (#4382 finding 6)
 
 
 def kk_err_text(code):

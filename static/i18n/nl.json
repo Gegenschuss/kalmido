@@ -17484,6 +17484,7 @@
   "Images (JPG, PNG, WebP), PDFs and audio files (MP3, M4A, AAC, WAV, OGG, Opus, FLAC). The file stays in the file store; comments sit at a point or, for audio, at a second.": "Afbeeldingen (JPG, PNG, WebP), pdf’s en audiobestanden (MP3, M4A, AAC, WAV, OGG, Opus, FLAC). Het bestand blijft in de bestandsopslag; opmerkingen staan op een punt of, bij audio, op een seconde.",
   "Please select an image (JPG, PNG, WebP), a PDF or an audio file (MP3, M4A, AAC, WAV, OGG, Opus, FLAC).": "Kies een afbeelding (JPG, PNG, WebP), een pdf of een audiobestand (MP3, M4A, AAC, WAV, OGG, Opus, FLAC).",
   "The server could not be reached, or its address lies in a private network that an admin has not allowed": "De server was niet bereikbaar, of het adres ligt in een privénetwerk dat geen beheerder heeft toegestaan",
+  "Only https:// addresses work here (http:// only for hosts an admin allowed)": "Hier werken alleen https://-adressen (http:// alleen voor hosts die een beheerder heeft toegestaan)",
   "PUBLIC_URL is not set": "PUBLIC_URL is niet ingesteld",
   "Apps then learn the address of this server from each request (its Host header). Set PUBLIC_URL in .env to the address people open and restart before apps connect (SELF-HOSTING.md).": "Apps leren het adres van deze server dan uit elk verzoek (de Host-header). Stel PUBLIC_URL in .env in op het adres dat mensen openen en herstart voordat apps verbinden (SELF-HOSTING.md).",
   "given by {0}": "gegeven door {0}",

@@ -95,6 +95,9 @@ def pl_put_conn():
         if hosted() and isinstance(d.get("url"), str) and d["url"].strip().lower().startswith("http://"):
             return err(P.pl_err_text("public_https"))  # 2.69.0 A (#1846)
         return err(tr("Invalid value: {0}", tr("Address")))
+    from ..calendars.subscriptions import cal_http_refused
+    if "url" in d and cal_http_refused(P.plh_allow(c, url) or frozenset(), url):
+        return err(P.pl_err_text("needs_https"))  # 2.674.0 (#4382 finding 6): the token never goes in plain text
     tok = P.pl_token(c, r) if r and url == r["url"] else ""
     if "token" in d:
         t = d["token"]

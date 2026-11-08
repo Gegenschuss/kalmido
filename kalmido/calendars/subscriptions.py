@@ -88,6 +88,7 @@ CAL_ERR = {"blocked": N_("This address is in a private network. An admin can all
            "no_calendars": N_("No calendars with events found in this account"),
            "too_complex": N_("The calendar is too complex to process"),
            "config": N_("Invalid link"),
+           "needs_https": N_("Only https:// addresses work here (http:// only for hosts an admin allowed)"),  # 2.674.0 (#4382 finding 6)
            "error": N_("Unexpected error")}
 DAV_NS, CALDAV_NS, CS_NS, ICAL_NS = "DAV:", "urn:ietf:params:xml:ns:caldav", "http://calendarserver.org/ns/", "http://apple.com/ns/ical/"
 _CGNAT = ipaddress.ip_network("100.64.0.0/10")
@@ -195,6 +196,24 @@ def cal_allow(c, purpose):
 def cal_host_allowed(allow, host, port):
     h = str(host or "").lower().strip("[]").rstrip(".")
     return (h, None) in allow or (h, port) in allow
+
+
+def cal_http_refused(allow, url):
+    """2.674.0 (#4382 finding 6): True when url is http:// to a host the admin did not allow for this purpose -- an access
+    token would go there in plain text (the rule of the webhooks, Git, ntfy: https, or http only through the allow list)."""
+    p = urllib.parse.urlsplit(str(url or ""))
+    if p.scheme.lower() != "http":
+        return False
+    try:
+        port = p.port or 80
+    except ValueError:
+        return True
+    if cal_host_allowed(allow, p.hostname, port):
+        return False
+    try:  # an internal address literal: the connect guard refuses it anyway, with its hint about the admin's list
+        return cal_ip_public(ipaddress.ip_address(str(p.hostname or "").strip("[]")))
+    except ValueError:
+        return str(p.hostname or "").lower().rstrip(".") not in ("localhost", "localhost.localdomain")
 
 
 def _cal_connector(allow):

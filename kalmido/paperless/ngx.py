@@ -72,6 +72,7 @@ PL_ERR = {"key": N_("The API token is not set (or the server key changed): enter
           "owner": N_("The person who set up the connection can no longer import here"),
           "quota": N_("The storage space is full: the import stopped"),
           "public_https": N_("In hosted operation only public HTTPS addresses work"),  # 2.69.0 A (#1846)
+          "needs_https": N_("Only https:// addresses work here (http:// only for hosts an admin allowed)"),  # 2.674.0 (#4382 finding 6)
           "failed": N_("The import stopped because of an error")}
 
 
@@ -229,6 +230,9 @@ def _pl_get1(c, url, token, path, ver, raw, limit):
     allow = plh_allow(c, url)
     if allow is None:  # 2.69.0 A (#1846): a stored http:// address on a server that is hosted now
         raise PlError("public_https")
+    from ..calendars.subscriptions import cal_http_refused
+    if cal_http_refused(allow, url):  # 2.674.0 (#4382 finding 6): a stored http:// address of a host not allowed (any more)
+        raise PlError("needs_https")
     hdr = {"Authorization": f"Token {token}", "Accept": "*/*" if raw else f"application/json; version={ver}"}
     req = urllib.request.Request(url + path, headers=hdr, method="GET")
     try:
