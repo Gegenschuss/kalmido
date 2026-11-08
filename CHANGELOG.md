@@ -16,6 +16,55 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.681.0] - 2026-11-08
+
+Package 2.657 (Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), CI-only rot: p2551_c_favout_ui, Teil 1/6: Sammelpaket: Aufgaben ohne Paket (D).
+
+### Changed
+- Agents must send the version (`expect_updated_at` or `If-Match`) when they change the settings of a calendar, an address book or a project (name, colour, columns, KPIs, workspace); without it the answer is 400 `version_required`, with an old one 409 with the current state. The MCP tools `update_event_calendar`, `update_address_book`, `update_list` and `set_list_columns` carry the field; agents read the version with the object first (#5052).
+- Calendar: renaming, recolouring or moving a calendar sends its version; a change someone else made meanwhile shows the conflict message instead of being overwritten (#5052).
+- Projects: the project settings get a version (new column `lists.updated_at`); a person who sends an old version gets the conflict message, people without a version keep working as before (#5052).
+- Documents > move receipts into the office: the preview reads the reasons a document stays (locked month, taken over by the accountant, cash book, equipment, booked, recognition running) for the whole list at once; the full move check runs only when moving (#4644).
+- Saved document views are always created private; sharing them with an organisation goes through Share (#4828).
+
+### Fixed
+- Organisation import: values of "Link to documents" fields point to the imported documents instead of being skipped; links to Paperless or to documents that did not come along drop out and are counted in the import report (#5018).
+- Calendar: deleting an event, the booking page's cancel, reopening a poll, undoing agent proposals and the hub dispo now run under the event's lock, so two changes at the same moment cannot overwrite each other (#5052).
+- Taking a shared object back from an organisation checks its shares before leaving the organisation and records the person who did it (#4828).
+
+Package 2.660 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Changed
+- Modules and style sheets loaded on demand ask with their content hash instead of the app version, so a new version only reloads what really changed (the service worker keeps unchanged ones); the idle chain no longer preloads Settings with its dependencies, and in data saver / 2G it preloads nothing; every language part has a version of its own, a new text reloads only its part, and the language core is no longer rewritten to local storage on every start (#4197).
+- Test tooling: jsdom 30 on Node 24 (#3799).
+
+### Fixed
+- Phone drawer at 320 px with "reduce motion": area names no longer swing between two sizes and wrap ("Rückblick"); the fit no longer measures during a size transition, and a column that needs more room grows only by its text, so 11 areas fit in two rows at 320 px without scrolling (#5103).
+- Renaming a wiki folder with many pages takes all page locks in one database statement again instead of one per page (#5104).
+- Chat: arrow keys in a closed reaction row skip the hidden reactions instead of getting stuck (#3799).
+- Phone opened directly on an agent chat: the row of open chats from last time is kept instead of being overwritten at start (#3799).
+- Deleting an open table: Undo restores it instead of saying "Changed elsewhere, not undone" (#3799).
+
+Package 2.673 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Changed
+- Calendar sync (CalDAV): a calendar query with a time range renders only the events in that range when the calendar is not cached yet, instead of every event of the calendar (#5124).
+- Contact sync (CardDAV): a contact photo above about 70 KB goes into the vCard at most 512 px on its longest edge as JPEG; the smaller copy is kept in memory. A card a phone writes back with that copy keeps the stored full picture; file exports still carry the full photo. All synced address books and calendars load once again after the update (#5124).
+
+### Fixed
+- Document notes: an index on the author column, so removing a person no longer scans all document notes (#5130).
+- Tests: the pin board notepad test waits until the new notepad's field has focus before it types and leaves (red only on slow CI runners) (#5129).
+
+Package 2.670 (Bündel: Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher), CI-only rot: p2191_c_perf, CI-only rot: p2290_c_fold_ui u. 1 weiter).
+### Added
+- Every area's short introduction now has 5-8 steps that point at the real controls (create, views and filters, folders and sharing, search, links to projects and tasks, the phone gesture, where the settings are), with own targets on the phone; Notes and Chat get an introduction of their own (#4576)
+### Changed
+- A new agent setup code, and redeeming one, answers 503 with a clear text when PUBLIC_URL is not set on the server, instead of putting http://localhost into the agent's settings (#5127)
+### Fixed
+- First-run setup: the project type Social media plan no longer shows up as a sixth "Start with" card (#5120)
+- Chat: opening the reply bar keeps a chat that was at its end at its end, so the reply scrolls into view instead of showing the "new messages" pill (#4898)
+- Lint check_dataattr: an attribute selector is no longer counted as a second meaning of the attribute (#4576)
+
 ## [2.675.0] - 2026-11-08
 
 Package 2.665 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
@@ -608,7 +657,8 @@ Package 2.582 (Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher),
 
 Not released (the CI of this version was red); its changes are listed under 2.605.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.675.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.681.0...HEAD
+[2.681.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.681.0
 [2.675.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.675.0
 [2.668.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.668.0
 [2.659.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.659.0
