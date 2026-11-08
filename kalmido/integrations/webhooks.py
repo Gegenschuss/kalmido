@@ -511,8 +511,13 @@ def wh_tick():
             c.execute("""DELETE FROM webhook_queue WHERE webhook_id IN (SELECT w.id FROM webhooks w JOIN users u ON u.id=w.user_id
                          WHERE w.enabled=0 OR u.disabled=1)""")
             c.commit()
-            rows = [dict(r) for r in c.execute("""SELECT q.*, w.url, w.secret, w.user_id FROM webhook_queue q
-                                                  JOIN webhooks w ON w.id=q.webhook_id WHERE q.next_at<=? ORDER BY q.next_at, q.id LIMIT ?""",
+            # 2.658.0 (#4193): the batch takes the waiting deliveries in turns over the webhooks (the first of each, then the
+            # second of each, ...; in its own order within one webhook), so 500 waiting ones of a dead webhook no longer stand
+            # in front of all others for many ticks
+            rows = [dict(r) for r in c.execute("""SELECT x.* FROM (SELECT q.*, w.url, w.secret, w.user_id,
+                                                         ROW_NUMBER() OVER (PARTITION BY q.webhook_id ORDER BY q.next_at, q.id) AS wh_rn
+                                                         FROM webhook_queue q JOIN webhooks w ON w.id=q.webhook_id WHERE q.next_at<=?) x
+                                                  ORDER BY x.wh_rn, x.next_at, x.id LIMIT ?""",
                                                (time.time(), WH_BATCH))]
             allow = wh_allow(c)
             for r in rows:
@@ -528,7 +533,7 @@ def wh_tick():
             continue                 # deliveries wait, unchanged, for the next one): one slow server costs a tick CAL_SEND_S
         res = wh_send(r["url"], r["key"], r["event"], r["delivery"], r["attempt"] + 1, r["payload"].encode(), allow) \
             if r["key"] else (False, None, 0, "error")
-        if res[3] in ("timeout", "network"):
+        if not res[0]:  # 2.658.0 (#4193): after any failure (was: only timeout / network) the rest of this webhook waits
             slow.add(r["webhook_id"])
         with GATE.bg():
             c = connect()
