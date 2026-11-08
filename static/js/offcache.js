@@ -69,6 +69,7 @@ async function oc_write(gen = OC.gen) {
       return;
     } catch (e) { OC.off = true; oc_warn('IndexedDB refused, localStorage from now on', e); oc_del().catch(() => {}); }
   }
+  if (S.lpCache !== c || gen !== OC.gen) return;  // 2.663.0 (#4200, Fable review): a sign-out while IndexedDB refused leaves nothing behind
   try { localStorage.setItem('tasks.cache', JSON.stringify(c, typeof le2eRepl === 'function' ? le2eRepl() : undefined)); }
   catch (e) { oc_warn('localStorage refused too, the offline start shows an older state', e); }
 }
@@ -87,7 +88,8 @@ async function oc_get() {
   if (raw) {
     let c = null; try { c = JSON.parse(raw); } catch { /* broken: the record below */ }
     if (c) {
-      if (!OC.off) oc_tx('readwrite', st => st.put({s: raw, at: Date.now()}, OC_KEY))
+      const g = OC.gen;  // 2.663.0 (#4200, Fable review): a sign-out before the take-over runs voids it
+      if (!OC.off) oc_tx('readwrite', st => { if (g === OC.gen) st.put({s: raw, at: Date.now()}, OC_KEY); })
         .then(() => { try { if (localStorage.getItem('tasks.cache') === raw) localStorage.removeItem('tasks.cache'); } catch { /* private mode */ } })
         .catch(e => oc_warn('taking over the old copy', e));
       return c;
