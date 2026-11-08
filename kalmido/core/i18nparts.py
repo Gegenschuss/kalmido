@@ -206,7 +206,7 @@ def _i18np_send(code, part):
         abort(404)
     v = request.args.get("v")
     # 2.660.0 (#4197): current = the version of all split texts or the version of this one part (i18np_vers)
-    cur = bool(v) and (v == st["ver"] or v == i18np_vers(code, st).get(part))
+    cur = v is not None and v != "" and v in (st["ver"], i18np_vers(code, st).get(part))
     if v and not cur and part.startswith("mod-"):
         part = "old-" + part[4:]
     plain, gz, etag = lang[part]
