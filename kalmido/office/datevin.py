@@ -14,6 +14,13 @@ dialog can leave it out (?in=0).
  - hints (dv_hints, shown by the check before the download): receipts without an amount (not exported), without a category
    (booked on the "other expenses" account), without a rate (booked without input tax).
 More kinds of receipts later: one more function in DV_SOURCES (c, oid, d_from, d_to, st, s) -> (rows, hints).
+ - 2.386.0 (#2328): the approved entertainment receipts (office/meals.py, books.ofc_meals_home), Belegfeld 1 "M<id>": per VAT
+   rate of the meal two lines, 70 % of its gross amount on the deductible account (SKR03 4650 / SKR04 6640) and 30 % on the not
+   deductible one (4654 / 6644), both with the input tax key of the rate -- so the input tax counts in full and the net amount
+   splits 70 / 30; the tip (no VAT) the same way without a key, a small business without any key. Both accounts changeable in
+   the settings ("meal", "meal_nd"). A year on the basis "bank and cash" (#4927) books a meal only through its bank / cash /
+   card line, on that line's day (books.bk_meals_strict), and the receipt of that line stays out (the meal books it). A
+   receipt of the category entertainment in the same period is not left out, only named in a hint ("maybe twice").
  - 2.444.0 (#3447): credit cards are an account of their own ("card", default SKR03 1730 / SKR04 3610): a receipt matched with a
    position is booked against it instead of the creditor; fees, private positions and the bank booking of the total: office/cardnorc.py."""
 import re
@@ -64,9 +71,13 @@ DV_TRAVEL = {
 DV_RK_KEY = {"car": "fares", "train": "fares", "flight": "fares", "rental_car": "fares", "taxi": "fares", "parking": "fares",
              "hotel": "hotel", "meals": "other", "other": "other"}
 DV_BU_IN = {"19": "9", "7": "8"}  # Vorsteuer keys
-DV_DEFAULTS = {"in_on": 1, "creditor": "", "in_counter": "creditor", "in_other": "", "cat_accounts": {}, "travel": {}, "bu_in": {}, "card": "", "card_private": ""}
+DV_DEFAULTS = {"in_on": 1, "creditor": "", "in_counter": "creditor", "in_other": "", "cat_accounts": {}, "travel": {}, "bu_in": {}, "card": "", "card_private": "",
+               "meal": "", "meal_nd": ""}  # 2.386.0 (#2328): the accounts of the entertainment receipts
 DV_CARD = {"SKR03": "1730", "SKR04": "3610"}  # 2.444.0 (#3447): Kreditkartenabrechnung
 DV_CARD_PRIVATE = {"SKR03": "1800", "SKR04": "2100"}  # Privatentnahmen
+DV_MEAL = {"SKR03": "4650", "SKR04": "6640"}  # 2.386.0 (#2328): Bewirtungskosten (70 %, abziehbar)
+DV_MEAL_ND = {"SKR03": "4654", "SKR04": "6644"}  # nicht abziehbare Bewirtungskosten (30 %)
+DV_MEAL_WORDS = DV_CAT_DEFAULTS[10][0]  # the keywords of the category "Bewirtung" (bewirtung, restaurant, ...)
 DV_CAT_MAX = 200
 DV_NO_AMOUNT = N_("{0} receipts without an amount are not exported")
 DV_NO_AMOUNT_1 = N_("1 receipt without an amount is not exported")
@@ -90,6 +101,12 @@ DV_DUP_IN = N_("{0} possibly duplicate receipts are exported")
 DV_DUP_IN_1 = N_("1 possibly duplicate receipt is exported")
 DV_CC_OPEN = N_("{0} card positions without a receipt are not exported")  # 2.444.0 (#3447)
 DV_CC_OPEN_1 = N_("1 card position without a receipt is not exported")
+# 2.386.0 (#2328): the entertainment receipts are booked from Office > Entertainment receipts; a receipt of the category
+# entertainment in the same period stays in the batch, the check only names it (decision 28.10.2026: a hint, nothing left out)
+DV_MEAL_70 = N_("Entertainment (70 % deductible)")
+DV_MEAL_30 = N_("Entertainment (30 % not deductible)")
+DV_MEAL_TWICE = N_("{0} receipts of the category entertainment may be booked twice: entertainment receipts are booked from Office > Entertainment receipts")
+DV_MEAL_TWICE_1 = N_("1 receipt of the category entertainment may be booked twice: entertainment receipts are booked from Office > Entertainment receipts")
 
 
 def _len(st, n, plus=0):
@@ -144,6 +161,16 @@ def dv_card_private(st):
     return st.get("card_private") or _len(st, DV_CARD_PRIVATE[_chart(st)])
 
 
+def dv_meal_accounts(st):
+    """2.386.0 (#2328): (deductible account, not deductible account) of the entertainment receipts."""
+    return st.get("meal") or _len(st, DV_MEAL[_chart(st)]), st.get("meal_nd") or _len(st, DV_MEAL_ND[_chart(st)])
+
+
+def dv_is_meal_cat(cat):
+    k = (cat or "").casefold()
+    return bool(k) and any(w in k for w in DV_MEAL_WORDS)
+
+
 # ---------------------------------------------------------------- settings
 def dv_settings(v, out):
     """Fills the input side defaults into the DATEV settings dict out (from the stored dict v)."""
@@ -166,7 +193,7 @@ def dv_settings_clean(v, out):
         out["creditor"] = _digits(v["creditor"], "creditor", 1, n + 1)
     if "in_other" in v:
         out["in_other"] = _digits(v["in_other"], "in_other", 1, n)
-    for k in ("card", "card_private"):  # 2.444.0 (#3447)
+    for k in ("card", "card_private", "meal", "meal_nd"):  # 2.444.0 (#3447); 2.386.0 (#2328): + meal accounts
         if k in v:
             out[k] = _digits(v[k], k, 1, n)
     if "cat_accounts" in v:
@@ -272,6 +299,8 @@ def dv_receipt_rows(c, oid, d_from, d_to, st, s):
     gegen = dv_counter(st)
     opened = []  # 2.610.0 (#4932): the receipts a strict year leaves out are named as a hint, not left out silently
     receipts = bk_receipts_basis(c, oid, d_from, d_to, by="doc", open_=opened)  # 2.603.0 (#4927): a year "bank and cash": only receipts with their line
+    taken = _dv_meals(c, oid, d_from, d_to, s)[1]  # 2.386.0 (#2328): the receipt of a meal's bank line: the meal books it
+    receipts = [rc for rc in receipts if rc["node_id"] not in taken] if taken else receipts
     own = dv_supplier_accounts(c, oid, st, [rc["node_id"] for rc in receipts])  # 2.148.0 D (#2458)
     own.update(dict.fromkeys(cc_dv_nodes(c, oid), dv_card_account(st)))  # 2.444.0 (#3447): paid by card: the card account, not the creditor
     bu_in = {**DV_BU_IN, **(st.get("bu_in") or {})}
@@ -355,13 +384,67 @@ def dv_travel_rows(c, oid, d_from, d_to, st, s):
     return rows, hints
 
 
-# the sources of the input side, in this order; 2.119.0 (hospitality receipts) and later kinds add one function here
+def _dv_meals(c, oid, d_from, d_to, s):
+    """2.386.0 (#2328): (the approved meals that count in [d_from, d_to] (books.ofc_meals_home rows, home currency), the receipt
+    node ids whose bank / cash / card line a meal took) by the basis of each year (office/euerbasis.py), like the EUeR."""
+    from .books import bk_meals_strict, ofc_meals_home
+    from .euerbasis import eb_flows, eb_segments
+    meals, taken = [], set()
+    for a, b, strict in eb_segments(s, d_from, d_to):
+        if not strict:
+            meals += ofc_meals_home(c, oid, a, b, s)
+            continue
+        flows = eb_flows(c, oid, a, b)
+        before = set(flows["paid"])
+        meals += bk_meals_strict(c, oid, flows, a, b, s)
+        taken |= before - set(flows["paid"])
+    return meals, taken
+
+
+def dv_meal_rows(c, oid, d_from, d_to, st, s):
+    """2.386.0 (#2328): the lines of the approved entertainment receipts (see the module text) + the hint "maybe twice"."""
+    meals = _dv_meals(c, oid, d_from, d_to, s)[0]
+    if not meals:
+        return [], []
+    from .books import bk_receipts_basis
+    from .meals import BW_SHARE
+    small = bool(s.get("small_business"))
+    gegen = dv_counter(st)
+    ded_acc, nd_acc = dv_meal_accounts(st)
+    bu_in = {**DV_BU_IN, **(st.get("bu_in") or {})}
+    rows = []
+    for m in meals:
+        # gross per VAT rate (lines net + VAT), the tip at 0 %; a small business: the whole gross amount without a rate
+        parts = {}
+        if small or not m.get("rates"):
+            parts[""] = m["gross"]
+        else:
+            for pct, net, vat in m["rates"]:
+                k = format(pct.normalize(), "f")
+                parts[k] = parts.get(k, dec(0)) + net + vat
+            if m.get("tip"):
+                parts["0"] = parts.get("0", dec(0)) + m["tip"]
+        for pct, gross in sorted(parts.items(), key=lambda x: -dec(x[0] or 0)):
+            gross = _eur(gross, s)
+            if gross == 0:
+                continue
+            ded = money(gross * BW_SHARE)
+            bu = "" if small else bu_in.get(pct, "")
+            for amount, konto, label in ((ded, ded_acc, DV_MEAL_70), (gross - ded, nd_acc, DV_MEAL_30)):
+                if amount:
+                    rows.append(_line(amount, konto, gegen, bu, m["date"], f"M{m['id']}", tr(label) + " " + (m["title"] or "")))
+    twice = sum(1 for rc in bk_receipts_basis(c, oid, d_from, d_to, by="doc") if dv_is_meal_cat(rc["category"]))
+    hints = [{"key": "meal_twice", "count": twice, "text": tr(DV_MEAL_TWICE_1) if twice == 1 else tr(DV_MEAL_TWICE, twice)}] if twice else []
+    return rows, hints
+
+
+# the sources of the input side, in this order; later kinds add one function here
 def _dv_cards(c, oid, d_from, d_to, st, s):
     from .cardnorc import cc_dv_rows
     return cc_dv_rows(c, oid, d_from, d_to, st, s)
 
 
-DV_SOURCES = [dv_receipt_rows, dv_travel_rows, _dv_cards]  # 2.444.0 (#3447): + credit cards
+DV_SOURCES = [dv_receipt_rows, dv_travel_rows, dv_meal_rows, _dv_cards]  # 2.444.0 (#3447): + credit cards; 2.386.0 (#2328): + meals
 
 
 def dv_rows(c, oid, d_from, d_to, st, s):
@@ -389,7 +472,8 @@ def dv_accounts(c, oid, st):
     return {"categories": [{"name": x, "default": dv_cat_default(st, x), "account": mine.get(x.casefold(), "")} for x in cats],
             "travel": [{"key": k, "default": dv_travel_default(st, k, own), "account": (st.get("travel") or {}).get(k, "")} for k in DV_TRAVEL_KEYS],
             "other": _len(st, DV_OTHER[_chart(st)]), "creditor": _len(st, DV_CREDITOR, 1), "bu_in": DV_BU_IN,
-            "card": _len(st, DV_CARD[_chart(st)]), "card_private": _len(st, DV_CARD_PRIVATE[_chart(st)])}  # 2.444.0 (#3447)
+            "card": _len(st, DV_CARD[_chart(st)]), "card_private": _len(st, DV_CARD_PRIVATE[_chart(st)]),  # 2.444.0 (#3447)
+            "meal": _len(st, DV_MEAL[_chart(st)]), "meal_nd": _len(st, DV_MEAL_ND[_chart(st)])}  # 2.386.0 (#2328)
 
 
 @app.get("/api/office/datev/accounts")

@@ -17597,6 +17597,8 @@
   "Add image, PDF or audio": "Bild, PDF oder Audio hinzufügen",
   "Images (JPG, PNG, WebP), PDFs and audio files (MP3, M4A, AAC, WAV, OGG, Opus, FLAC). The file stays in the file store; comments sit at a point or, for audio, at a second.": "Bilder (JPG, PNG, WebP), PDFs und Audiodateien (MP3, M4A, AAC, WAV, OGG, Opus, FLAC). Die Datei bleibt in der Dateiablage; Kommentare sitzen an einem Punkt oder, bei Audio, an einer Sekunde.",
   "Please select an image (JPG, PNG, WebP), a PDF or an audio file (MP3, M4A, AAC, WAV, OGG, Opus, FLAC).": "Bitte ein Bild (JPG, PNG, WebP), ein PDF oder eine Audiodatei (MP3, M4A, AAC, WAV, OGG, Opus, FLAC) wählen.",
+  "{0} receipts of the category entertainment may be booked twice: entertainment receipts are booked from Office > Entertainment receipts": "{0} Belege der Kategorie Bewirtung sind vielleicht doppelt gebucht: Bewirtungsbelege werden aus Büro > Bewirtungsbelege gebucht",
+  "1 receipt of the category entertainment may be booked twice: entertainment receipts are booked from Office > Entertainment receipts": "1 Beleg der Kategorie Bewirtung ist vielleicht doppelt gebucht: Bewirtungsbelege werden aus Büro > Bewirtungsbelege gebucht",
   "The server could not be reached, or its address lies in a private network that an admin has not allowed": "Der Server war nicht erreichbar, oder seine Adresse liegt in einem privaten Netz, das kein Admin freigegeben hat",
   "Only https:// addresses work here (http:// only for hosts an admin allowed)": "Hier gehen nur https://-Adressen (http:// nur für Hosts, die ein Admin freigegeben hat)",
   "You may not address this agent in this project": "Du darfst diesen Agenten in diesem Projekt nicht ansprechen",

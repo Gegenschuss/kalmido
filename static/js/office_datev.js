@@ -90,6 +90,8 @@ document.addEventListener('click', e => { const b = e.target.closest?.('[data-dx
 // 2.120.0 C (#2090): the input side of the batch (receipts, travel expenses): its own section, every field saves itself on
 // change (one undo step in the toast), the accounts of the receipt categories come from the server
 const DV_TRAVEL = [['fares', N_('Travel: fares')], ['hotel', N_('Travel: hotel')], ['vma', N_('Per diem')], ['other', N_('Travel: other costs')]];
+// 2.386.0 (#2328): the two accounts of the entertainment receipts (70 % deductible / 30 % not), the defaults from the server
+const DV_MEAL = [['meal', N_('Entertainment (70 % deductible)')], ['meal_nd', N_('Entertainment (30 % not deductible)')]];
 const DV = {acc: null, oid: null};
 async function dv_load() {
   try { DV.acc = await api('GET', '/api/office/datev/accounts'); } catch (x) { DV.acc = {categories: [], travel: [], error: x.message || tr('unknown')}; }
@@ -102,7 +104,8 @@ function dv_accHtml() {
   const cats = a.categories.length ? a.categories.map(c => `<div class="row"><label>${esc(c.name)}</label>${num('cat', c.name, c.account, c.default, tr('Expense account for {0}', c.name))}</div>`).join('')
     : `<p class="muted ofchint">${tr('No receipt categories yet.')}</p>`;
   return `<h4>${tr('Expense accounts of the receipt categories')}</h4>${cats}
-    <h4>${tr('Travel expenses')}</h4>${a.travel.map(t => `<div class="row"><label>${esc(tr((DV_TRAVEL.find(x => x[0] === t.key) || [, t.key])[1]))}</label>${num('travel', t.key, t.account, t.default, tr((DV_TRAVEL.find(x => x[0] === t.key) || [, t.key])[1]))}</div>`).join('')}`;
+    <h4>${tr('Travel expenses')}</h4>${a.travel.map(t => `<div class="row"><label>${esc(tr((DV_TRAVEL.find(x => x[0] === t.key) || [, t.key])[1]))}</label>${num('travel', t.key, t.account, t.default, tr((DV_TRAVEL.find(x => x[0] === t.key) || [, t.key])[1]))}</div>`).join('')}
+    ${a.meal ? `<h4>${tr('Entertainment receipts')}</h4>${DV_MEAL.map(([k, n]) => `<div class="row"><label>${esc(tr(n))}</label>${num(k, k, (OFC.info?.settings?.datev_extf || {})[k], a[k], tr(n))}</div>`).join('')}` : ''}`;
 }
 function dv_settingsHtml(st) {
   if (DV.oid !== OFC.info?.org_id || !DV.acc) { DV.oid = OFC.info?.org_id; DV.acc = null; setTimeout(dv_load, 0); }
