@@ -275,9 +275,9 @@ def v1_attachment_text_get(aid):
         return v1_err(413, tr("{0}: larger than {1} MB", att["name"], TEXT_FILE_MB), name="too_large")
     full = os.path.join(ATT_DIR, att["path"])
     try:
-        from ..core.orgcrypt import OVERHEAD, oc_open
+        from ..core.orgcrypt import oc_open, oc_sealed_max
         with open(full, "rb") as f:  # 2.42.0 (#828): a sealed file is decrypted (the size check above is the plain size)
-            data = oc_open(c, f.read(TEXT_FILE_MB * 1024 * 1024 + 1 + OVERHEAD))
+            data = oc_open(c, f.read(oc_sealed_max(TEXT_FILE_MB * 1024 * 1024 + 1)))  # 2.663.0 B (#4191): either format
     except OSError:
         return v1_err(404, tr("File damaged or missing"))
     r = text_of_bytes(att["name"], att["mime"], data, max_chars, owner=me())

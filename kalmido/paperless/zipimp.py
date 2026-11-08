@@ -44,7 +44,7 @@ from ..accounts.session import GATE  # 2.369.5 (#2517): pulled up from functions
 from ..admin.hosting import quota_info, QuotaExceeded, fmt_bytes  # 2.369.5 (#2517): pulled up from functions
 from .learn import pll_finish, pll_stored, pll_rules_preview, pll_wf_export  # 2.369.5 (#2517): pulled up from functions
 from .web import _run_public, _gate, _ws, _public  # 2.369.5 (#2517): pulled up from functions
-from ..core.orgcrypt import MAGIC, OrgCryptError, oc_open_k  # 2.369.5 (#2517): pulled up from functions
+from ..core.orgcrypt import OrgCryptError, oc_open_k, oc_sealed  # 2.369.5 (#2517): pulled up from functions
 
 
 def _env_mb(name, default):
@@ -157,7 +157,7 @@ class _Parts(io.RawIOBase):
             try:
                 with open(_part_path(self._rid, i), "rb") as f:
                     raw = f.read()
-                if raw[:len(MAGIC)] == MAGIC:
+                if oc_sealed(raw):  # 2.663.0 B (#4191): either format
                     if self._key is None:
                         raise PlhError("zip_gone")
                     raw = oc_open_k(self._key, raw, _CTX + self._ws.encode())

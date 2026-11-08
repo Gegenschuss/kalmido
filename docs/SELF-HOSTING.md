@@ -886,6 +886,15 @@ At a glance (the same two lists as in Settings > Organisation > People > Organis
   unless it goes into a file).
 - **Before a downgrade below 2.42** run `decrypt-all` (it switches the encryption off first, then turns every field and
   file back into plain text and exits with 0 only when nothing is left encrypted); then start the older image.
+- **Large files in chunks (2.663).** A stored file of 4 MB or more is sealed in chunks of 1 MiB (header `KENC2`, each chunk
+  AES-256-GCM with a key per file derived from the organisation's or person's key; chunk number and end mark are bound
+  to each chunk, so moved, missing or appended chunks do not open). Downloads stream and a range request (video, large
+  PDF) decrypts only the chunks it needs. Smaller files and files sealed before stay in the single-piece format and are
+  never rewritten; both formats are read. Files of the single-piece format from 10 MB on are opened whole in memory and
+  count against `KALMIDO_SEAL_RAM_MB` (default 256 MB per process, twice the file size each); over it a download waits up
+  to `KALMIDO_SEAL_RAM_WAIT` seconds and then answers 503 with `Retry-After`.
+  **Before going back to 2.662 or older** (which cannot read chunked files): set `KALMIDO_SEAL_CHUNKS=0`, restart, then run
+  `orgcrypt_cli files-to-v1` (rewrites every chunked file in the single-piece format, exits with 1 when a file failed).
 - **Deleting an organisation** deletes its key and its office folder: whatever of it is left encrypted can no longer
   be read on this server (2.148.1: its own files are never decrypted on the way, only files that live on elsewhere). Files of projects that moved to another workspace are re-sealed first. Older backups still
   contain the wrapped key, so with the master key a restored old backup can read that organisation's data again.

@@ -91,6 +91,7 @@ VARS = (
     _v("KALMIDO_ORGCRYPT_DELAY", "", "Seconds before the background encryption pass starts after a start (default: 300).", "security"),
     _v("KALMIDO_SEAL_RAM_MB", "256", "MB of memory per process for encrypted files of the older single-piece format opened whole (from 10 MB each, counted twice their size); over it a download waits briefly, then answers 503 with Retry-After.", "security"),
     _v("KALMIDO_SEAL_RAM_WAIT", "15", "Seconds a download waits for room in KALMIDO_SEAL_RAM_MB before it answers 503.", "security"),
+    _v("KALMIDO_SEAL_CHUNKS", "1", "Switch: new stored files from 4 MB on are encrypted in chunks (streamed, ranges without decrypting the whole file). Off before going back to 2.662 or older, then run orgcrypt_cli files-to-v1.", "security"),
     _v("KALMIDO_ORGCRYPT_ROT_SETTLE", "30", "Longest wait in seconds of a key rotation for running writers after it locked writes.", "security"),
     _v("KALMIDO_TENANT_CHECK", "", "Daily check of the organisation boundaries: empty = daily, always = every watchdog tick, 0 / off = never.", "security"),
     _v("KALMIDO_TENANT_CHECK_HOUR", "3", "Local hour from which the daily boundary check runs.", "security"),

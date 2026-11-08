@@ -9,6 +9,8 @@ Key model:
   fields      = "kenc1:" + base64url(nonce | ciphertext), AES-256-GCM with the org key, AAD = "kenc1|<org id>|<table.column>"
   files       = b"KENC1\\n" + org id (8 bytes, big endian) + nonce + ciphertext, AAD = header + ctx (b"file"); the org id in the
                 header keeps a file readable after its list moved to another organisation
+2.663.0 B (#4191): large files (from SEAL_CHUNK_FROM) in chunks = b"KENC2\n" + org id + chunk size + salt + chunks,
+                each chunk AES-256-GCM with a per-file key from the org key (section "files in chunks"); both formats are read
 Nonces: 12 random bytes per encryption, no counter (2.360.0 A, #2496): safe up to about 2^32 encryptions per key; a key
 in use for that long is renewed (orgcrypt_cli rotate, docs/SELF-HOSTING.md) -- no format change needed.
 Without a master key nothing is encrypted (everything plain as before); reading plain values / files always works (no
@@ -60,6 +62,7 @@ from ..core.db import body, bump, connect, db, err, gset, iso, iso_ms, now_utc  
 
 PREFIX = "kenc1:"
 MAGIC = b"KENC1\n"
+MAGIC2 = b"KENC2\n"  # 2.663.0 B (#4191): a sealed file in chunks (section "files in chunks" below)
 _HEAD = len(MAGIC) + 8 + 12  # magic + org id + nonce
 FILE_CTX = b"file"
 
@@ -596,7 +599,7 @@ def oc_seal(c, org_id, data, ctx=FILE_CTX, fresh=False):
     2.64.0 (#1864): org_id = a space id (< 0: the person's account key). fresh = bytes from outside (an upload, a mail,
     an import): when they already start with MAGIC they get an outer layer with this space's key (also while the
     encryption is switched off); the download hands back exactly the uploaded bytes."""
-    if data[:len(MAGIC)] == MAGIC:
+    if oc_sealed(data):  # 2.663.0 B (#4191): either format
         if fresh and org_id and SECRET_KEY:
             key = oc_key(c, org_id)
             return oc_seal_raw(key, org_id, data, ctx) if key is not None else data
@@ -616,13 +619,21 @@ def _fresh_refused():
 
 
 def oc_seal_k(key, org_id, data, ctx=FILE_CTX):
-    if key is None or data[:len(MAGIC)] == MAGIC:
+    if key is None or oc_sealed(data):
         return data
     return oc_seal_raw(key, org_id, data, ctx)
 
 
 def oc_seal_raw(key, org_id, data, ctx=FILE_CTX):
-    """Seal data with key whatever it holds (also content that itself starts with MAGIC: an outer layer)."""
+    """Seal data with key whatever it holds (also content that itself starts with MAGIC: an outer layer).
+    2.663.0 B (#4191): a stored file (ctx FILE_CTX) from SEAL_CHUNK_FROM on in chunks while SEAL_CHUNKS is on."""
+    if SEAL_CHUNKS and bytes(ctx) == FILE_CTX and len(data) >= SEAL_CHUNK_FROM:
+        return oc_seal_chunks(key, org_id, data, ctx)
+    return _seal_v1(key, org_id, data, ctx)
+
+
+def _seal_v1(key, org_id, data, ctx=FILE_CTX):
+    """The single-piece format (MAGIC): the whole content one AES-GCM message."""
     head = MAGIC + struct.pack(">q", int(org_id))
     n = os.urandom(12)
     return head + n + AESGCM(key).encrypt(n, bytes(data), head + bytes(ctx))
@@ -631,6 +642,8 @@ def oc_seal_raw(key, org_id, data, ctx=FILE_CTX):
 def oc_file_org(data):
     """The organisation a sealed file belongs to (from its header), None for a plain file. 2.64.0 (#1864): < 0 = the
     account key of that person (0 = a private document preview, docs/store.py thumb_seal)."""
+    if bytes(data[:len(MAGIC2)]) == MAGIC2 and len(data) >= len(MAGIC2) + 8:  # 2.663.0 B (#4191): same place in both formats
+        return struct.unpack(">q", data[len(MAGIC2):len(MAGIC2) + 8])[0]
     if data[:len(MAGIC)] != MAGIC or len(data) < _HEAD:
         return None
     return struct.unpack(">q", data[len(MAGIC):len(MAGIC) + 8])[0]
@@ -638,9 +651,9 @@ def oc_file_org(data):
 
 def oc_open(c, data, ctx=FILE_CTX):
     """The plain bytes; data without MAGIC is returned unchanged. The org id comes from the header."""
-    if data[:len(MAGIC)] != MAGIC:
+    if not oc_sealed(data):
         return data
-    if len(data) < _HEAD + 16:
+    if data[:len(MAGIC)] == MAGIC and len(data) < _HEAD + 16:
         raise OrgCryptError("a sealed file is truncated")
     oid = oc_file_org(data)
     key = oc_key(c, oid, create=False)
@@ -650,6 +663,8 @@ def oc_open(c, data, ctx=FILE_CTX):
 
 
 def oc_open_k(key, data, ctx=FILE_CTX):
+    if data[:len(MAGIC2)] == MAGIC2:  # 2.663.0 B (#4191)
+        return _ChunkFile(io.BytesIO(data), len(data), key, ctx).read_all()
     if data[:len(MAGIC)] != MAGIC:
         return data
     head = data[:len(MAGIC) + 8]
@@ -668,16 +683,20 @@ def oc_open_k(key, data, ctx=FILE_CTX):
 def oc_is_sealed_file(path):
     try:
         with open(path, "rb") as f:
-            return f.read(len(MAGIC)) == MAGIC
+            return oc_sealed(f.read(len(MAGIC)))
     except OSError:
         return False
 
 
 def oc_read_file(c, path, ctx=FILE_CTX):
-    """2.663.0 B (#4191): a large sealed file counts against the RAM budget while it is decrypted (oc_ram_take)."""
+    """2.663.0 B (#4191): a large sealed file counts against the RAM budget while it is decrypted (oc_ram_take); a chunked
+    one is read chunk by chunk (no copy of the whole ciphertext)."""
     held = oc_ram_take(_sealed_size(path))
     try:
         with open(path, "rb") as f:
+            if f.read(len(MAGIC2)) == MAGIC2:
+                return _chunk_file(c, f, ctx).read_all()
+            f.seek(0)
             return oc_open(c, f.read(), ctx)
     finally:
         oc_ram_give(held)
@@ -783,13 +802,28 @@ def oc_reseal_file(path, new_data, check=None):
     return _write_atomic(path, new_data, mode, check)
 
 
-OVERHEAD = _HEAD + 16  # bytes a sealed file is larger than its plain content
+OVERHEAD = _HEAD + 16  # bytes a sealed file is larger than its plain content (single-piece format; chunks: oc_sealed_max)
 
 
 def oc_plain_size(path):
-    """The size of a stored file's plain content (a sealed file without its header and tag)."""
+    """The size of a stored file's plain content (a sealed file without its header and tag(s))."""
     n = os.path.getsize(path)
-    return n - OVERHEAD if n >= OVERHEAD and oc_is_sealed_file(path) else n
+    try:
+        with open(path, "rb") as f:
+            h = f.read(_HEAD2)
+    except OSError:
+        return n
+    if h[:len(MAGIC2)] == MAGIC2:  # 2.663.0 B (#4191)
+        try:
+            return _chunk_geom(h, n)[3]
+        except OrgCryptError:
+            return n
+    return n - OVERHEAD if n >= OVERHEAD and h[:len(MAGIC)] == MAGIC else n
+
+
+def oc_sealed_max(n):
+    """2.663.0 B (#4191): the most bytes a sealed file of n plain bytes takes on disk, in either format."""
+    return n + max(OVERHEAD, _HEAD2 + _TAG * (n // _CHUNK_MIN + 1))
 
 
 def oc_seal_path(c, org_id, path, ctx=FILE_CTX, fresh=False):
@@ -815,6 +849,9 @@ def oc_seal_path(c, org_id, path, ctx=FILE_CTX, fresh=False):
     key = oc_key(c, org_id)
     if key is None:
         return False
+    if SEAL_CHUNKS and bytes(ctx) == FILE_CTX and os.path.getsize(path) >= SEAL_CHUNK_FROM:
+        _seal_file_chunks(key, org_id, path, ctx)  # 2.663.0 B (#4191): file to file, one chunk in memory at a time
+        return True
     with open(path, "rb") as f:
         data = f.read()
     oc_reseal_file(path, oc_seal_k(key, org_id, data, ctx))
@@ -858,11 +895,16 @@ def oc_copy_file(c, src, dst, sid):
 
 
 def oc_send_file(c, path, **kw):
-    """flask.send_file for a stored file: a plain file is streamed as before, a sealed one is decrypted in memory.
+    """flask.send_file for a stored file: a plain file is streamed as before, a sealed one of the single-piece format is
+    decrypted in memory (RAM budget), a chunked one (2.663.0 B, #4191) streamed chunk by chunk with real ranges.
     kw = the usual send_file arguments (mimetype, as_attachment, download_name, ...)."""
     from flask import send_file
     if not oc_is_sealed_file(path):
         return send_file(path, **kw)
+    with open(path, "rb") as f:
+        chunked = f.read(len(MAGIC2)) == MAGIC2
+    if chunked:  # 2.663.0 B (#4191): streamed, a range request decrypts only the chunks it needs
+        return _send_chunks(c, path, kw)
     kw.setdefault("last_modified", os.path.getmtime(path))
     kw.pop("conditional", None)
     held = oc_ram_take(_sealed_size(path))  # 2.663.0 B (#4191): kept until the answer is sent (call_on_close)
@@ -877,6 +919,203 @@ def oc_send_file(c, path, **kw):
         done = []
         rv.call_on_close(lambda: done or (done.append(1), oc_ram_give(held)))
     return rv
+
+
+# ---- 2.663.0 B (#4191): sealed files in chunks ------------------------------------------------------------------------
+# MAGIC2 + space id (8 bytes, big endian) + chunk size (4 bytes) + salt (16 random bytes), then the chunks: each the
+# AES-256-GCM ciphertext of up to `chunk size` plain bytes with its 16-byte tag; only the last chunk may be shorter, an
+# empty content is one empty last chunk. The key of a file = HKDF-SHA256(the space's key, salt, info "kalmido-file-chunks-v1")
+# (same org / account key as the single-piece format, a fresh key per file), so the nonce is the chunk's index.
+# AAD = header + ctx + chunk index (8 bytes) + last flag (1 byte): a chunk moved, dropped or appended, a file cut off at a
+# chunk border or a changed header does not open. Reading a range decrypts only the chunks it touches.
+# Written for stored files (ctx FILE_CTX) from SEAL_CHUNK_FROM on while SEAL_CHUNKS is on. KALMIDO_SEAL_CHUNKS=0 writes the
+# single-piece format again; `orgcrypt_cli files-to-v1` rewrites the chunked files (the way back to 2.662 or older, which
+# cannot read them). Files of both formats are always read.
+CHUNK = 1024 * 1024
+SEAL_CHUNK_FROM = 4 * CHUNK
+SEAL_CHUNKS = os.environ.get("KALMIDO_SEAL_CHUNKS", "1") != "0"
+_HEAD2 = len(MAGIC2) + 8 + 4 + 16
+_CHUNK_MIN, _CHUNK_MAX = 4096, 16 * CHUNK
+_TAG = 16
+_FK_INFO = b"kalmido-file-chunks-v1"
+
+
+def oc_sealed(data):
+    """True when bytes (or a file's first bytes) start like a sealed file of either format."""
+    h = bytes(data[:len(MAGIC)])
+    return h == MAGIC or h == MAGIC2
+
+
+def _fkey(key, salt):
+    return HKDF(algorithm=hashes.SHA256(), length=32, salt=salt, info=_FK_INFO).derive(key)
+
+
+def _chunk_aad(head, ctx, i, last):
+    return head + bytes(ctx) + struct.pack(">QB", i, 1 if last else 0)
+
+
+def _chunk_geom(head, total):
+    """(space id, chunk size, number of chunks, plain size) of a chunked file of `total` bytes; OrgCryptError when the
+    header or the length cannot be one."""
+    if len(head) < _HEAD2 or head[:len(MAGIC2)] != MAGIC2:
+        raise OrgCryptError("a sealed file is truncated")
+    oid, size = struct.unpack(">qI", head[len(MAGIC2):len(MAGIC2) + 12])
+    if not _CHUNK_MIN <= size <= _CHUNK_MAX:
+        raise OrgCryptError(f"{_label(oid)}: a sealed file has a broken header")
+    full, rem = divmod(total - _HEAD2, size + _TAG)
+    if (rem and rem < _TAG) or (not full and not rem):
+        raise OrgCryptError(f"{_label(oid)}: a sealed file is truncated")
+    return oid, size, full + (1 if rem else 0), full * size + (rem - _TAG if rem else 0)
+
+
+class _ChunkWriter:
+    """Seals one file chunk by chunk: head first, then seal(part, last) for every chunk in order."""
+    def __init__(self, key, org_id, ctx=FILE_CTX, size=CHUNK):
+        self.head = MAGIC2 + struct.pack(">qI", int(org_id), size) + os.urandom(16)
+        self.size, self.ctx, self.i = size, bytes(ctx), 0
+        self.aes = AESGCM(_fkey(key, self.head[-16:]))
+
+    def seal(self, part, last):
+        out = self.aes.encrypt(self.i.to_bytes(12, "big"), bytes(part), _chunk_aad(self.head, self.ctx, self.i, last))
+        self.i += 1
+        return out
+
+
+def oc_seal_chunks(key, org_id, data, ctx=FILE_CTX):
+    """data sealed in the chunk format (whatever it holds)."""
+    w = _ChunkWriter(key, org_id, ctx)
+    n, out = len(data), [w.head]
+    if not n:
+        out.append(w.seal(b"", True))
+    for o in range(0, n, w.size):
+        out.append(w.seal(data[o:o + w.size], o + w.size >= n))
+    return b"".join(out)
+
+
+def _seal_file_chunks(key, org_id, path, ctx=FILE_CTX):
+    """Seal a plain file in place in the chunk format, reading and writing one chunk at a time (tmp + os.replace, the
+    file's permissions kept)."""
+    try:
+        mode = os.stat(path).st_mode & 0o7777
+    except OSError:
+        mode = None
+    tmp = f"{path}.oc-{os.getpid()}-{threading.get_ident()}.tmp"
+    w = _ChunkWriter(key, org_id, ctx)
+    try:
+        with open(path, "rb") as src, open(tmp, "wb") as out:
+            out.write(w.head)
+            part = src.read(w.size)
+            while True:
+                nxt = src.read(w.size)
+                out.write(w.seal(part, not nxt))
+                if not nxt:
+                    break
+                part = nxt
+            out.flush()
+            os.fsync(out.fileno())
+        if mode is not None:
+            os.chmod(tmp, mode)
+        os.replace(tmp, path)
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+
+
+class _ChunkFile:
+    """A chunked sealed file opened for reading: plain size and any chunk, each checked on its own (OrgCryptError).
+    rot: fall back to the earlier key of a running rotation (_rot_key)."""
+    def __init__(self, f, total, key, ctx=FILE_CTX, rot=True):
+        if key is None:
+            raise OrgCryptError("a sealed file: no key")
+        f.seek(0)
+        self.head = f.read(_HEAD2)
+        self.oid, self.size, self.n, self.plain = _chunk_geom(self.head, total)
+        self.f, self.ctx = f, bytes(ctx)
+        old = _rot_key(self.oid) if rot else None
+        self._keys = [key] + ([old] if old is not None and old != key else [])
+        self._aes = None
+        self._cur = (-1, b"")
+
+    def chunk(self, i):
+        if self._cur[0] == i:
+            return self._cur[1]
+        self.f.seek(_HEAD2 + i * (self.size + _TAG))
+        raw = self.f.read(self.size + _TAG)
+        nonce, aad = i.to_bytes(12, "big"), _chunk_aad(self.head, self.ctx, i, i == self.n - 1)
+        for aes in [self._aes] if self._aes else [AESGCM(_fkey(k, self.head[-16:])) for k in self._keys]:
+            try:
+                out = aes.decrypt(nonce, raw, aad)
+            except InvalidTag:
+                continue
+            self._aes, self._cur = aes, (i, out)
+            return out
+        raise OrgCryptError(f"{_label(self.oid)}: a sealed file cannot be decrypted")
+
+    def read_all(self):
+        return b"".join(self.chunk(i) for i in range(self.n))
+
+
+def _chunk_file(c, f, ctx=FILE_CTX):
+    """_ChunkFile of an open chunked file with the key named in its header."""
+    f.seek(0)
+    oid = oc_file_org(f.read(len(MAGIC2) + 8))
+    key = oc_key(c, oid, create=False)
+    if key is None:
+        raise OrgCryptError(f"{_label(oid)}: no key for a sealed file")
+    return _ChunkFile(f, os.fstat(f.fileno()).st_size, key, ctx)
+
+
+class _ChunkStream:
+    """The answer body of a chunked file: iterates the plain bytes from the current position; seekable, so werkzeug's
+    range handling (_RangeWrapper) jumps to the first chunk a range needs instead of decrypting from the start."""
+    def __init__(self, r):
+        self.r, self.pos = r, 0
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self.pos >= self.r.plain:
+            raise StopIteration
+        i, o = divmod(self.pos, self.r.size)
+        out = self.r.chunk(i)[o:]
+        self.pos += len(out)
+        return out
+
+    def seekable(self):
+        return True
+
+    def seek(self, pos, whence=0):
+        base = 0 if whence == 0 else self.pos if whence == 1 else self.r.plain
+        self.pos = max(0, min(base + pos, self.r.plain))
+        return self.pos
+
+    def tell(self):
+        return self.pos
+
+    def close(self):
+        self.r.f.close()
+
+
+def _send_chunks(c, path, kw):
+    """oc_send_file for a chunked file: Content-Length = the plain size, ranges (206 / 416) and If-Modified-Since by
+    werkzeug's make_conditional, the body decrypted chunk by chunk while it is sent (about two chunks in memory). The last
+    chunk is checked before the answer starts (wrong key, cut-off file: an error instead of a broken download)."""
+    from flask import request, send_file
+    f = open(path, "rb")
+    try:
+        r = _chunk_file(c, f)
+        r.chunk(r.n - 1)
+        kw.pop("conditional", None)
+        kw.pop("etag", None)
+        kw.setdefault("last_modified", os.path.getmtime(path))
+        rv = send_file(io.BytesIO(b""), conditional=False, etag=False, **kw)
+        rv.response = _ChunkStream(r)
+        rv.content_length = r.plain
+        return rv.make_conditional(request.environ, accept_ranges=True, complete_length=r.plain)
+    except BaseException:
+        f.close()
+        raise
 
 
 # ---- server-side caches (the text cache of attachments): sealed with a key derived from the master key ----------------
@@ -1168,6 +1407,20 @@ def rck_rekey(k1, k2, org_id, ctx, value):
 def rck_rekey_file(k1, k2, data, ctxs=(FILE_CTX,)):
     """A sealed file's bytes during a rotation: None when already sealed with k2, else the bytes sealed with k2 (same
     header and ctx). OrgCryptError when it opens with neither key under any of ctxs."""
+    if data[:len(MAGIC2)] == MAGIC2:  # 2.663.0 B (#4191): a chunked file stays chunked (the running rotation's fallback off)
+        for ctx in ctxs:
+            try:
+                _ChunkFile(io.BytesIO(data), len(data), k2, ctx, rot=False).chunk(0)
+                return None
+            except OrgCryptError:
+                pass
+        for ctx in ctxs:
+            try:
+                plain = _ChunkFile(io.BytesIO(data), len(data), k1, ctx, rot=False).read_all()
+            except OrgCryptError:
+                continue
+            return oc_seal_chunks(k2, oc_file_org(data), plain, ctx)
+        raise OrgCryptError(f"{_label(oc_file_org(data))}: a sealed file opens with neither key")
     head = data[:len(MAGIC) + 8]
     n0, body = data[len(head):_HEAD], data[_HEAD:]
     for ctx in ctxs:

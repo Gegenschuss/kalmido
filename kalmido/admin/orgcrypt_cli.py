@@ -20,7 +20,7 @@ background thread) and the command line for the server admin:
     python -m kalmido.admin.orgcrypt_cli recovery --org N [--new] [--recovery-out FILE]   # 2.138.0 C: show / renew its recovery key
         (the recovery key goes to stdout or into a new file with mode 0600, never into the log)
 
-Every run is idempotent and restartable: values carry the prefix "kenc1:", files the magic b"KENC1\\n", so a half-done
+Every run is idempotent and restartable: values carry the prefix "kenc1:", files the magic b"KENC1\\n" (2.663: or b"KENC2\\n", in chunks), so a half-done
 run simply continues; files are replaced atomically (tmp + os.replace), rows are updated only while they still hold the
 value that was read (compare and set), in batches with a commit each. Output: counts only, never a value or a key.
 
@@ -363,7 +363,7 @@ def files_encrypt(c, oid, key, paths, stop=None):
             break
         same = _still(p)  # 2.611.0 (#4865)  # review 2.611: marked before the header is read, a file replaced after it is noticed
         h = _head(p)
-        if h is None or h[:len(oc.MAGIC)] == oc.MAGIC:
+        if h is None or oc.oc_sealed(h):
             continue
         try:
             with open(p, "rb") as f:
@@ -388,7 +388,7 @@ def files_decrypt(c, paths, only_org=None, reseal=None, only=None, stats=None):
     for p in paths:
         same = _still(p)  # 2.611.0 (#4865)  # review 2.611: marked before the header is read, a file replaced after it is noticed
         h = _head(p)
-        if h is None or h[:len(oc.MAGIC)] != oc.MAGIC:
+        if h is None or not oc.oc_sealed(h):
             continue
         hid = oc.oc_file_org(h)
         if (only_org is not None and hid != only_org) or (only is not None and not only(hid)):
@@ -407,7 +407,7 @@ def files_decrypt(c, paths, only_org=None, reseal=None, only=None, stats=None):
                 if tgt not in keys:
                     keys[tgt] = oc.oc_key(c, tgt)
                 data = oc.oc_seal_raw(keys[tgt], tgt, data) if keys[tgt] else data
-            elif data[:len(oc.MAGIC)] == oc.MAGIC:
+            elif oc.oc_sealed(data):
                 # 2.64.0 (#1864): an uploaded file that itself looks sealed keeps its outer layer (stored plain, the server
                 # would open it with the key named inside); counted as "kept", not as a failure
                 if stats is not None:
@@ -799,7 +799,7 @@ def _files_settle_parts(c, parts, stop, out, key, active):
             h = _head(p)
             if h is None:
                 continue
-            sealed = h[:len(oc.MAGIC)] == oc.MAGIC
+            sealed = oc.oc_sealed(h)
             hid = oc.oc_file_org(h) if sealed else None
             if sealed and (hid == sid or not hid):  # header 0 = a private document preview (docs/store.py), not in these tables
                 continue
@@ -840,7 +840,7 @@ def private_count(c):
             if sid and sid < 0:
                 h = _head(p)
                 if h:
-                    out["files"]["enc" if h[:len(oc.MAGIC)] == oc.MAGIC else "plain"] += 1
+                    out["files"]["enc" if oc.oc_sealed(h) else "plain"] += 1
     out["rows"] = priv_rows_count(c)  # 2.306.0 Fix-2a (#2885): the journal and the private filed mails
     return out
 
@@ -896,7 +896,7 @@ def docs_thumbs_open(c):
         for r in rows:
             p = os.path.join(ATT_DIR, r["rel"])
             h = _head(p)
-            if not h or h[:len(oc.MAGIC)] != oc.MAGIC or oc.oc_file_org(h) != 0:
+            if not h or not oc.oc_sealed(h) or oc.oc_file_org(h) != 0:
                 continue
             try:
                 oc.oc_reseal_file(p, S.thumb_read(c, r["ws"], p))
@@ -913,7 +913,7 @@ def files_count(c, oid):
     for p in org_files(c, oid):
         h = _head(p)
         if h:
-            out["enc" if h[:len(oc.MAGIC)] == oc.MAGIC else "plain"] += 1
+            out["enc" if oc.oc_sealed(h) else "plain"] += 1
     return out
 
 
@@ -1466,7 +1466,7 @@ def rot_files(c, oid, k1, k2, stop=None):
                 if name.endswith((".tmp", ".part")) or ".oc-" in name or os.path.islink(p):
                     continue
                 h = _head(p)
-                if not h or h[:len(oc.MAGIC)] != oc.MAGIC or oc.oc_file_org(h) != oid:
+                if not h or not oc.oc_sealed(h) or oc.oc_file_org(h) != oid:
                     continue
                 try:
                     st = os.stat(p)
@@ -1488,6 +1488,40 @@ def rot_files(c, oid, k1, k2, stop=None):
                     print(TAG, "cannot reseal a file:", type(e).__name__, flush=True)
     return n, bad
 
+
+def files_to_v1(c, stop=None):
+    """2.663.0 B (#4191): the way back before going back to 2.662 or older: every stored file sealed in chunks (MAGIC2) is
+    sealed again in the single-piece format with the key named in its header (whole in memory, one file at a time). Set
+    KALMIDO_SEAL_CHUNKS=0 for the server first, else new uploads are chunked again. -> (changed, failed)."""
+    n = bad = 0
+    keys = {}
+    for top in _rot_dirs():
+        for d, dirs, names in os.walk(top):
+            dirs[:] = [x for x in dirs if not os.path.islink(os.path.join(d, x))]
+            for name in names:
+                if stop and stop():
+                    return n, bad
+                p = os.path.join(d, name)
+                if name.endswith((".tmp", ".part")) or ".oc-" in name or os.path.islink(p):
+                    continue
+                same = _still(p)
+                h = _head(p)
+                if not h or h[:len(oc.MAGIC2)] != oc.MAGIC2:
+                    continue
+                hid = oc.oc_file_org(h)
+                try:
+                    if hid not in keys:
+                        keys[hid] = oc.oc_key(c, hid, create=False) if hid else None
+                    if keys[hid] is None:
+                        raise oc.OrgCryptError(f"{oc._label(hid)}: no key")
+                    with open(p, "rb") as f:
+                        data = oc.oc_open_k(keys[hid], f.read())
+                    if oc.oc_reseal_file(p, oc._seal_v1(keys[hid], hid, data), check=same):
+                        n += 1
+                except (OSError, oc.OrgCryptError) as e:
+                    bad += 1
+                    print(TAG, "cannot reseal a file:", str(e) if isinstance(e, oc.OrgCryptError) else type(e).__name__, flush=True)
+    return n, bad
 
 def rot_indexes(c, oid):
     """2.138.0 C (#1972): the keyed indexes derived from the organisation's key made again with the new one: the word
@@ -1720,6 +1754,8 @@ def main(argv):
     sub.add_parser("docs-to-account-key", help="2.126.0: the private documents' values on the persons' account keys again")
     sub.add_parser("reindex-private", help="2.138.4: after a new server key: the private documents' word index again, "
                                            "previews that no longer open are made again")
+    sub.add_parser("files-to-v1", help="2.663.0: the files sealed in chunks back in the single-piece format (before going back to 2.662 "
+                                       "or older; set KALMIDO_SEAL_CHUNKS=0 first)")
     ra = sub.add_parser("rewrap-accounts", help="2.64.0: store the account keys again with the current server key (needs the earlier one)")
     ra.add_argument("--old-key-file", required=True, help='a file holding the earlier KALMIDO_SECRET_KEY, "-" = stdin')
     rw = sub.add_parser("rewrap", help="store an organisation's key again (new KALMIDO_SECRET_KEY) from its recovery key")
@@ -1796,6 +1832,14 @@ def main(argv):
             t = docs_switch(c, a.cmd == "docs-to-account-key")
             print(TAG, a.cmd + ":", json.dumps(t), "(docs_account_key is now", "1)" if a.cmd == "docs-to-account-key" else "0)")
             if t["failed"] or t["left"]:
+                return 1
+        elif a.cmd == "files-to-v1":  # 2.663.0 B (#4191)
+            if oc.SEAL_CHUNKS:
+                print(TAG, "files-to-v1: note: KALMIDO_SEAL_CHUNKS is on here - the server writes new large files in chunks "
+                      "until it runs with KALMIDO_SEAL_CHUNKS=0", flush=True)
+            n, bad = files_to_v1(c)
+            print(TAG, "files-to-v1:", json.dumps({"changed": n, "failed": bad}), flush=True)
+            if bad:
                 return 1
         elif a.cmd == "rewrap-accounts":
             from ..core.config import _secret_key_parse

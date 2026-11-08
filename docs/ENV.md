@@ -87,6 +87,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_ORGCRYPT_ROT_SETTLE` | `30` | Longest wait in seconds of a key rotation for running writers after it locked writes. |
 | `KALMIDO_PUBLIC_BURST` | `300` | Views of one public link in a short time that raise a security alert. |
 | `KALMIDO_PUBLIC_RATE` | `60` | Page views of public links per client address and minute. |
+| `KALMIDO_SEAL_CHUNKS` | `1` | Switch: new stored files from 4 MB on are encrypted in chunks (streamed, ranges without decrypting the whole file). Off before going back to 2.662 or older, then run orgcrypt_cli files-to-v1. |
 | `KALMIDO_SEAL_RAM_MB` | `256` | MB of memory per process for encrypted files of the older single-piece format opened whole (from 10 MB each, counted twice their size); over it a download waits briefly, then answers 503 with Retry-After. |
 | `KALMIDO_SEAL_RAM_WAIT` | `15` | Seconds a download waits for room in KALMIDO_SEAL_RAM_MB before it answers 503. |
 | `KALMIDO_SECRET_FILE` | `(empty)` | File that holds the server key; created once when missing. Must not lie inside the data or backup folder. In the image: /secret/kalmido.key when /secret is a mounted volume. |
