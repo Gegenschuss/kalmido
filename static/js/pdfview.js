@@ -7,7 +7,8 @@
    project files, office documents, archive PDFs and the documents / file areas.
    2.521.0 (#4476): o.step(dir) = leaf through a list without closing (documents: docread.js dcr_fullOpts) - two buttons with
    o.pos ("3 of 48") and their names o.prevT / o.nextT (texts of the caller's module) and the arrow keys left / right go to the previous / next one (the pages then turn with Page up / down);
-   o.img = an image instead of a PDF, o.kind 'file' = a file that cannot be shown (a hint and Download), both only with o.step. */
+   o.img = an image instead of a PDF, o.kind 'file' = a file that cannot be shown (a hint and Download), both only with o.step.
+   2.727.0 (#5202): o.peek(dir) -> {img} = the neighbour's (small) picture for the placeholder that glides along with a swipe. */
 'use strict';
 
 const PV_LIB = '/static/vendor/pdfjs/pdf.min.mjs', PV_WORKER = '/static/vendor/pdfjs/pdf.worker.min.mjs';
@@ -138,13 +139,13 @@ async function pdfView(o) {
     gen++; io?.disconnect(); try { doc?.destroy(); } catch {}
     pdfView({...n, back});  // its first part (the new box, the focus) runs at once
     const lb = $('.lightbox.pview'); if (f && lb) $(`[data-pv="${f}"]:not([disabled])`, lb)?.focus();
-    if (swiped && lb) swn_slideIn($('.pvbody', lb), dir);  // 2.652.0 (#5071): it glides in from the side of the swipe
   };
   // 2.652.0 (#5071): on a touch screen (phone, tablet, any width) a swipe sideways leafs through the list (swipenav.js, the
   // gesture of the document preview); enlarged (zoom over the width) one finger moves the page as before
-  let swiped = false;
+  // 2.727.0 (#5202): the neighbour lies beside it as a placeholder (o.peek(dir) -> {img} its small picture, else an empty
+  // page) and glides along; let go, it snaps fully into place and only then loads (the placeholder stays until it is there)
   const swn = o.step && typeof swn_attach === 'function' ? swn_attach(body, {area: () => zoom <= 1 ? body : null,
-    can: dir => !(dir > 0 ? o.last : o.first), go: dir => { swiped = true; leaf(dir).finally(() => { swiped = false; }); }}) : null;
+    can: dir => !(dir > 0 ? o.last : o.first), go: dir => leaf(dir), peek: o.peek}) : null;
   if (swn) body.style.touchAction = 'pan-y';
   // own keys while the preview has the focus (Esc here also gives the focus back, events.js only removes a lightbox)
   m.addEventListener('keydown', e => {

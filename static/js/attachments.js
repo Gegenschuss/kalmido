@@ -158,14 +158,14 @@ function attLightbox(id, list, url = attUrl, prep = null) {  // 2.32.0 (#983): u
   let sw = null;
   // lazy-ok-begin: swOn runs only once swipenav.js is in (the typeof / loadModule below)
   const swOn = () => { sw = swn_attach(m, {area: t => z === 1 && t && !t.closest?.('.lbbar') ? img() : null, can: d => !!imgs[i + d],
-    go: d => { i += d; draw(); swn_slideIn(img(), d); }}); };
+    go: d => { i += d; draw(); sw?.prime(); }, peek: d => ({img: imgs[i + d] ? url(imgs[i + d]) : ''})}); };  // 2.727.0 (#5202): the next picture lies beside it and glides along, it snaps in (no glide-in after)
   // lazy-ok-end
   if (typeof swn_attach === 'function') swOn();
   else if (navigator.maxTouchPoints > 0 || isTouch()) loadModule('swipenav').then(() => { if (m.isConnected && !sw) swOn(); }).catch(() => {});
   m.addEventListener('click', e => {
     const b = e.target.closest('[data-lb]');
     if (!b && sw?.recent()) return;  // 2.652.0 (#5073): the end of a swipe
-    if (b && b.dataset.lb !== 'x') { i = (i + +b.dataset.lb + imgs.length) % imgs.length; draw(); return; }
+    if (b && b.dataset.lb !== 'x') { i = (i + +b.dataset.lb + imgs.length) % imgs.length; draw(); sw?.prime(); return; }
     if (!b && e.target.tagName === 'IMG' && (z > 1 || moved)) { moved = false; return; }  // 2.331.0 E (#3311): zoomed / moved
     if (b || e.target === m || e.target.tagName === 'IMG') m.remove();
   });

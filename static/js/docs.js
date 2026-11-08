@@ -357,7 +357,7 @@ function dc_goTo(id, dir) {
     c.scrollIntoView?.({block: 'nearest'}); if (f) c.focus({preventScroll: true});
   });
 }
-async function dc_step(dir) {  // true = turned; the real end springs back
+async function dc_step(dir, snapped) {  // true = turned; the real end springs back; 2.727.0 (#5202): snapped = the swipe already brought it in
   const cur = DC.opening ?? DC.doc?.id;
   let v = dc_nav();  // 2.683.0 (#5150): the list it was opened from (the file store's folder or the documents)
   if (!v) return false;
@@ -366,13 +366,13 @@ async function dc_step(dir) {  // true = turned; the real end springs back
     const at = DC.doc?.id === cur && DC.navFor === cur && DC.navAt != null ? DC.navAt : -1, n = at < 0 ? null : v.docs[dir > 0 ? at : at - 1];
     if (at < 0) return false;
     if (!n) { dc_bounce(dir); return false; }
-    await dc_goTo(n.id, dir);
+    await dc_goTo(n.id, snapped ? 0 : dir);
     return true;
   }
   if (dir > 0 && i + 1 >= v.docs.length && v.docs.length < v.total && v.more) { await v.more(); v = dc_nav(); i = v ? v.docs.findIndex(x => x.id === cur) : -1; }
   const n = i < 0 ? null : v.docs[i + dir];
   if (!n) { dc_bounce(dir); return false; }
-  await dc_goTo(n.id, dir);
+  await dc_goTo(n.id, snapped ? 0 : dir);
   return true;
 }
 const dc_mdOpen = () => $('.dc-md:not(.dc-pane)') || $('.dc-pane');
@@ -404,8 +404,10 @@ function dc_zoomSet(box, k, x, y) {
 const dc_pvBox = t => t?.closest?.('.dc-md .dc-prev');
 document.addEventListener('touchstart', e => {
   if (!e.touches) return;  // a plain Event("touchstart") (tests, synthetic taps) has no touch list
+  const was = DCW.sw?.body;  // 2.727.0 (#5202): a second finger mid-swipe: the sheets go back into place
+  if (was && !DCW.snap) { dc_nbClear(was); was.style.transition = ''; was.style.transform = ''; }
   const box = dc_pvBox(e.target);
-  if (!box) { DCW.sw = null; return; }
+  if (!box || DCW.snap) { DCW.sw = null; return; }  // 2.727.0 (#5202): not while the last one still snaps in
   const z = box._z || {k: 1, x: 0, y: 0};
   if (e.touches.length >= 2) {  // two fingers: enlarge / shrink the preview around their middle
     const [p, q] = e.touches, r = box.getBoundingClientRect(), el = box.firstElementChild;
@@ -448,6 +450,7 @@ document.addEventListener('touchmove', e => {
     s.body = $('.dc-body', md);
     const i = dc_navIdx(DC.doc), v = dc_nav();  // 2.683.0 (#5150): the list it was opened from
     s.edge = {'1': !v.docs[i + 1] && v.docs.length >= v.total, '-1': i <= 0};
+    dc_nbAdd(s.body, s.edge['1'] ? null : v.docs[i + 1] || 0, s.edge['-1'] ? null : v.docs[i - 1] || 0);  // 2.727.0 (#5202): the neighbours lie beside it and glide along
   }
   if (e.cancelable) e.preventDefault();
   s.v = (t.clientX - s.lx) / Math.max(1, Date.now() - s.lt); s.lx = t.clientX; s.lt = Date.now();
@@ -456,6 +459,71 @@ document.addEventListener('touchmove', e => {
   s.body.style.transition = 'none';
   s.body.style.transform = `translateX(${Math.round(end ? dx * .3 : dx)}px)`;
 }, {passive: false});
+// ---- 2.727.0 (#5202): leafing like turning a page. While the finger swipes, the previous / next document of the list lies
+// left / right of the open one as a placeholder (title, type, date, its small picture - fetched ahead when the document was
+// drawn - or an empty sheet) inside .dc-body, so all three glide together over the whole width. Let go far enough: the new one
+// snaps fully into place and only then its content loads (dc_step, no glide-in afterwards); short of it: all springs back.
+// prefers-reduced-motion: no snapping animation, it changes at once. At the real end the short spring back stays (dc_bounce).
+const DC_NBGAP = 16;  // px between the sheets
+function dc_nbThumb(x) {
+  if (!x) return '';
+  if (x.thumb) return `/api/docs/${x.id}/thumb?v=${encodeURIComponent(x.updated_at || '')}`;
+  return x.thumb === undefined ? $(`[data-dco="${x.id}"] img`)?.getAttribute('src') || '' : '';  // the file store's cards: only {id}, their picture
+}
+function dc_nbHtml(x) {
+  const u = dc_nbThumb(x), meta = [x.type?.name, x.date ? dc_day(x.date) : ''].filter(Boolean).join(' · ');
+  return `<div class="lhdr dc-nbh"><h3>${esc(x.name || x.sender?.name || '')}</h3></div>${meta ? `<p class="dc-nbm muted">${esc(meta)}</p>` : ''}<div class="dc-nbv">${u ? `<img src="${esc(u)}" alt="">` : ''}</div>`;
+}
+function dc_nbAdd(body, next, prev) {  // null = nothing on that side (the end); 0 = not loaded yet
+  body.querySelectorAll(':scope > .dc-nb').forEach(x => x.remove());
+  body.style.position = 'relative';
+  body.closest('.dc-md')?.classList.add('dc-sw');
+  for (const [x, cls] of [[next, 'dc-nb-n'], [prev, 'dc-nb-p']]) {
+    if (x === null) continue;
+    const nb = document.createElement('div');
+    nb.className = `dc-nb ${cls}`; nb.setAttribute('aria-hidden', 'true');
+    nb.innerHTML = x ? dc_nbHtml(x) : '<div class="dc-nbv"></div>';  // not loaded yet (the next page): an empty sheet
+    body.appendChild(nb);
+  }
+}
+function dc_nbClear(body) {
+  if (!body) return;
+  body.querySelectorAll(':scope > .dc-nb').forEach(x => x.remove());
+  body.style.position = '';
+  body.closest('.dc-md')?.classList.remove('dc-sw');
+}
+// the new document is drawn into the body that still stands where its placeholder snapped in: back to its place at once
+function dc_nbLand(body) {
+  dc_nbClear(body);
+  if (!body.style.transform) return;
+  body.style.transition = 'none'; body.style.transform = '';
+  void body.offsetWidth;
+  body.style.transition = '';
+}
+// the small pictures of the two neighbours are fetched while the open one is read (the browser keeps them; at most a few)
+function dc_nbPre(d) {
+  const v = dc_nav(), i = dc_navIdx(d); if (!v || i < 0) return;
+  const pre = DCW.pre || (DCW.pre = new Map());
+  for (const x of [v.docs[i + 1], v.docs[i - 1]]) {
+    const u = dc_nbThumb(x); if (!u || pre.has(u)) continue;
+    const im = new Image(); im.decoding = 'async'; im.src = u; pre.set(u, im);
+    if (pre.size > 6) pre.delete(pre.keys().next().value);
+  }
+}
+async function dc_snap(s, dir) {
+  const b = s.body, id = b.dataset.id, w = b.offsetWidth || s.box.clientWidth || innerWidth;
+  const ms = matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : Math.round(Math.max(120, Math.min(260, 260 * (1 - Math.abs(s.dx) / (w + DC_NBGAP)))));
+  DCW.snap = true;
+  try {
+    b.style.transition = ms ? `transform ${ms}ms ease-out` : 'none';
+    b.style.transform = `translateX(${-dir * (w + DC_NBGAP)}px)`;
+    if (ms) await new Promise(ok => { const t = setTimeout(ok, ms + 60); b.addEventListener('transitionend', ev => { if (ev.target === b) { clearTimeout(t); ok(); } }, {once: true}); });
+    await dc_step(dir, true);
+  } catch { /* api() shows its own error */ } finally {
+    DCW.snap = false;
+    if (b.isConnected && b.dataset.id === id) { dc_nbClear(b); b.style.transition = ''; b.style.transform = ''; }  // not turned after all: back into place
+  }
+}
 function dc_touchEnd(e) {
   if (DCW.pz) {
     if (e.touches?.length >= 2) return;
@@ -472,8 +540,11 @@ function dc_touchEnd(e) {
   const w = s.box.clientWidth || innerWidth;
   // far enough (a fifth of the width) or a quick flick: the next / previous document, else back into place
   const go = e.type !== 'touchcancel' && (Math.abs(s.dx) > Math.min(90, w * .2) || (Math.abs(s.dx) > 30 && Math.abs(s.v) > .35 && Math.sign(s.v) === Math.sign(s.dx)));
+  const dir = s.dx < 0 ? 1 : -1;
+  if (go && !s.edge[String(dir)]) { dc_snap(s, dir); return; }  // 2.727.0 (#5202): the neighbour snaps in, then it loads
+  dc_nbClear(s.body);
   s.body.style.transition = ''; s.body.style.transform = '';
-  if (go) dc_step(s.dx < 0 ? 1 : -1);
+  if (go) dc_step(dir);  // the real end: it springs back
 }
 document.addEventListener('touchend', dc_touchEnd, {passive: true});
 document.addEventListener('touchcancel', dc_touchEnd, {passive: true});
@@ -526,7 +597,7 @@ function dc_mdDraw(md) {
   // morphed (a field keeps its focus while the one before saves), another one drawn anew; phones: Back arrow to the list
   let body = $('.dc-body', md);
   if (!body) { body = document.createElement('div'); body.className = 'dc-body'; md.appendChild(body); }
-  if (body.dataset.id !== String(d.id)) { body.textContent = ''; body.dataset.id = String(d.id); }
+  if (body.dataset.id !== String(d.id)) { body.textContent = ''; body.dataset.id = String(d.id); dc_nbLand(body); }  // 2.727.0 (#5202)
   // 2.521.0 (#4476): the preview and the properties in two parts (side by side in the wide reading view, docread.js)
   const rd = typeof dcr_inPane === 'function' && dcr_inPane(md);
   fl_set(body, `<div class="lhdr"><button class="iconbtn dc-back" data-dc="close" aria-label="${esc(tr('Back'))}">${ic('back')}</button><h3 id="dc-h">${esc(d.name)}</h3><span class="spacer"></span>${rd ? dcr_headBtn(md) : ''}<button class="iconbtn dc-x" data-dc="close" aria-label="${esc(tr('Close'))}">${ic('x')}</button></div>
@@ -554,7 +625,8 @@ function dc_mdDraw(md) {
   dc_pvDraw(md, d);
   if (typeof dfl_runs === 'function') dfl_runs(md, d);  // 2.581.0 (#4803): the runs of flows with Undo (docflows.js)
   if (typeof dn_draw === 'function') dn_draw(md, d);  // 2.635.0 (#4807 d): the notes (docnotes.js)
-  if (DC.slide) dc_slideIn(md);  // 2.476.0 (#3935): the next document glides in from the side it was swiped to
+  if (DC.slide) dc_slideIn(md);  // 2.476.0 (#3935): the next document glides in from the side (2.727.0, #5202: only the arrows / keys; a swipe snapped it in)
+  dc_nbPre(d);  // 2.727.0 (#5202): the neighbours' small pictures ahead
 }
 // 2.430.0 (#3582): the preview at the top: the small picture at once, then an image as itself or a PDF's first page drawn sharp
 // to the width (pdf.js of the module pdf, nothing in the file runs); fails = the small picture stays. Once per document and file size.

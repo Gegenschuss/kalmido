@@ -141,8 +141,8 @@ function swipe(w, el, dx, dy = 0, x0 = 200) {  // one finger from (x0, 300) by d
     const lb = () => d.querySelector('.lightbox:not(.pview)'), img = () => lb()?.querySelector('img'), at = () => (img()?.getAttribute('src') || '').replace(/.*\?/, '');
     check(lb() && at() === 'a', `${label} viewer: the first picture`);
     swipe(m, img(), -150);
+    click(m, img());  // 2.727.0 (#5202): the tap right after the swipe (the next picture snaps in meanwhile, then it is drawn)
     check(await until(() => at() === 'b'), `${label} viewer: a swipe to the left = the next picture (${at()})`);
-    click(m, img());
     check(lb() && at() === 'b', `${label} viewer: the end of a swipe is no tap (the view stays open)`);
     swipe(m, img(), 150);
     check(await until(() => at() === 'a'), `${label} viewer: a swipe to the right = the one before`);
@@ -194,9 +194,9 @@ function swipe(w, el, dx, dy = 0, x0 = 200) {  // one finger from (x0, 300) by d
       await ev(`(attLightbox('a', ['a', 'b'].map(id => ({id, name: id + '.png', size: 10})), (a, dl) => '/static/icon.svg?' + a.id + (dl ? '&dl' : '')), 1)`);
       const AT = `(document.querySelector('.lightbox > img')?.getAttribute('src') || '').replace(/.*\\?/, '')`;
       check(await wait(`${AT} === 'a' && document.querySelector('.lightbox > img').complete && typeof swn_attach === 'function'`), `Firefox ${W}: the image viewer open`);
-      await ev(`(() => { ${TOUCH} sw(document.querySelector('.lightbox > img'), -${Math.round(W * .4)}); return 1; })()`);
+      // 2.727.0 (#5202): the tap right after the swipe (the next picture snaps in first)
+      await ev(`(() => { ${TOUCH} sw(document.querySelector('.lightbox > img'), -${Math.round(W * .4)}); document.querySelector('.lightbox > img').click(); return 1; })()`);
       check(await wait(`${AT} === 'b'`), `Firefox ${W}: a swipe on the picture = the next picture`);
-      await ev(`(document.querySelector('.lightbox > img').click(), 1)`);
       check(await ev(`!!document.querySelector('.lightbox')`), `Firefox ${W}: ... the end of the swipe does not close it`);
       const img = `document.querySelector('.lightbox > img')`;
       await ev(`(async () => { const el = ${img}, r = el.getBoundingClientRect(); for (let i = 0; i < 3; i++) { el.dispatchEvent(new WheelEvent('wheel', {deltaY: -100, ctrlKey: true, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, bubbles: true, cancelable: true})); await new Promise(f => requestAnimationFrame(f)); } return 1; })()`);

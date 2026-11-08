@@ -248,7 +248,7 @@ function ab_pvOpts(n) {
   const list = (AB.data?.items || []).filter(x => x.kind === 'file' && !x._enc && !upLocked(x) && (ab_isPdf(x) || ab_isImg(x))), i = list.findIndex(x => x.id === n.id);
   if (i < 0 || list.length < 2) return o;
   Object.assign(o, {pos: tr('{0} of {1}', i + 1, list.length), first: i <= 0, last: i >= list.length - 1, prevT: tr('Previous document'), nextT: tr('Next document'),
-    step: async dir => (list[i + dir] ? ab_pvOpts(list[i + dir]) : null)});
+    step: async dir => (list[i + dir] ? ab_pvOpts(list[i + dir]) : null), peek: dir => ({img: list[i + dir] && ab_isImg(list[i + dir]) ? ab_url(list[i + dir]) : ''})});  // 2.727.0 (#5202): a picture glides in as itself
   return o;
 }
 // ---- opening a file: images in the lightbox, PDFs in the PDF view, text in the text view, the rest downloads

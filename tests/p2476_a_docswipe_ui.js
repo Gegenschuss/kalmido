@@ -3,7 +3,7 @@
 // page at its end), own container (start.sh), jsdom + Firefox (phone 390 px and 320 px). Invented data only.
 // P2476A_NOSTART=1 = the container runs. A small page (DC.page = 2, the test switch) stands for the 200 of a real load.
 // - phone: "1 of 5" and two arrow buttons above the preview; a swipe to the left on the preview = the next document (glides
-//   in, the address follows), to the right = the one before; a swipe on the fields below or up / down changes nothing; the
+//   in with the swipe - 2.727.0 #5202, the address follows), to the right = the one before; a swipe on the fields below or up / down changes nothing; the
 //   end of a swipe opens no viewer
 // - past the last loaded document the next page loads (swipe and arrow button); at the real end the page springs back
 // - the preview enlarged with two fingers: one finger moves it, no turn; back at normal size the swipe turns again
@@ -90,10 +90,11 @@ function swipe(w, el, dx, dy = 0) {  // one finger from (200, 300) by dx / dy in
 
   m.eval('window.__pv = 0; pdfView = () => { window.__pv++; }');
   swipe(m, prev(), -150);
+  click(m, prev());  // 2.727.0 (#5202): the tap the browser sends right after the swipe (the next one snaps in meanwhile)
   check(await until(() => shown() === order[1]), 'a swipe to the left on the preview: the next document');
   check(m.location.hash === `#docs/${order[1]}` && nav() === '2 of 5', '... the address and "2 of 5" follow ' + m.location.hash + ' ' + nav());
-  check(d.querySelector('.modal.dc-md .dc-body').classList.contains('dc-in-n'), '... it glides in from the right');
-  click(m, prev());
+  // 2.727.0 (#5202): it snapped in with the swipe (the placeholder glided along, p2727_c_glide_ui): no glide-in afterwards
+  check(!d.querySelector('.modal.dc-md .dc-body').classList.contains('dc-in-n') && !d.querySelector('.dc-nb'), '... it stands in place, no glide-in afterwards');
   check(m.eval('window.__pv') === 0, '... the end of the swipe opens no viewer');
   swipe(m, prev(), 150);
   check(await until(() => shown() === order[0] && nav() === '1 of 5'), 'a swipe to the right: the document before');

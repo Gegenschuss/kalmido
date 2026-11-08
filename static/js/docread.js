@@ -252,6 +252,7 @@ function dcr_fullOpts(d) {
     o.pos = tr('{0} of {1}', i + 1, n); o.first = i <= 0; o.last = i >= n - 1;
     o.prevT = tr('Previous document'); o.nextT = tr('Next document');
     o.step = async dir => (await dc_step(dir)) && DC.doc ? dcr_fullOpts(DC.doc) : null;
+    o.peek = dir => ({img: dc_nbThumb(dc_nav()?.docs[i + dir])});  // 2.727.0 (#5202): its small picture glides in with the swipe
   }
   return o;
 }
