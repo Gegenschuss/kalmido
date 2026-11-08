@@ -329,6 +329,9 @@ def git_http(k, path, etag=None, method="GET", data=None):
     """One GET against the provider's API -> (status, headers, json or None on 304). Raises CalError / GitRate.
     2.394.0 C (#3377): method / data (a JSON body) for the issue sync's writes (PATCH / PUT / POST).
     2.539.0 (#4379): the whole call ends after CAL_SEND_S (a server answering drop by drop: CalError timeout)."""
+    tx = k.get("commit_first")  # 2.658.0 (#4193): the poll (git_poll) holds no open transaction while the provider answers
+    if tx is not None and tx.in_transaction:
+        tx.commit()
     until = time.monotonic() + CAL_SEND_S
     with cal_until(until) as cut:
         try:
@@ -743,6 +746,11 @@ def git_poll(c, cid):
         c.commit()
         return
     k, gh = git_ctx(c, r), r["provider"] == "github"
+    # 2.658.0 (#4193): fetching and storing apart, like calendars/subscriptions.py cal_sync: every call to the provider
+    # (git_http, also those of gitbuild / the issue sync below) first commits what the poll has stored so far, so no row
+    # lock and no snapshot stays open over the network. What one call brings is stored in its own short transaction;
+    # each store is idempotent (ON CONFLICT, git_closes, the links), so a poll that breaks off halfway only repeats.
+    k["commit_first"] = c
     etags = json.loads(r["etags"] or "{}")
     keep = dict(etags)
     # 2.13.4 (p220 flake, a real bug): a poll still running while someone saves the connection (a new token: git_update

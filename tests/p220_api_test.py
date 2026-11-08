@@ -283,7 +283,9 @@ put_state()
 r = Bo.post(B + f"/api/lists/{OTHER}/repos", json={"provider": "github", "base_url": GH, "repo": "acme/lib", "token": TOKEN})
 check(r.status_code == 403, "bob (member of OTHER) cannot connect")
 r = A.post(B + f"/api/lists/{OTHER}/repos", json={"provider": "github", "base_url": GH, "repo": "acme/lib", "token": TOKEN})
-t2 = until(lambda: (lambda t: t if t.get("code") else None)(task_of(A, T2)), 12)
+# 2.658.0 (#4193): wait for the linked pull request itself - "code" appears with the connection already (its build state
+# "none" for every task of a list with a repository), before the first poll stored anything (a rare red on a slow run)
+t2 = until(lambda: (lambda t: t if (t.get("code") or {}).get("prs") else None)(task_of(A, T2)), 12)
 check(t2 and t2["code"]["prs"][0]["repo"] == "acme/lib", "T2 linked in its own list's repository")
 check(not [a for a in A.get(B + f"/api/tasks/{T2}/timeline").json()["activity"] if a["kind"] == "git_pr"], "the first poll (baseline) writes no activity")
 
