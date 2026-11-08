@@ -323,7 +323,7 @@ def bnk_preview_of(c, oid, b, fs=None):
                 skipped=sum(1 for r in rows if r["error"]), skipped_rows=dva_bnk_skipped(rows), **extra, **_info_out(info))
 
 
-BNK_PICK_ACCOUNT = N_("Choose the bank account this statement belongs to")
+BNK_PICK_ACCOUNT = N_("Select the bank account this statement belongs to")
 
 
 def bnk_accounts(c, oid):

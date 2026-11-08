@@ -17730,5 +17730,5 @@
   "PUBLIC_URL is not set on this server, so the setup command cannot name its address: ask the server admin to set PUBLIC_URL to the address people open (.env) and restart.": "PUBLIC_URL is op deze server niet ingesteld, dus de installatieopdracht kan het adres niet noemen: vraag het serverbeheer PUBLIC_URL in te stellen op het adres dat iedereen opent (.env) en opnieuw te starten.",
   "Edit booking": "Boeking bewerken",
   "Only changes of others": "Alleen wijzigingen van anderen",
-  "Choose the bank account this statement belongs to": "Kies de bankrekening waar dit afschrift bij hoort"
+  "Select the bank account this statement belongs to": "Kies de bankrekening waar dit afschrift bij hoort"
 }

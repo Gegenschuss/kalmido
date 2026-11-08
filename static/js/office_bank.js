@@ -171,7 +171,7 @@ function dvaBnkSkipHtml(p, many) {
 const bnkAccName = a => [a.label, a.iban_end ? `… ${a.iban_end}` : ''].filter(Boolean).join(' ') || tr('Bank account');
 function bnkAccPickHtml(st) {
   if (!st.banks.length) return '';
-  return `<div class="row"><label for="bi-bank">${tr('Bank account')}</label><select id="bi-bank" required aria-required="true"><option value="">${tr('Choose the bank account this statement belongs to')}</option>${st.banks.map(a => `<option value="${a.id}" ${st.bank === a.id ? 'selected' : ''}>${esc(bnkAccName(a))}</option>`).join('')}</select></div>`;
+  return `<div class="row"><label for="bi-bank">${tr('Bank account')}</label><select id="bi-bank" required aria-required="true"><option value="">${tr('Select the bank account this statement belongs to')}</option>${st.banks.map(a => `<option value="${a.id}" ${st.bank === a.id ? 'selected' : ''}>${esc(bnkAccName(a))}</option>`).join('')}</select></div>`;
 }
 function bnkImpModal(text, name, after) {  // text + name: one statement read already (as before); without them the start step
   const md = modal(''), card = $('.card', md), st = {p: null, mapping: null, rows: null, account: null, bank: null, banks: []};  // 2.124.0 D (#2342): account = the name for a CSV balance; 2.702.0 (#5183): bank = the chosen bank account
@@ -247,7 +247,7 @@ function bnkImpModal(text, name, after) {  // text + name: one statement read al
     if (b.dataset.bi === 'back') { await preview(null); return; }
     if (st.p?.columns) {
       st.mapping = mapOf();
-      if (st.banks.length && !st.bank) { err(tr('Choose the bank account this statement belongs to')); $('#bi-bank', md)?.focus(); return; }  // 2.702.0 (#5183): never silently the default
+      if (st.banks.length && !st.bank) { err(tr('Select the bank account this statement belongs to')); $('#bi-bank', md)?.focus(); return; }  // 2.702.0 (#5183): never silently the default
       b.disabled = true; await preview(st.mapping); return;
     }
     // 2.356.0 B (#2934): the target before the start, in words: the office area of the account(s) + the account (#1940)
