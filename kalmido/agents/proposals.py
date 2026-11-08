@@ -45,7 +45,7 @@ from ..agents.workstyle import ws_next_mark, ws_next_step  # 2.236.0 B (#2911)
 from ..agents.datalock import dl_job_input  # 2.235.0 B2 (#2902)
 from ..agents.core import agent_usable, agent_added_events, task_being_edited, tidy_changed_since  # 2.369.5 (#2517): pulled up from functions
 from ..agents.core import agent_never_lids  # 2.582.0 (#4380)
-from ..agents.jobchat import JCD_KINDS  # 2.369.5 (#2517): pulled up from functions
+from ..agents.jobchat import JCD_KINDS, jcb_post  # 2.369.5 (#2517): pulled up from functions; 2.739.0 (#5216): jcb_post
 from ..agents.steps import steps_take  # 2.369.5 (#2517): pulled up from functions
 from ..agents.chat import h6e_agent_push_ok, chat_choice_set  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgs import ws_apply_default, ws_member_problem  # 2.369.5 (#2517): pulled up from functions
@@ -1503,7 +1503,6 @@ def v1_agent_chat_post(uid):
         raise BadInput(tr("Invalid value: {0}", "kind"))
     src = chat_source(b.pop("source", None))  # 2.388.0 (#3341): who produced the message, the app can hide a source
     if b.get("kind") == "brief":  # 2.739.0 (#5216): agents/jobchat.py jcb_post
-        from ..agents.jobchat import jcb_post
         r = chat_set_source(c, jcb_post(c, aid, uid, b, files), src)
         bump(c)
         c.commit()
