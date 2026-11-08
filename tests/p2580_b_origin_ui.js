@@ -52,7 +52,7 @@ const org = (d, id) => row(d, id)?.querySelector('.wso');
   const p = org(d, PT);
   check(p && p.title === 'Private · Move house' && p.querySelector('.wsp-dot'), 'Today: the private task names Private ' + (p && p.title));
   check(!row(d, PT)?.querySelector('.wsprv') && !row(d, OT)?.querySelector('.wsprv'), 'Today: no house mark in a row (the origin replaces it)');
-  check(row(d, PT)?.querySelectorAll('.wso').length >= 1 && row(d, PT).querySelectorAll('.lst').length === 1, 'Today: one project chip per row, no second one');  // 2.750.0 (#4502): in the meta line or the column "Project"
+  check(row(d, PT)?.querySelectorAll('.wso').length >= 1 && [...row(d, PT).querySelectorAll('.lst')].filter(e => !e.closest('.mlc')).length === 1, 'Today: one project chip per row, no second one');  // 2.750.0 (#4502): in the meta line or the column "Project" (.mlc = the column's copy for narrow widths)
   // Next 7 days
   w.location.hash = 'week';
   check(await until(() => org(d, OW)?.title === 'Alpha Studio · Shoot'), 'Next 7 days: the origin too');
