@@ -1,6 +1,24 @@
 {
  "versions": [
   {
+   "version": "2.740.0",
+   "date": "2026-11-08",
+   "items": [
+    {
+     "de": "Mit der Branche Film gibt es die Projektvorlage Dreh: Einstellungen als Karten, Drehtage als Spalten, Bild-Kacheln als Storyboard und die Shotlist als PDF.",
+     "en": "With the industry Film & Video there is the project type Shoot: shots as cards, shooting days as columns, picture tiles as a storyboard and the shot list as a PDF."
+    },
+    {
+     "de": "Neue Branche Agentur und Dienstleistung mit eigenen Vorgaben für Kalkulation und Import.",
+     "en": "New industry Agency and services with its own defaults for calculation and import."
+    },
+    {
+     "de": "Postfach-Regeln zeigen jetzt an, wenn aus einer Mail kein Dokument entstand, und versuchen es beim nächsten Lauf erneut.",
+     "en": "Mailbox rules now show when a mail produced no document and try again on the next run."
+    }
+   ]
+  },
+  {
    "version": "2.734.0",
    "date": "2026-11-08",
    "items": [

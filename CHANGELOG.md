@@ -17,6 +17,46 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.740.0] - 2026-11-08
+
+Package 2.725 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Changed
+- Phone: the bar above notes and knowledge pages always wraps; the search gets its own line on narrow and touch screens, the buttons below keep their full size (nothing cut off or overlapping, e.g. on a folded phone). The head's chips (workspace, agents, status, timer) share one height and a round shape (#5163).
+- Section heads on touch screens: holding still opens one menu; dragging starts only from the hold of the drag, the row menu's own long press no longer fires as well (#5177).
+- Tests: UI suites start Firefox as a mouse unless they ask for touch (#5169).
+
+### Fixed
+- Dialogs: the footer sits where it sat before 2.331 again (short dialogs were 20 px taller because of the resize grip); while scrolling, the band above the buttons is a shadow (#5158).
+- MCP: the tool log_decision needs the agent scope like its route POST /agent/decisions (#5157).
+- CI red suites p2150_api, p2150_ui, p2360_0_c_agents_api, p2260_api (agent PATCH of a list sends the version it read, required since #5052), p2417_a_ui (the click after a drag is sent like a browser does), p2633_b_safearea_ui (waits for the stripes' transitions under reduced motion) (#5173, #5172, #5174, #5171, #5175, #5159).
+
+Package 2.733.0 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Fixed
+- Statistics: the travel expenses made from a trip count again under Travel (the office check returns the area and the "own" level since #4642; a member on "own" sees only the trips they entered) (#5204)
+
+Package 2.636 (Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Added
+- #4565 Project type "Shoot" (only with the industry Film & Video): every card is a shot with the fields scene, shot size, lens and location, the columns are shooting days, the board shows a picture tile per card (first image attachment) as the storyboard, and "Shot list (PDF)" in the board exports one table per shooting day (`GET /api/lists/<id>/shotlist.pdf`).
+- #4952 Second industry pack "Agency & services" (code `agency`): its own day calculation blocks and suggested services, and the archive import file name template date_number_client as its default (`legacy_fn_template` in a pack); Film & Video is unchanged.
+### Fixed
+- #4853 Mailbox rules: a mail that produced no document is no longer remembered for good - the claim is released so the next run tries again, and the rule shows why (no right on the target folder, or every document refused); a mail whose files are refused for what they are (type, content) stays remembered and is not fetched again; saving a rule with a new target folder checks the mailbox holder's right on it.
+- #4854 Organisation import: the history of moved items no longer carries IDs of the source server (move points to the folder in the target or stays empty, moved_space is cleared).
+
+Package 2.550 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Added
+- Deleting a custom field puts it into a field trash with all its values (also of tasks in the trash): the confirmation says so, a toast offers Undo, and Project settings > Deleted fields lists it with Restore (owner and project admins, within the trash period; the trash run deletes it for good afterwards) (#4528)
+- Removing a member or leaving a project keeps a note of their assignments, person field values, delegations and watches; adding the same person again within the trash period asks "Restore what X had?" (also a button in the member row of the share dialog). Nothing that was set meanwhile is overwritten (#4528)
+- Off-site SFTP target: optional field "Expected fingerprint" (the line of `ssh-keygen -lf` or `SHA256:…`); a different host key stops the backup (#4517)
+### Changed
+- The removal question for a member now also counts delegations and watches and names the way back (#4528)
+- Backup names and the manifest carry the instance id of the server (`kalmido-backup-<date>-<time>-<id>-<kind>.zip[.enc]`); older names stay listed and restorable (#4517)
+### Security
+- Off-site clean-up deletes only this server's own backups and shared files, never those of another server in the same folder; while an old backup name of unknown origin lies there, no shared file is deleted (#4517)
+- Off-site S3 endpoints must use https (http only to this machine), like WebDAV; a stored http endpoint is refused with a clear message (#4517)
+- Off-site SFTP stores the host key only after a successful sign-in (#4517)
+
 ## [2.734.0] - 2026-11-08
 
 Package 2.727 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
@@ -120,7 +160,8 @@ Package 2.685 (Bündel: Kommentare: Aktivität in drei Stufen (nur Kommenta, Bü
 - Office: switching "Office & finance" on no longer leaves the office saying it is switched off when it loaded before the switch was saved (#5176).
 - Balance sheet: a receipt booked against the bank (counter account "bank") and paid from the cash box is now booked bank to cash instead of being left out (#5128).
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.734.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.740.0...HEAD
+[2.740.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.740.0
 [2.734.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.734.0
 [2.731.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.731.0
 [2.719.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.719.0
