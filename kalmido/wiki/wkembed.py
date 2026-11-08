@@ -25,7 +25,7 @@ from ..accounts.session import me
 from ..core.errors import BadInput
 from ..sheets.core import sh_may, sh_need  # 2.369.5 (#2517): pulled up from functions
 from ..sheets.shbook import shb_deleted  # 2.369.5 (#2517): pulled up from functions
-from .pages import wiki_need, wiki_space_key  # 2.369.5 (#2517): pulled up from functions
+from .pages import wiki_may_read, wiki_need, wiki_space_key  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgs import user_orgs  # 2.369.5 (#2517): pulled up from functions
 from .wikie2e import wke_open_sql  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgroles import user_orgs_full  # 2.369.5 (#2517): pulled up from functions
@@ -205,10 +205,11 @@ def wem_backlinks():
     else:
         raise BadInput(tr("Invalid value: {0}", "file"))
     orgs = [o for o in user_orgs(c, uid) if o in user_orgs_full(c, uid)]  # 2.143.0 A (#2151)
-    rows = c.execute(f"SELECT DISTINCT p.id, p.org_id, p.path FROM wiki_links k JOIN wiki_pages p ON p.id=k.from_id WHERE k.{col}=? "
+    rows = c.execute(f"SELECT p.* FROM wiki_pages p WHERE p.id IN (SELECT k.from_id FROM wiki_links k WHERE k.{col}=?) "
                      f"AND {wke_open_sql('p')} AND p.deleted_at IS NULL AND ((p.org_id IS NULL AND p.owner_id=?)"
                      + (f" OR p.org_id IN ({','.join(str(int(x)) for x in orgs)})" if orgs else "") + ") ORDER BY p.path LIMIT 50",
                      (oid, uid)).fetchall()
+    rows = [r for r in rows if wiki_may_read(c, uid, r)]  # 2.750.0 (#5264): the page's own role (wkf_role), not the membership
     return jsonify(pages=[{"id": r["id"], "path": r["path"], "space": wiki_space_key(r["org_id"])} for r in rows])
 
 
