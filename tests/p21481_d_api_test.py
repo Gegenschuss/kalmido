@@ -230,7 +230,7 @@ def slow():
     s.close()
 threading.Thread(target=slow, daemon=True).start()
 kk.unseal = lambda *a: "key"
-sub.cal_allow = lambda c, purpose=None: None  # 2.380 G (#3389): cal_allow(c, purpose)
+sub.cal_allow = lambda c, purpose=None: frozenset()  # 2.380 G (#3389): cal_allow(c, purpose); 2.730.0 (#5196): a set like the real one, cal_http_refused (#4382) looks into it
 sub._cal_opener = lambda allow: urllib.request.build_opener()
 kk._KK_END.t = time.monotonic() + 1.5
 t0 = time.monotonic()
