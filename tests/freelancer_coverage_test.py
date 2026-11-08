@@ -1369,10 +1369,8 @@ PATCH /api/servers/{}/tasks/{}
 PATCH /api/supporter/nudge
 PATCH /api/tasks/{}/links/{}
 PATCH /api/tasks/{}/ticket
-PATCH /api/v1/address-books/{}
 PATCH /api/v1/clients/{}
 PATCH /api/v1/comments/{}
-PATCH /api/v1/event-calendars/{}
 PATCH /api/v1/family/rewards/{}
 PATCH /api/v1/fields/{}
 PATCH /api/v1/forms/{}
@@ -1543,7 +1541,6 @@ POST /api/trash/lists/{}/export.zip
 POST /api/users/{}/approve
 POST /api/users/{}/invite
 POST /api/users/{}/signin-link
-POST /api/v1/address-books
 POST /api/v1/agent/chats/{}/messages/{}/pin
 POST /api/v1/agent/chats/{}/messages/{}/reactions
 POST /api/v1/agent/chats/{}/messages/{}/withdraw
@@ -1555,7 +1552,6 @@ POST /api/v1/comments/{}/choice
 POST /api/v1/comments/{}/reactions
 POST /api/v1/comments/{}/withdraw
 POST /api/v1/contacts/bulk
-POST /api/v1/event-calendars
 POST /api/v1/event-calendars/{}/import
 POST /api/v1/events/{}/prep-task
 POST /api/v1/events/{}/restore
