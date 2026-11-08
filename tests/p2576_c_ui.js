@@ -2,7 +2,7 @@
 // 2.576.0 (#4487) UI tests: Office > Receipts and the file store apart (decision 04.11.2026). Own container (start.sh),
 // Firefox. Invented people and companies only. Carol has NO organisation (her personal office).
 // - a computer: Office > Receipts is a tree node; unfolded it lists her office upload not recorded yet ("New in the office"),
-//   never her private document; the file store's Documents folds (its folders) and its list shows only the private one
+//   never her private document; the file store's All documents (2.752.0 #4887: a row, no tree of its own) shows only the private one
 // - the office document's sheet points to the other place instead of a copy: "Also in Office › Receipts" and "File store"
 //   (its folder), the jump opens it; the private document's sheet has no such line
 // - a phone, 390 px: the line fits, nothing sticks out, the jump closes the sheet and opens the file store's folder
@@ -69,15 +69,11 @@ const FEAT = 'office,clients,files,docs';
       'computer: unfolded, Receipts lists the office upload not recorded yet');
     check(await ev(`!${node('d:receipts:' + PD)}`), 'computer: never the private document');
     await shot('p2576c-desktop-receipts.png');
-    // the file store's Documents: folds, lists only the private document
+    // the file store's documents: lists only the private document. 2.752.0 (#4887): "All documents" is a row below the one
+    // tree of the panel (no fold node with a second tree of the same folders any more)
     await nav(B + '#docs');
-    const arrow = `document.querySelector('#side .abfilt [data-act="sbb-tree"][data-k="ab:docs"]')`;
-    check(await ready(ev, `!!${arrow} && !!document.querySelector('#side .abfilt [data-go="docs"][aria-current="page"]')`, 80), 'computer: Documents is a fold node, marked');
-    check(await ready(ev, `!!document.querySelector('#side .dc-ptree')`, 40), 'computer: open on its page: its folders below');
-    await ev(`(() => { ${arrow}.click(); return 1; })()`);
-    check(await ready(ev, `!document.querySelector('#side .dc-ptree') && ${arrow}?.getAttribute('aria-expanded') === 'false'`, 40), 'computer: folded by its arrow');
-    await ev(`(() => { ${arrow}.click(); return 1; })()`);
-    check(await ready(ev, `!!document.querySelector('#side .dc-ptree')`, 40), 'computer: unfolded again');
+    check(await ready(ev, `!!document.querySelector('#side .abfilt [data-go="ablage/docs"][aria-current="page"]') && location.hash === '#ablage/docs'`, 80), 'computer: All documents, marked (the old link leads there)');
+    check(await ev(`!document.querySelector('#side .dc-ptree') && !document.querySelector('#side [data-k="ab:docs"]')`), 'computer: no second folder tree below it');
     check(await ready(ev, `!!document.querySelector('.dc-view [data-dco="${PD}"]') && !document.querySelector('.dc-view [data-dco="${OD}"]')`, 60),
       'computer: the file store\'s documents: the private one, not the office\'s');
     // the office document's sheet points to Office > Receipts and to its folder

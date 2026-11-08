@@ -73,7 +73,7 @@ async function upload(name, pages) {
   check(order.length === 3, 'three cards in the list');
   const viewId = () => +(d.querySelector('.dv-view .dc-body')?.dataset.id || 0);
   click(w, d.querySelector(`.dc-view [data-dco="${order[0]}"]`));
-  check(await until(() => viewId() === order[0] && w.location.hash === `#docs/${order[0]}`), 'a click on a card opens the document view with its own address ' + w.location.hash);
+  check(await until(() => viewId() === order[0] && w.location.hash === `#ablage/${order[0]}`), 'a click on a card opens the document view with its own address ' + w.location.hash);
   check(!d.querySelector('.dc-view') && !d.querySelector('.modal') && !d.querySelector('.dc-pane'), '... the cards are left (no list, no dialog, no pane)');
   const v = () => d.querySelector('.dv-view');
   check(v().querySelector('.dv-head [data-dc="close"]') && v().querySelector('#dc-h')?.textContent.trim() && /1 of 3/.test(v().querySelector('.dv-head .dc-navn')?.textContent || ''), '... the head: back, the title, "1 of 3"');
@@ -87,7 +87,7 @@ async function upload(name, pages) {
   // the arrow keys right / left, not while typing
   d.activeElement?.blur?.();
   keyOn(w, d.body, 'ArrowRight');
-  check(await until(() => viewId() === order[1] && w.location.hash === `#docs/${order[1]}`), 'arrow right: the next document, the address follows');
+  check(await until(() => viewId() === order[1] && w.location.hash === `#ablage/${order[1]}`), 'arrow right: the next document, the address follows');
   check(/2 of 3/.test(v().querySelector('.dc-navn')?.textContent || '') && v().querySelector(`.dv-strip [data-dvgo="${order[1]}"]`)?.classList.contains('on'), '... "2 of 3", the strip follows');
   keyOn(w, d.body, 'ArrowLeft');
   check(await until(() => viewId() === order[0]), 'arrow left: the one before');
@@ -100,7 +100,7 @@ async function upload(name, pages) {
   check(viewId() === order[0], '... not while typing in a field');
   snd.blur();
   click(w, v().querySelector(`.dv-strip [data-dvgo="${order[2]}"]`));
-  check(await until(() => viewId() === order[2] && w.location.hash === `#docs/${order[2]}`), 'a click in the strip jumps to that document');
+  check(await until(() => viewId() === order[2] && w.location.hash === `#ablage/${order[2]}`), 'a click in the strip jumps to that document');
 
   // a field saves without a button, Undo in the head takes it back
   const f = v().querySelector('#dc-sender'), old = f.value;
@@ -115,7 +115,7 @@ async function upload(name, pages) {
   // Esc: back to the list, the card of the document looked at last in view and focused
   d.activeElement?.blur?.();
   keyOn(w, d.body, 'Escape');
-  check(await until(() => !v() && d.querySelector('.dc-view .dc-card') && /^#docs$/.test(w.location.hash)), 'Esc leads back to the list ' + w.location.hash);
+  check(await until(() => !v() && d.querySelector('.dc-view .dc-card') && /^#ablage\/docs$/.test(w.location.hash)), 'Esc leads back to the list ' + w.location.hash);
   check(await until(() => d.querySelector(`.dc-card[data-k="dc${order[2]}"]`)?.classList.contains('dc-cur') && d.activeElement === d.querySelector(`.dc-view [data-dco="${order[2]}"]`)), '... the card of the document looked at last is marked and has the focus');
   w.close();
 
@@ -129,12 +129,12 @@ async function upload(name, pages) {
   check(await until(() => lb()?.querySelector('.pvdocs [data-pv="dnext"]')), 'Full screen: the buttons previous / next document');
   const dir = at < 2 ? 'dnext' : 'dprev', to = w2.eval(`DC.docs[${at < 2 ? at + 1 : at - 1}].id`);
   click(w2, lb().querySelector(`[data-pv="${dir}"]`));
-  check(await until(() => +(d2.querySelector('.dv-view .dc-body')?.dataset.id || 0) === to && w2.location.hash === `#docs/${to}`), '... the next document in the full screen, the view follows');
+  check(await until(() => +(d2.querySelector('.dv-view .dc-body')?.dataset.id || 0) === to && w2.location.hash === `#ablage/${to}`), '... the next document in the full screen, the view follows');
   check(d2.querySelectorAll('.lightbox').length === 1, '... one full screen, not one per document');
   click(w2, lb().querySelector('[data-pv="x"]'));
   check(await until(() => !lb() && +(d2.querySelector('.dv-view .dc-body')?.dataset.id || 0) === to), '... closed, the view stays on that document');
   click(w2, d2.querySelector('.dv-view [data-dc="close"]'));
-  check(await until(() => !d2.querySelector('.dv-view') && d2.querySelector('.dc-view .dc-card') && w2.location.hash === '#docs'), '... "Documents" (back) leads to the list');
+  check(await until(() => !d2.querySelector('.dv-view') && d2.querySelector('.dc-view .dc-card') && w2.location.hash === '#ablage/docs'), '... "Documents" (back) leads to the list');
   w2.close();
 
   // ================= from p2521_c_docread_ui (#4476): "To review" - Checked brings the next one, the arrows go on from there
@@ -150,7 +150,7 @@ async function upload(name, pages) {
   keyOn(w3, d3.body, 'ArrowRight');
   check(await until(() => vid() === rv[2]), '... arrow right goes on with the one after it');
   keyOn(w3, d3.body, 'Escape');
-  check(await until(() => w3.location.hash === '#docs/review' && d3.querySelector('.dc-view')), '... Esc leads back to "To review"');
+  check(await until(() => w3.location.hash === '#ablage/review' && d3.querySelector('.dc-view')), '... Esc leads back to "To review"');
   w3.close();
 
   // ================= phone (jsdom): the same view, back to the list
@@ -172,7 +172,7 @@ async function upload(name, pages) {
     const wait = async (js, n = 60) => { for (let i = 0; i < n; i++) { if (await ev(js).catch(() => false)) return true; await sleep(250); } return false; };
     check(await wait(`document.querySelectorAll('.dc-card').length === 3`), 'Firefox: three cards');
     await ev(`(document.querySelector('.dc-view [data-dco="${D1}"]').click(), 1)`);
-    check(await wait(`!!document.querySelector('.dv-view #dc-sender') && location.hash === '#docs/${D1}'`), 'Firefox: the view opens');
+    check(await wait(`!!document.querySelector('.dv-view #dc-sender') && location.hash === '#ablage/${D1}'`), 'Firefox: the view opens');
     const r = await ev(`(() => { const q = s => document.querySelector('.dv-view ' + s).getBoundingClientRect(); const s = q('.dv-strip'), m = q('.dv-mask'), p = q('.dv-pv'), h = q('.dv-head');
       return {sr: Math.round(s.right), ml: Math.round(m.left), mr: Math.round(m.right), pl: Math.round(p.left), pw: Math.round(p.width), pb: Math.round(p.bottom), ht: Math.round(h.bottom), mt: Math.round(m.top), vh: innerHeight}; })()`);
     check(r && r.sr <= r.ml && r.mr <= r.pl && r.pw > r.mr - r.ml && r.mt >= r.ht && r.pb <= r.vh, 'Firefox: strip, fields and preview side by side below the head, the preview the widest ' + JSON.stringify(r));
@@ -212,9 +212,9 @@ async function upload(name, pages) {
     await ev(`(document.querySelector('[data-dvgrip="strip"]').dispatchEvent(new MouseEvent('dblclick', {bubbles: true})), 1)`);
     check(await wait(`!LS.get('dv.stripW', 0) && document.querySelector('.dv-strip').getBoundingClientRect().width < 160`), 'Firefox: a double click: the strip at its standard width');
     await ev(`(document.activeElement && document.activeElement.blur(), document.body.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowLeft', bubbles: true, cancelable: true})), 1)`);  // D1 is the oldest: the last of the list
-    check(await wait(`location.hash !== '#docs/${D1}' && /2 of 3/.test(document.querySelector('.dc-navn').textContent)`), 'Firefox: arrow left leafs on (to the one before)');
+    check(await wait(`location.hash !== '#ablage/${D1}' && /2 of 3/.test(document.querySelector('.dc-navn').textContent)`), 'Firefox: arrow left leafs on (to the one before)');
     await ev(`(document.body.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true, cancelable: true})), 1)`);
-    check(await wait(`!document.querySelector('.dv-view') && location.hash === '#docs' && document.querySelectorAll('.dc-card').length === 3`), 'Firefox: Esc, back in the list');
+    check(await wait(`!document.querySelector('.dv-view') && location.hash === '#ablage/docs' && document.querySelectorAll('.dc-card').length === 3`), 'Firefox: Esc, back in the list');
     // phone: one column, the preview above the fields
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
     await nav(B + `#docs/${D1}`);

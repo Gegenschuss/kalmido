@@ -67,7 +67,7 @@ async function upload(name, lines) {
   check(await until(() => paneId() === order[0] && d.querySelector('.dv-view #dc-sender')), 'a click opens the document (2.583.0: in its view)');
   check(!d.querySelector('.modal') && d.querySelector('#view .dv-view') && !d.querySelector('.dc-view'), '... a page of its own, no dialog');
   check(d.querySelector(`.dv-strip [data-dvgo="${order[0]}"]`)?.classList.contains('on'), '... the open document is marked in the strip');
-  check(w.location.hash === `#docs/${order[0]}`, '... the address names the document ' + w.location.hash);
+  check(w.location.hash === `#ablage/${order[0]}`, '... the address names the document ' + w.location.hash);
   check(d.querySelector('.dv-view .dv-pv .dv-pages') && d.querySelector('.dv-view .dv-mask .dc-form'), '... the preview and the fields');
   for (const f of ['sender', 'date', 'tags', 'folder']) check(d.querySelector(`.dv-view #dc-${f}`), `... the field ${f}`);
 
@@ -80,7 +80,7 @@ async function upload(name, lines) {
 
   // the strip, the arrow keys (2.583.0: left / right), Esc
   click(w, d.querySelector(`.dv-strip [data-dvgo="${order[2]}"]`));
-  check(await until(() => paneId() === order[2] && w.location.hash === `#docs/${order[2]}`), 'a click in the strip switches the document');
+  check(await until(() => paneId() === order[2] && w.location.hash === `#ablage/${order[2]}`), 'a click in the strip switches the document');
   d.activeElement?.blur?.();
   key(w, 'ArrowLeft');
   check(await until(() => paneId() === order[1]), 'arrow left: the document before');
@@ -90,14 +90,14 @@ async function upload(name, lines) {
   await sleep(400);
   check(paneId() === order[0], '... the first stays at the top');
   key(w, 'ArrowRight');
-  check(await until(() => paneId() === order[1] && w.location.hash === `#docs/${order[1]}`), 'arrow right: the next document');
+  check(await until(() => paneId() === order[1] && w.location.hash === `#ablage/${order[1]}`), 'arrow right: the next document');
   d.querySelector('.dv-view #dc-sender').focus();
   d.querySelector('.dv-view #dc-sender').dispatchEvent(new w.KeyboardEvent('keydown', {key: 'ArrowRight', bubbles: true, cancelable: true}));
   await sleep(400);
   check(paneId() === order[1], '... not while typing in a field');
   d.querySelector('.dv-view #dc-sender').blur();
   key(w, 'Escape');
-  check(await until(() => !d.querySelector('.dv-view') && !d.querySelector('.dc-md') && w.location.hash === '#docs'), 'Esc leaves the view, the address is #docs again');
+  check(await until(() => !d.querySelector('.dv-view') && !d.querySelector('.dc-md') && w.location.hash === '#ablage/docs'), 'Esc leaves the view, the address is #docs again');
   check(await until(() => d.querySelector(`.dc-card[data-k="dc${order[1]}"]`)?.classList.contains('dc-cur')), '... the card looked at last is marked');
   click(w, card(order[1]));
   await until(() => paneId() === order[1]);

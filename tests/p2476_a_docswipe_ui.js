@@ -93,7 +93,7 @@ function swipe(w, el, dx, dy = 0) {  // one finger from (200, 300) by dx / dy in
   swipe(m, prev(), -150);
   click(m, prev());  // 2.727.0 (#5202): the tap the browser sends right after the swipe (the next one snaps in meanwhile)
   check(await until(() => shown() === order[1]), 'a swipe to the left on the preview: the next document');
-  check(m.location.hash === `#docs/${order[1]}` && nav() === '2 of 5', '... the address and "2 of 5" follow ' + m.location.hash + ' ' + nav());
+  check(m.location.hash === `#ablage/${order[1]}` && nav() === '2 of 5', '... the address and "2 of 5" follow ' + m.location.hash + ' ' + nav());
   // 2.727.0 (#5202): it snapped in with the swipe (the placeholder glided along, p2727_c_glide_ui): no glide-in afterwards
   // 2.736.0 (#5212): the neighbours drawn ahead wait outside the view (.dv-nbhold): no placeholder left IN the view
   check(!d.querySelector('.dv-view .dc-body').classList.contains('dc-in-n') && !d.querySelector('.dv-view .dc-nb'), '... it stands in place, no glide-in afterwards');
@@ -144,7 +144,7 @@ function swipe(w, el, dx, dy = 0) {  // one finger from (200, 300) by dx / dy in
   swipe(m, prev(), 150);
   check(await until(() => shown() === m.eval('DC.docs[3].id') && nav() === '4 of 5'), '... at normal size the swipe turns again');
   click(m, d.querySelector('.dv-view .dv-back'));
-  await until(() => !d.querySelector('.dc-md') && m.location.hash === '#docs' && d.querySelector('.dc-view'));  // 2.583.0 (#4835): Back goes back in the history
+  await until(() => !d.querySelector('.dc-md') && m.location.hash === '#ablage/docs' && d.querySelector('.dc-view'));  // 2.583.0 (#4835): Back goes back in the history
 
   // "To review" on the phone: Checked -> the next one at once
   for (const id of IDS.slice(0, 3)) await call('POST', `/api/docs/${id}/review`, {done: false});
@@ -179,7 +179,7 @@ function swipe(w, el, dx, dy = 0) {  // one finger from (200, 300) by dx / dy in
   await until(() => pane() === rv2[0] && d2.querySelector('.dv-view [data-dc="checked"]'));
   check(/1 of 2/.test(d2.querySelector('.dv-view .dc-navn')?.textContent || ''), 'computer: "1 of 2" in the pane too');
   click(w2, d2.querySelector('.dv-view [data-dc="checked"]'));
-  check(await until(() => pane() === rv2[1] && d2.querySelector('.dv-view') && w2.location.hash === `#docs/${rv2[1]}`), 'computer: after "Checked" the pane shows the next document to review');
+  check(await until(() => pane() === rv2[1] && d2.querySelector('.dv-view') && w2.location.hash === `#ablage/${rv2[1]}`), 'computer: after "Checked" the pane shows the next document to review');
   check(await until(() => /1 of 1/.test(d2.querySelector('.dv-view .dc-navn')?.textContent || '')), '... the counter follows the shorter list: "1 of 1"');
   click(w2, d2.querySelector('.dv-view [data-dc="checked"]'));
   check(await until(() => !d2.querySelector('.dv-view')), '... the last one checked: the pane closes');
@@ -209,7 +209,7 @@ function swipe(w, el, dx, dy = 0) {  // one finger from (200, 300) by dx / dy in
       check(r && r.l >= 0 && r.r <= W && r.ta === 'pan-y' && r.txt === '1 of 5' && r.sw <= r.ccw + 1, `Firefox ${W}: the counter fits, the preview takes sideways swipes, no sideways scrolling ` + JSON.stringify(r));
       await ev(`(() => { ${TOUCH} sw(document.querySelector('.dv-view .dv-pages'), -${Math.round(W * .4)}); return 1; })()`);
       check(await wait(`+document.querySelector('.dv-view .dc-body').dataset.id === DC.docs[1].id && /^2 of /.test(document.querySelector('.dc-navn').textContent)`), `Firefox ${W}: a swipe on the preview turns to the next document`);
-      check(await ev(`location.hash === '#docs/' + DC.docs[1].id`), `Firefox ${W}: ... the address follows`);
+      check(await ev(`location.hash === '#ablage/' + DC.docs[1].id`), `Firefox ${W}: ... the address follows`);
       await ev(`(() => { ${TOUCH} sw(document.querySelector('.dv-view #dc-sender'), -${Math.round(W * .4)}); return 1; })()`);
       await sleep(400);
       check(await ev(`+document.querySelector('.dv-view .dc-body').dataset.id === DC.docs[1].id`), `Firefox ${W}: a swipe on the fields does not turn`);

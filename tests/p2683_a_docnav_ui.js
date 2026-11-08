@@ -82,7 +82,7 @@ function swipe(w, el, dx) {
   check(!d.querySelector('.dc-nav [data-dc="step:-1"]').disabled && !d.querySelector('.dc-nav [data-dc="step:1"]').disabled, '... both arrows on');
   swipe(m, prev(), -150);
   check(await until(() => shown() === order[2] && nav() === '3 of 4'), 'a swipe to the left: the next document of the folder ' + nav());
-  check(m.location.hash === '#docs/' + order[2] && m.eval('S.route.mod') === 'docs', '... the address follows (2.583.0: the view has its own): ' + m.location.hash);
+  check(m.location.hash === '#ablage/' + order[2] && m.eval('S.route.mod') === 'docs', '... the address follows (2.583.0: the view has its own): ' + m.location.hash);
   click(m, d.querySelector('.dv-view [data-dc="step:1"]'));
   check(await until(() => shown() === order[3] && nav() === '4 of 4'), 'the arrow forward: the last one, "4 of 4"');
   check(d.querySelector('.dc-nav [data-dc="step:1"]').disabled, '... the arrow forward is off at the end');

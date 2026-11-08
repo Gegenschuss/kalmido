@@ -56,7 +56,7 @@ const docNew = async (name, text, ws = 'private', ck = CK) => {
   click(w, save);
   const VID = await until(() => w.eval(`(DCV.items || []).find(v => v.title === 'Koala docs')?.id`), 100);
   check(VID, 'saved: the view is there');
-  check(await until(() => w.location.hash === '#docs/v/' + VID), 'the saved view opens (#docs/v/<id>)');
+  check(await until(() => w.location.hash === '#ablage/v/' + VID), 'the saved view opens (#docs/v/<id>)');
   const st = () => w.eval(`JSON.stringify({q: DC.q, total: DC.total, loading: DC.loading, dv: DC.dv, route: S.route, applied: DCV.applied, now: typeof dc_params === 'function' ? dcv_queryNow() : '', hash: location.hash})`);
   const v0 = await until(() => w.eval(`(v => v && v.count === 1 ? v : null)(dcv_get(${VID}))`)) || w.eval(`dcv_get(${VID})`);
   check(v0 && v0.query === 'q=Koala&area=private' && v0.ws === 'private' && v0.count === 1, 'it keeps the search and counts its hits ' + JSON.stringify(v0));
@@ -71,7 +71,7 @@ const docNew = async (name, text, ws = 'private', ck = CK) => {
   check(await until(() => w.eval(`DC.dv === null && DCV.applied === null && !DC.vsort && !DC.f.review && !DC.loading`)), 'back to Documents: the view is left (its sort and filters go) ' + st());
   click(w, d.querySelector(`#side [data-dcvid="${VID}"]`));
   // 2.583.0 (#4835): wait for the view itself (DC.dv), not only the text - viewmem.js brings 'Koala' back before the row's view applies
-  check(await until(() => w.eval(`location.hash === '#docs/v/${VID}' && DC.dv === ${VID} && DCV.applied?.id === ${VID} && ${listed('Koala')} && DC.total === 1 && !DC.loading`)),
+  check(await until(() => w.eval(`location.hash === '#ablage/v/${VID}' && DC.dv === ${VID} && DCV.applied?.id === ${VID} && ${listed('Koala')} && DC.total === 1 && !DC.loading`)),
     'the sidebar row applies the view again ' + st());
   // a changed search: "Update view" takes it over
   type('Emu');
@@ -94,13 +94,13 @@ const docNew = async (name, text, ws = 'private', ck = CK) => {
   w.eval(`dcv_todaySet(${VID}, true)`);
   check(await until(async () => (await call('GET', '/api/state')).settings.dv_today === String(VID)), 'Show on Today: stored');
   w.location.hash = 'today';
-  const card = await until(() => d.querySelector(`#view .dcv-today[aria-labelledby="dcvh-${VID}"] .dwl a[href="#docs/${D1}"]`) && d.querySelector(`#view .dcv-today`), 100);
-  check(card && card.querySelector('.dcn')?.textContent === '1' && card.textContent.includes('Koala invoices') && card.querySelector(`a[href="#docs/v/${VID}"]`), 'Today: the block with its hit, the number and "Show all"');
+  const card = await until(() => d.querySelector(`#view .dcv-today[aria-labelledby="dcvh-${VID}"] .dwl a[href="#ablage/${D1}"]`) && d.querySelector(`#view .dcv-today`), 100);
+  check(card && card.querySelector('.dcn')?.textContent === '1' && card.textContent.includes('Koala invoices') && card.querySelector(`a[href="#ablage/v/${VID}"]`), 'Today: the block with its hit, the number and "Show all"');  // 2.752.0 (#4887): the addresses of the one area "Files"
   // delete + undo
   w.location.hash = 'docs/v/' + VID;
   await until(() => w.eval(`DC.dv === ${VID}`));
   await w.eval(`dcv_delete(dcv_get(${VID}))`);
-  check(await until(() => !d.querySelector(`#side [data-dcvid="${VID}"]`) && w.location.hash === '#docs'), 'deleted: gone from the sidebar, back to Documents');
+  check(await until(() => !d.querySelector(`#side [data-dcvid="${VID}"]`) && w.location.hash === '#ablage/docs'), 'deleted: gone from the sidebar, back to Documents');
   check((await call('GET', '/api/state')).settings.dv_today === '', 'deleted: off Today too');
   await w.eval(`histStep('undo')`);
   check(await until(() => d.querySelector(`#side [data-dcvid="${VID}"]`)), 'undo: the view is back');

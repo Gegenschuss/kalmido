@@ -71,7 +71,7 @@ const ready = id => until(async () => { const d = await call('GET', `/api/docs/$
   d.querySelector(`[data-dco="${D1}"]`).click();
   const md = await until(() => d.querySelector('.dc-md #dc-sender'));
   check(md, 'the document sheet with its fields');
-  check(w.location.hash === `#docs/${D1}`, 'the address names the document ' + w.location.hash);
+  check(w.location.hash === `#ablage/${D1}`, 'the address names the document ' + w.location.hash);
   check(/89[.,]90/.test(d.querySelector('#dc-amount')?.value || '') && d.querySelector('#dc-date')?.value === '2026-09-01', 'amount and date recognised');
   const sIn = d.querySelector('#dc-sender');
   sIn.value = 'Versicherung Beispiel AG'; sIn.dispatchEvent(new w.Event('change', {bubbles: true}));

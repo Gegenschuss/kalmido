@@ -54,16 +54,18 @@ const up = async (url, field, name, text, extra = {}) => {
       await sleep(500);
       const m = JSON.parse(await ev(MEASURE));
       const hs = Object.values(m);
-      check(hs.length >= 5, `${tag}: search, switch, filter, sort and a button are measured (${Object.keys(m).join()})`);
+      check(hs.length >= 5, `${tag}: search, (phone: switch,) filter, sort and the buttons are measured (${Object.keys(m).join()})`);
       check(hs.length && Math.max(...hs) - Math.min(...hs) <= 1, `${tag}: every control of the toolbar has the same height (${JSON.stringify(m)})`);
       if (hs.length) check(Math.abs(hs[0] - (touch ? 44 : 40)) <= 1.5, `${tag}: the height is ${touch ? '44' : '40'} px (${hs[0]})`);
       if (wd < 500) {
-        const n = await ev(`document.querySelectorAll('.dc-view [data-dc="review"], .dc-view [data-go="docs/review"]').length`);
+        const n = await ev(`document.querySelectorAll('.dc-view [data-dc="review"], .dc-view [data-go="ablage/review"]').length`);
         check(n === 1, `${tag}: "To review" stands only once (${n})`);
       }
       await shot(`p4472-${tag}-docs.png`);
       // 2.540.0 (#4472): the chosen part of the switch is marked (it was drawn like the other one)
-      check(await ev(`(() => { const [a, b] = document.querySelectorAll('.dc-bar .dc-seg button'); return !!a && a.classList.contains('on') && !b.classList.contains('on') && getComputedStyle(a).backgroundColor !== getComputedStyle(b).backgroundColor; })()`), `${tag}: the chosen part of the switch is marked`);
+      // 2.752.0 (#4887): with the panel (a computer) the switch is gone: the panel has "All documents" / "To review"
+      if (await ev(`typeof sbb_on === 'function' && sbb_on()`)) check(await ev(`!document.querySelector('.dc-bar .dc-seg') && !!document.querySelector('#side [data-go="ablage/review"]')`), `${tag}: no switch beside the panel's rows`);
+      else check(await ev(`(() => { const [a, b] = document.querySelectorAll('.dc-bar .dc-seg button'); return !!a && a.classList.contains('on') && !b.classList.contains('on') && getComputedStyle(a).backgroundColor !== getComputedStyle(b).backgroundColor; })()`), `${tag}: the chosen part of the switch is marked`);
       if (!touch) {  // the receipt filters: the labels on one line, the two ticks on one line, "Date by"
         await o.nav(B + '#office/books/receipts');
         check(await wait(`!!document.querySelector('.rcl-filters #rcl-novat')`), `${tag}: the receipt filters are drawn`);

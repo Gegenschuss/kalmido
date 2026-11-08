@@ -9,6 +9,8 @@
 //   is kept for the person (a second device shows the cards again)
 // - recognition: the line "Recognition on" in the documents folder; a file in a plain folder: "Recognise" in its menu makes
 //   it a document; a folder: "Recognition…"; the card's menu has Share… and the link for external people
+// 2.752.0 (#4887): the addresses are #ablage/docs|review|<id> now (the old #docs links lead there), a folder with recognition
+//   shows the documents' view (.dc-infold), the filter is named "All documents"
 // freelancer-matrix: files (alice has no organisation: her private workspace)
 const {execFileSync} = require('child_process');
 const path = require('path');
@@ -53,18 +55,18 @@ const up = async (url, field, name, text, extra = {}) => {
   await until(() => d.querySelector('#side .abfilt'));
   check(w.eval(`mg_partsShown(mg_area('ablage')).map(p => p[0]).join()`) === 'ablage', 'the area shows one part (no entry Documents)');
   check(!d.querySelector('#view .mgtabs') && !d.querySelector('#srail [data-sbb="docs"]'), 'no tabs, no own icon for Documents');
-  check(d.querySelector('#side .abfilt [data-go="docs"]') && d.querySelector('#side .abfilt [data-go="docs/review"]'), 'the panel: the saved filters Documents and To review');
-  check(/Documents/.test(d.querySelector('#side .abfilt [data-go="docs"]')?.textContent || '') && /To review/.test(d.querySelector('#side .abfilt [data-go="docs/review"]')?.textContent || ''), 'the filters are named');
+  check(d.querySelector('#side .abfilt [data-go="ablage/docs"]') && d.querySelector('#side .abfilt [data-go="ablage/review"]'), 'the panel: the saved filters Documents and To review');
+  check(/All documents/.test(d.querySelector('#side .abfilt [data-go="ablage/docs"]')?.textContent || '') /* 2.752.0 (#4887) */ && /To review/.test(d.querySelector('#side .abfilt [data-go="ablage/review"]')?.textContent || ''), 'the filters are named');
   w.location.hash = '#docs';
   check(await until(() => w.eval('S.route.mod') === 'docs' && d.querySelector('#view .dc-view [data-dco]')), 'old link #docs: the documents');
-  check(d.querySelector('#srail [data-sbb="ablage"].on') && d.querySelector('#side .abfilt [data-go="docs"][aria-current="page"]'), 'old link #docs: inside the file store, the filter Documents marked');
+  check(d.querySelector('#srail [data-sbb="ablage"].on') && d.querySelector('#side .abfilt [data-go="ablage/docs"][aria-current="page"]'), 'old link #docs: inside the file store, the filter Documents marked');
   w.location.hash = '#docs/review';
-  check(await until(() => d.querySelector('#side .abfilt [data-go="docs/review"][aria-current="page"]') && d.querySelector('[data-dc="review"][aria-selected="true"]')), 'old link #docs/review: the filter To review');
+  check(await until(() => d.querySelector('#side .abfilt [data-go="ablage/review"][aria-current="page"]') && d.querySelector('[data-dc="review"][aria-selected="true"]')), 'old link #docs/review: the filter To review');
   d.querySelector('[data-dc="all"]')?.click();
-  check(await until(() => w.location.hash === '#docs' && d.querySelector('#side .abfilt [data-go="docs"][aria-current="page"]')), 'the button All of the view = the filter Documents');
+  check(await until(() => w.location.hash === '#ablage/docs' && d.querySelector('#side .abfilt [data-go="ablage/docs"][aria-current="page"]')), 'the button All of the view = the filter Documents');
 check(await until(() => d.querySelector(`.dc-view [data-dco="${DOC}"]`) && d.querySelector('[data-dc="all"][aria-selected="true"]')), 'All: the list is loaded again (the document is back)');
 d.querySelector('[data-dc="review"]')?.click();
-check(await until(() => w.location.hash === '#docs/review' && w.eval('DC.f.review && !DC.loading') && [...d.querySelectorAll('.dc-view .dc-card')].every(c => c.classList.contains('rev'))),
+check(await until(() => w.location.hash === '#ablage/review' && w.eval('DC.f.review && !DC.loading') && [...d.querySelectorAll('.dc-view .dc-card')].every(c => c.classList.contains('rev'))),
   'the button To review: the filter loads (only documents to review)');
 w.location.hash = '#docs';
 await until(() => d.querySelector(`.dc-view [data-dco="${DOC}"]`));
@@ -76,10 +78,10 @@ await until(() => d.querySelector(`.dc-view [data-dco="${DOC}"]`));
   // ================= list / cards per folder, recognition
   w = await boot({user: 'alice', hash: 'ablage/' + ROOT}); d = w.document;
   // 2.583.0 (#4832): a folder that recognises shows its content as document cards at once, without the list / cards switch
-  check(await until(() => d.querySelector(`.abview .abcards [data-dco="${DOC}"]`)), 'the documents folder (it recognises): the document as its tile at once');
+  check(await until(() => d.querySelector(`.abview .dc-infold [data-dco="${DOC}"]`)), 'the documents folder (it recognises): the document as its tile at once');
   check(!d.querySelector('.abview [data-abdv]'), '... no list / cards switch there');
   check(await until(() => /Recognition on/.test(d.querySelector('.abrecog')?.textContent || '')), 'the documents folder: Recognition on');
-  d.querySelector(`.abcards [data-dco="${DOC}"]`)?.closest('li')?.querySelector('[data-ab="menu"]')?.click();
+  d.querySelector(`.dc-infold [data-dco="${DOC}"]`)?.closest('li')?.querySelector('[data-ab="menu"]')?.click();
   const cm = await until(() => menuItems(d).length && menuItems(d));
   check(cm && cm.includes('Share…') && cm.some(x => /Link for external people/.test(x)), 'the card\'s menu: Share… and the link for external people ' + JSON.stringify(cm));
   w.eval('closePop()');
@@ -88,7 +90,7 @@ await until(() => d.querySelector(`.dc-view [data-dco="${DOC}"]`));
   check(d.querySelector('.abview [data-abdv="cards"]'), '... a folder without recognition keeps the list / cards switch');
   // 2.583.0 (#4832): a plain file opens the same view as a document (no fields, "Recognise"); Back leads to the folder
   d.querySelector(`[data-abid="${FILE}"] [data-ab="open"]`)?.click();
-  check(await until(() => w.location.hash === `#docs/${FILE}` && d.querySelector('.dv-view [data-dc="dvrecog"]') && !d.querySelector('.dv-view #dc-sender')), 'a plain file opens the document view (without fields, with Recognise)');
+  check(await until(() => w.location.hash === `#ablage/${FILE}` && d.querySelector('.dv-view [data-dc="dvrecog"]') && !d.querySelector('.dv-view #dc-sender')), 'a plain file opens the document view (without fields, with Recognise)');
   d.querySelector('.dv-view [data-dc="close"]')?.click();
   check(await until(() => w.location.hash === `#ablage/${PLAIN}` && d.querySelector(`.abview [data-abid="${FILE}"]`)), '... back leads to its folder');
   d.querySelector(`[data-abid="${FILE}"] [data-ab="menu"]`)?.click();
@@ -106,15 +108,15 @@ await until(() => d.querySelector(`.dc-view [data-dco="${DOC}"]`));
   pick(d, 'On')?.click();
   check(await until(async () => (await call('GET', `/api/files?parent=${PLAIN}`)).node?.recog_on === true), 'On: the folder recognises');
   w.location.hash = '#ablage/' + PLAIN;
-  check(await until(() => d.querySelector(`.abview .abcards [data-dco="${FILE}"]`) && !d.querySelector('.abview [data-abdv]')), '2.583.0 (#4832): recognising now, the folder shows document cards without the switch');
+  check(await until(() => d.querySelector(`.abview .dc-infold [data-dco="${FILE}"]`) && !d.querySelector('.abview [data-abdv]')), '2.583.0 (#4832): recognising now, the folder shows document cards without the switch');
   w.close();
   w = await boot({user: 'alice', hash: 'ablage/' + ROOT}); d = w.document;
-  check(await until(() => d.querySelector(`.abview .abcards [data-dco="${DOC}"]`)), 'a new start: the documents folder shows its cards again');
+  check(await until(() => d.querySelector(`.abview .dc-infold [data-dco="${DOC}"]`)), 'a new start: the documents folder shows its cards again');
   w.close();
 
   // ================= a phone: the filters below the spaces, no tabs
   w = await boot({user: 'alice', hash: 'ablage', mobile: true}); d = w.document;
-  check(await until(() => d.querySelector('.abspaces .abfilt[data-go="docs"]') && d.querySelector('.abspaces .abfilt[data-go="docs/review"]')), 'phone: the saved filters below the spaces');
+  check(await until(() => d.querySelector('.abspaces .abfilt[data-go="ablage/docs"]') && d.querySelector('.abspaces .abfilt[data-go="ablage/review"]')), 'phone: the saved filters below the spaces');
   check(!d.querySelector('#view .mgtabs'), 'phone: no tabs');
   w.location.hash = '#docs';
   check(await until(() => d.querySelector('.dc-view .abdnav [data-go="ablage"]')), 'phone: the documents filter leads back to the files');
@@ -131,10 +133,10 @@ await until(() => d.querySelector(`.dc-view [data-dco="${DOC}"]`));
     for (const [wd, h, tag] of [[1440, 900, '1440'], [390, 844, '390']]) {
       await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: wd, height: h}});
       await o.nav(B + '#ablage/' + ROOT);
-      check(await wait(`!!document.querySelector('.abview .abcards .dc-card')`), `${tag}: the cards of the documents folder`);
+      check(await wait(`!!document.querySelector('.abview .dc-infold .dc-card')`), `${tag}: the cards of the documents folder`);  // 2.752.0 (#4887): the documents' view of the folder
       await sleep(500); await shot(`p2353-d-${tag}-cards.png`);
       await o.nav(B + '#ablage/' + PLAIN);
-      check(await wait(`!!document.querySelector('.abview .abcards .dc-card')`), `${tag}: the folder that recognises now: cards (2.583.0, #4832)`);
+      check(await wait(`!!document.querySelector('.abview .dc-infold .dc-card')`), `${tag}: the folder that recognises now: cards (2.583.0, #4832)`);
       await sleep(400); await shot(`p2353-d-${tag}-list.png`);
       await o.nav(B + '#docs/review');
       check(await wait(`!!document.querySelector('.dc-view')`), `${tag}: the filter To review`);

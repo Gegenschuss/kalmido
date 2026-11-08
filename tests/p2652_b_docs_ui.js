@@ -87,7 +87,7 @@ async function upload(name, lines) {
       await ev(`(document.querySelector('.dv-view .dv-back').click(), 1)`);
       check(await wait(`!document.querySelector('.dv-view') && !history.state?.f8d && f8d_bk.pushed === 0 && !f8d_bk.skip`), `${W}: the arrow closes the view, no overlay entry left`);
       // 2.652.0 (#5070): back on the list's own entry, no dead entry left
-      check(await wait(`history.state?.p2652b === ${W} && /^#docs$/.test(location.hash)`), `${W}: the arrow leaves no dead history entry ` + await ev(`JSON.stringify({s: history.state, h: location.hash})`));
+      check(await wait(`history.state?.p2652b === ${W} && /^#ablage\/docs$/.test(location.hash)`), `${W}: the arrow leaves no dead history entry ` + await ev(`JSON.stringify({s: history.state, h: location.hash})`));
       check(await wait(`document.querySelectorAll('.dc-card').length === 14 && Math.abs(document.getElementById('view').scrollTop - ${v0}) <= 2`), `${W}: the list is back at the same place ` + await ev(`document.getElementById('view').scrollTop`));
     }
 
@@ -108,7 +108,7 @@ async function upload(name, lines) {
     await sleep(300);
     check(await ev(`window.__push`) === pushes, 'Back 1: no history entry pushed again (Chrome skips it on the next Back)');
     await ev(`(history.back(), 1)`);
-    check(await wait(`!document.querySelector('.dv-view') && f8d_bk.pushed === 0 && /^#docs$/.test(location.hash) && document.querySelectorAll('.dc-card').length === 14`), 'Back 2: the document closes, the list is there');
+    check(await wait(`!document.querySelector('.dv-view') && f8d_bk.pushed === 0 && /^#ablage\/docs$/.test(location.hash) && document.querySelectorAll('.dc-card').length === 14`), 'Back 2: the document closes, the list is there');
     await ev(`(history.back(), 1)`);
     check(await wait(`!/^#docs/.test(location.hash) && location.href.startsWith(${JSON.stringify(B)})`), 'Back 3: back to the view before the documents, still in Kalmido');
   }, true);
