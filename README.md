@@ -19,10 +19,10 @@
 
 ## What's new
 
-**2.719.0** (2026-11-08):
-- **Security**: receipt fetcher keys can be limited to IP addresses / networks like API tokens; plus address tokens lie sealed and hashed in the database.
-- **Office**: CSV bank statement import asks which bank account it belongs to; balance sheet books payouts on the right account.
-- **Tasks**: task search stays fast on large instances.
+**2.739.0** (2026-11-08):
+- **Industries**: new packs Film & Video and Agency & services; project type Shoot with storyboard tiles and a shot list PDF (Film & Video only).
+- **Backup**: off-site backup lets several servers share one folder (instance id in the names); S3 only over https; SFTP with optional expected fingerprint.
+- **Tasks**: deleted custom fields go to a trash and can be restored; removed members can get their assignments back when added again.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 
