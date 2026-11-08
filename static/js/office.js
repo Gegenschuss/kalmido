@@ -912,6 +912,7 @@ const OST_SUBS = [['company', 'building', N_('Company')], ['tax', 'wallet', N_('
 function ost_taxHtml() {
   if (!ofcAdmin()) return '';  // 2.555.0 (#4664): the lock hint stands once on top of the page; the group falls away for members
   return `<div class="ostax" data-fg-skip>${[typeof bka_settingsHtml === 'function' ? bka_settingsHtml() : '' /* 2.470.0 (#3596) */, typeof bkSettingsHtml === 'function' ? bkSettingsHtml() : '',
+    typeof ldb_setHtml === 'function' ? ldb_setHtml() : '' /* 2.666.0 (#3461): income statement or balance sheet */,
     typeof txdSectionHtml === 'function' && ofcFeat('books.tax_dates') ? txdSectionHtml() : '',
     typeof lb_rateSetHtml === 'function' ? lb_rateSetHtml() : '', typeof cfs_settingsHtml === 'function' ? cfs_settingsHtml() : '',
     typeof fci_setHtml === 'function' ? fci_setHtml() : '', typeof cb_setHtml === 'function' ? cb_setHtml() : ''].join('')}</div>`;

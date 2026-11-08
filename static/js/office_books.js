@@ -76,6 +76,7 @@ function bkTabHtml() {
   if (bkSub() === 'archive' && typeof bkaHtml === 'function') return bkaHtml();  // 2.414.0 A (#3502): the booking archive (office_bookarch.js)
   if (bkSub() === 'taxforms') return tfHtml();  // 2.467.0 (#3456): Anlage EUeR and annual VAT return
   if (bkSub() === 'taxcheck') return tcHtml();  // 2.589.0 (#3458): the tax check before filing (traffic light)
+  if (bkSub() === 'ledger' && typeof ldbHtml === 'function') return ldbHtml();  // 2.666.0 (#3461): the balance sheet (office_ledger.js)
   if (BK.err) return `<div class="empty">${esc(BK.err)}</div>`;
   if (!BK.info || !BK.euer || !BK.ustva) { if (!BK.loadingT) BK.loadingT = setTimeout(() => { BK.loadingT = 0; bkLoad(); }, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
   if (bkSub() === 'ustva' && !BK.jumped) { BK.jumped = true; setTimeout(() => $('#bk-ustva')?.scrollIntoView({block: 'start'}), 0); }
@@ -84,6 +85,7 @@ function bkTabHtml() {
     ${ofcFeat('books.datev') ? `<a class="btn sm ghost" href="#office/books/archive" data-bk-archive>${ic('archive', 's')}<span>${tr('Booking archive')}</span></a>` : ''}
     ${ofcFeat('books.vat_return') ? `<a class="btn sm ghost" href="#office/books/taxforms/euer" data-bk-taxforms>${ic('file', 's')}<span>${tr('Tax forms')}</span></a>` : ''}
     ${ofcFeat('books.vat_return') ? `<a class="btn sm ghost" href="#office/books/taxcheck" data-bk-taxcheck>${ic('check', 's')}<span>${tr('Tax check')}</span></a>` : ''}
+    ${BK.info?.ledger === 'balance' ? `<a class="btn sm ghost" href="#office/books/ledger" data-bk-ledger>${ic('list', 's')}<span>${tr('Balance sheet')}</span></a>` : ''/* 2.666.0 (#3461) */}
     ${OFC.info?.procdoc !== false ? `<a class="btn sm ghost" href="#office/books/procdoc" data-bk-procdoc>${ic('file', 's')}<span>${tr('Procedure documentation')}</span></a>` : ''}</div>
     ${bkPhotoHtml()}`;
   // 2.365.2 D (#2789): tax reserve, VAT basis and tax dates are set in Settings > Company & office > Bank & taxes (ost_taxHtml)

@@ -15,6 +15,7 @@ const LD_MODS = {
     'office_books', 'office_receipts', 'office_bank', 'office_taxdates',  // 2.90.0 (#1921, #1922); 2.153.0 (#2055): office_receipts
     'office_banknorc',  // 2.299.0 C (#3192): bank bookings without a receipt
     'office_cards',  // 2.444.0 (#3447): credit card statements
+    'office_ledger',  // 2.666.0 (#3461): the balance sheet (double-entry bookkeeping)
     'office_recurring', 'office_subs', 'office_dunning',  // 2.91.0 (#1923, #1924); 2.147.1 B (#2054): office_dunning
     'office_peppol',  // 2.154.0 B (#1960): e-invoices over Peppol
     'office_payonline',  // 2.469.0 (#3459): online payment of invoices
