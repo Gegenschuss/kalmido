@@ -35,6 +35,8 @@ const NET = () => {
 };
 
 // 2.501.0 (#4296): true = no browser part in this run, the caller returns; the suites with an own firefox() use it too
+// 2.726.0 (#5160): fine pointer that can hover (6 = fine | hover); also for the suites with their own Firefox start (p230, p240 ...)
+const MOUSE_PREFS = [['ui.primaryPointerCapabilities', 6], ['ui.allPointerCapabilities', 6]];
 const noFirefox = (tag, check) => {
   if (process.env.KALMIDO_SKIP_FIREFOX === '1') { console.log(`${tag}: Firefox part skipped (KALMIDO_SKIP_FIREFOX=1)`); return true; }
   try { execFileSync('firefox', ['--version'], {stdio: 'ignore'}); return false; } catch { check(false, `${tag}: no firefox on PATH, the browser part cannot run (KALMIDO_SKIP_FIREFOX=1 leaves it out on purpose)`); return true; }
@@ -64,7 +66,7 @@ module.exports = ({tag, check, shots, prefs: extra = [], lazy = false, connectS 
   const base = fs.mkdtempSync(path.join(process.env.TMPDIR || os.tmpdir(), `kalmido-${tag}-`));
   const prefs = [['browser.shell.checkDefaultBrowser', false], ['datareporting.policy.dataSubmissionEnabled', false], ['ui.prefersReducedMotion', 1],
     ...(touch === true ? [['ui.primaryPointerCapabilities', 1], ['ui.allPointerCapabilities', 1], ['dom.w3c_touch_events.enabled', 1]]
-      : [['ui.primaryPointerCapabilities', 6], ['ui.allPointerCapabilities', 6]]), ...extra];
+      : MOUSE_PREFS), ...extra];
   const userJs = prefs.map(([k, v]) => `user_pref("${k}", ${JSON.stringify(v)});`).join('\n') + '\n';
   // CI of 2.496.1: three starts of p2151_ui stayed without a connection and nothing said why: Firefox's messages go to a file, each
   // start notes how it ended, and the FAIL line carries it all (run_all.sh shows only FAIL lines)
@@ -261,3 +263,4 @@ module.exports.act = async (ev, name, {click = true, n = 60} = {}) => {
   return false;
 };
 module.exports.noFirefox = noFirefox;
+module.exports.MOUSE_PREFS = MOUSE_PREFS;

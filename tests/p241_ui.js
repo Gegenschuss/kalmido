@@ -32,7 +32,8 @@ async function firefox(fn) {
   if (require('./ff').noFirefox('p241_ui', check)) return;  // 2.501.0 (#4296): no firefox = red
   const PORT = 9300 + Math.floor(Math.random() * 600);
   const prof = fs.mkdtempSync(path.join(process.env.TMPDIR || os.tmpdir(), 'kalmido-p241-'));
-  fs.writeFileSync(path.join(prof, 'user.js'), [['browser.shell.checkDefaultBrowser', false], ['datareporting.policy.dataSubmissionEnabled', false], ['ui.prefersReducedMotion', 1]]
+  // 2.726.0 (#5160): a mouse like every suite without touch (headless Firefox alone reports hover:none = finger mode)
+  fs.writeFileSync(path.join(prof, 'user.js'), [['browser.shell.checkDefaultBrowser', false], ['datareporting.policy.dataSubmissionEnabled', false], ['ui.prefersReducedMotion', 1], ...require('./ff').MOUSE_PREFS]
     .map(([k, v]) => `user_pref("${k}", ${JSON.stringify(v)});`).join('\n') + '\n');
   const ff = spawn('firefox', ['--headless', '--no-remote', '--profile', prof, `--remote-debugging-port=${PORT}`, 'about:blank'], {stdio: 'ignore'});
   let ws, seq = 0; const pend = new Map();
