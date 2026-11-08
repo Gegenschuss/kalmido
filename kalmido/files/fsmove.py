@@ -512,9 +512,13 @@ def fsm_memo_apply(c, back, to, uid):
             if node and (node["org_id"] or None) == (to or None) and not fsm_share_ends(c, x, to, uid):
                 if fsm_share_gone(c, x):  # 2.273.0 F1 (#3042): its group / person deleted since, or the same share is there again
                     continue
-                c.execute("INSERT INTO fs_shares(node_id,user_id,group_id,agent_id,role,expires_at,created_by,created_at) VALUES(?,?,?,?,?,?,?,?)",
-                          (x["node_id"], x["user_id"], x["group_id"], x["agent_id"], x["role"], x["expires_at"], x["created_by"], x["created_at"]))
-                n += 1
+                key = next((k for k in ("user_id", "group_id", "agent_id") if x.get(k)), None)
+                if key and x.get("role") in ("view", "edit"):
+                    from ..core.objects import obj_node_share  # core/objects.py loads the file store (files/web.py) at its top
+                    # 2.747.0 (#5246): the share comes back through the core (the move back checked who may; no agent event)
+                    obj_node_share(c, uid, {"id": x["node_id"]}, key, x[key], x["role"], x["expires_at"], org=to or None,
+                                   event=False, checked=True, extra={"created_by": x["created_by"], "created_at": x["created_at"]})
+                    n += 1
         for nid, lid in (d.get("receipts") or {}).items():
             if fsm_list_ok(c, lid, to, uid):
                 n += c.execute("UPDATE rc_receipts SET list_id=? WHERE node_id=? AND list_id IS NULL", (lid, int(nid))).rowcount
@@ -560,8 +564,11 @@ def fsm_apply(c, uid, plan, to, new_paths, old_paths):
             raise Denied(409, tr("A file is being recognised right now. Please try again in a moment."))
     back = fsm_memo_back(c, plan, to, uid)  # 2.273.0 B (#3042): a move back first takes the memo of the move out
     fsm_memo(c, plan, to, uid)
-    for s in plan.get("ends") or []:
-        c.execute("DELETE FROM fs_shares WHERE id=?", (s,))
+    for s in plan.get("ends") or []:  # 2.747.0 (#5246): through the core (obj_revoked; the move's memo brings them back on a move back)
+        sn = c.execute("SELECT n.* FROM fs_nodes n JOIN fs_shares f ON f.node_id=n.id WHERE f.id=?", (s,)).fetchone()
+        if sn is not None:
+            from ..core.objects import obj_node_unshare  # core/objects.py loads the file store (files/web.py) at its top
+            obj_node_unshare(c, uid, sn, s, org=src or None, reason="move")
     for r in plan["stay"]:  # up to the top of the source workspace (in the trash: restored there)
         nm = r["name"] if r["deleted_at"] else _free_name(c, None, r["owner_id"], src, r["name"], skip=r["id"])
         c.execute("UPDATE fs_nodes SET parent_id=NULL, name=? WHERE id=?", (nm, r["id"]))

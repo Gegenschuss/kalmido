@@ -575,8 +575,13 @@ def _sp_do(c, uid, nid, m, n, v, parts, data, auto=False):
         for i, (ps, pdf) in enumerate(zip(parts, pdfs), 1):
             pid = docs_ingest(c, uid, n["org_id"], f"{stem} ({i}).pdf", pdf, "application/pdf", m["source"], parent_id=n["parent_id"])
             fs_log_add(c, pid, "upload", "split")
-            c.execute("INSERT INTO fs_shares(node_id, user_id, group_id, agent_id, role, expires_at, created_by, created_at) "
-                      "SELECT ?, user_id, group_id, agent_id, role, expires_at, created_by, created_at FROM fs_shares WHERE node_id=?", (pid, nid))
+            for sh in c.execute("SELECT * FROM fs_shares WHERE node_id=? ORDER BY id", (nid,)).fetchall():
+                key = next((k for k in ("user_id", "group_id", "agent_id") if sh[k]), None)
+                if key and sh["role"] in ("view", "edit"):  # 2.747.0 (#5246): each part gets the stack's shares through the core
+                    from ..core.objects import obj_node_share  # core/objects.py loads the file store at its top
+                    obj_node_share(c, uid, {"id": pid}, key, sh[key], sh["role"], sh["expires_at"], org=n["org_id"] or None,
+                                   event=False, checked=True,
+                                   extra={"created_by": sh["created_by"], "created_at": sh["created_at"], "by_role": sh["by_role"]})
             c.execute("UPDATE doc_meta SET area=?, area_sort=? WHERE node_id=?", (area, sort, pid))
             ids.append(pid)
         S.asn_lock(c, m["ws"], nid)  # 2.363.3 (#3133): only around the numbers, after the parts are stored: a save with "next" waits

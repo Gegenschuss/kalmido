@@ -8,7 +8,7 @@ changed events / contacts last, the leads' history and their millisecond version
  - #4766 knowledge: a rename = ONE obj_history entry (kind wiki) and no new version; an old expect_updated_at = 409 "page";
    GET .../versions carries it under "renames"
  - #4766 files: a folder's share taken back in the file store's dialog (DELETE /api/files/shares/<id>) is deleted with its log
-   line, never kept dead in obj_revoked (review F7; only a core object's reference node goes there)
+   line, and (2.747.0, #5246) kept in obj_revoked like every core share taken back
  - #4776: events and contacts carry updated_by: the app, the API (an agent with its version), CalDAV / CardDAV, the trash
  - #4776: a lead made in the app has a millisecond updated_at; its change is in obj_history (kind office_deal); a row with an
    old whole-second updated_at still matches expect_updated_at (200), an older one = 409
@@ -134,9 +134,10 @@ def files_revoke(who, s, space, agid):
     shid = r.json()["id"]
     check(s.delete(B + f"/api/files/shares/{shid}").ok, f"{who}: the share taken back in the dialog")
     check(not dbx("SELECT 1 FROM fs_shares WHERE id=?", (shid,)), f"{who}: the share is gone")
-    # 2.571.0 (#4766): review F7 - a folder's share has no restore way, so it is deleted as before (no dead obj_revoked row)
+    # 2.747.0 (#5246): decision 08.11.2026 - the dialog's share goes the core's way too: into obj_revoked (no kind, like the
+    # nightly boundary repair), reason unshare (was: review F7, deleted without a row)
     rv = [x for x in dbx("SELECT src, reason, row_json FROM obj_revoked WHERE src='fs_shares'") if f'"id": {shid},' in x[2]]
-    check(rv == [], f"{who}: a folder's share is not kept in obj_revoked {rv}")
+    check(len(rv) == 1 and rv[0][1] == "unshare", f"{who}: a folder's share is kept in obj_revoked {rv}")
     check(dbx("SELECT 1 FROM fs_log WHERE node_id=? AND action='unshare' AND detail=?", (nid, str(shid))), f"{who}: the log line as before")
 
 

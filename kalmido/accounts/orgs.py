@@ -1718,12 +1718,9 @@ def org_leave(c, oid, uid, heir, back=None):
     # groups have no organisation and the person stays a member there -- their marks stay
     c.execute("DELETE FROM tchat_reads WHERE user_id IN (%s) AND room_id IN (SELECT id FROM tchat_rooms WHERE org_id=? OR "
               "list_id IN (SELECT id FROM lists WHERE org_id=?))" % ",".join("?" * (len(ags) + 1)), (uid, *ags, oid, oid))
-    with system_ctx(c):  # 2.560.0 (#4698 a): their channel memberships and file / knowledge shares in the organisation end
-        # (coming back the same day, also as a guest = no old closed channels, no old folder shares)
-        c.execute("DELETE FROM tchat_members WHERE user_id IN (%s) AND room_id IN (SELECT id FROM tchat_rooms WHERE org_id=?)"
-                  % ",".join("?" * (len(ags) + 1)), (uid, *ags, oid))
-        c.execute("DELETE FROM fs_shares WHERE (user_id IN ({0}) OR agent_id IN ({0})) AND node_id IN (SELECT id FROM fs_nodes WHERE org_id=?)"
-                  .format(",".join("?" * (len(ags) + 1))), (uid, *ags, uid, *ags, oid))
+    # 2.560.0 (#4698 a): their channel memberships and file / knowledge shares in the organisation end (coming back the same
+    # day, also as a guest = no old closed channels, no old folder shares) -- 2.747.0 (#5246): person_revoked 'leave' above
+    # takes exactly these rows (the person and their agents) into obj_revoked; the second bare DELETE went
     # 2.53.0 (#1424, review): the leaver's task bells in the organisation go too (else the nightly boundary check alarms)
     c.execute("DELETE FROM task_bell WHERE org_id=? AND user_id IN (%s)" % ",".join("?" * (len(ags) + 1)), (oid, uid, *ags))
     from ..sheets.shshare import shs_leave

@@ -885,14 +885,13 @@ def files_share_add(nid):
     if not any(x["id"] == tid for x in pool):
         return err(tr("Only people, groups and agents of the same workspace can get a share"), 409)
     old = c.execute(f"SELECT id FROM fs_shares WHERE node_id=? AND {key}=? AND COALESCE(list_own, 0)=0", (nid, tid)).fetchone()  # #4739
-    if old:
-        c.execute("UPDATE fs_shares SET role=?, expires_at=? WHERE id=?", (role, exp, old[0]))
-        sid = old[0]
-    else:
-        if c.execute("SELECT COUNT(*) FROM fs_shares WHERE node_id=? AND COALESCE(list_own, 0)=0", (nid,)).fetchone()[0] >= SHARE_MAX:
-            return err(tr("Too many shares"), 409)
-        sid = insert_id(c, f"INSERT INTO fs_shares(node_id,{key},role,expires_at,created_by,created_at) VALUES(?,?,?,?,?,?)",
-                        (nid, tid, role, exp, me(), _now()))
+    if not old and c.execute("SELECT COUNT(*) FROM fs_shares WHERE node_id=? AND COALESCE(list_own, 0)=0", (nid,)).fetchone()[0] >= SHARE_MAX:
+        return err(tr("Too many shares"), 409)
+    from ..core.objects import obj_node_share  # core/objects.py imports this module at its top
+    # 2.747.0 (#5246): the share row itself through the core (the checks above are the file store's own: checked=True;
+    # the members dialog's rows of a list stay apart, list_own); it writes the log line
+    sid = obj_node_share(c, me(), n, key, tid, role, exp, org=n["org_id"] or None, checked=True,
+                         match=(" AND COALESCE(list_own, 0)=0", ()))
     lr_ = b.get("list_role")  # 2.352.0 A (#2748): a projects folder's share may carry the list role (admin | participant ...)
     if lr_ is None and old and fs_area_of(c, nid) == "lists":
         c.execute("UPDATE fs_shares SET list_role=NULL WHERE id=?", (sid,))
@@ -900,7 +899,6 @@ def files_share_add(nid):
         if lr_ not in ("admin", "edit", "participant", "view") or (lr_ == "admin" and key == "agent_id"):
             return err(tr("Invalid value: {0}", "list_role"))
         c.execute("UPDATE fs_shares SET list_role=?, role=? WHERE id=?", (lr_, "edit" if lr_ in ("admin", "edit") else "view", sid))
-    fs_log_add(c, nid, "share", f"{key[:-3]}:{tid}:{role}")
     if key == "agent_id" and not old:
         _agent_event(c, tid, n, role)
     bump(c)
@@ -963,9 +961,9 @@ def files_share_delete(sid):
         # into obj_revoked under the object's kind / id (its restore finds it there); the log line as before
         obj_node_unshare(c, me(), n, sid, kind=n["ref_kind"], ref_id=n["ref_id"], org=n["org_id"] or None)
     elif not any(f(c, me(), n, s) for f in fs_unshare_hooks):  # 2.623.0 (#4778): a table's / a knowledge card's own way first
-        # review F7: a folder / file share has no restore way (obj_revoked rows are found by kind / id): deleted as before
-        c.execute("DELETE FROM fs_shares WHERE id=?", (sid,))
-        fs_log_add(c, s["node_id"], "unshare", str(sid))
+        # 2.747.0 (#5246): a folder / file share goes the core's way too -- into obj_revoked without a kind (like the
+        # nightly boundary repair, core/objects.py _boundary_share), then deleted; the log line is the core's
+        obj_node_unshare(c, me(), n, sid, org=n["org_id"] or None)
     bump(c)
     c.commit()
     return jsonify(shares=_shares(c, s["node_id"]))
