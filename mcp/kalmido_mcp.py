@@ -2815,7 +2815,8 @@ TOOL_MAP = {t[0]: t for t in TOOLS}
 TOOL_SCOPES = {
     "agent": ("get_agent", "get_queue", "set_queue_order", "get_rules", "add_rule", "react_to_chat", "set_status", "report_progress", "list_events", "wait_for_events", "list_jobs", "create_job", "get_job",
               "submit_proposal", "propose_to_other_topic", "propose_to_person", "update_job", "list_chats", "get_reply_style", "chat_typing", "send_chat", "request_chat_approval", "use_approval", "withdraw_chat_choices", "pin_chat_message", "report_usage", "get_usage",
-              "report_plan_usage", "get_plan_usage", "clear_plan_usage", "list_schedules", "propose_playbook"),
+              "report_plan_usage", "get_plan_usage", "clear_plan_usage", "list_schedules", "propose_playbook",
+              "log_decision"),  # 2.725.0 (#5157): POST /agent/decisions has scope agent
     "tasks:write": ("add_contract", "add_device", "add_upkeep", "sync_read_later", "add_occasion", "add_deadline", "ingredients_to_shopping", "give_stars", "add_reward", "update_reward", "request_reward",
                     "decide_reward", "create_note", "update_note", "create_task", "update_task", "add_decision", "set_delivery", "add_snippet", "complete_task", "set_waiting", "clear_waiting", "tidy_task", "move_task", "duplicate_task", "link_task_to_list", "unlink_task_from_list", "batch_tasks",
                     "reopen_task", "partial_task", "skip_occurrence", "take_task", "watch_task", "unwatch_task", "add_subtask", "add_dependency", "remove_dependency", "add_relation", "remove_relation", "create_habit",
