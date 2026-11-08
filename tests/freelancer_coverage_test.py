@@ -1320,7 +1320,6 @@ DELETE /api/my/agents/{}/machines/{}
 DELETE /api/newsletter
 DELETE /api/newsletter/segments/{}
 DELETE /api/notepads/{}
-DELETE /api/office/docs/{}/parts/{}
 DELETE /api/office/logo
 DELETE /api/office/meals/choices/{}
 DELETE /api/office/meals/{}/file/{}
