@@ -17,6 +17,15 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.734.0] - 2026-11-08
+
+Package 2.727 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Changed
+- Tables: the sheet bar under the grid is always there, also with one sheet - its tab ("Sheet 1" for a new table) and the "+" beside it, like a spreadsheet; a tap on the open tab gives its menu (rename, duplicate, pivot; the first sheet keeps no delete). Who may only read sees the tab without "+" and menu (#5203).
+- Documents and file store: a swipe leafs like turning a page - the previous / next document lies beside the open one as a placeholder (title, type, date, its preview fetched ahead, else an empty page) and glides along with the finger over the whole width; let go and it snaps in, then its content loads. The end of the list still springs back; the full view (PDF) and the picture viewer do the same; reduced motion changes at once (#5202).
+- German wording: "Freigabe" means approval only; sharing says "Teilen" / "Zugriff" (e.g. "Links und Zugriffe"), a lone bank "Konto" is "Bankkonto", agent bundles are "Teil {0} von {1}"; English "activity" for the history of one thing is "history". TRANSLATING.md has the glossary lines and tools/i18n_check.py reports "Freigabe" in a sharing text (#5197).
+
 ## [2.731.0] - 2026-11-08
 
 Package 2.707 (Bündel: CI: ZAP-Schritt 'Start PostgreSQL' scheitert geleg).
@@ -111,7 +120,8 @@ Package 2.685 (Bündel: Kommentare: Aktivität in drei Stufen (nur Kommenta, Bü
 - Office: switching "Office & finance" on no longer leaves the office saying it is switched off when it loaded before the switch was saved (#5176).
 - Balance sheet: a receipt booked against the bank (counter account "bank") and paid from the cash box is now booked bank to cash instead of being left out (#5128).
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.731.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.734.0...HEAD
+[2.734.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.734.0
 [2.731.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.731.0
 [2.719.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.719.0
 [2.710.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.710.0
