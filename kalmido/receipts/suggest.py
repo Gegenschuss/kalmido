@@ -632,6 +632,51 @@ def olk_fs_maybe(c, ids):
                                         UNION SELECT node_id FROM office_letter_links WHERE node_id IN ({q})""", ids * 5)}
 
 
+def olk_fs_locked_many(c, ids):
+    """2.657.0 (#4644): olk_fs_locked (without arrival / hold) of many nodes in a fixed number of queries -> {id: last day ISO}
+    of those locked now. The same sources and days as olk_fs_locked: keep the two in step (the move preview of
+    docs/areamove.py lists with this, the move itself asks olk_fs_locked per node through files/fsmove.py fsm_plan)."""
+    ids = [int(i) for i in ids]
+    if not ids:
+        return {}
+    q = ",".join("?" * len(ids))
+    rcs = {r["node_id"]: r for r in c.execute(f"""SELECT r.node_id, r.paid_at, r.vat_pct, r.set_at, r.billed_doc_id, r.billed_at,
+                                                  m.doc_date FROM rc_receipts r LEFT JOIN doc_meta m ON m.node_id=r.node_id
+                                                  WHERE r.node_id IN ({q})""", ids)}
+    metas = {r["node_id"]: r for r in c.execute(f"SELECT node_id, kept_until, doc_date FROM doc_meta WHERE node_id IN ({q})", ids)}
+    bill = sorted({r["billed_doc_id"] for r in rcs.values() if r["billed_doc_id"]})
+    docs = {d["id"]: d for d in c.execute(f"SELECT id, locked_at, status FROM office_docs WHERE id IN ({','.join('?' * len(bill))})",
+                                          bill)} if bill else {}
+    ends = {i: [] for i in ids}
+    for i, k in metas.items():
+        if k["kept_until"]:
+            ends[i].append(olk_day(k["kept_until"]))
+    for i, r in rcs.items():
+        if r["paid_at"] is not None or r["vat_pct"] is not None:
+            ends[i].append(olk_until(r["doc_date"] or r["paid_at"] or r["set_at"], "receipt"))
+        d = docs.get(r["billed_doc_id"]) if r["billed_doc_id"] else None
+        if d and (d["locked_at"] or d["status"] == "sent"):
+            ends[i].append(olk_until(r["doc_date"] or r["billed_at"] or r["set_at"], "receipt"))
+    for e in c.execute(f"SELECT node_id, day FROM office_cash_entries WHERE node_id IN ({q})", ids):
+        ends[e["node_id"]].append(olk_until(e["day"], "receipt"))
+    for lk in c.execute(f"SELECT node_id, MIN(created_at) AS at FROM office_letter_links WHERE node_id IN ({q}) GROUP BY node_id", ids):
+        if lk["at"]:
+            m = metas.get(lk["node_id"])
+            ends[lk["node_id"]].append(olk_until((m and m["doc_date"]) or lk["at"], "letter"))
+    this_year = now_utc().year
+    for a in c.execute(f"SELECT receipt_node_id, purchase_date, life_months, archived FROM office_equipment WHERE receipt_node_id IN ({q})", ids):
+        r = rcs.get(a["receipt_node_id"])
+        m = re.match(r"(\d{4})", a["purchase_date"] or (r["doc_date"] if r else "") or "")
+        year = int(m.group(1)) + -(-int(a["life_months"] or 0) // 12) if m else this_year
+        ends[a["receipt_node_id"]].append(olk_until(str(max(year, this_year) if not a["archived"] else year), "receipt"))
+    out = {}
+    for i, e in ends.items():
+        until = max((x for x in e if x), default=None)
+        if olk_active(until):
+            out[i] = until.isoformat()
+    return out
+
+
 def olk_office_ws(c, ws, org_id):
     """2.355.0 E (#2845): whether workspace ws belongs to an office: an organisation's, or the space of a person with a
     personal office (structure only)."""

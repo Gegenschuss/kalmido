@@ -16,6 +16,7 @@ tenant-matrix: document
  - a member of the organisation who is no admin: no hint (why=admin), POST 403
 usage: p4434_a_umzug_test.py <datadir>      (a fresh container; P4434A_NOSTART=1 / KMT_NOSTART=1: it runs already)"""
 import os
+import re
 import sys
 from datetime import datetime, timedelta, timezone
 
@@ -26,7 +27,7 @@ import kt  # noqa: E402
 from kt import B, FAILS, OKS, check, dbx, until  # noqa: E402
 from freelancer_fixture import freelancer  # noqa: E402
 
-kt.fresh(prefix="P4434A")
+kt.fresh(env={"KALMIDO_TEST_TIMING_ALL": "1"}, prefix="P4434A")  # 2.657.0 (#4644): statements per request (Server-Timing)
 A = kt.setup()
 ALICE = A.get(B + "/api/state").json()["me"]["id"]
 MV = B + "/api/docs/office-move"
@@ -72,6 +73,12 @@ def upload(s, name, data):
 def row(nid):
     x = dbx("SELECT d.area, d.area_sort, d.ws, n.org_id, n.parent_id, n.name FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id WHERE d.node_id=?", (nid,))
     return tuple(x[0]) if x else None
+
+
+def nstmt(r):
+    """2.657.0 (#4644): the statements of request r (Server-Timing db n=...), -1 without."""
+    m = re.search(r'db;dur=[\d.]+;desc="n=(\d+)"', r.headers.get("Server-Timing", ""))
+    return int(m.group(1)) if m else -1
 
 
 def preview(s, **q):
@@ -191,8 +198,15 @@ it = {x["id"]: x for x in j["items"]}
 check(j["office"] == "org" and it.get(a2, {}).get("pick") == "move" and it.get(a3, {}).get("pick") == "move", f"the preview of Alpha's office {j}")
 check(a1 in it and it[a1]["pick"] == "stay" and it[a1].get("block"), f"a receipt booked in the personal office stays, with its reason {it.get(a1)}")
 check((row(a1), row(a2), row(a3)) == (o1, o2, o3) and shares(a2) == [(GINA, "view")], "the preview moves nothing, the share stays")
+# 2.657.0 (#4644): the preview reads the reasons of its whole list at once (docs/areamove.py amv_blocks), no fsm_plan per row
+full, cnt = A.get(MV), A.get(MV, params={"count": "1"})
+plan_n = nstmt(full) - nstmt(cnt)
+check(nstmt(full) > 0 and nstmt(cnt) > 0 and plan_n <= 20,
+      f"rueckfall #4644: the reasons of {len(full.json()['items'])} rows cost a fixed number of statements ({nstmt(full)} - {nstmt(cnt)} = {plan_n})")
 r = A.post(MV, json={"ids": [a1]})
 check(r.ok and r.json()["moved"] == 0 and not preview(A, count="1")["hidden"], f"review #4434: nothing moved, the hint stays {r.text[:160]}")
+check([x.get("reason") for x in r.json()["stayed"]] == [it[a1]["block"]],
+      f"#4644: the preview names the same reason as the move (fsm_plan) {r.json()['stayed']} {it[a1].get('block')!r}")
 r = A.post(MV, json={"ids": [a1, a2, a3]})
 check(r.ok and r.json()["moved"] == 2 and [x["id"] for x in r.json()["stayed"]] == [a1], f"the move into Alpha, the booked one stays {r.status_code} {r.text[:300]}")
 RA = r.json()["id"]

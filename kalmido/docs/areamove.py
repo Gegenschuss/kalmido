@@ -6,7 +6,8 @@ stays there; nothing moves by itself with the update. Office > Receipts shows on
 that is a receipt (a row in rc_receipts), an e-invoice or a recognised invoice, each preset to "move" or "stays" -- the
 tag "Tax" (Steuer) and every doubt (only one sign of an invoice) stay, and what the file move would refuse (a receipt booked
 or of a locked month in the personal office's books, the cash book, the equipment list: files/fsmove.py fsm_plan) stays
-with its reason and cannot be chosen. Only the person's click moves (POST /api/docs/office-move {ids}), in groups of
+with its reason and cannot be chosen (2.657.0, #4644: the preview reads these reasons for its whole list at once, amv_blocks;
+fsm_plan runs per document only at the move). Only the person's click moves (POST /api/docs/office-move {ids}), in groups of
 AMV_GROUP documents per transaction (one document that cannot go stays, the rest goes); one undo takes the whole move back
 within AMV_UNDO_DAYS days (POST /api/docs/office-move/<id>/undo): the folder and the name in the own space, the shares the move
 ended, the receipt's project, the area as it was. A document changed since (recorded as a receipt in the personal office,
@@ -19,21 +20,22 @@ of #4433: out of an organisation only its admin moves a file again, org_out_ok, 
 gets no hint and keeps "Move to office" per document. Agents never (403); another person's documents are never listed (only
 the person's own space)."""
 import json
-from datetime import timedelta
+from datetime import date, timedelta
 
 from flask import jsonify, request
 
 from ..core.config import app
 from ..core.db import body, bump, db, iso, now_utc, parse_iso, usettings, uset
-from ..core.i18n import N_, tr
+from ..core.i18n import N_, short_day, tr
 from ..core.access import Denied
 from ..core.pg import insert_id, system_ctx
 from ..accounts.session import me
 from ..accounts.orgs import is_org_admin
 from ..accounts.spacemove import smv_refuse_agent
 from ..files.store import fs_log_add
-from ..files.fsmove import _rm, fsm_apply, fsm_list_ok, fsm_plan, fsm_share_gone
+from ..files.fsmove import FSM_BOOKED_STAYS, FSM_RECEIPT_STAYS, _rm, fsm_apply, fsm_list_ok, fsm_plan, fsm_share_gone
 from ..notify.push import WD_TICKS
+from ..office.periodlock import _pl_taken, period_need_open, pl_ws_office  # 2.657.0 (#4644): amv_blocks
 from . import store as S
 from .area import ar_office
 from .split import sp_view
@@ -108,6 +110,40 @@ def amv_plan(c, uid, off, nid, dry):
     return plan, None
 
 
+def amv_blocks(c, ids):
+    """2.657.0 (#4644): why documents ids of the own space would stay at a move into an organisation's office, for the whole
+    preview in a fixed number of queries -> {id: reason}. The reasons and texts files/fsmove.py fsm_plan gives such a
+    document, in its order: a receipt of a locked month or taken over by the bookkeeping (office/periodlock.py
+    pl_receipt_need_open), a receipt of the cash book / the equipment list, a booked receipt kept by law, the recognition
+    running. The other checks of fsm_plan (rights, folder rules) and these again run per document at the move (amv_one)."""
+    from ..receipts.suggest import olk_fs_locked_many  # inside, as files/fsmove.py fsm_plan does
+    ids = [int(i) for i in ids]
+    if not ids:
+        return {}
+    q = ",".join("?" * len(ids))
+    out, offices = {}, {}
+    for r in c.execute(f"""SELECT d.node_id, d.ws, d.doc_date, r.paid_at, r.submitted_by, r.set_by FROM rc_receipts r
+                           JOIN doc_meta d ON d.node_id=r.node_id WHERE r.node_id IN ({q}) ORDER BY d.node_id""", ids):
+        if r["ws"] not in offices:
+            offices[r["ws"]] = pl_ws_office(c, r["ws"])
+        oid = offices[r["ws"]]
+        if oid:
+            try:
+                period_need_open(c, oid, r["doc_date"], r["paid_at"])
+                _pl_taken(c, oid, r)
+            except Denied as e:
+                out[r["node_id"]] = e.text()
+    for (i,) in c.execute(f"""SELECT node_id FROM office_cash_entries WHERE node_id IN ({q}) UNION
+                              SELECT receipt_node_id FROM office_equipment WHERE receipt_node_id IN ({q})""", ids + ids):
+        out.setdefault(i, tr(FSM_RECEIPT_STAYS))
+    for i, until in olk_fs_locked_many(c, [x for x in ids if x not in out]).items():
+        out[i] = tr(FSM_BOOKED_STAYS, short_day(date.fromisoformat(until), year=True))
+    for (i,) in c.execute(f"""SELECT node_id FROM doc_meta WHERE node_id IN ({q}) AND state='run' UNION
+                              SELECT node_id FROM file_text WHERE kind='fs' AND node_id IN ({q}) AND state='run'""", ids + ids):
+        out.setdefault(i, tr("A file is being recognised right now. Please try again in a moment."))
+    return out
+
+
 def amv_last(c, uid):
     """The person's last move that can still be undone: {id, n, at, until} or None."""
     r = c.execute("SELECT id, n, created_at FROM doc_office_moves WHERE user_id=? AND undone_at IS NULL ORDER BY id DESC LIMIT 1",
@@ -134,12 +170,12 @@ def amv_get():
     if request.args.get("count") == "1":
         return jsonify(out)
     items = rows[:AMV_LIST]
-    if off[0] == "org":
+    if off[0] == "org":  # 2.657.0 (#4644): the reasons of the whole list at once; fsm_plan only at the move (amv_one)
+        blocks = amv_blocks(c, [x["id"] for x in items])
         for x in items:
-            _, block = amv_plan(c, uid, off, x["id"], True)
-            if block:
-                x.update(pick="stay", block=block)
-    c.rollback()  # the plans write nothing; nothing of a preview stays
+            if x["id"] in blocks:
+                x.update(pick="stay", block=blocks[x["id"]])
+    c.rollback()  # nothing of a preview stays (the period locks' shared locks end here)
     return jsonify(**out, items=items, more=max(0, len(rows) - AMV_LIST))
 
 
