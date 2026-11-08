@@ -197,7 +197,7 @@ async function pdfView(o) {
       cv.setAttribute('aria-label', tr('Page {0}', i + 1));
       if (my !== gen || p.dataset.s !== String(s)) return;
       p.replaceChildren(cv);
-      pv_text(pv_libNow, page, vp, p, () => my === gen && p.dataset.s === String(s) && p.isConnected);  // 2.742.0 (#4861)
+      pv_text(pv_libNow, page, page.getViewport({scale: s}), p, () => my === gen && p.dataset.s === String(s) && p.isConnected);  // 2.742.0 (#4861)
     } catch (e) { if (my === gen) { p.dataset.s = ''; p.innerHTML = `<span class="pvperr">${esc(tr('This page could not be shown'))}</span>`; } }
   };
   const go = n => { n = Math.max(1, Math.min(pages.length, n)); pages[n - 1]?.scrollIntoView({block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'}); cur = n; status(); };
@@ -334,6 +334,8 @@ async function pdfView(o) {
     pages = $$('.pvpage', body);
     $('.pvnav', m).hidden = $('.pvzoom', m).hidden = false;
     layout(); observe(); ahead();
+    const p0 = pages[0], s0 = p0?.dataset.s, g0 = gen;  // 2.742.0 (#4861): the first page drawn ahead gets its text layer too
+    if (s0) doc.getPage(1).then(pg => pv_text(pv_libNow, pg, pg.getViewport({scale: +s0}), p0, () => g0 === gen && p0.dataset.s === s0 && p0.isConnected)).catch(() => {});
     return;
   }
   try {
