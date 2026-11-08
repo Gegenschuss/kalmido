@@ -688,6 +688,9 @@ Column kinds also `checkbox` (1 / 0), `person` (account id of someone who sees t
 and `file` (read only for you: the file name; people upload files in the app).
 2.124.0: a table can have several sheets (`sheet_tabs` lists them, `sheet_add_tab` adds one); read and fill one sheet with
 the tools above and the sheet's id, reach into another sheet with `Name!A1` or `'Sheet name'!A1:B5`.
+2.671.0: a sheet with `kind: "pivot"` is a pivot sheet people set up in the app: it has no cells; `sheet_read` gives its
+computed table in `pivot.result` (`header`, `rows`, `total`, each cell `{v, d}`), always fresh from its source sheet. It
+takes no writes (409): change the source sheet instead.
 
 ### Filed e-mails (2.483.0)
 With `read` you read the e-mails people filed with a client or a project: `list_filed_mails` (`client_id` or `list_id`,

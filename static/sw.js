@@ -62,18 +62,18 @@ const LAZY = ['/static/js/acctset.js', '/static/js/sesview.js', '/static/js/supp
   '/static/js/docnotes.js', '/static/js/life.js', '/static/js/devlink.js', '/static/js/budget.js', '/static/js/integrations.js',
   '/static/js/playbook.js', '/static/js/timeline.js', '/static/js/roadmap.js', '/static/js/feeds.js', '/static/js/bookmarks.js',
   '/static/js/readlater.js', '/static/js/cfkinds.js', '/static/js/mineboard.js', '/static/js/sectpl.js', '/static/js/objprop.js',
-  '/static/js/orgschema.js', '/static/js/asstprop.js', '/static/js/sheetprop.js', '/static/js/sheetfold.js', '/static/js/sheets.js',
-  '/static/js/sheets2.js', '/static/js/sheetsio.js', '/static/js/sheetsize.js', '/static/js/sheetshare.js', '/static/js/sheetchart.js',
-  '/static/js/sheetkinds.js', '/static/js/sheetprint.js', '/static/js/sheetbook.js', '/static/js/sheetfmt.js', '/static/js/sheetfill.js',
-  '/static/js/sheetmove.js', '/static/js/sheetgroup.js', '/static/js/fslock.js', '/static/js/tagsel.js', '/static/js/ablage.js',
-  '/static/js/ablinks.js', '/static/js/family.js', '/static/js/filereq.js', '/static/js/fltdlg.js', '/static/js/office_fints.js',
-  '/static/js/fsshare.js', '/static/js/videorev.js', '/static/js/abscan.js', '/static/js/pubvideo.js', '/static/js/flow.js', '/static/js/hookin.js',
-  '/static/js/polls.js', '/static/js/formq.js', '/static/js/navmenu.js', '/static/js/tourmods.js', '/static/js/office_undo.js',
-  '/static/js/objsave.js', '/static/js/voice.js', '/static/js/hubmailbox.js', '/static/js/mailrules.js', '/static/js/listprint.js',
-  '/static/js/evinvite.js', '/static/js/projtime.js', '/static/js/envs.js', '/static/js/dpmodal.js', '/static/js/gitrepo.js',
-  '/static/js/timesheet.js', '/static/js/absence.js', '/static/js/leave.js', '/static/js/dispo.js', '/static/js/hubmail.js', '/static/js/msvview.js',
-  '/static/js/sprints2.js', '/static/js/sideviews.js', '/static/js/notetrash.js', '/static/js/trashui.js', '/static/js/clientpage.js',
-  '/static/js/whatsnew.js', '/static/js/offcache.js'];
+  '/static/js/orgschema.js', '/static/js/asstprop.js', '/static/js/sheetprop.js', '/static/js/sheetpivot.js', '/static/js/sheetfold.js',
+  '/static/js/sheets.js', '/static/js/sheets2.js', '/static/js/sheetsio.js', '/static/js/sheetsize.js', '/static/js/sheetshare.js',
+  '/static/js/sheetchart.js', '/static/js/sheetkinds.js', '/static/js/sheetprint.js', '/static/js/sheetbook.js', '/static/js/sheetfmt.js',
+  '/static/js/sheetfill.js', '/static/js/sheetmove.js', '/static/js/sheetgroup.js', '/static/js/fslock.js', '/static/js/tagsel.js',
+  '/static/js/ablage.js', '/static/js/ablinks.js', '/static/js/family.js', '/static/js/filereq.js', '/static/js/fltdlg.js',
+  '/static/js/office_fints.js', '/static/js/fsshare.js', '/static/js/videorev.js', '/static/js/abscan.js', '/static/js/pubvideo.js',
+  '/static/js/flow.js', '/static/js/hookin.js', '/static/js/polls.js', '/static/js/formq.js', '/static/js/navmenu.js', '/static/js/tourmods.js',
+  '/static/js/office_undo.js', '/static/js/objsave.js', '/static/js/voice.js', '/static/js/hubmailbox.js', '/static/js/mailrules.js',
+  '/static/js/listprint.js', '/static/js/evinvite.js', '/static/js/projtime.js', '/static/js/envs.js', '/static/js/dpmodal.js',
+  '/static/js/gitrepo.js', '/static/js/timesheet.js', '/static/js/absence.js', '/static/js/leave.js', '/static/js/dispo.js', '/static/js/hubmail.js',
+  '/static/js/msvview.js', '/static/js/sprints2.js', '/static/js/sideviews.js', '/static/js/notetrash.js', '/static/js/trashui.js',
+  '/static/js/clientpage.js', '/static/js/whatsnew.js', '/static/js/offcache.js'];
 // 2.45.0 (#1529): the new cache is filled completely first (addAll fails on any non-2xx -> this install is dropped and the
 // old worker and cache stay); old caches are deleted only when the new one holds the whole shell
 // 2.65.0 (#1824): the stylesheets of the modules loaded on demand (static/css/, LD_CSS in lazyload.js, same order)

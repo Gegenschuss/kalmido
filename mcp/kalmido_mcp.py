@@ -1422,7 +1422,8 @@ TOOLS += [
     # 2.124.0 E (#2116): several sheets in one table
     ("sheet_tabs", "2.124.0 (scope sheets:read): the sheets of a table (id, name, pos, first) - a table can have several sheets like a "
                    "spreadsheet file. Read / change ONE sheet with sheet_read, sheet_set_cells ... and the sheet's id; a formula reaches "
-                   "into another sheet with Name!A1 or 'Sheet name'!A1:B5.",
+                   "into another sheet with Name!A1 or 'Sheet name'!A1:B5. 2.671.0: kind pivot = a pivot sheet (no cells; sheet_read "
+                   "gives its computed table in pivot.result: header, rows, total).",
      _obj({"sheet_id": S_ID}, ["sheet_id"]), lambda api, a: api.call("GET", f"/sheets/{_id(a, 'sheet_id')}/tabs")),
     ("sheet_add_tab", "2.124.0 (scope sheets:write): add a sheet to a table: name?, columns?, rows? (like sheet_create). One call = one "
                       "batch (taking it back moves the new sheet to the trash: sheet_undo_batch with the NEW sheet's id).",

@@ -944,6 +944,7 @@ ROUTES = {
     # deletes and restores sheets of her private table; API v1 through the agents of the same test)
     "GET /api/sheets/{}/tabs": "sheets", "POST /api/sheets/{}/tabs": "sheets", "PATCH /api/sheets/{}/tabs/{}": "sheets",
     "DELETE /api/sheets/{}/tabs/{}": "sheets", "POST /api/sheets/{}/tabs/{}/restore": "sheets",
+    "PUT /api/sheets/{}/tabs/{}/pivot": "sheets",  # 2.671.0 (#3463 b): the setting of a pivot sheet (p2671_c_pivot_test.py)
     "GET /api/v1/sheets/{}/tabs": "sheets", "POST /api/v1/sheets/{}/tabs": "sheets",
     "PATCH /api/sheets/{}/columns/{}": "sheets", "PATCH /api/v1/sheets/{}": "sheets", "POST /api/sheets": "sheets",
     "POST /api/sheets/{}/batches/{}/undo": "sheets", "POST /api/sheets/{}/cells/{}/freeze": "sheets",

@@ -1159,6 +1159,7 @@ ROUTES = {
     # 2.124.0 E (#2116): the sheets of a table (p2124_e_api_test.py: a stranger 404 on every route, another organisation's agent 404)
     "GET /api/sheets/{}/tabs": "sheet", "POST /api/sheets/{}/tabs": "sheet", "PATCH /api/sheets/{}/tabs/{}": "sheet",
     "DELETE /api/sheets/{}/tabs/{}": "sheet", "POST /api/sheets/{}/tabs/{}/restore": "sheet",
+    "PUT /api/sheets/{}/tabs/{}/pivot": "sheet",  # 2.671.0 (#3463 b): p2671_c_pivot_test.py, a stranger 404
     "GET /api/v1/sheets/{}/tabs": "sheet_v1", "POST /api/v1/sheets/{}/tabs": "sheet_v1",
     "DELETE /api/sheets/{}": "sheet", "POST /api/sheets/{}/restore": "sheet", "PUT /api/sheets/{}/cells": "sheet",
     "POST /api/sheets/{}/cells/{}/freeze": "sheet", "POST /api/sheets/{}/cells/{}/name": "sheet",

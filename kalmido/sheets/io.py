@@ -46,6 +46,8 @@ from .shfuncs2 import shf_arg_fill, shf_text_fmts, shf_xl_text_fmt  # 2.578.0 (#
 from .shfmt import (ShfmXl, shfm_import_apply, shfm_load, shfm_xl_merges, shfm_xl_read_rules, shfm_xl_rules,  # 2.578.0 (#3462 C)
                     shfm_xl_styles)
 from .shbook import shb_xlsx, shb_import, shb_pairs, shb_create, SHB_TABS_MAX, shb_quote, shb_xl_ref  # 2.369.5 (#2517): pulled up from functions
+from .shbook import shb_is_pivot  # 2.671.0 (#3463 b)
+from .shpivot import shp_csv  # 2.671.0 (#3463 b)
 
 SHX_FILE_MAX = 10 * 1024 * 1024        # an uploaded file
 SHX_UNZIPPED_MAX = 60 * 1024 * 1024    # the parts of an .xlsx read in all (zip bomb guard)
@@ -120,6 +122,8 @@ def _used_rows(book, at, res):
 # ---------------------------------------------------------------- export: CSV
 def shx_csv(c, sheet):
     """The CSV text (with BOM) of the sheet's values."""
+    if shb_is_pivot(sheet):  # 2.671.0 (#3463 b): a pivot sheet as its computed table
+        return shp_csv(c, sheet)
     book, res, at = _grid(c, sheet)
     lg = lang()
     de = dec_comma(lg)

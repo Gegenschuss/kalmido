@@ -86,7 +86,16 @@ def shb_label(r):
 
 
 def shb_tab(r, i):
-    return {"id": r["id"], "name": shb_label(r), "pos": i, "first": not r["book_id"]}
+    return {"id": r["id"], "name": shb_label(r), "pos": i, "first": not r["book_id"],
+            "kind": "pivot" if shb_is_pivot(r) else "sheet"}  # 2.671.0 (#3463 b): + kind
+
+
+def shb_is_pivot(r):
+    """2.671.0 (#3463 b): is sheet row r a pivot sheet (sheets/shpivot.py: a setting, no cells of its own)?"""
+    try:
+        return bool(r["pivot"])
+    except (KeyError, IndexError, TypeError):
+        return False
 
 
 def shb_dict(c, r):
@@ -94,8 +103,12 @@ def shb_dict(c, r):
     bid = shb_bid(r)
     rows = shb_rows(c, bid)
     first = next((x for x in rows if x["id"] == bid), None)
-    return {"book_id": bid, "book_title": first["title"] if first else r["title"], "tab_name": shb_label(r),
-            "tabs": [shb_tab(x, i) for i, x in enumerate(rows)]}
+    out = {"book_id": bid, "book_title": first["title"] if first else r["title"], "tab_name": shb_label(r),
+           "tabs": [shb_tab(x, i) for i, x in enumerate(rows)], "kind": "pivot" if shb_is_pivot(r) else "sheet"}
+    if shb_is_pivot(r):  # 2.671.0 (#3463 b): the setting and the result computed from the source sheet for this viewer
+        from .shpivot import shp_dict
+        out["pivot"] = shp_dict(c, r)
+    return out
 
 
 def shb_only_books(c, rows):
@@ -312,9 +325,11 @@ def _name_free(rows, name, but=None):
         raise BadInput(tr("A sheet with this name already exists"))
 
 
-def shb_create(c, first, uid, name=None, after_id=None, columns=None, rows=None, agent_id=None, batch=None, copy_of=None):
+def shb_create(c, first, uid, name=None, after_id=None, columns=None, rows=None, agent_id=None, batch=None, copy_of=None, pivot=None):
     """A new sheet in table `first` (its first sheet's row) -> its id. columns / rows as sh_create (default 3 text columns,
-    10 rows); copy_of = a sheet of the table to copy (columns, rows, inputs, names; file cells stay empty)."""
+    10 rows); copy_of = a sheet of the table to copy (columns, rows, inputs, names; file cells stay empty).
+    2.671.0 (#3463 b): pivot = the setting of a pivot sheet (sheets/shpivot.py shp_clean; no columns, no rows); a copy of a
+    pivot sheet is a pivot sheet with its setting."""
     from .core import SH_COLS_MAX, SH_START_COLS, SH_START_ROWS, sh_add_rows, sh_change, sh_clean_col, sh_reload
     tabs = shb_rows(c, first["id"])
     if len(tabs) >= SHB_TABS_MAX:
@@ -340,6 +355,12 @@ def shb_create(c, first, uid, name=None, after_id=None, columns=None, rows=None,
                        "book_id,tab_pos,tab_name) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
                     (first["org_id"], first["owner_id"], name, first["list_id"], uid, ts, ts, uid, agent_id, batch, first["id"], pos, name))
     sh_change(c, tid, batch, agent_id, "create")
+    if copy_of is not None and shb_is_pivot(copy_of):  # 2.671.0 (#3463 b)
+        pivot = {k: v for k, v in json.loads(copy_of["pivot"]).items() if k != "updated_at"}
+    if pivot is not None:
+        from .shpivot import shp_dump
+        c.execute("UPDATE sheets SET pivot=? WHERE id=?", (shp_dump(pivot), tid))
+        return tid
     if copy_of is not None:
         _copy(c, copy_of, tid, uid, ts)
         return tid
@@ -404,7 +425,9 @@ def _need_book(c, sid, write=False):
     from .core import sh_need, sh_reload
     if write:
         need_feat("sheets")
-    r = sh_need(c, sid, write=write)
+    r = sh_need(c, sid)
+    if write:  # 2.671.0 (#3463 b): the rights of the table (asked through a pivot sheet, too: that one takes no write itself)
+        r = sh_need(c, shb_bid(r), write=True)
     first = sh_reload(c, shb_bid(r))
     return first, me()
 
@@ -431,7 +454,8 @@ def sheets_tabs_get(sid):
 
 @app.post("/api/sheets/<int:sid>/tabs")
 def sheets_tabs_add(sid):
-    """{name?, after_id?, copy_of?} -> a new sheet (3 text columns, 10 rows; copy_of: a copy of that sheet) (201)."""
+    """{name?, after_id?, copy_of?, pivot?} -> a new sheet (3 text columns, 10 rows; copy_of: a copy of that sheet) (201).
+    2.671.0 (#3463 b): pivot = {source, rows, cols, values, filter} -> a pivot sheet (sheets/shpivot.py)."""
     from .core import sh_touch
     c = db()
     first, uid = _need_book(c, sid, write=True)
@@ -442,7 +466,11 @@ def sheets_tabs_add(sid):
     src = None
     if b.get("copy_of") is not None:
         src = _need_tab(c, first, b.get("copy_of"))
-    tid = shb_create(c, first, uid, b.get("name"), after, copy_of=src)
+    pv = None
+    if b.get("pivot") is not None and src is None:  # 2.671.0 (#3463 b)
+        from .shpivot import shp_clean
+        pv = shp_clean(c, first, b.get("pivot"))
+    tid = shb_create(c, first, uid, b.get("name"), after, copy_of=src, pivot=pv)
     sh_touch(c, tid, uid)
     r = c.execute("SELECT * FROM sheets WHERE id=?", (tid,)).fetchone()
     return _answer(c, first, 201, tab={"id": tid, "name": shb_label(r)})
@@ -649,6 +677,11 @@ def shb_xlsx(c, sheet_row):
     from .shfmt import ShfmXl  # 2.578.0 (#3462 C): the cell formats of all sheets in one registry
     reg = ShfmXl()
     for k, r in enumerate(rows, 1):
+        if shb_is_pivot(r):  # 2.671.0 (#3463 b): a pivot sheet as its computed values (fixed styles only)
+            from .shpivot import shp_xlsx_sheet
+            parts[f"xl/worksheets/sheet{k}.xml"] = shp_xlsx_sheet(c, r, reg)
+            wsheets.append(names[r["id"]])
+            continue
         z = zipfile.ZipFile(_io.BytesIO(shx_xlsx(c, dict(r) | {"title": names[r["id"]]}, names, reg)))
         st = z.read("xl/styles.xml").decode()
         m = _DXF.search(st)
@@ -740,7 +773,7 @@ def v1_sheet_tab_add(sid):
     _check_fields(b, ("name", "columns", "rows"))
     agent_id, batch = _write_ctx()
     c = db()
-    r = sh_need(c, sid, write=True)
+    r = sh_need(c, shb_bid(sh_need(c, sid)), write=True)  # 2.671.0 (#3463 b): the table's rights (also asked through a pivot sheet)
     cols, rows = b.get("columns"), b.get("rows")
     if cols is not None and not isinstance(cols, list):
         raise BadInput(tr("Invalid value: {0}", "columns"))
@@ -758,7 +791,9 @@ def shb_spec(paths, schemas, op, ok, errs, ref, pid, q, inputs, col_in, write):
     sid = pid("id", "Table id (any of its sheets)")
     tab = {"type": "object", "properties": {"id": {"type": "integer", "description": "The sheet's id: use it like a table id"},
                                             "name": {"type": "string"}, "pos": {"type": "integer"},
-                                            "first": {"type": "boolean", "description": "The first sheet carries the table"}}}
+                                            "first": {"type": "boolean", "description": "The first sheet carries the table"},
+                                            "kind": {"type": "string", "enum": ["sheet", "pivot"],  # 2.671.0 (#3463 b)
+                                                     "description": "pivot = a pivot sheet: read its computed table in `pivot.result` of the sheet"}}}
     paths["/sheets/{id}/tabs"] = {
         "get": op("The sheets of a table (2.124.0)", T, ok({"type": "object", "properties": {"data": {"type": "array", "items": tab},
                                                                                             "book_id": {"type": "integer"}}})

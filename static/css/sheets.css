@@ -248,6 +248,20 @@ html.mini-sheet .shvtop>a.btn{display:none}
 .shp-set legend{font-weight:600;margin-bottom:.25rem;width:100%}
 .shp-opts{flex-direction:column}
 .shp-hint{width:100%}
+/* 2.671.0 (#3463 b): the pivot sheet (sheetpivot.js): its computed table, read-only, totals bold */
+.spv-src{display:flex;align-items:center;gap:.375rem;margin:.25rem 0 .5rem}
+.spv-body{flex:1;min-height:0;display:flex;flex-direction:column}
+.spv-scroll{overflow:auto;max-width:100%;border:1px solid var(--line);border-radius:var(--r-s)}
+.spv-grid{border-collapse:collapse;min-width:100%}
+.spv-grid th,.spv-grid td{padding:.375rem .625rem;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+.spv-grid thead th{position:sticky;top:0;background:var(--bg2);font-weight:600}
+.spv-grid tbody th{font-weight:500}
+.spv-grid .num{text-align:right;font-variant-numeric:tabular-nums}
+.spv-grid tfoot th,.spv-grid tfoot td{font-weight:600;background:var(--bg2);border-top:2px solid var(--line)}
+.spv-dlg fieldset{border:0;padding:0;margin:0 0 .75rem}
+.spv-dlg legend{font-weight:600;margin-bottom:.25rem}
+.spv-val{display:flex;gap:.5rem;align-items:center}
+.spv-fvals{display:flex;flex-direction:column;max-height:12rem;overflow:auto;gap:.125rem}
 /* 2.124.0 E (#2116): the sheet bar under the grid (sheetbook.js): tabs that scroll sideways on a phone, the open one in the
    accent; one sheet = only a quiet "+" */
 .shbbar{display:flex;align-items:center;gap:.25rem;margin-top:.5rem;min-width:0;border-top:.0625rem solid var(--line)}

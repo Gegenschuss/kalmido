@@ -15,7 +15,7 @@ function shb_barHtml(sh) {
   if (tabs.length < 2) return `<div class="shbbar one">${add}</div>`;
   return `<div class="shbbar"><div class="shbtabs" role="tablist" aria-label="${esc(tr('Sheets'))}">${tabs.map(t => {
     const on = t.id === sh.id;
-    return `<button type="button" role="tab" class="shbtab${on ? ' on' : ''}" aria-selected="${on}" ${on ? 'aria-haspopup="menu"' : ''} data-shb="tab" data-id="${t.id}" ${w && !rowd_touch() ? 'draggable="true"' : ''} title="${esc(on && w ? tr('Sheet menu') : t.name)}">${esc(t.name)}${on && w ? ic('down', 's') : ''}</button>`;
+    return `<button type="button" role="tab" class="shbtab${on ? ' on' : ''}" aria-selected="${on}" ${on ? 'aria-haspopup="menu"' : ''} data-shb="tab" data-id="${t.id}" ${w && !rowd_touch() ? 'draggable="true"' : ''} title="${esc(on && w ? tr('Sheet menu') : t.name)}">${t.kind === 'pivot' ? ic('columns', 's') : '' /* 2.671.0 (#3463 b) */}${esc(t.name)}${on && w ? ic('down', 's') : ''}</button>`;
   }).join('')}</div>${add}</div>`;
 }
 
@@ -68,10 +68,17 @@ async function shbDelete(sh, tid) {
     redo: async () => { await shbReq('DELETE', shbUrl(bid, tid)); await shbAfter(next?.id); return {skipped: []}; }});
   histToast(tr('Sheet {0} deleted', qn(name)), e);
 }
+// 2.671.0 (#3463 b): a new pivot sheet from the open sheet / the open pivot's setting: the dialog loads on demand (sheetpivot.js)
+async function shbPivot(sh, edit) {
+  try { await loadModule('sheetpivot'); } catch (e) { toast(/** @type {any} */ (e).message); return; }
+  if (typeof spv_dialog === 'function') spv_dialog(sh, edit ? sh.pivot : null);
+}
 function shbMenu(sh, tid, a) {
   const tabs = shbTabs(), i = tabs.findIndex(t => t.id === tid), t = tabs[i]; if (!t) return;
   menu(a, [{label: tr('Rename…'), icon: 'edit', fn: () => shbRename(sh, tid)},
     {label: tr('Duplicate'), icon: 'copy', fn: () => shbAdd(sh, true)},
+    {label: tr('New pivot sheet…'), icon: 'columns', fn: () => shbPivot(sh, false)},  // 2.671.0 (#3463 b): sheetpivot.js
+    ...(t.kind === 'pivot' ? [{label: tr('Edit pivot…'), icon: 'edit', fn: () => shbPivot(sh, true)}] : []),
     ...(i > 0 ? [{label: tr('Move left'), icon: 'left', fn: () => shbMove(sh, tid, i - 1)}] : []),
     ...(i < tabs.length - 1 ? [{label: tr('Move right'), icon: 'right', fn: () => shbMove(sh, tid, i + 1)}] : []),
     ...(t.first ? [] : ['-', {label: tr('Delete sheet'), icon: 'trash', cls: 'flag-5', fn: () => shbDelete(sh, tid)}])], null, null, t.name);

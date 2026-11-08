@@ -37,6 +37,7 @@ from .vars import (SH_HERE_WORDS, SH_VAR_TYPE, sh_field_key, sh_field_word, sh_f
 from .shkinds import SHK_KINDS, _shk_file_swap, shk_plain, shk_raw  # 2.124.0 B (#2110): checkbox, person, link, file
 from .shbook import (shb_cell_stats, shb_counts, shb_deleted, shb_dict, shb_display, shb_internal, shb_only_books, shb_pairs, shb_rights_row,
                      shb_check, shb_touch)  # 2.124.0 E (#2116): several sheets in one table
+from .shbook import shb_is_pivot  # 2.671.0 (#3463 b)
 from ..accounts.orgs import user_orgs  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgroles import need_org_area, org_sees_all, org_readonly, user_orgs_full  # 2.369.5 (#2517): pulled up from functions
 from .shhist import shh_log, shh_meta  # 2.369.5 (#2517): pulled up from functions; 2.564.0 (#4701): shh_meta
@@ -178,6 +179,8 @@ def sh_need(c, sid, write=False, deleted=False):
         raise Denied(404)
     if write and not sh_may(c, uid, r, write=True):
         raise Denied(403)
+    if write and not deleted and r["book_id"] and shb_is_pivot(r):  # 2.671.0 (#3463 b): no cells, rows or columns of its own
+        raise Denied(409, tr("A pivot sheet is computed from its source sheet: change the source sheet"))
     return r
 
 

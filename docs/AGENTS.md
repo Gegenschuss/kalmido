@@ -4490,6 +4490,13 @@ space, project and shares are the table's: whoever may read the table reads all 
 sheet of the same table with `Name!A1` or `'Sheet name'!A1:B5` (also in `SUMMEWENN`, `SVERWEIS` ...); a renamed sheet keeps
 its formulas, a sheet in the trash gives `ref`. Taking back the call that added a sheet moves the sheet to the trash.
 
+**Pivot sheets (2.671.0).** A sheet with `kind: "pivot"` (in `tabs` and in the sheet itself) is a pivot sheet a person set up
+in the app: it has no cells, rows or columns of its own. `GET /api/v1/sheets/{id}` (`sheet_read`) gives its setting and its
+table in `pivot`: `source` (the sheet it reads), `rows` / `cols` (column ids of the source), `values` (`[{col, agg: sum |
+count | avg}]`), `filter` (`[{col, values}]`) and `result` = `{header: [texts], rows: [[{v, d}]], total: [{v, d}] | null,
+keys, truncated, error}` (`v` the value, `d` the shown text), computed from the source sheet on every read with the same
+functions as `SUMME` / `MITTELWERT`. Writes to a pivot sheet are refused (409): change the source sheet.
+
 **Cell format and colour rules (2.578.0).** A cell of `sheet_read` has `fmt` (`null` = none): `{bold, italic, wrap: true,
 color / fill: a | a2 | g1 | g2 | g3 (accent, light accent, dark / middle / light grey - no other colours), align: left |
 center | right, merge: [rows, columns]}` on top of its column's kind. Change it with `sheet_set_cells`: `fmt_patch:

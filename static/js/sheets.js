@@ -160,6 +160,7 @@ function viewSheets() {
   if (SHV.errFor !== r.sh + ':' + S.v && (!SHV.sh || SHV.sh.id !== r.sh || (SHV.sh._v !== S.v && !SHV.ed))) shvLoad(r.sh);
   const sh = SHV.sh && SHV.sh.id === r.sh ? SHV.sh : null;
   if (!sh) return `<div class="shvwrap"><div class="shvtop"><a class="btn sm" href="#sheets">${ic('back', 's')}${tr('Tables')}</a></div><p class="muted lempty" role="status">${SHV.err && SHV.errFor === r.sh + ':' + S.v ? esc(SHV.err) : tr('Loading…')}</p></div>`;
+  if (sh.kind === 'pivot') { if (typeof spv_html === 'function') return spv_html(sh); ld_later('sheetpivot'); return `<p class="muted lempty" role="status">${tr('Loading…')}</p>`; }  // 2.671.0 (#3463 b): sheetpivot.js
   return shvSheetHtml(sh);
 }
 function shvOverview(lid) {
