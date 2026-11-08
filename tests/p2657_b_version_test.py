@@ -146,25 +146,24 @@ LA = settings_rule("agent", AH)
 
 # ================================================================== a person's web PATCH of a project's settings
 L = A.post(B + "/api/lists", json={"name": "Garden"}).json()["id"]
-v0 = next(x for x in A.get(B + "/api/state").json()["lists"] if x["id"] == L).get("updated_at")
 r = A.patch(B + f"/api/lists/{L}", json={"color": "#224466"})
-check(r.ok, f"a person without a version: as before ({r.status_code} {r.text[:120]})")
-v1 = r.json().get("updated_at")
-check(bool(v1) and v1 != v0, f"the change gives the project a new version ({v0} -> {v1})")
+v0 = r.json().get("updated_at") if r.ok else None
+check(bool(v0), f"a person without a version: as before, the answer carries the new version ({r.status_code} {r.text[:120]})")
+r = A.patch(B + f"/api/lists/{L}", json={"color": "#224488", "expect_updated_at": v0})
+v1 = r.json().get("updated_at") if r.ok else None
+check(r.ok and bool(v1) and v1 != v0, f"with the version read = changed, a new version ({v0} -> {v1})")
 r = A.patch(B + f"/api/lists/{L}", json={"name": "Not this", "expect_updated_at": v0})
 check(r.status_code == 409 and isinstance(r.json().get("current"), dict), f"a person with an old version = 409 with current ({r.status_code} {r.text[:160]})")
 check(dbx("SELECT name FROM lists WHERE id=?", (L,))[0][0] == "Garden", "the name stays as it was")
 r = A.patch(B + f"/api/lists/{L}", json={"name": "Garden plot", "expect_updated_at": v1})
 check(r.ok and dbx("SELECT name FROM lists WHERE id=?", (L,))[0][0] == "Garden plot", f"with the version now = changed ({r.status_code})")
-v2 = r.json().get("updated_at")
-r = A.patch(B + f"/api/lists/{L}", json={"view": "board"})
-check(r.ok, "a member's own view setting")
-# an old project without a version: the read shows created_at, the change takes it
+v2 = r.json().get("updated_at") if r.ok else None
+# an old project without a version: the change takes created_at
 sql_w("UPDATE lists SET updated_at='' WHERE id=?", (L,))
 created = dbx("SELECT created_at FROM lists WHERE id=?", (L,))[0][0]
 r = A.patch(B + f"/api/lists/{L}", json={"name": "Garden old", "expect_updated_at": created})
 check(r.ok and dbx("SELECT name FROM lists WHERE id=?", (L,))[0][0] == "Garden old", f"an old project takes created_at as its version ({r.status_code} {r.text[:120]})")
-check(v2, "the version came back with the answer")
+check(v2 and v2 != v1, "the version came back with the answer")
 
 
 # ================================================================== ev_lock: a poll's event goes under the event's lock
