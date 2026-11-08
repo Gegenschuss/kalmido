@@ -106,6 +106,7 @@ from ..files.fslock import fl_is_locked, fsl_denied
 from ..accounts.orgretain import upg_heir
 
 from .objhooks import BOUNDARY  # 2.649.0 (#5051)
+from .undogroups import ug_drop  # 2.747.0 (#5249): a person's step groups go where their undo rows go
 from .objhooks import FOLLOW, OBJ, REVOKE  # kind -> the registered hooks; what a person loses (core/objhooks.py: accounts reads them)
 OBJ_RANK = {None: 0, "view": 1, "edit": 2, "manage": 3}
 OBJ_ROLES = ("view", "edit", "manage")
@@ -957,6 +958,7 @@ def obj_revoke_person(c, uid, org, reason, heir=None, role=None):
                     mt, key = reg["members"]
                     out[mt] = _take(c, mt, f"user_id IN ({q}) AND {key} IN (SELECT id FROM {reg['table']} WHERE org_id=?)",
                                     (*ppl, int(org)), reason, by, int(org), "user_id", kind=reg["kind"])
+            ug_drop(c, "user_id=? AND org_id=?", (int(uid), int(org)))  # 2.747.0 (#5249): the step groups there with their parts
             c.execute("DELETE FROM obj_undo WHERE user_id=? AND org_id=?", (int(uid), int(org)))
             if heir and heir != uid:
                 for reg in OBJ.values():
@@ -994,6 +996,7 @@ def obj_revoke_person(c, uid, org, reason, heir=None, role=None):
                                     f"{reg['table']} k WHERE k.id={mt}.{key} AND (k.owner_id={mt}.user_id OR EXISTS (SELECT 1 FROM "
                                     f"agents a WHERE a.user_id={mt}.user_id AND a.owner_id=k.owner_id)))",
                                     (int(org),), reason, by, int(org), "user_id", kind=reg["kind"])
+            ug_drop(c, "org_id=?", (int(org),))  # 2.747.0 (#5249)
             c.execute("DELETE FROM obj_undo WHERE org_id=?", (int(org),))
         elif reason == "delete" and uid:
             for reg in OBJ.values():  # review F1: an organisation's object stays with it, the heir owns it (owner_id cascades)
@@ -1011,6 +1014,7 @@ def obj_revoke_person(c, uid, org, reason, heir=None, role=None):
                                         "AND COALESCE(u.kind,'')!='agent'", (n["id"], int(uid))).fetchone()[0]
                         if nxt:
                             c.execute("UPDATE fs_nodes SET owner_id=? WHERE id=?", (int(nxt), n["id"]))
+            ug_drop(c, "user_id=?", (int(uid),))  # 2.747.0 (#5249)
             c.execute("DELETE FROM obj_undo WHERE user_id=?", (int(uid),))
             c.execute("UPDATE obj_history SET user_id=NULL WHERE user_id=?", (int(uid),))
             c.execute("UPDATE obj_revoked SET by_id=NULL WHERE by_id=?", (int(uid),))

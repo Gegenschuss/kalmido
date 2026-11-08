@@ -117,6 +117,7 @@ KINDS = {
     # 2.89.0 (#1916): tables belong to one organisation (every member) or one person (org_id NULL, owner_id); attached to a list
     # the list decides; Kalmido variables in formulas are evaluated per viewer (a source they may not see: "denied", no name / value)
     "obj": ("matrix", "obj_core_test.py, obj_write_test.py, p2579_c_api_test.py (2.579.0: saved document views, their counts / hits / sharing): a core object (2.558.0, core/objects.py) of another organisation / person: 404 for the person and her agent (read, list, change, trash, restore, delete, history, undo, shares); shares only to the same workspace"),
+    "undo": ("matrix", "p2747_b_undo_core_test.py (2.747.0, #5249): another person's step group: not listed, 404 on undo / redo; an agent 403"),
     "sheet": ("matrix", "p2528_c_sheets_test.py (the trash of tables), p289_a_api_test.py: a table of another organisation / person / list: 404 (read, change, cells, columns, rows, "
                         "trash, presence, completion); a formula's source of another workspace cannot be chosen and shows no value"),
     # 2.124.0 C (#2113): one table shared with single people / agents (sheets/shshare.py): only people / agents of the table's
@@ -1152,6 +1153,7 @@ ROUTES = {
     "POST /api/obj/{}/{}/shares": "obj", "DELETE /api/obj/{}/{}/shares/{}": "obj", "POST /api/obj/{}/{}/shares/{}/restore": "obj",
     "GET /api/v1/agent/objects/{}": "obj", "GET /api/v1/agent/objects/{}/{}": "obj", "PATCH /api/v1/agent/objects/{}/{}": "obj",
     "POST /api/v1/agent/objects/{}/{}/proposals": "obj",  # 2.623.0 (#4718): an agent's change proposal (p2623_c_objprop_test.py, tenant-matrix: obj)
+    "GET /api/undo": "undo", "POST /api/undo/to/{}": "undo", "POST /api/undo/{}/redo": "undo",  # 2.747.0 (#5249): the own step groups (p2747_b_undo_core_test.py)
     # 2.96.0 B (#1941): a table to the other workspace (p296_b_api_test.py)
     "POST /api/sheets/{}/move-space": "sheet",
     # 2.401.0 (#2924): the dry run of a project's workspace change (p2401_a_api_test.py)

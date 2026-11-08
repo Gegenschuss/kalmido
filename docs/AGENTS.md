@@ -1162,6 +1162,9 @@ An agent account must say which version it read whenever it changes content a pe
 the app are unchanged). Without one the write answers `400` with
 `{"error": {"code": "version_required", "message": "...", "fields": [the keys that would do]}}` and nothing changes;
 with an old one it answers `409` `conflict` with the state now under `current` (read it, decide anew, never just resend).
+Undo steps (2.747.0): an agent's writes record no undo steps of a person, and the routes of a person's last steps
+(`/api/undo`) answer `403` to an agent; they are not part of the REST API or MCP. A person takes an agent's change back
+through its proposal, batch or decision instead.
 Read first, send the version back:
 
 | Area | Write | Version to send | Read it from |

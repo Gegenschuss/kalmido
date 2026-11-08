@@ -30,6 +30,7 @@ from flask import g, jsonify
 from ..core.config import app, APP_VERSION, DATABASE_URL
 from ..core.db import connect, db, gset, gsetting, iso, now_utc
 from ..core.db import db_log_err  # 2.239.0 B (#2888): no values of database errors in the log
+from ..core.undogroups import undo_count  # 2.747.0 (#5249): GET /api/admin/retention
 from ..core.pg import POOL_MAX_ALL, WEB_PROC, WEB_PROCS, WEB_THREADS, WEB_THREADS_ALL, connect_direct, pool_stats
 from ..core.reqtime import rt_stats
 from ..accounts.session import _BG_TURN, GATE
@@ -276,7 +277,8 @@ def admin_health():
 def admin_retention():
     """2.152.0 (#2165): admins of the server: the retention runs (switch, period, last result in numbers). No user data."""
     need_admin()
-    return jsonify(ret_status(db()))
+    c = db()
+    return jsonify({**ret_status(c), "undo": undo_count(c)})  # 2.747.0 (#5249): the undo steps in numbers (groups, bytes, oldest)
 
 
 # ---- 2.642.0 (#4975): KALMIDO_WEB_PROCS -- several web processes of one container on the same port ---------------------------

@@ -21,6 +21,7 @@ LAYERS = (
 )
 LAYER_OF = {"admin.migrate": "core", "api.common": "core", "accounts.orgback": "domain",
             "core.objects": "domain", "core.writes": "domain", "core.objweb": "integrations",
+            "core.undoweb": "domain",  # 2.747.0 (#5249): the step groups' routes stand on the write path
             "docs.mailnamed": "integrations"}  # the move from SQLite runs inside init_db; 2.149.0 G (#2517): the v1 helpers are infrastructure; 2.365.1 (#3395): orgback calls every area; 2.558.0 (#4709): the shared core stands on the file store and accounts, its routes on the API
 
 ORDER = (
@@ -556,6 +557,7 @@ ORDER = (
     "office.pbtransfer",  # 2.137.0 D (#1981): the personal office into an existing organisation (after office.officemove)
     "office.owrite",  # 2.567.0 (#4711): the one write call of an office row on the core's write layer (lock, version, history, undo)
     "office.undo",  # 2.111.0 A (#2233): undo of the office editors (copies before each own change, restore with conflict check)
+    "office.undogrp",  # 2.747.0 (#5249): who may take an office step back from the core's step groups (after office.undo)
     "office.otrash",  # 2.272.0 E2 (#3038): the office trash (deleted drafts and master data, restore, purge after the period)
     "tasks.atttrash",  # 2.272.0 E2 (#3038): the trash run of task / comment / project files (no routes)
     "office.numranges",  # 2.138.0 D (#2256): the next running number of every number series (office admin)
@@ -575,6 +577,8 @@ ORDER = (
     "agents.ideaprop",  # 2.156.0 A (#1201): "Add ideas" in the mind map -- an agent proposes sub-branches
     "lists.rules",  # 2.71.0 A (#1457): rules of a list (When ... then ...), after api.v1
     "core.objects", "core.writes", "core.objweb",  # 2.558.0 (#4709): the shared core (register, roles, write path) and its generic routes
+    "core.undogroups",  # 2.747.0 (#5249): the step groups per account (storage, limits, prune; no routes)
+    "core.undoweb",  # 2.747.0 (#5249): undo across devices -- the own step groups listed and taken back (GET /api/undo)
     "agents.objprop",  # 2.623.0 (#4718): an agent's change of a core object as a proposal a person accepts (after core.objweb)
     "collab.tcxcore",  # 2.565.0 (#4719): the team chat's channels and groups as a kind of the shared core (no routes of its own)
     "lists.lmcore",  # 2.568.0 (#4739): the projects as a kind of the shared core (shares, revocation, settings history)

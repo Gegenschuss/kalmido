@@ -157,6 +157,14 @@ c.commit()
   (agents must send it), only the fields sent, undo step, `updated_at` / `updated_by`, history (an encrypted column stays
   sealed there), `bump`. The area checks its rights before, as it always did. `office/undo.py` keeps its route and header
   and runs on `obj_undo_run` (the steps live in `obj_undo`).
+- Undo across devices, stage 1 (2.747.0, #5249): every write of a person that records a step (`obj_undo_pre`, also
+  without the editor header) adds it as a part of the request's step group per account (`core/undogroups.py`,
+  table `undo_groups`; the header `X-Kalmido-Undo-Group` bundles several requests within 10 seconds, `X-Kalmido-Device`
+  names the device). 30 days, 300 groups per person, 256 KB per part, 2 MB or 1000 parts per group (above: listed as
+  `toobig`, no copy). `core/undoweb.py`: `GET /api/undo`, `POST /api/undo/to/<id>` (newest first, the rights of now,
+  a part that changed since stays and is named, a barrier stops), `POST /api/undo/<id>/redo`; `undo_barrier` for
+  finalising / sending; a tracked kind registers who may take its steps back (`undo_need_reg`, the office in
+  `office/undo.py`), a kind without one is never written back. People only (agents 403).
 - Stage 2b (2.576.0, #4794): a 409 of `ow_write` carries the current state under `current` only (the old keys `row` /
   `letter` / `client` went). Every office row on `ow_write` has its history route `GET <its save path>/history`
   (`ow_history_answer`; e.g. `/api/office/trips/<id>/history`, `/api/clients/<id>/history`): the route runs the rights

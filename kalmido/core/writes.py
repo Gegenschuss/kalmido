@@ -14,6 +14,8 @@ Undo: obj_undo(c, uid, kind, id, sess, op) generalises office/undo.py -- a copy 
 editor session (header X-Kalmido-Undo: <token>), written back only while the object is exactly as that step left it
 (fingerprint; someone else's change in between = 409). undo_scope of the kind = more tables than the main row (stage 2: the
 office's documents with their parts).
+2.747.0 (#5249): every write of a person records its step (not only with the header) as a part of the request's step group
+per account (core/undogroups.py, kept UNDO_KEEP_D days); core/undoweb.py lists the groups and takes them back (GET /api/undo).
 Adapters for write paths that do not go through obj_write yet (stage 2 ff., like office/otrash.py otb_put):
   obj_undo_pre(c, uid, kind, id) / obj_undo_post(c)      record a step around an own write (in its transaction)
   obj_history_add(c, uid, kind, id, before, after, action) note a change in the history
@@ -43,6 +45,7 @@ from flask import g, has_request_context, request
 from .access import Denied, acx_of, acx_org_ok, need_feat
 from .conflict import VersionRequired, ccf_check
 from .db import bump, insert_id, iso, iso_ms, now_utc
+from .undogroups import UG_LABEL, UG_LABEL_PLAIN, UNDO_KEEP_D, ug_added, ug_current, ug_fits, ug_gc, ug_gids  # 2.747.0 (#5249)
 from .errors import BadInput, UnknownFields
 from .i18n import N_, tr
 from .objects import OBJ_COLS, obj_need, obj_node_follow, obj_public, obj_reg, obj_row, obj_title, obj_forget
@@ -58,7 +61,7 @@ OBJ_HISTORY_MAX = 200  # entries kept per object (the oldest go)
 META_KEYS = ("expect_updated_at",)
 UNDO_HDR = "X-Kalmido-Undo"  # the same header as office/undo.py (static/js/office_undo.js, static/js/objsave.js)
 UNDO_OPS = ("undo", "redo", "all", "redoall")
-UNDO_KEEP_H = 24
+UNDO_KEEP_H = 24 * UNDO_KEEP_D  # 2.747.0 (#5249): 30 days (was 24 hours), the steps are listed per account now (core/undogroups.py)
 UNDO_MAX_STEPS = 60
 UNDO_FIXED = {"id", "org_id", "owner_id", "kind", "created_at", "created_by", "rev", "updated_at", "updated_by", "deleted_at", "deleted_by"}
 UNDO_NO_FP = {"updated_at", "rev", "updated_by"}
@@ -385,8 +388,10 @@ def obj_purge(c, uid, kind, rid):
     obj_need(c, uid, kind, rid, "manage", trash=True)
     write_lock(c, f"obj-{kind}-{int(rid)}")
     fs_ref_drop(c, kind, rid)
+    gids = ug_gids(c, "kind=? AND ref_id=?", (kind, int(rid)))  # 2.747.0 (#5249): the step groups of its undo rows
     for t in ("obj_history", "obj_undo", "obj_revoked"):
         c.execute(f"DELETE FROM {t} WHERE kind=? AND ref_id=?", (kind, int(rid)))
+    ug_gc(c, gids)
     c.execute(f"DELETE FROM {reg['table']} WHERE id=?", (int(rid),))
     obj_forget()
     bump(c, _area(reg))
@@ -473,28 +478,46 @@ def _token():
 
 
 def obj_undo_pre(c, uid, kind, rid, oid=None):
-    """Before a write changes the object: with the header (a person's editor session), the state before = one step."""
-    tok = _token()
-    if not tok or obj_is_agent(c, uid):
+    """Before a write changes the object: the state before = one step. 2.747.0 (#5249): of every write of a person in a
+    request, as a part of the request's step group (core/undogroups.py); with the header X-Kalmido-Undo also a step of that
+    editor session (the same row). Agents and writes outside a request record nothing."""
+    if not has_request_context() or obj_is_agent(c, uid):
         return
+    tok = _token()
     sc = undo_scope(kind, rid, oid)
     _lock_rows(c, sc)
     snap = _snap(c, sc)
     main = (snap.get(sc[0][0]) or [None])[0]
     if not main:
         return
-    key = (uid, tok, kind, int(rid))
-    c.execute("DELETE FROM obj_undo WHERE user_id=? AND sess=? AND kind=? AND ref_id=? AND state<>'done'", key)  # a new step ends the way forward
-    rows = c.execute("SELECT id, seq, fp_after FROM obj_undo WHERE user_id=? AND sess=? AND kind=? AND ref_id=? ORDER BY seq", key).fetchall()
-    if not rows:
-        c.execute("DELETE FROM obj_undo WHERE created_at<?", (iso(now_utc() - timedelta(hours=UNDO_KEEP_H)),))
-    elif len(rows) >= UNDO_MAX_STEPS:
-        c.execute("UPDATE obj_undo SET fp_after=? WHERE id=?", (rows[1]["fp_after"], rows[0]["id"]))
-        c.execute("DELETE FROM obj_undo WHERE id=?", (rows[1]["id"],))
-    sid = insert_id(c, "INSERT INTO obj_undo(org_id, user_id, sess, kind, ref_id, seq, state, snap, fp_before, fp_after, created_at) "
-                       "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
-                    (main.get("org_id"), uid, tok, kind, int(rid), (rows[-1]["seq"] + 1) if rows else 1, "done",
-                     json.dumps(snap, ensure_ascii=False, default=str), _fp(snap, _nofp(kind)), "", iso(now_utc())))
+    js = json.dumps(snap, ensure_ascii=False, default=str)
+    n = len(js.encode())
+    reg = _reg(kind)
+    label = (UG_LABEL, [[reg["label"]]]) if reg.get("label") else (UG_LABEL_PLAIN, [])
+    grp = ug_current(c, uid, _area(reg), main.get("org_id"), label)
+    gid = grp["id"] if grp is not None and ug_fits(c, grp, n) else None
+    if not tok and gid is None:
+        return  # a group too big for copies: listed, nothing to keep
+    seq = 1
+    if tok:
+        key = (uid, tok, kind, int(rid))
+        gone = ug_gids(c, "user_id=? AND sess=? AND kind=? AND ref_id=? AND state<>'done'", key)
+        c.execute("DELETE FROM obj_undo WHERE user_id=? AND sess=? AND kind=? AND ref_id=? AND state<>'done'", key)  # a new step ends the way forward
+        rows = c.execute("SELECT id, seq, fp_after, group_id FROM obj_undo WHERE user_id=? AND sess=? AND kind=? AND ref_id=? ORDER BY seq", key).fetchall()
+        if not rows:
+            c.execute("DELETE FROM obj_undo WHERE created_at<?", (iso(now_utc() - timedelta(hours=UNDO_KEEP_H)),))
+        elif len(rows) >= UNDO_MAX_STEPS:
+            c.execute("UPDATE obj_undo SET fp_after=? WHERE id=?", (rows[1]["fp_after"], rows[0]["id"]))
+            c.execute("DELETE FROM obj_undo WHERE id=?", (rows[1]["id"],))
+            gone.append(rows[1]["group_id"])  # 2.747.0 (#5249): its group keeps the other parts (or goes, ug_gc)
+        ug_gc(c, gone)
+        seq = (rows[-1]["seq"] + 1) if rows else 1
+    sid = insert_id(c, "INSERT INTO obj_undo(org_id, user_id, sess, kind, ref_id, seq, state, snap, fp_before, fp_after, created_at, "
+                       "group_id, mode, bytes) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (main.get("org_id"), uid, tok, kind, int(rid), seq, "done", js, _fp(snap, _nofp(kind)), "", iso(now_utc()),
+                     gid, "snap", n))
+    if gid is not None:
+        ug_added(c, grp, n)
     g.obj_undo_step = (sid, sc, _nofp(kind))
 
 
@@ -591,16 +614,20 @@ def obj_undo_run(c, uid, kind, rid, oid, sess, op="undo", fix=None, keep=None):
         for st in undone if op == "redoall" else undone[:1]:
             a, z = _redo_one(c, sc, c.execute("SELECT * FROM obj_undo WHERE id=?", (st["id"],)).fetchone(), uid, reg, fix)
             first, last = first or a, z
-    t = sc[0][0]
-    b0, a0 = (first.get(t) or [{}])[0], (last.get(t) or [{}])[0]
-    keys = reg["fields"] if reg["fields"] is not None else [k for k in {**b0, **a0} if k not in UNDO_FIXED and k not in UNDO_NO_FP]
-    diff = [k for k in keys if not _same(b0.get(k), a0.get(k))]
-    obj_history_add(c, uid, kind, rid, {k: b0.get(k) for k in diff}, {k: a0.get(k) for k in diff}, action="undo" if op in ("undo", "all") else "redo",
-                    org_id=oid, agent=False)
+    obj_undo_hist(c, uid, kind, rid, oid, reg, sc, first, last, "undo" if op in ("undo", "all") else "redo")
     bump(c, _area(reg))
     left = c.execute("SELECT state, COUNT(*) FROM obj_undo WHERE user_id=? AND sess=? AND kind=? AND ref_id=? GROUP BY state",
                      (uid, tok, kind, int(rid))).fetchall()
     return {r[0]: r[1] for r in left}
+
+
+def obj_undo_hist(c, uid, kind, rid, oid, reg, sc, first, last, action):
+    """The history entry of an undo / redo: the main row's fields from first (before it) to last (after it)."""
+    t = sc[0][0]
+    b0, a0 = (first.get(t) or [{}])[0], (last.get(t) or [{}])[0]
+    keys = reg["fields"] if reg["fields"] is not None else [k for k in {**b0, **a0} if k not in UNDO_FIXED and k not in UNDO_NO_FP]
+    diff = [k for k in keys if not _same(b0.get(k), a0.get(k))]
+    obj_history_add(c, uid, kind, rid, {k: b0.get(k) for k in diff}, {k: a0.get(k) for k in diff}, action=action, org_id=oid, agent=False)
 
 
 def obj_cols_ok(c, kind):

@@ -121,8 +121,9 @@ check(any(x.get("action") == "update" and (x.get("detail") or {}).get("undo") fo
       "the office log names the undo")
 
 # ---- without the header nothing is recorded; an own write without undo in between ends the way back
-n = one("SELECT COUNT(*) FROM obj_undo")  # 2.567.0 (#4711): the core's obj_undo
-check(Bo.patch(B + f"/api/office/docs/{D}", json={"project_ref": "P-1"}).ok and one("SELECT COUNT(*) FROM obj_undo") == n, "no header: no step")
+# 2.747.0 (#5249): a save without the header records a step of the person's step groups (core/undogroups.py), no session step
+n = one("SELECT COUNT(*) FROM obj_undo WHERE sess<>''")  # 2.567.0 (#4711): the core's obj_undo
+check(Bo.patch(B + f"/api/office/docs/{D}", json={"project_ref": "P-1"}).ok and one("SELECT COUNT(*) FROM obj_undo WHERE sess<>''") == n, "no header: no session step")
 r = undo(Bo, "doc", D, T1, "undo")
 check(r.status_code == 409 and doc(Bo, D)["project_ref"] == "P-1", f"a change without undo in between: 409, it stays ({r.status_code})")
 
