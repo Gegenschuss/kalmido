@@ -445,7 +445,7 @@ document.addEventListener('dragend', () => { if (secDrag !== null) { secDrag = n
 // LM_SECHEAD, 500 ms), as the rows of the file store do - let go unmoved = the menu (once), moved past the threshold = the drag
 let secHold = null, secHeld = false;
 const secLpTake = () => { if (typeof LM_SECHEAD !== 'undefined') ms_lpTake(LM_SECHEAD); };
-const secLpDrop = () => { if (typeof LM_SECHEAD !== 'undefined' && LM_SECHEAD.lp) { clearTimeout(LM_SECHEAD.lp.t); LM_SECHEAD.lp = null; } };
+// a move past the threshold before the hold ends the row menu's long press by itself (multisel.js pointermove, 10 px)
 document.addEventListener('touchstart', e => {
   const h = e.target.closest?.('#view .ghead[data-section], #view .khead[data-ksec]');
   const sid = h && +(h.dataset.section || h.dataset.ksec);
@@ -453,7 +453,7 @@ document.addEventListener('touchstart', e => {
   const p = e.touches[0];
   secHold = {h, sid, x: p.clientX, y: p.clientY, timer: setTimeout(() => { if (!secHold) return; secHold.fired = true; secLpTake(); if (!canEditList(S.sections.find(x => x.id === secHold.sid)?.list_id)) { secHeadMenu(secHold.h, secHold.sid); return; } sb_secHoldStart(secHold.h, secHold.sid, secHold.x, secHold.y); }, 450)};
 }, {passive: true});
-document.addEventListener('touchmove', e => { if (secHold && !secHold.fired && Math.hypot(e.touches[0].clientX - secHold.x, e.touches[0].clientY - secHold.y) > 8) { clearTimeout(secHold.timer); secHold = null; secLpDrop(); } }, {passive: true});
+document.addEventListener('touchmove', e => { if (secHold && !secHold.fired && Math.hypot(e.touches[0].clientX - secHold.x, e.touches[0].clientY - secHold.y) > 8) { clearTimeout(secHold.timer); secHold = null; } }, {passive: true});
 function secHoldEnd(e) {
   if (!secHold) return;
   clearTimeout(secHold.timer);
