@@ -319,6 +319,25 @@ check(until(lambda: status(T[5]) == 2), "tag Y completes the task")
 check(dbq("SELECT ref FROM git_closes WHERE task_id=?", (T[5],)) == [("2.12",)], "... in Y")
 check(until(lambda: status(REST) == 2), "... and its rest (package released)")
 
+# ------------------------------------------------------------------ 2.662.0 (#4602): a list of an organisation
+# tasks carry org_id under row-level security now; the poll's release events run without a person and must still read
+# the task of an organisation's list (before the fix: TypeError, rolled back, never completed)
+r = A.post(B + "/api/admin/orgs", json={"name": "Acme"})
+check(r.status_code == 201, f"org list: an organisation {r.status_code} {r.text[:150]}")
+WS = r.json().get("id")
+STATE["8090"]["acme/org"] = {"default_branch": "main", "pulls": [], "commits": {"main": []}, "tags": [{"name": "3.0.0"}, {"name": "2.9.0"}],
+                             "compare": {"2.9.0...3.0.0": [], "3.0.0...main": []}, "branches": [{"name": "main", "commit": {"sha": "o1"}}]}
+put_state()
+OL = A.post(B + "/api/lists", json={"name": "Org app", "kind": "project", "org_id": WS}).json()["id"]
+check(dbq("SELECT org_id FROM lists WHERE id=?", (OL,)) == [(WS,)], "org list: in alice's organisation")
+OF = A.post(B + f"/api/lists/{OL}/fields", json={"name": "Version", "type": "text"}).json()["id"]
+r = A.post(B + f"/api/lists/{OL}/repos", json={"provider": "github", "base_url": GH, "repo": "acme/org"})
+check(r.status_code == 201, f"org list: connected {r.status_code} {r.text[:150]}")
+check(A.put(B + f"/api/lists/{OL}/repos/close-release", json={"on": True}).ok, "org list: the switch")
+ot = A.post(B + "/api/tasks", json={"title": "Org page", "list_id": OL, "fields": {str(OF): "3.0"}}).json()["id"]
+check(dbq("SELECT org_id FROM tasks WHERE id=?", (ot,)) == [(WS,)], "org list: the task carries the organisation")
+check(until(lambda: status(ot) == 2), "org list: released package completes the task (release events read it under RLS)")
+
 # ------------------------------------------------------------------ without an organisation
 FID, Fr = freelancer(B, A)  # freelancer-matrix: lists
 STATE["8090"]["frida/site"] = {"default_branch": "main", "pulls": [], "commits": {"main": []}, "tags": [{"name": "1.0.0"}, {"name": "0.9.0"}],
