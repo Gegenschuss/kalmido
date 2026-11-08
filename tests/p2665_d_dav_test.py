@@ -170,6 +170,13 @@ A.patch(B + f"/api/lists/{L1}", json={"color": "#e11d48"})
 n1, _, _ = both()
 check(n1 != c1, "a new colour changes the ctag")
 c1 = n1
+# review L1: texts of a collection are rendered in the person's language: a change of language gives a new ctag
+A.patch(B + "/api/settings", json={"lang": "de"})
+n1, _, _ = both()
+A.patch(B + "/api/settings", json={"lang": "en"})
+check(n1 != c1, "a change of the person's language changes the ctag")
+n1, _, _ = both()
+check(n1 == c1, "... and back to the old language gives the old ctag")
 
 # other lists / instance changes: no new ctag, nothing rendered for L1
 al.home(PF_BOTH)

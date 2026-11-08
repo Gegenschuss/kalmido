@@ -25,7 +25,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from ..core.config import app, APP_NAME, APP_VERSION, PUBLIC_URL, TZ
 from ..core.pg import insert_id
-from ..core.i18n import N_, tr
+from ..core.i18n import N_, lang, tr
 from ..core.db import (
     body, bump, db, gset, gsetting, inbox_default, iso, iso_ms, local_now, now_utc, parse_iso, usettings,
 )
@@ -203,8 +203,9 @@ def dav_code_fp():
 
 
 def dav_fp(*parts):
-    """2.665.0 (#4196): the 20 hex digits of a collection's key (getctag / sync-token)."""
-    return hashlib.blake2b(repr(parts).encode("utf-8"), digest_size=10).hexdigest()
+    """2.665.0 (#4196): the 20 hex digits of a collection's key (getctag / sync-token). Review L1: with the person's language
+    (texts of locked lists and labels are rendered in it; a change of language renders anew)."""
+    return hashlib.blake2b(repr((*parts, lang())).encode("utf-8"), digest_size=10).hexdigest()
 
 
 def dav_once(fn):
