@@ -61,9 +61,16 @@ def code(r):
         return None
 
 
-def ct(gen=1, n=48):
-    """A ciphertext of a space with the lock (shape only)."""
-    return "e2e1:" + json.dumps({"v": 1, "g": gen, "iv": b64(12), "ct": b64(n)}, separators=(",", ":"))
+def ct(gen=1, n=48, v=1):
+    """A ciphertext of a space with the lock (shape only). 2.680.0 (#5146): v 2 for a new page (since 2.652.0, #5044, v 1 only
+    for an edit and the re-encryption)."""
+    return "e2e1:" + json.dumps({"v": v, "g": gen, "iv": b64(12), "ct": b64(n)}, separators=(",", ":"))
+
+
+def newid(s, sp):
+    """2.680.0 (#5146): the reserved id of my next v 2 page in the space -> the fields of the POST."""
+    j = s.post(B + "/api/wiki/e2e/newid", json={"space": sp}).json()
+    return {"id": j.get("id"), "resv": j.get("resv")}
 
 
 if not LOCAL:
@@ -195,7 +202,13 @@ check(r.status_code == 409 and code(r) == "wiki_e2e", "on: a ciphertext of an un
 X1 = ct(1, 120)
 r = Bo.patch(B + f"/api/wiki/pages/{PG['other']}", json={"body": X1, "path": ct(1)})
 check(r.ok and r.json()["body"] == X1 and r.json()["attrs"] == {} and r.json()["template"] is False, "on: ciphertexts are stored " + r.text[:200])
+# 2.680.0 (#5146): since 2.652.0 (#5044) a NEW page with v 1 ciphers is refused 400, nothing stored; a new page is v 2 under
+# a reserved id (edits and the re-encryption below keep v 1)
+n0 = dbx("SELECT COUNT(*) FROM wiki_pages WHERE org_id=?", (ORG,))[0][0]
 r = Bo.post(B + "/api/wiki/pages", json={"space": SP, "path": ct(1), "body": ct(1)})
+check(r.status_code == 400 and "reload" in r.text, "#5044: on: a new page with v 1 ciphers 400 " + r.text[:200])
+check(dbx("SELECT COUNT(*) FROM wiki_pages WHERE org_id=?", (ORG,))[0][0] == n0, "#5044: on: the v 1 page is not stored")
+r = Bo.post(B + "/api/wiki/pages", json={"space": SP, "path": ct(1, v=2), "body": ct(1, v=2), **newid(Bo, SP)})
 NEWP = r.json().get("id") if r.status_code == 201 else None
 check(r.status_code == 201, "on: a new page with ciphertexts " + r.text[:200])
 check(Bo.post(B + "/api/wiki/pages", json={"space": SP, "path": "Plain new"}).status_code == 409, "on: a new plain page 409")
