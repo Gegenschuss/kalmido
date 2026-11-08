@@ -19,10 +19,10 @@
 
 ## What's new
 
-**2.710.0** (2026-11-08):
-- **Agents**: hosted MCP connected apps expire after 90 days; Settings > Organisation > Agents shows and revokes them.
-- **Security**: audit hardening (sealed mail plus tokens, stricter http checks, narrower agent scopes).
-- **Exports**: DATEV, GoBD and knowledge exports use temporary files and limited export slots.
+**2.719.0** (2026-11-08):
+- **Security**: receipt fetcher keys can be limited to IP addresses / networks like API tokens; plus address tokens lie sealed and hashed in the database.
+- **Office**: CSV bank statement import asks which bank account it belongs to; balance sheet books payouts on the right account.
+- **Tasks**: task search stays fast on large instances.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 
