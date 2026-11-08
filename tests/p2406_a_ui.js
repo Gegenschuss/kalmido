@@ -105,7 +105,9 @@ const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown'
     check(f && f.hn.fs === f.pn.fs, '#3492: a folder head has the font size of a project row ' + JSON.stringify(f && [f.hn.fs, f.pn.fs]));
     check(f && f.hi.w === 16 && Math.abs(f.hi.l - f.pi.l) <= 1, '#3492: the folder symbol is 1 rem at the project rows\' left edge ' + JSON.stringify(f && [f.hi, f.pi]));
     check(f && f.ha && f.ha.l >= f.hn.r, '#3492: the folder arrow sits after the name ' + JSON.stringify(f && [f.ha, f.hn]));
-    check(f && f.hm && f.hm.l >= f.ha.r - 1, '#3492: the folder\'s "…" stays the last thing in the row ' + JSON.stringify(f && [f.ha, f.hm]));
+    // 2.725.0 (#5169): ff.js starts a mouse now; with a mouse the folder's "…" stands left of the fold arrow (2.521.0 #4397,
+    // start-ablage-side-2521.css) - "last in the row" held only for the finger layout the suite ran in unnoticed
+    check(f && f.hm && f.hm.r <= f.ha.l + 1, '#4397: the folder\'s "…" stands left of the fold arrow, not over it ' + JSON.stringify(f && [f.ha, f.hm]));
     check(f && f.ci && Math.abs(f.ci.l - f.hn.l) <= 2, '#3492: a project in the folder: its symbol under the folder\'s name ' + JSON.stringify(f && [f.ci, f.hn]));
 
     // ---- #3492: the office menu: a tree row vs a plain row
