@@ -324,7 +324,7 @@ def bnk_preview_of(c, oid, b, fs=None):
 
 
 BNK_PICK_ACCOUNT = N_("Select the bank account this statement belongs to")
-BNK_PICK_CSV = N_("Import CSV files on their own when you choose a bank account: XML and MT940 statements name their account themselves")
+BNK_PICK_CSV = N_("Import CSV files on their own when you select a bank account: XML and MT940 statements name their account themselves")
 
 
 def bnk_accounts(c, oid):
