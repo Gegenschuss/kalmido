@@ -552,6 +552,10 @@ function startDrop() { LS.del('cache'); S.lpCache = null; if (typeof oc_drop ===
 function startSave() {
   if (!S.lpCache || (typeof MW_ON !== 'undefined' && MW_ON)) return;
   if (typeof loadModule !== 'function' || !globalThis.indexedDB) { LS.set('cache', S.lpCache); return; }
+  if (typeof oc_soon === 'function') { oc_soon(); return; }
+  // the start fetches no module (p265_b): the first write waits for the idle preload (lazyload.js, 5 s), it takes the newest state then
+  const wait = 6000 - performance.now();
+  if (wait > 0) { if (!startSave.t) startSave.t = setTimeout(() => { startSave.t = 0; startSave(); }, wait); return; }
   loadModule('offcache').then(() => oc_soon(), e => { console.warn('Kalmido: offline start state: module not loaded, localStorage', e); if (S.lpCache) LS.set('cache', S.lpCache); });
 }
 async function startRead() {
