@@ -501,6 +501,7 @@ def v1_list(d):
             "org_visibility": d.get("org_visibility") or "", "org_edit": bool(d.get("org_edit")), "org_reader": bool(d.get("org_reader")),
             "owner_id": d["owner_id"], "owner_name": d["owner_name"], "shared": d["shared"],
             "status": d.get("status") or None, "progress": d["progress"], "created_at": d["created_at"],
+            "updated_at": d.get("updated_at") or d["created_at"],  # 2.657.0 (#5052): the settings' version (PATCH expect_updated_at)
             "tags": d.get("tags") or [], "agent_tidy": d.get("agent_tidy") or "off", "tidy_agent_id": d.get("tidy_agent_id"),
             "listen_agent_ids": d.get("listen_agent_ids") or [],  # 2.13.1 (#471)
             "listen_default": bool(d.get("listen_default")),  # 2.30.0 (#1034): the project type lets agents listen in by default
@@ -809,8 +810,9 @@ def v1_list_create():
     from ..agents.safety import token_list_add
     token_list_add(db(), j["id"])  # 2.30.0 (#919): a token limited to selected lists keeps the list it created
     db().commit()
-    if later:
-        v1_call(list_update, j["id"], body=later)
+    if later:  # 2.657.0 (#5052): the settings of the project just made, with its version (an agent must send one)
+        lr = db().execute("SELECT updated_at, created_at FROM lists WHERE id=?", (j["id"],)).fetchone()
+        v1_call(list_update, j["id"], body={**later, "expect_updated_at": lr["updated_at"] or lr["created_at"]})
     d = next(x for x in visible_lists(db(), me()) if x["id"] == j["id"])
     return jsonify({**v1_list(d), **({"bug_list_id": j["bug_list_id"]} if j.get("bug_list_id") else {})}), 201
 
@@ -833,6 +835,7 @@ def v1_list_patch(lid):
                                                "org_visibility", "org_edit", "sort_mode", "group_field"))  # 2.28.0 (#935); 2.34.0 (#266); 2.39.1 (#1188); 2.41.0 (#1471); 2.46.0 (#1603)
     unknown = [k for k in unknown if k != "points_on"]  # 2.60.0 (#1511): story points on (the owner)
     unknown = [k for k in unknown if k != "ticket_key"]  # 2.390.0 (#3353): the project's ticket key (owner / list admins)
+    unknown = [k for k in unknown if k != "expect_updated_at"]  # 2.657.0 (#5052): the version read (lists/lists.py lv_check)
     if "points_on" in b and not isinstance(b["points_on"], bool):
         raise BadInput(tr("Invalid value: {0}", "points_on"))
     if unknown:

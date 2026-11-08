@@ -291,7 +291,9 @@ evs, cur = events(cl, cur)
 check(not [e for e in evs if e["event"] == "comment" and e["data"]["task"]["id"] == T5], "off: no event")
 # rights
 check(Bo.patch(B + f"/api/lists/{L1}", json={"listen_agent_ids": [AG]}).status_code == 403, "a member cannot change it")
-check(cl.req("PATCH", f"/lists/{L1}", json={"listen_agent_ids": [AG]}).status_code == 403, "an agent token cannot change it")
+# 2.657.0 (#5052): an agent sends the version it read (else 400 version_required before this rule)
+check(cl.req("PATCH", f"/lists/{L1}", json={"listen_agent_ids": [AG], "expect_updated_at": cl.req("GET", f"/lists/{L1}").json()["updated_at"]}).status_code == 403,
+      "an agent token cannot change it")
 check(alice_api.req("PATCH", f"/lists/{L1}", json={"listen_agent_ids": [ids["bob"]]}).status_code == 400, "a person is no agent -> 400")
 check(alice_api.req("PATCH", f"/lists/{L1}", json={"listen_agent_ids": "3"}).status_code == 400, "wrong type -> 400")
 r = alice_api.req("PATCH", f"/lists/{L1}", json={"listen_agent_ids": [AG, AG2]})

@@ -21,6 +21,9 @@ from ..tasks.validation import TICKET_TYPES, TT_KEY_RE  # 2.483.0 (#3916); 2.609
 from ..tasks.ttypes import tt_known  # 2.609.0 (#3372)
 from ..core.access import list_other_agent, ONE_AGENT_MSG  # 2.149.0 G (#2517): pulled up from functions
 from ..core.access import qn_is, qn_private  # 2.477.0 (#3881)
+from ..core.conflict import ccf_check, kern_version_seed, take_version  # 2.657.0 (#5052)
+from ..core.db import iso_ms  # 2.657.0 (#5052)
+from ..core.pg import write_lock  # 2.657.0 (#5052)
 from ..api.common import v1_call, V1Error  # 2.149.0 G (#2517): pulled up from functions
 
 
@@ -236,6 +239,31 @@ def lp_current(c, lid, role):
     return cur
 
 
+def lv_check(c, lid, role, b):
+    """2.657.0 (#5052): the version check of a project's settings (PATCH /api/lists/<id>, /api/v1/lists/<id>): under the write_lock
+    of the core's kind 'list', expect_updated_at (or If-Match) differing from lists.updated_at = 409 {error, current}; an agent
+    must send it or _prev (lp_prev_conflicts, per field), else 400 version_required. People without one: as before (old clients).
+    Returns the row as it was (lv_after compares)."""
+    if not (isinstance(b.get("_prev"), dict) and b["_prev"]):
+        take_version(b)
+    write_lock(c, f"obj-list-{int(lid)}")
+    row = kern_version_seed(c, "lists", lid)
+    ccf_check(b, row["updated_at"], "current", lambda: {**lp_current(c, lid, role), "updated_at": row["updated_at"]})
+    return row
+
+
+def lv_after(c, lid, row0):
+    """2.657.0 (#5052): lists.updated_at = now when a column of the project's row differs from row0 (lv_check). -> the version."""
+    row = c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone()
+    if row is None:
+        return None
+    if any(row[k] != row0[k] for k in row.keys() if k != "updated_at"):
+        ts = iso_ms(now_utc())
+        c.execute("UPDATE lists SET updated_at=? WHERE id=?", (ts, lid))
+        return ts
+    return row["updated_at"]
+
+
 def lp_prev_conflicts(c, lid, role, b):
     """Drops from b every field whose server value differs from b['_prev'][field] (changed elsewhere meanwhile) unless it
     already is the new value. Returns (b, conflicts [{field, server, mine}]). Without `_prev`: b unchanged (old clients)."""
@@ -419,6 +447,8 @@ def list_update(lid):
     b = {k: v for k, v in b.items() if k != "agent_peers"}  # 2.40.0 (#1373): fixed off, still accepted from old clients, ignored
     c = db()
     role = need_list(c, lid, write=False)
+    lv0 = lv_check(c, lid, role, b)  # 2.657.0 (#5052): the settings' version under the project's lock
+    b = {k: v for k, v in b.items() if k != "expect_updated_at"}
     if qn_is(c, lid) and qn_shares(b):  # 2.477.0 (#3881): the list "Notes" stays private (no workspace, folder, agents, family)
         qn_private(c, lid)
     pz_has, pz_prev, pz_out = False, None, {}  # 2.528.0 B (#4305, A10): the properties merged key by key (oxb_props_merge)
@@ -666,9 +696,10 @@ def list_update(lid):
         pt_out = {**pt_out, **({"move_ended": ended} if ended else {}), **({"move_restored": back} if back else {})}
     if lh0 is not None:  # 2.568.0 (#4739): before / after in the core's history (an agent's change is marked)
         lmc_history(c, me(), lid, lh0, lmc_snap(c, lid, lh_keys))
+    lv1 = lv_after(c, lid, lv0)  # 2.657.0 (#5052): a new version when the project's row changed
     bump(c)
     c.commit()
-    return jsonify(ok=True, conflicts=conflicts, **pt_out, **pz_out)
+    return jsonify(ok=True, conflicts=conflicts, updated_at=lv1, **pt_out, **pz_out)
 
 
 @app.post("/api/lists/reorder")

@@ -340,6 +340,7 @@ def openapi_spec():
             "view": {"type": "string", "enum": list(LIST_VIEWS)}, "role": {"type": "string", "enum": ["owner", "admin", "edit", "participant", "view"]},
             "owner_id": {"type": "integer"}, "owner_name": {"type": "string"}, "shared": {"type": "boolean"},
             "status": nul("string", enum=[*LIST_STATUSES, None]), "progress": ref("Progress"), "created_at": {"type": "string", "format": "date-time"},
+            "updated_at": {"type": "string", "description": "2.657.0 (#5052): the version of the project's settings (send it as expect_updated_at with PATCH)"},
             "nag": {"type": "string", "enum": [x for x in NAG_VALUES if x != "off"], "description": "2.7.0: default nag interval of the project's tasks; empty = none"},
             "day_hours": nul("number", description="2.7.0: hours of a working day / shift for this project's time sums; null = the server's value"),
             "columns": {"type": ["array", "null"], "items": {"type": "string"}, "description": COL_DOC},
@@ -387,6 +388,8 @@ def openapi_spec():
             "day_hours": nul("number", minimum=1, maximum=24, description="2.7.0: hours per day / shift (owner); null = the server's value"),
             "org_id": nul("integer", description="2.28.0: the workspace: an organisation you belong to, null = private (default: the folder's, else private)")}},
         "ListPatch": {"type": "object", "additionalProperties": False, "properties": {
+            "expect_updated_at": {"type": "string", "description": "2.657.0 (#5052): updated_at of the project as read (409 with error.current "
+                                  "when its settings changed meanwhile; also as the header If-Match); required for agent accounts: 400 version_required"},
             "ticket_key": nul("string", description="2.390.0: the project's ticket key APP (owner / project admins; null / \"\" = none). "
                               "The tasks get running numbers (APP-1, APP-2, ... in the order they were made), old keys keep finding their tasks"),
             "org_id": nul("integer", description="2.28.0: the project's workspace (the owner; 409 while people / agents in it do not fit, for family / Home & life projects and the inbox)"),
@@ -686,7 +689,7 @@ def openapi_spec():
         "/lists": {"get": op("Projects you can see (own and shared)", L, ok(ref("ListPage")) | errs()),
                    "post": op("Create a project", L, ok(ref("List"), "Created", "201") | errs("400"), body=ref("ListInput"), scope="write")},
         "/lists/{id}": {"get": op("One project with its sections", L, ok(ref("ListDetail")) | errs("404"), [pid("id", "Project id")]),
-                        "patch": op("Change a project (2.7.0)", L, ok(ref("List")) | errs("400", "403", "404"), [pid("id", "Project id")],
+                        "patch": op("Change a project (2.7.0)", L, ok(ref("List")) | errs("400", "403", "404", "409"), [pid("id", "Project id")],
                                     body=ref("ListPatch"), scope="write",
                                     desc="Owner: name, color, kind, nag (default nag interval of its tasks), day_hours (hours per day / "
                                          "shift for the time sums). Owner and project admins: columns (2.14.0), archived (2.39.1). Members change only "
