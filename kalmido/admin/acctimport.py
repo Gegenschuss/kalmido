@@ -155,6 +155,7 @@ UMZ_DROP = {
     "comments": {"mentions", "suggestion", "choices", "choice", "ext_name", "client_ref"},  # 2.370.2 (#3088): client_ref like the notes'
     "attachments": {"path", "enc_by"},
     "list_files": {"path"},
+    "video_versions": {"uploaded"},  # 2.662.0 (#5041): the review's rights stand in for the file only for an upload made here
     "events": {"href"},
     "contacts": {"href"},
     "notes": {"client_ref"},  # 2.362.0 (#3090, review): the offline outbox mark of the old server (unique per person)

@@ -358,9 +358,10 @@ def vdr_version_add(c, r, link, uid):
     n = (c.execute("SELECT MAX(n) FROM video_versions WHERE review_id=?", (r["id"],)).fetchone()[0] or 0) + 1
     # 2.641.0 (#4769): + the medium and, for an image / PDF, its file of the file store (vdmedia.vdm_media)
     return insert_id(c, "INSERT INTO video_versions(review_id, org_id, n, url, provider, embed_id, created_by, created_at, kind, file_id, file_no, "
-                        "file_name, mime) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                        "file_name, mime, uploaded) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                      (r["id"], r["org_id"], n, link["url"], link["provider"], link["embed_id"], uid, iso(now_utc()), link.get("kind") or "video",
-                      link.get("file_id"), link.get("file_no"), link.get("file_name") or "", link.get("mime") or ""))
+                      link.get("file_id"), link.get("file_no"), link.get("file_name") or "", link.get("mime") or "",
+                      1 if link.get("uploaded") else 0))  # 2.662.0 (#5041): an upload of the sign-off follows the review's rights
 
 
 def vdr_comment_add(c, r, uid, b, ext_name=None):

@@ -11,7 +11,10 @@ freelancer-matrix: videos
    image: 400; a PDF from the file store (file_id) at a project: {page: 2, x, y}, {page} alone; a point without a page: 400
  - a new version (an upload / a file of the store) = v2; v1 keeps its comments and its own bytes (file_no pinned)
  - rights: another organisation's person: 404 on the review, the list, the bytes; a member who sees the task but NOT the
-   file: no review (404, not listed) until the file is shared with her (then 200, the bytes too); a file of another
+   file: no review (404, not listed) until the file is shared with her (then 200, the bytes too) -- 2.662.0 (#5041): except
+   a file uploaded through the approval: the task decides (bob 200, the bytes too; the file itself in the store stays 404;
+   dave of the organisation without the project 404); the same file chosen from the store in another approval stays
+   strict; a file of another
    workspace or a file the person cannot see as a version: 409 / 404; no customer link (409) and no move (409) with files
  - the agents' API: an agent with the project shared but not the file: 404; the file shared: the review with kind, pos and
    mark, a comment at {page, x, y} (201), the bytes through /api/v1/...; a video review stays as before (at_sec)
@@ -107,18 +110,20 @@ s0.headers.update(H)
 assert s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice Admin", "password": "password123"}).ok
 A = sess("alice")
 A.post(B + "/api/admin/setup", json={"lang": "en", "collab_all": True})
-for u, n in (("bob", "Bob Member"), ("carol", "Carol Other")):
+for u, n in (("bob", "Bob Member"), ("carol", "Carol Other"), ("dave", "Dave Outside")):  # 2.662.0 (#5041): + dave
     r = A.post(B + "/api/users", json={"username": u, "display_name": n, "password": "password123", "email": f"{u}@example.com"})
     assert r.ok, r.text
-Bo, Ca = sess("bob"), sess("carol")
-for s in (A, Bo, Ca):
+Bo, Ca, Dv = sess("bob"), sess("carol"), sess("dave")
+for s in (A, Bo, Ca, Dv):
     s.patch(B + "/api/settings", json={"lang": "en", "features": FEAT, "tour": "done"})
 ALICE, BOB, CAROL = (s.get(B + "/api/state").json()["me"]["id"] for s in (A, Bo, Ca))
 ORG = A.post(B + "/api/admin/orgs", json={"name": "Alpha", "admin_id": ALICE}).json()["id"]
 assert A.put(B + f"/api/orgs/{ORG}/members", json={"email": "bob@example.com", "role": "member"}).ok
+assert A.put(B + f"/api/orgs/{ORG}/members", json={"email": "dave@example.com", "role": "member"}).ok  # 2.662.0 (#5041): in the org, not in the project
 ORG2 = A.post(B + "/api/admin/orgs", json={"name": "Beta", "admin_id": CAROL}).json()["id"]
 A.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
 Bo.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
+Dv.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
 Ca.patch(B + "/api/settings", json={"workspace": f"org:{ORG2}"})
 L = A.post(B + "/api/lists", json={"name": "Logo Bäckerei Sonnig", "org_id": ORG}).json()["id"]
 assert A.put(B + f"/api/lists/{L}/members", json={"user_id": BOB, "role": "edit"}).ok
@@ -223,10 +228,26 @@ check(A.get(B + V1["content"]).content == PNG1, "the approval's v1 still shows t
 # ---- rights
 check(Ca.get(B + f"{V}/{RID}").status_code == 404 and Ca.get(B + V1["content"]).status_code == 404, "another organisation: 404 on the review and the bytes")
 check((Ca.get(B + f"{V}?task_id={T}").json().get("reviews") or []) == [], "another organisation: no review listed")
-check(Bo.get(B + f"{V}/{RID}").status_code == 404, "bob sees the task but not the file: no review (404)")
-check(RID not in [x["id"] for x in Bo.get(B + f"{V}?task_id={T}").json().get("reviews", [])], "bob: not listed at the task")
-check(Bo.get(B + V1["content"]).status_code == 404, "bob: no bytes")
-check(Bo.post(B + f"{V}/{RID}/comments", json={"body": "x"}).status_code == 404, "bob: no comment")
+# 2.662.0 (#5041): a file uploaded through the approval follows the approval's rights (was: bob 404 without the file right);
+# a file chosen from the file store stays strict, also the same uploaded file chosen again in another approval
+check(Bo.get(B + f"{V}/{RID}").ok, "bob sees the task: he sees the approval made by upload (#5041)")
+check(RID in [x["id"] for x in Bo.get(B + f"{V}?task_id={T}").json().get("reviews", [])], "bob: listed at the task (#5041)")
+r = Bo.get(B + V1["content"])
+check(r.ok and r.content == PNG1 and "sandbox" in r.headers.get("Content-Security-Policy", ""), f"bob: the bytes of v1, sandboxed {r.status_code} {r.headers.get('Content-Security-Policy')}")
+check(Bo.get(B + V2.get("content", "/x")).ok, "bob: the bytes of v2 (an upload too)")
+c = Bo.post(B + f"{V}/{RID}/comments", json={"body": "Von Bob", "pos": {"x": 0.2, "y": 0.2}})
+check(c.ok, f"bob comments on the approval like on the task {c.status_code} {c.text[:200]}")
+check(Bo.get(B + f"/api/files/nodes/{FID1}").status_code == 404 and Bo.get(B + f"/api/files/nodes/{FID1}/content").status_code == 404,
+      "bob: the file itself in the file store stays closed (only through this approval)")
+check(sql("SELECT uploaded FROM video_versions WHERE review_id=? ORDER BY n", (RID,)) == [(1,), (1,)], "both versions are marked uploaded")
+check(Dv.get(B + f"/api/tasks/{T}").status_code in (403, 404), "dave (organisation, not the project) does not see the task")
+check(Dv.get(B + f"{V}/{RID}").status_code == 404 and Dv.get(B + V1["content"]).status_code == 404, "dave: no approval, no bytes (the folder is not opened to the org)")
+rx = A.post(B + V, json={"list_id": L, "file_id": FID1, "title": "Logo aus der Ablage"})
+check(rx.ok and rx.json()["versions"][0]["file_id"] == FID1, f"alice: the uploaded file chosen from the file store for another approval {rx.status_code} {rx.text[:200]}")
+RX = rx.json()["id"] if rx.ok else 0
+check(sql("SELECT uploaded FROM video_versions WHERE review_id=?", (RX,)) == [(0,)], "chosen from the store: not marked uploaded")
+check(Bo.get(B + f"{V}/{RX}").status_code == 404 and Bo.get(B + f"{V}/{RX}/versions/{rx.json()['versions'][0]['id'] if rx.ok else 0}/file").status_code == 404,
+      "bob: the same file chosen from the store stays strict (404 without the file right)")
 fold = sql("SELECT parent_id FROM fs_nodes WHERE id=?", (FID1,))[0][0]
 r = A.post(B + f"/api/files/nodes/{fold}/shares", json={"user_id": BOB, "role": "view"})
 check(r.ok, f"alice shares the folder Approvals with bob {r.status_code} {r.text[:200]}")
@@ -272,7 +293,12 @@ r = ag.get(B + f"/api/v1/videos/{RP}/versions/{pv['id']}/file")
 check(r.ok and r.content == PDF, f"the agent reads the PDF's bytes {r.status_code}")
 web = [ag.get(B + f"{V}/{RP}").status_code, ag.get(B + f"/api/videos/{RP}/versions/{pv['id']}/file").status_code]
 check(all(x in (401, 403, 404) for x in web), f"the app's routes stay closed to agents {web}")
-check(ag.get(B + f"/api/v1/videos/{RID}").status_code == 404, "the agent: the image review (its folder not shared) 404")
+# 2.662.0 (#5041): was 404 (its folder not shared) -- the image review was made by upload, so the shared project decides
+r = ag.get(B + f"/api/v1/videos/{RID}")
+# (its newest version is the PDF of the store, shared with the agent above: that one stays strict)
+check(r.ok and [v.get("kind") for v in r.json().get("versions", [])][:2] == ["image", "image"], f"the agent: the upload review at the shared project (#5041) {r.status_code} {r.text[:200]}")
+check(ag.get(B + f"/api/v1/videos/{RID}/versions/{V1.get('id')}/file").content == PNG1, "the agent: its bytes through the API")
+check(ag.get(B + f"/api/v1/videos/{RX}").status_code == 404, "the agent: the same file chosen from the store stays strict (404)")
 
 # ---- 2.658.0 (#5043): streamed like the file store (range requests), the type from the first 1024 bytes only
 r = A.get(B + V1.get("content", "/x"), headers={"Range": "bytes=2-9"})

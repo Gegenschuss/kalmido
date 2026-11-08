@@ -128,7 +128,7 @@ def vdm_upload(c, uid, org_id, f):
     except ValueError as e:
         raise BadInput(str(e)) from None
     fs_log_add(c, nid, "upload", "approval")
-    return vdm_file_version(c, org_id, nid)
+    return dict(vdm_file_version(c, org_id, nid), uploaded=1)  # 2.662.0 (#5041): this version's file follows the review's rights
 
 
 def vdm_body():
@@ -154,10 +154,38 @@ def vdm_media(c, uid, org_id, b, vdr_parse):
 
 
 # ---------------------------------------------------------------- rights
+def vdm_by_review(c, v, chain):
+    """2.662.0 (#5041): may the review's rights (vdr_may) stand in for the file store's for version row v's file? Only for a
+    file uploaded through the sign-off for exactly this version (uploaded = 1), still a plain file of the review's workspace,
+    in no locked folder and under no filed mail (those keep their own rules); else the file right decides (strict)."""
+    if not v["uploaded"] or not chain or chain[0]["kind"] != "file" or (chain[0]["org_id"] or None) != (v["org_id"] or None):
+        return False
+    if any(r["hub_mail_id"] for r in chain):
+        return False
+    return fsl_of_chain(c, chain) is None
+
+
+def vdm_node(c, v):
+    """2.662.0 (#5041): the file row of version row v for vdm_send: a file uploaded for exactly this version (vdm_by_review)
+    without the file right (the caller checked the review: vdr_need / vdr_v1_need), still 404 in the trash; else need_node."""
+    chain = fs_chain(c, v["file_id"])
+    if not vdm_by_review(c, v, chain):
+        return need_node(c, v["file_id"])
+    if fs_deleted(chain):
+        raise Denied(404)
+    return dict(chain[0])
+
+
 def vdm_files_ok(c, uid, rid):
-    """Every file of review rid's versions is visible to uid (a file removed for good: file_id NULL, no hindrance)."""
-    ids = [r[0] for r in c.execute("SELECT DISTINCT file_id FROM video_versions WHERE review_id=? AND file_id IS NOT NULL", (rid,))]
-    return all(fs_role(c, i, uid) for i in ids)
+    """Every file of review rid's versions is visible to uid (a file removed for good: file_id NULL, no hindrance).
+    2.662.0 (#5041): the file of a version uploaded through the sign-off needs no file right (vdm_by_review: the review's
+    place decides, vdr_may); a file chosen from the file store does, also when it was uploaded for another review."""
+    rows = c.execute("SELECT file_id, uploaded, org_id FROM video_versions WHERE review_id=? AND file_id IS NOT NULL", (rid,)).fetchall()
+    need = {r["file_id"] for r in rows if not r["uploaded"]}
+    for r in rows:
+        if r["file_id"] not in need and not vdm_by_review(c, r, fs_chain(c, r["file_id"])):
+            need.add(r["file_id"])
+    return all(fs_role(c, i, uid) for i in need)
 
 
 def vdm_has_files(c, rid):
@@ -270,7 +298,7 @@ def vdm_send(c, v):
     streamed through the file store's way (files/web.py _send: oc_send_file, range requests, 206), not read into memory."""
     if not v or not v["file_id"]:
         raise Denied(404)
-    n = need_node(c, v["file_id"])
+    n = vdm_node(c, v)  # 2.662.0 (#5041): was need_node -- an upload of this version follows the review (checked by the caller)
     if n["kind"] != "file":
         raise Denied(404)
     full = vdm_path(c, v["file_id"], v["file_no"])
