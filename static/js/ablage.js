@@ -251,6 +251,7 @@ function ab_pvOpts(n) {
     step: async dir => (list[i + dir] ? ab_pvOpts(list[i + dir]) : null), peek: dir => ({img: list[i + dir] && ab_isImg(list[i + dir]) ? ab_url(list[i + dir]) : ''})});  // 2.727.0 (#5202): a picture glides in as itself
   return o;
 }
+const ab_navFiles = () => (AB.data?.items || []).filter(x => x.kind === 'file' && !x._enc && !upLocked(x) && (ab_isPdf(x) || ab_isImg(x))).map(x => x.id);  // 2.583.0 + 2.652.0 (#5071): the folder's PDFs and pictures the view leafs through (as ab_pvOpts)
 // ---- opening a file: images in the lightbox, PDFs in the PDF view, text in the text view, the rest downloads
 function ab_openFile(n, o = {}) {  // 2.583.0 (#4832): o.raw = the viewer of its kind (the document view's full screen)
   if (n.kind === 'ref' && FS_REF_VIEW[n.ref_kind] === 'pdf' && typeof pdfView === 'function') { pdfView({url: ab_url(n), name: n.name, size: n.size, dlUrl: ab_url(n, true)}); return; }  // 2.351.0 B (#2749)
@@ -258,7 +259,9 @@ function ab_openFile(n, o = {}) {  // 2.583.0 (#4832): o.raw = the viewer of its
   if (n.kind === 'ref') { if (n.open) go(n.open); else toast(tr('No access')); return; }  // 2.199.0 A (#2742): a filed document opens in its area
   if (upLocked(n)) { toast(tr('Locked: malware was found in this file ({0})', n.up.sig || '?')); return; }  // 2.61.0 (#1818)
   if (n._enc && typeof fsl_open === 'function') { fsl_open(n); return; }  // 2.353.0 A (#2758): decrypted in the browser
-  if (n.kind === 'file' && !o.raw && typeof abd_on === 'function' && abd_on() && typeof dc_open === 'function') { dc_open(n.id); return; }  // 2.583.0 (#4832): a file opens the document view (one sheet for files and documents)
+  // 2.583.0 (#4832): a file opens the document view (one sheet for files and documents); 2.652.0 (#5071): it leafs through the
+  // folder's documents, PDFs and pictures in the order shown (the view's arrows, its full screen with the swipe)
+  if (n.kind === 'file' && !o.raw && typeof abd_on === 'function' && abd_on() && typeof dc_open === 'function') { const l = ab_navFiles(); dc_open(n.id, l.length > 1 && l.includes(n.id) ? {list: l} : {}); return; }
   if (ab_isImg(n)) { const imgs = (AB.data?.items || []).filter(x => ab_isImg(x) && !upLocked(x)); attLightbox(n.id, imgs, (a, dl) => ab_url(a, dl)); return; }
   if (n.kind === 'file' && dv_is(n)) { dpvOpen({url: `/api/files/nodes/${encodeURIComponent(n.id)}/preview`, name: n.name, size: n.size, dlUrl: ab_url(n, true)}); return; }  // 2.92.0 C (#1926)
   if (ab_isPdf(n)) { if (typeof pdfView === 'function') pdfView(ab_pvOpts(n)); else window.open(ab_url(n), '_blank', 'noopener'); return; }  // 2.652.0 (#5071): ab_pvOpts

@@ -116,7 +116,14 @@ function swipe(w, el, dx, dy = 0, x0 = 200) {  // one finger from (x0, 300) by d
   {
     const m = await boot({user: 'alice', hash: `ablage/${K}`, mobile: true, ls: {abSpace: '"private"'}}), d = m.document;
     check(await until(() => m.eval(`(AB.data?.items || []).length === 4`)), 'file store: the folder with four files');
+    // 2.583.0 (#4832): a file opens the document view; its full screen leafs through the folder
+    const full = async (id, what) => {
+      check(await until(() => d.querySelector(`.dv-view .dc-body[data-id="${id}"] [data-dc="view"]`)), `file store: ${what} opens in the document view`);
+      await sleep(800);  // the end-of-swipe guard of the preview (700 ms)
+      click(m, d.querySelector('.dv-view [data-dc="view"]'));
+    };
     m.eval(`ab_openFile(ab_item(${FP1}))`);
+    await full(FP1, 'a PDF of the folder');
     const lb = () => d.querySelector('.lightbox.pview'), no = () => lb()?.querySelector('.pvdno')?.textContent || '', name = () => lb()?.querySelector('.tvname b')?.textContent || '';
     check(await until(() => no() === '1 of 3' && name() === 'a-brief.pdf'), `file store: a PDF of the folder leafs: "1 of 3" (the text file is left out) (${no()} ${name()})`);
     swipe(m, lb().querySelector('.pvbody'), -150);
@@ -129,6 +136,7 @@ function swipe(w, el, dx, dy = 0, x0 = 200) {  // one finger from (x0, 300) by d
     m.eval(`go('ablage/${K2}')`);
     await until(() => m.eval(`(AB.data?.items || []).length === 1 && AB.data.items[0].id === ${FA}`));
     m.eval(`ab_openFile(ab_item(${FA}))`);
+    await full(FA, 'a PDF alone in its folder');
     check(await until(() => lb()?.querySelector('.tvname b')?.textContent === 'allein.pdf') && !lb().querySelector('.pvdocs'), 'file store: alone in its folder nothing to leaf');
     m.close();
   }

@@ -72,8 +72,8 @@ async function upload(name, lines) {
       // #5072: the whole page, also on the tablet (it was the sticky pane .dc-pane there); 2.583.0 (#4835): the document view
       check(await wait(`!!document.querySelector('.dv-view .dv-pages') && /^#docs\\/\\d+$/.test(location.hash)`), `${W}: the document opens as a page of its own`);
       check(await ev(`!document.querySelector('.dc-pane') && !document.querySelector('.dc-view [data-dco]')`), `${W}: no pane beside the list, the list is not drawn behind it`);
-      const cover = `(() => { const c = document.querySelector('.dv-view'), v = document.getElementById('view'); if (!c || !v) return null; const r = c.getBoundingClientRect(), q = v.getBoundingClientRect();
-        return {l: Math.round(r.left), r: Math.round(r.right), vl: Math.round(q.left), vr: Math.round(q.right), iw: innerWidth, ok: r.left <= q.left + 24 && r.right >= q.right - 24}; })()`;
+      const cover = `(() => { const c = document.querySelector('.dv-view'), v = document.getElementById('view'); if (!c || !v) return null; const r = c.getBoundingClientRect(), q = v.getBoundingClientRect(), cs = getComputedStyle(v), pl = parseFloat(cs.paddingLeft) || 0, pr = parseFloat(cs.paddingRight) || 0;
+        return {l: Math.round(r.left), r: Math.round(r.right), vl: Math.round(q.left), vr: Math.round(q.right), iw: innerWidth, ok: r.left <= q.left + pl + 2 && r.right >= q.right - pr - 2 - (v.offsetWidth - v.clientWidth)}; })()`;
       let c = await ev(cover);
       check(c && c.ok, `${W}: the view fills the content area ` + JSON.stringify(c));
       check(await wait(`!!document.querySelector('.dv-view .dv-pg canvas')`, {timeout: 20000}), `${W}: the sharp first page is drawn`);
