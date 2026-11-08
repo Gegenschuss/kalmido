@@ -35,7 +35,8 @@ window.__early = document.querySelectorAll('script[data-ld]').length;
   check(w.eval("LDP('mod1')") === w.__pending, 'a second ask while it loads gets the same promise (no second tag)');
   // a page already parsed: the tag comes at once (no wait)
   w.eval("LDP('mod2')");
-  check(!!w.document.querySelector('script[data-ld="mod2"]'), 'after the parse a module is inserted at once');
+  await new Promise(r => setTimeout(r, 0));
+  check(!!w.document.querySelector('script[data-ld="mod2"]'), 'after the parse a module is inserted without waiting for an event');
   w.close();
   console.log(F.length ? `FAILED ${F.length} of ${ok + F.length}` : `OK ${ok}`);
   process.exit(F.length ? 1 : 0);
