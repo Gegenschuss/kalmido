@@ -74,11 +74,13 @@ def agent_jobs_get():
         return ag_jobs_page(c, where, args)  # 2.40.0 (#1432): "Load more"; without ?limit / ?before as before
     if request.args.get("state", "all") == "open":
         where.append("state IN ('running','waiting')")
-    rows, cur = [], None
-    while len(rows) < 200:  # newest first, up to 200 visible jobs (no fixed window of rows any more)
+    rows, cur, read = [], None, 0
+    # 2.674.0 (#4194 review F2): at most AG_JOBS_SCAN rows read per request, like the paged list
+    while len(rows) < 200 and read < AG_JOBS_SCAN:  # newest first, up to 200 visible jobs (no fixed window of rows any more)
         a = list(args) + ([cur[0], cur[1]] if cur else [])
         batch = c.execute(f"SELECT {jl_cols(c)} FROM agent_jobs WHERE " + " AND ".join(where) + (" AND (updated_at, id) < (?, ?)" if cur else "")
                           + " ORDER BY updated_at DESC, id DESC LIMIT 500", a).fetchall()
+        read += len(batch)
         seen = jobs_seen(c, batch, me())
         rows += [j for j in batch if j["id"] in seen]
         if len(batch) < 500:

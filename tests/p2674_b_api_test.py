@@ -340,6 +340,18 @@ check(r.ok and {J["t3"], J["part2"]} <= {x["id"] for x in r.json()["jobs"]},
       f"#4194 frida's older jobs are listed behind 600 newer foreign ones {[x['id'] for x in r.json().get('jobs', [])][:10]}")
 r = Ca.get(B + "/api/agents/jobs")
 check(r.ok and {x["id"] for x in r.json()["jobs"]} == EXPECT_JOBS["carol"] | MORE_T2, f"#4194 carol's job list over HTTP (+ the board's 20) {[x['id'] for x in r.json().get('jobs', [])]}")
+# 2.674.0 (#4194 review F2): the list without ?limit reads at most AG_JOBS_SCAN rows - carol (a participant of PART, T4b is not hers)
+# passes the database filter for every job of T1 and drops them only in the exact check; more of them must not mean more reads
+qn = []
+for g in (1, 2):
+    kt.dbx("""INSERT INTO agent_jobs(agent_id, task_id, user_id, title, state, log, created_at, updated_at)
+              SELECT ?, ?, ?, 'Cap ' || g, 'done', '', ?, ? FROM generate_series(1, 6000) g""",
+           (CLEO, T4b, uid["bob"], "2026-10-22T10:00:00+00:00", "2026-10-22T10:00:00+00:00"))
+    r = Ca.get(B + "/api/agents/jobs")
+    qn.append(nstmt(r) if r.ok else -1)
+kt.dbx("DELETE FROM agent_jobs WHERE title LIKE 'Cap %'")
+print("F2 reads", qn, flush=True)
+check(qn[0] > 0 and qn[0] == qn[1], f"#4194 review F2: 6000 or 12000 hidden rows cost carol the same reads (capped) {qn}")
 r = Ca.get(B + "/api/agents/jobs", params={"limit": 50})
 check(r.ok and {x["id"] for x in r.json()["jobs"]} == EXPECT_JOBS["carol"] | MORE_T2, "#4194 carol's job pages (?limit) over HTTP: the same jobs")
 r = Fr.get(B + "/api/agents/jobs", params={"limit": 20})
