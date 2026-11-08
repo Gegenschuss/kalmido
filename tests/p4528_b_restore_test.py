@@ -114,8 +114,9 @@ check(one("SELECT group_field FROM lists WHERE id=?", (L,)) == f"cf:{FS}", "rest
 check(F.post(B + f"/api/fields/trash/{TR}/restore").status_code == 404, "restore: a second time 404")
 check(F.post(B + f"/api/tasks/{T2}/restore").ok and val(T2, FS) == "Old", "the task out of the trash keeps its value")
 r = TA.delete(V + f"/fields/{FS}")
-# an agent is never a project admin (403); one owning the project waits for a person's approval (202) -- either way it stays
-check(r.status_code in (202, 403) and one("SELECT 1 FROM list_fields WHERE id=?", (FS,)), f"an agent cannot delete the field at once {r.status_code}")
+# an agent is never a project admin: refused (403), the field stays
+# 2.736.0 (p2501_a_nosham): one status, not "success or refusal" (measured: 403)
+check(r.status_code == 403 and one("SELECT 1 FROM list_fields WHERE id=?", (FS,)), f"an agent cannot delete the field at once {r.status_code}")
 # the trash run
 TR2 = F.delete(B + f"/api/fields/{FS}").json().get("trash_id")
 dbx("UPDATE field_trash SET deleted_at=? WHERE id=?", (ago(400), TR2))
