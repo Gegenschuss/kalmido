@@ -91,7 +91,8 @@ function ws_target(ws) {
   if (mod === 'agents' && a === 'agents') { const ag = agentById(+b); return ag && wsAgentIn(ag, ws) ? null : 'agents'; }
   if (mod === 'sheets' && b === 'l') return ws_listIn(c, ws) ? null : 'sheets';
   if (mod === 'office') return c ? 'office/' + b : null;  // office/<tab> is a part of the office, office/<tab>/<id> one document
-  if (mod === 'docs' && b === 'review') return null;  // a saved filter, no object
+  if (mod === 'docs' && (b === 'review' || b === 'docs')) return null;  // a saved filter, no object; 2.752.0 (#4887): #ablage/docs|review
+  if (mod === 'docs') return 'ablage/docs';  // 2.752.0 (#4887): a document or a saved view of the other workspace -> All documents
   if (mod === 'ablage' && /^aus-/.test(b)) return null;  // a collection
   if (mod === 'clients' && a === 'mailhub') return null;
   if (mod === 'msv') return null;  // a list on another server belongs to no workspace

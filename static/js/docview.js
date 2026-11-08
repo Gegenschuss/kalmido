@@ -1,7 +1,7 @@
 // @ts-check
 /* Kalmido web client: the document view (2.583.0, #4835, includes #4829 and #4832). A click on a document's card (the
    documents, the file store's cards) leaves the cards and opens the document as a page of its own with its own address
-   #docs/<id> (reload, the browser's Back and a link open it again). The head: back to the list (Esc, the same place of the
+   #ablage/<id> (2.752.0 #4887, before #docs/<id>; reload, the browser's Back and a link open it again). The head: back to the list (Esc, the same place of the
    list), the title, "3 of 128" with two arrow buttons and the arrow keys left / right through the list as shown (filters,
    sort: docs.js dc_navHtml / dc_step, the next page loads at its end, a document that left the list leafs on from where it
    stood, #4476), right: Download / Actions / Delete. Below three columns: a narrow strip of the neighbouring documents (can
@@ -49,9 +49,9 @@ function dcv_fill(id) {
 }
 // from the list / the file store / a link inside the app: a new entry in the browser's history, the place of the list kept
 function dcv_go(id) {
-  const v = $('#view'), inList = S.route.mod === 'docs' && !dc_hashId();
-  DVW.back = {hash: location.hash || '#docs', y: inList && v ? v.scrollTop : null, id, pushed: true};
-  location.hash = `#docs/${id}`;
+  const v = $('#view'), inList = dc_listOn() && !dc_hashId();  // 2.752.0 (#4887): + a folder's documents
+  DVW.back = {hash: location.hash || '#ablage/docs', y: inList && v ? v.scrollTop : null, id, pushed: true};
+  AB_FILEIDS.add(id); location.hash = `#ablage/${id}`;  // 2.752.0 (#4887): one address for files and documents (core.js)
 }
 function dcv_close(v) {
   v = v || $('.dv-view');
@@ -60,7 +60,7 @@ function dcv_close(v) {
   const b = DVW.back;
   dcv_left();
   if (b?.pushed && history.length > 1) history.back();
-  else location.hash = b?.hash && !/^#docs\/\d/.test(b.hash) ? b.hash : DC.f.review ? '#docs/review' : '#docs';
+  else location.hash = b?.hash && !dcv_isDocHash(b.hash) ? b.hash : DVW.par ? '#ablage/' + DVW.par : DC.f.review ? '#ablage/review' : '#ablage/docs';  // 2.752.0 (#4887): opened by a link / reload: its folder
 }
 // the view was left (Esc, Back, another area): free the PDF, the list comes back at the same place with its card in view
 function dcv_left() {
@@ -71,7 +71,9 @@ function dcv_left() {
   DVW.back = {...(DVW.back || {}), id, pushed: false, restore: true};
 }
 // another area (a link of a field, the sidebar): the view's document and its PDF go along
-window.addEventListener('hashchange', () => { if (!/^#docs\/\d/.test(location.hash) && (DC.doc || DVW.pdf)) dcv_left(); });
+// 2.752.0 (#4887): an address of a document = #ablage/<id of a file> (or the old #docs/<id> on its way to it)
+const dcv_isDocHash = h => { const m = /^#(docs|ablage)\/(\d+)/.exec(h || ''); return !!m && (m[1] === 'docs' || AB_FILEIDS.has(+m[2])); };
+window.addEventListener('hashchange', () => { if (!dcv_isDocHash(location.hash) && (DC.doc || DVW.pdf)) dcv_left(); });
 function dcv_restore() {
   const b = DVW.back; if (!b?.restore || !$('.dc-view')) return;
   b.restore = false;

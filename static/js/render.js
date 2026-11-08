@@ -597,7 +597,7 @@ function renderTop0() {
   if (!title && m === 'feeds') title = tr('Feeds');  // 2.85.0 B (#1162)
   if (!title && m === 'bookmarks') title = tr('Bookmarks');  // 2.97.0 A (#1950)
   if (!title && m === 'reading') title = tr('Read later');  // 2.172.0 B (#2679)
-  if (!title && (m === 'ablage' || m === 'docs')) title = tr(m === 'ablage' ? 'File store' : 'Documents');  // 2.48.0 (#1207, #1111)
+  if (!title && (m === 'ablage' || m === 'docs')) title = tr('Files');  // 2.48.0 (#1207, #1111); 2.752.0 (#4887): one area "Files"
   if (m === 'msv') title = msvvTitle();  // 2.73.0 C (#661)
   if (mg_title(m) && !S.me?.kid && !(sbb_on() && mg_areaOf(m)?.[0] !== 'office')) title = mg_title(m);  // 2.44.0 (#1187): the area's name, its tabs below; 2.152.2 (#2618): sidebar B has no tabs, the part's own name (the office's page has its own heading)
   if (sbb_on() && mg_areaOf(m)?.[0] === 'office' && !S.me?.kid && typeof ofm_cur === 'function') { const oit = ofm_all().find(i => i.key === ofm_cur(m)); if (oit) title = tr(oit.name); }  // 2.224.0 B (#2816): the big heading of an office page = its name ("Office" stands above the panel)

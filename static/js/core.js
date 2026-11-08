@@ -1747,9 +1747,21 @@ const SMART = {
   archived: {name: N_('Archived'), icon: 'archive'},  // 1.6.1: the archived lists (main view)
   search: {name: N_('Search'), icon: 'search'},
 };
+// 2.752.0 (#4887): files and documents are ONE area "Files" under ONE address: #ablage/docs (all documents), #ablage/review
+// (to review), #ablage/v/<id> (a saved view, docviews.js) and #ablage/<id> of a FILE (the document view, docview.js; the id of a
+// folder stays the folder). The ids known to be files (opened from a card or a link, found by ab_load) are kept here, the
+// route of a file is the internal module docs. The old links #docs, #docs/<id>, #docs/review, #docs/v/<id> lead here for good
+const AB_FILEIDS = new Set();
+const AB_DOCSUB = ['docs', 'review', 'v'];
+function ab_docsHash(h) {  // 'docs/…' -> 'ablage/…' (null: not an old documents' address)
+  const p = h.split('/'); if (p[0] !== 'docs') return null;
+  if (+p[1]) { AB_FILEIDS.add(+p[1]); return 'ablage/' + +p[1]; }
+  return 'ablage/' + (p[1] === 'review' ? 'review' : p[1] === 'v' && +p[2] ? 'v/' + +p[2] : 'docs');
+}
 function parseHash() {
-  const h = decodeURIComponent(location.hash.slice(1));
+  let h = decodeURIComponent(location.hash.slice(1));
   if (!h) return {mod: 'tasks', key: LS.get('lastKey', START_KEY)};
+  const dh = ab_docsHash(h); if (dh) { history.replaceState(history.state, '', '#' + dh); h = dh; }  // 2.752.0 (#4887): the old address replaced, no extra entry
   const [a, b] = h.split('/');
   if (a === 't' && b && S.route.mod === 'home') return {mod: 'home', key: 'home', task: +b};  // 2.542.0 (#4579): from Start the detail opens over Start
   if (a === 't' && b) return {mod: 'tasks', key: S.route.key || START_KEY, task: +b};
@@ -1792,8 +1804,8 @@ function parseHash() {
   if (a === 'wiki' && b === 's') { const p = h.split('/'); return {mod: 'wiki', key: 'wiki', wid: null, wsp: p[2] || '', ...(p[3] === 'd' ? {wdir: p.slice(4).join('/')} : p[3] === 't' ? {wtag: p.slice(4).join('/')} : {})}; }  // 2.198.0 A (#2743): wiki/s/<space>[/d/<folder path>] under "All"
   if (a === 'wiki') return {mod: 'wiki', key: 'wiki', wid: +b || null, ...(b === 'd' ? {wdir: h.split('/').slice(2).join('/')} : b === 't' ? {wtag: h.split('/').slice(2).join('/')} : {})};  // 2.49.0 (#1199): wiki/<page id>; 2.152.3 B (#2620): wiki/d/<folder path>
   if (a === 'sheets') return {mod: 'sheets', key: 'sheets', sh: b === 'l' || b === 'f' ? null : +b || null, shl: b === 'l' ? +(h.split('/')[2]) || null : null, shf: b === 'f' ? +(h.split('/')[2]) || null : null};  // 2.89.0 (#1916): sheets/<id>, sheets/l/<list id>; 2.199.0 C (#2742): sheets/f/<folder id>
+  if (a === 'ablage' && (AB_DOCSUB.includes(b) || AB_FILEIDS.has(+b))) return {mod: 'docs', key: 'docs', id: AB_FILEIDS.has(+b) ? +b : null, ...(b === 'review' ? {review: true} : {}), ...(b === 'v' && +h.split('/')[2] ? {dv: +h.split('/')[2]} : {})};  // 2.752.0 (#4887): ablage/docs|review|v/<id>|<file id>  // 2.579.0 (#4802): docs/v/<id> = a saved view (docviews.js)  // 2.48.0 (#1111): documents (docs.js); 2.353.0 D (#2759): docs/review = the saved filter To review
   if (a === 'ablage') return {mod: 'ablage', key: 'ablage', nid: +b || null, ...(/^aus-[a-z]{2,12}$/.test(b || '') ? {aus: b.slice(4)} : {})};  // 2.48.0 (#1207): ablage/<folder or file id>; 2.429.0 (#3580): ablage/aus-<key> (a collection)
-  if (a === 'docs') return {mod: 'docs', key: 'docs', id: +b || null, ...(b === 'review' ? {review: true} : {}), ...(b === 'v' && +h.split('/')[2] ? {dv: +h.split('/')[2]} : {})};  // 2.579.0 (#4802): docs/v/<id> = a saved view (docviews.js)  // 2.48.0 (#1111): documents (docs.js); 2.353.0 D (#2759): docs/review = the saved filter To review
   if (a === 'office' && b === 's') { const p = h.split('/'); return {mod: 'office', key: 'office', wsp: p[2] || '', tab: p[3] || '', id: +p[4] || null}; }  // 2.577.0 (#4638): office/s/<space>[/<tab>[/<id>]] under "All workspaces"
   if (a === 'office' && b && S.route?.mod === 'office' && S.route.wsp && typeof wsCur === 'function' && wsCur() === 'all') {  // 2.577.0 (#4638): a link inside an open area keeps it (the address says it too)
     history.replaceState(history.state, '', '#office/s/' + S.route.wsp + '/' + h.slice(7));

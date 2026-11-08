@@ -2,8 +2,8 @@
 /* Kalmido web client: 2.353.0 D (#2759) file store and documents are ONE area "Ablage". Each folder shows as a list or as
    cards (the documents' tiles of docs.js, dc_card; the choice per folder and person: the setting ab_cards), recognition
    (text, sender, type, date) is switched per folder (subfolders inherit, like the rights) or started for one file
-   ("Recognise"), and "Documents" / "To review" are saved filters below the folders (#docs, #docs/review; ablage.js
-   ab_panelHtml, on phones abd_navHtml). A locked folder (part A: the node's field locked) never recognises, its cards show
+   ("Recognise"), and "All documents" / "To review" are saved filters below the folders (#ablage/docs, #ablage/review; ablage.js
+   ab_panelHtml, on phones ab_docBtns; 2.752.0 #4887: a folder with recognition shows the documents' view, abd_foldHtml). A locked folder (part A: the node's field locked) never recognises, its cards show
    the names only. The rules live on the server (docs/recog.py); ablage.js calls in here only when this file is loaded.
    Loaded with the documents (lazyload.js, module docs). Classic script sharing the global scope with the others. */
 'use strict';
@@ -98,14 +98,28 @@ function abd_badge(n) {
   if (n.doc.state === 'wait' || n.doc.state === 'run') return `<span class="abver abdoc">${tr('Recognising…')}</span>`;
   return `<span class="abbadge abdoc" title="${esc(tr('Document: recognised'))}" aria-label="${esc(tr('Document: recognised'))}">${ic('sparkle', 's')}</span>`;
 }
-// ---- the saved filters on phones (a computer: the panel, ablage.js): below the spaces of the file store; in the documents'
-// view the way back to the file store
-function abd_navHtml(inAb) {
-  if (!abd_on() || (typeof sbb_on === 'function' && sbb_on())) return '';
-  const r = S.route, rv = DC.review ? ` <span class="dc-count">${DC.review}</span>` : '';
-  const b = (go, icon, name, on, after = '') => `<button type="button" class="abspace abfilt ${on ? 'on' : ''}" data-go="${go}" ${on ? 'aria-current="page"' : ''}>${ic(icon, 's')}<span>${esc(name)}</span>${after}</button>`;
-  const fs = b('docs', 'file', tr('Documents'), r.mod === 'docs' && !r.review) + (inAb ? b('docs/review', 'check', tr('To review'), r.mod === 'docs' && !!r.review, rv) : '');  // 2.540.0 (#4472): in the documents' view the switch of the bar is the only "To review"
-  return inAb ? fs : `<nav class="abspaces abdnav" aria-label="${esc(tr('File store'))}">${b('ablage', 'folder', tr('Files'), false)}${fs}</nav>`;
+// ---- 2.752.0 (#4887): a folder with recognition = the documents' view of that folder (ablage.js viewAblage): the documents'
+// bar (search, filter, sort, card size, Add / Scan into this folder), its subfolders as cards first, its documents (docs.js
+// dc_bodyHtml: the server's list ?folder=, a search / filter ?under= takes the subfolders along, sorted and paged like all
+// documents), then its files that are no documents (yet). The switch Files | Documents of phones (abd_navHtml) is gone: the
+// bar of the spaces has "All documents" / "To review" (ablage.js ab_docBtns)
+function abd_foldHtml(d) {
+  const n = d.node, fresh = dc_ctxSet('f:' + n.id), open = !document.querySelector('.dc-infold');
+  if (DC.ws != null && DC.ws !== dc_ws()) p61b_dcReset();
+  if (!DC.loading && (fresh || (!DC.docs && !DC.err) || (open && Date.now() - (DC.at || 0) > 3000))) setTimeout(dc_load, 0);
+  if (open && typeof dcv_restore === 'function') setTimeout(dcv_restore, 0);  // back from a document: the same place, its card in view
+  const items = d.items || [], have = new Set((DC.docs || []).map(x => x.id));
+  const kids = items.filter(x => x.kind === 'folder'), plain = items.filter(x => x.kind !== 'folder' && !(x.doc && !abd_locked(x)) && !have.has(x.id));
+  const ul = xs => xs.length ? `<ul class="dc-grid abcards" aria-label="${esc(tr('Files'))}">${xs.map(abd_card).join('')}</ul>` : '';
+  const fold = {node: n, canAdd: ab_canWrite(n.role), before: ul(kids), after: ul(plain), card: abd_docCard};
+  return `<div class="dc-view dc-infold" data-abfold="${n.id}">${dc_headHtml(fold)}${dc_bodyHtml(fold)}</div>`;
+}
+// a document of the folder: its card with the file store's menu and share names (an entry of the folder; one found in a
+// subfolder by a search: the documents' card)
+function abd_docCard(doc) {
+  const n = (AB.data?.items || []).find(x => x.id === doc.id);
+  if (!n || abd_locked(n)) return dc_card(doc);
+  return abd_card({...n, doc});
 }
 
 // ---- events
@@ -114,7 +128,7 @@ document.addEventListener('click', e => {
   const v = /** @type {HTMLElement|null} */ (t.closest?.('.abview [data-abdv]'));
   if (v) { abd_setCards(AB.key || (S.route.nid ? 'n:' + S.route.nid : 's:' + ab_curSpace()), v.dataset.abdv === 'cards'); return; }
   const o = /** @type {HTMLElement|null} */ (t.closest?.('.abview [data-dco]'));  // a document's card: the document view (2.583.0, #4832/#4835; Back leads to the file store)
-  if (o) { e.preventDefault(); dc_open(+o.dataset.dco, {list: abd_navIds()}); return; }  // 2.683.0 (#5150): + the folder's documents to leaf through
+  if (o && !o.closest('.dc-infold')) { e.preventDefault(); dc_open(+o.dataset.dco, {list: abd_navIds()}); return; }  // 2.683.0 (#5150): + the folder's documents to leaf through; 2.752.0 (#4887): a folder with recognition: docs.js opens it
   const r = /** @type {HTMLElement|null} */ (t.closest?.('.abview [data-abdr]'));
   if (r) { const n = AB.data?.node; if (n && n.id === +r.dataset.abdr) abd_recogMenu(n, r); }
 });

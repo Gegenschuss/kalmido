@@ -63,8 +63,8 @@ function fv2_hashKey(g) {
   if ((m = /^(who|grp|f|l)\/(\d+)$/.exec(g))) return {who: 'p:', grp: 'g:', f: 'f:', l: 'l:'}[m[1]] + m[2];
   if ((m = /^office\/(offers|invoices|letters|gendocs)\/(\d+)$/.exec(g))) return `r:office_${{offers: 'doc', invoices: 'doc', letters: 'letter', gendocs: 'gendoc'}[m[1]]}:${m[2]}`;
   if ((m = /^(wiki|sheets|contacts|contacts\/b)\/(\d+)$/.exec(g))) return `r:${{wiki: 'wiki', sheets: 'sheet', contacts: 'contact', 'contacts/b': 'address_book'}[m[1]]}:${m[2]}`;
-  if ((m = /^docs\/v\/(\d+)$/.exec(g))) return 'r:docview:' + m[1];  // 2.579.0 (#4802)
-  if ((m = /^(ablage|docs)\/(\d+)$/.exec(g))) return `${m[1] === 'docs' ? 'doc' : 'file'}:${m[2]}`;
+  if ((m = /^(?:docs|ablage)\/v\/(\d+)$/.exec(g))) return 'r:docview:' + m[1];  // 2.579.0 (#4802); 2.752.0 (#4887): + #ablage/v/<id>
+  if ((m = /^(ablage|docs)\/(\d+)$/.exec(g))) return `${m[1] === 'docs' || AB_FILEIDS.has(+m[2]) ? 'doc' : 'file'}:${m[2]}`;  // 2.752.0 (#4887): #ablage/<id> of a file = its document view
   try {
     if (g.startsWith('tag/')) return 'tag:' + decodeURIComponent(g.slice(4));
     if (g.startsWith('folder/')) return 'folder:' + decodeURIComponent(g.slice(7));
@@ -88,7 +88,7 @@ function fv2_tile(key, ctx) {
   if (fv2_isObj(key)) {
     const o = FV2.res[key], d = p === 'r' ? FV2_REF[v.split(':')[0]] : [o?.folder ? 'folder' : 'file', p === 'doc' ? 'docs' : 'ablage']; if (!o || !d) return null;
     if (p === 'r' && !feat(d[1])) return null;
-    return {key, name: o.name, place: o.label, ws: o.ws, icon: ic(d[0]), attrs: `data-fv2-go="${esc(o.to)}" data-fv2-ws="${esc(o.ws || '')}"`, on: location.hash.slice(1) === o.to};
+    return {key, name: o.name, place: o.label, ws: o.ws, icon: ic(d[0]), attrs: `data-fv2-go="${esc(o.to)}" data-fv2-ws="${esc(o.ws || '')}"`, on: location.hash.slice(1) === String(o.to || '').replace(/^docs\//, 'ablage/') || location.hash.slice(1) === o.to};  // 2.752.0 (#4887): #docs/… is #ablage/… now
   }
   if (p === 'l') {
     const l = listById(+v); if (!l || l.is_inbox || l.archived || life_store(l) || (!ctx.allWs && !inWs(l))) return null;  // 2.609.0 (#4613): an area's store list is no project tile

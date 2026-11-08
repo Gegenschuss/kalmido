@@ -2,7 +2,7 @@
 /* Kalmido web client: saved views of the documents search (2.579.0, #4802; server: kalmido/docs/dviews.py, a kind of the
    shared core). Classic script sharing the global scope with the others; loaded on demand (lazyload.js 'docviews') by the
    documents list, the sidebar of Files and Today.
-   - "Save view" in the documents' bar keeps the search field, the filters and the sort under a name (#docs/v/<id> opens it)
+   - "Save view" in the documents' bar keeps the search field, the filters and the sort under a name (#ablage/v/<id> opens it; the old #docs/v/<id> leads there)
    - the sidebar lists the views of the shown workspace under "Documents" / "To review", each with its number of hits
    - the view's menu (its "…" at the top of the list, right-click / long press on its row): rename, take over the current
      filters, favourite, show on Today, share with everyone of the organisation (admins in an organisation's workspace),
@@ -44,7 +44,7 @@ function dcv_sideHtml() {
   const ws = typeof wsCur === 'function' ? wsCur() : 'all';
   if (!DCV.items || DCV.ws !== ws || Date.now() - DCV.at > 60000) setTimeout(() => dcv_load(), 0);
   const r = S.route;
-  return (DCV.items || []).map(v => sbb_row('docs/v/' + v.id, 'filter', v.title, r.mod === 'docs' && r.dv === v.id, `data-sbbpart="docs-view" data-dcvid="${v.id}"`,
+  return (DCV.items || []).map(v => sbb_row('ablage/v/' + v.id, 'filter', v.title, r.mod === 'docs' && r.dv === v.id, `data-sbbpart="docs-view" data-dcvid="${v.id}"`,
     `${v.shared_all ? `<span class="dcv-all" title="${esc(tr('Shared with everyone of the organisation'))}">${ic('users', 's')}</span>` : ''}${v.count != null ? `<span class="c">${v.count}</span>` : ''}`)).join('');
 }
 
@@ -70,7 +70,7 @@ function dcv_apply(v) {
   DC.more = false; DC.at = 0; DC.facets = null;
   DCV.applied = v ? {id: v.id, query: v.query} : null;
 }
-// the route changed (docs.js viewDocs): #docs/v/<id> applies the view, leaving it empties the search again
+// the route changed (docs.js viewDocs): #ablage/v/<id> applies the view, leaving it empties the search again
 function dcv_routeSync() {
   const id = S.route.mod === 'docs' ? S.route.dv || null : null;
   if ((DC.dv || null) === id) return;
@@ -79,7 +79,7 @@ function dcv_routeSync() {
   const v = dcv_get(id);
   if (v) { dcv_apply(v); dc_load(); return; }
   DC.dv = null;  // not loaded yet: again once the views are there
-  dcv_load(true).then(() => { if (S.route.mod === 'docs' && S.route.dv === id) { if (dcv_get(id)) { dcv_routeSync(); dc_draw(); } else { toast(tr('This view does not exist or you cannot see it.')); go('docs'); } } });
+  dcv_load(true).then(() => { if (S.route.mod === 'docs' && S.route.dv === id) { if (dcv_get(id)) { dcv_routeSync(); dc_draw(); } else { toast(tr('This view does not exist or you cannot see it.')); go('ablage/docs'); } } });
 }
 const dcv_changed = () => !!DC.dv && !!DCV.applied && DCV.applied.id === DC.dv && dcv_queryNow() !== new URLSearchParams(DCV.applied.query || '').toString();
 // the documents' bar: "Save view"; in a view: its name, a mark when the search differs from what it keeps, its menu
@@ -99,7 +99,7 @@ async function dcv_save() {
   let v; try { v = await api('POST', '/api/obj/docview', {title: name.trim(), query: dcv_queryNow(), ws}); } catch { return; }
   dcv_stale(); await dcv_load(true);
   toast(tr('View “{0}” saved', v.title));
-  go('docs/v/' + v.id);
+  go('ablage/v/' + v.id);
 }
 async function dcv_patch(v, b, label) {
   const old = dcv_get(v.id) || v, back = Object.fromEntries(Object.keys(b).map(k => [k, old[k]]));
@@ -120,7 +120,7 @@ async function dcv_delete(v) {
   try { await api('POST', dcv_url(v.id) + '/trash'); } catch { return; }
   if (dcv_isToday(v.id)) dcv_todaySet(v.id, false, true);
   dcv_stale(); await dcv_load(true);
-  if (DC.dv === v.id) go('docs');
+  if (DC.dv === v.id) go('ablage/docs');
   const back = async () => { try { await api('POST', dcv_url(v.id) + '/restore'); } catch { /* shown */ } dcv_stale(); dcv_load(true); };
   offerUndo(tr('View “{0}” deleted', v.title), histAdd({label: tr('Delete view'), undo: back, redo: async () => { try { await api('POST', dcv_url(v.id) + '/trash'); } catch { /* shown */ } dcv_stale(); dcv_load(true); }}));
 }
@@ -163,8 +163,8 @@ function dcv_todayCard(id) {
   if (!h || Date.now() - h.at > 60000) dcv_hitsLoad(id);
   if (h?.gone) return '';
   const v = h?.view || dcv_get(id), name = v?.title || tr('Saved view');
-  const rows = (h?.docs || []).map(d => `<li><a href="#docs/${d.id}">${ic('file', 's')}<span class="dwt"><b>${esc(d.name || '')}</b>${d.date ? ` <span class="muted">${esc(dayLabel(d.date, true))}</span>` : ''}</span></a></li>`).join('');
-  return `<section class="dcard dcv-today" aria-labelledby="dcvh-${id}"><h3 id="dcvh-${id}">${ic('filter', 's')}<span>${esc(name)}</span>${h && !h.busy ? `<span class="dcn">${h.total}</span>` : ''}<span class="spacer"></span><a class="linkbtn" href="#docs/v/${id}">${esc(tr('Show all'))}</a></h3>
+  const rows = (h?.docs || []).map(d => `<li><a href="#ablage/${d.id}">${ic('file', 's')}<span class="dwt"><b>${esc(d.name || '')}</b>${d.date ? ` <span class="muted">${esc(dayLabel(d.date, true))}</span>` : ''}</span></a></li>`).join('');
+  return `<section class="dcard dcv-today" aria-labelledby="dcvh-${id}"><h3 id="dcvh-${id}">${ic('filter', 's')}<span>${esc(name)}</span>${h && !h.busy ? `<span class="dcn">${h.total}</span>` : ''}<span class="spacer"></span><a class="linkbtn" href="#ablage/v/${id}">${esc(tr('Show all'))}</a></h3>
     ${h && !h.busy ? rows ? `<ul class="dwl">${rows}</ul>` : `<p class="muted">${esc(tr('No documents in this view.'))}</p>` : `<p class="muted">${esc(tr('Loading…'))}</p>`}</section>`;
 }
 function dcv_todayParts() {

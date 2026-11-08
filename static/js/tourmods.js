@@ -75,7 +75,7 @@ const tourMods = () => ({
     {id: 'ablage4', sel: '[data-ab="new-folder"]', opt: 1, t: tr('Folders and sharing'), d: tr('Create folders here. Share a folder from its menu (right-click or long press): the people you add see only that folder.')},
     {id: 'ablage5', sel: '#ftxt-q, #dc-q', t: tr('Search'), d: tr('Search by name or by the text inside the files.')},
     {id: 'ablage6', t: tr('Files of projects'), d: tr('Files attached in your projects show here too, read-only.')},
-    {id: 'ablage7', sel: '#side [data-go="docs"], #view [data-go="docs"]', ms: '#view [data-go="docs"]', on: () => feat('docs'), opt: 1, t: tr('Documents'), d: tr('Letters and receipts with sender, type and date, sorted by your rules.')},
+    {id: 'ablage7', sel: '#side [data-go="ablage/docs"], #view [data-go="ablage/docs"]', ms: '#view [data-go="ablage/docs"]', on: () => feat('docs'), opt: 1, t: tr('Documents'), d: tr('Letters and receipts with sender, type and date, sorted by your rules.')},
     tourRail('ablage')],
   wiki: [{id: 'wiki1', t: tr('Your knowledge'), d: tr('Notes and instructions as pages that link to each other.')},
     {id: 'wiki3', sel: '[data-wk="new"]', opt: 1, t: tr('New page'), d: tr('Name it with a slash to put it into a folder, e.g. Processes/Checklist.')},

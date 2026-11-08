@@ -19,8 +19,9 @@ const MG_AREAS = [
   ['reading', 'bookmark', N_('Reading|area'), [['reading', 'book', N_('Read later'), () => feat('reading'), () => ['reading']],
     ['feeds', 'news', N_('Feeds'), () => feat('feeds'), () => ['feeds']],
     ['bookmarks', 'bookmark', N_('Bookmarks'), () => feat('reading'), () => ['reading']]]],
-  // 2.48.0 (#1207, #1111): the file store with its parts files (ablage.js) and documents (docs.js)
-  ['ablage', 'folder', N_('File store|area'), [['ablage', 'folder', N_('Files'), () => ab_on(), () => ['files']],
+  // 2.48.0 (#1207, #1111): the file store with its parts files (ablage.js) and documents (docs.js); 2.752.0 (#4887): ONE area
+  // "Files" with one tree, the part docs is only the documents' switch (no entry of its own, MG_NONAV; routes #ablage/docs …)
+  ['ablage', 'folder', N_('Files'), [['ablage', 'folder', N_('Files'), () => ab_on(), () => ['files']],
     ['docs', 'file', N_('Documents'), () => typeof viewDocs === 'function' && feat('docs'), () => ['docs']]]]];
 const MG_IDS = MG_AREAS.map(a => a[0]);
 const mg_area = id => MG_AREAS.find(a => a[0] === id) || null;
@@ -403,7 +404,7 @@ const o3a_orgView = () => typeof wsCur === 'function' && wsCur().startsWith('org
 // 2.173.0 A (#2680): the parts of an area shown in the current view (an organisation's: without the private ones) and the
 // name of Home there (only travel and staying in touch: not "Home")
 // 2.353.0 D (#2759): parts without an own entry in the navigation (tabs, panel, menus): Documents is a saved filter of the
-// file store now (abdocs.js); its route #docs, its switch and its old links stay
+// file store now (abdocs.js); its switch and its old links stay (2.752.0, #4887: #docs leads to #ablage/docs, core.js)
 const MG_NONAV = new Set(['docs']);
 const mg_partsShown = a => mg_parts(a).filter(p => !o3a_hid(p[0]) && !MG_NONAV.has(p[0]) && !nav_orgOff(a[0], p[0]));  // 2.418.0 (#3560): + off in the organisation
 // 2.418.0 (#3560): the parts in the area's menu (panel, tabs): the person's order, without the hidden ones (the open one stays)

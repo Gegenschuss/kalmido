@@ -58,7 +58,11 @@ async function ab_load() {
   } catch (x) {
     if (seq !== AB.seq) return;
     if (r.nid) {  // a file: open its folder and the file's details
-      try { const n = await api('GET', `/api/files/nodes/${r.nid}`); if (n.kind !== 'folder') { AB.loading = false; go(n.parent_id ? 'ablage/' + n.parent_id : ab_home(ab_nodeSp(n))); setTimeout(() => ab_details(n.id), 50); return; } } catch { /* below */ }
+      try { const n = await api('GET', `/api/files/nodes/${r.nid}`);
+        // 2.752.0 (#4887): #ablage/<id> of a file = its document view (core.js AB_FILEIDS: the route of the module docs); a locked /
+        // encrypted file and the trash keep the way before (its folder with the file's details)
+        if (n.kind === 'file' && !n.in_trash && !n.locked && !n._enc && !upLocked(n) && feat('docs') && !S.me?.kid && S.route.nid === n.id) { AB_FILEIDS.add(n.id); AB.loading = false; route(); return; }
+        if (n.kind !== 'folder') { AB.loading = false; go(n.parent_id ? 'ablage/' + n.parent_id : ab_home(ab_nodeSp(n))); setTimeout(() => ab_details(n.id), 50); return; } } catch { /* below */ }
     }
     AB.data = null; AB.dkey = ''; AB.err = x.message || tr('unknown');
   }
@@ -68,7 +72,7 @@ async function ab_load() {
   if (typeof fsl_auto === 'function') fsl_auto(AB.data);  // 2.353.0 A (#2758): an owner hands over waiting keys
 }
 function ab_draw() { if (S.route.mod !== 'ablage') return; const el = $('#view'); if (el) keepFocus(el, () => setHtml(el, mg_wrap('ablage', viewAblage()))); }
-const ab_reload = () => { AB.key = ''; ab_ptStale(); if (S.route.mod === 'ablage') ab_load(); };  // 2.152.3 B (#2621): + the panel's folders
+const ab_reload = () => { AB.key = ''; ab_ptStale(); if (S.route.mod === 'ablage') { ab_load(); if (typeof dc_inFold === 'function' && dc_inFold()) dc_load(); } };  // 2.752.0 (#4887): + a folder's documents  // 2.152.3 B (#2621): + the panel's folders
 
 // ---- the view
 function viewAblage() {
@@ -88,13 +92,16 @@ function viewAblage() {
   const tree = r.nid && d ? [...(d.crumbs || []).map((c, i) => ({id: c.id, name: c.name, lvl: i + 1, on: c.id === r.nid})),
     ...d.items.filter(n => n.kind === 'folder').map(n => ({id: n.id, name: n.name, lvl: (d.crumbs || []).length + 1, sub: true}))] : [];
   const treeHtml = tree.map(t => `<button type="button" class="abspace abtree ${t.on ? 'on' : ''}" style="--ablvl:${Math.min(t.lvl, 6)}" data-go="ablage/${t.id}" data-abdrop="${t.id}" ${t.on ? 'aria-current="page"' : ''}>${ic('folder', 's')}<span>${esc(t.name)}</span></button>`).join('');
-  const spaces = `<nav class="abspaces" aria-label="${esc(tr('File store'))}">${ab_spaces().map(s => `<button type="button" class="abspace ${!r.nid && s === sp ? 'on' : ''}" data-ab="space" data-sp="${esc(s)}" ${!r.nid && s === sp ? 'aria-current="page"' : ''}>${ab_spaceIcon(s)}<span>${esc(ab_spaceName(s))}</span></button>${r.nid && s === (sp || 'shared') ? treeHtml : ''}`).join('')}${typeof abd_navHtml === 'function' ? abd_navHtml(true) : ''}</nav>`;  // 2.353.0 D (#2759): + the saved filters
+  const spaces = `<nav class="abspaces" aria-label="${esc(tr('File store'))}">${ab_spaces().map(s => `<button type="button" class="abspace ${!r.nid && s === sp ? 'on' : ''}" data-ab="space" data-sp="${esc(s)}" ${!r.nid && s === sp ? 'aria-current="page"' : ''}>${ab_spaceIcon(s)}<span>${esc(ab_spaceName(s))}</span></button>${r.nid && s === (sp || 'shared') ? treeHtml : ''}`).join('')}${ab_docBtns(true)}</nav>`;  // 2.353.0 D (#2759): + the saved filters; 2.752.0 (#4887): All documents, To review
   const desk = typeof sbb_on === 'function' && sbb_on();  // 2.152.3 B (#2621): a computer: spaces and folders are in the panel (ab_panelHtml), the path on top
   const trash = !r.nid && sp === 'trash', canAdd = r.nid ? ab_canWrite(d?.node?.role) : (sp === 'private' || (sp || '').startsWith('org:'));
+  // 2.752.0 (#4887): a folder with recognition shows the documents' view (abdocs.js abd_foldHtml: their bar, the documents' cards,
+  // its subfolders before them); every other folder its list as before
+  const fold = !!(r.nid && d?.node && typeof abd_recogHere === 'function' && abd_recogHere(key) && typeof abd_foldHtml === 'function');
   const crumbs = r.nid && d ? `<nav class="abcrumbs" aria-label="${esc(tr('Path'))}">${ab_all() ? spo_upHtml('ablage') : '' /* 2.540.0 (#4575) */}<button type="button" class="linkbtn" data-ab="space" data-sp="${esc(sp === 'shared' || !sp ? 'shared' : sp)}" data-abdrop="top">${esc(ab_spaceName(sp || 'shared'))}</button>${(d.crumbs || []).map((c, i, a) => `<span class="abcsep" aria-hidden="true">/</span>${i === a.length - 1 ? `<span class="abccur" aria-current="page">${esc(c.name)}</span>` : `<button type="button" class="linkbtn" data-go="ablage/${c.id}" data-abdrop="${c.id}">${esc(c.name)}</button>`}`).join('')}</nav>` : ab_all() ? spo_crumbHtml('ablage', ab_spaceName(sp)) : `<h3 class="abtitle">${esc(ab_spaceName(sp))}</h3>`;  // 2.540.0 (#4575): under "All" the path back to the overview
-  const tools = trash ? ab_trashTools(d) : `<div class="abtools">${canAdd ? `<button type="button" class="btn sm" data-ab="new-folder">${ic('folder', 's')} ${tr('New folder')}</button><button type="button" class="btn sm pri" data-ab="upload">${ic('upload', 's')} ${tr('Upload')}</button>${d?.node?.locked ? '' : `<button type="button" class="btn sm" data-ab="scan">${ic('camera', 's')} ${tr('Scan')}</button>`}<input type="file" id="ab-file" multiple hidden>` : ''}${typeof dt_abOn === 'function' && dt_abOn(sp || d?.space) ? '' : ab_smvTools(d)}${typeof dt_abBtn === 'function' ? dt_abBtn(sp || d?.space) : ''}${!trash && d && typeof abd_toolsHtml === 'function' ? abd_toolsHtml(d, key) : ''}${r.nid && d?.node?.share_with ? `<button type="button" class="btn sm abshbtn" data-ab="share" data-id="${d.node.id}" title="${esc(tr('Share…'))}">${ic('users', 's')} ${tr('Share')}</button>` : '' /* 2.558.0 (#4693) */}${r.nid && d?.node ? `<button type="button" class="iconbtn" data-ab="menu" data-id="${d.node.id}" aria-label="${esc(tr('More actions for {0}', d.node.name))}" title="${esc(tr('More'))}">${ic('dots')}</button>` : ''}</div>`;
+  const tools = trash ? ab_trashTools(d) : fold ? ab_foldTools(d, canAdd) : `<div class="abtools">${canAdd ? `<button type="button" class="btn sm" data-ab="new-folder">${ic('folder', 's')} ${tr('New folder')}</button><button type="button" class="btn sm pri" data-ab="upload">${ic('upload', 's')} ${tr('Upload')}</button>${d?.node?.locked ? '' : `<button type="button" class="btn sm" data-ab="scan">${ic('camera', 's')} ${tr('Scan')}</button>`}<input type="file" id="ab-file" multiple hidden>` : ''}${typeof dt_abOn === 'function' && dt_abOn(sp || d?.space) ? '' : ab_smvTools(d)}${typeof dt_abBtn === 'function' ? dt_abBtn(sp || d?.space) : ''}${!trash && d && typeof abd_toolsHtml === 'function' ? abd_toolsHtml(d, key) : ''}${r.nid && d?.node?.share_with ? `<button type="button" class="btn sm abshbtn" data-ab="share" data-id="${d.node.id}" title="${esc(tr('Share…'))}">${ic('users', 's')} ${tr('Share')}</button>` : '' /* 2.558.0 (#4693) */}${r.nid && d?.node ? `<button type="button" class="iconbtn" data-ab="menu" data-id="${d.node.id}" aria-label="${esc(tr('More actions for {0}', d.node.name))}" title="${esc(tr('More'))}">${ic('dots')}</button>` : ''}</div>`;
   // 2.428.0 A (#3581): where "Select" is offered the rows' boxes show on hover too (ab_smvBox), not in the trash / tag filter / search
-  AB.selHere = !!d?.items?.length &&  /* 2.589.0 (#4875): the trash too */ !(typeof dt_abOn === 'function' && dt_abOn(sp || d.space)) && !(typeof ftxtActive === 'function' && ftxtActive());
+  AB.selHere = !!d?.items?.length && !fold &&  /* 2.589.0 (#4875): the trash too */ !(typeof dt_abOn === 'function' && dt_abOn(sp || d.space)) && !(typeof ftxtActive === 'function' && ftxtActive());
   let body;
   if (r.aus) return `<div class="abview ${desk ? 'abdesk' : ''}">${desk ? '' : spaces}<div class="abmain">${ab_collHtml(d, sp)}</div></div>`;  // 2.429.0 (#3580)
   if (AB.err && AB.key === key) body = `<div class="empty">${ic('folder')}<span>${esc(AB.err)}</span><button type="button" class="btn" data-ab="space" data-sp="private">${tr('Private|workspace')}</button></div>`;
@@ -102,13 +109,34 @@ function viewAblage() {
   else if (!d.items.length && !d.collections?.length) body = `<div class="empty abempty">${ic(trash ? 'trash' : 'folder')}<span>${trash ? tr('The trash is empty') : sp === 'shared' && !r.nid ? tr('Nothing is shared with you yet') : canAdd ? tr('Drop files here or use “Upload”') : tr('This folder is empty')}</span>${!r.nid && sp.startsWith('org:') && !ab_orgAdmin(sp) ? `<span class="muted abemptyhint">${tr('You see the organisation’s folders once an admin opens them to everyone or shares them with you.')}</span>` : ''}</div>`;
   else body = `<div class="ablist${AB.selOn ? ' abselon' : ''}" role="list">${d.items.map(n => ab_rowHtml(n, trash)).join('')}${(d.collections || []).map(ab_collRow).join('')}</div>`;  // 2.429.0 (#3580): + "From <area>" after the folders and files
   if (d?.items.length && !trash && typeof abd_cardsOn === 'function' && abd_cardsOn(key)) body = abd_cardsHtml(d, key);  // 2.353.0 D (#2759): the folder as cards
+  if (fold) body = abd_foldHtml(d, key);  // 2.752.0 (#4887)
   if (d?.node?.locked && typeof fsl_bannerHtml === 'function') body = fsl_bannerHtml(d) + body;  // 2.353.0 A (#2758)
-  if (d && typeof dt_abOn === 'function' && dt_abOn(sp || d.space)) body = dt_abBody(sp || d.space);  // 2.122.0 B (#2099): the tag filter of the space
-  const search = !trash && !d?.node?.locked && typeof ftxtBox === 'function' ? ftxtBox() : '';  // 2.61.0 (#1820): names + recognised text; 2.353.0 F (#2758, review N9): a locked folder searches its names here only (the banner)
+  if (!fold && d && typeof dt_abOn === 'function' && dt_abOn(sp || d.space)) body = dt_abBody(sp || d.space);  // 2.122.0 B (#2099): the tag filter of the space
+  const search = !trash && !fold /* 2.752.0 (#4887): the documents' search of the folder */ && !d?.node?.locked && typeof ftxtBox === 'function' ? ftxtBox() : '';  // 2.61.0 (#1820): names + recognised text; 2.353.0 F (#2758, review N9): a locked folder searches its names here only (the banner)
   if (search && ftxtActive()) body = ftxtResults();
   const hint = !r.nid && sp === 'private' && d && !d.items.length ? `<p class="muted abhint">${tr('Share a folder with a person or an agent: they see exactly that folder, nothing else.')}</p>` : '';
   const tdays = trash && d?.trash_days ? `<p class="muted abhint abtrashdays">${esc(trashNote(tr('Files and folders in the trash are deleted permanently after {0} days.', d.trash_days), d.purge_on === false))}</p>` : '';  // 2.152.0 B (#2165)
   return `<div class="abview ${canAdd ? 'abdropok' : ''} ${desk ? 'abdesk' : ''}" data-abzone="${r.nid || ''}">${desk ? '' : spaces}<div class="abmain">${search}${search && ftxtActive() ? `<h3 class="abtitle">${tr('Search results')}</h3>` : crumbs + tools + (r.nid ? ab_shHead(d) : '') + ab_scanDoneHtml() + (!trash && d && typeof abd_recogLine === 'function' ? abd_recogLine(d) : '')}${body}${search && ftxtActive() ? '' : hint + tdays + ab_smvBar(trash)}</div></div>`;
+}
+// 2.752.0 (#4887): the file store's tools above a folder with recognition: New folder, Share, its menu (Upload and Scan are
+// "Add documents" / "Scan" in the documents' bar, the same way into the folder)
+function ab_foldTools(d, canAdd) {
+  const n = d.node;
+  return `<div class="abtools">${canAdd ? `<button type="button" class="btn sm" data-ab="new-folder">${ic('folder', 's')} ${tr('New folder')}</button>` : ''}${n.share_with ? `<button type="button" class="btn sm abshbtn" data-ab="share" data-id="${n.id}" title="${esc(tr('Share…'))}">${ic('users', 's')} ${tr('Share')}</button>` : ''}<button type="button" class="iconbtn" data-ab="menu" data-id="${n.id}" aria-label="${esc(tr('More actions for {0}', n.name))}" title="${esc(tr('More'))}">${ic('dots')}</button></div>`;
+}
+// 2.752.0 (#4887): ONE area "Files": below the folders "All documents" and "To review" (the documents' saved filters, routes
+// #ablage/docs and #ablage/review, docs.js). Phones / tablets without the panel: as buttons in the bar of the spaces on top;
+// in the documents' own list its switch "All | To review" stays the only "To review" there (#4472)
+const ab_docsOn = () => feat('docs') && !S.me?.kid;
+function ab_docBtns(review) {
+  if (!ab_docsOn()) return '';
+  const r = S.route, rv = typeof DC !== 'undefined' && DC.review ? ` <span class="dc-count">${DC.review}</span>` : '';
+  const b = (go, icon, name, on, after = '') => `<button type="button" class="abspace abfilt ${on ? 'on' : ''}" data-go="${go}" ${on ? 'aria-current="page"' : ''}>${ic(icon, 's')}<span>${esc(name)}</span>${after}</button>`;
+  return b('ablage/docs', 'file', tr('All documents'), r.mod === 'docs' && !r.review && !r.dv && !r.id) + (review ? b('ablage/review', 'check', tr('To review'), r.mod === 'docs' && !!r.review, rv) : '');
+}
+function ab_phoneNav() {  // the documents' list (docs.js viewDocs) without the panel: the spaces and All documents, like a folder's bar
+  if (typeof sbb_on === 'function' && sbb_on()) return '';
+  return `<nav class="abspaces abdnav" aria-label="${esc(tr('Files'))}">${ab_spaces().map(s => `<button type="button" class="abspace" data-go="${esc(ab_home(s))}" data-absp="${esc(s)}">${ab_spaceIcon(s)}<span>${esc(ab_spaceName(s))}</span></button>`).join('')}${ab_docBtns(false)}</nav>`;
 }
 // 2.152.3 B (#2621): the panel of the file store (sidebar B on a computer): its parts (Files, Documents) as entries; below
 // Files the top folders of the shown workspace (several workspaces: each one first), a folder's subfolders loaded and drawn
@@ -139,21 +167,22 @@ function ab_panelHtml() {
   const withColl = (s, it) => it && [...it.map(node), ...collNodes(s)];
   const spaceNode = s => ({k: 'ab:s:' + s, name: ab_spaceName(s), go: ab_home(s) /* 2.540.0 (#4575) */, on: cur === s, icon: s === 'private' ? 'home' : s === 'shared' ? 'users' : s === 'trash' ? 'trash' : 'folder', battrs: `data-absp="${esc(s)}"`,
     kids: real.includes(s) && (AB.pt['s:' + s]?.items?.length !== 0 || !!AB.pt['s:' + s]?.coll?.length), open: !!path.length && AB.data?.space === s, sub: () => withColl(s, ab_ptGet('s:' + s))});
-  const files = () => {
-    const one = real.length === 1, top = one ? ab_ptGet('s:' + real[0]) : [];
-    const tree = (one ? (top ? sbb_treeHtml(withColl(real[0], top), 1) : `<p class="muted sbbtl" style="--sbbl:1">${esc(tr('Loading…'))}</p>`) : sbb_treeHtml(real.map(spaceNode), 1))
-      + sbb_treeHtml(ab_spaces().filter(s => !real.includes(s)).map(spaceNode), 1);
-    return sbb_row('ablage', 'folder', tr('Files'), one && cur === real[0], `data-sbbpart="ablage" ${one ? `data-absp="${esc(real[0])}"` : ''}`) + `<div class="sbbtree" role="group" aria-label="${esc(tr('Folders'))}">${tree}</div>`;
-  };
-  // 2.353.0 D (#2759): Documents = the saved filters "Documents" (every recognised file) and "To review" below the folders
+  // 2.752.0 (#4887): ONE tree (the documents' own tree with the same folders again is gone); below it "All documents", "To
+  // review" and the saved views (2.579.0 #4802, docviews.js, loaded without redrawing the view: it draws the panel itself,
+  // sbb_sync), then "Shared with me" and the trash. The part docs of the area stays the switch of the documents (Settings >
+  // Modules, the menu's hidden parts: hidden = no documents' rows here)
   const rv = typeof DC !== 'undefined' && DC.review ? `<span class="c">${DC.review}</span>` : '';
-  // 2.576.0 (#4487): Documents folds like the office's document areas (sbb_treeHtml, open by itself while the filter is open):
-  // its folders (2.199.0 B #2742 dc_panelTree, docs.js loaded on the first unfold); the file store's documents only -- the
-  // office's are in Office > Receipts (docs.js dc_params area=private)
-  const dnode = {k: 'ab:docs', name: tr('Documents'), icon: 'file', go: 'docs', on: r.mod === 'docs' && !r.review && !r.dv, battrs: 'data-sbbpart="docs"', kids: true, open: r.mod === 'docs',
-    sub: () => typeof dc_panelTree === 'function' ? [{raw: dc_panelTree()}] : (typeof loadModule === 'function' && loadModule('docs').then(() => sbb_sync('ablage'), () => {}), null)};
-  const docs = () => `<div class="abfilt" role="group" aria-label="${esc(tr('Saved filters'))}">${sbb_treeHtml([dnode], 0)}${sbb_row('docs/review', 'check', tr('To review'), r.mod === 'docs' && !!r.review, 'data-sbbpart="docs-review"', rv)}${typeof dcv_sideHtml === 'function' ? dcv_sideHtml() : (typeof loadModule === 'function' && feat('docs') && !S.me?.kid ? (loadModule('docviews').catch(() => {}), '') : '') /* 2.579.0 (#4802): the saved views with their numbers (docviews.js; loaded without redrawing the view: it draws the panel itself, sbb_sync) */}</div>`;
-  return `<div class="sgroup sbbp">${nav_sort('ablage', mg_parts(a).filter(p => !nav_orgOff('ablage', p[0]) && (p[0] === r.mod || !nav_hid('ablage', p[0]))), p => p[0]).map(p => p[0] === 'ablage' ? files() : p[0] === 'docs' ? docs() : sbb_row(p[0], p[1], tr(p[2]), p[0] === r.mod, `data-sbbpart="${p[0]}"`)).join('')}</div>`;  // 2.418.0 (#3560): the menu's order and hidden parts
+  const docRows = () => `<div class="abfilt" role="group" aria-label="${esc(tr('Documents'))}">${sbb_row('ablage/docs', 'file', tr('All documents'), r.mod === 'docs' && !r.review && !r.dv && !r.id, 'data-sbbpart="docs"')}${sbb_row('ablage/review', 'check', tr('To review'), r.mod === 'docs' && !!r.review, 'data-sbbpart="docs-review"', rv)}${typeof dcv_sideHtml === 'function' ? dcv_sideHtml() : (typeof loadModule === 'function' && ab_docsOn() ? (loadModule('docviews').catch(() => {}), '') : '')}</div>`;
+  const files = dOn => {
+    const one = real.length === 1, top = one ? ab_ptGet('s:' + real[0]) : [];
+    const tree = one ? (top ? sbb_treeHtml(withColl(real[0], top), 1) : `<p class="muted sbbtl" style="--sbbl:1">${esc(tr('Loading…'))}</p>`) : sbb_treeHtml(real.map(spaceNode), 1);
+    const rest = sbb_treeHtml(ab_spaces().filter(s => !real.includes(s)).map(spaceNode), 1);
+    return sbb_row('ablage', 'folder', tr('Files'), one && cur === real[0], `data-sbbpart="ablage" ${one ? `data-absp="${esc(real[0])}"` : ''}`) + `<div class="sbbtree" role="group" aria-label="${esc(tr('Folders'))}">${tree}</div>`
+      + (dOn ? docRows() : '') + `<div class="sbbtree abrest" role="group" aria-label="${esc(tr('Shared with me'))}">${rest}</div>`;
+  };
+  const parts = nav_sort('ablage', mg_parts(a).filter(p => !nav_orgOff('ablage', p[0]) && (p[0] === r.mod || !nav_hid('ablage', p[0]))), p => p[0]);
+  const dOn = ab_docsOn() && parts.some(p => p[0] === 'docs'), fOn = parts.some(p => p[0] === 'ablage');
+  return `<div class="sgroup sbbp">${parts.map(p => p[0] === 'ablage' ? files(dOn) : p[0] === 'docs' ? (fOn || !dOn ? '' : docRows()) : sbb_row(p[0], p[1], tr(p[2]), p[0] === r.mod, `data-sbbpart="${p[0]}"`)).join('')}</div>`;  // 2.418.0 (#3560): the menu's order and hidden parts
 }
 // 2.199.0 A (#2742): the panel's folders are dragged into another folder (move) or before / after one (sort by hand), and
 // have the menu of a row (right-click, long press, context key)
@@ -175,7 +204,8 @@ sbb_treeReg('ab', {
   order: (id, pos) => { const n = ab_ptItem(id); if (n) ab_order(n, pos); },
   menu: id => { const n = ab_ptItem(id); return n ? ab_menuItems(n, true) : []; }});
 // a space in the panel: picked before the click's data-go opens #ablage (capture: ahead of the router's click)
-document.addEventListener('click', e => { const b = e.target.closest?.('#side [data-absp]'); if (b) { ab_pick(b.dataset.absp); AB.key = ''; } }, true);  // 2.540.0 (#4575): ab_pick
+// 2.752.0 (#4887): + the spaces of the documents' bar on phones (ab_phoneNav)
+document.addEventListener('click', e => { const b = e.target.closest?.('#side [data-absp], .abdnav [data-absp]'); if (b) { ab_pick(b.dataset.absp); AB.key = ''; } }, true);  // 2.540.0 (#4575): ab_pick
 // 2.429.0 (#3580): the file store shows only its own folders; what hangs on the other areas' objects (files of knowledge
 // pages, project files, files left in an area's folders) is a read-only collection "From <area>" at the top of the space,
 // grouped by its object (route ablage/aus-<key>, the space shown: AB.space). Open / download only; deleting stays on the
