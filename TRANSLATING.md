@@ -172,6 +172,7 @@ the wording of an office pack (key ending in `|pack`) is checked by the pack, no
 | Bestellnr. / Referenz, Kunden-Nr. | Ref./PO no., Client no. (the DATEV Mandantennummer stays "client number") | Ref./PO No., Customer No. |
 | Erledigt / Abgeschlossen | done = a button or a column, completed = the state of a task | |
 | Vorschlag / Hinweis | proposal = what an agent proposes, suggestion = a hint of the system | |
+| Verlauf / Aktivität | history = what happened to this one thing (a task's comments, a page, a cell), activity = across an account or organisation (activity log, activity per organisation) | activity for the history of one thing; German "Aktivität" for one thing's history |
 
 Examples in texts: Promo film, Example Ltd, Grandma Rose.
 
