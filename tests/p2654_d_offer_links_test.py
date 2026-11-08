@@ -11,6 +11,10 @@ freelancer-matrix: office
  - the preview of the imported second version: every task linked, no row "new" or ticked; applying every key makes no task
    (one click does not double them)
  - a person without an organisation imports the same file into the private space (the personal office): the same
+ - 2.671.0 (#5097): the shoot day of the quotation booked into the disposition (an open place, resource_kind slot) comes
+   along; offer_root / offer_doc name the new first version, offer_pos the new part (d:<part>:<crew row>:<n>, the crew row
+   as it was); the dispo of the imported second version finds it ("same", nothing ticked) and one click books nothing twice.
+   A booking whose place key names a part that did not come along keeps its row with offer_* emptied (an own booking)
 usage: p2654_d_offer_links_test.py <datadir>"""
 import base64
 import os
@@ -22,7 +26,7 @@ from freelancer_fixture import freelancer
 
 KEY = base64.b64encode(os.urandom(32)).decode()
 kt.fresh({"KALMIDO_INSTANCE_MODE": "workspaces", "KALMIDO_ORGCRYPT_DELAY": "0", "KALMIDO_SECRET_KEY": KEY})
-FEAT = "cal,comments,collab,office,clients,docs,files,fields,time"
+FEAT = "cal,comments,collab,office,clients,docs,files,fields,time,dispo"  # 2.671.0 (#5097): + dispo
 O = "/api/office"
 D = O + "/docs"
 COMPANY = {"name": "Beispiel Film GmbH", "street": "Musterweg 1", "zip": "12345", "city": "Musterstadt", "country": "DE",
@@ -108,7 +112,7 @@ CAM = ok(A.post(B + O + "/crew", json={"name_de": "Kamera", "name_en": "Camera",
 
 # ---------------------------------------------------------------- the quotation, its tasks, a second version
 CL = ok(A.post(B + "/api/clients", json={**CLIENT, "org_id": ORG}), "client")["id"]
-Q = ok(A.post(B + D, json={"kind": "offer", "lang": "de", "project_title": "Imagefilm", "client_id": CL, "items": [
+Q = ok(A.post(B + D, json={"kind": "offer", "lang": "de", "project_title": "Imagefilm", "client_id": CL, "service_from": "2027-03-01", "items": [
     {"kind": "service", "title": "Konzept", "detail": "Idee", "qty": 2, "unit": "day", "rate": 800},
     {"kind": "service", "title": "Schnitt", "qty": 6, "unit": "hour", "rate": 95}]}), "the quotation")["id"]
 PG = ok(A.post(B + f"{D}/{Q}/parts", json={"title": "Grafik"}), "a part")["part"]["id"]
@@ -123,6 +127,17 @@ check({x["title"] for x in pv["rows"]} == TITLES and any(x["key"].startswith("s:
 r = ok(A.post(B + f"{D}/{Q}/tasks", json={"pick": [x["key"] for x in pv["rows"]], "create": {"name": "Imagefilm Quelle"}}), "tasks made")
 L = r.get("list_id")
 check(r.get("created") == 4 and L, f"four tasks in a new project {r}")
+# 2.671.0 (#5097): the shoot day into the disposition (one open camera place), and a booking with a place key of no part
+dd = ok(A.get(B + f"{D}/{Q}/tasks"), "the dispo preview")["dispo"]
+check(dd.get("on") and len(dd.get("days") or []) == 1 and dd["days"][0]["state"] == "new", f"one shoot day to book {dd}")
+r = ok(A.post(B + f"{D}/{Q}/tasks", json={"pick": [], "dispo": {"pick": [dd["days"][0]["key"]]}}), "the shoot day booked")
+check(r.get("dispo", {}).get("booked") == 1, f"one open place booked {r}")
+SLOT = sql("SELECT offer_root, offer_doc, offer_pos FROM hub_bookings WHERE org_id=? AND resource_kind='slot' AND deleted_at IS NULL", (ORG,))
+check(len(SLOT) == 1 and SLOT[0][0] == Q and SLOT[0][1] == Q and SLOT[0][2].startswith(f"d:{PS}:"), f"the booking names the quotation {SLOT}")
+SLOT_POS = SLOT[0][2]
+sql("INSERT INTO hub_bookings(org_id,job,title,start,\"end\",resource_kind,resource_id,res_label,status,note,created_by,created_at,updated_at,"
+    "offer_root,offer_doc,offer_pos,offer_mark,slot_name) SELECT org_id,'fremd0000000000a','Fremd',start,\"end\",'slot',0,'Fremd','option','',"
+    "created_by,created_at,updated_at,offer_root,offer_doc,'d:987654321:zz:1','','Fremd' FROM hub_bookings WHERE org_id=? AND resource_kind='slot'", (ORG,))
 Q2 = ok(A.post(B + f"{D}/{Q}/duplicate"), "a second version")["id"]
 check(sql("SELECT COUNT(*) FROM office_doc_items WHERE doc_id=? AND origin_id IS NOT NULL", (Q2,))[0][0] >= 3
       and sql("SELECT COUNT(*) FROM office_doc_parts WHERE doc_id=? AND origin_id IS NOT NULL", (Q2,))[0][0] == 2, "the copy names its origins")
@@ -165,6 +180,21 @@ def moved(s, who, lid, docs_where, docs_args):
     r = ok(s.post(B + f"{D}/{nq2}/tasks", json={"pick": [x["key"] for x in pv3["rows"]]}), f"{who}: one click on every row")
     n = sql("SELECT COUNT(*) FROM tasks WHERE list_id=? AND deleted_at IS NULL", (lid,))[0][0]
     check(r.get("created") == 0 and n == len(TITLES), f"{who}: no task twice {r} {n}")
+    # 2.671.0 (#5097): the bookings of the disposition
+    sp = docs_args[0]
+    bk = sql("SELECT title, offer_root, offer_doc, offer_pos, offer_mark FROM hub_bookings WHERE org_id=? AND resource_kind='slot' AND deleted_at IS NULL ORDER BY id", (sp,))
+    slots = [b for b in bk if b[0] != "Fremd"]
+    own = [b for b in bk if b[0] == "Fremd"]
+    pos = SLOT_POS.split(":")
+    check(len(slots) == 1 and slots[0][1] == nq1 and slots[0][2] == nq1 and slots[0][4] == ""
+          and slots[0][3] == f"d:{min(parts1 & {x[0] for x in sql('SELECT id FROM office_doc_parts WHERE doc_id=? AND kind=?', (nq1, 'shoot'))})}:{pos[2]}:{pos[3]}",
+          f"{who}: the open place came along on the new quotation and part {bk} / {SLOT_POS}")
+    check(len(own) == 1 and own[0][1:] == (None, None, "", ""), f"{who}: a place key of no part: the booking stays, offer_* emptied {own}")
+    dp = ok(s.get(B + f"{D}/{nq2}/tasks"), f"{who}: the dispo after the move")["dispo"]
+    check(dp.get("on") and [(x["state"], x["pick"]) for x in dp["days"]] == [("same", False)], f"{who}: the dispo finds its booking {dp}")
+    r = ok(s.post(B + f"{D}/{nq2}/tasks", json={"pick": [], "dispo": {"pick": [x["key"] for x in dp["days"]]}}), f"{who}: one click on every shoot day")
+    n = sql("SELECT COUNT(*) FROM hub_bookings WHERE org_id=? AND resource_kind='slot' AND deleted_at IS NULL", (sp,))[0][0]
+    check(r.get("dispo", {}).get("booked") == 0 and n == 2, f"{who}: no shoot day twice {r} {n}")
 
 
 # ---------------------------------------------------------------- import into the empty organisation
@@ -175,7 +205,7 @@ check(L2, "the project came along")
 moved(A, "organisation", L2[0][0], "org_id=?", (ORG2,))
 
 # ---------------------------------------------------------------- a person without an organisation (freelancer-matrix: office)
-FID, Fr = freelancer(B, A, "frida")
+FID, Fr = freelancer(B, A, "frida", features=FEAT)  # 2.671.0 (#5097): with the disposition
 run(Fr, opened(Fr, OX, RK), "private")
 FL = sql("SELECT id FROM lists WHERE org_id IS NULL AND owner_id=? AND name='Imagefilm Quelle' AND deleted_at IS NULL", (FID,))
 PB = sql("SELECT id FROM orgs WHERE personal_of=?", (FID,))

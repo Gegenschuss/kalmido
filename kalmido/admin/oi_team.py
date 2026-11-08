@@ -28,6 +28,7 @@ from .acctimport import umz_mentions  # 2.362.4 (#3100)
 from ..core.orgcrypt import FIELDS  # 2.363.4 (#3127)
 from ..hub.hubmail import hbm_seal  # 2.363.4 (#3127)
 from ..hub.hubmail import _index  # 2.369.5 (#2517): pulled up from functions
+from .oi_office import _oi_origins  # 2.671.0 (#5097)
 from ..hub.mailbox import mbx_take_values  # 2.369.5 (#2517): pulled up from functions
 from ..team.portal import pt_email_hash, pt_email_norm  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgs import is_org_admin  # 2.369.5 (#2517): pulled up from functions
@@ -158,16 +159,41 @@ def _msg(c, run, src, d, ctx):
 
 
 # ---------------------------------------------------------------- absences, bookings, e-mails
+# 2.671.0 (#5097): the place key of a booking the disposition made from a quotation (office/offerdispo.py odp_days):
+# d:<part origin id>:<crew row uid>:<n>; the crew row uid is carried over as it is (only the part id is mapped)
+_OI_BOOK_POS = re.compile(r"d:([1-9][0-9]{0,17}):([^\n]{0,200}):([1-9][0-9]{0,3})")
+
+
+def _booking_offer(run, src, d, ctx):
+    """2.671.0 (#5097): offer_root / offer_doc / offer_pos of a booking from a quotation on the new ids, like the tasks' links
+    (oi_office._p_offer_link): the chain's root and the version through the import's office_docs (a root that did not come
+    along: the version itself), the part in the place key through the parts' origins (oi_office._oi_origins). What names
+    nothing of this import is emptied: the booking stays, as an own booking (never an old id that points at a foreign quotation)."""
+    if not (src.get("offer_root") or src.get("offer_doc") or src.get("offer_pos") or src.get("offer_mark")):
+        return
+    doc = run.m("office_docs", src.get("offer_doc"))
+    root = run.m("office_docs", src.get("offer_root")) or doc
+    m = _OI_BOOK_POS.fullmatch(str(src.get("offer_pos") or ""))
+    part = _oi_origins(run, ctx.data).get(("office_doc_parts", int(m.group(1)))) if m and root else None
+    if not part:
+        d.update(offer_root=None, offer_doc=None, offer_pos="", offer_mark="")
+        return
+    d.update(offer_root=root, offer_doc=doc or root, offer_pos=f"d:{part}:{m.group(2)}:{m.group(3)}")
+
+
 def _booking(c, run, src, d, ctx):
     kind, rid = _txt(src.get("resource_kind"), 20), src.get("resource_id")
     if kind == "user":
         new = _who(ctx, rid, own=True)
+    elif kind == "slot":  # 2.671.0 (#5097): an open place of a crew function holds nobody (resource_id 0, hub/dispo.py DSP_SLOT)
+        new = 0
     else:
         new = run.m({"contact": "contacts", "equipment": "office_equipment", "set": "office_sets"}.get(kind, ""), rid)
-    if not new:
+    if new is None or (not new and kind != "slot"):
         run.warning(N_("A booking of a resource that was not imported was left out: {0}"), _txt(src.get("res_label"), 80))
         return False
     d["resource_id"] = new
+    _booking_offer(run, src, d, ctx)
     return d
 
 
