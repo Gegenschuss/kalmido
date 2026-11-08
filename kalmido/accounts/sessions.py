@@ -127,6 +127,7 @@ def me_session_end(sid):
     resp = jsonify(ok=True, current=hit == cur)
     if hit == cur:
         resp.delete_cookie(COOKIE, path="/")
+        resp.headers["Clear-Site-Data"] = '"cache"'  # 2.666.0 (#4074 7): the own session ended here = a logout (login.py auth_logout)
     return resp
 
 

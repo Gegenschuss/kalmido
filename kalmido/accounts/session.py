@@ -359,7 +359,10 @@ def authenticate():
         if path.startswith("/api/office/") and (request.headers.get("Authorization") or "").lower().startswith("bearer "):
             return err(tr("Tokens cannot use this endpoint"), 403)  # 2.36.2 E (#1146): agent tokens never reach office & finance
         setup = not c.execute("SELECT 1 FROM users").fetchone()
-        return jsonify(error=tr("Please sign in"), auth="setup" if setup else "login"), 401
+        resp = jsonify(error=tr("Please sign in"), auth="setup" if setup else "login")
+        if request.cookies.get(COOKIE):  # 2.666.0 (#4074 7): the session ended (expired, ended elsewhere): like the logout,
+            resp.headers["Clear-Site-Data"] = '"cache"'  # the browser's copies (card previews ?v=, private max-age) go
+        return resp, 401
     return redirect("/", 303)
 
 
