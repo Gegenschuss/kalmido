@@ -19,10 +19,11 @@
 
 ## What's new
 
-**2.748.0** (2026-11-08):
-- **Documents**: a document opens in its own view with every PDF page drawn sharp, the fields beside it and arrow keys to leaf through; card size slider for documents and files.
-- **Settings**: one column again, rarely used options under "Further options".
-- **Agents**: agents can take deleted files back out of the trash (API v1 / MCP `restore_attachment`, `restore_project_file`).
+**2.756.0** (2026-11-09):
+- **Knowledge**: per space "Offline available" also keeps the space's files on the device (pausable, synced on the next online moment).
+- **Projects**: rules fire days before a due date or when overdue, run up to 5 actions and take "Only if" conditions.
+- **Documents**: swiping between documents is seamless.
+- **Self-hosting**: `KALMIDO_WEB_PROCS` (1-16) runs several web processes in one container.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 
