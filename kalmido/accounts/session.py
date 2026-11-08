@@ -17,7 +17,7 @@ from ..core.config import (
     OPEN_PATHS, PROXY_IGNORE, PUB_PREFIX, SESSION_DAYS, TRUSTED_PROXIES, TRUSTED_PROXY_COUNT, TRUSTED_PROXY_HEADERS,
 )
 from ..core.i18n import browser_lang, tr
-from ..core.db import connect, db, err, gsetting, iso, now_utc
+from ..core.db import connect, db, err, gsetting, iso, now_iso, now_utc
 from ..core.pg import system_ctx  # 2.369.6 (#3139)
 from ..core.orgcrypt import ROT_LOCK_KEY, ROT_LOCK_TTL
 from ..core.ratedb import rate_clear, rate_counts  # 2.306.0 D1 (#2875): failures counted for every process
@@ -69,8 +69,18 @@ def session_gen(u, ws):
     tok = request.cookies.get(COOKIE) if g.auth_via == "session" else None
     who = _token_hash(tok) if tok else f"{g.auth_via}:{u['proxy_login'] or ''}"
     orgs = ",".join(f"{w['id']}:{w['role']}" for w in sorted(ws, key=lambda w: w["id"]))
-    raw = "\x1f".join(("kalmido-sgen:v1", str(u["id"]), who, u["password_hash"] or "", orgs))
+    raw = "\x1f".join(("kalmido-sgen:v1", str(u["id"]), who, u["password_hash"] or "", orgs, sgen_shares(db(), u["id"])))
     return hashlib.sha256(raw.encode()).hexdigest()[:24]
+
+
+def sgen_shares(c, uid):
+    """2.666.0 (#4074 9): the live folder / page shares of the file store uid gets (directly or through a group), as part of
+    the sign-in mark: a share taken back (or expired, or a group left) changes sgen, so sessGuard (core.js) drops the offline
+    copy of the knowledge pages at the next /api/state instead of keeping it until that space is synced again. The members
+    rows of the projects (list_own, #4739) are no folder shares: a project membership leaves the mark as it is."""
+    rows = c.execute("""SELECT id, node_id, role FROM fs_shares WHERE (user_id=? OR group_id IN (SELECT group_id FROM group_members WHERE user_id=?))
+                        AND (expires_at IS NULL OR expires_at > ?) AND COALESCE(list_own, 0)=0 ORDER BY id LIMIT 5000""", (uid, uid, now_iso())).fetchall()
+    return ",".join(f"{r[0]}:{r[1]}:{r[2]}" for r in rows)
 
 
 def client_ip():
