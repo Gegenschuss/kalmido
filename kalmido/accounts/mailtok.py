@@ -86,7 +86,7 @@ def mtk_reseal_tick(c, force=False):
     with system_ctx(c):  # the addresses of every person and organisation; nothing is shown to anybody
         for t in MTK_TABLES:  # fixed names, no input
             while True:
-                rows = c.execute(f"SELECT token FROM {t} WHERE token_hash IS NULL AND token<>'' AND token NOT LIKE 'v1.%' "
+                rows = c.execute(f"SELECT token FROM {t} WHERE token_hash IS NULL AND token<>'' AND token NOT ILIKE 'v1.%' "
                                  f"LIMIT {MTK_BATCH}").fetchall()
                 done = 0
                 for r in rows:
