@@ -569,7 +569,7 @@ def fsl_convert(nid, fid):
                 raise ValueError(tr("Invalid value: {0}", "name"))
             name = safe_fs_name(name)
             if n["kind"] == "file":
-                from .upsafe import h6d_read
+                from .upsafe import h6d_read, up_check, up_after_store
                 if not f:
                     raise ValueError(tr("File missing"))
                 data = h6d_read(f)
@@ -577,9 +577,11 @@ def fsl_convert(nid, fid):
                     raise ValueError(tr("Invalid value: {0}", "file"))
                 if not data or len(data) > MAX_FILE_MB * 1024 * 1024:
                     raise ValueError(tr("{0}: larger than {1} MB", name, MAX_FILE_MB))
-                mime = _mime_of(name, request.form.get("type") or "")
+                # 2.666.0 (#4074 1): plain again = checks and recognition like an upload (virus scan, type, photo data), as fsl_move
+                data, mime, info = up_check(c, name, data, _mime_of(name, request.form.get("type") or ""), uid, n["org_id"], "fs")
                 gone = _fsl_replace(c, n, data, mime, 0, uid)
                 c.execute("UPDATE fs_nodes SET mime=? WHERE id=?", (mime, fid))
+                up_after_store(c, "fs", fid, n["org_id"], info)
             name = _free_name(c, n["parent_id"], n["owner_id"], n["org_id"], name, skip=fid)
             c.execute("UPDATE fs_nodes SET name=?, e2e_gen=0 WHERE id=?", (name, fid))
         else:
