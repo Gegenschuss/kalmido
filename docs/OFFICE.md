@@ -1295,6 +1295,11 @@ filename?, mapping?, account?}` (one file) or, since 2.144.1, `multipart/form-da
 is opened) and `mapping` (a JSON string) / `account` as form fields; the answer adds `files`, `file_errors [{file, error}]`
 and `skipped_files`, each preview row its `file`. `fmt` of a mixed import is `mixed`. Since 2.146 the answers add `pending_count` and `camt052`,
 each row `pending`; the mapping may name `sign` (the column of the debit / credit mark).
+Since 2.702 (#5183): a CSV statement names no account of its own, so with two or more active bank accounts (office bank
+accounts) the column preview adds `bank_accounts [{id, label, iban_end, default}]` and the dialog asks which one it belongs
+to; `POST /api/office/bank/import` then needs `bank_account` (the id; JSON field or form field), else 400 -- never silently
+the default account. The choice is kept as `office_bank_imports.bank_account_id`, names the CSV balance (its IBAN, else its
+label) and puts the lines on that account in the balance sheet. With one bank account nothing is asked.
 
 Since 2.355: amounts take thousand separators only in groups of three ("1.234,56", "1,234.56"); anything else is an
 unreadable row instead of another number ("1,234.5" with the decimal comma, "1.234" with the decimal point), cents are
