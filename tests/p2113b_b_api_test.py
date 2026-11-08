@@ -50,9 +50,10 @@ BOB, CAROL, DAVE, EVE = ids["bob"], ids["carol"], ids["dave"], ids["eve"]
 Bo, Ca, Da, Ev = sess("bob"), sess("carol"), sess("dave"), sess("eve")
 for x in (A, Bo, Ca, Da, Ev):
     x.patch(B + "/api/settings", json={"lang": "en"})
-r = A.post(B + "/api/admin/agents", json={"scopes": ["read", "tasks:write", "comments"], "username": "claude", "display_name": "Claude", "org_id": ORG})
+# 2.674.0 (#4382): a team chat file is a download (attachments:read), like the files of tasks
+r = A.post(B + "/api/admin/agents", json={"scopes": ["read", "tasks:write", "comments", "attachments:read"], "username": "claude", "display_name": "Claude", "org_id": ORG})
 CL, CLH = r.json()["id"], {"Authorization": "Bearer " + r.json()["token"]}
-r = A.post(B + "/api/admin/agents", json={"scopes": ["read", "tasks:write", "comments"], "username": "otto", "display_name": "Otto", "org_id": BETA})
+r = A.post(B + "/api/admin/agents", json={"scopes": ["read", "tasks:write", "comments", "attachments:read"], "username": "otto", "display_name": "Otto", "org_id": BETA})
 OT, OTH = r.json()["id"], {"Authorization": "Bearer " + r.json()["token"]}
 # alice, bob and carol work together (a shared list); dave is in the organisation but shares nothing with them
 TEAM = A.post(B + "/api/lists", json={"name": "Team", "org_id": ORG}).json()["id"]
