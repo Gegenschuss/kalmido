@@ -388,6 +388,8 @@ def _receipt_side(c, oid, j, st, s, y0, y1, banks=None, meal_nodes=frozenset()):
         doc = r.get("Belegfeld 1") or ""
         if node and doc.startswith("B") and node in meal_nodes:
             continue  # 2.702.0 (#5183): the same bill as an approved entertainment receipt: the meal counts, once
+        if doc[:1] == "M" and doc[1:].isdigit():
+            continue  # 2.386.0 (#2328): the DATEV batch books the entertainment receipts too; here _meal_side books them, once
         if banks and doc.startswith("KA") and doc[2:].isdigit() and gegen == banks.default:
             gegen = banks.of_card(int(doc[2:]))  # 2.685.0 (#5128): the card total leaves the bank account of its bank line
         if node and doc.startswith("B") and node in afa_ids:
