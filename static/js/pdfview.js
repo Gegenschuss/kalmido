@@ -19,9 +19,9 @@ const PV_LIB = '/static/vendor/pdfjs/pdf.min.mjs', PV_WORKER = '/static/vendor/p
 const PV_ZMIN = 0.5, PV_ZMAX = 4;
 const pv_svg = d => `<svg class="i" viewBox="0 0 20 20" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 const PV_IC = {minus: pv_svg('M4 10H16'), ext: pv_svg('M11 4H16V9M16 4L9 11M14 12V16H4V6H8')};
-let pv_lib = null;
+let pv_lib = null, pv_libNow = null;  // 2.742.0 (#4861): pv_libNow = the loaded module (its TextLayer)
 function pv_load() {
-  if (!pv_lib) pv_lib = import(PV_LIB).then(m => { m.GlobalWorkerOptions.workerSrc = PV_WORKER; return m; }).catch(e => { pv_lib = null; throw e; });
+  if (!pv_lib) pv_lib = import(PV_LIB).then(m => { m.GlobalWorkerOptions.workerSrc = PV_WORKER; pv_libNow = m; return m; }).catch(e => { pv_lib = null; throw e; });
   return pv_lib;
 }
 // 2.549.0 (#4578): the library and the worker get a time limit (15 s, window.pv_waitMs shortens it for the tests): a worker
@@ -88,6 +88,56 @@ function pv_preEl(v) {
 }
 // 2.65.0 (#1823): the click on a preview link and pv_attr moved to lazyload.js (drawn at start, this file loads on demand)
 
+// ---- 2.742.0 (#4861): the text of a page can be marked and copied as in a PDF program: over each drawn canvas lies the
+// invisible text layer of pdf.js (TextLayer; its spans carry the text as textContent, never as markup), at the page's scale
+// (--scale-factor; a zoom draws page and layer anew), freed with the page. Returns the layer, or null; host._pvnt = true when
+// the page has no text at all (a scan: the caller offers the recognised text instead).
+async function pv_text(lib, page, vp, host, live) {
+  if (!lib?.TextLayer) return null;
+  let tc; try { tc = await page.getTextContent(); } catch { return null; }
+  if (!live()) return null;
+  host._pvnt = !tc.items.some(x => /** @type {any} */ (x).str?.trim());
+  if (host._pvnt) return null;
+  const tl = document.createElement('div');
+  tl.className = 'textLayer';
+  tl.style.setProperty('--scale-factor', String(vp.scale));
+  try { await new lib.TextLayer({textContentSource: tc, container: tl, viewport: vp}).render(); } catch { return null; }
+  if (!live()) return null;
+  const end = document.createElement('div'); end.className = 'endOfContent'; tl.append(end);
+  host.querySelector(':scope > .textLayer')?.remove();
+  host.append(tl);
+  return tl;
+}
+// a zoom changed the page boxes: the layers drawn at the old scale follow at once (until the page is drawn anew)
+function pv_textScale(root, s) { for (const tl of root.querySelectorAll('.textLayer')) /** @type {HTMLElement} */ (tl).style.setProperty('--scale-factor', String(s)); }
+// the text of every page (Cmd / Ctrl+A copies all of them, also the ones far away without a layer)
+async function pv_allText(doc, live) {
+  const out = [];
+  for (let i = 1; i <= Math.min(doc.numPages, 2000); i++) {
+    const tc = await (await doc.getPage(i)).getTextContent(); if (!live()) return null;
+    out.push(tc.items.map(x => (/** @type {any} */ (x).str || '') + (/** @type {any} */ (x).hasEOL ? '\n' : '')).join('').trim());
+  }
+  return out.filter(Boolean).join('\n\n');
+}
+// Cmd / Ctrl+A inside a preview: the drawn pages' text is marked, the copy gets the text of all pages
+function pv_selAll(doc, col) {
+  const sel = getSelection(); if (!sel || !col) return;
+  const r = document.createRange(); r.selectNodeContents(col); sel.removeAllRanges(); sel.addRange(r);
+  const my = col._pvag = (col._pvag || 0) + 1, q = sel.rangeCount ? sel.getRangeAt(0) : r; col._pvall = null;
+  col._pvr = [q.startContainer, q.startOffset, q.endContainer, q.endOffset];  // as the browser keeps it (a copy compares)
+  pv_allText(doc, () => col.isConnected && col._pvag === my).then(t => { if (t != null && col._pvag === my) col._pvall = t; }).catch(() => {});
+}
+document.addEventListener('copy', e => {
+  const sel = getSelection(); if (!sel || sel.rangeCount !== 1) return;
+  const r = sel.getRangeAt(0), col = /** @type {any} */ (r.commonAncestorContainer)?.closest?.('.dv-pgcol, .pvpages'), k = col?._pvr;
+  if (!col?._pvall || !k || r.startContainer !== k[0] || r.startOffset !== k[1] || r.endContainer !== k[2] || r.endOffset !== k[3]) return;  // the marking of Ctrl+A, unchanged
+  e.clipboardData?.setData('text/plain', col._pvall); e.preventDefault();
+});
+document.addEventListener('pointerdown', e => {  // as pdf.js' viewer: while marking, the end of the layer covers the page (no jumps)
+  const tl = /** @type {any} */ (e.target).closest?.('.textLayer'); if (tl) tl.classList.add('selecting');
+});
+document.addEventListener('pointerup', () => { for (const tl of document.querySelectorAll('.textLayer.selecting')) tl.classList.remove('selecting'); });
+
 async function pdfView(o) {
   $('.lightbox')?.remove();
   const back = o.back || document.activeElement, m = document.createElement('div');
@@ -147,6 +197,7 @@ async function pdfView(o) {
       cv.setAttribute('aria-label', tr('Page {0}', i + 1));
       if (my !== gen || p.dataset.s !== String(s)) return;
       p.replaceChildren(cv);
+      pv_text(pv_libNow, page, vp, p, () => my === gen && p.dataset.s === String(s) && p.isConnected);  // 2.742.0 (#4861)
     } catch (e) { if (my === gen) { p.dataset.s = ''; p.innerHTML = `<span class="pvperr">${esc(tr('This page could not be shown'))}</span>`; } }
   };
   const go = n => { n = Math.max(1, Math.min(pages.length, n)); pages[n - 1]?.scrollIntoView({block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'}); cur = n; status(); };
@@ -225,6 +276,7 @@ async function pdfView(o) {
     if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); return; }
     if (e.target.closest?.('input,textarea')) return;
     const k = e.key;
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && k.toLowerCase() === 'a' && doc && !fail) { e.preventDefault(); e.stopPropagation(); pv_selAll(doc, $('.pvpages', body)); return; }  // 2.742.0 (#4861): every page
     if (o.step && (k === 'ArrowRight' || k === 'ArrowLeft') && !e.altKey && !e.ctrlKey && !e.metaKey) { e.preventDefault(); leaf(k === 'ArrowRight' ? 1 : -1); return; }
     if (fail || !doc) return;
     if (k === 'ArrowRight' || (o.step && k === 'PageDown')) { e.preventDefault(); go(cur + 1); }

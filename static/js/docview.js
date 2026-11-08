@@ -16,7 +16,7 @@
    asks it through typeof checks. Classic script sharing the global scope with the others. */
 'use strict';
 
-const DVW = {back: null, tab: 'details', pdf: null, ro: null, drag: null, he: null, node: null, more: false};
+const DVW = {back: null, tab: 'details', pdf: null, ro: null, drag: null, he: null, node: null, more: false, notext: null};  // notext: 2.742.0 (#4861)
 // the tabs of the fields; History and Shares come from the file store's node (GET /api/files/nodes/<id>, its rights)
 const DCV_TABS = [['details', N_('Details')], ['text', N_('Content')], ['hist', N_('History')], ['share', N_('Shares')]];
 const DCV_ZMIN = 0.1, DCV_ZMAX = 8, DCV_CVMAX = 12e6;  // the zoom's limits; the most pixels one page's canvas gets
@@ -319,9 +319,25 @@ function dcv_pvHtml(d) {
   return `<section class="dv-pv" aria-label="${esc(tr('Preview'))}"><div class="dv-pvbar" role="group" aria-label="${esc(tr('Zoom'))}"><span class="dv-pgn" data-fl-fill></span><span class="spacer"></span>
     <button type="button" class="iconbtn" data-dc="dvz:out" aria-label="${esc(tr('Zoom out'))}" title="${esc(tr('Zoom out'))}">${ic('minus', 's')}</button><span class="dv-zp" data-fl-fill></span><button type="button" class="iconbtn" data-dc="dvz:in" aria-label="${esc(tr('Zoom in'))}" title="${esc(tr('Zoom in'))}">${ic('plus', 's')}</button>
     <button type="button" class="btn sm" data-dc="dvz:width" aria-pressed="${dcv_zoom() === 'width'}" title="${esc(tr('Fit to width'))}">${tr('Width')}</button><button type="button" class="btn sm" data-dc="dvz:page" aria-pressed="${dcv_zoom() === 'page'}" title="${esc(tr('Show the whole page'))}">${tr('Whole page')}</button><span class="spacer"></span>
-    <button type="button" class="btn sm" data-dc="view" title="${esc(tr('Show {0}', d.name))}">${ic('expand', 's')} <span>${tr('Full screen')}</span></button></div>
+    ${dcv_copyOn(d) ? `<button type="button" class="btn sm" data-dc="dvcopy" title="${esc(tr('Copy the recognised text'))}">${ic('copy', 's')} <span>${tr('Copy text')}</span></button>` : '' /* 2.742.0 (#4861) */}<button type="button" class="btn sm" data-dc="view" title="${esc(tr('Show {0}', d.name))}">${ic('expand', 's')} <span>${tr('Full screen')}</span></button></div>
     <div class="dv-pages" data-fl-fill tabindex="0" role="region" aria-label="${esc(tr('Show {0}', d.name))}"></div></section>`;
 }
+// 2.742.0 (#4861): "Copy text" with the recognised text: an image, a scanned PDF (recognised by OCR, or its first page has no
+// text layer); a PDF with text is marked in the preview itself. #4806 (the archive version with a text layer) is not built yet.
+const dcv_copyOn = d => !!(d?.text && !d.file && (/^image\//.test(d.mime || '') || (dc_isPdf(d) && (d.method === 'ocr' || DVW.notext === d.id))));
+async function dcv_copyText(text) {
+  let ok = false;
+  try { if (typeof clipCopy === 'function') ok = await clipCopy(text); else { await navigator.clipboard.writeText(text); ok = true; } } catch { ok = false; }
+  toast(ok ? tr('Copied') : tr('Copy failed, select the text by hand'));
+}
+// Cmd / Ctrl+A inside the preview: the text of every page (pdfview.js pv_selAll), not the whole app
+document.addEventListener('keydown', e => {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey || (e.key || '').toLowerCase() !== 'a' || !DVW.pdf || typeof pv_selAll !== 'function') return;
+  const box = DVW.pdf.box, t = /** @type {any} */ (e.target), an = getSelection()?.anchorNode;
+  if (!box?.isConnected || !(box.contains(t) || (an && box.contains(an)))) return;
+  e.preventDefault(); e.stopPropagation();
+  pv_selAll(DVW.pdf.doc, $('.dv-pgcol', box));
+});
 function dcv_free() { if (DVW.pdf) DVW.pdf.off = true; try { DVW.pdf?.doc?.destroy(); } catch { /* gone */ } DVW.pdf?.io?.disconnect(); DVW.pdf = null; }
 // 2.736.0 (#5212): nb = a neighbour drawn ahead ({ctrl}): its own PDF (nb.pdf, the open one's stays), stopped by nb.ctrl
 async function dcv_pvDraw(md, d, nb) {
@@ -386,6 +402,7 @@ function dcv_layout(box, keep, force) {
   const pages = $$('.dv-pg', box);
   pages.forEach((p, i) => { const b = box._base[i] || box._base[0]; p.style.width = Math.floor(b.w * s) + 'px'; p.style.height = Math.floor(b.h * s) + 'px'; });
   if (keep) box.scrollTop = top * box.scrollHeight;
+  if (typeof pv_textScale === 'function') pv_textScale(box, s);  // 2.742.0 (#4861): the text layers stay on their page
   dcv_zbar(box); dcv_pgn(box);
   const pdf = DVW.pdf?.box === box ? DVW.pdf : [...(DCW.nb?.values() || [])].find(e => e.pdf?.box === box)?.pdf; if (!pdf || pdf.off) return;  // 2.736.0 (#5212): + a neighbour's
   pdf.gen++; pdf.s = s;
@@ -411,6 +428,10 @@ async function dcv_page(pdf, p) {
     await page.render({canvas: cv, canvasContext: cv.getContext('2d'), viewport: vp, transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null}).promise;
     if (my !== pdf.gen || pdf.off || p.dataset.s !== String(s)) return;
     p.replaceChildren(cv);
+    // 2.742.0 (#4861): the text layer over the page (pdfview.js pv_text); page 1 without any text = a scan: "Copy text"
+    if (typeof pv_text === 'function') await pv_text(typeof pv_libNow === 'undefined' ? null : pv_libNow, page, vp, p, () => my === pdf.gen && !pdf.off && p.dataset.s === String(s) && p.isConnected);
+    const d = DC.doc;
+    if (i === 0 && p._pvnt && d && DVW.notext !== d.id && pdf.box.closest('.dv-view') && $('.dc-body', pdf.box.closest('.dv-view'))?.dataset.id === String(d.id)) { DVW.notext = d.id; if (dcv_copyOn(d)) dc_mdDraw(pdf.box.closest('.dv-view')); }
   } catch { if (my === pdf.gen) p.dataset.s = ''; }
 }
 function dcv_pgn(box) {  // "Page 3 / 12": the page at the upper third of the box
@@ -464,6 +485,7 @@ document.addEventListener('click', e => {
     return;
   }
   if (a === 'dvundo') { dcv_undo(); return; }
+  if (a === 'dvcopy') { if (DC.doc?.text) dcv_copyText(DC.doc.text); return; }  // 2.742.0 (#4861)
   if (a === 'dvrecog' && DC.doc?.file) {  // 2.583.0 (#4832): a plain file becomes a document (the view shows its fields then)
     const id = DC.doc.id;
     api('PUT', `/api/files/nodes/${id}/recognition`, {mode: 'on'}).then(() => { toast(tr('“{0}” is being recognised', DC.doc?.name || '')); if (DC.doc?.id === id) dc_open(id); }).catch(() => {});
