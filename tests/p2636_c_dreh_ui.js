@@ -53,7 +53,7 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEElEQVR
   w.eval(`listModal(null, '', {kind: 'project'})`);
   check(await until(() => d.querySelector('.modal.lnew [data-pt="shoot"]')), 'Film & Video: the Shoot card');
   const cards = [...d.querySelectorAll('.modal.lnew .ptcard')].map(b => b.dataset.pt);
-  check(cards.join(',').startsWith(',agency,software,private,shoot'), 'after the built-in types ' + cards.join(','));
+  check(cards.join(',').startsWith(',agency,software,private,social,shoot'), 'after the built-in types ' + cards.join(','));
   d.querySelector('.modal.lnew').remove();
   w.location.hash = 'l/' + L.id;
   check(await until(() => d.querySelector('#view .kanban.shtboard .shtpic')), 'the storyboard: picture tiles on the board (shoot.js loaded)');
