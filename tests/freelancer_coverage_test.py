@@ -34,7 +34,7 @@ KINDS = {
                         "p2477_quicknote_api_test.py: her private list Notes of the quick note, sharing refused, an empty note gone for good (2.477.0)"),
     "lists": ("matrix", SUITE + ": private lists and folders, sections, fields, templates, filters, forms, rules, views; every GET; "
                         "p2577_a_views_api_test.py: shared views of the own project (2.577.0)"),
-    "office": ("matrix", SUITE + ", p2199_b_office_test.py (2.199.0: a quotation of the personal office in a private folder, the folder routes, her agent), p2473_a_api_test.py, p288_a_api_test.py, p293_a_api_test.py, p293_b_api_test.py, p294_a_api_test.py, p295_a_api_test.py, p295_b_api_test.py, p2111_a_api_test.py, p2113c_a_api_test.py, p2110_b_api_test.py: the personal office (the freelancer is its admin): settings, company "
+    "office": ("matrix", SUITE + ", p2666_c_bilanz_test.py, p2199_b_office_test.py (2.199.0: a quotation of the personal office in a private folder, the folder routes, her agent), p2473_a_api_test.py, p288_a_api_test.py, p293_a_api_test.py, p293_b_api_test.py, p294_a_api_test.py, p295_a_api_test.py, p295_b_api_test.py, p2111_a_api_test.py, p2113c_a_api_test.py, p2110_b_api_test.py: the personal office (the freelancer is its admin): settings, company "
                          "fields, private clients, quotation, invoice, finalising, PDF, e-invoice; receipts, newsletter, Paperless; document "
                          "templates with signature, logbook (2.93.0); travel expenses with the per diem, its report and import (2.95.0); undo of the editors (2.111.0); "
                          "p2137_a_api_test.py: the owner exports the personal office (export, recovery key) and imports an organisation's office into it (2.137.0); p2146_d_api_test.py: the retention export of the own records before a deletion (2.146.0); p2483_a_series_api_test.py: her agent reads her invoice series, subscriptions and the series fields of her invoices (2.483.0); p2616_c_fints_test.py: her bank fetch over FinTS (2.616.0)"),
@@ -538,6 +538,9 @@ ROUTES = {
     "GET /api/office/books/archive": "office", "GET /api/office/books/archive/bookings": "office", "GET /api/office/books/archive/bookings/{}": "office",  # 2.414.0 (#3502)
     "GET /api/office/books/archive/accounts": "office", "GET /api/office/books/archive/docs/{}": "office", "GET /api/office/books/archive/files/{}": "office",
     "POST /api/office/books/archive/check": "office", "POST /api/office/books/archive/import": "office", "POST /api/office/books/archive/runs/{}/undo": "office",
+    "GET /api/office/books/ledger": "office", "GET /api/office/books/ledger/settings": "office", "PUT /api/office/books/ledger/settings": "office",  # 2.666.0 (#3461)
+    "GET /api/office/books/ledger/{}.csv": "office", "POST /api/office/books/ledger/entries": "office", "PUT /api/office/books/ledger/entries/{}": "office",
+    "DELETE /api/office/books/ledger/entries/{}": "office", "POST /api/office/books/ledger/close": "office",
     "GET /api/office/datev/suppliers": "office", "PUT /api/office/datev/suppliers/{}": "office", "DELETE /api/office/datev/suppliers/{}": "office",
     "POST /api/office/datev/suppliers/{}/restore": "office", "GET /api/office/datev/opening": "office",
     "GET /api/office/deals": "office", "GET /api/office/deals/summary": "office", "GET /api/office/docs": "office",

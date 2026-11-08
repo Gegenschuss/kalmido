@@ -766,7 +766,8 @@ def bk_get():
                    small_business=bool(s.get("small_business")), month=mo, receipts=month, year=year, einvoices=einv,
                    missing=[] if s.get("small_business") else missing, note=tr(BK_NOTE),
                    incomplete=len(gaps.get("no_date") or ()) + len(gaps.get("no_amount") or ()),
-                   years=bk_years(c, oid))  # 2.593.0 (#4891): the year pickers of the books and the VAT return
+                   years=bk_years(c, oid),  # 2.593.0 (#4891): the year pickers of the books and the VAT return
+                   ledger=(s.get("profit_method") or {}).get("method") or "euer")  # 2.666.0 (#3461): "balance" = the balance sheet page (office/ledger_dbl.py)
 
 
 def bk_years(c, oid, uid=None):
