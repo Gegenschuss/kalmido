@@ -45,6 +45,8 @@ from ..core.db import body, bump, db, err, iso, now_utc
 from ..core.access import Denied, MANAGE_ROLES, WRITE_ROLES, acx_of, list_role, list_roles, need_list, reading_sql, vis_sql
 from ..core.orgcrypt import FIELDS, OrgCryptError, PREFIX, oc_active_for, oc_dec_fields, oc_enc_fields, oc_is_enc, oc_plain_safe
 from ..accounts.session import me
+from ..accounts.orgroles import need_org_write  # 2.674.0 (#4382 finding 3)
+from ..accounts.mailtok import mtk_new, mtk_plain, mtk_where  # 2.674.0 (#4382 finding 5)
 from ..files.fslock import fsl_need_plain  # 2.353.0 F (#2758)
 from ..accounts.orgs import is_org_admin
 
@@ -264,7 +266,6 @@ def _target(c, b):
 
 def _hub_tok_row(c, tok):
     """2.674.0 (#4382 finding 5): the hub_tokens row of the token tok of an incoming mail (by its hash), None without one."""
-    from ..integrations.mailtok import mtk_where
     w, a = mtk_where(tok)
     return c.execute(f"SELECT * FROM hub_tokens WHERE {w}", a).fetchone()
 
@@ -274,7 +275,6 @@ def _client_addr_write(c, kind, uid, org_id):
     the one who renews receives its mail): the write right on the client like need_client on a change (a read-only person of
     the organisation only reads the address that is there), as a project's address needs the write role (_target)."""
     if kind == "client" and org_id:
-        from ..accounts.orgroles import need_org_write
         need_org_write(c, uid, org_id)
 
 
@@ -282,7 +282,6 @@ def _address_of(c, kind, uid, org_id, cid, lid):
     from ..integrations.mail import mail_addr
     w, a = _token_where(kind, uid, org_id, cid, lid)
     r = c.execute(f"SELECT token FROM hub_tokens WHERE {w}", a).fetchone()
-    from ..integrations.mailtok import mtk_plain  # 2.674.0 (#4382 finding 5)
     return mail_addr(mtk_plain(c, r[0])) if r else ""
 
 
@@ -318,7 +317,6 @@ def hbm_address_new():
     _client_addr_write(c, kind, uid, org)  # 2.674.0 (#4382 finding 3)
     tok = secrets.token_urlsafe(12).replace("-", "x").replace("_", "y")
     c.execute(f"DELETE FROM hub_tokens WHERE {w}", a)
-    from ..integrations.mailtok import mtk_new  # 2.674.0 (#4382 finding 5): sealed + its hash, no plain text
     c.execute("INSERT INTO hub_tokens(token,token_hash,kind,user_id,org_id,client_id,list_id,created_at) VALUES(?,?,?,?,?,?,?,?)",
               (*mtk_new(c, tok), kind, uid, org, cid, lid, _now()))
     c.commit()
@@ -923,7 +921,6 @@ def _import(c, r, msg, raw, mail_text):
         subj = re.sub(r"^\s*((fwd?|wg|tr|fw|doorst)\s*:\s*)+", "", subj, flags=re.I).strip() or subj
     if r["kind"] == "inbox":
         from ..integrations.mail import mail_addr
-        from ..integrations.mailtok import mtk_plain
         own_addrs = {own, mail_addr(mtk_plain(c, r["token"])).lower()}  # 2.674.0 (#4382 finding 5)
         if mine and not fwd:
             cand = []  # audit I4: unproven -> "Not assigned", the person assigns it by hand

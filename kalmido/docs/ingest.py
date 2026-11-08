@@ -16,6 +16,7 @@ from datetime import timedelta
 from ..core.config import app
 from ..core.db import connect, iso, now_utc
 from ..accounts.session import GATE, bg_here
+from ..accounts.mailtok import mtk_where  # 2.674.0 (#4382 finding 5)
 from ..core.pg import system_ctx
 from ..files.store import fs_add_hooks, fs_on_delete, fs_put, fs_role
 from . import store as S
@@ -353,7 +354,6 @@ def _mail_parts(files, ei_is, mid):
 def _doc_mail_row(c, toks):
     """2.674.0 (#4382 finding 5): the doc_mail row of the first of the tokens toks that is a document address (by the hash;
     a row of an older version by its plain token), None without one."""
-    from ..integrations.mailtok import mtk_where
     for t in toks:
         w, a = mtk_where(t)
         r = c.execute(f"SELECT * FROM doc_mail WHERE {w}", a).fetchone()

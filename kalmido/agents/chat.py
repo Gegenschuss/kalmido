@@ -34,6 +34,7 @@ from ..agents.core import (
 from ..collab.reactions import clean_emoji
 from ..collab.news import news_read_job  # 2.369.5 (#2517): pulled up from functions
 from ..collab.replies import reply_quotes, reply_check  # 2.369.5 (#2517): pulled up from functions
+from ..agents.core import agent_usable  # 2.674.0 (#4382 finding 7)
 from ..agents.core import jn9_job_names, agent_shares, need_agent, may_set_runtime, task_editing_set  # 2.369.5 (#2517): pulled up from functions
 from ..agents.core import jl_cols, job_vis_sql, jobs_may_act, jobs_pre, jobs_seen  # 2.674.0 B (#4194)
 from ..collab.comments import comment_plain  # 2.369.5 (#2517): pulled up from functions
@@ -162,7 +163,6 @@ def agent_job_action(jid):
         # 2.674.0 (#4382 finding 7): writing to the agent needs, besides the right to stop the job, the right to address the
         # agent in the task's list (agent_usable, like a mention or a comment to it); the person the job is for always may
         if j["user_id"] != me() and j["task_id"]:
-            from ..agents.core import agent_usable
             t = c.execute("SELECT list_id FROM tasks WHERE id=?", (j["task_id"],)).fetchone()
             if not t or not t["list_id"] or not agent_usable(c, j["agent_id"], me(), t["list_id"]):
                 raise Denied(403, tr("You may not address this agent in this project"))

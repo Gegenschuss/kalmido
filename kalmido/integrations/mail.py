@@ -21,6 +21,7 @@ from ..core.pg import insert_id, system_ctx, table_exists
 from ..core.i18n import browser_lang, lang, md_plain, tr, trn
 from ..core.db import body, bump, connect, db, err, inbox_default, iso, local_now, now_utc, uset, usettings
 from ..accounts.session import GATE, me
+from ..accounts.mailtok import mtk_new, mtk_plain, mtk_where  # 2.674.0 (#4382 finding 5)
 from ..accounts.bgjobs import bgj_fn
 from ..core.access import Denied, list_role, need_list, vis_sql, WRITE_ROLES
 from ..core.pages import new_inbox_task, save_attachment_bytes, split_link, valid_url
@@ -77,7 +78,6 @@ def mail_addr(token):
 
 
 def mail_tokens(c, uid):
-    from .mailtok import mtk_plain  # 2.674.0 (#4382 finding 5): a new token is stored sealed
     return {r["list_id"]: mtk_plain(c, r["token"]) for r in c.execute("SELECT * FROM mail_tokens WHERE user_id=?", (uid,))}
 
 
@@ -121,7 +121,6 @@ def mail_token_new():
             return jsonify(error=le2b_off(), code="list_e2e"), 409
     tok = secrets.token_urlsafe(12).replace("-", "x").replace("_", "y")
     c.execute("DELETE FROM mail_tokens WHERE user_id=? AND list_id IS NOT DISTINCT FROM ?", (me(), lid))
-    from .mailtok import mtk_new
     c.execute("INSERT INTO mail_tokens(token,token_hash,user_id,list_id,created_at) VALUES(?,?,?,?,?)",
               (*mtk_new(c, tok), me(), lid, iso(now_utc())))  # 2.674.0 (#4382 finding 5): sealed + its hash, no plain text
     c.commit()
@@ -247,7 +246,6 @@ def mail_target(c, msg):
     """(user id, list id or None, how) the mail is for, or (None, None, None): how "token" = a token in To / Cc / Delivered-To /
     X-Original-To, how "from" = (mail_from_me) the sender's address of a person who allowed that, which anyone can forge."""
     hdrs = " ".join(str(msg.get_all(h, [])) for h in ("To", "Cc", "Delivered-To", "X-Original-To", "Envelope-To"))
-    from .mailtok import mtk_where
     for tok in MAIL_TOKEN_RE.findall(hdrs):
         w, a = mtk_where(tok)  # 2.674.0 (#4382 finding 5): by the hash (a row of an older version by the plain token)
         r = c.execute(f"SELECT * FROM mail_tokens WHERE {w}", a).fetchone()

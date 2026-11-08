@@ -41,7 +41,7 @@ from ..core.errors import BadInput
 from ..core.mailframe import MAIL_ACC, MAIL_MUTED, Safe, mail_html
 from ..notify.alerts import _env_int, aa_count, aa_err, aa_fail, aa_ok
 from ..core.env import env_bool
-from ..calendars.subscriptions import CAL_ERR, CAL_SEND_S, cal_until  # 2.369.5 (#2517): pulled up from functions; 2.539.0 (#4379): CAL_SEND_S, cal_until
+from ..calendars.subscriptions import CAL_ERR, CAL_SEND_S, cal_host_allowed, cal_until  # 2.369.5 (#2517): pulled up from functions; 2.539.0 (#4379): CAL_SEND_S, cal_until
 from ..collab.integfail import integ_org_admins, integ_tell  # 2.369.5 (#2517): pulled up from functions
 from ..collab.comments import comment_plain, user_names  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgs import _need_org_admin  # 2.369.5 (#2517): pulled up from functions
@@ -172,7 +172,6 @@ def chn_send(kind, t, text, allow):
         # 2.674.0 (#4382 finding 4): a host the admin did not allow gets one answer for "private network" / no answer / no
         # connection / TLS (like the webhooks' wh_send): no DNS oracle for internal names, no port scan through the test
         # button; a host of the allow-list keeps its code (the admin's own target)
-        from ..calendars.subscriptions import cal_host_allowed
         try:
             p = urllib.parse.urlsplit(chn_request(kind, t, text)[0])
             ok_host = cal_host_allowed(allow, p.hostname, p.port or {"http": 80, "https": 443}.get(p.scheme))

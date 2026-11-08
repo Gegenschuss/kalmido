@@ -37,7 +37,7 @@ from ..core.pg import system_ctx, write_lock
 from ..docs import store as S
 from ..core.orgcrypt import oc_enc_k  # 2.149.0 G (#2517): pulled up from functions
 from ..core.access import Denied  # 2.149.0 G (#2517): pulled up from functions
-from ..calendars.subscriptions import cal_err_text, cal_norm_url  # 2.369.5 (#2517): pulled up from functions
+from ..calendars.subscriptions import cal_err_text, cal_http_refused, cal_norm_url  # 2.369.5 (#2517): pulled up from functions
 from ..docs.ingest import docs_ingest  # 2.369.5 (#2517): pulled up from functions
 from ..admin.hosting import QuotaExceeded  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.session import GATE  # 2.369.5 (#2517): pulled up from functions
@@ -230,7 +230,6 @@ def _pl_get1(c, url, token, path, ver, raw, limit):
     allow = plh_allow(c, url)
     if allow is None:  # 2.69.0 A (#1846): a stored http:// address on a server that is hosted now
         raise PlError("public_https")
-    from ..calendars.subscriptions import cal_http_refused
     if cal_http_refused(allow, url):  # 2.674.0 (#4382 finding 6): a stored http:// address of a host not allowed (any more)
         raise PlError("needs_https")
     hdr = {"Authorization": f"Token {token}", "Accept": "*/*" if raw else f"application/json; version={ver}"}

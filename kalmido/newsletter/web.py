@@ -18,6 +18,7 @@ from ..core.pg import insert_id
 from ..core.i18n import N_, tr
 from ..core.access import Denied
 from ..accounts.session import me
+from ..calendars.subscriptions import cal_allow, cal_http_refused  # 2.674.0 (#4382 finding 6)
 from ..docs.web import _no_agent, ws_param
 from . import sync as N
 from .adapters import NWL_DEFAULT_URL, NWL_KINDS, NWL_PREVIEW, NwlError
@@ -119,7 +120,6 @@ def nwl_put_conn():
             url = pl_norm_url(d["url"])
             if not url:
                 return err(tr("Invalid value: {0}", tr("Address")))
-            from ..calendars.subscriptions import cal_allow, cal_http_refused
             if cal_http_refused(cal_allow(c, "newsletter"), url):  # 2.674.0 (#4382 finding 6): access data never in plain text
                 return err(N.nwl_err_text("needs_https"))
     if kind == "listmonk" and not url:

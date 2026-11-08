@@ -19,6 +19,7 @@ from ..core.pg import st_ids, write_lock  # 2.525.0 (#4195): an id set as one ar
 from ..core.access import Denied, acx_of
 from ..core.orgcrypt import OrgCryptError
 from ..accounts.session import me
+from ..accounts.mailtok import mtk_plain  # 2.674.0 (#4382 finding 5)
 from ..files.scan import sc_guard  # 2.306.0: pulled up from functions (layers budget)
 from ..files.store import fs_chain, fs_deleted, fs_log_add, fs_role, fs_visible_ids, fs_visible_sql, fs_version_row, need_node
 from . import store as S
@@ -878,7 +879,6 @@ def _settings_json(c, ws, uid):
     if oid:
         can = is_org_admin(c, uid, oid)
     tok = c.execute("SELECT token FROM doc_mail WHERE user_id=? AND org_id IS NOT DISTINCT FROM ? AND aid=''", (uid, oid)).fetchone()  # 2.577.0 C (#4466): the general one
-    from ..integrations.mailtok import mtk_plain  # 2.674.0 (#4382 finding 5): a new token is stored sealed
     root = S.root_id(c, ws)  # 2.48.0 review: the marked documents folder; only the folders uid can see (L4)
     vis = fs_visible_ids(c, uid) if root else set()
     # 2.199.0 B (#2742): the whole tree below the documents folder (path, depth, parent), not only the first level

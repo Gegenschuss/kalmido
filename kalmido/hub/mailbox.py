@@ -44,6 +44,7 @@ from ..core.db import body, bump, db, err, iso, now_utc, connect
 from ..core.access import Denied, WRITE_ROLES, acx_of, list_role, need_list
 from ..collab.integfail import INTEG_FAILS, integ_org_admins, integ_tell
 from ..accounts.session import me
+from ..accounts.mailtok import mtk_where  # 2.674.0 (#4382 finding 5)
 from . import hubmail as H
 from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
 from ..accounts.login import seal  # 2.369.5 (#2517): pulled up from functions
@@ -606,7 +607,6 @@ def mbx_import(c, box, raw):
         r = None
         hdrs = " ".join(str(msg.get_all(h, [])) for h in ("To", "Cc", "Delivered-To", "X-Original-To", "Envelope-To"))
         for t in MAIL_TOKEN_RE.findall(hdrs):  # a hub address of this workspace (another workspace's token counts as none)
-            from ..integrations.mailtok import mtk_where  # 2.674.0 (#4382 finding 5): by the hash
             w, a = mtk_where(t)
             x = c.execute(f"SELECT * FROM hub_tokens WHERE {w}", a).fetchone()
             if x and fits(x["kind"], x["user_id"], x["org_id"], x["client_id"], x["list_id"]):

@@ -28,6 +28,7 @@ from ..core.config import APP_NAME, APP_VERSION, MAX_FILE_MB
 from ..core.db import now_iso
 from ..core.i18n import N_
 from ..calendars.subscriptions import CalError, cal_http
+from ..accounts.mailtok import mtk_hash, mtk_new  # 2.674.0 (#4382 finding 5)
 
 ML_LINKS = 3          # links followed per mail
 ML_SCAN = 200         # links of one mail looked at
@@ -201,7 +202,6 @@ def ml_budget(c, token, kind, n=1):
     the doc_mail row (hits_hour = the hour, hits_links / hits_eml); call inside system_ctx, the caller commits."""
     col, cap = ("hits_links", ML_HOUR_LINKS) if kind == "links" else ("hits_eml", ML_HOUR_EML)
     # 2.674.0 (#4382 finding 5): token = the row's stored value (sealed or an old plain one) or the plain token of a sealed row
-    from ..integrations.mailtok import mtk_hash
     r = c.execute(f"SELECT token, hits_hour, {col} AS used FROM doc_mail WHERE token=? OR token_hash=? FOR UPDATE",
                   (token, mtk_hash(token))).fetchone()
     if not r or n <= 0:
@@ -231,6 +231,5 @@ def ml_token_new(c, uid, org):
     Used by the documents settings (POST /api/docs/mail) and the office settings (POST /api/office/receipt-mail)."""
     tok = "d" + secrets.token_urlsafe(14).replace("-", "x").replace("_", "y")
     c.execute("DELETE FROM doc_mail WHERE user_id=? AND org_id IS NOT DISTINCT FROM ? AND aid=''", (uid, org))  # 2.577.0 C (#4466): the named ones stay
-    from ..integrations.mailtok import mtk_new  # 2.674.0 (#4382 finding 5): sealed + its hash, no plain text
     c.execute("INSERT INTO doc_mail(token, token_hash, user_id, org_id, created_at) VALUES(?,?,?,?,?)", (*mtk_new(c, tok), uid, org, now_iso()))
     return tok

@@ -1,4 +1,4 @@
-"""2.674.0 (#4382 finding 5): the SHA-256 of the plus address tokens (integrations/mailtok.py). New rows store the token
+"""2.674.0 (#4382 finding 5): the SHA-256 of the plus address tokens (accounts/mailtok.py). New rows store the token
 sealed and its hash here; a mail is matched by the hash. Rows of an older version keep token in plain text and token_hash NULL
 (found by the plain token as before). Only new nullable columns and indexes: the version before ignores them (it does not find
 the addresses made after this version, the old ones keep working)."""

@@ -14,8 +14,8 @@ from ..core.errors import Denied
 from ..core.i18n import tr
 from ..core.pg import write_lock
 from ..accounts.session import me
+from ..accounts.mailtok import mtk_new, mtk_plain  # 2.674.0 (#4382 finding 5)
 from ..integrations.mail import MAIL_IN_ON, mail_addr
-from ..integrations.mailtok import mtk_new, mtk_plain  # 2.674.0 (#4382 finding 5)
 from .mailaddr import DMN_MAX, DMN_NAME_MAX, GENERAL, OFF_MSG, dmn_row_tags, dmn_folder, dmn_tags, dmn_token
 from .web import _no_agent, ws_param
 

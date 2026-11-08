@@ -17,6 +17,7 @@ from ..tasks.validation import as_int, TITLE_MAX
 from ..core.errors import BadInput
 from ..life.model import _dump, life_list, need_life
 from ..calendars.subscriptions import cal_norm_url  # 2.369.5 (#2517): pulled up from functions
+from ..calendars.subscriptions import cal_allow, cal_http_refused  # 2.674.0 (#4382 finding 6)
 from ..life.model import _insert  # 2.369.5 (#2517): pulled up from functions
 from ..life.bookmarks import bm_create, bm_kick  # 2.369.5 (#2517): pulled up from functions
 
@@ -102,7 +103,6 @@ def kk_set(c, uid, b):
     url = kk_norm_url(b["url"]) if "url" in b else (r["url"] if r else None)
     if not url:
         raise BadInput(tr("Invalid value: {0}", "URL"))
-    from ..calendars.subscriptions import cal_allow, cal_http_refused
     if "url" in b and cal_http_refused(cal_allow(c, "karakeep"), url):  # 2.674.0 (#4382 finding 6): the key never in plain text
         raise BadInput(kk_err_text("needs_https"))
     tok = r["token"] if r else ""
@@ -153,7 +153,6 @@ def kk_req(c, r, path, method="GET", body=None):
         key = ""
     if not key:
         raise KkError("key")
-    from ..calendars.subscriptions import cal_http_refused
     if cal_http_refused(cal_allow(c, "karakeep"), r["url"]):  # 2.674.0 (#4382 finding 6): a stored http:// address of a host not allowed
         raise KkError("needs_https")
     hdr = {"Authorization": f"Bearer {key}", "Accept": "application/json"}
