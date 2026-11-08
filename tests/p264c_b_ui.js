@@ -222,21 +222,31 @@ const gens = idx => (idx.pages || []).flatMap(p => [p.path, p.body]).filter(v =>
     PB = await ev(`wkeCreate(${JSON.stringify(SP)}, 'Prefix body', 0, 'e2e1:typed').then(r => r.id + '|' + r.body, e => 'ERR ' + e.message)`);
     check(String(PB).endsWith('| e2e1:typed'), 'a text "e2e1:…" is stored with a space in front ' + PB);
     // a page of an older app: name and text begin with the prefix inside the cipher
-    OLDP = await ev(`(async () => { const sp = ${JSON.stringify(SP)}, s = WKE.st[sp], key = WKE.keys[sp][s.gen];
-      const seal = async (f, t) => { const b = await e2eSeal(key, le2ePad(e2eTEnc().encode(t)), wkeAad(s.space_id, s.gen, f)); return 'e2e1:' + JSON.stringify({v: 1, g: s.gen, iv: b.iv, ct: b.ct}); };
-      return (await rawFetch('POST', '/api/wiki/pages', {space: sp, path: await seal('path', 'e2e1:Old'), body: await seal('body', 'e2e1:old text')})).id; })().catch(e => 'ERR ' + e.message)`);
-    check(OLDP > 0, 'setup: a page whose plain name and text begin with "e2e1:" ' + OLDP);
+    // 2.680.0 (#5147): since 2.652.0 (#5044) a new page takes v 2 ciphers only (v 1 400 "Please reload the app."), so the page
+    // is sealed as v 2 under an id reserved first (as such an app would have to now); the v 1 refusal is checked on the way
+    const old = await ev(`(async () => { const sp = ${JSON.stringify(SP)}, s = WKE.st[sp], key = WKE.keys[sp][s.gen];
+      const seal = async (f, t, v, pid) => { const b = await e2eSeal(key, le2ePad(e2eTEnc().encode(t)), wkeAad(s.space_id, s.gen, f, pid, v)); return 'e2e1:' + JSON.stringify({v, g: s.gen, iv: b.iv, ct: b.ct}); };
+      let refused = 0; try { await rawFetch('POST', '/api/wiki/pages', {space: sp, path: await seal('path', 'e2e1:Old v1', 1), body: await seal('body', 'e2e1:old v1', 1)}); } catch (e) { refused = e.status || ('ERR ' + e.message); }
+      const rv = await rawFetch('POST', '/api/wiki/e2e/newid', {space: sp});
+      const id = (await rawFetch('POST', '/api/wiki/pages', {space: sp, path: await seal('path', 'e2e1:Old', 2, rv.id), body: await seal('body', 'e2e1:old text', 2, rv.id), id: rv.id, resv: rv.resv})).id;
+      return {refused, id}; })().catch(e => ({err: e.message}))`);
+    check(old.refused === 400, '#5044: a new page with v 1 ciphers is refused 400 ' + JSON.stringify(old));
+    OLDP = old.id || 0;
+    check(OLDP > 0, 'setup: a page whose plain name and text begin with "e2e1:" ' + JSON.stringify(old));
 
     // 2.64.3 E (#1817, review 2 M2): a cipher of an older generation that no key opens; the re-encryption takes it over as empty
+    // 2.680.0 (#5147): a new page takes v 2 only since 2.652.0 (#5044): the lost cipher is v 2 under a reserved id
     const BADP = await ev(`(async () => { const sp = ${JSON.stringify(SP)}, s = WKE.st[sp];
       const k = await crypto.subtle.generateKey({name: 'AES-GCM', length: 256}, false, ['encrypt', 'decrypt']);
-      const b = await e2eSeal(k, le2ePad(e2eTEnc().encode('lost')), wkeAad(s.space_id, 1, 'path'));
-      return (await rawFetch('POST', '/api/wiki/pages', {space: sp, path: 'e2e1:' + JSON.stringify({v: 1, g: 1, iv: b.iv, ct: b.ct}), body: ''})).id; })().catch(e => 'ERR ' + e.message)`);
+      const rv = await rawFetch('POST', '/api/wiki/e2e/newid', {space: sp});
+      const b = await e2eSeal(k, le2ePad(e2eTEnc().encode('lost')), wkeAad(s.space_id, 1, 'path', rv.id, 2));
+      return (await rawFetch('POST', '/api/wiki/pages', {space: sp, path: 'e2e1:' + JSON.stringify({v: 2, g: 1, iv: b.iv, ct: b.ct}), body: '', id: rv.id, resv: rv.resv})).id; })().catch(e => 'ERR ' + e.message)`);
     check(BADP > 0 && ((await call('GET', '/api/wiki/e2e?space=' + SP)).j.reenc || 0) > 0, 'setup: an unreadable cipher of generation 1, re-encryption due ' + BADP);
     await ev(`(window.wkeTA = wkeReenc(${JSON.stringify(SP)}, null, {ask: true}).then(r => ({r}), e => ({err: e.message})), 1)`);
     check(await waitFor(`!!document.querySelector('.cdlg [data-cd="yes"]')`), 'the re-encryption asks before taking over unreadable texts');
     await ev(`(document.querySelector('.cdlg [data-cd="yes"]')?.click(), 1)`);
-    const ta = await ev(`window.wkeTA.then(async x => { const sp = ${JSON.stringify(SP)}; await wk_load(sp, true); return {...x, path: wk_pages(sp).find(p => p.id === ${BADP})?.path}; })`);
+    // 2.680.0 (#5147): a failed setup (BADP 'ERR …') no longer breaks this expression (was: SyntaxError in Firefox)
+    const ta = await ev(`window.wkeTA.then(async x => { const sp = ${JSON.stringify(SP)}; await wk_load(sp, true); return {...x, path: wk_pages(sp).find(p => p.id === ${Number(BADP) || 0})?.path}; })`);
     const i2 = (await call('GET', '/api/wiki/e2e?space=' + SP)).j, g2 = gens((await call('GET', '/api/wiki?space=' + SP + '&bodies=1')).j);
     check(ta.r === true && /^Unreadable page/.test(ta.path || '') && !i2.reenc && !(+i2.left?.pages) && g2.every(x => x === 2), 'the re-encryption takes the unreadable page over encrypted and ends ' + JSON.stringify([ta, i2.reenc, i2.left]).slice(0, 300));
 
