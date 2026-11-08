@@ -1257,7 +1257,7 @@ async function setupChoices(el, logo) {
   }
   // 2.7.0 (K21): one question "Start with": empty, the sample project, or a project of a built-in type (agency, software, personal)
   const STARTS = [['', N_('Empty|start'), 'list', N_('Your Basket and Today, nothing else')], ['sample', N_('Sample project'), 'eye', N_('A small client project with dates and a checklist, to look around; remove it any time under Settings > Data')],  // 2.578.0 (#4573): the film text only with Film & Video (draw)
-    ...PTYPE_UI.slice(1).map(([k, n, i, d]) => [k, n, i, d]),
+    ...PTYPE_UI.slice(1).filter(([k]) => k !== 'social').map(([k, n, i, d]) => [k, n, i, d]),  // 2.670.0 (#5120): Social media plan (#1957) is no start card of the setup
     ['import', N_('Import from another app'), 'download', N_('Todoist, Trello, Asana, Notion and more: you start empty and the import opens right away')]];  // 2.538.0 (#4361)
   const row = ([k, n, d]) => `<label class="suse"><input type="checkbox" data-use="${k}" ${picked.has(k) ? 'checked' : ''}><span><b>${tr(n)}</b><small class="muted">${tr(d)}</small></span></label>`;
   // 2.144.2 A (#2369): preset '' (modules fit no purpose) matches nothing, so "Start" switches nothing extra off
