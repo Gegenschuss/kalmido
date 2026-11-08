@@ -270,7 +270,7 @@ def chn_tick(skip=None):
             later.append(r)          # messages go back into the queue as they were (no failure counted; keep created_at = their order)
             continue
         res.append((r, chn_send(r["kind"], r["t"], r["text"], allow) if r["t"] else (False, None, "config")))
-        if not res[-1][1][0]:  # 2.665.0 (#5113): after any failure (was: only timeout / network) the rest of this channel waits
+        if not res[-1][1][0] and res[-1][1][2] != "config":  # 2.665.0 (#5113): after any failure (was: only timeout / network) the rest of this channel waits; review L5: a broken setup ("config") is dropped per message as before
             skip.add(r["channel_id"])
     if res or later:
         with GATE.bg():

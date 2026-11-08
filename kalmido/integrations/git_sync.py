@@ -636,24 +636,49 @@ def gsy_create_issue(c, r, k, L):
     return True
 
 
+def _comments_since(k, no, since, deadline):
+    """2.665.0 (#5113 review M1/M2): the issue's comments written since `since` (ISO), read until complete: GitHub with
+    ?since= (oldest first, only the newer ones), GitLab newest first until one is older. Not complete within the deadline or
+    GSY_COMMENT_PAGES pages: unsure, CalError (the caller sends nothing rather than twice)."""
+    out = []
+    for page in range(1, GSY_COMMENT_PAGES + 1):
+        if time.monotonic() > deadline:
+            raise CalError("timeout")
+        if k.get("low"):
+            raise GitRate(k["low"])
+        if k["provider"] == "gitlab":
+            path = _issue_path(k, no, "comments") + f"?sort=desc&order_by=created_at&per_page={GIS_PAGE}&page={page}"
+        else:
+            z = since.replace("+00:00", "Z")
+            path = _issue_path(k, no, "comments") + f"?since={urllib.parse.quote(z, safe='')}&per_page={GIS_PAGE}&page={page}"
+        _, _, j = git_http(k, path)
+        if not isinstance(j, list):
+            raise CalError("parse")
+        rows = [x for x in (gis_norm_comment(k["provider"], y) for y in j) if x]
+        out += rows
+        if len(j) < GIS_PAGE or (k["provider"] == "gitlab" and rows and not _newer(rows[-1]["created_at"], since)):
+            return out
+    raise CalError("error")
+
+
 def _sent_before(c, r, k, no, row, text, got):
     """2.665.0 (#5113): an earlier try of comment row was marked (send_at) before its POST and did not get to store the
     answer: the issue comment with the same text written since the mark that no row has yet (adopted, never sent twice), else
-    None. The issue's comments are read once per push (got); all pages read without it: unsure (CalError), nothing is sent."""
-    if "list" not in got:
-        got["list"] = _fetch_comments(k, no, time.monotonic() + GSY_ROUND_S)
-        got["full"] = len(got["list"]) >= GSY_COMMENT_PAGES * GIS_PAGE
+    None. Review M1/M2: only the comments since the mark are read, completely (_comments_since; unsure = CalError, nothing is
+    sent), so a long issue no longer blocks and a slow provider no longer gets the comment twice; L7: the text is compared as
+    far as the stored body goes (100000 characters)."""
     try:
         since = iso(parse_iso(row["send_at"]) - timedelta(seconds=120))  # the repository's clock may differ a little
     except (ValueError, TypeError):
         since = row["send_at"]
+    if since not in got:
+        got[since] = _comments_since(k, no, since, time.monotonic() + GSY_ROUND_S)
     have = {x[0] for x in c.execute("SELECT remote_id FROM git_issue_comments WHERE conn_id=? AND remote_id IS NOT NULL", (r["id"],))}
-    for x in got["list"]:
-        if isinstance(x.get("id"), int) and x["id"] not in have and (x["body"] or "").strip() == text.strip() and \
+    want = text[:100000].strip()
+    for x in got[since]:
+        if isinstance(x.get("id"), int) and x["id"] not in have and (x["body"] or "").strip() == want and \
                 _newer(x["created_at"], since):
             return x["id"]
-    if got["full"]:
-        raise CalError("error")
     return None
 
 

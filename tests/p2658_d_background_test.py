@@ -346,6 +346,17 @@ c.commit()
 mode["remote"] = [{"id": 9500, "user": {"login": "dev"}, "body": text, "created_at": "2026-11-08T00:00:30Z"}]
 push()
 out["again"] = {"calls": calls[:], "state": state()}
+# 2.665.0 (#5113 review M1): the provider is too slow to read the comments since the mark completely: unsure, nothing posted
+del calls[:]
+with system_ctx(c):
+    x3 = comment("Third from here")
+    c.execute("UPDATE git_issue_comments SET send_at=? WHERE id=?", ("2026-11-08T00:00:00Z", x3))
+c.commit()
+mode["remote"] = []
+GS.GSY_ROUND_S = -1
+push()
+GS.GSY_ROUND_S = 60
+out["slow"] = {"calls": calls[:], "state": state()}
 with system_ctx(c):
     c.execute("DELETE FROM git_conns WHERE id=?", (cid,))
 c.commit()
@@ -370,6 +381,10 @@ st = again.get("state") or {}
 posts = [x for x in again.get("calls") or [] if x[0] == "POST"]
 check(not posts and [x[1] for x in st.get("cm") or []] == [9002, 9500] and st.get("title") == "Push again" and st.get("due") == 0,
       f"#5113: a comment sent before whose answer was not stored is found and adopted, never posted twice ({again})")
+slow = j.get("slow") or {}
+st = slow.get("state") or {}
+check(not [x for x in slow.get("calls") or [] if x[0] == "POST"] and (st.get("cm") or [[0, 0]])[-1][1] is None,
+      f"#5113 review M1: comments not read completely in time: the marked comment is not posted again ({slow})")
 
 # ---------------------------------------------------------------- 4. agents: an event wakes only its agent's long-polls
 AG = r"""
