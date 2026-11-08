@@ -13,9 +13,9 @@ import secrets
 from datetime import timedelta
 from flask import g, jsonify, request, send_from_directory
 
-from ..core.config import app, PUBLIC_URL
+from ..core.config import app, PUBLIC_URL, PUBLIC_URL_SET
 from ..core.pg import system_ctx
-from ..core.i18n import tr
+from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, now_utc, parse_iso
 from ..core.access import Denied
 from ..accounts.session import _rate_blocked, _rate_fail, _token_hash, client_ip, rate_ip
@@ -31,6 +31,9 @@ AINS_RATE = 10  # failed redeems per address in the login window (15 min)
 # where the setup script fetches the starter files (mcp/starter_files.txt lists them); {version} = this instance's version
 AINS_STARTER_BASE = os.environ.get("KALMIDO_STARTER_BASE", "https://github.com/Gegenschuss/kalmido/raw/v{version}/mcp/")
 _AINS_BAD = re.compile(r"[\x00-\x1f\x7f]")
+# 2.670.0 (#5127): without PUBLIC_URL no setup code (503), like the receipt fetcher / scan inbox (#4074 5): the default
+# http://localhost:3040 would land in the agent's config, and the request's Host header is no address to trust
+AINS_NO_URL = N_("PUBLIC_URL is not set on this server, so the setup command cannot name its address: ask the server admin to set PUBLIC_URL to the address people open (.env) and restart.")
 
 
 def ains_version():
@@ -111,6 +114,8 @@ def ains_code_new(c, aid):
     if osn not in AINS_OS:
         raise Denied(400, tr("Invalid value: {0}", "os"))
     folder = ains_text(b.get("folder"), AINS_FOLDER_MAX, "folder")
+    if not PUBLIC_URL_SET:  # 2.670.0 (#5127): no code (and no row) that would name localhost or the request's Host
+        return err(tr(AINS_NO_URL), 503)
     code = "ks_" + secrets.token_urlsafe(18)
     t = now_utc()
     exp = iso(t + timedelta(minutes=AINS_CODE_TTL_MIN))
@@ -118,7 +123,7 @@ def ains_code_new(c, aid):
     c.execute("INSERT INTO agent_setup_codes(agent_id,code_hash,os,folder,created_by,created_at,expires_at) VALUES(?,?,?,?,?,?,?)",
               (aid, _token_hash(code), osn, folder, g.user["id"], iso(t), exp))
     c.commit()
-    return jsonify(code=code, expires_at=exp, ttl_min=AINS_CODE_TTL_MIN, os=osn, folder=folder, url=(PUBLIC_URL or request.host_url).rstrip("/"))
+    return jsonify(code=code, expires_at=exp, ttl_min=AINS_CODE_TTL_MIN, os=osn, folder=folder, url=PUBLIC_URL.rstrip("/"))
 
 
 def ains_machine_del(c, aid, tid):
@@ -189,6 +194,8 @@ def ains_redeem():
         return err(tr("Too many failed attempts, please wait a few minutes"), 429)
     if not API_ON:
         return err(tr("The API is switched off on this server"), 403)
+    if not PUBLIC_URL_SET:  # 2.670.0 (#5127): a code made before a restart without PUBLIC_URL stays unused (no token for localhost)
+        return err(tr(AINS_NO_URL), 503)
     b = body()
     code = b.get("code") if isinstance(b.get("code"), str) else ""
     host = ains_text(b.get("host"), AINS_HOST_MAX, "host")
@@ -217,7 +224,7 @@ def ains_redeem():
         c.commit()
         ver = ains_version()
         print("agent setup: code redeemed for agent", r["agent_id"], "token", tid, flush=True)
-        return jsonify(token=tok, url=(PUBLIC_URL or request.host_url).rstrip("/"), version=ver,
+        return jsonify(token=tok, url=PUBLIC_URL.rstrip("/"), version=ver,
                        agent={"id": a["user_id"], "name": _plain(a["display_name"] or a["username"]), "username": _plain(a["username"]),
                               "team": not a["owner_id"]},
                        operator_id=ains_operator(c, a, r), starter_base=AINS_STARTER_BASE.replace("{version}", ver or "main"),

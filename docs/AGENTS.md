@@ -211,7 +211,7 @@ curl -fsSL https://tasks.example.com/agent-setup.sh | KALMIDO_SETUP_CODE=ks_... 
 $env:KALMIDO_SETUP_CODE='ks_...'; & ([scriptblock]::Create((irm https://tasks.example.com/agent-setup.ps1))) -Url https://tasks.example.com -Dir "$HOME\projects\site"
 ```
 
-The code lives 15 minutes and works once (only its hash is stored; *New code* makes another). 2.360.0: the code goes in the
+The code lives 15 minutes and works once (only its hash is stored; *New code* makes another). 2.670.0 (#5127): the token goes with the server's `PUBLIC_URL`: without one set (the default is `http://localhost:3040`) both the new code (`POST /api/my/agents/<id>/setup-code`, `/api/admin/agents/<id>/setup-code`) and redeeming answer `503` with a text that names it (no code, no token). 2.360.0: the code goes in the
 environment (`KALMIDO_SETUP_CODE`, on Windows too), so it is not in the computer's process list (`--code` / `-Code` still
 work). The scripts take an `http://` address only for this computer (`localhost`, `127.0.0.1`, `[::1]`) or with
 `--allow-http` / `-AllowHttp` (Kalmido adds it to the command when it runs without https), and fetch the starter files

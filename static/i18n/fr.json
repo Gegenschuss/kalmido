@@ -17485,5 +17485,6 @@
   "The server is busy opening other large encrypted files. Please try again in a moment.": "Le serveur ouvre d'autres gros fichiers chiffrés. Réessayez dans un instant.",
   "Add image, PDF or audio": "Ajouter une image, un PDF ou un audio",
   "Images (JPG, PNG, WebP), PDFs and audio files (MP3, M4A, AAC, WAV, OGG, Opus, FLAC). The file stays in the file store; comments sit at a point or, for audio, at a second.": "Images (JPG, PNG, WebP), PDF et fichiers audio (MP3, M4A, AAC, WAV, OGG, Opus, FLAC). Le fichier reste dans l’espace fichiers ; les commentaires se placent à un point ou, pour l’audio, à une seconde.",
-  "Please select an image (JPG, PNG, WebP), a PDF or an audio file (MP3, M4A, AAC, WAV, OGG, Opus, FLAC).": "Veuillez choisir une image (JPG, PNG, WebP), un PDF ou un fichier audio (MP3, M4A, AAC, WAV, OGG, Opus, FLAC)."
+  "Please select an image (JPG, PNG, WebP), a PDF or an audio file (MP3, M4A, AAC, WAV, OGG, Opus, FLAC).": "Veuillez choisir une image (JPG, PNG, WebP), un PDF ou un fichier audio (MP3, M4A, AAC, WAV, OGG, Opus, FLAC).",
+  "PUBLIC_URL is not set on this server, so the setup command cannot name its address: ask the server admin to set PUBLIC_URL to the address people open (.env) and restart.": "PUBLIC_URL n'est pas défini sur ce serveur, la commande d'installation ne peut donc pas indiquer son adresse : demandez à l'administration du serveur de définir PUBLIC_URL sur l'adresse que l'on ouvre (.env) et de redémarrer."
 }
