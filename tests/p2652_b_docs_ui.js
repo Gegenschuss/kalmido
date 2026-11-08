@@ -110,7 +110,7 @@ async function upload(name, lines) {
     await ev(`(history.back(), 1)`);
     check(await wait(`!document.querySelector('.dv-view') && f8d_bk.pushed === 0 && /^#ablage\\/docs$/.test(location.hash) && document.querySelectorAll('.dc-card').length === 14`), 'Back 2: the document closes, the list is there');
     await ev(`(history.back(), 1)`);
-    check(await wait(`!/^#docs/.test(location.hash) && location.href.startsWith(${JSON.stringify(B)})`), 'Back 3: back to the view before the documents, still in Kalmido');
+    check(await wait(`!/^#(docs|ablage)/.test(location.hash) /* 2.752.0 (#4887) */ && location.href.startsWith(${JSON.stringify(B)})`), 'Back 3: back to the view before the documents, still in Kalmido');
   }, true);
 
   console.log(`p2652_b_docs_ui: ${ok} passed, ${F.length} failed`);
