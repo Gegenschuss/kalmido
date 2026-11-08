@@ -1,6 +1,6 @@
 // 2.199.0 B (#2742) UI tests: folders for the office. Own container (start.sh), jsdom, invented names only.
-// - documents (a computer): the panel shows the whole folder tree below the documents folder (ns 'dc', draggable, a menu);
-//   a subfolder picked = the list shows its documents (?under=), a removable line names the path; the document's folder
+// - documents (a computer): 2.752.0 (#4887) the one tree of the file store has the documents folder's subfolders (ns 'ab',
+//   draggable, a menu); a subfolder picked = its documents' view (its path on top), "All documents" all again; the document's folder
 //   field is a pick with the path ("Documents / Client Alpha / 2026") and offers a new subfolder of the current one
 // - the office (a computer): 2.351.0 (#3312) the area Quotations & invoices is a tree node (no group "Folders", no automatic
 //   groups); the year is a filter at the top of the list; the document's More menu files it into a folder (a reference node)
@@ -44,17 +44,22 @@ const openRow = async (w, d, txt) => { const r = rowOf(d, txt); const a = r?.que
   check(DOC2, 'setup: a second document (no folder)');
 
   // ================= documents, a computer
-  let w = await boot({user: 'alice', hash: 'docs'}), d = w.document;
+  // 2.752.0 (#4887): ONE tree - the documents' folders are the file store's folders (ns 'ab'); a subfolder opens as a folder with
+  // recognition (the documents' view with only its own documents); "All documents" below the tree shows all of them again
+  let w = await boot({user: 'alice', hash: 'ablage'}), d = w.document;
+  const DR = await until(() => rowOf(d, 'Documents'));
+  await openRow(w, d, 'Documents');
   const CA = await until(() => rowOf(d, 'Client Alpha'));
-  check(CA && CA.dataset.sbbns === 'dc' && CA.getAttribute('draggable') === 'true' && CA.dataset.sbbmenu === '1', 'documents: the panel shows the folder, draggable, with a menu');
+  check(CA && CA.dataset.sbbns === 'ab' && CA.getAttribute('draggable') === 'true' && CA.dataset.sbbmenu === '1' && DR, 'documents: the panel shows the folder in the one tree, draggable, with a menu');
+  check(!d.querySelector('#side .sbbt[data-sbbns="dc"]'), 'documents: no second tree of the same folders');
   await openRow(w, d, 'Client Alpha');
   const Y = await until(() => rowOf(d, '2026'));
   check(Y && Y.dataset.sbbpar === 'n:' + CA?.dataset.sbbid, 'documents: its subfolder below it (any depth)');
   Y?.querySelector('.sbbtn')?.click();
-  check(await until(() => /Documents \/ Client Alpha \/ 2026/.test(d.querySelector('.dc-under')?.textContent || '')), 'documents: the picked folder named with its path');
-  check(await until(() => d.querySelectorAll('.dc-grid [data-dco]').length === 1 && d.querySelector(`.dc-grid [data-dco="${DOC}"]`)), 'documents: only the folder\'s document is listed');
-  d.querySelector('[data-dc="under-off"]')?.click();
-  check(await until(() => d.querySelectorAll('.dc-grid [data-dco]').length === 2 && !d.querySelector('.dc-under')), 'documents: the line removed = all documents again');
+  check(await until(() => w.location.hash === '#ablage/' + Y?.dataset.sbbid && /2026/.test(d.querySelector('.abview .abccur')?.textContent || '')), 'documents: the picked folder named with its path');
+  check(await until(() => d.querySelectorAll('.dc-infold .dc-grid [data-dco]').length === 1 && d.querySelector(`.dc-infold [data-dco="${DOC}"]`)), 'documents: only the folder\'s document is listed');
+  d.querySelector('#side [data-go="ablage/docs"]')?.click();
+  check(await until(() => d.querySelectorAll('.dc-grid [data-dco]').length === 2 && !d.querySelector('.dc-infold')), 'documents: All documents = all documents again');
   w.location.hash = '#docs/' + DOC;
   const sel = await until(() => d.querySelector('#dc-folder'));
   const opts = sel ? [...sel.options].map(o => o.textContent) : [];

@@ -70,7 +70,7 @@ async function upload(name, lines) {
       await ev(`(history.replaceState({p2652b: ${W}}, '', location.href), 1)`);  // marks the entry of the list (#5070: the arrow comes back to it)
       await ev(`(document.querySelector('.dc-view [data-dco="' + DC.docs[0].id + '"]').click(), 1)`);
       // #5072: the whole page, also on the tablet (it was the sticky pane .dc-pane there); 2.583.0 (#4835): the document view
-      check(await wait(`!!document.querySelector('.dv-view .dv-pages') && /^#docs\\/\\d+$/.test(location.hash)`), `${W}: the document opens as a page of its own`);
+      check(await wait(`!!document.querySelector('.dv-view .dv-pages') && /^#ablage\\/\\d+$/.test(location.hash)`), `${W}: the document opens as a page of its own`);
       check(await ev(`!document.querySelector('.dc-pane') && !document.querySelector('.dc-view [data-dco]')`), `${W}: no pane beside the list, the list is not drawn behind it`);
       const cover = `(() => { const c = document.querySelector('.dv-view'), v = document.getElementById('view'); if (!c || !v) return null; const r = c.getBoundingClientRect(), q = v.getBoundingClientRect(), cs = getComputedStyle(v), pl = parseFloat(cs.paddingLeft) || 0, pr = parseFloat(cs.paddingRight) || 0;
         return {l: Math.round(r.left), r: Math.round(r.right), vl: Math.round(q.left), vr: Math.round(q.right), iw: innerWidth, ok: r.left <= q.left + pl + 2 && r.right >= q.right - pr - 2 - (v.offsetWidth - v.clientWidth)}; })()`;
@@ -87,7 +87,7 @@ async function upload(name, lines) {
       await ev(`(document.querySelector('.dv-view .dv-back').click(), 1)`);
       check(await wait(`!document.querySelector('.dv-view') && !history.state?.f8d && f8d_bk.pushed === 0 && !f8d_bk.skip`), `${W}: the arrow closes the view, no overlay entry left`);
       // 2.652.0 (#5070): back on the list's own entry, no dead entry left
-      check(await wait(`history.state?.p2652b === ${W} && /^#ablage\/docs$/.test(location.hash)`), `${W}: the arrow leaves no dead history entry ` + await ev(`JSON.stringify({s: history.state, h: location.hash})`));
+      check(await wait(`history.state?.p2652b === ${W} && /^#ablage\\/docs$/.test(location.hash)`), `${W}: the arrow leaves no dead history entry ` + await ev(`JSON.stringify({s: history.state, h: location.hash})`));
       check(await wait(`document.querySelectorAll('.dc-card').length === 14 && Math.abs(document.getElementById('view').scrollTop - ${v0}) <= 2`), `${W}: the list is back at the same place ` + await ev(`document.getElementById('view').scrollTop`));
     }
 
@@ -97,18 +97,18 @@ async function upload(name, lines) {
     await ev(`(location.hash = '#docs', 1)`);
     check(await wait(`document.querySelectorAll('.dc-card').length === 14`, {timeout: 20000}), 'Back: the list');
     await ev(`(document.querySelector('.dc-view [data-dco="' + DC.docs[0].id + '"]').click(), 1)`);
-    check(await wait(`!!document.querySelector('.dv-view .dv-pages') && /^#docs\\/\\d+$/.test(location.hash) && !history.state?.f8d`), 'Back: the document open with its own address (2.583.0: an entry of its own, no overlay)');
+    check(await wait(`!!document.querySelector('.dv-view .dv-pages') && /^#ablage\\/\\d+$/.test(location.hash) && !history.state?.f8d`), 'Back: the document open with its own address (2.583.0: an entry of its own, no overlay)');
     await sleep(800);  // the end-of-swipe guard of the preview (700 ms): a tap within it is ignored on purpose
     await ev(`(() => { window.__push = 0; const p = history.pushState; history.pushState = function () { window.__push++; return p.apply(this, arguments); }; return 1; })()`);
     await ev(`(document.querySelector('.dv-view [data-dc="view"]').click(), 1)`);
     check(await wait(`!!document.querySelector('.lightbox') && history.state?.f8d === 1 && f8d_bk.pushed === 1`), 'Back: the full view open, an entry of its own ' + await ev(`JSON.stringify({s: history.state, p: f8d_bk.pushed, lb: !!document.querySelector('.lightbox')})`));
     const pushes = await ev(`window.__push`);
     await ev(`(history.back(), 1)`);
-    check(await wait(`!document.querySelector('.lightbox') && !!document.querySelector('.dv-view') && f8d_bk.pushed === 0 && /^#docs\\/\\d+$/.test(location.hash)`), 'Back 1: the full view closes, the document stays');
+    check(await wait(`!document.querySelector('.lightbox') && !!document.querySelector('.dv-view') && f8d_bk.pushed === 0 && /^#ablage\\/\\d+$/.test(location.hash)`), 'Back 1: the full view closes, the document stays');
     await sleep(300);
     check(await ev(`window.__push`) === pushes, 'Back 1: no history entry pushed again (Chrome skips it on the next Back)');
     await ev(`(history.back(), 1)`);
-    check(await wait(`!document.querySelector('.dv-view') && f8d_bk.pushed === 0 && /^#ablage\/docs$/.test(location.hash) && document.querySelectorAll('.dc-card').length === 14`), 'Back 2: the document closes, the list is there');
+    check(await wait(`!document.querySelector('.dv-view') && f8d_bk.pushed === 0 && /^#ablage\\/docs$/.test(location.hash) && document.querySelectorAll('.dc-card').length === 14`), 'Back 2: the document closes, the list is there');
     await ev(`(history.back(), 1)`);
     check(await wait(`!/^#docs/.test(location.hash) && location.href.startsWith(${JSON.stringify(B)})`), 'Back 3: back to the view before the documents, still in Kalmido');
   }, true);
