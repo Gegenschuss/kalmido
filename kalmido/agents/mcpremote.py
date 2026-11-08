@@ -717,6 +717,18 @@ def _inproc_cls(mod):
     return InProc
 
 
+def mcpr_body(limit=MCPR_MAX_BODY):
+    """2.674.0 (#4028, review F10): the request body, at most limit + 1 bytes read from the stream in pieces (more = too large).
+    request.get_data read a body without Content-Length (Transfer-Encoding: chunked) completely into memory before the cut."""
+    s, buf = request.stream, bytearray()
+    while len(buf) <= limit:
+        b = s.read(min(65536, limit + 1 - len(buf)))
+        if not b:
+            break
+        buf += b
+    return bytes(buf)
+
+
 def _unauth(error=None):
     v = f'Bearer resource_metadata="{mcpr_base()}/.well-known/oauth-protected-resource"'
     if error:
@@ -758,7 +770,7 @@ def mcpr_mcp():
         return jsonify(error="use POST"), 405, {"Allow": "POST"}
     if (request.content_length or 0) > MCPR_MAX_BODY:
         return jsonify(error="too large"), 413
-    raw = request.get_data(cache=False)[:MCPR_MAX_BODY + 1]
+    raw = mcpr_body()  # 2.674.0 (#4028, review F10): a body without Content-Length (chunked) is read in pieces up to the limit
     if len(raw) > MCPR_MAX_BODY:
         return jsonify(error="too large"), 413
     if not gr["last_used_at"] or (now_utc() - parse_iso(gr["last_used_at"])).total_seconds() >= MCPR_USED_EVERY:
