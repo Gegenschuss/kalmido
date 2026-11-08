@@ -14,7 +14,8 @@ trigger only writes into it. Way back if ever needed: DROP TRIGGER kalmido_tchat
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS tchat_room_sig (
   room_id BIGINT PRIMARY KEY, n BIGINT NOT NULL DEFAULT 0, pins BIGINT NOT NULL DEFAULT 0,
-  max_id BIGINT NOT NULL DEFAULT 0, rev BIGINT NOT NULL DEFAULT 0);
+  max_id BIGINT NOT NULL DEFAULT 0, -- no FK (2.658.0 #5101): the highest message id of the room as a marker, not a link
+  rev BIGINT NOT NULL DEFAULT 0);
 CREATE OR REPLACE FUNCTION kalmido_tchat_room_sig() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE
   r BIGINT;
