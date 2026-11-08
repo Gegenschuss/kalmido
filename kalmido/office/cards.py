@@ -368,7 +368,8 @@ def cc_stmt_file(sid):
     s = cc_stmt(c, oid, sid, uid, every)
     if not s["node_id"]:
         raise Denied(404)
-    return Response(fs_read(c, s["node_id"]), mimetype="application/pdf", headers={"Content-Disposition": f'inline; filename="statement-{s["month"]}.pdf"', "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
+    return Response(fs_read(c, s["node_id"]), mimetype="application/pdf", headers={"Content-Disposition": f'inline; filename="statement-{s["month"]}.pdf"', "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff",
+                                                                                 "Content-Security-Policy": "sandbox"})  # 2.666.0 (#4074 11): a holder's upload never runs script under the app origin (bookarch._send)
 
 
 def cc_writable(c, oid, s, *days):
