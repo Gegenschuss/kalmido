@@ -1342,7 +1342,6 @@ DELETE /api/v1/event-calendars/{}
 DELETE /api/v1/event-calendars/{}/members/{}
 DELETE /api/v1/events/{}
 DELETE /api/v1/family/rewards/{}
-DELETE /api/v1/filters/{}
 DELETE /api/v1/forms/{}
 DELETE /api/v1/lists/{}
 DELETE /api/v1/lists/{}/files/{}
