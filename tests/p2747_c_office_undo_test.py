@@ -259,7 +259,9 @@ office = sorted(k for k in OBJ_TRACK if k.startswith('office_') or k == 'client'
 miss = [k for k in office if k not in UNDO_NEED and k not in UGO_NOACCESS]
 both = [k for k in UGO_NOACCESS if k in UNDO_NEED]
 area = sorted({OBJ_TRACK[k]['area'] for k in office})
-print('MISS', miss, 'BOTH', both, 'AREA', area, 'N', len(office))""")
+print('MISS', miss, 'BOTH', both, 'AREA', area, 'N', len(office), 'SERIES', 'office_inv_series' in UNDO_NEED)""")
+# 2.747.0 (review N3): an invoice series never goes back from the list (an old active / next_date would auto-send missed periods)
+check("SERIES False" in out, f"office_inv_series: noaccess from the list {out[-200:]}")
 check("MISS [] BOTH [] AREA ['office']" in out, f"every tracked office kind: a check of its own or noaccess on purpose, area office {out[-500:]}")
 r = A.post(B + O + "/fixed-costs", json={"label": "Miete", "amount": "1000", "start": TODAY.replace(day=1).isoformat(), "repeat": "monthly"})
 check(r.status_code == 201, f"a fixed cost ({r.status_code} {r.text[:200]})")

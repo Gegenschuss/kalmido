@@ -292,8 +292,13 @@ check(Fr.post(B + f"/api/undo/to/{G1}").status_code == 404, "bob's group: 404 fo
 now_ = "to_char(now(), 'YYYY-MM-DD\"T\"HH24:MI:SS+00:00')"
 dbx(f"INSERT INTO obj_undo(user_id, sess, kind, ref_id, snap, created_at) VALUES(?, ?, 'client', 999999998, '{{\"clients\": [{{\"name\": \"Gone Ltd\"}}]}}', {now_})", (FID, "ef" * 8))
 dbx(f"INSERT INTO obj_undo(user_id, sess, kind, ref_id, created_at) VALUES(?, ?, 'client', ?, {now_})", (FID, "ef" * 8, FC))
-check(until(lambda: not dbx("SELECT 1 FROM obj_undo WHERE kind='client' AND ref_id=999999998"), timeout=120),
+GOR = dbx(f"INSERT INTO undo_groups(user_id, area, label_key, state, parts, bytes, created_at, updated_at) VALUES(?, 'office', 'Change', 'done', 2, 20, {now_}, {now_}) "
+          "RETURNING id", (FID,))[0][0]
+dbx(f"INSERT INTO obj_undo(user_id, sess, kind, ref_id, created_at, group_id, bytes) VALUES(?, '', 'client', 999999997, {now_}, ?, 10)", (FID, GOR))
+dbx(f"INSERT INTO obj_undo(user_id, sess, kind, ref_id, created_at, group_id, bytes) VALUES(?, '', 'client', ?, {now_}, ?, 10)", (FID, FC, GOR))
+check(until(lambda: not dbx("SELECT 1 FROM obj_undo WHERE kind='client' AND ref_id IN (999999998, 999999997)"), timeout=120),
       "the watchdog dropped the copy of a client that is gone for good")
+check(dbx("SELECT parts, bytes FROM undo_groups WHERE id=?", (GOR,)) == [(1, 10)], f"review N4: its group is recounted {dbx('SELECT parts, bytes FROM undo_groups WHERE id=?', (GOR,))}")
 check(dbx("SELECT 1 FROM obj_undo WHERE kind='client' AND ref_id=? AND sess=?", (FC, "ef" * 8)), "the parts of a living client stay")
 
 sys.exit(done("p2747_b_undo_core"))

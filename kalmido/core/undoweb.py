@@ -11,7 +11,8 @@ step left it). The rights are checked at the moment of taking back, never the on
 (obj_need), a tracked kind of an old area the check its area registered (undo_need_reg: the office in office/undo.py); a kind
 without one is never written back (noaccess). A part that cannot go back (changed since, moved, no right) stays and is named
 in the answer, the other parts of the group go back anyway (decision of #5249): the group becomes partial (or noaccess when
-nothing of it may be changed). A barrier or a group too big for copies stops the run there."""
+nothing of it may be changed). A barrier or a group too big for copies stops the run there. Barriers are per person like the list (decision 2 of
+#5249: only own steps): a barrier of someone else does not stop a person's run; a finalised document is frozen anyway."""
 import json
 
 from flask import jsonify, request

@@ -259,7 +259,10 @@ def ug_drop_orphans(c):
     for kind, t in sorted(UG_TRACKED.items()):
         if not t or "id" not in (table_columns(c, t) or ()):
             continue
-        n += c.execute(f"DELETE FROM obj_undo WHERE kind=? AND NOT EXISTS (SELECT 1 FROM {t} r WHERE r.id=obj_undo.ref_id)", (kind,)).rowcount
+        cond = f"kind=? AND NOT EXISTS (SELECT 1 FROM {t} r WHERE r.id=obj_undo.ref_id)"
+        gids = ug_gids(c, cond, (kind,))  # review N4: their groups are recounted (or go when empty)
+        n += c.execute(f"DELETE FROM obj_undo WHERE {cond}", (kind,)).rowcount
+        ug_gc(c, gids)
     return n
 
 

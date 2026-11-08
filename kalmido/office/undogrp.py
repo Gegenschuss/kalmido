@@ -7,11 +7,12 @@ document only while not finalised / sent, a letter only as a draft; a client by 
 fields stay for who may not change them). Its own module (after office.docs / office.letters / office.undo): docs imports
 office.undo.
 2.747.0 (#5252): the other kinds ow_write writes (office/owrite.py ow_kind) are mapped: the plain settings-like rows of an
-office (UGO_ADMIN: bank rules, cash flow adjustments and fixed costs, deals, invoice series, travel purposes, business
+office (UGO_ADMIN: bank rules, cash flow adjustments and fixed costs, deals, travel purposes, business
 contracts, credit cards) go back for an admin of that office (the personal office: its owner), as the master data. The rows
 with a state or a person of their own stay noaccess on purpose (UGO_NOACCESS: a generated document / template that may be
 final, a logbook drive, an entertainment receipt that may be approved, a trip and its receipts, a booked card line, a
-vehicle of a person): their own rules (locks, approvals, GoBD) are not repeated here."""
+vehicle of a person, an invoice series - review N3: an old active / next_date would make the tick catch up and
+auto-send the periods missed): their own rules (locks, approvals, GoBD) are not repeated here."""
 from ..core.errors import Denied
 from ..core.i18n import tr
 from ..core.undoweb import undo_need_reg
@@ -64,9 +65,10 @@ undo_need_reg("client", ugo_client)
 undo_need_reg("office_letter", ugo_letter)
 for _k in MD:
     undo_need_reg(f"office_md_{_k}", ugo_md)
-UGO_ADMIN = ("office_bank_rule", "office_cf_adjust", "office_fixed_cost", "office_deal", "office_inv_series", "office_trip_purpose",
+UGO_ADMIN = ("office_bank_rule", "office_cf_adjust", "office_fixed_cost", "office_deal", "office_trip_purpose",
              "office_agreement", "office_cc_card")  # 2.747.0 (#5252)
 UGO_NOACCESS = ("office_gendoc", "office_doctpl", "office_drive", "office_meal", "office_meal_choice", "office_trip", "office_trip_item",
-                "office_cc_line", "office_vehicle")  # never from the list (core/undoweb.py _need: no check registered = noaccess)
+                "office_cc_line", "office_vehicle",
+                "office_inv_series")  # never from the list (core/undoweb.py _need: no check registered = noaccess)
 for _k in UGO_ADMIN:
     undo_need_reg(_k, ugo_md)
