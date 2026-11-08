@@ -4,6 +4,7 @@
  1. the web client as it is: no finding, no stale line in tools/trh_ok.txt (red before the callers moved to trh / trnh)
  2. the rule on small sources: a name through ${tr( in a template with markup is a finding, through trn( too (not its n);
     trh / trnh, esc(), a number, x.length, a constant, a translation of its own, markup built on purpose are not
+ 2b. trh / trnh with an esc() value is escaped twice: a finding (review: projtime.js); esc(a) + b.name is no esc() call
  3. what the check leaves to the code: a template without markup (text), a tr() inside another call (esc(tr(…)),
     a helper taking a label) or inside an array literal, a tr() of a nested template is checked on its own
  4. a ternary and a string join land directly in the template: checked
@@ -39,6 +40,12 @@ for ok, what in (("${trh('{0} invites you', name)}", "trh"), ("${trnh('{0} of {1
                  ("${tr('In {0}', tr('Documents|folder'))}", "a translation"), ("${tr('By {0}', `<b>${esc(n)}</b>`)}", "markup on purpose"),
                  ("${tr('Round {0}', Math.round(x))}", "Math")):
     check(found(f"h = `<div>{ok}</div>`;") == [], f"not a finding: {what}")
+
+check(found("h = `<p>${tr('{0} of {1}', esc(a) + b.name)}</p>`;") == [("tr", ["esc(a) + b.name"])],
+      "esc(a) + b.name is not one esc() call: a finding")
+check([x[2] for x in check_trh.double_escaped("h = `<p>${trh('{0} in {1}', n, esc(name))}</p>`;")] == ["esc(name)"],
+      "trh with an esc() value: escaped twice (review 2.689: projtime.js showed &amp; in a project name)")
+check(list(check_trh.double_escaped("// trh('{0}', esc(x)) in a comment\nh = trh('{0}', name);")) == [], "... not in a comment, not a plain value")
 
 # 3. left to the code
 check(found("t.textContent = `${tr('{0} invites you', name)} - ok`;") == [], "a template without markup is text")

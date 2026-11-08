@@ -1168,7 +1168,7 @@ async function bkoDraw(md, j) {
     if (j.upload_pending && !j.running) h += `<div class="shint cnote bkopend">${tr('The upload is on, but no backup has reached this target yet. Until one has, the journal of deleted accounts is not cleaned up: press “Upload now” or check the target.')}</div>`;
   }
   // 2.662.0 (#4587): backups at a removed / replaced target still count for the journal, until they expire (also without a target)
-  if (j.former?.count) h += `<div class="shint bkoformer">${trh('Backups at a former off-site target still hold back the clean-up of the journal of deleted accounts: {0}, until {1} at the latest.', j.former.count, esc(fmtDate(String(j.former.until).slice(0, 10))))}</div>`;
+  if (j.former?.count) h += `<div class="shint bkoformer">${trh('Backups at a former off-site target still hold back the clean-up of the journal of deleted accounts: {0}, until {1} at the latest.', j.former.count, fmtDate(String(j.former.until).slice(0, 10)))}</div>`;
   box.innerHTML = h;
   if (j.running && !box._poll) box._poll = setTimeout(async () => { box._poll = null; if (md.isConnected) await bkoDraw(md); }, 2000);
 }

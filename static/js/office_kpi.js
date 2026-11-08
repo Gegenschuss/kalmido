@@ -37,7 +37,7 @@ function kp_html() {
     ${tile(r.to_date ? tr('Revenue this year so far') : tr('Revenue {0}', y), ofcMoney(r.year), `${nr} · ${trh('a year earlier: {0}', ofcMoney(r.year_prev))} ${kp_delta(r.year, r.year_prev)}`)}
     ${tile(tr('Open items'), ofcMoney(d.invoices.open.amount), esc(`${trn('{0} invoice', '{0} invoices', d.invoices.open.count)} · ${tr('open and overdue')}`), 'open')}${/* 2.356.0 D (#3007): the accountant's word */ ''}
     ${tile(tr('Overdue|invoices'), ofcMoney(d.invoices.overdue.amount), esc(trn('{0} invoice', '{0} invoices', d.invoices.overdue.count)), 'overdue', +d.invoices.overdue.count ? 'warn' : '')}
-    ${tile(tr('Pipeline, weighted'), ofcMoney(d.pipeline.weighted), esc(`${tr('value × probability')} · ${trh('{0} open', ofcMoney(d.pipeline.open))}`), 'pipeline')}
+    ${tile(tr('Pipeline, weighted'), ofcMoney(d.pipeline.weighted), esc(tr('value × probability') + ' · ' + tr('{0} open', ofcMoney(d.pipeline.open))), 'pipeline')}
     ${tile(tr('Cash flow, next 3 months'), ofcMoney(d.cashflow.reduce((a, x) => a + +x.balance, 0)), esc(tr('Balance incl. expected payments')), 'cashflow')}</div>`;
   // revenue per month: two series (this year / the year before), one accent; legend + values on tap and in a table for screen readers
   const max = Math.max(1, ...r.months.flatMap(m => [+m.amount, +m.prev]));

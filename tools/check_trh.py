@@ -11,6 +11,7 @@ every inserted value and keep the translation's own <b> / <code>. This check rea
          a translation of its own (tr('…'), trn('…', '…', n))
   not checked: a tr() inside another call's arguments (esc(tr(…)), a helper that takes a label) or inside an array / object
   literal (mapped through esc() later) - the code there decides
+  twice  trh / trnh with an esc(…) value is reported too (a name with & would show "&amp;")
   else   reported: use trh / trnh (or esc() the value); a value that is HTML on purpose (a <b>…</b> built elsewhere)
          goes into tools/trh_ok.txt as "file|key|value" with a reason after #
 
@@ -129,7 +130,20 @@ def safe(a):
         return bool(TAG.search(a)) or "${" not in a  # markup built on purpose; ${…} text without markup = a finding
     if re.match(r"trn?\((['\"])(?:[^\\]|\\.)*?\1\s*(,\s*(['\"])(?:[^\\]|\\.)*?\3\s*,\s*[\w$.]+\s*)?\)$", a):
         return True  # a translation of its own (tr('Documents|folder'), trn('{0} file', '{0} files', n))
+    if re.match(r"(esc|i18nEsc)\(", a):  # one esc(…) call as a whole, not esc(a) + b.name
+        return call_args(a, a.index("("))[1] == len(a)
     return any(r.match(a) for r in SAFE)
+
+
+def double_escaped(src):
+    """trh / trnh calls with an esc(…) value: escaped twice, a name with & shows "&amp;" -> (line, key, value)."""
+    for m in re.finditer(r"(?<![\w$.])(trnh|trh)\(", src):
+        if src[src.rfind("\n", 0, m.start()) + 1:m.start()].lstrip().startswith(("//", "*")):
+            continue  # a comment line
+        args, _e = call_args(src, m.end() - 1)
+        for a in (args[3:] if m.group(1) == "trnh" else args[1:]):
+            if re.match(r"(esc|i18nEsc)\(", a):
+                yield src.count("\n", 0, m.start()) + 1, args[0] if args else "", a
 
 
 def html(tpls, k):
@@ -197,6 +211,8 @@ def main(argv):
     for p in sorted(glob.glob(os.path.join(ROOT, "static", "js", "*.js"))):
         rel = os.path.relpath(p, ROOT)
         src = open(p, encoding="utf-8").read()
+        for line, key, a in double_escaped(src):  # 2.689.0 (#5125, review): trh(…, esc(x)) escapes twice
+            out.append(f"{rel}:{line}: trh / trnh with {a!r}: escaped twice - pass the value without esc()")
         for line, fn, key, bad, _pos in findings(rel, src):
             for a in bad:
                 ident = f"{os.path.basename(rel)}|{key}|{a}"

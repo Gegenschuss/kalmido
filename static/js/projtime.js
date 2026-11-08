@@ -76,7 +76,7 @@ async function tz_wipe(lid, name) {
   if (!pv.count && pv.undo) { tz_wipeUndoAsk(lid, pv.undo); return; }  // 2.530.0 B (#4315): the last delete can still come back
   if (!pv.count) { toast(pv.billed ? tr('Nothing to delete: {0} already billed, they stay', pv.billed) : tr('No time tracked in this project.')); return; }
   const md = modal(`<h3>${tr('Delete all times of this project')}</h3>
-    <p>${pv.all ? trh('{0} entries ({1}) of everybody in {2} will be deleted.', pv.count, fmtDur(pv.seconds), esc(name)) : trh('Your {0} entries ({1}) in {2} will be deleted. Entries of others stay.', pv.count, fmtDur(pv.seconds), esc(name))}</p>
+    <p>${pv.all ? trh('{0} entries ({1}) of everybody in {2} will be deleted.', pv.count, fmtDur(pv.seconds), name) : trh('Your {0} entries ({1}) in {2} will be deleted. Entries of others stay.', pv.count, fmtDur(pv.seconds), name)}</p>
     ${pv.billed ? `<p class="muted">${trn('{0} entry is already billed and stays.', '{0} entries are already billed and stay.', pv.billed)}</p>` : ''}
     <p class="muted">${tr('The entries stay restorable until the trash period ends (Undo, or here again).')} <a href="/api/time/export.csv?${esc(tz_query([lid], 'all', '', ''))}" download>CSV</a></p>
     ${pv.undo ? `<p class="muted tz-undo">${trh('Last deleted ({0}): {1} entries ({2}).', fmtWhen(pv.undo.at), pv.undo.count, fmtDur(pv.undo.seconds))} <button class="btn sm" data-m="undo">${tr('Restore')}</button></p>` : ''}
