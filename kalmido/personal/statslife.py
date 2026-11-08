@@ -156,10 +156,11 @@ def _span(a, z, lo, hi):
 
 def stl_trip_costs(c, uid, trips):
     """{list id: (amount, currency)} -- the travel expenses made from the trips (kalmido/life/tripcost.py) that uid may
-    open there (the admins of the office area; never an agent / API token: ltc_office refuses, then simply none)."""
+    open there (the admins of the office area; never an agent / API token: ltc_office refuses, then simply none; a member on
+    the level "own" only the trips they entered, #4642)."""
     if not trips:
         return {}
-    from ..life.tripcost import ltc_office
+    from ..life.tripcost import ltc_office, ltc_own_trip
     from ..office.travel import rk_home_cur, rk_trips
     ids = ",".join(str(int(t["id"])) for t in trips)
     org = {t["id"]: t["org_id"] for t in trips}
@@ -172,13 +173,17 @@ def stl_trip_costs(c, uid, trips):
                 offices[lo] = None  # no personal office yet: a GET makes none (Fable review 2.630)
                 continue
             try:
-                offices[lo] = ltc_office(c, uid, lo)
+                offices[lo] = ltc_office(c, uid, lo)  # #5204: (oid, own) since #4642, not the bare oid (no costs ever)
             except Denied:
                 offices[lo] = None
-        oid = offices[lo]
-        if oid is None or oid != k["org_id"]:
+        if offices[lo] is None:
+            continue
+        oid, own = offices[lo]
+        if oid != k["org_id"]:
             continue
         try:
+            if own:
+                ltc_own_trip(c, oid, k["trip_id"], uid)  # somebody else's linked travel expenses: none, like the GET
             rt = rk_trips(c, oid, trip_id=k["trip_id"])
         except Denied:
             continue
