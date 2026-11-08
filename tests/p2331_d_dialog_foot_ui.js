@@ -29,10 +29,13 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
     const c = card.getBoundingClientRect(), r = b.getBoundingClientRect(), f = foot.getBoundingClientRect();
     const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
     // the old footer rule (no sticky): the button must sit where it sat before
-    const was = {t: r.top, b: r.bottom}; foot.style.cssText = 'position:static;margin:1.125rem 0 0;padding:0';
-    const o = b.getBoundingClientRect(); foot.style.cssText = '';
+    // 2.725.0 (#5158): transition none - with a transition on margin / padding (reduce motion used "all" until #5115) the
+    // measurement in the same frame read the old place and this check could never fail; at 1440 the resize grip of a dialog with a text field is in the card
+    const grip = card.querySelector('.dlggrip');
+    const was = {t: r.top, b: r.bottom}; foot.style.cssText = 'position:static;margin:1.125rem 0 0;padding:0;transition:none'; if (grip) grip.style.marginTop = '-1rem';
+    const o = b.getBoundingClientRect(); foot.style.cssText = ''; if (grip) grip.style.marginTop = '';
     return {scrolls: card.scrollHeight > card.clientHeight + 2, cardOverflow: getComputedStyle(card).overflowY, pos: getComputedStyle(foot).position,
-      inside: r.top >= c.top && r.bottom <= c.bottom + 1, hit: !!hit && (hit === b || b.contains(hit)), h: Math.round(r.height), moved: Math.round(Math.abs(o.top - was.t) + Math.abs(o.bottom - was.b))};
+      inside: r.top >= c.top && r.bottom <= c.bottom + 1, hit: !!hit && (hit === b || b.contains(hit)), h: Math.round(r.height), moved: Math.round(Math.abs(o.top - was.t) + Math.abs(o.bottom - was.b)), grip: !!grip};
   })()`;
   for (const [tag, w, hgt, touch] of [['390', 390, 844, true], ['1440', 1440, 900, false]]) {
     await firefox(async o => {
@@ -48,7 +51,7 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
       await shot(`p2331d-${tag}-long.png`);
       const short = await ev(probe(1));
       check(!short.scrolls && short.inside && short.hit, `${tag}: short dialog, Save in the card ` + JSON.stringify(short));
-      check(short.moved <= 1, `${tag}: short dialog, the button sits where it sat before the change ` + JSON.stringify(short));
+      check(short.moved <= 1 && (tag !== '1440' || short.grip), `${tag}: short dialog, the button sits where it sat before the change ` + JSON.stringify(short));
       await shot(`p2331d-${tag}-short.png`);
     }, touch);
   }

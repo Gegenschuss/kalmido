@@ -375,8 +375,8 @@ body>.modal{position:fixed;inset:0;max-height:none;max-width:none;margin:0}  /* 
 .modal .row label{min-width:8.75rem;color:var(--muted);font-size:var(--fs-m)}
 .modal .row input,.modal .row select{flex:1}
 .modal .foot{display:flex;gap:.5rem;justify-content:flex-end;margin-top:1.125rem;flex-wrap:wrap}
-/* 2.331.0 D (#3308): every dialog footer sticks to the bottom of the card; same resting position as before (no line, so short dialogs look unchanged) */
-.modal .card>.foot{position:sticky;bottom:-1.25rem;z-index:2;margin:.375rem -1.25rem -1.25rem;padding:.75rem 1.25rem 1.25rem;background:var(--bg2)}
+/* 2.331.0 D (#3308): every dialog footer sticks to the bottom of the card; same resting position as before (no line, so short dialogs look unchanged); 2.725.0 (#5158): the top gap is the old margin (it collapses with the margin above as before), the band above the buttons while stuck is a shadow, the resize grip after the foot takes no room */
+.modal .card>.foot{position:sticky;bottom:-1.25rem;z-index:2;margin:1.125rem -1.25rem -1.25rem;padding:0 1.25rem 1.25rem;background:var(--bg2)} .modal .card>.foot:not(.sfoot,.ppfoot,.stfoot,.clfoot){box-shadow:0 -.75rem 0 var(--bg2)} .modal .card:not(.dlg-sized)>.foot+.dlggrip{margin-top:-2.25rem}
 @media (max-width:899px){
   .modal .card>.foot{bottom:calc(-1.25rem - var(--safe-b));margin-bottom:calc(-1.25rem - var(--safe-b));padding-bottom:calc(1.25rem + var(--safe-b))}
 }
