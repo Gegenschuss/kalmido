@@ -31,12 +31,12 @@ guards it besides."""
 import json
 import secrets
 import threading
-from datetime import date, timedelta
+from datetime import date, datetime, time as dtime, timedelta
 
 from flask import g, has_request_context, jsonify
 
-from ..core.config import app, PUBLIC_URL
-from ..core.db import bump, db, err, insert_id, iso, local_now, now_utc
+from ..core.config import app, PUBLIC_URL, TZ
+from ..core.db import bump, db, err, insert_id, iso, local_day, local_now, now_utc
 from ..core.i18n import tr
 from ..core.access import Denied, acx_of, acx_org_ok, task_visible
 from ..core.pages import new_inbox_task
@@ -169,7 +169,7 @@ def _did(b, a):
 
 def _fl_rules(c, ws):
     """The flows of ws with their author and the day they were saved (_by, _day)."""
-    meta = {r[0]: (r[1], str(r[2] or "")[:10]) for r in c.execute("SELECT id, created_by, created_at FROM doc_rules WHERE ws=?", (ws,))}
+    meta = {r[0]: (r[1], str(local_day(str(r[2] or "")) or "")) for r in c.execute("SELECT id, created_by, created_at FROM doc_rules WHERE ws=?", (ws,))}  # 2.658.0 (#5099): the local day
     return [{**r, "_by": meta.get(r["id"], (None, ""))[0], "_day": meta.get(r["id"], (None, ""))[1]} for r in S.rules_get(c, ws)]
 
 
@@ -401,6 +401,11 @@ def fl_changed(c, nid, before):
 
 
 # ---- trigger "scheduled": the background tick ---------------------------------------------------------------------------------
+def _midnight_utc(day):
+    """2.658.0 (#5099): the start of local day `day` (server time zone) as a stored UTC timestamp (iso), for created_at bounds."""
+    return iso(datetime.combine(day, dtime(0), tzinfo=TZ))
+
+
 def fl_tick(c):
     """One look at every scheduled flow (caller: system_ctx, commits). -> the number of runs made."""
     today = local_now().date()
@@ -416,14 +421,24 @@ def fl_tick(c):
                 since = date.fromisoformat(str(day)[:10]) if day else today
             except ValueError:
                 since = today
-            last, first = (today - timedelta(days=days)).isoformat(), (since - timedelta(days=days)).isoformat()
-            rows = c.execute(f"""SELECT d.node_id, {col} AS base FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id
-                                 WHERE d.ws=? AND n.deleted_at IS NULL AND d.state IN ('done', 'failed') AND {col} IS NOT NULL AND {col}<>''
-                                   AND {col}<=? AND {col}>=? AND NOT EXISTS (SELECT 1 FROM doc_flow_runs x WHERE x.trig='scheduled'
-                                   AND x.rule_id=? AND x.node_id=d.node_id AND x.stamp={col}) ORDER BY {col}, d.node_id LIMIT ?""",
-                             (ws, last, first, r["id"], FL_TICK_DOCS)).fetchall()
+            last, first = today - timedelta(days=days), since - timedelta(days=days)
+            if r["from"] == "added":  # 2.658.0 (#5099): created_at is a UTC timestamp, its first 10 characters are the UTC day;
+                # the window is local days (local_now), so the bounds are the local midnights as UTC timestamps and the stamp is
+                # the local day of the row (a document that came in between 0:00 and 1:00 Berlin time was found only a day late)
+                rows = c.execute("""SELECT d.node_id, d.created_at AS base FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id
+                                    WHERE d.ws=? AND n.deleted_at IS NULL AND d.state IN ('done', 'failed') AND d.created_at IS NOT NULL
+                                      AND d.created_at<? AND d.created_at>=? AND NOT EXISTS (SELECT 1 FROM doc_flow_runs x
+                                      WHERE x.trig='scheduled' AND x.rule_id=? AND x.node_id=d.node_id) ORDER BY d.created_at, d.node_id LIMIT ?""",
+                                 (ws, _midnight_utc(last + timedelta(days=1)), _midnight_utc(first), r["id"], FL_TICK_DOCS)).fetchall()
+            else:
+                rows = c.execute(f"""SELECT d.node_id, {col} AS base FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id
+                                     WHERE d.ws=? AND n.deleted_at IS NULL AND d.state IN ('done', 'failed') AND {col} IS NOT NULL AND {col}<>''
+                                       AND {col}<=? AND {col}>=? AND NOT EXISTS (SELECT 1 FROM doc_flow_runs x WHERE x.trig='scheduled'
+                                       AND x.rule_id=? AND x.node_id=d.node_id AND x.stamp={col}) ORDER BY {col}, d.node_id LIMIT ?""",
+                                 (ws, last.isoformat(), first.isoformat(), r["id"], FL_TICK_DOCS)).fetchall()
             for row in rows:
-                nid, stamp = row["node_id"], str(row["base"])[:10]
+                nid = row["node_id"]
+                stamp = (local_day(str(row["base"])) or today).isoformat() if r["from"] == "added" else str(row["base"])[:10]
                 claim = c.execute("""INSERT INTO doc_flow_runs(org_id, ws, node_id, rule_id, trig, stamp, state, created_at)
                                      VALUES(?,?,?,?,'scheduled',?,'skip',?) ON CONFLICT DO NOTHING RETURNING id""",
                                   (S.ws_org(ws), ws, nid, r["id"], stamp, _ts())).fetchone()
