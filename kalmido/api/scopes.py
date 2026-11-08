@@ -294,6 +294,7 @@ SCOPES_READ_ONLY = frozenset(("read", "attachments:read", "files:read", "sheets:
 AGENT_RO_REFUSED = (r"^/agent/chats/\{\}$", r"^/agent/chats/\{\}/messages/\{\}/(reactions|pin|withdraw)$", r"^/agent/proposals(/[a-z-]+)?$",
                     r"^/agent/jobs/\{\}/proposal$")  # 2.360.0 C (#2496): + withdraw
 AGENT_RO_REFUSED += (r"^/agent/objects/\{\}/\{\}/proposals$",)  # 2.623.0 (#4718): a change proposal for a core object reaches a person too
+AGENT_RO_REFUSED += (r"^/lists/\{\}/playbook/proposals$",)  # 2.674.0 (#4382 finding 10): a Playbook proposal reaches people (News) too
 # 2.360.0 C (#2496): its own jobs stay open (status / log), but not the parts that reach a person: a job for a person
 # (start line in their chat) or one that waits for them (News + push)
 AGENT_RO_JOBS = r"^/agent/jobs(/\{\})?$"
