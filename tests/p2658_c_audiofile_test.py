@@ -207,6 +207,9 @@ check(m.status_code == 200 and m.content == MP3, f"frida's customer plays the fi
 # 2.658.0 (Fable review): the account of the person who made the link is disabled -> the link no longer gives the file
 check(A.patch(B + f"/api/users/{FRI}", json={"disabled": True}).ok, "frida disabled by the admin")
 check(media(FTOK).status_code == 404, "a disabled account's link does not give the file")
+# 2.666.0 (#5112): the page itself (and so its comments / decision) answers like an unknown link, too
+check(page(FTOK).status_code == 404, f"a disabled account's link: the page is gone {page(FTOK).status_code}")
 A.patch(B + f"/api/users/{FRI}", json={"disabled": False})
+check(page(FTOK).status_code == 200, "enabled again: the page is back")
 
 sys.exit(kt.done("p2658_c_audiofile"))

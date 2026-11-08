@@ -733,6 +733,8 @@ def vdr_sig_row(c, s):
 
 
 def vdr_sig_valid(c, s):
+    if not c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0", (s["created_by"],)).fetchone():
+        return False  # 2.666.0 (#5112): a disabled account's approval link is void (as the list links, signoff.py sig_check)
     r = vdr_sig_row(c, s)
     vs = vdr_versions(c, r["id"]) if r else []
     return bool(r) and vdr_sig_hash(r) == s["doc_hash"] and bool(vs) and (vs[-1]["kind"] or "video") == "video"  # 2.641.0 (#4769)
