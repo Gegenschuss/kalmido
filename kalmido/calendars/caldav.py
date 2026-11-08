@@ -106,6 +106,20 @@ _DAV_VTZ, _DAV_INST = {}, {}
 DAV_SINGLE = {"UID", "DTSTAMP", "CREATED", "LAST-MODIFIED", "SUMMARY", "DESCRIPTION", "DUE", "DTSTART", "PRIORITY", "STATUS",
               "COMPLETED", "PERCENT-COMPLETE", "URL", "RRULE"}
 _APPPW_OK, _APPPW_LOCK = {}, threading.Lock()
+DAV_TEST = os.environ.get("KALMIDO_TEST") == "1"  # 2.665.0 (#4196): tests only - objects rendered per DAV request (header)
+
+
+def dav_rendered(n):
+    """2.665.0 (#4196): count n rendered objects of this request (tests only: X-Kalmido-Test-Dav-Rendered)."""
+    if DAV_TEST:
+        g.dav_rendered = g.get("dav_rendered", 0) + n
+
+
+@app.after_request
+def dav_rendered_header(resp):
+    if DAV_TEST and request.path.startswith(DAV_ROOT):
+        resp.headers["X-Kalmido-Test-Dav-Rendered"] = str(g.get("dav_rendered", 0))
+    return resp
 
 
 class DavError(Exception):
@@ -633,6 +647,7 @@ def dav_coll(c, u, lst):
             print("caldav: skipping task", t["id"], e, flush=True)
             continue
         members[dav_name_of(t["id"], ctx["meta"].get(t["id"]))] = (t["id"], dav_etag(lines, tz), lines, tz, t)
+    dav_rendered(len(rows))
     coll = DavColl(lst, members)
     with _DAV_CACHE_LOCK:
         if len(_DAV_CACHE) > 64:

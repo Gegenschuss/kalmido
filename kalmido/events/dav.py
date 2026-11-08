@@ -21,6 +21,7 @@ from ..calendars.caldav import (
     _el, _privs, _xe, A_, C_, CS_, D_, dav_body, dav_common, dav_href, dav_multistatus, dav_principal_href, dav_propfind_req,
     dav_response, dav_xml, DAV_MAX_BODY, DAV_NAME_RE, DAV_SYNC_KEEP, DavError, dav_color, dav_report_props,
 )
+from ..calendars.caldav import dav_rendered  # 2.665.0 (#4196)
 from ..events.model import att_rows, ev_att_ok, ev_delete, ev_expand, events_on, my_cal_ids
 from ..events.model import cal_touch, is_occ, occ_ps_of, EV_OCC_PS_MAX  # 2.383.0 (#2587)
 from ..events.ics import etag, ev_lines, EvError, read_vevent, store_parsed, wrap
@@ -95,6 +96,7 @@ def ev_coll(c, u, coll):
             print("caldav: skipping event", r["id"], e, flush=True)
             continue
         members[r["href"]] = (r["id"], etag(lines, tzs), lines, tzs, r)
+    dav_rendered(len(rows))
     ec = EvColl(coll, members)
     with _LOCK:
         if len(_CACHE) > 64:

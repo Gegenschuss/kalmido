@@ -18,6 +18,7 @@ from ..calendars.caldav import (
     _el, _privs, _xe, A_, CR_, CS_, D_, dav_body, dav_common, dav_href, dav_multistatus, dav_principal_href, dav_propfind_req,
     dav_response, dav_xml, DAV_MAX_BODY, DAV_NAME_RE, DavError, dav_color, dav_report_props,
 )
+from ..calendars.caldav import dav_rendered  # 2.665.0 (#4196)
 from ..core.errors import BadInput
 from ..core.i18n import tr
 from ..contacts.model import (
@@ -109,6 +110,7 @@ def ab_coll(c, u, book):
             print("carddav: skipping contact", r["id"], e, flush=True)
             continue
         members[f"c{r['id']}.vcf" if book.get("ids") is not None else r["href"]] = (r["id"], _etag(text), text, r)
+    dav_rendered(len(members))
     ac = AbColl(book, members)
     with _LOCK:
         if len(_CACHE) > 64:
