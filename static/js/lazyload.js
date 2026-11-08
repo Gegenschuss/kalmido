@@ -293,7 +293,11 @@ function ld_script(f) {
   if (LD_RAN.has(f)) return Promise.resolve();
   if (LD_BAD.has(f)) return Promise.reject(LD_BAD.get(f));
   if (LD_PEND.has(f)) return LD_PEND.get(f);
-  const p = new Promise((res, rej) => {
+  // 2.750.0 (#5307): not while the page is still parsed - an inserted script runs as soon as it is there, maybe before the last
+  // start scripts (keys.js: kb_on), and a module that failed so stays broken until a reload (LD_BAD). The start scripts all ran
+  // before DOMContentLoaded.
+  const parsed = document.readyState === 'loading' ? new Promise(r => document.addEventListener('DOMContentLoaded', () => r(undefined), {once: true})) : null;
+  const p = (parsed || Promise.resolve()).then(() => new Promise((res, rej) => {
     const s = document.createElement('script');
     s.src = ld_url(f);
     s.dataset.ld = f;
@@ -312,7 +316,7 @@ function ld_script(f) {
     };
     s.onerror = () => { done(); s.remove(); rej(new Error('could not load ' + f)); };
     document.head.appendChild(s);
-  });
+  }));
   LD_PEND.set(f, p);
   return p;
 }
