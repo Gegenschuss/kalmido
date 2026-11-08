@@ -464,7 +464,8 @@ document.addEventListener('touchmove', e => {
 // drawn - or an empty sheet) inside .dc-body, so all three glide together over the whole width. Let go far enough: the new one
 // snaps fully into place and only then its content loads (dc_step, no glide-in afterwards); short of it: all springs back.
 // prefers-reduced-motion: no snapping animation, it changes at once. At the real end the short spring back stays (dc_bounce).
-const DC_NBGAP = 16;  // px between the sheets
+// the gap between the sheets: 1rem as in docs.css (.dc-nb-n / .dc-nb-p), in px for the glide (the rem scale follows the font size)
+const DC_NBGAP = () => parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
 function dc_nbThumb(x) {
   if (!x) return '';
   if (x.thumb) return `/api/docs/${x.id}/thumb?v=${encodeURIComponent(x.updated_at || '')}`;
@@ -512,11 +513,11 @@ function dc_nbPre(d) {
 }
 async function dc_snap(s, dir) {
   const b = s.body, id = b.dataset.id, w = b.offsetWidth || s.box.clientWidth || innerWidth;
-  const ms = matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : Math.round(Math.max(120, Math.min(260, 260 * (1 - Math.abs(s.dx) / (w + DC_NBGAP)))));
+  const ms = matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : Math.round(Math.max(120, Math.min(260, 260 * (1 - Math.abs(s.dx) / (w + DC_NBGAP())))));
   DCW.snap = true;
   try {
     b.style.transition = ms ? `transform ${ms}ms ease-out` : 'none';
-    b.style.transform = `translateX(${-dir * (w + DC_NBGAP)}px)`;
+    b.style.transform = `translateX(${-dir * (w + DC_NBGAP())}px)`;
     if (ms) await new Promise(ok => { setTimeout(ok, ms + 60); b.addEventListener('transitionend', ev => { if (ev.target === b) ok(); }, {once: true}); });  // a promise settles once: the late timer does nothing
     await dc_step(dir, true);
   } catch { /* api() shows its own error */ } finally {
