@@ -36,6 +36,7 @@ SECRET_OK = {
     "nl_suppress.email_hash": "plain hash of an address the organisation holds itself: who unsubscribed stays unsubscribed after a move",
     "office_bank_rule_nos.key": "the name of a rule's entry",
     "task_offer_links.item_key": "2.654.0 (#4585): the quotation position a task came from (i:<position> | s:<part>:<crew row>), not a secret",
+    "office_ledger_entries.credit": "the credit account number of a booking (2.666.0, #3461), no credential",
     "office_bank_tx.rkeys": "the matching keys of a bank line",
     "office_bank_tx.key_org": "the organisation the matching key belongs to",
     "office_bank_tx.hash": "fingerprint of a bank line, against importing it twice",

@@ -135,6 +135,9 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      # 2.603.0 (#4927): the basis of the income statement per year {"YYYY": "bank" | "receipts"} (set only by its own
                      # route, office/euerbasis.py; a year without an entry: the latest earlier one, else "receipts")
                      "euer_basis": {},
+                     # 2.666.0 (#3461): the profit determination {"method": "euer" | "balance", "size": "small" | "micro"} (set only by
+                     # its own route, office/ledger_dbl.py; empty = the income statement as before)
+                     "profit_method": {},
                      # 2.93.0 B (#1928): the mileage allowance per business km of the logbook (set only by its own route,
                      # office/logbook.py)
                      "km_rate": "0.30",

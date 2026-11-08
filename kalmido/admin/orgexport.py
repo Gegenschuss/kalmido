@@ -362,6 +362,7 @@ OX_AREAS = (
     ("office/procdocs.json", "office_procdocs", "org_id=?"),  # 2.148.0 C (#2472): versions of the procedure documentation
     ("office/suppliers.json", "office_suppliers", "org_id=?"),  # 2.148.0 D (#2458): creditors of the DATEV import
     ("office/opening_balances.json", "office_opening_balances", "org_id=?"),  # 2.148.0 D (#2458)
+    ("office/ledger_entries.json", "office_ledger_entries", "org_id=?"),  # 2.666.0 (#3461): adjusting / opening entries of the balance sheet
     # 2.414.0 (#3502): the booking archive (the files bka-* come with OFFICE_DIR)
     ("office/bookarch_files.json", "office_bookarch_files", "org_id=?"),
     ("office/bookarch.json", "office_bookarch", "org_id=?"),

@@ -77,6 +77,7 @@ RX_TABLES = (
     ("books/number-ranges.csv", "office_numbers"),
     ("books/opening-balances.csv", "office_opening_balances"),
     ("books/period-locks.csv", "office_period_locks"),
+    ("books/ledger-entries.csv", "office_ledger_entries"),  # 2.666.0 (#3461): adjusting / opening entries of the balance sheet
     ("books/equipment.csv", "office_equipment"),
     ("archive/archive.csv", "office_archive"),
     ("archive/bookarch.csv", "office_bookarch"),  # 2.414.0 (#3502): the booking archive of past DATEV years (books, 10 years)

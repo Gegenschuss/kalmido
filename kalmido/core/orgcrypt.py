@@ -99,6 +99,7 @@ FIELDS = {
     "office_vehicles": ("plate",), "office_drives": ("start_place", "dest", "purpose", "correct_note"),  # 2.93.0 B (#1928): the logbook; 2.152.0 C (#2169): + reason
     "office_drive_log": ("prev",),  # 2.93.0 B (#1928): the change log of the logbook
     "office_cash_entries": ("text",), "office_cash_log": ("prev",),  # 2.121.0 B (#2095): the cash book
+    "office_ledger_entries": ("text",),  # 2.666.0 (#3461): adjusting / opening entries of the balance sheet
     "office_procdocs": ("data",),  # 2.148.0 C (#2472): the procedure documentation (own texts + prefilled snapshot)
     "office_suppliers": ("name", "street", "zip", "city", "vat_id", "iban"),  # 2.148.0 D (#2458): creditors of the DATEV import
     "office_bookarch": ("doc1", "doc2", "text", "raw"), "office_bookarch_accts": ("label",),  # 2.414.0 (#3502): the booking archive
@@ -152,6 +153,7 @@ PM_CRYPT_CATS = {"office_company": N_("Bank and tax data of the company"), ("off
                  "office_doc_templates": N_("Document templates and documents"), "office_gen_docs": N_("Document templates and documents"),  # 2.93.0 A (#1927)
                  "office_vehicles": N_("Logbook"), "office_drives": N_("Logbook"), "office_drive_log": N_("Logbook"),  # 2.93.0 B (#1928)
                  "office_cash_entries": N_("Cash book"), "office_cash_log": N_("Cash book"),  # 2.121.0 B (#2095)
+                 "office_ledger_entries": N_("Balance sheet entries"),  # 2.666.0 (#3461)
                  "office_procdocs": N_("Procedure documentation"),  # 2.148.0 C (#2472)
                  "office_suppliers": N_("Suppliers of the DATEV import"),  # 2.148.0 D (#2458)
                  "office_bookarch": N_("Booking archive"), "office_bookarch_accts": N_("Booking archive"),  # 2.414.0 (#3502)

@@ -667,6 +667,8 @@ SPECS = [
         after=lambda c, run, src, nid, ctx: _oi_mark(c, run, ctx, "cashbook", None, {"closing": nid, "day": _txt(src.get("day"), 10)})),  # 2.237.0 D (#2870)
     OiT("office/cash_log.json", "office_cash_log", refs={"book_id": "office_cashbooks", "entry_id": "office_cash_entries"}, need=("book_id",),
         people={"by_user": "null"}, private="office"),
+    OiT("office/ledger_entries.json", "office_ledger_entries", people={**_P, "updated_by": "null"}, private="office",
+        label=N_("Balance sheet entries")),  # 2.666.0 (#3461): adjusting / opening entries of the balance sheet
     OiT("office/period_locks.json", "office_period_locks", people={"locked_by": "null"}, private="office", rid=False,
         key=("org_id", "period"),  # 2.148.0 A (#2471): locked accounting periods
         after=lambda c, run, src, nid, ctx: _oi_mark(c, run, ctx, "period", None, {"period": _txt(src.get("period"), 7)})),  # 2.237.0 D (#2870)
