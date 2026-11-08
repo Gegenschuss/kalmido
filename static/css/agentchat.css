@@ -523,7 +523,8 @@ body.kb-open .acsug-l{max-height:min(30vh,9rem)}
 .chhb{display:flex;align-items:center;flex:none;gap:0;margin-left:auto}
 .chhb .iconbtn{min-width:2.25rem;min-height:2.25rem;justify-content:center}
 @media (pointer:coarse){ .chhb .iconbtn{min-width:2.75rem;min-height:2.75rem} .chath.chh2{padding-top:.3125rem;padding-bottom:.3125rem} }
-.chath.chh2 .chback{margin:0 .25rem 0 -.375rem}
+.chath.chh2 .chback{margin:0 -.125rem 0 -.375rem}  /* 2.750.0 (#5243): arrow and picture close together like the team chat (the 2.75rem touch box left a wide gap) */
+.chath.chh2 .chst.st-paused .chstx{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}  /* 2.750.0 (#5243): the header never grows a second line while paused (the full text is the hint) */
 #pop .menu-list button.minfo:disabled{opacity:1;color:var(--text2)}
 /* 2.350.0 A (#2793): the narrow chat panel / window on the desktop: icon Send, the tools behind the plus like the phone
    (#2788), so the box keeps its width */
