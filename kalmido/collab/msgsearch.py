@@ -23,7 +23,7 @@ from ..core.config import app
 from ..core.i18n import tr
 from ..core.db import db, gset, gsetting, ix_ensure
 from ..accounts.session import me
-from ..core.access import collab_all, Denied, FULL_ROLES, list_role, tvis, vis_sql
+from ..core.access import collab_all, Denied, FULL_ROLES, list_role, tvis, vis_search_lids, vis_sql
 from ..tasks.validation import as_int
 from ..core.errors import BadInput
 from ..collab.comments import comment_plain, MENTION_RE, user_names
@@ -184,12 +184,13 @@ def search_messages(c, uid, q, arts=None, sender=None, room=None, agent=None, ta
         return roles[lid]
 
     if "c" in arts:
+        # 2.695.0 (#4960): the visible lists as an array (vis_search_lids, without the lock's): their tasks through the index
+        # tasks_list, their comments through comments_task -- under row-level security the trigram index cannot help
         rows = c.execute(f"""SELECT m.id, m.task_id, m.user_id, m.body, m.created_at, t.list_id, t.title
             FROM comments m JOIN tasks t ON t.id=m.task_id
-            WHERE {mcond} AND m.deleted_at IS NULL AND t.deleted_at IS NULL AND t.list_id IN {vis_sql()} AND {tvis(c, uid, 't.', write=True)}{snd}
-              AND t.list_id NOT IN (SELECT id FROM lists WHERE e2e IS NOT NULL)
+            WHERE {mcond} AND m.deleted_at IS NULL AND t.deleted_at IS NULL AND t.list_id = ANY(CAST(? AS BIGINT[])) AND {tvis(c, uid, 't.', write=True)}{snd}
             {' AND m.task_id=?' if task is not None else ''} ORDER BY m.id DESC LIMIT {MSG_CAND}""",
-                         match + [uid, uid] + ([sender] if sender is not None else []) + ([task] if task is not None else [])).fetchall()
+                         match + [vis_search_lids(c, uid)] + ([sender] if sender is not None else []) + ([task] if task is not None else [])).fetchall()
         for r in rows:
             if not role(r["list_id"]):
                 continue

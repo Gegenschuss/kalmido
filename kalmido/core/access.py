@@ -530,6 +530,14 @@ def vis_sql(ov=True):
     return acx_lists_sql(ov=ov)
 
 
+def vis_search_lids(c, uid):
+    """2.695.0 (#4960): the ids of vis_sql without the lists with the lock (the browser searches those) -- a search filters
+    the tasks by them as one array. Under row-level security (2.662.0, #4602) no text index of tasks / comments helps
+    (ILIKE / ~ are not leakproof), and with the scope as a subquery the planner could read every task of the instance
+    first; with the array it takes the visible lists' tasks through the index tasks_list."""
+    return [r[0] for r in c.execute(f"SELECT id FROM lists WHERE id IN {vis_sql()} AND e2e IS NULL", (uid, uid)).fetchall()]
+
+
 def joined_lists_sql():
     """2.369.5 (#2517): THE raw subquery "the lists an account owns or is a member of" (two ? = the account id: owner,
     member). For an account other than the request's own (an agent, the other person) or where every such list counts:

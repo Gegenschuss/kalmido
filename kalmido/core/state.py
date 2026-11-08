@@ -15,7 +15,7 @@ from ..accounts.session import me, session_gen, user_public
 from ..accounts.pictures import avatar_map, list_icon_url
 from ..accounts.colors import ac_color_map
 from ..core.access import (
-    acx_lists_sql, collab_all, Denied, health_hidden, need_task, org_trips_hidden, plists, reading_ids, time_all, tvis, vis_sql, wr_sql, WRITE_ROLES,
+    acx_lists_sql, collab_all, Denied, health_hidden, need_task, org_trips_hidden, plists, reading_ids, time_all, tvis, vis_search_lids, vis_sql, wr_sql, WRITE_ROLES,
 )
 from ..core.serializers import load_tasks, running_pomo, tags_for, td_lean, TD_DEFAULTS  # 2.575.0 B (#3966): + td_lean
 from ..core.pg import st_ids
@@ -689,14 +689,16 @@ def search_tasks(c, uid, raw, limit, files=True):
     # indexes tasks_trgm_* no longer help in a person's context and the one-id-set-per-field form of 2.149.0 C (#2515) read
     # the whole table once per field (every organisation's rows; measured in tests/p2689_a_search_rls_test.py: 32 000 tasks
     # 29 ms before, 2.5 ms now). The matches are the same.
-    rows = load_tasks(c, f"list_id IN {vis_sql()} AND list_id NOT IN (SELECT id FROM lists WHERE e2e IS NOT NULL) "
+    # 2.695.0 (#4960): the visible lists as one array first (vis_search_lids, without the lock's), so the planner cannot read
+    # every task of the instance for the subquery; tests/p2695_l_search_rls_test.py
+    rows = load_tasks(c, "list_id = ANY(CAST(? AS BIGINT[])) "
                          f"AND deleted_at IS NULL AND {tvis(c, uid, write=True)} "
                          "AND (title ILIKE ? ESCAPE '\\' OR content ILIKE ? ESCAPE '\\' OR url ILIKE ? ESCAPE '\\' "
                          "OR (snippets IS NOT NULL AND EXISTS (SELECT 1 FROM "
                          "jsonb_array_elements(CASE WHEN jsonb_typeof(snippets)='array' THEN snippets ELSE '[]'::jsonb END) j "
                          "WHERE (j->>'code') ILIKE ? ESCAPE '\\' OR (j->>'path') ILIKE ? ESCAPE '\\')) "
                          "OR id = ANY(CAST(? AS BIGINT[]))) "
-                         "ORDER BY status, updated_at DESC LIMIT ?", (uid, uid, q, q, q, q, q, list(fids), limit))
+                         "ORDER BY status, updated_at DESC LIMIT ?", (vis_search_lids(c, uid), q, q, q, q, q, list(fids), limit))
     for t in rows:  # 2.61.0 (#1820): "in file <name>" when only a file's text matched
         if t["id"] in fhit and not any(raw.casefold() in (t.get(k) or "").casefold() for k in ("title", "content", "url")):
             t["file_hit"] = fhit[t["id"]]
