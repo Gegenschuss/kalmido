@@ -765,12 +765,15 @@ def _wka_save(c, pid, text, uid, ts):
 def wka_export_zip(c, oid, uid):
     """GET /api/wiki/export (pages.wiki_export checked the space and its lock): every page as .md, its files under
     _attachments/<page path>/<name>, the links in the pages as [[_attachments/…]] (a re-import gives the same structure).
-    Written into a temporary file (the files may be large), sent and gone."""
+    Written into a temporary file (the files may be large), sent and gone. 2.674.0 (#4190): the limits of the files ZIP
+    (files/bulk.py abm_too_big: count and size of the files, 413 before anything is written) and one of the two places of
+    the large exports (abm_slot, 429 when both are taken)."""
+    from ..files.bulk import abm_slot, abm_too_big
     w, a = wiki_space_sql(oid, uid)
     pw = w.replace(" AND ", " AND p.")
     pages = c.execute(f"SELECT id, org_id, owner_id, path, body FROM wiki_pages WHERE deleted_at IS NULL AND {w} ORDER BY path", a).fetchall()
     zpath, used = {}, {}
-    rows = c.execute(f"SELECT f.id, f.page_id, f.name, f.path, p.path AS ppath FROM wiki_files f JOIN wiki_pages p ON p.id=f.page_id "
+    rows = c.execute(f"SELECT f.id, f.page_id, f.name, f.path, f.size, p.path AS ppath FROM wiki_files f JOIN wiki_pages p ON p.id=f.page_id "
                      f"WHERE f.deleted_at IS NULL AND p.deleted_at IS NULL AND p.{pw} ORDER BY f.page_id, f.id", a).fetchall()
     for r in rows:
         stem, dot, ext = r["name"].rpartition(".") if "." in r["name"].strip(".") else (r["name"], "", "")
@@ -780,6 +783,9 @@ def wka_export_zip(c, oid, uid):
             name = f"{stem} ({n}){dot}{ext}"
         used[f"{r['page_id']}/{name.lower()}"] = 1
         zpath[r["id"]] = (f"_attachments/{r['ppath']}/{name}", r)
+    msg = abm_too_big(len(zpath), sum(int(r["size"] or 0) for r in rows))  # 2.674.0 (#4190)
+    if msg:
+        raise Denied(413, msg)
 
     def back(m):
         hit = zpath.get(int(m.group(3)))
@@ -792,20 +798,21 @@ def wka_export_zip(c, oid, uid):
         return f"[[{p}]]" if not lb or lb == r["name"] else f"[[{p}|{lb.replace('|', '/')}]]"
     from .wkhist import wsb_body_or
     os.makedirs(WKA_TMP, mode=0o700, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(prefix="export-", suffix=".zip", dir=WKA_TMP)
-    try:
-        with os.fdopen(fd, "wb") as out, zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
-            for r in pages:
-                text = wsb_body_or(c, r, None)  # 2.126.2 B (#2358): an unreadable page is left out, never its ciphertext
-                if text is not None:
-                    z.writestr(r["path"] + ".md", WKA_URL_RE.sub(back, text or ""))  # 2.123.0 A (#2105): opened
-            for p, r in zpath.values():
-                try:
-                    data = oc_read_file(c, os.path.join(ATT_DIR, r["path"]))
-                except OSError:
-                    continue  # a missing file (storage check reports it) does not stop the export
-                z.writestr(p, data, compress_type=zipfile.ZIP_DEFLATED if p.lower().endswith(".svg") else zipfile.ZIP_STORED)
-        fh = open(tmp, "rb")
-    finally:
-        os.remove(tmp)  # the open handle keeps the bytes until the answer is sent
+    with abm_slot():  # 2.674.0 (#4190): Denied(429) before the temporary file when both places are taken
+        fd, tmp = tempfile.mkstemp(prefix="export-", suffix=".zip", dir=WKA_TMP)
+        try:
+            with os.fdopen(fd, "wb") as out, zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED, allowZip64=True) as z:
+                for r in pages:
+                    text = wsb_body_or(c, r, None)  # 2.126.2 B (#2358): an unreadable page is left out, never its ciphertext
+                    if text is not None:
+                        z.writestr(r["path"] + ".md", WKA_URL_RE.sub(back, text or ""))  # 2.123.0 A (#2105): opened
+                for p, r in zpath.values():
+                    try:
+                        data = oc_read_file(c, os.path.join(ATT_DIR, r["path"]))
+                    except OSError:
+                        continue  # a missing file (storage check reports it) does not stop the export
+                    z.writestr(p, data, compress_type=zipfile.ZIP_DEFLATED if p.lower().endswith(".svg") else zipfile.ZIP_STORED)
+            fh = open(tmp, "rb")
+        finally:
+            os.remove(tmp)  # the open handle keeps the bytes until the answer is sent
     return send_file(fh, mimetype="application/zip", as_attachment=True, download_name="wiki.zip")

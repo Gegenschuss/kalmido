@@ -18,6 +18,7 @@ import tempfile
 import threading
 import warnings
 import zipfile
+from contextlib import contextmanager
 
 from flask import jsonify, request, send_file
 
@@ -40,6 +41,8 @@ ABM_SCAN_PAGES = 30  # pages per scan
 ABM_SCAN_MAX_MB = 60  # the pages of one scan together (the phone scales them before sending)
 # 2.112.1 (#2058, review): at most two ZIPs / scans are built at once per server process (temp disk, CPU, memory)
 ABM_BUSY = threading.BoundedSemaphore(2)
+# 2.674.0 (#4190): the large exports (DATEV, GoBD, knowledge) take a place of the same two; both taken = 429 with this text
+ABM_BUSY_TEXT = N_("Another large export is running right now. Please try again in a moment.")
 ABM_SCAN_EDGE = 2000  # the long edge of a page in the PDF (pixels)
 ABM_SCAN_DPI = 180  # 2000 px at 180 dpi ~ the long edge of an A4 page
 # already packed: stored as they are (packing again costs time and wins nothing)
@@ -241,6 +244,35 @@ def abm_too_big(files, size, max_files=None, max_mb=None):
     return None
 
 
+@contextmanager
+def abm_slot():
+    """2.674.0 (#4190): one of the ABM_BUSY places for a large export while the with block runs; Denied(429, ABM_BUSY_TEXT)
+    at once when both are taken (the web process never waits for a place)."""
+    if not ABM_BUSY.acquire(blocking=False):
+        raise Denied(429, tr(ABM_BUSY_TEXT))
+    try:
+        yield
+    finally:
+        ABM_BUSY.release()
+
+
+if os.environ.get("KALMIDO_TEST") == "1":  # test containers only (tests/start.sh)
+    _ABM_HELD = [0]
+
+    @app.post("/api/test/exports/hold")
+    def _abm_test_hold():
+        """2.674.0 (#4190): {on: true} takes every free place of ABM_BUSY (as running exports would), {on: false} gives back
+        what it took -> {held}."""
+        if (request.get_json(silent=True) or {}).get("on"):
+            while ABM_BUSY.acquire(blocking=False):
+                _ABM_HELD[0] += 1
+        else:
+            while _ABM_HELD[0]:
+                ABM_BUSY.release()
+                _ABM_HELD[0] -= 1
+        return jsonify(held=_ABM_HELD[0])
+
+
 def abm_readable(c, n):
     """May this file's current version go out at all (not locked by the virus scanner, not waiting for it)?"""
     try:
@@ -250,10 +282,12 @@ def abm_readable(c, n):
     return True
 
 
-def abm_plan(c, roots, can_read):
+def abm_plan(c, roots, can_read, max_files=None, max_mb=None):
     """[(path in the ZIP, node row or None for a folder)] of roots and everything below them that can_read lets through:
-    no trash, no links / pages, no locked files; the folder structure kept, names made unique per folder."""
+    no trash, no links / pages, no locked files; the folder structure kept, names made unique per folder.
+    2.674.0 (#4190): Denied(413) as soon as the files passed the limits (abm_too_big), the rest of the tree is not walked."""
     out, seen, top = [], set(), set()
+    count = [0, 0]  # files, bytes
 
     def walk(n, prefix, taken, lvl):
         if n["id"] in seen or n["deleted_at"] or n["kind"] not in ("file", "folder") or not can_read(c, n):
@@ -262,6 +296,11 @@ def abm_plan(c, roots, can_read):
         if n["kind"] == "file":
             if n["cur_version"] and abm_readable(c, n):
                 out.append((prefix + abm_unique(abm_zip_name(n["name"]), taken), n))
+                count[0] += 1
+                count[1] += int(n["size"] or 0)
+                msg = abm_too_big(count[0], count[1], max_files, max_mb)  # 2.674.0 (#4190): stop at the first file too many
+                if msg:
+                    raise Denied(413, msg)
             return
         path = prefix + abm_unique(abm_zip_name(n["name"]), taken, folder=True) + "/"
         out.append((path, None))
@@ -279,7 +318,7 @@ def abm_plan(c, roots, can_read):
 def abm_zip_plan(c, roots, can_read, max_files=None, max_mb=None):
     """(plan, files): abm_plan with the limits checked -- Denied(409) when nothing can go into the ZIP, Denied(413) when
     the limits are passed."""
-    plan = abm_plan(c, roots, can_read)
+    plan = abm_plan(c, roots, can_read, max_files, max_mb)
     if not plan:
         raise Denied(409, tr("Nothing here can be downloaded"))
     files = [n for _, n in plan if n is not None]

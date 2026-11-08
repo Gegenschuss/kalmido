@@ -677,6 +677,7 @@ ROUTES = {
     "GET /api/test/fints/lib": "test",  # 2.616.0 (#2473, Fable findings): tests/p2616_c_fints_test.py (the library's inner parts)
     "POST /api/test/fints/conn": "test",  # 2.616.0 (#2473, Fable findings): tests/p2616_c_fints_test.py (the limits of a step)
     "POST /api/test/fints/hold": "test",  # 2.616.0 (#2473, Fable findings): tests/p2616_c_fints_test.py (a dialog in a running step)
+    "POST /api/test/exports/hold": "test",  # 2.674.0 (#4190): tests/p2674_a_exports_test.py (the places of the large exports taken)
     "DAV /test/boom": "test",  # 2.447.0 (#3761): tests/p2447_a_lang_test.py
     # ---- event (19)
     "GET /api/calendars/events": "event", "GET /api/v1/events": "event", "POST /api/v1/events": "event",

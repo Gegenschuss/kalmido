@@ -13,14 +13,15 @@ uuid5 of the office area, kind and id as before), so a second export and one aft
 ?check=1: {count, files, from, to, hints, no_booking: [...], no_receipt: [...]} without building the files: receipts the
 batch cannot book (no amount) and bookings without a receipt (money paid out on the bank account without a matched receipt,
 cash paid out without a receipt file)."""
-import io
+import os
 import re
+import tempfile
 import uuid
 import zipfile
 from datetime import date, timedelta
 from xml.sax.saxutils import escape, quoteattr
 
-from flask import Response, g, request
+from flask import g, request
 
 from ..core.config import app
 from ..core.i18n import N_, tr
@@ -36,9 +37,10 @@ from ..core.orgcrypt import oc_dec_fields  # 2.369.5 (#2517): pulled up from fun
 from .datev import dx_check, dx_extf, dx_need_eur, dx_rows, dx_settings, _period  # 2.369.5 (#2517): pulled up from functions
 from ..core.db import local_now  # 2.369.5 (#2517): pulled up from functions
 from .invoices import inv_files  # 2.369.5 (#2517): pulled up from functions
+from ..files.bulk import abm_drop, abm_send_zip, abm_slot  # 2.674.0 (#4190): temporary file + the shared place of the large exports
 
 DZ_NS = uuid.UUID("6f0a4c2e-1d8b-4f7e-9a3c-5b2d8e7f1a90")  # the name space of Kalmido's receipt GUIDs (never change)
-DZ_MAX_BYTES = 80 * 1024 * 1024  # the receipt files of one export together (the archive is built in memory)
+DZ_MAX_BYTES = 80 * 1024 * 1024  # the receipt files of one export together (2.674.0, #4190: written into temporary files, not memory)
 DZ_MAX_FILES = 1500  # documents per export (every invoice PDF is rendered)
 DZ_LIST_MAX = 50  # entries per list of the check
 DZ_TOO_BIG = N_("The receipts of this period are too large for one file ({0} MB); please export a shorter period.")
@@ -183,49 +185,60 @@ def dz_build(c, oid, d_from, d_to, by="", inside=True, locked_only=False, check=
         return None, info
     if len(docs) + len(nodes) > DZ_MAX_FILES:
         raise BadInput(tr(DZ_TOO_MANY, DZ_MAX_FILES))
+    with abm_slot():  # 2.674.0 (#4190): at most two large exports at once (429 else); the invoice PDFs are rendered inside
+        return dz_write(c, oid, d_from, d_to, by, inside, locked_only, rows, docs, nodes, s, info), info
+
+
+def dz_write(c, oid, d_from, d_to, by, inside, locked_only, rows, docs, nodes, s, info):
+    """2.674.0 (#4190): the ZIP of dz_build in a temporary file -> its path (the caller sends it with abm_send_zip or drops
+    it). Every receipt goes into the inner archive as soon as it is read (one file in memory at a time), the inner archive
+    lies in its own temporary file and is copied into the outer one; document.xml (small) comes last."""
     now = local_now()
     batch, _n = dx_extf(c, oid, d_from, d_to, by=by, s=s, now=now, inside=inside, rows=rows, fixed=locked_only)
-    entries, files, total, used = [], [], 0, set()
-
-    def add(gd, name, data, desc):
-        nonlocal total
-        total += len(data)
-        if total > DZ_MAX_BYTES:
-            raise BadInput(tr(DZ_TOO_BIG, DZ_MAX_BYTES // (1024 * 1024)))
-        base, n = name, 2
-        while name.lower() in used:
-            stem, dot, ext = base.rpartition(".")
-            name = f"{stem}-{n}.{ext}" if dot else f"{base}-{n}"
-            n += 1
-        used.add(name.lower())
-        entries.append((gd, name, desc))
-        files.append((name, data))
-
-    for did, gd in docs.items():
-        fl = inv_files(c, oid, did)
-        pdf = next((f for f in fl if f[2] == "application/pdf"), fl[0] if fl else None)
-        if pdf:
-            add(gd, _safe(pdf[0], f"doc-{did}", "pdf"), pdf[1], pdf[0])
-    for nid, gd in nodes.items():
-        n = c.execute("SELECT name FROM fs_nodes WHERE id=?", (nid,)).fetchone()
-        try:
-            data = fs_read(c, nid)
-        except Denied:
-            continue  # no content (a receipt without a file stays linked in the batch; the advisor sees the gap)
-        add(gd, _safe(n["name"] if n else "", f"receipt-{nid}", "pdf" if data[:4] == b"%PDF" else ""), data, (n["name"] if n else "") or f"B{nid}")
     span = f"{d_from.replace('-', '')}_{d_to.replace('-', '')}"
-    inner = io.BytesIO()
-    with zipfile.ZipFile(inner, "w", zipfile.ZIP_STORED) as z:  # PDFs and photos are compressed already
-        z.writestr("document.xml", dz_document_xml(entries, d_from, d_to, now), compress_type=zipfile.ZIP_DEFLATED)
-        for name, data in files:
-            z.writestr(name, data)
-    files.clear()
-    outer = io.BytesIO()
-    with zipfile.ZipFile(outer, "w", zipfile.ZIP_STORED) as z:
-        z.writestr(f"EXTF_Buchungsstapel_{span}.csv", batch)
-        z.writestr(f"Belege_{span}.zip", inner.getvalue())
+    entries, total, used = [], 0, set()
+    fd_in, p_in = tempfile.mkstemp(prefix="kalmido-datev-", suffix=".zip")
+    fd_out, p_out = tempfile.mkstemp(prefix="kalmido-datev-", suffix=".zip")
+    try:
+        with os.fdopen(fd_in, "wb") as fh, zipfile.ZipFile(fh, "w", zipfile.ZIP_STORED, allowZip64=True) as z:  # PDFs / photos are packed
+
+            def add(gd, name, data, desc):
+                nonlocal total
+                total += len(data)
+                if total > DZ_MAX_BYTES:
+                    raise BadInput(tr(DZ_TOO_BIG, DZ_MAX_BYTES // (1024 * 1024)))
+                base, n = name, 2
+                while name.lower() in used:
+                    stem, dot, ext = base.rpartition(".")
+                    name = f"{stem}-{n}.{ext}" if dot else f"{base}-{n}"
+                    n += 1
+                used.add(name.lower())
+                entries.append((gd, name, desc))
+                z.writestr(name, data)
+
+            for did, gd in docs.items():
+                fl = inv_files(c, oid, did)
+                pdf = next((f for f in fl if f[2] == "application/pdf"), fl[0] if fl else None)
+                if pdf:
+                    add(gd, _safe(pdf[0], f"doc-{did}", "pdf"), pdf[1], pdf[0])
+            for nid, gd in nodes.items():
+                n = c.execute("SELECT name FROM fs_nodes WHERE id=?", (nid,)).fetchone()
+                try:
+                    data = fs_read(c, nid)
+                except Denied:
+                    continue  # no content (a receipt without a file stays linked in the batch; the advisor sees the gap)
+                add(gd, _safe(n["name"] if n else "", f"receipt-{nid}", "pdf" if data[:4] == b"%PDF" else ""), data, (n["name"] if n else "") or f"B{nid}")
+            z.writestr("document.xml", dz_document_xml(entries, d_from, d_to, now), compress_type=zipfile.ZIP_DEFLATED)
+        with os.fdopen(fd_out, "wb") as fh, zipfile.ZipFile(fh, "w", zipfile.ZIP_STORED, allowZip64=True) as z:
+            z.writestr(f"EXTF_Buchungsstapel_{span}.csv", batch)
+            z.write(p_in, f"Belege_{span}.zip")
+    except BaseException:
+        abm_drop(p_out)
+        raise
+    finally:
+        abm_drop(p_in)
     info["file"] = f"DATEV_{span}.zip"
-    return outer.getvalue(), info
+    return p_out
 
 
 @app.get("/api/office/datev/zip")
@@ -238,11 +251,16 @@ def dz_zip_get():
     d_from, d_to = _period()
     u = g.user
     by = (u["display_name"] if "display_name" in u.keys() else "") or u["username"]
-    data, info = dz_build(c, oid, d_from, d_to, by=by, inside=request.args.get("in") != "0",
+    path, info = dz_build(c, oid, d_from, d_to, by=by, inside=request.args.get("in") != "0",
                           locked_only=request.args.get("locked") == "1", check=request.args.get("check") == "1")
-    if data is None:
+    if path is None:
         return info
-    ofx_log(c, oid, "export", target="datev", detail={"from": info["from"], "to": info["to"], "count": info["count"], "files": info["files"]})
-    c.commit()
-    return Response(data, mimetype="application/zip", headers={"Content-Disposition": f'attachment; filename="{info["file"]}"',
-                                                               "Cache-Control": "no-store"})  # 2.306.0 D2 (#2875)
+    try:  # 2.674.0 (#4190): a temporary file (dz_write), sent and gone
+        ofx_log(c, oid, "export", target="datev", detail={"from": info["from"], "to": info["to"], "count": info["count"], "files": info["files"]})
+        c.commit()
+        resp = abm_send_zip(path, info["file"])
+    except BaseException:
+        abm_drop(path)
+        raise
+    resp.headers["Cache-Control"] = "no-store"  # 2.306.0 D2 (#2875)
+    return resp

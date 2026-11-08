@@ -17483,6 +17483,8 @@
   "Add image, PDF or audio": "Añadir imagen, PDF o audio",
   "Images (JPG, PNG, WebP), PDFs and audio files (MP3, M4A, AAC, WAV, OGG, Opus, FLAC). The file stays in the file store; comments sit at a point or, for audio, at a second.": "Imágenes (JPG, PNG, WebP), PDF y archivos de audio (MP3, M4A, AAC, WAV, OGG, Opus, FLAC). El archivo se queda en el almacén de archivos; los comentarios se colocan en un punto o, en el audio, en un segundo.",
   "Please select an image (JPG, PNG, WebP), a PDF or an audio file (MP3, M4A, AAC, WAV, OGG, Opus, FLAC).": "Elige una imagen (JPG, PNG, WebP), un PDF o un archivo de audio (MP3, M4A, AAC, WAV, OGG, Opus, FLAC).",
+  "Another large export is running right now. Please try again in a moment.": "Ahora mismo se está ejecutando otra exportación grande. Inténtalo de nuevo en un momento.",
+  "The request is too large (at most {0} MB)": "La solicitud es demasiado grande (como máximo {0} MB)",
   "New pivot sheet…": "Nueva hoja dinámica…",
   "Edit pivot…": "Editar tabla dinámica…",
   "Pivot of the sheet {0}, always up to date. Change the values there.": "Tabla dinámica de la hoja {0}, siempre actualizada. Cambia los valores allí.",

@@ -17483,6 +17483,8 @@
   "Add image, PDF or audio": "Afbeelding, pdf of audio toevoegen",
   "Images (JPG, PNG, WebP), PDFs and audio files (MP3, M4A, AAC, WAV, OGG, Opus, FLAC). The file stays in the file store; comments sit at a point or, for audio, at a second.": "Afbeeldingen (JPG, PNG, WebP), pdf’s en audiobestanden (MP3, M4A, AAC, WAV, OGG, Opus, FLAC). Het bestand blijft in de bestandsopslag; opmerkingen staan op een punt of, bij audio, op een seconde.",
   "Please select an image (JPG, PNG, WebP), a PDF or an audio file (MP3, M4A, AAC, WAV, OGG, Opus, FLAC).": "Kies een afbeelding (JPG, PNG, WebP), een pdf of een audiobestand (MP3, M4A, AAC, WAV, OGG, Opus, FLAC).",
+  "Another large export is running right now. Please try again in a moment.": "Er loopt nu al een andere grote export. Probeer het zo meteen opnieuw.",
+  "The request is too large (at most {0} MB)": "Het verzoek is te groot (hoogstens {0} MB)",
   "New pivot sheet…": "Nieuw draaiblad…",
   "Edit pivot…": "Draaitabel bewerken…",
   "Pivot of the sheet {0}, always up to date. Change the values there.": "Draaitabel van het blad {0}, altijd actueel. Wijzig de waarden daar.",

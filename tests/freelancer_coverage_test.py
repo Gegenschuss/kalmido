@@ -753,6 +753,7 @@ ROUTES = {
     "GET /api/test/fints/lib": "test",  # 2.616.0 (#2473, Fable findings): tests/p2616_c_fints_test.py (the library's inner parts)
     "POST /api/test/fints/conn": "test",  # 2.616.0 (#2473, Fable findings): tests/p2616_c_fints_test.py (the limits of a step)
     "POST /api/test/fints/hold": "test",  # 2.616.0 (#2473, Fable findings): tests/p2616_c_fints_test.py (a dialog in a running step)
+    "POST /api/test/exports/hold": "test",  # 2.674.0 (#4190): tests/p2674_a_exports_test.py (the places of the large exports taken)
     "DAV /test/boom": "test",  # 2.447.0 (#3761): tests/p2447_a_lang_test.py
     "DELETE /api/books/{}": "pim", "DELETE /api/books/{}/members/{}": "pim", "DELETE /api/books/{}/org": "pim",
     "POST /api/books/{}/restore": "pim", "POST /api/books/{}/purge": "pim", "POST /api/contacts/{}/restore": "pim",  # 2.272.0 E1 (#3038)
