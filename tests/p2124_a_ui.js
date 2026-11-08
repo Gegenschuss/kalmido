@@ -111,7 +111,9 @@ const item = (d, re) => [...d.querySelectorAll('[role="menuitem"]')].find(b => r
   md.querySelector('input[name="shc-t"][value="bar"]').checked = false;
   md.querySelectorAll('.shc-ys input').forEach(i => { i.checked = [C[1], C[2]].includes(+i.value); });
   click(w, md.querySelector('[data-m="save"]'));
-  check(await until(() => d.querySelectorAll('#shc-box path.shc-ln').length === 2 && d.querySelectorAll('#shc-box .shc-leg li').length === 2), 'a line chart with two lines and a legend');
+  check(await until(() => d.querySelectorAll('#shc-box path.shc-ln').length === 2 && d.querySelectorAll('#shc-box .shc-leg li').length === 2),
+    // 2.680.0 (#5138): red once only in the CI of 2.668 - say what was there (the view's chart, the server's, the lines drawn)
+    `a line chart with two lines and a legend (view ${w.eval('JSON.stringify(SHV.sh?.chart)')} rev ${w.eval('SHV.sh?.rev')}, server ${JSON.stringify((await call('GET', `/api/sheets/${SID}`)).chart)}, lines ${d.querySelectorAll('#shc-box path.shc-ln').length}, legend ${d.querySelectorAll('#shc-box .shc-leg li').length})`);
   // hide / show
   click(w, d.querySelector('#shc-box [data-shc="hide"]'));
   check(!d.getElementById('shc-box'), 'hidden');
@@ -119,6 +121,21 @@ const item = (d, re) => [...d.querySelectorAll('[role="menuitem"]')].find(b => r
   check(await until(() => item(d, /Show chart/)), 'the menu offers "Show chart"');
   click(w, item(d, /Show chart/));
   check(await until(() => d.getElementById('shc-box')), 'shown again');
+  // 2.680.0 (#5138): a load of the sheet whose answer was on its way while an own write (here the chart) moved the sheet on
+  // must not put the older sheet back (it took the sheet's view to its old chart for good: its _v already counted the write's
+  // event). SHV.sh is watched; the GET's answer is held until the write is through.
+  w.eval(`(() => { let v = SHV.sh; window.__shOld = []; Object.defineProperty(SHV, 'sh', {configurable: true, enumerable: true, get: () => v,
+    set: x => { if (x && v && x.id === v.id && x.rev < v.rev) __shOld.push(v.rev + '->' + x.rev); v = x; }}); return 1; })()`);
+  const f0 = w.fetch; let go, got = 0; const held = new Promise(r => { go = r; });
+  w.fetch = (u, o) => { const p = f0(u, o); return new RegExp(`/api/sheets/${SID}(\\?|$)`).test(String(u)) && (!o || !o.method || o.method === 'GET') ? p.then(r => { got++; return held.then(() => r); }) : p; };
+  const ld = w.eval(`shvLoad(${SID}, true)`);
+  check(await until(() => got > 0), 'race: the load\'s answer came (held back)');
+  await w.eval(`shc_save(SHV.sh, {type: 'line', x: ${C[0]}, y: [${C[1]}]}, 'race')`);
+  const rev1 = w.eval('SHV.sh.rev');
+  go(); await ld; w.fetch = f0;
+  check(w.eval('__shOld.length') === 0 && w.eval('SHV.sh.chart?.y?.length') === 1 && w.eval('SHV.sh.rev') >= rev1,
+    `race: the older answer did not replace the sheet (${w.eval('__shOld.join()')}, chart ${w.eval('JSON.stringify(SHV.sh.chart)')}, rev ${w.eval('SHV.sh.rev')} >= ${rev1})`);
+  w.eval(`(() => { const v = SHV.sh; Object.defineProperty(SHV, 'sh', {value: v, writable: true, configurable: true, enumerable: true}); return 1; })()`);
   check(errs.length === 0, 'no JS errors: ' + errs.slice(0, 3).join(' | '));
 
   // ---- a reader sees the chart, without the edit button

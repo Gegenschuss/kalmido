@@ -78,6 +78,9 @@ async function shvLoad(id, force) {
       if (SHV.sh === old && old.etag === sh.etag && old.rev === old._etRev) { old._v = S.v; SHV.err = ''; SHV.errFor = null; SHV.n304 = (SHV.n304 || 0) + 1; sh = null; }
       else sh = await rawFetch('GET', '/api/sheets/' + id);  // the sheet here changed meanwhile: the whole one
     }
+    // 2.680.0 (#5138): an answer older than the sheet here (an own write moved its rev on while the load was on its way) does
+    // not put the old sheet back; a load asked for meanwhile still runs, the next event loads again
+    if (sh && SHV.sh?.id === id && typeof sh.rev === 'number' && sh.rev < SHV.sh.rev) sh = null;
     if (sh) {
       // 2.517.0 (#3714): a load that comes back after the route moved on does not replace the sheet of the route
       if (S.route.mod === 'sheets' && S.route.sh && S.route.sh !== id && SHV.sh?.id === S.route.sh) return;
