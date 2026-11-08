@@ -290,8 +290,16 @@ check(counts(ORG3) == before, f"nothing removed {before} {counts(ORG3)}")
 # ---------------------------------------------------------------- the normal undo by the admin (another target)
 j = run(A, opened(A, OX, RK), ORG4, people={EH("bob@example.com"): {"share": True}})
 check(one("SELECT COUNT(*) FROM office_docs WHERE org_id=? AND locked_at IS NOT NULL", (ORG4,)) == 1, "the invoice finalised in the file came along")
+# 2.666.0 (#4074 3): a time entry of the import billed since on an invoice that stays is part of its basis: the undo keeps it
+L4 = one("SELECT id FROM lists WHERE org_id=? AND name='Alpha Projekt'", (ORG4,))
+TE4 = [x[0] for x in dbx("SELECT id FROM time_entries WHERE list_id=? ORDER BY id", (L4,))]
+check(len(TE4) == 2, f"both time entries came along {TE4}")
+dbx("UPDATE time_entries SET billed_doc_id=(SELECT id FROM office_docs WHERE org_id=? AND locked_at IS NOT NULL), billed_at=? WHERE id=?",
+    (ORG4, NOW, TE4[0]))
 r = A.post(B + f"/api/imports/{(j.get('result') or {}).get('import_id')}/undo")
 check(r.ok, f"undo by the admin {r.status_code} {r.text[:160]}")
+check([x[0] for x in dbx("SELECT id FROM time_entries WHERE id IN (?,?) ORDER BY id", tuple(TE4))] == TE4[:1],
+      f"2.666.0 (#4074 3): the billed time entry stays, the other one goes {dbx('SELECT id, billed_doc_id FROM time_entries WHERE list_id=?', (L4,))}")
 # 2.593.0 (#4864): ... but the invoice that came finalised, with its client
 FIN4 = [x[0] for x in dbx("SELECT id FROM office_docs WHERE org_id=? AND locked_at IS NOT NULL", (ORG4,))]
 check(counts(ORG4) == {"lists": 0, "office_docs": 1, "clients": 1, "hub_absences": 0, "time_sheets": 0} and len(FIN4) == 1,

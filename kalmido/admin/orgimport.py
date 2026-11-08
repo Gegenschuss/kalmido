@@ -474,6 +474,10 @@ def oi_undo(c, uid, cr, since, plan):
         table, rid, space = item
         if not plan.goes(table, rid):
             continue
+        if table == "time_entries":  # 2.666.0 (#4074 3): a time entry billed on an invoice that stays is part of its basis and
+            b = c.execute("SELECT billed_doc_id FROM time_entries WHERE id=?", (rid,)).fetchone()  # stays (as acctimport umz_undo)
+            if b and b["billed_doc_id"] and not plan.goes("office_docs", b["billed_doc_id"]):
+                continue
         col = (space_cols.get(table) or (None,))[0]
         # 2.593.0 (#4864): a document imported as finalised never goes (umz_undoplan._keep_final); the release stays for what
         # a delete here sets null on a finalised document, the condition is the second guard of the plan
