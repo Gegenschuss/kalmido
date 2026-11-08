@@ -63,10 +63,11 @@ KNOWN = {
 
 
 def emitters(files):
-    """attribute -> files that write data-<attribute>= (exactly that name, not data-<attribute>-more)."""
+    """attribute -> files that write data-<attribute>= (exactly that name, not data-<attribute>-more). 2.670.0 (#4576): an
+    attribute selector ('[data-x="v"]', a file that only looks for the element, e.g. tourmods.js) writes nothing."""
     out = {}
     for n, t in files.items():
-        for a in set(re.findall(r"(?<![a-z0-9-])data-([a-z][a-z0-9-]*)=", t)):
+        for a in set(re.findall(r"(?<![a-z0-9\[-])data-([a-z][a-z0-9-]*)=", t)):
             out.setdefault(a, set()).add(n)
     return out
 

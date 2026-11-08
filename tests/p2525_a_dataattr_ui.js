@@ -32,6 +32,11 @@ check(r.status === 1 && /a\.js:1: data-zz is emitted by b\.js/.test(r.stdout), '
 fs.writeFileSync(path.join(tmp, 'static', 'js', 'a.js'), "// one-meaning guard: data-zz\ndocument.addEventListener('click', e => {\n  const b = e.target.closest('[data-zz]'); if (!b) return;\n});\n");
 r = spawnSync('python3', [path.join(tmp, 'tools', 'check_dataattr.py')], {encoding: 'utf8'});
 check(r.status === 1 && /add it to KNOWN/.test(r.stdout), 'an attribute missing in KNOWN is a finding even with the marker');
+// 2.670.0 (#4576): a file that only looks for the element with an attribute selector writes nothing (the introductions' steps)
+fs.writeFileSync(path.join(tmp, 'static', 'js', 'a.js'), "document.addEventListener('click', e => {\n  const b = e.target.closest('[data-zz]'); if (!b) return;\n});\n");
+fs.writeFileSync(path.join(tmp, 'static', 'js', 'b.js'), "const el = () => document.querySelector('#view [data-zz=\"new\"], [data-zz]');\n");
+r = spawnSync('python3', [path.join(tmp, 'tools', 'check_dataattr.py')], {encoding: 'utf8'});
+check(r.status === 0, 'an attribute selector in another file is no second meaning: ' + r.stdout);
 fs.rmSync(tmp, {recursive: true, force: true});
 
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});

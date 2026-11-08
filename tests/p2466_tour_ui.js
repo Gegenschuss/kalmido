@@ -48,7 +48,8 @@ const step = d => d.querySelector('.tour')?.dataset.step || '';
   // first opening of an area: its introduction, once
   w.location.hash = 'cal';
   check(await until(() => step(d) === 'cal1'), 'the Calendar opens with its introduction');
-  check(w.eval('TOUR.steps.length') >= 2 && w.eval('TOUR.steps.length') <= 4, '2-4 steps');
+  // 2.670.0 (#4576): about seven steps per area (5-8, was 2-4); jsdom lays nothing out, so the steps marked opt are left out here
+  check(w.eval('TOUR.steps.length') >= 5 && w.eval('TOUR.steps.length') <= 8, '5-8 steps: ' + w.eval('TOUR.steps.length'));
   check(await until(async () => (await set()).tours_seen === 'cal'), 'remembered in tours_seen');
   await toLast(w, d);
   check(d.querySelector('.tour #t-more')?.checked === true, 'the last card of an area has the tick too');

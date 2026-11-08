@@ -615,8 +615,9 @@ function tourSteps() {
 }
 // 2.466.0 (#3314): the short introduction of an area: once, the first time the area opens (tours_seen, per account), never
 // for a child, a second window or after "Show more introductions" is unticked; the welcome tour goes first. Restart: Settings > Help.
-// A step without a target (or with its target not on the screen) shows its card in the middle.
-const TOUR_AREAS = ['cal', 'office', 'time', 'review', 'life', 'reading', 'ablage', 'wiki', 'sheets', 'habits', 'agents'];  // the steps: tourmods.js, loaded on the first use
+// A step without a target (or with its target not on the screen) shows its card in the middle; 2.670.0 (#4576): a step marked opt
+// whose button the page does not show is left out (tourmods.js tourModSteps).
+const TOUR_AREAS = ['cal', 'office', 'time', 'review', 'life', 'reading', 'ablage', 'wiki', 'sheets', 'habits', 'agents', 'notes', 'team'];  // the steps: tourmods.js, loaded on the first use; 2.670.0 (#4576): + Notes, Chat
 const toursSeen = () => (S.settings.tours_seen || '').split(',').filter(Boolean);
 const tourModBlocked = () => TOUR.on || !S.me || S.me.kid || S.settings.tour === 'pending' || S.settings.tours_more === '0' || MW_ON || S.capturePage || S.sel || S.route?.task || !!$('.modal');
 function tourModAuto() {
@@ -713,7 +714,7 @@ function tourGo(i) {
   const card = $('.tcard', el), ring = $('.tring', el);
   el.dataset.step = st.id; el.dataset.sel = st.sel || '';
   card.innerHTML = `<div class="tstep"><span>${TOUR.i + 1}/${n}</span><span class="tdots">${TOUR.steps.map((_, j) => `<i class="${j === TOUR.i ? 'on' : j < TOUR.i ? 'past' : ''}"></i>`).join('')}</span></div>
-    <h3>${TOUR.i === 0 && !TOUR.mod ? tourHiFig() : ''}${esc(tr(st.t, ...(st.targs || [])))}</h3><p>${esc(tr(st.d, ...(st.args || []))).replace(/!(\p{L})/gu, '!\u2060$1')}</p>
+    <h3>${TOUR.i === 0 && !TOUR.mod ? tourHiFig() : ''}${esc(st.tx ? st.t : tr(st.t, ...(st.targs || [])))}</h3><p>${esc(st.tx ? st.d : tr(st.d, ...(st.args || []))).replace(/!(\p{L})/gu, '!\u2060$1')}</p>
     ${last && TOUR.sample && !TOUR.sampleSent ? `<label class="tsample"><input type="checkbox" id="t-sample" ${TOUR.sampleOn ? 'checked' : ''}><span><b>${tr('Create a sample project')}</b><small>${TOUR.industry === 'film' ? tr('A small video production with dates, dependencies and a packing list. Remove it any time under Settings > Data.') : tr('A small client project with dates, dependencies and a checklist. Remove it any time under Settings > Data.')}</small></span></label>${S.industry?.can_set && S.industry.choices?.length ? `<label class="tsample tind"><span><b>${tr('Industry')}</b><small>${tr('Film & Video adds the shoot calculation and the image film as sample. Change it any time under Settings > General.')}</small></span><select id="t-industry">${indOpts(S.industry, TOUR.industry)}</select></label>` : ''}` : ''}
     ${last && !TOUR.mod && (S.agents || []).length ? pk2_setupHtml() : ''}
     ${last && !S.me?.kid ? `<label class="tsample"><input type="checkbox" id="t-more" ${TOUR.more ? 'checked' : ''}><span><b>${tr('Show more introductions')}</b></span></label>` : ''}
