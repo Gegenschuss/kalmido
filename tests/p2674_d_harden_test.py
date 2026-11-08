@@ -264,8 +264,9 @@ AG, AGH = r.json()["id"], bearer(r.json()["token"])
 r = A.post(B + "/api/admin/agents", json={"scopes": ["read"], "username": "leser", "display_name": "Leser", "org_id": ORG})
 RO, ROH = r.json()["id"], bearer(r.json()["token"])
 L = A.post(B + "/api/lists", json={"name": "Projekt 2674"}).json()["id"]
-for u_, role in ((uid["bob"], "edit"), (AG, "edit"), (RO, "edit")):
-    check(A.put(B + f"/api/lists/{L}/members", json={"user_id": u_, "role": role}).ok, f"7: share the project with {u_}")
+for u_, role in ((uid["bob"], "edit"), (AG, "edit"), (RO, "view")):
+    r = A.put(B + f"/api/lists/{L}/members", json={"user_id": u_, "role": role})
+    check(r.ok, f"7: share the project with {u_} as {role} ({r.status_code} {r.text[:200]})")
 A.patch(B + f"/api/lists/{L}", json={"agent_members": False})
 TID = A.post(B + "/api/tasks", json={"title": "Aufgabe 2674", "list_id": L}).json()["id"]
 r = requests.post(V + "/agent/jobs", headers=AGH, json={"title": "Arbeit", "task_id": TID})
