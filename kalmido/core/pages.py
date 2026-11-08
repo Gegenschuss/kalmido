@@ -240,7 +240,13 @@ def too_large(_):  # json, not flask's html page (the client treats html as "ses
 
 @app.get("/")
 def index():
-    return index_page()
+    r = index_page()
+    # 2.742.0 (#4858): the right half of the split view (static/js/splitview.js) is this page in an iframe of the app itself:
+    # only /?mini=1&split=1 may be framed, and only by a page of the same origin (no other site, every other page stays DENY)
+    if request.args.get("mini") == "1" and request.args.get("split") == "1":
+        r.headers["Content-Security-Policy"] = CSP.replace("frame-ancestors 'none'", "frame-ancestors 'self'")
+        r.headers["X-Frame-Options"] = "SAMEORIGIN"
+    return r
 
 
 @app.get("/capture")

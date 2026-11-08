@@ -599,7 +599,7 @@ async function evCalsModal() {
     if (sm) {
       const key = sm.dataset.cvxmenu;
       menu(sm, [{label: tr('Only this calendar'), icon: 'eye', fn: async () => { await cvxOnly(key); draw(); }},
-        {label: tr('Show all calendars'), icon: 'all', fn: async () => { await cvxAll(); draw(); }}, '-',
+        {label: tr('Show all calendars'), icon: 'all', fn: async () => { await cvxAll(); draw(); }}, ...(typeof spl_item === 'function' ? spl_item('#cal') : []) /* 2.742.0 (#4858) */, '-',
         {label: tr('Subscriptions…'), icon: 'gear', sub: tr('Settings > Integrations > Calendars'), fn: () => { md.remove(); settingsModal('calendars'); }}]);
       return;
     }

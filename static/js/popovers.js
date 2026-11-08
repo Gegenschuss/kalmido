@@ -922,6 +922,7 @@ function taskMenu(anchor, id, o = {}) {
     ...ow_menuItems(t),  // 2.392.0 C (#3370)
     ...dv_menuItems(t),  // 2.392.2 (#3365): park, waiting for, clear
     ...(typeof mw_ok === 'function' && mw_ok() && t.id > 0 ? [{label: tr('Open in its own window'), icon: 'panel', fn: () => mw_taskOpen(id)}] : []),  // 2.43.0 (#1500)
+    ...(t.id > 0 && typeof spl_item === 'function' ? spl_item('#t/' + id) : []),  // 2.742.0 (#4858): the split view's right half
     ...(typeof tbl_menuItems === 'function' ? tbl_menuItems(t, anchor) : []),  // 2.53.0 C (#1424): the bell of this task
     '-',
     {label: tr('Save as template'), icon: 'copy', fn: () => saveTemplate({task_id: id}, t.title), ...(listById(t.list_id)?.e2e ? {dis: true, title: tr('Not available in encrypted projects')} : {})},  // 2.64.1 (#1817)

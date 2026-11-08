@@ -399,7 +399,7 @@ function wk_nodeItems(nid, anchor) {  // the menu of a folder / a page (the row'
       ...share({space: x.sp, path: f.path, folder: true}), '-', {label: tr('Move to the trash'), icon: 'trash', cls: 'flag-5', fn: () => wk_fTrash(x.sp, f)}];
   }
   const p = {...x.page, space: x.sp};
-  return [{label: tr('Open'), icon: 'note', fn: () => go('wiki/' + p.id)}, ...fv2_menuRow('r:wiki:' + p.id) /* 2.441.0 (#3592) */, {label: tr('Rename…'), icon: 'edit', fn: () => wk_rename(p)},
+  return [{label: tr('Open'), icon: 'note', fn: () => go('wiki/' + p.id)}, ...(typeof spl_item === 'function' ? spl_item('#wiki/' + p.id) : []) /* 2.742.0 (#4858) */, ...fv2_menuRow('r:wiki:' + p.id) /* 2.441.0 (#3592) */, {label: tr('Rename…'), icon: 'edit', fn: () => wk_rename(p)},
     {label: tr('Move to…'), icon: 'arrow', fn: () => wk_moveTo(nid, anchor)}, ...share({space: x.sp, path: p.path, page_id: p.id}),
     '-', {label: tr('Move to the trash'), icon: 'trash', cls: 'flag-5', fn: () => wk_delete(p)}];
 }

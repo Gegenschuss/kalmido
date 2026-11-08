@@ -8,7 +8,7 @@
 // shows only this conversation (no sidebar, tabs, list of conversations, Back), live like any tab; the miniwin.js guards keep
 // its UI state (local preferences, settings PATCHes) to itself. Touch devices: nothing changes (no button, no middle click).
 const dw_chatOf = h => { const m = /^#(agents|team)\/(\d+)/.exec(h || ''); return m ? `${m[1]}/${+m[2]}` : ''; };
-const DW_CHAT = MW_ON ? dw_chatOf(location.hash) : '';
+const DW_CHAT = MW_ON && !MW_SPLIT ? dw_chatOf(location.hash) : '';  // 2.742.0 (#4858): the split view's right half is no chat window
 const dw_chatMini = () => !!DW_CHAT;  // agentchat.js chatFull(): the window's chat is always the full page, at any width
 function dw_chatOpen(kind, id) {
   id = +id; if (!id || !['agents', 'team'].includes(kind)) return null;

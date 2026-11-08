@@ -592,7 +592,7 @@ def wsp_clean_ws_colors(v):
 
 
 # 2.143.0 D (#2155): the keys of LOOK_KEYS (dialogs.js); the client decides what a value means, the server only bounds it
-LOOK_KEYS = ("theme", "density", "densitySide", "densityRows", "densSideV", "densRowsV", "fsize", "font", "accent", "pack", "headShow", "chatHuman", "chatAgent", "railLabels", "wkEd", "wkSt", "wkW", "ntW")  # 2.599.0 (#4808): wkW / ntW = the default page width of knowledge pages / notes  # 2.319.0 B (#3288); 2.350.0 B (#3147): wkEd = the knowledge editor; 2.371.3 (#3152): wkSt = the own reading style
+LOOK_KEYS = ("theme", "density", "densitySide", "densityRows", "densSideV", "densRowsV", "fsize", "font", "accent", "pack", "headShow", "chatHuman", "chatAgent", "railLabels", "wkEd", "wkSt", "wkW", "ntW", "split", "splW", "splR")  # 2.742.0 (#4858): split view on / right width (rem) / right route  # 2.599.0 (#4808): wkW / ntW = the default page width of knowledge pages / notes  # 2.319.0 B (#3288); 2.350.0 B (#3147): wkEd = the knowledge editor; 2.371.3 (#3152): wkSt = the own reading style
 
 
 def clean_look_pref(v):
@@ -614,6 +614,8 @@ def clean_look_pref(v):
         if k == "wkSt" and x not in ("clear", "book", "compact", "notepad"):  # 2.371.3 (#3152): a fixed choice only (a class)
             continue
         if k in ("wkW", "ntW") and x not in ("breit", "voll"):  # 2.599.0 (#4808): a fixed choice ('' / lesen = never stored)
+            continue
+        if k == "splR" and not (isinstance(x, str) and re.fullmatch(r"#[\w/:.,%-]{0,39}", x)):  # 2.742.0 (#4858): an app address only
             continue
         if isinstance(x, bool) or (isinstance(x, str) and len(x) <= 40 and x.isprintable()):
             out[k] = x

@@ -434,6 +434,7 @@ function listMenuItems(id, anchor) {
   if (teamOn() && l.shared && !l.archived && l.role !== 'participant') items.push({label: tr('Team chat'), icon: 'comment', fn: () => listChat(id)});
   if (feat('sheets') && !l.is_inbox && !l.archived && !l.e2e) items.push({label: tr('Attached tables'), icon: 'sheet', cls: 'msheets', fn: () => go('sheets/l/' + id)});  // 2.89.0 (#1916): the tables attached to it
   if (!l.archived && typeof mw_ok === 'function' && mw_ok()) items.push({label: tr('Open in its own window'), icon: 'panel', cls: 'mminiwin', fn: () => mw_open(id)});  // 2.39.1 (#1294): desktop, miniwin.js
+  if (!l.archived && typeof spl_item === 'function') items.push(...spl_item('#l/' + id));  // 2.742.0 (#4858): the split view's right half
   if (!l.is_inbox && !l.archived) items.push({label: tr('Move to folder…'), icon: 'folder', fn: () => folderPick(at(), id)});
   if (!l.is_inbox && !l.archived && !S.listReorder && typeof listReorderSet === 'function') items.push({label: tr('Sort projects'), icon: 'sort', cls: 'mlsort', fn: () => listReorderSet(true)});  // 2.482.0 (#3951): the sort mode of sidebar + Projects page
   // 2.116.0 C (#2064): the list as a CSV file / a printable page (listprint.js); a list with the lock has only ciphertext on the server
@@ -1379,7 +1380,7 @@ function orphWire(md) {
   });
 }
 // Settings > Appearance: all per-device visual settings, applied instantly (no Save), with a live preview
-const LOOK_KEYS = ['theme', 'density', 'densitySide', 'densityRows', 'densSideV', 'densRowsV', 'fsize', 'font', 'accent', 'pack', 'headShow', 'chatHuman', 'chatAgent', 'railLabels', 'wkEd', 'wkSt', 'wkW', 'ntW'];  // 2.599.0 (#4808): the default page width of knowledge pages / notes (chat.js pgw_*)  // 2.371.3 (#3152): the own reading style of knowledge pages  // 2.350.0 B (#3147): the knowledge editor (live preview / plain text)  // 2.319.0 B (#3288): app bar labels  // 2.233.0 C (#3196): chat colours  // 2.18.0: densSideV / densRowsV; 2.83.0 C (#1427): theme, header pictures, rings
+const LOOK_KEYS = ['theme', 'density', 'densitySide', 'densityRows', 'densSideV', 'densRowsV', 'fsize', 'font', 'accent', 'pack', 'headShow', 'chatHuman', 'chatAgent', 'railLabels', 'wkEd', 'wkSt', 'wkW', 'ntW', 'split', 'splW', 'splR'];  // 2.742.0 (#4858): the split view (miniwin.js / splitview.js): on, width of the right half (rem), its route  // 2.599.0 (#4808): the default page width of knowledge pages / notes (chat.js pgw_*)  // 2.371.3 (#3152): the own reading style of knowledge pages  // 2.350.0 B (#3147): the knowledge editor (live preview / plain text)  // 2.319.0 B (#3288): app bar labels  // 2.233.0 C (#3196): chat colours  // 2.18.0: densSideV / densRowsV; 2.83.0 C (#1427): theme, header pictures, rings
 // 2.143.0 D (#2155): the appearance follows the account (setting "look"), unless this device keeps its own (LS lookLocal).
 // Every LOOK_KEYS change (LS.set / LS.del) is sent after a short pause; a state from the server is adopted when it differs.
 let lookTimer = 0, lookApplying = false;

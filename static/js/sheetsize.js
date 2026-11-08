@@ -14,7 +14,7 @@ const SHZ = {plan: null, live: null, w: {}, ro: null, el: null, ph: null, t: 0};
 const SHZ_MIN_W = 16, SHZ_MIN_H = 8, SHZ_AUTO_H = 22, SHZ_COL = 7;  // rem; SHZ_AUTO_H = the automatic frame's height (CSS)
 const shz_on = () => !isMobile();
 const shz_rem = () => parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-const shz_mini = () => typeof MW_ON !== 'undefined' && MW_ON && /^#sheets\/\d+/.test(location.hash);
+const shz_mini = () => typeof MW_ON !== 'undefined' && MW_ON && !MW_SPLIT && /^#sheets\/\d+/.test(location.hash);
 const shz_full = () => document.documentElement.classList.contains('shzfull') || shz_mini();  // the frame = the window
 // the size of a table's frame in rem ({w, h}) or null = automatic; while the grip is dragged its live size
 function shz_size(id) {

@@ -818,6 +818,8 @@ function settingsModal(focus) {
     // 2.418.0 (#3560): the editor of every area's menu and the tab bar (navmenu.js nav_pageDraw)
     nav: S.me?.kid ? '' : `<h4 id="s-nav-h">${tr('Menus')}</h4>${hint(tr('The order and the points of each menu, for you on every device. Minus hides a point (the search still finds it), Plus brings it back, drag by the grip.'))}<div id="s-navmenus"><div class="muted mhint">${tr('Loading…')}</div></div>`,
     look: `<div id="s-lookin">${lookHtml()}</div>
+      ${typeof spl_offer === 'function' && spl_offer() ? `<h4 id="s-split-h">${tr('Split view')}</h4><div class="row">${chk('s-split', LS.get('split', false) === true, tr('A second view of the app on the right'))}</div>
+      ${hint(tr('Only on a wide screen: “Open on the right” in the menu of a project, task, document, knowledge page or calendar shows it there. The grip between the two halves changes their widths.'))}` : '' /* 2.742.0 (#4858): miniwin.js spl_offer, splitview.js */}
       <h4 id="s-wacc-h">${tr('Colour of the workspace')}</h4><div class="row">${chk('s-wacc', s.ws_accent !== '0', tr('Interface in the colour of the workspace'))}</div>
       ${hint(tr('Main buttons, the active navigation, ticks, progress and focus take the colour of the workspace shown; Private keeps the accent colour. In “All workspaces” tasks and lists show the colour of their workspace, everything else the accent colour. Off: always the accent colour.')) /* 2.490.0 B (#4026) */}
       <h4 id="s-lemo-h">${tr('New projects')}</h4><div class="row">${chk('s-lemo', s.list_emoji !== '0', tr('Suggest icons for new projects'))}</div>
@@ -1221,6 +1223,10 @@ function settingsModal(focus) {
   if (S.me) { tfaWire(md); tokWire(md); apwWire(md); e2eWire(md); }  // 2.42.0 (#828): + end-to-end encryption
   if (S.me?.is_admin) oidcWire(md);
   if (S.me?.is_admin) { aaWire(md); bkWire(md); orphWire(md); }
+  md.addEventListener('change', e => {  // 2.742.0 (#4858): the split view (miniwin.js spl_check mounts / unmounts the right half)
+    if (e.target.id !== 's-split') return;
+    setLocal(tr('Split view'), () => LS.get('split', false) === true, v => { LS.set('split', v); const c = $('#s-split'); if (c) c.checked = v; spl_check(); }, e.target.checked);
+  });
   md.addEventListener('change', e => { if (e.target.id === 's-mdpen') { LS.set('mdPenOnly', e.target.checked); if (S.sel) renderDetail(); } });  // 2.40.0 (#1203): this device
   md.addEventListener('change', async e => {
     if (e.target.id !== 's-wpdev') return;

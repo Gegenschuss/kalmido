@@ -359,7 +359,7 @@ async function cvxAll() {
 function cvxTlMenu(anchor, key, name) {
   menu(anchor, [{label: tr('Hide this calendar'), icon: 'eyeoff', fn: () => cvxTlHide(key, name)},
     {label: tr('Only this calendar'), icon: 'eye', fn: () => cvxOnly(key)},
-    {label: tr('Show all calendars'), icon: 'all', fn: cvxAll}, '-',
+    {label: tr('Show all calendars'), icon: 'all', fn: cvxAll}, ...(typeof spl_item === 'function' ? spl_item('#cal') : []) /* 2.742.0 (#4858) */, '-',
     {label: tr('Calendars…'), icon: 'cal', fn: evCalsModal}]);
 }
 // Today: the "…" of "Events today" switches single calendars off / on in this block only

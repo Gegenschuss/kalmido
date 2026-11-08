@@ -1097,7 +1097,7 @@ function dc_selToggle(id) {  // 2.430.0 (#3582): tick / untick one card; the fir
 // with it), Open, favourite; while choosing runs a long press ticks the card; the click that ends the press does not open it (multisel.js)
 function dc_cardMenu(r) {
   const id = +r.dataset.dco, d = (DC.docs || []).find(x => x.id === id); if (!d) return false;
-  menu(r, [...cm_selHead(d.sender?.name || d.name, () => dc_selToggle(id)), {label: tr('Open'), icon: 'eye', fn: () => dc_open(id)}, ...fv2_menuRow('doc:' + id)]);
+  menu(r, [...cm_selHead(d.sender?.name || d.name, () => dc_selToggle(id)), {label: tr('Open'), icon: 'eye', fn: () => dc_open(id)}, ...(typeof spl_item === 'function' ? spl_item('#docs/' + id) : []) /* 2.742.0 (#4858) */, ...fv2_menuRow('doc:' + id)]);
   return true;
 }
 if (typeof cm_bind === 'function') {

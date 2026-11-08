@@ -34,6 +34,7 @@ function bootDone() {
   if (fdList('fdf').length) setTimeout(() => toast(tr('Unsaved input of a dialog was kept: open the dialog again to finish it')), 1500);
   // 2.145.0 B (#2424): an own window (miniwin.js) shows one list / task / chat: no other servers, no suggestions, no push housekeeping
   if (!MW_ON) setTimeout(msvvBoot, 0);  // 2.73.0 C (#661): the other servers (msvview.js), after the own state
+  if (!MW_ON) setTimeout(spl_check, 0);  // 2.742.0 (#4858): the split view's right half, when it is on (miniwin.js)
   setTimeout(chatFabDraw, 0);  // 2.29.0 (#363)
   if (LS.get('after2fa', false)) { LS.set('after2fa', false); setTimeout(() => settingsModal('account'), 400); }  // 2.22.0 (#697)
   { const rs = LS.get('rsToast', ''); if (rs) { LS.del('rsToast'); setTimeout(() => loadModule('settings').then(() => rs_after(rs)).catch(() => {}), 600); } }  // 2.593.0 (#4590): after a reset of the settings: the message with Undo (setreset.js)

@@ -17847,6 +17847,12 @@
   "Only changes of others": "Solo cambios de otros",
   "Select the bank account this statement belongs to": "Elige la cuenta bancaria de este extracto",
   "Import CSV files on their own when you select a bank account: XML and MT940 statements name their account themselves": "Importa los archivos CSV por separado si eliges una cuenta bancaria: los extractos XML y MT940 indican su cuenta ellos mismos",
+  "Open on the right": "Abrir a la derecha",
+  "Split view": "Vista dividida",
+  "A second view of the app on the right": "Una segunda vista de la app a la derecha",
+  "Only on a wide screen: “Open on the right” in the menu of a project, task, document, knowledge page or calendar shows it there. The grip between the two halves changes their widths.": "Solo en una pantalla ancha: «Abrir a la derecha» en el menú de un proyecto, una tarea, un documento, una página de conocimiento o un calendario lo muestra allí. El asa entre las dos mitades cambia sus anchos.",
+  "Width of the right half": "Ancho de la mitad derecha",
+  "Right half": "Mitad derecha",
   "Copy text": "Copiar texto",
   "Copy the recognised text": "Copiar el texto reconocido",
   "Column widths of the lists": "Anchos de columna de las listas"
