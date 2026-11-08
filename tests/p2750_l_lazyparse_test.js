@@ -44,6 +44,7 @@ const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL
   await new Promise(r => setTimeout(r, 20));
   check(!w.document.querySelector('script[data-ld="mod3"]'), '#5307: parsed but before DOMContentLoaded (a defer start script): no tag yet');
   w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
+  w.eval('domLoaded = true');  // core.js's own once-listener did that at the real event
   await new Promise(r => setTimeout(r, 20));
   check(!!w.document.querySelector('script[data-ld="mod3"]'), '... DOMContentLoaded: now the tag is there');
   // a page already parsed: the tag comes at once (no wait)
