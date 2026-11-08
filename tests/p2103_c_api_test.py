@@ -396,25 +396,12 @@ except Exception:  # noqa: BLE001 -- the foreign key violation
 
 # the schema rule: every *_id column of schema.py has a key or the marker "no FK" (the columns of 2.102 are the frozen
 # list p2103_c_fk_legacy.txt: it may only shrink)
+# 2.755.0 (#5261): the rule lives in tools/check_fk_comment.py (a lint step); the suite calls the same logic
 SCHEMA_PY = os.path.join(N, "..", "kalmido", "core", "schema.py")
 if os.path.exists(SCHEMA_PY):
     sys.path.insert(0, os.path.join(N, "..", "tools"))
-    from check_migrations import schema_src
-    src = schema_src(os.path.join(N, ".."))  # 2.475.0 (#3478): + migrations.d
-    legacy = {ln.strip() for ln in open(os.path.join(N, "p2103_c_fk_legacy.txt"), encoding="utf-8") if ln.strip() and not ln.startswith("#")}
-    sch = "\n".join(re.findall(r'SCHEMA = """(.*?)"""', src, re.S))
-    bad = []
-    for t in re.finditer(r"((?:--[^\n]*\n)*)CREATE TABLE IF NOT EXISTS (\w+) \((.*?)\);", sch, re.S):
-        if "no FK" in t.group(1):
-            continue
-        for line in t.group(3).split("\n"):
-            for col in re.findall(r"(\w+_id) BIGINT(?! GENERATED)([^,]*)", line):
-                if "REFERENCES" not in col[1] and "PRIMARY KEY" not in col[1] and "no FK" not in line and f"{t.group(2)}.{col[0]}" not in legacy:
-                    bad.append(f"{t.group(2)}.{col[0]}")
-    for line in src.split("\n"):
-        m = re.match(r'\s*\("(\w+)", "(\w+_id)", "ALTER TABLE \w+ ADD COLUMN \w+ BIGINT([^"]*)"\)', line)
-        if m and "REFERENCES" not in m.group(3) and "no FK" not in line and f"{m.group(1)}.{m.group(2)}" not in legacy:
-            bad.append(f"{m.group(1)}.{m.group(2)}")
+    from check_fk_comment import findings as fk_findings
+    bad = fk_findings(os.path.join(N, ".."))
     check(not bad, f"#2174: every new *_id column has REFERENCES or a 'no FK' comment: {bad}")
 
 print(f"p2103_c_api: {OKS[0]} ok, {len(FAILS)} failed")

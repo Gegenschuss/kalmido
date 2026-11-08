@@ -1,4 +1,4 @@
-# 2.152.0 (#2174): the *_id columns of schema.py without a foreign key as of 2.147.1 (frozen; tests/p2103_c_api_test.py).
+# 2.152.0 (#2174): the *_id columns of schema.py without a foreign key as of 2.147.1 (frozen; tools/check_fk_comment.py, 2.755.0 #5261).
 # This list may only shrink: a new *_id column gets REFERENCES ... ON DELETE ... or a comment with "no FK: <reason>".
 activity.user_id
 agent_bridges.by_id

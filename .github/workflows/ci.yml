@@ -252,6 +252,10 @@ jobs:
         run: python tools/check_trh.py
       - name: Every table with people's data is exported or named (2.362.4, #3107)
         run: python tools/check_export_tables.py
+      - name: Every new *_id column has a foreign key or a 'no FK' marker (2.755.0, #5261)
+        run: python tools/check_fk_comment.py
+      - name: No check in tests/ that cannot fail (2.755.0, #5261)
+        run: python tools/check_nosham.py
       - name: Translations complete
         run: |
           python tools/i18n_check.py

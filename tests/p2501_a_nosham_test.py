@@ -3,12 +3,12 @@
 """2.501.0 (#4296): no silent green. Static, no container (the run_all.sh case runs the real script with a stubbed docker and suites).
  - tests/*: no check that cannot fail (`check(True`, `.ok or True`, `else True,` in a check, `|| true,`, `: true, '...'`); the ones
    with a reason stand in ALLOWED with it. A status list that takes success and refusal (`in (201, 409)`) is frozen: MIXED_OLD
-   may only shrink, a new one fails here. A check that passes either way says nothing.
+   may only shrink, a new one fails here. A check that passes either way says nothing. 2.755.0 (#5261): these rules live in
+   tools/check_nosham.py (lint), called from here
  - the Firefox question lives in tests/ff.js only; without Firefox a check fails, KALMIDO_SKIP_FIREFOX=1 gives a skip line
  - tests/run_all.sh writes SKIPPED / PARTLY SKIPPED suites before its last line, which stays what a test runner reads
 usage: p2501_a_nosham_test.py"""
 import os
-import re
 import shutil
 import stat
 import subprocess
@@ -18,39 +18,10 @@ import tempfile
 from kt import FAILS, OKS, check
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ME = os.path.basename(__file__)
-SHAM_PY = re.compile(r"\bcheck\(True\b|\bor True\b|\belse True\s*,")
-SHAM_JS = re.compile(r"\bcheck\(true\b|\|\|\s*true\s*,|\bcheck\([^;]*\?[^;:]*:\s*true\s*,\s*['\"`]")
-MIXED = re.compile(r"status_code in \((?=[^)]*\b2\d\d\b)(?=[^)]*\b[34]\d\d\b)[^)]*\)")
-# (file, a piece of the line): the check can fail or the line is no check, and why
-ALLOWED = {
-    ("api_v1_test.py", 'check(True, "spec valid")'): "after validate(spec), which raises; the except branch fails",
-    ("p2103_c_api_test.py", 'check(True, "")'): "counts the expected foreign key error; the try fails with check(False)",
-    ("p2154_b_ubl_test.py", 'check(True, "")'): "counts the expected BadInput; the try fails with check(False)",
-    ("p248_b_unit_test.py", 'check(True, "")'): "counts the expected RuleError; the try fails with check(False)",
-    ("p2191_f2_i18nrobust_test.py", "check(True, "): "counts the expected error; the try fails with check(False)",
-    ("pg_layer_test.py", "check(True, "): "counts the expected exception; the try fails with check(False)",
-    ("webpush_test.py", 'check(True, "")'): "after verify(), which raises; the except branch fails",
-    ("usage_hook_test.py", 'check(True, "released again'): "StateLock raises when it is not released",
-    ("backup_test.py", "== code if code else True"): "not a check of its own: the code is compared when the case names one",
-    ("p290_c_api_test.py", "if due30.month != d30.month else True"): "only a due date in another month has this rule",
-    ("p2239_d_aufbewahrung_test.py", "list_purge(c, {LID}, None)[0] is None or True"): "a line of Python for the container, it only prints",
-    ("p21481_c_api_test.py", "push.ntfy = lambda"): "a stub that returns true, no check",
-    ("p2641_c_weekly_test.py", 'check(True, f"safe_path refuses {bad}")'): "counts the expected ValueError; the try fails with check(False)",  # 2.663.0 (#4341)
-}
-# 2.501.0 (#4296): the old ones, one by one into real checks (task in the job's result); (file, status codes)
-# 2.663.0 (#4341): emptied - every old list now names the one right code (or < 500 where only 'no crash' is meant)
-MIXED_OLD = set()
-
-
-def sham(fn, line):
-    """The reason a line is a check that cannot fail, or None."""
-    rx = SHAM_JS if fn.endswith(".js") else SHAM_PY
-    code = re.sub(r"(^|\s)(#|//)\s.*$", "", line)  # a comment may quote the old form
-    if not rx.search(code):
-        return None
-    return None if any(f == fn and piece in line for f, piece in ALLOWED) else line.strip()[:110]
-
+# 2.755.0 (#5261): the static rules (sham, MIXED, ALLOWED, MIXED_OLD, Firefox asked for itself) live in tools/check_nosham.py,
+# a lint step; this suite calls the same logic and keeps the parts that need node / bash
+sys.path.insert(0, os.path.join(HERE, "..", "tools"))
+from check_nosham import file_findings, findings, sham  # noqa: E402
 
 # the rules themselves: red on the old forms, quiet on real checks
 for bad in ('assert r.ok or True', 'check(x == 1 if y else True, "z")', 'check(True, "z")'):
@@ -59,24 +30,11 @@ for bad in ("check(/a/.test(t) || true, 'z');", "check(true, 'z');", "check(a ? 
     check(sham("x_ui.js", bad), f"self check: {bad} is found")
 for good in ('check(r.ok, "z")', 'check(a == 1 if b else c == 2, "z")', '# or True in a comment'):
     check(not sham("x_test.py", good), f"self check: {good} stays quiet")
-
-names = sorted(f for f in os.listdir(HERE) if f.endswith((".py", ".js")) and f != ME)
-mixed_now = set()
-for fn in names:
-    src = open(os.path.join(HERE, fn), encoding="utf-8", errors="replace").read()
-    for no, line in enumerate(src.split("\n"), 1):
-        s = sham(fn, line)
-        check(not s, f"{fn}:{no}: a check that cannot fail: {s} - make it a real one, or name the reason in {ME} ALLOWED")
-        for m in MIXED.finditer(line):
-            codes = re.search(r"\((.*)\)", m.group(0)).group(1)
-            mixed_now.add((fn, codes))
-            check((fn, codes) in MIXED_OLD, f"{fn}:{no}: status_code in ({codes}) passes on success and on refusal - say which one is right")
-    if fn.endswith(".js") and fn != "ff.js":
-        check("execFileSync('firefox'" not in src and "spawnSync('firefox'" not in src, f"{fn}: asks for Firefox itself, without it nothing would fail: use tests/ff.js (firefox or noFirefox)")
-for f, c in sorted(MIXED_OLD - mixed_now):
-    check(False, f"{ME} MIXED_OLD: {f} ({c}) is gone - take the line out, the list only shrinks")
-for f, piece in ALLOWED:
-    check(os.path.exists(os.path.join(HERE, f)) and piece in open(os.path.join(HERE, f), encoding="utf-8").read(), f"{ME} ALLOWED: {f} {piece!r} is gone - take the line out")
+check(file_findings("x_test.py", "check(r.status_code in (202, 403), 'z')"), "self check: a status list of success and refusal is found")
+check(not file_findings("x_test.py", "check(r.status_code in (200, 201), 'z')"), "self check: two success codes stay quiet")
+check(file_findings("x_ui.js", "execFileSync('firefox', ['-v'])"), "self check: a test that asks for Firefox itself is found")
+for x in findings(os.path.join(HERE, "..")):
+    check(False, x)
 
 # ---- Firefox missing: red; KALMIDO_SKIP_FIREFOX=1: a skip line. With a PATH that has no firefox, the real ff.js
 NODE = shutil.which("node")
