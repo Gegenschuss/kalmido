@@ -300,7 +300,9 @@ def dv_receipt_rows(c, oid, d_from, d_to, st, s):
     gegen = dv_counter(st)
     opened = []  # 2.610.0 (#4932): the receipts a strict year leaves out are named as a hint, not left out silently
     receipts = bk_receipts_basis(c, oid, d_from, d_to, by="doc", open_=opened)  # 2.603.0 (#4927): a year "bank and cash": only receipts with their line
-    taken = _dv_meals(c, oid, d_from, d_to, s)[1]  # 2.386.0 (#2328): the receipt of a meal's bank line: the meal books it
+    # 2.386.0 (#2328): a year "bank and cash": the receipt of a meal's bank line stays out, the meal books it
+    from .euerbasis import eb_segments
+    taken = _dv_meals(c, oid, d_from, d_to, s)[1] if any(x[2] for x in eb_segments(s, d_from, d_to)) else set()
     receipts = [rc for rc in receipts if rc["node_id"] not in taken] if taken else receipts
     own = dv_supplier_accounts(c, oid, st, [rc["node_id"] for rc in receipts])  # 2.148.0 D (#2458)
     own.update(dict.fromkeys(cc_dv_nodes(c, oid), dv_card_account(st)))  # 2.444.0 (#3447): paid by card: the card account, not the creditor
