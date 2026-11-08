@@ -729,11 +729,32 @@ def lr_own_ran_out(c, lids, uid):
     ids = sorted({int(x) for x in lids or () if x})
     if not ids or not uid:
         return set()
+    if has_request_context():  # 2.662.0 (p2369_6_api red after #5050): one read per request and person, not one per list
+        return lr_own_gone(c, uid) & set(ids)
+    return _lr_own_gone_q(c, uid, ids)
+
+
+def _lr_own_gone_q(c, uid, ids=None):
+    """{list id} where uid's own member share ran out (of ids; None = of every list)."""
     with _sys(c):  # the node lies in the owner's tree
         return {r[0] for r in c.execute("""SELECT n.ref_id FROM fs_nodes n JOIN fs_shares s ON s.node_id=n.id WHERE n.kind='ref'
-                                           AND n.ref_kind='list' AND n.ref_id = ANY(CAST(? AS BIGINT[])) AND s.list_own=1
-                                           AND (s.user_id=? OR s.agent_id=?) AND s.expires_at IS NOT NULL AND s.expires_at <= ?""",
-                                        (st_ids(ids), int(uid), int(uid), now_iso())).fetchall()}
+                                           AND n.ref_kind='list' AND (CAST(? AS BIGINT[]) IS NULL OR n.ref_id = ANY(CAST(? AS BIGINT[])))
+                                           AND s.list_own=1 AND (s.user_id=? OR s.agent_id=?) AND s.expires_at IS NOT NULL
+                                           AND s.expires_at <= ?""",
+                                        (*[None if ids is None else st_ids(ids)] * 2, int(uid), int(uid), now_iso())).fetchall()}
+
+
+def lr_own_gone(c, uid):
+    """2.662.0: lr_own_ran_out for the whole request -- every list of uid whose own share ran out, read once (as "system")
+    and kept in g; the start-up read of /api/state takes it in the system phase of the membership lookup (acx_warm), so
+    the list roles of the answer switch the context no more (#3139 budget)."""
+    memo = g.setdefault("lr_own_gone", {})
+    if uid not in memo:
+        memo[uid] = _lr_own_gone_q(c, uid)
+    return memo[uid]
+
+
+acx_warm_register("/api/state", lr_own_gone)
 
 
 def _lr_without_own(c, lid, uid, role, r):
