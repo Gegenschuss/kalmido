@@ -180,7 +180,8 @@ p = page(TOK2)
 fm = re.search(r'class="fform sigf">.*?name="f" value="([^"]+)".*?name="v" value="([^"]+)"', p.text, re.S)
 d = requests.post(B + "/s/q/" + TOK2, data={"f": fm.group(1) if fm else "", "v": fm.group(2) if fm else "", "name": "Kundin Example",
                                             "ok": "1", "do": "accept"}, allow_redirects=False, headers={"Accept-Language": "en"})
-check(d.status_code in (200, 302, 303) and A.get(B + f"{V}/{RID}").json().get("state") == "approved", f"the customer approves {d.status_code}")
+# 2.663.0 (#4341): the decision saved answers 303 back to the page (office/signoff.py); a 200 would be the form again with an error
+check(d.status_code == 303 and A.get(B + f"{V}/{RID}").json().get("state") == "approved", f"the customer approves {d.status_code}")
 check(media(TOK2).status_code == 404, "decided: the file is no longer handed out")
 
 # ---- a person without an organisation
