@@ -17,6 +17,28 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.731.0] - 2026-11-08
+
+Package 2.707 (Bündel: CI: ZAP-Schritt 'Start PostgreSQL' scheitert geleg).
+
+### Fixed
+- CI: the OWASP ZAP job pulls the PostgreSQL image with up to 3 tries and a growing pause before starting it, and prints the container log when the database does not start; a short registry hang no longer fails the step and holds the release. The ZAP finding itself stays a hard check. Suite p2707_zap_db_start runs the step with a stand-in docker (#5185).
+
+Package 2.715 (Bündel: CI: ZAP-Datenbank wird zu früh als bereit gemeldet).
+
+### Fixed
+- CI, job "OWASP ZAP baseline": the step "Start PostgreSQL" checks the database over TCP (pg_isready -h 127.0.0.1) instead of the socket. The postgres:17 image first runs a setup server on the socket only and restarts it; the socket check took that server as ready and the one final check then met the restart ("rejecting connections") and failed the job. The wait loop (90 s) is now the final check itself; tests/p2707_zap_db_start_test.py plays the setup server and its restart (#5187).
+
+Package 2.724 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Fixed
+- #5184: the start state no longer sends the internal organisation column of every task (row-level security of #4602); a big organisation account's start set is back under its 2 MB budget (2.02 -> 1.96 MB in p3136_state_size), the suite now prints the start set's bytes per task key.
+- #5186: test p151_ui waits until the timer ran a full second before Stop - a shorter entry is discarded as a misclick, so on a fast runner the hint of the task just tracked was missing.
+
+Package 2.730 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Fixed
+- #5195: test p2139_b_api gives its agent the scope attachments:read - a team chat file download needs it since #4382 (finding 8), the test was not pulled along; it now also checks that a token without it gets 403.
+- #5196: test p21481_d_api stubs the bookmark sync's allow list with an empty set like the real one - the http check of #4382 (finding 6) looks into it and crashed on None.
+
 ## [2.719.0] - 2026-11-08
 
 Package 2.702 (Bündel: Bilanz: Auszahlungen der Online-Zahlungen und CSV-).
@@ -89,6 +111,7 @@ Package 2.685 (Bündel: Kommentare: Aktivität in drei Stufen (nur Kommenta, Bü
 - Office: switching "Office & finance" on no longer leaves the office saying it is switched off when it loaded before the switch was saved (#5176).
 - Balance sheet: a receipt booked against the bank (counter account "bank") and paid from the cash box is now booked bank to cash instead of being left out (#5128).
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.719.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.731.0...HEAD
+[2.731.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.731.0
 [2.719.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.719.0
 [2.710.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.710.0
