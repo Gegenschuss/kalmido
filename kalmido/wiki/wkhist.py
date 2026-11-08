@@ -426,8 +426,16 @@ def wkh_settle(c, plain=None, stop=None):
                         new = _seal(key(sid), sid, ctx, v)
                     # 2.611.0 (#4865): and still in the space it was read in -- a page moved meanwhile with its text unchanged
                     # (a target that seals nothing) was sealed with the old space's key, unreadable in the new one
-                    out["changed"] += c.execute(f"UPDATE {table} SET body=? WHERE id=? AND body=? AND org_id IS NOT DISTINCT FROM ? "
-                                                "AND owner_id IS NOT DISTINCT FROM ?", (new, r["id"], v, r["org_id"], r["owner_id"])).rowcount
+                    done = c.execute(f"UPDATE {table} SET body=? WHERE id=? AND body=? AND org_id IS NOT DISTINCT FROM ? "
+                                     "AND owner_id IS NOT DISTINCT FROM ?", (new, r["id"], v, r["org_id"], r["owner_id"])).rowcount
+                    out["changed"] += done
+                    if not done and plain is not None:
+                        # 2.662.0 (#4939): the way back wrote nothing (changed meanwhile): still sealed for a space it opens = failed
+                        now = c.execute(f"SELECT org_id, owner_id, body FROM {table} WHERE id=?", (r["id"],)).fetchone()
+                        nsid = wkh_sid(now["org_id"], now["owner_id"]) if now else 0
+                        if now and nsid and oc_is_enc(now["body"] or "") and not le2e_is_cipher(now["body"]) and plain(nsid):
+                            out["failed"] += 1
+                            print("[orgcrypt] knowledge text left sealed:", table, r["id"], flush=True)
             c.commit()
             if len(rows) < WKH_BATCH:
                 break

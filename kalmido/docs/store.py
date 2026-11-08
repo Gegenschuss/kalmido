@@ -22,7 +22,7 @@ from datetime import timedelta
 from ..core.config import SECRET_KEY, ATT_DIR
 from ..core.db import insert_id, iso, now_utc
 from ..core.i18n import LANGS, N_, lang, tr
-from ..core.orgcrypt import OrgCryptError, PREFIX, oc_active, oc_dec_k, oc_enc_k, oc_key
+from ..core.orgcrypt import OrgCryptError, PREFIX, oc_active, oc_dec_k, oc_enc_k, oc_key, oc_private_on  # 2.662.0 (#4939): + oc_private_on
 from . import classify as CL
 from . import extract as EX
 from . import rules as RU
@@ -1198,8 +1198,9 @@ def _thumb_ctx(ws):
 
 
 def thumb_seal(c, ws, data):
-    """The preview of a private document sealed with the space's derived key (unchanged: encryption off, no server key)."""
-    if ws_org(ws) or not oc_active(c):
+    """The preview of a private document sealed with the space's derived key (unchanged: encryption off, no server key).
+    2.662.0 (#4939): also unchanged while private_encrypt is off (after decrypt-private no new preview is sealed again)."""
+    if ws_org(ws) or not oc_active(c) or not oc_private_on(c):
         return data
     key = _ws_key(c, ws)
     return oc_seal_k(key, 0, data, _thumb_ctx(ws)) if key else data

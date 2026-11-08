@@ -152,13 +152,15 @@ def bud_dkey(c, lid, sid, day, amount, kind, title):
     return hmac.new(key, msg, hashlib.sha256).hexdigest()[:40]
 
 
-def bud_settle(c, list_ids=None, plain=None, force_from=None, stop=None, commit=True, left=None):
+def bud_settle(c, list_ids=None, plain=None, force_from=None, stop=None, commit=True, left=None, failed=None):
     """Every budget row encrypted for the space of its list now. plain(sid) -> True: decrypt that row (the way back:
     decrypt-all / decrypt-private); force_from = a space whose key is about to go (an account / organisation is
     deleted): its rows are moved to the space they lie in now even when that one is switched off. Rows of a space that is
     not active stay as they are (like files_settle). Commits per list (commit=False: inside the caller's transaction).
     left (2.611.0, #4865): a list that gets the ids of the lists the background pass could not finish (busy, or a row changed
-    meanwhile) -- admin/orgcrypt_cli.py bud_settle_again queues them again. -> number of rows changed."""
+    meanwhile) -- admin/orgcrypt_cli.py bud_settle_again queues them again. failed (2.662.0, #4939): a list that gets
+    (table, id) of every row the way back (plain) could not open -- it changed between the read and the write and is still
+    sealed (decrypt-all / decrypt-private count them as failed). -> number of rows changed."""
     n = 0
     left = [] if left is None else left
     with system_ctx(c):  # orgcrypt: server-side bulk work over every space (no content leaves this function)
@@ -223,12 +225,25 @@ def bud_settle(c, list_ids=None, plain=None, force_from=None, stop=None, commit=
                     upd = c.execute(f"UPDATE {table} SET {', '.join(k + '=?' for k in cols)} WHERE id=? AND "
                                     + " AND ".join(f"{k} IS NOT DISTINCT FROM ?" for k in same), [sets[k] for k in cols] + [r["id"]] + [r[k] for k in same])
                     changed += 1 if upd.rowcount else 0
+                    if not upd.rowcount and plain and _bud_still_sealed(c, table, r["id"], plain):
+                        # 2.662.0 (#4939): the way back left this row sealed (it changed meanwhile) -- counted, not silent
+                        print("[orgcrypt] budget row left sealed:", table, r["id"], flush=True)
+                        if failed is not None:
+                            failed.append((table, r["id"]))
                     if not upd.rowcount and commit and not plain and force_from is None and lid not in left:
                         left.append(lid)  # 2.611.0 (#4865): changed meanwhile -- a later pass looks at the row again
         if commit:
             c.commit()  # 2.585.0 (#4836): also when nothing changed -- ends the list's FOR SHARE
             n += changed
     return n
+
+
+def _bud_still_sealed(c, table, rid, plain):
+    """2.662.0 (#4939): bud_settle's way back wrote nothing for this row (compare and set): True when it is still sealed for
+    a space the way back opens (an edit that wrote it plain meanwhile, or its deletion, is no failure)."""
+    r = c.execute(f"SELECT sid FROM {table} WHERE id=?", (rid,)).fetchone()
+    sid = int(r["sid"] or 0) if r else 0
+    return bool(sid) and bool(plain(sid))
 
 
 # ---------------------------------------------------------------- values

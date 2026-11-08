@@ -853,11 +853,13 @@ def decrypt_private(c):
         c.execute("UPDATE user_keys SET migrated_at=NULL")
     c.commit()
     st = {}
-    _bud().bud_settle(c, plain=lambda sid: sid < 0)  # 2.72.0 (#1333): budgets of private spaces plain again
-    _wkh().wkh_settle(c, plain=lambda sid: sid < 0)  # 2.123.0 A (#2105): texts of private knowledge pages plain again
+    bf = []  # 2.662.0 (#4939): budget rows the way back left sealed
+    _bud().bud_settle(c, plain=lambda sid: sid < 0, failed=bf)  # 2.72.0 (#1333): budgets of private spaces plain again
+    wk = _wkh().wkh_settle(c, plain=lambda sid: sid < 0)  # 2.123.0 A (#2105): texts of private knowledge pages plain again
     rows = _priv_rows(c, plain=lambda sid: sid < 0)  # 2.306.0 A (#2885): the journal and the private filed mails plain again
     n, bad = files_decrypt(c, all_files(c), only=lambda hid: hid is not None and hid < 0, stats=st)
-    return {"files": n, "failed": bad, "kept": st.get("kept", 0), "rows": rows}
+    bad += len(bf) + wk["failed"]  # 2.662.0 (#4939): rows left sealed fail the run like files that did not open
+    return {"files": n, "failed": bad, "kept": st.get("kept", 0), "rows": rows, "budget_failed": len(bf), "wiki_failed": wk["failed"]}
 
 
 def before_user_delete(c, uid):
@@ -891,20 +893,27 @@ def docs_thumbs_open(c):
     S = _ds()
     n = bad = 0
     for col in _thumb_cols(c):
-        with system_ctx(c):  # orgcrypt: server-side bulk work over the private documents' previews
-            rows = c.execute(f"SELECT ws, {col} AS rel FROM doc_meta WHERE ws LIKE 'u%' AND {col}<>''").fetchall()  # pg-ok: ws prefix u is case-exact
-        for r in rows:
-            p = os.path.join(ATT_DIR, r["rel"])
-            h = _head(p)
-            if not h or not oc.oc_sealed(h) or oc.oc_file_org(h) != 0:
-                continue
-            try:
-                oc.oc_reseal_file(p, S.thumb_read(c, r["ws"], p))
-                n += 1
-            except OSError as e:
-                bad += 1
-                print(TAG, "cannot open a document preview:", type(e).__name__, flush=True)
-    c.commit()
+        last = 0
+        while True:  # 2.662.0 (#4939): in portions of BATCH rows over node_id (was: every private preview at once)
+            with system_ctx(c):  # orgcrypt: server-side bulk work over the private documents' previews
+                rows = c.execute(f"SELECT node_id, ws, {col} AS rel FROM doc_meta WHERE node_id>? AND ws LIKE 'u%' AND {col}<>'' "  # pg-ok: ws prefix u is case-exact
+                                 f"ORDER BY node_id LIMIT {BATCH}", (last,)).fetchall()
+            for r in rows:
+                p = os.path.join(ATT_DIR, r["rel"])
+                same = _still(p)  # 2.662.0 (#4939): like the other passes, marked before the header is read
+                h = _head(p)
+                if not h or not oc.oc_sealed(h) or oc.oc_file_org(h) != 0:
+                    continue
+                try:
+                    if oc.oc_reseal_file(p, S.thumb_read(c, r["ws"], p), check=same):
+                        n += 1
+                except OSError as e:
+                    bad += 1
+                    print(TAG, "cannot open a document preview:", type(e).__name__, flush=True)
+            c.commit()
+            if len(rows) < BATCH:
+                break
+            last = rows[-1]["node_id"]
     return n, bad
 
 
@@ -981,8 +990,11 @@ def decrypt_all(c):
         tp = trash_pass(c, oid, False, key)  # 2.570.0 D (#4716): the copies in the office trash plain again (not emptied)
         tot["fields"] += tp["changed"]
         tot["failed"] += tp["failed"]
-    tot["fields"] += _bud().bud_settle(c, plain=lambda sid: True)  # 2.72.0 (#1333): the household budget plain again
-    tot["fields"] += _wkh().wkh_settle(c, plain=lambda sid: True)["changed"]  # 2.123.0 A (#2105): the knowledge pages plain again
+    bf = []  # 2.662.0 (#4939): budget rows / knowledge texts the way back left sealed count as failed
+    tot["fields"] += _bud().bud_settle(c, plain=lambda sid: True, failed=bf)  # 2.72.0 (#1333): the household budget plain again
+    wk = _wkh().wkh_settle(c, plain=lambda sid: True)  # 2.123.0 A (#2105): the knowledge pages plain again
+    tot["fields"] += wk["changed"]
+    tot["failed"] += len(bf) + wk["failed"]
     tot["fields"] += _priv_rows(c, plain=lambda sid: True)  # 2.306.0 A (#2885): the journal and the private filed mails plain again
     d = docs_pass(c, False)  # 2.126.0 A (#1971): the documents' values plain again
     tot["fields"] += d["changed"]
@@ -1134,10 +1146,11 @@ def oc_settle_lists(list_ids, again=0):
 OC_SETTLE_AGAIN = 4
 
 
-def bud_settle_again(c, list_ids=None, stop=None, again=0):
-    """2.611.0 (#4865): life/budget.py bud_settle of the background passes, the lists it had to leave queued again. -> rows."""
+def bud_settle_again(c, list_ids=None, stop=None, again=0, plain=None, failed=None):
+    """2.611.0 (#4865): life/budget.py bud_settle of the background passes, the lists it had to leave queued again. -> rows.
+    2.662.0 (#4939): plain / failed handed on to bud_settle (failed gets the rows the way back left sealed)."""
     left = []
-    n = _bud().bud_settle(c, list_ids=list_ids, stop=stop, left=left)
+    n = _bud().bud_settle(c, list_ids=list_ids, stop=stop, left=left, plain=plain, failed=failed)
     oc_settle_again(left, again)
     return n
 
