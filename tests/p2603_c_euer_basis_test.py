@@ -14,6 +14,8 @@ invoice 2 (595.00) paid by hand, 50.00 received without an invoice.
    (the line leaves the bookings without receipt), only the bank-paid invoice + the money received without invoice, the card
    difference warned; VAT figures (field 66, field 81) alike
  - a year with a locked month keeps its basis (409); the meal link: one meal per line (409), taken off again
+ - 2.755.0 (#5241): the input tax (field 66) where a receipts year meets a strict one: the day of the bank line decides, every
+   receipt exactly once over the years (both directions); a receipts year away from the edge keeps the document date
  - a person without an organisation (freelancer-matrix: office): the same in the personal office
 usage: p2603_c_euer_basis_test.py <datadir>"""
 import base64
@@ -339,6 +341,42 @@ def office(s, who, ws, me):
     chk, rows, miss = bx(s, f"{Y}-12-01", T0)
     check("r5-dezember.pdf" not in miss and "-47.60" in [g for t, g in rows if t in ("Receipt", "Beleg")],
           f"{who}: M2: R5 (December, paid in January) in the export and not open {miss[:400]} {rows}")
+    # ---- 2.755.0 (#5241): the input tax at the edge between the bases -- every receipt exactly once over the years.
+    # {Y - 1} receipts -> {Y} bank and cash -> {TODAY.year} receipts again (set here, the lock part below sets it once more).
+    # E1 of 20.12.{Y-1} paid on 05.01.{Y} (was in both years), E2 of 03.01.{Y} paid on 28.12.{Y-1} (was in none),
+    # E3 of 20.12.{Y} paid on 01.01. this year (was in none), E4 of 01.01. this year paid on 29.12.{Y} (was in both);
+    # E5 of 28.03.{Y-1} paid on 02.04.: a receipts year away from the edge keeps the document date (March, par. 15 UStG)
+    TY = TODAY.year
+    check(s.put(B + "/api/office/books/basis", json={"year": TY, "basis": "receipts"}).ok, f"{who}: #5241: this year by receipts")
+    e1 = doc(s, ws, "e1-dez-jan.pdf", "23.80", f"{Y - 1}-12-20", "19")
+    e2 = doc(s, ws, "e2-jan-vorab.pdf", "35.70", f"{Y}-01-03", "19")
+    e3 = doc(s, ws, "e3-dez-jan.pdf", "47.60", f"{Y}-12-20", "19")
+    e4 = doc(s, ws, "e4-jan-vorab.pdf", "59.50", f"{TY}-01-01", "19")
+    e5 = doc(s, ws, "e5-maerz-april.pdf", "11.90", f"{Y - 1}-03-28", "19")
+    r = s.post(B + O + "/bank/import", json={"text": camt([ntry("23.80", f"{Y}-01-05", "EEINS"), ntry("35.70", f"{Y - 1}-12-28", "EZWEI"),
+                                                           ntry("47.60", f"{TY}-01-01", "EDREI"), ntry("59.50", f"{Y}-12-29", "EVIER"),
+                                                           ntry("11.90", f"{Y - 1}-04-02", "EFUENF")]), "filename": "konto3.xml"})
+    check(r.status_code == 201, f"{who}: #5241: bank import {r.status_code} {r.text[:200]}")
+    tx = {t["purpose"].split()[-1]: t["id"] for t in s.get(B + O + "/bank/tx?state=all").json()["items"]}
+    for ref, nid in (("EEINS", e1), ("EZWEI", e2), ("EDREI", e3), ("EVIER", e4), ("EFUENF", e5)):
+        check(m(tx[ref], {"kind": "receipt", "id": nid}).ok, f"{who}: #5241: {ref} matched")
+
+    def vat_ids(year, period):
+        u = s.get(B + O + f"/books/ustva?year={year}&period={period}").json()
+        return {x["node_id"]: x["date"] for x in u.get("items", []) if x.get("kind") == "receipt"}
+    p0, p1, p2 = vat_ids(Y - 1, "y"), vat_ids(Y, "y"), vat_ids(TY, "y")
+    check(e1 not in p0 and p1.get(e1) == f"{Y}-01-05", f"{who}: #5241: E1 only in the strict year, on its line's day {p0.get(e1)} {p1.get(e1)}")
+    check(p0.get(e2) == f"{Y - 1}-12-28" and e2 not in p1, f"{who}: #5241: E2 in the receipts year of its line {p0.get(e2)} {p1.get(e2)}")
+    check(e3 not in p1 and p2.get(e3) == f"{TY}-01-01", f"{who}: #5241: E3 in the receipts year of its line {p1.get(e3)} {p2.get(e3)}")
+    check(p1.get(e4) == f"{Y}-12-29" and e4 not in p2, f"{who}: #5241: E4 only in the strict year {p1.get(e4)} {p2.get(e4)}")
+    check(p0.get(e5) == f"{Y - 1}-03-28" and e5 in vat_ids(Y - 1, "m03") and e5 not in vat_ids(Y - 1, "m04"),
+          f"{who}: #5241: E5 away from the edge by its document date (March) {p0.get(e5)}")
+    check(vat_ids(Y - 1, "m12").get(e2) == f"{Y - 1}-12-28" and e1 not in vat_ids(Y - 1, "m12"), f"{who}: #5241: December of {Y - 1}")
+    # the income statement of the two receipts years counts the same receipts (E2 + E5 / E3 + R5 of M2): its input tax = field 66
+    ev = {y: s.get(B + O + f"/books/euer?year={y}").json()["expense_total"]["vat"] for y in (Y - 1, TY)}
+    uv = {y: s.get(B + O + f"/books/ustva?year={y}&period=y").json()["kz"]["66"] for y in (Y - 1, TY)}
+    check(ev == uv and ev[Y - 1] == "7.60" and ev[TY] == "15.20", f"{who}: #5241: the EUeR and field 66 agree in the receipts years {ev} {uv}")
+
     # ---- a locked month keeps the basis of its year
     r = s.post(B + O + "/periods/lock", json={"through": f"{Y}-01", "confirm": f"01/{Y}"})
     check(r.ok, f"{who}: January of {Y} locked {r.text[:200]}")

@@ -61,7 +61,8 @@ from .meals import BW_SHARE, ofc_bw_booked  # 2.534.0 (#4333): the approved ente
 from ..core.serializers import csv_cell  # 2.369.5 (#2517): pulled up from functions
 from .ledger import ofx_log  # 2.369.5 (#2517): pulled up from functions
 from .years import ofc_years, ofc_years_join, ofc_years_sql  # 2.593.0 (#4891): the years with data
-from .euerbasis import EB_NORC_LABEL, eb_basis_of, eb_flows, eb_income_payment_ids, eb_segments  # 2.603.0 (#4927): the basis of the EUeR per year
+from .euerbasis import EB_NORC_LABEL, eb_basis_of, eb_flows, eb_income_payment_ids, eb_map, eb_segments  # 2.603.0 (#4927): the basis of the EUeR per year
+# 2.755.0 (#5241): eb_map -- an office that never chose "bank and cash" has no edge between two bases
 
 
 def _j(s):
@@ -125,7 +126,7 @@ def _uid_filter(uid):
 
 
 # ---------------------------------------------------------------- receipts (contract with part B)
-def bk_receipts(c, oid, frm, to, uid=None, by="paid", gaps=None, paid=None, with_undated=True, zero=False):
+def bk_receipts(c, oid, frm, to, uid=None, by="paid", gaps=None, paid=None, with_undated=True, zero=False, skip=()):
     """The receipts of office area oid in [frm, to] (ISO days, both included) ->
     [{node_id, date, amount (Decimal gross, office currency), vat_pct, net, vat, category, title, paid_at, doc_date, checked_at,
     checked_by (2.420.0 C, #3448: a person's tick, the user id)}].
@@ -139,7 +140,8 @@ def bk_receipts(c, oid, frm, to, uid=None, by="paid", gaps=None, paid=None, with
     each row then carries "src" / "ref" (the line).
     2.610.0 (#4932 review N2 / N3): with_undated=False leaves the receipts without any date out of gaps (a later segment of
     bk_receipts_basis: they were named once already); zero=True keeps the receipts without an amount as rows of amount 0
-    (instead of gaps "no_amount": the open receipts of a strict year name them too)."""
+    (instead of gaps "no_amount": the open receipts of a strict year name them too).
+    2.755.0 (#5241): skip = node ids left out before anything is counted (bk_receipts_edge: they count in a strict year)."""
     from ..docs.store import doc_opener  # 2.546.0 (#4186)
     ws = bk_ws(c, oid)
     s = office_settings(c, oid)
@@ -157,6 +159,8 @@ def bk_receipts(c, oid, frm, to, uid=None, by="paid", gaps=None, paid=None, with
                          f"{day} AS day FROM rc_receipts r JOIN doc_meta d ON d.node_id=r.node_id JOIN fs_nodes n ON n.id=r.node_id "
                          f"WHERE d.ws=? AND n.kind='file' AND n.deleted_at IS NULL AND {day}>=? AND {day}<=? ORDER BY {day}, r.node_id",
                          (ws, frm, to)).fetchall()
+    if skip:
+        rows = [r for r in rows if r["node_id"] not in skip]  # 2.755.0 (#5241)
     out, amts, opener = [], {}, {}
     for r in rows:  # 2.546.0 (#4186): the amounts first (key read once), then trash and rights of the rest in one go (fs_roles_many)
         if r["ws"] not in opener:
@@ -221,10 +225,11 @@ def bk_receipts_basis(c, oid, frm, to, by="doc", uid=None, gaps=None, open_=None
     the exports name them instead of leaving them out silently (review M2: "without a line" means no line on any day, so a
     receipt of 28.03. paid on 02.04. is not open in March; review N3: receipts without an amount as well, amount 0); prep(a, b, flows) runs before the receipts of a strict
     segment are read (the neutral export takes the entertainment receipts off their lines there, as books.bk_euer)."""
-    segs = eb_segments(office_settings(c, oid), frm, to)
-    if not any(x[2] for x in segs):
+    s = office_settings(c, oid)
+    segs = eb_segments(s, frm, to)
+    if "bank" not in eb_map(s).values():  # 2.755.0 (#5241): was "no strict year in [frm, to]" -- a receipts year next to a strict one has an edge
         return bk_receipts(c, oid, frm, to, uid=uid, by=by, gaps=gaps)
-    out, linked = [], None
+    out, linked, lines = [], None, None
     for i, (a, b, strict) in enumerate(segs):
         one = i == 0  # review N2: the receipts without any date belong to no period -- named (and counted as hidden) once
         if strict:
@@ -237,10 +242,36 @@ def bk_receipts_basis(c, oid, frm, to, by="doc", uid=None, gaps=None, open_=None
                 prep(a, b, flows)
             out += bk_receipts(c, oid, a, b, uid=uid, paid=flows["paid"], gaps=gaps, with_undated=one)
         else:
-            out += bk_receipts(c, oid, a, b, uid=uid, by=by, gaps=gaps, with_undated=one)
+            if lines is None:  # 2.755.0 (#5241): the bank / card / cash lines of every day, read once
+                lines = eb_flows(c, oid, "0001-01-01", "9999-12-31")["paid"]
+            out += bk_receipts_edge(c, oid, s, a, b, by, lines, uid=uid, gaps=gaps, with_undated=one)
     if gaps is not None and not gaps.get("no_amount"):
         gaps.pop("no_amount", None)
     return out
+
+
+def bk_receipts_edge(c, oid, s, a, b, by, lines, uid=None, gaps=None, with_undated=True):
+    """2.755.0 (#5241): the receipts of [a, b] (a segment of a receipts year) by bk_receipts(by), at the edge to a strict year
+    so that every receipt counts exactly once over the years. lines = {node id: {day, amount, src, ref}} of the bank / card /
+    cash lines of every day (eb_flows). Where the two bases meet, the day of the line decides:
+     - a receipt whose line lies in a strict year counts there (on the line's day), never here as well;
+     - a receipt whose own day (by `by`) lies in a strict year but whose line lies in [a, b] counts here, on the line's day and
+       with its amount (the strict year left it open: no line in that year).
+    Receipts without a line and the years away from an edge count as before."""
+    strict = lambda day: bool(day) and eb_basis_of(s, int(day[:4])) == "bank"  # noqa: E731
+    gone = {n for n, x in lines.items() if strict(x["day"])}
+    rows = bk_receipts(c, oid, a, b, uid=uid, by=by, gaps=gaps, with_undated=with_undated, skip=gone)
+    cand = sorted(n for n, x in lines.items() if a <= x["day"] <= b)
+    if not cand:
+        return rows
+    day = "COALESCE(NULLIF(r.paid_at, ''), d.doc_date)" if by == "paid" else "COALESCE(NULLIF(d.doc_date, ''), NULLIF(r.paid_at, ''))"
+    own = {r["node_id"]: r["day"] for r in c.execute(f"SELECT r.node_id, {day} AS day FROM rc_receipts r JOIN doc_meta d ON d.node_id=r.node_id "
+                                                      f"WHERE d.ws=? AND r.node_id IN ({','.join('?' * len(cand))})", (bk_ws(c, oid), *cand)).fetchall()}
+    moved = {n: lines[n] for n in cand if strict(own.get(n))}
+    if not moved:
+        return rows
+    extra = bk_receipts(c, oid, a, b, uid=uid, paid=moved, gaps=gaps, with_undated=False)
+    return sorted(rows + extra, key=lambda rc: (rc["date"] or "", rc["node_id"]))
 
 
 def bk_gaps_text(gaps, missing=()):
@@ -484,7 +515,8 @@ def bk_euer(c, oid, year):
     if not small:
         from .assets import ast_afa_year
         afa = ast_afa_year(c, oid, year)
-    for rc in (bk_receipts(c, oid, y0, y1, paid=flows["paid"]) if strict else bk_receipts(c, oid, y0, y1)):
+    # 2.755.0 (#5241): a receipts year at the edge to a strict one: the day of the line decides (bk_receipts_edge), as the VAT figures
+    for rc in (bk_receipts(c, oid, y0, y1, paid=flows["paid"]) if strict else bk_receipts_basis(c, oid, y0, y1, by="paid")):
         k = "c:" + rc["category"].casefold() if rc["category"] else "c:"
         x = exp.setdefault(k, {"label": rc["category"] or tr("Other"), "v": [Decimal(0)] * 3, "count": 0})
         if rc["node_id"] in afa["receipt_ids"]:
@@ -700,7 +732,9 @@ def bk_ustva(c, oid, year, period):
     kz66, missing = Decimal(0), 0
     r13 = {"eu": [Decimal(0), Decimal(0)], "other": [Decimal(0), Decimal(0)]}  # 2.545.0 (#4387): [base, tax] of 46 / 47, 84 / 85
     # 2.603.0 (#4927): the strict basis: the input tax of the receipts with a bank / card / cash line, on the line's day
-    for rc in (bk_receipts(c, oid, frm, to, paid=flows["paid"]) if strict else bk_receipts(c, oid, frm, to, by="doc")):
+    # 2.755.0 (#5241): a receipts year: by the document date as before, but at the edge to a strict year the day of the bank / card /
+    # cash line decides (bk_receipts_edge) -- every receipt gives its input tax exactly once over the years, as the exports count it
+    for rc in (bk_receipts(c, oid, frm, to, paid=flows["paid"]) if strict else bk_receipts_basis(c, oid, frm, to, by="doc")):
         if rc["rc13b"]:
             x = r13[rc["rc13b"]]
             x[0], x[1] = x[0] + rc["net"], x[1] + money(rc["net"] * dec(rc["rc13b_pct"]) / 100)
