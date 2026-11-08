@@ -17,6 +17,7 @@ freelancer-matrix: lists, tasks
  - GET /api/state/delta?lz=1 after a change in a list not loaded: lzc carries that list's new count
 usage: p3136_state_size_test.py <datadir>   (P3136_NOSTART=1 / KMT_NOSTART=1: the container runs already)"""
 import gzip
+import json
 import os
 import re
 import sys
@@ -112,6 +113,8 @@ r, raw, best = measure(Bo, "bob (organisation, 200 lists, 20.600 tasks)")
 check(r.ok, "bob: /api/state answers")
 st = r.json()
 check(len(st.get("lists", [])) >= 200, "bob: all 200 organisation lists in the start state")
+# 2.724.0 (#5184): the row-level security column org_id of #4602 (08.11.2026) came along on every task, +75 KB in bob's start set
+check(not any("org_id" in t for t in st["tasks"]), "bob: no task carries the internal org_id")
 
 full = {t["id"]: t for t in st["tasks"]}
 check("lz" not in st and len(full) == len(st["tasks"]) > 16000, "without lz=1: the whole state as before")
@@ -237,6 +240,14 @@ check(rr.ok and {t["id"] for t in rr.json()["tasks"]} == {i for i, t in ffull.it
 gid, G = freelancer(B, A, "gina")
 assert G.post(B + "/api/lists", json={"name": "Klein", "kind": "project"}).ok
 check("lz" not in G.get(B + "/api/state?lz=1&lzl=").json(), "a small account: lz=1 answers the whole state")
+# 2.724.0 (#5184): which task keys fill the start set (bytes as sent, the largest first) - the first look when the budget is red
+kb, tdef = {}, lzj.get("tdef") or {}
+for t in lzj["tasks"]:  # filled back by tdfill: a key at its tdef default did not go over the wire
+    for k, v in t.items():
+        if k in tdef and type(v) is type(tdef[k]) and v == tdef[k]:
+            continue
+        kb[k] = kb.get(k, 0) + len(json.dumps({k: v}, separators=(",", ":"))) - 1
+print("PERF bob start set by task key:", ", ".join(f"{k} {n / 1e3:.0f} KB" for k, n in sorted(kb.items(), key=lambda x: -x[1])[:12]), flush=True)
 if BUDGET_BYTES:
     check(lzraw <= BUDGET_BYTES, f"bob: start set within {BUDGET_BYTES} bytes ({lzraw})")
 sys.exit(kt.done("p3136_state_size"))
