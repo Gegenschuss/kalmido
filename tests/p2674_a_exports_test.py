@@ -124,7 +124,9 @@ def stmts(r):
 
 
 if not (os.environ.get("P2674A_NOSTART") or os.environ.get("KMT_NOSTART")):
-    r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], capture_output=True, text=True)
+    # the test containers run with TASKS_MAX_FILE_MB=1 (a request limit of 4 MB, below the JSON limit): here the default 50
+    env = dict(os.environ, EXTRA=os.environ.get("EXTRA", "") + " -e TASKS_MAX_FILE_MB=50")
+    r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=env, capture_output=True, text=True)
     assert r.returncode == 0, r.stdout + r.stderr
     time.sleep(0.8)
 s0 = requests.Session()
@@ -144,17 +146,26 @@ RA = receipt(A, f"org:{ORG}", "alpha.pdf", "119.00")
 RF = receipt(Fr, "private", "frida.pdf", "238.00")
 
 # ---------------------------------------------------------------- the JSON limit
-big = json.dumps({"title": "Zu gross", "pad": "a" * (11 * 1024 * 1024)})
+MB = 1024 * 1024
+lim = last_json(in_ct("from kalmido.core.config import app\nfrom kalmido.core.jsonlimit import jl_cap\nimport json\n"
+                      "print(json.dumps({'app': app.config['MAX_CONTENT_LENGTH'], 'plain': jl_cap('POST', '/api/tasks'), "
+                      "'v1': jl_cap('POST', '/api/v1/files')}))")) or {}
+APP, PLAIN, V1 = lim.get("app") or 0, lim.get("plain") or 0, lim.get("v1") or 0
+check(APP and PLAIN == min(10 * MB, APP) and V1 == min(28 * MB, APP), f"the limits: 10 MB for JSON, 28 MB for /api/v1/files, never above the app's {lim}")
+big = json.dumps({"title": "Zu gross", "pad": "a" * (PLAIN + MB)})
 r = A.post(B + "/api/tasks", data=big, headers={"Content-Type": "application/json"})
-check(r.status_code == 413 and "10 MB" in (r.json().get("error") or ""), f"JSON above 10 MB: 413 with the limit ({r.status_code} {r.text[:160]})")
-ok = json.dumps({"title": "Knapp drunter", "pad": "a" * (9 * 1024 * 1024)})
+check(r.status_code == 413 and f"{PLAIN // MB} MB" in (r.json().get("error") or ""), f"JSON above the limit: 413 with the limit ({r.status_code} {r.text[:160]})")
+ok = json.dumps({"title": "Knapp drunter", "pad": "a" * (PLAIN - MB)})
 r = A.post(B + "/api/tasks", data=ok, headers={"Content-Type": "application/json"})
-check(r.status_code != 413 and r.ok, f"JSON of 9 MB still goes through ({r.status_code} {r.text[:160]})")
+check(r.status_code != 413 and r.ok, f"JSON below the limit still goes through ({r.status_code} {r.text[:160]})")
 r = Fr.post(B + "/api/tasks", data=big, headers={"Content-Type": "application/json"})
 check(r.status_code == 413, f"a person without an organisation: the same limit ({r.status_code})")
-r = requests.post(B + "/api/v1/files", data=json.dumps({"name": "x.txt", "content": "a" * (12 * 1024 * 1024)}),
-                  headers={"Content-Type": "application/json", "Authorization": "Bearer kal_invalid"})
-check(r.status_code != 413, f"POST /api/v1/files keeps its larger JSON limit (no 413 for 12 MB: {r.status_code})")
+if V1 > PLAIN + MB:
+    r = requests.post(B + "/api/v1/files", data=json.dumps({"name": "x.txt", "content": "a" * (PLAIN + MB // 2)}),
+                      headers={"Content-Type": "application/json", "Authorization": "Bearer kal_invalid"})
+    check(r.status_code != 413, f"POST /api/v1/files keeps its larger JSON limit (no 413 above 10 MB: {r.status_code})")
+else:
+    print(f"note: the request limit of this container ({APP // MB} MB) leaves no room above the JSON limit; the larger limit is checked by its value")
 out = in_ct("from kalmido.core.config import app\nfrom kalmido.core.jsonlimit import JSON_BIG\nimport json\n"
             "have = {(m, r.rule) for r in app.url_map.iter_rules() for m in r.methods}\n"
             "print(json.dumps({'missing': sorted(' '.join(k) for k in JSON_BIG if k not in have), 'n': len(JSON_BIG)}))")
