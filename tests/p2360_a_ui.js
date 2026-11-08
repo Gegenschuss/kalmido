@@ -145,7 +145,8 @@ const settings = async () => (await call('GET', '/api/state')).settings;
   const grid = [...md.querySelectorAll('#l-emogrid [data-emo]:not(.none)')];
   const gk = grid.map(b => w.eval(`sbiIconFor(${JSON.stringify(b.dataset.emo)})`));
   check(grid.length >= 120 && grid.every(b => b.querySelector('svg.i.l')) && new Set(gk).size === gk.length, 'list dialog: the grid offers one button per line icon ' + JSON.stringify([grid.length, new Set(gk).size]));
-  md.querySelector('#l-emogrid [data-emo="🚀"]').click(); await sleep(100);
+  // 2.660.0 (#3799): jsdom 30 selector engine (@asamuzakjp/dom-selector) turns emoji (surrogate pairs) in a selector into U+FFFD: found by dataset
+  [...md.querySelectorAll('#l-emogrid [data-emo]')].find(b => b.dataset.emo === '🚀').click(); await sleep(100);
   inp.value = 'Launch'; inp.dispatchEvent(new w.Event('input', {bubbles: true}));
   md.querySelector('[data-m="save"]').click();
   check(await until(async () => (await call('GET', '/api/state')).lists.some(l => l.name === '🚀Launch' || l.name === '🚀 Launch')), 'list dialog: a picked line icon saves its emoji in the name');

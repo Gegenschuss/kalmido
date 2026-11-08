@@ -43,14 +43,16 @@ function cw_with(k, fn) {
 }
 
 // ---- remembered per device (the open chats and their heights) for the account that opened them
-let cw_saved = '';
+// 2.660.0 (#3799): nothing is written before cw_restore() has read the device's list: a chat drawn at start (cw_frame) wrote an empty
+// list over it first, so a phone opened on an agent chat lost its row of open chats
+let cw_saved = '', cw_read = false;
 function cw_save() {
-  if (!S.me) return;
+  if (!S.me || !cw_read) return;
   const o = JSON.stringify({u: S.me.id, open: !!S.cw.wins.length && cw_docked(), wins: S.cw.wins.map(w => ({k: w.k, h: Math.round((w.h || 1) * 100) / 100, c: w.c === true}))});
   if (o !== cw_saved) { cw_saved = o; LS.set('cwins', JSON.parse(o)); }
 }
 async function cw_restore() {
-  const o = LS.get('cwins', null); if (!o || o.u !== S.me?.id || !Array.isArray(o.wins) || !o.wins.length) return;
+  const o = LS.get('cwins', null); cw_read = true; if (!o || o.u !== S.me?.id || !Array.isArray(o.wins) || !o.wins.length) return;
   if (o.wins.some(w => /^t:/.test(w.k)) && teamOn() && S.tc.rooms === null) await loadTeam();
   // only chats this person may still open (an agent that is gone / paused, a conversation no longer shared: dropped quietly)
   const ok = k => /^a:\d+$/.test(k) ? !!agentById(cw_id(k))?.enabled && feat('agents') : /^t:\d+$/.test(k) && teamOn() && (S.tc.rooms || []).some(r => r.id === cw_id(k));
@@ -63,7 +65,7 @@ async function cw_restore() {
   const a = wins.find(w => w.k[0] === 'a');
   if (a) chatOpen(cw_id(a.k)); else cw_show();
 }
-{ const t = setInterval(() => { if (!S.booted || !S.me) return; clearInterval(t); cw_restore(); }, 400); }
+{ const t = setInterval(() => { if (!S.booted || !S.me) return; clearInterval(t); cw_restore().finally(cw_save); }, 400); }  // 2.660.0 (#3799): then what changed before is written
 
 // ---- the list changes: chatOpen() (normal open: replaces the active window; o.split: one more window), a team window
 function cw_note(k, o = {}) {

@@ -206,7 +206,7 @@ const contrast = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y
   // place): wait for no undo running and the delete's step on top, then up to 15 s for the restore
   await until(() => !w.eval('HIST.busy') && /^Deleted /.test(w.eval('HIST.undo[HIST.undo.length - 1]?.label') || ''));
   await w.eval(`histStep('undo')`);
-  check(await until(async () => (await call('GET', `/api/sheets/${BID}`))._status === 200, 100), 'undo: back ' + w.eval(`(HIST.busy ? 'busy ' : '') + (HIST.undo[HIST.undo.length - 1]?.label || '-') + ' / ' + (HIST.redo[HIST.redo.length - 1]?.label || '-')`));
+  check(await until(async () => (await call('GET', `/api/sheets/${BID}`))._status === 200, 100), 'undo: back ' + w.eval(`(HIST.busy ? 'busy ' : '') + (HIST.undo[HIST.undo.length - 1]?.label || '-') + ' / ' + (HIST.redo[HIST.redo.length - 1]?.label || '-')`) + ' toast: ' + (d.querySelector('#toast')?.textContent || '-') + ' errs: ' + errs.slice(-3).join(' | '));  // 2.660.0 (#3799): a failed restore drops the step: say why
   w.close();
 
   // ---- a reader of the list: read only

@@ -552,6 +552,9 @@ async function shvDelete(id, title, lid) {
   try { await rawFetch('DELETE', '/api/sheets/' + id); } catch (e) { toast(e.message); return; }
   SHV.backTo = lid ? 'sheets/l/' + lid : 'sheets';
   shvAfterIdx(id, true);
+  // 2.660.0 (#3799): the delete ends the table's editing session first: its step belonged to the session (the route still on the table,
+  // the hash changes later), leaving folded it into "<table> saved", whose undo found the table gone and said "Changed elsewhere"
+  if (typeof oun_sheetLeave === 'function') oun_sheetLeave('sheet:' + id);
   const e = histAdd({label: tr('Deleted {0}', qn(title || '')), ids: [], snaps: [], lids: [],
     undo: async () => { await rawFetch('POST', `/api/sheets/${id}/restore`); shvAfterIdx(id); return {skipped: []}; },
     redo: async () => { await rawFetch('DELETE', '/api/sheets/' + id); shvAfterIdx(id, true); return {skipped: []}; }});

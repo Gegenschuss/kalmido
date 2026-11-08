@@ -73,6 +73,9 @@ const key = (w, el, k) => el.dispatchEvent(new w.KeyboardEvent('keydown', {key: 
   const msg = () => d.querySelector(`#chat-msgs .cmsg[data-mid="a:${q1.id}"]`);
   const plus = () => msg()?.querySelector('.rxrow [data-act="rx-more"]');
   check(plus() && plus().getAttribute('aria-haspopup') === 'dialog' && plus().getAttribute('aria-label') === 'More reactions' && plus().tabIndex === -1, 'agent chat: "+" More reactions after 👍 👎 ❤️ (not an extra Tab stop)');
+  // 2.660.0 (#3799): since #4608 the quick reactions of an agent message are hidden (display:none) until "React" opens the bar;
+  // jsdom 30 applies that CSS to focus() like a browser: open the bar first, as a person does
+  click(w, msg().querySelector('.rxrow .rxtog')); await until(() => msg()?.classList.contains('rxshow'));
   const up = msg().querySelector('.rxrow [data-e="up"]'); up.focus(); key(w, up, 'End');
   check(d.activeElement === plus(), '← → / End reach the "+"');
   click(w, plus()); await sleep(200);
@@ -80,7 +83,13 @@ const key = (w, el, k) => el.dispatchEvent(new w.KeyboardEvent('keydown', {key: 
   check(grid.length >= 10 && d.querySelector('#pop #rx-in'), 'the emoji grid opens (with "any emoji")');
   click(w, grid.find(b => b.dataset.rx === '\u{1F389}'));
   check(await until(async () => (await call('GET', `/api/agents/${AG}/chat`)).messages.find(m => m.id === q1.id)?.reactions.some(r => r.emoji === '\u{1F389}')), 'picked 🎉: stored on the message');
-  check(await until(() => msg()?.querySelector('.rxrow .rx.on[data-e="\u{1F389}"]')), '… and shown as my reaction chip');
+  // 2.660.0 (#3799): jsdom 30 selector engine turns emoji (surrogate pairs) in a selector into U+FFFD: found by dataset
+  const tada = () => [...(msg()?.querySelectorAll('.rxrow .rx.on') || [])].find(b => b.dataset.e === '\u{1F389}');
+  check(await until(() => tada()), '… and shown as my reaction chip');
+  // 2.660.0 (#3799): with the bar closed the arrow keys skip the hidden chips: End = the "React" toggle, not the hidden "+"
+  await until(() => !msg()?.classList.contains('rxshow'));
+  tada().focus(); key(w, tada(), 'End');
+  check(d.activeElement === msg().querySelector('.rxrow .rxtog'), '#3799: bar closed, End reaches the last visible button (React), not a hidden one: ' + (d.activeElement?.className || ''));
   w.eval('chatClose()'); w.close();
 
   // ================= jsdom: "+" in the team chat

@@ -15,6 +15,7 @@ const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL
 // a restarted container: wait until the proxy port answers too (start.sh only waits for the app port)
 const fresh = async (env = {}) => {
   execFileSync('bash', [path.join(__dirname, 'start.sh')], {stdio: 'ignore', env: {...process.env, ...env}});
+  require('./boot').dropConnections();  // 2.660.0 (#3799): jsdom 30 keeps its connections to the old server
   await until(async () => (await fetch(B + 'api/health').catch(() => null))?.ok, 30000);
 };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};

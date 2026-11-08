@@ -75,7 +75,8 @@ const events = async (since = 0) => (await v1('GET', `/agent/events?since=${sinc
   pk.querySelector('#rx-in').value = '🚀'; pk.querySelector('[data-rx-ok]').click(); await sleep(900);
   check([...d.querySelectorAll(`.cm[data-cid="${k1}"] .rx`)].some(b => b.textContent.startsWith('🚀') && b.classList.contains('on')), 'custom emoji reaction shown');
   d.querySelector(`.cm[data-cid="${k1}"] [data-act="c-react-more"]`).click(); await sleep(300);
-  d.querySelector('#pop [data-rx="🎉"]').click(); await idle(w);
+  // 2.660.0 (#3799): jsdom 30 selector engine (@asamuzakjp/dom-selector) turns emoji (surrogate pairs) in a selector into U+FFFD: found by dataset
+  [...d.querySelectorAll('#pop [data-rx]')].find(b => b.dataset.rx === '🎉').click(); await idle(w);
   check([...d.querySelectorAll(`.cm[data-cid="${k1}"] .rx`)].some(b => b.textContent.startsWith('🎉')), '🎉 from the picker');
   check([...d.querySelectorAll('.actl')].some(x => /approved the comment of/.test(x.textContent)) || !w.eval('showAct()'), 'approval in the history');
   // 2.4.1 (#376): no "Wake agent" button any more (the API route stays, see p200_api_test.py / p241_api_test.py)

@@ -17,6 +17,7 @@ const fresh = () => execFileSync('bash', [path.join(__dirname, 'start.sh')], {st
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 
 async function open(jar) {  // the app with a cookie jar of its own (the setup response logs the admin in)
+  require('./boot').dropConnections();  // 2.360.3 (#2916): fresh() restarted the container
   const vc = new VirtualConsole(); vc.on('jsdomError', e => { if (!/navigation|Not implemented/.test(e.message)) errs.push(e.message); });
   const dom = await JSDOM.fromURL(B, {runScripts: 'dangerously', resources: new (require('./boot').PooledLoader)(),  /* 2.20.0: browser-like connections (boot.js) */ pretendToBeVisual: true, virtualConsole: vc,
     beforeParse(w) {

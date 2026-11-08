@@ -68,7 +68,7 @@ function rxRow(rs, {mid, act, dis = false, name = null, extra = '', own = false,
 // the arrow keys inside a reaction row (one Tab stop per message)
 function rxRowKey(e) {
   const b = e.target.closest?.('.rxrow .rx'); if (!b || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return false;
-  const all = $$('.rx:not(:disabled)', b.closest('.rxrow')), i = all.indexOf(b); if (i < 0) return false;
+  const all = $$('.rx:not(:disabled)', b.closest('.rxrow')).filter(x => x === b || getComputedStyle(x).display !== 'none'), i = all.indexOf(b); if (i < 0) return false;  // 2.660.0 (#3799): hidden chips (closed bar, #4608) cannot take the focus
   const j = e.key === 'Home' ? 0 : e.key === 'End' ? all.length - 1 : (i + (e.key === 'ArrowRight' ? 1 : -1) + all.length) % all.length;
   all.forEach((x, k) => x.tabIndex = k === j ? 0 : -1); all[j].focus(); e.preventDefault(); return true;
 }

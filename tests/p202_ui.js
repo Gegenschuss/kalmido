@@ -168,7 +168,8 @@ const key = (w, k, o = {}) => w.document.body.dispatchEvent(new w.KeyboardEvent(
   check(lm.querySelectorAll('.lipick [data-licon]').length >= 12 && lm.querySelector('.lipick [data-licon="kalmido"].on'), 'picture presets (app icon + profile pictures) + upload, the current one marked');
   lm.querySelector('.lipick [data-licon="robot"]').click(); await sleep(900);
   check(w.eval(`listById(${L}).icon`) === '/static/avatars/robot.svg' && lm.querySelector('#l-emo img')?.getAttribute('src') === '/static/avatars/robot.svg', 'pick a preset: saved, shown at once');
-  lm.querySelector('#l-emo').click(); lm.querySelector('#l-emogrid [data-emo="🎬"]').click(); await sleep(1200);
+  // 2.660.0 (#3799): jsdom 30 selector engine (@asamuzakjp/dom-selector) turns emoji (surrogate pairs) in a selector into U+FFFD: found by dataset
+  lm.querySelector('#l-emo').click(); [...lm.querySelectorAll('#l-emogrid [data-emo]')].find(b => b.dataset.emo === '🎬').click(); await sleep(1200);
   check(w.eval(`listById(${L}).icon`) === '' && w.eval(`listById(${L}).name`) === '🎬Film', 'an emoji replaces the picture ' + w.eval(`listById(${L}).name`));
   lm.querySelector('#l-emo').click(); lm.querySelector('.lipick [data-licon="coffee"]').click(); await sleep(1500);
   check(w.eval(`listById(${L}).icon`) === '/static/avatars/coffee.svg' && w.eval(`listById(${L}).name`) === 'Film', 'a picture takes the emoji out of the name ' + w.eval(`listById(${L}).name`));
