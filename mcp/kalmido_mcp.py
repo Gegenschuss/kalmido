@@ -2912,6 +2912,7 @@ TOOLSETS = {
         pin_chat_message set_status report_progress list_events wait_for_events list_jobs create_job get_job submit_proposal update_job list_chats get_reply_style
         confirm_abort chat_typing send_chat request_chat_approval use_approval withdraw_chat_choices delete_chat_attachment comment_typing report_usage
         get_usage report_plan_usage get_plan_usage clear_plan_usage list_schedules list_rules get_me get_announcement list_news mark_news_read list_agents
+        log_decision
         list_team_chats read_team_chat post_team_message list_team_channels leave_team_channel edit_team_message delete_team_message react_team_message
         pin_team_message mark_team_chat_read
         list_objects get_object update_object propose_object_change
