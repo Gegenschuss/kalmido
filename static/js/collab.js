@@ -584,7 +584,16 @@ document.addEventListener('touchcancel', () => { document.removeEventListener('t
 // ------------------------------------------------------------------ comments + activity (module "collab")
 // Loaded per task when the detail panel opens (GET /timeline), refreshed when the version changes.
 // Comments are sent directly (never queued offline): offline, the text stays in the box with a notice.
-const showAct = () => LS.get('showActivity', true);
+// 2.685.0 (#5162): history between the comments in three levels, per device: 1 = comments only, 2 = changes of others,
+// 3 = all changes incl. my own. Default (key empty): shared list 3, private list 2. The old on/off key moves over once.
+const ACT_LV = t => cmSocial(t) ? 3 : 2;
+function actLevel(t) {
+  let v = +LS.get('activityLevel', 0) || 0;
+  if (!v && LS.get('showActivity', null) !== null) { if (LS.get('showActivity', true) === false) { v = 1; LS.set('activityLevel', 1); } LS.del('showActivity'); }
+  return v >= 1 && v <= 3 ? v : ACT_LV(t);
+}
+const showAct = t => actLevel(t) > 1;
+function actItems(t, T) { const lv = actLevel(t); return lv === 3 ? T.activity || [] : lv === 2 ? tlForeign(t) : []; }
 // 2.4.2 (#386): comment order per user (all devices): old = oldest first, the box at the bottom edge (sticky);
 // new = newest first, the box right above the newest comment (no scrolling to answer)
 const cmtNew = () => S.settings?.comment_order === 'new';
@@ -594,10 +603,10 @@ function tlMenu(anchor) {
   const nw = cmtNew(), keep = tr('Order of the comments, saved for you on all devices');
   menu(anchor, [{label: tr('Oldest first'), icon: 'sort', on: !nw, cls: 'mtlold', title: keep, fn: () => { if (nw) cmtOrderToggle(); }},
     {label: tr('Newest first'), icon: 'sort', on: nw, cls: 'mtlnew', title: keep, fn: () => { if (!nw) cmtOrderToggle(); }},
-    // 2.682.0 (#5155): also in a list that is not shared, as soon as changes of others show there (agents, automations, via)
-    ...(cmSocial(t) || tlForeign(t).length ? ['-', {label: tr('With activity'), icon: 'clock', on: showAct(), cls: 'mtlact', title: tr('Show the history of changes between the comments'), fn: tlActToggle}] : [])]);
+    // 2.685.0 (#5162): three levels, always offered, in shared and private lists
+    ...(collab() ? ['-', ...[[1, 'Comments only', 'mtlact1'], [2, 'Only changes of others', 'mtlact2'], [3, 'All changes', 'mtlact3']].map(([n, l, c]) => ({label: tr(l), icon: 'clock', on: actLevel(t) === n, cls: 'mtlact ' + c, title: tr('Show the history of changes between the comments'), fn: () => tlActSet(n)}))] : [])]);
 }
-function tlActToggle() { LS.set('showActivity', !showAct()); renderDetail(); }
+function tlActSet(n) { LS.set('activityLevel', n === ACT_LV(taskById(S.sel)) ? 0 : n); renderDetail(); }
 async function cmtOrderToggle() {
   const v = cmtNew() ? 'old' : 'new', f = document.activeElement?.id === 'c-input';
   S.settings.comment_order = v; renderDetail(); if (f) $('#c-input')?.focus();
@@ -826,7 +835,7 @@ function timelineItems(ro = false) {
   if (T.err) return `<div class="muted cmempty">${T.err === 'offline' ? tr('Comments and activity are only available online.') : esc(T.err)}</div>`;
   if (!T.comments) return `<div class="muted cmempty">${tr('Loading…')}</div>`;
   const U = T.users || {};
-  const items = [...T.comments.map(c => ({at: c.created_at, c, ro})), ...(showAct() ? (soc ? T.activity || [] : tlForeign(taskById(T.id))).map(a => ({at: a.created_at, a})) : [])]  // 2.682.0 (#5155): the switch also hides the changes of others in a list that is not shared
+  const items = [...T.comments.map(c => ({at: c.created_at, c, ro})), ...actItems(taskById(T.id), T).map(a => ({at: a.created_at, a}))]  // 2.685.0 (#5162): level 1 none, 2 changes of others, 3 all
     .sort((x, y) => new Date(x.at) - new Date(y.at) || (x.c ? 1 : 0) - (y.c ? 1 : 0));
   const pend = cmtPendItems(T);  // 2.537.0 (#4569): own comments still on their way, after the newest
   if (!items.length && !pend.length) return soc || cmSplitOn(taskById(T.id)) ? `<div class="muted cmempty">${tr('No comments yet.')}</div>` : '';  // 2.31.0 (#344): the split keeps its area
@@ -853,7 +862,7 @@ function timelineHtml(t) {
   const nw = cmtNew(), top = nw && cmtOn() && t.id > 0 && !t.context, split = cmSplitOn(t);
   // 2.31.0 (#1054): order and history sit in a small "…" menu (were two big switches); "Comments only" says so in the head.
   // (#344) the desktop split folds its area with the arrow at the end
-  return `<h5 class="cmhead"><span>${tr('Comments')}</span><span class="c" id="d-tl-count">${n || ''}</span>${(soc || tlForeign(t).length) && !showAct() ? `<span class="cmmode">${tr('Comments only')}</span>` : ''}<span class="spacer"></span><button type="button" class="iconbtn cmmenu" data-act="tl-menu" aria-haspopup="menu" aria-label="${esc(tr('Comment options'))}" title="${esc(tr('Comment options'))}">${ic('dots', 's')}</button>${split ? `<button type="button" class="iconbtn dsfoldb" data-act="cm-fold" aria-controls="d-cpane" aria-expanded="${!dsFold()}" aria-label="${esc(dsFold() ? tr('Show the comments') : tr('Fold the comments'))}" title="${esc(dsFold() ? tr('Show the comments') : tr('Fold the comments'))}">${ic('chev', 's')}</button>` : ''}</h5>
+  return `<h5 class="cmhead"><span>${tr('Comments')}</span><span class="c" id="d-tl-count">${n || ''}</span>${actLevel(t) === 1 ? `<span class="cmmode">${tr('Comments only')}</span>` : actLevel(t) === 2 && soc ? `<span class="cmmode">${tr('Only changes of others')}</span>` : ''}<span class="spacer"></span><button type="button" class="iconbtn cmmenu" data-act="tl-menu" aria-haspopup="menu" aria-label="${esc(tr('Comment options'))}" title="${esc(tr('Comment options'))}">${ic('dots', 's')}</button>${split ? `<button type="button" class="iconbtn dsfoldb" data-act="cm-fold" aria-controls="d-cpane" aria-expanded="${!dsFold()}" aria-label="${esc(dsFold() ? tr('Show the comments') : tr('Fold the comments'))}" title="${esc(dsFold() ? tr('Show the comments') : tr('Fold the comments'))}">${ic('chev', 's')}</button>` : ''}</h5>
     <div id="d-ptl">${typeof ptl_boxHtml === 'function' ? ptl_boxHtml(t) : '' /* 2.63.0 B (#1513): a customer's report */}</div>
     ${top ? cmComposer(t, true) : ''}<div class="cms" id="d-tl-items">${S.tl.id === t.id ? timelineItems() : `<div class="muted cmempty">${tr('Loading…')}</div>`}</div><button type="button" class="chnew cmnew hidden" id="cm-new">${tr('New comment')} <span aria-hidden="true">↓</span></button>
     ${soc ? typingHtml(taskTypers(t), 'd-typing') : ''}`;

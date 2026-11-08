@@ -601,7 +601,6 @@ document.addEventListener('click', async e => {
     case 'link-edit': S.editLink = true; renderDetail(); setTimeout(() => { const i = $('#d-url'); if (i) { i.focus(); i.select(); } }, 0); break;
     case 'link-rm': { const t = taskById(S.sel); if (t) patchUndoable(t.id, {url: null}, tr('Link removed')); break; }
     case 'tl-order': cmtOrderToggle(); break;  // 2.4.2 (#386)
-    case 'tl-act': tlActToggle(); break;
     case 'tl-menu': e.stopPropagation(); tlMenu(a); break;  // 2.31.0 (#1054)
     case 'cm-fold': dsFoldToggle(); break;  // 2.31.0 (#344)
     case 'md-subtasks': mdToSubtasks(); break;

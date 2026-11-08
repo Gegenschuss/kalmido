@@ -38,10 +38,10 @@ const api = async (w, method, url, body) => (await w.fetch(url, {method, headers
   check(d.querySelector('.linkchip')?.textContent.trim() === 'github.com' && d.querySelector('.linkchip').rel === 'noopener noreferrer', 'detail link chip');
   check(d.querySelector('#detail .dmeta .dwho'), 'assignee chip present (collab on; 2.31.0: the only assignee control)');
   // activity toggle, remembered per device (2.31.0 #1054: in the "…" of the comment head)
-  const tlAct = async done => { d.querySelector('#d-tl [data-act="tl-menu"]').click(); (await until(() => d.querySelector('#pop .mtlact')))?.click(); await until(done); };
+  const tlAct = async (done, lv = 1) => { d.querySelector('#d-tl [data-act="tl-menu"]').click(); (await until(() => d.querySelector('#pop .mtlact' + lv)))?.click(); await until(done); };
   await tlAct(() => d.querySelectorAll('#d-tl .actl').length === 0);
-  check(d.querySelectorAll('#d-tl .actl').length === 0 && w.__store['tasks.showActivity'] === 'false' && /Comments only/.test(d.querySelector('#d-tl .cmhead').textContent), 'toggle hides activity and remembers it');
-  await tlAct(() => d.querySelectorAll('#d-tl .actl').length >= 1);
+  check(d.querySelectorAll('#d-tl .actl').length === 0 && w.__store['tasks.activityLevel'] === '1' && /Comments only/.test(d.querySelector('#d-tl .cmhead').textContent), 'toggle hides activity and remembers it');
+  await tlAct(() => d.querySelectorAll('#d-tl .actl').length >= 1, 3);
   check(d.querySelectorAll('#d-tl .actl').length >= 1, 'toggle shows activity again');
   // moderation: alice owns the list -> delete buttons on others' comments, edit only on hers
   const others = [...d.querySelectorAll('#d-tl .cm')].filter(c => !/^Alice/.test(c.querySelector('.chead b').textContent));

@@ -160,9 +160,9 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   check(d.querySelector('#detail #d-content')?.getAttribute('placeholder') === 'Description' && d.querySelector('#detail #d-content').getAttribute('aria-label') === 'Description', '1.7.1: plain "Description" placeholder (Markdown explained in Help)');
   // 2.31.0 (#1054): the switch is a checked entry in the "…" of the comment head; "Comments only" shows in the head
   click(w, d.querySelector('#detail [data-act="tl-menu"]')); await settle(w);
-  const tg = d.querySelector('#pop .mtlact');
-  check(tg && tg.classList.contains('on') && /With activity/.test(tg.textContent) && !/Comments only/.test(d.querySelector('#d-tl .cmhead').textContent), 'activity entry names its state (checked)');
-  click(w, tg); await settle(w);
+  const tg = d.querySelector('#pop .mtlact3');
+  check(tg && tg.classList.contains('on') && /All changes/.test(tg.textContent) && !/Comments only/.test(d.querySelector('#d-tl .cmhead').textContent), 'activity entry names its state (checked)');
+  click(w, d.querySelector('#pop .mtlact1')); await settle(w);
   check(/Comments only/.test(d.querySelector('#d-tl .cmhead .cmmode')?.textContent || ''), 'toggled: "Comments only"');
   await call('POST', `/api/tasks/${plan}/comments`, {body: 'Ping from the old days'});
   await closeW(w);

@@ -2322,7 +2322,6 @@
   "Turn the open checklist items into subtasks": "Trasforma le voci aperte della checklist in sottoattività",
   "{0} checklist item of {1} is now a subtask": ["{0} voce della checklist di {1} è ora una sottoattività", "{0} voci della checklist di {1} sono ora sottoattività"],
   "{0} subtask added": ["{0} sottoattività aggiunta", "{0} sottoattività aggiunte"],
-  "With activity": "Con cronologia",
   "Comments only": "Solo commenti",
   "Complete anyway": "Completa comunque",
   "Custom…": "Personalizza…",
@@ -17718,5 +17717,6 @@
   "Open a conversation in a split window from its head and keep working.": "Apri una conversazione in una finestra divisa dalla sua intestazione e continua a lavorare.",
   "Mentions and replies from the chat arrive here too.": "Anche menzioni e risposte della chat arrivano qui.",
   "All areas in the menu": "Tutte le aree nel menu",
-  "PUBLIC_URL is not set on this server, so the setup command cannot name its address: ask the server admin to set PUBLIC_URL to the address people open (.env) and restart.": "PUBLIC_URL non è impostato su questo server, quindi il comando di configurazione non può indicarne l'indirizzo: chiedi all'amministrazione del server di impostare PUBLIC_URL sull'indirizzo che si apre (.env) e di riavviare."
+  "PUBLIC_URL is not set on this server, so the setup command cannot name its address: ask the server admin to set PUBLIC_URL to the address people open (.env) and restart.": "PUBLIC_URL non è impostato su questo server, quindi il comando di configurazione non può indicarne l'indirizzo: chiedi all'amministrazione del server di impostare PUBLIC_URL sull'indirizzo che si apre (.env) e di riavviare.",
+  "Only changes of others": "Solo modifiche degli altri"
 }

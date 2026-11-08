@@ -2322,7 +2322,6 @@
   "Turn the open checklist items into subtasks": "Open checklistitems omzetten in subtaken",
   "{0} checklist item of {1} is now a subtask": ["{0} checklistitem van {1} is nu een subtaak", "{0} checklistitems van {1} zijn nu subtaken"],
   "{0} subtask added": ["{0} subtaak toegevoegd", "{0} subtaken toegevoegd"],
-  "With activity": "Met activiteit",
   "Comments only": "Alleen opmerkingen",
   "Complete anyway": "Toch voltooien",
   "Custom…": "Aangepast…",
@@ -17717,5 +17716,6 @@
   "Open a conversation in a split window from its head and keep working.": "Open een gesprek via de kop in een gesplitst venster en werk verder.",
   "Mentions and replies from the chat arrive here too.": "Vermeldingen en antwoorden uit de chat komen hier ook binnen.",
   "All areas in the menu": "Alle onderdelen in het menu",
-  "PUBLIC_URL is not set on this server, so the setup command cannot name its address: ask the server admin to set PUBLIC_URL to the address people open (.env) and restart.": "PUBLIC_URL is op deze server niet ingesteld, dus de installatieopdracht kan het adres niet noemen: vraag het serverbeheer PUBLIC_URL in te stellen op het adres dat iedereen opent (.env) en opnieuw te starten."
+  "PUBLIC_URL is not set on this server, so the setup command cannot name its address: ask the server admin to set PUBLIC_URL to the address people open (.env) and restart.": "PUBLIC_URL is op deze server niet ingesteld, dus de installatieopdracht kan het adres niet noemen: vraag het serverbeheer PUBLIC_URL in te stellen op het adres dat iedereen opent (.env) en opnieuw te starten.",
+  "Only changes of others": "Alleen wijzigingen van anderen"
 }

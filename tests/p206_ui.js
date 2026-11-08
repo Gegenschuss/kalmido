@@ -52,7 +52,8 @@ const TABLET = {'(min-width:600px) and (min-height:600px)': true};
   // 2.31.0 (#344): a desktop keeps the comments area (split) with "No comments yet."; phones keep only the box (p2310_b_ui)
   check(ci && d.querySelector('#detail.dsplit #d-cpane #d-tl .cmempty') && ci.placeholder === 'Write a comment…' && !ci.closest('.ccomp').classList.contains('used'), 'private task without comments: the empty area + the box (compact), without the @ hint');
   click(w, d.querySelector('#detail [data-act="tl-menu"]')); await sleep(50);
-  check(!d.querySelector('#pop .mtlact') && !d.querySelector('#detail .cmfold'), 'private: no activity switch, no fold toggle'); w.eval('closePop()');
+  // 2.685.0 (#5162): the three levels are always offered, also in a private list without foreign changes
+  check(d.querySelectorAll('#pop .mtlact').length === 3 && d.querySelector('#pop .mtlact2.on') && !d.querySelector('#detail .cmfold'), 'private: three activity levels (2 checked), no fold toggle'); w.eval('closePop()');
   ci.focus(); ci.value = 'Asked for the IBAN form'; ci.dispatchEvent(new w.Event('input', {bubbles: true}));
   check(ci.closest('.ccomp').classList.contains('used'), 'typing opens the bar (files, Send)');
   click(w, d.querySelector('[data-act="c-send"]')); await sleep(1200);
@@ -74,14 +75,21 @@ const TABLET = {'(min-width:600px) and (min-height:600px)': true};
   for (let i = 0; i < 40 && !d.querySelector('#detail #d-tl .actl'); i++) await sleep(100);
   check(d.querySelector('#detail #d-tl .actl .via') && !d.querySelector('#detail .cmmode'), '#5155: private list: the change via API shows between the notes');
   click(w, d.querySelector('#detail [data-act="tl-menu"]')); await sleep(50);
-  const pa = d.querySelector('#pop .mtlact');
-  check(pa && pa.classList.contains('on'), '#5155: private list with a change of others: "With activity" in the "…" (on)');
+  const pa = d.querySelector('#pop .mtlact1');
+  check(d.querySelectorAll('#pop .mtlact').length === 3 && d.querySelector('#pop .mtlact2').classList.contains('on'), '#5162: private list: three levels, "Only changes of others" is the default (checked)');
   click(w, pa); await sleep(150);
-  check(!d.querySelector('#detail #d-tl .actl') && /Comments only/.test(d.querySelector('#d-tl .cmhead .cmmode')?.textContent || '') && w.eval(`LS.get('showActivity', true)`) === false, '#5155: off: only the notes, "Comments only" in the head');
+  check(!d.querySelector('#detail #d-tl .actl') && /Comments only/.test(d.querySelector('#d-tl .cmhead .cmmode')?.textContent || '') && w.eval(`LS.get('activityLevel', 0)`) === 1, '#5162: level 1: only the notes, "Comments only" in the head');
   click(w, d.querySelector('#detail [data-act="tl-menu"]')); await sleep(50);
-  check(d.querySelector('#pop .mtlact') && !d.querySelector('#pop .mtlact').classList.contains('on'), '#5155: the switch stays reachable (off)');
-  click(w, d.querySelector('#pop .mtlact')); await sleep(150);
-  check(d.querySelector('#detail #d-tl .actl') && !d.querySelector('#detail .cmmode'), '#5155: on again: the change is back');
+  check(d.querySelector('#pop .mtlact1').classList.contains('on') && !d.querySelector('#pop .mtlact2').classList.contains('on'), '#5162: the levels stay reachable (1 checked)');
+  click(w, d.querySelector('#pop .mtlact3')); await sleep(150);
+  check(d.querySelector('#detail #d-tl .actl') && !d.querySelector('#detail .cmmode') && w.eval(`LS.get('activityLevel', 0)`) === 3, '#5162: level 3: the changes incl. my own (the change is there)');
+  click(w, d.querySelector('#detail [data-act="tl-menu"]')); await sleep(50);
+  click(w, d.querySelector('#pop .mtlact2')); await sleep(150);
+  check(d.querySelector('#detail #d-tl .actl .via') && w.eval(`LS.get('activityLevel', 0)`) === 0, '#5162: level 2 = default of a private list: stored as empty, the foreign change shows');
+  w.eval(`LS.del('activityLevel'); LS.set('showActivity', false); renderDetail()`); await sleep(150);
+  check(!d.querySelector('#detail #d-tl .actl') && w.eval(`LS.get('activityLevel', 0)`) === 1 && w.eval(`LS.get('showActivity', null)`) === null, '#5162: the old key showActivity=false moves to level 1 and is removed');
+  w.eval(`LS.set('showActivity', true); LS.del('activityLevel'); renderDetail()`); await sleep(150);
+  check(d.querySelector('#detail #d-tl .actl') && w.eval(`LS.get('activityLevel', 0)`) === 0 && w.eval(`LS.get('showActivity', null)`) === null, '#5162: the old key showActivity=true moves to the default and is removed');
   w.close();
   // #316 / #322: order in the panel (a project task with a subtask, a dependency and a comment)
   await call('POST', `/api/tasks/${copy}/comments`, {body: 'Draft is in the drive'});

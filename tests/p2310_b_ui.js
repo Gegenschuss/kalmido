@@ -114,11 +114,11 @@ const CHIP = `(() => { const a = [...document.querySelectorAll('#detail .attsec 
   check(!d.querySelector('#d-tl .cmtoggle') && d.querySelector('#d-tl [data-act="tl-menu"]')?.getAttribute('aria-haspopup') === 'menu', '#1054: no big switches, a "…" in the head');
   click(w, d.querySelector('#d-tl [data-act="tl-menu"]')); await sleep(80);
   let mi = [...d.querySelectorAll('#pop [role="menuitem"]')];
-  check(mi.length === 3 && mi[0].classList.contains('mtlold') && mi[0].classList.contains('on') && mi[1].classList.contains('mtlnew') && mi[2].classList.contains('mtlact') && mi[2].classList.contains('on'), '#1054: "…": Oldest first (checked), Newest first, With activity (checked) ' + mi.map(x => x.textContent).join('|'));
-  click(w, mi[2]); await sleep(150);
+  check(mi.length === 5 && mi[0].classList.contains('mtlold') && mi[0].classList.contains('on') && mi[1].classList.contains('mtlnew') && mi[2].classList.contains('mtlact1') && mi[4].classList.contains('mtlact3') && mi[4].classList.contains('on'), '#1054/#5162: "…": Oldest first (checked), Newest first, the three activity levels (shared: 3 checked) ' + mi.map(x => x.textContent).join('|'));
+  click(w, mi[2]); await sleep(150);  // level 1
   check(d.querySelectorAll('#d-cpane .actl').length === 0 && /Comments only/.test(d.querySelector('#d-tl .cmhead .cmmode')?.textContent || '') && d.querySelector('#detail.dsplit'), '#344: "Comments only" in the comments area, the head says so');
   click(w, d.querySelector('#d-tl [data-act="tl-menu"]')); await sleep(80);
-  click(w, d.querySelector('#pop .mtlact')); await sleep(150);
+  click(w, d.querySelector('#pop .mtlact3')); await sleep(150);
   check(d.querySelectorAll('#d-cpane .actl').length >= 1 && !d.querySelector('#d-tl .cmmode'), '#344: with the history again');
   // the assignee once
   check(d.querySelector('#detail .dmeta .dwho') && !d.querySelector('#detail #d-assignee') && !d.querySelector('#detail select[data-sheet-av]'), '#1054: the assignee only as the chip under the title');
