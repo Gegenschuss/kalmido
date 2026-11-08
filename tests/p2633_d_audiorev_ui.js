@@ -120,9 +120,11 @@ const FIT = sel => `(() => { const vw = document.documentElement.clientWidth, e 
       check(await until(`document.getElementById('vd-at')?.value === '00:42'`), tag + ' customer page: typing fills the timecode 00:42 ' + await ev(`String(document.getElementById('vd-at')?.value)`));
       check(await ev(`window.__paused === 1`), tag + ' customer page: typing pauses the <audio>');
       await ev(`(() => { document.getElementById('vd-name').value = 'Kundin Example'; document.getElementById('vd-text').value = 'Ende zu kurz'; document.getElementById('vdr-f').submit(); return 1; })()`);
-      check(await until(`/Thank you, your comment has arrived/.test(document.body.textContent) && !!document.querySelector('a.vdr-at[data-at="42.0"]')`), tag + ' customer page: the comment at 00:42 arrived');
+      // 2.658.0 (#5102): the page after the form is ready only when pubvideo.js has wired "Load audio" (readyState complete:
+      // every script ran); a click before that did nothing, no <audio> came and the stand-in threw on null (CI only, slow runner)
+      check(await until(`document.readyState === 'complete' && /Thank you, your comment has arrived/.test(document.body.textContent) && !!document.querySelector('a.vdr-at[data-at="42.0"]')`), tag + ' customer page: the comment at 00:42 arrived');
       await ev(`document.querySelector('[data-vdr-load]').click(), 1`);
-      await until(`!!document.querySelector('.vdr-player audio')`);
+      check(await until(`!!document.querySelector('.vdr-player audio')`), tag + ' customer page: "Load audio" again builds the <audio>');
       await ev(STUB);
       await ev(`document.querySelector('a.vdr-at').click(), 1`);
       check(await until(`Math.abs(document.querySelector('.vdr-player audio').currentTime - 42) < 0.1`), tag + ' customer page: a tap on the timecode seeks the <audio> '
