@@ -107,6 +107,7 @@ pin = re.search(r"pip install ruff==(\d+\.\d+\.\d+)", ci)
 check(pin and f"ruff=={pin.group(1)}" in toml, f"ci.yml installs the ruff version ruff.toml names: {pin and pin.group(1)}")
 check("python tools/ruff_baseline.py /tmp/ruff.json" in ci and "--exit-zero" in ci, "ci.yml compares with the baseline")
 check(re.search(r'select = \["E", "F", "BLE"\]', toml) and "line-length = 130" in toml, "ruff.toml: E, F, BLE, 130")
+check(re.search(r'ignore = \["E501"\]', toml), "ruff.toml: E501 is out of the gate (2.755.0, #5294 - an edit of one of ~39 500 long lines would be new)")
 base = json.load(open(os.path.join(ROOT, "tools", "ruff_baseline.json"), encoding="utf-8"))
 bad = [(f, r) for f, rules in base["files"].items() for r, hs in rules.items()
        if not all(re.fullmatch(r"[0-9a-f]{12}", h) for h in hs) or not os.path.exists(os.path.join(ROOT, f))]

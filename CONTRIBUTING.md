@@ -51,7 +51,7 @@ a test for what you change; security fixes need a regression test in `tests/secu
   their groups are still started). Run the suites you touched while you work and
   the full run once before the pull request.
 - **bandit locally**, as CI does: `pip install bandit && bandit -q --severity-level high -r app.py kalmido tools`.
-- **ruff locally** (2.755.0, #5294; rules E, F, BLE, line length 130 in `ruff.toml`), as CI does: `pip install ruff==0.17.4`,
+- **ruff locally** (2.755.0, #5294; rules E, F, BLE in `ruff.toml`; E501 line length is a guide (130), not part of the gate - ~39 500 existing lines are longer), as CI does: `pip install ruff==0.17.4`,
   `ruff check --output-format json --exit-zero . > /tmp/ruff.json && python3 tools/ruff_baseline.py /tmp/ruff.json`.
   Only new code is red: the findings of the existing code stand in `tools/ruff_baseline.json` (file, rule and a hash of
   the code line, no line number - moving code keeps it known, changing the line makes it new, so touched lines get

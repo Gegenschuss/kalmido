@@ -11,7 +11,7 @@ kept as a short hash) - the line NUMBER does not count, so moving code or an edi
 the line itself does (touched code gets cleaned). Counted, not a set: a second, new copy of a known line is new.
 Exit 1 and one `::error` annotation per NEW finding; exit 0 when every finding is known. Entries without a finding any more
 (fixed) are a notice only (--strict: red). A scan with no finding at all while the baseline is big is red (ruff broken).
-The baseline is compact ({file: {rule: [hash, ...]}}): the existing code has ~40 000 findings, most of them long lines.
+The baseline is compact ({file: {rule: [hash, ...]}}): the existing code has ~2 100 findings (E501 is not in the gate).
 The ruff version is pinned in the CI step (pip install ruff==0.17.4); a ruff update that finds more needs --update.
 Python standard library only."""
 import argparse

@@ -6,5 +6,8 @@ extend-exclude = ["static", "embed/models", "tests/node_modules"]
 
 [lint]
 select = ["E", "F", "BLE"]
+# E501 (line length) is not part of the gate (2.755.0, #5294, assumption): ~39 500 existing lines are longer than 130, an edit of
+# any of them would count as a new finding and turn every package red. line-length stays as the guide for new code.
+ignore = ["E501"]
 # unknown codes in old noqa markers (S608, B018, PLC0415, ...) are not an error
 external = ["S", "B", "PLC", "ARG", "SIM", "N", "PLW", "PLR", "UP", "RUF", "C"]

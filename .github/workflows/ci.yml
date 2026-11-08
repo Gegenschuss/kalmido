@@ -260,7 +260,7 @@ jobs:
         run: python tools/check_core_crosscut.py
       - name: New columns with real types - TIMESTAMPTZ, BOOLEAN, JSONB (2.755.0, #5305)
         run: python tools/check_coltypes.py
-      - name: ruff (E, F, BLE; ruff.toml) red for new code only - tools/ruff_baseline.json (2.755.0, #5294)
+      - name: ruff (E, F, BLE without E501; ruff.toml) red for new code only - tools/ruff_baseline.json (2.755.0, #5294)
         run: |
           pip install ruff==0.17.4
           ruff check --output-format json --exit-zero . > /tmp/ruff.json
