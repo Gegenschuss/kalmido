@@ -89,10 +89,13 @@ def ltm_rcmail_get():
 def ltm_rcmail_new():
     """{renew} -- the forwarding address for receipts: made when there is none yet; renew = a new one (the old one stops)."""
     c, uid, oid = office_ctx()
+    b = body()
+    if not isinstance(b, dict):  # 2.666.0 (#4074 15): a list / a string as the body is 400, not 500
+        raise Denied(400, tr("Invalid data"))
     j = _rcmail_json(c, oid, uid)
     if not j["enabled"]:
         raise Denied(409, tr("E-mail to tasks is not set up on this server"))
-    if not j["address"] or body().get("renew") is True:
+    if not j["address"] or b.get("renew") is True:
         who, org = ltm_space(c, oid, uid)
         ml_token_new(c, who, org)
         c.commit()
