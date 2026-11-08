@@ -465,6 +465,16 @@ def _oidc_fail_redirect(code, stepup=False):
     return resp
 
 
+# 2.674.0 (#4028): the one way back after the sign-in besides "/": the consent page of the hosted MCP access with its query
+# (agents/mcpremote.py sends a person who is not signed in to /?oauth=<query>; static/js/events.js afterLogin, the same
+# pattern). A path of this server only: no "//", no "\\", no "/" or ":" in the query (the redirect URI in it is URL-encoded).
+OIDC_RET_RE = re.compile(r"/oauth/authorize\?[\w%=&.~+-]{1,4000}", re.ASCII)
+
+
+def oidc_ret_ok(v):
+    return isinstance(v, str) and bool(OIDC_RET_RE.fullmatch(v))
+
+
 @app.get("/api/auth/oidc/start")
 def oidc_start():
     from ..notify.push import _b64u
@@ -505,6 +515,8 @@ def oidc_start():
     # OIDC_STATES_PER_IP, OIDC_STATES_MAX on the server); the callback takes it once (DELETE ... RETURNING)
     st = {"bind": _token_hash(bind), "nonce": nonce, "verifier": verifier, "exp": now + OIDC_STATE_TTL,
           "remember": request.args.get("remember", "1") != "0"}
+    if not stepup and oidc_ret_ok(request.args.get("ret")):  # 2.674.0 (#4028): back to the consent page of the hosted MCP access
+        st["ret"] = request.args["ret"]
     if stepup:
         st.update(stepup=stepup, org=so, oid=soid, uid=sess_uid)
     if not eph_put(EPH_OIDC, state, seal(c, "oidc:" + _token_hash(state), json.dumps(st)), OIDC_STATE_TTL, ip=rate_ip(),
@@ -587,7 +599,7 @@ def oidc_callback():
         ses_end(c, None, [_token_hash(old)])
     tok, age = start_session(c, u["id"], st["remember"], "oidc")
     c.commit()
-    resp = set_cookie(redirect("/", 303), tok, age)
+    resp = set_cookie(redirect(st["ret"] if oidc_ret_ok(st.get("ret")) else "/", 303), tok, age)  # 2.674.0 (#4028)
     resp.delete_cookie(OIDC_COOKIE, path="/api/auth/oidc")
     return resp
 

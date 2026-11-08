@@ -352,5 +352,27 @@ s, r = oidc_login({"sub": "sub-max", "preferred_username": "max", "groups": ["ka
 check(err_of(r) == "ok" and not A.get(B + "/api/groups").json()["groups"][0]["members"]
       and not any(x["id"] == L for x in s.get(B + "/api/state").json()["lists"]), "claim gone -> out of the group, the list is gone")
 
+
+# 2.674.0 (#4028): after the OIDC sign-in back to the consent page of the hosted MCP access (as after the password sign-in,
+# static/js/account.js passes ret=afterLogin()); only that path of this server, never another host or path (no open redirect)
+def ret_login(ret):
+    s = sess()
+    r = s.get(B + "/api/auth/oidc/start", params={"ret": ret}, allow_redirects=False)
+    q = dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(r.headers.get("Location", "")).query))
+    code = give_code(q, {"sub": "sub-max", "preferred_username": "max", "groups": ["kalmido"]})
+    return s.get(B + "/api/auth/oidc/callback", params={"code": code, "state": q["state"]}, allow_redirects=False)
+
+
+RET = "/oauth/authorize?response_type=code&client_id=kmc_x&redirect_uri=http%3A%2F%2F127.0.0.1%3A9%2Fcb&state=s-1"
+r = ret_login(RET)
+check(r.status_code == 303 and r.headers.get("Location") == RET and "kalmido_session" in r.cookies,
+      f"#4028: signed in with OIDC from the consent page -> back to /oauth/authorize with its query ({r.headers.get('Location')})")
+for bad in ("//evil.example/oauth/authorize?a=1", "https://evil.example/oauth/authorize?a=1", "/oauth/authorize?a=1/../../x",
+            "/\\evil.example", "/oauth/authorize/../../x?a=1", "/oauth/authorize?r=https://evil.example", "/api/me?a=1",
+            "/oauth/authorize?", "/oauth/authorize?a=\u00e4"):
+    r = ret_login(bad)
+    check(r.status_code == 303 and r.headers.get("Location") == "/" and "kalmido_session" in r.cookies,
+          f"#4028: no open redirect: ret={bad!r} -> '/' ({r.headers.get('Location')})")
+
 print(f"\n{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

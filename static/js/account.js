@@ -649,7 +649,7 @@ async function authScreen(j) {
     el.addEventListener('click', e => {
       const b = e.target.closest('[data-au]'); if (!b) return;
       const rem = $('#au-rem', el)?.checked !== false;
-      if (b.dataset.au === 'oidc') location.href = '/api/auth/oidc/start?remember=' + (rem ? 1 : 0);
+      if (b.dataset.au === 'oidc') { const ret = afterLogin(); location.href = '/api/auth/oidc/start?remember=' + (rem ? 1 : 0) + (ret.startsWith('/oauth/authorize?') ? '&ret=' + encodeURIComponent(ret) : ''); }  // 2.674.0 (#4028): back to the consent page of an app (accounts/oidc.py oidc_ret_ok)
       if (b.dataset.au === 'passkey') authPasskey($('#au-err', el), rem);
       if (b.dataset.au === 'signup') signupScreen(el, logo, info);  // 2.23.0 (#711)
       if (b.dataset.au === 'forgot') lg_forgotScreen(el, logo, $('#au-user', el).value.trim());  // 2.49.0 (#1531)
