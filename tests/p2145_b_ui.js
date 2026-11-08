@@ -145,7 +145,7 @@ const median = a => { const s = [...a].sort((x, y) => x - y); return s[Math.floo
       const c = (await cmd('browsingContext.create', {type: 'tab'})).context;
       await cmd('browsingContext.navigate', {context: c, url: B + 'static/icon.svg', wait: 'complete'});
       const ask = (uid, nn = nonce) => evIn(c, `new Promise(res => { const ch = new BroadcastChannel('kalmido-mini-state'); let got = null; ch.onmessage = e => { if (e.data && e.data.re === 'q${uid}') got = e.data; };
-        ch.postMessage({ask: 'q${uid}', uid: ${uid}, nonce: ${JSON.stringify(nn)}}); setTimeout(() => { ch.close(); res(got ? {uid: got.uid, len: got.state.length, tasks: JSON.parse(got.state).tasks.length} : null); }, 600); })`);
+        ch.postMessage({ask: 'q${uid}', uid: ${uid}, nonce: ${JSON.stringify(nn)}}); setTimeout(() => { ch.close(); const st = got && (typeof got.state === 'string' ? JSON.parse(got.state) : got.state); res(got ? {uid: got.uid, kind: typeof got.state, tasks: st.tasks.length} : null); }, 600); })`);  // 2.663.0 (#4200): a structured clone while no list is locked
       const me = await ev(`S.me.id`);
       check(await ask(me + 1000) == null, '#2424: another person gets no answer');
       check(await ask(me, '') == null && await ask(me, 'f'.repeat(32)) == null, '#2875: without the nonce of the main window the same person gets no answer either');

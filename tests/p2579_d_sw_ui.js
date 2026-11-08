@@ -95,7 +95,9 @@ const refused = port => new Promise(res => {
     check(await pu(`typeof S !== 'undefined' && S.booted && !!document.querySelector('#view .trow[data-id="${T}"]')`), 'online: the app starts over the relay, the list opens');
     // #4283 (review of p264a_c_ui): the queue is in IndexedDB here - a silent fallback to localStorage is red, not "either"
     check(await pu(`OBX.on === true && !!OBX.st`), 'online: the offline queue lives in IndexedDB (OBX.on), no silent fallback to localStorage');
-    check(await ev(`!!localStorage.getItem('tasks.cache')`), 'online: the last state is kept for an offline start');
+    // 2.663.0 (#4200): the last state is kept in IndexedDB "kalmido-start" (offcache.js, written when idle), no longer in localStorage
+    check(await pu(`typeof OC !== 'undefined' && OC.wrote > 0 && !OC.off`), 'online: the last state is kept for an offline start (IndexedDB, no fallback to localStorage)');
+    check(await ev(`!localStorage.getItem('tasks.cache')`), 'online: no copy of the state in localStorage');
     const sw = await ev(`(async () => {
       await navigator.serviceWorker.ready;
       for (let i = 0; i < 240; i++) {

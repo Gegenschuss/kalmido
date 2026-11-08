@@ -92,6 +92,7 @@ const LD_MODS = {
   trashui: ['trashui'],  // 2.272.0 G (#3038): the trash dialogs / views of 2.272.0 (start budget)
   clientpage: ['clientpage'],  // 2.563.0 (#4742): Office > Clients (the list and the client's card), on its view; the office, the contacts and the trash use its globals (LD_NEED)
   whatsnew: ['whatsnew'],  // 2.556.0 (#4685): the dialog "New for you" after an update (wn_boot below loads it only when there is news)
+  offcache: ['offcache'],  // 2.663.0 (#4200): the offline start state in IndexedDB (core.js startSave / startRead)
 };
 // 2.65.0 (#1823): modules a module needs before its own files (their globals are used while it draws): the settings dialog
 // draws the agent panes (agentchat.js), the calendars (calview.js) and the tokens / webhooks (integrations.js), the agent chat

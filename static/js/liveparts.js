@@ -200,7 +200,7 @@ function lpCacheSoon() {
     const c = S.lpCache; if (!c) return;
     Object.assign(c, {v: S.v, tasks: [...S.tasks.values()], lists: S.lists, counts: S.counts});
     if (S.lz) c.lz = {pending: [...S.lz.pending], counts: S.lz.counts}; else delete c.lz;  // 2.369.2 (#3136): the loaded lists stay
-    LS.set('cache', c);
+    startSave();  // 2.663.0 (#4200): IndexedDB when the browser is idle (core.js)
   }, 30000);
 }
 

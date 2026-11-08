@@ -125,8 +125,8 @@ const mw_snapP = MW_ON && typeof BroadcastChannel === 'function' && LS.get('uid'
   const uid = LS.get('uid', null), ask = Math.random().toString(36).slice(2), ch = new BroadcastChannel(MW_SNAP_CH), nonce = mw_nonce(false);
   const done = j => { ch.onmessage = null; ch.close(); res(j); };
   ch.onmessage = e => {
-    const m = e.data; if (!m || m.re !== ask || m.uid !== uid || typeof m.state !== 'string') return;
-    let j = null; try { j = JSON.parse(m.state); } catch { /* broken: wait for another answer or the time-out */ }
+    const m = e.data; if (!m || m.re !== ask || m.uid !== uid || !m.state || !['string', 'object'].includes(typeof m.state)) return;
+    let j = null; try { j = typeof m.state === 'string' ? JSON.parse(m.state) : m.state; } catch { /* broken: wait for another answer or the time-out */ }  // 2.663.0 (#4200): a structured clone while no list is locked
     if (j?.me?.id === uid && Array.isArray(j.lists) && Array.isArray(j.tasks)) done(j);
   };
   setTimeout(() => done(null), 8000);  // the channel does not stay open
@@ -150,8 +150,11 @@ if (!MW_ON && typeof BroadcastChannel === 'function' && mw_nonce(true)) {
     const ch = new BroadcastChannel(MW_SNAP_CH), nonce = mw_nonce(true);
     ch.onmessage = e => {
       const m = e.data; if (!m || typeof m.ask !== 'string' || m.nonce !== nonce || !S.booted || !S.me || m.uid !== S.me.id || !S.lpCache || OUT.q.length) return;
+      // 2.663.0 (#4200): no list locked: the state itself (a structured clone, no JSON on the main thread); else the JSON of LS.set
+      const st = {...S.lpCache, v: S.v, tasks: [...S.tasks.values()], lists: S.lists, counts: S.counts}, repl = typeof le2eRepl === 'function' ? le2eRepl() : undefined;
+      if (!repl) { try { ch.postMessage({re: m.ask, uid: S.me.id, state: st}); return; } catch { /* not clonable: the JSON below */ } }
       let state;
-      try { state = JSON.stringify({...S.lpCache, v: S.v, tasks: [...S.tasks.values()], lists: S.lists, counts: S.counts}, typeof le2eRepl === 'function' ? le2eRepl() : undefined); } catch { return; }
+      try { state = JSON.stringify(st, repl); } catch { return; }
       ch.postMessage({re: m.ask, uid: S.me.id, state});
     };
   } catch { /* no channel: every window starts on its own */ }

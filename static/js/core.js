@@ -546,7 +546,18 @@ function wkoDrop() {
   if (globalThis.__wkoStore) return globalThis.__wkoStore.clear().catch(() => {});  // tests: the stand-in for IndexedDB
   return new Promise(ok => { try { const r = indexedDB.deleteDatabase('kalmido-wiki'); r.onsuccess = r.onerror = r.onblocked = () => ok(); } catch { ok(); } });
 }
-function startDrop() { LS.del('cache'); S.lpCache = null; }
+function startDrop() { LS.del('cache'); S.lpCache = null; if (typeof oc_drop === 'function') oc_drop(); else if (globalThis.indexedDB) { try { indexedDB.deleteDatabase('kalmido-start'); } catch { /* none */ } } }  // 2.663.0 (#4200): + its IndexedDB record
+// 2.663.0 (#4200): the offline start state (S.lpCache) goes to IndexedDB when the browser is idle (offcache.js, loaded on demand);
+// an own window (miniwin.js) writes none; without IndexedDB or the module localStorage as before
+function startSave() {
+  if (!S.lpCache || (typeof MW_ON !== 'undefined' && MW_ON)) return;
+  if (typeof loadModule !== 'function' || !globalThis.indexedDB) { LS.set('cache', S.lpCache); return; }
+  loadModule('offcache').then(() => oc_soon(), e => { console.warn('Kalmido: offline start state: module not loaded, localStorage', e); if (S.lpCache) LS.set('cache', S.lpCache); });
+}
+async function startRead() {
+  if (typeof loadModule === 'function' && globalThis.indexedDB) { try { await loadModule('offcache'); return await oc_get(); } catch (e) { console.warn('Kalmido: offline start state: module not loaded, localStorage', e); } }
+  return LS.get('cache', null);
+}
 const wkoOld = m => !m || !(Date.now() - Date.parse(m.at) < WKO_MAX_AGE);
 function sessGuard(me) {
   if (!me) return;
@@ -1473,7 +1484,8 @@ async function ld_go(auto) {
   catch (e) {
     if (!(e instanceof Offline)) throw e;
     if (!S.tasks.size) {  // offline start: last cached state + still-queued edits
-      const c = LS.get('cache', null); if (!c) throw e;
+      const c = await startRead(); if (!c) throw e;  // 2.663.0 (#4200): IndexedDB (offcache.js), the old localStorage copy taken over once
+      if (S.tasks.size) return;  // another load came first meanwhile
       if (wkoOld(LS.get('wko', null))) wkoDrop();  // 2.238.0 B (#2872): 14 days without an online sync
       applyState(c); OUT.q.forEach(applyLocal);
     }
@@ -1486,7 +1498,7 @@ async function ld_go(auto) {
   applyState(j, ld_w0);
   if (j?.lva && !S.lpA) S.lpA = j.lva;  // 2.619.0 (#3890): the areas of this state (read before its v): the first poll takes a delta, not the whole state again
   if (S.qfWait && typeof qfSend === 'function') qfSend();  // 2.376.1 CI fix: files of a quick add whose new task was not loaded yet
-  LS.set('cache', j); S.lpCache = j;  // 2.42.0 (#1376): the delta keeps the cache current (liveparts.js)
+  S.lpCache = j; startSave();  // 2.663.0 (#4200): written when idle (IndexedDB); 2.42.0 (#1376): the delta keeps the cache current (liveparts.js)
   if (S.extra) await loadExtra().catch(() => {});
   if (S.sel && (cmtOn() || collab()) && S.tl.id === S.sel && S.tl.v !== S.v) loadTimeline(S.sel);
   if (S.sel && timeOn() && S.te.tid === S.sel && S.te.v !== S.v) loadTaskTime(S.sel);
