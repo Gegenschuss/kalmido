@@ -130,8 +130,9 @@ def _page(c, r, role, path, names, full=False):
 
 
 def _log(c, uid, r, action, detail=""):
-    """An agent's access in the history of the page's node (people's changes stay in the page history)."""
-    if not _is_agent(c, uid):
+    """An agent's access in the history of the page's node (people's changes stay in the page history).
+    2.674.0 (#4028, review F14): not for HEAD (Flask answers it with the GET route; nothing was read)."""
+    if request.method == "HEAD" or not _is_agent(c, uid):
         return
     n = wkf_node_of(c, r["id"])
     if n is not None:
@@ -341,7 +342,8 @@ def _file_need(c, uid, fid):
 
 def _file(f, marks=None):
     d = {"id": f["id"], "page_id": f["page_id"], "name": f["name"], "mime": f["mime"], "size": f["size"],
-         "created_at": f["created_at"], "image": f["mime"].startswith("image/"), "url": f"/api/v1/wiki/files/{f['id']}"}
+         "created_at": f["created_at"], "image": f["mime"].startswith("image/") and f["mime"] != SVG,  # 2.674.0 (#4028, review F14)
+         "url": f"/api/v1/wiki/files/{f['id']}"}
     if marks and f["id"] in marks:
         d["up"] = marks[f["id"]]  # the virus scan's mark, like the other file lists
     return d
@@ -363,6 +365,11 @@ def wkv_files(pid):
     return jsonify(data=[_file(x, marks) for x in rows], next_cursor=None)
 
 
+def _wkv_status(resp):
+    """2.674.0 (#4028): the status of an answer (a Response or err()'s (response, status) pair)."""
+    return int(resp[1]) if isinstance(resp, tuple) else resp.status_code
+
+
 @app.get("/api/v1/wiki/files/<int:fid>")
 @v1_view
 def wkv_file_get(fid):
@@ -371,9 +378,13 @@ def wkv_file_get(fid):
     c = db()
     uid = me()
     f, r, _, _ = _file_need(c, uid, fid)
-    _log(c, uid, r, "download", f["name"])
+    # 2.674.0 (#4028, review F14): an SVG never as a picture through the API (a download, application/octet-stream); the read
+    # is noted only when the bytes go out (not for HEAD, not for a missing / damaged file)
+    resp = wka_send(c, f, dl=True) if f["mime"] == SVG else send_stored(f)
+    if _wkv_status(resp) < 400:
+        _log(c, uid, r, "download", f["name"])
     c.commit()
-    return wka_send(c, f) if f["mime"] == SVG else send_stored(f)
+    return resp
 
 
 @app.get("/api/v1/wiki/files/<int:fid>/text")
@@ -442,7 +453,7 @@ def wkv_spec(paths, schemas, op, ok, errs, ref, pid, q):
     # 2.488.0 B (#2209): the files of a page (PDFs and pictures), read only
     schemas["WikiFile"] = {"type": "object", "properties": {
         "id": {"type": "integer"}, "page_id": {"type": "integer"}, "name": {"type": "string"}, "mime": {"type": "string"},
-        "size": {"type": "integer"}, "created_at": {"type": "string"}, "image": {"type": "boolean"},
+        "size": {"type": "integer"}, "created_at": {"type": "string"}, "image": {"type": "boolean", "description": "A picture (an SVG drawing: false)"},
         "url": {"type": "string", "description": "GET it for the bytes (/text: the text of a PDF)"},
         "up": {"type": "string", "description": "Only when the virus scan marked it (unchecked / infected)"}}}
     fid = pid("id", "File id (from GET /wiki/pages/{id}/files)")
@@ -456,7 +467,8 @@ def wkv_spec(paths, schemas, op, ok, errs, ref, pid, q):
     paths["/wiki/files/{id}"] = {
         "get": op("The bytes of a knowledge page's file (2.488.0)", T,
                   {"200": {"description": "The file", "content": {"application/octet-stream": {"schema": {"type": "string", "format": "binary"}}}}}
-                  | errs("403", "404", "410"), [fid, q("dl", "1 = download"), q("v", "Cache key (the size)")], scope="wiki:read", desc=fshared)}
+                  | errs("403", "404", "410"), [fid, q("dl", "1 = download"), q("v", "Cache key (the size)")], scope="wiki:read",
+                  desc=fshared + " An SVG drawing always comes as a download (application/octet-stream), never as a picture.")}
     paths["/wiki/files/{id}/text"] = {
         "get": op("The text of a knowledge page's file (2.488.0): the text layer of a PDF", T,
                   ok({"type": "object", "properties": {

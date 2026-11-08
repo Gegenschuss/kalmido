@@ -232,13 +232,13 @@ def wka_get(fid, name=None):
     return wka_send(c, f)
 
 
-def wka_send(c, f):
+def wka_send(c, f, dl=None):
     """2.488.0 B (#2209, also API v1): a cleaned SVG of a page as a picture in a sandbox (?dl=1 downloads); the caller checked
-    the rights and the scan."""
+    the rights and the scan. 2.674.0 (#4028, review F14): dl=True always as a download (API v1)."""
     full = os.path.join(ATT_DIR, f["path"])
     if not os.path.isfile(full):
         return err(tr("File damaged or missing"), 404)
-    dl = request.args.get("dl") == "1"
+    dl = request.args.get("dl") == "1" if dl is None else dl
     resp = oc_send_file(c, full, mimetype=SVG if not dl else "application/octet-stream", as_attachment=dl,
                         download_name=f["name"], conditional=True, max_age=0)
     resp.headers["Content-Security-Policy"] = "default-src 'none'; img-src data:; style-src 'unsafe-inline'; sandbox"
