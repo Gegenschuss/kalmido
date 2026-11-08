@@ -57,7 +57,8 @@ def jc_chat_rows(c, aid, jid, before, limit, after=0):
         raise Denied(404)
     pre = jc_prefixes(j)
     # review: my addressed messages only from the job's start on (a reused first name must not pull in an older job's)
-    q = ("SELECT * FROM agent_chat WHERE agent_id=? AND user_id=? AND (job_id=? OR (sender='user' AND created_at>=? AND ("
+    # 2.739.0 (#5216): without the job's brief (jcb_of, the answer's field brief: always at the top, never paged away)
+    q = ("SELECT * FROM agent_chat WHERE agent_id=? AND user_id=? AND COALESCE(kind, '')<>'brief' AND (job_id=? OR (sender='user' AND created_at>=? AND ("
          + " OR ".join("body ILIKE ? ESCAPE '\\'" for _p in pre) + ")))")
     # 2.86.0 (N28): a job name with % or _ is matched literally
     args = [aid, uid, jid, j["created_at"] or "", *[like_escape(p) + "%" for p in pre]]
@@ -149,3 +150,44 @@ def jcs_progress(c, jid, uid):
     rows = c.execute("SELECT text, created_at FROM agent_steps WHERE job_id=? AND user_id=? AND state='log' ORDER BY id DESC LIMIT ?",
                      (jid, uid, JCS_PROGRESS_MAX)).fetchall()
     return [{"text": r["text"], "at": r["created_at"]} for r in reversed(rows)]
+
+
+# ---- 2.739.0 (#5216): the brief of a job -- the exact wording the agent (its host) gave the job, so the person can read it.
+# The agent posts it once per job (POST /api/v1/agent/chats/{uid} {kind: brief, job_id, body}; a newer one replaces it). It
+# shows only in the job's own chat (?job=, the answer's field brief), at the top and folded ("Show the brief"), never in the
+# whole chat or its search, no push, never unread, no buttons, no event to anyone, no pin; it does not end open buttons
+# (chat_newest counts kind NULL only). Older servers answer 400 on the unknown kind -- the host then simply leaves it out.
+JCB_MAX = 60000  # characters of a brief (a job's brief is often longer than a chat message, CHAT_MAX)
+
+
+def jcb_post(c, aid, uid, b, files):
+    """{kind: brief, job_id, body, job_parent?} of agent aid for person uid -> the new row (caller commits). The job must be
+    one of aid's jobs for uid; the text is kept as it is (Markdown, line breaks), at most JCB_MAX characters."""
+    extra = sorted(k for k, v in b.items() if k not in ("body", "kind", "job_id", "job_parent") and v not in (None, "", False, "false", "0"))
+    if extra:
+        raise BadInput(tr("Invalid value: {0}", ", ".join(extra)))
+    if files:
+        raise BadInput(tr("Invalid value: {0}", "file"))
+    if b.get("job_id") in (None, ""):
+        raise BadInput(tr("Invalid value: {0}", "job_id"))
+    j = c.execute("SELECT * FROM agent_jobs WHERE id=? AND agent_id=?", (as_int(b["job_id"], "job_id", 1), aid)).fetchone()
+    if not j or j["user_id"] != uid:
+        raise BadInput(tr("Invalid value: {0}", "job_id"))
+    text = b.get("body").strip() if isinstance(b.get("body"), str) else ""
+    if not text:
+        raise BadInput(tr("The message is empty"))
+    if len(text) > JCB_MAX:
+        raise BadInput(tr("The message is too long (max. {0} characters)", JCB_MAX))
+    c.execute("DELETE FROM agent_chat WHERE agent_id=? AND user_id=? AND job_id=? AND kind='brief'", (aid, uid, j["id"]))
+    r = chat_add(c, aid, uid, "agent", text, None)
+    c.execute("UPDATE agent_chat SET kind='brief', job_id=?, job_parent=?, read_at=? WHERE id=?",
+              (j["id"], j["parent_id"] if "parent_id" in j.keys() else None, iso_ms(now_utc()), r["id"]))
+    return c.execute("SELECT * FROM agent_chat WHERE id=?", (r["id"],)).fetchone()
+
+
+def jcb_of(c, aid, uid, jid):
+    """{id, body, created_at} of the brief of job jid in uid's conversation with agent aid (the newest), None without. The
+    caller (jc_chat_rows) already checked that uid may see the job."""
+    r = c.execute("SELECT id, body, created_at FROM agent_chat WHERE agent_id=? AND user_id=? AND job_id=? AND kind='brief' ORDER BY id DESC LIMIT 1",
+                  (aid, uid, jid)).fetchone()
+    return {"id": r["id"], "body": r["body"], "created_at": r["created_at"]} if r else None

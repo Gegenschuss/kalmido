@@ -1277,7 +1277,9 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                                  "expires_in": {"type": "integer", "minimum": 10, "maximum": 604800, "description": "2.30.0 (#1041): seconds a permission "
                                                                 "question (2.35.0: or an approval request) stays open; then it shows as not answered (denied)"},
                                                  "offer_save": {"type": "boolean", "description": "2.37.0 (#1159): the button \"Save as task\" under the message (the person saves it, never the agent)"},
-                                                 "kind": {"type": "string", "enum": ["message", "notice"], "description": "2.41.0 (#1206): notice = one grey line (body up to 200 characters, no buttons, at most one file)"},
+                                                 "kind": {"type": "string", "enum": ["message", "notice", "brief"], "description": "2.41.0 (#1206): notice = one grey line (body up to 200 characters, no buttons, at most one file); "
+                                                          "2.739.0 (#5216): brief = the exact wording of the brief you gave a job (with job_id, body up to 60000 characters, nothing else): "
+                                                          "shown folded at the top of that job's own chat only, never in the whole chat, no push; a newer one replaces it"},
                                                  "job_msg": {"type": "string", "enum": ["say", "question", "result", "error"], "description": "2.306.0 F (#2942): with job_id, the kind of this job message (2.96.0 C, #2015)"},
                                                  "source": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,23}$", "description": "2.388.0 (#3341): what produced this "
                                                             "message, when it is not you answering (e.g. dispatcher: a helper of yours); comes back as source, "

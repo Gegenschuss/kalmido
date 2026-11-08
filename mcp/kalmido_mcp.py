@@ -1037,7 +1037,9 @@ TOOLS = [
                   "the person decides and saves it -- you never save a message yourself. kind (2.41.0): notice = one small grey "
                   "line in the middle of the chat instead of a message (no push, never unread, at most 200 characters, no buttons; "
                   "at most one file, which a tap on the line opens), e.g. 'New session, summary taken over (22:10)' after your "
-                  "host started a fresh session; older servers answer 400 -- then send nothing. "
+                  "host started a fresh session; older servers answer 400 -- then send nothing. kind (2.739.0): brief with job_id = the exact "
+                  "wording of the brief you gave that job (Markdown, up to 60000 characters, no other fields): the person reads it folded at "
+                  "the top of the job's own chat, never in the whole chat; no push; a newer brief of the job replaces it; older servers answer 400 -- then send nothing. "
                   "next_step (2.236.0, #2911): the next step you suggest, at most 200 characters (servers before 2.565.0: 80) -- shown as ONE button at the end of the "
                   "message (when your work style has next_step on; the answer tells next_step_dropped: off | repeat | conflict | full). "
                   "limit (2.236.0, #2909): true = this message reports a limit (a one-way step, a refusal, a stop, an error); with work "
@@ -1062,7 +1064,9 @@ TOOLS = [
                "style": {"type": "string", "enum": ["default", "primary", "danger"]}}, "required": ["id", "label"]}},
            "multi": {"type": "boolean"},
            "offer_save": {"type": "boolean", "description": "2.37.0: offer the person the button 'Save as task' under this message"},
-           "kind": {"type": "string", "enum": ["message", "notice"], "description": "2.41.0: notice = a small grey line (session / summary notes)"},
+           "kind": {"type": "string", "enum": ["message", "notice", "brief"], "description": "2.41.0: notice = a small grey line (session / summary notes); "
+                                                                     "2.739.0: brief = the wording of the brief you gave job job_id (only body + job_id, up to "
+                                                                     "60000 characters): folded at the top of the job's own chat, never in the whole chat, no push"},
            "next_step": {"type": "string", "minLength": 1, "maxLength": 200, "description": "2.236.0: the next step as one button at the end"},
            "limit": {"type": "boolean", "description": "2.236.0: this message reports a limit (may push with work style push 'limits')"},
            "files": {"type": "array", "maxItems": 10, "items": {"type": "object", "properties": {

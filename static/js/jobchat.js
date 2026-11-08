@@ -433,3 +433,11 @@ function jcs_rows(ms, row) {
   return out;
 }
 const jcs_progHtml = p => `<div class="cnotice jcsp" role="note" data-k="jp${p.i}_${p.t}" title="${esc(fmtWhen(p.at))}"><span>${esc(p.text || '')}</span></div>`;
+
+// ---- 2.739.0 (#5216): the job's brief -- the exact wording its agent gave the job (kind brief, the field brief of ?job=).
+// Only in the job's own chat, as its first row and folded ("Show the brief"); the whole chat never gets it from the server.
+// The row's key stays the same while the brief does, so a refresh keeps it open or folded.
+function jcb_html() {
+  const b = S.chat.job && S.chat.brief; if (!b || !b.body) return '';
+  return `<details class="jcbrief" data-k="brief${+b.id}"><summary><span class="jcbt">${esc(tr('Job brief'))}</span><span class="jcbs">${esc(tr('Show the brief'))}</span>${ic('chev', 's')}</summary><div class="jcbb">${commentBody(b.body, {})}</div></details>`;
+}

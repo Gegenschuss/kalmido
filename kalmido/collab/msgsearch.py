@@ -243,7 +243,7 @@ def search_messages(c, uid, q, arts=None, sender=None, room=None, agent=None, ta
             sq = " AND ((m.sender='user' AND m.user_id=?) OR (m.sender='agent' AND m.agent_id=?))"
             a2 += [sender, sender]
         rows = c.execute(f"""SELECT m.id, m.agent_id, m.user_id, m.sender, m.body, m.created_at
-            FROM agent_chat m WHERE {mcond} AND {cond}{sq} ORDER BY m.id DESC LIMIT {MSG_CAND}""", match + a2).fetchall()
+            FROM agent_chat m WHERE {mcond} AND {cond}{sq} AND COALESCE(m.kind, '')<>'brief' ORDER BY m.id DESC LIMIT {MSG_CAND}""", match + a2).fetchall()  # 2.739.0 (#5216): no job briefs
         reach = {}
         for r in rows:
             if not agent_me:

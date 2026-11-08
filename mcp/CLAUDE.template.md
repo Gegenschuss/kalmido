@@ -161,6 +161,9 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
 - A new session that took over a summary, or a compacted conversation, may be shown with a notice (`send_chat` with
   `kind: "notice"`, 2.41.0): one short line such as *New session, summary taken over (22:10)*, a small grey line without
   push. Never answer with a notice; an older server answers 400, then send nothing.
+- When you give a job a written brief, you may post its exact wording once (`send_chat` with `kind: "brief"` and
+  `job_id`, 2.739.0): the person reads it folded at the top of the job's own chat, never in the whole chat. Never use it
+  for answers; an older server answers 400, then send nothing.
 
 ### Showing that you are alive
 - Before you answer in the chat, send the **typing signal** (`chat_typing`), then answer. Leave a short pause (about

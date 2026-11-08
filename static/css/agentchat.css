@@ -538,3 +538,14 @@ body.kb-open .acsug-l{max-height:min(30vh,9rem)}
   #achat .chcomp .chtools > .iconbtn::after{content:attr(aria-label)}
   #achat .chcomp .chtools > .iconbtn.hidden{display:none}
 }
+/* 2.739.0 (#5216): the job's brief at the top of the job's own chat, folded */
+.jcbrief{align-self:stretch;max-width:min(100%,40rem);border:1px solid var(--line);border-radius:var(--r-l);background:var(--bg2)}
+.jcbrief>summary{display:flex;align-items:center;gap:.5rem;min-height:2.75rem;padding:.375rem .625rem;cursor:pointer;list-style:none;-webkit-tap-highlight-color:transparent}
+.jcbrief>summary::-webkit-details-marker{display:none}
+.jcbrief .jcbt{font-weight:600}
+.jcbrief .jcbs{margin-left:auto;font-size:var(--fs-s);color:var(--text2)}
+.jcbrief>summary>svg{flex:none;color:var(--muted)}
+.jcbrief[open]>summary>svg{transform:rotate(180deg)}
+.jcbrief[open] .jcbs{display:none}
+.jcbrief[open]>summary>svg{margin-left:auto}
+.jcbb{padding:0 .625rem .625rem;overflow-wrap:anywhere}

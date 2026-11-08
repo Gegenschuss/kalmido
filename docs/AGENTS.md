@@ -2092,6 +2092,22 @@ compacted its context in the middle of a run. `POST /api/v1/agent/chats/{user_id
   The reference launcher does this: it sends *Conversation compacted (HH:MM)* when a chat run's command reports a
   `compact_boundary` (text `KALMIDO_NOTICE_COMPACTED`) and stops trying after the first `400` / `404`.
 
+### The brief of a job
+
+*Since 2.739.0.*
+
+A host that gives a job a written brief (the prompt of the job's run) can show its exact wording to the person the job is
+for: `POST /api/v1/agent/chats/{user_id}` with `{"kind": "brief", "job_id": 82, "body": "…"}` (MCP `send_chat` with
+`kind: "brief"`):
+
+- `job_id` is required (your job for this person, else `400`); `body` is kept as it is (Markdown, line breaks), at most
+  60000 characters; `job_parent` is allowed, every other field (`choices`, `task_id`, `reply_to`, files …) answers `400`.
+- It shows **only in the job's own chat** (`GET /api/agents/{id}/chat?job=` carries it as `brief: {id, body, created_at}`,
+  not in `messages`): folded at the top as *Brief* with *Show the brief*. Never in the whole chat or the message search,
+  no push, never unread, no event to anyone, no answer buttons, cannot be pinned; it does not make open buttons expire.
+- Send it once when the job starts; a newer brief of the same job replaces the older one.
+- Older servers (before 2.739.0) answer `400` (invalid `kind`): send nothing then -- never a normal message instead.
+
 ### Chat reactions and delivery
 
 *Since 2.7.2.*
@@ -2265,6 +2281,7 @@ Agents read files like this:
 | Ask for an approval in the chat (2.35.0) | `POST /api/v1/agent/chats/{user_id}` with `approval: {title, what?, yes_label?, no_label?}`; the answer: event `chat_choice` with `approval` | `request_chat_approval` |
 | Ask for an approval / offer answer buttons on a task (2.41.0) | `POST /api/v1/tasks/{id}/comments` with `approval: {title, what?}` or `choices`; withdraw: `POST /api/v1/comments/{id}/withdraw`; the answer: event `comment` with `answer` | `request_comment_approval`, `add_comment` (`choices`), `withdraw_comment_choices` |
 | Offer to save an answer as a task (2.37.0) | `POST /api/v1/agent/chats/{user_id}` with `offer_save: true`: the button *Save as task* under the message; the person saves it (title, project, review date), agents never save | `send_chat` with `offer_save` |
+| The brief of a job (2.739.0) | `POST /api/v1/agent/chats/{user_id}` with `kind: "brief"`, `job_id` and the brief as `body` (at most 60000 characters): folded at the top of the job's own chat only, never in the whole chat, no push; older servers `400` = send nothing |
 | A notice in the chat (2.41.0) | `POST /api/v1/agent/chats/{user_id}` with `kind: "notice"` and a one-line `body` (at most 200 characters, optionally one file): a small grey line, no push, never unread; older servers `400` = send nothing | `send_chat` with `kind: "notice"` |
 | Send files in the chat | `POST /api/v1/agent/chats/{user_id}` as `multipart/form-data`: `body` (optional with files), `task_id`, `file` (repeatable) | `send_chat` with `files: [{name, base64, mime?}]` |
 | Write a text file onto a task (2.30.0) | `POST /api/v1/tasks/{id}/attachments/text` with `{name, content}` (needs `attachments:write`) | `create_text_file` |

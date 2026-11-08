@@ -112,7 +112,7 @@ def cpin_agent_set(c, m, b, by_agent):
     dict or raises BadInput / Denied (caller commits nothing: done here)."""
     from ..agents.chat import chat_one
     from ..agents.core import agent_emit
-    if "kind" in m.keys() and m["kind"] == "notice":
+    if "kind" in m.keys() and m["kind"] in ("notice", "brief"):  # 2.739.0 (#5216): nor a job's brief
         raise BadInput(tr("Invalid value: {0}", "message"))
     on = cpin_want(b, bool(m["pinned_at"]))
     aid, uid = m["agent_id"], m["user_id"]

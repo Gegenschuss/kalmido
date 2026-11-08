@@ -212,10 +212,10 @@ def chat_dict(r, rx=None, files=None, api=False, newest=None, edits=False):
     of the conversation's newest messages per source (chat_newest, 2.212.0 #2787), for choice_state."""
     ch = _jload(r["choices"]) if "choices" in r.keys() else None
     ans = _jload(r["choice"]) if "choice" in r.keys() else None
-    kind = (r["kind"] if "kind" in r.keys() else None) or "message"  # 2.41.0 (#1206): message | notice
+    kind = (r["kind"] if "kind" in r.keys() else None) or "message"  # 2.41.0 (#1206): message | notice; 2.739.0 (#5216): | brief
     return {"id": r["id"], "agent_id": r["agent_id"], "user_id": r["user_id"], "from": r["sender"], "body": r["body"],
             "task_id": r["task_id"], "created_at": r["created_at"], "delivered_at": r["delivered_at"], "kind": kind,
-            "reactions": (rx or {}).get(r["id"], []), "asks": r["sender"] == "agent" and kind != "notice" and (chat_asks(r["body"]) or bool(ch and (ch.get("permission") or ch.get("approval")))),
+            "reactions": (rx or {}).get(r["id"], []), "asks": r["sender"] == "agent" and kind == "message" and (chat_asks(r["body"]) or bool(ch and (ch.get("permission") or ch.get("approval")))),
             # 2.28.0 (#1005): answer buttons of an agent's message ({choices: [{id, label, style?}], multi}) and the person's
             # answer ({ids, at}); null without. 2.30.0 (#1037 / #1041): choices.permission (a permission question),
             # choices.expires_at; choice_state open | answered | expired (a newer message came, the time ran out) | withdrawn.
@@ -713,6 +713,8 @@ def chat_post(c, aid, uid, sender, b, files, allowed_keys=("body", "task_id")):
 # push, never unread, no buttons, no live steps taken along, no event to anyone; it does not make older buttons expire and
 # is no answer to an edited message. At most one file (the summary): a tap on the line opens it.
 NOTICE_MAX = 200
+# 2.739.0 (#5216): rows of the whole chat (and of its search) without the briefs of jobs (they show in the job's own chat only)
+JCB_NOT_SQL = "COALESCE(kind, '')<>'brief'"
 
 
 def chat_source(v):
@@ -897,18 +899,20 @@ def agent_chat_get(aid):
     after = as_int(request.args.get("after", 0), "after", 0)
     before = as_int(request.args.get("before", 0), "before", 0)
     limit = as_int(request.args.get("limit", 300), "limit", 1, 300)
-    q, args = "SELECT * FROM agent_chat WHERE agent_id=? AND user_id=? AND id>?", [aid, me(), after]
+    # 2.739.0 (#5216): a job's brief (kind brief) never shows in the whole chat, only in the job's own chat (as "brief")
+    q, args = f"SELECT * FROM agent_chat WHERE agent_id=? AND user_id=? AND id>? AND {JCB_NOT_SQL}", [aid, me(), after]
     if before:
         q += " AND id<?"
         args.append(before)
     rows = c.execute(q + " ORDER BY id DESC LIMIT ?", (*args, limit)).fetchall()[::-1]
-    more = bool(rows) and bool(c.execute("SELECT 1 FROM agent_chat WHERE agent_id=? AND user_id=? AND id<? LIMIT 1",
+    more = bool(rows) and bool(c.execute(f"SELECT 1 FROM agent_chat WHERE agent_id=? AND user_id=? AND id<? AND {JCB_NOT_SQL} LIMIT 1",
                                          (aid, me(), rows[0]["id"])).fetchone())
     if request.args.get("job"):  # 2.56.0 (#1793): the history of one job of this agent, only from my own conversation
-        from ..agents.jobchat import jc_chat_rows
+        from ..agents.jobchat import jc_chat_rows, jcb_of
         rows, more = jc_chat_rows(c, aid, as_int(request.args["job"], "job", 1), before, limit, after)
         from ..agents.jobchat import jcs_progress
         prog = jcs_progress(c, as_int(request.args["job"], "job", 1), me())  # 2.153.0 (#1962)
+        brief = jcb_of(c, aid, me(), as_int(request.args["job"], "job", 1))  # 2.739.0 (#5216): the job's brief (null = none)
     if c.execute("UPDATE agent_chat SET read_at=? WHERE agent_id=? AND user_id=? AND sender='agent' AND read_at IS NULL",
                  (iso(now_utc()), aid, me())).rowcount:
         c.commit()
@@ -948,7 +952,7 @@ def agent_chat_get(aid):
                    pins=pins,  # 2.62.0 (#1848): the pinned messages, also older than this page
                    # 2.96.0 C (#2015): the jobs of these messages (name, version, state), for the job cards
                    jobs=jcd_jobs(c, aid, msgs + apo + pins + sug, me()),
-                   **({"progress": prog} if request.args.get("job") else {}))  # 2.62.0 (#1848): the pinned messages, also older than this page
+                   **({"progress": prog, "brief": brief} if request.args.get("job") else {}))  # 2.62.0 (#1848): the pinned messages, also older than this page
 
 
 def chat_task(c, v, uid_a, uid_b, person=False):

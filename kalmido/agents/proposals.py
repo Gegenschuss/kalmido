@@ -1498,9 +1498,17 @@ def v1_agent_chat_post(uid):
     if unknown:
         raise UnknownFields(unknown)
     # 2.41.0 (#1206): kind = message (default) | notice (a small grey line, no push, never unread; older servers answer 400)
-    if b.get("kind") not in (None, "", "message", "notice"):
+    # 2.739.0 (#5216): | brief (the wording of a job's brief: only in the job's own chat, folded, no push, never unread)
+    if b.get("kind") not in (None, "", "message", "notice", "brief"):
         raise BadInput(tr("Invalid value: {0}", "kind"))
     src = chat_source(b.pop("source", None))  # 2.388.0 (#3341): who produced the message, the app can hide a source
+    if b.get("kind") == "brief":  # 2.739.0 (#5216): agents/jobchat.py jcb_post
+        from ..agents.jobchat import jcb_post
+        r = chat_set_source(c, jcb_post(c, aid, uid, b, files), src)
+        bump(c)
+        c.commit()
+        chat_unlink_trimmed()
+        return jsonify(chat_one(c, r, api=True)), 201
     srvweb_body(c, aid, uid, b)  # 2.571.0 D (#4676): a server agent's run with web access names its web sources
     if b.get("kind") == "notice":
         r = chat_set_source(c, cx_notice_post(c, aid, uid, b, files), src)
