@@ -10,7 +10,7 @@ freelancer-matrix: office
  - 12) the Peppol status fetch and the receiver lookup (provider calls with the office's key) need the right to send
    ("release") like sending: a group person without it 403, with it through; a person without organisation (own office) through
  - 13) a point of Money switched off: somebody without the right gets 403, not the feature's 404 (no answer about the switch);
-   the admin still 404
+   the admin still 404 (a guest without office groups; a group person is stopped by the path gate before already)
  - 15) POST /api/office/receipt-mail with a list as the body: 400 (organisation and a person without organisation)
  - 5) without PUBLIC_URL: a new receipt fetcher is refused (503, no row, never the request's Host in a code), the hosted MCP
    metadata answer 503 instead of naming the request's Host as issuer; the connected apps list still answers (no address)
@@ -170,10 +170,18 @@ group("Nur Briefe", {"letters": "edit"})
 r = A.put(O + "/settings", json={"features_off": ["money.kpi"]})
 check(r.ok and r.json()["features"].get("money.kpi") is False, f"the admin switches the key figures off {r.status_code}")
 r = Ca.get(O + "/kpi")
-check(r.status_code == 403, f"#4074 13: no right for the key figures: 403, not the feature's 404 ({r.status_code} {r.text[:120]})")
+check(r.status_code == 403, f"#4074 13: no right for the key figures (an office group): 403 ({r.status_code} {r.text[:120]})")
+r = A.post(B + "/api/users", json={"username": "gina", "display_name": "Gina Guest", "password": PASSWORD, "email": "gina@example.com"})
+assert r.ok, r.text
+check(A.put(B + f"/api/orgs/{ORG}/members", json={"email": "gina@example.com", "role": "guest"}).ok, "gina joins as a guest (no office groups)")
+Gi = sess("gina")
+Gi.patch(B + "/api/settings", json={"lang": "en", "features": FEAT, "tour": "done", "workspace": f"org:{ORG}"})
+r = Gi.get(O + "/kpi")
+check(r.status_code == 403, f"#4074 13: a guest (no office right): 403, not the feature's 404 ({r.status_code} {r.text[:120]})")
 check(A.get(O + "/kpi").status_code == 404, "the admin: 404 (switched off)")
 A.put(O + "/settings", json={"features_off": []})
-check(Ca.get(O + "/kpi").status_code == 403 and A.get(O + "/kpi").ok, "on again: the admin 200, carol still 403")
+check(Ca.get(O + "/kpi").status_code == 403 and Gi.get(O + "/kpi").status_code == 403 and A.get(O + "/kpi").ok,
+      "on again: the admin 200, carol and the guest still 403")
 
 # ---------------------------------------------------------------- 15) receipt-mail: a body that is no object
 for s, who in ((A, "the organisation's admin"), (Fr, "a person without organisation")):
