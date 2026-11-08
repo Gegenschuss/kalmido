@@ -17480,6 +17480,7 @@
   "{0} × {1} px · pixel ratio {2} · pointer {3} · hover {4} · phone layout {5} · finger operation {6}": "{0} × {1} px · densité de pixels {2} · pointeur {3} · survol {4} · mise en page mobile {5} · commande au doigt {6}",
   "The person who created this link may no longer share this folder": "La personne qui a créé ce lien ne peut plus partager ce dossier",
   "The person who created this request may no longer upload into this folder": "La personne qui a créé cette demande ne peut plus déposer de fichiers dans ce dossier",
+  "Links to documents that did not come along were left out": "Les liens vers des documents non importés ont été omis",
   "The server is busy opening other large encrypted files. Please try again in a moment.": "Le serveur ouvre d'autres gros fichiers chiffrés. Réessayez dans un instant.",
   "Add image, PDF or audio": "Ajouter une image, un PDF ou un audio",
   "Images (JPG, PNG, WebP), PDFs and audio files (MP3, M4A, AAC, WAV, OGG, Opus, FLAC). The file stays in the file store; comments sit at a point or, for audio, at a second.": "Images (JPG, PNG, WebP), PDF et fichiers audio (MP3, M4A, AAC, WAV, OGG, Opus, FLAC). Le fichier reste dans l’espace fichiers ; les commentaires se placent à un point ou, pour l’audio, à une seconde.",

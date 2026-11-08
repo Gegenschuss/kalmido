@@ -17481,6 +17481,7 @@
   "{0} × {1} px · pixel ratio {2} · pointer {3} · hover {4} · phone layout {5} · finger operation {6}": "{0} × {1} px · densità di pixel {2} · puntatore {3} · hover {4} · layout telefono {5} · uso con le dita {6}",
   "The person who created this link may no longer share this folder": "La persona che ha creato questo link non può più condividere questa cartella",
   "The person who created this request may no longer upload into this folder": "La persona che ha creato questa richiesta non può più caricare file in questa cartella",
+  "Links to documents that did not come along were left out": "I collegamenti a documenti non importati sono stati omessi",
   "The server is busy opening other large encrypted files. Please try again in a moment.": "Il server sta aprendo altri file cifrati di grandi dimensioni. Riprova tra un momento.",
   "Add image, PDF or audio": "Aggiungi immagine, PDF o audio",
   "Images (JPG, PNG, WebP), PDFs and audio files (MP3, M4A, AAC, WAV, OGG, Opus, FLAC). The file stays in the file store; comments sit at a point or, for audio, at a second.": "Immagini (JPG, PNG, WebP), PDF e file audio (MP3, M4A, AAC, WAV, OGG, Opus, FLAC). Il file resta nell’archivio file; i commenti stanno su un punto o, per l’audio, su un secondo.",

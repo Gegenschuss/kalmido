@@ -432,6 +432,24 @@ def _field(c, run, src, d, ctx):
     return d
 
 
+def _df_links(run, v):
+    """2.657.0 (#5018): a link field's value ("12,34") with each document id of the archive put onto the document this run
+    made from it (the documents come before the values); a Paperless id ("pl:7", the source's Paperless) or an id that did not
+    come along drops out and counts as a warning of the report. Never a raw id of the source. "" = nothing left."""
+    from ..docs.fields import DF_LINKS_MAX
+    out = []
+    for x in str(v).split(","):
+        x = x.strip()
+        new = run.m("fs_nodes", x) if re.fullmatch(r"[1-9]\d{0,17}", x) else None
+        if not new:
+            if x:
+                run.warning(N_("Links to documents that did not come along were left out"))
+            continue
+        if str(new) not in out and len(out) < DF_LINKS_MAX:
+            out.append(str(new))
+    return ",".join(out)
+
+
 def _field_value(c, run, src, d, ctx):
     """2.184.0 A (#2579): the value of a custom field, sealed with the target's workspace key (a select value -> its option)."""
     from ..docs import store as S
@@ -439,8 +457,10 @@ def _field_value(c, run, src, d, ctx):
     v = src.get("value")
     if not f or not isinstance(v, str) or v.startswith("kenc1:"):
         return _df_skip(run)  # a value that did not open in the export
-    if f["type"] == "documentlink":  # 2.635.0 (#4807 c): its ids are the source server's documents -- not taken over (yet)
-        return _df_skip(run)
+    if f["type"] == "documentlink":  # 2.657.0 (#5018): the source's document ids -> the ones this run made (run.m only)
+        v = _df_links(run, v)
+        if not v:
+            return _df_skip(run)
     if f["type"] == "select":
         omap = _st(run).get("opts", {}).get(d["field_id"])
         v = omap.get(v) if omap is not None else v
