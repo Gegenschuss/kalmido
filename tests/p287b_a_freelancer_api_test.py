@@ -363,6 +363,7 @@ SUBST = [
     (r"/sheets/\d+/files/$", None), (r"/sheets/$", "sheet"), (r"/polls/$", "poll"), (r"/bookmarks/$", "bookmark"),
     (r"/office/letters/$", "letter"), (r"/office/packs/$", "pack"), (r"/office/agreements/$", "agreement"), (r"/forms/$", "form"),
     (r"/office/cashbooks/$", "cashbook"),
+    (r"/office/books/ledger/$", "ledgercsv"),  # 2.666.0 (#3461): the CSV lists of the balance sheet (susa, pl, bs, journal)
     # 2.570.0 (#4783): the office rows of the history routes
     (r"/office/trips/\d+/items/$", "tripitem"), (r"/office/trips/purposes/$", "trippurpose"), (r"/office/trips/$", "trip"),
     (r"/office/fixed-costs/$", "fixedcost"), (r"/office/cashflow/adjust/$", "cfadjust"), (r"/office/bank/rules/$", "bankrule"),
@@ -385,6 +386,7 @@ SUBST = [
     (r"/absences/$", "absence"), (r"/budget/$", "budget"),
 ]
 IDS["me"] = FID
+IDS["ledgercsv"] = "susa"  # 2.666.0 (#3461): ledger/<what>.csv names a list, not an id
 
 
 # 2.421.0 A (#2936): route -> {placeholder key: the id to take instead} where the first own object is the wrong kind
