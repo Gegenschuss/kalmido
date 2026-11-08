@@ -1,5 +1,5 @@
 // 2.124.0 part E UI test (#2116), own container (start.sh): several sheets in one table.
-// A table with one sheet shows only a quiet "+" under the grid (the view as before); "+" adds a sheet and opens it, the bar
+// A table with one sheet shows its tab "Sheet 1" and the "+" under the grid (2.727.0, #5203); "+" adds a sheet and opens it, the bar
 // then shows both sheets (the open one marked), a tap on the other sheet opens it, a tap on the open one gives its menu
 // (rename, duplicate, move, delete; the first sheet has no delete), Undo takes a new sheet back in ONE step, the
 // overview names the number of sheets; a reader sees the bar without "+" and without the menu.
@@ -31,11 +31,17 @@ const FEAT = 'collab,comments,sheets';
   const S = await call('POST', '/api/sheets', {title: 'Shoot plan', space: 'private'});
   check(S.status === 201, 'a private table');
 
-  // ================= one sheet: only "+"
+  // ================= one sheet: its tab "Sheet 1" and the "+"
+  // 2.727.0 (#5203): the bar is always there - one sheet shows its tab and the "+" (before: only a quiet "+", class "one")
   let w = await boot({user: 'alice', hash: 'sheets/' + S.id}), d = w.document;
   await until(() => d.querySelector('#view .shvgrid'));
   const bar = await until(() => d.querySelector('#view .shbbar'));
-  check(bar && bar.classList.contains('one') && !bar.querySelector('.shbtab') && bar.querySelector('[data-shb="add"]'), 'one sheet: only the "+" ' + (bar?.outerHTML || '').slice(0, 200));
+  check(bar && !bar.classList.contains('one') && bar.querySelectorAll('.shbtab').length === 1 && bar.querySelector('.shbtab.on')?.textContent.trim() === 'Sheet 1' && bar.querySelector('[data-shb="add"]'), '#5203 one sheet: the tab "Sheet 1" and the "+" ' + (bar?.outerHTML || '').slice(0, 200));
+  d.querySelector('#view .shbtab.on')?.click();
+  await until(() => items(d).length);
+  const m0 = items(d).map(b => b.textContent.trim());
+  check(m0.includes('Rename…') && m0.includes('Duplicate') && !m0.includes('Delete sheet') && !m0.includes('Move left') && !m0.includes('Move right'), '#5203 one sheet: its menu, no delete ' + m0.join(' | '));
+  w.eval('closePop()');
   // ================= "+": a new sheet, opened
   d.querySelector('#view [data-shb="add"]')?.click();
   const t2 = await until(async () => { const x = await call('GET', `/api/sheets/${S.id}/tabs`); return x.tabs?.length === 2 && x.tabs[1].id; });
@@ -95,6 +101,16 @@ const FEAT = 'collab,comments,sheets';
   d.querySelector('#view .shbtab.on')?.click();
   await sleep(200);
   check(!items(d).length, 'a reader: no sheet menu');
+  w.close();
+  // 2.727.0 (#5203): a reader of a table with one sheet sees its tab, without "+" and without the menu
+  const S1 = await call('POST', '/api/sheets', {title: 'One sheet', space: 'private'});
+  await call('POST', `/api/sheets/${S1.id}/shares`, {user_id: BOB, role: 'read'});
+  w = await boot({user: 'bob', hash: 'sheets/' + S1.id}); d = w.document;
+  check(await until(() => d.querySelectorAll('#view .shbtab').length === 1), '#5203 a reader, one sheet: the tab');
+  check(!d.querySelector('#view [data-shb="add"]'), '#5203 a reader, one sheet: no "+"');
+  d.querySelector('#view .shbtab.on')?.click();
+  await sleep(200);
+  check(!items(d).length, '#5203 a reader, one sheet: no menu');
   w.close();
 
   check(errs.length === 0, 'no JS errors: ' + errs.slice(0, 3).join(' | '));

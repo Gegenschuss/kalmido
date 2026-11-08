@@ -1,18 +1,18 @@
 // @ts-check
 // 2.124.0 E (#2116): several sheets in one table, loaded with the tables (lazyload.js). The sheet bar under the grid (like a
 // spreadsheet): the sheets as tabs (tap = open it, tap on the open one = its menu: rename, duplicate, move, delete; drag to
-// move on a computer), "+" = a new sheet after the open one. One sheet: only a quiet "+" (who may change the table), the view
-// stays as before. Every change is one Undo step; a deleted sheet goes to the trash and Undo brings it back. Each sheet is
+// move on a computer), "+" = a new sheet after the open one. One sheet: its tab and the "+" as well (2.727.0, #5203). Every change is one Undo step; a deleted sheet goes to the trash and Undo brings it back. Each sheet is
 // a sheet of its own on the server (GET /api/sheets/<id> with its id): the bar opens it by its route #sheets/<id>.
 const shbUrl = (bid, tid, x) => `/api/sheets/${bid}/tabs${tid ? '/' + tid : ''}${x ? '/' + x : ''}`;
 const shbBid = sh => sh?.book_id || sh?.id;
 const shbOpen = id => { if (S.route.mod === 'sheets' && S.route.sh === id) return; location.replace('#sheets/' + id); };
 
 function shb_barHtml(sh) {
-  const tabs = sh.tabs || [], w = sh.can_write;
-  if (tabs.length < 2 && !w) return '';
+  // 2.727.0 (#5203): the bar is always there, also with one sheet - its tab (its name, a new table
+  // "Sheet 1") and the "+" beside it like a spreadsheet; the tab acts as with two sheets (tap on the open one = its menu).
+  // Who may only read sees the tab without "+" and without the menu. Without tabs (an older answer) the open sheet alone.
+  const w = sh.can_write, tabs = sh.tabs?.length ? sh.tabs : [{id: sh.id, name: sh.tab_name || tr('Sheet {0}', 1), first: true, kind: sh.kind}];
   const add = w ? `<button type="button" class="shbadd iconbtn" data-shb="add" title="${esc(tr('Add sheet'))}" aria-label="${esc(tr('Add sheet'))}">${ic('plus', 's')}</button>` : '';
-  if (tabs.length < 2) return `<div class="shbbar one">${add}</div>`;
   return `<div class="shbbar"><div class="shbtabs" role="tablist" aria-label="${esc(tr('Sheets'))}">${tabs.map(t => {
     const on = t.id === sh.id;
     return `<button type="button" role="tab" class="shbtab${on ? ' on' : ''}" aria-selected="${on}" ${on ? 'aria-haspopup="menu"' : ''} data-shb="tab" data-id="${t.id}" ${w && !rowd_touch() ? 'draggable="true"' : ''} title="${esc(on && w ? tr('Sheet menu') : t.name)}">${t.kind === 'pivot' ? ic('columns', 's') : '' /* 2.671.0 (#3463 b) */}${esc(t.name)}${on && w ? ic('down', 's') : ''}</button>`;
