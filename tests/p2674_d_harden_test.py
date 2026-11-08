@@ -130,6 +130,12 @@ T1 = r.json().get("url", "").rsplit("/", 1)[-1]
 check(r.status_code == 201 and T1, "2: a public link with pictures " + r.text[:200])
 q = requests.get(B + f"/s/w/{T1}/img/{PID}/{IMG}")
 check(q.ok and q.content.startswith(b"\x89PNG") and q.headers.get("Content-Type", "").startswith("image/png"), f"2: a PNG still comes ({q.status_code})")
+# 2.674.0 (#4382 review F1): a picture over the preview limit of extlinks (15 MB) is never read into memory: 404
+big = dbx("SELECT path FROM fs_versions WHERE node_id=? ORDER BY no DESC LIMIT 1", (IMG,))[0][0]
+bigp = py("import json, os\nfrom kalmido.core.config import ATT_DIR\nprint(json.dumps({'p': os.path.join(ATT_DIR, %r)}))" % big).get("p")
+subprocess.run(["docker", "exec", CT, "truncate", "-s", "+16M", bigp], check=True)
+check(requests.get(B + f"/s/w/{T1}/img/{PID}/{IMG}").status_code == 404, "2 (review F1): a picture over 15 MB is not read and not sent")
+subprocess.run(["docker", "exec", CT, "truncate", "-s", "-16M", bigp], check=True)
 dbx("UPDATE fs_versions SET mime='image/svg+xml' WHERE node_id=?", (SVG,))
 dbx("UPDATE fs_nodes SET mime='image/svg+xml' WHERE id=?", (SVG,))
 check(requests.get(B + f"/s/w/{T1}/img/{PID}/{SVG}").status_code == 404, "2: a file store picture marked SVG never comes (was: every image/*)")

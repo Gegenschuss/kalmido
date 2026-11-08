@@ -411,9 +411,11 @@ def wsh_img_send(c, n, v, public):
             raise Denied(404)
         # 2.674.0 (#4382 finding 2): only a raster picture whose bytes start like one (the pattern of extlinks XL_IMG);
         # anything else (an SVG, a file named .png that is none) is 404
-        from ..files.extlinks import XL_IMG
+        from ..files.extlinks import XL_IMG, XL_PREVIEW_MB
         mime = v["mime"] or n["mime"] or ""
-        data = oc_read_file(c, full) if mime in XL_IMG else b""
+        # 2.674.0 (#4382 review F1): read into memory only up to the preview limit of extlinks (public route)
+        small = os.path.getsize(full) <= XL_PREVIEW_MB * 1024 * 1024
+        data = oc_read_file(c, full) if mime in XL_IMG and small else b""
         if not data.startswith(XL_IMG.get(mime, (b"\0\0\0\0",))) or (mime == "image/webp" and data[8:12] != b"WEBP"):
             raise Denied(404)
         resp = Response(data, mimetype=mime)
