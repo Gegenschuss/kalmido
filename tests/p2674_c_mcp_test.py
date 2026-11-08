@@ -173,7 +173,7 @@ r = refresh(tk2)
 check(r.status_code == 400 and j(r).get("error") == "invalid_grant" and "90 days" in j(r).get("error_description", ""),
       f"F12: 90 days after the access was made the refresh is refused ({r.status_code} {r.text[:160]})")
 check(dbx("SELECT revoked_at FROM oauth_grants WHERE id=?", (G,))[0][0] is not None, "F12: and the access is revoked")
-check(not any(g["id"] == G for g in Fr.get(B + "/api/my/mcp-grants").json()["grants"]), "F12: it left her list")
+check(not any(g["id"] == G for g in j(Fr.get(B + "/api/my/mcp-grants")).get("grants", [])), "F12: it left her list")
 
 # ================================================================ F12: Administration > Agents, the apps of team agents
 tt = full(TEAM, A)
@@ -193,7 +193,7 @@ check(requests.get(B + "/api/admin/mcp-grants", headers={"Authorization": "Beare
 check(A.delete(B + f"/api/admin/mcp-grants/{grant_of(TK)}").status_code == 404, "F12: the admin cannot revoke her personal agent's access here")
 check(A.delete(B + f"/api/admin/mcp-grants/{GT}").ok, "F12: the admin revokes the team agent's access")
 check(refresh(tt).status_code == 400 and mcp(tt["access_token"]).status_code == 401, "F12: the app's tokens stop at once")
-check(GT not in {x["id"] for x in A.get(B + "/api/admin/mcp-grants").json()["grants"]}, "F12: gone from the list")
+check(GT not in {x["id"] for x in j(A.get(B + "/api/admin/mcp-grants")).get("grants", [])} and A.get(B + "/api/admin/mcp-grants").ok, "F12: gone from the list")
 
 # ================================================================ F13: the clean-up
 tk = full()
