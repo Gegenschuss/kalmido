@@ -33,7 +33,7 @@ from ..core.db import body, db, err, iso, now_utc
 from ..core.retention import ret_on, ret_report, ret_trash_cut, ret_trash_days  # 2.272.0 A (#3026); 2.549.0 (#4536): ret_trash_days
 from ..core.i18n import N_, csv_dialect, tr
 from ..core.pg import insert_id, write_lock
-from ..accounts.session import me, rate_ip
+from ..accounts.session import _accept_lang, me, rate_ip
 from ..accounts.login import auth_key
 from ..core.errors import BadInput
 from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
@@ -48,10 +48,12 @@ from ..lists.public import public_links_on, pub_gone, pub_headers, pub_html, pub
 from ..accounts.orgout import oo_denied, oo_into_note, org_out, org_out_ok  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.spacemove import smv_answer, smv_refuse_agent, smv_same, smv_target  # 2.369.5 (#2517): pulled up from functions
 from .vdmedia import vdm_body, vdm_files_ok, vdm_has_files, vdm_marks, vdm_media, vdm_need_movable, vdm_pos, vdm_pos_dict, vdm_pos_text, vdm_send, vdm_version_row  # 2.641.0 (#4769)
+from .vdmedia import vdm_pub_send  # 2.658.0 (#5015)
 
 VDR_URL_MAX, VDR_TITLE_MAX, VDR_BODY_MAX, VDR_NAME_MAX = 2000, 200, 2000, 120
 VDR_AT_MAX = 86400.0                     # a timecode lies within 24 hours
 VDR_PUB_RATE, VDR_PUB_HOUR = 10, 60      # customer comments per client address and minute / per link and hour
+VDR_MEDIA_RATE = 240                     # 2.658.0 (#5015): requests for the customer page's audio file per client address and minute (seeking = ranges)
 VDR_STATES = ("open", "approved", "changes")
 VDR_FILE_RE = re.compile(r"\.(mp4|m4v|webm|mov)$", re.I)
 # 2.633.0 (#4777): audio over a direct https link -- recognised by the file name only (Kalmido fetches no foreign URL), played by
@@ -124,6 +126,8 @@ def vdr_embed(v, origin=None):
         if VDR_VIMEO_RE.fullmatch(vid) and (not h or VDR_VIMEO_H_RE.fullmatch(h)):
             return f"{VDR_FRAME['vimeo']}/video/{vid}?" + (f"h={h}&" if h else "") + "dnt=1&playsinline=1"
     if p in ("file", "audio"):  # 2.633.0 (#4777): audio
+        if p == "audio" and v["file_name"]:  # 2.658.0 (#5015): an audio file of the file store -> the route of its bytes (None: gone)
+            return f"/api/videos/{v['review_id']}/versions/{v['id']}/file" if v["file_id"] else None
         return v["url"]
     return None
 
@@ -255,7 +259,7 @@ def vdr_version_dict(v):
     kind = v["kind"] or "video"
     d = {"id": v["id"], "n": v["n"], "url": v["url"], "provider": v["provider"], "embed": vdr_embed(v) if kind == "video" else None,
          "timed": kind == "video" and v["provider"] != "link", "created_at": v["created_at"], "kind": kind}
-    if kind != "video":
+    if kind != "video" or v["file_name"]:  # 2.658.0 (#5015): + an audio file of the file store (kind video, provider audio)
         d.update(file_id=v["file_id"], file_no=v["file_no"], file_name=v["file_name"], mime=v["mime"],
                  content=f"/api/videos/{v['review_id']}/versions/{v['id']}/file" if v["file_id"] else None)
     return d
@@ -751,11 +755,16 @@ def vdr_pub_key(c, s):
     return hmac.new(auth_key(c), f"vdrc:{s['id']}:{s['token_hash']}".encode(), hashlib.sha256).hexdigest()
 
 
-def vdr_player_html(v, origin, title, lg=None):
+def vdr_player_html(v, origin, title, lg=None, token=None):
     """The player of a version (no script of the provider), or the plain link. 2.240.0 D (#2886): the customer page never loads a
     player by itself -- a placeholder with the question comes first; static/js/pubvideo.js builds the iframe / <video> from data-src
     after the click (nothing is remembered across visits)."""
     e = html.escape
+    if v["provider"] == "audio" and v["file_name"]:  # 2.658.0 (#5015): an audio file of the file store, served by this server
+        if not (v["file_id"] and token):  # through the link only (vdr_pub_media): no third party, so no question first
+            return ""
+        return (f'<div class="vdr-player vdr-aud" data-prov="audio"><audio src="{e(SIG_PREFIX + token)}/media" controls preload="metadata" '
+                f'aria-label="{e(title)}"></audio></div>')
     src = vdr_embed(v, origin)
     if v["provider"] in ("youtube", "vimeo") and src:
         who = {"youtube": "YouTube", "vimeo": "Vimeo"}[v["provider"]]
@@ -780,7 +789,9 @@ def vdr_sig_html(c, s, lg, token, prefix):
     e = html.escape
     r, v = vdr_sig_row(c, s), vdr_sig_newest(c, s)
     origin = "{0.scheme}://{0.netloc}".format(urlsplit(PUBLIC_URL))
-    player = vdr_player_html(v, origin, r["title"], lg)
+    player = vdr_player_html(v, origin, r["title"], lg, token)
+    if not player and v["provider"] == "audio" and v["file_name"]:  # 2.658.0 (#5015): the file left the file store
+        player = f'<p class="vdr-hint">{e(tr("The file of this version is no longer in the file store.", lg=lg))}</p>'
     if not player:
         player = (f'<p class="vdr-hint">{e(tr(VDR_NO_TIME, lg=lg))}</p><p><a class="btn" href="{e(v["url"])}" target="_blank" '
                   f'rel="noopener noreferrer nofollow">{e(tr("Open the video", lg=lg))}</a></p>')
@@ -813,6 +824,25 @@ def vdr_sig_html(c, s, lg, token, prefix):
             + (f'<p class="ok" role="status">{e(tr("Thank you, your comment has arrived.", lg=lg))}</p>' if sent else "")
             + (f'<ul class="vdr-list">{"".join(one(x) for x in top)}</ul>' if top else f'<p class="sub">{e(tr("No comments yet.", lg=lg))}</p>')
             + form + "</section>" + '<script src="/static/js/pubvideo.js" defer></script>')
+
+
+@app.get("/s/q/<token>/media")
+def vdr_pub_media(token):
+    """2.658.0 (#5015): the audio file of the file store that the link's page plays -- only the newest version's file (the one
+    the page shows), only while the link is open (sig_open: not revoked, not expired, the review there; state open = not
+    decided) and only while the file may be read (vdmedia.vdm_pub_send). Everything else: the answer of an unknown link."""
+    c = db()
+    if hit_limit("vdrm:" + rate_ip(), VDR_MEDIA_RATE):
+        return pub_limited(_accept_lang())
+    s, bad = sig_open(c, token)
+    if bad:
+        return bad
+    resp = vdm_pub_send(c, vdr_sig_newest(c, s), s) if s["kind"] == "video" and s["state"] == "open" else None
+    if resp is None:
+        return pub_gone(sig_lang(c, s))
+    resp.headers["X-Robots-Tag"] = "noindex, nofollow, noarchive"
+    resp.headers["Referrer-Policy"] = "no-referrer"
+    return resp
 
 
 @app.post("/s/q/<token>/comments")

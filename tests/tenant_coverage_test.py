@@ -1439,6 +1439,7 @@ ROUTES = {
     "GET /api/office/cards/reminder": "office", "PUT /api/office/cards/reminder": "office",
     # 2.425.0 B (#3451): recurring providers of the bank bookings (p2425_b_api_test.py: another organisation sees none, 404)
     "GET /api/office/bank/vendors": "office", "PUT /api/office/bank/vendors": "office", "PUT /api/office/bank/vendors/settings": "office",
+    "GET /s/q/{}/media": "signoff",  # 2.658.0 (#5015): a sign-off's audio file, p2658_c_audiofile_test.py
 }
 
 # ---- 1. every route is classified, nothing stale

@@ -36,7 +36,7 @@ function vdr_listHtml(rows, k, id, add) {
     <span class="vdrst st-${esc(r.state)}" aria-hidden="true"></span></button></li>`).join('');
   return (li ? `<ul class="vdrrows" role="list">${li}</ul>` : '')
     + (add ? `<button type="button" class="btn sm vdradd" data-vdr="new" data-k="${k}" data-i="${id}">${ic('plus', 's')} ${tr('Add video or audio link')}</button>`
-      + ` <button type="button" class="btn sm vdradd" data-vdr="newfile" data-k="${k}" data-i="${id}">${ic('plus', 's')} ${tr('Add image or PDF')}</button>` : '');  // 2.641.0 (#4769)
+      + ` <button type="button" class="btn sm vdradd" data-vdr="newfile" data-k="${k}" data-i="${id}">${ic('plus', 's')} ${tr('Add image, PDF or audio')}</button>` : '');  // 2.641.0 (#4769); 2.658.0 (#5015): + audio
 }
 // 2.96.3 (#1959): the section arrives after the detail - redraw it without taking the focus (comment box of #reply/<id>)
 function vdr_redrawTask(tid) {
@@ -133,6 +133,7 @@ function vdr_playerInner(v, title) {
 }
 function vdr_playerHtml(v, title) {
   if (!v) return '';
+  if (vdr_stored(v) && !v.embed) return `<div class="vdrnolink">${ic('info', 's')}<p>${esc(tr('The file of this version is no longer in the file store.'))}</p></div>`;  // 2.658.0 (#5015)
   const ext = v.provider === 'youtube' || v.provider === 'vimeo' || vdr_isFile(v);
   // 2.240.0 D2 (#2886): video_ext_ok only covers YouTube/Vimeo; a direct file from another host always asks
   if (ext && (vdr_isFile(v) || S.settings?.video_ext_ok !== '1') && vdr_gateName(v)) {
@@ -366,10 +367,10 @@ function vdr_menu(anchor, st) {
     '-',
     {label: tr('Copy comments as text'), icon: 'copy', fn: () => vdr_copyText(st)},
     {label: tr('Download comments (CSV)'), icon: 'download', fn: () => { location.href = `/api/videos/${rid}/export?version_id=${st.ver}`; }},
-    vdr_media(vdr_v(st)) ? vdr_v(st).content && {label: tr('Download the file'), icon: 'download', fn: () => { location.href = vdr_v(st).content + '?dl=1'; }}
+    vdr_stored(vdr_v(st)) ? vdr_v(st).content && {label: tr('Download the file'), icon: 'download', fn: () => { location.href = vdr_v(st).content + '?dl=1'; }}
       : {label: tr('Open the original link'), icon: 'link', fn: () => window.open(vdr_v(st).url, '_blank', 'noopener,noreferrer')},
     '-',
-    w && !r.versions.some(vdr_media) && typeof smv_can === 'function' && smv_can(r.org_id) && {label: tr('Move to another workspace…'), icon: 'arrow', fn: () => vdr_move(st)},  // 2.641.0 (#4769): files stay in their workspace
+    w && !r.versions.some(vdr_stored) && typeof smv_can === 'function' && smv_can(r.org_id) && {label: tr('Move to another workspace…'), icon: 'arrow', fn: () => vdr_move(st)},  // 2.641.0 (#4769): files stay in their workspace
     w && {label: tr('Delete'), icon: 'trash', cls: 'danger', fn: () => vdr_delete(st)}], null, null, r.title);
 }
 async function vdr_newVersion(st) {
@@ -422,8 +423,10 @@ async function vdr_move(st) {
 // image / of a PDF page (x / y 0..1), shown as a numbered point; a tap on the image sets the point, a tap on a comment's number
 // shows it (a PDF opens that page). The PDF pages come from the bundled pdf.js of the PDF preview (pdfview.js, module pdf).
 const vdr_media = v => !!v && (v.kind === 'image' || v.kind === 'pdf');
-const VDR_ACCEPT = 'image/jpeg,image/png,image/webp,application/pdf,.jpg,.jpeg,.png,.webp,.pdf';
-const VDR_FILE_RE = /^(image\/(jpeg|png|webp)|application\/pdf)$/;
+// 2.658.0 (#5015): + audio files (the server decides by the first bytes; the file store's type is only the browser's guess)
+const VDR_ACCEPT = 'image/jpeg,image/png,image/webp,application/pdf,.jpg,.jpeg,.png,.webp,.pdf,audio/*,.mp3,.m4a,.aac,.wav,.ogg,.oga,.opus,.flac';
+const VDR_FILE_RE = /^(image\/(jpeg|png|webp)|application\/pdf|audio\/[\w.+-]+)$/;
+const vdr_stored = v => !!v && !!v.file_name;  // 2.658.0 (#5015): a version from the file store (image, PDF or audio)
 function vdr_mediaHtml(v) {
   if (!v.content) return `<div class="vdrnolink">${ic('info', 's')}<p>${esc(tr('The file of this version is no longer in the file store.'))}</p></div>`;
   const stage = `<div class="vdrstage" data-vdr-stage>${v.kind === 'pdf' ? '<div class="vdrcv"></div>' : `<img src="${esc(v.content)}" alt="${esc(v.file_name || '')}" draggable="false">`}<div class="vdrpins"></div></div>`;
@@ -524,8 +527,8 @@ function vdr_space(k, id) {  // the workspace of a section ('' = unknown: only t
 // a new review (k / id = its place) or a new version (st) from an image / PDF: an upload or a file of the file store
 function vdr_newFile(k, id, st) {
   const sp = st ? (st.r.org_id ? 'org:' + st.r.org_id : 'private') : vdr_space(k, id), ps = {parent: null, q: '', n: 0};
-  const md = modal(`<form class="vdrform vdrfile" novalidate><h3 id="vdr-ft">${st ? tr('New version') : tr('Add image or PDF')}</h3>
-    <div class="shint">${esc(tr('Images (JPG, PNG, WebP) and PDFs. The file stays in the file store; comments sit at a point.'))}</div>
+  const md = modal(`<form class="vdrform vdrfile" novalidate><h3 id="vdr-ft">${st ? tr('New version') : tr('Add image, PDF or audio')}</h3>
+    <div class="shint">${esc(tr('Images (JPG, PNG, WebP), PDFs and audio files (MP3, M4A, AAC, WAV, OGG, Opus, FLAC). The file stays in the file store; comments sit at a point or, for audio, at a second.'))}</div>
     <label class="btn pri vdrup">${ic('upload', 's')} ${tr('Upload a file')}<input type="file" id="vdr-file" class="sr" accept="${VDR_ACCEPT}"></label>
     <p class="muted mhint">${esc(tr('Uploads go into the folder “Approvals” of the file store. Who may not see the file there does not see the approval.'))}</p>
     <h4>${tr('From the file store')}</h4>
@@ -545,7 +548,7 @@ function vdr_newFile(k, id, st) {
     if (n !== ps.n) return;
     const its = (j.items || []).filter(x => !x.no_access && ((x.kind === 'file' && VDR_FILE_RE.test(x.mime || '')) || (x.kind === 'folder' && !ps.q)));
     list.innerHTML = (ps.parent && !ps.q ? `<button type="button" role="listitem" class="wemit" data-vdrf="up">${ic('left', 's')}<span class="wemn">${esc(tr('Back'))}</span></button>` : '')
-      + (its.length ? its.map(x => `<button type="button" role="listitem" class="wemit" data-vdrf="${x.id}">${ic(x.kind === 'folder' ? 'folder' : x.mime === 'application/pdf' ? 'pdf' : 'picture', 's')}<span class="wemn">${esc(x.name)}</span>${x.kind === 'file' ? `<small class="muted">${fmtSize(x.size || 0)}</small>` : ''}</button>`).join('')
+      + (its.length ? its.map(x => `<button type="button" role="listitem" class="wemit" data-vdrf="${x.id}">${ic(x.kind === 'folder' ? 'folder' : x.mime === 'application/pdf' ? 'pdf' : /^audio\//.test(x.mime || '') ? 'music' : 'picture', 's')}<span class="wemn">${esc(x.name)}</span>${x.kind === 'file' ? `<small class="muted">${fmtSize(x.size || 0)}</small>` : ''}</button>`).join('')
         : `<p class="muted">${esc(ps.q ? tr('Nothing found') : tr('No files here yet.'))}</p>`);
     list._its = its; list._up = j.parent_id ?? (j.crumbs || []).slice(-2, -1)[0]?.id ?? null;
   };

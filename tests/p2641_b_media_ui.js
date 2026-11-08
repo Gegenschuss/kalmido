@@ -1,6 +1,6 @@
 // 2.641.0 part B UI test (#4769), own container (start.sh): the approval of an image with numbered points, on a phone.
 // kalmido-suite: fresh
-// - a task's section "Approval" offers "Add image or PDF" next to "Add video link"
+// - a task's section "Approval" offers "Add image, PDF or audio" (2.658.0 #5015) next to "Add video link"
 // - the review view shows the image (its bytes route) with the points of its comments, numbered 1, 2 at their place
 // - a tap on the image sets the point of the next comment (a pending point "3", the composer says "at point 3"), the text
 //   typed before stays, sending stores {x, y} (the server has it) and draws point 3
@@ -58,7 +58,7 @@ const PDF = Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\ne
   const key = JSON.stringify('task_id:' + T.id);
   await until(() => w.eval('S.sel') === T.id && w.eval("typeof VDR === 'object'") && w.eval(`Array.isArray(VDR.by[${key}])`));
   w.eval('renderDetail()');
-  check(d.querySelector('#d-vdr [data-vdr="newfile"]') && /Add image or PDF/.test(d.querySelector('#d-vdr').textContent), 'the section offers "Add image or PDF"');
+  check(d.querySelector('#d-vdr [data-vdr="newfile"]') && /Add image, PDF or audio/.test(d.querySelector('#d-vdr').textContent), 'the section offers "Add image, PDF or audio"');  // 2.658.0 (#5015): + audio
   check(d.querySelectorAll('#d-vdr [data-vdr="open"]').length === 2, 'the two reviews are listed');
 
   // the review view: the image with its points

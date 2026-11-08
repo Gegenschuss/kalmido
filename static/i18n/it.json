@@ -17413,7 +17413,6 @@
   "Select a column": "Scegli una colonna",
   "Select a tag": "Scegli un tag",
   "Select a person": "Scegli una persona",
-  "Add image or PDF": "Aggiungi immagine o PDF",
   "Tap to comment without a point": "Tocca per commentare senza punto",
   "Tap on the image to set a point": "Tocca l'immagine per segnare un punto",
   "at point {0}": "al punto {0}",
@@ -17425,12 +17424,10 @@
   "Download the file": "Scarica il file",
   "The file of this version is no longer in the file store.": "Il file di questa versione non è più nell'archivio.",
   "Point {0}": "Punto {0}",
-  "Images (JPG, PNG, WebP) and PDFs. The file stays in the file store; comments sit at a point.": "Immagini (JPG, PNG, WebP) e PDF. Il file resta nell'archivio; i commenti si trovano su un punto.",
   "Upload a file": "Carica un file",
   "Uploads go into the folder “Approvals” of the file store. Who may not see the file there does not see the approval.": "I file caricati vanno nella cartella «Approvazioni» dell'archivio. Chi non può vedere il file lì non vede l'approvazione.",
   "e.g. Logo draft": "es. Bozza del logo",
   "The client link is for videos only": "Il link per il cliente è solo per i video",
-  "Please select an image (JPG, PNG, WebP) or a PDF.": "Scegli un'immagine (JPG, PNG, WebP) o un PDF.",
   "Only files of the same workspace can be added": "Si possono aggiungere solo file dello stesso spazio di lavoro",
   "An approval of images or PDFs stays in the workspace of its files": "Un'approvazione di immagini o PDF resta nello spazio di lavoro dei suoi file",
   "At most {0} change proposals per day for one person": "Al massimo {0} proposte di modifica al giorno per una persona",
@@ -17443,5 +17440,8 @@
   "Proposed with the first key: the agent pauses for the day once its runs used this many tokens, also the runs other people start through chat, mentions or assignments. Empty = no limit.": "Proposto con la prima chiave: l’agente si ferma per la giornata appena le sue esecuzioni hanno usato questi token, anche quelle che altre persone avviano tramite chat, menzioni o assegnazioni. Vuoto = nessun limite.",
   "No usage limit: every run, also those other people start through chat, mentions or assignments, is billed to this key without a cap. Set one under “Usage limit” in the agent’s settings.": "Nessun limite di utilizzo: ogni esecuzione, anche quelle che altre persone avviano tramite chat, menzioni o assegnazioni, va su questa chiave senza tetto. Impostane uno in «Limite di consumo» nelle impostazioni dell’agente.",
   "The person who created this link may no longer share this folder": "La persona che ha creato questo link non può più condividere questa cartella",
-  "The person who created this request may no longer upload into this folder": "La persona che ha creato questa richiesta non può più caricare file in questa cartella"
+  "The person who created this request may no longer upload into this folder": "La persona che ha creato questa richiesta non può più caricare file in questa cartella",
+  "Add image, PDF or audio": "Aggiungi immagine, PDF o audio",
+  "Images (JPG, PNG, WebP), PDFs and audio files (MP3, M4A, AAC, WAV, OGG, Opus, FLAC). The file stays in the file store; comments sit at a point or, for audio, at a second.": "Immagini (JPG, PNG, WebP), PDF e file audio (MP3, M4A, AAC, WAV, OGG, Opus, FLAC). Il file resta nell’archivio file; i commenti stanno su un punto o, per l’audio, su un secondo.",
+  "Please select an image (JPG, PNG, WebP), a PDF or an audio file (MP3, M4A, AAC, WAV, OGG, Opus, FLAC).": "Scegli un’immagine (JPG, PNG, WebP), un PDF o un file audio (MP3, M4A, AAC, WAV, OGG, Opus, FLAC)."
 }

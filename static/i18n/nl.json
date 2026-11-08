@@ -17412,7 +17412,6 @@
   "Select a column": "Kies een kolom",
   "Select a tag": "Kies een label",
   "Select a person": "Kies een persoon",
-  "Add image or PDF": "Afbeelding of pdf toevoegen",
   "Tap to comment without a point": "Tik om zonder punt te reageren",
   "Tap on the image to set a point": "Tik op de afbeelding om een punt te zetten",
   "at point {0}": "bij punt {0}",
@@ -17424,12 +17423,10 @@
   "Download the file": "Bestand downloaden",
   "The file of this version is no longer in the file store.": "Het bestand van deze versie staat niet meer in de opslag.",
   "Point {0}": "Punt {0}",
-  "Images (JPG, PNG, WebP) and PDFs. The file stays in the file store; comments sit at a point.": "Afbeeldingen (JPG, PNG, WebP) en pdf's. Het bestand blijft in de opslag; reacties staan bij een punt.",
   "Upload a file": "Bestand uploaden",
   "Uploads go into the folder “Approvals” of the file store. Who may not see the file there does not see the approval.": "Uploads komen in de map ‘Goedkeuringen’ van de opslag. Wie het bestand daar niet mag zien, ziet de goedkeuring ook niet.",
   "e.g. Logo draft": "bijv. Logo-ontwerp",
   "The client link is for videos only": "De klantlink is alleen voor video's",
-  "Please select an image (JPG, PNG, WebP) or a PDF.": "Kies een afbeelding (JPG, PNG, WebP) of een pdf.",
   "Only files of the same workspace can be added": "Alleen bestanden uit dezelfde werkruimte kunnen worden toegevoegd",
   "An approval of images or PDFs stays in the workspace of its files": "Een goedkeuring van afbeeldingen of pdf's blijft in de werkruimte van de bestanden",
   "At most {0} change proposals per day for one person": "Hoogstens {0} wijzigingsvoorstellen per dag voor één persoon",
@@ -17442,5 +17439,8 @@
   "Proposed with the first key: the agent pauses for the day once its runs used this many tokens, also the runs other people start through chat, mentions or assignments. Empty = no limit.": "Voorgesteld bij de eerste sleutel: de agent pauzeert voor de dag zodra zijn runs zoveel tokens hebben verbruikt, ook de runs die anderen via chat, vermeldingen of toewijzingen starten. Leeg = geen limiet.",
   "No usage limit: every run, also those other people start through chat, mentions or assignments, is billed to this key without a cap. Set one under “Usage limit” in the agent’s settings.": "Geen gebruikslimiet: elke run, ook die anderen via chat, vermeldingen of toewijzingen starten, gaat zonder plafond op deze sleutel. Stel er een in onder ‘Verbruikslimiet’ in de instellingen van de agent.",
   "The person who created this link may no longer share this folder": "De persoon die deze link heeft gemaakt, mag deze map niet meer delen",
-  "The person who created this request may no longer upload into this folder": "De persoon die dit verzoek heeft gemaakt, mag niet meer uploaden naar deze map"
+  "The person who created this request may no longer upload into this folder": "De persoon die dit verzoek heeft gemaakt, mag niet meer uploaden naar deze map",
+  "Add image, PDF or audio": "Afbeelding, pdf of audio toevoegen",
+  "Images (JPG, PNG, WebP), PDFs and audio files (MP3, M4A, AAC, WAV, OGG, Opus, FLAC). The file stays in the file store; comments sit at a point or, for audio, at a second.": "Afbeeldingen (JPG, PNG, WebP), pdf’s en audiobestanden (MP3, M4A, AAC, WAV, OGG, Opus, FLAC). Het bestand blijft in de bestandsopslag; opmerkingen staan op een punt of, bij audio, op een seconde.",
+  "Please select an image (JPG, PNG, WebP), a PDF or an audio file (MP3, M4A, AAC, WAV, OGG, Opus, FLAC).": "Kies een afbeelding (JPG, PNG, WebP), een pdf of een audiobestand (MP3, M4A, AAC, WAV, OGG, Opus, FLAC)."
 }

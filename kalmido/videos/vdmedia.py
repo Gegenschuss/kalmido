@@ -26,8 +26,10 @@ from ..core.db import body
 from ..core.errors import BadInput
 from ..core.i18n import N_, tr
 from ..core.orgcrypt import oc_is_sealed_file, oc_read_file, oc_send_file
+from ..core.pg import system_ctx
+from ..files.fslock import fsl_of_chain
 from ..files.scan import sc_guard
-from ..files.store import fs_folder, fs_log_add, fs_put, fs_role, fs_version_row, need_node, safe_fs_name
+from ..files.store import fs_chain, fs_deleted, fs_folder, fs_log_add, fs_put, fs_role, fs_version_row, need_node, safe_fs_name
 from ..files.upsafe import h6d_read
 from ..files.web import _send_headers
 
@@ -35,7 +37,7 @@ VDM_KINDS = ("video", "image", "pdf")
 VDM_HEAD = 1024  # 2.658.0 (#5043): the type is read from the first VDM_HEAD bytes only (never the whole file)
 VDM_PAGE_MAX = 9999
 VDM_FOLDER = N_("Approvals|sign-off")
-VDM_TYPES = N_("Please select an image (JPG, PNG, WebP) or a PDF.")
+VDM_TYPES = N_("Please select an image (JPG, PNG, WebP), a PDF or an audio file (MP3, M4A, AAC, WAV, OGG, Opus, FLAC).")  # 2.658.0 (#5015): + audio
 VDM_SPACE = N_("Only files of the same workspace can be added")
 VDM_NOMOVE = N_("An approval of images or PDFs stays in the workspace of its files")
 
@@ -50,13 +52,40 @@ def vdm_sniff(data):
         return "image/png"
     if d[:4] == b"RIFF" and d[8:12] == b"WEBP":
         return "image/webp"
+    a = vdm_sniff_audio(d)  # 2.658.0 (#5015): before the PDF rule (its header may sit anywhere in the first bytes)
+    if a:
+        return a
     if b"%PDF-" in d:
         return "application/pdf"
     return None
 
 
+def vdm_sniff_audio(d):
+    """2.658.0 (#5015): an audio file by its first bytes -- WAV, OGG (Vorbis / Opus), FLAC, M4A, MP3 (ID3 tag or a frame),
+    AAC (ADTS) -- else None. The <audio> element plays it; a version from the file store is a timed medium like an audio link."""
+    if d[:4] == b"RIFF" and d[8:12] == b"WAVE":
+        return "audio/wav"
+    if d[:4] == b"OggS":
+        return "audio/ogg"
+    if d[:4] == b"fLaC":
+        return "audio/flac"
+    if d[4:8] == b"ftyp" and d[8:11] in (b"M4A", b"M4B"):
+        return "audio/mp4"
+    if d[:3] == b"ID3":
+        return "audio/mpeg"
+    if len(d) >= 4 and d[0] == 0xFF:
+        if d[1] & 0xF6 == 0xF0:  # ADTS: sync, layer 00
+            return "audio/aac"
+        if d[1] & 0xE0 == 0xE0 and d[1] & 0x06 and d[2] & 0xF0 not in (0x00, 0xF0):  # an MPEG audio frame: layer set, a bit rate
+            return "audio/mpeg"
+    return None
+
+
 def vdm_kind(mime):
-    return "pdf" if mime == "application/pdf" else "image" if mime else None
+    """The version kind of a sniffed type: pdf | image | video (2.658.0 #5015: audio = the timed medium, provider audio)."""
+    if not mime:
+        return None
+    return "pdf" if mime == "application/pdf" else "video" if mime.startswith("audio/") else "image"
 
 
 # ---------------------------------------------------------------- a version from the file store / an upload
@@ -76,7 +105,7 @@ def vdm_file_version(c, org_id, file_id):
     mime = vdm_sniff(vdm_head(c, vdm_path(c, file_id, v["no"])))
     if not mime:
         raise BadInput(tr(VDM_TYPES))
-    return {"url": "", "provider": "store", "embed_id": "", "kind": vdm_kind(mime), "file_id": file_id, "file_no": v["no"],
+    return {"url": "", "provider": "audio" if mime.startswith("audio/") else "store", "embed_id": "", "kind": vdm_kind(mime), "file_id": file_id, "file_no": v["no"],
             "file_name": n["name"], "mime": mime}
 
 
@@ -233,6 +262,30 @@ def vdm_send(c, v):
     dl = request.args.get("dl") == "1"
     resp = oc_send_file(c, full, mimetype=mime, as_attachment=dl, download_name=v["file_name"] or n["name"] or "file",
                         conditional=True, max_age=0)
+    return _send_headers(resp, mime)
+
+
+def vdm_pub_send(c, v, s):
+    """2.658.0 (#5015): the audio file of version row v for customer link s (office/signoff.py, checked open by the caller):
+    only a file of the link's workspace, still in the file store (not in the trash, not in a locked folder), still visible
+    to the person who made the link (the file's access), only as audio by its first bytes; streamed (range requests).
+    None = not available (the caller answers like an unknown link)."""
+    if not v or not v["file_id"] or v["provider"] != "audio":
+        return None
+    with system_ctx(c):  # the public page reads as "anon"; the checks below bind it to exactly this link's file and workspace
+        chain = fs_chain(c, v["file_id"])
+        if (not chain or chain[0]["kind"] != "file" or fs_deleted(chain) or fsl_of_chain(c, chain) is not None
+                or (chain[0]["org_id"] or None) != (s["org_id"] or None) or not fs_role(c, v["file_id"], s["created_by"], chain=chain)):
+            return None
+        try:
+            full = vdm_path(c, v["file_id"], v["file_no"])
+        except Denied:
+            return None
+        mime = vdm_sniff(vdm_head(c, full))
+        if not mime or not mime.startswith("audio/"):
+            return None
+        resp = oc_send_file(c, full, mimetype=mime, as_attachment=False, download_name=v["file_name"] or "audio",
+                            conditional=True, max_age=0)
     return _send_headers(resp, mime)
 
 

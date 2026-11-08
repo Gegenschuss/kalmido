@@ -1205,6 +1205,8 @@ ROUTES = {
     "GET /api/office/bank/vendors": "office", "PUT /api/office/bank/vendors": "office", "PUT /api/office/bank/vendors/settings": "office",
     # 2.553.0 B (#3460): requests by e-mail of a project (p2553_b_reqmail_test.py, freelancer-matrix: hub: her own project's request address)
     "GET /api/lists/{}/request-mail": "hub", "PATCH /api/lists/{}/request-mail": "hub",
+    # 2.658.0 (#5015): the audio file of the file store on the customer page of a sign-off (p2658_c_audiofile_test.py, also frida)
+    "GET /s/q/{}/media": "link",
 }
 
 

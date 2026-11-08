@@ -53,9 +53,9 @@ SIG_LINK_HOUR = 20          # decision attempts per link and hour
 NAME_MAX, EMAIL_MAX, REASON_MAX, UA_MAX = 120, 200, 1000, 300
 SIG_KINDS = ("offer", "acceptance", "document", "video")  # 2.93.0 A (#1927): document = a document made from a template (office/doctpl.py)
 # 2.99.1 A (#1959): video = a video sign-off (videos/review.py; accept = "Approve", decline = "Request changes"); its page shows
-# the player (no script of the provider, only static/pubvideo.js) and takes comments: its own CSP
+# the player (no script of the provider, only static/pubvideo.js) and takes comments: its own CSP; 2.658.0 (#5015): media-src + 'self' = an audio file of the file store through /s/q/<token>/media
 SIG_VIDEO_CSP = ("default-src 'none'; style-src 'self'; img-src 'self'; font-src 'self'; script-src 'self'; "
-                 "frame-src https://player.vimeo.com https://www.youtube-nocookie.com; media-src https:; form-action 'self'; "
+                 "frame-src https://player.vimeo.com https://www.youtube-nocookie.com; media-src https: 'self'; form-action 'self'; "
                  "frame-ancestors 'none'; base-uri 'none'")
 LOG_TEXT = {"accepted": "signoff_accepted", "declined": "signoff_declined"}
 SIG_PDF_KEEP_DAYS = 30      # 2.86.0 (N17): a decided quotation's PDF stays downloadable this long when the link has no expiry

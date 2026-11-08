@@ -68,6 +68,8 @@ def vdr_v1_dict(c, r, full=False):
     for v in d["versions"]:  # 2.641.0 (#4769): the bytes of an image / PDF through the API
         if v.get("content"):
             v["content"] = f"/api/v1/videos/{r['id']}/versions/{v['id']}/file"
+            if v.get("embed"):  # 2.658.0 (#5015): an audio file of the file store plays from the same bytes
+                v["embed"] = v["content"]
     if full:
         d["comments"] = vdr_v1_comments(c, d)
     return d
@@ -187,7 +189,8 @@ def vdr_v1_spec(paths, schemas, op, ok, errs, ref, pid, q):
         "space": {"type": "string"}, "task_id": {"type": ["integer", "null"]}, "list_id": {"type": ["integer", "null"]},
         "kind": {"type": "string", "enum": ["video", "image", "pdf"], "description": "2.641.0: the newest version's medium"},
         "versions": {"type": "array", "items": {"type": "object", "description": "{id, n, kind video|image|pdf, url, provider vimeo|youtube|file|audio|link|store, "
-                                                                                 "embed, timed, created_at}; image / pdf also {file_id, file_no, file_name, "
+                                                                                 "embed, timed, created_at}; image / pdf and (2.658.0) an audio file of the "
+                                                                                 "file store (kind video, provider audio) also {file_id, file_no, file_name, "
                                                                                  "mime, content (GET: the bytes)}"}},
         "version": {"type": "integer", "description": "The newest version's number"}, "open_comments": {"type": "integer"},
         "can_write": {"type": "boolean"}, "comments": {"type": "array", "items": ref("VideoComment"), "description": "Only when reading one review"},
