@@ -154,11 +154,15 @@ S.thumb_read = replace_between
 n, bad = cli.docs_thumbs_open(c)
 with open(p1, "rb") as f:
     kept = f.read() == b"replacement"
-print(json.dumps({"before": before, "hooked": bool(done), "n": n, "bad": bad, "kept": kept, "f2": head('f2')}))""")
+# 2.583.0 (#4812): thumb_store also writes the sharp preview (doc_meta.thumb_l) of both, opened by the same pass
+with system_ctx(c):
+    nl = c.execute("SELECT COUNT(*) AS n FROM doc_meta WHERE node_id IN (?, ?) AND thumb_l<>''", tuple(DOCS.values())).fetchone()["n"] if "thumb_l" in cli._thumb_cols(c) else 0
+c.commit()
+print(json.dumps({"before": before, "hooked": bool(done), "n": n, "nl": nl, "bad": bad, "kept": kept, "f2": head('f2')}))""")
 check(r["before"] == {"f1": 0, "f2": 0}, f"setup: two private previews of header 0 {r}")
 check(r["hooked"], f"setup: the preview was replaced while the pass ran {r}")
 check(r["kept"], f"#4939 (2): the replaced preview stays as it is (was overwritten with the old picture) {r}")
-check(r["f2"] == "plain" and r["n"] == 1 and r["bad"] == 0, f"#4939 (2): the next portion's preview is opened (paging over node_id) {r}")
+check(r["f2"] == "plain" and r["n"] == 1 + r["nl"] and r["bad"] == 0, f"#4939 (2): the next portion's preview is opened (paging over node_id; + the sharp previews, 2.583.0) {r}")
 check(route_ok("f2"), "#4939 (2): the opened preview still answers with the picture")
 
 # ---------------------------------------------------------------- (1) the way back counts rows it could not write
