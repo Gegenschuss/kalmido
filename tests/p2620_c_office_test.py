@@ -154,8 +154,10 @@ r = A.post(B + f"/api/life/trips/{AT}/expenses")
 check(r.status_code == 201, "#4642: the admin's travel expenses " + r.text[:200])
 ATID = r.json().get("trip_id")
 r = Bo.post(B + f"/api/life/trips/{AT}/expenses")
-check(r.status_code == 403, f"#4642: somebody else's travel expenses: 403 ({r.status_code})")
-check(Bo.get(B + f"/api/life/trips/{AT}/expenses").status_code == 403, "#4642: GET somebody else's: 403")
+# 2.695.0 (#4958): 409 with the way out (own travel expenses in the office) instead of a bare 403
+check(r.status_code == 409 and "travel expenses of this trip" in (r.json().get("error") or "") and "office" in (r.json().get("error") or ""),
+      f"#4958: somebody else's travel expenses: 409 with the way out ({r.status_code}) {r.text[:200]}")
+check(Bo.get(B + f"/api/life/trips/{AT}/expenses").status_code == 409, "#4958: GET somebody else's: 409")
 check(sql("SELECT COUNT(*) FROM office_trips WHERE org_id=?", (ORG,))[0][0] == 2, "#4642: no second office trip")
 check(Ri.post(B + f"/api/life/trips/{AT}/expenses").status_code == 403, "#4642: read-only 403")
 check(Mi.post(B + f"/api/life/trips/{BT}/expenses").status_code == 404, "#4642: a member who does not see the trip 404")

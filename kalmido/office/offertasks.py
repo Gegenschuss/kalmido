@@ -27,7 +27,7 @@ from flask import g, has_request_context, jsonify
 from ..core.config import app
 from ..core.db import body, bump, iso, now_utc
 from ..core.i18n import LANGS, tr
-from ..core.access import WRITE_ROLES, Denied, list_role, need_list
+from ..core.access import WRITE_ROLES, Denied, _list_role, list_role, need_list
 from ..core.errors import BadInput
 from ..core.pg import insert_id, write_lock
 from ..collab.liste2eguard import le2b_list_locked, le2b_off
@@ -98,7 +98,9 @@ def otk_count(c, r, uid=None):
     if uid is None:
         u = getattr(g, "user", None) if has_request_context() else None
         uid = u["id"] if u is not None else None
-    if uid is None or not list_role(c, r["list_id"], uid):
+    # 2.695.0 (#4958): the raw role (_list_role), not list_role: a count is no list read, so an agent's request writes no
+    # list access into the agents' log for it (list_role notes one, access_note)
+    if uid is None or not _list_role(c, r["list_id"], uid):
         return 0
     return len([x for x in otk_links(c, r["org_id"], r, r["list_id"]).values() if not x["deleted_at"]])
 

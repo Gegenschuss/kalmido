@@ -10,7 +10,7 @@ import json
 from flask import g, jsonify
 
 from ..core.config import app
-from ..core.i18n import tr
+from ..core.i18n import N_, tr
 from ..core.db import bump, db, iso, now_utc
 from ..core.pg import insert_id, write_lock
 from ..core.access import Denied, vis_sql
@@ -21,6 +21,8 @@ from ..life.model import need_life
 from ..office.model import OFFICE_ADMIN_ONLY, office_gate, office_role, pb_owner, pb_personal
 from ..office.periodlock import period_need_open
 from ..office.travel import rk_trip_clean
+
+LTC_TAKEN = N_("Somebody already entered the travel expenses of this trip - enter your own in the office under Travel expenses")
 
 
 def ltc_trip_list(c, uid, lid):
@@ -57,10 +59,11 @@ def ltc_office(c, uid, oid_list):
 
 def ltc_own_trip(c, oid, tid, uid):
     """2.620.0 (#4642): on the level "own" the linked office trip must be one uid entered (created_by), else 403 -- the
-    trip of a shared trip project somebody else made the travel expenses of stays theirs (no id, no second one)."""
+    trip of a shared trip project somebody else made the travel expenses of stays theirs (no id, no second one).
+    2.695.0 (#4958): 409 with the way out (the own trip in the office), not a bare 403 the button keeps running into."""
     r = c.execute("SELECT created_by FROM office_trips WHERE id=? AND org_id=?", (tid, oid)).fetchone()
     if r is None or r[0] != uid:
-        raise Denied(403, tr("The travel expenses of this trip were entered by somebody else"))
+        raise Denied(409, tr(LTC_TAKEN))
 
 
 def ltc_open(c, uid, lid):
