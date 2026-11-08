@@ -327,7 +327,7 @@ def dx_rows(c, oid, d_from, d_to, s=None, inside=True, hints_out=None):
                     "Gegenkonto (ohne BU-Schlüssel)": dx_debtor(st, r81b_customer_no(r)), "BU-Schlüssel": "",
                     "Belegdatum": _ddmm(r["p_date"]), "Belegfeld 1": dx_beleg(r["number"]),
                     "Buchungstext": ("Zahlung " + (r["number"] or "") + " " + name).strip()[:60], "Festschreibung": "0",
-                    "_date": r["p_date"], "_kind": "payment"})
+                    "_date": r["p_date"], "_kind": "payment", "_pay": r["p_id"]})  # 2.685.0 (#5128): _pay = the payment (the ledger's bank account)
     if inside:  # 2.120.0 C (#2090): receipts and travel expenses in the same batch (office/datevin.py)
         from .datevin import dv_rows
         rows, hints = dv_rows(c, oid, d_from, d_to, st, s)

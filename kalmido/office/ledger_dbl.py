@@ -21,6 +21,15 @@ The journal of a year is worked out on every look from what is there -- nothing 
  - depreciation (office/assets.py ast_afa_year): depreciation against the fixed asset account; the device's receipt is
    capitalised (net on the asset account instead of an expense), a device without a receipt is capitalised against the
    clearing account in the year of its purchase
+ - 2.685.0 (#5128), the three sources the income statement counts as well (books.bk_euer): the approved entertainment
+   receipts (office/meals.py) on their day -- the deductible 70 % per VAT rate with the full input tax and the 30 % not
+   deductible on an account of their own, both an expense in the commercial accounts -- against the card account (paid by
+   card) or the clearing account (the bank / cash line that paid it books against the clearing account instead of an expense
+   of its own); the mileage allowance of the logbook on 31 December against the private deposits (a personal office) or the
+   clearing account; paid reminder fees on their day as other income against the clearing account
+ - 2.685.0 (#5128): every bank account of the office (office/bankacc.py) is a ledger account of its own: its DATEV account, else
+   the next free one after the default (SKR03 1200ff / SKR04 1800ff); the default account stays the DATEV settings' one. A
+   bank line belongs to the account whose IBAN (or name) its statement carries (office_bank_balances), else to the default
 Stored (office_ledger_entries, migrations.d/3461_a.py) are only the entries made by hand ("manual": accruals, provisions,
 corrections) and the opening entries ("open": by hand for the first year, else written by the closing of the year before;
 without them the opening balances of the DATEV import, office/datevimp.py). The year-end closing checks that the balance sheet
@@ -49,15 +58,18 @@ from ..core.pg import insert_id, write_lock
 from ..core.serializers import csv_cell
 from .calc import dec, dstr, money
 from .assets import ast_afa_year, ast_values
-from .bankacc import bka_datev
-from .books import _year, bk_receipts, bk_ws
+from .bankacc import bka_datev, bka_rows
+from .bkexport import bx_meal_parts
+from .books import _home, _year, bk_fees_paid, bk_receipts, bk_ws, ofc_meals_euer, ofc_meals_home
+from .cfbank import cfb_balances
 from .cardnorc import cc_dv_nodes
 from .catacct import ca_accounts
 from .datev import DX_CASES, _acct, dx_need_eur, dx_rows, dx_settings
-from .datevin import DV_BU_IN, dv_card_account, dv_card_private, dv_cat_account, dv_counter, dv_rows, dv_supplier_accounts
+from .datevin import DV_BU_IN, dv_card_account, dv_card_private, dv_cat_account, dv_counter, dv_rows, dv_supplier_accounts, dv_travel_account
 from .euerbasis import _bank_rows, _cash_rows
 from .ledger import ofx_company, ofx_log
-from .model import office_ctx_admin as _ctx, office_rows, office_settings, office_settings_lock, office_settings_save
+from .logbook import lb_allowance_year
+from .model import office_ctx_admin as _ctx, office_rows, office_settings, office_settings_lock, office_settings_save, pb_owner
 from .periodlock import period_need_open, pl_lock
 from .taxcheck import TC_CORP_RE
 
@@ -82,9 +94,11 @@ LD_OPEN_WRITTEN = N_("The opening entries of {0} come from the closing of {1}: b
 # the accounts the journal needs beyond those of the DATEV export, per chart (4 digits, stretched to the ledger length)
 LD_ACCOUNTS = {
     "SKR03": {"vat19": "1776", "vat7": "1771", "in19": "1576", "in7": "1571", "asset": "0490", "afa": "4830", "clearing": "1590",
-              "transit": "1360", "private_in": "1890", "capital": "0800", "carry": "0860", "opening": "9000"},
+              "transit": "1360", "private_in": "1890", "capital": "0800", "carry": "0860", "opening": "9000",
+              "meal": "4650", "meal_nd": "4654", "fee_in": "2700"},  # 2.685.0 (#5128)
     "SKR04": {"vat19": "3806", "vat7": "3801", "in19": "1406", "in7": "1401", "asset": "0690", "afa": "6220", "clearing": "1370",
-              "transit": "1460", "private_in": "2180", "capital": "2900", "carry": "2970", "opening": "9000"},
+              "transit": "1460", "private_in": "2180", "capital": "2900", "carry": "2970", "opening": "9000",
+              "meal": "6640", "meal_nd": "6644", "fee_in": "4830"},  # 2.685.0 (#5128)
 }
 LD_ACC_LABELS = {
     "vat19": N_("VAT 19 %"), "vat7": N_("VAT 7 %"), "in19": N_("Input tax 19 %"), "in7": N_("Input tax 7 %"),
@@ -93,7 +107,10 @@ LD_ACC_LABELS = {
     "capital": N_("Subscribed capital"), "carry": N_("Profit / loss carried forward"), "opening": N_("Opening balance account"),
     "debtor": N_("Trade receivables"), "creditor": N_("Trade payables"), "bank": N_("Bank"), "cash": N_("Cash"),
     "card": N_("Credit card"), "private": N_("Private withdrawals"),
+    "meal": N_("Entertainment (70 % deductible)"), "meal_nd": N_("Entertainment (30 % not deductible)"),  # 2.685.0 (#5128)
+    "fee_in": N_("Reminder fees received (not taxable)"), "km": N_("Mileage allowance"),
 }
+LD_BANK_BASE = {"SKR03": 1200, "SKR04": 1800}  # 2.685.0 (#5128): the bank accounts of the office follow the default one
 LD_CASE_LABELS = {"standard": N_("Revenue 19 % VAT"), "reduced": N_("Revenue 7 % VAT"), "exempt": N_("Tax-free revenue"),
                   "reverse": N_("Revenue reverse charge (EU)"), "abroad": N_("Revenue not taxable in Germany"), "small": N_("Revenue (small business)"),
                   "skonto_standard": N_("Cash discounts granted 19 % VAT"), "skonto_reduced": N_("Cash discounts granted 7 % VAT"),
@@ -238,6 +255,73 @@ def _ld_ctx(c, oid, s=None):
     return s, st
 
 
+def _iban_key(v):
+    return re.sub(r"\s+", "", str(v or "")).upper()
+
+
+class _Banks:
+    """2.685.0 (#5128): the ledger account of every bank account of the office (office/bankacc.py): the default one = the bank
+    of the DATEV settings (bka_datev), the others their own DATEV account, else the next free number after the chart's bank
+    (SKR03 1200ff / SKR04 1800ff). A bank line belongs to the account its statement names (office_bank_balances.account = the
+    IBAN of a CAMT / MT940 statement or the name typed at a CSV import), else to the default account."""
+
+    def __init__(self, c, oid, st):
+        self.c, self.oid = c, oid
+        self.default = st["bank"] or _acct(st, "bank")
+        self.labels, self._imp, self._pay, self._card = {}, None, None, None
+        n = int(st["acct_len"])
+        rows = bka_rows(c, oid) + bka_rows(c, oid, archived=True)
+        own = {r["id"]: (r.get("datev_account") or "") for r in rows}
+        used = {self.default} | {v.ljust(n, "0") for v in own.values() if v and len(v) <= n}
+        base, nxt, keys = LD_BANK_BASE[_chart(st)], 0, {}
+        for r in rows:
+            if r["is_default"] and not r["archived"]:
+                a = self.default
+            elif own[r["id"]] and len(own[r["id"]]) <= n:
+                a = own[r["id"]].ljust(n, "0")
+            else:
+                a = self.default
+                while a in used:
+                    nxt += 1
+                    a = str(base + nxt).ljust(n, "0")
+                used.add(a)
+            if a != self.default:
+                self.labels[a] = " - ".join(x for x in (tr(LD_ACC_LABELS["bank"]), r.get("label") or ("… " + _iban_key(r.get("iban"))[-4:] if r.get("iban") else "")) if x)
+            for k in (_iban_key(r.get("iban")), (r.get("label") or "").strip().casefold()):
+                if k:
+                    keys.setdefault(k, a)
+        self.keys = keys
+
+    def of_import(self, iid):
+        """The ledger account of the bank lines of import iid."""
+        if self._imp is None:
+            self._imp = {}
+            if len(set(self.keys.values()) - {self.default}):  # one bank account only: every line on the default
+                for b in cfb_balances(self.c, self.oid):
+                    a = self.keys.get(_iban_key(b["account"])) or self.keys.get((b["account"] or "").strip().casefold())
+                    if a:
+                        self._imp.setdefault(b["import_id"], a)
+        return self._imp.get(iid, self.default)
+
+    def of_line(self, t):
+        return self.of_import(t.get("import_id"))
+
+    def of_payment(self, pid):
+        """The bank account of an invoice payment booked by a bank line (office_payments.bank_tx_id / office_bank_tx.payment_id)."""
+        if self._pay is None:
+            self._pay = {r["pid"]: r["import_id"] for r in self.c.execute(
+                "SELECT p.id AS pid, t.import_id FROM office_bank_tx t JOIN office_payments p ON p.org_id=t.org_id AND (p.id=t.payment_id OR p.bank_tx_id=t.id) "
+                "WHERE t.org_id=? AND t.deleted_at IS NULL", (self.oid,))}
+        return self.of_import(self._pay.get(pid)) if pid in self._pay else self.default
+
+    def of_card(self, sid):
+        """The bank account the total of card statement sid left (its bank line, match_kind card)."""
+        if self._card is None:
+            self._card = {r["match_id"]: r["import_id"] for r in self.c.execute(
+                "SELECT match_id, import_id FROM office_bank_tx WHERE org_id=? AND match_kind='card' AND deleted_at IS NULL", (self.oid,))}
+        return self.of_import(self._card.get(sid)) if sid in self._card else self.default
+
+
 # ---------------------------------------------------------------- the journal
 def _amt(v):
     """A DATEV line amount ("1234,56") -> Decimal."""
@@ -271,7 +355,7 @@ def _vat_split(gross, pct):
     return gross - vat, vat
 
 
-def _receipt_side(c, oid, j, st, s, y0, y1):
+def _receipt_side(c, oid, j, st, s, y0, y1, banks=None):
     """The receipts, travel expenses and card lines of the DATEV input side, split into net and input tax; the receipts of
     depreciated devices onto the fixed asset account. -> (node ids of the receipts paid by card, hints)."""
     small = bool(s.get("small_business"))
@@ -288,6 +372,8 @@ def _receipt_side(c, oid, j, st, s, y0, y1):
             gross = -gross
         node = r.get("_node")
         doc = r.get("Belegfeld 1") or ""
+        if banks and doc.startswith("KA") and doc[2:].isdigit() and gegen == banks.default:
+            gegen = banks.of_card(int(doc[2:]))  # 2.685.0 (#5128): the card total leaves the bank account of its bank line
         if node and doc.startswith("B") and node in afa_ids:
             konto = asset  # 2.666.0 (#3461): a depreciated device is capitalised, its depreciation is the expense
             j.label(asset, tr(LD_ACC_LABELS["asset"]))
@@ -313,7 +399,7 @@ def _cat_names(c, oid):
     return {k: ", ".join(sorted(v, key=str.casefold))[:80] for k, v in out.items()}
 
 
-def _doc_side(c, oid, j, st, s, y0, y1):
+def _doc_side(c, oid, j, st, s, y0, y1, banks=None):
     """Invoices, credit notes, cash discounts and invoice payments of the DATEV export, revenue split into net and VAT."""
     small = bool(s.get("small_business"))
     case_of = {}
@@ -328,6 +414,8 @@ def _doc_side(c, oid, j, st, s, y0, y1):
         kind = r.get("_kind") or ""
         doc = r.get("Belegfeld 1") or ""
         if kind == "payment":
+            if banks and konto == banks.default and r.get("_pay"):
+                konto = banks.of_payment(r["_pay"])  # 2.685.0 (#5128): the bank account of the line that paid it
             j.add(r["_date"], doc, r.get("Buchungstext"), konto, gegen, a, "payment")
             continue
         case = case_of.get(gegen)
@@ -352,26 +440,41 @@ def _creditors(c, oid, st, nodes, card_nodes):
     return {n: own.get(n) or dv_counter(st) for n in nodes}
 
 
-def _money_side(c, oid, j, st, s, y0, y1, card_nodes):
+def _meal_lines(c, oid):
+    """2.685.0 (#5128): {(bank | cash, line id)} of the lines that paid an approved entertainment receipt (office_meals.pay_kind /
+    pay_id, office/mealpay.py): the meal books the expense, the line only moves the money (against the clearing account)."""
+    return {(r[0], r[1]) for r in c.execute("SELECT pay_kind, pay_id FROM office_meals WHERE org_id=? AND status='approved' AND deleted_at IS NULL "
+                                            "AND pay_kind IN ('bank', 'cash') AND pay_id IS NOT NULL", (oid,))}
+
+
+def _money_side(c, oid, j, st, s, y0, y1, card_nodes, banks=None):
     """The bank lines and cash entries that the DATEV export leaves to the tax advisor, and the payments of the receipts
     (whatever year their receipt was booked in)."""
-    bank = st["bank"] or _acct(st, "bank")
+    banks = banks or _Banks(c, oid, st)
+    bank0 = bank = banks.default
     cash = st["cash"] or _acct(st, "cash")
+    meal_paid = _meal_lines(c, oid)
     clearing, transit = ld_acct(st, "clearing"), ld_acct(st, "transit")
-    banks, cashes = _bank_rows(c, oid, y0, y1), _cash_rows(c, oid, y0, y1)
-    cred = _creditors(c, oid, st, {t["match_id"] for t in banks if t["match_kind"] == "receipt"} | {e["node_id"] for e in cashes if e["node_id"]},
+    lines, cashes = _bank_rows(c, oid, y0, y1), _cash_rows(c, oid, y0, y1)
+    cred = _creditors(c, oid, st, {t["match_id"] for t in lines if t["match_kind"] == "receipt"} | {e["node_id"] for e in cashes if e["node_id"]},
                       card_nodes)
     paid = set()
-    for t in banks:
+    for t in lines:
         a, k = t["amount"], t["match_kind"]
         txt = t.get("counterpart") or t.get("purpose") or ""
         doc = f"BK{t['id']}"
+        bank = banks.of_line(t)
         if not a or k in ("invoice", "card", "payout"):
             continue  # the payment of the invoice / the card total / the payout of the online payments: the DATEV lines book them
         if k == "receipt":
             if t["match_id"] in cred:
                 j.add(t["day"], doc, txt, cred[t["match_id"]], bank, -a, "bank")
                 paid.add(t["match_id"])
+            elif bank != bank0 and st.get("in_counter") == "bank" and t["match_id"] not in card_nodes:
+                j.add(t["day"], doc, txt, bank0, bank, -a, "bank")  # 2.685.0 (#5128): the receipt booked the default bank, the money left this one
+            continue
+        if ("bank", t["id"]) in meal_paid and k in (None, "", "noreceipt", "ignored"):
+            j.add(t["day"], doc, txt, bank, clearing, a, "bank")  # 2.685.0 (#5128): an entertainment receipt books the expense
             continue
         if k == "private":
             j.add(t["day"], doc, txt, bank, ld_acct(st, "private_in") if a > 0 else dv_card_private(st), a, "bank")
@@ -393,6 +496,12 @@ def _money_side(c, oid, j, st, s, y0, y1, card_nodes):
             if e["node_id"] in cred and e["node_id"] not in paid:
                 j.add(e["day"], doc, txt, cred[e["node_id"]], cash, a, "cash")
                 paid.add(e["node_id"])
+            elif st.get("in_counter") == "bank" and e["node_id"] not in card_nodes and e["node_id"] not in paid:
+                # 2.685.0 (#3461 review, #5128): the receipt was booked against the bank (counter account bank), the money left the cash box
+                j.add(e["day"], doc, txt, bank0, cash, a, "cash")
+                paid.add(e["node_id"])
+        elif ("cash", e["id"]) in meal_paid:
+            j.add(e["day"], doc, txt, clearing, cash, a, "cash")  # 2.685.0 (#5128): the entertainment receipt books the expense
         else:
             konto = dv_cat_account(st, e["category"] or "")
             j.label(konto, e["category"] or "")
@@ -409,8 +518,51 @@ def _money_side(c, oid, j, st, s, y0, y1, card_nodes):
                and rc["node_id"] not in paid and rc["node_id"] not in card_nodes and not _flowed(c, oid, rc["node_id"])]
         cr = _creditors(c, oid, st, [rc["node_id"] for rc in rcs], card_nodes)
         for rc in rcs:
-            j.add(rc["paid_at"], f"B{rc['node_id']}", rc["title"], cr[rc["node_id"]], bank, rc["amount"], "receipt_paid")
+            j.add(rc["paid_at"], f"B{rc['node_id']}", rc["title"], cr[rc["node_id"]], bank0, rc["amount"], "receipt_paid")
     return paid
+
+
+def _meal_side(c, oid, j, st, s, y0, y1):
+    """2.685.0 (#5128): the approved entertainment receipts of the year on their day, as the income statement counts them
+    (books.ofc_meals_euer, per VAT rate as bkexport.bx_meal_parts): the deductible 70 % with the full input tax, the 30 % on
+    an account of their own -- the commercial accounts carry both as an expense. Counter: the card account when a card line
+    paid it, else the clearing account (the bank / cash line that paid it books against it, _money_side)."""
+    small = bool(s.get("small_business"))
+    meal, nd, clearing, card = ld_acct(st, "meal"), ld_acct(st, "meal_nd"), ld_acct(st, "clearing"), dv_card_account(st)
+    for m in ofc_meals_home(c, oid, y0, y1, s):
+        v, sm = ofc_meals_euer([m], small)
+        counter = card if (m.get("pay") or ("",))[0] == "card" else clearing
+        doc, txt = f"BW{m['id']}", m["title"] or tr(LD_ACC_LABELS["meal"])
+        for pct, net, tax in bx_meal_parts(m, v):
+            j.add(m["date"], doc, txt, meal, counter, net, "meal")
+            p = str(pct) if pct != "" else ""
+            j.add(m["date"], doc, txt, ld_acct(st, "in" + p) if p in ("19", "7") else nd, counter, tax, "meal", kind="vat" if p in ("19", "7") else "")
+        j.add(m["date"], doc, txt, nd, counter, dec(sm["not_deductible"]), "meal")
+        j.label(meal, tr(LD_ACC_LABELS["meal"]))
+        j.label(nd, tr(LD_ACC_LABELS["meal_nd"]))
+
+
+def _km_side(c, oid, j, st, year):
+    """2.685.0 (#5128): the mileage allowance of the logbook (business drives with a private car, office/logbook.py) on 31
+    December: the travel account (fares) against the private deposits of the owner (a personal office) or the clearing account
+    (the reimbursement to the person who drove)."""
+    km = lb_allowance_year(c, oid, year)
+    if not km["count"] or not km["amount"]:
+        return
+    own = bool(pb_owner(c, oid))
+    acct = dv_travel_account(st, "fares", own)
+    j.label(acct, tr(LD_ACC_LABELS["km"]))
+    j.add(f"{year}-12-31", f"KM{year}", f"{tr(LD_ACC_LABELS['km'])} {km['km'].normalize():f} km",
+          acct, ld_acct(st, "private_in" if own else "clearing"), km["amount"], "km")
+
+
+def _fee_side(c, oid, j, st, s, y0, y1):
+    """2.685.0 (#5128): the paid reminder fees on their day (books.bk_fees_paid; damages, no VAT): the clearing account (the
+    money came with a bank / cash line) against the other income."""
+    acct = ld_acct(st, "fee_in")
+    for f in bk_fees_paid(c, oid, y0, y1, _home(s)):
+        j.add(f["date"], f["number"] or f"M{f['doc_id']}", tr(LD_ACC_LABELS["fee_in"]), ld_acct(st, "clearing"), acct, f["amount"], "fee")
+        j.label(acct, tr(LD_ACC_LABELS["fee_in"]))
 
 
 def _flowed(c, oid, nid):
@@ -474,11 +626,17 @@ def ld_journal(c, oid, year):
     dx_need_eur(s)
     y0, y1 = f"{year}-01-01", f"{year}-12-31"
     j = _J(st)
+    banks = _Banks(c, oid, st)  # 2.685.0 (#5128): an account per bank account
     opening = _opening(c, oid, j, st, year)
-    _doc_side(c, oid, j, st, s, y0, y1)
-    card_nodes, hints = _receipt_side(c, oid, j, st, s, y0, y1)
-    _money_side(c, oid, j, st, s, y0, y1, card_nodes)
+    _doc_side(c, oid, j, st, s, y0, y1, banks)
+    card_nodes, hints = _receipt_side(c, oid, j, st, s, y0, y1, banks)
+    _money_side(c, oid, j, st, s, y0, y1, card_nodes, banks)
     _afa_side(c, oid, j, st, s, year)
+    _meal_side(c, oid, j, st, s, y0, y1)  # 2.685.0 (#5128): entertainment, mileage allowance, reminder fees as in bk_euer
+    _km_side(c, oid, j, st, year)
+    _fee_side(c, oid, j, st, s, y0, y1)
+    for a, lb in banks.labels.items():
+        j.label(a, lb)
     for e in ld_entries(c, oid, year, ("manual",)):
         j.add(e["day"], f"UB{e['id']}", e["text"], e["debit"], e["credit"], dec(e["amount"]), "manual", ref=e["id"])
     j.rows.sort(key=lambda r: (r["src"] != "open", r["day"], r["doc"]))
