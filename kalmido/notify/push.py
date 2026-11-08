@@ -24,7 +24,7 @@ from ..core.usertz import hm_text, tz_gap, tz_of_s, user_now
 from ..core.db import bump, connect, DbError, inbox_default, iso, local_now, now_utc, parse_iso, uset, usettings
 from ..accounts.session import GATE
 from ..core.access import list_role, pvis, task_visible, vis_sql
-from ..tasks.validation import NAG_HOUR_CAP, NAG_MINUTES, valid_hm
+from ..tasks.validation import NAG_HOUR_CAP, NAG_MINUTES, REM_MAX, REM_MIN, valid_hm
 from ..tasks.tasks import _wd_followups
 from ..collab.comments import collab_on, push_gate_tick, task_push_tick
 from ..collab.news import news_cleanup, news_unread_me, notif_ok
@@ -878,13 +878,32 @@ def _watchdog_tick(c):
     _wd_section(c, "admin alerts", aa_tick)
 
 
+# 2.658.0 (#4193): the reminder / nag ticks read only the columns they use (was t.* with the notes of every open task with a
+# due date and reminders, every 30 s) and only the due days that can fire now (wd_due_window).
+WD_TASK_COLS = ("t.id, t.list_id, t.assignee_id, t.created_by, t.title, t.priority, t.due, t.due_time, t.reminders, t.reminded, "
+                "t.repeat, t.nag, t.nag_at, t.deadline, l.name AS list_name, l.is_inbox AS list_inbox, l.owner_id AS list_owner, "
+                "l.nag AS list_nag")
+
+
+def wd_due_window(now):
+    """2.658.0 (#4193): the due days (ISO text, inclusive) a reminder can be sent for now. An offset lies within
+    REM_MIN..REM_MAX minutes before the due time (validation.clean_reminders), a reminder missed by more than 6 h is never
+    sent, the due time is at most the end of the day, and a person's clock is at most 26 h away from the server's: two
+    days of margin on each side keep every reminder that can fire. Before: one more read of tasks long past that only
+    marked their missed reminders as fired (nothing was sent for them)."""
+    lo = now - timedelta(minutes=-REM_MIN) - timedelta(hours=6) - timedelta(days=3)
+    hi = now + timedelta(minutes=REM_MAX) + timedelta(days=2)
+    return lo.date().isoformat(), hi.date().isoformat()
+
+
 def _wd_reminders(c, users, S, LG, now):
     # task reminders -- fire once per (due, offset); skip if missed by > 6 h. Goes to the assignee,
     # unassigned tasks to their creator.
-    rows = c.execute("""SELECT t.*, l.name AS list_name, l.is_inbox AS list_inbox, l.owner_id AS list_owner, l.nag AS list_nag
+    lo, hi = wd_due_window(now)
+    rows = c.execute(f"""SELECT {WD_TASK_COLS}
                         FROM tasks t JOIN lists l ON l.id=t.list_id
-                        WHERE t.status=0 AND t.deleted_at IS NULL AND t.due IS NOT NULL
-                          AND t.reminders!='' AND l.archived=0""").fetchall()  # 1.5.1: none for archived lists
+                        WHERE t.status=0 AND t.deleted_at IS NULL AND t.due IS NOT NULL AND t.due >= ? AND t.due <= ?
+                          AND t.reminders!='' AND l.archived=0""", (lo, hi)).fetchall()  # 1.5.1: none for archived lists
     early, margin = wd_early_allday(S), WD_EARLY_MARGIN + tz_gap(S, now)  # 2.368.3 (#2985): + the distance to the people's clocks
     # 2.281.0 B (#3117): list roles / push settings per person, once per tick (a wave of 100 reminders)
     memo = {"bundle": {}}  # 2.367 (#2967): + the all-day reminders of this tick per person
@@ -1058,10 +1077,12 @@ def nag_start(t, s):
 
 
 def _wd_nags(c, users, S, LG, now):
-    rows = c.execute("""SELECT t.*, l.name AS list_name, l.is_inbox AS list_inbox, l.owner_id AS list_owner, l.nag AS list_nag
+    # 2.658.0 (#4193): only the columns used; no lower bound (an overdue task keeps nagging), the upper one of wd_due_window
+    # (the nags begin with the first reminder at the earliest)
+    rows = c.execute(f"""SELECT {WD_TASK_COLS}
                         FROM tasks t JOIN lists l ON l.id=t.list_id
-                        WHERE t.status=0 AND t.deleted_at IS NULL AND t.due IS NOT NULL AND l.archived=0
-                          AND ((t.nag NOT IN ('', 'off')) OR (t.nag='' AND l.nag!=''))""").fetchall()
+                        WHERE t.status=0 AND t.deleted_at IS NULL AND t.due IS NOT NULL AND t.due <= ? AND l.archived=0
+                          AND ((t.nag NOT IN ('', 'off')) OR (t.nag='' AND l.nag!=''))""", (wd_due_window(now)[1],)).fetchall()
     early, margin = wd_early_allday(S), WD_EARLY_MARGIN + tz_gap(S, now)  # 2.368.3 (#2985): + the distance to the people's clocks
     for t in rows:
         if not wd_nag_maybe(t, early, now, margin):
