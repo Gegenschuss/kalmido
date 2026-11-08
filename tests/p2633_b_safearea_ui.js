@@ -2,8 +2,8 @@
 // kalmido-suite: fresh
 // Own container (start.sh), Firefox. Firefox has no safe area, so the test sets --safe-b / --safe-t on the root element (the
 // values env(safe-area-inset-*) gives on an iPhone with a home indicator: 34 px below, 47 px above). Invented data only.
-// - the status bar: apple-mobile-web-app-status-bar-style is black-translucent (the page reaches up behind the clock, the
-//   safe area on top counts); the head starts below the clock; the workspace stripe on top of the head and the loading bar sit
+// - the status bar: apple-mobile-web-app-status-bar-style is black again (2.750.0, #5240; the --safe-t rules below are
+//   measured with a simulated 47 px and stay valid); the head starts below the clock; the workspace stripe on top of the head and the loading bar sit
 //   below the status bar, not behind the clock (the glowing line seen on a phone)
 // - the tab bar keeps only part of the home indicator room: padding-bottom max(--safe-b - .75rem, min(--safe-b, .5rem)),
 //   34 px -> 22 px, 12 px -> 8 px, 0 -> 0 (no safe area: as before); it ends at the screen's bottom; the labels sit close to it
@@ -52,7 +52,7 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
     await nav(B + '#l/' + lid);
     check(await ready(ev, `document.querySelectorAll('#view .trow').length >= 30 && !!document.querySelector('#tabs') && !!document.querySelector('#fab')`, 100), 'the list with 30 tasks, the tab bar and the "+" button');
     // ---- the status bar
-    check(await ev(`document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')?.content`) === 'black-translucent', 'status bar style "black-translucent" (the page reaches behind the clock, --safe-t counts)');
+    check(await ev(`document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')?.content`) === 'black', 'status bar style "black" (2.750.0 #5240: the page starts below the clock; --safe-t is 0 there, the rules stay for a translucent bar)');
     await ev(safe(34, 47));
     check(await ready(ev, `parseFloat(getComputedStyle(document.querySelector('#tabs')).paddingBottom) === 22`, 20), 'safe area 34 px: the bar takes it');
     // 2.725.0 (#5159): since #5115 reduced motion keeps a .01 ms transition only for visual properties - the padding above is
