@@ -344,6 +344,13 @@ def gsy_merge(c, r, L, t, n, k=None):
     tail, ref = snap.get("tail") or "", _ref(r, n["no"])
     loc, locked, changed = gsy_local(c, t, tail), _locked_note(c, t["id"]), False
     rts, ev = n.get("updated_at"), {}
+    # 2.665.0 (#5113): the field times of a conflict are asked for before the first write (_apply), the same request the
+    # loop below would make: with commit_first (git_http) no half-merged task is committed by that request
+    for f in GSY_FIELDS:
+        if "got" in ev:
+            break
+        if not (f == "body" and locked) and _gsy_conflict(f, _remote(n, f), loc[f], snap.get(f)):
+            _field_time(k, n, f, ev)
     for f in GSY_FIELDS:
         if f == "body" and locked:  # a private (locked) note: never compared, never sent
             continue
@@ -375,6 +382,11 @@ def gsy_merge(c, r, L, t, n, k=None):
             changed = True
         snap[f] = R
     return snap, dirty, changed
+
+
+def _gsy_conflict(f, R, V, S):
+    """2.665.0 (#5113): both sides changed field f since the last sync (gsy_merge's case that asks for the field's time)."""
+    return not _eq(f, R, V) and not (S is not None and (_eq(f, R, S) or _eq(f, V, S)))
 
 
 def _unlink(c, conn_id, no):
@@ -624,15 +636,49 @@ def gsy_create_issue(c, r, k, L):
     return True
 
 
+def _sent_before(c, r, k, no, row, text, got):
+    """2.665.0 (#5113): an earlier try of comment row was marked (send_at) before its POST and did not get to store the
+    answer: the issue comment with the same text written since the mark that no row has yet (adopted, never sent twice), else
+    None. The issue's comments are read once per push (got); all pages read without it: unsure (CalError), nothing is sent."""
+    if "list" not in got:
+        got["list"] = _fetch_comments(k, no, time.monotonic() + GSY_ROUND_S)
+        got["full"] = len(got["list"]) >= GSY_COMMENT_PAGES * GIS_PAGE
+    try:
+        since = iso(parse_iso(row["send_at"]) - timedelta(seconds=120))  # the repository's clock may differ a little
+    except (ValueError, TypeError):
+        since = row["send_at"]
+    have = {x[0] for x in c.execute("SELECT remote_id FROM git_issue_comments WHERE conn_id=? AND remote_id IS NOT NULL", (r["id"],))}
+    for x in got["list"]:
+        if isinstance(x.get("id"), int) and x["id"] not in have and (x["body"] or "").strip() == text.strip() and \
+                _newer(x["created_at"], since):
+            return x["id"]
+    if got["full"]:
+        raise CalError("error")
+    return None
+
+
 def _push_comments(c, r, k, no):
     """The comments still to be sent to issue no; each one is stored (committed) as soon as the repository took it
-    (2.394.0 D, #3377 review 1: an error with the next one never sends it twice)."""
-    for row in c.execute("""SELECT x.id, m.body, m.user_id, m.deleted_at FROM git_issue_comments x JOIN comments m ON m.id=x.comment_id
+    (2.394.0 D, #3377 review 1: an error with the next one never sends it twice).
+    2.665.0 (#5113): each one is marked (send_at, committed) before its POST; a marked one whose answer was not stored (the
+    store broke off after the POST) is looked for among the issue's comments first (_sent_before): at most one more POST,
+    only when the repository has no such comment."""
+    got = {}
+    for row in c.execute("""SELECT x.id, x.send_at, m.body, m.user_id, m.deleted_at FROM git_issue_comments x JOIN comments m ON m.id=x.comment_id
                             WHERE x.conn_id=? AND x.issue_no=? AND x.remote_id IS NULL ORDER BY x.id""", (r["id"], no)).fetchall():
         if row["deleted_at"] or not (row["body"] or "").strip():
             c.execute("DELETE FROM git_issue_comments WHERE id=?", (row["id"],))
+            c.commit()
             continue
-        j = _send(k, "POST", _issue_path(k, no, "comments"), {"body": _comment_text(c, row)})
+        text = _comment_text(c, row)
+        rid = _sent_before(c, r, k, no, row, text, got) if row["send_at"] else None
+        if rid is not None:
+            c.execute("UPDATE git_issue_comments SET remote_id=? WHERE id=?", (rid, row["id"]))
+            c.commit()
+            continue
+        c.execute("UPDATE git_issue_comments SET send_at=? WHERE id=?", (iso(now_utc()), row["id"]))
+        c.commit()
+        j = _send(k, "POST", _issue_path(k, no, "comments"), {"body": text})
         rid = j.get("id") if isinstance(j, dict) else None
         if isinstance(rid, int):
             c.execute("UPDATE git_issue_comments SET remote_id=? WHERE id=?", (rid, row["id"]))
@@ -664,6 +710,12 @@ def gsy_push_one(c, r, k, L):
     locked = _locked_note(c, t["id"])
     out = {f: loc[f] for f in GSY_FIELDS if not (f == "body" and locked) and not _eq(f, loc[f], snap.get(f))}
     rts = n["updated_at"]
+    # 2.665.0 (#5113): what the merge did is stored in its own short transaction before anything is sent (the snap of what
+    # the issue has now; dirty stays as the row has it): a failed send no longer needs a rollback of the merge, and the
+    # next try neither applies nor logs a conflict a second time
+    c.execute("UPDATE git_issue_links SET snap=?, remote_updated_at=? WHERE conn_id=? AND issue_no=?",
+              (json.dumps(snap, ensure_ascii=False), rts, r["id"], n["no"]))
+    c.commit()
     if out:
         m = gis_norm_issue(r["provider"], _send(k, "PATCH" if k["provider"] == "github" else "PUT", _issue_path(k, n["no"]), _out_fields(k, out)))
         snap.update(out)
@@ -696,7 +748,11 @@ def _failed(c, r, L, code, again):
 
 def gsy_push(c):
     """The git loop's part: the linked tasks whose collected changes are due (GSY_PUSH_PER_TICK). Per connection: read only
-    or locked = nothing goes out; a rate limit pauses it; an error is shown and retried later."""
+    or locked = nothing goes out; a rate limit pauses it; an error is shown and retried later.
+    2.665.0 (#5113): like the poll (git_poll, 2.658.0) every request first commits (commit_first in git_http): no row lock
+    and no snapshot stays open while the provider answers. Every answer is stored and committed at once (gsy_create_issue,
+    gsy_push_one, _push_comments), so an error rolls back only what came after the last request; the error itself is stored
+    as the link's state (push_err / push_fails / push_due, git_conns.issue_error)."""
     now = time.time()
     rows = c.execute("""SELECT l.* FROM git_issue_links l JOIN git_conns k ON k.id=l.conn_id
                         WHERE l.push_due>0 AND l.push_due<=? AND k.issue_sync=1 ORDER BY l.push_due LIMIT ?""", (now, GSY_PUSH_PER_TICK)).fetchall()
@@ -709,6 +765,7 @@ def gsy_push(c):
         if not r:  # 2.394.0 D (#3377 review 7): the connection was deleted meanwhile (its links went with it)
             continue
         k = conns.get(("k", r["id"])) or conns.setdefault(("k", r["id"]), git_ctx(c, r))
+        k["commit_first"] = c  # 2.665.0 (#5113): see above
         try:
             if gsy_block(c, r):
                 c.execute("UPDATE git_issue_links SET push_due=0 WHERE conn_id=?", (r["id"],))

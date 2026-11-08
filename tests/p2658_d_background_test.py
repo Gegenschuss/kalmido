@@ -15,6 +15,10 @@ freelancer-matrix: own
  - 2.665.0 (#5113) channels: like the webhooks - after a failed send the rest of that channel waits (also for the next
    chn_tick of the same round of chn_loop), the batch takes the messages in turns over the channels: 40 waiting ones of a
    dead channel are tried once, a second channel (of a person without an organisation) is still served, in its order
+ - 2.665.0 (#5113) git issue sync push (gsy_push): no open database transaction while the provider answers (every call of
+   git_http sees an idle connection), the change and the comment are stored; a failed send stays as the link's state
+   (push_err / push_fails / push_due, issue_error) instead of being rolled back; a comment whose POST went out but whose
+   answer was not stored (send_at set) is found in the issue's comments and adopted, not sent a second time
 usage: p2658_d_background_test.py <datadir>"""
 import json
 import os
@@ -263,6 +267,109 @@ check([x for x in calls if x.startswith("d")] == ["d0"] and len(dead) == 40 and 
       f"({[x for x in calls if x.startswith('d')]}, {dead[:3]}..., fails {j.get('fails')}, batch {j.get('batch')})")
 check([x for x in calls if x.startswith("a")] == ["a0", "a1"] and j.get("alive") == 0,
       f"#5113: a second channel is still served, in its order, though 40 of the dead one wait before it ({calls}, left {j.get('alive')})")
+
+# ---------------------------------------------------------------- 6. #5113 git issue sync: the push holds no transaction
+TP = task("Push me")
+GSP = r"""
+import json, time, app
+from kalmido.core.db import connect, insert_id
+from kalmido.core.pg import system_ctx
+from kalmido.calendars.subscriptions import CalError
+from kalmido.integrations import git as G
+from kalmido.integrations import git_sync as GS
+LID, TID = %d, %d
+c = connect()
+with system_ctx(c):
+    cid = insert_id(c, "INSERT INTO git_conns(list_id,provider,base_url,owner,repo,default_branch,created_at,next_at,hash_ids,issue_sync,issue_rw) "
+                       "VALUES(?,?,?,?,?,?,?,?,1,1,1)", (LID, "github", "", "acme", "push", "main", "2026-01-01T00:00:00Z", time.time() + 86400))
+    snap = json.dumps({"title": "Old title", "body": "", "state": "open", "labels": [], "tail": ""})
+    c.execute("INSERT INTO git_issue_links(conn_id,issue_no,task_id,created_at,snap,dirty,push_due) VALUES(?,5,?,?,?,?,0)",
+              (cid, TID, "2026-01-01T00:00:00Z", snap, json.dumps({"title": "2026-11-08T00:00:00.000Z"})))
+    uid = c.execute("SELECT owner_id FROM lists WHERE id=?", (LID,)).fetchone()[0]
+    def comment(text):
+        mid = insert_id(c, "INSERT INTO comments(task_id,user_id,body,mentions,created_at) VALUES(?,?,?,'',?)", (TID, uid, text, "2026-11-08T00:00:00Z"))
+        return insert_id(c, "INSERT INTO git_issue_comments(conn_id,issue_no,remote_id,comment_id,created_at) VALUES(?,5,NULL,?,?)", (cid, mid, "2026-11-08T00:00:00Z"))
+    x1 = comment("First from here")
+c.commit()
+calls, issue, mode = [], {"number": 5, "title": "Old title", "body": "", "state": "open", "labels": [], "user": {"login": "dev"},
+                          "html_url": "https://example.com/acme/push/issues/5", "created_at": "2026-01-01T00:00:00Z",
+                          "updated_at": "2026-01-02T00:00:00Z", "comments": 0}, {"fail": False, "remote": []}
+def fake(k, path, etag, method, data, until):
+    calls.append([method, path, c.in_transaction])
+    if method == "GET" and "/issues/5/comments" in path:
+        return 200, {}, mode["remote"]
+    if method == "GET" and path.endswith("/issues/5"):
+        return 200, {}, dict(issue)
+    if method == "PATCH":
+        if mode["fail"]:
+            raise CalError("network")
+        issue.update(data)
+        return 200, {}, dict(issue, updated_at="2026-11-08T01:00:00Z")
+    if method == "POST" and path.endswith("/issues/5/comments"):
+        return 201, {}, {"id": 9001 + len([x for x in calls if x[0] == "POST"])}
+    raise CalError("not_found")
+G._git_http1 = fake
+def push():
+    with system_ctx(c):
+        c.execute("UPDATE git_issue_links SET push_due=1 WHERE conn_id=?", (cid,))
+        c.commit()
+        GS.gsy_push(c)
+        c.commit()
+def state():
+    with system_ctx(c):
+        L = c.execute("SELECT snap, push_due, push_err, push_fails FROM git_issue_links WHERE conn_id=?", (cid,)).fetchone()
+        k = c.execute("SELECT issue_error FROM git_conns WHERE id=?", (cid,)).fetchone()
+        cm = [list(r) for r in c.execute("SELECT id, remote_id, send_at<>'' FROM git_issue_comments WHERE conn_id=? ORDER BY id", (cid,))]
+        c.commit()
+    return {"title": json.loads(L["snap"]).get("title"), "due": L["push_due"], "err": L["push_err"], "fails": L["push_fails"],
+            "ierr": k["issue_error"], "cm": cm, "now": time.time()}
+out = {}
+push()
+out["ok"] = {"calls": calls[:], "state": state()}
+# a failed send: the state is stored, nothing rolled back
+del calls[:]
+with system_ctx(c):
+    c.execute("UPDATE tasks SET title='Push again' WHERE id=?", (TID,))
+    x2 = comment("Second from here")
+c.commit()
+mode["fail"] = True
+push()
+out["fail"] = {"calls": calls[:], "state": state()}
+# the comment's POST went out earlier but its answer was not stored: found in the repository, not sent again
+del calls[:]
+mode["fail"] = False
+with system_ctx(c):
+    c.execute("UPDATE git_issue_comments SET send_at=? WHERE id=?", ("2026-11-08T00:00:00Z", x2))
+    row = c.execute("SELECT m.body, m.user_id FROM git_issue_comments x JOIN comments m ON m.id=x.comment_id WHERE x.id=?", (x2,)).fetchone()
+    text = GS._comment_text(c, row)
+c.commit()
+mode["remote"] = [{"id": 9500, "user": {"login": "dev"}, "body": text, "created_at": "2026-11-08T00:00:30Z"}]
+push()
+out["again"] = {"calls": calls[:], "state": state()}
+with system_ctx(c):
+    c.execute("DELETE FROM git_conns WHERE id=?", (cid,))
+c.commit()
+c.close()
+print(json.dumps(out))
+"""
+j = py(GSP % (LID, int(TP or 0)))
+ok, fail, again = j.get("ok") or {}, j.get("fail") or {}, j.get("again") or {}
+allc = (ok.get("calls") or []) + (fail.get("calls") or []) + (again.get("calls") or [])
+check(len(allc) >= 6 and not any(x[2] for x in allc),
+      f"#5113: the git push holds no database transaction while the provider answers ({len(allc)} calls, open at "
+      f"{[x[:2] for x in allc if x[2]]})")
+st = ok.get("state") or {}
+check([x[0] for x in ok.get("calls") or []] == ["GET", "PATCH", "POST"] and st.get("title") == "Push me" and st.get("due") == 0
+      and [x[1] for x in st.get("cm") or []] == [9002],
+      f"#5113: the push still sends and stores the change and the comment ({ok})")
+st = fail.get("state") or {}
+check(st.get("err") == "network" and st.get("fails") == 1 and (st.get("due") or 0) > (st.get("now") or 0) and st.get("ierr") == "network"
+      and [x[1] for x in st.get("cm") or []] == [9002, None],
+      f"#5113: a failed send stays as the link's state (push_err, push_fails, push_due later, issue_error), the comment waits ({st})")
+st = again.get("state") or {}
+posts = [x for x in again.get("calls") or [] if x[0] == "POST"]
+check(not posts and [x[1] for x in st.get("cm") or []] == [9002, 9500] and st.get("title") == "Push again" and st.get("due") == 0,
+      f"#5113: a comment sent before whose answer was not stored is found and adopted, never posted twice ({again})")
 
 # ---------------------------------------------------------------- 4. agents: an event wakes only its agent's long-polls
 AG = r"""
