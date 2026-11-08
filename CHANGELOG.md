@@ -17,6 +17,36 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.756.0] - 2026-11-09
+
+Package 2.625 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Changed
+- Settings > Integrations: every integration is a folded row with icon, name and state (connected / not connected); opening it shows the form. The cards at the top, the search and other jumps open the matching row (#4489)
+- Newsletter > New segment: groups, companies and address books are picked as condition rows (What / is or is not / value with a search) instead of one button per entry; "is not" excludes contacts; old segments stay unchanged (#4486)
+- Tests: every suite writes a JUnit report (tests/.junit/<suite>.xml, a case per check), the CI uploads it per shard; the train's flaky detection reads it (#4005)
+### Security
+- Agent runner: permission answers travel over a local connection between runner and hook (Unix socket / named pipe, peer process check, key per run, one-time nonce per question); no answer file an agent could write any more. AGENT-SECURITY.md describes a separate OS user for the agent's tools (#3661)
+- Scheduling polls: when a personal agent changes owner, its private polls move into the former owner's trash (read-only, links closed); the new owner only sees what the agent creates afterwards (#3961)
+
+Package 2.637 (Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Added
+- #4745 Knowledge: "Offline available" per space in the space menu keeps all files of the space on the device (IndexedDB of this sign-in, never the service worker cache): size and free space are shown before switching on (too little space = a note, nothing loads), persistent storage is requested, loading runs in the background with progress (x of y files, MB), can be paused and resumes after a reload or a lost connection. The next online moment syncs new / changed files and removes deleted, trashed or no longer permitted ones; signing out or switching account removes the copy; switching off frees the space; a copy the browser cleared is marked honestly. Offline, file links and images open from the copy. New route GET /api/wiki/space-files (files of a space with size and checksum, rights as file access, no trash). Encrypted spaces take no files, so the switch is not offered there.
+- #4768 Project rules: the due trigger takes a distance ("X days before the due date", 1-30, or "overdue for X days", 0-30), runs once per task and due day and again when the date moves; a rule runs up to 5 actions one after the other (all or nothing; a missing right pauses the whole rule as before; a move into another project only as the last action); optional conditions "Only if" (priority, assignee, project tag, section; all must hold). Existing rules run unchanged. Agent API, OpenAPI and MCP propose_rule take `actions` and `conditions`; account and organisation import / export map the ids inside the chain and the conditions.
+
+Package 2.736 (Bündel: Dokumente: Wischen nahtlos - Nachbar-Dokument fert, Einstellungen: Android-Zurück geht zum vorigen Ber).
+### Changed
+- Documents: swiping to the next or previous document is seamless on touch screens - both direct neighbours are fetched and drawn ahead with all their fields and the preview in full size; after the snap the drawn view is simply swapped in: no request, no jumping picture, no text that appears later. Leafing on stops what is no direct neighbour any more; swiping back reuses the view just left. The PDF full view and the image viewer leaf the same way (#5212)
+### Fixed
+- Settings: the Back key (Android) and the arrow in the header go back to the area shown before (on a phone the overview, if you came from there), also after a search hit or a jump to another area; only the last Back closes the settings. Opening and closing a part inside an area is no step (#5214)
+- Tests: the field trash column field_id carries its 'no FK' marker and the agent delete check in the field trash suite expects one status (403) - both guard suites were red on main (#4528)
+
+Package 2.642 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Added
+- #4772 Client link of a video sign-off for clients without an account: several links per sign-off at once (at most 10), each with an optional expiry and its own switch-off (decided links too); the tick "The client may also see the older versions" makes older versions readable at `?v=<n>`; a new version keeps the link working and shows the client the new version while the earlier decision stays in the history (undoing the version gives it back); the client's name is entered once (cookie on the link's path); client comments show as "Name (Guest)" in the app. Images and PDFs on the client page follow in #5040.
+- #4975 `KALMIDO_WEB_PROCS` (default 1): several web processes on one port (SO_REUSEPORT, Linux; otherwise one with a log line), threads and database pool shared out instead of multiplied, background work only in the first process, an ended process is started again (growing wait when it dies at once); restore and the connection check count the processes like `KALMIDO_REPLICAS`; `/api/admin/health` shows the answering process.
+### Changed
+- #4975 Calendar, contacts, newsletter and PDF text syncs take an advisory lock, so two processes or replicas never run the same sync twice; the hourly limits of uploads, form bytes and error reports are counted in the database for all processes (the first upload of an hour larger than `KALMIDO_UPLOAD_HOURLY_MB` is now refused as well); the printed first-start setup code is accepted by every web process of the container, an operator's code stays the only one.
+
 ## [2.749.0] - 2026-11-08
 
 Package 2.583 (Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Teil 1/6: Sa).
@@ -190,7 +220,8 @@ Package 2.685 (Bündel: Kommentare: Aktivität in drei Stufen (nur Kommenta, Bü
 - Office: switching "Office & finance" on no longer leaves the office saying it is switched off when it loaded before the switch was saved (#5176).
 - Balance sheet: a receipt booked against the bank (counter account "bank") and paid from the cash box is now booked bank to cash instead of being left out (#5128).
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.749.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.756.0...HEAD
+[2.756.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.756.0
 [2.749.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.749.0
 [2.740.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.740.0
 [2.734.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.734.0
