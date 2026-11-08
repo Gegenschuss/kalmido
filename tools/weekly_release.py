@@ -16,8 +16,9 @@ pick: the newest latest-ok version up to the end of the ISO week of --today that
   of the servers reads only that section of the latest release), then all CHANGELOG sections of these versions, made
   readable by tools/release_notes.py.
 prune: which GitHub release objects and ghcr image versions go. A version stays when it is the newest latest-ok version of
-  its ISO week (weeks before the first latest-ok tag: the newest release of the week), the current latest release, or the
-  object is younger than --days days. Images: only tagged versions whose tags are all plain X.Y.Z go (never :latest, never
+  its ISO week (weeks before the first latest-ok tag: the newest release of the week) and younger than 4 weeks (KEEP_WEEKS,
+  2.750.0 #5247), the current latest release, the newest latest-ok version or one above it, or the object is younger than
+  --days days. Images: only tagged versions whose tags are all plain X.Y.Z go (never :latest, never
   the untagged platform parts of a kept image; --children: the untagged parts of an image that goes go with it, 2.658.0
   #5042). Prints the lists for the log; --plan writes the API paths to DELETE, one
   per line. Only release objects and package versions: git tags are NEVER deleted or moved (safe_path refuses everything
@@ -40,6 +41,7 @@ HEAD = re.compile(r"^## \[(\d+\.\d+\.\d+)\]")
 ACTION = re.compile(r"^\s{0,3}(#{1,6})\s*action needed\b.*$", re.I)
 HEADING = re.compile(r"^\s{0,3}(#{1,6})\s")
 KEEP_DAYS = 14
+KEEP_WEEKS = 4  # 2.750.0 (#5247): the checked version of a week stays only this long (by its date); older ones go, their tags stay
 SAFE = (re.compile(r"^repos/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/releases/\d+$"),
         re.compile(r"^(?:users|orgs)/[A-Za-z0-9_.-]+/packages/container/[A-Za-z0-9_.-]+/versions/\d+$"))
 
@@ -169,12 +171,16 @@ def weekly_notes(secs, prev, target):
     return "\n".join(out).rstrip() + "\n", vs
 
 
-def keep_set(tags, releases, latest):
+def keep_set(tags, releases, latest, now=None, weeks=KEEP_WEEKS):
     """Versions that stay: newest latest-ok of each ISO week, the newest release of each week before the first latest-ok tag,
-    the current latest release."""
+    the current latest release. 2.750.0 (#5247): with now, a week's version stays only while it is younger than `weeks` weeks
+    (the tag's / release's date); the newest checked version and all above it, the young ones and latest stay in prune_plan."""
     keep = set()
     by_week = {}
+    since = now - dt.timedelta(weeks=weeks) if now is not None else None
     for v, d in tags.items():
+        if since is not None and d < since:
+            continue
         k = week(d)
         if k not in by_week or v > by_week[k]:
             by_week[k] = v
@@ -184,6 +190,8 @@ def keep_set(tags, releases, latest):
     for r in releases:
         v = ver(r.get("tag_name"))
         if not v or (first and v >= first) or not r.get("created_at"):
+            continue
+        if since is not None and when(r["created_at"]) < since:
             continue
         k = week(when(r["created_at"]))
         if k not in old or v > old[k]:
@@ -214,7 +222,7 @@ def prune_plan(tags, latest, releases, images, repo, packages, now, days=KEEP_DA
                          " test)")
     if not ver(latest):
         raise SystemExit(f"no current latest release ({latest!r}): refusing to plan")
-    keep = keep_set(tags, releases, latest)
+    keep = keep_set(tags, releases, latest, now)
     young = now - dt.timedelta(days=days)
     top = max(max(tags), ver(latest))  # 2.641.0 (#5011, review): the newest checked version and all above it (the live one
     # and the next ones) stay even when the train stood still for longer than `days` - the server pulls :X.Y.Z of them

@@ -1,8 +1,9 @@
 name: Prune releases
 
 # 2.641.0 (#5011): thins out old GitHub release objects and ghcr image versions. What stays (tools/weekly_release.py prune): the
-# newest latest-ok version of each ISO week (weeks before the first latest-ok tag: the newest release of the week), the current
-# latest release, everything younger than 14 days; of the images only tagged versions whose tags are all X.Y.Z can go (never
+# newest latest-ok version of each ISO week (weeks before the first latest-ok tag: the newest release of the week) for the last 4
+# weeks only (2.750.0 #5247: older week versions go, each can be built again from its tag), the current latest release, the newest
+# latest-ok version and all above it, everything younger than 14 days; of the images only tagged versions whose tags are all X.Y.Z can go (never
 # :latest, never the untagged platform parts of a kept image; 2.658.0 #5042: the untagged parts of a manifest that goes go with it
 # when no kept manifest names them, read with imagetools inspect --raw). Standard: a dry run that only writes the list into the log; it
 # deletes only with dry_run false (by hand) or when weekly-release.yml calls it with the repository variable

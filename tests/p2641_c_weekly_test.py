@@ -137,11 +137,27 @@ keep, plan = wr.prune_plan(TG, "v2.639.0", REL, IMG, "o/r", "users/o/packages/co
 rel_gone = sorted(x[1] for x in plan if x[0] == "release")
 img_gone = sorted(x[1] for x in plan if x[0] == "image")
 check((2, 630, 0) in keep and (2, 629, 0) not in keep, f"the newest latest-ok of each ISO week stays, an older one of it goes {sorted(keep)}")
-check((2, 501, 0) in keep and (2, 500, 0) not in keep and (2, 490, 0) in keep,
-      "before the first latest-ok tag: the newest release of each week stays")
-check(rel_gone == ["2.500.0", "2.629.0"], f"releases that go {rel_gone}")
+# 2.750.0 (#5247): the week versions of September / August are older than 4 weeks now - they go (their tags stay)
+check(not keep & {(2, 501, 0), (2, 500, 0), (2, 490, 0)}, f"#5247: week versions older than 4 weeks no longer stay {sorted(keep)}")
+check(rel_gone == ["2.490.0", "2.500.0", "2.501.0", "2.629.0"], f"releases that go {rel_gone}")
 check("2.631.0" not in rel_gone and "2.635.0" not in rel_gone, "younger than 14 days stays (even without latest-ok)")
-check(img_gone == ["2.500.0", "2.629.0"], f"images that go {img_gone}")
+check(img_gone == ["2.490.0", "2.500.0", "2.501.0", "2.629.0"], f"images that go {img_gone}")
+# before the first latest-ok tag (inside the 4 weeks): the newest release of each week stays
+keep4 = wr.keep_set(TG, REL, "v2.639.0", d("2026-09-20T10:00:00Z"))
+check((2, 501, 0) in keep4 and (2, 500, 0) not in keep4 and (2, 490, 0) in keep4,
+      f"before the first latest-ok tag: the newest release of each week stays {sorted(keep4)}")
+# 2.750.0 (#5247): week 4 back stays, week 5 back goes; latest and the newest checked version stay however old
+TG6 = wr.read_tags("latest-ok/3.1.0 2026-10-05T10:00:00Z\nlatest-ok/3.2.0 2026-10-14T10:00:00Z\nlatest-ok/3.3.0 2026-10-21T10:00:00Z\n")
+REL6 = [{"id": 60 + i, "tag_name": f"v3.{i}.0", "created_at": c}
+        for i, c in [(1, "2026-10-05T10:00:00Z"), (2, "2026-10-14T10:00:00Z"), (3, "2026-10-21T10:00:00Z")]]
+IMG6 = [{"id": 70 + i, "created_at": c, "tags": [f"3.{i}.0"]}
+        for i, c in [(1, "2026-10-05T10:00:00Z"), (2, "2026-10-14T10:00:00Z"), (3, "2026-10-21T10:00:00Z")]]
+keep6, plan6 = wr.prune_plan(TG6, "v3.3.0", REL6, IMG6, "o/r", "users/o/packages/container/kalmido", NOW)
+gone6 = sorted(x[1] for x in plan6)
+check((3, 2, 0) in keep6 and (3, 1, 0) not in keep6, f"#5247: 25 days back stays, 34 days back goes {sorted(keep6)}")
+check(gone6 == ["3.1.0", "3.1.0"], f"#5247: release object and image of the old week go, nothing else {gone6}")
+_, plan7 = wr.prune_plan(TG6, "v3.1.0", REL6, IMG6, "o/r", "users/o/packages/container/kalmido", d("2027-03-01T10:00:00Z"))
+check(not {x[1] for x in plan7} & {"3.1.0", "3.3.0"}, f"#5247: months later latest and the newest checked version still stay {plan7}")
 check(not any(p.endswith("/versions/4") or p.endswith("/versions/5") or p.endswith("/versions/7") for _, _, p in plan),
       "untagged parts, :latest and a young image stay")
 check(not any("/releases/90" in p or "/releases/91" in p for _, _, p in plan), "a release without a version or a draft is never touched")
