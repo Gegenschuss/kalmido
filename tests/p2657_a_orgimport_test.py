@@ -100,7 +100,7 @@ def links(s, nid, name):
 
 
 def warned(j, text):
-    return sum(w.get("count") or 0 for w in (j.get("result") or {}).get("warnings") or [] if (w.get("text") or [""])[0] == text)
+    return sum(w.get("count") or 0 for w in (j.get("result") or {}).get("warnings") or [] if (w.get("text") if isinstance(w.get("text"), str) else (w.get("text") or [""])[0]) == text)
 
 
 def node(space, name):
