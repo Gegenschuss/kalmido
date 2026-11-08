@@ -296,8 +296,11 @@ for resp in ET.fromstring(r.content).findall(D_ + "response"):
     ad = resp.find(".//{urn:ietf:params:xml:ns:carddav}address-data")
     if ad is not None and "Pia Picture" in (ad.text or ""):
         card = (resp.find(D_ + "href").text, resp.find(f".//{D_}getetag").text, ad.text)
-m = re.search(r"PHOTO(?:;ENCODING=b;TYPE=\w+)?:(?:data:image/\w+;base64,)?([^\r\n]+)", card[2].replace("\r\n ", "")) if card else None
-small = base64.b64decode(m.group(1)) if m else b""
+m = re.search(r"PHOTO(?:;ENCODING=b;TYPE=\w+)?:(?:data:image/\w+;base64,)?([^\r\n]+)", re.sub(r"\r?\n[ \t]", "", card[2])) if card else None
+try:  # the XML parser hands the lines over with LF only (folded lines: LF + space)
+    small = base64.b64decode(m.group(1)) if m else b""
+except ValueError:
+    small = b""
 check(small[:2] == b"\xff\xd8" and len(m.group(1)) < len(BIG) // 4,
       f"the big photo goes as a small JPEG in the vCard ({small[:4]} {len(m.group(1)) if m else 0} of {len(BIG)})")
 if card:
