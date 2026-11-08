@@ -133,6 +133,16 @@ for what, b in (("the pivot itself as source", {"source": P, "values": [{"col": 
     check(Bo.put(B + f"/api/sheets/{T}/tabs/{P}/pivot", json=b).status_code == 400, f"400: {what}")
 check(Bo.post(B + f"/api/sheets/{T}/tabs", json={"pivot": {"source": 999999, "values": [{"col": CC, "agg": "sum"}]}}).status_code == 400,
       "a new pivot of a sheet that is not in the table: 400")
+# 2.671.0 (#3463, review R2 F1): a sheet of ANOTHER table is never a source - not one of a stranger (Erin's private table, Bob
+# cannot read it), not one of Bob's own other tables; both answer exactly as a sheet that does not exist (no hint whether it exists)
+ET = Er.post(B + "/api/sheets", json={"title": "Erin's", "space": "private"}).json()["id"]
+BT = Bo.post(B + "/api/sheets", json={"title": "Bob's other", "space": "private"}).json()["id"]
+none = Bo.put(B + f"/api/sheets/{T}/tabs/{P}/pivot", json={"source": 999999, "values": [{"col": None, "agg": "count"}]})
+for what, src in (("a stranger's table", ET), ("an own other table", BT)):
+    for how, resp in (("setting", Bo.put(B + f"/api/sheets/{T}/tabs/{P}/pivot", json={"source": src, "values": [{"col": None, "agg": "count"}]})),
+                      ("new pivot", Bo.post(B + f"/api/sheets/{T}/tabs", json={"pivot": {"source": src, "values": [{"col": None, "agg": "count"}]}}))):
+        check(resp.status_code == 400 and resp.json() == none.json(), f"{what} as source ({how}): 400, the same answer as an unknown sheet " + resp.text[:200])
+check(res(Bo, P).get("source", {}).get("id") == T, "the setting stays on the own table's sheet")
 check(Bo.put(B + f"/api/sheets/{T}/tabs/{S2}/pivot", json=SPEC).status_code == 409, "an ordinary sheet has no pivot setting: 409")
 check(Bo.put(B + f"/api/sheets/{T}/tabs/{P}/pivot", json=SPEC).ok, "back to clients")
 
