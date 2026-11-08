@@ -92,7 +92,7 @@ def batch(s, q=P):
 
 def meal_lines(rows, mid):
     """[(amount, konto, gegenkonto, bu)] of the lines of meal mid, sorted."""
-    return sorted((x[0], x[6], x[7], x[8]) for x in rows if x[10].strip('"') == f"M{mid}")
+    return sorted((x[0], x[6], x[7], x[8].strip('"')) for x in rows if x[10].strip('"') == f"M{mid}")
 
 
 def full(host, **kw):
