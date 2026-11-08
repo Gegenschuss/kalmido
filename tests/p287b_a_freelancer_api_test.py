@@ -386,7 +386,7 @@ SUBST = [
     (r"/absences/$", "absence"), (r"/budget/$", "budget"),
 ]
 IDS["me"] = FID
-IDS["ledgercsv"] = "susa"  # 2.666.0 (#3461): ledger/<what>.csv names a list, not an id
+IDS["ledgercsv"] = "bs"  # 2.666.0 (#3461): ledger/<what>.csv names a list, not an id; 2.685.0 (#5128): "bs" -- ledger/<what>.pdf knows bs / pl only
 
 
 # 2.421.0 A (#2936): route -> {placeholder key: the id to take instead} where the first own object is the wrong kind

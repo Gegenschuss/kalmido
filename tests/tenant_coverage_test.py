@@ -582,6 +582,7 @@ ROUTES = {
     "GET /api/office/books/ledger": "office", "GET /api/office/books/ledger/settings": "office", "PUT /api/office/books/ledger/settings": "office",  # 2.666.0 (#3461)
     "GET /api/office/books/ledger/{}.csv": "office", "POST /api/office/books/ledger/entries": "office", "PUT /api/office/books/ledger/entries/{}": "office",
     "DELETE /api/office/books/ledger/entries/{}": "office", "POST /api/office/books/ledger/close": "office",
+    "GET /api/office/books/ledger/{}.pdf": "office",  # 2.685.0 (#5128): p2685_b_bilanz_test.py
     "GET /api/office/datev/suppliers": "office", "PUT /api/office/datev/suppliers/{}": "office", "DELETE /api/office/datev/suppliers/{}": "office",
     "POST /api/office/datev/suppliers/{}/restore": "office", "GET /api/office/datev/opening": "office",
     # 2.90.0 A (#1921): bookkeeping light, office admins (p290_a_api_test.py)

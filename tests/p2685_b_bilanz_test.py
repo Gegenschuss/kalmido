@@ -12,6 +12,7 @@ The year before (Y), the same in both offices (an organisation with SKR03, a per
    an invoice paid through one of them too; the default account keeps its lines
  - (b) an invoice with 2 % cash discount paid in time: revenue and VAT reduced on the day of the payment, the debtor balances
  - (a) the counter account of receipts "bank": a receipt paid out of the cash box books bank against cash
+ - (3) the balance sheet and the profit and loss account as PDF; a member of the organisation gets none
 Every year: debit = credit, assets = equity and liabilities.
 usage: p2685_b_bilanz_test.py <datadir>"""
 import base64
@@ -24,7 +25,7 @@ import testclock
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 import kt  # noqa: E402
-from freelancer_fixture import freelancer  # noqa: E402
+from freelancer_fixture import freelancer, login, org_join  # noqa: E402
 from kt import B, check  # noqa: E402
 
 KEY = base64.b64encode(os.urandom(32)).decode()
@@ -204,6 +205,12 @@ def office(s, who, ws, chart, me):
     check(bal(rep, a["clearing"]) == D("45.00") - (D(kr[0]["amount"]) if kr and a["km_counter"] == a["clearing"] else 0),
           f"{who}: clearing: the unmatched 45.00 (the meal and its line net out) {bal(rep, a['clearing'])}")
 
+    # ---- (3) the balance sheet and the profit and loss account as PDF (the rights of the CSV)
+    for what in ("bs", "pl"):
+        r = s.get(B + L + f"/{what}.pdf?year={Y}")
+        check(r.ok and r.headers.get("Content-Type", "").startswith("application/pdf") and r.content[:5] == b"%PDF-" and f"-{Y}.pdf" in r.headers.get("Content-Disposition", ""),
+              f"{who}: PDF {what} {r.status_code} {r.headers.get('Content-Type')}")
+    check(s.get(B + L + f"/susa.pdf?year={Y}").status_code == 404, f"{who}: no PDF of an unknown list")
     # ---- (1) a paid reminder fee (this year: marked paid today)
     r = s.post(B + O + "/docs/reminder", json={"doc_ids": [ic], "level": 1, "fee": 5})
     check(r.ok, f"{who}: a reminder with a fee {r.status_code} {r.text[:200]}")
@@ -240,6 +247,15 @@ A.patch(B + "/api/settings", json={"lang": "en", "features": FEAT, "tour": "done
 ORG = A.post(B + "/api/admin/orgs", json={"name": "Alpha", "admin_id": ALICE}).json()["id"]
 A.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
 office(A, "org", f"org:{ORG}", "SKR03", ALICE)
+
+# a member of the organisation (no office admin) gets no PDF of the balance sheet
+r = A.post(B + "/api/users", json={"username": "bob", "display_name": "Bob", "password": "password123", "email": "bob@example.com", "orgs": []})
+check(r.ok, "setup: bob " + r.text[:120])
+A.put(B + f"/api/orgs/{ORG}/members", json={"email": "bob@example.com", "role": "member"})
+org_join(B, "bob", ORG)
+Bo = login(B, "bob")
+Bo.patch(B + "/api/settings", json={"lang": "en", "features": FEAT, "tour": "done", "workspace": f"org:{ORG}"})
+check(Bo.get(B + f"/api/office/books/ledger/bs.pdf?year={Y}").status_code in (403, 404), "a member gets no PDF of the balance sheet")
 
 # ---------------------------------------------------------------- a person without an organisation  # freelancer-matrix: office
 FID, Fr = freelancer(B, A)

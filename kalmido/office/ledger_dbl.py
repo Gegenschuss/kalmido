@@ -52,11 +52,11 @@ from ..core.conflict import ccf_check
 from ..core.db import body, bump, iso, local_now, now_utc
 from ..core.errors import BadInput, DeniedKey
 from ..core.access import Denied
-from ..core.i18n import N_, csv_dialect, tr
+from ..core.i18n import N_, csv_dialect, lang, tr
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.pg import insert_id, write_lock
 from ..core.serializers import csv_cell
-from .calc import dec, dstr, money
+from .calc import calc_lang, dec, dstr, money
 from .assets import ast_afa_year, ast_values
 from .bankacc import bka_datev, bka_rows
 from .bkexport import bx_meal_parts
@@ -69,7 +69,8 @@ from .datevin import DV_BU_IN, dv_card_account, dv_card_private, dv_cat_account,
 from .euerbasis import _bank_rows, _cash_rows
 from .ledger import ofx_company, ofx_log
 from .logbook import lb_allowance_year
-from .model import office_ctx_admin as _ctx, office_rows, office_settings, office_settings_lock, office_settings_save, pb_owner
+from .model import office_ctx_admin as _ctx, ofx_name1, office_rows, office_settings, office_settings_lock, office_settings_save, pb_owner
+from .pdf import C_INK2, C_RULE, pdf_date, pdf_money, pdf_paper_ns, pdf_write
 from .periodlock import period_need_open, pl_lock
 from .taxcheck import TC_CORP_RE
 
@@ -1000,6 +1001,86 @@ def ld_csv(what):
     c.commit()
     return Response("﻿" + buf.getvalue(), mimetype="text/csv; charset=utf-8",
                     headers={"Content-Disposition": f'attachment; filename="{tr(LD_CSV[what])}-{year}.csv"', "Cache-Control": "no-store"})
+
+
+LD_PDF = {"bs": N_("balance-sheet|file name"), "pl": N_("profit-and-loss|file name")}
+
+
+def ld_pdf_bytes(c, oid, rep, what, lg):
+    """2.685.0 (#5128): the balance sheet (what "bs": assets, then equity and liabilities, each with its total) or the profit and
+    loss account ("pl": the lines, the net income) of ld_reports as a plain PDF on the office's paper -- the way of the income
+    statement's PDF (books.bk_euer_pdf_bytes): company, title, the table, the check line and the note."""
+    s = office_settings(c, oid)
+    ppr = pdf_paper_ns(s.get("paper"))
+    company = ofx_name1(ofx_company(c, oid).get("name") or (s.get("company") or {}).get("name"))
+    m = lambda v: pdf_money(v, calc_lang(lg), "EUR")  # noqa: E731  home currency EUR only (as the DATEV export)
+    x0, x1 = 56, ppr.A4_W - 56
+    pages, st = [], {"pg": None, "y": 0}
+
+    def need(h):
+        if st["pg"] is None or st["y"] + h > ppr.A4_H - 56:
+            st["pg"] = ppr._Page()
+            pages.append(st["pg"])
+            st["y"] = 56
+
+    def row(label, amount, bold=False, indent=0, size=9):
+        need(16)
+        st["pg"].text(x0 + indent, st["y"], str(label)[:80], size, bold=bold)
+        st["pg"].text(x1 - 120, st["y"], m(amount), size, bold=bold, align="r", width=120)
+        st["y"] += 14
+
+    def rule():
+        st["pg"].line(x0, st["y"], x1, st["y"], color=C_RULE)
+        st["y"] += 5
+
+    title = tr("Balance sheet as of {0}", pdf_date(f"{rep['year']}-12-31", calc_lang(lg))) if what == "bs" else tr("Profit and loss account {0}", rep["year"])
+    need(60)
+    if company:
+        st["pg"].text(x0, st["y"], company, 10, color=C_INK2)
+        st["y"] += 18
+    st["pg"].text(x0, st["y"], title, 16, bold=True)
+    st["y"] += 30
+    ch = rep["checks"]
+    if what == "bs":
+        for side, head, tot in (("a", tr("Assets"), ch["assets"]), ("p", tr("Equity and liabilities"), ch["liabilities"])):
+            need(50)
+            st["pg"].text(x0, st["y"], head, 11, bold=True)
+            st["y"] += 16
+            rule()
+            for r in [x for x in rep["bs"] if x["side"] == side]:
+                row(r["label"], r["amount"], bold=not r["level"], indent=12 if r["level"] else 0)
+            rule()
+            row(tr("Total"), tot, bold=True)
+            st["y"] += 14
+    else:
+        rule()
+        lines = [r for r in rep["pl"] if dec(r["amount"])]
+        for r in lines or [{"label": tr("None"), "amount": "0", "kind": "i"}]:
+            row(r["label"], r["amount"] if r["kind"] == "i" else dstr(-dec(r["amount"])))
+        rule()
+        row(tr("Net income / net loss for the year"), rep["result"], bold=True, size=11)
+        st["y"] += 14
+    ok = ch["balanced"] and dec(ch["difference"]) == 0
+    need(40)
+    st["y"] += st["pg"].para(x0, st["y"], tr("Debit = credit, assets = equity and liabilities.") if ok else
+                             tr("The balance sheet does not balance (difference {0}).", m(ch["difference"])), 8, x1 - x0, color=C_INK2) + 4
+    st["y"] += st["pg"].para(x0, st["y"], tr(LD_NOTE), 8, x1 - x0, color=C_INK2) + 4
+    return pdf_write(pages, {}, title=title, author=company)
+
+
+@app.get("/api/office/books/ledger/<what>.pdf")
+def ld_pdf(what):
+    """2.685.0 (#5128). Office admin (as the CSV). ?year=YYYY -> the balance sheet (bs) or the profit and loss account (pl) as PDF."""
+    if what not in LD_PDF:
+        raise Denied(404)
+    c, uid, oid = _ctx()
+    year = _year_arg()
+    rep = ld_reports(c, oid, year)
+    data = ld_pdf_bytes(c, oid, rep, what, lang())
+    ofx_log(c, oid, "export", target="books", detail={"what": f"ledger-{what}.pdf", "year": year})
+    c.commit()
+    return Response(data, mimetype="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="{tr(LD_PDF[what])}-{year}.pdf"', "Cache-Control": "no-store"})
 
 
 @app.post("/api/office/books/ledger/entries")
