@@ -19,10 +19,11 @@
 
 ## What's new
 
-**2.681.0** (2026-11-08):
-- **Guided tours**: every area's short introduction walks you through the real controls, Notes and Chat have their own.
-- **Agents**: calendar, address book and project settings need the object's version like tasks and events; the setup code needs `PUBLIC_URL` on the server.
-- **Sync**: calendar queries with a time range and contact photos in CardDAV are lighter.
+**2.682.0** (2026-11-08):
+- **Bookkeeping**: optional double-entry bookkeeping for GmbH/UG next to the EÜR (SKR03/SKR04, trial balance, P&L, HGB balance sheet small/micro, year-end closing).
+- **Contacts**: the contact card is built from blocks you can show, hide, fold and order, like the client card.
+- **Approvals**: images and PDFs uploaded in an approval are visible to project colleagues.
+- **Self-hosting**: `PUBLIC_URL` must be set for the receipt fetcher, the scan inbox setup code and hosted MCP (otherwise 503).
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 

@@ -16,6 +16,51 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.682.0] - 2026-11-08
+
+Package 2.670 Part A (rescue): test diagnostics for two CI-only red suites.
+### Changed
+- Tests p2589_c_ui and p2239_b_logs: a failure now names the state of the page / the log lines involved, to find the cause of their CI-only red runs (#5009, #4897)
+
+Package 2.677 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Changed
+- The single "reduce motion" exception for the phone drawer's area names (start-sbfit-5103.css) is gone; since #5115 the general rule no longer animates sizes, so the drawer fit stays calm without it (#5126).
+
+Package 2.662 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Security
+- Tasks, comments, events and contacts carry the organisation of their list / task / calendar / address book (org_id, filled and carried along by database triggers, also for writes of the previous version); row-level security now guards these four tables as a second floor under the app's own visibility check (#4602).
+
+### Changed
+- Approval: an image or PDF uploaded through the approval follows the approval's rights (task / project / client), so project colleagues and agents of the shared project see it and its bytes; the file itself stays private in the file store, and a file chosen from the file store still needs the file right (#5041).
+- Backups: the names of backups on a former off-site target expire after the longest set retention plus 30 days, so they no longer hold back the deletion journal forever; the backup page says how many former backups still hold the journal and until when (#4587).
+
+### Fixed
+- Encryption in the background: the way back (decrypt-all / decrypt-private) counts budget rows and knowledge-base texts it could not write as failed instead of leaving them sealed silently; opening private document previews runs in portions with the file check; new private previews stay plain while private encryption is off (#4939).
+
+Package 2.682 (Bündel: Kommentare: Schalter 'Mit Aktivität' auch in nicht, Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Changed
+- Comments of a task in a list that is not shared: as soon as changes of others show between the comments (agents, automations, changes via API / CalDAV / webhook), the "…" menu of the comments has "With activity" too; off shows only the comments and the head says "Comments only". The same per-device setting as in shared lists (#5155).
+
+Package 2.666 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Added
+- Bookkeeping: double-entry bookkeeping for companies that must draw up a balance sheet (GmbH, UG). Settings > Bank & tax: choose "income statement (EÜR)" (default, unchanged) or "balance sheet" (suggested for GmbH/UG/HRB), size small or micro. The journal is worked out from the existing documents (invoices, receipts, bank, cash book, depreciation) in SKR03 or SKR04 from the DATEV settings; trial balance, profit and loss account and balance sheet (HGB small / micro) with CSV export; entries by hand (adjustments, opening balances) and the year-end closing, which writes the opening entries of the next year and locks the year. Bookkeeping > Balance sheet (#3461).
+- Contacts: the contact card is built from blocks like the client card - each person can show / hide, fold and order the blocks ("Customise the contact card"), kept per person and the same for all contacts (#3624).
+
+### Security
+- Approvals: the customer link of a disabled account answers like an unknown link (page, comments, decision) (#5112).
+- Hardening from the security audit (#4074): unlocking a locked folder runs the plain files through the upload checks (virus scan, type sniff, photo data); IMAP without UIDPLUS no longer expunges other mails marked deleted; the organisation import's undo keeps time entries billed on a remaining invoice; without PUBLIC_URL the receipt fetcher's and scan inbox's setup codes and the hosted MCP metadata answer 503 instead of using the request's Host header; signature links work at most 90 days after they were made; ending the own session and a 401 for an ended session clear the browser's HTTP cache (Clear-Site-Data); trh()/trnh() escape inserted values; a revoked file or folder share drops the knowledge offline copy at the next sync; the card statement PDF is served sandboxed; foreign ICC colour profiles reach littlecms only when they are well-formed and at most 1 MB; the Peppol status fetch and lookup need the release right; office routes check rights before answering 404 for a switched-off function; a receipt-mail body that is no object is 400.
+
+Package 2.680 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Fixed
+- Tables: a chart saved while the table was still loading no longer jumps back to the older chart; a load answer older than the table on screen is dropped (#5138).
+- Tests: knowledge pages and list channel messages in the end-to-end encryption suites are created as version 2, as the server demands since #5044; each suite checks that a new version 1 item is refused (#5145, #5146, #5147).
+- Tests: headless Firefox reports no hover and no pointer, so the app ran in finger mode there since #5082/#5085; six UI suites start Firefox as a mouse, new suite p2680_c_pointer_ui checks the pointer setting (#5139, #5140, #5141, #5142, #5143, #5144).
+
 ## [2.681.0] - 2026-11-08
 
 Package 2.657 (Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), CI-only rot: p2551_c_favout_ui, Teil 1/6: Sammelpaket: Aufgaben ohne Paket (D).
@@ -657,7 +702,8 @@ Package 2.582 (Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher),
 
 Not released (the CI of this version was red); its changes are listed under 2.605.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.681.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.682.0...HEAD
+[2.682.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.682.0
 [2.681.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.681.0
 [2.675.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.675.0
 [2.668.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.668.0
