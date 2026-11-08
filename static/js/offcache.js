@@ -78,7 +78,7 @@ function oc_soon() {
   if (OC.t) return;
   OC.t = 1;
   const g = OC.gen;
-  if (typeof requestIdleCallback === 'function') requestIdleCallback(() => { if (g === OC.gen) oc_write(g); }, {timeout: 10000});
+  if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(() => { if (g === OC.gen) oc_write(g); }, {timeout: 10000});
   else setTimeout(() => { if (g === OC.gen) oc_write(g); }, 300);
 }
 // core.js startRead: the old / fallback localStorage copy first (it is the newest, see above; then moved here), else the record
