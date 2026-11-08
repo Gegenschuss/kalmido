@@ -34,7 +34,7 @@ import secrets
 from datetime import date, datetime, timedelta
 from urllib.parse import quote
 
-from flask import g, jsonify, request
+from flask import g, jsonify, request, Response
 
 from ..core import objhooks  # 2.565.0: START (core/db.init_db runs the forward copy)
 from ..files.fsref import fs_unshare_hooks  # 2.623.0 (#4778)
@@ -48,6 +48,7 @@ from ..collab.comments import user_names
 from ..core.errors import BadInput
 from .pages import wiki_clean_path, wiki_dict, wiki_need, wiki_space, wiki_space_key
 from ..core.orgcrypt import oc_send_file  # 2.149.0 G (#2517): pulled up from functions
+from ..core.orgcrypt import oc_read_file  # 2.674.0 (#4382 finding 2)
 from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
 from ..files.fslock import fl_is_locked
 from ..files.scan import sc_guard
@@ -386,6 +387,7 @@ def wsh_img_nodes(c, shares, page, text, only=None):
     out = {}
     if not makers or not ids:
         return out
+    from ..files.extlinks import XL_IMG
     # the share's guest / the public link reads as somebody else: the maker's rights on the file store decide (deliberately
     # across the reader's context, for the pictures embedded in this shared page only)
     with system_ctx(c):
@@ -394,7 +396,8 @@ def wsh_img_nodes(c, shares, page, text, only=None):
                 continue
             n = c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
             v = fs_version_row(c, nid, None)
-            if n and v and (v["mime"] or n["mime"] or "").startswith("image/"):
+            # 2.674.0 (#4382 finding 2): raster types only (an SVG of the file store is no picture here, see wsh_img_send)
+            if n and v and (v["mime"] or n["mime"] or "") in XL_IMG:
                 out[nid] = (n, v)
     return out
 
@@ -406,7 +409,14 @@ def wsh_img_send(c, n, v, public):
         sc_guard(c, "fs", n["id"], v["no"])
         if not os.path.isfile(full):
             raise Denied(404)
-        resp = oc_send_file(c, full, mimetype=v["mime"] or n["mime"], download_name=n["name"], conditional=True, max_age=0)
+        # 2.674.0 (#4382 finding 2): only a raster picture whose bytes start like one (the pattern of extlinks XL_IMG);
+        # anything else (an SVG, a file named .png that is none) is 404
+        from ..files.extlinks import XL_IMG
+        mime = v["mime"] or n["mime"] or ""
+        data = oc_read_file(c, full) if mime in XL_IMG else b""
+        if not data.startswith(XL_IMG.get(mime, (b"\0\0\0\0",))) or (mime == "image/webp" and data[8:12] != b"WEBP"):
+            raise Denied(404)
+        resp = Response(data, mimetype=mime)
     resp.headers["Content-Security-Policy"] = "default-src 'none'; img-src data:; style-src 'unsafe-inline'; sandbox"
     resp.headers["X-Content-Type-Options"] = "nosniff"
     resp.headers["Cache-Control"] = "no-store, private"
