@@ -1,6 +1,28 @@
 {
  "versions": [
   {
+   "version": "2.682.0",
+   "date": "2026-11-08",
+   "items": [
+    {
+     "de": "In einer Abnahme hochgeladene Bilder und PDFs sehen jetzt auch die Kolleginnen und Kollegen im Projekt.",
+     "en": "Images and PDFs uploaded in an approval are now visible to your project colleagues too."
+    },
+    {
+     "de": "In privaten Listen lässt sich die Aktivität anderer zwischen den Kommentaren jetzt über „…“ > „Mit Aktivität“ ausblenden.",
+     "en": "In private lists you can now hide the activity of others between the comments with \"…\" > \"With activity\"."
+    },
+    {
+     "de": "Für GmbH und UG gibt es neben der EÜR jetzt die Bilanz mit Summen- und Saldenliste, GuV und Jahresabschluss.",
+     "en": "Companies with a balance sheet duty get double-entry bookkeeping with trial balance, P&L, balance sheet and year-end closing."
+    },
+    {
+     "de": "Die Kontaktkarte lässt sich wie die Kundenkarte in Blöcken ein- und ausblenden und zuklappen.",
+     "en": "The contact card can show, hide and fold its blocks like the client card."
+    }
+   ]
+  },
+  {
    "version": "2.681.0",
    "date": "2026-11-08",
    "items": [
