@@ -123,7 +123,9 @@ async function qfDownload(tmp) {
   }
 }
 function qfForget(tmps) { const st = qfStore(); if (st) for (const t of tmps) if (t) st.del(t).catch(() => {}); }
-function attLightbox(id, list, url = attUrl) {  // 2.32.0 (#983): url = the address of a project file
+// 2.683.0 (#5150): prep(a) = makes a picture's address first, url(a) is '' until then (a locked folder decrypts each picture
+// only when it is turned to): "Loading…" in its place, the picture once it is there (if it is still the one shown)
+function attLightbox(id, list, url = attUrl, prep = null) {  // 2.32.0 (#983): url = the address of a project file
   const t = taskById(S.sel), imgs = (list || (t?.attachments || []).filter(isImg)).filter(a => !upLocked(a));  // 2.61.0 (#1818): never a locked file
   let i = Math.max(0, imgs.findIndex(a => a.id === id));
   const m = document.createElement('div');
@@ -133,7 +135,11 @@ function attLightbox(id, list, url = attUrl) {  // 2.32.0 (#983): url = the addr
   let z = 1, tx = 0, ty = 0, pan = null, moved = false;
   const img = () => $('img', m);
   const put = () => { const el = img(); if (el) el.style.transform = z === 1 ? '' : `translate(${tx}px, ${ty}px) scale(${z})`; m.classList.toggle('lbz', z > 1); };
-  const draw = () => { z = 1; tx = ty = 0; m.classList.remove('lbz'); const a = imgs[i]; m.innerHTML = `<img src="${url(a)}" alt="${esc(a.name)}"><div class="lbbar"><span>${esc(a.name)} · ${fmtSize(a.size)}</span><span class="spacer"></span>${imgs.length > 1 ? `<button data-lb="-1" title="${esc(tr('Previous image'))}" aria-label="${esc(tr('Previous image'))}">${ic('left')}</button><button data-lb="1" title="${esc(tr('Next image'))}" aria-label="${esc(tr('Next image'))}">${ic('right')}</button>` : ''}<a href="${url(a, true)}" download title="${tr('Download')}">${ic('download')}</a><button data-lb="x" title="${tr('Close')}">${ic('x')}</button></div>`; };
+  const draw = () => {
+    z = 1; tx = ty = 0; m.classList.remove('lbz'); const a = imgs[i], u = url(a);
+    if (!u && prep) prep(a).then(() => { if (imgs[i] === a && m.isConnected) draw(); }, () => { const p = imgs[i] === a && $('.lbload', m); if (p) p.textContent = tr('Could not load the file'); });
+    m.innerHTML = `${u || !prep ? `<img src="${u}" alt="${esc(a.name)}">` : `<div class="lbload" role="status">${tr('Loading…')}</div>`}<div class="lbbar"><span>${esc(a.name)} · ${fmtSize(a.size)}</span><span class="spacer"></span>${imgs.length > 1 ? `<button data-lb="-1" title="${esc(tr('Previous image'))}" aria-label="${esc(tr('Previous image'))}">${ic('left')}</button><button data-lb="1" title="${esc(tr('Next image'))}" aria-label="${esc(tr('Next image'))}">${ic('right')}</button>` : ''}${u || !prep ? `<a href="${url(a, true)}" download title="${tr('Download')}">${ic('download')}</a>` : ''}<button data-lb="x" title="${tr('Close')}">${ic('x')}</button></div>`;
+  };
   draw();
   pz_attach(m, {area: t => t && !t.closest('.lbbar') ? img() : null,
     start: (el, x, y) => { const r = el.getBoundingClientRect(), cx = r.left + r.width / 2 - tx, cy = r.top + r.height / 2 - ty; return {cx, cy, z0: z, ux: (x - cx - tx) / z, uy: (y - cy - ty) / z}; },

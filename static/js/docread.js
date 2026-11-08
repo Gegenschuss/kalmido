@@ -248,7 +248,7 @@ function dcr_fullOpts(d) {
   // 2.652.0 (#5071): phones too (before: no leafing there) - a swipe sideways leafs on every touch screen (pdfview.js)
   const i = dc_navIdx(d);
   if (i >= 0) {
-    const n = Math.max(DC.total || 0, DC.docs.length);
+    const n = dc_navN();  // 2.683.0 (#5150): the list it was opened from
     o.pos = tr('{0} of {1}', i + 1, n); o.first = i <= 0; o.last = i >= n - 1;
     o.prevT = tr('Previous document'); o.nextT = tr('Next document');
     o.step = async dir => (await dc_step(dir)) && DC.doc ? dcr_fullOpts(DC.doc) : null;

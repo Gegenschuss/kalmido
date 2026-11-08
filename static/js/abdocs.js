@@ -55,11 +55,14 @@ function abd_recogLine(d) {
   const txt = n.recog_on ? tr('Recognition on: text, sender, type and date of new files are recognised') : tr('Recognition off in this folder');
   return `<p class="muted abrecog">${ic('sparkle', 's')}<span>${esc(txt)}${from ? ` <small>(${esc(from)})</small>` : ''}</span>${ab_canWrite(n.role) ? `<button type="button" class="linkbtn" data-abdr="${n.id}">${tr('Change…')}</button>` : ''}</p>`;
 }
+// 2.683.0 (#5150): the documents of the folder in the order shown (its cards; in the list view its entries), the sheet leafs
+// through them (docs.js dc_nav: "3 of 48", the arrows, the swipe); before, the sheet of the file store could not leaf at all
+const abd_navIds = () => { const c = $$('.abview [data-dco]').map(x => +x.dataset.dco); return c.length ? c : (AB.data?.items || []).filter(n => n.doc?.id && !abd_locked(n)).map(n => n.id); };
 function abd_menuItems(n) {
-  if (!abd_on() || abd_locked(n) || !ab_canWrite(n.role)) return n.doc?.id && abd_on() ? [{label: tr('Open as document'), icon: 'file', fn: () => dc_open(n.id, {keep: true})}] : [];
+  if (!abd_on() || abd_locked(n) || !ab_canWrite(n.role)) return n.doc?.id && abd_on() ? [{label: tr('Open as document'), icon: 'file', fn: () => dc_open(n.id, {keep: true, list: abd_navIds()})}] : [];
   if (n.kind === 'folder') return [{label: tr('Recognition…'), icon: 'sparkle', fn: () => setTimeout(() => abd_recogMenu(n), 0)}];  // after this menu closed
   if (n.kind !== 'file') return [];
-  if (n.doc) return [{label: tr('Open as document'), icon: 'file', fn: () => dc_open(n.id, {keep: true})}];
+  if (n.doc) return [{label: tr('Open as document'), icon: 'file', fn: () => dc_open(n.id, {keep: true, list: abd_navIds()})}];
   return [{label: tr('Recognise'), icon: 'sparkle', fn: () => abd_recognise(n)}];  // a file outside a recognising folder
 }
 function abd_recogMenu(n, anchor) {
@@ -105,7 +108,7 @@ document.addEventListener('click', e => {
   const v = /** @type {HTMLElement|null} */ (t.closest?.('.abview [data-abdv]'));
   if (v) { abd_setCards(AB.key || (S.route.nid ? 'n:' + S.route.nid : 's:' + ab_curSpace()), v.dataset.abdv === 'cards'); return; }
   const o = /** @type {HTMLElement|null} */ (t.closest?.('.abview [data-dco]'));  // a document's card: its sheet over the file store (the route stays)
-  if (o) { e.preventDefault(); dc_open(+o.dataset.dco, {keep: true}); return; }
+  if (o) { e.preventDefault(); dc_open(+o.dataset.dco, {keep: true, list: abd_navIds()}); return; }  // 2.683.0 (#5150): + the folder's documents to leaf through
   const r = /** @type {HTMLElement|null} */ (t.closest?.('.abview [data-abdr]'));
   if (r) { const n = AB.data?.node; if (n && n.id === +r.dataset.abdr) abd_recogMenu(n, r); }
 });

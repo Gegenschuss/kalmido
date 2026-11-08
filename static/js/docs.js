@@ -222,6 +222,9 @@ async function dc_shareFiles(files) {  // the share sheet: "File as document"
 const dc_paneOk = () => !isMobile() && !(isTouch() && !matchMedia('(min-width:64rem)').matches);
 const dc_pageOn = () => !dc_paneOk();  // (a phone is never paneOk)
 async function dc_open(id, o = {}) {  // 2.353.0 D (#2759): o.keep = opened from the file store's cards (its route stays)
+  // 2.683.0 (#5150): o.list = the ids of the documents shown where it was opened (the file store's cards): leafing goes through them
+  if (o.list) DC.navSrc = {mod: S.route.mod, docs: o.list.map(x => ({id: +x}))};
+  else if (!o.keep && id !== DC.doc?.id) DC.navSrc = null;  // (the same one drawn anew after a change keeps it)
   // 2.430.0 (#3582): in the documents view of a computer the document opens in the pane beside the list; phones
   // and the file store keep the sheet (phones: as a whole page). DC.opening = the document being fetched (a later one wins)
   const pane = o.pane ?? (!o.keep && dc_paneOk() && S.route.mod === 'docs' && !$('.dc-md:not(.dc-pane)'));  // 2.476.0 (#3935): o.pane = stay in the pane
@@ -236,7 +239,9 @@ async function dc_open(id, o = {}) {  // 2.353.0 D (#2759): o.keep = opened from
   if (!DC.set || DC.set.ws !== ws) { const s = await api('GET', `/api/docs/settings?ws=${ws}`).catch(() => null); if (DC.opening !== id) return; DC.set = s; }
   DC.opening = null;
   DC.doc = d;
-  const ni = dc_navIdx(d); if (ni >= 0) DC.navAt = ni;  // 2.521.0 (#4476): where it stands in the list (it may leave it: checked, filtered)
+  const ni = dc_navIdx(d); if (ni >= 0) { DC.navAt = ni; DC.navFor = d.id; }  // 2.521.0 (#4476): where it stands in the list (it may leave it: checked, filtered)
+  else if (DC.navFor !== d.id) DC.navAt = null;  // 2.683.0 (#5150): never the place of the one before
+  dc_navSeek();
   if (pane) {
     DC.paneId = id;
     if (dc_hashId() !== id) history.replaceState(history.state, '', `#docs/${id}`);
@@ -251,7 +256,7 @@ async function dc_open(id, o = {}) {  // 2.353.0 D (#2759): o.keep = opened from
     if (dc_pageOn()) md.classList.add('dc-page');  // 2.652.0 (#5072): the whole page also on a touch tablet (docs.css)
     // 2.652.0 (#5070): every replaceState in this file keeps the entry's state (state.f8d of backclose.js): with null the
     // arrow left the document's entry behind as a dead Back
-    onRemove(md, () => { DC.doc = null; if (dc_hashId()) history.replaceState(history.state, '', '#docs'); if (o.keep && S.route.mod === 'ablage' && typeof ab_reload === 'function') ab_reload(); });
+    onRemove(md, () => { DC.doc = null; DC.navSrc = null; if (dc_hashId()) history.replaceState(history.state, '', '#docs'); if (o.keep && S.route.mod === 'ablage' && typeof ab_reload === 'function') ab_reload(); });
     md.addEventListener('click', dc_mdClick);
     md.addEventListener('change', dc_mdChange);
     if (dc_hashId() !== id && !o.keep) history.replaceState(history.state, '', `#docs/${id}`);
@@ -299,13 +304,22 @@ document.addEventListener('click', e => { if (e.target.closest?.('.dc-pane')) dc
 // below) turns to the next / previous one, which glides in; past the last loaded one the next page loads, at the real end
 // the page springs back. A preview enlarged with two fingers moves with one finger instead; normal size again = swipes.
 const DCW = {sw: null, pz: null, end: 0};
-const dc_navIdx = d => (S.route.mod === 'docs' && DC.docs && d ? DC.docs.findIndex(x => x.id === d.id) : -1);
+// 2.683.0 (#5150): the list it was opened from: a folder of the file store (its document cards as shown there, DC.navSrc from
+// abdocs.js, the route stays on the file store) or the documents' list (DC.docs with its filter, sorting and next pages)
+function dc_nav() {
+  const v = DC.navSrc;
+  if (v && S.route.mod === v.mod) return {docs: v.docs, total: v.docs.length, more: null};
+  return S.route.mod === 'docs' && DC.docs ? {docs: DC.docs, total: DC.total, more: dc_more} : null;
+}
+const dc_navIdx = d => { const v = d && dc_nav(); return v ? v.docs.findIndex(x => x.id === d.id) : -1; };
+const dc_navN = () => { const v = dc_nav(); return v ? Math.max(v.total || 0, v.docs.length) : 0; };
 function dc_navHtml(d) {
   const i = dc_navIdx(d); if (i < 0) return '';
-  const n = Math.max(DC.total || 0, DC.docs.length);
+  const n = dc_navN();
   return `<div class="dc-nav" data-sig="${i}/${n}" role="group" aria-label="${esc(tr('{0} of {1}', i + 1, n))}"><button type="button" class="iconbtn dc-navb" data-dc="step:-1" aria-label="${esc(tr('Previous document'))}" title="${esc(tr('Previous document'))}"${i > 0 ? '' : ' disabled'}>${ic('left', 's')}</button><span class="dc-navn" aria-hidden="true">${esc(tr('{0} of {1}', i + 1, n))}</span><button type="button" class="iconbtn dc-navb" data-dc="step:1" aria-label="${esc(tr('Next document'))}" title="${esc(tr('Next document'))}"${i < n - 1 ? '' : ' disabled'}>${ic('right', 's')}</button></div>`;
 }
 function dc_navSync() {  // the list changed (loaded again, the next page): the counter of the open document follows
+  dc_navSeek();
   for (const md of $$('.dc-md')) {
     const top = $('.dc-top', md), d = DC.doc;
     if (!top || !d || $('.dc-body', md)?.dataset.id !== String(d.id)) continue;
@@ -317,12 +331,25 @@ function dc_navSync() {  // the list changed (loaded again, the next page): the 
     if (f) $(`.dc-nav [data-dc="${f}"]`, top)?.focus({preventScroll: true});
   }
 }
+// 2.683.0 (#5150): opened with an address (a link, a reload, a search hit) the document may stand further down the list
+// than its loaded first page: the next pages follow until it is found (at most DC_SEEK pages per document) - then the
+// counter, the arrows and the swipe are there; not in the list at all (another filter): none, as before
+const DC_SEEK = 5;
+function dc_navSeek() {
+  const d = DC.doc;
+  if (!d || S.route.mod !== 'docs' || !DC.docs || DC.loading || DC.moreP || DC.docs.length >= DC.total || dc_navIdx(d) >= 0) return;
+  if (DC.navAt != null && DC.navFor === d.id) return;  // it stood in the list and left it (checked, filtered): no search
+  if (DC.seekFor !== d.id) { DC.seekFor = d.id; DC.seekN = 0; }
+  if (DC.seekN >= DC_SEEK) return;
+  DC.seekN++;
+  dc_more().then(ok => { if (ok) dc_navSeek(); });  // the next page while it is still missing (its dc_draw already drew the counter)
+}
 // opens another document of the list where the open one stands (the pane keeps its card in view and the focus on it)
 function dc_goTo(id, dir) {
   DC.slide = dir;
   const pane = !!DC.paneId && !$('.dc-md:not(.dc-pane)');
   const f = pane && document.activeElement?.closest?.('.dc-view [data-dco]');
-  return dc_open(id, pane ? {pane: true} : {}).then(() => {
+  return dc_open(id, pane ? {pane: true} : {keep: !!DC.navSrc && S.route.mod === DC.navSrc.mod}).then(() => {  // 2.683.0 (#5150): the file store's route stays
     if (!pane) return;
     const c = $(`.dc-view [data-dco="${id}"]`); if (!c) return;
     c.scrollIntoView?.({block: 'nearest'}); if (f) c.focus({preventScroll: true});
@@ -330,17 +357,18 @@ function dc_goTo(id, dir) {
 }
 async function dc_step(dir) {  // true = turned; the real end springs back
   const cur = DC.opening ?? DC.doc?.id;
-  let i = (DC.docs || []).findIndex(x => x.id === cur);
-  if (S.route.mod !== 'docs') return false;
+  let v = dc_nav();  // 2.683.0 (#5150): the list it was opened from (the file store's folder or the documents)
+  if (!v) return false;
+  let i = v.docs.findIndex(x => x.id === cur);
   if (i < 0) {  // 2.521.0 (#4476): the open one left the list ("To review": checked or accepted; a filter): on from where it stood
-    const at = DC.doc?.id === cur && DC.navAt != null && DC.docs ? DC.navAt : -1, n = at < 0 ? null : DC.docs[dir > 0 ? at : at - 1];
+    const at = DC.doc?.id === cur && DC.navFor === cur && DC.navAt != null ? DC.navAt : -1, n = at < 0 ? null : v.docs[dir > 0 ? at : at - 1];
     if (at < 0) return false;
     if (!n) { dc_bounce(dir); return false; }
     await dc_goTo(n.id, dir);
     return true;
   }
-  if (dir > 0 && i + 1 >= DC.docs.length && DC.docs.length < DC.total) { await dc_more(); i = (DC.docs || []).findIndex(x => x.id === cur); }
-  const n = i < 0 ? null : DC.docs[i + dir];
+  if (dir > 0 && i + 1 >= v.docs.length && v.docs.length < v.total && v.more) { await v.more(); v = dc_nav(); i = v ? v.docs.findIndex(x => x.id === cur) : -1; }
+  const n = i < 0 ? null : v.docs[i + dir];
   if (!n) { dc_bounce(dir); return false; }
   await dc_goTo(n.id, dir);
   return true;
@@ -416,8 +444,8 @@ document.addEventListener('touchmove', e => {
     const md = s.box.closest('.dc-md');
     if (s.lock === 'y' || dc_navIdx(DC.doc) < 0 || $('.dc-body', md)?.dataset.id !== String(DC.doc?.id)) { DCW.sw = null; return; }  // up / down: the page scrolls
     s.body = $('.dc-body', md);
-    const i = dc_navIdx(DC.doc);
-    s.edge = {'1': !DC.docs[i + 1] && DC.docs.length >= DC.total, '-1': i <= 0};
+    const i = dc_navIdx(DC.doc), v = dc_nav();  // 2.683.0 (#5150): the list it was opened from
+    s.edge = {'1': !v.docs[i + 1] && v.docs.length >= v.total, '-1': i <= 0};
   }
   if (e.cancelable) e.preventDefault();
   s.v = (t.clientX - s.lx) / Math.max(1, Date.now() - s.lt); s.lx = t.clientX; s.lt = Date.now();

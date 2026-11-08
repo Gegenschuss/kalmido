@@ -171,17 +171,41 @@ async function fslFetch(n, v) {
   return r.arrayBuffer();
 }
 const fslToast = x => toast(x instanceof Offline ? tr('Offline: only works again with a connection') : x?.message || tr('Cannot be decrypted'));
+async function fslDec(n, v) { await fslKeys(n.lock_id, true); return fslFileDec(n.lock_id, await fslFetch(n, v)); }
+// a picture as a data: URL (the CSP allows img-src 'self' data:); '' = unreadable
+const fslDataUrl = blob => new Promise(res => { const fr = new FileReader(); fr.onload = () => res(String(fr.result)); fr.onerror = () => res(''); fr.readAsDataURL(blob); });
+const fslBlobUrl = blob => { const u = URL.createObjectURL(blob); setTimeout(() => URL.revokeObjectURL(u), 120000); return u; };
+// 2.683.0 (#5150): the files of the locked folder in the order shown that the viewers leaf through, like an open folder
+// (ablage.js: the pictures in the image viewer, ab_pvOpts: PDFs and pictures in the PDF view); sealed names (no key) stay out
+const fslLeaf = ok => (AB.data?.items || []).filter(x => x.kind === 'file' && x._enc && !x._sealed && !upLocked(x) && ok(x));
+// the PDF view's options of a decrypted file; o.step decrypts the next / previous one only when it is turned to
+async function fsl_pvOpts(n, f) {
+  const blob = new Blob([f.data], {type: f.type}), o = {name: f.name, size: f.data.length};
+  if (ab_isImg({mime: f.type})) { o.img = await fslDataUrl(blob); o.kind = 'img'; o.url = o.dlUrl = o.img; }
+  else { o.url = o.dlUrl = fslBlobUrl(blob); o.data = new Uint8Array(f.data); }
+  const list = fslLeaf(x => ab_isPdf(x) || ab_isImg(x)), i = list.findIndex(x => x.id === n.id);
+  if (i < 0 || list.length < 2) return o;
+  return Object.assign(o, {pos: tr('{0} of {1}', i + 1, list.length), first: i <= 0, last: i >= list.length - 1, prevT: tr('Previous document'), nextT: tr('Next document'),
+    step: async dir => { const x = list[i + dir]; if (!x) return null; try { return await fsl_pvOpts(x, await fslDec(x)); } catch (e) { fslToast(e); return null; } }});
+}
 // open (dl: download) a file of a locked folder: decrypted here; images in the viewer, PDFs in the PDF view, else a download
 async function fsl_open(n, dl, v) {
   let f;
-  try { await fslKeys(n.lock_id, true); f = await fslFileDec(n.lock_id, await fslFetch(n, v)); } catch (x) { fslToast(x); return; }
+  try { f = await fslDec(n, v); } catch (x) { fslToast(x); return; }
   const blob = new Blob([f.data], {type: f.type}), a = {id: n.id, name: f.name, size: f.data.length, mime: f.type};
-  if (!dl && ab_isImg(a) && typeof attLightbox === 'function') {  // a data: URL (the CSP allows img-src 'self' data:)
-    const du = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(String(fr.result)); fr.onerror = () => res(''); fr.readAsDataURL(blob); });
-    if (du) { attLightbox(n.id, [a], () => du); return; }
+  if (!dl && ab_isImg(a) && typeof attLightbox === 'function') {
+    const du = await fslDataUrl(blob);
+    if (du) {
+      // 2.683.0 (#5150): all pictures of the folder (an older version: only it); each one decrypted when it is turned to
+      const imgs = v ? [] : fslLeaf(ab_isImg), got = new Map([[n.id, du]]);
+      const prep = async x => { if (got.has(x.id)) return; const g = await fslDec(x).catch(e => { fslToast(e); throw e; }); got.set(x.id, await fslDataUrl(new Blob([g.data], {type: g.type}))); };
+      if (imgs.some(x => x.id === n.id)) attLightbox(n.id, imgs, x => got.get(x.id) || '', prep);
+      else attLightbox(n.id, [a], () => du);
+      return;
+    }
   }
-  const url = URL.createObjectURL(blob);
-  setTimeout(() => URL.revokeObjectURL(url), 120000);
+  if (!dl && !v && ab_isPdf(a) && typeof pdfView === 'function') { pdfView(await fsl_pvOpts(n, f)); return; }  // 2.683.0 (#5150): leafs like the documents
+  const url = fslBlobUrl(blob);
   if (!dl && ab_isPdf(a) && typeof pdfView === 'function') { pdfView({url, dlUrl: url, name: f.name, size: a.size, data: new Uint8Array(f.data)}); return; }
   const el = document.createElement('a'); el.href = url; el.download = f.name; document.body.appendChild(el); el.click(); el.remove();
 }
