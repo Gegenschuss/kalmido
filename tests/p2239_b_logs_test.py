@@ -116,7 +116,8 @@ r = A.post(B + "/api/admin/orgs", json={"name": "Nordlicht Probe 2239"})
 check(r.ok, f"an organisation {r.status_code} {r.text[:150]}")
 ln = wait_line(n0, "created by")
 check(ln and ln[-1].rstrip().endswith(f"created by user #{AID}") and "alice" not in since(n0) and "Nordlicht Probe 2239" not in since(n0),
-      f"#2888: the admin and the organisation by number only {ln[-1:]}")
+      f"#2888: the admin and the organisation by number only {ln[-1:]} "
+      f"{[x for x in since(n0).splitlines() if 'alice' in x or 'Nordlicht Probe 2239' in x][:5]}")  # 2.670.0 (#4897): the lines that name them (red once in the CI, 2.579.0)
 
 # ================================================================== the helpers (a fresh process)
 CODE = """from kalmido.accounts.login import login_log_ip as f, login_log_who as w
