@@ -143,7 +143,7 @@ check(rel_gone == ["2.490.0", "2.500.0", "2.501.0", "2.629.0"], f"releases that 
 check("2.631.0" not in rel_gone and "2.635.0" not in rel_gone, "younger than 14 days stays (even without latest-ok)")
 check(img_gone == ["2.490.0", "2.500.0", "2.501.0", "2.629.0"], f"images that go {img_gone}")
 # before the first latest-ok tag (inside the 4 weeks): the newest release of each week stays
-keep4 = wr.keep_set(TG, REL, "v2.639.0", d("2026-09-20T10:00:00Z"))
+keep4 = wr.keep_set(TG, REL, "v2.639.0", d("2026-09-12T10:00:00Z"))
 check((2, 501, 0) in keep4 and (2, 500, 0) not in keep4 and (2, 490, 0) in keep4,
       f"before the first latest-ok tag: the newest release of each week stays {sorted(keep4)}")
 # 2.750.0 (#5247): week 4 back stays, week 5 back goes; latest and the newest checked version stay however old
