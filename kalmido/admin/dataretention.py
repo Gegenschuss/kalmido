@@ -29,6 +29,7 @@ from ..core.serializers import unlink_files
 from ..team.portal import _PT_EDITS
 from .backup import BK_DIR, BK_KEEP_WEEKLY_CAP, bk_parse_name  # 2.312.0 B (#3264)
 from .hosting import hosted  # 2.552.0 (#4596, review)
+from .offsite import bko_former_expire, bko_former_live  # 2.662.0 (#4587)
 from ..core.config import ATT_DIR  # 2.369.5 (#2517): pulled up from functions
 from ..files.store import FS_VERSIONS_KEEP  # 2.369.5 (#2517): pulled up from functions
 
@@ -121,7 +122,9 @@ def lgc_journal_cut(now, c=None):
     backups count too). None = the folder cannot be read: nothing goes.
     2.505.0 (#4302): the off-site backups count the same (bko_remote, the names kept there after the last upload): an older one
     must not bring back what was deleted without it going again. An off-site target without a readable list: nothing goes.
-    2.538.0 (#4367): + the names of a target that was removed or replaced (bko_former)."""
+    2.538.0 (#4367): + the names of a target that was removed or replaced (bko_former).
+    2.662.0 (#4587): only those of them not yet expired (offsite.bko_former_live: older than the longest set retention plus
+    30 days no longer count -- nothing rotates the old target, they held the journal for ever)."""
     cut = now - timedelta(weeks=BK_KEEP_WEEKLY_CAP)
     try:
         names = os.listdir(BK_DIR)
@@ -142,9 +145,10 @@ def lgc_journal_cut(now, c=None):
                 return None
             # 2.538.0 (#4367): the backups of a removed / replaced target ("formerly off-site", offsite.bko_retire) still
             # lie there and can be restored: they count as well
-            former = json.loads(gsetting(c, "bko_former") or "[]")
-            if not isinstance(former, list):
+            got = bko_former_live(c, now)  # 2.662.0 (#4587): the expired ones left out
+            if got is None:
                 return None
+            former = [p["name"] for p in got[0]]
         except ValueError:
             return None
         names = [*names, *(n for n in (*remote, *former) if isinstance(n, str))]
@@ -175,6 +179,12 @@ def lgc_tick(c, force=False):
                 counts[table] = lgc_count_del(c, table, col, cond, cut, kill)
             except Exception as e:  # noqa: BLE001  one table must not stop the others
                 lgc_failed(c, table, e)
+        if kill:
+            try:  # 2.662.0 (#4587): the expired formerly off-site names go first (lgc_journal_cut leaves them out anyway)
+                if bko_former_expire(c, now):
+                    c.commit()
+            except Exception as e:  # noqa: BLE001
+                lgc_failed(c, "bko_former", e)
         cut = lgc_journal_cut(now, c)  # 2.312.0 B (#3264); 2.505.0 (#4302): with the off-site backups
         if cut:
             for table in ("deleted_accounts", "purged_rows"):  # 2.360.4 (#3243)

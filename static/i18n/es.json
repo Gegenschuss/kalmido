@@ -17475,6 +17475,7 @@
   "{0} × {1} px · pixel ratio {2} · pointer {3} · hover {4} · phone layout {5} · finger operation {6}": "{0} × {1} px · densidad de píxeles {2} · puntero {3} · hover {4} · diseño de móvil {5} · manejo con el dedo {6}",
   "The person who created this link may no longer share this folder": "La persona que creó este enlace ya no puede compartir esta carpeta",
   "The person who created this request may no longer upload into this folder": "La persona que creó esta solicitud ya no puede subir archivos a esta carpeta",
+  "Backups at a former off-site target still hold back the clean-up of the journal of deleted accounts: {0}, until {1} at the latest.": "Copias en un destino externo anterior aún retrasan la limpieza del registro de cuentas eliminadas: {0}, como máximo hasta el {1}.",
   "This is created in your own space first; an admin of the organisation shares it with everyone afterwards": "Esto se crea primero en tu propio espacio; después un administrador de la organización lo comparte con todos",
   "Links to documents that did not come along were left out": "Se omitieron los enlaces a documentos que no se importaron",
   "The server is busy opening other large encrypted files. Please try again in a moment.": "El servidor está abriendo otros archivos cifrados grandes. Inténtalo de nuevo en un momento.",

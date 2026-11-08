@@ -10,6 +10,8 @@ the clean-up of the list. Invented names only, addresses @example.com.
    upload = upload_pending (the backup page's hint); the keep note says accounts excepted
  2.538.0 (#4367, review F7): with an unreadable formerly-off-site list, removing / replacing a target that holds backups is
    refused (409), its names stay
+ 2.662.0 (#4587): a formerly off-site name expires after the longest set retention + 30 days: no longer counted for the
+   journal, dropped by the daily clean-up, the backup page names how many still count and until when
 usage: p2505_restore_purged_test.py <datadir>
 freelancer-matrix: admin (the restore is the instance's; the entries are those of a person without an organisation)"""
 import json
@@ -144,27 +146,42 @@ check("cut None" not in py(CUT) and "cut 2020" not in py(CUT), "no off-site targ
 # 2.538.0 (#4367): removing the target keeps its backups' names as "formerly off-site" (they still lie there and can be
 # restored): the journal is not cut past them (was: the local rule at once, 2.505.0 review)
 OFF = B + "/api/admin/backups/offsite"
+
+
+# 2.662.0 (#4587): formerly off-site names expire after the longest set retention + 30 days (was: never) -- the checks below set
+# the longest one (365 days + 104 weeks = 1093 days) and use backups 800 / 760 days old instead of 2020 (older than the
+# journal's 104 weeks, so they move the cut, and not expired yet)
+def bkname(days):
+    return "kalmido-backup-" + (NOW - timedelta(days=days)).strftime("%Y%m%d") + "-033000-auto.zip.enc"
+
+
+def bkday(days):
+    return (NOW - timedelta(days=days)).strftime("%Y-%m-%d")
+
+
+setting("bk_keep_daily", "365")
+setting("bk_keep_weekly", "104")
 DAV = {"url": "https://dav.example.com/backups", "user": "kbk", "password": "dav-secret-1"}
 check(A.patch(OFF, json={"type": "webdav", "webdav": DAV, "password": PW}).ok, "off-site: a target set up")
 check(A.get(OFF).json().get("upload_pending") is False, "off-site: off = no hint about a missing upload")
 setting("bko_conf", json.dumps({**json.loads(sql("SELECT value FROM settings WHERE key='bko_conf'")[0][0]), "on": True}))
 check(A.get(OFF).json().get("upload_pending") is True, "off-site: on without an upload = the backup page's hint")
-setting("bko_remote", json.dumps(["kalmido-backup-20200102-033000-auto.zip.enc"]))
+setting("bko_remote", json.dumps([bkname(800)]))  # 2.662.0 (#4587): a date that has not expired (was 2020-01-02)
 check(A.get(OFF).json().get("upload_pending") is False, "off-site: after an upload no hint")
 r = A.patch(OFF, json={"remove": True})
 check(r.ok, f"off-site: remove the target {r.status_code} {r.text[:160]}")
 out = py(CUT)
-check("cut 2020-01-02" in out, "off-site removed: its backups still hold the journal back " + out[-200:])
-check("kalmido-backup-20200102-033000-auto.zip.enc" in (sql("SELECT value FROM settings WHERE key='bko_former'") or [[""]])[0][0],
+check(f"cut {bkday(800)}" in out, "off-site removed: its backups still hold the journal back " + out[-200:])
+check(bkname(800) in (sql("SELECT value FROM settings WHERE key='bko_former'") or [[""]])[0][0],
       "off-site removed: the names kept as formerly off-site")
 # another address of the target: the backups at the old one stay formerly off-site as well
 setting("bko_former", None)
 check(A.patch(OFF, json={"type": "webdav", "webdav": DAV, "password": PW}).ok, "off-site: a target again")
-setting("bko_remote", json.dumps(["kalmido-backup-20200304-033000-auto.zip.enc"]))
+setting("bko_remote", json.dumps([bkname(760)]))  # 2.662.0 (#4587): was 2020-03-04
 check(A.patch(OFF, json={"webdav": {**DAV, "url": "https://dav2.example.com/backups"}, "password": PW}).ok, "off-site: another address")
 check(not sql("SELECT value FROM settings WHERE key='bko_remote' AND value<>''"), "another address: the list of the new target starts empty")
-check("cut 2020-03-04" in py(CUT), "another address: the old target's backups hold the journal back")
-check(A.patch(OFF, json={"keep": 5}).ok and "cut 2020-03-04" in py(CUT), "the count kept is no other target")
+check(f"cut {bkday(760)}" in py(CUT), "another address: the old target's backups hold the journal back")
+check(A.patch(OFF, json={"keep": 5}).ok and f"cut {bkday(760)}" in py(CUT), "the count kept is no other target")
 setting("bko_former", "not json")
 check("cut None" in py(CUT), "an unreadable formerly-off-site list: nothing goes")
 # 2.538.0 (#4367, review F7): an unreadable formerly-off-site list: removing / replacing the target is refused, the names of
@@ -181,5 +198,30 @@ setting("bko_remote", None)
 r = A.patch(OFF, json={"remove": True})
 check(r.ok, f"unreadable formerly-off-site list, no backups on the target: removing goes {r.status_code} {r.text[:160]}")
 setting("bko_former", None)
+
+# 2.662.0 (#4587): a formerly off-site name expires once it is older than the longest set retention (keep_daily days +
+# keep_weekly weeks, or the off-site keep) plus 30 days: it no longer holds the journal, the daily clean-up drops it, and the
+# backup page says how many still count and until when. Time through set dates, no waiting.
+setting("bk_keep_daily", "300")
+setting("bk_keep_weekly", "70")  # 300 + 490 = 790 days, + 30 = 820: 800 days old still counts, 830 days old has expired
+setting("bko_former", json.dumps([bkname(830), bkname(800), "not-a-backup-name"]))
+out = py(CUT)
+check(f"cut {bkday(800)}" in out and f"cut {bkday(830)}" not in out, "#4587: the expired name no longer holds the journal back " + out[-200:])
+f = A.get(OFF).json().get("former") or {}
+check(f.get("count") == 1 and str(f.get("until", ""))[:10] == (NOW + timedelta(days=20)).strftime("%Y-%m-%d"),
+      f"#4587: the backup page: one former backup still counts, until its date + 820 days {f}")
+setting("bko_former", json.dumps([bkname(830), bkname(800)]))  # the plain list of before 2.662 is read as it is
+TICK = "import os\nos.environ['KALMIDO_PURGE_LOGS'] = '1'\nfrom kalmido.admin.dataretention import lgc_tick\nlgc_tick(c, force=True)\nprint('tick ok')"
+out = py(TICK)
+check("tick ok" in out, "#4587: the daily clean-up runs " + out[-300:])
+check(json.loads(sql("SELECT value FROM settings WHERE key='bko_former'")[0][0]) == [bkname(800)],
+      "#4587: the daily clean-up drops the expired name, the other stays")
+setting("bk_keep_weekly", "50")  # 300 + 350 + 30 = 680 days: 800 days old has expired too
+check(f"cut {bkday(800)}" not in py(CUT), "#4587: a shorter retention lets the name expire")
+check(not A.get(OFF).json().get("former"), "#4587: nothing left to wait for = no note on the backup page")
+py(TICK)
+check(not (sql("SELECT value FROM settings WHERE key='bko_former'") or [[""]])[0][0], "#4587: the last expired name dropped, the list empty")
+check(A.patch(OFF, json={"type": "webdav", "webdav": DAV, "password": PW}).ok and A.patch(OFF, json={"remove": True}).ok,
+      "#4587: an empty list after the expiry: removing a target still works")
 print(f"p2505_restore_purged: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 sys.exit(1 if FAILS else 0)

@@ -17475,6 +17475,7 @@
   "{0} × {1} px · pixel ratio {2} · pointer {3} · hover {4} · phone layout {5} · finger operation {6}": "{0} × {1} px · pixelverhouding {2} · aanwijzer {3} · hover {4} · telefoonindeling {5} · vingerbediening {6}",
   "The person who created this link may no longer share this folder": "De persoon die deze link heeft gemaakt, mag deze map niet meer delen",
   "The person who created this request may no longer upload into this folder": "De persoon die dit verzoek heeft gemaakt, mag niet meer uploaden naar deze map",
+  "Backups at a former off-site target still hold back the clean-up of the journal of deleted accounts: {0}, until {1} at the latest.": "Back-ups op een eerder extern doel houden het opschonen van het logboek van verwijderde accounts nog tegen: {0}, uiterlijk tot {1}.",
   "This is created in your own space first; an admin of the organisation shares it with everyone afterwards": "Dit wordt eerst in je eigen ruimte gemaakt; daarna deelt een beheerder van de organisatie het met iedereen",
   "Links to documents that did not come along were left out": "Koppelingen naar documenten die niet zijn meegekomen, zijn weggelaten",
   "The server is busy opening other large encrypted files. Please try again in a moment.": "De server opent op dit moment andere grote versleutelde bestanden. Probeer het zo meteen opnieuw.",

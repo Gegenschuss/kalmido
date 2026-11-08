@@ -61,8 +61,10 @@ from ..accounts.bgjobs import bgj_add, bgj_fn, bgj_pending
 from ..calendars.subscriptions import _cal_connector, CalError, cal_ip_public
 from ..core.orgcrypt import RCK_FRESH_MIN, rck_step, rck_stepup
 from .hosting import hosted
-from ..notify.alerts import _env_int, aa_now
+from ..notify.alerts import _clamp_int, _env_int, aa_now  # 2.662.0 (#4587): + _clamp_int
 from .backup import BK_DIR, BK_NAME_RE, BK_STORE, bk_list, bk_passphrase, bk_test_gate, need_backups
+from .backup import BK_KEEP_WEEKLY_CAP, bk_parse_name  # 2.662.0 (#4587)
+from ..core.pg import write_lock  # 2.662.0 (#4587)
 from . import bkstore as bks  # 2.432.0 (#3584)
 
 BKO_TYPES = ("s3", "webdav", "sftp")
@@ -175,6 +177,7 @@ def bko_state(c):
             # 2.538.0 (#4367): on, but no backup has reached this target yet: until one has, the journal of deleted accounts
             # is not cleaned up (dataretention.lgc_journal_cut) -- the backup page says so
             "upload_pending": bool(conf["on"] and conf["type"] and not gsetting(c, "bko_remote")),
+            "former": bko_former_state(c),  # 2.662.0 (#4587): formerly off-site backups the journal still waits for
             "hosted": hosted()}  # 2.552.0 (#4596): the page shows only the note that the operator keeps the off-site copies
 
 
@@ -199,6 +202,7 @@ def bko_retire(c):
     is not cut too early. An unreadable bko_former stays as it is (the journal then keeps everything). -> False (nothing
     changed) when the target still holds backups and bko_former is unreadable: their names would be lost (review F7), the
     caller refuses the change (BKO_FORMER_BAD)."""
+    write_lock(c, "bko_former")  # 2.662.0 (#4587): not at the same time as the expiry (bko_former_expire) -- no name lost
     try:
         names = json.loads(gsetting(c, "bko_remote") or "[]")
     except ValueError:
@@ -217,6 +221,60 @@ def bko_retire(c):
             gset(c, "bko_former", json.dumps(keep))
     gset(c, "bko_remote", "")
     return True
+
+
+# 2.662.0 (#4587): a formerly off-site name counts this many days longer than the longest set retention (bko_former_days)
+BKO_FORMER_GRACE_DAYS = 30
+
+
+def bko_former_days(c):
+    """2.662.0 (#4587): how many days a formerly off-site backup counts for the journal of deleted accounts: the longest set
+    retention -- the backups' own (keep_daily days + keep_weekly weeks, the weeks up to BK_KEEP_WEEKLY_CAP) or the off-site
+    rule's (keep newest backups, at most one a day) -- plus BKO_FORMER_GRACE_DAYS. Nothing rotates the old target any more,
+    so without an end the names would hold the journal for ever."""
+    daily = _clamp_int(gsetting(c, "bk_keep_daily"), 1, 365, 14)
+    weekly = _clamp_int(gsetting(c, "bk_keep_weekly"), 0, BK_KEEP_WEEKLY_CAP, 8)
+    return max(daily + 7 * weekly, bko_conf(c)["keep"]) + BKO_FORMER_GRACE_DAYS
+
+
+def bko_former_live(c, now):
+    """2.662.0 (#4587): the formerly off-site backups that still count -> (live, all), live = [bk_parse_name(n)] whose date
+    (from the name, kalmido-backup-YYYYMMDD-HHMMSS-...) is not older than bko_former_days; all = every name as stored (the
+    format stays a plain list of names). None = bko_former unreadable (the journal then keeps everything). A name without a
+    date never counted for the journal (lgc_journal_cut) and does not count here."""
+    try:
+        names = json.loads(gsetting(c, "bko_former") or "[]")
+    except ValueError:
+        return None
+    if not isinstance(names, list):
+        return None
+    edge = now - timedelta(days=bko_former_days(c))
+    live = [p for p in (bk_parse_name(n) if isinstance(n, str) else None for n in names) if p and p["at"] >= edge]
+    return live, names
+
+
+def bko_former_expire(c, now):
+    """2.662.0 (#4587): drops the expired names from bko_former (dataretention.lgc_tick, before the journal is cut; the
+    caller commits). An unreadable list stays as it is. -> the number of names dropped."""
+    write_lock(c, "bko_former")  # not at the same time as bko_retire adds names
+    got = bko_former_live(c, now)
+    if got is None:
+        return 0
+    live, names = got
+    if len(live) == len(names):
+        return 0
+    gset(c, "bko_former", json.dumps(sorted(p["name"] for p in live)) if live else "")
+    return len(names) - len(live)
+
+
+def bko_former_state(c):
+    """2.662.0 (#4587): for the backup page: {"count": formerly off-site backups the journal still waits for, "until": when
+    the last of them stops counting (ISO)}; None = none (or the list is unreadable: BKO_FORMER_BAD says so on a change)."""
+    got = bko_former_live(c, now_utc())
+    if not got or not got[0]:
+        return None
+    newest = max(p["at"] for p in got[0])
+    return {"count": len(got[0]), "until": iso(newest + timedelta(days=bko_former_days(c)))}
 
 
 # 2.538.0 (#4367, review F7)

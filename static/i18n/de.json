@@ -17475,6 +17475,7 @@
   "{0} × {1} px · pixel ratio {2} · pointer {3} · hover {4} · phone layout {5} · finger operation {6}": "{0} × {1} px · Pixeldichte {2} · Zeiger {3} · Hover {4} · Handy-Layout {5} · Finger-Bedienung {6}",
   "The person who created this link may no longer share this folder": "Die Person, die diesen Link erstellt hat, darf diesen Ordner nicht mehr teilen",
   "The person who created this request may no longer upload into this folder": "Die Person, die diese Anfrage erstellt hat, darf nicht mehr in diesen Ordner hochladen",
+  "Backups at a former off-site target still hold back the clean-up of the journal of deleted accounts: {0}, until {1} at the latest.": "Sicherungen an einem früheren Off-Site-Ziel halten das Aufräumen des Journals gelöschter Konten noch zurück: {0}, längstens bis {1}.",
   "This is created in your own space first; an admin of the organisation shares it with everyone afterwards": "Das entsteht zuerst in deinem eigenen Bereich; ein Admin der Organisation gibt es danach für alle frei",
   "Links to documents that did not come along were left out": "Verweise auf Dokumente, die nicht mitkamen, wurden weggelassen",
   "The server is busy opening other large encrypted files. Please try again in a moment.": "Der Server öffnet gerade andere große verschlüsselte Dateien. Bitte gleich noch einmal versuchen.",
