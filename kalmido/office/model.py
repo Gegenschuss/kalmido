@@ -215,10 +215,12 @@ def office_org(c, uid, admin=False, area=None):
     oid, role = office_where(c, uid)
     if oid and has_request_context() and request.method not in ("GET", "HEAD", "OPTIONS"):
         sga_scope_check(c, oid)  # 2.538.0 (#4365): a support session writes into no office of a foreign organisation without its own grant
-    if oid and has_request_context():  # 2.380 F (#3411): a point of Money switched off answers 404 (its data stays)
-        fk = office_path_feature(request.path)
-        if fk and not office_feature_on(office_settings(c, oid), fk):
-            raise Denied(404, tr(OF_FEATURE_OFF))
+    def feat(oid):  # 2.380 F (#3411): a point of Money switched off answers 404 (its data stays). 2.666.0 (#4074 13): only after
+        if oid and has_request_context():  # the rights below, so somebody without the right learns nothing of the switch
+            fk = office_path_feature(request.path)
+            if fk and not office_feature_on(office_settings(c, oid), fk):
+                raise Denied(404, tr(OF_FEATURE_OFF))
+        return oid
     from .rights import ofr_history_save
     # 2.143.0 A (#2151): guest none; read-only reads; accounting reads + exports. 2.570.0 (#4783 review F1): a row's history
     # (GET <save path>/history) needs the role of saving it (read-only / accounting: 403 like the save)
@@ -228,7 +230,7 @@ def office_org(c, uid, admin=False, area=None):
         if (area or request.path.startswith("/api/office/")) and ofr_check(c, uid, oid, area, admin):
             if no:
                 raise Denied(403, tr(no))
-            return oid
+            return feat(oid)
         from .rights import ofr_rights
         if ofr_rights(c, uid, oid, role) is not None:
             raise Denied(403, tr(OFFICE_ADMIN_ONLY))  # ruled by groups, but a caller without an area: as before only admins
@@ -236,7 +238,7 @@ def office_org(c, uid, admin=False, area=None):
         raise Denied(403, tr(OFFICE_ADMIN_ONLY))
     if no:
         raise Denied(403, tr(no))
-    return oid
+    return feat(oid)
 
 
 # 2.577.0 (#4638): the office's own address under "All workspaces" (#office/s/<space>, static/js/office.js ofc_sp): the app
