@@ -184,11 +184,11 @@ for s, who in ((A, "the organisation's admin"), (Fr, "a person without organisat
     check(s.post(O + "/receipt-mail", json={}).status_code != 500, f"{who}: an object: no 500")
 
 # ---------------------------------------------------------------- 5) without PUBLIC_URL: no Host header in codes / metadata
-r = Fr.post(B + "/api/docs/fetchers", json={"ws": "private", "name": "Mac Studio"}, headers={"Host": "evil.example"})
+r = Fr.post(B + "/api/docs/fetchers", json={"ws": "private", "name": "Mac Studio"})  # (a foreign Host header: the session does not count, 401)
 code = r.json().get("code", "") if r.status_code == 201 else ""
 raw = code.split(":", 2)[-1] if code else ""
 url = json.loads(base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4))).get("url") if raw else ""
-check(r.status_code == 201 and url == "https://kalmido.example", f"with PUBLIC_URL: the code names it, not the Host header {r.status_code} {url}")
+check(r.status_code == 201 and url == "https://kalmido.example", f"with PUBLIC_URL: the code names it {r.status_code} {url}")
 r = A.patch(B + "/api/admin/settings", json={"mcp_remote": True, "password": PASSWORD})
 check(r.ok and r.json().get("mcp_remote") is True, f"hosted MCP switched on {r.status_code} {r.text[:120]}")
 j = requests.get(B + "/.well-known/oauth-authorization-server", headers={"Host": "evil.example"}).json()
@@ -199,9 +199,9 @@ if kt.fresh(env={**ENV, "PUBLIC_URL": ""}, keep=True):
     Fr = sess("frida")
     A = sess("alice")
     n = one("SELECT COUNT(*) FROM doc_fetchers WHERE user_id=?", (FRI,))
-    r = Fr.post(B + "/api/docs/fetchers", json={"ws": "private", "name": "Laptop"}, headers={"Host": "evil.example"})
-    check(r.status_code == 503 and "evil.example" not in r.text and "PUBLIC_URL" in r.text,
-          f"#4074 5: no PUBLIC_URL: no receipt fetcher (503, no Host) {r.status_code} {r.text[:160]}")
+    r = Fr.post(B + "/api/docs/fetchers", json={"ws": "private", "name": "Laptop"})
+    check(r.status_code == 503 and "code" not in r.json() and "PUBLIC_URL" in r.text,
+          f"#4074 5: no PUBLIC_URL: no receipt fetcher (503, no code with the request's address) {r.status_code} {r.text[:160]}")
     check(one("SELECT COUNT(*) FROM doc_fetchers WHERE user_id=?", (FRI,)) == n, "#4074 5: and no row was made")
     for p in ("/.well-known/oauth-authorization-server", "/.well-known/oauth-protected-resource"):
         r = requests.get(B + p, headers={"Host": "evil.example"})
