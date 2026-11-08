@@ -14,7 +14,11 @@
    (o.peek(dir) -> {img} = its picture / small picture, {} = an empty page; null / no peek = an empty page) and glides along over
    the whole width; let go far enough, the neighbour snaps fully into place and only then o.go(dir) loads it (a promise: the
    placeholder stays until it is done); no glide-in afterwards. prefers-reduced-motion: no snapping animation. prime() = fetch the
-   neighbours' pictures ahead (attach does it once; a viewer that changes its picture itself calls it again). */
+   neighbours' pictures ahead (attach does it once; a viewer that changes its picture itself calls it again).
+   2.736.0 (#5212): no seam after the snap. o.peek(dir) -> {el} = the neighbour made ready by the caller (drawn as it will stand,
+   e.g. pdfview.js: its first page drawn ahead), laid in as it is; o.full = the neighbour fills the content box of the area's
+   frame (its offsetParent, e.g. the image viewer: the picture where it will stand, not in the box of the picture shown now), and
+   the area glides by that width; the pictures fetched ahead are decoded too, so the one turned to stands there at once. */
 'use strict';
 
 const SWN_EDGE = 16, SWN_GAP = 16;
@@ -24,9 +28,17 @@ const SWN_PRE = new Map();
 function swn_pre(u) {
   if (!u || SWN_PRE.has(u)) return;
   const im = new Image(); im.decoding = 'async'; im.src = u; SWN_PRE.set(u, im);
+  im.decode?.().catch(() => {});  // 2.736.0 (#5212): decoded ahead, drawn in the first frame after the snap
   if (SWN_PRE.size > 6) SWN_PRE.delete(/** @type {string} */ (SWN_PRE.keys().next().value));
 }
-/** @param {HTMLElement} root @param {{area: (t: any) => HTMLElement|null, can: (dir: number) => boolean, go: (dir: number) => any, peek?: (dir: number) => ({img?: string}|null)}} o */
+/** @param {HTMLElement} el the area -> the box the neighbour takes: o.full = the content box of its frame, else its own box */
+function swn_box(el, full) {
+  const f = full ? /** @type {HTMLElement|null} */ (el.offsetParent) : null;
+  if (!f) return {l: el.offsetLeft, t: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight};
+  const cs = getComputedStyle(f), pl = parseFloat(cs.paddingLeft) || 0, pt = parseFloat(cs.paddingTop) || 0;
+  return {l: pl, t: pt, w: f.clientWidth - pl - (parseFloat(cs.paddingRight) || 0), h: f.clientHeight - pt - (parseFloat(cs.paddingBottom) || 0)};
+}
+/** @param {HTMLElement} root @param {{area: (t: any) => HTMLElement|null, can: (dir: number) => boolean, go: (dir: number) => any, peek?: (dir: number) => ({img?: string, el?: HTMLElement}|null), full?: boolean}} o */
 function swn_attach(root, o) {
   /** @type {any} */
   let s = null, end = 0, snap = false;
@@ -49,10 +61,11 @@ function swn_attach(root, o) {
   const drop = () => { if (s?.lock) loose(s); s = null; };
   /** @param {HTMLElement} el @param {number} dir the neighbour beside the area, in its place and size */
   const lay = (el, dir) => {
-    const p = o.peek ? o.peek(dir) : null, nb = document.createElement('div');
+    const p = o.peek ? o.peek(dir) : null, nb = document.createElement('div'), b = swn_box(el, o.full);
     nb.className = 'swn-nb'; nb.dataset.dir = String(dir); nb.setAttribute('aria-hidden', 'true');
-    nb.style.cssText = `position:absolute;left:${el.offsetLeft}px;top:${el.offsetTop}px;width:${el.offsetWidth}px;height:${el.offsetHeight}px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;pointer-events:none;overflow:hidden`;
-    if (p?.img) { const im = document.createElement('img'); im.src = p.img; im.alt = ''; im.style.cssText = 'max-width:100%;max-height:100%;object-fit:contain'; nb.appendChild(im); }
+    nb.style.cssText = `position:absolute;left:${b.l}px;top:${b.t}px;width:${b.w}px;height:${b.h}px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;pointer-events:none;overflow:hidden`;
+    if (p?.el) nb.appendChild(p.el);  // 2.736.0 (#5212): made ready by the caller, as it will stand
+    else if (p?.img) { const im = document.createElement('img'); im.src = p.img; im.alt = ''; im.style.cssText = 'max-width:100%;max-height:100%;object-fit:contain'; nb.appendChild(im); }
     else { const pg = document.createElement('div'); pg.style.cssText = 'height:min(90%,calc(100vw * 297 / 210));aspect-ratio:210 / 297;max-width:94%;background:var(--bg3,#eee);border-radius:4px'; nb.appendChild(pg); }
     el.after(nb);
     return nb;
@@ -92,7 +105,7 @@ function swn_attach(root, o) {
       if (Math.abs(dx) <= Math.abs(dy) * 1.2) { s = null; return; }  // up / down: scrolling
       s.lock = 'x';
       s.edge = {'1': !o.can(1), '-1': !o.can(-1)};
-      s.w = s.el.offsetWidth || innerWidth;
+      s.w = (o.full ? swn_box(s.el, true).w : s.el.offsetWidth) || innerWidth;  // 2.736.0 (#5212): o.full glides by the frame's width
       s.nb = [1, -1].filter(d => !s.edge[String(d)]).map(d => lay(s.el, d));  // 2.727.0 (#5202): the neighbours glide along
     }
     if (e.cancelable) e.preventDefault();

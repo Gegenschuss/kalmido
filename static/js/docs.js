@@ -235,8 +235,9 @@ async function dc_open(id, o = {}) {
   if (S.route.mod !== 'docs' || !dc_hashId()) { if (typeof dcv_go === 'function') dcv_go(id); return; }
   if (dc_hashId() !== id) { history.replaceState(history.state, '', `#docs/${id}`); S.route.id = id; }
   DC.opening = id;
-  let d;
-  try { d = await rawFetch('GET', `/api/docs/${id}`); } catch (x) {
+  const pre = dc_nbFresh(id);  // 2.736.0 (#5212): a neighbour fetched ahead opens without a request (its drawn body is taken over)
+  let d = pre?.d;
+  if (!d) try { d = await rawFetch('GET', `/api/docs/${id}`); } catch (x) {
     // 2.583.0 (#4832): no document: a plain file of the file store opens the same view (its fields only once recognised)
     const n = x?.status === 404 ? await rawFetch('GET', `/api/files/nodes/${id}`).catch(() => null) : null;
     // 2.583.0 (#4835 review): a locked (encrypted folder) or malware-locked file keeps its own way, not the view
@@ -249,10 +250,11 @@ async function dc_open(id, o = {}) {
   if (typeof LD_P === 'object' && LD_P.docs) await LD_P.docs.catch(() => {});
   if (DC.opening !== id) return;
   const ws = d.org_id ? 'org:' + d.org_id : 'private';
-  if (!d.file && (!DC.set || DC.set.ws !== ws)) { const s = await api('GET', `/api/docs/settings?ws=${ws}`).catch(() => null); if (DC.opening !== id) return; DC.set = s; }
+  if (!d.file && (!DC.set || DC.set.ws !== ws)) { const s = pre?.set?.ws === ws ? pre.set : await api('GET', `/api/docs/settings?ws=${ws}`).catch(() => null); if (DC.opening !== id) return; DC.set = s; }
   DC.opening = null;
   if (dc_hashId() !== id) return;  // the view was left meanwhile
   DC.doc = d;
+  if (pre && Date.now() - pre.at > DC_NBOLD) dc_nbRecheck(d);  // 2.736.0 (#5212): fetched a while ago: compared quietly behind the drawn body
   const ni = dc_navIdx(d); if (ni >= 0) { DC.navAt = ni; DC.navFor = d.id; }  // 2.521.0 (#4476): where it stands in the list (it may leave it: checked, filtered)
   else if (DC.navFor !== d.id) DC.navAt = null;  // 2.683.0 (#5150): never the place of the one before
   dc_navSeek();
@@ -420,11 +422,13 @@ function dc_nbHtml(x) {
   return `<div class="lhdr dc-nbh"><h3>${esc(x.name || x.sender?.name || '')}</h3></div>${meta ? `<p class="dc-nbm muted">${esc(meta)}</p>` : ''}<div class="dc-nbv">${u ? `<img src="${esc(u)}" alt="">` : ''}</div>`;
 }
 function dc_nbAdd(body, next, prev) {  // null = nothing on that side (the end); 0 = not loaded yet
-  body.querySelectorAll(':scope > .dc-nb').forEach(x => x.remove());
+  body.querySelectorAll(':scope > .dc-nb').forEach(x => { if (x._dcnb && typeof dcv_nbPark === 'function') dcv_nbPark(x); else x.remove(); });
   body.style.position = 'relative';
   body.closest('.dc-md')?.classList.add('dc-sw');
   for (const [x, cls] of [[next, 'dc-nb-n'], [prev, 'dc-nb-p']]) {
     if (x === null) continue;
+    const e = x && dc_nbFresh(x.id);  // 2.736.0 (#5212): drawn ahead = the real body with all its fields glides along
+    if (e?.el?.firstChild) { e.el.classList.remove('dc-nb-n', 'dc-nb-p'); e.el.classList.add(cls); body.appendChild(e.el); continue; }
     const nb = document.createElement('div');
     nb.className = `dc-nb ${cls}`; nb.setAttribute('aria-hidden', 'true');
     nb.innerHTML = x ? dc_nbHtml(x) : '<div class="dc-nbv"></div>';  // not loaded yet (the next page): an empty sheet
@@ -433,7 +437,7 @@ function dc_nbAdd(body, next, prev) {  // null = nothing on that side (the end);
 }
 function dc_nbClear(body) {
   if (!body) return;
-  body.querySelectorAll(':scope > .dc-nb').forEach(x => x.remove());
+  body.querySelectorAll(':scope > .dc-nb').forEach(x => { if (x._dcnb && typeof dcv_nbPark === 'function') dcv_nbPark(x); else x.remove(); });  // 2.736.0 (#5212): a body drawn ahead waits on
   body.style.position = '';
   body.closest('.dc-md')?.classList.remove('dc-sw');
 }
@@ -454,6 +458,54 @@ function dc_nbPre(d) {
     const im = new Image(); im.decoding = 'async'; im.src = u; pre.set(u, im);
     if (pre.size > 6) pre.delete(pre.keys().next().value);
   }
+  dc_nbAhead(v, i);
+}
+// ---- 2.736.0 (#5212): leafing without a seam. On a touch screen (where the swipe is) the two direct neighbours of the open
+// document are fetched whole (data, the settings of their workspace) and drawn by docview.js (dcv_nbDraw: the same lines as
+// the open one, the preview at its final size) - DCW.nb: id -> {id, d, set, at, ctrl, el, pdf}. A swipe lays that body beside
+// the open one, dc_open / dcv_draw take it over as it is after the snap: no request, no picture that moves, no text that comes
+// later. Only the direct neighbours: whatever leaves that place is stopped (AbortController) and freed. Older than DC_NBOLD:
+// compared quietly after the swap (dc_nbRecheck), drawn anew only when something changed; older than DC_NBMAX: fetched anew.
+const DC_NBOLD = 20000, DC_NBMAX = 600000;
+// a neighbour fetched ahead that may stand for the document: its data are there, not too old, and the list knows no newer state
+function dc_nbFresh(id) {
+  const e = DCW.nb?.get(id); if (!e?.d || Date.now() - e.at > DC_NBMAX) return null;
+  const x = dc_nav()?.docs.find(y => y.id === id);
+  return x?.updated_at && e.d.updated_at && x.updated_at !== e.d.updated_at ? null : e;
+}
+const dc_nbOn = () => typeof dcv_nbDraw === 'function' && (navigator.maxTouchPoints > 0 || isTouch());
+function dc_nbAhead(v, i) {
+  if (!dc_nbOn()) return;
+  const want = [v.docs[i + 1], v.docs[i - 1]].filter(x => x?.id), nb = DCW.nb || (DCW.nb = new Map());
+  for (const [id, e] of nb) if (!want.some(x => x.id === id)) { dcv_nbFree(e); nb.delete(id); }
+  for (const x of want) {
+    const e = nb.get(x.id);
+    if (e && (!e.d || dc_nbFresh(x.id))) continue;  // on its way or still good
+    if (e) { dcv_nbFree(e); nb.delete(x.id); }
+    dc_nbFetch(x.id);
+  }
+}
+function dc_nbStop() { for (const e of DCW.nb?.values() || []) dcv_nbFree(e); DCW.nb?.clear(); $('.dv-nbhold')?.remove(); }  // the view left: nothing more ahead
+async function dc_nbFetch(id) {
+  const ctrl = new AbortController(), e = {id, ctrl, at: Date.now(), d: null, set: null, el: null, pdf: null};
+  DCW.nb.set(id, e);
+  const gone = () => ctrl.signal.aborted || DCW.nb.get(id) !== e;
+  try {
+    await DC_Q.get(id)?.catch(() => {});  // a change of this one still on its way (it was open just now) first
+    const d = await rawFetch('GET', `/api/docs/${id}`); if (gone() || !d?.id) { if (!gone()) DCW.nb.delete(id); return; }
+    const ws = d.org_id ? 'org:' + d.org_id : 'private';
+    const set = DC.set?.ws === ws ? DC.set : await rawFetch('GET', `/api/docs/settings?ws=${ws}`).catch(() => null); if (gone()) return;
+    if (typeof LD_P === 'object' && LD_P.docs) await LD_P.docs.catch(() => {});  // every part of the module draws along (as dc_open)
+    if (gone() || !dc_mdOpen()) return;
+    e.d = d; e.set = set; e.at = Date.now();
+    dcv_nbDraw(e);
+  } catch { if (DCW.nb.get(id) === e) DCW.nb.delete(id); }  // a plain file of the file store (404) or offline: the placeholder stays
+}
+// fetched a while ago: the server's state quietly behind the drawn body; drawn anew (a morph) only when it differs
+async function dc_nbRecheck(d) {
+  let x; try { x = await rawFetch('GET', `/api/docs/${d.id}`); } catch { return; }
+  if (DC.doc !== d || !x?.id || JSON.stringify(x) === JSON.stringify(d)) return;  // changed here meanwhile: its own save goes on
+  DC.doc = x; dc_mdDraw(dc_mdOpen());
 }
 async function dc_snap(s, dir) {
   const b = s.body, id = b.dataset.id, w = b.offsetWidth || s.box.clientWidth || innerWidth;

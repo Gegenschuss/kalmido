@@ -72,6 +72,9 @@ const tx = el => { const m = /translateX\((-?[\d.]+)px\)/.exec(el?.style.transfo
   const order = m.eval('DC.docs.map(x => x.id)'), names = m.eval('DC.docs.map(x => x.name)');
   m.eval('DC.docs.forEach(x => { x.thumb = x.thumb || 1; }); 1');  // every one with a small picture (the address is enough here)
   const body = () => d.querySelector('.dv-view .dc-body'), shown = () => +(body()?.dataset.id || 0), prev = () => d.querySelector('.dv-view .dv-pages');
+  // 2.736.0 (#5212): the neighbours are drawn whole ahead now (p2736_b_docswipe_seamless_ui); here the placeholder that stands
+  // while their data are not there yet: nothing is fetched ahead in this window
+  m.eval('dc_nbAhead = () => {}; 1');
   click(m, d.querySelector(`[data-dco="${order[0]}"]`));
   check(await until(() => shown() === order[0] && prev()), 'phone: the first document opens');
   const u1 = m.eval(`dc_nbThumb(DC.docs[1])`);
@@ -87,13 +90,13 @@ const tx = el => { const m = /translateX\((-?[\d.]+)px\)/.exec(el?.style.transfo
   touch(m, prev(), 'touchend', []);
   check(tx(body()) < -120 && m.eval('DCW.snap === true') && m.eval('DC.opening') == null && shown() === order[0], 'let go: it snaps fully over first, the next one is not fetched yet: ' + body().style.transform);
   check(await until(() => shown() === order[1]), 'then the next document is loaded');
-  check(!body().style.transform && !d.querySelector('.dc-nb') && !body().classList.contains('dc-in-n') && !body().classList.contains('dc-in-p'), '... in place at once: no placeholder left, no glide-in afterwards');
+  check(!body().style.transform && !d.querySelector('.dv-view .dc-nb') /* 2.736.0 (#5212): in the view */ && !body().classList.contains('dc-in-n') && !body().classList.contains('dc-in-p'), '... in place at once: no placeholder left, no glide-in afterwards');
   check(!d.querySelector('.dv-view.dc-sw'), '... nothing clipped any more');
 
   hold(m, prev(), -25);  // short and slow: under the threshold
   check(d.querySelector('.dv-view .dc-body > .dc-nb-n') && d.querySelector('.dv-view .dc-body > .dc-nb-p'), 'in the middle: placeholders on both sides');
   touch(m, prev(), 'touchend', []);
-  check(!body().style.transform && !d.querySelector('.dc-nb') && shown() === order[1], 'a short swipe springs back: the same one, no placeholder left');
+  check(!body().style.transform && !d.querySelector('.dv-view .dc-nb') && shown() === order[1], 'a short swipe springs back: the same one, no placeholder left');
 
   click(m, d.querySelector('.dv-view [data-dc="step:1"]'));
   check(await until(() => shown() === order[2]), 'the arrow forward: the last one');
@@ -111,7 +114,7 @@ const tx = el => { const m = /translateX\((-?[\d.]+)px\)/.exec(el?.style.transfo
   hold(r, dr.querySelector('.dv-view .dv-pages'), -150);
   touch(r, dr.querySelector('.dv-view .dv-pages'), 'touchend', []);
   check(r.eval('DC.opening') === order[1], 'reduced motion: let go, the next one is fetched at once (no snapping animation)');
-  check(await until(() => +(dr.querySelector('.dv-view .dc-body')?.dataset.id || 0) === order[1] && !dr.querySelector('.dc-nb')), '... and shown');
+  check(await until(() => +(dr.querySelector('.dv-view .dc-body')?.dataset.id || 0) === order[1] && !dr.querySelector('.dv-view .dc-nb')), '... and shown');
   r.close();
 
   // ================= swipenav.js: the image viewer and the full screen

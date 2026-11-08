@@ -95,7 +95,8 @@ function swipe(w, el, dx, dy = 0) {  // one finger from (200, 300) by dx / dy in
   check(await until(() => shown() === order[1]), 'a swipe to the left on the preview: the next document');
   check(m.location.hash === `#docs/${order[1]}` && nav() === '2 of 5', '... the address and "2 of 5" follow ' + m.location.hash + ' ' + nav());
   // 2.727.0 (#5202): it snapped in with the swipe (the placeholder glided along, p2727_c_glide_ui): no glide-in afterwards
-  check(!d.querySelector('.dv-view .dc-body').classList.contains('dc-in-n') && !d.querySelector('.dc-nb'), '... it stands in place, no glide-in afterwards');
+  // 2.736.0 (#5212): the neighbours drawn ahead wait outside the view (.dv-nbhold): no placeholder left IN the view
+  check(!d.querySelector('.dv-view .dc-body').classList.contains('dc-in-n') && !d.querySelector('.dv-view .dc-nb'), '... it stands in place, no glide-in afterwards');
   check(m.eval('window.__pv') === 0, '... the end of the swipe opens no viewer');
   swipe(m, prev(), 150);
   check(await until(() => shown() === order[0] && nav() === '1 of 5'), 'a swipe to the right: the document before');

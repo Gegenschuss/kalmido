@@ -67,6 +67,7 @@ function dcv_left() {
   const id = DC.doc?.id ?? DC.opening ?? DVW.back?.id;
   if (DC.doc) DC.lastId = DC.doc.id;
   DC.doc = null; DC.opening = null; DC.actsMore = null; DC.navSrc = null; dcv_free();
+  if (typeof dc_nbStop === 'function') dc_nbStop();  // 2.736.0 (#5212): the neighbours drawn ahead go along
   DVW.back = {...(DVW.back || {}), id, pushed: false, restore: true};
 }
 // another area (a link of a field, the sidebar): the view's document and its PDF go along
@@ -85,28 +86,102 @@ function dcv_restore() {
 function dcv_draw(md) {
   const d = DC.doc; if (!d || !md) return;
   dcv_hook(md);
-  const w = d.role !== 'view', body = $('.dc-body', md);
-  if (body && body.dataset.id !== String(d.id)) { DVW.he = null; DVW.node = null; const s = $('.dv-saved', md); if (s) s.textContent = ''; if (typeof dc_nbLand === 'function') dc_nbLand(body); }  // 2.727.0 (#5202): the swiped body back in place
-  const tabs = DCV_TABS.filter(([t]) => t === 'details' || (t === 'text' && !d.file) || (t === 'hist' && w) || (t === 'share' && d.role === 'owner'));  // 2.583.0 (#4832): a plain file has no recognised text
+  const w = d.role !== 'view';
+  let body = $('.dc-body', md);
+  if (body && body.dataset.id !== String(d.id)) {
+    DVW.he = null; DVW.node = null; const s = $('.dv-saved', md); if (s) s.textContent = '';
+    if (typeof dc_nbLand === 'function') dc_nbLand(body);  // 2.727.0 (#5202): the swiped body back in place
+    body = dcv_nbTake(d, body) || body;  // 2.736.0 (#5212): the neighbour drawn ahead takes its place as it stands
+  }
+  const tabs = dcv_tabs(d);
   if (!tabs.some(([t]) => t === DVW.tab)) DVW.tab = 'details';
-  const off = dcv_stripOff();
   // the body is keyed by the document: another one is drawn anew (its preview, its fields), the same one morphed (a field
   // keeps its focus while the one before saves); the head stays (the focus on the arrow buttons while leafing)
   fl_set(md, `${dcv_headHtml(d, w)}
-    <div class="dc-body dv-cols${off ? ' dv-nostrip' : ''}" data-k="b${d.id}" data-id="${d.id}">${dcv_stripHtml(d, off)}${off ? '' : dcv_gripHtml('strip', tr('In the list'))}
-      <section class="dv-mask dc-props" id="dc-props" aria-label="${esc(tr('Properties'))}">
-        <div class="dv-tabs" role="tablist" aria-label="${esc(tr('Properties'))}">${tabs.map(([t, l]) => `<button type="button" role="tab" id="dv-t-${t}" data-dvtab="${t}" aria-controls="dv-p-${t}" aria-selected="${DVW.tab === t}" tabindex="${DVW.tab === t ? 0 : -1}">${tr(l)}</button>`).join('')}</div>
-        ${tabs.map(([t]) => `<div class="dv-tp" role="tabpanel" id="dv-p-${t}" aria-labelledby="dv-t-${t}"${DVW.tab === t ? '' : ' hidden'}${t === 'hist' || t === 'share' ? ' data-fl-fill' : ''}>${t === 'details' ? dcv_detailsHtml(d, w) : t === 'text' ? dcv_textHtml(d, w) : ''}</div>`).join('')}
-      </section>${dcv_gripHtml('mask', tr('Properties'))}
-      ${dcv_pvHtml(d)}
-    </div>`);
+    ${dcv_bodyHtml(d, null)}`);
+  body = $('.dc-body', md); if (body) body._dcv = {d, set: DC.set};  // 2.736.0 (#5212): what it shows (it may become a neighbour)
   if (DVW.tab === 'hist' || DVW.tab === 'share') dcv_tabLoad(md, d);
   dcv_pvDraw(md, d);
   if (typeof dfl_runs === 'function' && !d.file) dfl_runs(md, d);  // 2.581.0 (#4803): the runs of flows with Undo (docflows.js)
   if (typeof dn_draw === 'function' && !d.file) dn_draw(md, d);  // 2.635.0 (#4807 d): the notes (docnotes.js), under the fields
   const cur = $('.dv-strip .dv-th.on', md); if (cur) cur.scrollIntoView?.({block: 'nearest'});
   if (DC.slide) dc_slideIn(md);  // 2.476.0 (#3935): the next document glides in from the side (2.727.0, #5202: only the arrows / keys; a swipe snapped it in)
-  if (typeof dc_nbPre === 'function') dc_nbPre(d);  // 2.727.0 (#5202): the neighbours' small pictures ahead
+  if (typeof dc_nbPre === 'function') dc_nbPre(d);  // 2.727.0 (#5202): the neighbours' small pictures ahead (2.736.0, #5212: and the neighbours drawn whole)
+}
+// 2.583.0 (#4832): a plain file has no recognised text
+const dcv_tabs = d => DCV_TABS.filter(([t]) => t === 'details' || (t === 'text' && !d.file) || (t === 'hist' && d.role !== 'view') || (t === 'share' && d.role === 'owner'));
+// the body: the strip, the fields in tabs, the preview. 2.736.0 (#5212): nb = a neighbour drawn ahead ({d, set}) by the same lines
+function dcv_bodyHtml(d, nb) {
+  const w = d.role !== 'view', tabs = dcv_tabs(d), off = dcv_stripOff();
+  const tab = tabs.some(([t]) => t === DVW.tab) ? DVW.tab : 'details';
+  return `<div class="dc-body dv-cols${off ? ' dv-nostrip' : ''}" data-k="b${d.id}" data-id="${d.id}">${dcv_stripHtml(d, off)}${off ? '' : dcv_gripHtml('strip', tr('In the list'))}
+      <section class="dv-mask dc-props" id="dc-props" aria-label="${esc(tr('Properties'))}">
+        <div class="dv-tabs" role="tablist" aria-label="${esc(tr('Properties'))}">${tabs.map(([t, l]) => `<button type="button" role="tab" id="dv-t-${t}" data-dvtab="${t}" aria-controls="dv-p-${t}" aria-selected="${tab === t}" tabindex="${tab === t ? 0 : -1}">${tr(l)}</button>`).join('')}</div>
+        ${tabs.map(([t]) => `<div class="dv-tp" role="tabpanel" id="dv-p-${t}" aria-labelledby="dv-t-${t}"${tab === t ? '' : ' hidden'}${t === 'hist' || t === 'share' ? ' data-fl-fill' : ''}>${t === 'details' ? dcv_detailsHtml(d, w, nb) : t === 'text' ? dcv_textHtml(d, w) : ''}</div>`).join('')}
+      </section>${dcv_gripHtml('mask', tr('Properties'))}
+      ${dcv_pvHtml(d)}
+    </div>`;
+}
+// ---- 2.736.0 (#5212): leafing without a seam. The direct neighbours of the open document are fetched whole (docs.js
+// dc_nbAhead) and drawn here by the same lines as the open one (dcv_bodyHtml, the preview by dcv_pvDraw at the width it
+// will have) into a body of their own. It waits outside the page in a holder of the open body's size (laid out, so the
+// pages get their final size; no ids while it waits: the page's own fields stay the only ones), a swipe lays it beside the
+// open body (docs.js dc_nbAdd) and after the snap it takes the open body's place as it is (dcv_nbTake): no request, no
+// picture that moves, no text that comes later. The body left behind waits as the neighbour on the other side.
+function dcv_nbHold() {
+  let h = $('.dv-nbhold');
+  if (!h) { h = document.createElement('div'); h.className = 'dv-nbhold'; h.setAttribute('aria-hidden', 'true'); h.inert = true; document.body.appendChild(h); }
+  const md = $('.dv-view'), b = md && $('.dc-body', md);
+  if (b?.offsetWidth) h.style.cssText = `${md.getAttribute('style') || ''};width:${b.offsetWidth}px;height:${b.offsetHeight}px`;  // the grips' widths (--dv-sw / --dv-mw) too
+  return h;
+}
+// a body made a waiting neighbour: its ids kept aside (data-dvid), out of reach (inert, aria-hidden), into the holder
+function dcv_nbPark(el) {
+  for (const x of el.querySelectorAll('[id]')) { /** @type {HTMLElement} */ (x).dataset.dvid = x.id; x.removeAttribute('id'); }
+  el.classList.remove('dc-body', 'dc-nb-n', 'dc-nb-p'); el.classList.add('dc-nb');
+  el.setAttribute('aria-hidden', 'true'); el.inert = true; el.style.transform = ''; el.style.transition = ''; el.style.position = '';
+  /** @type {any} */ (el)._dcnb = true;
+  dcv_nbHold().appendChild(el);
+}
+// e = {id, d, set, ctrl}: its body drawn (the preview fetches its file with e.ctrl's signal)
+function dcv_nbDraw(e) {
+  const t = document.createElement('template'); t.innerHTML = dcv_bodyHtml(e.d, e).trim();
+  const el = /** @type {HTMLElement} */ (t.content.firstElementChild); if (!el) return;
+  e.el = el;
+  dcv_nbHold().appendChild(el);
+  if (typeof dn_draw === 'function' && !e.d.file) dn_draw(/** @type {any} */ (el), e.d);  // the notes (docnotes.js) as on the open one
+  dcv_nbPark(el);
+  dcv_pvDraw(el, e.d, e);
+  const box = el.querySelector('.dv-pages'); if (box) DVW.ro?.observe(box);
+}
+// the neighbour gone (no direct neighbour any more, the view closed): its file freed, its body away
+function dcv_nbFree(e) {
+  e.ctrl?.abort();
+  if (e.pdf) { e.pdf.off = true; e.pdf.io?.disconnect(); try { e.pdf.doc?.destroy(); } catch { /* gone */ } }
+  const box = e.el && $('.dv-pages', e.el); if (box) DVW.ro?.unobserve(box);
+  e.el?.remove(); e.el = null;
+}
+// the document now drawn was drawn ahead (dc_open took its data): its body takes the open one's place; the open one waits
+// as a neighbour (the way back), unless a change of it is still on its way
+function dcv_nbTake(d, old) {
+  const e = DCW.nb?.get(d.id); if (!e?.el || e.d !== d || !e.el.firstChild) return null;
+  DCW.nb.delete(d.id); e.taken = true;  // a preview still on its way becomes the view's (dcv_pvDraw)
+  const el = e.el;
+  for (const x of el.querySelectorAll('[data-dvid]')) { const y = /** @type {HTMLElement} */ (x); y.id = y.dataset.dvid || ''; delete y.dataset.dvid; }
+  el.classList.remove('dc-nb', 'dc-nb-n', 'dc-nb-p'); el.classList.add('dc-body');
+  el.removeAttribute('aria-hidden'); el.inert = false; /** @type {any} */ (el)._dcnb = false;
+  const was = /** @type {any} */ (old)._dcv, pdf = DVW.pdf?.box && old.contains(DVW.pdf.box) ? DVW.pdf : null;
+  old.replaceWith(el);
+  DVW.pdf = e.pdf || null;
+  if (e.pdf) e.pdf.nb = false;
+  if (was?.d && was.d.id !== d.id && !DC_PEND.has(was.d.id) && $('.dv-pages', old)?._base) {  // its preview finished
+    const o = {id: was.d.id, d: was.d, set: was.set, at: Date.now(), ctrl: new AbortController(), el: old, pdf};
+    if (pdf) pdf.nb = true;
+    const pz = $('.dv-pages', old); if (pz && typeof dc_zoomSet === 'function') dc_zoomSet(pz, 1, 0, 0);
+    dcv_nbPark(old);
+    DCW.nb.set(o.id, o);
+  } else if (pdf) { DVW.pdf = pdf; dcv_free(); DVW.pdf = e.pdf || null; }
+  return el;
 }
 function dcv_headHtml(d, w) {
   const fromAb = /^#ablage/.test(DVW.back?.hash || '');
@@ -137,9 +212,9 @@ function dcv_stripHtml(d, off) {
   }).join('')}</ul>`}</nav>`;
 }
 // Details: what is used often first; due date, archive number, amount, custom fields and the capture date under "More fields"
-function dcv_detailsHtml(d, w) {
+function dcv_detailsHtml(d, w, nb) {  // 2.736.0 (#5212): nb = a neighbour drawn ahead (its workspace's lists: nb.set)
   if (d.file) return dcv_fileHtml(d, w);  // 2.583.0 (#4832)
-  const set = DC.set || {senders: [], types: [], tags: [], folders: []}, ro = w ? '' : 'disabled';
+  const set = (nb ? nb.set : DC.set) || {senders: [], types: [], tags: [], folders: []}, ro = w ? '' : 'disabled';
   const dl = (id, list) => `<datalist id="${id}">${list.map(x => `<option value="${esc(x.name)}">`).join('')}</datalist>`;
   const field = (f, label, input) => `<div class="row dc-f"><label for="dc-${f}">${label}</label>${input}${dc_auto(d, f)}</div>`;
   const sug = Object.entries(d.suggest || {});
@@ -164,7 +239,7 @@ function dcv_detailsHtml(d, w) {
     field('asn', tr('Archive number'), `<span class="dc-amt"><input type="number" min="1" id="dc-asn" data-dcp="asn" value="${esc(d.asn || '')}" ${ro}>${w && !d.asn ? `<button type="button" class="btn sm" data-dc="asnnext">${tr('Next free number')}</button>` : ''}</span>${typeof dc_asnTakenHtml === 'function' ? dc_asnTakenHtml(d) : '' /* 2.591.0 B (#4863) */}`),
     ...(d.custom_fields || []).map(f => dc_cfRow(d, f, ro)), typeof pmeta_takenHtml === 'function' ? pmeta_takenHtml(d) : ''].join('');
   const n = [d.due, d.amount, d.asn].filter(Boolean).length + (d.custom_fields || []).filter(f => f.value != null && f.value !== '').length;
-  return `${busy}${sugHtml}${task}${typeof rx_html === 'function' ? rx_html(d) : ''}${typeof rc_slot === 'function' ? rc_slot(d) : ''}${typeof ltd_slot === 'function' ? ltd_slot(d) : ''}${typeof ast_docSlot === 'function' ? ast_docSlot(d) : '' /* 2.126.1 A (#2123) */}
+  return `${busy}${sugHtml}${task}${typeof rx_html === 'function' ? rx_html(d) : ''}${typeof rc_slot === 'function' ? (nb ? `${rc_alsoHtml(d)}<div class="rc-slot"></div><p class="rc-cb muted" hidden></p>` : rc_slot(d)) : ''}${typeof ltd_slot === 'function' ? (nb ? `<div class="ltd" data-nid="${d.id}"></div>` : ltd_slot(d)) : '' /* 2.736.0 (#5212): a neighbour drawn ahead: their frames only (they keep one document's state each) */}${typeof ast_docSlot === 'function' ? ast_docSlot(d) : '' /* 2.126.1 A (#2123) */}
     <div class="dc-form">${main}</div>
     <details class="dv-more"${DVW.more ? ' open' : ''}><summary>${ic('chev', 's dc-chev')}<span>${tr('More fields')}</span>${n ? `<span class="muted dv-cnt">${esc(tr('{0} filled in', n))}</span>` : ''}</summary><div class="dc-form">${rare}</div></details>
     <div class="dc-notes" data-fl-fill></div>${w ? `<p class="muted dv-hint">${tr('Every change saves at once, with undo.')}</p>` : ''}`;
@@ -246,17 +321,18 @@ function dcv_pvHtml(d) {
     <button type="button" class="btn sm" data-dc="view" title="${esc(tr('Show {0}', d.name))}">${ic('expand', 's')} <span>${tr('Full screen')}</span></button></div>
     <div class="dv-pages" data-fl-fill tabindex="0" role="region" aria-label="${esc(tr('Show {0}', d.name))}"></div></section>`;
 }
-function dcv_free() { try { DVW.pdf?.doc?.destroy(); } catch { /* gone */ } DVW.pdf?.io?.disconnect(); DVW.pdf = null; }
-async function dcv_pvDraw(md, d) {
+function dcv_free() { if (DVW.pdf) DVW.pdf.off = true; try { DVW.pdf?.doc?.destroy(); } catch { /* gone */ } DVW.pdf?.io?.disconnect(); DVW.pdf = null; }
+// 2.736.0 (#5212): nb = a neighbour drawn ahead ({ctrl}): its own PDF (nb.pdf, the open one's stays), stopped by nb.ctrl
+async function dcv_pvDraw(md, d, nb) {
   const box = $('.dv-pages', md); if (!box) return;
   const key = `${d.id}:${d.size}`;  // a field saved does not draw it again
   if (box._pv === key && box.firstChild) return;
   box._pv = key;
-  if (DVW.pdf && DVW.pdf.box !== box) dcv_free();
+  if (!nb && DVW.pdf && DVW.pdf.box !== box) dcv_free();
   if (!DVW.ro && typeof ResizeObserver === 'function') DVW.ro = new ResizeObserver(es => { for (const e of es) if (/** @type {any} */ (e.target).isConnected) { const t = /** @type {any} */ (e.target); (t._rt ||= debounce(() => dcv_layout(t), 80))(); } });
   DVW.ro?.observe(box);
   if (!box._sc) { box._sc = true; box.addEventListener('scroll', () => dcv_pgn(box), {passive: true}); }
-  const live = () => box.isConnected && box._pv === key;
+  const live = () => (nb && !nb.taken ? !nb.ctrl.signal.aborted : box.isConnected && !box.closest('.dv-nbhold')) && box._pv === key;
   box.dataset.pages = ''; box._base = null;
   box.innerHTML = `<div class="dv-pgcol">${d.thumb ? `<div class="dv-pg dv-img dv-thumb"><img src="${esc(dc_thumbUrl(d))}" alt=""></div>` : `<span class="dc-ph">${ic(dc_isPdf(d) ? 'file' : 'picture')}</span>`}</div>`;
   dcv_pgn(box); dcv_zbar(box);
@@ -270,7 +346,7 @@ async function dcv_pvDraw(md, d) {
   try {
     await loadModule('pdf');
     const lib = typeof pv_load === 'function' ? await pv_load() : null; if (!lib || !live()) return;
-    const r = await fetch(dc_fileUrl(d), {credentials: 'same-origin'}); if (!r.ok || !live()) return;
+    const r = await fetch(dc_fileUrl(d), {credentials: 'same-origin', signal: nb?.ctrl.signal}); if (!r.ok || !live()) return;
     // as in pdfview.js: nothing in the file runs (no eval, no scripts, no links)
     const doc = await lib.getDocument({data: new Uint8Array(await r.arrayBuffer()), isEvalSupported: false, enableScripting: false, disableAutoFetch: true, stopAtErrors: false, useSystemFonts: true}).promise;
     if (!live()) { doc.destroy(); return; }
@@ -281,8 +357,8 @@ async function dcv_pvDraw(md, d) {
       base.push(vp ? {w: vp.width, h: vp.height} : {...base[base.length - 1]});
       if (!live()) { doc.destroy(); return; }
     }
-    if (DVW.pdf) dcv_free();
-    DVW.pdf = {doc, box, gen: 0};
+    if (nb && !nb.taken) { nb.pdf = {doc, box, gen: 0, nb: true}; }  // 2.736.0 (#5212): the neighbour's own (dcv_nbTake makes it the view's)
+    else { if (DVW.pdf) dcv_free(); DVW.pdf = {doc, box, gen: 0}; }
     box._base = base;
     box.innerHTML = `<div class="dv-pgcol">${base.map((_, i) => `<div class="dv-pg" data-i="${i}"></div>`).join('')}</div>`;
     box.dataset.pages = String(base.length);
@@ -310,7 +386,7 @@ function dcv_layout(box, keep, force) {
   pages.forEach((p, i) => { const b = box._base[i] || box._base[0]; p.style.width = Math.floor(b.w * s) + 'px'; p.style.height = Math.floor(b.h * s) + 'px'; });
   if (keep) box.scrollTop = top * box.scrollHeight;
   dcv_zbar(box); dcv_pgn(box);
-  const pdf = DVW.pdf; if (!pdf || pdf.box !== box) return;
+  const pdf = DVW.pdf?.box === box ? DVW.pdf : [...(DCW.nb?.values() || [])].find(e => e.pdf?.box === box)?.pdf; if (!pdf || pdf.off) return;  // 2.736.0 (#5212): + a neighbour's
   pdf.gen++; pdf.s = s;
   for (const p of pages) p.dataset.s = '';
   pdf.io?.disconnect();
@@ -324,7 +400,7 @@ async function dcv_page(pdf, p) {
   p.dataset.s = String(s);
   try {
     const page = await pdf.doc.getPage(i + 1);
-    if (my !== pdf.gen || DVW.pdf !== pdf) return;
+    if (my !== pdf.gen || pdf.off) return;  // 2.736.0 (#5212): pdf.off = freed (the view's or a neighbour's)
     const vp = page.getViewport({scale: s});
     // sharp: the screen's own pixel density (up to 3), at most DCV_CVMAX pixels per page
     const dpr = Math.min(window.devicePixelRatio || 1, 3, Math.sqrt(DCV_CVMAX / (vp.width * vp.height)));
@@ -332,7 +408,7 @@ async function dcv_page(pdf, p) {
     cv.width = Math.floor(vp.width * dpr); cv.height = Math.floor(vp.height * dpr);
     cv.setAttribute('aria-label', tr('Page {0}', i + 1));
     await page.render({canvas: cv, canvasContext: cv.getContext('2d'), viewport: vp, transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null}).promise;
-    if (my !== pdf.gen || DVW.pdf !== pdf || p.dataset.s !== String(s)) return;
+    if (my !== pdf.gen || pdf.off || p.dataset.s !== String(s)) return;
     p.replaceChildren(cv);
   } catch { if (my === pdf.gen) p.dataset.s = ''; }
 }
@@ -497,6 +573,7 @@ function dcv_fullOpts(d) {
     o.prevT = tr('Previous document'); o.nextT = tr('Next document');
     o.step = async dir => (await dc_step(dir)) && DC.doc ? dcv_fullOpts(DC.doc) : null;
     o.peek = dir => ({img: dc_nbThumb(dc_nav()?.docs[i + dir])});  // 2.727.0 (#5202): its small picture glides in with the swipe
+    o.near = dir => { const x = dc_nav()?.docs[i + dir], e = x && typeof dc_nbFresh === 'function' ? dc_nbFresh(x.id) : null; return e?.d ? dcv_fullOpts(e.d) : null; };  // 2.736.0 (#5212): fetched ahead by docs.js, made ready by pdfview.js
   }
   return o;
 }

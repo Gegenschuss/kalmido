@@ -158,7 +158,7 @@ function attLightbox(id, list, url = attUrl, prep = null) {  // 2.32.0 (#983): u
   let sw = null;
   // lazy-ok-begin: swOn runs only once swipenav.js is in (the typeof / loadModule below)
   const swOn = () => { sw = swn_attach(m, {area: t => z === 1 && t && !t.closest?.('.lbbar') ? img() : null, can: d => !!imgs[i + d],
-    go: d => { i += d; draw(); sw?.prime(); }, peek: d => ({img: imgs[i + d] ? url(imgs[i + d]) : ''})}); };  // 2.727.0 (#5202): the next picture lies beside it and glides along, it snaps in (no glide-in after)
+    go: d => { i += d; draw(); sw?.prime(); }, peek: d => ({img: imgs[i + d] ? url(imgs[i + d]) : ''}), full: true}); };  // 2.727.0 (#5202): the next picture lies beside it and glides along, it snaps in (no glide-in after); 2.736.0 (#5212): full = where it will stand
   // lazy-ok-end
   if (typeof swn_attach === 'function') swOn();
   else if (navigator.maxTouchPoints > 0 || isTouch()) loadModule('swipenav').then(() => { if (m.isConnected && !sw) swOn(); }).catch(() => {});

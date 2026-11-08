@@ -8,7 +8,11 @@
    2.521.0 (#4476): o.step(dir) = leaf through a list without closing (documents: docview.js dv_fullOpts, 2.583.0) - two buttons with
    o.pos ("3 of 48") and their names o.prevT / o.nextT (texts of the caller's module) and the arrow keys left / right go to the previous / next one (the pages then turn with Page up / down);
    o.img = an image instead of a PDF, o.kind 'file' = a file that cannot be shown (a hint and Download), both only with o.step.
-   2.727.0 (#5202): o.peek(dir) -> {img} = the neighbour's (small) picture for the placeholder that glides along with a swipe. */
+   2.727.0 (#5202): o.peek(dir) -> {img} = the neighbour's (small) picture for the placeholder that glides along with a swipe.
+   2.736.0 (#5212): o.near(dir) -> the view options of the neighbour when they are known ahead (else null, asked again a few
+   times): its file is fetched and opened, the page sizes read and the first page drawn to this view's width (pv_pre), a picture
+   decoded; a swipe lays exactly that beside the page and after the snap the new view takes it over in the same step (o.pre):
+   no Loading…, no page drawn again. Only the direct neighbours; leafing on or closing stops and frees the rest. */
 'use strict';
 
 const PV_LIB = '/static/vendor/pdfjs/pdf.min.mjs', PV_WORKER = '/static/vendor/pdfjs/pdf.worker.min.mjs';
@@ -29,6 +33,59 @@ function pv_timed(p, task) {
   return Promise.race([p, late]).finally(() => clearTimeout(t));
 }
 const pv_isPdf = a => a?.mime === 'application/pdf' || /\.pdf$/i.test(String(a?.name || ''));
+const PV_OPEN = {isEvalSupported: false, enableScripting: false, disableAutoFetch: true, stopAtErrors: false, useSystemFonts: true};
+// one page drawn at the scale s: sharp on high-density screens, capped so a big zoom on a big page stays within the canvas limits of phones
+async function pv_cv(page, s) {
+  const vp = page.getViewport({scale: s}), dpr = Math.min(window.devicePixelRatio || 1, 2, Math.sqrt(16e6 / (vp.width * vp.height)));
+  const cv = document.createElement('canvas');
+  cv.width = Math.floor(vp.width * dpr); cv.height = Math.floor(vp.height * dpr);
+  await page.render({canvas: cv, canvasContext: cv.getContext('2d'), viewport: vp, transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null}).promise;
+  return cv;
+}
+// every page's own size (mixed formats); only the first 30 are read up front, the others take the size of the one before
+async function pv_sizes(doc) {
+  const base = [];
+  for (let i = 1; i <= doc.numPages; i++) {
+    const vp = i <= 30 ? (await doc.getPage(i)).getViewport({scale: 1}) : null;
+    base.push(vp ? {w: vp.width, h: vp.height} : {...base[base.length - 1]});
+  }
+  return base;
+}
+const pv_fit = (body, base) => { const cs = getComputedStyle(body); return Math.min(2, Math.max(200, body.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - 2) / Math.max(...base.map(b => b.w))); };
+// 2.736.0 (#5212): a neighbour made ready ahead for the view body (its width): {url, doc, base, fit, cv} for a PDF, {url, im} for a
+// picture, null for anything else or when ac stopped it; pv_preFree lets go of the opened file
+async function pv_pre(n, body, ac) {
+  if (!n || n.kind === 'file' || (!n.img && !n.url) || !navigator.onLine) return null;
+  const st = () => ac.signal.aborted;
+  if (n.img) { const im = new Image(); im.className = 'pvimg'; im.alt = n.name || ''; im.src = n.img; await im.decode().catch(() => {}); return st() ? null : {url: n.url, im}; }
+  const sp = typeof ofc_spUrl === 'function' ? ofc_spUrl : u => u;
+  const r = await fetch(sp(n.url), {credentials: 'same-origin', signal: ac.signal}); if (!r.ok || st()) return null;
+  const data = new Uint8Array(await r.arrayBuffer()), lib = await pv_timed(pv_load()); if (st()) return null;
+  const task = lib.getDocument({data, ...PV_OPEN}), doc = await pv_timed(task.promise, task);
+  try {
+    const base = await pv_sizes(doc); if (st()) throw 0;
+    const fit = pv_fit(body, base), cv = await pv_cv(await doc.getPage(1), fit); if (st()) throw 0;
+    cv.setAttribute('aria-label', tr('Page {0}', 1));
+    return {url: n.url, doc, base, fit, cv};
+  } catch { try { doc.destroy(); } catch {} return null; }
+}
+const pv_preFree = v => { try { v?.doc?.destroy(); } catch {} };
+// the pages of a view in their final size (CSSOM, no inline style attribute); a canvas drawn ahead goes on the first one
+function pv_pagesEl(base, s, cv) {
+  const w = document.createElement('div'); w.className = 'pvpages';
+  base.forEach((b, i) => { const p = document.createElement('div'); p.className = 'pvpage'; p.dataset.i = String(i); p.style.width = Math.floor(b.w * s) + 'px'; p.style.height = Math.floor(b.h * s) + 'px'; w.appendChild(p); });
+  if (cv && w.firstChild) { /** @type {HTMLElement} */ (w.firstChild).dataset.s = String(s); w.firstChild.appendChild(cv); }
+  return w;
+}
+// what a swipe lays beside the page: the view body as the neighbour will stand (built once)
+function pv_preEl(v) {
+  if (v.el) return v.el;
+  const el = document.createElement('div');
+  el.className = 'tvbody pvbody'; el.style.cssText = 'width:100%;height:100%;box-sizing:border-box;overflow:hidden';
+  if (v.im) { const w = document.createElement('div'); w.className = 'pvimgw'; w.appendChild(v.im.cloneNode()); el.appendChild(w); }
+  else el.appendChild(pv_pagesEl(v.base, v.fit, v.cv));
+  return (v.el = el);
+}
 // 2.65.0 (#1823): the click on a preview link and pv_attr moved to lazyload.js (drawn at start, this file loads on demand)
 
 async function pdfView(o) {
@@ -59,6 +116,7 @@ async function pdfView(o) {
   const backHref = back?.getAttribute?.('href');
   const close = () => {
     gen++; io?.disconnect(); m.remove(); try { doc?.destroy(); } catch {}
+    pre_free();  // 2.736.0 (#5212)
     (back?.isConnected ? back : backHref && $$('[data-pview]').find(x => x.getAttribute('href') === backHref))?.focus?.();
   };
   const showFail = msg => {
@@ -74,7 +132,7 @@ async function pdfView(o) {
   // page boxes have their final size before anything is drawn (no jumps); a box is drawn when it comes near the view
   const layout = () => {
     const s = fit * zoom;
-    pages.forEach((p, i) => { p.style.width = Math.floor(base[i].w * s) + 'px'; p.style.height = Math.floor(base[i].h * s) + 'px'; p.dataset.s = ''; p.textContent = ''; });
+    pages.forEach((p, i) => { p.style.width = Math.floor(base[i].w * s) + 'px'; p.style.height = Math.floor(base[i].h * s) + 'px'; if (p.dataset.s !== String(s)) { p.dataset.s = ''; p.textContent = ''; } });  // 2.736.0 (#5212): a page drawn ahead at this scale stays
     status();
     if (swn) body.style.touchAction = zoom <= 1 ? 'pan-y' : '';  // 2.652.0 (#5071): sideways is the swipe; enlarged the page scrolls both ways
   };
@@ -85,13 +143,8 @@ async function pdfView(o) {
     try {
       const page = await doc.getPage(i + 1);
       if (my !== gen || p.dataset.s !== String(s)) return;
-      const vp = page.getViewport({scale: s});
-      // sharp on high-density screens, capped so a big zoom on a big page stays within the canvas limits of phones
-      const dpr = Math.min(window.devicePixelRatio || 1, 2, Math.sqrt(16e6 / (vp.width * vp.height)));
-      const cv = document.createElement('canvas');
-      cv.width = Math.floor(vp.width * dpr); cv.height = Math.floor(vp.height * dpr);
+      const cv = await pv_cv(page, s);  // 2.736.0 (#5212): shared with the neighbour drawn ahead
       cv.setAttribute('aria-label', tr('Page {0}', i + 1));
-      await page.render({canvas: cv, canvasContext: cv.getContext('2d'), viewport: vp, transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null}).promise;
       if (my !== gen || p.dataset.s !== String(s)) return;
       p.replaceChildren(cv);
     } catch (e) { if (my === gen) { p.dataset.s = ''; p.innerHTML = `<span class="pvperr">${esc(tr('This page could not be shown'))}</span>`; } }
@@ -127,6 +180,22 @@ async function pdfView(o) {
     if (a === 'prev') go(cur - 1); else if (a === 'next') go(cur + 1);
     else if (a === 'in') setZoom(+(zoom * 1.25).toFixed(3)); else if (a === 'out') setZoom(+(zoom / 1.25).toFixed(3)); else if (a === 'fit') setZoom(1, false);
   });
+  // 2.736.0 (#5212): the direct neighbours made ready ahead (dir -> {ac, v}); asked again a few times while their data are on the way
+  /** @type {any} */
+  const PRE = {};
+  m._pre = PRE;  // (the tests look at what is made ready)
+  const pre_free = () => { for (const k of Object.keys(PRE)) { PRE[k].ac.abort(); pv_preFree(PRE[k].v); delete PRE[k]; } };
+  const ahead = (k = 0) => {
+    if (!o.near || !m.isConnected) return;
+    let wait = false;
+    for (const dir of [1, -1]) {
+      if (PRE[dir] || (dir > 0 ? o.last : o.first)) continue;
+      const n = o.near(dir); if (!n) { wait = true; continue; }
+      const e = PRE[dir] = {ac: new AbortController(), v: null};
+      pv_pre(n, body, e.ac).then(v => { if (PRE[dir] === e && m.isConnected) e.v = v; else pv_preFree(v); }, () => {});
+    }
+    if (wait && k < 15) setTimeout(() => ahead(k + 1), 400);
+  };
   // 2.521.0 (#4476): the previous / next one of the list in the same place; the one that opened it keeps the focus back
   let leafing = false;
   const leaf = async dir => {
@@ -136,16 +205,20 @@ async function pdfView(o) {
     leafing = false;
     if (!n || !m.isConnected) return;
     const f = document.activeElement?.dataset?.pv;
+    const p = PRE[dir]?.v, use = p && p.url === n.url && !n.data ? p : null;  // 2.736.0 (#5212): made ready ahead
+    if (use) PRE[dir].v = null;
     gen++; io?.disconnect(); try { doc?.destroy(); } catch {}
-    pdfView({...n, back});  // its first part (the new box, the focus) runs at once
+    pre_free();
+    pdfView({...n, back, pre: use});  // its first part (the new box, the focus) runs at once
     const lb = $('.lightbox.pview'); if (f && lb) $(`[data-pv="${f}"]:not([disabled])`, lb)?.focus();
   };
   // 2.652.0 (#5071): on a touch screen (phone, tablet, any width) a swipe sideways leafs through the list (swipenav.js, the
   // gesture of the document preview); enlarged (zoom over the width) one finger moves the page as before
   // 2.727.0 (#5202): the neighbour lies beside it as a placeholder (o.peek(dir) -> {img} its small picture, else an empty
   // page) and glides along; let go, it snaps fully into place and only then loads (the placeholder stays until it is there)
+  // 2.736.0 (#5212): the neighbour made ready ahead lies there as it will stand (pv_preEl); else the placeholder as before
   const swn = o.step && typeof swn_attach === 'function' ? swn_attach(body, {area: () => zoom <= 1 ? body : null,
-    can: dir => !(dir > 0 ? o.last : o.first), go: dir => leaf(dir), peek: o.peek}) : null;
+    can: dir => !(dir > 0 ? o.last : o.first), go: dir => leaf(dir), peek: dir => (PRE[dir]?.v ? {el: pv_preEl(PRE[dir].v)} : o.peek ? o.peek(dir) : null)}) : null;
   if (swn) body.style.touchAction = 'pan-y';
   // own keys while the preview has the focus (Esc here also gives the focus back, events.js only removes a lightbox)
   m.addEventListener('keydown', e => {
@@ -197,8 +270,18 @@ async function pdfView(o) {
   if (o.aid) dpvSumMount(m, o);  // 2.92.0 C (#1926): "Summarise" by an agent (docpreview.js, same module)
   const my = gen;
   if (o.img || o.kind === 'file') {  // 2.521.0 (#4476): leafing reached an image / a file that is no PDF
-    if (o.img) body.innerHTML = `<div class="pvimgw"><img class="pvimg" src="${esc(o.img)}" alt="${esc(o.name || '')}"></div>`;
+    if (o.pre?.im) { const w = document.createElement('div'); w.className = 'pvimgw'; w.appendChild(o.pre.im); body.replaceChildren(w); }  // 2.736.0 (#5212): decoded ahead
+    else if (o.img) body.innerHTML = `<div class="pvimgw"><img class="pvimg" src="${esc(o.img)}" alt="${esc(o.name || '')}"></div>`;
     else showFail(tr('This file cannot be shown here. You can download it.'));
+    ahead();
+    return;
+  }
+  if (o.pre?.doc) {  // 2.736.0 (#5212): opened and its first page drawn ahead: shown in this same step, nothing loads or is drawn again
+    doc = o.pre.doc; base = o.pre.base; fit = pv_fit(body, base);
+    body.replaceChildren(pv_pagesEl(base, fit, Math.abs(fit - o.pre.fit) < 0.002 ? o.pre.cv : null));
+    pages = $$('.pvpage', body);
+    $('.pvnav', m).hidden = $('.pvzoom', m).hidden = false;
+    layout(); observe(); ahead();
     return;
   }
   try {
@@ -210,22 +293,17 @@ async function pdfView(o) {
     const lib = await pv_timed(pv_load()).catch(e => { if (e.name === 'PvTimeout') pv_lib = null; throw e; });
     if (my !== gen || !m.isConnected) return;
     // isEvalSupported off: pdf.js never builds code from the file; no scripting, links stay inert (no annotation layer)
-    const task = lib.getDocument({data, isEvalSupported: false, enableScripting: false, disableAutoFetch: true, stopAtErrors: false, useSystemFonts: true});
+    const task = lib.getDocument({data, ...PV_OPEN});
     // 2.549.0 (#4578): a worker that fails ("Setting up fake worker failed") or never answers is no message for the user
     doc = await pv_timed(task.promise, task).catch(e => { throw e?.name === 'PasswordException' || e?.name === 'InvalidPDFException' ? e : Object.assign(new Error(String(e?.message || e)), {name: 'PvWorker'}); });
     if (my !== gen || !m.isConnected) { doc.destroy(); return; }
-    for (let i = 1; i <= doc.numPages; i++) {
-      // every page's own size (mixed formats); only the first is read up front, the others when the document is long
-      const vp = i <= 30 ? (await doc.getPage(i)).getViewport({scale: 1}) : null;
-      base.push(vp ? {w: vp.width, h: vp.height} : {...base[base.length - 1]});
-    }
+    base = await pv_sizes(doc);  // 2.736.0 (#5212): shared with the neighbour made ready ahead
     if (my !== gen || !m.isConnected) return;
-    const cs = getComputedStyle(body), avail = Math.max(200, body.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - 2);
-    fit = Math.min(2, avail / Math.max(...base.map(b => b.w)));
+    fit = pv_fit(body, base);
     body.innerHTML = `<div class="pvpages">${base.map((_, i) => `<div class="pvpage" data-i="${i}"></div>`).join('')}</div>`;
     pages = $$('.pvpage', body);
     $('.pvnav', m).hidden = $('.pvzoom', m).hidden = false;
-    layout(); observe();
+    layout(); observe(); ahead();
   } catch (e) {
     if (my !== gen || !m.isConnected) return;
     showFail(e instanceof TypeError || !navigator.onLine ? tr('The preview needs a connection. You can download the file when you are online again.')
