@@ -45,8 +45,15 @@ if [[ -z "$(docker ps -q -f "name=^${DBC}$")" ]]; then
   docker run -d --name "$DBC" --network bridge -e POSTGRES_USER=kalmido -e POSTGRES_PASSWORD=kalmido -e POSTGRES_DB=kalmido \
     --tmpfs /var/lib/postgresql/data postgres:17 -c fsync=off -c synchronous_commit=off -c full_page_writes=off \
     -c max_connections=200 >/dev/null || exit 1
-  for _ in $(seq 1 60); do docker exec "$DBC" pg_isready -U kalmido -d kalmido -q 2>/dev/null && break; sleep 0.5; done
-  sleep 1  # the image restarts the server once after its first init
+  # 2.728.0 (#5188): readiness over TCP, not the socket (as the ZAP step, #5187). At its first start the image runs a setup
+  # server on the socket only and then restarts it; a socket check took that server as ready (the fixed "sleep 1" papered
+  # over the gap). TCP answers only once the real server runs, so the loop waits for a real state, not a fixed time.
+  DBOK=0
+  for _ in $(seq 1 120); do
+    if docker exec "$DBC" pg_isready -h 127.0.0.1 -U kalmido -d kalmido -q 2>/dev/null; then DBOK=1; break; fi
+    sleep 0.5
+  done
+  [[ "$DBOK" == 1 ]] || { echo "start.sh: database $DBC not ready over TCP" >&2; docker logs "$DBC" 2>&1 | tail -20 >&2; exit 1; }
   for _ in $(seq 1 60); do docker exec "$DBC" psql -U kalmido -d kalmido -Atqc "SELECT 1" >/dev/null 2>&1 && break; sleep 0.5; done
 fi
 PSQL=(docker exec "$DBC" psql -U kalmido -d kalmido -v ON_ERROR_STOP=1 -Atq)

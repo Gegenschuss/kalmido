@@ -380,8 +380,8 @@ version: [Upgrade to 2.37](#upgrade-to-237-postgresql-required).
   `ALTER ROLE kalmido PASSWORD '...'` inside the database.
 - **Settings of the `db` service.** `POSTGRES_INITDB_ARGS=--data-checksums` (damaged pages are reported, not read
   silently; only takes effect when `./pgdata` is created), memory settings for a 1 GB limit (see "Memory of the
-  database" below), a `pg_isready` health check that
-  Kalmido waits for, and no published port. Keep the image on major version 17 (see "major upgrade" below).
+  database" below), a `pg_isready` health check over TCP
+  (`-h 127.0.0.1`, so the setup server of the very first start does not count as ready) that Kalmido waits for, and no published port. Keep the image on major version 17 (see "major upgrade" below).
 - **Extensions need the database owner.** `init_db` creates `unaccent` and `pg_trgm` (both trusted extensions in the
   official image). With an external server, the user in `DATABASE_URL` must own the database, or create them once yourself.
 - **Connections.** Kalmido keeps up to 40 connections (24 threads + 16, `KALMIDO_DB_POOL_MAX`; 80 before 2.521);
