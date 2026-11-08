@@ -20,7 +20,7 @@ from datetime import timedelta
 from flask import jsonify, request
 
 from ..core.config import app
-from ..core.pg import IntegrityError, insert_id, system_ctx, write_lock
+from ..core.pg import IntegrityError, insert_id, st_ids, system_ctx, write_lock
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, iso, iso_ms, now_utc
 from ..core.retention import ret_on, ret_report  # 2.272.0 A (#3026)
@@ -481,8 +481,11 @@ def wiki_lock_pages(c, ids):
     lock, then in id order, as dvb_wiki_locked): a save in between is never undone by the row read before. -> the ids sorted."""
     write_lock(c, "wiki-relink")
     out = sorted({int(x) for x in ids})
-    for i in out:
-        write_lock(c, f"wiki-{i}")
+    if out:  # 2.660.0 (#5104): every page's lock in ONE statement, still in id order (was: one statement per page, an N+1 on a
+        # folder of 300 pages); the same names as write_lock(c, f"wiki-{id}"), so a save / relink waits on the same lock as before.
+        # ORDER BY ordinality: PostgreSQL evaluates the volatile lock function after the sort, so the locks are taken in id order
+        c.execute("SELECT pg_advisory_xact_lock(hashtext('wiki-' || t.i::text)) FROM unnest(CAST(? AS BIGINT[])) WITH ORDINALITY "
+                  "AS t(i, o) ORDER BY t.o", (st_ids(out),)).fetchall()
     return out
 
 
