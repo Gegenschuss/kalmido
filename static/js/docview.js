@@ -178,7 +178,7 @@ function dcv_fileHtml(d, w) {
 }
 // Content: the state of the recognition and the recognised text
 function dcv_textHtml(d, w) {
-  return `<p class="dc-state ${esc(d.state)}" role="status">${esc(tr(DC_STATE[d.state] || d.state))}${d.state === 'failed' && d.error_text ? `: ${esc(d.error_text)}` : ''}${d.method === 'ocr' ? ` · ${tr('text recognition')}` : d.method === 'e-invoice' ? ` · ${tr('E-invoice')}` : ''}
+  return `<p class="dc-state ${esc(d.state)}" role="status">${esc(tr(DC_STATE[d.state] || d.state))}${d.state === 'failed' && d.error_text ? `: ${esc(d.error_text)}` : ''}${d.method === 'ocr' ? ` · ${tr('text recognition')}` : d.method === 'e-invoice' ? ` · ${tr('E-invoice')}` : ''}${d.state === 'done' && d.method === 'none' ? `<span class="dc-notext muted" role="note"> · ${tr('No text can be read from this kind of file (older Office formats, PowerPoint, RTF): it stays a file without text. Download it to open it.')}</span>` : '' /* 2.635.0 (#4807) */}
       ${w && (d.state === 'done' || d.state === 'failed') ? `<button type="button" class="linkbtn" data-dc="redo">${tr('Recognise again')}</button>` : ''}</p>
     <div class="dc-text"><h4>${tr('Recognised text')}</h4>${d.text ? `<pre>${esc(d.text)}</pre>` : `<p class="muted">${tr('No text recognised.')}</p>`}</div><div class="dc-flows" data-fl-fill></div>`;  // 2.581.0 (#4803): the runs of flows (docflows.js dfl_runs)
 }
