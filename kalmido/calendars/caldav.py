@@ -175,7 +175,8 @@ class DavCache:
 
 _DAV_CACHE = DavCache()
 _DAV_CACHE_LOCK = _DAV_CACHE.lock  # (admin/backup.py clears the cache after a restore)
-DAV_RENDER_V = "1"  # 2.665.0 (#4196): raise when a helper of the rendering changes what a client gets (part of every key)
+DAV_RENDER_V = "2"  # 2.665.0 (#4196): raise when a helper of the rendering changes what a client gets (part of every key)
+# 2.673.0 (#5124): "2" - contact photos go smaller (contacts/carddav.py dav_photo)
 _DAV_CODE = []
 
 
@@ -239,6 +240,13 @@ class DavLazy:
                 dav_rendered(len(m))
                 _DAV_CACHE.put(self.slot, self.hash, m, sum(self._size(x) + DAV_CACHE_OBJ_BYTES for x in m.values()))
             self._members = m
+        return self._members
+
+    def cached(self):
+        """2.673.0 (#5124): the members when they are rendered already (this request or the cache under the same key), else
+        None - without rendering."""
+        if self._members is None:
+            self._members = _DAV_CACHE.get(self.slot, self.hash)
         return self._members
 
     def state(self):

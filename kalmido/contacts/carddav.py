@@ -1,9 +1,13 @@
 """CardDAV server: every address book a person sees as a collection of vCards (iOS / macOS Contacts, DAVx5, Thunderbird)."""
+import base64
+import collections
 import email.utils
 import functools
 import hashlib
+import io
 import json
 import re
+import threading
 import urllib.parse
 from datetime import timezone
 
@@ -32,6 +36,76 @@ from ..contacts.model import book_touch  # 2.369.5 (#2517): pulled up from funct
 AB_REPORTS = ("<D:supported-report><D:report><CR:addressbook-query/></D:report></D:supported-report>"
               "<D:supported-report><D:report><CR:addressbook-multiget/></D:report></D:supported-report>"
               "<D:supported-report><D:report><D:sync-collection/></D:report></D:supported-report>")
+
+
+# 2.673.0 (#5124): a contact photo goes into a DAV answer at most DAV_PHOTO_PX on its longest edge (JPEG): phones and desktops
+# sync every card of an address book, the full picture (up to PHOTO_MAX) made each card heavy. Small photos go as stored. The
+# smaller copy is kept per picture (_PHOTO_SMALL, newest DAV_PHOTO_KEEP) and in the rendered collection (DavCache); a card
+# a client writes back with that copy keeps the stored full picture (ab_put).
+DAV_PHOTO_PX = 512
+DAV_PHOTO_CHARS = 96 * 1024  # a data URI up to this length goes as stored
+DAV_PHOTO_KEEP = 256
+_PHOTO_SMALL, _PHOTO_LOCK = collections.OrderedDict(), threading.Lock()
+
+
+def _photo_shrink(uri):
+    """A data URI -> the same picture at most DAV_PHOTO_PX as a JPEG data URI, or '' (not a picture, no Pillow, not smaller)."""
+    m = re.fullmatch(r"data:image/\w+;base64,(.+)", uri, re.S)
+    if not m:
+        return ""
+    try:
+        from PIL import Image, ImageOps
+    except ImportError:
+        return ""
+    try:
+        im = Image.open(io.BytesIO(base64.b64decode(m.group(1))))  # reads the header only
+        if im.width * im.height > 60_000_000:
+            return ""
+        if im.format == "JPEG":
+            im.draft("RGB", (DAV_PHOTO_PX * 2, DAV_PHOTO_PX * 2))  # decode at a reduced scale (fast, little memory)
+        im.load()
+        im = ImageOps.exif_transpose(im)
+        if im.mode in ("RGBA", "LA", "P"):
+            im = im.convert("RGBA")
+            bg = Image.new("RGB", im.size, (255, 255, 255))
+            bg.paste(im, mask=im.getchannel("A"))
+            im = bg
+        else:
+            im = im.convert("RGB")
+        im.thumbnail((DAV_PHOTO_PX, DAV_PHOTO_PX), Image.Resampling.LANCZOS)
+        out = io.BytesIO()
+        im.save(out, "JPEG", quality=85, optimize=True)
+    except Exception:  # noqa: BLE001  (truncated, unknown format, decompression bomb ...): the stored picture goes
+        return ""
+    small = "data:image/jpeg;base64," + base64.b64encode(out.getvalue()).decode("ascii")
+    return small if len(small) < len(uri) else ""
+
+
+def dav_photo(uri):
+    """2.673.0 (#5124): the photo as a DAV answer carries it: small ones as stored, big ones as the smaller copy (kept)."""
+    if not uri or len(uri) <= DAV_PHOTO_CHARS:
+        return uri
+    k = hashlib.blake2b(uri.encode("utf-8"), digest_size=16).digest()
+    with _PHOTO_LOCK:
+        hit = _PHOTO_SMALL.get(k)
+        if hit is not None:
+            _PHOTO_SMALL.move_to_end(k)
+            return hit
+    small = _photo_shrink(uri) or uri
+    with _PHOTO_LOCK:
+        _PHOTO_SMALL[k] = small
+        while len(_PHOTO_SMALL) > DAV_PHOTO_KEEP:
+            _PHOTO_SMALL.popitem(last=False)
+    return small
+
+
+def dav_vcard(r, version=None):
+    """The vCard of a contact row as the DAV clients get it (the photo through dav_photo)."""
+    d = dict(r)
+    d["photo"] = dav_photo(d.get("photo") or "")
+    if version:
+        d["version"] = version
+    return render_vcard(d)
 
 
 AB_SHARED = "s1"  # 2.351.0 B (#2749): the collection of the contacts shared one by one through folders
@@ -106,7 +180,7 @@ def ab_render(c, u, book):
     where, args = _ab_where(book)
     for r in c.execute(f"SELECT * FROM contacts ct WHERE {where} ORDER BY ct.id", args):
         try:
-            text = render_vcard(r)
+            text = dav_vcard(r)
         except (ValueError, TypeError, KeyError) as e:
             print("carddav: skipping contact", r["id"], e, flush=True)
             continue
@@ -165,7 +239,7 @@ def props_book(c, u, book, ac_fn):
 def props_member(u, m, role, version=None):
     cid, et, text, r = m
     if version and version != r["version"]:
-        text = render_vcard({**dict(r), "version": version})
+        text = dav_vcard(r, version)
     return {**dav_common(u), D_ + "resourcetype": "", D_ + "getetag": _xe(et), D_ + "getcontenttype": "text/vcard; charset=utf-8",
             D_ + "getlastmodified": email.utils.format_datetime(parse_iso(r["updated_at"]).astimezone(timezone.utc), usegmt=True),
             D_ + "getcontentlength": str(len(text.encode("utf-8"))), CR_ + "address-data": _xe(text),
@@ -206,14 +280,14 @@ def card_now(c, book, name, lock=False):
         r = c.execute("SELECT * FROM contacts WHERE id=? AND deleted_at IS NULL", (int(m.group(1)),)).fetchone() if m and int(m.group(1)) in book["ids"] else None
         if not r:
             return None
-        text = render_vcard(r)
+        text = dav_vcard(r)
         return r, _etag(text), text
     if lock:
         write_lock(c, f"carddav:{book['id']}:{name}")
     r = c.execute("SELECT * FROM contacts WHERE book_id=? AND href=? AND deleted_at IS NULL" + (" FOR UPDATE" if lock else ""), (book["id"], name)).fetchone()
     if not r:
         return None
-    text = render_vcard(r)
+    text = dav_vcard(r)
     return r, _etag(text), text
 
 
@@ -339,6 +413,8 @@ def ab_put(c, u, book, name):
          ("kind", "fn", "given", "family", "middle", "prefix", "suffix", "nickname", "org", "dept", "title", "emails", "phones",
           "addresses", "urls", "bday", "anniversary", "note", "groups", "photo")}
     if have:
+        if f["photo"] and f["photo"] != have[0]["photo"] and f["photo"] == dav_photo(have[0]["photo"] or ""):
+            f["photo"] = have[0]["photo"]  # 2.673.0 (#5124): the smaller copy we sent comes back: the full picture stays
         if v["uid"] != have[0]["uid"]:
             # 2.370.4 (#3089, review N9): only against live contacts (a card in the trash with this UID does not block)
             if c.execute("SELECT 1 FROM contacts WHERE book_id=? AND uid=? AND id!=? AND deleted_at IS NULL", (book["id"], v["uid"], have[0]["id"])).fetchone():

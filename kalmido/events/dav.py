@@ -18,7 +18,7 @@ from ..calendars.caldav import (
     _el, _privs, _xe, A_, C_, CS_, D_, dav_body, dav_common, dav_href, dav_multistatus, dav_principal_href, dav_propfind_req,
     dav_response, dav_xml, DAV_MAX_BODY, DAV_NAME_RE, DAV_SYNC_KEEP, DavError, dav_color, dav_report_props,
 )
-from ..calendars.caldav import dav_code_fp, dav_fp, dav_once, DavLazy  # 2.665.0 (#4196)
+from ..calendars.caldav import dav_code_fp, dav_fp, dav_once, dav_rendered, DavLazy  # 2.665.0 (#4196), 2.673.0 (#5124)
 from ..events.model import att_rows, ev_att_ok, ev_delete, ev_expand, events_on, my_cal_ids
 from ..events.model import cal_touch, is_occ, occ_ps_of, EV_OCC_PS_MAX  # 2.383.0 (#2587)
 from ..events.ics import etag, ev_lines, EvError, read_vevent, store_parsed, wrap
@@ -227,32 +227,34 @@ def _tr_dt(s):
 
 
 def query_filter(root):
+    """The filter of a calendar-query on an event's row -> (match(row), ranged). ranged (2.673.0, #5124): the client asked for a
+    time-range, so only the rows that match need rendering."""
     filt = root.find(C_ + "filter")
     if filt is None:
-        return lambda m: True
+        return (lambda r: True), False
     cal = filt.find(C_ + "comp-filter")
     if cal is None or cal.get("name", "").upper() != "VCALENDAR":
-        return lambda m: True
+        return (lambda r: True), False
     comps = cal.findall(C_ + "comp-filter")
     if not comps:
-        return lambda m: True
+        return (lambda r: True), False
     ev = next((x for x in comps if x.get("name", "").upper() == "VEVENT"), None)
     if ev is None or ev.find(C_ + "is-not-defined") is not None:
-        return lambda m: False  # VTODO / VJOURNAL: never in an event calendar
+        return (lambda r: False), True  # VTODO / VJOURNAL: never in an event calendar
     tr_ = ev.find(C_ + "time-range")
     if tr_ is None:
-        return lambda m: True
+        return (lambda r: True), False
     a = _tr_dt(tr_.get("start")) or date(1900, 1, 1)
     b = _tr_dt(tr_.get("end")) or date(2999, 12, 31)
     if (b - a).days > 3660:  # a very wide window: everything that starts before its end
-        return lambda m: m[4]["first_day"] <= b.isoformat()
-    return lambda m: bool(ev_expand(m[4], a - timedelta(days=1), b, 1))
+        return (lambda r: r["first_day"] <= b.isoformat()), True
+    return (lambda r: bool(ev_expand(r, a - timedelta(days=1), b, 1))), True
 
 
 def ev_report(c, u, coll, raw):
     root = dav_xml(raw)
     want = dav_report_props(root)
-    ec = ev_coll(c, u, coll)
+    ec = ev_coll(c, u, coll, load=root.tag != C_ + "calendar-query")  # the query renders below, only what it asks for
     base = ("calendars", u["username"], coll["key"])
     role = coll["role"]
     if root.tag == C_ + "calendar-multiget":
@@ -273,8 +275,14 @@ def ev_report(c, u, coll, raw):
                     yield dav_response(dav_href(*base, name), want, props_member(u, m, role))
         return dav_multistatus(gen())
     if root.tag == C_ + "calendar-query":
-        ok = query_filter(root)
-        return dav_multistatus(dav_response(dav_href(*base, n), want, props_member(u, m, role)) for n, m in ec.members.items() if ok(m))
+        ok, ranged = query_filter(root)
+        members = ec.cached() if ranged else ec.members
+        if members is None:  # 2.673.0 (#5124): a time-range and nothing rendered yet: only the events in it, the cache untouched
+            hits = list(ev_render(c, u, coll, [r for r in _rows(c, u, coll) if ok(r)]).items())
+            dav_rendered(len(hits))
+        else:
+            hits = [(n, m) for n, m in members.items() if ok(m[4])]
+        return dav_multistatus(dav_response(dav_href(*base, n), want, props_member(u, m, role)) for n, m in hits)
     if root.tag == D_ + "sync-collection":
         te = root.find(D_ + "sync-token")
         tok = (te.text or "").strip() if te is not None else ""

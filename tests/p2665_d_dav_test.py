@@ -12,11 +12,17 @@ per person and collection instead of the instance-wide change counter. Invented 
    stays when alice changes her own (per person) tags, and bob never sees alice's tag
  - sync-collection with the old token reports the changed task and the task in the trash
  - event calendar: a new event changes its ctag, a task change does not; address book: a new contact and a new photo change it
+ - 2.673.0 (#5124): a calendar-query with a time-range renders only the events in it (a fresh calendar: one of twelve
+   months), without a time-range all; a big contact photo goes into the vCard at most 512 px as JPEG, a card written back
+   with that copy keeps the stored full picture
  - a person without an organisation (freelancer-matrix: pim): her list's ctag follows a new task
 usage: p2665_d_dav_test.py <datadir>      (a fresh container; P2665D_NOSTART=1 = the server already runs)"""
+import base64
 import os
 import re
+import struct
 import sys
+import zlib
 import xml.etree.ElementTree as ET
 
 import requests
@@ -247,6 +253,60 @@ a3 = al.ctag(f"b{bk}", "addressbooks")
 check(a3 != a2, "a contact photo changes the ctag")
 A.patch(B + f"/api/contacts/{CID}", json={"photo": PNG2})
 check(al.ctag(f"b{bk}", "addressbooks") != a3, "another photo of the same size changes the ctag")
+
+# ================================================================== 2.673.0 (#5124): time-range, contact photo size
+cal2 = A.post(B + "/api/evcals", json={"name": "Year events", "org_id": ORG}).json()["id"]
+for mo in range(1, 13):
+    assert A.post(B + "/api/events", json={"cal_id": cal2, "title": f"Month {mo:02d}", "start": f"2027-{mo:02d}-10T10:00",
+                                           "end": f"2027-{mo:02d}-10T11:00"}).status_code == 201
+CQ = ('<?xml version="1.0"?><c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav"><d:prop><d:getetag/>'
+      '<c:calendar-data/></d:prop><c:filter><c:comp-filter name="VCALENDAR"><c:comp-filter name="VEVENT">{}</c:comp-filter>'
+      '</c:comp-filter></c:filter></c:calendar-query>')
+r = al.req("REPORT", f"/dav/calendars/alice/e{cal2}/", CQ.format('<c:time-range start="20270301T000000Z" end="20270401T000000Z"/>'),
+           Depth="1", **{"Content-Type": "application/xml"})
+got = sorted(set(re.findall(r"Month \d\d", r.text)))
+check(r.status_code == 207 and got == ["Month 03"], f"time-range March: only the March event ({r.status_code} {got})")
+check(0 <= rendered(r) <= 1, f"... and only that one is rendered, not all twelve ({rendered(r)})")
+r = al.req("REPORT", f"/dav/calendars/alice/e{cal2}/", CQ.format(""), Depth="1", **{"Content-Type": "application/xml"})
+check(len(set(re.findall(r"Month \d\d", r.text))) == 12, "without a time-range: all twelve events")
+r = al.req("REPORT", f"/dav/calendars/alice/e{cal2}/", CQ.format('<c:time-range start="20270601T000000Z" end="20270701T000000Z"/>'),
+           Depth="1", **{"Content-Type": "application/xml"})
+check(sorted(set(re.findall(r"Month \d\d", r.text))) == ["Month 06"] and rendered(r) == 0,
+      f"time-range June after the full query: from the cache, nothing rendered ({rendered(r)})")
+
+
+def png(w, h):
+    """A noise PNG (does not compress): big as a data URI."""
+    raw = b"".join(b"\0" + os.urandom(w * 3) for _ in range(h))
+    def chunk(t, d):
+        return struct.pack(">I", len(d)) + t + d + struct.pack(">I", zlib.crc32(t + d) & 0xffffffff)
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0))
+            + chunk(b"IDAT", zlib.compress(raw, 1)) + chunk(b"IEND", b""))
+
+
+BIG = "data:image/png;base64," + base64.b64encode(png(700, 150)).decode("ascii")
+r = A.post(B + "/api/contacts", json={"book_id": bk, "fn": "Pia Picture", "photo": BIG})
+check(r.ok, f"a contact with a big photo: {r.status_code} {r.text[:200]}")
+PID = r.json().get("id")
+r = al.req("REPORT", f"/dav/addressbooks/alice/b{bk}/", '<?xml version="1.0"?><cr:addressbook-query xmlns:d="DAV:" '
+           'xmlns:cr="urn:ietf:params:xml:ns:carddav"><d:prop><d:getetag/><cr:address-data/></d:prop></cr:addressbook-query>',
+           Depth="1", **{"Content-Type": "application/xml"})
+card = None
+for resp in ET.fromstring(r.content).findall(D_ + "response"):
+    ad = resp.find(".//{urn:ietf:params:xml:ns:carddav}address-data")
+    if ad is not None and "Pia Picture" in (ad.text or ""):
+        card = (resp.find(D_ + "href").text, resp.find(f".//{D_}getetag").text, ad.text)
+m = re.search(r"PHOTO(?:;ENCODING=b;TYPE=\w+)?:(?:data:image/\w+;base64,)?([^\r\n]+)", card[2].replace("\r\n ", "")) if card else None
+small = base64.b64decode(m.group(1)) if m else b""
+check(small[:2] == b"\xff\xd8" and len(m.group(1)) < len(BIG) // 4,
+      f"the big photo goes as a small JPEG in the vCard ({small[:4]} {len(m.group(1)) if m else 0} of {len(BIG)})")
+if card:
+    r = al.req("PUT", card[0], card[2].replace("FN:Pia Picture", "FN:Pia Pictured"), **{"Content-Type": "text/vcard",
+                                                                                       "If-Match": card[1]})
+    check(r.status_code == 204, f"the card written back as it came: {r.status_code} {r.text[:200]}")
+    got = A.get(B + f"/api/contacts/{PID}").json()
+    check(got.get("fn") == "Pia Pictured" and got.get("photo") == BIG, "... keeps the stored full picture "
+          f"({got.get('fn')} {len(got.get('photo') or '')} of {len(BIG)})")
 
 # ================================================================== a person without an organisation
 FID, Fr = freelancer(B, A, "frida", features="cal,comments,events,contacts")
