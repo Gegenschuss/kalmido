@@ -73,6 +73,11 @@ LD_UNBALANCED = N_("The balance sheet does not balance (difference {0}): the yea
 LD_NOT_OVER = N_("Only a finished year can be closed.")
 LD_ALREADY = N_("The year {0} is closed already.")
 LD_SAME = N_("Debit and credit account must differ.")
+# 2.666.0 (#3461 review): the closing never writes a second set of opening entries, never into a closed year, never on an
+# opening that does not balance; after a closing the next year's opening is the closing's (corrections: adjusting entries)
+LD_NEXT_OPEN = N_("The year {0} has opening entries already: delete them before closing {1}.")
+LD_OPEN_UNBAL = N_("The opening entries do not balance (difference {0}): the year cannot be closed.")
+LD_OPEN_WRITTEN = N_("The opening entries of {0} come from the closing of {1}: book a correction as an adjusting entry.")
 
 # the accounts the journal needs beyond those of the DATEV export, per chart (4 digits, stretched to the ledger length)
 LD_ACCOUNTS = {
@@ -585,8 +590,10 @@ def ld_reports(c, oid, year, jr=None):
                     bs_lines.append({"key": k, "label": tr(lb), "side": side, "level": 1, "amount": dstr(bs[k]), "accounts": bs_accts[k]})
     assets = sum((bs[k] for k, _l, sd in LD_BS if sd == "a"), Decimal(0))
     liab = sum((bs[k] for k, _l, sd in LD_BS if sd == "p"), Decimal(0))
+    op = acc.get(ld_acct(st, "opening"), [Decimal(0)] * 4)  # 2.666.0 (#3461 review): the opening balance account: 0 when the opening entries balance
     checks = {"debit": dstr(tot[0] + tot[2]), "credit": dstr(tot[1] + tot[3]), "balanced": tot[0] + tot[2] == tot[1] + tot[3],
-              "assets": dstr(assets), "liabilities": dstr(liab), "difference": dstr(assets - liab), "result": dstr(result)}
+              "assets": dstr(assets), "liabilities": dstr(liab), "difference": dstr(assets - liab), "result": dstr(result),
+              "opening": dstr(op[0] + op[2] - op[1] - op[3])}
     return {"year": year, "size": size, "susa": susa, "pl": pl_lines, "result": dstr(result), "bs": bs_lines, "checks": checks,
             "hints": jr["hints"], "opening": jr["opening"]}
 
@@ -637,6 +644,12 @@ def _need_open_year(c, oid, *years):
             raise DeniedKey(409, LD_CLOSED, str(y))
 
 
+def _need_open_free(c, oid, kind, year):
+    """2.666.0 (#3461 review): no opening entry by hand for a year whose year before is closed: that closing wrote them."""
+    if kind == "open" and year - 1 in ld_closed_years(c, oid):
+        raise DeniedKey(409, LD_OPEN_WRITTEN, str(year), str(year - 1))
+
+
 def _entry_row(c, oid, eid):
     r = c.execute("SELECT * FROM office_ledger_entries WHERE id=? AND org_id=? AND kind IN ('manual', 'open')", (eid, oid)).fetchone()
     if r is None:
@@ -653,6 +666,7 @@ def ld_entry_add(c, oid, uid, b):
     write_lock(c, f"office_ledger_{int(oid)}")
     v = ld_entry_clean(c, oid, b)
     _need_open_year(c, oid, v["year"])
+    _need_open_free(c, oid, v["kind"], v["year"])
     period_need_open(c, oid, v["day"])
     at = iso(now_utc())
     enc = oc_enc_fields(c, oid, "office_ledger_entries", {"text": v["text"]})
@@ -672,6 +686,7 @@ def ld_entry_put(c, oid, uid, eid, b):
         raise DeniedKey(409, LD_CLOSED, str(cur["year"]))  # written by a closing: stays as it is
     v = ld_entry_clean(c, oid, b, cur)
     _need_open_year(c, oid, cur["year"], v["year"])
+    _need_open_free(c, oid, v["kind"], v["year"])
     period_need_open(c, oid, cur["day"], v["day"])
     enc = oc_enc_fields(c, oid, "office_ledger_entries", {"text": v["text"]})
     c.execute("UPDATE office_ledger_entries SET year=?, kind=?, day=?, debit=?, credit=?, amount=?, text=?, updated_at=?, updated_by=? "
@@ -703,12 +718,19 @@ def ld_close(c, oid, uid, year):
     if year >= local_now().year:
         raise DeniedKey(409, LD_NOT_OVER)
     write_lock(c, f"office_ledger_{int(oid)}")
-    if year in ld_closed_years(c, oid):
+    closed = ld_closed_years(c, oid)
+    if year in closed:
         raise DeniedKey(409, LD_ALREADY, str(year))
+    if year + 1 in closed:  # 2.666.0 (#3461 review): never into a closed year
+        raise DeniedKey(409, LD_CLOSED, str(year + 1))
+    if ld_entries(c, oid, year + 1, ("open",)):  # 2.666.0 (#3461 review): never a second set of opening entries
+        raise DeniedKey(409, LD_NEXT_OPEN, str(year + 1), str(year))
     rep = ld_reports(c, oid, year)
     ch = rep["checks"]
     if not ch["balanced"] or dec(ch["difference"]) != 0:
         raise DeniedKey(409, LD_UNBALANCED, ch["difference"])
+    if dec(ch["opening"]) != 0:  # 2.666.0 (#3461 review): an opening that does not balance would ride along as a balance of 9000
+        raise DeniedKey(409, LD_OPEN_UNBAL, ch["opening"])
     _s, st = _ld_ctx(c, oid)
     op, carry = ld_acct(st, "opening"), ld_acct(st, "carry")
     at, day, n = iso(now_utc()), f"{year + 1}-01-01", 0
@@ -854,7 +876,8 @@ def ld_entry_delete_route(eid):
 
 @app.post("/api/office/books/ledger/close")
 def ld_close_post():
-    """Office admin. {year} -> ld_close (409: not over, closed already, not balanced, the income statement chosen)."""
+    """Office admin. {year} -> ld_close (409: not over, closed already, not balanced, the opening entries do not balance, the next
+    year closed or with opening entries already, the income statement chosen)."""
     c, uid, oid = _ctx()
     b = body()
     if not isinstance(b, dict):

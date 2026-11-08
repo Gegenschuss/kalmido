@@ -205,6 +205,13 @@ def office(s, who, ws, chart):
 
     # ---- year-end closing
     check(s.post(B + "/api/office/books/ledger/close", json={"year": TODAY.year}).status_code == 409, f"{who}: this year cannot be closed")
+    # 2.666.0 (#3461 review): an opening that does not balance (one side only against account 9000) blocks the closing
+    r = s.post(B + L + "/entries", json={"day": f"{Y}-01-01", "kind": "open", "debit": a["bank"], "credit": "9000", "amount": "100.00", "text": "Probe EB"})
+    check(r.status_code == 201, f"{who}: an opening entry by hand {r.text[:200]}")
+    r2 = s.post(B + L + "/close", json={"year": Y})
+    check(r2.status_code == 409 and "100" in r2.text, f"{who}: the opening entries do not balance: no closing {r2.status_code} {r2.text[:200]}")
+    check(s.get(B + L + f"?year={Y}").json()["checks"]["opening"] == "-100.00", f"{who}: the check names the difference of the opening (credit on 9000)")
+    check(s.delete(B + L + f"/entries/{r.json()['id']}").ok, f"{who}: the probe opening entry deleted")
     r = s.post(B + "/api/office/books/ledger/close", json={"year": Y})
     check(r.ok and r.json()["result"] == rep["result"] and r.json()["opening"] > 0, f"{who}: {Y} closed {r.text[:200]}")
     check(s.post(B + "/api/office/books/ledger/close", json={"year": Y}).status_code == 409, f"{who}: closed twice 409")
@@ -219,6 +226,12 @@ def office(s, who, ws, chart):
     check(oa("bank") == D("921.00") and cls(nx, "bs:B.II.1", "open") == D("595.00") and oa("prov") == D("-500.00"), f"{who}: the balances carried forward")
     check(oa("carry") == -want, f"{who}: the result on the profit / loss carried forward {oa('carry')} = {-want}")
     check(s.get(B + f"/api/office/books/ledger?year={Y}").json().get("closed") is True, f"{who}: {Y} shows as closed")
+    # 2.666.0 (#3461 review): the closing of {Y} wrote the opening of the next year: no second set, by hand or by closing the year before
+    r = s.post(B + L + "/entries", json={"day": f"{TODAY.year}-01-01", "kind": "open", "debit": a["bank"], "credit": "9000", "amount": "1.00"})
+    check(r.status_code == 409, f"{who}: no opening entry by hand after the closing {r.status_code} {r.text[:120]}")
+    r = s.post(B + L + "/close", json={"year": Y - 1})
+    check(r.status_code == 409, f"{who}: {Y - 1} cannot close after {Y}: {Y} is closed and has its opening {r.status_code} {r.text[:120]}")
+    check(s.get(B + f"/api/office/books/ledger?year={TODAY.year}").json()["checks"]["opening"] == "0.00", f"{who}: the opening of {TODAY.year} balances")
 
 
 kt.fresh(env={"KALMIDO_INSTANCE_MODE": "workspaces", "KALMIDO_ORGCRYPT_DELAY": "0", "KALMIDO_SECRET_KEY": KEY}, prefix="P2666C")
