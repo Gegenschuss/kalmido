@@ -125,6 +125,7 @@ G3 = g3[2]["id"]
 check(items(Ol) == [] and items(A) == [], "olga and alice list nothing of bob's")
 check(Ol.post(B + f"/api/undo/to/{G1}").status_code == 404 and A.post(B + f"/api/undo/to/{G1}").status_code == 404
       and Ol.post(B + f"/api/undo/{G1}/redo").status_code == 404 and get(Bo, O1)["note"] == "n2", "another person's group: 404 on undo / redo, nothing written")
+A.put(B + "/api/admin/agent-policy", json={"user_agents": True})
 AG = agent(A, "undobot", ORG)
 r = requests.get(B + "/api/undo", headers=AG.h, timeout=30)
 check(r.status_code in (401, 403), f"an agent's token on /api/undo: refused ({r.status_code})")
@@ -137,6 +138,7 @@ except Denied as e:
     print('CODE', e.code)""")
 check("CODE 403" in out, f"an agent: 403 (obj_is_agent) {out[-300:]}")
 OA = new(Bo, "For the agent", ORG)["id"]
+check(Bo.post(B + f"/api/obj/{K}/{OA}/shares", json={"agent_id": AG.id, "role": "edit"}).status_code == 201, "OA shared with the agent")
 n = len(groups(BOB))
 r = AG.patch(OA, {"note": "by the agent", "expect_updated_at": get(Bo, OA)["updated_at"]})
 check(r.ok and groups(AG.id) == [] and len(groups(BOB)) == n, f"an agent's write records no step ({r.status_code} {r.text[:200]})")
@@ -221,7 +223,8 @@ dbx("INSERT INTO undo_groups(user_id, area, label_key, state, created_at, update
 first = dbx("SELECT MIN(id) FROM undo_groups WHERE user_id=?", (CARL,))[0][0]
 patch(Ca, O1, note="carl")
 gc = groups(CARL)
-check(len(gc) == 300 and gc[0]["id"] == first + 1 and gc[-1]["state"] == "done" and gc[-1]["parts"] == 1, f"300 kept, the oldest went ({len(gc)})")
+check(len(gc) == 300 and first not in [x["id"] for x in gc] and gc[-1]["state"] == "done" and gc[-1]["parts"] == 1,
+      f"300 kept, the oldest ({first}, carl's change of O2) went ({len(gc)}, {gc[0]['id']}, {dict(gc[-1])})")
 
 # ---------------------------------------------------------------- the watchdog: older than 30 days, parts without a group
 old = "to_char(now() - interval '31 days', 'YYYY-MM-DD\"T\"HH24:MI:SS+00:00')"
