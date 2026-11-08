@@ -55,6 +55,11 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
     check(await ev(`document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')?.content`) === 'black-translucent', 'status bar style "black-translucent" (the page reaches behind the clock, --safe-t counts)');
     await ev(safe(34, 47));
     check(await ready(ev, `parseFloat(getComputedStyle(document.querySelector('#tabs')).paddingBottom) === 22`, 20), 'safe area 34 px: the bar takes it');
+    // 2.725.0 (#5159): since #5115 reduced motion keeps a .01 ms transition only for visual properties - the padding above is
+    // there at once, the box shadows of the stripes still run that transition in the same frame (CI read 0px / 4px). Wait until
+    // no transition runs any more (a real state: getAnimations), after a style read that starts them.
+    check(await ready(ev, `(() => { for (const e of [document.querySelector('#top'), document.querySelector('#side .sbmsrch')]) if (e) getComputedStyle(e).boxShadow;
+      return [document.querySelector('#top'), document.querySelector('#side .sbmsrch')].every(e => !e || !e.getAnimations().some(a => a.pending || a.playState === 'running')); })()`, 40), 'the stripes\' transitions have ended');
     const top = await ev(`(() => { const t = document.querySelector('#top'), h = t.querySelector('h1'); const l = document.createElement('div'); l.className = 'ldbar on'; l.id = 'p2633-ld'; document.body.appendChild(l);
       const o = {sh: getComputedStyle(t).boxShadow, pt: parseFloat(getComputedStyle(t).paddingTop), h1: Math.round(h.getBoundingClientRect().top), ld: Math.round(l.getBoundingClientRect().top)}; l.remove(); return o; })()`);
     check(top.pt >= 47 && top.h1 >= 47, 'the head starts below the clock ' + JSON.stringify(top));
