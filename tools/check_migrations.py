@@ -23,9 +23,15 @@ runs at every start, the second one would fail); a column of a feature taken out
 `ALTER TABLE <table> DROP COLUMN IF EXISTS <column>` in AFTER and the line `# drop-ok <table>.<column>: <why>`, and the column may be
 added nowhere any more.
 
+2.755.0 (#5263): one more one-way step: a one-off clean-up of rows already in the trash goes with
+`DELETE FROM <table> WHERE ... < '<ISO date>'` in AFTER and the line `# purge-ok <table>: <why>`. AFTER runs at every start, so
+the WHERE must hold a fixed cut-off (a quoted date, not in the future): after the first start it finds nothing new, and rows put into the trash
+later keep their trash period (and their undo) until the regular purge run takes them.
+
 usage: python3 tools/check_migrations.py [-v]     exit code 1 on a finding
 """
 import ast
+import datetime
 import glob
 import json
 import os
@@ -42,6 +48,9 @@ UNIQUE_OK = re.compile(r"^[ \t]*#[ \t]*unique-ok[ \t]+(\w+)[ \t]*:[ \t]*\S", re.
 DROP_TABLE = re.compile(r"DROP\s+TABLE\s+(IF\s+EXISTS\s+)?(\w+)", re.I)  # 2.574.0 (#3779); review F5: IF EXISTS checked on its own
 DROP_COLUMN = re.compile(r"ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(\w+)\s+DROP\s+COLUMN\s+(IF\s+EXISTS\s+)?(\w+)", re.I)  # review F5
 DROP_OK = re.compile(r"^[ \t]*#[ \t]*drop-ok[ \t]+(\w+(?:\.\w+)?)[ \t]*:[ \t]*\S", re.M)
+PURGE = re.compile(r"DELETE\s+FROM\s+(\w+)\b(.*)", re.I | re.S)  # 2.755.0 (#5263): a one-off clean-up in AFTER
+PURGE_CUT = re.compile(r"\bWHERE\b.*<\s*'(\d{4}-\d\d-\d\d)[^']*'", re.I | re.S)
+PURGE_OK = re.compile(r"^[ \t]*#[ \t]*purge-ok[ \t]+(\w+)[ \t]*:[ \t]*\S", re.M)
 
 
 def fragments(root=ROOT):
@@ -179,6 +188,7 @@ def content_findings(n, values, src):
         col = ADD_COLUMN.fullmatch(sql_bare(x).strip().rstrip(";").strip())
         drop = DROP_TABLE.fullmatch(sql_bare(x).strip().rstrip(";").strip())
         dcol = DROP_COLUMN.fullmatch(sql_bare(x).strip().rstrip(";").strip())
+        purge = PURGE.fullmatch(sql_bare(x).strip().rstrip(";").strip())
         if col:  # a column on a table made after the steps (#4300): AFTER runs at every start, so IF NOT EXISTS
             why = step_finding(col.group(1), col.group(2), x)
             if not why and not re.search(r"ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\b", x, re.I):
@@ -192,6 +202,13 @@ def content_findings(n, values, src):
             why = "AFTER runs at every start: DROP COLUMN IF EXISTS" if not dcol.group(2) else \
                 None if key in set(DROP_OK.findall(src)) else \
                 f"DROP COLUMN is a one-way step (its values are lost): needs a line # drop-ok {key}: <why>"
+        elif purge:  # 2.755.0 (#5263): a one-off clean-up, bounded by a fixed cut-off, with a reason
+            cut = PURGE_CUT.search(x)
+            why = "AFTER runs at every start: a DELETE needs a WHERE with a fixed cut-off (< '<ISO date>')" if not cut else \
+                "the cut-off lies in the future: until then every start would empty the trash" \
+                if cut.group(1) > datetime.date.today().isoformat() else \
+                None if purge.group(1) in set(PURGE_OK.findall(src)) else \
+                f"DELETE is a one-way step (its rows are lost): needs a line # purge-ok {purge.group(1)}: <why>"
         else:
             why = index_finding(x, own, ok)
         if why:

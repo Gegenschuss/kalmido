@@ -736,7 +736,9 @@ Since 2.37.0 Kalmido runs on PostgreSQL 17 only (`DATABASE_URL`); SQLite is gone
   a `UNIQUE` index on a table the fragment does not create can fail on existing rows and needs a line
   `# unique-ok <index>: <why no two rows can collide>` in the fragment. The one way out (2.574, #3779): the table of a feature
   that was taken out goes with `DROP TABLE IF EXISTS <table>` in `AFTER` and a line `# drop-ok <table>: <why>` (a one-way
-  step; the table may be created nowhere any more). `tests/p2192_c_upgrade_test.py` starts the current
+  step; the table may be created nowhere any more). A one-off clean-up of rows already in the trash (2.755, #5263) goes with
+  `DELETE FROM <table> WHERE ... < '<ISO date>'` in `AFTER` and a line `# purge-ok <table>: <why>`: the fixed cut-off keeps it
+  a no-op after the first start; it runs as the system (every organisation's rows). `tests/p2192_c_upgrade_test.py` starts the current
   server on the old dump with a row in every table.
   A fragment's `SCHEMA` may also hold a trigger (`CREATE OR REPLACE FUNCTION` with a `$$` body, then `CREATE OR REPLACE
   TRIGGER` on one statement; `trigger_skip_present` leaves an unchanged trigger alone), e.g. 2.542.0 (#4598)

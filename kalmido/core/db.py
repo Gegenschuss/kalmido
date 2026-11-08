@@ -984,6 +984,10 @@ def init_db(guard=True, load=None):
         for stmt in INDEXES.strip().split(";") + FRAG_AFTER:  # 2.475.0 (#3478): + the fragments' AFTER
             m = _IX_LINE.search(stmt + ";")
             if stmt.strip() and not (m and m.group(1).lower() in have_ix) and not col_present(c, stmt):
+                if re.match(r"\s*DELETE\s", stmt, re.I):  # 2.755.0 (#5263): a fragment's one-off clean-up reaches every organisation's rows
+                    with pg_system_ctx(c):
+                        c.execute(stmt)
+                    continue
                 c.execute(stmt)
         clk("indexes")
         from ..life.rss import p2172b_feed_unique
