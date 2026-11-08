@@ -296,6 +296,9 @@ APP_ONLY = [
     ("2.568.0 (#4739): a project's core share rows, their restore and its settings history stay with people like the core "
      "objects' own (2.558.0 #4709 above) -- an agent changes members through PUT/DELETE /lists/{}/members, never restores taken shares",
      ("=GET /api/lists/{}/shares", "=POST /api/lists/{}/shares/{}/restore", "=GET /api/lists/{}/history")),
+    ("2.747.0 (#5249, #5246): undo across devices is a person's own list of steps -- agents record no steps and get 403 on "
+     "/api/undo (docs/AGENTS.md); a client dialog's undo session is the editor's, like the core objects' undo above",
+     ("=GET /api/undo", "=POST /api/undo/to/{}", "=POST /api/undo/{}/redo", "=POST /api/clients/{}/undo")),
     ("2.558.0 (#4709): the core objects' own management stays with people -- creating, the trash, deleting, the editor's undo session and who it is shared with (an agent changes what is shared with it, never its shares or its existence)",
      ("=POST /api/obj/{}", "=POST /api/obj/{}/{}/trash", "=POST /api/obj/{}/{}/restore", "=DELETE /api/obj/{}/{}", "=GET /api/obj/{}/{}/history",
       "=POST /api/obj/{}/{}/undo", "=GET /api/obj/{}/{}/shares", "=POST /api/obj/{}/{}/shares", "=DELETE /api/obj/{}/{}/shares/{}",
