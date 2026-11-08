@@ -216,6 +216,28 @@ check("kenc1:SEALEDAAA" in snap and "SEALEDBBB" not in snap, "the copy holds the
 r = Bo.post(B + f"/api/undo/to/{GS}")
 check(r.ok and dbx("SELECT note, title FROM obj_probe WHERE id=?", (O6,))[0][0] == "kenc1:SEALEDAAA", "the undo writes the sealed value back as it was")
 
+# 2.747.0 (#5249, review F1): a step older than a key rotation of its organisation is never written back (its sealed copy
+# would be unreadable once the old key is gone); a step after the rotation goes as usual; during a rotation nothing goes
+O7 = new(Bo, "Rekeyed", ORG, note="r1")["id"]
+patch(Bo, O7, note="r2")
+GK = groups(BOB)[-1]["id"]
+dbx("INSERT INTO org_keys(org_id, wrapped, kek_check, created_at, rotated_at) VALUES(?, 'x', 'x', '2026-01-01T00:00:00+00:00', "
+    "to_char(now() + interval '1 hour', 'YYYY-MM-DD\"T\"HH24:MI:SS+00:00')) ON CONFLICT (org_id) DO UPDATE SET rotated_at=EXCLUDED.rotated_at", (ORG,))
+r = Bo.post(B + f"/api/undo/to/{GK}")
+x = r.json() if r.ok else {}
+check(r.ok and get(Bo, O7)["note"] == "r2" and [s["id"] for s in x.get("stayed", [])] == [O7] and "schlüssel" in (x["stayed"][0]["reason"] or "").lower(),  # bob reads German
+      f"rotated after the step: the copy stays unused, the answer names the key change {x} {r.status_code}")
+dbx("UPDATE org_keys SET rotated_at='2026-01-01T00:00:00+00:00', rot_started_at=to_char(now(), 'YYYY-MM-DD\"T\"HH24:MI:SS+00:00') WHERE org_id=?", (ORG,))
+patch(Bo, O7, note="r3")
+GK2 = groups(BOB)[-1]["id"]
+r = Bo.post(B + f"/api/undo/to/{GK2}")
+check(r.ok and get(Bo, O7)["note"] == "r3", f"while a rotation runs nothing is written back {r.status_code} {r.text[:200]}")
+dbx("UPDATE org_keys SET rot_started_at=NULL WHERE org_id=?", (ORG,))
+patch(Bo, O7, note="r4")
+r = Bo.post(B + f"/api/undo/to/{groups(BOB)[-1]['id']}")
+check(r.ok and get(Bo, O7)["note"] == "r3", f"a step after the rotation goes back as usual {r.status_code} {r.text[:200]}")
+dbx("DELETE FROM org_keys WHERE org_id=? AND wrapped='x'", (ORG,))
+
 # ---------------------------------------------------------------- the 301st group removes the oldest
 dbx("INSERT INTO undo_groups(user_id, area, label_key, state, created_at, updated_at) SELECT ?, 'other', 'Change', 'barrier', "
     "to_char(now() - interval '2 days' + s * interval '1 second', 'YYYY-MM-DD\"T\"HH24:MI:SS+00:00'), "
@@ -264,5 +286,14 @@ check(r.ok and r.json()["undone"] == [FG2, FG] and sv["name_de"] == "Beratung" a
 r = Fr.post(B + f"/api/undo/{FG}/redo")
 check(r.ok and Fr.get(B + f"/api/office/services/{SV}").json()["name_de"] == "Beratung plus", f"and redoes the service ({r.status_code} {r.text[:200]})")
 check(Fr.post(B + f"/api/undo/to/{G1}").status_code == 404, "bob's group: 404 for her")
+
+# 2.747.0 (#5249, review F2): the copy of a client / document deleted for good does not wait 30 days (their own deletions do
+# not call obj_rows_drop): the watchdog drops parts of obj_track kinds whose row is gone; a living row keeps its parts
+now_ = "to_char(now(), 'YYYY-MM-DD\"T\"HH24:MI:SS+00:00')"
+dbx(f"INSERT INTO obj_undo(user_id, sess, kind, ref_id, snap, created_at) VALUES(?, ?, 'client', 999999998, '{{\"clients\": [{{\"name\": \"Gone Ltd\"}}]}}', {now_})", (FID, "ef" * 8))
+dbx(f"INSERT INTO obj_undo(user_id, sess, kind, ref_id, created_at) VALUES(?, ?, 'client', ?, {now_})", (FID, "ef" * 8, FC))
+check(until(lambda: not dbx("SELECT 1 FROM obj_undo WHERE kind='client' AND ref_id=999999998"), timeout=120),
+      "the watchdog dropped the copy of a client that is gone for good")
+check(dbx("SELECT 1 FROM obj_undo WHERE kind='client' AND ref_id=? AND sess=?", (FC, "ef" * 8)), "the parts of a living client stay")
 
 sys.exit(done("p2747_b_undo_core"))

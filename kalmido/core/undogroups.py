@@ -39,7 +39,7 @@ from flask import g, has_request_context, request
 from .access import acx_of
 from .db import bump, iso, lv_area, now_utc
 from .i18n import N_
-from .pg import insert_id, system_ctx
+from .pg import insert_id, system_ctx, table_columns
 
 UNDO_KEEP_D = 30  # 30 days, like the trash (#5249)
 UNDO_GROUPS_MAX = 300  # groups kept per person
@@ -237,12 +237,29 @@ def undo_prune(c, force=False):
         c.execute("DELETE FROM obj_undo WHERE created_at<?", (lim,))
         for (uid,) in c.execute("SELECT user_id FROM undo_groups GROUP BY user_id HAVING COUNT(*)>?", (UNDO_GROUPS_MAX,)).fetchall():
             ug_cap(c, uid)
+        ug_drop_orphans(c)  # review F2: copies of rows deleted for good (a purged client, a document out of the trash)
         gone = "group_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM undo_groups x WHERE x.id=obj_undo.group_id)"
         c.execute(f"DELETE FROM obj_undo WHERE {gone} AND sess=''")
         c.execute(f"UPDATE obj_undo SET group_id=NULL WHERE {gone}")
         n += c.execute("DELETE FROM undo_groups WHERE state NOT IN ('barrier','toobig') AND NOT EXISTS "
                        "(SELECT 1 FROM obj_undo u WHERE u.group_id=undo_groups.id)").rowcount
     c.commit()
+    return n
+
+
+UG_TRACKED = {}  # kind -> table of core/writes.py obj_track (filled there; this module is below writes.py)
+
+
+def ug_drop_orphans(c):
+    """2.747.0 (#5249, review F2): the parts of the old areas' kinds (core/writes.py obj_track: office documents, clients,
+    letters, master data, ...) whose row is gone. Their own deletions do not call objhooks.py obj_rows_drop, so a full copy
+    of a client or document deleted for good would wait the whole UNDO_KEEP_D days; a copy of a missing row can never be
+    taken back anyway (its fingerprint finds nothing). Registered core kinds go with obj_purge. Caller: system context."""
+    n = 0
+    for kind, t in sorted(UG_TRACKED.items()):
+        if not t or "id" not in (table_columns(c, t) or ()):
+            continue
+        n += c.execute(f"DELETE FROM obj_undo WHERE kind=? AND NOT EXISTS (SELECT 1 FROM {t} r WHERE r.id=obj_undo.ref_id)", (kind,)).rowcount
     return n
 
 

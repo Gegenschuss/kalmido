@@ -45,7 +45,7 @@ from flask import g, has_request_context, request
 from .access import Denied, acx_of, acx_org_ok, need_feat
 from .conflict import VersionRequired, ccf_check
 from .db import bump, insert_id, iso, iso_ms, now_utc
-from .undogroups import UG_LABEL, UG_LABEL_PLAIN, UNDO_KEEP_D, ug_added, ug_current, ug_fits, ug_gc, ug_gids  # 2.747.0 (#5249)
+from .undogroups import UG_LABEL, UG_LABEL_PLAIN, UNDO_KEEP_D, UG_TRACKED, ug_added, ug_current, ug_fits, ug_gc, ug_gids  # 2.747.0 (#5249)
 from .errors import BadInput, UnknownFields
 from .i18n import N_, tr
 from .objects import OBJ_COLS, obj_need, obj_node_follow, obj_public, obj_reg, obj_row, obj_title, obj_forget
@@ -68,6 +68,7 @@ UNDO_NO_FP = {"updated_at", "rev", "updated_by"}
 NEED_VERSION = N_("Send expect_updated_at (the updated_at you read): agents change an object only with its version")
 UNDO_CONFLICT = N_("Changed by someone else in the meantime, so it cannot be undone")
 UNDO_MOVED = N_("Moved to another workspace in the meantime, so it cannot be undone")
+UNDO_REKEYED = N_("The organisation's key was changed since then, so it cannot be undone")  # 2.747.0 (#5249, review F1)
 UNDO_NOTHING = N_("Nothing to undo")
 PURGE_FIRST = N_("Put it into the trash first")
 JOIN_ADMIN = N_("Only admins of the organisation can share this with everyone of it")  # 2.579.0 (#4802)
@@ -81,6 +82,7 @@ OBJ_TRACK = {}  # 2.567.0 (#4711): kind -> {table, area, undo_scope, undo_keep, 
 def obj_track(kind, table, *, area="other", undo_scope=None, undo_keep=None, undo_nofp=None):
     """2.567.0 (#4711): an old area's kind for the history and the undo only (module docstring). undo_keep / undo_nofp:
     {table: {column}} never written back on undo / never part of the fingerprint (a number drawn since, cached sums)."""
+    UG_TRACKED[kind] = table  # 2.747.0 (#5249, review F2): undogroups.py ug_drop_orphans
     OBJ_TRACK[kind] = {"kind": kind, "table": table, "area": area, "undo_scope": undo_scope, "fields": None,
                        "undo_keep": dict(undo_keep or {}), "undo_nofp": dict(undo_nofp or {})}
     return OBJ_TRACK[kind]
@@ -536,11 +538,25 @@ def _main_org(snap, sc):
     return ((snap.get(sc[0][0]) or [{}])[0]).get("org_id")
 
 
+def _undo_rekeyed(c, st):
+    """2.747.0 (#5249, review F1): a copy holds the sealed values (kenc1:) as they were; after a key rotation of the
+    organisation (or while one runs) the old key is gone or going, so writing the copy back would leave unreadable text.
+    A step older than the rotation (or any step during one) is refused with 409, never written back."""
+    oid = st["org_id"] if "org_id" in st.keys() else None
+    if not oid:
+        return
+    with system_ctx(c):  # org_keys is infrastructure (core/orgcrypt.py reads it as "system"); only the two times are read
+        k = c.execute("SELECT rot_started_at, rotated_at FROM org_keys WHERE org_id=?", (int(oid),)).fetchone()
+    if k and (k["rot_started_at"] or (k["rotated_at"] and str(st["created_at"] or "") < str(k["rotated_at"]))):
+        raise Denied(409, tr(UNDO_REKEYED))
+
+
 def _undo_one(c, sc, st, uid, reg, fix=None):
     nofp = reg.get("undo_nofp") or {}
     cur = _snap(c, sc)
     if not st["fp_after"] or _fp(cur, nofp) != st["fp_after"]:
         raise Denied(409, tr(UNDO_CONFLICT))
+    _undo_rekeyed(c, st)
     old = json.loads(st["snap"])
     if _main_org(old, sc) != _main_org(cur, sc):
         raise Denied(409, tr(UNDO_MOVED))
@@ -557,6 +573,7 @@ def _redo_one(c, sc, st, uid, reg, fix=None):
     cur = _snap(c, sc)
     if not st["fp_undone"] or _fp(cur, nofp) != st["fp_undone"] or not st["redo"]:
         raise Denied(409, tr(UNDO_CONFLICT))
+    _undo_rekeyed(c, st)
     new = json.loads(st["redo"])
     if _main_org(new, sc) != _main_org(cur, sc):
         raise Denied(409, tr(UNDO_MOVED))
