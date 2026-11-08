@@ -3790,7 +3790,7 @@
   {
    "rule": "python.flask.security.injection.tainted-sql-string.tainted-sql-string",
    "file": "kalmido/wiki/wkembed.py",
-   "code": "rows = c.execute(f\"SELECT DISTINCT p.id, p.org_id, p.path FROM wiki_links k JOIN wiki_pages p ON p.id=k.from_id WHERE k.{col}=? \"",
+   "code": "rows = c.execute(f\"SELECT p.* FROM wiki_pages p WHERE p.id IN (SELECT k.from_id FROM wiki_links k WHERE k.{col}=?) \"",
    "reason": "SQL built from fixed fragments only: the column is one of two fixed names, the organisation ids are int()-cast, wke_open_sql is fixed.",
    "date": "2026-11-05"
   },
