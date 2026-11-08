@@ -17730,5 +17730,6 @@
   "PUBLIC_URL is not set on this server, so the setup command cannot name its address: ask the server admin to set PUBLIC_URL to the address people open (.env) and restart.": "PUBLIC_URL no está configurada en este servidor, así que el comando de instalación no puede indicar su dirección: pide a la administración del servidor que configure PUBLIC_URL con la dirección que se abre (.env) y reinicie.",
   "Edit booking": "Editar asiento",
   "Only changes of others": "Solo cambios de otros",
-  "Select the bank account this statement belongs to": "Elige la cuenta bancaria de este extracto"
+  "Select the bank account this statement belongs to": "Elige la cuenta bancaria de este extracto",
+  "Import CSV files on their own when you choose a bank account: XML and MT940 statements name their account themselves": "Importa los archivos CSV por separado si eliges una cuenta bancaria: los extractos XML y MT940 indican su cuenta ellos mismos"
 }

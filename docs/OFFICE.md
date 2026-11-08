@@ -1299,7 +1299,8 @@ Since 2.702 (#5183): a CSV statement names no account of its own, so with two or
 accounts) the column preview adds `bank_accounts [{id, label, iban_end, default}]` and the dialog asks which one it belongs
 to; `POST /api/office/bank/import` then needs `bank_account` (the id; JSON field or form field), else 400 -- never silently
 the default account. The choice is kept as `office_bank_imports.bank_account_id`, names the CSV balance (its IBAN, else its
-label) and puts the lines on that account in the balance sheet. With one bank account nothing is asked.
+label) and puts the lines on that account in the balance sheet. With one bank account nothing is asked. A CSV mixed
+with CAMT / MT940 files in one import is refused then (400: import the CSV on its own).
 
 Since 2.355: amounts take thousand separators only in groups of three ("1.234,56", "1,234.56"); anything else is an
 unreadable row instead of another number ("1,234.5" with the decimal comma, "1.234" with the decimal point), cents are

@@ -305,7 +305,7 @@ class _Banks:
         the one its statement's balance names, else the default."""
         if self._imp is None:
             self._imp = {}
-            if len(set(self.keys.values()) - {self.default}):  # one bank account only: every line on the default
+            if len(set(self.by_id.values()) - {self.default}):  # one bank account only: every line on the default (#5183 review: by_id, an account without IBAN / name counts)
                 for r in self.c.execute("SELECT id, bank_account_id FROM office_bank_imports WHERE org_id=? AND bank_account_id IS NOT NULL",
                                         (self.oid,)):
                     if r["bank_account_id"] in self.by_id:
@@ -470,7 +470,8 @@ def _meal_nodes(c, oid):
     w = "SELECT pay_id FROM office_meals WHERE org_id=? AND status='approved' AND deleted_at IS NULL AND pay_kind=? AND pay_id IS NOT NULL"
     out = {r[0] for r in c.execute(f"SELECT match_id FROM office_bank_tx WHERE org_id=? AND match_kind='receipt' AND match_id IS NOT NULL "
                                    f"AND deleted_at IS NULL AND id IN ({w})", (oid, oid, "bank"))}
-    out |= {r[0] for r in c.execute(f"SELECT node_id FROM office_cash_entries WHERE org_id=? AND node_id IS NOT NULL AND id IN ({w})", (oid, oid, "cash"))}
+    out |= {r[0] for r in c.execute(f"SELECT e.node_id FROM office_cash_entries e WHERE e.org_id=? AND e.node_id IS NOT NULL AND e.storno_of IS NULL "
+                                    f"AND NOT EXISTS (SELECT 1 FROM office_cash_entries x WHERE x.storno_of=e.id) AND e.id IN ({w})", (oid, oid, "cash"))}
     out |= {r[0] for r in c.execute(f"SELECT node_id FROM office_cc_lines WHERE org_id=? AND node_id IS NOT NULL AND id IN ({w})", (oid, oid, "card"))}
     return out
 
@@ -499,7 +500,7 @@ def _money_side(c, oid, j, st, s, y0, y1, card_nodes, banks=None, meal_nodes=fro
             continue
         if not a or k in ("invoice", "card", "payout"):
             continue  # the payment of the invoice / the card total / the payout of the online payments: the DATEV lines book them
-        if ("bank", t["id"]) in meal_paid and k == "receipt":  # its receipt is in meal_nodes
+        if k == "receipt" and t["match_id"] in meal_nodes:  # #5183 review: by the receipt, whichever of its lines the meal names
             j.add(t["day"], doc, txt, bank, clearing, a, "bank")  # 2.702.0 (#5183): the meal books the expense, not its receipt too
             continue
         if k == "receipt":
@@ -528,7 +529,7 @@ def _money_side(c, oid, j, st, s, y0, y1, card_nodes, banks=None, meal_nodes=fro
         txt = oc_dec_fields(c, oid, "office_cash_entries", {"text": e["text"]})["text"] or ""
         if e["dir"] == "in":
             j.add(e["day"], doc, txt, cash, transit, a, "cash")
-        elif ("cash", e["id"]) in meal_paid:  # with a receipt: it is in meal_nodes, not booked
+        elif ("cash", e["id"]) in meal_paid or (e["node_id"] and e["node_id"] in meal_nodes):  # its receipt is not booked
             j.add(e["day"], doc, txt, clearing, cash, a, "cash")  # 2.685.0 (#5128), 2.702.0 (#5183): the meal books the expense
         elif e["node_id"]:
             if e["node_id"] in cred and e["node_id"] not in paid:

@@ -6,13 +6,15 @@ SKR03, a person without an organisation with SKR04), the year before (Y):
  - (1) the collective payout of the online payment provider lands on the second account (its statement): the invoice's payment
    is booked on the default account (as DATEV does), the payout line moves the money onto the second account
  - (2) a CSV statement names no account: with two bank accounts the preview offers them, the import without a choice is
-   refused (400), with the second account chosen its lines land on the second account (was: silently the default)
+   refused (400), with the second account chosen its lines land on the second account (was: silently the default); a CSV
+   mixed with a CAMT statement in one import is refused (one choice cannot hold for both)
  - (3) a restaurant bill 59.50 that is a receipt (matched with its bank line) and an approved entertainment receipt on the same
    line counts once: the meal books 70 / 30 + input tax, the receipt is not booked, the bank line goes against the clearing
    account (was: the receipt's expense on top)
 Every year: debit = credit, assets = equity and liabilities.
 usage: p2702_bilanz_test.py <datadir>"""
 import base64
+import json
 import os
 import sys
 from decimal import Decimal
@@ -144,6 +146,12 @@ def office(s, who, ws, chart, me):
     two = next((x["id"] for x in accts if not x["default"]), None)
     r = s.post(B + O + "/bank/import", json={"text": csv, "filename": "konto2.csv", "mapping": mapping, "bank_account": 999999})
     check(r.status_code == 400, f"{who}: an unknown bank account is refused {r.status_code}")
+    # a CSV together with a CAMT statement (several files): one choice cannot hold for both -> 400, import them one by one
+    mixed = [("files", ("konto2.csv", csv.encode(), "text/csv")), ("files", ("konto1.xml", camt(IBAN1, [ntry("12.00", f"{Y}-08-01", "MIXED")]).encode(), "text/xml"))]
+    r = s.post(B + O + "/bank/import", files=mixed, data={"mapping": json.dumps(mapping), "bank_account": str(two)})
+    check(r.status_code == 400, f"{who}: a mixed CSV + CAMT import with a chosen account is refused {r.status_code} {r.text[:200]}")
+    r = s.post(B + O + "/bank/import", files=mixed, data={"mapping": json.dumps(mapping)})
+    check(r.status_code == 400, f"{who}: a mixed CSV + CAMT import without a choice is refused {r.status_code} {r.text[:200]}")
     r = s.post(B + O + "/bank/import", json={"text": csv, "filename": "konto2.csv", "mapping": mapping, "bank_account": two})
     check(r.status_code == 201 and r.json().get("count") == 1, f"{who}: the CSV imported into the second account {r.status_code} {r.text[:200]}")
     tx = {t["purpose"].split()[-1]: t["id"] for t in s.get(B + O + "/bank/tx?state=all").json()["items"]}

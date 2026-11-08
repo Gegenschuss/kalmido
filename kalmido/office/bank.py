@@ -316,7 +316,7 @@ def bnk_preview_of(c, oid, b, fs=None):
     fmt, rows, cols, parts, info = bnk_parse(c, oid, b, fs)
     extra = cfb_preview(c, oid, fmt, b, cols, parts)  # 2.124.0 D (#2342): the statement's balances / the guessed balance column
     if rows is None:  # 2.702.0 (#5183): + the bank accounts to choose from (two or more)
-        return dict(fmt=fmt, **cols, **extra, bank_accounts=bnk_accounts(c, oid), **_info_out(info))
+        return dict(fmt=fmt, **cols, **extra, bank_accounts=bnk_accounts(c, oid) if all(p["fmt"] == "csv" for p in parts) else [], **_info_out(info))
     ok = [r for r in rows if not r["error"] and not r["pending"]]  # 2.146.0 C (#2469): pending ones counted apart
     return dict(fmt=fmt, rows=[_row_out(r) for r in rows], count=sum(1 for r in ok if not r["dup"]),
                 dup_count=sum(1 for r in ok if r["dup"]), pending_count=sum(1 for r in rows if not r["error"] and r["pending"]),
@@ -324,6 +324,7 @@ def bnk_preview_of(c, oid, b, fs=None):
 
 
 BNK_PICK_ACCOUNT = N_("Select the bank account this statement belongs to")
+BNK_PICK_CSV = N_("Import CSV files on their own when you choose a bank account: XML and MT940 statements name their account themselves")
 
 
 def bnk_accounts(c, oid):
@@ -344,12 +345,17 @@ def _bnk_account_pick(c, oid, b, parts):
     if isinstance(v, str) and v.strip().isdigit():
         v = int(v.strip())
     accts = bnk_accounts(c, oid)
+    csv = any(p["fmt"] == "csv" for p in parts)
+    if accts and csv and any(p["fmt"] != "csv" for p in parts):  # #5183 review: one choice cannot hold for a mixed import
+        raise BadInput(tr(BNK_PICK_CSV))
     if v in (None, "", 0):
-        if accts and any(p["fmt"] == "csv" for p in parts):
+        if accts and csv:
             raise BadInput(tr(BNK_PICK_ACCOUNT))
         return None
     if isinstance(v, bool) or not isinstance(v, int):
         raise BadInput(tr("Invalid value: {0}", "bank_account"))
+    if any(p["fmt"] != "csv" for p in parts):  # #5183 review: a CAMT / MT940 statement names its own account
+        raise BadInput(tr(BNK_PICK_CSV))
     from .bankacc import bka_rows
     row = next((r for r in bka_rows(c, oid) if r["id"] == v), None)
     if row is None:
