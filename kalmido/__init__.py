@@ -36,6 +36,7 @@ ORDER = (
     "core.db",
     "core.usertz",  # 2.368.3 (#2985): the person's clock (time zone, time format)
     "core.errors",  # 2.149.0 G (#2517): BadInput, Denied, UnknownFields (re-exported at the old places)
+    "core.jsonlimit",  # 2.674.0 (#4190): JSON bodies at most 10 MB (a few routes larger on purpose); before every hook that reads a body
     "core.ctx",  # 2.149.0 G (#2517): me()
     "core.dlock",  # 2.235.0 B (#2902): THE check of an agent's data lock (core/access.py calls it)
     "core.conflict",  # 2.269.0 C (#3017): expect_updated_at -> 409 with the current state (Conflict, ccf_check)
