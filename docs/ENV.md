@@ -87,6 +87,8 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_ORGCRYPT_ROT_SETTLE` | `30` | Longest wait in seconds of a key rotation for running writers after it locked writes. |
 | `KALMIDO_PUBLIC_BURST` | `300` | Views of one public link in a short time that raise a security alert. |
 | `KALMIDO_PUBLIC_RATE` | `60` | Page views of public links per client address and minute. |
+| `KALMIDO_SEAL_RAM_MB` | `256` | MB of memory per process for encrypted files of the older single-piece format opened whole (from 10 MB each, counted twice their size); over it a download waits briefly, then answers 503 with Retry-After. |
+| `KALMIDO_SEAL_RAM_WAIT` | `15` | Seconds a download waits for room in KALMIDO_SEAL_RAM_MB before it answers 503. |
 | `KALMIDO_SECRET_FILE` | `(empty)` | File that holds the server key; created once when missing. Must not lie inside the data or backup folder. In the image: /secret/kalmido.key when /secret is a mounted volume. |
 | `KALMIDO_SECRET_KEY` | `(empty)` | The server key (32 bytes, base64). Encrypts organisation data and stored tokens; wins over KALMIDO_SECRET_FILE. Keep a copy apart from the backups. |
 | `KALMIDO_SECRET_KEY_CHANGED` | `0` | Switch: accept a server key that differs from the one this database was used with (a key changed on purpose; rewrap afterwards, then remove it again). |

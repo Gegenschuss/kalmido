@@ -89,6 +89,8 @@ VARS = (
     _v("KALMIDO_SECRET_KEY_CHANGED", "0", "Switch: accept a server key that differs from the one this database was used with (a key changed on purpose; rewrap afterwards, then remove it again).", "security"),  # 2.190.0 B (#2592)
     _v("KALMIDO_ORGCRYPT_PAUSE", "0.2", "Seconds between two portions of the background encryption pass.", "security"),
     _v("KALMIDO_ORGCRYPT_DELAY", "", "Seconds before the background encryption pass starts after a start (default: 300).", "security"),
+    _v("KALMIDO_SEAL_RAM_MB", "256", "MB of memory per process for encrypted files of the older single-piece format opened whole (from 10 MB each, counted twice their size); over it a download waits briefly, then answers 503 with Retry-After.", "security"),
+    _v("KALMIDO_SEAL_RAM_WAIT", "15", "Seconds a download waits for room in KALMIDO_SEAL_RAM_MB before it answers 503.", "security"),
     _v("KALMIDO_ORGCRYPT_ROT_SETTLE", "30", "Longest wait in seconds of a key rotation for running writers after it locked writes.", "security"),
     _v("KALMIDO_TENANT_CHECK", "", "Daily check of the organisation boundaries: empty = daily, always = every watchdog tick, 0 / off = never.", "security"),
     _v("KALMIDO_TENANT_CHECK_HOUR", "3", "Local hour from which the daily boundary check runs.", "security"),

@@ -17440,6 +17440,7 @@
   "No usage limit: every run, also those other people start through chat, mentions or assignments, is billed to this key without a cap. Set one under “Usage limit” in the agent’s settings.": "Geen gebruikslimiet: elke run, ook die anderen via chat, vermeldingen of toewijzingen starten, gaat zonder plafond op deze sleutel. Stel er een in onder ‘Verbruikslimiet’ in de instellingen van de agent.",
   "The person who created this link may no longer share this folder": "De persoon die deze link heeft gemaakt, mag deze map niet meer delen",
   "The person who created this request may no longer upload into this folder": "De persoon die dit verzoek heeft gemaakt, mag niet meer uploaden naar deze map",
+  "The server is busy opening other large encrypted files. Please try again in a moment.": "De server opent op dit moment andere grote versleutelde bestanden. Probeer het zo meteen opnieuw.",
   "Add image, PDF or audio": "Afbeelding, pdf of audio toevoegen",
   "Images (JPG, PNG, WebP), PDFs and audio files (MP3, M4A, AAC, WAV, OGG, Opus, FLAC). The file stays in the file store; comments sit at a point or, for audio, at a second.": "Afbeeldingen (JPG, PNG, WebP), pdf’s en audiobestanden (MP3, M4A, AAC, WAV, OGG, Opus, FLAC). Het bestand blijft in de bestandsopslag; opmerkingen staan op een punt of, bij audio, op een seconde.",
   "Please select an image (JPG, PNG, WebP), a PDF or an audio file (MP3, M4A, AAC, WAV, OGG, Opus, FLAC).": "Kies een afbeelding (JPG, PNG, WebP), een pdf of een audiobestand (MP3, M4A, AAC, WAV, OGG, Opus, FLAC)."

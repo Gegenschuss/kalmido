@@ -17441,6 +17441,7 @@
   "No usage limit: every run, also those other people start through chat, mentions or assignments, is billed to this key without a cap. Set one under “Usage limit” in the agent’s settings.": "Nessun limite di utilizzo: ogni esecuzione, anche quelle che altre persone avviano tramite chat, menzioni o assegnazioni, va su questa chiave senza tetto. Impostane uno in «Limite di consumo» nelle impostazioni dell’agente.",
   "The person who created this link may no longer share this folder": "La persona che ha creato questo link non può più condividere questa cartella",
   "The person who created this request may no longer upload into this folder": "La persona che ha creato questa richiesta non può più caricare file in questa cartella",
+  "The server is busy opening other large encrypted files. Please try again in a moment.": "Il server sta aprendo altri file cifrati di grandi dimensioni. Riprova tra un momento.",
   "Add image, PDF or audio": "Aggiungi immagine, PDF o audio",
   "Images (JPG, PNG, WebP), PDFs and audio files (MP3, M4A, AAC, WAV, OGG, Opus, FLAC). The file stays in the file store; comments sit at a point or, for audio, at a second.": "Immagini (JPG, PNG, WebP), PDF e file audio (MP3, M4A, AAC, WAV, OGG, Opus, FLAC). Il file resta nell’archivio file; i commenti stanno su un punto o, per l’audio, su un secondo.",
   "Please select an image (JPG, PNG, WebP), a PDF or an audio file (MP3, M4A, AAC, WAV, OGG, Opus, FLAC).": "Scegli un’immagine (JPG, PNG, WebP), un PDF o un file audio (MP3, M4A, AAC, WAV, OGG, Opus, FLAC)."

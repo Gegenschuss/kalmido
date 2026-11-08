@@ -44,13 +44,14 @@ import os
 import re
 import struct
 import threading
+import time
 from decimal import Decimal, InvalidOperation
 
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
-from flask import jsonify
+from flask import has_request_context, jsonify
 
 from ..core.config import app, SECRET_KEY, COOKIE
 from ..core.i18n import N_, tr
@@ -673,8 +674,79 @@ def oc_is_sealed_file(path):
 
 
 def oc_read_file(c, path, ctx=FILE_CTX):
-    with open(path, "rb") as f:
-        return oc_open(c, f.read(), ctx)
+    """2.663.0 B (#4191): a large sealed file counts against the RAM budget while it is decrypted (oc_ram_take)."""
+    held = oc_ram_take(_sealed_size(path))
+    try:
+        with open(path, "rb") as f:
+            return oc_open(c, f.read(), ctx)
+    finally:
+        oc_ram_give(held)
+
+
+# ---- 2.663.0 B (#4191): RAM budget for sealed files opened whole ------------------------------------------------------
+# A sealed file of the older format is decrypted in memory as a whole (ciphertext + plain text at the peak), and the
+# answer keeps the plain text until it is sent. From SEAL_RAM_FILE on such a file counts twice its size against a budget
+# per process; over the budget a request waits up to SEAL_RAM_WAIT seconds for room and then answers 503 + Retry-After
+# (also on public links, where no sign-in is needed). A background job (no request) waits longer and then goes on.
+# A single file larger than the budget is let through when nothing else is held (it could never be opened otherwise).
+SEAL_RAM_FILE = 10 * 1024 * 1024
+SEAL_RAM_BUDGET = int(os.environ.get("KALMIDO_SEAL_RAM_MB") or 256) * 1024 * 1024
+SEAL_RAM_WAIT = float(os.environ.get("KALMIDO_SEAL_RAM_WAIT") or 15)
+SEAL_RAM_BG_WAIT = 300
+SEAL_RAM_RETRY = 10
+_RAM = threading.Condition()
+_RAM_HELD = [0]
+
+
+class SealBusy(Exception):
+    pass
+
+
+@app.errorhandler(SealBusy)
+def _seal_busy(e):
+    r, code = err(tr("The server is busy opening other large encrypted files. Please try again in a moment."), 503)
+    r.headers["Retry-After"] = str(SEAL_RAM_RETRY)
+    return r, code
+
+
+def _sealed_size(path):
+    """The on-disk size of a sealed file (0 for a plain or missing one: those are streamed or fail elsewhere)."""
+    try:
+        return os.path.getsize(path) if oc_is_sealed_file(path) else 0
+    except OSError:
+        return 0
+
+
+def oc_ram_take(n):
+    """Reserve room for a sealed file of n bytes decrypted in memory; returns what to hand back to oc_ram_give.
+    Below SEAL_RAM_FILE nothing is counted. SealBusy when a request waited SEAL_RAM_WAIT seconds in vain."""
+    if n < SEAL_RAM_FILE:
+        return 0
+    need = 2 * n
+    req = has_request_context()
+    end = time.monotonic() + (SEAL_RAM_WAIT if req else SEAL_RAM_BG_WAIT)
+    with _RAM:
+        while _RAM_HELD[0] and _RAM_HELD[0] + need > SEAL_RAM_BUDGET:
+            left = end - time.monotonic()
+            if left <= 0:
+                if req:
+                    raise SealBusy()
+                break  # a background job goes on after its long wait
+            _RAM.wait(left)
+        _RAM_HELD[0] += need
+    return need
+
+
+def oc_ram_give(held):
+    if held:
+        with _RAM:
+            _RAM_HELD[0] -= held
+            _RAM.notify_all()
+
+
+def oc_ram_held():
+    """Bytes the budget counts right now (tests, diagnostics)."""
+    return _RAM_HELD[0]
 
 
 def _write_atomic(path, data, mode=None, check=None):
@@ -793,7 +865,18 @@ def oc_send_file(c, path, **kw):
         return send_file(path, **kw)
     kw.setdefault("last_modified", os.path.getmtime(path))
     kw.pop("conditional", None)
-    return send_file(io.BytesIO(oc_read_file(c, path)), conditional=True, etag=False, **kw)
+    held = oc_ram_take(_sealed_size(path))  # 2.663.0 B (#4191): kept until the answer is sent (call_on_close)
+    try:
+        with open(path, "rb") as f:
+            data = oc_open(c, f.read())
+        rv = send_file(io.BytesIO(data), conditional=True, etag=False, **kw)
+    except BaseException:
+        oc_ram_give(held)
+        raise
+    if held:
+        done = []
+        rv.call_on_close(lambda: done or (done.append(1), oc_ram_give(held)))
+    return rv
 
 
 # ---- server-side caches (the text cache of attachments): sealed with a key derived from the master key ----------------
