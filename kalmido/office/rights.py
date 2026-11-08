@@ -768,10 +768,14 @@ def ofr_group_delete(gid):
     for u in users:
         if not c.execute("SELECT 1 FROM office_rgroup_members WHERE org_id=? AND user_id=?", (oid, u)).fetchone():
             c.execute("INSERT INTO office_rgroup_members(org_id, user_id, tpl, created_at) VALUES(?,?,?,?)", (oid, u, TPL_NONE, iso(now_utc())))
+    from .otrash import otb_put  # otrash loads this module at its top
+    # 2.747.0 (#5246, #4707): the group's definition (name, levels, specials) into the office trash -- its members are taken
+    # out above and do NOT come back with it (a restore hands out no rights; the log keeps who they were)
+    tid = otb_put(c, oid, uid, "rgroup", "office_rgroups", gid, cur["name"])
     c.execute("DELETE FROM office_rgroups WHERE id=? AND org_id=?", (gid, oid))
     ofr_log(c, oid, uid, "group_delete", group=f"g:{gid}", before={**cur, "members": users})
     c.commit()
-    return jsonify(ok=True)
+    return jsonify(ok=True, trash_id=tid)
 
 
 def _keep_a_manager(c, oid, drop_group=None, user=None, new_refs=None):

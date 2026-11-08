@@ -74,17 +74,21 @@ def otb_snap(c, table, ids, out=None, depth=0):
     return out
 
 
-def otb_put(c, oid, uid, kind, table, rid, label, sub="", extra_nulls=(), key="id"):
+def otb_put(c, oid, uid, kind, table, rid, label, sub="", extra_nulls=(), key="id", more=()):
     """Stores the copy of row rid of table (call it BEFORE the DELETE, in the same transaction). -> the trash id
     2.567.0 (#4707): rid a list = ONE entry for several rows (an import taken back, a letter's links: one restore brings them
     all back, ref_id = the first); key = the column naming the row of a table without an id (office_cf_start: org_id; the
-    rows pointing at such a table are not copied - it has none)."""
+    rows pointing at such a table are not copied - it has none). 2.747.0 (#5246): more = [(table, ids)] of rows that go with it
+    without a foreign key (a quotation part's positions), copied after it and brought back with it."""
     ids = list(rid) if isinstance(rid, (list, tuple)) else [rid]
     if key == "id":
         snap = otb_snap(c, table, ids)
     else:
         rows = c.execute(f"SELECT * FROM {table} WHERE {key}=?", (ids[0],)).fetchall()
         snap = {"rows": [[table, [{k: _val(r[k]) for k in r.keys()} for r in rows]]] if rows else [], "nulls": [], "key": key}
+    for t, more_ids in more:  # 2.747.0 (#5246)
+        if more_ids:
+            otb_snap(c, t, more_ids, snap)
     snap["nulls"] += [list(x) for x in extra_nulls]
     tid = insert_id(c, "INSERT INTO office_trash(org_id, kind, sub, ref_id, label, snap, deleted_by, deleted_at) VALUES(?,?,?,?,?,?,?,?)",
                      (oid, kind, sub or "", ids[0], (label or "")[:300], json.dumps(snap, default=str), uid, iso_ms(now_utc())))
@@ -207,7 +211,7 @@ def _need_kind(c, uid, oid, tid):
     r = c.execute("SELECT kind FROM office_trash WHERE id=? AND org_id=?", (tid, oid)).fetchone()
     if not r:
         raise Denied(404)
-    if r["kind"] != "doc" and office_role(c, uid, oid) != "admin":
+    if r["kind"] not in ("doc", "part") and office_role(c, uid, oid) != "admin":  # 2.747.0 (#5246): a quotation's part as its document
         raise Denied(403, tr("Only an admin of this workspace can do this"))
 
 
@@ -246,7 +250,8 @@ def otb_restore_route(tid):
     ofx_log(c, oid, "restore", **({"doc_id": ref} if kind == "doc" else {"target": kind}), detail={"id": ref})
     bump(c)
     c.commit()
-    return jsonify(ok=True, kind=kind, id=ref, **otb_gone_out(notes))
+    part = c.execute("SELECT doc_id FROM office_doc_parts WHERE id=?", (ref,)).fetchone() if kind == "part" else None  # 2.747.0 (#5246)
+    return jsonify(ok=True, kind=kind, id=ref, **({"doc_id": part[0]} if part else {}), **otb_gone_out(notes))
 
 
 def otb_gone_out(notes):

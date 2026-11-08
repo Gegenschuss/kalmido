@@ -27,6 +27,7 @@ from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.access import acx_anon_bind, Denied, FULL_ROLES, list_role, need_list
 from ..core.orgcrypt import OrgCryptError, oc_dec, oc_dec_fields, oc_enc, oc_enc_fields, oc_is_enc, oc_log_detail
 from .model import office_role, pb_owner
+from .model import pb_personal  # 2.747.0 (#5246)
 from .rights import NO_RIGHT, ofr_admin_or, ofr_allows
 from ..accounts.orgroles import OFFICE_READ
 from ..accounts.orgs import user_orgs
@@ -438,11 +439,13 @@ def sig_gone_delete(sid):
         raise Denied(409, tr("This record is kept until {0} by law", kept))
     if kept:  # 2.545.0 (#4595): the switch "Extend the lock" of its office keeps it after the period too
         olk_need_unheld(c, r["org_id"] or olk_person_office(c, r["created_by"]))
+    from .otrash import otb_put  # 2.747.0 (#5246, #4707): into the trash of its office (a person's: their personal office)
+    tid = otb_put(c, r["org_id"] or pb_personal(c, r["created_by"]), uid, "signoff", "office_signoffs", sid, r["title"] or "")
     c.execute("DELETE FROM office_signoffs WHERE id=?", (sid,))
     if r["org_id"]:
         ofx_log(c, r["org_id"], "signoff_delete", target="video", detail={"signoff": sid})
     c.commit()
-    return jsonify(ok=True)
+    return jsonify(ok=True, trash_id=tid)
 
 
 # acceptance of a list (the owner of the list; from the list dialog > Public link)

@@ -177,7 +177,7 @@ function umzInit(md) {
     const b = e.target.closest('[data-umz]'); if (!b) return;
     const a = b.dataset.umz;
     try {
-      if (a === 'sigdel') { await api('DELETE', `/api/videos/signoffs/orphaned/${+b.dataset.id}`); toast(tr('Deleted')); return umzSigLoad(md); }
+      if (a === 'sigdel') { await api('DELETE', `/api/videos/signoffs/orphaned/${+b.dataset.id}`); toast(tr('“{0}” moved to the trash', tr('Video sign-off'))); return umzSigLoad(md); }  // 2.747.0 (#5246): the office trash keeps it
       if (a === 'exp') { b.disabled = true; await api('POST', '/api/account/export'); return umzExpLoad(md); }
       if (a === 'exp-del') {
         if (!await askConfirm(tr('Delete the export now?'), tr('The file is removed from the server. You can create a new one at any time.'), {ok: tr('Delete'), danger: true})) return;

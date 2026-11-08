@@ -132,7 +132,10 @@ async function orr_copy(ref) {
 async function orr_del(gid) {
   const g = (ORR.data?.groups || []).find(x => x.id === gid); if (!g) return;
   if (!await askConfirm(tr('Delete the group “{0}”?', g.name), tr('Its members keep their other groups; without one they have no office access.'), {ok: tr('Delete'), danger: true})) return;
-  try { await api('DELETE', `/api/office/rights/groups/${gid}`); toast(tr('Deleted')); ORR.log = null; }
+  try {  // 2.747.0 (#5246): into the office trash (the group without its members), Undo = restore it from there
+    const j = await api('DELETE', `/api/office/rights/groups/${gid}`); ORR.log = null;
+    toast(tr('“{0}” moved to the trash', g.name), j.trash_id ? () => api('POST', `/api/office/trash/${j.trash_id}/restore`).then(() => { ORR.log = null; orr_load(); }, x => toast(x.message || tr('unknown'))) : undefined);
+  }
   catch (x) { toast(x.message || tr('unknown')); }
   await orr_load();
 }

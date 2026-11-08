@@ -27,6 +27,7 @@ from .model import PARTS_TITLE_FILM, UNITS, office_role, office_settings
 from .packs import office_pack_for
 from .docs import doc_items, _calc_doc, DUP_ITEM_SKIP, doc_public, doc_row, recalc, OFD_ITEM_RESET, _iid, clean_items  # 2.369.5 (#2517): pulled up from functions
 from .ledger import ofx_need_editable, ofx_log, ofx_diff, ofx_items_brief  # 2.369.5 (#2517): pulled up from functions
+from .otrash import OTB_CHECK, otb_put  # 2.747.0 (#5246): a deleted part into the office trash
 
 try:  # the shoot calculation (part C, office/sheet.py); until it is there a shoot part counts nothing
     from . import sheet as _dk_sheet
@@ -853,10 +854,30 @@ def tp_part_delete(did, pid):
     """Removes the part, its positions and the title page positions that stand for it. Returns the document."""
     c, uid, oid, admin, r = _ctx_doc(did)
     p = tp_part(c, oid, did, pid)
+    # 2.747.0 (#5246, #4707): the part goes into the office trash with its positions and title page lines (no foreign key:
+    # more=), restorable while the quotation is a draft (OTB_CHECK "part"); the answer names it (trash_id)
+    its = [x[0] for x in c.execute("SELECT id FROM office_doc_items WHERE doc_id=? AND org_id=? AND (part_id=? OR (kind='part' AND ref_part_id=?))",
+                                   (did, oid, pid, pid)).fetchall()]
+    otb_put(c, oid, uid, "part", "office_doc_parts", pid, " · ".join(x for x in (p["title"], r["number"] or r["project_title"]) if x),
+            sub=str(did), more=[("office_doc_items", its)])
     c.execute("DELETE FROM office_doc_items WHERE doc_id=? AND org_id=? AND (part_id=? OR (kind='part' AND ref_part_id=?))", (did, oid, pid, pid))
     c.execute("DELETE FROM office_doc_parts WHERE id=? AND doc_id=? AND org_id=?", (pid, did, oid))
     ofx_log(c, oid, "part", doc_id=did, detail={"before": {"part": pid, "kind": p["kind"], "title": p["title"]}})
     return _done(c, oid, r, admin)
+
+
+def _part_back(c, oid, pid):
+    """2.747.0 (#5246): after a part came back from the office trash -- its quotation must still be an editable draft (409 rolls
+    the restore back), then its sums and title page as after a normal change."""
+    row = c.execute("SELECT doc_id FROM office_doc_parts WHERE id=? AND org_id=?", (pid, oid)).fetchone()
+    d = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=?", (row[0], oid)).fetchone() if row else None
+    if d is None:
+        raise Denied(404)
+    ofx_need_editable(d)
+    recalc(c, oid, d["id"])
+
+
+OTB_CHECK["part"] = _part_back
 
 
 @app.put("/api/office/docs/<int:did>/parts/<int:pid>/items")
