@@ -102,6 +102,8 @@ SPECIAL_ROUTES = {
     "POST /api/office/docs/<int:did>/unlock": "release",
     "POST /api/office/docs/<int:did>/send": "release", "POST /api/office/docs/<int:did>/peppol": "release",
     "POST /api/office/docs/<int:did>/peppol/undelivered": "release",  # 2.370.0 (#2778): frees "send again"
+    # 2.666.0 (#4074 12): the provider calls with the office's key (status fetch, receiver lookup) like sending
+    "POST /api/office/docs/<int:did>/peppol/refresh": "release", "POST /api/office/docs/<int:did>/peppol/lookup": "release",
     "GET /api/office/docs/<int:did>/recipients": "release",  # 2.433.0 (#3599): the send dialog's addresses (the e-mail for invoices)
     "POST /api/office/series/<int:sid>/run": "release",
     # pay: payments of invoices, reminder fees, payment proposals, the bank matching that books
