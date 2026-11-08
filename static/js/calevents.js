@@ -9,6 +9,10 @@
 // week grid (drag over free time) and the quick sheet's "Event" button open the editor (evEditor).
 const evOn = () => feat('events');
 const evCal = id => (S.evcals || []).find(c => c.id === id);
+// 2.657.0 (#5052): a calendar's settings with the version read (expect_updated_at; changed meanwhile = 409, its current version kept for the next try)
+const evcVerKeep = (id, v) => { const x = evCal(id); if (x && v) x.updated_at = v; };
+const evcPatch = (id, b) => api('PATCH', `/api/evcals/${id}`, {...b, expect_updated_at: evCal(id)?.updated_at || undefined})
+  .then(j => { evcVerKeep(id, j?.updated_at); return j; }, e => { evcVerKeep(id, e?.data?.current?.updated_at); throw e; });
 // 2.46.2 (#1659): a calendar's new name shows at once (optimistic, an error puts the old one back), no reload of everything
 function evCalRename(id, name, draw) {
   const put = () => {
@@ -16,7 +20,7 @@ function evCalRename(id, name, draw) {
     if (x) x.name = name; if (y) y.name = name;
     return () => { if (x) x.name = o1; if (y) y.name = o2; };
   };
-  return optWrite(put, () => api('PATCH', `/api/evcals/${id}`, {name}), draw).then(() => cvxCals(true).then(draw), () => {});
+  return optWrite(put, () => evcPatch(id, {name}), draw).then(() => cvxCals(true).then(draw), () => {});
 }
 const evWrite = c => !!c && (c.role === 'owner' || c.role === 'edit');
 const evWritable = () => (S.evcals || []).filter(c => evWrite(c) && !c.hidden && wsObjIn(c));  // 2.30.0 (#1036): of the shown workspace
@@ -578,7 +582,7 @@ async function evCalsModal() {
     const s = e.target.closest('[data-evcshow]');
     if (s) {  // 2.559.0 (#4659): switched at once (a hidden calendar's events leave the views), an error switches it back
       const id = +s.dataset.evcshow, on = s.checked;
-      try { await evOpt(evCalShowPut(id, on), () => api('PATCH', `/api/evcals/${id}`, {hidden: !on}), () => { draw(); renderView(); }); } catch { s.checked = !on; draw(); return; }
+      try { await evOpt(evCalShowPut(id, on), () => evcPatch(id, {hidden: !on}), () => { draw(); renderView(); }); } catch { s.checked = !on; draw(); return; }
       redraw(); return;
     }
     const x = e.target.closest('[data-cvx]'); if (!x) return;
@@ -604,8 +608,8 @@ async function evCalsModal() {
       const c = evCal(+m.dataset.evcmenu); if (!c) return;
       const own = c.role === 'owner';
       menu(m, [own && {label: tr('Rename…'), icon: 'edit', fn: async () => { const n = await askPrompt(tr('Rename the calendar'), c.name, {input: {max: 100}}); if (n && n.trim()) evCalRename(c.id, n.trim(), redraw); }},  // 2.46.2 (#1659): at once
-        own && {label: tr('Colour…'), icon: 'palette', fn: () => calColorPop(m, LCOLORS.filter(Boolean), c.color, async col => { try { await api('PATCH', `/api/evcals/${c.id}`, {color: col}); } catch { return; } refresh(); })},
-        own && wsOn() && {label: tr('Workspace…'), icon: 'brief', fn: () => wsMoveMenu(m, c.org_id, async org => { try { await api('PATCH', `/api/evcals/${c.id}`, {org_id: org}); } catch { return; } refresh(); })},
+        own && {label: tr('Colour…'), icon: 'palette', fn: () => calColorPop(m, LCOLORS.filter(Boolean), c.color, async col => { try { await evcPatch(c.id, {color: col}); } catch { return; } refresh(); })},
+        own && wsOn() && {label: tr('Workspace…'), icon: 'brief', fn: () => wsMoveMenu(m, c.org_id, async org => { try { await evcPatch(c.id, {org_id: org}); } catch { return; } refresh(); })},
         own && collab() && {label: tr('Share…'), icon: 'users', fn: () => evShareModal(c, users, refresh)},
         evWrite(c) && {label: tr('Import a calendar file (ICS)…'), icon: 'upload', fn: () => evImport(c, refresh)},
         {label: tr('Export (ICS)'), icon: 'download', fn: () => { location.href = `/api/evcals/${c.id}/export.ics`; }},
@@ -651,7 +655,7 @@ function evShareModal(c, users, done) {
   const draw = () => { $('#evs-list', md).innerHTML = (c.members || []).length ? `<ul class="evclist">${c.members.map(m => `<li class="evcrow">${av(m.user_id, names.get(m.user_id) || '')}<span class="evcn">${esc(names.get(m.user_id) || '?')} <span class="muted">· ${esc(m.role === 'edit' ? tr('can edit') : tr('can view'))}</span></span><button class="iconbtn" data-evsrm="${m.user_id}" aria-label="${esc(tr('Stop sharing with {0}', names.get(m.user_id) || ''))}">${ic('x', 's')}</button></li>`).join('')}</ul>` : `<p class="muted">${tr('Not shared yet.')}</p>`; };
   const wsDraw = () => {  // 2.46.4 (#1737)
     shWsFill($('.shws', md), c.org_id || null, a => wsMoveMenu(a, c.org_id, async org => {
-      try { await api('PATCH', `/api/evcals/${c.id}`, {org_id: org}); } catch { return; }
+      try { await evcPatch(c.id, {org_id: org}); } catch { return; }
       c.org_id = org; wsDraw(); $('#evs-user', md).innerHTML = shWsOptions(users, c.org_id || null, c.members); shWsPick($('#evs-user', md)); done();
     }));
   };

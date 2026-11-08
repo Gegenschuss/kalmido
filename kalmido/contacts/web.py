@@ -36,6 +36,7 @@ from ..accounts.orgout import org_out  # 2.369.5 (#2517): pulled up from functio
 from ..collab.liste2e import le2a_gen_refuse  # 2.369.5 (#2517): pulled up from functions
 from ..collab.comments import user_names  # 2.369.5 (#2517): pulled up from functions
 from ..core.conflict import Conflict  # 2.564.0 (#4701/#4702)
+from ..core.conflict import ccf_check, kern_version_seed, take_version  # 2.657.0 (#5052)
 
 # 2.41.0 (#1437): never above the request limit (MAX_CONTENT_LENGTH answers 413 before the route), whole MB for the message
 VCF_MAX = min(50, (app.config.get("MAX_CONTENT_LENGTH") or 0) // (1024 * 1024) or 50) * 1024 * 1024
@@ -88,7 +89,15 @@ def op_book_new(c, uid, b):
 
 def op_book_edit(c, uid, bid, b):
     bk, role = need_book(c, bid, manage=True)  # 2.182.0 (#2719): access before the body check (a foreign id is always 404)
-    _unknown(b, ("name", "color", "birthdays_list_id", "org_id"))
+    _unknown(b, ("name", "color", "birthdays_list_id", "org_id", "expect_updated_at"))
+    if any(k in b for k in ("name", "color", "birthdays_list_id", "org_id")):
+        # 2.657.0 (#5052): the address book's settings under its lock and its version -- an agent must send the version it
+        # read (expect_updated_at or If-Match, else 400 version_required as obj_write); changed since = 409 with "current".
+        # People's old clients without one: as before.
+        take_version(b)
+        write_lock(c, f"obj-address_book-{int(bid)}")
+        bk = kern_version_seed(c, "books", bid)
+        ccf_check(b, bk["updated_at"], "current", lambda: book_public(c, bk, uid))
     if "org_id" in b and bk["owner_org_id"] and b["org_id"] != bk["owner_org_id"]:  # 2.52.0 C (#1438)
         raise Denied(409, tr("An address book of an organisation stays in it"))
     if "org_id" in b and not bk["owner_org_id"]:  # 2.30.0 (#1036): the owner moves it into another workspace (409 while a member does not fit)
@@ -112,7 +121,8 @@ def op_book_edit(c, uid, bid, b):
                 f["owner_id"] = uid
                 c.execute("DELETE FROM book_members WHERE book_id=? AND user_id=?", (bid, uid))
     if f:
-        c.execute(f"UPDATE books SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), bid])
+        c.execute(f"UPDATE books SET {','.join(k + '=?' for k in f)}, rev=rev+1, updated_at=?, updated_by=? WHERE id=?",
+                  [*f.values(), iso_ms(now_utc()), uid, bid])  # 2.657.0 (#5052): a new version
         book_touch(c, bid)
         if "name" in f:  # 2.351.0 B (#2749): the name on its folder node
             from .ctfolder import CTF_BOOK, ctf_renamed

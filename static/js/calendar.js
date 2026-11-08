@@ -323,7 +323,7 @@ async function cvxShow(key, on, draw = true) {
   const [k, id] = key.split(':'), n = +id;
   if (k === 'x') { await cvxSave(ABC_SET[id], on ? '1' : '0'); if (draw) cvxRedraw(); return true; }  // 2.155.0 B (#2076)
   try {
-    if (k === 'e') { await api('PATCH', `/api/evcals/${n}`, {hidden: !on}); const c = evCal(n); if (c) c.hidden = !on; }
+    if (k === 'e') { await evcPatch(n, {hidden: !on})  /* 2.657.0 (#5052) */; const c = evCal(n); if (c) c.hidden = !on; }
     else {
       await api('PATCH', `/api/calendars/${n}`, {visible: on});
       const x = (S.cvxSubs || []).find(s => s.id === n); if (x) x.visible = on;

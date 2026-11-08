@@ -23,6 +23,8 @@ from ..tasks.tasks import task_create  # 2.369.5 (#2517): pulled up from functio
 from ..core.errors import UnknownFields  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgs import obj_org_set, ws_fit_problem  # 2.369.5 (#2517): pulled up from functions
 from ..core.conflict import Conflict  # 2.564.0 (#4701/#4702)
+from ..core.conflict import ccf_check, kern_version_seed, take_version  # 2.657.0 (#5052)
+from ..core.pg import write_lock  # 2.657.0 (#5052)
 from ..events.model import EV_CALS_MAX, EV_KIND, KERN, ev_has_node, ev_role  # 2.566.0 (#4712): the shared core (events/evkern.py fills KERN)
 from ..files.fsref import fs_ref_rename  # 2.566.0 (#4712)
 from ..core.pg import system_ctx  # 2.566.0 (#4712)
@@ -51,6 +53,14 @@ def op_cal_new(c, uid, b):
 def op_cal_edit(c, uid, cid, b):
     _unknown(b, ("name", "color", "description", "hidden", "org_id", "expect_updated_at"))
     cal, role = need_evcal(c, cid)
+    if any(k in b for k in ("name", "color", "description", "org_id")):
+        # 2.657.0 (#5052): the calendar's settings under its lock and its version -- an agent must send the version it read
+        # (expect_updated_at or If-Match, else 400 version_required as obj_write); the app sends it too, an old client
+        # without one keeps its own read. "hidden" alone is the person's own view setting: no version.
+        take_version(b)
+        write_lock(c, f"obj-{EV_KIND}-{int(cid)}")
+        cal = kern_version_seed(c, "ev_cals", cid)
+        ccf_check(b, cal["updated_at"], "current", lambda: cal_public(c, cal, uid))
     if "org_id" in b:  # 2.30.0 (#1036): the owner moves it into another workspace (409 while a member does not fit)
         if obj_org_set(c, "ev_cals", "cal_id", "ev_cal_members", cid, b["org_id"], "cal"):
             KERN["follow"](c, EV_KIND, cid)  # 2.566.0 (#4712): its node (and the shares on it) follow
@@ -61,8 +71,8 @@ def op_cal_edit(c, uid, cid, b):
             raise Denied(403, tr("Only the owner of the calendar can do this"))
         f = cal_fields(f)
         # 2.566.0 (#4712): through the shared core's write path -- the lock, the version (expect_updated_at: 409 with the
-        # calendar as it is now under "current"), rev, the history, the change counter. Without a version the old behaviour
-        # stays, also for an agent (the API's version rule for agents is #4702's, not this route's): its own read is the version.
+        # calendar as it is now under "current"), rev, the history, the change counter. 2.657.0 (#5052): an agent's version
+        # is required above; a person's old client without one: the read under the lock is the version.
         exp = b.get("expect_updated_at") or cal["updated_at"] or None
         _row, ch = KERN["write"](c, uid, EV_KIND, cid, f, expect=exp)
         if "name" in ch:

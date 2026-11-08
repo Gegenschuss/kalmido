@@ -6,6 +6,7 @@ from flask import jsonify
 from .config import app
 from .errors import Denied
 from .i18n import tr
+from .pg import system_ctx  # 2.657.0 (#5052): kern_version_seed
 
 
 class Conflict(Denied):
@@ -94,3 +95,17 @@ def take_version(b, key="expect_updated_at"):
         if h:
             b[key] = h
     return b
+
+
+KERN_SEED_TABLES = ("ev_cals", "books", "lists")  # 2.657.0 (#5052): the kinds whose old rows may still carry updated_at '' (lists: 5052_a.py)
+
+
+def kern_version_seed(c, table, rid):
+    """2.657.0 (#5052): a calendar / address book made before 2.566.0 (#4712) has updated_at '' (no version yet): its read shows
+    created_at as its version (events/model.py cal_public, contacts/model.py book_public), so here -- under the object's
+    write_lock, before the version check -- that row gets created_at as its updated_at. Returns the row."""
+    if table not in KERN_SEED_TABLES:
+        raise ValueError(table)
+    with system_ctx(c):  # structure only (a copy of the row's own created_at): also for a member who may not write the row
+        c.execute(f"UPDATE {table} SET updated_at=created_at WHERE id=? AND (updated_at IS NULL OR updated_at='')", (int(rid),))
+    return c.execute(f"SELECT * FROM {table} WHERE id=?", (int(rid),)).fetchone()  # the caller holds the write_lock

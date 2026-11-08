@@ -217,8 +217,11 @@ def contacts_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
         "get": op("2.21.0 (module Contacts): the address books the token's user sees (own + shared)", K, ok(ref("AddressBookPage")) | errs("409"), scope=S),
         "post": op("A new own address book", K, ok(ref("AddressBook"), "Created", "201") | errs("400", "409"), body={**book_in, "required": ["name"]}, scope=S)}
     paths["/address-books/{id}"] = {
-        "patch": op("Rename / recolour an address book, choose the list for its birthdays (owner)", K, ok(ref("AddressBook")) | errs("400", "403", "404"),
-                    [bid_p], body={**book_in, "properties": {**book_in["properties"], "birthdays_list_id": nul("integer")}}, scope=S),
+        "patch": op("Rename / recolour an address book, choose the list for its birthdays (owner)", K, ok(ref("AddressBook")) | errs("400", "403", "404", "409"),
+                    [bid_p], body={**book_in, "properties": {**book_in["properties"], "birthdays_list_id": nul("integer"),
+                                                             "expect_updated_at": {"type": "string", "description": "2.657.0 (#5052): updated_at of the "
+                                                                                   "address book as read (409 with error.current when it changed meanwhile; "
+                                                                                   "also as the header If-Match); required for agent accounts: 400 version_required"}}}, scope=S),
         "delete": op("Delete an address book with its contacts (owner): into the trash (2.272.0), restorable in the app for the trash period", K,
                      {"204": {"description": "In the trash"}} | errs("403", "404"), [bid_p], scope=S)}
     paths["/address-books/{id}/members/{user_id}"] = {

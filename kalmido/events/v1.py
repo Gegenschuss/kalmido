@@ -239,8 +239,12 @@ def events_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
                    body={**cal_in, "required": ["name"]}, scope=S)}
     paths["/event-calendars/{id}"] = {
         "patch": op("Rename / recolour a calendar (owner) or hide it from the own views (anyone who sees it)", E,
-                    ok(ref("EventCalendar")) | errs("400", "403", "404"), [cid_p],
-                    body={**cal_in, "properties": {**cal_in["properties"], "hidden": {"type": "boolean"}}}, scope=S),
+                    ok(ref("EventCalendar")) | errs("400", "403", "404", "409"), [cid_p],
+                    body={**cal_in, "properties": {**cal_in["properties"], "hidden": {"type": "boolean"},
+                                                   "expect_updated_at": {"type": "string", "description": "2.657.0 (#5052): updated_at of the calendar "
+                                                                         "as read (409 with error.current when it changed meanwhile; also as the header "
+                                                                         "If-Match); required for agent accounts when name, color, description or org_id "
+                                                                         "change: 400 version_required"}}}, scope=S),
         "delete": op("Delete a calendar with all its events (owner)", E, {"204": {"description": "Deleted"}} | errs("403", "404"), [cid_p], scope=S)}
     paths["/event-calendars/{id}/members/{user_id}"] = {
         "put": op("Share a calendar with a person: view (read) or edit (owner)", E, ok(ref("EventCalendar")) | errs("400", "403", "404", "409"),

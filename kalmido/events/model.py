@@ -245,7 +245,9 @@ def cal_public(c, r, uid, names=None):
     if role == "owner":
         d["members"] = cal_members(c, r["id"])
     if "updated_at" in r.keys():
-        d["updated_at"] = r["updated_at"]  # 2.566.0 (#4712): the version a change sends back (expect_updated_at)
+        # 2.566.0 (#4712): the version a change sends back (expect_updated_at); 2.657.0 (#5052): an old row without one shows
+        # created_at (core/conflict.py kern_version_seed gives it that version on its next change)
+        d["updated_at"] = r["updated_at"] or (r["created_at"] if "created_at" in r.keys() else "")
     return d
 
 
@@ -1111,6 +1113,12 @@ def ev_actor(uid=None):
 
 
 def ev_delete(c, r, uid=None):
+    """The event r into the trash. 2.657.0 (#5052): always under the event's lock (ev_lock's 'event-<id>'), for every caller
+    (CalDAV, booking page, polls, agent proposals); an event another writer deleted while we waited stays as it is (False)."""
+    write_lock(c, f"event-{int(r['id'])}")
+    now = c.execute("SELECT deleted_at FROM events WHERE id=? FOR UPDATE", (int(r["id"]),)).fetchone()
+    if now is None or now["deleted_at"]:
+        return False
     c.execute("UPDATE events SET deleted_at=?, updated_at=?, updated_by=COALESCE(?, updated_by) WHERE id=?",
               (iso(now_utc()), iso_ms(now_utc()), ev_actor(uid), r["id"]))  # 2.571.0 (#4776): updated_by
     from ..integrations.webhooks import who_note
@@ -1118,6 +1126,7 @@ def ev_delete(c, r, uid=None):
     cal_touch(c, r["cal_id"])
     bump(c)
     ev_tell(c, r, "cancelled")  # 2.367.2 (#2969): the people of the server invited to it
+    return True
 
 
 def is_occ(r, occ):

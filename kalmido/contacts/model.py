@@ -243,7 +243,9 @@ def book_public(c, b, uid, names=None):
     if role == "owner":
         d["members"] = book_members_of(c, b["id"])  # 2.566.0 (#4712)
     if "updated_at" in b.keys():
-        d["updated_at"] = b["updated_at"]  # 2.566.0 (#4712): the version a change sends back (expect_updated_at)
+        # 2.566.0 (#4712): the version a change sends back (expect_updated_at); 2.657.0 (#5052): an old row without one shows
+        # created_at (core/conflict.py kern_version_seed gives it that version on its next change)
+        d["updated_at"] = b["updated_at"] or (b["created_at"] if "created_at" in b.keys() else "")
     return d
 
 
