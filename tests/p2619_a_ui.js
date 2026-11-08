@@ -86,6 +86,8 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   await until(() => sheet() && w.history.state?.f8d);
   w.eval(`openPop(document.querySelector('#qsheet'), '<div class="p2619m">menu</div>')`);
   check(!d.querySelector('#pop').classList.contains('hidden'), '#4943: a menu over the sheet');
+  // 2.652.0 (#5070): the menu has its own history entry over the sheet's (one per level); Back once it is there
+  check(await until(() => w.history.state?.f8d === 2), '#4943: the menu over the sheet has its own history entry');
   w.history.back();
   check(await until(() => d.querySelector('#pop').classList.contains('hidden')), '#4943: Back closes the menu first');
   check(!!sheet(), '#4943: … the sheet stays under it');
