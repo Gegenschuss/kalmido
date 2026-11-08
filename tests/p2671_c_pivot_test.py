@@ -117,6 +117,10 @@ ver = get(Bo, P)["pivot"]["updated_at"]
 r = Bo.put(B + f"/api/sheets/{T}/tabs/{P}/pivot", json={**SPEC, "filter": [{"col": CA, "values": ["Acme", "Gamma"]}], "expect_updated_at": ver})
 check(r.ok and [row[0]["d"] for row in r.json()["pivot"]["result"]["rows"]] == ["Acme", "Gamma"]
       and r.json()["pivot"]["result"]["total"][1]["v"] == 300, "a filter: only Acme and Gamma " + r.text[:300])
+# 2.671.0 (#3463, review R2 F2): a setting over 20 KB (filter values) is refused, the saved one stays
+ver = get(Bo, P)["pivot"]["updated_at"]
+r = Bo.put(B + f"/api/sheets/{T}/tabs/{P}/pivot", json={**SPEC, "filter": [{"col": CA, "values": [f"{i:03d}" + "x" * 200 for i in range(150)]}], "expect_updated_at": ver})
+check(r.status_code == 400 and get(Bo, P)["pivot"]["updated_at"] == ver, "a setting over 20 KB: 400, nothing saved " + r.text[:200])
 r = Bo.put(B + f"/api/sheets/{T}/tabs/{P}/pivot", json={"source": T, "rows": [CB], "values": [{"col": None, "agg": "count"}]})
 check(r.ok and vals(r.json()["pivot"]["result"]["rows"]) == [["Feb", "2"], ["Jan", "3"]]
       and r.json()["pivot"]["result"]["header"] == ["Month", "Count"], "the number of rows per month " + r.text[:300])

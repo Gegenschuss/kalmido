@@ -39,6 +39,7 @@ SHP_ROW_FIELDS = 3
 SHP_VALUES = 6
 SHP_FILTERS = 5
 SHP_FILTER_VALUES = 200
+SHP_SPEC_MAX = 20_000    # review R2 F2: the whole setting as JSON (it is saved with every change in the history, old and new)
 SHP_ROWS_MAX = 2000      # result rows; more -> truncated
 SHP_COLS_MAX = 50        # values of the column field; more -> truncated
 SHP_AGGS = ("sum", "count", "avg")
@@ -110,7 +111,10 @@ def shp_clean(c, first, b, self_id=None):
                 or not all(isinstance(x, str) and len(x) <= 500 for x in f["values"]):
             raise BadInput(tr("Invalid value: {0}", "filter"))
         out_f.append({"col": col(f.get("col"), "filter"), "values": list(dict.fromkeys(f["values"]))})
-    return {"source": src, "rows": rows, "cols": cols, "values": out_v, "filter": out_f}
+    out = {"source": src, "rows": rows, "cols": cols, "values": out_v, "filter": out_f}
+    if len(json.dumps(out)) > SHP_SPEC_MAX:  # review R2 F2: no bloating of the table and its history through the filter values
+        raise BadInput(tr("Invalid value: {0}", "filter"))
+    return out
 
 
 def shp_dump(spec):
