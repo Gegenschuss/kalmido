@@ -16,6 +16,44 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.693.0] - 2026-11-08
+
+Package 2.683 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Fixed
+- Documents on the phone: a document opened from a card of a file store folder now shows "3 of 48", the arrow buttons and the sideways swipe through the folder's documents in the order shown (before: no leafing at all, the sheet only knew the documents' own list); "Open as document" in the folder's list view leafs the same way; a document opened by its address (link, reload, search hit) that stands further down than the loaded page loads the next pages until it is found (#5150).
+- Locked folders: a picture opens with all pictures of the folder (arrows, swipe), a PDF leafs through the folder's PDFs and pictures like an open folder; each file is decrypted in the browser only when it is turned to, never all of them in advance (#5150).
+
+Package 2.671 (Bündel: Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), CI-only rot: p2551_c_favout_ui, Teil 1/6: Sammelpaket: Aufgaben ohne ).
+### Added
+- Tables: group the rows by one column (dates by day, month or year) with collapsible groups and a subtotal row per group - sum, count or average per number column. A view only, like the filter: nothing is saved, the subtotals take no part in formulas, copying or the export; moving rows is held while grouped (#3463).
+- Tables: pivot sheet - a sheet of a workbook computed from another sheet of the same workbook on every read (rows, an optional column field, up to six values as sum / count / average, filters), read-only with totals, always current; its setting is saved with a version (409 on a stale one); the xlsx / CSV export writes its values. Agents see `kind` of every tab and the pivot result when reading a sheet (#3463).
+### Fixed
+- Organisation import: disposition bookings made from a quotation keep their link to the imported quotation and part (offer_root / offer_doc / offer_pos on the new ids, emptied when nothing of the import fits), and open places of a crew function come along - the disposition on the target no longer books the shoot days twice (#5097).
+
+Package 2.620 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Releases für Selbst-Hoster: Tag-Version braucht ei, Sammelpaket: Aufgaben ohn).
+### Changed
+- A long press (phone) or right click (computer) opens the row's "…" menu also for mailbox addresses, repositories, webhooks, file requests, table folder cards and file cards (#4616).
+- Members without office groups (level "own" for travel) can take their own trip from the trip planning into the office's travel expenses; approval and DATEV stay with the admin (#4642).
+### Fixed
+- Tasks from a quotation that were moved into another project no longer count for the old project, the next version of the quotation shows them as "moved to another project" and never writes into them; the quotation's task count needs sight of the project, the project's budget sums all quotation chains of the project; the link follows the moved task, so deleting the old project keeps it (#4586).
+
+Package 2.693 (Bündel: Bündel: Kommentare: Schalter 'Mit Aktivität' auch in nicht, Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Fixed
+- Tables: printing a pivot sheet no longer gives an empty page or "Nothing to print". The pivot sheet's menu (the three dots) now offers "Print / PDF…"; the PDF holds the computed table as the view shows it, with the header and the bold total row (#5148).
+
+Package 2.685 (Bündel: Kommentare: Aktivität in drei Stufen (nur Kommenta, Bündel: Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), CI-only r).
+### Added
+- Balance sheet: the journal now also books the approved entertainment receipts (70 % deductible with the full input tax, the 30 % on an account of their own), the mileage allowance of the logbook (31 December) and paid reminder fees (other income, no VAT) - the same figures as the income statement (#5128).
+- Balance sheet: every bank account of the office is a ledger account of its own (its DATEV account, else the next free one after the default, SKR03 1200ff / SKR04 1800ff); a bank line belongs to the account whose IBAN its statement carries, invoice payments and card totals follow their bank line (#5128).
+- Balance sheet and profit and loss account as PDF next to the CSV (`GET /api/office/books/ledger/<bs|pl>.pdf?year=`, office admin, logged as an export); entries made by hand can be edited in a dialog (409 when someone changed them meanwhile); a difference on the opening balance account 9000 shows before the year-end closing (#5128).
+### Changed
+- Comments: the history between the comments has three levels in the "…" menu, in shared and private lists alike: comments only, changes of others, all changes incl. my own. Default per device: shared list = all changes, private list = changes of others; the old on/off setting carries over. The head says "Comments only" or (shared list) "Only changes of others" (#5162).
+### Fixed
+- Office: switching "Office & finance" on no longer leaves the office saying it is switched off when it loaded before the switch was saved (#5176).
+- Balance sheet: a receipt booked against the bank (counter account "bank") and paid from the cash box is now booked bank to cash instead of being left out (#5128).
+
 ## [2.682.0] - 2026-11-08
 
 Package 2.670 Part A (rescue): test diagnostics for two CI-only red suites.
@@ -702,7 +740,8 @@ Package 2.582 (Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher),
 
 Not released (the CI of this version was red); its changes are listed under 2.605.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.682.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.693.0...HEAD
+[2.693.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.693.0
 [2.682.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.682.0
 [2.681.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.681.0
 [2.675.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.675.0

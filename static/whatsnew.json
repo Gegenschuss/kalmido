@@ -1,6 +1,44 @@
 {
  "versions": [
   {
+   "version": "2.693.0",
+   "date": "2026-11-08",
+   "items": [
+    {
+     "de": "Dokumente aus einem Ablage-Ordner lassen sich am Handy jetzt durchblättern, auch in verschlüsselten Ordnern.",
+     "en": "Documents opened from a file store folder can now be leafed through on the phone, in encrypted folders too."
+    },
+    {
+     "de": "Tabellen lassen sich nach einer Spalte gruppieren, mit auf- und zuklappbaren Gruppen und Zwischensummen.",
+     "en": "Tables can be grouped by one column, with collapsible groups and subtotals."
+    },
+    {
+     "de": "Ein Pivot-Blatt fasst ein anderes Blatt der Mappe zusammen und bleibt immer aktuell.",
+     "en": "A pivot sheet summarises another sheet of the workbook and always stays current."
+    },
+    {
+     "de": "Langes Drücken oder Rechtsklick öffnet das Menü jetzt auch bei Postfach-Adressen, Repositories, Webhooks, Datei-Anfragen, Tabellen-Ordnern und Datei-Karten.",
+     "en": "A long press or right click now opens the menu for mailbox addresses, repositories, webhooks, file requests, table folders and file cards too."
+    },
+    {
+     "de": "Mitglieder ohne Büro-Gruppe können ihre eigene Reise aus der Reiseplanung ins Büro übernehmen.",
+     "en": "Members without an office group can take their own trip from the trip planning into the office."
+    },
+    {
+     "de": "Im Menü „…“ der Kommentare wählst du jetzt zwischen nur Kommentaren, Änderungen anderer und allen Änderungen.",
+     "en": "In the comments' \"…\" menu you now choose between comments only, changes of others and all changes."
+    },
+    {
+     "de": "Bilanz und GuV gibt es jetzt auch als PDF, und Buchungen von Hand lassen sich bearbeiten.",
+     "en": "The balance sheet and the profit and loss account are now also available as PDF, and entries made by hand can be edited."
+    },
+    {
+     "de": "Die Bilanz bucht jetzt auch Bewirtungen, die Kilometerpauschale und Mahngebühren und führt jedes Bankkonto einzeln.",
+     "en": "The balance sheet now also books entertainment, the mileage allowance and reminder fees and keeps every bank account separately."
+    }
+   ]
+  },
+  {
    "version": "2.682.0",
    "date": "2026-11-08",
    "items": [
