@@ -1445,7 +1445,6 @@ POST /api/lists/{}/e2e/stop
 POST /api/lists/{}/folder-reset
 POST /api/lists/{}/header
 POST /api/lists/{}/icon
-POST /api/lists/{}/join
 POST /api/lists/{}/milestones
 POST /api/lists/{}/notepads
 POST /api/lists/{}/playbook/proposals/{}/apply
