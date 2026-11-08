@@ -73,7 +73,7 @@ const click = (w, el) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbl
   w.eval(`PAL.q = 'import'`);
   check(w.eval(`palItems().some(x => x.id === 'a:plimp')`), '#1934: "import" finds it too');
   const docsHit = w.eval(`(palAll().find(x => x.id === 'v:docs') || {}).sub`);
-  check(docsHit === 'File store', '#1934: a part of an area (Documents) with the area below: ' + docsHit);
+  check(docsHit === 'Files', '#1934: a part of an area (Documents) with the area below: ' + docsHit);  // 2.752.0 (#4887): the area is called Files
   w.eval(`PALX.ws = wsCur(); PALX.at = Date.now(); PALX.docs = {senders: [{name: 'Example Utility', ids: [7]}], types: [{name: 'Invoice', ids: [9]}], tags: [{name: 'Tax', ids: [3]}]}; PALX.folders = [{id: 99, name: 'Contracts', sp: 'private', many: false}]; PAL.all = null`);  // 2.595.0 (#4902): the set is kept per opening since #4199 - the fetched parts reset it (palSubLoad), the stand-in here too
   w.eval(`PAL.q = 'tax'`);
   const tax = w.eval(`palItems().find(x => x.id === 'dcf:tag:3')`);
