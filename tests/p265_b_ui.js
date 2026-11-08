@@ -157,7 +157,7 @@ const NEW = {agentchat: ['agentchat', 'agentsetup', 'agentrotate', 'agentwork', 
     check(await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.ok)`), 'Firefox: login');
     await nav(B);
     for (let i = 0; i < 40 && !(await ev('!!(window.S && S.me)').catch(() => false)); i++) await sleep(250);
-    // the idle preload (5 s after the start) may fetch settings + what it needs: only what started before counts
+    // 2.660.0 (#4197): the idle chain (5 s after the start) may fetch the switched-on areas (calendar, timeline, wiki, docs, life), never the settings: only what started before counts
     const fetched = await ev(`JSON.stringify(performance.getEntriesByType('resource').filter(e => /\\/static\\/(js\\/(${LAZY.join('|')})\\.js|css\\/)/.test(e.name) && e.startTime < 4500).map(e => e.name.replace(/^.*\\/static\\//, '')))`);
     check(fetched === '[]', 'Firefox: the start fetches no module and no module stylesheet ' + fetched);
     await nav(B + '#docs');

@@ -270,7 +270,7 @@ function loadCss(f) {  // 2.65.0 (#1824): one stylesheet of static/css/; also us
   if (LD_CSSP[f]) return LD_CSSP[f];
   return LD_CSSP[f] = new Promise((res, rej) => {
     const l = document.createElement('link');
-    l.rel = 'stylesheet'; l.href = `/static/css/${f}.css` + ld_q('css', f);  // 2.660.0 (#4197): its content hash l.dataset.ldcss = f;
+    l.rel = 'stylesheet'; l.href = `/static/css/${f}.css` + ld_q('css', f); l.dataset.ldcss = f;  // 2.660.0 (#4197): its content hash
     l.onload = () => res();
     l.onerror = () => { l.remove(); delete LD_CSSP[f]; rej(new Error('could not load ' + f + '.css')); };
     document.head.appendChild(l);

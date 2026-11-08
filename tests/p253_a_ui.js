@@ -131,8 +131,8 @@ function swRun(src, {failLazy = false} = {}) {
     check(await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`) === 200, 'Firefox: login');
     await nav(B);
     for (let i = 0; i < 40 && !(await ev('!!(window.S && S.me)').catch(() => false)); i++) await sleep(250);
-    // settings.js may come later on its own (the idle preload 5 s after the start): only what started before counts
-    const fetched = await ev(`JSON.stringify(performance.getEntriesByType('resource').filter(e => /\\/static\\/js\\/(settings|contacts|office[a-z_]*)\\.js/.test(e.name) && (e.startTime < 4500 || !/settings/.test(e.name))).map(e => e.name.split('/').pop() + '@' + Math.round(e.startTime)))`);
+    // 2.660.0 (#4197): the idle chain no longer preloads settings.js (nor its dependencies): none of these may come before the click
+    const fetched = await ev(`JSON.stringify(performance.getEntriesByType('resource').filter(e => /\\/static\\/js\\/(settings|contacts|office[a-z_]*)\\.js/.test(e.name)).map(e => e.name.split('/').pop() + '@' + Math.round(e.startTime)))`);
     check(fetched === '[]', 'Firefox: the start fetches no on-demand module ' + fetched);
     await ev(`(() => { const b = document.createElement('button'); b.dataset.act = 'settings'; document.body.append(b); b.click(); b.remove(); return 1; })()`);  // #3400: the gear lives in a menu now
     for (let i = 0; i < 40 && !(await ev('!!document.querySelector(".smodal")')); i++) await sleep(150);
