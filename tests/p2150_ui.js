@@ -151,7 +151,8 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
   await call('PATCH', `/api/admin/agents/${ag.id}`, {scopes: ['read', 'tasks:write', 'comments', 'structure', 'delete']});
   await call('PUT', `/api/lists/${L}/members`, {user_id: ag.id, role: 'edit'});
   const AL = (await tcall('POST', '/lists', TOK, {name: 'Scratch'})).id;
-  await tcall('PATCH', `/lists/${AL}`, TOK, {archived: true});
+  // 2.725.0 (#5172): an agent sends the version it read (2.657.0, #5052: else 400 version_required)
+  await tcall('PATCH', `/lists/${AL}`, TOK, {archived: true, expect_updated_at: (await tcall('GET', `/lists/${AL}`, TOK)).updated_at});
   const pend = await tcall('DELETE', `/lists/${AL}`, TOK);
   check(pend._st === 202 && pend.job?.state === 'waiting', 'agent deletes a list: waits (202)');
   w = await boot({user: 'alice', hash: 'agents'}); d = w.document;

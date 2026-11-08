@@ -69,6 +69,10 @@ class Api:
     def put(self, p, js=None, **k):
         return self.req("PUT", p, json=js, **k)
 
+    def lpatch(self, lid, js):
+        """2.725.0 (#5173): PATCH /lists/{id} with the version just read - agents must send it (2.657.0, #5052)."""
+        return self.patch(f"/lists/{lid}", {**js, "expect_updated_at": self.get(f"/lists/{lid}").json()["updated_at"]})
+
     def delete(self, p, **k):
         return self.req("DELETE", p, **k)
 
@@ -273,7 +277,8 @@ check(A.get(B + "/api/admin/agent-policy").json()["scope_limit"]["agents"][-1] =
 # ================================================================== approvals
 ev0 = cl.get("/agent").json()["cursor"]
 AL = cl.post("/lists", {"name": "Agent scratch"}).json()["id"]
-check(cl.patch(f"/lists/{AL}", {"archived": True}).ok, "agent archives its own list (no approval)")
+# 2.725.0 (#5173): an agent sends the version it read (2.657.0, #5052: else 400 version_required)
+check(cl.lpatch(AL, {"archived": True}).ok, "agent archives its own list (no approval)")
 r = cl.delete(f"/lists/{AL}")
 check(r.status_code == 202 and r.json()["approval_required"] and r.json()["job"]["state"] == "waiting" and r.json()["job"]["approval"],
       f"agent deletes a list: 202 + waiting job {r.text[:200]}")
@@ -322,13 +327,13 @@ Bo.patch(B + f"/api/my/agents/{PA}", json={"scopes": ["read", "tasks:write", "st
 check(A.put(B + f"/api/lists/{L}/members", json={"user_id": PA, "role": "edit"}).status_code == 404,
       "somebody else's personal agent cannot be added to a list: 404")
 PL = pa_tok.post("/lists", {"name": "Bot list"}).json()["id"]
-pa_tok.patch(f"/lists/{PL}", {"folder": ""})
-r = pa_tok.patch(f"/lists/{PL}", {"folder": "Work"})
+pa_tok.lpatch(PL, {"folder": ""})  # 2.725.0 (#5173): with the version (#5052)
+r = pa_tok.lpatch(PL, {"folder": "Work"})
 check(r.status_code == 202 and dbx("SELECT user_id FROM agent_jobs WHERE id=?", (r.json()["job"]["id"],))[0][0] == ids["bob"],
       "personal agent moves its list into a folder: its owner approves")
 r = Bo.post(B + f"/api/agents/jobs/{r.json()['job']['id']}/action", json={"action": "approve"})
 check(r.ok and r.json()["state"] == "done" and dbx("SELECT folder FROM lists WHERE id=?", (PL,))[0][0] == "Work", f"owner approves: moved {r.text[:200]}")
-check(pa_tok.patch(f"/lists/{PL}", {"name": "Bot list 2"}).ok, "renaming its list: no approval")
+check(pa_tok.lpatch(PL, {"name": "Bot list 2"}).ok, "renaming its list: no approval")
 # a failing replay ends failed
 r = cl.post("/tasks/batch", {"ids": T[:10], "action": "delete"})
 check(r.status_code == 202, "agent batch delete of 10: approval")
@@ -342,7 +347,7 @@ A.patch(B + f"/api/admin/agents/{AG}", json={"enabled": True})
 A.patch(B + f"/api/admin/agents/{AG}", json={"allowed_ips": "0.0.0.0/0"})
 dbx("UPDATE api_tokens SET allowed_ips='172.16.0.0/12,0.0.0.0/0' WHERE user_id=?", (AG,))
 IL = cl.post("/lists", {"name": "IP list"}).json()["id"]
-cl.patch(f"/lists/{IL}", {"archived": True})
+cl.lpatch(IL, {"archived": True})  # 2.725.0 (#5173): with the version (#5052)
 r = cl.delete(f"/lists/{IL}")
 dbx("UPDATE api_tokens SET allowed_ips='203.0.113.7' WHERE user_id=?", (AG,))
 r = A.post(B + f"/api/agents/jobs/{r.json()['job']['id']}/action", json={"action": "approve"})
