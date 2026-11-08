@@ -2894,6 +2894,7 @@ TOOLSETS = {
         get_document update_document create_document list_notepads create_notepad update_notepad delete_notepad write_status_pad get_weekly_status
         list_layout_blocks get_view_layout propose_layout set_wip_limit set_dwell_limits get_velocity list_flow propose_import propose_rule list_video_reviews get_video_review
         add_video_comment set_video_comment_done get_workload get_absences get_day_plan get_day_review
+        list_views create_view set_section_kind set_task_state
     """,
     "code": """
         list_repos list_build_status list_environments set_deployment request_merge_approval request_integration_approval request_deploy_approval
