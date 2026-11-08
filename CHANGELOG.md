@@ -17,6 +17,36 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.749.0] - 2026-11-08
+
+Package 2.583 (Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Teil 1/6: Sa).
+
+### Added
+- Documents: a document opens as its own view with its own address (#docs/<id>): head with back (Esc returns to the same place in the list), "3 of 128", arrows and the arrow keys through the current list, download / actions / delete; a foldable strip of neighbouring documents on the left; the fields in tabs (Details, Content, History, Shares) with rarer ones under "More fields", every change saved at once with undo; on the right every PDF page below each other, drawn sharp when scrolled to, zoom, width, whole page, full screen. Grips between the columns move to the edge. Phone: one column, preview on top, swipe as before. Replaces the pane, the phone sheet and the reading view (#4835, #4829).
+- File store: one card and one sheet for files and documents - a file opens the same document view, a folder with recognition always shows document cards without a switch (#4832).
+- Documents and file store cards: card size slider (7-28 rem) in the bar, Ctrl/Cmd + wheel, Ctrl + plus/minus and two fingers on the card area, remembered per person for computer and phone; small cards show only the picture, bigger ones load a sharper 800 px preview (new column doc_meta.thumb_l, filled for older documents in idle time) (#4812).
+- Settings: each tab shows the often used settings first, the rest under "Further options" (open/closed remembered per person on all devices, the search opens it and highlights the field, "2 changed" when something under it differs from the start value); new route GET /api/settings/defaults (#4833).
+
+### Changed
+- Large screens: lists and overviews in every area (task lists, projects, start, office, contacts, statistics, time, agents, file store / documents, budget, bookmarks, tags, archive, waiting) use the full width of the content area; reading text and forms keep their widths (#4840).
+- Task list rows behave like a table on wide lists: the title gets about 40 rem at most, text columns share the rest and grow instead of being cut, more columns stay in the first line, numbers align right; wider time / progress / created columns in the project list (#4840).
+- Settings show one column of form width again on wide monitors; the wider dialog and the invoice editor side by side stay (#4833).
+
+### Fixed
+- A document card always shows its title in bold, the sender on its own line below (#4870).
+- Documents show every date with its year (06.11.2026), no Today / weekday (#4877).
+- Review: a locked or encrypted file reached by its address keeps its own way; the page count of a drawn PDF is capped; the 800 px preview has a file size cap (#4835, #4812).
+
+Package 2.610 (Bündel: Releases für Selbst-Hoster: Tag-Version braucht ei, Sammelpaket: Aufgaben ohne Paket (Dispatcher), Teil 1/6: Sammelpaket: Aufgaben o).
+
+### Added
+- Agent API: agents restore task attachments and project files from the trash - `POST /api/v1/attachments/<id>/restore` and `POST /api/v1/list-files/<id>/restore` with the same rights as deleting (scope `attachments:write`, only what is shared with the agent); MCP tools `restore_attachment` and `restore_project_file` (#4010).
+- Release workflow: `release.yml` can also be started by hand on an existing tag (Actions > Release > Run workflow, input `tag`), with the same gate - a green full CI run on the tag's commit; the image comes from the tag, the GitHub release stays with the weekly release (#4926).
+
+### Changed
+- Office > Bookkeeping: in a year with the basis "Bank and cash (strict)" the neutral export counts like the income statement - receipts through their bank, cash or card line with its day and amount, entertainment receipts through their line, bank and cash lines without a receipt as rows of type "Booking"; what does not count is listed in `missing.txt` of the archive. The DATEV export names receipts without a payment line and invoice payments without a bank booking as hints instead of leaving them out silently (#4932).
+- Internal: templates, comments, waiting on, the people of a task, field options and the trash of sections / planned sprints write through the shared core's layer for side objects (`kalmido/core/objparts.py`); answers and rights stay the same (#4762).
+
 ## [2.740.0] - 2026-11-08
 
 Package 2.725 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
@@ -160,7 +190,8 @@ Package 2.685 (Bündel: Kommentare: Aktivität in drei Stufen (nur Kommenta, Bü
 - Office: switching "Office & finance" on no longer leaves the office saying it is switched off when it loaded before the switch was saved (#5176).
 - Balance sheet: a receipt booked against the bank (counter account "bank") and paid from the cash box is now booked bank to cash instead of being left out (#5128).
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.740.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.749.0...HEAD
+[2.749.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.749.0
 [2.740.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.740.0
 [2.734.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.734.0
 [2.731.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.731.0
