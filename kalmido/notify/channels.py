@@ -70,7 +70,8 @@ CH_TEST_LIMIT = 20       # "Send test" per person within the rate window
 TELEGRAM_API = (os.environ.get("KALMIDO_TELEGRAM_API", "").strip() or "https://api.telegram.org").rstrip("/")
 CH_ERR = {"http": N_("The server answered with an error ({0})"), "timeout": N_("No answer in time"),
           "network": N_("The address could not be reached"), "tls": N_("The secure connection failed"),
-          "config": N_("Invalid URL"), "error": N_("Sending failed")}
+          "config": N_("Invalid URL"), "error": N_("Sending failed"),
+          "unreachable": N_("The server could not be reached, or its address lies in a private network that an admin has not allowed")}  # 2.674.0 (#4382 finding 4)
 TG_TOKEN_RE = re.compile(r"\d{3,15}:[A-Za-z0-9_-]{20,80}")
 TG_CHAT_RE = re.compile(r"-?\d{1,20}|@[A-Za-z0-9_]{4,64}")
 PHONE_RE = re.compile(r"\+\d{6,16}")
@@ -166,7 +167,19 @@ def chn_send(kind, t, text, allow):
     until = time.monotonic() + CAL_SEND_S  # 2.539.0 (#4379): the whole send ends after CAL_SEND_S (a server answering drop by drop)
     with cal_until(until) as cut:
         res = _chn_send1(kind, t, text, allow, until)
-    return (False, res[1], "timeout") if cut.is_set() else res
+    res = (False, res[1], "timeout") if cut.is_set() else res
+    if res[2] in ("blocked", "timeout", "tls", "network"):
+        # 2.674.0 (#4382 finding 4): a host the admin did not allow gets one answer for "private network" / no answer / no
+        # connection / TLS (like the webhooks' wh_send): no DNS oracle for internal names, no port scan through the test
+        # button; a host of the allow-list keeps its code (the admin's own target)
+        from ..calendars.subscriptions import cal_host_allowed
+        try:
+            p = urllib.parse.urlsplit(chn_request(kind, t, text)[0])
+            ok_host = cal_host_allowed(allow, p.hostname, p.port or {"http": 80, "https": 443}.get(p.scheme))
+        except (KeyError, TypeError, ValueError):
+            ok_host = False
+        return res if ok_host else (False, None, "unreachable")
+    return res
 
 
 def _chn_send1(kind, t, text, allow, until):

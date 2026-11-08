@@ -300,7 +300,8 @@ A.patch(B + f"/api/me/webhooks/{wbig['id']}", json={"enabled": False})
 for host in ("evil.test:8097", "meta.test", "ten.test", "cgnat.test"):
     wx = mk(A, f"https://{host}/x", ["task.created"], host)
     r = A.post(B + f"/api/me/webhooks/{wx['id']}/test").json()
-    check(not r["ok"] and r["error"] == "blocked" and r["error_text"], f"connect-time guard: {host} blocked ({r['error']})")
+    # 2.674.0 (#4382): a host not allowed answers one code for blocked / timeout / network / TLS, without milliseconds
+    check(not r["ok"] and r["error"] == "unreachable" and r["error_text"] and not r["ms"], f"connect-time guard: {host} blocked ({r['error']})")
     A.delete(B + f"/api/me/webhooks/{wx['id']}")
 check(not [x for x in hooks_log() if x["path"] == "/x"], "blocked hosts were never contacted")
 r = A.post(B + f"/api/me/webhooks/{w1['id']}/test").json()

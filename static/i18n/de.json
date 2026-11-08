@@ -17483,6 +17483,7 @@
   "Add image, PDF or audio": "Bild, PDF oder Audio hinzufügen",
   "Images (JPG, PNG, WebP), PDFs and audio files (MP3, M4A, AAC, WAV, OGG, Opus, FLAC). The file stays in the file store; comments sit at a point or, for audio, at a second.": "Bilder (JPG, PNG, WebP), PDFs und Audiodateien (MP3, M4A, AAC, WAV, OGG, Opus, FLAC). Die Datei bleibt in der Dateiablage; Kommentare sitzen an einem Punkt oder, bei Audio, an einer Sekunde.",
   "Please select an image (JPG, PNG, WebP), a PDF or an audio file (MP3, M4A, AAC, WAV, OGG, Opus, FLAC).": "Bitte ein Bild (JPG, PNG, WebP), ein PDF oder eine Audiodatei (MP3, M4A, AAC, WAV, OGG, Opus, FLAC) wählen.",
+  "The server could not be reached, or its address lies in a private network that an admin has not allowed": "Der Server war nicht erreichbar, oder seine Adresse liegt in einem privaten Netz, das kein Admin freigegeben hat",
   "PUBLIC_URL is not set": "PUBLIC_URL ist nicht gesetzt",
   "Apps then learn the address of this server from each request (its Host header). Set PUBLIC_URL in .env to the address people open and restart before apps connect (SELF-HOSTING.md).": "Apps erfahren die Adresse dieses Servers dann aus jeder Anfrage (ihrem Host-Header). Bevor sich Apps verbinden: PUBLIC_URL in .env auf die Adresse setzen, die alle öffnen, und neu starten (SELF-HOSTING.md).",
   "given by {0}": "erteilt von {0}",

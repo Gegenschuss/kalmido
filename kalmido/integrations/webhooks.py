@@ -73,12 +73,14 @@ WH_MAX = 10              # per user (2.115.0 A: and per organisation)
 WH_LOG_KEEP = 50         # delivery log rows per webhook
 WH_QUEUE_MAX = 500       # pending deliveries per webhook (more are dropped and logged)
 WH_BATCH = 20            # deliveries per tick
+WH_UNREACHABLE = ("blocked", "timeout", "tls", "network")  # 2.674.0 (#4382 finding 4): one answer for a host not allowed
 WH_TEST_LIMIT = 20       # "Send test" per user within FAIL_WINDOW
 WH_ACT = {"created": "task.created", "complete": "task.completed", "reopen": "task.reopened", "delete": "task.deleted",
           "purge": "task.deleted", "comment": "comment.created"}
 WH_ERR = {"blocked": CAL_ERR["blocked"], "timeout": CAL_ERR["timeout"], "network": CAL_ERR["network"], "tls": CAL_ERR["tls"],
           "redirect": N_("The server answered with a redirect, which is not followed"), "http": N_("The server answered with an error ({0})"),
-          "config": N_("Invalid URL"), "error": CAL_ERR["error"], "dropped": N_("Too many pending deliveries, event dropped")}
+          "config": N_("Invalid URL"), "error": CAL_ERR["error"], "dropped": N_("Too many pending deliveries, event dropped"),
+          "unreachable": N_("The server could not be reached, or its address lies in a private network that an admin has not allowed")}  # 2.674.0 (#4382 finding 4)
 
 
 def need_wh():
@@ -132,6 +134,10 @@ def wh_send(url, secret, event, delivery, attempt, body_bytes, allow):
         with contextlib.suppress(ValueError):
             if cal_host_allowed(allow, p.hostname, p.port or {"http": 80, "https": 443}.get(p.scheme)):
                 return res[0], res[1], res[2], "network"
+    if res[3] in WH_UNREACHABLE:
+        # 2.674.0 (#4382 finding 4): a host the admin did not allow gets one answer for "private network" / no answer / no
+        # connection / TLS, without the milliseconds -- no DNS oracle for internal names, no port scan through the test button
+        return False, None, 0, "unreachable"
     return res
 
 
