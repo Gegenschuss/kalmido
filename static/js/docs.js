@@ -1369,7 +1369,7 @@ async function dc_bulkTags(add) {
   const all = add ? (DC.facets?.tags || []) : [...new Set(known)].map(name => ({name}));
   const n = DC.sel.size;
   const names = await dt_pick({title: add ? trn('Add tags to {0} document', 'Add tags to {0} documents', n) : trn('Remove tags from {0} document', 'Remove tags from {0} documents', n),
-    all: add ? all : (all.length ? all : DC.facets?.tags || []), cur: [], ok: add ? tr('Add') : tr('Remove')});
+    all: add ? all : (all.length ? all : DC.facets?.tags || []), cur: [], ok: add ? tr('Add') : tr('Remove'), known: !add});  // 2.742.0 (#4862): removing offers only the given tags
   if (!names?.length) return;
   dc_bulk(add ? {add_tags: names} : {remove_tags: names}, add ? tr('Tags added') : tr('Tags removed'));
 }

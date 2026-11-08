@@ -9,31 +9,19 @@
    Classic script sharing the global scope with the others (load order: index.html, docs/ARCHITECTURE.md). */
 'use strict';
 
-// ---- the tag picker: resolves with the chosen names, or null (cancelled). all: [{name}], cur: [names] chosen at the start
-async function dt_pick({title, all, cur, ok}) {
-  const names = [], seen = new Set();
-  for (const n of [...(all || []).map(x => x.name || x), ...(cur || [])]) { const k = String(n || '').toLowerCase(); if (k && !seen.has(k)) { seen.add(k); names.push(String(n)); } }
-  const on = new Set((cur || []).map(x => String(x).toLowerCase()));
-  const pill = n => `<button type="button" class="tsp ${on.has(n.toLowerCase()) ? 'tsp-in' : ''}" data-tsp="${esc(n)}" aria-pressed="${on.has(n.toLowerCase())}">${on.has(n.toLowerCase()) ? ic('check', 's') + ' ' : ''}${esc(n)}</button>`;
-  const draw = md => { const b = $('.tspick', md); if (b) b.innerHTML = names.map(pill).join('') || `<span class="muted">${tr('No tags yet')}</span>`; };
-  const add = md => {
-    const inp = $('#ts-new', md), v = (inp?.value || '').replace(/\s+/g, ' ').trim().slice(0, 120); if (!v) return;
-    if (!names.some(x => x.toLowerCase() === v.toLowerCase())) names.push(v);
-    on.add(v.toLowerCase()); inp.value = ''; draw(md); inp.focus();
-  };
+// ---- the tag picker: resolves with the chosen names, or null (cancelled). all: [{name}], cur: [names] chosen at the start.
+// 2.742.0 (#4862): the tag field (tf_html below) in a dialog, the same as in a document; known: only names of all (remove)
+async function dt_pick({title, all, cur, ok, known = false}) {
+  const at = {root: /** @type {HTMLElement|null} */ (null)};
   const r = await askDialog({title, ok: ok || tr('Save'), cancel: tr('Cancel'),
-    html: `<div class="tspick" role="group" aria-label="${esc(tr('Tags'))}"></div><div class="tsnew"><input id="ts-new" maxlength="120" placeholder="${esc(tr('New tag'))}" aria-label="${esc(tr('New tag'))}" autocomplete="off"><button type="button" class="btn sm" data-tsadd="1">${ic('plus', 's')} ${tr('Add')}</button></div>`,
-    after: md => {
-      md.classList.add('tsdlg'); draw(md);
-      md.addEventListener('click', e => {
-        const p = e.target.closest('[data-tsp]');
-        if (p) { const k = p.dataset.tsp.toLowerCase(); if (on.has(k)) on.delete(k); else on.add(k); draw(md); $$('[data-tsp]', md).find(x => x.dataset.tsp.toLowerCase() === k)?.focus(); return; }
-        if (e.target.closest('[data-tsadd]')) add(md);
-      });
-      md.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'ts-new' && e.target.value.trim()) { e.preventDefault(); add(md); } });
-    }});
-  if (r === false || r == null) return null;
-  return names.filter(n => on.has(n.toLowerCase()));
+    html: tf_html({id: 'ts-new', vals: (cur || []).map(String), all: all || [], label: tr('Tags'), ph: tr('Add a tag…'), noNew: known}),
+    after: md => { md.classList.add('tsdlg'); at.root = $('.tfld', md); setTimeout(() => $('#ts-new', md)?.focus(), 0); }});
+  tf_close();
+  const root = at.root;
+  if (r === false || r == null || !root) return null;
+  const inp = /** @type {HTMLInputElement|null} */ (root.querySelector('.tfin'));
+  if (inp && tf_norm(inp.value)) { const v = inp.value; inp.value = ''; tf_add(root, v.split(',')); }  // typed, not yet taken
+  return tf_vals(root);
 }
 
 // ---- filter buttons: st = {name: 'in' | 'not'}; a click goes off -> in -> not -> off (dt_cycle)
@@ -172,3 +160,165 @@ document.addEventListener('click', e => {
   // after this handler: set them once the click is over
   setTimeout(() => { for (const b of /** @type {NodeListOf<HTMLInputElement>} */ (document.querySelectorAll('.ablist [data-absel="one"]'))) b.checked = AB.sel.has(+b.dataset.id); }, 0);
 }, true);
+
+// ---- 2.742.0 (#4862): the tag field, ONE part for documents (docview.js), the file store and the editing of several
+// (dt_pick): the given tags as pills with an x, a text field behind them; from the first letter a list of its own (no
+// <datalist>, it looks different in every browser) with the known tags (the start first, then within; the hit in bold),
+// the arrow keys + Enter / Tab take one, a comma or Enter makes a new one ("New: …" as the last line), Backspace in the
+// empty field takes the last pill away. single: one value (sender / document type later). Accessible as a combobox with
+// a listbox and aria-activedescendant. The list lives in <body> (a redraw of the view, which morphs the field, keeps it
+// open; a dialog does not clip it). A change sets the hidden field (attrs, e.g. data-dcp="tags", its value the names
+// joined by ", ") and sends it a change event: the caller saves as before. Names come in as text only (esc / textContent).
+const TFLD = {all: new Map(), lb: null, inp: null, act: -1, rows: []};
+const tf_norm = s => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, 120);
+const tf_pillHtml = (v, ro) => `<span class="tsp tsp-in tfp" data-tfv="${esc(v)}"><span class="tft">${esc(v)}</span>${ro ? '' : `<button type="button" class="tfx" data-tfx tabindex="-1" aria-label="${esc(tr('Remove {0}', v))}">${ic('x', 's')}</button>`}</span>`;
+// id: the text field's id (a <label for> names it); all: the known names; vals: the given ones; attrs: on the hidden field
+function tf_html({id, vals, all, ro = false, single = false, attrs = '', ph = '', label = '', noNew = false}) {
+  TFLD.all.set(id, (all || []).map(x => tf_norm(x?.name ?? x)).filter(Boolean));
+  const vs = (vals || []).map(tf_norm).filter(Boolean);
+  return `<div class="tfld${single ? ' tf1' : ''}${ro ? ' tfro' : ''}" data-tf="${esc(id)}"${single ? ' data-tf1' : ''}${noNew ? ' data-tfnonew' : ''}><span class="tfps">${vs.map(v => tf_pillHtml(v, ro)).join('')}</span>${ro ? '' : `<input id="${esc(id)}" class="tfin" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="${esc(id)}-lb" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="enter" maxlength="120"${label ? ` aria-label="${esc(label)}"` : ''}${ph && !vs.length ? ` placeholder="${esc(ph)}"` : ''}>`}<input type="hidden" class="tfval" ${attrs} value="${esc(vs.join(', '))}"></div>`;
+}
+const tf_vals = root => [...root.querySelectorAll('.tfp')].map(p => /** @type {HTMLElement} */ (p).dataset.tfv || '');
+// sets the pills (the field's own drawing, the caller's redraw draws the same) and tells the hidden field
+function tf_set(root, vals, tell = true) {
+  const ro = root.classList.contains('tfro'), seen = new Set(), out = [];
+  for (const v of vals.map(tf_norm)) { const k = v.toLowerCase(); if (v && !seen.has(k)) { seen.add(k); out.push(v); } }
+  const ps = root.querySelector('.tfps'); if (ps) ps.innerHTML = out.map(v => tf_pillHtml(v, ro)).join('');
+  const inp = root.querySelector('.tfin'); if (inp && out.length) inp.removeAttribute('placeholder');
+  const h = root.querySelector('.tfval'); if (!h) return out;
+  const nv = out.join(', ');
+  if (h.value !== nv) { h.value = nv; if (tell) h.dispatchEvent(new Event('change', {bubbles: true})); }
+  return out;
+}
+// names taken (one or several at once = one change): a known one in its own spelling; single = the last replaces the value
+function tf_add(root, names) {
+  const all = TFLD.all.get(root.dataset.tf) || [], one = root.hasAttribute('data-tf1'), cur = tf_vals(root);
+  let out = one ? cur.slice(0, 1) : [...cur];
+  for (const name of Array.isArray(names) ? names : [names]) {
+    const v = tf_norm(name); if (!v) continue;
+    const known = all.find(x => x.toLowerCase() === v.toLowerCase());
+    if (!known && root.hasAttribute('data-tfnonew')) continue;
+    if (one) out = [known || v];
+    else if (!out.some(x => x.toLowerCase() === v.toLowerCase())) out.push(known || v);
+  }
+  if (out.length !== cur.length || out.some((x, i) => x !== cur[i])) tf_set(root, out);
+}
+// the hits of q: the known names not given yet, the ones starting with q first, then the ones containing it
+function tf_hits(root, q) {
+  const all = TFLD.all.get(root.dataset.tf) || [], cur = new Set(tf_vals(root).map(x => x.toLowerCase())), k = q.toLowerCase();
+  const free = all.filter(x => !cur.has(x.toLowerCase()));
+  if (!k) return free.slice(0, 50);
+  return [...free.filter(x => x.toLowerCase().startsWith(k)), ...free.filter(x => !x.toLowerCase().startsWith(k) && x.toLowerCase().includes(k))].slice(0, 50);
+}
+const tf_mark = (s, q) => { const i = q ? s.toLowerCase().indexOf(q.toLowerCase()) : -1; return i < 0 ? esc(s) : `${esc(s.slice(0, i))}<b>${esc(s.slice(i, i + q.length))}</b>${esc(s.slice(i + q.length))}`; };
+function tf_close() {
+  if (TFLD.inp) { TFLD.inp.setAttribute('aria-expanded', 'false'); TFLD.inp.removeAttribute('aria-activedescendant'); }
+  TFLD.lb?.remove(); TFLD.lb = null; TFLD.inp = null; TFLD.act = -1; TFLD.rows = [];
+}
+// opens / draws the list under the field; all = every free name (ArrowDown in the empty field)
+function tf_open(inp, all = false) {
+  const root = inp.closest('.tfld'); if (!root) return;
+  const q = tf_norm(inp.value);
+  if (!q && !all) { tf_close(); return; }
+  const hits = tf_hits(root, q), rows = hits.map(v => ({v, nw: false}));
+  const given = tf_vals(root).some(x => x.toLowerCase() === q.toLowerCase());
+  if (q && !root.hasAttribute('data-tfnonew') && !given && !hits.some(x => x.toLowerCase() === q.toLowerCase())) rows.push({v: q, nw: true});
+  if (!rows.length) { tf_close(); return; }
+  if (TFLD.inp && TFLD.inp !== inp) tf_close();
+  const id = inp.id + '-lb';
+  let lb = TFLD.lb;
+  if (!lb) { lb = document.createElement('ul'); lb.className = 'tflb'; lb.setAttribute('role', 'listbox'); document.body.appendChild(lb); }
+  lb.id = id; lb.setAttribute('aria-label', inp.getAttribute('aria-label') || /** @type {any} */ (inp).labels?.[0]?.textContent || tr('Tags'));
+  const keep = TFLD.rows[TFLD.act]?.v;
+  TFLD.lb = lb; TFLD.inp = inp; TFLD.rows = rows;
+  // the best hit is marked at once (Enter takes it); a name typed exactly: that one
+  let act = keep != null ? rows.findIndex(r => r.v === keep) : -1;
+  if (act < 0) act = q || all ? 0 : -1;
+  TFLD.act = act;
+  lb.innerHTML = rows.map((r, i) => `<li role="option" id="${esc(id)}-${i}" data-tfo="${i}" aria-selected="${i === act}" class="${r.nw ? 'tfnew' : ''}">${r.nw ? esc(tr('New: {0}', '\u0001')).replace('\u0001', `<b>${esc(r.v)}</b>`) : tf_mark(r.v, q)}</li>`).join('');
+  inp.setAttribute('aria-expanded', 'true');
+  tf_actSet(act);
+  tf_place();
+}
+function tf_actSet(i) {
+  const lb = TFLD.lb, inp = TFLD.inp; if (!lb || !inp) return;
+  TFLD.act = i;
+  for (const o of lb.children) o.setAttribute('aria-selected', String(+(/** @type {HTMLElement} */ (o).dataset.tfo) === i));
+  const o = i >= 0 ? lb.children[i] : null;
+  if (o) { inp.setAttribute('aria-activedescendant', o.id); o.scrollIntoView?.({block: 'nearest'}); } else inp.removeAttribute('aria-activedescendant');
+}
+// under the field (above it when there is no room below, e.g. the phone's keyboard)
+function tf_place() {
+  const lb = TFLD.lb, root = TFLD.inp?.closest('.tfld');
+  if (!lb || !root || !root.isConnected) { tf_close(); return; }
+  const r = root.getBoundingClientRect(), vh = window.visualViewport?.height || window.innerHeight, below = vh - r.bottom, up = below < 160 && r.top > below;
+  lb.style.left = `${Math.max(4, r.left)}px`; lb.style.width = `${Math.max(r.width, 160)}px`;
+  lb.style.top = up ? '' : `${r.bottom + 2}px`; lb.style.bottom = up ? `${window.innerHeight - r.top + 2}px` : '';
+  lb.style.maxHeight = `${Math.max(120, Math.min(320, (up ? r.top : below) - 12))}px`;
+}
+// takes the marked row (or the typed text); false: nothing to take
+function tf_take(inp, typed = false) {
+  const root = inp.closest('.tfld'); if (!root) return false;
+  const r = !typed && TFLD.inp === inp ? TFLD.rows[TFLD.act] : null, v = r ? r.v : tf_norm(inp.value);
+  if (!v) return false;
+  inp.value = '';
+  tf_add(root, v); tf_close();
+  return true;
+}
+document.addEventListener('input', e => {
+  const inp = dt_el(e).closest?.('.tfin'); if (!inp) return;
+  const el = /** @type {HTMLInputElement} */ (inp);
+  if (el.value.includes(',')) {  // a comma: what stands before it becomes a tag (also pasted "a, b, c")
+    const parts = el.value.split(','), rest = parts.pop() || '', root = el.closest('.tfld');
+    el.value = rest.trimStart();
+    if (root) tf_add(root, parts);
+  }
+  tf_open(el);
+});
+// before the view's / dialog's own keys (Esc closes the list, not the view; Enter takes, it does not send the dialog)
+document.addEventListener('keydown', e => {
+  const inp = /** @type {HTMLInputElement} */ (dt_el(e).closest?.('.tfin')); if (!inp || e.isComposing) return;
+  const open = TFLD.inp === inp && !!TFLD.lb, n = TFLD.rows.length, stop = () => { e.preventDefault(); e.stopPropagation(); };
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    stop();
+    if (!open) { tf_open(inp, true); if (e.key === 'ArrowUp' && TFLD.rows.length) tf_actSet(TFLD.rows.length - 1); return; }
+    tf_actSet(e.key === 'ArrowDown' ? (TFLD.act + 1) % n : (TFLD.act <= 0 ? n - 1 : TFLD.act - 1));
+  } else if (e.key === 'Enter') {
+    if (open && TFLD.act >= 0) { stop(); tf_take(inp); } else if (tf_norm(inp.value)) { stop(); tf_take(inp, true); }
+  } else if (e.key === 'Tab' && !e.shiftKey) {
+    if (open && TFLD.act >= 0) { stop(); tf_take(inp); }
+  } else if (e.key === 'Escape') {
+    if (open) { stop(); tf_close(); }
+  } else if (e.key === 'Backspace' && !inp.value && inp.selectionStart === 0) {
+    const root = inp.closest('.tfld'), cur = root ? tf_vals(root) : [];
+    if (root && cur.length) { stop(); tf_set(root, cur.slice(0, -1)); }
+  }
+}, true);
+// leaving the field: typed text becomes a tag (the field's change event), the list closes
+document.addEventListener('change', e => {
+  const inp = /** @type {HTMLInputElement} */ (dt_el(e).closest?.('.tfin')); if (!inp) return;
+  e.stopPropagation();
+  const root = inp.closest('.tfld'), v = inp.value; if (!root || !tf_norm(v)) return;
+  inp.value = '';
+  tf_add(root, v.split(','));
+}, true);
+document.addEventListener('focusout', e => { if (TFLD.inp && dt_el(e) === TFLD.inp) setTimeout(() => { if (TFLD.inp && document.activeElement !== TFLD.inp) tf_close(); }, 0); });
+// a row of the list: the press keeps the focus in the field, the click takes the row
+document.addEventListener('mousedown', e => { if (dt_el(e).closest?.('.tflb') || dt_el(e).closest?.('.tfx')) e.preventDefault(); });
+document.addEventListener('click', e => {
+  const o = dt_el(e).closest?.('.tflb [data-tfo]');
+  if (o && TFLD.inp) { const inp = TFLD.inp; tf_actSet(+(/** @type {HTMLElement} */ (o).dataset.tfo)); tf_take(inp); inp.focus(); return; }
+  const x = dt_el(e).closest?.('.tfx');
+  if (x) {
+    const root = x.closest('.tfld'), v = /** @type {HTMLElement} */ (x.closest('.tfp'))?.dataset.tfv; if (!root || v == null) return;
+    e.preventDefault(); e.stopPropagation();
+    tf_set(root, tf_vals(root).filter(y => y !== v));
+    /** @type {HTMLElement} */ (root.querySelector('.tfin'))?.focus();
+    return;
+  }
+  const root = dt_el(e).closest?.('.tfld');
+  if (root && !dt_el(e).closest('.tfin')) /** @type {HTMLElement} */ (root.querySelector('.tfin'))?.focus();
+});
+window.addEventListener('scroll', () => { if (TFLD.lb) tf_place(); }, true);
+window.addEventListener('resize', () => { if (TFLD.lb) tf_place(); });
+window.addEventListener('hashchange', tf_close);

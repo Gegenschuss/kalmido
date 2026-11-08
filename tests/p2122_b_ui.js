@@ -53,13 +53,19 @@ const tagsOf = async id => ((await call('GET', `/api/files/nodes/${id}/tags`)).t
   check(!d.querySelector(`.abrow[data-abid="${R[2]}"] .abtags`), 'a row without tags shows none');
   w.__dialogs = 'manual';
   w.eval(`dt_abEdit(AB.data.items.find(x => x.id === ${R[2]}))`);
-  const pk = await until(() => d.querySelector('.modal.tsdlg .tspick [data-tsp]') && d.querySelector('.modal.tsdlg'));
-  check(pk && [...pk.querySelectorAll('[data-tsp]')].map(b => b.dataset.tsp).sort().join(',') === 'Kunde,Steuer', 'the picker offers the tags of the space');
+  // 2.742.0 (#4862): the picker is the tag field (tagsel.js tf_html): a letter offers the tags of the space, Enter takes one,
+  // a comma makes a new one
+  const pk = await until(() => d.querySelector('.modal.tsdlg .tfld #ts-new') && d.querySelector('.modal.tsdlg'));
+  const tin = pk?.querySelector('#ts-new');
+  const typeIn = v => { tin.focus(); tin.value = v; tin.dispatchEvent(new w.Event('input', {bubbles: true})); };
   if (pk) {
-    click(w, pk.querySelector('[data-tsp="Steuer"]'));
-    check(pk.querySelector('[data-tsp="Steuer"]').getAttribute('aria-pressed') === 'true', 'a click switches a tag on');
-    pk.querySelector('#ts-new').value = 'Neu 2025'; click(w, pk.querySelector('[data-tsadd]'));
-    check(pk.querySelector('[data-tsp="Neu 2025"]')?.getAttribute('aria-pressed') === 'true', 'a new tag is added and on');
+    tin.focus(); tin.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'ArrowDown', bubbles: true, cancelable: true}));
+    check([...d.querySelectorAll('body > .tflb [role="option"]')].map(o => o.textContent).sort().join(',') === 'Kunde,Steuer', 'the picker offers the tags of the space');
+    typeIn('st');
+    tin.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Enter', bubbles: true, cancelable: true}));
+    check(pk.querySelector('.tfp[data-tfv="Steuer"]'), 'a tag taken from the list');
+    typeIn('Neu 2025,');
+    check(pk.querySelector('.tfp[data-tfv="Neu 2025"]'), 'a new tag is added');
     click(w, pk.querySelector('[data-cd="yes"]'));
   }
   check(await until(async () => (await tagsOf(R[2])) === 'Neu 2025,Steuer', 60), 'the tags are saved');
@@ -182,7 +188,7 @@ const tagsOf = async id => ((await call('GET', `/api/files/nodes/${id}/tags`)).t
   check(mi, 'the bar: "Edit" offers "Add tags…"');
   mi?.click();
   const pk2 = await until(() => vd.querySelector('.modal.tsdlg'));
-  if (pk2) { pk2.querySelector('#ts-new').value = 'Stapel'; click(v, pk2.querySelector('[data-tsadd]')); click(v, pk2.querySelector('[data-cd="yes"]')); }
+  if (pk2) { pk2.querySelector('#ts-new').value = 'Stapel'; click(v, pk2.querySelector('[data-cd="yes"]')); }  // 2.742.0 (#4862): the tag field takes typed text on OK
   const has = async (id, t) => ((await call('GET', `/api/docs/${id}`)).tags || []).some(x => x.name === t);
   check(await until(async () => await has(D1, 'Stapel') && await has(D3, 'Stapel') && !(await has(D2, 'Stapel')), 60), 'both chosen documents have the tag');
   check(v.eval(`/Tags added/.test(HIST.undo[HIST.undo.length - 1]?.label || '')`), 'ONE undo step');

@@ -98,7 +98,8 @@ const ready = id => until(async () => { const d = await call('GET', `/api/docs/$
   hold(w, /^PATCH \/api\/docs\/\d+$/);
   setField('dc-tags', 'home, insurance');
   check(await until(() => w.__held.length === 1 && w.eval(`DC.doc.tags.map(t => t.name).join('|')`) === 'home|insurance'), 'tags: at once (two tags) ' + w.eval(`JSON.stringify([DC.doc.tags, window.__held.length])`));
-  check(d.querySelector('.dc-md #dc-tags').value === 'home, insurance', 'tags: the field after the redraw');
+  // 2.742.0 (#4862): the tags are pills of the tag field (typed text with commas becomes pills when the field is left)
+  check([...d.querySelectorAll('.dc-md .tfld[data-tf="dc-tags"] .tfp')].map(p => p.dataset.tfv).join(', ') === 'home, insurance', 'tags: the field after the redraw');
   w.__held[0].fail(500);
   check(await until(() => !w.eval(`DC.doc.tags.length`)), 'tags: a refusal takes them back');
   hold(w, /^PATCH \/api\/docs\/\d+$/);
