@@ -62,7 +62,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   const sum = brief().querySelector('summary');
   check(/Job brief/.test(sum.textContent) && /Show the brief/.test(sum.textContent), 'the title "Job brief" and "Show the brief" ' + sum.textContent);
   const body = brief().querySelector('.jcbb');
-  check(body && body.querySelector('strong') && /the brief/.test(body.querySelector('strong').textContent) && body.querySelectorAll('li').length === 2, 'the whole text as Markdown (bold, list)');
+  check(body && body.querySelector('b') && /the brief/.test(body.querySelector('b').textContent) && body.querySelectorAll('li').length === 2, 'the whole text as Markdown (bold, list)');
   brief().open = true;
   check(brief().open, 'a tap opens it');
   const k0 = brief().dataset.k;
@@ -83,7 +83,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
 
   // ================= CSS
   const css = fs.readFileSync(path.join(__dirname, '..', 'static', 'css', 'agentchat.css'), 'utf8');
-  const blk = css.slice(css.indexOf('2.739.0 (#5216)'));
+  const blk = css.slice(css.indexOf('/* 2.739.0 (#5216)'));
   check(/\.jcbrief>summary\{[^}]*min-height:2\.75rem/.test(blk), 'the fold has a hit area of 2.75rem');
   const plain = blk.replace(/\/\*[\s\S]*?\*\//g, '');
   check(!/(?<![\d.])([3-9]|\d{2,})px/.test(plain) && !/#[0-9a-f]{3,6}\b/i.test(plain), 'CSS: rem sizes, no new colours');
