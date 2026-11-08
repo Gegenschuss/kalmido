@@ -1,6 +1,24 @@
 {
  "versions": [
   {
+   "version": "2.749.0",
+   "date": "2026-11-08",
+   "items": [
+    {
+     "de": "Ein Dokument öffnet sich jetzt in einer eigenen Ansicht mit allen Seiten scharf, Feldern daneben und Blättern mit den Pfeiltasten.",
+     "en": "A document now opens in its own view with every page sharp, the fields beside it and the arrow keys to leaf through."
+    },
+    {
+     "de": "Die Größe der Dokument- und Datei-Kacheln stellst du mit einem Regler oder mit Strg und Mausrad ein.",
+     "en": "Set the size of document and file cards with a slider or with Ctrl and the mouse wheel."
+    },
+    {
+     "de": "Einstellungen stehen wieder in einer Spalte, Seltenes liegt unter „Weitere Optionen“.",
+     "en": "Settings are one column again, rarely used ones sit under \"Further options\"."
+    }
+   ]
+  },
+  {
    "version": "2.740.0",
    "date": "2026-11-08",
    "items": [
