@@ -171,5 +171,6 @@ const lm_open = (sel, fn) => r => { const b = lm_btn(r, sel); if (!b) return fal
 cm_bind('#tc-msgs .cmsg, .tthview .cmsg', lm_open('[data-act="tc-msg-menu"]', (b, r) => tcMsgMenu(r, +b.dataset.mid)), null, lm_keep);
 cm_bind('#detail .cm:not(.cedit)', lm_open('[data-act="cm-copy"]', (b, r) => cmCopyMenu(b, r)), null, lm_keep);
 cm_bind('#chat-msgs .cmsg', lm_open('[data-act="chat-msg-menu"]', (b, r) => { const m = (S.chat?.msgs || []).find(x => x.id === +b.dataset.mid); if (!m) return false; acMsgMenu(r, m); }), null, lm_keep);
-cm_bind('#view .ghead[data-section]', lm_open('[data-act="section-menu"]', (b, r) => sectionMenu(r, +b.dataset.id)), null, lm_keep);
+// 2.725.0 (#5177): the long press of a section head is taken by dnd.js's hold (drag / menu on release, ms_lpTake): one menu, not two
+const LM_SECHEAD = cm_bind('#view .ghead[data-section]', lm_open('[data-act="section-menu"]', (b, r) => sectionMenu(r, +b.dataset.id)), null, lm_keep);
 cm_bind('#view .tl-cal .tl-name', lm_open('[data-act="cvx-tlmenu"]', (b, r) => cvxTlMenu(r, b.dataset.key, b.dataset.name)), null, lm_keep);
