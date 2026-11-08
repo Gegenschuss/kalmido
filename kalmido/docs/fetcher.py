@@ -24,10 +24,10 @@ from ..core.config import MAX_FILE_MB, PUBLIC_URL, PUBLIC_URL_SET, app
 from ..core.db import body, bump, db, err, iso, iso_ms, now_utc, parse_iso
 from ..core.errors import BadInput, Denied, UnknownFields
 from ..core.i18n import N_, lang, tr
+from ..core.ipallow import ips_clean, token_ip_ok  # 2.705.0 (#5151): the address rule of a key, as for API tokens
 from ..core.pg import insert_id, system_ctx
 from ..accounts.session import _rate_blocked, _rate_fail, _token_hash, client_ip, FAIL_WINDOW, me
 from ..api.common import hit_limit, v1_err, v1_json, v1_view, V1_KEY_KINDS
-from ..api.scopes import ips_clean, token_ip_ok  # 2.705.0 (#5151): the address rule of a key, as for API tokens
 from ..collab.comments import collab_user
 from ..collab.news import notif_ok
 from ..files.store import fs_log_add

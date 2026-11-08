@@ -45,6 +45,7 @@ ORDER = (
     "core.pgbus",  # 2.622.0 (#3891): signals between the processes of an instance (pg_notify)
     "api.common",  # 2.149.0 G (#2517): the /api/v1 route helpers (core layer, see LAYER_OF)
     "core.tokenhash",  # 2.138.0 C (#1907): upload / calendar tokens as hashes
+    "core.ipallow",  # 2.705.0 (#5151): the address rule of a key (API tokens, receipt fetcher keys)
     "core.rls",  # 2.37.0 (#1150): row-level security, applied by init_db
     "core.orgrows",  # 2.662.0 (#4602): the organisation of tasks / comments / events / contacts (triggers, set up by init_db)
     "core.retention",  # 2.152.0 (#2165): deletion periods + the switch of the retention runs
