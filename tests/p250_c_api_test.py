@@ -260,8 +260,13 @@ check(x["state"] == "declined" and x["reason"] == "Zu teuer", "the reason is sto
 check(A.post(B + f"/api/office/docs/{DOC2}/signoff", json={}).status_code == 409, "a decided quotation gets no new link")
 DOC3 = A.post(B + f"/api/office/docs/{DOC}/duplicate").json()["id"]
 A.post(B + f"/api/office/docs/{DOC3}/status", json={"status": "sent"})
-S4 = A.post(B + f"/api/office/docs/{DOC3}/signoff", json={"expires": "2099-12-31"}).json()
-check(S4.get("expires_at", "")[:13] in ("2099-12-31T22", "2099-12-31T23", "2100-01-01T00"), f"expiry through the end of the day {S4.get('expires_at')}")
+# 2.666.0 (#4074 10): an expiry at most 90 days ahead (was 2099-12-31); further ahead: 400
+import datetime as _dt  # noqa: E402
+from kt import today as _today  # noqa: E402  (the test clock, as the server's)
+D30 = _today() + _dt.timedelta(days=30)
+check(A.post(B + f"/api/office/docs/{DOC3}/signoff", json={"expires": "2099-12-31"}).status_code == 400, "an expiry years ahead: 400")
+S4 = A.post(B + f"/api/office/docs/{DOC3}/signoff", json={"expires": D30.isoformat()}).json()
+check(S4.get("expires_at", "")[:13] in (f"{D30}T22", f"{D30}T23", f"{D30 + _dt.timedelta(days=1)}T00"), f"expiry through the end of the day {S4.get('expires_at')}")
 check(A.post(B + f"/api/office/docs/{DOC3}/signoff", json={"expires": "2001-01-01"}).status_code == 400, "an expiry in the past: 400")
 S4 = A.post(B + f"/api/office/docs/{DOC3}/signoff", json={}).json()
 T4K = S4["url"].split("/s/q/")[1]

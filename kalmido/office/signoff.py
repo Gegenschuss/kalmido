@@ -58,6 +58,7 @@ SIG_VIDEO_CSP = ("default-src 'none'; style-src 'self'; img-src 'self'; font-src
                  "frame-src https://player.vimeo.com https://www.youtube-nocookie.com; media-src https: 'self'; form-action 'self'; "
                  "frame-ancestors 'none'; base-uri 'none'")
 LOG_TEXT = {"accepted": "signoff_accepted", "declined": "signoff_declined"}
+SIG_MAX_DAYS = 90           # 2.666.0 (#4074 10): an open link works at most this long after it was made (as a file request, FRQ_DAYS_MAX)
 SIG_PDF_KEEP_DAYS = 30      # 2.86.0 (N17): a decided quotation's PDF stays downloadable this long when the link has no expiry
 SIG_NOTE = N_("Simple electronic signature: usually enough to accept a quotation or confirm an acceptance; not for contracts that the law requires in written form (they need a qualified signature). This is not legal advice.")  # noqa: E501
 
@@ -85,13 +86,21 @@ def sig_url(c, r):
 
 
 def sig_expiry(v):
-    """'YYYY-MM-DD' | None -> stored expiry (valid through the end of that day) | None; BadInput on a bad date."""
+    """'YYYY-MM-DD' | None -> stored expiry (valid through the end of that day) | None; BadInput on a bad date. None: the link
+    ends SIG_MAX_DAYS after it was made (sig_too_old); 2.666.0 (#4074 10): a date further ahead than that is refused."""
     if v in (None, ""):
         return None
     if not isinstance(v, str) or not valid_date(v) or v < local_now().date().isoformat():
         raise BadInput(tr("The expiry date must be today or later"))
+    if v > (local_now().date() + timedelta(days=SIG_MAX_DAYS)).isoformat():
+        raise BadInput(tr("A signature link works at most {0} days", SIG_MAX_DAYS))
     d = date.fromisoformat(v) + timedelta(days=1)
     return iso(datetime(d.year, d.month, d.day, tzinfo=TZ))
+
+
+def sig_too_old(r):
+    """2.666.0 (#4074 10): an open link made more than SIG_MAX_DAYS ago is over, with or without its own expiry date."""
+    return bool(r["created_at"]) and parse_iso(r["created_at"]) + timedelta(days=SIG_MAX_DAYS) <= now_utc()
 
 
 def sig_doc_hash(c, oid, did):
@@ -214,7 +223,8 @@ def sig_public(c, r, full=True):
     """full=False (members of the office who are not its admin): without the signer's e-mail, address and device
     (2.50.0 #1200 review: personal data of the customer only for the admins / the list's owner)."""
     d = sig_dec(c, r)
-    live = d["state"] == "open" and not d["revoked_at"] and not (d["expires_at"] and parse_iso(d["expires_at"]) <= now_utc())
+    live = d["state"] == "open" and not d["revoked_at"] and not (d["expires_at"] and parse_iso(d["expires_at"]) <= now_utc()) \
+        and not sig_too_old(d)  # 2.666.0 (#4074 10)
     return {"id": d["id"], "kind": d["kind"], "doc_id": d["doc_id"], "gen_doc_id": d.get("gen_doc_id"), "video_id": d.get("video_id"), "list_id": d["list_id"], "section_id": d["section_id"],
             "task_id": d["task_id"], "title": d["title"], "state": d["state"], "expires_at": d["expires_at"], "revoked_at": d["revoked_at"],
             "signer_name": d["signer_name"], "signer_email": d["signer_email"], "reason": d["reason"], "signed_at": d["signed_at"],
@@ -515,7 +525,7 @@ def sig_find(c, token):
         r = c.execute("SELECT * FROM office_signoffs WHERE token_hash=?", (_token_hash(token),)).fetchone()
     if not r or r["revoked_at"]:
         return None
-    if r["state"] == "open" and r["expires_at"] and parse_iso(r["expires_at"]) <= now_utc():
+    if r["state"] == "open" and (r["expires_at"] and parse_iso(r["expires_at"]) <= now_utc() or sig_too_old(r)):  # 2.666.0 (#4074 10)
         return None
     acx_anon_bind(c, r["org_id"])
     g.user, g.auth_via = PUB_ACTOR, "public"
