@@ -175,5 +175,10 @@ check(fr.status_code == 201 and fr.json().get("kind") == "brief", "freelancer's 
 check(not briefs_in(chat(F, FA).get("messages", [])), "freelancer: not in the whole chat")
 check((chat(F, FA, f"?job={FJ}").get("brief") or {}).get("body") == "Build the **invoice** list.", "freelancer: the brief in the job's chat")
 check(post(FH, FU, {"kind": "brief", "job_id": J, "body": "x"}).status_code == 400, "freelancer's agent: bob's job 400")
+fb = chat(F, FA, f"?job={FJ}").get("brief") or {}
+check(F.post(B + f"/api/agents/{FA}/chat/{fb.get('id')}/pin", json={"pinned": True}).status_code == 400, "freelancer: the brief cannot be pinned")
+fm = post(FH, FU, {"body": "A plain answer for Frida"})
+rp = F.post(B + f"/api/agents/{FA}/chat/{fm.json().get('id')}/pin", json={"pinned": True})
+check(rp.status_code == 200 and (rp.json().get("message") or {}).get("pinned_at"), "freelancer: a plain message can be pinned " + rp.text[:200])
 
 sys.exit(kt.done("p5216_brief_api"))

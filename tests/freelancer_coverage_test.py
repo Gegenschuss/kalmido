@@ -1398,7 +1398,6 @@ PATCH /api/v1/sections/{}
 PATCH /api/v1/team/messages/{}
 PATCH /api/v1/templates/{}
 POST /api/account/export/file
-POST /api/agents/{}/chat/{}/pin
 POST /api/agents/{}/chat/{}/reactions
 POST /api/agents/{}/meeting-images
 POST /api/agents/{}/share-all
