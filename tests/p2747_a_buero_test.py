@@ -277,7 +277,7 @@ part("frida", Fr, Ca)
 rgroup("alice", A, ids["bob"])
 rgroup("frida", Fr)
 signoff("alice", A, ALICE, ORG)
-signoff("frida", Fr, FID, None)
+signoff("frida", Fr, FID, None)  # her personal office exists (the office settings above made it)
 
 cal_purge("alice", A, AAG)
 cal_purge("frida", Fr, FAG)

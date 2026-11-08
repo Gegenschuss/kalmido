@@ -440,12 +440,15 @@ def sig_gone_delete(sid):
     if kept:  # 2.545.0 (#4595): the switch "Extend the lock" of its office keeps it after the period too
         olk_need_unheld(c, r["org_id"] or olk_person_office(c, r["created_by"]))
     from .otrash import otb_put  # 2.747.0 (#5246, #4707): into the trash of its office (a person's: their personal office)
-    tid = otb_put(c, r["org_id"] or pb_personal(c, r["created_by"]), uid, "signoff", "office_signoffs", sid, r["title"] or "")
+    # a person without a personal office has no office trash (and none is made here: an office turns the record into a business
+    # record with a legal period, sig_gone_kept): their record goes as before
+    office = r["org_id"] or pb_personal(c, r["created_by"], create=False)
+    tid = otb_put(c, office, uid, "signoff", "office_signoffs", sid, r["title"] or "") if office else None
     c.execute("DELETE FROM office_signoffs WHERE id=?", (sid,))
     if r["org_id"]:
         ofx_log(c, r["org_id"], "signoff_delete", target="video", detail={"signoff": sid})
     c.commit()
-    return jsonify(ok=True, trash_id=tid)
+    return jsonify(ok=True, **({"trash_id": tid} if tid else {}))
 
 
 # acceptance of a list (the owner of the list; from the list dialog > Public link)
