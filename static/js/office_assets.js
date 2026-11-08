@@ -20,7 +20,7 @@ function astSummaryHtml(rows) {
   return `<section class="ast-sum" aria-label="${esc(tr('Equipment value'))}">
     <div class="ast-tiles"><div class="ast-tile"><small class="muted">${tr('New value')}</small><b>${ofcMoney(sum('new_value_eff'))}</b></div>
     <div class="ast-tile"><small class="muted">${tr('Current value')}</small><b>${ofcMoney(sum('current_value_eff'))}</b></div>
-    <div class="ast-tile"><small class="muted">${tr('Depreciation {0}', yr)}</small><b>${ofcMoney(sum('afa_year'))}</b></div></div>
+    <div class="ast-tile"><small class="muted">${trh('Depreciation {0}', yr)}</small><b>${ofcMoney(sum('afa_year'))}</b></div></div>
     <div class="ast-exp">${pol.length ? `<select id="ast-pol" aria-label="${esc(tr('Insured by'))}"><option value="">${tr('All devices')}</option>${pol.map(([v, n]) => `<option value="${v}">${esc(n)}</option>`).join('')}<option value="0">${tr('Not insured')}</option></select>` : ''}
     <a class="btn sm" id="ast-csv" href="${AST_URL}/value.csv" download>${ic('download', 's')} CSV</a><a class="btn sm" id="ast-pdf" href="${AST_URL}/value.pdf" download>${ic('download', 's')} PDF</a></div>
     ${astNote()}</section>`;

@@ -51,7 +51,7 @@ function hbm_listHtml(key) {
   if (!j) return `<p class="muted">${tr('Loading…')}</p>`;
   if (!j.mails.length) return `<p class="muted hbmempty">${(s.q || '').trim() ? tr('No e-mail matches.') : inbox ? tr('Nothing waits here: every e-mail found its client.')
     : j.enabled ? tr('No e-mails yet. Send or forward e-mails to the address of this client or project (Copy address), they are filed here.') : tr('No e-mails yet.')}</p>`;
-  const more = j.total > j.mails.length ? `<p class="muted">${tr('{0} more: search to narrow them down', j.total - j.mails.length)}</p>` : '';
+  const more = j.total > j.mails.length ? `<p class="muted">${trh('{0} more: search to narrow them down', j.total - j.mails.length)}</p>` : '';
   return `<ul class="hbmlist" role="list">${j.mails.map(m => `<li class="hbmrow">
     <button type="button" class="hbmopen" data-hbmopen="${m.id}" data-hbmk="${key}">
       <span class="hbmtop"><b class="hbmfrom">${m.dir === 'out' ? `${ic('send', 's')} ${esc(tr('To {0}', m.to_list || ''))}` : esc(m.from_name || m.from_addr || tr('Unknown sender'))}</b>${m.state === 'failed' ? `<span class="hmbtag bad">${tr('Not sent')}</span>` : m.state === 'sending' ? `<span class="hmbtag">${tr('Sending…')}</span>` : m.dir === 'out' ? `<span class="hmbtag">${tr('Sent')}</span>` : ''}${m.files ? `<span class="hbmclip muted" title="${esc(trn('{0} attachment', '{0} attachments', m.files))}">${ic('clip', 's')}${m.files}</span>` : ''}<time class="muted">${esc(fmtWhen(m.sent_at || m.created_at))}</time></span>

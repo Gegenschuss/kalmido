@@ -1114,10 +1114,10 @@ async function bkDraw(md, j) {
     tr('Backups use {0}, {1} free on the disk.', fmtBytes(j.total_bytes), j.free_bytes ? fmtBytes(j.free_bytes) : '?')];
   h += hint(st.join(' '));
   // 2.432.0 (#3584): larger files are kept once for all backups (the sizes below are without them)
-  if (j.store_files) h += `<div class="shint bkstore">${tr('Shared files of all backups: {0} in {1} (each file is kept only once).', fmtBytes(j.store_bytes), trn('{0} file', '{0} files', j.store_files))}</div>`;
+  if (j.store_files) h += `<div class="shint bkstore">${trh('Shared files of all backups: {0} in {1} (each file is kept only once).', fmtBytes(j.store_bytes), trn('{0} file', '{0} files', j.store_files))}</div>`;
   // 2.209.0 E (#1627): little room left for further backups (less than three of the newest one's size)
   const each = j.items.length ? j.items[0].size + (j.items[0].store_new_bytes || 0) : 0;  // 2.432.0 (#3584): + its new shared files
-  if (j.free_bytes && j.items.length && j.free_bytes < 3 * each) h += `<div class="shint cnote bkspace">${tr('Little space left on the disk for further backups (each one about {0}). Keep fewer backups or give the backup folder a bigger disk.', fmtBytes(each))}</div>`;
+  if (j.free_bytes && j.items.length && j.free_bytes < 3 * each) h += `<div class="shint cnote bkspace">${trh('Little space left on the disk for further backups (each one about {0}). Keep fewer backups or give the backup folder a bigger disk.', fmtBytes(each))}</div>`;
   if (j.last_error) h += `<div class="shint cnote">${tr('The last backup failed ({0}): {1}', esc(aaWhen(j.last_error_at)), esc(j.last_error))}</div>`;
   if ((j.leftovers || []).length) h += `<div class="shint cnote" id="bk-leftovers">${tr('Folders from a restore are lying next to the data folder ({0}). After a hard stop the database and the files may not match: check them, a successful restore removes them.', esc(j.leftovers.join(', ')))}</div>`;  // 2.370.2 (#2779)
   h += j.items.length ? `<div class="members bklist">${j.items.map(x => `<div class="mrow bkrow" data-bkn="${esc(x.name)}"><span class="n"><b>${esc(aaWhen(x.created_at))}</b> · ${tr(BK_KIND[x.kind] || x.kind)} · ${fmtBytes(x.size)}${x.encrypted ? ` · ${ic('lock', 's')} ${tr('encrypted')}` : ''}${x.legacy ? ` · ${tr('old (SQLite), moved over when restored')}` : ''}
@@ -1168,7 +1168,7 @@ async function bkoDraw(md, j) {
     if (j.upload_pending && !j.running) h += `<div class="shint cnote bkopend">${tr('The upload is on, but no backup has reached this target yet. Until one has, the journal of deleted accounts is not cleaned up: press “Upload now” or check the target.')}</div>`;
   }
   // 2.662.0 (#4587): backups at a removed / replaced target still count for the journal, until they expire (also without a target)
-  if (j.former?.count) h += `<div class="shint bkoformer">${tr('Backups at a former off-site target still hold back the clean-up of the journal of deleted accounts: {0}, until {1} at the latest.', j.former.count, esc(fmtDate(String(j.former.until).slice(0, 10))))}</div>`;
+  if (j.former?.count) h += `<div class="shint bkoformer">${trh('Backups at a former off-site target still hold back the clean-up of the journal of deleted accounts: {0}, until {1} at the latest.', j.former.count, esc(fmtDate(String(j.former.until).slice(0, 10))))}</div>`;
   box.innerHTML = h;
   if (j.running && !box._poll) box._poll = setTimeout(async () => { box._poll = null; if (md.isConnected) await bkoDraw(md); }, 2000);
 }

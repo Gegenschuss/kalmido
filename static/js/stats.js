@@ -58,10 +58,10 @@ function viewStats() {
       ${hbarChart(j.done.by_list.map(x => ({name: listLabel(x), v: x.n})), {label: tr('Completed by project')})}</section>`;
   P.overdue = `<section class="stcard"><div class="sthead"><h3>${tr('Overdue')}</h3><span class="muted">${trn('{0} overdue now', '{0} overdue now', j.overdue[j.overdue.length - 1].n)}</span></div>
       ${lineChart(j.overdue.map(x => x.n), j.overdue.map((x, i) => i === j.overdue.length - 1 ? tr('Today') : shortDay(x.date)), {label: tr('Overdue tasks at the end of each week'), tip: i => `${i === j.overdue.length - 1 ? tr('Today') : fmtDate(j.overdue[i].date)}: ${trn('{0} overdue', '{0} overdue', j.overdue[i].n)}`})}</section>`;
-  if (feat('pomo')) P.focus = `<section class="stcard"><div class="sthead"><h3>${tr('Focus time')}</h3><span class="muted">${tr('12 weeks: {0}', fmtH(j.focus.total))}</span></div>
+  if (feat('pomo')) P.focus = `<section class="stcard"><div class="sthead"><h3>${tr('Focus time')}</h3><span class="muted">${trh('12 weeks: {0}', fmtH(j.focus.total))}</span></div>
       ${barChart(j.focus.per_week, wl, {fmt: v => fmtH(Math.round(v)), tip: i => tipW(i, fmtH(j.focus.per_week[i])), label: tr('Focus minutes per week'), time: true})}
       <h4>${tr('By project')}</h4>${hbarChart(j.focus.by_list.map(x => ({name: listLabel(x), v: x.minutes})), {fmt: fmtH, label: tr('Focus by project')})}</section>`;
-  if (timeOn() && j.time) P.time = `<section class="stcard"><div class="sthead"><h3>${tr('Tracked time')}</h3><span class="muted">${tr('12 weeks: {0}', fmtH(j.time.total))}</span><span class="spacer"></span><button class="btn sm" data-go="time">${ic('clock', 's')} ${tr('Reports')}</button></div>
+  if (timeOn() && j.time) P.time = `<section class="stcard"><div class="sthead"><h3>${tr('Tracked time')}</h3><span class="muted">${trh('12 weeks: {0}', fmtH(j.time.total))}</span><span class="spacer"></span><button class="btn sm" data-go="time">${ic('clock', 's')} ${tr('Reports')}</button></div>
       ${barChart(j.time.per_week, wl, {fmt: v => fmtH(Math.round(v)), tip: i => tipW(i, fmtH(j.time.per_week[i])), label: tr('Tracked minutes per week'), time: true})}
       <h4>${tr('By project')}</h4>${hbarChart(j.time.by_list.map(x => ({name: listLabel(x), v: x.minutes})), {fmt: fmtH, label: tr('Tracked time by project')})}</section>`;
   const hs = feat('habits') && !o3a_orgView() ? S.habits.filter(x => !x.archived) : [];  // 2.398.0 (#3406): habits are private (not in an organisation's view)
@@ -84,11 +84,11 @@ function stl_contracts(c) {
   return `<section class="stcard stl-contracts"><div class="sthead"><h3>${tr('Contracts')}</h3></div>
     ${stl_tiles([[c.count, trn('running contract', 'running contracts', c.count), tr('Deadlines to cancel in the next {0} days: {1}', c.notice_days, c.notice.length)],
       [fmtMoney(c.monthly), tr('per month'), tr('{0} per year', fmtMoney(c.yearly))]])}
-    <h4>${tr('Deadlines to cancel')}</h4>${rows ? `<ul class="stlist">${rows}</ul>` : `<div class="muted stempty">${tr('No deadline to cancel in the next {0} days.', c.notice_days)}</div>`}
+    <h4>${tr('Deadlines to cancel')}</h4>${rows ? `<ul class="stlist">${rows}</ul>` : `<div class="muted stempty">${trh('No deadline to cancel in the next {0} days.', c.notice_days)}</div>`}
     <h4>${tr('By provider')}</h4>${hbarChart(c.by_provider.map(x => ({name: `${x.name || tr('No provider')} (${x.n})`, v: x.monthly})), {fmt: fmtMoney, label: tr('Cost per month by provider')})}</section>`;
 }
 function stl_health(h, wl, tipW) {
-  const rows = h.people.map(p => `<div class="stlr"><span class="n">${esc(p.name || tr('Me'))}</span><span>${tr('{0} done', p.done)}</span>
+  const rows = h.people.map(p => `<div class="stlr"><span class="n">${esc(p.name || tr('Me'))}</span><span>${trh('{0} done', p.done)}</span>
     <span>${p.next ? `<a href="#t/${p.next.task_id}">${esc(p.next.title)}</a> <span class="muted">${stl_when(p.next.due)}</span>` : `<span class="muted">${tr('nothing due')}</span>`}</span>
     <span class="${p.overdue ? 'od' : 'muted'}">${trn('{0} overdue', '{0} overdue', p.overdue)}</span>
     <span class="muted">${p.med_due ? esc(tr('Intakes done {0} of {1}', p.med_done, p.med_due)) : ''}</span></div>`).join('');

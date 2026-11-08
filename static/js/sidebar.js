@@ -29,7 +29,7 @@ function renderMultiBar() {
     : mob ? btn(['mb-move', 'folder', tr('Move')]) + btn(['mb-date', 'cal', tr('Date')]) + btn(['mb-done', 'done', tr('Complete')]) + btn(['mb-menu', 'dots', tr('More')])
       : btn(['mb-done', 'done', tr('Complete')]) + btn(['mb-del', 'trash', tr('Delete'), 'danger']);
   b.classList.toggle('mb4', mob && n > 0);
-  b.innerHTML = `<span class="mcount" role="status">${n ? tr('{0} selected', n) : tr('Tap tasks')}</span>
+  b.innerHTML = `<span class="mcount" role="status">${n ? trh('{0} selected', n) : tr('Tap tasks')}</span>
     ${acts}
     <button class="iconbtn mbx" data-act="mb-close" title="${esc(tr('Clear selection') + ' (Esc)')}" aria-label="${esc(tr('Clear selection'))}">${ic('x')}</button>`;
   meSync();
@@ -753,7 +753,7 @@ async function folderPropsModal(f, opt = {}) {
     ${collab() ? `<div class="row"><label>${tr('People')}</label><button type="button" class="btn sm" data-m="people">${ic('users', 's')} ${tr('Share…')}</button></div>` : ''}
     <div class="row"><label>${tr('Repository')}</label><button type="button" class="btn sm" data-m="repos">${ic('git', 's')} ${tr('Repository…')}</button></div>
     <fieldset class="fsapply" ${nL ? '' : 'hidden'}><legend>${tr('Apply to')}</legend>
-      <label class="chkl"><input type="radio" name="fs-ap" value="all" ${nL ? 'checked' : ''}> ${tr('New projects and the {0} projects in the folder', nL)}</label>
+      <label class="chkl"><input type="radio" name="fs-ap" value="all" ${nL ? 'checked' : ''}> ${trh('New projects and the {0} projects in the folder', nL)}</label>
       <label class="chkl"><input type="radio" name="fs-ap" value="new" ${nL ? '' : 'checked'}> ${tr('Only new projects')}</label>
       ${ownN ? `<label class="chkl"><input type="checkbox" id="fs-force"> ${esc(trn('Also the {0} project changed on its own', 'Also the {0} projects changed on their own', ownN))}</label>` : ''}</fieldset>
     <div class="fsprev" id="fs-prev" role="status" hidden></div>

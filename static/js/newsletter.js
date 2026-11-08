@@ -70,14 +70,14 @@ function nwl_html(set) {
   const busy = c.busy || d.runs?.[0]?.state === 'busy';
   const n = d.contacts;
   let h = nwl_wsSel() + why;
-  h += `<p class="nwl-conn"><b>${esc(NWL_KIND_TXT[c.kind] || c.kind)}</b>${c.preview ? ` <span class="nwl-tag">${tr('Preview')}</span>` : ''} <span class="muted">${esc(c.url || '')}</span> <span class="muted">· ${c.hint ? tr('Access data set (…{0})', c.hint) : tr('Access data set')}</span>
+  h += `<p class="nwl-conn"><b>${esc(NWL_KIND_TXT[c.kind] || c.kind)}</b>${c.preview ? ` <span class="nwl-tag">${tr('Preview')}</span>` : ''} <span class="muted">${esc(c.url || '')}</span> <span class="muted">· ${c.hint ? trh('Access data set (…{0})', c.hint) : tr('Access data set')}</span>
     ${set ? `<button type="button" class="linkbtn" data-nwl="edit">${tr('Change')}</button> <button type="button" class="linkbtn" data-nwl="disconnect">${tr('Disconnect')}</button>` : `<button type="button" class="linkbtn" data-nwl="go-set">${tr('Settings of the service')}</button>`}</p>`;
   if (c.error_text) h += `<p class="nwl-err" role="alert">${esc(c.error_text)}</p>`;
   if (set) return h + nwl_setRest(c) + `<div class="row"><span class="muted">${tr('Segments, the sync by hand and the consent import: Contacts > Newsletter.')}</span><button type="button" class="btn sm" data-nwl="open-dlg">${ic('mail', 's')} ${tr('Newsletter…')}</button></div>`;
-  h += `<p class="muted">${tr('{0} contacts, {1} with an e-mail address · {2} consented, {3} pending, {4} unsubscribed or bounced', n.total, n.email, n.yes, n.pending, n.blocked)}</p>`;
+  h += `<p class="muted">${trh('{0} contacts, {1} with an e-mail address · {2} consented, {3} pending, {4} unsubscribed or bounced', n.total, n.email, n.yes, n.pending, n.blocked)}</p>`;
   h += `<h4>${tr('Segments')}</h4>`;
   h += (d.segments || []).length ? `<ul class="nwl-segs">${d.segments.map(s => `<li><div class="nwl-sn"><b>${esc(s.name)}</b> <span class="muted">→ ${s.list_name ? esc(s.list_name) : tr('no list yet')}</span>
-      <div class="muted">${esc(nwl_ruleTxt(s.rule))} · ${tr('{0} go to the service, {1} on the list', s.counts.send, s.counts.on_list)}</div></div>
+      <div class="muted">${esc(nwl_ruleTxt(s.rule))} · ${trh('{0} go to the service, {1} on the list', s.counts.send, s.counts.on_list)}</div></div>
       <button type="button" class="iconbtn" data-nwl="seg-edit" data-sid="${s.id}" aria-label="${esc(tr('Edit'))}" title="${esc(tr('Edit'))}">${ic('edit', 's')}</button>
       <button type="button" class="iconbtn" data-nwl="seg-del" data-sid="${s.id}" aria-label="${esc(tr('Delete'))}" title="${esc(tr('Delete'))}">${ic('trash', 's')}</button></li>`).join('')}</ul>`
     : `<p class="muted">${tr('No segments yet: a segment picks contacts by group, company or address book and fills one list at the service.')}</p>`;
@@ -96,8 +96,8 @@ function nwl_impHtml() {
   let h = `<h4>${tr('Import consents')}</h4><p class="muted">${tr('A CSV file with the columns E-mail, Date and Source (optional). It only records proof for contacts that are already in your address books; nothing is sent.')}</p>
     <div class="row"><label for="nwl-imp-file">${tr('CSV file')}</label><input id="nwl-imp-file" type="file" accept=".csv,text/csv,text/plain"></div>`;
   if (p) {
-    h += `<p class="nwl-imp-sum">${tr('{0} rows: {1} valid, {2} with a problem', p.rows, p.valid, p.errors_count)} · ${tr('{0} will be recorded, {1} stay as they are, {2} not in the address books', p.will_change, p.kept, p.unmatched)}</p>`;
-    if (p.errors.length) h += `<ul class="nwl-imp-err">${p.errors.map(x => `<li><span class="muted">${tr('Line {0}', x.line)}</span> ${esc(x.email)} · ${esc(x.reason)}</li>`).join('')}</ul>`;
+    h += `<p class="nwl-imp-sum">${trh('{0} rows: {1} valid, {2} with a problem', p.rows, p.valid, p.errors_count)} · ${trh('{0} will be recorded, {1} stay as they are, {2} not in the address books', p.will_change, p.kept, p.unmatched)}</p>`;
+    if (p.errors.length) h += `<ul class="nwl-imp-err">${p.errors.map(x => `<li><span class="muted">${trh('Line {0}', x.line)}</span> ${esc(x.email)} · ${esc(x.reason)}</li>`).join('')}</ul>`;
     h += `<div class="foot"><button type="button" class="btn" data-nwl="imp-cancel">${tr('Cancel')}</button><span class="spacer"></span><button type="button" class="btn pri" data-nwl="imp-go" ${p.will_change ? '' : 'disabled'}>${tr('Import')}</button></div>`;
   }
   return h;

@@ -83,20 +83,20 @@ function ldbBsHtml(d) {
     return `<h4 class="bk-h">${esc(s === 'a' ? tr('Assets') : tr('Equity and liabilities'))}</h4><table class="bk-tab ldb-bs" data-ldb-side="${s}"><thead><tr><th>${esc(s === 'a' ? tr('Assets') : tr('Equity and liabilities'))}</th><th class="num">${tr('Amount')}</th></tr></thead><tbody>${rows}
       <tr class="bk-tot"><th scope="row">${tr('Total')}</th><td class="num" data-ldb-total="${s}">${ldbMoney(tot)}</td></tr></tbody></table>`;
   };
-  return `<section class="bk-sec" aria-labelledby="ldb-bsh"><div class="ofcbar"><h3 class="ofcgrp" id="ldb-bsh">${tr('Balance sheet as of {0}', fmtDay('year', pd(`${d.year}-12-31`)))}</h3><span class="spacer"></span>${ldbCsv('bs', d.year)}${ldbPdf('bs', d.year)}</div>
+  return `<section class="bk-sec" aria-labelledby="ldb-bsh"><div class="ofcbar"><h3 class="ofcgrp" id="ldb-bsh">${trh('Balance sheet as of {0}', fmtDay('year', pd(`${d.year}-12-31`)))}</h3><span class="spacer"></span>${ldbCsv('bs', d.year)}${ldbPdf('bs', d.year)}</div>
     ${side('a')}${side('p')}</section>`;
 }
 
 function ldbPlHtml(d) {
   const rows = d.pl.filter(r => +r.amount).map(r => `<tr><th scope="row">${esc(r.label)}</th><td class="num">${r.kind === 'e' ? '- ' : ''}${ldbMoney(r.amount)}</td></tr>`).join('')
     || `<tr><td colspan="2" class="muted">${tr('None')}</td></tr>`;
-  return `<section class="bk-sec" aria-labelledby="ldb-plh"><div class="ofcbar"><h3 class="ofcgrp" id="ldb-plh">${tr('Profit and loss account {0}', d.year)}</h3><span class="spacer"></span>${ldbCsv('pl', d.year)}${ldbPdf('pl', d.year)}</div>
+  return `<section class="bk-sec" aria-labelledby="ldb-plh"><div class="ofcbar"><h3 class="ofcgrp" id="ldb-plh">${trh('Profit and loss account {0}', d.year)}</h3><span class="spacer"></span>${ldbCsv('pl', d.year)}${ldbPdf('pl', d.year)}</div>
     <table class="bk-tab ldb-pl"><tbody>${rows}</tbody></table>
     <div class="bk-profit"><span>${tr('Net income / net loss for the year')}</span><b class="${+d.result < 0 ? 'neg' : ''}" data-ldb-result>${ldbMoney(d.result)}</b></div></section>`;
 }
 
 function ldbSusaHtml(d) {
-  const head = `<div class="ofcbar"><h3 class="ofcgrp" id="ldb-ssh">${tr('Trial balance {0}', d.year)}</h3><span class="spacer"></span>
+  const head = `<div class="ofcbar"><h3 class="ofcgrp" id="ldb-ssh">${trh('Trial balance {0}', d.year)}</h3><span class="spacer"></span>
     <button type="button" class="btn sm ghost" data-ldb="susa" aria-expanded="${LDB.susa}">${esc(LDB.susa ? tr('Hide') : tr('Show'))}</button>${ldbCsv('susa', d.year)}${ldbCsv('journal', d.year)}</div>`;
   if (!LDB.susa) return `<section class="bk-sec" aria-labelledby="ldb-ssh">${head}</section>`;
   const th = `<thead><tr><th>${tr('Account')}</th><th class="num">${tr('Opening balance')}</th><th class="num">${tr('Debit')}</th><th class="num">${tr('Credit')}</th><th class="num">${tr('Balance')}</th></tr></thead>`;
@@ -117,7 +117,7 @@ function ldbEntriesHtml(d) {
 
 function ldbCloseHtml(d) {
   if (d.closed || d.year >= new Date().getFullYear()) return '';
-  return `<section class="bk-sec" aria-labelledby="ldb-clh"><div class="ofcbar"><h3 class="ofcgrp" id="ldb-clh">${tr('Year-end closing {0}', d.year)}</h3><span class="spacer"></span>
+  return `<section class="bk-sec" aria-labelledby="ldb-clh"><div class="ofcbar"><h3 class="ofcgrp" id="ldb-clh">${trh('Year-end closing {0}', d.year)}</h3><span class="spacer"></span>
     <button type="button" class="btn sm" data-ldb="close">${ic('lock', 's')}<span>${tr('Close year…')}</span></button></div>
     <p class="muted ofchint">${esc(tr('Carries the balances into {0}, the result onto the profit / loss carried forward, and locks every month of {1} (GoBD).', d.year + 1, d.year))}</p></section>`;
 }

@@ -143,7 +143,7 @@ function shc_html(sh) {  // the chart above the formula bar ('' without a settin
   const body = !dt.ys.length ? `<p class="muted">${tr('The columns of the chart are gone. Select new ones.')}</p>`
     : !dt.pts.length || (sl && !sl.parts.length) ? `<p class="muted">${tr('No numbers to show yet.')}</p>`
       : sl ? `<div class="shc-piebox">${shc_pieSvg(sh, ch, sl)}${shc_pieLegend(sh, sl)}</div>`
-      : `<div class="shc-scroll">${shc_svg(sh, ch, dt)}</div>${dt.more ? `<p class="muted shc-note">${tr('The first {0} rows are shown.', SHC_MAX)}</p>` : ''}`;
+      : `<div class="shc-scroll">${shc_svg(sh, ch, dt)}</div>${dt.more ? `<p class="muted shc-note">${trh('The first {0} rows are shown.', SHC_MAX)}</p>` : ''}`;
   return `<section class="shc" id="shc-box" aria-label="${esc(tr('Chart'))}"><div class="shc-head">${ic('chart', 's')}${legend}<span class="spacer"></span>
     ${sh.can_write ? `<button type="button" class="iconbtn" data-shc="edit" title="${esc(tr('Edit chart…'))}" aria-label="${esc(tr('Edit chart…'))}">${ic('edit', 's')}</button>` : ''}
     <button type="button" class="iconbtn" data-shc="hide" title="${esc(tr('Hide chart'))}" aria-label="${esc(tr('Hide chart'))}">${ic('x', 's')}</button></div>

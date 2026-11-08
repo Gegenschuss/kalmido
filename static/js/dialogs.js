@@ -552,7 +552,7 @@ async function listDeleteForGood(id) {
   // 2.102.0 A (#1988): a list without the lock goes into the list trash (restorable, undo below); with the lock: for good
   const ok = !l.e2e ? await askConfirm(tr('Delete “{0}”?', lname(l)), '', {danger: true, ok: tr('Delete'), html: `<p>${esc(otr_note(l))}</p>${lmDeleteNotes(l, all.length, open)}`})
     : await askConfirm(tr('Delete “{0}” permanently?', lname(l)), '', {danger: true, ok: tr('Delete permanently'),
-    html: `<p>${tr('This cannot be undone. Lost permanently:')}</p><ul class="cdlg-l">${lost.map(x => `<li>${esc(x)}</li>`).join('')}</ul>${isOwner(l) ? '' : lmDeleteNotes(l, all.length, open)}<p class="muted" ${isOwner(l) && !l.e2e ? '' : 'hidden'}>${all.length ? trn('Its {0} task goes to the trash of your basket ({1} open) and can be restored from there.', 'Its {0} tasks go to the trash of your inbox ({1} open) and can be restored from there.', all.length, open) : tr('The project has no tasks.')}</p>${isOwner(l) ? lmDeleteNotes(l, all.length, open) : ''}`});
+    html: `<p>${tr('This cannot be undone. Lost permanently:')}</p><ul class="cdlg-l">${lost.map(x => `<li>${esc(x)}</li>`).join('')}</ul>${isOwner(l) ? '' : lmDeleteNotes(l, all.length, open)}<p class="muted" ${isOwner(l) && !l.e2e ? '' : 'hidden'}>${all.length ? trnh('Its {0} task goes to the trash of your basket ({1} open) and can be restored from there.', 'Its {0} tasks go to the trash of your inbox ({1} open) and can be restored from there.', all.length, open) : tr('The project has no tasks.')}</p>${isOwner(l) ? lmDeleteNotes(l, all.length, open) : ''}`});
   if (!ok) return false;
   // 2.46.2 (#1659): the list (and its tasks) leave the screen at once; archive + delete + the reload run behind it, an
   // error brings the list back (optWrite: a state that arrives meanwhile gets it removed again)
@@ -931,7 +931,7 @@ function listModal(id, folder = '', o = {}) {
     <div class="shint lhint">${tr('Timer and time entries on the tasks of this project, for everyone in it. Time tracked already stays in the review when it is switched off.')}</div>` : ''}
     ${timeOn() ? `<div class="ltimex" ${id && l.time_tracking ? '' : 'hidden'}>` : ''}
     ${id && timeOn() && (own || l.day_hours) ? `<div class="row"><label for="l-dayh">${tr('Hours per day')}</label><input id="l-dayh" inputmode="decimal" value="${l.day_hours != null ? esc(String(l.day_hours).replace('.', numDec())) : ''}" placeholder="${esc(fmtNum(S.timeDayH || 8))}" style="max-width:5rem" ${dis}></div>
-      <div class="shint">${tr('Hours per day or shift, for the time sum in the header. Empty = {0} h.', fmtNum(S.timeDayH || 8))}</div>` : ''}
+      <div class="shint">${trh('Hours per day or shift, for the time sum in the header. Empty = {0} h.', fmtNum(S.timeDayH || 8))}</div>` : ''}
     ${timeOn() && (own || l.rate) ? `<div class="row"><label for="l-rate">${tr('Hourly rate')}</label><input id="l-rate" inputmode="decimal" value="${l.rate != null ? esc(String(l.rate).replace('.', numDec())) : ''}" placeholder="${tr('optional')}" style="max-width:6.875rem" ${dis}><span class="muted">${esc(S.settings.time_currency || '')} · ${tr('time reports')}</span></div>` : ''}
     ${timeOn() ? '</div>' : ''}`, fown)}
     ${lmSec('show', tr('Display and behaviour'), `

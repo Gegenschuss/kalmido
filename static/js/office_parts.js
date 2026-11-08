@@ -101,7 +101,7 @@ function tpPartEditorHtml(d, adm, pid = tpOpenId(d)) {
   if (t.net_incl_raw != null) rows.push([t.labels?.net_incl_raw, tpMoney(t.net_incl_raw, d)]);
   if (t.net_excl_raw != null) rows.push([t.labels?.net_excl_raw, tpMoney(t.net_excl_raw, d)]);
   const sums = `<div class="ofdtotals tptotals"><dl>${rows.map(([k, x], i) => `<div class="ofdtr tr-${i ? 'incl' : 'net'}"><dt>${esc(k)}</dt><dd>${esc(x)}</dd></div>`).join('')}</dl>
-    ${adm && t.costs != null ? `<p class="muted ofdint">${ic('eye', 's')} ${tr('Internal: external costs {0}, surplus {1}', tpMoney(t.costs, d), tpMoney(t.margin, d))}</p>` : ''}</div>`;
+    ${adm && t.costs != null ? `<p class="muted ofdint">${ic('eye', 's')} ${trh('Internal: external costs {0}, surplus {1}', tpMoney(t.costs, d), tpMoney(t.margin, d))}</p>` : ''}</div>`;
   // 2.113.0 (#2248): the title page shows the same fields: the part's ids get its own prefix (no double ids)
   return head + tpf_ids(ofdItemsHtml(v, adm) + ofdAutoHtml(v, t), p.id) + sums;
 }

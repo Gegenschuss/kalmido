@@ -76,7 +76,7 @@ function clientDetailParts(c) {
         <div><b>${est ? esc(fmtH(est)) : '–'}</b><span>${tr('estimated')}</span><small>${esc(trn('{0} task with an estimate', '{0} tasks with an estimate', st.estimated))}</small></div>
         <div><b>${st.open}</b><span>${tr('open')}</span><small>${esc(tr('{0} done', st.done))}</small></div></div>
       ${budgetBar(c)}
-      <div class="clacts"><button class="btn pri" data-act="client-sheet" data-id="${c.id}" ${timeOn() ? '' : 'disabled'}>${ic('file', 's')} ${tr('Timesheet {0}', monthLabel(mon))}</button>
+      <div class="clacts"><button class="btn pri" data-act="client-sheet" data-id="${c.id}" ${timeOn() ? '' : 'disabled'}>${ic('file', 's')} ${trh('Timesheet {0}', monthLabel(mon))}</button>
         <a class="btn" href="/api/time/export.csv?${esc(clientTimeQuery(c, mon))}" download ${timeOn() && c.lists.length ? '' : 'hidden'}>${ic('download', 's')} CSV</a>
         <a class="btn" href="/api/time/export.xlsx?${esc(clientTimeQuery(c, mon))}" download ${timeOn() && c.lists.length ? '' : 'hidden'}>${ic('download', 's')} ${tr('Excel (XLSX)')}</a></div>`,
     lists: `<section class="stcard"><div class="sthead"><h3>${tr('Projects')}</h3></div>

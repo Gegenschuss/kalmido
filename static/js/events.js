@@ -300,7 +300,7 @@ function captureHelp() {  // /capture without a page: the bookmarklet + the keyb
     <div class="shint keep">${tr('Drag the button to your bookmarks bar. On any page, click it: a small window opens with the page title and address, Enter saves it to your basket. It runs no code of ours on that page and uses your normal sign-in.')}</div>
     <h4>${tr('Keyboard')}</h4>
     <div class="kbrow"><span>${tr('In the app')}</span>${kb('q')} ${kb('Ctrl+Space')}</div>
-    <div class="shint keep">${tr('Installed app: its icon menu (right-click in the taskbar or dock, long-press on phones) has “Quick add”. A system-wide key: Windows: Start menu > right-click Kalmido > More > Open file location > Properties > Shortcut key; macOS: Shortcuts app > New shortcut “Open URL” with {0} > Add keyboard shortcut; Linux (GNOME / KDE): a custom shortcut that opens {0} in your browser.', location.origin + '/capture')}</div>
+    <div class="shint keep">${trh('Installed app: its icon menu (right-click in the taskbar or dock, long-press on phones) has “Quick add”. A system-wide key: Windows: Start menu > right-click Kalmido > More > Open file location > Properties > Shortcut key; macOS: Shortcuts app > New shortcut “Open URL” with {0} > Add keyboard shortcut; Linux (GNOME / KDE): a custom shortcut that opens {0} in your browser.', location.origin + '/capture')}</div>
     <div class="foot"><span class="spacer"></span><a class="btn" href="/#inbox">${tr('Open Kalmido')}</a><button class="btn pri" data-m="cap">${ic('plus', 's')} ${tr('Capture now')}</button></div>`);
   md.classList.add('capmodal');
   md.addEventListener('click', e => {

@@ -419,12 +419,12 @@ function ofdPayList(d, adm) {  // 2.354.0 D (#2837): also the refunds of a credi
 const ofdNegRest = d => d.kind === 'invoice' && d.locked && +(d.totals?.gross || 0) < 0;
 function ofdPaymentsHtml(d, adm) {
   if (ofdNegRest(d) && d.status !== 'cancelled') {
-    const sum = `<p class="ofdpaysum"><span>${tr('Paid back: {0}', ofdMoney(Math.abs(+d.paid || 0), d))}</span><b>${tr('To pay back: {0}', ofdMoney(d.overpaid || 0, d))}</b></p>`;
+    const sum = `<p class="ofdpaysum"><span>${trh('Paid back: {0}', ofdMoney(Math.abs(+d.paid || 0), d))}</span><b>${trh('To pay back: {0}', ofdMoney(d.overpaid || 0, d))}</b></p>`;
     return (ofdPayList(d, adm) || `<p class="muted">${tr('No refund booked yet.')}</p>`) + sum
       + (adm && +d.overpaid > 0 ? `<button type="button" class="btn sm" data-ofd="pay">${ic('plus', 's')}<span>${tr('Record refund')}</span></button>` : '');
   }
   const list = ofdPayList(d, adm) || `<p class="muted">${tr('No payments yet.')}</p>`;
-  const sum = `<p class="ofdpaysum"><span>${tr('Paid: {0}', ofdMoney(d.paid || 0, d))}</span>${+d.credits ? `<span>${tr('Credited: {0}', ofdMoney(d.credits, d))}</span>` : ''}<b>${tr('Open: {0}', ofdMoney(d.open || 0, d))}</b>${+d.overpaid > 0 && !(d.credits_of || []).length ? `<b>${tr('To pay back: {0}', ofdMoney(d.overpaid, d))}</b>` /* 2.355.0 A (#2847); 2.354.0 D (#2837): with credit notes the refund line below says it, less the refunds booked */ : ''}</p>`;
+  const sum = `<p class="ofdpaysum"><span>${trh('Paid: {0}', ofdMoney(d.paid || 0, d))}</span>${+d.credits ? `<span>${trh('Credited: {0}', ofdMoney(d.credits, d))}</span>` : ''}<b>${trh('Open: {0}', ofdMoney(d.open || 0, d))}</b>${+d.overpaid > 0 && !(d.credits_of || []).length ? `<b>${trh('To pay back: {0}', ofdMoney(d.overpaid, d))}</b>` /* 2.355.0 A (#2847); 2.354.0 D (#2837): with credit notes the refund line below says it, less the refunds booked */ : ''}</p>`;
   const cr = (d.credits_of || []).length ? `<p class="muted ofchint">${tr('Credit notes')}: ${d.credits_of.map(c => `<a href="#office/invoices/${c.id}">${esc(c.number || tr('Draft'))}</a>`).join(', ')}</p>`
     + (+d.refund_open > 0 ? `<p class="ofdfeeinfo ofdrefund" role="status">${esc(tr('Refund open: {0}. Record it on the credit note.', ofdMoney(d.refund_open, d)))}</p>` : '') : '';  // 2.354.0 D (#2837)
   if (d.status === 'cancelled') return list + sum + cr;
@@ -518,7 +518,7 @@ function ofdTotalsHtml(d, t, adm) {
     if (d.kind === 'invoice' && d.locked && +d.overpaid > 0) rows.push([tr('To pay back'), ofdMoney(d.overpaid, d), 'open']);  // 2.355.0 A (#2847): overpaid
     return `<div class="ofdtotals" id="ofd-totals"><dl>${rows.map(([k, v, c]) => `<div class="ofdtr tr-${c}"><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
       <p class="muted ofdnote">${esc(t.vat_note || '')}${t.fx_note ? ` · ${esc(t.fx_note)}` : ''}${t.tax_eur_text ? ` · ${esc((t.home || 'EUR') === 'EUR' ? tr('tax in EUR: {0}', t.tax_eur_text) : tr('tax in {0}: {1}', t.home, t.tax_eur_text))}` : ''}</p>
-      ${adm && t.costs != null && d.kind !== 'reminder' ? `<p class="muted ofdint">${ic('eye', 's')} ${tr('Internal: external costs {0}, surplus {1}', ofdMoney(t.costs, d), ofdMoney(t.margin, d))}</p>` : ''}</div>`;
+      ${adm && t.costs != null && d.kind !== 'reminder' ? `<p class="muted ofdint">${ic('eye', 's')} ${trh('Internal: external costs {0}, surplus {1}', ofdMoney(t.costs, d), ofdMoney(t.margin, d))}</p>` : ''}</div>`;
   }
   const rows = [[L.net || tr('Net total'), ofdMoney(t.net || 0, d), 'net']];
   if (t.net_incl_raw != null) rows.push([L.net_incl_raw, ofdMoney(t.net_incl_raw, d), 'incl']);
@@ -527,8 +527,8 @@ function ofdTotalsHtml(d, t, adm) {
   if (d.vat_mode !== 'novat') rows.push([L.gross || tr('Gross total'), ofdMoney(t.gross || 0, d), 'gross']);
   return `<div class="ofdtotals" id="ofd-totals"><dl>${rows.map(([k, v, c]) => `<div class="ofdtr tr-${c}"><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
     <p class="muted ofdnote">${esc(t.vat_note || '')}${t.fx_note ? ` · ${esc(t.fx_note)}` : ''}</p>
-    ${adm && t.costs != null ? `<p class="muted ofdint">${ic('eye', 's')} ${tr('Internal: external costs {0}, surplus {1}', ofdMoney(t.costs, d), ofdMoney(t.margin, d))}</p>` : ''}
-    ${adm && d.items_margin != null ? `<p class="muted ofdint ofdmsum">${tr('Surplus of the positions: {0}', ofdMoney(d.items_margin, d))}</p>` : ''}</div>`;
+    ${adm && t.costs != null ? `<p class="muted ofdint">${ic('eye', 's')} ${trh('Internal: external costs {0}, surplus {1}', ofdMoney(t.costs, d), ofdMoney(t.margin, d))}</p>` : ''}
+    ${adm && d.items_margin != null ? `<p class="muted ofdint ofdmsum">${trh('Surplus of the positions: {0}', ofdMoney(d.items_margin, d))}</p>` : ''}</div>`;
 }
 // 2.47.0 (#1649): a position of unit "percent" (e.g. artists' social insurance): its rate in % of the positions marked extern
 const ekUnits = () => OFC_UNITS.some(u => u[0] === 'percent') ? OFC_UNITS : [...OFC_UNITS, ['percent', '%']];
@@ -1153,7 +1153,7 @@ document.addEventListener('change', e => {
 // 2.354.0 D (#2837): the refunds paid back on a finalised credit note (same payment lines, same dialog)
 function ofdRefundsHtml(d, adm) {
   const list = ofdPayList(d, adm) || `<p class="muted">${tr('No refund booked yet.')}</p>`;
-  const sum = `<p class="ofdpaysum"><span>${tr('Paid back: {0}', ofdMoney(d.paid || 0, d))}</span><b>${tr('Refund open: {0}', ofdMoney(d.refund_open || 0, d))}</b></p>`;
+  const sum = `<p class="ofdpaysum"><span>${trh('Paid back: {0}', ofdMoney(d.paid || 0, d))}</span><b>${trh('Refund open: {0}', ofdMoney(d.refund_open || 0, d))}</b></p>`;
   return list + sum + (adm && +d.refund_open > 0 ? `<button type="button" class="btn sm" data-ofd="pay">${ic('plus', 's')}<span>${tr('Record refund')}</span></button>` : '');
 }
 function ofdPaymentDialog(d) {

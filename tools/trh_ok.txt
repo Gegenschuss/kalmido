@@ -1,0 +1,14 @@
+# 2.689.0 (#5125): tr() / trn() calls in HTML templates whose inserted value is HTML on purpose (escaped already,
+# markup built with esc()). One line per value: file|key as written|value as written  # what it is. tools/check_trh.py
+acctset.js|'Deleted: {0}'|when  # esc()-wrapped dates
+agents.js|'Discarded. {0} was told.'|agent  # <b>esc(name)</b>
+agents.js|'{0} is working on it. You get a notification when the proposal is ready.'|agent  # <b>esc(name)</b>
+integrations.js|'<b>Android, DAVx⁵:</b> + > Login with URL and user name. Base URL {0}, user name, app password, Create account. Under CalDAV tick the lists; DAVx⁵ asks which task app shows them (Tasks.org, jtx Board or OpenTasks).'|url  # <code>esc(url)</code>
+integrations.js|'<b>Android, Tasks.org:</b> Settings > Synchronization > Add account > CalDAV. URL {0}, user name, app password. Every project becomes a list in Tasks.org.'|url  # <code>esc(url)</code>
+integrations.js|'<b>Linux, Evolution:</b> File > New > Task List, type CalDAV, URL {0}, user name, Find Task Lists, select a list.'|url  # <code>esc(url)</code>
+integrations.js|'<b>Mac:</b> System Settings > Internet Accounts > Add Account > Add Other Account > CalDAV account. Account type Manual, user name, app password, server address {0}; then tick Reminders. Not found? Account type Advanced, server path {1}, port 443, SSL on.'|srv  # <code>esc(server)</code>
+integrations.js|'<b>Thunderbird (Windows, macOS, Linux):</b> Tasks > New Calendar > On the Network. User name and location {0}, Find Calendars; enter the app password when asked and let Thunderbird remember it. Tick the lists you want: their tasks show under Tasks.'|url  # <code>esc(url)</code>
+integrations.js|'<b>iPhone / iPad:</b> Settings > Apps > Calendar > Calendar Accounts > Add Account > Other > Add CalDAV Account. Server {0}, your user name and the app password. Then switch on Reminders in the new account. Not found? Advanced Settings > Account URL {1}.'|prin  # <code>esc(principal)</code>
+integrations.js|'<b>iPhone / iPad:</b> Settings > Apps > Calendar > Calendar Accounts > Add Account > Other > Add CalDAV Account. Server {0}, your user name and the app password. Then switch on Reminders in the new account. Not found? Advanced Settings > Account URL {1}.'|srv  # <code>esc(server)</code>
+move.js|'From {0}, created {1}'|src  # esc(url) or a translation
+receipts.js|'Also in {0}'|ls.join(' · ')  # links built with esc()

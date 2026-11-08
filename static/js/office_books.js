@@ -104,7 +104,7 @@ const bkPhotoHtml = () => `<div class="bk-photo">${isTouch() ? `<label class="bt
 function bkExportHtml() {
   if (!ofcFeat('books.export_csv')) return '';
   const y = BK.year, q = `from=${y}-01-01&to=${y}-12-31`;
-  return `<section class="bk-sec" aria-labelledby="bk-exh"><div class="ofcbar"><h3 class="ofcgrp" id="bk-exh">${tr('Export for the tax advisor {0}', y)}</h3><div class="shint">${tr('All invoices, credit notes, payments, receipts and travel expenses of the year in one list; the ZIP also holds the invoice PDFs and the receipt files.')}</div><span class="spacer"></span>
+  return `<section class="bk-sec" aria-labelledby="bk-exh"><div class="ofcbar"><h3 class="ofcgrp" id="bk-exh">${trh('Export for the tax advisor {0}', y)}</h3><div class="shint">${tr('All invoices, credit notes, payments, receipts and travel expenses of the year in one list; the ZIP also holds the invoice PDFs and the receipt files.')}</div><span class="spacer"></span>
     <a class="btn sm ghost" href="/api/office/books/export?${q}" download>${ic('download', 's')}<span>CSV</span></a><a class="btn sm ghost" href="/api/office/books/export?${q}&zip=1" download>${ic('download', 's')}<span>ZIP</span></a></div>
     ${BK.info.incomplete ? `<p class="shint bk-exgap"><a href="#office/receipts">${trn('{0} receipt without date or amount is not in the export - complete it', '{0} receipts without date or amount are not in the export - complete them', BK.info.incomplete)}</a></p>` : ''}</section>`;  // 2.356.0 (#3097)
 }
@@ -148,12 +148,12 @@ function bkTable(rows, total, count) {
 }
 function bkEuerHtml() {
   const d = BK.euer;
-  return `<section class="bk-sec" aria-labelledby="bk-euh"><div class="ofcbar"><h3 class="ofcgrp" id="bk-euh">${tr('Income/expense statement {0}', d.year)}</h3><span class="spacer"></span>
+  return `<section class="bk-sec" aria-labelledby="bk-euh"><div class="ofcbar"><h3 class="ofcgrp" id="bk-euh">${trh('Income/expense statement {0}', d.year)}</h3><span class="spacer"></span>
     <a class="btn sm ghost" href="/api/office/books/euer.csv?year=${d.year}" download>${ic('download', 's')}<span>CSV</span></a><a class="btn sm ghost" href="/api/office/books/euer.pdf?year=${d.year}" download>${ic('download', 's')}<span>PDF</span></a></div>
     <h4 class="bk-h">${tr('Income')}</h4>${bkTable(d.income, d.income_total)}
     <h4 class="bk-h">${tr('Expenses')}</h4>${bkTable(d.expenses, d.expense_total, true)}
     <div class="bk-profit"><span>${tr('Profit')}${d.small_business ? ` <small class="muted">(${tr('small business: gross')})</small>` : ''}</span><b class="${+d.profit < 0 ? 'neg' : ''}">${ofcMoney(d.profit)}</b></div>
-    ${d.tax_reserve_pct ? `<div class="bk-profit bk-res"><span>${tr('Tax reserve for the year ({0} % of the profit)', d.tax_reserve_pct)}</span><b>${ofcMoney(d.tax_reserve)}</b></div>` : ''}
+    ${d.tax_reserve_pct ? `<div class="bk-profit bk-res"><span>${trh('Tax reserve for the year ({0} % of the profit)', d.tax_reserve_pct)}</span><b>${ofcMoney(d.tax_reserve)}</b></div>` : ''}
     ${d.missing_vat ? `<p class="bk-warn">${esc(trn('{0} receipt without VAT rate counts without input tax.', '{0} receipts without VAT rate count without input tax.', d.missing_vat))}</p>` : ''}
     ${(d.afa_no_receipt || []).length ? `<p class="bk-warn bk-afanorc">${esc(tr('Depreciation without a linked receipt: {0}. Link the purchase receipt at the device, else it may count twice.', d.afa_no_receipt.map(x => x.name).join(', ')))} <a href="#office/equipment">${esc(tr('Equipment'))}</a></p>` : ''}
     ${(d.meals?.notes || []).map((n, i) => `<p class="${i ? 'bk-warn' : 'muted ofchint'}" data-bk-meal="${i}">${esc(n)}</p>`).join('')}${''/* 2.534.0 (#4333): the 30 % and the double-count hint */}
@@ -193,7 +193,7 @@ function bkUstvaHtml() {
   if (d.small_business) body = `<p class="bk-warn">${tr('Small business: no VAT return')}</p>`;
   else {
     const shown = BK_KZ.filter(([k]) => ['81', '86', '66', '83'].includes(k) || +d.kz[k]);
-    body = `<dl class="bk-kz">${shown.map(([k, n]) => `<div class="${k === '83' ? 'bk-kz83' : ''}"><dt><span class="bk-kzn">${tr('Field {0}', k)}</span> ${esc(tr(n))}</dt><dd>${['81', '86', '35', '21', '45', '41', '43', '48', '60', '46', '84'].includes(k) ? esc(fmtNum(+d.kz[k], 0)) + ' ' + ofcSym(ofcHome()) : ofcMoney(d.kz[k])}</dd></div>`).join('')}</dl>
+    body = `<dl class="bk-kz">${shown.map(([k, n]) => `<div class="${k === '83' ? 'bk-kz83' : ''}"><dt><span class="bk-kzn">${trh('Field {0}', k)}</span> ${esc(tr(n))}</dt><dd>${['81', '86', '35', '21', '45', '41', '43', '48', '60', '46', '84'].includes(k) ? esc(fmtNum(+d.kz[k], 0)) + ' ' + ofcSym(ofcHome()) : ofcMoney(d.kz[k])}</dd></div>`).join('')}</dl>
       <p class="muted ofchint">${esc(tr('VAT 19 %: {0} · VAT 7 %: {1}', ofcMoney(d.tax['19']), ofcMoney(d.tax['7'])))} · ${d.basis === 'soll' ? tr('VAT on invoicing (by invoice date)') : tr('VAT on payment received')}</p>
       ${+d.exempt_other ? `<p class="bk-warn">${esc(tr('Other tax-free sales of {0} stand in field 48: please check the reason of the exemption.', ofcMoney(d.exempt_other)))}</p>` : ''}
       ${d.missing_vat ? `<p class="bk-warn">${esc(trn('{0} receipt without VAT rate counts without input tax.', '{0} receipts without VAT rate count without input tax.', d.missing_vat))}</p>` : ''}
@@ -251,7 +251,7 @@ const tfRow = r => `<tr${r.sum ? ' class="bk-tot"' : ''}><td class="num" data-l=
   <td class="num" data-l="${esc(tr('Base'))}">${r.base != null ? esc(fmtNum(+r.base, 0)) + ' ' + ofcSym(TF.d.currency) : ''}</td><td class="num" data-l="${esc(tr('Amount'))}">${r.tax != null ? ofcMoney(r.tax) : r.amount != null ? ofcMoney(r.amount) : ''}</td></tr>`;
 function tfVatHtml(d) {
   if (d.small_business) return '';
-  return `<div class="tf-vat"><h4 class="bk-h">${tr('VAT and the tax office in {0}', d.year)}</h4>
+  return `<div class="tf-vat"><h4 class="bk-h">${trh('VAT and the tax office in {0}', d.year)}</h4>
     ${ofcRowF('tf-paid', tr('VAT paid to the tax office'), `<input id="tf-paid" inputmode="decimal" class="numin" value="${esc(fmtNum(+d.vat_paid, 2))}">`, tr('Advance payments and final payments that left the account in this year.'))}
     ${ofcRowF('tf-refund', tr('VAT refunded by the tax office'), `<input id="tf-refund" inputmode="decimal" class="numin" value="${esc(fmtNum(+d.vat_refund, 2))}">`)}</div>`;
 }

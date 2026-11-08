@@ -126,7 +126,7 @@ function viewHabits() {
   let h = `<div class="hweek head"><span class="hnh"></span>${days.map(d => `<span class="${d === t0 ? 'today' : ''}" aria-label="${esc(dayLabel(d, true))}">${WD[pd(d).getDay()]}<br>${pd(d).getDate()}</span>`).join('')}<span style="text-align:right">${tr('Streak')}</span></div>`;
   for (const x of hs) {
     const col = cssColor(x.color) || HCOLORS[0];
-    h += `<div class="hweek" style="--hc:${col}"><div class="hname" data-act="habit-open" data-id="${x.id}"><span class="sw" style="background:${col}"></span><div style="min-width:0"><b>${esc(x.name)}</b><small>${x.per_week ? tr('{0} of {1} this week', weekDone(x, mon), x.per_week) : x.goal > 1 ? tr('{0}/{1} today', x.logs[t0] || 0, x.goal) : habitScheduled(x, t0) ? ((x.logs[t0] || 0) >= 1 ? tr('done today') : tr('open today')) : tr('day off today')}</small>${x.per_week ? weekProg(x, mon) : ''}</div></div>
+    h += `<div class="hweek" style="--hc:${col}"><div class="hname" data-act="habit-open" data-id="${x.id}"><span class="sw" style="background:${col}"></span><div style="min-width:0"><b>${esc(x.name)}</b><small>${x.per_week ? trh('{0} of {1} this week', weekDone(x, mon), x.per_week) : x.goal > 1 ? trh('{0}/{1} today', x.logs[t0] || 0, x.goal) : habitScheduled(x, t0) ? ((x.logs[t0] || 0) >= 1 ? tr('done today') : tr('open today')) : tr('day off today')}</small>${x.per_week ? weekProg(x, mon) : ''}</div></div>
       ${days.map(d => {
         const c = x.logs[d] || 0, sch = habitScheduled(x, d);
         const cls = [d > t0 ? 'future' : '', !sch ? 'off' : '', c >= x.goal ? 'full' : c ? 'part' : '', d === t0 ? 'today' : ''].join(' ');

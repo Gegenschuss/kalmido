@@ -226,7 +226,7 @@ function shvSheetHtml(sh) {
   const colgroup = `<colgroup><col class="shvrhc">${cols.map(c => `<col data-c="${c.id}" style="width:${shvW(c) / 16}rem">`).join('')}${w ? '<col class="shvaddcc">' : ''}${shz ? shz_colsHtml(sh) : ''}</colgroup>`;  // 2.98.0 C (#2181): + the empty columns that fill the frame
   const head = `<thead><tr><th class="shvcorner" scope="col"><span class="sr">${tr('Row')}</span></th>${cols.map(c => shvTh(sh, c, filt)).join('')}${w ? `<th class="shvaddc"><button type="button" class="iconbtn" data-shv="coladd" title="${esc(tr('Add column'))}" aria-label="${esc(tr('Add column'))}">${ic('plus', 's')}</button></th>` : ''}${shz ? shz_headHtml(sh) : ''}</tr></thead>`;
   const body = `<tbody>${typeof shg_on === 'function' && shg_on(sh) ? shg_bodyHtml(sh) /* 2.671.0 (#3463): groups + subtotals (sheetgroup.js) */ : rows.map(r => shvTr(sh, r)).join('')}</tbody>${shz ? shz_bodyHtml(sh) : ''}`;
-  const foot = `<div class="shvfoot">${w ? `<button type="button" class="btn sm" data-shv="rowadd">${ic('plus', 's')}${tr('Add row')}</button>` : ''}${nf ? `<span class="muted">${tr('{0} of {1} rows shown', rows.length, all)}</span>` : ''}</div>`;
+  const foot = `<div class="shvfoot">${w ? `<button type="button" class="btn sm" data-shv="rowadd">${ic('plus', 's')}${tr('Add row')}</button>` : ''}${nf ? `<span class="muted">${trh('{0} of {1} rows shown', rows.length, all)}</span>` : ''}</div>`;
   return `<div class="shvwrap shvsheet" data-k="shv-${sh.id}">${top}${pres}${shvRefsHtml(sh)}${typeof shc_html === 'function' ? shc_html(sh) : ''}${bar}${typeof shfm_barHtml === 'function' ? shfm_barHtml(sh) : '' /* 2.578.0 (#3462 C) */}
     <div class="shvbody"><div class="shvgridw"><div class="shzbox"${typeof shz_boxAttr === 'function' ? shz_boxAttr(sh) : ''}><div class="shvscroll" id="shv-scroll" tabindex="0" role="grid" aria-label="${esc(sh.title || tr('Table'))}" aria-rowcount="${all + 1}" aria-colcount="${cols.length + 1}" aria-multiselectable="true" ${c0 ? `aria-activedescendant="shv-c-${c0.r}-${c0.c}"` : ''}>
       <table class="shvgrid" role="presentation">${colgroup}${head}${body}</table><svg class="shvdeps" id="shv-deps" aria-hidden="true"></svg></div>${typeof shz_gripHtml === 'function' ? shz_gripHtml(sh) : ''}</div>${foot}${typeof shb_barHtml === 'function' ? shb_barHtml(sh) : ''}</div>
@@ -308,7 +308,7 @@ function shvSideHtml(sh) {
     const from = [...(c?.refs || []).map(refBtn), ...(c?.sources || []).map(srcLi)].filter(Boolean);
     const into = (c ? sh._into.get(c.id) || [] : []).map(refBtn).filter(Boolean);
     const origin = c ? (c.frozen ? 'frozen' : c.origin || 'own') : '';
-    cell = `<section class="shvsec"><h4>${tr('Cell {0}', addr)}${col?.title ? ` <span class="muted">· ${esc(col.title)}</span>` : ''}</h4>
+    cell = `<section class="shvsec"><h4>${trh('Cell {0}', addr)}${col?.title ? ` <span class="muted">· ${esc(col.title)}</span>` : ''}</h4>
       <label class="shvrow2"><span>${tr('Name')}</span><input id="shv-name" value="${esc(c?.name || '')}" maxlength="60" autocomplete="off" spellcheck="false" placeholder="${esc(c ? tr('e.g. day_rate') : tr('Enter a value first'))}" ${w && c ? '' : 'disabled'}></label>
       ${c ? `<div class="shvkv"><span>${tr('Value')}</span><b class="shvval o-${origin}">${c.error ? shvShow(c) : esc(c.display ?? '')}</b></div>
       ${isF ? `<div class="shvkv"><span>${tr('Formula')}</span><code class="shvcode">${esc(c.raw)}</code></div>` : ''}

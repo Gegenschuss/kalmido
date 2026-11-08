@@ -62,7 +62,7 @@ function pl_toText(r) {
 function pl_runHtml(r, stop) {
   const pct = r.total ? Math.min(100, Math.round(r.done * 100 / r.total)) : 0;
   return `<div class="pl-run" role="status"><div class="pl-bar"><i style="transform:scaleX(${r.total ? pct / 100 : 0.05})"></i></div>
-      <span>${r.state === 'stop' ? tr('Stopping…') : r.state === 'queued' ? (r.place ? tr('Waiting, place {0} in the queue', r.place) : tr('Import starts…')) : r.total ? tr('{0} of {1} documents', r.done, r.total) : tr('Import starts…')}</span>
+      <span>${r.state === 'stop' ? tr('Stopping…') : r.state === 'queued' ? (r.place ? trh('Waiting, place {0} in the queue', r.place) : tr('Import starts…')) : r.total ? trh('{0} of {1} documents', r.done, r.total) : tr('Import starts…')}</span>
       ${stop && r.state !== 'stop' ? `<button type="button" class="btn sm" data-pl="${stop}">${tr('Stop')}</button>` : ''}</div>
     <p class="muted pl-to">${esc(tr('Into {0}', pl_toText(r)))}</p>
     ${r.state === 'stop' ? '' : `<p class="muted pl-bg">${tr('Runs on in the background. You can close the window.')}</p>`}`;
@@ -71,7 +71,7 @@ function pl_runHtml(r, stop) {
 function plh_upHtml(up) {
   const pct = up.total ? Math.min(100, Math.round(up.done * 100 / up.total)) : 0;
   return `<div class="pl-run" role="status"><div class="pl-bar"><i style="transform:scaleX(${pct / 100})"></i></div>
-      <span>${up.check ? tr('Checking the export…') : tr('Uploading: {0} of {1}', fmtBytes(up.done), fmtBytes(up.total))}</span>
+      <span>${up.check ? tr('Checking the export…') : trh('Uploading: {0} of {1}', fmtBytes(up.done), fmtBytes(up.total))}</span>
       ${up.check ? '' : `<button type="button" class="btn sm" data-pl="zip-cancel">${tr('Cancel')}</button>`}</div>
     ${up.check ? '' : `<p class="muted pl-bg">${tr('Keep the window open until the upload is done.')}</p>`}`;
 }
@@ -105,11 +105,11 @@ function pl_html(mode) {
   const r = c.run, running = ['queued', 'busy', 'stop'].includes(r.state);
   h += `<p class="pl-conn"><span class="pl-url">${esc(c.url)}</span>${can && !running ? ` <button type="button" class="linkbtn" data-pl="edit">${tr('Change')}</button> <button type="button" class="linkbtn" data-pl="disconnect">${tr('Disconnect')}</button>` : ''}</p>`;
   if (c.error_text) h += `<p class="pl-err" role="alert">${esc(c.error_text)}</p>`;
-  else if (c.synced_at && !running) h += `<p class="muted">${tr('Last looked: {0}', fmtWhen(c.synced_at))}</p>`;
+  else if (c.synced_at && !running) h += `<p class="muted">${trh('Last looked: {0}', fmtWhen(c.synced_at))}</p>`;
   if (running) {
     h += pl_runHtml(r, can && 'stop');  // 2.87.9 (#1935, #1940)
   } else if (r.kind === 'all' && r.done) {
-    h += `<p class="muted">${tr('Last import: {0} new, {1} already there, {2} failed', r.new, r.skipped, r.failed)}</p>`;
+    h += `<p class="muted">${trh('Last import: {0} new, {1} already there, {2} failed', r.new, r.skipped, r.failed)}</p>`;
     h += pll_line(r.learn);  // 2.69.0 B (#1847)
   }
   if (can) {
@@ -142,7 +142,7 @@ async function pl_preview(zip) {
     <p class="muted">${tr('Each document comes with its file, text, date and notes. Documents that are already here are left out.')}</p>
     ${plh_size_html(p.size)}
     ${sec(tr('Tags'), p.tags.map(tagRow))}${sec(tr('Correspondents → senders'), p.senders.map(t => labRow('senders', t)))}${sec(tr('Document types'), p.types.map(t => labRow('types', t)))}${pll_preview_html(p)}
-    <div class="foot"><button type="button" class="btn" data-plp="close">${tr('Cancel')}</button><span class="spacer"></span><button type="button" class="btn pri" data-plp="start" ${left && p.size?.fits !== 'no' ? '' : 'disabled'}>${tr('Import {0} documents', left)}</button></div>`;
+    <div class="foot"><button type="button" class="btn" data-plp="close">${tr('Cancel')}</button><span class="spacer"></span><button type="button" class="btn pri" data-plp="start" ${left && p.size?.fits !== 'no' ? '' : 'disabled'}>${trh('Import {0} documents', left)}</button></div>`;
   md.addEventListener('change', e => {
     const s = e.target.closest('select[data-plk]'); if (!s) return;
     const inp = $('[data-pln]', s.closest('li')); if (inp) inp.disabled = s.value === 'skip';
@@ -220,7 +220,7 @@ function pll_preview_html(p) {
     // 2.581.0 (#4803): workflows -> document flows: what is not taken over (the rest of the flow is)
     trigger: N_('trigger not supported'), owner: N_('owner and rights not taken over'), webhook: N_('webhook not taken over'), email: N_('e-mail not taken over'), action: N_('action not taken over'), filter: N_('path or e-mail rule filter not taken over')};
   let h = `<div class="pll-rules">`;
-  if (n) h += `<label class="chkl"><input type="checkbox" id="pll-rules" ${r.on === false ? '' : 'checked'}> ${tr('Import the matching rules from Paperless-ngx ({0})', n)}</label>`;
+  if (n) h += `<label class="chkl"><input type="checkbox" id="pll-rules" ${r.on === false ? '' : 'checked'}> ${trh('Import the matching rules from Paperless-ngx ({0})', n)}</label>`;
   const notes = [];
   if (r.dup) notes.push(trn('{0} rule is already here', '{0} rules are already here', r.dup));
   if (r.auto) notes.push(tr('{0} use “Auto” in Paperless-ngx: Kalmido learns them from the imported documents', r.auto));
@@ -259,7 +259,7 @@ function plh_html(d) {
   if (z?.state === 'bad') h += `<p class="pl-err" role="alert">${esc(z.error_text)}</p>`;
   if (z?.state === 'done' && r) {
     if (r.error_text) h += `<p class="pl-err" role="alert">${esc(r.error_text)}</p>`;
-    h += `<p class="muted">${tr('Last import from a ZIP: {0} new, {1} already there, {2} failed', r.new, r.skipped, r.failed)}</p>`;
+    h += `<p class="muted">${trh('Last import from a ZIP: {0} new, {1} already there, {2} failed', r.new, r.skipped, r.failed)}</p>`;
     h += pll_line(r.learn);
   }
   if (z && ['upload', 'check', 'ready'].includes(z.state) && !z.mine) return h + `<p class="muted">${tr('Another import is under way in this area')}</p></div>`;
@@ -268,7 +268,7 @@ function plh_html(d) {
 function plh_size_html(sz) {
   if (!sz || sz.need == null) return '';
   const need = (sz.exact ? '' : tr('about') + ' ') + fmtBytes(sz.need);
-  if (sz.free == null) return `<p class="muted">${tr('Needs {0} of storage.', need)}</p>`;
+  if (sz.free == null) return `<p class="muted">${trh('Needs {0} of storage.', need)}</p>`;
   const t = tr('Needs {0} of storage, {1} free.', need, fmtBytes(sz.free));
   if (sz.fits === 'no') return `<p class="pl-err" role="alert">${t} ${tr('Free up storage first: the documents do not fit.')}</p>`;
   if (sz.fits === 'maybe') return `<p class="pl-warn" role="status">${t} ${tr('It may not all fit: the import stops cleanly when the storage is full.')}</p>`;

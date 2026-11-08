@@ -34,7 +34,7 @@ async function wpDraw(md) {
     else if (!mine) h += hint(tr('Your browser asks for permission once. Pushes arrive even when Kalmido is closed.'));
   }
   if (j.subs.length) {
-    h += `<h4>${tr('Devices')}</h4><div class="navlist wpdevs">${j.subs.map(x => `<div class="navrow" data-wpdev="${x.id}">${ic('bell', 's')}<span>${esc(x.label || x.host)}${mine && mine.id === x.id ? ` <span class="devtag">${tr('This device')}</span>` : ''}<small class="muted" style="display:block">${esc(x.host)} · ${tr('since {0}', dayLabel(x.created_at.slice(0, 10)))}${x.last_ok ? ' · ' + tr('last push {0}', dayLabel(x.last_ok.slice(0, 10))) : ''}</small></span><button class="iconbtn" data-m="wp-del" data-sub="${x.id}" data-ep="${esc(x.endpoint)}" title="${tr('remove')}" aria-label="${tr('remove')}">${ic('x', 's')}</button></div>`).join('')}</div>`;
+    h += `<h4>${tr('Devices')}</h4><div class="navlist wpdevs">${j.subs.map(x => `<div class="navrow" data-wpdev="${x.id}">${ic('bell', 's')}<span>${esc(x.label || x.host)}${mine && mine.id === x.id ? ` <span class="devtag">${tr('This device')}</span>` : ''}<small class="muted" style="display:block">${esc(x.host)} · ${trh('since {0}', dayLabel(x.created_at.slice(0, 10)))}${x.last_ok ? ' · ' + trh('last push {0}', dayLabel(x.last_ok.slice(0, 10))) : ''}</small></span><button class="iconbtn" data-m="wp-del" data-sub="${x.id}" data-ep="${esc(x.endpoint)}" title="${tr('remove')}" aria-label="${tr('remove')}">${ic('x', 's')}</button></div>`).join('')}</div>`;
   }
   box.innerHTML = h;
   wpState(md, j);
@@ -296,7 +296,7 @@ function modulesHtmlMain(hint) {
       <div class="row"><label for="s-pl">${tr('Long break')}</label><input type="number" id="s-pl" value="${esc(s.pomo_long)}" min="1" inputmode="numeric" class="numin"><span class="muted">${tr('min')}</span></div>
       <div class="row"><label for="s-pe">${tr('Long break after')}</label><input type="number" id="s-pe" value="${esc(s.pomo_long_every)}" min="1" inputmode="numeric" class="numin"><span class="muted">${tr('pomos')}</span></div></details>`
     : k === 'time' && timeOn() ? `<details class="mopt"><summary>${tr('Time tracking settings')}</summary>
-      <div class="row"><label for="s-trnd">${tr('Rounding')}</label><select id="s-trnd">${[0, 5, 6, 10, 15, 30].map(v => `<option value="${v}" ${String(v) === String(s.time_rounding || '0') ? 'selected' : ''}>${v ? tr('up to {0} min per entry', v) : tr('none')}</option>`).join('')}</select></div>
+      <div class="row"><label for="s-trnd">${tr('Rounding')}</label><select id="s-trnd">${[0, 5, 6, 10, 15, 30].map(v => `<option value="${v}" ${String(v) === String(s.time_rounding || '0') ? 'selected' : ''}>${v ? trh('up to {0} min per entry', v) : tr('none')}</option>`).join('')}</select></div>
       ${hint(tr('Rounding applies to the report, the CSV export and the timesheet; the tracked times stay exact. Hourly rate: in the project dialog (owner).'))}
       <div class="row"><label for="s-tcur">${tr('Currency')}</label><input id="s-tcur" value="${esc(s.time_currency ?? '€')}" maxlength="8" class="numin"></div>
       <div class="row"><label for="s-ttarget">${tr('Daily target')}</label><input type="number" id="s-ttarget" value="${esc(s.time_target || '0')}" min="0" max="24" step="0.25" class="numin"><span class="muted">${tr('hours, 0 = none')}</span></div>
@@ -874,7 +874,7 @@ function settingsModal(focus) {
       <div class="row">${chk('s-wnew', s.whatsnew_on !== '0', tr('Show what is new after an update'))}</div><!-- 2.556.0 (#4685): the dialog "New for you" -->
       ${S.me?.kid ? '' : `<div class="row">${chk('s-tmore', s.tours_more !== '0', tr('Show more introductions'))}</div>
       <div class="row">${TOUR_AREAS.filter(id => sbb_def(id)?.[3]()).map(id => `<button class="btn sm" data-m="tour-mod" data-v="${id}">${esc(tr(sbb_def(id)[2]))}</button>`).join('')}</div>`}<!-- 2.466.0 (#3314): one area's introduction again -->
-      ${isTouch() ? '' : `<div class="shelp">${tr('{0}: search and commands for everything (tasks, projects, views, settings). j / k move through the tasks, x completes, s snoozes, g t goes to Today.', kbText('Mod+K'))}</div>`}
+      ${isTouch() ? '' : `<div class="shelp">${trh('{0}: search and commands for everything (tasks, projects, views, settings). j / k move through the tasks, x completes, s snoozes, g t goes to Today.', kbText('Mod+K'))}</div>`}
       <h4>${tr('Quick add')}</h4>
       <div class="shelp">${tr('today, tomorrow, day after tomorrow, friday, next monday, in 3 days, 12.10., 3pm, at 15:00<br>daily, weekdays, weekly, every monday, every 2 weeks, monthly, yearly<br>!high / !medium / !low (or !!!, !!, !) · #tag · ~project, “in project Work” or “… in Work” at the end<br>German works too: morgen 15 uhr, jeden montag, !hoch<br>Keyboard: n = new task, / = search, Esc = close')}</div>
       <div class="shelp">${tr('@name assigns (people of the project) · 30 min, 2h, for 1.5 hours = duration<br>remind me 15 min before · remind me tomorrow 9am, remind me Tue 9:00 (also without a date)')}</div>  <!-- 2.111.0 C (#2057) -->
@@ -1314,7 +1314,7 @@ function impInit(md) {
     const head = j.dry_run
       ? trn('Preview: {0} task will be created', 'Preview: {0} tasks will be created', n) + (j.skipped ? ' · ' + trn('{0} is already there and will be skipped', '{0} are already there and will be skipped', j.skipped) : '')
       : trn('Imported: {0} task', 'Imported: {0} tasks', n) + (j.skipped ? ' · ' + trn('{0} skipped (already there)', '{0} skipped (already there)', j.skipped) : '');
-    const ls = j.lists.map(l => `<div class="mrow"><span class="n">${esc(l.name)}</span><span class="muted">${trn('{0} task', '{0} tasks', l.tasks)}${l.skipped ? ' · ' + tr('{0} skipped', l.skipped) : ''}${l.sections ? ' · ' + trn('{0} new section', '{0} new sections', l.sections) : ''} · ${l.existing ? tr('existing project') : tr('new project')}</span></div>`).join('');
+    const ls = j.lists.map(l => `<div class="mrow"><span class="n">${esc(l.name)}</span><span class="muted">${trn('{0} task', '{0} tasks', l.tasks)}${l.skipped ? ' · ' + trh('{0} skipped', l.skipped) : ''}${l.sections ? ' · ' + trn('{0} new section', '{0} new sections', l.sections) : ''} · ${l.existing ? tr('existing project') : tr('new project')}</span></div>`).join('');
     const opts = j.dry_run ? sel('s-imp-target', tr('Into'), [['new', tr('New projects (your own project with the same name is reused)')], ...lists().map(l => [String(l.id), lname(l)])], I.opts.target || 'new')
       + (wsOn() && !(I.opts.target && I.opts.target !== 'new') ? sel('s-imp-space', tr('Workspace'), wsOptions().filter(w => w !== 'all').map(w => [w, wsName(w)]), I.opts.space) : '')  // 2.87.9 (#1940)
       + (I.src === 'trello' ? sel('s-imp-mode', tr('Trello lists'), [['sections', tr('as sections of one project')], ['lists', tr('as separate projects (in a folder)')]], I.opts.mode || 'sections')
@@ -2058,7 +2058,7 @@ function tty_draw(box, j) {
   box.innerHTML = `${wsOn() ? `<div class="row"><label for="s-tty-ws">${tr('Workspace')}</label>${wsSelectHtml('s-tty-ws', oid)}</div>` : ''}
     <div class="members">${j.types.map(row).join('') || `<div class="muted mhint">${tr('No own ticket types yet.')}</div>`}</div>
     ${j.can_edit ? `${j.types.length < j.max ? `<div class="row"><input id="s-tty-new" maxlength="40" placeholder="${esc(tr('New type, e.g. Incident'))}" aria-label="${esc(tr('New ticket type'))}"><button type="button" class="btn sm" data-tty-add="1">${tr('Add')}</button></div>
-      ${j.suggestions.length ? `<div class="row"><label>${tr('Suggestions')}</label>${j.suggestions.map(s => `<button type="button" class="btn sm" data-tty-sug="${esc(s.key)}">${ic(s.icon, 's')} ${esc(tr('Switch on {0}', s.name))}</button>`).join('')}</div>` : ''}` : `<div class="shint keep">${tr('At most {0} own ticket types', j.max)}</div>`}`
+      ${j.suggestions.length ? `<div class="row"><label>${tr('Suggestions')}</label>${j.suggestions.map(s => `<button type="button" class="btn sm" data-tty-sug="${esc(s.key)}">${ic(s.icon, 's')} ${esc(tr('Switch on {0}', s.name))}</button>`).join('')}</div>` : ''}` : `<div class="shint keep">${trh('At most {0} own ticket types', j.max)}</div>`}`
       : `<div class="shint keep">${tr('Only an admin of this organisation can change it.')}</div>`}`;
 }
 async function tty_after(box) { await tty_open(box, box._j.space); tty_load(true); }

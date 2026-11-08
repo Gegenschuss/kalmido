@@ -136,7 +136,7 @@ function oimClientCard(c, i) {
   const dup = c.dup ? `<p class="oimdup">${ic('copy', 's')} ${esc(c.dup.kind === 'existing' ? tr('Already a client: {0}', c.dup.name) : tr('Twice in the file (row {0})', c.dup.row))}</p>
     <select data-oim-act="${i}" aria-label="${esc(tr('What to do'))}">${oimActs(c).map(([v, n]) => `<option value="${v}" ${c.action === v ? 'selected' : ''}>${esc(tr(n))}</option>`).join('')}</select>` : '';
   const xm = OIM.pv?.columns?.map || {}, xf = (k, label, mx) => k in xm ? fld(k, label, mx) : '';  // 2.363.0 (#3103): only what the file has
-  return `<li class="oimcard ${on ? '' : 'off'} ${c.flags?.length ? 'warn' : ''}"><div class="oimhd"><label class="chkl"><input type="checkbox" data-oim-on="c" data-i="${i}" ${on ? 'checked' : ''}> <b>${esc(c.name || tr('(no name)'))}</b></label><span class="muted">${tr('row {0}', c.row)}</span></div>
+  return `<li class="oimcard ${on ? '' : 'off'} ${c.flags?.length ? 'warn' : ''}"><div class="oimhd"><label class="chkl"><input type="checkbox" data-oim-on="c" data-i="${i}" ${on ? 'checked' : ''}> <b>${esc(c.name || tr('(no name)'))}</b></label><span class="muted">${trh('row {0}', c.row)}</span></div>
     ${c.reasons?.length ? `<p class="oimwarn">${ic('alert', 's')} ${esc(c.reasons.join(' · '))}</p>` : ''}${dup}
     <div class="oimgrid">${fld('name', tr('Company'), 80, 'w2')}${fld('contact', tr('Contact person'), 120, 'w2')}${fld('street', tr('Street'), 200, 'w2')}${fld('zip', tr('Postcode'), 20)}${fld('city', tr('City'), 120)}<div class="oimfl"><span>${esc(tr('Country'))}</span>${ctyField('oim-cty-' + i, c.country, {attrs: `data-oim-c="${i}" data-k="country"`, dis: on ? '' : 'disabled', label: tr('Country')})}</div></div>
     ${xf('email', tr('E-mail'), 200)}${xf('phone', tr('Phone'), 60)}${xf('customer_no', tr('Client no.|customer'), 40)}${xf('vat_id', tr('VAT ID'), 20)}<details class="oimraw"><summary>${tr('Original text')}</summary><pre>${esc(c.address || '')}</pre></details></li>`;
@@ -292,7 +292,7 @@ function oim_rowMenu(id, row) {
 // 2.97.0 C (#2049): a read-only copy taken along by a move between offices (office/officemove.py): view and PDF only
 // 2.543.0 (#4473): the archive label of a row: under the amount (ofdsr, desktop) and in the meta line (ofdst, phones)
 const oim_archTag = (r, c) => `<small class="rotag ${c}">${ic('archive', 's')}${r.copy ? esc(oim_copyLabel(r.copy)) : tr('Archive|documents') + (r.kind === 'invoice' ? ' · ' + (r.paid ? tr('Paid') : tr('open')) : '')}</small>`;
-const oim_copyLabel = cp => tr('Read-only copy from {0}', cp.from === 'private' ? tr('Private|workspace') : (cp.name || tr('Organisation')));
+const oim_copyLabel = cp => trh('Read-only copy from {0}', cp.from === 'private' ? tr('Private|workspace') : (cp.name || tr('Organisation')));
 
 // ---- actions
 async function oimPreview(file, map) {

@@ -33,18 +33,18 @@ function kp_html() {
   // expected payments count (its balance is actual + planned, kalmido/office/cashflow.py)
   const nr = esc(tr('net, received'));
   const tiles = `<div class="kptiles">
-    ${tile(r.to_date ? tr('Revenue this month') : tr('Revenue in December'), ofcMoney(r.month), `${nr} · ${tr('a year earlier: {0}', ofcMoney(r.month_prev))} ${kp_delta(r.month, r.month_prev)}`)}
-    ${tile(r.to_date ? tr('Revenue this year so far') : tr('Revenue {0}', y), ofcMoney(r.year), `${nr} · ${tr('a year earlier: {0}', ofcMoney(r.year_prev))} ${kp_delta(r.year, r.year_prev)}`)}
+    ${tile(r.to_date ? tr('Revenue this month') : tr('Revenue in December'), ofcMoney(r.month), `${nr} · ${trh('a year earlier: {0}', ofcMoney(r.month_prev))} ${kp_delta(r.month, r.month_prev)}`)}
+    ${tile(r.to_date ? tr('Revenue this year so far') : tr('Revenue {0}', y), ofcMoney(r.year), `${nr} · ${trh('a year earlier: {0}', ofcMoney(r.year_prev))} ${kp_delta(r.year, r.year_prev)}`)}
     ${tile(tr('Open items'), ofcMoney(d.invoices.open.amount), esc(`${trn('{0} invoice', '{0} invoices', d.invoices.open.count)} · ${tr('open and overdue')}`), 'open')}${/* 2.356.0 D (#3007): the accountant's word */ ''}
     ${tile(tr('Overdue|invoices'), ofcMoney(d.invoices.overdue.amount), esc(trn('{0} invoice', '{0} invoices', d.invoices.overdue.count)), 'overdue', +d.invoices.overdue.count ? 'warn' : '')}
-    ${tile(tr('Pipeline, weighted'), ofcMoney(d.pipeline.weighted), esc(`${tr('value × probability')} · ${tr('{0} open', ofcMoney(d.pipeline.open))}`), 'pipeline')}
+    ${tile(tr('Pipeline, weighted'), ofcMoney(d.pipeline.weighted), esc(`${tr('value × probability')} · ${trh('{0} open', ofcMoney(d.pipeline.open))}`), 'pipeline')}
     ${tile(tr('Cash flow, next 3 months'), ofcMoney(d.cashflow.reduce((a, x) => a + +x.balance, 0)), esc(tr('Balance incl. expected payments')), 'cashflow')}</div>`;
   // revenue per month: two series (this year / the year before), one accent; legend + values on tap and in a table for screen readers
   const max = Math.max(1, ...r.months.flatMap(m => [+m.amount, +m.prev]));
   const h = v => Math.max(0, +v) / max;
   const chart = `<section class="kpchart" aria-labelledby="kp-rev"><div class="ofcbar"><h3 class="ofcgrp" id="kp-rev">${tr('Revenue per month (net, received)')}</h3><span class="spacer"></span>
     <span class="kplegend" aria-hidden="true"><span><i class="kpcur"></i>${y}</span><span><i class="kpprev"></i>${y - 1}</span></span></div>
-    ${max <= 1 ? `<p class="muted ofchint">${tr('No payments received in {0} and {1} yet.', y, y - 1)}</p>` : ''}<div class="kpbars" aria-hidden="true">${r.months.map(m => `<button type="button" class="kpm ${m.month === ym ? 'cur' : ''}" tabindex="-1" title="${esc(`${kp_mon(m.month)} ${y}: ${ofcMoney(m.amount)} · ${y - 1}: ${ofcMoney(m.prev)}`)}" data-kp="tip" data-t="${esc(`${kp_mon(m.month)}: ${ofcMoney(m.amount)} (${y - 1}: ${ofcMoney(m.prev)})`)}">
+    ${max <= 1 ? `<p class="muted ofchint">${trh('No payments received in {0} and {1} yet.', y, y - 1)}</p>` : ''}<div class="kpbars" aria-hidden="true">${r.months.map(m => `<button type="button" class="kpm ${m.month === ym ? 'cur' : ''}" tabindex="-1" title="${esc(`${kp_mon(m.month)} ${y}: ${ofcMoney(m.amount)} · ${y - 1}: ${ofcMoney(m.prev)}`)}" data-kp="tip" data-t="${esc(`${kp_mon(m.month)}: ${ofcMoney(m.amount)} (${y - 1}: ${ofcMoney(m.prev)})`)}">
       <span class="kpb"><i class="kpprev" style="transform:scaleY(${h(m.prev).toFixed(3)})"></i><i class="kpcur" style="transform:scaleY(${h(m.amount).toFixed(3)})"></i></span><small>${esc(kp_mon(m.month))}</small></button>`).join('')}</div>
     <table class="sr"><caption>${tr('Revenue per month (net, received)')}</caption><thead><tr><th>${tr('Month')}</th><th>${y}</th><th>${y - 1}</th></tr></thead><tbody>${r.months.map(m => `<tr><th>${esc(kp_mon(m.month))}</th><td>${ofcMoney(m.amount)}</td><td>${ofcMoney(m.prev)}</td></tr>`).join('')}</tbody></table></section>`;
   const pct = (p, lvl) => p == null ? '' : `<span class="kpbud" aria-hidden="true"><i class="${lvl}" style="transform:scaleX(${Math.min(1, p / 100).toFixed(3)})"></i></span><small class="kppct ${lvl}">${p} %</small>`;
@@ -53,8 +53,8 @@ function kp_html() {
     const lvl = c.level === 'over' ? 'over' : c.level === 'warn' ? 'warn' : '';
     return `<li class="kpclient"><div class="kpch"><b>${esc(cdn_label(c))}</b><span class="spacer"></span><span class="rksum">${tr('Margin')} ${ofcMoney(c.margin)}${c.margin_pct != null ? ` <small class="muted">(${c.margin_pct} %)</small>` : ''}</span></div>
       <div class="kprow"><span class="muted">${tr('Hours')}</span><span>${hrs(c.hours, c.budget_h)}</span>${pct(c.pct_h, lvl)}</div>
-      ${c.budget_amount ? `<div class="kprow"><span class="muted">${tr('Budget')}</span><span>${tr('{0} of {1}', ofcMoney(c.amount), ofcMoney(c.budget_amount))}</span>${pct(c.pct_amount, lvl)}</div>` : ''}
-      <div class="kprow"><span class="muted">${tr('Invoiced {0}', y)}</span><span class="rksum">${ofcMoney(c.invoiced)}</span><span class="muted">${tr('Costs')} ${ofcMoney(c.costs)}</span></div>
+      ${c.budget_amount ? `<div class="kprow"><span class="muted">${tr('Budget')}</span><span>${trh('{0} of {1}', ofcMoney(c.amount), ofcMoney(c.budget_amount))}</span>${pct(c.pct_amount, lvl)}</div>` : ''}
+      <div class="kprow"><span class="muted">${trh('Invoiced {0}', y)}</span><span class="rksum">${ofcMoney(c.invoiced)}</span><span class="muted">${tr('Costs')} ${ofcMoney(c.costs)}</span></div>
       ${c.projects.map(p => `<div class="kprow kpproj"><a href="#l/${p.id}">${ic('brief', 's')}<span>${esc(p.name)}</span></a><span>${hrs(p.hours, p.budget_h)}</span>${pct(p.pct_h, p.pct_h >= 100 ? 'over' : p.pct_h >= 80 ? 'warn' : '')}</div>`).join('')}</li>`;
   }).join('')}</ul>` : `<p class="muted lempty">${tr('No client with hours, a budget or invoices yet.')}</p>`;
   // 2.298.0 A2 (#3186): the margin formula behind the (i) of the heading, only the revenue rule stays visible

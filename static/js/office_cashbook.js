@@ -136,7 +136,7 @@ async function cbEntryModal(e) {
   if (e.invoice && !inv.some(i => i[0] === e.invoice.id)) inv.unshift([e.invoice.id, e.invoice.number]);
   const dis = ro ? 'disabled' : '';
   const noInv = !ro && links.invoices_allowed === false;  // 2.538.0 (#4368): no right to book payments on invoices = no choice
-  const md = modal(`<h3>${tr('Cash entry no. {0}', e.no)}</h3>
+  const md = modal(`<h3>${trh('Cash entry no. {0}', e.no)}</h3>
     ${ro ? `<p class="muted">${esc([e.locked ? tr('The day is closed: the entry cannot change any more; cancel it instead.') : '', cbRef(e)].filter(Boolean).join(' · '))}</p>` : ''}
     <fieldset class="cb-fs" ${dis}>
     <div class="row"><label>${tr('Kind')}</label>${ofcSel('cb-edir', e.dir, [['in', tr('Income')], ['out', tr('Expense')]])}</div>

@@ -1267,7 +1267,7 @@ function taskRow(t, opts = {}) {
   if (!lc && rs('tags')) for (const g of t.tags) meta.push(ptagChip(g, t.list_id));
   // 2.0.8 (#319): sorted by "Created": a small creation date on the row
   if (!lc && !opts.trash && !opts.checklist && t.created_at && opts.crd && rs('created')) meta.push(`<span class="crd" title="${esc(tr('Created {0}', fmtWhen(t.created_at)))}">${ic('plus', 's')}${dayLabel(ds(new Date(t.created_at)))}</span>`);
-  if (opts.trash) meta.push(`<span>${tr('deleted {0}', dayLabel(t.deleted_at.slice(0, 10)))}</span>`);
+  if (opts.trash) meta.push(`<span>${trh('deleted {0}', dayLabel(t.deleted_at.slice(0, 10)))}</span>`);
   if (opts.trash) { const l = ttpLeft(t); if (l != null) meta.push(`<span class="ttpleft">${esc(l ? trn('{0} day left', '{0} days left', l) : tr('deleted soon'))}</span>`); }  // 2.116.0 A (#2063)
   const msvb = msvvSelfBadge(opts); if (msvb) meta.unshift(msvb);  // 2.73.0 C (#661): merged views, a server linked
   if (opts.trash && t.keep) meta.push(`<span class="tkeep" title="${esc(tr('Only the project owner can delete it permanently'))}">${ic('lock', 's')}${tr('stays')}</span>`);  // 2.0.5

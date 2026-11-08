@@ -129,7 +129,7 @@ function rmHead(G) {
     if (G.z === 'month') top += `<div class="tl-m" style="left:${i * G.dw}px">${MON[dd.getMonth()]} ${dd.getFullYear()}</div>`;
     else {
       bot += `<div class="rm-ml" style="left:${i * G.dw}px">${MONS[dd.getMonth()]}</div>`;
-      if (q !== lastQ) { top += `<div class="tl-m" style="left:${i * G.dw}px">${tr('Q{0} {1}', Math.floor(dd.getMonth() / 3) + 1, dd.getFullYear())}</div>`; lastQ = q; }
+      if (q !== lastQ) { top += `<div class="tl-m" style="left:${i * G.dw}px">${trh('Q{0} {1}', Math.floor(dd.getMonth() / 3) + 1, dd.getFullYear())}</div>`; lastQ = q; }
     }
   }
   return [tlStickyMonths(top, G.days * G.dw), bot];
