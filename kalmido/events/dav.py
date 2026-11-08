@@ -1,11 +1,8 @@
 """Events over CalDAV: every event calendar (and the person's invitations) as a VEVENT collection next to the task lists."""
 import email.utils
 import functools
-import hashlib
 import json
 import re
-import threading
-import time
 import urllib.parse
 import zlib
 from datetime import date, datetime, timedelta, timezone
@@ -14,14 +11,14 @@ from flask import request, Response
 
 from ..core.config import APP_NAME, TZ
 from ..core.i18n import tr
-from ..core.db import bump, IntegrityError, gsetting, iso_ms, now_utc, parse_iso
+from ..core.db import bump, IntegrityError, iso_ms, now_utc, parse_iso
 from ..core.pg import write_lock  # 2.565.0 (#4703)
 from ..core.access import collab_all
 from ..calendars.caldav import (
     _el, _privs, _xe, A_, C_, CS_, D_, dav_body, dav_common, dav_href, dav_multistatus, dav_principal_href, dav_propfind_req,
     dav_response, dav_xml, DAV_MAX_BODY, DAV_NAME_RE, DAV_SYNC_KEEP, DavError, dav_color, dav_report_props,
 )
-from ..calendars.caldav import dav_rendered  # 2.665.0 (#4196)
+from ..calendars.caldav import dav_code_fp, dav_fp, dav_once, DavLazy  # 2.665.0 (#4196)
 from ..events.model import att_rows, ev_att_ok, ev_delete, ev_expand, events_on, my_cal_ids
 from ..events.model import cal_touch, is_occ, occ_ps_of, EV_OCC_PS_MAX  # 2.383.0 (#2587)
 from ..events.ics import etag, ev_lines, EvError, read_vevent, store_parsed, wrap
@@ -29,7 +26,6 @@ from ..events.web import op_rsvp  # 2.369.5 (#2517): pulled up from functions
 from ..calendars.caldav import dav_lists, dav_caps_add  # 2.369.5 (#2517): pulled up from functions
 from ..events.model import cal_create  # 2.369.5 (#2517): pulled up from functions
 
-_CACHE, _LOCK = {}, threading.Lock()
 EV_REPORTS = ("<D:supported-report><D:report><C:calendar-query/></D:report></D:supported-report>"
               "<D:supported-report><D:report><C:calendar-multiget/></D:report></D:supported-report>"
               "<D:supported-report><D:report><D:sync-collection/></D:report></D:supported-report>"
@@ -65,28 +61,35 @@ def _rows(c, u, coll):
             if r["cal_id"] not in mine and ev_att_ok(c, u["id"], r["cal_org"])]  # 2.87.0 (#1983)
 
 
-class EvColl:
-    def __init__(self, coll, members):
-        self.coll, self.members = coll, members
-        h = hashlib.sha1(usedforsecurity=False)
-        for n in sorted(members):
-            h.update(f"{n}\0{members[n][1]}\n".encode("utf-8"))
-        self.hash = h.hexdigest()[:20]
-        self.token = f"urn:kalmido:sync:{coll['key']}-{self.hash}"
-        self.ctag = '"' + self.hash + '"'
-
-    def state(self):
-        return {n: m[1] for n, m in self.members.items()}
+class EvColl(DavLazy):
+    """2.665.0 (#4196): an event collection for one person (calendars/caldav.py DavLazy): the key without rendering."""
+    def __init__(self, coll, uid, h, render):
+        super().__init__(("event", uid, coll["key"]), coll["key"], h, render, lambda m: sum(len(x) for x in m[2]))
+        self.coll = coll
 
 
-def ev_coll(c, u, coll):
-    key = (u["id"], coll["key"], gsetting(c, "version"), coll["name"], coll["color"], coll["role"], collab_all())
-    now = time.monotonic()
-    with _LOCK:
-        hit = _CACHE.get(key)
-        if hit and hit[0] > now:
-            return hit[1]
-    rows = _rows(c, u, coll)
+def ev_coll_key(c, u, coll, rows=None):
+    """2.665.0 (#4196): the key of an event collection for u without rendering: its events digested in SQL (every column, the
+    attendees with their answers, the names of attendees and organiser as the VEVENT shows them), plus name, colour,
+    role, description, "everyone in the organisation", the time zone and the code of the rendering. rows: the invitations
+    (filtered in Python, ev_att_ok) - their ids."""
+    if coll["id"] is not None:
+        where, args = "e.cal_id=? AND e.deleted_at IS NULL", (coll["id"],)
+    else:
+        where, args = "e.id = ANY(CAST(? AS BIGINT[]))", ([int(r["id"]) for r in rows],)
+    r = c.execute(f"""SELECT count(*), max(e.updated_at),
+                             md5(string_agg(e::text || '|' || COALESCE(cu.display_name, '') || '|' || COALESCE(cu.username, '') || '|'
+                                            || COALESCE((SELECT string_agg(a::text || '|' || COALESCE(au.display_name, '') || '|'
+                                                                           || COALESCE(au.username, ''), '/' ORDER BY a.id)
+                                                         FROM event_attendees a LEFT JOIN users au ON au.id=a.user_id
+                                                         WHERE a.event_id=e.id), ''), '//' ORDER BY e.id))
+                      FROM events e LEFT JOIN users cu ON cu.id=e.created_by WHERE {where}""", args).fetchone()
+    return dav_fp("event", u["id"], coll["key"], coll["id"], tuple(r), coll["name"], coll["color"], coll["role"],
+                  coll.get("description"), collab_all(), getattr(TZ, "key", "UTC"), dav_code_fp())
+
+
+def ev_render(c, u, coll, rows=None):
+    rows = _rows(c, u, coll) if rows is None else rows
     atts = att_rows(c, [r["id"] for r in rows])
     members = {}
     for r in rows:
@@ -96,13 +99,16 @@ def ev_coll(c, u, coll):
             print("caldav: skipping event", r["id"], e, flush=True)
             continue
         members[r["href"]] = (r["id"], etag(lines, tzs), lines, tzs, r)
-    dav_rendered(len(rows))
-    ec = EvColl(coll, members)
-    with _LOCK:
-        if len(_CACHE) > 64:
-            for k in sorted(_CACHE, key=lambda k: _CACHE[k][0])[:16]:
-                _CACHE.pop(k, None)
-        _CACHE[key] = (now + 60, ec)
+    return members
+
+
+def ev_coll(c, u, coll, load=True):
+    """The event collection coll for u. 2.665.0 (#4196): the key costs one query, the members are rendered only when needed
+    (load: now) and cached per person and collection under the key."""
+    rows = _rows(c, u, coll) if coll["id"] is None else None  # the invitations: filtered per row, the same rows for both
+    ec = EvColl(coll, u["id"], ev_coll_key(c, u, coll, rows), functools.partial(ev_render, c, u, coll, rows))
+    if load:
+        ec.members  # noqa: B018 (rendered before the response streams)
     return ec
 
 
@@ -146,6 +152,7 @@ def coll_href(u, coll):
 
 
 def props_coll(c, u, coll, order, ec_fn):
+    ec_fn = dav_once(ec_fn)  # 2.665.0 (#4196): one key query for getctag + sync-token
     color = dav_color(coll["color"])
     p = {**dav_common(u), D_ + "resourcetype": "<D:collection/><C:calendar/>", D_ + "displayname": _xe(coll["name"]),
          D_ + "owner": f"<D:href>{_xe(dav_principal_href(u))}</D:href>",
@@ -182,7 +189,7 @@ def home_responses(c, u, want, start):
     """The event collections in the calendar home (PROPFIND Depth 1 on the home)."""
     out = []
     for i, coll in enumerate(evdav_colls(c, u).values()):
-        out.append(dav_response(coll_href(u, coll), want, props_coll(c, u, coll, start + i, functools.partial(ev_coll, c, u, coll))))
+        out.append(dav_response(coll_href(u, coll), want, props_coll(c, u, coll, start + i, functools.partial(ev_coll, c, u, coll, load=False))))
     return out
 
 
@@ -414,7 +421,7 @@ def evdav(m, c, u, pw_row, kind, key, name):
         deep = request.headers.get("Depth", "1").strip().lower() in ("1", "infinity")
         order = 1000 + list(evdav_colls(c, u)).index(key)
         if kind == "evcoll":
-            ec = ev_coll(c, u, coll)
+            ec = ev_coll(c, u, coll, load=deep)  # 2.665.0 (#4196): Depth 0 renders nothing
             first = dav_response(coll_href(u, coll), want, props_coll(c, u, coll, order, lambda: ec))
 
             def gen():

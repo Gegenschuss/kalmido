@@ -102,13 +102,6 @@
   {
    "rule": "python.lang.security.insecure-hash-algorithms.insecure-hash-algorithm-sha1",
    "file": "kalmido/calendars/caldav.py",
-   "code": "h = hashlib.sha1(usedforsecurity=False)",
-   "reason": "sha1 with usedforsecurity=False (the rule does not read the flag): CalDAV ETag / sync token, a change marker, no security use.",
-   "date": "2026-11-05"
-  },
-  {
-   "rule": "python.lang.security.insecure-hash-algorithms.insecure-hash-algorithm-sha1",
-   "file": "kalmido/calendars/caldav.py",
    "code": "return '\"' + hashlib.sha1((\"\\n\".join(lines) + (\"|tz\" if tz else \"\")).encode(\"utf-8\"), usedforsecurity=False).hexdigest()[:24] + '\"'",
    "reason": "sha1 with usedforsecurity=False (the rule does not read the flag): CalDAV ETag / sync token, a change marker, no security use.",
    "date": "2026-11-05"
@@ -125,13 +118,6 @@
    "file": "kalmido/calendars/polls.py",
    "code": "f'<input class=\"frm-link\" readonly value=\"{e(link)}\" aria-label=\"{e(tr(\"Link to change your vote\", lg=lg))}\">'",
    "reason": "thank-you page of the public poll: link, token and texts are html.escape'd (e()).",
-   "date": "2026-11-05"
-  },
-  {
-   "rule": "python.lang.security.insecure-hash-algorithms.insecure-hash-algorithm-sha1",
-   "file": "kalmido/contacts/carddav.py",
-   "code": "h = hashlib.sha1(usedforsecurity=False)",
-   "reason": "sha1 with usedforsecurity=False (the rule does not read the flag): CardDAV ETag / sync token, a change marker, no security use.",
    "date": "2026-11-05"
   },
   {
@@ -160,13 +146,6 @@
    "file": "kalmido/contacts/model.py",
    "code": "v[\"uid\"] = \"import-\" + hashlib.sha1((v[\"fn\"] + \"|\" + json.dumps(v[\"emails\"])).encode(\"utf-8\"), usedforsecurity=False).hexdigest()[:20]",
    "reason": "sha1 with usedforsecurity=False (the rule does not read the flag): a stable uid / duplicate marker of an imported vCard, no security use.",
-   "date": "2026-11-05"
-  },
-  {
-   "rule": "python.lang.security.insecure-hash-algorithms.insecure-hash-algorithm-sha1",
-   "file": "kalmido/events/dav.py",
-   "code": "h = hashlib.sha1(usedforsecurity=False)",
-   "reason": "sha1 with usedforsecurity=False (the rule does not read the flag): CalDAV sync token, a change marker, no security use.",
    "date": "2026-11-05"
   },
   {

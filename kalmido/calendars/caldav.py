@@ -2,6 +2,7 @@
 import email.message
 import email.policy
 import email.utils
+import collections
 import functools
 import hashlib
 import html
@@ -11,6 +12,7 @@ import re
 import secrets
 import threading
 import time
+import types
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -65,10 +67,13 @@ from ..api.common import hit_limit, v1_call, V1Error  # 2.149.0 G (#2517): pulle
 # came (dav_meta.extra) and sent back, so a round trip loses nothing. A client that never sent CATEGORIES / RELATED-TO
 # (Reminders keeps tags and subtasks to itself) does not clear tags or the parent by leaving them out: each app password
 # remembers which of the two its client writes (app_passwords.caps).
-# ETag = hash of the rendered VTODO; getctag / sync-token = hash of the collection's (href, ETag) set. The last
-# DAV_SYNC_KEEP sets per person and list are kept (dav_sync) for the deltas of sync-collection; an unknown token answers
-# 403 valid-sync-token and the client loads the collection again. Rendered collections are cached per person, list and
-# change counter (settings.version), so the clients' frequent polls cost no rendering.
+# ETag = hash of the rendered VTODO. 2.665.0 (#4196): getctag / sync-token = hash of the collection's key (dav_coll_key: the
+# list's rows digested in SQL - count, last change, every column of the tasks, their DAV data, the person's tags - plus the
+# list's name / colour / role, the person's settings that change the rendering and the day), so a PROPFIND renders nothing
+# for it; before it was the hash of the rendered (href, ETag) set. The last DAV_SYNC_KEEP sets per person and list are kept
+# (dav_sync) for the deltas of sync-collection; an unknown token answers 403 valid-sync-token and the client loads the
+# collection again. Rendered collections are cached per person and collection under that key (DavCache), no longer under
+# the instance-wide change counter: a change elsewhere renders nothing again.
 DAV_ON = env_bool("KALMIDO_CALDAV", True)
 DAV_HTTP_OK = env_bool("KALMIDO_CALDAV_HTTP", False)
 try:
@@ -100,7 +105,7 @@ DAV_NAME_RE = re.compile(r"[^/\\\x00-\x1f\x7f]{1,200}")
 # properties of a VTODO that map to task fields (everything else is kept in dav_meta.extra)
 DAV_MAPPED = {"UID", "DTSTAMP", "CREATED", "LAST-MODIFIED", "SUMMARY", "DESCRIPTION", "DUE", "DTSTART", "PRIORITY",
               "STATUS", "COMPLETED", "PERCENT-COMPLETE", "CATEGORIES", "RELATED-TO", "RRULE", "URL"}
-_DAV_CACHE, _DAV_CACHE_LOCK = {}, threading.Lock()
+# 2.665.0 (#4196): the rendered collections (tasks, events, address books) of every person: DavCache below
 _DAV_VTZ, _DAV_INST = {}, {}
 # properties that appear once in a VTODO: a stored copy of one of them yields to the value Kalmido writes
 DAV_SINGLE = {"UID", "DTSTAMP", "CREATED", "LAST-MODIFIED", "SUMMARY", "DESCRIPTION", "DUE", "DTSTART", "PRIORITY", "STATUS",
@@ -120,6 +125,123 @@ def dav_rendered_header(resp):
     if DAV_TEST and request.path.startswith(DAV_ROOT):
         resp.headers["X-Kalmido-Test-Dav-Rendered"] = str(g.get("dav_rendered", 0))
     return resp
+
+
+# 2.665.0 (#4196): the cache of rendered DAV collections. One entry per person and collection (slot), holding the key it
+# was rendered under: a newer key replaces the entry, so old states never pile up. Bounded by entries, by the size of the
+# rendered text (a person with hundreds of lists no longer pushes her own lists out after 64, contact photos count with
+# their size) and by idle time; least recently used goes first. Before: 64 entries per process, 60 s, keyed by the
+# instance-wide change counter.
+DAV_CACHE_COLLS = 5000                # entries
+DAV_CACHE_BYTES = 64 * 1024 * 1024    # rendered text of all entries (+ DAV_CACHE_OBJ_BYTES per object)
+DAV_CACHE_OBJ_BYTES = 256
+DAV_CACHE_IDLE_S = 3600               # an entry nobody asked for within an hour goes
+
+
+class DavCache:
+    def __init__(self):
+        self.d, self.size, self.lock = collections.OrderedDict(), 0, threading.RLock()
+
+    def get(self, slot, key):
+        with self.lock:
+            hit = self.d.get(slot)
+            if hit is None or hit[0] != key:
+                return None
+            self.d.move_to_end(slot)
+            self.d[slot] = (key, time.monotonic(), hit[2], hit[3])
+            return hit[2]
+
+    def put(self, slot, key, members, size):
+        now = time.monotonic()
+        with self.lock:
+            old = self.d.pop(slot, None)
+            if old is not None:
+                self.size -= old[3]
+            self.d[slot] = (key, now, members, size)
+            self.size += size
+            while len(self.d) > 1 and (len(self.d) > DAV_CACHE_COLLS or self.size > DAV_CACHE_BYTES
+                                       or next(iter(self.d.values()))[1] < now - DAV_CACHE_IDLE_S):
+                _, v = self.d.popitem(last=False)
+                self.size -= v[3]
+
+    def clear(self):
+        with self.lock:
+            self.d.clear()
+            self.size = 0
+
+    def __len__(self):
+        return len(self.d)
+
+
+_DAV_CACHE = DavCache()
+_DAV_CACHE_LOCK = _DAV_CACHE.lock  # (admin/backup.py clears the cache after a restore)
+DAV_RENDER_V = "1"  # 2.665.0 (#4196): raise when a helper of the rendering changes what a client gets (part of every key)
+_DAV_CODE = []
+
+
+def _dav_code_digest(co, h):
+    h.update(co.co_code)
+    for x in co.co_consts:
+        if isinstance(x, types.CodeType):
+            _dav_code_digest(x, h)
+        else:  # frozensets in a stable order (string hashes differ per process)
+            h.update(repr(sorted(map(repr, x)) if isinstance(x, frozenset) else x).encode("utf-8"))
+
+
+def dav_code_fp():
+    """2.665.0 (#4196): digest of the rendering functions' code (the same in every process of a version): a version that
+    renders tasks, events or contacts differently gives every collection a new key, an update that does not keeps them
+    (no line numbers, so the clients do not load everything again after each update)."""
+    if not _DAV_CODE:
+        from ..events.ics import ev_lines
+        from ..contacts.model import render_vcard
+        h = hashlib.blake2b(DAV_RENDER_V.encode("utf-8"), digest_size=6)
+        for f in (dav_vtodo, ev_lines, render_vcard):
+            _dav_code_digest(f.__code__, h)
+        _DAV_CODE.append(h.hexdigest())
+    return _DAV_CODE[0]
+
+
+def dav_fp(*parts):
+    """2.665.0 (#4196): the 20 hex digits of a collection's key (getctag / sync-token)."""
+    return hashlib.blake2b(repr(parts).encode("utf-8"), digest_size=10).hexdigest()
+
+
+def dav_once(fn):
+    """2.665.0 (#4196): fn() once (getctag and sync-token of one collection share its key query)."""
+    box = []
+
+    def get():
+        if not box:
+            box.append(fn())
+        return box[0]
+    return get
+
+
+class DavLazy:
+    """2.665.0 (#4196): a collection for one person: its change state (hash -> getctag, sync-token) comes from its key without
+    rendering; the members {name: (id, etag, ...)} are rendered on first use (render(), on the request's own connection) or
+    come from the cache when the key is the same. Lives for one request only (render holds that request's connection):
+    callers that stream the members load them before the response streams (load=True)."""
+    def __init__(self, slot, prefix, h, render, size):
+        self.slot, self.hash, self._render, self._size = slot, h, render, size
+        self.token = f"urn:kalmido:sync:{prefix}-{h}"
+        self.ctag = '"' + h + '"'
+        self._members = None
+
+    @property
+    def members(self):
+        if self._members is None:
+            m = _DAV_CACHE.get(self.slot, self.hash)
+            if m is None:
+                m = self._render()
+                dav_rendered(len(m))
+                _DAV_CACHE.put(self.slot, self.hash, m, sum(self._size(x) + DAV_CACHE_OBJ_BYTES for x in m.values()))
+            self._members = m
+        return self._members
+
+    def state(self):
+        return {n: m[1] for n, m in self.members.items()}
 
 
 class DavError(Exception):
@@ -607,37 +729,51 @@ def dav_ctx(c, u, task_ids):
             "e2e": le2b_task_lists(c, task_ids)}  # 2.64.1 B (#1817): tasks of lists with the lock
 
 
-class DavColl:
+class DavColl(DavLazy):
     """One list as a calendar collection for one person: members {name: (task id, etag, lines, tz, row)}, token."""
-    def __init__(self, lst, members):
-        self.lst, self.members = lst, members
-        h = hashlib.sha1(usedforsecurity=False)
-        for name in sorted(members):
-            h.update(f"{name}\0{members[name][1]}\n".encode("utf-8"))
-        self.hash = h.hexdigest()[:20]
-        self.token = f"urn:kalmido:sync:{lst['id']}-{self.hash}"
-        self.ctag = '"' + self.hash + '"'
-
-    def state(self):
-        return {n: m[1] for n, m in self.members.items()}
+    def __init__(self, lst, uid, h, render):  # the cache slot: per person and list (never one person's rendering for another)
+        super().__init__(("task", uid, lst["id"]), lst["id"], h, render, lambda m: sum(len(x) for x in m[2]))
+        self.lst = lst
 
 
-def dav_coll(c, u, lst):
-    """The rendered collection of list lst for u (cached per person, list, change counter and day)."""
-    key = (u["id"], lst["id"], gsetting(c, "version"), dav_done_cutoff(), lst["name"], lst["color"], lst["role"], collab_all(), bool(lst.get("o3a_ov")))
-    now = time.monotonic()
-    with _DAV_CACHE_LOCK:
-        hit = _DAV_CACHE.get(key)
-        if hit and hit[0] > now:
-            return hit[1]
+def dav_where(c, u, lst):
+    """2.665.0 (#4196): (SQL condition on tasks t, its parameters) of the tasks of list lst that are resources for u - one rule
+    for the key and the rendering."""
+    uid, o3a = u["id"], bool(lst.get("o3a_ov"))
+    return (f"""t.list_id=? AND t.deleted_at IS NULL AND (t.status=0 OR COALESCE(t.completed_at, t.updated_at)>=?)
+                AND {tvis(c, uid, 't.')} {"AND t.assignee_id=?" if o3a else ""}""",
+            (lst["id"], dav_done_cutoff(), *((uid,) if o3a else ())))  # 2.83.0 (#1725): o3a = only the tasks assigned to u
+
+
+def dav_coll_key(c, u, lst):
+    """2.665.0 (#4196): the key of list lst as u's calendar, without rendering: one statement digests the resource rows in SQL
+    (count, last change, every column of each task - a change without a new updated_at counts too, as do the trash, a task
+    moved in or out and trash + new task in the same second (other id) -, its DAV data, the UID of its parent, u's own
+    tags, the list's lock, u's all-day reminder time), plus what else changes the rendering or the rights: name, colour,
+    role, the participant context, "everyone in the organisation", the day (completed tasks age out), the time zone, this
+    database's instance id and the code of the rendering. A list another person or list changes keeps its key."""
     uid = u["id"]
-    pl = plists(c, uid)
-    rows = c.execute(f"""SELECT * FROM tasks t WHERE t.list_id=? AND t.deleted_at IS NULL
-                         AND (t.status=0 OR COALESCE(t.completed_at, t.updated_at)>=?) AND {tvis(c, uid, 't.')}
-                         {"AND t.assignee_id=?" if lst.get("o3a_ov") else ""}
-                         ORDER BY t.id""", (lst["id"], dav_done_cutoff(), *((uid,) if lst.get("o3a_ov") else ()))).fetchall()  # 2.83.0 (#1725)
+    where, args = dav_where(c, u, lst)
+    r = c.execute(f"""SELECT count(*), max(t.updated_at),
+                             md5(string_agg(t::text || '|' || COALESCE(m::text, '') || '|' || COALESCE(pm.uid, '') || '|'
+                                            || COALESCE((SELECT string_agg(x.tag, ',' ORDER BY x.tag) FROM task_tags x
+                                                         WHERE x.task_id=t.id AND x.user_id=?), ''), '/' ORDER BY t.id)),
+                             (SELECT l.e2e IS NOT NULL FROM lists l WHERE l.id=?),
+                             (SELECT s.value FROM user_settings s WHERE s.user_id=? AND s.key='allday_time')
+                      FROM tasks t LEFT JOIN dav_meta m ON m.task_id=t.id LEFT JOIN dav_meta pm ON pm.task_id=t.parent_id
+                      WHERE {where}""", (uid, lst["id"], uid, *args)).fetchone()
+    ctx = sorted(pvis(c, uid, lst["id"])[2]) if lst["id"] in plists(c, uid) else ()
+    return dav_fp("task", uid, lst["id"], tuple(r), lst["name"], lst["color"], lst["role"], bool(lst.get("o3a_ov")), collab_all(),
+                  ctx, dav_done_cutoff(), getattr(TZ, "key", "UTC"), dav_inst(c), dav_code_fp())
+
+
+def dav_render(c, u, lst):
+    """The members of list lst as u's calendar, rendered."""
+    uid = u["id"]
+    where, args = dav_where(c, u, lst)
+    rows = c.execute(f"SELECT * FROM tasks t WHERE {where} ORDER BY t.id", args).fetchall()
     ctx = dav_ctx(c, u, [r["id"] for r in rows])
-    if lst["id"] in pl:
+    if lst["id"] in plists(c, uid):
         _, _, ctx["context"] = pvis(c, uid, lst["id"])
     members = {}
     for t in rows:
@@ -647,13 +783,15 @@ def dav_coll(c, u, lst):
             print("caldav: skipping task", t["id"], e, flush=True)
             continue
         members[dav_name_of(t["id"], ctx["meta"].get(t["id"]))] = (t["id"], dav_etag(lines, tz), lines, tz, t)
-    dav_rendered(len(rows))
-    coll = DavColl(lst, members)
-    with _DAV_CACHE_LOCK:
-        if len(_DAV_CACHE) > 64:
-            for k in sorted(_DAV_CACHE, key=lambda k: _DAV_CACHE[k][0])[:16]:
-                _DAV_CACHE.pop(k, None)
-        _DAV_CACHE[key] = (now + 60, coll)
+    return members
+
+
+def dav_coll(c, u, lst, load=True):
+    """The collection of list lst for u. 2.665.0 (#4196): its key costs one query, the members are rendered only when needed
+    (load: now; else on first use) and cached per person and list under the key."""
+    coll = DavColl(lst, u["id"], dav_coll_key(c, u, lst), functools.partial(dav_render, c, u, lst))
+    if load:
+        coll.members  # noqa: B018 (rendered before the response streams)
     return coll
 
 
@@ -724,6 +862,7 @@ def dav_props_home(u):
 
 
 def dav_props_cal(c, u, lst, order, coll_fn):
+    coll_fn = dav_once(coll_fn)  # 2.665.0 (#4196): one key query for getctag + sync-token
     color = dav_color(lst["color"])
     p = {**dav_common(u), D_ + "resourcetype": "<D:collection/><C:calendar/>", D_ + "displayname": _xe(dav_lname(lst)),
          D_ + "owner": f"<D:href>{_xe(dav_principal_href(u))}</D:href>",
@@ -1524,12 +1663,12 @@ def davs_propfind(c, u, kind, lst, name):
             from ..events.dav import home_responses
             for i, L in enumerate(dav_lists(c, u).values()):
                 out.append(dav_response(dav_href("calendars", u["username"], L["id"], coll=True), want,
-                                        dav_props_cal(c, u, L, i, functools.partial(dav_coll, c, u, L))))
+                                        dav_props_cal(c, u, L, i, functools.partial(dav_coll, c, u, L, load=False))))
             out += home_responses(c, u, want, 1000)
         return dav_multistatus(out)
     order = list(dav_lists(c, u)).index(lst["id"])
     if kind == "cal":
-        coll = dav_coll(c, u, lst)
+        coll = dav_coll(c, u, lst, load=deep)  # 2.665.0 (#4196): Depth 0 (a client asking for the ctag) renders nothing
         first = dav_response(dav_href("calendars", u["username"], lst["id"], coll=True), want,
                              dav_props_cal(c, u, lst, order, lambda: coll))
         role = lst["role"]

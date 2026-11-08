@@ -1,24 +1,23 @@
 """CardDAV server: every address book a person sees as a collection of vCards (iOS / macOS Contacts, DAVx5, Thunderbird)."""
 import email.utils
+import functools
 import hashlib
 import json
 import re
-import threading
-import time
 import urllib.parse
 from datetime import timezone
 
 from flask import request, Response
 
 from ..core.config import APP_NAME
-from ..core.db import bump, gsetting, parse_iso
+from ..core.db import bump, parse_iso
 from ..core.pg import write_lock  # 2.273.0 C (#3048)
 from ..core.access import collab_all
 from ..calendars.caldav import (
     _el, _privs, _xe, A_, CR_, CS_, D_, dav_body, dav_common, dav_href, dav_multistatus, dav_principal_href, dav_propfind_req,
     dav_response, dav_xml, DAV_MAX_BODY, DAV_NAME_RE, DavError, dav_color, dav_report_props,
 )
-from ..calendars.caldav import dav_rendered  # 2.665.0 (#4196)
+from ..calendars.caldav import dav_code_fp, dav_fp, dav_once, DavLazy  # 2.665.0 (#4196)
 from ..core.errors import BadInput
 from ..core.i18n import tr
 from ..contacts.model import (
@@ -30,7 +29,6 @@ from ..contacts.model import book_touch  # 2.369.5 (#2517): pulled up from funct
 # 2.21.0 (#658): /dav/addressbooks/<user>/ is the address book home (RFC 6352), b<id>/ one address book, <name>.vcf one
 # contact. Same login (app passwords), rate limits, sync-collection (dav_sync2, coll b<id>) and ETag rules as the CalDAV
 # part; /.well-known/carddav leads to /dav/. Contacts that are groups (Apple's KIND group cards) are kept as they came.
-_CACHE, _LOCK = {}, threading.Lock()
 AB_REPORTS = ("<D:supported-report><D:report><CR:addressbook-query/></D:report></D:supported-report>"
               "<D:supported-report><D:report><CR:addressbook-multiget/></D:report></D:supported-report>"
               "<D:supported-report><D:report><D:sync-collection/></D:report></D:supported-report>")
@@ -76,47 +74,52 @@ def _etag(text):
     return '"' + hashlib.sha1(body.encode("utf-8"), usedforsecurity=False).hexdigest()[:24] + '"'
 
 
-class AbColl:
-    def __init__(self, book, members):
-        self.book, self.members = book, members
-        h = hashlib.sha1(usedforsecurity=False)
-        for n in sorted(members):
-            h.update(f"{n}\0{members[n][1]}\n".encode("utf-8"))
-        self.hash = h.hexdigest()[:20]
-        self.token = f"urn:kalmido:sync:{book['key']}-{self.hash}"
-        self.ctag = '"' + self.hash + '"'
-
-    def state(self):
-        return {n: m[1] for n, m in self.members.items()}
+class AbColl(DavLazy):
+    """2.665.0 (#4196): an address book for one person (calendars/caldav.py DavLazy): the key without rendering."""
+    def __init__(self, book, uid, h, render):
+        super().__init__(("book", uid, book["key"]), book["key"], h, render, lambda m: len(m[2]))
+        self.book = book
 
 
-def ab_coll(c, u, book):
-    key = (u["id"], book["key"], gsetting(c, "version"), book["name"], book["role"], collab_all(), book.get("ids"))
-    now = time.monotonic()
-    with _LOCK:
-        hit = _CACHE.get(key)
-        if hit and hit[0] > now:
-            return hit[1]
-    members = {}
+def _ab_where(book):
     # 2.272.0 E1 (#3038): a contact in the trash is gone for the device (sync-collection reports it as deleted, the ctag changes)
     if book.get("ids") is not None:  # 2.351.0 B (#2749): the shared contacts (names c<id>.vcf: hrefs of two books may clash)
-        rows = c.execute(f"SELECT * FROM contacts WHERE id IN ({','.join(str(int(x)) for x in book['ids']) or '0'}) AND deleted_at IS NULL ORDER BY id")
-    else:
-        rows = c.execute("SELECT * FROM contacts WHERE book_id=? AND deleted_at IS NULL ORDER BY id", (book["id"],))
-    for r in rows:
+        return f"ct.id IN ({','.join(str(int(x)) for x in book['ids']) or '0'}) AND ct.deleted_at IS NULL", ()
+    return "ct.book_id=? AND ct.deleted_at IS NULL", (book["id"],)
+
+
+def ab_coll_key(c, u, book):
+    """2.665.0 (#4196): the key of an address book for u without rendering: its contacts digested in SQL (count, last change,
+    every column; the photo by its length, its start and end and the contact's updated_at, which every write of a photo
+    sets - not the whole picture on every poll), plus name, role, "everyone in the organisation", the contacts of the
+    shared collection and the code of the rendering."""
+    where, args = _ab_where(book)
+    r = c.execute(f"""SELECT count(*), max(ct.updated_at),
+                             md5(string_agg((to_jsonb(ct) - 'photo' - 'search')::text || '|' || length(ct.photo) || '|'
+                                            || md5(left(ct.photo, 64) || right(ct.photo, 256)), '/' ORDER BY ct.id))
+                      FROM contacts ct WHERE {where}""", args).fetchone()
+    return dav_fp("book", u["id"], book["key"], tuple(r), book["name"], book["role"], collab_all(), book.get("ids"), dav_code_fp())
+
+
+def ab_render(c, u, book):
+    members = {}
+    where, args = _ab_where(book)
+    for r in c.execute(f"SELECT * FROM contacts ct WHERE {where} ORDER BY ct.id", args):
         try:
             text = render_vcard(r)
         except (ValueError, TypeError, KeyError) as e:
             print("carddav: skipping contact", r["id"], e, flush=True)
             continue
         members[f"c{r['id']}.vcf" if book.get("ids") is not None else r["href"]] = (r["id"], _etag(text), text, r)
-    dav_rendered(len(members))
-    ac = AbColl(book, members)
-    with _LOCK:
-        if len(_CACHE) > 64:
-            for k in sorted(_CACHE, key=lambda k: _CACHE[k][0])[:16]:
-                _CACHE.pop(k, None)
-        _CACHE[key] = (now + 60, ac)
+    return members
+
+
+def ab_coll(c, u, book, load=True):
+    """The address book for u. 2.665.0 (#4196): the key costs one query, the members are rendered only when needed (load: now)
+    and cached per person and address book under the key."""
+    ac = AbColl(book, u["id"], ab_coll_key(c, u, book), functools.partial(ab_render, c, u, book))
+    if load:
+        ac.members  # noqa: B018 (rendered before the response streams)
     return ac
 
 
@@ -145,6 +148,7 @@ def props_home(u):
 
 
 def props_book(c, u, book, ac_fn):
+    ac_fn = dav_once(ac_fn)  # 2.665.0 (#4196): one key query for getctag + sync-token
     p = {**dav_common(u), D_ + "resourcetype": "<D:collection/><CR:addressbook/>", D_ + "displayname": _xe(book["name"]),
          D_ + "owner": f"<D:href>{_xe(dav_principal_href(u))}</D:href>",
          CR_ + "supported-address-data": '<CR:address-data-type content-type="text/vcard" version="3.0"/>'
@@ -379,7 +383,7 @@ def abdav(m, c, u, p):
                 else:
                     for b in ab_books(c, u).values():
                         out.append(dav_response(dav_href("addressbooks", u["username"], b["key"], coll=True), want_props,
-                                                props_book(c, u, b, lambda b=b: ab_coll(c, u, b))))
+                                                props_book(c, u, b, lambda b=b: ab_coll(c, u, b, load=False))))
             return dav_multistatus(out)
         if m == "REPORT":
             return dav_multistatus([])
@@ -391,7 +395,7 @@ def abdav(m, c, u, p):
         raise DavError(404, "Not found")
     if m == "PROPFIND":
         if kind == "book":
-            ac = ab_coll(c, u, book)
+            ac = ab_coll(c, u, book, load=deep)  # 2.665.0 (#4196): Depth 0 renders nothing
             first = dav_response(dav_href("addressbooks", u["username"], key, coll=True), want_props, props_book(c, u, book, lambda: ac))
 
             def gen():
