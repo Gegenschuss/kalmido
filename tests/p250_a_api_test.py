@@ -189,7 +189,8 @@ check(requests.get(B + "/api/v1/absences", params={"org": ORG2}, headers=AGH).st
 check(Bo.delete(B + f"/api/lists/{_LS}/members/{AGT}").ok, "setup: the agent leaves the shared project")  # 2.361.4 (#2935): out of an organisation only without its projects
 check(A.patch(B + f"/api/admin/agents/{AGT}", json={"org_id": None}).ok, "setup: the agent becomes private")
 check(requests.get(B + "/api/v1/absences", headers=AGH).status_code == 404, "a private agent sees no team (404)")
-check(A.post(B + "/api/team/absences", json={"kind": "off", "start_date": D1}).status_code in (201, 404), "the instance admin outside Alpha enters into their own area")
+# 2.663.0 (#4341): abs_create -> abs_org: alice is in no organisation (setup removed her), so her personal area (pb_personal) -> 201
+check(A.post(B + "/api/team/absences", json={"kind": "off", "start_date": D1}).status_code == 201, "the instance admin outside Alpha enters into their own area (201)")
 r = requests.get(B + "/api/team/absences", headers=AGH)
 check(r.status_code in (401, 403), f"agents cannot use the web routes ({r.status_code})")
 A.post(B + "/api/auth/logout")

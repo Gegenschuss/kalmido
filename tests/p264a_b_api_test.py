@@ -216,7 +216,8 @@ check(r.ok and r.json()["title"] == "" and r.json().get("encrypted") is True, f"
 r = TA.get(f"/tasks/{T2}")
 check(r.ok and r.json()["title"].startswith("Open") and not r.json().get("encrypted"), "a task of an open list is unchanged")
 r = TA.get(f"/tasks/{T}/comments")
-check(r.status_code in (200, 403, 404) and "e2e1:" not in r.text, f"v1 comments: no ciphertext {r.status_code} {r.text[:200]}")
+# 2.663.0 (#4341): v1_comments: alice owns the list, a GET passes le2b_v1_guard; le2b_v1_mask empties the texts -> 200
+check(r.status_code == 200 and "e2e1:" not in r.text, f"v1 comments: 200, no ciphertext {r.status_code} {r.text[:200]}")
 check("e2e1:" not in TA.get("/tasks?status=all").text, "no ciphertext anywhere in a v1 answer")
 r = TA.patch(f"/tasks/{T}", {"due": due})
 check(r.status_code == 403 and (r.json().get("error") or {}).get("code") == "list_e2e", f"v1 write into the locked list 403 {r.status_code} {r.text[:200]}")
@@ -228,7 +229,8 @@ r = TA.post(f"/tasks/{T2}/move", {"list_id": L})
 check(r.status_code == 403, f"v1 move into the locked list 403 {r.status_code}")
 check(TA.patch(f"/tasks/{T2}", {"due": due}).ok, "v1 writes in an open list still work")
 r = TA.get("/search?q=e2e1")
-check(r.status_code in (200, 404) and "e2e1:" not in r.text and f'"id": {T},' not in r.text.replace('"id":', '"id": '),
+# 2.663.0 (#4341): v1_search: q given, a GET (no write guard) -> 200 with the locked list's texts masked
+check(r.status_code == 200 and "e2e1:" not in r.text and f'"id": {T},' not in r.text.replace('"id":', '"id": '),
       f"v1 search finds nothing of the locked list {r.text[:200]}")
 
 # ================================================================== agents (M4)
@@ -294,7 +296,8 @@ if tp.ok:
 r = A.get(B + "/api/tasks?scope=search&q=e2e1")
 check(r.ok and T not in [x["id"] for x in r.json().get("tasks", [])], "web search: nothing of the locked list")
 r = A.get(B + "/api/search/messages?q=QQQQ")
-check(r.status_code in (200, 404) and "e2e1:" not in r.text, f"message search: no ciphertext {r.status_code}")
+# 2.663.0 (#4341): msg_search_web: a valid q and no filters -> search_messages raises nothing -> 200
+check(r.status_code == 200 and "e2e1:" not in r.text, f"message search: 200, no ciphertext {r.status_code}")
 c2 = cipher(9)
 r = A.patch(B + f"/api/tasks/{T}", json={"title": c2})
 check(r.ok, f"the web app writes a ciphertext title {r.status_code} {r.text[:200]}")

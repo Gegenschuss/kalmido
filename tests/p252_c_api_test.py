@@ -200,7 +200,9 @@ check(dbx("SELECT COUNT(*) FROM contact_occ WHERE contact_id=?", (CT,))[0][0] ==
 
 # ---- the manager's account is deleted: the book stays, another admin manages it
 check(A.put(B + f"/api/orgs/{ALPHA}/members", json={"user_id": ERIN, "role": "admin"}).ok, "erin is an admin of Alpha")
-check(S["erin"].patch(B + f"/api/books/{BK}", json={"birthdays_list_id": LB}).status_code in (200, 404), "erin chooses the birthday list")
+# 2.663.0 (#4341): op_book_edit: erin (Alpha admin) manages the book, but LB went to alice when bob left and is not shared with
+# erin (no org visibility) -> list_role None -> 404; the owner is set by hand below
+check(S["erin"].patch(B + f"/api/books/{BK}", json={"birthdays_list_id": LB}).status_code == 404, "erin cannot choose a birthday list she cannot write (404)")
 dbx("UPDATE books SET owner_id=? WHERE id=?", (ERIN, BK), write=True)  # erin manages it now (whatever the list rights said)
 r = A.delete(B + f"/api/users/{ERIN}")
 check(r.ok, f"alice deletes erin's account ({r.status_code} {r.text[:200]})")

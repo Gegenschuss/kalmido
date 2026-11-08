@@ -238,8 +238,9 @@ check(Q3 not in [int(x) for x in (Bo.get(B + "/api/state").json()["settings"].ge
 r = Bo.post(B + "/api/favorites/suggestion", json={})
 check(r.ok and r.json().get("list_id") is None, "each list is offered only once " + r.text[:120])
 check(requests.post(B + "/api/favorites/suggestion", headers={**PIAH, **H}, json={}).status_code in (401, 403, 404), "agents: no suggestion")
-check(Bo.patch(B + "/api/settings", json={"fav_asked": ""}).status_code in (200, 400) and
-      Bo.post(B + "/api/favorites/suggestion", json={}).json().get("list_id") is None, "fav_asked cannot be reset from the app")
+# 2.663.0 (#4341): settings_update skips SETTINGS_SERVER_ONLY keys (fav_asked) silently and answers 200
+check(Bo.patch(B + "/api/settings", json={"fav_asked": ""}).status_code == 200 and
+      Bo.post(B + "/api/favorites/suggestion", json={}).json().get("list_id") is None, "fav_asked cannot be reset from the app (200, ignored)")
 Bo.patch(B + "/api/settings", json={"fav_suggest": "0"})
 dbx("UPDATE user_settings SET value='' WHERE user_id=? AND key='fav_asked'", (BOB,), write=True)
 check(Bo.post(B + "/api/favorites/suggestion", json={}).json().get("list_id") is None, "fav_suggest 0: no suggestion")

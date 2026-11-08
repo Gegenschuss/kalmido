@@ -404,7 +404,8 @@ r = setv(A, RN, "A2", "=" + "(" * 40 + "2" + ")" * 40 + "+" + "+".join(["1"] * 1
 check(r.ok and (cell(get(A, RN), "A2") or {}).get("value") == 102, "review 4: 40 brackets and 100 terms still work " + r.text[:200])
 _csv = ("Formel\r\n=" + "(" * 300 + "1" + ")" * 300 + "\r\n").encode()
 r = A.post(B + "/api/sheets/import", data={"space": "private"}, files={"file": ("deep.csv", _csv)})
-check(r.status_code in (201, 400), "review 4: importing a deep formula: no 500 " + str(r.status_code))
+# 2.663.0 (#4341): shx_import_post: a CSV cell is never a formula (f=None); "=..." is stored as text ("'" prefix) -> 201
+check(r.status_code == 201, "review 4: importing a deep formula: kept as text, 201 " + str(r.status_code))
 
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

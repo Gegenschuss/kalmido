@@ -60,8 +60,10 @@ check(len(ev) == 2 and ev[1]["event"] == "sheet_unshared" and ev[1]["data"] == {
 check(Fr.post(B + f"/api/sheets/{SID}/shares", json={"user_id": FAG, "role": "read"}).status_code == 201
       and [e["event"] for e in events()][2:] == ["sheet_shared"], "#2361: a share that comes back is new again")
 FE = Fe.get(B + "/api/state").json()["me"]["id"]
-check(Fr.post(B + f"/api/sheets/{SID}/shares", json={"user_id": FE, "role": "read"}).status_code in (201, 409) and len(events()) == 3,
-      "#2361: a share with a person is no agent's event")
+# 2.663.0 (#4341): sheets_shares_add: no organisation on this server (setup without a name) -> visible_people is everyone,
+# the private table has no org filter, so Fenna is a target and the share is made (201)
+check(Fr.post(B + f"/api/sheets/{SID}/shares", json={"user_id": FE, "role": "read"}).status_code == 201 and len(events()) == 3,
+      "#2361: a share with a person (201) is no agent's event")
 
 # ---- #2477
 VC = "BEGIN:VCARD\r\nVERSION:3.0\r\nUID:{u}\r\nFN:{n}\r\nEND:VCARD\r\n"

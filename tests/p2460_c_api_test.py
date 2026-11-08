@@ -137,7 +137,8 @@ check(A.get(GD, params={"folder": "", "role": "view"}).status_code == 400, "grou
 check(A.get(B + "/api/folders/groups/99999/diff", params={"folder": F, "role": "view"}).status_code == 404, "unknown group 404")
 check(requests.get(GD, params={"folder": F, "role": "view"}, headers=H).status_code == 401, "group diff not signed in 401")
 r = Bo.get(GD, params={"folder": F, "role": "view"})
-check(r.status_code in (200, 404) and (r.status_code == 404 or r.json()["lists"] == []), f"another person: nothing of Alice's folder {r.text[:200]}")
+# 2.663.0 (#4341): need_group -> grp_visible: workspaces mode, Bob is not the creator, not a member and shares no organisation with Carol -> 404
+check(r.status_code == 404, f"another person: nothing of Alice's folder (unknown group 404) {r.status_code} {r.text[:200]}")
 r = A.put(B + f"/api/folders/groups/{G}", json={"folder": F, "role": "view", "apply": False})
 check(r.ok, "group: only new lists")
 check(dbx("SELECT role FROM group_shares WHERE list_id=? AND group_id=?", (L1, G))[0][0] == "admin", "Alpha keeps the group's own role")

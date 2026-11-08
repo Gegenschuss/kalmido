@@ -525,7 +525,9 @@ r = put(D, WORK + "ev1.ics", ev)
 check(r.status_code == 403 and b"supported-calendar-component" in r.content, "an event: 403 supported-calendar-component")
 check(put(D, WORK + "bad.ics", "hello").status_code == 415, "not iCalendar: 415")
 check(put(D, WORK + "nouid.ics", vcal(todo("SUMMARY:No UID"))).status_code == 400, "no UID: 400")
-check(put(D, WORK + "kalmido-1-00000000.ics", mk("x-1", "SUMMARY:x")).status_code in (201, 403), "foreign made-up names are just names")
+# 2.663.0 (#4341): dav PUT: only kalmido-<id>-<this database's random dav_instance>.ics is reserved (403); "00000000" is not
+# this instance's id, the UID is new and alice owns the list -> a new task, 201
+check(put(D, WORK + "kalmido-1-00000000.ics", mk("x-1", "SUMMARY:x")).status_code == 201, "foreign made-up names are just names (201)")
 check(put(D, WORK + "big.ics", mk("big", "SUMMARY:" + "x" * 1100000)).status_code == 413, "larger than max-resource-size: 413")
 # ---------------------------------------------------------------- lockout
 A.post(B + "/api/users", json={"username": "dave", "display_name": "Dave", "password": "password123"})

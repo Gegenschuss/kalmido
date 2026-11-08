@@ -265,7 +265,22 @@ check(lm_on("anna@example.com", LID) == "confirmed" and lm_on("cleo@example.com"
 check(lm_sub("emil@example.com") is None, "Emil (consent unknown) not sent")
 check(lm_sub("ben@example.com") is None, "Ben (pending, mode consented) not sent")
 check(lm_sub("carla@example.com") is None, "carol's private contact never goes out")
-check(Bo.post(B + "/api/newsletter/sync", json={"ws": WA}).status_code in (202, 409), "a second start is fine or 409 while busy")
+
+
+def _idle():
+    j = Bo.get(B + f"/api/newsletter?ws={WA}").json()
+    return not j["conn"]["busy"] and j["runs"][0]["state"] != "busy"
+
+
+# 2.663.0 (#4341): nwl_sync -> nwl_start: 409 exactly while a run of the connection is busy (a 'busy' row or the in-process
+# _BUSY set, shown as conn.busy), else 202. Both cases are built on a known state instead of the first run's timing.
+until(_idle, 40)
+check(Bo.post(B + "/api/newsletter/sync", json={"ws": WA}).status_code == 202, "a second start after the first run ended: 202")
+until(_idle, 40)
+_busy = dbx("INSERT INTO nl_runs(conn_id, org_id, kind, by_id, state, started_at) SELECT conn_id, org_id, 'manual', by_id, 'busy', started_at "
+            "FROM nl_runs WHERE conn_id=(SELECT id FROM nl_conns WHERE ws=?) ORDER BY id DESC LIMIT 1 RETURNING id", (f"o{ALPHA}",), write=True)[0][0]
+check(Bo.post(B + "/api/newsletter/sync", json={"ws": WA}).status_code == 409, "a start while a run is busy: 409")
+dbx("DELETE FROM nl_runs WHERE id=?", (_busy,), write=True)
 until(lambda: (Bo.get(B + f"/api/newsletter?ws={WA}").json()["runs"][0]["state"] != "busy"), 40)
 no_secret(json.dumps(dbx("SELECT counts, errors FROM nl_runs")), "the run log in the database")
 
