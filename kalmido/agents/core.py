@@ -177,22 +177,47 @@ def lst_brief(c, lid):
 
 
 # ---- events: queue (polling) + webhook, long-polling wake-up
-_AGENT_COND = threading.Condition()
+_AGENT_LOCK = threading.RLock()
+_AGENT_COND = threading.Condition(_AGENT_LOCK)
 _AGENT_GEN = [0]
 _AGENT_WAITERS = {}
+# 2.658.0 (#4193): one condition per agent with waiting long-polls (sharing _AGENT_LOCK): an event wakes only that agent's
+# waiters (was notify_all: every waiting long-poll of every agent read the database again). A wake-up without agent ids
+# (a lost bus signal, a caller that does not know them) still wakes all. Both dicts hold only agents with waiters
+# (agents/api.py _waiter adds and drops them).
+_AGENT_CONDS = {}
+_AGENT_GENS = {}
 
 
-def _agent_wake_here(_d=None):
-    with _AGENT_COND:
-        _AGENT_GEN[0] += 1
-        _AGENT_COND.notify_all()
+def agent_wake_ids(d):
+    """The agent ids of a wake-up (a list of ints) or None = all."""
+    if not isinstance(d, list) or not d or not all(isinstance(x, int) and not isinstance(x, bool) for x in d):
+        return None
+    return d
 
 
-def agent_notify(c=None):
+def _agent_wake_here(d=None):
+    ids = agent_wake_ids(d)
+    with _AGENT_LOCK:
+        if ids is None:
+            _AGENT_GEN[0] += 1
+            _AGENT_COND.notify_all()
+            for cv in _AGENT_CONDS.values():
+                cv.notify_all()
+            return
+        for aid in ids:
+            if aid in _AGENT_CONDS:
+                _AGENT_GENS[aid] = _AGENT_GENS.get(aid, 0) + 1
+                _AGENT_CONDS[aid].notify_all()
+
+
+def agent_notify(c=None, aids=None):
     """Wakes the agents' waiting long-polls (they look for new rows). 2.622.0 (#3891): in the other web processes too
-    (core/pgbus.py). c: the events are still in that connection's transaction -- the others hear it with its commit."""
-    _agent_wake_here()
-    bus_send("agents", c=c)
+    (core/pgbus.py). c: the events are still in that connection's transaction -- the others hear it with its commit.
+    2.658.0 (#4193): aids = the agents with new events (only their long-polls wake up); None = all."""
+    ids = sorted({int(x) for x in aids}) if aids else None
+    _agent_wake_here(ids)
+    bus_send("agents", ids, c=c)
 
 
 bus_on("agents", _agent_wake_here)
@@ -201,7 +226,7 @@ bus_on("agents", _agent_wake_here)
 @app.after_request
 def agent_wakeup(resp):
     if has_request_context() and g.pop("agent_wake", False):
-        agent_notify()
+        agent_notify(aids=g.pop("agent_wake_ids", None))  # 2.658.0 (#4193): only the agents of this request's events
     return resp
 
 
@@ -284,8 +309,9 @@ def agent_emit(c, aid, event, data, actor="auto", via=None):
               (aid, iso(now_utc() - timedelta(days=AGENT_EVENTS_KEEP_DAYS)), aid, AGENT_EVENTS_KEEP_MAX))
     if has_request_context():
         g.agent_wake = True
+        g.setdefault("agent_wake_ids", set()).add(int(aid))  # 2.658.0 (#4193)
     else:
-        agent_notify(c)  # 2.622.0 (#3891): the other processes hear it with the caller's commit
+        agent_notify(c, [aid])  # 2.622.0 (#3891): the other processes hear it with the caller's commit
     return seq
 
 

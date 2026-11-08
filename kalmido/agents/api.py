@@ -2,6 +2,7 @@
 import random
 import json
 import re
+import threading
 import time
 from datetime import timedelta
 from flask import g, jsonify
@@ -19,7 +20,7 @@ from ..core.errors import BadInput, UnknownFields
 from ..notify.push import push_prio
 from ..api.common import v1_args, v1_err, v1_json, v1_view
 from ..agents.core import (
-    _AGENT_COND, _AGENT_GEN, _AGENT_WAITERS, agent_active, AGENT_EVENTS, AGENT_EVENTS_STALE_H, agent_ids, AGENT_JOBS_KEEP, AGENT_OFFLINE_S,
+    _AGENT_COND, _AGENT_CONDS, _AGENT_GEN, _AGENT_GENS, _AGENT_LOCK, _AGENT_WAITERS, agent_active, AGENT_EVENTS, AGENT_EVENTS_STALE_H, agent_ids, AGENT_JOBS_KEEP, AGENT_OFFLINE_S,
     AGENT_POLL_WRITE_S, agent_public, agent_row, agent_runtime, agent_shares, agent_usable, AGENT_STATUSES, AGENT_WAIT_MAX,
     AGENT_WAITERS_ALL, AGENT_WAITERS_PER, job_dict, JOB_LOG_MAX, JOB_STATES, JOB_TITLE_MAX, job_visible, need_agent,
     STATUS_TEXT_MAX, f8f_job_name_in, job_task_ids,
@@ -213,10 +214,15 @@ def _waiter(aid, on):
             if _AGENT_WAITERS.get(aid, 0) >= AGENT_WAITERS_PER or sum(_AGENT_WAITERS.values()) >= AGENT_WAITERS_ALL:
                 return False
             _AGENT_WAITERS[aid] = _AGENT_WAITERS.get(aid, 0) + 1
+            if aid not in _AGENT_CONDS:  # 2.658.0 (#4193): the agent's own condition while it has waiters
+                _AGENT_CONDS[aid] = threading.Condition(_AGENT_LOCK)
+                _AGENT_GENS[aid] = 0
         else:
             _AGENT_WAITERS[aid] = max(0, _AGENT_WAITERS.get(aid, 0) - 1)
             if not _AGENT_WAITERS[aid]:
                 _AGENT_WAITERS.pop(aid, None)
+                _AGENT_CONDS.pop(aid, None)
+                _AGENT_GENS.pop(aid, None)
         return True
 
 
@@ -251,8 +257,8 @@ def v1_agent_events():
                 if g.pop("gate", False):
                     GATE.leave()
                 while True:
-                    with _AGENT_COND:
-                        gen = _AGENT_GEN[0]
+                    with _AGENT_COND:  # 2.658.0 (#4193): a wake-up for all or for this agent
+                        gen = (_AGENT_GEN[0], _AGENT_GENS.get(aid, 0))
                     c1 = connect()
                     try:
                         rows = _agent_events_after(c1, aid, since, limit + 1)
@@ -262,8 +268,8 @@ def v1_agent_events():
                     if rows or left <= 0 or GATE.maint:
                         break
                     with _AGENT_COND:
-                        if _AGENT_GEN[0] == gen:
-                            _AGENT_COND.wait(left)
+                        if (_AGENT_GEN[0], _AGENT_GENS.get(aid, 0)) == gen:
+                            _AGENT_CONDS[aid].wait(left)
             finally:
                 _waiter(aid, False)
                 waited = round(time.monotonic() - t0, 1)
