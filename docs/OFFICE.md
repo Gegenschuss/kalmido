@@ -1125,6 +1125,11 @@ domestically* yourself. Since 2.538 a reverse charge invoice cannot be finalised
   the line *Entertainment (70 % deductible)*, their input tax in full in field 66. They have no link to the receipts: a
   restaurant bill that also lies under *Receipts* counts twice (the statement says so whenever entertainment receipts
   count). See *Entertainment receipts*.
+  The DATEV booking batch (since 2.386, #2328) books them too, Belegfeld 1 `M<id>`: per VAT rate 70 % of the gross amount
+  on *Entertainment (70 % deductible)* (SKR03 4650 / SKR04 6640) and 30 % on *not deductible* (4654 / 6644), both with the
+  input tax key of the rate (so the input tax counts in full), the tip without a key, a small business without any key.
+  Both accounts can be changed in the DATEV settings. A receipt of the category entertainment in the same period stays in
+  the batch; the check before the download names it as maybe booked twice.
 - **Credit cards** (2.536): fees, interest and positions marked *No receipt needed* of a confirmed statement count in the
   statement (line *Card fees without receipt*, no input VAT) and in the cash flow, as in the DATEV export; private and open
   positions do not, a position with its receipt counts through that receipt (see *Credit cards*).
