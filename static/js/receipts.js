@@ -169,7 +169,7 @@ function rc_putLocal(id, v) {
 }
 async function rc_put(id, v) {
   const draw = () => { if (RC.id === id) rc_draw(); };
-  const j = await optWrite(rc_putLocal(id, v), () => api('PUT', `/api/docs/${id}/receipt`, v), draw);
+  const j = await optWrite(rc_putLocal(id, v), () => api('PUT', `/api/docs/${id}/receipt`, v), draw, {mod: true});
   if (RC.id === id) { RC.d = j; rc_draw(); }
   return {};
 }

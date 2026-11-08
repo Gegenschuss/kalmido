@@ -200,7 +200,7 @@ function lbDriveModal(d, fix) {
       }
       if (b.dataset.m === 'del') {  // 2.559.0 (#4660): at once, the undo after the answer
         md.remove();
-        try { await optWrite(lbRowCut(d.id), () => api('DELETE', `/api/office/drives/${d.id}`), ofcDraw); } catch { return; }
+        try { await optWrite(lbRowCut(d.id), () => api('DELETE', `/api/office/drives/${d.id}`), ofcDraw, {mod: true}); } catch { return; }
         lbRefresh();
         toast(tr('Deleted'), async () => { await api('POST', `/api/office/drives/${d.id}/restore`); lbReload(true); });
         return;
@@ -216,7 +216,7 @@ function lbDriveModal(d, fix) {
         // 2.576.0 (#4794): objsave.js - only the changed fields; a 409 puts the row back and opens the dialog again on the saved drive with the input and the merge bar
         md.remove();
         const d0 = ofcBase(md, d);  // before the row shows the new values (optSet changes the row object)
-        let j; try { j = await optWrite(optSet(() => LB.drives?.find(x => x.id === d.id), lbRowVals(body)), () => ofcSave(null, `/api/office/drives/${d.id}`, d0, body), ofcDraw); }
+        let j; try { j = await optWrite(optSet(() => LB.drives?.find(x => x.id === d.id), lbRowVals(body)), () => ofcSave(null, `/api/office/drives/${d.id}`, d0, body), ofcDraw, {mod: true}); }
         catch (x) { ofcSaveErr(null, x, r => { const m2 = lbDriveModal(r); lbReload(); return m2; }); return; }
         if (!j) { ofcDraw(); return; }
         const x = LB.drives?.find(y => y.id === d.id); if (x && j?.id === d.id) Object.assign(x, j);
@@ -228,7 +228,7 @@ function lbDriveModal(d, fix) {
         // 2.559.0 (#4660): the dialog closes at once, a provisional row (negative id) shows in the list; the real one after the answer
         md.remove();
         const tmp = -Date.now(), row = {...lbRowVals(body), id: tmp, warn: null, trip_id: null, locked: false, corrected_by: null};
-        const req = optWrite(lbRowPut(row), () => api('POST', '/api/office/drives', body), ofcDraw);
+        const req = optWrite(lbRowPut(row), () => api('POST', '/api/office/drives', body), ofcDraw, {mod: true});
         LB_PEND.set(tmp, req.then(r => r.id, () => null));  // a refusal: nothing to open (null), no unhandled rejection
         let j; try { j = await req; } catch { return; } finally { LB_PEND.delete(tmp); }
         const other = (j.vehicle_id && j.vehicle_id !== LB.vid) || j.day.slice(0, 4) !== lbYear();

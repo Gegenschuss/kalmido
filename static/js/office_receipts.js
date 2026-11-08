@@ -147,7 +147,7 @@ function rclSelBar() {
 // the background (bkRefresh: the rows stay until the fresh ones are there)
 async function rclChecked(ids, on) {
   const put = typeof bkRowsPut === 'function' ? bkRowsPut(ids, bkChkStamp(on)) : () => null;
-  const j = await optWrite(put, () => api('POST', '/api/office/books/receipts/checked', {node_ids: ids, checked: on}), ofcDraw);
+  const j = await optWrite(put, () => api('POST', '/api/office/books/receipts/checked', {node_ids: ids, checked: on}), ofcDraw, {mod: true});
   if (typeof bkRefresh === 'function') bkRefresh(); else rclReload();  // (bkRefresh reads the receipts list again too)
   return j;
 }

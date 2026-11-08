@@ -517,7 +517,7 @@ const bkChkTxt = r => r.checked_at ? tr('Checked by {0} on {1}', r.checked_by?.n
 // refusal (locked month) puts box, line and rows back with the server's reason
 const bkChkStamp = on => on ? {checked_at: new Date().toISOString(), checked_by: S.me?.display_name || ''} : {checked_at: null, checked_by: null};
 async function bkChkPut(id, on) {
-  const j = await optWrite(bkRowsPut([id], bkChkStamp(on)), () => api('POST', '/api/office/books/receipts/checked', {node_ids: [id], checked: on}), ofcDraw);
+  const j = await optWrite(bkRowsPut([id], bkChkStamp(on)), () => api('POST', '/api/office/books/receipts/checked', {node_ids: [id], checked: on}), ofcDraw, {mod: true});
   bkRefresh();
   return j.rows?.[0] || {};
 }
@@ -534,7 +534,7 @@ async function bkChkSet(md, id, on) {
 async function bkSave(id, v) {
   const vals = {amount: v.doc.amount || null, date: v.doc.date || null, category: v.rc.category, vat_pct: v.rc.vat_pct ?? null};
   try {
-    await optWrite(bkRowsPut([id], vals), async () => { await api('PATCH', `/api/docs/${id}`, v.doc); await api('PUT', `/api/docs/${id}/receipt`, v.rc); }, ofcDraw);
+    await optWrite(bkRowsPut([id], vals), async () => { await api('PATCH', `/api/docs/${id}`, v.doc); await api('PUT', `/api/docs/${id}/receipt`, v.rc); }, ofcDraw, {mod: true});
   } finally { bkRefresh(); }  // 2.110.0 B (#2055): the receipts list too (rclReload)
   return {};
 }

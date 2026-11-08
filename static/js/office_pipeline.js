@@ -76,7 +76,7 @@ async function pp_patch(id, body, msg = tr('Saved'), rec = null) {  // 2.559.0 (
   // expect_updated_at (saved elsewhere meanwhile -> 409, the caller's merge bar); the undo writes back only the keys that
   // really changed, with the version this save left
   const r0 = rec && ofcBase(null, rec);  // before the card shows the new values (optSet changes the row object)
-  const j = await optWrite(optSet(() => pp_item(id), pp_local(body)), () => r0 ? ofcSave(null, `/api/office/deals/${id}`, r0, body) : api('PATCH', `/api/office/deals/${id}`, body), ofcDraw);
+  const j = await optWrite(optSet(() => pp_item(id), pp_local(body)), () => r0 ? ofcSave(null, `/api/office/deals/${id}`, r0, body) : api('PATCH', `/api/office/deals/${id}`, body), ofcDraw, {mod: true});
   if (!j) { pp_refresh(); return rec; }
   pp_itemSet(j); pp_refresh();
   const before = Object.fromEntries(Object.entries(j.before || {}).filter(([k, v]) => JSON.stringify(v ?? null) !== JSON.stringify(j[k] ?? null)));
@@ -130,7 +130,7 @@ function pp_modal(x, stage) {
       if (b.dataset.m === 'del') {  // 2.559.0 (#4660): gone at once, a refusal brings it back
         md.remove();
         const out = () => { const its = PPS.data?.items, k = its ? its.findIndex(i => i.id === x.id) : -1; if (k < 0) return null; const [o] = its.splice(k, 1); return () => { if (PPS.data && !pp_item(x.id)) PPS.data.items.splice(Math.min(k, PPS.data.items.length), 0, o); }; };
-        try { await optWrite(out, () => api('DELETE', `/api/office/deals/${x.id}`), ofcDraw); } catch { return; }
+        try { await optWrite(out, () => api('DELETE', `/api/office/deals/${x.id}`), ofcDraw, {mod: true}); } catch { return; }
         pp_refresh();
         toast(tr('Deleted'), async () => { pp_itemSet(await api('POST', `/api/office/deals/${x.id}/restore`)); pp_refresh(); });
         return;
@@ -165,7 +165,7 @@ function pp_modal(x, stage) {
       const tmp = -Date.now(), was = PPS.stage;
       const put = () => { if (!PPS.data) return null; if (!pp_item(tmp)) PPS.data.items.push({offer_id: null, list_id: null, ...pp_local(body), id: tmp}); return () => { if (PPS.data) PPS.data.items = PPS.data.items.filter(i => i.id !== tmp); }; };
       PPS.stage = body.stage;
-      let j; try { j = await optWrite(put, () => api('POST', '/api/office/deals', body), ofcDraw); } catch { if (PPS.stage === body.stage) PPS.stage = was; ofcDraw(); return; }
+      let j; try { j = await optWrite(put, () => api('POST', '/api/office/deals', body), ofcDraw, {mod: true}); } catch { if (PPS.stage === body.stage) PPS.stage = was; ofcDraw(); return; }
       pp_itemSet(j, tmp); pp_refresh();
       toast(tr('Added'), async () => { await api('DELETE', `/api/office/deals/${j.id}`); pp_refresh(); });
     } catch (x2) { err(x2.message); }

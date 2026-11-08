@@ -84,7 +84,7 @@ const rdl_tmpPut = tmp => () => {
 };
 async function rdl_add(url) {
   const tmp = {id: -Date.now(), title: url, url, site: rdl_host(url), created_at: new Date().toISOString(), done: false, can_edit: false, summary: ''};
-  let j; try { j = await optWrite(rdl_tmpPut(tmp), () => rdl_save(url, ''), rdl_draw); } catch { return false; }  // api() showed the reason
+  let j; try { j = await optWrite(rdl_tmpPut(tmp), () => rdl_save(url, ''), rdl_draw, {mod: true}); } catch { return false; }  // api() showed the reason
   const x = rdl_item(tmp.id);
   if (x && (!j?.created || rdl_item(j.task_id))) { RDL.items = RDL.items.filter(y => y.id !== tmp.id); if (!j?.created) RDL.count = Math.max(0, RDL.count - 1); }
   else if (x) x.id = j.task_id;
@@ -107,7 +107,7 @@ const rdl_tickPut = (id, done) => () => {
 async function rdl_tick(id) {
   const x = rdl_item(id); if (!x || id < 0) return;
   const done = !x.done, path = id => `/api/tasks/${id}/${done ? 'complete' : 'reopen'}`, back = id => `/api/tasks/${id}/${done ? 'reopen' : 'complete'}`;
-  const req = RDL.pend = optWrite(rdl_tickPut(id, done), () => api('POST', path(id)), rdl_draw);
+  const req = RDL.pend = optWrite(rdl_tickPut(id, done), () => api('POST', path(id)), rdl_draw, {mod: true});
   await req;
   offerUndo(done ? tr('Read: {0}', x.title) : tr('Unread: {0}', x.title), histAdd({label: done ? tr('Read: {0}', x.title) : tr('Unread: {0}', x.title),
     undo: async () => { await api('POST', back(id)); await rdl_reload(); },

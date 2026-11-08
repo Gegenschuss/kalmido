@@ -110,7 +110,7 @@ async function bm_add(url, extra = {}, where = '') {
   const sp = extra.space || bm_addSp();
   const tmp = {id: -Date.now(), url, title: extra.title || url, site: bm_host(url), description: '', note: '', tags: [], state: 'unread', preview: 'pending', image: '', can_edit: false, space: sp};
   try {
-    const j = await optWrite(bm_tmpPut(tmp, sp), () => api('POST', '/api/bookmarks', {url, space: bm_addSp(), ...extra}), bm_draw);
+    const j = await optWrite(bm_tmpPut(tmp, sp), () => api('POST', '/api/bookmarks', {url, space: bm_addSp(), ...extra}), bm_draw, {mod: true});
     const b = j.bookmark;
     const i = BM.items.findIndex(y => y.id === tmp.id);
     if (i >= 0) { if (j.existed || bm_item(b.id)) { BM.items.splice(i, 1); BM.count = Math.max(0, BM.count - 1); } else BM.items[i] = b; }
@@ -132,7 +132,7 @@ async function bm_patch(id, ch, label, hl = label, x0 = null) {
   const x = bm_item(id) || x0 || await api('GET', `/api/bookmarks/${id}`);
   const old = {}; for (const k of Object.keys(ch)) old[k] = x[k];
   const go = () => api('PATCH', `/api/bookmarks/${id}`, ch);
-  const nx = await optWrite(optSet(() => bm_item(id), ch), () => (bm_q = bm_q.catch(() => {}).then(go)), bm_draw);
+  const nx = await optWrite(optSet(() => bm_item(id), ch), () => (bm_q = bm_q.catch(() => {}).then(go)), bm_draw, {mod: true});
   // 2.570.0 (#4770): undo / redo send only the changed keys against the version the step before left (core.js undoStep; the
   // preview fetch no longer moves it): changed in another session since -> "Changed elsewhere, not undone", their change stays
   let ver = nx?.updated_at || '';
@@ -151,7 +151,7 @@ const bm_delPut = id => () => {
 };
 async function bm_del(id, x0 = null) {
   const x = bm_item(id) || x0 || await api('GET', `/api/bookmarks/${id}`);
-  await optWrite(bm_delPut(id), () => api('DELETE', `/api/bookmarks/${id}`), bm_draw);
+  await optWrite(bm_delPut(id), () => api('DELETE', `/api/bookmarks/${id}`), bm_draw, {mod: true});
   offerUndo(tr('Deleted: {0}', x.title), histAdd({label: tr('Delete bookmark {0}', qn(x.title)),
     undo: async () => { await api('POST', `/api/bookmarks/${id}/restore`, {}); await bm_reload(); },
     redo: async () => { await api('DELETE', `/api/bookmarks/${id}`); await bm_reload(); }}));
