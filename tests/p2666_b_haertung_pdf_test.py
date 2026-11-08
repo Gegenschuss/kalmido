@@ -77,7 +77,7 @@ for what, (mode, icc) in cases.items():
     check(n == 0 and out is im, f"#4074 14: {what}: littlecms not called, the picture as it was ({n} calls)")
 
 b = io.BytesIO()
-Image.new("RGB", (60, 20), (47, 93, 138)).save(b, "PNG", icc_profile=big)
+Image.new("RGB", (60, 20), (47, 93, 138)).save(b, "JPEG", icc_profile=big)  # a JPEG carries a profile over 1 MB (Pillow's PNG reader refuses one)
 CALLS.clear()
 obj = pdf.pdf_image_object(b.getvalue())
 check(obj and obj[0] == 60 and obj[1] == 20 and not CALLS, f"#4074 14: a logo with a too large profile still prints, unparsed ({len(CALLS)} calls)")

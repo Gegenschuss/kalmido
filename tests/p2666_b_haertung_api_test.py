@@ -22,18 +22,23 @@ import kt  # noqa: E402
 from freelancer_fixture import freelancer  # noqa: E402
 from kt import B, check, done, sess  # noqa: E402
 
+FEAT = "cal,comments,collab,files,docs,office,clients,wiki"
 kt.fresh(prefix="P2666B")
-A = kt.setup()
-A.patch(B + "/api/settings", json={"lang": "en", "tour": "done"})
+assert sess().post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice Admin", "password": kt.PASSWORD}).ok
+A = sess("alice")
+A.post(B + "/api/admin/setup", json={"org_name": "Example Studio", "lang": "en", "collab_all": True, "modules": ["cal", "comments", "collab"]})
+A.patch(B + "/api/settings", json={"lang": "en", "tour": "done", "features": FEAT})
+ORG = A.get(B + "/api/state").json()["me"]["workspaces"][0]["id"]
 uid = {}
 for u in ("bob", "carol"):
-    r = A.post(B + "/api/users", json={"username": u, "display_name": u.title(), "password": kt.PASSWORD, "email": f"{u}@example.com"})
+    r = A.post(B + "/api/users", json={"orgs": [{"id": ORG, "role": "member"}], "username": u, "display_name": u.title(), "password": kt.PASSWORD, "email": f"{u}@example.com"})
     assert r.ok, r.text
     uid[u] = r.json()["id"]
 Bo, Ca = sess("bob"), sess("carol")
 for s in (Bo, Ca):
-    s.patch(B + "/api/settings", json={"lang": "en", "tour": "done"})
+    s.patch(B + "/api/settings", json={"lang": "en", "tour": "done", "features": FEAT})
 FID, Fr = freelancer(B, A)
+Fr.patch(B + "/api/settings", json={"features": FEAT})
 D = date.today().isoformat()
 CSD = "Clear-Site-Data"
 
@@ -66,12 +71,6 @@ for who, mk in (("bob", lambda: sess("bob")), ("frida", lambda: sess("frida"))):
     check(s3.get(B + "/api/state").ok, f"7 {who}: the other session of the person goes on")
 
 # ================================================================== 9: folder shares are part of the sign-in mark
-WS = A.get(B + "/api/state").json()["me"]["workspaces"]
-ORG = WS[0]["id"]
-for s in (A, Bo, Ca):
-    f = (s.get(B + "/api/state").json().get("settings", {}).get("features") or "").split(",")
-    if "wiki" not in f:
-        s.patch(B + "/api/settings", json={"features": ",".join([x for x in f if x] + ["wiki", "files"])})
 
 
 def sgen(s):
@@ -107,9 +106,6 @@ check(sgen(Fr) == f0, "9 frida: the mark of the person without an organisation s
 for who, s, holder in (("alice", A, kt.me_id(A)), ("frida", Fr, FID)):
     if who == "alice":
         A.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
-    f = (s.get(B + "/api/state").json().get("settings", {}).get("features") or "").split(",")
-    if "office" not in f:
-        s.patch(B + "/api/settings", json={"features": ",".join([x for x in f if x] + ["office"])})
     card = s.post(B + "/api/office/cards", json={"holder_id": holder, "last4": "2666"})
     check(card.ok, f"11 {who}: a card {card.status_code} {card.text[:160]}")
     if not card.ok:
