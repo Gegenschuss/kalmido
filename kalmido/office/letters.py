@@ -21,6 +21,7 @@ from flask import Response, g, has_request_context, jsonify, request
 from ..core.config import app, APP_VERSION
 from ..core.pg import insert_id, write_lock
 from .owrite import ow_crypt, ow_history_answer, ow_kind, ow_undo_ctx, ow_write  # 2.567.0 (#4711): the office's write layer
+from .oubar import oub_barrier, oub_label_letter, OUB_SENT  # 2.747.0 (#5252): the label of its step group, the barrier of a sent letter
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, err, iso, local_now, now_utc
@@ -341,7 +342,7 @@ def lt_profile_save(c, oid, uid, upd):
 
 
 # ---------------------------------------------------------------- the letters
-ow_kind("office_letter", "office_letters")  # 2.567.0 (#4711): history + session undo (office/undo.py kind "letter")
+ow_kind("office_letter", "office_letters", label=oub_label_letter)  # 2.567.0 (#4711): history + session undo (office/undo.py kind "letter")
 
 
 def lt_create(c, oid, uid, data, agent_id=None):
@@ -956,6 +957,7 @@ def lt_mark_sent(c, oid, d, channel=None, tracking_no=None, followup_days=None, 
     if not d.get("node_id"):
         nid = lt_file(c, oid, uid or lt_uid(), d, lt_pdf(c, oid, d))
         c.execute("UPDATE office_letters SET node_id=? WHERE id=? AND org_id=?", (nid, d["id"], oid))
+    oub_barrier(c, uid, oid, OUB_SENT, oub_label_letter(d)[1][0])  # 2.747.0 (#5252): sent = a barrier (object number only: sealed)
     bump(c)
     return lt_row(c, oid, d["id"])
 

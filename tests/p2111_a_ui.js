@@ -4,7 +4,7 @@
 // - a field changed: Ctrl+Z (focus outside the field) takes that step back; two more changes, then "Back": the hint
 //   "… saved · Undo" for 10 seconds, its button brings back the values from the opening
 // - left again after a change, then someone else changes it: the button refuses with the reason, their change stays
-// - "Finalise" ends the way back (no hint when leaving)
+// - "Finalise" ends the way back (no hint when leaving); 2.747.0 (#5252): the history shows it as a barrier, Undo there names why
 // - a table: a changed cell, leaving shows the hint, its button empties the cell again
 // - the client dialog: after "Save" the same hint, its button brings back the old name
 const path = require('path');
@@ -82,10 +82,16 @@ const FEAT = 'cal,comments,collab,office,clients,sheets';
     check(await open(ev, nav), 'opened a fourth time');
     await setField(ev, 'ofd-project_ref', 'REF-8');
     await until(async () => (await docGet()).project_ref === 'REF-8');
-    await ev(`(() => { oun_hdr('POST', '/api/office/docs/${doc.id}/finalize'); return 1; })()`);  // what the finalise request does to the session
+    // 2.747.0 (#5252): what the finalise request does to the session - the header first, its answer then (oun_ok): the
+    // session ends once it went through and the history shows the step as a barrier
+    await ev(`(() => { oun_hdr('POST', '/api/office/docs/${doc.id}/finalize'); oun_ok('POST', '/api/office/docs/${doc.id}/finalize', {id: ${doc.id}, kind: 'offer', number: 'A-2026-1'}); return 1; })()`);
     await back(ev);
     await sleep(1200);
     check(!await ev(toastOn), 'after finalising: no hint');
+    check(await ev(`HIST.undo.at(-1)?.barrier ? HIST.undo.at(-1).label : ''`) === 'Finalised: A-2026-1', 'the history shows the barrier ' + await ev(`HIST.undo.at(-1)?.label || ''`));
+    await ev(`(() => { histStep('undo'); return 1; })()`);
+    check(await ready(ev, `/Finalised or sent/.test(document.getElementById('toast')?.textContent || '')`), 'Undo on the barrier: the reason, nothing undone ' + await ev(`document.getElementById('toast')?.textContent || ''`));
+    check((await docGet()).project_ref === 'REF-8', 'the change before finalising stays');
     // a table: a cell, then leaving -> the hint, Undo -> the cell is empty again
     const sh = await call(CA, 'POST', '/api/sheets', {title: 'Budget sheet'});
     check(sh.http === 201, 'a table ' + sh.http);

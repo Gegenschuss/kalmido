@@ -31,6 +31,7 @@ from .abschlag import abs_skonto_rows  # 2.355.0 C (#2840)
 from .euerbasis import eb_income_payment_ids, eb_segments  # 2.603.0 (#4927): the basis of the EUeR per year
 from .model import office_gate, office_need_feature, office_org, office_settings
 from .ledger import ofx_log
+from .oubar import OUB_DATEV_EXP, oub_barrier  # 2.747.0 (#5252): a DATEV export handed out is a barrier of the undo steps
 
 # tax cases -> the default revenue accounts per chart (automatic accounts: DATEV adds the VAT itself, no tax key needed)
 # 2.355.0 C (#2840): + the cash discounts granted (Gewaehrte Skonti) at 19 % / 7 % / without VAT. 2.355.0 C (#2844): reverse =
@@ -438,6 +439,7 @@ def dx_extf_get():
     if request.args.get("check"):
         return jsonify(count=n, **{"from": d_from, "to": d_to}, file=fname, hints=hints)
     ofx_log(c, oid, "export", target="datev", detail={"from": d_from, "to": d_to, "count": n})
+    oub_barrier(c, uid, oid, OUB_DATEV_EXP, d_from, d_to)  # 2.747.0 (#5252)
     c.commit()
     return Response(data, mimetype="text/csv; charset=windows-1252", headers={"Content-Disposition": f"attachment; filename=\"{fname}\"",
                                                                                    "Cache-Control": "no-store"})  # 2.190.0 D (#2496)

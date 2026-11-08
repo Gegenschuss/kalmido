@@ -47,6 +47,7 @@ from .pdf import pdf_phone  # 2.369.5 (#2517): pulled up from functions
 from .catalog import pkc_origin  # 2.369.5 (#2517): pulled up from functions
 from .calc import calc_tax_day  # 2.531.0 (#4498)
 from .chain import hch_append, hch_check, hch_migrate  # 2.531.0 (#4497)
+from .oubar import OUB_FINAL, oub_barrier, oub_doc_name  # 2.747.0 (#5252): finalising is a barrier of the undo steps
 
 # P2: does a document of this kind get its number only when it is finalised? (quotations: at creation, unless the
 # organisation chose otherwise; invoices / credit notes of a later release: always at finalising)
@@ -446,7 +447,9 @@ def ofx_finalize(c, oid, uid, did):
             hch_append(c, oid, did, s)  # 2.531.0 (#4497): its place in the hash chain of its series (not a quotation / trial document)
     except Exception as e:  # noqa: BLE001
         app.logger.warning("office chain: document %s of office %s not chained yet: %s", did, oid, type(e).__name__)
-    return doc_row(c, oid, did)
+    r = doc_row(c, oid, did)
+    oub_barrier(c, uid, oid, OUB_FINAL, oub_doc_name(r))  # 2.747.0 (#5252): listed, "bis hierher" stops here
+    return r
 
 
 def ofx_snapshot_pack(r):

@@ -355,6 +355,7 @@ ORDER = (
     "hub.mailrules",  # 2.581.0 (#4804): documents from the own mailbox (mail rules)
     "office.packs",  # 2.36.1 (#1021): country packs (data), used by office.model
     "office.homecur",  # 2.189.0 (#2475): the office's home currency (no routes; used by office.model and the money modules)
+    "office.oubar",  # 2.747.0 (#5252): labels and barriers of the office's undo steps (core imports only; ledger, invoices, letters use it)
     "office.model",  # 2.36.1 (#1021): office & finance (B); C/D append office.calc, office.docs, office.pdf
     "office.web",
     "office.rights",  # 2.187.0 (#2476): office access rights (groups, levels per area; a before_request gate)

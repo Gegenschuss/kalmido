@@ -669,7 +669,7 @@ WD_SLOW_MS = 200  # 2.149.0 C (#2516): a watchdog section that takes longer leav
 WD_SLOW_S = env_int("KALMIDO_WD_SLOW_S", 600, lo=0, hi=86400)
 WD_SLOW = frozenset((
     "news cleanup", "office log prune", "usage cleanup", "audit cleanup", "proposal cleanup", "chat files cleanup",
-    "team chat files cleanup", "org export cleanup", "merge snapshots", "office undo copies", "video trash", "list trash",
+    "team chat files cleanup", "org export cleanup", "merge snapshots", "video trash", "list trash",
     "task trash", "old logs", "orphan files", "agent chat days", "trash periods", "booking archive", "retired organisations",
     "account export cleanup", "server link tokens", "files cleanup", "contract files trash", "terms files",
     "entertainment receipts trash", "wiki files", "wiki trash", "table files"))
@@ -777,8 +777,6 @@ def _watchdog_tick(c):
     from ..admin.orgexport import ox_cleanup
     _wd_section(c, "org export cleanup", ox_cleanup)  # 2.42.0 (#833): archives after 24 h
     _wd_section(c, "merge snapshots", mg_prune, False)  # 2.66.0 (#1835): the undo data of merges after 30 days
-    from ..office.undo import oun_prune
-    _wd_section(c, "office undo copies", oun_prune)  # 2.111.0 A (#2233): the editors' undo copies after a day
     _wd_section(c, "undo steps", undo_prune)  # 2.747.0 (#5249): the step groups after 30 days, over 300 per person, parts without a group
     from ..videos.review import vdr_trash_prune
     _wd_section(c, "video trash", vdr_trash_prune)  # 2.99.1 (#1959) review M3: video sign-offs in the trash after 30 days

@@ -13,19 +13,20 @@ POST /api/office/undo/<doc|client|letter|<master data kind>|<ow kind>>/<id> {ses
 such a copy back -- only while the object is exactly as this person's last step left it (fingerprint), so a change by
 someone else (or an own action without undo: finalise, send, payment, status, DATEV) in between is never overwritten: 409
 with a readable reason. A finalised / sent document stays as it is (409). Rights as for the normal change of the object.
-Copies live one day (KEEP_H): the watchdog (oun_prune) and every new session remove older ones."""
-from datetime import timedelta
-
+Copies live KEEP_H (2.747.0 #5249: 30 days, was a day): the watchdog (core/undogroups.py undo_prune) and every new session
+remove older ones. 2.747.0 (#5252): finalising, sending, a payment, DATEV and the period lock also write a barrier into the
+person's step groups (office/oubar.py); this session undo keeps its own guard (_ctx: OUN_FINAL, the fingerprint)."""
 from flask import jsonify
 
 from ..core.config import app
 from ..core.i18n import N_, tr
-from ..core.db import body, bump, db, iso, now_utc
+from ..core.db import body, bump, db
 from ..core.access import Denied
 from ..core.writes import OBJ_TRACK, UNDO_KEEP_H, _fp, _undo_args, obj_undo_post, obj_undo_pre, obj_undo_run, undo_scope
 from .model import MD, office_role, office_row, sr_public  # 2.369.5 (#2517): pulled up from functions
 from .ledger import ofx_locked, ofx_log  # 2.369.5 (#2517): pulled up from functions
 from .owrite import OW_UNDO_CTX, ow_kind
+from .oubar import oub_label_client, oub_label_doc, oub_label_md  # 2.747.0 (#5252)
 from ..accounts.session import me  # 2.369.5 (#2517): pulled up from functions
 from ..team.clients import CLIENT_BILL_GATED, _gate, cl_bill_ok, client_public, need_client  # 2.369.5 (#2517): pulled up from functions
 
@@ -52,10 +53,11 @@ def _md_scope(kind):
 DOC_KEEP = {"office_docs": {"number"}}
 DOC_NOFP = {"office_docs": {"number", "totals"}, "office_doc_parts": {"totals"}}  # the parts' sums too (recalc after each undo)
 OUN_KINDS = {"doc": "office_doc", "client": "client", "letter": "office_letter", **{k: f"office_md_{k}" for k in MD}}  # route kind -> core kind
-ow_kind("office_doc", "office_docs", scope=_doc_scope, keep=DOC_KEEP, nofp=DOC_NOFP)
-ow_kind("client", "clients", scope=lambda ref, oid: [("clients", "id=?", (ref,), False), ("office_client_contacts", "client_id=?", (ref,), True)])
+ow_kind("office_doc", "office_docs", scope=_doc_scope, keep=DOC_KEEP, nofp=DOC_NOFP, label=oub_label_doc)  # 2.747.0 (#5252): labels
+ow_kind("client", "clients", scope=lambda ref, oid: [("clients", "id=?", (ref,), False), ("office_client_contacts", "client_id=?", (ref,), True)],
+        label=oub_label_client)
 for _k in MD:
-    ow_kind(f"office_md_{_k}", MD[_k]["table"], scope=_md_scope(_k))
+    ow_kind(f"office_md_{_k}", MD[_k]["table"], scope=_md_scope(_k), label=oub_label_md(MD[_k]["label"]))
 
 
 def oun_kind(kind):
@@ -76,19 +78,8 @@ def oun_fp(snap):
     return _fp(snap, DOC_NOFP)
 
 
-OUN_PRUNE = {"at": 0.0}
-
-
-def oun_prune(c):
-    """The watchdog (at most hourly, system context): copies older than KEEP_H go, also those of deleted documents and
-    clients (nothing of a deleted object stays longer than a day)."""
-    import time
-    if time.time() - OUN_PRUNE["at"] < 3600:
-        return
-    OUN_PRUNE["at"] = time.time()
-    lim = iso(now_utc() - timedelta(hours=KEEP_H))
-    c.execute("DELETE FROM obj_undo WHERE created_at<?", (lim,))
-    c.commit()
+# 2.747.0 (#5252): oun_prune went -- the watchdog's core/undogroups.py undo_prune removes every copy older than KEEP_H (30
+# days, core/writes.py UNDO_KEEP_H) with its group, the groups over the cap per person and the parts without a group.
 
 
 # ---------------------------------------------------------------- recording (hooks of the write routes)
@@ -160,7 +151,8 @@ def oun_restore(kind, ref):
     keep = None
     if kind == "client" and not cl_bill_ok(c, uid, need_client(c, ref, uid)["org_id"], "edit"):
         keep = {"clients": set(CLIENT_BILL_GATED)}  # 2.577.0 (#3964): like cl_bill_strip -- fields uid may not change stay as they are
-    left = obj_undo_run(c, uid, oun_kind(kind), ref, oid, b.get("sess"), op, fix=fix, keep=keep)
+    left = obj_undo_run(c, uid, oun_kind(kind), ref, oid, b.get("sess"), op, fix=fix, keep=keep,
+                        lock=f"office_doc_{int(ref)}" if kind == "doc" else None)  # 2.747.0 (#5252, review F3): with finalising / numbering / status
     if oid is not None:
         if kind == "doc":
             ofx_log(c, oid, "update", doc_id=ref, detail={"undo": op})

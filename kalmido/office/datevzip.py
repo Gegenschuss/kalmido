@@ -31,6 +31,7 @@ from ..personal.timetrack import BadInput
 from .calc import dec, dstr, money
 from .model import office_gate, office_need_feature, office_org, office_settings
 from .ledger import ofx_log
+from .oubar import OUB_DATEV_EXP, oub_barrier  # 2.747.0 (#5252)
 from .periodlock import pl_through  # 2.369.5 (#2517): pulled up from functions
 from ..files.store import fs_chain, fs_deleted, fs_role, fs_read  # 2.369.5 (#2517): pulled up from functions
 from ..core.orgcrypt import oc_dec_fields  # 2.369.5 (#2517): pulled up from functions
@@ -257,6 +258,7 @@ def dz_zip_get():
         return info
     try:  # 2.674.0 (#4190): a temporary file (dz_write), sent and gone
         ofx_log(c, oid, "export", target="datev", detail={"from": info["from"], "to": info["to"], "count": info["count"], "files": info["files"]})
+        oub_barrier(c, None, oid, OUB_DATEV_EXP, info["from"], info["to"])  # 2.747.0 (#5252): a DATEV export handed out
         c.commit()
         resp = abm_send_zip(path, info["file"])
     except BaseException:

@@ -194,6 +194,10 @@ async function histStep(dir, n = 1) {
     await flushSaves();
     for (let i = 0; i < n && !stop; i++) {
       const from = HIST[dir], e = from[from.length - 1]; if (!e) break;
+      if (e.barrier) {  // 2.747.0 (#5252): finalised / sent / paid (office_undo.js oun_bar): one Undo names why and takes the entry off, "up to here" stops before it
+        if (i === 0 && n === 1) from.pop();
+        toast(e.barrier); stop = true; break;
+      }
       if (e.lids.some(l => listById(l) && !canAddTo(l))) {  // the list became view-only in the meantime (participants: the server checks each task)
         from.pop(); stop = true;
         toast(dir === 'undo' ? tr('Read-only: “{0}” can no longer be undone', e.label) : tr('Read-only: “{0}” can no longer be redone', e.label));

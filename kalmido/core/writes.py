@@ -79,12 +79,13 @@ MOVE_SHARED = N_("It is shared with people or agents: remove those shares first"
 OBJ_TRACK = {}  # 2.567.0 (#4711): kind -> {table, area, undo_scope, undo_keep, undo_nofp, fields: None} (obj_track)
 
 
-def obj_track(kind, table, *, area="other", undo_scope=None, undo_keep=None, undo_nofp=None):
+def obj_track(kind, table, *, area="other", undo_scope=None, undo_keep=None, undo_nofp=None, undo_label=None):
     """2.567.0 (#4711): an old area's kind for the history and the undo only (module docstring). undo_keep / undo_nofp:
-    {table: {column}} never written back on undo / never part of the fingerprint (a number drawn since, cached sums)."""
+    {table: {column}} never written back on undo / never part of the fingerprint (a number drawn since, cached sums).
+    2.747.0 (#5252): undo_label(main row as stored) -> (i18n key, [values]) = the label of its step group (obj_undo_pre)."""
     UG_TRACKED[kind] = table  # 2.747.0 (#5249, review F2): undogroups.py ug_drop_orphans
     OBJ_TRACK[kind] = {"kind": kind, "table": table, "area": area, "undo_scope": undo_scope, "fields": None,
-                       "undo_keep": dict(undo_keep or {}), "undo_nofp": dict(undo_nofp or {})}
+                       "undo_keep": dict(undo_keep or {}), "undo_nofp": dict(undo_nofp or {}), "undo_label": undo_label}
     return OBJ_TRACK[kind]
 
 
@@ -496,6 +497,8 @@ def obj_undo_pre(c, uid, kind, rid, oid=None):
     n = len(js.encode())
     reg = _reg(kind)
     label = (UG_LABEL, [[reg["label"]]]) if reg.get("label") else (UG_LABEL_PLAIN, [])
+    if callable(reg.get("undo_label")):  # 2.747.0 (#5252): a tracked kind names its object (office/oubar.py)
+        label = reg["undo_label"](main) or label
     grp = ug_current(c, uid, _area(reg), main.get("org_id"), label)
     gid = grp["id"] if grp is not None and ug_fits(c, grp, n) else None
     if not tok and gid is None:
@@ -600,17 +603,19 @@ def _undo_args(sess, op):
     return tok
 
 
-def obj_undo_run(c, uid, kind, rid, oid, sess, op="undo", fix=None, keep=None):
+def obj_undo_run(c, uid, kind, rid, oid, sess, op="undo", fix=None, keep=None, lock=None):
     """2.567.0 (#4711): obj_undo without its rights check -- the caller checked them (an obj_track kind: the area's own,
     office/undo.py). oid = the object's workspace now; fix(c) runs after each write back (the sums of a document).
-    2.577.0 (#3964): keep {table: {column}} = columns that stay as they are now on top of undo_keep (fields uid may not change)."""
+    2.577.0 (#3964): keep {table: {column}} = columns that stay as they are now on top of undo_keep (fields uid may not change).
+    2.747.0 (#5252, review F3): lock = the write_lock name the kind's own saves take (an office document: office_doc_<id>, the
+    one of finalising / numbering / status), so an undo and those serialise (default obj-<kind>-<id>)."""
     tok = _undo_args(sess, op)
     reg = _reg(kind)
     if keep:
         reg = {**reg, "undo_keep": {t: set(reg["undo_keep"].get(t, ())) | set(v) for t, v in {**reg["undo_keep"], **keep}.items()}}
     if obj_is_agent(c, uid):
         raise Denied(403)
-    write_lock(c, f"obj-{kind}-{int(rid)}")
+    write_lock(c, lock or f"obj-{kind}-{int(rid)}")
     sc = undo_scope(kind, rid, oid)
     _lock_rows(c, sc)
     steps = c.execute("SELECT * FROM obj_undo WHERE user_id=? AND sess=? AND kind=? AND ref_id=? ORDER BY seq", (uid, tok, kind, int(rid))).fetchall()

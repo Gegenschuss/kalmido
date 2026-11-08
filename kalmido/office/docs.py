@@ -29,6 +29,7 @@ from .homecur import HC_CODES, hc_code, hc_home, hc_office_rate  # 2.189.0 (#247
 from .model import (NAME_MAX, PT_MAX, TEXT_MAX, UNITS, client_short_code, pb_cl_sql, pb_cl_live, office_gate, office_need_feature, office_org, onc_next, onc_ready, onc_version, office_role, office_settings,
                     office_seed_texts, office_trial_number, trial_flag)
 from .pdf import pdf_paper  # 2.357.0 A (#3156)
+from .oubar import OUB_SENT, oub_barrier, oub_doc_name  # 2.747.0 (#5252): a document marked sent is a barrier of the undo steps
 from .ledger import (ofx_release, ofx_company, ofx_company_print, ofx_sender_line, ofx_diff, ofx_items_brief, ofx_locked, ofx_log, ofx_logo_path, ofx_need_editable,
                      ofx_number_at_finalize, ofx_snapshot_pack, OFX_LOCKED)
 from .countries import fk_country_label  # 2.296.0 B (#3168)
@@ -1616,6 +1617,8 @@ def odoc_set_status(c, oid, did, st, uid, r=None):
         c.execute("UPDATE office_docs SET paid_at=CASE WHEN status='paid' THEN COALESCE(paid_at, ?) ELSE NULL END WHERE id=? AND org_id=?", (ts, did, oid))
     if st != r["status"]:
         ofx_log(c, oid, "status", doc_id=did, detail={"before": {"status": r["status"]}, "after": {"status": st}})
+        if st == "sent":  # 2.747.0 (#5252): marked sent (by hand or by the mail) = a barrier of the undo steps
+            oub_barrier(c, uid, oid, OUB_SENT, oub_doc_name(r))
         if st in ("sent", "paid"):
             from ..integrations.webhooks import who_note
             who_note(f"invoice.{st}", "invoice", did)  # 2.115.0 A (#2061)

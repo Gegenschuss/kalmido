@@ -77,10 +77,12 @@ def ow_undo_ctx(kind, fn):
 _COLS = {}  # table -> its columns (they only grow at start-up: the migrations run before the first request)
 
 
-def ow_kind(kind, table, scope=None, keep=None, nofp=None):
-    """Track an office kind (core/writes.py obj_track): scope(rid, oid) -> the undo's tables (default: the row)."""
-    return obj_track(kind, table, area="other", undo_scope=scope or (lambda rid, oid: [(table, "id=?", (int(rid),), False)]),
-                     undo_keep=keep, undo_nofp=nofp)
+def ow_kind(kind, table, scope=None, keep=None, nofp=None, label=None):
+    """Track an office kind (core/writes.py obj_track): scope(rid, oid) -> the undo's tables (default: the row).
+    2.747.0 (#5252): area "office" (its step groups are listed under the office, an undo from the list reloads it);
+    label(main row as stored) -> (key, [values]) names the object in its step group (office/oubar.py)."""
+    return obj_track(kind, table, area="office", undo_scope=scope or (lambda rid, oid: [(table, "id=?", (int(rid),), False)]),
+                     undo_keep=keep, undo_nofp=nofp, undo_label=label)
 
 
 def ow_cols(c, table):

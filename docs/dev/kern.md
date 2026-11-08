@@ -165,6 +165,14 @@ c.commit()
   a part that changed since stays and is named, a barrier stops), `POST /api/undo/<id>/redo`; `undo_barrier` for
   finalising / sending; a tracked kind registers who may take its steps back (`undo_need_reg`, the office in
   `office/undo.py`), a kind without one is never written back. People only (agents 403).
+- Undo across devices, stage 4 (2.747.0, #5252): the office's step groups have area `office` and a label naming the object
+  (`obj_track(undo_label=)` / `ow_kind(label=)`, `office/oubar.py`: a document by kind and number, a client or master data
+  row by its name, a letter only by its object number; a sealed value never goes into a label). Finalising, sending (also
+  "marked sent", a letter), a payment and its reversal, the DATEV copy and export and the period lock write a barrier
+  (`oub_barrier` -> `undo_barrier`): listed, "bis hierher" stops there. `office/undogrp.py` maps every tracked office
+  kind: its own check, `UGO_ADMIN` (the office's admin) or `UGO_NOACCESS` on purpose (rows with locks / approvals of
+  their own). A document's undo takes the lock of its saves and of finalising (`office_doc_<id>`). The editor session
+  (`X-Kalmido-Undo`) stays; in the browser a barrier ends it as an entry of the history (`office_undo.js` `oun_bar`).
 - Stage 2b (2.576.0, #4794): a 409 of `ow_write` carries the current state under `current` only (the old keys `row` /
   `letter` / `client` went). Every office row on `ow_write` has its history route `GET <its save path>/history`
   (`ow_history_answer`; e.g. `/api/office/trips/<id>/history`, `/api/clients/<id>/history`): the route runs the rights

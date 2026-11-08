@@ -19,6 +19,7 @@ from flask import g, jsonify, request
 
 from ..core.config import app
 from .calc import calc_tax_day  # 2.531.0 (#4498)
+from .oubar import OUB_DATEV, OUB_PAID, OUB_PAY_BACK, OUB_SENT, oub_barrier, oub_doc_name  # 2.747.0 (#5252): barriers of the undo steps
 from ..core.pg import insert_id, write_lock
 from ..core.i18n import N_, stored_join, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc
@@ -1285,6 +1286,7 @@ def inv_send_mail(c, oid, uid, m, r=None):
     c.execute("UPDATE office_docs SET status=CASE WHEN status IN ('issued') THEN 'sent' ELSE status END, sent_at=COALESCE(sent_at, ?), updated_at=? "
               "WHERE id=? AND org_id=?", (ts, ts, r["id"], oid))
     ofx_log(c, oid, "send", doc_id=r["id"], detail=m["detail"])
+    oub_barrier(c, uid, oid, OUB_SENT, oub_doc_name(r))  # 2.747.0 (#5252): a refused mail rolls it back with the marks
     try:
         _mail(m["to"], m["subject"], m["text"], attachments=m["files"], cc=m["cc"], from_name=m["from_name"], reply_to=m["reply_to"], **m["kw"])
     except Exception:
@@ -1369,6 +1371,7 @@ def inv_datev(c, oid, r, s=None, files=None):
     ts = iso(now_utc())
     c.execute("UPDATE office_docs SET datev_sent_at=?, updated_at=? WHERE id=? AND org_id=?", (ts, ts, r["id"], oid))
     ofx_log(c, oid, "datev", doc_id=r["id"], detail={"to": s["datev_email"], "files": [f[0] for f in files]})
+    oub_barrier(c, None, oid, OUB_DATEV, oub_doc_name(r))  # 2.747.0 (#5252): the person of the request
 
 
 # ---------------------------------------------------------------- routes
@@ -1628,6 +1631,7 @@ def inv_pay_add(c, oid, uid, did, b, ref=None, online_ref=None, typed=False):
                     (oid, did, d, float(money(amt)), method, note, uid, iso(now_utc()), ref, online_ref))
     inv_refresh_paid(c, oid, did)
     ofx_log(c, oid, "payment", doc_id=did, detail={"id": pid, "date": d, "amount": dstr(amt), "method": method})
+    oub_barrier(c, uid, oid, OUB_PAID, oub_doc_name(r))  # 2.747.0 (#5252): not for the payment provider's hook (no person)
     if not refund and not neg:
         from .dunning import dun_paid_news
         dun_paid_news(c, oid, r, uid)  # 2.367.4 (#2972)
@@ -1688,6 +1692,7 @@ def inv_pay_del(c, oid, did, pid, note="", uid=None):
     rid = olk_pay_reverse(c, oid, did, p, note=note, uid=uid)
     inv_refresh_paid(c, oid, did)
     ofx_log(c, oid, "payment_delete", doc_id=did, detail={"id": pid, "date": p["date"], "amount": dstr(p["amount"]), "reversal_id": rid})
+    oub_barrier(c, uid, oid, OUB_PAY_BACK, oub_doc_name(c.execute("SELECT id, kind, number FROM office_docs WHERE id=? AND org_id=?", (did, oid)).fetchone()))  # 2.747.0 (#5252)
     # 2.355.0 E (#2843, review F3): a booking split on several invoices stays matched while another part is booked (it points
     # to the next part then: parts and rest stay visible, as when another part is taken back)
     nxt = c.execute("SELECT p.id, p.doc_id FROM office_payments p WHERE p.org_id=? AND p.bank_tx_id=? AND p.id<>? AND p.reverses_id IS NULL "

@@ -22,6 +22,7 @@ from ..personal.timetrack import BadInput
 from .model import office_gate, office_org, office_role
 from .rights import ofr_rights
 from .ledger import ofx_log  # 2.369.5 (#2517): pulled up from functions
+from .oubar import OUB_PERIOD, oub_barrier  # 2.747.0 (#5252): locking months is a barrier of the undo steps
 
 PL_LOCKED = N_("{0} is locked (GoBD). Book corrections in an open month, e.g. as a credit note dated today.")
 PL_MAX_MONTHS = 600  # 50 years in one lock call at most
@@ -150,6 +151,7 @@ def pl_lock(c, oid, uid, through):
                   (oid, p, uid, at))
     g.setdefault("_pl_through", {})[oid] = m
     ofx_log(c, oid, "period_lock", target="period", detail={"from": months[0], "to": months[-1], "months": len(months)})
+    oub_barrier(c, uid, oid, OUB_PERIOD, pl_label(months[-1]))  # 2.747.0 (#5252)
     return months
 
 
