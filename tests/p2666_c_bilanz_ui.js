@@ -2,12 +2,14 @@
 // kalmido-suite: fresh
 // jsdom, invented figures. The personal office of alice: the choice in the settings (income statement -> balance sheet), the button in the
 // bookkeeping's bar, the page with balance sheet, profit and loss and trial balance (assets = equity and liabilities), an entry made
-// in the dialog shows in the list and moves the result.
+// in the dialog shows in the list and moves the result. Firefox at 1280 and 390 (mouse / touch): the page drawn, no overflow to the side;
+// screenshots with P2666C_SHOTS=<dir>.
 const {execFileSync} = require('child_process');
 const path = require('path');
 const {boot, sleep, B, login} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
+const firefox = require('./ff')({tag: 'p2666_c_bilanz_ui', check, shots: 'P2666C_SHOTS'});
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 const DATA = process.argv[2] || path.join(__dirname, '.data');
 if (!process.env.P2666C_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
@@ -62,6 +64,21 @@ const Y = new Date().getFullYear();
   check(await until(() => /-500\.00|−500\.00|500\.00/.test(d.querySelector('[data-ldb-result]')?.textContent || '') && d.querySelector('[data-ldb-check="ok"]')),
     'the result moved by the provision, still balanced: ' + (d.querySelector('[data-ldb-result]')?.textContent || ''));
   w.close();
+  // the real layout: Firefox at a desktop and a phone width
+  for (const touch of [false, true]) {
+    await firefox(async ({cmd, ev, nav, ctx, shot, until: fu}) => {
+      await nav(B + 'static/icon.svg');
+      check(await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`) === 200, 'Firefox: login');
+      const [vw, vh] = touch ? [390, 844] : [1280, 900];
+      await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
+      await nav(B + '#office/books/ledger');
+      await fu(`typeof LDB === 'object'`);
+      await ev(`(() => { LDB.year = ${Y}; LDB.d = null; LDB.susa = true; ofcDraw(); return 1; })()`);
+      check(await fu(`!!document.querySelector('[data-ldb-total="a"]') && !!document.querySelector('.ldb-susa')`), `Firefox ${vw}: the balance sheet page`);
+      check(await ev(`document.documentElement.scrollWidth <= window.innerWidth + 1`), `Firefox ${vw}: nothing sticks out to the side`);
+      await shot(`p2666_c_ledger_${vw}.png`);
+    }, touch);
+  }
   console.log(`${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });

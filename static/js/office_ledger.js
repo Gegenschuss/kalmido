@@ -76,10 +76,10 @@ function ldbBsHtml(d) {
   const side = s => {
     const rows = d.bs.filter(r => r.side === s).map(r => `<tr${r.level ? '' : ' class="bk-tot"'}><th scope="row">${r.level ? '&nbsp;&nbsp;' : ''}${esc(r.label)}</th><td class="num">${ldbMoney(r.amount)}</td></tr>`).join('');
     const tot = s === 'a' ? d.checks.assets : d.checks.liabilities;
-    return `<table class="bk-tab ldb-bs" data-ldb-side="${s}"><thead><tr><th>${esc(s === 'a' ? tr('Assets') : tr('Equity and liabilities'))}</th><th class="num">${tr('Amount')}</th></tr></thead><tbody>${rows}
+    return `<h4 class="bk-h">${esc(s === 'a' ? tr('Assets') : tr('Equity and liabilities'))}</h4><table class="bk-tab ldb-bs" data-ldb-side="${s}"><thead><tr><th>${esc(s === 'a' ? tr('Assets') : tr('Equity and liabilities'))}</th><th class="num">${tr('Amount')}</th></tr></thead><tbody>${rows}
       <tr class="bk-tot"><th scope="row">${tr('Total')}</th><td class="num" data-ldb-total="${s}">${ldbMoney(tot)}</td></tr></tbody></table>`;
   };
-  return `<section class="bk-sec" aria-labelledby="ldb-bsh"><div class="ofcbar"><h3 class="ofcgrp" id="ldb-bsh">${tr('Balance sheet as of {0}', fmtDateLoc(`${d.year}-12-31`))}</h3><span class="spacer"></span>${ldbCsv('bs', d.year)}</div>
+  return `<section class="bk-sec" aria-labelledby="ldb-bsh"><div class="ofcbar"><h3 class="ofcgrp" id="ldb-bsh">${tr('Balance sheet as of {0}', fmtDay('year', pd(`${d.year}-12-31`)))}</h3><span class="spacer"></span>${ldbCsv('bs', d.year)}</div>
     ${side('a')}${side('p')}</section>`;
 }
 
