@@ -3,7 +3,8 @@
  - KALMIDO_SMTP_* / KALMIDO_IMAP_* of the admin: the TLS context checks certificate + host name (CERT_REQUIRED,
    check_hostname); only KALMIDO_SMTP_INSECURE=1 turns it off (CERT_NONE); a workspace's own server stays checked
  - instance mailbox: a mail taken in whole (or dropped as for nobody / a double, MAIL_DROP) is marked \\Deleted and
-   expunged (UID EXPUNGE when the server has UIDPLUS, else EXPUNGE); a mail whose import failed, that an importer refused
+   expunged (UID EXPUNGE when the server has UIDPLUS, else EXPUNGE -- 2.666.0 #4074 2: only when no other mail is marked
+   deleted); a mail whose import failed, that an importer refused
    (None / 0) or that was taken in only in part (MailKept: an attachment not stored) stays (only \\Seen); a mail another
    process claimed stays too; KALMIDO_IMAP_KEEP=1 = only \\Seen as before; workspace mailboxes (delete off) only \\Seen
  - error log lines: a refused recipient's address never lands in the log (only the error class); 2.360.5 (#3245): the
@@ -95,10 +96,12 @@ import json, smtplib, sys, io, app
 from kalmido.integrations import mail as M
 class FakeIMAP:
     capabilities = ("IMAP4REV1",)
-    def __init__(self, *a, **k): self.stores, self.expunged, self.xat = [], 0, []
+    def __init__(self, *a, **k): self.stores, self.expunged, self.xat, self.foreign = [], 0, [], ""
     def select(self, folder): return "OK", [b"6"]
     def xatom(self, *a): self.xat.append(" ".join(a)); return "OK", []
     def uid(self, cmd, *a):
+        if cmd == "SEARCH" and "DELETED" in a:  # 2.666.0 (#4074 2): the plain EXPUNGE asks first which ones are marked deleted
+            return "OK", [" ".join([u for u, f in self.stores if "Deleted" in f] + ([self.foreign] if self.foreign else [])).encode()]
         if cmd == "SEARCH": return "OK", [b"1 2 3 4 5"]
         if cmd == "FETCH":
             if "SIZE" in a[1]: return "OK", [b"1 (UID %s RFC822.SIZE 100)" % a[0]]
@@ -120,6 +123,8 @@ try:
     f = FakeIMAP(); M.mail_fetch(f, "INBOX", importer, delete=True); out["del"] = [f.stores, f.expunged]
     f = FakeIMAP(); M.mail_fetch(f, "INBOX", importer); out["keep"] = [f.stores, f.expunged]
     f = FakeIMAP(); f.capabilities = ("IMAP4REV1", "UIDPLUS"); M.mail_fetch(f, "INBOX", importer, delete=True); out["uidplus"] = [f.xat, f.expunged]
+    # 2.666.0 (#4074 2): without UIDPLUS another client's mail marked deleted (UID 9) is never expunged along
+    f = FakeIMAP(); f.foreign = "9"; M.mail_fetch(f, "INBOX", importer, delete=True); out["foreign"] = [f.stores, f.expunged]
     # the instance poll: deletes by default, KALMIDO_IMAP_KEEP=1 keeps
     made = []
     M.imaplib.IMAP4 = M.imaplib.IMAP4_SSL = lambda *a, **k: made.append(FakeIMAP()) or made[-1]
@@ -139,6 +144,9 @@ check(d.get("2") == "(\\Seen)", f"delete: the failed one stays (only seen) {d}")
 check(d.get("4") == "(\\Seen)" and d.get("5") == "(\\Seen)", f"delete: refused (None) and taken in part (MailKept) stay {d}")
 check(j.get("uidplus") == [["UID EXPUNGE 1,3"], 0], f"UIDPLUS: UID EXPUNGE of exactly the deleted ones {j.get('uidplus')}")
 check((j.get("del") or [0, 0])[1] == 1, f"delete: expunged once {j.get('del')}")
+fo = {u: f for u, f in (j.get("foreign") or [[], 0])[0]}
+check("\\Deleted" in fo.get("1", "") and (j.get("foreign") or [0, 1])[1] == 0,
+      f"2.666.0 (#4074 2): no UIDPLUS + another mail marked deleted: ours marked, no EXPUNGE {j.get('foreign')}")
 k = {u: f for u, f in (j.get("keep") or [[], 0])[0]}
 check(k and all(f == "(\\Seen)" for f in k.values()) and j["keep"][1] == 0, f"workspace mailbox (delete off): only seen, no expunge {j.get('keep')}")
 p = {u: f for u, f in (j.get("poll") or [[], 0])[0]}

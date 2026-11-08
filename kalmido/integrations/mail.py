@@ -476,13 +476,20 @@ def mail_fetch(M, folder, importer, max_bytes=None, box="", delete=False, prefet
 
 
 def mail_expunge(M, uids):
-    """2.240.0 A (#2883): removes exactly these deleted mails (UID EXPUNGE, RFC 4315 UIDPLUS); a server without it: the
-    plain EXPUNGE (removes every mail marked deleted in the folder). A failure leaves them marked seen + deleted."""
+    """2.240.0 A (#2883): removes exactly these deleted mails (UID EXPUNGE, RFC 4315 UIDPLUS). 2.666.0 (#4074 2): a server
+    without it gets the plain EXPUNGE only when no other mail of the folder is marked deleted (it removes every marked one:
+    another client's mail marked deleted but not yet removed is never taken along); else ours stay marked seen + deleted
+    (never fetched again) until the mail program removes them. A failure leaves them marked as well."""
     try:
         if "UIDPLUS" in (getattr(M, "capabilities", ()) or ()):  # (imaplib's uid() knows no EXPUNGE: an extension command)
-            typ, _ = M.xatom("UID", "EXPUNGE", b",".join(u if isinstance(u, bytes) else str(u).encode() for u in uids).decode())
-            if typ == "OK":
-                return
+            M.xatom("UID", "EXPUNGE", b",".join(u if isinstance(u, bytes) else str(u).encode() for u in uids).decode())
+            return  # 2.666.0 (#4074 2): also when refused -- no plain EXPUNGE behind it (it would take other mails along)
+        typ, data = M.uid("SEARCH", None, "DELETED")
+        mine = {u if isinstance(u, bytes) else str(u).encode() for u in uids}
+        marked = set((data[0] or b"").split()) if typ == "OK" and data else None
+        if marked is None or not marked <= mine:
+            print("mail: other mails marked deleted in the folder, no expunge", flush=True)
+            return
         M.expunge()
     except Exception as e:  # noqa: BLE001 - the mails stay marked seen
         print("mail: expunge failed:", type(e).__name__, flush=True)
