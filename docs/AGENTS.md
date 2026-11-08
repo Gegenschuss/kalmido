@@ -81,11 +81,11 @@ Every agent has **permissions** (scopes) on top of its projects and roles. New a
 | Comments, reactions, News read | `comments` | on |
 | Structure: projects, sections, fields, project tags, templates, filters, folders, overview, status | `structure` | off |
 | Delete & trash | `delete` | off |
-| Read / upload files of tasks, comments and projects | `attachments:read` / `attachments:write` | off |
+| Read / upload files of tasks, comments and projects; 2.674.0: also the files of the team chat (`GET /team/files/{id}`) and, for a person's token, of the agent chat (`GET /chat-attachments/{id}`; the agent of the conversation reads them with `read`) | `attachments:read` / `attachments:write` | off |
 | The file store: read / add files and folders (2.48.0) | `files:read` / `files:write` | on |
 | Time tracking: timer and time entries; 2.582.0: also reading time entries (`GET /time/entries`, MCP `list_time_entries`) and the time gaps (`GET /time/gaps`, MCP `get_time_gaps`); without it the hours and amounts of clients, the project overview and table variables stay empty; the own running timer stays *Read* | `time` | off |
 | Export | `export` | off |
-| Calendar: events and event calendars (2.21.0) | `calendar` | off |
+| Calendar: events and event calendars (2.21.0); 2.674.0: without it the day plan (`GET /dayplan`) shows events only as "Busy" | `calendar` | off |
 | Contacts: address books and contacts, personal data of other people (2.21.0) | `contacts` | off |
 | Office drafts: quotations, invoices, letters, leads (2.51.0) | `office` | off |
 | Pin board notepads on project pages, an agent changes only its own (2.51.0) | `pinboard` | off |
@@ -2247,6 +2247,7 @@ Agents read files like this:
 | Files of a task and its comments | `GET /api/v1/tasks/{id}/attachments` → `[{id, task_id, comment_id, name, mime, size, created_at, url}]` | `list_attachments` |
 | One task / comment file (binary) | `GET /api/v1/attachments/{id}` (`?dl=1` = download) | `get_attachment` (`source: task`) |
 | A chat file (binary) | `GET /api/v1/chat-attachments/{id}`, ids from the message's `attachments` | `get_attachment` (`source: chat`) |
+| A team chat file (binary; 2.674.0: needs `attachments:read`) | `GET /api/v1/team/files/{id}`, ids from the message's `attachments` | `get_attachment` (`source: team`) |
 | A task / comment file as text (2.34.0) | `GET /api/v1/attachments/{id}/text` (`?max_chars=`, default and at most 200000) | `read_attachment` |
 | Remove a chat file you sent | `DELETE /api/v1/chat-attachments/{id}` | – |
 | Ask for an approval in the chat (2.35.0) | `POST /api/v1/agent/chats/{user_id}` with `approval: {title, what?, yes_label?, no_label?}`; the answer: event `chat_choice` with `approval` | `request_chat_approval` |

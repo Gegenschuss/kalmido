@@ -324,6 +324,12 @@ def scope_refine(paths):
                     sc = next((s for rx, s in SCOPE_RULES if re.search(rx, p)), "structure")
             elif sc == "read" and m == "get" and (p in ("/attachments/{id}", "/attachments/{id}/text", "/lists/{id}/files/{file_id}")):
                 sc = "attachments:read"
+            elif sc == "read" and m == "get" and p in ("/team/files/{id}", "/chat-attachments/{id}"):
+                sc = "attachments:read"  # 2.674.0 (#4382 finding 8): the binary of a chat file is a download like the others
+                if p == "/chat-attachments/{id}":  # the agent of the conversation reads what a person sent to it (as before)
+                    op.setdefault("x-kalmido-agent-scope", "read")
+            elif sc == "read" and m == "get" and p == "/me/app-passwords":
+                sc = "account"  # 2.674.0 (#4382 finding 8): like creating / revoking them (account settings)
             op["x-kalmido-scope"] = sc
             if sc not in ("read", "agent"):
                 op.setdefault("description", "")

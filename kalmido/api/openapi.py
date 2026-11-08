@@ -674,7 +674,7 @@ def openapi_spec():
         "/me/app-passwords": {
             "get": op("Your app passwords for calendar apps (CalDAV) and the server's CalDAV address", "Account",
                       ok({"type": "object", "properties": {"data": {"type": "array", "items": ref("AppPassword")}, "caldav": ref("CalDAV")}})
-                      | errs("403"), desc="Persons only (2.9.0); an agent's token gets 403."),
+                      | errs("403"), desc="Persons only (2.9.0); an agent's token gets 403. 2.674.0: needs the account permission."),
             "post": op("Create an app password (shown once in the answer)", "Account",
                        ok({"allOf": [ref("AppPassword"), {"type": "object", "properties": {"password": {"type": "string",
                            "description": "Shown only this once; Kalmido keeps only a hash"}}}]}, "Created", "201") | errs("400", "403", "409"),

@@ -1,7 +1,7 @@
 """Day planning ("Plan my day") and the evening review."""
 import json
 from datetime import date, datetime, timedelta, timezone
-from flask import jsonify, request
+from flask import g, jsonify, request
 
 from ..core.config import app, PUBLIC_URL, TZ
 from ..core.i18n import tr
@@ -397,7 +397,11 @@ def v1_dayplan():
     """The built-in day plan of the token's user (a preview; nothing changes)."""
     a = v1_args(("date", "mode"))
     c = db()
-    return jsonify(dayplan_compute(c, me(), dayplan_day(a.get("date")), dayplan_mode(a.get("mode"))))
+    out = dayplan_compute(c, me(), dayplan_day(a.get("date")), dayplan_mode(a.get("mode")))
+    if g.get("auth_via") == "token" and "calendar" not in (g.get("scopes") or set()):
+        # 2.674.0 (#4382 finding 8): a token without the calendar permission sees when the person is busy, not what
+        out["events"] = [{**e, "title": tr("Busy")} for e in out["events"]]
+    return jsonify(out)
 
 
 @app.get("/api/v1/dayplan/review")
@@ -443,6 +447,7 @@ def dayplan_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
                                    desc="Free slots between the day's calendar events and timed tasks within the working hours, "
                                         "filled with open tasks (overdue / today first, then deadlines, due date, priority). "
                                         "Nothing changes: apply it with PATCH /tasks/{id} (plan_start = date + 'T' + start, "
-                                        "duration). Planning never changes due, due_time or deadline.")}
+                                        "duration). Planning never changes due, due_time or deadline. 2.674.0: a token without "
+                                        "the calendar permission gets the events' times with the title \"Busy\" only.")}
     paths["/dayplan/review"] = {"get": op("The daily review: done, open, moved today; a plan for the next working day", D,
                                           ok(ref("DayReview")) | errs("400"), [dq])}
