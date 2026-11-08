@@ -7,6 +7,7 @@
 // #315 comments as personal notes: private lists, "+ Comment", no mentions / activity outside shared lists, the Comments module,
 //      no comments in checklists
 // #316 / #322 detail order: description, subtasks, comments, dependencies, tags, attachments, fields
+// 2.682.0 (#5155): "With activity" also in a private list once a change of someone else shows there
 // #318 a menu opened inside a dialog (Settings > AI colleague; 2.4.2: the share button is gone, a menu anchored there) shows above it
 const fs = require('fs'), path = require('path');
 const {boot, errs, sleep, B, login} = require('./boot');
@@ -62,6 +63,25 @@ const TABLET = {'(min-width:600px) and (min-height:600px)': true};
   ci = d.querySelector('#c-input'); ci.value = '@'; ci.dispatchEvent(new w.Event('input', {bubbles: true})); await sleep(100);
   check(d.querySelector('#detail .mpick')?.classList.contains('hidden') !== false, 'no mention picker in a private list');
   ci.value = ''; ci.dispatchEvent(new w.Event('input', {bubbles: true}));
+  w.close();
+  // 2.682.0 (#5155): a change of someone else in a private list (here: via the own API token) shows between the notes, and
+  // the "…" now has "With activity" there too: off = only the notes, "Comments only" in the head; on = the change again
+  const TOK = (await call('POST', '/api/me/tokens', {name: 'p206', scopes: ['read', 'write']})).token;
+  const vp = await fetch(B + `api/v1/tasks/${taxes}`, {method: 'PATCH', headers: {Authorization: 'Bearer ' + TOK, 'Content-Type': 'application/json'}, body: JSON.stringify({title: 'Taxes 2026'})});
+  check(vp.status === 200, '#5155: the change via API ' + vp.status);
+  w = await boot({user: 'alice', hash: 'l/' + PRIV}); d = w.document;
+  w.eval(`openDetail(${taxes})`);
+  for (let i = 0; i < 40 && !d.querySelector('#detail #d-tl .actl'); i++) await sleep(100);
+  check(d.querySelector('#detail #d-tl .actl .via') && !d.querySelector('#detail .cmmode'), '#5155: private list: the change via API shows between the notes');
+  click(w, d.querySelector('#detail [data-act="tl-menu"]')); await sleep(50);
+  const pa = d.querySelector('#pop .mtlact');
+  check(pa && pa.classList.contains('on'), '#5155: private list with a change of others: "With activity" in the "…" (on)');
+  click(w, pa); await sleep(150);
+  check(!d.querySelector('#detail #d-tl .actl') && /Comments only/.test(d.querySelector('#d-tl .cmhead .cmmode')?.textContent || '') && w.eval(`LS.get('showActivity', true)`) === false, '#5155: off: only the notes, "Comments only" in the head');
+  click(w, d.querySelector('#detail [data-act="tl-menu"]')); await sleep(50);
+  check(d.querySelector('#pop .mtlact') && !d.querySelector('#pop .mtlact').classList.contains('on'), '#5155: the switch stays reachable (off)');
+  click(w, d.querySelector('#pop .mtlact')); await sleep(150);
+  check(d.querySelector('#detail #d-tl .actl') && !d.querySelector('#detail .cmmode'), '#5155: on again: the change is back');
   w.close();
   // #316 / #322: order in the panel (a project task with a subtask, a dependency and a comment)
   await call('POST', `/api/tasks/${copy}/comments`, {body: 'Draft is in the drive'});

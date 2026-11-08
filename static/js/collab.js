@@ -594,7 +594,8 @@ function tlMenu(anchor) {
   const nw = cmtNew(), keep = tr('Order of the comments, saved for you on all devices');
   menu(anchor, [{label: tr('Oldest first'), icon: 'sort', on: !nw, cls: 'mtlold', title: keep, fn: () => { if (nw) cmtOrderToggle(); }},
     {label: tr('Newest first'), icon: 'sort', on: nw, cls: 'mtlnew', title: keep, fn: () => { if (!nw) cmtOrderToggle(); }},
-    ...(cmSocial(t) ? ['-', {label: tr('With activity'), icon: 'clock', on: showAct(), cls: 'mtlact', title: tr('Show the history of changes between the comments'), fn: tlActToggle}] : [])]);
+    // 2.682.0 (#5155): also in a list that is not shared, as soon as changes of others show there (agents, automations, via)
+    ...(cmSocial(t) || tlForeign(t).length ? ['-', {label: tr('With activity'), icon: 'clock', on: showAct(), cls: 'mtlact', title: tr('Show the history of changes between the comments'), fn: tlActToggle}] : [])]);
 }
 function tlActToggle() { LS.set('showActivity', !showAct()); renderDetail(); }
 async function cmtOrderToggle() {
@@ -825,7 +826,7 @@ function timelineItems(ro = false) {
   if (T.err) return `<div class="muted cmempty">${T.err === 'offline' ? tr('Comments and activity are only available online.') : esc(T.err)}</div>`;
   if (!T.comments) return `<div class="muted cmempty">${tr('Loading…')}</div>`;
   const U = T.users || {};
-  const items = [...T.comments.map(c => ({at: c.created_at, c, ro})), ...(showAct() || !soc ? (soc ? T.activity || [] : tlForeign(taskById(T.id))).map(a => ({at: a.created_at, a})) : [])]
+  const items = [...T.comments.map(c => ({at: c.created_at, c, ro})), ...(showAct() ? (soc ? T.activity || [] : tlForeign(taskById(T.id))).map(a => ({at: a.created_at, a})) : [])]  // 2.682.0 (#5155): the switch also hides the changes of others in a list that is not shared
     .sort((x, y) => new Date(x.at) - new Date(y.at) || (x.c ? 1 : 0) - (y.c ? 1 : 0));
   const pend = cmtPendItems(T);  // 2.537.0 (#4569): own comments still on their way, after the newest
   if (!items.length && !pend.length) return soc || cmSplitOn(taskById(T.id)) ? `<div class="muted cmempty">${tr('No comments yet.')}</div>` : '';  // 2.31.0 (#344): the split keeps its area
@@ -852,7 +853,7 @@ function timelineHtml(t) {
   const nw = cmtNew(), top = nw && cmtOn() && t.id > 0 && !t.context, split = cmSplitOn(t);
   // 2.31.0 (#1054): order and history sit in a small "…" menu (were two big switches); "Comments only" says so in the head.
   // (#344) the desktop split folds its area with the arrow at the end
-  return `<h5 class="cmhead"><span>${tr('Comments')}</span><span class="c" id="d-tl-count">${n || ''}</span>${soc && !showAct() ? `<span class="cmmode">${tr('Comments only')}</span>` : ''}<span class="spacer"></span><button type="button" class="iconbtn cmmenu" data-act="tl-menu" aria-haspopup="menu" aria-label="${esc(tr('Comment options'))}" title="${esc(tr('Comment options'))}">${ic('dots', 's')}</button>${split ? `<button type="button" class="iconbtn dsfoldb" data-act="cm-fold" aria-controls="d-cpane" aria-expanded="${!dsFold()}" aria-label="${esc(dsFold() ? tr('Show the comments') : tr('Fold the comments'))}" title="${esc(dsFold() ? tr('Show the comments') : tr('Fold the comments'))}">${ic('chev', 's')}</button>` : ''}</h5>
+  return `<h5 class="cmhead"><span>${tr('Comments')}</span><span class="c" id="d-tl-count">${n || ''}</span>${(soc || tlForeign(t).length) && !showAct() ? `<span class="cmmode">${tr('Comments only')}</span>` : ''}<span class="spacer"></span><button type="button" class="iconbtn cmmenu" data-act="tl-menu" aria-haspopup="menu" aria-label="${esc(tr('Comment options'))}" title="${esc(tr('Comment options'))}">${ic('dots', 's')}</button>${split ? `<button type="button" class="iconbtn dsfoldb" data-act="cm-fold" aria-controls="d-cpane" aria-expanded="${!dsFold()}" aria-label="${esc(dsFold() ? tr('Show the comments') : tr('Fold the comments'))}" title="${esc(dsFold() ? tr('Show the comments') : tr('Fold the comments'))}">${ic('chev', 's')}</button>` : ''}</h5>
     <div id="d-ptl">${typeof ptl_boxHtml === 'function' ? ptl_boxHtml(t) : '' /* 2.63.0 B (#1513): a customer's report */}</div>
     ${top ? cmComposer(t, true) : ''}<div class="cms" id="d-tl-items">${S.tl.id === t.id ? timelineItems() : `<div class="muted cmempty">${tr('Loading…')}</div>`}</div><button type="button" class="chnew cmnew hidden" id="cm-new">${tr('New comment')} <span aria-hidden="true">↓</span></button>
     ${soc ? typingHtml(taskTypers(t), 'd-typing') : ''}`;
