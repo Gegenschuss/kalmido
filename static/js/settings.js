@@ -152,6 +152,8 @@ async function setStep(to, from, label, wire) {  // one way of a settings step; 
 }
 async function setAfter(patch) {
   if ('lang' in patch) { await i18nLoad(patch.lang); LS.set('lang', patch.lang); document.documentElement.lang = patch.lang; }
+  // 2.685.0 (#5176): the office read its settings while the switch was still on its way (403 "switched off"): read them again now
+  if ('features' in patch && typeof OFC !== 'undefined' && OFC.infoErr && feat('office')) { OFC.info = null; OFC.infoErr = null; }
   if ('features' in patch || 'nav_order' in patch) { try { await load(); } catch { /* offline: the local copy is right */ } await route(); return; }  // route: a view whose module went off
   if ('assistant_on' in patch) asst_onSync(patch.assistant_on);  // 2.75.0 (#1411): the entry points follow the switch
   if ('member_view' in patch) { await mvAfter(); return; }  // 2.436.0 (#3620): the whole view follows (core.js)

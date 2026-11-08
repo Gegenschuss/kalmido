@@ -65,6 +65,10 @@ const FEAT = 'cal,comments,collab,clients';
   check(d.querySelector('#side [data-ofm][aria-current="page"]')?.dataset.go === 'office/settings' && !!d.querySelector('.office [data-setgo="biz-tpl"]'), 'point Settings, the way back to Texts & templates');  // 2.152.2 (#2617): the office points sit in the panel #side
   check(!!d.querySelector('.office [data-ofc="new"][data-kind="services"]'), 'admin: "New service"');
   check(/Nothing here yet/.test(d.querySelector('.office .ofcbody')?.textContent || ''), 'empty hint');
+  // 2.685.0 (#5176): the office read its settings before the switch was saved (403 "switched off"); once the save is through it reads them again
+  w.eval(`OFC.info = null; OFC.infoErr = 'Office & finance is switched off in your settings'; ofcDraw()`);
+  await w.eval(`setAfter({features: S.settings.features})`);
+  check(await until(() => !w.eval('OFC.infoErr') && !!d.querySelector('.office [data-ofc="new"][data-kind="services"]')), 'a "switched off" read during the switch is read again once the switch is saved');
   d.querySelector('.office [data-ofc="new"][data-kind="services"]').click(); await until(() => d.querySelector('.ofcdlg'));
   let md = d.querySelector('.ofcdlg');
   check(!!md && /New service/.test(md.querySelector('h3')?.textContent || ''), 'dialog "New service"');
