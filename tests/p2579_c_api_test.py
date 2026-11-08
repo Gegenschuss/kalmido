@@ -107,6 +107,10 @@ check(r.ok and r.json()["total"] == 2 and len(r.json()["docs"]) == 1, f"the firs
 check(view(Bo, VID) == 404 and listed(Bo, WS) == {} and Bo.get(B + f"/api/docs/views/{VID}/hits").status_code == 404, "private: the member sees nothing of it")
 r = Bo.post(B + f"/api/obj/{K}", json={"title": "Bob's", "query": "q=Quokka", "ws": WS, "org_id": ORG})
 check(r.status_code == 403, f"a member does not create a view for everyone (org_join admin) ({r.status_code} {r.text[:160]})")
+# 2.657.0 (#4828): a view is always made private -- not even the admin creates one in the organisation (sharing is /share)
+r = A.post(B + f"/api/obj/{K}", json={"title": "Admin's direct", "query": "q=Quokka", "ws": "private", "org_id": ORG})
+check(r.status_code == 403 and "Admin's direct" not in str(A.get(B + "/api/docs/views").json()),
+      f"rueckfall #4828: the admin's create with org_id is refused, nothing made ({r.status_code} {r.text[:160]})")
 BV = Bo.post(B + f"/api/obj/{K}", json={"title": "Bob's own", "query": "q=Quokka", "ws": WS}).json()["id"]
 check(view(A, BV) == 404 and BV not in listed(A, WS), "a member's private view: not even the organisation's admin sees it")
 check(listed(Bo, WS) == {BV: 1}, "the member's own view counts what he sees")
@@ -175,6 +179,21 @@ r = A.post(B + f"/api/obj/{K}/{VID}/shares", json={"agent_id": PAID, "role": "vi
 check(r.status_code == 201 and agent_ids(PAH) == [VID], f"shared with her own agent: it reads the view ({r.status_code} {r.text[:160]})")
 r = A.post(B + f"/api/docs/views/{VID}/share", json={"all": True})
 check(r.status_code == 409 and view(Bo, VID) == 404, f"a view with a share of its own does not move ({r.status_code} {r.text[:160]})")
+
+# ---------------------------------------------------------------- 2.657.0 (#4828): the shares are checked before org_out
+check(A.put(B + f"/api/orgs/{ORG}/members", json={"user_id": uid["bob"], "role": "admin"}).ok, "setup: bob an admin for a while")
+r = Bo.post(B + f"/api/docs/views/{BV}/share", json={"all": True})
+check(r.ok and r.json()["shared_all"], f"setup: bob (admin) shares his view with everyone ({r.status_code} {r.text[:160]})")
+r = Bo.post(B + f"/api/obj/{K}/{BV}/shares", json={"user_id": uid["rita"], "role": "view"})
+check(r.status_code == 201, f"setup: a share of its own ({r.status_code} {r.text[:160]})")
+BSID = r.json()["id"]
+check(A.put(B + f"/api/orgs/{ORG}/members", json={"user_id": uid["bob"], "role": "member"}).ok, "setup: bob a member again")
+r = Bo.post(B + f"/api/docs/views/{BV}/share", json={"all": False})
+check(r.status_code == 409, f"rueckfall #4828: the share is named first (409), not org_out's 403 ({r.status_code} {r.text[:160]})")
+check(Bo.delete(B + f"/api/obj/{K}/{BV}/shares/{BSID}").ok, "setup: the share taken back")
+r = Bo.post(B + f"/api/docs/views/{BV}/share", json={"all": False})
+check(r.status_code == 403 and view(A, BV).get("org_id") == ORG, f"a member does not take it out of the organisation ({r.status_code})")
+check(A.post(B + f"/api/docs/views/{BV}/share", json={"all": False}).ok and view(A, BV) == 404, "the admin takes it back: bob's own again")
 
 # ---------------------------------------------------------------- Today and the favourites
 check(A.patch(B + "/api/settings", json={"dv_today": f"{VID},{VID},{PV}"}).ok and A.get(B + "/api/state").json()["settings"]["dv_today"] == f"{VID},{PV}",

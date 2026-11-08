@@ -50,12 +50,12 @@ def oo_mine(c, kind, obj, uid):
     return r["org_id"], "" if name.startswith(("e2e1:", "kenc1:")) else name[:200]  # a locked space's (2.356.1: an encrypted office's) ciphertext is no name for the admins
 
 
-def oo_grant(c, oid, kind, obj):
-    """The id of the signed-in person's approved, unused request for obj of kind in organisation oid (OO_GRANT_DAYS), or None."""
+def oo_grant(c, oid, kind, obj, uid=None):
+    """The id of the signed-in person's (2.657.0, #4828: or uid's) approved, unused request for obj of kind in organisation oid (OO_GRANT_DAYS), or None."""
     if not kind or obj is None:
         return None
     r = c.execute("SELECT id FROM org_out_requests WHERE org_id=? AND kind=? AND obj_id=? AND by_id=? AND state='approved' "
-                  "AND decided_at>=? ORDER BY id DESC LIMIT 1", (oid, kind, obj, me(), iso(now_utc() - timedelta(days=OO_GRANT_DAYS)))).fetchone()
+                  "AND decided_at>=? ORDER BY id DESC LIMIT 1", (oid, kind, obj, me() if uid is None else uid, iso(now_utc() - timedelta(days=OO_GRANT_DAYS)))).fetchone()
     return r[0] if r else None
 
 
@@ -67,43 +67,46 @@ def oo_into_note(c, from_oid, to_oid):
     return tr(OO_INTO_NOTE)
 
 
-def oo_denied(c, oid, to_oid, kind, obj):
+def oo_denied(c, oid, to_oid, kind, obj, uid=None):
     """The 403 for a move out of oid by a non-admin: for the maker going private it carries what to ask for (the client offers
     "Ask an admin")."""
     data = None
-    if to_oid is None and kind and isinstance(obj, int) and oo_mine(c, kind, obj, me()):
+    if to_oid is None and kind and isinstance(obj, int) and oo_mine(c, kind, obj, me() if uid is None else uid):
         data = {"out_request": {"org": oid, "kind": kind, "id": obj}}
     return Denied(403, tr(OO_ADMIN_ONLY), data=data)
 
 
-def org_out(c, oid, to_oid, kind, name, list_id=None, obj=None):
+def org_out(c, oid, to_oid, kind, name, list_id=None, obj=None, uid=None):
     """Data of organisation oid (kind: list | template | file | sheet | contacts | chat, name = what the log shows) goes to
     to_oid (None = private). Nothing to do when oid is no organisation or the target is the same one; else 403 for anybody
     but an admin of oid, and for an admin: log + News to the other admins (the caller commits). 2.361.2 (#2923): obj = the
-    id(s) of what goes (kind of OO_KINDS): a member's released request for each of them lets it go private (used up here)."""
+    id(s) of what goes (kind of OO_KINDS): a member's released request for each of them lets it go private (used up here).
+    2.657.0 (#4828): uid = who moves it (the core's obj_space_set passes its uid); None = the signed-in person (me())."""
     real = _org_name(c, oid, to_oid)
+    who = me() if uid is None else uid
     if real is None:
         return
     objs = obj if isinstance(obj, (list, tuple)) else [obj] if obj is not None else []
     grants = []
-    if not is_admin_of(c, oid):
-        grants = [oo_grant(c, oid, kind, o) for o in objs] if to_oid is None else []
+    if not is_org_admin(c, who, oid):
+        grants = [oo_grant(c, oid, kind, o, who) for o in objs] if to_oid is None else []
         if not grants or not all(grants):
-            raise oo_denied(c, oid, to_oid, kind, next((o for o, g in zip(objs, grants) if not g), objs[0] if objs else None))
+            raise oo_denied(c, oid, to_oid, kind, next((o for o, g in zip(objs, grants) if not g), objs[0] if objs else None), who)
         n = c.execute(f"UPDATE org_out_requests SET state='used' WHERE state='approved' AND id IN ({','.join('?' * len(grants))})", grants).rowcount
         if n != len(set(grants)):  # review: a second move at the same time does not use the same release again
-            raise oo_denied(c, oid, to_oid, kind, objs[0])
-    oo_note(c, oid, real, kind, name, list_id, to="org" if to_oid else "private", released=bool(grants))
+            raise oo_denied(c, oid, to_oid, kind, objs[0], who)
+    oo_note(c, oid, real, kind, name, list_id, to="org" if to_oid else "private", released=bool(grants), uid=who)
 
 
-def oo_note(c, oid, real, kind, name, list_id=None, to="private", back=False, released=False):
+def oo_note(c, oid, real, kind, name, list_id=None, to="private", back=False, released=False, uid=None):
     """The log row (action moveout) and the News to the other admins of a move out of organisation oid (named real).
     2.361.0 (#2922): back = a list its owner had brought in went back to their private space (accounts/orgs.py org_leave).
-    2.361.2 (#2923): released = a member's released request let it go."""
+    2.361.2 (#2923): released = a member's released request let it go. 2.657.0 (#4828): uid = who moved it (None: me())."""
+    who = me() if uid is None else uid
     detail = {"kind": kind, "to": to, **({"released": True} if released else {}), **({"back": True} if back else {})}
     c.execute("INSERT INTO org_list_log(org_id,list_id,list_name,action,by_id,owner_id,to_id,created_at,detail) VALUES(?,?,?,?,?,?,?,?,?)",
-              (oid, list_id, str(name or "")[:200], "moveout", me(), None, None, iso(now_utc()), json.dumps(detail)))
-    oo_news(c, oo_admins(c, oid, me()), {"action": "moveout", "name": str(name or "")[:200], "org": real, "org_id": oid, "kind": kind})  # 2.540.0 (#4383)
+              (oid, list_id, str(name or "")[:200], "moveout", who, None, None, iso(now_utc()), json.dumps(detail)))
+    oo_news(c, oo_admins(c, oid, who), {"action": "moveout", "name": str(name or "")[:200], "org": real, "org_id": oid, "kind": kind})  # 2.540.0 (#4383)
 
 
 def oo_exported(c, oid, uid, n):

@@ -68,6 +68,8 @@ UNDO_MOVED = N_("Moved to another workspace in the meantime, so it cannot be und
 UNDO_NOTHING = N_("Nothing to undo")
 PURGE_FIRST = N_("Put it into the trash first")
 JOIN_ADMIN = N_("Only admins of the organisation can share this with everyone of it")  # 2.579.0 (#4802)
+# 2.657.0 (#4828): a kind with org_join "admin" (a saved view) is always made private; sharing is a step of its own
+CREATE_PRIVATE = N_("This is created in your own space first; an admin of the organisation shares it with everyone afterwards")
 MOVE_OWNER = N_("Its owner is not a member of that organisation")
 MOVE_SHARED = N_("It is shared with people or agents: remove those shares first")
 OBJ_TRACK = {}  # 2.567.0 (#4711): kind -> {table, area, undo_scope, undo_keep, undo_nofp, fields: None} (obj_track)
@@ -225,7 +227,8 @@ def obj_create(c, uid, kind, vals, org_id=None):
         if not acx_org_ok(c, uid, org_id):
             raise Denied(404)
         need_org_write(c, uid, org_id)
-        _join_ok(c, uid, reg, org_id)  # 2.579.0 (#4802)
+        if reg.get("org_join") == "admin":  # 2.657.0 (#4828): made private, shared only through obj_space_set (/share)
+            raise Denied(403, tr(CREATE_PRIVATE))
     v = _clean(c, reg, vals, None)
     for k, f in reg["fields"].items():
         if k not in v:
@@ -306,13 +309,18 @@ def obj_space_set(c, uid, kind, rid, org_id):
         _join_ok(c, uid, reg, org_id)
         if row["owner_id"] != uid and org_role_key(c, row["owner_id"], org_id) is None:
             raise Denied(409, tr(MOVE_OWNER))
-    if old is not None:
-        org_out(c, old, org_id, kind, obj_title(c, kind, rid) or tr(reg["label"]))  # 403 for anybody but its admin
+    # 2.657.0 (#4828): the shares (its node's and the kind's old member table) are checked BEFORE org_out writes its log / News
     with system_ctx(c):  # structure: whether its node (in the tree it leaves) carries a share
         shared = c.execute("SELECT 1 FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id WHERE n.kind='ref' AND n.ref_kind=? AND n.ref_id=? "
                            "LIMIT 1", (kind, int(rid))).fetchone()
+        if not shared and reg.get("members"):
+            mt, key = reg["members"]  # names checked by obj_register; the owner's own row is no share
+            shared = c.execute(f"SELECT 1 FROM {mt} WHERE {key}=? AND user_id!=? LIMIT 1",
+                               (int(rid), row["owner_id"])).fetchone()
     if shared:
         raise Denied(409, tr(MOVE_SHARED))
+    if old is not None:
+        org_out(c, old, org_id, kind, obj_title(c, kind, rid) or tr(reg["label"]), uid=uid)  # 403 for anybody but its admin
     ts = _now()
     c.execute(f"UPDATE {reg['table']} SET org_id=?, rev=rev+1, updated_at=?, updated_by=? WHERE id=?", (org_id, ts, uid, int(rid)))
     obj_history_add(c, uid, kind, rid, {"org_id": old}, {"org_id": org_id}, action="move", org_id=org_id)

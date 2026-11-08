@@ -6,7 +6,7 @@ kind docview), a switch shows it as a block on Today (the first five hits + the 
 A view is an object of the shared core (docs/dev/kern.md, kind 'docview', table doc_views of migrations.d/4802_a.py): no share
 table, no check and no save path of its own. Private per person (org_id NULL: only its owner sees it); in an organisation's
 workspace an admin shares it with everyone of the organisation (core/writes.py obj_space_set: org_id = the organisation, the
-members read it, org_access "view"; org_join "admin": no member brings one there, not even at creation) and takes it back.
+members read it, org_access "view"; org_join "admin": no member brings one there; 2.657.0, #4828: a view is always created private, also by an admin) and takes it back.
 Agents see a view only through an explicit share (the core's default role gives agents nothing), on the core's agent routes.
 
 The hits are ALWAYS worked out with the rights of whoever looks (doc_query runs as the signed-in person): a view an admin

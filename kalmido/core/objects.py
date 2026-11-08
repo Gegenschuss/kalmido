@@ -194,7 +194,8 @@ def obj_register(kind, table, *, label, fields, open_url=None, space=None, title
     filing and sharing the book's node stay with who manages it, files/fsref.py 2.199.0 F).
     2.579.0 (#4802): org_join = who may bring an object into an organisation (obj_create with org_id, core/writes.py
     obj_space_set): "member" (default: every member who writes there) or "admin" (only its admins: a saved view of the
-    documents search, which a person keeps private until an admin shares it with everyone of the organisation)."""
+    documents search, which a person keeps private until an admin shares it with everyone of the organisation; 2.657.0, #4828:
+    obj_create refuses an org_id for such a kind, even from an admin -- it is made private and shared with obj_space_set)."""
     if not _NAME.fullmatch(kind or "") or not _TABLE.fullmatch(table or ""):
         raise ValueError(f"obj_register: invalid kind / table {kind!r} {table!r}")
     if base_role is not None and visible is None:
