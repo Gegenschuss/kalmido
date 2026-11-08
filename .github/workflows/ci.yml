@@ -258,6 +258,8 @@ jobs:
         run: python tools/check_nosham.py
       - name: Links, tags, comments, read marks, versions, following only in the shared core (2.755.0, #5267)
         run: python tools/check_core_crosscut.py
+      - name: New columns with real types - TIMESTAMPTZ, BOOLEAN, JSONB (2.755.0, #5305)
+        run: python tools/check_coltypes.py
       - name: Translations complete
         run: |
           python tools/i18n_check.py
