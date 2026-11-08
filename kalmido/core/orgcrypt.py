@@ -713,8 +713,10 @@ SEAL_RAM_BUDGET = int(os.environ.get("KALMIDO_SEAL_RAM_MB") or 256) * 1024 * 102
 SEAL_RAM_WAIT = float(os.environ.get("KALMIDO_SEAL_RAM_WAIT") or 15)
 SEAL_RAM_BG_WAIT = 300
 SEAL_RAM_RETRY = 10
+SEAL_RAM_QUEUE = 2  # 2.663.0 (#4191, Fable review): at most this many requests wait for room; more answer 503 at once
 _RAM = threading.Condition()
 _RAM_HELD = [0]
+_RAM_WAITING = [0]
 
 
 class SealBusy(Exception):
@@ -743,17 +745,31 @@ def oc_ram_take(n):
         return 0
     need = 2 * n
     req = has_request_context()
-    end = time.monotonic() + (SEAL_RAM_WAIT if req else SEAL_RAM_BG_WAIT)
+    # 2.663.0 (#4191, Fable review): a request without a signed-in person (public link) never waits, and only
+    # SEAL_RAM_QUEUE requests wait at once - otherwise parallel downloads of a public link hold every server thread
+    wait = SEAL_RAM_BG_WAIT if not req else (SEAL_RAM_WAIT if _ram_signed_in() else 0)
+    end = time.monotonic() + wait
     with _RAM:
-        while _RAM_HELD[0] and _RAM_HELD[0] + need > SEAL_RAM_BUDGET:
-            left = end - time.monotonic()
-            if left <= 0:
-                if req:
-                    raise SealBusy()
-                break  # a background job goes on after its long wait
-            _RAM.wait(left)
+        if req and _RAM_HELD[0] and _RAM_HELD[0] + need > SEAL_RAM_BUDGET and _RAM_WAITING[0] >= SEAL_RAM_QUEUE:
+            raise SealBusy()
+        _RAM_WAITING[0] += 1
+        try:
+            while _RAM_HELD[0] and _RAM_HELD[0] + need > SEAL_RAM_BUDGET:
+                left = end - time.monotonic()
+                if left <= 0:
+                    if req:
+                        raise SealBusy()
+                    break  # a background job goes on after its long wait
+                _RAM.wait(left)
+        finally:
+            _RAM_WAITING[0] -= 1
         _RAM_HELD[0] += need
     return need
+
+
+def _ram_signed_in():
+    from flask import g
+    return bool(getattr(g, "user", None))
 
 
 def oc_ram_give(held):
@@ -917,7 +933,12 @@ def oc_send_file(c, path, **kw):
         raise
     if held:
         done = []
-        rv.call_on_close(lambda: done or (done.append(1), oc_ram_give(held)))
+        give = lambda: done or (done.append(1), oc_ram_give(held))  # noqa: E731
+        # 2.663.0 (#4191, Fable review): send_file answers with direct_passthrough, so the WSGI server closes only the body
+        # iterator, never the Response: the hand-back hangs on the body (ClosingIterator); call_on_close covers HEAD / 304
+        from werkzeug.wsgi import ClosingIterator
+        rv.response = ClosingIterator(rv.response, give)
+        rv.call_on_close(give)
     return rv
 
 

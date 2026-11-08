@@ -99,6 +99,47 @@ with app.test_request_context("/x"):
     out["alone"] = [rv.status_code, oc.oc_ram_held() > 0]
     rv.close()
 out["end"] = oc.oc_ram_held()
+# 2.663.0 (#4191, Fable review): the WSGI server closes only the body iterator of a send_file answer (direct_passthrough),
+# never the Response itself - the room must come back on that path too (was: held until the process restarted)
+oc.SEAL_RAM_BUDGET = 30 * MB
+from flask import request, g
+with app.test_request_context("/x"):
+    rv = oc.oc_send_file(c, big, mimetype="application/octet-stream")
+    it = rv.get_app_iter(request.environ)
+    body = b"".join(it)
+    mid = oc.oc_ram_held()
+    it.close()
+    out["wsgi"] = [body == data, mid >= 24, oc.oc_ram_held()]
+# a public link (nobody signed in) does not wait for room; a signed-in person waits until it is free
+oc.SEAL_RAM_WAIT = 5
+held = oc.oc_ram_take(os.path.getsize(big))
+with app.test_request_context("/x"):
+    t0 = time.monotonic()
+    try:
+        oc.oc_send_file(c, big, mimetype="application/octet-stream")
+        out["pub"] = None
+    except oc.SealBusy:
+        out["pub"] = time.monotonic() - t0 < 2
+with app.test_request_context("/x"):
+    g.user = {"id": 1}
+    threading.Timer(0.3, oc.oc_ram_give, [held]).start()
+    rv = oc.oc_send_file(c, big, mimetype="application/octet-stream")
+    out["signed"] = rv.status_code
+    rv.close()
+# more than SEAL_RAM_QUEUE waiting at once: the next one is refused at once
+held = oc.oc_ram_take(os.path.getsize(big))
+oc._RAM_WAITING[0] = oc.SEAL_RAM_QUEUE
+with app.test_request_context("/x"):
+    g.user = {"id": 1}
+    t0 = time.monotonic()
+    try:
+        oc.oc_send_file(c, big, mimetype="application/octet-stream")
+        out["queue"] = None
+    except oc.SealBusy:
+        out["queue"] = time.monotonic() - t0 < 2
+oc._RAM_WAITING[0] = 0
+oc.oc_ram_give(held)
+out["end2"] = oc.oc_ram_held()
 print(json.dumps(out))""")
 check(r["held"] >= 24, f"step 1: the other download is counted twice its size {r}")
 check(r["busy"] and r["busy"][0] == 503 and r["busy"][1] == "10" and r["busy"][2] == r["held"],
@@ -108,6 +149,10 @@ check(r["bg"] == [True, r["held"]], f"step 1: a background job goes on after its
 check(r["sent"][0] == 200 and r["sent"][1] >= 24 and r["body"], f"step 1: with room the download is counted while it is sent {r}")
 check(r["after"] == 0, f"step 1: closing the answer hands the room back (once) {r}")
 check(r["alone"] == [200, True] and r["end"] == 0, f"step 1: a file larger than the budget opens when nothing else is held {r}")
+check(r["wsgi"] == [True, True, 0], f"step 1: closing the body iterator as the WSGI server does hands the room back (was: never) {r}")
+check(r["pub"] is True, f"step 1: without a signed-in person (public link) a busy budget answers 503 at once {r}")
+check(r["signed"] == 200, f"step 1: a signed-in person waits for room and then gets the file {r}")
+check(r["queue"] is True and r["end2"] == 0, f"step 1: with SEAL_RAM_QUEUE requests already waiting the next is refused at once {r}")
 
 # ---------------------------------------------------------------- step 2: the chunk format inside one process
 r = in_ct(BASE + """out = {}
