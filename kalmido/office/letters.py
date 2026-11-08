@@ -915,12 +915,17 @@ def lt_pdf_get(lid):
         n = c.execute("SELECT deleted_at FROM fs_nodes WHERE id=?", (d["node_id"],)).fetchone()
         if n and not n["deleted_at"] and fs_role(c, d["node_id"], uid):
             try:
-                data = fs_read(c, d["node_id"])
+                # 2.674.0 (#4382 finding 1): the filed original (version 1), never a later version someone with edit on the
+                # node pushed under it; a pruned original or a non-PDF falls back to writing the letter anew
+                data = fs_read(c, d["node_id"], 1)
             except Denied:
+                data = None
+            if data is not None and not data.startswith(b"%PDF-"):
                 data = None
     if data is None:
         data = lt_pdf(c, oid, d)
     resp = Response(data, mimetype="application/pdf")
+    resp.headers["Content-Security-Policy"] = "sandbox"  # 2.674.0 (#4382 finding 1): like every other inline PDF way
     disp = dt_disposition(d.get("subject") or tr("Letter"))
     resp.headers["Content-Disposition"] = disp if request.args.get("dl") == "1" else disp.replace("attachment;", "inline;", 1)
     resp.headers["Cache-Control"] = "private, no-store"
