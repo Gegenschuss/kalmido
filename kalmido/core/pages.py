@@ -20,7 +20,8 @@ from ..core.orgcrypt import oc_task_org  # 2.149.0 G (#2517): pulled up from fun
 from ..core.tokenhash import tkh_hash, tkh_match  # 2.149.0 G (#2517): pulled up from functions
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from ..core.db import GLOBAL_DEFAULTS, lv_versions_fmt, lv_versions_q  # 2.149.0 G (#2517): pulled up from functions
-from ..core.strip import strip_asset, start_css_files, with_start_css  # 2.191.0 B (#1824), 2.476.0 (#3487)
+from ..core.strip import start_css_files  # 2.191.0 B (#1824), 2.476.0 (#3487)
+from ..core.codemanifest import CM_ASSET_RE, CM_SW_LIST_RE, cm_index, cm_json, cm_ld_metas, cm_served, cm_sha, cm_static_rels  # 2.742.0 (#5217)
 
 
 # ---------------------------------------------------------------- pages
@@ -74,8 +75,8 @@ def headers(resp):
 
 _SHASH, _SHASH_LOCK = {}, threading.Lock()
 ST_PACK_DIR = os.path.join(app.root_path, "static_packed")  # 2.442.0 (#2808): tools/pack_static.py, in the Docker image
-_ASSET_RE = re.compile(r'(<(?:script|link)\b[^>]*?\b(?:src|href)="/static/)([\w./-]+\.(?:js|css))"')
-_SW_LIST_RE = re.compile(r"const (SHELL|LAZY|LAZY_CSS) = \[(.*?)\];", re.S)  # 2.660.0 (#4197): with the name of the list
+_ASSET_RE = CM_ASSET_RE  # 2.742.0 (#5217): the regexes and the steps of the page live in core/codemanifest.py (tools/web_manifest.py too)
+_SW_LIST_RE = CM_SW_LIST_RE  # 2.660.0 (#4197): with the name of the list
 
 
 def static_hash(rel):
@@ -119,14 +120,14 @@ def st_asset(rel):
         if rel.endswith((".js", ".css")) and not rel.startswith("vendor/"):
             with open(path, "rb") as f:
                 data = f.read()
-            if starts:
-                data = with_start_css(root, data, starts)
-            served = strip_asset(rel, data)
-            if served is None:
+            # 2.742.0 (#5217): the same step as the web manifest (core/codemanifest.py cm_served)
+            out, stripped = cm_served(root, rel, data, starts)
+            served = out
+            if not stripped:
                 app.logger.warning("static %s goes out with its comments (strip unsure)", rel)
-                if starts:
-                    served = data  # never the file alone: the start styles belong to it
-            h.update(data if served is None else served)
+                if not starts:
+                    served = None  # the file as it is; with start styles never the file alone
+            h.update(out)
         else:
             with open(path, "rb") as f:
                 for chunk in iter(lambda: f.read(1 << 16), b""):
@@ -134,8 +135,18 @@ def st_asset(rel):
     except OSError:
         return None
     with _SHASH_LOCK:
-        _SHASH[path] = (key, (served, h.hexdigest()[:12], mtime))
+        _SHASH[path] = (key, (served, h.hexdigest()[:12], mtime), h.hexdigest())  # 2.742.0 (#5217): + the full hash
     return _SHASH[path][1]
+
+
+def static_hash_full(rel):
+    """2.742.0 (#5217): the full SHA-256 (64 hex) of static/<rel> as it goes out (st_asset; static_hash = its first 12 digits);
+    None: no such file."""
+    if not st_asset(rel):
+        return None
+    root = os.path.realpath(app.static_folder)
+    hit = _SHASH.get(os.path.realpath(os.path.join(root, rel)))
+    return hit[2] if hit else None
 
 
 def st_packed(h):
@@ -184,15 +195,6 @@ def st_static(filename):
 app.view_functions["static"] = st_static
 
 
-def _versioned(html):
-    """index.html: every start script and stylesheet under /static/ gets ?v=<content hash> (the file list itself stays in
-    index.html; tools/check_layout.py compares it with sw.js)."""
-    def sub(m):
-        h = static_hash(m.group(2))
-        return m.group(0) if not h else f'{m.group(1)}{m.group(2)}?v={h}"'
-    return _ASSET_RE.sub(sub, html)
-
-
 def st_warm():
     """2.191.0 (#1824): strip + hash the start scripts / styles of index.html once in the background at start, so the first
     page after a restart does not wait for it (about 1-3 s)."""
@@ -217,11 +219,9 @@ def index_page():
         with open(path, encoding="utf-8") as f:
             # 2.660.0 (#4197): + the content hashes of the modules loaded on demand (lazyload.js ld_url / loadCss) and the version of
             # each language part (i18n.js i18nV): an update loads only what changed
+            # 2.742.0 (#5217): rendered by core/codemanifest.py cm_index, the step tools/web_manifest.py repeats for the release
             _INDEX.update(mt=mt, at=time.monotonic(),
-                          html=_versioned(f.read().replace('<meta name="kalmido-version" content="">',
-                                                           f'<meta name="kalmido-version" content="{APP_VERSION}">', 1)
-                                          .replace('<meta name="kalmido-i18n" content="">', f'<meta name="kalmido-i18n" content="{i18np_ver()}">'
-                                                   + ld_hash_metas() + f'\n<meta name="kalmido-i18nv" content="{i18np_table()}">', 1)))
+                          html=cm_index(f.read(), APP_VERSION, i18np_ver(), ld_hash_metas(), i18np_table(), static_hash))
     r = Response(_INDEX["html"], mimetype="text/html")
     r.headers["Cache-Control"] = "no-cache"
     return r
@@ -559,15 +559,7 @@ def ld_hash_metas():
     """2.660.0 (#4197): two meta tags of the app page with the content hash of every module file loaded on demand (LAZY /
     LAZY_CSS of sw.js = LD_MODS / LD_CSS of lazyload.js): "<name>=<hash> …". lazyload.js asks for them with ?v=<hash>, the
     form the service worker knows (its precache answers without the network, a new version loads only changed files)."""
-    out = ""
-    for meta, lst, rx in (("kalmido-ldjs", "LAZY", r"/static/js/([\w-]+)\.js"), ("kalmido-ldcss", "LAZY_CSS", r"/static/css/([\w-]+)\.css")):
-        pairs = []
-        for u in sw_urls()["lists"].get(lst, []):
-            m, h = re.fullmatch(rx, u), static_hash(u[8:])
-            if m and h:
-                pairs.append(f"{m.group(1)}={h}")
-        out += f'\n<meta name="{meta}" content="{" ".join(pairs)}">'
-    return out
+    return cm_ld_metas(sw_urls()["lists"], static_hash)  # 2.742.0 (#5217): core/codemanifest.py
 
 
 @app.get("/sw-manifest.json")
@@ -584,6 +576,33 @@ def sw_manifest():
     # 2.660.0 (#4197): i18n = the current version of every language part: an update keeps the parts of an old cache that did not change
     r = jsonify(v=1, files=files, i18n=i18np_all_vers())
     r.headers["Cache-Control"] = "no-cache"
+    return r
+
+
+_CM = {}
+
+
+@app.get("/api/code-manifest")
+def code_manifest():
+    """2.742.0 (#5217): the web manifest of this server (core/codemanifest.py): the full SHA-256 of every file the browser gets,
+    computed from what goes out here - static files (st_asset), /sw.js, the language parts (core/i18nparts.py), the app page
+    (index_page). Without signing in and without the database, only hashes; the same bytes as web-manifest-X.Y.Z.json of the
+    release when this server runs that version unchanged. Built again at most every 5 seconds."""
+    if _CM.get("body") is None or time.monotonic() - _CM.get("at", 0) > 5:
+        from ..core.i18nparts import i18np_parts  # the language parts as they go out
+        files = {}
+        for rel in cm_static_rels(os.path.realpath(app.static_folder)):
+            h = static_hash_full(rel)
+            if h:
+                files["/static/" + rel] = h
+        with open(os.path.join(app.static_folder, "sw.js"), "rb") as f:
+            files["/sw.js"] = cm_sha(f.read())
+        for url, data in i18np_parts().items():
+            files[url] = cm_sha(data)
+        files["/"] = cm_sha(index_page().get_data())
+        _CM.update(at=time.monotonic(), body=cm_json(APP_VERSION, files))
+    r = Response(_CM["body"], mimetype="application/json")
+    r.headers["Cache-Control"] = "no-store"
     return r
 
 

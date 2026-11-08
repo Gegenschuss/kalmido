@@ -168,6 +168,21 @@ def i18np_all_vers():
         return []
 
 
+def i18np_parts():
+    """2.742.0 (#5217): {url: bytes} of every language part as it goes out with the current version (/api/code-manifest); split
+    off: <code>.core.json = the whole language file, no module parts."""
+    st, out = i18np_state(), {}
+    for code in i18np_langs():
+        if not st["ver"]:
+            with open(os.path.join(I18N_DIR, code + ".json"), "rb") as f:
+                out[f"/static/i18n/{code}.core.json"] = f.read()
+            continue
+        for part, (plain, _, _) in (_i18np_lang(st, code) or {}).items():
+            if not part.startswith("old-"):
+                out[f"/static/i18n/{code}.{part}.json"] = plain
+    return out
+
+
 def _i18np_lang(st, code):
     """{part: (plain bytes, gzip bytes)} of one language ("core", "mod-<name>"); None: no such language."""
     hit = st["langs"].get(code)

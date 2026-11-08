@@ -6,7 +6,7 @@ name: Weekly release
 # (tools/weekly_release.py pick) and publishes it on the tag vX.Y.Z - the update check of the servers and install.sh accept only
 # vX.Y.Z. The text holds all CHANGELOG sections since the last weekly release, with their "Action needed" sections collected on
 # top (the update hint reads only that section of the latest release); the assets are the same as before (installers, source
-# archives, image-digest.txt, SHA256SUMS). Then :latest moves to the digest of :X.Y.Z and the release becomes latest, in that
+# archives, image-digest.txt, SHA256SUMS; 2.742.0 #5217: + web-manifest-X.Y.Z.json). Then :latest moves to the digest of :X.Y.Z and the release becomes latest, in that
 # order. Afterwards prune-releases.yml thins out old releases and images - a dry run (only the list in the log) unless the
 # repository variable KALMIDO_PRUNE_APPLY is 1. Git tags are never created, moved or deleted here (--verify-tag).
 # Rights as in release.yml: the job with checkout reads only; the job that writes runs only download-artifact.
@@ -57,7 +57,7 @@ jobs:
           b=$(git rev-parse -q --verify "refs/tags/latest-ok/$ver^{commit}") || { echo "::error::no tag latest-ok/$ver"; exit 1; }
           [ "$a" = "$b" ] || { echo "::error::latest-ok/$ver is on $b, v$ver on $a"; exit 1; }
           cat notes.md
-      - name: Release assets (installers, source archives, image digest, SHA256SUMS)
+      - name: Release assets (installers, source archives, image digest, web manifest, SHA256SUMS)
         if: steps.pick.outputs.version != ''
         env:
           VER: ${{ steps.pick.outputs.version }}
@@ -71,6 +71,15 @@ jobs:
           digest=$(docker buildx imagetools inspect "ghcr.io/gegenschuss/kalmido:$VER" --format '{{.Manifest.Digest}}')
           printf '%s' "$digest" | grep -Eq '^sha256:[0-9a-f]{64}$' || { echo "::error::no usable image digest for :$VER: $digest"; exit 1; }
           printf '%s\n' "$digest" > dist/image-digest.txt
+          # 2.742.0 (#5217): web-manifest-X.Y.Z.json - the full SHA-256 of every file the browser gets from this version (what
+          # /api/code-manifest of a server running it answers), built from the tag's source archive with the tag's own
+          # tools/web_manifest.py, twice independently: different = no release. Tags before 2.742.0 have no tool, no manifest.
+          mkdir wm && tar -xzf "dist/kalmido-$VER.tar.gz" -C wm
+          if [ -f "wm/kalmido-$VER/tools/web_manifest.py" ]; then
+            python3 "wm/kalmido-$VER/tools/web_manifest.py" --root "wm/kalmido-$VER" --twice -o "dist/web-manifest-$VER.json"
+          else
+            echo "::notice title=web manifest::v$VER has no tools/web_manifest.py (before 2.742.0): no web manifest"
+          fi
           (cd dist && sha256sum -- * > SHA256SUMS && cat SHA256SUMS)
       - name: Hand the assets to the job publish
         if: steps.pick.outputs.version != ''

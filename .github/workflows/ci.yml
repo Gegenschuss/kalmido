@@ -220,6 +220,10 @@ jobs:
       # 2.653.0 (#5087): check_layout.py runs tools/check_touch_switch.py too (finger operation on isTouchUi(), not on isMobile())
       - name: Module lists agree (index.html / sw.js / static/js, kalmido/__init__.py / the package)
         run: python tools/check_layout.py
+      # 2.742.0 (#5217): the web manifest (tools/web_manifest.py, the full SHA-256 of every file the browser gets) built twice, in two
+      # fresh processes from two copies of the tree - any difference stops the run (the release attaches it per version)
+      - name: Web manifest reproducible (built twice independently)
+        run: python tools/web_manifest.py --twice -o /tmp/web-manifest.json
       # 2.380 G (#3390): the hashes the server sends to the agent setup match the starter files
       - name: Starter file hashes (mcp/starter_sha256.txt)
         run: python tools/starter_sha.py --check

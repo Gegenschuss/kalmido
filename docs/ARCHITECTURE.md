@@ -471,6 +471,15 @@ About shows the window size, pixel ratio, pointer, hover and both switches of th
   only its own part, the manifest's `i18n` list lets the worker keep every unchanged part. The idle preload no longer
   loads the settings, and neither it nor the language warm-up runs with the data saver or on 2G.
 - Static files, `/sw.js`, `/sw-manifest.json` and `/robots.txt` are served without a session lookup (no database access).
+- *2.742.0 (code integrity, stage 1):* the web manifest names the full SHA-256 of every file the browser gets from a
+  version, as it goes out: every file under `static/` (`.js` / `.css` without comments, `app.css` with the start styles),
+  `/sw.js`, every language part and the app page `/` as rendered (it holds only values derived from the code: version,
+  hashes, versions of the language parts - no nonce, no instance name). One recipe, `kalmido/core/codemanifest.py`:
+  `GET /api/code-manifest` (no sign-in, no database, only hashes) answers it from what the server really sends,
+  `tools/web_manifest.py` builds it from a source tree without the app. The CI builds it twice independently (any
+  difference stops the run), the weekly release attaches `web-manifest-X.Y.Z.json` built from the tag (also in
+  `SHA256SUMS`). The first 12 digits of every entry are the `?v=` / `sw-manifest.json` value. `/manifest.json` is no code
+  (texts in the visitor's language, the signed-in person's shortcuts) and stays out. No signature yet.
 - Every answer carries `Server-Timing: app;dur=…, db;dur=…;desc="n=<statements>"` (`core/reqtime.py`, counted per
   thread in `core/pg.py`). A request slower than `KALMIDO_SLOW_REQUEST_MS` (default 500, 0 = off) logs one line with
   method, route pattern, duration, statements and database time; `GET /api/admin/health` has p50 / p95 / max of the

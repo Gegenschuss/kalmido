@@ -91,6 +91,15 @@ for name in ("SHELL", "LAZY", "LAZY_CSS"):
         # 2.191.0 A (#2518): the core texts of a language (<code>.core.json) are split from <code>.json by the server
         if not os.path.isfile(os.path.join(ROOT, re.sub(r"^(static/i18n/[\w-]+)\.core\.json$", r"\1.json", u))):
             ERR.append(f"sw.js {name}: /{u} does not exist")
+# 2.742.0 (#5217): the web manifest (kalmido/core/codemanifest.py, tools/web_manifest.py) names every file under static/: each file
+# the app page loads and the service worker precaches must be one of them, else the release's list misses code the browser runs
+sys.path.insert(0, os.path.join(ROOT, "kalmido", "core"))
+import codemanifest  # noqa: E402
+_cm_rels = set(codemanifest.cm_static_rels(os.path.join(ROOT, "static")))
+for _u in [m.group(2) for m in codemanifest.CM_ASSET_RE.finditer(read("static", "index.html"))] + \
+        [u[8:] for v in codemanifest.cm_sw_lists(sw).values() for u in v if not re.fullmatch(r"/static/i18n/[\w-]+\.core\.json", u)]:
+    if _u not in _cm_rels:
+        ERR.append(f"web manifest: /static/{_u} (index.html / sw.js) is no file under static/ (kalmido/core/codemanifest.py cm_static_rels)")
 _cache = re.search(r"const CACHE = 'tasks-shell-v\d+';\s*// app (\S+)", sw)
 _ver = read("VERSION").strip()
 if not _cache or _cache.group(1) != _ver:
