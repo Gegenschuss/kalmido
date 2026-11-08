@@ -1,6 +1,16 @@
 {
  "versions": [
   {
+   "version": "2.675.0",
+   "date": "2026-11-08",
+   "items": [
+    {
+     "de": "Der Verlauf eines Agenten liest sich in Alltagssprache, fasst gleiche Schritte zusammen und zeigt im Dialog nur die letzten fünf Zeilen.",
+     "en": "An agent's history reads in plain words, groups similar steps and shows only the newest five lines in the dialog."
+    }
+   ]
+  },
+  {
    "version": "2.668.0",
    "date": "2026-11-08",
    "items": [

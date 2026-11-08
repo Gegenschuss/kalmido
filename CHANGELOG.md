@@ -16,6 +16,38 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.675.0] - 2026-11-08
+
+Package 2.665 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Changed
+- Calendar and contact sync (CalDAV / CardDAV): the change state of a list, calendar or address book (getctag, sync-token) comes from one database query over its own rows instead of rendering every object; the rendered collections are kept per person and collection instead of being dropped by any change anywhere in the instance. A change in one list no longer re-renders all others (#4196).
+- Background work: notification channels are served in turns, and after a failed send the rest of that channel waits for the next run, so one dead channel no longer holds up the others; the issue sync sends to GitHub / GitLab with no open database transaction, keeps errors as the link's state, and a comment whose answer was not stored is looked up instead of posted twice (#5113).
+
+### Fixed
+- Reduce motion: with the system setting "reduce motion" only visual properties (opacity, transform, colours) keep their very short transition; sizes and positions change at once, so headings and area names that fit their text measure the new size and no longer flicker or loop (#5115).
+- Tests: CI-only failures of p2390_b_api (new section field), p2425_b_ui (date-dependent hint text) and p4434_a_umzug (race with the background cleanup) (#5109, #5110, #5111).
+
+Package 2.663 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Changed
+- Large stored files (from 4 MiB) are sealed in 1 MiB chunks (format KENC2, a key per file derived from the space key, chunk index and end mark bound in each chunk): downloads stream, and a range request (videos, large PDFs) decrypts only the chunks it needs instead of the whole file. Files in the older format stay as they are and keep opening; `KALMIDO_SEAL_CHUNKS=0` and `orgcrypt_cli files-to-v1` are the way back before a downgrade (docs/SELF-HOSTING.md) (#4191)
+- Sealed files in the older format from 10 MB on count against a RAM budget per process (`KALMIDO_SEAL_RAM_MB`, default 256; `KALMIDO_SEAL_RAM_WAIT`): a signed-in person waits briefly for room, a public link and a third waiting request get 503 with Retry-After at once (#4191)
+- The offline start state lives in IndexedDB and is written when the browser is idle (no longer a large JSON in localStorage on the main thread); the old copy is taken over once, a refused write falls back to localStorage and is reported (#4200)
+- An open table asks with its etag first and loads and redraws the sheet only when it changed (#4200)
+### Fixed
+- Tests: 40 status checks that accepted success and refusal alike now expect the one right answer; the eleven remaining importers are checked by behaviour for the target workspace question (#4341)
+
+Package 2.653 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Added
+- Agents: `POST /api/v1/agent/decisions {title, ref?}` and the MCP tool `log_decision` write a line "Decided: <title>" into the agent's own history for decisions outside the Kalmido API (a job card answered itself, a tool change on its server, something deliberately not started); no undo, 30 per minute (#5079).
+- Agents: Settings > Agents > Work style > History shows the newest five lines and "Show whole history" with paging (`GET /api/agents/<id>/control/history`); the history keeps 500 lines per agent (#5079).
+- Developers: the finger switch `isTouchUi()` (coarse pointer or no hover) for operation, `isMobile()` only for layout by width; the lint rule `tools/check_touch_switch.py` (run by check_layout) is red on new width checks next to focus, drag, gestures or shortcut hints (#5087).
+- Settings > Help > About shows one line about this device: window size, pixel ratio, pointer, hover, phone layout and finger operation (#5087).
+
+### Changed
+- Agent history lines read in plain words with the task title and the changed fields ("Priority changed: <title>") instead of method and path; similar steps of an agent within five minutes in one project form one expandable line ("12 tasks changed in Releases"), each step keeps its own undo (#5079).
+
 ## [2.668.0] - 2026-11-08
 
 Package 2.655 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), CI-only rot: p2551_c_favout_ui).
@@ -576,7 +608,8 @@ Package 2.582 (Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher),
 
 Not released (the CI of this version was red); its changes are listed under 2.605.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.668.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.675.0...HEAD
+[2.675.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.675.0
 [2.668.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.668.0
 [2.659.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.659.0
 [2.656.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.656.0
