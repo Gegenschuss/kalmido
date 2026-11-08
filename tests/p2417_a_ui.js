@@ -115,6 +115,9 @@ const click = (w, el) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbl
     check(!!d.querySelector('.side-ghost'), `${u} phone: the grip drags at once`);
     tch(prow(I.loose), 'touchmove', 60); await sleep(50);
     tch(prow(I.loose), 'touchend');
+    // 2.725.0 (#5175): the browser's click after a drag, swallowed by drg_noClick (since #4966 the grip drags by drag.js); jsdom sends none,
+    // so without it the swallow took the next click of the test (Done below, within 350 ms) and the sort mode stayed on
+    d.body.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
     check(await until(async () => ((await call(ck, 'GET', '/api/state')).lists || []).find(l => l.id === I.loose)?.folder === 'Gamma'), `${u} phone: the dragged project is in the folder Gamma now`);
     await until(() => [...d.querySelectorAll('#view .pstart .ps-folder')].find(x => x.querySelector('.psfold span')?.textContent === 'Gamma')?.querySelector(`[data-list="${I.loose}"]`));
     const gam = [...[...d.querySelectorAll('#view .pstart .ps-folder')].find(x => x.querySelector('.psfold span')?.textContent === 'Gamma')?.querySelectorAll('[data-list]') || []].map(x => +x.dataset.list);
