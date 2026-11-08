@@ -181,7 +181,8 @@ for who, s, name in (("org", A, "Alice Admin"), ("freelancer", Fr, "Frida")):
     for bad in ("kein-mail", "a@b.example\r\nBcc: x@example.org", "a@b.example, c@d.example"):
         r = s.post(B + f"{D}/{invoice(s, CL)}/send", json={"to": "kunde@example.com", "datev": False, "reply_to": bad})
         check(r.status_code == 400, f"{who}: wrong answer address {bad!r} 400 ({r.status_code})")
-        check(s.put(B + O + "/mail-profile", json={"reply_to": bad}).status_code in (200, 400) and s.get(B + O + "/mail-profile").json()["reply_to"] in (f"{who}@nordlicht.example",), f"{who}: never stored {bad!r}")
+        # 2.663.0 (#4341): ofm_put: no single address after lt_line (OFM_MAIL_RE) -> BadInput 400, nothing stored
+        check(s.put(B + O + "/mail-profile", json={"reply_to": bad}).status_code == 400 and s.get(B + O + "/mail-profile").json()["reply_to"] in (f"{who}@nordlicht.example",), f"{who}: never stored {bad!r}, 400")
     check(len(sent()) == n, f"{who}: a wrong answer address sends nothing")
     r = s.put(B + O + "/mail-profile", json={"from_name": "A\r\nBcc: x@example.org"})
     r, m = send(s, CL)

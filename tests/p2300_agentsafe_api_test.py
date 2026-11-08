@@ -137,7 +137,8 @@ ad = {a["id"]: a for a in A.get(B + "/api/admin/agents").json()["agents"]}
 check(any(not b["approved"] and {x["id"] for x in b["lists"]} == {X1, X2} for b in ad[CL2]["bridges"]), "#919: an old bridge stays and is flagged unapproved " + str(ad[CL2]["bridges"])[:200])
 bb = Bo.get(B + f"/api/agents/{CL2}/bridges")
 check(bb.ok and all(x["name"] is None for b in bb.json()["bridges"] for x in b["lists"] if x["id"] == X2), "#919: someone in only one of the lists sees the other one unnamed " + bb.text[:200])
-check(Ca.get(B + f"/api/agents/{CL}/bridges").status_code in (200, 404), "#919: the bridges route answers")
+# 2.663.0 (#4341): CL is a team agent and a member of AC, where carol is a member -> agent_bridges_get answers 200
+check(Ca.get(B + f"/api/agents/{CL}/bridges").status_code == 200, "#919: the bridges route answers carol (shares AC with the agent): 200")
 # review: sharing by e-mail address and groups never open a bridge (silently, nothing about the account is revealed)
 r = A.post(B + "/api/admin/agents", json={"scopes": ["read"], "username": "third", "display_name": "Third"})
 CL3 = r.json()["id"]

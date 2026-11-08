@@ -28,7 +28,7 @@ sys.path.insert(0, N)
 DATA = sys.argv[1]
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
-from kt import check, done  # noqa: E402
+from kt import check, done, until  # noqa: E402
 from freelancer_fixture import freelancer  # noqa: E402
 
 SLOW = 2.0  # this suite's delay: long enough to tell "delayed" from "not delayed" by the clock
@@ -80,6 +80,7 @@ r = T.post(B + "/api/me/2fa/totp", json={"password": "password123"})
 assert r.ok, r.text
 SEC = r.json()["secret"]
 assert T.post(B + "/api/me/2fa/totp/confirm", json={"code": totp(SEC)}).ok
+SEC_STEP = int(time.time() // 30)  # 2.663.0 (#4341): the confirm used this time step (or an older one); the server keeps it
 P = sess_at("pat", NAT)  # signed in before the failures: changes the password afterwards
 
 # ---- 21 wrong logins with 10 names from one address
@@ -110,9 +111,12 @@ s = requests.Session()
 s.headers.update({**H, "X-Forwarded-For": NAT})
 r = s.post(B + "/api/auth/login", json={"username": "tess", "password": "password123"})
 check(r.ok and r.json().get("twofa"), f"#3111: tess: right password -> the second step ({r.status_code} {r.text[:80]})")
+# 2.663.0 (#4341): auth_2fa refuses a code of a step not newer than the confirm's (replay, 401); wait for the next step,
+# then the right code is 200 (finish_login)
+until(lambda: int(time.time() // 30) > SEC_STEP, timeout=35)
 t0 = time.monotonic()
 r = s.post(B + "/api/auth/2fa", json={"code": totp(SEC)})
-check(r.status_code in (200, 401) and r.status_code != 429, f"#3111: the 2FA step after other names' failures: not 429 ({r.status_code})")
+check(r.status_code == 200, f"#3111: the 2FA step after other names' failures: 200, not 429 ({r.status_code} {r.text[:80]})")
 check(time.monotonic() - t0 < SLOW * 0.75, "#3111: ... and not delayed for a known name")
 r = P.patch(B + "/api/me", json={"current_password": "password123", "password": "password456"})
 check(r.ok, f"#3111: pat changes the password from that address (no 429) ({r.status_code} {r.text[:80]})")

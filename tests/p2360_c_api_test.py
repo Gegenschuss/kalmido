@@ -128,7 +128,9 @@ vt = requests.get(V + f"/tasks/{T}", headers={"Authorization": "Bearer " + tok})
 check(vt is not None and vt.ok and "paperless" not in vt.json(), "v1 task: no Paperless field")
 spec = requests.get(V + "/openapi.json")
 check(spec.ok and "/paperless" not in spec.text and "task_paperless" not in spec.text, "OpenAPI: no Paperless paths or fields")
-check(A.patch(B + "/api/settings", json={"paperless_keep": "1"}).status_code in (200, 400), "the old setting paperless_keep is no switch any more")
+# 2.663.0 (#4341): settings_update skips a key not in USER_DEFAULTS and answers 200 (ok), nothing stored
+check(A.patch(B + "/api/settings", json={"paperless_keep": "1"}).status_code == 200 and not dbx("SELECT 1 FROM user_settings WHERE key='paperless_keep'"),
+      "the old setting paperless_keep is no switch any more: 200, not stored")
 
 # ================================================================== normal work goes on
 r = Bo.post(B + "/api/tasks", json={"title": "Call the roofer", "list_id": P})

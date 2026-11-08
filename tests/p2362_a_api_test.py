@@ -243,7 +243,8 @@ dbx("INSERT INTO comments(task_id,user_id,body,created_at,suggestion) VALUES(?,?
 KG = dbx("SELECT id FROM comments WHERE task_id=? ORDER BY id DESC LIMIT 1", (TR,))[0][0]
 e0 = dbx("SELECT COUNT(*) FROM agent_events WHERE agent_id=? AND event='reaction'", (AGA,))[0][0]
 r = A.post(B + f"/api/comments/{KG}/decide", json={"decision": "approve"})
-check(r.status_code in (200, 409), "reaction: alice decides " + r.text[:120])
+# 2.663.0 (#4341): alice owns LR (an approver), the request is open -> gate_decide_route answers 200 with the state
+check(r.status_code == 200, "reaction: alice decides, 200 " + r.text[:120])
 check(dbx("SELECT COUNT(*) FROM agent_events WHERE agent_id=? AND event='reaction'", (AGA,))[0][0] == e0,
       "reaction: no event to an agent that is not in the list")
 

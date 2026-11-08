@@ -62,8 +62,10 @@ def no(r, what):
     check(r.status_code in (403, 404), f"{what}: refused ({r.status_code} {r.text[:120]})")
 
 
-def hidden(r, what):
-    check(r.status_code in (200, 207, 403, 404) and MARK not in r.text, f"{what}: nothing of the first organisation ({r.status_code}) {r.text[:160] if MARK in r.text else ''}")
+# 2.663.0 (#4341): the expected code per call (code=): the lists answer 200, a DAV PROPFIND 207, an agent route without its
+# scope 403 - and in every case nothing of the first organisation
+def hidden(r, what, code=200):
+    check(r.status_code == code and MARK not in r.text, f"{what}: {code}, nothing of the first organisation ({r.status_code}) {r.text[:160] if MARK in r.text else ''}")
 
 
 def boundary(s):
@@ -162,7 +164,8 @@ check(A.put(B + f"/api/books/{b2['id']}/members", json={"user_id": AG1, "role": 
 check(A.put(B + f"/api/books/{b1['id']}/members", json={"user_id": BOB, "role": "edit"}).ok, "#1036: a member of the organisation joins its address book")
 check(A.patch(B + f"/api/books/{b2['id']}", json={"org_id": ORG}).json()["org_id"] == ORG, "#1036: an address book moves into the organisation")
 ag = requests.post(V + "/event-calendars", headers=AG1H, json={"name": "Bot cal"})
-check(ag.status_code in (201, 403) and (ag.status_code == 403 or ag.json()["org_id"] == ORG), "#1036: an agent's own calendar is in its workspace " + ag.text[:100])
+# 2.663.0 (#4341): POST /event-calendars needs the scope calendar; teambot has read, tasks:write, comments -> 403 in api_authenticate
+check(ag.status_code == 403, "#1036: the team bot without the scope calendar creates no calendar: 403 " + ag.text[:100])
 
 # ---- the nightly boundary check: an admin alert once, the time of the last run
 LP = A.post(B + "/api/lists", json={"name": "Private list", "org_id": None}).json()["id"]
@@ -366,7 +369,7 @@ for name, s in (("carol", Ca), ("dave", Da)):
     dav = requests.Session()
     dav.auth = (uname, pw.get("password") or pw.get("token") or "")
     for path in (f"/dav/calendars/{uname}/", f"/dav/addressbooks/{uname}/"):
-        hidden(dav.request("PROPFIND", B + path, headers={"Depth": "1"}), f"matrix {name}: DAV {path}")
+        hidden(dav.request("PROPFIND", B + path, headers={"Depth": "1"}), f"matrix {name}: DAV {path}", 207)  # 2.663.0 (#4341): the own DAV home: multistatus
     check(dav.request("PROPFIND", B + f"/dav/calendars/{uname}/e{KA}/", headers={"Depth": "1"}).status_code in (403, 404), f"matrix {name}: DAV the foreign calendar")
     check(dav.request("PROPFIND", B + f"/dav/addressbooks/{uname}/b{BA}/", headers={"Depth": "1"}).status_code in (403, 404), f"matrix {name}: DAV the foreign address book")
     check(dav.request("PROPFIND", B + "/dav/calendars/bob/", headers={"Depth": "1"}).status_code in (403, 404), f"matrix {name}: DAV bob's home")
@@ -387,7 +390,8 @@ no(agb.req("PATCH", f"/address-books/{BA}", json={"name": "x"}), "matrix agent: 
 no(agb.req("PATCH", f"/templates/{TPA}", json={"name": "x"}), "matrix agent: template PATCH")
 no(agb.req("PATCH", f"/forms/{FA}", json={"title": "x"}), "matrix agent: form PATCH")
 for p in ("/event-calendars", "/address-books", "/events?from=2026-10-01&to=2026-10-31", "/contacts", "/templates", "/export", "/search?q=" + MARK, "/tasks", "/lists", "/stale", "/time/gaps", "/agent/schedules"):
-    hidden(agb.get(p), f"matrix agent: {p}")
+    # 2.663.0 (#4341): betabot has calendar, contacts, export, read; /time/gaps needs the agent scope time -> 403 (api_authenticate)
+    hidden(agb.get(p), f"matrix agent: {p}", 403 if p == "/time/gaps" else 200)
 # webhooks: carol's hook gets nothing of the first organisation (deliveries only for visible tasks)
 WC = Ca.post(B + "/api/me/webhooks", json={"name": "c", "url": "https://hooks.example.invalid/hook", "events": ["task.created"]}).json()["id"]
 # 2.380 (#3391): a new personal webhook gets no organisation's list at all (also not carol's own one in Beta): her own task

@@ -133,7 +133,8 @@ if r.ok:
     AH = {"Authorization": "Bearer " + r.json()["token"]}
     A.patch(B + f"/api/admin/agents/{r.json()['id']}", json={"org_id": ORG})
     r = requests.get(B + "/api/v1/search", params={"q": "Sonnenhang", "fulltext": "1"}, headers=AH)
-    check(r.status_code in (200, 403) and (r.status_code == 403 or "office" not in r.json()), f"(f) agents' API: no office hits {r.status_code} {r.text[:160]}")
+    # 2.663.0 (#4341): /api/v1/search needs the scope read (every token has it) -> fts_v1 answers 200, without office hits
+    check(r.status_code == 200 and "office" not in r.json(), f"(f) agents' API: 200, no office hits {r.status_code} {r.text[:160]}")
     r = requests.get(B + "/api/search", params={"q": "Sonnenhang"}, headers=AH)
     check(r.status_code != 200 or "office" not in r.json(), f"(f) an agent token on the web search: no office hits {r.status_code}")
 check(not has(office(A, "name"), "offer", OFF), "(f) a key of the recipient JSON (\"name\") is no hit")

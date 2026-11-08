@@ -193,7 +193,8 @@ check(r.ok and r.json().get("undone") == 0 and amount(Bo, DOC) == "119.00", f"#3
 check(A.put(B + f"{R}/people/{BOB}", json={"groups": ["tpl:projects"]}).ok, "setup: the right back")
 # a skipped undo uses up the step (as a value changed since, p2299_e): the taken-over values stay
 r = Bo.post(B + f"/api/proposals/{J}/undo")
-check(r.status_code in (200, 409) and amount(Bo, DOC) == "119.00", f"after the skipped undo the values stay ({r.status_code} {r.text[:120]})")
+# 2.663.0 (#4341): the skipped undo already marked the record undone -> proposal_undo answers 409 "Nothing to undo"
+check(r.status_code == 409 and amount(Bo, DOC) == "119.00", f"after the skipped undo the values stay, a second undo: 409 ({r.status_code} {r.text[:120]})")
 
 # ---------------------------------------------------------------- (c) a person without an organisation
 # freelancer-matrix: office

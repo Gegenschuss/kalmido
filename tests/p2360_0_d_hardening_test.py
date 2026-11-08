@@ -257,7 +257,8 @@ vk = re.search(r'name="v" value="([^"]+)"', pg.text)
 r = requests.post(B + f"/s/q/{QT}/comments", data={"f": fk.group(1) if fk else "", "v": vk.group(1) if vk else "", "name": "Kundin Example",
                                                      "text": "Bitte heller"}, allow_redirects=False)
 cc = dbx("SELECT id FROM video_comments WHERE review_id=? AND ext_name<>''", (VID,))
-check(r.status_code in (200, 303) and cc, f"the customer comments through the link ({r.status_code})")
+# 2.663.0 (#4341): vdr_pub_comment answers a stored comment with a 303 back to the link page (?sent=1)
+check(r.status_code == 303 and cc, f"the customer comments through the link, 303 ({r.status_code})")
 if cc:
     r = Bo.post(B + f"/api/videos/{VID}/comments", json={"body": "Antwort vom Leser", "parent_id": cc[0][0]})
     check(r.status_code == 403 and not dbx("SELECT 1 FROM video_comments WHERE body='Antwort vom Leser'"),

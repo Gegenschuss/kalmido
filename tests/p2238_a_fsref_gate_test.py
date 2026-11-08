@@ -240,7 +240,8 @@ TOK = r.json()["url"].split("/s/q/")[1] if r.ok else ""
 pg = requests.get(B + "/s/q/" + TOK)
 m = re.search(r'name="f" value="([0-9a-f]+)"', pg.text)
 r = requests.post(B + "/s/q/" + TOK, data={"f": m.group(1) if m else "", "name": "Max Example", "ok": "1", "do": "accept"}, allow_redirects=False)
-check(r.status_code in (200, 302, 303), f"setup: the client accepts online ({r.status_code})")
+# 2.663.0 (#4341): sig_decide answers a recorded decision with a 303 back to the link page
+check(r.status_code == 303, f"setup: the client accepts online, 303 ({r.status_code})")
 file_in(A, QA, BOX)  # bob reads the box (view share, no quotations in the office)
 ra, rb = A.get(B + f"{REF}/{QA}/pdf"), Bo.get(B + f"{REF}/{QA}/pdf")
 check(ra.ok and "-accepted" in ra.headers.get("Content-Disposition", ""), f"(h) alice gets the accepted version ({ra.headers.get('Content-Disposition')})")

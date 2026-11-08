@@ -106,7 +106,8 @@ if not (os.environ.get("P2360B_NOSTART") or os.environ.get("KMT_NOSTART")):
     assert r.returncode == 0, r.stdout + r.stderr
 s0 = requests.Session()
 s0.headers.update(H)
-assert until(lambda: s0.get(B + "/api/state").status_code in (200, 401, 403), 30), "server up"
+# 2.663.0 (#4341): a fresh server answers /api/state without a session with 401 (authenticate: "Please sign in", auth=setup)
+assert until(lambda: s0.get(B + "/api/state").status_code == 401, 30), "server up (401 before the setup)"
 assert s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice Admin", "password": "password123"}).ok
 A = sess("alice")
 A.post(B + "/api/admin/setup", json={"lang": "en", "collab_all": True, "modules": ["cal", "comments"]})

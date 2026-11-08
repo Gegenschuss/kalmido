@@ -180,7 +180,8 @@ def run(s, who, me):
     fk = re.search(r'name="f" value="([0-9a-f]+)"', pg.text)
     r = requests.post(B + "/s/q/" + tok, data={"f": fk.group(1) if fk else "", "name": "Camille Exemple", "do": "accept", "ok": "1"},
                       allow_redirects=False, headers={"User-Agent": "TestBrowser/1.0"})
-    check(r.status_code in (200, 302, 303), f"{who}: accepted online {r.status_code}")
+    # 2.663.0 (#4341): sig_decide answers a recorded decision with a 303 back to the link page
+    check(r.status_code == 303, f"{who}: accepted online, 303 {r.status_code}")
     pa = s.get(B + f"{D}/{qa}/pdf")
     check(pa.ok and in_pdf(pa.content, FR["Accepted online by"]) and not in_pdf(pa.content, "Online angenommen")
           and in_pdf(pa.content, "Camille Exemple"), f"#3183 {who}: the acceptance box in French ({pa.status_code})")
