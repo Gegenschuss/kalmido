@@ -1,6 +1,0 @@
-/* 2.660.0 (#5103): "reduce motion" (app.css, prefers-reduced-motion) makes every change of every property a .01 ms transition,
-   the font size too. areas.js sbb_fit sets an area name's size and measures it in the same frame; during that transition the
-   browser still gives the old size: the fit judged on the old size, the next frame showed the new one, its watcher fitted
-   again - an endless 9 / 10 px swing, "Rückblick" split in every other frame. The names, their tiles and the drawer's row
-   never animate. */
-@media (prefers-reduced-motion:reduce){ #srail .srb,#srail .srb .srbn,#side .sbmr,#side .sbmr .srb,#side .sbmr .srb .srbn{transition:none!important} }

@@ -677,8 +677,9 @@ function sbb_fit() {
 // name in its old 9 px type during a font load; a moment later it drew in 10 px, too wide for its column, and nothing fitted it
 // again: "Rückblick" split / cut in the 320 px drawer). Each name's box is noted at the end of a fit; when it differs later,
 // the fit runs again in the next frame. The fit's own result is noted, so a fit never wakes itself (no loop)
-// 2.660.0 (#5103): that holds only while the fit's sizes take effect at once: under "reduce motion" they were transitions
-// (css/start-sbfit-5103.css), the fit measured the old size and woke itself every other frame. Width AND height are noted: a name in a
+// 2.660.0 (#5103): that holds only while the fit's sizes take effect at once: under "reduce motion" they were transitions,
+// the fit measured the old size and woke itself every other frame (since 2.665.0 #5115 app.css gives sizes no transition, so
+// 2.677.0 #5126 dropped the own exception css/start-sbfit-5103.css). Width AND height are noted: a name in a
 // full column grows only in height (a second line) when its type grows
 const SBB_FITSZ = new WeakMap();
 let sbb_fitRO = null, sbb_fitDue = false;
