@@ -65,6 +65,11 @@ const SPLIT = `(sel => [...document.querySelectorAll(sel)].filter(n => n.getClie
       // 2.499.0 (#4047): nothing in the drawer is cut: no "…" class, no text beyond its box in either direction
       const cut = await ev(`[...document.querySelectorAll('#side .sbmr .srbn')].filter(n => n.classList.contains('srcut') || getComputedStyle(n).getPropertyValue('-webkit-line-clamp') !== 'none' || n.scrollWidth > n.clientWidth + 1 || n.scrollHeight > n.clientHeight + 1).map(n => n.textContent)`);
       check(cut.length === 0, `#4047 ${px} px: no area name cut in the drawer: ` + JSON.stringify(cut));
+      // 2.660.0 (#5103): this Firefox runs with "reduce motion" (ff.js): every size the fit set was a .01 ms transition, the fit
+      // measured the old size and its watcher fitted again every other frame ("Rückblick" 9 / 10 px, split in every other frame,
+      // red now and then). A fit (as after any redraw) ends the fitting: in the next 30 frames no further fit, no size changes
+      const calm = await ev(`new Promise(res => { const f0 = window.sbb_fit, sz = () => [...document.querySelectorAll('#side .sbmr .srbn')].map(n => n.style.fontSize).join(); let runs = 0, flips = 0, k = 0; window.sbb_fit = () => { runs++; f0(); }; f0(); let last = sz(); const tick = () => { const s = sz(); if (s !== last) { flips++; last = s; } if (++k < 30) requestAnimationFrame(tick); else { window.sbb_fit = f0; res({runs, flips, sizes: s}); } }; requestAnimationFrame(tick); })`);
+      check(calm.runs === 0 && calm.flips === 0, `#5103 ${px} px: a fit is final, it does not wake itself: ` + JSON.stringify(calm));
       // 2.651.0 (#5063): the names' type grows after the fit without a redraw, resize or font event (in the CI a font load did
       // it: "Rückblick" drawn in 10 px after it was measured in 9 px): the app fits them again by itself
       if (px === 320) {

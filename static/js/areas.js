@@ -673,15 +673,19 @@ function sbb_fit() {
 // name in its old 9 px type during a font load; a moment later it drew in 10 px, too wide for its column, and nothing fitted it
 // again: "Rückblick" split / cut in the 320 px drawer). Each name's box is noted at the end of a fit; when it differs later,
 // the fit runs again in the next frame. The fit's own result is noted, so a fit never wakes itself (no loop)
+// 2.660.0 (#5103): that holds only while the fit's sizes take effect at once: under "reduce motion" they were transitions
+// (css/start-sbfit-5103.css), the fit measured the old size and woke itself every other frame. Width AND height are noted: a name in a
+// full column grows only in height (a second line) when its type grows
 const SBB_FITSZ = new WeakMap();
 let sbb_fitRO = null, sbb_fitDue = false;
 function sbb_fitWatch() {
   if (typeof ResizeObserver !== 'function') return;
   sbb_fitRO ||= new ResizeObserver(es => {
-    if (sbb_fitDue || !es.some(e => e.target.isConnected && Math.abs(e.contentRect.width - (SBB_FITSZ.get(e.target) ?? e.contentRect.width)) > .5)) return;
+    const moved = e => { const o = SBB_FITSZ.get(e.target); return !!o && (Math.abs(e.contentRect.width - o.w) > .5 || Math.abs(e.contentRect.height - o.h) > .5); };
+    if (sbb_fitDue || !es.some(e => e.target.isConnected && moved(e))) return;
     sbb_fitDue = true; requestAnimationFrame(() => { sbb_fitDue = false; sbb_fit(); });
   });
-  for (const n of $$('#srail .srbn, #side .sbmr .srbn')) { SBB_FITSZ.set(n, n.getBoundingClientRect().width); sbb_fitRO.observe(n); }
+  for (const n of $$('#srail .srbn, #side .sbmr .srbn')) { const r = n.getBoundingClientRect(); SBB_FITSZ.set(n, {w: r.width, h: r.height}); sbb_fitRO.observe(n); }
 }
 window.addEventListener('resize', () => requestAnimationFrame(sbb_fit));
 document.fonts?.addEventListener('loadingdone', sbb_fit);
