@@ -63,10 +63,10 @@ def mc_type(c, table, col):
 def mc_misfits(c, table, col):
     """[ids] of the rows of table whose col does not fit NUMERIC(14,2) without a change (see the module text); the hash chain's
     positions must be exact text as well."""
-    tq, cq = qi(table, MC_TABLES), qi(col, MC_NAMES)
+    cq = qi(col, MC_NAMES)
     t = f"btrim({cq})"
     fits = f"CASE WHEN {t} ~ '{MC_FITS}' THEN {t}::numeric = round({t}::numeric, 2) ELSE {t} = '' END"
-    sql = f"SELECT id FROM {tq} x WHERE {cq} IS NOT NULL AND NOT ({fits})"
+    sql = f"SELECT id FROM {qi(table, MC_TABLES)} x WHERE {cq} IS NOT NULL AND NOT ({fits})"
     if table == "office_doc_items":  # office/chain.py: a chained document's positions as the exact text
         sql += (f" OR ({cq} IS NOT NULL AND NOT ({cq} ~ '{MC_EXACT}' AND {cq} <> '-0.00') AND EXISTS (SELECT 1 FROM office_docs d "
                 "WHERE d.id=x.doc_id AND d.chain_seq IS NOT NULL))")
