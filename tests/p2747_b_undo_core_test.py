@@ -240,8 +240,8 @@ dbx("DELETE FROM org_keys WHERE org_id=? AND wrapped='x'", (ORG,))
 
 # ---------------------------------------------------------------- the 301st group removes the oldest
 dbx("INSERT INTO undo_groups(user_id, area, label_key, state, created_at, updated_at) SELECT ?, 'other', 'Change', 'barrier', "
-    "to_char(now() - interval '2 days' + s * interval '1 second', 'YYYY-MM-DD\"T\"HH24:MI:SS+00:00'), "
-    "to_char(now() - interval '2 days', 'YYYY-MM-DD\"T\"HH24:MI:SS+00:00') FROM generate_series(1, 300) s", (CARL,))
+    "date_trunc('second', now() - interval '2 days' + s * interval '1 second'), "
+    "date_trunc('second', now() - interval '2 days') FROM generate_series(1, 300) s", (CARL,))  # TIMESTAMPTZ (2.755 lint)
 first = dbx("SELECT MIN(id) FROM undo_groups WHERE user_id=?", (CARL,))[0][0]
 patch(Ca, O1, note="carl")
 gc = groups(CARL)
@@ -250,7 +250,8 @@ check(len(gc) == 300 and first not in [x["id"] for x in gc] and gc[-1]["state"] 
 
 # ---------------------------------------------------------------- the watchdog: older than 30 days, parts without a group
 old = "to_char(now() - interval '31 days', 'YYYY-MM-DD\"T\"HH24:MI:SS+00:00')"
-GO = dbx(f"INSERT INTO undo_groups(user_id, area, label_key, state, parts, created_at, updated_at) VALUES(?, 'other', 'Change', 'done', 1, {old}, {old}) "
+old_tz = "date_trunc('second', now() - interval '31 days')"  # undo_groups: TIMESTAMPTZ
+GO = dbx(f"INSERT INTO undo_groups(user_id, area, label_key, state, parts, created_at, updated_at) VALUES(?, 'other', 'Change', 'done', 1, {old_tz}, {old_tz}) "
          "RETURNING id", (BOB,))[0][0]
 dbx(f"INSERT INTO obj_undo(user_id, sess, kind, ref_id, created_at, group_id) VALUES(?, '', ?, ?, {old}, ?)", (BOB, K, O1, GO))
 dbx("INSERT INTO obj_undo(user_id, sess, kind, ref_id, created_at, group_id) VALUES(?, '', ?, ?, "
@@ -292,7 +293,7 @@ check(Fr.post(B + f"/api/undo/to/{G1}").status_code == 404, "bob's group: 404 fo
 now_ = "to_char(now(), 'YYYY-MM-DD\"T\"HH24:MI:SS+00:00')"
 dbx(f"INSERT INTO obj_undo(user_id, sess, kind, ref_id, snap, created_at) VALUES(?, ?, 'client', 999999998, '{{\"clients\": [{{\"name\": \"Gone Ltd\"}}]}}', {now_})", (FID, "ef" * 8))
 dbx(f"INSERT INTO obj_undo(user_id, sess, kind, ref_id, created_at) VALUES(?, ?, 'client', ?, {now_})", (FID, "ef" * 8, FC))
-GOR = dbx(f"INSERT INTO undo_groups(user_id, area, label_key, state, parts, bytes, created_at, updated_at) VALUES(?, 'office', 'Change', 'done', 2, 20, {now_}, {now_}) "
+GOR = dbx(f"INSERT INTO undo_groups(user_id, area, label_key, state, parts, bytes, created_at, updated_at) VALUES(?, 'office', 'Change', 'done', 2, 20, date_trunc('second', now()), date_trunc('second', now())) "
           "RETURNING id", (FID,))[0][0]
 dbx(f"INSERT INTO obj_undo(user_id, sess, kind, ref_id, created_at, group_id, bytes) VALUES(?, '', 'client', 999999997, {now_}, ?, 10)", (FID, GOR))
 dbx(f"INSERT INTO obj_undo(user_id, sess, kind, ref_id, created_at, group_id, bytes) VALUES(?, '', 'client', ?, {now_}, ?, 10)", (FID, FC, GOR))
