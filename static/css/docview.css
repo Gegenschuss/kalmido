@@ -131,3 +131,30 @@
 .dv-hist .abvrow>span:first-child{flex:1 1 auto;min-width:0;overflow-wrap:anywhere;padding:.25rem 0}
 .dv-hist .abvrow .spacer{display:none}
 .dv-hist .abrefs .wkmen{margin-top:.75rem}
+
+/* 2.777.0 B (#4874): the page strip under the preview's bar (docpages.js): small pages in a row, chosen / to delete / blank? */
+.dpg{flex:none;display:flex;flex-direction:column;gap:.25rem;padding:.375rem .5rem .5rem;background:#3d4145;border-top:1px solid rgba(255,255,255,.12)}
+.dpg[hidden]{display:none}
+.dpg-bar{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem}
+.dpg-bar .btn{min-height:2.25rem;border-color:transparent;background:none;color:#fff}
+.dpg-bar .btn:hover{background:rgba(255,255,255,.16)}
+.dpg-bar .btn.pri{background:var(--accent);color:var(--on-accent,#fff)}
+.dpg-bar :disabled{opacity:.4}
+.dpg-cnt{font-size:.875rem;padding-inline:.25rem}
+.dpg-hint,.dpg-note{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;margin:0;font-size:.8125rem}
+.dpg-note{color:rgba(255,255,255,.75)}
+.dpg-hint .linkbtn{color:#fff;text-decoration:underline}
+.dpg-list{display:flex;gap:.5rem;margin:0;padding:.25rem .125rem;list-style:none;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-color:#8a8f94 transparent}
+.dpg-pg{position:relative;display:flex;flex-direction:column;align-items:center;gap:.125rem;min-width:5.25rem;padding:.25rem;border:2px solid transparent;border-radius:var(--r-s,.375rem);background:none;color:#fff;cursor:pointer}
+.dpg-pg:hover{background:rgba(255,255,255,.1)}
+.dpg-pg.on{border-color:var(--accent);background:rgba(255,255,255,.14)}
+.dpg-pg:focus-visible{outline:2px solid #fff;outline-offset:1px}
+.dpg-th{display:flex;align-items:center;justify-content:center;width:4.5rem;height:4.5rem;transform:rotate(var(--dpg-r,0deg));transition:transform .15s}
+.dpg-th:empty{background:#fff;opacity:.85;width:3.25rem}
+.dpg-th canvas{display:block;max-width:4.5rem;max-height:4.5rem;background:#fff;box-shadow:0 1px .25rem rgba(0,0,0,.45)}
+.dpg-no{font-size:.75rem}
+.dpg-bl{position:absolute;top:.125rem;left:.125rem;padding:0 .25rem;border-radius:.25rem;background:#f5c542;color:#222;font-size:.6875rem;font-weight:600}
+.dpg-x{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;border-radius:inherit;background:rgba(180,30,30,.55);pointer-events:none}
+.dpg-pg.gone .dpg-th{opacity:.35}
+.dv-pg.dpg-gone{opacity:.3}
+@media (prefers-reduced-motion:reduce){.dpg-th{transition:none}}
