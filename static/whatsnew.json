@@ -1,6 +1,32 @@
 {
  "versions": [
   {
+   "version": "2.786.0",
+   "date": "2026-11-09",
+   "items": [
+    {
+     "de": "Unter „Alle Arbeitsbereiche“ und auf Start siehst du jetzt, was zuletzt bearbeitet wurde - Seiten, Dateien und Später-lesen über alle Bereiche.",
+     "en": "Under \"All workspaces\" and on Start you now see what was edited last - pages, files and read-later items across all workspaces."
+    },
+    {
+     "de": "Tabellen: Nachkommastellen und eine eigene Währung stellst du jetzt je Spalte ein.",
+     "en": "Tables: set decimal places and an own currency per column."
+    },
+    {
+     "de": "Ordner mit Dokumenten lassen sich wieder als Liste mit Typ, Absender, Datum und Betrag anzeigen.",
+     "en": "Folders with documents can be shown as a list again, with type, sender, date and amount."
+    },
+    {
+     "de": "Aufgaben blättern am Handy jetzt wie Seiten: die nächste Aufgabe liegt schon fertig daneben, samt Kommentaren.",
+     "en": "Tasks on phones now turn like pages: the next task already lies ready beside the open one, comments included."
+    },
+    {
+     "de": "Auf der Agenten-Seite öffnet jede Auftrags-Karte mit „Chat öffnen“ direkt den Verlauf, auch bei beendeten Aufträgen.",
+     "en": "On the agents page every job card opens its chat with \"Open chat\", also for ended jobs."
+    }
+   ]
+  },
+  {
    "version": "2.782.0",
    "date": "2026-11-09",
    "items": [
