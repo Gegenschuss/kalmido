@@ -156,7 +156,14 @@ rows = sum(want.values())
 mt = next((ln for ln in lg.splitlines() if ln.startswith("migrate-sqlite: done:")), "")
 print(f"MIGRATION big: {rows} rows in {len(want)} tables, start to healthy {secs:.1f} s; {mt}", flush=True)
 rep = report()
-check(rep.get("status") == "ok" and len(rep.get("tables", {})) == len(want), f"(b) report: ok, every table ({len(rep.get('tables', {}))}/{len(want)})")
+# 2.771.0 (#5342): a table of the SQLite file that this version no longer has (paperless_links, dropped by
+# migrations.d/5265_a.py in 2.755) is not taken over: the report has every OTHER table and names the gone one in its notes
+GONE = {"paperless_links"}
+kept = {t for t in want if t not in GONE}
+check(rep.get("status") == "ok" and set(rep.get("tables", {})) == kept,
+      f"(b) report: ok, every table still in this version ({len(rep.get('tables', {}))}/{len(kept)}) {sorted(kept ^ set(rep.get('tables', {})))[:5]}")
+check(all(f"table {t} of the SQLite file not taken over (gone in this version)" in rep.get("notes", []) for t in GONE & set(want)),
+      "(b) report: the gone table is named in the notes " + str([x for x in rep.get("notes", []) if x.startswith("table ")])[:300])
 diff = {t: (want[t], x.get("source"), x.get("written")) for t, x in rep.get("tables", {}).items() if x.get("source") != want.get(t)}
 check(not diff, "(b) report: source rows = rows of the SQLite file " + str(diff)[:300])
 left = {t: x for t, x in rep.get("tables", {}).items() if x.get("written") != x.get("source")}
