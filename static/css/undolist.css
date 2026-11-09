@@ -1,0 +1,22 @@
+/* 2.773.0 (#5250): the list "Recent steps" (undolist.js, loaded with it): the window of the ← button and the page #steps share
+   the rows. A row: label, time · area · device, a greyed reason; its button at the right. The window's list scrolls inside. */
+#pop.ulwin{width:min(30rem,calc(100vw - 24px));padding:0}
+.ulpop .ulhead{padding:.75rem .875rem .25rem}
+.ulhead h2{margin:0;font-size:var(--fs-b)}
+.ulhead p{margin:.125rem 0 0;font-size:var(--fs-s)}
+.ulpop .ulbody{max-height:min(65vh,34rem);overflow-y:auto;overscroll-behavior:contain;padding:0 .375rem .5rem}
+.ulpage{max-width:44rem;padding:.5rem 1rem 2rem}
+.ulpage .ulhead{padding:.25rem 0 .5rem}
+.ullist{list-style:none;margin:0;padding:0}
+.ulrow{display:flex;align-items:center;gap:.625rem;padding:.5rem;border-top:1px solid var(--line);min-height:2.75rem}
+.ulrow:first-child{border-top:0}
+.ulmain{flex:1;min-width:0;display:flex;flex-direction:column;gap:.125rem}
+.ullab{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ulmeta,.ultag{color:var(--muted);font-size:var(--fs-xs)}
+.ulrow .btn{flex:none}
+.ulrow.uloff .ullab,.ulrow.ulundone .ullab{color:var(--muted)}
+.ulrow.ulundone .ullab{text-decoration:line-through}
+.ulrow.ul-q .ultag{font-weight:600}
+.ulnote{margin:.375rem .5rem;font-size:var(--fs-s)}
+.ulerr,.ulempty{margin:.5rem;font-size:var(--fs-s)}
+@media (max-width:767px){ #pop.ulwin{width:auto} .ulpop .ulbody{max-height:60vh} }

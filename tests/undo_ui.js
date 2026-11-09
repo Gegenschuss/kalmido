@@ -39,8 +39,9 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
 
   // ================= the buttons
   check(btn('undo') && btn('redo'), '← / → buttons in the top bar');
-  check(btn('undo').disabled && btn('redo').disabled, 'both disabled while the history is empty');
-  check(btn('undo').getAttribute('aria-label') === 'Nothing to undo' && btn('redo').getAttribute('aria-label') === 'Nothing to redo', 'empty labels');
+  // 2.773.0 (#5250): with nothing to undo here ← opens the list "Recent steps" (the steps of every device): enabled, named so
+  check(!btn('undo').disabled && btn('redo').disabled, '→ disabled while the history is empty, ← opens the list');
+  check(btn('undo').getAttribute('aria-label') === 'Recent steps' && btn('redo').getAttribute('aria-label') === 'Nothing to redo', 'empty labels');
 
   // ================= several steps across action types, back and forth
   await w.eval(`toggleTask(${t1})`); await sleep(200);                        // 1 complete
@@ -74,7 +75,7 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   const [a1, a2, a3, a4] = await Promise.all([get(t1), get(t2), get(t3), get(tn)]);
   check(a1.status === 0 && a2.priority === 0 && a3.list_id === WORK && a4.status === 404 && !(await secL()) && (await st()).lists.find(l => l.id === WORK).kind === 'list',
     'all six undone: reopened, priority, list, trash, section, type');
-  check(btn('undo').disabled && hl('redo') === 6, '← disabled at the start, six steps forward');
+  check(btn('undo').getAttribute('aria-label') === 'Recent steps' && hl('redo') === 6, '← at the start (2.773.0 #5250: opens the list), six steps forward');
   for (let i = 0; i < 3; i++) btn('redo').click(), await sleep(50), await idle();
   const [b1, b2, b3] = await Promise.all([get(t1), get(t2), get(t3)]);
   check(b1.status === 2 && b2.priority === 5 && b3.list_id === HOME, 'redo x3: completed again, priority again, moved again');
@@ -259,13 +260,14 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   await w.eval(`go('l/${WORK}')`); await sleep(300);
   const j1 = await mk('Jump', WORK); await w.eval('load().then(render)'); await sleep(200);
   for (const p of [1, 3, 5, 0]) { await w.eval(`patchTask(${j1}, {priority: ${p}})`); await sleep(60); }
+  // 2.773.0 (#5250): a right-click on ← opens the list "Recent steps" (undolist.js): this browser's task steps are rows
+  // "only this device" with "Back up to here" (was: a menu of the last 10 steps, "Undo up to here")
   btn('undo').dispatchEvent(new w.MouseEvent('contextmenu', {bubbles: true, cancelable: true}));
-  await sleep(100);
-  const items = [...d.querySelectorAll('#pop:not(.hidden) .menu-list button[data-i]')];
-  check(items.length === 10 && d.querySelector('#pop .hhead')?.textContent === 'Undo up to here', `right-click: the last 10 steps (${items.length})`);
+  const items = await until(() => { const r = [...d.querySelectorAll('#pop:not(.hidden) .ulbody .ulrow.ul-l')]; return r.length >= 4 && w.eval('UL.items !== null') && r; });
+  check(items && items.length >= 4 && items.every(r => /only this device/.test(r.textContent)) && /Recent steps/.test(d.querySelector('#pop .ulhead')?.textContent || ''), `right-click: the list "Recent steps" with this browser's steps (${items && items.length})`);
   check(/Priority of “Jump”: None/.test(items[0]?.textContent) && /Priority of “Jump”: High/.test(items[1]?.textContent), 'newest first');
   const before = hl('undo');
-  items[2].click(); await sleep(50); await idle();
+  items[2].querySelector('[data-ul-go]').click(); await sleep(50); await idle(); await until(() => !w.eval('UL.busy'));
   check((await get(j1)).priority === 1 && hl('undo') === before - 3 && hl('redo') >= 3, 'third entry: three steps undone in order');
   check(/3 steps undone/.test(toastText(d)), `toast counts the steps: ${toastText(d)}`);
   // long-press (touch) opens the same menu

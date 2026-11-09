@@ -191,7 +191,7 @@ const updDot = () => !!(S.me?.is_admin && S.about?.available);
 const modOn = m => m === 'tasks' || m === 'home' || m === 'msv' || m === 'notes' || m === 'tags' || (m === 'team' ? teamOn() : m === 'agents' ? agentsTab() : m === 'news' ? collab() : m === 'overview' ? overviewOn() : m === 'time' ? timeOn() : m === 'family' ? feat(m) || !!S.me?.kid : m === 'life' ? lifeOn() : m === 'bookmarks' ? feat('reading') : m === 'workload' ? workloadOn() : m === 'office' ? officeOn() : m === 'ablage' ? ab_on() : m === 'docs' ? typeof viewDocs === 'function' && feat('docs') : feat(m));  // 2.48.0 (#1207, #1111); 2.97.0 A (#1950): bookmarks = module reading
 // no "+" button on views without tasks
 // views of the tasks module that are not a task list (no quick add, no selection, no open-count)
-const NOLIST_KEYS = ['done', 'trash', 'search', 'archived', 'projects', 'favorites'];  // 2.417.0 A (#3559): + the start page of Projects
+const NOLIST_KEYS = ['done', 'trash', 'search', 'archived', 'projects', 'favorites', 'steps'];  // 2.773.0 (#5250): + the page "Recent steps"  // 2.417.0 A (#3559): + the start page of Projects
 // 2.0.6 (#188): tablets in portrait (phone layout, but >= 600 x 600 px) get the docked composer of the desktop instead of
 // the "+" button wherever a view has one; phones keep the "+"
 // 2.19.0 (#669, a regression of 2.7.2): the tablet layout with the docked "Add task" bar (600-899 px wide, 600 px high) is
@@ -624,6 +624,7 @@ async function rawFetch0(method, url, body, key, osp) {
   const sp = osp !== undefined ? osp : ofc_spHdr(url); if (sp) opt.headers['X-Kalmido-Office-Space'] = sp;  // 2.577.0 (#4638)
   if (key) opt.headers['Idempotency-Key'] = key;  // 2.270.0 C (#3022): a replay the server already applied comes back as its first answer
   const dev = wpDevHeader(url); if (dev) opt.headers['X-Kalmido-Device'] = dev;
+  if (method !== 'GET' && S.me && S.me.kind !== 'agent') opt.headers['X-Kalmido-Device-Name'] = histDevice();  // 2.773.0 (#5250): the device of a step in the list "Recent steps" (undo.js)
   const un = (typeof oun_hdr === 'function' ? oun_hdr(method, url) : '') || (typeof obj_hdr === 'function' ? obj_hdr(method, url) : ''); if (un) opt.headers['X-Kalmido-Undo'] = un;  // 2.111.0 A (#2233): office_undo.js; 2.558.0 (#4709): objsave.js
   if (body instanceof FormData) opt.body = body;
   else if (body !== undefined) { opt.body = JSON.stringify(body); opt.headers['Content-Type'] = 'application/json'; }
@@ -1768,6 +1769,7 @@ function parseHash() {
   if (a === 't' && b) return {mod: 'tasks', key: S.route.key || START_KEY, task: +b};
   if (a === 'home') return {mod: 'home', key: 'home'};  // 2.17.0 (#475): the dashboard (the logo)
   if (a === 'projects') return {mod: 'tasks', key: 'projects'};  // 2.417.0 A (#3559): the start page of Projects (render.js viewProjStart)
+  if (a === 'steps') return {mod: 'tasks', key: 'steps'};  // 2.773.0 (#5250): the page "Recent steps" (undolist.js viewSteps)
   if (a === 'favorites') return {mod: 'tasks', key: 'favorites'};  // 2.441.0 (#3592): the page of a phone (favtiles.js viewFavPage)
   if (a === 'team') return {mod: 'team', key: 'team', rid: +b || null};  // 2.17.0 (#419)
   if (a === 'msg' && (b === 'a' || b === 't')) { const p = h.split('/'); return {mod: 'tasks', key: S.route.key || LS.get('lastKey', START_KEY), msg: {art: b, place: +p[2], id: +p[3]}}; }  // 2.37.0 (#1159): link back to a saved message

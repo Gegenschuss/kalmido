@@ -353,6 +353,7 @@ function groupRest(v, arr, dn = []) {  // dn: 2.36.2 (#1136) the completed tasks
 function titleFor(k) {
   if (SMART[k]) return tr(SMART[k].name);
   if (k === 'favorites') return tr('Favourites');  // 2.441.0 (#3592)
+  if (k === 'steps') return tr('Recent steps');  // 2.773.0 (#5250)
   if (k === 'projects') return tr('Projects');  // 2.417.0 A (#3559)
   if (k.startsWith('l:')) return lname(listById(+k.slice(2))) || tr('Project');
   if (k.startsWith('tag:')) return '#' + k.slice(4);

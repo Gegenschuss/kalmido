@@ -496,6 +496,16 @@ About shows the window size, pixel ratio, pointer, hover and both switches of th
   other hashes under the same version leave a mark (`/sw-code-changed`) and the message `code-changed` (the hint with a way
   to the check) until a page confirms it (`code-ack`). Same server, same limit: mistakes and slips, not a deceiving operator
   (docs/CODE-VERIFY.md).
+- *2.773.0 (undo across devices, stage 2, #5250):* the list *Recent steps* (`static/js/undolist.js`, loaded on demand): a
+  right-click / long-press on ← (or a click while this browser has nothing to undo) opens it as a window, the account menu
+  as the page `#steps` - one component. Rows: changes waiting in the outbox on top, then the person's step groups of
+  `GET /api/undo` (every device) merged by time with this browser's steps of areas not on the server's history yet
+  (`HIST`, "only this device"; steps the server lists itself carry `srv` and are not shown twice). "Back up to here" walks
+  the rows from the top: runs of browser steps through `histStep(dir, n, only)`, runs of server groups through
+  `POST /api/undo/to/<id>`; a barrier / a group too big for copies greys itself and every older row. Live through the
+  person's own `self` counter of the poll; rows are patched in place, the top row stays put. Every write of the app sends
+  `X-Kalmido-Device-Name` (`undo.js histDevice`: browser + system + a short mark in localStorage), which
+  `core/undogroups.py ug_device` stores as the group's device.
 - Every answer carries `Server-Timing: app;dur=…, db;dur=…;desc="n=<statements>"` (`core/reqtime.py`, counted per
   thread in `core/pg.py`). A request slower than `KALMIDO_SLOW_REQUEST_MS` (default 500, 0 = off) logs one line with
   method, route pattern, duration, statements and database time; `GET /api/admin/health` has p50 / p95 / max of the

@@ -163,7 +163,7 @@ function objSaved(url, name, after) {
     if (after) await after(j);
     return {skipped: []};
   };
-  const e = histAdd({label: msg, ids: [], snaps: [], lids: [], undo: () => run('all'), redo: () => run('redoall')});
+  const e = histAdd({label: msg, ids: [], snaps: [], lids: [], srv: true, undo: () => run('all'), redo: () => run('redoall')});  // 2.773.0 (#5250): srv = the server's list "Recent steps" has its steps
   histToast(msg, e, 10000);
   return true;
 }

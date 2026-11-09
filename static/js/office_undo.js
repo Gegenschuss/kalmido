@@ -47,7 +47,7 @@ function oun_ok(method, url, j) {
   s.n = (s.n || 0) + 1; s.busy = Math.max(0, (s.busy || 0) - 1);
   if (!key.startsWith('doc:')) { s.name = j?.name || j?.name_de || j?.key || s.name; return; }
   s.name = oun_docName(j) || s.name;
-  histAdd({label: tr('{0} changed', s.name || tr('Document')), ids: [], snaps: [], lids: [], oun: key, tok: s.tok,
+  histAdd({label: tr('{0} changed', s.name || tr('Document')), ids: [], snaps: [], lids: [], oun: key, tok: s.tok, srv: true,  // 2.773.0 (#5250): srv = the server's list "Recent steps" has it
     undo: () => oun_run(key, s.tok, 'undo'), redo: () => oun_run(key, s.tok, 'redo')});
 }
 const oun_docName = d => !d || !d.kind ? '' : d.number || d.project_title || (typeof ofdKindName === 'function' ? ofdKindName(d.kind, true) : '');
@@ -79,7 +79,7 @@ function oun_bar(method, url, j) {
   const what = m[2] === 'payments' && method === 'DELETE' ? 'unpay' : m[2];
   if (s) oun_end(key);
   const name = oun_docName(j) || s?.name || tr('Document');
-  histAdd({label: tr(OUN_BAR_LABEL[what], name), ids: [], snaps: [], lids: [], barrier: tr('Finalised or sent in the meantime, so the changes stay'),
+  histAdd({label: tr(OUN_BAR_LABEL[what], name), ids: [], snaps: [], lids: [], srv: true, barrier: tr('Finalised or sent in the meantime, so the changes stay'),
     undo: async () => ({skipped: []}), redo: async () => ({skipped: []})});
 }
 // leaving a document: its remaining own steps -> one entry "Undo all since opening" + the 10-second hint
@@ -91,7 +91,7 @@ function oun_leave(key) {
   const steps = oun_pull(key);
   if (!steps.length) { if (typeof renderHist === 'function') renderHist(); return; }
   const msg = tr('{0} saved', s.name || tr('Document'));
-  const e = histAdd({label: msg, ids: [], snaps: [], lids: [], ounAll: key,
+  const e = histAdd({label: msg, ids: [], snaps: [], lids: [], ounAll: key, srv: true,
     undo: () => oun_run(key, s.tok, 'all'), redo: () => oun_run(key, s.tok, 'redoall')});
   histToast(msg, e, OUN.ms);
 }

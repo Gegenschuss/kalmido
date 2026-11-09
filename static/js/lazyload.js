@@ -98,6 +98,7 @@ const LD_MODS = {
   shoot: ['shoot'],  // 2.636.0 (#4565): the storyboard of a shoot (picture tiles on the board, the button Shot list)
   splitview: ['splitview'],  // 2.742.0 (#4858): the split view on a wide screen, only while it is on (miniwin.js spl_check)
   codecheck: ['codecheck'],  // 2.766.0 (#5220): Settings > Help > Check code (the hashes of the code this browser holds)
+  undolist: ['undolist'],  // 2.773.0 (#5250): the list "Recent steps" (the ← button's right-click / long-press, the page #steps)
 };
 // 2.65.0 (#1823): modules a module needs before its own files (their globals are used while it draws): the settings dialog
 // draws the agent panes (agentchat.js), the calendars (calview.js) and the tokens / webhooks (integrations.js), the agent chat
@@ -131,7 +132,8 @@ const LD_CALL = {settings: ['settingsModal', 'setApply', 'settingsSync', 'modCou
   orgschema: ['ofs_mount', 'ofs_manage', 'rqf_ask', 'olb_manage'],  // 2.609.0 (#3373)
   hubmailbox: ['hmb_dialog', 'hmb_compose'],  // 2.141.0 A (#2141, #2138)
   listprint: ['lexPrint'], evinvite: ['evf_modal'], projtime: ['tz_open'], dayplan: ['dayplanModal'], gitrepo: ['repoWire', 'folderRepoModal'], hubmail: ['hbm_open'],
-  sprints: ['spr_assign', 'spr_pick', 'spr_cfgModal', 'spr_cfgSet', 'spr_closeModal', 'spr_moreMenu']};  // 2.149.0 F (#2518)
+  sprints: ['spr_assign', 'spr_pick', 'spr_cfgModal', 'spr_cfgSet', 'spr_closeModal', 'spr_moreMenu'],  // 2.149.0 F (#2518)
+  undolist: ['ul_open']};  // 2.773.0 (#5250): the window of the ← button
 // 2.65.0 (#1823): functions that only update what the module drew: before it is loaded there is nothing to update (no loading)
 const LD_NOP = {agentchat: ['chatLoad', 'chatPatch', 'chatFit', 'stepsChanged', 'chatTypers', 'chatStHtml'], timeline: ['tlKbSync', 'tlAfterRender', 'rmAfterRender'],
   timesheet: ['tsl_printNote'],  // 2.149.0 F (#2518): the printed timesheet's month line (nothing before the card loaded the month)
@@ -141,7 +143,7 @@ const LD_NOP = {agentchat: ['chatLoad', 'chatPatch', 'chatFit', 'stepsChanged', 
 // them next to the scripts and resolves only once they apply (no unstyled flash when the area opens)
 const LD_CSS = {settings: ['settings'], contacts: ['contacts'], office: ['office'], agentchat: ['agentchat'], pdf: ['pdf'], mindmap: ['mindmap'],
   wiki: ['wiki'], stats: ['stats'], calendar: ['calendar'], docs: ['docs', 'docview'] /* 2.583.0 (#4835) */, docviews: ['docviews'], life: ['life'],
-  integrations: ['integrations'], playbook: ['playbook'], timeline: ['timeline'], feeds: ['feeds'], bookmarks: ['bookmarks'], sheets: ['sheets'], videos: ['videorev'], tagsel: ['tagsel'], filereq: ['filereq'], fltdlg: ['fltdlg'], abscan: ['abscan'], ablage: ['ablage'] /* 2.558.0 (#4693) */, calabs: ['calabs'], sideviews: ['sideviews'], navmenu: ['navmenu'], whatsnew: ['whatsnew'], shoot: ['shoot'], splitview: ['splitview'] /* 2.742.0 (#4858) */};  /* 2.636.0 (#4565) */  // 2.418.0 (#3560): + navmenu  // 2.97.0 A (#1950): + bookmarks  // 2.85.0 B (#1162): + feeds
+  integrations: ['integrations'], playbook: ['playbook'], timeline: ['timeline'], feeds: ['feeds'], bookmarks: ['bookmarks'], sheets: ['sheets'], videos: ['videorev'], tagsel: ['tagsel'], filereq: ['filereq'], fltdlg: ['fltdlg'], abscan: ['abscan'], ablage: ['ablage'] /* 2.558.0 (#4693) */, calabs: ['calabs'], sideviews: ['sideviews'], navmenu: ['navmenu'], whatsnew: ['whatsnew'], shoot: ['shoot'], splitview: ['splitview'] /* 2.742.0 (#4858) */, undolist: ['undolist'] /* 2.773.0 (#5250) */};  /* 2.636.0 (#4565) */  // 2.418.0 (#3560): + navmenu  // 2.97.0 A (#1950): + bookmarks  // 2.85.0 B (#1162): + feeds
 const LD_VIEW = {viewFamily: ['family', 1], viewAblage: ['ablage', 1], viewContacts: ['contacts', 1], viewOffice: ['office', 1], kp_tile: ['office'], ux_info: ['office'], ofcII: ['office'],
   dpj_projHtml: ['office'],  // 2.168.0 A (#2665): a project page's quotations & invoices (only while the office is on)
   // 2.65.0 (#1823)
@@ -162,7 +164,8 @@ const LD_VIEW = {viewFamily: ['family', 1], viewAblage: ['ablage', 1], viewConta
   ptr_html: ['trashui'],  // 2.567.0 A (#4707): sections, sprints, links, templates and budget rows in the trash view
   tsl_card: ['timesheet'], hbm_hubView: ['hubmail', 1],  // 2.149.0 F (#2518): the time page's timesheet card (it fetches the month itself)
   sht_pic: ['shoot'], sht_bar: ['shoot'],  // 2.636.0 (#4565): the board of a shoot (calendar.js viewKanban)
-  ms_clView: ['clientpage', 1]};  // 2.563.0 (#4742): Office > Clients (clients.js viewClients)
+  ms_clView: ['clientpage', 1],  // 2.563.0 (#4742): Office > Clients (clients.js viewClients)
+  viewSteps: ['undolist', 1]};  // 2.773.0 (#5250): the page "Recent steps"
 // 2.556.0 (#4685) "New for you": once per new version (the version seen last is a user setting, accounts/whatsnew.py) the
 // server is asked what is new since then; only when there is something the dialog's module loads (whatsnew.js). Nothing at
 // all on a server without the feature (no whatsnew_seen), for agents, in a second window or the capture page.

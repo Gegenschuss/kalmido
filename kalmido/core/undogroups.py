@@ -49,6 +49,7 @@ UNDO_GROUP_PARTS = 1000  # parts of a group (tasks/batch.py BATCH_MAX)
 UNDO_BUNDLE_S = 10  # seconds the token of X-Kalmido-Undo-Group keeps a group open
 UNDO_GROUP_HDR = "X-Kalmido-Undo-Group"
 UNDO_DEVICE_HDR = "X-Kalmido-Device"
+UNDO_DEVNAME_HDR = "X-Kalmido-Device-Name"  # 2.773.0 (#5250): the app's name of the browser (undo.js histDevice)
 UG_STATES = ("done", "undone", "partial", "barrier", "toobig", "noaccess")
 UG_HOLD = ("barrier", "toobig")  # rows without copies: never empty, they hold the way back
 UG_LABEL = N_("Changed: {0}")
@@ -70,10 +71,15 @@ def ug_token():
 
 
 def ug_device():
-    """The device name the app sends (X-Kalmido-Device), printable, at most 80 characters; "" without."""
+    """The device name the app sends (X-Kalmido-Device-Name, 2.773.0 #5250; else X-Kalmido-Device unless it is a push
+    subscription's endpoint / id, notify/push.py), printable, at most 80 characters; "" without."""
     if not has_request_context():
         return ""
-    v = re.sub(r"[\x00-\x1f\x7f]+", " ", request.headers.get(UNDO_DEVICE_HDR) or "").strip()
+    v = request.headers.get(UNDO_DEVNAME_HDR) or ""
+    if not v.strip():
+        v = request.headers.get(UNDO_DEVICE_HDR) or ""
+        v = "" if re.match(r"\s*(https?:|\d+\s*$)", v) else v  # the device header of the push routes: never a name
+    v = re.sub(r"[\x00-\x1f\x7f]+", " ", v).strip()
     return v[:80]
 
 

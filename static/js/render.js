@@ -1173,6 +1173,7 @@ function renderView0() {
   else if (S.route.key === 'archived') setHtml(el, viewArchived());
   else if (S.route.key === 'mine_wait') setHtml(el, viewMineWait());  // 2.392.0 D (#3369)
   else if (S.route.key === 'favorites') setHtml(el, viewFavPage());  // 2.441.0 (#3592)
+  else if (S.route.key === 'steps') setHtml(el, viewSteps());  // 2.773.0 (#5250): the page "Recent steps" (undolist.js)
   else if (S.route.key === 'projects') setHtml(el, viewProjStart());  // 2.417.0 A (#3559)
   else if (isRoadmap()) setHtml(el, viewRoadmap());
   else if (isOverview()) setHtml(el, viewProjOv());  // 2.7.1 (#410)

@@ -15,7 +15,7 @@
 const UNDO_FIELDS = ['list_id', 'section_id', 'parent_id', 'due', 'due_time', 'start', 'duration', 'reminders', 'repeat', 'repeat_from', 'priority', 'pinned', 'assignee_id', 'ttype', 'deadline', 'nag', 'assignee_group_id', 'plan_start', 'ms', 'milestone_id', 'locked'];  // 2.18.0: ms, milestone_id (#430)  // 2.11.0: plan_start  // 2.10.0: assignee_group_id  // 2.4.0: ttype (#340), 2.7.0: deadline, nag
 UNDO_FIELDS.push('remind_at');  // 2.111.0 C (#2057): the fixed-time reminder
 const HIST_FIELDS = [...UNDO_FIELDS, 'title', 'content', 'url', 'tags', 'fields'];
-const HIST_MAX = 30, HIST_MENU = 10;
+const HIST_MAX = 100, HIST_MENU = 100;  // 2.773.0 (#5250, #5242): 100 steps (was 30), the → menu lists them all (was 10) and scrolls
 const HIST = {undo: [], redo: [], busy: false, group: null, gToast: null, toastE: null, sess: 0, ids: {}, secmap: new Map()};
 const snapTask = t => t ? JSON.parse(JSON.stringify(t)) : null;
 const withKids = id => { const out = [], walk = x => { for (const k of children(x)) { out.push(snapTask(k)); walk(k.id); } }; out.push(snapTask(taskById(id))); walk(id); return out.filter(Boolean); };
@@ -53,6 +53,7 @@ function histAdd(e) {
   if (!e.after) e.after = ids.map(id => snapTask(S.tasks.get(id)) || {id, _gone: true});
   e.lids = [...new Set([...(e.lids || []), ...e.snaps.map(s => s.list_id), ...e.after.map(s => s.list_id)].filter(Boolean))];
   if (e.q === undefined) e.q = e.res?._q || null;
+  if (!e.at) { e.at = Date.now(); e.area = e.area || (e.sett ? 'self' : S.route?.mod || 'tasks'); }  // 2.773.0 (#5242): time and area for the list "Recent steps" (undolist.js)
   if (HIST.group) { HIST.group.push(e); return e; }
   HIST.undo.push(e);
   if (HIST.undo.length > HIST_MAX) HIST.undo.shift();
@@ -185,15 +186,19 @@ async function histRun(e, dir) {
   return {skipped: r.skipped || [], queued: !!r.q, none: !!r.none, note: r.note};  // 2.560.0 (#4667): note = a sentence instead of "Undone: …"
 }
 // n steps back (undo) or forward (redo), one after the other
-async function histStep(dir, n = 1) {
-  if (HIST.busy) return;
+// 2.773.0 (#5250): only = these entries of HIST[dir] (newest first) instead of the newest n (the list "Recent steps" skips the
+// steps the server's list shows itself); -> {done, stop} (how many went, whether it stopped before the end)
+async function histStep(dir, n = 1, only = null) {
+  if (HIST.busy) return {done: 0, stop: true};
+  if (only) n = only.length;
   HIST.busy = true; renderHist();
   const done = [], skipped = [];
   let queued = false, stop = false, dropped = null, note = '';
   try {
     await flushSaves();
     for (let i = 0; i < n && !stop; i++) {
-      const from = HIST[dir], e = from[from.length - 1]; if (!e) break;
+      const from = HIST[dir], e = only ? only[i] : from[from.length - 1]; if (!e || !from.includes(e)) break;
+      if (only) { from.splice(from.indexOf(e), 1); from.push(e); }  // 2.773.0 (#5250): to the top, so the pops below take it
       if (e.barrier) {  // 2.747.0 (#5252): finalised / sent / paid (office_undo.js oun_bar): one Undo names why and takes the entry off, "up to here" stops before it
         if (i === 0 && n === 1) from.pop();
         toast(e.barrier); stop = true; break;
@@ -235,33 +240,64 @@ async function histStep(dir, n = 1) {
     HIST.busy = false;
     try { renderHist(); } catch { /* page gone */ }
   }
+  return {done: done.length, stop};  // 2.773.0 (#5250)
 }
 // ---- the ← / → buttons (top bar), their tooltips and the history menu
 function histBtn(dir) {
   const e = HIST[dir][HIST[dir].length - 1], p = histPending(e);
   const lab = e ? (dir === 'undo' ? tr('Undo: {0}', e.label) : tr('Redo: {0}', e.label)) : dir === 'undo' ? tr('Nothing to undo') : tr('Nothing to redo');
-  return {lab, tip: lab + (e ? ` (${kbText(dir === 'undo' ? 'Mod+Z' : 'Mod+Shift+Z')})` : '') + (p ? ' · ' + tr('waiting for the connection') : ''), off: !e || HIST.busy, p};
+  // 2.773.0 (#5250): list = nothing to undo here, the button opens the list "Recent steps" (the person's steps of every device)
+  const list = dir === 'undo' && !e && histListable();
+  return {lab, tip: lab + (e ? ` (${kbText(dir === 'undo' ? 'Mod+Z' : 'Mod+Shift+Z')})` : '') + (p ? ' · ' + tr('waiting for the connection') : ''), off: !e || HIST.busy, p, list};
 }
+const histListable = () => !!S.me && S.me.kind !== 'agent' && !S.me.kid;  // 2.773.0 (#5250): a person has the list "Recent steps"
 function histBtns() {
-  return `<div class="hist tf" role="group" aria-label="${esc(tr('History'))}">${['undo', 'redo'].map(dir => { const b = histBtn(dir); return `<button type="button" class="iconbtn hbtn${b.p ? ' pend' : ''}" data-act="hist-${dir}" aria-label="${esc(b.lab)}" title="${esc(b.tip)}"${b.off ? ' disabled' : ''}>${ic(dir === 'undo' ? 'undo' : 'redo')}</button>`; }).join('')}</div>`;
+  return `<div class="hist tf" role="group" aria-label="${esc(tr('History'))}">${['undo', 'redo'].map(dir => { const b = histBtn(dir), lab = b.list ? tr('Recent steps') : b.lab; return `<button type="button" class="iconbtn hbtn${b.p ? ' pend' : ''}" data-act="hist-${dir}" aria-label="${esc(lab)}" title="${esc(b.list ? lab : b.tip)}"${b.off && !b.list ? ' disabled' : ''}>${ic(dir === 'undo' ? 'undo' : 'redo')}</button>`; }).join('')}</div>`;
 }
 function renderHist() {  // in place: keeps the keyboard focus on the button
   for (const dir of ['undo', 'redo']) {
     const el = $(`#top [data-act="hist-${dir}"]`); if (!el) continue;
     const b = histBtn(dir);
-    el.disabled = b.off; el.title = b.tip; el.setAttribute('aria-label', b.lab); el.classList.toggle('pend', b.p);
+    const lab = b.list ? tr('Recent steps') : b.lab;  // 2.773.0 (#5250)
+    el.disabled = b.off && !b.list; el.title = b.list ? lab : b.tip; el.setAttribute('aria-label', lab); el.classList.toggle('pend', b.p);
   }
 }
 function histMenu(anchor, dir) {
+  if (dir === 'undo' && S.me?.kind !== 'agent') { $('#toast')?.classList.add('hidden'); ul_open(anchor); return; }  // 2.773.0 (#5250): the list "Recent steps" (undolist.js, loaded on demand)
   const list = HIST[dir].slice(-HIST_MENU).reverse();
   if (!list.length || HIST.busy) return;
   $('#toast')?.classList.add('hidden');
-  menu(anchor, list.map((e, i) => ({label: e.label, icon: dir === 'undo' ? 'undo' : 'redo', cls: 'hitem' + (histPending(e) ? ' pend' : ''), fn: () => histStep(dir, i + 1)})));
+  menu(anchor, list.map((e, i) => ({label: e.label, sub: histWhen(e), icon: dir === 'undo' ? 'undo' : 'redo', cls: 'hitem' + (histPending(e) ? ' pend' : ''), fn: () => histStep(dir, i + 1)})));
   const p = $('#pop');
   if (p) {
     p.querySelector('.menu-list')?.insertAdjacentHTML('afterbegin', `<div class="hhead">${esc(dir === 'undo' ? tr('Undo up to here') : tr('Redo up to here'))}</div>`);
     p.querySelector('.menu-list')?.setAttribute('aria-label', dir === 'undo' ? tr('Undo history') : tr('Redo history'));
   }
+}
+// 2.773.0 (#5242): "Office · 20:58" under a step (its area as the app names it, the time in the reader's format)
+function histWhen(e) {
+  if (!e?.at) return '';
+  const t = new Date(e.at).toLocaleTimeString(LOCALE(), {hour: '2-digit', minute: '2-digit'});
+  return [histAreaName(e.area), t].filter(Boolean).join(' · ');
+}
+// the areas of a step: the app's views (S.route.mod) and the server's areas (core/db.py LV_AREAS, undo_groups.area)
+const HIST_AREAS = {tasks: N_('Tasks'), home: N_('Tasks'), comments: N_('Comments'), office: N_('Office'), clients: N_('Office'), calendar: N_('Calendar'), cal: N_('Calendar'),
+  sheets: N_('Tables'), wiki: N_('Knowledge|area'), budget: N_('Budget'), team: N_('Team'), time: N_('Time tracking'), contacts: N_('Contacts'), docs: N_('Documents'),
+  ablage: N_('File store'), notes: N_('Notes'), family: N_('Family'), news: N_('News'), agentchat: N_('Agent chat'), agents: N_('Agents'), self: N_('Settings'), other: N_('Other')};
+const histAreaName = a => a ? tr(HIST_AREAS[a] || N_('Other')) : '';
+// 2.773.0 (#5250): the name of this browser in the list "Recent steps" of the person's other devices (header
+// X-Kalmido-Device-Name of a write, core.js rawFetch0; kalmido/core/undogroups.py ug_device): browser + system + a short
+// mark of its own, kept in localStorage (ASCII only: a header value)
+function histDevice() {
+  let v = LS.get('undoDev', '');
+  if (!v) {
+    const ua = navigator.userAgent || '';
+    const br = /Edg\//.test(ua) ? 'Edge' : /Firefox\//.test(ua) ? 'Firefox' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : 'Browser';
+    const os = /Android/.test(ua) ? 'Android' : /iPhone|iPad/.test(ua) ? 'iOS' : /Mac OS X/.test(ua) ? 'macOS' : /Windows/.test(ua) ? 'Windows' : /Linux/.test(ua) ? 'Linux' : '';
+    v = `${br}${os ? ' on ' + os : ''} (${Math.random().toString(36).slice(2, 6)})`;
+    LS.set('undoDev', v);
+  }
+  return v;
 }
 document.addEventListener('contextmenu', e => {
   const b = e.target.closest?.('#top [data-act^="hist-"]'); if (!b) return;

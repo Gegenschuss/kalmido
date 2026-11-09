@@ -524,6 +524,7 @@ document.addEventListener('click', async e => {
       {label: tr('Start|home'), icon: 'start', fn: () => { closeSide(); go('home'); }},  // 2.138.2 C (#2392): the logo (the way home) left the sidebar
       {label: tr('Account'), icon: 'user', fn: () => { closeSide(); settingsModal('account'); }},
       {label: tr('Settings'), icon: 'gear', keys: 'g s', fn: () => { closeSide(); settingsModal(); }},
+      ...(S.me && S.me.kind !== 'agent' ? [{label: tr('Recent steps'), icon: 'undo', act: 'ul-page', fn: () => { closeSide(); go('steps'); }}] : []),  // 2.773.0 (#5250): the list of the ← button as a page (undolist.js)
       ...(mvOn() ? [{label: tr('Show administration again'), icon: 'eye', fn: () => { closeSide(); loadModule('settings').then(() => mvSet(false), () => {}); }}] : []),  // 2.436.0 (#3620)
       ...(S.me?.auth === 'session' ? ['-', {label: tr('Sign out'), icon: 'logout', fn: logout}] : [])]); break; }
     case 'tabs-more': tabsMore(a); break;
@@ -701,7 +702,7 @@ document.addEventListener('click', async e => {
     }
     case 'section-menu': e.stopPropagation(); sectionMenu(a, id); break;
     case 'nav-back': bnBack(); break;
-    case 'hist-undo': case 'hist-redo': if (!histHeld()) histStep(act.slice(5)); break;
+    case 'hist-undo': case 'hist-redo': if (!histHeld()) { if (act === 'hist-undo' && histBtn('undo').list) ul_open(a); else histStep(act.slice(5)); } break;  // 2.773.0 (#5250): nothing to undo here: the list "Recent steps"
     case 'date': datePop(a, id); break;
     case 'due-q': quickDue(id, +a.dataset.d); break;
     case 'prio': prioMenu(a, id); break;
