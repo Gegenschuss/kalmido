@@ -186,4 +186,4 @@ check(Ol.post(B + f"/api/undo/to/{G}").status_code == 404, "someone else: 404 on
 back(Fr, G, "freelancer: row deleted")
 check(FR[0] in [x["id"] for x in sheet(Fr, FS)["rows"]], "freelancer: her row is back")
 
-done()
+sys.exit(done("p2800_c_sheet_steps"))
