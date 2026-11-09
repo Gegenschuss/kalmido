@@ -14550,7 +14550,6 @@
   "Statement read: please check the positions": "Extracto leído: comprueba los movimientos",
   "Statement removed": "Extracto eliminado",
   "Sum of the positions": "Suma de los movimientos",
-  "Take “{0}”": "Usar «{0}»",
   "Undo confirmation": "Retirar confirmación",
   "The booking does not match the total of the statement": "El movimiento no coincide con el total del extracto",
   "The positions are confirmed; undo the confirmation to change them": "Los movimientos están confirmados; retira la confirmación para cambiarlos",
