@@ -49,26 +49,26 @@ check([tuple(x) for x in types] == [("created_at", "timestamp with time zone"), 
 
 for who, s, org in (("org member", A, ORG), ("freelancer", Fr, None)):
     o = new(s, "Plan " + who, org, note="first")
-    O = o["id"]
+    oid = o["id"]
     check(CANON.match(o.get("updated_at") or "") and CANON.match(o.get("created_at") or "") and o.get("deleted_at") in (None, ""),
           f"{who}: created_at / updated_at as canonical ISO text {o.get('created_at')!r} {o.get('updated_at')!r}")
-    check(get(s, O)["updated_at"] == o["updated_at"], f"{who}: the read gives the same text as the create")
+    check(get(s, oid)["updated_at"] == o["updated_at"], f"{who}: the read gives the same text as the create")
     z, plus1 = other_forms(o["updated_at"])
-    r = s.patch(B + f"/api/obj/{K}/{O}", json={"note": "second", "expect_updated_at": z})
+    r = s.patch(B + f"/api/obj/{K}/{oid}", json={"note": "second", "expect_updated_at": z})
     check(r.ok and r.json().get("note") == "second", f"{who}: the same instant with Z is no conflict ({r.status_code} {r.text[:200]})")
-    cur = r.json() if r.ok else get(s, O)
+    cur = r.json() if r.ok else get(s, oid)
     check(CANON.match(cur.get("updated_at") or ""), f"{who}: the new version canonical {cur.get('updated_at')!r}")
-    r = s.patch(B + f"/api/obj/{K}/{O}", json={"note": "third", "expect_updated_at": other_forms(cur["updated_at"])[1]})
+    r = s.patch(B + f"/api/obj/{K}/{oid}", json={"note": "third", "expect_updated_at": other_forms(cur["updated_at"])[1]})
     check(r.ok and r.json().get("note") == "third", f"{who}: the same instant as +01:00 is no conflict ({r.status_code} {r.text[:200]})")
-    r = s.patch(B + f"/api/obj/{K}/{O}", json={"note": "stale", "expect_updated_at": "2000-01-01T00:00:00Z"})
+    r = s.patch(B + f"/api/obj/{K}/{oid}", json={"note": "stale", "expect_updated_at": "2000-01-01T00:00:00Z"})
     body = r.json() if r.status_code == 409 else {}
     check(r.status_code == 409 and body.get("current", {}).get("note") == "third" and CANON.match(body["current"].get("updated_at") or "")
-          and get(s, O)["note"] == "third", f"{who}: an older version 409 with the current state, nothing written ({r.status_code} {r.text[:200]})")
-    check(s.post(B + f"/api/obj/{K}/{O}/trash").ok, f"{who}: to the trash")
+          and get(s, oid)["note"] == "third", f"{who}: an older version 409 with the current state, nothing written ({r.status_code} {r.text[:200]})")
+    check(s.post(B + f"/api/obj/{K}/{oid}/trash").ok, f"{who}: to the trash")
     tr_items = s.get(B + f"/api/obj/{K}", params={"trash": "1"}).json().get("items", [])
-    t = [x for x in tr_items if x["id"] == O]
+    t = [x for x in tr_items if x["id"] == oid]
     check(t and CANON.match(t[0].get("deleted_at") or t[0].get("updated_at") or ""), f"{who}: the trash list reads the TIMESTAMPTZ row {t}")
-    check(s.post(B + f"/api/obj/{K}/{O}/restore").ok and get(s, O).get("deleted_at") in (None, ""), f"{who}: restored, deleted_at cleared")
+    check(s.post(B + f"/api/obj/{K}/{oid}/restore").ok and get(s, oid).get("deleted_at") in (None, ""), f"{who}: restored, deleted_at cleared")
 
 # ---------------------------------------------------------------- ts_canon inside the app
 out = in_app("""from datetime import datetime, timezone, timedelta
