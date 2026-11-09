@@ -1733,14 +1733,6 @@
   {
    "rule": "semgrep.kalmido-sql-ident-without-qi",
    "file": "kalmido/core/writes.py",
-   "code": "r = (c.execute(f\"SELECT org_id FROM {reg['table']} WHERE id=?\", (int(rid),)).fetchone() if kind in OBJ_TRACK",
-   "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
-   "date": "2026-11-09",
-   "task": 5296
-  },
-  {
-   "rule": "semgrep.kalmido-sql-ident-without-qi",
-   "file": "kalmido/core/writes.py",
    "code": "rid = insert_id(c, f\"INSERT INTO {reg['table']}({','.join(cols)}) VALUES({','.join('?' * len(cols))})\",",
    "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
    "date": "2026-11-09",
