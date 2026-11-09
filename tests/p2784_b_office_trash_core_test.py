@@ -21,7 +21,7 @@ from kt import B, check, dbx, done, fresh, sess  # noqa: E402
 from obj_probe import in_app  # noqa: E402
 
 fresh(prefix="P2784B")
-O = B + "/api/office/datev/suppliers"
+OFC = B + "/api/office/datev/suppliers"
 K = "osupplier"
 
 assert sess().post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
@@ -51,7 +51,7 @@ def supplier(org, name, deleted=None):
 
 
 def names(s):
-    r = s.get(O)
+    r = s.get(OFC)
     return [x["name"] for x in r.json().get("items", [])] if r.ok else None
 
 
@@ -71,22 +71,22 @@ def modes(gid):
 # ---------------------------------------------------------------- delete -> trash -> restore (an organisation's admin)
 S1 = supplier(ORG, "Example Timber Ltd")
 check(names(A) == ["Example Timber Ltd"], f"the supplier is in the list {names(A)}")
-check(Bo.delete(O + f"/{S1}").status_code == 403 and row(S1)[0] is None, "a member: 403, nothing goes")
-check(Ol.delete(O + f"/{S1}").status_code == 404 and row(S1)[0] is None, "another organisation: 404, nothing goes")
+check(Bo.delete(OFC + f"/{S1}").status_code == 403 and row(S1)[0] is None, "a member: 403, nothing goes")
+check(Ol.delete(OFC + f"/{S1}").status_code == 404 and row(S1)[0] is None, "another organisation: 404, nothing goes")
 g0 = len(groups(AID))
-r = A.delete(O + f"/{S1}")
+r = A.delete(OFC + f"/{S1}")
 check(r.ok and names(A) == [], f"deleted: gone from the list {r.status_code} {r.text[:200]}")
 d = row(S1)
 check(d is not None and d[0] and d[1] == AID, f"in the core's trash: deleted_at and deleted_by set, the row stays {d}")
-check(Ol.post(O + f"/{S1}/restore").status_code == 404 and row(S1)[0], "another organisation: no restore (404)")
-check(A.post(O + f"/{S1}/restore").ok and names(A) == ["Example Timber Ltd"] and row(S1) == (None, None),
+check(Ol.post(OFC + f"/{S1}/restore").status_code == 404 and row(S1)[0], "another organisation: no restore (404)")
+check(A.post(OFC + f"/{S1}/restore").ok and names(A) == ["Example Timber Ltd"] and row(S1) == (None, None),
       f"restored: back in the list, deleted_at / deleted_by empty {row(S1)}")
 gs = groups(AID)
 check(len(gs) == g0 + 2 and modes(gs[-2]["id"]) == ["trash"] and modes(gs[-1]["id"]) == ["restore"],
       f"delete and restore are two steps of the person (modes trash / restore) {gs[g0:]}")
 
 # ---------------------------------------------------------------- delete again -> taken back from the list of steps
-check(A.delete(O + f"/{S1}").ok and names(A) == [], "deleted again")
+check(A.delete(OFC + f"/{S1}").ok and names(A) == [], "deleted again")
 GT = groups(AID)[-1]["id"]
 it = A.get(B + "/api/undo").json()["items"]
 check(it and it[0]["id"] == GT and it[0]["undo"] is True and "Supplier" in it[0]["label"], f"the step is listed in GET /api/undo {it[:1]}")
@@ -97,23 +97,23 @@ check(r.ok and GT in r.json().get("undone", []) and names(A) == ["Example Timber
 check(dbx("SELECT state FROM undo_groups WHERE id=?", (GT,))[0][0] == "undone", "the group is undone")
 
 # ---------------------------------------------------------------- a person without an organisation (her personal office)
-check(Fr.get(O).ok, "freelancer: the suppliers of her personal office open")
+check(Fr.get(OFC).ok, "freelancer: the suppliers of her personal office open")
 PB = dbx("SELECT id FROM orgs WHERE personal_of=?", (FID,))[0][0]
 F1 = supplier(PB, "Example Prints")
 check(names(Fr) == ["Example Prints"] and "Example Prints" not in (names(A) or []), "freelancer: her supplier, only hers")
-check(A.delete(O + f"/{F1}").status_code == 404 and row(F1)[0] is None, "someone else: 404 on her supplier")
-check(Fr.delete(O + f"/{F1}").ok and names(Fr) == [] and row(F1)[1] == FID, "freelancer: into the trash")
+check(A.delete(OFC + f"/{F1}").status_code == 404 and row(F1)[0] is None, "someone else: 404 on her supplier")
+check(Fr.delete(OFC + f"/{F1}").ok and names(Fr) == [] and row(F1)[1] == FID, "freelancer: into the trash")
 GF = groups(FID)[-1]["id"]
 check(modes(GF) == ["trash"] and Fr.post(B + f"/api/undo/to/{GF}").ok and names(Fr) == ["Example Prints"], "freelancer: taken back with the undo")
-check(Fr.delete(O + f"/{F1}").ok and Fr.post(O + f"/{F1}/restore").ok and names(Fr) == ["Example Prints"], "freelancer: restore")
-check(Fr.delete(O + f"/{F1}").ok, "freelancer: into the trash again")
+check(Fr.delete(OFC + f"/{F1}").ok and Fr.post(OFC + f"/{F1}/restore").ok and names(Fr) == ["Example Prints"], "freelancer: restore")
+check(Fr.delete(OFC + f"/{F1}").ok, "freelancer: into the trash again")
 
 # ---------------------------------------------------------------- the retention run is the core's
 S2 = supplier(ORG, "Example Old Ltd")
 S3 = supplier(ORG, "Example Young Ltd")
 S4 = supplier(ORG, "Example Live Ltd")  # old dates, never deleted: never a candidate
 for s in (S2, S3):
-    check(A.delete(O + f"/{s}").ok, f"into the trash {s}")
+    check(A.delete(OFC + f"/{s}").ok, f"into the trash {s}")
 dbx("UPDATE office_suppliers SET deleted_at=? WHERE id IN (?, ?)", (OLD, S2, F1))
 out = in_app(f"""from kalmido.core.writes import obj_trash_due, obj_trash_prune
 print("DUE", sorted(obj_trash_due(c, "{K}")))

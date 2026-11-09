@@ -9,7 +9,7 @@ PlayError with the step and the answer. Python standard library + requests only.
 import time
 from xml.sax.saxutils import escape
 
-O = "/api/office"
+OFC = "/api/office"
 
 
 class PlayError(Exception):
@@ -72,14 +72,14 @@ def play(s, base, fx, ws, me, log=print):
 
     # ---- the office: company, chart, VAT on invoicing, quarterly returns, balance sheet
     f, st = fx["firma"], fx["einstellungen"]
-    go("office settings", s.put(base + O + "/settings", json={
+    go("office settings", s.put(base + OFC + "/settings", json={
         "lang": "de", "currency": "EUR", "vat_basis": st["vat_basis"], "datev_extf": {"chart": fx["kontenrahmen"]},
         "company_fields": {k: f[k] for k in ("name", "street", "zip", "city", "country", "tax_number", "register_no", "iban")}}))
-    go("tax dates", s.put(base + O + "/tax-dates", json={"ustva": st["ustva"]}))
-    go("balance sheet chosen", s.put(base + O + "/books/ledger/settings", json={"method": st["method"], "size": st["size"]}))
-    get(O + "/settings/bank-accounts")  # the default bank account from the company's IBAN (first look)
+    go("tax dates", s.put(base + OFC + "/tax-dates", json={"ustva": st["ustva"]}))
+    go("balance sheet chosen", s.put(base + OFC + "/books/ledger/settings", json={"method": st["method"], "size": st["size"]}))
+    get(OFC + "/settings/bank-accounts")  # the default bank account from the company's IBAN (first look)
     for e in fx["eroeffnung"]:
-        go("opening entry " + e["text"], s.post(base + O + "/books/ledger/entries", json={
+        go("opening entry " + e["text"], s.post(base + OFC + "/books/ledger/entries", json={
             "day": f"{year}-01-01", "debit": e["soll"], "credit": e["haben"], "amount": e["betrag"], "text": e["text"], "kind": "open"}))
     log("office and opening entries")
 
@@ -101,14 +101,14 @@ def play(s, base, fx, ws, me, log=print):
         go("receipt " + b["key"], s.put(base + f"/api/docs/{nid}/receipt", json=rb))
         ids[b["key"]] = nid
     for a in fx["anlagen"]:
-        ids[a["key"]] = go("device " + a["key"], s.post(base + O + "/equipment", json={
+        ids[a["key"]] = go("device " + a["key"], s.post(base + OFC + "/equipment", json={
             "name": a["name"], "purchase_date": a["kauf"], "purchase_net": a["netto"], "life_months": a["monate"], "afa_method": "linear",
             "receipt_node_id": ids[a["beleg"]]}))["id"]
     log("receipts and the device")
 
     # ---- the credit card: a typed statement, its receipts matched
     k = fx["karte"]
-    K = O + "/cards"
+    K = OFC + "/cards"
     cid = go("card", s.post(base + K, json={"holder_name": k["inhaber"], "last4": k["last4"]}))["id"]
     r = go("card statement", s.post(base + f"{K}/{cid}/statements", files={"file": ("karte.pdf", pdf(["Kreditkartenabrechnung", k["monat"]]), "application/pdf")},
                                      data={"month": k["monat"]}))
@@ -131,11 +131,11 @@ def play(s, base, fx, ws, me, log=print):
     for x in fx["kunden"]:
         cl[x["key"]] = go("client " + x["name"], s.post(base + "/api/clients", json={k_: x[k_] for k_ in ("name", "street", "zip", "city", "country")}))["id"]
     kb = fx["kasse"]
-    bid = go("cash box", s.post(base + O + "/cashbooks", json={"name": kb["name"], "opening": kb["anfang"], "opening_day": kb["anfang_tag"]}))["id"]
+    bid = go("cash box", s.post(base + OFC + "/cashbooks", json={"name": kb["name"], "opening": kb["anfang"], "opening_day": kb["anfang_tag"]}))["id"]
     ids["kasse"] = bid
-    go("bank statement", s.post(base + O + "/bank/import", json={"text": camt(fx["bank"], year), "filename": f"konto-{year}.xml"}))
+    go("bank statement", s.post(base + OFC + "/bank/import", json={"text": camt(fx["bank"], year), "filename": f"konto-{year}.xml"}))
     keys = {z["key"] for z in fx["bank"]["zeilen"]}
-    for t in get(O + "/bank/tx?state=all")["items"]:
+    for t in get(OFC + "/bank/tx?state=all")["items"]:
         w = (t.get("purpose") or "").split()
         if w and w[-1] in keys:
             ids[w[-1]] = t["id"]
@@ -145,7 +145,7 @@ def play(s, base, fx, ws, me, log=print):
 
     # ---- the year in date order: invoices / credit notes / reminders (the number series wants their order), cash entries and
     # the reconciliation of the bank lines -- a credit note after the payment of its invoice, as it happened
-    D = O + "/docs"
+    D = OFC + "/docs"
 
     def doc(kind, x):
         if kind == "invoice":
@@ -174,7 +174,7 @@ def play(s, base, fx, ws, me, log=print):
             eb["node_id"] = ids[e["beleg"]]
         if e.get("rechnung"):
             eb["invoice_id"] = ids[e["rechnung"]]
-        ids[e["key"]] = go("cash entry " + e["key"], s.post(base + O + f"/cashbooks/{bid}/entries", json=eb)).get("id")
+        ids[e["key"]] = go("cash entry " + e["key"], s.post(base + OFC + f"/cashbooks/{bid}/entries", json=eb)).get("id")
 
     def bank(z):
         a = z.get("abgleich")
@@ -187,7 +187,7 @@ def play(s, base, fx, ws, me, log=print):
             mb["id"] = ids[a["beleg"]]
         elif a["art"] == "card":
             mb["id"] = ids["karte"]
-        go("bank line matched " + z["key"], s.post(base + O + f"/bank/tx/{ids[z['key']]}/match", json=mb))
+        go("bank line matched " + z["key"], s.post(base + OFC + f"/bank/tx/{ids[z['key']]}/match", json=mb))
 
     ev = [(x["datum"], 0, lambda x=x: doc("invoice", x)) for x in fx["rechnungen"]]
     ev += [(x["datum"], 0, lambda x=x: doc("credit", x)) for x in fx["gutschriften"]]
@@ -204,21 +204,21 @@ def play(s, base, fx, ws, me, log=print):
 
     # ---- entertainment receipt, travel expenses
     for m in fx["bewirtung"]:
-        r = go("meal " + m["key"], s.post(base + O + "/meals", json={
+        r = go("meal " + m["key"], s.post(base + OFC + "/meals", json={
             "date": m["datum"], "place_name": m["ort"], "place_address": m["adresse"], "occasion": m["anlass"], "host": {"id": me},
             "guests": m["gaeste"], "amounts": [{"kind": "food", "rate": m["satz"], "gross": m["brutto"]}]}))
         ids[m["key"]] = r["id"]
-        go("meal approved " + m["key"], s.post(base + O + f"/meals/{r['id']}/approve"))
-        go("meal paid " + m["key"], s.put(base + O + f"/meals/{r['id']}/payment", json={"kind": "bank", "id": ids[m["bank"]]}))
+        go("meal approved " + m["key"], s.post(base + OFC + f"/meals/{r['id']}/approve"))
+        go("meal paid " + m["key"], s.put(base + OFC + f"/meals/{r['id']}/payment", json={"kind": "bank", "id": ids[m["bank"]]}))
     for t in fx["reisen"]:
-        ids[t["key"]] = go("trip " + t["key"], s.post(base + O + "/trips", json={
+        ids[t["key"]] = go("trip " + t["key"], s.post(base + OFC + "/trips", json={
             "date_from": t["von"], "date_to": t["bis"], "dest": t["ziel"], "overnight": 1, "country": t["land"], "t_start": t["start"], "t_end": t["ende"],
             "items": [{"date": p["tag"], "category": p["art"], "amount": p["betrag"], "vat_pct": p["ust"]} for p in t["positionen"]]}))["id"]
     log("entertainment and travel")
 
     # ---- adjusting entries
     for u in fx["umbuchungen"]:
-        ids[u["key"]] = go("adjusting entry " + u["key"], s.post(base + O + "/books/ledger/entries", json={
+        ids[u["key"]] = go("adjusting entry " + u["key"], s.post(base + OFC + "/books/ledger/entries", json={
             "day": u["tag"], "debit": u["soll"], "credit": u["haben"], "amount": u["betrag"], "text": u["text"], "kind": "manual"}))["id"]
     log("adjusting entries")
     return ids

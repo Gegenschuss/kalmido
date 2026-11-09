@@ -36,7 +36,7 @@ from muster_gmbh_demo import allowed  # noqa: E402
 from muster_gmbh_play import play  # noqa: E402
 
 D = Decimal
-O = "/api/office"
+OFC = "/api/office"
 FX = json.load(open(os.path.join(N, "fixtures", "muster_gmbh_2025.json"), encoding="utf-8"))
 Y = FX["jahr"]
 FEAT = "cal,comments,collab,office,clients,docs"
@@ -130,10 +130,10 @@ A.patch(B + "/api/settings", json={"lang": "de", "features": FEAT, "tour": "done
 ORG = A.post(B + "/api/admin/orgs", json={"name": FX["firma"]["name"], "admin_id": ME}).json()["id"]
 A.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
 IDS = play(A, B, FX, f"org:{ORG}", ME, log=lambda x: print("played:", x, flush=True))
-check(True, "all events played in through the API")
+check("MA1" in IDS and len(IDS) >= len(FX.get("mahnungen") or []), f"all events played in through the API ({len(IDS)} ids)")
 
 # ================================================================ 3. Kalmido against the expected figures
-rep = A.get(B + O + f"/books/ledger?year={Y}&journal=1").json()
+rep = A.get(B + OFC + f"/books/ledger?year={Y}&journal=1").json()
 jr = rep.get("journal") or []
 got = Counter((x["day"], x["debit"], x["credit"], D(x["amount"])) for x in jr)
 exp = Counter((d, dr, cr, D(a)) for d, dr, cr, a in EXP)
@@ -157,7 +157,7 @@ ch = rep.get("checks") or {}
 check(ch.get("balanced") and D(ch.get("difference") or "1") == 0 and D(ch.get("assets") or "0") == D(SOLL["summe_aktiva"]) and D(ch.get("opening") or "1") == 0,
       f"checks: debit = credit, assets {SOLL['summe_aktiva']} = equity and liabilities, opening balance account 0 {ch}")
 for q in ("q1", "q2", "q3", "q4", "y"):
-    r = A.get(B + O + f"/books/ustva?year={Y}&period={q}")
+    r = A.get(B + OFC + f"/books/ustva?year={Y}&period={q}")
     kz = r.json().get("kz", {}) if r.ok else {}
     check(r.ok and r.json().get("basis") == "soll", f"VAT return {q}: VAT on invoicing {r.status_code} {r.text[:120] if not r.ok else r.json().get('basis')}")
     for f in FIELDS:
@@ -173,7 +173,7 @@ for x in LUECKEN:
     print("  -", x, flush=True)
 
 # ================================================================ 4. the reminder fee with its day (#5387 fix)
-D_ = O + "/docs"
+D_ = OFC + "/docs"
 rm = IDS["MA1"]
 fee_day = kt.dbx("SELECT reminder_fee_paid_at FROM office_docs WHERE id=?", (rm,))[0][0]
 check(fee_day == FX["mahnungen"][0]["bezahlt_am"], f"fee paid on the day the money came, not today (was: always today) {fee_day}")
@@ -203,7 +203,7 @@ def fee_personal(s, who):
     r = s.post(B + f"{D_}/{rid}/fee", json={"state": "paid", "day": f"{Y}-04-20"})
     check(r.ok, f"{who}: fee paid with its day {r.text[:200]}")
     check(kt.dbx("SELECT reminder_fee_paid_at FROM office_docs WHERE id=?", (rid,))[0][0] == f"{Y}-04-20", f"{who}: the day is stored")
-    eu = s.get(B + O + f"/books/euer?year={Y}").json()
+    eu = s.get(B + OFC + f"/books/euer?year={Y}").json()
     fee = [x for x in eu.get("income") or [] if x["key"] == "fee"]
     check(fee and fee[0]["gross"] == "5.00", f"{who}: the income statement of {Y} counts the fee (was: the year of the click) {fee}")
     r = s.post(B + f"{D_}/{rid}/fee", json={"state": "paid"})
@@ -218,7 +218,7 @@ def fee_personal(s, who):
 
 FID, Fr = freelancer(B, A)
 Fr.patch(B + "/api/settings", json={"features": FEAT})
-r = Fr.put(B + O + "/settings", json={"lang": "de", "currency": "EUR", "payment_days": 14, "company_fields": {
+r = Fr.put(B + OFC + "/settings", json={"lang": "de", "currency": "EUR", "payment_days": 14, "company_fields": {
     "name": "Frida Beispiel", "street": "Weg 2", "zip": "12345", "city": "Musterstadt", "country": "DE", "tax_number": "12/345/67891",
     "iban": "DE89370400440532013000"}})
 check(r.ok, f"freelancer: office settings {r.text[:200]}")
@@ -227,7 +227,7 @@ fee_personal(Fr, "freelancer")
 # 2.784.0 (#5387 review): a fee paid in a month that is locked keeps its day - neither moved to an open month nor opened again
 rid = kt.dbx("SELECT id FROM office_docs WHERE org_id=(SELECT id FROM orgs WHERE personal_of=?) AND kind='reminder' ORDER BY id DESC LIMIT 1", (FID,))[0][0]
 check(Fr.post(B + f"{D_}/{rid}/fee", json={"state": "paid", "day": f"{Y}-04-20"}).ok, "freelancer: the fee back on its April day")
-r = Fr.post(B + O + "/periods/lock", json={"through": f"{Y}-05", "confirm": f"05/{Y}"})
+r = Fr.post(B + OFC + "/periods/lock", json={"through": f"{Y}-05", "confirm": f"05/{Y}"})
 check(r.ok, f"freelancer: lock through 05/{Y} {r.status_code} {r.text[:160]}")
 r1 = Fr.post(B + f"{D_}/{rid}/fee", json={"state": "paid", "day": f"{Y}-06-02"})
 r2 = Fr.post(B + f"{D_}/{rid}/fee", json={"state": ""})
