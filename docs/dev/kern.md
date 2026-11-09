@@ -25,11 +25,18 @@ CREATE TABLE IF NOT EXISTS meetings (
   org_id BIGINT REFERENCES orgs(id) ON DELETE CASCADE,          -- NULL = private
   owner_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,  -- private ones go with the account; the core hands an
                                                                 -- organisation's to the heir first
-  rev BIGINT NOT NULL DEFAULT 1, created_at TEXT NOT NULL, created_by BIGINT,
-  updated_at TEXT NOT NULL, updated_by BIGINT, deleted_at TEXT, deleted_by BIGINT,
+  rev BIGINT NOT NULL DEFAULT 1, created_at TIMESTAMPTZ NOT NULL, created_by BIGINT,
+  updated_at TIMESTAMPTZ NOT NULL, updated_by BIGINT, deleted_at TIMESTAMPTZ, deleted_by BIGINT,
   title TEXT NOT NULL DEFAULT '', agenda TEXT NOT NULL DEFAULT '', starts DATE);
 CREATE INDEX IF NOT EXISTS meetings_trash ON meetings(deleted_at) WHERE deleted_at IS NOT NULL;  -- the trash list
 ```
+
+Points in time are `TIMESTAMPTZ` (2.760.0, #5311; new tables take real types, the lint `tools/check_coltypes.py`). The app
+reads them as ISO text in one canonical form (`kalmido/core/pg.py` `ts_canon`: UTC, `+00:00`, microseconds only when there
+are any), the same form the older `TEXT` columns hold, and writes the ISO text of `now_iso()` as before. So the answers,
+the history, undo and the version check (`expect_updated_at`, `ccf_check` compares both sides canonically) behave alike for
+`TEXT` and `TIMESTAMPTZ` tables; an older area moves its columns over in its stage. Never compare such a column with `''`
+(`deleted_at IS NULL` / `IS NOT NULL`).
 
 Add the table to `kalmido/core/rls.py` TABLES (it has an `org_id`) and to the export lists (`tools/check_export_tables.py`
 says where). The core keeps its own data in `obj_history`, `obj_undo` and `obj_revoked`; shares are rows of `fs_shares`

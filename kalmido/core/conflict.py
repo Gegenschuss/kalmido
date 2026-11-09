@@ -6,7 +6,7 @@ from flask import jsonify
 from .config import app
 from .errors import Denied
 from .i18n import tr
-from .pg import system_ctx  # 2.657.0 (#5052): kern_version_seed
+from .pg import system_ctx, ts_canon  # 2.657.0 (#5052): kern_version_seed; 2.760.0 (#5311): ts_canon
 
 
 class Conflict(Denied):
@@ -26,9 +26,10 @@ def conflict_answer(e):
 
 def ccf_check(b, have, key, cur):
     """Call after write_lock(c, "<table>-<id>") and reading the row. b = the request body; have = the row's updated_at now;
-    cur = a function -> the current state for the answer."""
+    cur = a function -> the current state for the answer. 2.760.0 (#5311): both sides in the canonical form (pg.py ts_canon), so
+    a TIMESTAMPTZ column and a TEXT one compare alike and the same instant written with Z or another offset is no conflict."""
     exp = b.get("expect_updated_at") if isinstance(b, dict) else None
-    if exp and str(exp) != str(have or ""):
+    if exp and ts_canon(str(exp)) != ts_canon(have):
         raise Conflict(key, cur())
 
 

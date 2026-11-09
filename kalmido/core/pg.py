@@ -22,11 +22,13 @@ import os
 import re
 import threading
 import time
+from datetime import datetime, timezone
 
 import psycopg
 from psycopg import adapt, errors as pgerrors  # noqa: F401  (pgerrors: specific SQLSTATE classes for callers)
 from psycopg.pq import TransactionStatus
 from psycopg.types.string import TextLoader
+from psycopg.types.datetime import TimestamptzLoader
 from psycopg_pool import ConnectionPool, PoolTimeout
 
 Error = psycopg.Error
@@ -160,8 +162,37 @@ class _NumLoader(adapt.Loader):
         return f
 
 
+def ts_canon(v):
+    """2.760.0 (#5311): a point in time in ONE canonical form - ISO 8601 in UTC with +00:00, microseconds only when there are
+    any (whole seconds = the form core/db.py now_iso writes into the TEXT columns). datetime (aware; naive = UTC) or ISO text
+    (Z, another offset, a T or a space) -> that form; None / '' -> ''; text that is no point in time stays as it is. The read of
+    TIMESTAMPTZ columns (_TsLoader) and the version check (core/conflict.py ccf_check) both use it, so expect_updated_at works
+    the same for TEXT and TIMESTAMPTZ tables."""
+    if v is None or v == "":
+        return ""
+    if isinstance(v, str):
+        try:
+            v = datetime.fromisoformat(v.strip().replace("Z", "+00:00"))
+        except ValueError:
+            return v
+    if not isinstance(v, datetime):
+        return str(v)
+    if v.tzinfo is None:
+        v = v.replace(tzinfo=timezone.utc)
+    return v.astimezone(timezone.utc).isoformat()
+
+
+class _TsLoader(TimestamptzLoader):
+    """2.760.0 (#5311): TIMESTAMPTZ reads as canonical ISO text (ts_canon), as the TEXT columns did: the answers, the history,
+    the undo rows and the version check see one form whichever type the column has (the core template, docs/dev/kern.md)."""
+
+    def load(self, data):
+        return ts_canon(super().load(data))
+
+
 def _adapters():
     am = adapt.AdaptersMap(psycopg.adapters)
+    am.register_loader("timestamptz", _TsLoader)  # 2.760.0 (#5311)
     am.register_dumper(bool, _IntUnknown)
     am.register_dumper(int, _IntUnknown)
     am.register_loader("numeric", _NumLoader)
