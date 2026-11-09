@@ -222,6 +222,19 @@ res = back(A, G1)
 check(stayed_of(res, LN) and stayed_of(res, LN)[0]["code"] == "conflict" and node(nid=LN).get("parent_id") in (None, 0),
       f"F1: the move is not taken back into the folder locked since (409, the file stays at the top) {res} {node(nid=LN).get('parent_id')}")
 
+# F2: the folder went into the organisation's workspace since -> the private file would hang below another workspace: 409
+SF = A.post(B + "/api/files/folders", json={"name": "Umzug Beispiel"}).json()["id"]
+SN = A.post(B + "/api/files/upload", data={"parent_id": SF}, files={"file": ("privat.txt", b"p", "text/plain")}).json()["items"][0]["id"]
+r = A.patch(B + f"/api/files/nodes/{SN}", json={"parent_id": None})
+check(r.ok, f"(setup) the file moved out of the folder {r.status_code} {r.text[:120]}")
+G2 = gid_after(A)
+r = A.post(B + "/api/files/move-space", json={"ids": [SF], "to": ORG, "parent": None})
+moved = kt.dbx("SELECT org_id FROM fs_nodes WHERE id=?", (SF,))
+check(r.ok and moved and moved[0][0] == ORG, f"(setup) the folder went into the organisation's workspace {r.status_code} {r.text[:160]} {moved}")
+res = back(A, G2)
+check(stayed_of(res, SN) and stayed_of(res, SN)[0]["code"] == "conflict" and node(nid=SN).get("parent_id") in (None, 0),
+      f"F2: the move is not taken back into a folder of another workspace (409, the file stays at the top) {res} {node(nid=SN).get('parent_id')}")
+
 # ---------------------------------------------------------------- habits
 r = A.post(B + "/api/habits", json={"name": "Laufen Beispiel"})
 check(r.ok, f"(setup) a habit {r.status_code} {r.text[:120]}")

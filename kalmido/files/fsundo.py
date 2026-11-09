@@ -69,6 +69,9 @@ def _target(c, uid, n, m):
             raise Denied(409, tr("A folder cannot be moved into itself"))
         if len(up) + 1 + fs_height(c, n["id"]) > DEPTH_MAX:
             raise Denied(409, tr("Folders can be nested at most {0} levels deep", DEPTH_MAX))
+        if (t["org_id"] or None) != (n["org_id"] or None) or t["owner_id"] != n["owner_id"]:
+            # review F2: the folder went into another workspace / tree since (files/fsmove.py) -- as _move (2.48.0, #1207)
+            raise Denied(409, tr("Files can only be moved within the same workspace"))
     elif n["owner_id"] != uid and not (n["org_id"] and n["role"] == "owner"):
         raise Denied(403)
 
