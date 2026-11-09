@@ -96,7 +96,7 @@ check(r.status_code == 200 and r.json().get("shared") is False and r.json()["age
 r = Ca.post(B + f"/api/agents/{TK}/chat", json={"body": "What is due today?"})
 check(r.status_code == 201, f"carl writes to it without a project ({r.status_code} {r.text[:200]})")
 msgs = Ca.get(B + f"/api/agents/{TK}/chat").json()["messages"]
-check(len(msgs) == 2 and msgs[0]["body"] == "What is due today?" and msgs[1]["sender"] == "agent"
+check(len(msgs) == 2 and msgs[0]["body"] == "What is due today?" and msgs[1]["from"] == "agent"
       and "do not see any project of yours" in msgs[1]["body"] and "Team KI" in msgs[1]["body"],
       f"the answer follows at once: it sees nothing and how to share a project {[m['body'][:60] for m in msgs]}")
 check(dbx("SELECT COUNT(*) FROM agent_events WHERE agent_id=?", (TK,))[0][0] == n_ev, "no event for the agent (no run, no costs, no data)")
