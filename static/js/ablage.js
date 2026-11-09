@@ -686,7 +686,7 @@ function ab_selBar(trash) {
   if (trash) return ab_trashBar();  // 2.589.0 (#4875)
   const xs = ab_selVals(), n = xs.length, docs = xs.some(x => x.isdoc), more = docs || smv_can(xs[0]?.org_id || null);
   return ms_barHtml('ab-sbar', 'absel', n, tr('Tap files'), [['all', 'all', n && n >= ab_selTotal() ? tr('Select none') : tr('All')],
-    ['move', 'arrow', tr('Move')], ['dl', 'download', tr('Download')], ...docs ? [['edit', 'edit', tr('Edit')]] : [], ['trash', 'trash', tr('Move to the trash'), 'danger'], ...more ? [['more', 'dots', tr('More')]] : []]);
+    ['move', 'arrow', tr('Move')], ['dl', 'download', tr('Download')], ...docs ? [['edit', 'edit', tr('Edit')]] : [], ['trash', 'trash', isMobile() ? tr('Trash') : tr('Move to the trash'), 'danger']  /* a phone: the short word (its question says it all) */, ...more ? [['more', 'dots', tr('More')]] : []]);
 }
 // a tap while choosing / Ctrl- or Cmd-click / the box: one row or card; Shift: the range from the last one (the anchor stays)
 function ab_selPick(id, shift) {
