@@ -193,6 +193,16 @@ c.commit()
   records nothing; while a group is taken back nothing records (`undo_quiet`). Not yet: creating / deleting a section,
   the project settings, and the browser's own task history (`undo.js`), which goes once the list of stage 2 shows the
   server's groups.
+- Undo across devices, stage 6 (2.777.0, #5254): calendar events (`events/evundo.py`), contacts (`contacts/ctundo.py`),
+  file store nodes (`files/fsundo.py`) and habits (`personal/habitundo.py`) are tracked kinds whose write routes record a
+  snap step of the person (`core/undoareas.py` `ua_pre` / `ua_post`; an event changed, moved or put into / out of the
+  trash; a contact likewise; a node renamed, moved, put into / out of the trash, a new or restored version; a habit's
+  settings and its trash). `obj_track(undo_free=)` lets the undo write the trash columns back; the area's fix then runs
+  its own restore / trash (`ua_trash_fix`) and re-checks the target the copy puts the row into (calendar, address book,
+  folder). A file's content is never copied: its step holds the version it pointed at (`cur_version`); a version the
+  clean-up removed cannot come back (409); `FSU_VERSION_HOOKS` let an area refresh what it derived from the content.
+  The browser's own steps (`histAdd`) stay until stages 2 / 7. Not yet: CalDAV / CardDAV and API v1 writes, budget,
+  settings.
 - Stage 2b (2.576.0, #4794): a 409 of `ow_write` carries the current state under `current` only (the old keys `row` /
   `letter` / `client` went). Every office row on `ow_write` has its history route `GET <its save path>/history`
   (`ow_history_answer`; e.g. `/api/office/trips/<id>/history`, `/api/clients/<id>/history`): the route runs the rights
