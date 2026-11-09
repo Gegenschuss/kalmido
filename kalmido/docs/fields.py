@@ -344,7 +344,8 @@ def facet_fields(c, vis, params):
         e["ids"].append(r["id"])
         if r["type"] == "select":
             for o in _opts(r).get("options", []):
-                e["values"].setdefault(o["name"].lower(), {"value": o["name"], "name": o["name"], "count": 0})
+                if isinstance(o, dict) and o.get("name"):  # review #4890: a broken option is left out, no 500
+                    e["values"].setdefault(o["name"].lower(), {"value": o["name"], "name": o["name"], "count": 0})
     q = f"SELECT field_id, value FROM doc_field_values WHERE field_id IN ({','.join('?' * len(by_id))}) AND node_id IN ({vis})"
     openers = {}
     for x in c.execute(q, list(by_id) + list(params)).fetchall():
@@ -354,7 +355,8 @@ def facet_fields(c, vis, params):
             counts[f["id"]] = counts.get(f["id"], 0) + 1
             continue
         open_ = openers.get(f["ws"]) or openers.setdefault(f["ws"], S.doc_opener(c, f["ws"], CTX, default=None))
-        o = next((o for o in _opts(f).get("options", []) if o["id"] == open_(x["value"])), None)
+        v = open_(x["value"])
+        o = next((o for o in _opts(f).get("options", []) if isinstance(o, dict) and o.get("name") and o.get("id") == v), None)
         if o:
             e["values"][o["name"].lower()]["count"] += 1
     out = []

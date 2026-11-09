@@ -161,30 +161,36 @@ def dsr_cf(args):
     return out
 
 
-def dsr_cf_sql(c, ids, val, params):
+def dsr_cf_sql(c, ids, val, params, base_where, base_params):
     """The condition (doc_meta d) of one custom field filter: documents whose field (one of ids) has the value val. The values
-    are sealed with the workspace key: a selection's values are opened here (only the rows of these fields), the outer
-    query keeps only the documents the caller sees (doc_query: doc_visible). An unknown field / option = no hit."""
+    are sealed with the workspace key: a selection's values are opened here, only of fields of workspaces with a document the
+    caller sees and only of those documents (review #4890: no opening of another workspace's values, no timing hint of its
+    option names); the outer query keeps only the visible documents anyway (doc_query: doc_visible). Unknown = no hit."""
     from .fields import CTX, _opts
-    rows = c.execute(f"SELECT id, ws, type, options FROM doc_fields WHERE id IN ({','.join('?' * len(ids))})", ids).fetchall()
-    boxes = [r["id"] for r in rows if r["type"] == "checkbox"]
+    seen = f"SELECT d.node_id FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id WHERE {' AND '.join(base_where)}"
+    rows = c.execute(f"SELECT id, ws, type, options FROM doc_fields WHERE id IN ({','.join('?' * len(ids))}) "
+                     f"AND ws IN (SELECT DISTINCT d.ws FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id WHERE {' AND '.join(base_where)})",
+                     [*ids, *base_params]).fetchall()
+    parts = []
+    boxes = [r for r in rows if r["type"] == "checkbox"]
     if boxes and val in ("1", "0"):
-        in_ws = "" if val == "1" else _in("d.ws", sorted({r["ws"] for r in rows if r["type"] == "checkbox"}), params) + " AND NOT "
-        return "(" + in_ws + _in("d.node_id IN (SELECT node_id FROM doc_field_values WHERE field_id", boxes, params) + "))"
+        in_ws = "" if val == "1" else _in("d.ws", sorted({r["ws"] for r in boxes}), params) + " AND NOT "
+        parts.append("(" + in_ws + _in("d.node_id IN (SELECT node_id FROM doc_field_values WHERE field_id", [r["id"] for r in boxes], params) + "))")
     hit = set()
     low = val.lower()
     for r in rows:
         if r["type"] != "select":
             continue
-        want = {o["id"] for o in _opts(r).get("options", []) if (o.get("name") or "").lower() == low}
+        want = {o.get("id") for o in _opts(r).get("options", []) if isinstance(o, dict) and (o.get("name") or "").lower() == low}
         if not want:
             continue
         open_ = S.doc_opener(c, r["ws"], CTX, default=None)
-        hit |= {x["node_id"] for x in c.execute("SELECT node_id, value FROM doc_field_values WHERE field_id=?", (r["id"],)) if open_(x["value"]) in want}
-    if not hit:
-        return "FALSE"
-    params.append(st_ids(hit))
-    return "d.node_id = ANY(CAST(? AS BIGINT[]))"
+        hit |= {x["node_id"] for x in c.execute(f"SELECT node_id, value FROM doc_field_values WHERE field_id=? AND node_id IN ({seen})",
+                                                [r["id"], *base_params]) if open_(x["value"]) in want}
+    if hit:
+        params.append(st_ids(hit))
+        parts.append("d.node_id = ANY(CAST(? AS BIGINT[]))")
+    return "(" + " OR ".join(parts) + ")" if parts else "FALSE"
 
 
 def dsr_filters(c, args, where, params, base_where, base_params):
@@ -227,7 +233,7 @@ def dsr_filters(c, args, where, params, base_where, base_params):
     if str(args.get("no_asn") or "") in ("1", "true"):
         where.append("d.asn IS NULL")
     for ids, val in dsr_cf(args):
-        where.append(dsr_cf_sql(c, ids, val, params))
+        where.append(dsr_cf_sql(c, ids, val, params, base_where, base_params))
     fol = flat("folder")
     if fol:
         fol = [f for f in fol if fs_role(c, int(f))]  # 2.306.0 (#2875 review N15): only folders the caller sees, as with under=
