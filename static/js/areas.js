@@ -386,7 +386,8 @@ const rd_crumb = mod => rd_open() ? spo_crumbHtml(mod, wsName(rd_open())) : '';
 const spo_href = (to, sp) => '#' + (typeof to === 'function' ? to(sp) : to + '/s/' + sp);
 const spo_html = (to, rows, o = {}) => `<section class="spov" aria-label="${esc(o.label || tr('Workspaces'))}"><h3 class="spovt">${esc(o.title || tr('All workspaces'))}</h3><ul class="spovl">${rows.map(([sp, name, icon]) => `<li><a href="${esc(spo_href(to, sp))}" class="spovr" data-spov="${esc(sp)}">${icon}<span>${esc(name)}</span></a></li>`).join('')}</ul></section>`;
 // the path back above an open space: "All workspaces /" (spo_upHtml, the file store puts its own path after it) + its name
-const spo_upHtml = route => `<a href="#${route}" class="linkbtn" data-spovup="1">${esc(tr('All workspaces'))}</a><span class="abcsep" aria-hidden="true">/</span>`;
+// 2.769.0 (#5339): a button like the other path links (an anchor is inline: no min-height, other baseline)
+const spo_upHtml = route => `<button type="button" class="linkbtn" data-go="${esc(route)}" data-spovup="1">${esc(tr('All workspaces'))}</button><span class="abcsep" aria-hidden="true">/</span>`;
 const spo_crumbHtml = (route, name) => `<nav class="abcrumbs spovc" aria-label="${esc(tr('Path'))}">${spo_upHtml(route)}<span class="abccur" aria-current="page">${esc(name)}</span></nav>`;
 // 2.490.0 C (#4025): where a link is saved to (Read later / a bookmark) is picked, not the shown workspace: Private, then
 // every organisation the person may add to (member or admin, Reading on there for the person). "(Team)" says that all its
