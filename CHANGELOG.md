@@ -17,7 +17,29 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
-## [2.771.0] - 2026-11-09
+## [2.774.0] - 2026-11-09
+
+Package 2.763 (Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Changed
+- Reactions are part of the shared core (#5269, stage Q1): one table `obj_reactions` holds the reactions of task comments,
+  team chat messages and the chat with an agent; `comment_reactions`, `tchat_rx` and `chat_reactions` are gone (their rows
+  move at the first start, one-way). One rule for all three: not on one's own message, not for guests / read-only people.
+  A deleted team chat message keeps its reactions in the trash: "Undo" / restore brings them back (before they were lost).
+  Team chat reactions also carry `count` now, like the other two. Find it: react to a team chat message, delete the
+  message, undo - the reaction is back.
+
+### Fixed
+- Phone scan: a page over 40 million pixels is refused from its header before it is decoded (#4527) - a fixed limit of the
+  scan instead of Pillow's process-wide one, which depended on which module set it last.
+
+### Fixed
+- main: p2351_a_officetree_ui names on a red phone drawer what the page showed (drawer open, clicks, tree nodes, route, dialogs, page errors), so the next CI red of 2.771.0 can be traced (#3398)
+
+Package 2.774 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Added
+- Undo across devices, stage 3: every change of a person to a task records its step on the server, in the step group of the request, whatever way it came (editing, multi-select, dragging, dependent dates, the offline queue, a proposal applied): only the changed fields before / after, plus completing (also a recurring task), reopening, the trash, restoring and creating; sections (name, limits, meaning) and their order too. `POST /api/undo/to/<id>` takes them back through the tasks' own write path - a field changed elsewhere since stays and is named, the other fields go back - and `POST /api/undo/<id>/redo` brings them forward; a task a batch left as it was records nothing, the undo itself records no new step, the parts of a task deleted for good go with the watchdog (#5251).
 
 Package 2.767 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
 
@@ -68,6 +90,10 @@ Package 2.768 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
 ### Added
 - Files: a "+" at the head of the folder tree in the sidebar makes a new folder (#4888).
 - Files: document, file and folder cards can be dragged onto a folder (sidebar tree, path, list, folder cards; on a phone hold, then drag); a ticked card drags the whole choice, one undo (#4888). A drag that begins in Kalmido never uploads (#4879).
+
+## [2.771.0] - 2026-11-09
+
+Not released (the CI of this version was red); its changes are listed under 2.774.0.
 
 ## [2.766.0] - 2026-11-09
 
@@ -411,7 +437,8 @@ Package 2.685 (Bündel: Kommentare: Aktivität in drei Stufen (nur Kommenta, Bü
 - Office: switching "Office & finance" on no longer leaves the office saying it is switched off when it loaded before the switch was saved (#5176).
 - Balance sheet: a receipt booked against the bank (counter account "bank") and paid from the cash box is now booked bank to cash instead of being left out (#5128).
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.771.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.774.0...HEAD
+[2.774.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.774.0
 [2.771.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.771.0
 [2.766.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.766.0
 [2.762.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.762.0
