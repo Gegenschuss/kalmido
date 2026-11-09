@@ -878,24 +878,50 @@ document.addEventListener('click', e => { if (e.target.closest?.('#chat-typing')
 // a job's history ("History"): open / closed per job (default: the switch above), loaded when opened
 const jobStepsBusy = new Set();
 const jobOpenIs = jid => S.jobOpen[jid] ?? stepsAlwaysOn();
+// 2.758.0 (#5223): an open history keeps what it shows until the new lines are there (a step marks it stale, it loads quietly
+// and only the inside of its box is exchanged: the box keeps its scroll, the bottom stays the bottom); "Loading…" only on the
+// very first opening, with a fixed least height
+function jobStepsBodyHtml(jid) {
+  const d = S.jobSteps[jid];
+  if (!d) { setTimeout(() => jobStepsLoad(jid), 0); return `<div class="muted jvb jvload">${esc(tr('Loading…'))}</div>`; }
+  if (d.stale) setTimeout(() => jobStepsLoad(jid, true), 0);
+  return d.err ? `<div class="muted jvb">${esc(d.err)}</div>` : jobStepsBody(jid, d);
+}
 function jobStepsHtml(jid, n) {
-  const open = jobOpenIs(jid), d = S.jobSteps[jid];
-  if (open && !d) setTimeout(() => jobStepsLoad(jid), 0);
-  const body = !open ? '' : !d ? `<div class="muted jvb">${esc(tr('Loading…'))}</div>` : d.err ? `<div class="muted jvb">${esc(d.err)}</div>` : jobStepsBody(jid, d);
-  return `<details class="jobv" data-jv="${jid}"${open ? ' open' : ''}><summary>${esc(tr('History'))} <span class="muted">${n}</span></summary>${body}</details>`;
+  const open = jobOpenIs(jid);
+  return `<details class="jobv" data-jv="${jid}"${open ? ' open' : ''}><summary>${esc(tr('History'))} <span class="muted">${n}</span></summary>${open ? jobStepsBodyHtml(jid) : ''}</details>`;
 }
 function jobStepsBody(jid, d) {
   const rows = (d.steps || []).map(x => x.heading ? `<div class="jvh"><time>${esc(chatHM(x.at))}</time><b>${esc(x.text)}</b></div>` : `<div class="jvs">${esc(x.text)}</div>`).join('');
   const more = d.total > (d.steps || []).length ? `<div class="muted jvmore">${esc(tr('The last {0} of {1} lines', d.steps.length, d.total))}</div>` : '';
   return `<div class="jvb">${more}${rows}<a class="linkbtn jvdl" href="/api/agents/jobs/${+jid}/steps?format=txt" download>${ic('download', 's')} ${esc(tr('Full history as a text file'))}</a></div>`;
 }
-async function jobStepsLoad(jid) {
-  if (jobStepsBusy.has(jid) || S.jobSteps[jid]) return;
+// again = a stale history loads anew while it keeps showing the old lines (a failed reload keeps them too)
+async function jobStepsLoad(jid, again) {
+  const old = S.jobSteps[jid];
+  if (jobStepsBusy.has(jid) || (old && !(again && old.stale))) return;
   jobStepsBusy.add(jid);
   try { S.jobSteps[jid] = await api('GET', `/api/agents/jobs/${jid}/steps`); }
-  catch (e) { S.jobSteps[jid] = {err: e instanceof Offline ? tr('Only available online.') : e.message, steps: [], total: 0}; }
+  catch (e) { if (old && !old.err) old.stale = false; else S.jobSteps[jid] = {err: e instanceof Offline ? tr('Only available online.') : e.message, steps: [], total: 0}; }
   finally { jobStepsBusy.delete(jid); }
-  jobStepsRedraw();
+  jv_paint(jid);
+}
+// 2.758.0 (#5223): only the histories of this job are touched (the chat bubble and the job card), nothing else is drawn again;
+// the box's content is exchanged in place (scroll kept, bottom stays bottom), the page keeps what the person looks at
+function jv_paint(jid) {
+  const ds = [...document.querySelectorAll(`details.jobv[data-jv="${+jid}"]`)];
+  if (!ds.length) return;
+  vw_anchorKeep(() => { for (const d of ds) {
+    const open = jobOpenIs(jid); if (d.open !== open) d.open = open;
+    const b = d.querySelector(':scope > .jvb');
+    if (!open) { b?.remove(); continue; }
+    const t = document.createElement('template'); t.innerHTML = jobStepsBodyHtml(jid); const n = t.content.firstElementChild;
+    if (!b) { d.append(n); continue; }
+    if (b.innerHTML === n.innerHTML && b.className === n.className) continue;
+    const bottom = b.scrollHeight - b.scrollTop - b.clientHeight < 4, top = b.scrollTop;
+    b.className = n.className; b.innerHTML = n.innerHTML;
+    b.scrollTop = bottom && !b.classList.contains('jvload') && top > 0 ? b.scrollHeight : top;
+  } });
 }
 // 2.46.2 (#1718): a click redraws at once (now), steps that arrive are gathered (fl_viewSoon)
 // 2.425.0 (#3575): a step that arrives never moves the focus: the field it sits in (chat box, search, …) keeps it with
@@ -925,17 +951,18 @@ function jv_keepField(fn) {
   try { return fn(); } finally { back(); setTimeout(back, 0); }  // also a late focus() of the redraw
 }
 // the summary toggles through the state (a redraw keeps it): click, Enter, Space
+// 2.758.0 (#5223): the click opens / closes only this history (no redraw of the page), the row under the finger stays
 document.addEventListener('click', e => {
   const sm = e.target.closest?.('details.jobv > summary'); if (!sm) return;
   e.preventDefault(); const jid = +sm.parentElement.dataset.jv;
-  S.jobOpen[jid] = !jobOpenIs(jid); jobStepsRedraw(true);
-  setTimeout(() => $(`details.jobv[data-jv="${jid}"] > summary`)?.focus({preventScroll: true}), 0);
+  S.jobOpen[jid] = !jobOpenIs(jid); jv_paint(jid);
+  sm.focus({preventScroll: true});
 });
-// /api/version said a new step arrived for me: the open chat fetches, open histories load again
+// /api/version said a new step arrived for me: the open chat fetches, open histories load again - 2.758.0 (#5223): quietly,
+// the old lines stay until the new ones are there; a closed one loads again when it is opened
 function stepsChanged() {
-  for (const k of Object.keys(S.jobSteps)) if (jobOpenIs(+k)) delete S.jobSteps[k];
+  for (const k of Object.keys(S.jobSteps)) { const d = S.jobSteps[k]; if (d.err) delete S.jobSteps[k]; else d.stale = true; if (jobOpenIs(+k)) jobStepsLoad(+k, true); }
   if (S.chat.aid) chatLoad();
-  else if (Object.keys(S.jobOpen).length || stepsAlwaysOn()) jobStepsRedraw();
 }
 // 2.29.0 (#363): window <-> side panel, fold (window only)
 // 2.350.0 A (#3317): "Open in its own window" and "Fold" are entries of the ⋯ menu (chatHeadInfo); the switch stays

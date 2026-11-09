@@ -624,6 +624,11 @@ function viewAgents() {
   const agOn = lyo_get('agents', 'agents', 'on'), agSort = lyo_get('agents', 'agents', 'sort'), agNeed = a => ['error', 'waiting', 'paused'].includes(agentHst(a)) || a.waiting || a.approvals_open ? 0 : 1;
   const agShow = ags.filter(a => !agOn || a.enabled);
   if (agSort === 'name') agShow.sort((a, b) => a.name.localeCompare(b.name, LOCALE())); else if (agSort === 'need') agShow.sort((a, b) => agNeed(a) - agNeed(b));
+  // 2.758.0 (#5223): "Need" sorts when the page is entered; live updates keep that order (a card that comes to need something
+  // stays at its place, the cards do not swap under the finger); a new agent joins at the end of its group
+  if (agSort !== 'need') S.agNeedOrd = null;
+  else if (!S.agNeedOrd || FL.vsig !== fl_sig()) S.agNeedOrd = agShow.map(a => a.id);
+  else { const ix = new Map(S.agNeedOrd.map((id, i) => [id, i])); agShow.sort((a, b) => (ix.get(a.id) ?? 1e9) - (ix.get(b.id) ?? 1e9)); }
   const card = a => `<div class="agcard ${a.enabled ? '' : 'off'}" data-k="ag${a.id}"${acw_attr(a.org_id)}>${avBtn(a.id, a.name, 'avatar lg')}<div class="agi"><b>${esc(a.name)}</b><span class="muted">${esc(agentSt(a))}${a.status_text && agentHst(a) !== 'offline' ? ' · ' + esc(a.status_text) : ''}</span>
       <span class="muted agn">${esc([a.running && trn('{0} running', '{0} running', a.running), a.waiting && trn('{0} waiting', '{0} waiting', a.waiting)].filter(Boolean).join(' · '))}</span></div>
       <div class="agb"><button class="btn sm" data-act="chat-open" data-aid="${a.id}" ${a.enabled ? '' : 'disabled'}>${ic('comment', 's')} ${tr('Chat')}${a.chat_unread ? ` <span class="nbadge">${a.chat_unread}</span>` : ''}</button>${a.approvals_open ? `<button class="btn sm apvcard" data-act="chat-open" data-aid="${a.id}">${ic('lock', 's')} ${esc(apvCount(a.approvals_open))}</button>` : ''}

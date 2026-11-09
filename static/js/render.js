@@ -1053,6 +1053,26 @@ function keepFocus(root, fn) {
   if (n && n.offsetParent !== null && !n.disabled) n.focus({preventScroll: true});
   return r;
 }
+// 2.758.0 (#5223): the agents page moves only when the person makes it move. A redraw or a box filled later keeps on the screen
+// what the person looks at: the row tapped last (while it is in sight), else the first card / row that begins in sight; its
+// screen position before = after (the page's pixel offset alone let every height change above it shift the view). At the very
+// top nothing is held: a new job appears on top there.
+const VW_ANCH = '.agcard, .agjh, .job, .job > .jobh, .job details > summary, .job .runtask';
+let vw_tap = null;
+document.addEventListener('pointerdown', e => { const t = e.target instanceof Element && e.target.closest?.(VW_ANCH); vw_tap = t && $('#view')?.contains(t) ? t : null; }, true);
+function vw_anchor(el) {
+  if (!el || el.scrollTop <= 0 || S.route?.mod !== 'agents' || el.querySelector('.chview')) return null;
+  const top = el.getBoundingClientRect().top, bot = top + el.clientHeight, inSight = r => r.height > 0 && r.bottom > top && r.top < bot;
+  if (vw_tap?.isConnected && el.contains(vw_tap)) { const r = vw_tap.getBoundingClientRect(); if (inSight(r)) return [vw_tap, r.top]; }
+  for (const n of el.querySelectorAll(VW_ANCH)) { const r = n.getBoundingClientRect(); if (r.height > 0 && r.top >= top && r.top < bot) return [n, r.top]; }
+  return null;
+}
+function vw_anchorBack(el, a) {
+  if (!a || !a[0].isConnected) return;
+  const d = a[0].getBoundingClientRect().top - a[1];
+  if (Math.abs(d) >= 0.5) el.scrollTop += d;
+}
+function vw_anchorKeep(fn) { const el = $('#view'), a = vw_anchor(el); try { return fn(); } finally { vw_anchorBack(el, a); } }
 function renderView() { FL.vlast = Date.now(); return td_rcRun(() => { const r = an_view(() => keepFocus($('#view'), renderView0));  // 2.46.1 (#1560): a view change / a new empty hint fades in
     rowRove(); rowMoreWatch(); agb_after(); vl_after(); vm_after(); td_lcSweep(); topw_sync(); topw_later(); return r; }); }  // 2.65.0 (#1825): vl_after = the window of a long list; 2.413.0 A (#3439): vm_after = a view entered again gets its place back (viewmem.js)  // 2.599.0 (#4814): topw_sync = the page's width for #top
 // ---- 2.599.0 (#4814): the page reports its width once to #main: data-w = lesen | form | seite (the widths of :root,
@@ -1107,7 +1127,7 @@ function renderView0() {
   // 2.12.2 (#451): the open phone chat is never rebuilt (that took the focus, closed the keyboard and jumped to the top):
   // it is patched in place
   if (m === 'agents' && S.route.agent && chatFull() && S.chat.aid === +S.route.agent && $('#view .chview')?.dataset.aid === String(S.chat.aid) && $('#chat-in')) { chatPatch(); agentLive(); renderMultiBar(); return; }
-  const scroll = el.scrollTop, ctk = ct_scrollKeep(el);  // 2.431.0 C (#3598)
+  const scroll = el.scrollTop, ctk = ct_scrollKeep(el), anc = vw_anchor(el);  // 2.431.0 C (#3598); 2.758.0 (#5223): agents page
   const wbs = $('#wbody')?.scrollTop, tls = $('#tlscroll')?.scrollLeft, tlt = $('#tlscroll')?.scrollTop, wasRm = !!$('.tl.rm');
   const qi = $('#qinput'), qf = !!qi && document.activeElement === qi, qv = qi ? qi.value : '';  // the composer survives a re-render
   const tin = $('#view .ttlin'), tinF = !!tin && document.activeElement === tin;  // 2.0.2: inline title edit + section input too
@@ -1162,7 +1182,7 @@ function renderView0() {
   else if (isTimeline()) setHtml(el, vsegHtml(routeList()) + viewTimeline(routeList().id));  // 2.13.0 (#453 A7)
   else if (moActive() && moBoard()) setHtml(el, mb_view());  // 2.156.0 C (#2072): My tasks as a board (mineboard.js)
   else setHtml(el, viewList());
-  el.scrollTop = scroll; ctk();
+  el.scrollTop = scroll; ctk(); vw_anchorBack(el, anc);
   if (m === 'agents' && $('#view .chview')) { chatFit(); chatPatch(); } else { if (m === 'team') chatFit(); /* 2.446.0 (#3334) */ else document.body.classList.remove('kb-open'); if (S.chat && !$('#chat-msgs')) S.chat.seenAt = 0; }  /* the chat left (chs cont) */  // 2.12.2 (#451): a chat opens at its newest message; 2.380 F (#3381): a new box at its place / first new message (chs_restore), an old one stays
   if (S.ie) inlineEditMount(tinF);
   const sa2 = $('#view .secadd-in'); if (sa2 && S.secAdd) { sa2.value = S.secAdd.v || ''; if (saiF) sa2.focus(); }

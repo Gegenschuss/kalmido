@@ -72,7 +72,8 @@ def agent_jobs_get():
     args += va
     if "limit" in request.args or "before" in request.args:
         return ag_jobs_page(c, where, args)  # 2.40.0 (#1432): "Load more"; without ?limit / ?before as before
-    if request.args.get("state", "all") == "open":
+    only_open = request.args.get("state", "all") == "open"
+    if only_open:
         where.append("state IN ('running','waiting')")
     rows, cur, read = [], None, 0
     # 2.674.0 (#4194 review F2): at most AG_JOBS_SCAN rows read per request, like the paged list
@@ -86,7 +87,10 @@ def agent_jobs_get():
         if len(batch) < 500:
             break
         cur = (batch[-1]["updated_at"], batch[-1]["id"])
-    return jsonify(jobs=ag_jobs_out(c, rows[:200]))
+    rows = rows[:200]
+    if only_open:  # 2.758.0 (#5223): the open jobs by start, newest on top (a working job keeps its place, like the paged list)
+        rows.sort(key=lambda j: j["id"], reverse=True)
+    return jsonify(jobs=ag_jobs_out(c, rows))
 
 
 def ag_jobs_out(c, rows):
@@ -117,8 +121,10 @@ def ag_jobs_page(c, where, args):
     cols = jl_cols(c)
     top = []
     if not cur:
+        # 2.758.0 (#5223): the open jobs by start (newest on top), not by their last change: a working job no longer
+        # climbs over the others on every step (the cards keep their places)
         top = c.execute(f"SELECT {cols} FROM agent_jobs WHERE {cond}state IN ('running','waiting') "
-                        "ORDER BY updated_at DESC, id DESC", args).fetchall()
+                        "ORDER BY id DESC", args).fetchall()
         vis = jobs_seen(c, top, uid)
         top = [j for j in top if j["id"] in vis]
     if request.args.get("state", "all") == "open":

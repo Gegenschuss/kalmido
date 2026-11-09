@@ -153,15 +153,27 @@ function jc_menuItems() {
 // ---- 2.63.0 (#1482): "Conversation" on the job card: the last messages of the job's own history (same endpoint as the chat,
 // ?job=), loaded when unfolded, refreshed on live updates while open; 403 / 404 (not my agent) = no section
 S.jth = {};  // job id -> {msgs, v, at, busy, hide}
+// 2.758.0 (#5223): the section is never exchanged: loading fills only the inside of its body (.jthbody), the <details> under
+// the finger stays; the old messages stay until the new ones are there; "Loading…" only on the first opening (least height)
+function jth_bodyHtml(j) {
+  const t = S.jth[j.id] || {};
+  const body = !t.msgs ? `<p class="muted jthload">${tr('Loading…')}</p>` : t.msgs.length
+    ? t.msgs.map(m => `<div class="jthm ${m.from === 'agent' ? 'ag' : 'me'}"><span class="muted">${esc(fmtWhen(m.created_at))}</span><p>${esc(String(m.body || '').slice(0, 400))}</p></div>`).join('') : `<p class="muted">${tr('No messages yet.')}</p>`;
+  return body + `<button type="button" class="btn sm" data-act="jc-open" data-jid="${j.id}" data-aid="${j.agent_id}">${ic('comment', 's')} ${tr('Open the whole conversation')}</button>`;
+}
 function jth_html(j) {
   if (j.kind || !j.agent_id) return '';
   const t = S.jth[j.id] || {}, open = !!S.jobThOpen?.[j.id];
   if (t.hide) return '';
   if (open && !t.busy && (!t.at || (t.v !== S.v && Date.now() - t.at > 3000))) setTimeout(() => jth_load(j), 0);
-  const body = !t.msgs ? `<p class="muted">${tr('Loading…')}</p>` : t.msgs.length
-    ? t.msgs.map(m => `<div class="jthm ${m.from === 'agent' ? 'ag' : 'me'}"><span class="muted">${esc(fmtWhen(m.created_at))}</span><p>${esc(String(m.body || '').slice(0, 400))}</p></div>`).join('') : `<p class="muted">${tr('No messages yet.')}</p>`;
   // data-k: its own key for the redraw (the history .joblog of the same card has the same data-jid)
-  return `<details class="jobth" data-k="jth${j.id}" data-jid="${j.id}"${open ? ' open' : ''}><summary>${tr('Conversation')}</summary><div class="jthbody">${open ? body : ''}${open ? `<button type="button" class="btn sm" data-act="jc-open" data-jid="${j.id}" data-aid="${j.agent_id}">${ic('comment', 's')} ${tr('Open the whole conversation')}</button>` : ''}</div></details>`;
+  return `<details class="jobth" data-k="jth${j.id}" data-jid="${j.id}"${open ? ' open' : ''}><summary>${tr('Conversation')}</summary><div class="jthbody">${open ? jth_bodyHtml(j) : ''}</div></details>`;
+}
+function jth_fill(j) {
+  const d = document.querySelector(`details.jobth[data-jid="${j.id}"]`); if (!d) return;
+  if (S.jth[j.id]?.hide) { vw_anchorKeep(() => d.remove()); return; }
+  const b = d.querySelector(':scope > .jthbody'), h = d.open ? jth_bodyHtml(j) : '';
+  if (b && b.innerHTML !== h) vw_anchorKeep(() => { b.innerHTML = h; });
 }
 async function jth_load(j) {
   const t = S.jth[j.id] || (S.jth[j.id] = {});
@@ -172,14 +184,13 @@ async function jth_load(j) {
     t.msgs = (r.messages || []).slice(-5); t.v = S.v; t.at = Date.now();
   } catch (e) { if (e && [403, 404].includes(e.status)) t.hide = true; else t.at = Date.now(); }
   t.busy = false;
-  const d = document.querySelector(`details.jobth[data-jid="${j.id}"]`);
-  if (d) d.outerHTML = jth_html(j);
+  jth_fill(j);
 }
 document.addEventListener('toggle', e => {
   const d = e.target instanceof Element && e.target.matches?.('details.jobth') ? e.target : null; if (!d) return;
   (S.jobThOpen || (S.jobThOpen = {}))[d.dataset.jid] = d.open;
   const j = (S.jobs?.items || []).find(x => x.id === +d.dataset.jid);
-  if (d.open && j) { const t = S.jth[j.id]; if (!t || !t.msgs) jth_load(j); else { d.outerHTML = jth_html(j); } }
+  if (d.open && j) { const t = S.jth[j.id]; if (!t || !t.msgs) jth_load(j); jth_fill(j); }
 }, true);
 
 // ---- 2.96.0 C (#2015): one card per job in the agent chat. The messages of a job (job_id, the "Job #N" start, or the

@@ -102,6 +102,12 @@ check(Bo.get(B + "/api/agents/jobs", params={"limit": 5, "before": "nonsense"}).
 r = Bo.get(B + "/api/agents/jobs", params={"limit": 5, "before": ans[0]["next"]}).json()
 check(not (set(j["id"] for j in r["jobs"]) & OPEN_B), "#1432: a page with before has no open jobs (they came with the first)")
 check([j["id"] for j in Bo.get(B + "/api/agents/jobs", params={"id": ENDED_B[-1]}).json()["jobs"]] == [ENDED_B[-1]], "#1432: ?id= one job")
+# 2.758.0 (#5223): the open jobs come by start (newest id on top), not by their last change: the oldest open job changes last
+# (a step), it keeps its place below the newer ones - in the paged list and in "Open" (state=open without limit)
+OPEN_IDS = sorted(OPEN_B, reverse=True)
+dbx("UPDATE agent_jobs SET updated_at=? WHERE id=?", ("2026-03-09T09:00:00Z", OPEN_IDS[-1]), write=True)
+check([j["id"] for j in Bo.get(B + "/api/agents/jobs", params={"state": "open"}).json()["jobs"]] == OPEN_IDS, "#5223: Open: the open jobs by start, a step does not move one up")
+check([j["id"] for j in Bo.get(B + "/api/agents/jobs", params={"limit": 20}).json()["jobs"]][:3] == OPEN_IDS, "#5223: the first page: the open jobs on top by start")
 alice_job = next(x[0] for x in rows if x[2] == ALICE)
 check(Bo.get(B + "/api/agents/jobs", params={"id": alice_job}).json()["jobs"] == [], "#1432: ?id= of a job not mine: empty")
 

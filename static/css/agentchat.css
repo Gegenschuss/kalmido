@@ -217,6 +217,10 @@ button.chmode:hover{color:var(--text);border-color:var(--muted)}
 .jobv>summary{cursor:pointer;color:var(--text2);min-height:1.5rem}
 .jvb{display:flex;flex-direction:column;gap:.125rem;margin-top:.25rem;color:var(--muted);font-size:var(--fs-xs);line-height:var(--lh);max-height:24rem;overflow:auto;overflow-wrap:anywhere}
 .jvh{display:flex;gap:.5rem;margin-top:.375rem;color:var(--text2)}
+/* 2.758.0 (#5223): "Loading…" of a history opened the first time keeps a fixed least height (no tall-short-tall jump) */
+.jvb.jvload{min-height:4.5rem}
+/* 2.758.0 (#5223): the same for the conversation of a job card (.jobth, jobchat.js) */
+.jthbody .jthload{min-height:4.5rem;margin:0}
 .jvh time{flex:none;color:var(--muted);font-variant-numeric:tabular-nums}
 .jvs{padding-left:3rem}
 .jvdl{margin-top:.375rem;align-self:flex-start;display:inline-flex;align-items:center;gap:.25rem}
