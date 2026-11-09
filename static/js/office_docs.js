@@ -109,7 +109,7 @@ async function ofdMore() {
       const seen = new Set(list.map(r => r.id));
       list.push(...(j.docs || []).filter(r => !seen.has(r.id))); OFD.next = j.next_cursor || null;
     }
-  } catch (x) { toast(x.message || tr('unknown')); }
+  } catch (x) { ofcErr(x); }
   OFD.more = false; ofdDraw();
 }
 async function ofdLoadList(force) {
@@ -119,7 +119,7 @@ async function ofdLoadList(force) {
   OFD.loading = true; OFD.loadAgain = false;
   const u = ofdListUrl();
   try { const j = await api('GET', `${u}&limit=${ofd_reloadN()}`); if (u === ofdListUrl()) { OFD.list = j.docs || []; OFD.next = j.next_cursor || null; OFD.role = j.role; OFD.err = ''; OFD.dunning = j.dunning || null; tri_meta(j); } }  // 2.147.1 B (#2054): dunning; 2.144.10 C (#2576): + trial filter / meta
-  catch (x) { if (u === ofdListUrl()) { OFD.list = []; OFD.next = null; OFD.err = x.message || tr('unknown'); } }
+  catch (x) { if (u === ofdListUrl()) { OFD.list = []; OFD.next = null; OFD.err = ofcErrHere(x); } }
   OFD.loading = false;
   if (OFD.loadAgain || u !== ofdListUrl()) { ofdLoadList(true); return; }
   const el = $('.office .ofcbody'); if (el) keepFocus(el, ofdDraw); else ofdDraw();  // 2.369.0 A (#3200): the search box keeps the cursor
@@ -131,7 +131,7 @@ async function ofdLoadDoc(id, force) {
   OFD.docLoading = true; OFD.docId = id;
   try { OFD.doc = await api('GET', `/api/office/docs/${id}`); OFD.viaFolder.delete(id); OFD.err = ''; OFD.conflict = null; if (OFD.doc?.kind && OFD.doc.kind !== OFD.kind) { OFD.kind = OFD.doc.kind; OFD.list = null; } }
   catch (x) {  // 2.199.0 B (#2742): no office right for it, but a shared folder holds it -> read through the folder (its PDF too)
-    OFD.doc = null; OFD.err = x.message || tr('unknown');
+    OFD.doc = null; OFD.err = ofcErrHere(x);
     // 2.351.0 A (#2823): a draft with edit through the folder is edited (saved over the folder way, ofd_viaUrl)
     try { const j = await rawFetch('GET', `/api/fsref/office_doc/${id}`); OFD.doc = ofd_viaDoc(j, j.folder_role); OFD.viaFolder.add(id); OFD.err = ''; } catch { /* keep the office's answer */ }
   }
@@ -549,7 +549,7 @@ function kvaNextHtml(d, lk, ro) {
   return inv;  // accepted: the main button; a draft that can be edited ("Finalise" behind) or declined: a plain one
 }
 async function kvaToInvoice(d, row) {
-  if (row) try { d = await api('GET', `/api/office/docs/${d.id}`); } catch (x) { toast(x.message || tr('unknown')); return; }  // 2.144.7 (#2572): a list row lacks parts / currency
+  if (row) try { d = await api('GET', `/api/office/docs/${d.id}`); } catch (x) { ofcErr(x); return; }  // 2.144.7 (#2572): a list row lacks parts / currency
   const have = oil_open(d);  // 2.356.0 C (#3003): an invoice of this quotation exists -> one question (it replaces the "not accepted" one)
   if (have.length) { if (!await askConfirm(tr('This quotation already has an invoice ({0}). Create another one?', have.map(x => x.number || tr('Draft')).join(', ')), '', {ok: tr('Create another invoice')})) return; d = {...d, oil_force: true}; }
   else if (d.status !== 'accepted' && !await askConfirm(tr('The quotation has not been accepted yet. Create the invoice anyway?'), '', {ok: tr('Create invoice')})) return;
@@ -573,7 +573,7 @@ function ofr_linkHtml(d) {
 const oil_hasRights = d => OFD.rightsFor === d.id || Object.values(d.rights || {}).some(v => v && (typeof v !== 'object' || v.id || v.text));
 // 2.356.0 C (#3005): "New invoice" > "From a quotation…": the open quotations (not declined, no invoice yet); a click is "Create invoice"
 async function oil_pickOffer() {
-  let rows; try { rows = await docsAll('/api/office/docs?kind=offer', api); } catch (x) { toast(x.message || tr('unknown')); return; }
+  let rows; try { rows = await docsAll('/api/office/docs?kind=offer', api); } catch (x) { ofcErr(x); return; }
   rows = rows.filter(r => !['declined', 'superseded'].includes(r.status) && !r.invoiced).sort((a, b) => (b.status === 'accepted') - (a.status === 'accepted'));
   const md = modal(`<h3>${esc(tr('Invoice from a quotation'))}</h3>${rows.length ? `<ul class="ofdpick oil_pick" role="list">${rows.map(r => `<li><button type="button" class="ofcrow" data-oil-pick="${r.id}"><span class="ofcn"><b>${esc(r.number || tr('(no number)'))}${r.recipient_name ? ` · ${esc(r.recipient_name)}` : ''}</b><small class="muted">${esc([r.project_title, r.date ? fmtDateLoc(r.date) : '', r.status_text].filter(Boolean).join(' · '))}</small></span><span class="ofdsum"><b>${esc(r.net_text)}</b><small class="muted">${esc(tr('net'))}</small></span></button></li>`).join('')}</ul>` : `<p class="muted">${esc(tr('No open quotations.'))}</p>`}<div class="foot"><span class="spacer"></span><button type="button" class="btn" data-m="close">${tr('Cancel')}</button></div>`);
   md.addEventListener('click', e => {
@@ -899,7 +899,7 @@ async function ofdClick(e) {
   if (a === 'kva-st') { await ofdSave('POST', `/api/office/docs/${OFD.doc.id}/status`, {status: b.dataset.st}); return; }  // 2.138.0 E (#2235): the answer updates OFD.doc
   if (a === 'credit') {
     if (!await askConfirm(tr('Credit note for {0}?', d.number || ''), tr('A draft with all positions is made. Shorten it for a partial credit; finalised over the full amount it cancels the invoice.'), {ok: tr('Create credit note')})) return;
-    try { const j = await ofdRefCall(`credit${d.id}`, ref => rawFetch('POST', `/api/office/docs/${d.id}/credit`, {client_ref: ref})); OFD.list = null; OFD.kind = 'credit'; OFD.doc = j; go(ofd_href(j.id, j.kind)); } catch (x) { toast(x.message || tr('unknown')); } return;
+    try { const j = await ofdRefCall(`credit${d.id}`, ref => rawFetch('POST', `/api/office/docs/${d.id}/credit`, {client_ref: ref})); OFD.list = null; OFD.kind = 'credit'; OFD.doc = j; go(ofd_href(j.id, j.kind)); } catch (x) { ofcErr(x); } return;
   }
   if (a === 'pay') { ofdPaymentDialog(d); return; }
   if (a === 'pay-del') {  // 2.152.0 C (#2168): a payment is reversed by a second line (both stay visible), never deleted
@@ -923,7 +923,7 @@ async function ofdClick(e) {
     const j = await ofdSave('POST', `/api/office/docs/${d.id}/finalize`, {}); if (j) toast(tr('Finalised as {0}', j.number || ''));
     return;
   }
-  if (a === 'dup') { try { const ask = await ofdDupAsk(d); if (!ask) return; const j = await ofdRefCall(`dup${d.id}`, ref => rawFetch('POST', `/api/office/docs/${d.id}/duplicate`, {client_ref: ref, ...ask})); OFD.list = null; OFD.doc = j; toast(tr('Copied as {0}', j.number || tr('Draft'))); go(ofd_href(j.id, j.kind)); } catch (x) { toast(x.message || tr('unknown')); } return; }
+  if (a === 'dup') { try { const ask = await ofdDupAsk(d); if (!ask) return; const j = await ofdRefCall(`dup${d.id}`, ref => rawFetch('POST', `/api/office/docs/${d.id}/duplicate`, {client_ref: ref, ...ask})); OFD.list = null; OFD.doc = j; toast(tr('Copied as {0}', j.number || tr('Draft'))); go(ofd_href(j.id, j.kind)); } catch (x) { ofcErr(x); } return; }
   if (a === 'more') { menu(b, ofdMoreItems(d)); return; }
   if (a === 'it-svc') { ofdServicePicker(); return; }
   if (a === 'it-head') { d.items.push({kind: 'heading', title: '', detail: '', qty: 1, unit: 'day', rate: 0, tax: 'standard', raw_fee: 0, producing: 0, intext: 'intern', cost: 0, discountable: 1}); ofdDraw();  // 2.114.1 A (#2254): saved with the first typed title
@@ -955,12 +955,12 @@ function cdn_recHtml(d, ro) {
 }
 async function cdn_editClient(d) {
   if (typeof clientModal !== 'function' || !d.client_id) return;
-  let c; try { c = await api('GET', `/api/clients/${d.client_id}`); } catch (x) { toast(x.message || tr('unknown')); return; }
+  let c; try { c = await api('GET', `/api/clients/${d.client_id}`); } catch (x) { ofcErr(x); return; }
   clientModal(c, {stay: true, done: () => ofdLoadDoc(d.id, true)});
 }
 // 2.38.0 (#1021, F1): creating, payments, sending, reminders (small dialogs; the server validates)
 async function ofdCreate(body) {
-  try { const j = await ofdRefCall('new', ref => rawFetch('POST', '/api/office/docs', {...body, client_ref: ref})); OFD.doc = j; OFD.list = null; OFD.kind = j.kind; go(ofd_href(j.id, j.kind)); } catch (x) { toast(x.message || tr('unknown')); }
+  try { const j = await ofdRefCall('new', ref => rawFetch('POST', '/api/office/docs', {...body, client_ref: ref})); OFD.doc = j; OFD.list = null; OFD.kind = j.kind; go(ofd_href(j.id, j.kind)); } catch (x) { ofcErr(x); }
 }
 // 2.144.10 C (#2576): trial documents (TEST number, watermark MUSTER, deletable any time); list: tag, filter, count.
 // 2.417.0 C (#3445): one test mode instead - a switch in the office settings, per person and office (setting trial_mode =
@@ -995,7 +995,7 @@ async function tri_set(on) {
     if (S.settings) S.settings.trial_mode = was;
     OFD.list = null;
     if (typeof ofcDraw === 'function') ofcDraw();
-    toast(x.message || tr('unknown'));
+    ofcErr(x);
   }
 }
 function tri_stripHtml() {
@@ -1008,7 +1008,7 @@ async function tri_new(kind) {
   try {
     const j = await ofdRefCall('new', ref => rawFetch('POST', '/api/office/docs', {...(kind === 'offer' ? {} : {kind}), ...tri_flag(), client_ref: ref}));
     OFD.doc = j; OFD.list = null; OFD.kind = j.kind || kind; go(ofd_href(j.id, j.kind || kind));
-  } catch (x) { toast(x.message || tr('unknown')); }
+  } catch (x) { ofcErr(x); }
 }
 function tri_filterHtml() {
   if (!tri_on()) return '';
@@ -1032,7 +1032,7 @@ async function tri_deleteAll() {
   const n = TRI.count || OFD.trialCount;
   if (!await askConfirm(tr('Delete all trial documents?'), trn('{0} trial document (with its PDFs and share links) disappears permanently. Real documents stay.', '{0} trial documents (with their PDFs and share links) disappear permanently. Real documents stay.', n), {ok: tr('Delete all'), danger: true})) return;
   try { const j = await rawFetch('POST', '/api/office/trial/delete-all', {}); OFD.list = null; OFD.doc = null; TRI.count = 0; const b = $('#tri-del-all'); if (b) b.hidden = true; toast(trn('{0} trial document deleted', '{0} trial documents deleted', (+j.docs || 0) + (+j.gen_docs || 0))); }
-  catch (x) { toast(x.message || tr('unknown')); }
+  catch (x) { ofcErr(x); }
 }
 document.addEventListener('change', e => { if (e.target.id === 'tri-mode') tri_set(e.target.checked); });
 document.addEventListener('click', e => {
@@ -1061,7 +1061,7 @@ function absHeadFields(d) {
 }
 async function absInvoiceDialog(d) {
   let info;
-  try { info = await api('GET', `/api/office/docs/${d.id}/progress`); } catch (x) { toast(x.message || tr('unknown')); return; }
+  try { info = await api('GET', `/api/office/docs/${d.id}/progress`); } catch (x) { ofcErr(x); return; }
   const pl = info.progress || [], cur = ofcSym(d.currency);  // 2.189.0 (#2475)
   const plist = pl.length ? `<ul class="ofdpick abs-list" role="list">${pl.map(p => `<li><span class="ofcn"><b>${esc(p.number || tr('Draft'))}</b><small class="muted">${esc([p.date ? fmtDateLoc(p.date) : '', p.gross_text, !p.locked ? tr('Draft') : +p.open <= 0 ? tr('Paid') : tr('open: {0}', p.open_text || p.open)].filter(Boolean).join(' · '))}</small></span></li>`).join('')}</ul>`
     : `<p class="muted">${tr('No progress invoices yet')}</p>`;
@@ -1140,7 +1140,7 @@ function tbill_html() {
 async function tbill_load() {
   const key = TBL.key;
   try { const j = await rawFetch('GET', `/api/office/time-open?${new URLSearchParams({from: TBL.from, to: TBL.to})}`); if (TBL.key === key) TBL.data = j; }
-  catch (x) { if (TBL.key === key) TBL.err = x.message || tr('unknown'); }
+  catch (x) { if (TBL.key === key) TBL.err = ofcErrHere(x); }
   if (TBL.key === key && S.route.mod === 'office' && OFC.tab === 'time') renderView();
 }
 // 2.218.0 B (#2805): a number field in the editor selects its content on focus, so typing replaces the preset ("1" + 2 = "12")
@@ -1217,7 +1217,7 @@ async function ofdSendDialog(d) {
 }
 async function ofdReminderDialog() {
   let rows = [];
-  try { rows = await docsAll(`/api/office/docs?kind=invoice&status=open${tri_on() ? '&trial=1' : ''}`, api); } catch (x) { toast(x.message || tr('unknown')); return; }
+  try { rows = await docsAll(`/api/office/docs?kind=invoice&status=open${tri_on() ? '&trial=1' : ''}`, api); } catch (x) { ofcErr(x); return; }
   if (!rows.length) { toast(tr('No open invoices')); return; }
   const s = OFC.info?.settings || {};
   // 2.355.0 D (#2846): only invoices past their due date can be reminded of (the server answers 409); the others stay visible, greyed out
@@ -1289,7 +1289,7 @@ document.addEventListener('toggle', e => { const s = e.target?.dataset?.sec; if 
 // 2.120.0 D (#2089): delivery notes / proofs of service and the timesheet of an invoice
 function ls_click(a, d) {
   if (a === 'new-ls') return ofdCreate({kind: 'delivery', ...tri_flag()});  // 2.417.0 C (#3445)
-  const make = async title => { try { const j = await ofdRefCall(`ls${d.id}`, ref => rawFetch('POST', `/api/office/docs/${d.id}/delivery`, {title, client_ref: ref})); OFD.list = null; OFD.kind = 'delivery'; OFD.doc = j; go(ofd_href(j.id, j.kind)); } catch (x) { toast(x.message || tr('unknown')); } };
+  const make = async title => { try { const j = await ofdRefCall(`ls${d.id}`, ref => rawFetch('POST', `/api/office/docs/${d.id}/delivery`, {title, client_ref: ref})); OFD.list = null; OFD.kind = 'delivery'; OFD.doc = j; go(ofd_href(j.id, j.kind)); } catch (x) { ofcErr(x); } };
   menu($('[data-ofd="to-ls"]'), [{label: tr('Create delivery note'), icon: 'file', fn: () => make('delivery')}, {label: tr('Create proof of service'), icon: 'file', fn: () => make('service')}]);
 }
 function ls_moreItems(d, inList) {
@@ -1344,7 +1344,7 @@ function ofd_fltHtml() {
 
 // 2.272.0 E2 (#3038): the office trash - deleted drafts and master data, restore or delete for good, the trash period
 async function otb_restore(tid, after) {
-  let j; try { j = await api('POST', `/api/office/trash/${tid}/restore`); } catch (x) { toast(x.message || tr('unknown')); return; }
+  let j; try { j = await api('POST', `/api/office/trash/${tid}/restore`); } catch (x) { ofcErr(x); return; }
   toast(j.note || tr('Restored'));  // 2.552.0 (#4561 B19): a draft whose client is gone for good comes back without one
   if (j.kind === 'trip' || j.kind === 'trip_item') { if (typeof RK !== 'undefined') RK.data = null; }  // 2.530.0 C (#4315)
   if (j.kind === 'trip_import' && typeof RK !== 'undefined') RK.data = null;  // 2.567.0 (#4707): the kinds of the cash flow / imports
@@ -1356,7 +1356,7 @@ async function otb_restore(tid, after) {
   if (after) after();
 }
 async function otb_open() {
-  let d; try { d = await api('GET', '/api/office/trash'); } catch (x) { toast(x.message || tr('unknown')); return; }
+  let d; try { d = await api('GET', '/api/office/trash'); } catch (x) { ofcErr(x); return; }
   const row = x => `<li data-id="${x.id}"><span class="an">${esc(x.kind === 'doc' ? ofdKindName(x.sub, true) : x.kind === 'trip' ? tr('Trip') : x.kind === 'trip_item' ? tr('Receipt') : x.kind === 'cc_line' ? tr('Credit card position') : ({part: tr('Part'), rgroup: tr('Rights group'), signoff: tr('Video sign-off'), fixed_cost: tr('Fixed cost'), fixed_import: tr('Fixed costs'), cf_start: tr('Starting balance'), cf_adjust: tr('Correction'), letter_link: tr('Letter'), trip_import: tr('Trips')})[x.kind] || tr('Master data'))}${x.label ? ' · ' + esc(x.label) : ''}</span> <span class="muted">${esc(fmtDayAbs(x.deleted_at.slice(0, 10)))}</span>
     <button type="button" class="linkbtn" data-m="restore">${esc(tr('Restore'))}</button> <button type="button" class="linkbtn" data-m="purge">${esc(tr('Delete permanently'))}</button></li>`;
   const md = modal(`<h3>${esc(tr('Trash'))}</h3>${d.items.length ? `<ul class="atrash otblist">${d.items.map(row).join('')}</ul>` : `<p class="muted">${esc(tr('The trash is empty'))}</p>`}
@@ -1368,7 +1368,7 @@ async function otb_open() {
     if (b.dataset.m === 'restore') { md.remove(); await otb_restore(id); return; }
     if (b.dataset.m === 'purge') {
       if (!await askConfirm(tr('Delete “{0}” permanently?', li.querySelector('.an')?.textContent || ''), tr('This cannot be undone.'), {ok: tr('Delete permanently'), danger: true})) return;
-      try { await api('DELETE', `/api/office/trash/${id}`); li.remove(); } catch (x) { toast(x.message || tr('unknown')); }
+      try { await api('DELETE', `/api/office/trash/${id}`); li.remove(); } catch (x) { ofcErr(x); }
     }
   });
 }
