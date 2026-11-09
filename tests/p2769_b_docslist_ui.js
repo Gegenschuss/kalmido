@@ -48,7 +48,10 @@ const order = async q => ((await call('GET', '/api/docs?ws=private&facets=0&' + 
   dbx('UPDATE doc_meta SET review=(CASE WHEN node_id=? THEN 1 ELSE 0 END) WHERE node_id IN (?, ?, ?)', [D2, D1, D2, D3]);
   const ROOT = (await call('GET', `/api/files/nodes/${D1}`)).parent_id;
   const PLAIN = (await call('POST', '/api/files/folders', {space: 'private', name: 'Holiday'})).id;
+  const pfd = new FormData(); pfd.append('parent_id', String(PLAIN)); pfd.append('file', new Blob(['Sun cream, hat'], {type: 'text/plain'}), 'packing-list.txt');
+  const PFILE = ((await (await fetch(B + 'api/files/upload', {method: 'POST', headers: {'X-Requested-With': 'kalmido', Cookie: CK}, body: pfd})).json().catch(() => ({}))).items || [])[0]?.id;  // the switch shows in a folder with entries
   check(ROOT && PLAIN && (await call('GET', `/api/files?parent=${ROOT}`)).node?.recog_on, 'setup: the documents folder recognises, a plain folder beside it');
+  check(PFILE, 'setup: a file in the plain folder');
 
   // ================= the server: sort by type / to review, the setting's new value
   const tyA = await order('sort=type'), tyD = await order('sort=type&dir=desc');
@@ -96,7 +99,7 @@ const order = async q => ((await call('GET', '/api/docs?ws=private&facets=0&' + 
   check(await until(() => d.querySelector(`.abview .dc-infold .dc-card [data-dco="${D1}"]`) && !d.querySelector('.abdl')), 'Cards again: the cards');
   check(await until(async () => !(await cards()).includes('!n:' + ROOT)), '... the choice removed from the setting');
   w.location.hash = '#ablage/' + PLAIN;
-  check(await until(() => d.querySelector('.abview [data-abdv="list"][aria-pressed="true"]') && !d.querySelector('.dc-infold')), 'a folder without recognition: its own switch, a list by default');
+  check(await until(() => d.querySelector('.abview [data-abdv="list"][aria-pressed="true"]') && d.querySelector(`.abview .ablist [data-abid="${PFILE}"]`) && !d.querySelector('.dc-infold')), 'a folder without recognition: its own switch, a list by default');
   w.close();
 
   // ================= the widths (Firefox): 1280 the columns, 460 / 320 the second line, nothing over the side
