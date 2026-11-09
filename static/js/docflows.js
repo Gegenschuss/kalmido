@@ -32,6 +32,8 @@ function dfl_formHtml(s) {  // the form "New flow" (ids dcr-* as before for the 
   const dl = (id, xs) => `<datalist id="${id}">${(xs || []).map(x => `<option value="${esc(x.name)}">`).join('')}</datalist>`;
   const row = (id, label, input) => `<div class="row"><label for="${id}">${label}</label>${input}</div>`;
   const inp = (id, max, extra = '') => `<input id="${id}" maxlength="${max}" autocomplete="off" ${extra}>`;
+  // 2.761.0 (#4868): sender / document type (if and then) with the suggestion field of the tags (tagsel.js, one value)
+  const tf = typeof tf_html === 'function', one = (id, xs, list) => tf ? tf_html({id, vals: [], all: xs || [], single: true}) : inp(id, 120, `list="${list}"`);
   const chk = (name, xs) => `<div class="row dfl-chk" role="group">${xs.map(([v, l]) => `<label class="chkl"><input type="checkbox" data-dfl="${name}" value="${esc(String(v))}"> ${esc(tr(l))}</label>`).join('')}</div>`;
   return `<details class="dc-radd dfl-add"><summary>${tr('New flow')}</summary>
     ${row('dfl-name', tr('Name'), inp('dfl-name', 120))}
@@ -46,11 +48,11 @@ function dfl_formHtml(s) {  // the form "New flow" (ids dcr-* as before for the 
     <p class="muted">${tr('Source')}</p>${chk('src', DFL_SOURCES)}
     ${row('dfl-fn', tr('File name'), inp('dfl-fn', 200, `placeholder="${esc(tr('e.g. invoice*.pdf'))}"`))}
     ${row('dfl-htags', tr('has one of the tags'), inp('dfl-htags', 300, `list="dcr-gl" placeholder="${esc(tr('comma-separated'))}"`))}
-    ${row('dfl-htype', tr('Document type is'), inp('dfl-htype', 120, 'list="dcr-tl"'))}
-    ${row('dfl-hsender', tr('Sender is'), inp('dfl-hsender', 120, 'list="dcr-sl"'))}
+    ${row('dfl-htype', tr('Document type is'), one('dfl-htype', s.types, 'dcr-tl'))}
+    ${row('dfl-hsender', tr('Sender is'), one('dfl-hsender', s.senders, 'dcr-sl'))}
     <h5>${tr('Actions')}</h5>
-    ${row('dcr-sender', tr('then sender'), inp('dcr-sender', 120, 'list="dcr-sl"') + dl('dcr-sl', s.senders))}
-    ${row('dcr-type', tr('then document type'), inp('dcr-type', 120, 'list="dcr-tl"') + dl('dcr-tl', s.types))}
+    ${row('dcr-sender', tr('then sender'), one('dcr-sender', s.senders, 'dcr-sl') + (tf ? '' : dl('dcr-sl', s.senders)))}
+    ${row('dcr-type', tr('then document type'), one('dcr-type', s.types, 'dcr-tl') + (tf ? '' : dl('dcr-tl', s.types)))}
     ${row('dcr-tags', tr('then tags'), inp('dcr-tags', 300, `list="dcr-gl" placeholder="${esc(tr('comma-separated'))}"`) + dl('dcr-gl', s.tags))}
     ${row('dfl-untag', tr('Remove tags'), inp('dfl-untag', 300, `list="dcr-gl" placeholder="${esc(tr('comma-separated'))}"`))}
     ${row('dcr-folder', tr('then folder'), inp('dcr-folder', 120, 'list="dcr-fl"') + `<datalist id="dcr-fl">${(s.folders || []).map(x => `<option value="${esc(x.path || x.name)}">`).join('')}</datalist>`)}

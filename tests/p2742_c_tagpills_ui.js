@@ -7,7 +7,7 @@
 // - Backspace in the empty field takes the last pill away; the x takes one away; Esc closes the list, not the view
 // - every change saves at once (PATCH, data-dcp=tags) with the view's undo; a reload shows the saved pills
 // - names are text: a tag with markup in its name stays text in the pills and in the list
-// - one value (single): a second name replaces the first (the mode the sender / type field will use later)
+// - one value (single): a second name replaces the first (2.761.0 #4868: in the text field itself, see p2761_a_docsender_ui)
 // P4: alice works without an organisation (private documents): the person without an organisation (freelancer-matrix: docs)
 const {execFileSync} = require('child_process');
 const path = require('path');
@@ -141,7 +141,8 @@ const tagsOf = async id => ((await call('GET', `/api/docs/${id}`)).tags || []).m
   type(w2, i1, 'be');
   await until(() => d2.querySelector('body > .tflb [role="option"]'));
   keyOn(w2, i1, 'Enter');
-  check([...d2.querySelectorAll('#tf1test .tfp')].map(p => p.dataset.tfv).join('|') === 'Beta' && d2.querySelector('#tf1test .tfval').value === 'Beta', 'one value: the new one replaces the old one');
+  // 2.761.0 (#4868): one value has no pill and no hidden field - the value stands in the text field itself
+  check(!d2.querySelector('#tf1test .tfp, #tf1test .tfval') && i1.value === 'Beta', 'one value: the new one replaces the old one');
   w2.close();
 
   console.log(`p2742_c_tagpills_ui: ${ok} ok, ${F.length} failed`);

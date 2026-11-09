@@ -165,18 +165,39 @@ document.addEventListener('click', e => {
 // (dt_pick): the given tags as pills with an x, a text field behind them; from the first letter a list of its own (no
 // <datalist>, it looks different in every browser) with the known tags (the start first, then within; the hit in bold),
 // the arrow keys + Enter / Tab take one, a comma or Enter makes a new one ("New: …" as the last line), Backspace in the
-// empty field takes the last pill away. single: one value (sender / document type later). Accessible as a combobox with
+// empty field takes the last pill away. single: one value (2.761.0 #4868, sender / document type, see tf1_* below). Accessible as a combobox with
 // a listbox and aria-activedescendant. The list lives in <body> (a redraw of the view, which morphs the field, keeps it
 // open; a dialog does not clip it). A change sets the hidden field (attrs, e.g. data-dcp="tags", its value the names
 // joined by ", ") and sends it a change event: the caller saves as before. Names come in as text only (esc / textContent).
-const TFLD = {all: new Map(), lb: null, inp: null, act: -1, rows: []};
+const TFLD = {all: new Map(), lb: null, inp: null, act: -1, rows: [], own: false};
 const tf_norm = s => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, 120);
 const tf_pillHtml = (v, ro) => `<span class="tsp tsp-in tfp" data-tfv="${esc(v)}"><span class="tft">${esc(v)}</span>${ro ? '' : `<button type="button" class="tfx" data-tfx tabindex="-1" aria-label="${esc(tr('Remove {0}', v))}">${ic('x', 's')}</button>`}</span>`;
 // id: the text field's id (a <label for> names it); all: the known names; vals: the given ones; attrs: on the hidden field
 function tf_html({id, vals, all, ro = false, single = false, attrs = '', ph = '', label = '', noNew = false}) {
   TFLD.all.set(id, (all || []).map(x => tf_norm(x?.name ?? x)).filter(Boolean));
   const vs = (vals || []).map(tf_norm).filter(Boolean);
+  if (single) return tf1_html(id, vs[0] || '', {ro, attrs, ph, label, noNew});
   return `<div class="tfld${single ? ' tf1' : ''}${ro ? ' tfro' : ''}" data-tf="${esc(id)}"${single ? ' data-tf1' : ''}${noNew ? ' data-tfnonew' : ''}><span class="tfps">${vs.map(v => tf_pillHtml(v, ro)).join('')}</span>${ro ? '' : `<input id="${esc(id)}" class="tfin" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="${esc(id)}-lb" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="enter" maxlength="120"${label ? ` aria-label="${esc(label)}"` : ''}${ph && !vs.length ? ` placeholder="${esc(ph)}"` : ''}>`}<input type="hidden" class="tfval" ${attrs} value="${esc(vs.join(', '))}"></div>`;
+}
+// 2.761.0 (#4868): one value (sender / document type, also in the flows): no pill, the value stands in the text field itself
+// (one can correct a letter), the same list from the first letter; taking a row or Enter sets the field and sends it ONE
+// change event (attrs sit on the text field, e.g. data-dcp="sender": the caller saves as with a plain field). Free text
+// stays a new value (noNew: not), a known name is taken in its own spelling. A comma is part of a name here.
+function tf1_html(id, v, {ro, attrs, ph, label, noNew}) {
+  return `<div class="tfld tf1${ro ? ' tfro' : ''}" data-tf="${esc(id)}" data-tf1${noNew ? ' data-tfnonew' : ''}><input id="${esc(id)}" class="tfin" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="${esc(id)}-lb" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" maxlength="120" value="${esc(v)}"${label ? ` aria-label="${esc(label)}"` : ''}${ph ? ` placeholder="${esc(ph)}"` : ''} ${attrs}${ro ? ' disabled' : ''}></div>`;
+}
+const tf1_is = inp => !!inp.closest('.tfld')?.hasAttribute('data-tf1');
+// the value as it is saved: a known name in its own spelling; a new one only without noNew (else the last saved one)
+function tf1_norm(inp, v) {
+  const root = inp.closest('.tfld'), n = tf_norm(v); if (!root || !n) return n;
+  const known = (TFLD.all.get(root.dataset.tf) || []).find(x => x.toLowerCase() === n.toLowerCase());
+  return known || (root.hasAttribute('data-tfnonew') ? (inp.getAttribute('value') || '') : n);
+}
+// sets the value and tells the caller once; the browser's own change when leaving the field afterwards is the same one
+function tf1_commit(inp, v) {
+  inp.value = tf1_norm(inp, v); /** @type {any} */ (inp)._tf1sent = inp.value;  // a property: a redraw (morph) keeps it, an attribute it would drop
+  TFLD.own = true;
+  try { inp.dispatchEvent(new Event('change', {bubbles: true})); } finally { TFLD.own = false; }
 }
 const tf_vals = root => [...root.querySelectorAll('.tfp')].map(p => /** @type {HTMLElement} */ (p).dataset.tfv || '');
 // sets the pills (the field's own drawing, the caller's redraw draws the same) and tells the hidden field
@@ -190,22 +211,21 @@ function tf_set(root, vals, tell = true) {
   if (h.value !== nv) { h.value = nv; if (tell) h.dispatchEvent(new Event('change', {bubbles: true})); }
   return out;
 }
-// names taken (one or several at once = one change): a known one in its own spelling; single = the last replaces the value
+// names taken (one or several at once = one change): a known one in its own spelling (one value: tf1_commit)
 function tf_add(root, names) {
-  const all = TFLD.all.get(root.dataset.tf) || [], one = root.hasAttribute('data-tf1'), cur = tf_vals(root);
-  let out = one ? cur.slice(0, 1) : [...cur];
+  const all = TFLD.all.get(root.dataset.tf) || [], cur = tf_vals(root);
+  const out = [...cur];
   for (const name of Array.isArray(names) ? names : [names]) {
     const v = tf_norm(name); if (!v) continue;
     const known = all.find(x => x.toLowerCase() === v.toLowerCase());
     if (!known && root.hasAttribute('data-tfnonew')) continue;
-    if (one) out = [known || v];
-    else if (!out.some(x => x.toLowerCase() === v.toLowerCase())) out.push(known || v);
+    if (!out.some(x => x.toLowerCase() === v.toLowerCase())) out.push(known || v);
   }
   if (out.length !== cur.length || out.some((x, i) => x !== cur[i])) tf_set(root, out);
 }
 // the hits of q: the known names not given yet, the ones starting with q first, then the ones containing it
 function tf_hits(root, q) {
-  const all = TFLD.all.get(root.dataset.tf) || [], cur = new Set(tf_vals(root).map(x => x.toLowerCase())), k = q.toLowerCase();
+  const all = TFLD.all.get(root.dataset.tf) || [], cur = new Set(root.hasAttribute('data-tf1') ? [] : tf_vals(root).map(x => x.toLowerCase())), k = q.toLowerCase();
   const free = all.filter(x => !cur.has(x.toLowerCase()));
   if (!k) return free.slice(0, 50);
   return [...free.filter(x => x.toLowerCase().startsWith(k)), ...free.filter(x => !x.toLowerCase().startsWith(k) && x.toLowerCase().includes(k))].slice(0, 50);
@@ -261,6 +281,7 @@ function tf_take(inp, typed = false) {
   const root = inp.closest('.tfld'); if (!root) return false;
   const r = !typed && TFLD.inp === inp ? TFLD.rows[TFLD.act] : null, v = r ? r.v : tf_norm(inp.value);
   if (!v) return false;
+  if (root.hasAttribute('data-tf1')) { tf_close(); if (!(typed && tf1_norm(inp, v) === inp.getAttribute('value'))) tf1_commit(inp, v); return true; }  // 2.761.0 (#4868): Enter on the saved value saves nothing
   inp.value = '';
   tf_add(root, v); tf_close();
   return true;
@@ -268,7 +289,7 @@ function tf_take(inp, typed = false) {
 document.addEventListener('input', e => {
   const inp = dt_el(e).closest?.('.tfin'); if (!inp) return;
   const el = /** @type {HTMLInputElement} */ (inp);
-  if (el.value.includes(',')) {  // a comma: what stands before it becomes a tag (also pasted "a, b, c")
+  if (el.value.includes(',') && !tf1_is(el)) {  // a comma: what stands before it becomes a tag (also pasted "a, b, c")
     const parts = el.value.split(','), rest = parts.pop() || '', root = el.closest('.tfld');
     el.value = rest.trimStart();
     if (root) tf_add(root, parts);
@@ -289,7 +310,7 @@ document.addEventListener('keydown', e => {
     if (open && TFLD.act >= 0) { stop(); tf_take(inp); }
   } else if (e.key === 'Escape') {
     if (open) { stop(); tf_close(); }
-  } else if (e.key === 'Backspace' && !inp.value && inp.selectionStart === 0) {
+  } else if (e.key === 'Backspace' && !inp.value && inp.selectionStart === 0 && !tf1_is(inp)) {
     const root = inp.closest('.tfld'), cur = root ? tf_vals(root) : [];
     if (root && cur.length) { stop(); tf_set(root, cur.slice(0, -1)); }
   }
@@ -297,11 +318,18 @@ document.addEventListener('keydown', e => {
 // leaving the field: typed text becomes a tag (the field's change event), the list closes
 document.addEventListener('change', e => {
   const inp = /** @type {HTMLInputElement} */ (dt_el(e).closest?.('.tfin')); if (!inp) return;
+  if (tf1_is(inp)) {  // 2.761.0 (#4868): one value - the change goes on to the caller, once per value
+    if (TFLD.own) return;
+    const v = tf1_norm(inp, inp.value), sent = /** @type {any} */ (inp)._tf1sent; inp.value = v; /** @type {any} */ (inp)._tf1sent = null;
+    if (sent === v) e.stopPropagation();
+    return;
+  }
   e.stopPropagation();
   const root = inp.closest('.tfld'), v = inp.value; if (!root || !tf_norm(v)) return;
   inp.value = '';
   tf_add(root, v.split(','));
 }, true);
+document.addEventListener('focusin', e => { const inp = dt_el(e).closest?.('.tf1 .tfin'); if (inp) /** @type {any} */ (inp)._tf1sent = null; });  // 2.761.0 (#4868)
 document.addEventListener('focusout', e => { if (TFLD.inp && dt_el(e) === TFLD.inp) setTimeout(() => { if (TFLD.inp && document.activeElement !== TFLD.inp) tf_close(); }, 0); });
 // a row of the list: the press keeps the focus in the field, the click takes the row
 document.addEventListener('mousedown', e => { if (dt_el(e).closest?.('.tflb') || dt_el(e).closest?.('.tfx')) e.preventDefault(); });
