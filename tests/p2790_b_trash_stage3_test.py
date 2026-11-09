@@ -24,13 +24,13 @@ from datetime import timedelta, timezone
 import kt
 from kt import B, CT, DATA, check, sess
 import testclock
-from freelancer_fixture import freelancer
+from freelancer_fixture import FEATURES, freelancer
 
 kt.fresh({"KALMIDO_INSTANCE_MODE": "workspaces"}, prefix="P2790B")
 assert sess().post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice Admin", "password": "password123"}).ok
 A = sess("alice")
 A.post(B + "/api/admin/setup", json={"lang": "en", "collab_all": True})
-A.patch(B + "/api/settings", json={"lang": "en", "tour": "done"})
+A.patch(B + "/api/settings", json={"lang": "en", "tour": "done", "features": FEATURES})  # the areas on: a refusal is the rights, not a switch
 FID, Fr = freelancer(B, A)
 PDF = b"%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n"
 
@@ -173,7 +173,8 @@ check(Fr.delete(B + f"/api/sheets/{S1}").ok, "tables: into the trash")
 check(trashed("sheets", S1) == (True, FID) and core_note("sheet_table", S1, "trash"), f"tables: in the core's trash {trashed('sheets', S1)}")
 tl = Fr.get(B + "/api/sheets/trash", params={"space": "private"}).json()
 check(S1 in [x["id"] for x in tl.get("sheets") or []], "tables: the trash view lists it")
-check(A.post(B + f"/api/sheets/{S1}/restore").status_code in (403, 404), "tables: someone else cannot restore it")
+r = A.post(B + f"/api/sheets/{S1}/restore")
+check(r.status_code in (403, 404) and trashed("sheets", S1) == (True, FID), f"tables: someone else cannot restore it {r.status_code} {r.text[:160]}")
 A.post(B + "/api/sheets/purge", json={"space": "private", "ids": [S1]})
 check(trashed("sheets", S1) is not None, "tables: someone else cannot delete it for good")
 check(Fr.post(B + f"/api/sheets/{S1}/restore").ok and trashed("sheets", S1) == (False, None), "tables: restored")
