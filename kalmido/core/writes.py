@@ -401,7 +401,7 @@ def obj_trash(c, uid, kind, rid, step=True):
     row, _ = obj_need(c, uid, kind, rid, _trash_need(reg))
     write_lock(c, f"obj-{kind}-{int(rid)}")
     ts = _now()
-    n = c.execute(f"UPDATE {reg['table']} SET deleted_at=?, deleted_by=?, rev=rev+1, updated_at=?, updated_by=? WHERE id=? AND {live_sql()}",
+    n = c.execute(f"UPDATE {qi(reg['table'], (reg['table'],))} SET deleted_at=?, deleted_by=?, rev=rev+1, updated_at=?, updated_by=? WHERE id=? AND {live_sql()}",
                   (ts, uid, ts, uid, int(rid))).rowcount
     if not n:
         return obj_row(c, kind, rid)  # someone else was quicker (the lock waited): it is in the trash already
@@ -432,7 +432,7 @@ def obj_restore(c, uid, kind, rid, step=True):
         c.execute("UPDATE fs_nodes SET deleted_at=NULL, deleted_by=NULL, name=? WHERE id=?", (nm, n["id"]))
     _kids_restore(c, reg, rid, gone)  # 2.773.0 (#5292)
     ts = _now()
-    c.execute(f"UPDATE {reg['table']} SET deleted_at=NULL, deleted_by=NULL, rev=rev+1, updated_at=?, updated_by=? WHERE id=?",
+    c.execute(f"UPDATE {qi(reg['table'], (reg['table'],))} SET deleted_at=NULL, deleted_by=NULL, rev=rev+1, updated_at=?, updated_by=? WHERE id=?",
               (ts, uid, int(rid)))
     obj_history_add(c, uid, kind, rid, {}, {}, action="restore")
     if step:

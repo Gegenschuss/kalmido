@@ -181,4 +181,4 @@ for a in (("t; drop", "deleted_at"), ("t", "name")):
 check("L deleted_at IS NULL | t.deleted_at IS NULL | t.revoked_at IS NOT NULL | l.deleted_at IS NULL" in out and out.count("ERR") == 2
       and "NOERR" not in out, f"live_sql / trash_sql: the condition, a wrong alias / column is refused {out[-300:]}")
 
-done()
+sys.exit(done("p2773_b_trash_core"))

@@ -1693,14 +1693,6 @@
   {
    "rule": "semgrep.kalmido-sql-ident-without-qi",
    "file": "kalmido/core/writes.py",
-   "code": "c.execute(f\"DELETE FROM {reg['table']} WHERE id=?\", (int(rid),))",
-   "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
-   "date": "2026-11-09",
-   "task": 5296
-  },
-  {
-   "rule": "semgrep.kalmido-sql-ident-without-qi",
-   "file": "kalmido/core/writes.py",
    "code": "c.execute(f\"DELETE FROM {t} WHERE kind=? AND ref_id=?\", (kind, int(rid)))",
    "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
    "date": "2026-11-09",
@@ -1710,22 +1702,6 @@
    "rule": "semgrep.kalmido-sql-ident-without-qi",
    "file": "kalmido/core/writes.py",
    "code": "c.execute(f\"SELECT id FROM {t} WHERE {where} FOR UPDATE\", args).fetchall()",
-   "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
-   "date": "2026-11-09",
-   "task": 5296
-  },
-  {
-   "rule": "semgrep.kalmido-sql-ident-without-qi",
-   "file": "kalmido/core/writes.py",
-   "code": "c.execute(f\"UPDATE {reg['table']} SET deleted_at=?, deleted_by=?, rev=rev+1, updated_at=?, updated_by=? WHERE id=? AND deleted_at IS NULL\",",
-   "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
-   "date": "2026-11-09",
-   "task": 5296
-  },
-  {
-   "rule": "semgrep.kalmido-sql-ident-without-qi",
-   "file": "kalmido/core/writes.py",
-   "code": "c.execute(f\"UPDATE {reg['table']} SET deleted_at=NULL, deleted_by=NULL, rev=rev+1, updated_at=?, updated_by=? WHERE id=?\",",
    "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
    "date": "2026-11-09",
    "task": 5296
@@ -1950,14 +1926,6 @@
    "rule": "semgrep.kalmido-sql-ident-without-qi",
    "file": "kalmido/docs/web.py",
    "code": "r = c.execute(f\"SELECT ws FROM {S.LABEL_KINDS[kind]} WHERE id=?\", (lid,)).fetchone()",
-   "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
-   "date": "2026-11-09",
-   "task": 5296
-  },
-  {
-   "rule": "semgrep.kalmido-sql-ident-without-qi",
-   "file": "kalmido/events/evkern.py",
-   "code": "c.execute(f\"DELETE FROM {t} WHERE kind=? AND ref_id=?\", (EV_KIND, cid))",
    "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
    "date": "2026-11-09",
    "task": 5296

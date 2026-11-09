@@ -19,7 +19,6 @@ from flask import has_request_context, request
 from ..core.config import _origin, APP_NAME, NTFY_TOKEN, NTFY_URL, PUBLIC_URL, safe_urlopen, TZ, WATCHDOG_INTERVAL
 from ..core.schema import USER_DEFAULTS
 from ..core.undogroups import undo_prune  # 2.747.0 (#5249): the watchdog's run of the undo step groups
-from ..core.writes import obj_trash_tick  # 2.773.0 (#5292): the core trash's retention run
 from ..core.i18n import LANGS, md_plain, short_day, tr, trn
 from ..core.pg import system_ctx
 from ..core.usertz import hm_text, tz_gap, tz_of_s, user_now
@@ -779,6 +778,7 @@ def _watchdog_tick(c):
     _wd_section(c, "org export cleanup", ox_cleanup)  # 2.42.0 (#833): archives after 24 h
     _wd_section(c, "merge snapshots", mg_prune, False)  # 2.66.0 (#1835): the undo data of merges after 30 days
     _wd_section(c, "undo steps", undo_prune)  # 2.747.0 (#5249): the step groups after 30 days, over 300 per person, parts without a group
+    from ..core.writes import obj_trash_tick  # 2.773.0 (#5292): local, core/writes.py imports back into notify (a cycle at start-up)
     _wd_section(c, "core trash", obj_trash_tick)  # 2.773.0 (#5292): core kinds with trash_prune, hourly (ret_due), switch "trash"
     from ..videos.review import vdr_trash_prune
     _wd_section(c, "video trash", vdr_trash_prune)  # 2.99.1 (#1959) review M3: video sign-offs in the trash after 30 days
