@@ -55,7 +55,7 @@ def shu_flush(c):
     try:
         with c.savepoint():
             for sid, batch in m["b"].items():
-                if not c.execute("SELECT 1 FROM sheet_changes WHERE sheet_id=? AND batch=? AND agent_id IS NULL AND batch LIKE 'p%' LIMIT 1", (sid, batch)).fetchone():
+                if not c.execute("SELECT 1 FROM sheet_changes WHERE sheet_id=? AND batch=? AND agent_id IS NULL AND substr(batch, 1, 1) = 'p' LIMIT 1", (sid, batch)).fetchone():
                     continue
                 r = sh_reload(c, sid)
                 if r is None:
@@ -93,7 +93,7 @@ def _names(c, sheet_row, stayed, kept):
 def shu_redo(c, sheet_row, batch, uid, stayed):
     """The undone changes of a person's batch forward again (oldest first): a cell only while it still holds the input the
     undo left, a row / column / format the same way. -> number of changes redone."""
-    rows = c.execute("SELECT * FROM sheet_changes WHERE sheet_id=? AND batch=? AND agent_id IS NULL AND batch LIKE 'p%' AND undone_at IS NOT NULL ORDER BY id",
+    rows = c.execute("SELECT * FROM sheet_changes WHERE sheet_id=? AND batch=? AND agent_id IS NULL AND substr(batch, 1, 1) = 'p' AND undone_at IS NOT NULL ORDER BY id",
                      (sheet_row["id"], batch)).fetchall()
     ts, n, book = iso_ms(now_utc()), 0, None
     for r in rows:
@@ -143,7 +143,7 @@ def shu_run(c, uid, sid, data, redo):
     r = sh_need(c, int(sid), write=True)
     write_lock(c, "sheet:" + str(int(sid)))  # the lock of the table's own writes (sh_set_cells)
     batch = str(data.get("b") or "")
-    if not batch or not c.execute("SELECT 1 FROM sheet_changes WHERE sheet_id=? AND batch=? AND agent_id IS NULL AND batch LIKE 'p%' LIMIT 1",
+    if not batch or not c.execute("SELECT 1 FROM sheet_changes WHERE sheet_id=? AND batch=? AND agent_id IS NULL AND substr(batch, 1, 1) = 'p' LIMIT 1",
                                   (int(sid), batch)).fetchone():
         raise Denied(404, tr(UG_GONE))  # the changes' trail is gone (retention) or never was
     stayed, kept = [], {}

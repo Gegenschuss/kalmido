@@ -460,7 +460,7 @@ def sheets_batch_undo(sid, batch):
     c = db()
     r = _need_w(c, sid)
     # 2.778.0 (#5253): an agent's call only -- a person's batch is their own step (sheets/shundo.py, /api/undo)
-    if not c.execute("SELECT 1 FROM sheet_changes WHERE sheet_id=? AND batch=? AND batch NOT LIKE 'p%' LIMIT 1", (sid, batch[:80])).fetchone():
+    if not c.execute("SELECT 1 FROM sheet_changes WHERE sheet_id=? AND batch=? AND substr(batch, 1, 1) <> 'p' LIMIT 1", (sid, batch[:80])).fetchone():
         raise Denied(404)
     kept = {}  # 2.528.0 (#4306 B24): rows / columns / the table a person typed into since stay
     n = sh_undo_batch(c, r, batch[:80], me(), kept=kept)

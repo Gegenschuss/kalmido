@@ -219,7 +219,7 @@ dbx("INSERT INTO sheet_changes (sheet_id, batch, agent_id, cell_id, row_id, col_
     "VALUES (?, 'a00ff00ff00ff00ff', NULL, NULL, NULL, NULL, 'fmt', NULL, NULL, '2026-11-09T10:00:00.000Z')", (S2,))
 bl = [x["batch"] for x in Bo.get(B + f"/api/sheets/{S2}").json().get("batches", [])]
 check("a00ff00ff00ff00ff" in bl and not any(b.startswith("p") for b in bl), f"F2: agents' panel lists the removed agent's batch, no person's {bl}")
-pb = dbx("SELECT batch FROM sheet_changes WHERE sheet_id=? AND batch LIKE 'p%' LIMIT 1", (S2,))[0][0]
+pb = dbx("SELECT batch FROM sheet_changes WHERE sheet_id=? AND substr(batch, 1, 1) = 'p' LIMIT 1", (S2,))[0][0]
 check(Bo.post(B + f"/api/sheets/{S2}/batches/{pb}/undo").status_code == 404, "F2: a person's batch is 404 on the agents' undo route")
 
 sys.exit(done("p2778_b_sheet_wiki_undo"))
