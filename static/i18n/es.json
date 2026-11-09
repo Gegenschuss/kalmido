@@ -17861,5 +17861,6 @@
   "Right half": "Mitad derecha",
   "Copy text": "Copiar texto",
   "Copy the recognised text": "Copiar el texto reconocido",
-  "Column widths of the lists": "Anchos de columna de las listas"
+  "Column widths of the lists": "Anchos de columna de las listas",
+  "A row was not imported, its amount has more than two decimal places: {0} ({1})": "Una fila no se importó, su importe tiene más de dos decimales: {0} ({1})"
 }

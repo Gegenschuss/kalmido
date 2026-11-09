@@ -17861,5 +17861,6 @@
   "Right half": "Rechterhelft",
   "Copy text": "Tekst kopiëren",
   "Copy the recognised text": "De herkende tekst kopiëren",
-  "Column widths of the lists": "Kolombreedtes van de lijsten"
+  "Column widths of the lists": "Kolombreedtes van de lijsten",
+  "A row was not imported, its amount has more than two decimal places: {0} ({1})": "Een regel is niet geïmporteerd, het bedrag heeft meer dan twee decimalen: {0} ({1})"
 }

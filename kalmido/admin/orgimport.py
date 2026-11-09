@@ -27,7 +27,7 @@ from ..core.errors import BadInput
 from ..core.i18n import N_
 from ..office.ledger import ofx_release  # 2.542.0 (#4598)
 from ..lists.listhead import HEAD_DIR, HEAD_MAX_MB, o3c_head_process, o3c_head_rel
-from .acctimport import UMZ_NO_SPACE, _BAD, _coerce, _file_bytes, _oid, _read_entry, _txt, tr, umz_cols, umz_insert, umz_row
+from .acctimport import UMZ_NO_SPACE, _BAD, _coerce, _file_bytes, _oid, _read_entry, _txt, tr, umz_cols, umz_insert, umz_money_misfit, umz_row
 from .acctimport import UMZ_ORG_SKIP  # 2.278.0 B (#3094)
 from .hosting import quota_fits  # 2.459.0 (#3849)
 from ..core.orgcrypt import oc_enc_fields, oc_list_org, oc_list_space, oc_user_space, oc_write_file  # 2.149.0 G (#2517): pulled up from functions
@@ -298,6 +298,10 @@ def oi_write(c, run, uid, man, zf, files, data, who):
                 fixed[col] = space
             for col in spec.late:
                 fixed.setdefault(col, None)
+            bad = umz_money_misfit(c, spec.table, src)
+            if bad:  # 2.765.0 (#5315): an amount NUMERIC(14,2) would round -- the row stays out, the report names its value
+                run.warning(N_("A row was not imported, its amount has more than two decimal places: {0} ({1})"), oi_area(spec), bad[1], must=True)
+                continue
             d = umz_row(c, spec.table, src, fixed, ts)
             if d is not None and spec.prep:
                 d = spec.prep(c, run, src, d, ctx)

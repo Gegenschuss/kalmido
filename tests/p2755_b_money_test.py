@@ -208,6 +208,24 @@ print(json.dumps(out))
 check(imp.get("vals") == [[None, "23.80"], ["0.00", "0.00"], "0.00"],
       f"import of an older export: '' -> NULL / 0, '23.8' -> 23.80, '-0.00' -> 0.00 in the NUMERIC columns {imp}")
 
+# 2.765.0 (#5315): an amount NUMERIC(14,2) would have to round (1234.567) is not rounded silently: umz_row leaves the row out,
+# umz_money_misfit names column and value for the import's report (orgimport.oi_write warns with it); 1234.560 / 23.8 still fit
+mis, _e = py(f"""
+from kalmido.admin.acctimport import umz_money_misfit, umz_row
+b = c.execute("SELECT book_id, org_id FROM office_cash_entries WHERE id=?", ({EID},)).fetchone()
+fx = {{'book_id': b['book_id'], 'org_id': b['org_id']}}
+row = lambda a: {{'amount': a, 'no': 803, 'day': '{Y}-01-04', 'dir': 'in', 'text': 'Alt'}}
+out = {{'mis': [umz_money_misfit(c, 'office_cash_entries', row(a)) for a in ('1234.567', 12.345, '1234.560', '23.8', '', 'x')],
+        'item': umz_money_misfit(c, 'office_doc_items', {{'net': '10.00', 'tax_amount': '1.905', 'title': 'Alt'}}),
+        'rows': [umz_row(c, 'office_cash_entries', row(a), fx, 'x') is None for a in ('1234.567', '1234.560')]}}
+out['mis'] = [list(m) if m else None for m in out['mis']]
+out['item'] = list(out['item']) if out['item'] else None
+c.rollback()
+print(json.dumps(out))
+""")
+check(mis.get("mis") == [["amount", "1234.567"], ["amount", "12.345"], None, None, None, None] and mis.get("item") == ["tax_amount", "1.905"]
+      and mis.get("rows") == [True, False], f"#5315: the import names an amount with a third decimal place and does not round it {mis}")
+
 # ---------------------------------------------------------------- a person without an organisation  # freelancer-matrix: office
 FID, Fr = freelancer(B, A)
 Fr.patch(B + "/api/settings", json={"features": FEAT})

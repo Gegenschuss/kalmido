@@ -17862,5 +17862,6 @@
   "Right half": "Metà destra",
   "Copy text": "Copia testo",
   "Copy the recognised text": "Copia il testo riconosciuto",
-  "Column widths of the lists": "Larghezze delle colonne delle liste"
+  "Column widths of the lists": "Larghezze delle colonne delle liste",
+  "A row was not imported, its amount has more than two decimal places: {0} ({1})": "Una riga non è stata importata, il suo importo ha più di due decimali: {0} ({1})"
 }

@@ -30,6 +30,7 @@ import threading
 import time
 import uuid
 import zipfile
+from decimal import Decimal, InvalidOperation  # 2.765.0 (#5315)
 from datetime import date, datetime, timedelta
 
 from flask import g, jsonify, request
@@ -47,6 +48,7 @@ from ..tasks.attachments import safe_name
 from .hosting import QuotaExceeded, fmt_bytes, quota_guard, quota_info
 from ..core.db import body, bump, connect, db, err, iso, iso_ms, now_utc, parse_iso, usettings, uset, create_user, DataError, IntegrityError
 from ..core.pg import insert_id, system_ctx
+from ..core.moneycol import MC_COLS  # 2.765.0 (#5315): the money columns NUMERIC(14,2)
 from ..core.errors import BadInput  # 2.273.0 A (#3030)
 from ..accounts.settings import clean_look_pref, clean_setting  # 2.273.0 A (#3030); 2.363.4 (#3127): clean_setting
 from ..tasks.snippets import snip_clean  # 2.273.0 A (#3030)
@@ -935,10 +937,44 @@ def umz_fmt(table, k, v):
     return r if f is _umz_rem else v if r else _BAD
 
 
+UMZ_MONEY = {(t, col) for t, col, _n in MC_COLS}  # 2.765.0 (#5315)
+UMZ_MONEY_TABLES = {t for t, _c in UMZ_MONEY}
+
+
+def _money_fits(v):
+    """2.765.0 (#5315): v fits a NUMERIC(14,2) column without a change -- at most 12 places before the point and no third place
+    after it that is not 0 (the rule of the migration, core/moneycol.py). '' / None / no number at all: not this check's
+    business (_coerce leaves a non-number out, '' becomes NULL / the default as before)."""
+    if v is None or isinstance(v, bool) or (isinstance(v, str) and not v.strip()):
+        return True
+    try:
+        d = Decimal(v.strip() if isinstance(v, str) else str(v))
+    except (InvalidOperation, ValueError, TypeError):
+        return True
+    if not d.is_finite():
+        return True
+    return abs(d) < Decimal(10) ** 12 and d == d.quantize(Decimal("0.01"))
+
+
+def umz_money_misfit(c, table, src):
+    """2.765.0 (#5315): (column, the value as in the file) of the first money column of the row that NUMERIC(14,2) would have
+    to round (1234.567), else None. The import does not round such a value silently: the row stays out and the report names
+    the value, as the start's migration keeps a column with such a value TEXT and names it."""
+    if table not in UMZ_MONEY_TABLES or not isinstance(src, dict):
+        return None
+    cols, _f = umz_cols(c, table)
+    for t, col in sorted(UMZ_MONEY):
+        if t == table and col in src and (cols.get(col) or ("",))[0] == "numeric" and not _money_fits(src[col]):
+            return col, str(src[col])[:40]
+    return None
+
+
 def umz_row(c, table, src, fixed, ts):
     """The row to insert: the file's values of the columns this server has (coerced to their type), never ids or columns
     that point at rows, plus the fixed values. None when a required column has no value."""
     cols, fks = umz_cols(c, table)
+    if umz_money_misfit(c, table, src):  # 2.765.0 (#5315): never rounded silently (the caller names the value)
+        return None
     drop = UMZ_DROP.get(table, ())
     d = {}
     for k, v in src.items():
