@@ -1,6 +1,36 @@
 {
  "versions": [
   {
+   "version": "2.771.0",
+   "date": "2026-11-09",
+   "items": [
+    {
+     "de": "Der Zurück-Pfeil auf Detailseiten geht jetzt einen Schritt zurück, Android-Zurück öffnet das Geschlossene nicht mehr.",
+     "en": "The back arrow on detail pages now steps back, so Android Back no longer reopens what you closed."
+    },
+    {
+     "de": "Kontakte, Kunden, Rechnungen und Belege zeigen Liste und Detail am großen Bildschirm einheitlich nebeneinander.",
+     "en": "Contacts, clients, invoices and receipts show list and detail side by side in the same way on large screens."
+    },
+    {
+     "de": "Gelöschte Angebotsteile und Rechtegruppen im Büro landen jetzt im Papierkorb und lassen sich wiederherstellen.",
+     "en": "Deleted quotation parts and rights groups in the office now go to the trash and can be restored."
+    },
+    {
+     "de": "In Dateien gibt es jetzt eine Auswahl-Leiste und ein Menü für Zeilen und Kacheln - Rechtsklick oder langes Drücken, \"Auswählen\" steht oben.",
+     "en": "Files now have one selection bar and one menu for rows and cards - right click or long press, with \"Select\" on top."
+    },
+    {
+     "de": "Dokumente und Dateien zeigen im Reiter Verlauf ihre Versionen: ansehen, herunterladen, wiederherstellen oder eine neue hochladen.",
+     "en": "Documents and files show their versions in the History tab: view, download, restore or upload a new one."
+    },
+    {
+     "de": "Kacheln und eine ganze Auswahl lassen sich auf einen Ordner ziehen; das + am Ordnerbaum legt einen neuen Ordner an.",
+     "en": "Cards and a whole selection can be dragged onto a folder; the + at the folder tree creates a new folder."
+    }
+   ]
+  },
+  {
    "version": "2.766.0",
    "date": "2026-11-09",
    "items": [

@@ -19,10 +19,10 @@
 
 ## What's new
 
-**2.766.0** (2026-11-09):
-- **Moving servers**: absences, timesheets, the household budget and folder playbooks now move with the account import.
-- **Check code**: Settings > Help > Check code shows a hash of the code your browser really runs, to compare with the published release.
-- **Agents page**: no more jumping while jobs work.
+**2.771.0** (2026-11-09):
+- **Files**: one selection bar and one right-click / long-press menu for rows and cards; the History tab lists versions; cards can be dragged onto folders.
+- **Undo**: steps are kept on the server per account for 30 days (the list in the app follows).
+- **Navigation**: the back arrow on detail pages steps back in the history; contacts, clients, invoices and receipts share one list-beside-detail layout.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 
@@ -273,7 +273,7 @@ stays empty. Otherwise the server creates a key once and from then on encrypts o
 version (after a failed check, e.g. GitHub's rate limit, again after an hour; right after an update at once). Admins then see a dot on the settings gear and, under *Settings > Server > Server* (since 2.46.6; before *Settings > Help*), "vX.Y.Z installed — vX.Y.Z+1
 available" with a link to the release notes. Nothing is downloaded or installed automatically, the container gets
 no Docker access, and the browser never contacts GitHub. Switch it off under *Settings > Server > Server > Whole server* or
-for good with `KALMIDO_UPDATE_CHECK=0` in `.env`. The update check uses api.github.com every 6 hours; an update pulls the image from ghcr.io, and update.sh downloads the installer of the latest release. The image `:X.Y.Z` and its GitHub release appear after the CI of that version is green; the image `:latest` and the latest release follow after its device test.
+for good with `KALMIDO_UPDATE_CHECK=0` in `.env`. The update check uses api.github.com every 6 hours; an update pulls the image from ghcr.io, and update.sh downloads the installer of the latest release. The image `:X.Y.Z` appears after the full CI of that version is green or red only outside the hard areas (invoices, backup, sign-in, security scanners; the weekly release notes name such suites); the image `:latest` and the latest release follow after its device test.
 
 </details>
 
