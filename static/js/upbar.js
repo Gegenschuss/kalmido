@@ -56,3 +56,24 @@ function upSend(url, opt, fd) {
     x.send(fd);
   });
 }
+// 2.766.0 (#5220): code integrity stage 3 b. The service worker reports other content hashes of the code under the same
+// version (static/sw.js swCodeNote): a quiet bar "The app's code changed without a new version" with a way to Settings > Help >
+// Check code. Closing it or opening the check confirms it to the worker (code-ack); unconfirmed, the next start shows it again.
+// Every start asks the worker once (code-check) when the page is drawn.
+function upCodeAck() { navigator.serviceWorker?.ready.then(r => r.active?.postMessage({type: 'code-ack'})).catch(() => {}); }
+function upCodeBar(d) {
+  if (document.getElementById('codechg') || typeof tr !== 'function') return;
+  const el = document.createElement('div'); el.id = 'codechg'; el.setAttribute('role', 'status');
+  el.innerHTML = '<span></span><button type="button" class="btn sm pri" data-ccgo></button><button type="button" class="iconbtn" data-ccx></button>';
+  const sp = /** @type {HTMLElement} */ (el.querySelector('span')), go = /** @type {HTMLElement} */ (el.querySelector('[data-ccgo]')), x = /** @type {HTMLElement} */ (el.querySelector('[data-ccx]'));
+  sp.textContent = tr("The app's code changed without a new version"); sp.title = tr('Version {0}', d.version || '?');
+  go.textContent = tr('Check code');
+  x.textContent = '×'; x.title = tr('Close'); x.setAttribute('aria-label', tr('Close'));
+  go.addEventListener('click', () => { el.remove(); upCodeAck(); loadModule('settings').then(() => settingsModal('codecheck'), () => {}); });
+  x.addEventListener('click', () => { el.remove(); upCodeAck(); });
+  document.body.appendChild(el);
+}
+if (globalThis.navigator?.serviceWorker) {
+  navigator.serviceWorker.addEventListener('message', e => { if (e.data?.type === 'code-changed' && typeof e.data.version === 'string') upCodeBar(e.data); });
+  addEventListener('load', () => navigator.serviceWorker.ready.then(r => r.active?.postMessage({type: 'code-check'})).catch(() => {}));
+}

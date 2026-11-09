@@ -73,7 +73,8 @@ const LAZY = ['/static/js/acctset.js', '/static/js/sesview.js', '/static/js/supp
   '/static/js/listprint.js', '/static/js/evinvite.js', '/static/js/projtime.js', '/static/js/envs.js', '/static/js/dpmodal.js',
   '/static/js/gitrepo.js', '/static/js/timesheet.js', '/static/js/absence.js', '/static/js/leave.js', '/static/js/dispo.js', '/static/js/hubmail.js',
   '/static/js/msvview.js', '/static/js/sprints2.js', '/static/js/sideviews.js', '/static/js/notetrash.js', '/static/js/trashui.js',
-  '/static/js/clientpage.js', '/static/js/whatsnew.js', '/static/js/offcache.js', '/static/js/shoot.js', '/static/js/splitview.js'];
+  '/static/js/clientpage.js', '/static/js/whatsnew.js', '/static/js/offcache.js', '/static/js/shoot.js', '/static/js/splitview.js',
+  '/static/js/codecheck.js'];
 // 2.45.0 (#1529): the new cache is filled completely first (addAll fails on any non-2xx -> this install is dropped and the
 // old worker and cache stay); old caches are deleted only when the new one holds the whole shell
 // 2.65.0 (#1824): the stylesheets of the modules loaded on demand (static/css/, LD_CSS in lazyload.js, same order)
@@ -96,6 +97,7 @@ async function swManifest() {
     const m = await r.json();
     if (!(m && m.v === 1 && m.files && typeof m.files === 'object')) return null;
     SW_I18N = new Set(Array.isArray(m.i18n) ? m.i18n.filter(h => SW_HASH.test(h)) : []);  // 2.660.0 (#4197)
+    SW_MAN = m;  // 2.766.0 (#5220): the version and the hashes for swCodeNote
     return m.files;
   } catch { return null; }
 }
@@ -118,8 +120,60 @@ async function swInstall() {
   await Promise.all(SHELL.map(u => swPrecache(c, u, files)));  // a failure drops this install (the old worker and cache stay)
   await Promise.all(LAZY.concat(LAZY_CSS).map(u => swPrecache(c, u, files).catch(() => 0)));
   await swKeepI18n(c, new Set([...SW_I18N, files['/static/i18n/de.core.json']])).catch(() => 0);
+  await swCodeNote(SW_MAN, true).then(d => d && swCodeTell(d)).catch(() => 0);  // 2.766.0 (#5220)
   await swDone(c);
 }
+// 2.766.0 (#5220): code integrity stage 3 b. The worker keeps the version and the content hash of every precached file
+// (sw-manifest.json) in its cache. Other hashes under the same version = the code changed without a new version: the open
+// pages get {type: 'code-changed'} (upbar.js: a hint with a link to Settings > Help > Check code). The mark stays until a page
+// confirms it (code-ack), so a page opened later learns it too (code-check, sent by every start). No pinning: the browser
+// always takes this worker from the server, so a server that means to deceive could change this check as well
+// (docs/CODE-VERIFY.md); it catches mistakes and slips.
+let SW_MAN = null;
+const SW_CODE = '/sw-code-state', SW_CODE_CHG = '/sw-code-changed';
+const swJson = o => new Response(JSON.stringify(o), {headers: {'Content-Type': 'application/json'}});
+// the kept state: this worker's cache first, then the other shell caches, the newest first (an update reads the old one)
+async function swCodeState() {
+  const ks = (await caches.keys()).filter(k => k !== CACHE && swVer(k) >= 0).sort((a, b) => swVer(b) - swVer(a));
+  for (const k of [CACHE, ...ks]) {
+    try { const r = await (await caches.open(k)).match(SW_CODE); if (r) return await r.json(); } catch { /* unreadable: the next one */ }
+  }
+  return null;
+}
+// the urls whose hash differs under the same version (sorted), else null
+function swCodeDiff(old, m) {
+  if (!old || !old.files || old.version !== m.version) return null;
+  const d = Object.keys(m.files).filter(u => SW_HASH.test(m.files[u] || '') && SW_HASH.test(old.files[u] || '') && old.files[u] !== m.files[u]).sort();
+  return d.length ? d : null;
+}
+// m = sw-manifest.json; install = a new worker (its state is written whatever the old one said). -> the mark or null
+async function swCodeNote(m, install) {
+  if (!m || m.v !== 1 || typeof m.version !== 'string' || !m.files || typeof m.files !== 'object') return null;  // an older server: no version to compare
+  const c = await caches.open(CACHE), old = await swCodeState(), diff = swCodeDiff(old, m);
+  // a page's check while the server already runs another version leaves the state to the coming update
+  if (install || !old || old.version === m.version) await c.put(SW_CODE, swJson({version: m.version, files: m.files}));
+  if (!diff) return null;
+  const mark = {version: m.version, files: diff.slice(0, 50), n: diff.length, at: new Date().toISOString()};
+  await c.put(SW_CODE_CHG, swJson(mark));
+  return mark;
+}
+async function swCodeTell(mark, to) {
+  for (const w of to ? [to] : await self.clients.matchAll({type: 'window', includeUncontrolled: true})) w.postMessage({type: 'code-changed', ...mark});
+}
+// a page asks (every start, upbar.js): the server's hashes now against the kept ones; a mark not yet confirmed is told again
+async function swCodeCheck(src) {
+  try {
+    const r = await fetch('/sw-manifest.json', {cache: 'no-store', credentials: 'same-origin'});
+    if (r.ok && !r.redirected && /json/.test(r.headers.get('content-type') || '')) await swCodeNote(await r.json(), false);
+  } catch { /* offline: only a kept mark */ }
+  const hit = await (await caches.open(CACHE)).match(SW_CODE_CHG);
+  if (hit && src) await swCodeTell(await hit.json(), src);
+}
+self.addEventListener('message', e => {
+  const t = e.data && e.data.type;
+  if (t === 'code-check') e.waitUntil(swCodeCheck(e.source).catch(() => 0));
+  if (t === 'code-ack') e.waitUntil(caches.open(CACHE).then(c => c.delete(SW_CODE_CHG)).catch(() => 0));
+});
 // 2.209.0 E (#1627): a marker written last by a finished install; a fallback never reads a half-filled cache (swAnyCache)
 const SW_DONE = '/sw-install-done';
 async function swDone(c) { try { await c.put(SW_DONE, new Response('1')); } catch { /* no marker = no fallback to this cache */ } }

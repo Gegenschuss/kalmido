@@ -580,7 +580,8 @@ def sw_manifest():
         if h:
             files[u] = h
     # 2.660.0 (#4197): i18n = the current version of every language part: an update keeps the parts of an old cache that did not change
-    r = jsonify(v=1, files=files, i18n=i18np_all_vers())
+    # 2.766.0 (#5220): + the version: other hashes under the same version = the code changed without a new version (sw.js swCodeNote)
+    r = jsonify(v=1, version=APP_VERSION, files=files, i18n=i18np_all_vers())
     r.headers["Cache-Control"] = "no-cache"
     return r
 

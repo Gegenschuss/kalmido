@@ -120,7 +120,11 @@ Adding an entry, in this order:
 - Since 2.761.0 every image and the web manifest of a weekly release (the SHA-256 of every file the browser gets) carry a
   GitHub build attestation (Sigstore, keyless, public transparency log): `gh attestation verify` shows that the release
   workflow of this repository built them from the tagged commit (*Production updates* in docs/SELF-HOSTING.md). It does
-  not yet let the browser check the app a server delivers; that is the next stage.
+  not by itself let the browser check the app a server delivers. Since 2.766.0 *Settings > Help > Check code* shows the
+  version and one hash of the code this browser holds, comparable with the line `web-manifest-X.Y.Z.json` in `SHA256SUMS`
+  of the release, and the service worker warns when the code changes without a new version. Both come from the same server
+  as the code: they catch mistakes and slips, not an operator who means to deceive; the manual way from outside is in
+  **[docs/CODE-VERIFY.md](docs/CODE-VERIFY.md)**.
 - API tokens act as their user. Give scripts the smallest access they need (*read* unless they must change
   things), an expiry, and revoke tokens you no longer use. Behind a login proxy, only let `/api/v1/` requests that carry
   an `abk_` token bypass the login (see docs/API.md).

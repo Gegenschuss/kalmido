@@ -1,0 +1,5 @@
+/* 2.766.0 (#5220): the hint "The app's code changed without a new version" (static/js/upbar.js upCodeBar, sent by the service
+   worker). A start file: the hint can come at any time, before any module is loaded. Below the new-version bar (#newver). */
+#codechg{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 3.25rem);z-index:95;display:inline-flex;align-items:center;gap:.5rem;padding:.375rem .4375rem .375rem .875rem;border-radius:2rem;border:1px solid var(--p3);background:var(--bg2);color:var(--text);font-size:var(--fs-s);box-shadow:var(--shadow);max-width:calc(100vw - 2rem)}
+#codechg span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:767px){ #codechg{top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 8rem)} }

@@ -69,6 +69,9 @@
   .row.myagnew>button{align-self:flex-start}
 }
 .aboutapp.off>span>b{color:var(--p3)}
+/* 2.766.0 (#5220): Settings > Help > Check code */
+#s-cc-res .cchash code{word-break:break-all;font-size:var(--fs-s)}
+#s-cc-res{margin-top:.5rem}
 .ssres{position:absolute;right:.875rem;top:calc(100% - .25rem);z-index:5;width:min(24rem,calc(100% - 1.75rem));max-height:60dvh;overflow-y:auto;background:var(--bg2);border:1px solid var(--line2);border-radius:var(--radius);box-shadow:var(--shadow);padding:.25rem;display:flex;flex-direction:column}
 .ssres.hidden{display:none}
 .ssres button{display:block;text-align:left;padding-inline:.625rem;border-radius:var(--r-s)}

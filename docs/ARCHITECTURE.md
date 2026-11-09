@@ -486,6 +486,16 @@ About shows the window size, pixel ratio, pointer, hover and both switches of th
   `attest` between `pick` and `publish` - OIDC token, no checkout, no shell; no attestation = no release. The attestations
   stay at GitHub (not in the registry). Check: `gh attestation verify` (docs/SELF-HOSTING.md, *Production updates*).
   Pinned like every action, `tests/p23602_a_api_test.py` checks the rights.
+- *2.766.0 (code integrity, stage 3, #5220):* *Settings > Help > Check code* (`static/js/codecheck.js`, loaded on demand)
+  takes `/api/code-manifest`, hashes every file of it that lies in the newest finished shell cache (`crypto.subtle`; a copy
+  under another `?v=` does not count), puts the browser's hash in place of the server's and writes the result the way
+  `cm_json` does: its SHA-256 equals the line `web-manifest-X.Y.Z.json` in the release's `SHA256SUMS` when every held file is
+  the published one. Files not in the cache keep the server's value and are named "not checked"; nothing is fetched from
+  GitHub (connect-src stays 'self'). `/sw-manifest.json` carries the version; the service worker keeps version + hashes in
+  its cache (`/sw-code-state`, `swCodeNote`) at every install and when a page asks (`code-check`, every start, `upbar.js`);
+  other hashes under the same version leave a mark (`/sw-code-changed`) and the message `code-changed` (the hint with a way
+  to the check) until a page confirms it (`code-ack`). Same server, same limit: mistakes and slips, not a deceiving operator
+  (docs/CODE-VERIFY.md).
 - Every answer carries `Server-Timing: app;dur=…, db;dur=…;desc="n=<statements>"` (`core/reqtime.py`, counted per
   thread in `core/pg.py`). A request slower than `KALMIDO_SLOW_REQUEST_MS` (default 500, 0 = off) logs one line with
   method, route pattern, duration, statements and database time; `GET /api/admin/health` has p50 / p95 / max of the

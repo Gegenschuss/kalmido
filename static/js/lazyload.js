@@ -97,6 +97,7 @@ const LD_MODS = {
   offcache: ['offcache'],  // 2.663.0 (#4200): the offline start state in IndexedDB (core.js startSave / startRead)
   shoot: ['shoot'],  // 2.636.0 (#4565): the storyboard of a shoot (picture tiles on the board, the button Shot list)
   splitview: ['splitview'],  // 2.742.0 (#4858): the split view on a wide screen, only while it is on (miniwin.js spl_check)
+  codecheck: ['codecheck'],  // 2.766.0 (#5220): Settings > Help > Check code (the hashes of the code this browser holds)
 };
 // 2.65.0 (#1823): modules a module needs before its own files (their globals are used while it draws): the settings dialog
 // draws the agent panes (agentchat.js), the calendars (calview.js) and the tokens / webhooks (integrations.js), the agent chat
