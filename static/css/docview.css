@@ -110,3 +110,18 @@
   .dv-mask{overflow:visible;padding:.25rem 0 0;border:0;background:none}
   .dv-amenu{min-width:min(16rem,calc(100vw - 2rem))}
 }
+/* 2.765.0 (#5331): a narrow view is one column like a phone, whatever the window's width (the Fold 8 open at 840 px beside the
+   side bar and the file tree leaves the view about 500 px: strip + fields took it all, the preview was 16 px). Below 48rem of the
+   view (strip 7rem + fields 20rem + grips + a preview of 20rem): the preview on top, the fields below, the column scrolls
+   inside the view (it keeps the page's height); a sideways swipe leafs as on a phone. Phones keep their own rules above. */
+.dv-view{container:dvview / inline-size}
+@media (min-width:768px){
+  @container dvview (max-width:47.99rem){
+    .dv-cols,.dv-cols.dv-nostrip{display:flex;flex-direction:column;gap:.75rem;overflow-y:auto;overscroll-behavior:contain}
+    .dv-strip,.dv-grip{display:none}
+    .dv-pv{order:-1;flex:none;height:62dvh}
+    .dv-pages{touch-action:pan-y}
+    .dv-pages.dc-zoomed{touch-action:none}
+    .dv-mask{flex:none;overflow:visible}
+  }
+}
