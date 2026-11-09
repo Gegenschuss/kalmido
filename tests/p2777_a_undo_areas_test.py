@@ -27,6 +27,7 @@ sys.path.insert(0, N)
 import kt  # noqa: E402
 from kt import B, check, done  # noqa: E402
 from freelancer_fixture import freelancer  # noqa: E402
+from obj_probe import in_app  # noqa: E402
 
 kt.fresh(prefix="P2777A")
 FEAT = "cal,events,contacts,files,docs,collab,comments,habits"
@@ -234,6 +235,25 @@ check(r.ok and moved and moved[0][0] == ORG, f"(setup) the folder went into the 
 res = back(A, G2)
 check(stayed_of(res, SN) and stayed_of(res, SN)[0]["code"] == "conflict" and node(nid=SN).get("parent_id") in (None, 0),
       f"F2: the move is not taken back into a folder of another workspace (409, the file stays at the top) {res} {node(nid=SN).get('parent_id')}")
+
+# F4: the history rows an undo wrote of a file deleted for good go with the watchdog's clean-up
+HN = A.post(B + "/api/files/upload", files={"file": ("verlauf.txt", b"h", "text/plain")}).json()["items"][0]["id"]
+A.patch(B + f"/api/files/nodes/{HN}", json={"name": "verlauf-neu.txt"})
+res = back(A, gid_after(A))
+nh = kt.dbx("SELECT COUNT(*) FROM obj_history WHERE kind='fs_node' AND ref_id=?", (HN,))[0][0]
+check(res.get("undone") and nh >= 1, f"(setup) the undo wrote a history row of the file ({nh}) {res}")
+check(A.delete(B + f"/api/files/nodes/{HN}").ok and A.delete(B + f"/api/files/nodes/{HN}?purge=1").ok, "(setup) the file deleted for good")
+out = in_app("""
+from kalmido.core.undogroups import ug_drop_orphans
+print('DROPPED', ug_drop_orphans(c))
+c.commit()""")
+nh = kt.dbx("SELECT COUNT(*) FROM obj_history WHERE kind='fs_node' AND ref_id=?", (HN,))[0][0]
+nu = kt.dbx("SELECT COUNT(*) FROM obj_undo WHERE kind='fs_node' AND ref_id=?", (HN,))[0][0]
+check("DROPPED" in out and nh == 0 and nu == 0, f"F4: no history / undo rows of the file left ({nh} / {nu}) {out[-300:]}")
+r = in_app("""
+from kalmido.core.objhooks import GONE
+print('GONE', sorted(k for k in GONE if k in ('event', 'fs_node', 'habit', 'contact')))""")
+check("GONE ['contact', 'event', 'fs_node', 'habit']" in r, f"F4: an account's deletion takes the rows of events, file nodes and habits too {r[-300:]}")
 
 # ---------------------------------------------------------------- habits
 r = A.post(B + "/api/habits", json={"name": "Laufen Beispiel"})

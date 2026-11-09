@@ -12,6 +12,7 @@ from ..core.errors import Denied
 from ..core.undoareas import ua_plain, ua_trash_fix
 from ..core.undogroups import UG_LABEL
 from ..core.undoweb import undo_need_reg
+from ..core.objhooks import GONE
 from ..core.writes import obj_track
 from ..core.db import bump, iso_ms, now_utc
 from .model import cal_touch, ev_delete, need_evcal, need_event
@@ -27,6 +28,7 @@ def evu_label(r):
 obj_track(EVU_KIND, "events", area="calendar", undo_keep=EVU_KEEP, undo_nofp={"events": {"seq", "imp_at", "imp_rev"}},
           undo_label=evu_label, undo_free=("deleted_at",))
 
+GONE[EVU_KIND] = "events"  # review F4: an account's deletion takes its history / undo rows of the objects that went (core/objhooks.py)
 
 def _restore(uid):
     def run(c, r):

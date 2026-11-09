@@ -18,6 +18,7 @@ from ..core.i18n import N_, tr
 from ..core.undoareas import UA_DELETED, UA_MOVED, UA_RENAMED, UA_RESTORED, UA_VERSION, ua_plain, ua_post, ua_pre, ua_trash_fix
 from ..core.undogroups import UG_LABEL
 from ..core.undoweb import undo_need_reg
+from ..core.objhooks import GONE
 from ..core.writes import obj_track
 from ..office.periodlock import pl_tree_need_open
 from .fslock import fsl_move_guard, fsl_of
@@ -37,6 +38,7 @@ def fsu_label(r):
 
 
 obj_track(FSU_KIND, "fs_nodes", area="other", undo_keep=FSU_KEEP, undo_label=fsu_label, undo_free=("deleted_at", "deleted_by"))
+GONE[FSU_KIND] = "fs_nodes"  # review F4: an account's deletion takes its history / undo rows of the objects that went (core/objhooks.py)
 
 
 FSU_WHAT = {"rename": UA_RENAMED, "move": UA_MOVED, "delete": UA_DELETED, "restore": UA_RESTORED, "version": UA_VERSION}
