@@ -146,7 +146,7 @@ function dc_ctxSet(c) {
   const was = DC.ctx || 'list'; DC.ctx = c;
   DC.folder = c.startsWith('f:') ? +c.slice(2) : null;
   if (was !== c && (was.startsWith('f:') || c.startsWith('f:'))) {
-    DC.seq++; clearTimeout(dc_qTimer);
+    DC.seq++;  // a load of the context left is dropped (a pending search of it only loads the new one again)
     Object.assign(DC, {q: '', f: {...dc_f0(), review: false}, under: null, more: false, docs: null, total: 0, err: null, loading: false, key: null, sel: new Map(), selOn: false, dv: null, vsort: null});
     if (typeof DCV === 'object') DCV.applied = null;  // a saved view applied before is left (docviews.js applies it again on its route)
   }
