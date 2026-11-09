@@ -83,6 +83,11 @@ check(cm.content_findings("f", {"AFTER": (["DELETE FROM t WHERE deleted_at < '20
       "#5263 lint: a DELETE without its # purge-ok line is a finding")
 check(cm.content_findings("f", {"AFTER": (["DELETE FROM t WHERE deleted_at < '2999-01-01'"], 1)}, OK_SRC),
       "#5263 lint: a cut-off in the future is a finding (until then every start would empty the trash)")
+# 2.755.0 (#5263, review M2): a cut-off on live rows is no clean-up of the trash
+check(cm.content_findings("f", {"AFTER": (["DELETE FROM t WHERE created_at < '2026-11-08'"], 1)}, OK_SRC),
+      "#5263 lint: a DELETE without a trash condition (created_at < ...: live rows) is a finding")
+check(cm.content_findings("f", {"AFTER": (["DELETE FROM t WHERE deleted_at < '2026-11-08'"], 1)}, OK_SRC) == [],
+      "#5263 lint: deleted_at < cut-off alone is a trash condition")
 check(cm.findings() == [], f"the fragments of this tree pass the lint {cm.findings()[:3]}")
 
 kt.fresh(prefix="P2755A")

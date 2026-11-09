@@ -24,7 +24,8 @@ runs at every start, the second one would fail); a column of a feature taken out
 added nowhere any more.
 
 2.755.0 (#5263): one more one-way step: a one-off clean-up of rows already in the trash goes with
-`DELETE FROM <table> WHERE ... < '<ISO date>'` in AFTER and the line `# purge-ok <table>: <why>`. AFTER runs at every start, so
+`DELETE FROM <table> WHERE ... < '<ISO date>'` in AFTER and the line `# purge-ok <table>: <why>`; review M2: the WHERE names the
+trash (`deleted_at IS NOT NULL` or `deleted_at < ...`), a cut-off on live rows (`created_at < ...`) is a finding. AFTER runs at every start, so
 the WHERE must hold a fixed cut-off (a quoted date, not in the future): after the first start it finds nothing new, and rows put into the trash
 later keep their trash period (and their undo) until the regular purge run takes them.
 
@@ -50,6 +51,7 @@ DROP_COLUMN = re.compile(r"ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(\w+)\s+DROP\s+COL
 DROP_OK = re.compile(r"^[ \t]*#[ \t]*drop-ok[ \t]+(\w+(?:\.\w+)?)[ \t]*:[ \t]*\S", re.M)
 PURGE = re.compile(r"DELETE\s+FROM\s+(\w+)\b(.*)", re.I | re.S)  # 2.755.0 (#5263): a one-off clean-up in AFTER
 PURGE_CUT = re.compile(r"\bWHERE\b.*<\s*'(\d{4}-\d\d-\d\d)[^']*'", re.I | re.S)
+PURGE_TRASH = re.compile(r"\bWHERE\b.*\bdeleted_at\s+(?:IS\s+NOT\s+NULL\b|<)", re.I | re.S)  # 2.755.0 (#5263, review M2): only rows in the trash
 PURGE_OK = re.compile(r"^[ \t]*#[ \t]*purge-ok[ \t]+(\w+)[ \t]*:[ \t]*\S", re.M)
 
 
@@ -205,6 +207,8 @@ def content_findings(n, values, src):
         elif purge:  # 2.755.0 (#5263): a one-off clean-up, bounded by a fixed cut-off, with a reason
             cut = PURGE_CUT.search(x)
             why = "AFTER runs at every start: a DELETE needs a WHERE with a fixed cut-off (< '<ISO date>')" if not cut else \
+                "a one-off clean-up only takes rows already in the trash: the WHERE needs deleted_at IS NOT NULL or deleted_at < '<ISO date>'" \
+                if not PURGE_TRASH.search(x) else \
                 "the cut-off lies in the future: until then every start would empty the trash" \
                 if cut.group(1) > datetime.date.today().isoformat() else \
                 None if purge.group(1) in set(PURGE_OK.findall(src)) else \
