@@ -4587,6 +4587,10 @@ strict way: `409` (`error.cells` = all current cells, `error.rev`) as soon as th
   `person` cell the account id (or the exact name) of someone who may see the table, anyone else is refused; a `link` cell
   an `http(s)://` or `mailto:` address (anything else is refused); a `file` cell is read only for agents (raw `file:<id>`,
   display = the file name) - people upload files into cells in the app.
+  2.769.0: `dec` (0-4, null = automatic) on a `number` / `currency` / `percent` column sets the decimal places shown, `cur`
+  (an ISO 4217 code of the office currencies, e.g. `USD`; null = the table's currency) a `currency` column's own currency; a
+  value outside is refused (400). Only `display`, sums, pivot, print and export follow them - `value` and formulas keep the
+  full number. `sheet_read` returns both on each column.
 - **Kalmido variables**: `projekt.<name>.<field>`, `liste.<name>.<field>` (fields `zeit_gesamt` hours, `aufgaben`, `offen`,
   `erledigt`, `budget_h`), `kunde.<name>.<field>` (`satz`, `budget_h`, `budget_betrag`, `zeit_gesamt`), `hier.<field>`
   (the attached project). English works the same: `project.`, `list.`, `client.`, `task.`, `here.` with `total_time`, `tasks`,

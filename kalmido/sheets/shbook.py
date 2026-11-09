@@ -371,8 +371,9 @@ def shb_create(c, first, uid, name=None, after_id=None, columns=None, rows=None,
         if not isinstance(col, dict):
             raise BadInput(tr("Invalid value: {0}", "columns"))
         f = sh_clean_col(col)
-        c.execute("INSERT INTO sheet_columns(sheet_id,pos,title,kind,options,color_mode,width) VALUES(?,?,?,?,?,?,?)",
-                  (tid, float(k + 1), f["title"], f["kind"], f.get("options", "[]"), f["color_mode"], f.get("width")))
+        c.execute("INSERT INTO sheet_columns(sheet_id,pos,title,kind,options,color_mode,width,dec,cur) VALUES(?,?,?,?,?,?,?,?,?)",
+                  (tid, float(k + 1), f["title"], f["kind"], f.get("options", "[]"), f["color_mode"], f.get("width"), f.get("dec"),
+                   f.get("cur")))  # 2.769.0 (#5351): + dec, cur
     r = sh_reload(c, tid)
     sh_add_rows(c, r, SH_START_ROWS if rows is None else rows, uid, agent_id=agent_id, batch=batch)
     return tid
@@ -382,8 +383,9 @@ def _copy(c, src, tid, uid, ts):
     """The columns, rows and inputs of sheet src into the new sheet tid (formula ids mapped onto the copies)."""
     cmap, rmap, xmap = {}, {}, {}
     for col in c.execute("SELECT * FROM sheet_columns WHERE sheet_id=? AND deleted_at IS NULL ORDER BY pos, id", (src["id"],)).fetchall():
-        cmap[col["id"]] = insert_id(c, "INSERT INTO sheet_columns(sheet_id,pos,title,kind,options,color_mode,width) VALUES(?,?,?,?,?,?,?)",
-                                    (tid, col["pos"], col["title"], col["kind"], col["options"], col["color_mode"], col["width"]))
+        cmap[col["id"]] = insert_id(c, "INSERT INTO sheet_columns(sheet_id,pos,title,kind,options,color_mode,width,dec,cur) VALUES(?,?,?,?,?,?,?,?,?)",
+                                    (tid, col["pos"], col["title"], col["kind"], col["options"], col["color_mode"], col["width"],
+                                     col["dec"], col["cur"]))  # 2.769.0 (#5351): + dec, cur
     for row in c.execute("SELECT * FROM sheet_rows WHERE sheet_id=? AND deleted_at IS NULL ORDER BY pos, id", (src["id"],)).fetchall():
         rmap[row["id"]] = insert_id(c, "INSERT INTO sheet_rows(sheet_id,pos) VALUES(?,?)", (tid, row["pos"]))
     kinds = {r["id"]: r["kind"] for r in c.execute("SELECT id, kind FROM sheet_columns WHERE sheet_id=?", (src["id"],)).fetchall()}

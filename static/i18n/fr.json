@@ -17899,6 +17899,8 @@
   "The app's code changed without a new version": "Le code de l'app a changé sans nouvelle version",
   "Guide": "Guide",
   "A row was not imported, its amount is not a number with at most two decimal places: {0} ({1})": "Une ligne n’a pas été importée, son montant n’est pas un nombre avec au plus deux décimales : {0} ({1})",
+  "Decimal places": "Décimales",
+  "Table currency ({0})": "Devise du tableau ({0})",
   "Moved to the trash: {0}": "Mis à la corbeille : {0}",
   "Restored from the trash: {0}": "Restauré depuis la corbeille : {0}",
   "Recent steps": "Dernières étapes",

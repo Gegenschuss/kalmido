@@ -395,7 +395,7 @@ def sh_fmt_number(x, lg, decimals=None):
         s = f"{x:,.4f}".rstrip("0").rstrip(".")
     else:
         s = f"{x:,.{decimals}f}"
-    if s in ("-0", "-0.00", "-0.0"):
+    if s.startswith("-") and not s.strip("-0.,"):  # 2.769.0 (#5351): any "-0.000…" (3 / 4 places too)
         s = s[1:]
     lang = _lg(lg)
     if lang == "en":
@@ -407,10 +407,12 @@ def sh_fmt_number(x, lg, decimals=None):
 SH_CURRENCY_SYMBOLS = {"EUR": "€", "USD": "$", "GBP": "£", "CHF": "CHF"}
 
 
-def sh_fmt_currency(x, lg, currency="EUR"):
+def sh_fmt_currency(x, lg, currency="EUR", dec=None):
+    """dec: 2.769.0 (#5351) the column's decimal places (None = 2, as before)."""
+    dec = 2 if dec is None else dec
     sym = SH_CURRENCY_SYMBOLS.get((currency or "EUR").upper(), (currency or "EUR").upper())
-    s = sh_fmt_number(abs(x), lg, 2)
-    neg = "-" if x < 0 and round(abs(x), 2) else ""
+    s = sh_fmt_number(abs(x), lg, dec)
+    neg = "-" if x < 0 and round(abs(x), dec) else ""
     if _lg(lg) == "en":
         return f"{neg}{sym}{s}"
     return f"{neg}{s} {sym}"
@@ -427,8 +429,9 @@ def sh_fmt_date(d, lg):
     return d.strftime("%d.%m.%Y")
 
 
-def sh_fmt(v, kind, lg, currency="EUR", yes="Yes", no="No"):
-    """The display text of a value in a column of that kind (text / select: numbers and dates in the plain format)."""
+def sh_fmt(v, kind, lg, currency="EUR", yes="Yes", no="No", dec=None):
+    """The display text of a value in a column of that kind (text / select: numbers and dates in the plain format).
+    2.769.0 (#5351): dec = the column's decimal places 0-4 (None = automatic, as before); currency = the column's own one."""
     if v is None:
         return ""
     if isinstance(v, bool):
@@ -437,9 +440,12 @@ def sh_fmt(v, kind, lg, currency="EUR", yes="Yes", no="No"):
         return sh_fmt_date(v, lg)
     if isinstance(v, float):
         if kind == "currency":
-            return sh_fmt_currency(v, lg, currency)
+            return sh_fmt_currency(v, lg, currency, dec)
         if kind == "percent":
-            return sh_fmt_number(round(v * 100, 2), lg) + ("%" if _lg(lg) == "en" else " %")
+            p = sh_fmt_number(round(v * 100, 2), lg) if dec is None else sh_fmt_number(round(v * 100, dec), lg, dec)
+            return p + ("%" if _lg(lg) == "en" else " %")
+        if kind == "number" and dec is not None:
+            return sh_fmt_number(round(v, dec), lg, dec)
         return sh_fmt_number(v, lg)
     return str(v)
 

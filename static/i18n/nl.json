@@ -17899,6 +17899,8 @@
   "The app's code changed without a new version": "De code van de app is gewijzigd zonder nieuwe versie",
   "Guide": "Handleiding",
   "A row was not imported, its amount is not a number with at most two decimal places: {0} ({1})": "Een regel is niet geïmporteerd, het bedrag is geen getal met hoogstens twee decimalen: {0} ({1})",
+  "Decimal places": "Decimalen",
+  "Table currency ({0})": "Valuta van de tabel ({0})",
   "Moved to the trash: {0}": "Naar de prullenbak verplaatst: {0}",
   "Restored from the trash: {0}": "Uit de prullenbak teruggezet: {0}",
   "Recent steps": "Laatste stappen",

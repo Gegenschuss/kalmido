@@ -231,7 +231,7 @@ def _need_col(c, sid, col_id, deleted=False):
     return x
 
 
-SHX_COL_PREV = ("title", "kind", "color_mode", "width", "pos")
+SHX_COL_PREV = ("title", "kind", "color_mode", "width", "pos", "dec", "cur")  # 2.769.0 (#5351): + dec, cur
 
 
 def shx_col_prev(old, b):
@@ -269,7 +269,7 @@ def shx_order_moved(live, prev):
 
 @app.patch("/api/sheets/<int:sid>/columns/<int:col_id>")
 def sheets_col_patch(sid, col_id):
-    """{title?, kind?, options?, options_ops?, color_mode?, width?, pos?} -- a select column takes typed labels over as its options'
+    """{title?, kind?, options?, options_ops?, color_mode?, width?, pos?, dec?, cur?} -- a select column takes typed labels over as its options'
     ids. 2.270.0 B (#3021): options_ops = single add / rename / remove (sh_option_ops) -> also {added: ids, conflicts}."""
     c = db()
     r = _need_w(c, sid)

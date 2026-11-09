@@ -691,6 +691,9 @@ you created, tables a person shared with you one by one and (2.199.0) tables in 
 you: never guess its value. Formulas: `=SUM(B2:B9)`, `=hours*rate`, `=project.<name>.total_time` (arguments with `;`; the German names `SUMME`, `projekt.`, `zeit_gesamt` work as well, cells come back in your language).
 Column kinds also `checkbox` (1 / 0), `person` (account id of someone who sees the table), `link` (http(s) / mailto only)
 and `file` (read only for you: the file name; people upload files in the app).
+2.769.0: a number / currency / percent column may carry `dec` (decimal places 0-4, null = automatic) and a currency column
+`cur` (ISO 4217 like `USD`, null = the table's currency); only the display, sums, print and export follow them, values and
+formulas keep the full number.
 2.124.0: a table can have several sheets (`sheet_tabs` lists them, `sheet_add_tab` adds one); read and fill one sheet with
 the tools above and the sheet's id, reach into another sheet with `Name!A1` or `'Sheet name'!A1:B5`.
 2.671.0: a sheet with `kind: "pivot"` is a pivot sheet people set up in the app: it has no cells; `sheet_read` gives its

@@ -41,6 +41,7 @@ from .shbook import shb_is_pivot  # 2.671.0 (#3463 b)
 from ..accounts.orgs import user_orgs  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgroles import need_org_area, org_sees_all, org_readonly, user_orgs_full  # 2.369.5 (#2517): pulled up from functions
 from .shhist import shh_log, shh_meta  # 2.369.5 (#2517): pulled up from functions; 2.564.0 (#4701): shh_meta
+from ..office.homecur import HC_CODES  # 2.769.0 (#5351): the currencies a currency column may have
 from .vars import SH_FIELD_HELP, sh_sources, _agent_cap  # 2.369.5 (#2517): pulled up from functions
 
 SH_KINDS = ("text", "number", "currency", "percent", "date", "select") + SHK_KINDS  # 2.124.0 B (#2110): + checkbox, person, link, file
@@ -698,7 +699,7 @@ class ShEvaluator:
         raw = x["raw"] or ""
         if x["frozen"]:
             v, _ = sh_freeze_load(x["frozen_value"])
-            return self.out(v, kind, "frozen")
+            return self.out(v, kind, "frozen", x["col_id"])
         if kind in SHK_KINDS:  # 2.124.0 B (#2110)
             return shk_plain(self, x, kind)
         v = sh_plain_value(raw, kind, opts)
@@ -707,11 +708,12 @@ class ShEvaluator:
             r = self.out(v, kind, "own")
             r["display"] = d
             return r
-        return self.out(v, kind, "own")
+        return self.out(v, kind, "own", x["col_id"])
 
-    def out(self, v, kind, origin):
+    def out(self, v, kind, origin, col_id=None):
         yes, no = tr("Yes"), tr("No")
-        return {"_v": v, "value": sh_json_value(v), "vtype": sh_vtype(v), "display": sh_fmt(v, kind, self.lg, self.currency, yes, no),
+        dec, cur = sh_col_numfmt(self.book.col_by.get(col_id), self.currency)  # 2.769.0 (#5351): the column's own format
+        return {"_v": v, "value": sh_json_value(v), "vtype": sh_vtype(v), "display": sh_fmt(v, kind, self.lg, cur, yes, no, dec),
                 "origin": origin, "error": None, "error_text": None}
 
     def run(self):
@@ -765,7 +767,7 @@ class ShEvaluator:
         origin = "kalmido" if self.vars[cid] else "formula"
         try:
             v = ShEval(_Env(self, x)).run(self.trees[cid])
-            r = self.out(v, kind, origin)
+            r = self.out(v, kind, origin, x["col_id"])
         except ShErr as e:
             r = dict(_err_res(e.kind, e.detail), origin=origin, _v=None)
         except (OverflowError, ValueError, ArithmeticError):  # ArithmeticError: decimal signals too (review 2.578 F1)
@@ -773,6 +775,27 @@ class ShEvaluator:
         except RecursionError:  # review 4
             r = dict(_err_res("syntax", "deep"), origin=origin, _v=None)
         self.res[cid] = r
+
+
+SH_DEC_MAX = 4  # 2.769.0 (#5351): a column shows 0-4 decimal places (None = automatic)
+
+
+def sh_col_numfmt(col, currency):
+    """2.769.0 (#5351): (decimal places or None, currency) a number / currency / percent column is shown with: its own dec / cur,
+    else automatic and the table's currency (columns from before 2.769 have neither). Only the display, sums, pivot, print and
+    export use it; values and formulas keep the full number."""
+    if col is None:
+        return None, currency
+    dec, cur = _col_get(col, "dec"), _col_get(col, "cur")
+    dec = dec if isinstance(dec, int) and not isinstance(dec, bool) and 0 <= dec <= SH_DEC_MAX else None
+    return dec, (cur if cur in HC_CODES else currency)
+
+
+def _col_get(col, k):
+    try:
+        return col[k]
+    except (KeyError, IndexError):
+        return None
 
 
 def sh_currency(c, sheet):
@@ -872,7 +895,8 @@ def _sources_of(c, sheet, uid, vs):
 # ---------------------------------------------------------------- the answers
 def sh_col_dict(r, i=None):
     return {"id": r["id"], "pos": r["pos"], "title": r["title"], "kind": r["kind"], "options": sh_options(r["options"]),
-            "color_mode": r["color_mode"], "width": r["width"], "letter": sh_col_letter(i) if i is not None else None}
+            "color_mode": r["color_mode"], "width": r["width"], "letter": sh_col_letter(i) if i is not None else None,
+            "dec": _col_get(r, "dec"), "cur": _col_get(r, "cur") or None}  # 2.769.0 (#5351)
 
 
 def sh_cell_dicts(c, sheet_row, book, res, ids=None, uid=None):
@@ -966,6 +990,7 @@ def sh_dict(c, sheet_row, uid=None, book=None):
     return {"id": sheet_row["id"], "title": sheet_row["title"], "space": sh_space_key(sheet_row["org_id"]), "org_id": sheet_row["org_id"],
             "list_id": sheet_row["list_id"], "list_title": sh_list_title(c, sheet_row, uid),
             "can_write": sh_may(c, uid, sheet_row, write=True), "currency": sh_currency(c, sheet_row),
+            "currencies": list(HC_CODES),  # 2.769.0 (#5351): what a currency column may choose
             "columns": [sh_col_dict(r, i) for i, r in enumerate(book.cols)], "rows": [{"id": r["id"], "pos": r["pos"]} for r in book.rows],
             "cells": cells, "names": {x["name"]: x["id"] for x in book.cells.values() if x.get("name") and book.live(x)},
             "presence": sh_presence(c, sheet_row["id"], uid), "sources": list(srcs.values()), "batches": sh_batches(c, sheet_row["id"]),
@@ -1050,6 +1075,16 @@ def sh_clean_col(b, partial=False):
         if w is not None and (isinstance(w, bool) or not isinstance(w, int) or not 30 <= w <= 2000):
             raise BadInput(tr("Invalid value: {0}", "width"))
         out["width"] = w
+    if "dec" in b:  # 2.769.0 (#5351): decimal places 0-4, null = automatic
+        d = b["dec"]
+        if d is not None and (isinstance(d, bool) or not isinstance(d, int) or not 0 <= d <= SH_DEC_MAX):
+            raise BadInput(tr("Invalid value: {0}", "dec"))
+        out["dec"] = d
+    if "cur" in b:  # 2.769.0 (#5351): an ISO 4217 code of the office currencies, null / "" = the table's currency
+        k = b["cur"]
+        if k not in (None, "") and (not isinstance(k, str) or k.upper() not in HC_CODES):
+            raise BadInput(tr("Invalid value: {0}", "cur"))
+        out["cur"] = k.upper() if k else None
     return out
 
 
@@ -1062,8 +1097,8 @@ def sh_add_col(c, sheet_row, b, uid, after_col_id=None, agent_id=None, batch=Non
     if n >= SH_COLS_MAX:
         raise BadInput(tr("Too many columns (at most {0})", SH_COLS_MAX))
     pos = _pos_after(c, "sheet_columns", sid, after_col_id)
-    cid = insert_id(c, "INSERT INTO sheet_columns(sheet_id,pos,title,kind,options,color_mode,width) VALUES(?,?,?,?,?,?,?)",
-                    (sid, pos, f["title"], f["kind"], f.get("options", "[]"), f["color_mode"], f.get("width")))
+    cid = insert_id(c, "INSERT INTO sheet_columns(sheet_id,pos,title,kind,options,color_mode,width,dec,cur) VALUES(?,?,?,?,?,?,?,?,?)",
+                    (sid, pos, f["title"], f["kind"], f.get("options", "[]"), f["color_mode"], f.get("width"), f.get("dec"), f.get("cur")))
     sh_change(c, sid, batch, agent_id, "col", col_id=cid)
     return cid
 
@@ -1372,8 +1407,8 @@ def sh_create(c, uid, space, title, list_id=None, columns=None, rows=None, agent
         if not isinstance(col, dict):
             raise BadInput(tr("Invalid value: {0}", "columns"))
         f = sh_clean_col(col)
-        c.execute("INSERT INTO sheet_columns(sheet_id,pos,title,kind,options,color_mode,width) VALUES(?,?,?,?,?,?,?)",
-                  (sid, float(i + 1), f["title"], f["kind"], f.get("options", "[]"), f["color_mode"], f.get("width")))
+        c.execute("INSERT INTO sheet_columns(sheet_id,pos,title,kind,options,color_mode,width,dec,cur) VALUES(?,?,?,?,?,?,?,?,?)",
+                  (sid, float(i + 1), f["title"], f["kind"], f.get("options", "[]"), f["color_mode"], f.get("width"), f.get("dec"), f.get("cur")))
     r = sh_reload(c, sid)
     if rows is None:
         sh_add_rows(c, r, SH_START_ROWS, uid)

@@ -28,6 +28,7 @@ from .core import (SH_KINDS, sh_add_col, sh_add_rows, sh_brief, sh_check_list, s
 from .shbook import shb_patch, shb_spec  # 2.369.5 (#2517): pulled up from functions
 from .shshare import shs_need_own  # 2.369.5 (#2517): pulled up from functions
 from .shfmt import shfm_spec  # 2.578.0 (#3462 C)
+from ..office.homecur import HC_CODES  # 2.769.0 (#5351)
 
 SHX_CREATE_FIELDS = ("title", "space", "list_id", "columns", "rows")
 
@@ -210,9 +211,9 @@ def v1_sheet_rows(sid):
 @app.post("/api/v1/sheets/<int:sid>/columns")
 @v1_view
 def v1_sheet_column(sid):
-    """{title, kind, options?, color_mode?, width?, after_col_id?} -> {col_id, rev, batch}"""
+    """{title, kind, options?, color_mode?, width?, dec?, cur?, after_col_id?} -> {col_id, rev, batch}"""
     b = v1_json()
-    _check_fields(b, ("title", "kind", "options", "color_mode", "width", "after_col_id"))
+    _check_fields(b, ("title", "kind", "options", "color_mode", "width", "dec", "cur", "after_col_id"))  # 2.769.0 (#5351): + dec, cur
     agent_id, batch = _write_ctx()
     c = db()
     r = sh_need(c, sid, write=True)
@@ -264,7 +265,12 @@ def sheets_spec(paths, schemas, op, ok, errs, ref, pid, q):
         "options": {"type": "array", "description": "select: the choices [{label, color?: #rrggbb, id?}]",
                     "items": {"type": "object", "properties": {"label": {"type": "string"}, "color": {"type": "string"}, "id": {"type": "string"}}}},
         "color_mode": {"type": "string", "enum": ["cell", "row"], "description": "select: colour the cell (default) or the whole row"},
-        "width": {"type": ["integer", "null"], "minimum": 30, "maximum": 2000}}}
+        "width": {"type": ["integer", "null"], "minimum": 30, "maximum": 2000},
+        # 2.769.0 (#5351): the column's own number format (display, sums, pivot, print, export; values stay full)
+        "dec": {"type": ["integer", "null"], "minimum": 0, "maximum": 4,
+                "description": "number / currency / percent: decimal places shown (null = automatic)"},
+        "cur": {"type": ["string", "null"], "enum": [*HC_CODES, None],
+                "description": "currency: the column's own ISO 4217 currency (null = the table's currency)"}}}
     inputs = {"type": "array", "items": {"type": "array", "items": {"type": ["string", "number", "boolean", "null"]}},
               "description": "Rows of inputs in the order of the columns. Numbers 1,5 or 1.5, dates DD.MM.YYYY or ISO, a select cell its "
                              "label (a new label becomes a new choice), formulas start with = (A1, B2:B9, cell / column names, "
@@ -297,7 +303,7 @@ def sheets_spec(paths, schemas, op, ok, errs, ref, pid, q):
         "id": {"type": "integer"}, "title": {"type": "string"}, "space": {"type": "string"}, "org_id": {"type": ["integer", "null"]},
         "list_id": {"type": ["integer", "null"]}, "list_title": {"type": ["string", "null"]}, "can_write": {"type": "boolean"},
         "currency": {"type": "string"},
-        "columns": {"type": "array", "items": {"type": "object", "description": "{id, pos, title, kind, options, color_mode, width, letter}"}},
+        "columns": {"type": "array", "items": {"type": "object", "description": "{id, pos, title, kind, options, color_mode, width, letter, dec, cur (2.769.0)}"}},
         "rows": {"type": "array", "items": {"type": "object", "description": "{id, pos}"}},
         "chart": {"type": ["object", "null"], "description": "2.124.0: the table's chart set in the app, {type: bar | line | stacked | pie | donut (2.578.0), x: "
                                                             "column id of the labels | null, y: [column ids of the numbers]}; read only here"},

@@ -29,7 +29,7 @@ from ..core.errors import BadInput
 from ..core.i18n import dec_comma, lang, tr
 from ..core.pg import write_lock
 from ..accounts.session import me
-from .core import ShBook, ShEvaluator, sh_currency, sh_touch
+from .core import ShBook, ShEvaluator, sh_col_numfmt, sh_currency, sh_touch  # 2.769.0 (#5351): + sh_col_numfmt
 from ..personal.timetrack import _csv_cell
 from .formula import ShErr, ShEval, sh_col_letter, sh_fmt, sh_json_value
 from .shbook import _need_book, _need_tab, shb_bid, shb_label, shb_rows
@@ -228,7 +228,9 @@ def shp_compute(c, r, uid=None):
             return _cell(None, "")
         kind = kinds.get(v["col"]) if v["agg"] != "count" else "number"
         kind = kind if kind in SHP_NUM_KINDS else "number"
-        return _cell(sh_json_value(x) if math.isfinite(x) else None, sh_fmt(x, kind, lg, cur))
+        # 2.769.0 (#5351): a sum / average in the column's own decimal places and currency (a count stays a plain number)
+        dec, ccur = sh_col_numfmt(book.col_by.get(v["col"]) if v["agg"] != "count" else None, cur)
+        return _cell(sh_json_value(x) if math.isfinite(x) else None, sh_fmt(x, kind, lg, ccur, dec=dec))
 
     vl = [vlabel(v) for v in vals_f]
     empty = tr("(empty)")

@@ -91,9 +91,10 @@ function shg_fmt(sh, col, v, how) {
   if (v == null) return '–';
   try {
     if (how === 'count') return new Intl.NumberFormat(LOCALE()).format(v);
-    if (col.kind === 'currency') return new Intl.NumberFormat(LOCALE(), {style: 'currency', currency: sh.currency || 'EUR'}).format(v);
-    if (col.kind === 'percent') return new Intl.NumberFormat(LOCALE(), {style: 'percent', maximumFractionDigits: 2}).format(v);
-    return new Intl.NumberFormat(LOCALE(), {maximumFractionDigits: 4}).format(v);
+    const d = Number.isInteger(col.dec) ? {minimumFractionDigits: col.dec, maximumFractionDigits: col.dec} : null;  // 2.769.0 (#5351): the column's own places
+    if (col.kind === 'currency') return new Intl.NumberFormat(LOCALE(), {style: 'currency', currency: col.cur || sh.currency || 'EUR', ...(d || {})}).format(v);
+    if (col.kind === 'percent') return new Intl.NumberFormat(LOCALE(), {style: 'percent', ...(d || {maximumFractionDigits: 2})}).format(v);
+    return new Intl.NumberFormat(LOCALE(), d || {maximumFractionDigits: 4}).format(v);
   } catch { return String(v); }
 }
 

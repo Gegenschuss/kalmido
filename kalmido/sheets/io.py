@@ -39,6 +39,8 @@ from ..core.errors import BadInput
 from .shkinds import shk_export, shk_guess  # 2.124.0 B (#2110)
 from .core import (SH_COLS_MAX, SH_ROWS_MAX, ShBook, _write_cells, sh_brief, sh_create, sh_currency, sh_eval, sh_need, sh_options,
                    sh_reload, sh_to_display, sh_to_internal, sh_touch)
+from .core import SH_DEC_MAX, sh_col_numfmt  # 2.769.0 (#5351): a column's own decimal places / currency
+from ..office.homecur import hc_code  # 2.769.0 (#5351)
 from .formula import (SH_CURRENCY_SYMBOLS, ShErr, sh_col_letter, sh_fmt_date, sh_name_ok, sh_parse_date, sh_parse_number,
                       sh_fn_key, sh_tokens)
 from .shfuncs import SHF_DE, SHF_EXCEL
@@ -127,6 +129,8 @@ def shx_csv(c, sheet):
     book, res, at = _grid(c, sheet)
     lg = lang()
     de = dec_comma(lg)
+    tcur = sh_currency(c, sheet)
+    decs = [sh_col_numfmt(col, tcur)[0] for col in book.cols]  # 2.769.0 (#5351): the values as the column shows them
     buf = io.StringIO()
     w = csv.writer(buf, delimiter=";" if de else ",", lineterminator="\r\n")
     w.writerow([_csv_cell(col["title"] or sh_col_letter(i)) for i, col in enumerate(book.cols)])
@@ -146,10 +150,13 @@ def shx_csv(c, sheet):
             elif isinstance(v, bool):
                 row.append(_csv_cell(r.get("display") or ""))
             elif isinstance(v, float):
+                d = decs[ci]
                 if col["kind"] == "percent":
-                    row.append(num(round(v * 100, 6)) + "%")
+                    row.append(num(round(v * 100, 6 if d is None else d)) + "%")
                 elif col["kind"] == "currency":
-                    row.append(num(round(v, 2)))
+                    row.append(num(round(v, 2 if d is None else d)))
+                elif col["kind"] == "number" and d is not None:
+                    row.append(num(round(v, d)))
                 else:
                     row.append(num(v))
             elif isinstance(v, date):
@@ -254,11 +261,49 @@ def _q(s):
     return escape(s, {'"': "&quot;"})
 
 
-def _currency_fmt(cur):
+def _currency_fmt(cur, dec=2):
     sym = SH_CURRENCY_SYMBOLS.get((cur or "EUR").upper(), (cur or "EUR").upper())
+    n = "#,##0" + ("." + "0" * dec if dec else "")  # 2.769.0 (#5351): the column's decimal places
     if sym in ("$", "£"):
-        return f'"{sym}"#,##0.00'
-    return f'#,##0.00\\ "{sym}"'
+        return f'"{sym}"{n}'
+    return f'{n}\\ "{sym}"'
+
+
+def shx_col_xlfmt(col, cur):
+    """2.769.0 (#5351): the Excel number format of a column with its own decimal places / currency, None = the fixed style of
+    its kind (automatic: General, 0.00 %, the table's currency with 2 places, as before)."""
+    dec, ccur = sh_col_numfmt(col, cur)
+    frac = ("." + "0" * dec) if dec else ""
+    if col["kind"] == "number" and dec is not None:
+        return "#,##0" + frac
+    if col["kind"] == "percent" and dec is not None:
+        return "0" + frac + "%"
+    if col["kind"] == "currency" and (dec is not None or ccur != cur):
+        return _currency_fmt(ccur, 2 if dec is None else dec)
+    return None
+
+
+def shx_xl_numfmt(code, nid=0):
+    """2.769.0 (#5351): (decimal places or None, currency or None) an imported number format stands for: the places of its first
+    section, the currency of its sign / code. Excel's built-in ones by number; General and the built-in 0.00 % (what the export
+    writes for "automatic") give None."""
+    if nid in (1, 3, 5, 6, 9):
+        return 0, None
+    if nid in (2, 4):
+        return 2, None
+    code = code or ""
+    if not code or code.lower() == "general":
+        return None, None
+    sec = re.split(r';(?=(?:[^"]*"[^"]*")*[^"]*$)', code)[0]
+    cur = None
+    for m in re.findall(r'"([^"]*)"|\[\$([^\]-]*)|([€$£])|\b([A-Z]{3})\b', sec):
+        cur = cur or hc_code(next((x for x in m if x), "").strip())
+    plain = re.sub(r'"[^"]*"|\\.|\[[^\]]*\]', "", sec)
+    if not re.search(r"[0#?]", plain):
+        return None, cur
+    m = re.search(r"[0#?]\.([0#?]+)", plain)
+    dec = min(m.group(1).count("0") + m.group(1).count("#") + m.group(1).count("?"), SH_DEC_MAX) if m else 0
+    return dec, cur
 
 
 def _xl_name_ok(name):
@@ -279,6 +324,8 @@ def shx_xlsx(c, sheet, xl_names=None, xl_reg=None):
     cur = sh_currency(c, sheet)
     # styles: 0 default, 1 header, 2 currency, 3 percent, 4 date
     style_of = {"currency": 2, "percent": 3, "date": 4}
+    own = [shx_col_xlfmt(col, cur) for col in book.cols]  # 2.769.0 (#5351): a column's own decimal places / currency
+    own = [reg.numfmt(x) if x else None for x in own]
     cells_xml, notes = [], []
     # the header
     hdr = "".join(f'<c r="{sh_col_letter(i)}1" s="1" t="inlineStr"><is><t xml:space="preserve">{escape(col["title"] or "")}</t></is></c>'
@@ -294,7 +341,7 @@ def shx_xlsx(c, sheet, xl_names=None, xl_reg=None):
             r = res.get(x["id"]) or {}
             raw = x["raw"] or ""
             v = shk_export(col, r, _pyval(r), None)  # 2.124.0 B (#2110): a checkbox as a truth value
-            s = style_of.get(col["kind"])
+            s = own[ci] or style_of.get(col["kind"])
             if isinstance(v, date):
                 s = 4
             cf = shfm_load(x.get("fmt"))  # 2.578.0 (#3462 C): bold, colours, alignment of the cell
@@ -394,7 +441,7 @@ def shx_xlsx(c, sheet, xl_names=None, xl_reg=None):
           + (f'<definedNames>{"".join(sorted(names))}</definedNames>' if names else "")
           + '<calcPr calcId="191029" fullCalcOnLoad="1"/></workbook>')
     styles = (f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="{_MAIN}">'
-              f'<numFmts count="1"><numFmt numFmtId="164" formatCode="{_q(_currency_fmt(cur))}"/></numFmts>'
+              f'<numFmts count="{1 + len(reg._nf)}"><numFmt numFmtId="164" formatCode="{_q(_currency_fmt(cur))}"/>{reg.numfmts_xml(_q)}</numFmts>'
                             + reg.xml() +  # 2.578.0 (#3462 C): fonts, fills, cellXfs of the five fixed styles + the cell formats
               '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
               f'<dxfs count="{len(dxfs)}">{"".join(dxfs)}</dxfs></styleSheet>')
@@ -547,8 +594,11 @@ def _num_fmts(z, names, budget):
                 out[i] = "date"
             elif nid in _XL_PCT_FMTS or "%" in plain:
                 out[i] = "percent"
-            elif nid in (5, 6, 7, 8, 42, 44) or re.search(r"[€$£]|\[\$|CHF|EUR|USD", code):
-                out[i] = "currency"
+            elif nid in (5, 6, 7, 8, 42, 44) or re.search(r"[€$£]|\[\$|CHF|EUR|USD", code) or shx_xl_numfmt(code, nid)[1]:
+                out[i] = "currency"  # 2.769.0 (#5351): + any office currency by its code ("SEK")
+            nf = shx_xl_numfmt(code, nid)
+            if nf != (None, None):
+                out[("nf", i)] = nf  # 2.769.0 (#5351): its decimal places / currency (_shx_cell puts it on the cell as "nf")
     return out, dxf_fill, shfm_xl_styles(st, _local)  # 2.578.0 (#3462 C): + the cell formats and the rules' colours
 
 
@@ -834,6 +884,12 @@ def _shx_cell(cel, k, r, cells, shared, strings, fmts, full, sty=None, fl=None):
             if full[0] > SHX_CELLS_MAX + SH_COLS_MAX:
                 raise _shx_too_many()
     cells[(r, ci)] = {"v": v or "", "f": f, "fmt": fmt, "num": t in (None, "n") and bool(v)}
+    try:  # 2.769.0 (#5351): the decimal places / currency of its number format
+        nf = fmts.get(("nf", int(cel.get("s") or 0)))
+    except ValueError:
+        nf = None
+    if nf:
+        cells[(r, ci)]["nf"] = nf
     if st_ and not (v or f) and fl is not None:  # 2.578.0 (#3462, review G1): a formatted empty cell becomes a cell - counted
         fl[0] += 1
         if fl[0] > SHX_CELLS_MAX:
@@ -995,6 +1051,26 @@ def _guess_kind(vals, fmts):
     return "text"
 
 
+def _shx_col_nf(kind, cells):
+    """2.769.0 (#5351): {dec?, cur?} of an imported number / currency / percent column when all its numbers share one format;
+    what the automatic shows anyway (a currency with 2 places) stays automatic."""
+    if kind not in ("number", "currency", "percent") or not cells:
+        return {}
+    nfs = {x.get("nf") for x in cells}
+    if len(nfs) != 1:
+        return {}
+    nf = nfs.pop()
+    if not nf:
+        return {}
+    dec, cur = nf
+    out = {}
+    if dec is not None and not (kind == "currency" and dec == 2):
+        out["dec"] = dec
+    if cur and kind == "currency":
+        out["cur"] = cur
+    return out
+
+
 def _is_header(row, nxt):
     """Is the first row a header (titles): text only (no numbers / dates / formulas) and something below it."""
     vals = [x for x in row if (x.get("v") or "").strip()]
@@ -1034,6 +1110,7 @@ def shx_import(c, uid, grid, space, title, list_id=None, into=None):
                             "color_mode": "row" if ci in grid.row_mode else "cell"})
         else:
             columns.append({"title": titles[ci], "kind": _guess_kind(vals, fmts)})
+            columns[-1].update(_shx_col_nf(columns[-1]["kind"], [r[ci] for r in data if ci < len(r) and r[ci].get("num")]))
     report = {"rows": len(data), "columns": width, "formulas": 0, "as_value": 0, "options_added": 0, "names": 0}
     grid.hdr = hdr  # 2.124.0 E (#2116)
     if into is not None:
@@ -1041,6 +1118,8 @@ def shx_import(c, uid, grid, space, title, list_id=None, into=None):
     else:
         sid = sh_create(c, uid, space, title, list_id, columns=columns or None, rows=max(len(data), 1))
     sheet = sh_reload(c, sid)
+    # 2.769.0 (#5351): a column in the table's own currency keeps "the table's currency" (follows a later change of it)
+    c.execute("UPDATE sheet_columns SET cur=NULL WHERE sheet_id=? AND cur=?", (sid, sh_currency(c, sheet)))
     book = ShBook(c, sheet)
     book.shh_off = True  # 2.124.0 B (#2112): a new table from a file has no history of its own
     plain, later = [], []

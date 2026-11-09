@@ -419,6 +419,20 @@ class ShfmXl:
                     '<xf numFmtId="10" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>',
                     '<xf numFmtId="14" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>']
         self._font, self._fill, self._xf = {}, {}, {}
+        self._nf, self._bnum = {}, {}  # 2.769.0 (#5351): {format code: (numFmtId, xf)}, {xf: numFmtId} of the columns' own formats
+
+    def numfmt(self, code):
+        """2.769.0 (#5351): the base style (xf index) of a column's own number format (a custom numFmt from 165 on)."""
+        if code not in self._nf:
+            nid = 165 + len(self._nf)
+            self.xfs.append(f'<xf numFmtId="{nid}" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>')
+            self._nf[code] = (nid, len(self.xfs) - 1)
+            self._bnum[len(self.xfs) - 1] = nid
+        return self._nf[code][1]
+
+    def numfmts_xml(self, esc):
+        """2.769.0 (#5351): the <numFmt> entries of the columns' own formats (after 164, the table's currency)."""
+        return "".join(f'<numFmt numFmtId="{nid}" formatCode="{esc(code)}"/>' for code, (nid, _x) in self._nf.items())
 
     def _idx(self, cache, lst, key, xml):
         if key not in cache:
@@ -441,7 +455,7 @@ class ShfmXl:
             fill = self._idx(self._fill, self.fills, f["fill"], f'<fill><patternFill patternType="solid"><fgColor rgb="FF{SHFM_XL_FILL[f["fill"]]}"/>'
                                                                   '<bgColor indexed="64"/></patternFill></fill>')
         al = (f.get("align") or "", bool(f.get("wrap")))
-        num = self.BASE_NUM.get(base, 0)
+        num = self._bnum.get(base, self.BASE_NUM.get(base, 0))  # 2.769.0 (#5351): a column's own number format too
         key = (num, font, fill, al)
         if key not in self._xf:
             a = ""

@@ -669,11 +669,21 @@ async function shvColAgain(cid, r) {
   const mine = Object.fromEntries(fs.map(x => [x.field, x.mine])), keys = fs.map(x => x.field);
   shvColModal(cur, null, {cur, raw: cur, theirs: keys, mine, both: keys});
 }
-const SHV_CFLD = {title: '#shv-ct', kind: '#shv-ck', width: '#shv-cw', color_mode: '.shvmode'};
+const SHV_CFLD = {title: '#shv-ct', kind: '#shv-ck', width: '#shv-cw', color_mode: '.shvmode', dec: '#shv-cd', cur: '#shv-cc'};  // 2.769.0 (#5351): + dec, cur
+// 2.769.0 (#5351): a number / currency / percent column's own decimal places (Automatic, 0-4) and a currency column's own currency
+// (default the table's); only the display, sums, pivot, print and export follow them, formulas keep the full value
+function shvNumFmtHtml(sh, st) {
+  const opt = (v, label, on) => `<option value="${esc(v)}" ${on ? 'selected' : ''}>${esc(label)}</option>`;
+  const decs = opt('', tr('Automatic'), st.dec == null) + [0, 1, 2, 3, 4].map(n => opt(String(n), String(n), st.dec === n)).join('');
+  const curs = [...new Set([...(sh.currencies || [sh.currency || 'EUR']), ...(st.cur ? [st.cur] : [])])];
+  return `<div class="row"><label for="shv-cd">${tr('Decimal places')}</label><select id="shv-cd">${decs}</select></div>`
+    + (st.kind === 'currency' ? `<div class="row"><label for="shv-cc">${tr('Currency')}</label><select id="shv-cc">${opt('', tr('Table currency ({0})', sh.currency || 'EUR'), !st.cur)}${curs.map(k => opt(k, k, st.cur === k)).join('')}</select></div>` : '');
+}
 function shvColModal(col, afterId, cf) {  // a new column (col = null) or its settings: title, kind, options with colours, colour for cell / row, width
   const sh = SHV.sh; if (!sh?.can_write) return;
   if (cf) col = {...cf.cur, ...cf.mine, id: cf.cur.id, options: cf.cur.options};  // 2.576.0 (#4764): the current column, the own input over it
-  const st = {kind: col?.kind || 'text', opts: JSON.parse(JSON.stringify(col?.options || [])), mode: col?.color_mode || 'cell', pal: null, width: shvW(col || {kind: 'text'})};
+  const st = {kind: col?.kind || 'text', opts: JSON.parse(JSON.stringify(col?.options || [])), mode: col?.color_mode || 'cell', pal: null, width: shvW(col || {kind: 'text'}),
+    dec: Number.isInteger(col?.dec) ? col.dec : null, cur: col?.cur || null};  // 2.769.0 (#5351): the column's own decimal places / currency
   if (!st.opts.length) st.opts = [{id: '', label: '', color: LCOLORS[1]}];
   const md = modal(`<h3>${col ? tr('Edit column') : tr('Add column')}</h3>
     <div class="row"><label for="shv-ct">${tr('Title')}</label><input id="shv-ct" value="${esc(col?.title || '')}" maxlength="60" placeholder="${esc(tr('e.g. Hours, Rate, Status'))}"></div>
@@ -684,13 +694,14 @@ function shvColModal(col, afterId, cf) {  // a new column (col = null) or its se
   md.classList.add('shvcmd');
   const extra = () => {
     const x = $('#shv-cx', md);
+    if (SHV_NUM.includes(st.kind)) { x.innerHTML = shvNumFmtHtml(sh, st); return; }  // 2.769.0 (#5351)
     if (st.kind !== 'select') { x.innerHTML = st.kind === 'date' ? `<p class="muted mhint">${mdFirst() ? tr('Dates as MM/DD/YYYY or YYYY-MM-DD; a date plus a number gives a date that many days later.') : tr('Dates as DD.MM.YYYY or YYYY-MM-DD; a date plus a number gives a date that many days later.')}</p>` : ''; return; }
     x.innerHTML = `<h4>${tr('Options')}</h4><div class="optlist" role="list">${st.opts.map((o, i) => `<div class="optrow" data-i="${i}" role="listitem"><button type="button" class="swc" data-ocol="${i}" style="background:${cssColor(o.color) || 'var(--bg4)'}" title="${esc(tr('Colour'))}" aria-label="${esc(tr('Colour'))}" aria-expanded="${st.pal === i}"></button><input data-oname="${i}" value="${esc(o.label)}" maxlength="60" placeholder="${esc(tr('Option'))}"><button type="button" class="iconbtn" data-orm="${i}" title="${esc(tr('Remove'))}" aria-label="${esc(tr('Remove'))}">${ic('x', 's')}</button></div>${st.pal === i ? `<div class="colors lrpal" role="group" aria-label="${esc(tr('Colour'))}">${LCOLORS.map((c, k) => `<button type="button" data-opal="${esc(c)}" style="background:${c || 'var(--bg4)'}" class="${(o.color || '') === c ? 'on' : ''}" aria-pressed="${(o.color || '') === c}" aria-label="${esc(c ? tr('Colour {0}', k) : tr('No colour'))}"></button>`).join('')}</div>` : ''}`).join('')}</div>
       <button type="button" class="btn sm" data-m="opt-add">${ic('plus', 's')}${tr('Add option')}</button>
       <fieldset class="shvmode"><legend>${tr('Colour of the option')}</legend><label class="chkl"><input type="radio" name="shv-cm" value="cell" ${st.mode !== 'row' ? 'checked' : ''}> ${tr('Colour for the cell')}</label><label class="chkl"><input type="radio" name="shv-cm" value="row" ${st.mode === 'row' ? 'checked' : ''}> ${tr('Colour for the whole row')}</label></fieldset>`;
   };
   extra();
-  md.addEventListener('change', e => { if (e.target.id === 'shv-ck') { st.kind = e.target.value; extra(); } if (e.target.name === 'shv-cm') st.mode = e.target.value; });
+  md.addEventListener('change', e => { if (e.target.id === 'shv-ck') { st.kind = e.target.value; extra(); } if (e.target.name === 'shv-cm') st.mode = e.target.value; if (e.target.id === 'shv-cd') st.dec = e.target.value === '' ? null : +e.target.value; if (e.target.id === 'shv-cc') st.cur = e.target.value || null; });
   md.addEventListener('input', e => { const i = e.target.dataset.oname; if (i !== undefined) st.opts[+i].label = e.target.value; });
   md.addEventListener('click', async e => {
     const b = e.target.closest('button'); if (!b) return;
@@ -708,6 +719,7 @@ function shvColModal(col, afterId, cf) {  // a new column (col = null) or its se
       body.options = st.opts.filter(o => o.label.trim()).map(o => { if (!o.id) { while (used.has('o' + n)) n++; o.id = 'o' + n; used.add(o.id); } return {id: o.id, label: o.label.trim(), color: cssColor(o.color) || ''}; });
       body.color_mode = st.mode;
     }
+    if (SHV_NUM.includes(st.kind)) { body.dec = st.dec; if (st.kind === 'currency') body.cur = st.cur; }  // 2.769.0 (#5351)
     md.remove();
     const seen = cf ? cf.cur : col;  // 2.576.0 (#4764): what the dialog showed (after a conflict: the server's) is the base, not a newer copy
     if (col && body.options) { shvColAgain(col.id, await shvColOpts(seen, body, tr('Column {0} changed', title || col.letter))); return; }
