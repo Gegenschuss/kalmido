@@ -124,10 +124,14 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,files,docs';
     await ev(`(() => { localStorage.clear(); sessionStorage.clear(); return 1; })()`);
     check(await signIn(ev) === 200, 'phone: carol signs in');
     await nav(B + '#office/offers');
-    await ready(ev, `typeof OFC === 'object' && !!OFC.info`, 80);
+    await ev(`(() => { window.__p2351e = []; /* the page's errors from here on */ addEventListener('error', e => window.__p2351e.push(String(e.message).slice(0, 120))); addEventListener('unhandledrejection', e => window.__p2351e.push('rej ' + String(e.reason?.message || e.reason).slice(0, 120))); return 1; })()`);
+    const ofc = await ready(ev, `typeof OFC === 'object' && !!OFC.info`, 80);
     // CI of 2.351.3: a late route render closes the drawer again (core.js closeSide) - opened again until it stays
-    const drawer = `(() => { if (!document.querySelector('#side.open')) document.querySelector('#top .menu')?.click(); return !!document.querySelector('#side.open') && !!${node('a:offers')}; })()`;
-    check(await ready(ev, drawer, 60), 'phone: the drawer shows Quotations & invoices as a tree node');
+    // CI of 2.771.0 (Mac green three times, drawer open after 0.3 s there): the FAIL line says what the page showed (#3398)
+    const drawer = `(() => { if (!document.querySelector('#side.open')) { window.__p2351o = (window.__p2351o || 0) + 1; document.querySelector('#top .menu')?.click(); } return !!document.querySelector('#side.open') && !!${node('a:offers')}; })()`;
+    const seen = () => ev(`JSON.stringify({open: !!document.querySelector('#side.open'), clicks: window.__p2351o || 0, menu: !!document.querySelector('#top .menu'), side: [...document.querySelectorAll('#side .sbbt')].map(x => x.dataset.sbbid).filter(Boolean).slice(0, 12), hash: location.hash, route: (typeof S === 'object' && S.route) ? S.route.mod + '/' + (S.route.key || '') : '', pop: !document.querySelector('#pop')?.classList.contains('hidden'), modal: [...document.querySelectorAll('.modal')].map(m => m.className).slice(0, 3), auth: !!document.querySelector('.authscreen'), errs: window.__p2351e || [], view: (document.querySelector('#view')?.textContent || '').trim().slice(0, 80)})`).catch(e => 'no answer: ' + e);
+    const dok = await ready(ev, drawer, 60);
+    check(dok, 'phone: the drawer shows Quotations & invoices as a tree node' + (dok ? '' : ` (office loaded: ${ofc}; ${await seen()})`));
     await openNode(ev, 'a:offers');
     check(await ready(ev, `${node('d:offers:' + Q[20])}?.dataset.sbbdrag === '1' && !${node('d:offers:' + Q[20])}.hasAttribute('draggable')`, 60), 'phone: the quotations are held to drag (no mouse drag)');
     await ev(`(() => { const t = ${node('d:offers:' + Q[20])}; if (t) sbb_tmenu(t); return 1; })()`);  // no node = the check above failed, not a JS error on top
