@@ -2,7 +2,7 @@
    (lazyload.js LD_CSS): tag buttons (picker + filters), the filter line above a list, tags on file rows, the filter sheet. */
 .tsp{display:inline-flex;align-items:center;gap:.25rem;min-height:2.25rem;padding:0 .75rem;border:.0625rem solid var(--line);border-radius:99rem;background:var(--bg2);color:var(--text);font:inherit;font-size:var(--fs-s);cursor:pointer}
 .tsp:hover{border-color:var(--accent)}
-.tsp.tsp-in{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-ink)}
+.tsp.tsp-in{background:var(--accent-soft);border-color:var(--accent);color:var(--text)}  /* 2.780.0 (#5388): text on the pale accent ground, never --accent-ink */
 .tsp.tsp-not{border-style:dashed;color:var(--muted);text-decoration:line-through}
 .tsp .tsc{color:var(--muted);font-variant-numeric:tabular-nums}  /* 2.772.0 (#4890): the number of documents of a filter */
 .tsp .tsig{font-weight:600;line-height:1}
@@ -10,7 +10,7 @@
 .tsnew{display:flex;gap:.5rem;align-items:center}
 .tsnew input{flex:1;min-height:2.75rem}  /* 2.138.4 A (#2362): 44 px */
 .tsfbar{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;padding:.25rem 0 .5rem}
-.tsfx{display:inline-flex;align-items:center;gap:.25rem;min-height:2rem;padding:0 .5rem 0 .75rem;border:0;border-radius:99rem;background:var(--accent-soft);color:var(--accent-ink);font:inherit;font-size:var(--fs-s);cursor:pointer}
+.tsfx{display:inline-flex;align-items:center;gap:.25rem;min-height:2rem;padding:0 .5rem 0 .75rem;border:0;border-radius:99rem;background:var(--accent-soft);color:var(--text);font:inherit;font-size:var(--fs-s);cursor:pointer}
 .tsfx .i{opacity:.7}
 .tsfx.not{background:var(--bg3);color:var(--muted)}
 .tsfn{color:var(--muted);font-size:var(--fs-s);margin-right:.25rem}
@@ -47,9 +47,9 @@
 .tflb{position:fixed;z-index:78;margin:0;padding:.25rem;list-style:none;overflow-y:auto;background:var(--bg2);border:1px solid var(--line2);border-radius:var(--r-l);box-shadow:var(--shadow);box-sizing:border-box}
 .tflb li{padding:.375rem .625rem;border-radius:var(--r-s);cursor:pointer;font-size:var(--fs-m);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tflb li b{font-weight:700}
-.tflb li[aria-selected="true"]{background:var(--accent-soft);color:var(--accent-ink)}
+.tflb li[aria-selected="true"]{background:var(--accent-soft);color:var(--text)}
 .tflb li.tfnew{border-top:1px solid var(--line);color:var(--muted)}
-.tflb li.tfnew[aria-selected="true"]{color:var(--accent-ink)}
+.tflb li.tfnew[aria-selected="true"]{color:var(--accent)}
 @media (max-width:767px),(pointer:coarse){
   .tfp{min-height:2.25rem}
   .tfx{width:2.25rem;height:2.25rem}

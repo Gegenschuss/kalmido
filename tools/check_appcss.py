@@ -49,8 +49,28 @@ def braces(name, text):
     return err
 
 
+def inkless(text):
+    """2.780.0 (#5388): a rule with background(-color):var(--accent-soft) AND color:var(--accent-ink) is an error -- the ink
+    colour is only for text on the full accent; on the pale tint it is unreadable in both themes. Works on any {...} block."""
+    bad = []
+    for m in re.finditer(r"\{([^{}]*)\}", re.sub(r"/\*.*?\*/", "", text, flags=re.S)):
+        b = m.group(1)
+        if re.search(r"background(?:-color)?\s*:\s*var\(--accent-soft\)", b) and re.search(r"(?<![-\w])color\s*:\s*var\(--accent-ink", b):
+            bad.append(b.strip()[:70])
+    return bad
+
+
 def errors(root=ROOT, verbose=False):
     err = []
+    for p in sorted(glob.glob(os.path.join(root, "static", "css", "*.css")) + [os.path.join(root, "static", "app.css")]):
+        with open(p, encoding="utf-8") as f:
+            for b in inkless(f.read()):
+                err.append(f"{os.path.relpath(p, root)}: --accent-ink text on --accent-soft ground (use var(--text) or var(--accent)): {b}")
+    for p in sorted(glob.glob(os.path.join(root, "static", "js", "*.js"))):
+        with open(p, encoding="utf-8") as f:
+            for no, line in enumerate(f, 1):
+                if "--accent-soft" in line and "color:var(--accent-ink" in line.replace(" ", ""):
+                    err.append(f"{os.path.relpath(p, root)} line {no}: --accent-ink text on --accent-soft ground (use var(--text) or var(--accent))")
     path = os.path.join(root, "static", "app.css")
     with open(path, encoding="utf-8") as f:
         n = css_lines(f.read())

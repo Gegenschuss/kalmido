@@ -7561,7 +7561,7 @@ label.pmsw>span:last-child>b,label.pmsw>span:last-child>small{display:block;widt
 .rt9n{flex:none;color:var(--muted);font-family:var(--mono);font-size:var(--fs-xs)}
 .rt9t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rt9done .rt9t{color:var(--muted);text-decoration:line-through}
-.rt9dup,.rt9dupb{flex:none;padding:.0625rem .5rem;border-radius:99rem;background:var(--accent-soft);color:var(--accent-ink);font-size:var(--fs-xs);font-weight:500}
+.rt9dup,.rt9dupb{flex:none;padding:.0625rem .5rem;border-radius:99rem;background:var(--accent-soft);color:var(--text);font-size:var(--fs-xs);font-weight:500}
 .rt9empty{padding:.25rem .5rem;font-size:var(--fs-s)}
 .rt9refh{padding:.5rem .5rem .125rem;color:var(--muted);font-size:var(--fs-xs);font-weight:600}
 .rt9qh{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem .75rem;margin:.25rem 0 0;padding:.25rem .5rem;font-size:var(--fs-s);color:var(--text2);min-width:0;animation:rt9in .2s ease}
@@ -7604,7 +7604,7 @@ label.pmsw>span:last-child>b,label.pmsw>span:last-child>small{display:block;widt
 .dwrow input{width:5.5rem;flex:0 0 auto}.dwrow select{flex:0 0 auto}
 /* 2.60.0 B (#1511): story points in the task row and the kanban column head, the velocity bars of the project page */
 .khead .sptsum{margin-left:.25rem}
-.meta .sptm{display:inline-flex;align-items:center;justify-content:center;min-width:1.125rem;font:600 var(--fs-xs) var(--mono);border-radius:99rem;padding:0 .3125rem;line-height:1rem;background:var(--accent-soft);color:var(--accent-ink)}
+.meta .sptm{display:inline-flex;align-items:center;justify-content:center;min-width:1.125rem;font:600 var(--fs-xs) var(--mono);border-radius:99rem;padding:0 .3125rem;line-height:1rem;background:var(--accent-soft);color:var(--text)}
 .sptvel{display:flex;flex-direction:column;gap:.375rem;overflow-x:auto}
 .sptvel svg{max-width:100%;height:auto;overflow:visible}
 .sptvel .sptbar{fill:var(--accent)}
