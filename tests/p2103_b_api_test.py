@@ -15,6 +15,7 @@ Selbstständige: the trash objects of the private workspace belong to a person w
 the instance admin's alone (no organisation, no freelancer side): n/a.
 usage: p2103_b_api_test.py <datadir>      (P2103B_NOSTART=1: a running server on KALMIDO_TEST_PORT, no start.sh)"""
 import io
+import json  # 2.783.0 (#5368): core_run
 import os
 import subprocess
 import sys
@@ -211,8 +212,18 @@ check(Fr.delete(B + f"/api/comments/{CM}").ok, "setup: the comment deleted (empt
 sql("UPDATE comments SET deleted_at=? WHERE id=?", (OLD, CM), write=True)
 
 # 2.152.0 (#2165): no "wiki" here -- main's own run wiki/pages.py wiki_trash_tick deletes the pages with their files (below)
-WANT = {"files": 1, "sheets": 1, "sheet_rows": 1, "sheet_columns": 1, "hub_mails": 1, "deals": 1, "series": 1,
-        "chat_tombstones": 1, "comments": 1}
+# 2.783.0 (#5368): the tombstones of the team chat are the core's run (core/writes.py obj_trash_tick, kind tchat_msg): CORE
+WANT = {"files": 1, "sheets": 1, "sheet_rows": 1, "sheet_columns": 1, "hub_mails": 1, "deals": 1, "series": 1, "comments": 1}
+CORE = {"tchat_msg": 1}
+
+
+def core_run(purge):
+    """2.783.0 (#5368): the core's trash run (forced) -> its report (settings ret_last_trash.obj_trash)."""
+    out = in_app("from kalmido.core.writes import obj_trash_tick\nprint('core', obj_trash_tick(c, force=True))",
+                 env=("KALMIDO_RETENTION_PURGE=1",) if purge else ())
+    check("core" in out and "Traceback" not in out, "the core's trash run ran " + out[-600:])
+    v = sql("SELECT value FROM settings WHERE key='ret_last_trash.obj_trash'")
+    return json.loads(v[0][0]) if v else {}
 
 # ---- the switch off: nothing goes, the numbers are reported
 out = in_app("from kalmido.files.trashpurge import tp_tick\nprint('counts', tp_tick(c, True))")
@@ -222,6 +233,9 @@ last = (st or {}).get("last") or {}
 check(st and not st["on"] and st["days"] == 30 and last.get("purged") is False, f"retention: trash off, 30 days, dry run: {st}")
 check(all((last.get("counts") or {}).get(k) == v for k, v in WANT.items()), f"dry run counts per area: {last.get('counts')}")
 check(one("SELECT COUNT(*) FROM fs_nodes WHERE id=?", (F_OLD,)) == 1 and os.path.isfile(P_OLD), "dry run: the old file and its stored file stay")
+cr = core_run(False)  # 2.783.0 (#5368)
+check(cr.get("purged") is False and all((cr.get("counts") or {}).get(k) == v for k, v in CORE.items())
+      and sql("SELECT 1 FROM tchat_msgs WHERE room_id=? AND body='' AND id<>?", (ROOM, TROOT)), f"dry run of the core: the tombstone counted, it stays {cr}")
 check(one("SELECT COUNT(*) FROM wiki_pages WHERE id=?", (W_OLD,)) == 1 and one("SELECT COUNT(*) FROM sheets WHERE id=?", (S_OLD,)) == 1
       and one("SELECT COUNT(*) FROM hub_mails WHERE id=?", (HM,)) == 1 and one("SELECT COUNT(*) FROM comments WHERE id=?", (CM,)) == 1,
       "dry run: page, table, mail and comment row stay")
@@ -235,6 +249,8 @@ check(last.get("purged") is True and all((last.get("counts") or {}).get(k) == v 
 check(not sql("SELECT 1 FROM fs_nodes WHERE id=?", (F_OLD,)) and not sql("SELECT 1 FROM fs_versions WHERE node_id=?", (F_OLD,)),
       "files: the old node and its versions are gone")
 check(not os.path.exists(P_OLD), "files: the stored file is gone from the disk")
+cr = core_run(True)  # 2.783.0 (#5368)
+check(cr.get("purged") is True and all((cr.get("counts") or {}).get(k) == v for k, v in CORE.items()), f"core purge counts: {cr}")
 check(sql("SELECT deleted_at IS NOT NULL FROM fs_nodes WHERE id=?", (F_NEW,)) == [(1,)], "files: deleted today stays in the trash")
 check(sql("SELECT 1 FROM wiki_pages WHERE id=?", (W_OLD,)), "wiki: the trash run leaves the pages to their own run")
 out = in_app("from kalmido.wiki.pages import wiki_trash_tick\nprint('wiki', wiki_trash_tick(c, True))", env=("KALMIDO_RETENTION_PURGE=1",))  # 2.272.0 (#3026): the trash runs delete only with the switch on

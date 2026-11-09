@@ -33,28 +33,40 @@ Interface:
   part_copy(c, kind, rid, scope_id, held, uid)                             the copy of the row before the caller deletes it
   part_copy_take(c, kind, rid, uid, need) -> the trash row (404: none / an agent; need(c, scope_id) = the area's right)
   part_copy_back(c, kind, r, lock, fix=None) -> the row inserted again (404: restored meanwhile); the copy goes
-  part_insert(c, table, snap)                                              a snapshot as a row (its own columns only)"""
+  part_insert(c, table, snap)                                              a snapshot as a row (its own columns only)
+
+2.783.0 (#5368, stage 6 of the trash core): the retention of the side objects is the core's run too. part_kind(...,
+trash_prune=True) hands the kind's trash to core/writes.py obj_trash_tick / obj_trash_prune (the area's own run goes):
+  rows with deleted_at   deleted for good after the trash period; prune = an extra SQL condition of the area (a thread's
+                         first message stays while replies point at it), on_prune(c, where, args) -> [paths] = what the area
+                         cleans up first (rows without FK; files the core unlinks after the commit)
+  copy=True              the kind's copies in list_part_trash (sections, sprints, deleted custom fields, the Undo copies of
+                         "Delete all times") are deleted after the period
+  part_trash_due(c, kind, cut) -> [ids] / part_trash_purge(c, kind, ids) -> [paths]    used by obj_trash_prune"""
 import json
 import re
 
-from .access import Denied, acx_of
+from .access import Denied, acx_of, live_sql, trash_sql  # 2.783.0 (#5368): live_sql, trash_sql
 from .conflict import ccf_check
 from .db import iso, now_utc
-from .pg import write_lock
+from .pg import insert_id, write_lock  # 2.783.0 (#5368): insert_id
 
-PART_KINDS = {}  # kind -> {kind, table, lock, version, key, agent}
+PART_KINDS = {}  # kind -> {kind, table, lock, version, key, agent, live, trash_prune, prune, on_prune, copy}
 PART_COL = re.compile(r"^[a-z_][a-z0-9_]*$")
 PART_TRASH = "list_part_trash"  # the copies of sections / planned sprints (scope = the list), 2.567.0 A (#4707)
 
 
-def part_kind(kind, table, *, lock, version=None, key=None, agent=True, live=None):
+def part_kind(kind, table, *, lock, version=None, key=None, agent=True, live=None, trash_prune=False, prune="", on_prune=None,
+              copy=False):
     """Register a side object kind. lock: the name of its write lock as a format string over {id} (the name the area's other
     writes use already, e.g. "task-{id}" like tasks/lifecycle.py apply_update); version(row) -> the version the client sends
     back as expect_updated_at (None = the kind has none); key: the key of the current state in a 409; agent=False: agents never
-    restore it from the trash; live: the condition of a live row (e.g. "deleted_at IS NULL") - part_write reads the row under the
-    lock with it, so a row another device put into the trash meanwhile answers 404 instead of being changed (review 2.610)."""
+    restore it from the trash; live: the condition of a live row (e.g. live_sql() of core/access.py) - part_write reads the row under the
+    lock with it, so a row another device put into the trash meanwhile answers 404 instead of being changed (review 2.610).
+    2.783.0 (#5368): trash_prune / prune / on_prune / copy = the core's retention run takes the kind (module docstring)."""
     PART_KINDS[kind] = {"kind": kind, "table": table, "lock": lock, "version": version, "key": key or kind, "agent": agent,
-                        "live": live}
+                        "live": live, "trash_prune": bool(trash_prune), "prune": prune or "", "on_prune": on_prune,
+                        "copy": bool(copy)}
     return PART_KINDS[kind]
 
 
@@ -110,7 +122,7 @@ def part_trash(c, kind, rid, uid, where=None, args=()):
     _lock(c, k, rid, None)
     ts = iso(now_utc())
     w, a = _part_where(rid, where, args)
-    n = c.execute(f"UPDATE {k['table']} SET deleted_at=?, deleted_by=? WHERE {w} AND deleted_at IS NULL", (ts, uid, *a)).rowcount
+    n = c.execute(f"UPDATE {k['table']} SET deleted_at=?, deleted_by=? WHERE {w} AND {live_sql()}", (ts, uid, *a)).rowcount
     return ts if n else None
 
 
@@ -137,12 +149,13 @@ def part_restore(c, kind, rid, uid, *, where=None, args=(), lock=None, guard=Non
 # ---------------------------------------------------------------- trash: a copy of the row
 def part_copy(c, kind, rid, scope_id, held, uid):
     """The copy of row rid of kind (snap = the row as it is, held = what hung on it) before the caller deletes the row, in the
-    same transaction. scope_id = the list it belongs to (who may restore it: the area's need on it)."""
+    same transaction. scope_id = the list it belongs to (who may restore it: the area's need on it).
+    2.783.0 (#5368): returns the id of the copy (a deleted custom field's trash id)."""
     k = _kind(kind)
     row = c.execute(f"SELECT * FROM {k['table']} WHERE id=?", (int(rid),)).fetchone()
-    c.execute(f"INSERT INTO {PART_TRASH}(list_id,kind,ref_id,snap,held,deleted_by,deleted_at) VALUES(?,?,?,?,?,?,?)",
-              (scope_id, kind, int(rid), json.dumps(dict(row), ensure_ascii=False, default=str),
-               json.dumps(held, ensure_ascii=False, default=str), uid, iso(now_utc())))
+    return insert_id(c, f"INSERT INTO {PART_TRASH}(list_id,kind,ref_id,snap,held,deleted_by,deleted_at) VALUES(?,?,?,?,?,?,?)",
+                     (scope_id, kind, int(rid), json.dumps(dict(row), ensure_ascii=False, default=str),
+                      json.dumps(held, ensure_ascii=False, default=str), uid, iso(now_utc())))
 
 
 def part_copy_take(c, kind, rid, uid, need):
@@ -181,3 +194,34 @@ def part_insert(c, table, snap):
     """A snapshot (a row read before) as a row again: its column names only (a name that is no plain column is skipped)."""
     cols = [x for x in snap if PART_COL.match(x)]
     c.execute(f"INSERT INTO {table}({','.join(cols)}) VALUES({','.join('?' * len(cols))})", [snap[x] for x in cols])
+
+
+# ---------------------------------------------------------------- 2.783.0 (#5368): the retention of the side objects
+def part_trash_due(c, kind, cut):
+    """The ids of kind's trash older than cut: rows with deleted_at (its table, the area's prune condition) or its copies
+    (list_part_trash rows of the kind). The caller reads under system_ctx (every workspace)."""
+    k = _kind(kind)
+    if k["copy"]:
+        q = f"SELECT id FROM {PART_TRASH} WHERE kind=? AND deleted_at<? ORDER BY id"
+        return [r[0] for r in c.execute(q, (kind, cut)).fetchall()]
+    q = f"SELECT id FROM {k['table']} WHERE {trash_sql()} AND deleted_at<?{k['prune']} ORDER BY id"
+    return [r[0] for r in c.execute(q, (cut,)).fetchall()]
+
+
+def part_trash_purge(c, kind, ids):
+    """Delete ids of part_trash_due for good: the area's on_prune first (rows without FK; returns file paths for after the
+    commit), then the rows (what hangs on them cascades). -> [paths]."""
+    k = _kind(kind)
+    ids = [int(x) for x in ids]
+    if not ids:
+        return []
+    paths = []
+    for i in range(0, len(ids), 500):
+        part = ids[i:i + 500]
+        if k["copy"]:
+            c.execute(f"DELETE FROM {PART_TRASH} WHERE kind=? AND id = ANY(CAST(? AS BIGINT[]))", (kind, part))
+            continue
+        if k["on_prune"] is not None:
+            paths += list(k["on_prune"](c, "id = ANY(CAST(? AS BIGINT[]))", (part,)) or ())
+        c.execute(f"DELETE FROM {k['table']} WHERE id = ANY(CAST(? AS BIGINT[]))", (part,))
+    return paths

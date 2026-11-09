@@ -8,8 +8,9 @@ the memo in its answer (restore_offer) and GET /api/lists/<id>/member-memos list
 admins only; POST /api/lists/<id>/members/<uid>/restore puts back what is still free, within the trash period: the task
 still exists in the project, no other assignee (person or group), no value in the person field (the field still exists),
 no other delegation (and check_delegate allows it for the person restoring), watching only of tasks the person sees.
-Nothing that was set meanwhile is overwritten. The memo goes after the restore; the trash run (files/trashpurge.py TP_PLAIN)
-deletes it after the trash period. Agents never restore (a person's step in the app)."""
+Nothing that was set meanwhile is overwritten. The memo goes after the restore; the core's trash run (core/writes.py
+obj_trash_tick, 2.783.0 #5368: a side object of core/objparts.py, kind MM_KIND) deletes it after the trash period. Agents
+never restore (a person's step in the app)."""
 import json
 
 from flask import g, jsonify
@@ -20,10 +21,13 @@ from ..core.db import bump, db, iso, now_utc
 from ..core.pg import insert_id, st_ids
 from ..core.access import Denied, list_role, need_collab, need_list, task_visible
 from ..core.retention import ret_trash_cut, ret_trash_days
+from ..core.objparts import part_kind  # 2.783.0 (#5368)
 from ..accounts.session import me
 from ..tasks.watchers import check_delegate, dlg_events
 
 MM_KEYS = ("assigned", "values", "delegate", "watch")
+MM_KIND = "member_memo"  # 2.783.0 (#5368): every memo lies in the trash from its start (deleted_at); the core's run ends it
+part_kind(MM_KIND, "member_memos", lock="member-memo-{id}", agent=False, trash_prune=True)
 
 
 def mm_snap(c, lid, uid):

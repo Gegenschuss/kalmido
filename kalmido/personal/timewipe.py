@@ -4,7 +4,10 @@ Owner and list admins delete every entry of the list, other members only their o
 Agent accounts: 403. Restore is the Undo step: the client sends back what the delete returned; the same rights apply.
 2.530.0 B (#4315): the deleted entries are kept on the server too (time_wipes, one row per delete): Undo names that row
 (wipe), so it works after the tab was closed until the trash period ends; then the trash run (files/trashpurge.py) deletes
-the row. The preview names the newest such row of the person (undo)."""
+the row. The preview names the newest such row of the person (undo).
+2.783.0 (#5368, stage 6 of the trash core): that copy is a copy of the core's trash (core/objparts.py: list_part_trash, kind
+TZW_KIND, ref_id = the person whose way back it is, snap = {n, seconds}, held = the entries); the core's run (core/writes.py
+obj_trash_tick) deletes it after the period. Rows of the old table time_wipes move there at every start (tzw_move)."""
 import hashlib
 import hmac
 import json
@@ -17,7 +20,9 @@ from ..core.db import body, bump, db, iso, now_utc
 from ..core.i18n import tr
 from ..core.access import Denied, list_role, need_list, need_time
 from ..accounts.session import me
-from ..core.pg import insert_id
+from ..core.pg import insert_id, system_ctx
+from ..core.objparts import PART_TRASH, part_kind  # 2.783.0 (#5368)
+from ..core import objhooks  # 2.783.0 (#5368): tzw_move at every start, the copies go with an account
 from ..accounts.login import auth_key  # 2.369.5 (#2517): pulled up from functions
 
 TZ_MAX_RESTORE = 20000
@@ -100,10 +105,69 @@ def n43_restore_ids(c, owner, e):
     return cid, pid
 
 
+TZW_KIND = "time_wipe"  # 2.783.0 (#5368): the Undo copy of "Delete all times" in the core's copy trash (module docstring)
+part_kind(TZW_KIND, "time_entries", lock="time-wipe-{id}", agent=False, trash_prune=True, copy=True)
+
+
+def tzw_dict(r):
+    """2.783.0 (#5368): a copy of the core's trash as the fields the routes read: {id, n, seconds, deleted_at, entries}."""
+    try:
+        snap = json.loads(r["snap"] or "{}")
+    except ValueError:
+        snap = {}
+    snap = snap if isinstance(snap, dict) else {}
+    return {"id": r["id"], "n": int(snap.get("n") or 0), "seconds": int(snap.get("seconds") or 0), "deleted_at": r["deleted_at"],
+            "entries": r["held"] or "[]"}
+
+
+def tzw_add(c, uid, lid, entries, n, seconds, at=None):
+    """2.783.0 (#5368): a new Undo copy of uid in list lid. -> its id."""
+    return insert_id(c, f"INSERT INTO {PART_TRASH}(list_id,kind,ref_id,snap,held,deleted_by,deleted_at) VALUES(?,?,?,?,?,?,?)",
+                     (lid, TZW_KIND, uid, json.dumps({"n": int(n or 0), "seconds": int(seconds or 0)}), entries, uid,
+                      at or iso(now_utc())))
+
+
+def tzw_set(c, wid, entries):
+    """2.783.0 (#5368): what is left of a copy (entries as JSON), or the copy goes (entries None)."""
+    if entries is None:
+        c.execute(f"DELETE FROM {PART_TRASH} WHERE id=? AND kind=?", (wid, TZW_KIND))
+    else:
+        c.execute(f"UPDATE {PART_TRASH} SET held=? WHERE id=? AND kind=?", (entries, wid, TZW_KIND))
+
+
+def tzw_move(c):
+    """2.783.0 (#5368): the rows of the old table time_wipes (a version before 2.783, also after a rollback) into the core's copy
+    trash with their time; at every start (core/objhooks.START), a no-op once the table is empty. One-way: the version
+    before no longer finds the moved copies (Undo by the server's copy works here until the trash period ends)."""
+    if not c.execute("SELECT to_regclass('time_wipes')").fetchone()[0]:
+        return 0
+    n = 0
+    with system_ctx(c):  # every workspace's copies (a start-up step; nothing is handed to a person)
+        for r in c.execute("SELECT * FROM time_wipes ORDER BY id").fetchall():
+            tzw_add(c, r["user_id"], r["list_id"], r["entries"] or "[]", r["n"], r["seconds"], r["deleted_at"])
+            c.execute("DELETE FROM time_wipes WHERE id=?", (r["id"],))
+            n += 1
+    return n
+
+
+def tzw_revoked(c, uid, org, reason, heir=None, role=None):
+    """2.783.0 (#5368): an account that goes takes its Undo copies along (as time_wipes.user_id did by ON DELETE CASCADE)."""
+    if reason != "delete" or not uid:
+        return {}
+    n = c.execute(f"DELETE FROM {PART_TRASH} WHERE kind=? AND ref_id=?", (TZW_KIND, int(uid))).rowcount
+    return {"time_wipes": n} if n else {}
+
+
+objhooks.START.append(("tzw_move5368", False, tzw_move))  # 2.783.0 (#5368): every start (rows of an older version too)
+objhooks.REVOKE.append(tzw_revoked)
+
+
 def tz_wipe_row(c, lid, uid, wid=None):
-    """2.530.0 B (#4315): the person's newest Undo copy of this list (or the one named), None = none (any more)."""
-    q = "SELECT * FROM time_wipes WHERE list_id=? AND user_id=?" + (" AND id=?" if wid is not None else "") + " ORDER BY id DESC LIMIT 1"
-    return c.execute(q, (lid, uid) + ((wid,) if wid is not None else ())).fetchone()
+    """2.530.0 B (#4315): the person's newest Undo copy of this list (or the one named), None = none (any more).
+    2.783.0 (#5368): from the core's copy trash (tzw_dict)."""
+    q = f"SELECT * FROM {PART_TRASH} WHERE list_id=? AND kind=? AND ref_id=?" + (" AND id=?" if wid is not None else "") + " ORDER BY id DESC LIMIT 1"
+    r = c.execute(q, (lid, TZW_KIND, uid) + ((wid,) if wid is not None else ())).fetchone()
+    return tzw_dict(r) if r else None
 
 
 @app.get("/api/lists/<int:lid>/time/delete-all")
@@ -150,8 +214,7 @@ def tz_delete_all(lid):
         e["sig"] = h6b_sig(c, lid, e)  # 2.86.0 (N10)
     wid = None
     if back:  # 2.530.0 B (#4315): the Undo copy on the server, in the same transaction as the delete
-        wid = insert_id(c, "INSERT INTO time_wipes(user_id,list_id,entries,n,seconds,deleted_at) VALUES(?,?,?,?,?,?)",
-                        (uid, lid, json.dumps(back, ensure_ascii=False), len(back), sum(int(r["seconds"] or 0) for r in rows), iso(now_utc())))
+        wid = tzw_add(c, uid, lid, json.dumps(back, ensure_ascii=False), len(back), sum(int(r["seconds"] or 0) for r in rows))  # 2.783.0 (#5368)
     if ids:  # 2.555.0 (#4570, review F2): the budget marks follow the wipe, so a later crossing tells again
         from .budgetwarn import bw_check
         bw_check(c, [(lid, None)] + [(lid, t) for t in {r["task_id"] for r in rows if r["task_id"]}])
@@ -224,21 +287,18 @@ def tz_restore(lid):
                    n43_iso(e.get("created_at")) or ts, ts))
         n += 1
     if w and left:  # 2.530.0 (#4315, review M1): what could not come back (closed month, left the project) stays for later
-        c.execute("UPDATE time_wipes SET entries=? WHERE id=?", (json.dumps(left), w["id"]))
+        tzw_set(c, w["id"], json.dumps(left))  # 2.783.0 (#5368): the core's copy
     elif w:
-        c.execute("DELETE FROM time_wipes WHERE id=?", (w["id"],))  # 2.530.0 B (#4315): its way back is used
+        tzw_set(c, w["id"], None)  # 2.530.0 B (#4315): its way back is used
     else:  # 2.530.0 B (#4315): the answer's copy came back (an older window): the server's copy of that delete is used up too
         sigs = {e.get("sig") for e in ents if isinstance(e, dict) and isinstance(e.get("sig"), str)}
-        for r in c.execute("SELECT id, entries FROM time_wipes WHERE list_id=? AND user_id=?", (lid, uid)).fetchall() if sigs else []:
+        for r in c.execute(f"SELECT id, held FROM {PART_TRASH} WHERE list_id=? AND kind=? AND ref_id=?", (lid, TZW_KIND, uid)).fetchall() if sigs else []:
             try:
-                xs = [x for x in json.loads(r["entries"] or "[]") if isinstance(x, dict)]
+                xs = [x for x in json.loads(r["held"] or "[]") if isinstance(x, dict)]
                 if sigs & {x.get("sig") for x in xs}:  # 2.530.0 (#4315, review M1): only what really came back is used up
                     gone = sigs - {x.get("sig") for x in left}
                     rest = [x for x in xs if x.get("sig") not in gone]
-                    if rest:
-                        c.execute("UPDATE time_wipes SET entries=? WHERE id=?", (json.dumps(rest), r["id"]))
-                    else:
-                        c.execute("DELETE FROM time_wipes WHERE id=?", (r["id"],))
+                    tzw_set(c, r["id"], json.dumps(rest) if rest else None)  # 2.783.0 (#5368)
             except ValueError:
                 continue
     if n:

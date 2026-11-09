@@ -9,9 +9,11 @@ from ..core.config import app, PUBLIC_URL, TZ
 from ..core.pg import insert_id, system_ctx
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, now_utc
-from ..core.retention import ret_on, ret_report, ret_trash_cut  # 2.272.0 F (#3026, review M4)
+# 2.783.0 (#5368): the trash and its retention run are the core's (core/objparts.py part_trash / part_restore, core/writes.py
+# obj_trash_tick): no run of its own any more
+from ..core.objparts import part_kind, part_restore, part_trash
 from ..accounts.session import client_ip, me
-from ..core.access import Denied, list_role, need_list, WRITE_ROLES
+from ..core.access import Denied, list_role, live_sql, need_list, WRITE_ROLES  # 2.783.0 (#5368): live_sql
 from ..core.errors import BadInput, reject_unknown
 from ..notify.alerts import _env_int, aa_count
 from ..collab.integfail import integ_tell
@@ -42,7 +44,7 @@ WHI_PER_MIN = _env_int("KALMIDO_HOOK_IN_PER_MIN", 60)
 WHI_PER_DAY = _env_int("KALMIDO_HOOK_IN_PER_DAY", 1000)
 WHI_LIST_MAX = 10
 WHI_NAME_MAX = 60
-WHI_KEEP_DAYS = 30           # a deleted webhook can be restored this long, then it is removed for good
+WHI_KEEP_DAYS = 30           # a deleted webhook can be restored this long (the trash period), then it is removed for good
 WHI_PAUSE = {  # paused_reason -> the text the settings show
     "creator": N_("the person who set it up has no access to the project any more"),
     "role": N_("the person who set it up can no longer change the project"),
@@ -85,12 +87,13 @@ def whi_need_manage(c, lid):
     need_list(c, lid, write=False, manage=True)
 
 
-def whi_purge(c, lid):
-    if not ret_on("trash"):
-        return
-    n = c.execute("DELETE FROM hook_in WHERE list_id=? AND deleted_at IS NOT NULL AND deleted_at<?", (lid, ret_trash_cut())).rowcount
-    if n:
-        ret_report(c, "trash", {"webhooks_in": n}, True, run="webhooks_in")
+WHI_KIND = "hook_in"  # 2.783.0 (#5368): a side object of the list; its trash is the core's (retention: obj_trash_tick)
+part_kind(WHI_KIND, "hook_in", lock="hook-in-{id}", agent=False, live=live_sql(), trash_prune=True)
+
+
+def whi_count(c, lid):
+    """2.783.0 (#5368): the list's webhooks that are not in the trash (the limit WHI_LIST_MAX)."""
+    return c.execute(f"SELECT COUNT(*) FROM hook_in WHERE list_id=? AND {live_sql()}", (lid,)).fetchone()[0]
 
 
 def whi_dict(c, r):
@@ -113,9 +116,7 @@ def whi_get(lid):
     """The inbound webhooks of a list (never their URLs: shown once). Owner / list admins."""
     c = db()
     whi_need_manage(c, lid)
-    whi_purge(c, lid)
-    c.commit()
-    rows = c.execute("SELECT * FROM hook_in WHERE list_id=? AND deleted_at IS NULL ORDER BY id", (lid,)).fetchall()
+    rows = c.execute(f"SELECT * FROM hook_in WHERE list_id=? AND {live_sql()} ORDER BY id", (lid,)).fetchall()
     why = whi_list_ok(c, lid)
     return jsonify(hooks=[whi_dict(c, r) for r in rows], limit=WHI_LIST_MAX, available=why is None, reason=why or "",
                    per_min=WHI_PER_MIN, per_day=WHI_PER_DAY, max_kb=WHI_MAX_BYTES // 1024)
@@ -131,7 +132,7 @@ def whi_create(lid):
     why = whi_list_ok(c, lid)
     if why:
         return err(why, 409)
-    if c.execute("SELECT COUNT(*) FROM hook_in WHERE list_id=? AND deleted_at IS NULL", (lid,)).fetchone()[0] >= WHI_LIST_MAX:
+    if whi_count(c, lid) >= WHI_LIST_MAX:
         return err(tr("At most {0} inbound webhooks per project", WHI_LIST_MAX), 409)
     name = str(b.get("name") or "").strip()[:WHI_NAME_MAX] if isinstance(b.get("name"), (str, type(None))) else None
     if name is None:
@@ -176,10 +177,10 @@ def whi_rotate(hid):
 
 @app.delete("/api/hooks-in/<int:hid>")
 def whi_delete(hid):
-    """Deleted: its URL answers 404 at once. One undo step: POST .../restore (WHI_KEEP_DAYS)."""
+    """Deleted: its URL answers 404 at once. One undo step: POST .../restore (WHI_KEEP_DAYS). 2.783.0 (#5368): the core's trash."""
     c = db()
     whi_need(c, hid)
-    c.execute("UPDATE hook_in SET deleted_at=? WHERE id=?", (iso(now_utc()), hid))
+    part_trash(c, WHI_KIND, hid, me())
     bump(c)
     c.commit()
     return jsonify(ok=True)
@@ -188,10 +189,12 @@ def whi_delete(hid):
 @app.post("/api/hooks-in/<int:hid>/restore")
 def whi_restore(hid):
     c = db()
-    r = whi_need(c, hid, deleted=True)
-    if c.execute("SELECT COUNT(*) FROM hook_in WHERE list_id=? AND deleted_at IS NULL", (r["list_id"],)).fetchone()[0] >= WHI_LIST_MAX:
-        return err(tr("At most {0} inbound webhooks per project", WHI_LIST_MAX), 409)
-    c.execute("UPDATE hook_in SET deleted_at=NULL WHERE id=?", (hid,))
+    whi_need(c, hid, deleted=True)
+    _, stop = part_restore(c, WHI_KIND, hid, me(),  # 2.783.0 (#5368): the core's way back
+                           guard=lambda c, x: err(tr("At most {0} inbound webhooks per project", WHI_LIST_MAX), 409)
+                           if whi_count(c, x["list_id"]) >= WHI_LIST_MAX else None)
+    if stop is not None:
+        return stop
     bump(c)
     c.commit()
     return jsonify(whi_dict(c, whi_need(c, hid)))
@@ -314,8 +317,8 @@ def whi_in(token):
         return err(tr("The request is too large (at most {0} KB)", WHI_MAX_BYTES // 1024), 413)
     h = whi_hash(token) if token and len(token) <= 200 else ""
     with system_ctx(c):  # 2.115.0 A (#2061): resolve the token (one row by its hash) across organisations, then act as its owner
-        r = c.execute("""SELECT h.*, l.archived FROM hook_in h JOIN lists l ON l.id=h.list_id
-                         WHERE h.token_hash=? AND h.deleted_at IS NULL""", (h,)).fetchone() if h else None
+        r = c.execute(f"""SELECT h.*, l.archived FROM hook_in h JOIN lists l ON l.id=h.list_id
+                         WHERE h.token_hash=? AND {live_sql("h")}""", (h,)).fetchone() if h else None
         u = c.execute("SELECT * FROM users WHERE id=?", (r["created_by"],)).fetchone() if r and r["created_by"] else None
     if not r:
         aa_count("security", "hookin", client_ip())

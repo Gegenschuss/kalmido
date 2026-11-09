@@ -42,7 +42,12 @@ def box(code, env=()):
 
 
 def run_purge(switch):
-    return box("from kalmido.files.trashpurge import tp_tick\nprint('counts', tp_tick(c, True))", ("KALMIDO_PURGE_TRASH=1",) if switch else ())
+    # 2.783.0 (#5368): + the core's run (the Undo copies of "Delete all times" are the core's copy trash)
+    return box("from kalmido.files.trashpurge import tp_tick\nfrom kalmido.core.writes import obj_trash_tick\n"
+               "print('counts', tp_tick(c, True), obj_trash_tick(c, force=True))", ("KALMIDO_PURGE_TRASH=1",) if switch else ())
+
+
+TZW = "list_part_trash WHERE kind='time_wipe'"  # 2.783.0 (#5368): ref_id = the person, snap = {n, seconds}, held = the entries
 
 
 def ago(days):
@@ -124,7 +129,7 @@ j = r.json()
 check(r.ok and j["deleted"] == 3 and isinstance(j.get("wipe"), int), f"time: deleted, the answer names the copy (wipe) {r.text[:200]}")
 W = j.get("wipe")
 check(dbx("SELECT COUNT(*) FROM time_entries WHERE list_id=?", (L,))[0][0] == 0, "time: the entries are gone from the list")
-check(dbx("SELECT n, user_id FROM time_wipes WHERE id=?", (W,)) == [(3, FID)], "time: the copy on the server (3 entries)")
+check(dbx(f"SELECT CAST(snap AS JSONB)->>'n', ref_id FROM {TZW} AND id=?", (W,)) == [("3", FID)], "time: the copy on the server (3 entries)")
 pv = F.get(B + f"/api/lists/{L}/time/delete-all").json()
 check(pv["count"] == 0 and (pv.get("undo") or {}).get("wipe") == W and pv["undo"]["count"] == 3, f"time: the preview names the copy {pv}")
 check(G.post(B + f"/api/lists/{L}/time/restore", json={"wipe": W}).status_code in (403, 404), "time: another person cannot use the copy")
@@ -132,13 +137,13 @@ check(G.post(B + f"/api/lists/{L}/time/restore", json={"wipe": W}).status_code i
 r = F.post(B + f"/api/lists/{L}/time/restore", json={"wipe": W})
 check(r.ok and r.json()["restored"] == 3, f"time: restore from the server's copy {r.status_code} {r.text[:150]}")
 check(sorted(x[0] for x in dbx("SELECT note FROM time_entries WHERE list_id=?", (L,))) == ["n0", "n1", "n2"], "time: the same three entries are back")
-check(not dbx("SELECT 1 FROM time_wipes WHERE id=?", (W,)), "time: the used copy is gone")
+check(not dbx(f"SELECT 1 FROM {TZW} AND id=?", (W,)), "time: the used copy is gone")
 check(F.post(B + f"/api/lists/{L}/time/restore", json={"wipe": W}).status_code == 404, "time: the copy works once (404)")
 # an older window restores from the answer's copy: the server's copy of that delete is used up with it (no second way back)
 r = F.post(B + f"/api/lists/{L}/time/delete-all", json={"confirm": "Frida film"})
 W1, back1 = r.json()["wipe"], r.json()["entries"]
 r = F.post(B + f"/api/lists/{L}/time/restore", json={"entries": back1})
-check(r.ok and r.json()["restored"] == 3 and not dbx("SELECT 1 FROM time_wipes WHERE id=?", (W1,)),
+check(r.ok and r.json()["restored"] == 3 and not dbx(f"SELECT 1 FROM {TZW} AND id=?", (W1,)),
       f"time: the answer's copy restores and uses the server's copy up {r.text[:120]}")
 check(F.post(B + f"/api/lists/{L}/time/restore", json={"wipe": W1}).status_code == 404
       and dbx("SELECT COUNT(*) FROM time_entries WHERE list_id=?", (L,))[0][0] == 3, "time: no entry comes back twice")
@@ -146,22 +151,22 @@ check(F.post(B + f"/api/lists/{L}/time/restore", json={"wipe": "x"}).status_code
 # 2.530.0 (#4315, review M1): a restore that brings nothing back (the month was closed since) keeps the server's copy
 r = F.post(B + f"/api/lists/{L}/time/delete-all", json={"confirm": "Frida film"})
 WM = r.json()["wipe"]
-mons = sorted({e["start"][:7] for e in __import__("json").loads(dbx("SELECT entries FROM time_wipes WHERE id=?", (WM,))[0][0])})
+mons = sorted({e["start"][:7] for e in __import__("json").loads(dbx(f"SELECT held FROM {TZW} AND id=?", (WM,))[0][0])})
 for m in mons:
     dbx("INSERT INTO time_sheets(user_id, month, state, created_at, updated_at) VALUES(?,?,'closed',?,?)", (FID, m, ago(0), ago(0)))
 r = F.post(B + f"/api/lists/{L}/time/restore", json={"wipe": WM})
-check(r.ok and r.json()["restored"] == 0 and r.json().get("left") == 3 and dbx("SELECT n FROM time_wipes WHERE id=?", (WM,)),
+check(r.ok and r.json()["restored"] == 0 and r.json().get("left") == 3 and dbx(f"SELECT 1 FROM {TZW} AND id=?", (WM,)),
       f"time: nothing came back (closed month), the copy stays {r.text[:150]}")
 dbx("DELETE FROM time_sheets WHERE user_id=?", (FID,))
 r = F.post(B + f"/api/lists/{L}/time/restore", json={"wipe": WM})
-check(r.ok and r.json()["restored"] == 3 and not dbx("SELECT 1 FROM time_wipes WHERE id=?", (WM,)),
+check(r.ok and r.json()["restored"] == 3 and not dbx(f"SELECT 1 FROM {TZW} AND id=?", (WM,)),
       f"time: once the month is open again the copy brings them back and is used up {r.text[:150]}")
 # the trash run deletes an old copy
 r = F.post(B + f"/api/lists/{L}/time/delete-all", json={"confirm": "Frida film"})
 W2 = r.json()["wipe"]
-dbx("UPDATE time_wipes SET deleted_at=? WHERE id=?", (ago(400), W2))
+dbx(f"UPDATE list_part_trash SET deleted_at=? WHERE kind='time_wipe' AND id=?", (ago(400), W2))
 run_purge(True)
-check(not dbx("SELECT 1 FROM time_wipes WHERE id=?", (W2,)), "time: the trash run deletes the old copy")
+check(not dbx(f"SELECT 1 FROM {TZW} AND id=?", (W2,)), "time: the trash run deletes the old copy")
 
 # ================================================================== the sample project
 def sample(s, uid, edit):

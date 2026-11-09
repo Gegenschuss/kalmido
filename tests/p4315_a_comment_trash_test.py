@@ -179,7 +179,8 @@ check(Da.get(B + f"/api/team/files/{FID_}").content == b"invented map", "dave re
 check(Bo.post(B + f"/api/team/messages/{MID}/restore").status_code == 404, "a live message: nothing to restore (404)")
 check(Bo.delete(B + f"/api/team/messages/{MID}").ok, "deleted again")
 write("UPDATE tchat_msgs SET deleted_at=? WHERE id=?", (OLD, MID))
-box("from kalmido.files.trashpurge import tp_tick\nprint(json.dumps(tp_tick(c, True)))")
+# 2.783.0 (#5368): the tombstones are the core's (core/writes.py obj_trash_tick), no longer tp_tick's
+box("from kalmido.core.writes import obj_trash_tick\nprint(json.dumps(obj_trash_tick(c, force=True)))")
 check(not dbx("SELECT 1 FROM tchat_msgs WHERE id=?", (MID,)) and not dbx("SELECT 1 FROM tchat_trash_text WHERE message_id=?", (MID,))
       and not dbx("SELECT 1 FROM tchat_files WHERE id=?", (FID_,)), "the trash run removes the message, its text and its file row")
 check(disk(FP) in (False, None), "the trash run removes the message's file from disk")

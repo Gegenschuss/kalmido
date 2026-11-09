@@ -11,6 +11,7 @@ from ..core.pg import insert_id, like_escape, st_ids, system_ctx, write_lock
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc, uset, usettings
 from ..core.access import collab_all, Denied, list_people, list_role, need_list, pvis, task_visible, vis_sql
+from ..core.access import live_sql  # 2.783.0 (#5368)
 from ..core.pages import valid_link
 from ..lists.lists import COL_MAX, columns_out
 from ..tasks.validation import log_act
@@ -18,6 +19,8 @@ from ..collab.comments import user_names
 from ..core.errors import BadInput
 from ..core.conflict import Conflict  # 2.564.0 (#4701)
 from ..core.objparts import part_kind, part_write  # 2.610.0 (#4762): the core's write layer of side objects
+from ..core.objparts import PART_TRASH, part_copy, part_copy_back  # 2.783.0 (#5368): the field trash is the core's copy trash
+from ..core import objhooks  # 2.783.0 (#5368): ftr_move at every start
 from ..core.numtext import user_num  # 2.263.0 (#2976)
 from ..core.retention import ret_trash_days  # 2.550.0 (#4528)
 from ..lists.folderdefs import fdf_named_gone  # 2.757.0 (#4501)
@@ -211,7 +214,7 @@ def field_value(c, f, v, lid):
             tid = int(str(v).strip().lstrip("#"))
         except ValueError:
             raise BadInput(tr("{0}: task not found", name)) from None
-        if tid <= 0 or not c.execute("SELECT 1 FROM tasks WHERE id=? AND deleted_at IS NULL", (tid,)).fetchone() \
+        if tid <= 0 or not c.execute(f"SELECT 1 FROM tasks WHERE id=? AND {live_sql()}", (tid,)).fetchone() \
                 or not task_visible(c, tid, fd_uid()):
             raise BadInput(tr("{0}: task not found", name))
         return str(tid)
@@ -371,7 +374,8 @@ def field_create(lid):
 
 
 FIELD_KIND = "list_field"  # 2.610.0 (#4762): a custom field, a side object of the core (core/objparts.py); its lock since #4701
-part_kind(FIELD_KIND, "list_fields", lock="field-{id}")
+# 2.783.0 (#5368): a deleted field waits as the core's copy (list_part_trash, held = its values); the core's run ends it
+part_kind(FIELD_KIND, "list_fields", lock="field-{id}", trash_prune=True, copy=True)
 
 
 @app.patch("/api/fields/<int:fid>")
@@ -494,7 +498,7 @@ def field_task_refs():
     out = []
     uid = fd_uid()
     seen = {}  # 2.191.0 C (#2593): list id -> visible task ids (None = whole list), decided once per list
-    for r in c.execute(f"SELECT id, title, status, list_id FROM tasks WHERE id IN ({','.join('?' * len(ids))}) AND deleted_at IS NULL",
+    for r in c.execute(f"SELECT id, title, status, list_id FROM tasks WHERE id IN ({','.join('?' * len(ids))}) AND {live_sql()}",
                        ids).fetchall() if ids else []:
         if r["list_id"] not in seen:
             seen[r["list_id"]] = fd_list_vis(c, r["list_id"], uid)
@@ -525,23 +529,25 @@ def fx_used_by(c, fid):
 
 
 FTR_MAX = 100  # 2.550.0 (#4528, review F2): deleted fields kept per project (the trash list shows up to 100 as well)
+FTR_COLS = ("id", "list_id", "name", "type", "options", "pinned", "sort", "created_at", "required", "org_field_id")  # 2.783.0 (#5368)
 
 
 @app.delete("/api/fields/<int:fid>")
 def field_delete(fid):
-    """2.550.0 (#4528): the field goes into the field trash (field_trash: its definition and every value, also of tasks in the
-    trash); Undo / restore within the trash period (POST /api/fields/trash/<id>/restore). Answer: values, trash_id."""
+    """2.550.0 (#4528): the field goes into the field trash (its definition and every value, also of tasks in the
+    trash); Undo / restore within the trash period (POST /api/fields/trash/<id>/restore). Answer: values, trash_id.
+    2.783.0 (#5368): the trash is the core's copy trash (core/objparts.py part_copy: list_part_trash, kind FIELD_KIND, snap = the
+    field's row, held = {vals, n, grouped}); trash_id = the copy's id."""
     c = db()
     r = need_field(c, fid)
     fdf_named_gone(c, r["list_id"], "list_fields", r["name"])  # 2.757.0 (#4501): a folder's field deleted -> the list differs
     vals = [[v[0], v[1]] for v in c.execute("SELECT task_id, value FROM task_field_values WHERE field_id=? ORDER BY task_id", (fid,))]
     grouped = c.execute("SELECT 1 FROM lists WHERE id=? AND group_field=?", (r["list_id"], f"cf:{fid}")).fetchone()
-    tid = insert_id(c, "INSERT INTO field_trash(list_id,field_id,name,type,def,vals,n,grouped,deleted_by,deleted_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
-                    (r["list_id"], fid, r["name"], r["type"], json.dumps({k: r[k] for k in ("options", "pinned", "sort", "created_at")}),
-                     json.dumps(vals, ensure_ascii=False), len({v[0] for v in vals}), 1 if grouped else 0, fd_uid(), iso(now_utc())))
+    tid = part_copy(c, FIELD_KIND, fid, r["list_id"], {"vals": vals, "n": len({v[0] for v in vals}), "grouped": 1 if grouped else 0},
+                    fd_uid())
     # review F2: at most FTR_MAX rows per project in the field trash, the oldest go first (no unbounded growth by delete loops)
-    c.execute("DELETE FROM field_trash WHERE list_id=? AND id NOT IN (SELECT id FROM field_trash WHERE list_id=? "
-              "ORDER BY deleted_at DESC, id DESC LIMIT ?)", (r["list_id"], r["list_id"], FTR_MAX))
+    c.execute(f"DELETE FROM {PART_TRASH} WHERE list_id=? AND kind=? AND id NOT IN (SELECT id FROM {PART_TRASH} WHERE list_id=? "
+              "AND kind=? ORDER BY deleted_at DESC, id DESC LIMIT ?)", (r["list_id"], FIELD_KIND, r["list_id"], FIELD_KIND, FTR_MAX))
     n = c.execute("DELETE FROM task_field_values WHERE field_id=?", (fid,)).rowcount
     c.execute("DELETE FROM list_fields WHERE id=?", (fid,))
     c.execute("UPDATE lists SET group_field='' WHERE group_field=?", (f"cf:{fid}",))  # 2.144.0 A2 (#2414): no grouping by a gone field
@@ -560,11 +566,48 @@ def ftr_person():
 def ftr_row(c, tid):
     """2.550.0 (#4528): a row of the field trash for its project's owner and admins (404 for everyone else, agents 403)."""
     ftr_person()
-    r = c.execute("SELECT * FROM field_trash WHERE id=?", (tid,)).fetchone()
+    r = c.execute(f"SELECT * FROM {PART_TRASH} WHERE id=? AND kind=?", (tid, FIELD_KIND)).fetchone()  # 2.783.0 (#5368)
     if not r:
         raise Denied(404)
     need_list(c, r["list_id"], manage=True)
     return r
+
+
+def ftr_parts(r):
+    """2.783.0 (#5368): (the field's row as it was, what hung on it) of a copy in the core's trash."""
+    try:
+        snap, held = json.loads(r["snap"] or "{}"), json.loads(r["held"] or "{}")
+    except ValueError:
+        snap, held = {}, {}
+    return (snap if isinstance(snap, dict) else {}), (held if isinstance(held, dict) else {})
+
+
+def ftr_move(c):
+    """2.783.0 (#5368): the rows of the old field trash (field_trash, written by a version before 2.783 -- also after a rollback)
+    into the core's copy trash with their time; at every start (core/objhooks.START), a no-op once the table is empty. One-way:
+    the version before no longer finds the moved rows (their fields stay restorable here until the trash period ends)."""
+    if not c.execute("SELECT to_regclass('field_trash')").fetchone()[0]:
+        return 0
+    n = 0
+    with system_ctx(c):  # every workspace's field trash (a start-up step; nothing is handed to a person)
+        for r in c.execute("SELECT * FROM field_trash ORDER BY id").fetchall():
+            try:
+                d = json.loads(r["def"] or "{}")
+                vals = json.loads(r["vals"] or "[]")
+            except ValueError:
+                d, vals = {}, []
+            snap = {"id": r["field_id"], "list_id": r["list_id"], "name": r["name"], "type": r["type"],
+                    **{k: d.get(k) for k in ("options", "pinned", "sort", "created_at") if k in d}}
+            insert_id(c, f"INSERT INTO {PART_TRASH}(list_id,kind,ref_id,snap,held,deleted_by,deleted_at) VALUES(?,?,?,?,?,?,?)",
+                      (r["list_id"], FIELD_KIND, r["field_id"], json.dumps(snap, ensure_ascii=False, default=str),
+                       json.dumps({"vals": vals, "n": r["n"], "grouped": r["grouped"]}, ensure_ascii=False), r["deleted_by"],
+                       r["deleted_at"]))
+            c.execute("DELETE FROM field_trash WHERE id=?", (r["id"],))
+            n += 1
+    return n
+
+
+objhooks.START.append(("ftr_move5368", False, ftr_move))  # 2.783.0 (#5368): every start (rows of an older version too)
 
 
 @app.get("/api/lists/<int:lid>/fields/trash")
@@ -574,11 +617,15 @@ def field_trash_list(lid):
     ftr_person()
     c = db()
     need_list(c, lid, manage=True)
-    rows = c.execute("SELECT id, name, type, n, deleted_by, deleted_at FROM field_trash WHERE list_id=? ORDER BY deleted_at DESC, id DESC "
-                     "LIMIT 100", (lid,)).fetchall()
+    rows = c.execute(f"SELECT * FROM {PART_TRASH} WHERE list_id=? AND kind=? ORDER BY deleted_at DESC, id DESC "
+                     "LIMIT 100", (lid, FIELD_KIND)).fetchall()  # 2.783.0 (#5368): the core's copy trash
     names = user_names(c, list({r["deleted_by"] for r in rows if r["deleted_by"]}))
-    return jsonify(fields=[{"id": r["id"], "name": r["name"], "type": r["type"], "tasks": r["n"], "deleted_at": r["deleted_at"],
-                            "deleted_by": names.get(r["deleted_by"], "")} for r in rows], days=ret_trash_days())
+    out = []
+    for r in rows:
+        snap, held = ftr_parts(r)
+        out.append({"id": r["id"], "name": snap.get("name") or "", "type": snap.get("type") or "", "tasks": int(held.get("n") or 0),
+                    "deleted_at": r["deleted_at"], "deleted_by": names.get(r["deleted_by"], "")})
+    return jsonify(fields=out, days=ret_trash_days())
 
 
 @app.post("/api/fields/trash/<int:tid>/restore")
@@ -587,36 +634,43 @@ def field_trash_restore(tid):
     values only of people who still reach it); the grouping by it when the project has no other one. The row leaves the trash."""
     c = db()
     r = ftr_row(c, tid)
-    lid, fid = r["list_id"], r["field_id"]
+    lid, fid = r["list_id"], r["ref_id"]
+    snap, held = ftr_parts(r)
+    ftype = str(snap.get("type") or "")
     if c.execute("SELECT 1 FROM list_fields WHERE id=?", (fid,)).fetchone():
         raise Denied(409, tr("This field exists already"))
     if c.execute("SELECT COUNT(*) FROM list_fields WHERE list_id=?", (lid,)).fetchone()[0] >= FIELD_MAX:
         return err(tr("At most {0} fields per project", FIELD_MAX))
-    d = json.loads(r["def"] or "{}")
-    pinned = 1 if d.get("pinned") and fields_pinned_ok(c, lid) else 0
-    c.execute("INSERT INTO list_fields(id,list_id,name,type,options,pinned,sort,created_at) VALUES(?,?,?,?,?,?,?,?)",
-              (fid, lid, r["name"], r["type"], d.get("options") or "{}", pinned, float(d.get("sort") or 0), d.get("created_at") or iso(now_utc())))
-    vals = json.loads(r["vals"] or "[]")
+
+    def fix(c, s):  # 2.783.0 (#5368): the row as it was, with what may no longer hold (the pin limit, a gone organisation field)
+        for k in [k for k in s if k not in FTR_COLS]:
+            s.pop(k)
+        s.update(pinned=1 if s.get("pinned") and fields_pinned_ok(c, lid) else 0, options=s.get("options") or "{}",
+                 sort=float(s.get("sort") or 0), created_at=s.get("created_at") or iso(now_utc()), name=str(s.get("name") or ""),
+                 type=ftype)
+        if s.get("org_field_id") and not c.execute("SELECT 1 FROM org_fields WHERE id=?", (s["org_field_id"],)).fetchone():
+            s["org_field_id"] = None
+    part_copy_back(c, FIELD_KIND, r, f"field-{int(fid)}", fix=fix)  # the copy goes (core/objparts.py)
+    vals = held.get("vals") or []
     live = {x[0] for x in c.execute("SELECT id FROM tasks WHERE list_id=? AND id = ANY(CAST(? AS BIGINT[]))",
                                     (lid, st_ids([v[0] for v in vals])))} if vals else set()
     people = None
-    if r["type"] == "person":  # review F1: the rule of fd_value (without collaboration only the owner)
+    if ftype == "person":  # review F1: the rule of fd_value (without collaboration only the owner)
         people = {str(x) for x in list_people(c, lid) if collab_all() or list_role(c, lid, x) == "owner"}
     n = 0
     for t, v in vals:
-        if r["type"] == "task" and not (str(v).isdigit() and c.execute(  # review F1: a task value only to a task still there and visible
-                "SELECT 1 FROM tasks WHERE id=? AND deleted_at IS NULL", (int(v),)).fetchone() and task_visible(c, int(v), fd_uid())):
+        if ftype == "task" and not (str(v).isdigit() and c.execute(  # review F1: a task value only to a task still there and visible
+                f"SELECT 1 FROM tasks WHERE id=? AND {live_sql()}", (int(v),)).fetchone() and task_visible(c, int(v), fd_uid())):
             continue
         if t in live and (people is None or v in people):
             n += c.execute("INSERT INTO task_field_values(task_id,field_id,value) VALUES(?,?,?) ON CONFLICT DO NOTHING", (t, fid, v)).rowcount
-    if r["grouped"]:
+    if held.get("grouped"):
         c.execute("UPDATE lists SET group_field=? WHERE id=? AND COALESCE(group_field,'')=''", (f"cf:{fid}", lid))
     cc = c.execute("SELECT col_cfg FROM lists WHERE id=?", (lid,)).fetchone()[0]
     if cc and f"f:{fid}" not in cc:  # like field_create: a list with its own columns shows it again as its last column
         cols = columns_out(cc, {x[0] for x in c.execute("SELECT id FROM list_fields WHERE list_id=?", (lid,))})
         if cols is not None and f"f:{fid}" not in cols and len(cols) < COL_MAX:
             c.execute("UPDATE lists SET col_cfg=? WHERE id=?", (json.dumps([*cols, f"f:{fid}"]), lid))
-    c.execute("DELETE FROM field_trash WHERE id=?", (tid,))
     bump(c)
     c.commit()
     return jsonify(ok=True, field=field_dict(c.execute("SELECT * FROM list_fields WHERE id=?", (fid,)).fetchone(), c), values=n)

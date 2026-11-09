@@ -34,8 +34,10 @@ OLD = (datetime.now(timezone.utc) - timedelta(days=40)).isoformat(timespec="seco
 def tick():
     """The trash period run with the switch on (tp_tick, forced) -> its output."""
     out = subprocess.run(["docker", "exec", "-e", "KALMIDO_RETENTION_PURGE=1", CT, "python", "-c",
+                          # 2.783.0 (#5368): + the core's run (the copies of sections / sprints are the core's copy trash)
                           "import app\nfrom kalmido.core.db import connect\nfrom kalmido.files.trashpurge import tp_tick\n"
-                          "c = connect()\nprint('counts', tp_tick(c, True))\nc.close()"], capture_output=True, text=True)
+                          "from kalmido.core.writes import obj_trash_tick\n"
+                          "c = connect()\nprint('counts', tp_tick(c, True), obj_trash_tick(c, force=True))\nc.close()"], capture_output=True, text=True)
     check("counts" in out.stdout and "Traceback" not in out.stderr, "the trash run ran " + (out.stdout + out.stderr)[-600:])
     return out.stdout
 

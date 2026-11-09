@@ -49,6 +49,7 @@ from .undogroups import UG_LABEL, UG_LABEL_PLAIN, UNDO_KEEP_D, UG_TRACKED, ug_ad
 from .errors import BadInput, UnknownFields
 from .i18n import N_, tr
 from .objhooks import OBJ  # 2.773.0 (#5292): obj_trash_tick
+from .objparts import PART_KINDS, part_trash_due, part_trash_purge  # 2.783.0 (#5368): the side objects' trash run
 from .objects import OBJ_COLS, obj_need, obj_node_follow, obj_public, obj_reg, obj_row, obj_title, obj_forget
 from .objects import obj_reg_node  # 2.754.0 (#5268): the write paths refuse a light kind
 from .pg import qi, system_ctx, table_columns, ts_canon, write_lock  # 2.755.0 (#5296): qi; 2.760.0 (#5311): ts_canon
@@ -468,7 +469,11 @@ def obj_purge(c, uid, kind, rid):
 
 
 def obj_trash_due(c, kind, cut=None):
-    """2.773.0 (#5292): the ids of the kind's objects in the trash longer than the trash period (core/retention.py ret_trash_cut)."""
+    """2.773.0 (#5292): the ids of the kind's objects in the trash longer than the trash period (core/retention.py ret_trash_cut).
+    2.783.0 (#5368): a side object of core/objparts.py (part_kind trash_prune=True) the same way."""
+    if kind in PART_KINDS and kind not in OBJ:
+        with system_ctx(c):
+            return part_trash_due(c, kind, cut or ret_trash_cut())
     reg = obj_reg_node(kind)  # 2.754.0 (#5268): a light kind has no trash of the core
     t = reg["table"]
     with system_ctx(c):  # the retention run reads every workspace's trash (ids only, no content)
@@ -476,12 +481,23 @@ def obj_trash_due(c, kind, cut=None):
                                         (cut or ret_trash_cut(),)).fetchall()]
 
 
-def obj_trash_prune(c, kind, cut=None, purge=None, ids=None):
+def obj_trash_prune(c, kind, cut=None, purge=None, ids=None, paths=None):
     """2.773.0 (#5292): THE retention run of a core kind -- its objects in the trash longer than the trash period are deleted
     for good the same way as obj_purge (_purge_rows), with the switch of every run (ret_on("trash"); off = count only) and its
-    report (ret_report run obj_<kind>). ids: read already by the caller. Returns their number; the caller commits."""
-    reg = obj_reg_node(kind)  # 2.754.0 (#5268): a light kind has no trash of the core
+    report (ret_report run obj_<kind>). ids: read already by the caller. Returns their number; the caller commits.
+    2.783.0 (#5368): a side object kind (core/objparts.py part_kind trash_prune=True: webhooks, chat messages, member memos,
+    the copies of list_part_trash) goes through part_trash_purge; the files it names land in paths (the caller unlinks them
+    after its commit: files/store.py fs_purge_files)."""
     purge = ret_on("trash") if purge is None else bool(purge)
+    if kind in PART_KINDS and kind not in OBJ:
+        old = obj_trash_due(c, kind, cut) if ids is None else [int(x) for x in ids]
+        if old and purge:
+            with system_ctx(c):  # no person: the period ran out (the area checked the rights when it went into the trash)
+                got = part_trash_purge(c, kind, old)
+            if paths is not None:
+                paths += got
+        return len(old)
+    reg = obj_reg_node(kind)  # 2.754.0 (#5268): a light kind has no trash of the core
     old = obj_trash_due(c, kind, cut) if ids is None else [int(x) for x in ids]
     if old and purge:
         t, cut = reg["table"], cut or ret_trash_cut()
@@ -508,9 +524,24 @@ def obj_trash_tick(c, force=False):
     for kind, reg in sorted(OBJ.items()):
         if reg.get("trash_prune"):
             out[kind] = obj_trash_prune(c, kind, cut, purge)
+    paths = []
+    for kind, k in sorted(PART_KINDS.items()):  # 2.783.0 (#5368): the side objects (core/objparts.py), one savepoint each
+        if k["trash_prune"] and kind not in OBJ:
+            got = []
+            try:
+                with c.savepoint():
+                    out[kind] = obj_trash_prune(c, kind, cut, purge, paths=got)
+            except Exception as e:  # noqa: BLE001 - like files/trashpurge.py: this kind waits for the next run
+                print("core trash:", kind, type(e).__name__, flush=True)
+                out[kind + "_err"] = 1
+                continue
+            paths += got
     if out:
         ret_report(c, "trash", out, purge, run="obj_trash")
     c.commit()
+    if paths:  # after the commit: a failed commit keeps the rows and their files
+        from ..files.store import fs_purge_files
+        fs_purge_files([], paths)
     return out
 
 

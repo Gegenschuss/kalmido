@@ -3,11 +3,13 @@ a trash longer than ret_days("trash") (KALMIDO_TRASH_DAYS, 30): file-store nodes
 index through fs_purge and its hooks), hub mails (the row and its word index; the mail's folder went into the
 file store's trash when the mail was deleted -- 2.536.0, #4338 -- and follows there), tables and their deleted rows /
 columns, pipeline deals, invoice series, the
-tombstones of deleted team chat messages and the emptied rows of deleted comments (2.530.0 A, #4315: with their kept text and
+emptied rows of deleted comments (2.530.0 A, #4315: with their kept text and
 files, collab/cmttrash.py); since 2.223.3 A (#2879) also absences,
 disposition bookings, scheduling polls with their votes, appointment types and file requests; since 2.567.0 A (#4707) the
 household budget (life/budget.py bud_trash_tick: entries with their receipts, templates, categories) and the project
 / task templates (lists/templates.py tpl_trash_tick, with their file copies).
+2.783.0 (#5368): the tombstones of the team chat, deleted custom fields, member memos, the Undo copies of "Delete all times",
+the copies of sections / sprints and the inbound webhooks are deleted by the core's run (core/writes.py obj_trash_tick).
 
 Like every retention run it only counts while ret_on("trash") is off (core/retention.py) and reports the numbers per
 area (GET /api/admin/retention). A node a hook of fs_on_delete refuses (Denied: legal retention of a booked receipt,
@@ -17,7 +19,7 @@ wiki/pages.py wiki_trash_tick with the pages' files, events/model.py)."""
 import time
 
 from ..core.db import iso, iso_ms, now_utc
-from ..core.access import Denied
+from ..core.access import Denied, live_sql  # 2.783.0 (#5368): live_sql
 from ..core.retention import ret_on, ret_report, ret_trash_cut
 from ..tasks.atttrash import atr_tick  # 2.272.0 E2 (#3038)
 from ..office.otrash import otb_tick  # 2.272.0 E2 (#3038)
@@ -25,7 +27,6 @@ from ..life.budget import bud_trash_tick  # 2.567.0 A (#4707)
 from ..lists.templates import tpl_trash_tick  # 2.567.0 A (#4707)
 from ..files.store import fs_purge, fs_purge_files  # 2.369.5 (#2517): pulled up from functions
 from ..core.pg import system_ctx  # 2.369.5 (#2517): pulled up from functions
-from ..collab.cmttrash import tcx_trash_paths
 from ..hub.hubmail import hbm_mail_nodes  # 2.536.0 (#4338): the nodes of a mail, shared with deleting it
 
 TP_TICK = {"at": 0.0}
@@ -35,14 +36,11 @@ TP_PRIVACY_HOLD = (" AND NOT EXISTS (SELECT 1 FROM office_privacy_sheets x WHERE
 # (count key, table, extra condition): the plain areas, one DELETE each (their child rows go by ON DELETE CASCADE)
 TP_PLAIN = (
     ("sheets", "sheets", ""),  # columns, rows, cells, changes, links cascade
-    ("sheet_rows", "sheet_rows", " AND sheet_id IN (SELECT id FROM sheets WHERE deleted_at IS NULL)"),
-    ("sheet_columns", "sheet_columns", " AND sheet_id IN (SELECT id FROM sheets WHERE deleted_at IS NULL)"),
+    ("sheet_rows", "sheet_rows", f" AND sheet_id IN (SELECT id FROM sheets WHERE {live_sql()})"),
+    ("sheet_columns", "sheet_columns", f" AND sheet_id IN (SELECT id FROM sheets WHERE {live_sql()})"),
     ("deals", "office_deals", ""),  # office_docs.deal_id: ON DELETE SET NULL
     ("series", "office_inv_series", ""),  # the invoices made stay (series_id is a plain number)
-    # body is empty already; its reactions go by trigger (obj_reactions, 2.763.0 #5269). 2.152.0 (#2165, review C-H2): a thread's first message stays while replies point
-    # at it (thread_of has no FK; without the root the replies can no longer be reached) -- it goes once its replies went
-    # 2.530.0 A (#4315): + the kept text (tchat_trash_text cascades) and the files of the message (rows cascade, the disk after the commit)
-    ("chat_tombstones", "tchat_msgs", " AND NOT EXISTS (SELECT 1 FROM tchat_msgs r WHERE r.thread_of=tchat_msgs.id)"),
+    # 2.783.0 (#5368): the tombstones of the team chat moved onto the core's run (collab/cmttrash.py TCX_MSG_KIND)
     # body is empty; reactions (trigger, #5269) and (2.530.0 A, #4315) the kept text go along; its files went through atr_tick above (same deleted_at)
     ("comments", "comments", ""),
     # 2.272.0 D (#3029): clients (contact persons, data protection sheets, mail-in addresses cascade -- video reviews go to their
@@ -64,15 +62,14 @@ TP_PLAIN = (
     ("appt_types", "appt_types", ""),
     ("file_requests", "fs_upload_requests", ""),
     # 2.530.0 B (#4315): deleted habits (their logs cascade) and the Undo copies of "Delete all times of this project"
-    ("habits", "habits", ""),
-    ("time_wipes", "time_wipes", ""),
-    # 2.567.0 A (#4707): the key links of project lists, the copies of deleted sections / planned sprints (lists/parttrash.py)
+    ("habits", "habits", ""),  # 2.783.0 (#5368): the Undo copies of "Delete all times" are the core's (personal/timewipe.py)
+    # 2.567.0 A (#4707): the key links of project lists; 2.783.0 (#5368): the copies of deleted sections / planned sprints
+    # (lists/parttrash.py) are the core's copy trash, deleted by its run (core/writes.py obj_trash_tick)
     ("list_links", "list_links", ""),
-    ("list_parts", "list_part_trash", ""),
     # 2.550.0 (#4528): deleted custom fields with their values (lists/fields.py field_delete) and what removing a member ended
     # (lists/membermemo.py): rows only, the restore is gone once the period is over
-    ("fields", "field_trash", ""),
-    ("member_memos", "member_memos", ""),
+    # 2.783.0 (#5368): field_trash's rows move into the core's copy trash at every start (lists/fields.py ftr_move); the
+    # member memos are a side object of the core (lists/membermemo.py MM_KIND): both on the core's run (core/writes.py)
 )
 
 
@@ -113,7 +110,7 @@ def tp_hubmail(c, cut, purge):
     for r in rows:
         # 2.536.0 (#4338): deleting the mail put them into the trash already (hbm_mail_del); this catches the older ones
         for nid in hbm_mail_nodes(c, r):
-            c.execute("UPDATE fs_nodes SET deleted_at=? WHERE id=? AND deleted_at IS NULL", (ts, nid))
+            c.execute(f"UPDATE fs_nodes SET deleted_at=? WHERE id=? AND {live_sql()}", (ts, nid))
         c.execute("DELETE FROM hub_mails WHERE id=?", (r["id"],))
     return len(rows)
 
@@ -170,8 +167,6 @@ def tp_tick(c, force=False):
                             # 2.199.0 C (#2742): their folder nodes (files/fsref.py) go with them
                             c.execute("DELETE FROM fs_nodes WHERE kind='ref' AND ref_kind='sheet' AND ref_id IN "
                                       "(SELECT id FROM sheets WHERE deleted_at IS NOT NULL AND deleted_at<?)", (cut,))
-                        if table == "tchat_msgs":  # 2.530.0 A (#4315): the files kept in the trash with the message
-                            kp += tcx_trash_paths(c, f"deleted_at IS NOT NULL AND deleted_at<?{extra}", (cut,))
                         if table in ("contacts", "books"):  # 2.351.0 B (#2749): their folder nodes (contacts/ctfolder.py) go with them
                             c.execute(f"DELETE FROM fs_nodes WHERE kind='ref' AND ref_kind='{'contact' if table == 'contacts' else 'address_book'}' "
                                       f"AND ref_id IN (SELECT id {w})", (cut,))
@@ -185,7 +180,7 @@ def tp_tick(c, force=False):
                         if key in ("sheet_rows", "sheet_columns") and counts[key]:
                             # 2.152.0 (#2165, review C-M2): a file the purged cells held (and no other cell holds) goes to the
                             # files' trash; shk_tick (sheets/shkinds.py) removes it with its scan / text rows after its period
-                            c.execute("UPDATE sheet_files SET deleted_at=? WHERE deleted_at IS NULL AND NOT EXISTS (SELECT 1 FROM sheet_cells x "
+                            c.execute(f"UPDATE sheet_files SET deleted_at=? WHERE {live_sql()} AND NOT EXISTS (SELECT 1 FROM sheet_cells x "
                                       "WHERE x.sheet_id=sheet_files.sheet_id AND trim(x.raw)='file:' || sheet_files.id)", (iso_ms(now_utc()),))
                     else:
                         counts[key] = c.execute(f"SELECT COUNT(*) {w}", (cut,)).fetchone()[0]

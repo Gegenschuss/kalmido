@@ -160,6 +160,15 @@ c.commit()
   and its own routes call `ofk_trash` / `ofk_restore` after their office checks; the core's run deletes it after the period.
   First kind: `osupplier` (the DATEV import's suppliers). The office trash of copies (`office/otrash.py`) stays for the
   kinds that delete the row itself until their stage moves them.
+- 2.783.0 (#5368, stage 6): the side objects (`core/objparts.py`, no registered kinds: their rights are the project's) use
+  the same run. `part_kind(..., trash_prune=True)` hands their trash to `obj_trash_tick` / `obj_trash_prune`: rows with
+  `deleted_at` (inbound webhooks `hook_in`, the team chat's tombstones `tchat_msgs` with the thread rule as `prune` and their
+  files through `on_prune`, unlinked after the commit, the member memos) or, with `copy=True`, their copies in
+  `list_part_trash` (sections, planned sprints, deleted custom fields, the Undo copies of "Delete all times"). The webhooks
+  go into the trash and back with `part_trash` / `part_restore`, a deleted field with `part_copy` / `part_copy_back`. The old
+  tables `field_trash` and `time_wipes` stay for the version before; their rows move into `list_part_trash` at every start
+  (`ftr_move`, `tzw_move`: one-way for those rows). No own runs any more in `files/trashpurge.py` or `integrations/hookin.py`
+  for these kinds.
 - Never write the trash filter by hand: `live_sql(alias)` / `trash_sql(alias)` of `core/access.py`. A new
   `deleted_at IS NULL` in the server code is red in `tools/check_live_filter.py`; the existing ones stand per file in
   `tools/live_filter_baseline.json`, which only shrinks (`--update` lowers it after a clean-up).

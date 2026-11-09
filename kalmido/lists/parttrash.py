@@ -24,6 +24,7 @@ from ..core.objparts import part_copy, part_copy_back, part_copy_take, part_kind
 from ..accounts.session import me
 from ..accounts.orgroles import user_orgs_full  # 2.609.0 (#3373, review F5)
 from ..core.access import Denied, acx_of, list_role, need_list, wr_sql, WRITE_ROLES
+from ..core.access import live_sql, trash_sql  # 2.783.0 (#5368): the core's trash filter
 from ..tasks.validation import log_changes
 from ..collab.comments import user_names
 from .listtrash import OTR_TRASH_DAYS
@@ -32,13 +33,13 @@ from .templates import tpl_may_write  # 2.609.0 (#3373, review F5)
 
 LPT_LIST_MAX = 300  # the trash view shows the newest ones
 LPT_SECTION, LPT_SPRINT = "section", SPR_KIND  # the kinds of list_part_trash, side objects of the core (2.610.0 #4762)
-part_kind(LPT_SECTION, "sections", lock="section-{id}", agent=False)
+part_kind(LPT_SECTION, "sections", lock="section-{id}", agent=False, trash_prune=True, copy=True)  # 2.783.0 (#5368): the core's run
 
 
 def lpt_section_put(c, sid, uid):
     """The copy of section sid with its open tasks, the placements of other lists' tasks in it and its shopping memory."""
     lid = c.execute("SELECT list_id FROM sections WHERE id=?", (sid,)).fetchone()[0]
-    held = {"tasks": [r[0] for r in c.execute("SELECT id FROM tasks WHERE section_id=? AND deleted_at IS NULL ORDER BY id", (sid,))],
+    held = {"tasks": [r[0] for r in c.execute(f"SELECT id FROM tasks WHERE section_id=? AND {live_sql()} ORDER BY id", (sid,))],
             "links": [[r[0], r[1]] for r in c.execute("SELECT task_id, list_id FROM task_links WHERE section_id=?", (sid,))],
             "shop": [[r[0], r[1]] for r in c.execute("SELECT item, at FROM shop_memory WHERE section_id=?", (sid,))]}
     part_copy(c, LPT_SECTION, sid, lid, held, uid)
@@ -93,7 +94,7 @@ def sprint_restore(sid):
     _, held = part_copy_back(c, LPT_SPRINT, r, f"sprints:{lid}", fix=_spr_fix)  # like starting / closing (sprints.py)
     moved, skipped = [], []
     for tid, at in held.get("tasks") or []:
-        if c.execute("UPDATE tasks SET sprint_id=?, sprint_at=? WHERE id=? AND list_id=? AND sprint_id IS NULL AND deleted_at IS NULL",
+        if c.execute(f"UPDATE tasks SET sprint_id=?, sprint_at=? WHERE id=? AND list_id=? AND sprint_id IS NULL AND {live_sql()}",
                      (sid, at, tid, lid)).rowcount:
             moved.append(tid)
         else:
@@ -132,16 +133,17 @@ def lpt_index():
             x = c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()
             names[lid] = x[0] if x else ""
         return names[lid]
-    for r in c.execute("SELECT p.* FROM list_part_trash p JOIN lists l ON l.id=p.list_id WHERE l.deleted_at IS NULL "
+    # 2.783.0 (#5368): only sections and sprints -- the core's copy trash holds deleted fields and time copies too (their own views)
+    for r in c.execute(f"SELECT p.* FROM list_part_trash p JOIN lists l ON l.id=p.list_id WHERE {live_sql('l')} AND p.kind IN (?,?) "
                        f"AND p.list_id IN {wr_sql()} "  # review 2.567: the caller's lists before the LIMIT (not the instance's newest)
-                       "ORDER BY p.deleted_at DESC, p.id DESC LIMIT 2000", (uid, uid)).fetchall():
+                       "ORDER BY p.deleted_at DESC, p.id DESC LIMIT 2000", (LPT_SECTION, LPT_SPRINT, uid, uid)).fetchall():
         if not _writable(c, uid, r["list_id"], can):
             continue
         snap = json.loads(r["snap"] or "{}")
         nm = snap.get("name") or (tr("Sprint {0}", snap.get("num")) if r["kind"] == "sprint" else "")
         items.append({"kind": r["kind"], "id": r["ref_id"], "list_id": r["list_id"], "name": nm, "deleted_at": r["deleted_at"],
                       "deleted_by": r["deleted_by"]})
-    for r in c.execute("SELECT k.* FROM list_links k JOIN lists l ON l.id=k.list_id WHERE k.deleted_at IS NOT NULL AND l.deleted_at IS NULL "
+    for r in c.execute(f"SELECT k.* FROM list_links k JOIN lists l ON l.id=k.list_id WHERE {trash_sql('k')} AND {live_sql('l')} "
                        f"AND k.list_id IN {wr_sql()} "
                        "ORDER BY k.deleted_at DESC LIMIT 2000", (uid, uid)).fetchall():
         if _writable(c, uid, r["list_id"], can):

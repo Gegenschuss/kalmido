@@ -10,20 +10,26 @@ text waits in comment_trash_text / tchat_trash_text, the files stay as rows and 
    tcx_file_access, tchat_msg_brief, replies, the organisation export)
 A restore (author or whoever could delete it, within the period) puts text and files back. The trash run
 (files/trashpurge.py) deletes the rows after the period: the attachments go first through atr_tick (same timestamp), the team
-chat files leave the disk after the commit (tcx_trash_paths)."""
+chat files leave the disk after the commit (tcx_trash_paths).
+2.783.0 (#5368, stage 6 of the trash core): the deleted team chat messages (tombstones) are a side object of the core
+(core/objparts.py part_kind TCX_MSG_KIND): the core's run (core/writes.py obj_trash_tick) deletes them after the period with
+the thread rule of before (a thread's first message stays while replies point at it) and their files (tcx_trash_paths,
+unlinked after the commit); files/trashpurge.py no longer has a run of its own for them."""
 from ..core.db import iso_ms, now_utc
+from ..core.objparts import part_kind  # 2.783.0 (#5368)
+from ..core.access import live_sql  # 2.783.0 (#5368)
 
 
 def cmt_trash(c, cid):
     """Comment cid into the trash: its text kept, its files into the attachment trash (same timestamp). The caller checked
     the rights and commits."""
-    r = c.execute("SELECT body, mentions FROM comments WHERE id=? AND deleted_at IS NULL FOR UPDATE", (cid,)).fetchone()
+    r = c.execute(f"SELECT body, mentions FROM comments WHERE id=? AND {live_sql()} FOR UPDATE", (cid,)).fetchone()
     if not r:
         return None
     ts = iso_ms(now_utc())
     c.execute("INSERT INTO comment_trash_text(comment_id, body, mentions) VALUES(?,?,?) ON CONFLICT(comment_id) DO UPDATE "
               "SET body=excluded.body, mentions=excluded.mentions", (cid, r["body"] or "", r["mentions"] or ""))
-    c.execute("UPDATE attachments SET deleted_at=? WHERE comment_id=? AND deleted_at IS NULL", (ts, cid))
+    c.execute(f"UPDATE attachments SET deleted_at=? WHERE comment_id=? AND {live_sql()}", (ts, cid))
     c.execute("UPDATE comments SET body='', mentions='', deleted_at=? WHERE id=?", (ts, cid))
     return ts
 
@@ -43,7 +49,7 @@ def cmt_restore(c, cid):
 
 def tcx_trash(c, mid):
     """Team chat message mid into the trash: text (and the ciphertext of an encrypted one) kept, files stay. Caller commits."""
-    m = c.execute("SELECT body, enc FROM tchat_msgs WHERE id=? AND deleted_at IS NULL FOR UPDATE", (mid,)).fetchone()
+    m = c.execute(f"SELECT body, enc FROM tchat_msgs WHERE id=? AND {live_sql()} FOR UPDATE", (mid,)).fetchone()
     if not m:
         return None
     ts = iso_ms(now_utc())
@@ -88,3 +94,8 @@ def ctt_purge_list(c, lid):
     c.execute(f"DELETE FROM tchat_files WHERE message_id IN (SELECT id FROM tchat_msgs WHERE {w})", (lid,))
     c.execute(f"DELETE FROM tchat_trash_text WHERE message_id IN (SELECT id FROM tchat_msgs WHERE {w})", (lid,))
     return paths
+
+
+TCX_MSG_KIND = "tchat_msg"  # 2.783.0 (#5368): the core's retention run of the team chat's tombstones (module docstring)
+part_kind(TCX_MSG_KIND, "tchat_msgs", lock="tchat-msg-{id}", agent=False, trash_prune=True,
+          prune=" AND NOT EXISTS (SELECT 1 FROM tchat_msgs r WHERE r.thread_of=tchat_msgs.id)", on_prune=tcx_trash_paths)

@@ -44,7 +44,12 @@ def box(code, env=()):
 
 
 def run_purge(switch):
-    return box("from kalmido.files.trashpurge import tp_tick\nprint('counts', tp_tick(c, True))", ("KALMIDO_PURGE_TRASH=1",) if switch else ())
+    # 2.783.0 (#5368): deleted fields and member memos are the core's trash (core/writes.py obj_trash_tick), no longer tp_tick's
+    return box("from kalmido.core.writes import obj_trash_tick\nprint('counts', obj_trash_tick(c, force=True))",
+               ("KALMIDO_PURGE_TRASH=1",) if switch else ())
+
+
+FTRQ = "FROM list_part_trash WHERE kind='list_field'"  # 2.783.0 (#5368): the field trash is the core's copy trash
 
 
 def ago(days):
@@ -93,7 +98,7 @@ check(not any(f["id"] == FS for f in st["fields"]), "delete: the field is gone f
 check(str(FS) not in (F.get(B + f"/api/tasks/{T1}").json().get("fields") or {}), "delete: the task has no value of it")
 check(not one("SELECT 1 FROM list_fields WHERE id=?", (FS,)) and val(T1, FS) is None, "delete: no live row reads it any more")
 check(one("SELECT group_field FROM lists WHERE id=?", (L,)) == "", "delete: no grouping by a gone field")
-vals = json.loads(one("SELECT vals FROM field_trash WHERE id=?", (TR,)) or "[]")
+vals = json.loads(one(f"SELECT held {FTRQ} AND id=?", (TR,)) or "{}").get("vals") or []  # 2.783.0 (#5368): the core's copy
 check(sorted(vals) == sorted([[T1, "Draft"], [T2, "Old"]]), f"trash: the values are kept, the trashed task's too {vals}")
 r = F.get(B + f"/api/lists/{L}/fields/trash")
 check(r.ok and [(x["id"], x["name"], x["tasks"]) for x in r.json()["fields"]] == [(TR, "Stage", 2)] and r.json()["days"] >= 1,
@@ -119,11 +124,11 @@ r = TA.delete(V + f"/fields/{FS}")
 check(r.status_code == 403 and one("SELECT 1 FROM list_fields WHERE id=?", (FS,)), f"an agent cannot delete the field at once {r.status_code}")
 # the trash run
 TR2 = F.delete(B + f"/api/fields/{FS}").json().get("trash_id")
-dbx("UPDATE field_trash SET deleted_at=? WHERE id=?", (ago(400), TR2))
+dbx("UPDATE list_part_trash SET deleted_at=? WHERE id=?", (ago(400), TR2))  # 2.783.0 (#5368): the core's copy trash
 out = run_purge(False)
-check(one("SELECT 1 FROM field_trash WHERE id=?", (TR2,)), f"trash run, switch off: only counted {out[-200:]}")
+check(one(f"SELECT 1 {FTRQ} AND id=?", (TR2,)), f"trash run, switch off: only counted {out[-200:]}")
 out = run_purge(True)
-check(not one("SELECT 1 FROM field_trash WHERE id=?", (TR2,)), f"trash run, switch on: the old field is gone for good {out[-200:]}")
+check(not one(f"SELECT 1 {FTRQ} AND id=?", (TR2,)), f"trash run, switch on: the old field is gone for good {out[-200:]}")
 check(F.post(B + f"/api/fields/trash/{TR2}/restore").status_code == 404, "after the trash run: nothing to restore")
 
 # 2.550.0 (#4528, review F1): a task value comes back only to a task that is still there (not one gone to the trash since)
@@ -137,12 +142,13 @@ check(F.delete(B + f"/api/tasks/{TX}").ok, "review F1 setup: the task it pointed
 r = F.post(B + f"/api/fields/trash/{TRT}/restore")
 check(r.ok and val(TY, FT) is None, f"review F1: no task value back that points at a task in the trash {r.text[:160]} {val(TY, FT)}")
 # 2.550.0 (#4528, review F2): the field trash keeps at most 100 deleted fields per project, the oldest go first
-dbx("INSERT INTO field_trash(list_id,field_id,name,type,deleted_at) SELECT ?, 900000 + g, 'old', 'text', ? FROM generate_series(1, 100) g",
-    (L, ago(1)))
+# 2.783.0 (#5368): the field trash is the core's copy trash (list_part_trash, kind list_field, ref_id = the field's id)
+dbx("INSERT INTO list_part_trash(list_id,kind,ref_id,snap,deleted_at) SELECT ?, 'list_field', 900000 + g, '{\"name\": \"old\"}', ? "
+    "FROM generate_series(1, 100) g", (L, ago(1)))
 check(F.delete(B + f"/api/fields/{FT}").ok, "review F2: one more field deleted")
-check(one("SELECT COUNT(*) FROM field_trash WHERE list_id=?", (L,)) == 100 and one("SELECT 1 FROM field_trash WHERE list_id=? AND field_id=?", (L, FT)),
-      f"review F2: at most 100 rows, the newest stays {one('SELECT COUNT(*) FROM field_trash WHERE list_id=?', (L,))}")
-dbx("DELETE FROM field_trash WHERE list_id=? AND field_id > 900000", (L,))
+check(one(f"SELECT COUNT(*) {FTRQ} AND list_id=?", (L,)) == 100 and one(f"SELECT 1 {FTRQ} AND list_id=? AND ref_id=?", (L, FT)),
+      f"review F2: at most 100 rows, the newest stays {one(f'SELECT COUNT(*) {FTRQ} AND list_id=?', (L,))}")
+dbx(f"DELETE {FTRQ} AND list_id=? AND ref_id > 900000", (L,))
 
 # ================================================================== removing a member and adding them again
 FP = F.post(B + f"/api/lists/{L}/fields", json={"name": "Owner", "type": "person"}).json()["id"]

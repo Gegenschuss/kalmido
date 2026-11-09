@@ -11,6 +11,7 @@ from ..accounts.pictures import avatar_map
 from ..accounts.orgs import may_see
 from ..core.access import collab_all, Denied, FULL_ROLES, list_role, MANAGE_ROLES, task_visible, vis_sql, WRITE_ROLES
 from ..core.access import access_note, health_hidden, org_trips_hidden, otr_live, ov_open, reading_sql, token_lists  # 2.281.0 B (#3110)
+from ..core.access import live_sql  # 2.783.0 (#5368): the trash filter of the core
 from ..accounts.orgroles import FULL_READ, org_say_refusal, role_known
 from ..accounts.orgs import INSTANCE_ENV
 from ..tasks.validation import as_int
@@ -303,20 +304,20 @@ def _tchat_room_counts(c, ids, uid):
     if not ids:
         return {}, {}, {}, {}
     lasts = {r["room_id"]: r for r in c.execute(
-        "SELECT DISTINCT ON (room_id) * FROM tchat_msgs WHERE room_id = ANY(CAST(? AS BIGINT[])) AND deleted_at IS NULL "
+        f"SELECT DISTINCT ON (room_id) * FROM tchat_msgs WHERE room_id = ANY(CAST(? AS BIGINT[])) AND {live_sql()} "
         "AND thread_of IS NULL ORDER BY room_id, id DESC", (ids,))}
     reads = {r[0]: (r[1], bool(r[2])) for r in c.execute(
         "SELECT room_id, last_id, muted FROM tchat_reads WHERE user_id=? AND room_id = ANY(CAST(? AS BIGINT[]))", (uid, ids))}
     pat = f"%<@{uid}>%"
     unr = {r[0]: (r[1], bool(r[2])) for r in c.execute(
-        """SELECT m.room_id, COUNT(*) FILTER (WHERE COALESCE(m.user_id,0)!=?), bool_or(m.body ILIKE ?) FROM tchat_msgs m
+        f"""SELECT m.room_id, COUNT(*) FILTER (WHERE COALESCE(m.user_id,0)!=?), bool_or(m.body ILIKE ?) FROM tchat_msgs m
            LEFT JOIN tchat_reads d ON d.room_id=m.room_id AND d.user_id=?
-           WHERE m.room_id = ANY(CAST(? AS BIGINT[])) AND m.id>COALESCE(d.last_id,0) AND m.deleted_at IS NULL AND m.thread_of IS NULL
+           WHERE m.room_id = ANY(CAST(? AS BIGINT[])) AND m.id>COALESCE(d.last_id,0) AND {live_sql("m")} AND m.thread_of IS NULL
            GROUP BY m.room_id""", (uid, pat, uid, ids))}
     thr = {r[0]: (r[1], bool(r[2])) for r in c.execute(
-        """SELECT t.room_id, COUNT(*), COALESCE(SUM(CASE WHEN m.body ILIKE ? THEN 1 ELSE 0 END),0) FROM tchat_msgs m
+        f"""SELECT t.room_id, COUNT(*), COALESCE(SUM(CASE WHEN m.body ILIKE ? THEN 1 ELSE 0 END),0) FROM tchat_msgs m
            JOIN tchat_thread_reads t ON t.root_id=m.thread_of AND t.user_id=? AND t.follow=1
-           WHERE t.room_id = ANY(CAST(? AS BIGINT[])) AND m.room_id=t.room_id AND m.id>t.last_id AND m.deleted_at IS NULL
+           WHERE t.room_id = ANY(CAST(? AS BIGINT[])) AND m.room_id=t.room_id AND m.id>t.last_id AND {live_sql("m")}
            AND COALESCE(m.user_id,0)!=? GROUP BY t.room_id""", (pat, uid, ids, uid))}
     return lasts, reads, unr, thr
 
@@ -419,7 +420,7 @@ def tchat_rx(c, ids):
 
 
 def tchat_msg_dict(c, m, rx=None, quotes=None, files=None, th=None):
-    t = c.execute("SELECT id, title FROM tasks WHERE id=? AND deleted_at IS NULL", (m["task_id"],)).fetchone() if m["task_id"] else None
+    t = c.execute(f"SELECT id, title FROM tasks WHERE id=? AND {live_sql()}", (m["task_id"],)).fetchone() if m["task_id"] else None
     # 2.33.0 (#1076): reply_to + reply (a short quote of the answered message; quotes = reply_quotes of a page)
     rt = m["reply_to"] if "reply_to" in m.keys() and not m["deleted_at"] else None
     rq = (quotes if quotes is not None else reply_quotes(c, "t", [rt])).get(rt) if rt else None
@@ -1004,9 +1005,9 @@ def tth_follow(c, r, root, uids, mid):
 
 def tth_unread(c, rid, uid):
     """(unread answers in the threads of room rid uid takes part in, whether one of them @mentions uid)."""
-    r = c.execute("""SELECT COUNT(*), COALESCE(SUM(CASE WHEN m.body ILIKE ? THEN 1 ELSE 0 END),0) FROM tchat_msgs m
+    r = c.execute(f"""SELECT COUNT(*), COALESCE(SUM(CASE WHEN m.body ILIKE ? THEN 1 ELSE 0 END),0) FROM tchat_msgs m
                      JOIN tchat_thread_reads t ON t.root_id=m.thread_of AND t.user_id=? AND t.follow=1
-                     WHERE t.room_id=? AND m.room_id=? AND m.id>t.last_id AND m.deleted_at IS NULL AND COALESCE(m.user_id,0)!=?""",
+                     WHERE t.room_id=? AND m.room_id=? AND m.id>t.last_id AND {live_sql("m")} AND COALESCE(m.user_id,0)!=?""",
                   (f"%<@{uid}>%", uid, rid, rid, uid)).fetchone()
     return r[0], bool(r[1])
 
@@ -1018,15 +1019,15 @@ def tth_summary(c, uid, ids):
         return {}
     q = ",".join("?" * len(ids))
     out = {r[0]: {"count": r[1], "last_at": r[2], "users": [], "unread": 0, "follow": False} for r in c.execute(
-        f"SELECT thread_of, COUNT(*), MAX(created_at) FROM tchat_msgs WHERE thread_of IN ({q}) AND deleted_at IS NULL GROUP BY thread_of", ids)}
+        f"SELECT thread_of, COUNT(*), MAX(created_at) FROM tchat_msgs WHERE thread_of IN ({q}) AND {live_sql()} GROUP BY thread_of", ids)}
     if not out:
         return out
-    for r in c.execute(f"""SELECT thread_of, user_id FROM tchat_msgs WHERE thread_of IN ({q}) AND deleted_at IS NULL AND user_id IS NOT NULL
+    for r in c.execute(f"""SELECT thread_of, user_id FROM tchat_msgs WHERE thread_of IN ({q}) AND {live_sql()} AND user_id IS NOT NULL
                            GROUP BY thread_of, user_id ORDER BY MAX(id) DESC""", ids):
         if r[0] in out and len(out[r[0]]["users"]) < TTH_USERS:
             out[r[0]]["users"].append(r[1])
     for r in c.execute(f"""SELECT t.root_id, t.follow, (SELECT COUNT(*) FROM tchat_msgs m WHERE m.thread_of=t.root_id AND m.id>t.last_id
-                             AND m.deleted_at IS NULL AND COALESCE(m.user_id,0)!=?) FROM tchat_thread_reads t
+                             AND {live_sql("m")} AND COALESCE(m.user_id,0)!=?) FROM tchat_thread_reads t
                            WHERE t.user_id=? AND t.root_id IN ({q})""", (uid, uid, *ids)):
         if r[0] in out:
             out[r[0]].update(follow=bool(r[1]), unread=r[2] if r[1] else 0)

@@ -22,6 +22,7 @@ from ..core.conflict import ccf_check  # 2.564.0 D (#4701)
 from ..core.objparts import part_kind, part_write  # 2.610.0 (#4762): the core's write layer of side objects
 from ..accounts.session import me
 from ..core.access import Denied, is_project, list_role, need_list, pvis, WRITE_ROLES
+from ..core.access import live_sql  # 2.783.0 (#5368)
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from ..tasks.validation import as_int  # 2.369.5 (#2517): pulled up from functions
 
@@ -64,7 +65,8 @@ def spr_ver(s):
 
 SPR_KIND = "sprint"  # 2.610.0 (#4762): a side object of the core (core/objparts.py): the dialog's version (409 key "sprint"), the
 # trash copy (lists/parttrash.py, the kind in list_part_trash); agents never take one back
-part_kind(SPR_KIND, "sprints", lock="sprint-{id}", version=spr_ver, key="sprint", agent=False)
+part_kind(SPR_KIND, "sprints", lock="sprint-{id}", version=spr_ver, key="sprint", agent=False, trash_prune=True,
+          copy=True)  # 2.783.0 (#5368): its copies in list_part_trash end in the core's run
 
 
 def spr_today():
@@ -106,12 +108,12 @@ def spr_tasks(c, s, uid=None):
     rv = spr_review(s) if s["state"] == "closed" else None
     if rv is not None:
         ids = [int(x) for x in (rv.get("done") or []) + (rv.get("moved") or []) if isinstance(x, int)][:5000]
-        rows = c.execute(f"SELECT * FROM tasks WHERE id IN ({','.join('?' * len(ids))}) AND list_id=? AND deleted_at IS NULL AND ms=0",
+        rows = c.execute(f"SELECT * FROM tasks WHERE id IN ({','.join('?' * len(ids))}) AND list_id=? AND {live_sql()} AND ms=0",
                          [*ids, s["list_id"]]).fetchall() if ids else []  # review: a task moved to another list since drops out
         moved = set(rv.get("moved") or [])
         rows = [dict(r, status=0, completed_at=None) if r["id"] in moved else dict(r) for r in rows]
     else:
-        rows = [dict(r) for r in c.execute("SELECT * FROM tasks WHERE sprint_id=? AND deleted_at IS NULL AND ms=0 ORDER BY status!=0, sort, id",
+        rows = [dict(r) for r in c.execute(f"SELECT * FROM tasks WHERE sprint_id=? AND {live_sql()} AND ms=0 ORDER BY status!=0, sort, id",
                                            (s["id"],))]
     if uid and list_role(c, s["list_id"], uid) == "participant":
         _, wr, _ = pvis(c, uid, s["list_id"])
@@ -266,7 +268,7 @@ def spr_close(c, s, target, uid):
     (review, next sprint id or None)."""
     lid = s["list_id"]
     cfg = spr_cfg((c.execute("SELECT sprint_cfg FROM lists WHERE id=?", (lid,)).fetchone() or [""])[0])
-    rows = [dict(r) for r in c.execute("SELECT id, status, points, sprint_at FROM tasks WHERE sprint_id=? AND deleted_at IS NULL AND ms=0",
+    rows = [dict(r) for r in c.execute(f"SELECT id, status, points, sprint_at FROM tasks WHERE sprint_id=? AND {live_sql()} AND ms=0",
                                        (s["id"],))]
     start = date.fromisoformat(s["start"])
     done = [r for r in rows if r["status"] == 2]
