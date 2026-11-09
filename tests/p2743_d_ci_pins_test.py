@@ -7,6 +7,7 @@
    download names an artifact that the same workflow uploads
  - Dependabot: github-actions and docker (/ and /embed, the two Dockerfiles), each with a limit above the default 5
 """
+import fnmatch
 import glob
 import os
 import re
@@ -37,9 +38,11 @@ for p in sorted(glob.glob(os.path.join(ROOT, ".github", "workflows", "*.yml"))):
             if "upload-artifact@" in u:
                 up.append((st.get("with") or {}).get("name"))
             if "download-artifact@" in u:
-                down.append((st.get("with") or {}).get("name"))
+                w = st.get("with") or {}
+                down.append(w.get("name") or w.get("pattern"))  # 2.754.0 (#5300): the coverage job takes every shard's data by pattern
     check(len(up) == len(set(up)) and None not in up, f"#3794: {name}: every upload has its own name {up}")
-    check(all(d in up for d in down), f"#3794: {name}: every download names an upload of the same workflow {down} {up}")
+    upm = [re.sub(r"\$\{\{[^}]*\}\}", "*", x or "") for x in up]  # a matrix name = any value
+    check(all(d in up or any(fnmatch.fnmatch(x, d) or fnmatch.fnmatch(d, x) for x in upm) for d in down), f"#3794: {name}: every download names an upload of the same workflow {down} {up}")
 for a in MIN:
     check(a in pins, f"#3794: {a} is used")
 for a, s in pins.items():
