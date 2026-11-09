@@ -16,7 +16,7 @@ import sys
 
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
-from freelancer_fixture import freelancer  # noqa: E402
+from freelancer_fixture import FEATURES, freelancer  # noqa: E402
 from kt import B, check, dbx, done, fresh, sess  # noqa: E402
 from obj_probe import in_app  # noqa: E402
 
@@ -27,7 +27,7 @@ K = "osupplier"
 assert sess().post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
 A = sess("alice")
 A.post(B + "/api/admin/setup", json={"org_name": "Example Studio", "lang": "en", "collab_all": True, "modules": ["comments", "office", "clients"]})
-A.patch(B + "/api/settings", json={"tour": "done", "lang": "en"})
+A.patch(B + "/api/settings", json={"tour": "done", "lang": "en", "features": FEATURES})
 ORG = A.get(B + "/api/state").json()["me"]["workspaces"][0]["id"]
 uid = {}
 r = A.post(B + "/api/users", json={"orgs": [{"id": ORG, "role": "member"}], "username": "bob", "display_name": "Bob",
@@ -38,7 +38,7 @@ uid["olga"] = r.json().get("id")
 check(A.post(B + "/api/admin/orgs", json={"name": "Other Example", "admin_id": uid["olga"]}).ok, "setup: another organisation")
 Bo, Ol = sess("bob"), sess("olga")
 for s in (Bo, Ol):
-    s.patch(B + "/api/settings", json={"tour": "done", "lang": "en", "features": "comments,office,clients"})
+    s.patch(B + "/api/settings", json={"tour": "done", "lang": "en", "features": FEATURES})
 AID = dbx("SELECT id FROM users WHERE username='alice'")[0][0]
 FID, Fr = freelancer(B, A)
 OLD = "2020-01-02T03:04:05.000Z"
