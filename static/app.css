@@ -540,7 +540,7 @@ code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);f
 
 /* ================= mobile ================= */
 @media (max-width:767px){
-  :root{--tabs-h:3.5rem;--tabs-pb:max(calc(var(--safe-b) - .75rem),min(var(--safe-b),.5rem))}
+  :root{--tabs-h:3.5rem;--tabs-pb:max(calc(var(--safe-b) - 1.4375rem),min(var(--safe-b),.5rem))}  /* 2.809.0 (#5437, a trial): the empty strip below the tab labels about halved - 34 px home indicator room -> 11 px (was 22 px with "- .75rem"; back: put .75rem in again). The labels keep ~9 px of the button below them, so they stay clear of the home indicator; no safe area (desktop, Android) = 0 as before */
   #app,#app.detail-open{grid-template-columns:1fr;display:block}
   #rail{display:none}
   #main{height:100dvh}

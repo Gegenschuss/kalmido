@@ -1,0 +1,7 @@
+/* 2.809.0 (#5437): the home-screen app on iOS 26 draws its own scroll-edge blur (blur + dimming, ~30 px below the status bar)
+   over the top of the page unless the element at the top centre sits in a fixed or sticky box about as wide as the screen
+   (WebKit LocalFrameView::fixedContainerEdges; then it uses a plain edge colour). Every phone head was static, so the head
+   looked blurred and washed out in all areas. The heads are sticky at top 0: they already sit at the top of a box that does
+   not scroll, so nothing moves; no backdrop-filter / translucency on them (that would bring the blur back). The task panel,
+   the drawer and dialogs are fixed already. */
+@media (max-width:767px){ #top,#view .chview>.cwsw,#view .chview>.chath,#view .tcview.inroom .tcrhead{position:sticky;top:0} }
