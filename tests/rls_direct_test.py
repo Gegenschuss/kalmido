@@ -16,7 +16,7 @@ import re
 import subprocess
 import sys
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import dbx as dbxm
 import requests
@@ -130,6 +130,9 @@ for t, col, ref in sql("""SELECT tc.table_name, kcu.column_name, ccu.table_name 
     FK[(t, col)] = ref
 
 
+FILL_EXTRA = {"undo_groups": {"state": "barrier"}}  # 2.780.0 (#5386): columns with a default that fill_row must set
+
+
 def fill_row(t, org):
     cols = sql("""SELECT column_name, data_type FROM information_schema.columns WHERE table_schema=current_schema() AND table_name=?
                   AND is_nullable='NO' AND column_default IS NULL AND is_identity='NO' AND column_name!='org_id'""", (t,))
@@ -150,10 +153,10 @@ def fill_row(t, org):
             v = "{}"
         # 2.780.0 (#5386): typed time columns (undo_groups.created_at / updated_at, TIMESTAMPTZ NOT NULL without a default,
         # #5249) refused the made-up text: the suite passed only when the app had written a row of each organisation before
-        elif typ.startswith("timestamp"):
-            v = "2026-10-20T00:00:00+00:00"
+        elif typ.startswith("timestamp"):  # now: the clean-up drops undo groups older than 30 days
+            v = datetime.now(timezone.utc).isoformat()
         elif typ == "date":
-            v = "2026-10-20"
+            v = datetime.now(timezone.utc).date().isoformat()
         else:
             v = f"{MARK if org == ALPHA else 'b'}-{t}"
         if v is None:
@@ -162,10 +165,19 @@ def fill_row(t, org):
             continue
         names.append(name)
         vals.append("'" + str(v).replace("'", "''") + "'")
+    # 2.780.0 (#5386): a made-up undo group has no parts; the core's clean-up (core/undogroups.py: watchdog prune, ug_gc)
+    # deletes such groups unless they are a barrier, so the row of each organisation stays only as one
+    for k, v in FILL_EXTRA.get(t, {}).items():
+        if k not in names:
+            names.append(k)
+            vals.append("'" + v + "'")
     # 2.50.1 (#1194): quoted names - hub_bookings has the columns start / end (end is a reserved word)
     sql(f"INSERT INTO {t}({','.join(chr(34) + n + chr(34) for n in names)}) VALUES({','.join(vals)}) ON CONFLICT DO NOTHING")
 
 
+# 2.780.0 (#5386): the app's own undo steps of the setup above may or may not have left a row of each organisation
+# (green on the Mac, red in CI v2.771.0): start without them, so fill_row's typed time columns are always exercised
+sql("DELETE FROM undo_groups")
 for _ in range(3):  # a few rounds: tables that point at others of the same organisation
     # 2.113.1 (#2059): a team chat file points at a message; tchat_msgs has no org_id (no row of its own here): one per room
     for (rid,) in sql("SELECT r.id FROM tchat_rooms r WHERE NOT EXISTS (SELECT 1 FROM tchat_msgs m WHERE m.room_id=r.id)"):
