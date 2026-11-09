@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS obj_reactions (  -- 2.763.0 (#5269): one reaction per
   target_id BIGINT NOT NULL, -- no FK: a row of the kind's table (comment -> comments, tchat -> tchat_msgs, agent_chat -> agent_chat); kalmido_orx_gone deletes with it
   user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   emoji TEXT NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, -- no now(): a restore refuses a call in a default (admin/backup.py _calls_ok), pg_dump prints this one bare
   PRIMARY KEY (target_kind, target_id, user_id, emoji));
 CREATE INDEX IF NOT EXISTS ix5269_obj_reactions_user ON obj_reactions(user_id);
 CREATE OR REPLACE FUNCTION kalmido_orx_gone() RETURNS trigger LANGUAGE plpgsql AS $$
