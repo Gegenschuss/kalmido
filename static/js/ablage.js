@@ -49,7 +49,9 @@ async function ab_load() {
   }
   const dq = typeof abd_cardsOn === 'function' && abd_cardsOn(key) ? '&docs=1' : '';  // 2.353.0 D (#2759): the cards need the documents' fields
   try {
-    const j = await api('GET', (r.nid ? `/api/files?parent=${r.nid}` : `/api/files?space=${encodeURIComponent(ab_curSpace())}`) + dq);
+    // 2.780.0 (#5391): a node address may be a file (#ablage/<file id>): its folder query says 409 "Not a folder" -- rawFetch says nothing,
+    // the way below opens the file; any other failure of a folder load is toasted in the catch as api() did
+    const j = await (r.nid ? rawFetch('GET', `/api/files?parent=${r.nid}` + dq) : api('GET', `/api/files?space=${encodeURIComponent(ab_curSpace())}` + dq));
     if (typeof fsl_prep !== 'function' && typeof loadModule === 'function') await loadModule('fslock').catch(() => {});  // 2.353.0 A (#2758)
     if (typeof fsl_prep === 'function') await fsl_prep(j);  // 2.353.0 A (#2758): names of a locked folder decrypted here
     if (seq !== AB.seq) return;
@@ -64,6 +66,7 @@ async function ab_load() {
         if (n.kind === 'file' && !n.in_trash && !n.locked && !n._enc && !upLocked(n) && feat('docs') && !S.me?.kid && S.route.nid === n.id) { AB_FILEIDS.add(n.id); AB.loading = false; route(); return; }
         if (n.kind !== 'folder') { AB.loading = false; go(n.parent_id ? 'ablage/' + n.parent_id : ab_home(ab_nodeSp(n))); setTimeout(() => ab_details(n.id), 50); return; } } catch { /* below */ }
     }
+    if (r.nid && x.message !== 'auth' && !(x instanceof Offline) && !x.shown) toast(x.message || tr('unknown'));  // 2.780.0 (#5391): what api() would have said
     AB.data = null; AB.dkey = ''; AB.err = x.message || tr('unknown');
   }
   AB.loading = false;

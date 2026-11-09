@@ -16,7 +16,7 @@
 .pvfail .btn{display:inline-flex;align-items:center;gap:.375rem}
 /* 2.521.0 (#4476): leafing through the documents in the full screen; an image of the list shown in it as well */
 .pvbar .pvdocs{display:flex;align-items:center;gap:.125rem;flex:none;padding-right:.5rem;margin-right:.25rem;border-right:1px solid var(--line)}
-.pvdno{font-size:var(--fs-s);color:var(--text2);font-variant-numeric:tabular-nums;min-width:4.5rem;text-align:center;white-space:nowrap}
+.pvdno{font-size:var(--fs-s);color:var(--text2);font-variant-numeric:tabular-nums;width:6.5rem;text-align:center;white-space:nowrap}  /* 2.780.0 (#5389): fixed width, the arrows do not move when the count gets longer */
 .pvdocs [disabled]{opacity:.35}
 .pvimgw{display:flex;justify-content:center;min-height:100%}
 .pvimg{display:block;max-width:100%;height:auto;align-self:flex-start;background:#fff;box-shadow:var(--shadow)}

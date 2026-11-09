@@ -4,10 +4,14 @@
    the module docs (lazyload.js LD_CSS). */
 .dv-view{display:flex;flex-direction:column;gap:.625rem;height:100%;min-height:26rem;box-sizing:border-box;padding-top:.5rem}
 @media (min-width:768px){ #view:has(> .dv-view){padding-bottom:.75rem} }
-.dv-head{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .75rem;flex:none}
+.dv-head{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:.5rem .75rem;flex:none}  /* 2.780.0 (#5389): the arrows stay in the middle whatever the file name */
+.dv-hl{display:flex;align-items:center;gap:.75rem;min-width:0}
+.dv-hr{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:.5rem .75rem;min-width:0}
+.dv-hr .spacer{display:none}
 .dv-back{flex:none;min-height:2.5rem}
-.dv-title{margin:0;min-width:0;max-width:min(40rem,40vw);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-l);font-weight:650}
-.dv-navslot{display:flex;align-items:center}
+.dv-title{margin:0;min-width:0;flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-l);font-weight:650}
+.dv-navslot{display:flex;align-items:center;justify-content:center;grid-column:2}
+.dv-navslot .dc-navn{min-width:0;width:7.5rem;white-space:nowrap}  /* a fixed width: "9 of 171" -> "10 of 171" moves nothing */
 .dv-navslot .dc-nav{margin:0}
 .dv-navslot .dc-navb{border:1px solid var(--line);border-radius:var(--r-s)}
 .dv-keys{font-size:var(--fs-xs)}
@@ -95,7 +99,9 @@
 /* phones: one column, the preview on top, the fields below; a sideways swipe on the preview leafs (docs.js) */
 @media (max-width:767px){
   .dv-view{height:auto;min-height:0;padding-top:.25rem}
-  .dv-head{gap:.375rem}
+  .dv-head{display:flex;flex-wrap:wrap;gap:.375rem}  /* phones as before: the groups dissolve into the one row */
+  .dv-hl,.dv-hr{display:contents}
+  .dv-hr .spacer{display:block}
   .dv-title{flex:1 1 0;max-width:none;font-size:var(--fs-m)}
   .dv-keys,.dv-strip,.dv-grip{display:none}
   .dv-back>span,.dv-hacts .btn>span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);clip-path:inset(50%)}
