@@ -7,7 +7,10 @@ FULL run of the workflow CI on the tagged commit (tools/ci_gate.py). Without a s
   one green full run beside a red one (re-run, nightly run of the same commit) = go; the loop in main() waits on the
   stubbed API state, not on a fixed time;
 - 2.595.0 (#4905): a green full run of ANOTHER commit with the same tree counts (same files), one of another tree or only
-  the push stage does not; release.yml can be re-run on a tag by workflow_dispatch and skips any other ref."""
+  the push stage does not; release.yml can be re-run on a tag by workflow_dispatch and skips any other ref.
+- 2.767.0 (#5324): a finished full run red only in soft parts = go ("soft"), the same rule as live in the fast lane; hard red
+  (a hard shard, a hard suite by name or group, a suite in no group, a red shard without a named suite, a hard job, a scanner
+  step of Lint), cancelled or the push stage = still no image; the soft red parts go into the notes of the weekly release."""
 import importlib.util
 import os
 import re
@@ -160,6 +163,149 @@ check("ref: ${{ needs.ci-gate.outputs.sha }}" in rtxt and "TAG: ${{ needs.ci-gat
 check("GITHUB_REF_NAME" not in rel.split("  release:\n", 1)[1], "#4926: release and publish no longer read the ref of the start")
 check("if: startsWith(github.ref, 'refs/tags/v') || inputs.tag != ''" in gtxt and '[ -n "$IN_TAG" ]' in gtxt,
       "#4905 + #4926: a dispatch runs on a tag ref or with the input tag, otherwise it is skipped")
+
+# ------------------------------------------------------------------ 2.767.0 (#5324): soft red = go (same rule as live)
+PATS = ["*invoice*", "*restore*", "*login*", "*bandit*", "*audit*", "*zap*", "*owasp*"]
+GRP = {"ux1_ui": "ux1_ui", "pg_prepare": "pg_layer", "p9_ui": "p9_invoice_group", "p1_invoice_ui": "p1_invoice_ui"}
+
+
+def job(i, name, conclusion="success", steps=None):
+    return {"id": i, "name": name, "status": "completed", "conclusion": conclusion, "steps": steps or []}
+
+
+def base_jobs(*extra):
+    return [job(1, "Shard plan (stage, suite times of the last runs)"), job(2, "Test suites 1/4 full hart (API, UI, security)"),
+            job(3, "Test suites 2/4 full hart (API, UI, security)"), job(4, "Test suites 3/4 full (API, UI, security)"),
+            job(5, "Test suites 4/4 full (API, UI, security)"), job(6, "Lint, i18n, scanners")] + list(extra)
+
+
+def red(jobs, nr, conclusion="failure"):
+    return [dict(j, conclusion=conclusion) if j["id"] == nr else j for j in jobs]
+
+
+def suites(m):
+    return lambda j: m.get(j["id"], [])
+
+
+soft_case = red(base_jobs(job(9, "Test suites (API, UI, security)", "failure")), 4)
+ok, txt, info = gate.judge_soft(soft_case, suites({4: ["ux1_ui", "pg_prepare"]}), PATS, GRP)
+check(ok and info["suites"] == ["pg_prepare", "ux1_ui"] and "ux1_ui" in txt, "#5324: hard shards green, red soft suites only = soft go (%s, %s)" % (ok, txt))
+ok, txt, _ = gate.judge_soft(red(base_jobs(), 2), suites({}), PATS, GRP)
+check(not ok and "hard shard" in txt, "#5324: a red hard shard = no image (%s)" % txt)
+ok, txt, _ = gate.judge_soft(red(base_jobs(), 3, "cancelled"), suites({}), PATS, GRP)
+check(not ok and "hard shard" in txt, "#5324: a hard shard cut at its time limit = no image (%s)" % txt)
+ok, txt, _ = gate.judge_soft(red(base_jobs(), 4), suites({4: ["p1_invoice_ui"]}), PATS, GRP)
+check(not ok and "p1_invoice_ui" in txt, "#5324: a red suite whose NAME is hard (on a soft shard) = no image (%s)" % txt)
+ok, txt, _ = gate.judge_soft(red(base_jobs(), 4), suites({4: ["p9_ui"]}), PATS, GRP)
+check(not ok and "p9_ui" in txt, "#5324: a red suite whose test GROUP is hard = no image (%s)" % txt)
+ok, txt, _ = gate.judge_soft(red(base_jobs(), 4), suites({4: ["unknown_ui"]}), PATS, GRP)
+check(not ok, "#5324: a red suite in no known group = hard (%s)" % txt)
+ok, txt, _ = gate.judge_soft(red(base_jobs(), 4), suites({4: ["ux1_ui"]}), PATS, None)
+check(not ok, "#5324: test groups not readable = unknown = hard (%s)" % txt)
+ok, txt, _ = gate.judge_soft(red(base_jobs(), 4), suites({}), PATS, GRP)
+check(not ok and "without a named suite" in txt, "#5324: a red shard without a named suite = hard (%s)" % txt)
+ok, txt, _ = gate.judge_soft(red(base_jobs(), 4), lambda j: None, PATS, GRP)
+check(not ok and "not readable" in txt, "#5324: annotations not readable = hard (%s)" % txt)
+ok, txt, info = gate.judge_soft(red(base_jobs(), 5, "timed_out"), suites({}), PATS, GRP)
+check(ok and info["cut"], "#5324: a SOFT shard at its time limit = soft, named in the notes (%s, %s)" % (ok, info))
+ok, txt, _ = gate.judge_soft(red(base_jobs(), 4), suites({4: ["ux1_ui"]}), [], GRP)
+check(not ok and "hard_suites.txt" in txt, "#5324: no hard list in the tree = nothing is soft (%s)" % txt)
+nohard = [j for j in base_jobs() if "hart" not in j["name"]]
+ok, txt, _ = gate.judge_soft(red(nohard, 4), suites({4: ["ux1_ui"]}), PATS, GRP)
+check(not ok and "no hard shard" in txt, "#5324: a plan without hard shards = unknown = hard (%s)" % txt)
+pushj = [dict(j, name=j["name"].replace(" full", " push")) for j in base_jobs()]
+ok, txt, _ = gate.judge_soft(red(pushj, 4), suites({4: ["ux1_ui"]}), PATS, GRP)
+check(not ok and "full stage" in txt, "#5324: the push stage = no image (%s)" % txt)
+ok, txt, info = gate.judge_soft(base_jobs(job(7, "Browser demo + quick add languages", "failure")), suites({}), PATS, GRP)
+check(ok and info["jobs"] == ["Browser demo + quick add languages"], "#5324: a red soft job = soft, named (%s)" % txt)
+for nm in ("E-invoice validators (veraPDF, KoSIT)", "OWASP ZAP baseline"):
+    ok, txt, _ = gate.judge_soft(base_jobs(job(7, nm, "failure")), suites({}), PATS + ["*einvoice*", "e-invoice*"], GRP)
+    check(not ok and "hard job" in txt, "#5324: a red hard job (%s) = no image (%s)" % (nm, txt))
+lint = lambda st: [job(6, "Lint, i18n, scanners", "failure", [{"name": "Set up job", "conclusion": "success"}, {"name": st, "conclusion": "failure"}])]
+ok, txt, _ = gate.judge_soft([j for j in base_jobs() if j["id"] != 6] + lint("ESLint of the client"), suites({}), PATS, GRP)
+check(ok, "#5324: a red Lint step that is no scanner = soft (%s)" % txt)
+ok, txt, _ = gate.judge_soft([j for j in base_jobs() if j["id"] != 6] + lint("bandit (fails on high severity only)"), suites({}), PATS, GRP)
+check(not ok and "Lint" in txt, "#5324: a red scanner step of Lint (bandit) = no image (%s)" % txt)
+ok, txt, _ = gate.judge_soft([j for j in base_jobs() if j["id"] != 6] + [job(6, "Lint, i18n, scanners", "failure")], suites({}), PATS, GRP)
+check(not ok, "#5324: a red Lint without a known step = hard (%s)" % txt)
+
+res, txt = gate.decide([run(1, conclusion="failure")], jobs_of({}), soft=lambda rid: (True, "soft suites: ux1_ui"))
+check(res == "soft" and "ux1_ui" in txt, "#5324: decide - a finished run red only in soft parts = soft (%s)" % res)
+res, txt = gate.decide([run(1, conclusion="failure")], jobs_of({}), soft=lambda rid: (False, "hard suite red: p4286_restore"))
+check(res == "red" and "p4286_restore" in txt, "#5324: decide - hard red stays red with the reason (%s, %s)" % (res, txt))
+res, _ = gate.decide([run(1, conclusion="cancelled")], jobs_of({}), soft=lambda rid: (True, "x"))
+check(res == "red", "#5324: decide - a cancelled run is never soft (%s)" % res)
+res, _ = gate.decide([run(1, conclusion="failure"), run(2, "in_progress")], jobs_of({}), soft=lambda rid: (True, "x"))
+check(res == "soft", "#5324: decide - a soft run does not wait for another one (%s)" % res)
+check(gate.decide_tree("soft", "x", [], jobs_of({}))[0] == "soft", "#5324: decide_tree keeps soft")
+
+# main(): the stubbed API with jobs (conclusions, steps) and annotations; groups / hard list stubbed like the tagged tree
+import tempfile  # noqa: E402
+td = tempfile.mkdtemp()
+os.makedirs(os.path.join(td, "tests"))
+with open(os.path.join(td, "tests", "hard_suites.txt"), "w") as f:
+    f.write("# hard\n" + "\n".join(PATS) + "\n")
+check(gate.patterns(td) == PATS and gate.patterns(os.path.join(td, "nope")) == [], "#5324: patterns() reads tests/hard_suites.txt of the tree")
+real = gate.groups(R)
+check(bool(real) and gate.hard_suite("ux1_ui", gate.patterns(R), real) is False and gate.hard_suite("p4286_restore", gate.patterns(R), real) is True,
+      "#5324: the real tree - ux1_ui soft, p4286_restore hard (tests/hard_suites.txt + tools/shards.py groups)")
+old_groups = gate.groups
+gate.groups = lambda tree: GRP
+
+
+def fake_api2(runs, jobs, anns):
+    def api(path):
+        if "/annotations" in path:
+            jid = int(path.split("/check-runs/")[1].split("/")[0])
+            return [{"title": "suite %s failed" % s, "message": "FAIL: x"} for s in anns.get(jid, [])] + [{"title": "Process completed with exit code 1."}]
+        if "/jobs" in path:
+            return {"jobs": jobs}
+        if "/git/commits/" in path:
+            return {"tree": {"sha": ""}}
+        if "status=success" in path:
+            return {"workflow_runs": []}
+        return {"workflow_runs": runs}
+    return api
+
+
+def main2(runs, jobs, anns, *extra):
+    gate.api = fake_api2(runs, jobs, anns)
+    old = sys.argv, dict(os.environ)
+    sys.argv = ["ci_gate.py", "--sha", "abc123", "--poll-s", "0", "--no-run-min", "0", "--tree", td] + list(extra)
+    os.environ["GITHUB_REPOSITORY"] = "owner/repo"
+    os.environ.pop("GITHUB_STEP_SUMMARY", None)
+    import io
+    import contextlib
+    buf = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(buf):
+            rc = gate.main()
+        return rc, buf.getvalue()
+    finally:
+        sys.argv = old[0]
+        os.environ.clear()
+        os.environ.update(old[1])
+
+
+rc, out = main2([run(7, conclusion="failure")], soft_case, {4: ["ux1_ui"]})
+check(rc == 0 and "soft" in out, "#5324: main - soft red full run = image goes ahead (rc %s)" % rc)
+rc, out = main2([run(7, conclusion="failure")], red(base_jobs(), 4), {4: ["p1_invoice_ui"]})
+check(rc == 1 and "p1_invoice_ui" in out, "#5324: main - hard red suite = no image (rc %s)" % rc)
+rc, out = main2([run(7, conclusion="failure")], soft_case, {4: ["ux1_ui", "pg_prepare"]}, "--report", "9.9.9")
+check(rc == 0 and "### Known test failures in 9.9.9" in out and "- suite `ux1_ui`" in out and "- suite `pg_prepare`" in out
+      and "actions/runs/7" in out and "FAIL" not in out, "#5324: --report - the notes section names the soft red suites, no log text (%s)" % out[:200])
+rc, out = main2([run(7)], base_jobs(), {}, "--report", "9.9.9")
+check(rc == 0 and out == "", "#5324: --report - green CI = no section")
+gate.groups = old_groups
+
+check("checks: read" in gtxt and '--tree "$RUNNER_TEMP/tagtree"' in gtxt and "git worktree add" in gtxt,
+      "#5324: ci-gate reads the annotations (checks: read) and judges with the hard list of the TAGGED tree")
+with open(os.path.join(R, ".github", "workflows", "weekly-release.yml"), encoding="utf-8") as f:
+    wk = f.read()
+pk = re.search(r"^  pick:\n((?:    .*\n|\n)+)", wk.split("\njobs:\n", 1)[1], re.M)
+pk = pk.group(1) if pk else ""
+check("tools/ci_gate.py --sha" in pk and "--report" in pk and "checks: read" in pk and "actions: read" in pk and "write" not in pk,
+      "#5324: the weekly release names the soft red suites of its version (read rights only in pick)")
 
 print("release_ci_gate: %d ok, %d failed" % (OKS[0], len(FAILS)))
 sys.exit(1 if FAILS else 0)

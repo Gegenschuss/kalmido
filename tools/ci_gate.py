@@ -14,16 +14,31 @@ A red or cancelled run that is re-run by hand (same run, new attempt) counts aga
 tree (identical files: the version commit back on main, a nightly / dispatched full run, a hotfix branch) counts as well -
 the CI tests files, not commit ids. Read from head_commit.tree_id of the run list (GET .../runs?status=success), no extra
 request per run. Not a loosening: the code of the tag has to have passed the full stage.
+2.767.0 (#5324): the image follows the same rule as live in the fast lane - a finished FULL run that is
+red only in SOFT parts counts as well ("soft green"). Hard = the list tests/hard_suites.txt of the tagged tree (the one list the
+CI plan puts on its hard shards "Test suites N/M full hart" and the live train reads; invoices / office, backup, login,
+scanners). A red run is soft green only when: it ended as failure (not cancelled), it was the full stage with at least one hard
+shard, every hard shard is green, every red shard names its red suites (annotations "suite X failed" of tests/run_all.sh) and
+none of them is hard (by name or by the name of its test group, tools/shards.py groups(); a suite in no group = hard), and no
+other hard job is red (name matches a pattern: e-invoice validators, semgrep, ZAP ...; a red step of "Lint ..." only when it is a
+scanner). Hard red, cancelled, only the push stage = no image, as before. The soft red parts are printed (step summary) and
+--report lists them for the release notes (weekly-release.yml).
+  python3 tools/ci_gate.py --sha SHA --report   markdown of the soft red parts of SHA's newest finished full run ("" = green)
 Env: GITHUB_TOKEN (or GH_TOKEN), GITHUB_REPOSITORY, GITHUB_SHA, GITHUB_API_URL (all set on GitHub Actions)."""
 import argparse
+import fnmatch
 import json
 import os
 import re
+import subprocess
 import sys
 import time
 import urllib.request
 
 STAGE_RE = re.compile(r"^Test suites \d+/\d+ (full|push)\b")
+SHARD_RE = re.compile(r"^Test suites (\d+)/\d+ (full|push)( hart)?\b")  # #5324: " hart" = a shard of the hard groups (ci.yml, #4557)
+SUITE_ANN_RE = re.compile(r"^suite ([A-Za-z0-9_.-]+) failed$")  # tests/run_all.sh: ::error title=suite NAME failed::...
+SCANNERS = ("audit", "gitleaks", "secret", "bandit", "semgrep", "trivy")  # a red step of the Lint job is hard only as one of these
 
 
 def stage(job_names):
@@ -32,10 +47,11 @@ def stage(job_names):
     return "full" if "full" in seen else ("push" if "push" in seen else "?")
 
 
-def decide(runs, jobs_of):
+def decide(runs, jobs_of, soft=None):
     """runs = the CI runs of the commit (GitHub API dicts), jobs_of(run_id) -> job names.
-    ("green" | "wait" | "red" | "none", text). Green beats everything (one green full run is enough); then a run still
-    queued / in progress = wait; else red with the reasons."""
+    ("green" | "soft" | "wait" | "red" | "none", text). Green beats everything (one green full run is enough); then (#5324,
+    soft(run_id) -> (ok, text) given) a finished run red only in soft parts = "soft" (go); then a run still queued / in
+    progress = wait; else red with the reasons."""
     if not runs:
         return "none", "no CI run for this commit yet"
     why = []
@@ -45,13 +61,125 @@ def decide(runs, jobs_of):
             if st == "full":
                 return "green", "CI run %s is green (full stage)" % r["id"]
             why.append("run %s green, but stage %s (a release needs the full stage)" % (r["id"], st))
+    if soft is not None:  # #5324: a finished full run red only in soft parts = go, like live in the fast lane
+        for r in runs:
+            if r.get("status") == "completed" and r.get("conclusion") == "failure":
+                ok, txt = soft(r["id"])
+                if ok:
+                    return "soft", "CI run %s is red only in soft parts (full stage): %s" % (r["id"], txt)
+                why.append("run %s failure: %s" % (r["id"], txt))
     busy = [r for r in runs if r.get("status") != "completed"]
     if busy:
         return "wait", "CI run %s %s" % (busy[0]["id"], busy[0].get("status"))
     for r in runs:
-        if r.get("conclusion") != "success":
+        if r.get("conclusion") != "success" and not (soft is not None and r.get("conclusion") == "failure"):
             why.append("run %s %s" % (r["id"], r.get("conclusion")))
     return "red", "; ".join(why)
+
+
+# ---------------------------------------------------------------- 2.767.0 (#5324): soft red = go (same rule as live in the fast lane)
+def patterns(tree):
+    """The hard patterns (fnmatch, lower case) of tests/hard_suites.txt in TREE; [] = no list (then nothing is soft)."""
+    try:
+        with open(os.path.join(tree, "tests", "hard_suites.txt"), encoding="utf-8") as f:
+            return [ln.strip().lower() for ln in f if ln.strip() and not ln.lstrip().startswith("#")]
+    except (OSError, UnicodeDecodeError):
+        return []
+
+
+_GROUPS_CODE = ("import importlib.util, json, sys\n"
+                "s = importlib.util.spec_from_file_location('shards', sys.argv[1] + '/tools/shards.py'); m = importlib.util.module_from_spec(s)\n"
+                "s.loader.exec_module(m)\n"
+                "print(json.dumps({x: g[0] for g in m.groups(sys.argv[1] + '/tests/run_all.sh') for x in g[1]}))")
+
+
+def groups(tree):
+    """{suite: first suite of its test group} of TREE (tools/shards.py groups(), as the CI plan and the live train); None = unreadable."""
+    try:
+        p = subprocess.run([sys.executable, "-I", "-c", _GROUPS_CODE, tree], capture_output=True, text=True, timeout=120)
+        d = json.loads(p.stdout or "null") if p.returncode == 0 else None
+    except (subprocess.SubprocessError, OSError, ValueError):
+        return None
+    return d if isinstance(d, dict) and d else None
+
+
+def hard_suite(name, pats, grp):
+    """Is a red suite hard: its name or the name of its test group matches a pattern; a suite in no known group = hard."""
+    low = (name or "").lower()
+    if not low or any(fnmatch.fnmatch(low, m) for m in pats):
+        return True
+    g = (grp or {}).get(name)
+    return g is None or any(fnmatch.fnmatch(str(g).lower(), m) for m in pats)
+
+
+def hard_job(job, pats):
+    """A red job that is no shard: the summing job "Test suites (...)" and "(informational)" never; "Lint ..." only with a red
+    scanner step (no step known = hard); any other job when its name matches a pattern (e-invoice, semgrep, ZAP ...)."""
+    low = (job.get("name") or "").strip().lower()
+    if low.startswith("test suites") or "(informational)" in low:
+        return False
+    if low.startswith("lint"):
+        steps = [(s.get("name") or "").lower() for s in job.get("steps") or [] if s.get("conclusion") not in ("success", "skipped", None)]
+        scan = [m for m in pats if m.strip("*") in SCANNERS]
+        return not steps or any(fnmatch.fnmatch(st, m) for st in steps for m in scan)
+    return any(fnmatch.fnmatch(low, m) for m in pats)
+
+
+def judge_soft(jobs, suites_of, pats, grp):
+    """jobs = the jobs of a finished red run (dicts: id, name, status, conclusion, steps); suites_of(job) -> the names of its red
+    suites (None = not readable). -> (soft?, text, {"suites": [...], "jobs": [...], "cut": [...]}) - see the head comment."""
+    info = {"suites": [], "jobs": [], "cut": []}
+    if not pats:
+        return False, "no tests/hard_suites.txt in the tagged tree (unknown = hard)", info
+    shards = [(SHARD_RE.match(j.get("name") or ""), j) for j in jobs]
+    shards = [(m, j) for m, j in shards if m]
+    if not shards or any(m.group(2) != "full" for m, _ in shards):
+        return False, "not the full stage", info
+    hard = [j for m, j in shards if m.group(3)]
+    if not hard:
+        return False, "no hard shard in the plan (unknown = hard)", info
+    for j in hard:
+        if j.get("conclusion") != "success":
+            return False, "hard shard red: %s (%s)" % (j.get("name"), j.get("conclusion")), info
+    for m, j in shards:
+        c = j.get("conclusion")
+        if m.group(3) or c in ("success", "skipped"):
+            continue
+        su = suites_of(j)
+        if su is None:
+            return False, "the red suites of %s are not readable (unknown = hard)" % j.get("name"), info
+        if c == "failure" and not su:
+            return False, "%s red without a named suite (unknown = hard)" % j.get("name"), info
+        if c != "failure":  # cancelled / timed out at its time limit: its other suites stay untested (the train counts it soft too)
+            info["cut"].append("%s (%s)" % (j.get("name"), c))
+        for s in su:
+            if hard_suite(s, pats, grp):
+                return False, "hard suite red: %s" % s, info
+            info["suites"].append(s)
+    for j in jobs:
+        if SHARD_RE.match(j.get("name") or "") or j.get("conclusion") in ("success", "skipped", None):
+            continue
+        if hard_job(j, pats):
+            return False, "hard job red: %s (%s)" % (j.get("name"), j.get("conclusion")), info
+        if not (j.get("name") or "").startswith("Test suites"):
+            info["jobs"].append(j.get("name"))
+    info["suites"] = sorted(set(info["suites"]))
+    parts = (["soft suites: " + ", ".join(info["suites"])] if info["suites"] else []) + (["soft jobs: " + ", ".join(info["jobs"])] if info["jobs"] else []) \
+        + (["shards at their time limit: " + ", ".join(info["cut"])] if info["cut"] else [])
+    return True, "; ".join(parts) or "no red part named", info
+
+
+def report_md(version, run_id, info, url=""):
+    """The section for the release notes: the soft red parts of the version (empty info = nothing)."""
+    if not (info.get("suites") or info.get("jobs") or info.get("cut")):
+        return ""
+    out = ["", "### Known test failures in %s (outside the hard areas)" % version, "",
+           "The full CI of this version was red only in suites outside invoices / office, backup / restore, sign-in and the "
+           "security scanners; those were all green (same rule as the live update)." + (" CI run: %s" % url if url else ""), ""]
+    out += ["- suite `%s`" % s for s in info.get("suites") or []]
+    out += ["- job: %s" % j for j in info.get("jobs") or []]
+    out += ["- cut at its time limit (suites untested): %s" % c for c in info.get("cut") or []]
+    return "\n".join(out) + "\n"
 
 
 TREE_EVENTS = ("push", "schedule", "workflow_dispatch")  # review 2.595.0 (#4905): a pull_request run tests the merge commit, other files
@@ -69,7 +197,7 @@ def same_tree(runs, tree, sha, repo):
 
 def decide_tree(res, txt, tree_runs, jobs_of):
     """#4905: (res, txt) of the tagged commit; a green FULL run with the same tree turns red / none / wait into green."""
-    if res == "green":
+    if res in ("green", "soft"):
         return res, txt
     for r in tree_runs:
         if stage(jobs_of(r["id"])) == "full":
@@ -92,26 +220,65 @@ def main():
     ap.add_argument("--timeout-min", type=float, default=240)
     ap.add_argument("--poll-s", type=float, default=60)
     ap.add_argument("--no-run-min", type=float, default=20)
+    ap.add_argument("--tree", default=os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."),
+                    help="#5324: checkout of the TAGGED commit (its tests/hard_suites.txt and test groups); default: this checkout")
+    ap.add_argument("--report", metavar="VERSION", help="#5324: print the release-notes section of the soft red parts and exit")
     a = ap.parse_args()
     repo = os.environ.get("GITHUB_REPOSITORY", "")
     if not (a.sha and repo):
         print("ci_gate: GITHUB_SHA / GITHUB_REPOSITORY missing"); return 1
     t0 = time.time()
     tree = [None]
+    cache = {}
+    hard = {}
 
     def tree_of():  # the tree of the tagged commit (from its own run, else the git commit), asked once
         if tree[0] is None:
             tree[0] = (api("/repos/%s/git/commits/%s" % (repo, a.sha)).get("tree") or {}).get("sha") or ""
         return tree[0]
 
+    def jobs_full(rid):
+        if rid not in cache:
+            cache[rid] = api("/repos/%s/actions/runs/%s/jobs?per_page=100" % (repo, rid)).get("jobs", [])
+        return cache[rid]
+
     def jobs_of(rid):
-        return [j.get("name") for j in api("/repos/%s/actions/runs/%s/jobs?per_page=100" % (repo, rid)).get("jobs", [])]
+        return [j.get("name") for j in jobs_full(rid)]
+
+    def suites_of(job):  # #5324: the red suites of a shard from its annotations (tests/run_all.sh "suite X failed")
+        try:
+            anns = api("/repos/%s/check-runs/%s/annotations?per_page=100" % (repo, job["id"]))
+        except Exception:  # noqa: BLE001 - not readable = unknown = hard
+            return None
+        return [m.group(1) for m in (SUITE_ANN_RE.match((x.get("title") or "").strip()) for x in anns or []) if m]
+
+    def judge(rid):
+        if "pats" not in hard:
+            hard["pats"], hard["grp"] = patterns(a.tree), groups(a.tree)
+        ok, txt, info = judge_soft(jobs_full(rid), suites_of, hard["pats"], hard["grp"])
+        hard[rid] = info
+        return ok, txt
+
+    def soft(rid):
+        ok, txt = judge(rid)
+        if ok:
+            hard["ok"] = rid
+        return ok, txt
+
+    if a.report:  # #5324: the soft red parts for the release notes (nothing when a run of SHA is green or none is soft)
+        runs = api("/repos/%s/actions/workflows/ci.yml/runs?head_sha=%s&per_page=50" % (repo, a.sha)).get("workflow_runs", [])
+        res, _ = decide(runs, jobs_of, soft)
+        if res == "soft":
+            rid = hard["ok"]
+            sys.stdout.write(report_md(a.report, rid, hard[rid], "https://github.com/%s/actions/runs/%s" % (repo, rid)))
+        return 0
 
     while True:
+        cache.clear()  # a re-run attempt of a run changes its jobs: ask again each poll
         try:
             runs = api("/repos/%s/actions/workflows/ci.yml/runs?head_sha=%s&per_page=50" % (repo, a.sha)).get("workflow_runs", [])
-            res, txt = decide(runs, jobs_of)
-            if res != "green":  # #4905: a green full run of the same files on another commit
+            res, txt = decide(runs, jobs_of, soft)
+            if res not in ("green", "soft"):  # #4905: a green full run of the same files on another commit
                 own = [(r.get("head_commit") or {}).get("tree_id") for r in runs if r.get("head_sha") == a.sha]
                 if own and own[0] and tree[0] is None:
                     tree[0] = own[0]
@@ -123,6 +290,13 @@ def main():
             res, txt = "wait", "API: %s" % e
         mins = (time.time() - t0) / 60
         print("ci_gate %s (%.0f min): %s" % (a.sha[:12], mins, txt), flush=True)
+        if res == "soft":  # #5324: go, and say so where the maintainer looks
+            print("::warning title=CI red only in soft suites::%s - image and release go ahead (same rule as the live update, #5324)" % txt)
+            summ = os.environ.get("GITHUB_STEP_SUMMARY")
+            if summ:
+                with open(summ, "a", encoding="utf-8") as f:
+                    f.write(report_md(a.sha[:12], hard["ok"], hard[hard["ok"]]) or "CI red only in soft parts\n")
+            return 0
         if res == "green":
             return 0
         if res == "red":

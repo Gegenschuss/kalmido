@@ -19,6 +19,10 @@ name: Release
 # 2.610.0 (#4926): or by hand from any ref with the input tag vX.Y.Z (GitHub page) - after a soft red full CI of a tag was made green
 # by a fix, the maintainer starts it on the newest green tag. The gate is the same: a green FULL run on the commit of that tag
 # (tools/ci_gate.py, also a green run with the same file tree), the tag is never moved; the input reaches the shell only as env.
+# 2.767.0 (#5324): the image follows the same rule as live - a finished full CI red only in SOFT suites passes
+# too (all hard shards green, no red suite / job of tests/hard_suites.txt of the tagged tree; tools/ci_gate.py). Hard red, cancelled
+# or only the push stage = no image as before. checks: read = the annotations naming the red suites; the soft red parts go into the
+# step summary and, with ci_gate.py --report, into the notes of the weekly release.
 on:
   push:
     tags: ["v*.*.*"]
@@ -41,6 +45,7 @@ jobs:
     permissions:
       contents: read
       actions: read
+      checks: read  # 2.767.0 (#5324): the annotations "suite X failed" of a red shard
     outputs:
       tag: ${{ steps.t.outputs.tag }}
       sha: ${{ steps.t.outputs.sha }}
@@ -69,7 +74,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG_SHA: ${{ steps.t.outputs.sha }}
-        run: python3 tools/ci_gate.py --sha "${TAG_SHA:-$GITHUB_SHA}" --timeout-min 240
+        # 2.767.0 (#5324): the hard list and the test groups come from the TAGGED tree (a start by hand runs the gate of main)
+        run: |
+          set -euo pipefail
+          git worktree add -q --detach "$RUNNER_TEMP/tagtree" "${TAG_SHA:-$GITHUB_SHA}"
+          python3 tools/ci_gate.py --sha "${TAG_SHA:-$GITHUB_SHA}" --tree "$RUNNER_TEMP/tagtree" --timeout-min 240
 
   release:
     needs: ci-gate

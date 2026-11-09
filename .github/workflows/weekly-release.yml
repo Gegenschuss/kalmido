@@ -13,6 +13,8 @@ name: Weekly release
 # 2.761.0 (#5218): the job attest signs web-manifest-X.Y.Z.json with a GitHub build attestation (Sigstore, keyless) between
 # the two: it has the OIDC token but no checkout (no code of the repository runs there) and cannot write contents; no
 # attestation = no release. The image is attested where it is built (release.yml).
+# 2.767.0 (#5324): an image may come from a full CI that was red only in soft suites (release.yml); the notes then name those
+# suites of the picked version (tools/ci_gate.py --report; actions + checks read only).
 on:
   schedule:
     - cron: "30 20 * * 0"   # Sunday evening (UTC), the ISO week ends at midnight
@@ -32,6 +34,8 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
+      actions: read  # 2.767.0 (#5324): the CI runs of the picked tag
+      checks: read  # 2.767.0 (#5324): their annotations naming the red suites
     outputs:
       version: ${{ steps.pick.outputs.version }}
       manifest: ${{ steps.assets.outputs.manifest }}
@@ -61,6 +65,21 @@ jobs:
           b=$(git rev-parse -q --verify "refs/tags/latest-ok/$ver^{commit}") || { echo "::error::no tag latest-ok/$ver"; exit 1; }
           [ "$a" = "$b" ] || { echo "::error::latest-ok/$ver is on $b, v$ver on $a"; exit 1; }
           cat notes.md
+      - name: Soft red suites of the version (tools/ci_gate.py --report)
+        if: steps.pick.outputs.version != ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VER: ${{ steps.pick.outputs.version }}
+        run: |
+          set -euo pipefail
+          sha=$(git rev-parse -q --verify "refs/tags/v$VER^{commit}")
+          git worktree add -q --detach "$RUNNER_TEMP/tagtree" "$sha"
+          if python3 tools/ci_gate.py --sha "$sha" --tree "$RUNNER_TEMP/tagtree" --report "$VER" > soft.md; then
+            cat soft.md >> notes.md
+            cat soft.md
+          else
+            echo "::warning title=soft red suites::not readable - the notes go out without that list"
+          fi
       - name: Release assets (installers, source archives, image digest, web manifest, SHA256SUMS)
         id: assets
         if: steps.pick.outputs.version != ''
