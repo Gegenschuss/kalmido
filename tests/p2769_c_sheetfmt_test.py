@@ -16,6 +16,7 @@ import io
 import os
 import re
 import sys
+import time
 import zipfile
 
 import requests
@@ -120,6 +121,26 @@ check(got == [("Hours", "number", 2, None), ("Fee", "currency", 0, "USD"), ("Rat
 check([at(d2, a).get("display") for a in ("A1", "B1", "C1")] == ["1,234.57", "$1,235", "19.500%"],
       "the imported table shows the same " + str([at(d2, a).get("display") for a in ("A1", "B1", "C1")]))
 check(at(d2, "A1").get("value") == 1234.5678, "the imported value is full " + str(at(d2, "A1").get("value")))
+# leader review (#5351): an uploaded formatCode is untrusted - a long one with an open quote and many ";" must not stall the
+# import (the old lookahead split was quadratic: minutes), and a ";" inside quotes does not end the first section
+XL = Fr.get(B + f"/api/sheets/{T}/export.xlsx").content
+zi, zo = zipfile.ZipFile(io.BytesIO(XL)), io.BytesIO()
+with zipfile.ZipFile(zo, "w", zipfile.ZIP_DEFLATED) as w:
+    for it in zi.infolist():
+        data = zi.read(it.filename)
+        if it.filename == "xl/styles.xml":
+            t = data.decode().replace('formatCode="#,##0.00"', 'formatCode="&quot;h;x&quot;#,##0.00"')
+            t = t.replace('formatCode="0.000%"', 'formatCode="0.000%;&quot;' + ';' * 300000 + '"')
+            data = t.encode()
+        w.writestr(it, data)
+t0 = time.monotonic()
+r = Fr.post(B + "/api/sheets/import", data={"space": "private"}, files={"file": ("Long.xlsx", zo.getvalue())}, timeout=120)
+took = time.monotonic() - t0
+print(f"  the import with the long number format took {took:.1f} s")
+check(r.status_code == 201 and took < 5, f"an import with a 300 KB number format answers at once ({took:.1f} s) " + r.text[:200])
+d4 = get(r.json()["sheet"]["id"]) if r.ok else {}
+got4 = [(c["title"], c.get("dec")) for c in d4.get("columns", [])[:3]]
+check(got4 == [("Hours", 2), ("Fee", 0), ("Rate", 3)], "a quoted ; and the cut long code keep the places " + str(got4))
 # an .xlsx in the table's own currency (EUR, 2 places) stays automatic: no own format on the column
 r = Fr.post(B + "/api/sheets", json={"title": "Plain", "space": "private"})
 PL = r.json()["id"]

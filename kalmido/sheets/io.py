@@ -291,10 +291,16 @@ def shx_xl_numfmt(code, nid=0):
         return 0, None
     if nid in (2, 4):
         return 2, None
-    code = code or ""
+    code = (code or "")[:255]  # Excel's own limit; the code comes from an uploaded file (review: no long input into the regexes)
     if not code or code.lower() == "general":
         return None, None
-    sec = re.split(r';(?=(?:[^"]*"[^"]*")*[^"]*$)', code)[0]
+    sec, q = code, False  # the first section: up to the first ";" outside quotes (linear, review: a lookahead split was quadratic)
+    for i, ch in enumerate(code):
+        if ch == '"':
+            q = not q
+        elif ch == ";" and not q:
+            sec = code[:i]
+            break
     cur = None
     for m in re.findall(r'"([^"]*)"|\[\$([^\]-]*)|([€$£])|\b([A-Z]{3})\b', sec):
         cur = cur or hc_code(next((x for x in m if x), "").strip())
@@ -568,7 +574,7 @@ def _num_fmts(z, names, budget):
         if tag == "numFmts":
             for nf in el:
                 try:
-                    custom[int(nf.get("numFmtId"))] = nf.get("formatCode") or ""
+                    custom[int(nf.get("numFmtId"))] = (nf.get("formatCode") or "")[:255]  # 2.769.0 (#5351) review: Excel's limit
                 except (TypeError, ValueError):
                     pass
         elif tag == "dxfs":
@@ -589,14 +595,14 @@ def _num_fmts(z, names, budget):
             except ValueError:
                 nid = 0
             code = custom.get(nid, "")
+            nf = shx_xl_numfmt(code, nid)  # 2.769.0 (#5351): once per xf (review)
             plain = re.sub(r'"[^"]*"|\\.|\[[^\]]*\]', "", code)  # without quoted text, escapes and [colour] / [$€-407]
             if nid in _XL_DATE_FMTS or (code and re.search(r"[dy]", plain, re.I) and not re.search(r"[h]", plain, re.I)):
                 out[i] = "date"
             elif nid in _XL_PCT_FMTS or "%" in plain:
                 out[i] = "percent"
-            elif nid in (5, 6, 7, 8, 42, 44) or re.search(r"[€$£]|\[\$|CHF|EUR|USD", code) or shx_xl_numfmt(code, nid)[1]:
+            elif nid in (5, 6, 7, 8, 42, 44) or re.search(r"[€$£]|\[\$|CHF|EUR|USD", code) or nf[1]:
                 out[i] = "currency"  # 2.769.0 (#5351): + any office currency by its code ("SEK")
-            nf = shx_xl_numfmt(code, nid)
             if nf != (None, None):
                 out[("nf", i)] = nf  # 2.769.0 (#5351): its decimal places / currency (_shx_cell puts it on the cell as "nf")
     return out, dxf_fill, shfm_xl_styles(st, _local)  # 2.578.0 (#3462 C): + the cell formats and the rules' colours
