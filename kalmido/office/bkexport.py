@@ -22,8 +22,8 @@ from ..core.config import app
 from ..core.db import db, local_now
 from ..core.i18n import N_, tr
 from ..core.errors import BadInput
-from .books import bk_gaps_text, ofc_meals_euer, ofc_meals_home  # 2.534.0 (#4333): ofc_meals_*
-from .books import bk_meals_strict, bk_receipts_basis  # 2.610.0 (#4932)
+from .books import bk_gaps_text, ofc_meals_euer  # 2.534.0 (#4333): ofc_meals_*; 2.764.0 (#5313): ofc_meals_home through bk_meals_receipts
+from .books import bk_meals_receipts, bk_meals_strict, bk_receipts_basis  # 2.610.0 (#4932); 2.764.0 (#5313): bk_meals_receipts
 from .euerbasis import EB_NORC_LABEL, eb_income_payment_ids, eb_segments  # 2.610.0 (#4932)
 from .calc import dec, dstr, money
 from .model import office_gate, office_need_feature, office_org, office_settings
@@ -151,7 +151,7 @@ def bx_rows(c, oid, frm, to, gaps=None):
                      "text": f"{tr('Cash book') if x.get('src') == 'cash' else tr('Bank booking')}: {txt}", "category": x.get("category") or "",
                      "tax_pct": "", "net": a, "tax": "", "gross": a, "currency": home, "file": ""})
     seen = set()
-    for y in range(int(frm[:4]), int(to[:4]) + 1):
+    for y in range(int(frm[:4]) - 1, int(to[:4]) + 2):  # 2.764.0 (#5313): + the neighbour years (an item of a trip of the next year)
         for tr_ in rk_trips(c, oid, year=str(y)):
             for it in tr_["items"]:
                 day = it["date"] or tr_["date_from"] or ""
@@ -167,9 +167,9 @@ def bx_rows(c, oid, frm, to, gaps=None):
     # 2.534.0 (#4333): the approved entertainment receipts, two rows each: the deductible 70 % with the full input tax and
     # the 30 % that are not deductible (a small business: 70 / 30 of the gross amount, no input tax) -- gross adds up to the bill
     if strict:  # 2.610.0 (#4932): the years by receipts as before, the strict ones through their lines (prep)
-        meals += [m for a_, b_, x in segs if not x for m in ofc_meals_home(c, oid, a_, b_, s)]
+        meals += [m for a_, b_, x in segs if not x for m in bk_meals_receipts(c, oid, a_, b_, s)]  # 2.764.0 (#5313): + the edge
     else:
-        meals = ofc_meals_home(c, oid, frm, to, s)
+        meals = bk_meals_receipts(c, oid, frm, to, s)  # 2.764.0 (#5313): a receipts year next to a strict one has an edge
     for m in meals:
         v, sm = ofc_meals_euer([m], small)
         nd = dec(sm["not_deductible"])

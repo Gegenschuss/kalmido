@@ -16,6 +16,8 @@ invoice 2 (595.00) paid by hand, 50.00 received without an invoice.
  - a year with a locked month keeps its basis (409); the meal link: one meal per line (409), taken off again
  - 2.755.0 (#5241): the input tax (field 66) where a receipts year meets a strict one: the day of the bank line decides, every
    receipt exactly once over the years (both directions); a receipts year away from the edge keeps the document date
+ - 2.764.0 (#5313): the same for the entertainment receipts (their line's day at the edge) and a travel receipt dated in the year
+   before its trip (counts in its own year, once)
  - a person without an organisation (freelancer-matrix: office): the same in the personal office
  - 2.743.0 (#4937): the basis changes at the turn of the year (both ways): a receipt with its line in the other year counts once,
    in the neutral and the DATEV export and in the EUeR (also a cash line without paid_at), and is not open
@@ -420,6 +422,45 @@ def office(s, who, ws, me):
     chk, rows, miss = bx(s, f"{Y}-01-01", f"{Y}-12-31")
     check("rb-jan-dez.pdf" not in miss, f"{who}: #4937: rb (line in a receipts year) is not open in the strict year {miss[:400]}")
     check("open_strict" not in dv_hints(s, f"{Y}-01-01", f"{Y}-01-31"), f"{who}: #4937: the January DATEV export names rb not open")
+
+    # ---- 2.764.0 (#5313): entertainment receipts and travel receipts at the same edges -- each exactly once over the years.
+    # MA of 27.12.{Y-1} paid on 04.01.{Y} (was in both years), MB of 28.12.{Y} paid on 03.01. this year (was in none);
+    # a trip of 10.01.{Y} with a ticket of 15.12.{Y-1} at 19 % (was in no year: the trip is of {Y})
+    r = s.post(B + O + "/bank/import", json={"text": camt([ntry("150.40", f"{Y}-01-04", "MEDGEA"), ntry("150.40", f"{TY}-01-03", "MEDGEB")]),
+                                             "filename": "konto5.xml"})
+    check(r.status_code == 201, f"{who}: #5313: bank import {r.status_code} {r.text[:200]}")
+    tx = {t["purpose"].split()[-1]: t["id"] for t in s.get(B + O + "/bank/tx?state=all").json()["items"]}
+    edge = {}
+    for name, day, ref in (("MA", f"{Y - 1}-12-27", "MEDGEA"), ("MB", f"{Y}-12-28", "MEDGEB")):
+        r = s.post(B + O + "/meals", json=meal(me, day))
+        check(r.status_code == 201, f"{who}: #5313: meal {name} {r.text[:200]}")
+        edge[name] = r.json()["id"]
+        check(s.post(B + O + f"/meals/{edge[name]}/approve").ok, f"{who}: #5313: meal {name} approved")
+        r = s.put(B + f"/api/office/meals/{edge[name]}/payment", json={"kind": "bank", "id": tx[ref]})
+        check(r.ok, f"{who}: #5313: meal {name} takes its line {r.text[:200]}")
+    r = s.post(B + O + "/trips", json={"date_from": f"{Y}-01-10", "date_to": f"{Y}-01-12", "dest": "Hamburg - Berlin", "purpose": "job",
+                                       "items": [{"date": f"{Y - 1}-12-15", "category": "train", "amount": "119", "vat_pct": "19"}]})
+    check(r.status_code == 201, f"{who}: #5313: a trip with a ticket of the year before {r.text[:200]}")
+
+    def vat_kind(year, kind, key):
+        u = s.get(B + O + f"/books/ustva?year={year}&period=y").json()
+        return {x[key]: x["date"] for x in u.get("items", []) if x.get("kind") == kind}
+    m0, m1, m2 = (vat_kind(y, "meal", "meal_id") for y in (Y - 1, Y, TY))
+    check(edge["MA"] not in m0 and m1.get(edge["MA"]) == f"{Y}-01-04", f"{who}: #5313: MA only in the strict year, on its line's day {m0} {m1}")
+    check(edge["MB"] not in m1 and m2.get(edge["MB"]) == f"{TY}-01-03", f"{who}: #5313: MB in the receipts year of its line {m1} {m2}")
+    q = s.get(B + O + f"/books/ustva?year={TY}&period=m01").json()
+    check(any(x.get("meal_id") == edge["MB"] for x in q.get("items", [])), f"{who}: #5313: MB in January of this year (its line's month)")
+    t0, t1 = vat_kind(Y - 1, "travel", "trip_id"), vat_kind(Y, "travel", "trip_id")
+    tid = r.json()["id"]
+    check(t0.get(tid) == f"{Y - 1}-12-15" and tid not in t1, f"{who}: #5313: the ticket counts in its own year, once {t0} {t1}")
+    # the income statement and field 66 agree again in the receipts years (+ MB 20.40, the ticket 19.00; rb of #4937 4.75 in {Y - 1})
+    ev = {y: s.get(B + O + f"/books/euer?year={y}").json()["expense_total"]["vat"] for y in (Y - 1, TY)}
+    uv = {y: s.get(B + O + f"/books/ustva?year={y}&period=y").json()["kz"]["66"] for y in (Y - 1, TY)}
+    check(ev == uv and ev[Y - 1] == "31.35" and ev[TY] == "35.60", f"{who}: #5313: the EUeR and field 66 agree with the meals and the ticket {ev} {uv}")
+    check(line(s.get(B + O + f"/books/euer?year={Y - 1}").json(), "m:") is None, f"{who}: #5313: the EUeR of {Y - 1} has no meal (MA counts in {Y})")
+    mt = line(s.get(B + O + f"/books/euer?year={TY}").json(), "m:")
+    check(mt and mt["count"] == 1 and mt["vat"] == "20.40", f"{who}: #5313: the EUeR of this year has MB once {mt}")
+
     # ---- a locked month keeps the basis of its year
     r = s.post(B + O + "/periods/lock", json={"through": f"{Y}-01", "confirm": f"01/{Y}"})
     check(r.ok, f"{who}: January of {Y} locked {r.text[:200]}")

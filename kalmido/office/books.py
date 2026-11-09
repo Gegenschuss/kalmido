@@ -501,7 +501,7 @@ def bk_euer(c, oid, year):
     inc_ids = eb_income_payment_ids(c, oid) if strict else None
     pay_outside = 0
     # 2.534.0 (#4333): the approved entertainment receipts (office/meals.py); 2.603.0 (#4927): strict = through their line only
-    meals = bk_meals_strict(c, oid, flows, y0, y1, s) if strict else ofc_meals_home(c, oid, y0, y1, s)
+    meals = bk_meals_strict(c, oid, flows, y0, y1, s) if strict else bk_meals_receipts(c, oid, y0, y1, s)  # 2.764.0 (#5313): + the edge
     for p, r in bk_payments(c, oid, y0, y1, home):
         if strict and p["id"] not in inc_ids:
             pay_outside += 1  # (6) a payment typed by hand without its bank / cash booking does not count
@@ -552,7 +552,7 @@ def bk_euer(c, oid, year):
         k = exp.setdefault("k:", {"label": tr("Card fees without receipt"), "v": [Decimal(0)] * 3, "count": 0})
         k["v"] = [k["v"][0] + x["amount"], k["v"][1], k["v"][2] + x["amount"]]
         k["count"] += 1
-    for t in rk_trips(c, oid, year=str(year)):
+    for t in bk_trips_near(c, oid, y0, y1):  # 2.764.0 (#5313): was rk_trips(year) -- an item of a trip of the next / last year
         for it in t["items"]:
             day = it["date"] or t["date_from"] or ""
             if not (y0 <= day <= y1):
@@ -639,6 +639,49 @@ def bk_meals_strict(c, oid, flows, frm, to, s):
     return out
 
 
+def bk_trips_near(c, oid, frm, to):
+    """2.764.0 (#5313): the trips whose items may lie in [frm, to] -- those of the years of [frm, to] and their neighbours, each
+    once: an item keeps its own day (a ticket bought in December for a trip in January), so a trip of the next year may
+    have an item of this one (rk_trips(year) alone left it out of both years)."""
+    out = {}
+    for y in range(int(frm[:4]) - 1, int(to[:4]) + 2):
+        for t in rk_trips(c, oid, year=str(y)):
+            out.setdefault(t["id"], t)
+    return list(out.values())
+
+
+def bk_meals_receipts(c, oid, a, b, s):
+    """2.764.0 (#5313): the approved meals of [a, b] (a segment of a receipts year) as ofc_meals_home, at the edge to a strict year
+    so that every meal counts exactly once over the years -- the rule of the receipts (bk_receipts_edge, #5241) for the meals:
+     - a meal whose line (office_meals.pay_kind / pay_id) lies in a strict year counts there (bk_meals_strict, on the line's day),
+       never here as well -- as long as that year takes it (its date within BK_MEAL_WINDOW days of that year);
+     - a meal whose own date lies in a strict year but whose line lies in [a, b] counts here, on the line's day (the strict year
+       does not count a meal without a line in it).
+    The lines are read for the years of [a, b] and their neighbours only (as bk_receipts_basis, #5314)."""
+    if "bank" not in eb_map(s).values():
+        return ofc_meals_home(c, oid, a, b, s)
+    strict = lambda day: bool(day) and eb_basis_of(s, int(day[:4])) == "bank"  # noqa: E731
+    n0, n1 = f"{int(a[:4]) - 1:04d}-01-01", f"{int(b[:4]) + 1:04d}-12-31"
+    fl = eb_flows(c, oid, n0, n1)
+    days = {(x["src"], x["ref"]): x["day"] for x in fl["paid"].values()}
+    days.update({(x["src"], x["ref"]): x["day"] for x in fl["norc"]})
+    w = timedelta(days=BK_MEAL_WINDOW)
+
+    def taken(day, line):  # the strict year of the line takes the meal (bk_meals_strict reads meals this close to its year)
+        y = int(line[:4])
+        return (date(y, 1, 1) - w).isoformat() <= day <= (date(y, 12, 31) + w).isoformat()
+
+    out = []
+    for m in ofc_meals_home(c, oid, n0, n1, s):
+        line = days.get(tuple(m["pay"])) if m.get("pay") else None
+        if a <= m["date"] <= b:
+            if not (line and strict(line) and taken(m["date"], line)):
+                out.append(m)
+        elif line and a <= line <= b and strict(m["date"]):
+            out.append(dict(m, date=line))
+    return sorted(out, key=lambda m: (m["date"], m["id"]))
+
+
 def bk_strict_warnings(c, oid, frm, to, flows, pay_outside):
     """2.603.0 (#4927): what the strict basis warns about -> {missing_receipt: [{day, amount, src, ref, text}] (bookings
     without a receipt, point 2), missing_count, income_open: [...] (money received without an invoice), card_diff: [...]
@@ -696,7 +739,7 @@ def bk_ustva(c, oid, year, period):
         return dict(head, small_business=True)
     flows = eb_flows(c, oid, frm, to) if strict else None
     inc_ids = eb_income_payment_ids(c, oid) if strict and basis == "ist" else None
-    meals = bk_meals_strict(c, oid, flows, frm, to, s) if strict else ofc_meals_home(c, oid, frm, to, s)  # 2.603.0 (#4927): before the receipts
+    meals = bk_meals_strict(c, oid, flows, frm, to, s) if strict else bk_meals_receipts(c, oid, frm, to, s)  # 2.603.0 (#4927): before the receipts; 2.764.0 (#5313): + the edge
     sums, items = {}, []
 
     memo = {}
@@ -752,7 +795,7 @@ def bk_ustva(c, oid, year, period):
         items.append({"kind": "receipt", "node_id": rc["node_id"], "title": rc["title"], "date": rc["date"], "gross": dstr(rc["amount"]),
                       "vat": dstr(rc["vat"]), "vat_pct": rc["vat_pct"], "rc13b": rc["rc13b"] or None})
     # 2.545.0 (#4387): the input tax of travel receipts with a VAT rate (by the receipt's day, else the trip's start)
-    for t in rk_trips(c, oid, year=str(year)):
+    for t in bk_trips_near(c, oid, frm, to):  # 2.764.0 (#5313): was rk_trips(year) -- an item of a trip of the next / last year
         for it in t["items"]:
             day = it["date"] or t["date_from"] or ""
             if not (frm <= day <= to) or not it.get("vat_pct"):

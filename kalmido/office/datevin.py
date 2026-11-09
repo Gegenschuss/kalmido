@@ -355,7 +355,7 @@ def dv_travel_rows(c, oid, d_from, d_to, st, s):
     own = bool(pb_owner(c, oid))
     gegen = dv_counter(st)
     rows, seen, in_datev = [], set(), 0
-    for y in sorted({d_from[:4], d_to[:4]}):
+    for y in map(str, range(int(d_from[:4]) - 1, int(d_to[:4]) + 2)):  # 2.764.0 (#5313): every year of the range + the neighbours
         for t in rk_trips(c, oid, year=y):
             if t["id"] in seen:
                 continue
@@ -390,12 +390,12 @@ def dv_travel_rows(c, oid, d_from, d_to, st, s):
 def _dv_meals(c, oid, d_from, d_to, s):
     """2.386.0 (#2328): (the approved meals that count in [d_from, d_to] (books.ofc_meals_home rows, home currency), the receipt
     node ids whose bank / cash / card line a meal took) by the basis of each year (office/euerbasis.py), like the EUeR."""
-    from .books import bk_meals_strict, ofc_meals_home
+    from .books import bk_meals_receipts, bk_meals_strict
     from .euerbasis import eb_flows, eb_segments
     meals, taken = [], set()
     for a, b, strict in eb_segments(s, d_from, d_to):
         if not strict:
-            meals += ofc_meals_home(c, oid, a, b, s)
+            meals += bk_meals_receipts(c, oid, a, b, s)  # 2.764.0 (#5313): at the edge to a strict year the line's day decides
             continue
         flows = eb_flows(c, oid, a, b)
         before = set(flows["paid"])
