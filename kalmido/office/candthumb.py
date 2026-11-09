@@ -6,6 +6,8 @@ the ones the person sees (cardlines.cl_found / bank._receipts). No preview (a PD
 the card shows its icon."""
 from urllib.parse import quote
 
+from ..core.access import live_sql
+
 
 def oc_thumbs(c, nids):
     """{node_id: address of its small preview} for the files nids (live, not deleted); files without one are missing."""
@@ -15,7 +17,7 @@ def oc_thumbs(c, nids):
     q = ",".join("?" * len(ids))
     out = {}
     for r in c.execute(f"SELECT n.id, n.mime, n.cur_version, d.thumb, d.updated_at FROM fs_nodes n LEFT JOIN doc_meta d ON d.node_id=n.id "
-                       f"WHERE n.id IN ({q}) AND n.kind='file' AND n.deleted_at IS NULL", ids).fetchall():
+                       f"WHERE n.id IN ({q}) AND n.kind='file' AND {live_sql('n')}", ids).fetchall():
         if r["thumb"]:
             out[r["id"]] = f"/api/docs/{int(r['id'])}/thumb?v={quote(str(r['updated_at'] or ''), safe='')}"
         elif str(r["mime"] or "").startswith("image/"):
