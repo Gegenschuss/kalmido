@@ -13,7 +13,9 @@
    Reading text (--w-lesen, width switch #4808) and forms (--w-form) keep their limits; dialogs, menus and fields as well. */
 .pstart,.stats,.pov,.lwrap,.abview,.dc-wrap:not(.dc-paneon),.tgview,.mwv,.archv{max-width:var(--w-seite);margin-inline:auto}
 /* 2.580.0 (#4815): the rest of the lists and overviews: tables overview and folder (.shvov), a knowledge folder, Completed / Trash (.hview) */
-.shvwrap.shvov,.wkfolder,.hview{max-width:var(--w-seite);margin-inline:auto}
+.shvwrap.shvov,.wkfolder,.hview{width:100%;max-width:var(--w-seite);margin-inline:auto}
+/* 2.783.0 (#5375): width:100% - in the knowledge stack (.wkdesk, a flex column) an item with margin-inline:auto shrank to its
+   content and stood as a narrow column in the middle; now the full width, --w-seite stays the only upper limit */
 
 /* --w-lesen: the news page is ONE shell (.nwview, collab.js viewNews): bars, bundles, sections, empty states and the swipe hint
    inside it (2.580.0, #4815; before single rules for some of the parts). A news tile on the start page is not in it. */
