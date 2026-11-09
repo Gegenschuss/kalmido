@@ -1,6 +1,16 @@
 {
  "versions": [
   {
+   "version": "2.759.0",
+   "date": "2026-11-09",
+   "items": [
+    {
+     "de": "Freigegebene Bewirtungsbelege landen im DATEV-Buchungsstapel, aufgeteilt in 70 % abziehbar und 30 % nicht abziehbar.",
+     "en": "Approved entertainment receipts go into the DATEV booking batch, split into 70 % deductible and 30 % not deductible."
+    }
+   ]
+  },
+  {
    "version": "2.756.0",
    "date": "2026-11-09",
    "items": [
