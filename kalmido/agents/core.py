@@ -1522,6 +1522,22 @@ def agent_unshared_view(d):
     return d
 
 
+def agent_shared_by(c, aid, uid):
+    """2.777.0 C (#5378, review F2): has person uid THEMSELVES shared a project with agent aid -- they own it or are its admin and
+    the agent is a member (a personal agent: only its owner)? Being a member of someone else's project that opens the agent to its
+    members (agent_shares) is not enough: the waiting starter plans of uid wake only by uid's own act (schedules.py
+    sched_wait_wake). For any account (the watchdog has no request): the agent's own lists, no request filters."""
+    from ..agents.admin import agent_owner
+    o = agent_owner(c, aid)
+    if o is not None:
+        return o == uid
+    with system_ctx(c):  # the agent's memberships and uid's role in them (structure, nothing is read out)
+        return bool(c.execute("""SELECT 1 FROM lists l WHERE l.deleted_at IS NULL AND l.is_inbox=0
+                                 AND l.id IN (SELECT list_id FROM list_members WHERE user_id=?)
+                                 AND (l.owner_id=? OR EXISTS(SELECT 1 FROM list_members m WHERE m.list_id=l.id AND m.user_id=?
+                                                             AND m.role IN ('owner','admin'))) LIMIT 1""", (aid, uid, uid)).fetchone())
+
+
 def ag_pre(c, rows, uid):
     """2.674.0 B (#4194): what agent_public asks per agent, read once for the agents rows of agents_for: their running /
     waiting jobs (the newest 200 each) that uid sees, the unread chat, pictures, last API use, which status tasks uid sees,

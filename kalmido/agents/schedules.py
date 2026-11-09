@@ -29,6 +29,7 @@ from ..api.common import v1_args, v1_view
 from ..agents.core import agent_active, agent_emit, agent_row, agent_shares, agent_usable, is_agent, lst_brief, need_agent
 from ..agents.datalock import dl_job_input  # 2.235.0 B2 (#2902)
 from ..agents.core import JOB_TITLE_MAX, job_dict  # 2.369.5 (#2517): pulled up from functions
+from ..agents.core import agent_shared_by  # 2.777.0 C (#5378)
 
 SCHED_FREQS = ("daily", "weekdays", "weekly", "monthly")
 SCHED_MAX = 20                 # plans per person and agent
@@ -330,16 +331,18 @@ def ast2_sched_triage(c, r, a, now, manual):
 
 def sched_wait_wake(c, aid=None):
     """2.777.0 C (#5378): switches on the waiting plans of a server agent's starter pack (share_wait=1, agents/srvstarter.py) of
-    agent aid (None: of every agent, the watchdog) whose person now reaches the agent (agent_shares: a project shared with it);
-    returns how many. A plan of a disabled account stays as it is. Nothing else changes: the plan keeps its person, rhythm and
-    text. Called by the watchdog (sched_tick) and by the starter pack asked again (agents/srvstarter.py _plan). The caller commits."""
-    with system_ctx(c):  # the plans of every person of this agent (structure: the check below is the person's own reach)
+    agent aid (None: of every agent, the watchdog) whose person has now shared a project with the agent THEMSELVES (agents/core.py
+    agent_shared_by: they own or manage a project the agent is in; review F2: someone else taking the agent into a project where
+    the person is only a member wakes nothing) and reaches it (agent_shares); returns how many. A plan of a disabled account stays
+    as it is. Nothing else changes: the plan keeps its person, rhythm and text. Called by the watchdog (sched_tick) and by the
+    starter pack asked again (agents/srvstarter.py _plan). The caller commits."""
+    with system_ctx(c):  # the plans of every person of this agent (structure: the check below is the person's own act and reach)
         rows = c.execute("SELECT s.id, s.agent_id, s.user_id FROM agent_schedules s JOIN users u ON u.id=s.user_id WHERE s.share_wait=1 "
                          "AND u.disabled=0" + (" AND s.agent_id=?" if aid else "") + " ORDER BY s.id LIMIT 500",
                          (aid,) if aid else ()).fetchall()
         n = 0
         for r in rows:
-            if not agent_shares(c, r["agent_id"], r["user_id"]):
+            if not agent_shared_by(c, r["agent_id"], r["user_id"]) or not agent_shares(c, r["agent_id"], r["user_id"]):
                 continue
             c.execute("UPDATE agent_schedules SET enabled=1, share_wait=0, last_state='', updated_at=? WHERE id=? AND share_wait=1",
                       (iso(now_utc()), r["id"]))

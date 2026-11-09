@@ -17,6 +17,8 @@
  - review F1: the text of such a member and Kalmido's answer never reach the agent: its poll (GET /api/v1/agent/chats), the
    message search and delivered stay without them, also after a project is shared later; a repeat with the same client_id is
    the stored message (no second answer)
+ - review F2: waiting plans wake only by the person's OWN share (owner / admin of a project the agent is in); someone else
+   taking the agent into a project where she is only a member wakes nothing; the state route says own: false
  - review F3: a member without a shared project sees nothing of the agent's host, model, rights mode, usage, costs, contact
 tenant-matrix: agent (another organisation's admin: the state route, the chat and the tab never reach the team agent)
 usage: p2777_c_srvagent_test.py <datadir>      (KMT_NOSTART=1 / P2777C_NOSTART=1: a running server)"""
@@ -75,7 +77,8 @@ r = starter(Bo, TK, ["briefing", "tidy", "followup", "meetings"])
 st = states(r)
 check(r.ok and st == {"briefing": "waiting", "tidy": "waiting", "followup": "waiting", "meetings": "created"},
       f"without a shared project: three plans wait, the rule is made, nothing skipped {r.text[:400]}")
-check(all(x["reason"] and "share a project" in x["reason"] for x in r.json()["items"] if x["state"] == "waiting"),
+# 2.777.0 (#5378): review F2 - the reason says it starts by one of YOUR projects
+check(all(x["reason"] and "share one of your projects" in x["reason"] for x in r.json()["items"] if x["state"] == "waiting"),
       "waiting: the calm reason says how it starts")
 check(sorted(plans_db(TK)) == [("briefing", 0, 1, False), ("followup", 0, 1, False), ("tidy", 0, 1, False)],
       f"stored switched off and marked as waiting {plans_db(TK)}")
@@ -176,6 +179,34 @@ check(Bo.put(B + f"/api/lists/{P3}/members", json={"user_id": TK3, "role": "edit
 r = starter(Bo, TK3, ["briefing"])
 check(states(r) == {"briefing": "exists"} and sorted(plans_db(TK3)) == ACTIVE3,
       f"the item asked again: every waiting plan of the agent starts at once {r.text[:200]} {plans_db(TK3)}")
+
+# ================================================================ review F2: only the person's OWN share wakes her plans
+r = Bo.post(B + f"/api/orgs/{ORG}/server-agents", json={"username": "teamki4", "display_name": "Team KI Four"})
+TK4 = r.json().get("id")
+check(states(starter(Bo, TK4, ["briefing", "tidy"])) == {"briefing": "waiting", "tidy": "waiting"}, "setup: bob's two plans wait")
+check(states(starter(A, TK4, ["briefing"])) == {"briefing": "waiting"}, "setup: alice's plan waits")
+
+
+def plans_of(aid, u):
+    return sorted(dbx("SELECT srv_flow, enabled, share_wait FROM agent_schedules WHERE agent_id=? AND user_id=?", (aid, u)))
+
+
+ALICE = A.get(B + "/api/state").json()["me"]["id"]
+PA = A.post(B + "/api/lists", json={"name": "Alice project", "org_id": ORG}).json()["id"]
+check(A.patch(B + f"/api/lists/{PA}", json={"agent_members": True}).ok, "alice opens her project's agents to its members")
+check(A.put(B + f"/api/lists/{PA}/members", json={"user_id": uid["bob"], "role": "edit"}).ok, "bob is only a member of it")
+check(A.put(B + f"/api/lists/{PA}/members", json={"user_id": TK4, "role": "edit"}).ok, "alice takes the agent into her project")
+j = Bo.get(B + f"/api/agents/{TK4}/server/starter").json()
+check(j.get("shared") is True and j.get("own") is False and j["items"]["briefing"] == "waiting",
+      f"bob reaches the agent through alice's project, but has shared nothing himself {j}")
+check(until(lambda: plans_of(TK4, ALICE) == [("briefing", 1, 0)], 75), f"alice's own share: the watchdog starts her plan {plans_of(TK4, ALICE)}")
+check(plans_of(TK4, uid["bob"]) == [("briefing", 0, 1), ("tidy", 0, 1)],
+      f"review F2: the same watchdog turn leaves bob's plans waiting (only a member of alice's project) {plans_of(TK4, uid['bob'])}")
+PB = Bo.post(B + "/api/lists", json={"name": "Bob project", "org_id": ORG}).json()["id"]
+check(Bo.put(B + f"/api/lists/{PB}/members", json={"user_id": TK4, "role": "edit"}).ok, "bob shares his own project with the agent")
+check(until(lambda: plans_of(TK4, uid["bob"]) == [("briefing", 1, 0), ("tidy", 1, 0)], 75),
+      f"bob's own share: his plans start {plans_of(TK4, uid['bob'])}")
+check(Bo.get(B + f"/api/agents/{TK4}/server/starter").json().get("own") is True, "the state route: own")
 
 # ================================================================ the dialog's order: a project first, then the pack
 r = Bo.post(B + f"/api/orgs/{ORG}/server-agents", json={"username": "teamki2", "display_name": "Team KI Two"})

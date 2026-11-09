@@ -118,7 +118,7 @@ function srv_projs(ws) {
 function srv_projHtml(ws) {
   const ls = srv_projs(ws);
   return `<legend>${tr('Projects for the agent')}</legend>
-    <div class="shint keep">${esc(tr('Shared with the agent first: it works only in projects shared with it. Without one its routines wait and start on their own once you share a project.'))}</div>
+    <div class="shint keep">${esc(tr('Shared with the agent first: it works only in projects shared with it. Without one your routines wait and start on their own once you share one of your projects with it.'))}</div>
     ${ls.length ? `<div class="srvpj" role="group" aria-label="${esc(tr('Projects for the agent'))}">${ls.map(l => `<label class="chkl"><input type="checkbox" data-srv-pj="${l.id}"><span>${esc(lname(l))}${wsOn() && !String(ws).startsWith('org:') ? ` <small class="muted">${esc(wsLabel(l.org_id))}</small>` : ''}</span></label>`).join('')}</div>`
       : `<div class="muted mhint">${esc(tr('No project of yours to share yet; you can share one later.'))}</div>`}`;
 }
@@ -224,7 +224,10 @@ async function srv_stDraw(md, a) {
   let j; try { j = await api('GET', `/api/agents/${a.id}/server/starter`); } catch { box.innerHTML = ''; return; }
   if (!md.isConnected) return;
   const waits = Object.values(j.items || {}).includes('waiting');
-  box.innerHTML = `${j.shared ? '' : `<div class="shint keep srvwait" role="note"><span>${esc(waits ? tr('No project is shared with {0} yet: its routines wait and start on their own once you share one.', a.name || '') : tr('No project is shared with {0} yet: it sees nothing and can only work once you share a project.', a.name || ''))}</span>
+  // review F2 (#5378): my waiting routines start only once I share one of MY projects (j.own), not through someone else's project
+  const hint = !j.shared ? (waits ? tr('No project is shared with {0} yet: your routines wait and start on their own once you share one of your projects with it.', a.name || '') : tr('No project is shared with {0} yet: it sees nothing and can only work once you share a project.', a.name || ''))
+    : waits && !j.own ? tr('Your routines with {0} wait until you share one of your own projects with it; a project of someone else does not start them.', a.name || '') : '';
+  box.innerHTML = `${!hint ? '' : `<div class="shint keep srvwait" role="note"><span>${esc(hint)}</span>
       <button type="button" class="btn sm" data-srv="share">${ic('users', 's')} ${tr('Share project')}</button></div>`}
     <h4 id="srv-st-h">${tr('Starter pack')}</h4><div class="srvruns" role="list" aria-labelledby="srv-st-h">${SRV_ST.map(([k, n]) => { const st = (j.items || {})[k] || 'missing';
       return `<div class="mrow srvsti" role="listitem" data-srv-sti="${k}" data-state="${st}"><span class="n">${esc(tr(n))} <small class="muted">${st === 'missing' ? '' : esc(tr(SRV_ST_STATE[st] || st))}</small></span>${st === 'missing' ? `<button type="button" class="btn sm" data-srv-add="${k}">${ic('plus', 's')} ${tr('Add')}</button>` : ''}</div>`; }).join('')}</div>

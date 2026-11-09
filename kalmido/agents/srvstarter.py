@@ -27,7 +27,8 @@ A server agent is a normal agent with provider "kalmido-server": Kalmido itself 
    organisation or an instance admin; everyone else 404. A planned
    job needs the person to reach the agent (agent_shares: always for the owner of a personal agent; a team agent only
    through a shared project) -- 2.777.0 C (#5378): otherwise the plan is made switched off with state "waiting" (a calm hint,
-   no error) and switches itself on once a project is shared with the agent (schedules.py sched_wait_wake: the watchdog
+   no error) and switches itself on once the person shares one of their own projects with the agent (schedules.py
+   sched_wait_wake, review F2: not when someone else takes the agent into a project the person is only a member of; the watchdog
    within a minute; the same item asked again starts it at once - the agent's window does that after "Share project"). GET …/server/starter tells the
    agent's window which items are there, waiting or still missing (added later one by one with the same POST). The documents of an organisation need its
    admin. Instance switch off -> 403 {error: "server_agents_off"}.
@@ -45,7 +46,7 @@ from ..accounts.session import me
 from ..accounts.orgs import is_org_admin, user_orgs
 from ..agents.schedules import SCHED_MAX, _sched_set_next, sched_in, sched_wait_wake
 from ..agents.agentrules import _insert as ar_insert, ar_changed
-from ..agents.core import agent_projects_count, agent_shares, need_person
+from ..agents.core import agent_projects_count, agent_shared_by, agent_shares, need_person
 from ..api.scopes import scopes_effective
 from ..api.v1 import SCOPES_AGENT_DEFAULT
 from ..office.agentdocs import ofa_agent_on, ofa_area
@@ -71,7 +72,7 @@ SRV_DAY_LIMIT_DEFAULT = 2_000_000
 SRV_FOLLOWUP_MAX = 60
 SRV_BRIEF_AT, SRV_TIDY_AT, SRV_FOLLOWUP_AT = "07:30", "07:00", "09:00"
 # 2.777.0 C (#5378): why a plan of the pack waits (a calm hint, no error): it starts on its own once a project is shared
-SRV_WAIT_WHY = N_("Starts on its own as soon as you share a project with the agent")
+SRV_WAIT_WHY = N_("Starts on its own as soon as you share one of your projects with the agent")
 SRV_OFFICE_AT, SRV_OFFICE_DAYS = "08:00", [1]  # 2.568.0 (#4673): weekly on Mondays (ISO weekday 1)
 SRV_DOC_FEATURES = ("sender", "type", "tags")
 SRV_TEXTS = {  # one literal each (tools/i18n_check.py reads no joined strings)
@@ -317,4 +318,6 @@ def srv_starter_get(aid):
     from ..agents.srvagent import srv_need
     c = db()
     a = srv_need(c, aid)
-    return jsonify(items=srv_starter_state(c, a, me()), shared=agent_shares(c, aid, me()), projects=agent_projects_count(c, aid), org_id=a["org_id"])
+    # own (review F2): I shared one of MY projects with it myself (agents/core.py agent_shared_by) -- only that wakes my waiting plans
+    return jsonify(items=srv_starter_state(c, a, me()), shared=agent_shares(c, aid, me()), own=agent_shared_by(c, aid, me()),
+                   projects=agent_projects_count(c, aid), org_id=a["org_id"])
