@@ -4775,8 +4775,9 @@ people (the API has no route for it).
   the file in the file store stays closed unless it is shared with you. A comment's place is `pos`: video `{t}` (seconds, the same as `at_sec`), image `{x, y}`, PDF `{page, x, y}` or
   `{page}`; `x` / `y` run from 0 to 1 over the width / height of the image or page, from the top left; `page` 1 = the
   first page. `mark` is the number of its point as people see it on the image / page (per version, page by page, oldest
-  first). Write a comment at a point with `pos` instead of `at_sec` (a place that does not fit the medium: 400). A sign-off of
-  images / PDFs has no customer link (that is for videos).
+  first). Write a comment at a point with `pos` instead of `at_sec` (a place that does not fit the medium: 400).
+  *Since 2.764.0 (#5040):* a sign-off of images / PDFs has a customer link too; the customer's comments there carry their
+  point (`pos`, `mark`) like the team's (until 2.763 the link was for videos only).
 - **Audio files of the file store (2.658.0).** An audio file (MP3, M4A, AAC, WAV, OGG / Opus, FLAC, recognised by its
   first bytes) can be a version too: `kind` `video`, `provider` `audio`, `timed` true, comments at a second like an audio link;
   it names its file like an image (`file_id`, `file_no`, `file_name`, `mime`, `content`; `embed` = the same bytes). The same

@@ -263,7 +263,9 @@ r = A.post(B + f"{V}/{RID}/versions", json={"file_id": FP})
 check(r.status_code == 409, f"a file of her private space into the organisation's review: 409 {r.status_code} {r.text[:200]}")
 r = A.post(B + f"{V}/{RID}/versions", json={"file_id": FPDF})
 check(r.ok and r.json()["versions"][-1]["kind"] == "pdf", f"a PDF of the same workspace as a new version {r.status_code}")
-check(A.post(B + f"{V}/{RID}/signoff", json={"expires": None}).status_code == 409, "no customer link for images / PDFs")
+# 2.764.0 (#5040): images / PDFs get a customer link too (was 409); the page itself: tests/p2642_a_reviewlink_test.py
+r = A.post(B + f"{V}/{RID}/signoff", json={"expires": None})
+check(r.ok and r.json().get("live"), f"a customer link for images / PDFs {r.status_code} {r.text[:200]}")
 r = A.post(B + f"{V}/{RID}/move-space", json={"to": "private", "dry": 1})
 check(r.status_code == 409, f"no move to another workspace with files {r.status_code} {r.text[:200]}")
 # a video review stays as before

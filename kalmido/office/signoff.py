@@ -644,6 +644,10 @@ def sig_page(c, r, token, lg, error=None, code=200):
                 + f'<p class="sub">{e(tr("Thank you. You can close this page.", lg=lg))}</p></div>')
         return pub_html(h, main, lg)
     vid = r["kind"] == "video"  # 2.99.1 A (#1959)
+    vkind = None
+    if vid:  # 2.764.0 (#5040): an image / PDF version is approved as "this version" (not "of the video")
+        from ..videos.review import vdr_sig_newest
+        vkind = (vdr_sig_newest(c, r) or {"kind": None})["kind"]
     if r["kind"] == "document":  # 2.93.0 A (#1927)
         from .doctpl import dt_sig_html
         head = dt_sig_html(c, r, lg, token, SIG_PREFIX)
@@ -656,6 +660,7 @@ def sig_page(c, r, token, lg, error=None, code=200):
         from .terms import agb_sig_html
         head += agb_sig_html(c, r, lg, token, SIG_PREFIX)
     acc = (tr("I accept the quotation", lg=lg) if r["kind"] == "offer" else tr("I sign this document", lg=lg) if r["kind"] == "document"
+           else tr("I approve this version", lg=lg) if vkind in ("image", "pdf")  # 2.764.0 (#5040)
            else tr("I approve this version of the video", lg=lg) if vid else tr("I confirm the acceptance", lg=lg))
     go = tr("Sign bindingly", lg=lg) if r["kind"] == "document" else tr("Approve|video", lg=lg) if vid else tr("Accept bindingly", lg=lg)
     no = tr("Request changes", lg=lg) if vid else tr("Reject", lg=lg)
@@ -680,7 +685,8 @@ def sig_page(c, r, token, lg, error=None, code=200):
             form = ""
     resp = pub_html(f"{r['title']} · {APP_NAME}", head + form, lg, code)
     if vid:
-        resp.headers["Content-Security-Policy"] = SIG_VIDEO_CSP
+        from ..videos.review import vdr_sig_csp  # 2.764.0 (#5040): + fetch / worker of this server for a PDF version
+        resp.headers["Content-Security-Policy"] = SIG_VIDEO_CSP + vdr_sig_csp(c, r)
     return resp
 
 

@@ -265,3 +265,25 @@ ul.xl-list .xl-off{color:var(--muted)}
 /* 2.642.0 (#4772): the versions of a client link that shows the older ones */
 .vdr-vers ul{list-style:none;display:flex;flex-wrap:wrap;gap:.25rem .75rem;margin:0 0 .75rem;padding:0}
 .vdr-vers a,.vdr-vers b{display:inline-block;padding:.5rem 0;min-height:2.75rem;box-sizing:border-box}
+/* 2.764.0 (#5040): the customer page of an image / PDF sign-off: the image / PDF page at full width with the comments'
+   numbered points (placed by static/pubvideo.js), a tap sets the point of the next comment; the PDF page keeps its place
+   while it loads (no jump) */
+.vdr-media{margin:1rem 0 .5rem}
+.vdr-stage{position:relative;cursor:crosshair;touch-action:manipulation;border-radius:.5rem;overflow:hidden;background:var(--bg2);border:1px solid var(--line)}
+.vdr-stage img,.vdr-stage canvas{display:block;width:100%;height:auto;user-select:none;-webkit-user-select:none}
+.vdr-k-pdf .vdr-cv:empty{aspect-ratio:1/1.4142}
+.vdr-pins{position:absolute;inset:0;pointer-events:none}
+.vdr-pin{position:absolute;pointer-events:auto;display:flex;align-items:center;justify-content:center;min-width:1.75rem;height:1.75rem;margin:-.875rem 0 0 -.875rem;
+  padding:0 .25rem;box-sizing:border-box;border-radius:999px;border:2px solid #fff;background:var(--accent);color:var(--ink);font:inherit;font-size:.8125rem;
+  font-weight:600;line-height:1;box-shadow:0 1px 3px rgba(0,0,0,.4);cursor:pointer}
+.vdr-pin[hidden]{display:none}
+.vdr-pin.new{opacity:.85;border-style:dashed;cursor:default}
+.vdr-pin.hl{outline:3px solid var(--text);outline-offset:2px}
+li.vdr-c.hl{background:var(--bg3)}
+.vdr-pgbar{display:flex;align-items:center;justify-content:center;gap:.75rem;margin:0 0 .5rem}
+.vdr-pgbar[hidden]{display:none}
+.vdr-pgbar button{min-width:2.75rem;min-height:2.75rem;border:1px solid var(--line2);border-radius:.5rem;background:transparent;color:var(--text);font:inherit;font-size:1.25rem;cursor:pointer}
+.vdr-pgbar button:disabled{opacity:.4;cursor:default}
+.vdr-ptst{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin:.75rem 0 0}
+.vdr-ptst[hidden]{display:none}
+.fform .vdr-ptst button{margin-top:0;background:transparent;color:var(--text);border:1px solid var(--line2)}

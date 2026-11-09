@@ -16,11 +16,17 @@ freelancer-matrix: videos
  - switched off / expired / unknown = the same answer; a version of another sign-off through a link: 409, nothing stored
  - a person without an organisation: private sign-off, link, comment, decision
  - comments limited per address
+ - 2.764.0 (#5040): images and PDFs: the link page shows the file with the points (the app's numbers), the guest comments at a
+   point (image x / y, PDF page + x / y), wrong points 400; the media route hands out only the files of the versions the link
+   shows (sandboxed, nosniff), never another sign-off's file, none for a video link, none after switching off; a person
+   without an organisation too
 usage: p2642_a_reviewlink_test.py <datadir>      (a fresh container; P2642A_NOSTART=1 = the server already runs)"""
 import base64
 import os
 import re
+import struct
 import sys
+import zlib
 from datetime import date, timedelta
 
 N = os.path.dirname(os.path.abspath(__file__))
@@ -229,6 +235,122 @@ check(r.status_code == 303 and FR["state"] == "approved" and any(x["customer"] a
       "decided; the comment shows as the guest's")
 check(Fr.post(B + f"{V}/{FV}/versions", json={"url": "https://vimeo.com/55555556"}).ok and "Version 2" in FG.get(B + "/s/q/" + tok(F1)).text,
       "a new version at the same private link")
+
+# ---------------------------------------------------------------- 2.764.0 (#5040): images and PDFs through the client link
+def png(w=2, h=1, rgb=(200, 30, 30)):
+    """A real small PNG (no library)."""
+    def chunk(t, d):
+        return struct.pack(">I", len(d)) + t + d + struct.pack(">I", zlib.crc32(t + d) & 0xffffffff)
+    raw = b"".join(b"\x00" + bytes(rgb) * w for _ in range(h))
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b"")
+
+
+def pdf2():
+    """A plain two-page PDF."""
+    objs = [b"<< /Type /Catalog /Pages 2 0 R >>", b"<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>",
+            b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] >>", b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] >>"]
+    out, offs = b"%PDF-1.4\n", []
+    for i, o in enumerate(objs, 1):
+        offs.append(len(out))
+        out += f"{i} 0 obj\n".encode() + o + b"\nendobj\n"
+    x = len(out)
+    out += f"xref\n0 {len(objs) + 1}\n0000000000 65535 f \n".encode() + b"".join(f"{o:010d} 00000 n \n".encode() for o in offs)
+    return out + f"trailer\n<< /Size {len(objs) + 1} /Root 1 0 R >>\nstartxref\n{x}\n%%EOF\n".encode()
+
+
+PNG1, PNG2, PDF = png(), png(3, 2, (10, 120, 200)), pdf2()
+
+
+def up(s, place, name, data, mime, vid=None, title=None):
+    form = {} if vid else {k: str(v) for k, v in place.items()}
+    if title:
+        form["title"] = title
+    return s.post(B + (f"{V}/{vid}/versions" if vid else V), files={"file": (name, data, mime)}, data=form)
+
+
+def cmt(g, t, **form):
+    pg_ = g.get(B + "/s/q/" + t)
+    fk_, vk_ = keys(pg_.text)
+    return g.post(B + f"/s/q/{t}/comments", data={"f": fk_[0], "v": vk_[0], "name": "Erika Gast", **form}, allow_redirects=False)
+
+
+r = up(A, {"task_id": T}, "logo-v1.png", PNG1, "image/png", title="Logo Entwurf")
+check(r.ok and r.json().get("kind") == "image", f"an image sign-off (upload) {r.status_code} {r.text[:200]}")
+IMG = r.json()
+IV1 = IMG["versions"][0]["id"]
+check(A.post(B + f"{V}/{IMG['id']}/comments", json={"body": "Intern Punkt", "version_id": IV1, "pos": {"x": 0.125, "y": 0.125}}).ok, "an internal comment at point 1")
+r = A.post(B + f"{V}/{IMG['id']}/signoff", json={"show_old": True})
+check(r.ok and r.json().get("live"), f"a client link for an image (was 409 until 2.763) {r.status_code} {r.text[:200]}")
+SI = r.json()
+TI = tok(SI)
+GI = guest()
+pg = GI.get(B + "/s/q/" + TI)
+check(pg.status_code == 200 and 'class="vdr-media vdr-k-image"' in pg.text and f'<img src="/s/q/{TI}/media"' in pg.text and 'id="vd-px"' in pg.text
+      and 'id="vd-at"' not in pg.text and "Intern Punkt" not in pg.text and "I approve this version" in pg.text and "of the video" not in pg.text,
+      f"the page shows the image with the point form, no timecode, no internal comment {pg.status_code}")
+check("connect-src" not in pg.headers.get("Content-Security-Policy", ""), "an image page fetches nothing (no connect-src)")
+m = GI.get(B + f"/s/q/{TI}/media")
+check(m.status_code == 200 and m.content == PNG1 and m.headers.get("Content-Type", "").startswith("image/png") and m.headers.get("X-Content-Type-Options") == "nosniff"
+      and "sandbox" in m.headers.get("Content-Security-Policy", "") and m.headers.get("Content-Disposition", "").startswith("inline"),
+      f"the image through the link: its bytes, inline, sandboxed, nosniff {m.status_code} {dict(m.headers)}")
+r = cmt(GI, TI, text="Logo nach links", px="0.25", py="0.5")
+check(r.status_code == 303, f"the guest comments at a point of the image {r.status_code}")
+row = dbx("SELECT pos_x, pos_y, page, at_sec, author_id FROM video_comments WHERE review_id=? AND ext_name='Erika Gast'", (IMG["id"],))
+check(len(row) == 1 and row[0][0] == 0.25 and row[0][1] == 0.5 and row[0][2] is None and row[0][3] is None and row[0][4] is None,
+      f"stored at x 0.25 / y 0.5 as the guest's {row}")
+R = A.get(B + f"{V}/{IMG['id']}").json()
+cg = [x for x in R["comments"] if x["customer"]]
+check(len(cg) == 1 and cg[0]["pos"] == {"x": 0.25, "y": 0.5} and cg[0]["mark"] == 2, f"in the app: pos and point 2 (after the internal point 1) {cg}")
+pg = GI.get(B + "/s/q/" + TI)
+check('data-x="0.25" data-y="0.5"' in pg.text and ">2</button>" in pg.text and 'class="vdr-at vdr-pt"' in pg.text and 'data-next="3"' in pg.text,
+      "the page shows the point with the app's number 2; the next point is 3")
+# (few on purpose: the guest's comments count against VDR_PUB_RATE per address, the last block below needs its 429)
+for bad, what in (({"px": "abc", "py": "0.2"}, "no number"), ({"px": "1.5", "py": "0.2"}, "outside the image")):
+    r = cmt(GI, TI, text="falsch " + what, **bad)
+    check(r.status_code == 400 and not dbx("SELECT 1 FROM video_comments WHERE body=?", ("falsch " + what,)), f"a wrong point ({what}): 400, nothing stored {r.status_code}")
+# a PDF as version 2 at the same link: page + point
+r = up(A, {}, "entwurf.pdf", PDF, "application/pdf", vid=IMG["id"])
+check(r.ok, f"a PDF as version 2 {r.status_code} {r.text[:200]}")
+pg = GI.get(B + "/s/q/" + TI)
+csp = pg.headers.get("Content-Security-Policy", "")
+check('class="vdr-media vdr-k-pdf"' in pg.text and "/static/js/pdfview.js" in pg.text and "connect-src 'self'" in csp and "worker-src 'self'" in csp
+      and "default-src 'none'" in csp, f"the same link shows the PDF (pdf.js, fetch and worker from this server only) {csp}")
+m = GI.get(B + f"/s/q/{TI}/media")
+check(m.status_code == 200 and m.content == PDF and m.headers.get("Content-Type", "").startswith("application/pdf") and m.headers.get("Content-Security-Policy") == "sandbox"
+      and m.headers.get("X-Content-Type-Options") == "nosniff", f"the PDF through the link: sandboxed (nothing in it runs) {m.status_code} {dict(m.headers)}")
+check(GI.get(B + f"/s/q/{TI}/media?dl=1").headers.get("Content-Disposition", "").startswith("attachment"), "?dl=1: a download (the page without script)")
+r = cmt(GI, TI, text="Seite zwei Titel", px="0.5", py="0.75", pg="2")
+row = dbx("SELECT pos_x, pos_y, page FROM video_comments WHERE body='Seite zwei Titel'")
+check(r.status_code == 303 and [tuple(x) for x in row] == [(0.5, 0.75, 2)], f"a point on page 2 of the PDF {r.status_code} {row}")
+r = cmt(GI, TI, text="ohne Seite", px="0.5", py="0.5")
+check(r.status_code == 400, f"a PDF point without its page: 400 {r.status_code}")
+pg = GI.get(B + "/s/q/" + TI)
+check('data-page="2"' in pg.text and "p. 2 · 1" in pg.text, "the PDF page lists the comment as p. 2 · 1")
+# only the files of the versions the link shows; never another review's file
+OI = up(A, {"task_id": T}, "fremd.png", PNG2, "image/png", title="Fremdes Bild").json()
+check(GI.get(B + f"/s/q/{TI}/media?v=1").content == PNG1, "the link with older versions: ?v=1 gives version 1's image")
+check(all(GI.get(B + f"/s/q/{TI}/media?v={n}").content != PNG2 for n in (1, 2, 3, OI["versions"][0]["id"], OI["id"])),
+      "no ?v= reaches the file of another sign-off")
+SN = A.post(B + f"{V}/{IMG['id']}/signoff", json={}).json()
+check(GI.get(B + f"/s/q/{tok(SN)}/media?v=1").content == PDF, "a link without older versions: ?v=1 stays on the newest file")
+SV = A.post(B + f"{V}/{OTHER['id']}/signoff", json={}).json()
+check(guest().get(B + f"/s/q/{tok(SV)}/media").status_code == 404, "a video link has no file: 404")
+check(guest().get(B + "/s/q/" + "z" * 43 + "/media").status_code == 404, "an unknown link: 404")
+check(A.post(B + f"{V}/{IMG['id']}/signoffs/{SI['id']}/revoke").ok, "the link switched off")
+m = guest().get(B + f"/s/q/{TI}/media")
+check(m.status_code == 404 and m.content != PDF and guest().get(B + "/s/q/" + TI).status_code == 404, "switched off: no page, no file")
+# a person without an organisation: an image link, the guest comments at a point
+r = up(Fr, {"task_id": FT}, "skizze.png", PNG2, "image/png", title="Skizze")
+check(r.ok and r.json().get("org_id") is None, f"frida: a private image sign-off {r.status_code} {r.text[:200]}")
+FI = r.json()
+FS = Fr.post(B + f"{V}/{FI['id']}/signoff", json={})
+check(FS.ok, f"frida: a client link for her image {FS.status_code} {FS.text[:200]}")
+FTOK = tok(FS.json()) if FS.ok else "x"
+check(FG.get(B + f"/s/q/{FTOK}/media").content == PNG2, "her guest sees the image")
+r = cmt(FG, FTOK, text="Baum kleiner", px="0.625", py="0.375")
+FR = Fr.get(B + f"{V}/{FI['id']}").json()
+check(r.status_code == 303 and any(x["customer"] and x["pos"] == {"x": 0.625, "y": 0.375} and x["mark"] == 1 for x in FR["comments"]),
+      f"frida's guest comments at a point (mark 1) {r.status_code}")
 
 # ---------------------------------------------------------------- comments limited per address
 S4 = A.post(B + f"{V}/{OTHER['id']}/signoff", json={}).json()

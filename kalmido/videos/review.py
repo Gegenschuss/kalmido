@@ -50,6 +50,7 @@ from ..accounts.orgout import oo_denied, oo_into_note, org_out, org_out_ok  # 2.
 from ..accounts.spacemove import smv_answer, smv_refuse_agent, smv_same, smv_target  # 2.369.5 (#2517): pulled up from functions
 from .vdmedia import vdm_body, vdm_files_ok, vdm_has_files, vdm_marks, vdm_media, vdm_need_movable, vdm_pos, vdm_pos_dict, vdm_pos_text, vdm_send, vdm_version_row  # 2.641.0 (#4769)
 from .vdmedia import vdm_pub_send  # 2.658.0 (#5015)
+from .vdmedia import vdm_pub_pos, vdm_pub_stage  # 2.764.0 (#5040)
 
 VDR_URL_MAX, VDR_TITLE_MAX, VDR_BODY_MAX, VDR_NAME_MAX = 2000, 200, 2000, 120
 VDR_AT_MAX = 86400.0                     # a timecode lies within 24 hours
@@ -703,8 +704,7 @@ def vdr_sig_new(vid):
     vs = vdr_versions(c, vid)
     if not vs:
         return err(tr("Invalid value: {0}", "url"), 409)
-    if (vs[-1]["kind"] or "video") != "video":  # 2.641.0 (#4769): no public file -- sharing images / PDFs outside is a task of its own
-        return err(tr("The client link is for videos only"), 409)
+    # 2.764.0 (#5040): images / PDFs too (2.641.0 #4769 had refused them: "The client link is for videos only")
     b = body()
     try:
         exp = sig_expiry((b if isinstance(b, dict) else {}).get("expires"))
@@ -748,7 +748,7 @@ def vdr_sig_valid(c, s):
         return False  # 2.666.0 (#5112): a disabled account's approval link is void (as the list links, signoff.py sig_check)
     r = vdr_sig_row(c, s)
     vs = vdr_versions(c, r["id"]) if r else []
-    return bool(r) and vdr_sig_hash(r) == s["doc_hash"] and bool(vs) and (vs[-1]["kind"] or "video") == "video"  # 2.641.0 (#4769)
+    return bool(r) and vdr_sig_hash(r) == s["doc_hash"] and bool(vs)  # 2.764.0 (#5040): images / PDFs too (2.641.0 #4769: videos only)
 
 
 def vdr_sig_newest(c, s):
@@ -799,21 +799,39 @@ def vdr_player_html(v, origin, title, lg=None, token=None):
             '</div></div>')
 
 
+def vdr_sig_csp(c, s):
+    """2.764.0 (#5040): what the customer page's CSP (office/signoff.py SIG_VIDEO_CSP) needs on top for a PDF version: the
+    page fetches the PDF from its own media route and pdf.js reads it in its worker (both from this server only)."""
+    vs = vdr_versions(c, s["video_id"]) if s["video_id"] else []
+    return "; connect-src 'self'; worker-src 'self'" if vs and vdl_shown(c, s, vs)[0]["kind"] == "pdf" else ""
+
+
+def vdr_sig_media_src(token, prefix, v, old):
+    """The customer page's media route of version v (?v=<n> for an older one the link shows, vdr_pub_media)."""
+    return f"{prefix}{token}/media" + (f"?v={int(v['n'])}" if old else "")
+
+
 def vdr_sig_html(c, s, lg, token, prefix):
-    """The head of the customer page: title, the newest version's player, its time line, the comments and the comment form."""
+    """The head of the customer page: title, the newest version's player, its time line, the comments and the comment form.
+    2.764.0 (#5040): an image / PDF version shows its file with the numbered points; the client sets a point (pubvideo.js)."""
     e = html.escape
     r, vs = vdr_sig_row(c, s), vdr_versions(c, s["video_id"])
     v, old = vdl_shown(c, s, vs)  # 2.642.0 (#4772): an older version only on a link that shows them (read-only)
     gname = vdl_name()  # the name the client typed before on this link
     origin = "{0.scheme}://{0.netloc}".format(urlsplit(PUBLIC_URL))
-    player = vdr_player_html(v, origin, r["title"], lg, token)
+    media = (v["kind"] or "video") in ("image", "pdf")  # 2.764.0 (#5040)
+    player = "" if media else vdr_player_html(v, origin, r["title"], lg, token)
+    if player and v["provider"] == "audio" and old:  # 2.764.0 (#5040): an older version's audio through ?v= (was always the newest's)
+        player = player.replace(f'src="{e(SIG_PREFIX + token)}/media"', f'src="{e(vdr_sig_media_src(token, SIG_PREFIX, v, old))}"')
     if not player and v["provider"] == "audio" and v["file_name"]:  # 2.658.0 (#5015): the file left the file store
         player = f'<p class="vdr-hint">{e(tr("The file of this version is no longer in the file store.", lg=lg))}</p>'
-    if not player:
+    if not player and not media:
         player = (f'<p class="vdr-hint">{e(tr(VDR_NO_TIME, lg=lg))}</p><p><a class="btn" href="{e(v["url"])}" target="_blank" '
                   f'rel="noopener noreferrer nofollow">{e(tr("Open the video", lg=lg))}</a></p>')
     cm = vdr_comments(c, r["id"], v["id"], public=True)
     names = user_names(c, [x["author_id"] for x in cm])
+    # 2.764.0 (#5040): the points' numbers as in the app (counted over every comment of the version, vdm_marks)
+    allm = vdm_marks(vdr_comments(c, r["id"], v["id"])) if media else {}
     kids = {}
     for x in cm:
         if x["parent_id"]:
@@ -822,17 +840,26 @@ def vdr_sig_html(c, s, lg, token, prefix):
     def one(x, reply=False):
         who = x["ext_name"] or names.get(x["author_id"]) or ""
         at = "" if reply or x["at_sec"] is None else f'<a class="vdr-at" href="#t={int(x["at_sec"])}" data-at="{x["at_sec"]}">{e(vdr_tc(x["at_sec"]))}</a> '
+        if media and not reply and (x["id"] in allm or x["page"]):  # 2.764.0 (#5040): "p. 2 · 3" -> its page and point
+            lbl = " · ".join(t for t in (tr("p. {0}|page", x["page"], lg=lg) if x["page"] else "", str(allm.get(x["id"], ""))) if t)
+            at = f'<a class="vdr-at vdr-pt" href="#vdr-stage" data-id="{x["id"]}" data-page="{x["page"] or ""}">{e(lbl)}</a> '
         return (f'<li class="vdr-c{" done" if x["done"] else ""}">{at}<b>{e(who)}</b> <span class="vdr-b">{e(rg4_dec_text(x["body"], lg))}</span>'
                 + (f'<ul class="vdr-re">{"".join(one(k, True) for k in kids[x["id"]])}</ul>' if x["id"] in kids else "") + "</li>")
     top = [x for x in cm if not x["parent_id"]]
     marks = "".join(f'<span class="vdr-mk" data-at="{x["at_sec"]}" title="{e(vdr_tc(x["at_sec"]))}"></span>' for x in top if x["at_sec"] is not None)
     sent = request.args.get("sent") == "1"
-    timed = v["provider"] != "link"
+    timed = not media and v["provider"] != "link"
+    if media:  # 2.764.0 (#5040): the file and its points; the next point's number as in the app (points of the version + 1)
+        player = vdm_pub_stage(v, vdr_sig_media_src(token, SIG_PREFIX, v, old), lg, top, allm, len(allm) + 1)
     form = (f'<form method="post" action="{prefix}{e(token)}/comments" class="fform vdrf" id="vdr-f">'
             f'<input type="hidden" name="f" value="{vdr_pub_key(c, s)}"><input type="hidden" name="v" value="{v["id"]}">'
             f'<label for="vd-name">{e(tr("Your name|public", lg=lg))}</label><input id="vd-name" name="name" maxlength="{VDR_NAME_MAX}" autocomplete="name" value="{e(gname)}" required>'
             + (f'<label for="vd-at">{e(tr("At (mm:ss, optional)", lg=lg))}</label><input id="vd-at" name="at" inputmode="numeric" maxlength="10" '
                f'placeholder="00:00" pattern="[0-9:.]*">' if timed else "")
+            # 2.764.0 (#5040): the point set by a tap on the image / page (pubvideo.js); empty = a comment without a point
+            + ('<input type="hidden" name="px" id="vd-px"><input type="hidden" name="py" id="vd-py"><input type="hidden" name="pg" id="vd-pg">'
+               f'<p class="vdr-ptst" id="vd-pt" hidden><span></span> <button type="button" class="btn sec" data-pt-clear>{e(tr("without point", lg=lg))}</button></p>'
+               if media else "")
             + f'<label for="vd-text">{e(tr("Comment", lg=lg))}</label><textarea id="vd-text" name="text" rows="3" maxlength="{VDR_BODY_MAX}" required></textarea>'
             f'<button type="submit">{e(tr("Send comment", lg=lg))}</button></form>')
     if old:  # 2.642.0 (#4772): an older version takes no comment (and the page no decision, office/signoff.sig_page)
@@ -843,7 +870,9 @@ def vdr_sig_html(c, s, lg, token, prefix):
             + f'<section class="vdr-cms"><h2>{e(tr("Comments", lg=lg))}</h2>'
             + (f'<p class="ok" role="status">{e(tr("Thank you, your comment has arrived.", lg=lg))}</p>' if sent else "")
             + (f'<ul class="vdr-list">{"".join(one(x) for x in top)}</ul>' if top else f'<p class="sub">{e(tr("No comments yet.", lg=lg))}</p>')
-            + form + "</section>" + '<script src="/static/js/pubvideo.js" defer></script>')
+            + form + "</section>"
+            + ('<script src="/static/js/pdfview.js" defer></script>' if media and v["kind"] == "pdf" else "")  # 2.764.0 (#5040): pdf.js as in the app
+            + '<script src="/static/js/pubvideo.js" defer></script>')
 
 
 @app.get("/s/q/<token>/media")
@@ -858,7 +887,10 @@ def vdr_pub_media(token):
     s, bad = sig_open(c, token)
     if bad:
         return bad
-    resp = vdm_pub_send(c, vdr_sig_newest(c, s), s) if s["kind"] == "video" and s["state"] == "open" else None
+    # 2.764.0 (#5040): the file of the version the page shows (vdl_shown: ?v=<n> only on a link that shows the older ones,
+    # else the newest) -- audio, image or PDF; never a version of another review (versions of this link's review only)
+    vs = vdr_versions(c, s["video_id"]) if s["kind"] == "video" and s["state"] == "open" and s["video_id"] else []
+    resp = vdm_pub_send(c, vdl_shown(c, s, vs)[0], s) if vs else None
     if resp is None:
         return pub_gone(sig_lang(c, s))
     if resp == "too_big":  # 2.773.0 (#5330): a large sealed file only signed in -- a defined answer without the content
@@ -904,12 +936,17 @@ def vdr_pub_comment(token):
     if str(v["id"]) != (request.form.get("v") or ""):
         return pub_html(tr("There is a newer version. Please look at it first.", lg=lg),
                         f'<div class="msg"><p class="err">{html.escape(tr("There is a newer version. Please look at it first.", lg=lg))}</p>{back}</div>', lg, 409)
+    kind = v["kind"] or "video"
     try:
-        at = vdr_at(request.form.get("at") or None)
+        if kind == "video":
+            b = {"body": text, "version_id": v["id"], "at_sec": vdr_at(request.form.get("at") or None)}
+        else:  # 2.764.0 (#5040): a point on the image / the PDF page (vdm_pos checks it as for the app)
+            b = dict(vdm_pub_pos(kind, request.form), body=text, version_id=v["id"])
+            vdm_pos(kind, b, vdr_at)
     except BadInput:  # 2.99.1 review L8: say it instead of dropping the time
-        bad_at = tr("Invalid value: {0}", tr("Timecode", lg=lg), lg=lg)
+        bad_at = tr("Invalid value: {0}", tr("Timecode", lg=lg) if kind == "video" else tr("Point|place", lg=lg), lg=lg)
         return pub_html(bad_at, f'<div class="msg"><p class="err">{html.escape(bad_at)}</p>{back}</div>', lg, 400)
-    vdr_comment_add(c, r, None, {"body": text, "version_id": v["id"], "at_sec": at}, ext_name=name)
+    vdr_comment_add(c, r, None, b, ext_name=name)
     push = vdr_pub_notify(c, s, r, name, text)
     c.commit()
     print("video review customer comment", r["id"], flush=True)

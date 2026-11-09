@@ -269,7 +269,7 @@ function vdr_cmsDraw(st) {
 }
 function vdr_sigDraw(st) {
   const r = st.r, el = $('.vdrsig', st.md);
-  if (!r.can_write || vdr_media(r.versions[r.versions.length - 1])) { el.innerHTML = ''; return; }  // 2.641.0 (#4769): the client link is for videos
+  if (!r.can_write) { el.innerHTML = ''; return; }  // 2.764.0 (#5040): images / PDFs too (2.641.0 #4769: videos only)
   const sw = {open: tr('Waiting for the client'), accepted: tr('Approved|video'), declined: tr('Changes requested')};
   // 2.642.0 (#4772): several links: every running one, then the last five records (decisions, switched off, expired)
   const all = r.signoffs || [], live = all.filter(x => x.live), rest = all.filter(x => !x.live).slice(0, 5);
@@ -281,7 +281,7 @@ function vdr_sigDraw(st) {
       ${!x.live && !x.revoked_at && x.state !== 'open' ? `<div class="row"><button type="button" class="btn sm danger" data-vdr="sigstop" data-id="${x.id}">${tr('Switch off')}</button></div>` : ''}
       ${x.reason ? `<div class="muted">${esc(tr('Reason: {0}', x.reason))}</div>` : ''}</li>`;
   }).join('');
-  el.innerHTML = `<h4>${tr('Client link')}</h4><p class="muted mhint">${esc(tr('Your client watches the newest version without an account, comments at a time and approves or requests changes.'))}</p>
+  el.innerHTML = `<h4>${tr('Client link')}</h4><p class="muted mhint">${esc(vdr_media(r.versions[r.versions.length - 1]) ? tr('Your client looks at the newest version without an account, comments at a point and approves or requests changes.') : tr('Your client watches the newest version without an account, comments at a time and approves or requests changes.'))}</p>
     ${rows ? `<ul class="sglist" role="list">${rows}</ul>` : ''}
     <div class="vdrsignew"><span class="vdrsigexp">${tr('Valid until (optional)')} ${dateIn('vdrsigdate', '', {min: today(), label: tr('Valid until (optional)'), attrs: 'class="vdrsigdate"'})}</span>
     ${r.versions.length > 1 ? `<label class="chk"><input type="checkbox" class="vdrsigold"> ${tr('The client may also see the older versions')}</label>` : ''}

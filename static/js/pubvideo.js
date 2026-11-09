@@ -74,3 +74,90 @@
     if (name && name.form) name.form.addEventListener('submit', () => localStorage.setItem('vdr-name', name.value.trim()));
   } catch { /* no storage */ }
 })();
+// 2.764.0 (#5040): the customer page of an image / PDF sign-off (videos/vdmedia.py vdm_pub_stage): the numbered points of the
+// comments placed on the image / the PDF page (CSSOM: the page's CSP allows no inline style), a tap on the image / page sets the
+// point of the next comment (the form's px / py / pg, 0..1 as in the app), a tap on a comment's point shows it (its page). PDF
+// pages come from the bundled pdf.js of the app's PDF preview (pdfview.js: pv_load, pv_timed, PV_OPEN, pv_cv), fetched from the
+// link's own media route; nothing in the PDF runs. Without this script the image shows and comments go without a point.
+(() => {
+  const md = document.querySelector('.vdr-media'); if (!md) return;
+  const stage = md.querySelector('.vdr-stage'), pins = md.querySelector('.vdr-pins'), pdf = md.dataset.kind === 'pdf', T = md.dataset;
+  const fx = /** @type {HTMLInputElement|null} */ (document.getElementById('vd-px')), fy = /** @type {HTMLInputElement|null} */ (document.getElementById('vd-py'));
+  const fp = /** @type {HTMLInputElement|null} */ (document.getElementById('vd-pg')), pst = document.getElementById('vd-pt'), text = document.getElementById('vd-text');
+  const calm = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let page = 1, doc = null, gen = 0, pt = null;
+  const fill = (s, ...a) => a.reduce((t, v, i) => t.replace(`{${i}}`, String(v)), s || '');
+  const put = (el, x, y) => { el.style.left = (x * 100).toFixed(2) + '%'; el.style.top = (y * 100).toFixed(2) + '%'; };
+  const draw = () => {
+    if (!pins) return;
+    for (const p of /** @type {NodeListOf<HTMLElement>} */ (pins.querySelectorAll('.vdr-pin:not(.new)'))) {
+      const on = !pdf || +p.dataset.page === page;
+      p.hidden = !on; if (on) put(p, +(p.dataset.x || 0), +(p.dataset.y || 0));
+    }
+    let n = /** @type {HTMLElement|null} */ (pins.querySelector('.vdr-pin.new'));
+    if (pt && (!pdf || pt.page === page)) {
+      if (!n) { n = document.createElement('span'); n.className = 'vdr-pin new'; n.setAttribute('aria-hidden', 'true'); n.textContent = T.next || ''; pins.appendChild(n); }
+      put(n, pt.x, pt.y);
+    } else if (n) n.remove();
+  };
+  const setPt = p => {
+    pt = p;
+    if (fx && fy && fp) { fx.value = p ? String(p.x) : ''; fy.value = p ? String(p.y) : ''; fp.value = p && pdf ? String(p.page) : ''; }
+    if (pst) { pst.hidden = !p; const sp = pst.querySelector('span'); if (sp) sp.textContent = p ? fill(T.tAt, T.next) : ''; }
+    draw();
+  };
+  const ready = () => !!stage && (!pdf || !!stage.querySelector('canvas')) && (pdf || !!stage.querySelector('img')?.complete);
+  if (stage && fx) stage.addEventListener('click', e => {
+    const t = /** @type {HTMLElement} */ (e.target); if (t.closest('.vdr-pin') || !ready()) return;
+    const r = stage.getBoundingClientRect(); if (!r.width || !r.height) return;
+    const cl = v => Math.round(Math.max(0, Math.min(1, v)) * 10000) / 10000;
+    setPt({x: cl((e.clientX - r.left) / r.width), y: cl((e.clientY - r.top) / r.height), page});
+    text?.focus({preventScroll: true});
+  });
+  document.querySelector('[data-pt-clear]')?.addEventListener('click', () => setPt(null));
+  const hl = el => { if (!el) return; el.classList.remove('hl'); void el.offsetWidth; el.classList.add('hl'); };
+  // a tap on a point: its comment; a tap on a comment's point: its page, the point marked
+  document.addEventListener('click', async e => {
+    const t = /** @type {HTMLElement} */ (e.target), pin = t.closest && t.closest('.vdr-pin[data-id]'), a = t.closest && t.closest('a.vdr-pt');
+    if (pin) { const li = document.querySelector(`a.vdr-pt[data-id="${/** @type {HTMLElement} */ (pin).dataset.id}"]`)?.closest('li'); li?.scrollIntoView({block: 'nearest', behavior: calm ? 'auto' : 'smooth'}); hl(li); return; }
+    if (!a) return;
+    e.preventDefault();
+    const d = /** @type {HTMLElement} */ (a).dataset;
+    if (pdf && d.page && +d.page !== page) await go(+d.page);
+    md.scrollIntoView({block: 'nearest', behavior: calm ? 'auto' : 'smooth'});
+    hl(/** @type {HTMLElement|null} */ (pins?.querySelector(`.vdr-pin[data-id="${d.id}"]`)));
+  });
+  const msg = /** @type {HTMLElement|null} */ (md.querySelector('.vdr-pgmsg')), bar = /** @type {HTMLElement|null} */ (md.querySelector('.vdr-pgbar'));
+  // one PDF page at the width of the page; the document is fetched once
+  const go = async n => {
+    const my = ++gen;
+    try {
+      if (!doc) {
+        const res = await fetch(T.src || '', {credentials: 'same-origin'}); if (!res.ok) throw new Error('http');
+        const data = new Uint8Array(await res.arrayBuffer()), lib = await pv_timed(pv_load());
+        const task = lib.getDocument({data, ...PV_OPEN});
+        doc = await pv_timed(task.promise, task);
+      }
+      page = Math.max(1, Math.min(doc.numPages, n || 1));
+      const pg = await doc.getPage(page), w = Math.max(200, md.clientWidth || 600);
+      const cv = await pv_cv(pg, w / pg.getViewport({scale: 1}).width);
+      if (my !== gen) return;
+      cv.setAttribute('aria-label', fill(T.tPg, page));
+      md.querySelector('.vdr-cv')?.replaceChildren(cv);
+      if (msg) msg.hidden = true;
+      if (bar) {
+        bar.hidden = doc.numPages < 2;
+        const no = bar.querySelector('.vdr-pgno'); if (no) no.textContent = fill(T.tPage, page, doc.numPages);
+        /** @type {HTMLButtonElement} */ (bar.querySelector('[data-pg="-1"]')).disabled = page <= 1;
+        /** @type {HTMLButtonElement} */ (bar.querySelector('[data-pg="1"]')).disabled = page >= doc.numPages;
+      }
+      if (pt && pt.page !== page) setPt(null); else draw();
+    } catch (e) {
+      if (my !== gen) return;
+      if (msg) { msg.hidden = false; msg.textContent = e && /** @type {Error} */ (e).name === 'PasswordException' ? T.tPw || '' : T.tFail || ''; }
+    }
+  };
+  bar?.addEventListener('click', e => { const b = /** @type {HTMLElement} */ (e.target).closest('[data-pg]'); if (b) go(page + +(/** @type {HTMLElement} */ (b).dataset.pg || 0)); });
+  if (pdf) go(1);
+  else { const img = stage?.querySelector('img'); if (img && !img.complete) img.addEventListener('load', draw, {once: true}); draw(); }
+})();

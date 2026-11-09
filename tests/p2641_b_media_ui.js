@@ -5,7 +5,7 @@
 // - a tap on the image sets the point of the next comment (a pending point "3", the composer says "at point 3"), the text
 //   typed before stays, sending stores {x, y} (the server has it) and draws point 3
 // - a tap on a comment's number marks its point, a tap on a point marks its comment; "without point" takes the point back
-// - an image review has no client link; v2 shows its own (no) points, v1 picked in the version select shows its three again
+// - an image review has a client link (2.764.0 #5040, was none); v2 shows its own (no) points, v1 picked in the version select shows its three again
 // - a PDF comment's number names its page ("p. 2")
 // - the styles keep the image inside a 320 px screen (max-width 100 %, the dialog full width on a phone)
 // P2641BUI_NOSTART=1 = the server already runs.
@@ -68,7 +68,8 @@ const PDF = Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\ne
   check(img.getAttribute('src') === `/api/videos/${R.id}/versions/${R.versions[0].id}/file`, 'the image comes from its bytes route ' + img.getAttribute('src'));
   const pins = [...d.querySelectorAll('.vdrdlg .vdrpin')];
   check(pins.map(p => p.textContent).join(',') === '1,2' && parseFloat(pins[0].style.left) === 25 && parseFloat(pins[0].style.top) === 50, 'points 1 and 2 at their place ' + pins.map(p => p.style.cssText).join(' | '));
-  check(!d.querySelector('.vdrdlg .vdrsig h4'), 'an image review has no client link');
+  // 2.764.0 (#5040): an image review has a client link too (was none); its hint says "at a point"
+  check(!!d.querySelector('.vdrdlg .vdrsig h4') && /comments at a point/.test(d.querySelector('.vdrdlg .vdrsig').textContent), 'an image review has a client link (comments at a point)');
   check(!d.querySelector('.vdrdlg .vdrtl:not([hidden]) .vdrmk'), 'no time line');
 
   // the text typed first stays when the point is set

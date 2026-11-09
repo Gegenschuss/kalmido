@@ -375,6 +375,10 @@ itself: the browser of the person who listens loads it (after *Load audio* when 
   customer sees the new version at the same address and decides again; the earlier decision stays in the list and as a
   comment at its version. In the app the customer's comments show as *Name (Guest)*. The page shows nothing but this one
   sign-off: no task, project, other sign-offs or contacts.
+  2.764.0: the customer link works for **images and PDFs** too: the page shows the image or the PDF page by page (the
+  bundled PDF viewer, nothing in the PDF runs) with the numbered points of the customer's comments; a tap sets the point
+  of the next comment (on a PDF: on the page shown), the same numbers as in the app. The page hands out only the file of
+  the version it shows and only while the link is open.
 - Rights: who sees the task / project / client sees the sign-off and may comment (like task comments); changing it, new
   versions, the customer link, moving and deleting need the right to edit there. A locked project (end-to-end) has none.
   At a client (2.122.4) that is an office role in the client's organisation (or, for a private client, its creator).

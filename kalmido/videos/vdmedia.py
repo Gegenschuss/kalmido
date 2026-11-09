@@ -14,8 +14,11 @@ comments and states as a video, no second way. Columns: core/migrations.d/4769_a
 - A comment's place: video {t} (at_sec), image {x, y}, PDF {page, x, y} (x / y = 0..1 of the width / height of the image or
   page; a PDF comment may name a page only). Numbered points: the app numbers the comments with a point per version in
   their order (page, then oldest first), the export the same.
-- The customer link (signoff kind video) stays for videos: an image / PDF version is no public file (sharing outside = a task
-  of its own). A review with files does not move to another workspace (its files stay in theirs)."""
+- The customer link (signoff kind video): 2.764.0 (#5040) also for images / PDFs -- the page shows the version's file
+  through the link's own media route (vdm_pub_send: only the version the link shows, only while it is open) and the client
+  sets a point (vdm_pub_stage, vdm_pub_pos; static/js/pubvideo.js). A review with files does not move to another workspace
+  (its files stay in theirs)."""
+import html
 import io
 import os
 
@@ -317,19 +320,38 @@ def vdm_send(c, v):
     return _send_headers(resp, mime)
 
 
+def vdm_pub_kind(v):
+    """2.764.0 (#5040): what the customer link may hand out of version row v: audio | image | pdf, else None (a video link)."""
+    if not v or not v["file_id"]:
+        return None
+    if v["provider"] == "audio":
+        return "audio"
+    return v["kind"] if v["kind"] in ("image", "pdf") else None
+
+
+VDM_PUB_MIME = {"audio": lambda m: m.startswith("audio/"), "image": lambda m: m in ("image/jpeg", "image/png", "image/webp"),
+                "pdf": lambda m: m == "application/pdf"}
+
+
 def vdm_pub_send(c, v, s):
     """2.658.0 (#5015): the audio file of version row v for customer link s (office/signoff.py, checked open by the caller):
     only a file of the link's workspace, still in the file store (not in the trash, not in a locked folder), still visible
     to the person who made the link (the file's access), only as audio by its first bytes; streamed (range requests).
-    None = not available (the caller answers like an unknown link). 2.773.0 (#5330): "too_big" = a sealed file above
-    VDM_PUB_SEALED_MB (no content, the caller answers 413); a fetch that starts playing is noted in the file's history
-    (action ext_view, detail "approval <id>": the file store shows it as an external link, files/extlinks.py xl_log)."""
-    if not v or not v["file_id"] or v["provider"] != "audio":
+    2.764.0 (#5040): also the image / PDF of an image / PDF version, served only as the type of the version's kind by its
+    first bytes (an image as image, a PDF as PDF), sandboxed and nosniff as in the app (files/web.py _send_headers);
+    ?dl=1 = as a download. None = not available (the caller answers like an unknown link). 2.773.0 (#5330): "too_big" = a
+    sealed file above VDM_PUB_SEALED_MB (no content, the caller answers 413); a fetch that starts playing / showing is noted
+    in the file's history (action ext_view, detail "approval <id>": the file store shows it as an external link,
+    files/extlinks.py xl_log)."""
+    kind = vdm_pub_kind(v)
+    if not kind:
         return None
     with system_ctx(c):  # the public page reads as "anon"; the checks below bind it to exactly this link's file and workspace
         chain = fs_chain(c, v["file_id"])
         if (not chain or chain[0]["kind"] != "file" or fs_deleted(chain) or fsl_of_chain(c, chain) is not None
-                or (chain[0]["org_id"] or None) != (s["org_id"] or None) or not fs_role(c, v["file_id"], s["created_by"], chain=chain)
+                or (chain[0]["org_id"] or None) != (s["org_id"] or None)
+                # 2.764.0 (#5040): a file uploaded for exactly this version follows the review as in the app (vdm_by_review, #5041)
+                or not (fs_role(c, v["file_id"], s["created_by"], chain=chain) or vdm_by_review(c, v, chain))
                 # 2.658.0 (Fable review): a disabled account's link no longer serves the file (as the list links, signoff.py)
                 or not c.execute("SELECT 1 FROM users WHERE id=? AND disabled=0", (s["created_by"],)).fetchone()):
             return None
@@ -341,13 +363,14 @@ def vdm_pub_send(c, v, s):
             return "too_big"
         head, data = vdm_open(c, full)
         mime = vdm_sniff(head)
-        if not mime or not mime.startswith("audio/"):
+        if not mime or not VDM_PUB_MIME[kind](mime):
             return None
         if vdm_pub_first(request.headers.get("Range")):  # 2.773.0 (#5330): the guest's fetch in the file's history (as vdm_send)
             c.execute("INSERT INTO fs_log(node_id,user_id,agent,action,detail,at) VALUES(?,?,?,?,?,?)",
                       (int(v["file_id"]), None, 0, "ext_view", f"approval {int(v['review_id'])}", iso(now_utc())))
             c.commit()
-        resp = vdm_stream(c, full, data, mimetype=mime, as_attachment=False, download_name=v["file_name"] or "audio", max_age=0)
+        resp = vdm_stream(c, full, data, mimetype=mime, as_attachment=kind != "audio" and request.args.get("dl") == "1",
+                          download_name=v["file_name"] or kind, max_age=0)
     return _send_headers(resp, mime)
 
 
@@ -365,6 +388,56 @@ def vdm_pub_first(rng):
     r = rng.strip().lower().replace(" ", "")
     # review 2.773 F2: Safari's probe "bytes=0-1" (and any closed range from 0) is no start of playing - only an open "bytes=0-"
     return r == "bytes=0-"
+
+
+# ---------------------------------------------------------------- 2.764.0 (#5040): the customer page of an image / PDF
+def vdm_pub_pos(kind, form):
+    """The place of a client's comment from the page's form fields px / py (0..1) and pg (the PDF page) -> the {pos} of
+    vdm_pos (checked there); empty fields = without a point. Text that is no number -> BadInput."""
+    def num(k):
+        t = (form.get(k) or "").strip()
+        if not t:
+            return None
+        if len(t) > 12:
+            raise BadInput(tr("Invalid value: {0}", "pos"))
+        try:
+            return float(t) if k != "pg" else int(t)
+        except ValueError:
+            raise BadInput(tr("Invalid value: {0}", "pos")) from None
+    x, y, pg = num("px"), num("py"), num("pg")
+    p = {}
+    if x is not None or y is not None:
+        p.update(x=x, y=y)
+        if kind == "pdf":
+            p["page"] = pg
+    return {"pos": p}
+
+
+def vdm_pub_stage(v, src, lg, top, marks, nxt):
+    """The image / the PDF page of version row v on the customer page with the numbered points of its comments (top: the
+    comments shown, marks: {id: number} counted over all comments of the version, as the app does). The points are placed by
+    static/js/pubvideo.js (the page's CSP allows no inline style); without script the comments still name their point."""
+    e = html.escape
+    if not vdm_pub_kind(v):
+        return f'<p class="vdr-hint">{e(tr("The file of this version is no longer in the file store.", lg=lg))}</p>'
+    pins = "".join(f'<button type="button" class="vdr-pin" data-id="{x["id"]}" data-x="{x["pos_x"]}" data-y="{x["pos_y"]}" data-page="{x["page"] or ""}" '
+                   f'aria-label="{e(tr("Point {0}", marks[x["id"]], lg=lg))}" hidden>{marks[x["id"]]}</button>' for x in top if x["id"] in marks)
+    pdf = v["kind"] == "pdf"
+    txt = {"set": tr("Tap on the image to set a point", lg=lg), "at": tr("at point {0}", lg=lg), "page": tr("Page {0} of {1}", lg=lg),
+           "pg": tr("Page {0}", lg=lg), "fail": tr("The preview could not be loaded.", lg=lg),
+           "pw": tr("This PDF is protected with a password and cannot be shown here.", lg=lg)}
+    data = " ".join(f'data-t-{k}="{e(t)}"' for k, t in txt.items())
+    if pdf:
+        body = ('<div class="vdr-cv"></div>')
+        bar = (f'<div class="vdr-pgbar" hidden><button type="button" class="btn sec" data-pg="-1" aria-label="{e(tr("Previous page", lg=lg))}">&lsaquo;</button>'
+               f'<span class="vdr-pgno" aria-live="polite"></span><button type="button" class="btn sec" data-pg="1" aria-label="{e(tr("Next page", lg=lg))}">&rsaquo;</button></div>'
+               f'<p class="vdr-hint vdr-pgmsg">{e(tr("Loading…", lg=lg))}</p>'
+               f'<noscript><p><a class="btn" href="{e(src)}?dl=1" rel="nofollow">{e(tr("Download the PDF", lg=lg))}</a></p></noscript>')
+    else:
+        body = f'<img src="{e(src)}" alt="{e(v["file_name"] or "")}" draggable="false">'
+        bar = ""
+    return (f'<div class="vdr-media vdr-k-{v["kind"]}" data-kind="{v["kind"]}" data-src="{e(src)}" data-next="{nxt}" {data}>{bar}'
+            f'<div class="vdr-stage" id="vdr-stage">{body}<div class="vdr-pins">{pins}</div></div></div>')
 
 
 def vdm_version_row(c, rid, nid):
