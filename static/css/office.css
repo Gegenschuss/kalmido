@@ -26,9 +26,9 @@
 .rkplist .iconbtn{flex:none;width:2.75rem;height:2.75rem}
 .ofcrow:hover,.ofcrow:focus-visible{border-color:var(--accent)}
 .ofcrow.arch{opacity:.6}
-.ofcrow .ofcn{flex:1;min-width:0;display:flex;flex-direction:column}
-.ofcrow .ofcn b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ofcrow .ofcn small{font-size:var(--fs-s);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ofcn{flex:1;min-width:0;display:flex;flex-direction:column}  /* 2.778.0 A (#5382): one shared rule for every office list, whatever the row class: name on top, detail line small below */
+.ofcn b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ofcn small{font-size:var(--fs-s);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ofcrow>svg{color:var(--muted);flex:none}
 .ofcrow[aria-expanded]>svg:last-child{transition:transform .15s}.ofcrow[aria-expanded="true"]>svg:last-child{transform:rotate(180deg)}  /* 2.591.0 (#4908): a row that opens a view ends in › (ic right), only a row that unfolds in place (aria-expanded) keeps ˅, turning when open */
 .ofcdlg .card{width:min(40rem,100%)}
@@ -159,8 +159,6 @@
 .ofdadd{display:flex;gap:.5rem;flex-wrap:wrap;margin:.5rem 0}
 .ofdautos{margin-top:.75rem}
 .ofdauto{display:flex;align-items:center;gap:.5rem;padding:.375rem .5rem;border-radius:var(--radius);background:var(--bg2);min-height:2.5rem}
-.ofdauto .ofcn{flex:1;min-width:0;display:flex;flex-direction:column}
-.ofdauto .ofcn small{font-size:var(--fs-s)}
 .ofdauto .ofdlt{font-variant-numeric:tabular-nums;white-space:nowrap}
 .ofdrules{margin-top:.5rem}
 /* 2.120.0 D (#2089): a delivery note shows no prices (rate, tax, line total) */
@@ -226,7 +224,6 @@
 .ofdpay .ib,.ofdref .ofdlt{margin-left:auto}
 ul.ofdpick{list-style:none;margin:0 0 .75rem;padding:0;max-height:40vh;overflow:auto;display:flex;flex-direction:column;gap:.25rem}  /* 2.39.1 (#1220): the list only, never the service picker's .modal */
 ul.ofdpick .chkl{display:flex;align-items:flex-start;gap:.5rem;min-height:2.75rem;padding:.25rem 0}
-ul.ofdpick .ofcn{display:flex;flex-direction:column}
 .ofddlg .row{display:flex;flex-direction:column;gap:.25rem;margin:0 0 .5rem}
 .ofddlg textarea,.ofddlg input:not([type=checkbox]):not([type=radio]),.ofddlg select{width:100%;box-sizing:border-box}
 .ofdtotals .tr-open dd{color:var(--danger);font-weight:600}
@@ -247,7 +244,6 @@ ul.ofdpick .ofcn{display:flex;flex-direction:column}
 .oimctr{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;justify-content:space-between}
 .oimctr p{margin:.25rem 0}
 .oimrun{display:flex;align-items:center;gap:.5rem;padding:.375rem .625rem;border-radius:var(--radius);background:var(--bg2);border:1px solid var(--line2);min-height:2.75rem}
-.oimrun .ofcn{flex:1;min-width:0;display:flex;flex-direction:column}
 .oimsum{margin:0 0 .5rem}
 .oimaddr{margin:.375rem 0 0;padding-top:.375rem;border-top:1px dashed var(--line2);font-size:var(--fs-s)}
 .oimaddr p{margin:.125rem 0}
@@ -303,9 +299,6 @@ ul.ofdpick .ofcn{display:flex;flex-direction:column}
 .tplist .tprow{display:flex;align-items:center;gap:.5rem}
 .tpopen{flex:1;min-width:0;display:flex;align-items:center;gap:.625rem;min-height:2.75rem;padding:.375rem .5rem;text-align:left;border-radius:var(--radius);background:none;border:1px solid transparent;color:var(--text);text-decoration:none}
 .tpopen:hover,.tpopen:focus-visible{border-color:var(--accent)}
-.tpopen .ofcn{flex:1;min-width:0;display:flex;flex-direction:column}
-.tpopen .ofcn b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.tpopen .ofcn small{font-size:var(--fs-s)}
 .tpunused{color:var(--accent);font-size:var(--fs-s)}
 .tpprint{white-space:nowrap}
 .tppl .ofdflags .btn{margin-left:auto}
@@ -455,9 +448,9 @@ ul.ofdpick .ofcn{display:flex;flex-direction:column}
 .bnkrh{margin:0;font-size:var(--fs-s)}
 .bnkbyr{font-size:var(--fs-s);white-space:nowrap}
 .brlrow{display:flex;align-items:center;gap:.375rem;flex-wrap:wrap}
-.brlrow .ofcn{flex:1 1 12rem;min-width:0;display:flex;flex-direction:column}
+.brlrow .ofcn{flex:1 1 12rem}
 .bkarow{display:flex;align-items:center;gap:.375rem;flex-wrap:wrap}.bkarow .btn{min-height:2.75rem}
-.bkarow .ofcn{flex:1 1 12rem;min-width:0;display:flex;flex-direction:column}.bkaold{margin-top:.5rem}
+.bkarow .ofcn{flex:1 1 12rem}.bkaold{margin-top:.5rem}
 /* 2.299.0 C (#3192): bookings without a receipt; computer: open receipts beside the list (drag onto a row) */
 .bnrbar select{min-height:2.75rem}
 .bnrcols{display:grid;grid-template-columns:minmax(0,1fr) minmax(14rem,18rem);gap:1rem;align-items:start}
@@ -581,8 +574,6 @@ ul.ofdpick .ofcn{display:flex;flex-direction:column}
 .abo-sw{flex:none;display:flex;align-items:center;gap:.375rem;min-width:0;padding:0 .5rem;border:1px solid var(--line2);border-radius:var(--radius);background:var(--bg2);font-size:var(--fs-s)}
 .abo-empty{display:flex;flex-direction:column;align-items:center;text-align:center;gap:.75rem;padding:3rem 1rem;color:var(--muted);font-size:var(--fs-m)}
 .abo-cand{display:flex;align-items:center;gap:.625rem;min-height:2.75rem;padding:.375rem .625rem;border:1px dashed var(--line2);border-radius:var(--radius)}
-.abo-cand .ofcn{flex:1;min-width:0;display:flex;flex-direction:column}
-.abo-cand .ofcn small{font-size:var(--fs-s)}
 .abo-notice{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem}
 .abo-notice input[type=number]{width:5.5rem}
 .abo-seats{display:flex;flex-wrap:wrap;gap:.25rem .75rem}
@@ -603,7 +594,7 @@ button.dun-hint:focus-visible{outline:.125rem solid var(--accent);outline-offset
 .dun-tag{margin-left:.375rem}
 .rin-list .rin-it{display:flex;align-items:center;flex-wrap:wrap;gap:.25rem .75rem;padding:.375rem 0;border-bottom:1px solid var(--line2)}
 .rin-list .rin-it:last-child{border-bottom:0}
-.rin-it .ofcn{flex:1 1 12rem;min-width:0}
+.rin-it .ofcn{flex:1 1 12rem}
 .rin-it.rin-off .ofcn,.rin-it.rin-off .rin-sum{opacity:.6}
 .rin-sum{font-variant-numeric:tabular-nums;white-space:nowrap}
 .rin-acts{display:flex;align-items:center;gap:.25rem;margin-left:auto}
@@ -918,7 +909,7 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 @media (prefers-reduced-motion:reduce){.oim .oimsec::after{transition:none}}
 /* 2.113.2 (#2253): the terms and conditions rows in the settings */
 .agblist .agbrow{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;padding:.375rem 0}
-.agblist .agbrow .ofcn{flex:1 1 12rem;min-width:0}
+.agblist .agbrow .ofcn{flex:1 1 12rem}
 /* 2.138.0 D (#2256): the next running number of every series (settings) and a draft's number in the editor */
 .onum h4{margin:1rem 0 .25rem}
 .onum .onumrow .numin{width:8rem}
