@@ -174,7 +174,7 @@ async function shfm_put(chg, label) {  // chg = [{row_id, col_id, fmt: the new f
   const keep = new Set(res.cf.map(x => x.row_id + ':' + x.col_id)), done = chg.filter(x => !keep.has(x.row_id + ':' + x.col_id));
   if (!done.length) return null;
   const back = done.map(x => ({row_id: x.row_id, col_id: x.col_id, fmt: x.old, prev: x.fmt})), fwd = done.map(x => ({row_id: x.row_id, col_id: x.col_id, fmt: x.fmt, prev: x.old}));
-  return histAdd({label: label || tr('Format changed'), ids: [], snaps: [], lids: [],
+  return histAdd({label: label || tr('Format changed'), ids: [], snaps: [], lids: [], srv: true,  // 2.800.0 (#5409): a cell write, the server lists it
     undo: () => shfm_send(sid, back, merges), redo: () => shfm_send(sid, fwd, merges)});
 }
 function shfm_apply(fn, label) {  // fn(format copy, cell {r, c}) -> the new format
@@ -317,5 +317,5 @@ async function shfm_rulesPut(rules, label) {
   };
   let res; try { res = await put(rules, sh.rev); } catch (e) { toast(e.message); if (e.status === 409) await shvLoad(sid, true); return; }
   const now = res.rules || [];
-  histToast(label, histAdd({label, ids: [], snaps: [], lids: [], undo: async () => { await put(old); return {skipped: []}; }, redo: async () => { await put(now); return {skipped: []}; }}));
+  histToast(label, histAdd({label, ids: [], snaps: [], lids: [], srv: true, undo: async () => { await put(old); return {skipped: []}; }, redo: async () => { await put(now); return {skipped: []}; }}));
 }

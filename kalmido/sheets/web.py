@@ -25,7 +25,7 @@ from ..accounts.orgs import is_org_admin
 from .core import sh_list_title, sh_may, sh_space, sh_space_key, sh_to_display
 from .shorder import sho_apply, sho_moved, sho_plan, sho_restore_apply, sho_restore_plan, sho_sort_plan  # 2.631.0 (#4620), 2.658.0 (#5000)
 from .shhist import shh_meta_write  # 2.564.0 (#4701/#4702); 2.571.0 (#4766): shh_meta_write
-from .shundo import shu_batch  # 2.778.0 (#5253): a person's writes as steps of "Recent steps"
+from .shundo import shu_batch, shu_rec  # 2.778.0 (#5253): a person's writes as steps of "Recent steps"; 2.800.0 (#5409): shu_rec
 
 
 def _int(v, what):
@@ -187,6 +187,8 @@ def sheets_freeze(sid, cid):
     if not isinstance(fr, bool):
         raise BadInput(tr("Invalid value: {0}", "frozen"))
     sh_freeze(c, r, x, fr, me())
+    if bool(x["frozen"]) != fr:  # 2.800.0 (#5409): the person's step
+        shu_rec(c, r, "freeze", "1" if x["frozen"] else "0", "1" if fr else "0", cell_id=cid, row_id=x["row_id"], col_id=x["col_id"])
     return _cell_answer(c, sid, cid)
 
 
@@ -197,6 +199,9 @@ def sheets_name(sid, cid):
     r = _need_w(c, sid)
     x = sh_need_cell(c, r, cid)
     sh_set_name(c, r, x, body().get("name"), me())
+    now = c.execute("SELECT name FROM sheet_cells WHERE id=?", (cid,)).fetchone()[0]
+    if (now or "") != (x["name"] or ""):  # 2.800.0 (#5409): the person's step
+        shu_rec(c, r, "name", x["name"] or "", now or "", cell_id=cid, row_id=x["row_id"], col_id=x["col_id"])
     return _cell_answer(c, sid, cid)
 
 
@@ -275,9 +280,22 @@ def sheets_col_patch(sid, col_id):
     ids. 2.270.0 B (#3021): options_ops = single add / rename / remove (sh_option_ops) -> also {added: ids, conflicts}."""
     c = db()
     r = _need_w(c, sid)
+    added, cf = shx_col_apply(c, r, col_id, body(), me(), step=True)
+    c.commit()
+    book = ShBook(c, sh_reload(c, sid))
+    return jsonify(column=sh_col_dict(book.col_by[col_id], book.col_idx[col_id]), rev=book.sheet["rev"], added=added, conflicts=cf)
+
+
+SHU_COL = SHX_COL_PREV + ("options",)  # 2.800.0 (#5409): the column fields a person's step keeps (before / after)
+
+
+def shx_col_apply(c, r, col_id, b, uid, step=False):
+    """PATCH .../columns/<id> (and its step back, sheets/shustep.py): the column's fields of b under the sheet's lock -> (added
+    option ids, conflicts). step: the person's change is a step of "Recent steps" (2.800.0, #5409: the fields that changed)."""
+    sid = int(r["id"])
     write_lock(c, "sheet:" + str(sid))  # 2.528.0 (#4305 A12): one writer per sheet, also for rows / columns
     old = _need_col(c, sid, col_id)
-    b, cf = shx_col_prev(old, body())  # 2.528.0 (#4305 A12): a field changed elsewhere since the writer read it stays (conflicts)
+    b, cf = shx_col_prev(old, b)  # 2.528.0 (#4305 A12): a field changed elsewhere since the writer read it stays (conflicts)
     f = sh_clean_col(b, partial=True)
     added = []
     if b.get("options_ops") is not None:  # 2.270.0 B (#3021): single option changes on the current list, one writer per sheet
@@ -305,22 +323,38 @@ def sheets_col_patch(sid, col_id):
             for x in c.execute("SELECT id, raw FROM sheet_cells WHERE col_id=?", (col_id,)).fetchall():
                 if x["raw"] in labels:
                     c.execute("UPDATE sheet_cells SET raw=? WHERE id=?", (labels[x["raw"]], x["id"]))
-        sh_touch(c, sid, me())
-    c.commit()
-    book = ShBook(c, sh_reload(c, sid))
-    return jsonify(column=sh_col_dict(book.col_by[col_id], book.col_idx[col_id]), rev=book.sheet["rev"], added=added, conflicts=cf)
+        sh_touch(c, sid, uid)
+        now = _need_col(c, sid, col_id)
+        ch = [k for k in SHU_COL if str(old[k]) != str(now[k])]
+        if step and ch:  # 2.800.0 (#5409)
+            shu_rec(c, r, "cset", json.dumps({k: old[k] for k in ch}), json.dumps({k: now[k] for k in ch}), col_id=col_id)
+    return added, cf
 
 
 @app.delete("/api/sheets/<int:sid>/columns/<int:col_id>")
 def sheets_col_delete(sid, col_id):
     """To the trash (formulas pointing at it show "ref"; Undo: .../restore)."""
     c = db()
-    _need_w(c, sid)
+    r = _need_w(c, sid)
     write_lock(c, "sheet:" + str(sid))  # 2.528.0 (#4305 A12): one writer per sheet, also for rows / columns
     _need_col(c, sid, col_id)
-    c.execute("UPDATE sheet_columns SET deleted_at=? WHERE id=?", (iso_ms(now_utc()), col_id))
+    ts = iso_ms(now_utc())
+    shu_rec(c, r, "cdel", shx_place(c, sid, "col", col_id), ts, col_id=col_id)  # 2.800.0 (#5409): the person's step
+    c.execute("UPDATE sheet_columns SET deleted_at=? WHERE id=?", (ts, col_id))
     sh_touch(c, sid, me())
     return _done(c, sid)
+
+
+def shx_place(c, sid, kind, xid):
+    """2.800.0 (#5409): how the table names a live row (its number) / column (its title or letter) right now."""
+    table = "sheet_rows" if kind == "row" else "sheet_columns"
+    live = [x[0] for x in c.execute(f"SELECT id FROM {table} WHERE sheet_id=? AND deleted_at IS NULL ORDER BY pos, id", (sid,))]
+    i = live.index(xid) if xid in live else 0
+    if kind == "row":
+        return tr("Row {0}", i + 1)
+    t = c.execute("SELECT title FROM sheet_columns WHERE id=?", (xid,)).fetchone()
+    from .formula import sh_col_letter
+    return tr("Column {0}", (t and t[0]) or sh_col_letter(i))
 
 
 @app.post("/api/sheets/<int:sid>/columns/<int:col_id>/restore")
@@ -360,10 +394,12 @@ def _need_row(c, sid, rid, deleted=False):
 @app.delete("/api/sheets/<int:sid>/rows/<int:rid>")
 def sheets_row_delete(sid, rid):
     c = db()
-    _need_w(c, sid)
+    r = _need_w(c, sid)
     write_lock(c, "sheet:" + str(sid))  # 2.528.0 (#4305 A12): one writer per sheet, also for rows / columns
     _need_row(c, sid, rid)
-    c.execute("UPDATE sheet_rows SET deleted_at=? WHERE id=?", (iso_ms(now_utc()), rid))
+    ts = iso_ms(now_utc())
+    shu_rec(c, r, "rdel", shx_place(c, sid, "row", rid), ts, row_id=rid)  # 2.800.0 (#5409): the person's step
+    c.execute("UPDATE sheet_rows SET deleted_at=? WHERE id=?", (ts, rid))
     sh_touch(c, sid, me())
     return _done(c, sid)
 
@@ -405,8 +441,18 @@ def _sh_order(sid, kind):
     """rows/order and columns/order (2.631.0, #4620: one way for both)."""
     c = db()
     r0 = _need_w(c, sid)
-    write_lock(c, "sheet:" + str(sid))  # 2.528.0 (#4305 A12): one writer per sheet, also for rows / columns
     b = body()
+    out = sh_order_apply(c, r0, kind, b, me(), step=True)
+    if isinstance(out, dict):  # moved elsewhere since: 409 with the current order
+        return jsonify(out), 409
+    return _done(c, sid, {"formulas": out} if b.get("moved") is not None else None)
+
+
+def sh_order_apply(c, r0, kind, b, uid, step=False):
+    """rows/order and columns/order (and their step back, sheets/shustep.py) -> the formulas a move changed, or a dict (the
+    body of the 409: the order changed since prev). step (2.800.0, #5409): the person's change is a step of "Recent steps"."""
+    sid = int(r0["id"])
+    write_lock(c, "sheet:" + str(sid))  # 2.528.0 (#4305 A12): one writer per sheet, also for rows / columns
     ids = b.get("ids")
     table, key = ("sheet_rows", "rows") if kind == "row" else ("sheet_columns", "columns")
     live = [x[0] for x in c.execute(f"SELECT id FROM {table} WHERE sheet_id=? AND deleted_at IS NULL ORDER BY pos, id", (sid,))]
@@ -414,23 +460,27 @@ def _sh_order(sid, kind):
     if shx_order_moved(live, b.get("prev")):
         r = sh_reload(c, sid)
         name = user_names(c, [r["updated_by"]]).get(r["updated_by"]) or "?"
-        return jsonify(error=tr("Changed in the meantime by {0}", name), **{key: live}, rev=r["rev"]), 409
+        return {"error": tr("Changed in the meantime by {0}", name), key: live, "rev": r["rev"]}
     if not isinstance(ids, list) or len(ids) > len(live) or any(isinstance(x, bool) or x not in lset for x in ids) or len(set(ids)) != len(ids):
         raise BadInput(tr("Invalid value: {0}", "ids"))
     given = set(ids)
     order = ids + [x for x in live if x not in given]
-    back = sho_restore_plan(c, r0, b.get("formulas"), me())  # 2.631.0 (#4620): the Undo of a move puts its formulas back
+    back = sho_restore_plan(c, r0, b.get("formulas"), uid)  # 2.631.0 (#4620): the Undo of a move puts its formulas back
     mv = sho_moved(b, live)
     if mv is None and b.get("formulas") is None:  # 2.658.0 (#5000): a sorting keeps the spans of ranges on their positions
-        plan = sho_sort_plan(c, r0, kind, live, order, me())
+        plan = sho_sort_plan(c, r0, kind, live, order, uid)
     else:  # a move (or its Undo, which names its formulas, maybe none): the ranges keep their members
-        plan = sho_plan(c, r0, kind, live, order, mv, me())  # before the new order is stored
+        plan = sho_plan(c, r0, kind, live, order, mv, uid)  # before the new order is stored
     for i, x in enumerate(order):
         c.execute(f"UPDATE {table} SET pos=? WHERE id=?", (float(i + 1), x))
-    fx = sho_apply(c, plan, me())
-    sho_restore_apply(c, back, me())
-    sh_touch(c, sid, me())
-    return _done(c, sid, {"formulas": fx} if b.get("moved") is not None else None)
+    fx = sho_apply(c, plan, uid)
+    sho_restore_apply(c, back, uid)
+    sh_touch(c, sid, uid)
+    if step and order != live:  # 2.800.0 (#5409): a move keeps its block and the formulas it changed (its way back)
+        move = mv is not None or b.get("formulas") is not None
+        shu_rec(c, r0, "order", json.dumps({"k": kind, "ids": live}),
+                json.dumps({"ids": order, "move": move, "mv": sorted(mv) if mv is not None else None, "fx": fx if move else None}))
+    return fx
 
 
 @app.post("/api/sheets/<int:sid>/presence")

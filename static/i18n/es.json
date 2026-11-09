@@ -18007,6 +18007,7 @@
   "The PDF cannot be read": "No se puede leer el PDF",
   "This PDF has more than {0} pages - its pages cannot be changed here": "Este PDF tiene más de {0} páginas: aquí no se pueden cambiar sus páginas",
   "The pages of this document cannot be changed (read-only or a locked month)": "Las páginas de este documento no se pueden cambiar (solo lectura o un mes bloqueado)",
+  "Kept rows and columns": "Filas y columnas fijadas",
   "People|event": "Personas",
   "Also private": "También privado",
   "Off: the office disappears in the workspace Private, the offices of your organisations stay. Nothing is deleted; switched on again, everything is there as before.": "Desactivado: la oficina desaparece en el espacio de trabajo Privado, las oficinas de tus organizaciones se quedan. No se borra nada; al volver a activarlo, todo está como antes.",

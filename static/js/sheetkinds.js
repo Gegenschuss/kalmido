@@ -128,7 +128,7 @@ async function shk_fixSet(body, label) {
   const sid = sh.id, old = {rows: sh.freeze_rows || 0, cols: sh.freeze_cols || 0}, now = {...old, ...body};
   const set = async v => { const j = await rawFetch('POST', `/api/sheets/${sid}/fixed`, v); if (SHV.sh?.id === sid) { SHV.sh.freeze_rows = j.freeze_rows; SHV.sh.freeze_cols = j.freeze_cols; SHV.sh.rev = j.rev; shk_after(); } };
   try { await set(now); } catch (e) { toast(e.message); return; }
-  const e = histAdd({label, ids: [], snaps: [], lids: [], undo: async () => { await set(old); return {skipped: []}; }, redo: async () => { await set(now); return {skipped: []}; }});
+  const e = histAdd({label, ids: [], snaps: [], lids: [], srv: true, undo: async () => { await set(old); return {skipped: []}; }, redo: async () => { await set(now); return {skipped: []}; }});
   histToast(label, e);
 }
 function shk_after() {  // after each redraw: the sticky rules of the kept rows / columns (offsets measured in the grid)

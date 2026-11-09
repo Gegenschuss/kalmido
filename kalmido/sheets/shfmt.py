@@ -340,6 +340,9 @@ def _rules_put(c, sid, b, uid):
     new = json.dumps(rules, separators=(",", ":")) if rules else ""
     c.execute("UPDATE sheets SET fmt_rules=? WHERE id=?", (new, sid))
     shh_meta(c, sid, "rules", str(len(shfm_rules_load(r))) if was else "", str(len(rules)) if rules else "", uid)
+    if was != new:  # 2.800.0 (#5409): a person's step (an agent records none: shu_batch)
+        from .shundo import shu_rec
+        shu_rec(c, r, "rules", was, new)
     sh_touch(c, sid, uid)
     return rules
 

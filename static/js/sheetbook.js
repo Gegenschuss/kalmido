@@ -36,7 +36,7 @@ async function shbAdd(sh, copy) {
   let r; try { r = await shbReq('POST', shbUrl(bid), {after_id: sh.id, ...(copy ? {copy_of: sh.id, name: tr('{0} (copy)', shbName(sh.id))} : {})}); } catch (e) { toast(e.message); return; }
   const tid = r.tab.id, name = r.tab.name;
   await shbAfter(tid);
-  const e = histAdd({label: tr('Created {0}', qn(name)), ids: [], snaps: [], lids: [],
+  const e = histAdd({label: tr('Created {0}', qn(name)), ids: [], snaps: [], lids: [], srv: true,  // 2.800.0 (#5409): the server lists the step
     undo: async () => { await shbReq('DELETE', shbUrl(bid, tid)); await shbAfter(from); return {skipped: []}; },
     redo: async () => { await shbReq('POST', shbUrl(bid, tid, 'restore')); await shbAfter(tid); return {skipped: []}; }});
   histToast(tr('Sheet {0} created', qn(name)), e);
@@ -47,7 +47,7 @@ async function shbRename(sh, tid) {
   if (t == null || !t.trim() || t.trim() === cur) return;
   const set = async v => { await shbReq('PATCH', shbUrl(bid, tid), {name: v}); await shbAfter(); };
   try { await set(t.trim()); } catch (e) { toast(e.message); return; }
-  const e = histAdd({label: tr('Renamed {0}', qn(t.trim())), ids: [], snaps: [], lids: [], undo: async () => { await set(cur); return {skipped: []}; }, redo: async () => { await set(t.trim()); return {skipped: []}; }});
+  const e = histAdd({label: tr('Renamed {0}', qn(t.trim())), ids: [], snaps: [], lids: [], srv: true, undo: async () => { await set(cur); return {skipped: []}; }, redo: async () => { await set(t.trim()); return {skipped: []}; }});
   histToast(tr('Renamed'), e);
 }
 async function shbMove(sh, tid, to) {
@@ -55,7 +55,7 @@ async function shbMove(sh, tid, to) {
   if (was < 0 || to < 0 || to >= shbTabs().length || to === was) return;
   const set = async p => { await shbReq('PATCH', shbUrl(bid, tid), {pos: p}); await shbAfter(); };
   try { await set(to); } catch (e) { toast(e.message); return; }
-  const e = histAdd({label: tr('Move {0}', qn(shbName(tid))), ids: [], snaps: [], lids: [], undo: async () => { await set(was); return {skipped: []}; }, redo: async () => { await set(to); return {skipped: []}; }});
+  const e = histAdd({label: tr('Move {0}', qn(shbName(tid))), ids: [], snaps: [], lids: [], srv: true, undo: async () => { await set(was); return {skipped: []}; }, redo: async () => { await set(to); return {skipped: []}; }});
   histToast(tr('Moved'), e);
 }
 async function shbDelete(sh, tid) {
@@ -63,7 +63,7 @@ async function shbDelete(sh, tid) {
   const next = tabs[i + 1] || tabs[i - 1];
   try { await shbReq('DELETE', shbUrl(bid, tid)); } catch (e) { toast(e.message); return; }
   await shbAfter(tid === sh.id ? next?.id : null);
-  const e = histAdd({label: tr('Deleted {0}', qn(name)), ids: [], snaps: [], lids: [],
+  const e = histAdd({label: tr('Deleted {0}', qn(name)), ids: [], snaps: [], lids: [], srv: true,
     undo: async () => { await shbReq('POST', shbUrl(bid, tid, 'restore')); await shbAfter(tid); return {skipped: []}; },
     redo: async () => { await shbReq('DELETE', shbUrl(bid, tid)); await shbAfter(next?.id); return {skipped: []}; }});
   histToast(tr('Sheet {0} deleted', qn(name)), e);

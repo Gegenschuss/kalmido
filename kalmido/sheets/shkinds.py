@@ -10,6 +10,7 @@ SHK_TRASH_DAYS. Changing a column's kind keeps every input as it was (an input t
 freeze_rows / freeze_cols (sheets columns): the first N rows / columns stay in view while scrolling (the client makes them
 sticky); changed with the right to write the table. Not to be mixed up with sh_freeze (a cell's value kept as a copy).
 """
+import json
 import mimetypes
 import os
 import re
@@ -320,6 +321,11 @@ def shk_fixed(sid):
     if out:
         c.execute(f"UPDATE sheets SET {','.join(k + '=?' for k in out)} WHERE id=?", [*out.values(), sid])
         sh_touch(c, sid, me())
+        was = {k: r[k] for k in ("freeze_rows", "freeze_cols")}
+        now = {**was, **out}
+        if now != was:  # 2.800.0 (#5409): the person's step (sheets/shustep.py)
+            from .shundo import shu_rec
+            shu_rec(c, r, "fixed", json.dumps(was), json.dumps(now))
     c.commit()
     r = sh_reload(c, sid)
     return jsonify(ok=True, rev=r["rev"], freeze_rows=r["freeze_rows"], freeze_cols=r["freeze_cols"])

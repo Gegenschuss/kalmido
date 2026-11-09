@@ -65,12 +65,29 @@ SHH_CORE = {"title": "title", "tab_name": "tab", "list_id": "list"}  # column of
 SHH_META["list"] = N_("Project")
 
 
+SHH_OWN = ("title", "tab_name", "list_id")  # 2.800.0 (#5409): the table's own fields of its copy step (sheets/shustep.py)
+
+
+class _NotOwn:
+    """2.800.0 (#5409): every column of the sheets row but its own fields -- not part of the copy step's check (a chart, a
+    colour rule, the sheet's place changed since do not stop the title's way back)."""
+
+    def __contains__(self, k):
+        return k not in SHH_OWN and k != "deleted_at"
+
+
+def _label(main):
+    from ..core.undogroups import UG_LABEL
+    return UG_LABEL, [main.get("title") or "Table"]
+
+
 def _core():
     """2.571.0 (#4766): the core's write layer, imported on first use (core/writes.py -> core/objects.py -> files/web.py ->
-    ... -> sheets: a module-level import would be a cycle); the kind is tracked once."""
+    ... -> sheets: a module-level import would be a cycle); the kind is tracked once. 2.800.0 (#5409): its steps are in the
+    area of the tables, name the table and check only its own fields (sheets/shustep.py takes them back)."""
     from ..core.writes import OBJ_TRACK, obj_history_add, obj_track
     if SHH_KIND not in OBJ_TRACK:
-        obj_track(SHH_KIND, "sheets")
+        obj_track(SHH_KIND, "sheets", area="sheets", undo_nofp={"sheets": _NotOwn()}, undo_label=_label)
     return obj_history_add
 
 

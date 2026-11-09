@@ -603,6 +603,7 @@ ORDER = (
     "collab.recent",  # 2.769.0 (#5352): "Recently edited" over Knowledge, Files and Reading (GET /api/recent)
     "core.undodiff",  # 2.774.0 (#5251): the diff parts of the step groups (no routes)
     "sheets.shundo",  # 2.778.0 (#5253): a person's table writes as steps on the server (no routes)
+    "sheets.shustep",  # 2.800.0 (#5409): a person's structural table changes as steps on the server (no routes)
     "tasks.tundo",  # 2.774.0 (#5251): the tasks' and sections' undo steps on the server (no routes)
     "wiki.wkundo",  # 2.778.0 (#5253): a person's knowledge page saves as steps on the server (no routes)
     # -- end of the sorted block: only core.idem and startup follow, they stay last

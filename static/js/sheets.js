@@ -550,7 +550,7 @@ async function shvRename(id, cur) {
   if (t == null || !t.trim() || t.trim() === cur) return;
   const set = async v => { await rawFetch('PATCH', '/api/sheets/' + id, {title: v}); shvAfterIdx(id); };
   try { await set(t.trim()); } catch (e) { toast(e.message); return; }
-  const e = histAdd({label: tr('Renamed {0}', qn(t.trim())), ids: [], snaps: [], lids: [], undo: async () => { await set(cur); return {skipped: []}; }, redo: async () => { await set(t.trim()); return {skipped: []}; }});
+  const e = histAdd({label: tr('Renamed {0}', qn(t.trim())), ids: [], snaps: [], lids: [], srv: true, undo: async () => { await set(cur); return {skipped: []}; }, redo: async () => { await set(t.trim()); return {skipped: []}; }});
   histToast(tr('Renamed'), e);
 }
 async function shvDelete(id, title, lid) {
@@ -577,7 +577,7 @@ async function shvSetList(sh, lid) {
   const old = sh.list_id || null, id = sh.id; if (old === lid) return;
   const set = async v => { await rawFetch('PATCH', '/api/sheets/' + id, {list_id: v}); shvAfterIdx(id); if (SHV.sh?.id === id) await shvLoad(id, true); };
   try { await set(lid); } catch (e) { toast(e.message); return; }
-  const e = histAdd({label: lid ? tr('Attached') : tr('Detached'), ids: [], snaps: [], lids: [], undo: async () => { await set(old); return {skipped: []}; }, redo: async () => { await set(lid); return {skipped: []}; }});
+  const e = histAdd({label: lid ? tr('Attached') : tr('Detached'), ids: [], snaps: [], lids: [], srv: true, undo: async () => { await set(old); return {skipped: []}; }, redo: async () => { await set(lid); return {skipped: []}; }});
   histToast(lid ? tr('Attached to {0}', lname(listById(lid)) || '') : tr('Detached'), e);
 }
 // rows
@@ -597,7 +597,7 @@ async function shvRowAdd(afterId, above) {
 }
 async function shvRowDel(rid) {
   const sid = SHV.sh?.id, n = SHV.sh?._rowNo.get(rid);
-  await shvStep(tr('Row {0} deleted', n), () => rawFetch('DELETE', `/api/sheets/${sid}/rows/${rid}`), () => rawFetch('POST', `/api/sheets/${sid}/rows/${rid}/restore`), tr('Row {0} deleted', n));
+  await shvStep(tr('Row {0} deleted', n), () => rawFetch('DELETE', `/api/sheets/${sid}/rows/${rid}`), () => rawFetch('POST', `/api/sheets/${sid}/rows/${rid}/restore`), tr('Row {0} deleted', n), null, true);  // 2.800.0 (#5409): srv
 }
 function shvSortVal(col, c) {
   if (!c || c.error) return null;
@@ -615,14 +615,14 @@ async function shvSort(cid, dir) {
   if (ids.join() === old.join()) return;
   SHV.sorted = {sid, c: cid, dir};
   // 2.528.0 (#4305 A12): prev = the order this device saw: a sorting elsewhere meanwhile is refused (409), not overwritten
-  await shvStep(tr('Sorted by {0}', col.title || col.letter), () => rawFetch('POST', `/api/sheets/${sid}/rows/order`, {ids, prev: old}), () => rawFetch('POST', `/api/sheets/${sid}/rows/order`, {ids: old, prev: ids}), tr('Sorted by {0}', col.title || col.letter));
+  await shvStep(tr('Sorted by {0}', col.title || col.letter), () => rawFetch('POST', `/api/sheets/${sid}/rows/order`, {ids, prev: old}), () => rawFetch('POST', `/api/sheets/${sid}/rows/order`, {ids: old, prev: ids}), tr('Sorted by {0}', col.title || col.letter), null, true);
 }
 // columns
 async function shvColDel(cid) {
   const sh = SHV.sh, col = sh?._col.get(cid); if (!col) return;
   const sid = sh.id, used = (sh.cells || []).some(c => (c.refs || []).some(r => sh._id.get(r)?.col_id === cid) && c.col_id !== cid);
   if (used && !await askConfirm(tr('Delete column {0}?', col.title || col.letter), tr('Formulas use it and then show an error.'), {ok: tr('Delete'), danger: true})) return;
-  await shvStep(tr('Column {0} deleted', col.title || col.letter), () => rawFetch('DELETE', `/api/sheets/${sid}/columns/${cid}`), () => rawFetch('POST', `/api/sheets/${sid}/columns/${cid}/restore`), tr('Column {0} deleted', col.title || col.letter));
+  await shvStep(tr('Column {0} deleted', col.title || col.letter), () => rawFetch('DELETE', `/api/sheets/${sid}/columns/${cid}`), () => rawFetch('POST', `/api/sheets/${sid}/columns/${cid}/restore`), tr('Column {0} deleted', col.title || col.letter), null, true);
 }
 async function shvColPatch(cid, body, label, seen) {  // seen: 2.576.0 (#4764) the column as the dialog showed it (its _prev)
   const sh = SHV.sh, col = seen || sh?._col.get(cid); if (!col || !sh?._col.get(cid)) return;
@@ -630,7 +630,7 @@ async function shvColPatch(cid, body, label, seen) {  // seen: 2.576.0 (#4764) t
   if (JSON.stringify(old) === JSON.stringify(body)) return;
   // 2.528.0 (#4305 A12): _prev = what this device saw; a field changed elsewhere meanwhile stays as it is there (conflicts)
   const send = async (b, p) => { const r = await rawFetch('PATCH', `/api/sheets/${sid}/columns/${cid}`, {...b, _prev: p}); if (r?.conflicts?.length) toast(tr('Changed elsewhere in the meantime') + ': ' + (col.title || col.letter)); return r; };
-  return shvStep(label || tr('Column changed'), () => send(body, old), () => send(old, body));  // 2.576.0 (#4764): the answer (its conflicts) for the dialog
+  return shvStep(label || tr('Column changed'), () => send(body, old), () => send(old, body), null, null, true);  // 2.576.0 (#4764): the answer (its conflicts) for the dialog
 }
 // 2.270.0 B (#3021): the dialog of a select column sends only its own option changes (add / rename / remove), the server applies
 // them to the current options; Undo sends the counterparts (rename checks the option is still as this step left it)
@@ -657,7 +657,7 @@ async function shvColOpts(col, body, label) {
   let added = [];
   return shvStep(label, async () => { const r = await send(rest, ops); added = r?.added || []; return r; },
     () => send(old, [...added.map(id => ({op: 'remove', id})), ...back]), null,
-    () => send(rest, ops.map(o => o.op === 'add' ? {...o, id: added.shift()} : o)).then(r => { added = r?.added || []; return r; }));
+    () => send(rest, ops.map(o => o.op === 'add' ? {...o, id: added.shift()} : o)).then(r => { added = r?.added || []; return r; }), true);
 }
 // 2.576.0 (#4764): a field of the column dialog changed elsewhere meanwhile (the answer's conflicts, sheets/web.py shx_col_prev):
 // the dialog comes again with the current column, the own input over it and those fields marked (objsave.js objMerge), instead
@@ -745,7 +745,7 @@ async function shvFreeze(c) {
   const set = async v => { const r = await rawFetch('POST', `/api/sheets/${sid}/cells/${cid}/freeze`, {frozen: v}); if (r?.cells) shvMerge(sid, r); else if (SHV.sh?.id === sid) await shvLoad(sid, true); };
   try { await set(to); } catch (e) { toast(e.message); return; }
   { const sd = $('#shv-side'); if (sd && SHV.sh?.id === sid) { sd.innerHTML = shvSideHtml(SHV.sh); sd.querySelector('[data-shv="freeze"]')?.focus({preventScroll: true}); } }  // 2.144.5 D (#2011): the button just tapped kept the panel from redrawing
-  const e = histAdd({label: to ? tr('Value frozen') : tr('Live again'), ids: [], snaps: [], lids: [], undo: async () => { await set(!to); return {skipped: []}; }, redo: async () => { await set(to); return {skipped: []}; }});
+  const e = histAdd({label: to ? tr('Value frozen') : tr('Live again'), ids: [], snaps: [], lids: [], srv: true, undo: async () => { await set(!to); return {skipped: []}; }, redo: async () => { await set(to); return {skipped: []}; }});
   histToast(to ? tr('Value frozen: it stays as it is until you make it live again') : tr('Live again'), e);
 }
 async function shvName(c, name) {
@@ -753,7 +753,7 @@ async function shvName(c, name) {
   if (name === old) return;
   const set = async v => { const r = await rawFetch('POST', `/api/sheets/${sid}/cells/${cid}/name`, {name: v}); if (r?.cells) shvMerge(sid, r); else if (SHV.sh?.id === sid) await shvLoad(sid, true); };
   try { await set(name); } catch (e) { toast(e.message); const i = $('#shv-name'); if (i) { i.value = old; i.focus(); } return; }
-  const e = histAdd({label: name ? tr('Name {0}', name) : tr('Name removed'), ids: [], snaps: [], lids: [], undo: async () => { await set(old); return {skipped: []}; }, redo: async () => { await set(name); return {skipped: []}; }});
+  const e = histAdd({label: name ? tr('Name {0}', name) : tr('Name removed'), ids: [], snaps: [], lids: [], srv: true, undo: async () => { await set(old); return {skipped: []}; }, redo: async () => { await set(name); return {skipped: []}; }});
   histToast(name ? tr('Cell named {0}: usable in formulas', name) : tr('Name removed'), e);
 }
 function shxUndoKeptText(k) {  // 2.528.0 (#4306 B24): what stayed at the agent Undo because someone typed into it since

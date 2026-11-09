@@ -8,8 +8,10 @@ named, the rest goes back; a row / column someone typed into since stays), forwa
 The person's batch carries no agent mark (sheet_cells.agent_batch stays empty, the agents' panel and their batch-undo
 routes never list or take it). The rights are the ones of now: write access to the table (sh_need write).
 Recorded right before the commit (core/pg.py Conn.pre_commit), only when the batch changed something.
-Not here (their own steps later): renaming / deleting / moving rows and columns, the sheet's title, tabs, charts, rules,
-names and frozen values -- the browser's own history keeps them as before."""
+2.800.0 (#5409): the other changes of a person to a table are steps of the same batch too (sheets/shustep.py): deleting rows
+and columns, a column's settings (title, type, options, width, ...), moving / sorting rows and columns, the chart, the colour
+rules, a cell's name and frozen value, the sheets of the bar (add, rename, move, delete); the table's own title and project
+go through the core's write layer (sheets/shhist.py shh_meta_write) and are a step of their own there."""
 import secrets
 
 from flask import g
@@ -22,7 +24,7 @@ from ..core.undodiff import ug_diff_add, undo_diff_reg, undo_person
 from ..core.undogroups import UG_LABEL, UG_TRACKED
 from ..core.undoweb import UG_GONE, UG_KEPT, UG_KEPT_REDO
 from ..core.writes import UNDO_NOTHING
-from .core import ShBook, sh_need, sh_reload, sh_touch, sh_undo_batch
+from .core import SH_STEP_KINDS, ShBook, sh_need, sh_reload, sh_touch, sh_undo_batch
 from .formula import sh_col_letter
 from .shfmt import shfm_undo
 from .shkinds import _shk_file_swap
@@ -69,11 +71,23 @@ def shu_flush(c):
 N_TABLE = "Table"
 
 
+def shu_rec(c, sheet_row, kind, old=None, new=None, cell_id=None, row_id=None, col_id=None):
+    """2.800.0 (#5409): a person's structural change of sheet_row into the request's batch (sheets/shustep.py takes it back);
+    nothing for an agent / no person / an undo running (shu_batch None)."""
+    from .core import sh_change
+    batch = shu_batch(c, sheet_row)
+    if batch:
+        sh_change(c, int(sheet_row["id"]), batch, None, kind, cell_id=cell_id, row_id=row_id, col_id=col_id, old=old, new=new)
+
+
 def _names(c, sheet_row, stayed, kept):
     """What stayed, as the table shows it: cell addresses (B4), rows / columns by number / letter."""
     book = ShBook(c, sh_reload(c, sheet_row["id"]))
     out = []
     for ch in stayed:
+        if ch.get("label"):  # 2.800.0 (#5409): a structural change names itself (sheets/shustep.py)
+            out.append(ch["label"])
+            continue
         x = book.at.get((ch["row_id"], ch["col_id"]))
         if x is not None and book.live(x):
             out.append(book.addr(x))
@@ -114,6 +128,12 @@ def shu_redo(c, sheet_row, batch, uid, stayed):
         elif r["kind"] == "fmt":
             if not shfm_undo(c, {**dict(r), "old_raw": r["new_raw"], "new_raw": r["old_raw"]}, uid):
                 stayed.append(dict(r))
+                continue
+        elif r["kind"] in SH_STEP_KINDS:  # 2.800.0 (#5409): a structural change (sheets/shustep.py)
+            went, left = SH_STEP_KINDS[r["kind"]](c, sheet_row, r, uid, ts, True)
+            if left:
+                stayed.append({**dict(r), "label": left})
+            if not went:
                 continue
         elif r["kind"] in ("row", "col"):
             # review r2778 F1: only a row / column this undo put into the trash comes back (deleted_at = the undo's time);

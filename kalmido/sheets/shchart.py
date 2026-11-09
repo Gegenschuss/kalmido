@@ -81,6 +81,9 @@ def sheets_chart_put(sid):
     was = c.execute("SELECT chart FROM sheets WHERE id=?", (sid,)).fetchone()[0] or ""
     c.execute("UPDATE sheets SET chart=? WHERE id=?", (json.dumps(ch) if ch else "", sid))
     shh_meta(c, sid, "chart", was, json.dumps(ch) if ch else "", me())
+    if was != (json.dumps(ch) if ch else ""):  # 2.800.0 (#5409): the person's step
+        from .shundo import shu_rec
+        shu_rec(c, sh_reload(c, sid), "chart", was, json.dumps(ch) if ch else "")
     sh_touch(c, sid, me())
     c.commit()
     return jsonify(ok=True, rev=sh_reload(c, sid)["rev"], chart=ch)

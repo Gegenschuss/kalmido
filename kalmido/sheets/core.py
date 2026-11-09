@@ -1422,6 +1422,9 @@ def sh_create(c, uid, space, title, list_id=None, columns=None, rows=None, agent
     return sid
 
 
+SH_STEP_KINDS = {}  # 2.800.0 (#5409): kind -> fn(c, sheet_row, change, uid, ts, redo) -> (went, what stayed | None) (sheets/shustep.py)
+
+
 def sh_undo_batch(c, sheet_row, batch, uid, kept=None, stayed=None):
     """Takes back exactly the changes of one agent call (newest first): cells get their former input when nobody changed them
     since, added rows / columns go to the trash, a sheet the call created goes to the trash. -> number of changes undone.
@@ -1450,6 +1453,12 @@ def sh_undo_batch(c, sheet_row, batch, uid, kept=None, stayed=None):
             if not shfm_undo(c, r, uid):
                 if stayed is not None:
                     stayed.append(dict(r))
+                continue
+        elif r["kind"] in SH_STEP_KINDS:  # 2.800.0 (#5409): a person's structural change (sheets/shustep.py)
+            went, left = SH_STEP_KINDS[r["kind"]](c, sheet_row, r, uid, ts, False)
+            if left and stayed is not None:
+                stayed.append({**dict(r), "label": left})
+            if not went:
                 continue
         elif r["kind"] in ("row", "col", "create") and shx_undo_keeps(c, sheet_row, r, batch, uid, ts, kept):
             c.execute("UPDATE sheet_changes SET undone_at=? WHERE id=?", (ts, r["id"]))  # 2.528.0 (#4306 B24): stays, see kept

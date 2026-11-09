@@ -474,6 +474,8 @@ def sheets_tabs_add(sid):
         pv = shp_clean(c, first, b.get("pivot"))
     tid = shb_create(c, first, uid, b.get("name"), after, copy_of=src, pivot=pv)
     sh_touch(c, tid, uid)
+    from .shundo import shu_rec
+    shu_rec(c, first, "tadd", None, str(tid))  # 2.800.0 (#5409): the person's step (on the table's first sheet)
     r = c.execute("SELECT * FROM sheets WHERE id=?", (tid,)).fetchone()
     return _answer(c, first, 201, tab={"id": tid, "name": shb_label(r)})
 
@@ -495,11 +497,10 @@ def sheets_tabs_patch(sid, tid):
         if not name:
             raise BadInput(tr("Invalid value: {0}", "name"))
         _name_free(tabs, name, but=tid)
-        if r["book_id"]:
-            c.execute("UPDATE sheets SET tab_name=?, title=? WHERE id=?", (name, name, tid))
-        else:
-            c.execute("UPDATE sheets SET tab_name=? WHERE id=?", (name, tid))
-        shh_meta_note(c, tid, "tab_name", shb_label(r), name, uid)  # 2.564.0 (#4701); 2.571.0 (#4766): in the core's history
+        shb_name_set(c, r, name, uid)
+        if name != shb_label(r):  # 2.800.0 (#5409): the person's step
+            from .shundo import shu_rec
+            shu_rec(c, first, "tname", json.dumps({"t": tid, "v": shb_label(r)}), json.dumps({"t": tid, "v": name}))
     if "pos" in b:
         p = b.get("pos")
         if isinstance(p, bool) or not isinstance(p, int) or not 0 <= p < len(tabs):
@@ -508,8 +509,21 @@ def sheets_tabs_patch(sid, tid):
         order.insert(p, tid)
         for k, x in enumerate(order):
             c.execute("UPDATE sheets SET tab_pos=? WHERE id=?", (float(k + 1), x))
+        was = [x["id"] for x in tabs]
+        if order != was:  # 2.800.0 (#5409): the person's step
+            from .shundo import shu_rec
+            shu_rec(c, first, "tpos", json.dumps(was), json.dumps(order))
     sh_touch(c, tid, uid)
     return _answer(c, first)
+
+
+def shb_name_set(c, r, name, uid):
+    """A sheet's name in the bar (r = its row; the name checked by the caller); a further sheet's title follows it."""
+    if r["book_id"]:
+        c.execute("UPDATE sheets SET tab_name=?, title=? WHERE id=?", (name, name, r["id"]))
+    else:
+        c.execute("UPDATE sheets SET tab_name=? WHERE id=?", (name, r["id"]))
+    shh_meta_note(c, r["id"], "tab_name", shb_label(r), name, uid)  # 2.564.0 (#4701); 2.571.0 (#4766): in the core's history
 
 
 @app.delete("/api/sheets/<int:sid>/tabs/<int:tid>")
@@ -521,7 +535,10 @@ def sheets_tabs_delete(sid, tid):
     r = _need_tab(c, first, tid)
     if not r["book_id"]:
         raise Denied(409, tr("This sheet carries the table and cannot be deleted on its own: delete the table instead"))
-    c.execute("UPDATE sheets SET deleted_at=? WHERE id=?", (iso_ms(now_utc()), tid))
+    ts = iso_ms(now_utc())
+    c.execute("UPDATE sheets SET deleted_at=? WHERE id=?", (ts, tid))
+    from .shundo import shu_rec
+    shu_rec(c, first, "tdel", str(tid), ts)  # 2.800.0 (#5409): the person's step
     sh_touch(c, first["id"], uid)
     return _answer(c, first)
 
