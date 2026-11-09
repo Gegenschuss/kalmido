@@ -156,7 +156,8 @@ check(field_vals(fr, "Archived") == {"Ticked": 1, "Not ticked": 1}, f"the reader
 check(total(Ri, WS, cf=f"{STATUS}:Paid") == 1 and total(Ri, WS, asn="140-200") == 2, "the reader's filters find only her documents")
 
 # ---------------------------------------------------------------- another organisation's admin: nothing of this one
-# tenant: GET /api/docs/facets (another organisation's workspace: 200 with nothing of it, like the list - no 404, the filter is a workspace, not an object)
+# another organisation's workspace: 200 with nothing of it, like the list (no 404: the filter is a workspace, not an object)
+# tenant: GET /api/docs/facets
 fo = facets(Ol, WS)
 check(isinstance(fo, dict) and not fo["senders"] and not fo["types"] and not fo["tags"] and fo["asn"] == {"with": 0, "without": 0} and fo["fields"] == [],
       f"another organisation's admin: no values, no numbers {fo}")
