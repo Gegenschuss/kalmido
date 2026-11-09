@@ -299,8 +299,8 @@ def oi_write(c, run, uid, man, zf, files, data, who):
             for col in spec.late:
                 fixed.setdefault(col, None)
             bad = umz_money_misfit(c, spec.table, src)
-            if bad:  # 2.765.0 (#5315): an amount NUMERIC(14,2) would round -- the row stays out, the report names its value
-                run.warning(N_("A row was not imported, its amount has more than two decimal places: {0} ({1})"), oi_area(spec), bad[1], must=True)
+            if bad:  # 2.765.0 (#5315): an amount NUMERIC(14,2) would round or cannot hold -- the row stays out, the report names its value
+                run.warning(N_("A row was not imported, its amount is not a number with at most two decimal places: {0} ({1})"), oi_area(spec), bad[1], must=True)
                 continue
             d = umz_row(c, spec.table, src, fixed, ts)
             if d is not None and spec.prep:

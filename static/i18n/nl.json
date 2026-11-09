@@ -17862,5 +17862,5 @@
   "Copy text": "Tekst kopiëren",
   "Copy the recognised text": "De herkende tekst kopiëren",
   "Column widths of the lists": "Kolombreedtes van de lijsten",
-  "A row was not imported, its amount has more than two decimal places: {0} ({1})": "Een regel is niet geïmporteerd, het bedrag heeft meer dan twee decimalen: {0} ({1})"
+  "A row was not imported, its amount is not a number with at most two decimal places: {0} ({1})": "Een regel is niet geïmporteerd, het bedrag is geen getal met hoogstens twee decimalen: {0} ({1})"
 }

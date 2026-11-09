@@ -17862,5 +17862,5 @@
   "Copy text": "Text kopieren",
   "Copy the recognised text": "Den erkannten Text kopieren",
   "Column widths of the lists": "Spaltenbreiten der Listen",
-  "A row was not imported, its amount has more than two decimal places: {0} ({1})": "Eine Zeile wurde nicht übernommen, ihr Betrag hat mehr als zwei Nachkommastellen: {0} ({1})"
+  "A row was not imported, its amount is not a number with at most two decimal places: {0} ({1})": "Eine Zeile wurde nicht übernommen, ihr Betrag ist keine Zahl mit höchstens zwei Nachkommastellen: {0} ({1})"
 }

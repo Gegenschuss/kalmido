@@ -48,7 +48,7 @@ from ..tasks.attachments import safe_name
 from .hosting import QuotaExceeded, fmt_bytes, quota_guard, quota_info
 from ..core.db import body, bump, connect, db, err, iso, iso_ms, now_utc, parse_iso, usettings, uset, create_user, DataError, IntegrityError
 from ..core.pg import insert_id, system_ctx
-from ..core.moneycol import MC_COLS  # 2.765.0 (#5315): the money columns NUMERIC(14,2)
+from ..core.moneycol import MC_COLS, MC_FITS  # 2.765.0 (#5315): the money columns NUMERIC(14,2) and their rule
 from ..core.errors import BadInput  # 2.273.0 A (#3030)
 from ..accounts.settings import clean_look_pref, clean_setting  # 2.273.0 A (#3030); 2.363.4 (#3127): clean_setting
 from ..tasks.snippets import snip_clean  # 2.273.0 A (#3030)
@@ -942,23 +942,27 @@ UMZ_MONEY_TABLES = {t for t, _c in UMZ_MONEY}
 
 
 def _money_fits(v):
-    """2.765.0 (#5315): v fits a NUMERIC(14,2) column without a change -- at most 12 places before the point and no third place
-    after it that is not 0 (the rule of the migration, core/moneycol.py). '' / None / no number at all: not this check's
-    business (_coerce leaves a non-number out, '' becomes NULL / the default as before)."""
-    if v is None or isinstance(v, bool) or (isinstance(v, str) and not v.strip()):
+    """2.765.0 (#5315): v fits a NUMERIC(14,2) column without a change -- the rule of the migration (core/moneycol.py MC_FITS:
+    a plain number with at most 12 places before the point, no third place after it that is not 0). '' / None: as before (NULL
+    or the column's default). Anything else (a text that is no plain number, '1,5', 'NaN', '1e3', true) does not fit either:
+    the import would otherwise leave the column out and the default 0 would stand in for it silently (review M1 / N1)."""
+    if v is None or (isinstance(v, str) and not v.strip()):
         return True
+    if isinstance(v, bool) or not isinstance(v, (str, int, float)):
+        return False
+    t = v.strip() if isinstance(v, str) else str(v)
+    if isinstance(v, str) and not re.fullmatch(MC_FITS, t):
+        return False
     try:
-        d = Decimal(v.strip() if isinstance(v, str) else str(v))
-    except (InvalidOperation, ValueError, TypeError):
-        return True
-    if not d.is_finite():
-        return True
-    return abs(d) < Decimal(10) ** 12 and d == d.quantize(Decimal("0.01"))
+        d = Decimal(t)
+    except (InvalidOperation, ValueError):
+        return False
+    return d.is_finite() and abs(d) < Decimal(10) ** 12 and d == d.quantize(Decimal("0.01"))
 
 
 def umz_money_misfit(c, table, src):
     """2.765.0 (#5315): (column, the value as in the file) of the first money column of the row that NUMERIC(14,2) would have
-    to round (1234.567), else None. The import does not round such a value silently: the row stays out and the report names
+    to round (1234.567) or cannot hold as it is ('1,5'), else None. The import does not round such a value silently: the row stays out and the report names
     the value, as the start's migration keeps a column with such a value TEXT and names it."""
     if table not in UMZ_MONEY_TABLES or not isinstance(src, dict):
         return None
