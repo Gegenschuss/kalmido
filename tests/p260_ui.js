@@ -156,7 +156,8 @@ const TOUCH = `(() => {
   top.classList.add('tl3');
   const labs = w.eval('topMoreItems()').filter(x => x !== '-').map(x => x.label);
   // 2.32.0 (#1062): the view tabs no longer fold into "…" (they become icons), Share and undo still do
-  check(['Share…', 'Nothing to undo'].every(x => labs.includes(x)) && !['List', 'Kanban', 'Timeline'].some(x => labs.includes(x)) && !labs.some(x => /^Search/.test(x)), 'tl3: Share and undo in "…", the view tabs stay: ' + labs.slice(0, 8).join(' | '));
+  // 2.773.0 (#5250): with nothing to undo here the undo entry opens the list "Recent steps" (named so in "…")
+  check(labs.includes('Share…') && labs.some(x => x === 'Nothing to undo' || x === 'Recent steps') && !['List', 'Kanban', 'Timeline'].some(x => labs.includes(x)) && !labs.some(x => /^Search/.test(x)), 'tl3: Share and undo in "…", the view tabs stay: ' + labs.slice(0, 8).join(' | '));
   top.classList.replace('tl3', 'tl4');
   check(!w.eval('topFolded()').some(x => x.icon === 'search'), 'tl4: Search stays in the header (2.18.0 #651, the title is cut instead)');
   top.classList.remove('tl4');
