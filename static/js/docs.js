@@ -224,16 +224,23 @@ function dc_bodyHtml(fold) {
 const dc_selMark = d => { const on = AB.selOn && AB.sel.has(d.id); return `<button type="button" class="dc-selmark" data-dcchk="${d.id}" role="checkbox" aria-checked="${on}" aria-label="${esc(tr('Select') + ': ' + d.name)}" tabindex="${AB.selOn ? 0 : -1}">${on ? ic('check', 's') : ''}</button>`; };
 // 2.583.0 (#4832): THE card of documents and of the file store: a document with its fields; o.file = a plain file or a folder of
 // the file store ({thumb, meta, attrs, after}: its picture, size and date, the button's own attributes, the menu after it)
+// 2.768.0 (#4888): a card the person may change can be dragged onto a folder (a mouse: the browser's drag; a finger: drag.js, data-abmv;
+// ablage.js ab_dragSrc / the cards' drg_attach), never in the trash
+function dc_dragAttr(d) {
+  if (typeof ab_canWrite !== 'function' || (S.route.mod === 'ablage' && !S.route.nid && typeof ab_curSpace === 'function' && ab_curSpace() === 'trash')) return '';
+  const n = typeof ab_item === 'function' ? ab_item(d.id) : null;
+  return ab_canWrite(n?.role || d.role) ? (typeof rowd_touch === 'function' && rowd_touch() ? ' data-abmv="1"' : ' draggable="true"') : '';
+}
 function dc_card(d, o = {}) {
   const f = o.file;
-  if (f) return `<li class="dc-card abcf${AB.sel.has(d.id) ? ' dc-on' : ''}" data-k="f${d.id}">${dc_selMark(d)}<button type="button" ${f.attrs} aria-label="${esc(d.name)}"><span class="dc-th">${f.thumb}</span><span class="dc-ct"><b class="dc-nm">${esc(d.name)}</b>${f.meta ? `<span class="dc-mt">${esc(f.meta)}</span>` : ''}</span></button>${f.after || ''}</li>`;
+  if (f) return `<li class="dc-card abcf${AB.sel.has(d.id) ? ' dc-on' : ''}" data-k="f${d.id}"${dc_dragAttr(d)}>${dc_selMark(d)}<button type="button" ${f.attrs} aria-label="${esc(d.name)}"><span class="dc-th">${f.thumb}</span><span class="dc-ct"><b class="dc-nm">${esc(d.name)}</b>${f.meta ? `<span class="dc-mt">${esc(f.meta)}</span>` : ''}</span></button>${f.after || ''}</li>`;
   const big = d.file || d.thumb_l ? dc_thumbUrl(d, true) : '';  // 2.583.0 (#4812): the sharp preview of big cards (tilesize.js)
   const thumb = d.thumb ? (typeof ts_img === 'function' ? ts_img(dc_thumbUrl(d), big) : `<img src="${esc(dc_thumbUrl(d))}" alt="" loading="lazy">`) : `<span class="dc-ph">${ic(dc_isPdf(d) ? 'file' : 'picture')}</span>`;
   const st = d.state === 'done' ? '' : `<span class="dc-st ${esc(d.state)}">${esc(tr(DC_STATE[d.state] || d.state))}</span>`;
   const meta = [d.date ? dc_day(d.date) : '', d.type?.name || '', d.asn ? `${DC.set?.asn_prefix || 'ASN'} ${d.asn}` : ''].filter(Boolean).map(esc).join(' · ');
   // 2.430.0 (#3582): a click always opens; the box (shown on hover, while choosing, or ticked) chooses, like Ctrl-/Shift-click and a long press
   const on = AB.selOn && AB.sel.has(d.id), cur = DC.lastId === d.id;  // 2.583.0 (#4835): the one looked at last; 2.768.0 (#4888): the area's one selection
-  return `<li class="dc-card${d.review ? ' rev' : ''}${on ? ' dc-on' : ''}${cur ? ' dc-cur' : ''}" data-k="dc${d.id}">${dc_selMark(d)}<button type="button" data-dco="${d.id}" aria-label="${esc(d.name)}">
+  return `<li class="dc-card${d.review ? ' rev' : ''}${on ? ' dc-on' : ''}${cur ? ' dc-cur' : ''}" data-k="dc${d.id}"${dc_dragAttr(d)}>${dc_selMark(d)}<button type="button" data-dco="${d.id}" aria-label="${esc(d.name)}">
     <span class="dc-th">${thumb}</span><span class="dc-ct"><b class="dc-nm" title="${esc(d.name)}">${esc(d.name)}</b>${d.sender?.name ? `<span class="dc-snd" title="${esc(d.sender.name)}">${esc(d.sender.name)}</span>` : '' /* 2.583.0 (#4870): always the title, the sender below it */}
     <span class="dc-mt">${meta}${d.amount ? ` · ${esc(dc_money(d.amount, d.currency))}` : ''}</span>
     ${d.tags.length ? `<span class="dc-tags">${d.tags.map(t => `<span class="dc-tag">${esc(t.name)}</span>`).join('')}</span>` : ''}

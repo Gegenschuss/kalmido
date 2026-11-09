@@ -592,21 +592,39 @@ document.addEventListener('change', e => { if (e.target.id === 'ab-file') { cons
 // 2.750.0 (#4879): every part of a row or card starts the move (its picture and link too - their own drag carried a file and
 // uploaded it as a new version onto itself); the drag carries the node id as KN_MIME (dropany.js kn_dragSet, shared with the
 // documents' cards later), the drops below move by it and upload only a drag that did not begin in Kalmido (kn_has)
-const ab_dragSrc = t => /** @type {any} */ (t)?.closest?.('.abview .abrow[data-abid], .abview .dc-card [data-dco], .abview .dc-card [data-ab="open"][data-id]');
-const ab_dragId = r => +(r.dataset.abid || r.dataset.dco || r.dataset.id) || 0;
+// 2.768.0 (#4888): + the cards of "All documents" / "To review" (onto a folder of the panel); a row or card of the choice drags the
+// whole choice (what the person may change), one drop = ONE undo step (ab_selMoveTo, the bar's Move)
+const ab_dragSrc = t => /** @type {any} */ (t)?.closest?.('.abview .abrow[data-abid], #view .dc-view .dc-card [data-dco], .abview .dc-card [data-ab="open"][data-id], #view .dc-view .dc-card[draggable], .abview .dc-card[draggable]');
+const ab_dragObj = id => (typeof ab_selObj === 'function' ? ab_selObj(id) : null) || ab_item(id);
+// the nodes a drag of id moves: the choice when id is ticked in it (only what the person may change), else id alone
+function ab_dragIds(id) {
+  if (!(AB.selOn && AB.sel.has(id) && AB.sel.size > 1)) return [id];
+  return [...AB.sel.values()].filter(x => ab_canWrite(x.role)).map(x => x.id);
+}
+// a target folder takes the drag: not one of the dragged nodes, not (for one node) its own folder
+const ab_dropOk = to => { const ids = AB.dragIds || []; if (!ids.length || ids.includes(to)) return false; return ids.length > 1 || ab_moveTo(ab_dragObj(ids[0]), to); };
+// the drop: one node the plain way (ab_move: locked folders, its undo), several as the bar's Move (one undo, the skipped counted)
+function ab_dragDrop(to) {
+  const ids = AB.dragIds || []; AB.drag = null; AB.dragIds = null;
+  if (!ids.length || ids.includes(to)) return;
+  if (ids.length === 1) { const n = ab_dragObj(ids[0]); if (n && ab_canMove(n) && ab_moveTo(n, to)) { if (ab_item(n.id)) ab_move(n, to); else ab_selMoveTo([ab_selInfo(n)], to); } return; }
+  const xs = ids.map(i => AB.sel.get(i)).filter(Boolean);
+  ab_selMoveTo(xs, to, AB.sel.size - xs.length);
+}
+const ab_dragId = r => r.classList.contains('dc-card') ? ab_cardId(r) : +(r.dataset.abid || r.dataset.dco || r.dataset.id) || 0;
 const ab_canMove = n => !!n && ab_canWrite(n.role) && !(!S.route.nid && ab_curSpace() === 'trash');
 const ab_moveTo = (n, to) => !!n && to !== n.id && (to ?? null) !== (n.parent_id ?? null);  // not onto itself, not into its own folder (nothing to do)
 document.addEventListener('dragstart', e => {
   const r = ab_dragSrc(e.target); if (!r || !e.dataTransfer) return;
-  const id = ab_dragId(r), n = ab_item(id); kn_dragSet(e, [id]);
-  if (!ab_canMove(n)) return;  // read-only / the trash: no move (KN_MIME still keeps it from uploading)
-  AB.drag = id; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', n?.locked ? '' : n?.name || '');  // 2.353.0 F (#2758, review N9): no plain name of a locked folder
+  const id = ab_dragId(r), n = ab_dragObj(id), ids = ab_dragIds(id); kn_dragSet(e, ids);
+  if (!ab_canMove(n) || !ids.length) return;  // read-only / the trash: no move (KN_MIME still keeps it from uploading)
+  AB.drag = id; AB.dragIds = ids; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', ids.length > 1 || n?.locked ? '' : n?.name || '');  // 2.353.0 F (#2758, review N9): no plain name of a locked folder
 });
-document.addEventListener('dragend', () => { AB.drag = null; $$('.abdrop').forEach(x => x.classList.remove('abdrop')); });
+document.addEventListener('dragend', () => { AB.drag = null; AB.dragIds = null; $$('.abdrop').forEach(x => x.classList.remove('abdrop')); });
 document.addEventListener('dragover', e => {
   const v = e.target.closest?.('.abview'); if (!v) { ab_sideOver(e); return; }
   const files = [...(e.dataTransfer?.types || [])].includes('Files') && !kn_has(e), t = e.target.closest('[data-abdrop]');  // 2.750.0 (#4879)
-  if (AB.drag && t && ab_moveTo(ab_item(AB.drag), t.dataset.abdrop === 'top' ? null : +t.dataset.abdrop)) { e.preventDefault(); $$('.abdrop').forEach(x => x !== t && x.classList.remove('abdrop')); t.classList.add('abdrop'); return; }  // 2.750.0 (#4879): its own folder takes nothing
+  if (AB.drag && t && ab_dropOk(t.dataset.abdrop === 'top' ? null : +t.dataset.abdrop)) { e.preventDefault(); $$('.abdrop').forEach(x => x !== t && x.classList.remove('abdrop')); t.classList.add('abdrop'); return; }  // 2.750.0 (#4879): its own folder takes nothing
   if (files && v.classList.contains('abdropok')) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; v.classList.add('abdrop'); }
 });
 document.addEventListener('dragleave', e => { if (e.target.classList?.contains('abview') && !e.target.contains(e.relatedTarget)) e.target.classList.remove('abdrop'); });
@@ -614,7 +632,7 @@ document.addEventListener('drop', e => {
   const v = e.target.closest?.('.abview'); if (!v) { ab_sideDrop(e); return; }
   e.preventDefault(); $$('.abdrop').forEach(x => x.classList.remove('abdrop'));
   const t = e.target.closest('[data-abdrop]');
-  if (AB.drag || kn_has(e)) { const n = ab_item(AB.drag || kn_ids(e)[0]); AB.drag = null; const to = t ? (t.dataset.abdrop === 'top' ? null : +t.dataset.abdrop) : undefined; if (n && t && ab_canMove(n) && ab_moveTo(n, to)) ab_move(n, to); return; }  // 2.750.0 (#4879): a drag from Kalmido never uploads
+  if (AB.drag || kn_has(e)) { if (!AB.dragIds && !AB.drag) AB.dragIds = kn_ids(e).slice(0, 1); const to = t ? (t.dataset.abdrop === 'top' ? null : +t.dataset.abdrop) : undefined; if (t && to !== undefined) ab_dragDrop(to); else { AB.drag = null; AB.dragIds = null; } return; }  // 2.750.0 (#4879): a drag from Kalmido never uploads; 2.768.0 (#4888): the whole choice
   const fs = e.dataTransfer?.files; if (!fs?.length || !v.classList.contains('abdropok')) return;
   ab_upload(fs, t && t.dataset.abdrop !== 'top' ? +t.dataset.abdrop : S.route.nid || null);
 });
@@ -624,28 +642,42 @@ document.addEventListener('drop', e => {
 // moving = what the long press did (the menu, or a tick while choosing). The mouse keeps the browser's drag above.
 const ab_fingerT = (d, x, y) => {
   const t = /** @type {any} */ (document.elementFromPoint(x, y))?.closest?.('#view .abview [data-abdrop], #side [data-abdrop]');
-  return t && t.dataset.abdrop !== String(d.id) ? t : null;
+  return t && t.dataset.abdrop !== String(d.id) && !(d.ids || []).includes(+t.dataset.abdrop) ? t : null;  // 2.768.0 (#4888): not one of the dragged
 };
+// 2.768.0 (#4888): the finger's drop = the mouse's (ab_dragDrop: one node, or the whole choice with one undo)
+const ab_fingerDrop = (d, x, y) => { const t = ab_fingerT(d, x, y); ab_fingerOff(d); if (!t) return; AB.drag = d.id; AB.dragIds = d.ids; ab_dragDrop(t.dataset.abdrop === 'top' ? null : +t.dataset.abdrop); };
 const ab_fingerOff = d => { d.r.classList.remove('dragging'); $$('.abdrop').forEach(x => x.classList.remove('abdrop')); };
 drg_attach(document, {
   mouse: false, hold: ROWD_HOLD, holdMove: 8, onTarget: true, raf: true, ghost: {el: d => d.r, cls: 'ghost-drag'},
   scroll: () => tdScroller($('#view')), edge: TD_EDGE, step: TD_MAX,
   start: t => {
     const r = /** @type {any} */ (t).closest?.('#view .abview .abrow[data-abmv]');
-    return r && !t.closest('input, textarea, select') && ab_item(+r.dataset.abid) ? {r, id: +r.dataset.abid} : null;
+    return r && !t.closest('input, textarea, select') && ab_item(+r.dataset.abid) ? {r, id: +r.dataset.abid, ids: ab_dragIds(+r.dataset.abid)} : null;
   },
   onHold: d => { ms_lpTake(AB_LP); d.r.classList.add('dragging'); if (navigator.vibrate) navigator.vibrate(12); },
   onMove: (d, x, y) => { const t = ab_fingerT(d, x, y); $$('.abdrop').forEach(b => b !== t && b.classList.remove('abdrop')); t?.classList.add('abdrop'); },
-  onDrop: (d, x, y) => {
-    const t = ab_fingerT(d, x, y), n = ab_item(d.id); ab_fingerOff(d);
-    if (t && n) ab_move(n, t.dataset.abdrop === 'top' ? null : +t.dataset.abdrop);
-  },
+  onDrop: ab_fingerDrop,
   onTap: d => { ab_fingerOff(d); const r = d.r.isConnected ? d.r : $(`#view .abview .abrow[data-abid="${d.id}"]`); if (r) ab_rowPick(r) || ab_rowCm(r); },
+  onCancel: ab_fingerOff,
+});
+// 2.768.0 (#4888): the cards the same way (documents, files, folders): hold, then drag onto a folder; held and let go unmoved =
+// the long press (the card's menu with "Select" on top, or a tick while choosing)
+drg_attach(document, {
+  mouse: false, hold: ROWD_HOLD, holdMove: 8, onTarget: true, raf: true, ghost: {el: d => d.r, cls: 'ghost-drag'},
+  scroll: () => tdScroller($('#view')), edge: TD_EDGE, step: TD_MAX,
+  start: t => {
+    const r = /** @type {any} */ (t).closest?.('#view .dc-card[data-abmv]'), id = r && ab_cardId(r);
+    return id && !t.closest('input, textarea, select, [data-ab="menu"]') ? {r, id, ids: ab_dragIds(id)} : null;
+  },
+  onHold: d => { ms_lpTake(AB_CARDLP); d.r.classList.add('dragging'); if (navigator.vibrate) navigator.vibrate(12); },
+  onMove: (d, x, y) => { const t = ab_fingerT(d, x, y); $$('.abdrop').forEach(b => b !== t && b.classList.remove('abdrop')); t?.classList.add('abdrop'); },
+  onDrop: ab_fingerDrop,
+  onTap: d => { ab_fingerOff(d); if (d.r.isConnected) ab_cardPick(d.r) || ab_cardMenu(d.r); },
   onCancel: ab_fingerOff,
 });
 
 // 2.152.3 B (#2621): a folder in the panel takes a dragged file row (moves it) or files from the computer (upload into it)
-const ab_sideT = e => { const t = e.target.closest?.('#side [data-abdrop]'); return t && (AB.drag ? ab_moveTo(ab_item(AB.drag), +t.dataset.abdrop) : [...(e.dataTransfer?.types || [])].includes('Files') && !kn_has(e)) ? t : null; };  // 2.750.0 (#4879): + not a drag from Kalmido
+const ab_sideT = e => { const t = e.target.closest?.('#side [data-abdrop]'); return t && (AB.drag ? ab_dropOk(+t.dataset.abdrop) : [...(e.dataTransfer?.types || [])].includes('Files') && !kn_has(e)) ? t : null; };  // 2.750.0 (#4879): + not a drag from Kalmido
 function ab_sideOver(e) {
   const t = ab_sideT(e); $$('#side .abdrop').forEach(x => x !== t && x.classList.remove('abdrop')); if (!t) return;
   e.preventDefault(); e.dataTransfer.dropEffect = AB.drag ? 'move' : 'copy'; t.classList.add('abdrop');
@@ -653,7 +685,7 @@ function ab_sideOver(e) {
 function ab_sideDrop(e) {
   const t = ab_sideT(e); if (!t) return;
   e.preventDefault(); $$('.abdrop').forEach(x => x.classList.remove('abdrop'));
-  if (AB.drag) { const n = ab_item(AB.drag); AB.drag = null; if (n && ab_moveTo(n, +t.dataset.abdrop)) ab_move(n, +t.dataset.abdrop); return; }
+  if (AB.drag) { ab_dragDrop(+t.dataset.abdrop); return; }  // 2.768.0 (#4888): one node or the whole choice
   if (e.dataTransfer?.files?.length && !kn_has(e)) ab_upload(e.dataTransfer.files, +t.dataset.abdrop);
 }
 // ---- "Show in the file store" for a task / project file: a link at the top of the file's workspace (no copy; the original's

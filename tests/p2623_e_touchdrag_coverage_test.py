@@ -54,6 +54,7 @@ TD_SITES = {
     # 2.627.0 (#4961 #4962): a file onto a folder, the icons of the area rail
     ("ablage.js", 'class="abrow"'): ("drag.js", "ablage.js"),
     ("ablage.js", "ab_dragSrc(e.target)"): ("drag.js", "ablage.js"),  # 2.750.0 (#4879): the rows' and cards' dragstart (was .abrow[draggable)
+    ("docs.js", "data-abmv=\"1\"' : ' draggable=\"true\"'"): ("drag.js", "ablage.js"),  # 2.768.0 (#4888): the cards onto a folder (dc_dragAttr; the finger: ablage.js, .dc-card[data-abmv])
     # 2.750.0 (#4879): only a marker on every drag that begins in the page (a drop never uploads it); each drag's finger way is its own place
     ("dropany.js", "setData(KN_IN_MIME"): ("kein", "a marker on every drag that begins in the page, no drag of its own; the finger ways are the places' own"),
     ("areas.js", "sbb_on() && !S.me?.kid"): ("drag.js", "areas.js"),
@@ -139,7 +140,9 @@ check("!rowd_touch() ? 'draggable=\"true\"'" in SRC["sheetbook.js"], "sheetbook.
 check("drg_attach(document, {" in SRC["basket.js"] and "kbGroupMove(d.id" in SRC["basket.js"], "basket.js: the finger moves a group by drg_attach, the same kbGroupMove")
 # 2.627.0 (#4961 #4962 #4966): the file rows and the rail icons keep the mouse's drag and get the finger from drag.js; the
 # sidebar's list rows, the areas' tree and the favourite tiles lost their own touch path
-check("rowd_touch() ? 'data-abmv=\"1\"' : 'draggable=\"true\"'" in SRC["ablage.js"] and "ab_move(n, t.dataset.abdrop" in SRC["ablage.js"] and "mouse: false" in SRC["ablage.js"],
+# 2.768.0 (#4888): the drop of rows and cards (one or the whole choice) is ab_dragDrop for mouse and finger
+check("rowd_touch() ? 'data-abmv=\"1\"' : 'draggable=\"true\"'" in SRC["ablage.js"] and "ab_dragDrop(t.dataset.abdrop" in SRC["ablage.js"] and "mouse: false" in SRC["ablage.js"]
+      and ".dc-card[data-abmv]" in SRC["ablage.js"],
       "ablage.js: the finger moves a file by drg_attach (the same ab_move), no browser drag on a touch screen")
 check("!rowd_touch() ? ' draggable=\"true\"'" in SRC["areas.js"] and "sbb_move(d.id, t.dataset.sbb" in SRC["areas.js"], "areas.js: the finger sorts the rail by drg_attach (the same sbb_move)")
 # 2.633.0 (#4963 #4964 #4965): the receipts, the office documents and the pipeline cards: the finger by drag.js, the mouse keeps the browser's drag
