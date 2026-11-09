@@ -41,7 +41,7 @@ const call = async (method, url, body, ck = CK) => { const r = await fetch(B + u
     const tap = (x, y) => cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 'f1', parameters: {pointerType: 'touch'}, actions: [{type: 'pointerMove', x: Math.round(x), y: Math.round(y)}, {type: 'pointerDown', button: 0}, {type: 'pause', duration: 60}, {type: 'pointerUp', button: 0}]}]}).then(() => cmd('input.releaseActions', {context: ctx}));
     for (const [where, hash] of [['inbox', '#inbox'], ['project', `#l/${W}`]]) {
       await o.nav(B + hash);
-      for (let i = 0; i < 40 && !(await ev(`!!(window.S && S.booted && document.querySelector('#fab:not(.gone)'))`).catch(() => false)); i++) await sleep(250);
+      for (let i = 0; i < 40 && !(await ev(`!!(window.S && S.booted && document.querySelector('#fab:not(.gone)')) && location.hash === '${hash}'`).catch(() => false)); i++) await sleep(250);
       for (let i = 0; i < 40 && (await ev(`document.getAnimations().filter(a => a.playState === 'running').length`).catch(() => 0)); i++) await sleep(100);
       const p = await ev(`(() => {
         const f = document.querySelector('#fab'), r = f.getBoundingClientRect(), out = {r: [r.left, r.top, r.width, r.height], hits: []};
@@ -63,7 +63,8 @@ const call = async (method, url, body, ck = CK) => { const r = await fetch(B + u
         let made = false;
         // 2.381.0 (#3543): up to 15 s - under a loaded runner the new task was not there after 3 s (alone green)
         for (let i = 0; i < 150 && !(made = await ev(`[...S.tasks.values()].some(t => t.title === 'Tapped task' && t.list_id === ${W})`)); i++) await sleep(100);
-        check(made, 'project: the task from the sheet is in the project');
+        // 2.771.0 (#5341): CI v2.761.0 red here once (green in v2.762.0): say where the task went, if it came at all
+        check(made, 'project: the task from the sheet is in the project ' + (made ? '' : JSON.stringify(await ev(`({tasks: [...S.tasks.values()].filter(t => /Tapped/.test(t.title)).map(t => [t.id, t.list_id]), want: ${W}, field: document.querySelector('#qsheet')?.value ?? null, sheet: !!document.querySelector('.qadd.sheet'), hash: location.hash, toast: document.querySelector('.toast')?.textContent || ''})`))));
         await tap(200, 120);
         for (let i = 0; i < 30 && (await ev(`!!document.querySelector('.qadd.sheet') || !document.querySelector('#fab:not(.gone)') || !!document.querySelector('.an-out')`)); i++) await sleep(100);
         for (let i = 0; i < 40 && (await ev(`document.getAnimations().filter(a => a.playState === 'running').length`).catch(() => 0)); i++) await sleep(100);
@@ -76,6 +77,10 @@ const call = async (method, url, body, ck = CK) => { const r = await fetch(B + u
         check(again, 'project: the second finger tap on + opens the quick add again');
       }
       await ev(`(() => { closePop(); return 1; })()`);
+      // 2.771.0 (#5341, CI red v2.761.0, then on the Mac: the project step ran on #inbox): closing the sheet takes its history entry
+      // back with history.back() (backclose.js f8d_sync), a moment later; the next navigate landed before it and that Back took it
+      // back. Wait until the app's own Back has landed and no overlay entry is left (a real state).
+      for (let i = 0; i < 50 && !(await ev(`!f8d_bk.skip && !f8d_bk.queued && f8d_bk.pushed === f8d_depth()`).catch(() => true)); i++) await sleep(100);
     }
   }, true);
   console.log(`${ok} ok, ${F.length} failed`);
