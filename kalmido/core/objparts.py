@@ -49,7 +49,7 @@ import re
 from .access import Denied, acx_of, live_sql, trash_sql  # 2.783.0 (#5368): live_sql, trash_sql
 from .conflict import ccf_check
 from .db import iso, now_utc
-from .pg import insert_id, write_lock  # 2.783.0 (#5368): insert_id
+from .pg import insert_id, qi, write_lock  # 2.783.0 (#5368): insert_id, qi
 
 PART_KINDS = {}  # kind -> {kind, table, lock, version, key, agent, live, trash_prune, prune, on_prune, copy}
 PART_COL = re.compile(r"^[a-z_][a-z0-9_]*$")
@@ -122,7 +122,7 @@ def part_trash(c, kind, rid, uid, where=None, args=()):
     _lock(c, k, rid, None)
     ts = iso(now_utc())
     w, a = _part_where(rid, where, args)
-    n = c.execute(f"UPDATE {k['table']} SET deleted_at=?, deleted_by=? WHERE {w} AND {live_sql()}", (ts, uid, *a)).rowcount
+    n = c.execute(f"UPDATE {qi(k['table'], (k['table'],))} SET deleted_at=?, deleted_by=? WHERE {w} AND {live_sql()}", (ts, uid, *a)).rowcount
     return ts if n else None
 
 
@@ -153,7 +153,7 @@ def part_copy(c, kind, rid, scope_id, held, uid):
     2.783.0 (#5368): returns the id of the copy (a deleted custom field's trash id)."""
     k = _kind(kind)
     row = c.execute(f"SELECT * FROM {k['table']} WHERE id=?", (int(rid),)).fetchone()
-    return insert_id(c, f"INSERT INTO {PART_TRASH}(list_id,kind,ref_id,snap,held,deleted_by,deleted_at) VALUES(?,?,?,?,?,?,?)",
+    return insert_id(c, f"INSERT INTO {qi(PART_TRASH, (PART_TRASH,))}(list_id,kind,ref_id,snap,held,deleted_by,deleted_at) VALUES(?,?,?,?,?,?,?)",
                      (scope_id, kind, int(rid), json.dumps(dict(row), ensure_ascii=False, default=str),
                       json.dumps(held, ensure_ascii=False, default=str), uid, iso(now_utc())))
 
@@ -202,9 +202,9 @@ def part_trash_due(c, kind, cut):
     (list_part_trash rows of the kind). The caller reads under system_ctx (every workspace)."""
     k = _kind(kind)
     if k["copy"]:
-        q = f"SELECT id FROM {PART_TRASH} WHERE kind=? AND deleted_at<? ORDER BY id"
+        q = f"SELECT id FROM {qi(PART_TRASH, (PART_TRASH,))} WHERE kind=? AND deleted_at<? ORDER BY id"
         return [r[0] for r in c.execute(q, (kind, cut)).fetchall()]
-    q = f"SELECT id FROM {k['table']} WHERE {trash_sql()} AND deleted_at<?{k['prune']} ORDER BY id"
+    q = f"SELECT id FROM {qi(k['table'], (k['table'],))} WHERE {trash_sql()} AND deleted_at<?{k['prune']} ORDER BY id"
     return [r[0] for r in c.execute(q, (cut,)).fetchall()]
 
 
@@ -219,9 +219,9 @@ def part_trash_purge(c, kind, ids):
     for i in range(0, len(ids), 500):
         part = ids[i:i + 500]
         if k["copy"]:
-            c.execute(f"DELETE FROM {PART_TRASH} WHERE kind=? AND id = ANY(CAST(? AS BIGINT[]))", (kind, part))
+            c.execute(f"DELETE FROM {qi(PART_TRASH, (PART_TRASH,))} WHERE kind=? AND id = ANY(CAST(? AS BIGINT[]))", (kind, part))
             continue
         if k["on_prune"] is not None:
             paths += list(k["on_prune"](c, "id = ANY(CAST(? AS BIGINT[]))", (part,)) or ())
-        c.execute(f"DELETE FROM {k['table']} WHERE id = ANY(CAST(? AS BIGINT[]))", (part,))
+        c.execute(f"DELETE FROM {qi(k['table'], (k['table'],))} WHERE id = ANY(CAST(? AS BIGINT[]))", (part,))
     return paths

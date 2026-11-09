@@ -21,7 +21,7 @@ from ..core.i18n import tr
 from ..core.access import Denied, list_role, need_list, need_time
 from ..accounts.session import me
 from ..core.pg import insert_id, system_ctx
-from ..core.objparts import PART_TRASH, part_kind  # 2.783.0 (#5368)
+from ..core.objparts import part_kind  # 2.783.0 (#5368)
 from ..core import objhooks  # 2.783.0 (#5368): tzw_move at every start, the copies go with an account
 from ..accounts.login import auth_key  # 2.369.5 (#2517): pulled up from functions
 
@@ -122,7 +122,7 @@ def tzw_dict(r):
 
 def tzw_add(c, uid, lid, entries, n, seconds, at=None):
     """2.783.0 (#5368): a new Undo copy of uid in list lid. -> its id."""
-    return insert_id(c, f"INSERT INTO {PART_TRASH}(list_id,kind,ref_id,snap,held,deleted_by,deleted_at) VALUES(?,?,?,?,?,?,?)",
+    return insert_id(c, "INSERT INTO list_part_trash(list_id,kind,ref_id,snap,held,deleted_by,deleted_at) VALUES(?,?,?,?,?,?,?)",
                      (lid, TZW_KIND, uid, json.dumps({"n": int(n or 0), "seconds": int(seconds or 0)}), entries, uid,
                       at or iso(now_utc())))
 
@@ -130,9 +130,9 @@ def tzw_add(c, uid, lid, entries, n, seconds, at=None):
 def tzw_set(c, wid, entries):
     """2.783.0 (#5368): what is left of a copy (entries as JSON), or the copy goes (entries None)."""
     if entries is None:
-        c.execute(f"DELETE FROM {PART_TRASH} WHERE id=? AND kind=?", (wid, TZW_KIND))
+        c.execute("DELETE FROM list_part_trash WHERE id=? AND kind=?", (wid, TZW_KIND))
     else:
-        c.execute(f"UPDATE {PART_TRASH} SET held=? WHERE id=? AND kind=?", (entries, wid, TZW_KIND))
+        c.execute("UPDATE list_part_trash SET held=? WHERE id=? AND kind=?", (entries, wid, TZW_KIND))
 
 
 def tzw_move(c):
@@ -154,7 +154,7 @@ def tzw_revoked(c, uid, org, reason, heir=None, role=None):
     """2.783.0 (#5368): an account that goes takes its Undo copies along (as time_wipes.user_id did by ON DELETE CASCADE)."""
     if reason != "delete" or not uid:
         return {}
-    n = c.execute(f"DELETE FROM {PART_TRASH} WHERE kind=? AND ref_id=?", (TZW_KIND, int(uid))).rowcount
+    n = c.execute("DELETE FROM list_part_trash WHERE kind=? AND ref_id=?", (TZW_KIND, int(uid))).rowcount
     return {"time_wipes": n} if n else {}
 
 
@@ -165,7 +165,7 @@ objhooks.REVOKE.append(tzw_revoked)
 def tz_wipe_row(c, lid, uid, wid=None):
     """2.530.0 B (#4315): the person's newest Undo copy of this list (or the one named), None = none (any more).
     2.783.0 (#5368): from the core's copy trash (tzw_dict)."""
-    q = f"SELECT * FROM {PART_TRASH} WHERE list_id=? AND kind=? AND ref_id=?" + (" AND id=?" if wid is not None else "") + " ORDER BY id DESC LIMIT 1"
+    q = "SELECT * FROM list_part_trash WHERE list_id=? AND kind=? AND ref_id=?" + (" AND id=?" if wid is not None else "") + " ORDER BY id DESC LIMIT 1"
     r = c.execute(q, (lid, TZW_KIND, uid) + ((wid,) if wid is not None else ())).fetchone()
     return tzw_dict(r) if r else None
 
@@ -292,7 +292,7 @@ def tz_restore(lid):
         tzw_set(c, w["id"], None)  # 2.530.0 B (#4315): its way back is used
     else:  # 2.530.0 B (#4315): the answer's copy came back (an older window): the server's copy of that delete is used up too
         sigs = {e.get("sig") for e in ents if isinstance(e, dict) and isinstance(e.get("sig"), str)}
-        for r in c.execute(f"SELECT id, held FROM {PART_TRASH} WHERE list_id=? AND kind=? AND ref_id=?", (lid, TZW_KIND, uid)).fetchall() if sigs else []:
+        for r in c.execute("SELECT id, held FROM list_part_trash WHERE list_id=? AND kind=? AND ref_id=?", (lid, TZW_KIND, uid)).fetchall() if sigs else []:
             try:
                 xs = [x for x in json.loads(r["held"] or "[]") if isinstance(x, dict)]
                 if sigs & {x.get("sig") for x in xs}:  # 2.530.0 (#4315, review M1): only what really came back is used up

@@ -19,7 +19,7 @@ from ..collab.comments import user_names
 from ..core.errors import BadInput
 from ..core.conflict import Conflict  # 2.564.0 (#4701)
 from ..core.objparts import part_kind, part_write  # 2.610.0 (#4762): the core's write layer of side objects
-from ..core.objparts import PART_TRASH, part_copy, part_copy_back  # 2.783.0 (#5368): the field trash is the core's copy trash
+from ..core.objparts import part_copy, part_copy_back  # 2.783.0 (#5368): the field trash is the core's copy trash
 from ..core import objhooks  # 2.783.0 (#5368): ftr_move at every start
 from ..core.numtext import user_num  # 2.263.0 (#2976)
 from ..core.retention import ret_trash_days  # 2.550.0 (#4528)
@@ -546,7 +546,7 @@ def field_delete(fid):
     tid = part_copy(c, FIELD_KIND, fid, r["list_id"], {"vals": vals, "n": len({v[0] for v in vals}), "grouped": 1 if grouped else 0},
                     fd_uid())
     # review F2: at most FTR_MAX rows per project in the field trash, the oldest go first (no unbounded growth by delete loops)
-    c.execute(f"DELETE FROM {PART_TRASH} WHERE list_id=? AND kind=? AND id NOT IN (SELECT id FROM {PART_TRASH} WHERE list_id=? "
+    c.execute("DELETE FROM list_part_trash WHERE list_id=? AND kind=? AND id NOT IN (SELECT id FROM list_part_trash WHERE list_id=? "
               "AND kind=? ORDER BY deleted_at DESC, id DESC LIMIT ?)", (r["list_id"], FIELD_KIND, r["list_id"], FIELD_KIND, FTR_MAX))
     n = c.execute("DELETE FROM task_field_values WHERE field_id=?", (fid,)).rowcount
     c.execute("DELETE FROM list_fields WHERE id=?", (fid,))
@@ -566,7 +566,7 @@ def ftr_person():
 def ftr_row(c, tid):
     """2.550.0 (#4528): a row of the field trash for its project's owner and admins (404 for everyone else, agents 403)."""
     ftr_person()
-    r = c.execute(f"SELECT * FROM {PART_TRASH} WHERE id=? AND kind=?", (tid, FIELD_KIND)).fetchone()  # 2.783.0 (#5368)
+    r = c.execute("SELECT * FROM list_part_trash WHERE id=? AND kind=?", (tid, FIELD_KIND)).fetchone()  # 2.783.0 (#5368)
     if not r:
         raise Denied(404)
     need_list(c, r["list_id"], manage=True)
@@ -598,7 +598,7 @@ def ftr_move(c):
                 d, vals = {}, []
             snap = {"id": r["field_id"], "list_id": r["list_id"], "name": r["name"], "type": r["type"],
                     **{k: d.get(k) for k in ("options", "pinned", "sort", "created_at") if k in d}}
-            insert_id(c, f"INSERT INTO {PART_TRASH}(list_id,kind,ref_id,snap,held,deleted_by,deleted_at) VALUES(?,?,?,?,?,?,?)",
+            insert_id(c, "INSERT INTO list_part_trash(list_id,kind,ref_id,snap,held,deleted_by,deleted_at) VALUES(?,?,?,?,?,?,?)",
                       (r["list_id"], FIELD_KIND, r["field_id"], json.dumps(snap, ensure_ascii=False, default=str),
                        json.dumps({"vals": vals, "n": r["n"], "grouped": r["grouped"]}, ensure_ascii=False), r["deleted_by"],
                        r["deleted_at"]))
@@ -617,7 +617,7 @@ def field_trash_list(lid):
     ftr_person()
     c = db()
     need_list(c, lid, manage=True)
-    rows = c.execute(f"SELECT * FROM {PART_TRASH} WHERE list_id=? AND kind=? ORDER BY deleted_at DESC, id DESC "
+    rows = c.execute("SELECT * FROM list_part_trash WHERE list_id=? AND kind=? ORDER BY deleted_at DESC, id DESC "
                      "LIMIT 100", (lid, FIELD_KIND)).fetchall()  # 2.783.0 (#5368): the core's copy trash
     names = user_names(c, list({r["deleted_by"] for r in rows if r["deleted_by"]}))
     out = []
