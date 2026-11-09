@@ -10,8 +10,8 @@
    Classic script sharing the global scope with the others (module docs, after docview.js; docview.js asks through typeof). */
 'use strict';
 
-/** @type {{id: number|null, n: number, ver: number, blank: Set<number>, del: Set<number>, rot: Map<number, number>, sel: Set<number>, last: number, receipt: boolean, busy: boolean, cv: Map<string, HTMLCanvasElement>, io: IntersectionObserver|null, tries: number}} */
-const DPG = {id: null, n: 0, ver: 0, blank: new Set(), del: new Set(), rot: new Map(), sel: new Set(), last: -1, receipt: false, busy: false, cv: new Map(), io: null, tries: 0};
+/** @type {{id: number|null, n: number, ver: number, blank: Set<number>, del: Set<number>, rot: Map<number, number>, sel: Set<number>, last: number, receipt: boolean, busy: boolean, cv: Map<string, HTMLCanvasElement>, io: IntersectionObserver|null, tries: number, stop: string}} */
+const DPG = {id: null, n: 0, ver: 0, blank: new Set(), del: new Set(), rot: new Map(), sel: new Set(), last: -1, receipt: false, busy: false, cv: new Map(), io: null, tries: 0, stop: ''};
 const DPG_TW = 72;  // the width of a small page (CSS px)
 
 // the strip only for a document (not a plain file) that is a PDF, with the right to write (while it is recognised again the
@@ -27,7 +27,7 @@ const dpg_boxHtml = (/** @type {any} */ d) => dpg_on(d) ? `<div class="dpg" id="
 
 function dpg_reset() {
   DPG.io?.disconnect();
-  Object.assign(DPG, {id: null, n: 0, ver: 0, blank: new Set(), del: new Set(), rot: new Map(), sel: new Set(), last: -1, receipt: false, busy: false, cv: new Map(), io: null, tries: 0});
+  Object.assign(DPG, {id: null, n: 0, ver: 0, blank: new Set(), del: new Set(), rot: new Map(), sel: new Set(), last: -1, receipt: false, busy: false, cv: new Map(), io: null, tries: 0, stop: ''});
 }
 const dpg_changed = () => DPG.del.size > 0 || [...DPG.rot.values()].some(r => r % 360);
 
@@ -36,7 +36,10 @@ async function dpg_open(/** @type {any} */ d) {
   let j; try { j = await api('GET', `/api/docs/${d.id}/pages`); } catch { return; }
   if (DC.doc?.id !== d.id || !j?.pages) return;
   dpg_reset();
-  Object.assign(DPG, {id: d.id, n: Math.min(+j.pages, +j.max || 1000), ver: +j.version || 0, blank: new Set(j.blank || []), receipt: !!j.receipt});
+  // review F7: more pages than the server changes (max) - a hint instead of a strip that could not be saved (413)
+  const max = +j.max || 1000;
+  const stop = +j.pages > max ? tr('This PDF has more than {0} pages - its pages cannot be changed here', max) : '';
+  Object.assign(DPG, {id: d.id, n: stop ? 0 : +j.pages, ver: +j.version || 0, blank: new Set(stop ? [] : j.blank || []), receipt: !!j.receipt, stop});
   dpg_draw(true);
 }
 function dpg_close() {
@@ -56,6 +59,11 @@ function dpg_draw(focus = false) {
   if (!box) return;
   if (!DPG.id || DC.doc?.id !== DPG.id) { box.hidden = true; box.textContent = ''; return; }
   box.hidden = false;
+  if (DPG.stop) {
+    box.innerHTML = `<p class="dpg-hint dpg-stop" role="status">${ic('info', 's')} <span>${esc(DPG.stop)}</span><button type="button" class="btn sm" data-dpg="cancel">${tr('Close')}</button></p>`;
+    if (focus) $('[data-dpg="cancel"]', box)?.focus({preventScroll: true});
+    return;
+  }
   const fo = /** @type {any} */ (document.activeElement)?.closest?.('.dpg [data-dpgp], .dpg [data-dpg]');
   const fk = fo ? (fo.dataset.dpgp ? `[data-dpgp="${fo.dataset.dpgp}"]` : `[data-dpg="${fo.dataset.dpg}"]`) : null;
   const n = DPG.n, keep = n - DPG.del.size, s = DPG.sel.size, allGone = s > 0 && [...DPG.sel].every(p => DPG.del.has(p));

@@ -144,6 +144,18 @@ const three = tag => [['Kita Beispiel', 'Elternbrief ' + tag, 'Datum 01.09.2026'
   check((await call('GET', `/api/files/nodes/${D}`)).version === 5, '... nothing restored: version 5 stays on top');
   check(w.eval('!HIST.undo.includes(window.__dpgE) && !HIST.redo.includes(window.__dpgE)'), '... the step is dropped (not in Undo, not in Redo)');
 
+  // review F7: more pages than the server changes: a hint instead of the strip
+  w.eval(`window.__dpgApi = api; api = (m, u, b) => window.__dpgApi(m, u, b).then(j => m === 'GET' && String(u).endsWith('/pages') ? {...j, ...window.__dpgOver} : j)`);
+  for (const [over, re, what] of [[{max: 2}, /more than 2 pages - its pages cannot be changed here/, 'more pages than max']]) {
+    w.eval(`window.__dpgOver = ${JSON.stringify(over)}`);
+    if (strip()) click(w, btn('cancel'));
+    await until(() => !strip());
+    click(w, v().querySelector('[data-dpg="open"]'));
+    check(await until(() => re.test(strip()?.querySelector('.dpg-stop')?.textContent || '')) && !strip().querySelector('[data-dpgp]') && !btn('save'), `${what}: the hint, no pages, no Save`);
+    click(w, btn('cancel'));
+    check(await until(() => !strip()) && v(), `... Close shuts the hint, the view stays`);
+  }
+  w.eval('api = window.__dpgApi');
   w.close();
 
   // ================= a reader and a text document: no "Pages"

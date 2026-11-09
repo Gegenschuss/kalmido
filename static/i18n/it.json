@@ -17984,5 +17984,6 @@
   "It lies in a locked folder, so it cannot be undone here": "Si trova in una cartella bloccata, quindi qui non si può annullare",
   "That version of the file is no longer there, so it cannot be undone": "Quella versione del file non esiste più, quindi non si può annullare",
   "There is a newer version by now - this step was dropped": "Nel frattempo c'è una versione più recente: questo passaggio viene scartato",
-  "The PDF cannot be read": "Il PDF non può essere letto"
+  "The PDF cannot be read": "Il PDF non può essere letto",
+  "This PDF has more than {0} pages - its pages cannot be changed here": "Questo PDF ha più di {0} pagine: qui non è possibile modificarne le pagine"
 }
