@@ -18,6 +18,8 @@ into the text the code and the exports always had ("23.80"), core/orgcrypt.py oc
 import sys
 from decimal import Decimal
 
+from .pg import system_ctx
+
 MC_COLS = (  # (table, column, nullable): the plain money columns of #5293
     ("office_doc_items", "net", True),
     ("office_doc_items", "tax_amount", True),
@@ -71,6 +73,15 @@ def mc_misfits(c, table, col):
 def mc_migrate(c, at):
     """init_db (2.755.0, #5293): every MC_COLS column that is still TEXT becomes NUMERIC(14,2) when its values fit, each in a
     savepoint of the start's transaction (at = the start's time, ISO) -> {"table.col": "done" | "kept" | "present"}."""
+    # 2.755.0 (#5293, review H1): system context for the whole run. The three tables are under FORCE ROW LEVEL SECURITY and the
+    # start's connection has no organisation: without it mc_misfits saw only the rows with org_id IS NULL, while the ALTER (DDL
+    # ignores row security) rewrote every row -- a chained position's "-0.00" / "23.8" became "0.00" / "23.80" and the hash
+    # chain's checksums broke.
+    with system_ctx(c):
+        return _mc_run(c, at)
+
+
+def _mc_run(c, at):
     out = {}
     for table, col, nullable in MC_COLS:
         k = f"{table}.{col}"

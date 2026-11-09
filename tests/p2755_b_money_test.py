@@ -11,6 +11,9 @@ org encryption on). Invented companies, people and figures only.
    same number ('' = 0 in the NOT NULL cash column, NULL in the nullable position columns); the chained positions turn and
    the chain stays intact; a chained position stored as '-0.00' keeps its column TEXT (its checksum would change)
  - a person without an organisation (freelancer-matrix: office): the same answers in the personal office
+ - review N4: the organisation import of an older export with '' in the four columns: NULL / 0 as the migration
+ - review H1: the real start as the database's owner without superuser / BYPASSRLS (row-level security holds): a chained position
+   of an organisation with '-0.00' keeps its column TEXT, the log names the id, /log/chain stays intact
 usage: p2755_b_money_test.py <datadir>"""
 import base64
 import json
@@ -180,10 +183,93 @@ ty2, _e = py("print(json.dumps(c.execute(\"SELECT data_type FROM information_sch
              "AND table_name='office_cash_entries' AND column_name='amount'\").fetchone()[0]))")
 check(ty2 == "numeric", f"migration: rolled back, the suite's database is as before {ty2}")
 
+# ---- review N4: the organisation import (admin/oi_office.py specs -> acctimport.umz_row / umz_insert) of an older export
+# with '' / '23.8' / '-0.00' in the four columns: '' as in the migration (NULL in the nullable position columns, the default 0 in
+# the NOT NULL ones), the others the same number (rolled back)
+imp, _e = py(f"""
+from kalmido.admin.acctimport import umz_insert, umz_row
+b = c.execute("SELECT book_id, org_id FROM office_cash_entries WHERE id=?", ({EID},)).fetchone()
+out = {{}}
+d = umz_row(c, 'office_doc_items', {{'net': '', 'tax_amount': '23.8', 'title': 'Alt', 'qty': '1', 'rate': '0'}}, {{'doc_id': {DRAFT}, 'org_id': {ORG}}}, 'x')
+out['item'] = umz_insert(c, 'office_doc_items', d)
+d = umz_row(c, 'office_cash_entries', {{'amount': '', 'no': 801, 'day': '{Y}-01-03', 'dir': 'in', 'text': 'Alt'}}, {{'book_id': b['book_id'], 'org_id': b['org_id']}}, 'x')
+out['cash0'] = umz_insert(c, 'office_cash_entries', d)
+d = umz_row(c, 'office_cash_entries', {{'amount': '-0.00', 'no': 802, 'day': '{Y}-01-03', 'dir': 'in', 'text': 'Alt'}}, {{'book_id': b['book_id'], 'org_id': b['org_id']}}, 'x')
+out['cash1'] = umz_insert(c, 'office_cash_entries', d)
+d = umz_row(c, 'office_ledger_entries', {{'amount': '', 'year': {Y}, 'day': '{Y}-12-31', 'debit': '4950', 'credit': '0970'}}, {{'org_id': {ORG}}}, 'x')
+out['led'] = umz_insert(c, 'office_ledger_entries', d)
+out['vals'] = [c.execute("SELECT net::text, tax_amount::text FROM office_doc_items WHERE id=?", (out['item'],)).fetchone() if out['item'] else None,
+               [c.execute("SELECT amount::text FROM office_cash_entries WHERE id=?", (i,)).fetchone()[0] if i else None for i in (out['cash0'], out['cash1'])],
+               c.execute("SELECT amount::text FROM office_ledger_entries WHERE id=?", (out['led'],)).fetchone()[0] if out['led'] else None]
+out['vals'][0] = list(out['vals'][0]) if out['vals'][0] else None
+c.rollback()
+print(json.dumps(out))
+""")
+check(imp.get("vals") == [[None, "23.80"], ["0.00", "0.00"], "0.00"],
+      f"import of an older export: '' -> NULL / 0, '23.8' -> 23.80, '-0.00' -> 0.00 in the NUMERIC columns {imp}")
+
 # ---------------------------------------------------------------- a person without an organisation  # freelancer-matrix: office
 FID, Fr = freelancer(B, A)
 Fr.patch(B + "/api/settings", json={"features": FEAT})
 office(Fr, "freelancer")
+
+# ---------------------------------------------------------------- review H1: the real start under a login without superuser / BYPASSRLS
+# 2.755.0 (#5293, review H1): the standard run logs in as the image's superuser, there row-level security never holds. Here the
+# app logs in as the database's owner without superuser / BYPASSRLS (start.sh KALMIDO_TEST_DB_LOGIN=owner, as tests/rls_owner_test.py):
+# the policies hold for it through FORCE, init_db's connection has no organisation. A chained position of an organisation stores
+# '-0.00' (an old value, the chain hashed it so), the column is TEXT again; a real restart (KEEP=1) runs mc_migrate in init_db.
+# Without system_ctx mc_misfits saw no row of the organisation and the ALTER turned '-0.00' into 0.00: column numeric, chain red.
+def start_owner(keep):
+    e = dict(os.environ, KALMIDO_TEST_DB_LOGIN="owner", EXTRA=os.environ.get("EXTRA", "") + f" -e KALMIDO_INSTANCE_MODE=workspaces -e KALMIDO_ORGCRYPT_DELAY=0 -e KALMIDO_SECRET_KEY={KEY}")
+    e.pop("KEEP", None)
+    if keep:
+        e["KEEP"] = "1"
+    r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=e, capture_output=True, text=True)
+    assert r.returncode == 0, r.stdout + r.stderr
+
+
+start_owner(False)
+r = until(_up, 30)
+assert r is not None and r.ok, r and r.text
+A = sess("alice")
+A.post(B + "/api/admin/setup", json={"lang": "en", "collab_all": True, "modules": ["cal", "comments"]})
+ALICE = A.get(B + "/api/state").json()["me"]["id"]
+A.patch(B + "/api/settings", json={"lang": "en", "features": FEAT, "tour": "done"})
+ORG = A.post(B + "/api/admin/orgs", json={"name": "Alpha", "admin_id": ALICE}).json()["id"]
+A.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
+DID, _eid, _draft = office(A, "owner")
+h1, _e = py(f"""
+from kalmido.core.moneycol import mc_type
+from kalmido.office.chain import hch_canon, hch_check, hch_hash
+out = {{'login': list(c.execute("SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname=current_user").fetchone())}}
+c.execute("ALTER TABLE office_doc_items ALTER COLUMN tax_amount TYPE TEXT USING tax_amount::text")
+it = c.execute("SELECT id FROM office_doc_items WHERE doc_id=? ORDER BY sort, id", ({DID},)).fetchall()[1]['id']
+c.execute("UPDATE office_doc_items SET tax_amount='-0.00' WHERE id=?", (it,))
+d = c.execute("SELECT * FROM office_docs WHERE id=?", ({DID},)).fetchone()
+c.execute("SELECT set_config('kalmido.locked_ok', 'on', true)")  # the finalised row's chain_hash (core/migrations.d/4598.py)
+c.execute("UPDATE office_docs SET chain_hash=? WHERE id=?", (hch_hash(d['chain_prev'] or '', hch_canon(c, {ORG}, d)), {DID}))
+out['it'] = it
+out['org'] = d['org_id']
+out['chain'] = hch_check(c, {ORG})['ok']
+out['type'] = mc_type(c, 'office_doc_items', 'tax_amount')
+c.commit()
+print(json.dumps(out))
+""")
+check(h1.get("login") == [False, False], f"H1: the app's login has no superuser / BYPASSRLS {h1}")
+check(h1.get("type") == "text" and h1.get("chain") is True and h1.get("org") == ORG, f"H1: the old state: TEXT, '-0.00' hashed into the chain {h1}")
+start_owner(True)  # the real start: init_db -> mc_migrate
+A = sess("alice")
+A.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
+lg = subprocess.run(["docker", "logs", CT], capture_output=True, text=True)
+lg = lg.stdout + lg.stderr
+ty3, _e = py("r = c.execute(\"SELECT data_type FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='office_doc_items' "
+             "AND column_name='tax_amount'\").fetchone()[0]\nv = c.execute('SELECT tax_amount::text FROM office_doc_items WHERE id=?', (%d,)).fetchone()[0]\n"
+             "print(json.dumps([r, v]))" % h1.get("it", 0))
+check(ty3 == ["text", "-0.00"], f"H1: after the real start the column stays TEXT, the value as it was {ty3}")
+check("5293: office_doc_items.tax_amount stays TEXT, 1 value(s)" in lg and f"(ids {h1.get('it')})" in lg,
+      f"H1: the start's log names the column and the id {lg[-800:]}")
+ch = A.get(B + OFC + "/log/chain").json()
+check(ch.get("ok") is True and ch.get("count", 0) >= 1, f"H1: /log/chain intact after the real start {ch}")
 
 print(f"p2755_b_money: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
