@@ -17997,6 +17997,7 @@
   "The PDF cannot be read": "Il PDF non può essere letto",
   "This PDF has more than {0} pages - its pages cannot be changed here": "Questo PDF ha più di {0} pagine: qui non è possibile modificarne le pagine",
   "The pages of this document cannot be changed (read-only or a locked month)": "Le pagine di questo documento non possono essere modificate (sola lettura o mese bloccato)",
+  "The + adds an appointment, a new task comes from the menu “…”. Hold a task or an appointment to drag it to another day.": "Il + aggiunge un appuntamento, una nuova attività arriva dal menu «…». Tieni premuto un'attività o un appuntamento per trascinarlo a un altro giorno.",
   "Arrival": "Arrivo",
   "Make-up": "Trucco",
   "Costume": "Costumi",

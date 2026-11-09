@@ -178,3 +178,28 @@ button.cyd:hover{background:var(--bg2)}
   .evcfoot .evclinks{flex:1 1 100%}
   .evcfoot .btn.pri{flex:1 1 100%;justify-content:center;min-height:2.75rem}
 }
+/* 2.802.0 (#5462): the calendar head (calBar, .cbm) on a phone and a tablet. Up to 1000 px: Completed, Find a date, Calendars and the
+   timeline's "No date" wait in "..." (calMoreMenu, the buttons stay in the DOM, hidden here), the rest stays on one quiet line, the title gives way first. A phone: one line
+   of views, one line of the period (title, back / Today / next, "..."); "+ Event" is the round + there. A computer is unchanged. */
+.calbar.cbm .calmore{display:none}
+@media (max-width:1000px){
+  .calbar.cbm{flex-wrap:nowrap}
+  .calbar.cbm .calmore{display:inline-flex;flex:none;min-width:2.75rem;justify-content:center}  /* 44 px for a finger (p2210, p260) */
+  .calbar.cbm :is([data-act="cal-done"],[data-act="tpo-list"],[data-act="ev-cals"],[data-act="tl-nd"]){display:none}
+  .calbar.cbm h2{flex:1 1 auto;min-width:3rem;overflow:hidden;text-overflow:ellipsis}
+  .calbar.cbm .seg{flex:none;min-width:0;max-width:100%;overflow-x:auto;scrollbar-width:none}  /* the views stay whole, the title gives way */
+  .calbar.cbm .seg button{flex:1 0 auto;white-space:nowrap;font-size:var(--fs-b)}
+  .calbar.cbm .calnav{flex:none;gap:0}
+  .calbar.cbm{gap:.25rem}
+  .calbar.cbm .seg{padding:0}
+  .calbar.cbm .seg button{padding:.25rem;min-width:2.75rem;justify-content:center}  /* a finger's 44 px (p2210, p260) */
+  .calbar.cbm .evnew .cdl{display:none}  /* "+" alone, its name stays in title / aria-label */
+}
+@media (max-width:767px){
+  .calbar.cbm{flex-wrap:wrap;row-gap:.375rem}
+  .calbar.cbm .seg{order:-1;flex:1 1 100%}
+  .calbar.cbm .seg button{justify-content:center;padding:.375rem .25rem}
+  .calbar.cbm h2{flex:1 1 0}
+  .calbar.cbm .calmore{order:2}
+  .calbar.cbm .evnew{display:none}
+}

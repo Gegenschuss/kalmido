@@ -672,6 +672,7 @@ document.addEventListener('click', async e => {
     case 'filter-new': closeSide(); filterModal(); break;
     case 'filter-edit': filterModal(id); break;
     case 'cal-done': setShowDone(!showDoneCal(), 'cal'); break;
+    case 'cal-more': e.stopPropagation(); calMoreMenu(a); break;  // 2.802.0 (#5462)
     // 2.36.1 (#1127): timeline names hide a calendar, "…" on a name / on "Events today" opens the calendar switches
     case 'cvx-tlhide': cvxTlHide(a.dataset.key, a.dataset.name); break;
     case 'cvx-tlmenu': e.stopPropagation(); cvxTlMenu(a, a.dataset.key, a.dataset.name); break;
@@ -883,7 +884,7 @@ function swp_end(cancel) {
 }
 document.addEventListener('touchend', () => swp_end(false));
 document.addEventListener('touchcancel', () => swp_end(true));
-$('#fab').addEventListener('click', () => { if (typeof QN_FAB === 'object' && ms_lpRecent(QN_FAB)) return; openQuickSheet(); });  // 2.477.0 (#3881): the click ending a hold opens no task
+$('#fab').addEventListener('click', () => { if (typeof QN_FAB === 'object' && ms_lpRecent(QN_FAB)) return; if (typeof calFabEv === 'function' && calFabEv()) { const d = S.calSel || today(); evEditor({start: `${d}T${pad(Math.min(22, new Date().getHours() + 1))}:00`}); return; } openQuickSheet(); });  // 2.477.0 (#3881): the click ending a hold opens no task
 
 document.addEventListener('input', e => {
   const t = e.target;
