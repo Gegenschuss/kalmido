@@ -58,7 +58,7 @@ from ..collab.comments import user_names
 from ..accounts.orgroles import need_org_write, org_role_key
 from ..accounts.orgout import org_out  # 2.579.0 (#4802): obj_space_set
 from ..files.fsref import fs_ref_drop, fs_ref_rename
-from ..files.store import _free_name
+from ..files.store import _free_name, fs_purge_files  # 2.783.0 (#5368): fs_purge_files
 
 OBJ_MERGE_MIN = 10  # changes of one person to one object within this many minutes are one history entry (wiki/wkhist.py)
 OBJ_HISTORY_MAX = 200  # entries kept per object (the oldest go)
@@ -540,7 +540,6 @@ def obj_trash_tick(c, force=False):
         ret_report(c, "trash", out, purge, run="obj_trash")
     c.commit()
     if paths:  # after the commit: a failed commit keeps the rows and their files
-        from ..files.store import fs_purge_files
         fs_purge_files([], paths)
     return out
 
