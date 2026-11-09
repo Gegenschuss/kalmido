@@ -146,10 +146,11 @@ function toast(msg, undo, ms, label) {  // label: the button's text instead of "
   toastTimer = setTimeout(hide, wait);
   // 2.16.0 (#473, WCAG 2.2.1): the toast stays while the pointer or the keyboard focus is on it
   el.onmouseenter = el.onfocusin = () => clearTimeout(toastTimer);
-  el.onpointerup = el.onpointercancel = e => { if (e.pointerType === 'mouse' && el.matches(':hover')) return; clearTimeout(toastTimer);  // a mouse still on it keeps it (#473)
-    toastTimer = setTimeout(hide, Math.max(2500, wait / 2)); };
-  el.onpointerdown = () => clearTimeout(toastTimer);  // 2.769.0 (#5350): a finger / pointer down on the toast keeps it until the tap is done
   el.onmouseleave = el.onfocusout = e => { if (e.type === 'focusout' && el.contains(e.relatedTarget)) return; if (el.matches(':hover') && e.type === 'focusout') return; clearTimeout(toastTimer); toastTimer = setTimeout(hide, Math.max(2500, wait / 2)); };
+  // 2.769.0 (#5350): a finger / pointer down on the toast keeps it until the tap is done (like the mouse on it), then its time runs
+  // again - not while a mouse still rests on it (#473); the toast's own keep / restart, no timer of its own (perf_budget)
+  el.onpointerdown = el.onmouseenter;
+  el.onpointerup = el.onpointercancel = e => { if (!(e.pointerType === 'mouse' && el.matches(':hover'))) el.onmouseleave(e); };
 }
 
 // ------------------------------------------------------------------ quick add wiring
