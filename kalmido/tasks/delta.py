@@ -199,7 +199,7 @@ def dl_scope(c, area, uid):
     no rows (what changed is not known), a row for everyone (who sees a list changed), a task no list can be found for,
     too many rows. "self" = the writer's own account. /api/version takes the maximum of the own keys (version_sigs), so a
     change in organisation A no longer makes the members of B fetch a delta (the client skips it, liveparts.js lpSkip)."""
-    if area == "self":
+    if area in ("self", "undo"):  # #5407: + the own list of steps
         return [f"version:u:{int(uid)}"] if uid else None
     if not uid or area not in ("tasks", "comments", "time"):
         return None

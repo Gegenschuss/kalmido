@@ -3,7 +3,7 @@
 """2.747.0 (#5249): undo across devices, stage 1 -- the core's undo steps grouped per account (kalmido/core/undogroups.py,
 kalmido/core/undoweb.py) with the test kind 'objprobe' (KALMIDO_TEST_OBJ=1, tests/obj_probe.py). Invented names only.
  - a write of a person (obj_write, office/owrite.py ow_write) opens a group: area, device (X-Kalmido-Device), label in the
-   reader's language, parts, bytes; the person's own "self" counter moves; several writes of ONE request = one group, the
+   reader's language, parts, bytes; the person's own "undo" counter moves (#5407); several writes of ONE request = one group, the
    header X-Kalmido-Undo-Group bundles two requests
  - GET /api/undo lists only the own groups (another person: nothing, 404 on undo / redo of a foreign group); an agent: 403
    (and its writes record no step)
@@ -73,8 +73,8 @@ def items(s):
     return r.json()["items"] if r.ok else r.status_code
 
 
-def self_ver(u):
-    r = dbx("SELECT value FROM settings WHERE key=?", (f"version:self:{u}",))
+def self_ver(u):  # #5407: the own "undo" counter (was "self": every write reloaded the whole state of the other devices)
+    r = dbx("SELECT value FROM settings WHERE key=?", (f"version:undo:{u}",))
     return int(r[0][0]) if r else 0
 
 

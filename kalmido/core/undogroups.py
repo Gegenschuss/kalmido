@@ -134,7 +134,7 @@ def _open(c, uid, area, org_id, label, state="done", token=""):
                     (int(uid), org_id, area or "other", lk, json.dumps(list(la), ensure_ascii=False, default=str), ug_device(), token,
                      state, ts, ts))
     ug_cap(c, uid)
-    bump(c, "self")  # the other devices of the person see the list move (GET /api/version, the own "self" counter)
+    bump(c, "undo")  # the other devices of the person see the list move (GET /api/version, the own "undo" counter, #5407)
     return gid
 
 

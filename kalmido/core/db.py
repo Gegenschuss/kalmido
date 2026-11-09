@@ -1631,13 +1631,13 @@ def bump(c, area=None):
     # account: other people's clients see no area move (a lean delta instead of the full state)
     a = area
     u = getattr(g, "user", None) if has_request_context() else None
-    if a == "self":
-        a = f"self:{int(u['id'])}" if u is not None and u["id"] is not None else "other"
+    if a in LV_OWN:  # #5407: + "undo", the own list of steps (core/undogroups.py), counted per account like "self"
+        a = f"{a}:{int(u['id'])}" if u is not None and u["id"] is not None else "other"
     n = c.execute("INSERT INTO settings(key,value) VALUES(?, '1') ON CONFLICT(key) DO UPDATE SET value=CAST(CAST(settings.value AS BIGINT)+1 AS TEXT) "
                   "RETURNING value", ("version:" + a,)).fetchone()
     if a.startswith("self:") and n and not lv_state_setting():  # the window that wrote learns its own counter (X-Kalmido-Lv): no full reload for it
         g.lv_self = int(n[0])
-    if has_request_context():
+    if has_request_context() and area != "undo":  # #5407: the step list's tick is not the route's (lv_auto_bump still ticks the area)
         g.lv_bumped = True  # 2.566.0 (#4706): this request ticked (lv_auto_bump adds none)
 
 
@@ -1660,7 +1660,11 @@ LV_AREAS = (
     # 2.280.0 F (#3109): not layouts/std (an admin's standard of a view for everyone: "other")
     ("self", re.compile(r"^/api/(settings$|habits(/|$)|layouts/saved(/|$)|favorites/suggestion$)")),
 )
-LV_AREA_KEYS = tuple(k for k, _ in LV_AREAS) + ("other",)
+# #5407: "undo" = the own list of steps across devices (core/undogroups.py, undolist.js): no route, counted per account like
+# "self", but a light area of the app (only the list reloads) - on "self" every write of a person made the person's other
+# devices load the whole state instead of the delta
+LV_AREA_KEYS = tuple(k for k, _ in LV_AREAS) + ("undo", "other")
+LV_OWN = ("self", "undo")
 LV_SHARED_SETTINGS = ("folders",)  # 2.280.0 A (#3109): settings others see (folder_orders of mirrored lists): not "self"
 # 2.280.0 F (#3109): own settings the server evaluates for /api/state (the lists' progress, the notification matrix, the day
 # plan, the question about old shares, texts in the language): the window that wrote reloads like another device of the person
@@ -1739,10 +1743,10 @@ def lv_versions(c):
 
 def lv_versions_q():
     """2.149.0 C (#2507): the query of lv_versions (one row: the keys, the values; /api/version runs it inside one statement)."""
-    keys = ["version:" + k for k in LV_AREA_KEYS if k != "self"]  # 2.41.1 (#1376): the known keys, no LIKE (pg_dialect)
+    keys = ["version:" + k for k in LV_AREA_KEYS if k not in LV_OWN]  # 2.41.1 (#1376): the known keys, no LIKE (pg_dialect)
     u = getattr(g, "user", None) if has_request_context() else None
-    if u is not None and u["id"] is not None:  # 2.280.0 A (#3109): "self" = the own account's counter
-        keys.append(f"version:self:{int(u['id'])}")
+    if u is not None and u["id"] is not None:  # 2.280.0 A (#3109): "self" = the own account's counter; #5407: + "undo"
+        keys += [f"version:{k}:{int(u['id'])}" for k in LV_OWN]
     return f"SELECT array_agg(key), array_agg(value) FROM settings WHERE key IN ({','.join('?' * len(keys))})", tuple(keys)
 
 
@@ -1750,8 +1754,8 @@ def lv_versions_fmt(r):
     out = dict.fromkeys(LV_AREA_KEYS, 0)
     for key, value in zip((r[0] or []) if r else [], (r[1] or []) if r else []):
         k = key[8:]
-        if k.startswith("self:"):  # 2.280.0 A (#3109)
-            k = "self"
+        if k.startswith(("self:", "undo:")):  # 2.280.0 A (#3109); #5407
+            k = k.split(":", 1)[0]
         if k in out:
             out[k] = int(value)
     return out

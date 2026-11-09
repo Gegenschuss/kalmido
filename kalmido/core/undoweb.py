@@ -209,6 +209,7 @@ def undo_group_to(c, uid, gid):
             out["undone"].append(grp["id"])
         c.commit()
     bump(c, "self")
+    bump(c, "undo")  # #5407: the list of steps of the other devices (undolist.js)
     c.commit()
     text = tr(UG_UNDONE, len(out["undone"]) + len(out["partial"]), total)
     if out["stopped"]:
@@ -224,6 +225,7 @@ def undo_group_redo(c, uid, gid):
         raise Denied(409, tr(UNDO_NOTHING))
     moved, stayed = _run_group(c, uid, grp, True)
     bump(c, "self")
+    bump(c, "undo")  # #5407: the list of steps of the other devices (undolist.js)
     c.commit()
     return {"redone": moved, "stayed": stayed, "text": tr(UG_REDONE, 1 if moved else 0, 1)}
 

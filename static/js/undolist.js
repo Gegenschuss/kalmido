@@ -13,11 +13,11 @@
    "Undo up to here" takes back every row above it and the row, newest first: runs of this browser's steps go through
    undo.js histStep(only), runs of server groups through /api/undo/to; a conflict leaves that part and names it (the rest of
    the group goes back, the server decides), a barrier ends the run. Live: the person's own "self" counter of the 4-s poll
-   (core.js, S.lpA.self) reloads the server rows; the rows are patched in place and the row at the top of the view stays
+   (core.js, S.lpA.undo, #5407) reloads the server rows; the rows are patched in place and the row at the top of the view stays
    where it is (no jump, #5224). Classic script sharing the global scope with the others. */
 'use strict';
 
-const UL = {items: null, err: '', self: undefined, busy: false, note: '', t: 0, n: 0, html: new WeakMap(), at: 0};
+const UL = {items: null, err: '', undo: undefined, busy: false, note: '', t: 0, n: 0, html: new WeakMap(), at: 0};
 const UL_MAX = 100;
 
 const ul_key = e => { if (!e.ulk) e.ulk = ++UL.n; return 'l:' + e.ulk; };
@@ -101,10 +101,10 @@ async function ul_fetch() {
 // live while a host is open: the own counter moved -> the server's rows again; else the rows of this browser (cheap)
 function ul_live() {
   if (UL.t) return;
-  UL.self = S.lpA?.self;
+  UL.undo = S.lpA?.undo;
   UL.t = setInterval(() => {
     if (!ul_hosts().length) { clearInterval(UL.t); UL.t = 0; UL.note = ''; return; }
-    if (S.lpA?.self !== UL.self && !UL.busy) { UL.self = S.lpA?.self; ul_fetch().then(ul_draw); return; }
+    if (S.lpA?.undo !== UL.undo && !UL.busy) { UL.undo = S.lpA?.undo; ul_fetch().then(ul_draw); return; }
     ul_draw();
   }, 1000);
 }

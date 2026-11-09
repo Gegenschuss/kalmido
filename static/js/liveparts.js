@@ -8,7 +8,7 @@
 // keep the full reload. S.lpOff = true switches it off (the old way, used by the measurement in the tests).
 // 2.280.0 A (#3109): the bundled follow-up takes the delta since the version before the light changes + the sidebar's parts
 // (agents, team chat, News, calendars: ?side=1) instead of the whole state; the knowledge pages are light (not in the state).
-const LP_LIGHT = new Set(['comments', 'agentchat', 'team', 'news', 'calendar', 'budget', 'sheets', 'wiki']);  // 2.72.0 (#1333): + the household budget (its own fetch); 2.89.0 (#1916): + tables
+const LP_LIGHT = new Set(['comments', 'agentchat', 'team', 'news', 'calendar', 'budget', 'sheets', 'wiki', 'undo']);  // 2.72.0 (#1333): + the household budget (its own fetch); 2.89.0 (#1916): + tables
 const LP_KEEP = new Set(['office', 'clients', 'contacts']);  // views a change of someone else never redraws (2.431.0 C, #3602: + contacts; clients / contacts follow with ms_clLive / ct_live)
 const LP_DEFER_MS = 15000;
 S.lpN = {render: 0, state: 0, light: 0};  // counters for the measurement (render() calls, full state loads, light updates)
