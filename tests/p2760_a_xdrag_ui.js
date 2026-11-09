@@ -162,6 +162,9 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
     check(d5.over, '4: the office takes a document ' + JSON.stringify(d5));
     const area = async () => (await call('GET', `/api/docs/${D}`)).area?.area;
     check(await poll(async () => (await area()) === 'office'), '4: the receipt is in the office ' + await area());
+    // 2.760.0: red before the fix - the drop onto the comment box above had linked the document as well (a late second step
+    // "linked with a task" that hid this message); now the history holds no such step
+    check(!(await ev(`${RD}.defaultView.eval('HIST.undo.some(e => /linked with a task/.test(e.label))')`)), '1: the drop onto the text field linked nothing');
     check(await toastIn('R', /Moved to office/), '4: undo offered ' + JSON.stringify(await ev(`(() => { const d = ${RD}, t = d && d.querySelector('#toast'); return {txt: t?.textContent, cls: t?.className, page: t?.dataset.page, hash: d?.defaultView.location.hash, undo: d?.defaultView.eval('HIST.undo.map(e => e.label)')}; })()`)));
     await undoIn('R');
     check(await poll(async () => (await area()) === 'private'), '4: undo moves it back ' + await area());

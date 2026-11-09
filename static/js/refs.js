@@ -333,7 +333,8 @@ function xd_kind(e) {  // the kind of a foreign drag of this app ('t', 'f', …)
   return k ? k.slice(XD_KIND.length) : '';
 }
 function xd_target(e, k) {
-  if (!k || !e.target?.closest) return null;
+  // over a text field the reference drop above owns the drop (its stopPropagation does not stop this listener on the same window)
+  if (!k || !e.target?.closest || rf_dropTa(e.target)) return null;
   for (const t of XD.tg) {
     if (!t.kinds.includes(k)) continue;
     const el = e.target.closest(t.sel);
