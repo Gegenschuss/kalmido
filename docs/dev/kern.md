@@ -169,6 +169,20 @@ c.commit()
   tables `field_trash` and `time_wipes` stay for the version before; their rows move into `list_part_trash` at every start
   (`ftr_move`, `tzw_move`: one-way for those rows). No own runs any more in `files/trashpurge.py` or `integrations/hookin.py`
   for these kinds.
+- 2.790.0 (#5365, stage 3 of the trash): `obj_on_purge(kind, f)` = the area's part of the delete for good: `f(c, id)` runs
+  first in `_purge_rows` (in a savepoint), cleans what the core does not know (stored files, scan / text rows, folder nodes)
+  and returns the work for after the commit (paths or callables); `Denied` keeps the object (a receipt under the legal
+  retention): `obj_purge` refuses, the retention run counts it as `<kind>_locked` and leaves it in the trash. Purges that
+  may meet such a hook run inside `obj_purge_after()` and call `unlink_files(box["after"])` after their commit
+  (`obj_trash_tick` does). File-store nodes (`files/fskern.py`, kind `fs_entry`), knowledge pages with their files
+  (`wiki/wkkern.py`, `wiki_page`, children `wiki_files`) and tables (`sheets/shkern.py`, `sheet_table`) are core kinds
+  without routes, node or listing: their routes check the area's rights, then call `obj_trash` / `obj_restore` / `obj_purge`
+  (no core step: the areas keep their own undo); `base_role` mirrors the area's rule of deleting / restoring, the space hook
+  names no organisation (the area's rule checks it). Their own purge runs (`tp_files`, `wiki_trash_tick`, the tables' line
+  of `tp_tick`, `wiki_purge`, `shx_purge`) are gone. Not yet on the core: files trashed on their own (knowledge files
+  `wka_tick`, table files `shk_tick`, held versions `wkx_tick`), deleted table rows / columns, and the followers that put
+  a table / page into the trash with a folder (`sheets/shfolder.py`, `wiki/wkfolder.py`): they write `deleted_at` directly,
+  the core's run deletes them all the same.
 - Never write the trash filter by hand: `live_sql(alias)` / `trash_sql(alias)` of `core/access.py`. A new
   `deleted_at IS NULL` in the server code is red in `tools/check_live_filter.py`; the existing ones stand per file in
   `tools/live_filter_baseline.json`, which only shrinks (`--update` lowers it after a clean-up).

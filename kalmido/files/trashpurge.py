@@ -35,7 +35,7 @@ TP_PRIVACY_HOLD = (" AND NOT EXISTS (SELECT 1 FROM office_privacy_sheets x WHERE
                    " AND (x.status='signed' OR x.signed_node_id IS NOT NULL))")
 # (count key, table, extra condition): the plain areas, one DELETE each (their child rows go by ON DELETE CASCADE)
 TP_PLAIN = (
-    ("sheets", "sheets", ""),  # columns, rows, cells, changes, links cascade
+    # 2.790.0 (#5365): tables in the trash go through the core's run (sheets/shkern.py); their deleted rows / columns stay here
     ("sheet_rows", "sheet_rows", f" AND sheet_id IN (SELECT id FROM sheets WHERE {live_sql()})"),
     ("sheet_columns", "sheet_columns", f" AND sheet_id IN (SELECT id FROM sheets WHERE {live_sql()})"),
     ("deals", "office_deals", ""),  # office_docs.deal_id: ON DELETE SET NULL
@@ -131,21 +131,6 @@ def tp_tick(c, force=False):
                 with c.savepoint():
                     w = f"FROM {table} WHERE deleted_at IS NOT NULL AND deleted_at<?{extra}"
                     if purge:
-                        if table == "sheets":  # 2.152.0 (#2165): the stored files of their file cells go too (sheet_files cascade)
-                            # 2.152.0 (#2165, review C-M1): also those of the further sheets of the table (book_id, they cascade with
-                            # it), and the scan / text rows of all these files (kind 'sheet', no FK) before the rows go
-                            fr = c.execute("SELECT f.id, f.path FROM sheet_files f JOIN sheets s ON s.id=f.sheet_id "
-                                           "WHERE (s.deleted_at IS NOT NULL AND s.deleted_at<?) OR s.book_id IN "
-                                           "(SELECT id FROM sheets WHERE deleted_at IS NOT NULL AND deleted_at<?)", (cut, cut)).fetchall()
-                            kp += [r["path"] for r in fr]
-                            for i in range(0, len(fr), 500):
-                                fids = [r["id"] for r in fr[i:i + 500]]
-                                q = ",".join("?" * len(fids))
-                                c.execute(f"DELETE FROM upload_scan WHERE kind='sheet' AND ref_id IN ({q})", fids)
-                                c.execute(f"DELETE FROM file_text WHERE kind='sheet' AND ref_id IN ({q})", fids)
-                            # 2.199.0 C (#2742): their folder nodes (files/fsref.py) go with them
-                            c.execute("DELETE FROM fs_nodes WHERE kind='ref' AND ref_kind='sheet' AND ref_id IN "
-                                      "(SELECT id FROM sheets WHERE deleted_at IS NOT NULL AND deleted_at<?)", (cut,))
                         if table in ("contacts", "books"):  # 2.351.0 B (#2749): their folder nodes (contacts/ctfolder.py) go with them
                             c.execute(f"DELETE FROM fs_nodes WHERE kind='ref' AND ref_kind='{'contact' if table == 'contacts' else 'address_book'}' "
                                       f"AND ref_id IN (SELECT id {w})", (cut,))

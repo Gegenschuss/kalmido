@@ -143,7 +143,8 @@ def sheets_delete(sid):
     c = db()
     from .shshare import shs_need_own
     shs_need_own(c, _need_w(c, sid))  # 2.124.0 C (#2113): never through a share
-    c.execute("UPDATE sheets SET deleted_at=? WHERE id=?", (iso_ms(now_utc()), sid))
+    from .shkern import shk_trash  # 2.790.0 (#5365): the core's trash (shkern loads after this module)
+    shk_trash(c, me(), sid)
     sh_touch(c, sid, me())
     return _done(c, sid)
 
@@ -155,7 +156,8 @@ def sheets_restore(sid):
     if r["book_id"]:  # 2.124.0 (#2116, review): a further sheet comes back through its sheet route (name and count checks)
         from .shbook import sheets_tabs_restore
         return sheets_tabs_restore(r["book_id"], sid)
-    c.execute("UPDATE sheets SET deleted_at=NULL WHERE id=?", (sid,))
+    from .shkern import shk_restore  # 2.790.0 (#5365): the core's trash
+    shk_restore(c, me(), sid)
     from .shshare import shs_core_move
     shs_core_move(c, sid)  # 2.565.0 (#4717): its old share rows not moved yet get their core shares
     sh_touch(c, sid, me())
@@ -605,29 +607,6 @@ def sheets_sheet_trash(sid):
                    tabs=[{"id": x["id"], "name": x["tab_name"] or x["title"], "deleted_at": x["deleted_at"]} for x in tabs])
 
 
-def shx_purge(c, ids):
-    """Tables ids (first sheets in the trash) for good, as the trash run does (files/trashpurge.py tp_tick): the stored files
-    of their file cells (also of their further sheets) with their scan / text rows, their folder nodes; the rest cascades.
-    -> stored paths to unlink after the commit."""
-    if not ids:
-        return []
-    q = ",".join("?" * len(ids))
-    fr = c.execute(f"SELECT f.id, f.path FROM sheet_files f JOIN sheets s ON s.id=f.sheet_id WHERE s.id IN ({q}) OR s.book_id IN ({q})",
-                   [*ids, *ids]).fetchall()
-    for i in range(0, len(fr), 500):
-        fids = [x["id"] for x in fr[i:i + 500]]
-        fq = ",".join("?" * len(fids))
-        c.execute(f"DELETE FROM upload_scan WHERE kind='sheet' AND ref_id IN ({fq})", fids)
-        c.execute(f"DELETE FROM file_text WHERE kind='sheet' AND ref_id IN ({fq})", fids)
-    c.execute(f"DELETE FROM fs_nodes WHERE kind='ref' AND ref_kind='sheet' AND ref_id IN ({q})", ids)
-    # 2.571.0 (#4766): the core's history of the table's own fields (no FK) goes with it
-    c.execute(f"DELETE FROM obj_history WHERE kind='sheet' AND ref_id IN (SELECT id FROM sheets WHERE book_id IN ({q}) "
-              f"OR (id IN ({q}) AND deleted_at IS NOT NULL))", [*ids, *ids])
-    c.execute(f"DELETE FROM sheets WHERE book_id IN ({q})", ids)
-    c.execute(f"DELETE FROM sheets WHERE id IN ({q}) AND deleted_at IS NOT NULL", ids)
-    return [x["path"] for x in fr]
-
-
 @app.post("/api/sheets/purge")
 def sheets_purge_many():
     """{space, ids} -- these tables of the trash for good; {space, all: true} -- empty the space's table trash. Rights as
@@ -647,7 +626,11 @@ def sheets_purge_many():
         mine = [x for x in mine if x in want]
     if oid and (b.get("all") is True or len(mine) > 1) and not shx_may_empty(c, uid, oid):
         raise Denied(403, tr(SHX_ADMIN_ONLY))  # one's own single table stays allowed (like knowledge)
-    paths = shx_purge(c, mine)
+    from ..core.writes import obj_purge_after  # 2.790.0 (#5365): the core's delete for good (sheets/shkern.py)
+    from .shkern import shk_purge
+    with obj_purge_after() as box:
+        for sid in mine:
+            shk_purge(c, uid, sid)
     if mine:
         if oid:  # the organisation's admins see it in the history of its projects (no table names)
             c.execute("INSERT INTO org_list_log(org_id,list_id,list_name,action,by_id,owner_id,to_id,created_at,detail) "
@@ -655,5 +638,5 @@ def sheets_purge_many():
                                                     json.dumps({"kind": "sheet", "sheets": len(mine)})))
         bump(c)
     c.commit()
-    unlink_files(paths)  # after the commit: a failed commit keeps the rows and their files
+    unlink_files(box["after"])  # after the commit: a failed commit keeps the rows and their files
     return jsonify(ok=True, ids=mine, skipped=[x for x in (ids or []) if x not in set(mine)])

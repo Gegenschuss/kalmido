@@ -593,7 +593,7 @@ ORDER = (
     "lists.lmcore",  # 2.568.0 (#4739): the projects as a kind of the shared core (shares, revocation, settings history)
     "events.evkern", "contacts.ctkern",  # 2.566.0 (#4712): calendars and address books as kinds of the shared core (stage 3)
     "core.objlight",  # 2.754.0 (#5268): the light kinds task, event, hub_mail, client of the shared core (after their areas)
-    "files.fskern", "wiki.wkkern",  # 2.790.0 (#5365): file-store nodes, knowledge pages on the core's trash
+    "files.fskern", "wiki.wkkern", "sheets.shkern",  # 2.790.0 (#5365): file-store nodes, knowledge pages, tables on the core's trash
     "events.evundo", "contacts.ctundo", "files.fsundo", "personal.habitundo",  # 2.777.0 (#5254): their steps in the step groups (who may take them back)
     "admin.supporter",  # 2.74.0 (#338): the supporter licence (self-hosted only, a badge, unlocks nothing)
     "admin.operator",  # 2.144.0 D (#797): the hosting operator's interface (off unless a token file is configured)

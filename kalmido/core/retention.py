@@ -18,10 +18,12 @@ Expired credentials (sessions, tokens, codes past their end) are no data of a pe
   run (module)                          kind     period            what goes / note
   tasks (tasks/tasktrash.py)            trash    trash             trashed tasks + attachments; lists kept by law stay (tasks_kept)
   lists (lists/listtrash.py otr_prune)  trash    trash             trashed lists with tasks + files; retain_until waits
-  - (files/trashpurge.py tp_tick)       trash    trash             fs nodes (receipts locked), hub mails, sheets, deals, series, tombstones
+  obj_trash (core/writes.py)            trash    trash             2.773.0 (#5292): the core kinds with trash_prune; 2.790.0 (#5365):
+                                                                    + fs nodes (fs_entry, receipts locked: fs_entry_locked), knowledge
+                                                                    pages with their files (wiki_page), tables (sheet_table)
+  - (files/trashpurge.py tp_tick)       trash    trash             hub mails, deleted table rows / columns, deals, series, tombstones
                                                                     2.223.3 A (#2879): + absences, dispo bookings, polls with votes,
                                                                     appointment types, file requests
-  wiki (wiki/pages.py)                  trash    trash             trashed pages with versions + their files
   wiki_files (wiki/wikiatt.py)          trash    trash             files trashed on their own
   wiki_e2e_held (wiki/wkhist.py)        trash    trash             2.528.0 D (#4306): versions held when a space's lock went on
   sheet_files (sheets/shkinds.py)       trash    trash             table files no cell holds any more
