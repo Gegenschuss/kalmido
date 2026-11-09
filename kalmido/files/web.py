@@ -15,11 +15,12 @@ from ..core.errors import BadInput  # 2.577.0 (#4708 3)
 from ..core.db import bump, body, db, err, insert_id, iso
 from ..accounts.session import me
 from ..core.access import Denied, acx_of, collab_all
+from ..core.serializers import unlink_files  # 2.790.0 (#5365): the purges' files after the commit
 from ..core.orgcrypt import oc_send_file
 from .upsafe import h6d_one_file_request, h6d_read
 from .scan import sc_guard  # 2.477.0 (#3936): pulled up from functions
 from .store import download_name  # 2.750.0 (#4876)
-from .store import (fs_chain, fs_chains, fs_deleted, fs_link_target, fs_log_add, fs_new_version, fs_purge, fs_purge_files, fs_put, fs_read,
+from .store import (fs_chain, fs_chains, fs_deleted, fs_link_target, fs_log_add, fs_new_version, fs_put, fs_read,
                     fs_height, fs_mail_rows, fs_role, fs_version_row, DEPTH_MAX, fs_visible_ids, need_node, safe_fs_name, _free_name,
                     _now, _place, ROLE_RANK)
 from .fsref import (FSR, fs_ref_content, fs_ref_json, fs_ref_need_move, fs_ref_need_share, fs_ref_node, fs_ref_place, fs_ref_role,  # 2.199.0 A (#2742)
@@ -733,10 +734,13 @@ def files_node_delete(nid):
             return err(tr("Only what is in the trash can be deleted permanently"), 409)
         if n["role"] != "owner":
             raise Denied(403)
-        ids, paths = fs_purge(c, nid)  # this node and what is below it (a node inside a deleted folder: only that one)
+        from ..core.writes import obj_purge_after  # 2.790.0 (#5365): the core's delete for good (files/fskern.py)
+        from .fskern import fsk_purge
+        with obj_purge_after() as box:
+            fsk_purge(c, uid, nid)  # this node and what is below it (a node inside a deleted folder: only that one)
         bump(c)
         c.commit()
-        fs_purge_files(ids, paths)  # 2.86.0 (N25): after the commit
+        unlink_files(box["after"])  # 2.86.0 (N25): after the commit
         return jsonify(ok=True)
     n = need_node(c, nid, write=True)
     if n["parent_id"] is None and n["role"] != "owner":
@@ -749,7 +753,8 @@ def files_node_delete(nid):
     pl_tree_need_open(c, nid)
     _fsu_step(c, uid, n, "delete")  # 2.777.0 (#5254)
     kept, refs = fs_trash_prepare(c, uid, n)  # 2.199.0 A (#2742): what may not go into the trash moves one level up first
-    c.execute("UPDATE fs_nodes SET deleted_at=?, deleted_by=? WHERE id=?", (_now(), uid, nid))
+    from .fskern import fsk_trash  # 2.790.0 (#5365): the core's trash
+    fsk_trash(c, uid, nid)
     fs_log_add(c, nid, "trash")
     for r in refs:
         fs_ref_trashed(c, uid, r, False)  # 2.199.0 A (#2742): the area's own trash (e.g. a sheet)
@@ -772,7 +777,10 @@ def files_node_restore(nid):
     fs_ref_need_move(c, me(), n, restore=True)  # 2.238.0 A (#2863): filed documents come back into the folder's shares -- edit on them, like moving
     _fsu_step(c, me(), n, "restore")  # 2.777.0 (#5254)
     nm = _free_name(c, n["parent_id"], n["owner_id"], n["org_id"], n["name"], skip=nid)
-    c.execute("UPDATE fs_nodes SET deleted_at=NULL, deleted_by=NULL, name=? WHERE id=?", (nm, nid))
+    if nm != n["name"]:
+        c.execute("UPDATE fs_nodes SET name=? WHERE id=?", (nm, nid))
+    from .fskern import fsk_restore  # 2.790.0 (#5365): the core's trash
+    fsk_restore(c, me(), nid)
     fs_log_add(c, nid, "restore")
     stays = fs_trash_restored(c, me(), n)  # 2.199.0 A (#2742); 2.373.0 (#3335): what stays in its area's trash
     bump(c)

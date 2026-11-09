@@ -50,7 +50,9 @@ def tick():
     """The trash period run of the file store with the switch on (tp_tick, forced)."""
     out = subprocess.run(["docker", "exec", "-e", "KALMIDO_RETENTION_PURGE=1", CT, "python", "-c",
                           "import app\nfrom kalmido.core.db import connect\nfrom kalmido.files.trashpurge import tp_tick\n"
-                          "c = connect()\nprint('counts', tp_tick(c, True))\nc.close()"], capture_output=True, text=True)
+                          # 2.790.0 (#5365): file-store nodes go through the core's run (files/fskern.py)
+                          "from kalmido.core.writes import obj_trash_tick\n"
+                          "c = connect()\nprint('counts', tp_tick(c, True), obj_trash_tick(c, True))\nc.close()"], capture_output=True, text=True)
     check("counts" in out.stdout and "Traceback" not in out.stderr, "the trash run ran " + (out.stdout + out.stderr)[-600:])
 
 

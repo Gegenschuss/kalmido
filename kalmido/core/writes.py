@@ -38,6 +38,8 @@ one write call on top is office/owrite.py ow_write."""
 import base64
 import hashlib
 import json
+from contextlib import contextmanager  # 2.790.0 (#5365): obj_purge_after
+from contextvars import ContextVar
 from datetime import timedelta
 
 from flask import g, has_request_context, request
@@ -55,6 +57,7 @@ from .objects import obj_reg_node  # 2.754.0 (#5268): the write paths refuse a l
 from .pg import qi, system_ctx, table_columns, ts_canon, write_lock  # 2.755.0 (#5296): qi; 2.760.0 (#5311): ts_canon
 from .retention import ret_due, ret_on, ret_report, ret_trash_cut  # 2.773.0 (#5292): the trash's retention run
 from ..collab.comments import user_names
+from .serializers import unlink_files  # 2.790.0 (#5365): obj_trash_tick, after the commit
 from ..accounts.orgroles import need_org_write, org_role_key
 from ..accounts.orgout import org_out  # 2.579.0 (#4802): obj_space_set
 from ..files.fsref import fs_ref_drop, fs_ref_rename
@@ -373,9 +376,58 @@ def _kids_restore(c, reg, rid, gone):
             c.execute(f"UPDATE {qi(t, (t,))} SET deleted_at=NULL WHERE id = ANY(CAST(? AS BIGINT[]))", (back,))
 
 
+OBJ_PURGE = {}  # 2.790.0 (#5365): kind -> f(c, rid) of obj_on_purge
+_PURGE_BOX = ContextVar("obj_purge_box", default=None)
+
+
+def obj_on_purge(kind, f):
+    """2.790.0 (#5365): the area's part of the delete for good of an object of kind (_purge_rows runs it first): f(c, rid) cleans
+    what the core does not know (stored files, scan / text rows, folder nodes) and returns what must happen after the commit
+    (paths relative to ATT_DIR or callables, core/serializers.py unlink_files) or None; Denied = the object is kept (a receipt
+    under the legal retention, files/store.py fs_on_delete): obj_purge refuses, the retention run counts it as locked."""
+    OBJ_PURGE[kind] = f
+
+
+@contextmanager
+def obj_purge_after(keep_locked=False):
+    """2.790.0 (#5365): collects the after-commit work of the purges within ({"after": [...], "locked": n}); the caller commits
+    and then calls unlink_files(box["after"]). keep_locked: a Denied of an area's hook keeps that object (counted) instead of
+    refusing (the retention run)."""
+    box = {"after": [], "locked": 0, "keep": bool(keep_locked)}
+    tok = _PURGE_BOX.set(box)
+    try:
+        yield box
+    finally:
+        _PURGE_BOX.reset(tok)
+
+
+def _purge_area(c, kind, rid):
+    """2.790.0 (#5365): the area's hook of obj_on_purge (in a savepoint: a refusal leaves nothing half done). False = kept."""
+    f = OBJ_PURGE.get(kind)
+    if f is None:
+        return True
+    box = _PURGE_BOX.get()
+    try:
+        with c.savepoint():
+            out = f(c, int(rid))
+    except Denied:
+        if box is None or not box["keep"]:
+            raise
+        box["locked"] += 1
+        return False
+    if out and box is not None:
+        box["after"] += list(out)
+    elif out:  # without a box nobody unlinks after the commit: the orphan sweep (files/fsmove.py, admin/dataretention.py) does
+        print("obj purge: after-commit work without obj_purge_after", kind, flush=True)
+    return True
+
+
 def _purge_rows(c, kind, reg, rid):
     """THE delete for good of one object of the trash (obj_purge after its rights check, obj_trash_prune for the retention run):
-    its reference node, history, undo steps, revoked shares and children go with it."""
+    its reference node, history, undo steps, revoked shares and children go with it. 2.790.0 (#5365): the area's hook first
+    (obj_on_purge); one that keeps the object (legal retention) leaves it in the trash."""
+    if not _purge_area(c, kind, rid):
+        return
     fs_ref_drop(c, kind, rid)
     gids = ug_gids(c, "kind=? AND ref_id=?", (kind, int(rid)))  # 2.747.0 (#5249): the step groups of its undo rows
     for t in ("obj_history", "obj_undo", "obj_revoked"):
@@ -521,26 +573,31 @@ def obj_trash_tick(c, force=False):
     if not ret_due("obj_trash", force=force):
         return {}
     purge, cut, out = ret_on("trash"), ret_trash_cut(), {}
-    for kind, reg in sorted(OBJ.items()):
-        if reg.get("trash_prune"):
-            out[kind] = obj_trash_prune(c, kind, cut, purge)
     paths = []
-    for kind, k in sorted(PART_KINDS.items()):  # 2.783.0 (#5368): the side objects (core/objparts.py), one savepoint each
-        if k["trash_prune"] and kind not in OBJ:
-            got = []
-            try:
-                with c.savepoint():
-                    n = obj_trash_prune(c, kind, cut, purge, paths=got)
-                if n:  # only the side object kinds with something due (the report keeps the numbers only anyway)
-                    out[kind] = n
-            except Exception as e:  # noqa: BLE001 - like files/trashpurge.py: this kind waits for the next run
-                print("core trash:", kind, type(e).__name__, flush=True)
-                out[kind + "_err"] = 1
-                continue
-            paths += got
+    with obj_purge_after(keep_locked=True) as box:  # 2.790.0 (#5365): the areas' stored files after the commit, receipts locked
+        for kind, reg in sorted(OBJ.items()):
+            if reg.get("trash_prune"):
+                n0 = box["locked"]
+                out[kind] = obj_trash_prune(c, kind, cut, purge)
+                if box["locked"] > n0:
+                    out[kind + "_locked"] = box["locked"] - n0
+        for kind, k in sorted(PART_KINDS.items()):  # 2.783.0 (#5368): the side objects (core/objparts.py), one savepoint each
+            if k["trash_prune"] and kind not in OBJ:
+                got = []
+                try:
+                    with c.savepoint():
+                        n = obj_trash_prune(c, kind, cut, purge, paths=got)
+                    if n:  # only the side object kinds with something due (the report keeps the numbers only anyway)
+                        out[kind] = n
+                except Exception as e:  # noqa: BLE001 - like files/trashpurge.py: this kind waits for the next run
+                    print("core trash:", kind, type(e).__name__, flush=True)
+                    out[kind + "_err"] = 1
+                    continue
+                paths += got
     if out:
         ret_report(c, "trash", out, purge, run="obj_trash")
     c.commit()
+    unlink_files(box["after"])  # 2.790.0 (#5365): after the commit (a failed commit keeps the rows and their files)
     if paths:  # after the commit: a failed commit keeps the rows and their files
         fs_purge_files([], paths)
     return out

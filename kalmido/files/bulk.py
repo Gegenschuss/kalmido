@@ -26,8 +26,9 @@ from ..core.config import app, MAX_FILE_MB
 from ..core.db import bump, db, body, err, local_now
 from ..core.i18n import N_, tr
 from ..core.access import Denied
+from ..core.serializers import unlink_files  # 2.790.0 (#5365): the purges' files after the commit
 from ..accounts.session import me
-from .store import DEPTH_MAX, fs_chain, fs_deleted, fs_purge, fs_purge_files, fs_log_add, fs_put, fs_read, fs_role, fs_visible_ids, need_node, safe_fs_name, _free_name, _now
+from .store import DEPTH_MAX, fs_chain, fs_deleted, fs_log_add, fs_put, fs_read, fs_role, fs_visible_ids, need_node, safe_fs_name, _free_name
 from .fsref import fs_ref_need_move, fs_ref_trashed, fs_trash_prepare, fs_trash_restored  # 2.199.0 A (#2742); 2.238.0 A (#2863)
 from .fsroots import fs_area_before, fs_area_root_need_free  # 2.199.0 F (#2742, review G1); 2.200.0 (#2747)
 from .fslock import fl_is_locked, fsl_denied, fsl_map  # 2.353.0 A (#2758); F: + scan
@@ -100,9 +101,9 @@ def files_bulk_trash():
         k, r = fs_trash_prepare(c, uid, c.execute("SELECT * FROM fs_nodes WHERE id=?", (i,)).fetchone())
         kept += k
         refs += r
-    ts = _now()
+    from .fskern import fsk_trash  # 2.790.0 (#5365): the core's trash
     for i in ids:
-        c.execute("UPDATE fs_nodes SET deleted_at=?, deleted_by=? WHERE id=?", (ts, uid, i))
+        fsk_trash(c, uid, i)
         fs_log_add(c, i, "trash")
     for r in refs:
         fs_ref_trashed(c, uid, r, False)
@@ -130,11 +131,14 @@ def files_bulk_restore():
     for n in rows:
         if n["deleted_at"]:
             pl_tree_need_open(c, n["id"])  # 2.237.0 B (#2864) like POST /api/files/nodes/<id>/restore: all or nothing
+    from .fskern import fsk_restore
     for n in rows:
         if not n["deleted_at"]:
             continue
         nm = _free_name(c, n["parent_id"], n["owner_id"], n["org_id"], n["name"], skip=n["id"])
-        c.execute("UPDATE fs_nodes SET deleted_at=NULL, deleted_by=NULL, name=? WHERE id=?", (nm, n["id"]))
+        if nm != n["name"]:
+            c.execute("UPDATE fs_nodes SET name=? WHERE id=?", (nm, n["id"]))
+        fsk_restore(c, uid, n["id"])  # 2.790.0 (#5365): the core's trash
         fs_log_add(c, n["id"], "restore")
         for k, v in fs_trash_restored(c, uid, n).items():  # 2.199.0 A (#2742); 2.373.0 (#3335): what stays in its area's trash
             stays[k] = stays.get(k, 0) + v
@@ -167,24 +171,31 @@ def files_bulk_purge():
             rows.append((i, n["role"]))
     own = abm_outermost(c, [i for i, role in rows if role == "owner"])
     kept = len([1 for _i, role in rows if role != "owner"])
-    deleted = locked = 0
-    ids, paths = [], []
-    for nid in own:
-        if not c.execute("SELECT 1 FROM fs_nodes WHERE id=?", (nid,)).fetchone():
-            continue
-        try:
-            with c.savepoint():
-                i, p = fs_purge(c, nid)  # this node and what is below it
-        except Denied:  # a hook keeps it (legal retention, #2168), like the trash run (files/trashpurge.py tp_files)
-            locked += 1
-            continue
-        deleted += 1
-        ids += i
-        paths += p
+    deleted, locked, after = abm_purge(c, uid, own)
     bump(c)
     c.commit()
-    fs_purge_files(ids, paths)  # 2.86.0 (N25): after the commit
+    unlink_files(after)  # 2.86.0 (N25): after the commit
     return jsonify(ok=True, deleted=deleted, kept=kept, locked=locked)
+
+
+def abm_purge(c, uid, own):
+    """2.790.0 (#5365): the nodes own (outermost, owned by uid) for good through the core's trash (files/fskern.py) -> (deleted,
+    locked, the after-commit work). A node a hook keeps (legal retention, #2168) stays, like the core's retention run."""
+    from ..core.writes import obj_purge_after
+    from .fskern import fsk_purge
+    deleted = locked = 0
+    with obj_purge_after() as box:
+        for nid in own:
+            if not c.execute("SELECT 1 FROM fs_nodes WHERE id=?", (nid,)).fetchone():
+                continue
+            try:
+                with c.savepoint():
+                    fsk_purge(c, uid, nid)  # this node and what is below it
+            except Denied:
+                locked += 1
+                continue
+            deleted += 1
+    return deleted, locked, box["after"]
 
 
 def files_trash_empty(c, uid):
@@ -198,22 +209,12 @@ def files_trash_empty(c, uid):
             break
         seen.update(i for i, _role in new)
         kept += len([1 for _i, role in new if role != "owner"])
-        ids, paths = [], []
-        for nid in abm_outermost(c, [i for i, role in new if role == "owner"]):
-            if not c.execute("SELECT 1 FROM fs_nodes WHERE id=?", (nid,)).fetchone():
-                continue
-            try:
-                with c.savepoint():
-                    i, p = fs_purge(c, nid)  # this node and what is below it
-            except Denied:  # a hook keeps it (legal retention, #2168)
-                locked += 1
-                continue
-            deleted += 1
-            ids += i
-            paths += p
+        d, lk, after = abm_purge(c, uid, abm_outermost(c, [i for i, role in new if role == "owner"]))
+        deleted += d
+        locked += lk
         bump(c)
         c.commit()
-        fs_purge_files(ids, paths)  # 2.86.0 (N25): after the commit
+        unlink_files(after)  # 2.86.0 (N25): after the commit
     return jsonify(ok=True, deleted=deleted, kept=kept, locked=locked)
 
 

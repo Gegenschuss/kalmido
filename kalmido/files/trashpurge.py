@@ -1,6 +1,5 @@
 """2.152.0 B (#2165): the trash periods of the areas without one. The watchdog (at most hourly) deletes for good what lies in
-a trash longer than ret_days("trash") (KALMIDO_TRASH_DAYS, 30): file-store nodes (with their versions, previews, text and
-index through fs_purge and its hooks), hub mails (the row and its word index; the mail's folder went into the
+a trash longer than ret_days("trash") (KALMIDO_TRASH_DAYS, 30): hub mails (the row and its word index; the mail's folder went into the
 file store's trash when the mail was deleted -- 2.536.0, #4338 -- and follows there), tables and their deleted rows /
 columns, pipeline deals, invoice series, the
 emptied rows of deleted comments (2.530.0 A, #4315: with their kept text and
@@ -12,20 +11,21 @@ household budget (life/budget.py bud_trash_tick: entries with their receipts, te
 the copies of sections / sprints and the inbound webhooks are deleted by the core's run (core/writes.py obj_trash_tick).
 
 Like every retention run it only counts while ret_on("trash") is off (core/retention.py) and reports the numbers per
-area (GET /api/admin/retention). A node a hook of fs_on_delete refuses (Denied: legal retention of a booked receipt,
-#2168) stays and is counted as files_locked. The logbook is never purged here: its entries are locked until the legal
-period ends (#2169). Lists, tasks, wiki pages and events have their own runs (lists/listtrash.py, tasks/tasktrash.py,
-wiki/pages.py wiki_trash_tick with the pages' files, events/model.py)."""
+area (GET /api/admin/retention). 2.790.0 (#5365): file-store nodes (with their versions, previews, text and index; a node a
+hook of fs_on_delete refuses -- legal retention of a booked receipt, #2168 -- stays, counted as fs_entry_locked), knowledge
+pages and tables are deleted by the core's run (core/writes.py obj_trash_tick: files/fskern.py, wiki/wkkern.py,
+sheets/shkern.py). The logbook is never purged here: its entries are locked until the legal
+period ends (#2169). Lists, tasks and events have their own runs (lists/listtrash.py, tasks/tasktrash.py, events/model.py)."""
 import time
 
 from ..core.db import iso, iso_ms, now_utc
-from ..core.access import Denied, live_sql  # 2.783.0 (#5368): live_sql
+from ..core.access import live_sql  # 2.783.0 (#5368): live_sql
 from ..core.retention import ret_on, ret_report, ret_trash_cut
 from ..tasks.atttrash import atr_tick  # 2.272.0 E2 (#3038)
 from ..office.otrash import otb_tick  # 2.272.0 E2 (#3038)
 from ..life.budget import bud_trash_tick  # 2.567.0 A (#4707)
 from ..lists.templates import tpl_trash_tick  # 2.567.0 A (#4707)
-from ..files.store import fs_purge, fs_purge_files  # 2.369.5 (#2517): pulled up from functions
+from ..files.store import fs_purge_files  # 2.369.5 (#2517): pulled up from functions
 from ..core.pg import system_ctx  # 2.369.5 (#2517): pulled up from functions
 from ..hub.hubmail import hbm_mail_nodes  # 2.536.0 (#4338): the nodes of a mail, shared with deleting it
 
@@ -77,29 +77,6 @@ def tp_cut():
     return ret_trash_cut()  # 2.272.0 A (#3026): with the floor of 1 day (0 was "everything now")
 
 
-def tp_files(c, cut, purge):
-    """File-store nodes in the trash since before cut. -> (purged or due, locked, paths, ids) -- files after the commit."""
-    due = locked = 0
-    paths, ids = [], []
-    for (nid,) in c.execute("SELECT id FROM fs_nodes WHERE deleted_at IS NOT NULL AND deleted_at<? ORDER BY deleted_at, id",
-                            (cut,)).fetchall():
-        if not purge:
-            due += 1
-            continue
-        if not c.execute("SELECT 1 FROM fs_nodes WHERE id=?", (nid,)).fetchone():
-            continue  # went with a folder above it
-        try:
-            with c.savepoint():
-                i, p = fs_purge(c, nid)
-        except Denied:  # a hook keeps it (legal retention, #2168): the node stays in the trash
-            locked += 1
-            continue
-        due += 1
-        ids += i
-        paths += p
-    return due, locked, paths, ids
-
-
 def tp_hubmail(c, cut, purge):
     """Hub mails in the trash since before cut: the row goes (hub_words cascade), the folder with the .eml and the
     attachments goes into the file store's trash (it is deleted there after the same period)."""
@@ -122,7 +99,9 @@ def tp_tick(c, force=False):
     TP_TICK["at"] = time.time()
     purge, cut, counts = ret_on("trash"), tp_cut(), {}
     with system_ctx(c):  # the trash of every organisation and private space (row-level security); nothing is handed to a person
-        counts["files"], counts["files_locked"], paths, ids = tp_files(c, cut, purge)
+        # 2.790.0 (#5365): file-store nodes go through the core's run (core/writes.py obj_trash_tick, files/fskern.py:
+        # fs_entry / fs_entry_locked); paths = the other areas' stored files below
+        paths = []
         counts["hub_mails"] = tp_hubmail(c, cut, purge)
         fc, fp = atr_tick(c, cut, purge)  # 2.272.0 E2 (#3038): task / comment / project files (unlinked after the commit)
         counts.update(fc)
@@ -191,6 +170,6 @@ def tp_tick(c, force=False):
             paths += kp
         ret_report(c, "trash", counts, purge)
     c.commit()
-    if paths or ids:
-        fs_purge_files(ids, paths)  # after the commit: a failed commit keeps the rows and their files
+    if paths:
+        fs_purge_files([], paths)  # after the commit: a failed commit keeps the rows and their files
     return counts

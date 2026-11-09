@@ -859,7 +859,16 @@ def fs_subtree(c, nid):
 def fs_purge(c, nid):
     """Remove node nid and its subtree for good: the hooks of fs_on_delete, the stored versions, the rows. Returns
     (ids, paths); the caller commits and only then calls fs_purge_files(ids, paths) -- 2.86.0 (N25): a failed commit
-    keeps the rows and their files."""
+    keeps the rows and their files. 2.790.0 (#5365): the trash's purges go through the core (files/fskern.py); this stays for
+    deleting a person's / an organisation's tree (fs_user_purge, fs_org_purge)."""
+    ids, paths = fs_purge_prep(c, nid)
+    c.execute("DELETE FROM fs_nodes WHERE id=?", (int(nid),))  # ON DELETE CASCADE: children, versions, shares, log
+    return ids, paths
+
+
+def fs_purge_prep(c, nid):
+    """2.790.0 (#5365): everything of fs_purge before the row goes (also the core trash's hook, files/fskern.py): the documents
+    locked, the hooks of fs_on_delete (Denied = legal retention: nothing may go), the stored versions -> (ids, paths)."""
     ids = fs_subtree(c, nid)
     with system_ctx(c):  # 2.493.0 (#4034): the documents going along locked before the first write, in one order (#3090): a
         # recognition run (docs/store.process, its first write is the document's own row) ends first or waits - else the
@@ -873,7 +882,6 @@ def fs_purge(c, nid):
         for f in fs_on_delete:
             paths += f(c, i) or []  # 2.306.0 D3 (#2875): a hook may return its stored files (relative to ATT_DIR) for after the commit
         paths += [r[0] for r in c.execute("SELECT path FROM fs_versions WHERE node_id=?", (i,))]
-    c.execute("DELETE FROM fs_nodes WHERE id=?", (int(nid),))  # ON DELETE CASCADE: children, versions, shares, log
     return ids, paths
 
 
@@ -882,8 +890,10 @@ def fs_purge_files(ids, paths):
     for p in paths:
         try:
             os.remove(os.path.join(ATT_DIR, p))
-        except OSError:
+        except FileNotFoundError:
             pass
+        except OSError as e:  # 2.790.0 (#5365): a trace; the orphan sweep (files/fsmove.py fs_orphans) removes it later
+            print("fs purge: file kept", type(e).__name__, flush=True)
     for i in ids:
         try:
             os.rmdir(os.path.join(ATT_DIR, FS_DIR, str(i)))
