@@ -1478,7 +1478,6 @@ POST /api/lists/{}/shift
 POST /api/lists/{}/shop-areas
 POST /api/lists/{}/signoffs/{}/revoke
 POST /api/lists/{}/tags/promote
-POST /api/lists/{}/time/restore
 POST /api/me/drop-token
 POST /api/me/mail/token
 POST /api/me/pin/lock

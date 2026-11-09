@@ -202,9 +202,10 @@ SUP = c.execute("INSERT INTO office_suppliers(org_id, name, created_at, updated_
                 (ORGA, "Example Supplier", OLD, OLD, OLD)).fetchone()[0]
 c.commit()
 # 2.784.0 (#5366): a deleted supplier lies in the core's trash: its run is the core's (obj_trash_prune of kind osupplier)
-M4 = (f"from kalmido.core.pg import system_ctx\nfrom kalmido.integrations.hookin import whi_purge\nimport kalmido.office.datevimp\n"
+# 2.783.0 (#5368): the webhooks' trash runs through the core too (obj_trash_prune of the side object kind hook_in), whi_purge is gone
+M4 = (f"from kalmido.core.pg import system_ctx\nimport kalmido.integrations.hookin\nimport kalmido.office.datevimp\n"
       f"from kalmido.core.writes import obj_trash_prune\n"
-      f"with system_ctx(c):\n    whi_purge(c, {FL2})\nobj_trash_prune(c, 'osupplier')\nc.commit()\nprint('ok')")
+      f"with system_ctx(c):\n    obj_trash_prune(c, 'hook_in')\nobj_trash_prune(c, 'osupplier')\nc.commit()\nprint('ok')")
 box(M4)
 check(exists("hook_in", HK) and exists("office_suppliers", SUP), "#3026 M4: switch off: an old deleted webhook / supplier stays")
 box(M4, on=True)

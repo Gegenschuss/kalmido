@@ -469,6 +469,10 @@ APP_ONLY = [
     ("2.353.0 D (#2759): recognition per folder / file of the file store is a person's setup in the app (which folders become "
      "documents); agents keep their shares, read and change documents with /documents and files with /files",
      ("=PUT /api/files/nodes/{}/recognition",)),
+    # 2.783.0 (#4882)
+    ("2.783.0 (#4882): Suggest title (the workspace's title pattern once on one document) is a person's step in the app sheet; "
+     "agents set the title themselves through /documents (a title from an agent counts as set by hand)",
+     ("=GET /api/docs/{}/title-suggest",)),
     # 2.607.0 (#4872)
     ("2.607.0 (#4872): Apply what was learned on many documents at once (sorting again with the stored text, its undo) is a "
      "person's step in the app, like bulk and Recognise again; agents set sender / type / tags one by one through /documents",

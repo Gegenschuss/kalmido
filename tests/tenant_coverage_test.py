@@ -1448,6 +1448,7 @@ ROUTES = {
     "GET /api/office/docs/{}/tasks": "office", "POST /api/office/docs/{}/tasks": "office",
     # 2.299.0 D (#3193): hide / show the hints of the receipt check (people with edit on the document; p2299_d_api_test.py)
     "POST /api/docs/{}/checks": "document",
+    "GET /api/docs/{}/title-suggest": "document",  # 2.783.0 (#4882): p2783_b_doctitle_test.py
     # 2.299.0 C (#3192): bank bookings without a receipt, their counter and the reminder (p2299_c_norc_test.py)
     "GET /api/office/bank/noreceipt": "office", "GET /api/office/bank/noreceipt/count": "office",
     "GET /api/office/bank/noreceipt/reminder": "office", "PUT /api/office/bank/noreceipt/reminder": "office",
