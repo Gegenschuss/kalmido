@@ -217,6 +217,11 @@ def bk_receipts(c, oid, frm, to, uid=None, by="paid", gaps=None, paid=None, with
     return out
 
 
+def bk_paid_all(c, oid):
+    """2.743.0 (#4937): {receipt node id: its bank / card / cash line {day, amount, src, ref}} over all days (eb_flows paid)."""
+    return eb_flows(c, oid, "0001-01-01", "9999-12-31")["paid"]
+
+
 def bk_receipts_basis(c, oid, frm, to, by="doc", uid=None, gaps=None, open_=None, prep=None):
     """2.603.0 (#4927): the receipts of [frm, to] by the basis of each year (office/euerbasis.py): "receipts" = bk_receipts(by);
     "bank and cash" = only those with a bank / card / cash line, on its day with its amount (the DATEV export).
@@ -229,21 +234,21 @@ def bk_receipts_basis(c, oid, frm, to, by="doc", uid=None, gaps=None, open_=None
     segs = eb_segments(s, frm, to)
     if "bank" not in eb_map(s).values():  # 2.755.0 (#5241): was "no strict year in [frm, to]" -- a receipts year next to a strict one has an edge
         return bk_receipts(c, oid, frm, to, uid=uid, by=by, gaps=gaps)
-    out, linked, lines = [], None, None
+    out, lines = [], None
     for i, (a, b, strict) in enumerate(segs):
         one = i == 0  # review N2: the receipts without any date belong to no period -- named (and counted as hidden) once
         if strict:
             flows = eb_flows(c, oid, a, b)
             if open_ is not None:
-                if linked is None:  # review M2: the lines of every day, read once
-                    linked = set(eb_flows(c, oid, "0001-01-01", "9999-12-31")["paid"])
-                open_ += [rc for rc in bk_receipts(c, oid, a, b, uid=uid, by=by, zero=True) if rc["node_id"] not in linked]
+                if lines is None:  # review M2: the lines of every day, read once
+                    lines = bk_paid_all(c, oid)
+                open_ += [rc for rc in bk_receipts(c, oid, a, b, uid=uid, by=by, zero=True) if rc["node_id"] not in lines]
             if prep is not None:
                 prep(a, b, flows)
             out += bk_receipts(c, oid, a, b, uid=uid, paid=flows["paid"], gaps=gaps, with_undated=one)
         else:
             if lines is None:  # 2.755.0 (#5241): the bank / card / cash lines of every day, read once
-                lines = eb_flows(c, oid, "0001-01-01", "9999-12-31")["paid"]
+                lines = bk_paid_all(c, oid)
             out += bk_receipts_edge(c, oid, s, a, b, by, lines, uid=uid, gaps=gaps, with_undated=one)
     if gaps is not None and not gaps.get("no_amount"):
         gaps.pop("no_amount", None)
@@ -636,7 +641,7 @@ def bk_strict_warnings(c, oid, frm, to, flows, pay_outside):
     (a card total that differs from its statement, point 3), open_receipts (receipts of the period without a bank, cash or card
     line: they do not count, point 1), payments_outside (invoice payments without a bank / cash booking, point 6)}."""
     mis = [x for x in flows["norc"] if x["missing"]]
-    paid = flows["paid"]
+    paid = bk_paid_all(c, oid)  # 2.743.0 (#4937): a line on any day (a receipt of 28.12. paid in January is not open)
     opened = sum(1 for rc in bk_receipts(c, oid, frm, to) if rc["node_id"] not in paid)
     row = lambda x: {"day": x["day"], "amount": dstr(money(x["amount"])), "src": x.get("src", "bank"), "ref": x["ref"], "text": x.get("text") or ""}  # noqa: E731
     return {"missing_receipt": [row(x) for x in mis[:BK_WARN_MAX]], "missing_count": len(mis), "label": tr(EB_NORC_LABEL),

@@ -43,7 +43,7 @@ function pdHtml() {
   const state = PD.view ? tr('Version {0} from {1}, read-only', d.viewing, pdDay(d.saved_at))
     : d.version ? tr('Last saved: version {0} from {1}', d.version, pdDay(d.saved_at)) + (d.saved_by ? ` · ${d.saved_by}` : '') : tr('No version saved yet');
   const gaps = PD.view ? 0 : d.sections.reduce((n, s) => n + s.fields.filter(f => !(f.key in PD.own ? PD.own[f.key] : f.own) && (f.need || (f.auto || '').includes(d.gap_marker))).length, 0);
-  const head = `<div class="ofcbar pd-bar"><a class="btn sm ghost" href="#office/books">${ic('back', 's')}<span>${tr('Bookkeeping')}</span></a><span class="spacer"></span>
+  const head = `<div class="ofcbar pd-bar"><a class="btn sm ghost" href="#office/books" data-navup>${ic('back', 's')}<span>${tr('Bookkeeping')}</span></a><span class="spacer"></span>
     <a class="btn sm ghost" href="/api/office/procdoc.md${q}" download>${ic('download', 's')}<span>Markdown</span></a><a class="btn sm ghost" href="/api/office/procdoc.pdf${q}" download>${ic('download', 's')}<span>PDF</span></a></div>
     <h2 class="pd-h">${tr('Procedure documentation')}</h2>
     <p class="muted ofchint">${tr('Describes how the bookkeeping works in this office (GoBD).')}${d.version ? '' : ' ' + tr('Kalmido fills in what it knows from the settings; complete the marked gaps and save a version.')}</p>

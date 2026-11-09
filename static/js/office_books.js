@@ -72,7 +72,7 @@ function bkTabHtml() {
   if (bkSub() === 'procdoc' && typeof pdHtml === 'function') return pdHtml();  // 2.148.0 C (#2472): the procedure documentation
   if (BK.oid !== OFC.info?.org_id || !BK.period) bkReset();  // another office area
   if (!ofcAdmin()) return ofcLockedHtml();  // 2.356.0 D (#3006): why, and the way to hand in receipts
-  if (bkSub() === 'receipts' && typeof rclHtml === 'function') return rclHtml();  // 2.110.0 B (#2055): all receipts (office_receipts.js)
+  if (bkSub() === 'receipts' && typeof rclHtml === 'function') return rcl_pairWrap(rclHtml());  // 2.110.0 B (#2055): all receipts (office_receipts.js); 2.743.0 B (#4930): in the pair .lsd2
   if (bkSub() === 'archive' && typeof bkaHtml === 'function') return bkaHtml();  // 2.414.0 A (#3502): the booking archive (office_bookarch.js)
   if (bkSub() === 'taxforms') return tfHtml();  // 2.467.0 (#3456): Anlage EUeR and annual VAT return
   if (bkSub() === 'taxcheck') return tcHtml();  // 2.589.0 (#3458): the tax check before filing (traffic light)
@@ -259,7 +259,7 @@ function tfHtml() {
   if (!ofcFeat('books.vat_return')) return `<div class="empty">${tr('The VAT return figures are switched off for this office.')}</div>`;
   const kind = location.hash.split('/')[3] === 'ust' ? 'ust' : 'euer';
   if (TF.oid !== OFC.info?.org_id || TF.kind !== kind) Object.assign(TF, {oid: OFC.info?.org_id, kind, d: null, err: null, ys: TF.oid === OFC.info?.org_id ? TF.ys : null, year: TF.year || new Date().getFullYear() - 1});
-  const back = `<a class="btn sm ghost" href="#office/books">${ic('back', 's')}<span>${tr('Bookkeeping')}</span></a>`;
+  const back = `<a class="btn sm ghost" href="#office/books" data-navup>${ic('back', 's')}<span>${tr('Bookkeeping')}</span></a>`;
   const tabs = `<div class="seg" role="group" aria-label="${esc(tr('Tax forms'))}">${[['euer', tr('Anlage EÜR')], ['ust', tr('Annual VAT return')]].map(([k, n]) => `<a class="btn sm${kind === k ? ' on' : ''}" href="#office/books/taxforms/${k}"${kind === k ? ' aria-current="page"' : ''}>${esc(n)}</a>`).join('')}</div>`;
   const bar = `<div class="ofcbar bk-bar">${back}${tabs}<a class="btn sm ghost" href="#office/books/taxcheck" data-bk-taxcheck>${ic('check', 's')}<span>${tr('Tax check')}</span></a><span class="spacer"></span><label class="bk-year"><span class="muted">${tr('Year')}</span>${ofcSel('tf-year', TF.year, tfYears())}</label></div>`;  // 2.589.0 (#3458): + the tax check
   if (TF.err) return bar + `<div class="empty">${esc(TF.err)}</div>`;
@@ -302,7 +302,7 @@ const tcRow = p => `<li class="tc-pt tc-${esc(p.ampel)}" data-tc="${esc(p.punkt)
 function tcHtml() {
   if (!ofcFeat('books.vat_return')) return `<div class="empty">${tr('The VAT return figures are switched off for this office.')}</div>`;
   if (TC.oid !== OFC.info?.org_id) Object.assign(TC, {oid: OFC.info?.org_id, d: null, err: null, year: TC.year || new Date().getFullYear() - 1});
-  const back = `<a class="btn sm ghost" href="#office/books/taxforms/euer">${ic('back', 's')}<span>${tr('Tax forms')}</span></a>`;
+  const back = `<a class="btn sm ghost" href="#office/books/taxforms/euer" data-navup>${ic('back', 's')}<span>${tr('Tax forms')}</span></a>`;
   const bar = `<div class="ofcbar bk-bar">${back}<h3 class="ofcgrp">${tr('Tax check')}</h3><span class="spacer"></span><label class="bk-year"><span class="muted">${tr('Year')}</span>${ofcSel('tc-year', TC.year, tfYears())}</label></div>`;
   if (TC.err) return bar + `<div class="empty">${esc(TC.err)}</div>`;
   if (!TC.d) { if (!TC.t) TC.t = setTimeout(() => { TC.t = 0; tcLoad(); }, 0); return bar + `<p class="muted lempty">${tr('Loading…')}</p>`; }

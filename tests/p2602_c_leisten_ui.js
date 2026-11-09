@@ -70,7 +70,8 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
       check(t === '15rem|14rem', '--w-leiste 15rem, --w-leiste-min 14rem ' + t); }
     // the grids of the lists that stay in the page, measured on a sample of each in the page (its first column)
     const col = cls => ev(`(() => { const v = document.querySelector('#view'), d = document.createElement('div'); d.className = ${JSON.stringify(cls)}; d.style.width = '60rem'; d.innerHTML = '<div></div><div></div>'; v.appendChild(d); const w = d.firstChild.getBoundingClientRect().width / ${REM}; d.remove(); return Math.round(w * 10) / 10; })()`);
-    for (const cls of ['abview', 'tcview', 'tcview inthread', 'ntview open', 'ctcols']) {
+    // 2.743.0 (#4930): contacts / clients take their columns from the building block .lsd2 (was .ctcols)
+    for (const cls of ['abview', 'tcview', 'tcview inthread', 'ntview open', 'lsd2']) {
       const w = await col(cls);
       check(Math.abs(w - 15) <= .1, `--w-leiste: the list column of .${cls.replace(' ', '.')} is 15rem (${w})`);
     }

@@ -4,22 +4,31 @@
    changes: contacts / clients keep their narrow list beside the card, a quotation / invoice stands in place of its list, a
    receipt opens as the dialog in the middle. Phones (767 / 599 px) never get the class. Private and organisation alike. */
 
-/* contacts and clients: list + card (both drawn already) */
-#view.lsdw > .ofwrap:has(.ctview > .ctcols){max-width:none}
-#view.lsdw .ctview > .ctcols{grid-template-columns:minmax(16rem,2fr) minmax(0,3fr)}
-
-/* quotations and invoices (office_docs.js ofd_pairHtml): the rows of the list on the left, the document on the right */
-#view.lsdw > .ofwrap:has(.lsd2){max-width:none}
-#view.lsdw .dash.office:has(.lsd2){max-width:none}  /* 2.571.0 (#4740): the office page (.dash, app.css) kept the pair at --w-seite = 96rem inside the wider .ofwrap */
-.lsd2{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr);gap:1rem;align-items:start}
-.lsd2 > .lsdl{position:sticky;top:0;max-height:calc(var(--vvh,100dvh) - 8rem);overflow-y:auto;overscroll-behavior:contain;min-width:0}
+/* 2.743.0 B (#4930): ONE building block for list beside detail: .lsd2 with the list .lsdl on the left and the detail .lsdr
+   on the right, for contacts, clients (contacts.js / clientpage.js .ctcols), quotations / invoices (office_docs.js
+   ofd_pairHtml) and receipts (office_receipts.js rcl_pairWrap). The widths live here only:
+   - below 100rem the narrow list --w-leiste (15rem, at least 14rem) beside the detail (contacts / clients; a document and
+     a receipt have no pair there),
+   - #view.lsdw (100rem and more) about 40 % list / 60 % detail,
+   - a phone one column.
+   Variants: .lsdfill = the pair fills the page and each column scrolls itself (contacts / clients, app.css #3598);
+   without it the list stays in place (sticky) beside a longer detail (documents); .lsdone = only the list until a receipt
+   docks beside it (body.rcldock), then the right column is the receipt dialog's place (rcl_dockSync measures it). */
+.lsd2{display:grid;grid-template-columns:minmax(var(--w-leiste-min),var(--w-leiste)) minmax(0,1fr);gap:1rem;min-height:0}
+#view.lsdw .lsd2{grid-template-columns:minmax(16rem,2fr) minmax(0,3fr)}
+.lsd2 > .lsdl,.lsd2 > .lsdr{min-width:0}
+.lsd2:not(.lsdfill,.lsdone){align-items:start}
+.lsd2:not(.lsdfill,.lsdone) > .lsdl{position:sticky;top:0;max-height:calc(var(--vvh,100dvh) - 8rem);overflow-y:auto;overscroll-behavior:contain}
+.lsd2.lsdone{display:block}
+body.rcldock #view.lsdw .lsd2.lsdone{display:grid}
 .lsd2 > .lsdl > .ofdlist{margin:0}
-.lsd2 > .lsdr{min-width:0}
-.lsdl .ofcrow[aria-current="true"],body.rcldock #view .ofcrow[aria-current="true"]{background:var(--bg3);border-color:var(--accent)}
+.lsdl .ofcrow[aria-current="true"]{background:var(--bg3);border-color:var(--accent)}
+/* the page itself gets the full width while it holds a pair */
+#view.lsdw > .ofwrap:has(.lsd2:not(.lsdone)),body.rcldock #view.lsdw > .ofwrap{max-width:none}
+#view.lsdw .dash.office:has(.lsd2:not(.lsdone)),body.rcldock #view.lsdw .dash.office{max-width:none}  /* 2.571.0 (#4740): the office page (.dash, app.css) kept the pair at --w-seite = 96rem inside the wider .ofwrap */
+@media (max-width:767px){ .lsd2{grid-template-columns:1fr} }
 
-/* receipts (office_receipts.js rcl_dock): the list keeps the left 40 % of the pair, the receipt's dialog stands right of it
-   (its box is placed by rcl_dockSync), without the dark backdrop, so the list stays visible and clickable */
-body.rcldock #view.lsdw > .ofwrap{max-width:none}
-body.rcldock #view.lsdw > .ofwrap > .ofbody{padding-right:60%}
+/* receipts (office_receipts.js rcl_dock): the receipt's dialog stands in the right column of the pair (its box is placed
+   over that column by rcl_dockSync), without the dark backdrop, so the list stays visible and clickable */
 .modal.lsddock{display:block;background:none;padding:0;pointer-events:none}
 .modal.lsddock > .card{pointer-events:auto;position:absolute;inset:0 0 1rem 0;width:auto !important;max-width:none !important;height:auto !important;max-height:none !important}  /* !important: the dialog's own widths (office.css .ofcdlg, a size set with its grip) are for the dialog in the middle */

@@ -349,7 +349,7 @@ document.addEventListener('click', e => {
   const a = e.target.closest?.('[data-act^="tc-"]'); if (!a) return;
   const act = a.dataset.act;
   if (act === 'tc-open') { go('team/' + a.dataset.rid); }
-  else if (act === 'tc-back') go('team');
+  else if (act === 'tc-back') navUp('team');  // 2.743.0 (#5235): up = back in the history when the list was the view before
   else if (act === 'tc-send') tcSend();
   else if (act === 'tc-react') { tcReact(+a.dataset.mid, a.dataset.e); }
   else if (act === 'tc-older') loadRoom(S.tc.rid, true).then(() => tcPatch());
@@ -1105,7 +1105,7 @@ document.addEventListener('click', e => {
   const a = e.target.closest?.('[data-act^="nt-"]'); if (!a) return;
   const act = a.dataset.act, n = noteCur();
   if (act === 'nt-new') noteNew();
-  else if (act === 'nt-close') { noteFlush(); go('notes/' + S.nt.lid); }
+  else if (act === 'nt-close') { noteFlush(); navUp('notes/' + S.nt.lid); }  // 2.743.0 (#5235)
   else if (act === 'nt-mode') { noteFlush(); S.nt.edit = a.dataset.m === 'edit'; renderView(); if (S.nt.edit) setTimeout(() => { const b = $('#nt-body'); if (b) { autosize(b); b.focus(); } }, 0); }
   else if (act === 'nt-pin' && n) { ntWrite(n, {pinned: !n.pinned}).then(r => { if (!r.queued) Object.assign(n, r); renderView(); }).catch(err => toast(err instanceof Offline ? tr('Offline: only works again with a connection') : err.message)); }  // 2.143.0 C (#2153): offline too
   else if (act === 'nt-menu') noteMenu(a);

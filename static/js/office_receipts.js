@@ -60,7 +60,7 @@ function rclSet(patch) { Object.assign(RCL.f, patch); rclSave(); rclLoad(false);
 function rclHtml(own) {  // 2.276.0 A (#3039): own = the page Office > Receipts (no way back to the bookkeeping)
   if (RCL.oid !== OFC.info?.org_id || !RCL.f) Object.assign(RCL, {oid: OFC.info?.org_id, f: rclRestore(), data: null, rows: [], key: '', err: null});
   if (RCL.open == null) RCL.open = !window.matchMedia?.('(max-width: 600px)').matches;
-  const back = (own ? '' : `<div class="ofcbar rcl-top"><a class="btn sm ghost" href="#office/books">${ic('back', 's')}<span>${tr('Bookkeeping')}</span></a><span class="spacer"></span></div>`) + `
+  const back = (own ? '' : `<div class="ofcbar rcl-top"><a class="btn sm ghost" href="#office/books" data-navup>${ic('back', 's')}<span>${tr('Bookkeeping')}</span></a><span class="spacer"></span></div>`) + `
     <h3 class="ofcgrp" id="rcl-h">${tr('All receipts')}</h3>`;
   if (RCL.key !== rclQuery() && !RCL.loading) setTimeout(() => rclLoad(false), 0);
   if (RCL.err) return back + rclFiltersHtml() + `<div class="empty">${esc(RCL.err)}</div>`;
@@ -108,6 +108,9 @@ function rclRow(r) {
 // the list (about 40 % on the left) instead of in the middle; the list stays visible and clickable, a click on another row
 // replaces the receipt (unsaved changes ask first), Esc / Cancel close it and the list stays. Narrower = the dialog as before.
 const rcl_docked = () => $('.modal.bk-sheet.lsddock');
+// 2.743.0 B (#4930): the receipts page in the building block .lsd2 (start-lsd-4553.css): one column (.lsdone) until a receipt
+// docks, then the list keeps the left column of the pair and the dialog takes the right one (the widths of the block)
+const rcl_pairWrap = h => `<div class="lsd2 lsdone rcl-pair"><div class="lsdl">${h}</div></div>`;
 async function rcl_open(id) {
   const old = rcl_docked();
   if (old) { if (+old.dataset.rxid === id) return; if (old._close) await old._close(); else modalClose(old); if (old.isConnected) return; }
@@ -127,9 +130,11 @@ function rcl_dockSync() {
   const md = rcl_docked(); if (!md) return;
   const wrap = $('#view > .ofwrap');
   if (!rclHere() || !lsd_wide() || !wrap) { md.classList.remove('lsddock'); md.style.inset = ''; document.body.classList.remove('rcldock'); RCL.dockId = 0; rcl_mark(); return; }  // narrower again: the dialog in the middle
-  document.body.classList.add('rcldock');  // start-lsd-4553.css: the list on the left 40 % of the pair
-  const place = () => { const w = $('#view > .ofwrap'); if (!w || !md.classList.contains('lsddock')) return; const r = w.getBoundingClientRect(), rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-    md.style.inset = `${Math.round(r.top)}px ${Math.max(0, Math.round(innerWidth - r.right))}px 0 ${Math.round(r.left + r.width * .4 + rem)}px`; };
+  document.body.classList.add('rcldock');  // start-lsd-4553.css: the pair .lsd2 gets its two columns
+  // 2.743.0 B (#4930): the dialog over the right column of the pair (was: 40 % + 1rem of the page, the page padded by 60 %)
+  const place = () => { const p = $('#view .lsd2.rcl-pair'), l = p && $(':scope > .lsdl', p); if (!l || !md.classList.contains('lsddock')) return;
+    const r = p.getBoundingClientRect(), lr = l.getBoundingClientRect(), gap = parseFloat(getComputedStyle(p).columnGap) || 0, top = Math.max(0, r.top, p.closest('.ofbody')?.getBoundingClientRect().top || 0);  // below the office tabs, also when the page has scrolled
+    md.style.inset = `${Math.round(top)}px ${Math.max(0, Math.round(innerWidth - r.right))}px 0 ${Math.round(lr.right + gap)}px`; };
   place(); requestAnimationFrame(() => requestAnimationFrame(place));  // again once the wider pair is laid out (measured at once it was still the narrow page)
 }
 window.addEventListener('hashchange', () => setTimeout(rcl_dockSync, 0));  // another page: the receipt goes back into the middle
@@ -227,7 +232,7 @@ function rcp_tabHtml() {
   if (!ofcAdmin()) return OFC.info?.submit ? rsb_tabHtml() : ofcLockedHtml();  // 2.356.0 D (#3129, #3006): members hand in receipts
   const ks = typeof ofm_all === 'function' ? ofm_all().filter(i => ['meals', 'travel'].includes(i.key) && i.on() && ofm_need(i) && ofm_ok(i)) : [];
   const kinds = ks.length ? `<nav class="rcp-kinds" aria-label="${esc(tr('Other receipts'))}">${ks.map(i => `<a class="btn sm ghost" href="#${i.go}" data-rcp="${i.key}">${ic(i.icon, 's')}<span>${esc(tr(i.name))}</span></a>`).join('')}</nav>` : '';
-  return `<div class="rcp">${typeof bkPhotoHtml === 'function' ? bkPhotoHtml() : ''}${kinds}${rsb_inHtml()}${amv_html()}${rcn_html()}${rclHtml(true)}</div>`;  // 2.356.0 D (#3129): + handed in; 2.522.0 (#4433): + new in the office; 2.547.0 (#4434): + the old receipts' move
+  return rcl_pairWrap(`<div class="rcp">${typeof bkPhotoHtml === 'function' ? bkPhotoHtml() : ''}${kinds}${rsb_inHtml()}${amv_html()}${rcn_html()}${rclHtml(true)}</div>`);  // 2.743.0 B (#4930): in the pair; 2.356.0 D (#3129): + handed in; 2.522.0 (#4433): + new in the office; 2.547.0 (#4434): + the old receipts' move
 }
 
 // ---- 2.522.0 (#4433): "New in the office" -- the documents the general input sorted into the office (or a person moved there)

@@ -58,7 +58,7 @@ async function bkaLoadSums() {
 // ---- the page
 function bkaHtml() {
   if (BKA.oid !== OFC.info?.org_id) bkaReset();
-  const back = `<a class="btn sm ghost" href="#office/books">${ic('back', 's')}<span>${tr('Bookkeeping')}</span></a>`;
+  const back = `<a class="btn sm ghost" href="#office/books" data-navup>${ic('back', 's')}<span>${tr('Bookkeeping')}</span></a>`;
   if (!ofcFeat('books.datev')) return `<div class="ofcbar">${back}</div><div class="empty">${tr('The DATEV function is switched off for this office.')}</div>`;
   if (BKA.err) return `<div class="ofcbar">${back}</div><div class="empty">${esc(BKA.err)}</div>`;
   if (!BKA.ov) { if (!BKA.loadingT) BKA.loadingT = setTimeout(() => { BKA.loadingT = 0; bkaLoad(); }, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }

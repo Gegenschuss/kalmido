@@ -57,7 +57,7 @@ const ldbReload = () => { LDB.d = null; LDB.err = null; ofcDraw(); };
 // the page #office/books/ledger
 function ldbHtml() {
   if (LDB.oid !== OFC.info?.org_id) Object.assign(LDB, {oid: OFC.info?.org_id, cfg: null, d: null, err: null});
-  const back = `<a class="btn sm ghost" href="#office/books">${ic('back', 's')}<span>${tr('Bookkeeping')}</span></a>`;
+  const back = `<a class="btn sm ghost" href="#office/books" data-navup>${ic('back', 's')}<span>${tr('Bookkeeping')}</span></a>`;
   const years = ofcYearOpts(typeof BK === 'object' ? BK.info?.years : null, LDB.year, 1).map(y => [y, y]);
   const bar = `<div class="ofcbar bk-bar">${back}<h3 class="ofcgrp">${tr('Balance sheet')}</h3><span class="spacer"></span><label class="bk-year"><span class="muted">${tr('Year')}</span>${ofcSel('ldb-year', LDB.year, years)}</label></div>`;
   if (LDB.err) return bar + `<div class="empty">${esc(LDB.err)}</div>`;

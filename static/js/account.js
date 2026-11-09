@@ -599,12 +599,24 @@ async function inviteScreen(tok) {
   $('#app')?.setAttribute('inert', '');
   setTimeout(() => $('#inv-pw', el)?.focus(), 50);
 }
+// 2.743.0 (#4284): a sign-out without network could not end the session on the server (HttpOnly cookie): this browser keeps
+// a mark (outside the tasks.* keys clearLocal wipes) and the next load of the state ends that session before anything else,
+// so a shared device does not open the account again once it is online. The sign-in screen (= the server knows no session) drops it.
+const LGO_KEY = 'kalmido.logoutPending';
+async function lgo_pending() {
+  let p = null;
+  try { p = localStorage.getItem(LGO_KEY); } catch { return; }
+  if (!p) return;
+  try { if ((await fetch('/api/auth/logout', {method: 'POST', headers: {'X-Requested-With': 'kalmido'}})).ok) localStorage.removeItem(LGO_KEY); } catch { /* still offline: the state load goes the offline way too */ }
+}
 async function logout() {
   if (kd_pinNeed()) return kd_pinAsk(logout);  // 2.49.0 (#1551): a child with the parents' PIN
   if (OUT.q.length && !await askConfirm(trn('{0} change is not synced yet and will be lost. Sign out anyway?', '{0} changes are not synced yet and will be lost. Sign out anyway?', OUT.q.length), '', {ok: tr('Sign out'), danger: true})) return;
   await wpDisable().catch(() => {});  // this device stops getting the pushes of the account that logs out
   await e2eForget();  // 2.42.0 (#828): keys remembered on this device go
-  try { await fetch('/api/auth/logout', {method: 'POST', headers: {'X-Requested-With': 'kalmido'}}); } catch { /* offline */ }
+  let gone = false;
+  try { gone = (await fetch('/api/auth/logout', {method: 'POST', headers: {'X-Requested-With': 'kalmido'}})).ok; } catch { /* offline */ }
+  if (!gone) try { localStorage.setItem(LGO_KEY, '1'); } catch { /* private mode */ }  // 2.743.0 (#4284): the session still lives on the server: the next load ends it first (lgo_pending)
   try { for (const k of await caches.keys()) await caches.delete(k); } catch { /* no Cache Storage */ }  // 2.126.0 D (#1992 O4): the app loads again from the server
   await Promise.race([clearLocal(), new Promise(r => setTimeout(r, 1500))]); location.replace('/');  // 2.143.0 C2 (#2153): the IndexedDB queue is empty before the page goes
 }
@@ -614,6 +626,7 @@ const legalLinks = (l, cls) => [['privacy_url', N_('Privacy')], ['imprint_url', 
 // login / first-run setup / "no account" screen (built-in login; with single sign-on the proxy logs in)
 async function authScreen(j) {
   if ($('.authscreen')) return;
+  try { localStorage.removeItem(LGO_KEY); } catch { /* private mode */ }  // 2.743.0 (#4284): no session on the server any more
   let info = {};
   try { info = await (await fetch('/api/auth/info')).json(); } catch { /* offline */ }
   await i18nLoad(info.lang || uiLang());

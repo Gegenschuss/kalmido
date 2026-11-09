@@ -1,7 +1,22 @@
 # 2.360.2 (#2912): keeps the commit hashes of the pinned actions current (with the version comment behind them)
+# 2.743.0 (#3794): + the base images of the two Dockerfiles (pinned by digest: Dependabot refreshes the digest of the same
+# tag, e.g. a patched python:3.12-slim); a new Python / Go version (a minor or major tag jump) is a decision, not a weekly PR.
+# The limit is above the default of 5, so one waiting PR does not hide the others. The PRs are not merged on GitHub: the
+# versions are raised by hand in a package and the PRs closed (#2421).
 version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    open-pull-requests-limit: 10
+  - package-ecosystem: docker
+    directories:
+      - /
+      - /embed
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]

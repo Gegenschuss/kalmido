@@ -336,7 +336,7 @@ document.addEventListener('click', async e => {
   if (a === 'view') { DT.view = b.dataset.v; if (S.route.id) go('office/gendocs'); else ofcDraw(); }
   else if (a === 'new') dtNewModal();
   else if (a === 'open') { DT.pv = null; DT.sg = null; DT.undo = null; go(`office/gendocs/${b.dataset.id}`); }
-  else if (a === 'back') { if (d && d.status === 'draft') { clearTimeout(dtSaveTimer); await dtSave(d, true); } go('office/gendocs'); }
+  else if (a === 'back') { if (d && d.status === 'draft') { clearTimeout(dtSaveTimer); await dtSave(d, true); } navUp('office/gendocs'); }  // 2.743.0 (#5235)
   else if (a === 'tnew') dtTplModal(null);
   else if (a === 'topen') { const t = dtTpl(+b.dataset.id); if (t) dtTplModal(t); }
   else if (a === 'starters') dtStartersModal();

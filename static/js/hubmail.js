@@ -88,7 +88,7 @@ function hbm_hubView() {
   // 2.298.0 C (#3187): the introduction only while nothing waits here
   const intro = !j ? '' : j.enabled ? j.total ? '' : `<p class="muted">${tr('Forward e-mails to your filing address (or send it a copy): a e-mail from the address of a client or of one of its contact persons is filed with that client, everything else waits here until you assign it.')}</p>`
     : `<p class="muted">${tr('Receiving e-mail is not set up on this server (an admin sets up the mailbox).')}</p>`;
-  return `<div class="ctview hbmhub"><h2 class="msclh"><a href="#clients" class="linkbtn">${ic('back', 's')}<span>${tr('Clients')}</span></a><span class="muted" aria-hidden="true">›</span><span>${tr('E-mail filing')}</span></h2>
+  return `<div class="ctview hbmhub"><h2 class="msclh"><a href="#clients" class="linkbtn" data-navup>${ic('back', 's')}<span>${tr('Clients')}</span></a><span class="muted" aria-hidden="true">›</span><span>${tr('E-mail filing')}</span></h2>
     ${intro}${sp ? `<h4>${tr('Your filing addresses')}</h4><ul class="hbmspaces" role="list">${sp}</ul>` : ''}${typeof hmb_hubSection === 'function' ? hmb_hubSection() : ''}
     <h4>${tr('Not assigned')}</h4>${hbm_bodyHtml(key)}</div>`;
 }

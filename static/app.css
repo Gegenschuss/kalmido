@@ -4682,7 +4682,7 @@ button.lkchip:hover{border-color:var(--accent)}
 /* 2.138.0 E (#2234): the magnifier sits inside the field and there is one frame only (no second ring around the input on focus) */
 .ctsearch>svg,.ctsearch>.ic{flex:none}
 .ctsearch input:focus,.ctsearch input:focus-visible{border:0;box-shadow:none}
-.ctcols{display:grid;grid-template-columns:minmax(var(--w-leiste-min),var(--w-leiste)) 1fr;gap:1rem;min-height:0;flex:1}
+.ctcols{min-height:0;flex:1}  /* 2.743.0 B (#4930): the columns come from the building block .lsd2 (static/css/start-lsd-4553.css) */
 .ctlistw{overflow:auto;min-height:0}
 .ctlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px}
 .ctrow{display:flex;align-items:center;gap:.625rem;width:100%;text-align:left;padding-inline:.5rem;border-radius:var(--radius)}
@@ -4736,7 +4736,6 @@ button.lkchip:hover{border-color:var(--accent)}
 .ctpk{align-self:flex-start}
 .ctpl{display:flex;flex-direction:column;max-height:16rem;overflow:auto}
 @media (max-width:767px){
-  .ctcols{grid-template-columns:1fr}
   .ctview.withcard .ctcard{padding-top:0}
   .lksec .lklab{min-width:100%;padding-top:0}
 }

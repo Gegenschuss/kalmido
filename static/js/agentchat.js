@@ -55,7 +55,7 @@ function chatOpen(aid, o = {}) {
 function chatClose() { if (S.chat.job && chatFull()) { jc_enter(S.chat.aid, null); return; }  // 2.56.0 (#1793): Back leaves a job's history first
   chs_save($('#chat-msgs'));  // 2.380 F (#3381): the place as left
   if (typeof jc_hist === 'function') jc_hist(false, !(S.route.mod === 'agents' && S.route.agent));  // 2.152.8 (#2711)
-  if (typeof cw_reset === 'function') cw_reset(); S.chat = {aid: null, msgs: [], err: null}; $('#achat')?.classList.add('hidden'); document.body.classList.remove('chat-open', 'chat-float'); fitLayout(); chatFabDraw(); if (S.route.mod === 'agents' && S.route.agent) { const b = S.chatBack; S.chatBack = null; go(b || 'agents'); } }
+  if (typeof cw_reset === 'function') cw_reset(); S.chat = {aid: null, msgs: [], err: null}; $('#achat')?.classList.add('hidden'); document.body.classList.remove('chat-open', 'chat-float'); fitLayout(); chatFabDraw(); if (S.route.mod === 'agents' && S.route.agent) { const b = S.chatBack; S.chatBack = null; navUp(b || 'agents'); } }  // 2.743.0 (#5235): navUp
 function chatPop(aid) {
   const p = $('#achat');
   if (p && !p.classList.contains('hidden') && (!aid || S.chat.aid === aid)) { if (p.classList.contains('float') && p.classList.contains('min')) { chatFloatMin(false); return; }

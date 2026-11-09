@@ -174,9 +174,9 @@ const shf_topItems = (xs, sp) => { const known = new Set(shf_data().folders.map(
 function shf_folderView(fid, card) {
   const f = shf_folder(fid), d = SHV.idx.all;
   if (!d || d.v !== S.v) shvLoadIdx('all');
-  if (!f) return `<div class="shvwrap shvov"><div class="shvtop"><a class="btn sm" href="#sheets">${ic('back', 's')}${tr('Tables')}</a></div><p class="muted lempty" role="status">${SHF.d && SHF.v !== -1 ? esc(SHF.err || tr('Not found')) : tr('Loading…')}</p></div>`;
+  if (!f) return `<div class="shvwrap shvov"><div class="shvtop"><a class="btn sm" href="#sheets" data-navup>${ic('back', 's')}${tr('Tables')}</a></div><p class="muted lempty" role="status">${SHF.d && SHF.v !== -1 ? esc(SHF.err || tr('Not found')) : tr('Loading…')}</p></div>`;
   const up = shf_folder(f.parent_id), w = shf_canW(f);
-  const head = `<div class="shvtop"><a class="btn sm" href="#${up ? 'sheets/f/' + up.id : 'sheets'}">${ic('back', 's')}<span class="shvbk">${esc(up ? up.name : shvSpaceName(f.space))}</span></a>
+  const head = `<div class="shvtop"><a class="btn sm" href="#${up ? 'sheets/f/' + up.id : 'sheets'}" data-navup>${ic('back', 's')}<span class="shvbk">${esc(up ? up.name : shvSpaceName(f.space))}</span></a>
     <h2 class="shvh">${ic(f.shared ? 'users' : 'folder', 's')} ${esc(f.name)}</h2><span class="spacer"></span>
     <button type="button" class="iconbtn" data-shf="fmenu" data-id="${f.id}" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots')}</button>
     ${w ? `<button type="button" class="btn sm pri" data-shf="new" data-id="${f.id}">${ic('plus', 's')}${tr('New table')}</button>` : ''}</div>`;

@@ -10,7 +10,7 @@ const spvAggName = a => a === 'sum' ? tr('Sum') : a === 'avg' ? tr('Average') : 
 
 function spv_html(sh) {
   const p = sh.pivot || {}, res = p.result || {}, w = sh.can_write;
-  const back = sh.list_id ? `<a class="btn sm" href="#sheets/l/${sh.list_id}">${ic('back', 's')}<span class="shvbk">${esc(sh.list_title || tr('Project'))}</span></a>` : `<a class="btn sm" href="#sheets">${ic('back', 's')}<span class="shvbk">${tr('Tables')}</span></a>`;
+  const back = sh.list_id ? `<a class="btn sm" href="#sheets/l/${sh.list_id}" data-navup>${ic('back', 's')}<span class="shvbk">${esc(sh.list_title || tr('Project'))}</span></a>` : `<a class="btn sm" href="#sheets" data-navup>${ic('back', 's')}<span class="shvbk">${tr('Tables')}</span></a>`;
   const top = `<div class="shvtop">${back}<h2 class="shvh">${esc((sh.book_title ?? sh.title) || tr('Untitled table'))}</h2>${w ? '' : `<span class="shvro">${ic('eye', 's')}${tr('Read-only')}</span>`}<span class="spacer"></span>
     ${w ? `<button type="button" class="btn sm" data-spv="edit">${ic('edit', 's')}${tr('Edit pivot…')}</button>` : ''}
     <button type="button" class="iconbtn" data-spv="menu" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots')}</button></div>`;

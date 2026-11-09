@@ -159,7 +159,7 @@ function viewSheets() {
   if (!r.sh) return shvOverview(null);
   if (SHV.errFor !== r.sh + ':' + S.v && (!SHV.sh || SHV.sh.id !== r.sh || (SHV.sh._v !== S.v && !SHV.ed))) shvLoad(r.sh);
   const sh = SHV.sh && SHV.sh.id === r.sh ? SHV.sh : null;
-  if (!sh) return `<div class="shvwrap"><div class="shvtop"><a class="btn sm" href="#sheets">${ic('back', 's')}${tr('Tables')}</a></div><p class="muted lempty" role="status">${SHV.err && SHV.errFor === r.sh + ':' + S.v ? esc(SHV.err) : tr('Loading…')}</p></div>`;
+  if (!sh) return `<div class="shvwrap"><div class="shvtop"><a class="btn sm" href="#sheets" data-navup>${ic('back', 's')}${tr('Tables')}</a></div><p class="muted lempty" role="status">${SHV.err && SHV.errFor === r.sh + ':' + S.v ? esc(SHV.err) : tr('Loading…')}</p></div>`;
   if (sh.kind === 'pivot') { if (typeof spv_html === 'function') return spv_html(sh); ld_later('sheetpivot'); return `<p class="muted lempty" role="status">${tr('Loading…')}</p>`; }  // 2.671.0 (#3463 b): sheetpivot.js
   return shvSheetHtml(sh);
 }
@@ -170,7 +170,7 @@ function shvOverview(lid) {
   let items = d?.items || [];
   if (!lid && ws && ws !== 'all') items = items.filter(x => x.space === ws || x.shared_in);  // 2.124.0 C (#2113): shared with me: in every workspace
   const hooks = SHV_HOOKS.overview.length;
-  const head = `<div class="shvtop">${lid ? `<a class="btn sm" href="#l/${lid}">${ic('back', 's')}${esc(l ? lname(l) : tr('Project'))}</a>` : ''}
+  const head = `<div class="shvtop">${lid ? `<a class="btn sm" href="#l/${lid}" data-navup>${ic('back', 's')}${esc(l ? lname(l) : tr('Project'))}</a>` : ''}
     ${lid ? `<h2 class="shvh">${esc(tr('Attached to {0}', l ? lname(l) : ''))}</h2><a class="btn sm" href="#sheets">${esc(tr('All tables'))}</a>` : ''}<span class="spacer"></span>
     ${hooks ? `${typeof SHX_IMPORT_ACCEPT === 'string' ? `<input type="file" id="shx-import-file" accept="${SHX_IMPORT_ACCEPT}" hidden>` : ''}<button type="button" class="iconbtn" data-shv="omenu" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots')}</button>` : ''}
     ${!lid || (l && canEditList(lid)) ? `<button type="button" class="btn sm pri" data-shv="new">${ic('plus', 's')}${lid ? tr('Attach a new table') : tr('New table')}</button>` : ''}</div>`;
@@ -213,7 +213,7 @@ function shvSheetHtml(sh) {
   const filt = shvFilt(sh), nf = Object.keys(filt).length;
   const pres = shvPresHtml(sh);
   SHV.rset = shvRangeSet();
-  const back = sh.list_id ? `<a class="btn sm" href="#sheets/l/${sh.list_id}" title="${esc(tr('Attached to {0}', sh.list_title || ''))}">${ic('back', 's')}<span class="shvbk">${esc(sh.list_title || tr('Project'))}</span></a>` : `<a class="btn sm" href="#sheets">${ic('back', 's')}<span class="shvbk">${tr('Tables')}</span></a>`;
+  const back = sh.list_id ? `<a class="btn sm" href="#sheets/l/${sh.list_id}" title="${esc(tr('Attached to {0}', sh.list_title || ''))}" data-navup>${ic('back', 's')}<span class="shvbk">${esc(sh.list_title || tr('Project'))}</span></a>` : `<a class="btn sm" href="#sheets" data-navup>${ic('back', 's')}<span class="shvbk">${tr('Tables')}</span></a>`;
   const top = `<div class="shvtop">${back}<h2 class="shvh"><button type="button" class="shvtitle" data-shv="rename" ${w ? '' : 'disabled'} title="${esc(w ? tr('Rename…') : '')}">${esc((sh.book_title ?? sh.title) || tr('Untitled table'))}</button></h2>
     ${w ? '' : `<span class="shvro">${ic('eye', 's')}${tr('Read-only')}</span>`}<span class="spacer"></span>
     ${typeof shg_btnHtml === 'function' ? shg_btnHtml(sh) : ''}${nf ? `<button type="button" class="btn sm" data-shv="unfilter" title="${esc(tr('Reset filters'))}">${ic('filter', 's')}${trn('{0} filter', '{0} filters', nf)}${ic('x', 's')}</button>` : ''}

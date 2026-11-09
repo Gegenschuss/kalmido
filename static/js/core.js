@@ -1470,6 +1470,7 @@ async function load(auto, want) {
 async function ld_go(auto) {
   let j, ld_w0 = null;
   try {
+    if (typeof lgo_pending === 'function') await lgo_pending();  // 2.743.0 (#4284): a sign-out made offline ends its session first
     let crossed = false;
     for (let i = 0; i < 3; i++) {  // 2.13.4: an answer that a write overtook is fetched again (see rawFetch)
       const w0 = ld_w0 = S.wseq || 0;  // 2.607.0 (#4901): for applyState (OPT_DONE)
@@ -1816,11 +1817,11 @@ function parseHash() {
   if (SMART[a]) return {mod: 'tasks', key: a};
   return {mod: 'tasks', key: START_KEY};
 }
-function go(hash) {
-  if (typeof f8d_defer === 'function' && f8d_defer(() => goNow(hash))) return;  // #3506: after the Back of a closed menu on its way (backclose.js)
-  goNow(hash);
+function go(hash, rep = false) {  // 2.743.0 (#5235): rep = replace the current entry instead of a new one (navUp, backnav.js)
+  if (typeof f8d_defer === 'function' && f8d_defer(() => goNow(hash, rep))) return;  // #3506: after the Back of a closed menu on its way (backclose.js)
+  goNow(hash, rep);
 }
-function goNow(hash) { const was = location.hash; if (was !== '#' + hash) { location.hash = hash; if (location.hash === was) route(); } else route(); }  // 2.619.0 (#4943): the same address in another spelling (a browser that keeps the hash decoded) fires no hashchange: route() itself (it closes the drawer)
+function goNow(hash, rep = false) { const was = location.hash; if (was !== '#' + hash) { if (rep) { if (typeof BN === 'object') BN.nt = 'replace'; location.replace('#' + hash); } else location.hash = hash; if (location.hash === was) route(); } else route(); }  // 2.619.0 (#4943): the same address in another spelling (a browser that keeps the hash decoded) fires no hashchange: route() itself (it closes the drawer)
 async function route() {
   vm_leave();  // 2.413.0 A (#3439): the view left keeps its place (viewmem.js)
   const r = parseHash();

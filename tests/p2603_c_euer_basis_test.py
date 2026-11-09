@@ -17,6 +17,8 @@ invoice 2 (595.00) paid by hand, 50.00 received without an invoice.
  - 2.755.0 (#5241): the input tax (field 66) where a receipts year meets a strict one: the day of the bank line decides, every
    receipt exactly once over the years (both directions); a receipts year away from the edge keeps the document date
  - a person without an organisation (freelancer-matrix: office): the same in the personal office
+ - 2.743.0 (#4937): the basis changes at the turn of the year (both ways): a receipt with its line in the other year counts once,
+   in the neutral and the DATEV export and in the EUeR (also a cash line without paid_at), and is not open
 usage: p2603_c_euer_basis_test.py <datadir>"""
 import base64
 import csv
@@ -144,6 +146,26 @@ def bx(s, frm, to):
     z = zipfile.ZipFile(io.BytesIO(s.get(B + q + "&zip=1").content))
     miss = "".join(z.read(n).decode("utf-8") for n in z.namelist() if n.endswith(".txt"))
     return chk, [(r[0], r[9].replace(",", ".")) for r in rows], miss
+
+
+def bx_rows(s, frm, to):
+    """2.743.0 (#4937): the raw rows of the neutral export CSV of [frm, to] (once() matches type, gross and title)."""
+    txt = s.get(B + f"{O}/books/export?from={frm}&to={to}").content.decode("utf-8-sig")
+    return list(csv.reader(io.StringIO(txt), delimiter=";" if ";" in txt.splitlines()[0] else ","))[1:]
+
+
+def once(s, who, what, gross, title, years):
+    """2.743.0 (#4937): a receipt counts exactly once over the years: the neutral export (its gross) and the DATEV batch (its
+    title) of each year -> {year: count}, both the same."""
+    nb, nd = {}, {}
+    for y in years:
+        # by gross AND title: E3 of #5241 has the same gross on the same day as R5
+        nb[y] = sum(1 for r in bx_rows(s, f"{y}-01-01", f"{y}-12-31")
+                    if r[0] in ("Receipt", "Beleg") and r[9].replace(",", ".") == gross and any(title in x for x in r))
+        r = s.get(B + O + f"/datev/extf?from={y}-01-01&to={y}-12-31")
+        nd[y] = sum(1 for x in r.content.decode("cp1252").splitlines() if title in x) if r.ok else -1  # booking lines naming it
+    check(sum(nb.values()) == 1 and nb == nd, f"{who}: #4937 {what}: once over the years, neutral {nb} DATEV {nd}")
+    return nb
 
 
 def dv_hints(s, frm, to):
@@ -377,6 +399,27 @@ def office(s, who, ws, me):
     uv = {y: s.get(B + O + f"/books/ustva?year={y}&period=y").json()["kz"]["66"] for y in (Y - 1, TY)}
     check(ev == uv and ev[Y - 1] == "7.60" and ev[TY] == "15.20", f"{who}: #5241: the EUeR and field 66 agree in the receipts years {ev} {uv}")
 
+    # ---- 2.743.0 (#4937): the basis changes at the turn of the year ({Y - 1} receipts, {Y} bank and cash): every receipt once
+    eu0 = s.get(B + O + f"/books/euer?year={Y - 1}").json()["expense_total"]
+    ra = doc(s, ws, "ra-dez-jan.pdf", "41.65", f"{Y - 1}-12-20", "19")  # receipt in December, its bank line in January (strict)
+    rb = doc(s, ws, "rb-jan-dez.pdf", "29.75", f"{Y}-01-07", "19")  # receipt in January (strict), its bank line in December
+    rk = doc(s, ws, "rk-kasse-dez.pdf", "17.85", f"{Y - 1}-12-30", "19")  # the edge case: a cash line sets no paid_at
+    r = s.post(B + O + "/bank/import", json={"text": camt([ntry("41.65", f"{Y}-01-05", "RSECHS"), ntry("29.75", f"{Y - 1}-12-22", "RSIEBEN")]),
+                                             "filename": "konto4.xml"})
+    check(r.status_code == 201, f"{who}: #4937: bank import {r.status_code} {r.text[:200]}")
+    tx = {t["purpose"].split()[-1]: t["id"] for t in s.get(B + O + "/bank/tx?state=all").json()["items"]}
+    check(m(tx["RSECHS"], {"kind": "receipt", "id": ra}).ok and m(tx["RSIEBEN"], {"kind": "receipt", "id": rb}).ok, f"{who}: #4937: ra / rb matched")
+    check(s.post(B + E, json={"day": f"{Y}-01-02", "dir": "in", "amount": "20.00", "text": "Einlage"}).status_code == 201, f"{who}: #4937: cash in for January")
+    check(s.post(B + E, json={"day": f"{Y}-01-04", "dir": "out", "amount": "17.85", "vat_pct": "19", "text": "Material", "node_id": rk}).status_code == 201,
+          f"{who}: #4937: rk paid from the cash box in January")
+    check(once(s, who, "receipt 12 / line 01", "-41.65", "ra-dez-jan", (Y - 1, Y)) == {Y - 1: 0, Y: 1}, f"{who}: #4937: ra in {Y} (its line)")
+    check(once(s, who, "receipt 01 / line 12", "-29.75", "rb-jan-dez", (Y - 1, Y)) == {Y - 1: 1, Y: 0}, f"{who}: #4937: rb in {Y - 1} (its line)")
+    check(once(s, who, "cash line without paid_at", "-17.85", "rk-kasse-dez", (Y - 1, Y)) == {Y - 1: 0, Y: 1}, f"{who}: #4937: rk in {Y} (its cash line)")
+    eu1 = s.get(B + O + f"/books/euer?year={Y - 1}").json()["expense_total"]
+    check(round(float(eu1["net"]) - float(eu0["net"]), 2) == 25.0, f"{who}: #4937: the EUeR of {Y - 1} counts rb only (25.00 net), not ra / rk {eu0} {eu1}")
+    chk, rows, miss = bx(s, f"{Y}-01-01", f"{Y}-12-31")
+    check("rb-jan-dez.pdf" not in miss, f"{who}: #4937: rb (line in a receipts year) is not open in the strict year {miss[:400]}")
+    check("open_strict" not in dv_hints(s, f"{Y}-01-01", f"{Y}-01-31"), f"{who}: #4937: the January DATEV export names rb not open")
     # ---- a locked month keeps the basis of its year
     r = s.post(B + O + "/periods/lock", json={"through": f"{Y}-01", "confirm": f"01/{Y}"})
     check(r.ok, f"{who}: January of {Y} locked {r.text[:200]}")
@@ -388,6 +431,24 @@ def office(s, who, ws, me):
     ei = s.get(B + O + f"/books/euer?year={TODAY.year}").json()
     check(inc(ei, "vat19")["net"] == "1500.00" and ei.get("basis") == "receipts", f"{who}: this year by receipts again")
     check(s.get(B + O + f"/books/euer?year={Y}").json().get("basis") == "bank", f"{who}: {Y} stays bank and cash")
+    # ---- 2.743.0 (#4937): the other way ({Y} bank and cash, {TODAY.year} receipts): R5 (28.12., bank line 01.01.) and r9
+    # (01.01., bank line 30.12.) once each; rw (29.12., cash line 01.01., no paid_at) is not open in {Y}
+    t1 = TODAY.year
+    check(once(s, who, "R5 receipt 12 / line 01", "-47.60", "r5-dezember", (Y, t1)) == {Y: 0, t1: 1}, f"{who}: #4937: R5 in {t1} (its line)")
+    r9 = doc(s, ws, "r9-jan-dez.pdf", "11.90", f"{t1}-01-01", "19")
+    r = s.post(B + O + "/bank/import", json={"text": camt([ntry("11.90", f"{Y}-12-30", "RNEUN")]), "filename": "konto4.xml"})
+    tx = {t["purpose"].split()[-1]: t["id"] for t in s.get(B + O + "/bank/tx?state=all").json()["items"]}
+    check(r.status_code == 201 and m(tx["RNEUN"], {"kind": "receipt", "id": r9}).ok, f"{who}: #4937: r9 matched {r.text[:200]}")
+    check(once(s, who, "r9 receipt 01 / line 12", "-11.90", "r9-jan-dez", (Y, t1)) == {Y: 1, t1: 0}, f"{who}: #4937: r9 in {Y} (its line)")
+    w0 = s.get(B + O + f"/books/euer?year={Y}").json()["warnings"]["open_receipts"]
+    e0 = s.get(B + O + f"/books/euer?year={t1}").json()["expense_total"]
+    rw = doc(s, ws, "rw-kasse-jan.pdf", "5.95", f"{Y}-12-29", "19")
+    check(s.post(B + E, json={"day": f"{t1}-01-01", "dir": "out", "amount": "5.95", "vat_pct": "19", "text": "Material", "node_id": rw}).status_code == 201,
+          f"{who}: #4937: rw paid from the cash box on 01.01.")
+    w1 = s.get(B + O + f"/books/euer?year={Y}").json()["warnings"]["open_receipts"]
+    check(w1 == w0, f"{who}: #4937: rw (cash line in January) is not open in {Y} {w0} -> {w1}")
+    e1 = s.get(B + O + f"/books/euer?year={t1}").json()["expense_total"]
+    check(round(float(e1["net"]) - float(e0["net"]), 2) == 5.0, f"{who}: #4937: the EUeR of {t1} counts rw once (5.00 net) {e0} {e1}")
     return mid
 
 

@@ -440,7 +440,7 @@ document.addEventListener('click', async e => {
   if (a === 'new') ltNewModal();
   else if (a === 'profile') ltProfileModal();
   else if (a === 'open') { LT.cur = null; LT.undo = null; go(`office/letters/${b.dataset.id}`); }
-  else if (a === 'back') { if (d && d.status === 'draft') { clearTimeout(ltSaveTimer); await ltSave(d, true); } LT.data = null; go('office/letters'); }
+  else if (a === 'back') { if (d && d.status === 'draft') { clearTimeout(ltSaveTimer); await ltSave(d, true); } LT.data = null; navUp('office/letters'); }  // 2.743.0 (#5235)
   else if (a === 'rc') { const x = LT.rc[+b.dataset.i]; if (x) ltRcPick(x); }
   else if (a === 'save' && d) ltSave(d);
   else if (a === 'sent' && d) {
