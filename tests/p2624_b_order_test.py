@@ -40,7 +40,13 @@ with tempfile.TemporaryDirectory() as tmp:
         with open(ini, "w", encoding="utf-8") as f:
             f.write(text)
 
-    put(src.replace(end, '    "tasks.aap2624",  # a\n    "tasks.zzp2624",\n' + end))
+    # 2.780.0: the two go to their sorted places in the block (appending them before the end mark broke once the block
+    # held a module sorting after tasks.aap2624, e.g. tasks.tundo of 2.774.0)
+    _bs = src.index("\n", src.index("# (it loads after every module above")) + 1
+    _be = src.index(end)
+    _rows = src[_bs:_be].splitlines(keepends=True) + ['    "tasks.aap2624",  # a\n', '    "tasks.zzp2624",\n']
+    _rows.sort(key=lambda r: r.split('"')[1])
+    put(src[:_bs] + "".join(_rows) + src[_be:])
     rc, out = lay(root)  # the copy leaves out folders such as kalmido/docs: other errors of the copy do not count here
     check(not any(x in out for x in ("sorted block", "one module per line", "after the sorted block")), "two new modules in the block, sorted: fine " + out[-400:])
     put(src.replace(end, '    "tasks.zzp2624",\n    "tasks.aap2624",\n' + end))
