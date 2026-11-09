@@ -16,7 +16,7 @@
    asks it through typeof checks. Classic script sharing the global scope with the others. */
 'use strict';
 
-const DVW = {back: null, tab: 'details', pdf: null, ro: null, drag: null, he: null, node: null, more: false, notext: null};  // notext: 2.742.0 (#4861)
+const DVW = {back: null, tab: 'details', pdf: null, ro: null, drag: null, he: null, node: null, more: false, notext: null, closed: null};  // notext: 2.742.0 (#4861); closed: #3506 the id of a view just closed
 // the tabs of the fields; History and Shares come from the file store's node (GET /api/files/nodes/<id>, its rights)
 const DCV_TABS = [['details', N_('Details')], ['text', N_('Content')], ['hist', N_('History')], ['share', N_('Shares')]];
 const DCV_ZMIN = 0.1, DCV_ZMAX = 8, DCV_CVMAX = 12e6;  // the zoom's limits; the most pixels one page's canvas gets
@@ -43,6 +43,7 @@ function dcv_html(id) {
 function dcv_hook(v) { if (v && !v._dv) { v._dv = true; v.remove = () => dcv_close(v); } }
 function dcv_fill(id) {
   const v = $('.dv-view'); if (!v || dc_hashId() !== id) return;
+  if (DVW.closed === id) return;  // #3506 (CI red of 2.786.0, p2154_a_ui): closed (a split, a delete), the address leaves a moment later: no fetch of the gone document (its 404 toast took the place of the split's Undo)
   dcv_hook(v);
   if (DC.doc?.id === id) { if (!v.firstChild) dc_mdDraw(v); return; }
   if (DC.opening !== id) dc_open(id);
@@ -50,13 +51,15 @@ function dcv_fill(id) {
 // from the list / the file store / a link inside the app: a new entry in the browser's history, the place of the list kept
 function dcv_go(id) {
   const v = $('#view'), inList = dc_listOn() && !dc_hashId();  // 2.752.0 (#4887): + a folder's documents
-  DVW.back = {hash: location.hash || '#ablage/docs', y: inList && v ? v.scrollTop : null, id, pushed: true};
+  DVW.back = {hash: location.hash || '#ablage/docs', y: inList && v ? v.scrollTop : null, id, pushed: true}; DVW.closed = null;
   AB_FILEIDS.add(id); location.hash = `#ablage/${id}`;  // 2.752.0 (#4887): one address for files and documents (core.js)
 }
+window.addEventListener('hashchange', () => { if (typeof DVW === 'object') DVW.closed = null; });
 function dcv_close(v) {
   v = v || $('.dv-view');
   if (v?.isConnected) Element.prototype.remove.call(v);
   if (S.route.mod !== 'docs' || !dc_hashId()) return;  // the route left already (a redraw took it away)
+  DVW.closed = dc_hashId();  // #3506: until the address has left (hashchange below)
   const b = DVW.back, cur = DC.doc?.id ?? DC.opening, listed = cur != null && (DC.docs || []).some(x => x.id === cur);
   dcv_left();
   if (b?.pushed && history.length > 1) history.back();
