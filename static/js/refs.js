@@ -387,6 +387,11 @@ async function xd_node(id) {  // the file / document as the reader may see it (t
   if (!j || j.deleted_at || j.in_trash) { toast(tr('No access')); return null; }
   return j;
 }
+async function xd_task(id) {  // the task of a foreign drag in this half's state (a fresh load when it is not there yet)
+  if (!S.tasks.has(id) && typeof load === 'function') await load();
+  if (S.tasks.has(id)) return S.tasks.get(id);
+  toast(tr('Task not found')); return null;
+}
 const xd_tid = el => el.closest('.trow[data-id]') ? +el.closest('.trow[data-id]').dataset.id : +S.sel || 0;
 
 // 1. a document / file onto a task (its row, the open task outside its text fields) = linked with the task, like "Link with
@@ -416,3 +421,10 @@ xd_on('#view .cm-editor', 'tf', async (s, el, e, id) => {
   const txt = s.k[0] === 't' ? `[[#${id}]]` : rf_text(s.k, name), at = v.posAtCoords({x: e.clientX, y: e.clientY}) ?? v.state.selection.main.head;
   v.dispatch({changes: {from: at, insert: txt + ' '}, selection: {anchor: at + txt.length + 1}}); v.focus();
 }, el => typeof WKCM !== 'undefined' && !!WKCM.view && el.contains(WKCM.view.dom));
+
+// 2. a task onto a project / the inbox in the sidebar, or onto a row / column of a list = moved there:
+//    dnd.js dropTask, the same checks, history step and undo as within one half
+xd_on('#side .srow[data-drop^="l:"], #side .srow[data-drop="inbox"], #view .trow[data-id], #view .kcol', 't', async (s, el, e, id) => {
+  if (!await xd_task(id)) return;
+  await dropTask(id, el, e.clientY);
+});
