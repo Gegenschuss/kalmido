@@ -132,7 +132,6 @@ G3 = groups(BOB)[-1]["id"]
 check(parts(G3)[0][0] == "sheet", "the row added is a step of the table")
 check(Bo.post(B + f"/api/undo/to/{G3}").ok and dbx("SELECT deleted_at FROM sheet_rows WHERE id=?", (NR,))[0][0], "undo: the new row in the trash")
 check(Bo.post(B + f"/api/undo/{G3}/redo").ok and not dbx("SELECT deleted_at FROM sheet_rows WHERE id=?", (NR,))[0][0], "redo: the row back")
-
 # ---------------------------------------------------------------- knowledge pages
 def page(s, space, path, text):
     r = s.post(B + "/api/wiki/pages", json={"space": space, "path": path, "body": text})
@@ -201,5 +200,26 @@ check(A.delete(B + f"/api/sheets/{SID}").ok, "the admin moves the table to the t
 r = Bo.post(B + f"/api/undo/to/{G4}")
 st = r.json().get("stayed", []) if r.ok else []
 check(r.ok and st and st[0]["code"] == "noaccess" and cell(R1, C2) == "z", f"a table in the trash: the step stays (no access) {r.text[:300]}")
+
+# ---------------------------------------------------------------- review r2778 F1 + F2 (own table, at the end: no step order above changes)
+S2, _, _ = new_sheet(Bo, "Review sheet", SP)
+r = Bo.post(B + f"/api/sheets/{S2}/rows", json={"count": 1})
+NR2 = r.json()["ids"][0]
+G5 = groups(BOB)[-1]["id"]
+check(Bo.post(B + f"/api/undo/to/{G5}").ok and dbx("SELECT deleted_at FROM sheet_rows WHERE id=?", (NR2,))[0][0], "F1: undo puts the row in the trash")
+dbx("UPDATE sheet_rows SET deleted_at='2026-12-01T00:00:00.000Z' WHERE id=?", (NR2,))  # someone else deleted it later
+r = Bo.post(B + f"/api/undo/{G5}/redo")
+st = r.json().get("stayed", []) if r.ok else []
+check(not r.json().get("redone") and st and st[0]["code"] == "conflict"
+      and dbx("SELECT deleted_at FROM sheet_rows WHERE id=?", (NR2,))[0][0] == "2026-12-01T00:00:00.000Z",
+      f"F1: redo leaves a row deleted since in the trash {r.status_code} {r.text[:200]}")
+# F2: an agent's batch whose agent was removed since (agent_id NULL, accounts/orgretain.py) stays in the agents' panel and
+# their batch-undo route; a person's batch ('p...') is neither listed nor taken there
+dbx("INSERT INTO sheet_changes (sheet_id, batch, agent_id, cell_id, row_id, col_id, kind, old_raw, new_raw, created_at) "
+    "VALUES (?, 'a00ff00ff00ff00ff', NULL, NULL, NULL, NULL, 'fmt', NULL, NULL, '2026-11-09T10:00:00.000Z')", (S2,))
+bl = [x["batch"] for x in Bo.get(B + f"/api/sheets/{S2}").json().get("batches", [])]
+check("a00ff00ff00ff00ff" in bl and not any(b.startswith("p") for b in bl), f"F2: agents' panel lists the removed agent's batch, no person's {bl}")
+pb = dbx("SELECT batch FROM sheet_changes WHERE sheet_id=? AND batch LIKE 'p%' LIMIT 1", (S2,))[0][0]
+check(Bo.post(B + f"/api/sheets/{S2}/batches/{pb}/undo").status_code == 404, "F2: a person's batch is 404 on the agents' undo route")
 
 sys.exit(done("p2778_b_sheet_wiki_undo"))

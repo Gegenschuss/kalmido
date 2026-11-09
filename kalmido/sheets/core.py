@@ -956,7 +956,7 @@ bus_on("shpres", _shpres_heard)
 
 def sh_batches(c, sid):
     rows = c.execute("SELECT batch, MIN(agent_id) AS agent_id, MIN(created_at) AS created_at, COUNT(*) AS n, COUNT(undone_at) AS u "
-                     "FROM sheet_changes WHERE sheet_id=? AND agent_id IS NOT NULL GROUP BY batch ORDER BY MIN(id) DESC LIMIT 50",  # 2.778.0 (#5253): agents' calls only
+                     "FROM sheet_changes WHERE sheet_id=? AND batch NOT LIKE 'p%' GROUP BY batch ORDER BY MIN(id) DESC LIMIT 50",  # 2.778.0 (#5253): agents' calls only, a person's batch is 'p…'
                      (sid,)).fetchall()
     names = user_names(c, {r["agent_id"] for r in rows})
     return [{"batch": r["batch"], "agent_id": r["agent_id"], "agent_name": names.get(r["agent_id"], ""), "created_at": r["created_at"],

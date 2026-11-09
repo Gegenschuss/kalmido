@@ -55,7 +55,7 @@ def shu_flush(c):
     try:
         with c.savepoint():
             for sid, batch in m["b"].items():
-                if not c.execute("SELECT 1 FROM sheet_changes WHERE sheet_id=? AND batch=? AND agent_id IS NULL LIMIT 1", (sid, batch)).fetchone():
+                if not c.execute("SELECT 1 FROM sheet_changes WHERE sheet_id=? AND batch=? AND agent_id IS NULL AND batch LIKE 'p%' LIMIT 1", (sid, batch)).fetchone():
                     continue
                 r = sh_reload(c, sid)
                 if r is None:
@@ -93,7 +93,7 @@ def _names(c, sheet_row, stayed, kept):
 def shu_redo(c, sheet_row, batch, uid, stayed):
     """The undone changes of a person's batch forward again (oldest first): a cell only while it still holds the input the
     undo left, a row / column / format the same way. -> number of changes redone."""
-    rows = c.execute("SELECT * FROM sheet_changes WHERE sheet_id=? AND batch=? AND agent_id IS NULL AND undone_at IS NOT NULL ORDER BY id",
+    rows = c.execute("SELECT * FROM sheet_changes WHERE sheet_id=? AND batch=? AND agent_id IS NULL AND batch LIKE 'p%' AND undone_at IS NOT NULL ORDER BY id",
                      (sheet_row["id"], batch)).fetchall()
     ts, n, book = iso_ms(now_utc()), 0, None
     for r in rows:
@@ -115,10 +115,18 @@ def shu_redo(c, sheet_row, batch, uid, stayed):
             if not shfm_undo(c, {**dict(r), "old_raw": r["new_raw"], "new_raw": r["old_raw"]}, uid):
                 stayed.append(dict(r))
                 continue
-        elif r["kind"] == "row":
-            c.execute("UPDATE sheet_rows SET deleted_at=NULL WHERE id=? AND deleted_at IS NOT NULL", (r["row_id"],))
-        elif r["kind"] == "col":
-            c.execute("UPDATE sheet_columns SET deleted_at=NULL WHERE id=? AND deleted_at IS NOT NULL", (r["col_id"],))
+        elif r["kind"] in ("row", "col"):
+            # review r2778 F1: only a row / column this undo put into the trash comes back (deleted_at = the undo's time);
+            # one kept at the undo (someone typed into it) is live already, one deleted since by someone else stays deleted
+            back = (c.execute("UPDATE sheet_rows SET deleted_at=NULL WHERE id=? AND deleted_at=?", (r["row_id"], r["undone_at"]))
+                    if r["kind"] == "row" else
+                    c.execute("UPDATE sheet_columns SET deleted_at=NULL WHERE id=? AND deleted_at=?", (r["col_id"], r["undone_at"])))
+            gone = (c.execute("SELECT 1 FROM sheet_rows WHERE id=? AND deleted_at IS NOT NULL", (r["row_id"],))
+                    if r["kind"] == "row" else
+                    c.execute("SELECT 1 FROM sheet_columns WHERE id=? AND deleted_at IS NOT NULL", (r["col_id"],))).fetchone()
+            if not back.rowcount and gone:
+                stayed.append(dict(r))
+                continue
         else:
             continue  # 'create' is no step of a person here
         c.execute("UPDATE sheet_changes SET undone_at=NULL WHERE id=?", (r["id"],))
@@ -135,7 +143,7 @@ def shu_run(c, uid, sid, data, redo):
     r = sh_need(c, int(sid), write=True)
     write_lock(c, "sheet:" + str(int(sid)))  # the lock of the table's own writes (sh_set_cells)
     batch = str(data.get("b") or "")
-    if not batch or not c.execute("SELECT 1 FROM sheet_changes WHERE sheet_id=? AND batch=? AND agent_id IS NULL LIMIT 1",
+    if not batch or not c.execute("SELECT 1 FROM sheet_changes WHERE sheet_id=? AND batch=? AND agent_id IS NULL AND batch LIKE 'p%' LIMIT 1",
                                   (int(sid), batch)).fetchone():
         raise Denied(404, tr(UG_GONE))  # the changes' trail is gone (retention) or never was
     stayed, kept = [], {}
