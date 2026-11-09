@@ -211,6 +211,7 @@ News, comments, the team chat and the browser encryption ("e2e") of lists and ch
 - `kalmido/collab/notelock.py` (`ln`) - Lock the note of a task with one
 - `kalmido/collab/notes.py` (`note`) - Notes of a list / project
 - `kalmido/collab/reactions.py` (`ltag`) - Reactions on comments, tidy suggestions and shared list tags
+- `kalmido/collab/recent.py` - "Recently edited" over Knowledge, Files and Reading: one read-only route GET /api/recent for the overview and the start page block
 - `kalmido/collab/replies.py` (`reply`) - Replies to one message -- task comments, team chat and agent chat
 - `kalmido/collab/tcxcore.py` (`tcx`) - The shared core, stage 5 -- the team chat
 - `kalmido/collab/teamchan.py` (`tcx`) - Team chat channels anyone may open, group conversations of three or more people, files in team chat messages
@@ -993,6 +994,7 @@ The start-up module.
 - `static/js/quickadd2.js` (`qa2`) - Quick add, second part: @person (assign)
 - `static/js/readlater.js` (`rdl`) - The view "Read later" (area Reading, part of the module "reading", loaded on demand with bookmarks.js: lazyload.js LD_MODS, styles in static/css/bookmarks.css)
 - `static/js/receipts.js` (`rc`) - An agent's suggestion waits here with Accept / Reject (one undo step each: reopen)
+- `static/js/recent.js` - "Recently edited": the overview "All workspaces" of Knowledge, Files and Reading and the start page block (GET /api/recent)
 - `static/js/refs.js` (`rf`) - References between things
 - `static/js/related.js` (`rt9`) - Related tasks. A folded "Related tasks"
 - `static/js/reloadguard.js` (`rl`) - Rl_waitServer(): the page and the stylesheet answer with 200 (used before the automatic reload of core.js verReload)
@@ -1060,6 +1062,7 @@ The start-up module.
 - `static/js/trashui.js` (`tr`) - The trash dialogs and views of 2.272.0, loaded on demand
 - `static/js/ttypes.js` (`tt`) - Own ticket types per workspace (kalmido/tasks/ttypes.py)
 - `static/js/undo.js` (`hist`) - Undo / redo history
+- `static/js/undolist.js` - The list "Recent steps": undo across devices up to a chosen step (GET /api/undo, undo.js)
 - `static/js/upbar.js` (`up`) - Upload progress with Cancel
 - `static/js/videorev.js` (`vdr`) - Video sign-offs, module "videos"
 - `static/js/viewmem.js` (`vm`) - Every view keeps its place
