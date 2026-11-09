@@ -24,7 +24,7 @@ async function wlk_open(kind) {
   Object.assign(WLK, {kind, items: rows.map(x => ({x, done: ''})), i: 0, cands: null, q: '', search: false, sel: 0, last: null, busy: false, taken: new Set()});
   const md = WLK.md = modal('');
   md.classList.add('ofcdlg', 'wlkdlg');
-  const card = /** @type {HTMLElement} */ ($('.card', md));
+  const card = /** @type {HTMLElement} */ (md.querySelector('.card'));
   card.tabIndex = -1;
   md.addEventListener('click', wlk_click);
   md.addEventListener('change', wlk_change);
