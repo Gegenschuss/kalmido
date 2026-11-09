@@ -17,6 +17,37 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.786.0] - 2026-11-09
+
+Package 2.769 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Added
+- Workspaces overview: under "All workspaces" Knowledge, Files and Read later no longer repeat the sidebar's workspace list; they show "Recently edited" across all workspaces (pages, files, read-later entries; the 20 newest, workspace chip, who, when; a tap opens it), "Pinned" above when there are favourites, full width. The workspaces stay as compact chips only where no sidebar shows them (phone, collapsed sidebar, Read later). One read-only endpoint `GET /api/recent` with the areas' own visibility checks, for people only (#5352).
+- Start: new block "Recently edited", on by default, can be hidden via "+ Block"; 8 entries, "More" leads to the overview; inside one workspace only its items (#5352).
+- Tables: number, currency and percent columns get "Decimal places" (Automatic, 0-4) in the column menu, currency columns also their own currency (default: the table's). Stored values and formulas keep the full value; display, group sums, pivot, print, CSV and .xlsx export follow the column, an .xlsx import reads them back. API v1 / MCP `sheet_create` and `sheet_add_column` take `dec` / `cur` (#5351).
+- Files: a folder with recognition (e.g. Documents) has the list / cards switch again (cards stay the default, the choice is kept per folder); the list shows Name, Type, Sender, Date, Amount and To review, sortable; on narrow screens the fields form a second line under the name. Documents can also be sorted by type and by "To review" (#5340).
+
+### Fixed
+- Files path line: "All workspaces /" sits on the same line, height and gap as the other path parts (it was a link, now a button like them) (#5339).
+- Toast on iPhone: a tap on "Close" could reach the row below (e.g. complete a task) when the toast went away during the tap; a finger on the toast now keeps it, and its old place swallows a click for a moment after it hid. A mouse still on the toast keeps it after a click (#5350).
+- Table import: an .xlsx with a very long number format no longer stalls the import (#5351).
+
+### Fixed
+- main: CI red of 2.774.0 - switching on a project's encryption now also removes the plain-text undo steps of its tasks and sections (#5408); the deploy webhook's auto close no longer fails with a server error (#5406); a change on one device no longer makes the person's other devices reload everything (#5407); tests p2370_m_api and p2369_4_api follow the reaction tables' move and the own undo counter (#5404, #5405).
+
+Package 2.754 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Agenten-Seite: Job-Karte bekommt 'Chat öffnen' - J, Bündel: Sammelpaket: Aufgaben ohn).
+### Added
+- Job cards on the agents page get "Open chat" (running and ended jobs); a tap on the job title opens the job's chat too, and Back leads to the agents page again. An ended job's chat keeps its input: a message wakes the job up (#5222).
+- Shared core: tasks, events, filed mails and clients are light kinds of the object core (role, title, link), with exactly the role of their area's own checks (#5268).
+- CI: CodeQL (Python, JavaScript) and a Trivy scan of the app image, reporting only - high / critical findings in the job summary (#5300).
+- CI: the nightly full run measures the server's test coverage; figure and modules without any coverage in the job summary, no gate (#5298).
+- Lint: every `${}` in an HTML template runs through esc() / tr() / a safe helper or is marked `html-ok`; the old findings are a shrinking baseline (#5297).
+### Changed
+- Tasks on phones leaf like turning a page: the previous and next task lie drawn beside the open one with their comments fetched ahead, follow the finger and snap in - nothing slides in afterwards (#5213).
+- CSS: one phone width (599px) and one tablet width (767px) for all media queries; a warning check lists unused classes and odd widths (#4511).
+### Fixed
+- A job chat opened on a phone from another page loaded no messages (#5222).
+
 ## [2.782.0] - 2026-11-09
 
 Package 2.772 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
@@ -474,7 +505,8 @@ Package 2.685 (Bündel: Kommentare: Aktivität in drei Stufen (nur Kommenta, Bü
 - Office: switching "Office & finance" on no longer leaves the office saying it is switched off when it loaded before the switch was saved (#5176).
 - Balance sheet: a receipt booked against the bank (counter account "bank") and paid from the cash box is now booked bank to cash instead of being left out (#5128).
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.782.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.786.0...HEAD
+[2.786.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.786.0
 [2.782.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.782.0
 [2.774.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.774.0
 [2.771.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.771.0
