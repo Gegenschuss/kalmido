@@ -1850,10 +1850,28 @@ def fd_reminder_extra(c, oid, rows):
     return rows
 
 
+def _fee_paid_day(c, oid, r, day):
+    """2.784.0 (#5387): the day a reminder fee was paid: day (ISO, not in the future, not before the reminder, its month open)
+    or today -- a fee paid in December and marked in January counts in December (books.bk_fees_paid, ledger_dbl._fee_side)."""
+    today = local_now().date().isoformat()
+    if not day:
+        return today
+    try:
+        d = date.fromisoformat(str(day)).isoformat()
+    except ValueError:
+        raise BadInput(tr("Invalid value: {0}", "day"))
+    if d > today or d < (r["date"] or ""):
+        raise BadInput(tr("Invalid value: {0}", "day"))
+    from .periodlock import period_need_open
+    period_need_open(c, oid, d)
+    return d
+
+
 @app.post("/api/office/docs/<int:did>/fee")
 def fd_fee_post(did):
-    """{state: "waived" | "paid" | ""} the organisation's admin waives the fee of a finalised reminder, marks it paid or
-    opens it again. The reminder document stays unchanged (GoBD); the change is logged."""
+    """{state: "waived" | "paid" | "", day?: the day it was paid (2.784.0, #5387; default today)} the organisation's admin
+    waives the fee of a finalised reminder, marks it paid or opens it again. The reminder document stays unchanged (GoBD); the
+    change is logged."""
     from .docs import doc_row
     c, uid, oid = _ctx()
     doc_row(c, oid, did)
@@ -1869,11 +1887,12 @@ def fd_fee_post(did):
     before = _col(r, "reminder_fee_state") or ""
     if before == "cancelled" and st != before:  # 2.355.0 D (#2846): cancelled with its invoice, for good
         raise Denied(409, tr("This fee was cancelled together with its invoice"))
-    if st != before:
+    paid_day = _fee_paid_day(c, oid, r, b.get("day")) if st == "paid" else None  # 2.784.0 (#5387): the day the money came, else today
+    if st != before or (st == "paid" and b.get("day") and paid_day != (_col(r, "reminder_fee_paid_at") or "")):
         # 2.545.0 (#4387): the day it was paid -- the income statement, key figures and cash flow count it then (books.bk_fees_paid)
-        paid_day = local_now().date().isoformat() if st == "paid" else None
         c.execute("UPDATE office_docs SET reminder_fee_state=?, reminder_fee_paid_at=? WHERE id=? AND org_id=?", (st, paid_day, did, oid))
-        ofx_log(c, oid, "reminder_fee", doc_id=did, detail={"before": before, "after": st, "fee": dstr(money(dec(r["reminder_fee"])))})
+        ofx_log(c, oid, "reminder_fee", doc_id=did, detail={"before": before, "after": st, "fee": dstr(money(dec(r["reminder_fee"]))),
+                                                          **({"day": paid_day} if paid_day else {})})
         bump(c)
     c.commit()
     return _answer(c, oid, uid, did)
