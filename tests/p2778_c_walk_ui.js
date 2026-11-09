@@ -3,9 +3,9 @@
 // freelancer-matrix: office (Frida, a person without an organisation: the bank walk-through in her own office, desktop and phone)
 // Own container (start.sh, mode workspaces), Firefox. Invented statements and receipts only (receipts = small PNG pictures).
 // - the list shows the candidate card (preview picture really loaded, amount) instead of the text suggestion
-// - credit card (Alice, organisation): "Go through" -> "1 of 3", the card's preview + amount, "Take over" -> the next open
-//   position ("2 of 3"), "Undo" -> back to it, open again on the server; keys 1 + Enter take the next; the last has no receipt
-//   -> "No receipt needed" -> the end view
+// - credit card (Alice, organisation): "Go through" -> "1 of 2" (the foreign fee needs no receipt from the start), the card's
+//   preview + amount, "Take over" -> the next open position ("2 of 2"), "Undo" -> back to it, open again on the server; keys
+//   1 + Enter take it again, the next one by its button -> the end view
 // - bank (Frida, desktop): the suggestion card in the list, the walk-through: take -> "2 of 3", undo -> "1 of 3", open again
 // - bank (Frida, phone 390 px): one card per screen width, no sideways scroll of the page, a swipe on the booking goes on / back
 const path = require('path');
@@ -125,26 +125,25 @@ const de = iso => `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}`;
     check(await ready(ev, `!!document.querySelector('.bnkother .ocd [data-cc="match"]') && !document.querySelector('.bnkother .ofcrow')`), '"Select receipt…" lists candidate cards');
     await shot('p2778c-cards-list.png');
     await ev(click(`document.querySelector('[data-cc="walk"]')`));
-    check(await ready(ev, progIs('1 von 3') + ` && ${headHas('/Cafe Beispiel/')}`), 'the walk-through opens at the first position "1 von 3": ' + await ev(prog()));
+    // the foreign fee needs no receipt from the start (ccread: kind fee), so two positions are open
+    check(await ready(ev, progIs('1 von 2') + ` && ${headHas('/Cafe Beispiel/')}`), 'the walk-through opens at the first open position "1 von 2": ' + await ev(prog()));
     check(await ready(ev, cardOk('.wlkdlg .wlk-cands', '/12,50/')), 'the walk-through: the card shows the picture and the amount');
     check(await ev(`/1/.test(${W}.querySelector('.ocd-key')?.textContent || '')`), 'mouse / keyboard: the card names its key');
     await shot('p2778c-cards-walk.png');
     await ev(click(`${W}.querySelector('.wlk-foot [data-wlk="take"]')`));
-    check(await ready(ev, progIs('2 von 3') + ` && ${headHas('/Cloud Beispiel/')}`), '"Übernehmen" goes to the next open position "2 von 3": ' + await ev(prog()));
+    check(await ready(ev, progIs('2 von 2') + ` && ${headHas('/Cloud Beispiel/')}`), '"Übernehmen" goes to the next open position "2 von 2": ' + await ev(prog()));
     check((await lines()).filter(x => x.state === 'matched').length === 1, 'the server: one position matched');
     check(await ready(ev, `!!${W}.querySelector('[data-wlk="undo"]')`), 'the undo button for the last step');
     await ev(click(`${W}.querySelector('[data-wlk="undo"]')`));
-    check(await ready(ev, progIs('1 von 3') + ` && ${headHas('/Cafe Beispiel/')} && !!${W}.querySelector('.wlk-cands .ocd')`), 'undo: back at the first position with its card');
+    check(await ready(ev, progIs('1 von 2') + ` && ${headHas('/Cafe Beispiel/')} && !!${W}.querySelector('.wlk-cands .ocd')`), 'undo: back at the first position with its card');
     let ls = await lines();
-    check(ls.every(x => x.state === 'open'), 'the server: undo opened the position again ' + JSON.stringify(ls.map(x => x.state)));
+    check(!ls.some(x => x.state === 'matched'), 'the server: undo opened the position again ' + JSON.stringify(ls.map(x => x.state)));
     // keys: 1 chooses, Enter takes
     await ev(`(() => { for (const k of ['1', 'Enter']) document.dispatchEvent(new KeyboardEvent('keydown', {key: k, bubbles: true, cancelable: true})); return 1; })()`);
-    check(await ready(ev, progIs('2 von 3') + ` && ${headHas('/Cloud Beispiel/')}`), 'keys 1 + Enter take the card, the next position comes');
+    check(await ready(ev, progIs('2 von 2') + ` && ${headHas('/Cloud Beispiel/')}`), 'keys 1 + Enter take the card, the next position comes');
     check(await ready(ev, cardOk('.wlkdlg .wlk-cands', '/18,40/')), 'the second position: its card (18,40) with the picture');
     check(await ev(`/USD/.test(${W}.querySelector('.wlk-tx')?.textContent || '')`), 'the foreign currency is shown');
-    await ev(`(() => { for (const k of ['1', 'Enter']) document.dispatchEvent(new KeyboardEvent('keydown', {key: k, bubbles: true, cancelable: true})); return 1; })()`);
-    check(await ready(ev, progIs('3 von 3') + ` && !!${W}.querySelector('.wlk-none')`), 'the fee: "3 von 3", no receipt found, said in words');
-    await ev(click(`${W}.querySelector('[data-wlk="mark"][data-v="noreceipt"]')`));
+    await ev(click(`${W}.querySelector('.wlk-foot [data-wlk="take"]')`));
     check(await ready(ev, `/Jede Buchung ist erledigt/.test(${W}?.textContent || '')`), 'the end view after the last one');
     ls = await lines();
     check(ls.filter(x => x.state === 'matched').length === 2 && ls.filter(x => x.state === 'noreceipt').length === 1, 'the server: two matched, one needs no receipt ' + JSON.stringify(ls.map(x => x.state)));
@@ -171,6 +170,12 @@ const de = iso => `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}`;
     check(await ready(ev, progIs('1 von 3') + ` && ${W}.querySelector('.wlk-tx b').textContent === ${JSON.stringify(first)}`), 'bank: undo goes back to the booking "1 von 3"');
     check(await ready(ev, `!!${W}.querySelector('.wlk-cands .ocd')`), 'bank: its card is there again');
     check(await openTx() === 3, 'the server: the booking is open again');
+    await ev(click(`${W}.querySelector('[data-wlk="mark"][data-v="noreceipt"]')`));
+    check(await ready(ev, progIs('2 von 3')), 'bank: "Kein Beleg nötig" goes on too');
+    check(await openTx() === 2, 'the server: marked as needing no receipt');
+    await ev(click(`${W}.querySelector('[data-wlk="undo"]')`));
+    check(await ready(ev, progIs('1 von 3') + ` && ${W}.querySelector('.wlk-tx b').textContent === ${JSON.stringify(first)}`), 'bank: undo of the mark goes back');
+    check(await openTx() === 3, 'the server: open again after the undo of the mark');
     await ev(click(`${W}.querySelector('[data-wlk="close"]')`));
 
     // ---- bank, phone width: one card per screen, a swipe goes on and back
@@ -183,7 +188,7 @@ const de = iso => `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}`;
     check(await ev(`(() => { const r = ${W}.querySelector('.wlk-cands'), c = r.querySelector('.ocd'); return Math.abs(c.getBoundingClientRect().width - r.clientWidth) < 2; })()`), 'phone: one card fills the width');
     check(await ev(`document.documentElement.scrollWidth <= innerWidth + 1 && ${W}.querySelector('.card').scrollWidth <= ${W}.querySelector('.card').clientWidth + 1`), 'phone: no sideways scroll');
     const swipe = (x0, x1) => `(() => { const t = ${W}.querySelector('.wlk-tx'), o = (k, x) => new PointerEvent(k, {bubbles: true, cancelable: true, clientX: x, clientY: 200, pointerId: 9, pointerType: 'touch', isPrimary: true});
-      t.dispatchEvent(o('pointerdown', x0)); t.dispatchEvent(o('pointermove', (x0 + x1) / 2)); t.dispatchEvent(o('pointerup', x1)); return 1; })()`;
+      t.dispatchEvent(o('pointerdown', ${x0})); t.dispatchEvent(o('pointermove', ${(x0 + x1) / 2})); t.dispatchEvent(o('pointerup', ${x1})); return 1; })()`;
     await ev(swipe(320, 60));
     check(await ready(ev, progIs('2 von 3')), 'phone: a swipe to the left shows the next booking: ' + await ev(prog()));
     await ev(swipe(60, 320));
