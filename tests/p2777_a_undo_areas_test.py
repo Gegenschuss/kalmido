@@ -335,4 +335,24 @@ check(r.ok, f"(setup) bob leaves the organisation {r.status_code} {r.text[:120]}
 sc, se = steps_of("contact", OCT), steps_of("event", OEV)
 check(not sc and not se, f"F3: leaving the organisation takes his steps of its contact and event with it {sc} {se}")
 
+# ---------------------------------------------------------------- review F8: moving out of a mirrored book makes a copy, no step
+out = in_app(f"""
+r = c.execute("INSERT INTO contact_srcs(user_id,name,url,status,created_at) VALUES(?,?,?,?,?) RETURNING id",
+              ({ALICE}, "Draussen", "https://contacts.example/book", "error", "2026-01-01T00:00:00+00:00")).fetchone()
+print('SRC', r[0])
+c.commit()""")
+SRC = int(out.split("SRC ")[1].split()[0]) if "SRC " in out else 0
+MB = A.post(B + "/api/books", json={"name": "Spiegel Beispiel", "org_id": None}).json()["id"]
+TB = A.post(B + "/api/books", json={"name": "Eigen Beispiel", "org_id": None}).json()["id"]
+MC = A.post(B + "/api/contacts", json={"book_id": MB, "fn": "Mira Spiegel"}).json()["id"]
+out = in_app(f"""
+c.execute("UPDATE books SET src_id=? WHERE id=?", ({SRC}, {MB}))
+c.commit()
+print('SET')""")
+check(SRC and "SET" in out, f"(setup) a mirrored address book {out[-300:]}")
+r = A.patch(B + f"/api/contacts/{MC}", json={"book_id": TB})
+nu = kt.dbx("SELECT COUNT(*) FROM obj_undo WHERE kind='contact' AND ref_id=?", (MC,))[0][0]
+check(r.ok and r.json().get("copied") is True and nu == 0,
+      f"F8: out of the mirror = a copy, the unchanged contact records no empty step ({nu}) {r.status_code} {r.text[:160]}")
+
 sys.exit(done("p2777_a_undo_areas"))
