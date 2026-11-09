@@ -379,6 +379,7 @@ body.pgdrag .dc-grid:not(.dc-selon) .dc-card:not(.dc-cur){content-visibility:aut
 .abdlrow>[role="cell"]{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-b)}
 .abdlrow>.abdl-title{display:flex;align-items:center;font-size:inherit}
 .abdl-amount{text-align:right}
+.abdlrow>.abdl-review{padding-left:.5rem}
 .abdlhead{min-height:2.5rem;font-size:var(--fs-s);color:var(--muted);background:var(--bg2)}
 .abdlsort{display:inline-flex;align-items:center;gap:.25rem;max-width:100%;min-height:2.5rem;padding:0 .25rem;border:0;background:none;color:inherit;font:inherit;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .abdlsort.on{color:var(--fg,inherit);font-weight:600}
