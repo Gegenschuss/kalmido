@@ -412,6 +412,7 @@ ORDER = (
     "office.gobdexport",  # 2.148.0 A (#2471): the export for the tax auditor (GDPdU index.xml + CSV)
     "office.datevzip",  # 2.148.0 B (#2470): DATEV batch + receipt images (document.xml) as one ZIP
     "office.datevin",  # 2.120.0 C (#2090): DATEV batch input side (receipts, travel expenses) + its accounts route
+    "office.okern",  # 2.784.0 (#5366): office kinds on the core's trash (before their modules: office.datevimp registers osupplier)
     "office.datevimp",  # 2.148.0 D (#2458): DATEV import (debtors / creditors, opening balances of a booking batch)
     "office.bookarch",  # 2.414.0 (#3502): the booking archive of past DATEV years (read-only)
     "office.taxforms",  # 2.467.0 (#3456): Anlage EUeR and annual VAT return line by line
