@@ -22,7 +22,7 @@ N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 import kt  # noqa: E402
 from freelancer_fixture import freelancer  # noqa: E402
-from kt import B, check, dbx, done, sess, today  # noqa: E402
+from kt import B, check, dbx, done, sess, today, until  # noqa: E402
 
 kt.fresh(prefix="P2774A")
 A = kt.setup()
@@ -198,6 +198,14 @@ check(g["label_key"] == "Sections reordered" and order() == list(reversed(before
 undo(A, g["id"])
 check(order() == before, f"the order is back {order()}")
 check(A.patch(B + f"/api/sections/{S2}", json={"name": ""}).status_code == 400, "an empty name: 400 as before")
+
+# ---------------------------------------------------------------- a task deleted for good: the watchdog drops its parts
+t8 = mk(A, title="Old fence")
+A.patch(B + f"/api/tasks/{t8}", json={"priority": 5})
+check(dbx("SELECT COUNT(*) FROM obj_undo WHERE kind='task' AND ref_id=?", (t8,))[0][0] == 2, "two parts of the task")
+check(A.delete(B + f"/api/tasks/{t8}?hard=1").ok, "deleted for good")
+check(until(lambda: dbx("SELECT COUNT(*) FROM obj_undo WHERE kind='task' AND ref_id=?", (t8,))[0][0] == 0, 60),
+      "the watchdog dropped its parts (its groups with them)")
 
 # ---------------------------------------------------------------- a person without an organisation
 FID, Fr = freelancer(B, A)

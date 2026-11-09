@@ -30,6 +30,7 @@ from ..core.errors import Denied
 from ..core.i18n import N_, tr
 from ..core.pg import write_lock
 from ..core.undodiff import ug_diff_add, undo_diff_reg, undo_person
+from ..core.undogroups import UG_TRACKED
 from ..core.undoweb import UG_KEPT, UG_KEPT_REDO
 from ..lists.listtrash import otr_err_task
 from ..lists.sections import sec_apply
@@ -320,3 +321,5 @@ def sec_order_run(c, uid, lid, data, redo):
 undo_diff_reg(TU_KIND, tu_run, TU_AREA)
 undo_diff_reg("section", sec_run, TU_AREA)
 undo_diff_reg("section_order", sec_order_run, TU_AREA)
+# the watchdog drops the parts of a task / section / project deleted for good (core/undogroups.py ug_drop_orphans)
+UG_TRACKED.update({TU_KIND: "tasks", "section": "sections", "section_order": "lists"})
