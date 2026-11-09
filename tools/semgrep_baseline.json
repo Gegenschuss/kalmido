@@ -709,14 +709,6 @@
   {
    "rule": "semgrep.kalmido-sql-ident-without-qi",
    "file": "kalmido/admin/umz_more.py",
-   "code": "out.update((table, r[0]) for r in c.execute(f\"SELECT {col} FROM {table} WHERE {col} IN ({','.join('?' * len(p))}) AND user_id=?\",",
-   "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
-   "date": "2026-11-09",
-   "task": 5296
-  },
-  {
-   "rule": "semgrep.kalmido-sql-ident-without-qi",
-   "file": "kalmido/admin/umz_more.py",
    "code": "r = c.execute(f\"SELECT updated_at, created_at FROM {table} WHERE {col}=? AND user_id=?\", (v, uid)).fetchone() if table == \"view_layouts\" else \\",
    "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
    "date": "2026-11-09",
