@@ -92,6 +92,10 @@ routes: [AGENTS.md, Server agents](AGENTS.md#server-agents).
 dialog (no server admin needed) and stores the organisation's key; its costs go on that key. Members give it orders in the
 projects whose owner switched on *Members may see and use the agent*; its settings carry a *Limit per member* (tokens per
 day or month). A personal agent on the server stays yours in shared projects too: only you give it orders.
+2.777.0 (#5378): the dialog asks for *Projects for the agent* and shares the chosen ones first; without one the routines wait
+and start on their own once a project is shared (the agent's settings say so calmly and offer *Share project*). A team
+agent shows in the tab *Agents* for every member of its organisation, also without a shared project ("No project shared" /
+"N projects"); writing to it without one gets an automatic answer from Kalmido on how to share a project with it, and no data.
 
 ## Quickest: one command on your computer
 

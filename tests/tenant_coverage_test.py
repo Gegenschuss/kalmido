@@ -1414,6 +1414,7 @@ ROUTES = {
     "POST /api/agents/{}/rules": "agent", "PATCH /api/agents/{}/rules/{}": "agent", "DELETE /api/agents/{}/rules/{}": "agent",
     # 2.557.0 C (#4670): the setup of a server agent: the defaults (no stored data of anybody) and its starter pack (owner / instance admin)
     "GET /api/agents/server/defaults": "public", "POST /api/agents/{}/server/starter": "agent",  # p2557_c_srvstarter_test.py
+    "GET /api/agents/{}/server/starter": "agent",  # 2.777.0 C (#5378): as the POST (p2777_c_srvagent_test.py, tenant-matrix: agent)
     # 2.235.0 B (#2902): the data lock of an agent (owner / instance admin, else 404; p2235_b_datalock_test.py)
     "GET /api/agents/{}/data-lock": "agent", "PATCH /api/agents/{}/data-lock": "agent",
     # 2.235.0 A (#2891 #2901): the control of an agent and the undo of its decisions (owner / instance admin, else 404; p2235_a_control_test.py)

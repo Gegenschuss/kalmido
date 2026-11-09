@@ -18,7 +18,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from flask import g, jsonify
 
 from ..core.config import app, TZ
-from ..core.pg import insert_id
+from ..core.pg import insert_id, system_ctx
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, now_utc, parse_iso
 from ..core.access import Denied, list_role, reading_ids
@@ -194,6 +194,7 @@ def sched_dict(c, r, uid=None, names=None):
             "title": r["title"], "prompt": r["prompt"], "freq": r["freq"], "days": sched_days(r), "time": r["at_time"], "tz": r["tz"],
             "list_id": r["list_id"], "list_name": lname, "enabled": bool(r["enabled"]),
             "action": (r["action"] if "action" in r.keys() else "chat") or "chat",  # 2.126.1 B (#2126)
+            "share_wait": bool(r["share_wait"]) if "share_wait" in r.keys() else False,  # 2.777.0 C (#5378): waits for a shared project
             "list_check": bool(r["list_check"]),  # 2.39.0 (#1168): a scheduled check of a list (made in its Playbook view)
             "next_at": r["next_at"] if r["enabled"] else None, "last_at": r["last_at"], "last_state": r["last_state"] or None,
             "created_at": r["created_at"], "updated_at": r["updated_at"]}
@@ -327,9 +328,35 @@ def ast2_sched_triage(c, r, a, now, manual):
     return state
 
 
+def sched_wait_wake(c, aid=None):
+    """2.777.0 C (#5378): switches on the waiting plans of a server agent's starter pack (share_wait=1, agents/srvstarter.py) of
+    agent aid (None: of every agent, the watchdog) whose person now reaches the agent (agent_shares: a project shared with it);
+    returns how many. A plan of a disabled account stays as it is. Nothing else changes: the plan keeps its person, rhythm and
+    text. Called by the watchdog (sched_tick) and by the starter pack asked again (agents/srvstarter.py _plan). The caller commits."""
+    with system_ctx(c):  # the plans of every person of this agent (structure: the check below is the person's own reach)
+        rows = c.execute("SELECT s.id, s.agent_id, s.user_id FROM agent_schedules s JOIN users u ON u.id=s.user_id WHERE s.share_wait=1 "
+                         "AND u.disabled=0" + (" AND s.agent_id=?" if aid else "") + " ORDER BY s.id LIMIT 500",
+                         (aid,) if aid else ()).fetchall()
+        n = 0
+        for r in rows:
+            if not agent_shares(c, r["agent_id"], r["user_id"]):
+                continue
+            c.execute("UPDATE agent_schedules SET enabled=1, share_wait=0, last_state='', updated_at=? WHERE id=? AND share_wait=1",
+                      (iso(now_utc()), r["id"]))
+            _sched_set_next(c, r["id"])
+            n += 1
+    return n
+
+
 def sched_tick(c):
     """Watchdog: every due plan once. The next due time is computed from now, so an outage costs at most one late run."""
     now = now_utc()
+    try:  # 2.777.0 C (#5378): plans of a starter pack that waited for a shared project
+        if sched_wait_wake(c):
+            c.commit()
+    except Exception as e:  # noqa: BLE001 -- the due plans below still run
+        c.rollback()
+        print("agent schedules: waking waiting plans failed:", type(e).__name__, flush=True)
     rows = c.execute("SELECT * FROM agent_schedules WHERE enabled=1 AND next_at IS NOT NULL AND next_at<=? ORDER BY next_at LIMIT ?",
                      (iso(now), SCHED_TICK_MAX)).fetchall()
     for r in rows:
@@ -399,6 +426,8 @@ def agent_schedule_update(sid):
         f["last_state"] = ""  # switched on again: the old "switched itself off" reason goes
     sets = ", ".join(f"{k}=?" for k in f)
     c.execute(f"UPDATE agent_schedules SET {sets}, updated_at=? WHERE id=?", (*f.values(), iso(now_utc()), sid))
+    if "enabled" in f:  # 2.777.0 C (#5378): switched on / off by hand: no longer waits for a shared project
+        c.execute("UPDATE agent_schedules SET share_wait=0 WHERE id=? AND share_wait=1", (sid,))
     _sched_set_next(c, sid)
     c.commit()
     return jsonify(sched_dict(c, sched_row(c, sid), uid))

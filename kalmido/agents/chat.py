@@ -12,7 +12,7 @@ from flask import g, jsonify, request
 from ..core.config import app, ATT_DIR, MAX_FILE_MB
 from ..core.pgbus import bus_on, bus_send  # 2.622.0 (#3891)
 from ..core.pg import insert_id
-from ..core.i18n import tr
+from ..core.i18n import N_, tr
 from ..core.db import ag_cursor, ag_cursor_parse, ag_limit, body, bump, db, err, iso, iso_ms, now_utc
 from ..core.retention import ret_days, ret_on, ret_report  # 2.272.0 A (#3026)
 from ..accounts.session import me
@@ -32,6 +32,7 @@ from ..agents.core import (
     CHAT_KEEP, CHAT_MAX, is_agent, JOB_ACTIONS, job_dict, job_may_act, job_visible, list_agents, lst_brief,
     need_chat_agent, WAKE_LIMIT,
 )
+from ..agents.core import agent_org_sees  # 2.777.0 C (#5378)
 from ..collab.reactions import clean_emoji
 from ..collab.news import news_read_job  # 2.369.5 (#2517): pulled up from functions
 from ..collab.replies import reply_quotes, reply_check  # 2.369.5 (#2517): pulled up from functions
@@ -890,7 +891,7 @@ def agent_chat_get(aid):
     newer ones; 2.12.2 (#451) ?before=<id>: the page of older ones (has_more: there are even older ones). Marks its answers read.
     2.56.0 (#1793) ?job=<id>: only that job's messages (jobchat.jc_chat_rows), with ?after= / ?before= / ?limit=."""
     c = db()
-    a = need_chat_agent(c, aid)
+    a, shared = chat_agent_or_org(c, aid)  # 2.777.0 C (#5378)
     after = as_int(request.args.get("after", 0), "after", 0)
     before = as_int(request.args.get("before", 0), "before", 0)
     limit = as_int(request.args.get("limit", 300), "limit", 1, 300)
@@ -941,7 +942,10 @@ def agent_chat_get(aid):
     sug = [chat_dict(r, None, None, newest=nw) for r in (c.execute(  # 2.233.0 A (#2848): the collected suggestions, newest first
         f"SELECT * FROM agent_chat WHERE id IN ({','.join('?' * len(nw['coll']))}) ORDER BY id DESC", nw["coll"]).fetchall() if nw["coll"] else [])]
     jn9_chat_jobs(c, sug, me())
-    return jsonify(agent=agent_public(c, a, me()), messages=msgs, now=iso_ms(now_utc()), has_more=more,
+    ag = agent_public(c, a, me())
+    if not shared:  # 2.777.0 C (#5378): seen only as a member of its organisation -- nothing of its work (as agents_for)
+        ag.update(shared=False, status_text="", status_key="", status_key_at="", status_task=None, pause_reason="", job_tasks=[])
+    return jsonify(agent=ag, messages=msgs, now=iso_ms(now_utc()), has_more=more, shared=shared,
                    suggestions=sug, chat_prefs=cp_get(c, aid, me()),  # 2.233.0 A (#2848)
                    steps_live=steps_live(c, aid, me()), approvals_open=apo,
                    pins=pins,  # 2.62.0 (#1848): the pinned messages, also older than this page
@@ -995,9 +999,11 @@ def agent_chat_post(aid):
     """{body, task_id?} -- a message to the agent (a 'chat' event). 2.13.1 (#465): or a multipart form (body?, task_id?,
     file...) with images / files (the body may then be empty)."""
     c = db()
-    a = need_chat_agent(c, aid)
+    a, shared = chat_agent_or_org(c, aid)  # 2.777.0 C (#5378)
     if not agent_active(a):
         return err(tr("This agent is paused"), 409)
+    if not shared:
+        return chat_unshared_answer(c, a)
     try:
         fb, files = chat_input(("body", "task_id", "reply_to", "client_id", "job_id"))  # 2.62.0 (#1530): client_id
         b = fb if fb is not None else body()
@@ -1020,6 +1026,41 @@ def agent_chat_post(aid):
     except BadInput as e:
         return err(str(e))
     chat_emit(c, aid, r)
+    c.commit()
+    chat_unlink_trimmed()
+    return jsonify(chat_one(c, r, edits=True)), 201
+
+
+# 2.777.0 C (#5378, decided 09.11.2026): a member of a team agent's organisation who shares no project with it may write to it. The
+# message starts no work of the agent (no event, no run, no costs on the organisation's key, no data of the person): Kalmido itself
+# answers in the agent's chat with this fixed text (no language model) -- it sees nothing of theirs and how to share a project with it.
+# The stored text stays in their conversation (GET /api/v1/agent/chats lists it like every chat row; the agent cannot answer: 404).
+CHAT_UNSHARED = N_("I do not see any project of yours yet, so I cannot work for you. Share a project with me: open the project, then Share, and add {0}. In a project of someone else, its owner adds me and switches on “Members may see and use the agent”. (An automatic answer from Kalmido: I only start working once a project is shared with me.)")  # noqa: E501
+
+
+def chat_agent_or_org(c, aid):
+    """(agent row, shared): the agent the person may chat with (need_chat_agent, shared True), else a team agent they see only as a
+    member of its organisation (agents/core.py agent_org_sees, shared False); 404 otherwise."""
+    a = agent_row(c, aid)
+    if a and not is_agent(g.user) and not agent_shares(c, aid, me()) and agent_org_sees(c, a, me()):
+        return a, False
+    return need_chat_agent(c, aid), True
+
+
+def chat_unshared_answer(c, a):
+    """POST /api/agents/<id>/chat of a person without a shared project (chat_agent_or_org shared False): their text is stored in
+    their own conversation, the fixed answer follows at once; nothing goes to the agent. Files and a task are refused."""
+    try:
+        fb, files = chat_input(("body", "task_id", "reply_to", "client_id", "job_id"))
+        b = fb if fb is not None else body()
+        if files or b.get("task_id") or b.get("job_id"):
+            raise BadInput(tr("Share a project with the agent first"))
+        r = chat_post(c, a["user_id"], me(), "user", {"body": b.get("body")}, None)
+    except UnknownFields as e:
+        return err(str(e))
+    except BadInput as e:
+        return err(str(e))
+    chat_add(c, a["user_id"], me(), "agent", tr(CHAT_UNSHARED, a["display_name"] or a["username"]), None)
     c.commit()
     chat_unlink_trimmed()
     return jsonify(chat_one(c, r, edits=True)), 201

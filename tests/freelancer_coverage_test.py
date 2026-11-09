@@ -1190,6 +1190,8 @@ ROUTES = {
     "GET /api/agents/{}/control/history": "agents", "POST /api/v1/agent/decisions": "agents",
     # 2.557.0 C (#4670): the setup of a server agent -- its defaults and the starter pack (owner / instance admin, else 404; p2557_c_srvstarter_test.py)
     "GET /api/agents/server/defaults": "agents", "POST /api/agents/{}/server/starter": "agents",
+    # 2.777.0 C (#5378): what of the starter pack is there / waits / is missing (as the POST; p2777_c_srvagent_test.py)
+    "GET /api/agents/{}/server/starter": "agents",
     # 2.144.6 A (#2053): time entries to an invoice (office/timebill.py: the office area's client lists, release = office admin;
     # p21446_a_api_test.py)
     "GET /api/office/time-open": "office", "POST /api/office/docs/{}/time-release": "office",

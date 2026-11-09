@@ -9,7 +9,7 @@ from datetime import timedelta
 from flask import g, has_request_context
 
 from ..core.config import app, EMAIL_RE
-from ..core.pg import insert_id, WEB_THREADS
+from ..core.pg import insert_id, system_ctx, WEB_THREADS
 from ..core.pgbus import bus_active, bus_on, bus_send  # 2.622.0 (#3891)
 from ..core.ephem import eph_add  # 2.622.0 (#3891)
 from ..core.i18n import tr
@@ -32,6 +32,8 @@ from ..api.common import act_via
 from ..integrations.webhooks import wh_actor, wh_log, WH_QUEUE_MAX
 from ..collab.replies import reply_of  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgs import is_org_admin  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgs import user_orgs  # 2.777.0 C (#5378)
+from ..accounts.orgroles import user_orgs_full  # 2.777.0 C (#5378)
 
 
 # ---------------------------------------------------------------- 2.0.0: agents, reactions, shared list tags, tidy
@@ -1453,13 +1455,48 @@ def _host_info(a):
     return host_info(a)
 
 
+def agent_org_orgs(c, uid):
+    """2.777.0 C (#5378, decided 09.11.2026): the organisations whose TEAM agents person uid sees without a shared project: the ones
+    uid is a member or admin of (not a guest, read-only or accounting role, not a retired organisation); none for an agent."""
+    u = c.execute("SELECT kind FROM users WHERE id=?", (uid,)).fetchone() if uid else None
+    if not u or (u["kind"] or "user") == "agent":
+        return set()
+    return set(user_orgs(c, uid)) & set(user_orgs_full(c, uid, write=True))
+
+
+def agent_org_sees(c, a, uid):
+    """2.777.0 C (#5378): does person uid see team agent a (agent_row, no owner) only as a member of its organisation? It grants NO
+    data: the agent still reaches only what is shared with it; such a person's chat never reaches the agent (agents/chat.py
+    chat_unshared_answer: Kalmido answers with a fixed hint how to share a project). A personal agent: never."""
+    return bool(a) and not a["owner_id"] and bool(a["org_id"]) and a["org_id"] in agent_org_orgs(c, uid)
+
+
+def agent_projects_count(c, aid):
+    """2.777.0 C (#5378): how many projects are shared with agent aid (its own basket not counted) - a number only, no names."""
+    with system_ctx(c):  # a count over the agent's memberships (structure; no project is named)
+        return c.execute("SELECT COUNT(*) FROM lists l WHERE l.is_inbox=0 AND l.deleted_at IS NULL AND l.owner_id<>? AND l.id IN "
+                         "(SELECT list_id FROM list_members WHERE user_id=?)", (aid, aid)).fetchone()[0]
+
+
 def agents_for(c, uid):
     rows = c.execute("""SELECT a.*, u.username, u.display_name, u.avatar, u.disabled FROM agents a JOIN users u ON u.id=a.user_id
                         WHERE u.kind='agent' ORDER BY u.id""").fetchall()
     sh = agents_shared(c, [a["user_id"] for a in rows], uid)  # 2.674.0 B (#4194): agent_shares for all at once
-    rows = [a for a in rows if a["user_id"] in sh]
+    # 2.777.0 C (#5378, decided 09.11.2026): a team agent of my organisation also without a shared project (agent_org_orgs)
+    oo = agent_org_orgs(c, uid) if any(not a["owner_id"] and a["org_id"] and a["user_id"] not in sh for a in rows) else set()
+    rows = [a for a in rows if a["user_id"] in sh or (not a["owner_id"] and a["org_id"] in oo)]
     pre = ag_pre(c, rows, uid) if rows and uid else None
-    return [agent_public(c, a, uid, pre) for a in rows]
+    out = [agent_public(c, a, uid, pre) for a in rows]
+    if not any(not a["owner_id"] for a in rows):
+        return out
+    for a, d in zip(rows, out):
+        if a["owner_id"]:
+            continue
+        d["shared"] = a["user_id"] in sh
+        d["projects"] = agent_projects_count(c, a["user_id"])  # how many projects it is in: a number, no names
+        if not d["shared"]:  # seen only as an organisation member: nothing of its work (what it does, on which task)
+            d.update(status_text="", status_key="", status_key_at="", status_task=None, pause_reason="", job_tasks=[])
+    return out
 
 
 def ag_pre(c, rows, uid):

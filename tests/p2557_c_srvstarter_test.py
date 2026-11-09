@@ -6,7 +6,7 @@
    tidy = plan triage daily 07:00, docs = levels "agent" for sender / type / tags + a standing rule, meetings = a standing
    rule, followup = plan on weekdays 09:00 with the days in its order), then all at once; the same again = "exists", no
    duplicate; each setting is an ordinary one afterwards (the plan switched off and deleted on its own)
- - wrong input 400, another person / an agent token 404, a team agent without a shared project: plans "skipped"
+ - wrong input 400, another person / an agent token 404, a team agent without a shared project: plans "waiting" (2.777.0, #5378)
  - the instance switch server_agents_off (PATCH /api/admin/settings, about): off -> defaults say so, starter 403
  - the same as a person without an organisation (freelancer-matrix: agents)
 usage: p2557_c_srvstarter_test.py <datadir>      (KMT_NOSTART=1 / P2557C_NOSTART=1: a running server)"""
@@ -159,8 +159,9 @@ check(r.status_code in (200, 201), f"a team server agent {r.status_code} {r.text
 TA = r.json()["id"]
 r = starter(A, TA, ["briefing", "docs"])
 st = states(r)
-check(r.ok and st.get("briefing") == "skipped" and st.get("docs") == "created", f"team agent: plan skipped without a shared project, docs of the organisation created {r.text[:300]}")
-check(next(x for x in r.json()["items"] if x["item"] == "briefing")["reason"], "skipped: with its reason")
+# 2.777.0 (#5378): without a shared project the plan is made switched off and waits (state "waiting", no longer "skipped")
+check(r.ok and st.get("briefing") == "waiting" and st.get("docs") == "created", f"team agent: plan waits without a shared project, docs of the organisation created {r.text[:300]}")
+check(next(x for x in r.json()["items"] if x["item"] == "briefing")["reason"], "waiting: with its reason")
 check(A.get(B + f"/api/docs/settings?ws=org:{ORG}").json()["levels"]["type"] == "agent", "the organisation's documents: type = agent")
 check(starter(F, TA, ["briefing"]).status_code == 404, "a team agent: not for a person without the admin role (404)")
 

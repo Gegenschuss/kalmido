@@ -105,6 +105,51 @@ function srv_starterHtml(d) {
     ${SRV_ST.map(([k, n, h]) => `<label class="chkl srvsti"><input type="checkbox" data-srv-st="${k}" ${k === 'office' ? '' : 'checked'}><span>${esc(tr(n))}<small class="muted">${esc(tr(h))}</small></span></label>${k === 'followup'
       ? `<div class="row srvfd"><label for="srv-fdays">${tr('after|days')}</label><input id="srv-fdays" type="number" inputmode="numeric" class="numin" min="1" max="${d.followup_max || 60}" value="${d.followup_days || 5}"><span class="muted">${tr('days')}</span></div>` : k === 'docs' ? '<div class="shint keep" id="srv-docsws" hidden></div>' : ''}`).join('')}</fieldset>`;
 }
+// 2.777.0 C (#5378): the projects I may share with an agent: managed by me, no basket / archive / lock / private kind (health,
+// budget, an organisation's trip), no agent in it yet (one agent per project). ws: 'org:<id>' = only that organisation's (a team
+// agent of it; also an agent that works there), 'private' = only private ones, '' = all of mine (a new personal agent: its
+// workspace follows the chosen projects)
+const srv_hasAgent = l => listPeople(l).some(p => p.agent || !!agentById(p.user_id));
+function srv_projs(ws) {
+  const org = String(ws || '').startsWith('org:') ? +String(ws).slice(4) : 0;
+  return (S.lists || []).filter(l => !l.archived && !l.is_inbox && !l.e2e && canManage(l) && !['health', 'budget'].includes(l.life) && !(l.life === 'travel' && l.org_id)
+    && !srv_hasAgent(l) && (org ? l.org_id === org : ws === 'private' ? !l.org_id : true)).sort((a, b) => lname(a).localeCompare(lname(b), LOCALE()));
+}
+function srv_projHtml(ws) {
+  const ls = srv_projs(ws);
+  return `<legend>${tr('Projects for the agent')}</legend>
+    <div class="shint keep">${esc(tr('Shared with the agent first: it works only in projects shared with it. Without one its routines wait and start on their own once you share a project.'))}</div>
+    ${ls.length ? `<div class="srvpj" role="group" aria-label="${esc(tr('Projects for the agent'))}">${ls.map(l => `<label class="chkl"><input type="checkbox" data-srv-pj="${l.id}"><span>${esc(lname(l))}${wsOn() && !String(ws).startsWith('org:') ? ` <small class="muted">${esc(wsLabel(l.org_id))}</small>` : ''}</span></label>`).join('')}</div>`
+      : `<div class="muted mhint">${esc(tr('No project of yours to share yet; you can share one later.'))}</div>`}`;
+}
+// shares the projects lids with agent aid (role edit; a bridge between different people asks first) -> the failures as texts
+async function srv_share(aid, lids) {
+  const out = [];
+  for (const lid of lids) {
+    try { await bridgeTry(ok => rawFetch('PUT', `/api/lists/${lid}/members`, {user_id: aid, role: 'edit', ...(ok ? {bridge_ok: true} : {})})); }
+    catch (x) { if (!x?.declined) out.push(`${lname(listById(lid) || {name: ''})}: ${x instanceof Offline ? tr('Only available online.') : x?.message || ''}`); }
+  }
+  return out;
+}
+// "Share project" in the agent's window: the projects of its workspace, then back to the window (its routines start)
+async function srv_shareModal(a, ws, done) {
+  const md = /** @type {any} */ (modal(`<h3>${esc(tr('Share a project with {0}', a.name || ''))}</h3>
+    <fieldset class="srvpjs">${srv_projHtml(ws)}</fieldset>
+    <div class="foot"><div class="calerr" role="alert" id="srv-pjerr" hidden></div><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="srv-pjok">${tr('Share')}</button></div>`));
+  md.addEventListener('click', async e => {
+    const b = /** @type {any} */ (e.target).closest('button[data-m]'); if (!b) return;
+    if (b.dataset.m === 'close') { md.remove(); return; }
+    if (b.dataset.m !== 'srv-pjok') return;
+    const lids = $$('[data-srv-pj]:checked', md).map(x => +x.dataset.srvPj), er = $('#srv-pjerr', md);
+    if (!lids.length) { er.textContent = tr('Choose a project'); er.hidden = false; return; }
+    b.disabled = true;
+    const f = await srv_share(a.id, lids);
+    b.disabled = false;
+    if (f.length) { er.textContent = f.join(' · '); er.hidden = false; }
+    if (f.length < lids.length) { toast(tr('Shared')); if (!f.length) md.remove(); load().then(render).catch(() => {}); done && done(); }
+  });
+  return md;
+}
 // "New agent" > "Runs on the Kalmido server". o.admin: from the administration (team agent or my own), else my personal agent
 async function srv_newModal(o = {}) {
   let d; try { d = await srv_defaults(true); } catch { toast(tr('Only available online.')); return; }
@@ -115,6 +160,7 @@ async function srv_newModal(o = {}) {
     <div class="row"><label for="srv-user">${tr('Username')}</label><input id="srv-user" class="unin" autocapitalize="off" autocomplete="off" spellcheck="false" maxlength="32"></div>
     <div class="shint keep" id="srv-userhint" hidden></div>
     ${srv_fieldsHtml(d, true)}
+    <fieldset class="srvpjs" id="srv-pjs"></fieldset>
     ${srv_starterHtml(d)}` : srv_offHtml()}
     <div class="foot"><div class="calerr" role="alert" id="srv-err" hidden></div><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button>${d.enabled_instance ? `<button class="btn pri" data-m="srv-ok">${tr('Create')}</button>` : ''}</div>`));
   userNameFollow(md, 'srv-name', 'srv-user', 'srv-userhint');
@@ -122,6 +168,10 @@ async function srv_newModal(o = {}) {
   // 2.621.0 (#4715): an owner without a listed workspace (instance team agent) shows no hint
   const dw = $('#srv-docsws', md), docsWs = () => { if (!dw) return; const v = $('#srv-own', md)?.value || 'me', w = (d.docs_scopes || []).find(x => x.key === v); dw.textContent = w ? tr('Applies to: {0}', w.name) : ''; dw.hidden = !w; };
   docsWs(); $('#srv-own', md)?.addEventListener('change', docsWs);
+  // 2.777.0 C (#5378): "Projects for the agent" follow the owner choice (a team agent of an organisation: only its projects)
+  const pjWs = () => { const v = $('#srv-own', md)?.value || 'me'; return v.startsWith('org:') ? v : ''; };
+  const pjDraw = () => { const f = $('#srv-pjs', md); if (f) f.innerHTML = srv_projHtml(pjWs()); };
+  pjDraw(); $('#srv-own', md)?.addEventListener('change', pjDraw);
   const un0 = $('#srv-user', md); if (un0) un0.value = slugUser(d.default_name || '');
   const err = $('#srv-err', md), show = m => { err.textContent = m || ''; err.hidden = !m; };
   md.addEventListener('click', async e => {
@@ -134,10 +184,13 @@ async function srv_newModal(o = {}) {
     if (!key) { need($('#srv-key', md), tr('The API key is missing')); return; }
     const items = $$('[data-srv-st]:checked', md).map(x => x.dataset.srvSt), days = Math.max(1, Math.min(d.followup_max || 60, +$('#srv-fdays', md)?.value || d.followup_days || 5));
     const team = o.admin && $('#srv-own', md)?.value === 'team';
+    // 2.777.0 C (#5378): the chosen projects; an agent works in ONE workspace, so they decide the workspace of an agent of mine
+    const pj = $$('[data-srv-pj]:checked', md).map(x => +x.dataset.srvPj), pws = [...new Set(pj.map(id => listById(id)?.org_id || null))];
+    if (pws.length > 1) { show(tr('Choose projects of one workspace: an agent works in one workspace.')); return; }
     b.disabled = true; show('');
     let r;
     try {
-      const nb = {username: un, display_name: name, provider: SRV_PROV};
+      const nb = {username: un, display_name: name, provider: SRV_PROV, ...(pws.length ? {org_id: pws[0]} : {})};
       const torg = o.admin ? 0 : +String($('#srv-own', md)?.value || '').replace('org:', '') || 0;  // 2.569.0 B (#4675): a team agent of my organisation
       r = torg ? await calReq('POST', `/api/orgs/${torg}/server-agents`, {username: un, display_name: name}) : o.admin ? await calReq('POST', '/api/admin/agents', team ? nb : {...nb, owner_id: S.me?.id}) : await calReq('POST', '/api/my/agents', nb);
     } catch (x) { show(x.message); b.disabled = false; return; }
@@ -145,27 +198,54 @@ async function srv_newModal(o = {}) {
     const fails = [];
     try { await calReq('PUT', `/api/agents/${r.id}/server`, {provider: $('#srv-prov', md).value, model: $('#srv-model', md).value, instructions: $('#srv-ins', md).value, api_key: key, ...srv_limBody(md)}); }
     catch (x) { fails.push(tr('Server settings: {0}', x.message)); }
+    if (!fails.length && pj.length) fails.push(...await srv_share(r.id, pj));  // 2.777.0 C (#5378): shared BEFORE the starter pack
+    const calm = [];  // a routine that waits for a project or an item that needs a right first: a calm hint, no error
     if (!fails.length && items.length) {
       try {
         const st = await calReq('POST', `/api/agents/${r.id}/server/starter`, {items, followup_days: days});
-        for (const x of st.items || []) if (x.state === 'skipped') fails.push(`${tr((SRV_ST.find(y => y[0] === x.item) || [])[1] || x.item)}: ${x.reason || ''}`);
+        for (const x of st.items || []) if (x.state === 'skipped') calm.push(`${tr((SRV_ST.find(y => y[0] === x.item) || [])[1] || x.item)}: ${x.reason || ''}`);
       } catch (x) { fails.push(tr('Starter pack: {0}', x.message)); }
     }
     md.remove(); o.done && o.done(); load().then(render).catch(() => {});
-    if (fails.length) { srv_editModal(r, fails); return; }
+    // 2.777.0 C (#5378): the agent's window opens after creating it: its starter pack, what waits, "Share project"
+    srv_editModal({...r, name: r.name || name}, fails, calm);
+    if (fails.length) return;
     toast(tr('{0} is ready', r.name || name));
     try { const m = await api('GET', `/api/agents/${r.id}/server/models`); if (m.fallback_note) toast(m.fallback_note); } catch { /* the settings say it */ }
   });
   setTimeout(() => $('#srv-name', md)?.focus(), 50);
   return md;
 }
-// the server settings of an agent (the same fields, no starter pack) + its latest runs; notes = what failed while creating it
-async function srv_editModal(a, notes) {
+// 2.777.0 C (#5378): the starter pack in the agent's window: each item with its state; a missing one is added later here (the same
+// POST as the dialog, e.g. "Due billing" once the agent has the office rights); without a shared project a calm hint + "Share project"
+const SRV_ST_STATE = {active: N_('On|starter'), waiting: N_('Waits for a project'), paused: N_('Paused|starter')};
+async function srv_stDraw(md, a) {
+  const box = $('#srv-st', md); if (!box) return;
+  let j; try { j = await api('GET', `/api/agents/${a.id}/server/starter`); } catch { box.innerHTML = ''; return; }
+  if (!md.isConnected) return;
+  const waits = Object.values(j.items || {}).includes('waiting');
+  box.innerHTML = `${j.shared ? '' : `<div class="shint keep srvwait" role="note"><span>${esc(waits ? tr('No project is shared with {0} yet: its routines wait and start on their own once you share one.', a.name || '') : tr('No project is shared with {0} yet: it sees nothing and can only work once you share a project.', a.name || ''))}</span>
+      <button type="button" class="btn sm" data-srv="share">${ic('users', 's')} ${tr('Share project')}</button></div>`}
+    <h4 id="srv-st-h">${tr('Starter pack')}</h4><div class="srvruns" role="list" aria-labelledby="srv-st-h">${SRV_ST.map(([k, n]) => { const st = (j.items || {})[k] || 'missing';
+      return `<div class="mrow srvsti" role="listitem" data-srv-sti="${k}" data-state="${st}"><span class="n">${esc(tr(n))} <small class="muted">${st === 'missing' ? '' : esc(tr(SRV_ST_STATE[st] || st))}</small></span>${st === 'missing' ? `<button type="button" class="btn sm" data-srv-add="${k}">${ic('plus', 's')} ${tr('Add')}</button>` : ''}</div>`; }).join('')}</div>
+    <div class="shint keep" id="srv-sthint" role="status" hidden></div>`;
+  box.dataset.ws = j.org_id ? 'org:' + j.org_id : 'private';
+  md._srvSt = j;
+}
+// after "Share project": the waiting routines asked again start at once (else the server's watchdog starts them within a minute)
+async function srv_stWake(md, a) {
+  const w = Object.entries(md._srvSt?.items || {}).filter(([, v]) => v === 'waiting').map(([k]) => k);
+  if (w.length) { try { await calReq('POST', `/api/agents/${a.id}/server/starter`, {items: w}); } catch { /* the watchdog starts them */ } }
+  if (md.isConnected) await srv_stDraw(md, a);
+}
+// the server settings of an agent (the same fields) + its starter pack + its latest runs; notes = what failed while creating it,
+// calm = what the starter pack left out for now (a right missing): a hint, no error (2.777.0 C #5378)
+async function srv_editModal(a, notes, calm) {
   const md = /** @type {any} */ (modal(`<h3>${esc(tr('{0} on the Kalmido server', a.name))}</h3>
     ${notes?.length ? `<div class="calerr" role="alert">${notes.map(esc).join('<br>')}</div>` : ''}
+    ${calm?.length ? `<div class="shint keep srvcalm" role="note">${calm.map(esc).join('<br>')}</div>` : ''}
+    <div id="srv-st"></div>
     <div id="srv-ed"><div class="muted mhint">${tr('Loading…')}</div></div>
-    <div class="row srvoffice"><button type="button" class="btn sm" data-srv="office">${ic('plus', 's')} ${tr('Due billing on Mondays at 08:00')}</button></div>
-    <div class="shint keep">${esc(tr('Open time and due invoices as a reminder; invoice drafts only after your Yes, never finalised or sent. Needs the agent’s office rights (“Office drafts”, “May draft office documents”).'))}</div>
     <div id="srv-team"></div>
     <h4 id="srv-runs-h">${tr('Latest runs')}</h4><div class="srvruns" id="srv-runs" role="list" aria-labelledby="srv-runs-h"><div class="muted mhint">${tr('Loading…')}</div></div>
     <div class="foot"><div class="calerr" role="alert" id="srv-err" hidden></div><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button><button class="btn pri" data-m="srv-save" hidden>${tr('Save')}</button></div>`));
@@ -187,7 +267,7 @@ async function srv_editModal(a, notes) {
       ${x.error ? `<small class="srverr">${esc(x.error)}</small>` : ''}</span></div>`).join('') || `<div class="muted mhint">${tr('No runs yet.')}</div>`;
   };
   md.addEventListener('click', async e => {
-    const t = /** @type {any} */ (e.target), b = t.closest('button[data-m], button[data-srv]'); if (!b) return;
+    const t = /** @type {any} */ (e.target), b = t.closest('button[data-m], button[data-srv], button[data-srv-add]'); if (!b) return;
     if (b.dataset.m === 'close') { md.remove(); return; }
     if (b.dataset.srv === 'rep') { const row = $('#srv-keyrow', md); if (row) { row.hidden = false; $('#srv-key', md)?.focus(); } return; }
     try {
@@ -195,12 +275,16 @@ async function srv_editModal(a, notes) {
         if (!await askConfirm(tr('Delete the API key?'), tr('The agent stops working on the server until you save a new key.'), {ok: tr('Delete'), danger: true})) return;
         await calReq('PUT', `/api/agents/${a.id}/server`, {delete_key: true}); toast(tr('Deleted')); await draw(); return;
       }
-      if (b.dataset.srv === 'office') {  // 2.568.0 (#4673): the starter item office later, once the agent has the office rights
+      if (b.dataset.srvAdd) {  // 2.568.0 (#4673) office, 2.777.0 C (#5378) every item: added later, e.g. once the agent has the rights
         b.disabled = true; show('');
-        const x = ((await calReq('POST', `/api/agents/${a.id}/server/starter`, {items: ['office']})).items || [])[0] || {};
-        if (x.state === 'skipped') show(x.reason || ''); else toast(x.state === 'exists' ? tr('Already set up') : tr('Saved'));
+        const x = ((await calReq('POST', `/api/agents/${a.id}/server/starter`, {items: [b.dataset.srvAdd]})).items || [])[0] || {};
+        const h = $('#srv-sthint', md);
+        if (x.state === 'skipped' || x.state === 'waiting') { if (h) { h.textContent = x.reason || ''; h.hidden = !x.reason; } }
+        else toast(x.state === 'exists' ? tr('Already set up') : tr('Saved'));
+        if (x.state !== 'skipped') await srv_stDraw(md, a);
         return;
       }
+      if (b.dataset.srv === 'share') { srv_shareModal(a, $('#srv-st', md)?.dataset.ws || '', () => srv_stWake(md, a)); return; }
       if (b.dataset.m === 'srv-save') {
         const key = $('#srv-key', md)?.value.trim() || '';
         b.disabled = true; show('');
@@ -210,7 +294,7 @@ async function srv_editModal(a, notes) {
       }
     } catch (x) { show(x.message); } finally { b.disabled = false; }
   });
-  draw(); runs(); srv_teamFill(md, a);
+  draw(); runs(); srv_teamFill(md, a); srv_stDraw(md, a);
   return md;
 }
 const srv_stateTxt = s => tr(({queued: N_('queued|run'), run: N_('running|run'), running: N_('running|run'), done: N_('done|run'), failed: N_('failed|run'), error: N_('failed|run'), aborted: N_('stopped|run'), paused: N_('paused|run')})[s] || s || '');  // agent_runs.state (srvagent_run.py)

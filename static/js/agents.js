@@ -617,6 +617,9 @@ function agCreateGo() {
   if (S.me?.is_admin) { settingsModal('agents'); pg_waitEl('[data-ag="new"]', b => b.click()); } else settingsModal('agentsetup');
 }
 const agSteps = () => `<ol class="agfirst">${[N_('Create the agent'), N_('Share a project with it'), N_('Set it up on your computer')].map(x => `<li>${tr(x)}</li>`).join('')}</ol>`;
+// 2.777.0 C (#5378): a team agent's card says whether and how many projects are shared with it (a number; also for a member of its
+// organisation who shares none with it: then the chat explains how to share one)
+const ag_projTxt = a => a.owner_id || a.projects == null ? '' : a.projects ? trn('{0} project', '{0} projects', a.projects) : tr('No project shared');
 function viewAgents() {
   if (S.jobs.items === null) { S.jobs.items = []; S.jobs.older = []; S.jobs.next = S.jobs.more = null; loadJobs(); aiuLoad().then(() => { if (S.route.mod === 'agents') renderView(); }); }  // 2.1.1: the usage card
   if (S.route.agent && chatFull()) return chatViewHtml(S.route.agent);
@@ -631,9 +634,9 @@ function viewAgents() {
   else if (!S.agNeedOrd || FL.vsig !== fl_sig()) S.agNeedOrd = agShow.map(a => a.id);
   else { const ix = new Map(S.agNeedOrd.map((id, i) => [id, i])); agShow.sort((a, b) => (ix.get(a.id) ?? 1e9) - (ix.get(b.id) ?? 1e9)); }
   const card = a => `<div class="agcard ${a.enabled ? '' : 'off'}" data-k="ag${a.id}"${acw_attr(a.org_id)}>${avBtn(a.id, a.name, 'avatar lg')}<div class="agi"><b>${esc(a.name)}</b><span class="muted">${esc(agentSt(a))}${a.status_text && agentHst(a) !== 'offline' ? ' · ' + esc(a.status_text) : ''}</span>
-      <span class="muted agn">${esc([a.running && trn('{0} running', '{0} running', a.running), a.waiting && trn('{0} waiting', '{0} waiting', a.waiting)].filter(Boolean).join(' · '))}</span></div>
+      <span class="muted agn">${esc([a.running && trn('{0} running', '{0} running', a.running), a.waiting && trn('{0} waiting', '{0} waiting', a.waiting), ag_projTxt(a)].filter(Boolean).join(' · '))}</span></div>
       <div class="agb"><button class="btn sm" data-act="chat-open" data-aid="${a.id}" ${a.enabled ? '' : 'disabled'}>${ic('comment', 's')} ${tr('Chat')}${a.chat_unread ? ` <span class="nbadge">${a.chat_unread}</span>` : ''}</button>${a.approvals_open ? `<button class="btn sm apvcard" data-act="chat-open" data-aid="${a.id}">${ic('lock', 's')} ${esc(apvCount(a.approvals_open))}</button>` : ''}
-      <button class="btn sm" data-act="sched-open" data-aid="${a.id}" title="${esc(tr('Planned jobs'))}">${ic('clock', 's')} ${tr('Plans')}</button></div>${av_listsHtml(a)}</div>`;  // 2.46.6 (#1708): its lists
+      ${a.shared === false ? '' : `<button class="btn sm" data-act="sched-open" data-aid="${a.id}" title="${esc(tr('Planned jobs'))}">${ic('clock', 's')} ${tr('Plans')}</button>`}</div>${av_listsHtml(a)}</div>`;  // 2.46.6 (#1708): its lists
   const items = S.jobs.items || [];
   if (ags.length) {  // 2.32.0 (#1063): the overview is built from blocks (Customize)
     const P = {agents: `<div class="agcards">${agShow.map(card).join('')}</div>`, usage: aiuCardHtml(),

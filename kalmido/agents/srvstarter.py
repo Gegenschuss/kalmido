@@ -26,7 +26,10 @@ A server agent is a normal agent with provider "kalmido-server": Kalmido itself 
    server settings (agents/srvagent.py srv_need): the owner of a personal agent, for a team agent an admin of its
    organisation or an instance admin; everyone else 404. A planned
    job needs the person to reach the agent (agent_shares: always for the owner of a personal agent; a team agent only
-   through a shared project) -- otherwise the item is "skipped" with the reason. The documents of an organisation need its
+   through a shared project) -- 2.777.0 C (#5378): otherwise the plan is made switched off with state "waiting" (a calm hint,
+   no error) and switches itself on once a project is shared with the agent (schedules.py sched_wait_wake: the watchdog
+   within a minute; the same item asked again starts it at once - the agent's window does that after "Share project"). GET …/server/starter tells the
+   agent's window which items are there, waiting or still missing (added later one by one with the same POST). The documents of an organisation need its
    admin. Instance switch off -> 403 {error: "server_agents_off"}.
 Kalmido calls no model here."""
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -40,9 +43,9 @@ from ..core.pg import insert_id
 from ..core.errors import BadInput, UnknownFields
 from ..accounts.session import me
 from ..accounts.orgs import is_org_admin, user_orgs
-from ..agents.schedules import SCHED_MAX, _sched_set_next, sched_in
+from ..agents.schedules import SCHED_MAX, _sched_set_next, sched_in, sched_wait_wake
 from ..agents.agentrules import _insert as ar_insert, ar_changed
-from ..agents.core import agent_shares, need_person
+from ..agents.core import agent_projects_count, agent_shares, need_person
 from ..api.scopes import scopes_effective
 from ..api.v1 import SCOPES_AGENT_DEFAULT
 from ..office.agentdocs import ofa_agent_on, ofa_area
@@ -67,6 +70,8 @@ SRV_FOLLOWUP_DAYS = 5
 SRV_DAY_LIMIT_DEFAULT = 2_000_000
 SRV_FOLLOWUP_MAX = 60
 SRV_BRIEF_AT, SRV_TIDY_AT, SRV_FOLLOWUP_AT = "07:30", "07:00", "09:00"
+# 2.777.0 C (#5378): why a plan of the pack waits (a calm hint, no error): it starts on its own once a project is shared
+SRV_WAIT_WHY = N_("Starts on its own as soon as you share a project with the agent")
 SRV_OFFICE_AT, SRV_OFFICE_DAYS = "08:00", [1]  # 2.568.0 (#4673): weekly on Mondays (ISO weekday 1)
 SRV_DOC_FEATURES = ("sender", "type", "tags")
 SRV_TEXTS = {  # one literal each (tools/i18n_check.py reads no joined strings)
@@ -110,8 +115,10 @@ def _plan(c, aid, uid, title, prompt, freq, hm, action="chat", days=None, flow="
     """A planned job of uid for agent aid (agents/schedules.py, the same checks as the dialog) -> (state, id, reason).
     2.565.0 D (#4674): flow = the starter routine it stands for (agent_schedules.srv_flow: its run uses the routine's model).
     2.621.0 (#4715): tit = the English title key (to find an older plan by its title in every language)."""
-    if not agent_shares(c, aid, uid):
-        return "skipped", None, tr("Share a project with the agent first")
+    # 2.777.0 C (#5378): without a shared project (a new team agent) the plan is made all the same, switched off and marked
+    # share_wait; it switches itself on once the person reaches the agent through a project (schedules.py sched_wait_wake: the
+    # watchdog, or this item asked again) -> state "waiting"
+    wait = not agent_shares(c, aid, uid)
     # 2.621.0 (#4715): a plan of the pack is found by its fixed marker (srv_flow), not by its translated title (a switch of the
     # language made a second plan); a plan of an older pack has no marker yet and is found by its title in any language
     r = c.execute("SELECT id FROM agent_schedules WHERE agent_id=? AND user_id=? AND srv_flow=? AND list_check=0 ORDER BY id", (aid, uid, flow)).fetchone() if flow else None
@@ -122,16 +129,23 @@ def _plan(c, aid, uid, title, prompt, freq, hm, action="chat", days=None, flow="
     if r:
         if flow:  # a plan of an older starter pack learns its routine
             c.execute("UPDATE agent_schedules SET srv_flow=? WHERE id=? AND srv_flow=''", (flow, r[0]))
+        if c.execute("SELECT 1 FROM agent_schedules WHERE id=? AND share_wait=1", (r[0],)).fetchone():  # 2.777.0 C (#5378)
+            if wait:
+                return "waiting", r[0], tr(SRV_WAIT_WHY)
+            sched_wait_wake(c, aid)  # reached now (a project was shared): it starts at once, not only at the watchdog's next turn
         return "exists", r[0], None
     f = sched_in(c, aid, uid, {"title": title, "prompt": prompt, "freq": freq, "days": days or [], "time": hm,
                                "tz": _tz(c, uid), "action": action, "enabled": True})
     if c.execute("SELECT COUNT(*) FROM agent_schedules WHERE agent_id=? AND user_id=? AND list_check=0", (aid, uid)).fetchone()[0] >= SCHED_MAX:
         return "skipped", None, tr("At most {0} plans per agent", SCHED_MAX)
     ts = iso(now_utc())  # the same row as POST /api/agents/<id>/schedules (schedules.py agent_schedule_create)
-    sid = insert_id(c, """INSERT INTO agent_schedules(agent_id,user_id,title,prompt,freq,days,at_time,tz,list_id,enabled,created_at,updated_at,action,srv_flow)
-                       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                    (aid, uid, f["title"], f["prompt"], f["freq"], f["days"], f["at_time"], f["tz"], None, 1, ts, ts, f["action"], flow))
+    sid = insert_id(c, """INSERT INTO agent_schedules(agent_id,user_id,title,prompt,freq,days,at_time,tz,list_id,enabled,created_at,updated_at,action,srv_flow,
+                       share_wait) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    (aid, uid, f["title"], f["prompt"], f["freq"], f["days"], f["at_time"], f["tz"], None, 0 if wait else 1, ts, ts, f["action"], flow,
+                     1 if wait else 0))
     _sched_set_next(c, sid)
+    if wait:
+        return "waiting", sid, tr(SRV_WAIT_WHY)
     return "created", sid, None
 
 
@@ -226,6 +240,26 @@ def srv_starter_apply(c, a, uid, items, days):
     return out
 
 
+def srv_starter_state(c, a, uid):
+    """2.777.0 C (#5378): what of the starter pack agent a (agent_row) already has for person uid -> {item: state}: active (the
+    plan runs / the rule is there), waiting (a plan waits for a shared project), paused (a plan switched off), missing (not set up
+    yet: the agent's window offers to add it later). Documents count as there with the rule and the levels "agent"."""
+    aid, out = a["user_id"], {}
+    for k in ("briefing", "tidy", "followup", "office"):
+        r = c.execute("SELECT enabled, share_wait FROM agent_schedules WHERE agent_id=? AND user_id=? AND srv_flow=? AND list_check=0 ORDER BY id",
+                      (aid, uid, k)).fetchone()
+        out[k] = "missing" if not r else "waiting" if r["share_wait"] else "active" if r["enabled"] else "paused"
+
+    def rule(key):
+        ts_ = list({tr(key), *(tr(key, lg=lg) for lg in LANGS)})
+        return bool(c.execute(f"SELECT 1 FROM agent_rules WHERE agent_id=? AND body IN ({','.join('?' * len(ts_))}) LIMIT 1", (aid, *ts_)).fetchone())
+    out["meetings"] = "active" if rule(SRV_TEXTS["meetings"]) else "missing"
+    out["docs"] = "active" if rule(SRV_TEXTS["docs"]) else "missing"
+    if out["office"] != "missing" and not rule(SRV_TEXTS["office"][2]):
+        out["office"] = "missing"
+    return out
+
+
 def srv_starter_in(b):
     """{items, followup_days?} -> (items, days); BadInput / UnknownFields otherwise."""
     if not isinstance(b, dict):
@@ -273,3 +307,14 @@ def srv_starter(aid):
     c.commit()
     print("server agent", aid, "starter pack", ",".join(f"{x['item']}:{x['state']}" for x in out), flush=True)
     return jsonify(items=out)
+
+
+@app.get("/api/agents/<int:aid>/server/starter")
+def srv_starter_get(aid):
+    """2.777.0 C (#5378): {items: {item: active|waiting|paused|missing}, shared, projects, org_id} - the starter pack of agent aid for me
+    (who may: as for POST, srv_need); shared = I reach the agent through a project (agent_shares); projects = how many are shared
+    with it. The agent's window shows from it what can be added later and the calm hint "Share a project"."""
+    from ..agents.srvagent import srv_need
+    c = db()
+    a = srv_need(c, aid)
+    return jsonify(items=srv_starter_state(c, a, me()), shared=agent_shares(c, aid, me()), projects=agent_projects_count(c, aid), org_id=a["org_id"])
