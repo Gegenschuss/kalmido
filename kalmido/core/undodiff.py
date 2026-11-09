@@ -40,7 +40,7 @@ def undo_person(c):
     if not has_request_context() or undo_quiet():
         return None
     u = getattr(g, "user", None)
-    if u is None:
+    if u is None or not u["id"]:  # #5406: a hook acts as nobody (lists/envs.py: id None) - nobody's step
         return None
     uid = int(u["id"])
     key = f"undo_person_{uid}"
