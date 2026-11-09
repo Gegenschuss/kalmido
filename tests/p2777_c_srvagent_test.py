@@ -14,9 +14,14 @@
    no data (its plans 404, its server settings 404), a task / files refused; other organisations 404
  - a person without an organisation: her personal server agent with her own project, the pack created and active, the state
    route (freelancer-matrix: agents)
+ - review F1: the text of such a member and Kalmido's answer never reach the agent: its poll (GET /api/v1/agent/chats), the
+   message search and delivered stay without them, also after a project is shared later; a repeat with the same client_id is
+   the stored message (no second answer)
 tenant-matrix: agent (another organisation's admin: the state route, the chat and the tab never reach the team agent)
 usage: p2777_c_srvagent_test.py <datadir>      (KMT_NOSTART=1 / P2777C_NOSTART=1: a running server)"""
 import sys
+
+import requests
 
 from freelancer_fixture import freelancer
 from kt import B, check, dbx, done, fresh, sess, until
@@ -101,6 +106,27 @@ check(len(msgs) == 2 and msgs[0]["body"] == "What is due today?" and msgs[1]["fr
       f"the answer follows at once: it sees nothing and how to share a project {[m['body'][:60] for m in msgs]}")
 check(dbx("SELECT COUNT(*) FROM agent_events WHERE agent_id=?", (TK,))[0][0] == n_ev, "no event for the agent (no run, no costs, no data)")
 check(Ca.post(B + f"/api/agents/{TK}/chat", json={"body": "x", "task_id": 1}).status_code == 400, "with a task: refused")
+# 2.777.0 (#5378): review F1 - the agent's own poll never carries carl's text nor Kalmido's answer to him
+r = A.post(B + f"/api/admin/agents/{TK}/token", json={})
+check(r.ok, f"setup: a token of the team agent {r.status_code}")
+TKH = {"Authorization": "Bearer " + r.json()["token"], "X-Requested-With": "kalmido"}
+V = B + "/api/v1"
+rows = requests.get(V + "/agent/chats?since=0", headers=TKH, timeout=30).json().get("data")
+check(rows is not None and not [m for m in rows if (m.get("user") or {}).get("id") == uid["carl"]],
+      f"review F1: the agent's poll lists none of carl's rows {[(m.get('from'), (m.get('body') or '')[:30]) for m in rows or []]}")
+rows = requests.get(V + f"/agent/chats?since=0&user_id={uid['carl']}", headers=TKH, timeout=30).json().get("data")
+check(rows == [], f"review F1: nor with ?user_id=carl {rows}")
+check(dbx("SELECT COUNT(*) FROM agent_chat WHERE agent_id=? AND user_id=? AND delivered_at IS NOT NULL", (TK, uid["carl"]))[0][0] == 0,
+      "review F1: carl's message is never marked delivered")
+r = requests.get(V + "/search?scope=messages&q=today&art=a", headers=TKH, timeout=30)
+check(r.ok and not [h for h in r.json().get("data") or [] if h.get("user_id") == uid["carl"]], f"review F1: the agent's message search finds nothing of carl {r.text[:200]}")
+n_c = len(Ca.get(B + f"/api/agents/{TK}/chat").json()["messages"])
+r1 = Ca.post(B + f"/api/agents/{TK}/chat", json={"body": "Once only", "client_id": "p2777c-cid-1"})
+r2 = Ca.post(B + f"/api/agents/{TK}/chat", json={"body": "Once only", "client_id": "p2777c-cid-1"})
+check(r1.status_code == 201 and r2.status_code == 200 and r1.json().get("id") == r2.json().get("id")
+      and len(Ca.get(B + f"/api/agents/{TK}/chat").json()["messages"]) == n_c + 2,
+      f"review F1: the same client_id again is the stored message, no second answer {r1.status_code} {r2.status_code}")
+check(all(m["kind"] == "message" for m in Ca.get(B + f"/api/agents/{TK}/chat").json()["messages"]), "for carl they are normal messages")
 for path in (f"/api/agents/{TK}/schedules", f"/api/agents/{TK}/server", f"/api/agents/{TK}/server/starter"):
     check(Ca.get(B + path).status_code == 404, f"carl gets no data of it: {path} 404")
 for s, who in ((Gu, "a guest"), (Ol, "another organisation's admin"), (Fr, "a person without an organisation")):
@@ -120,6 +146,8 @@ check(a and a.get("projects") == 1 and a.get("shared") is False, f"carl: '1 proj
 r = Ca.post(B + f"/api/agents/{TK}/chat", json={"body": "And now?"})
 check(r.status_code == 201 and "do not see any project" in Ca.get(B + f"/api/agents/{TK}/chat").json()["messages"][-1]["body"],
       "carl still gets the fixed answer: the project is not opened to him")
+rows = requests.get(V + "/agent/chats?since=0", headers=TKH, timeout=30).json().get("data") or []
+check(not [m for m in rows if (m.get("user") or {}).get("id") == uid["carl"]], "review F1: with a project shared now, carl's earlier rows still never reach the agent")
 # a plan switched off by hand no longer waits
 sid = next(p["id"] for p in Bo.get(B + f"/api/agents/{TK}/schedules").json()["data"] if p["title"] == "Follow up")
 check(Bo.patch(B + f"/api/agent-schedules/{sid}", json={"enabled": False}).ok, "bob switches the follow-up off")

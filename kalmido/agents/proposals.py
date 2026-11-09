@@ -41,6 +41,7 @@ from ..agents.chat import (
     chat_delivered, chat_dict, chat_file_access, chat_newest, jn9_chat_jobs, chat_file_delete, chat_files_of, chat_input, chat_one, chat_post,
     chat_react_req, chat_reactions_of, chat_set_source, chat_source, chat_unlink_trimmed, cx_notice_post, APPROVAL_PUSH_HOUR,
 )
+from ..agents.chat import CHAT_UNSHARED_SQL  # 2.777.0 C (#5378)
 from ..agents.workstyle import ws_next_mark, ws_next_step  # 2.236.0 B (#2911)
 from ..agents.datalock import dl_job_input  # 2.235.0 B2 (#2902)
 from ..agents.core import agent_usable, agent_added_events, task_being_edited, tidy_changed_since  # 2.369.5 (#2517): pulled up from functions
@@ -1445,7 +1446,8 @@ def v1_agent_chats():
     c = db()
     since = as_int(a.get("since", 0) or 0, "since", 0)
     limit = as_int(a.get("limit", 200), "limit", 1, 500)
-    q, args = "SELECT * FROM agent_chat WHERE agent_id=? AND id>?", [aid, since]
+    # 2.777.0 C (#5378, review F1): never the text of a person without a shared project nor Kalmido's fixed answer (CHAT_UNSHARED_SQL)
+    q, args = f"SELECT * FROM agent_chat WHERE agent_id=? AND id>? AND {CHAT_UNSHARED_SQL}", [aid, since]
     if a.get("user_id"):
         q += " AND user_id=?"
         args.append(as_int(a["user_id"], "user_id", 1))
@@ -1648,7 +1650,7 @@ def v1_agent_chat_react(uid, mid):
     unknown = sorted(k for k in b if k not in ("emoji", "on"))
     if unknown:
         raise UnknownFields(unknown)
-    m = c.execute("SELECT * FROM agent_chat WHERE id=? AND agent_id=? AND user_id=?", (mid, aid, uid)).fetchone()
+    m = c.execute(f"SELECT * FROM agent_chat WHERE id=? AND agent_id=? AND user_id=? AND {CHAT_UNSHARED_SQL}", (mid, aid, uid)).fetchone()  # 2.777.0 C (#5378)
     if not m or not agent_shares(c, aid, uid):
         raise Denied(404)
     g.v1_body = b

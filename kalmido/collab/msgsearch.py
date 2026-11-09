@@ -228,8 +228,8 @@ def search_messages(c, uid, q, arts=None, sender=None, room=None, agent=None, ta
                 d.update(list_id=r["list_id"], chat_name=lnames[r["list_id"]])
             hits.append(d)
     if "a" in arts:
-        if agent_me:
-            cond, a2 = "m.agent_id=?", [uid]
+        if agent_me:  # 2.777.0 C (#5378, review F1): never a text of a person without a shared project (agents/chat.py CHAT_UNSHARED_SQL)
+            cond, a2 = "m.agent_id=? AND COALESCE(m.kind, '')<>'unshared'", [uid]
             if agent is not None:  # an agent filters by the person it talks to
                 cond += " AND m.user_id=?"
                 a2.append(agent)

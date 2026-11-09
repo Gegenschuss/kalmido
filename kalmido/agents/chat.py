@@ -221,6 +221,7 @@ def chat_dict(r, rx=None, files=None, api=False, newest=None, edits=False):
     ch = _jload(r["choices"]) if "choices" in r.keys() else None
     ans = _jload(r["choice"]) if "choice" in r.keys() else None
     kind = (r["kind"] if "kind" in r.keys() else None) or "message"  # 2.41.0 (#1206): message | notice; 2.739.0 (#5216): | brief
+    kind = "message" if kind == "unshared" else kind  # 2.777.0 C (#5378, review F1): for the person a normal message (CHAT_UNSHARED_SQL)
     return {"id": r["id"], "agent_id": r["agent_id"], "user_id": r["user_id"], "from": r["sender"], "body": r["body"],
             "task_id": r["task_id"], "created_at": r["created_at"], "delivered_at": r["delivered_at"], "kind": kind,
             "reactions": (rx or {}).get(r["id"], []), "asks": r["sender"] == "agent" and kind == "message" and (chat_asks(r["body"]) or bool(ch and (ch.get("permission") or ch.get("approval")))),
@@ -723,6 +724,9 @@ def chat_post(c, aid, uid, sender, b, files, allowed_keys=("body", "task_id")):
 NOTICE_MAX = 200
 # 2.739.0 (#5216): rows of the whole chat (and of its search) without the briefs of jobs (they show in the job's own chat only)
 JCB_NOT_SQL = "COALESCE(kind, '')<>'brief'"
+# 2.777.0 C (#5378, review F1): rows the agent never gets (a person without a shared project and Kalmido's fixed answer to them,
+# chat_unshared_answer): every agent route over agent_chat adds this condition
+CHAT_UNSHARED_SQL = "COALESCE(kind, '')<>'unshared'"
 
 
 def chat_source(v):
@@ -1049,21 +1053,33 @@ def chat_agent_or_org(c, aid):
 
 def chat_unshared_answer(c, a):
     """POST /api/agents/<id>/chat of a person without a shared project (chat_agent_or_org shared False): their text is stored in
-    their own conversation, the fixed answer follows at once; nothing goes to the agent. Files and a task are refused."""
+    their own conversation, the fixed answer follows at once; nothing goes to the agent. Files and a task are refused.
+    Review F1 (#5378): both rows are marked kind 'unshared' (CHAT_UNSHARED_SQL): no agent route lists, finds or marks them
+    delivered -- GET /api/v1/agent/chats, the message search, reactions -- so the text never reaches the agent, also not after a
+    project is shared later. client_id as on the normal way: the same message again within seconds is the stored one."""
+    aid = a["user_id"]
     try:
         fb, files = chat_input(("body", "task_id", "reply_to", "client_id", "job_id"))
         b = fb if fb is not None else body()
         if files or b.get("task_id") or b.get("job_id"):
             raise BadInput(tr("Share a project with the agent first"))
-        r = chat_post(c, a["user_id"], me(), "user", {"body": b.get("body")}, None)
+        from ..collab.teamchat import csd_client_id, csd_dup
+        cid = csd_client_id(b)
+        dup = cid and csd_dup(c, "agent_chat", "agent_id=? AND user_id=? AND sender='user'", (aid, me()), cid,
+                              b.get("body").strip() if isinstance(b.get("body"), str) else "")
+        if dup:  # the same message again within seconds: the stored one, no second answer
+            return jsonify(chat_one(c, dup, edits=True)), 200
+        r = chat_post(c, aid, me(), "user", {"body": b.get("body")}, None)
     except UnknownFields as e:
         return err(str(e))
     except BadInput as e:
         return err(str(e))
-    chat_add(c, a["user_id"], me(), "agent", tr(CHAT_UNSHARED, a["display_name"] or a["username"]), None)
+    ans = chat_add(c, aid, me(), "agent", tr(CHAT_UNSHARED, a["display_name"] or a["username"]), None)
+    c.execute("UPDATE agent_chat SET kind='unshared', client_id=COALESCE(?, client_id) WHERE id=?", (cid or None, r["id"]))
+    c.execute("UPDATE agent_chat SET kind='unshared' WHERE id=?", (ans["id"],))
     c.commit()
     chat_unlink_trimmed()
-    return jsonify(chat_one(c, r, edits=True)), 201
+    return jsonify(chat_one(c, c.execute("SELECT * FROM agent_chat WHERE id=?", (r["id"],)).fetchone(), edits=True)), 201
 
 
 def chat_emit(c, aid, r):
