@@ -19,9 +19,10 @@
 
 ## What's new
 
-**2.762.0** (2026-11-09):
-- **Files**: files and documents are one area with one folder tree; a folder with recognition shows its documents with search, filters and sorting; "All documents", "To review" and saved views sit below the tree.
-- **Split view**: drag tasks, files and documents between the two halves (lists, calendar, office, file store, onto a task).
+**2.766.0** (2026-11-09):
+- **Moving servers**: absences, timesheets, the household budget and folder playbooks now move with the account import.
+- **Check code**: Settings > Help > Check code shows a hash of the code your browser really runs, to compare with the published release.
+- **Agents page**: no more jumping while jobs work.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 

@@ -17,6 +17,36 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.766.0] - 2026-11-09
+
+Package 2.765 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Sammelpaket: Aufgabe).
+
+### Added
+- Account import: absences (into the personal office, sealed; a waiting request arrives as an entered absence), timesheets (a month already here keeps its own, the preview and the result name it), the household budget (categories with limits, recurring items and entries onto the budget list that comes along; receipt files are not in the export and are named as staying behind) and the playbooks of folders with their versions now move along; the undo takes them away again, a budget list changed since stays whole (#3965).
+- Tests: one touch suite for the phone's main views at 375, 460 and 840 px and the iPhone Duo closed (382 x 580) - Today, a project with a task and comments, the file store with an open document, knowledge pages, calendar, contacts, Office > Invoices, the agent chat and the settings: no sideways overflow, no button narrower than its content, no overlapping buttons, the "…" menu and its arrows, sheets close, long press, leafing, a tap in a scrolled dialog (#5170).
+
+### Fixed
+- Account and organisation import: an amount with a third decimal place (1234.567) or one that is no plain number is no longer rounded or turned into 0 silently in the money columns - the row stays out and the import's report names the value, as the start's migration does (#5315).
+- Document view: a narrow view (the Fold open at 840 px beside the side bar and the file tree) is one column like on a phone - the preview on top, the fields below, swiping leafs; before, the preview was 16 px wide (#5331).
+
+Package 2.758 (Bündel: Agenten-Seite springt beim Aufklappen von Verlauf/).
+### Fixed
+- Agents page no longer jumps while jobs work (#5223): an open History keeps its lines until the new ones are loaded and only the inside of its box is exchanged (the box keeps its scroll, the bottom stays the bottom); "Loading…" only on the first opening, with a fixed least height; a tap on History opens just that box instead of redrawing the page.
+- The Conversation section of a job card is no longer replaced on every reload (#5223): only its messages are exchanged, the opened section under the finger stays.
+- Open jobs keep their places (#5223): ordered by start (newest on top) instead of their last change, so a working job no longer climbs over the others on every step.
+- The agents page keeps what you look at (#5223): a redraw or a box filled later holds the tapped row (or the first card in sight) at its screen position; a new job appears on top only when the page is scrolled to the very top. The agent cards sorted by "Need" are sorted when the page is entered, not on every live update.
+
+Package 2.766 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), CI-only rot: p2173_a_travel_care_scope, Bündel: Sammelpaket: Aufgaben ohne Paket (Dis).
+
+### Added
+- Settings > Help > Check code: shows the version and the SHA-256 of the code this browser really holds (its own hash of every file in the service worker's cache, one recipe with the release's `web-manifest-X.Y.Z.json`), a "Copy hash" button, the files that differ by name, a link to the GitHub release of the version and a guide; it says honestly that it catches mistakes and slips, not an operator who means to deceive. New `docs/CODE-VERIFY.md` with the manual way (#5220).
+- Service worker: when the code's hashes change while the version stays the same, a bar says "The app's code changed without a new version" with a button to the check; `/sw-manifest.json` names the version (#5220).
+
+### Fixed
+- Settings on a phone: opened straight into an area (e.g. from the office's old settings address) and then leaving by a link or a new address, the settings closed only back to their overview and stayed open over the new page since #5214; a new address closes them whole again, Back still steps through the areas (#5322).
+- Video review, client link: "Valid until (optional)" uses the app's own date picker like every other date field instead of the browser's native one (#5321).
+- Tests: the member's answer for somebody else's travel expenses of a shared trip is the 409 with the way to the own ones in the office (since #4958), checked without trip id or amounts (#5329); the two-process long-poll measures its wake from the other process' event, not from the slow process start of the CI runner (#5323).
+
 ## [2.762.0] - 2026-11-09
 
 Package 2.726 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
@@ -329,7 +359,8 @@ Package 2.685 (Bündel: Kommentare: Aktivität in drei Stufen (nur Kommenta, Bü
 - Office: switching "Office & finance" on no longer leaves the office saying it is switched off when it loaded before the switch was saved (#5176).
 - Balance sheet: a receipt booked against the bank (counter account "bank") and paid from the cash box is now booked bank to cash instead of being left out (#5128).
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.762.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.766.0...HEAD
+[2.766.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.766.0
 [2.762.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.762.0
 [2.761.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.761.0
 [2.759.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.759.0

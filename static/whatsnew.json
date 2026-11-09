@@ -1,6 +1,24 @@
 {
  "versions": [
   {
+   "version": "2.766.0",
+   "date": "2026-11-09",
+   "items": [
+    {
+     "de": "Beim Umzug auf einen anderen Server kommen jetzt auch Abwesenheiten, Stundenzettel, das Haushaltsbudget und die Arbeitsanleitungen von Ordnern mit.",
+     "en": "Moving to another server now also takes your absences, timesheets, household budget and folder playbooks along."
+    },
+    {
+     "de": "Auf aufgeklappten Faltgeräten zeigt die Dokumentansicht die Vorschau wieder in voller Breite über den Feldern.",
+     "en": "On unfolded phones the document view shows the preview at full width above the fields again."
+    },
+    {
+     "de": "Unter Einstellungen > Hilfe > Code prüfen zeigt Kalmido, welcher Code in deinem Browser läuft, als Prüfwert zum Vergleich mit der Veröffentlichung.",
+     "en": "Settings > Help > Check code shows which code runs in your browser, as a hash to compare with the published release."
+    }
+   ]
+  },
+  {
    "version": "2.762.0",
    "date": "2026-11-09",
    "items": [
