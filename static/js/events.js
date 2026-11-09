@@ -117,6 +117,17 @@ window.addEventListener('hashchange', () => {
   if ((toastPage() || '#') === p) return;  // 2.350.0 D (#3242): an empty hash is the start page ('#'), not 'no page'
   clearTimeout(toastTimer); el.classList.add('hidden'); el.dataset.page = ''; HIST.toastE = null;
 });
+// 2.769.0 (#5350): a tap on the toast's Close must never reach the row below. (1) A finger on the toast keeps it (the timer would
+// hide it between touchstart and the click the browser sends afterwards, and that click then hit the row under it); (2) after the
+// toast went away its old place swallows a click for a moment (TOAST_GUARD_MS; a tap that began before the hide)
+let TOAST_GUARD_MS = 350, TOAST_GUARD = null;
+function toastGuard(el) { const r = el.getBoundingClientRect(); if (r.width > 0) TOAST_GUARD = {r, t: Date.now()}; }
+document.addEventListener('click', e => {
+  const g = TOAST_GUARD; if (!g) return;
+  if (Date.now() - g.t > TOAST_GUARD_MS) { TOAST_GUARD = null; return; }
+  if (e.target.closest?.('#toast:not(.hidden)')) return;
+  if (e.clientX >= g.r.left && e.clientX <= g.r.right && e.clientY >= g.r.top && e.clientY <= g.r.bottom) { e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); TOAST_GUARD = null; }
+}, true);
 function toast(msg, undo, ms, label) {  // label: the button's text instead of "Undo" (2.13.0: "Open")
   const el = $('#toast');
   announce(msg + (undo ? ' · ' + (label || tr('Undo')) + (isTouch() ? '' : ' (' + kbText('Mod+Z') + ')') : ''));
@@ -128,13 +139,15 @@ function toast(msg, undo, ms, label) {  // label: the button's text instead of "
   toastPlace(el);
   if (undo) el.querySelector('button').onclick = () => { el.classList.add('hidden'); undo(); };
   clearTimeout(toastTimer);
-  const hide = () => { el.classList.add('hidden'); if (undo) HIST.toastE = null; };
+  const hide = () => { toastGuard(el); el.classList.add('hidden'); if (undo) HIST.toastE = null; };
   const tx = el.querySelector('button.tx'); if (tx) tx.onclick = () => { clearTimeout(toastTimer); hide(); };
   el.onkeydown = e => { if (e.key === 'Escape' && !el.classList.contains('hidden')) { e.stopPropagation(); clearTimeout(toastTimer); hide(); } };  // 2.49.0 (#1769)
   const wait = ms || (undo ? 6000 : 2500);
   toastTimer = setTimeout(hide, wait);
   // 2.16.0 (#473, WCAG 2.2.1): the toast stays while the pointer or the keyboard focus is on it
   el.onmouseenter = el.onfocusin = () => clearTimeout(toastTimer);
+  el.onpointerup = el.onpointercancel = () => { clearTimeout(toastTimer); toastTimer = setTimeout(hide, Math.max(2500, wait / 2)); };
+  el.onpointerdown = () => clearTimeout(toastTimer);  // 2.769.0 (#5350): a finger / pointer down on the toast keeps it until the tap is done
   el.onmouseleave = el.onfocusout = e => { if (e.type === 'focusout' && el.contains(e.relatedTarget)) return; if (el.matches(':hover') && e.type === 'focusout') return; clearTimeout(toastTimer); toastTimer = setTimeout(hide, Math.max(2500, wait / 2)); };
 }
 
