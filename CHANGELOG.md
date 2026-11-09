@@ -17,6 +17,35 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.759.0] - 2026-11-09
+
+Package 2.386 (DATEV-Stapel: Bewirtungsbelege buchen).
+
+### Added
+- Office > Books > DATEV booking batch: approved entertainment receipts are booked (Belegfeld 1 "M<id>"): per VAT rate 70 % of the gross amount on "Entertainment (70 % deductible)" (SKR03 4650 / SKR04 6640) and 30 % on "not deductible" (4654 / 6644), both with the input tax key of the rate so the input tax counts in full; the tip without a key; a small business without any key. In a year on the basis "bank and cash" a meal is booked through its bank / cash / card line and that line's receipt stays out (#2328).
+- DATEV settings, section "Receipts and travel expenses": the two accounts of the entertainment receipts can be changed (#2328).
+- The check before the download names receipts of the category entertainment in the same period as "maybe booked twice"; they stay in the batch (#2328).
+
+Package 2.695 (Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: CI-only rot:).
+
+### Changed
+- Search: the task search and the comment search take the visible projects first (index on the project) instead of reading every task of the instance; under the row-level security of tasks and comments no text index can help (#4960).
+- Long press: every row with a "…" button opens the same menu on a long press (phone) or a right click (computer), now also bookmarks, read later, table cards, own sections in "My tasks", the rows of the dialogs "Calendars" and "Address books" and the error reports of repositories; a coverage test makes a new "…" without it fail (#4619).
+
+### Fixed
+- Travel expenses from the trip planning: when somebody else already entered the travel expenses of a shared trip, the button now says so and points to entering your own in the office, instead of a bare refusal (#4958).
+- Quotations: counting the tasks made from a quotation no longer notes a project access in the agents' access log (#4958).
+
+Package 2.728 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Fixed
+- Self-hosting, first start: the health check of the `db` service in docker-compose.yml checks the database over TCP (`pg_isready -h 127.0.0.1`). At its very first start the postgres:17 image runs a setup server on the socket only and then restarts it; the socket check reported that server as healthy, so Kalmido could start into the restart. The test start script (tests/start.sh) waits the same way instead of a fixed one-second pause and stops with the container log when the database never gets ready; tests/p2728_db_ready_tcp_test.py plays the setup server and its restart (#5188).
+
+Package 2.735 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Fixed
+- Office > Receipts, filters on phones (#5208): the segment buttons (Checked / Not checked, Paid / Not paid, Receipt date / Payment date) are no longer narrower than their label on touch screens of 320-460 px ("Ungeprüft" was 7 px wider than its button); each button now takes at least its label's width and the rest is shared.
+
 ## [2.756.0] - 2026-11-09
 
 Package 2.625 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
@@ -220,7 +249,8 @@ Package 2.685 (Bündel: Kommentare: Aktivität in drei Stufen (nur Kommenta, Bü
 - Office: switching "Office & finance" on no longer leaves the office saying it is switched off when it loaded before the switch was saved (#5176).
 - Balance sheet: a receipt booked against the bank (counter account "bank") and paid from the cash box is now booked bank to cash instead of being left out (#5128).
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.756.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.759.0...HEAD
+[2.759.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.759.0
 [2.756.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.756.0
 [2.749.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.749.0
 [2.740.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.740.0
