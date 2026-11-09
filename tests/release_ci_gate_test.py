@@ -221,7 +221,10 @@ check(ok and info["jobs"] == ["Browser demo + quick add languages"], "#5324: a r
 for nm in ("E-invoice validators (veraPDF, KoSIT)", "OWASP ZAP baseline"):
     ok, txt, _ = gate.judge_soft(base_jobs(job(7, nm, "failure")), suites({}), PATS + ["*einvoice*", "e-invoice*"], GRP)
     check(not ok and "hard job" in txt, "#5324: a red hard job (%s) = no image (%s)" % (nm, txt))
-lint = lambda st: [job(6, "Lint, i18n, scanners", "failure", [{"name": "Set up job", "conclusion": "success"}, {"name": st, "conclusion": "failure"}])]
+def lint(st):
+    return [job(6, "Lint, i18n, scanners", "failure", [{"name": "Set up job", "conclusion": "success"}, {"name": st, "conclusion": "failure"}])]
+
+
 ok, txt, _ = gate.judge_soft([j for j in base_jobs() if j["id"] != 6] + lint("ESLint of the client"), suites({}), PATS, GRP)
 check(ok, "#5324: a red Lint step that is no scanner = soft (%s)" % txt)
 ok, txt, _ = gate.judge_soft([j for j in base_jobs() if j["id"] != 6] + lint("bandit (fails on high severity only)"), suites({}), PATS, GRP)
