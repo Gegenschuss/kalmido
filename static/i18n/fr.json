@@ -18007,6 +18007,7 @@
   "The PDF cannot be read": "Le PDF ne peut pas être lu",
   "This PDF has more than {0} pages - its pages cannot be changed here": "Ce PDF compte plus de {0} pages - ses pages ne peuvent pas être modifiées ici",
   "The pages of this document cannot be changed (read-only or a locked month)": "Les pages de ce document ne peuvent pas être modifiées (lecture seule ou mois verrouillé)",
+  "People|event": "Personnes",
   "Also private": "Aussi en privé",
   "Off: the office disappears in the workspace Private, the offices of your organisations stay. Nothing is deleted; switched on again, everything is there as before.": "Désactivé : le bureau disparaît de l’espace de travail Privé, les bureaux de tes organisations restent. Rien n’est supprimé ; une fois réactivé, tout est là comme avant.",
   "The office is switched off in the workspace Private. Switch it on under Settings > Modules > Office & finance > Also private.": "Le bureau est désactivé dans l’espace de travail Privé. Active-le sous Paramètres > Modules > Bureau et finances > Aussi en privé."

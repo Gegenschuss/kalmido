@@ -299,7 +299,7 @@ async function evEditor(o = {}) {
       <input id="ev-count" class="numin" type="number" inputmode="numeric" min="1" max="999" value="${rrEnd(st.rrule).type === 'count' ? esc(rrEnd(st.rrule).val) : '10'}" aria-label="${esc(tr('a number of times'))}" ${rrEnd(st.rrule).type === 'count' ? '' : 'hidden'}></div>
     <div class="row"><label for="ev-loc">${tr('Location')}</label><input id="ev-loc" maxlength="500" value="${esc(st.location || '')}" autocomplete="off"></div>
     <div class="row evrems"><span class="rlab" id="ev-rem-l">${tr('Reminders')}</span><div class="evchips" id="ev-rems" role="group" aria-labelledby="ev-rem-l"></div></div>
-    <div class="row evatts"><span class="rlab" id="ev-att-l">${tr('People')}</span><div class="evatt-w"><div class="evchips" id="ev-atts" role="group" aria-labelledby="ev-att-l"></div>
+    <div class="row evatts"><span class="rlab" id="ev-att-l">${tr('People|event')}</span><div class="evatt-w"><div class="evchips" id="ev-atts" role="group" aria-labelledby="ev-att-l"></div>
       <div class="evattadd"><input id="ev-attin" list="ev-attl" autocomplete="off" placeholder="${esc(tr('Name or e-mail'))}" aria-label="${esc(tr('Add a person'))}" enterkeyhint="done"><datalist id="ev-attl"></datalist><button type="button" class="btn sm" data-evm="attadd">${ic('plus', 's')} ${tr('Add')}</button></div></div></div>
     <div class="row ppcol"><label for="ev-desc">${tr('Notes')}</label><textarea id="ev-desc" rows="3" maxlength="20000">${esc(st.description || '')}</textarea></div>
     <details class="evmore"><summary>${tr('More')}</summary>
@@ -468,7 +468,7 @@ function evNewAt(day, hm, endHm) {
 function evSheetBtn(preset) {
   const q = $('.qadd.sheet'); if (!q || !evOn() || !preset?.due || q.querySelector('.qevbtn') || isListCal()) return;  // 2.156.0 C (#2071): a list's calendar makes tasks only
   const b = document.createElement('button');
-  b.type = 'button'; b.className = 'btn sm qevbtn'; b.innerHTML = `${ic('cal', 's')}<span>${esc(tr('Event'))}</span>`;
+  b.type = 'button'; b.className = 'btn sm qevbtn'; b.innerHTML = `${ic('cal', 's')}<span>${esc(tr('Event|calendar'))}</span>`;
   b.title = tr('Create an event at this time instead'); b.setAttribute('aria-label', tr('Create an event at this time instead'));
   b.addEventListener('click', () => {
     const title = ($('#qsheet')?.value || '').trim(), p = {...preset};
