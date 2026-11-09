@@ -71,6 +71,16 @@ const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
     await ev(`(() => { TOAST_GUARD_MS = 0; })()`);
     await tap(p, 50);
     check(await until(`window.__row === 1`), '#5350: later the row takes its click again');
+    // (c) leader review: a mouse click on the toast while the pointer stays on it keeps the toast (#473) - the new pointerup
+    //     restart must not hide it under the pointer (a touch pointer has no hover, it restarts the timer)
+    await ev(`(() => { document.getElementById('p2769-row')?.remove(); toast('Saved', () => {}, 700); })()`);
+    await until(`!!document.querySelector('#toast:not(.hidden)') && document.querySelector('#toast').getAnimations().length === 0`);
+    p = await ev(`(() => { const q = document.querySelector('#toast').getBoundingClientRect(); return {x: Math.round(q.left + 4), y: Math.round(q.top + q.height / 2)}; })()`);
+    await cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 'm1', parameters: {pointerType: 'mouse'}, actions: [{type: 'pointerMove', x: p.x, y: p.y}, {type: 'pointerDown', button: 0}, {type: 'pointerUp', button: 0}]}]});
+    check(await ev(`document.querySelector('#toast').matches(':hover')`), '#5350 (c): the mouse is on the toast');
+    await new Promise(r => setTimeout(r, 3200));  // longer than the restarted timer (2500 ms): a negative check needs the time
+    check(await ev(`!document.querySelector('#toast').classList.contains('hidden')`), '#5350 (c): a mouse click on the toast keeps it while the mouse stays on it');
+    await cmd('input.releaseActions', {context: ctx});
   }, true);
 
   console.log(`p2769_a_pfad_toast_ui: ${ok} ok, ${F.length} failed`);
