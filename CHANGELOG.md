@@ -17,6 +17,58 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.771.0] - 2026-11-09
+
+Package 2.767 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Changed
+- Release images: the image `:X.Y.Z` of a version is now built when its full CI is green OR red only in suites outside the hard areas (invoices / office, backup / restore, sign-in and tokens, security scanners - `tests/hard_suites.txt`, the same list the live update uses). All hard shards must be green, every red suite must be named and soft, a security scanner that failed or did not run, a skipped hard job, a missing shard, a cancelled run or only the push stage still keep the image back (`tools/ci_gate.py`). Before, not one of the last 100 full runs was fully green and `latest` stayed on 2.502.0 (#5324).
+- Weekly release: the notes name the suites that were red outside the hard areas in the full CI of the released version ("Known test failures in X.Y.Z"), or say that the list could not be read (#5324).
+
+Package 2.743 (Bündel: Bündel: CI-only rot: p2466_c_ui + p2306_f_doc_anchors (Nac, CI-only rot: p2299_e_agentread_ui (TypeError readi, Büro: direkter Banka).
+
+### Changed
+- Back arrow: the visible ‹ on contacts, clients, letters, office documents, created documents, notes, team rooms, wiki pages and the agent chat goes back in the history when the previous view is the list it leads to, otherwise it replaces the current entry - Android Back no longer opens what was just closed; the "one level up" links in office and tables do the same (#5235).
+- List beside detail: contacts, clients, invoices and receipts share one layout block (`.lsd2`) - narrow list (15rem) next to the detail, about 40 / 60 from 100rem on, one column on phones; the receipt dialog docks over the right column instead of indenting the page (#4930).
+- CI: GitHub Actions on their current major versions (checkout 7, setup-python 7, setup-node 7, cache 6, upload-artifact 7, download-artifact 8, setup-java 6, docker actions 4 / 7), still pinned by commit hash; Dependabot also refreshes the base images of `Dockerfile` and `embed/Dockerfile` (#3794).
+
+### Fixed
+- Office > Bookkeeping: when the EUeR basis changes between two years ("Receipts" one year, "Bank and cash (strict)" the other), every receipt counts exactly once - in the income statement, the neutral export and the DATEV export, also with cash / card lines; a receipt of late December paid in January is no longer listed as open in the old year (#4937).
+- Sign-out without network: the session on the server is ended on the next load of the app, so a shared device does not open the account again once it is online; tests for the user boundary of the offline queue (other account, order, temporary ids, idempotency key) and for sign-out (cache emptied, question about unsynced changes, also offline) (#4284).
+
+Package 2.747 (Bündel: Gemeinsamer Kern Stufe 7e: Büro und Ablage - Direk, Rückgängig über alle Geräte, Stufe 4: Büro: Gruppe, Rückgängig über alle Geräte,).
+### Added
+- #5249 Undo across devices, stage 1 (core): every write of a person records its undo step on the server as a part of a step group per account (time, area, device, label, state, bytes); `GET /api/undo` lists the own groups, `POST /api/undo/to/<id>` takes them back newest first (a part changed by someone else stays and is named, the rest goes back), `POST /api/undo/<id>/redo`. Caps: 300 groups per person, 30 days, 256 KB per part, 2 MB or 1000 parts per group (bigger steps are listed, not undoable). The watchdog prunes, the retention page counts them. Agents record no steps and get 403. A step older than a key rotation of its organisation is refused instead of writing an unreadable copy back. No visible change yet (the list "Letzte Schritte" comes with #5250).
+- #5252 Undo across devices, stage 4 (office): office steps carry a label (document kind and number, client or master data name; letters only their number), and finalising, sending, payments, DATEV exports and period locks write a barrier: undo stops there instead of silently ending the editor session. Undo and finalising a document now take the same lock.
+- #5246 The last hard deletes of the office go into the office trash and can be restored: a quotation part with its positions, a rights group (without its members), an orphaned video sign-off.
+### Changed
+- #5246 Shares of the file store (share dialog, moving, splitting a stack) run through the core (`obj_node_share` / `obj_node_unshare`); a removed share lands in the core's revoked list. Leaving an organisation no longer deletes the same rows twice.
+- #5246 Saving office master data runs on the core write layer (lock, version, undo step, history); a conflict answers the current state under `current` (was `row`). The "saved · Undo" of master data and client dialogs goes through the core's undo.
+### Removed
+- #5246 The table `office_undo` (unused since 2.567) is dropped (one-way: its at most one day old copies, read by nothing since 2.567, are gone; an older version only logs a watchdog error).
+### Fixed
+- #5249 `field_trash.field_id` carries the "no FK" marker (the schema rule of p2103_c_api was red).
+
+Package 2.771 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Fixed
+- Tests: p2742_c_textlayer_ui measures "Shift+arrow does not leaf" against the address before the key (a document link opens under the files area since #4887) and measures the text layer once a redraw has put it back (#5338).
+- Tests: p2370_m_api expects the SQLite move report without the table paperless_links, which 2.755 dropped (#5265), and checks that its notes name it (#5342).
+- Tests: p2391_t_ui waits for the options of a choice menu instead of a fixed 300 ms (#5343).
+- Tests: p2283_ui waits until closing the quick add sheet has taken its history entry back before it opens the next view; a navigation that landed before that Back was taken back to the inbox (#5341).
+
+### Changed
+- Lint: `tools/check_migrations.py` reports a column DEFAULT in a migration fragment that calls a function the backup restore refuses (the list `_CALL_HEADS` of `kalmido/admin/backup.py`, read from there), e.g. `now()` - use `CURRENT_TIMESTAMP` (#5333).
+
+Package 2.768 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Changed
+- Files: ONE selection for rows and every card - documents, plain files and folders - in a folder's list, its cards, a folder with recognition, All documents and To review (#4888). One bar: All, Move (into a folder of the area, one undo), Download (one file or a ZIP), Edit (tags, type, sender - only with documents chosen), Move to the trash (red, asks with the number, one undo), More (CSV, another workspace). What you may not change is left out and counted ("2 skipped").
+- Files: a right click or a long press on a row OR a card opens the same menu with "Select" on top: Open, Download, Share, Rename, Tags, Move to, a new version, Recognition, Move to the trash (#4888). With several ticked, the menu of a ticked one shows the bar's actions. Deleting from the menu, the bar or the document view is one way with one undo.
+- Files: the document view is the details sheet of every file (#4888): its tab History lists the versions (view, download, restore, upload a new one - one undo step each), the history and "Mentioned in"; readers see the versions without the writing buttons. Its Actions have "Upload a new version…", "Move to…" and "Rename…". "Details and history" of a file opens this tab; folders keep the dialog.
+### Added
+- Files: a "+" at the head of the folder tree in the sidebar makes a new folder (#4888).
+- Files: document, file and folder cards can be dragged onto a folder (sidebar tree, path, list, folder cards; on a phone hold, then drag); a ticked card drags the whole choice, one undo (#4888). A drag that begins in Kalmido never uploads (#4879).
+
 ## [2.766.0] - 2026-11-09
 
 Package 2.765 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Sammelpaket: Aufgabe).
@@ -359,7 +411,8 @@ Package 2.685 (Bündel: Kommentare: Aktivität in drei Stufen (nur Kommenta, Bü
 - Office: switching "Office & finance" on no longer leaves the office saying it is switched off when it loaded before the switch was saved (#5176).
 - Balance sheet: a receipt booked against the bank (counter account "bank") and paid from the cash box is now booked bank to cash instead of being left out (#5128).
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.766.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.771.0...HEAD
+[2.771.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.771.0
 [2.766.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.766.0
 [2.762.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.762.0
 [2.761.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.761.0
