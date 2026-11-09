@@ -530,7 +530,9 @@ def obj_trash_tick(c, force=False):
             got = []
             try:
                 with c.savepoint():
-                    out[kind] = obj_trash_prune(c, kind, cut, purge, paths=got)
+                    n = obj_trash_prune(c, kind, cut, purge, paths=got)
+                if n:  # only the side object kinds with something due (the report keeps the numbers only anyway)
+                    out[kind] = n
             except Exception as e:  # noqa: BLE001 - like files/trashpurge.py: this kind waits for the next run
                 print("core trash:", kind, type(e).__name__, flush=True)
                 out[kind + "_err"] = 1

@@ -105,8 +105,9 @@ dbx("DELETE FROM task_field_values WHERE field_id=?", (FO,))
 dbx("DELETE FROM list_fields WHERE id=?", (FO,))
 dbx("INSERT INTO field_trash(list_id,field_id,name,type,def,vals,n,grouped,deleted_by,deleted_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
     (L, FO, "Width", "text", json.dumps({"options": "{}", "pinned": 0, "sort": 2, "created_at": ago(3)}), json.dumps([[T1, "4 m"]]), 1, 0, FID, ago(2)))
+# the start step (core/objhooks.START) runs when the process imports the app already: here once more, then nothing is left
 out = box("from kalmido.lists.fields import ftr_move\nprint(ftr_move(c))")
-check(out == "1" and not one("SELECT COUNT(*) FROM field_trash"), f"old field trash: moved at the start step {out}")
+check(out in ("0", "1") and not one("SELECT COUNT(*) FROM field_trash"), f"old field trash: moved at the start step {out}")
 TRO = one("SELECT id FROM list_part_trash WHERE kind='list_field' AND ref_id=?", (FO,))
 check(TRO and one("SELECT deleted_by FROM list_part_trash WHERE id=?", (TRO,)) == FID, "old field trash: one copy, who deleted it kept")
 r = F.post(B + f"/api/fields/trash/{TRO}/restore")
@@ -133,7 +134,7 @@ dbx("UPDATE list_part_trash SET deleted_at=? WHERE id=?", (ago(400), W2))
 # an old time_wipes row moves; an account that goes takes its copies along
 dbx("INSERT INTO time_wipes(user_id,list_id,entries,n,seconds,deleted_at) VALUES(?,?,?,?,?,?)", (GID, L, "[]", 0, 0, ago(1)))
 out = box("from kalmido.personal.timewipe import tzw_move\nprint(tzw_move(c))")
-check(out == "1" and not one("SELECT COUNT(*) FROM time_wipes")
+check(out in ("0", "1") and not one("SELECT COUNT(*) FROM time_wipes")
       and one("SELECT COUNT(*) FROM list_part_trash WHERE kind='time_wipe' AND ref_id=?", (GID,)) == 1, f"time: the old copy moved {out}")
 out = box(f"from kalmido.personal.timewipe import tzw_revoked\nprint(json.dumps(tzw_revoked(c, {GID}, None, 'delete')))")
 check(json.loads(out or "{}") == {"time_wipes": 1} and not one("SELECT 1 FROM list_part_trash WHERE kind='time_wipe' AND ref_id=?", (GID,)),
