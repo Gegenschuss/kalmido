@@ -225,6 +225,7 @@ Contacts and address books (CardDAV, merge, history).
 - `kalmido/contacts/carddav.py` (`ab`) - CardDAV server: every address book a person sees as a collection of vCards (iOS / macOS Contacts, DAVx5, Thunderbird)
 - `kalmido/contacts/ctfolder.py` (`ctf`) - Address books and contacts in folders
 - `kalmido/contacts/ctkern.py` - Address books on the shared core, stage 3
+- `kalmido/contacts/ctundo.py` - Undo across devices, stage 6 -- contacts in the core's step groups (core/undoareas.py)
 - `kalmido/contacts/ctxlist.py` (`ctx`) - Contacts: the list's tools
 - `kalmido/contacts/history.py` (`ctk`) - The history on a contact's card
 - `kalmido/contacts/merge.py` (`ctm`) - Merging duplicate contacts by hand (reversible, core/merges.py)
@@ -264,6 +265,7 @@ The foundation: database, schema, access layer, request context, conflicts (409)
 - `kalmido/core/numtext.py` - ONE reader for numbers typed by people - the same rules as parseNum in static/js/core.js
 - `kalmido/core/objects.py` (`obj`) - The shared core, stage 1 -- ONE register of object kinds and ONE role function for every new area (docs/dev/kern.md "So baut man einen neuen Bereich")
 - `kalmido/core/objhooks.py` (`obj`) - The two things of the shared core that the layer accounts needs, without importing upward
+- `kalmido/core/objlight.py` (`obj`) - The light kinds of the shared core (task, event, hub_mail, client): kind and role only, no node, no shares, no write path
 - `kalmido/core/objparts.py` (`part`) - The shared core, stage 6b -- the side objects of a project on the core
 - `kalmido/core/objreact.py` (`orx`) - Reactions exist once, in the shared core: one table obj_reactions for comments, team chat and the agent chat
 - `kalmido/core/objweb.py` (`obj`) - The generic routes of the core objects (core/objects.py, core/writes.py)
@@ -282,6 +284,7 @@ The foundation: database, schema, access layer, request context, conflicts (409)
 - `kalmido/core/stmtfiles.py` (`stmt`) - The uploaded statements of one request
 - `kalmido/core/strip.py` (`strip`) - The client's JavaScript and CSS go out without comments (the files in the repo keep them: they are the documentation)
 - `kalmido/core/tokenhash.py` (`tkh`) - The personal upload token (POST /drop)
+- `kalmido/core/undoareas.py` - Undo across devices, stage 6 -- what the areas outside the office share to record and take back their steps
 - `kalmido/core/undodiff.py` (`undo`) - Undo across devices, stage 3 -- diff parts of the step groups: an area keeps only what a step changed and takes it back through its own write path
 - `kalmido/core/undogroups.py` (`ug`) - Undo across devices, stage 1 -- the core's undo steps grouped per account (table undo_groups)
 - `kalmido/core/undoweb.py` (`undo`) - Undo across devices -- a person's step groups listed and taken back (/api/undo)
@@ -311,6 +314,7 @@ Documents: upload and ingest, recognition, classification, fields, search, folde
 - `kalmido/docs/mailnamed.py` (`dmn`) - The settings routes of the named document addresses (docs/mailaddr.py)
 - `kalmido/docs/notes.py` (`dn`) - Notes on a document
 - `kalmido/docs/ocr.py` (`ocr`) - The text of a document and its preview image
+- `kalmido/docs/pages.py` - Pages of a PDF document deleted or turned by 90 degrees, saved as a new version of its file
 - `kalmido/docs/rcheck.py` (`rck`) - The fixed check of a receipt
 - `kalmido/docs/recog.py` (`rc`) - Recognition per folder or file
 - `kalmido/docs/rules.py` (`clean`) - Rules that sort documents ("contains word X -> sender Y, type Z, tag T, folder F")
@@ -330,6 +334,7 @@ Calendar events: model, invitations, free / busy, ICS and CalDAV routes.
 - `kalmido/events/dav.py` (`ev`) - Events over CalDAV: every event calendar (and the person's invitations)
 - `kalmido/events/evfeed.py` (`evf`) - A subscription link (ICS feed)
 - `kalmido/events/evkern.py` (`ev`) - Calendars on the shared core, stage 3
+- `kalmido/events/evundo.py` - Undo across devices, stage 6 -- calendar events in the core's step groups (core/undoareas.py)
 - `kalmido/events/freebusy.py` (`efb`) - Free / busy of the people one invites, for the event editor
 - `kalmido/events/ics.py` (`ics`) - Events as iCalendar (VEVENT)
 - `kalmido/events/invite.py` (`evi`) - Invitations to an event by e-mail for attendees outside the server (iMIP, RFC 6047)
@@ -360,6 +365,7 @@ The file store ("Ablage"): folders, files, shares, locks, scan, tags, views and 
 - `kalmido/files/fsroots.py` (`fs`) - The root folder of an area in a workspace
 - `kalmido/files/fsshnames.py` - The short list "Shared with Anna, Ben · agent X"
 - `kalmido/files/fstags.py` (`dt`) - Tags in the file store ("Ablage")
+- `kalmido/files/fsundo.py` - Undo across devices, stage 6 -- the file store's metadata and content versions in the core's step groups
 - `kalmido/files/fsviews.py` (`fsv`) - The file store ("Ablage") shows only its own folders
 - `kalmido/files/officeprev.py` (`dpv`) - The preview and the text of Word (.docx)
 - `kalmido/files/photometa.py` (`pm`) - Photo metadata (GPS, camera)
@@ -636,6 +642,7 @@ Personal tools: habits, statistics and time tracking.
 
 - `kalmido/personal/budgetwarn.py` (`bw`) - The budget warning of projects and tasks (decision of only a display, no lock)
 - `kalmido/personal/habits.py` (`pomo`) - Habits and focus sessions (pomodoro)
+- `kalmido/personal/habitundo.py` - Undo across devices, stage 6 -- habits in the core's step groups (core/undoareas.py)
 - `kalmido/personal/stats.py` - Statistics (module "stats")
 - `kalmido/personal/statslife.py` (`stl`) - The statistics blocks of Home & life
 - `kalmido/personal/timegaps.py` - Time-tracking helper. "Maybe forgotten"
@@ -838,6 +845,7 @@ The start-up module.
 - `static/js/docfetch.js` (`fx`) - "Receipt fetcher" in Settings > Integrations, below the folder watcher (docscan.js dsc_integrHtml / dsc_integrDraw)
 - `static/js/docflows.js` (`dfl`) - Document flows ("Abläufe")
 - `static/js/docnotes.js` (`dn`) - Notes on a document
+- `static/js/docpages.js` - The page strip of the document view: pages of a PDF deleted or turned, saved as a new version
 - `static/js/docpreview.js` (`dpv`) - The Word / Excel preview and "
 - `static/js/docs.js` (`dc`) - Documents: the list (cards with a preview)
 - `static/js/docscan.js` (`dsc`) - "Scans from your computer"
