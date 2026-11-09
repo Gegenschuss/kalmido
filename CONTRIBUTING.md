@@ -120,6 +120,8 @@ and issues are the way.
   rules needed at start into `static/css/start-<topic>.css`; a new start script below the sorted mark in
   `static/index.html` (docs/ARCHITECTURE.md, "Styles and start scripts").
 - Comments explain *why*; the user-facing behaviour belongs in the README.
+- Short module and function names: [docs/GLOSSAR.md](docs/GLOSSAR.md) says what each module and script is and what the
+  prefixes mean; a new file needs its line there (`python3 tools/check_glossar.py`).
 
 ## AI-assisted development
 

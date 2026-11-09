@@ -20,6 +20,7 @@ from ..core.conflict import Conflict  # 2.564.0 (#4701)
 from ..core.objparts import part_kind, part_write  # 2.610.0 (#4762): the core's write layer of side objects
 from ..core.numtext import user_num  # 2.263.0 (#2976)
 from ..core.retention import ret_trash_days  # 2.550.0 (#4528)
+from ..lists.folderdefs import fdf_named_gone  # 2.757.0 (#4501)
 from .formula import fx_check_cycles, fx_compile, fx_display
 
 
@@ -409,6 +410,8 @@ def field_update(fid):
     # options this change removes lose their values, never one another admin added meanwhile
     field_prune_opts(c, fid, r["type"], opts)
     c.execute("UPDATE list_fields SET name=?, options=? WHERE id=?", (name, json.dumps(opts, ensure_ascii=False), fid))
+    if name.casefold() != (r["name"] or "").casefold():  # 2.757.0 (#4501): a folder's field renamed -> the list differs
+        fdf_named_gone(c, r["list_id"], "list_fields", r["name"])
     bump(c)
     c.commit()
     return jsonify(field_dict(c.execute("SELECT * FROM list_fields WHERE id=?", (fid,)).fetchone(), c))
@@ -530,6 +533,7 @@ def field_delete(fid):
     trash); Undo / restore within the trash period (POST /api/fields/trash/<id>/restore). Answer: values, trash_id."""
     c = db()
     r = need_field(c, fid)
+    fdf_named_gone(c, r["list_id"], "list_fields", r["name"])  # 2.757.0 (#4501): a folder's field deleted -> the list differs
     vals = [[v[0], v[1]] for v in c.execute("SELECT task_id, value FROM task_field_values WHERE field_id=? ORDER BY task_id", (fid,))]
     grouped = c.execute("SELECT 1 FROM lists WHERE id=? AND group_field=?", (r["list_id"], f"cf:{fid}")).fetchone()
     tid = insert_id(c, "INSERT INTO field_trash(list_id,field_id,name,type,def,vals,n,grouped,deleted_by,deleted_at) VALUES(?,?,?,?,?,?,?,?,?,?)",

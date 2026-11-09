@@ -414,6 +414,7 @@ def list_create():
     oid = clean_org_id(c, b["org_id"], uid) if "org_id" in b else ws_default_org(c, uid, folder)  # 2.28.0 (#935): the workspace
     g.list_keep = ("org_id",) if "org_id" in b else ()  # 2.29.0 (#1030): an explicit workspace beats the folder's default
     g.list_keep += ("time_tracking",) if "time_tracking" in b else ()  # 2.41.0 (#1471): so does an explicit time tracking
+    g.list_keep += ("view",) if b.get("view") else ()  # 2.757.0 (#4501): and an explicit view (the same as the folder's is no own one)
     # 2.2.1 (#359): dep_shift ("Move dependent tasks along") is taken at creation too (before, only PATCH set it)
     cur_id = insert_id(c, "INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,checklist,kind,dep_shift,tickets,org_id,time_tracking) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
                     (name, color, folder, srt, view, iso(now_utc()), uid, dab, kind,
@@ -463,6 +464,7 @@ def list_update(lid):
     lh0 = lmc_snap(c, lid, lh_keys) if lh_keys else None  # 2.568.0 (#4739): the settings' history (before)
     tb_col_on = None  # 2.39.1 (#1293): modules the field columns switched on (None = no field columns sent)
     tidy0 = c.execute("SELECT agent_tidy, agent_members, agent_peers, agent_followup, folder, org_id FROM lists WHERE id=?", (lid,)).fetchone()
+    fdf0 = c.execute("SELECT view, nag, rate, day_hours, col_cfg FROM lists WHERE id=?", (lid,)).fetchone()  # 2.757.0 (#4501)
     if "agent_tidy" in b or "tidy_agent_id" in b:  # 2.0.0: "Agent may tidy up entries" (own permission rule, see
         # list_tidy_update); 2.4.1 (#379): "Tidy up by" (the one agent)
         e = list_tidy_update(c, lid, b.get("agent_tidy"), b.get("tidy_agent_id"), "tidy_agent_id" in b)
@@ -687,6 +689,11 @@ def list_update(lid):
                 list_own_mark(c, lid, k)
         if "listen_agent_ids" in given and vals.get("folder", tidy0["folder"]) == tidy0["folder"]:  # 2.30.0 (#1034)
             list_own_mark(c, lid, "agent_listen")
+    if fdf0 and tidy0 and vals.get("folder", tidy0["folder"]) == tidy0["folder"]:  # 2.757.0 (#4501): changed on its own -> differs
+        now = c.execute("SELECT view, nag, rate, day_hours, col_cfg FROM lists WHERE id=?", (lid,)).fetchone()
+        for k, col in (("view", "view"), ("nag", "nag"), ("rate", "rate"), ("day_hours", "day_hours"), ("columns", "col_cfg")):
+            if k in given and now[col] != fdf0[col]:
+                list_own_mark(c, lid, k)
     if "org_id" in given or vals.get("family") or vals.get("life"):  # 2.46.0 (#1603): private again -> only its members
         from ..lists.orgvis import ov_private_reset
         ov_private_reset(c, lid, tidy0["org_id"] if tidy0 else None)

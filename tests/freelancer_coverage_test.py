@@ -1464,7 +1464,6 @@ POST /api/lists/{}/e2e/files/{}
 POST /api/lists/{}/e2e/keys
 POST /api/lists/{}/e2e/rotate
 POST /api/lists/{}/e2e/stop
-POST /api/lists/{}/folder-reset
 POST /api/lists/{}/header
 POST /api/lists/{}/icon
 POST /api/lists/{}/milestones

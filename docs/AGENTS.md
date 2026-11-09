@@ -1072,6 +1072,11 @@ went to every agent of the project).
   project's "…" menu and the share summary say *Agent listens in* or *Agent only via @*. Folder settings (2.29.0) can set it
   for all projects of a folder (`agent_listen: true | false` in `PUT /api/folders/props`); 2.41.0: per agent of the folder in
   its Share dialog (`PUT /api/folders/agents {folder, agent_id, listen}`).
+- **More folder defaults (2.757.0):** a folder also sets the view, columns, custom fields, project tags, repeat reminder,
+  hours per day, hourly rate and "Show the progress bar" of its projects (`view`, `columns`, `fields`, `ltags`, `nag`,
+  `day_hours`, `rate`, `show_progress` in `PUT /api/folders/props`, people only). Fields and tags are only added, never
+  removed. A project whose setting is changed on its own (also through `PATCH /api/v1/lists/{id}`) lists the key in
+  `folder_own` ("differs from the folder") until `POST /api/lists/{id}/folder-reset`.
 - **Tidying is separate:** *Agent may tidy up entries* (`agent_tidy`) is its own switch, default off, independent of
   listening; with tidying on, the tidy agent also gets `tidy` for tasks moved into the project.
 - **Existing projects (update to 2.30):** every project keeps the agents that read every comment before (an explicit choice, or

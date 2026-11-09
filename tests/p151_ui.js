@@ -288,7 +288,10 @@ const task = async id => (await st()).tasks.find(t => t.id === id);
   await until(() => Date.now() - t0 >= 1500);  // 2.724.0 (#5186): the timer ran a full second on the server's clock too
   click(w, card().querySelector('[data-act="tv-stop"]'));
   check(await until(async () => !(await call('GET', '/api/state')).timer && !card()), 'Stop ends the timer, the card goes');
-  check(await until(() => !!d.querySelector(`.tvrun.idle [data-act="timer-toggle"][data-id="${tt}"]`)), 'hint offers the task just tracked');
+  // 2.757.0 (#5211): the FAIL says why: the toast (discarded = shorter than a second), the totals the page has and the server's
+  const hint = await until(() => !!d.querySelector(`.tvrun.idle [data-act="timer-toggle"][data-id="${tt}"]`));
+  check(hint, 'hint offers the task just tracked' + (hint ? '' : ' ' + JSON.stringify({toast: d.querySelector('#toast')?.textContent, page: w.eval(`S.timeTotals[${tt}] || null`),
+    server: (await call('GET', '/api/state')).time_totals?.[tt] || null, waited: Date.now() - t0, hint: d.querySelector('.tvrun.idle')?.textContent})));
   click(w, d.querySelector(`.tvrun.idle [data-act="timer-toggle"][data-id="${tt}"]`));
   check(await until(async () => (await call('GET', '/api/state')).timer?.task_id === tt), 'one tap starts it again');
   await w.eval('timerStop()');

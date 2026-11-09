@@ -87,6 +87,7 @@ ORDER = (
     "lists.filterrules",  # 2.577.0 (#3356): the rules of a saved filter as SQL (no routes)
     "lists.sections", "lists.seckind",
     "lists.sectpl",  # 2.156.0 C (#2073)
+    "lists.folderdefs",  # 2.757.0 (#4501)
     "lists.folders",
     "lists.lmove",  # 2.401.0 (#2924): the dry run of a project's workspace change, what goes along
     "lists.foldershare",  # 2.41.0 (#1420)

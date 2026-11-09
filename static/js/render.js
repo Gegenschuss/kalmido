@@ -1089,19 +1089,20 @@ function topw_sync() {
   let w = 'voll', px = 0;
   {
     const rs = getComputedStyle(document.documentElement), rem = parseFloat(rs.fontSize) || 16;
-    const named = new Map(['lesen', 'form', 'seite'].map(k => [Math.round(parseFloat(rs.getPropertyValue('--w-' + k)) * rem), k]));
+    const named = new Map(['lesen', 'form', 'seite'].map(k => [Math.round(parseFloat(rs.getPropertyValue('--w-' + k)) * rem), k]).filter(([n]) => n > 0));  // 2.757.0 (#5309): 'none' was NaN and matched any element
+    const seite = named.has(Math.round(parseFloat(rs.getPropertyValue('--w-seite')) * rem)) ? null : topw_seite();  // --w-seite none (#4840): known by its rules
     const vr = v.getBoundingClientRect(), vs = getComputedStyle(v), l0 = vr.left + parseFloat(vs.paddingLeft), r0 = vr.left + v.clientWidth - parseFloat(vs.paddingRight);
     const mid = e => { const r = e.getBoundingClientRect(); return r.width > 0 && Math.abs((r.left - l0) - (r0 - r.right)) < 2; };
     const own = v.querySelector('[data-pw]');
     let hit = null, key = '';
     if (own) { hit = own; key = 'eigen'; }
     else for (let d = 0, lv = [...v.children]; d < 3 && !hit && lv.length; d++) {
-      for (const e of lv) { const k = named.get(Math.round(parseFloat(getComputedStyle(e).maxWidth))); if (k) { hit = e; key = k; break; } }
+      for (const e of lv) { const k = named.get(Math.round(parseFloat(getComputedStyle(e).maxWidth))) || (seite && seite.some(x => topw_is(e, x)) ? 'seite' : ''); if (k) { hit = e; key = k; break; } }
       lv = lv.flatMap(e => [...e.children]).slice(0, 80);
     }
     topw_watch(hit);
     const mw = hit ? parseFloat(getComputedStyle(hit).maxWidth) : NaN;
-    if (hit && mw > 0 && mid(hit)) { w = key === 'eigen' ? named.get(Math.round(mw)) || 'eigen' : key; px = mw; }
+    if (hit && (mw > 0 || key === 'seite') && mid(hit)) { w = key === 'eigen' ? named.get(Math.round(mw)) || 'eigen' : key; px = mw > 0 ? mw : 0; }  // seite without a limit: no --pw, #top = the padding of #view
   }
   if (m.dataset.w !== w) m.dataset.w = w;
   $('#top')?.classList.toggle('topw', w !== 'voll');  // the class on #top itself: its padding follows at once (no wait for an attribute two levels up)
@@ -1109,6 +1110,24 @@ function topw_sync() {
   if (m.style.getPropertyValue('--pw') !== pw) { if (pw) m.style.setProperty('--pw', pw); else m.style.removeProperty('--pw'); }
   if (m.style.getPropertyValue('--pw-sb') !== sb) m.style.setProperty('--pw-sb', sb);
 }
+// 2.757.0 (#5309): --w-seite is none since 2.583 (#4840, lists full width): a computed max-width 'none' cannot tell a list
+// (seite) from a board (voll), so the selectors that give an element max-width var(--w-seite) are read from the style sheets
+// (cached until a sheet or rule more arrives; rules of a media query only while it applies)
+let topw_selc = [], topw_selk = '';
+function topw_seite() {
+  const sh = [...document.styleSheets], rules = s => { try { return s.cssRules; } catch { return null; } };
+  const k = sh.length + ':' + sh.reduce((a, s) => a + (rules(s)?.length || 0), 0) + ':' + innerWidth;
+  if (k === topw_selk) return topw_selc;
+  const out = [];
+  const walk = list => { for (const r of list || []) {
+    if (r.selectorText && /var\(--w-seite\)/.test(r.style?.getPropertyValue('max-width') || '') && topw_is(document.documentElement, r.selectorText) !== null) out.push(r.selectorText);
+    if (r.cssRules && (!r.media || matchMedia(r.media.mediaText).matches)) walk(r.cssRules);
+  } };
+  for (const s of sh) walk(rules(s));
+  topw_selk = k; topw_selc = out;
+  return topw_selc;
+}
+const topw_is = (e, sel) => { try { return e.matches(sel); } catch { return null; } };  // null = a selector matches() cannot read (a pseudo-element)
 let topw_raf = 0;
 // the measured element changes its size later (its width switched, a style that arrives after the render): measure again
 let topw_ro = null, topw_el = null;

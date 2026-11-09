@@ -273,6 +273,8 @@ jobs:
           pip install ruff==0.17.4
           ruff check --output-format json --exit-zero . > /tmp/ruff.json
           python tools/ruff_baseline.py /tmp/ruff.json
+      - name: Every module and script has a line in docs/GLOSSAR.md (2.757.0, #5295)
+        run: python tools/check_glossar.py -v
       - name: Translations complete
         run: |
           python tools/i18n_check.py

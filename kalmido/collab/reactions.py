@@ -18,6 +18,7 @@ from ..core.objreact import orx_of, orx_set, orx_toggle  # 2.763.0 (#5269): the 
 from ..core.errors import BadInput, UnknownFields
 from ..lists.orglabels import olb_match  # 2.609.0 (#3373)
 from ..api.v1 import _tag_arg, PRIO_NAMES, PRIO_VALUES
+from ..lists.folderdefs import fdf_named_gone  # 2.757.0 (#4501)
 from ..agents.core import (
     agent_emit, agent_ids, agent_task_data, is_agent, is_approver, list_agents, LTAG_MAX, LTAG_NAME_MAX,
     REACTION_ALIASES, REACTIONS, tidy_agent_of, tidy_candidates, TIDY_MODES,
@@ -434,6 +435,8 @@ def ltag_update(tag_id):
         return err(tr("This tag already exists in the project"), 409)
     if f:
         c.execute(f"UPDATE list_tags SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), tag_id])
+        if "name" in f and f["name"].casefold() != r["name"].casefold():  # 2.757.0 (#4501): a folder's tag renamed -> the list differs
+            fdf_named_gone(c, r["list_id"], "list_tags", r["name"])
         bump(c)
         c.commit()
     return jsonify(dict(c.execute("SELECT id, list_id, name, color, sort FROM list_tags WHERE id=?", (tag_id,)).fetchone()))
@@ -446,6 +449,7 @@ def ltag_delete(tag_id):
     r = need_ltag(c, tag_id)
     ids = [x[0] for x in c.execute("SELECT task_id FROM task_list_tags WHERE tag_id=?", (tag_id,))]
     c.execute("DELETE FROM list_tags WHERE id=?", (tag_id,))
+    fdf_named_gone(c, r["list_id"], "list_tags", r["name"])  # 2.757.0 (#4501): a folder's tag deleted -> the list differs
     bump(c)
     c.commit()
     return jsonify(ok=True, ids=ids, tag={"name": r["name"], "color": r["color"], "list_id": r["list_id"]})

@@ -713,6 +713,8 @@ def settings_update():
                 vals[k] = v
     if "show_done_views" in vals:  # 2.46.1 (#1422): an own choice against a folder's "Hide completed" is marked
         rs_done_sync(c, me(), usettings(c, me()).get("show_done_views"), vals["show_done_views"])  # 2.593.0 (#4590): one import for both
+    if "show_progress" in vals:  # 2.757.0 (#4501): an own choice against a folder's "Show the progress bar" is marked
+        rs_done_sync(c, me(), usettings(c, me()).get("show_progress"), vals["show_progress"], "show_progress")
     for k, v in vals.items():
         uset(c, me(), k, v)
         if k == "dashboard" or k in LAYOUT_KEYS:  # 2.55.0 (#1069): the active saved arrangement follows
@@ -836,10 +838,11 @@ def rs_put(c, uid, k, v):
         uset(c, uid, k, v)
 
 
-def rs_done_sync(c, uid, old, new):
-    """The folders' "differs from the folder" marks follow the changed show_done_views (as PATCH /api/settings does)."""
-    from ..lists.folders import lc_done_sync
-    lc_done_sync(c, uid, old, new)
+def rs_done_sync(c, uid, old, new, key="show_done_views"):
+    """The folders' "differs from the folder" marks follow the changed show_done_views (as PATCH /api/settings does);
+    2.757.0 (#4501): key="show_progress" does the same for a folder's "Show the progress bar" (one upward import for both)."""
+    from ..lists.folders import fdf_prog_sync, lc_done_sync
+    (fdf_prog_sync if key == "show_progress" else lc_done_sync)(c, uid, old, new)
 
 
 @app.post("/api/settings/reset")

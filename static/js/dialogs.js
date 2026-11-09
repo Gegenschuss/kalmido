@@ -921,7 +921,7 @@ async function lwsDry(id, from, to) {
   return !!await smv_open({what: qn(lname(listById(id)) || ''), from, only: [smv_ws(to)], check, run: async () => true});
 }
 function listModal(id, folder = '', o = {}) {
-  const l = id ? listById(id) : {name: '', color: '', folder, view: 'list', kind: o.kind || 'list', tickets: 0};
+  const l = id ? listById(id) : {name: '', color: '', folder, view: (typeof folderEff === 'function' && folderEff(folder).view) || 'list', kind: o.kind || 'list', tickets: 0};  // 2.757.0 (#4501): the folder's view
   const own = isOwner(l), dis = own ? '' : 'disabled';
   // 2.40.0 (#1431): a list admin changes name, icon and colour too (the rest stays the owner's)
   const ladm = !!id && !own && l.role === 'admin' && !l.is_inbox, adis = own || ladm ? '' : 'disabled';

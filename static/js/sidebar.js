@@ -666,7 +666,9 @@ document.addEventListener('focusin', sbt_tip);
 // value ("differs from the folder") until "Back to the folder" in its dialog.
 const FP_ROLES = [['admin', N_('Admin')], ['edit', N_('Member')], ['participant', N_('Participant')], ['view', N_('Read-only')]];  // 2.364.0 C (#3041)
 const FP_KEYS = {org_id: N_('Workspace'), agent_id: N_('Agent'), agent_members: N_('Members may see and use the agent'), agent_tidy: N_('Agent may tidy up entries'), agent_listen: N_('Agent listens in'), hide_done: N_('Hide completed'),  // 2.39.1 (#1214): hide_done
-  agent_followup: N_('Agent follows up'), time_tracking: N_('Time tracking'), ptype: N_('Project type')};  // 2.411.0 (#3516): ptype  // 2.41.0 (#1423): the list's texts; + agent_followup, time_tracking (#1471)
+  agent_followup: N_('Agent follows up'), time_tracking: N_('Time tracking'), ptype: N_('Project type'),
+  view: N_('View'), columns: N_('Columns'), fields: N_('Custom fields'), ltags: N_('Project tags'), nag: N_('Repeat reminders'),  // 2.757.0 (#4501)
+  day_hours: N_('Hours per day'), rate: N_('Hourly rate'), show_progress: N_('Show the progress bar')};  // 2.411.0 (#3516): ptype  // 2.41.0 (#1423): the list's texts; + agent_followup, time_tracking (#1471)
 function folderEff(path) {
   const parts = String(path || '').split(FSEP).filter(Boolean), out = {};
   for (let i = 1; i <= parts.length; i++) Object.assign(out, (S.folderProps || {})[parts.slice(0, i).join(FSEP)] || {});
@@ -686,6 +688,13 @@ function folderValTxt(k, v) {
   if (k === 'ptype') return tr(PTYPE_UI.find(([x]) => x === v)?.[1] || v);
   if (k === 'agent_id') return v ? agentById(v)?.name || personNameAny(v) : tr('No agent');
   if (k === 'agent_tidy') return tr(TIDY_SHORT[v] || v);
+  // 2.757.0 (#4501): the defaults of the projects in the folder
+  if (k === 'view') return tr({list: N_('List'), kanban: N_('Kanban'), timeline: N_('Timeline')}[v] || v);
+  if (k === 'nag') return tr(NAG_OPTS.find(([x]) => x === v)?.[1] || v);
+  if (k === 'day_hours') return fmtNum(v) + ' h';
+  if (k === 'rate') return fmtNum(v) + (S.settings.time_currency ? ' ' + S.settings.time_currency : '');
+  if (k === 'columns') return v === 'default' ? tr('Default columns') : trn('{0} column', '{0} columns', (v || []).length);
+  if (k === 'fields' || k === 'ltags') return (v || []).map(x => x.name).join(', ') || tr('None');
   return v ? tr('On') : tr('Off');
 }
 const folderSharedIn = f => (S.foldersSharedIn || []).find(x => f && (f === x.folder || f.startsWith(x.folder + FSEP)));
@@ -714,6 +723,7 @@ document.addEventListener('input', e => {
   const h = $('#l-fhint'); if (!h || $('.lhdr', e.target.closest('.modal'))) return;  // a new list only (an existing one shows it after saving)
   h.innerHTML = folderHintHtml({}, 0, fNorm(e.target.value)); h.hidden = !h.innerHTML;
   const ws = $('#l-ws'); const fp = folderEff(fNorm(e.target.value)); if (ws && 'org_id' in fp) ws.value = fp.org_id ? String(fp.org_id) : '';
+  const vw = $('#l-view'); if (vw && fp.view && $(`option[value="${fp.view}"]`, vw)) vw.value = fp.view;  // 2.757.0 (#4501)
   if (typeof lmFolderPtype === 'function') lmFolderPtype(e.target.closest('.modal'), fNorm(e.target.value));  // 2.411.0 (#3516)
 });
 // 2.41.0 (#1423): like the list dialog: switches (a third state "Not set" for a folder), every change saved at once with
@@ -731,6 +741,11 @@ async function folderPropsModal(f, opt = {}) {
   // a switch with a third state: not set (dimmed, says so) -> a tap sets it; "Not set" puts it back
   const fsw = (id, k, label, hint) => `<div class="fsw ${k in p ? '' : 'unset'}" data-fsw="${k}"><label class="chkl swl"><span class="swc"><input type="checkbox" role="switch" id="${id}" data-fk="${k}" ${effOn(k) ? 'checked' : ''}><span class="swt" aria-hidden="true"></span></span><span>${esc(label)}</span></label><span class="fsst muted">${esc(stTxt(k))}</span><button type="button" class="linkbtn fsclr" data-fsclr="${k}" ${k in p ? '' : 'hidden'}>${tr('Not set')}</button></div>${hint ? `<div class="shint aghint">${hint}</div>` : ''}`;
   const sel = (id, k, opts, dis = '') => `<div class="row"><label for="${id}">${tr(FP_KEYS[k])}</label><select id="${id}" data-fk="${k}" ${dis}><option value="">${esc(inh[k] ? tr('As the folder above: {0}', folderValTxt(k, inh[k].value)) : tr('Not set (each project decides)'))}</option>${opts.map(([v, n]) => `<option value="${esc(String(v))}" ${k in p && String(p[k] === true ? 1 : p[k] === false ? 0 : p[k]) === String(v) ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>`;
+  // 2.757.0 (#4501): a number (hours per day, rate) and a value taken from one of my projects (columns, fields, tags)
+  const fnum = (id, k, unit) => `<div class="row" data-fnum="${k}"><label for="${id}">${tr(FP_KEYS[k])}</label><input id="${id}" data-fk="${k}" data-fnumin="1" inputmode="decimal" value="${k in p ? esc(fmtNum(p[k])) : ''}" placeholder="${esc(stTxt(k))}" style="max-width:6.875rem"><span class="muted">${esc(unit)}</span><button type="button" class="linkbtn fsclr" data-fsclr="${k}" ${k in p ? '' : 'hidden'}>${tr('Not set')}</button></div>`;
+  const cpLists = () => (S.lists || []).filter(l => isOwner(l) && !l.is_inbox && !l.archived).sort((a, b) => ((info.lists || []).some(x => x.id === b.id) - (info.lists || []).some(x => x.id === a.id)));
+  const cpTxt = k => k in p ? folderValTxt(k, p[k]) : stTxt(k);
+  const fcopy = (id, k) => `<div class="row" data-fcp="${k}"><label for="${id}">${tr(FP_KEYS[k])}</label><select id="${id}" data-fk="${k}" data-fcopy="1"><option value="">${esc(tr('Take from project…'))}</option>${cpLists().map(l => `<option value="${l.id}">${esc(lname(l))}</option>`).join('')}</select><button type="button" class="linkbtn fsclr" data-fsclr="${k}" ${k in p ? '' : 'hidden'}>${tr('Not set')}</button></div><div class="shint lhint fcpst" data-fcpst="${k}">${esc(cpTxt(k))}</div>`;
   // 2.37.0 (#1158): a folder without lists of my own (e.g. only lists others shared with me): the settings hold for new lists
   const md = modal(`<div class="lhdr"><h3>${ic('sliders', 's')} ${esc(tr('Folder settings “{0}”', fDisp(f)))}</h3><span class="ssaved" role="status" aria-live="polite"></span><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
     ${nL ? '' : `<div class="shint cnote fsnone">${ic('info', 's')} ${tr('Applies to new projects in this folder. Shared projects of others keep their settings.')}</div>`}
@@ -749,7 +764,13 @@ async function folderPropsModal(f, opt = {}) {
     <h4>${tr('Completed')}</h4>
     ${fsw('fs-hd', 'hide_done', tr('Hide completed'), '')}
     <div class="shint lhint fshdhint">${tr('Default for your projects in the folder. Shared projects of others and ones you changed yourself keep their setting.')}</div>
-    ${typeof timeOn === 'function' && timeOn() ? `<h4>${tr('Time tracking')}</h4>${fsw('fs-tt', 'time_tracking', tr('Time tracking'), '')}` : ''}
+    ${typeof timeOn === 'function' && timeOn() ? `<h4>${tr('Time tracking')}</h4>${fsw('fs-tt', 'time_tracking', tr('Time tracking'), '')}${fnum('fs-dayh', 'day_hours', 'h')}${fnum('fs-rate', 'rate', S.settings.time_currency || '')}` : ''}
+    <h4>${tr('Display and behaviour')}</h4>${''/* 2.757.0 (#4501): view, columns, fields, tags, reminder, progress bar */}
+    ${sel('fs-vw', 'view', [['list', tr('List')], ...(feat('kanban') ? [['kanban', tr('Kanban')]] : []), ...(feat('timeline') ? [['timeline', tr('Timeline')]] : [])])}
+    ${fcopy('fs-cols', 'columns')}${typeof fieldsOn === 'function' && fieldsOn() ? fcopy('fs-flds', 'fields') : ''}${collab() ? fcopy('fs-tags', 'ltags') : ''}
+    <div class="shint lhint">${tr('Columns, custom fields and project tags are taken from one of your projects. Fields and tags the projects lack are added; nothing is removed, the values of the tasks stay.')}</div>
+    ${sel('fs-nag', 'nag', NAG_OPTS.map(([v, n]) => [v, tr(n)]))}
+    ${progressOn() ? fsw('fs-pg', 'show_progress', tr('Show the progress bar'), '') : ''}
     ${collab() ? `<div class="row"><label>${tr('People')}</label><button type="button" class="btn sm" data-m="people">${ic('users', 's')} ${tr('Share…')}</button></div>` : ''}
     <div class="row"><label>${tr('Repository')}</label><button type="button" class="btn sm" data-m="repos">${ic('git', 's')} ${tr('Repository…')}</button></div>
     <fieldset class="fsapply" ${nL ? '' : 'hidden'}><legend>${tr('Apply to')}</legend>
@@ -770,13 +791,16 @@ async function folderPropsModal(f, opt = {}) {
   const sync = k => {  // the row of key k shows what is saved now
     const row = $(`[data-fsw="${k}"]`, md);
     if (row) { row.classList.toggle('unset', !(k in p)); $('input', row).checked = effOn(k); $('.fsst', row).textContent = stTxt(k); $('.fsclr', row).hidden = !(k in p); return; }
+    const fc = $(`[data-fcp="${k}"]`, md), fn = $(`[data-fnum="${k}"]`, md);  // 2.757.0 (#4501)
+    if (fc) { $('select', fc).value = ''; $('.fsclr', fc).hidden = !(k in p); const st = $(`[data-fcpst="${k}"]`, md); if (st) st.textContent = cpTxt(k); return; }
+    if (fn) { $('input', fn).value = k in p ? fmtNum(p[k]) : ''; $('.fsclr', fn).hidden = !(k in p); return; }
     const s = $(`select[data-fk="${k}"]`, md); if (s) s.value = k in p ? String(p[k] === true ? 1 : p[k] === false ? 0 : p[k]) : '';
   };
   const put = async (k, v, undo = true) => {
     const prev = k in p ? p[k] : null, er = $('#fs-prev', md);
     const body = {folder: f, props: {[k]: v}, apply: $('[name="fs-ap"]:checked', md)?.value || 'all', ...($('#fs-force', md)?.checked ? {force: true} : {})};
     let r; try { r = await api('PUT', '/api/folders/props', body); } catch { sync(k); return; }
-    if (v === null) delete p[k]; else p[k] = v;
+    if (v === null) delete p[k]; else p[k] = r.props && k in r.props ? r.props[k] : v;  // 2.757.0 (#4501): {from: id} -> the stored value
     sync(k);
     const bad = (r.lists || []).filter(l => l.skipped.length || l.own.length);
     er.innerHTML = bad.length ? `<b>${esc(trn('{0} project does not follow:', '{0} projects do not follow:', bad.length))}</b><ul>${bad.map(l => `<li>${esc(l.name)}: ${esc([...l.skipped.map(x => `${tr(FP_KEYS[x.key])} – ${x.reason}`), ...l.own.map(x => tr('{0} changed on its own', tr(FP_KEYS[x])))].join('; '))}</li>`).join('')}</ul>` : '';
@@ -790,7 +814,9 @@ async function folderPropsModal(f, opt = {}) {
     const t = e.target, k = t.dataset?.fk; if (!k) return;
     e.stopPropagation();
     if (t.type === 'checkbox') { put(k, t.checked).then(() => { if (k === 'agent_members' && t.checked && av_folderPersonal(f).length) toast(tr('Saved') + ' · ' + av_personalHint(av_folderPersonal(f)), undefined, 9000); }); return; }  // 2.46.6 (#1680)
-    put(k, t.value === '' ? null : k === 'agent_tidy' || k === 'ptype' ? t.value : +t.value);  // 2.411.0 (#3516): ptype is a key
+    if (t.dataset.fcopy) { if (t.value) put(k, {from: +t.value}); return; }  // 2.757.0 (#4501)
+    if (t.dataset.fnumin) { put(k, t.value.trim() === '' ? null : numBody(t.value)); return; }
+    put(k, t.value === '' ? null : ['agent_tidy', 'ptype', 'view', 'nag'].includes(k) ? t.value : +t.value);  // 2.411.0 (#3516): ptype is a key; 2.757.0 (#4501): view, nag
   });
   md.addEventListener('click', async e => {
     const b = e.target.closest('button'); if (!b) return;

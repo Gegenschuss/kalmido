@@ -18,6 +18,7 @@ from ..core.errors import BadInput
 from ..api.common import v1_call, V1Error  # 2.149.0 G (#2517): pulled up from functions
 from ..lists.lists import folder_under  # 2.411.0 (#3516)
 from ..lists.lists import FOLDER_SEP, list_agent_set, clean_folder, _folder_member_add  # 2.369.5 (#2517): pulled up from functions
+from ..lists.folderdefs import FDF_KEYS, fdf_apply, fdf_clean, fdf_prog_sync, fdf_same  # noqa: F401 -- 2.757.0 (#4501): fdf_prog_sync is imported from here by accounts.settings
 
 # 2.40.0 (#1373): agent_peers is no folder default any more (agents never address each other); a stored one is ignored
 FOLDER_PROPS = ("org_id", "agent_id", "agent_members", "agent_tidy", "agent_listen")  # 2.30.0 (#1034): agent_listen
@@ -25,6 +26,7 @@ FOLDER_PROPS += ("hide_done",)  # 2.39.1 (#1214): "Hide completed" for the lists
 FOLDER_PROPS += ("agent_followup",)  # 2.41.0 (#1423): "Agent follows up" as a folder default (2.40 ignores the key)
 FOLDER_PROPS += ("time_tracking",)  # 2.41.0 (#1471): time tracking on / off for the lists of the folder (lists.time_tracking)
 FOLDER_PROPS += ("ptype",)  # 2.411.0 (#3516): the project type of NEW lists in the folder (folder_ptype); existing lists keep theirs
+FOLDER_PROPS += FDF_KEYS  # 2.757.0 (#4501): view, fields, columns, project tags, repeat reminder, hours per day, rate, progress bar
 FOLDER_APPLY = ("all", "new")
 
 
@@ -204,6 +206,12 @@ def folder_apply(c, lid, keys=None, force=False, dry=False, uid=None):
                     lc_done_put(c, uid, views)
                 if prev == bool(v):  # it showed completed tasks and the folder hides them, or the other way round
                     changed += 1
+            elif k in FDF_KEYS:  # 2.757.0 (#4501): view, fields, columns, tags, reminder, hours, rate, progress bar
+                if fdf_same(c, lid, k, v, uid):
+                    continue
+                if not dry:
+                    fdf_apply(c, lid, k, v, uid)
+                changed += 1
             elif k == "agent_tidy":
                 cur = c.execute("SELECT agent_tidy FROM lists WHERE id=?", (lid,)).fetchone()[0] or "off"
                 if cur == v:
@@ -270,6 +278,8 @@ def _clean_props(c, b):
             if v not in TIDY_MODES:
                 raise BadInput(tr("Invalid value: {0}", k))
             out[k] = v
+        elif k in FDF_KEYS:  # 2.757.0 (#4501)
+            out[k] = fdf_clean(c, me(), k, v)
         elif k == "ptype":  # 2.411.0 (#3516)
             from ..lists.templates import PTYPES
             if v not in PTYPES:
@@ -324,7 +334,9 @@ def folder_props_get():
 
 @app.put("/api/folders/props")
 def folder_props_put():
-    """{folder, props: {org_id?, agent_id?, agent_members?, agent_peers?, agent_tidy?, agent_listen?} (null removes a default),
+    """{folder, props: {org_id?, agent_id?, agent_members?, agent_peers?, agent_tidy?, agent_listen?, hide_done?, agent_followup?,
+    time_tracking?, ptype?, view?, fields?, columns?, ltags?, nag?, day_hours?, rate?, show_progress?} (null removes a default;
+    2.757.0 #4501: columns / fields / ltags also as {from: id of my list}, see lists/folderdefs.py),
     apply: all (default: the existing lists follow) | new (only lists that come later), force?: also the lists that differ on
     purpose, dry_run?: only say what would happen}. -> {props, changed, lists: [{id, name, skipped: [{key, reason}]}]}"""
     c, b = db(), body()
@@ -416,6 +428,8 @@ def folder_list_arrived(c, lid, keep=()):
     # sends the workspace with every create, the same value as the folder's must not show "differs: Workspace")
     diff = {x["key"] for x in lm_folder_changes(c, lid, r["folder"])} if keep else set()
     for k in keep:
+        if k in FDF_KEYS and k in eff and fdf_same(c, lid, k, eff[k], r["owner_id"]):
+            continue  # 2.757.0 (#4501): chosen the same as the folder's (e.g. the view of the new-project dialog)
         if k in eff and (k in diff or k not in LM_MOVE_KEYS):
             list_own_mark(c, lid, k)
     folder_apply(c, lid, keys=[k for k in FOLDER_PROPS if k not in keep], uid=r["owner_id"])
@@ -522,6 +536,9 @@ def lm_folder_keep(c, lid, keep=(), uid=None):
     if lc_done_differs(c, uid, lid, eff):  # 2.46.1 (#1422): an own "Show / Hide completed" of the list
         diff.add("hide_done")
     c.execute("UPDATE lists SET folder_own=? WHERE id=?", (json.dumps(sorted(k for k in diff if k in eff)), lid))
+    # 2.757.0 (#4501): the view, fields, columns, tags, reminder, hours, rate and progress bar follow the folder on every move
+    # (the question before a move is about who may be in the list: workspace and agent)
+    folder_apply(c, lid, keys=[k for k in FDF_KEYS if k not in diff], uid=uid)
     if "time_tracking" in eff and "time_tracking" not in keep:  # 2.551.0 (#4640): no question for it, so the list takes the folder's
         folder_apply(c, lid, keys=["time_tracking"], uid=uid)
 

@@ -4,7 +4,7 @@
    inner space) whose text column keeps the chosen width; below 1700 px (1440 x 900, tablets, phones) no sheet, as before.
    After start-breite.css (name order), whose .ntedit rule this one refines. */
 .ntwrap{--ntpw:var(--w-lesen);--ntpad:0px;--ntsheet:var(--ntpw)}
-.ntwrap.pgw-breit{--ntpw:var(--w-seite)}
+.ntwrap.pgw-breit{--ntpw:96rem}  /* 2.757.0 (#5309): the former --w-seite; since 2.583 (#4840) it is none and calc(none + ...) dropped the grid of list + note */
 .ntwrap.pgw-voll{--ntpw:none;--ntsheet:none}
 .ntwrap .ntedit:not(.wktagview){max-width:var(--ntsheet)}
 @media (min-width:1700px){
