@@ -130,7 +130,7 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   w.eval('S.multi.clear(); S.multiMode = false; render()');
   w.eval(`sectionPicker(document.querySelector('#view .trow[data-id="${t2}"]'), ${t2})`); await until(() => /Later/.test(d.querySelector('#pop:not(.hidden)')?.textContent || ''));
   let pop = d.querySelector('#pop:not(.hidden)');
-  check(pop && /Nicht zugeordnet/.test(pop.textContent) && /Later/.test(pop.textContent), 'section picker (German)');
+  check(pop && /Ohne Abschnitt/.test(pop.textContent) && /Later/.test(pop.textContent), 'section picker (German)');  // 2.800.0 (#5441): was "Nicht zugeordnet"
   [...pop.querySelectorAll('button')].find(b => b.textContent.trim() === 'Later').click();
   check(await until(async () => (await taskOf(t2, BK)).section_id === C), 'picked: moved to "Later"');
   check(await until(() => /In Abschnitt „Later“ verschoben/.test(toastText(d)), 15000), `German toast: ${toastText(d)}`);
