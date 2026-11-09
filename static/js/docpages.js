@@ -14,8 +14,9 @@
 const DPG = {id: null, n: 0, ver: 0, blank: new Set(), del: new Set(), rot: new Map(), sel: new Set(), last: -1, receipt: false, busy: false, cv: new Map(), io: null, tries: 0};
 const DPG_TW = 72;  // the width of a small page (CSS px)
 
-// the strip only for a document (not a plain file) that is a recognised PDF, with the right to write
-const dpg_on = (/** @type {any} */ d) => !!d && !d.file && d.role !== 'view' && typeof dc_isPdf === 'function' && dc_isPdf(d) && d.state === 'done' && (d.pages || 0) >= 1;
+// the strip only for a document (not a plain file) that is a PDF, with the right to write (while it is recognised again the
+// server counts its pages itself; a save waits for the end of the run: 409)
+const dpg_on = (/** @type {any} */ d) => !!d && !d.file && d.role !== 'view' && typeof dc_isPdf === 'function' && dc_isPdf(d);
 const dpg_openFor = (/** @type {any} */ d) => !!d && DPG.id === d.id;
 // the button in the preview's bar (docview.js dcv_pvHtml)
 function dpg_btn(/** @type {any} */ d) {
