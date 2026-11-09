@@ -60,7 +60,7 @@ function upSend(url, opt, fd) {
 // version (static/sw.js swCodeNote): a quiet bar "The app's code changed without a new version" with a way to Settings > Help >
 // Check code. Closing it or opening the check confirms it to the worker (code-ack); unconfirmed, the next start shows it again.
 // Every start asks the worker once (code-check) when the page is drawn.
-function upCodeAck() { navigator.serviceWorker?.ready.then(r => r.active?.postMessage({type: 'code-ack'})).catch(() => {}); }
+function upCodeAck() { navigator.serviceWorker?.ready?.then(r => r.active?.postMessage({type: 'code-ack'})).catch(() => {}); }
 function upCodeBar(d) {
   if (document.getElementById('codechg') || typeof tr !== 'function') return;
   const el = document.createElement('div'); el.id = 'codechg'; el.setAttribute('role', 'status');
@@ -73,7 +73,7 @@ function upCodeBar(d) {
   x.addEventListener('click', () => { el.remove(); upCodeAck(); });
   document.body.appendChild(el);
 }
-if (globalThis.navigator?.serviceWorker) {
+if (globalThis.navigator?.serviceWorker?.addEventListener) {
   navigator.serviceWorker.addEventListener('message', e => { if (e.data?.type === 'code-changed' && typeof e.data.version === 'string') upCodeBar(e.data); });
-  addEventListener('load', () => navigator.serviceWorker.ready.then(r => r.active?.postMessage({type: 'code-check'})).catch(() => {}));
+  addEventListener('load', () => navigator.serviceWorker.ready?.then(r => r.active?.postMessage({type: 'code-check'})).catch(() => {}));  // a stub without ready (jsdom tests): nothing
 }
