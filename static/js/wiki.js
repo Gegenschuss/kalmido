@@ -293,7 +293,7 @@ function wk_moveTo(nid, anchor) {  // "Move to …": the folders of the space (n
   menu(anchor || document.body, [{head: tr('Move to …')}, ...items.slice(0, 80)], null, null, tr('Move to …'));
 }
 // ---- 2.353.0 C (#2829, audit B 2): "Select" next to "New folder": several folders / pages (their nodes) moved or put into the
-// trash at once -- the file store's selection bar (ablage.js ab_smvBar: same look and texts), ONE undo step per action. Only
+// trash at once -- the file store's selection bar (ablage.js ab_selBar: same look and texts), ONE undo step per action. Only
 // where the folders' menu works today (wk_canFolder: not in a space with the lock, not read-only, not for agents).
 const wk_selOk = sp => WK.selOn && WK.selSp === sp && wk_canFolder(sp);
 function wk_selBtn(sp, any) {
