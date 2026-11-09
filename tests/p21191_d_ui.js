@@ -104,10 +104,10 @@ const watch = async (w, fn, ms = 400) => {
     check(await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`) === 200, 'Firefox: login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
     await nav(B + '#docs');
-    for (let i = 0; i < 30 && !(await ev(`!!document.querySelector('[data-dcsel="mode"]')`).catch(() => false)); i++) await sleep(300);
+    for (let i = 0; i < 30 && !(await ev(`!!document.querySelector('.dc-view [data-absel="mode"]')`).catch(() => false)); i++) await sleep(300);
     const rowH = () => ev(`Math.round(document.querySelector('.dc-card')?.getBoundingClientRect().height || 0)`);
     const h0 = await rowH();
-    await ev(`(document.querySelector('[data-dcsel="mode"]').click(), 1)`);
+    await ev(`(document.querySelector('.dc-view [data-absel="mode"]').click(), 1)  /* 2.768.0 (#4888): the area's one selection */`);
     for (let i = 0; i < 20 && !(await ev(`!!document.querySelector('.dc-selmark')`)); i++) await sleep(200);
     await sleep(300);
     // the target = the mark's padding box grown by its ::after insets; and a tap 21 px off its centre still lands on the mark

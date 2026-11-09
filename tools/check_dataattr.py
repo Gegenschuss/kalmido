@@ -29,12 +29,13 @@ BEFORE = 4
 KNOWN = {
     "ab": ("shared", {"abdocs.js", "docs.js", "filetext.js", "tagsel.js"}),  # 2.752.0 (#4887): docs.js dc_headHtml (Add / Scan into a folder with recognition = ablage.js upload / scan)
     "abo": ("shared", {"office_cashflow.js"}),
-    "absel": ("shared", {"tagsel.js"}),
+    "absel": ("shared", {"docs.js"}),  # 2.768.0 (#4888): the area's one selection and bar (ablage.js), its "Select" in the documents' bar
     "bk": ("guarded", {"account.js"}),
     "bka": ("guarded", {"office_bankacc.js", "office_bookarch.js"}),
     "bnk": ("shared", {"office_bankrules.js"}),
     "cb": ("guarded", {"contacts.js"}),
     "cc": ("guarded", {"choicecard.js", "office_cards.js"}),
+    "dcchk": ("shared", {"docs.js"}),  # 2.768.0 (#4888): the choosing mark of every card (docs.js dc_selMark) = ablage.js ab_selPick
     "dl": ("guarded", {"family.js", "office_docs.js"}),
     "dpfor": ("shared", {"agentrotate.js"}),
     "dv": ("guarded", {"office_datev.js"}),

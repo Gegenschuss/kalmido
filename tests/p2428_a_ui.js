@@ -2,7 +2,8 @@
 // 2.428.0 A (#3581) UI tests: one selection bar everywhere -- the shared floating bar of multisel.js (ms_barHtml, class
 // .mselbar, like the tasks' and the contacts' bar) in the documents, the file store, the knowledge lists, the user
 // management and the receipts of a trip. Own container (start.sh), jsdom, invented names only.
-// - documents: Select -> #dc-sbar (hint, count, Edit, Download, More); More holds the CSV export; Esc ends; a Ctrl-click
+// - documents: Select -> #ab-sbar (hint, count, Edit, Download, More); More holds the CSV export; Esc ends; a Ctrl-click
+//   (2.768.0 #4888: the area's one bar #ab-sbar for documents too; Edit only once documents are chosen)
 //   on a card and a click on its hover mark start choosing (nothing opens); a long press (touch) starts it too
 // - file store: the row's box (shown on hover) starts choosing -> #ab-sbar (Move, Download, Delete); Ctrl-click, Shift-click
 //   range, long press; Delete moves the chosen files into the trash; Esc ends
@@ -58,31 +59,32 @@ const count = (d, id) => d.querySelector(`#${id} .mcount`)?.textContent || '';
   let w = await boot({user: 'alice', hash: 'docs'}), d = w.document;
   await until(() => d.querySelectorAll('[data-dco]').length === 2, 60);
   const ids = w.eval('DC.docs.map(x => x.id)');
-  check(!d.querySelector('#dc-sbar') && d.querySelectorAll('.dc-selmark').length === 2, 'documents: no bar yet, every card has its (hover) mark');
-  d.querySelector('[data-dcsel="mode"]').click();
-  let bar = await until(() => d.querySelector('#dc-sbar.mselbar'));
-  check(bar && /Tick the boxes/.test(count(d, 'dc-sbar')) && bar.querySelector('[data-dcsel="edit"]')?.disabled, 'documents: Select -> the shared bar with the hint, Edit waits ' + count(d, 'dc-sbar'));
-  for (const id of ids) w.eval(`dc_smvToggle(${id})`);
-  bar = await until(() => /2 selected/.test(count(d, 'dc-sbar')) && d.querySelector('#dc-sbar'));
-  check(bar && ['edit', 'zip', 'more', 'all', 'close'].every(k => bar.querySelector(`[data-dcsel="${k}"]`)), 'documents: 2 selected, Edit / Download / More / All / X');
-  bar?.querySelector('[data-dcsel="more"]').click();
+  check(!d.querySelector('#ab-sbar') && d.querySelectorAll('.dc-selmark').length === 2, 'documents: no bar yet, every card has its (hover) mark');
+  d.querySelector('[data-absel="mode"]').click();
+  let bar = await until(() => d.querySelector('#ab-sbar.mselbar'));
+  // 2.768.0 (#4888): the area's one bar; Edit only once documents are chosen
+  check(bar && /Tap files/.test(count(d, 'ab-sbar')) && !bar.querySelector('[data-absel="edit"]'), 'documents: Select -> the shared bar with the hint, no Edit yet ' + count(d, 'ab-sbar'));
+  for (const id of ids) w.eval(`ab_selPick(${id})`);
+  bar = await until(() => /2 selected/.test(count(d, 'ab-sbar')) && d.querySelector('#ab-sbar'));
+  check(bar && ['edit', 'dl', 'move', 'trash', 'more', 'all', 'close'].every(k => bar.querySelector(`[data-absel="${k}"]`)), 'documents: 2 selected, Edit / Download / Move / Trash / More / All / X');
+  bar?.querySelector('[data-absel="more"]').click();
   check(await until(() => d.querySelector('#pop .menu-list .msm-csv')), 'documents: More holds "Export as CSV"');
   w.eval('closePop()');
   esc(w, d.body);
-  check(await until(() => !d.querySelector('#dc-sbar') && !w.eval('DC.selOn')), 'documents: Esc ends the selection');
+  check(await until(() => !d.querySelector('#ab-sbar') && !w.eval('AB.selOn')), 'documents: Esc ends the selection');
   const h0 = w.location.hash;
   ctrlClick(w, d.querySelector(`[data-dco="${ids[0]}"]`));
-  check(await until(() => /1 selected/.test(count(d, 'dc-sbar'))) && w.location.hash === h0 && !d.querySelector('.dc-md'), 'documents: a Ctrl-click chooses the card, nothing opens');
-  esc(w, d.body); await until(() => !w.eval('DC.selOn'));
+  check(await until(() => /1 selected/.test(count(d, 'ab-sbar'))) && w.location.hash === h0 && !d.querySelector('.dc-md'), 'documents: a Ctrl-click chooses the card, nothing opens');
+  esc(w, d.body); await until(() => !w.eval('AB.selOn'));
   d.querySelector(`[data-k="dc${ids[1]}"] .dc-selmark`).dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
-  check(await until(() => /1 selected/.test(count(d, 'dc-sbar')) && w.eval(`DC.sel.has(${ids[1]})`)), 'documents: the hover mark starts choosing');
-  esc(w, d.body); await until(() => !w.eval('DC.selOn'));
+  check(await until(() => /1 selected/.test(count(d, 'ab-sbar')) && w.eval(`AB.sel.has(${ids[1]})`)), 'documents: the hover mark starts choosing');
+  esc(w, d.body); await until(() => !w.eval('AB.selOn'));
   // 2.607.0 (#4612): a long press opens the card's menu (name, "Select" on top); "Select" starts choosing with the card
   touch(w, d.querySelector(`[data-dco="${ids[0]}"]`), 'pointerdown');
-  check(await until(() => menuIt(d)[1] === 'Select') && !w.eval('DC.selOn'), 'documents: a long press opens the menu, "Select" on top ' + menuIt(d));
+  check(await until(() => menuIt(d)[1] === 'Select') && !w.eval('AB.selOn'), 'documents: a long press opens the menu, "Select" on top ' + menuIt(d));
   touch(w, d.querySelector(`[data-dco="${ids[0]}"]`), 'pointerup');
   menuPick(d, 'Select');
-  check(await until(() => w.eval(`DC.selOn && DC.sel.has(${ids[0]})`)), 'documents: "Select" starts choosing with the card');
+  check(await until(() => w.eval(`AB.selOn && AB.sel.has(${ids[0]})`)), 'documents: "Select" starts choosing with the card');
   w.close();
 
   // ================= file store
@@ -94,7 +96,7 @@ const count = (d, id) => d.querySelector(`#${id} .mcount`)?.textContent || '';
   tick(w, box(A[0]));
   bar = await until(() => /1 selected/.test(count(d, 'ab-sbar')) && d.querySelector('#ab-sbar.mselbar'));
   check(bar && ['move', 'dl', 'trash', 'all', 'close'].every(k => bar.querySelector(`[data-absel="${k}"]`)) && !bar.querySelector('[data-absel="more"]'),
-    'file store: the box starts choosing -> Move, Download, Delete, no "More" without an organisation');
+    'file store: the box starts choosing -> Move, Download, Move to the trash, no "More" without an organisation');
   esc(w, d.body);
   check(await until(() => !d.querySelector('#ab-sbar') && !w.eval('AB.selOn')), 'file store: Esc ends the selection');
   const h1 = w.location.hash;
@@ -112,7 +114,7 @@ const count = (d, id) => d.querySelector(`#${id} .mcount`)?.textContent || '';
   await sleep(700);  // the click that would end the press is past (ms_lpRecent)
   tick(w, box(A[2]));
   await until(() => /2 selected/.test(count(d, 'ab-sbar')));
-  d.querySelector('#ab-sbar [data-absel="trash"]').click();
+  d.querySelector('#ab-sbar [data-absel="trash"]').click();  // 2.768.0 (#4888): it asks with the number first (boot.js answers yes)
   check(await until(async () => { const it = (await call('GET', '/api/files?space=private')).items || []; return !it.some(n => n.id === A[1] || n.id === A[2]) && it.some(n => n.id === A[0]); }, 60),
     'file store: Delete moves the chosen files into the trash');
   check(await until(() => !d.querySelector('#ab-sbar')), 'file store: the selection ends after the action');

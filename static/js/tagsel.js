@@ -3,9 +3,7 @@
    loaded on demand (lazyload.js module tagsel; the documents module needs it, the file store loads it when it opens):
    - the tag picker: the tags of a workspace as buttons to switch on / off plus a field for a new tag (dt_pick);
    - tag buttons for a filter that switch between "with", "without" and off (dt_pills / dt_cycle);
-   - choosing a range with Shift (dt_rsClick): a click sets the anchor, Shift-click chooses everything between the anchor and
-     the target in the order shown (a target already chosen: the range is unchosen), Ctrl / Cmd-click switches one. The
-     anchor belongs to one list (another folder / filter = a new anchor). Phones: no Shift, nothing changes there.
+   - Shift + mouse button in a list marks no text (2.768.0, #4888: the ranges themselves are the area's one selection, ablage.js ab_selPick).
    Classic script sharing the global scope with the others (load order: index.html, docs/ARCHITECTURE.md). */
 'use strict';
 
@@ -37,23 +35,6 @@ function dt_cycle(st, name, tri = true) {
 
 // ---- choosing a range with Shift
 const dt_el = e => /** @type {HTMLElement} */ (e.target);
-const DT_RS = {key: '', id: null};
-const dt_rsMouse = e => e.pointerType ? e.pointerType === 'mouse' : !(typeof isTouch === 'function' && isTouch());  // Shift-click turns choosing on with a mouse only
-function dt_rsReset() { DT_RS.key = ''; DT_RS.id = null; }
-function dt_rsAnchor(key, id) { DT_RS.key = key; DT_RS.id = id; }
-// e: the click; key: the list it is in; id: the target; ids: the order shown; has(id) / set(id, on): the caller's choice
-function dt_rsClick(e, key, id, ids, has, set) {
-  if (DT_RS.key !== key) dt_rsAnchor(key, null);
-  if (e.shiftKey && DT_RS.id != null && DT_RS.id !== id) {
-    const a = ids.indexOf(DT_RS.id), b = ids.indexOf(id);
-    if (a >= 0 && b >= 0) {
-      const on = !has(id);
-      for (const x of ids.slice(Math.min(a, b), Math.max(a, b) + 1)) set(x, on);
-      return;  // the anchor stays: the next Shift-click spans from it again
-    }
-  }
-  set(id, !has(id)); dt_rsAnchor(key, id);
-}
 // Shift + mouse button in a list: no text marking (the click chooses instead)
 document.addEventListener('mousedown', e => { if (e.shiftKey && dt_el(e).closest?.('.ablist, .dc-grid')) e.preventDefault(); });
 
@@ -140,26 +121,7 @@ document.addEventListener('click', e => {
   if (b.dataset.dtab === 'filter') dt_abFilter(b.dataset.sp);
   else if (b.dataset.dtab === 'clear') { DT_AB.st = {}; DT_AB.res = null; ab_draw(); }
 });
-// the file store: Shift / Ctrl / Cmd on the checkboxes of the rows (AB.sel), Shift-click on a row turns choosing on
-document.addEventListener('click', e => {
-  if (typeof AB === 'undefined' || !dt_el(e).closest?.('.ablist') || dt_abOn(AB.data?.space || ab_curSpace())) return;
-  const row = dt_el(e).closest('.abrow'), box = dt_el(e).closest('[data-absel="one"]');
-  if (!row || dt_el(e).closest('[data-ab="menu"], [data-ab="restore"]')) return;
-  const id = +row.dataset.abid, key = 'ab:' + AB.dkey;
-  if (box) {
-    if (!(e.shiftKey || e.ctrlKey || e.metaKey)) { dt_rsAnchor(key, id); return; }  // a plain click: the box itself, the anchor here
-  } else {
-    if (!((e.shiftKey && dt_rsMouse(e)) || (AB.selOn && (e.ctrlKey || e.metaKey)))) return;
-    if (!AB.selOn) { if (!document.querySelector('[data-absel="mode"]')) return; AB.selOn = true; AB.sel.clear(); dt_rsReset(); }
-  }
-  e.preventDefault(); e.stopPropagation();
-  const ids = [...document.querySelectorAll('.ablist .abrow')].map(r => +r.dataset.abid);
-  dt_rsClick(e, key, id, ids, x => AB.sel.has(x), (x, on) => { if (on) AB.sel.add(x); else AB.sel.delete(x); });
-  ab_draw();
-  // a box the page kept has its own state (it wins over the attribute), and the cancelled click puts the clicked box back
-  // after this handler: set them once the click is over
-  setTimeout(() => { for (const b of /** @type {NodeListOf<HTMLInputElement>} */ (document.querySelectorAll('.ablist [data-absel="one"]'))) b.checked = AB.sel.has(+b.dataset.id); }, 0);
-}, true);
+// 2.768.0 (#4888): Shift / Ctrl / Cmd on the rows and cards of the file store: ablage.js (the area's one selection, ab_selPick)
 
 // ---- 2.742.0 (#4862): the tag field, ONE part for documents (docview.js), the file store and the editing of several
 // (dt_pick): the given tags as pills with an x, a text field behind them; from the first letter a list of its own (no

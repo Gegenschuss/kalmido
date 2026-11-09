@@ -50,7 +50,7 @@ function abd_cardsHtml(d) {
   if (!AB.dq && !AB.loading && d.items.some(n => n.doc && !n.doc.id)) { AB.key = ''; setTimeout(ab_load, 0); }  // 2.477.0 (#3936)
   return abd_cardsHtml2(d);
 }
-const abd_cardsHtml2 = d => `<ul class="dc-grid abcards" aria-label="${esc(tr('Files'))}">${d.items.map(abd_card).join('')}</ul>`;
+const abd_cardsHtml2 = d => `<ul class="dc-grid abcards${AB.selOn ? ' dc-selon' : '' /* 2.768.0 (#4888) */}" aria-label="${esc(tr('Files'))}">${d.items.map(abd_card).join('')}</ul>`;
 
 // ---- recognition: the line above a folder's list, the menu items, the switch
 function abd_recogLine(d) {
@@ -110,7 +110,7 @@ function abd_foldHtml(d) {
   if (open && typeof dcv_restore === 'function') setTimeout(dcv_restore, 0);  // back from a document: the same place, its card in view
   const items = d.items || [], have = new Set((DC.docs || []).map(x => x.id));
   const kids = items.filter(x => x.kind === 'folder'), plain = items.filter(x => x.kind !== 'folder' && !(x.doc && !abd_locked(x)) && !have.has(x.id));
-  const ul = xs => xs.length ? `<ul class="dc-grid abcards" aria-label="${esc(tr('Files'))}">${xs.map(abd_card).join('')}</ul>` : '';
+  const ul = xs => xs.length ? `<ul class="dc-grid abcards${AB.selOn ? ' dc-selon' : '' /* 2.768.0 (#4888) */}" aria-label="${esc(tr('Files'))}">${xs.map(abd_card).join('')}</ul>` : '';
   const fold = {node: n, canAdd: ab_canWrite(n.role), before: ul(kids), after: ul(plain), card: abd_docCard};
   return `<div class="dc-view dc-infold" data-abfold="${n.id}">${dc_headHtml(fold)}${dc_bodyHtml(fold)}</div>`;
 }
@@ -138,5 +138,4 @@ document.addEventListener('error', e => {
   if (img?.tagName !== 'IMG' || !img.closest?.('.abcf .dc-th')) return;
   img.outerHTML = `<span class="dc-ph">${ic('picture')}</span>`;
 }, true);
-// 2.620.0 (#4616): a long press (phone) / right click (computer) opens the row's "…" menu: the click on its button, which the click guard of the press lets through (st.done = 0 for that one click)
-let abd_lpS; if (typeof cm_bind === 'function') abd_lpS = cm_bind('.abcards .dc-card', r => { const b = lm_btn(r, '[data-ab="menu"]'); if (!b) return false; const d = abd_lpS.done; abd_lpS.done = 0; b.click(); abd_lpS.done = d; return true; }, null, lm_keep);
+// 2.768.0 (#4888): a card's long press / right click is the area's one card menu (ablage.js ab_cardMenu, AB_CARDLP)

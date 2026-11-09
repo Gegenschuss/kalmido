@@ -28,7 +28,8 @@ const AREAS = [
   {name: 'inbound webhooks', mod: 'hookin', fn: 'whiMount', cls: 'whi-row', btn: 'data-whi-menu="1"', file: 'hookin.js', link: true},
   {name: 'file requests', mod: 'filereq', fn: 'frq_open', cls: 'frq-row', btn: 'data-frq="menu"', file: 'filereq.js', link: true},
   {name: 'table folder cards', mod: 'sheets', fn: 'shf_cardsHtml', cls: 'shfcard', btn: 'data-shf="fmenu"', file: 'sheetfold.js', link: false},
-  {name: 'file cards', mod: 'docs', fn: 'abd_card', cls: 'dc-card', btn: 'data-ab="menu"', file: 'abdocs.js', link: true},
+  // 2.768.0 (#4888): the file cards (abdocs.js) left this list: a card's long press / right click is the file store's one card menu
+  // (ablage.js ab_cardMenu, not the click on its "…"), tested with real cards in tests/p2768_a_ui.js
 ];
 
 (async () => {

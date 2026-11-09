@@ -25,7 +25,8 @@ from kt import FAILS, OKS, check  # noqa: E402
 
 # (file, the button's first data attribute, else its class) -> (how many unmarked buttons, why no row long press)
 RM_LEFT = {
-    ("ablage.js", 'data-ab="menu"'): (1, "the open folder's menu in the tool bar above the list (a page menu)"),
+    # 2.768.0 (#4888): + the bar above a folder with recognition (ab_foldTools, 2.752.0 #4887) - the count was stale since then
+    ("ablage.js", 'data-ab="menu"'): (2, "the open folder's menu in the tool bar above the list and above a folder with recognition (page menus)"),
     ("bookmarks.js", "summary"): (1, "the page menu of the bookmarks (import / export)"),
     ("budget.js", "summary"): (1, "the page menu of a budget"),
     ("feeds.js", "summary"): (1, "the page menu of the feeds (OPML import / export)"),

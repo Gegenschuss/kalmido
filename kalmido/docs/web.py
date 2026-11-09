@@ -21,7 +21,7 @@ from ..core.orgcrypt import OrgCryptError
 from ..accounts.session import me
 from ..accounts.mailtok import mtk_plain  # 2.674.0 (#4382 finding 5)
 from ..files.scan import sc_guard  # 2.306.0: pulled up from functions (layers budget)
-from ..files.store import fs_chain, fs_deleted, fs_log_add, fs_role, fs_visible_ids, fs_visible_sql, fs_version_row, need_node
+from ..files.store import fs_chain, fs_deleted, fs_log_add, fs_role, fs_roles_many, fs_visible_ids, fs_visible_sql, fs_version_row, need_node
 from . import store as S
 from .ingest import docs_ingest, docs_kick
 from .area import ar_sql, ar_view  # 2.522.0 (#4433)
@@ -377,6 +377,12 @@ def docs_list():
     rows, total, review = doc_query(c, uid, request.args, vis)
     pre = doc_prefetch(c, [r["node_id"] for r in rows])  # 2.525.0 (#4195): the row helpers in three queries, not per row
     out = [doc_json(c, r, pre["nodes"][r["node_id"]], pre=pre) for r in rows if r["node_id"] in pre["nodes"]]
+    # 2.768.0 (#4888): the role and owner of each row for the file store's one selection (what one may not change is left out
+    # and counted before the all-or-nothing trash / move); fs_roles_many reads the chains once for the whole page
+    roles = fs_roles_many(c, [d["id"] for d in out], uid)
+    for d in out:
+        d["role"] = (roles.get(d["id"]) or (False, None))[1] or "view"
+        d["owner_id"] = pre["nodes"][d["id"]]["owner_id"]
     waiting = c.execute(f"SELECT COUNT(*) FROM doc_meta d WHERE d.state IN ('wait','run') AND d.node_id {vis[0]}", (vis[1],)).fetchone()[0]
     res = {"docs": out, "total": total, "review": review, "waiting": waiting}
     if request.args.get("facets") != "0":

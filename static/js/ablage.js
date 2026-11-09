@@ -5,7 +5,7 @@
    Classic script sharing the global scope with the others (load order: index.html, docs/ARCHITECTURE.md). */
 'use strict';
 
-const AB = {space: LS.get('abSpace', ''), key: '', dkey: '', data: null, err: '', loading: false, seq: 0, sel: new Set(), drag: null};
+const AB = {space: LS.get('abSpace', ''), key: '', dkey: '', data: null, err: '', loading: false, seq: 0, sel: new Map(), selOn: false, drag: null};  // 2.768.0 (#4888): sel = the area's ONE selection (ab_selInfo)
 const ab_spaces = () => { const w = wsCur(); return [...(w === 'all' || w === 'private' || !wsOn() ? ['private'] : []), ...(wsOn() ? (S.me?.workspaces || []).filter(o => w === 'all' || w === 'org:' + o.id).map(o => 'org:' + o.id) : []), 'shared', 'trash']; };
 // 2.540.0 (#4575): "All workspaces" with more than one space of one's own (Private + an organisation): the top of the file
 // store is the overview of the spaces (areas.js spo_html, + Shared with me and the trash), the open one is in the address
@@ -77,6 +77,7 @@ const ab_reload = () => { AB.key = ''; ab_ptStale(); if (S.route.mod === 'ablage
 // ---- the view
 function viewAblage() {
   if (!ab_on()) return `<div class="empty">${setLinkHtml(tr('The file store is off (Settings > Modules)'))}</div>`;
+  ab_selKeep();  // 2.768.0 (#4888)
   if (typeof dt_abOn !== 'function' && typeof ld_later === 'function') ld_later('tagsel');  // 2.122.0 B (#2099 #2295): tags, Shift ranges
   if (typeof abd_cardsHtml !== 'function' && feat('docs') && typeof ld_later === 'function') ld_later('docs');  // 2.353.0 D (#2759): cards, recognition (abdocs.js)
   const r = S.route;
@@ -99,8 +100,8 @@ function viewAblage() {
   // its subfolders before them); every other folder its list as before
   const fold = !!(r.nid && d?.node && typeof abd_recogHere === 'function' && abd_recogHere(key) && typeof abd_foldHtml === 'function');
   const crumbs = r.nid && d ? `<nav class="abcrumbs" aria-label="${esc(tr('Path'))}">${ab_all() ? spo_upHtml('ablage') : '' /* 2.540.0 (#4575) */}<button type="button" class="linkbtn" data-ab="space" data-sp="${esc(sp === 'shared' || !sp ? 'shared' : sp)}" data-abdrop="top">${esc(ab_spaceName(sp || 'shared'))}</button>${(d.crumbs || []).map((c, i, a) => `<span class="abcsep" aria-hidden="true">/</span>${i === a.length - 1 ? `<span class="abccur" aria-current="page">${esc(c.name)}</span>` : `<button type="button" class="linkbtn" data-go="ablage/${c.id}" data-abdrop="${c.id}">${esc(c.name)}</button>`}`).join('')}</nav>` : ab_all() ? spo_crumbHtml('ablage', ab_spaceName(sp)) : `<h3 class="abtitle">${esc(ab_spaceName(sp))}</h3>`;  // 2.540.0 (#4575): under "All" the path back to the overview
-  const tools = trash ? ab_trashTools(d) : fold ? ab_foldTools(d, canAdd) : `<div class="abtools">${canAdd ? `<button type="button" class="btn sm" data-ab="new-folder">${ic('folder', 's')} ${tr('New folder')}</button><button type="button" class="btn sm pri" data-ab="upload">${ic('upload', 's')} ${tr('Upload')}</button>${d?.node?.locked ? '' : `<button type="button" class="btn sm" data-ab="scan">${ic('camera', 's')} ${tr('Scan')}</button>`}<input type="file" id="ab-file" multiple hidden>` : ''}${typeof dt_abOn === 'function' && dt_abOn(sp || d?.space) ? '' : ab_smvTools(d)}${typeof dt_abBtn === 'function' ? dt_abBtn(sp || d?.space) : ''}${!trash && d && typeof abd_toolsHtml === 'function' ? abd_toolsHtml(d, key) : ''}${r.nid && d?.node?.share_with ? `<button type="button" class="btn sm abshbtn" data-ab="share" data-id="${d.node.id}" title="${esc(tr('Share…'))}">${ic('users', 's')} ${tr('Share')}</button>` : '' /* 2.558.0 (#4693) */}${r.nid && d?.node ? `<button type="button" class="iconbtn" data-ab="menu" data-id="${d.node.id}" aria-label="${esc(tr('More actions for {0}', d.node.name))}" title="${esc(tr('More'))}">${ic('dots')}</button>` : ''}</div>`;
-  // 2.428.0 A (#3581): where "Select" is offered the rows' boxes show on hover too (ab_smvBox), not in the trash / tag filter / search
+  const tools = trash ? ab_trashTools(d) : fold ? ab_foldTools(d, canAdd) : `<div class="abtools">${canAdd ? `<button type="button" class="btn sm" data-ab="new-folder">${ic('folder', 's')} ${tr('New folder')}</button><button type="button" class="btn sm pri" data-ab="upload">${ic('upload', 's')} ${tr('Upload')}</button>${d?.node?.locked ? '' : `<button type="button" class="btn sm" data-ab="scan">${ic('camera', 's')} ${tr('Scan')}</button>`}<input type="file" id="ab-file" multiple hidden>` : ''}${typeof dt_abOn === 'function' && dt_abOn(sp || d?.space) ? '' : ab_selTools(d)}${typeof dt_abBtn === 'function' ? dt_abBtn(sp || d?.space) : ''}${!trash && d && typeof abd_toolsHtml === 'function' ? abd_toolsHtml(d, key) : ''}${r.nid && d?.node?.share_with ? `<button type="button" class="btn sm abshbtn" data-ab="share" data-id="${d.node.id}" title="${esc(tr('Share…'))}">${ic('users', 's')} ${tr('Share')}</button>` : '' /* 2.558.0 (#4693) */}${r.nid && d?.node ? `<button type="button" class="iconbtn" data-ab="menu" data-id="${d.node.id}" aria-label="${esc(tr('More actions for {0}', d.node.name))}" title="${esc(tr('More'))}">${ic('dots')}</button>` : ''}</div>`;
+  // 2.428.0 A (#3581): where "Select" is offered the rows' boxes show on hover too (ab_selBox), not in the trash / tag filter / search
   AB.selHere = !!d?.items?.length && !fold &&  /* 2.589.0 (#4875): the trash too */ !(typeof dt_abOn === 'function' && dt_abOn(sp || d.space)) && !(typeof ftxtActive === 'function' && ftxtActive());
   let body;
   if (r.aus) return `<div class="abview ${desk ? 'abdesk' : ''}">${desk ? '' : spaces}<div class="abmain">${ab_collHtml(d, sp)}</div></div>`;  // 2.429.0 (#3580)
@@ -116,7 +117,7 @@ function viewAblage() {
   if (search && ftxtActive()) body = ftxtResults();
   const hint = !r.nid && sp === 'private' && d && !d.items.length ? `<p class="muted abhint">${tr('Share a folder with a person or an agent: they see exactly that folder, nothing else.')}</p>` : '';
   const tdays = trash && d?.trash_days ? `<p class="muted abhint abtrashdays">${esc(trashNote(tr('Files and folders in the trash are deleted permanently after {0} days.', d.trash_days), d.purge_on === false))}</p>` : '';  // 2.152.0 B (#2165)
-  return `<div class="abview ${canAdd ? 'abdropok' : ''} ${desk ? 'abdesk' : ''}" data-abzone="${r.nid || ''}">${desk ? '' : spaces}<div class="abmain">${search}${search && ftxtActive() ? `<h3 class="abtitle">${tr('Search results')}</h3>` : crumbs + tools + (r.nid ? ab_shHead(d) : '') + ab_scanDoneHtml() + (!trash && d && typeof abd_recogLine === 'function' ? abd_recogLine(d) : '')}${body}${search && ftxtActive() ? '' : hint + tdays + ab_smvBar(trash)}</div></div>`;
+  return `<div class="abview ${canAdd ? 'abdropok' : ''} ${desk ? 'abdesk' : ''}" data-abzone="${r.nid || ''}">${desk ? '' : spaces}<div class="abmain">${search}${search && ftxtActive() ? `<h3 class="abtitle">${tr('Search results')}</h3>` : crumbs + tools + (r.nid ? ab_shHead(d) : '') + ab_scanDoneHtml() + (!trash && d && typeof abd_recogLine === 'function' ? abd_recogLine(d) : '')}${body}${search && ftxtActive() ? '' : hint + tdays + ab_selBar(trash)}</div></div>`;
 }
 // 2.752.0 (#4887): the file store's tools above a folder with recognition: New folder, Share, its menu (Upload and Scan are
 // "Add documents" / "Scan" in the documents' bar, the same way into the folder)
@@ -268,7 +269,7 @@ function ab_rowHtml(n, trash) {
     : `<button type="button" class="abopen" data-ab="open" data-id="${n.id}" ${n.kind === 'folder' ? `data-abdrop="${n.id}"` : ''}>${ab_icon(n)}<span class="abtxt"><span class="abname">${esc(n.name)}</span>${meta ? `<span class="abmeta2 muted">${esc(meta)}</span>` : ''}</span></button>`;  // abmeta2: the details below the name on phones
   const acts = trash ? `<button type="button" class="btn sm" data-ab="restore" data-id="${n.id}">${ic('undo', 's')} ${tr('Restore')}</button>${n.role === 'owner' ? `<button type="button" class="btn sm danger" data-ab="purge" data-id="${n.id}">${ic('trash', 's')} ${tr('Delete permanently')}</button>` : ''}`  // 2.589.0 (#4875): + for good (owners)
     : `<button data-rowmenu="abrow" type="button" class="iconbtn" data-ab="menu" data-id="${n.id}" aria-label="${esc(tr('More actions for {0}', n.name))}" title="${esc(tr('More'))}">${ic('dots')}</button>`;
-  return `<div class="abrow" role="listitem" data-abid="${n.id}" ${!trash && ab_canWrite(n.role) ? (rowd_touch() ? 'data-abmv="1"' : 'draggable="true"') : '' /* 2.627.0 (#4961): a finger by drag.js */}>${ab_smvBox(n)}${main}${typeof dt_abTags === 'function' ? dt_abTags(n) : ''}<span class="abmeta muted">${esc(meta)}</span><span class="abbadges">${badges}</span>${acts}</div>`;
+  return `<div class="abrow" role="listitem" data-abid="${n.id}" ${!trash && ab_canWrite(n.role) ? (rowd_touch() ? 'data-abmv="1"' : 'draggable="true"') : '' /* 2.627.0 (#4961): a finger by drag.js */}>${ab_selBox(n)}${main}${typeof dt_abTags === 'function' ? dt_abTags(n) : ''}<span class="abmeta muted">${esc(meta)}</span><span class="abbadges">${badges}</span>${acts}</div>`;
 }
 const ab_item = id => (AB.data?.items || []).find(x => x.id === +id) || (AB.data?.node?.id === +id ? AB.data.node : null) || (typeof ftxtItem === 'function' ? ftxtItem(id) : null) || (typeof dt_abItem === 'function' ? dt_abItem(id) : null);  // 2.61.0 (#1820): + search hits; 2.122.0 B: + tag filter hits
 
@@ -382,11 +383,7 @@ async function ab_moveDlg(n, at) {  // 2.768.0 (#4888): at = the anchor of the m
   const anchor = at || $(`[data-abid="${n.id}"] [data-ab="menu"]`) || $('[data-ab="menu"]') || document.body;
   menu(anchor, [{head: tr('Move to …')}, ...items.slice(0, 60)], null, null, tr('Move to …'));
 }
-async function ab_delete(n) {
-  let r; try { r = await api('DELETE', `/api/files/nodes/${n.id}`); } catch { return; }
-  if (S.route.nid === n.id) go(n.parent_id ? 'ablage/' + n.parent_id : ab_home(AB.data?.space || ab_nodeSp(n))); else ab_reload();
-  offerUndo([tr('“{0}” moved to the trash', n.name), fs_keptText(r?.kept)].filter(Boolean).join(' · '), histAdd({label: tr('Delete “{0}”', n.name), undo: () => ab_req('POST', `/api/files/nodes/${n.id}/restore`), redo: () => ab_req('DELETE', `/api/files/nodes/${n.id}`)}));
-}
+const ab_delete = n => abm_trash([n]);  // 2.768.0 (#4888): the same way as the bar (POST /api/files/trash, ONE undo)
 async function ab_restore(n) {
   let r; try { r = await api('POST', `/api/files/nodes/${n.id}/restore`); } catch { return; }
   ab_reload();
@@ -421,7 +418,8 @@ function ab_menu(anchor, n, pick) { menu(anchor, pick ? [...cm_selHead(n.name, p
 function ab_menuItems(n, tree) {
   const w = ab_canWrite(n.role), own = n.role === 'owner', f = n.kind !== 'folder', ref = n.kind === 'ref';
   return [
-    f ? {label: tr('Open'), icon: 'eye', fn: () => ab_openFile(n)} : null,
+    f ? {label: tr('Open'), icon: 'eye', fn: () => n._open ? n._open() : ab_openFile(n)} : null,  // 2.768.0 (#4888): _open = a document card's own way (its list to leaf through)
+    ...(f && n._spl && typeof spl_item === 'function' ? spl_item(n._spl) : []),  // 2.742.0 (#4858): a document card: Open on the right
     ...(ref ? [] : fv2_menuRow('file:' + n.id)),  // 2.441.0 (#3592)
     f && !ref ? {label: tr('Download'), icon: 'download', fn: () => { if (n._enc && typeof fsl_open === 'function') return fsl_open(n, true); const a = document.createElement('a'); a.href = ab_url(n, true); a.download = n.name; document.body.appendChild(a); a.click(); a.remove(); }} : null,
     tree && w && !f ? {label: tr('New folder…'), icon: 'plus', fn: () => ab_newFolder(n.id)} : null,
@@ -562,8 +560,10 @@ document.addEventListener('click', e => {
   if (a === 'new-folder') { ab_newFolder(); return; }
   if (a === 'upload') { $('#ab-file')?.click(); return; }
   if (a === 'scan') { abm_scan(); return; }  // 2.112.1 A (#2058)
-  if (a === 'open' && n && b.closest('.ablist') && AB.selHere && (AB.selOn || (ms_modClick(e) && !isMobile()))) { e.preventDefault(); ab_smvPick(n.id, e.shiftKey); return; }  // 2.428.0 A (#3581)
+  if (a === 'open' && n && b.closest('.ablist') && AB.selHere && (AB.selOn || (ms_modClick(e) && !isMobile()))) { e.preventDefault(); ab_selPick(n.id, e.shiftKey); return; }  // 2.428.0 A (#3581)
   if (a === 'open' && n) { if (n.kind === 'folder') go('ablage/' + n.id); else ab_openFile(n); return; }
+  if (a === 'menu' && b.closest('.dc-card')) { ab_cardMenu(b.closest('.dc-card'), b); return; }  // 2.768.0 (#4888): a card's "…" = its menu with "Select" on top
+  if (a === 'menu' && n && b.closest('.ablist') && ab_selMany(n.id)) { ab_selMenu(b); return; }  // 2.768.0 (#4888): a chosen row of several: the selection's menu
   if (a === 'menu' && n) { ab_menu(b, n); return; }
   if (a === 'share') { e.preventDefault(); e.stopPropagation(); ab_share(+b.dataset.id); return; }  // 2.558.0 (#4693): the names / "Share" on top
   if (a === 'scandone-x') { AB.scanDone = null; ab_draw(); return; }
@@ -581,10 +581,11 @@ function ab_ctxNode(id) {  // the panel's folders: from its cache, else asked fo
 const ab_canPickRow = r => AB.selHere && !!r.closest('.ablist') && !!ab_item(+r.dataset.abid);
 const ab_rowCm = r => {  // the panel's folders: sbb_treeReg('ab') menu (2.199.0)
   const m = r.querySelector('[data-ab="menu"]'), id = m && m.dataset.id; if (!id) return false;  // trash rows: no menu
-  const pick = ab_canPickRow(r) ? (rid => () => ab_smvPick(rid))(+r.dataset.abid) : null;
+  if (r.closest('.ablist') && ab_selMany(id)) { ab_selMenu(m); return true; }  // 2.768.0 (#4888)
+  const pick = ab_canPickRow(r) ? (rid => () => ab_selPick(rid))(+r.dataset.abid) : null;
   ab_ctxNode(id).then(n => { if (n && r.isConnected) ab_menu(m || r.querySelector('.sbbtn') || r, n, pick); });
   return true;
-}, ab_rowPick = r => { if (!AB.selOn || !ab_canPickRow(r)) return false; ab_smvPick(+r.dataset.abid); return true; };
+}, ab_rowPick = r => { if (!AB.selOn || !ab_canPickRow(r)) return false; ab_selPick(+r.dataset.abid); return true; };
 const AB_LP = cm_bind('#view .abview .abrow', ab_rowCm, ab_rowPick);
 document.addEventListener('change', e => { if (e.target.id === 'ab-file') { const fs = e.target.files; ab_upload(fs, S.route.nid || null); e.target.value = ''; } });
 // dropping files from the computer into the open folder / onto a folder row; dragging a row onto a folder (or the path) moves it
@@ -651,43 +652,113 @@ async function ab_linkFile(refKind, refId, org) {
   offerUndo(tr('“{0}” is now in your files', n.name), histAdd({label: tr('Show “{0}” in the file store', n.name), undo: () => ab_req('DELETE', `/api/files/nodes/${n.id}`), redo: () => ab_req('POST', `/api/files/nodes/${n.id}/restore`)}));
 }
 
-// ---- 2.96.0 A (#1941): choose several rows (checkboxes, big targets on phones) and move them -- within the space ("Move to…")
-// or into the other workspace (private <-> organisation, the shared dialog of spacemove.js). Each action = ONE undo step.
-const ab_smvOk = n => !!n && n.kind !== 'link' && !n.agent_id && ab_canWrite(n.role);
-const ab_smvSel = () => (AB.data?.items || []).filter(n => AB.sel.has(n.id));
-const ab_smvTools = d => d?.items?.length && !(typeof ftxtActive === 'function' && ftxtActive()) ? `<button type="button" class="btn sm ${AB.selOn ? 'on' : ''}" data-absel="mode" aria-pressed="${!!AB.selOn}">${ic('check', 's')} ${tr('Select')}</button>` : '';
-const ab_smvBox = n => AB.selOn || AB.selHere ? `<label class="absel" title="${esc(tr('Select {0}', n.name))}"><input type="checkbox" data-absel="one" data-id="${n.id}" ${AB.sel.has(n.id) ? 'checked' : ''} aria-label="${esc(tr('Select {0}', n.name))}"></label>` : '';
-// 2.428.0 A (#3581): the shared floating bar (multisel.js ms_barHtml): Move, Download, Delete (trash); another workspace under "More"
-function ab_smvBar(trash) {
+// ---- 2.768.0 (#4888): ONE selection of the area "Files" for rows AND cards (documents, files, folders) in every view of it: a
+// folder's list or cards, a folder with recognition (abdocs.js), All documents and To review (docs.js). AB.sel = id -> what the
+// bar needs of the node (ab_selInfo: the node's own field names, isdoc = a document); ONE bar (ab_selBar, multisel.js ms_barHtml):
+// All, Move (a folder of the area), Download (one file as it is, else a ZIP), Edit (tags, type, sender, what was learned: only with
+// documents chosen, docs.js dc_bulkMenu), Move to the trash (asks with the number, ONE undo), More (CSV of the documents, another
+// workspace). What the person may not change is left out and counted ("2 skipped"): the server's bulk routes are all or nothing.
+// The trash keeps its own bar (ab_trashBar). Replaces AB.sel / AB.selOn of the rows + DC.sel / DC.selOn of the document cards and
+// their two bars (2.96.0 A #1941, 2.428.0 A #3581, 2.430.0 #3582). Each action = ONE undo step.
+const ab_smvOk = n => !!n && n.kind !== 'link' && !n.agent_id && ab_canWrite(n.role);  // another workspace (2.96.0 A, #1941)
+const ab_selInfo = x => ({id: x.id, name: x.name || '', kind: x.kind || 'file', role: x.role || '', org_id: x.org_id || null, parent_id: x.parent_id ?? null,
+  owner_id: x.owner_id ?? null, agent_id: x.agent_id || null, locked: !!x.locked, up: x.up || null, isdoc: x.kind ? !!x.doc : !x.file});
+// a node of the open folder (with its document, when the documents' list has it) or a document of the list (docs.js DC.docs)
+function ab_selObj(id) {
+  const n = ab_item(id), d = typeof DC === 'undefined' ? null : (DC.docs || []).find(x => x.id === id);
+  return n ? (d && !n.doc ? {...n, doc: d} : n) : d;
+}
+const ab_selFold = () => typeof dc_inFold === 'function' && dc_inFold();
+const ab_selDocs = () => S.route.mod === 'docs' || ab_selFold();  // the documents' list is on screen (its own route or a folder's)
+const ab_selOrder = () => $$('#view .ablist .abrow[data-abid], #view .dc-card [data-dcchk]').map(x => +(x.dataset.abid || x.dataset.dcchk));
+// everything one can choose here: the rows / cards shown and the documents the list has not loaded yet ("All" = every hit, dc_smvAll)
+const ab_selTotal = () => ab_selDocs() ? ab_selOrder().length + Math.max(0, (DC.total || 0) - (DC.docs || []).length) : (AB.data?.items || []).length;
+const ab_selCtx = () => S.route.mod === 'docs' ? 'docs:' + (S.route.review ? 'r' : '') + ':' + (S.route.dv || '') : 'ab:' + ab_key(S.route);
+function ab_selKeep() { const k = ab_selCtx(); if (AB.selCtx !== k) { AB.selCtx = k; ab_selEnd(); } }  // another folder / list: the choice ends
+const ab_selEnd = () => { AB.sel.clear(); AB.selOn = false; AB.selLast = null; };
+const ab_selDraw = () => { if (S.route.mod === 'docs' && typeof dc_draw === 'function') dc_draw(); else ab_draw(); };
+const ab_selVals = () => [...AB.sel.values()];
+const ab_skipTxt = k => k ? tr('{0} skipped', k) : '';
+const ab_selTools = d => d?.items?.length && !(typeof ftxtActive === 'function' && ftxtActive()) ? `<button type="button" class="btn sm ${AB.selOn ? 'on' : ''}" data-absel="mode" aria-pressed="${!!AB.selOn}">${ic('check', 's')} ${tr('Select')}</button>` : '';
+const ab_selBox = n => AB.selOn || AB.selHere ? `<label class="absel" title="${esc(tr('Select {0}', n.name))}"><input type="checkbox" data-absel="one" data-id="${n.id}" ${AB.sel.has(n.id) ? 'checked' : ''} aria-label="${esc(tr('Select {0}', n.name))}"></label>` : '';
+function ab_selBar(trash) {
   if (!AB.selOn) return '';
   if (trash) return ab_trashBar();  // 2.589.0 (#4875)
-  const ns = ab_smvSel(), all = (AB.data?.items || []).length, ok = ns.length > 0 && ns.every(ab_smvOk);
-  const h = ms_barHtml('ab-sbar', 'absel', ns.length, tr('Tap files'), [['all', 'all', ns.length && ns.length === all ? tr('Select none') : tr('All')],
-    ['move', 'arrow', tr('Move')], ['dl', 'download', tr('Download')], ['trash', 'trash', tr('Delete'), 'danger'], ...smv_can(ns[0]?.org_id || null) ? [['more', 'dots', tr('More')]] : []]);
-  // a button some of the chosen rows cannot take stays off (as before); the bar's own rule only knows "nothing chosen"
-  const off = {move: !ok, dl: !ns.some(abm_dlOk), trash: !ns.every(abm_trashOk), more: !ok};
-  return h.replace(/<button type="button" class="mbb [^"]*" data-absel="(\w+)"/g, (m, k) => off[k] && ns.length ? m + ' disabled' : m);
+  const xs = ab_selVals(), n = xs.length, docs = xs.some(x => x.isdoc), more = docs || smv_can(xs[0]?.org_id || null);
+  return ms_barHtml('ab-sbar', 'absel', n, tr('Tap files'), [['all', 'all', n && n >= ab_selTotal() ? tr('Select none') : tr('All')],
+    ['move', 'arrow', tr('Move')], ['dl', 'download', tr('Download')], ...docs ? [['edit', 'edit', tr('Edit')]] : [], ['trash', 'trash', tr('Move to the trash'), 'danger'], ...more ? [['more', 'dots', tr('More')]] : []]);
 }
-const ab_smvMore = (b, ns) => menu(b, [{label: tr('Move to another workspace…'), icon: 'building', cls: 'msm-space', fn: () => ab_smvSpace(ns)}], null, null, tr('Selection'));
-const ab_smvEnd = () => { AB.sel.clear(); AB.selOn = false; };
-// several rows into one folder of the same space (the server refuses another tree / a folder into itself)
-async function ab_smvMoveDlg(ns) {
-  let fs; try { fs = (await api('GET', '/api/files/folders?ablage=1')).folders; } catch { return; }
-  const n0 = ns[0], ids = new Set(ns.map(n => n.id));
-  const ok = fs.filter(f => (f.org_id || null) === (n0.org_id || null) && f.owner_id === n0.owner_id && !ids.has(f.id));
-  const go2 = async target => {
-    const done = [];
-    for (const n of ns) {
-      if ((n.parent_id ?? null) === (target || null)) continue;
-      try { await api('PATCH', `/api/files/nodes/${n.id}`, {parent_id: target || null}); done.push({id: n.id, was: n.parent_id ?? null}); } catch { break; }
-    }
-    ab_smvEnd(); ab_reload();
-    if (!done.length) return;
-    const all = async to => { for (const x of done) await ab_req('PATCH', `/api/files/nodes/${x.id}`, {parent_id: to(x)}); return {}; };
-    offerUndo(trn('{0} item moved', '{0} items moved', done.length), histAdd({label: tr('Move to…'), undo: () => all(x => x.was), redo: () => all(() => target || null)}));
-  };
-  const items = [{label: tr('Top level'), icon: 'up', fn: () => go2(null)}, ...ok.map(f => ({label: f.path, icon: 'folder', fn: () => go2(f.id)}))];
-  menu($('[data-absel="move"]') || document.body, [{head: tr('Move to …')}, ...items.slice(0, 60)], null, null, tr('Move to …'));
+// a tap while choosing / Ctrl- or Cmd-click / the box: one row or card; Shift: the range from the last one (the anchor stays)
+function ab_selPick(id, shift) {
+  id = +id;
+  if (!AB.selOn) { AB.selOn = true; AB.sel.clear(); AB.selLast = null; }
+  const on = !AB.sel.has(id), ids = shift && AB.selLast != null && AB.selLast !== id ? ms_range(ab_selOrder(), AB.selLast, id) : [id];
+  for (const x of ids) { const o = on && ab_selObj(x); if (o) AB.sel.set(x, ab_selInfo(o)); else if (!on) AB.sel.delete(x); }
+  if (ids.length === 1) AB.selLast = id;
+  ab_selDraw();
+}
+async function ab_selAll() {
+  if (AB.sel.size && AB.sel.size >= ab_selTotal()) { AB.sel.clear(); ab_selDraw(); return; }
+  for (const id of ab_selOrder()) if (!AB.sel.has(id)) { const o = ab_selObj(id); if (o) AB.sel.set(id, ab_selInfo(o)); }
+  if (ab_selDocs() && typeof dc_smvAll === 'function' && (DC.total || 0) > (DC.docs || []).length) await dc_smvAll();  // every hit (at most DC_SMV_MAX)
+  ab_selDraw();
+}
+const ab_relist = () => { ab_reload(); if (S.route.mod === 'docs' && typeof dc_load === 'function') { DC.facets = null; dc_load(); } };
+// several nodes into one folder of the same space (the server refuses another tree / a folder into itself: counted as skipped)
+async function ab_selMove(anchor) {
+  const xs = ab_selVals(), ok = xs.filter(x => ab_canWrite(x.role)), skip = xs.length - ok.length;
+  if (!ok.length) { toast(ab_skipTxt(skip)); return; }
+  const org = ok[0].org_id || null;
+  if (ok.some(x => (x.org_id || null) !== org)) { toast(tr('Select items of one workspace')); return; }
+  let fs; try { fs = (await api('GET', '/api/files/folders?ablage=1')).folders; } catch { return; }  // no folder in the trash (#4881)
+  const own = ok.find(x => x.owner_id != null)?.owner_id, ids = new Set(ok.map(x => x.id));
+  const tg = fs.filter(f => (f.org_id || null) === org && (own == null || f.owner_id === own) && !ids.has(f.id));
+  const items = [{label: tr('Top level'), icon: 'up', fn: () => ab_selMoveTo(ok, null, skip)}, ...tg.map(f => ({label: f.path, icon: 'folder', fn: () => ab_selMoveTo(ok, f.id, skip)}))];
+  menu(anchor || $('[data-absel="move"]') || document.body, [{head: tr('Move to …')}, ...items.slice(0, 60)], null, null, tr('Move to …'));
+}
+async function ab_selMoveTo(xs, target, skip = 0) {
+  const done = [];
+  for (const x of xs) {
+    if ((x.parent_id ?? null) === (target || null)) continue;
+    try { await rawFetch('PATCH', `/api/files/nodes/${x.id}`, {parent_id: target || null}); done.push({id: x.id, was: x.parent_id ?? null}); }
+    catch (e) { if (!e.status || e.status >= 500) { toast(e.message || tr('unknown')); break; } skip++; }  // refused: skipped, the rest goes on
+  }
+  ab_selEnd(); ab_relist(); ab_selDraw();
+  if (!done.length) { if (skip) toast(ab_skipTxt(skip)); return; }
+  const all = async to => { for (const x of done) { try { await api('PATCH', `/api/files/nodes/${x.id}`, {parent_id: to(x)}); } catch { /* shown */ } } ab_relist(); return {}; };
+  offerUndo([trn('{0} item moved', '{0} items moved', done.length), ab_skipTxt(skip)].filter(Boolean).join(' · '), histAdd({label: tr('Move to…'), undo: () => all(x => x.was), redo: () => all(() => target || null)}));
+}
+function ab_selDl() {
+  const xs = ab_selVals(), ok = xs.filter(abm_dlOk), skip = xs.length - ok.length;
+  if (!ok.length) { toast(ab_skipTxt(skip)); return; }
+  if (ok.length > 1 && ok.every(x => x.isdoc) && typeof dc_zip === 'function') dc_zip(ok.map(x => x.id)); else abm_download(ok);
+  if (skip) toast(ab_skipTxt(skip));
+}
+async function ab_selTrash() {
+  const xs = ab_selVals(), ok = xs.filter(abm_trashOk), skip = xs.length - ok.length;
+  if (!ok.length) { toast(ab_skipTxt(skip)); return; }
+  if (!await askConfirm(trn('Move {0} item to the trash?', 'Move {0} items to the trash?', ok.length), [abm_countText(ok), ab_skipTxt(skip)].filter(Boolean).join(' · '),
+    {ok: tr('Move to the trash'), danger: true})) return;
+  abm_trash(ok, {skip, end: true});
+}
+function ab_selMoreItems() {
+  const xs = ab_selVals(), docs = xs.filter(x => x.isdoc), orgs = new Set(xs.map(x => x.org_id || null)), from = orgs.size === 1 ? [...orgs][0] : null;
+  return [docs.length && typeof dcx_csv === 'function' ? {label: tr('Export as CSV'), icon: 'download', cls: 'msm-csv', fn: () => dcx_csv(docs.map(x => x.id))} : null,
+    orgs.size <= 1 && smv_can(from) ? {label: tr('Move to another workspace…'), icon: 'building', cls: 'msm-space', fn: () => ab_selSpace(xs)} : null].filter(Boolean);
+}
+const ab_selMore = b => menu(b, ab_selMoreItems(), null, null, tr('Selection'));
+// a right click (or the "…") on a chosen row / card while several are chosen: what the bar offers, as a menu (the same functions)
+function ab_selMenu(anchor) {
+  const n = AB.sel.size, docs = ab_selVals().some(x => x.isdoc), later = fn => () => setTimeout(fn, 0);  // a second menu after this one closed
+  menu(anchor, [{label: tr('{0} selected', n), cls: 'mhead', dis: true, fn: () => {}}, '-', {label: tr('Move to…'), icon: 'arrow', cls: 'msm-move', fn: later(() => ab_selMove(anchor))},
+    {label: tr('Download'), icon: 'download', cls: 'msm-dl', fn: ab_selDl}, docs && typeof dc_bulkMenu === 'function' ? {label: tr('Edit'), icon: 'edit', cls: 'msm-edit', fn: later(() => dc_bulkMenu(anchor))} : null,
+    ...ab_selMoreItems(), '-', {label: tr('Move to the trash'), icon: 'trash', cls: 'danger msm-trash', fn: ab_selTrash}].filter(Boolean), null, null, tr('Selection'));
+}
+const ab_selMany = id => AB.selOn && AB.sel.size > 1 && AB.sel.has(+id);
+// documents of the documents' list go into the documents folder there (docs.js dc_smvMove), anything else asks for the place
+function ab_selSpace(xs) {
+  if (S.route.mod === 'docs' && xs.every(x => x.isdoc) && typeof dc_smvMove === 'function') return dc_smvMove(new Map(xs.map(x => [x.id, x.org_id || null])), trn('{0} document', '{0} documents', xs.length));
+  return ab_smvSpace(xs);
 }
 async function ab_smvPlaces(to) {
   const fs = (await api('GET', '/api/files/folders?ablage=1')).folders || [];
@@ -705,62 +776,104 @@ async function ab_smvSpace(ns) {
   const r = await smv_open({what: ns.length === 1 ? `“${ns[0].name}”` : trn('{0} item', '{0} items', ns.length), from, places: ab_smvPlaces, total: ids.length,  // 2.147.1 B (#2230): batches + progress
     check: (to, p) => ab_smvDry(req(to, p)), run: (to, p, _o, step) => { last = req(to, p); return smv_post('/api/files/move-space', last, 'ids', step); }});
   if (!r?.moved || !last) return;
-  ab_smvEnd();
-  if (S.route.nid && ids.includes(S.route.nid)) go(r.moved[0].parent_was ? 'ablage/' + r.moved[0].parent_was : 'ablage'); else ab_reload();
+  ab_selEnd();
+  if (S.route.nid && ids.includes(S.route.nid)) go(r.moved[0].parent_was ? 'ablage/' + r.moved[0].parent_was : 'ablage'); else ab_relist();
   const back = {items: r.moved.map(m => ({id: m.id, parent: m.parent_was, name: m.name_was})), to: smv_ws(r.org_was)}, again = last;
-  const post = async (b, key) => { try { await smv_post('/api/files/move-space', b, key); } catch { /* shown */ } ab_reload(); return {}; };
+  const post = async (b, key) => { try { await smv_post('/api/files/move-space', b, key); } catch { /* shown */ } ab_relist(); return {}; };
   offerUndo(smv_label(r, ids.length), histAdd({label: tr('Move to another workspace'),
     undo: () => post(back, 'items'), redo: () => post(again, 'ids')}));
 }
 document.addEventListener('click', e => {
-  const b = e.target.closest?.('[data-absel]'); if (!b || !b.closest('.abview') || b.dataset.absel === 'one') return;
-  const a = b.dataset.absel, items = AB.data?.items || [];
-  if (a === 'mode') { AB.selOn = !AB.selOn; AB.sel.clear(); ab_draw(); }
-  else if (a === 'off' || a === 'close') { ab_smvEnd(); ab_draw(); }
-  else if (a === 'all') { const all = !!items.length && ab_smvSel().length === items.length; AB.sel = new Set(all ? [] : items.map(n => n.id)); ab_draw(); }
-  else if (a === 'move') ab_smvMoveDlg(ab_smvSel());
-  else if (a === 'space') ab_smvSpace(ab_smvSel());
-  else if (a === 'dl') abm_download(ab_smvSel());  // 2.112.1 A (#2058)
-  else if (a === 'trash') abm_trash(ab_smvSel());
-  else if (a === 'more') ab_smvMore(b, ab_smvSel());
-  else if (a === 'restore') abm_restoreSel(ab_smvSel());  // 2.589.0 (#4875): the trash's bar
-  else if (a === 'purge') abm_purge(ab_smvSel());
+  const b = e.target.closest?.('[data-absel]'); if (!b || !b.closest('.abview, .dc-view') || b.dataset.absel === 'one') return;
+  const a = b.dataset.absel;
+  if (a === 'mode') { const on = !AB.selOn; ab_selEnd(); AB.selOn = on; ab_selDraw(); }
+  else if (a === 'off' || a === 'close') { ab_selEnd(); ab_selDraw(); }
+  else if (a === 'all') ab_selAll();
+  else if (a === 'move') ab_selMove(b);
+  else if (a === 'dl') ab_selDl();  // 2.112.1 A (#2058)
+  else if (a === 'edit' && typeof dc_bulkMenu === 'function') dc_bulkMenu(b);  // 2.122.0 B (#2294)
+  else if (a === 'trash') ab_selTrash();
+  else if (a === 'more') ab_selMore(b);
+  else if (a === 'restore') abm_restoreSel(ab_selVals());  // 2.589.0 (#4875): the trash's bar
+  else if (a === 'purge') abm_purge(ab_selVals());
 });
-// 2.428.0 A (#3581): a box ticked on hover starts choosing; Ctrl / Cmd / Shift + click on a row (computer) chooses it, a tap
-// while choosing too; a long press (phone) starts it (cm_bind below); Esc ends it
-function ab_smvPick(id, shift) {
-  if (!AB.selOn) { AB.selOn = true; AB.sel.clear(); AB.selLast = null; }
-  const order = (AB.data?.items || []).map(n => n.id);
-  const ids = shift && AB.selLast != null ? ms_range(order, AB.selLast, id) : [id], on = !AB.sel.has(id);
-  for (const x of ids) if (on) AB.sel.add(x); else AB.sel.delete(x);
-  AB.selLast = id; if (typeof dt_rsAnchor === 'function') dt_rsAnchor('ab:' + AB.dkey, id);  // tagsel.js takes the next Shift / Ctrl-click from here
-  ab_draw();
-}
-kb_on('view', 'Escape', () => { if (!(AB.selOn && $('#view .abview') && !$('.modal, .lightbox') && $('#pop')?.classList.contains('hidden'))) return false; ab_smvEnd(); ab_draw(); }); // 2.630.0 (#4510): key registry (keys.js), after the open dialogs / menus
+kb_on('view', 'Escape', () => { if (!(AB.selOn && $('#view .abview, #view .dc-view') && !$('.modal, .lightbox') && $('#pop')?.classList.contains('hidden'))) return false; ab_selEnd(); ab_selDraw(); }); // 2.630.0 (#4510): key registry (keys.js), after the open dialogs / menus
+// a row's box ticked on hover starts choosing (2.428.0 A, #3581)
 document.addEventListener('change', e => {
   const b = e.target.closest?.('[data-absel="one"]'); if (!b) return;
-  const id = +b.dataset.id; if (b.checked) AB.sel.add(id); else AB.sel.delete(id);
-  AB.selOn = true; AB.selLast = id;  // 2.428.0 A (#3581): a box ticked on hover starts choosing
-  ab_draw();
+  const id = +b.dataset.id;
+  if (!AB.selOn) { AB.selOn = true; AB.sel.clear(); }
+  if (b.checked) { const o = ab_selObj(id); if (o) AB.sel.set(id, ab_selInfo(o)); } else AB.sel.delete(id);
+  AB.selLast = id; ab_selDraw();
 });
+// Shift / Ctrl / Cmd on a row's box (2.122.0 B #2295, was tagsel.js); a card's mark, Ctrl- / Cmd- / Shift-click (computer) and a
+// tap while choosing on a card (#4612: while choosing runs a tap ticks, like the rows). Before the cards' own click (open)
+document.addEventListener('click', e => {
+  const t = e.target, box = t.closest?.('#view [data-absel="one"]');
+  if (box) {
+    if (!(e.shiftKey || e.ctrlKey || e.metaKey)) return;
+    e.preventDefault(); e.stopPropagation(); ab_selPick(+box.dataset.id, e.shiftKey);
+    setTimeout(() => { for (const x of $$('#view [data-absel="one"]')) x.checked = AB.sel.has(+x.dataset.id); }, 0);  // the cancelled click puts the box back
+    return;
+  }
+  const c = t.closest?.('#view .dc-card'); if (!c || !c.closest('.dc-view, .abcards')) return;
+  const k = t.closest('[data-dcchk]');
+  if (k) { e.preventDefault(); e.stopPropagation(); ab_selPick(+k.dataset.dcchk, e.shiftKey); return; }
+  if (t.closest('.abcmenu, .abcshw') || !(AB.selOn || (ms_modClick(e) && !isMobile()))) return;
+  const id = ab_cardId(c); if (!id) return;
+  e.preventDefault(); e.stopPropagation(); ab_selPick(id, e.shiftKey);
+}, true);
+
+// ---- 2.768.0 (#4888): ONE menu of a card (document, file, folder) by a right click, a long press and its "…": "Select" on top
+// (#4612, multisel.js cm_selHead), then the file row's items (ab_menuItems; the node from GET /api/files/nodes/<id> when the
+// folder did not load it, as ab_ctxNode); while choosing runs a long press ticks the card. Replaces docs.js dc_cardMenu (Open
+// and Select only) and abdocs.js abd_lpS (the click on the "…")
+const ab_cardId = c => +(c.querySelector('[data-dcchk]')?.dataset.dcchk || c.querySelector('[data-dco]')?.dataset.dco || c.querySelector('[data-ab="open"]')?.dataset.id || 0);
+function ab_cardMenu(c, anchor) {
+  const id = ab_cardId(c); if (!id) return false;
+  if (ab_selMany(id)) { ab_selMenu(anchor || c); return true; }
+  const doc = !!c.querySelector('[data-dco]'), fold = !!c.closest('.abview');
+  ab_ctxNode(id).then(n => {
+    if (!n || !c.isConnected) return;
+    const x = doc ? {...n, doc: n.doc || {id}, _spl: '#docs/' + id, _open: () => dc_open(id, fold && typeof abd_navIds === 'function' ? {list: abd_navIds()} : {})} : n;
+    ab_menu(anchor || c.querySelector('[data-ab="menu"]') || c, x, () => ab_selPick(id));
+  });
+  return true;
+}
+const ab_cardPick = c => { if (!AB.selOn) return false; const id = ab_cardId(c); if (!id) return false; ab_selPick(id); return true; };
+const AB_CARDLP = cm_bind('.dc-view .dc-card, .abcards .dc-card', c => ab_cardMenu(c), ab_cardPick, lm_keep);
 
 // ---- 2.112.1 A (#2058): the selection into the trash (ONE undo step for all), download (one file as it is, else a ZIP),
 // a folder as a ZIP, the phone scan (abscan.js) into the open folder
 const abm_trashOk = n => ab_canWrite(n.role) && (n.parent_id || n.role === 'owner');
 const abm_dlOk = n => n.kind === 'folder' || (n.kind === 'file' && !upLocked(n));
-async function abm_trash(ns) {
-  ns = ns.filter(abm_trashOk); if (!ns.length) return;
-  let r; try { r = await api('POST', '/api/files/trash', {ids: ns.map(n => n.id)}); } catch { return; }
-  const ids = r.ids || ns.map(n => n.id);
-  ab_smvEnd(); ab_reload();
-  offerUndo([trn('{0} item moved to the trash', '{0} items moved to the trash', ns.length), fs_keptText(r.kept)].filter(Boolean).join(' · '), histAdd({label: tr('Move to the trash'),  // 2.199.0 A (#2742): + what stayed
-    undo: () => ab_req('POST', '/api/files/restore', {ids}), redo: () => ab_req('POST', '/api/files/trash', {ids})}));
+// 2.768.0 (#4888): the ONE way into the trash - the bar, a row's or card's menu, the document view (docs.js): POST /api/files/trash
+// in parts of 500 (all or nothing per part: what may not go is left out first and counted), ONE undo step (POST /api/files/restore).
+// o.skip = already left out, o.end = the selection ends (the bar; otherwise only these leave it). -> the ids that went, or null
+async function abm_trash(ns, o = {}) {
+  const ok = ns.filter(abm_trashOk), skip = (o.skip || 0) + ns.length - ok.length;
+  if (!ok.length) { if (skip) toast(ab_skipTxt(skip)); return null; }
+  const ids = [], kept = [];
+  for (let i = 0; i < ok.length; i += 500) {
+    const part = ok.slice(i, i + 500).map(n => n.id);
+    let r; try { r = await api('POST', '/api/files/trash', {ids: part}); } catch { break; }
+    ids.push(...(r.ids || part)); kept.push(...(r.kept || []));
+  }
+  if (o.end) ab_selEnd(); else for (const n of ok) AB.sel.delete(n.id);
+  const cur = ok.find(n => n.id === S.route.nid && S.route.mod === 'ablage');  // the open folder went: its parent
+  if (cur) go(cur.parent_id ? 'ablage/' + cur.parent_id : ab_home(AB.data?.space || ab_nodeSp(cur))); else ab_relist();
+  if (!ids.length) return null;
+  const post = async url => { for (let i = 0; i < ids.length; i += 500) { try { await api('POST', url, {ids: ids.slice(i, i + 500)}); } catch { /* shown */ } } ab_relist(); return {}; };
+  const what = ok.length === 1 ? tr('“{0}” moved to the trash', ok[0].name) : trn('{0} item moved to the trash', '{0} items moved to the trash', ok.length);
+  offerUndo([what, fs_keptText(kept), ab_skipTxt(skip)].filter(Boolean).join(' · '), histAdd({label: ok.length === 1 ? tr('Delete “{0}”', ok[0].name) : tr('Move to the trash'),  // 2.199.0 A (#2742): + what stayed
+    undo: () => post('/api/files/restore'), redo: () => post('/api/files/trash')}));
+  return ids;
 }
 // ---- 2.589.0 (#4875): the trash: "Empty trash" on top, several rows back or for good (POST /api/files/trash/purge: only what
 // the person owns goes, the rest stays and is counted)
-const ab_trashTools = d => d?.items?.length ? `<div class="abtools">${ab_smvTools(d)}<button type="button" class="btn sm danger" data-ab="trash-empty">${ic('trash', 's')} ${tr('Empty trash')}</button></div>` : '';
+const ab_trashTools = d => d?.items?.length ? `<div class="abtools">${ab_selTools(d)}<button type="button" class="btn sm danger" data-ab="trash-empty">${ic('trash', 's')} ${tr('Empty trash')}</button></div>` : '';
 function ab_trashBar() {
-  const ns = ab_smvSel(), all = (AB.data?.items || []).length;
+  const ns = ab_selVals(), all = (AB.data?.items || []).length;
   const h = ms_barHtml('ab-sbar', 'absel', ns.length, tr('Tap files'), [['all', 'all', ns.length && ns.length === all ? tr('Select none') : tr('All')],
     ['restore', 'undo', tr('Restore')], ['purge', 'trash', tr('Delete permanently'), 'danger']]);
   return ns.length && !ns.some(n => n.role === 'owner') ? h.replace(/(data-absel="purge")/, '$1 disabled') : h;
@@ -772,7 +885,7 @@ async function abm_restoreSel(ns) {
   if (!ns.length) return;
   const ids = ns.map(n => n.id);
   let r; try { r = await api('POST', '/api/files/restore', {ids}); } catch { return; }
-  ab_smvEnd(); ab_reload();
+  ab_selEnd(); ab_reload();
   offerUndo(trn('{0} item restored', '{0} items restored', (r.ids || ids).length), histAdd({label: tr('Restore'),
     undo: () => ab_req('POST', '/api/files/trash', {ids}), redo: () => ab_req('POST', '/api/files/restore', {ids})}));
 }
@@ -788,7 +901,7 @@ async function abm_purge(ns) {
   if (!await askConfirm(ns ? trn('Delete {0} item permanently?', 'Delete {0} items permanently?', own.length) : tr('Empty the trash permanently?'), txt,
     {ok: ns ? tr('Delete permanently') : tr('Empty trash'), danger: true})) return;
   let r; try { r = await api('POST', '/api/files/trash/purge', ns ? {ids: rows.map(n => n.id)} : {all: true}); } catch { return; }
-  ab_smvEnd(); ab_reload();
+  ab_selEnd(); ab_reload();
   toast([trn('{0} item deleted permanently', '{0} items deleted permanently', r.deleted || 0),
     r.kept ? trn('{0} stayed, it belongs to someone else', '{0} stayed, they belong to others', r.kept) : '',
     r.locked ? trn('{0} stayed, it is kept by law (retention)', '{0} stayed, they are kept by law (retention)', r.locked) : ''].filter(Boolean).join(' · '), null, r.kept || r.locked ? 6000 : undefined);

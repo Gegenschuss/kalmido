@@ -38,7 +38,7 @@ const upload = async (ck, name, text) => {
   // ================= 25 files: busy button + progress bar + one undo
   const w = await boot({user: 'alice', hash: 'ablage/s/private', ls: {abSpace: '"private"'}}), d = w.document;  // 2.540.0 (#4575): under "All workspaces" #ablage is the overview of the spaces; the private space has its address
   await until(() => d.querySelector(`.abrow[data-abid="${ids[0]}"]`));
-  w.eval(`AB.selOn = true; AB.sel = new Set(${JSON.stringify(ids)}); ab_smvSpace(AB.data.items.filter(x => AB.sel.has(x.id)))`);
+  w.eval(`ab_smvSpace(AB.data.items.filter(x => ${JSON.stringify(ids)}.includes(x.id)))`);  // 2.768.0 (#4888): AB.sel is the area's one selection (a Map); the move takes the nodes
   const md = await until(() => d.querySelector('.smv-dlg'));
   const yes = md && await until(() => !md.querySelector('[data-smv="yes"]').disabled && md.querySelector('.smv-notes li') && md, 60);
   check(md?.querySelector('.smv-bar[role="progressbar"]') && md.querySelector('.smv-prog')?.hidden, 'the bar exists for 25 items, hidden before the move');

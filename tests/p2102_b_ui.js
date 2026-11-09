@@ -78,9 +78,9 @@ const css = f => { for (const base of [path.join(__dirname, '..', 'static'), pat
   const fu = new FormData(); fu.append('file', new Blob(['erste Datei']), 'eins.txt'); fu.append('space', 'private');
   await fetch(B + 'api/files/upload', {method: 'POST', headers: {'X-Requested-With': 'kalmido', Cookie: CK}, body: fu});
   w = await boot({user: 'alice', hash: 'docs', mobile: true}); d = w.document;
-  await until(() => d.querySelector('[data-dcsel="mode"]'));
+  await until(() => d.querySelector('.dc-view [data-absel="mode"]'));  // 2.768.0 (#4888): the area's one selection (ablage.js)
   check(!d.querySelector('.dc-grid.dc-selon'), 'documents: no extra room outside choosing');
-  d.querySelector('[data-dcsel="mode"]').click();
+  d.querySelector('.dc-view [data-absel="mode"]').click();
   check(await until(() => d.querySelector('.dc-grid.dc-selon .dc-selmark')), 'documents: choosing -> the grid has room for the bar, the cards a mark');
   w.close();
   w = await boot({user: 'alice', hash: 'ablage', mobile: true, ls: {abSpace: '"private"'}}); d = w.document;

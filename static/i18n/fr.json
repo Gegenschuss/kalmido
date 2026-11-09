@@ -17894,6 +17894,7 @@
   "The app's code changed without a new version": "Le code de l'app a changé sans nouvelle version",
   "Guide": "Guide",
   "A row was not imported, its amount is not a number with at most two decimal places: {0} ({1})": "Une ligne n’a pas été importée, son montant n’est pas un nombre avec au plus deux décimales : {0} ({1})",
+  "Move {0} item to the trash?": ["Mettre {0} élément à la corbeille ?", "Mettre {0} éléments à la corbeille ?"],
   "View version {0}": "Voir la version {0}",
   "Restore version {0}": "Restaurer la version {0}",
   "New version of “{0}”": "Nouvelle version de « {0} »"

@@ -101,7 +101,7 @@ const tagsOf = async id => ((await call('GET', `/api/files/nodes/${id}/tags`)).t
 
   // ================= #2295 the file store: Shift ranges
   const box = id => d.querySelector(`[data-absel="one"][data-id="${id}"]`);
-  const sel = () => w.eval('[...AB.sel].sort((a, b) => a - b).join(",")');
+  const sel = () => w.eval('[...AB.sel.keys()].sort((a, b) => a - b).join(",")');  // 2.768.0 (#4888): AB.sel = the area's one selection (id -> what the bar needs)
   const order = () => [...d.querySelectorAll('.ablist .abrow')].map(r => +r.dataset.abid);
   click(w, d.querySelector(`.abrow[data-abid="${R[0]}"] .abopen`), {shiftKey: true});
   check(await until(() => w.eval('AB.selOn') && sel() === String(R[0])), 'Shift-click without choosing turns choosing on with that row');
@@ -165,12 +165,12 @@ const tagsOf = async id => ((await call('GET', `/api/files/nodes/${id}/tags`)).t
   check(await until(() => cards() === [D1, D2, D3].join(',') && !vd.querySelector('#dc-q')?.value), 'taking the search out');
 
   // ================= #2295 documents: Shift ranges
-  const dsel = () => v.eval('[...DC.sel.keys()].sort((a, b) => a - b).join(",")');
+  const dsel = () => v.eval('[...AB.sel.keys()].sort((a, b) => a - b).join(",")');  // 2.768.0 (#4888): the area's one selection (ablage.js)
   const dorder = () => v.eval('DC.docs.map(x => x.id)');
   const card = id => vd.querySelector(`[data-dco="${id}"]`);
   const od = dorder();
   click(v, card(od[0]), {shiftKey: true});
-  check(await until(() => v.eval('DC.selOn') && dsel() === String(od[0]) && !vd.querySelector('.dc-md')), 'documents: Shift-click turns choosing on, nothing opens');
+  check(await until(() => v.eval('AB.selOn') && dsel() === String(od[0]) && !vd.querySelector('.dc-md')), 'documents: Shift-click turns choosing on, nothing opens');
   click(v, card(od[2]), {shiftKey: true});
   check(await until(() => dsel() === [...od].sort((a, b) => a - b).join(',')), 'documents: the range forwards');
   click(v, card(od[1]), {shiftKey: true});
@@ -179,11 +179,11 @@ const tagsOf = async id => ((await call('GET', `/api/files/nodes/${id}/tags`)).t
   click(v, card(od[0]), {shiftKey: true});
   check(await until(() => dsel() === [...od].sort((a, b) => a - b).join(',')), 'documents: the range backwards');
   click(v, card(od[1]), {metaKey: true});
-  check(await until(() => !v.eval(`DC.sel.has(${od[1]})`)), 'documents: Cmd-click switches one');
+  check(await until(() => !v.eval(`AB.sel.has(${od[1]})`)), 'documents: Cmd-click switches one');
   // the chosen documents at once: a tag (ONE undo step)
-  v.eval(`DC.sel = new Map([[${D1}, null], [${D3}, null]]); dc_draw()`);
+  v.eval(`ab_selEnd(); ab_selPick(${D1}); ab_selPick(${D3})`);
   v.__dialogs = 'manual';
-  click(v, vd.querySelector('[data-dcsel="edit"]'));
+  click(v, vd.querySelector('#ab-sbar [data-absel="edit"]'));
   const mi = await until(() => [...vd.querySelectorAll('#pop [role="menuitem"]')].find(b => /Add tags/.test(b.textContent)));
   check(mi, 'the bar: "Edit" offers "Add tags…"');
   mi?.click();
@@ -196,8 +196,8 @@ const tagsOf = async id => ((await call('GET', `/api/files/nodes/${id}/tags`)).t
   check(await until(async () => !(await has(D1, 'Stapel')) && !(await has(D3, 'Stapel')), 60), 'undo: the tag is gone from both');
   v.__dialogs = undefined;
   // the ZIP
-  v.eval(`DC.sel = new Map([[${D1}, null], [${D2}, null]]); dc_draw()`);
-  click(v, vd.querySelector('[data-dcsel="zip"]'));
+  v.eval(`ab_selEnd(); ab_selPick(${D1}); ab_selPick(${D2})`);
+  click(v, vd.querySelector('#ab-sbar [data-absel="dl"]'));  // 2.768.0 (#4888): Download of the one bar (documents only: their ZIP)
   check(await until(() => /being prepared/.test(vd.body.textContent)), 'ZIP: the hint while it is prepared');
   v.close();
 

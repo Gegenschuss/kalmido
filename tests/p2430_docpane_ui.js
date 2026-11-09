@@ -104,19 +104,18 @@ async function upload(name, lines) {
   click(w, d.querySelector('.dv-view .dv-back[data-dc="close"]'));
   check(await until(() => !d.querySelector('.dv-view') && d.querySelector('.dc-view .dc-card')), 'the back button leaves the view');
 
-  // choosing: Ctrl-click and the box choose, a plain click opens also while choosing
+  // choosing: Ctrl-click and the box choose; 2.768.0 (#4888): while choosing runs a plain click ticks too (rule #4612, the
+  // area's one selection, like the rows) - before (2.430.0, #3582) it opened the card
   await until(() => card(order[0]));
   click(w, card(order[0]), {ctrlKey: true});
-  check(await until(() => w.eval('DC.selOn') && w.eval(`DC.sel.has(${order[0]})`) && !d.querySelector('.dc-md')), 'Ctrl-click chooses the card, nothing opens');
+  check(await until(() => w.eval('AB.selOn') && w.eval(`AB.sel.has(${order[0]})`) && !d.querySelector('.dc-md')), 'Ctrl-click chooses the card, nothing opens');
   click(w, d.querySelector(`[data-dcchk="${order[1]}"]`));
-  check(await until(() => w.eval(`DC.sel.has(${order[1]})`) && d.querySelector(`[data-dcchk="${order[1]}"]`)?.getAttribute('aria-checked') === 'true' && !d.querySelector('.dc-md')), 'the box chooses a second card');
-  check(/2 selected/.test(d.querySelector('#dc-sbar')?.textContent || ''), '... the bar: 2 selected');  // 2.428.0 (#3581): the shared bar
+  check(await until(() => w.eval(`AB.sel.has(${order[1]})`) && d.querySelector(`[data-dcchk="${order[1]}"]`)?.getAttribute('aria-checked') === 'true' && !d.querySelector('.dc-md')), 'the box chooses a second card');
+  check(/2 selected/.test(d.querySelector('#ab-sbar')?.textContent || ''), '... the bar: 2 selected');  // 2.428.0 (#3581): the shared bar; 2.768.0 (#4888): the area's one #ab-sbar
   click(w, card(order[2]));
-  check(await until(() => paneId() === order[2] && !w.eval(`DC.sel.has(${order[2]})`)), 'a plain click opens even while choosing (and does not choose)');
-  check(w.eval('DC.sel.size') === 2, '... the choice stays');
-  d.querySelector('.dv-view [data-dc="close"]').click();
-  await until(() => d.querySelector('.dc-view'));
-  w.eval('DC.selOn = false; DC.sel = new Map(); dc_draw()');
+  check(await until(() => w.eval(`AB.sel.has(${order[2]})`) && !d.querySelector('.dv-view') && !d.querySelector('.dc-md')), 'while choosing a plain click ticks the card, nothing opens');
+  check(w.eval('AB.sel.size') === 3, '... the choice holds all three');
+  w.eval('ab_selEnd(); dc_draw()');
   await sleep(200);
 
   // an address #docs/<id> opens the view

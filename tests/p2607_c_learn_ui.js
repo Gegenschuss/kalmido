@@ -40,8 +40,8 @@ const sender = async id => (await call('GET', `/api/docs/${id}`)).sender?.name |
   const v = await boot({user: 'alice', hash: 'docs'}), vd = v.document;
   await until(() => vd.querySelectorAll('.dc-card').length === 3, 80);
   // the selection: Edit > Apply what was learned
-  v.eval(`DC.selOn = true; DC.sel = new Map([[${D1}, null], [${D2}, null]]); dc_draw()`);
-  click(v, vd.querySelector('[data-dcsel="edit"]'));
+  v.eval(`ab_selEnd(); ab_selPick(${D1}); ab_selPick(${D2})`);  // 2.768.0 (#4888): the area's one selection (ablage.js)
+  click(v, vd.querySelector('#ab-sbar [data-absel="edit"]'));
   const mi = await until(() => [...vd.querySelectorAll('#pop [role="menuitem"]')].find(b => /Apply what was learned/.test(b.textContent)));
   check(mi, 'the bar: "Edit" offers "Apply what was learned"');
   mi?.click();
@@ -52,7 +52,7 @@ const sender = async id => (await call('GET', `/api/docs/${id}`)).sender?.name |
   check(v.eval(`HIST.undo[HIST.undo.length - 1]?.label`) === 'Apply what was learned', 'ONE undo step');
   if (t) click(v, t.querySelector('button'));
   check(await until(async () => await sender(D1) === null && await sender(D2) === null, 60), 'Undo in the message: both back');
-  v.eval(`dc_selEnd()`);
+  v.eval(`ab_selEnd(); dc_draw()`);
 
   // "To review": the button for every document there
   v.eval(`go('docs/review')`);

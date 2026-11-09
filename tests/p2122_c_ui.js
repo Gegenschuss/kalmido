@@ -43,17 +43,18 @@ const textPdf = line => {  // a one-page PDF with a text layer, written by hand
     check(r.status === 201, 'a document uploaded: ' + r.status);
   }
   let w = await boot({user: 'alice', hash: 'docs'}), d = w.document;
-  await until(() => d.querySelector('[data-dcsel="mode"]'));
-  d.querySelector('[data-dcsel="mode"]').click(); await sleep(300);
-  const btn = () => d.querySelector('#dc-sbar [data-dcsel="more"]');  // 2.428.0 (#3581): "Export as CSV" sits under "More" of the shared bar
-  check(btn() && btn().disabled, 'More (with the CSV export) waits for a choice');
+  await until(() => d.querySelector('.dc-view [data-absel="mode"]'));
+  d.querySelector('.dc-view [data-absel="mode"]').click(); await sleep(300);
+  // 2.428.0 (#3581): "Export as CSV" sits under "More" of the shared bar; 2.768.0 (#4888): the area's one bar #ab-sbar (More off or not there without a choice)
+  const btn = () => d.querySelector('#ab-sbar [data-absel="more"]');
+  check(!btn() || btn().disabled, 'More (with the CSV export) waits for a choice');
   const dl = []; const calls = [];
   w.HTMLAnchorElement.prototype.click = function () { dl.push({name: this.download, href: this.href}); };
   w.URL.createObjectURL = () => 'blob:csv'; w.URL.revokeObjectURL = () => {};
   const f0 = w.fetch.bind(w); w.fetch = (u, o) => { if (/export\.csv/.test(u)) calls.push({u, body: o && o.body, method: o && o.method}); return f0(u, o); };
   const ids = w.eval('DC.docs.map(x => x.id)');
   check(ids.length === 2, 'two documents listed');
-  for (const id of ids) w.eval(`dc_smvToggle(${id})`);
+  for (const id of ids) w.eval(`ab_selPick(${id})`);
   await sleep(300);
   check(!btn().disabled, 'More is on with a choice');
   btn().click();

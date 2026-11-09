@@ -249,6 +249,10 @@ body.pgdrag .dc-grid:not(.dc-selon) .dc-card:not(.dc-cur){content-visibility:aut
 /* 2.428.0 A (#3581): the bar is the shared floating one (app.css .msbar); the mark shows on hover before choosing starts */
 :not(.dc-selon)>.dc-card .dc-selmark{display:none}
 @media (hover:hover) and (pointer:fine){.dc-view .dc-grid:not(.dc-selon)>.dc-card>button:hover .dc-selmark{display:flex}}
+/* 2.768.0 (#4888): every card of the area (documents, files, folders, also the folder cards outside the documents' view) shows its
+   mark on hover; above the share names of a file card */
+@media (hover:hover) and (pointer:fine){.dc-grid:not(.dc-selon)>.dc-card:hover .dc-selmark{display:flex}}
+.dc-card>.dc-selmark{z-index:2}
 /* 2.102.0 B (#2206): room below the grid as high as the sticky bar; the choosing mark gets a 2.75rem touch target (the circle stays 1.75rem) */
 .dc-grid.dc-selon{padding-bottom:7.5rem}
 /* 2.119.1 D (#2206): the pseudo box starts inside the .125rem border: -.625rem makes the 2.75rem (44 px), -.5rem was 2.5rem (40 px) */

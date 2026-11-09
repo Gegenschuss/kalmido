@@ -173,6 +173,7 @@ function viewDocs() {
   const id = dc_hashId();
   const open = !id && !document.querySelector('.dc-view');  // not on screen yet = the tab is being opened
   if (!id) dc_ctxSet('list');  // 2.752.0 (#4887): all documents, to review, a saved view (a folder's list stays behind its document)
+  if (!id && typeof ab_selKeep === 'function') ab_selKeep();  // 2.768.0 (#4888): another list ends the area's one selection
   if (DC.ws != null && DC.ws !== dc_ws()) p61b_dcReset();  // 2.66.1 (#1945): another workspace -> its data, open or not
   if (!DC.loading && ((!DC.docs && !DC.err) || (open && (Date.now() - (DC.at || 0) > 3000 || DC.atWs !== dc_ws())))) setTimeout(dc_load, 0);
   if (S.route.mod === 'docs' && (S.route.dv || null) !== (DC.dv || null)) { if (typeof dcv_routeSync === 'function') dcv_routeSync(); else if (typeof ld_later === 'function') ld_later('docviews'); }  // 2.579.0 (#4802): #docs/v/<id> = a saved view
@@ -207,30 +208,32 @@ function dc_headHtml(fold) {
 function dc_bodyHtml(fold) {
   const active = dc_fEntries().length > 0 || !!DC.q.trim();
   const card = fold?.card || dc_card;
-  const grid = DC.docs?.length ? `<ul class="dc-grid${DC.selOn ? ' dc-selon' : ''}" aria-label="${esc(tr('Documents'))}">${DC.docs.map(d => card(d)).join('')}</ul>${DC.total > DC.docs.length ? `<p class="muted dc-moreld"><button type="button" class="linkbtn" data-dc="loadmore">${esc(tr('Load more ({0} of {1})', DC.docs.length, DC.total))}</button></p>` /* 2.476.0 (#3935) */ : ''}` : '';
+  const grid = DC.docs?.length ? `<ul class="dc-grid${AB.selOn ? ' dc-selon' : ''}" aria-label="${esc(tr('Documents'))}">${DC.docs.map(d => card(d)).join('')}</ul>${DC.total > DC.docs.length ? `<p class="muted dc-moreld"><button type="button" class="linkbtn" data-dc="loadmore">${esc(tr('Load more ({0} of {1})', DC.docs.length, DC.total))}</button></p>` /* 2.476.0 (#3935) */ : ''}` : '';
   if (DC.err) return `<div class="empty">${ic('alert')}<span>${esc(DC.err)}</span></div>`;
   if (fold) {
     const before = active ? '' : fold.before || '', after = active ? '' : fold.after || '';
     if (!DC.docs && !before && !after) return `<p class="muted lempty">${tr('Loading…')}</p>`;
     if (!DC.docs?.length && !before && !after) return `<div class="empty nempty dc-empty abempty">${ic('folder')}<span>${active ? tr('No documents found') : fold.canAdd ? tr('Drop files here or use “Upload”') : tr('This folder is empty')}</span></div>`;
-    return before + grid + after + dc_smvBar();
+    return before + grid + after + ab_selBar();  // 2.768.0 (#4888): the area's one bar (ablage.js)
   }
   if (!DC.docs) return `<p class="muted lempty">${tr('Loading…')}</p>`;
   if (!DC.docs.length) return `<div class="empty nempty dc-empty">${ic('file')}<span>${active || DC.f.review ? tr('No documents found') : tr('Drop PDFs or photos of letters here, or add them with the button. Kalmido reads the text, finds date and amount and sorts them.')}</span></div>`;
-  return grid + dc_smvBar();
+  return grid + ab_selBar();
 }
+// 2.768.0 (#4888): the choosing mark of every card (documents, files, folders): ablage.js ab_selPick
+const dc_selMark = d => { const on = AB.selOn && AB.sel.has(d.id); return `<button type="button" class="dc-selmark" data-dcchk="${d.id}" role="checkbox" aria-checked="${on}" aria-label="${esc(tr('Select') + ': ' + d.name)}" tabindex="${AB.selOn ? 0 : -1}">${on ? ic('check', 's') : ''}</button>`; };
 // 2.583.0 (#4832): THE card of documents and of the file store: a document with its fields; o.file = a plain file or a folder of
 // the file store ({thumb, meta, attrs, after}: its picture, size and date, the button's own attributes, the menu after it)
 function dc_card(d, o = {}) {
   const f = o.file;
-  if (f) return `<li class="dc-card abcf" data-k="f${d.id}"><button type="button" ${f.attrs} aria-label="${esc(d.name)}"><span class="dc-th">${f.thumb}</span><span class="dc-ct"><b class="dc-nm">${esc(d.name)}</b>${f.meta ? `<span class="dc-mt">${esc(f.meta)}</span>` : ''}</span></button>${f.after || ''}</li>`;
+  if (f) return `<li class="dc-card abcf${AB.sel.has(d.id) ? ' dc-on' : ''}" data-k="f${d.id}">${dc_selMark(d)}<button type="button" ${f.attrs} aria-label="${esc(d.name)}"><span class="dc-th">${f.thumb}</span><span class="dc-ct"><b class="dc-nm">${esc(d.name)}</b>${f.meta ? `<span class="dc-mt">${esc(f.meta)}</span>` : ''}</span></button>${f.after || ''}</li>`;
   const big = d.file || d.thumb_l ? dc_thumbUrl(d, true) : '';  // 2.583.0 (#4812): the sharp preview of big cards (tilesize.js)
   const thumb = d.thumb ? (typeof ts_img === 'function' ? ts_img(dc_thumbUrl(d), big) : `<img src="${esc(dc_thumbUrl(d))}" alt="" loading="lazy">`) : `<span class="dc-ph">${ic(dc_isPdf(d) ? 'file' : 'picture')}</span>`;
   const st = d.state === 'done' ? '' : `<span class="dc-st ${esc(d.state)}">${esc(tr(DC_STATE[d.state] || d.state))}</span>`;
   const meta = [d.date ? dc_day(d.date) : '', d.type?.name || '', d.asn ? `${DC.set?.asn_prefix || 'ASN'} ${d.asn}` : ''].filter(Boolean).map(esc).join(' · ');
   // 2.430.0 (#3582): a click always opens; the box (shown on hover, while choosing, or ticked) chooses, like Ctrl-/Shift-click and a long press
-  const on = DC.selOn && DC.sel.has(d.id), cur = DC.lastId === d.id;  // 2.583.0 (#4835): the one looked at last
-  return `<li class="dc-card${d.review ? ' rev' : ''}${on ? ' dc-on' : ''}${cur ? ' dc-cur' : ''}" data-k="dc${d.id}"><button type="button" class="dc-selmark" data-dcchk="${d.id}" role="checkbox" aria-checked="${on}" aria-label="${esc(tr('Select') + ': ' + d.name)}" tabindex="${DC.selOn ? 0 : -1}">${on ? ic('check', 's') : ''}</button><button type="button" data-dco="${d.id}" aria-label="${esc(d.name)}">
+  const on = AB.selOn && AB.sel.has(d.id), cur = DC.lastId === d.id;  // 2.583.0 (#4835): the one looked at last; 2.768.0 (#4888): the area's one selection
+  return `<li class="dc-card${d.review ? ' rev' : ''}${on ? ' dc-on' : ''}${cur ? ' dc-cur' : ''}" data-k="dc${d.id}">${dc_selMark(d)}<button type="button" data-dco="${d.id}" aria-label="${esc(d.name)}">
     <span class="dc-th">${thumb}</span><span class="dc-ct"><b class="dc-nm" title="${esc(d.name)}">${esc(d.name)}</b>${d.sender?.name ? `<span class="dc-snd" title="${esc(d.sender.name)}">${esc(d.sender.name)}</span>` : '' /* 2.583.0 (#4870): always the title, the sender below it */}
     <span class="dc-mt">${meta}${d.amount ? ` · ${esc(dc_money(d.amount, d.currency))}` : ''}</span>
     ${d.tags.length ? `<span class="dc-tags">${d.tags.map(t => `<span class="dc-tag">${esc(t.name)}</span>`).join('')}</span>` : ''}
@@ -844,12 +847,8 @@ async function dc_mdClick(e) {
     return;
   }
   if (a === 'task') { await dc_newTask(d, md); return; }
-  if (a === 'del') {
-    try { await api('DELETE', `/api/files/nodes/${d.id}`); } catch { return; }
-    md.remove(); dc_load();
-    histToast(tr('Document {0} deleted', d.name), histAdd({label: tr('Document {0} deleted', d.name),
-      undo: async () => { await api('POST', `/api/files/nodes/${d.id}/restore`); dc_load(); return {}; },
-      redo: async () => { await api('DELETE', `/api/files/nodes/${d.id}`); dc_load(); return {}; }}));
+  if (a === 'del') {  // 2.768.0 (#4888): the area's one way into the trash (ablage.js abm_trash: POST /api/files/trash, ONE undo)
+    if (await abm_trash([{...ab_selInfo(d), role: d.role || 'edit'}])) md.remove();
   }
 }
 
@@ -1083,12 +1082,8 @@ async function dc_sClick(e) {
 let dc_qTimer = null;
 document.addEventListener('click', e => {
   const v = e.target.closest('.dc-view'); if (!v) return;
-  // 2.430.0 (#3582): a plain click opens, also while choosing; the box, Ctrl/Cmd-click and Shift-click (ranges, 2.122.0 B #2295) choose
-  const k = e.target.closest('[data-dcchk]');
-  if (k) { if (e.shiftKey) dc_rsClick(e, +k.dataset.dcchk); else dc_selToggle(+k.dataset.dcchk); return; }
+  // 2.768.0 (#4888): the box, Ctrl/Cmd-click, Shift-click and a tap while choosing are the area's one selection (ablage.js, before this)
   const o = e.target.closest('[data-dco]');
-  if (o && e.shiftKey && (DC.selOn || (typeof dt_rsMouse === 'function' && dt_rsMouse(e)))) { dc_rsClick(e, +o.dataset.dco); return; }
-  if (o && (e.ctrlKey || e.metaKey)) { dc_selToggle(+o.dataset.dco); return; }
   if (o) { dc_open(+o.dataset.dco, v.classList.contains('dc-infold') && typeof abd_navIds === 'function' ? {list: abd_navIds()} : {}); return; }  // 2.583.0 (#4835): the document view; 2.752.0 (#4887): in a folder it leafs through the folder's cards
   const b = e.target.closest('[data-dc]'); if (!b) return;
   const a = b.dataset.dc;
@@ -1129,55 +1124,20 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && DC
 
 // ---- 2.96.0 A (#1941): choose documents (one, several, or every one the filters find) and move them into the other workspace
 // (private <-> organisation): into the documents folder there, with sender, type and tags. ONE undo step (back to the old folders).
-DC.sel = new Map();  // id -> org_id of the chosen documents (also those beyond the shown page: "Select all")
-DC.selOn = false;
+// 2.768.0 (#4888): the choice is the area's one selection (ablage.js AB.sel, ab_selPick, ab_selBar); here what only documents have
 const DC_SMV_MAX = 2000;  // the server's limit per move (accounts/spacemove.py SMV_MAX)
-const dc_smvBtn = () => DC.docs?.length ? `<button type="button" class="btn sm ${DC.selOn ? 'on' : ''}" data-dcsel="mode" aria-pressed="${DC.selOn}">${ic('check', 's')} <span>${tr('Select')}</span></button>` : '';
-function dc_selToggle(id) {  // 2.430.0 (#3582): tick / untick one card; the first one turns choosing on
-  if (!DC.selOn) { DC.selOn = true; DC.sel = new Map(); if (typeof dt_rsReset === 'function') dt_rsReset(); }
-  if (typeof dt_rsAnchor === 'function') dt_rsAnchor('dc:' + dc_params(), id);  // a following Shift-click spans from here
-  dc_smvToggle(id);
-}
-// 2.607.0 (#4612): a long press (phone) / a right click (computer) on a card opens its menu: the name, "Select" (starts choosing
-// with it), Open, favourite; while choosing runs a long press ticks the card; the click that ends the press does not open it (multisel.js)
-function dc_cardMenu(r) {
-  const id = +r.dataset.dco, d = (DC.docs || []).find(x => x.id === id); if (!d) return false;
-  menu(r, [...cm_selHead(d.sender?.name || d.name, () => dc_selToggle(id)), {label: tr('Open'), icon: 'eye', fn: () => dc_open(id)}, ...(typeof spl_item === 'function' ? spl_item('#docs/' + id) : []) /* 2.742.0 (#4858) */, ...fv2_menuRow('doc:' + id)]);
-  return true;
-}
-if (typeof cm_bind === 'function') {
-  const dc_lp = cm_bind('.dc-view .dc-card [data-dco]', dc_cardMenu, r => { if (!DC.selOn) return false; dc_selToggle(+r.dataset.dco); return true; });
-  window.addEventListener('click', e => { if (ms_lpRecent(dc_lp) && e.target.closest?.('.dc-view .dc-card')) { e.preventDefault(); e.stopPropagation(); } }, true);
-}
-function dc_smvToggle(id) {
-  const d = (DC.docs || []).find(x => x.id === id); if (!d) return;
-  if (DC.sel.has(id)) DC.sel.delete(id); else DC.sel.set(id, d.org_id || null);
-  dc_draw();
-}
-// 2.428.0 A (#3581): the shared floating bar (multisel.js ms_barHtml): Edit, Download (ZIP) on it, the rare ones under "More"
-function dc_smvBar() {
-  if (!DC.selOn) return '';
-  const n = DC.sel.size;
-  return ms_barHtml('dc-sbar', 'dcsel', n, tr('Tick the boxes'), [['all', 'all', n && n >= DC.total ? tr('Select none') : tr('All')],
-    ['edit', 'edit', tr('Edit')], ['zip', 'download', tr('Download')], ['more', 'dots', tr('More')]]);
-}
-function dc_smvMore(anchor) {
-  const orgs = new Set(DC.sel.values()), from = orgs.size === 1 ? [...orgs][0] : null;
-  menu(anchor, [{label: tr('Export as CSV'), icon: 'download', cls: 'msm-csv', fn: dcx_csv},
-    orgs.size <= 1 && smv_can(from) ? {label: tr('Move to another workspace…'), icon: 'building', cls: 'msm-space', fn: () => dc_smvMove(DC.sel, trn('{0} document', '{0} documents', DC.sel.size))} : null].filter(Boolean), null, null, tr('Selection'));
-}
-const dc_selEnd = () => { DC.selOn = false; DC.sel = new Map(); dc_draw(); };
-async function dc_smvAll() {  // every document the search and the filters find (page by page, at most DC_SMV_MAX)
-  const p = dc_params(), out = new Map();
+const dc_selIds = () => [...AB.sel.values()].filter(x => x.isdoc).map(x => x.id);  // the chosen documents
+const dc_smvBtn = () => DC.docs?.length || (ab_selFold() && AB.data?.items?.length) ? `<button type="button" class="btn sm ${AB.selOn ? 'on' : ''}" data-absel="mode" aria-pressed="${!!AB.selOn}">${ic('check', 's')} <span>${tr('Select')}</span></button>` : '';
+async function dc_smvAll() {  // every document the search and the filters find (page by page, at most DC_SMV_MAX), added to the choice
+  const p = dc_params();
   p.set('facets', '0'); p.set('limit', '200');
   for (let off = 0; off < DC_SMV_MAX; off += 200) {
     p.set('offset', String(off));
     let j; try { j = await api('GET', '/api/docs?' + p); } catch { return; }
-    for (const d of j.docs || []) out.set(d.id, d.org_id || null);
+    for (const d of j.docs || []) if (!AB.sel.has(d.id)) AB.sel.set(d.id, ab_selInfo(d));
     if ((j.docs || []).length < 200) break;
   }
   if (DC.total > DC_SMV_MAX) toast(tr('Too many at once: at most {0}', DC_SMV_MAX));
-  DC.sel = out; dc_draw();
 }
 async function dc_smvMove(sel, what) {
   const orgs = new Set(sel.values());
@@ -1188,32 +1148,17 @@ async function dc_smvMove(sel, what) {
     check: async to => { try { return await rawFetch('POST', '/api/files/move-space', {ids, to: smv_ws(to), parent: 'docs', dry: 1}); } catch (x) { return {block: x.message || tr('The check failed. Please try again.')}; } },
     run: (to, _p, _o, step) => { last = {ids, to: smv_ws(to), parent: 'docs'}; return smv_post('/api/files/move-space', last, 'ids', step); }});
   if (!r?.moved || !last) return null;
-  DC.sel = new Map(); DC.selOn = false; DC.facets = null;
+  ab_selEnd(); DC.facets = null;
   dc_load();
   const req = async (b, key) => { try { await smv_post('/api/files/move-space', b, key); } catch { /* shown */ } DC.facets = null; dc_load(); return {}; };
   const back = {items: r.moved.map(m => ({id: m.id, parent: m.parent_was, name: m.name_was})), to: smv_ws(r.org_was)}, again = last;
   offerUndo(smv_label(r, ids.length), histAdd({label: tr('Move to another workspace'), undo: () => req(back, 'items'), redo: () => req(again, 'ids')}));
   return r;
 }
-document.addEventListener('click', e => {
-  const b = e.target.closest?.('[data-dcsel]'); if (!b || !b.closest('.dc-view')) return;
-  const a = b.dataset.dcsel;
-  if (a === 'mode') { DC.selOn = !DC.selOn; DC.sel = new Map(); dc_draw(); }
-  else if (a === 'off' || a === 'close') dc_selEnd();
-  else if (a === 'all') { if (DC.sel.size && DC.sel.size >= DC.total) { DC.sel = new Map(); dc_draw(); } else dc_smvAll(); }
-  else if (a === 'none') { DC.sel = new Map(); dc_draw(); }
-  else if (a === 'csv') dcx_csv();  // 2.122.0 (#2100)
-  else if (a === 'space') dc_smvMove(DC.sel, trn('{0} document', '{0} documents', DC.sel.size));
-  else if (a === 'edit') dc_bulkMenu(b);  // 2.122.0 B (#2294)
-  else if (a === 'zip') dc_zip();
-  else if (a === 'more') dc_smvMore(b);
-});
-// 2.428.0 A (#3581): Esc ends the selection (the long press: dc_selToggle above, 2.430.0 #3582)
-kb_on('view', 'Escape', () => { if (!(DC.selOn && $('#view .dc-view') && !$('.modal, .lightbox') && $('#pop')?.classList.contains('hidden'))) return false; dc_selEnd(); }); // 2.630.0 (#4510): key registry (keys.js), after the open dialogs / menus
 
 // 2.122.0 (#2100): the chosen documents as a CSV file (the server leaves out what the person may not see)
-async function dcx_csv() {
-  const ids = [...DC.sel.keys()]; if (!ids.length) return;
+async function dcx_csv(ids = dc_selIds()) {
+  if (!ids.length) return;
   try {
     const r = await fetch('/api/docs/export.csv', {method: 'POST', headers: {'X-Requested-With': 'kalmido', 'Content-Type': 'application/json'}, body: JSON.stringify({ids})});
     if (!r.ok) throw new Error(String(r.status));
@@ -1330,18 +1275,6 @@ document.addEventListener('change', e => {
   DC.f[k] = el.type === 'checkbox' ? el.checked : el.value;
   dc_fChanged();
 });
-// ---- 2.122.0 B (#2295): Shift-click chooses a range of cards (tagsel.js dt_rsClick), Shift-click without choosing turns it on
-function dc_rsClick(e, id) {
-  if (typeof dt_rsClick !== 'function') { dc_smvToggle(id); return; }
-  if (!DC.selOn) { DC.selOn = true; DC.sel = new Map(); dt_rsReset(); }
-  const docs = DC.docs || [];
-  dt_rsClick(e, 'dc:' + dc_params(), id, docs.map(d => d.id), x => DC.sel.has(x), (x, on) => {
-    const d = docs.find(y => y.id === x);
-    if (on && d) DC.sel.set(x, d.org_id || null); else if (!on) DC.sel.delete(x);
-  });
-  dc_draw();
-}
-
 // ---- 2.122.0 B (#2294): the chosen documents at once (POST /api/docs/bulk in parts of 500; ONE undo step) and as a ZIP
 const DC_BULK = 500;
 async function dc_bulkSend(bodies) {  // [{...}] one request each -> {changed, denied, before}
@@ -1352,27 +1285,29 @@ async function dc_bulkSend(bodies) {  // [{...}] one request each -> {changed, d
   }
   return out;
 }
+// 2.768.0 (#4888): after a change of several: the documents' list, and a folder's list where the documents were chosen
+const dc_relist = () => { DC.facets = null; if (S.route.mod === 'ablage') ab_reload(); else dc_load(); };
 const dc_chunks = (a, n) => Array.from({length: Math.ceil(a.length / n)}, (_, i) => a.slice(i * n, i * n + n));
 async function dc_bulk(change, label) {
-  const ids = [...DC.sel.keys()]; if (!ids.length) return;
+  const ids = dc_selIds(); if (!ids.length) return;
   const req = dc_chunks(ids, DC_BULK).map(part => ({ids: part, ...change}));
-  let r; try { r = await dc_bulkSend(req); } catch { dc_load(); return; }
-  DC.facets = null; dc_load();
+  let r; try { r = await dc_bulkSend(req); } catch { dc_relist(); return; }
+  dc_relist();
   if (r.denied) toast(trn('{0} document may only be viewed by you and stays as it is', '{0} documents may only be viewed by you and stay as they are', r.denied));
   if (!r.changed.length) { if (!r.denied) toast(tr('Nothing to change')); return; }
   const back = dc_chunks(r.before, DC_BULK).map(part => ({restore: part}));
-  const step = bodies => async () => { try { await dc_bulkSend(bodies); } catch { /* shown */ } DC.facets = null; dc_load(); return {}; };
+  const step = bodies => async () => { try { await dc_bulkSend(bodies); } catch { /* shown */ } dc_relist(); return {}; };
   histToast(`${label}: ${trn('{0} document', '{0} documents', r.changed.length)}`, histAdd({label, undo: step(back), redo: step(req)}));
 }
 function dc_bulkMenu(anchor) {
   menu(anchor, [{label: tr('Add tags…'), icon: 'tag', fn: () => dc_bulkTags(true)}, {label: tr('Remove tags…'), icon: 'tag', fn: () => dc_bulkTags(false)},
     {label: tr('Set document type…'), icon: 'file', fn: () => dc_bulkSet('type')}, {label: tr('Set sender…'), icon: 'user', fn: () => dc_bulkSet('sender')},
-    {label: tr('Apply what was learned'), icon: 'sparkle', cls: 'dc-learnsel', fn: () => dc_learn([...DC.sel.keys()])}], null, null, tr('Edit'));  // 2.607.0 (#4872)
+    {label: tr('Apply what was learned'), icon: 'sparkle', cls: 'dc-learnsel', fn: () => dc_learn(dc_selIds())}], null, null, tr('Edit'));  // 2.607.0 (#4872)
 }
 // 2.607.0 (#4872): "Apply what was learned": only the sorting (rules + what was learned) with the stored text, no new recognition
 // (POST /api/docs/apply-learned in parts of DC_LEARN with the progress as a message; ONE undo step: the run token of all parts)
 const DC_LEARN = 100;
-const dc_learnBar = () => DC.f.review && DC.docs?.length && !DC.selOn ? `<p class="muted dc-wait dc-learnbar"><button type="button" class="btn sm" data-dc="learnall" title="${esc(tr('Sorts every document in To review again with the rules and what was learned (no new text recognition)'))}">${ic('sparkle', 's')} <span>${tr('Apply what was learned')}</span></button></p>` : '';
+const dc_learnBar = () => DC.f.review && DC.docs?.length && !AB.selOn ? `<p class="muted dc-wait dc-learnbar"><button type="button" class="btn sm" data-dc="learnall" title="${esc(tr('Sorts every document in To review again with the rules and what was learned (no new text recognition)'))}">${ic('sparkle', 's')} <span>${tr('Apply what was learned')}</span></button></p>` : '';
 async function dc_learnSend(ids, b, onStep) {  // -> the summed answers ({run, set, suggested, changed, denied, skipped, back})
   const out = {run: b.run || null, set: 0, suggested: 0, changed: [], denied: 0, skipped: 0, back: 0};
   for (let i = 0; i < ids.length; i += DC_LEARN) {
@@ -1410,9 +1345,9 @@ async function dc_learnReview() {  // every document of "To review" the search a
   dc_learn(ids);
 }
 async function dc_bulkTags(add) {
-  const known = (DC.docs || []).filter(d => DC.sel.has(d.id)).flatMap(d => d.tags.map(t => t.name));
+  const known = [...(DC.docs || []), ...(AB.data?.items || []).map(n => n.doc).filter(x => x?.tags)].filter(d => AB.sel.has(d.id)).flatMap(d => d.tags.map(t => t.name));
   const all = add ? (DC.facets?.tags || []) : [...new Set(known)].map(name => ({name}));
-  const n = DC.sel.size;
+  const n = dc_selIds().length;
   const names = await dt_pick({title: add ? trn('Add tags to {0} document', 'Add tags to {0} documents', n) : trn('Remove tags from {0} document', 'Remove tags from {0} documents', n),
     all: add ? all : (all.length ? all : DC.facets?.tags || []), cur: [], ok: add ? tr('Add') : tr('Remove'), known: !add});  // 2.742.0 (#4862): removing offers only the given tags
   if (!names?.length) return;
@@ -1420,14 +1355,14 @@ async function dc_bulkTags(add) {
 }
 async function dc_bulkSet(kind) {
   const list = (kind === 'type' ? DC.facets?.types : DC.facets?.senders) || [];
-  const v = await askDialog({title: kind === 'type' ? tr('Document type of the selected documents ({0})', DC.sel.size) : tr('Sender of the selected documents ({0})', DC.sel.size), ok: tr('Save'),
+  const v = await askDialog({title: kind === 'type' ? tr('Document type of the selected documents ({0})', dc_selIds().length) : tr('Sender of the selected documents ({0})', dc_selIds().length), ok: tr('Save'),
     input: {value: '', max: 120, placeholder: kind === 'type' ? tr('e.g. Invoice, Contract, Letter') : tr('Sender')},
     after: md => { const i = $('#cdlg-in', md); if (!i) return; const dl = document.createElement('datalist'); dl.id = 'dc-bulkdl'; dl.innerHTML = list.map(x => `<option value="${esc(x.name)}">`).join(''); i.setAttribute('list', dl.id); i.after(dl); }});
   if (v == null || !String(v).trim()) return;
   dc_bulk({[kind]: String(v).trim()}, kind === 'type' ? tr('Document type set') : tr('Sender set'));
 }
-async function dc_zip() {
-  const ids = [...DC.sel.keys()]; if (!ids.length) return;
+async function dc_zip(ids = dc_selIds()) {
+  if (!ids.length) return;
   let r; try { r = await api('POST', '/api/docs/zip', {ids}); } catch { return; }  // too many / too large: the server's hint is the toast
   toast(trn('The ZIP with {0} document is being prepared…', 'The ZIP with {0} documents is being prepared…', r.files));
   const a = document.createElement('a'); a.href = r.url; a.download = ''; document.body.appendChild(a); a.click(); a.remove();

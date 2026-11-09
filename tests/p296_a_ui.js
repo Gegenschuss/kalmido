@@ -93,13 +93,13 @@ const confirmMove = async w => {
   const v = await boot({user: 'alice', hash: 'docs'}), vd = v.document;
   const card = await until(() => vd.querySelector(`[data-dco="${DOC}"]`), 60);
   check(card, 'the document card');
-  vd.querySelector('[data-dcsel="mode"]')?.click();
-  // 2.430.0 (#3582): a plain click on a card opens it even while choosing; the box on the card chooses
+  vd.querySelector('.dc-view [data-absel="mode"]')?.click();  // 2.768.0 (#4888): the area's one selection and bar (#ab-sbar)
+  // 2.430.0 (#3582): the box on the card chooses
   await until(() => vd.querySelector(`.dc-grid.dc-selon [data-dcchk="${DOC}"]`));
   vd.querySelector(`[data-dcchk="${DOC}"]`).click();
   check(await until(() => vd.querySelector(`[data-dcchk="${DOC}"]`)?.getAttribute('aria-checked') === 'true' && !vd.querySelector('.dc-md')), 'Select: the box chooses the card, nothing opens');
-  const dbar = await until(() => /1 selected/.test(vd.querySelector('#dc-sbar')?.textContent || '') && vd.querySelector('#dc-sbar'));  // 2.428.0 (#3581)
-  dbar?.querySelector('[data-dcsel="more"]')?.click();
+  const dbar = await until(() => /1 selected/.test(vd.querySelector('#ab-sbar')?.textContent || '') && vd.querySelector('#ab-sbar'));  // 2.428.0 (#3581)
+  dbar?.querySelector('[data-absel="more"]')?.click();
   const sp2 = await until(() => vd.querySelector('#pop .menu-list .msm-space'));
   check(dbar && sp2, 'the bar of the documents: 1 selected, "Move to another workspace…" under More');
   sp2?.click();
