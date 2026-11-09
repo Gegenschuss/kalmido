@@ -170,17 +170,18 @@ check(not exists("wiki_files", WF2), "#3026: switch on: the wiki file goes")
 # the page run
 check(A.delete(B + f"/api/wiki/pages/{WP}").ok, "setup: the page into the trash again")
 c.execute("UPDATE wiki_pages SET deleted_at='2020-01-01T00:00:00.000+00:00' WHERE id=?", (WP,))
-n = json.loads(box("from kalmido.wiki.pages import wiki_trash_tick\nprint(json.dumps(wiki_trash_tick(c, True)))") or "{}")
-check(n.get("pages") == 1 and exists("wiki_pages", WP) and os.path.isfile(WFP), f"#3026: switch off: the page stays, counted {n}")
-check((runs().get("wiki") or {}).get("purged") is False, "#3026: the wiki run reports the dry run")
-n = json.loads(box("from kalmido.wiki.pages import wiki_trash_tick\nprint(json.dumps(wiki_trash_tick(c, True)))", on=True) or "{}")
+# 2.790.0 (#5365): the pages go through the core's run (wiki/wkkern.py, kind wiki_page, report slot obj_trash)
+n = json.loads(box("from kalmido.core.writes import obj_trash_tick\nprint(json.dumps(obj_trash_tick(c, True)))") or "{}")
+check(n.get("wiki_page") == 1 and exists("wiki_pages", WP) and os.path.isfile(WFP), f"#3026: switch off: the page stays, counted {n}")
+check((runs().get("obj_trash") or {}).get("purged") is False, "#3026: the core's run reports the dry run")
+n = json.loads(box("from kalmido.core.writes import obj_trash_tick\nprint(json.dumps(obj_trash_tick(c, True)))", on=True) or "{}")
 check(not exists("wiki_pages", WP) and not os.path.exists(WFP), f"#3026: switch on: the page goes with its stored file {n}")
 
 # ---------------------------------------------------------------- the other runs report too (dry run)
 box("from kalmido.sheets.shkinds import shk_tick\nshk_tick(c, force=True)\nfrom kalmido.office.contractfiles import dma_purge_tick\n"
     "dma_purge_tick(c)\nfrom kalmido.office.meals import bw_purge_tick\nbw_purge_tick(c)\nfrom kalmido.videos.review import vdr_trash_prune\n"
     "vdr_trash_prune(c)\nprint('ok')")
-check({"lists", "tasks", "wiki", "wiki_files"} <= set(runs()), f"#3026: GET /api/admin/retention lists the runs {sorted(runs())}")
+check({"lists", "tasks", "obj_trash", "wiki_files"} <= set(runs()), f"#3026: GET /api/admin/retention lists the runs {sorted(runs())}")  # 2.790.0 (#5365): wiki -> obj_trash
 
 # ---------------------------------------------------------------- freelancer: a private list in the trash
 FIDF, Fr = freelancer(B, A, features=FEAT)

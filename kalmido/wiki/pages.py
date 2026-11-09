@@ -13,17 +13,15 @@ The session routes are for people only (session.py refuses agents); agents and t
 import hashlib
 import json
 import re
-import time
 import unicodedata
-from datetime import timedelta
 
 from flask import jsonify, request
 
 from ..core.config import app
-from ..core.pg import IntegrityError, insert_id, st_ids, system_ctx, write_lock
+from ..core.pg import IntegrityError, insert_id, st_ids, write_lock
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, iso, iso_ms, now_utc
-from ..core.retention import ret_on, ret_report  # 2.272.0 A (#3026)
+from ..core.retention import ret_on  # 2.272.0 A (#3026)
 from ..accounts.session import me
 from ..accounts.orgs import is_org_admin  # 2.306.0 D3 (#2875)
 from ..core.access import Denied, task_visible
@@ -699,7 +697,8 @@ def wiki_delete(pid):
     c = db()
     r = wiki_need(c, pid, write=True)  # 2.200.0 A (#2747): edit on the page
     wiki_need_space(c, me(), r)  # 2.200.0 B (#2747): deleting is the space's, not an edit share's
-    c.execute("UPDATE wiki_pages SET deleted_at=? WHERE id=?", (iso_ms(now_utc()), pid))
+    from .wkkern import wkk_trash  # 2.790.0 (#5365): the core's trash (wkkern loads after this module)
+    wkk_trash(c, me(), pid)
     bump(c)
     c.commit()
     return jsonify(ok=True, page=wiki_dict(r, full=False))
@@ -728,7 +727,7 @@ def wiki_bulk(trash):
         raise BadInput(tr("Invalid value: {0}", "ids"))
     if not isinstance(fids, list) or len(fids) > WIKI_ZIP_FILES or any(isinstance(x, bool) or not isinstance(x, int) for x in fids):
         raise BadInput(tr("Invalid value: {0}", "files"))
-    done, skipped, renamed, ts = [], [], [], iso_ms(now_utc())
+    done, skipped, renamed = [], [], []
     from .wikiatt import wka_bulk  # 2.99.0 A (#2182): files to the trash before their pages, back after them
     fdone, fskip = wka_bulk(c, uid, fids, True) if trash else ([], [])
     for pid in ids:
@@ -746,11 +745,17 @@ def wiki_bulk(trash):
                 path = _wke_free_path(c, r["org_id"], r["owner_id"], pid, r["path"])
         try:
             with c.savepoint():
-                c.execute("UPDATE wiki_pages SET deleted_at=?, path=? WHERE id=?", (ts if trash else None, path, pid))
-                if not trash and r["deleted_at"]:  # 2.272.0 A (#3026): its files trashed with it (or later) come back too;
-                    # a file deleted on its own before the page stays in the trash
-                    c.execute("UPDATE wiki_files SET deleted_at=NULL WHERE page_id=? AND deleted_at>=? AND wkx_held_at IS NULL",
-                              (pid, r["deleted_at"]))
+                # 2.790.0 (#5365): the core's trash -- its files go with it as children (the same time) and only those come
+                # back; a file deleted on its own before the page stays in the trash
+                from .wkkern import wkk_restore, wkk_trash, wkk_with_page
+                if trash:
+                    wkk_trash(c, uid, pid)
+                    wkk_with_page(c, pid, fdone)  # its files trashed just before (above) went with it
+                else:
+                    if path != r["path"]:
+                        c.execute("UPDATE wiki_pages SET path=? WHERE id=?", (path, pid))
+                    wkk_restore(c, uid, pid)
+                if not trash and r["deleted_at"]:
                     from .wikiatt import wkx_files_back
                     wkx_files_back(c, uid, r)  # 2.528.0 D (#4306): files held at a lock only for who could read the space then
             done.append(pid)
@@ -772,74 +777,12 @@ def wiki_bulk(trash):
 
 
 # ---- 2.143.0 B (#2211): the trash of pages -- listed, deleted for good by hand ("Delete permanently", "Empty trash") and after
-# the trash period of tasks (tasktrash.ttp_days, KALMIDO_TRASH_DAYS) by the watchdog. Final = the row and what cascades from it
-# (links, files, history, word index), the files' scan / text marks and move records; the stored files after the commit.
-WKT_TICK = {"at": 0.0}
-WKT_BATCH = 200  # pages per run; the rest follows in the next hour
+# the trash period by the watchdog. 2.790.0 (#5365): both through the core's trash (wiki/wkkern.py: obj_purge, the core's
+# retention run obj_trash_tick); the area's own wiki_purge / wiki_trash_tick are gone.
 
 
 def wiki_trash_days():
     return ttp_days()
-
-
-def wiki_purge(c, ids):
-    """Deletes these pages for good when they are (still) in the trash -> (ids deleted, stored file paths to unlink after the
-    commit). The caller checked the rights."""
-    ids = sorted({int(x) for x in ids})
-    if not ids:
-        return [], []
-    q = ",".join("?" * len(ids))
-    ids = [r[0] for r in c.execute(f"SELECT id FROM wiki_pages WHERE id IN ({q}) AND deleted_at IS NOT NULL ORDER BY id FOR UPDATE", ids)]
-    if not ids:
-        return [], []
-    q = ",".join("?" * len(ids))
-    from .wikiatt import wka_page_files
-    files = wka_page_files(c, ids)
-    fids = [r[0] for r in c.execute(f"SELECT id FROM wiki_files WHERE page_id IN ({q})", ids)]
-    if fids:
-        f = ",".join("?" * len(fids))
-        c.execute(f"DELETE FROM upload_scan WHERE kind='wiki' AND ref_id IN ({f})", fids)
-        c.execute(f"DELETE FROM file_text WHERE kind='wiki' AND ref_id IN ({f})", fids)
-    c.execute(f"DELETE FROM space_moves WHERE kind='wiki' AND obj_id IN ({q})", ids)
-    # a share of exactly this page ends with it (a later page of the same name is not shared by the old link); folder shares stay
-    c.execute("UPDATE wiki_shares s SET revoked_at=? FROM wiki_pages p WHERE p.id IN (" + q + ") AND s.is_folder=0 AND s.revoked_at IS NULL "
-              "AND COALESCE(s.org_id,0)=COALESCE(p.org_id,0) AND COALESCE(s.owner_id,0)=COALESCE(p.owner_id,0) AND lower(s.path)=lower(p.path) "
-              "AND NOT EXISTS (SELECT 1 FROM wiki_pages x WHERE x.deleted_at IS NULL AND COALESCE(x.org_id,0)=COALESCE(p.org_id,0) "
-              "AND COALESCE(x.owner_id,0)=COALESCE(p.owner_id,0) AND lower(x.path)=lower(p.path))", [iso(now_utc()), *ids])
-    c.execute(f"DELETE FROM obj_history WHERE kind='wiki' AND ref_id IN ({q})", ids)  # 2.571.0 (#4766): its renames (no FK)
-    c.execute(f"DELETE FROM wiki_pages WHERE id IN ({q})", ids)  # links, files, versions, word index: ON DELETE CASCADE
-    from .wkfolder import wkf_drop
-    wkf_drop(c, ids)  # 2.200.0 A (#2747): their nodes in the tree
-    if files:  # a stored file another row still names stays on disk
-        f = ",".join("?" * len(files))
-        used = {r[0] for r in c.execute(f"SELECT path FROM wiki_files WHERE path IN ({f})", files)}
-        files = [p for p in files if p not in used]
-    return ids, files
-
-
-def wiki_trash_tick(c, force=False):
-    """The watchdog (at most hourly): pages longer in the trash than the period go for good, with their files. -> counts."""
-    if not force and time.time() - WKT_TICK["at"] < 3600:
-        return {}
-    WKT_TICK["at"] = time.time()
-    cut = iso_ms(now_utc() - timedelta(days=wiki_trash_days()))
-    purge, files = ret_on("trash"), []  # 2.272.0 A (#3026): like every retention run, off = count only
-    with system_ctx(c):  # housekeeping over every space: rows are only deleted, nothing is handed to a person
-        if purge:
-            due = [r[0] for r in c.execute("SELECT id FROM wiki_pages WHERE deleted_at IS NOT NULL AND deleted_at<? "
-                                           "ORDER BY deleted_at, id LIMIT ?", (cut, WKT_BATCH))]
-            ids, files = wiki_purge(c, due) if due else ([], [])
-            counts = {"pages": len(ids), "files": len(files)}
-            if ids:
-                bump(c)
-        else:
-            counts = {"pages": c.execute("SELECT COUNT(*) FROM wiki_pages WHERE deleted_at IS NOT NULL AND deleted_at<?", (cut,)).fetchone()[0],
-                      "files": c.execute("SELECT COUNT(*) FROM wiki_files f JOIN wiki_pages p ON p.id=f.page_id "
-                                         "WHERE p.deleted_at IS NOT NULL AND p.deleted_at<?", (cut,)).fetchone()[0]}
-        ret_report(c, "trash", counts, purge, run="wiki")
-    c.commit()
-    unlink_files(files)  # after the commit: a failed commit keeps the rows and their files
-    return counts
 
 
 @app.get("/api/wiki/trash")
@@ -889,7 +832,17 @@ def wiki_purge_many():
         if oid and b.get("all") is not True and len(mine) > 1 and not _wkp_may_empty(c, uid, oid):
             # 2.306.0 (#2875 review N12): several pages at once = emptying the trash by hand; one's own single page stays allowed
             raise Denied(403, tr(WKP_ADMIN_ONLY))
-    done, files = wiki_purge(c, mine)
+    from ..core.writes import obj_purge_after  # 2.790.0 (#5365): the core's delete for good (the stored files after the commit)
+    from .wkkern import wkk_purge
+    done = []
+    with obj_purge_after() as box:
+        for pid in sorted(mine):
+            try:
+                with c.savepoint():
+                    wkk_purge(c, uid, pid)
+                done.append(pid)
+            except Denied:
+                continue
     if done:
         if oid:  # 2.306.0 D3 (#2875): the organisation's admins see it in the history of its projects (no page names)
             c.execute("INSERT INTO org_list_log(org_id,list_id,list_name,action,by_id,owner_id,to_id,created_at,detail) "
@@ -897,7 +850,7 @@ def wiki_purge_many():
                                                     json.dumps({"kind": "wiki", "pages": len(done)})))
         bump(c)
     c.commit()
-    unlink_files(files)  # after the commit
+    unlink_files(box["after"])  # after the commit
     return jsonify(ok=True, ids=done, skipped=[x for x in ids if x not in set(done)])
 
 

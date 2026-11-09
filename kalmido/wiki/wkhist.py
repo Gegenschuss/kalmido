@@ -247,7 +247,7 @@ def wkh_prev(c, r):
 # ---- 2.528.0 D (#4306, B26): switching the lock on holds the history and the files in the trash instead of deleting them ---
 # wkx_held_at (migrations.d/4306_d.py) marks the rows; while the space is locked nobody sees them (the routes below answer a
 # locked space without history, wikiatt serves no file of it); wkx_tick deletes held versions and held trash files after the
-# trash period (ret_trash_cut; review 2.528: also with the retention switch off), or earlier wka_tick / wiki_trash_tick. Once the
+# trash period (ret_trash_cut; review 2.528: also with the retention switch off), or earlier wka_tick / the core trash run (2.790.0, #5365). Once the
 # lock is off again a held row is shown only to the people named in wiki_spaces.wkx_holds for its time (who could read the
 # space then): no later member, share or agent gets it. The org export leaves held versions out (admin/orgexport.py ox_live).
 def _wkx_where(oid, owner, alias=""):
