@@ -420,3 +420,18 @@ A comment or team chat message in the trash keeps them (it shows none), a restor
 writes them into the old files (`comments/reactions.json` with `comment_id`, `chat/reactions.json` with `message_id`), so
 older archives and new ones import the same way. A new area with reactions adds its kind to `ORX_KINDS` and a trigger line in
 a fragment -- no table of its own.
+
+### Versions of tables (stage Q7c, 2.800.0, #5283)
+
+Checked against the core's versions and undo steps, the two change tables of the tables area stay, each for its own logic:
+- `sheet_hist` is the cell history of a table (who changed which cell when, before -> after; *History of the cell*, *Recent
+  changes*): a diff per cell, not a version of the object. It stays (decision of 08.11.2026) and follows the one retention
+  switch of the logs (`core/retention.py` kind `logs`, `KALMIDO_LOG_DAYS`): the daily clean-up (`admin/dataretention.py`
+  `lgc_tick`) and the next write cut the rows past the period; the newest 200 per table is its own limit besides.
+- `sheet_changes` is not covered by `obj_undo`, so it stays: it is the trail of an agent's call (the agents' panel, the batch
+  undo of web and API v1, `sh_undo_batch`; agents record no steps in `obj_undo`), and a person's steps of a table in
+  `obj_undo` are pointer parts (mode `ref`, #5253 / #5409) into the person's batch there -- without it they would need a copy
+  of their own in `obj_undo`. `tools/check_core_crosscut.py` does not count it as a cross-cutting part (no name ending,
+  no marker column), so it has no line in `tools/core_crosscut_allow.json` (a line of a table that does not look like one
+  is red); the reason stands here.
+

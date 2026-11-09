@@ -773,7 +773,7 @@ target yet, nothing leaves the list either; the backup page says so. Retiring an
 Expired credentials (sessions, tokens, codes past their end) are no data of a person any more and go without the switch.
 
 **Logs (`KALMIDO_LOG_DAYS`).** Once a day: the activity of tasks and projects, the file store's log, the log of organisation
-lists and the change log of tables after the period; admin alerts and the admin sign-in addresses after a year; finished
+lists, the change log and the cell history of tables after the period; admin alerts and the admin sign-in addresses after a year; finished
 agent jobs after 180 days. The office logs (documents, logbook, archive) belong to the bookkeeping and stay as long as
 their document; so does the file store's log of an office record (a receipt, a filed letter, a cash book or DATEV receipt).
 

@@ -7,7 +7,7 @@ Invented accounts only (example.com); the person without an organisation (freela
  - newsletter: deleting an address book keeps its unsubscriptions; the private suppression rows go with the account
  - agent chat: KALMIDO_CHAT_KEEP_DAYS is applied by the daily run (dry run without the switch)
  - logs: the 400-day clean-up keeps the history row the customer portal's "your text" check reads (same answer before
-   and after), other old rows go
+   and after), other old rows go; 2.800.0 (#5283): a table's cell history (sheet_hist) older than the period goes too
 usage: p2186_c_retention_test.py <datadir>      (P2186C_NOSTART=1: a running server on KALMIDO_TEST_PORT)
 """
 import hashlib
@@ -172,7 +172,13 @@ orig = ("from kalmido.team.portal import pt_original\nfrom kalmido.core.pg impor
         "    print('orig', repr(pt_original(c, p)))" % TP["id"])
 before = box(orig)
 check("orig ''" in before, "portal: (setup) an edited description: the page shows the title only " + before[-200:])
+# 2.800.0 (#5283, stage Q7c): a table's cell history follows the same switch of the logs
+SH = Fr.post(B + "/api/sheets", json={"title": "Old sheet", "space": "private"}).json()["id"]
+for when, mark in ((ago(500), "old-5283"), (ago(1), "new-5283")):
+    sql("INSERT INTO sheet_hist(sheet_id, user_id, old_raw, new_raw, at) VALUES(?,?,?,?,?)", (SH, FID, "", mark, when), write=True)
 out = box("from kalmido.admin.dataretention import lgc_tick\nprint('rows', lgc_tick(c, True))", ("KALMIDO_PURGE_LOGS=1",))
+marks = [x[0] for x in sql("SELECT new_raw FROM sheet_hist WHERE sheet_id=? ORDER BY id", (SH,))]
+check(marks == ["new-5283"], f"logs: a table's cell history older than the period goes, the newer stays {marks}")
 left = sql("SELECT id, kind FROM activity WHERE task_id=? AND created_at<?", (TP["id"], ago(400)))
 check(left == [(first, "content")], f"portal: the oldest edit row of the ticket stays, the others go {left} " + out[-200:])
 check(not sql("SELECT 1 FROM activity WHERE task_id=? AND created_at<?", (TO, ago(400))), "logs: an old edit row of a task without a ticket goes")

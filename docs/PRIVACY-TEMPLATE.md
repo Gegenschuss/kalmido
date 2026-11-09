@@ -48,7 +48,7 @@ Kalmido's defaults (the operator can change them with the variables named; see [
 |------|---------|--------------------|
 | Trash (tasks, projects, files, pages, mails, events, bookmarks, …) | 30 days, then deleted for good | `KALMIDO_TRASH_DAYS` |
 | Activity / project / file / table change log | 400 days | `KALMIDO_LOG_DAYS` |
-| Cell history of tables | the newest 200 entries of a table within 90 days | – |
+| Cell history of tables | the newest 200 entries of a table, at most as long as the change log | `KALMIDO_LOG_DAYS` |
 | Office log | changes stay for good (bookkeeping); reads (open, preview, PDF, XML) 90 days | – |
 | Bookings of a booking page | never confirmed: 7 days after they expired; cancelled and never confirmed: 30 days. Confirmed ones (also when cancelled later) have no period: the owner of the page deletes them in the app (search by name or e-mail over all bookings), otherwise they stay until the owner's account is deleted | – |
 | E-mails deleted in a workspace mailbox | the mail leaves the list, but its `.eml` and attachments stay readable in the file store for those who could read it. Only the trash run, when switched on, removes the mail and moves its folder to the file store's trash; without that switch they stay. To remove the content at once, delete the folder *E-Mails / ...* too | `KALMIDO_TRASH_DAYS`, `KALMIDO_PURGE_TRASH` |

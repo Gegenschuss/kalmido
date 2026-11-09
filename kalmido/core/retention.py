@@ -65,7 +65,7 @@ from .pg import system_ctx
 RET_KINDS = ("trash", "logs", "backups", "files", "chat")
 RET_DAYS = {
     "trash": 30,     # #2165: files, wiki, hub mails, sheets, pipeline, invoice series, chat tombstones
-    "logs": 400,     # #2171: activity, list_activity, fs_log, org_list_log, sheet_changes (office logs stay: GoBD)
+    "logs": 400,     # #2171: activity, list_activity, fs_log, org_list_log, sheet_changes, sheet_hist (#5283) (office logs stay: GoBD)
     "backups": 30,   # #2172: safety backups (kind=safety) older than this
     "files": 1,      # #2173: an orphan file must be older than this before the sweep removes it
     "chat": 0,       # #2175: agent chat messages older than this (0 = no day limit, only the count limit)

@@ -1,6 +1,9 @@
 """2.124.0 B (#2112): the change history of a table's cells -- every input a person (or an agent) stored: who, when, before /
-after. Written by sheets/core.py _store (one row per changed cell), kept short: the newest SHH_KEEP rows of a sheet within
-SHH_DAYS (older ones go on the next write), at most SHH_KEEP rows of one call (an import logs nothing: io.py sets shh_off).
+after. Written by sheets/core.py _store (one row per changed cell), kept short: the newest SHH_KEEP rows of a sheet (older
+ones go on the next write), at most SHH_KEEP rows of one call (an import logs nothing: io.py sets shh_off). 2.800.0 (#5283,
+stage Q7c): its age follows the one switch of the logs (core/retention.py kind "logs": ret_days / ret_on) -- the daily
+clean-up (admin/dataretention.py lgc_tick) and the next write cut the rows past it; while the switch counts only, only the
+count limit cuts.
 Its own table (sheet_hist), so the agents' trail (sheet_changes, sh_undo_batch, the "Changes by agents" panel) stays as it
 is. Inputs are stored as the cells keep them (sheet_cells.raw is not sealed at rest either) and shown for the viewer:
 formulas with the names they may see, options / people / files by their names. Read = the right to read the table; the
@@ -14,12 +17,12 @@ from flask import jsonify, request
 from ..core.config import app
 from ..core.db import db, iso_ms, now_utc
 from ..core.i18n import N_, tr
+from ..core.retention import ret_days, ret_on  # 2.800.0 (#5283)
 from ..accounts.session import me
 from ..collab.comments import user_names
 from .shkinds import SHK_FILE_RE, shk_bool, shk_people  # 2.369.5 (#2517): pulled up from functions
 
 SHH_KEEP = 200
-SHH_DAYS = 90
 SHH_CELL_MAX = 50
 
 
@@ -31,8 +34,8 @@ def shh_log(c, book, xid, rid, cid, old, new, uid, agent_id, ts):
     if n >= SHH_KEEP:
         return
     sid = book.sheet["id"]
-    if not n:
-        cut = iso_ms(now_utc() - timedelta(days=SHH_DAYS))
+    if not n:  # 2.800.0 (#5283): the age of the logs' switch (core/retention.py), the count limit always
+        cut = iso_ms(now_utc() - timedelta(days=ret_days("logs"))) if ret_on("logs") else ""
         c.execute("DELETE FROM sheet_hist WHERE sheet_id=? AND (at<? OR id<=(SELECT id FROM sheet_hist WHERE sheet_id=? "
                   "ORDER BY id DESC LIMIT 1 OFFSET ?))", (sid, cut, sid, SHH_KEEP - 1))
     book._shh_n = n + 1

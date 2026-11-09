@@ -81,7 +81,7 @@ budget against the time booked, or plain lists (equipment, shooting plan, contac
   the ones you see. A cell's text stays on one line (a long one ends with "…"). *Browser print* is the quick way of before:
   a plain view of the rows shown with the column titles repeated on every page; in the print dialog choose *Save as PDF*.
 - **History.** The panel has *History of the cell* (who changed the chosen cell when, before -> after) and *Recent changes*
-  (also in the table's menu): the latest 200 changes of the table within 90 days, people and agents. Whoever may read the
+  (also in the table's menu): the latest 200 changes of the table, people and agents (older than the log period of the operator, `KALMIDO_LOG_DAYS`, they go with the daily clean-up). Whoever may read the
   table sees its history; it moves along when the table moves to another workspace.
 
 ## Formulas, functions and Kalmido variables

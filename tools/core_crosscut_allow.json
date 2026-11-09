@@ -47,7 +47,7 @@
   "push_tags": "own logic: a device's push topics (subscriptions of the push service)",
   "reading_orgs": "own logic: which organisations read a list (a right)",
   "rss_reads": "stage Q8 (read marks) takes it down: the core's read marks",
-  "sheet_hist": "own logic: a table's cell history (decision Q7c)",
+  "sheet_hist": "own logic: a table's cell history (decision Q7c, #5283: under the logs' retention switch)",
   "sheet_links": "own logic: batch undo of a table's links (check again after #5249)",
   "task_bell": "stage Q9 (following) takes it down: obj_follow",
   "task_enc_notes": "own logic: a task's encrypted note is content of its own",

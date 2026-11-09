@@ -1,7 +1,7 @@
 """2.152.0 D (#2171 #2173): the daily clean-up of old logs and expired credentials, and the weekly orphan-file sweep
 (no routes; the watchdog starts both, see notify/push.py watchdog_tick).
 
-- lgc_tick (kind "logs"): activity, list_activity, fs_log, org_list_log, sheet_changes older than ret_days("logs"), the admin
+- lgc_tick (kind "logs"): activity, list_activity, fs_log, org_list_log, sheet_changes, sheet_hist (2.800.0, #5283) older than ret_days("logs"), the admin
   alerts and admin sign-in addresses after a year, finished agent jobs after half a year, the journal of deleted accounts
   after the backup period (lgc_journal_cut, 2.312.0 B #3264) -- only while ret_on("logs"), else
   the run just counts (dry run, GET /api/admin/retention). The office logs (office_doc_log, office_drive_log,
@@ -48,6 +48,7 @@ LGC_LOGS = (
     ("fs_log", "at", f"node_id NOT IN ({DRT_OFFICE_NODES})", None),  # 2.239.0 D (#2874): not the office records' log
     ("org_list_log", "created_at", "", None),
     ("sheet_changes", "created_at", "", None),
+    ("sheet_hist", "at", "", None),  # 2.800.0 (#5283, stage Q7c): a table's cell history under the same switch
     ("admin_alerts", "created_at", "", 365),
     ("admin_login_ips", "last_at", "", 365),
     ("agent_jobs", "updated_at", "state IN ('done','failed','stopped')", 180),
