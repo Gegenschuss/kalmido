@@ -89,7 +89,10 @@ def obj_trash_route(kind, rid):
     c, uid = db(), me()
     obj_trash(c, uid, kind, rid)
     c.commit()
-    return jsonify(_one(c, uid, kind, rid, trash=True))
+    try:
+        return jsonify(_one(c, uid, kind, rid, trash=True))
+    except Denied:  # 2.778.0 (#5371): trash_role 'edit' -- a writer may put it in, the trash shows it only to who manages it
+        return jsonify(id=int(rid), kind=kind, trashed=True)
 
 
 @app.post("/api/obj/<kind>/<int:rid>/restore")

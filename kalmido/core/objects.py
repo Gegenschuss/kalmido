@@ -430,9 +430,10 @@ def obj_forget():
         g.pop("obj_roles", None)
 
 
-def obj_role(c, uid, kind, rid, row=None, pre=None):
+def obj_role(c, uid, kind, rid, row=None, pre=None, own_trash=False):
     """None | 'view' | 'edit' | 'manage' -- THE role of account uid on the object (module docstring, steps 1-4). pre: obj_rows'
-    reads of the whole listing (_rows_pre)."""
+    reads of the whole listing (_rows_pre). 2.778.0 (#5371): own_trash=True skips step 4 for an object uid itself put into
+    the trash (deleted_by) -- only for taking that own step back (core/writes.py obj_restore undo=True); not cached."""
     reg = OBJ.get(kind or "")
     if reg is None or not uid:
         return None
@@ -441,7 +442,7 @@ def obj_role(c, uid, kind, rid, row=None, pre=None):
         uid = int(uid)  # #5268 review F6: the own-request checks (_req_token_lists, hmv1._hmv_own) compare ints
     except (TypeError, ValueError):
         return None
-    cache = _cache()
+    cache = None if own_trash else _cache()
     key = (uid, kind, rid)
     if cache is not None and key in cache:
         return cache[key]
@@ -452,21 +453,22 @@ def obj_role(c, uid, kind, rid, row=None, pre=None):
         # review F3: a share gives at most 'edit' -- the chain is read only when the area's own role is below it
         share = _share_role(c, uid, reg, row, pre=pre) if OBJ_RANK[base] < OBJ_RANK["edit"] and reg["fsref"] else None  # #4739
         out = base if OBJ_RANK[base] >= OBJ_RANK[share] else share
-        if row["deleted_at"] and out != "manage":
+        own = own_trash and row["deleted_by"] is not None and int(row["deleted_by"]) == int(uid)
+        if row["deleted_at"] and out != "manage" and not own:
             out = None  # step 4: the trash only for who may restore it
     if cache is not None:
         cache[key] = out
     return out
 
 
-def obj_need(c, uid, kind, rid, need="view", trash=False):
+def obj_need(c, uid, kind, rid, need="view", trash=False, own_trash=False):
     """(row, role) of the object for uid, or Denied: 404 without a role (or in the trash unless trash=True; outside the
-    trash with trash=True too), 403 without the role need ('view' | 'write' | 'manage')."""
+    trash with trash=True too), 403 without the role need ('view' | 'write' | 'manage'). own_trash: obj_role's (#5371)."""
     reg = obj_reg(kind)
     if reg["feat"]:
         need_feat(reg["feat"])
     row = obj_row(c, kind, rid)
-    role = obj_role(c, uid, kind, rid, row=row) if row is not None else None
+    role = obj_role(c, uid, kind, rid, row=row, own_trash=own_trash) if row is not None else None
     if not role or bool(row["deleted_at"]) != bool(trash):
         raise Denied(404)
     want = {"view": "view", "write": "edit", "edit": "edit", "manage": "manage"}.get(need)
@@ -1160,6 +1162,9 @@ def _probe_register():
                  # 2.773.0 (#5292): with KALMIDO_TEST_OBJ_PARTS=1 (tests/p2773_b_trash_core_test.py) its parts (table
                  # obj_probe_part, made by that suite) are its children, and the core's retention run takes its trash
                  **({"children": (("obj_probe_part", "probe_id"),), "trash_prune": True} if os.environ.get("KALMIDO_TEST_OBJ_PARTS") == "1" else {}))
+    if os.environ.get("KALMIDO_TEST_OBJ_PARTS") == "1":  # 2.778.0 (#5371): a kind whose writers may trash (table obj_probe_e)
+        obj_register("objprobe_e", "obj_probe_e", label="Test object", area="other", fields={"title": f_text(120, required=True)},
+                     trash_role="edit")
 
 
 _probe_register()

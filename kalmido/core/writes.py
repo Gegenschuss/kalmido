@@ -424,10 +424,13 @@ def obj_trash(c, uid, kind, rid, step=True):
     return obj_row(c, kind, rid)
 
 
-def obj_restore(c, uid, kind, rid, step=True):
-    """Out of the trash ('manage'), with the children that went with it. step=False: the undo itself."""
+def obj_restore(c, uid, kind, rid, step=True, undo=False):
+    """Out of the trash ('manage'), with the children that went with it. step=False: no step of its own. 2.778.0 (#5371):
+    undo=True is the person's own trash step taken back (core/undoweb.py _trash_part): the role of putting it in
+    (_trash_need), so who may trash it may take that back -- only while it is still the trash uid put it in (deleted_by);
+    the trash's own restore stays at 'manage'."""
     reg = obj_reg_node(kind)  # 2.754.0 (#5268)
-    row, _ = obj_need(c, uid, kind, rid, "manage", trash=True)
+    row, _ = obj_need(c, uid, kind, rid, _trash_need(reg) if undo else "manage", trash=True, own_trash=undo)
     write_lock(c, f"obj-{kind}-{int(rid)}")
     # 2.760.0 (#5311): the node's deleted_at is TEXT, the object's may be TIMESTAMPTZ (read canonically, pg.py ts_canon):
     # compare both canonically, not as text (a TIMESTAMPTZ table's restore left its node in the trash)

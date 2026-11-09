@@ -113,7 +113,10 @@ def _trash_part(c, uid, kind, rid, p, redo):
     back = (st["mode"] == "trash") != bool(redo)  # undo of a trash / redo of a restore = out of the trash
     if bool(row["deleted_at"]) != back:
         raise Denied(409, tr(UNDO_CONFLICT))
-    (obj_restore if back else obj_trash)(c, uid, kind, rid, step=False)
+    if back:  # 2.778.0 (#5371): the own step back with the role of putting it in (trash_role 'edit' = write), not 'manage'
+        obj_restore(c, uid, kind, rid, step=False, undo=True)
+    else:
+        obj_trash(c, uid, kind, rid, step=False)
     c.execute("UPDATE obj_undo SET state=? WHERE id=?", ("done" if redo else "undone", st["id"]))
 
 

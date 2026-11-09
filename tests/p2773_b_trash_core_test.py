@@ -11,6 +11,8 @@ a TEXT deleted_at while the object's is TIMESTAMPTZ). Invented names only.
  - the retention run: obj_trash_prune counts (switch off) or deletes what is in the trash longer than the period, not the
    younger ones; obj_trash_tick reports it (ret_last_trash.obj_trash); the calendars' run goes through the same core path
  - live_sql / trash_sql (core/access.py): the condition with an alias, a wrong alias / column = ValueError
+ - 2.778.0 (#5371): a kind with trash_role 'edit' (objprobe_e): a member who put it into the trash takes that own step back
+   (/api/undo), the trash's restore stays at manage; another person's trash meanwhile is not taken out by the old step
 tenant-matrix: obj (another organisation: 404 on trash / restore / delete of an object, no undo of a foreign step)
 freelancer-matrix: obj (a person without an organisation: her object with children into the trash, undone, deleted for good)
 usage: p2773_b_trash_core_test.py <datadir>"""
@@ -143,6 +145,40 @@ GF = groups(FID)[-1]["id"]
 check(Fr.post(B + f"/api/undo/to/{GF}").ok and parts(F1) == {"a": None, "b": None, "own": OLD}, "freelancer: taken back with the children")
 check(Fr.post(B + f"/api/obj/{K}/{F1}/trash").ok and Fr.delete(B + f"/api/obj/{K}/{F1}").ok and gone(F1) and parts(F1) == {},
       "freelancer: deleted for good with the children")
+
+# ---------------------------------------------------------------- 2.778.0 (#5371): trash_role 'edit' -- the own trash step goes back
+KE = "objprobe_e"  # the second test kind (KALMIDO_TEST_OBJ_PARTS=1): its writers may put it into the trash
+for q in ("CREATE TABLE IF NOT EXISTS obj_probe_e (LIKE obj_probe INCLUDING DEFAULTS INCLUDING IDENTITY INCLUDING CONSTRAINTS)",
+          "ALTER TABLE obj_probe_e ADD PRIMARY KEY (id)", "GRANT SELECT, INSERT, UPDATE, DELETE ON obj_probe_e TO kalmido_app",
+          "GRANT USAGE, SELECT ON SEQUENCE obj_probe_e_id_seq TO kalmido_app"):
+    dbx(q)
+
+
+def e_del(oid):
+    return dbx("SELECT deleted_at FROM obj_probe_e WHERE id=?", (oid,))[0][0]
+
+
+r = Bo.post(B + f"/api/obj/{KE}", json={"title": "Shared plan", "org_id": ORG})
+check(r.status_code == 201, f"setup: an object of the edit-trash kind {r.status_code} {r.text[:200]}")
+E1 = r.json()["id"]
+CARL = uid["carl"]
+check(Ca.post(B + f"/api/obj/{KE}/{E1}/trash").ok and e_del(E1), "a member (edit) puts it into the trash (trash_role edit)")
+GE = groups(CARL)[-1]["id"]
+it = Ca.get(B + "/api/undo").json()["items"]
+check(it and it[0]["id"] == GE and it[0]["undo"] is True, f"the member's own trash step is listed {it[:1]}")
+check(Ca.post(B + f"/api/obj/{KE}/{E1}/restore").status_code in (403, 404) and e_del(E1),
+      "the member: the trash's own restore stays at manage (no restore)")
+r = Ca.post(B + f"/api/undo/to/{GE}")
+check(r.ok and GE in r.json().get("undone", []) and not r.json().get("stayed") and not e_del(E1),
+      f"the member takes the own trash step back: out of the trash {r.status_code} {r.text[:300]}")
+r = Ca.post(B + f"/api/undo/{GE}/redo")
+check(r.ok and e_del(E1), f"redo: the member puts it into the trash again {r.text[:200]}")
+check(Ca.post(B + f"/api/obj/{KE}/{E1}/restore").status_code in (403, 404), "still no restore through the trash for the member")
+# someone else's trash meanwhile: the member's old step does not restore what another person put into the trash
+check(A.post(B + f"/api/obj/{KE}/{E1}/restore").ok and Bo.post(B + f"/api/obj/{KE}/{E1}/trash").ok, "the admin restores, the owner trashes")
+r = Ca.post(B + f"/api/undo/to/{GE}")
+check(r.ok and r.json().get("stayed") and e_del(E1), f"the member's old step: another person's trash stays {r.status_code} {r.text[:300]}")
+check(Ol.post(B + f"/api/undo/to/{GE}").status_code == 404, "another account: the member's step is not there (404)")
 
 # ---------------------------------------------------------------- the retention run
 O2 = with_parts(Bo, "Old plan", ORG)
