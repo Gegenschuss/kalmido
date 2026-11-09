@@ -91,7 +91,11 @@ for bad in ("123", "1234567", "12a4", "", None):
 r = Bo.put(B + f"/api/family/kids/{LINA}/pin", json={"pin": "4821"})
 check(r.ok and r.json()["pin"] is True and "4821" not in r.text and "pin_hash" not in r.text and "scrypt" not in r.text, "the parent sets the PIN; the answer has no PIN / hash " + r.text[:200])
 h = dbx("SELECT pin_hash, fails FROM kid_pins WHERE kid_id=?", (LINA,))
-check(h and h[0][0] != "4821" and "4821" not in h[0][0] and h[0][0].split(":")[0] in ("scrypt", "pbkdf2"), "stored as a password hash " + (h[0][0][:12] if h else ""))
+# 2.780.0 (#5374): was '"4821" not in hash' - the random salt / hex digest holds "4821" by chance now and then (red in CI
+# v2.766.0 with a proper scrypt hash); the PIN must not be one of the hash's parts, the hex digest must be a real digest
+hp = h[0][0].split("$") if h else []
+check(h and len(hp) == 3 and "4821" not in hp[:2] and hp[0].split(":")[0] in ("scrypt", "pbkdf2") and len(hp[2]) >= 64
+      and all(ch in "0123456789abcdef" for ch in hp[2]) and "4821" not in hp[0], "stored as a password hash " + (h[0][0][:12] if h else ""))
 for s, who in ((Li, "child"), (Bo, "parent"), (A, "admin")):
     check("4821" not in s.get(B + "/api/state").text and "pin_hash" not in s.get(B + "/api/state").text, f"state of the {who}: no PIN, no hash")
 check(Li.delete(B + f"/api/family/kids/{LINA}/pin").status_code in (403, 404), "the child cannot remove its PIN")
