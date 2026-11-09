@@ -1,3 +1,4 @@
+// @ts-check
 /* Kalmido web client: the call sheet of a shoot day (2.802.0, #1956), module "callsheet" (lazyload.js, loaded by the button
    "Call sheet" of a booking in the disposition, dispo.js dp_editSheet; only with the industry Film & Video). One dialog per
    shoot day (= one job of the disposition): what the app knows is shown (day, crew, project, client, production), the day
@@ -16,6 +17,9 @@ const CS_ROWS = {
 const CS_CALL_DEPTS = [N_('Production'), N_('Lighting'), N_('Camera'), N_('Director'), N_('Make-up / costume'), N_('Cast')];
 const CS_MAX = 4 * 1024 * 1024;
 
+/** the form's elements (inputs, buttons) of the dialog: the type check knows them as any */
+const cs_one = (s, r) => /** @type {any} */ ($(s, r));
+const cs_all = (s, r) => /** @type {any[]} */ ($$(s, r));
 const cs_url = (job, org, tail = '') => `/api/team/dispo/callsheet/${encodeURIComponent(job)}${tail}?org=${org}`;
 /** a link that opens the address in the device's map app (Apple devices: Apple Maps, else Google Maps); nothing before the tap */
 function cs_mapHref(t) {
@@ -79,10 +83,11 @@ function cs_formHtml(cs) {
 
 /** the form's values as the server's data object */
 function cs_collect(md) {
+  /** @type {Record<string, any>} */
   const out = {};
-  $$('[data-f]', md).forEach(el => { const v = el.value.trim(); if (v) out[el.dataset.f] = v; });
+  cs_all('[data-f]', md).forEach(el => { const v = el.value.trim(); if (v) out[el.dataset.f] = v; });
   for (const k of Object.keys(CS_ROWS)) {
-    const rows = $$(`.csrow[data-k="${k}"]`, md).map(r => Object.fromEntries($$('input', r).map(i => [i.dataset.c, i.value.trim()]))).filter(r => Object.values(r).some(Boolean));
+    const rows = cs_all(`.csrow[data-k="${k}"]`, md).map(r => Object.fromEntries(cs_all('input', r).map(i => [i.dataset.c, i.value.trim()]))).filter(r => Object.values(r).some(Boolean));
     if (k === 'calls' && rows.every(r => !r.time)) continue;  // only the suggested departments without a time: nothing to keep
     if (rows.length) out[k] = rows;
   }
@@ -95,15 +100,15 @@ const cs_readFile = f => new Promise((ok, no) => { const r = new FileReader(); r
 async function cs_open(job, org) {
   let cs;
   try { cs = (await api('GET', cs_url(job, org))).callsheet; } catch { return; /* api() said it */ }
-  const md = modal(''), card = $('.card', md);
+  const md = /** @type {any} */ (modal('')), card = cs_one('.card', md);
   md.classList.add('csmd');
   let sketch;  // undefined = unchanged, '' = remove, data URI = new
   const draw = () => {
     setHtml(card, cs_formHtml(cs));
-    if (!cs.can_edit) $$('input, textarea, select, [data-cs="rowadd"], [data-cs="rowdel"], [data-cs="sketchdel"]', md).forEach(x => { if (!x.closest('.foot')) x.disabled = true; });
+    if (!cs.can_edit) cs_all('input, textarea, select, [data-cs="rowadd"], [data-cs="rowdel"], [data-cs="sketchdel"]', md).forEach(x => { if (!x.closest('.foot')) x.disabled = true; });
   };
   draw();
-  const err = t => { const e = $('.cserr', md); if (e) { e.textContent = t || ''; e.hidden = !t; } };
+  const err = t => { const e = cs_one('.cserr', md); if (e) { e.textContent = t || ''; e.hidden = !t; } };
   const save = async () => {
     const before = {data: cs.data || {}};
     const v = {data: cs_collect(md), expect_updated_at: cs.updated_at || undefined, ...(sketch !== undefined ? {sketch} : {})};
@@ -119,7 +124,7 @@ async function cs_open(job, org) {
       if (e?.status === 409 && e.data?.callsheet) {
         err(tr('Someone else saved this call sheet meanwhile. Load the newer version (your changes here are dropped) or copy them first.'));
         const b = document.createElement('button'); b.type = 'button'; b.className = 'btn sm'; b.dataset.cs = 'reload'; b.textContent = tr('Load the newer version');
-        $('.cserr', md)?.append(' ', b);
+        cs_one('.cserr', md)?.append(' ', b);
         md._cur = e.data.callsheet;
       }
       return false;
@@ -132,27 +137,28 @@ async function cs_open(job, org) {
   };
   const fname = () => `callsheet-${(cs.auto?.date || '')}.pdf`;
   md.addEventListener('change', async e => {
-    const t = e.target;
-    if (t.id === 'cs-loc_address') { const p = $('.csmap', md); if (p) setHtml(p, t.value.trim() ? `<a href="${esc(cs_mapHref(t.value.trim()))}" target="_blank" rel="noopener noreferrer">${ic('link', 's')} ${tr('Open in maps')}</a>` : ''); }
+    const t = /** @type {any} */ (e.target);
+    if (t.id === 'cs-loc_address') { const p = cs_one('.csmap', md); if (p) setHtml(p, t.value.trim() ? `<a href="${esc(cs_mapHref(t.value.trim()))}" target="_blank" rel="noopener noreferrer">${ic('link', 's')} ${tr('Open in maps')}</a>` : ''); }
     if (t.id === 'cs-sketch' && t.files?.[0]) {
       const f = t.files[0];
       if (!/^image\/(png|jpeg)$/.test(f.type)) { toast(tr('Please select a PNG or JPEG picture')); t.value = ''; return; }
       if (f.size > CS_MAX) { toast(tr('The picture is too large (at most {0} MB)', 4)); t.value = ''; return; }
       sketch = await cs_readFile(f);
-      const box = $('.cssketch', md); if (box) setHtml(box, `<img src="${esc(sketch)}" alt="${esc(tr('Directions sketch'))}"><p class="muted">${tr('Saved with "Save".')}</p>`);
+      const box = cs_one('.cssketch', md); if (box) setHtml(box, `<img src="${esc(sketch)}" alt="${esc(tr('Directions sketch'))}"><p class="muted">${tr('Saved with "Save".')}</p>`);
     }
   });
   md.addEventListener('click', async e => {
-    const b = e.target.closest('[data-cs]'); if (!b || b.disabled) return;
+    const b = /** @type {any} */ (e.target).closest?.('[data-cs]'); if (!b || b.disabled) return;
     const k = b.dataset.cs;
     if (k === 'close') { md.remove(); return; }
-    if (k === 'rowadd') { const box = $(`.csrows[data-k="${b.dataset.k}"]`, md); if (!box) return; box.insertAdjacentHTML('beforeend', cs_lineHtml(b.dataset.k, {})); $('.csrow:last-child input', box)?.focus(); return; }
+    if (k === 'rowadd') { const box = cs_one(`.csrows[data-k="${b.dataset.k}"]`, md); if (!box) return; box.insertAdjacentHTML('beforeend', cs_lineHtml(b.dataset.k, {})); cs_one('.csrow:last-child input', box)?.focus(); return; }
     if (k === 'rowdel') { b.closest('.csrow')?.remove(); return; }
-    if (k === 'sketchdel') { sketch = ''; const box = $('.cssketch', md); if (box) setHtml(box, `<p class="muted">${tr('The picture goes with "Save".')}</p>`); b.remove(); return; }
+    if (k === 'sketchdel') { sketch = ''; const box = cs_one('.cssketch', md); if (box) setHtml(box, `<p class="muted">${tr('The picture goes with "Save".')}</p>`); b.remove(); return; }
     if (k === 'reload') { if (md._cur) { cs = md._cur; md._cur = null; sketch = undefined; draw(); } return; }
     if (k === 'save') { b.disabled = true; await save(); b.disabled = false; return; }
     if (k === 'pdf' || k === 'share') {
-      if (cs.can_edit && !(await save())) return;  // what the form shows is what the PDF says
+      const dirty = sketch !== undefined || JSON.stringify(cs_collect(md)) !== JSON.stringify(cs.data || {});
+      if (cs.can_edit && dirty && !(await save())) return;  // what the form shows is what the PDF says (saved first when changed)
       b.disabled = true;
       try {
         const blob = await pdfBlob();
