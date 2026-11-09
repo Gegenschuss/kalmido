@@ -452,3 +452,11 @@ xd_on('#view', 'f', async (s, el, e, id) => {
   const label = tr('Moved to office');
   histToast(label, histAdd({label, undo: go('private', true), redo: go('office', false)}));
 }, () => S.route.mod === 'office');
+// 5. a file onto a folder of the file store (the open folder's rows / path, the panel's folders) = moved there (ablage.js ab_move)
+xd_on('#view .abview [data-abdrop], #side [data-abdrop], #view .abview[data-abzone]', 'f', async (s, el, e, id) => {
+  const v = await xd_node(id); if (!v || typeof ab_move !== 'function') return;
+  const d = el.dataset.abdrop ?? el.dataset.abzone ?? '';
+  const to = d === 'top' || d === '' ? null : +d;
+  if (to === id) return;
+  await ab_move(v, to);
+}, el => !el.matches('.abview') || !!el.dataset.abzone);  // the open folder itself (not a space's top: its space is not known here)
