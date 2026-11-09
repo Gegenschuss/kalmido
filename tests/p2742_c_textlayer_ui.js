@@ -85,7 +85,10 @@ async function upload(name, pages) {
     const wait = async (js, n = 60) => { for (let i = 0; i < n; i++) { if (await ev(js).catch(() => false)) return true; await sleep(250); } return false; };
     const P0 = `document.querySelector('.dv-pages .dv-pg[data-i="0"]')`;
     check(await wait(`!!${P0}?.querySelector('canvas') && !!${P0}.querySelector('.textLayer span')`, 100), 'Firefox: page 1 drawn with its text layer');
-    const geo = async () => JSON.parse(await ev(`(() => { const p = ${P0}, tl = p.querySelector('.textLayer'), a = p.getBoundingClientRect(), b = tl.getBoundingClientRect(), sp = [...tl.querySelectorAll('span')].find(s => /Elternhandbuch/.test(s.textContent)), c = sp && sp.getBoundingClientRect(), box = document.querySelector('.dv-pages');
+    // 2.771.0 (#5338): CI v2.762.0 "tl is null" - a redraw (zoom, the fields beside it) swaps the page's layer: measure once
+    // page and layer are both there again (a real state, no fixed time)
+    const geo = async () => { for (let i = 0; ; i++) { await wait(`!!${P0}?.querySelector('canvas') && !!${P0}.querySelector('.textLayer span')`, 80); try { return await geo1(); } catch (e) { if (i >= 5) throw e; } } };
+    const geo1 = async () => JSON.parse(await ev(`(() => { const p = ${P0}, tl = p.querySelector('.textLayer'), a = p.getBoundingClientRect(), b = tl.getBoundingClientRect(), sp = [...tl.querySelectorAll('span')].find(s => /Elternhandbuch/.test(s.textContent)), c = sp && sp.getBoundingClientRect(), box = document.querySelector('.dv-pages');
       return JSON.stringify({dl: Math.round(b.left - a.left), dt: Math.round(b.top - a.top), dw: Math.round(b.width - a.width), dh: Math.round(b.height - a.height), color: sp && getComputedStyle(sp).color, sel: getComputedStyle(tl).userSelect,
         sx: c && Math.round(c.left - a.left), sy: c && Math.round(c.top - a.top), sw: c && Math.round(c.width), sh: c && Math.round(c.height), pw: Math.round(a.width), s: box._s, sf: tl.style.getPropertyValue('--scale-factor')}); })()`));
     // the layout settles (the fields load beside it, a new width draws the page anew): the same layer over three looks
@@ -110,7 +113,9 @@ async function upload(name, pages) {
     // the key handlers run at once: dc_step watched while the key is sent (no wait needed)
     const leafed = await ev(`(() => { const s0 = dc_step; let n = 0; dc_step = (...a) => { n++; return s0(...a); };
       try { document.querySelector('.dv-pages').dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowRight', shiftKey: true, bubbles: true, cancelable: true})); } finally { dc_step = s0; } return n; })()`);
-    check(leafed === 0 && await ev(`location.hash`) === `#docs/${D1}`, 'Firefox: Shift+arrow does not leaf');
+    // 2.771.0 (#5338): since #4887 a #docs/<id> link opens the document under #ablage/...: the hash before the key is the measure
+    const hk = await ev(`location.hash`);
+    check(leafed === 0 && hk === pos.h, 'Firefox: Shift+arrow does not leaf ' + JSON.stringify({leafed, before: pos.h, after: hk}));
     // zoom: page and layer anew at the new scale, the layer still covers the page
     await ev(`(document.querySelector('.dv-view [data-dc="dvz:in"]').click(), 1)`);
     check(await wait(`(() => { const p = ${P0}, tl = p.querySelector('.textLayer'), b = document.querySelector('.dv-pages'); return !!tl && +tl.style.getPropertyValue('--scale-factor') === b._s && b._s > ${s0} * 1.15 && !!p.querySelector('canvas') && p.dataset.s === String(b._s); })()`, 80), 'Firefox: zoomed, the layer at the new scale');
