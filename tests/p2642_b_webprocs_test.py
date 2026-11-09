@@ -177,6 +177,7 @@ def poll():
     t = time.time()
     rr = requests.get(B + "/api/v1/agent/events", params={"since": cur, "wait": 20}, headers=ag.headers)
     res["r"] = (rr, time.time() - t)
+    res["end"] = time.monotonic()
 
 
 th = threading.Thread(target=poll)
@@ -185,8 +186,14 @@ check(kt.until(lambda: any((health().get("threads") or {}).get("busy", 0) >= 2 f
       "setup: the agent's long-poll waits in one of the processes")
 out = box("from kalmido.agents.core import agent_emit\n"
           f"print('seq', agent_emit(c, {AID}, 'nudge', {{'text': 'p2642'}}, actor=None))")
+emitted = time.monotonic()  # the other process has committed its event and ended
 th.join(25)
 rr, dt = res.get("r", (None, 99))
-check("seq " in out and rr is not None and rr.ok and rr.json()["data"] and dt < 8,
-      f"#4975: the long-poll wakes for an event of another process ({dt:.1f}s of 20) {out[-200:]}")
+# 2.766.0 (#5323, CI red of 2.756 / 2.759 at 8.1 s): dt from the start of the poll also holds the setup wait and the other
+# process' start (docker exec + imports, slow on the CI runner) - the wake itself is the time after that process ended; without a
+# wake the poll waits its full 20 s (no recheck), so the server's own "waited" below 20 is the proof it woke
+lag = res.get("end", emitted + 99) - emitted
+waited = (rr.json().get("waited", 99) if rr is not None and rr.ok else 99)
+check("seq " in out and rr is not None and rr.ok and rr.json()["data"] and lag < 5 and waited < 18,
+      f"#4975: the long-poll wakes for an event of another process ({lag:.1f}s after it, waited {waited}s of 20, all {dt:.1f}s) {out[-200:]}")
 sys.exit(kt.done("p2642_b_webprocs"))
