@@ -64,10 +64,20 @@ jobs:
               echo "::warning::imagetools inspect failed for $dg"
             fi
           done
+          # 2.762.0 (#5320): the plan (or the reason of a refusal) always reaches the log and the summary - under set -e a
+          # failing script ended the step before `cat plan.txt` and the run was red without a word. Exit 2 = refused (no
+          # latest-ok tag, no latest release): nothing is deleted, a warning; any other error stays red with its message.
+          rc=0
           python3 tools/weekly_release.py prune --tags tags.txt --latest "$latest" --releases releases.jsonl --images images.jsonl \
-            --repo "$GH_REPO" --packages "$pkg" --children children.jsonl --plan delete.txt 2> plan.txt
+            --repo "$GH_REPO" --packages "$pkg" --children children.jsonl --plan delete.txt 2> plan.txt || rc=$?
           cat plan.txt
           { echo '### Prune plan'; echo; sed 's/^/    /' plan.txt; } >> "$GITHUB_STEP_SUMMARY"
+          why=$(tail -n 1 plan.txt | tr -d '\r' | cut -c1-400)
+          case "$rc" in
+            0) ;;
+            2) : > delete.txt; echo "::warning title=prune skipped::${why:-refused, nothing planned}" ;;
+            *) echo "::error title=prune plan failed (exit $rc)::${why:-no message}"; exit "$rc" ;;
+          esac
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: prune-plan

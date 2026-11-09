@@ -217,6 +217,18 @@ check(r.returncode == 0 and plan_txt == "repos/o/r/releases/1\nusers/o/packages/
       f"prune on the command line: the plan file {r.returncode} {plan_txt!r} {r.stderr[-300:]}")
 check("delete releases (1): 2.629.0" in r.stderr and "delete images (1): 2.629.0" in r.stderr and "keep (" in r.stderr,
       f"the lists for the log {r.stderr[-300:]}")
+# 2.762.0 (#5320): no latest-ok tag on the command line = exit 2, the reason on stderr, an empty plan file (the weekly run
+# of 08.11. died at exit 1 without a word and the delete job had no delete.txt)
+with open(os.path.join(TMP, "none.txt"), "w") as f:
+    f.write("")
+with open(os.path.join(TMP, "delete.txt"), "w") as f:
+    f.write("repos/o/r/releases/1\n")  # a stale plan must not survive a refusal
+r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "weekly_release.py"), "prune", "--tags", "none.txt", "--latest", "v2.630.0",
+                    "--releases", "r.jsonl", "--images", "i.jsonl", "--repo", "o/r", "--packages", "users/o/packages/container/kalmido",
+                    "--today", "2026-11-20", "--plan", "delete.txt"], cwd=TMP, capture_output=True, text=True)
+check(r.returncode == 2 and "refused: no latest-ok tag listed" in r.stderr and "Traceback" not in r.stderr
+      and open(os.path.join(TMP, "delete.txt")).read() == "",
+      f"#5320: a refusal is exit 2 with its reason and an empty plan {r.returncode} {r.stderr[-300:]!r}")
 r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "weekly_release.py"), "pick", "--tags", "tags.txt", "--latest", "v2.629.0",
                     "--today", "2026-10-25", "--notes", "notes.md", os.path.join(ROOT, "CHANGELOG.md")], cwd=TMP, capture_output=True, text=True)
 check(r.returncode == 0 and "version=2.630.0\n" in r.stdout and "prev=2.629.0\n" in r.stdout and os.path.exists(os.path.join(TMP, "notes.md")),
@@ -246,7 +258,7 @@ check("ghcr.io/gegenschuss/kalmido:${{ steps.v.outputs.version }}" in rel, "rele
 check(re.search(r"^  schedule:\n    - cron: \"[0-9]+ [0-9]+ \* \* 0\"", wk, re.M) is not None and "workflow_dispatch:" in wk,
       "weekly-release.yml runs on Sunday and by hand")
 wj = jobs(wk)
-check(set(wj) == {"pick", "publish", "prune"}, f"weekly jobs {sorted(wj)}")
+check(set(wj) == {"pick", "attest", "publish", "prune"}, f"weekly jobs {sorted(wj)}")  # 2.762.0 (#5320): + attest of 2.761.0 (#5218)
 check("write" not in wj["pick"] and "tools/weekly_release.py pick" in wj["pick"], "the job pick reads only and runs the script")
 check("contents: write" in wj["publish"] and "packages: write" in wj["publish"] and wj["publish"].count("uses:") == 1
       and "actions/download-artifact@" in wj["publish"], "the job that writes runs only download-artifact")
@@ -269,6 +281,29 @@ check("inputs.dry_run == false" in pj["delete"] and pj["delete"].count("uses:") 
       "the delete job runs only when asked and only download-artifact")
 check("imagetools inspect --raw" in pj["plan"] and "--children children.jsonl" in pj["plan"] and "{id, name, created_at" in pj["plan"],
       "2.658.0 (#5042): the plan job reads the children of the tagged manifests and hands them to the script")
+# 2.762.0 (#5320): the script's exit code is caught (`|| rc=$?`), the plan is printed before the step decides, a refusal
+# (exit 2) is a warning with an empty delete.txt, any other code stays red with the message
+_pl = pj["plan"]
+_py = _pl.find("python3 tools/weekly_release.py prune")
+check(_py >= 0 and "--plan delete.txt 2> plan.txt || rc=$?" in _pl and _pl.find("cat plan.txt", _py) > _pl.find("|| rc=$?", _py)
+      and '2) : > delete.txt; echo "::warning' in _pl and 'exit "$rc"' in _pl and "::error title=prune plan failed" in _pl,
+      "#5320: the plan step shows the script's message also when it fails")
+_sh = shutil.which("bash")
+if _sh:  # run the decision part of the step with a stand-in script: the message reaches the log, exit codes as above
+    _blk = _pl[_pl.rfind("rc=0", 0, _py):_pl.find("esac", _py) + 4]
+    _blk = re.sub(r"(?m)^ {10}", "", _blk).replace("python3 tools/weekly_release.py prune", "fake_prune")
+    for code_, want_rc, want in ((2, 0, "::warning title=prune skipped::refused: no latest-ok tag"),
+                                 (1, 1, "::error title=prune plan failed (exit 1)::ValueError: boom"), (0, 0, "keep (1)")):
+        msg = {2: "refused: no latest-ok tag listed", 1: "Traceback\nValueError: boom", 0: "keep (1): 2.630.0"}[code_]
+        with open(os.path.join(TMP, "msg.txt"), "w") as f:
+            f.write(msg + "\n")
+        script = ("set -euo pipefail\nGITHUB_STEP_SUMMARY=summary.md latest=v2.630.0 GH_REPO=o/r pkg=users/o/packages/container/kalmido\n"
+                  f"fake_prune() {{ echo repos/o/r/releases/9 > delete.txt; cat msg.txt >&2; return {code_}; }}\n" + _blk)
+        r = subprocess.run([_sh, "-c", script], cwd=TMP, capture_output=True, text=True, timeout=30)
+        dl = open(os.path.join(TMP, "delete.txt")).read()
+        check(r.returncode == want_rc and want in r.stdout and msg.splitlines()[-1] in r.stdout
+              and (dl == "" if code_ == 2 else dl != ""),
+              f"#5320: plan step, script exit {code_} -> step exit {r.returncode}, {r.stdout[-200:]!r} {r.stderr[-200:]!r}, delete.txt {dl!r}")
 check("gh api -X DELETE" in pj["delete"] and "*refs*|*/git/*|*/tags*" in pj["delete"] and "git push" not in code(pr) and "git tag" not in code(pr)
       and "--cleanup-tag" not in pr, "the delete loop refuses refs and tags; no git tag is ever touched")
 for name, t in (("weekly-release.yml", wk), ("prune-releases.yml", pr), ("promote.yml", pro)):

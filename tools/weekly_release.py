@@ -21,7 +21,8 @@ prune: which GitHub release objects and ghcr image versions go. A version stays 
   the untagged platform parts of a kept image; --children: the untagged parts of an image that goes go with it, 2.658.0
   #5042). Prints the lists for the log; --plan writes the API paths to DELETE, one
   per line. Only release objects and package versions: git tags are NEVER deleted or moved (safe_path refuses everything
-  else). No latest-ok tag or no latest release (a failed listing) = exit 2, nothing is planned.
+  else). No latest-ok tag or no latest release (a failed listing) = exit 2, nothing is planned, an empty --plan file and
+  the reason on stderr (2.762.0 #5320: the workflow shows it as a warning; before, the step died at exit 1 without a word).
 Standard library only (the workflows run it with the runner's python3).
 """
 import argparse
@@ -208,7 +209,9 @@ def prune_plan(tags, latest, releases, images, repo, packages, now, days=KEEP_DA
     no tagged manifest that stays names them, and only when the children of EVERY tagged manifest that stays are known
     (one unknown = no part is deleted: it might be shared). Images need their digest in "name" for that."""
     if not tags:
-        raise SystemExit("no latest-ok tag listed: refusing to plan (a failed listing must not delete anything)")
+        raise SystemExit("no latest-ok tag listed: refusing to plan (a failed listing must not delete anything; the live train"
+                         " pushes latest-ok/X.Y.Z only for a live version with a green full CI, its image and a passed device"
+                         " test)")
     if not ver(latest):
         raise SystemExit(f"no current latest release ({latest!r}): refusing to plan")
     keep = keep_set(tags, releases, latest)
@@ -330,8 +333,15 @@ def main(argv=None):
         print(f"count={len(vs)}")
         return 0
     kids = read_children(read_json_lines(a.children)) if a.children else None
-    keep, plan = prune_plan(tags, a.latest, read_json_lines(a.releases), read_json_lines(a.images), a.repo, a.packages, now, a.days,
-                            kids)
+    try:
+        keep, plan = prune_plan(tags, a.latest, read_json_lines(a.releases), read_json_lines(a.images), a.repo, a.packages, now,
+                                a.days, kids)
+    except SystemExit as e:  # 2.762.0 (#5320): a refusal says why and leaves an empty plan (nothing is deleted), exit 2
+        print(f"refused: {e}", file=sys.stderr)
+        if a.plan:
+            with open(a.plan, "w", encoding="utf-8") as f:
+                f.write("")
+        return 2
     print(f"keep ({len(keep)}): " + " ".join(vstr(v) for v in sorted(keep)), file=sys.stderr)
     for kind in ("release", "image", "part"):
         rows = [x for x in plan if x[0] == kind]
