@@ -250,9 +250,10 @@ PBS = one("SELECT COUNT(*) FROM orgs WHERE personal_of=?", (GID,))
 res3 = []
 for _n in range(2):
     iid3, j = upload(Gi, FILE3)
-    r = Gi.post(B + f"/api/account/import/{iid3}/run", json={"target": "private", "people": {}})
+    pre = (j.get("state"), j.get("error"))
+    r = Gi.post(B + f"/api/account/import/{iid3}/run", json={"target": "private", "people": {}, "again": _n == 1})
     j = until(lambda: state_of(Gi, iid3), 180) or {} if r.status_code == 202 else {}
-    res3.append((j.get("state"), json.dumps((j.get("result") or {}).get("warnings"), ensure_ascii=False)))
+    res3.append((j.get("state"), json.dumps((j.get("result") or {}).get("warnings"), ensure_ascii=False), pre, r.status_code, r.text[:200]))
 check([x[0] for x in res3] == ["done", "done"], f"N4 the file imported twice {res3}")
 check(one("SELECT COUNT(*) FROM time_sheets WHERE user_id=? AND month='2026-11'", (GID,)) == 1
       and one("SELECT COUNT(*) FROM hub_absences WHERE user_id=? AND start_date='2026-12-01' AND deleted_at IS NULL", (GID,)) == 1,
