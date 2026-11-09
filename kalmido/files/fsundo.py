@@ -23,7 +23,7 @@ from ..core.writes import obj_track
 from ..office.periodlock import pl_tree_need_open
 from .fslock import fsl_move_guard, fsl_of
 from .fsref import fs_ref_need_move, fs_ref_trashed, fs_trash_prepare, fs_trash_restored
-from .fsroots import fs_area_after, fs_area_before, fs_area_need_fit, fs_area_root_need_free
+from .fsroots import fs_area_after, fs_area_before, fs_area_need_fit, fs_area_of, fs_area_root_need_free
 from .store import DEPTH_MAX, _free_name, _now, fs_chain, fs_deleted, fs_height, fs_log_add, need_node
 
 FSU_KIND = "fs_node"
@@ -52,13 +52,14 @@ def fsu_pre(c, uid, n, what=None):
     ua_pre(c, uid, FSU_KIND, n["id"], *((key, nm) if key else ()))
 
 
-def _target(c, uid, n, m):
-    """Node n (as before the undo, with its role) goes back into folder m["parent_id"] (the checks of web.py _move)."""
+def _target(c, uid, n, m, src):
+    """Node n (as before the undo, with its role) goes back into folder m["parent_id"] (the checks of web.py _move); src = the
+    node's area before the undo (the copy already put parent_id back, so its chain names the target's area)."""
     tid = m["parent_id"]
     if tid:
         need_node(c, tid)  # a folder the person does not see: 404 before its lock is checked (as _move)
     fsl_move_guard(c, n, tid)  # review F1: across a locked folder's border only re-encrypted (409, as _move)
-    fs_area_need_fit(c, tid, m["kind"], m["ref_kind"], node=m)
+    fs_area_need_fit(c, tid, m["kind"], m["ref_kind"], node=m, src_area=src)  # review F6: the area before the undo
     fs_ref_need_move(c, uid, n)
     if tid:
         t = need_node(c, tid, write=True)
@@ -86,6 +87,7 @@ def fsu_need(c, uid, rid, oid):
     fs_area_root_need_free(c, rid)
     pl_tree_need_open(c, rid)  # a receipt of a locked month stays where and as it is
     ctx = fs_area_before(c, uid, n)
+    src = fs_area_of(c, rid)  # review F6: the area it lies in now (before the copy is written back)
     was, was_by = c.execute("SELECT deleted_at, deleted_by FROM fs_nodes WHERE id=?", (int(rid),)).fetchone()
 
     def back(c, x):
@@ -110,7 +112,7 @@ def fsu_need(c, uid, rid, oid):
     def fix(c):
         m = c.execute("SELECT * FROM fs_nodes WHERE id=?", (int(rid),)).fetchone()
         if m["parent_id"] != n["parent_id"]:
-            _target(c, uid, n, m)
+            _target(c, uid, n, m, src)
         if m["parent_id"] != n["parent_id"] or m["name"] != n["name"]:
             nm = _free_name(c, m["parent_id"], m["owner_id"], m["org_id"], m["name"], skip=int(rid))
             if nm != m["name"]:
