@@ -361,8 +361,19 @@ def section_update(sid):
     a name / limit changed elsewhere meanwhile stays (conflicts). 2.60.0 (#1510): wip_limit null / 0 = no limit. 2.410.0 B
     (#3515): dwell_warn_h / dwell_alert_h = hours in the column after which a card's time turns yellow / red (null / 0 = none).
     2.577.0 (#3354): kind = the column's meaning; the tasks in it stay as they are, it counts from the next move on."""
-    b = body()
     c = db()
+    conflicts = sec_apply(c, sid, body())
+    bump(c)
+    c.commit()
+    return jsonify(ok=True, conflicts=conflicts)
+
+
+SEC_UNDO = ("name", "wip_limit", "wip_hard", "dwell_warn_h", "dwell_alert_h", "kind")  # 2.774.0 (#5251): what a section's step keeps
+
+
+def sec_apply(c, sid, b):
+    """PATCH /api/sections/<id> without its answer (2.774.0, #5251: also the server's undo of a section step, tasks/tundo.py).
+    Returns the conflicts; records the person's step (the values before / after that changed)."""
     write_lock(c, f"section-{int(sid)}")  # 2.269.0 B (#3034): the _prev check and the write see no other edit in between
     need_section(c, sid)
     conflicts = []
@@ -373,7 +384,7 @@ def section_update(sid):
         name = str(b["name"] or "").strip()
         name = le2a_clean_cipher(name, "name") if le2e_is_cipher(name) else name[:200]  # 2.64.1 (#1817): a ciphertext is never cut
         if not name:
-            return err(tr("Name missing"))
+            raise BadInput(tr("Name missing"))
         le2e_guard(c, c.execute("SELECT list_id FROM sections WHERE id=?", (sid,)).fetchone()[0], {"section": name}, cur={"section": cur["name"]})
         if "name" in prev and cur["name"] != str(prev["name"] or "") and cur["name"] != name:
             conflicts.append({"field": "name", "server": cur["name"], "mine": name})
@@ -406,9 +417,9 @@ def section_update(sid):
             conflicts.append({"field": "kind", "server": cur["kind"], "mine": kind})
         else:
             c.execute("UPDATE sections SET kind=? WHERE id=?", (kind, sid))
-    bump(c)
-    c.commit()
-    return jsonify(ok=True, conflicts=conflicts)
+    from ..tasks.tundo import tu_section
+    tu_section(c, sid, cur, SEC_UNDO)  # 2.774.0 (#5251)
+    return conflicts
 
 
 @app.post("/api/lists/<int:lid>/sections/order")
@@ -429,6 +440,9 @@ def sections_order(lid):
     if bad or sorted(ids) != sorted(cur):
         return err(tr("Invalid value: {0}", "ids"))
     c.executemany("UPDATE sections SET sort=? WHERE id=?", [(k, i) for k, i in enumerate(ids)])
+    if ids != cur:
+        from ..tasks.tundo import tu_sec_order
+        tu_sec_order(c, lid, cur, ids)  # 2.774.0 (#5251)
     bump(c)
     c.commit()
     return jsonify(ok=True, prev=cur, ids=ids, conflicts=[])

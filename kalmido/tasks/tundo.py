@@ -1,0 +1,329 @@
+"""2.774.0 (#5251): undo across devices, stage 3 -- the tasks' steps on the server (diff parts, core/undodiff.py).
+
+Every change of a person to a task records its step in the request's step group (core/undogroups.py), kind 'task', area
+'tasks', whatever way it came (PATCH, multi-select / batch, drag, keyboard, the offline queue sent later, a proposal applied):
+  fields    tasks/lifecycle.py apply_update: the task's own values before (tu_mark, once per request and task) and after, only
+            the ones that changed ({op: fields, b: before, a: after}); taken back = apply_update with the values before and
+            _prev = the values the step left: a field changed elsewhere since stays (named), the others go back
+  complete  do_complete: what its undo payload needs ({op, st, u}); taken back = undo_status (the completed copy of a recurring
+            task goes, the date comes back), forward again = tsk_finish
+  reopen    tsk_reopen / the batch's reopen: the completion it ended; taken back = undo_status, forward = tsk_reopen
+  delete / restore   the trash: back = restore_task / do_delete (only while the task is still there / not there)
+  create    a new task: back = to the trash (not when someone else changed it since), forward = back from the trash
+Recorded right before the commit (core/pg.py Conn.pre_commit, tu_flush), so a task a batch left as it was records nothing.
+The label names the task (one) or counts them (several); a ciphertext title (a list with the lock) is never put in a label,
+the app sets the title it can read (GET /api/undo kind / ref_id).
+Sections (lists/sections.py): a section's name, limits, time limits and meaning (kind 'section', sec_apply with _prev) and the
+order of a project's sections (kind 'section_order', ref = the project, only while the order is still the one the step left).
+Not here: the snippets and the lock of a task (their own routes and rules), creating / deleting a section and a project's
+settings (a step of their own later), the browser's own history (static/js/undo.js) which stays until the list of stage 2
+takes over."""
+import json
+
+from flask import g
+
+from ..core.db import bump
+from ..core.errors import Denied
+from ..core.i18n import N_, tr
+from ..core.undodiff import ug_diff_add, undo_diff_reg, undo_person
+from ..tasks.validation import TASK_FIELDS
+
+TU_COLS = tuple(k for k in TASK_FIELDS if k not in ("snippets", "locked"))  # the snippets keep authors, the lock is its own step
+TU_EXTRA = ("tags", "ltags", "fields", "people")
+TU_KIND = "task"
+TU_AREA = "tasks"
+TU_EDIT = N_("Edited {0}")
+TU_DONE = N_("Completed {0}")
+TU_REOPEN = N_("Reopened {0}")
+TU_DEL = N_("Deleted {0}")
+TU_RESTORE = N_("Restored {0}")
+TU_NEW = N_("Created: {0}")
+TU_MANY = N_("{0} tasks changed")
+TU_TASK = N_("Task")
+TU_LABEL = {"fields": TU_EDIT, "complete": TU_DONE, "reopen": TU_REOPEN, "delete": TU_DEL, "restore": TU_RESTORE, "create": TU_NEW}
+TU_GONE = N_("Changed in the meantime, nothing to undo")
+TU_SEC = N_("Section renamed to {0}")
+TU_SEC_SET = N_("Section {0}")
+TU_SEC_ORDER = N_("Sections reordered")
+
+
+def _marks(c):
+    """The request's marks (None when nothing is recorded: no person, an agent, an undo running); registers the flush."""
+    uid = undo_person(c)
+    if uid is None:
+        return None
+    m = g.get("tu_marks")
+    if m is None or m["uid"] != uid:
+        m = g.tu_marks = {"uid": uid, "fields": {}, "seq": []}
+    c.pre_commit["tasks.undo"] = tu_flush
+    return m
+
+
+def _extra(c, tid, k):
+    if k == "tags":
+        from ..tasks.tasks import my_tags
+        return sorted(my_tags(c, tid))
+    if k == "ltags":
+        from ..collab.reactions import ltag_names
+        return sorted(ltag_names(c, tid))
+    if k == "fields":
+        return {str(r[0]): r[1] for r in c.execute("SELECT field_id, value FROM task_field_values WHERE task_id=? ORDER BY field_id", (tid,))}
+    return [r[0] for r in c.execute("SELECT user_id FROM task_people WHERE task_id=? ORDER BY user_id", (tid,))]
+
+
+def _state(c, row, extras):
+    st = {k: row[k] for k in TU_COLS if k in row.keys()}
+    for k in extras:
+        st[k] = _extra(c, row["id"], k)
+    return st
+
+
+def tu_mark(c, tid, row, b):
+    """apply_update, before it writes: the task's values (row = as stored now) and the extras b touches (tags, list tags,
+    field values, people). The first mark of a task in a request is its "before"; a later one adds extras not read yet."""
+    m = _marks(c)
+    if m is None or row is None:
+        return
+    want = {k for k in TU_EXTRA if k in b} | ({"tags"} if "add_tags" in b else set())
+    have = m["fields"].get(tid)
+    if have is None:
+        m["fields"][tid] = (_state(c, row, want), set(want))
+        m["seq"].append(("fields", tid, None))
+        return
+    for k in want - have[1]:
+        have[0][k] = _extra(c, tid, k)
+        have[1].add(k)
+
+
+def tu_op(c, tid, op, data=None):
+    """complete / reopen / delete / restore / create of task tid (data = what its way back needs), checked at the commit."""
+    m = _marks(c)
+    if m is not None:
+        m["seq"].append((op, int(tid), dict(data or {})))
+
+
+def _js(v):
+    if v in ("", None):
+        return None
+    return json.dumps(v, sort_keys=True, default=str) if isinstance(v, (dict, list)) else str(v)
+
+
+def _holds(row, op, data):
+    """Does the op still hold at the commit (not rolled back to a savepoint)?"""
+    if op == "complete":
+        u = data.get("u") or {}
+        return bool(u.get("at")) and (row["due"] == u.get("next") if u.get("copy_id") else row["status"] == data.get("st"))
+    if op == "reopen":
+        return row["status"] == 0
+    if op in ("delete", "create"):
+        return (op == "delete") == bool(row["deleted_at"])
+    if op == "restore":
+        return not row["deleted_at"]
+    return False
+
+
+def tu_flush(c):
+    """The marked tasks' steps into the request's group (core/pg.py Conn.pre_commit, right before the commit). A failure
+    here never costs the write itself: it runs in a savepoint and only logs."""
+    m = g.pop("tu_marks", None)
+    if not m or not m["seq"]:
+        return
+    try:
+        with c.savepoint():
+            _flush(c, m)
+    except Exception as e:  # noqa: BLE001 -- the step is lost, the change itself commits
+        print("tasks undo step not recorded:", type(e).__name__, str(e)[:200], flush=True)
+
+
+def _flush(c, m):
+    parts = []
+    for op, tid, data in m["seq"]:
+        row = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
+        if row is None:
+            continue
+        if op == "fields":
+            before, extras = m["fields"][tid]
+            after = _state(c, row, extras)
+            keys = [k for k in before if _js(before[k]) != _js(after.get(k))]
+            if keys:
+                parts.append((row, {"op": "fields", "b": {k: before[k] for k in keys}, "a": {k: after.get(k) for k in keys}}))
+        elif _holds(row, op, data):
+            parts.append((row, {"op": op, **data}))
+    if not parts:
+        return
+    tids = {r["id"] for r, _ in parts}
+    if len(tids) == 1:
+        label = (TU_LABEL.get(parts[0][1]["op"], TU_EDIT), [_title(parts[-1][0]["title"])])
+    else:
+        label = (TU_MANY, [len(tids)])
+    orgs = {}
+    for row, data in parts:
+        lid = row["list_id"]
+        if lid not in orgs:
+            orgs[lid] = _org(c, lid)
+        ug_diff_add(c, m["uid"], TU_KIND, row["id"], orgs[lid], TU_AREA, label, data)
+
+
+def _org(c, lid):
+    r = c.execute("SELECT org_id FROM lists WHERE id=?", (lid,)).fetchone()
+    return r[0] if r else None
+
+
+def _title(v):
+    from ..collab.liste2e import le2e_is_cipher
+    return [TU_TASK] if not v or le2e_is_cipher(v) else str(v)[:60]
+
+
+def tu_section(c, sid, cur, keys):
+    """sec_apply: the section's values before (cur) and now; a step when one of keys changed (written at once: the routes of
+    a section have no savepoints)."""
+    uid = undo_person(c)
+    if uid is None or cur is None:
+        return
+    now = c.execute("SELECT list_id, name, wip_limit, wip_hard, dwell_warn_h, dwell_alert_h, kind FROM sections WHERE id=?", (sid,)).fetchone()
+    ch = [k for k in keys if _js(cur[k]) != _js(now[k])]
+    if not ch:
+        return
+    from ..collab.liste2e import le2e_is_cipher
+    plain = not le2e_is_cipher(now["name"] or "")  # a list with the lock: the name is a ciphertext, never in a label
+    label = (TU_SEC, [now["name"]]) if "name" in ch and plain else (TU_SEC_SET, [now["name"] if plain else ""])
+    ug_diff_add(c, uid, "section", sid, _org(c, now["list_id"]), TU_AREA, label,
+                {"op": "fields", "b": {k: cur[k] for k in ch}, "a": {k: now[k] for k in ch}})
+
+
+def tu_sec_order(c, lid, before, after):
+    uid = undo_person(c)
+    if uid is not None:
+        ug_diff_add(c, uid, "section_order", lid, _org(c, lid), TU_AREA, (TU_SEC_ORDER, []), {"op": "order", "b": before, "a": after})
+
+
+# ---------------------------------------------------------------- taking a step back / forward (core/undoweb.py)
+def _fields(c, tid, data, redo):
+    from ..tasks.lifecycle import apply_update, need_live
+    need_live(c, tid)
+    src, dst = (data.get("b") or {}, data.get("a") or {}) if redo else (data.get("a") or {}, data.get("b") or {})
+    if not dst:
+        raise Denied(409, tr(TU_GONE))
+    cf = []
+    e = apply_update(c, tid, {**dst, "_prev": src}, cf, lock=True)
+    if e:
+        raise Denied(409, e)
+    left = [x["field"] for x in cf]
+    if left and len(left) >= sum(len(v) if k == "fields" and isinstance(v, dict) else 1 for k, v in dst.items()):
+        from ..core.undoweb import UG_KEPT, UG_KEPT_REDO
+        raise Denied(409, tr(UG_KEPT_REDO if redo else UG_KEPT, ", ".join(left)))
+    return data, left
+
+
+def _status_back(c, tid, u):
+    from ..tasks.lifecycle import signed, undo_status
+    e = undo_status(c, tid, signed(tid, u))
+    if e:
+        raise Denied(409, e)
+
+
+def _complete(c, tid, data, redo):
+    from ..tasks.lifecycle import need_live, tsk_finish
+    if not redo:
+        _status_back(c, tid, data.get("u") or {})
+        return data, []
+    need_live(c, tid)
+    if c.execute("SELECT status FROM tasks WHERE id=?", (tid,)).fetchone()[0] != 0:
+        raise Denied(409, tr(TU_GONE))
+    u = {}
+    tsk_finish(c, tid, int(data.get("st") or 2), u)
+    return {**data, "u": u}, []
+
+
+def _reopen(c, tid, data, redo):
+    from ..tasks.lifecycle import need_live, tsk_reopen
+    if not redo:
+        _status_back(c, tid, data.get("u") or {})
+        return data, []
+    need_live(c, tid)
+    old = c.execute("SELECT status, completed_at, completed_by FROM tasks WHERE id=?", (tid,)).fetchone()
+    if old["status"] == 0:
+        raise Denied(409, tr(TU_GONE))
+    u = {"op": "reopen", "status": old["status"], "completed_at": old["completed_at"], "completed_by": old["completed_by"]}
+    tsk_reopen(c, tid, u)
+    return {**data, "u": u}, []
+
+
+def _trash(c, tid, out):
+    """out = True: to the trash (only while it is not there), False: back (only while it is there)."""
+    from ..lists.listtrash import otr_err_task
+    from ..tasks.lifecycle import restore_task, trash_task
+    row = c.execute("SELECT deleted_at FROM tasks WHERE id=?", (tid,)).fetchone()
+    if bool(row["deleted_at"]) == out:
+        raise Denied(409, tr(TU_GONE))
+    if out:
+        trash_task(c, tid)
+        return
+    if otr_err_task(c, tid) is not None:  # the project is in the trash: it comes back with its project only
+        raise Denied(409, tr("This task’s project is in the trash: restore the project"))
+    restore_task(c, tid)
+
+
+def _created_changed(c, uid, tid, since):
+    """Someone else changed the created task since (activity of another account): it is not put to the trash."""
+    return bool(since) and c.execute("SELECT 1 FROM activity WHERE task_id=? AND created_at>? AND (user_id IS NULL OR user_id!=?) LIMIT 1",
+                                     (tid, str(since), int(uid))).fetchone()
+
+
+def tu_run(c, uid, tid, data, redo):
+    """core/undodiff.py run: one task part back (redo: forward). The rights of now: write access to the task (need_task)."""
+    from ..core.access import need_task
+    role = need_task(c, tid)
+    op = data.get("op")
+    if op in ("delete", "create", "restore") and role == "participant":
+        raise Denied(403, tr("Participants cannot delete tasks"))
+    if op == "fields":
+        out = _fields(c, tid, data, redo)
+    elif op == "complete":
+        out = _complete(c, tid, data, redo)
+    elif op == "reopen":
+        out = _reopen(c, tid, data, redo)
+    elif op in ("delete", "restore"):
+        _trash(c, tid, (op == "delete") == redo)
+        out = (data, [])
+    elif op == "create":
+        if not redo and _created_changed(c, uid, tid, data.get("at")):
+            raise Denied(409, tr(TU_GONE))
+        _trash(c, tid, not redo)
+        out = (data, [])
+    else:
+        raise Denied(404)
+    bump(c, TU_AREA)
+    return out
+
+
+def sec_run(c, uid, sid, data, redo):
+    """A section's step back / forward: sec_apply with _prev (a value changed elsewhere since stays, named)."""
+    from ..lists.sections import sec_apply
+    src, dst = (data.get("b") or {}, data.get("a") or {}) if redo else (data.get("a") or {}, data.get("b") or {})
+    left = [x["field"] for x in sec_apply(c, sid, {**dst, "_prev": src})]
+    if left and len(set(left)) >= len(dst):
+        from ..core.undoweb import UG_KEPT, UG_KEPT_REDO
+        raise Denied(409, tr(UG_KEPT_REDO if redo else UG_KEPT, ", ".join(left)))
+    bump(c, TU_AREA)
+    return data, left
+
+
+def sec_order_run(c, uid, lid, data, redo):
+    """The order of a project's sections back / forward: only while it is still the one the step left (same sections)."""
+    from ..core.access import need_list
+    from ..core.pg import write_lock
+    need_list(c, lid)
+    write_lock(c, f"sections:{lid}")
+    src, dst = (data.get("b"), data.get("a")) if redo else (data.get("a"), data.get("b"))
+    cur = [r[0] for r in c.execute("SELECT id FROM sections WHERE list_id=? ORDER BY sort, id", (lid,))]
+    if not isinstance(dst, list) or cur != src or sorted(dst) != sorted(cur):
+        raise Denied(409, tr(TU_GONE))
+    c.executemany("UPDATE sections SET sort=? WHERE id=?", [(k, i) for k, i in enumerate(dst)])
+    bump(c, TU_AREA)
+    return data, []
+
+
+undo_diff_reg(TU_KIND, tu_run, TU_AREA)
+undo_diff_reg("section", sec_run, TU_AREA)
+undo_diff_reg("section_order", sec_order_run, TU_AREA)

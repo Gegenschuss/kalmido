@@ -277,6 +277,9 @@ class Conn:
         self._sp = itertools.count(1)
         self.closed = False
         self.commits = 0  # 2.566.0 (#4706): commits of this connection (db.py lv_auto_bump: a write route that committed)
+        # 2.774.0 (#5251): work that belongs into the transaction right before it commits (core/undodiff.py: the undo steps
+        # of the tasks a request changed, read once the request's writes are final); key -> fn(conn); a rollback drops them
+        self.pre_commit = {}
 
     # context (#1142 / RLS): who is asking
     def set_ctx(self, user_id=None, org_ids=(), role="user"):
@@ -379,10 +382,14 @@ class Conn:
             self._db_ctx = None  # 2.369.6 (#3139, review): a script may end / roll back the transaction or a savepoint
 
     def commit(self):
+        while self.pre_commit:  # 2.774.0 (#5251): a hook may register another (taken in turn, each once)
+            key = next(iter(self.pre_commit))
+            self.pre_commit.pop(key)(self)
         self._pg.commit()
         self.commits += 1
 
     def rollback(self):
+        self.pre_commit = {}  # 2.774.0 (#5251): what the hooks would record was rolled back
         self._pg.rollback()
 
     def heal(self):

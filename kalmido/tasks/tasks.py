@@ -360,6 +360,8 @@ def task_create():
     if g.get("task_like"):  # 2.392.0 B (#3364): the rest of a task: seen by the same people and agents, before any event goes out
         task_inherit(c, cur_id, g.pop("task_like"))
     log_act(c, cur_id, "created")
+    from ..tasks.tundo import tu_op
+    tu_op(c, cur_id, "create", {"at": ts})  # 2.774.0 (#5251): the server's undo step (back = to the trash)
     agent_task_mentions(c, cur_id)
     agent_tidy_events(c, cur_id)
     agent_added_events(c, cur_id)  # 2.23.0 (#795)

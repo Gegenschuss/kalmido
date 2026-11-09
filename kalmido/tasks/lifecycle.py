@@ -33,6 +33,7 @@ from ..lists.listtrash import otr_err_task, otr_trash  # 2.369.5 (#2517): pulled
 from ..lists.listtrash import otr_need
 from ..tasks.ttypes import tt_check  # 2.609.0 (#3372)
 from ..lists.seckind import sk_after_status, sk_gate, sk_on_move, sk_snap, sk_undo  # 2.577.0 (#3354)
+from ..tasks.tundo import tu_mark, tu_op  # 2.774.0 (#5251): the steps of "Letzte Schritte" on the server
 
 
 def _norm(v):
@@ -127,6 +128,7 @@ def apply_update(c, tid, b, conflicts=None, lock=False):
     if e:
         return e
     cur = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()  # also the "before" of the activity log
+    tu_mark(c, tid, cur, b)  # 2.774.0 (#5251): the values before = the undo step (recorded at the commit, only what changed)
     from ..lists.rules import rul_fire, rul_snap
     rb = rul_snap(c, tid)  # 2.71.0 A (#1457): list rules compare with this after the change
     e = lock_problem(c, cur, f, b) if lock else None  # 2.36.0 (#1118): a locked task keeps its locked fields (app writes)
@@ -493,6 +495,8 @@ def do_complete(c, tid, status=2, undo=None):
     from ..notify.channels import chn_note
     write_lock(c, f"task-{tid}")  # 2.126.0 D (#1987): one completion of a task at a time (the row below is then current)
     irr_guard(c, tid)  # 2.392.0 (#3370)
+    if undo is None:
+        undo = {}  # 2.774.0 (#5251): the server's undo step needs it from every way of completing
     sk_snap(c, tid)  # 2.577.0 (#3354)
     t = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
     e = lock_done_problem(t)  # 2.542.0 (#4609): every way of completing ends here -- a locked task is unlocked first
@@ -579,6 +583,8 @@ def do_complete(c, tid, status=2, undo=None):
                 c.execute("UPDATE tasks SET status=?, completed_at=?, completed_by=?, updated_at=? WHERE id=? AND status=0 AND locked=0",
                           (status, ts, who, ts, d))  # 2.542.0 (#4609): a locked subtask stays open
     sk_after_status(c, t, status, undo, cur_id if nxt else None)  # 2.577.0 (#3354): into the project's done / rejected column
+    if status != 0 and t["status"] != status:
+        tu_op(c, tid, "complete", {"st": status, "u": undo})  # 2.774.0 (#5251)
     rul_fire_done(c, tid, cur_id if nxt else None, rb)  # 2.71.0 A (#1457): a recurring task: its completed copy
     return nxt
 
@@ -841,7 +847,10 @@ def tsk_reopen(c, tid, undo=None):
     old = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()  # 2.577.0 (#3354): the whole row for sk_after_status
     do_reopen(c, tid)
     if old["status"] != 0:
+        if undo is None:  # 2.774.0 (#5251): the server's undo step (a list rule's reopen too)
+            undo = {"op": "reopen", "status": old["status"], "completed_at": old["completed_at"], "completed_by": old["completed_by"]}
         sk_after_status(c, old, 0, undo)  # 2.577.0 (#3354): out of a done / rejected column
+        tu_op(c, tid, "reopen", {"u": undo})
     rul_fire(c, tid, rb)
 
 
@@ -904,6 +913,7 @@ def trash_task(c, tid):
     irr_guard(c, tid)  # 2.392.0 (#3370)
     do_delete(c, tid)
     log_act(c, tid, "delete")
+    tu_op(c, tid, "delete")  # 2.774.0 (#5251)
 
 
 def do_delete(c, tid):
@@ -973,6 +983,7 @@ def restore_task(c, tid):
         rt_section(c, [tid, *descendants(c, tid)])
         if r["deleted_at"]:
             log_act(c, tid, "restore")
+            tu_op(c, tid, "restore")  # 2.774.0 (#5251)
 
 
 def rt_may(c, lid):

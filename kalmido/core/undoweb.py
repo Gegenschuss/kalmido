@@ -15,7 +15,7 @@ nothing of it may be changed). A barrier or a group too big for copies stops the
 #5249: only own steps): a barrier of someone else does not stop a person's run; a finalised document is frozen anyway."""
 import json
 
-from flask import jsonify, request
+from flask import g, jsonify, request
 
 from .config import app
 from .ctx import me
@@ -25,6 +25,7 @@ from .i18n import N_, tr, tr_stored
 from .objects import obj_need
 from .objhooks import OBJ
 from .pg import write_lock
+from .undodiff import UNDO_DIFF
 from .undogroups import UNDO_GROUPS_MAX, UNDO_KEEP_D
 from .writes import UNDO_NOTHING, _area, _lock_rows, _redo_one, _reg, _undo_one, obj_is_agent, obj_undo_hist, undo_scope
 
@@ -34,6 +35,8 @@ UG_GONE = N_("It is no longer there, so it cannot be undone")
 UG_STOP = N_("Stopped before a step that cannot be undone: {0}")
 UG_UNDONE = N_("{0} of {1} steps undone")
 UG_REDONE = N_("{0} of {1} steps redone")
+UG_KEPT = N_("Changed elsewhere, not undone: {0}")  # 2.774.0 (#5251): the fields of a diff part that stayed
+UG_KEPT_REDO = N_("Changed elsewhere, not redone: {0}")
 
 
 def undo_need_reg(kind, fn):
@@ -61,9 +64,44 @@ def _label(r):
     return tr_stored([r["label_key"], *args]) if r["label_key"] else "", args
 
 
+def _diff_part(c, uid, p, redo):
+    """2.774.0 (#5251): a diff part (core/undodiff.py) back / forward through its area's own write path. None when it went
+    whole; {..., code, reason, went: True} when it went but some of it stayed (fields changed elsewhere)."""
+    kind, rid = p["kind"], int(p["ref_id"])
+    spec = UNDO_DIFF.get(kind)
+    try:
+        with c.savepoint():
+            if spec is None:
+                raise Denied(404, tr(UG_GONE))
+            st = c.execute("SELECT id, state, snap FROM obj_undo WHERE id=?", (p["id"],)).fetchone()
+            if st is None or st["state"] != ("undone" if redo else "done"):
+                raise Denied(409, tr(UNDO_NOTHING))
+            try:
+                data = json.loads(st["snap"] or "{}")
+            except ValueError:
+                raise Denied(404, tr(UG_GONE)) from None
+            g.undo_running = True  # the area's write path records no new step (core/undodiff.py undo_quiet)
+            try:
+                data, left = spec["run"](c, uid, rid, data, redo)
+            finally:
+                g.undo_running = False
+            c.execute("UPDATE obj_undo SET state=?, snap=? WHERE id=?",
+                      ("done" if redo else "undone", json.dumps(data, ensure_ascii=False, default=str), p["id"]))
+            p["area"] = spec["area"]
+        if left:
+            return {"group": p["group_id"], "kind": kind, "id": rid, "code": "conflict", "went": True,
+                    "reason": tr(UG_KEPT_REDO if redo else UG_KEPT, ", ".join(str(x) for x in left))}
+        return None
+    except Denied as e:
+        code = "noaccess" if e.code in (403, 404) else "conflict"
+        return {"group": p["group_id"], "kind": kind, "id": rid, "code": code, "reason": e.text()}
+
+
 def _part(c, uid, p, redo):
     """One part back (redo: forward again). None when it went, else {group, kind, id, code, reason}."""
     kind, rid = p["kind"], int(p["ref_id"])
+    if p.get("mode") == "diff":
+        return _diff_part(c, uid, p, redo)
     try:
         with c.savepoint():
             try:
@@ -98,7 +136,7 @@ def _state(c, gid):
 
 def _run_group(c, uid, grp, redo):
     """Every part of grp back (redo: forward), newest first (redo: oldest first). -> (moved, [stayed])."""
-    parts = c.execute("SELECT id, group_id, kind, ref_id, org_id FROM obj_undo WHERE group_id=? AND state=? ORDER BY id " + ("ASC" if redo else "DESC"),
+    parts = c.execute("SELECT id, group_id, kind, ref_id, org_id, mode FROM obj_undo WHERE group_id=? AND state=? ORDER BY id " + ("ASC" if redo else "DESC"),
                       (grp["id"], "undone" if redo else "done")).fetchall()
     moved, stayed, areas = 0, [], set()
     for r in parts:
@@ -106,7 +144,7 @@ def _run_group(c, uid, grp, redo):
         bad = _part(c, uid, p, redo)
         if bad:
             stayed.append(bad)
-        else:
+        if not bad or bad.pop("went", False):  # 2.774.0 (#5251): a diff part that went with some fields kept counts as moved
             moved += 1
             areas.add(p.get("area"))
     state = _state(c, grp["id"])

@@ -17892,6 +17892,7 @@
   "The app's code changed without a new version": "Der Code der App hat sich ohne neue Version geändert",
   "Guide": "Anleitung",
   "A row was not imported, its amount is not a number with at most two decimal places: {0} ({1})": "Eine Zeile wurde nicht übernommen, ihr Betrag ist keine Zahl mit höchstens zwei Nachkommastellen: {0} ({1})",
+  "Restored {0}": "{0} wiederhergestellt",
   "Move {0} item to the trash?": ["{0} Eintrag in den Papierkorb legen?", "{0} Einträge in den Papierkorb legen?"],
   "View version {0}": "Version {0} ansehen",
   "Restore version {0}": "Version {0} wiederherstellen",
