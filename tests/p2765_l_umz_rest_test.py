@@ -241,4 +241,25 @@ after2 = {t: one(f"SELECT COUNT(*) FROM {t} WHERE list_id=?", (BL2 or 0,)) for t
 check(one("SELECT deleted_at FROM lists WHERE id=?", (BL2 or 0,)) is not None and after2 == rows2,
       f"F5 the unchanged budget list goes into the trash with all its rows (restorable) {after2} {rows2}")
 
+# 2.765.0 (review N4): the same file imported a second time brings nothing of these areas again - and its result names no
+# timesheet month as "kept" (the month is the one of the first run), only that the areas came with an earlier import
+FILE3 = mkzip({"timesheets": [{"id": 75, "month": "2026-11", "state": "open", "note": "zweimal", "created_at": TS, "updated_at": TS}],
+               "absences": [{"id": 65, "kind": "vacation", "start_date": "2026-12-01", "end_date": "2026-12-02", "note": "zweimal",
+                             "status": "approved", "created_at": TS}]})
+PBS = one("SELECT COUNT(*) FROM orgs WHERE personal_of=?", (GID,))
+res3 = []
+for _n in range(2):
+    iid3, j = upload(Gi, FILE3)
+    r = Gi.post(B + f"/api/account/import/{iid3}/run", json={"target": "private", "people": {}})
+    j = until(lambda: state_of(Gi, iid3), 180) or {} if r.status_code == 202 else {}
+    res3.append((j.get("state"), json.dumps((j.get("result") or {}).get("warnings"), ensure_ascii=False)))
+check([x[0] for x in res3] == ["done", "done"], f"N4 the file imported twice {res3}")
+check(one("SELECT COUNT(*) FROM time_sheets WHERE user_id=? AND month='2026-11'", (GID,)) == 1
+      and one("SELECT COUNT(*) FROM hub_absences WHERE user_id=? AND start_date='2026-12-01' AND deleted_at IS NULL", (GID,)) == 1,
+      "N4 ... its timesheet and absence arrive once")
+W2 = res3[1][1] if len(res3) > 1 else ""
+check("Timesheets of months you have here already" not in W2 and "from an earlier import" in W2,
+      f"N4 ... the second result names no skipped month, only the earlier import {W2[:400]}")
+check(one("SELECT COUNT(*) FROM orgs WHERE personal_of=?", (GID,)) == PBS, "N3 ... and no second personal office")
+
 sys.exit(kt.done("p2765_l_umz_rest"))
