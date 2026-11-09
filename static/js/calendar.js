@@ -159,8 +159,10 @@ function cevTime(e, d) {
   return `${e.d0 === d ? fmtTimeAt(e.s) : '…'}–${e.d1 === d ? fmtTimeAt(e.e) : '…'}`;  // 2.368.0 B (#2982): fmtTimeAt = 12 / 24 h as chosen
 }
 // 2.52.0 (#1016): cgok = may be dragged into other days (caldrag.js)
-const cevChip = (e, d) => `<div class="cev${cevTimed(e, d) ? '' : ' allday'}${abcX(e) ? ' cevx' : ''}${ap_draftCls(e)}${cg_canDrag(e) ? ' cgok' : ''}" data-cev="${e.id}" style="--cc:${cevColor(e)}" title="${esc(cevTitle(e))}">${cevTimed(e, d) && e.d0 === d ? `<span class="muted">${fmtTimeAt(e.s)}</span> ` : ''}${esc(cevTitle(e))}</div>`;
-const cevRow = (e, d, cls = '', mark = '') => `<div class="cevrow${ap_draftCls(e)}${cls}" data-cev="${e.id}" style="--cc:${cevColor(e)}" role="button" tabindex="0"><i class="cevdot"></i><span class="cevt">${cevTime(e, d)}</span><span class="cevn">${esc(cevTitle(e))}</span>${mark}${e.location ? `<span class="cevl">${esc(e.location)}</span>` : ''}<span class="cevc">${esc(cevCal(e))}</span></div>`;
+// 2.800.0 (#5468): an event of a subscribed calendar is personal and shows in every workspace: it carries the subscription's mark
+const cevSubMark = e => e.own || abcX(e) ? '' : `<span class="cevsub" title="${esc(tr('Subscribed calendar'))}" aria-label="${esc(tr('Subscribed calendar'))}" role="img">${ic('sync', 's')}</span>`;
+const cevChip = (e, d) => `<div class="cev${cevTimed(e, d) ? '' : ' allday'}${abcX(e) ? ' cevx' : ''}${ap_draftCls(e)}${cg_canDrag(e) ? ' cgok' : ''}" data-cev="${e.id}" style="--cc:${cevColor(e)}" title="${esc(cevTitle(e))}">${cevSubMark(e)}${cevTimed(e, d) && e.d0 === d ? `<span class="muted">${fmtTimeAt(e.s)}</span> ` : ''}${esc(cevTitle(e))}</div>`;
+const cevRow = (e, d, cls = '', mark = '') => `<div class="cevrow${ap_draftCls(e)}${cls}" data-cev="${e.id}" style="--cc:${cevColor(e)}" role="button" tabindex="0"><i class="cevdot"></i><span class="cevt">${cevTime(e, d)}</span><span class="cevn">${esc(cevTitle(e))}</span>${cevSubMark(e)}${mark}${e.location ? `<span class="cevl">${esc(e.location)}</span>` : ''}<span class="cevc">${esc(cevCal(e))}</span></div>`;
 // 2.490.0 (#4021): on Today a timed event that ends today and whose end has passed is "past"; all-day / multi-day ones stay until the day ends
 const cevPast = (e, d, now = new Date()) => cevTimed(e, d) && e.d1 === d && e.e <= now;
 const cevNow = (e, d, now = new Date()) => cevTimed(e, d) && e.s <= now && now < e.e;
@@ -298,7 +300,9 @@ const cvxTodayOn = e => (e.own && e.cal == null) || !cvxList('today_cals_hidden'
 // 2.624.0 (#3946): a list is also off when one folder of its path (own sidebar path, l.folder) is in cal_folders_hidden
 const cvxFolderOff = (f, hid = cvxList('cal_folders_hidden')) => { const ps = String(f || '').split('/').filter(Boolean); return hid.length > 0 && ps.some((_, i) => hid.includes(ps.slice(0, i + 1).join('/'))); };
 const cvxListOff = (id, hl = cvxList('cal_lists_hidden'), hf = cvxList('cal_folders_hidden')) => hl.includes(id) || (hf.length > 0 && cvxFolderOff(listById(id)?.folder, hf));
-const cvxTaskOn = t => S.settings?.cal_tasks !== '0' && !cvxListOff(t.list_id);
+// 2.800.0 (#5468): a dated task follows the shown workspace like the events (cevWs) and every other task view (wsHidden: the
+// sidebar, Today, openTasks): only the lists of that workspace (the inbox is in each), "All" shows all
+const cvxTaskOn = t => S.settings?.cal_tasks !== '0' && !cvxListOff(t.list_id) && !wsHidden(t);
 // stores one of the json lists (the local copy first, so the views redraw at once)
 function cvxSave(k, arr) {
   S.settings[k] = typeof arr === 'string' ? arr : JSON.stringify(arr);

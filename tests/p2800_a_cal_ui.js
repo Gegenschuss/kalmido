@@ -3,10 +3,13 @@
 // - #5460: an event in the lower half of the month opens its window after the details are loaded inside the browser window
 //   (1280x800 and 820x800): its lower edge stays in the window, Edit (owner) and Accept (invited person) are in sight and take
 //   the click; the actions run Edit - Preparation task - Delete (Delete last); "Hide on Today" is no longer in the window
+// - #5468: dated tasks in the calendar follow the workspace like the events: in Private only the private list's task, in the
+//   organisation only its list's task, under "All" both; an event of a subscribed calendar shows in each, with its mark;
+//   a person without an organisation (bob) sees all of their own dated tasks
 // freelancer-matrix: events (alice has no organisation: her private workspace)
 const path = require('path');
 const {execFileSync} = require('child_process');
-const {sleep, B, login} = require('./boot');
+const {sleep, B, login, boot, until: until0} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const firefox = require('./ff')({tag: 'p2800_a_cal_ui', check, shots: 'P2800A_SHOTS'});
@@ -14,6 +17,10 @@ const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 const DATA = process.argv[2] || path.join(__dirname, '.data');
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 const call = async (ck, method, url, body) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); const j = await r.json().catch(() => ({})); return {...j, http: r.status}; };
+const CT = process.env.KALMIDO_TEST_CONTAINER || 'kalmido-test';
+const py = code => execFileSync('docker', ['exec', CT, 'python', '-c', code], {encoding: 'utf8'}).trim();
+const until = fn => until0(fn, {timeout: 15000, step: 100});
+const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const pad = n => String(n).padStart(2, '0');
 const dstr = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
@@ -27,7 +34,7 @@ const dstr = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate()
   const CB = await login('bob');
   await call(CB, 'PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'cal,events,collab'});
 
-  // ================= #5460: the event window in the lower half of the month
+  // the event of #5460 (below), made before the organisation exists: an invitation to bob, who stays without one
   const now = new Date(), LAST = dstr(new Date(now.getFullYear(), now.getMonth() + 1, 0));  // the month's last day: its lowest rows
   const W = await call(CA, 'POST', '/api/evcals', {name: 'Work', color: '#2dd4bf'});
   const long = Array.from({length: 14}, (_, i) => `Point ${i + 1}: go through the cut list with the studio and note what is left.`).join('\n');
@@ -35,6 +42,54 @@ const dstr = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate()
     location: 'Studio 2, back entrance', description: long, attendees: [{user_id: BOB}], reminders: [30]});
   check(EV.id, '#5460: the event on the server ' + EV.http);
 
+
+  // ================= #5468: dated tasks follow the workspace in the calendar
+  const D = dstr(new Date()), ME = (await call(CA, 'GET', '/api/me')).id;
+  const ORG = (await call(CA, 'POST', '/api/admin/orgs', {name: 'Studio North', admin_id: ME})).id;
+  check(ORG, '#5468: an organisation');
+  const OL = await call(CA, 'POST', '/api/lists', {name: 'Client work', org_id: ORG});
+  const PL = await call(CA, 'POST', '/api/lists', {name: 'Home matters', org_id: null});  // private (with one organisation a new list would go there)
+  const TO = await call(CA, 'POST', '/api/tasks', {title: 'Send the rough cut', list_id: OL.id, due: D});
+  const TP = await call(CA, 'POST', '/api/tasks', {title: 'File the tax return', list_id: PL.id, due: D});
+  check(OL.id && PL.id && TO.id && TP.id, '#5468: a dated task in an organisation list and in a private list');
+  // a synced subscription of alice with one event today, written like the sync does
+  py(`from kalmido.core.db import connect
+c = connect()
+c.execute("INSERT INTO cal_subs(user_id,kind,name,color,visible,url,status,created_at) VALUES(${ME},'ics','Club fixtures','#f5b041',1,'x','ok','2026-01-01T00:00:00Z')")
+sid = c.execute('SELECT MAX(id) FROM cal_subs').fetchone()[0]
+c.execute('INSERT INTO cal_events(sub_id,uid,title,all_day,start,"end",d0,d1) VALUES(?,?,?,?,?,?,?,?)', (sid, 'm1', 'Home match', 1, '${D}', '${D}', '${D}', '${D}'))
+c.commit(); c.close()`);
+  for (const [ws, want, not] of [['private', [TP.id], [TO.id]], [`org:${ORG}`, [TO.id], [TP.id]], ['all', [TO.id, TP.id], []]]) {
+    await call(CA, 'PATCH', '/api/settings', {workspace: ws});
+    const w = await boot({user: 'alice', hash: 'cal', ls: {'tasks.calMode': '"month"'}}), d = w.document;
+    const cell = () => d.querySelector(`#view .cell[data-day="${D}"]`);
+    const ids = () => [...(cell()?.querySelectorAll('.ev[data-id]') || [])].map(x => +x.dataset.id);
+    check(await until(() => want.every(id => ids().includes(id))), `#5468 ${ws}: the workspace's dated task is in the month ` + JSON.stringify(ids()) + ' ' + w.eval(`JSON.stringify({ws: wsCur(), cell: !!document.querySelector('#view .cell[data-day="${D}"]'), route: S.route?.key, n: S.tasks.size, t: [...S.tasks.values()].filter(t => t.due).map(t => [t.id, t.list_id, listById(t.list_id)?.org_id, wsHidden(t), cvxTaskOn(t)]), sel: S.calMonth})`));
+    check(not.every(id => !ids().includes(id)), `#5468 ${ws}: the other workspace's task is not ` + JSON.stringify(ids()));
+    const sub = await until(() => [...(cell()?.querySelectorAll('.cev') || [])].find(x => /Home match/.test(x.textContent)));
+    check(sub && sub.querySelector('.cevsub[aria-label="Subscribed calendar"]'), `#5468 ${ws}: the subscribed calendar's event shows, with its mark`);
+    // into the task and back: the month stays as it was
+    if (want[0] && cell()?.querySelector(`.ev[data-id="${want[0]}"]`)) {
+      click(w, cell().querySelector(`.ev[data-id="${want[0]}"]`));
+      check(await until(() => d.querySelector(`#detail:not(.hidden) [data-id="${want[0]}"], #detail:not(.hidden)`) && w.eval('S.sel') === want[0]), `#5468 ${ws}: the task opens from the calendar`);
+      w.eval('closeDetail()');
+      check(await until(() => !w.eval('S.sel') && want.every(id => ids().includes(id))), `#5468 ${ws}: back in the month, the task still there`);
+    }
+    w.close();
+  }
+  await call(CA, 'PATCH', '/api/settings', {workspace: 'all'});
+  // a person without an organisation: every own dated task shows (Private is all they have)
+  const BL = await call(CB, 'POST', '/api/lists', {name: 'Errands'});
+  const TB = await call(CB, 'POST', '/api/tasks', {title: 'Pick up the parcel', list_id: BL.id, due: D});
+  const TI = await call(CB, 'POST', '/api/tasks', {title: 'Call the landlord', due: D});
+  {
+    const w = await boot({user: 'bob', hash: 'cal', ls: {'tasks.calMode': '"month"'}}), d = w.document;
+    const ids = () => [...(d.querySelector(`#view .cell[data-day="${D}"]`)?.querySelectorAll('.ev[data-id]') || [])].map(x => +x.dataset.id);
+    check(await until(() => ids().includes(TB.id) && ids().includes(TI.id)), '#5468 without an organisation: list and inbox task in the month ' + JSON.stringify(ids()));
+    w.close();
+  }
+
+  // ================= #5460: the event window in the lower half of the month
   const signIn = (ev, user) => ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${user}', password: 'password123'})}).then(r => r.status)`);
   // the open window and one button in it: rects, and whether the button is the element at its own centre (in sight, not covered)
   const geo = sel => `(() => { const p = document.querySelector('#pop'), b = p.querySelector(${JSON.stringify(sel)}); if (!b) return null;
