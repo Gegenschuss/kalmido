@@ -19,6 +19,7 @@
    the stored message (no second answer)
  - review F2: waiting plans wake only by the person's OWN share (owner / admin of a project the agent is in); someone else
    taking the agent into a project where she is only a member wakes nothing; the state route says own: false
+ - review F5: the item asked again starts only the plans of the person asking
  - review F3: a member without a shared project sees nothing of the agent's host, model, rights mode, usage, costs, contact
 tenant-matrix: agent (another organisation's admin: the state route, the chat and the tab never reach the team agent)
 usage: p2777_c_srvagent_test.py <datadir>      (KMT_NOSTART=1 / P2777C_NOSTART=1: a running server)"""
@@ -207,6 +208,18 @@ check(Bo.put(B + f"/api/lists/{PB}/members", json={"user_id": TK4, "role": "edit
 check(until(lambda: plans_of(TK4, uid["bob"]) == [("briefing", 1, 0), ("tidy", 1, 0)], 75),
       f"bob's own share: his plans start {plans_of(TK4, uid['bob'])}")
 check(Bo.get(B + f"/api/agents/{TK4}/server/starter").json().get("own") is True, "the state route: own")
+
+# ================================================================ review F5: the item asked again starts only the asker's plans
+r = Bo.post(B + f"/api/orgs/{ORG}/server-agents", json={"username": "teamki5", "display_name": "Team KI Five"})
+TK5 = r.json().get("id")
+check(states(starter(Bo, TK5, ["briefing"])) == {"briefing": "waiting"} and states(starter(A, TK5, ["briefing"])) == {"briefing": "waiting"},
+      "setup: a waiting plan of bob and one of alice")
+PB5 = Bo.post(B + "/api/lists", json={"name": "Bob project five", "org_id": ORG}).json()["id"]
+check(Bo.patch(B + f"/api/lists/{PB5}", json={"agent_members": True}).ok and Bo.put(B + f"/api/lists/{PB5}/members", json={"user_id": ALICE, "role": "edit"}).ok
+      and Bo.put(B + f"/api/lists/{PB5}/members", json={"user_id": TK5, "role": "edit"}).ok, "bob shares his project (alice only a member)")
+check(states(starter(Bo, TK5, ["briefing"])) == {"briefing": "exists"} and plans_of(TK5, uid["bob"]) == [("briefing", 1, 0)],
+      f"bob asks again: his plan starts at once {plans_of(TK5, uid['bob'])}")
+check(plans_of(TK5, ALICE) == [("briefing", 0, 1)], f"review F5: alice's plan keeps waiting {plans_of(TK5, ALICE)}")
 
 # ================================================================ the dialog's order: a project first, then the pack
 r = Bo.post(B + f"/api/orgs/{ORG}/server-agents", json={"username": "teamki2", "display_name": "Team KI Two"})

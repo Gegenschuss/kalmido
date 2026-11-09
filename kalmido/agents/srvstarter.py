@@ -133,7 +133,9 @@ def _plan(c, aid, uid, title, prompt, freq, hm, action="chat", days=None, flow="
         if c.execute("SELECT 1 FROM agent_schedules WHERE id=? AND share_wait=1", (r[0],)).fetchone():  # 2.777.0 C (#5378)
             if wait:
                 return "waiting", r[0], tr(SRV_WAIT_WHY)
-            sched_wait_wake(c, aid)  # reached now (a project was shared): it starts at once, not only at the watchdog's next turn
+            # reached now (a project was shared): it starts at once, not only at the watchdog's next turn; review F5: only the plans
+            # of the person asking (their own act), the others' wait for the watchdog and their own share (sched_wait_wake)
+            sched_wait_wake(c, aid, uid, asked=True)
         return "exists", r[0], None
     f = sched_in(c, aid, uid, {"title": title, "prompt": prompt, "freq": freq, "days": days or [], "time": hm,
                                "tz": _tz(c, uid), "action": action, "enabled": True})
