@@ -19,10 +19,9 @@
 
 ## What's new
 
-**2.761.0** (2026-11-09):
-- **Layout**: split view on wide screens shows a second page of the app on the right (Settings > Appearance).
-- **Documents**: tags, sender and document type suggest known entries from the first letter; text in the PDF preview can be marked and copied.
-- **Security**: web manifest per release (`web-manifest-X.Y.Z.json`, `/api/code-manifest`); images and the manifest carry a GitHub build attestation (`gh attestation verify`, see docs/SELF-HOSTING.md).
+**2.762.0** (2026-11-09):
+- **Files**: files and documents are one area with one folder tree; a folder with recognition shows its documents with search, filters and sorting; "All documents", "To review" and saved views sit below the tree.
+- **Split view**: drag tasks, files and documents between the two halves (lists, calendar, office, file store, onto a task).
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 

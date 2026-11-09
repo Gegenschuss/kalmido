@@ -17,6 +17,34 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.762.0] - 2026-11-09
+
+Package 2.726 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Fixed
+- Menus: every entry that opens a further menu, choice sheet or picker now shows the arrow on the right like a second level (e.g. "Permissions: …" in the agent chat's ⋯ menu, "Workspace…", "Section menu…", "Move to folder…", "Sort…", "Notifications: …"); the lint check `tools/check_menu_next.py` (inside `check_layout.py`) keeps new entries from forgetting it. The info lines of the agent chat menu (kind of agent, usage) all look the same now, the kind line was greyer than the rest (#5164).
+- Tests: the suites with their own Firefox start (p230, p240, p241, p242, p251, p252) start as a mouse too, like `tests/ff.js` since #5169 (`MOUSE_PREFS`) (#5160).
+- Welcome tour on a computer with a mouse: the last card "Settings and modules" was cut off (9 steps with the keyboard step, the tour shows 8); now the keyboard step gives way and Settings stays the last card (#5160).
+
+Package 2.762 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Fixed
+- Weekly release: the prune plan no longer fails silently - the plan step always prints the script's output; a refusal (no latest-ok tag or no latest release) ends as a warning with an empty plan, nothing is deleted; any other error stays red with its message (#5320)
+
+Package 2.760.0 (Dragging between the halves of the split view, real time types in the core, server key loss in the docs).
+### Added
+- #4859: Drag between the two halves of the split view (and between windows of the app): a document onto a task = linked, a task or file into a knowledge page = a reference, a task onto a project in the sidebar or a list row / column = moved, a task onto a calendar day = its date, a file or document onto a day = an all-day appointment with a reference, a document into the office = moved to the office, a file onto a folder of the file store = moved. The drag carries only kind and id; the receiving half calls the normal routes (rights checked by the server) and each drop has its undo.
+### Changed
+- #5311: The core template (docs/dev/kern.md) creates created_at / updated_at / deleted_at as TIMESTAMPTZ. TIMESTAMPTZ columns read as one canonical ISO text (UTC, +00:00), and the version check (expect_updated_at) compares both sides canonically, so it works alike for TEXT and TIMESTAMPTZ tables; restoring from the trash, the agents' proposal "stale" flag and the account import handle TIMESTAMPTZ columns too.
+### Fixed
+- #4859: Split view: "Open on the right" while the right half is still starting no longer leaves it empty.
+- #4523: docs/SELF-HOSTING.md names everything lost with the server key because it hangs on the account keys (private files, journal, privately filed mails, household budget, private knowledge pages, values of a person's own documents) and that organisations and private offices come back with their recovery key; the overview table is "the main parts".
+
+Package 2.752 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Changed
+- Files: files and documents are one area "Files" with one folder tree in the sidebar - the second tree under "Documents" (the same folders again) is gone. Below the tree: "All documents", "To review" (with its counter) and the saved views, then "Shared with me" and the trash. A folder with recognition shows the documents' view: their bar (search, filter, sort, card size, Add documents and Scan into this folder), its subfolders as cards first, then its own documents and its other files; a search or a filter there takes the subfolders along. Every other folder keeps its list. On phones the bar on top has the spaces plus "All documents" / "To review"; the switch Files | Documents is gone (#4887)
+- Files: one address for everything: #ablage/docs, #ablage/review, #ablage/v/<id> and #ablage/<id> (a folder, or a file in the document view). The old links #docs, #docs/review, #docs/v/<id> and #docs/<id> lead there for good; reload and the browser's Back keep working. A document opened by a link closes into the list it leafs through, a plain file into its folder. /api/v1/docs and /api/docs are unchanged, so are the rights (a reader sees no writing buttons) (#4887)
+
 ## [2.761.0] - 2026-11-09
 
 Package 2.742 (Bündel: Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher), CI-only rot: p2191_c_perf, CI-only rot: p2290_c_fold_ui u. 1 weiter).
@@ -301,7 +329,8 @@ Package 2.685 (Bündel: Kommentare: Aktivität in drei Stufen (nur Kommenta, Bü
 - Office: switching "Office & finance" on no longer leaves the office saying it is switched off when it loaded before the switch was saved (#5176).
 - Balance sheet: a receipt booked against the bank (counter account "bank") and paid from the cash box is now booked bank to cash instead of being left out (#5128).
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.761.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.762.0...HEAD
+[2.762.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.762.0
 [2.761.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.761.0
 [2.759.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.759.0
 [2.756.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.756.0

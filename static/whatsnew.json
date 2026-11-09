@@ -1,6 +1,24 @@
 {
  "versions": [
   {
+   "version": "2.762.0",
+   "date": "2026-11-09",
+   "items": [
+    {
+     "de": "In der geteilten Ansicht kannst du Aufgaben, Dateien und Dokumente von einer Hälfte in die andere ziehen - in Listen, Kalender, Büro, Ablage oder auf eine Aufgabe.",
+     "en": "In the split view you can drag tasks, files and documents from one half into the other - into lists, the calendar, the office, the file store or onto a task."
+    },
+    {
+     "de": "Dateien und Dokumente sind ein Bereich mit einem Ordnerbaum; ein Ordner mit Erkennung zeigt seine Dokumente mit Suche, Filter und Sortierung.",
+     "en": "Files and documents are one area with one folder tree; a folder with recognition shows its documents with search, filters and sorting."
+    },
+    {
+     "de": "„Alle Dokumente“, „Zu prüfen“ und gespeicherte Ansichten stehen in der Seitenleiste unter dem Ordnerbaum.",
+     "en": "\"All documents\", \"To review\" and saved views sit in the sidebar below the folder tree."
+    }
+   ]
+  },
+  {
    "version": "2.761.0",
    "date": "2026-11-09",
    "items": [
