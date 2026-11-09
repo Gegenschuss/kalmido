@@ -128,8 +128,15 @@ const three = tag => [['Kita Beispiel', 'Elternbrief ' + tag, 'Datum 01.09.2026'
   click(w, v().querySelector('[data-dpg="open"]'));
   check(await until(() => strip()?.querySelectorAll('[data-dpgp]').length === 3), '... the strip counts three pages again');
 
+  // review F8: Shift+End marks the whole span from the page to the last one (not only both ends)
+  click(w, pg(1));
+  keyOn(w, pg(1), 'End', {shiftKey: true});
+  check(await until(() => [1, 2, 3].every(n => pg(n)?.getAttribute('aria-pressed') === 'true')), 'Shift+End: pages 1 to 3 marked (the span, page 2 too)');
+  click(w, pg(1));
+  check(await until(() => pg(1)?.getAttribute('aria-pressed') === 'true' && pg(2)?.getAttribute('aria-pressed') === 'false'), '... a click marks page 1 alone again');
+
   // turn right: the small page shows it, saved as a new version
-  click(w, pg(1)); click(w, btn('right'));
+  click(w, btn('right'));
   check(await until(() => pg(1)?.querySelector('.dpg-th')?.style.getPropertyValue('--dpg-r') === '90deg' && /turned by 90°/.test(pg(1).getAttribute('aria-label'))), 'turn right: page 1 shown turned by 90');
   click(w, btn('save'));
   check(await until(async () => (await call('GET', `/api/files/nodes/${D}`)).version === 4, 100), '... saved as version 4');

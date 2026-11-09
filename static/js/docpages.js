@@ -209,7 +209,8 @@ document.addEventListener('keydown', e => {
   else if (k === 'Delete' || k === 'Backspace') { if (pg && !DPG.sel.size) DPG.sel.add(+pg.dataset.dpgp); dpg_del(); }
   else if (pg && (k === 'ArrowLeft' || k === 'ArrowRight' || k === 'Home' || k === 'End')) {
     const p = +pg.dataset.dpgp, to = k === 'Home' ? 1 : k === 'End' ? DPG.n : Math.max(1, Math.min(DPG.n, p + (k === 'ArrowRight' ? 1 : -1)));
-    if (e.shiftKey) { DPG.sel.add(p); DPG.sel.add(to); DPG.last = to; dpg_draw(); } else DPG.last = to;
+    // review F8: Shift marks the whole span (Shift+End / Home too), as Shift+click does
+    if (e.shiftKey) { for (let i = Math.min(p, to); i <= Math.max(p, to); i++) DPG.sel.add(i); DPG.last = to; dpg_draw(); } else DPG.last = to;
     for (const x of $$('.dv-view .dpg [data-dpgp]')) x.tabIndex = +(/** @type {any} */ (x).dataset.dpgp) === to ? 0 : -1;
     /** @type {any} */ ($(`.dv-view .dpg [data-dpgp="${to}"]`))?.focus();
   } else return;
