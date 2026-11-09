@@ -144,8 +144,11 @@ def obj_history_add(c, uid, kind, rid, before, after, action="update", org_id=No
     person (and the same agent flag) within OBJ_MERGE_MIN minutes merges into the last entry: its before stays, after grows."""
     reg = _reg(kind)
     if org_id is None:
-        r = (c.execute(f"SELECT org_id FROM {reg['table']} WHERE id=?", (int(rid),)).fetchone() if kind in OBJ_TRACK
-             else obj_row(c, kind, rid))
+        if kind in OBJ_TRACK:  # 2.777.0 (#5254): a tracked table without a workspace column (habits: always a person's own)
+            r = (c.execute(f"SELECT org_id FROM {qi(reg['table'], {reg['table']})} WHERE id=?", (int(rid),)).fetchone()
+                 if "org_id" in (table_columns(c, reg["table"]) or ()) else None)
+        else:
+            r = obj_row(c, kind, rid)
         org_id = (r["org_id"] or None) if r is not None else None
     ag = 1 if (obj_is_agent(c, uid) if agent is None else agent) else 0
     ts = _now()

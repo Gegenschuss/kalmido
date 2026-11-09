@@ -8,6 +8,7 @@ go back from the list (POST /api/undo/to/<id>), also from another device of the 
  - a contact changed -> undo -> the old name; into the trash -> undo -> back (GET 200); redo -> in the trash again
  - a file renamed / moved into a folder / into the trash -> undo -> old name, top level, out of the trash; a new version ->
    undo -> the file points at version 1 again (content v1, no third version written), redo -> version 2
+ - a habit renamed -> undo -> the old name; into the trash -> undo -> back
  - only own steps: another person neither lists nor takes back a step (404); a step whose object someone else changed since
    stays (named in the answer)
 freelancer-matrix: undo (a person without an organisation: her contact and her file step go back from the list)
@@ -23,7 +24,7 @@ from kt import B, check, done  # noqa: E402
 from freelancer_fixture import freelancer  # noqa: E402
 
 kt.fresh(prefix="P2777A")
-FEAT = "cal,events,contacts,files,docs,collab,comments"
+FEAT = "cal,events,contacts,files,docs,collab,comments,habits"
 A = kt.setup()
 A.patch(B + "/api/settings", json={"lang": "en", "features": FEAT, "tour": "done"})
 ALICE = A.get(B + "/api/state").json()["me"]["id"]
@@ -181,6 +182,29 @@ check(res.get("partial") == [g["id"]] and [x["id"] for x in st] == [t1] and st[0
       and node(nid=t1)["name"] == "plan-bob.txt" and node(nid=t2)["name"] == "liste.txt",
       f"bob's change stays and is named, the other part goes back {res}")
 check(not [x for x in lst(Bo) if x["id"] == g["id"]], "bob does not see alice's step")
+
+# ---------------------------------------------------------------- habits
+r = A.post(B + "/api/habits", json={"name": "Laufen Beispiel"})
+check(r.ok, f"(setup) a habit {r.status_code} {r.text[:120]}")
+HB = r.json()["id"]
+
+
+def habit():
+    x = kt.dbx("SELECT name, deleted_at FROM habits WHERE id=?", (HB,))
+    return dict(x[0]) if x else {}
+
+
+r = A.patch(B + f"/api/habits/{HB}", json={"name": "Laufen Neu"})
+check(r.ok and habit()["name"] == "Laufen Neu", f"the habit renamed {r.status_code} {r.text[:120]}")
+g = newest(PHONE)
+check(g.get("kind") == "habit" and "Laufen Beispiel" in (g.get("label") or ""), f"the habit's step is listed {g}")
+res = back(PHONE, g["id"])
+check(res.get("undone") == [g["id"]] and habit()["name"] == "Laufen Beispiel", f"taken back from the phone: the old name {res} {habit()}")
+r = A.delete(B + f"/api/habits/{HB}")
+check(r.ok and habit()["deleted_at"], f"the habit went into the trash {r.status_code}")
+g = newest(A)
+res = back(A, g["id"])
+check(res.get("undone") == [g["id"]] and not habit()["deleted_at"], f"undo of the delete: the habit is back {res} {habit()}")
 
 # ---------------------------------------------------------------- a person without an organisation
 up = Fr.post(B + "/api/files/upload", files={"file": ("frei.txt", b"f1", "text/plain")})

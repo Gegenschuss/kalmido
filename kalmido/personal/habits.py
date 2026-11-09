@@ -119,6 +119,8 @@ def habit_update(hid):
     write_lock(c, f"habits-{hid}")
     h = c.execute("SELECT * FROM habits WHERE id=?", (hid,)).fetchone()
     ccf_check(b, h["updated_at"] or h["created_at"], "habit", lambda: dict(h))
+    if set(b) - {"sort", "expect_updated_at"}:
+        _hb_step(c, hid)  # 2.777.0 (#5254): the person's step (a new order alone is none)
     vals = {k: clean_habit_value(k, b[k]) for k in HABIT_FIELDS if k in b and k not in ("remind_at", "remind_times")}  # BadInput: 400, nothing stored
     vals.update(remind_columns(b))  # 2.140.0 C (#2135)
     for k, v in vals.items():
@@ -128,6 +130,7 @@ def habit_update(hid):
         ts = iso_ms(now_utc())
         c.execute("UPDATE habits SET updated_at=? WHERE id=?", (ts, hid))
     bump(c)
+    _hb_done(c)
     c.commit()
     return jsonify(ok=True, updated_at=ts or h["created_at"])
 
@@ -138,8 +141,11 @@ def habit_delete(hid):
     need_habit(c, hid)
     # 2.530.0 B (#4315): into the trash -- the logs stay; restorable until the trash period ends, then the trash run
     # (files/trashpurge.py TP_PLAIN "habits") deletes it with its logs
+    write_lock(c, f"habits-{hid}")  # 2.777.0 (#5254): the lock of its saves around its step
+    _hb_step(c, hid, "delete")
     c.execute("UPDATE habits SET deleted_at=? WHERE id=?", (iso(now_utc()), hid))
     bump(c)
+    _hb_done(c)
     c.commit()
     return jsonify(ok=True, trashed=True)
 
@@ -149,10 +155,24 @@ def habit_restore(hid):
     """2.530.0 B (#4315): a habit back from the trash (with every tick and note), at the end of the list."""
     c = db()
     need_habit(c, hid, trashed=True)
+    write_lock(c, f"habits-{hid}")  # 2.777.0 (#5254)
+    _hb_step(c, hid, "restore")
     c.execute("UPDATE habits SET deleted_at=NULL WHERE id=?", (hid,))
     bump(c)
+    _hb_done(c)
     c.commit()
     return jsonify(ok=True)
+
+
+def _hb_step(c, hid, what=None):
+    """2.777.0 (#5254): the undo step of the signed-in person's write of habit hid (personal/habitundo.py)."""
+    from .habitundo import hbu_pre
+    hbu_pre(c, me(), hid, what)
+
+
+def _hb_done(c):
+    from .habitundo import hbu_post
+    hbu_post(c)
 
 
 def habits_trash(c, uid):
