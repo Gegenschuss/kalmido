@@ -74,7 +74,7 @@ const pick = (w, el, v) => { if (!el) return; el.value = v; el.dispatchEvent(new
   const fmt = (cid, v) => w.eval(`shg_fmt(SHV.sh, SHV.sh._col.get(${cid}), ${v}, 'sum')`);
   check(await until(() => w.eval(`SHV.sh._col.get(${CB})?.cur === 'USD'`)), 'the client knows the column\'s currency');
   check(fmt(CA, 2469.1356) === '2,469.14', 'subtotal of Hours with 2 places ' + fmt(CA, 2469.1356));
-  check(fmt(CB, 10) === '$10.00', 'subtotal of Fee in dollars ' + fmt(CB, 10));
+  check(/^(US)?\$10\.00$/.test(fmt(CB, 10)), 'subtotal of Fee in dollars (the locale may write US$) ' + fmt(CB, 10));
   check(!errs.length, 'no script errors ' + JSON.stringify(errs).slice(0, 300));
   w.close();
 
