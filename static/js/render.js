@@ -1319,14 +1319,18 @@ function taskRow(t, opts = {}) {
   const chk = (t.status === 2 ? 'on' : t.status === -1 ? 'wont' : 'p' + (opts.checklist ? 0 : t.priority)) + (work ? ' work' : '') + (isMs(t) ? ' ms' : '');
   let lcH = '';
   if (lc) {  // 2.14.0 (#425): the cells in the list's order; a cell the width has no room for shows in the second line
-    const cells = lc.filter(k => k !== 'id').map(k => [k, lcCell(k, t, {kids, openKids, time, checklist: opts.checklist, vc: opts.vc, inDay})]);
+    // #3506: in a default layout (lcFallback, the collected views without an own choice) the due cell follows the symbol level too:
+    // switched off, only an overdue date shows (as the row did, dueOn)
+    const lcDef = opts.vc ? !S.settings?.view_cols : lcFb;
+    const cells = lc.filter(k => k !== 'id').map(k => [k, lcCell(k, t, {kids, openKids, time, checklist: opts.checklist, vc: opts.vc, inDay, dueOn: !lcDef || dueOn})]);
     lcH = `<div class="lcols" id="tc-${t.id}" data-act="open"${lcFit(lc)}>${cells.map(([k, c], i) => `<span class="lc ${lcCls(k)} ${lcOvf(i)}" data-k="${esc(k)}"${tcAttr(k, t)}>${c}</span>`).join('')}</div>`;  // 2.39.1 (#1327): tcAttr
     cells.forEach(([k, c], i) => { if (c && i >= 2) meta.push(`<span class="mlc ${lcOvf(i)}" data-lc="${esc(k)}">${c}</span>`); });
     meta.unshift(...cells.slice(0, 2).filter(([, c]) => c).map(([k, c]) => `<span class="mlc o0" data-lc="${esc(k)}">${c}</span>`));  // 2.290.0 C (#3163): the first two cells too, shown only in a narrow list on a computer (app.css), else hidden
   }
   // 2.31.0 (#1051): the number is part of the tap area (opens the task); phones show it in the meta line instead (.mid), so
   // titles with and without a number start at the same x
-  const gut = !opts.checklist && t.id > 0 && (lc ? lc.includes('id') : (ticketsOn(t.list_id) || idsOn(t.list_id)) && rs('num') && pz_on(t.list_id, 'ticket')) ? `<span class="tgut" aria-label="${esc(tr('Ticket {0}', '#' + t.id))}"${opts.trash ? '' : ' data-act="open"'}>#${t.id}</span>` : '';
+  // #3506 (CI red of 2.782.0): a collected view's columns (opts.vc) have no number column: the task's own list decides, as before #4502
+  const gut = !opts.checklist && t.id > 0 && (lc && !opts.vc ? lc.includes('id') : (ticketsOn(t.list_id) || idsOn(t.list_id)) && rs('num') && pz_on(t.list_id, 'ticket')) ? `<span class="tgut" aria-label="${esc(tr('Ticket {0}', '#' + t.id))}"${opts.trash ? '' : ' data-act="open"'}>#${t.id}</span>` : '';
   if (gut) meta.unshift(`<span class="mid" aria-label="${esc(tr('Ticket {0}', '#' + t.id))}">#${t.id}</span>`);
   const collapsed = S.collapsed.has('t' + t.id);
   const ro = !opts.trash && !canEdit(t);
@@ -1639,9 +1643,13 @@ const lcOvf = i => [2, 3, 5, 7, 10, 13, 16].filter(n => i >= n).map(n => 'o' + n
 // and archived lists keep the plain rows). The collected views (Today, My tasks, filters, tags, folders, …) show the
 // person's own choice (user setting view_cols: json list of keys, '' = vcDefault; the same in every collected view and on
 // every device), with the column "Project"; their title row carries data-lid="v" (VC instead of a list)
+// #3506 (CI red of 2.782.0): default columns nobody chose follow the row's symbol level (rowsym.js): "Calm" keeps the due
+// date, "Important" its set (+ the project in Today / Tomorrow); a list's own columns and an own view_cols choice stay as chosen
+const LC_RSY = {id: 'num', who: 'person', time: 'tracked', list: 'list', progress: 'sub', deps: 'blocked', tags: 'tags', created: 'created'};
+const lcRsy = k => { const s = k.startsWith('f:') ? 'fields' : LC_RSY[k]; return !s || rsy_on(s) || (k === 'list' && rsyProjToday()); };
 function lcFallback(l) {
   if (!l || l.checklist || l.family === 'shopping' || l.archived) return null;
-  const c = colDefault(l).filter(k => k === 'id' || colChoices(l).some(y => y[0] === k));
+  const c = colDefault(l).filter(k => (k === 'id' || colChoices(l).some(y => y[0] === k)) && lcRsy(k));
   return c.some(k => k !== 'id') ? c : null;  // nothing but the number: the plain rows
 }
 const VC = {id: 'v', virtual: true, name: ''};
@@ -1652,7 +1660,7 @@ const vcDefault = () => ['due', 'who', 'time', 'list', 'progress', 'deps', 'tags
 function vcCols() {
   let c = null; try { c = JSON.parse(S.settings?.view_cols || 'null'); } catch { c = null; }
   const av = new Set(vcChoices().map(x => x[0])), out = Array.isArray(c) ? c.filter(k => av.has(k)) : [];
-  return out.length ? out : vcDefault();
+  return out.length ? out : vcDefault().filter(lcRsy);  // #3506: the default follows the symbol level
 }
 async function vcSave(next, quiet) {  // next = the keys in their order, null = the default
   const prev = S.settings.view_cols || '', v = next && next.length ? JSON.stringify(next) : '';
@@ -1673,14 +1681,15 @@ const colName = (l, k) => k === 'id' ? tr('Task number') : (colChoices(l).find(x
 const colShort = (l, k) => k === 'time' ? tr('Tracked') : colName(l, k);  // the title row's label (narrow columns)
 function lcCell(k, t, x) {
   switch (k) {
-    case 'due': if (x.inDay) return t.due_time ? `<span class="dt today" title="${esc(dueLabel(t))}">${ic('clock', 's')}<span class="cdt">${esc(t.due_time)}</span></span>` : '<span class="lcnil" aria-hidden="true">\u2013</span>';  // 2.750.0 (#4502): Today shows the time only, like its date column did (#1051)
+    case 'due': if (x.dueOn === false && dueClass(t) !== 'over') return '<span class="lcnil" aria-hidden="true">\u2013</span>';  // #3506: the level switched the due date off
+      if (x.inDay) return t.due_time ? `<span class="dt today" title="${esc(dueLabel(t))}">${ic('clock', 's')}<span class="cdt">${esc(t.due_time)}</span></span>` : '<span class="lcnil" aria-hidden="true">\u2013</span>';  // 2.750.0 (#4502): Today shows the time only, like its date column did (#1051)
       return t.due && !x.checklist ? `<span class="dt ${dueClass(t)}" title="${esc(dueLabel(t))}">${dueClass(t) === 'over' ? ic('alert', 's') + `<span class="sr">${tr('Overdue')}: </span>` : ''}${t.start && t.start < t.due ? ic('timeline', 's rngi') : ''}<span class="cdt">${esc(dueLabel(t, false))}</span></span>` : '<span class="lcnil" aria-hidden="true">\u2013</span>';  // 2.87.9 (#1914): dim dash for an empty cell
     case 'prio': return t.priority && !x.checklist && PRIO_NAMES[t.priority] ? `<span class="lcp flag-${t.priority}" title="${esc(tr(PRIO_NAMES[t.priority]))}">${ic('flag', 's')}<span class="lbl">${esc(tr(PRIO_NAMES[t.priority]))}</span></span>` : '';
     case 'who': return t.id > 0 && collab() && (!x.vc || listById(t.list_id)?.shared) ? whoCell(t) : '';  // 2.750.0 (#4502): a collected view: only shared lists have someone to assign
     case 'list': { const l = listById(t.list_id); return !l ? '' : ws_isOrigin(l) ? ws_originHtml(l, lname(l), 'lst') /* 2.580.0 (#4821): under "All" workspace · project */ : `<span class="lst" title="${esc(lname(l))}">${licMark(l, 'lsm')}<span>${esc(lname(l))}</span></span>`; }  // 2.750.0 (#4502): like the project chip (.lst)
     case 'tags': return [...(t.ltags || []).map(g => ltagChip(g, t.list_id)), ...t.tags.map(g => ptagChip(g, t.list_id))].join('');
     case 'time': return x.time ? `<span class="tchip ${x.time.live ? 'live' : ''}" data-tt="${t.id}" title="${x.time.tip}">${ic('clock', 's')}<b>${x.time.txt}</b></span>` : '';
-    case 'progress': return x.kids.length ? `<span class="subc" title="${esc(tr('{0} of {1} subtasks done', x.kids.length - x.openKids, x.kids.length))}">${ic('sub', 's')}${x.kids.length - x.openKids}/${x.kids.length}</span>` : '';
+    case 'progress': { if (!x.kids.length) return ''; const n = esc(tr('{0} of {1} subtasks done', x.kids.length - x.openKids, x.kids.length)); return `<span class="subc" title="${n}">${ic('sub', 's')}${x.kids.length - x.openKids}/${x.kids.length}<span class="sr"> ${n}</span></span>`; }  // #3506: the screen reader hears what it counts, as the row's chip did
     case 'deps': return t.blocked && t.status === 0 && dFor(t) ? `<span class="blk" title="${esc(blockedTitle(t))}">${ic('lock', 's')}<span class="lbl">${tr('blocked')}</span></span>` : '';
     case 'delivery': return dv_cell(t);  // 2.392.2 (#3365)
     case 'created': return t.created_at ? `<span class="crd" title="${esc(tr('Created {0}', fmtWhen(t.created_at)))}">${ic('plus', 's')}${dayLabel(ds(new Date(t.created_at)))}</span>` : '';
@@ -1802,7 +1811,7 @@ function lcBar(l, lc) {
   const ks = lc.filter(k => k !== 'id');
   if (!ks.length || l.archived || isOverview()) return '';
   const cur = sortMode();
-  return `<div class="lcbar" data-lid="${l.id}" role="toolbar" aria-label="${esc(tr('Shown fields'))}"><div class="lcbs">${ks.map(k => { const n = colName(l, k), on = colSorts(k).includes(cur), dir = on ? sortDir(cur) : '';
+  return `<div class="lcbar" data-lid="${l.id}" role="toolbar" aria-label="${esc(tr('Shown fields'))}"><div class="lcbs" data-hscroll>${ks.map(k => { const n = colName(l, k), on = colSorts(k).includes(cur), dir = on ? sortDir(cur) : '';
     return `<button type="button" class="lcbn${on ? ' sorted' : ''}" data-k="${esc(k)}" aria-haspopup="menu" title="${esc(tr('Column menu: {0}', n))}"><span>${esc(n)}</span>${on ? `<span class="lcsa" aria-hidden="true">${ic('chev', dir === 'ascending' ? 's cup' : 's')}</span>` : ''}</button>`; }).join('')}</div>${l.virtual ? `<button type="button" class="lcbf" data-act="vcols" aria-haspopup="menu" title="${esc(tr('Shown columns'))}">${ic('columns', 's')}<span>${esc(tr('Columns'))}</span></button>` /* 2.750.0 (#4502) */ : `<button type="button" class="lcbf" data-act="cols" data-id="${l.id}" aria-haspopup="dialog" title="${esc(tr('Shown fields…'))}">${ic('columns', 's')}<span>${esc(tr('Fields'))}</span></button>`}</div>`;
 }
 document.addEventListener('click', e => { const b = e.target.closest?.('.lcbar .lcbn[data-k]'); if (!b) return; e.preventDefault(); lcMenu(b); });

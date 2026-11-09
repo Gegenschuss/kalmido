@@ -8,3 +8,12 @@
 .lc-list .lst .lic.lsm .licd{width:.4375rem;height:.4375rem}
 /* the same width for the cells and the title between 600 and 767 px (app.css: the other columns' widths there) */
 @media (min-width:600px) and (max-width:767px){ :is(.lcols,.lchead) .lc-list{width:6rem} }
+/* #3506 (CI red of 2.782.0, p2497_c_ttledit_ui): editing a title in a row with columns (title above, .tmain a column) keeps
+   the row's height: the row-mode rule ".trow.hascols.iedit .ttl{flex:1 1 0}" (app.css) let the title shrink to nothing there
+   and the field hung over the next rows */
+@media (min-width:768px){ .trow.hascols.haslc.iedit .ttl{flex:none;width:100%} }
+/* #3506 (CI red of 2.782.0, p2380r_e_ui): every list has column titles now (lcFallback): they stay at the top of the scroll
+   box while the rows scroll, as the field columns' head did (#3416 .fcolhead, app.css) */
+.lchead{position:sticky;top:0;z-index:4;background:var(--bg)}
+/* a block's "…" (widgets.js .lymore, absolute at the top right of Today's task block) stays above the sticky titles (axe target-size) */
+.lyb > .lymore{z-index:5}

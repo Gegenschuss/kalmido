@@ -33,20 +33,21 @@ const call = async (method, url, body) => { const r = await fetch(B + url.replac
     await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`);
     // ---- #3416: the column head stays at the top of the scroll box
     await nav(B + '#l/' + P);
-    check(await ready(ev, `!!document.querySelector('.fcolhead') && document.querySelectorAll('#view .fcols').length > 10`), '#3416: list with columns shown');
-    check(await ev(`getComputedStyle(document.querySelector('.fcolhead')).position === 'sticky'`), '#3416: the head is sticky');
+    // 2.750.0 (#4502): a list without its own columns shows its default columns (the field Package among them) under .lchead
+    check(await ready(ev, `/Package/.test(document.querySelector('#view .lchead')?.textContent || '') && document.querySelectorAll('#view .trow.haslc .lcols').length > 10`), '#3416: list with columns shown');
+    check(await ev(`getComputedStyle(document.querySelector('#view .lchead')).position === 'sticky'`), '#3416: the head is sticky');
     await ev(`(() => { document.querySelector('#view').scrollTop = 600; return 1; })()`);
     await sleep(300);
-    const g = await ev(`(() => { const h = document.querySelector('.fcolhead').getBoundingClientRect(), v = document.querySelector('#view').getBoundingClientRect(); return [Math.round(h.top - v.top), document.querySelector('#view').scrollTop, getComputedStyle(document.querySelector('.fcolhead')).backgroundColor]; })()`);
+    const g = await ev(`(() => { const h = document.querySelector('#view .lchead').getBoundingClientRect(), v = document.querySelector('#view').getBoundingClientRect(); return [Math.round(h.top - v.top), document.querySelector('#view').scrollTop, getComputedStyle(document.querySelector('#view .lchead')).backgroundColor]; })()`);
     check(g[1] > 100 && g[0] >= 0 && g[0] <= 4, '#3416: after scrolling the head is still at the top ' + JSON.stringify(g));
     check(!/rgba\(0, 0, 0, 0\)|transparent/.test(g[2]), '#3416: the head has its own background ' + g[2]);
     await shot('p2380r-e-colhead.png');
     await ev(`localStorage.setItem('tasks.theme', '"dark"'); localStorage.setItem('tasks.lookLocal', 'true'); 1`);
     await nav(B + '#l/' + P);
-    await ready(ev, `!!document.querySelector('.fcolhead')`);
+    await ready(ev, `!!document.querySelector('#view .lchead')`);
     await ev(`(() => { document.querySelector('#view').scrollTop = 600; return 1; })()`);
     await sleep(300);
-    check(await ev(`(() => { const h = document.querySelector('.fcolhead').getBoundingClientRect(), v = document.querySelector('#view').getBoundingClientRect(); return h.top - v.top <= 4; })()`), '#3416: dark: the head stays too');
+    check(await ev(`(() => { const h = document.querySelector('#view .lchead').getBoundingClientRect(), v = document.querySelector('#view').getBoundingClientRect(); return h.top - v.top <= 4; })()`), '#3416: dark: the head stays too');
     await ev(`localStorage.setItem('tasks.theme', '"light"'); 1`);
 
     // ---- #3465: wording

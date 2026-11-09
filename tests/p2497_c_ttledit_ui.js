@@ -37,7 +37,8 @@ const LONG = 'Start of a really long task title that wraps over several lines in
       check(await o.until(`!!document.querySelector('#view .trow[data-id="${T}"] .ttl')`, {timeout: 20000}), `${tag}: the row is there`);
       const row = `document.querySelector('#view .trow[data-id="${T}"]')`;
       // a computer's row with columns shows one line with an ellipsis (the whole title only while editing); a phone's row wraps
-      const wraps = wd < 768;
+      // 2.750.0 (#4502): the inbox has its default columns: a computer's row with them (haslc) wraps its title like a phone's
+      const wraps = wd < 768 || await ev(`${row}.classList.contains('haslc')`);
       const before = await ev(`(() => { const r = ${row}, t = r.querySelector('.ttl'); return {row: r.getBoundingClientRect().height, ttl: t.getBoundingClientRect().height, top: t.getBoundingClientRect().top}; })()`);
       if (wraps) check(before.ttl > 40, `${tag}: the long title wraps ` + JSON.stringify(before));
       await ev(`(() => { inlineEditStart(${T}); return 1; })()`);

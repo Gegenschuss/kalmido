@@ -73,7 +73,8 @@ const ACCENTS = ['petrol', 'violet', 'raspberry',  // 2.300.0 (#3198): petrol de
   const tts = [...d.querySelectorAll('#view .trow .ttl[data-kt]')];
   check(tts.length >= 5 && tts.filter(x => x.tabIndex === 0).length === 1 && tts.every(x => x.getAttribute('role') === 'button'), 'one row title per view is a Tab stop (roving), all are buttons');
   check([...d.querySelectorAll('#view .trow > .chk')].filter(x => x.tabIndex === 0).length === 1, 'only that row\'s checkbox is a Tab stop too');
-  check(tts[0].getAttribute('aria-describedby') && d.getElementById(tts[0].getAttribute('aria-describedby'))?.classList.contains('meta'), 'the row title is described by its meta line');
+  // 2.750.0 (#4502): a row with columns is described by its cells and its meta line (two ids)
+  check((tts[0].getAttribute('aria-describedby') || '').split(/\s+/).some(id => d.getElementById(id)?.classList.contains('meta')), 'the row title is described by its meta line ' + tts[0].getAttribute('aria-describedby'));
   // the keyboard: ↓ moves the real focus, Enter opens, Esc gives the focus back
   tts[0].focus(); key(w, tts[0], 'ArrowDown'); await sleep(100);
   check(d.activeElement === tts[1] && tts[1].tabIndex === 0 && tts[0].tabIndex === -1, '↓ moves the focus (and the Tab stop) to the next row');

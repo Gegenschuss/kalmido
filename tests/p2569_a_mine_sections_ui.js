@@ -100,7 +100,9 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   const pc = () => w.eval(`topMoreItems().find(x => x.label === 'Project as a column')`);
   check(pc() && !pc().on, '(4) "…" offers "Project as a column"');
   w.eval(`topMoreItems().find(x => x.label === 'Project as a column').fn()`);
-  check(await until(() => d.querySelector(`#view .trow[data-id="${TB}"] .c-list`) && !d.querySelector(`#view .trow[data-id="${TB}"] .mosub`)), '(4) the column "Project", no grey line');
+  // 2.750.0 (#4502): My tasks has the column titles of the collected views; its column Project (.lc-list) names the project
+  const pcol = () => d.querySelector(`#view .trow[data-id="${TB}"] .c-list, #view .trow[data-id="${TB}"] .lc-list`);
+  check(await until(() => (pcol()?.textContent || '').includes('Home') && !d.querySelector(`#view .trow[data-id="${TB}"] .mosub`)), '(4) the column "Project", no grey line ' + (pcol()?.textContent || ''));
   w.eval(`topMoreItems().find(x => x.label === 'Project as a column').fn()`);
   check(await until(() => d.querySelector(`#view .trow[data-id="${TB}"] .mosub`)), '(4) off again: the grey line "List › Section"');
   const TF = await mk('Brand new overdue', {due: '2020-01-04'});
