@@ -94,4 +94,4 @@ check(f"CASES {exp!r}" in out, f"ts_canon: one form for datetime, offsets, a spa
 check("READ '2026-11-09T02:00:00.500000+00:00'" in out, f"a TIMESTAMPTZ reads as canonical ISO text\n{out[-400:]}")
 check("SAME ok" in out and "OTHER conflict" in out, f"ccf_check: same instant passes, another one is a conflict\n{out[-400:]}")
 
-done("p2760_l_ts")
+sys.exit(done("p2760_l_ts"))
