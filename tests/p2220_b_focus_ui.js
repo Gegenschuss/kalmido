@@ -82,9 +82,12 @@ const ALL = 'cal,collab,agents,comments,progress';
 
     // ---- #2809: "Load older messages" keeps the focus in the chat
     if (mobile) { w.location.hash = 'agents/' + AG; await sleep(400); } else w.eval(`chatOpen(${AG})`);
-    await until(() => d.querySelectorAll('#chat-msgs .cmsg').length >= 30);
+    // #3506 (CI red of 2.782.0): the slower CI had no button after 15 s on the phone (green on the Mac): wait up to 30 s for the
+    // messages AND the button, say what was there, and stop this part instead of a TypeError
+    await until(() => d.querySelectorAll('#chat-msgs .cmsg').length >= 30 && d.querySelector('#chat-msgs [data-act="chat-older"]'), 200);
     let older = d.querySelector('#chat-msgs [data-act="chat-older"]');
-    check(older && d.querySelectorAll('#chat-msgs .cmsg').length === 30, `${tag}: 30 messages, "Load older messages"`);
+    check(older && d.querySelectorAll('#chat-msgs .cmsg').length === 30, `${tag}: 30 messages, "Load older messages" (${d.querySelectorAll('#chat-msgs .cmsg').length} messages, route ${w.location.hash}, button ${!!older})`);
+    if (!older) throw new Error(`${tag}: no "Load older messages" button`);
     older.focus(); click(w, older);
     await until(() => d.querySelectorAll('#chat-msgs .cmsg').length === 60); await sleep(100);
     older = d.querySelector('#chat-msgs [data-act="chat-older"]');

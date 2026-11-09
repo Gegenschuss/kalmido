@@ -133,7 +133,10 @@ const EMOJI = /\p{Extended_Pictographic}/u;
       await ev(`(() => { orgModal({id: ${ORG}}, () => {}); return 1; })()`);
       await ready(ev, `!!document.querySelector('.modal.ogmodal #og-list .ogrow')`);
       await ev(`(() => { const f = document.querySelector('#og-flt'); f.value = 'all'; f.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
-      await sleep(300);
+      // #3506 (CI red of 2.782.0): wait for the settled layout (all rows there, the card no longer taller than its box), not a
+      // fixed 300 ms - the slower CI measured the card while it was still growing (overflow 20, green on the Mac); a card that
+      // really overflows stays red after the wait
+      await ready(ev, `(() => { const c = document.querySelector('.modal.ogmodal .card'), l = c && c.querySelector('#og-list'); return !!l && l.querySelectorAll('.ogrow').length >= 26 && c.scrollHeight - c.clientHeight <= 2; })()`, 40);
       const m = await ev(`(() => { const c = document.querySelector('.modal.ogmodal .card'), l = c.querySelector('#og-list'), f = c.querySelector('.foot'), h = c.querySelector('h3');
         const cr = c.getBoundingClientRect(), fr = f.getBoundingClientRect(), r = l.querySelector('.ogrow').getBoundingClientRect(), b = l.querySelector('.ogchk').getBoundingClientRect();
         return {lscroll: l.scrollHeight > l.clientHeight + 4, cscroll: c.scrollHeight - c.clientHeight, footIn: fr.bottom <= cr.bottom + 1 && fr.top >= cr.top, headTop: h.getBoundingClientRect().top >= cr.top - 1,
