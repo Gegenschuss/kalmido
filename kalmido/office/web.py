@@ -379,7 +379,8 @@ def office_row_patch(kind, rid):
     diff["before"].pop("updated_at", None)
     if diff["after"]:
         ofx_log(c, oid, "update", target=kind, detail={"id": r["id"], **diff})
-    bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
+    # 2.780.0 (#5384): no bump of its own any more - ow_write ticks the area already when a field changed (since #5246);
+    # a second tick here moved "office" by two (p2566_b_bump red); without a change nothing moved, so no tick either
     c.commit()
     return jsonify(r)
 
