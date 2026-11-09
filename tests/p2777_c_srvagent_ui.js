@@ -143,6 +143,9 @@ async function create(w, d, T, un, own, pj) {
   const say = await call('POST', `/api/agents/${a3.id}/chat`, {body: 'What is due today?'}, CA);
   check(say.status === 201, 'carl writes to it without a project' + T);
   w = await boot({user: 'carl', hash: 'agents'}); d = w.document;
+  // review F4: every request of the app that ends in 4xx / 5xx and every toast while carl uses the chat
+  w.eval(`window.__p2777bad = []; window.__p2777toast = []; { const f0 = window.fetch; window.fetch = async (...x) => { const r = await f0(...x); if (r.status >= 400) window.__p2777bad.push(r.status + ' ' + String(x[0]?.url || x[0])); return r; }; }
+    { const t0 = toast; toast = (...x) => { window.__p2777toast.push(String(x[0] ?? '')); return t0(...x); }; }`);
   const c3 = await until(() => d.querySelector(`.agcard[data-k="ag${a3.id}"]`));
   check(c3 && /No project shared/.test(c3.textContent) && /Team Three/.test(c3.textContent), 'its card: "No project shared"' + T);
   const c1 = a1 && d.querySelector(`.agcard[data-k="ag${a1.id}"]`);
@@ -152,6 +155,31 @@ async function create(w, d, T, un, own, pj) {
     click(w, c3.querySelector('[data-act="chat-open"]'));
     const ans = await until(() => [...d.querySelectorAll('#achat, .achat, .chatview, main')].some(x => /do not see any project of yours/.test(x.textContent)));
     check(ans, 'the chat opens and shows the answer: it sees nothing, how to share a project' + T);
+    // 2.777.0 (#5378): review F4 - text only, no side calls: writing works, the answer shows, no red error
+    const box = await until(() => d.querySelector(`.chmsgs[data-agid="${a3.id}"]`)?.closest('#achat, .chview'));
+    check(box && box.querySelector('#chat-in') && !box.querySelector('[data-act="chat-attach"]') && !box.querySelector('.mreply') && !box.querySelector('[data-act="chat-react"]'),
+      'review F4: only the text box - no attach, no reply, no reactions' + T);
+    const mb = box?.querySelector('.cmsg [data-act="chat-msg-menu"]');
+    if (mb) {
+      click(w, mb);
+      const items = await until(() => { const l = [...d.querySelectorAll('[role="menuitem"]')].map(x => x.textContent.trim()); return l.length && l; });
+      check(items && items.some(x => /^Copy/.test(x)) && !items.some(x => /Reply|Pin|Edit|Delete|React|Save as task/.test(x)),
+        'review F4: the message menu only copies ' + JSON.stringify(items) + T);
+      d.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Escape', bubbles: true}));
+    }
+    const n0 = box ? box.querySelectorAll('.cmsg').length : 0;
+    const ci = box?.querySelector('#chat-in');
+    if (ci) {
+      ci.focus(); ci.value = 'Can you help me?'; ci.dispatchEvent(new w.Event('input', {bubbles: true}));
+      click(w, box.querySelector('[data-act="chat-send"]'));
+      const two = await until(() => { const ms = [...d.querySelectorAll(`.chmsgs[data-agid="${a3.id}"] .cmsg`)]; return ms.length >= n0 + 2 && ms; });
+      check(two && /Can you help me\?/.test(two[two.length - 2].textContent) && /do not see any project of yours/.test(two[two.length - 1].textContent),
+        'review F4: carl writes and sees his text and the fixed answer right after it' + T);
+      check(ci.isConnected ? ci.value === '' : true, 'the box is empty again' + T);
+    }
+    const bad = w.eval('window.__p2777bad || []').filter(x => x.includes(`/api/agents/${a3.id}`) || x.includes('/api/chat')), toasts = w.eval('window.__p2777toast || []');
+    check(!bad.length, 'review F4: no request of the chat ends in an error ' + JSON.stringify(bad) + T);
+    check(!toasts.some(t => /error|share a project with the agent first|not found/i.test(t)), 'review F4: no error toast ' + JSON.stringify(toasts) + T);
   }
   w.close();
 

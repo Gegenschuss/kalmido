@@ -155,6 +155,9 @@ function chatRows() {
 function chatRowHtml(m, a) {
   if (m.kind === 'notice') return chatNoticeHtml(m);  // 2.41.0 (#1206); 2.96.0 C (#2015): jcd_rows = job cards + filter
   const t = m.task_id && taskById(m.task_id), mine = m.from !== 'agent';
+  // 2.777.0 C (#5378, review F4): no project shared - only text: no reply (as for a paused agent), no reactions (chatRxHtml), the
+  // message menu only copies (chat.js acMsgMenu) - those routes answer 400 / 404 there
+  if (a?.shared === false) a = {...a, enabled: false};
   // 2.7.2 (#422): my messages say Sent / Delivered (the agent fetched it); (#421) reactions, quick 👍 👎 ❤️ on the agent's
   const dlvT = m.delivered_at ? tr('Delivered') + ' · ' + fmtWhen(m.delivered_at) : tr('Sent');  // 2.437.0 A (#3318): ticks only, the word as title / aria-label
   const dlv = mine ? `<span class="cdlv ${m.delivered_at ? 'on' : ''}" role="img" title="${esc(dlvT)}" aria-label="${esc(dlvT)}">${ic('check', 's')}${m.delivered_at ? ic('check', 's') : ''}</span>` : '';
@@ -527,6 +530,7 @@ S.chatFiles = {};
 const chatFilesHtml = aid => (S.chatFiles[aid] || []).map((f, i) => `<span class="cfile">${ic(/^image\//.test(f.type) ? 'clip' : 'file', 's')}<span>${esc(f.name || tr('Image'))}</span><button type="button" data-act="chat-stage-rm" data-i="${i}" title="${esc(tr('Remove'))}" aria-label="${esc(tr('Remove') + ': ' + (f.name || tr('Image')))}">${ic('x', 's')}</button></span>`).join('');
 function chatAddFiles(files, aid = S.chat.aid) {
   files = noEmpty(files); if (!files.length || !aid) return;
+  if (agentById(aid)?.shared === false) return;  // 2.777.0 C (#5378, review F4): no project shared - text only (a drop / paste adds nothing)
   const lim = upLimit(files, true);  // 2.363.3 (#3134)
   if (lim) { toast(lim); files = files.filter(upFits); }
   const arr = S.chatFiles[aid] ||= [];
@@ -608,6 +612,7 @@ document.addEventListener('drop', e => {
   e.preventDefault(); e.stopImmediatePropagation(); z.classList.remove('filedrop'); chatAddFiles(e.dataTransfer.files); $('#chat-in')?.focus();
 }, true);
 function chatRxHtml(m, a) {
+  if (a?.shared === false) return '';  // 2.777.0 C (#5378, review F4): no reactions without a shared project
   const rs = m.reactions || [], ag = m.from === 'agent', on = !!a?.enabled, ask = ag && !!m.asks, perm = chatPerm(m);
   const meR = e => rs.some(r => r.emoji === e && r.users.some(u => S.me && u.id === S.me.id));
   const qn = (k, n) => ask && k === 'up' ? N_('Approve (counts as approval)') : ask && k === 'down' ? N_('Reject (counts as rejection)') : n;
@@ -990,14 +995,14 @@ function chatInner(aid) {
   // permissions, model, workspace, usage, search and the window actions sit in the ⋯ menu. Right at most the side panel
   // switch, ⋯ and close as one group (the phone: only ⋯). The search button stays hidden as the anchor of the search bar.
   return `<div class="chath chh2${acc}">${back}${avBtn(a.id, a.name, 'avatar')}<div class="chn"><span class="chnm"><b>${esc(a.name)}</b>${chatRingHtml(a)}${chatWsHtml(a)}</span><span class="chl2">${chatStHtml(a)}${chatPausedHtml(a)}</span></div><span class="spacer"></span>${msgSearchBtn('a', a.id)}${typeof cw_headBtns === 'function' ? cw_headBtns('a:' + a.id) : ''}
-      <span class="chhb" role="group" aria-label="${esc(tr('Chat'))}">${back ? '' : chatWinBtns()}${jcd_fbtnHtml() /* 2.152.2 C (#2627): the menu button */}${back ? '' : `<button class="iconbtn" data-act="chat-close" title="${tr('Close')}" aria-label="${tr('Close')}">${ic('x')}</button>`}</span></div>
+      <span class="chhb" role="group" aria-label="${esc(tr('Chat'))}">${back ? '' : chatWinBtns()}${a.shared === false ? '' /* 2.777.0 C (#5378, review F4) */ : jcd_fbtnHtml() /* 2.152.2 C (#2627): the menu button */}${back ? '' : `<button class="iconbtn" data-act="chat-close" title="${tr('Close')}" aria-label="${tr('Close')}">${ic('x')}</button>`}</span></div>
     ${jc_barHtml()}${jcd_filtHtml()}${msBarHtml('a', a.id)}<div class="apvpins" id="chat-apv" hidden></div>${cpnBarHtml('a:' + a.id)}<div class="chmsgs${acv ? ' wac-loc' : ''}" id="chat-msgs" data-agid="${a.id}"${acv ? ` data-agacc="${a.id}" style="--agcol:${gc};${acv}"` : gc ? ` style="--agcol:${gc}"` : ''} role="log" aria-live="polite" aria-relevant="additions" aria-label="${esc(tr('Messages'))}">${chatMsgs()}</div>
     <button type="button" class="chnew hidden${acv ? ' wac-loc' : ''}" id="chat-new" data-act="chat-bottom"${acv ? ` data-agacc="${a.id}" style="${acv}"` : ''}>${tr('New message')} <span aria-hidden="true">↓</span></button>
     ${typingHtml(chatTypers(a), 'chat-typing')}
     ${chatStepsLiveHtml()}
     <div class="mtgcards" id="chat-mtg">${mtg_cardsHtml(a.id)}</div>
     <div class="cfiles chfiles" id="chat-files">${chatFilesHtml(a.id)}</div>
-    <div class="acsug" id="chat-sug" hidden></div>${replyBarHtml('a:' + a.id)}<div class="chcomp${acc}">${/*html-ok*/ chToolsHtml([`<button type="button" class="iconbtn chclip" data-act="chat-attach" title="${esc(tr('Attach images or files'))}" aria-label="${esc(tr('Attach images or files'))}" ${a.enabled ? '' : 'disabled'}>${ic('clip')}</button>`, mtg_btnHtml(a), typeof rf_btnHtml === 'function' ? rf_btnHtml('chat-in', !a.enabled) : '' /* 2.147.1 A (#2523) */])/* 2.213.0 (#2788): phones: one plus menu */}<input type="file" id="chat-file" multiple hidden><textarea id="chat-in" rows="1" enterkeyhint="enter" placeholder="${esc(jc_ph(a))}" aria-label="${esc(jc_ph(a))}" ${a.enabled ? '' : 'disabled'}>${esc(S.drafts['chat:' + a.id] || '')}</textarea><span class="muted chkh">${esc(chatKeyHintVis())}</span><button class="btn sm pri" data-act="chat-send" title="${esc(chatKeyHint())}" aria-label="${esc(tr('Send'))}" ${a.enabled ? '' : 'disabled'}>${ic('send', 's')}<span>${tr('Send')}</span></button></div>`;
+    <div class="acsug" id="chat-sug" hidden></div>${a.shared === false ? '' : replyBarHtml('a:' + a.id)}<div class="chcomp${acc}">${a.shared === false ? '' /* 2.777.0 C (#5378, review F4): text only */ : /*html-ok*/ chToolsHtml([`<button type="button" class="iconbtn chclip" data-act="chat-attach" title="${esc(tr('Attach images or files'))}" aria-label="${esc(tr('Attach images or files'))}" ${a.enabled ? '' : 'disabled'}>${ic('clip')}</button>`, mtg_btnHtml(a), typeof rf_btnHtml === 'function' ? rf_btnHtml('chat-in', !a.enabled) : '' /* 2.147.1 A (#2523) */])/* 2.213.0 (#2788): phones: one plus menu */}<input type="file" id="chat-file" multiple hidden><textarea id="chat-in" rows="1" enterkeyhint="enter" placeholder="${esc(jc_ph(a))}" aria-label="${esc(jc_ph(a))}" ${a.enabled ? '' : 'disabled'}>${esc(S.drafts['chat:' + a.id] || '')}</textarea><span class="muted chkh">${esc(chatKeyHintVis())}</span><button class="btn sm pri" data-act="chat-send" title="${esc(chatKeyHint())}" aria-label="${esc(tr('Send'))}" ${a.enabled ? '' : 'disabled'}>${ic('send', 's')}<span>${tr('Send')}</span></button></div>`;
 }
 function chatViewHtml(aid) {
   if (S.chat.aid !== +aid) { S.chat = {aid: +aid, msgs: [], err: null}; setTimeout(chatLoad, 0); }

@@ -1433,6 +1433,10 @@ async function chatCopy(msgs, m, kind, md) {  // 2.41.0 (#1374): with formatting
 // 2.571.0 (#4608): the menu of an agent-chat message is a function: the "…" button and a long press / right click (multisel.js lm_*) open the same one
 function acMsgMenu(a, m) {
   const ag = agentById(S.chat.aid);
+  if (ag?.shared === false) {  // 2.777.0 C (#5378, review F4): no project shared with the agent - only copying (the rest answers 400 / 404)
+    menu(a, [{label: tr('Copy'), icon: 'copy', fn: () => chatCopy(S.chat.msgs, m, 'agent')}, {label: tr('Copy as Markdown'), icon: 'copy', fn: () => chatCopy(S.chat.msgs, m, 'agent', true)}]);
+    return;
+  }
   menu(a, [ag?.enabled ? {label: tr('Reply'), icon: 'reply', fn: () => replyStart('a', m.id)} : null, m.kind === 'notice' ? null : cpnItem('a', m),  // 2.62.0 (#1848)
     {label: tr('Copy'), icon: 'copy', fn: () => chatCopy(S.chat.msgs, m, 'agent')},  // 2.37.0 (#1165)
     {label: tr('Copy as Markdown'), icon: 'copy', fn: () => chatCopy(S.chat.msgs, m, 'agent', true)},  // 2.41.0 (#1374)
