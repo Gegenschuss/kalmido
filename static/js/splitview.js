@@ -88,6 +88,9 @@ function spl_show(route) {
   LS.set('splR', r);
   if (!SPL.el) { spl_mount(r); return; }
   let w = null; try { w = SPL.fr.contentWindow; } catch { w = null; }
+  // 2.760.0 (#4859): a copy still starting holds the iframe's first document (about:blank): its address is no app address
+  // (location.replace built "blank#…" from it and the right half stayed empty) - then load the copy with the route instead
+  try { if (w && !(w.location.pathname === '/' && /[?&]split=1(?:&|$)/.test(w.location.search))) w = null; } catch { w = null; }
   // replace, no new entry: the iframe shares the tab's history, Back in the left app should not first step through the right one
   try { if (w) { if (w.location.hash !== r) w.location.replace(w.location.pathname + w.location.search + r); w.focus(); return; } } catch { /* reload below */ }  // the copy routes on hashchange (a copy still starting reads it at its start)
   SPL.fr.src = '/?mini=1&split=1' + r;

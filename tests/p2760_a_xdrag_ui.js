@@ -154,13 +154,15 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
     check(await until(`(() => { const d = ${RD}; const v = d?.querySelector(${JSON.stringify(box === '#c-input' ? '#c-input' : '#d-content')})?.value || ''; return v.includes('/#ablage/${D})'); })()`), '1: onto a text field of the task = a reference to the document ' + box);
 
     // ---- 4. a receipt into the office of the right half = "Move to office"; undo = back
-    check(await right('#office', '#view'), 'the right half shows the office');
-    await until(`(() => { const d = ${RD}; return !!(d && d.defaultView.location.hash.startsWith('#office') && d.querySelector('#view')?.children.length); })()`);
+    // 2.760.0: the office turns #office into #office/start on its first draw (location.replace = a hashchange), and an undo
+    // message ends with its page (#2801): wait for the office's own page before the drop, not just for #office
+    check(await right('#office/start', '#view'), 'the right half shows the office');
+    await until(`(() => { const d = ${RD}; return !!(d && d.defaultView.location.hash === '#office/start' && d.querySelector('#view')?.children.length); })()`);
     const d5 = await drag('L', `.dc-card[data-k="dc${D}"] > button[data-dco]`, 'R', '#view');
     check(d5.over, '4: the office takes a document ' + JSON.stringify(d5));
     const area = async () => (await call('GET', `/api/docs/${D}`)).area?.area;
     check(await poll(async () => (await area()) === 'office'), '4: the receipt is in the office ' + await area());
-    check(await toastIn('R', /Moved to office/), '4: undo offered');
+    check(await toastIn('R', /Moved to office/), '4: undo offered ' + JSON.stringify(await ev(`(() => { const d = ${RD}, t = d && d.querySelector('#toast'); return {txt: t?.textContent, cls: t?.className, page: t?.dataset.page, hash: d?.defaultView.location.hash, undo: d?.defaultView.eval('HIST.undo.map(e => e.label)')}; })()`)));
     await undoIn('R');
     check(await poll(async () => (await area()) === 'private'), '4: undo moves it back ' + await area());
 

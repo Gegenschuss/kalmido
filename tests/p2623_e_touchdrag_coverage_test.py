@@ -69,6 +69,9 @@ TD_SITES = {
     ("sheetgrid.js", "SG.drag"): ("kein", "a guard: holds back the browser's drag over the grid's own cell drag"),
     ("refs.js", "RF_TA_SEL"): ("kein", "a reference dropped into a text box; the finger has the button Insert reference (refs.js)"),
     ("refs.js", "rf_srcKey"): ("kein", "a reference dropped into a text box; the finger has the button Insert reference (refs.js)"),
+    # 2.760.0 (#4859): dragging between the halves of the split view - the split view exists only on a wide screen with a mouse (splitview.js)
+    ("refs.js", "includes(RF_MIME)) return;"): ("kein", "the drag between the split view's halves: the split view is mouse-only (splitview.js, #4858)"),
+    ("refs.js", "b.hasAttribute('draggable')"): ("kein", "document cards draggable only with a mouse while the split view is on (#4859)"),
 }
 
 
