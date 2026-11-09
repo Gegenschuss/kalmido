@@ -29,6 +29,10 @@ trash (`deleted_at IS NOT NULL` or `deleted_at < ...`), a cut-off on live rows (
 the WHERE must hold a fixed cut-off (a quoted date, not in the future): after the first start it finds nothing new, and rows put into the trash
 later keep their trash period (and their undo) until the regular purge run takes them.
 
+2.771.0 (#5333): a column DEFAULT that calls a function the backup does not know (kalmido/admin/backup.py _CALL_HEADS, read from
+there, not copied) is a finding: pg_dump prints it into every dump, and the restore refuses a dump with such a call (2.763: DEFAULT now()
+in a fragment made every backup unrestorable). CURRENT_TIMESTAMP instead of now() (pg_dump prints it without brackets).
+
 usage: python3 tools/check_migrations.py [-v]     exit code 1 on a finding
 """
 import ast
@@ -53,6 +57,8 @@ PURGE = re.compile(r"DELETE\s+FROM\s+(\w+)\b(.*)", re.I | re.S)  # 2.755.0 (#526
 PURGE_CUT = re.compile(r"\bWHERE\b.*<\s*'(\d{4}-\d\d-\d\d)[^']*'", re.I | re.S)
 PURGE_TRASH = re.compile(r"\bWHERE\b.*\bdeleted_at\s+(?:IS\s+NOT\s+NULL\b|<)", re.I | re.S)  # 2.755.0 (#5263, review M2): only rows in the trash
 PURGE_OK = re.compile(r"^[ \t]*#[ \t]*purge-ok[ \t]+(\w+)[ \t]*:[ \t]*\S", re.M)
+DEFAULT_KW = re.compile(r"\bDEFAULT\b", re.I)  # 2.771.0 (#5333)
+DEFAULT_END = re.compile(r"(?:NOT|NULL|REFERENCES|CHECK|PRIMARY|UNIQUE|CONSTRAINT|GENERATED|COLLATE)\b", re.I)
 
 
 def fragments(root=ROOT):
@@ -160,6 +166,42 @@ def trigger_when_finding(stmt):
     return None
 
 
+_HEADS = None
+
+
+def call_heads(root=ROOT):
+    """2.771.0 (#5333): the call heads a dump may hold, as kalmido/admin/backup.py _CALL_HEADS has them (parsed, not imported)."""
+    global _HEADS
+    if _HEADS is None:
+        with open(os.path.join(root, "kalmido", "admin", "backup.py"), encoding="utf-8") as f:
+            tree = ast.parse(f.read())
+        _HEADS = next(ast.literal_eval(n.value) for n in tree.body
+                      if isinstance(n, ast.Assign) and getattr(n.targets[0], "id", "") == "_CALL_HEADS")
+    return _HEADS
+
+
+def default_call_finding(stmt):
+    """2.771.0 (#5333): why a column DEFAULT in stmt would make every backup unrestorable (None: fine). pg_dump prints the DEFAULT
+    into the dump, kalmido/admin/backup.py _calls_ok refuses every call whose head is not in _CALL_HEADS (case aside: pg_dump
+    prints now() as written, LOWER() as lower())."""
+    bare, heads = sql_bare(stmt), {h.lower() for h in call_heads()}
+    for m in DEFAULT_KW.finditer(bare):
+        depth, i, expr = 0, m.end(), ""
+        while i < len(bare):  # the expression up to the column's end (a comma or the table's bracket) or its next clause
+            ch = bare[i]
+            if depth == 0 and (ch in ",;)" or (DEFAULT_END.match(bare, i) and not re.match(r"\w", bare[i - 1]))):
+                break
+            depth += (ch == "(") - (ch == ")")
+            expr += ch
+            i += 1
+        bad = sorted({c for c in re.findall(r'(?<![\w."])([A-Za-z_][\w.]*)\s*\(', expr) if c.lower() not in heads})
+        if bad and not re.match(r"\s*AS\s+IDENTITY\b", expr, re.I):
+            return (f"DEFAULT with {', '.join(b + '()' for b in bad)}: a dump with that call is refused by the restore "
+                    "(kalmido/admin/backup.py _CALL_HEADS), every backup would be unrestorable - CURRENT_TIMESTAMP instead of now(), "
+                    "else a constant")
+    return None
+
+
 def content_findings(n, values, src):
     """2.509.0 (#4285): what a fragment's statements do. values = {name: (literal value, line)}."""
     bad = []
@@ -168,6 +210,9 @@ def content_findings(n, values, src):
     stmts = [x.strip() for x in sql_bare(schema).split(";") if x.strip()]
     own = {CREATE_TABLE.match(x).group(1) for x in stmts if CREATE_TABLE.match(x)}
     for x in stmts:
+        why = default_call_finding(x)  # 2.771.0 (#5333)
+        if why:
+            bad.append(f"{n}:{sl}: SCHEMA: {why}: {x[:60]}")
         if not x.upper().startswith("CREATE"):
             bad.append(f"{n}:{sl}: SCHEMA only creates, not: {x[:60]}")
         elif re.match(r"CREATE\s+TABLE\b", x, re.I) and not re.match(r"CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\b", x, re.I):
@@ -182,7 +227,7 @@ def content_findings(n, values, src):
                 bad.append(f"{n}:{sl}: SCHEMA: trigger {TRIGGER_WHEN.match(x).group(1)}: {why}")
     steps, ml = values.get("MIGRATIONS", ([], 0))
     for table, col, ddl in steps:
-        why = step_finding(table, col, ddl)
+        why = step_finding(table, col, ddl) or default_call_finding(ddl)  # 2.771.0 (#5333)
         if why:
             bad.append(f"{n}:{ml}: step {table}.{col}: {why}")
     after, al = values.get("AFTER", ([], 0))
@@ -215,6 +260,7 @@ def content_findings(n, values, src):
                 f"DELETE is a one-way step (its rows are lost): needs a line # purge-ok {purge.group(1)}: <why>"
         else:
             why = index_finding(x, own, ok)
+        why = why or default_call_finding(x)  # 2.771.0 (#5333)
         if why:
             bad.append(f"{n}:{al}: AFTER: {why}: {x[:60]}")
     return bad
