@@ -17,8 +17,6 @@ run, an agent chat message deleted, a task purged with its comments); while a co
 they stay, so restoring it brings them back (decided 08.11.2026, question 5). user_id has a real key (the account goes, its
 reactions go). No organisation column: the target's area checks the reader before a reaction is read or written.
 """
-from datetime import datetime
-
 from .db import now_utc
 from .errors import BadInput, Denied
 from .i18n import N_, tr
@@ -82,18 +80,8 @@ def orx_set(c, kind, tid, uid, emoji, on, at=None):
 # ---- the move of the three old tables (once; core/db.py init_db calls it before the fragments' AFTER drops them)
 ORX_OLD = (("comment_reactions", "comment", "comment_id", "comments"), ("tchat_rx", "tchat", "message_id", "tchat_msgs"),
            ("chat_reactions", "agent_chat", "message_id", "agent_chat"))
+ORX_ISO = r"^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])T([01]\d|2[0-3]):[0-5]\d:[0-5]\d(\.\d{1,6})?(Z|[+-]\d\d:\d\d)$"
 ORX_NAMES = {x for t, _k, col, parent in ORX_OLD for x in (t, col, parent)}  # the allowlist of qi() (#5296)
-
-
-def _orx_when(v):
-    """created_at of an old row (ISO text) as a point in time; an unreadable one -> now (the reaction stays)."""
-    if isinstance(v, datetime):
-        return v
-    try:
-        d = datetime.fromisoformat(str(v or "").strip().replace("Z", "+00:00"))
-    except ValueError:
-        return now_utc()
-    return d if d.tzinfo else d.replace(tzinfo=now_utc().tzinfo)
 
 
 def orx_move(c):
@@ -105,9 +93,11 @@ def orx_move(c):
         if not c.execute("SELECT to_regclass(?)", (table,)).fetchone()[0]:
             continue
         cq = qi(col, ORX_NAMES)
-        rows = c.execute(f"SELECT x.{cq} AS tid, x.user_id, x.emoji, x.created_at FROM {qi(table, ORX_NAMES)} x "
-                         f"JOIN {qi(parent, ORX_NAMES)} p ON p.id=x.{cq} JOIN users u ON u.id=x.user_id").fetchall()
-        for r in rows:
-            n += c.execute("INSERT INTO obj_reactions(target_kind, target_id, user_id, emoji, created_at) VALUES(?,?,?,?,?) "
-                           "ON CONFLICT DO NOTHING", (kind, r["tid"], r["user_id"], r["emoji"], _orx_when(r["created_at"]))).rowcount
+        # review 2.763: one statement per table (not a round trip per row) inside the start transaction; an old time that is
+        # not in the app's ISO form (iso_ms) becomes now instead of failing the cast
+        n += c.execute(f"""INSERT INTO obj_reactions(target_kind, target_id, user_id, emoji, created_at)
+                           SELECT ?, x.{cq}, x.user_id, x.emoji,
+                                  CASE WHEN x.created_at ~ ? THEN x.created_at::timestamptz ELSE now() END
+                           FROM {qi(table, ORX_NAMES)} x JOIN {qi(parent, ORX_NAMES)} p ON p.id=x.{cq} JOIN users u ON u.id=x.user_id
+                           ON CONFLICT DO NOTHING""", (kind, ORX_ISO)).rowcount
     return n
