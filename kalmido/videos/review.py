@@ -861,9 +861,21 @@ def vdr_pub_media(token):
     resp = vdm_pub_send(c, vdr_sig_newest(c, s), s) if s["kind"] == "video" and s["state"] == "open" else None
     if resp is None:
         return pub_gone(sig_lang(c, s))
+    if resp == "too_big":  # 2.773.0 (#5330): a large sealed file only signed in -- a defined answer without the content
+        return vdr_pub_too_big(sig_lang(c, s))
     resp.headers["X-Robots-Tag"] = "noindex, nofollow, noarchive"
     resp.headers["Referrer-Policy"] = "no-referrer"
     return resp
+
+
+def vdr_pub_too_big(lg):
+    """2.773.0 (#5330): the answer of the media route for a sealed file above vdmedia.VDM_PUB_SEALED_MB: 413, no content."""
+    t = tr("File too large for the link", lg=lg)
+    r = pub_html(t, f'<div class="msg"><h1>{html.escape(t)}</h1>'
+                 f'<p>{html.escape(tr("This file can only be opened signed in. Please ask the sender for it.", lg=lg))}</p></div>', lg, 413)
+    r.headers["X-Robots-Tag"] = "noindex, nofollow, noarchive"
+    r.headers["Referrer-Policy"] = "no-referrer"
+    return r
 
 
 @app.post("/s/q/<token>/comments")

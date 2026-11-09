@@ -17899,6 +17899,8 @@
   "The app's code changed without a new version": "De code van de app is gewijzigd zonder nieuwe versie",
   "Guide": "Handleiding",
   "A row was not imported, its amount is not a number with at most two decimal places: {0} ({1})": "Een regel is niet geïmporteerd, het bedrag is geen getal met hoogstens twee decimalen: {0} ({1})",
+  "File too large for the link": "Bestand te groot voor de link",
+  "This file can only be opened signed in. Please ask the sender for it.": "Dit bestand kan alleen ingelogd worden geopend. Vraag het aan de afzender.",
   "Ticked": "Aangevinkt",
   "Not ticked": "Niet aangevinkt",
   "Archive number {0}": "Archiefnummer {0}",

@@ -23,10 +23,10 @@ from flask import request
 
 from ..core.config import ATT_DIR, MAX_FILE_MB
 from ..core.access import Denied
-from ..core.db import body
+from ..core.db import body, iso, now_utc
 from ..core.errors import BadInput
 from ..core.i18n import N_, tr
-from ..core.orgcrypt import oc_is_sealed_file, oc_read_file, oc_send_file
+from ..core.orgcrypt import oc_is_sealed_file, oc_plain_size, oc_read_file, oc_send_file
 from ..core.pg import system_ctx
 from ..files.fslock import fsl_of_chain
 from ..files.scan import sc_guard
@@ -41,6 +41,9 @@ VDM_FOLDER = N_("Approvals|sign-off")
 VDM_TYPES = N_("Please select an image (JPG, PNG, WebP), a PDF or an audio file (MP3, M4A, AAC, WAV, OGG, Opus, FLAC).")  # 2.658.0 (#5015): + audio
 VDM_SPACE = N_("Only files of the same workspace can be added")
 VDM_NOMOVE = N_("An approval of images or PDFs stays in the workspace of its files")
+# 2.773.0 (#5330): a sealed file (core/orgcrypt.py, decrypted whole per request) above this size is not handed out through
+# the customer link (no sign-in), only signed in (vdm_send); a plain file streams from disk and has no such limit
+VDM_PUB_SEALED_MB = float(os.environ.get("KALMIDO_REVIEW_LINK_SEALED_MAX_MB") or 50)
 
 
 def vdm_sniff(data):
@@ -318,7 +321,9 @@ def vdm_pub_send(c, v, s):
     """2.658.0 (#5015): the audio file of version row v for customer link s (office/signoff.py, checked open by the caller):
     only a file of the link's workspace, still in the file store (not in the trash, not in a locked folder), still visible
     to the person who made the link (the file's access), only as audio by its first bytes; streamed (range requests).
-    None = not available (the caller answers like an unknown link)."""
+    None = not available (the caller answers like an unknown link). 2.773.0 (#5330): "too_big" = a sealed file above
+    VDM_PUB_SEALED_MB (no content, the caller answers 413); a fetch that starts playing is noted in the file's history
+    (action ext_view, detail "approval <id>": the file store shows it as an external link, files/extlinks.py xl_log)."""
     if not v or not v["file_id"] or v["provider"] != "audio":
         return None
     with system_ctx(c):  # the public page reads as "anon"; the checks below bind it to exactly this link's file and workspace
@@ -332,12 +337,33 @@ def vdm_pub_send(c, v, s):
             full = vdm_path(c, v["file_id"], v["file_no"])
         except Denied:
             return None
+        if vdm_pub_too_big(full):  # 2.773.0 (#5330): checked BEFORE anything is decrypted
+            return "too_big"
         head, data = vdm_open(c, full)
         mime = vdm_sniff(head)
         if not mime or not mime.startswith("audio/"):
             return None
+        if vdm_pub_first(request.headers.get("Range")):  # 2.773.0 (#5330): the guest's fetch in the file's history (as vdm_send)
+            c.execute("INSERT INTO fs_log(node_id,user_id,agent,action,detail,at) VALUES(?,?,?,?,?,?)",
+                      (int(v["file_id"]), None, 0, "ext_view", f"approval {int(v['review_id'])}", iso(now_utc())))
+            c.commit()
         resp = vdm_stream(c, full, data, mimetype=mime, as_attachment=False, download_name=v["file_name"] or "audio", max_age=0)
     return _send_headers(resp, mime)
+
+
+def vdm_pub_too_big(full):
+    """2.773.0 (#5330): a sealed stored file larger than VDM_PUB_SEALED_MB: the customer link does not hand it out (each request
+    would decrypt it whole, many addresses could keep the server busy with one link)."""
+    return oc_is_sealed_file(full) and oc_plain_size(full) > VDM_PUB_SEALED_MB * 1024 * 1024
+
+
+def vdm_pub_first(rng):
+    """2.773.0 (#5330): a request that starts playing (no range, or a range from byte 0) -- only those go into the file's history,
+    not every seek of the <audio> element (as files/extlinks.py logs one entry per page view)."""
+    if not rng:
+        return True
+    r = rng.strip().lower().replace(" ", "")
+    return r.startswith("bytes=0-") and "," not in r
 
 
 def vdm_version_row(c, rid, nid):

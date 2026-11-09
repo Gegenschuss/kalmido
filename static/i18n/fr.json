@@ -17899,6 +17899,8 @@
   "The app's code changed without a new version": "Le code de l'app a changé sans nouvelle version",
   "Guide": "Guide",
   "A row was not imported, its amount is not a number with at most two decimal places: {0} ({1})": "Une ligne n’a pas été importée, son montant n’est pas un nombre avec au plus deux décimales : {0} ({1})",
+  "File too large for the link": "Fichier trop volumineux pour le lien",
+  "This file can only be opened signed in. Please ask the sender for it.": "Ce fichier ne peut être ouvert qu'en étant connecté. Veuillez le demander à l'expéditeur.",
   "Ticked": "Coché",
   "Not ticked": "Non coché",
   "Archive number {0}": "Numéro d'archive {0}",
