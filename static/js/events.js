@@ -675,7 +675,6 @@ document.addEventListener('click', async e => {
     case 'cvx-tlhide': cvxTlHide(a.dataset.key, a.dataset.name); break;
     case 'cvx-tlmenu': e.stopPropagation(); cvxTlMenu(a, a.dataset.key, a.dataset.name); break;
     case 'cvx-today-menu': e.stopPropagation(); cvxTodayMenu(a); break;
-    case 'cvx-today-flip': closePop(); cvxTodayFlip(a.dataset.key, a.dataset.name); break;  // 2.443.0 (#3740)
     case 'cal-mode': S.calMode = a.dataset.k; LS.set('calMode', S.calMode); if (S.calMode === 'week') LS.set('calDays', 7); if (S.calMode === 'month') S.calMonth = S.calSel.slice(0, 7); if (a.closest('#side') && S.route.mod !== 'cal') { go('cal'); break; } renderView(); an_calSlide(0); if (sbb_on()) renderSide(); else if (a.closest('#side')) { renderSide(); closeSide(); } break;  // 2.152.2 (#2622): the views in the calendar's panel; 2.196.0 A (#2737): the phone's drawer closes like after any row; 2.290.0 A (#3144): the tab "Week" = 7 days again
     // lazy-ok-begin: 2.149.0 F (#2519): the buttons of these cases are drawn only by timeline.js / roadmap.js (loaded)
     case 'tl-pick-cancel': tlPickEnd(); break;

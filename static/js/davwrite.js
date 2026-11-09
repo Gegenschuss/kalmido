@@ -88,10 +88,10 @@ function dvw_pop(anchor, e) {
     <div class="cevh"><i class="cevdot"></i><b>${esc(cevTitle(e))}</b></div>
     <div class="cevm">${ic('clock', 's')}<span>${esc(cevWhen(e))}</span></div>
     ${e.location ? `<div class="cevm">${ic('mappin', 's')}<span>${esc(e.location)}</span></div>` : ''}
-    <div class="cevm">${ic('cal', 's')}<span>${esc(cevCal(e))}</span>${cvxTodayBtn(e)}</div>
+    <div class="cevm">${ic('cal', 's')}<span>${esc(cevCal(e))}</span></div>
     ${desc ? `<div class="cevdesc">${cevLinkify(desc)}${e.description.length > 2000 ? '…' : ''}</div>` : ''}
-    <div class="cevact dvwact"><button class="btn sm" data-dvw="edit">${ic('edit', 's')} ${tr('Edit')}</button><button class="btn sm danger" data-dvw="del">${ic('trash', 's')} ${tr('Delete')}</button>
-      <button class="btn sm pri" data-cevtask>${ic('plus', 's')} ${tr('Create task from event')}</button></div></div>`);
+    <div class="cevact dvwact"><button class="btn sm" data-dvw="edit">${ic('edit', 's')} ${tr('Edit')}</button><button class="btn sm pri" data-cevtask>${ic('plus', 's')} ${tr('Create task from event')}</button>
+      <button class="btn sm danger" data-dvw="del">${ic('trash', 's')} ${tr('Delete')}</button></div></div>`);  // 2.800.0 (#5460): Delete last
   p.onclick = ev => {
     const b = ev.target.closest('[data-dvw], [data-cevtask]'); if (!b) return;
     closePop();

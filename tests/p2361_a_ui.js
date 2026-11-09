@@ -202,19 +202,19 @@ const utc = (d, h) => { const x = new Date(`${d}T${String(h).padStart(2, '0')}:0
   rowsT = [...d.querySelectorAll('.cevtoday .cevrow')].map(r => r.querySelector('.cevn').textContent);
   check(rowsT.length === 3 && (await settings()).today_cals_hidden === '[]', 'Today menu: "Show all" ' + JSON.stringify(rowsT));
 
-  // 2.443.0 (#3740): the switch in the event's window (Today only), the block's own "…" has the calendars too (the phone's menu)
+  // 2.443.0 (#3740): the block's own "…" has the calendars by name (the phone's menu)
+  // 2.800.0 (#5460): "Hide on Today" left the event's window (it switches the whole calendar): the window shows the calendar's
+  // name only, the switch is the block menu's entry with the calendar's name and the column Today of the window Calendars
   click(w, [...d.querySelectorAll('.cevtoday .cevrow')].find(r => /Standup today/.test(r.textContent)));
-  await until(() => d.querySelector('#pop [data-act="cvx-today-flip"]'));
-  const flip = d.querySelector('#pop [data-act="cvx-today-flip"]');
-  check(/Hide on Today/.test(flip.textContent) && flip.dataset.key === `s:${TEAM}`, '#3740: the window offers Hide on Today ' + flip.textContent);
-  click(w, flip);
+  await until(() => d.querySelector('#pop .cevpop .cevm'));
+  check(!d.querySelector('#pop [data-act="cvx-today-flip"]') && /Team feed/.test(d.querySelector('#pop .cevpop').textContent), '#5460: the event window names the calendar, no Hide on Today');
+  w.eval('closePop()');
+  click(w, d.querySelector('[data-act="wg-more"][data-lyv="today"][data-k="events"]')); await sleep(150);
+  click(w, [...d.querySelectorAll('#pop [role="menuitem"]')].find(b => /Team feed/.test(b.textContent) && b.classList.contains('on')));
   await until(() => ![...d.querySelectorAll('.cevtoday .cevrow')].some(r => /Standup today/.test(r.textContent)));
   check(![...d.querySelectorAll('.cevtoday .cevrow')].some(r => /Standup today/.test(r.textContent)), '#3740: gone from Today');
   s = await settings();
   check(JSON.parse(s.today_cals_hidden).join() === `s:${TEAM}` && (await call('GET', `/api/calendars`)).subs.find(x => x.id === TEAM).visible === true, '#3740: Today only, the calendar stays visible ' + s.today_cals_hidden);
-  check(w.eval(`cvxTodayBtn(S.cal.items.find(e => e.sub === ${TEAM}))`).includes('Show on Today'), '#3740: hidden: the window offers Show on Today');
-  check(w.eval(`cvxTodayBtn({own: true, cal: null})`) === '', '#3740: an invitation has no switch');
-  check(w.eval(`cvxTodayBtn({holiday: true})`).includes('data-key="x:hol"'), '#3740: a holiday has one');
   click(w, d.querySelector('[data-act="wg-more"][data-lyv="today"][data-k="events"]')); await sleep(150);
   const wmi = [...d.querySelectorAll('#pop [role="menuitem"]')];
   check(wmi.some(b => /Team feed/.test(b.textContent) && !b.classList.contains('on')) && wmi.some(b => /Public holidays/.test(b.textContent)) && wmi.some(b => /Move|Hide/.test(b.textContent)),

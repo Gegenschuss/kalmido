@@ -41,11 +41,28 @@ function openPop(anchor, html, onClose) {
   kb_push('popover', p, {close: closePop});  // 2.630.0 (#4510): the last opened (menu in a dialog / dialog over a menu) closes first (keys.js)
   if (isMobile()) { p.classList.add('sheet'); const t = $('#toast'); if (t && !t.classList.contains('hidden')) requestAnimationFrame(() => toastPlace(t)); return p; }  // 2.13.0 (#453 A12)
   $('#scrim').classList.add('clear');
-  const r = anchor.getBoundingClientRect();
-  const w = p.offsetWidth, h = p.offsetHeight;
-  let x = Math.min(r.left, innerWidth - w - 12), y = r.bottom + 6;
-  if (y + h > innerHeight - 12) y = Math.max(12, r.top - h - 6);
-  p.style.left = Math.max(12, x) + 'px'; p.style.top = y + 'px';
+  return placePop(p, anchor);
+}
+// 2.800.0 (#5460): the place of an open popover next to its anchor, also again once its content has grown (the event popover
+// measured only "Loading…" and then reached over the window's lower edge). Under the anchor, else above it (as before: a menu
+// that fits on neither side moves up to the window's top, over its anchor). fit: true (the event popover) = fits it on neither
+// side, it takes the larger side with a height limit and scrolls itself (never below 240 px: then it may cover the anchor, but
+// stays inside the window). A phone sheet keeps its own place.
+function placePop(p, anchor, fit) {
+  if (!p || !anchor?.getBoundingClientRect || p.classList.contains('hidden') || p.classList.contains('sheet')) return p;
+  const M = 12, G = 6, r = anchor.getBoundingClientRect();
+  if (fit) p.style.maxHeight = '';
+  const w = p.offsetWidth, below = innerHeight - M - r.bottom - G, above = r.top - G - M;
+  let h = p.offsetHeight, y;
+  if (h <= below) y = r.bottom + G;
+  else if (!fit) y = Math.max(M, r.top - h - G);
+  else if (h <= above) y = r.top - G - h;
+  else {
+    const dn = below >= above, room = Math.max(dn ? below : above, Math.min(240, innerHeight - 2 * M));
+    p.style.maxHeight = Math.floor(room) + 'px'; h = p.offsetHeight;
+    y = Math.max(M, Math.min(dn ? r.bottom + G : r.top - G - h, innerHeight - M - h));
+  }
+  p.style.left = Math.max(M, Math.min(r.left, innerWidth - w - M)) + 'px'; p.style.top = y + 'px';
   return p;
 }
 // 2.31.0 (#1056): menu groups. {head: 'View'} starts a group with a small heading (role="group" + aria-label), '-' is a quiet

@@ -88,6 +88,8 @@ function evWhen(e) {
 async function evPop(anchor, e) {
   if (e.eid < 0) return;  // 2.559.0 (#4659): the stand-in of a new event still on its way (evEditor) has nothing to open yet
   const p = openPop(anchor, `<div class="cevpop evpop" style="--cc:${evCalColor(e)}"><div class="cevh"><i class="cevdot"></i><b>${esc(cevTitle(e))}</b></div><div class="muted">${tr('Loading…')}</div></div>`);
+  // 2.800.0 (#5460): placed again once the details are in (a redraw meanwhile may have taken the anchor: its place from the start)
+  const r0 = anchor.getBoundingClientRect(), at = () => anchor.isConnected ? anchor : {getBoundingClientRect: () => r0};
   let ev;
   try { ev = await api('GET', `/api/events/${e.eid}`); } catch { closePop(); return; }
   if ($('#pop').classList.contains('hidden')) return;
@@ -101,15 +103,17 @@ async function evPop(anchor, e) {
     <div class="cevm">${ic('clock', 's')}<span>${esc(evWhen(e))}</span></div>
     ${e.recurring ? `<div class="cevm">${ic('repeat', 's')}<span>${esc(repeatLabel(ev.rrule) || tr('Repeats'))}${e.changed ? ' · ' + esc(tr('this date changed')) : ''}</span></div>` : ''}
     ${e.location ? `<div class="cevm">${ic('mappin', 's')}<span>${esc(e.location)}</span></div>` : ''}
-    <div class="cevm">${ic('cal', 's')}<span>${esc(evCalName(e))}${w ? '' : ' · ' + esc(tr('read-only'))}</span>${cvxTodayBtn(e)}</div>
+    <div class="cevm">${ic('cal', 's')}<span>${esc(evCalName(e))}${w ? '' : ' · ' + esc(tr('read-only'))}</span></div>
     ${att.length ? `<div class="cevm evatt">${ic('users', 's')}<span>${att.slice(0, 8).map(a => `<span class="evap ps-${esc(a.partstat)}" title="${esc(tr(EV_PS_WORD[a.partstat] || ''))}">${esc(a.name || a.email)}</span>`).join(', ')}${att.length > 8 ? ' …' : ''}</span></div>` : ''}
     ${ev.reminders?.length ? `<div class="cevm">${ic('bell', 's')}<span>${esc(ev.reminders.map(m => evRemLabel(m, ev.all_day)).join(', '))}</span></div>` : ''}
     ${desc ? `<div class="cevdesc">${cevLinkify(desc)}</div>` : ''}
     ${typeof hbm_linkHtml === 'function' ? hbm_linkHtml('event', ev.id) : ''}${''/* 2.141.0 B (#2139): the e-mail the event was made from (hubmail.js) */}
     ${t ? `<button class="linkbtn evtask" data-evp="task">${ic('done', 's')} ${esc(tr('Preparation: {0}', t.title))}</button>` : ''}
+    <div class="evpfoot">${''/* 2.800.0 (#5460): answer and actions stay in sight while the rest scrolls; Delete last */}
     ${me ? `<div class="evrsvp" role="group" aria-label="${esc(tr('Your answer'))}">${EV_PS.map(([k, n, i]) => `<button class="btn sm ${me.partstat === k ? 'on' : ''}" data-evps="${k}" aria-pressed="${me.partstat === k}">${ic(i, 's')} ${tr(n)}</button>`).join('')}</div>` : ''}
     ${w && ev.status === 'tentative' && !e.recurring ? `<div class="cevact apdraftact"><button class="btn sm pri" data-evp="apok">${ic('check', 's')} ${tr('Confirm')}</button><button class="btn sm" data-evp="del">${ic('x', 's')} ${tr('Discard')}</button></div>` : ''}
-    <div class="cevact">${w ? `<button class="btn sm${ev.status === 'tentative' && !e.recurring ? '' : ' pri'}" data-evp="edit">${ic('edit', 's')} ${tr('Edit')}</button>${!ev.task_id ? `<button class="btn sm" data-evp="prep">${ic('plus', 's')} ${tr('Preparation task')}</button>` : ''}<button class="btn sm danger" data-evp="del">${ic('trash', 's')} ${tr('Delete')}</button>` : `<button class="btn sm" data-evp="totask">${ic('plus', 's')} ${tr('Create task from event')}</button>`}${feat('wiki') ? `<button class="btn sm" data-evp="minutes" title="${esc(tr('Minutes of this event as a knowledge page'))}">${ic('note', 's')} ${tr('Minutes|meeting')}</button>` : ''}</div></div>`;
+    <div class="cevact">${w ? `<button class="btn sm${ev.status === 'tentative' && !e.recurring ? '' : ' pri'}" data-evp="edit">${ic('edit', 's')} ${tr('Edit')}</button>${!ev.task_id ? `<button class="btn sm" data-evp="prep">${ic('plus', 's')} ${tr('Preparation task')}</button>` : ''}` : `<button class="btn sm" data-evp="totask">${ic('plus', 's')} ${tr('Create task from event')}</button>`}${feat('wiki') ? `<button class="btn sm" data-evp="minutes" title="${esc(tr('Minutes of this event as a knowledge page'))}">${ic('note', 's')} ${tr('Minutes|meeting')}</button>` : ''}${w ? `<button class="btn sm danger" data-evp="del">${ic('trash', 's')} ${tr('Delete')}</button>` : ''}</div></div></div>`;
+  placePop(p, at(), true);
   p.onclick = async ev2 => {
     const ps = ev2.target.closest('[data-evps]');
     if (ps) { try { await api('POST', `/api/events/${ev.id}/rsvp`, {partstat: ps.dataset.evps}); } catch { return; } closePop(); toast(tr('Answer sent: {0}', tr(EV_PS_WORD[ps.dataset.evps]))); calInvalidate(); renderView(); return; }

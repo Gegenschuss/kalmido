@@ -1,0 +1,4 @@
+/* 2.800.0 (#5460): the event window - your answer and the actions stay in sight at its lower edge while the rest scrolls */
+.evpfoot{display:flex;flex-direction:column;gap:.4375rem}
+#pop .evpfoot{position:sticky;bottom:-.375rem;z-index:1;background:var(--bg2);padding:.25rem 0 .375rem}
+#pop.sheet .evpfoot{bottom:calc(-.75rem - var(--safe-b))}
