@@ -13,13 +13,18 @@ The office trash of copies (office/otrash.py, office_trash) stays for the kinds 
 data, trips, ...) until their stage moves them here."""
 from ..core.access import Denied
 from ..core.objects import OBJ, obj_register, obj_row
-from ..core.pg import system_ctx
+from ..core.pg import qi, system_ctx
 from ..core.retention import ret_on, ret_trash_cut
 from ..core.writes import obj_restore, obj_trash, obj_trash_prune
 from .model import office_role, pb_owner
 from .rights import office_can
 
-OFK = {}  # kind -> {table, area}
+OFK = {}  # kind -> {table, area, need}
+
+
+def _t(table):
+    """The table's name for SQL text: only one registered here (core/pg.py qi)."""
+    return qi(table, {k["table"] for k in OFK.values()})
 
 
 def _base_of(kind):
@@ -41,14 +46,14 @@ def _base_of(kind):
 def _visible_of(table):
     def visible(c, uid):  # the candidates only (cap hook: obj_role decides each row)
         u = int(uid)
-        return (f"(SELECT id FROM {table} WHERE org_id IN (SELECT id FROM orgs WHERE personal_of = {u}) "
+        return (f"(SELECT id FROM {_t(table)} WHERE org_id IN (SELECT id FROM orgs WHERE personal_of = {u}) "
                 f"OR org_id IN (SELECT org_id FROM org_members WHERE user_id = {u}))")
     return visible
 
 
 def _space_of(table):
     def space(c, rid):
-        r = c.execute(f"SELECT org_id FROM {table} WHERE id=?", (int(rid),)).fetchone()
+        r = c.execute(f"SELECT org_id FROM {_t(table)} WHERE id=?", (int(rid),)).fetchone()
         if r is None:
             return None
         # a personal office has no organisation floor (its owner is checked by the base role), an organisation's has
@@ -76,7 +81,7 @@ def ofk_restore(c, uid, kind, rid):
     row = obj_row(c, kind, rid)
     if row is not None and row["deleted_at"] and ret_on("trash"):
         with system_ctx(c):
-            due = c.execute(f"SELECT 1 FROM {OBJ[kind]['table']} WHERE id=? AND deleted_at<?", (int(rid), ret_trash_cut())).fetchone()
+            due = c.execute(f"SELECT 1 FROM {_t(OBJ[kind]['table'])} WHERE id=? AND deleted_at<?", (int(rid), ret_trash_cut())).fetchone()
         if due:
             obj_trash_prune(c, kind, purge=True, ids=[int(rid)])
             c.commit()
