@@ -32,6 +32,12 @@ for good in ('check(r.ok, "z")', 'check(a == 1 if b else c == 2, "z")', '# or Tr
     check(not sham("x_test.py", good), f"self check: {good} stays quiet")
 check(file_findings("x_test.py", "check(r.status_code in (202, 403), 'z')"), "self check: a status list of success and refusal is found")
 check(not file_findings("x_test.py", "check(r.status_code in (200, 201), 'z')"), "self check: two success codes stay quiet")
+# 2.755.0 (#5261 review): a list / set of codes, and a # inside a string literal is no comment
+check(file_findings("x_test.py", "check(r.status_code in [201, 409], 'z')"), "self check: a status list in [..] is found")
+check(file_findings("x_test.py", "check(r.status_code in {200, 403}, 'z')"), "self check: a status set in {..} is found")
+check(not file_findings("x_test.py", "check(r.status_code in [200, 201], 'z')"), "self check: two success codes in [..] stay quiet")
+check(sham("x_test.py", 'check(r.get("# x") or True, "z")'), "self check: a # inside a string does not hide the old form")
+check(sham("x_ui.js", "check(a == '// x' || true, 'z');"), "self check: a // inside a string does not hide the old form")
 check(file_findings("x_ui.js", "execFileSync('firefox', ['-v'])"), "self check: a test that asks for Firefox itself is found")
 for x in findings(os.path.join(HERE, "..")):
     check(False, x)

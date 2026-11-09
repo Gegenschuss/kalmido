@@ -22,7 +22,10 @@ ME = "tools/check_nosham.py"
 SKIP = {"p2501_a_nosham_test.py"}  # it quotes the forms on purpose (its self checks of this logic)
 SHAM_PY = re.compile(r"\bcheck\(True\b|\bor True\b|\belse True\s*,")
 SHAM_JS = re.compile(r"\bcheck\(true\b|\|\|\s*true\s*,|\bcheck\([^;]*\?[^;:]*:\s*true\s*,\s*['\"`]")
-MIXED = re.compile(r"status_code in \((?=[^)]*\b2\d\d\b)(?=[^)]*\b[34]\d\d\b)[^)]*\)")
+# 2.755.0 (#5261 review): a tuple, a list or a set
+MIXED = re.compile(r"status_code in \s*(?:\((?=[^)]*\b2\d\d\b)(?=[^)]*\b[34]\d\d\b)[^)]*\)"
+                   r"|\[(?=[^\]]*\b2\d\d\b)(?=[^\]]*\b[34]\d\d\b)[^\]]*\]"
+                   r"|\{(?=[^}]*\b2\d\d\b)(?=[^}]*\b[34]\d\d\b)[^}]*\})")
 # (file, a piece of the line): the check can fail or the line is no check, and why
 ALLOWED = {
     ("api_v1_test.py", 'check(True, "spec valid")'): "after validate(spec), which raises; the except branch fails",
@@ -44,10 +47,27 @@ ALLOWED = {
 MIXED_OLD = set()
 
 
+def strip_comment(line):
+    """line without its trailing comment (# or // after a blank / at the start) - a # inside a string literal is no comment."""
+    quote = None
+    for i, ch in enumerate(line):
+        if quote:
+            if ch == "\\":
+                continue
+            if ch == quote and line[i - 1] != "\\":
+                quote = None
+        elif ch in "'\"`":
+            quote = ch
+        elif ch in "#/" and (i == 0 or line[i - 1].isspace()) and (ch == "#" or line[i:i + 2] == "//") \
+                and line[i + (1 if ch == "#" else 2):i + (2 if ch == "#" else 3)].isspace():
+            return line[:i]
+    return line
+
+
 def sham(fn, line):
     """The reason a line is a check that cannot fail, or None."""
     rx = SHAM_JS if fn.endswith(".js") else SHAM_PY
-    code = re.sub(r"(^|\s)(#|//)\s.*$", "", line)  # a comment may quote the old form
+    code = strip_comment(line)  # a comment may quote the old form
     if not rx.search(code):
         return None
     return None if any(f == fn and piece in line for f, piece in ALLOWED) else line.strip()[:110]
@@ -55,7 +75,7 @@ def sham(fn, line):
 
 def mixed(line):
     """The status lists of a line that take success and refusal: ['201, 409', ...]."""
-    return [re.search(r"\((.*)\)", m.group(0)).group(1) for m in MIXED.finditer(line)]
+    return [re.search(r"[(\[{](.*)[)\]}]", m.group(0)).group(1) for m in MIXED.finditer(line)]
 
 
 def file_findings(fn, src, mixed_now=None):
