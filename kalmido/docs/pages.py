@@ -183,11 +183,18 @@ def docs_pages_get(nid):
     _no_agent()
     c = db()
     m, n, data = _pdf_doc(c, nid, False)
-    np = int(m["pages"] or 0) if m["state"] == "done" else 0
+    np = _known_pages(m, n)
     if np < 1:
         np = dp_count(data)
     return jsonify(pages=np or 0, version=n["cur_version"], blank=_blank(m, np or 0), receipt=ar_is_receipt(c, nid),
                    write=n["role"] != "view", max=DP_PAGES)
+
+
+def _known_pages(m, n):
+    """review F5: the page count the recognition found for the file's current version (0: not known, count it)."""
+    if m["state"] == "done" and int(m["version"] or 0) == int(n["cur_version"] or 0):
+        return int(m["pages"] or 0)
+    return 0
 
 
 @app.post("/api/docs/<int:nid>/pages")
@@ -203,7 +210,7 @@ def docs_pages_save(nid):
     m, n, data = _pdf_doc(c, nid, True)
     if m["state"] in ("wait", "run"):
         return err(tr("The document is still being recognised"), 409)
-    np = dp_count(data)
+    np = _known_pages(m, n) or dp_count(data)  # review F5: the worker checks the count again (exit 5)
     if np is None:
         return err(tr("The pages cannot be read right now, try again later"), 409)
     if np > DP_PAGES:

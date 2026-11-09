@@ -230,6 +230,10 @@ def busy():
     finally:
         P._DP_SEM.release(); P._DP_SEM.release()
 part("busy", busy)
+# F5: the known page count of the current version
+part("known", lambda: [P._known_pages({"state": "done", "version": 2, "pages": 3}, {"cur_version": 2}),
+                       P._known_pages({"state": "done", "version": 1, "pages": 3}, {"cur_version": 2}),
+                       P._known_pages({"state": "wait", "version": 2, "pages": 3}, {"cur_version": 2})])
 part("exit5", lambda: with_run(lambda *a, **k: subprocess.CompletedProcess(a[0], 5, b"", b""), lambda: P._edit(b"%PDF", 2, [1], {})))
 print(json.dumps(out))
 """
@@ -242,5 +246,6 @@ check(U, f"the unit part ran ({u.stderr[-400:]})")
 check(U.get("count_timeout") is None and U.get("count_oserror") is None, f"F2: a timeout / a failed start of the count = None (409), no 500 {U}")
 check(isinstance(U.get("edit_timeout"), list) and U["edit_timeout"][0] == 409, f"F2: a timeout of the edit: 409 {U.get('edit_timeout')}")
 check(isinstance(U.get("busy"), list) and U["busy"][0] == 409 and "Several PDFs" in (U["busy"][1] or ""), f"F3: both places taken: 409 busy after the wait {U.get('busy')}")
+check(U.get("known") == [3, 0, 0], f"F5: the known page count only for the recognised current version {U.get('known')}")
 
 sys.exit(kt.done("p2777_b_docpages"))
