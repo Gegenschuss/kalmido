@@ -97,7 +97,7 @@ check(isinstance(res, dict) and res["redone"] == 1, f"redone {res}")
 check(task(t1)["title"] == "Water the tulips" and task(t1)["priority"] == 3, f"forward again {task(t1)}")
 
 # ---------------------------------------------------------------- a field changed elsewhere stays, the rest goes back
-A.patch(B + f"/api/tasks/{t1}", json={"title": "Water all", "priority": 2})
+A.patch(B + f"/api/tasks/{t1}", json={"title": "Water all", "priority": 5})
 G = last(AL)["id"]
 Bo.patch(B + f"/api/tasks/{t1}", json={"title": "Bob waters"})
 res = undo(A, G)
@@ -109,24 +109,23 @@ check(all(x["id"] != G for x in Bo.get(B + "/api/undo").json()["items"]), "and n
 
 # ---------------------------------------------------------------- multi-select: one group, one part per task
 t2, t3, t4 = mk(A, title="Rake leaves"), mk(A, title="Cut hedge"), mk(A, title="Sow grass")
-r = A.post(B + "/api/tasks/batch", json={"ids": [t2, t3, t4], "action": "patch", "data": {"priority": 4}})
+r = A.post(B + "/api/tasks/batch", json={"ids": [t2, t3, t4], "action": "patch", "data": {"priority": 7}})
 check(r.ok and r.json()["count"] == 3, f"batch {r.text[:200]}")
 g = last(AL)
 check(g["parts"] == 3 and g["label_key"] == "{0} tasks changed" and json.loads(g["label_args"]) == [3], f"one group for the batch {g}")
 undo(A, g["id"])
 check([task(t)["priority"] for t in (t2, t3, t4)] == [0, 0, 0], f"all three back {[task(t) for t in (t2, t3, t4)]}")
-# a locked task of a batch keeps its values and records nothing
-A.patch(B + f"/api/tasks/{t4}", json={"locked": 1})
-r = A.post(B + "/api/tasks/batch", json={"ids": [t3, t4], "action": "patch", "data": {"priority": 5}})
+# a task of a batch that fails goes back to its savepoint and records nothing (the step is read at the commit)
+r = A.post(B + "/api/tasks/batch", json={"ids": [t3, t4], "action": "patch_each",
+                                         "data": {"items": {str(t3): {"priority": 5}, str(t4): {"priority": 5, "title": ""}}}})
 g = last(AL)
-check(r.ok and r.json()["skipped"] == [t4], f"the locked one skipped {r.text[:200]}")
+check(r.ok and r.json()["count"] == 1 and task(t4)["priority"] == 0, f"the failing one kept its values {r.text[:200]}")
 check([x[1] for x in parts(g["id"])] == [t3], f"only the changed task is a part {parts(g['id'])}")
-A.patch(B + f"/api/tasks/{t4}", json={"locked": 0})
 
 # ---------------------------------------------------------------- drag (reorder) into another place
-r = A.post(B + "/api/tasks/reorder", json={"items": [{"id": t2, "sort": 99, "priority": 2}]})
+r = A.post(B + "/api/tasks/reorder", json={"items": [{"id": t2, "sort": 99, "priority": 3}]})
 g = last(AL)
-check(r.ok and parts(g["id"])[0][3]["a"] == {"sort": 99, "priority": 2}, f"a drag is a step {parts(g['id'])}")
+check(r.ok and parts(g["id"])[0][3]["a"] == {"sort": 99, "priority": 3}, f"a drag is a step {parts(g['id'])}")
 undo(A, g["id"])
 check(task(t2)["priority"] == 0 and task(t2)["sort"] != 99, f"dragged back {task(t2)}")
 
@@ -170,7 +169,7 @@ redo(A, G5)
 check(task(t5)["deleted_at"] is None, "redo brings it back")
 t6 = mk(A, title="Mow")
 G6 = last(AL)["id"]
-Bo.patch(B + f"/api/tasks/{t6}", json={"priority": 2})
+Bo.patch(B + f"/api/tasks/{t6}", json={"priority": 3})
 res = undo(A, G6)
 check(task(t6)["deleted_at"] is None and res["stayed"] and res["stayed"][0]["code"] == "conflict",
       f"a new task someone else changed since stays {res}")
