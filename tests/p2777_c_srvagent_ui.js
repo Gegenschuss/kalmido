@@ -175,7 +175,7 @@ async function create(w, d, T, un, own, pj) {
       const two = await until(() => { const ms = [...d.querySelectorAll(`.chmsgs[data-agid="${a3.id}"] .cmsg`)]; return ms.length >= n0 + 2 && ms; });
       check(two && /Can you help me\?/.test(two[two.length - 2].textContent) && /do not see any project of yours/.test(two[two.length - 1].textContent),
         'review F4: carl writes and sees his text and the fixed answer right after it' + T);
-      check(ci.isConnected ? ci.value === '' : true, 'the box is empty again' + T);
+      check(await until(() => { const c2 = d.querySelector('#chat-in'); return !!c2 && c2.value === ''; }), 'the box is empty again (the input after sending, also when it was drawn anew)' + T);
     }
     const bad = w.eval('window.__p2777bad || []').filter(x => x.includes(`/api/agents/${a3.id}`) || x.includes('/api/chat')), toasts = w.eval('window.__p2777toast || []');
     check(!bad.length, 'review F4: no request of the chat ends in an error ' + JSON.stringify(bad) + T);

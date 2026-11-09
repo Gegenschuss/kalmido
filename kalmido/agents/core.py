@@ -19,6 +19,7 @@ from ..accounts.pictures import avatar_url
 from ..core.dlock import dl_list_locked
 from ..core.access import acx_task_ok, Denied, joined_lists_sql, list_people, list_role, MANAGE_ROLES, need_list, need_task, org_trip_sql, reading_sql, task_visible, vis_sql, WRITE_ROLES
 from ..core.access import tasks_visible  # 2.674.0 B (#4194)
+from ..core.access import otr_live  # 2.777.0 (#5378): the lists' trash condition of the core
 from ..core.pg import st_ids  # 2.674.0 B (#4194)
 from ..core.state import visible_sections
 from ..tasks.oneway import dec_list
@@ -1478,8 +1479,8 @@ def agent_projects_counts(c, aids):
     if not ids:
         return {}
     with system_ctx(c):  # a count over the agents' memberships (structure; no project is named)
-        n = {r[0]: r[1] for r in c.execute("""SELECT m.user_id, COUNT(*) FROM list_members m JOIN lists l ON l.id=m.list_id
-                                               WHERE m.user_id = ANY(CAST(? AS BIGINT[])) AND l.is_inbox=0 AND l.deleted_at IS NULL
+        n = {r[0]: r[1] for r in c.execute(f"""SELECT m.user_id, COUNT(*) FROM list_members m JOIN lists l ON l.id=m.list_id
+                                               WHERE m.user_id = ANY(CAST(? AS BIGINT[])) AND l.is_inbox=0 AND {otr_live("l")}
                                                AND l.owner_id<>m.user_id GROUP BY m.user_id""", (st_ids(ids),))}
     return {a: n.get(a, 0) for a in ids}
 
@@ -1532,7 +1533,7 @@ def agent_shared_by(c, aid, uid):
     if o is not None:
         return o == uid
     with system_ctx(c):  # the agent's memberships and uid's role in them (structure, nothing is read out)
-        return bool(c.execute("""SELECT 1 FROM lists l WHERE l.deleted_at IS NULL AND l.is_inbox=0
+        return bool(c.execute(f"""SELECT 1 FROM lists l WHERE {otr_live("l")} AND l.is_inbox=0
                                  AND l.id IN (SELECT list_id FROM list_members WHERE user_id=?)
                                  AND (l.owner_id=? OR EXISTS(SELECT 1 FROM list_members m WHERE m.list_id=l.id AND m.user_id=?
                                                              AND m.role IN ('owner','admin'))) LIMIT 1""", (aid, uid, uid)).fetchone())
