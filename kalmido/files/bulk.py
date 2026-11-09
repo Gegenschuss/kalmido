@@ -414,11 +414,13 @@ ABM_SCAN_FORMATS = ("JPEG", "PNG", "WEBP", "HEIF")  # 2.635.0 (#4645): Pillow fo
 def abm_pdf(pages, rots, bw):
     """The bytes of a PDF with one page per image (bytes): EXIF orientation applied, turned by rots[i] degrees (clockwise),
     the long edge at most ABM_SCAN_EDGE, grey + auto contrast when bw. A page over ABM_SCAN_MAX_PIXELS is refused before it
-    is decoded (2.763.0, #4527); Pillow's guard against decompression bombs stays on as well (its warning is an error here). No EXIF / location goes into the PDF (the pages are drawn again)."""
+    is decoded (2.763.0, #4527), whatever Pillow's process-wide limit says (its hard error stays, it lies above that). No EXIF / location goes into the PDF (the pages are drawn again)."""
     from PIL import Image, ImageOps
     out = []
     with warnings.catch_warnings():
-        warnings.simplefilter("error", Image.DecompressionBombWarning)
+        # 2.763.0 (#4527, review): the warning of Pillow's process-wide limit (30 M or 80 M, whichever module set it last) is not
+        # the judge here: ABM_SCAN_MAX_PIXELS below is; its hard error (twice the global) lies above 40 M anyway
+        warnings.simplefilter("ignore", Image.DecompressionBombWarning)
         # 2.635.0 (#4645): only the formats a phone camera writes; an EPS (Ghostscript), TIFF and the rest are "not a picture".
         # "HEIF" is the format name the HEIF plugin registers (pi_heif in kalmido/docs/ocr.py) - only when it is there.
         fmts = [f for f in ABM_SCAN_FORMATS if f != "HEIF" or f in Image.OPEN]  # Pillow itself loads JPEG / PNG / WEBP on demand

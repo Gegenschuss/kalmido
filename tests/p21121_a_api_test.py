@@ -251,6 +251,24 @@ except ValueError as e:
 r = subprocess.run(["docker", "exec", "-i", os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test"), "python", "-c", code],
                    capture_output=True, text=True, timeout=120)
 check("too large" in r.stdout, f"abm_pdf with Pillow's limit at 80 M: the page is too large ({r.stdout[-160:]} {r.stderr[-300:]})")
+# review: and a 35 M page is built also when Pillow's global limit is 30 M (another module set it last)
+code = """
+import struct, zlib
+from PIL import Image
+from kalmido.files.bulk import abm_pdf
+Image.MAX_IMAGE_PIXELS = 30_000_000
+def ch(t, d):
+    return struct.pack(">I", len(d)) + t + d + struct.pack(">I", zlib.crc32(t + d) & 0xFFFFFFFF)
+png = (b"\\x89PNG\\r\\n\\x1a\\n" + ch(b"IHDR", struct.pack(">IIBBBBB", 5000, 7000, 8, 0, 0, 0, 0))
+       + ch(b"IDAT", zlib.compress(b"\\x00" * (5001 * 7000))) + ch(b"IEND", b""))
+try:
+    print("built" if abm_pdf([png], [], True)[:5] == b"%PDF-" else "no pdf")
+except ValueError as e:
+    print(e)
+"""
+r = subprocess.run(["docker", "exec", "-i", os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test"), "python", "-c", code],
+                   capture_output=True, text=True, timeout=120)
+check("built" in r.stdout, f"abm_pdf with Pillow's limit at 30 M: a 35 M page is built ({r.stdout[-160:]} {r.stderr[-300:]})")
 r = scan(Er, [IMG1], [("parent_id", str(SHF))])
 check(r.status_code == 403, f"erin with 'view' on the folder cannot scan into it ({r.status_code})")
 r = scan(Da, [IMG1], [("parent_id", str(PROJ))])
