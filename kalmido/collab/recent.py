@@ -21,7 +21,7 @@ the person switched off (features) nothing at all. People only: an agent or an A
 favourites), so the agent API has no such route (docs/AGENTS.md unchanged)."""
 from flask import g, has_request_context, jsonify, request
 
-from ..core.access import Denied
+from ..core.access import Denied, live_sql
 from ..core.config import app
 from ..core.db import db
 from ..core.errors import BadInput
@@ -113,7 +113,7 @@ def rcn_wiki(c, uid, key, oid, limit):
         conds.append(f"org_id IN ({','.join(str(o) for o in orgs)})")
     rows = []
     if conds:
-        rows = c.execute(f"SELECT * FROM wiki_pages WHERE deleted_at IS NULL AND ({' OR '.join(conds)}) "
+        rows = c.execute(f"SELECT * FROM wiki_pages WHERE {live_sql()} AND ({' OR '.join(conds)}) "
                          f"ORDER BY updated_at DESC, id DESC LIMIT ?", (*args, limit * 4)).fetchall()
     own_ids, info, via_share = {r["id"] for r in rows}, {}, set()
     if key == "all":  # pages others shared with uid from spaces uid does not read anyway (the list "Shared with me")
@@ -146,7 +146,7 @@ def rcn_files(c, uid, key, oid, limit):
         w, a = "TRUE", []
     else:
         w, a = "org_id=?", [oid]
-    rows = c.execute(f"SELECT * FROM fs_nodes WHERE kind='file' AND deleted_at IS NULL AND {w} AND id IN {fs_visible_sql_c(c, uid)} "
+    rows = c.execute(f"SELECT * FROM fs_nodes WHERE kind='file' AND {live_sql()} AND {w} AND id IN {fs_visible_sql_c(c, uid)} "
                      f"ORDER BY updated_at DESC, id DESC LIMIT ?", (*a, limit * 4)).fetchall()
     rows = fsv_drop(c, fs_mail_rows(c, uid, rows))  # like a folder's listing; no file of another area's folders
     lk = fsl_map(c, [r["id"] for r in rows])
@@ -175,7 +175,7 @@ def rcn_reading(c, uid, key, oid, limit):
     if not lsp:
         return []
     ph = ",".join("?" * len(lsp))
-    rows = c.execute(f"SELECT id, list_id, title, url, created_at, created_by FROM tasks WHERE list_id IN ({ph}) AND deleted_at IS NULL "
+    rows = c.execute(f"SELECT id, list_id, title, url, created_at, created_by FROM tasks WHERE list_id IN ({ph}) AND {live_sql()} "
                      f"AND parent_id IS NULL AND status=0 ORDER BY created_at DESC, id DESC LIMIT ?", (*lsp, limit)).fetchall()
     return [{"area": "reading", "id": r["id"], "space": lsp[r["list_id"]], "title": r["title"], "place": rl_site(r["url"]),
              "url": r["url"] or "", "by": r["created_by"], "at": r["created_at"]} for r in rows]
