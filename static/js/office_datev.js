@@ -94,7 +94,7 @@ const DV_TRAVEL = [['fares', N_('Travel: fares')], ['hotel', N_('Travel: hotel')
 const DV_MEAL = [['meal', N_('Entertainment (70 % deductible)')], ['meal_nd', N_('Entertainment (30 % not deductible)')]];
 const DV = {acc: null, oid: null};
 async function dv_load() {
-  try { DV.acc = await api('GET', '/api/office/datev/accounts'); } catch (x) { DV.acc = {categories: [], travel: [], error: x.message || tr('unknown')}; }
+  try { DV.acc = await api('GET', '/api/office/datev/accounts'); } catch (x) { DV.acc = {categories: [], travel: [], error: ofcErrHere(x)}; }
   const box = $('#dv-acc'); if (box) box.innerHTML = dv_accHtml();
 }
 function dv_accHtml() {
@@ -138,6 +138,6 @@ async function dv_save(el) {
   try {
     await put(b); if (err) err.textContent = '';
     toast(tr('Saved'), async () => { await put(old); DV.acc = null; ofcDraw(); });
-  } catch (x) { if (err) err.textContent = x.message || tr('unknown'); }
+  } catch (x) { if (err) err.textContent = ofcErrHere(x); }
 }
 document.addEventListener('change', e => { const el = e.target; if (el.dataset?.dv && el.closest?.('.dvset')) dv_save(el); });

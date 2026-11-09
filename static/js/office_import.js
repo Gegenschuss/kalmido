@@ -252,7 +252,7 @@ function oimRunsHtml() {
 async function oimLoadList() {
   if (OIM.listLoading) return;
   OIM.listLoading = true;
-  try { OIM.list = await api('GET', '/api/office/legacy/archive'); } catch (x) { OIM.list = {items: [], error: x.message || tr('unknown')}; }
+  try { OIM.list = await api('GET', '/api/office/legacy/archive'); } catch (x) { OIM.list = {items: [], error: ofcErrHere(x)}; }
   OIM.listLoading = false;
   if (typeof ofdDraw === 'function') ofdDraw();
 }
@@ -305,7 +305,7 @@ async function oimPreview(file, map) {
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.error || r.statusText);
     OIM.pv = j; OIM.filter = '';
-  } catch (x) { toast(x.message || tr('unknown')); }
+  } catch (x) { ofcErr(x); }
   OIM.busy = false; ofcDraw();
 }
 async function oimImport() {
@@ -327,7 +327,7 @@ async function oimImport() {
     OIM.pv = null; OIM.file = null; ofcReload('services'); ofcReload('equipment'); ofcReload('roles'); ofcReload('crew');
     if (c.clients && typeof load === 'function') await load();  // 2.80.0 (#1842): the documents' client field knows the imported clients
     await oimLoad();
-  } catch (x) { const el = $('.oimpv .aerr'); if (el) el.textContent = x.message || ''; else toast(x.message || ''); }
+  } catch (x) { const el = $('.oimpv .aerr'); if (el) el.textContent = ofcErrHere(x); else ofcErr(x); }
   OIM.busy = false; ofcDraw();
 }
 // 2.621.0 (#4600): the file name template of the archive (fixed ones + an own one from fixed blocks), kept per office area
@@ -358,7 +358,7 @@ async function oim_fntChange(t) {
     const j = await api('POST', '/api/office/legacy/archive/parse', {names: todo.map(x => x.file_name), template: name, ...(name === 'custom' ? {...cu, fields: cu.fields.filter(Boolean)} : {})});
     f.current = j.template.name; f.custom = j.template.custom; OIM.fntDraft = null;
     (j.items || []).forEach((p, i) => { const x = todo[i], {file_name, ...rest} = p; if (x && !x.swapped) Object.assign(x, rest, {paid: rest.kind === x.kind ? x.paid : rest.kind === 'invoice' ? 1 : 0}); });
-  } catch (x) { toast(x.message || ''); }
+  } catch (x) { ofcErr(x); }
   ofcDraw();
 }
 async function oimPickPdf(files) {
@@ -367,7 +367,7 @@ async function oimPickPdf(files) {
   try {
     const j = await api('POST', '/api/office/legacy/archive/parse', {names: fs.map(f => f.name)});
     (j.items || []).forEach((x, i) => OIM.arch.push({...x, file: fs[i], amount: '', paid: x.kind === 'invoice' ? 1 : 0, done: false, err: '', addrBusy: true}));
-  } catch (x) { toast(x.message || ''); }
+  } catch (x) { ofcErr(x); }
   ofcDraw();
   for (const x of OIM.arch.filter(y => y.addrBusy && !y.addr)) { await oimReadAddr(x); ofcDraw(); }  // one after the other (the server reads one PDF per person at a time)
 }
@@ -376,7 +376,7 @@ async function oimArchiveGo() {
   if (!todo.length) return;
   OIM.archBusy = true; ofcDraw();
   let run;
-  try { run = (await api('POST', '/api/office/legacy/archive/run')).run_id; } catch (x) { toast(x.message || ''); OIM.archBusy = false; ofcDraw(); return; }
+  try { run = (await api('POST', '/api/office/legacy/archive/run')).run_id; } catch (x) { ofcErr(x); OIM.archBusy = false; ofcDraw(); return; }
   let ok = 0;
   for (const x of todo) {
     const fd = new FormData();
@@ -391,7 +391,7 @@ async function oimArchiveGo() {
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error || r.statusText);
       x.done = true; x.err = ''; ok++;
-    } catch (e) { x.err = e.message || tr('unknown'); }
+    } catch (e) { x.err = ofcErrHere(e); }
   }
   OIM.archBusy = false; OIM.list = null;
   toast(trn('{0} document archived', '{0} documents archived', ok));
@@ -417,7 +417,7 @@ document.addEventListener('click', async e => {
       body: tr('The number skips {0} numbers of the series; give a reason (GoBD)', skip), ok: tr('Save'),
       input: {placeholder: tr('Reason for the jump (kept in the office log)'), max: 300}}) : '';
     if (reason === null) return;
-    try { await api('POST', '/api/office/legacy/counter', {kind: b.dataset.kind, last, ...(reason ? {reason} : {})}); toast(tr('Saved')); await oimLoad(); await ofcInfo(true); } catch (x) { toast(x.message || ''); }
+    try { await api('POST', '/api/office/legacy/counter', {kind: b.dataset.kind, last, ...(reason ? {reason} : {})}); toast(tr('Saved')); await oimLoad(); await ofcInfo(true); } catch (x) { ofcErr(x); }
   } else if (a === 'area-skip') bk_skipAll(b.dataset.area);
   else if (a === 'undo') {
     const kind = b.dataset.kind;  // 2.46.1 (#1557): one area only; 2.138.0 E (#2241): the texts say that used services / devices are archived
@@ -431,7 +431,7 @@ document.addEventListener('click', async e => {
         + (OIM.arcd ? ' · ' + trn('{0} entry in use archived', '{0} entries in use archived', OIM.arcd.length) : ''));
       if (fx) { if (typeof rk_cfReload === 'function') rk_cfReload(); if (typeof rk_reload === 'function') rk_reload(); if (typeof pp_reload === 'function') pp_reload(); }
       OIM.list = null; ofcReload('services'); ofcReload('equipment'); ofcReload('roles'); ofcReload('crew'); await oimLoad();
-    } catch (x) { toast(x.message || ''); }
+    } catch (x) { ofcErr(x); }
   }
 });
 document.addEventListener('change', e => {
@@ -505,7 +505,7 @@ function r81b_val(field, v) {
 }
 async function r81b_archEdit(id) {
   let d;
-  try { d = await api('GET', `/api/office/legacy/archive/${id}`); } catch (x) { toast(x.message || tr('unknown')); return; }
+  try { d = await api('GET', `/api/office/legacy/archive/${id}`); } catch (x) { ofcErr(x); return; }
   if (OIM.clients === null && typeof fx8a_oimClients === 'function') await fx8a_oimClients(true);
   const cls = [...(OIM.clients || [])];
   if (d.client_id && !cls.some(c => c.id === d.client_id)) cls.push({id: d.client_id, name: d.client || '#' + d.client_id});
@@ -574,7 +574,7 @@ async function r81b_archEdit(id) {
 // ---- 2.138.0 E (#2237): "Renumber" in the services: 1..n in the order the list shows (one undo step)
 async function imr_renumber() {
   let j;
-  try { j = await api('POST', '/api/office/services/renumber'); } catch (x) { toast(x.message || tr('unknown')); return; }
+  try { j = await api('POST', '/api/office/services/renumber'); } catch (x) { ofcErr(x); return; }
   ofcReload('services');
   if (!j.changed) { toast(tr('The order is already numbered')); return; }
   const before = j.before || {};
@@ -598,7 +598,7 @@ const imr_set = (list, archived) => Promise.all(list.map(x => api('PATCH', `/api
 const imr_after = async () => { ofcReload('services'); ofcReload('equipment'); await oimLoad(); };
 async function imr_restore(i) {
   const x = OIM.arcd?.[i]; if (!x) return;
-  try { await imr_set([x], 0); } catch (e) { toast(e.message || tr('unknown')); return; }
+  try { await imr_set([x], 0); } catch (e) { ofcErr(e); return; }
   x.restored = true; await imr_after();
   offerUndo(tr('Restored'), histAdd({label: tr('Restore') + ` “${x.name}”`,
     undo: async () => { await imr_set([x], 1); x.restored = false; await imr_after(); },
@@ -607,7 +607,7 @@ async function imr_restore(i) {
 async function imr_tidy(rid) {
   if (!await askConfirm(tr('Archive leftover entries?'), tr('The services and devices this undone import left behind are archived. Nothing is deleted; documents keep showing them.'), {ok: tr('Archive')})) return;
   let j;
-  try { j = await api('POST', `/api/office/legacy/runs/${rid}/tidy`); } catch (e) { toast(e.message || tr('unknown')); return; }
+  try { j = await api('POST', `/api/office/legacy/runs/${rid}/tidy`); } catch (e) { ofcErr(e); return; }
   const list = j.archived || [];
   OIM.arcd = list.length ? list : null; await imr_after();
   if (!list.length) return;

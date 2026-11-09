@@ -77,7 +77,7 @@ function brl_edit(r, init) {
       b.disabled = false;
       const el = $('.aerr', md);
       if (r && typeof objConflict === 'function' && await objConflict(md, x, s => { const m2 = brl_edit(s); brl_load(); return m2; })) return;  // 2.576.0 (#4794): the merge bar
-      el.textContent = x.message || tr('unknown');
+      el.textContent = ofcErrHere(x);
     }
   });
   return md;
@@ -108,14 +108,14 @@ async function brl_put(id, body, was, md) {
   offerUndo(tr('Saved'), histAdd({label: tr('Bank rule changed'), undo: () => step(old), redo: () => step(now)}));
 }
 async function brl_on(id, on) {
-  try { await api('PUT', `/api/office/bank/rules/${id}`, {active: on}); } catch (x) { toast(x.message || tr('unknown')); brl_load(); return; }
+  try { await api('PUT', `/api/office/bank/rules/${id}`, {active: on}); } catch (x) { ofcErr(x); brl_load(); return; }
   brl_load();
   offerUndo(on ? tr('Rule switched on') : tr('Rule switched off'), histAdd({label: tr('Bank rule changed'),
     undo: async () => { await api('PUT', `/api/office/bank/rules/${id}`, {active: !on}); brl_load(); },
     redo: async () => { await api('PUT', `/api/office/bank/rules/${id}`, {active: on}); brl_load(); }}));
 }
 async function brl_del(id) {
-  try { await api('DELETE', `/api/office/bank/rules/${id}`); } catch (x) { toast(x.message || tr('unknown')); return; }
+  try { await api('DELETE', `/api/office/bank/rules/${id}`); } catch (x) { ofcErr(x); return; }
   brl_load();
   offerUndo(tr('Rule deleted'), histAdd({label: tr('Bank rule deleted'),
     undo: async () => { await api('POST', `/api/office/bank/rules/${id}/restore`); brl_load(); },
@@ -125,7 +125,7 @@ async function brl_revert(id) {
   const r = (BRL.items || []).find(x => x.id === id);
   if (!await askConfirm(tr('Undo the marks of this rule?'), tr('Every booking this rule marked becomes open again (not in locked months). The rule itself stays.'), {ok: tr('Undo its marks')})) return;
   let j;
-  try { j = await api('POST', `/api/office/bank/rules/${id}/revert`); } catch (x) { toast(x.message || tr('unknown')); return; }
+  try { j = await api('POST', `/api/office/bank/rules/${id}/revert`); } catch (x) { ofcErr(x); return; }
   brl_stale(); brl_load();
   const msg = trn('{0} booking open again', '{0} bookings open again', j.undone) + (j.locked ? ` · ${trn('{0} in a locked month stays', '{0} in a locked month stay', j.locked)}` : '');
   offerUndo(msg, histAdd({label: tr('Marks of a bank rule undone') + (r ? ` (${r.name})` : ''),
@@ -151,9 +151,9 @@ function brl_sugHtml() {
 }
 async function brl_sugTake(yes) {
   const s = BNK.ruleSug; BNK.ruleSug = null; if (!s) return;
-  if (!yes) { try { await api('POST', '/api/office/bank/rules/decline', {counterpart: s.counterpart || '', iban: s.iban || ''}); } catch (x) { toast(x.message || tr('unknown')); } ofcDraw(); return; }
+  if (!yes) { try { await api('POST', '/api/office/bank/rules/decline', {counterpart: s.counterpart || '', iban: s.iban || ''}); } catch (x) { ofcErr(x); } ofcDraw(); return; }
   const body = {name: s.counterpart || s.iban || '', ...(s.iban ? {iban: s.iban} : {counterpart: s.counterpart}), action: s.action, category: s.category || '', direction: s.direction || '', apply_open: true};
-  try { await brl_new(body); } catch (x) { toast(x.message || tr('unknown')); }
+  try { await brl_new(body); } catch (x) { ofcErr(x); }
   bnkReload();
 }
 

@@ -128,7 +128,7 @@ function astPick(md) {
       if (n !== seq) return;
       list.innerHTML = (j.items || []).map(d => `<li><button type="button" class="ofcrow" data-ast="take" data-id="${d.id}"><span class="ofcn"><b>${esc(d.name)}</b><small class="muted">${esc([d.date ? fmtDateLoc(d.date) : '', d.sender, d.amount ? `${fmtNum(+d.amount, 2)} ${d.currency || ''}`.trim() : '', d.receipt ? tr('Receipt') : ''].filter(Boolean).join(' · '))}</small></span></button></li>`).join('')
         || `<li class="muted">${q ? tr('Nothing matches.') : tr('No documents in this office yet.')}</li>`;
-    } catch (x) { list.innerHTML = `<li class="aerr">${esc(x.message || '')}</li>`; }
+    } catch (x) { list.innerHTML = `<li class="aerr">${esc(ofcErrHere(x))}</li>`; }
   };
   let t;
   $('#ast-rq', pk).addEventListener('input', e => { clearTimeout(t); t = setTimeout(() => load(e.target.value.trim()), 250); });
@@ -139,7 +139,7 @@ function astPick(md) {
     try {
       const s = await api('GET', `${AST_URL}/receipts/${b.dataset.id}`);
       astTake(md, s); pk.remove();
-    } catch (x) { toast(x.message || ''); }
+    } catch (x) { ofcErr(x); }
   });
   load('');
   return pk;
@@ -206,7 +206,7 @@ async function astLinkAct(md, b) {
     if (a === 'dl-take') { const j = await rawFetch('POST', `${AST_URL}/${id}/to-device`, {}); toast(tr('Added as a private device'), () => go(`t/${j.task.id}`), 0, tr('Open')); }
     else if (a === 'dl-pull') { await rawFetch('POST', `/api/life/device-links/${+b.dataset.link}/pull`, {into: 'equipment'}); toast(tr('Updated')); ofcReload('equipment'); }
     else if (a === 'dl-unlink') await rawFetch('DELETE', `/api/life/device-links/${+b.dataset.link}`);
-  } catch (er) { toast(er.message || tr('unknown')); }
+  } catch (er) { ofcErr(er); }
   b.disabled = false;
   astLinkLoad(md, id);
 }

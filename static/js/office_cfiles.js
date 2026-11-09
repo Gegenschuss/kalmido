@@ -31,7 +31,7 @@ async function dmaLoad(md) {
   const cid = +box.dataset.cid;
   if (!cid) { box.innerHTML = dmaListHtml([], null); return; }
   try { DMA.items = (await api('GET', dmaUrl(cid))).items || []; box.innerHTML = dmaListHtml(DMA.items, cid); }
-  catch (x) { box.innerHTML = `<p class="muted">${esc(x.message || '')}</p>`; }
+  catch (x) { box.innerHTML = `<p class="muted">${esc(ofcErrHere(x))}</p>`; }
 }
 function dmaPick(multi, done) {
   const i = document.createElement('input'); i.type = 'file'; i.accept = 'application/pdf,.pdf'; i.multiple = multi;
@@ -51,7 +51,7 @@ async function dmaUploadAll(md, cid, files) {
 async function dmaAfterSave(cid) {
   const fs = DMA.pending; DMA.pending = [];
   let err = '';
-  for (const f of fs) { try { await dmaSend(cid, f); } catch (x) { err = x.message || ''; } }
+  for (const f of fs) { try { await dmaSend(cid, f); } catch (x) { err = ofcErrHere(x); } }
   if (fs.length) ofcReload('contracts');
   if (err) toast(err);
 }

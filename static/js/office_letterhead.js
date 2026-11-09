@@ -47,7 +47,7 @@ const bp_send = async (m, u, b) => { const j = await api(m, u, b); BPL.st = j.le
 async function bp_put(b, undoBody) {
   const err = $('#bp-err'); if (err) err.textContent = '';
   try { await bp_send('PUT', '/api/office/letterhead', b); }
-  catch (x) { if (err) err.textContent = x.message || ''; else toast(x.message || tr('unknown')); return; }
+  catch (x) { if (err) err.textContent = ofcErrHere(x); else ofcErr(x); return; }
   bp_hist(tr('Saved'), () => bp_send('PUT', '/api/office/letterhead', undoBody), () => bp_send('PUT', '/api/office/letterhead', b));
 }
 async function bp_upload(file) {
@@ -69,7 +69,7 @@ async function bp_act(a) {
   } else if (a === 'del') {
     const was = BPL.st?.file || '';
     try { await bp_send('DELETE', '/api/office/letterhead'); bp_hist(tr('Removed'), () => bp_send('POST', '/api/office/letterhead/restore', {file: was}), () => bp_send('DELETE', '/api/office/letterhead')); }
-    catch (x) { toast(x.message || tr('unknown')); }
+    catch (x) { ofcErr(x); }
   }
 }
 document.addEventListener('click', e => { const b = e.target.closest?.('[data-bp-act]'); if (!b || !b.closest('#bpset')) return; e.preventDefault(); bp_act(b.dataset.bpAct); });

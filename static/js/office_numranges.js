@@ -20,7 +20,7 @@ async function onumLoad() {
   if (ONUM.loading) return;
   ONUM.loading = true;
   try { const j = await api('GET', '/api/office/number-ranges'); ONUM.ranges = j.ranges || []; ONUM.err = ''; }
-  catch (x) { ONUM.ranges = []; ONUM.err = x.message || tr('unknown'); }
+  catch (x) { ONUM.ranges = []; ONUM.err = ofcErrHere(x); }
   ONUM.loading = false;
   onumRedraw();
 }
@@ -65,7 +65,7 @@ async function onumApply(kind) {
     if (typeof OFC === 'object') { OFC.log = null; if (OFC.pv) delete OFC.pv[kind]; if (kind === 'offer' && OFC.info) OFC.info.number_preview = j.preview; }
     const sch = $('#' + ONUM_SCHEME_IDS[kind]); if (sch && typeof ofcSchemePv === 'function') ofcSchemePv(sch, true);  // the scheme's "next: …" again
     toast(tr('Saved'));
-  } catch (x) { ONUM['e' + kind] = x.message || tr('unknown'); }
+  } catch (x) { ONUM['e' + kind] = ofcErrHere(x); }
   onumRedraw();
   $('#onum-' + kind)?.focus();
 }
@@ -108,10 +108,10 @@ async function onumDocSave() {
     // one undo step where the server allows the way back: a quotation's number is free (the series is not touched);
     // invoices / credit notes / reminders never go down in their series, so no undo there
     if (kind === 'offer' && old && typeof histAdd === 'function') {
-      const back = async n => { try { await onumDocSet({id}, n, ''); ofdDraw(); } catch (x) { toast(x.message || tr('unknown')); } };
+      const back = async n => { try { await onumDocSet({id}, n, ''); ofdDraw(); } catch (x) { ofcErr(x); } };
       offerUndo(tr('Saved'), histAdd({label: tr('Change number'), undo: () => back(old), redo: () => back(j.number)}));
     } else toast(tr('Saved'));
-  } catch (x) { e.busy = false; e.err = x.message || tr('unknown'); }
+  } catch (x) { e.busy = false; e.err = ofcErrHere(x); }
   ofdDraw();
 }
 // the office list follows a change made elsewhere (another device, the console, an agent): load() of the state calls this

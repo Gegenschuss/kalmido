@@ -13,7 +13,7 @@ const plAdd = (m, n) => { const d = new Date(+m.slice(0, 4), +m.slice(5, 7) - 1 
 
 async function plLoad() {
   PLK.loading = true;
-  try { PLK.data = await api('GET', '/api/office/periods'); } catch (x) { PLK.data = {error: x.message || tr('unknown'), months: []}; }
+  try { PLK.data = await api('GET', '/api/office/periods'); } catch (x) { PLK.data = {error: ofcErrHere(x), months: []}; }
   PLK.loading = false;
   const box = $('#pl-sec'); if (box) box.outerHTML = plSectionHtml();
 }
@@ -44,7 +44,7 @@ function plSectionHtml() {
 async function plLockDialog() {
   const to = /** @type {HTMLSelectElement|null} */ ($('#pl-to'))?.value; if (!to) return;
   let hints = [];
-  try { hints = (await api('GET', `/api/office/periods?check=${to}`)).hints || []; } catch (x) { toast(x.message || tr('unknown')); return; }
+  try { hints = (await api('GET', `/api/office/periods?check=${to}`)).hints || []; } catch (x) { ofcErr(x); return; }
   const lab = plLabel(to);
   ofdDlg(tr('Lock up to {0}', lab), `<p>${esc(tr('All open months up to and including {0} are locked permanently. Invoices, payments, bank matches, receipts, cash entries and trips of these months can then no longer be changed or deleted. This cannot be undone.', lab))}</p>
     ${hints.length ? `<ul class="plhints">${hints.map(h => `<li>${esc(h.text)}</li>`).join('')}</ul>` : ''}

@@ -13,7 +13,7 @@ const rk_ymAdd = (ym, n) => { const [y, m] = ym.split('-').map(Number); return r
 async function rk_cfLoad() {
   const q = rk_cfQ(); RKF.q = q;
   try { const j = await api('GET', '/api/office/cashflow?' + q); if (RKF.q === q) { RKF.data = j; RKF.err = null; } }
-  catch (x) { RKF.err = x.message || tr('unknown'); }
+  catch (x) { RKF.err = ofcErrHere(x); }
   try { const fj = await api('GET', '/api/office/fixed-costs'); RKF.fixed = fj.items || []; RKF.agr = fj.agreements || []; } catch (x) { RKF.fixed = []; RKF.agr = []; }  // 2.92.0 A (#1925): agr
   try { RKF.check = await api('GET', '/api/office/cashflow/check'); } catch (x) { RKF.check = null; }  // 2.67.0 (#1838)
   ofcDraw();
@@ -91,7 +91,7 @@ document.addEventListener('click', async e => {
   const b = e.target.closest('[data-cf8]'); if (!b) return;
   const did = +b.dataset.doc, v = b.dataset.cf8, from = OFD.doc?.id === did ? OFD.doc.cf_chain?.cashflow || 'auto' : 'auto';
   if (v === from) return;
-  try { await cf8_set(did, v); } catch (x) { toast(x.message || tr('unknown')); return; }
+  try { await cf8_set(did, v); } catch (x) { ofcErr(x); return; }
   offerUndo(tr('Saved'), histAdd({label: tr('Cash flow choice changed'), undo: () => cf8_set(did, from), redo: () => cf8_set(did, v)}));
 });
 function rk_fixedHtml() {
@@ -114,9 +114,9 @@ async function rk_fixedCatRename(k) {
   if (to === k) return;
   if (to && cats.has(to) && !await askConfirm(tr('Merge categories?'), tr('“{0}” will be merged with “{1}”.', k, to), {ok: tr('Merge')})) return;
   let j;
-  try { j = await api('POST', '/api/office/fixed-costs/category-rename', {from: k, to}); } catch (x) { toast(x.message || tr('unknown')); return; }
+  try { j = await api('POST', '/api/office/fixed-costs/category-rename', {from: k, to}); } catch (x) { ofcErr(x); return; }
   rk_cfReload();
-  toast(j.merged ? tr('Categories merged') : tr('Renamed'), async () => { await api('POST', '/api/office/fixed-costs/category-rename', {from: j.to, to: j.old, ids: j.ids}).catch(x => toast(x.message || tr('unknown'))); rk_cfReload(); });
+  toast(j.merged ? tr('Categories merged') : tr('Renamed'), async () => { await api('POST', '/api/office/fixed-costs/category-rename', {from: j.to, to: j.old, ids: j.ids}).catch(x => ofcErr(x)); rk_cfReload(); });
 }
 // 2.122.3 A (#2333): without VAT net and gross are the same, so one amount without "net"/"gross" (like the contracts row)
 function rk_fixedSum(f) {
@@ -170,7 +170,7 @@ function rk_fixedModal(f) {
     } catch (x) {
       const el = $('.aerr', md); if (!el) return;
       if (typeof objConflict === 'function' && await objConflict(md, x, r => { const m2 = rk_fixedModal(r); rk_cfReload(); return m2; })) return;  // 2.576.0 (#4794): the merge bar, nothing typed is lost
-      el.textContent = x.message || '';
+      el.textContent = ofcErrHere(x);
     }
   });
   return md;
@@ -193,7 +193,7 @@ async function fci_preview(file) {
     const r = await ofc_spFetch('/api/office/fixed-costs/import/preview', {method: 'POST', body: fd, credentials: 'same-origin', headers: {'X-Requested-With': 'kalmido'}});
     j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.error || r.statusText);
-  } catch (x) { toast(x.message || tr('unknown')); return; }
+  } catch (x) { ofcErr(x); return; }
   fci_modal(j.rows || [], file.name);
 }
 function fci_modal(rows, name) {
@@ -229,7 +229,7 @@ function fci_modal(rows, name) {
       md.remove(); rk_cfReload();
       toast(trn('{0} fixed cost imported', '{0} fixed costs imported', j.created), async () => { const u = await api('POST', '/api/office/fixed-costs/delete', {ids: j.ids}); rk_cfReload();
         if (u.kept) toast(trn('{0} fixed cost stays: changed since the import', '{0} fixed costs stay: changed since the import', u.kept)); });  // 2.272.0 C (#3027)
-    } catch (x) { b.disabled = false; const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
+    } catch (x) { b.disabled = false; const el = $('.aerr', md); if (el) el.textContent = ofcErrHere(x); }
   });
   return md;
 }
@@ -259,7 +259,7 @@ document.addEventListener('change', async e => {
   try {
     await put(on ? {on: 1, user_id: uid} : {on: 0});
     toast(on ? tr('Monthly check on') : tr('Monthly check off'), async () => { await put(old.on && old.user_id ? old : {on: 0}); });
-  } catch (x) { toast(x.message || tr('unknown')); ofcDraw(); }
+  } catch (x) { ofcErr(x); ofcDraw(); }
 });
 
 document.addEventListener('click', e => {
@@ -345,7 +345,7 @@ function cfs_modal(a, mo) {
     } catch (x) {
       const el = $('.aerr', md); if (!el) return;
       if (typeof objConflict === 'function' && await objConflict(md, x, r => { const m2 = cfs_modal(r); rk_cfReload(); return m2; })) return;  // 2.576.0 (#4794): the merge bar
-      el.textContent = x.message || '';
+      el.textContent = ofcErrHere(x);
     }
   });
 }
@@ -364,7 +364,7 @@ document.addEventListener('change', async e => {
   if (raw && amount == null) { toast(tr('Invalid value: {0}', tr('Real balance'))); return; }
   const was = RKF.data?.rows?.find(r => r.month === mo)?.real ?? null;
   if ((was == null && amount == null) || (was != null && amount != null && +was === +amount)) return;
-  try { await cfs_realPut(mo, amount); } catch (x) { toast(x.message || tr('unknown')); return; }
+  try { await cfs_realPut(mo, amount); } catch (x) { ofcErr(x); return; }
   offerUndo(tr('Saved'), histAdd({label: tr('Real balance changed'), undo: () => cfs_realPut(mo, was), redo: () => cfs_realPut(mo, amount)}));
 });
 document.addEventListener('keydown', e => { const x = e.target; if (e.key === 'Enter' && !e.isComposing && x.dataset?.cfsReal) { e.preventDefault(); x.blur(); } });
@@ -399,7 +399,7 @@ document.addEventListener('change', async e => {
   if (!was && !now) { CFS.day = day; return; }  // nothing saved yet: the office settings redraw when a part finished loading, the picked day stays
   if (was && now && +was.amount === +now.amount && was.day === now.day) return;
   let tid = null;
-  try { tid = await cfs_startSet(now); } catch (x) { toast(x.message || tr('unknown')); return; }
+  try { tid = await cfs_startSet(now); } catch (x) { ofcErr(x); return; }
   offerUndo(tr('Saved'), histAdd({label: tr('Starting balance changed'), undo: () => cfs_startSet(was, tid), redo: async () => { tid = await cfs_startSet(now); }}));
 });
 document.addEventListener('keydown', e => { const x = e.target; if (e.key === 'Enter' && !e.isComposing && x.id === 'cfs-amount-set') { e.preventDefault(); e.stopPropagation(); x.blur(); } }, true);  // never the settings form's submit
@@ -451,5 +451,5 @@ document.addEventListener('click', async e => {
       await cfs_realPut(mo, amount);
       offerUndo(tr('Saved'), histAdd({label: tr('Real balance changed'), undo: () => cfs_realPut(mo, null), redo: () => cfs_realPut(mo, amount)}));
     }
-  } catch (x) { t.disabled = false; toast(x.message || tr('unknown')); }
+  } catch (x) { t.disabled = false; ofcErr(x); }
 });

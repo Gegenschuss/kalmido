@@ -370,7 +370,7 @@ def dsb_send(sid):
     write_lock(c, f"office_privacy_{int(sid)}")
     r = dsb_sheet(c, oid, sid)
     if not MAIL_OUT_ON:
-        raise Denied(409, tr("Sending e-mail is not set up on this server (KALMIDO_SMTP_HOST)"))
+        raise Denied(409, tr("E-mail sending is not set up on this server yet: whoever runs the server sets it up."))
     if r["archived"] or not r["gen_doc_id"]:
         raise Denied(409, tr("Finish the document first"))
     gd = dt_doc(c, oid, r["gen_doc_id"])

@@ -52,7 +52,7 @@ async function pol_save(el) {
     if (err) err.textContent = '';
     pol_redraw();
     toast(tr('Saved'));
-  } catch (x) { if (err) err.textContent = x.message || tr('unknown'); }
+  } catch (x) { if (err) err.textContent = ofcErrHere(x); }
 }
 document.addEventListener('change', e => { const el = e.target; if (el instanceof HTMLElement && el.dataset?.pol && el.closest('#pol-set')) pol_save(el); });
 document.addEventListener('click', async e => {
@@ -64,7 +64,7 @@ document.addEventListener('click', async e => {
     if (a === 'rotate') { if (!await askConfirm(tr('New webhook address?'), tr('The old address stops at once: enter the new one at the provider.'), {ok: tr('New webhook address')})) return; POL.conf = await api('POST', '/api/office/payonline/rotate'); }
     if (a === 'retry' || a === 'done') POL.conf = await api('POST', `/api/office/payonline/events/${b.dataset.id}/${a}`);
     pol_redraw();
-  } catch (x) { if (err) err.textContent = x.message || tr('unknown'); }
+  } catch (x) { if (err) err.textContent = ofcErrHere(x); }
 });
 
 // ---- an invoice: the switch, the link, what is held
@@ -76,7 +76,7 @@ function pol_box(d) {
 }
 document.addEventListener('change', async e => {
   const el = /** @type {HTMLInputElement} */ (e.target); if (el.dataset?.poldoc !== 'on' || !OFD.doc) return;
-  try { OFD.doc.pay_online = await api('PUT', `/api/office/docs/${OFD.doc.id}/pay-online`, {on: el.checked ? 1 : 0}); ofdDraw(); } catch (x) { toast(x.message || tr('unknown')); el.checked = !el.checked; }
+  try { OFD.doc.pay_online = await api('PUT', `/api/office/docs/${OFD.doc.id}/pay-online`, {on: el.checked ? 1 : 0}); ofdDraw(); } catch (x) { ofcErr(x); el.checked = !el.checked; }
 });
 document.addEventListener('click', async e => {
   const b = e.target instanceof Element ? e.target.closest('[data-poldoc="copy"]') : null; if (!(b instanceof HTMLElement) || !OFD.doc) return;
@@ -85,5 +85,5 @@ document.addEventListener('click', async e => {
     OFD.doc.pay_online = j;
     await navigator.clipboard.writeText(j.url || '');
     toast(tr('Link copied'));
-  } catch (x) { toast(x.message || tr('unknown')); }
+  } catch (x) { ofcErr(x); }
 });

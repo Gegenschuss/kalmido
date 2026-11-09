@@ -52,5 +52,5 @@ document.addEventListener('change', async e => {
     await put({[k]: v});
     const undo = {}; for (const f in old) if (old[f] != null) undo[f] = old[f];
     toast(tr('Tax dates saved'), async () => { await put(undo); });
-  } catch (x) { toast(x.message || tr('unknown')); if (typeof ofcDraw === 'function') ofcDraw(); }
+  } catch (x) { ofcErr(x); if (typeof ofcDraw === 'function') ofcDraw(); }
 });

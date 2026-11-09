@@ -13,8 +13,8 @@ const FNT_POLL_MS = 2500;  // the approval in the banking app: one status questi
 
 async function fnt_open() {
   let s;
-  try { s = await api('GET', '/api/office/bank/fints'); } catch (x) { toast(x.message || tr('unknown')); return; }
-  if (!s.on) { toast(s.message || tr('unknown')); return; }
+  try { s = await api('GET', '/api/office/bank/fints'); } catch (x) { ofcErr(x); return; }
+  if (!s.on) { ofcErr(s); return; }
   const md = /** @type {any} */ (modal('')), card = $('.card', md), st = {d: null, busy: false, acct: (s.accounts.find(a => a.ok) || {}).id};
   md.classList.add('ofcdlg', 'bnkdlg', 'fntdlg');
   const head = `<h3>${tr('Fetch from bank')}</h3>`;
@@ -56,7 +56,7 @@ async function fnt_open() {
       if (!p.count) err(p.dup_count ? tr('Every booking of this period is there already.') : tr('The bank sent no bookings for this period.'));
     }
   };
-  const gone = (x) => { st.d = null; form(); err(x.message || tr('unknown')); };  // the server ended the bank connection: start again
+  const gone = (x) => { st.d = null; form(); err(ofcErrHere(x)); };  // the server ended the bank connection: start again
   const call = async (method, path, data) => {
     st.busy = true; $$('button[data-fn]', md).forEach(b => { b.disabled = true; });
     try { return await api(method, path, data); }
@@ -88,7 +88,7 @@ async function fnt_open() {
       if (!req.login || !req.pin || !req.server) { err(tr('Please fill in the sign-in name, the PIN and the server')); return; }
       pinEl.value = '';  // the PIN leaves the page with this one request
       try { st.d = (await call('POST', '/api/office/bank/fints/start', req)).dialog; req.pin = ''; view(); }
-      catch (x) { req.pin = ''; err(x.message || tr('unknown')); }
+      catch (x) { req.pin = ''; err(ofcErrHere(x)); }
       return;
     }
     const d = st.d;

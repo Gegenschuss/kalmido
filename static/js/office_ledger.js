@@ -15,7 +15,7 @@ const ldbBase = () => '/api/office/books/ledger';
 
 async function ldbCfgLoad() {
   LDB.cfgLoading = true;
-  try { LDB.cfg = await api('GET', `${ldbBase()}/settings`); } catch (x) { LDB.cfg = {error: x.message || tr('unknown')}; }
+  try { LDB.cfg = await api('GET', `${ldbBase()}/settings`); } catch (x) { LDB.cfg = {error: ofcErrHere(x)}; }
   LDB.cfgLoading = false;
   const box = $('#ldb-set'); if (box) box.outerHTML = ldb_setHtml();
 }
@@ -38,7 +38,7 @@ function ldb_setHtml() {
 
 async function ldbCfgSet(k, v) {
   try { LDB.cfg = await api('PUT', `${ldbBase()}/settings`, {[k]: v}); LDB.d = null; if (typeof BK === 'object' && BK.info) BK.info.ledger = LDB.cfg.method; toast(tr('Saved')); }
-  catch (x) { toast(x.message || tr('unknown')); }
+  catch (x) { ofcErr(x); }
   const box = $('#ldb-set'); if (box) box.outerHTML = ldb_setHtml();
 }
 
@@ -48,7 +48,7 @@ async function ldbLoad() {
     const d = await api('GET', `${ldbBase()}?year=${LDB.year}`);
     if (seq !== LDB.seq) return;
     Object.assign(LDB, {d, err: null, cfg: d.settings});
-  } catch (x) { if (seq === LDB.seq) { LDB.err = x.message || tr('unknown'); LDB.d = null; } }
+  } catch (x) { if (seq === LDB.seq) { LDB.err = ofcErrHere(x); LDB.d = null; } }
   LDB.loading = false;
   ofcDraw();
 }
@@ -147,7 +147,7 @@ async function ldbEntryDelete(id) {
   const e = LDB.d?.entries.find(x => x.id === id); if (!e) return;
   if (!await askConfirm(tr('Delete this entry?'), '', {ok: tr('Delete')})) return;
   try { await api('DELETE', `${ldbBase()}/entries/${id}?expect_updated_at=${encodeURIComponent(e.updated_at)}`); toast(tr('Deleted')); ldbReload(); }
-  catch (x) { toast(x.message || tr('unknown')); }
+  catch (x) { ofcErr(x); }
 }
 
 function ldbCloseDialog() {

@@ -76,7 +76,7 @@ async function bw_load() {
   if (BW.loading) return;
   BW.loading = true; const gen = BW.gen;
   let j = null, err = null;
-  try { j = await api('GET', BW_U + (BW.year ? `?year=${BW.year}` : '')); } catch (x) { err = x.message || tr('unknown'); }
+  try { j = await api('GET', BW_U + (BW.year ? `?year=${BW.year}` : '')); } catch (x) { err = ofcErrHere(x); }
   BW.loading = false;
   // its answer can predate the change (approve right after save: the list stayed a draft); 2.559.0 (#4660): it is dropped
   // and the rows on screen stay until the fresh answer is there
@@ -156,7 +156,7 @@ async function bw_unlock(m, md) {
     const j = await api('POST', `${BW_U}/${m.id}/unlock`, {reason: why.trim()}); md?.remove(); bw_reload();
     toast(tr('Approval undone'), async () => { await api('POST', `${BW_U}/${m.id}/approve`, {sign_image: m.sign_image ? 1 : 0}); bw_reload(); });
     if (md) bw_modal(j);
-  } catch (x) { toast(x.message || tr('unknown')); }
+  } catch (x) { ofcErr(x); }
 }
 // 2.332.0 C (#3301): the approver's signature picture (letters profile) on the receipt PDF
 const BW_SIG_HINT = N_('Your signature picture then stands on the signature line of the PDF. A picture of a signature is not an electronic signature; clarify its acceptance by the tax office with your tax adviser.');
@@ -288,7 +288,7 @@ function bw_modal(m0) {
       const id = m.id, now = m; toast(tr('Saved'), async () => { await undoWrite(`${BW_U}/${id}`, old, now?.updated_at, {now: b}).catch(() => null); bw_reload(); });  // 2.566.0 (#4704): core.js undoWrite - only the keys this save changed, against its version; changed since -> said, kept
     } else {
       m = await api('POST', BW_U, b);
-      if (pend) { try { m = await api('POST', `${BW_U}/${m.id}/file`, bw_fd(pend)); } catch (x) { toast(x.message || ''); } }
+      if (pend) { try { m = await api('POST', `${BW_U}/${m.id}/file`, bw_fd(pend)); } catch (x) { ofcErr(x); } }
       const id = m.id; toast(tr('Added'), async () => { await api('DELETE', `${BW_U}/${id}`); bw_reload(); });
     }
     return m;
@@ -346,7 +346,7 @@ function bw_modal(m0) {
         if (hostOk) { await bw_approve(m.id, sig); md.remove(); return; }  // 2.187.1 B (#2735): nothing to save
         await save(); bw_reload();
         try { await bw_approve(m.id, sig); md.remove(); }
-        catch (x) { md.remove(); bw_modal(m).querySelector('.aerr').textContent = tr('Saved as a draft.') + ' ' + (x.message || ''); }
+        catch (x) { md.remove(); bw_modal(m).querySelector('.aerr').textContent = tr('Saved as a draft.') + ' ' + ofcErrHere(x); }
       }
     } catch (x) { if (typeof objConflict === 'function' && await objConflict(md, x, r => { const m2 = bw_modal(r); bw_reload(); return m2; })) return; err(x.message); }  // 2.576.0 (#4794)
   });
@@ -359,14 +359,14 @@ const BW_PAYK = {bank: N_('Bank'), cash: N_('Cash book'), card: N_('Credit card'
 const bw_payLabel = x => x.gone ? tr('Booking gone') : [tr(BW_PAYK[x.kind] || x.kind), fmtDateLoc(x.day), ofcMoney(x.amount), x.text].filter(Boolean).join(' · ');
 async function bw_payLoad(md, id) {
   const box = $('.bwpaybox', md); if (!box) return;
-  let j; try { j = await api('GET', `${BW_U}/${id}/payment`); } catch (x) { box.textContent = x.message || tr('unknown'); return; }
+  let j; try { j = await api('GET', `${BW_U}/${id}/payment`); } catch (x) { box.textContent = ofcErrHere(x); return; }
   const opts = [['', tr('Not linked')], ...(j.current ? [[`${j.current.kind}:${j.current.id}`, bw_payLabel(j.current)]] : []), ...j.candidates.map(x => [`${x.kind}:${x.id}`, bw_payLabel(x)])];
   box.classList.remove('muted');
   box.innerHTML = ofcSel('bw-pay', j.current ? `${j.current.kind}:${j.current.id}` : '', opts, null, tr('Paid with'));
   $('#bw-pay', box).addEventListener('change', async e => {
     e.stopPropagation();
     const v = /** @type {any} */ (e.target).value, [kind, lid] = v ? v.split(':') : [null, null];
-    try { await api('PUT', `${BW_U}/${id}/payment`, kind ? {kind, id: +lid} : {kind: null}); toast(tr('Saved')); } catch (x) { toast(x.message || tr('unknown')); bw_payLoad(md, id); }
+    try { await api('PUT', `${BW_U}/${id}/payment`, kind ? {kind, id: +lid} : {kind: null}); toast(tr('Saved')); } catch (x) { ofcErr(x); bw_payLoad(md, id); }
   });
 }
 function bw_fd(f) { const fd = new FormData(); fd.append('file', f, f.name || 'bill.pdf'); return fd; }
@@ -374,7 +374,7 @@ function bw_fd(f) { const fd = new FormData(); fd.append('file', f, f.name || 'b
 // ---- the evaluation (approved receipts only), CSV / PDF with the same filters
 async function bw_loadReport() {
   const q = bw_q();
-  try { BW.rep = Object.assign(await api('GET', `${BW_U}/report?${q}`), {q}); } catch (x) { BW.rep = {error: x.message || tr('unknown'), q}; }
+  try { BW.rep = Object.assign(await api('GET', `${BW_U}/report?${q}`), {q}); } catch (x) { BW.rep = {error: ofcErrHere(x), q}; }
   ofcDraw();
 }
 function bw_reportHtml() {
@@ -430,7 +430,7 @@ document.addEventListener('change', e => {
 const BWC = {data: null, oid: undefined};
 async function bw_choicesLoad() {
   BWC.oid = OFC.info?.org_id;
-  try { BWC.data = await api('GET', `${BW_U}/choices`); } catch (x) { BWC.data = {places: [], persons: []}; toast(x.message || tr('unknown')); }
+  try { BWC.data = await api('GET', `${BW_U}/choices`); } catch (x) { BWC.data = {places: [], persons: []}; ofcErr(x); }
   const sec = $('.bwcset'); if (sec) sec.outerHTML = bw_settingsHtml();  // only this section: the settings form keeps what is typed there
 }
 function bw_settingsHtml() {
@@ -461,7 +461,7 @@ async function bw_choiceAct(a, el) {
       await api('PATCH', `${BW_U}/choices/${old.id}`, {[a]: v}); BW.data = null; old[a] = v;
       toast(tr('Saved'), async () => { await api('PATCH', `${BW_U}/choices/${old.id}`, {[a]: was}); BW.data = null; bw_choicesLoad(); });
     }
-  } catch (x) { if (a === 'name' || a === 'extra') { const o = all.find(c => c.id === +el.dataset.id); if (o) el.value = o[a] || ''; } toast(x.message || tr('unknown')); }
+  } catch (x) { if (a === 'name' || a === 'extra') { const o = all.find(c => c.id === +el.dataset.id); if (o) el.value = o[a] || ''; } ofcErr(x); }
 }
 document.addEventListener('click', e => { const b = /** @type {any} */ (e.target).closest?.('button[data-bwc]'); if (!b) return; e.preventDefault(); bw_choiceAct(b.dataset.bwc, b); });
 document.addEventListener('change', e => { const x = /** @type {any} */ (e.target); if (['name', 'extra'].includes(x.dataset?.bwc)) bw_choiceAct(x.dataset.bwc, x); });

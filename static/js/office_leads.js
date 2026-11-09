@@ -58,7 +58,7 @@ async function leadConvert(x, md) {
     const b = e.target.closest('[data-lm]'); if (!b) return;
     const v = b.dataset.lm;
     if (v === 'close') { close(); return; }
-    try { await go2(v === 'new' ? null : +v); pick.remove(); } catch (x2) { toast(x2.message || tr('unknown')); }
+    try { await go2(v === 'new' ? null : +v); pick.remove(); } catch (x2) { ofcErr(x2); }
   });
 }
 
@@ -74,9 +74,9 @@ document.addEventListener('change', e => { const t = e.target; if (t.id === 'lea
 async function leadRead(f) {
   const rd = enc => new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = () => no(r.error); r.readAsText(f, enc); });
   let text;
-  try { text = await f.text(); if (text.includes('�')) text = await rd('windows-1252'); } catch (x) { toast(x.message || tr('unknown')); return; }  // as the bank import
+  try { text = await f.text(); if (text.includes('�')) text = await rd('windows-1252'); } catch (x) { ofcErr(x); return; }  // as the bank import
   let p;
-  try { p = await api('POST', '/api/office/leads/import', {text}); } catch (x) { toast(x.message || tr('unknown')); return; }
+  try { p = await api('POST', '/api/office/leads/import', {text}); } catch (x) { ofcErr(x); return; }
   leadImpModal(text, p);
 }
 function leadImpModal(text, p) {
@@ -101,7 +101,7 @@ function leadImpModal(text, p) {
       const j = await api('POST', '/api/office/leads/import', {text, commit: true});
       md.remove(); PPS.stage = 'lead'; pp_reload();
       toast(trn('{0} lead imported', '{0} leads imported', j.count), async () => { await api('POST', '/api/office/leads/import/undo', {ids: j.ids}); pp_reload(); });
-    } catch (x) { const el = $('.aerr', md); if (el) el.textContent = x.message || tr('unknown'); b.disabled = false; }
+    } catch (x) { const el = $('.aerr', md); if (el) el.textContent = ofcErrHere(x); b.disabled = false; }
   });
 }
 

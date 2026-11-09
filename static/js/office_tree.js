@@ -76,7 +76,7 @@ function oft_after(area) {
   if (typeof ab_ptStale === 'function') ab_ptStale();
   if (S.route.mod === 'office' && (area === 'offers' || area === 'invoices') && typeof OFD !== 'undefined') OFD.list = null;
 }
-const oft_req = async (area, m, url, b) => { try { const r = await rawFetch(m, url, b); oft_after(area); return r || true; } catch (e) { toast(e.message); return null; } };
+const oft_req = async (area, m, url, b) => { try { const r = await rawFetch(m, url, b); oft_after(area); return r || true; } catch (e) { ofcErr(e); return null; } };  // 2.802.0 (#5451)
 const oft_open = (area, k) => { if (isMobile()) return; const x = new Set(LS.get('sbbOpen', []) || []); x.add(k); LS.set('sbbOpen', [...x].slice(-300)); };
 async function oft_newFolder(area, pid) {
   const v = await askDialog({title: tr('New folder'), input: {value: '', placeholder: tr('Folder name'), max: 120}, ok: tr('Create'), cancel: undefined, after: undefined});

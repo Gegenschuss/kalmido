@@ -30,7 +30,7 @@ async function bkaLoad() {
     const ys = (ov.years || []).map(y => y.year);
     if (!ys.includes(BKA.year)) { BKA.year = ys[0] || 0; BKA.list = null; BKA.sums = null; }
     Object.assign(BKA, {ov, err: null});
-  } catch (x) { if (seq === BKA.seq) BKA.err = /** @type {any} */ (x).message || tr('unknown'); }
+  } catch (x) { if (seq === BKA.seq) BKA.err = ofcErrHere(x); }
   ofcDraw();
 }
 const bkaQuery = (offset = 0) => {
@@ -45,13 +45,13 @@ async function bkaLoadList(more) {
     const j = await api('GET', `${BKA_URL}/bookings?${bkaQuery(old ? old.items.length : 0)}`);
     if (seq !== BKA.seq) return;
     BKA.list = old ? {...j, items: [...old.items, ...j.items]} : j;
-  } catch (x) { if (seq === BKA.seq) BKA.list = {error: /** @type {any} */ (x).message || tr('unknown'), items: []}; }
+  } catch (x) { if (seq === BKA.seq) BKA.list = {error: ofcErrHere(x), items: []}; }
   ofcDraw();
 }
 async function bkaLoadSums() {
   const seq = ++BKA.seq;
   try { const j = await api('GET', `${BKA_URL}/accounts?year=${BKA.year}`); if (seq === BKA.seq) BKA.sums = j.items || []; }
-  catch (x) { if (seq === BKA.seq) BKA.sums = {error: /** @type {any} */ (x).message || tr('unknown')}; }
+  catch (x) { if (seq === BKA.seq) BKA.sums = {error: ofcErrHere(x)}; }
   ofcDraw();
 }
 
@@ -131,7 +131,7 @@ function bkaRunsHtml() {
 // ---- one booking: every column of its line
 async function bkaOpen(id) {
   let j;
-  try { j = await api('GET', `${BKA_URL}/bookings/${id}`); } catch (x) { toast(/** @type {any} */ (x).message || tr('unknown')); return; }
+  try { j = await api('GET', `${BKA_URL}/bookings/${id}`); } catch (x) { ofcErr(x); return; }
   const raw = Object.entries(j.raw || {});
   const md = modal(`<h3>${esc(tr('Booking {0}', fmtDateLoc(j.day) || j.day || ''))}</h3>
     <p class="bka-dsum">${bkaAcct(j.account, j.account_label)}${j.counter ? ` <span class="muted">→</span> ${bkaAcct(j.counter, j.counter_label)}` : ''} · <b>${esc(ofcMoney(j.amount))}</b> ${esc(bkaSide(j.side))}</p>
@@ -170,7 +170,7 @@ async function bkaCheck(input) {
   pv.innerHTML = `<p class="muted">${tr('Loading…')}</p>`;
   const fd = new FormData(); for (const f of fs) fd.append('file', f);
   let j;
-  try { j = await api('POST', `${BKA_URL}/check`, fd); } catch (x) { pv.innerHTML = `<p class="aerr" role="alert">${esc(/** @type {any} */ (x).message || tr('unknown'))}</p>`; BKA.files = null; return; }
+  try { j = await api('POST', `${BKA_URL}/check`, fd); } catch (x) { pv.innerHTML = `<p class="aerr" role="alert">${esc(ofcErrHere(x))}</p>`; BKA.files = null; return; }
   pv.innerHTML = bkaPreviewHtml(j);
   if (ok) ok.disabled = !j.ok;
 }
@@ -196,7 +196,7 @@ function bkaPreviewHtml(j) {
 const bkaReload = () => { BKA.ov = null; BKA.list = null; BKA.sums = null; ofcDraw(); };
 async function bkaUndo(id) {
   if (!await askConfirm(tr('Undo this import?'), tr('Its bookings, labels, receipt images and original files leave the archive.'), {ok: tr('Undo'), danger: true})) return;
-  try { await api('POST', `${BKA_URL}/runs/${id}/undo`); } catch (x) { toast(/** @type {any} */ (x).message || tr('unknown')); return; }
+  try { await api('POST', `${BKA_URL}/runs/${id}/undo`); } catch (x) { ofcErr(x); return; }
   bkaReload(); toast(tr('Import undone'));
 }
 const bkaSetList = () => { BKA.list = null; BKA.view = 'list'; ofcDraw(); };

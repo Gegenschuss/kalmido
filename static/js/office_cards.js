@@ -11,7 +11,7 @@ const CC_KIND = {fee: N_('Fee'), credit: N_('Money back')};
 async function ccLoad() {
   if (CC.loading) return;
   CC.loading = true;
-  try { CC.data = await api('GET', '/api/office/cards'); CC.err = null; } catch (x) { CC.err = x.message || tr('unknown'); }
+  try { CC.data = await api('GET', '/api/office/cards'); CC.err = null; } catch (x) { CC.err = ofcErrHere(x); }
   CC.loading = false;
   ofcDraw();
 }

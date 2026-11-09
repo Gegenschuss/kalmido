@@ -50,7 +50,7 @@ async function rclLoad(more) {
     Object.assign(RCL, {data: j, err: null, key: q});
     // 2.299.0 D (#3193): receipts not checked yet -> the next request checks the next ones (only while the number goes down)
     if (!more && j.hints_pending && j.hints_pending < rclPend) { rclPend = j.hints_pending; RCL.key = ''; } else rclPend = Infinity;
-  } catch (x) { if (seq === RCL.seq) { RCL.err = x.message || tr('unknown'); RCL.key = q; } }
+  } catch (x) { if (seq === RCL.seq) { RCL.err = ofcErrHere(x); RCL.key = q; } }
   if (seq === RCL.seq) RCL.loading = false;
   ofcDraw();
 }
@@ -335,7 +335,7 @@ async function rsb_load() {
   const oid = OFC.info?.org_id;
   RSB.loading = true;
   try { const j = await api('GET', '/api/office/receipts/mine'); if (oid === OFC.info?.org_id) Object.assign(RSB, {rows: j.rows || [], err: null}); }
-  catch (x) { if (oid === OFC.info?.org_id) Object.assign(RSB, {rows: [], err: x.message || tr('unknown')}); }
+  catch (x) { if (oid === OFC.info?.org_id) Object.assign(RSB, {rows: [], err: ofcErrHere(x)}); }
   RSB.loading = false; ofcDraw();
 }
 function rsb_tabHtml() {
@@ -358,7 +358,7 @@ async function rsb_upload(files) {
   const fd = new FormData();
   for (const f of files) fd.append('files', f, f.name || 'receipt.jpg');
   RSB.busy = true;
-  let j; try { j = await api('POST', '/api/office/receipts/submit', fd); } catch (x) { RSB.busy = false; toast(x.message || tr('unknown')); return; }
+  let j; try { j = await api('POST', '/api/office/receipts/submit', fd); } catch (x) { RSB.busy = false; ofcErr(x); return; }
   RSB.busy = false;
   for (const e of j.errors || []) toast(e);
   if ((j.dups || []).length && !(j.ids || []).length) toast(tr('This file already exists: {0}', j.dups[0].name));

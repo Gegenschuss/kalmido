@@ -51,7 +51,7 @@ async function lbLoad() {
     if (LB.vid && (!LB.drives || LB.q !== q)) { const j = await api('GET', '/api/office/drives?' + q); LB.drives = j.drives; LB.closed = j.closed || []; LB.q = q; }  // 2.152.0 C (#2169): + closed
     if (LB.view === 'report' && (!LB.rep || LB.rep.year !== +lbYear())) LB.rep = await api('GET', `/api/office/logbook/report?year=${lbYear()}`);
     LB.err = null;
-  } catch (x) { LB.err = x.message || tr('unknown'); }
+  } catch (x) { LB.err = ofcErrHere(x); }
   LB.loading = false;
   ofcDraw();
 }
@@ -237,7 +237,7 @@ function lbDriveModal(d, fix) {
         if (other) lbReload(true); else { ofcDraw(); lbRefresh(); }
         toast(j.warn ? lbWarn(j.warn) : tr('Added'), async () => { await api('DELETE', `/api/office/drives/${j.id}`); lbReload(true); });
       }
-    } catch (x) { const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
+    } catch (x) { const el = $('.aerr', md); if (el) el.textContent = ofcErrHere(x); }
   });
   return md;  // 2.576.0 (#4794): objConflict opens it again after a 409 (the merge bar)
   // (lbReload(true) emptied LB.base first, the dialog then failed on the missing vehicles and never showed)
@@ -258,7 +258,7 @@ function lbPrev(p) {
 async function lbHistInto(md, d) {
   const ol = $('.lgb-hlist', md); if (!ol) return;
   let rows;
-  try { rows = (await api('GET', `/api/office/drives/${d.id}/log`)).log; } catch (x) { ol.innerHTML = `<li class="muted">${esc(x.message || '')}</li>`; return; }
+  try { rows = (await api('GET', `/api/office/drives/${d.id}/log`)).log; } catch (x) { ol.innerHTML = `<li class="muted">${esc(ofcErrHere(x))}</li>`; return; }
   ol.innerHTML = rows.slice().reverse().map(r => `<li><b>${esc(tr(LB_ACT[r.action] || r.action))}</b> <span class="muted">${esc(fmtMoment(new Date(r.at)))} · ${esc(r.by)}</span>
     ${Object.keys(r.prev || {}).length ? `<small>${esc((r.action === 'create' || r.action === 'corrected' ? '' : tr('Before') + ': ') + lbPrev(r.prev))}</small>` : ''}</li>`).join('');
 }
@@ -281,12 +281,12 @@ async function lbCloseModal() {
     if (b.dataset.m === 'close') { close(); return; }
     const cv = $('#lgb-cv', md).value;
     try { const j = await api('POST', '/api/office/logbook/close', {month: $('#lgb-cm', md).value, vehicle_id: cv === 'all' ? null : +cv || null}); LB.closed = j.closed; md.remove(); lbReload(); toast(tr('Month closed')); }
-    catch (x) { const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
+    catch (x) { const el = $('.aerr', md); if (el) el.textContent = ofcErrHere(x); }
   });
 }
 async function lbLogModal(d) {
   let rows;
-  try { rows = (await api('GET', `/api/office/drives/${d.id}/log`)).log; } catch (x) { toast(x.message || ''); return; }
+  try { rows = (await api('GET', `/api/office/drives/${d.id}/log`)).log; } catch (x) { ofcErr(x); return; }
   const md = modal(`<h3>${tr('History')}</h3><p class="muted">${esc([fmtDateLoc(d.day), lbRoute(d)].filter(Boolean).join(' · '))}</p>
     <ol class="lgb-log">${rows.slice().reverse().map(r => `<li><b>${esc(tr(LB_ACT[r.action] || r.action))}</b> <span class="muted">${esc(fmtMoment(new Date(r.at)))} · ${esc(r.by)}</span>
       ${Object.keys(r.prev || {}).length ? `<small>${esc((r.action === 'create' ? '' : tr('Before') + ': ') + lbPrev(r.prev))}</small>` : ''}</li>`).join('')}</ol>
@@ -338,7 +338,7 @@ async function lbSaveRate(el) {
   const n = ofcNum(el.value), year = LB.rateY || new Date().getFullYear(), old = lb_rateOf(year);
   if (n == null || n < 0) { toast(tr('Invalid value: {0}', tr('Mileage allowance per business km'))); el.value = fmtNum(+old, 2); return; }
   if (+n === +old) return;
-  try { await lb_ratePut(year, String(n)); } catch (x) { toast(x.message || ''); return; }
+  try { await lb_ratePut(year, String(n)); } catch (x) { ofcErr(x); return; }
   toast(tr('Saved'), () => lb_ratePut(year, old));
 }
 document.addEventListener('change', e => {

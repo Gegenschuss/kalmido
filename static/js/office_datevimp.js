@@ -21,7 +21,7 @@ function dimp_sectionHtml() {
 }
 
 async function dimp_supLoad() {
-  try { DIMP.sup = (await api('GET', '/api/office/datev/suppliers')).items || []; } catch (x) { DIMP.sup = {error: x.message || tr('unknown')}; }
+  try { DIMP.sup = (await api('GET', '/api/office/datev/suppliers')).items || []; } catch (x) { DIMP.sup = {error: ofcErrHere(x)}; }
   const box = $('#dimp-sup'); if (box) box.innerHTML = dimp_supHtml();
 }
 function dimp_supHtml() {
@@ -84,7 +84,7 @@ async function dimp_check(input) {
   pv.innerHTML = `<p class="muted">${tr('Loading…')}</p>`;
   const fd = new FormData(); fd.append('file', f);
   let j;
-  try { j = await api('POST', '/api/office/datev/import/check', fd); } catch (x) { pv.innerHTML = `<p class="aerr" role="alert">${esc(x.message || tr('unknown'))}</p>`; DIMP.file = null; return; }
+  try { j = await api('POST', '/api/office/datev/import/check', fd); } catch (x) { pv.innerHTML = `<p class="aerr" role="alert">${esc(ofcErrHere(x))}</p>`; DIMP.file = null; return; }
   pv.innerHTML = dimp_previewHtml(j);
   if (ok) ok.disabled = !dimp_any(j);
 }
@@ -116,7 +116,7 @@ function dimp_previewHtml(j) {
 
 // ---- the opening balances of a year (bookkeeping)
 async function dimp_obLoad(year) {
-  try { DIMP.ob[year] = await api('GET', `/api/office/datev/opening?year=${year}`); } catch (x) { DIMP.ob[year] = {items: [], years: [], error: x.message || tr('unknown')}; }
+  try { DIMP.ob[year] = await api('GET', `/api/office/datev/opening?year=${year}`); } catch (x) { DIMP.ob[year] = {items: [], years: [], error: ofcErrHere(x)}; }
   const box = $('#dimp-ob'); if (box) box.outerHTML = dimp_obHtml(year);
 }
 function dimp_obHtml(year) {

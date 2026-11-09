@@ -9,7 +9,7 @@ const BNK = {oid: null, fints: null, state: 'open', data: null, q: '', err: null
 const bnkFntHtml = () => {
   const f = BNK.fints;
   if (!f) { if (f === null) { BNK.fints = false; api('GET', '/api/office/bank/fints').then(j => { BNK.fints = j; }, () => { BNK.fints = {on: false, message: ''}; }).then(() => ofcDraw()); } return ''; }
-  return `<button class="btn" data-bnk="fints" ${f.on ? '' : `disabled aria-describedby="bnk-fnt-off"`}>${ic('download', 's')}<span>${tr('Fetch from bank')}</span></button>${f.on ? '' : `<small class="muted bnkfnt-off" id="bnk-fnt-off">${esc(f.message || '')}</small>`}`;
+  return `<button class="btn" data-bnk="fints" ${f.on ? '' : `disabled aria-describedby="bnk-fnt-off"`}>${ic('download', 's')}<span>${tr('Fetch from bank')}</span></button>${f.on ? '' : `<small class="muted bnkfnt-off" id="bnk-fnt-off">${esc(f.message || tr('The bank fetch is not set up on this server yet: whoever runs the server sets it up.'))}</small>`}`;
 };
 OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, ['bank', 'bank', N_('Bank'), 1, () => bnkHtml(), 'money']);  // admins only; 2.92.1 (#1917): in the menu group Money
 const BNK_KIND = {invoice: N_('Invoice'), receipt: N_('Receipt'), private: N_('Private'), ignored: N_('Ignored'), noreceipt: N_('No receipt needed'), card: N_('Credit card statement'), payout: N_('Collective payout'), cash: N_('Cash box transfer')};  // 2.299.0 C (#3192): noreceipt; 2.444.0 (#3447): card; 2.603.0 (#4927): cash
@@ -17,7 +17,7 @@ const BNK_KIND = {invoice: N_('Invoice'), receipt: N_('Receipt'), private: N_('P
 async function bnkLoad() {
   const q = 'state=' + BNK.state; BNK.q = q;
   try { const j = await api('GET', '/api/office/bank/tx?' + q); if (BNK.q === q) { BNK.data = j; BNK.err = null; } }
-  catch (x) { BNK.err = x.message || tr('unknown'); }
+  catch (x) { BNK.err = ofcErrHere(x); }
   if (BNK.showImp) await bnkImpLoad(false);
   ofcDraw();
 }
@@ -118,7 +118,7 @@ function bnkImpHtml() {
 async function bnkMatch(tid, kind, mid, parts) {
   const req = {kind, ...(mid ? {id: +mid} : {}), ...(parts ? {parts} : {})};  // 2.355.0 B (#2843): parts of a split
   let j;
-  try { j = await api('POST', `/api/office/bank/tx/${tid}/match`, req); } catch (x) { toast(x.message || tr('unknown')); return; }
+  try { j = await api('POST', `/api/office/bank/tx/${tid}/match`, req); } catch (x) { ofcErr(x); return; }
   if (typeof brl_learned === 'function') brl_learned(j);  // 2.299.0 B (#3191): "Always like this?" after the second time
   bnkReload();
   // 2.355.0 B (#2843): a receipt with another amount than the booking is matched, but said (undo right in the toast)
@@ -130,7 +130,7 @@ async function bnkMatch(tid, kind, mid, parts) {
 }
 async function bnkUnmatch(tid) {
   let j;
-  try { j = await api('POST', `/api/office/bank/tx/${tid}/unmatch`); } catch (x) { toast(x.message || tr('unknown')); return; }
+  try { j = await api('POST', `/api/office/bank/tx/${tid}/unmatch`); } catch (x) { ofcErr(x); return; }
   const was = {kind: j.was.kind, ...(j.was.id ? {id: j.was.id} : {})};
   bnkReload();
   offerUndo(tr('Match undone'), histAdd({label: tr('Bank match undone'),
@@ -138,7 +138,7 @@ async function bnkUnmatch(tid) {
     redo: async () => { await api('POST', `/api/office/bank/tx/${tid}/unmatch`); bnkReload(); }}));
 }
 async function bnkImpUndo(iid) {
-  try { await api('POST', `/api/office/bank/imports/${iid}/undo`); } catch (x) { toast(x.message || tr('unknown')); return; }
+  try { await api('POST', `/api/office/bank/imports/${iid}/undo`); } catch (x) { ofcErr(x); return; }
   BNK.imports = null; bnkReload();
   offerUndo(tr('Import undone'), histAdd({label: tr('Import undone'),
     undo: async () => { await api('POST', `/api/office/bank/imports/${iid}/restore`); BNK.imports = null; bnkReload(); },
@@ -240,8 +240,8 @@ function bnkImpModal(text, name, after) {  // text + name: one statement read al
   const preview = async mapping => {
     try { st.p = await api('POST', '/api/office/bank/import/preview', form(mapping)); }
     catch (x) {
-      if (st.p) err(x.message); else if (typeof text === 'string') { md.remove(); toast(x.message || tr('unknown')); }
-      else { start(); err(x.message || tr('unknown')); }  // 2.144.1 B (#2446): e.g. MT940 -> the message in the start step
+      if (st.p) err(x.message); else if (typeof text === 'string') { md.remove(); ofcErr(x); }
+      else { start(); err(ofcErrHere(x)); }  // 2.144.1 B (#2446): e.g. MT940 -> the message in the start step
       $$('button[data-bi]', md).forEach(b => { b.disabled = false; }); return;
     }
     if (st.p.columns) { st.banks = st.p.bank_accounts || []; cols(); } else rowsView();

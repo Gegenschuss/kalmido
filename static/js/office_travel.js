@@ -73,7 +73,7 @@ async function rk_load() {
   if (RK.loading) return;
   RK.loading = true; const gen = RK.gen;
   let j = null, err = null;
-  try { j = await api('GET', '/api/office/trips' + (RK.year ? `?year=${RK.year}` : '')); } catch (x) { err = x.message || tr('unknown'); }
+  try { j = await api('GET', '/api/office/trips' + (RK.year ? `?year=${RK.year}` : '')); } catch (x) { err = ofcErrHere(x); }
   RK.loading = false;
   // its answer can predate the change (approve right after save: the list stayed a draft); 2.559.0 (#4660): it is dropped
   // and the rows on screen stay until the fresh answer is there
@@ -85,7 +85,7 @@ async function rk_load() {
 }
 async function rk_loadReport() {
   const y = RK.year, q = `by=${RK.by}` + (y ? `&from=${y}-01-01&to=${y}-12-31` : '') + (RK.filter === 'missing' ? '&missing=1' : '') + rk_pq();
-  try { RK.rep = Object.assign(await api('GET', '/api/office/trips/report?' + q), {q}); } catch (x) { RK.rep = {error: x.message || tr('unknown'), q}; }
+  try { RK.rep = Object.assign(await api('GET', '/api/office/trips/report?' + q), {q}); } catch (x) { RK.rep = {error: ofcErrHere(x), q}; }
   ofcDraw();
 }
 
@@ -202,7 +202,7 @@ function rk_purposeWire(md) {
     if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); row.hidden = true; inp.value = ''; sel.value = sel.dataset.prev; sel.focus(); return; }
     if (e.key !== 'Enter' || e.isComposing) return;
     e.preventDefault(); e.stopPropagation();
-    try { if (await rk_purposeTake(md)) sel.focus(); } catch (x) { const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
+    try { if (await rk_purposeTake(md)) sel.focus(); } catch (x) { const el = $('.aerr', md); if (el) el.textContent = ofcErrHere(x); }
   });
 }
 async function rk_purposeTake(md) {  // the typed name -> an own purpose of the office, chosen in the dialog; '' when nothing is typed
@@ -222,7 +222,7 @@ async function rk_purposeVal(md) {  // the purpose to save (a name still in the 
 const RKP = {list: null, oid: null};
 async function rk_purposesLoad() {
   RKP.oid = OFC.info?.org_id; RKP.list = [];
-  try { RKP.list = (await api('GET', '/api/office/trips/purposes')).purposes || []; } catch (x) { RKP.list = []; toast(x.message || tr('unknown')); }
+  try { RKP.list = (await api('GET', '/api/office/trips/purposes')).purposes || []; } catch (x) { RKP.list = []; ofcErr(x); }
   const sec = $('.rkpset'); if (sec) sec.outerHTML = rk_settingsHtml();  // only this section: the settings form keeps what is typed there
 }
 function rk_settingsHtml() {
@@ -253,7 +253,7 @@ async function rk_purposeAct(a, el) {
       await api('PATCH', `/api/office/trips/purposes/${old.id}`, {name}); RK.data = null; old.name = name;
       toast(tr('Saved'), async () => { await api('PATCH', `/api/office/trips/purposes/${old.id}`, {name: was}); RK.data = null; rk_purposesLoad(); });
     }
-  } catch (x) { if (a === 'name') { const o = (RKP.list || []).find(p => p.id === +el.dataset.id); if (o) el.value = o.name; } toast(x.message || tr('unknown')); }
+  } catch (x) { if (a === 'name') { const o = (RKP.list || []).find(p => p.id === +el.dataset.id); if (o) el.value = o.name; } ofcErr(x); }
 }
 document.addEventListener('click', e => { const b = e.target.closest?.('button[data-rkp]'); if (!b) return; e.preventDefault(); rk_purposeAct(b.dataset.rkp, b); });
 document.addEventListener('change', e => { if (e.target.dataset?.rkp === 'name') rk_purposeAct('name', e.target); });
@@ -327,7 +327,7 @@ function rk_tripModal(t) {
         rk_tripSet(j, tmp); rk_refresh();
         toast(tr('Added'), async () => { await api('DELETE', `/api/office/trips/${j.id}`); if (RK.open === j.id) RK.open = null; rk_refresh(); });
       }
-    } catch (x) { const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
+    } catch (x) { const el = $('.aerr', md); if (el) el.textContent = ofcErrHere(x); }
   });
   return md;
 }
@@ -388,14 +388,14 @@ function rk_itemModal(t, i) {
         rk_tripSet(j); rk_refresh();
         toast(tr('Added'), async () => { rk_tripSet(await api('DELETE', `/api/office/trips/${t.id}/items/${j.item_id}`).then(x => x.trip)); rk_refresh(); });
       }
-    } catch (x) { const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
+    } catch (x) { const el = $('.aerr', md); if (el) el.textContent = ofcErrHere(x); }
   });
   return md;
 }
 async function rk_billModal(t) {
   const ids = t.items.filter(i => RK.sel.has(i.id) && !i.billed && i.id > 0).map(i => i.id); if (!ids.length) return;  // 2.559.0 (#4660): not the provisional ones
   let docs = [];
-  try { docs = (await api('GET', `/api/office/trips/bill-docs${t.client_id ? `?client_id=${t.client_id}` : ''}`)).docs || []; } catch (x) { toast(x.message || ''); return; }
+  try { docs = (await api('GET', `/api/office/trips/bill-docs${t.client_id ? `?client_id=${t.client_id}` : ''}`)).docs || []; } catch (x) { ofcErr(x); return; }
   const kind = d => d.kind === 'invoice' ? tr('Invoice') : tr('Quotation');
   const md = modal(`<h3>${tr('Bill receipts on')}</h3>
     <p class="muted">${esc(trn('{0} receipt becomes a position with the amount as purchase price.', '{0} receipts become positions with the amount as purchase price.', ids.length))}</p>
@@ -413,7 +413,7 @@ async function rk_billModal(t) {
       const j = await api('POST', '/api/office/trips/bill', {doc_id: +$('#rk-doc', md).value, item_ids: ids, markup_pct: ofcNum($('#rk-mk', md).value), one: $('#rk-one', md)?.checked ? 1 : 0});
       md.remove(); RK.sel.clear(); rk_reload();
       toast(tr('Billed on {0}', j.number || tr('Draft')), async () => { await api('POST', '/api/office/trips/unbill', {item_ids: j.items, positions: j.positions}); rk_reload(); });
-    } catch (x) { const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
+    } catch (x) { const el = $('.aerr', md); if (el) el.textContent = ofcErrHere(x); }
   });
 }
 
@@ -596,13 +596,13 @@ async function rk_vmaDaysModal(t) {  // per day: country (+ city) and the meals 
     try {
       const j = await api('PATCH', `/api/office/trips/${t.id}`, {vma_days: days}); md.remove(); rk_reload();
       toast(tr('Saved'), async () => { await undoWrite(`/api/office/trips/${t.id}`, {vma_days: old}, j?.updated_at).catch(() => null); rk_reload(); });  // 2.566.0 (#4704): against this save's version
-    } catch (x) { const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
+    } catch (x) { const el = $('.aerr', md); if (el) el.textContent = ofcErrHere(x); }
   });
 }
 async function rk_vmaLoad(y) {
   const p = RK.person;  // 2.117.0 A (#2291)
   RKV.src = RK.data; RKV.rep = {y, p, loading: true};
-  try { RKV.rep = Object.assign(await api('GET', `/api/office/trips/vma?year=${y}${rk_pq()}`), {y, p}); } catch (x) { RKV.rep = {y, p, error: x.message || tr('unknown')}; }
+  try { RKV.rep = Object.assign(await api('GET', `/api/office/trips/vma?year=${y}${rk_pq()}`), {y, p}); } catch (x) { RKV.rep = {y, p, error: ofcErrHere(x)}; }
   ofcDraw();
 }
 function rk_vmaRepHtml() {  // the evaluation: per diem per person of the year (all years -> the current one), PDF / Excel / CSV
@@ -648,7 +648,7 @@ async function rk_impPreview(file) {
     const r = await ofc_spFetch('/api/office/trips/import/preview', {method: 'POST', body: fd, credentials: 'same-origin', headers: {'X-Requested-With': 'kalmido'}});
     j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.error || r.statusText);
-  } catch (x) { toast(x.message || tr('unknown')); return; }
+  } catch (x) { ofcErr(x); return; }
   rk_impModal(j, file.name);
 }
 // a sheet = a person: a person of the office (u<id>) or the sheet's name as a free name (n)
@@ -705,7 +705,7 @@ function rk_impModal(j, name) {
       toast(trn('{0} trip imported', '{0} trips imported', k.created), async () => { const u = await api('POST', '/api/office/trips/delete', {ids: k.ids}); rk_reload();
         const n = (u.kept || []).length + (u.skipped || []).length;  // 2.272.0 C (#3027): changed trips stay
         if (n) toast(trn('{0} trip stays: changed since the import', '{0} trips stay: changed since the import', n)); });
-    } catch (x) { b.disabled = false; const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
+    } catch (x) { b.disabled = false; const el = $('.aerr', md); if (el) el.textContent = ofcErrHere(x); }
   });
   return md;
 }
@@ -725,5 +725,5 @@ const ofcBase = (md, r) => ({...(md?._objBase || r?._objBase || r)});
 // the dialog's error line, or a toast once it is gone
 async function ofcSaveErr(md, x, again) {
   if (typeof objConflict === 'function' && await objConflict(md, x, again)) return;
-  const el = md?.isConnected && $('.aerr', md); if (el) el.textContent = x?.message || ''; else if (x?.message) toast(x.message);
+  const el = md?.isConnected && $('.aerr', md); if (el) el.textContent = ofcErrHere(x); else ofcErr(x);
 }

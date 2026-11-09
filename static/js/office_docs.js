@@ -679,6 +679,8 @@ const ofdSave = (method, url, body, src) => ofd_inChain(() => ofd_save1(method, 
 const ofd_inChain = fn => { const p = (OFD.chain || Promise.resolve()).then(fn, fn); OFD.chain = p.catch(() => { /* the caller reports it */ }); return p; };
 const ofd_ver = () => OFD.doc?.updated_at ? {expect_updated_at: OFD.doc.updated_at} : {};
 const ofd_lnShut = j => !!OFD.langNotesShut && OFD.langNotesShut.id === j.id && OFD.langNotesShut.key === JSON.stringify(j.lang_notes);  // 2.482.0 (#3940)
+// 2.802.0 (#5451): the error of the last failed save (a field's change says it at the field)
+let OFD_SAVEX = /** @type {any} */ (null);
 async function ofd_save1(method, url, body, src) {
   OFD.saving++; ofdSaveHint();
   const ver = ofd_verUrl(url) && body && typeof body === 'object' && !Array.isArray(body) ? OFD.doc.updated_at : null;
@@ -706,7 +708,7 @@ async function ofd_save1(method, url, body, src) {
     if (fk && x.message !== 'auth') fdDrop('fdw', fk);  // 2.552.0 (#4547): refused / offline: the field keeps the input (ofdChange), not sent later
     if (x.status === 409 && x.data?.doc && OFD.doc && x.data.doc.id === OFD.doc.id) { OFD.conflict = {id: OFD.doc.id, doc: x.data.doc}; OFD.err = ''; return null; }
     if (x.status === 409 && x.data?.code === 'terms_missing') { OFD.err = ''; return {terms_missing: x.data, message: x.message}; }  // 2.534.0 (#4339): the send dialog asks (ofcSendTerms)
-    OFD.err = x.message || tr('unknown'); toast(OFD.err); return null;
+    OFD_SAVEX = x; ofcErr(x); return null;  // 2.802.0 (#5451): said once (a field's save: at the field, ofdChange), never raw in the head
   }
   finally { OFD.saving--; OFD.log = null; ofdDraw(); OFD.list = null; }
 }
@@ -748,13 +750,13 @@ async function ofdChange(e) {
   const t = e.target, form = t?.closest?.('.ofdeditor[data-fg]');
   if (!form || !OFD.doc || !fgField(t)) return ofdChange0(e);
   const fk = form.dataset.fg, k = fgKey(t), v = fgVal(t);
-  OFD.err = '';
+  OFD_SAVEX = null;
   await ofdChange0(e);
-  if (!OFD.err) return;
+  const sx = OFD_SAVEX; OFD_SAVEX = null; if (!sx) return;
   const n = fgFields(document).find(x => x.closest('[data-fg]')?.dataset.fg === fk && fgKey(x) === k); if (!n) return;
   if (fgVal(n) !== v) { if (n.type === 'checkbox' || n.type === 'radio') n.checked = v; else n.value = v; }
   (FG.d[fk] ||= {f: {}}).f[k] = v;
-  if (typeof ost_mark === 'function') ost_mark(n, 'err', OFD.err);
+  if (typeof ost_mark === 'function') ost_mark(n, 'err', tr('Not saved: {0}', ofcErrHere(sx)));  // 2.802.0 (#5451): the toast goes, the field says it
 }
 // a position field's input into its line (d = the document or the open part); false = no such line
 function ofd_itSet(d, t) {
@@ -1044,7 +1046,7 @@ function ofdDlg(title, body, okLabel, onOk) {
   md.addEventListener('click', async e => {
     const b = e.target.closest('[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { md.remove(); return; }
-    if (b.dataset.m === 'ok') { b.disabled = true; try { if (await onOk(md) !== false) md.remove(); } catch (x) { $('.aerr', md).textContent = x.message || tr('unknown'); } b.disabled = false; }
+    if (b.dataset.m === 'ok') { b.disabled = true; try { if (await onOk(md) !== false) md.remove(); } catch (x) { $('.aerr', md).textContent = ofcErrHere(x); } b.disabled = false; }
   });
   setTimeout(() => { if (!isTouch()) $('input,select,textarea', md)?.focus(); }, 50);
   return md;
@@ -1190,16 +1192,19 @@ async function ofcSendTerms(send) {
 }
 async function ofdSendDialog(d) {
   let ms = {smtp: true, datev_email: ''}, tm = null;
-  try { ms = await api('GET', '/api/office/mail-status'); } catch {}
+  // 2.802.0 (#5451): what could not be loaded is named once in the dialog (no toast each, no part silently missing)
+  const miss = [], get = async (url, what) => { try { return await api('GET', url); } catch (x) { ofcErrHere(x); miss.push(what); return null; } };
+  ms = await get('/api/office/mail-status', tr('E-mail settings')) || ms;
   const prof = typeof ofmProfile === 'function' ? await ofmProfile() : null;  // 2.439.0 (#3617): the person's signature, answer address, sender
-  try { tm = await api('GET', `/api/office/docs/${d.id}/terms`); } catch {}  // 2.113.2 (#2253): the terms of the document's language
+  tm = await get(`/api/office/docs/${d.id}/terms`, tr('Terms and conditions'));  // 2.113.2 (#2253): the terms of the document's language
   // 2.433.0 (#3599): invoices / reminders to the e-mail for invoices with the contact persons for invoices in copy,
   // quotations to the default contact person with the e-mail for invoices in copy (server: fk_send_rcpts)
   let rc = {to: '', cc: []};
-  try { if (d.client_id) rc = await api('GET', `/api/office/docs/${d.id}/recipients`); } catch {}
+  if (d.client_id) rc = await get(`/api/office/docs/${d.id}/recipients`, tr('Recipients|mail')) || rc;
   const to = rc.to || '', cc = (rc.cc || []).join(', ');
   // 2.40.0 (#1368 point 10): plain words for people who do not run the server; without mail the button downloads the PDF
-  const hint = !ms.smtp ? `<p class="ofdwarn">${esc(tr('E-mail sending is not set up: download the PDF and send it yourself.') + (S.me?.is_admin ? ' (KALMIDO_SMTP_HOST)' : ''))}</p>` : '';
+  const hint = (!ms.smtp ? `<p class="ofdwarn">${esc(tr('E-mail sending is not set up: download the PDF and send it yourself.') + (S.me?.is_admin ? ' ' + ofcNoMail() : ''))}</p>` : '')  // 2.802.0 (#5451): no variable name
+    + (miss.length ? `<p class="ofdwarn ofdmiss" role="status">${esc(tr('Could not be loaded: {0}. Check the fields before sending.', miss.join(', ')))}</p>` : '');
   ofdDlg(tr('Send {0}', d.number || ''), hint + ofdF('s-to', tr('To|mail recipient'), `<input id="ofd-s-to" type="email" value="${esc(to)}" maxlength="200" ${ms.smtp ? '' : 'disabled'}>`)
     + ofdF('s-cc', tr('Copy to'), `<input id="ofd-s-cc" type="email" multiple value="${esc(cc)}" maxlength="1000" placeholder="${esc(tr('several: separated by commas'))}" ${ms.smtp ? '' : 'disabled'}>`)
     + ofdF('s-subject', tr('Subject'), `<input id="ofd-s-subject" value="${esc(`${ofdKindName(d.kind, true)} ${d.number || ''}`)}" maxlength="200" ${ms.smtp ? '' : 'disabled'}>`)

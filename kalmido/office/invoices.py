@@ -1178,7 +1178,7 @@ def inv_datev_ready(c, oid, r, s):
     from ..integrations.mail import MAIL_OUT_ON
     office_need_feature(c, oid, "books.datev", s)  # 2.147.0 (#2459, #2460)
     if not MAIL_OUT_ON:
-        raise DeniedKey(409, N_("Sending e-mail is not set up on this server (KALMIDO_SMTP_HOST)"))
+        raise DeniedKey(409, N_("E-mail sending is not set up on this server yet: whoever runs the server sets it up."))
     if not s.get("datev_email"):
         raise DeniedKey(409, N_("No DATEV inbox address in the settings"))
     if not ofx_locked(r):
@@ -1202,7 +1202,7 @@ def inv_send(c, oid, uid, r, b, later=False, auto=False):
     from ..integrations.mail import MAIL_OUT_ON
     from .mailsig import ofm_mail, ofm_own_text, ofm_reply, ofm_sender
     if not ofm_sender(c, oid, uid, {} if auto else None)["via"]:  # 2.439.0 (#3617): the person's mailbox also sends without the server's SMTP
-        raise DeniedKey(409, N_("Sending e-mail is not set up on this server (KALMIDO_SMTP_HOST)"))
+        raise DeniedKey(409, N_("E-mail sending is not set up on this server yet: whoever runs the server sets it up."))
     if not ofx_locked(r):
         raise DeniedKey(409, N_("Finalise the document first"))
     if _col(r, "trial"):  # 2.542.0 (#4594): a trial document (SAMPLE mark) never goes out by e-mail: manual send, series, reminder

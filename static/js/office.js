@@ -71,7 +71,7 @@ async function ofcInfo(force) {
   const ws = OFC.ws;  // 2.80.0 (#1842): an answer for the workspace before a switch is dropped and read again
   let info = null, err = null;
   try { info = await api('GET', '/api/office/settings'); }
-  catch (x) { err = x.message || tr('unknown'); }
+  catch (x) { err = ofcErrHere(x); }
   OFC.infoLoading = false;
   if (OFC.ws !== ws) { ofcInfo(); return; }
   OFC.info = info; OFC.infoErr = err;
@@ -115,7 +115,7 @@ async function ofcLoad(kind, force) {
   OFC.loading[kind] = true;
   ++OFC.seq;
   try { const j = await api('GET', `/api/office/${kind}?archived=1`); OFC.data[kind] = j.items || []; }
-  catch (x) { OFC.data[kind] = {error: x.message || tr('unknown')}; }
+  catch (x) { OFC.data[kind] = {error: ofcErrHere(x)}; }
   OFC.loading[kind] = false;
   ofcDraw();
 }
@@ -443,7 +443,7 @@ function ofcModal(kind, r) {
       if (m === 'del') {
         if (!await askConfirm(tr('Delete “{0}”?', r.name || r.name_de || r.key || ''), tr('Entries that documents, contracts or sets still use are archived instead.'), {ok: tr('Delete'), danger: true})) return;
         const j = await api('DELETE', `/api/office/${kind}/${r.id}`); md.remove(); ofcReload(kind);
-        if (j.trash_id) toast(tr('“{0}” moved to the trash', r.name || r.name_de || r.key || ''), () => api('POST', `/api/office/trash/${j.trash_id}/restore`).then(() => ofcReload(kind), x => toast(x.message || tr('unknown'))));  // 2.272.0 E2 (#3038)
+        if (j.trash_id) toast(tr('“{0}” moved to the trash', r.name || r.name_de || r.key || ''), () => api('POST', `/api/office/trash/${j.trash_id}/restore`).then(() => ofcReload(kind), x => ofcErr(x)));  // 2.272.0 E2 (#3038)
         else toast(j.result === 'archived' ? tr('Archived (still in use)') : tr('Deleted'));
         return;
       }
@@ -480,7 +480,7 @@ function ofcModal(kind, r) {
       if (kind === 'equipment' && r && ofcAdmin()) astUndo(r, body, sv); else if (!(r && typeof objSaved === 'function' && objSaved(ourl, body.name_de || body.name || body.key || r.name_de || r.name || r.key, () => ofcReload(kind)))) toast(r ? tr('Saved') : tr('Added'));  // 2.92.0 B (#1931): one undo step; 2.111.0 A (#2233): "… saved · Undo"; 2.747.0 (#5246): objsave.js
     } catch (x) {
       const el = $('.aerr', md); if (!el) return;
-      el.textContent = x.message || '';
+      el.textContent = ofcErrHere(x);
     }
   });
   setTimeout(() => { if (!isTouch() && adm) $('input:not([type=hidden]),select,textarea', md)?.focus(); }, 50);
@@ -633,7 +633,7 @@ async function rthLoad(j) {
     <div class="shint">${esc(tr('Kept from the end of the year: invoices and receipts {0} years, books {1} years, the logbook {2} years, business letters {3} years.', ky.receipt, ky.book, ky.logbook, ky.letter))}</div>`;
   $('#rth-on', box).onchange = async e => {
     const el = e.target, on = el.checked; el.disabled = true;
-    try { await rthLoad(await api('PUT', '/api/office/settings/retention-hold', {on})); } catch (x) { el.checked = !on; el.disabled = false; toast(x.message); }
+    try { await rthLoad(await api('PUT', '/api/office/settings/retention-hold', {on})); } catch (x) { el.checked = !on; el.disabled = false; ofcErr(x); }
   };
 }
 // 2.147.0 (#2461): the e-invoice format -- only the formats the country pack offers (the base pack: ZUGFeRD / Factur-X)
@@ -659,7 +659,7 @@ async function pb_move() {
     await refreshMe(); S.workspaces = true; S.settings.workspace = 'org:' + j.org_id; LS.set('ws', S.settings.workspace);
     pb_reset(true); OFC.ws = typeof wsCur === 'function' ? wsCur() : ''; render();
     toast(tr('The organisation “{0}” now holds your office', j.name));
-  } catch (x) { toast(x.message || tr('unknown')); }
+  } catch (x) { ofcErr(x); }
 }
 // 2.137.0 D (#1981): the personal office into an organisation the person is an admin of (one way: preview with the
 // conflicts, then the confirmation; GET /api/office/move/check, POST /api/office/move/org)
@@ -670,7 +670,7 @@ async function pb_transfer() {
   const show = async md => {
     const box = $('#pbt-pv', md), ok = $('[data-cd="yes"]', md), want = org;
     pv = null; ok.disabled = true; box.innerHTML = `<p class="muted">${esc(tr('Loading…'))}</p>`;
-    let j; try { j = await api('GET', `/api/office/move/check?org=${encodeURIComponent(want)}`); } catch (x) { if (want === org) box.innerHTML = `<p class="aerr">${esc(x.message || tr('unknown'))}</p>`; return; }
+    let j; try { j = await api('GET', `/api/office/move/check?org=${encodeURIComponent(want)}`); } catch (x) { if (want === org) box.innerHTML = `<p class="aerr">${esc(ofcErrHere(x))}</p>`; return; }
     if (want !== org) return;
     pv = j;
     box.innerHTML = (j.conflicts.length ? `<p><b>${esc(tr('Cannot be transferred'))}</b></p>${ul(j.conflicts)}` : '')
@@ -686,7 +686,7 @@ async function pb_transfer() {
     await refreshMe(); S.settings.workspace = 'org:' + j.org_id; LS.set('ws', S.settings.workspace);
     pb_reset(true); OFC.ws = typeof wsCur === 'function' ? wsCur() : ''; render();
     toast(tr('Your office is now in “{0}”', j.name));
-  } catch (x) { toast(x.message || tr('unknown')); }
+  } catch (x) { ofcErr(x); }
 }
 // 2.356.0 A (#2926): the own part of an organisation's office into the personal office (POST /api/office/move-space what office:
 // the shared move dialog with the read-only copy option, one undo step)
@@ -845,7 +845,7 @@ async function ofcSaveSettings(form) {
   catch (x) {
     // 2.528.0 (#4305 A3): changed elsewhere: the current settings are drawn, what was typed here stays (formguard draft), save again
     if (oxaStale(x)) { await ofcInfo(true); toast(tr('Someone else changed the settings meanwhile. The page shows their state, your changes are kept: check and save again.')); return; }
-    const el = $('.aerr', form); if (el) el.textContent = x.message || '';
+    const el = $('.aerr', form); if (el) el.textContent = ofcErrHere(x);
   }
 }
 // 2.189.0 (#2475): the home currency (chosen only in a pack that allows it, fixed after the first bookings), the currency of new
@@ -1093,7 +1093,7 @@ function ost_save(el) {
       el._ostV = undefined;
       const d = FG.d[fk] || (FG.d[fk] = {f: {}}); d.f[k] = v;  // the value stays (a redraw puts it back, closing the page asks)
       if (x?.oxaRedraw) await ofcInfo(true);  // 2.528.0 (#4305 A3): changed elsewhere: the current settings, the typed value on top
-      ost_mark(el.isConnected ? el : ost_find(el) || el, 'err', x instanceof Offline ? tr('Offline: only works again with a connection') : x?.message || tr('Could not save'));  // 2.528.0 (#4305 A3): the field drawn again (changed elsewhere)
+      ost_mark(el.isConnected ? el : ost_find(el) || el, 'err', tr('Not saved: {0}', ofcErrHere(x)));  // 2.528.0 (#4305 A3): the field drawn again (changed elsewhere); 2.802.0 (#5451): said once, at the field
     }
   });
   return OST.q;
@@ -1124,7 +1124,27 @@ function ost_markBack() {
 }
 // 2.40.0 (#1378): one upload helper for the office (FormData + the CSRF header X-Requested-With via rawFetch, the server's error text)
 const ofcUpload = (url, file) => { const fd = new FormData(); fd.append('file', file); return rawFetch('POST', url, fd); };
-const ofcUpErr = x => x instanceof Offline ? tr('Offline: only works again with a connection') : (x?.message || tr('unknown'));
+const ofcUpErr = x => ofcErrTxt(x);  // 2.802.0 (#5451)
+// 2.802.0 (#5451): an error of the office is said once and in plain words. api() already says a refused or failed request
+// (it marks the error shown); ofcErr says only what nobody said yet (an own check, rawFetch), an empty text as a plain sentence.
+// ofcErrHere = the text for a place on the page (a dialog's .aerr, an empty list): api()'s toast of the same text goes, the
+// place keeps it (one message, where it belongs)
+const ofcErrTxt = (/** @type {any} */ x) => x instanceof Offline ? tr('Offline: only works again with a connection') : (x?.message && x.message !== 'auth' && x.message !== 'down' ? String(x.message) : tr('That did not work. Please try again.'));
+/** @param {any} x */
+function ofcErr(x) {
+  if (x?.shown || x?.message === 'auth') return;
+  toast(ofcErrTxt(x));
+  if (x && typeof x === 'object') x.shown = true;
+}
+// 2.802.0 (#5451): mail sending missing on the server, in plain words (the variable only in the server's docs)
+const ofcNoMail = () => tr('E-mail sending is not set up on this server yet: whoever runs the server sets it up.');
+/** @param {any} x @returns {string} */
+function ofcErrHere(x) {
+  const t = ofcErrTxt(x), el = x?.shown && $('#toast');
+  if (el && !el.classList.contains('hidden') && el.textContent.trim().startsWith(t)) el.classList.add('hidden');
+  if (x && typeof x === 'object') x.shown = true;
+  return t;
+}
 async function ofcLogoUpload(file) {
   if (!file) return;
   // 2.357.0 B (#3179): a logo below 300 px prints small (never scaled up beyond 200 dpi) -- say so after the upload
@@ -1156,14 +1176,14 @@ document.addEventListener('click', async e => {
   else if (a === 'open') { e.preventDefault(); const r = ofcRow(b.dataset.kind, +b.dataset.id); if (r) ofcModal(b.dataset.kind, r); }
   else if (a === 'log-all' || a === 'log-ag') { e.preventDefault(); OFC.logAg = a === 'log-ag'; ofcDraw(); }  // 2.51.0 A (#1348)
   else if (a === 'import') { e.preventDefault(); $('#os-import')?.click(); }  // 2.591.0 (#4894): the input's change reads the file (a drop onto the window too, dropany.js)
-  else if (a === 'chain') { e.preventDefault(); try { OFC.chain = await api('GET', '/api/office/log/chain'); } catch (x) { toast(x.message || ''); OFC.chain = null; } ofcDraw(); }  // 2.531.0 (#4497)
-  else if (a === 'log') { e.preventDefault(); try { const j = await api('GET', '/api/office/log?limit=50'); OFC.log = j.log || []; } catch (x) { toast(x.message || ''); OFC.log = []; } ofcDraw(); }
+  else if (a === 'chain') { e.preventDefault(); try { OFC.chain = await api('GET', '/api/office/log/chain'); } catch (x) { ofcErr(x); OFC.chain = null; } ofcDraw(); }  // 2.531.0 (#4497)
+  else if (a === 'log') { e.preventDefault(); try { const j = await api('GET', '/api/office/log?limit=50'); OFC.log = j.log || []; } catch (x) { ofcErr(x); OFC.log = []; } ofcDraw(); }
   else if (a === 'scheme-reset') { e.preventDefault(); const inp = $('#' + b.dataset.for); if (!inp || inp.disabled) return;  // 2.114.2 (#2264): last saved valid scheme (the server fills the default when none is saved)
     inp.value = OFC.info.settings?.[b.dataset.kind + '_scheme'] || ''; inp.focus(); inp.dispatchEvent(new Event('input', {bubbles: true})); }
   else if (a === 'bb') { e.preventDefault(); const inp = $('#' + b.dataset.for); if (!inp || inp.disabled) return;  // 2.40.0 (#1382): a building block at the caret
     const p0 = inp.selectionStart ?? inp.value.length, p1 = inp.selectionEnd ?? p0, t = b.dataset.bb;
     inp.value = inp.value.slice(0, p0) + t + inp.value.slice(p1); inp.focus(); inp.setSelectionRange(p0 + t.length, p0 + t.length); inp.dispatchEvent(new Event('input', {bubbles: true})); }
-  else if (a === 'logo-del') { e.preventDefault(); try { await api('DELETE', '/api/office/logo'); await ofcInfo(true); toast(tr('Removed')); } catch (x) { toast(x.message || ''); } }
+  else if (a === 'logo-del') { e.preventDefault(); try { await api('DELETE', '/api/office/logo'); await ofcInfo(true); toast(tr('Removed')); } catch (x) { ofcErr(x); } }
   else if (a === 'name-take') { e.preventDefault(); const el = $('#os-name'); if (el) { ost_save(el); b.closest('.ofcnamesug')?.remove(); } }  // 2.356.0 D (#3006): the organisation's name as the company name
 });
 document.addEventListener('submit', e => { const f = e.target.closest?.('#ofc-set'); if (!f) return; e.preventDefault(); if (OFC.info?.role === 'admin') ofcSaveSettings(f); });

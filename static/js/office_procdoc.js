@@ -15,7 +15,7 @@ async function pdLoad() {
     const [data, vs] = await Promise.all([api('GET', `/api/office/procdoc${q}`), api('GET', '/api/office/procdoc/versions')]);
     if (seq !== PD.seq) return;
     Object.assign(PD, {data, versions: vs.items || [], err: null});
-  } catch (x) { if (seq === PD.seq) PD.err = /** @type {any} */ (x).message || tr('unknown'); }
+  } catch (x) { if (seq === PD.seq) PD.err = ofcErrHere(x); }
   ofcDraw();
 }
 const pdEdit = () => !!(PD.data?.can_edit && !PD.view);
@@ -66,7 +66,7 @@ async function pdSave() {
     Object.assign(PD, {data: d, own: {}});
     PD.versions = (await api('GET', '/api/office/procdoc/versions')).items || [];
     toast(tr('Version {0} saved', d.version));
-  } catch (x) { toast(/** @type {any} */ (x).message || tr('unknown')); }
+  } catch (x) { ofcErr(x); }
   PD.busy = false; ofcDraw();
 }
 

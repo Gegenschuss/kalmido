@@ -210,7 +210,7 @@ def ltm_send_post(lid):
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
     if not ofm_sender(c, oid, uid)["via"]:  # 2.439.0 (#3617): the person's mailbox also sends without the server's SMTP
-        raise BadInput(tr("Sending e-mail is not set up on this server (KALMIDO_SMTP_HOST)"))
+        raise BadInput(tr("E-mail sending is not set up on this server yet: whoever runs the server sets it up."))
     write_lock(c, f"office_letter_{int(lid)}")  # like /sent: two presses never mail twice
     d = lt_row(c, oid, lid)
     if d["status"] != "draft":

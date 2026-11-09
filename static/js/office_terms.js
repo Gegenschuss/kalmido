@@ -47,13 +47,13 @@ function agbUploadDialog(lg) {
       if (!f) throw new Error(tr('No file'));
       const fd = new FormData(); fd.append('file', f); fd.append('date', $('#ofd-agb-date', md)?.value || '');
       try { AGB.data = await rawFetch('POST', `/api/office/terms/${lg}`, fd); }
-      catch (x) { throw new Error(typeof ofcUpErr === 'function' ? ofcUpErr(x) : (x.message || tr('unknown'))); }
+      catch (x) { throw new Error(ofcErrHere(x)); }
       AGB.ws = OFC.ws; agbRedraw(); toast(tr('Saved'));
     });
 }
 async function agbDelete(lg) {
   let j;
-  try { j = await api('DELETE', `/api/office/terms/${lg}`); } catch (x) { toast(x.message || tr('unknown')); return; }
+  try { j = await api('DELETE', `/api/office/terms/${lg}`); } catch (x) { ofcErr(x); return; }
   AGB.data = j; agbRedraw();
   const old = j.removed;
   offerUndo(tr('Removed'), histAdd({label: tr('Terms and conditions removed'),

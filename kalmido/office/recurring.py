@@ -313,7 +313,7 @@ def rin_send(c, oid, uid, did):
     2.269.0 D (#3046): only finalised and checked here (number, the day's counters); the mail goes out after the caller's
     commit (rin_mail), so a failed commit never leaves a mailed invoice whose number is given again."""
     if not ofm_sender(c, oid, uid, {})["via"]:  # 2.439.0 (#3617): also through the mailbox of the series' person
-        return False, [N_("Sending e-mail is not set up on this server (KALMIDO_SMTP_HOST)")], False, None
+        return False, [N_("E-mail sending is not set up on this server yet: whoever runs the server sets it up.")], False, None
     cid = doc_row(c, oid, did)["client_id"]
     to = rin_client_mail(c, oid, cid)
     if not to:

@@ -17,14 +17,14 @@ async function orr_load() {
   ORR.busy = true;
   const oid = OFC.info?.org_id;
   try { const j = await api('GET', '/api/office/rights'); if (oid === OFC.info?.org_id) { ORR.data = j; ORR.err = null; } }
-  catch (x) { ORR.err = x.message || tr('unknown'); }
+  catch (x) { ORR.err = ofcErrHere(x); }
   ORR.busy = false;
   ofcDraw();
 }
 async function orr_logLoad() {
   ORR.logBusy = true;
   try { const j = await api('GET', '/api/office/rights/log'); ORR.log = j.items || []; ORR.logErr = null; }
-  catch (x) { ORR.logErr = x.message || tr('unknown'); }
+  catch (x) { ORR.logErr = ofcErrHere(x); }
   ORR.logBusy = false;
   ofcDraw();
 }
@@ -73,7 +73,7 @@ async function orr_personSave(el) {
   const refs = all.filter(x => x.checked).map(x => x.value);
   ORR.open.add('p:' + pid);
   try { await api('PUT', `/api/office/rights/people/${pid}`, {groups: refs}); savedTick(el); ORR.log = null; }  // 2.298.0 A1 (#3186): the quiet tick
-  catch (x) { toast(x.message || tr('unknown')); }
+  catch (x) { ofcErr(x); }
   await orr_load();
 }
 
@@ -121,12 +121,12 @@ function orr_sumLine(d, g) {
 async function orr_groupPatch(gid, b) {
   ORR.open.add('g:' + gid);
   try { await api('PATCH', `/api/office/rights/groups/${gid}`, b); savedTick(document.activeElement); ORR.log = null; }  // 2.298.0 A1 (#3186): the quiet tick at the changed field
-  catch (x) { toast(x.message || tr('unknown')); }
+  catch (x) { ofcErr(x); }
   await orr_load();
 }
 async function orr_copy(ref) {
   try { const j = await api('POST', '/api/office/rights/groups', {from: ref}); ORR.open.add(j.ref); toast(tr('Group “{0}” created', j.name)); ORR.log = null; }
-  catch (x) { toast(x.message || tr('unknown')); }
+  catch (x) { ofcErr(x); }
   await orr_load();
 }
 async function orr_del(gid) {
@@ -134,9 +134,9 @@ async function orr_del(gid) {
   if (!await askConfirm(tr('Delete the group “{0}”?', g.name), tr('Its members keep their other groups; without one they have no office access.'), {ok: tr('Delete'), danger: true})) return;
   try {  // 2.747.0 (#5246): into the office trash (the group without its members), Undo = restore it from there
     const j = await api('DELETE', `/api/office/rights/groups/${gid}`); ORR.log = null;
-    toast(tr('“{0}” moved to the trash', g.name), j.trash_id ? () => api('POST', `/api/office/trash/${j.trash_id}/restore`).then(() => { ORR.log = null; orr_load(); }, x => toast(x.message || tr('unknown'))) : undefined);
+    toast(tr('“{0}” moved to the trash', g.name), j.trash_id ? () => api('POST', `/api/office/trash/${j.trash_id}/restore`).then(() => { ORR.log = null; orr_load(); }, x => ofcErr(x)) : undefined);
   }
-  catch (x) { toast(x.message || tr('unknown')); }
+  catch (x) { ofcErr(x); }
   await orr_load();
 }
 

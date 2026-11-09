@@ -69,7 +69,7 @@ function bka_edit(r) {
       if (r) await bka_put(r, body);
       else { await api('POST', BKA_API, {...body, default: !!$('#bka-default', md)?.checked}); toast(tr('Saved')); await bka_reload(); }
       md.remove();
-    } catch (x) { b.disabled = false; $('.aerr', md).textContent = x.message || tr('unknown'); }
+    } catch (x) { b.disabled = false; $('.aerr', md).textContent = ofcErrHere(x); }
   });
   return md;
 }
@@ -83,19 +83,19 @@ async function bka_put(r, body) {
 }
 async function bka_default(id) {
   const was = (BACC.items || []).find(x => x.is_default), make = rid => async () => { await api('POST', `${BKA_API}/${rid}/default`); await bka_reload(); };
-  try { await make(id)(); } catch (x) { toast(x.message || tr('unknown')); return; }
+  try { await make(id)(); } catch (x) { ofcErr(x); return; }
   if (was) offerUndo(tr('Default account changed'), histAdd({label: tr('Default account changed'), undo: make(was.id), redo: make(id)}));
 }
 async function bka_archive(id) {
   let j;
-  try { j = await api('POST', `${BKA_API}/${id}/archive`); } catch (x) { toast(x.message || tr('unknown')); return; }
+  try { j = await api('POST', `${BKA_API}/${id}/archive`); } catch (x) { ofcErr(x); return; }
   await bka_reload();
   const back = async () => { await api('POST', `${BKA_API}/${id}/restore`); if (j.was_default) await api('POST', `${BKA_API}/${id}/default`); await bka_reload(); };
   const again = async () => { await api('POST', `${BKA_API}/${id}/archive`); await bka_reload(); };
   offerUndo(tr('Bank account archived'), histAdd({label: tr('Bank account archived'), undo: back, redo: again}));
 }
 async function bka_restore(id) {
-  try { await api('POST', `${BKA_API}/${id}/restore`); } catch (x) { toast(x.message || tr('unknown')); return; }
+  try { await api('POST', `${BKA_API}/${id}/restore`); } catch (x) { ofcErr(x); return; }
   await bka_reload();
   offerUndo(tr('Bank account restored'), histAdd({label: tr('Bank account restored'),
     undo: async () => { await api('POST', `${BKA_API}/${id}/archive`); await bka_reload(); },

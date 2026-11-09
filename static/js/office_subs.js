@@ -11,7 +11,7 @@ const aboFields = o => ({sub: o.sub || 0, notice_days: o.notice_days || 0, seats
 async function aboLoad() {
   if (ABO.loading) return;
   ABO.loading = true;
-  try { ABO.data = await api('GET', '/api/office/subs'); ABO.err = null; } catch (x) { ABO.err = x.message || tr('unknown'); }
+  try { ABO.data = await api('GET', '/api/office/subs'); ABO.err = null; } catch (x) { ABO.err = ofcErrHere(x); }
   ABO.loading = false;
   ofcDraw();
 }
@@ -130,7 +130,7 @@ function aboModal(f) {
     } catch (x) {
       const el = $('.aerr', md); if (!el) return;
       if (typeof objConflict === 'function' && await objConflict(md, x, r => { const m2 = aboModal(r); aboReload(); return m2; })) return;  // 2.576.0 (#4794): the merge bar
-      el.textContent = x.message || '';
+      el.textContent = ofcErrHere(x);
     }
   });
   return md;
@@ -140,7 +140,7 @@ document.addEventListener('change', async e => {
   const t = e.target.closest?.('[data-abo-low]'); if (!t) return;
   const id = +t.dataset.aboLow, on = t.checked ? 1 : 0;
   try { await aboPatch(id, {low_use: on}, {low_use: on ? 0 : 1}, on ? tr('Marked as hardly used') : tr('No longer marked as hardly used')); }
-  catch (x) { toast(x.message || tr('unknown')); aboReload(); }
+  catch (x) { ofcErr(x); aboReload(); }
 });
 document.addEventListener('click', async e => {
   const b = e.target.closest?.('[data-abo]'); if (!b) return;
@@ -152,6 +152,6 @@ document.addEventListener('click', async e => {
   else if (a === 'new') aboModal(null);
   else if (a === 'edit') { const f = (ABO.data?.items || []).find(x => x.id === +b.dataset.id); if (f) aboModal(f); }
   else if (a === 'mark') {
-    try { await aboPatch(+b.dataset.id, {sub: 1}, {sub: 0}, tr('Marked as subscription')); } catch (x) { toast(x.message || tr('unknown')); }
+    try { await aboPatch(+b.dataset.id, {sub: 1}, {sub: 0}, tr('Marked as subscription')); } catch (x) { ofcErr(x); }
   }
 });

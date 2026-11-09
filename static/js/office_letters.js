@@ -28,7 +28,7 @@ async function ltLoad() {
   if (LT.loading) return;
   LT.loading = true;
   try { LT.data = await api('GET', '/api/office/letters'); LT.err = null; }
-  catch (x) { LT.data = null; LT.err = x.message || tr('unknown'); }
+  catch (x) { LT.data = null; LT.err = ofcErrHere(x); }
   LT.loading = false;
   ofcDraw();
 }
@@ -51,7 +51,7 @@ async function ltMakeFromHash(h) {
     LT.data = null; LT.cur = j; LT.making = '';
     location.replace(`#office/letters/${j.id}`);
     toast(tr('Created'), async () => { await api('DELETE', `/api/office/letters/${j.id}`); ltReload(); go('office/letters'); });
-  } catch (x) { LT.making = ''; toast(x.message || tr('unknown')); go('office/letters'); }
+  } catch (x) { LT.making = ''; ofcErr(x); go('office/letters'); }
 }
 
 // ---- the tab
@@ -192,7 +192,7 @@ async function ltSave(d, quiet) {
     return true;
   } catch (x) {
     if (!LT.pend && p) LT.pend = p;  // offline / signed out: it waits (and stays in this browser, lt_keep) for the next try
-    const el = $('#lt-err'); if (el && x.message !== 'auth') el.textContent = x instanceof Offline ? tr('Offline: only works again with a connection') : x.message || '';
+    const el = $('#lt-err'); if (el && x.message !== 'auth') el.textContent = ofcErrHere(x);
     return false;
   }
 }
@@ -258,7 +258,7 @@ async function ltCreate(b) {
     LT.data = null; LT.cur = j; LT.undo = null; go(`office/letters/${j.id}`);
     toast(tr('Created'), async () => { await api('DELETE', `/api/office/letters/${j.id}`); ltReload(); go('office/letters'); });
     return '';
-  } catch (x) { if (!b.template_id && !b.client_id) toast(x.message || tr('unknown')); return x.message || tr('unknown'); }
+  } catch (x) { if (!b.template_id && !b.client_id) ofcErr(x); return ofcErrTxt(x); }
 }
 // 2.351.0 A (#2823): the folder of Correspondence the letter goes into when it is sent (the folders the person may add to,
 // with their path; office_tree.js) -- filed as the letter's reference node, the PDF stays filed in the documents as before
@@ -292,7 +292,7 @@ async function ltSentModal(d) {
       if (typeof oft_after === 'function') oft_after('letters');
       md.remove(); LT.cur = j; LT.data = null; ofcDraw();
       toast(tr('Sent and filed'));
-    } catch (x) { b.disabled = false; const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
+    } catch (x) { b.disabled = false; const el = $('.aerr', md); if (el) el.textContent = ofcErrHere(x); }
   });
 }
 // 2.357.0 C (#3158): the own signature: a picture (its light background made transparent) or drawn with finger / trackpad
@@ -365,7 +365,7 @@ function ltProfileModal(opts = {}) {
     if (f.size > 12 * 1024 * 1024) { err(tr('The picture is too large (at most {0} KB)', 300)); return; }  // 2.357.0 C (#3158): made smaller here
     const r = new FileReader();
     r.onload = async () => {
-      try { img = await ltSigClear(String(r.result || '')); } catch (x) { err(x.message || ''); return; }
+      try { img = await ltSigClear(String(r.result || '')); } catch (x) { err(ofcErrHere(x)); return; }
       if (img.length * 3 / 4 > 300 * 1024) { img = P.image || ''; err(tr('The picture is too large (at most {0} KB)', 300)); return; }
       changed = true; padOff(); $('.lt-sigbox', md).innerHTML = pic(); $('[data-m="rm"]', md).hidden = false; err('');
     };
@@ -396,21 +396,21 @@ function ltProfileModal(opts = {}) {
         if (LT.data) LT.data.profile = old.image ? o : await api('DELETE', UDEL);
         ofcDraw();
       });
-    } catch (x) { err(x.message || ''); }
+    } catch (x) { err(ofcErrHere(x)); }
   });
 }
 async function ltArchive(d) {
   try {
     await api('DELETE', `/api/office/letters/${d.id}`); clearTimeout(ltSaveTimer); LT.data = null; LT.cur = null; go('office/letters');
     toast(tr('Deleted'), async () => { await api('POST', `/api/office/letters/${d.id}/restore`); LT.data = null; LT.cur = null; go(`office/letters/${d.id}`); });
-  } catch (x) { toast(x.message || tr('unknown')); }
+  } catch (x) { ofcErr(x); }
 }
 async function ltCopy(d) {
   try {
     const j = await api('POST', '/api/office/letters', {copy_of: d.id});
     LT.data = null; LT.cur = j; LT.undo = null; go(`office/letters/${j.id}`);
     toast(tr('Copy created'), async () => { await api('DELETE', `/api/office/letters/${j.id}`); LT.data = null; LT.cur = null; go(`office/letters/${d.id}`); });
-  } catch (x) { toast(x.message || tr('unknown')); }
+  } catch (x) { ofcErr(x); }
 }
 async function ltAsTemplate(d) {
   if (d.status === 'draft' && !await ltSave(d, true)) return;
@@ -419,7 +419,7 @@ async function ltAsTemplate(d) {
     if (LT.data) LT.data = null;
     toast(tr('Template “{0}” added', t.name), async () => { await api('DELETE', `/api/office/doc-templates/${t.id}`); LT.data = null; ofcDraw(); });
     ofcDraw();
-  } catch (x) { toast(x.message || tr('unknown')); }
+  } catch (x) { ofcErr(x); }
 }
 
 // ---- events
@@ -452,7 +452,7 @@ document.addEventListener('click', async e => {
   }
   else if (a === 'delivered' && d) {
     try { LT.cur = await api('POST', `/api/office/letters/${d.id}/delivered`); LT.data = null; ofcDraw(); toast(tr('Marked as delivered'), async () => { LT.cur = await api('DELETE', `/api/office/letters/${d.id}/delivered`); LT.data = null; ofcDraw(); }); }
-    catch (x) { toast(x.message || tr('unknown')); }
+    catch (x) { ofcErr(x); }
   } else if (a === 'copy' && d) ltCopy(d);
   else if (a === 'arch' && d) ltArchive(d);
   else if (a === 'more' && d) {

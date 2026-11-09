@@ -16,7 +16,7 @@ async function dtLoad() {
   if (DT.loading) return;
   DT.loading = true;
   try { DT.data = await api('GET', '/api/office/gen-docs'); DT.err = null; }
-  catch (x) { DT.data = null; DT.err = x.message || tr('unknown'); }
+  catch (x) { DT.data = null; DT.err = ofcErrHere(x); }
   DT.loading = false;
   ofcDraw();
   if (DT.preset) { const p = DT.preset; DT.preset = null; dtNewModal(p); }
@@ -130,7 +130,7 @@ async function dtPreview(id, bodyText) {
     const j = await api('POST', '/api/office/gen-docs/preview', b);
     if (seq !== DT.pvSeq) return;
     DT.pv = {id, ...j};
-  } catch (x) { if (seq === DT.pvSeq) DT.pv = {id, missing: [], blocks: [['p', x.message || tr('unknown')]]}; }
+  } catch (x) { if (seq === DT.pvSeq) DT.pv = {id, missing: [], blocks: [['p', ofcErrHere(x)]]}; }
   const box = $('.dtp-pv');
   if (box && bodyText != null) {  // only the preview pane (the text field keeps focus and cursor)
     const pv = DT.pv;
@@ -191,7 +191,7 @@ function dtNewModal(p = {}) {
       const j = await api('POST', '/api/office/gen-docs', {template_id: +v('#dt-tpl') || null, client_id: +v('#dt-client') || null, list_id: +v('#dt-list') || null, doc_id: +v('#dt-offer') || null, title: v('#dt-ntitle'), ...(typeof tri_flag === 'function' ? tri_flag() : {})});  // 2.417.0 C (#3445): trial in the test mode
       md.remove(); DT.data = null; DT.pv = null; go(`office/gendocs/${j.id}`);
       toast(tr('Created'), async () => { await api('DELETE', `/api/office/gen-docs/${j.id}`); DT.data = null; go('office/gendocs'); });
-    } catch (x) { const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
+    } catch (x) { const el = $('.aerr', md); if (el) el.textContent = ofcErrHere(x); }
   });
 }
 // from a quotation (office_docs.js, menu "Create order confirmation"): the dialog with client + quotation set
@@ -245,13 +245,13 @@ function dtTplModal(t) {
     } catch (x) {
       const el = $('.aerr', md); if (!el) return;
       if (typeof objConflict === 'function' && await objConflict(md, x, r => { const m2 = dtTplModal(r); dtReload(); return m2; })) return;  // 2.576.0 (#4794): the merge bar
-      el.textContent = x.message || '';
+      el.textContent = ofcErrHere(x);
     }
   });
 }
 async function dtStartersModal() {
   let j;
-  try { j = await api('GET', '/api/office/doc-templates/starters'); } catch (x) { toast(x.message || ''); return; }
+  try { j = await api('GET', '/api/office/doc-templates/starters'); } catch (x) { ofcErr(x); return; }
   const md = modal(`<h3>${tr('Use sample')}</h3><p class="muted">${esc(j.note || '')}</p>
     ${ofcRowF('dt-slang', tr('Language'), ofcSel('dt-slang', j.lang, (S.languages || []).map(L => [L.code, L.name])))}
     <ul class="ofclist dtp-starters" role="list">${j.starters.map(s => `<li><div class="ofcrow dtp-srow"><span class="ofcn"><b>${esc(s.name)}</b><small class="muted">${esc([s.kind !== 'other' ? s.kind_label : '', s.legal ? tr('Legal text: please have it checked') : '', s.machine ? tr('Machine translated, check before use') : ''].filter(Boolean).join(' · '))}</small></span><button type="button" class="btn sm pri" data-m="take" data-k="${esc(s.key)}">${tr('Add')}</button></div></li>`).join('')}</ul>
@@ -265,7 +265,7 @@ async function dtStartersModal() {
       const t = await api('POST', '/api/office/doc-templates', {starter: b.dataset.k, lang: $('#dt-slang', md).value});
       md.remove(); DT.view = 'templates'; dtReload();
       toast(tr('Template “{0}” added', t.name), async () => { await api('DELETE', `/api/office/doc-templates/${t.id}`); dtReload(); });
-    } catch (x) { const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
+    } catch (x) { const el = $('.aerr', md); if (el) el.textContent = ofcErrHere(x); }
   });
 }
 function dtInsertVar(btn) {
@@ -309,7 +309,7 @@ async function dtSave(d, quiet) {
     const el = $('#dt-err'); if (el) el.textContent = '';
     return true;
   } catch (x) {
-    const el = $('#dt-err'); if (el && x.message !== 'auth') el.textContent = x instanceof Offline ? tr('Offline: only works again with a connection') : x.message || '';
+    const el = $('#dt-err'); if (el && x.message !== 'auth') el.textContent = ofcErrHere(x);
     return false;
   }
 }
@@ -350,17 +350,17 @@ document.addEventListener('click', async e => {
     try { const pv = await api('POST', '/api/office/gen-docs/preview', {gen_doc_id: d.id}); miss = pv.missing_labels || pv.missing || []; } catch {}
     if (miss.length && !await askConfirm(tr('Finish this document?'), tr('Missing details (left out in the PDF): {0}', miss.join(', ')), {ok: tr('Continue'), cancel: tr('Back')})) return;
     if (!await askConfirm(tr('Finish this document?'), tr('The variables are filled in, the text is frozen and the PDF is filed with the client. Afterwards it can only be copied.'), {ok: tr('Finish')})) return;
-    try { const j = await api('POST', `/api/office/gen-docs/${d.id}/final`); toast(tr('Finished and filed')); dtReload(); if (j?.node_id) dt_fileWhere(j.node_id, b); } catch (x) { toast(x.message || tr('unknown')); }
+    try { const j = await api('POST', `/api/office/gen-docs/${d.id}/final`); toast(tr('Finished and filed')); dtReload(); if (j?.node_id) dt_fileWhere(j.node_id, b); } catch (x) { ofcErr(x); }
   } else if (a === 'arch' && d) {
-    try { await api('DELETE', `/api/office/gen-docs/${d.id}`); DT.data = null; go('office/gendocs'); toast(tr('Archived'), async () => { await api('POST', `/api/office/gen-docs/${d.id}/restore`); DT.data = null; go(`office/gendocs/${d.id}`); }); } catch (x) { toast(x.message || tr('unknown')); }
+    try { await api('DELETE', `/api/office/gen-docs/${d.id}`); DT.data = null; go('office/gendocs'); toast(tr('Archived'), async () => { await api('POST', `/api/office/gen-docs/${d.id}/restore`); DT.data = null; go(`office/gendocs/${d.id}`); }); } catch (x) { ofcErr(x); }
   } else if (a === 'copy' && d) {
-    try { const j = await api('POST', '/api/office/gen-docs', {copy_of: d.id}); DT.data = null; DT.pv = null; go(`office/gendocs/${j.id}`); toast(tr('Copy created'), async () => { await api('DELETE', `/api/office/gen-docs/${j.id}`); DT.data = null; go(`office/gendocs/${d.id}`); }); } catch (x) { toast(x.message || tr('unknown')); }
+    try { const j = await api('POST', '/api/office/gen-docs', {copy_of: d.id}); DT.data = null; DT.pv = null; go(`office/gendocs/${j.id}`); toast(tr('Copy created'), async () => { await api('DELETE', `/api/office/gen-docs/${j.id}`); DT.data = null; go(`office/gendocs/${d.id}`); }); } catch (x) { ofcErr(x); }
   } else if (a === 'more' && d) {
     menu(b, [
       d.status !== 'draft' ? {label: tr('Edit a copy'), icon: 'copy', fn: () => b.closest('#view')?.querySelector('[data-dt="copy"]')?.click()} : null,
       d.status === 'draft' ? {label: tr('Preview (PDF)'), icon: 'eye', fn: () => dtPdfPreview(d)} : null,
       {label: tr('Archive'), icon: 'archive', cls: 'danger', fn: async () => {
-        try { await api('DELETE', `/api/office/gen-docs/${d.id}`); DT.data = null; go('office/gendocs'); toast(tr('Archived'), async () => { await api('POST', `/api/office/gen-docs/${d.id}/restore`); DT.data = null; go(`office/gendocs/${d.id}`); }); } catch (x) { toast(x.message || tr('unknown')); }
+        try { await api('DELETE', `/api/office/gen-docs/${d.id}`); DT.data = null; go('office/gendocs'); toast(tr('Archived'), async () => { await api('POST', `/api/office/gen-docs/${d.id}/restore`); DT.data = null; go(`office/gendocs/${d.id}`); }); } catch (x) { ofcErr(x); }
       }}]);
   } else if (a === 'sgnew' && d) {
     const err = $('#dt-sgerr'); if (err) err.textContent = '';
@@ -368,13 +368,13 @@ document.addEventListener('click', async e => {
       const j = await api('POST', `/api/office/gen-docs/${d.id}/signoff`, {expires: $('#dt-exp')?.value || null});
       DT.sg = null; ofcDraw();
       toast(tr('Signature link created'), async () => { await api('POST', `/api/office/signoffs/${j.id}/revoke`); DT.sg = null; ofcDraw(); });
-    } catch (x) { if (err) err.textContent = x.message || ''; }
+    } catch (x) { if (err) err.textContent = ofcErrHere(x); }
   } else if (a === 'sgcopy') {
     const i = $(`[data-dturl="${b.dataset.id}"]`);
     try { await navigator.clipboard.writeText(i.value); toast(tr('Link copied')); } catch { i.focus(); i.select(); toast(tr('Copy the selected link')); }
   } else if (a === 'sgstop') {
     if (!await askConfirm(tr('Stop the signature link?'), tr('It stops working at once.'), {ok: tr('Switch off'), danger: true})) return;
-    try { await api('POST', `/api/office/signoffs/${b.dataset.id}/revoke`); toast(tr('Signature link stopped')); DT.sg = null; ofcDraw(); } catch (x) { toast(x.message || tr('unknown')); }
+    try { await api('POST', `/api/office/signoffs/${b.dataset.id}/revoke`); toast(tr('Signature link stopped')); DT.sg = null; ofcDraw(); } catch (x) { ofcErr(x); }
   }
 });
 document.addEventListener('change', e => {
@@ -399,7 +399,7 @@ document.addEventListener('input', e => {
 // and the mail dialog (recipient, subject and text to look at and change). The section itself: clientpage.js dsb_clHtml.
 const DSB_API = '/api/office/privacy-sheets';
 async function dsb_new(cid) {
-  let d; try { d = await api('GET', `${DSB_API}?client_id=${cid}`); } catch (x) { toast(x.message || ''); return; }
+  let d; try { d = await api('GET', `${DSB_API}?client_id=${cid}`); } catch (x) { ofcErr(x); return; }
   const kinds = d.kinds || [], hint = k => kinds.find(x => x.key === k)?.hint || '';
   const md = modal(`<h3>${tr('Data protection sheet')}</h3>
     ${ofcRowF('dsb-kind', tr('Sheet'), ofcSel('dsb-kind', 'dpa', kinds.map(k => [k.key, k.label])))}
@@ -421,11 +421,11 @@ async function dsb_new(cid) {
       const undo = async () => { await api('DELETE', `${DSB_API}/${j.sheet.id}`); dsb_clReload(); };
       if (j.edit) { DT.data = null; DT.pv = null; go(`office/gendocs/${j.sheet.gen_doc_id}`); toast(tr('Fill in the [placeholders], then finish the document'), undo); }
       else toast(tr('Created'), undo);
-    } catch (x) { b.disabled = false; const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
+    } catch (x) { b.disabled = false; const el = $('.aerr', md); if (el) el.textContent = ofcErrHere(x); }
   });
 }
 async function dsb_set(x, body) {
-  try { await api('PATCH', `${DSB_API}/${x.id}`, body); dsb_clReload(); } catch (e) { toast(e.message || ''); }
+  try { await api('PATCH', `${DSB_API}/${x.id}`, body); dsb_clReload(); } catch (e) { ofcErr(e); }
 }
 function dsb_open(x, signed) {
   const u = `${DSB_API}/${x.id}/pdf${signed ? '?signed=1' : ''}`;
@@ -439,14 +439,14 @@ function dsb_menu(b, x) {
   menu(b, [draft ? {label: tr('Edit and finish'), icon: 'edit', fn: () => { DT.data = null; DT.pv = null; go(`office/gendocs/${x.gen_doc_id}`); }} : null,
     !draft && x.node_id ? {label: tr('Open PDF'), icon: 'file', fn: () => dsb_open(x, false)} : null,
     x.signed_node_id ? {label: tr('Open the signed sheet'), icon: 'file', fn: () => dsb_open(x, true)} : null,
-    x.review ? {label: x.review === 2 ? tr('Checked: reply handled') : tr('Checked: signature is fine'), icon: 'check',  /* 2.154.0 E (#2192): review 2 = a reply that was not filed (office log) */ fn: async () => { try { await api('POST', `${DSB_API}/${x.id}/confirm`); dsb_clReload(); } catch (e) { toast(e.message || ''); } }} : null,
+    x.review ? {label: x.review === 2 ? tr('Checked: reply handled') : tr('Checked: signature is fine'), icon: 'check',  /* 2.154.0 E (#2192): review 2 = a reply that was not filed (office log) */ fn: async () => { try { await api('POST', `${DSB_API}/${x.id}/confirm`); dsb_clReload(); } catch (e) { ofcErr(e); } }} : null,
     !draft && !(x.sign && x.status === 'signed') ? {label: tr('Send by e-mail…'), icon: 'mail', fn: () => dsb_mail(x)} : null,
     !draft && x.sign && x.status !== 'signed' ? {label: tr('Upload the signed sheet…'), icon: 'upload', fn: () => dsb_upload(x)} : null,
     ...(draft ? [] : x.sign ? [st('signed', tr('Mark as signed')), st('declined', tr('Mark as rejected')), x.review === 1 ? st('sent', tr('Not the signed sheet: back to sent')) : null]
       : [st('handed', tr('Mark as handed over'))]),
     done || x.status === 'declined' ? st('open', tr('Mark as open')) : null,
     {label: tr('Archive'), icon: 'archive', fn: async () => {
-      try { await api('DELETE', `${DSB_API}/${x.id}`); dsb_clReload(); toast(tr('Archived'), async () => { await api('POST', `${DSB_API}/${x.id}/restore`); dsb_clReload(); }); } catch (e) { toast(e.message || ''); }
+      try { await api('DELETE', `${DSB_API}/${x.id}`); dsb_clReload(); toast(tr('Archived'), async () => { await api('POST', `${DSB_API}/${x.id}/restore`); dsb_clReload(); }); } catch (e) { ofcErr(e); }
     }}].filter(Boolean));
 }
 function dsb_upload(x) {
@@ -454,13 +454,13 @@ function dsb_upload(x) {
   i.onchange = async () => {
     const f = i.files?.[0]; if (!f) return;
     const fd = new FormData(); fd.append('file', f, f.name || 'signed.pdf');
-    try { await api('POST', `${DSB_API}/${x.id}/signed`, fd); toast(tr('Signed sheet filed with the client')); dsb_clReload(); } catch (e) { toast(e.message || ''); }
+    try { await api('POST', `${DSB_API}/${x.id}/signed`, fd); toast(tr('Signed sheet filed with the client')); dsb_clReload(); } catch (e) { ofcErr(e); }
   };
   i.click();
 }
 async function dsb_mail(x) {
-  let m; try { m = await api('GET', `${DSB_API}/${x.id}/mail`); } catch (e) { toast(e.message || ''); return; }
-  if (!m.smtp) { toast(tr('Sending e-mail is not set up on this server (KALMIDO_SMTP_HOST)')); return; }
+  let m; try { m = await api('GET', `${DSB_API}/${x.id}/mail`); } catch (e) { ofcErr(e); return; }
+  if (!m.smtp) { toast(ofcNoMail()); return; }  // 2.802.0 (#5451): no variable name
   const md = modal(`<h3>${tr('Send by e-mail')} · ${esc(x.kind_label)}</h3>
     ${ofcRowF('dsb-to', tr('To'), `<input id="dsb-to" type="email" value="${esc(m.to || '')}" maxlength="200" autocomplete="off">`)}
     ${ofcRowF('dsb-subj', tr('Subject'), ofcIn('dsb-subj', m.subject, {max: 200}))}
@@ -477,7 +477,7 @@ async function dsb_mail(x) {
     try {
       await api('POST', `${DSB_API}/${x.id}/send`, {to: $('#dsb-to', md).value.trim(), subject: $('#dsb-subj', md).value, text: $('#dsb-text', md).value});
       md.remove(); toast(tr('Sent')); dsb_clReload();
-    } catch (er) { b.disabled = false; const el = $('.aerr', md); if (el) el.textContent = er.message || ''; }
+    } catch (er) { b.disabled = false; const el = $('.aerr', md); if (el) el.textContent = ofcErrHere(er); }
   });
 }
 

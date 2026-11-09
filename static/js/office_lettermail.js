@@ -36,7 +36,7 @@ function ltmInsert(text) {
 // ---- text blocks: pick (search, insert at the cursor) and manage (new, change, delete with undo, samples)
 async function ltmBlocksModal(pick) {
   let j;
-  try { j = await api('GET', '/api/office/letter-blocks'); } catch (x) { toast(x.message || ''); return; }
+  try { j = await api('GET', '/api/office/letter-blocks'); } catch (x) { ofcErr(x); return; }
   let blocks = j.blocks || [];
   /** @type {any} */
   const md = modal(`<h3>${tr('Text blocks')}</h3>
@@ -99,7 +99,7 @@ function ltmBlockEdit(t, after) {
         const sv = await ofcSave(md, `/api/office/letter-blocks/${t.id}`, t, v); md.remove(); after();  // 2.576.0 (#4794): only the changed fields (objsave.js)
         if (!sv) return;
         const back = Object.fromEntries(Object.entries(old).filter(([k, x]) => String(x ?? '') !== String(sv?.[k] ?? '')));
-        if (Object.keys(back).length) toast(tr('Saved'), async () => { try { await rawFetch('PATCH', `/api/office/letter-blocks/${t.id}`, sv?.updated_at ? {...back, expect_updated_at: sv.updated_at} : back); } catch (x) { toast(x.status === 409 ? tr('Changed in the meantime') : x.message || ''); } after(); });
+        if (Object.keys(back).length) toast(tr('Saved'), async () => { try { await rawFetch('PATCH', `/api/office/letter-blocks/${t.id}`, sv?.updated_at ? {...back, expect_updated_at: sv.updated_at} : back); } catch (x) { toast(x.status === 409 ? tr('Changed in the meantime') : ofcErrTxt(x)); } after(); });
         else toast(tr('Saved'));
       } else {
         const j = await api('POST', '/api/office/letter-blocks', v); md.remove(); after();
@@ -108,13 +108,13 @@ function ltmBlockEdit(t, after) {
     } catch (x) {
       const el = $('.aerr', md); if (!el) return;
       if (typeof objConflict === 'function' && await objConflict(md, x, r => { const m2 = ltmBlockEdit(r, after); after(); return m2; })) return;  // 2.576.0 (#4794): the merge bar
-      el.textContent = x.message || '';
+      el.textContent = ofcErrHere(x);
     }
   });
 }
 async function ltmStarters(after) {
   let j;
-  try { j = await api('GET', '/api/office/letter-blocks/starters'); } catch (x) { toast(x.message || ''); return; }
+  try { j = await api('GET', '/api/office/letter-blocks/starters'); } catch (x) { ofcErr(x); return; }
   /** @type {any} */
   const md = modal(`<h3>${tr('Use sample')}</h3><p class="muted">${esc(j.note || '')}</p>
     ${ofcRowF('ltm-slang', tr('Language'), ofcSel('ltm-slang', j.lang, (S.languages || []).map(L => [L.code, L.name])))}
@@ -129,7 +129,7 @@ async function ltmStarters(after) {
       const t = await api('POST', '/api/office/letter-blocks', {starter: b.dataset.k, lang: $('#ltm-slang', md).value});
       md.remove(); after();
       toast(tr('Text block “{0}” added', t.name), async () => { await api('DELETE', `/api/office/letter-blocks/${t.id}`); after(); });
-    } catch (x) { const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
+    } catch (x) { const el = $('.aerr', md); if (el) el.textContent = ofcErrHere(x); }
   });
 }
 
@@ -182,7 +182,7 @@ async function ofmSigModal(done) {
       const j = await api('PUT', '/api/office/mail-profile', {signature: reset ? null : ta.value, from_name: $('#ofm-name', md).value, reply_to: $('#ofm-rt', md).value.trim(),
         ...($('#ofm-logo', md) ? {logo: $('#ofm-logo', md).checked} : {}), ...($('#ofm-via', md) ? {via: $('#ofm-via', md).value} : {})});
       md.remove(); toast(tr('Saved')); done?.(j);
-    } catch (x) { b.disabled = false; const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
+    } catch (x) { b.disabled = false; const el = $('.aerr', md); if (el) el.textContent = ofcErrHere(x); }
   });
 }
 
@@ -192,7 +192,7 @@ async function ltmMailModal(id) {
   const prof = await ofmProfile();
   // 2.595.0 (#4906): an e-mail address typed a moment ago is still in LT.pend (saved 1.5 s after the last key): save it first
   if (typeof LT !== 'undefined' && LT.pend && LT.pend.d.id === id) await ltSave(LT.pend.d, true);
-  try { [j, info] = await Promise.all([api('GET', `/api/office/letters/${id}/mail-draft`), ltmInfo()]); } catch (x) { toast(x.message || ''); return; }
+  try { [j, info] = await Promise.all([api('GET', `/api/office/letters/${id}/mail-draft`), ltmInfo()]); } catch (x) { ofcErr(x); return; }
   if (!j.to) j.to = ($('#lt-rcpt_email')?.value || '').trim();  // 2.595.0 (#4906): the form's E-mail field, when the server has none yet
   const hint = j.reply_address ? tr('Answers go to {0} and are linked to this letter automatically.', j.reply_address)
     : tr('There is no document address for this office: answers go to the company e-mail and are assigned to the letter by hand.');
@@ -209,7 +209,7 @@ async function ltmMailModal(id) {
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="send">${ic('send', 's')} ${tr('Send')}</button></div>`);
   md.classList.add('ofcdlg', 'ltm-dlg');
   const close = fgModal(md);
-  if (info && info.mail_on === false) $('.aerr', md).textContent = tr('Sending e-mail is not set up on this server (KALMIDO_SMTP_HOST)');
+  if (info && info.mail_on === false) $('.aerr', md).textContent = ofcNoMail();  // 2.802.0 (#5451)
   md.addEventListener('click', async e => {
     const b = /** @type {any} */ (e.target).closest('[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { close(); return; }
@@ -218,7 +218,7 @@ async function ltmMailModal(id) {
       await api('POST', `/api/office/letters/${id}/send-mail`, {to: $('#ltm-to', md).value.trim(), cc: $('#ltm-cc', md).value.trim(),
         subject: $('#ltm-subj', md).value, text: $('#ltm-text', md).value, ...ofmSendBody(md)});
       md.remove(); toast(tr('Sent')); ltmReload();
-    } catch (x) { b.disabled = false; const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
+    } catch (x) { b.disabled = false; const el = $('.aerr', md); if (el) el.textContent = ofcErrHere(x); }
   });
 }
 

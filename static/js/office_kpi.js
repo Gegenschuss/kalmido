@@ -9,7 +9,7 @@ OFC_TABS.splice(Math.max(0, OFC_TABS.findIndex(t => t[0] === 'cashflow' || t[0] 
 async function kp_load() {
   const q = KPS.year ? `?year=${KPS.year}` : ''; KPS.q = q;
   try { const j = await api('GET', '/api/office/kpi' + q); if (KPS.q === q) { KPS.data = j; KPS.err = null; } }
-  catch (x) { KPS.err = x.message || tr('unknown'); }
+  catch (x) { KPS.err = ofcErrHere(x); }
   ofcDraw();
 }
 const kp_delta = (a, b) => {

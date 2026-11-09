@@ -15,7 +15,7 @@ async function pp_load() {
   PPS.loading = true; const gen = PPS.gen;
   let j = null;
   try { j = await api('GET', '/api/office/deals'); PPS.err = null; }
-  catch (x) { if (!PPS.data) PPS.err = x.message || tr('unknown'); }  // 2.559.0 (#4660): a failed background reload keeps the cards
+  catch (x) { if (!PPS.data) PPS.err = ofcErrHere(x); }  // 2.559.0 (#4660): a failed background reload keeps the cards
   PPS.loading = false;
   if (gen !== PPS.gen) return pp_load();  // 2.559.0 (#4660): an answer from before an own change is fetched again, the cards stay
   if (j) { PPS.data = j; for (const p of OPT) p.put(); }  // own changes still on the way stay on top of the fresh board

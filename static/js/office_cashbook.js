@@ -24,7 +24,7 @@ async function cbLoad() {
     const q = `${CB.bid}:${CB.year}`;
     if (CB.bid && (!CB.list || CB.q !== q)) { CB.list = await api('GET', `/api/office/cashbooks/${CB.bid}/entries?year=${CB.year}`); CB.q = q; }
     CB.err = null;
-  } catch (x) { CB.err = x.message || tr('unknown'); }
+  } catch (x) { CB.err = ofcErrHere(x); }
   CB.loading = false;
   ofcDraw();
 }
@@ -121,7 +121,7 @@ async function cbQuick(f) {
     CB.ref = '';
     CB.year = j.day.slice(0, 4); cbReload(true);
     toast(tr('Booked as no. {0}', j.no), async () => { await api('POST', `/api/office/cash-entries/${j.id}/cancel`, {}); cbReload(true); });
-  } catch (x) { if (err) err.textContent = x.message || ''; }
+  } catch (x) { if (err) err.textContent = ofcErrHere(x); }
 }
 const CB_KEYS = ['day', 'dir', 'amount', 'vat_pct', 'text', 'category', 'node_id', 'invoice_id'];
 async function cbLinks() {
@@ -191,7 +191,7 @@ function cbPrev(p) {
 }
 async function cbLogModal(e) {
   let rows;
-  try { rows = (await api('GET', `/api/office/cash-entries/${e.id}/log`)).log; } catch (x) { toast(x.message || ''); return; }
+  try { rows = (await api('GET', `/api/office/cash-entries/${e.id}/log`)).log; } catch (x) { ofcErr(x); return; }
   const md = modal(`<h3>${tr('History')}</h3><p class="muted">${esc(tr('Cash entry no. {0}', e.no))} · ${esc(e.text)}</p>
     <ol class="lgb-log">${rows.slice().reverse().map(r => `<li><b>${esc(tr(CB_ACT[r.action] || r.action))}</b> <span class="muted">${esc(fmtMoment(new Date(r.at)))} · ${esc(r.by)}</span>
       ${r.action === 'cancel' && r.prev.by_no ? `<small>${esc(tr('Cancelled by no. {0}', r.prev.by_no))}</small>` : cbPrev(r.prev) ? `<small>${esc((r.action === 'create' ? '' : tr('Before') + ': ') + cbPrev(r.prev))}</small>` : ''}</li>`).join('')}</ol>
@@ -218,7 +218,7 @@ async function cbCloseModal() {
         <dt>${tr('Expense')}</dt><dd>${ofcMoney(p.sum_out)}</dd><dt>${tr('Closing balance')}</dt><dd><b>${ofcMoney(p.closing)}</b></dd></dl>
         <p class="muted">${esc([p.from !== p.day ? tr('Closes {0} to {1}', fmtDateLoc(p.from), fmtDateLoc(p.day)) : fmtDateLoc(p.day), trn('{0} entry', '{0} entries', p.count)].join(' · '))}</p>`;
       go.disabled = false;
-    } catch (x) { cb$('.cb-plan', md).innerHTML = ''; err.textContent = x.message || ''; }
+    } catch (x) { cb$('.cb-plan', md).innerHTML = ''; err.textContent = ofcErrHere(x); }
   };
   md.addEventListener('change', ev => { if (/** @type {any} */ (ev.target).id === 'cb-cday') preview(); });
   md.addEventListener('click', async ev => {
@@ -226,7 +226,7 @@ async function cbCloseModal() {
     if (x.dataset.m === 'close') { close(); return; }
     if (!await askConfirm(tr('Close the day permanently?'), tr('This cannot be undone.'), {ok: tr('Close permanently')})) return;
     try { await api('POST', `/api/office/cashbooks/${b.id}/closing`, {day: cb$('#cb-cday', md).value}); md.remove(); cbReload(true); toast(tr('Day closed')); }
-    catch (y) { err.textContent = y.message || ''; }
+    catch (y) { err.textContent = ofcErrHere(y); }
   });
   preview();
 }
@@ -235,7 +235,7 @@ async function cbBookNew() {
     const j = await api('POST', '/api/office/cashbooks', {name: tr('Cash box {0}', (CB.base?.books.length || 0) + 1), opening: '0', opening_day: cbToday()});
     CB.bid = j.id; cbReload(true);
     toast(tr('Added'), async () => { await api('PATCH', `/api/office/cashbooks/${j.id}`, {archived: 1}); cbReload(true); });
-  } catch (x) { toast(x.message || ''); }
+  } catch (x) { ofcErr(x); }
 }
 async function cbBookSet(bid, key, v) {  // autosave of one field of a cash box; one undo step
   const b = cbBook(bid); if (!b || String(b[key]) === String(v)) return;
@@ -243,7 +243,7 @@ async function cbBookSet(bid, key, v) {  // autosave of one field of a cash box;
   try {
     await api('PATCH', `/api/office/cashbooks/${bid}`, {[key]: v}); cbReload(true);
     toast(key === 'archived' ? (v ? tr('Archived') : tr('Restored')) : tr('Saved'), async () => { await api('PATCH', `/api/office/cashbooks/${bid}`, {[key]: old}); cbReload(true); });
-  } catch (x) { toast(x.message || ''); cbReload(true); }
+  } catch (x) { ofcErr(x); cbReload(true); }
 }
 
 // ---- events

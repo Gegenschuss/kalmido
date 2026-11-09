@@ -216,7 +216,7 @@ def kp_link_send(cid):
     if not public_links_on(c, "portal") or not office_settings(c, oid).get("portal_docs"):
         raise Denied(409, tr("Documents in the client portal are switched off in the office settings"))
     if not MAIL_OUT_ON:
-        raise Denied(409, tr("Sending e-mail is not set up on this server (KALMIDO_SMTP_HOST)"))
+        raise Denied(409, tr("E-mail sending is not set up on this server yet: whoever runs the server sets it up."))
     inv, main = pt_email_norm(cl["email_invoice"]), pt_email_norm(cl["email"])
     em = (main if b.get("to") == "main" else inv if b.get("to") == "invoice" else (inv or main)) or ""
     if not em:

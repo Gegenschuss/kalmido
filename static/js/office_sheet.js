@@ -80,7 +80,7 @@ async function dkSave(root, pid, sheet) {
     ofdDraw();  // the view was drawn again meanwhile (e.g. master data loaded): draw it with the new figures; 2.113.0 (#2248): also the title page next to the open sheet
   } catch (x) {
     if (x.status === 409 && x.data?.doc && OFD.doc && x.data.doc.id === OFD.doc.id) { OFD.conflict = {id: OFD.doc.id, doc: x.data.doc}; ofdDraw(); }  // 2.269.0 A (#3012)
-    else toast(x.message || tr('unknown'));
+    else ofcErr(x);
   }
   finally { DK.saving--; ofdSaveHint?.(); }
 }

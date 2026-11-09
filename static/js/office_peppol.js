@@ -50,7 +50,7 @@ async function pep_save(el) {
     if (err) err.textContent = '';
     const box = $('#pep-set'); if (box) box.outerHTML = pep_settingsHtml();
     toast(k === 'api_key' ? tr('API key saved') : tr('Saved'));
-  } catch (x) { if (err) err.textContent = x.message || tr('unknown'); }
+  } catch (x) { if (err) err.textContent = ofcErrHere(x); }
 }
 document.addEventListener('change', e => { const el = e.target; if (el instanceof HTMLElement && el.dataset?.pep && el.closest('#pep-set')) pep_save(el); });
 document.addEventListener('click', async e => {
@@ -59,7 +59,7 @@ document.addEventListener('click', async e => {
   if (b.dataset.pepa === 'suggest') { const i = /** @type {HTMLInputElement|null} */ ($('#pep-sender')); if (i) { i.value = b.dataset.v || ''; pep_save(i); } return; }
   if (b.dataset.pepa === 'check') {
     b.setAttribute('disabled', '');
-    try { PEP.conf = await api('POST', '/api/office/peppol/check'); const box = $('#pep-set'); if (box) box.outerHTML = pep_settingsHtml(); toast(PEP.conf.ok ? tr('Connection works') : PEP.conf.check_text || tr('unknown')); } catch (x) { if (err) err.textContent = x.message || tr('unknown'); }
+    try { PEP.conf = await api('POST', '/api/office/peppol/check'); const box = $('#pep-set'); if (box) box.outerHTML = pep_settingsHtml(); toast(PEP.conf.ok ? tr('Connection works') : PEP.conf.check_text || tr('unknown')); } catch (x) { if (err) err.textContent = ofcErrHere(x); }
     b.removeAttribute('disabled');
   }
 });
@@ -98,7 +98,7 @@ async function pep_dialog(d) {
     if (sb instanceof HTMLElement) { sb.hidden = !(v.can_send); const t = sb.querySelector('span'); if (t) t.textContent = v.can_retry ? tr('Send again') : tr('Send'); }
   };
   const load = async refresh => {
-    try { v = await api(refresh ? 'POST' : 'GET', `/api/office/docs/${d.id}/peppol${refresh ? '/refresh' : ''}`); draw(); const a = aerr(); if (a) a.textContent = ''; } catch (x) { const a = aerr(); if (a) a.textContent = x.message || tr('unknown'); }
+    try { v = await api(refresh ? 'POST' : 'GET', `/api/office/docs/${d.id}/peppol${refresh ? '/refresh' : ''}`); draw(); const a = aerr(); if (a) a.textContent = ''; } catch (x) { const a = aerr(); if (a) a.textContent = ofcErrHere(x); }
   };
   md.addEventListener('click', async e => {
     const b = e.target instanceof Element ? e.target.closest('[data-pepd]') : null; if (!(b instanceof HTMLElement)) return;
@@ -121,7 +121,7 @@ async function pep_dialog(d) {
         try { const j = await api('GET', `/api/office/docs/${d.id}`); if (OFD.doc && OFD.doc.id === d.id) { OFD.doc = j; ofdDraw(); } } catch { /* the document view refreshes on its next load */ }
       }
       if (ae) ae.textContent = '';
-    } catch (x) { if (ae) ae.textContent = x.message || tr('unknown'); if (a === 'send') await load(false); } finally { b.removeAttribute('disabled'); }
+    } catch (x) { if (ae) ae.textContent = ofcErrHere(x); if (a === 'send') await load(false); } finally { b.removeAttribute('disabled'); }
   });
   await load(true);
   return md;

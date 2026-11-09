@@ -21,7 +21,7 @@ function rinFresh() {
 async function rinLoad() {
   RIN.loading = true;
   try { const j = await api('GET', '/api/office/series'); RIN.items = j.items || []; RIN.docs = j.docs || {}; RIN.err = null; }
-  catch (x) { RIN.items = RIN.items || []; RIN.err = x.message || tr('unknown'); }
+  catch (x) { RIN.items = RIN.items || []; RIN.err = ofcErrHere(x); }
   RIN.loading = false;
   if (RIN.showBin) { try { RIN.bin = (await api('GET', '/api/office/series?bin=1')).items || []; } catch { RIN.bin = []; } }
   if (typeof ofdDraw === 'function') ofdDraw();
@@ -119,7 +119,7 @@ function rinSheet(d, s) {
       let ver = sv.updated_at;
       const step = async src => {
         try { ver = (await rawFetch('PATCH', `/api/office/series/${s.id}`, {...Object.fromEntries(ks.map(k => [k, src[k]])), ...(ver ? {expect_updated_at: ver} : {})})).updated_at; }
-        catch (x) { toast(x.status === 409 ? tr('Changed in the meantime') : x.message || tr('unknown')); }
+        catch (x) { toast(x.status === 409 ? tr('Changed in the meantime') : ofcErrTxt(x)); }
         rinReload();
       };
       if (ks.length) offerUndo(tr('Saved'), histAdd({label: tr('Invoice series changed'), undo: () => step(old), redo: () => step(now)}));
@@ -135,7 +135,7 @@ function rinSheet(d, s) {
     md.querySelectorAll('[data-rin-every]').forEach(x => { const on = x === b; x.classList.toggle('on', on); x.setAttribute('aria-checked', on); });
   });
 }
-async function rinDo(method, url, body) { try { await rawFetch(method, url, body); } catch (x) { toast(x.message || tr('unknown')); } rinReload(); }
+async function rinDo(method, url, body) { try { await rawFetch(method, url, body); } catch (x) { ofcErr(x); } rinReload(); }
 const rinPatch = (id, b) => rinDo('PATCH', `/api/office/series/${id}`, b);
 
 // ---- clicks (the list section, the editor box, the cash flow's jump)
@@ -159,7 +159,7 @@ async function rinClick(e) {
   if ((a === 'edit' || a === 'tap') && s) { rinSheet(OFD.doc && OFD.doc.id === s.template_id ? OFD.doc : {}, s); return; }
   if (a === 'restore' && s) { await rinDo('POST', `/api/office/series/${s.id}/restore`); offerUndo(tr('Restored'), histAdd({label: tr('Invoice series restored'), undo: () => rinDo('DELETE', `/api/office/series/${s.id}`), redo: () => rinDo('POST', `/api/office/series/${s.id}/restore`)})); return; }
   if (a === 'del' && s) {
-    try { await rawFetch('DELETE', `/api/office/series/${s.id}`); } catch (x) { toast(x.message || tr('unknown')); return; }
+    try { await rawFetch('DELETE', `/api/office/series/${s.id}`); } catch (x) { ofcErr(x); return; }
     rinReload();
     offerUndo(tr('Invoice series deleted'), histAdd({label: tr('Invoice series deleted'), undo: () => rinDo('POST', `/api/office/series/${s.id}/restore`), redo: () => rinDo('DELETE', `/api/office/series/${s.id}`)}));
     return;
@@ -168,21 +168,21 @@ async function rinClick(e) {
     if (s.auto_send && !await askConfirm(tr('Make and send the invoice now?'), tr('The invoice of the next period is finalised and mailed to the client at once.'), {ok: tr('Send|mail')})) return;
     b.disabled = true;
     let j;
-    try { j = await rawFetch('POST', `/api/office/series/${s.id}/run`); } catch (x) { b.disabled = false; toast(x.message || tr('unknown')); rinReload(); return; }
+    try { j = await rawFetch('POST', `/api/office/series/${s.id}/run`); } catch (x) { b.disabled = false; ofcErr(x); rinReload(); return; }
     OFD.list = null;
     rinReload();
     if (j.error) toast(j.error);
     if (j.sent) { toast(tr('Invoice sent')); return; }  // a mail cannot be taken back: no undo step
     const prev = j.prev_next_date;
     offerUndo(tr('Invoice draft created'), histAdd({label: tr('Invoice draft created'),
-      undo: async () => { try { await rawFetch('DELETE', `/api/office/docs/${j.doc_id}`); } catch (x) { toast(x.message || tr('unknown')); } OFD.list = null; await rinPatch(s.id, {next_date: prev}); },
-      redo: async () => { try { const k = await rawFetch('POST', `/api/office/series/${s.id}/run`); j.doc_id = k.doc_id; } catch (x) { toast(x.message || tr('unknown')); } OFD.list = null; rinReload(); }}));
+      undo: async () => { try { await rawFetch('DELETE', `/api/office/docs/${j.doc_id}`); } catch (x) { ofcErr(x); } OFD.list = null; await rinPatch(s.id, {next_date: prev}); },
+      redo: async () => { try { const k = await rawFetch('POST', `/api/office/series/${s.id}/run`); j.doc_id = k.doc_id; } catch (x) { ofcErr(x); } OFD.list = null; rinReload(); }}));
   }
 }
 async function rinChange(e) {
   const b = e.target.closest('[data-rin="active"]'); if (!b) return;
   const id = +b.dataset.sid, on = b.checked ? 1 : 0;
-  try { await rawFetch('PATCH', `/api/office/series/${id}`, {active: on}); } catch (x) { b.checked = !on; toast(x.message || tr('unknown')); return; }
+  try { await rawFetch('PATCH', `/api/office/series/${id}`, {active: on}); } catch (x) { b.checked = !on; ofcErr(x); return; }
   rinReload();
   offerUndo(on ? tr('Invoice series active') : tr('Invoice series paused'), histAdd({label: on ? tr('Invoice series active') : tr('Invoice series paused'), undo: () => rinPatch(id, {active: on ? 0 : 1}), redo: () => rinPatch(id, {active: on})}));
 }

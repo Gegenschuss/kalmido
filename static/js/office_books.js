@@ -35,7 +35,7 @@ async function bkLoad() {
     if (seq !== BK.seq) return;
     Object.assign(BK, {info, euer, ustva, err: null});
     bkAcctLines();  // 2.144.2 B (#2352)
-  } catch (x) { if (seq === BK.seq) BK.err = x.message || tr('unknown'); }
+  } catch (x) { if (seq === BK.seq) BK.err = ofcErrHere(x); }
   ofcDraw();
 }
 async function bkBilledLoad(info) {  // 2.121.0 C (#2094)
@@ -49,7 +49,7 @@ const bkBilledTxt = b => !b ? '' : b.missing ? tr('Billed, the invoice did not c
 async function bkLoadUstva() {
   const seq = ++BK.seq;
   try { const j = await api('GET', `/api/office/books/ustva?year=${BK.pyear}&period=${BK.period}`); if (seq === BK.seq) BK.ustva = j; }
-  catch (x) { toast(x.message || tr('unknown')); }
+  catch (x) { ofcErr(x); }
   ofcDraw();
 }
 const bkReload = () => { BK.info = null; BK.euer = null; if (typeof RSB === 'object') RSB.inRows = null; if (typeof RKF === 'object') RKF.data = null; if (typeof rclReload === 'function') rclReload(); ofcDraw(); };  // 2.276.0 A (#3039): + the receipts list; 2.356.0 D (#3129): + handed in  // 2.114.1 B (#2018): receipts count in the cash flow
@@ -126,7 +126,7 @@ function bkEinvHtml(ei) {
 async function bkEinvTake(id, b) {
   const take = async () => { await api('POST', `/api/docs/${id}/receipt/einvoice`); bkReload(); return {}; };
   b.disabled = true;
-  try { await take(); } catch (x) { b.disabled = false; toast(x.message || tr('unknown')); return; }
+  try { await take(); } catch (x) { b.disabled = false; ofcErr(x); return; }
   const label = tr('Added as receipt');
   histToast(label, histAdd({label, undo: async () => { await api('PUT', `/api/docs/${id}/receipt`, {project_id: null, category: '', vat_pct: null}); bkReload(); return {}; }, redo: take}));
 }
@@ -233,7 +233,7 @@ async function ebSet(year, basis) {
 async function ebSetUndo(basis) {
   const y = BK.ebYear || new Date().getFullYear(), from = ebBasisOf(OFC.info?.settings, y);
   if (from === basis) return;
-  try { await ebSet(y, basis); } catch (x) { toast(x.message || tr('unknown')); ofcDraw(); return; }
+  try { await ebSet(y, basis); } catch (x) { ofcErr(x); ofcDraw(); return; }
   const label = tr('Changed setting');
   histToast(label, histAdd({label, undo: () => ebSet(y, from), redo: () => ebSet(y, basis)}));
 }
@@ -244,7 +244,7 @@ const tfYears = () => ofcYearOpts(TF.ys, TF.year, 1).map(y => [y, y]);  // 2.593
 async function tfLoad() {
   const seq = ++TF.seq;
   try { const d = await api('GET', `/api/office/books/taxform/${TF.kind}?year=${TF.year}`); if (seq === TF.seq) Object.assign(TF, {d, err: null, ys: d.years ?? TF.ys}); }
-  catch (x) { if (seq === TF.seq) TF.err = x.message || tr('unknown'); }
+  catch (x) { if (seq === TF.seq) TF.err = ofcErrHere(x); }
   ofcDraw();
 }
 const tfRow = r => `<tr${r.sum ? ' class="bk-tot"' : ''}><td class="num" data-l="${esc(tr('Line'))}">${r.line}</td><td class="num" data-l="${esc(tr('Field'))}">${esc(r.kz)}</td><th scope="row">${esc(r.label)}${(r.from || []).length ? ` <small class="muted">${esc(r.from.join(', '))}</small>` : ''}</th>
@@ -281,7 +281,7 @@ async function tfVatSave() {
   const num = id => { const v = ($('#' + id)?.value || '').trim(); return v ? ofcNum(v) : 0; };
   const paid = num('tf-paid'), refund = num('tf-refund');
   if (paid == null || refund == null) { toast(tr('Invalid data')); return; }
-  try { TF.d = await api('PUT', '/api/office/books/taxform/vat', {year: TF.year, paid: paid.toFixed(2), refund: refund.toFixed(2)}); } catch (x) { toast(x.message || tr('unknown')); }
+  try { TF.d = await api('PUT', '/api/office/books/taxform/vat', {year: TF.year, paid: paid.toFixed(2), refund: refund.toFixed(2)}); } catch (x) { ofcErr(x); }
   ofcDraw();
 }
 
@@ -292,7 +292,7 @@ const TC_LBL = {green: N_('In order'), yellow: N_('Please check'), red: N_('Devi
 async function tcLoad() {
   const seq = ++TC.seq;
   try { const d = await api('GET', `/api/office/books/taxcheck?year=${TC.year}`); if (seq === TC.seq) Object.assign(TC, {d, err: null}); }
-  catch (x) { if (seq === TC.seq) TC.err = x.message || tr('unknown'); }
+  catch (x) { if (seq === TC.seq) TC.err = ofcErrHere(x); }
   ofcDraw();
 }
 const tcGo = (p, inner) => !p.link ? inner : p.link.startsWith('setgo:') ? `<button type="button" class="linkbtn tc-go" data-setgo="${esc(p.link.slice(6))}">${inner}</button>` : p.link.startsWith('#') ? `<a class="tc-go" href="${esc(p.link)}">${inner}</a>` : inner;  // 2.589.0 (#3458, review): only in-app links
@@ -321,7 +321,7 @@ async function bkSet(key, val) {
 async function bkSetUndo(key, val) {
   const from = OFC.info?.settings?.[key];
   if (String(from) === String(val)) return;
-  try { await bkSet(key, val); } catch (x) { toast(x.message || tr('unknown')); ofcDraw(); return; }
+  try { await bkSet(key, val); } catch (x) { ofcErr(x); ofcDraw(); return; }
   const label = tr('Changed setting');
   histToast(label, histAdd({label, undo: () => bkSet(key, from), redo: () => bkSet(key, val)}));
 }
@@ -358,7 +358,7 @@ async function bkMerge(files) {  // the photos -> one PDF (abscan.js: smaller on
     const r = await fetch('/api/files/scan', {method: 'POST', body: fd, headers: {'X-Requested-With': 'kalmido'}});
     if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || httpErrText(r.status)); }
     return new File([await r.blob()], name + '.pdf', {type: 'application/pdf'});
-  } catch (x) { toast(x?.message || tr('unknown')); return null; }
+  } catch (x) { ofcErr(x); return null; }
 }
 function bkDups(dups) {
   if (!dups.length) return;
@@ -374,7 +374,7 @@ async function bkUpload(files) {
   const fd = new FormData();
   for (const f of files) fd.append('files', f, f.name || 'receipt.jpg');
   fd.append('ws', BK.info?.upload_ws || (OFC.info?.personal ? 'private' : `org:${OFC.info?.org_id}`)); fd.append('unzip', '1'); fd.append('area', 'office');  // 2.276.0 A (#3039): Receipts loads no BK.info
-  let j; try { j = await api('POST', '/api/docs', fd); } catch (x) { toast(x.message || tr('unknown')); return; }
+  let j; try { j = await api('POST', '/api/docs', fd); } catch (x) { ofcErr(x); return; }
   for (const e of j.errors || []) toast(e);
   const ids = j.ids || [], dups = j.dups || [];
   if (ids.length) {
@@ -389,7 +389,7 @@ async function bkUpload(files) {
 }
 async function bkSheet(id, fresh) {
   let doc, rc;
-  try { [doc, rc] = await Promise.all([api('GET', `/api/docs/${id}`), api('GET', `/api/docs/${id}/receipt`)]); } catch (x) { toast(x.message || tr('unknown')); return; }
+  try { [doc, rc] = await Promise.all([api('GET', `/api/docs/${id}`), api('GET', `/api/docs/${id}/receipt`)]); } catch (x) { ofcErr(x); return; }
   const r = rc.receipt || {}, cats = [...new Set([...(BK.info?.categories || []), ...(rc.categories || [])])];
   const wait = doc.state === 'wait' || doc.state === 'run';
   const md = modal(`<h3>${tr('Receipt')}</h3><p class="muted bk-sname">${esc(doc.name)}${doc.einvoice ? ` · <a class="bk-einv" href="/api/docs/${id}/einvoice" target="_blank" rel="noopener">${tr('Readable view')}</a>` : ''}</p><div class="bk-rx"></div><div class="bk-rcs"></div>
@@ -471,7 +471,7 @@ async function bkAcctSave(md) {
   const cat = ($('#bk-cat', md)?.value || '').trim(), val = ($('#bk-acctin', md)?.value || '').replace(/\D/g, '');
   const from = {...(BK.info?.accounts?.own || {})}, to = {...from};
   if (val) to[cat.toLowerCase()] = val; else delete to[cat.toLowerCase()];
-  try { await bkAcctPut(to); } catch (x) { $('.aerr', md).textContent = x.message || ''; return; }
+  try { await bkAcctPut(to); } catch (x) { $('.aerr', md).textContent = ofcErrHere(x); return; }
   await bkAcctFresh(); bkAcctLine(md);
   const label = tr('Changed account');
   // 2.144.2 B (#2352): undo / redo draw the line of an open sheet from the data put back
@@ -482,7 +482,7 @@ async function bkBillModal(pre) {
   const all = [...(BK.info?.receipts || [])].reverse().filter(r => !BK.billed[r.node_id] && r.amount);
   const list = all;
   let docs = [];
-  try { docs = (await api('GET', '/api/office/trips/bill-docs')).docs || []; } catch (x) { toast(x.message || ''); return; }
+  try { docs = (await api('GET', '/api/office/trips/bill-docs')).docs || []; } catch (x) { ofcErr(x); return; }
   const kind = d => d.kind === 'invoice' ? tr('Invoice') : tr('Quotation');
   const md = modal(`<h3>${tr('Bill receipts on to a client')}</h3>
     <p class="muted">${tr('Each receipt becomes a position with the amount as purchase price (net where the receipt has a VAT rate).')}</p>
@@ -504,7 +504,7 @@ async function bkBillModal(pre) {
       const j = await api('POST', '/api/office/receipts/bill', {doc_id: +$('#bkb-doc', md).value, node_ids: ids, markup_pct: ofcNum($('#bkb-mk', md).value), one: $('#bkb-one', md)?.checked ? 1 : 0});
       md.remove(); bkReload();
       toast(tr('Billed on {0}', j.number || tr('Draft')), async () => { await api('POST', '/api/office/receipts/unbill', {node_ids: j.items, positions: j.positions}); bkReload(); });
-    } catch (x) { b.disabled = false; const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
+    } catch (x) { b.disabled = false; const el = $('.aerr', md); if (el) el.textContent = ofcErrHere(x); }
   });
 }
 function bkRxAfter(id) {  // 2.121.0 A (#2092): taken over / undone -> the sheet shows the new values
@@ -526,7 +526,7 @@ async function bkChkPut(id, on) {
 async function bkChkSet(md, id, on) {
   const box = $('#bk-chk', md), el = $('.bk-chkby', md), was = el?.textContent || '';
   if (el) el.textContent = bkChkTxt(bkChkStamp(on));
-  let x; try { x = await bkChkPut(id, on); } catch (err) { if (box) box.checked = !on; if (el) el.textContent = was; const a = $('.aerr', md); if (a) a.textContent = err.message || ''; return; }
+  let x; try { x = await bkChkPut(id, on); } catch (err) { if (box) box.checked = !on; if (el) el.textContent = was; const a = $('.aerr', md); if (a) a.textContent = ofcErrHere(err); return; }
   if (el && box?.checked === on) el.textContent = bkChkTxt(x);
   const label = on ? tr('Receipt marked as checked') : tr('Check removed');
   histToast(label, histAdd({label, undo: async () => { await bkChkPut(id, !on); return {}; }, redo: async () => { await bkChkPut(id, on); return {}; }}));
@@ -592,7 +592,7 @@ const BKC = {src: null, d: null, err: null, seq: 0};
 async function bkCmpLoad(src) {
   const seq = ++BKC.seq;
   try { const d = await api('GET', `/api/office/books/euer/compare?year=${src.year}`); if (seq === BKC.seq && BKC.src === src) Object.assign(BKC, {d, err: null}); }
-  catch (x) { if (seq === BKC.seq) BKC.err = x.message || tr('unknown'); }
+  catch (x) { if (seq === BKC.seq) BKC.err = ofcErrHere(x); }
   ofcDraw();
 }
 const bkCmpMoney = v => v == null ? '–' : ofcMoney(v);

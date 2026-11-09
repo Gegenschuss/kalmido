@@ -15,7 +15,7 @@ const bnr_mon = m => { const [y, mo] = m.split('-').map(Number); try { return ne
 async function bnr_load() {
   const q = bnr_q(); BNR.q = q;
   try { const j = await api('GET', '/api/office/bank/noreceipt?' + q); if (BNR.q === q) { BNR.data = j; BNR.err = null; } }
-  catch (x) { BNR.err = x.message || tr('unknown'); }
+  catch (x) { BNR.err = ofcErrHere(x); }
   if (BNR.rules === undefined) {  // the rules come with part B: without the route (404) the "remember" button stays hidden
     BNR.rules = null;
     // a plain fetch: an unknown route answers an HTML 404, which rawFetch would take for an expired session (reload)

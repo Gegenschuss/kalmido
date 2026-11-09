@@ -76,16 +76,16 @@ _TAN_MAX = 64
 
 # the readable messages per code (the answer carries the code too; never a text of the bank library)
 FNT_MSG = {
-    "no_product_id": N_("The bank fetch is not set up on this server (FinTS product registration missing)."),
-    "no_library": N_("The bank fetch is not available on this server (the FinTS library is missing)."),
+    "no_product_id": N_("The bank fetch is not set up on this server yet: whoever runs the server sets it up."),  # 2.802.0 (#5451): plain words
+    "no_library": N_("The bank fetch is not available on this server yet: whoever runs the server can add it."),  # 2.802.0 (#5451)
     "pin": N_("The bank refused the sign-in. Please check the sign-in name and the PIN. Kalmido does not try again by itself."),
     "locked": N_("The bank has locked the online access for now. Please unlock it with your bank first."),
     "wait": N_("The bank refused the sign-in several times. Please wait an hour or check the details with your bank."),
     "busy": N_("Too many bank fetches at once. Please try again in a moment."),
     "too_many": N_("Too many bank fetches. Please wait a few minutes."),
-    "connection": N_("The bank's FinTS server cannot be reached. Please check the server address."),
+    "connection": N_("The bank's server cannot be reached. Please check the server address."),  # 2.802.0 (#5451)
     "blocked": N_("This server address is not allowed (only https addresses on the internet)."),
-    "unsupported": N_("The bank does not offer the statement over FinTS for this account."),
+    "unsupported": N_("The bank does not offer the statement for this account for fetching."),  # 2.802.0 (#5451)
     "no_account": N_("The bank does not list this IBAN for this sign-in name."),
     "tan_method": N_("This TAN method cannot be used here (e.g. a flicker code). Please select another one."),
     "bank": N_("The bank answered with an error. Please try again later."),

@@ -43,7 +43,7 @@ async function pkc_load(refresh) {
     j = refresh ? await api('POST', '/api/office/catalog/refresh', {}) : null;
     // the refresh answers with the full list; the search (q, kind) is asked again from the fresh cache
     if (!j || PKC.q || PKC.kind) j = await api('GET', `/api/office/catalog?q=${encodeURIComponent(PKC.q)}&kind=${encodeURIComponent(PKC.kind)}`);
-  } catch (x) { j = {...(PKC.data || {}), error: x instanceof Offline ? tr('Offline: only works again with a connection') : x.message || tr('unknown'), items: PKC.data?.items || [], failed: !PKC.data}; }  // (the last list stays)
+  } catch (x) { j = {...(PKC.data || {}), error: ofcErrHere(x), items: PKC.data?.items || [], failed: !PKC.data}; }  // (the last list stays)
   if (seq !== PKC.seq || oid !== PKC.oid) return;
   PKC.loading = false; PKC.data = j; pkc_paint();
 }
@@ -115,7 +115,7 @@ async function pkc_after() {
   await pkc_load();
 }
 // quietly for undo / redo: errors as a toast, the step reports itself
-const pkc_req = async (m, url, b) => { try { await api(m, url, b); } catch (x) { toast(x.status === 404 && m === 'POST' && url.endsWith('/install') ? tr('That version is no longer in the catalogue.') : x.message || tr('unknown')); } await pkc_after(); return {}; };
+const pkc_req = async (m, url, b) => { try { await api(m, url, b); } catch (x) { toast(x.status === 404 && m === 'POST' && url.endsWith('/install') ? tr('That version is no longer in the catalogue.') : ofcErrTxt(x)); } await pkc_after(); return {}; };
 async function pkc_install(k, update) {
   const it = pkc_item(k); if (!it?.latest || PKC.busy) return;
   const body = {kind: it.kind, code: it.code, version: it.latest.version}, prev = it.installed?.version || null, name = it.name || it.code;
@@ -133,7 +133,7 @@ async function pkc_install(k, update) {
       body.accept_community = true; await api('POST', '/api/office/packs/install', body);
     }
   } catch (x) {
-    PKC.err[k] = x.status === 422 ? [x.message, ...(x.data?.problems || []).slice(0, 5)].filter(Boolean).join(' · ') : x instanceof Offline ? tr('Offline: only works again with a connection') : x.message || tr('unknown');
+    PKC.err[k] = x.status === 422 ? [x.message, ...(x.data?.problems || []).slice(0, 5)].filter(Boolean).join(' · ') : ofcErrHere(x);
     return;
   } finally { PKC.busy = ''; pkc_paint(); }
   // undo: a new install is removed again; an update goes back to the version before (built in: remove the installed one)
@@ -148,7 +148,7 @@ async function pkc_back(it, version, name) {
   try { await api('POST', '/api/office/packs/install', b); }
   catch (x) {
     if (x.status === 409 && await askConfirm(tr('Install the community pack “{0}”?', name), tr('Community packs are not checked by the Kalmido team. Check tax rates and texts before you send documents with it.'), {ok: tr('Install')})) return pkc_req('POST', '/api/office/packs/install', {...b, accept_community: true});
-    if (x.status !== 409) toast(x.status === 404 ? tr('That version is no longer in the catalogue.') : x.message || tr('unknown'));
+    if (x.status !== 409) toast(x.status === 404 ? tr('That version is no longer in the catalogue.') : ofcErrTxt(x));
   }
   await pkc_after(); return {};
 }
@@ -159,7 +159,7 @@ async function pkc_remove(k) {
   if (!await askConfirm(tr('Uninstall “{0}”?', name), (it.builtin ? tr('The office goes back to the built-in version. Finalised documents keep the pack version they were made with.') : tr('Finalised documents keep the pack version they were made with.')) + aff, {ok: tr('Uninstall'), danger: true})) return;
   PKC.busy = k; delete PKC.err[k]; pkc_paint();
   try { await api('DELETE', pkc_url(it)); }
-  catch (x) { PKC.err[k] = x instanceof Offline ? tr('Offline: only works again with a connection') : x.message || tr('unknown'); return; }  // 409: what still uses it, in plain words
+  catch (x) { PKC.err[k] = ofcErrHere(x); return; }  // 409: what still uses it, in plain words
   finally { PKC.busy = ''; pkc_paint(); }
   offerUndo(tr('“{0}” uninstalled', name), histAdd({label: tr('Uninstall “{0}”', name), undo: () => pkc_req('POST', pkc_url(it) + '/restore'), redo: () => pkc_req('DELETE', pkc_url(it))}));
   await pkc_after();
@@ -269,13 +269,13 @@ async function ocf_choose() {
     if (eb === 'bank') await api('PUT', '/api/office/books/basis', {year: new Date().getFullYear(), basis: 'bank'});  // 2.603.0 (#4927)
     toast(tr('Country set: {0}', ocf_name(code)));
   }
-  catch (x) { toast(x.message || tr('unknown')); return; }
+  catch (x) { ofcErr(x); return; }
   $('.ocf-choose')?.remove();  // (the quotations keep their drawn part while they reload)
   await ofcInfo(true);
 }
 // ---- the warning before the country pack changes (office.js ost_save): what is hidden / shown, open documents
 async function ocf_confirmSwitch(code) {
-  let j; try { j = await api('GET', `/api/office/pack-switch?code=${encodeURIComponent(code)}`); } catch (x) { toast(x.message || tr('unknown')); return false; }
+  let j; try { j = await api('GET', `/api/office/pack-switch?code=${encodeURIComponent(code)}`); } catch (x) { ofcErr(x); return false; }
   const nm = k => tr(OCF_FEATS.find(f => f[0] === k)?.[2] || k);
   const lines = [tr('Finalised invoices keep their state ({0} documents); new documents use the new pack.', j.locked_docs)];
   if (j.open_docs) lines.push(tr('{0} open documents will be calculated with the new rates and texts.', j.open_docs));

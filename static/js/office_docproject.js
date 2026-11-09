@@ -120,7 +120,7 @@ function otk_dispoHtml(dp) {
 async function otk_open() {
   const d = OFD.doc; if (!d) return;
   let j;
-  try { j = await api('GET', `/api/office/docs/${d.id}/tasks`); } catch (x) { toast(x.message || tr('unknown')); return; }
+  try { j = await api('GET', `/api/office/docs/${d.id}/tasks`); } catch (x) { ofcErr(x); return; }
   const upd = j.linked > 0, secs = [...new Set(j.rows.map(x => x.section))];
   const rows = secs.map(s => `${s ? `<tr class="otksec"><th colspan="5">${esc(s)}</th></tr>` : ''}${j.rows.filter(x => x.section === s).map(otk_line).join('')}`).join('')
     + (j.gone.length ? `<tr class="otksec"><th colspan="5">${tr('No longer in the quotation')}</th></tr>${j.gone.map(otk_line).join('')}` : '');
@@ -151,7 +151,7 @@ async function otk_open() {
     if (!j.list_id) { const name = (/** @type {HTMLInputElement|null} */ ($('#otk-name', md))?.value || '').trim(); if (!name) { toast(tr('Please enter a name')); return; } req.create = {name}; }
     /** @type {HTMLButtonElement} */ (b).disabled = true;
     let r;
-    try { r = await api('POST', `/api/office/docs/${d.id}/tasks`, req); } catch (x) { /** @type {HTMLButtonElement} */ (b).disabled = false; toast(x.message || tr('unknown')); return; }
+    try { r = await api('POST', `/api/office/docs/${d.id}/tasks`, req); } catch (x) { /** @type {HTMLButtonElement} */ (b).disabled = false; ofcErr(x); return; }
     modalClose(md);
     if (r.made_project && typeof load === 'function') await load();
     if (typeof modulesOnToast === 'function') modulesOnToast(r.modules_on);

@@ -37,7 +37,7 @@ document.addEventListener('click', e => {
 async function agrLoad() {
   const seq = ++AGR.seq;
   try { const j = await api('GET', '/api/office/agreements' + (AGR.arch ? '?archived=1' : '')); if (seq === AGR.seq) { AGR.data = j; AGR.err = null; } }
-  catch (x) { if (seq === AGR.seq) AGR.err = x.message || tr('unknown'); }
+  catch (x) { if (seq === AGR.seq) AGR.err = ofcErrHere(x); }
   ofcDraw();
 }
 const agrReload = () => { AGR.data = null; if (typeof RKF === 'object') RKF.data = null; if (S.route.mod === 'office' && ofcTab() === 'agreements') agrLoad(); };
@@ -149,7 +149,7 @@ function agrModal(a) {
     } catch (x) {
       const el = $('.aerr', md); if (!el) return;
       if (typeof objConflict === 'function' && await objConflict(md, x, r => { const m2 = agrModal(r); agrReload(); return m2; })) return;  // 2.576.0 (#4794): the merge bar
-      el.textContent = x.message || '';
+      el.textContent = ofcErrHere(x);
     }
   });
   return md;
@@ -219,7 +219,7 @@ async function agrDocSend(f, done, errEl) {  // 2.633.0 (#4920): the file of the
   try {
     const j = await api('POST', '/api/docs', fd);
     if (j.ids?.[0]) done({id: j.ids[0], name: f.name}); else if (errEl) errEl.textContent = (j.errors || []).join(' ');
-  } catch (x) { if (errEl) errEl.textContent = x.message || ''; }
+  } catch (x) { if (errEl) errEl.textContent = ofcErrHere(x); }
 }
 
 document.addEventListener('click', e => {
