@@ -8,6 +8,11 @@ One rule for every new amount column of the office:
   driver (kalmido/core/pg.py) gives NUMERIC to Python as `int` / `float`; take it into the calculator with
   `office/calc.py dec()` and give it out with `dstr()` ("23.80"). Rates, quantities and prices per unit that need more
   places stay `NUMERIC(14,4)` (office_doc_items.qty / rate, office_payments.amount).
+- **The float limit of the driver** (review N3): `_NumLoader` in kalmido/core/pg.py turns a NUMERIC value with places into a
+  Python `float`, exact up to 15 significant digits. A single `NUMERIC(14,2)` value (at most 14 digits) always comes back
+  exactly, and `dec()` / `mc_text` take it via `str()` without rounding. A **sum** in SQL (`SUM(amount)`, a balance over
+  years) may grow past 15 digits; then do not fetch it as a number but as text, `SUM(amount)::text`, and take that into
+  `dec()`. The loader itself stays as it is (the rest of the app reads NUMERIC as int / float since SQLite).
 - **Minor units (`BIGINT`, cents) only at the border to a payment provider** (office_pay_*.amount_minor, fee_minor): the
   provider counts that way, nothing else does.
 - **A column encrypted at rest stays `TEXT`** (kalmido/core/orgcrypt.py `FIELDS`: office_bank_tx.amount, office_cf_*.amount,
