@@ -170,16 +170,20 @@ def ts_canon(v):
     the same for TEXT and TIMESTAMPTZ tables."""
     if v is None or v == "":
         return ""
+    raw = v
     if isinstance(v, str):
         try:
             v = datetime.fromisoformat(v.strip().replace("Z", "+00:00"))
         except ValueError:
-            return v
+            return raw
     if not isinstance(v, datetime):
         return str(v)
     if v.tzinfo is None:
         v = v.replace(tzinfo=timezone.utc)
-    return v.astimezone(timezone.utc).isoformat()
+    try:
+        return v.astimezone(timezone.utc).isoformat()
+    except OverflowError:  # review 2.760.0: year 1 / 9999 with an offset leaves the range -> as given (never equal to a real version)
+        return raw if isinstance(raw, str) else str(raw)
 
 
 class _TsLoader(TimestamptzLoader):

@@ -848,7 +848,9 @@ def _coerce(v, typ):
         elif not isinstance(v, str):
             v = str(v)
         return v[:UMZ_TEXT_MAX].replace("\x00", "")
-    return _BAD  # json, binary, time stamps: not taken over
+    if typ == "timestamp with time zone":  # 2.760.0 (#5311): the core template's columns -- a valid ISO time stamp as text
+        return v if _iso_ts(v) else _BAD
+    return _BAD  # json, binary, other time stamps: not taken over
 
 
 def _umz_snips(v, by):
@@ -955,7 +957,7 @@ def umz_row(c, table, src, fixed, ts):
     for k, (typ, nullable, dflt) in cols.items():
         if k in d or nullable or dflt or k == "id":
             continue
-        if typ == "text" and k.endswith("_at"):
+        if typ in ("text", "timestamp with time zone") and k.endswith("_at"):  # 2.760.0 (#5311): + TIMESTAMPTZ
             d[k] = ts
         else:
             return None

@@ -31,12 +31,13 @@ CREATE TABLE IF NOT EXISTS meetings (
 CREATE INDEX IF NOT EXISTS meetings_trash ON meetings(deleted_at) WHERE deleted_at IS NOT NULL;  -- the trash list
 ```
 
-Points in time are `TIMESTAMPTZ` (2.760.0, #5311; new tables take real types, the lint `tools/check_coltypes.py`). The app
+Points in time are `TIMESTAMPTZ` (2.760.0, #5311; new tables take real types, checked by the column type lint of #5305). The app
 reads them as ISO text in one canonical form (`kalmido/core/pg.py` `ts_canon`: UTC, `+00:00`, microseconds only when there
 are any), the same form the older `TEXT` columns hold, and writes the ISO text of `now_iso()` as before. So the answers,
 the history, undo and the version check (`expect_updated_at`, `ccf_check` compares both sides canonically) behave alike for
 `TEXT` and `TIMESTAMPTZ` tables; an older area moves its columns over in its stage. Never compare such a column with `''`
-(`deleted_at IS NULL` / `IS NOT NULL`).
+(`deleted_at IS NULL` / `IS NOT NULL`), and a trigger never takes one as `to_jsonb(row)->>'..._at'` (that text carries the
+session's zone, not the canonical form): use `to_char(x AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"+00:00"')`.
 
 Add the table to `kalmido/core/rls.py` TABLES (it has an `org_id`) and to the export lists (`tools/check_export_tables.py`
 says where). The core keeps its own data in `obj_history`, `obj_undo` and `obj_revoked`; shares are rows of `fs_shares`
