@@ -21,13 +21,14 @@ import json
 import os
 import subprocess
 import sys
+import threading
 
 from flask import jsonify
 
 from ..core.config import app
 from ..core.db import body, bump, db, err, now_iso
 from ..core.errors import BadInput
-from ..core.i18n import tr
+from ..core.i18n import N_, tr
 from ..core.pg import write_lock
 from ..core.access import Denied
 from ..accounts.session import me  # 2.777.0 (#5254)
@@ -43,6 +44,9 @@ from .split import _get as sp_get, _put as sp_put, _no_agent
 DP_PAGES = 1000              # pages of a PDF this edits at most
 DP_BYTES = 100 << 20         # bytes of a PDF this edits at most (the child process holds it a few times)
 DP_TURNS = (90, 180, 270)
+DP_WAIT = 20                 # review F3: seconds a request waits for a free place to read a PDF, then 409 "busy"
+_DP_SEM = threading.BoundedSemaphore(2)  # review F3: at most two pypdf child processes of this route at once (like split.py _THUMB_SEM)
+DP_BUSY = N_("Several PDFs are being read right now, try again in a moment.")  # the text of tasks/attachtext.py ERR_MSG busy
 
 # pypdf in a limited child process: the PDF on stdin, the change as argv (JSON {n, delete, rotate}); out: the new PDF.
 # Exit 3 = encrypted, 4 = the output budget exceeded, 5 = the page count is not the one the server checked against.
@@ -89,13 +93,17 @@ COUNT_WORKER = PAGES_WORKER[:PAGES_WORKER.index("n = len(r.pages)")] + "sys.stdo
 
 
 def _dp_run(code, arg, data, secs):
-    """A limited pypdf child process (code, its argv JSON, the PDF on stdin). review F2: a timeout or a failed start (fork) =
-    None (the callers: 409)."""
+    """A limited pypdf child process (code, its argv JSON, the PDF on stdin). review F3: at most two at once, a request waits
+    DP_WAIT seconds for a place (else 409 busy); review F2: a timeout or a failed start (fork) = None (the callers: 409)."""
+    if not _DP_SEM.acquire(timeout=DP_WAIT):
+        raise Denied(409, tr(DP_BUSY))
     try:
         return subprocess.run([sys.executable, "-I", "-c", code, arg], input=data, capture_output=True, timeout=secs, close_fds=True,
                               env={"PATH": os.environ.get("PATH", "/usr/bin:/bin")})
     except (subprocess.TimeoutExpired, OSError):
         return None
+    finally:
+        _DP_SEM.release()
 
 
 def dp_count(data):

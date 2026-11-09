@@ -221,6 +221,15 @@ def with_run(fake, fn):
 part("count_timeout", lambda: with_run(boom, lambda: P.dp_count(b"%PDF")))
 part("edit_timeout", lambda: with_run(boom, lambda: P._edit(b"%PDF", 2, [1], {})))
 part("count_oserror", lambda: with_run(fork, lambda: P.dp_count(b"%PDF")))
+# F3: both places taken
+def busy():
+    P.DP_WAIT = 0.2
+    P._DP_SEM.acquire(); P._DP_SEM.acquire()
+    try:
+        return P.dp_count(b"%PDF")
+    finally:
+        P._DP_SEM.release(); P._DP_SEM.release()
+part("busy", busy)
 part("exit5", lambda: with_run(lambda *a, **k: subprocess.CompletedProcess(a[0], 5, b"", b""), lambda: P._edit(b"%PDF", 2, [1], {})))
 print(json.dumps(out))
 """
@@ -232,5 +241,6 @@ except (ValueError, IndexError):
 check(U, f"the unit part ran ({u.stderr[-400:]})")
 check(U.get("count_timeout") is None and U.get("count_oserror") is None, f"F2: a timeout / a failed start of the count = None (409), no 500 {U}")
 check(isinstance(U.get("edit_timeout"), list) and U["edit_timeout"][0] == 409, f"F2: a timeout of the edit: 409 {U.get('edit_timeout')}")
+check(isinstance(U.get("busy"), list) and U["busy"][0] == 409 and "Several PDFs" in (U["busy"][1] or ""), f"F3: both places taken: 409 busy after the wait {U.get('busy')}")
 
 sys.exit(kt.done("p2777_b_docpages"))
