@@ -121,6 +121,7 @@ const de = iso => `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}`;
     await ev(click(`document.querySelector('[data-cc="confirm"]')`));
     check(await ready(ev, cardOk('.ccsug', '/12,50/')), 'the list: the suggestion is a candidate card with the picture and 12,50 ' + await ev(`document.querySelector('.ccsug')?.outerHTML.slice(0, 500) || 'none'`));
     check(await ev(`!document.querySelector('.ccsug .ofcrow')`), 'the list: no text row any more');
+    check(await ev(`(() => { const c = document.querySelector('.ccsug .ocd'), r = c.getBoundingClientRect(); return r.height < 360 && document.querySelector('.ccsug').getBoundingClientRect().height < r.height + 40; })()`), 'the list: the card sits right under "Vorschlag", no empty space');
     await ev(click(`document.querySelector('.ccl [data-cc="pick"]')`));
     check(await ready(ev, `!!document.querySelector('.bnkother .ocd [data-cc="match"]') && !document.querySelector('.bnkother .ofcrow')`), '"Select receipt…" lists candidate cards');
     await shot('p2778c-cards-list.png');
