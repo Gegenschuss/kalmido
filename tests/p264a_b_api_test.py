@@ -361,6 +361,30 @@ if g:
           "undo of the move out: the step's own part and group are scrubbed (wanted)")
     check(undo_marks(MV) == 0, "after the undo: no plain text of the task in obj_undo")
 
+# 2.800.0 (#5447, Fable review 2.787): the move out of a task WITH a subtask: its way back would need the subtask's texts
+# re-encrypted (le2a_move list_e2e_move), which the server cannot. The step marks the move as not undoable at recording
+# (keep): the undo leaves the task in the open list and names it (UG_KEPT), the other fields of the step still go back.
+MS = MK + "Sub"
+T4 = A.post(B + "/api/tasks", json={"list_id": L2, "title": MS + "Top", "priority": 1}).json()["id"]
+T4S = A.post(B + "/api/tasks", json={"list_id": L2, "title": MS + "Child", "parent_id": T4}).json()["id"]
+r = A.patch(B + f"/api/tasks/{T4}", json={"list_id": L, "title": cipher(7), "le2e_move": {"tasks": [{"id": T4S, "title": cipher(8)}]}})
+check(r.ok and dbx("SELECT list_id FROM tasks WHERE id=?", (T4S,))[0][0] == L, f"#5447: task with subtask into the lock {r.status_code} {r.text[:200]}")
+r = A.patch(B + f"/api/tasks/{T4}", json={"list_id": L2, "title": MS + "Out", "priority": 3,
+                                          "le2e_move": {"tasks": [{"id": T4S, "title": MS + "ChildOut"}]}})
+check(r.ok and dbx("SELECT list_id FROM tasks WHERE id=?", (T4,))[0][0] == L2, f"#5447: move out with the subtask {r.status_code} {r.text[:200]}")
+g = dbx("SELECT group_id, CAST(snap AS text) FROM obj_undo WHERE kind='task' AND ref_id=? ORDER BY id DESC LIMIT 1", (T4,))
+check(bool(g) and '"keep"' in g[0][1] and "list_id" in g[0][1], f"#5447: the move out is marked as not undoable at recording {g}")
+if g:
+    r = A.post(B + f"/api/undo/to/{g[0][0]}")
+    row = dbx("SELECT list_id, title, priority FROM tasks WHERE id=?", (T4,))[0]
+    sub = dbx("SELECT list_id, title FROM tasks WHERE id=?", (T4S,))[0]
+    st = (r.json().get("stayed") or [{}]) if r.ok else [{}]
+    check(r.ok and row[0] == L2 and row[1] == MS + "Out" and sub[0] == L2 and sub[1] == MS + "ChildOut",
+          f"#5447: undo leaves task and subtask in the open list with their texts {r.status_code} {r.text[:200]} {row} {sub}")
+    check(row[2] == 1, f"#5447: the other field of the step (priority) goes back {row}")
+    check(r.ok and g[0][0] in r.json().get("partial", []) and "list_id" in str(st[0].get("reason")) and st[0].get("code") == "conflict",
+          f"#5447: the move is named as not undone (partial, UG_KEPT) {r.text[:300]}")
+
 print(f"\n{OKS[0]} checks ok, {len(FAILS)} failed", flush=True)
 if FAILS:
     print("FAILED:\n - " + "\n - ".join(FAILS))

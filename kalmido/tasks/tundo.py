@@ -22,7 +22,7 @@ import json
 
 from flask import g
 
-from ..collab.liste2e import le2e_is_cipher
+from ..collab.liste2e import le2a_moving, le2a_subtree, le2e_is_cipher
 from ..collab.reactions import ltag_names
 from ..core.access import need_list, need_task
 from ..core.db import bump
@@ -162,6 +162,30 @@ def _plain_under_lock(c, row, b):
     return any(isinstance(b.get(k), str) and b[k] and not le2e_is_cipher(b[k]) for k in TU_PLAIN)
 
 
+def _lock_extras(c, tid):
+    """2.800.0 (#5447): texts a move of task tid between a locked and another list would have to carry re-encrypted besides
+    its own (subtasks, comments, text field values -- liste2e.py le2a_move); the server cannot, it has no key."""
+    ids = le2a_subtree(c, tid)
+    if len(ids) > 1:
+        return True
+    return bool(c.execute("SELECT 1 FROM comments WHERE task_id=? AND COALESCE(body, '')<>'' LIMIT 1", (tid,)).fetchone()
+                or c.execute("""SELECT 1 FROM task_field_values v JOIN list_fields lf ON lf.id=v.field_id WHERE v.task_id=?
+                                AND lf.type='text' AND COALESCE(v.value, '')<>'' LIMIT 1""", (tid,)).fetchone())
+
+
+def _kept_move(c, row, b):
+    """2.800.0 (#5447, Fable review 2.787): a move OUT of a locked list (or between two locks) whose way back would need the
+    browser for more than the task's own texts (subtasks, comments, text field values): the move and the texts that changed
+    format are marked as not undoable at recording ("keep"), so taking the step back leaves them and names them (UG_KEPT)
+    instead of ending in 4xx (list_e2e_move); the other fields of the step still go back."""
+    src = b.get("list_id")
+    if not src or src == row["list_id"] or not _tu_locked(c, src) or not le2a_moving(c, row["list_id"], src):
+        return []
+    if not _lock_extras(c, row["id"]):
+        return []
+    return ["list_id"] + [k for k in TU_PLAIN if k in b]
+
+
 def _flush(c, m):
     parts, skip = [], set()
     for op, tid, data in m["seq"]:
@@ -176,7 +200,11 @@ def _flush(c, m):
             if keys and _plain_under_lock(c, row, b):
                 skip.add(tid)
             elif keys:
-                parts.append((row, {"op": "fields", "b": b, "a": {k: after.get(k) for k in keys}}))
+                d = {"op": "fields", "b": b, "a": {k: after.get(k) for k in keys}}
+                kept = _kept_move(c, row, b)
+                if kept:
+                    d["keep"] = kept
+                parts.append((row, d))
         elif _holds(row, op, data):
             parts.append((row, {"op": op, **data}))
     parts = [p for p in parts if p[0]["id"] not in skip]  # 2.787.0 (#5417): no part at all for such a task in this request
@@ -235,14 +263,20 @@ def _fields(c, tid, data, redo):
     src, dst = (data.get("b") or {}, data.get("a") or {}) if redo else (data.get("a") or {}, data.get("b") or {})
     if not dst:
         raise Denied(409, tr(TU_GONE))
+    kept = [k for k in data.get("keep") or [] if k in dst]  # 2.800.0 (#5447): marked at recording, never written back
+    if kept:
+        dst = {k: v for k, v in dst.items() if k not in kept}
+        if not dst:
+            raise Denied(409, tr(UG_KEPT_REDO if redo else UG_KEPT, ", ".join(kept)))
+        src = {k: v for k, v in src.items() if k not in kept}
     cf = []
     e = apply_update(c, tid, {**dst, "_prev": src}, cf, lock=True)
     if e:
         raise Denied(409, e)
     left = [x["field"] for x in cf]
     if left and len(left) >= sum(len(v) if k == "fields" and isinstance(v, dict) else 1 for k, v in dst.items()):
-        raise Denied(409, tr(UG_KEPT_REDO if redo else UG_KEPT, ", ".join(left)))
-    return data, left
+        raise Denied(409, tr(UG_KEPT_REDO if redo else UG_KEPT, ", ".join(kept + left)))
+    return data, kept + left
 
 
 def _status_back(c, tid, u):
