@@ -440,3 +440,15 @@ xd_on('.cal .cell[data-day], .wad[data-day], .wcol[data-day]', 'f', async (s, el
   re();
   offerUndo(tr('Event created'), histAdd({label: tr('New event “{0}”', title), undo: () => api('DELETE', `/api/events/${r.id}`), redo: () => api('POST', `/api/events/${r.id}/restore`), post: re}));
 }, () => feat('events'));
+// 4. a receipt from the documents into the office = "Move to office" (docs/area.py, the same call back is its undo, like
+//    receipts.js rc_areaMove; the server checks the office and the right to write the document)
+xd_on('#view', 'f', async (s, el, e, id) => {
+  const go = (to, undo) => async () => {
+    await api('POST', `/api/docs/${id}/area`, undo ? {to, undo: true} : {to});
+    try { if (S.route.mod === 'office') renderView(); } catch { /* the view draws itself on its next poll */ }
+    return {};
+  };
+  try { await go('office', false)(); } catch { return; }
+  const label = tr('Moved to office');
+  histToast(label, histAdd({label, undo: go('private', true), redo: go('office', false)}));
+}, () => S.route.mod === 'office');
