@@ -355,7 +355,7 @@ if g:
     GO = g[0][0]
     r = A.post(B + f"/api/undo/to/{GO}")
     row = dbx("SELECT list_id, title FROM tasks WHERE id=?", (T3,))[0]
-    check(r.status_code < 500 and row[0] == L and str(row[1]).startswith("e2e1:"),
+    check(r.ok and row[0] == L and str(row[1]).startswith("e2e1:"),
           f"undo of the move out: back in the locked list with the ciphertexts {r.status_code} {r.text[:200]} {row}")
     check(not dbx("SELECT 1 FROM undo_groups WHERE id=?", (GO,)) and not dbx("SELECT 1 FROM obj_undo WHERE group_id=?", (GO,)),
           "undo of the move out: the step's own part and group are scrubbed (wanted)")

@@ -184,7 +184,10 @@ def _flush(c, m):
         return
     tids = {r["id"] for r, _ in parts}
     if len(tids) == 1:
-        label = (TU_LABEL.get(parts[0][1]["op"], TU_EDIT), [_title(parts[-1][0]["title"])])
+        last = parts[-1][0]
+        # 2.787.0 (#5417, review): a list that is locking itself (e2e set, task not converted yet) names no plain title
+        ttl = [TU_TASK] if _tu_locked(c, last["list_id"]) else _title(last["title"])
+        label = (TU_LABEL.get(parts[0][1]["op"], TU_EDIT), [ttl])
     else:
         label = (TU_MANY, [len(tids)])
     orgs = {}
