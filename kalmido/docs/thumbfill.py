@@ -125,3 +125,54 @@ def p2583_thumb_l_fill(c):
             print("docs: sharp preview catch-up", nid, type(e).__name__, e, flush=True)
     gset(c, FILL_L_KEY, json.dumps({"below": rows[-1][0]}))
     return len(rows)
+
+
+# 2.781.0 (#5390): the scan mark (doc_meta.auto["_scan"], docs/scanmark.py) for documents recognised before it existed -- the
+# same catch-up pattern: only while the queue is idle, a portion every FILL_S seconds, newest first, its own position
+# (FILL_SCAN_KEY), "done" at the end. Only PDFs, pictures and documents of a scan inbox are looked at (anything else is no
+# scan, the missing mark says so already); a document that cannot be told now keeps no mark (its next recognition sets it).
+FILL_SCAN_KEY = "docs_scan_fill"  # settings: {"below": lowest node id handled so far} or {"done": 1}
+_QS = {"at": 0.0}
+
+
+def p5390_scan_fill(c):
+    """One portion of the catch-up of the scan mark (run like p61a_thumb_fill in the queue's system context, the caller
+    commits). Returns the number of documents looked at; 0 when it is not time yet or done."""
+    if not FILL or time.monotonic() - _QS["at"] < FILL_S:
+        return 0
+    _QS["at"] = time.monotonic()
+    try:
+        st = json.loads(gsetting(c, FILL_SCAN_KEY) or "{}")
+    except ValueError:
+        st = {}
+    st = st if isinstance(st, dict) else {}
+    if st.get("done"):
+        return 0
+    below = int(st.get("below") or 2 ** 62)
+    rows = c.execute("""SELECT d.node_id FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id
+                        WHERE d.node_id < ? AND d.state='done' AND POSITION('"_scan"' IN COALESCE(d.auto, ''))=0 AND n.deleted_at IS NULL
+                          AND (d.source='scan' OR LOWER(n.mime)='application/pdf' OR LOWER(n.mime) LIKE 'image/%' OR LOWER(n.name) LIKE '%.pdf')  -- pg-ok: LOWER() on the column
+                        ORDER BY d.node_id DESC LIMIT ?""", (below, FILL_N)).fetchall()  # pg-ok: LOWER() on the column only
+    if not rows:
+        gset(c, FILL_SCAN_KEY, json.dumps({"done": 1}))
+        return 0
+    from .scanmark import scan_of
+    for (nid,) in rows:
+        try:
+            with c.savepoint():  # one broken document never stops the catch-up
+                m = S.meta_row(c, nid)
+                node = c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
+                data = fs_read(c, nid)
+                ei = bool(S.meta_json(c, m, "extracted", {}).get("_einv")) if m["extracted"] else False
+                scan = scan_of(node["name"], node["mime"], data, file_kind(node["name"], node["mime"], data[:2048]), m["source"], einvoice=ei)
+                if scan is not None:
+                    r = c.execute("SELECT auto FROM doc_meta WHERE node_id=? FOR UPDATE", (nid,)).fetchone()  # a save meanwhile stays
+                    auto = json.loads(r["auto"] or "{}") if r else None
+                    if isinstance(auto, dict) and "_scan" not in auto:
+                        auto["_scan"] = scan
+                        c.execute("UPDATE doc_meta SET auto=? WHERE node_id=?", (json.dumps(auto, separators=(",", ":")), nid))
+            c.commit()  # the row lock ends here, not after the whole portion
+        except Exception as e:  # noqa: BLE001 -- a missing file, a key that does not open, a broken PDF: skip it
+            print("docs: scan mark catch-up", nid, type(e).__name__, e, flush=True)
+    gset(c, FILL_SCAN_KEY, json.dumps({"below": rows[-1][0]}))
+    return len(rows)

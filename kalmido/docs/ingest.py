@@ -216,11 +216,11 @@ def docs_run_once():
             except Exception as e:  # noqa: BLE001 -- the queue never dies
                 c.rollback()
                 print("docs: split scan", type(e).__name__, e, flush=True)
-            from .thumbfill import p61a_thumb_fill, p2583_thumb_l_fill  # 2.66.1 (#1944): previews of imports from before, while nothing waits; 2.583.0 (#4812): + the sharp ones
+            from .thumbfill import p61a_thumb_fill, p2583_thumb_l_fill, p5390_scan_fill  # 2.66.1 (#1944): previews of imports from before, while nothing waits; 2.583.0 (#4812): + the sharp ones
             try:
                 with system_ctx(c):  # docs queue: server-side catch-up of every workspace's previews, nothing handed to a person
-                    if not p61a_thumb_fill(c):
-                        p2583_thumb_l_fill(c)  # 2.583.0 (#4812): then the sharp previews of big cards
+                    if not p61a_thumb_fill(c) and not p2583_thumb_l_fill(c):  # 2.583.0 (#4812): then the sharp previews of big cards
+                        p5390_scan_fill(c)  # 2.781.0 (#5390): then the scan mark of documents from before
                 c.commit()
             except Exception as e:  # noqa: BLE001 -- the queue never dies
                 c.rollback()

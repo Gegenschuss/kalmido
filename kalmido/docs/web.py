@@ -130,6 +130,7 @@ def doc_json(c, m, node, full=False, role=None, pre=None):
     auto.pop("_hand", None)
     auto.pop("_was", None)      # 2.273.0 F2 (#3047): the recognised values behind the hand values (doc_update)
     asn_t = auto.pop("_asn_taken", None)  # 2.591.0 B (#4863): the code's number has another document (asn_taken_view)
+    scan = bool(auto.pop("_scan", None))  # 2.781.0 (#5390): a scan (docs/scanmark.py): the archive number field shows
     sug = S.meta_json(c, m, "suggest", {})
     sug.pop("_given", None)
     out_sug = {}
@@ -163,7 +164,7 @@ def doc_json(c, m, node, full=False, role=None, pre=None):
          "sender": {"id": m["sender_id"], "name": S.label_name(c, ws, "sender", m["sender_id"])} if m["sender_id"] else None,
          "type": {"id": m["type_id"], "name": S.label_name(c, ws, "type", m["type_id"])} if m["type_id"] else None,
          "tags": pre["tags"].get(m["node_id"], []) if pre else S.node_tags(c, m["node_id"]), "folder": folder, "auto": auto, "suggest": out_sug, "review": bool(m["review"]),
-         "thumb": bool(m["thumb"]), "thumb_l": bool(S.thumb_l_of(m)), "task_id": m["task_id"], "asn": m["asn"], "source": m["source"], "created_at": node["created_at"],
+         "thumb": bool(m["thumb"]), "thumb_l": bool(S.thumb_l_of(m)), "task_id": m["task_id"], "asn": m["asn"], "scan": scan, "source": m["source"], "created_at": node["created_at"],
          "updated_at": m["updated_at"], "parent_id": node["parent_id"], "hand": hand,
          "edited_at": doc_ver(m)}  # 2.570.0 (#4770): the version of people's changes (expect_updated_at of PATCH)
     # 2.210 C (#2761): only a flag whether the document is shared (no names)

@@ -95,9 +95,11 @@ function textPdf(lines) {  // a one-page PDF with a text layer, written by hand
     check(same(rows, 'l') && same(rows, 'x'), 'a letter: labels and fields each start at one left edge ' + JSON.stringify(rows));
     // 2.555.0 (#4470): the pane beside the list is narrower than 36rem: the label stands above its field (left of it only in a wide form, p2555_a_formnarrow_ui)
     check(rows.every(r => Math.abs(r.x - r.l) <= 1), 'computer pane: the label above its field ' + JSON.stringify(rows));
-    const widths = await ev(`(() => { const w = s => Math.round(document.querySelector(s).getBoundingClientRect().width); return JSON.stringify([w('#dc-name'), w('#dc-asn').valueOf() && w('.dc-f .dc-amt')]); })()`);
+    // 2.781.0 (#5390): a digital letter is no scan and has no archive number field any more: the file name row (field + button, same .dc-amt) instead
+    const widths = await ev(`(() => { const w = s => Math.round(document.querySelector(s).getBoundingClientRect().width); return JSON.stringify([w('#dc-name'), w('#dc-file').valueOf() && w('.dc-f .dc-amt')]); })()`);
     const [wn, wa] = JSON.parse(widths);
-    check(Math.abs(wn - wa) <= 2, 'the archive number row is as wide as the title ' + widths);
+    check(Math.abs(wn - wa) <= 2, 'a row with field + button (file name) is as wide as the title ' + widths);
+    check(await ev(`!document.querySelector('#dc-asn')`), '2.781.0 (#5390): a digital letter without a number: no archive number field');
     // the actions
     const acts = `(() => { const r = e => e.getBoundingClientRect(), a = [...document.querySelectorAll('.dv-hacts .btn, .dv-hacts .iconbtn')]  /* 2.554.0 (#4469): Delete is an icon button; 2.583.0 (#4835): the head of the view */.filter(e => e.getClientRects().length); const del = a[a.length - 1], prev = a[a.length - 2];
       return JSON.stringify({n: a.length, last: del.dataset.dc, cl: del.classList.contains('dc-adel'), lines: new Set(a.map(e => Math.round(r(e).top))).size, apart: !!prev && Math.abs(r(del).right - r(del.parentElement).right) <= 1}); })()`;  // 2.583.0 (#4835): Delete at the right end of the head

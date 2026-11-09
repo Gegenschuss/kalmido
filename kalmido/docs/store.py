@@ -1403,6 +1403,8 @@ def process(c, nid):
     if ei and not res.get("error"):
         res["method"] = "e-invoice"
     thumb_store(c, m, node, data, res.get("kind"))
+    from .scanmark import scan_of            # 2.781.0 (#5390): read before the row is locked (a PDF is read in a child process)
+    scan = scan_of(node["name"], node["mime"], data, res.get("kind"), m["source"], einvoice=bool(ei))
     text = res.get("text") or ""
     asn_found = None
     if not m["asn"]:
@@ -1481,6 +1483,8 @@ def process(c, nid):
     if not m2:  # #3090: deleted along while the run went (users.user_delete / orgs.org_delete lock its row first)
         return None
     auto_all.pop("_asn_taken", None)         # 2.591.0 B (#4863): a fresh run, a fresh hint
+    if scan is not None:                     # 2.781.0 (#5390): a scan (archive number field); unknown = the old mark stays
+        auto_all["_scan"] = scan
     if asn_found and not m2["asn"]:
         asn_lock(c, ws, nid)                 # 2.273.0 C (#3047); F2: only around the write
         holder = asn_holder(c, ws, asn_found, nid)
