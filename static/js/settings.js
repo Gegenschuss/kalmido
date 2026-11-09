@@ -1201,7 +1201,7 @@ function settingsModal(focus) {
   if (cur === 'biz' && typeof biz_draw === 'function') biz_draw(md);  // 2.365.2 (#2789)
   if (cur === 'docs' && typeof dcs_draw === 'function') dcs_draw(md);
   if (focus === 'codecheck') { setTimeout(() => $('#s-cc-h', md)?.scrollIntoView({block: 'start'}), 0); setCodeCheck(md); }  // 2.766.0 (#5220)
-  md.addEventListener('click', e => { const b = e.target.closest('[data-cc]'); if (b?.dataset.cc === 'run') setCodeCheck(md); else if (b?.dataset.cc === 'copy' && typeof ckvCopy === 'function') ckvCopy(md); });  // 2.766.0 (#5220)
+  md.addEventListener('click', e => { const b = e.target.closest('[data-ccv]'); if (b?.dataset.ccv === 'run') setCodeCheck(md); else if (b?.dataset.ccv === 'copy' && typeof ckvCopy === 'function') ckvCopy(md); });  // 2.766.0 (#5220)
   if (typeof wt_holDraw === 'function') wt_holDraw(md);  // 2.365.2 C (#2789): its box exists only in General
   calsWire(md); whWire(md); if (S.me?.is_admin) { agWire(md); audWire(md); }
   agSetupWire(md);  // 2.7.2 (#420)
@@ -1658,7 +1658,7 @@ function aboutHtml(chk, hint) {
     <div class="row aboutmarks"><label></label><span class="muted">${tr('Product and company names mentioned in Kalmido are trademarks of their respective owners. Kalmido is an independent project, not affiliated with or endorsed by them.')}</span></div>
     <div class="row aboutlinks"><label></label>${ABOUT_LINKS.map(([u, n, i]) => `<a class="btn sm" href="${u}" target="_blank" rel="noopener noreferrer">${ic(i, 's')} ${tr(n)}</a>`).join('')}${legalLinks(a.legal, 'btn sm')}</div>`;
   // 2.766.0 (#5220): Check code - the hash of the code this browser holds (codecheck.js, loaded by the button; setCodeCheck)
-  h += `<h4 id="s-cc-h">${tr('Check code')}</h4>${hint(esc(tr('Shows the version and one hash of the code this browser was given, to compare with the release on GitHub. This display comes from the same server as the code: it catches mistakes and slips, not an operator who means to deceive. That needs a check from outside (guide).')))}<div id="s-cc"><button type="button" class="btn sm" data-cc="run">${ic('shield', 's')} ${tr('Check code')}</button><div id="s-cc-res" aria-live="polite"></div></div>`;
+  h += `<h4 id="s-cc-h">${tr('Check code')}</h4>${hint(esc(tr('Shows the version and one hash of the code this browser was given, to compare with the release on GitHub. This display comes from the same server as the code: it catches mistakes and slips, not an operator who means to deceive. That needs a check from outside (guide).')))}<div id="s-cc"><button type="button" class="btn sm" data-ccv="run">${ic('shield', 's')} ${tr('Check code')}</button><div id="s-cc-res" aria-live="polite"></div></div>`;
   h += sup_aboutHtml();  // 2.74.0 (#338): "Support Kalmido" (self-hosted only)
   return h;
 }

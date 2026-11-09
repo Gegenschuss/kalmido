@@ -142,9 +142,9 @@ async function swCheck() {
 
     // ---- Settings > Help > Check code (bob: no organisation, no admin)
     await ev(`(async () => { await loadModule('settings'); settingsModal('help'); return 1; })()`);
-    check(await pu(`!!document.querySelector('.smodal #sp-help:not(.hidden) #s-cc-h') && !!document.querySelector('[data-cc="run"]')`), 'Settings > Help: the section "Check code" with its button, for a person without an organisation');
+    check(await pu(`!!document.querySelector('.smodal #sp-help:not(.hidden) #s-cc-h') && !!document.querySelector('[data-ccv="run"]')`), 'Settings > Help: the section "Check code" with its button, for a person without an organisation');
     check(await ev(`!LD_RAN.has('codecheck')`), 'codecheck.js is not loaded before the button (a module on demand)');
-    await ev(`document.querySelector('[data-cc="run"]').click(), 1`);
+    await ev(`document.querySelector('[data-ccv="run"]').click(), 1`);
     check(await pu(`!!document.querySelector('#s-cc-res #s-cc-hash')`), 'Check code: the result is drawn');
     const res = JSON.parse(await ev(`JSON.stringify({hash: document.querySelector('#s-cc-hash').textContent, sum: document.querySelector('#s-cc-sum').textContent, ok: document.querySelector('#s-cc-sum').dataset.ok,
       ver: document.querySelector('#s-cc-res .row span').textContent, rel: document.querySelector('#s-cc-rel').getAttribute('href'), tgt: document.querySelector('#s-cc-rel').target, ran: LD_RAN.has('codecheck')})`));
@@ -158,7 +158,7 @@ async function swCheck() {
     await shot('codecheck');
     // Copy hash (the clipboard stubbed)
     await ev(`(() => { window.__copied = []; Object.defineProperty(navigator, 'clipboard', {value: {writeText: async t => { window.__copied.push(t); }}, configurable: true}); return 1; })()`);
-    await ev(`document.querySelector('[data-cc="copy"]').click(), 1`);
+    await ev(`document.querySelector('[data-ccv="copy"]').click(), 1`);
     check(await pu(`window.__copied.includes(${JSON.stringify(SRV)})`), '"Copy hash" puts the hash into the clipboard');
 
     // ---- the browser hashes what it holds: core.js with other bytes under its right ?v=
@@ -166,7 +166,7 @@ async function swCheck() {
       const ks = (await caches.keys()).filter(k => /^tasks-shell-v\\d+$/.test(k)).sort((a, b) => +b.slice(13) - +a.slice(13)), c = await caches.open(ks[0]);
       const req = (await c.keys()).find(r => new URL(r.url).pathname === '/static/js/core.js' && new URL(r.url).searchParams.get('v'));
       await c.put(req, new Response('/* not the published core.js */', {headers: {'content-type': 'text/javascript'}}));
-      document.querySelector('[data-cc="run"]').click();
+      document.querySelector('[data-ccv="run"]').click();
       for (let i = 0; i < 200 && document.querySelector('#s-cc-sum')?.dataset.ok !== '0'; i++) await new Promise(r => setTimeout(r, 100));
       return JSON.stringify({x: await ckvRun(), sum: document.querySelector('#s-cc-sum').textContent, hash: document.querySelector('#s-cc-hash').textContent});
     })()`));

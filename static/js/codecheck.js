@@ -59,7 +59,7 @@ function ckvHtml(/** @type {any} */ x) {
   const rel = `${CKV_REPO}/releases/tag/v${encodeURIComponent(x.version)}`, old = typeof APP_VER === 'string' && APP_VER && APP_VER !== x.version;
   const ok = !x.bad.length && x.same;
   return `<div class="row"><label>${tr('Version')}</label><span>v${esc(x.version)}${old ? ` · <b>${esc(tr('This window runs v{0}: reload first', APP_VER))}</b>` : ''}</span></div>
-    <div class="row"><label>${tr('Hash of the code')}</label><span class="cchash"><code id="s-cc-hash" translate="no">${esc(x.hash)}</code> <button type="button" class="btn sm" data-cc="copy">${ic('copy', 's')} ${tr('Copy hash')}</button></span></div>
+    <div class="row"><label>${tr('Hash of the code')}</label><span class="cchash"><code id="s-cc-hash" translate="no">${esc(x.hash)}</code> <button type="button" class="btn sm" data-ccv="copy">${ic('copy', 's')} ${tr('Copy hash')}</button></span></div>
     <div class="row"><label>${tr('Result')}</label><span id="s-cc-sum" data-ok="${ok ? 1 : 0}">${ok ? esc(trn("{0} file in this browser checked: it matches the server's list.", "{0} files in this browser checked: all match the server's list.", x.checked))
       : x.bad.length ? `<b>${esc(trn("{0} file in this browser differs from the server's list:", "{0} files in this browser differ from the server's list:", x.bad.length))}</b> <span translate="no">${x.bad.slice(0, 12).map(esc).join(', ')}${x.bad.length > 12 ? ' …' : ''}</span>`
       : `<b>${esc(tr("The hash here and the server's manifest differ although every checked file matches: please report it."))}</b>`}
@@ -69,7 +69,7 @@ function ckvHtml(/** @type {any} */ x) {
 }
 // the button "Check code" of Settings > Help (settings.js): fills #s-cc-res
 async function ckvCheck(/** @type {ParentNode} */ md) {
-  const box = /** @type {HTMLElement | null} */ (md.querySelector('#s-cc-res')), btn = /** @type {HTMLButtonElement | null} */ (md.querySelector('[data-cc="run"]'));
+  const box = /** @type {HTMLElement | null} */ (md.querySelector('#s-cc-res')), btn = /** @type {HTMLButtonElement | null} */ (md.querySelector('[data-ccv="run"]'));
   if (!box) return null;
   if (btn) btn.disabled = true;
   box.innerHTML = `<div class="muted">${tr('Checking…')}</div>`;
