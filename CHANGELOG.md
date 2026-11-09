@@ -17,6 +17,86 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.787.0] - 2026-11-10
+
+Package 2.764 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Added
+- Approvals: the client link without an account works for image and PDF approvals too (#5040) - the client sees the file,
+  sets a point (image) or a page and a point (PDF) with the same numbers as in the app, comments and approves; the link hands
+  out only the files of the versions it shows, sandboxed. Find it: an image approval > Client link > open the link on the phone,
+  tap the image.
+
+### Fixed
+- Income statement / VAT return: entertainment receipts at the edge between a "receipts" year and a "bank and cash" year count
+  exactly once (the day of their bank line decides, as for receipts since #5241); a travel receipt dated in the year before
+  its trip counts in its own year (was in none) - also in the exports and DATEV (#5313).
+- Office: a receipts year reads the bank / card / cash lines of the near years only instead of every year (#5314).
+- Client link: the guest page played the newest audio file for an older audio version (#5040).
+
+Package 2.777 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Neuer Server-Agent: Startpak).
+
+### Added
+- Document view: delete and turn pages of a PDF, saved as a new version of the same document (#4874). The button
+  "Pages" in the preview bar opens a strip of all pages; mark pages (Ctrl/Shift for several), Del removes, turn left /
+  right, "Delete blank pages" (blank pages are only suggested, never removed by themselves). "Save as new version" keeps
+  the original as the older version in the tab History; id, archive number, sender, tags and links stay. Undo is one
+  step. Only people with write access; office receipts show that the original stays as a version. Find it: open a
+  PDF document, Pages, mark page 2, Del, Save - the view shows one page less, History lists both versions.
+- Undo across devices, stage 6 (#5254): calendar events (edit, move to another calendar, trash, restore), contacts
+  (edit, move to another address book, trash, restore), files (rename, move, trash, restore, new version, restore a
+  version) and habits write their steps on the server, so the list of recent steps can take them back from another
+  device. A file's step points at its version, the content is never copied. Taking back checks today's rights.
+- New server agent: the create dialog has "Projects for the agent" (several; one's own projects, for a team agent
+  those of the organisation); the chosen projects are shared before the starter pack (#5378).
+
+### Changed
+- New server agent without a shared project: the starter pack creates its routines paused and waiting instead of
+  showing three red errors; they start by themselves once the person shares a project with the agent. The agent
+  window lists all starter pack items with their state, adds a missing one at any time and shows a calm hint with
+  "Share project" (#5378).
+- A team agent is listed in the tab Agents for every member and admin of its organisation, also without a shared
+  project, with "No project shared" or "N projects"; a member without a shared project can write to it and gets a
+  fixed answer from Kalmido on how to share a project - the agent itself gets nothing from that person (#5378).
+  Find it: as a member of an organisation, open Agents - the team agent is there with "No project shared".
+
+### Fixed
+- Restoring an older version of a document recognises it again at once (page count and text no longer stale for a
+  minute) (#4874).
+
+Package 2.780 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), CI-only rot: p271_ui, Teil 1/6).
+
+### Fixed
+- Tags and chips readable again: text on the pale accent ground uses the normal text colour (tag pills in the tag field, filter chips, the selected list row, duplicate and step badges); a lint rule in tools/check_appcss.py refuses --accent-ink on --accent-soft (#5388).
+- Document view: the leaf arrows with "n of m" stay in the middle of the head, whatever the length of the file name; long names are cut with an ellipsis (full name in the tooltip), the counter has a fixed width; phone layout unchanged (#5389).
+- Opening a document directly by its address (reload, link, favourite) no longer flashes a red "Not a folder" message (#5391).
+- Master data PATCH ticked the office area twice (p2566_b_bump, #5384).
+- Test fixes for suites red in CI: p2623_b_unshare_cards follows the #5246 decision (#5385), rls_direct fills typed time columns properly (#5386), p249_b_api no longer trips over the PIN's digits inside a random salt (#5374), p2624_b_order puts its probe modules at their sorted place (#5403), p2742_c_tagpills_ui accepts the #ablage address of the document view.
+
+Package 2.778 (Bündel: Bündel: Gemeinsamer Kern Stufe 7e: Büro und Ablage - Direk, Rückgängig über alle Geräte, Stufe 4: Büro: Gruppe, Rückgängig über alle).
+### Added
+- Office: a walk-through for open credit card positions and open bank bookings - one booking after the other with progress "n of m", the candidates as cards with a preview of the receipt / invoice, take over, search another, upload, no receipt needed, private (bank also ignore, cash, split), skip, undo of the last step; keys 1-3 / Enter / arrows with a mouse, one card per screen and swipe on a phone (#5383)
+- Office: the same candidate card (preview, amount, date, reason) replaces the text suggestion and the text match list in the credit card and bank lists (#5383)
+- Undo across devices, stage 5: a person's table cell writes and added rows / columns, and a knowledge page's saves, are steps of "Recent steps" pointing to the table's batch / the page's versions; a cell or page changed since by someone else stays and is named, the rest goes back (#5253)
+### Fixed
+- Office settings, terms and conditions (PDF): the language and the file name no longer run together; every office list shows the name on top and the detail line below (#5382)
+- Trash core: a writer who put an object into the trash (trash_role edit) can take that own step back from "Recent steps"; the plain restore from the trash stays with manage (#5371)
+
+Package 2.787 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Security
+- Locked (end-to-end encrypted) lists: moving a task from an open list into a locked list records no server undo step for
+  that task, so its former plain texts no longer stay in the undo history after the move (#5417); while a list is locking
+  itself, an undo step names "Task" instead of the plain title.
+
+### Fixed
+- A task opened by its address (link, notification, reload, bookmark) shows its own project behind it with the task's row
+  marked, no longer the empty Inbox; Back leads into that project (#5438). Find it: open a task link from another app or
+  reload the page while a task is open - the project list stands behind it.
+
+### Fixed
+- main: CI red of 2.782.0 - the default columns of lists and collected views (Today, My tasks, ...) follow the row's symbol level again (Calm / Important), task numbers show in collected views again, the subtask cell tells screen readers what it counts, column titles stay at the top while the rows scroll, editing a title in a row with columns keeps the row's height (#4502); in the agent chat header on phones the picture's and the back arrow's touch areas no longer overlap (#5243); a long document title on a phone no longer pushes the actions into a second line, the preview no longer jumps when leafing (#4876); old suites follow "Recent steps", the full-width pages and the document title field (#5250, #4840, #4876); two suites wait for the settled state instead of a fixed time (#3506); CI red of 2.786.0 - after splitting a stack its Undo stays on screen (no "Not found" for the gone document) (#4887), suites follow the start card "Recently edited" (#5352) and a team chat redraw (#3506).
+
 ## [2.786.0] - 2026-11-09
 
 Package 2.769 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
@@ -505,7 +585,8 @@ Package 2.685 (Bündel: Kommentare: Aktivität in drei Stufen (nur Kommenta, Bü
 - Office: switching "Office & finance" on no longer leaves the office saying it is switched off when it loaded before the switch was saved (#5176).
 - Balance sheet: a receipt booked against the bank (counter account "bank") and paid from the cash box is now booked bank to cash instead of being left out (#5128).
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.786.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.787.0...HEAD
+[2.787.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.787.0
 [2.786.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.786.0
 [2.782.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.782.0
 [2.774.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.774.0
