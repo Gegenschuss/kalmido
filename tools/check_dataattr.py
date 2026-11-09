@@ -35,6 +35,7 @@ KNOWN = {
     "bnk": ("shared", {"office_bankrules.js"}),
     "cb": ("guarded", {"contacts.js"}),
     "cc": ("guarded", {"choicecard.js", "office_cards.js"}),
+    "dco": ("shared", {"abdocs.js"}),  # 2.769.0 (#5340): a document row of a folder's list opens it like its card (docs.js dc_open)
     "dcchk": ("shared", {"docs.js"}),  # 2.768.0 (#4888): the choosing mark of every card (docs.js dc_selMark) = ablage.js ab_selPick
     "dl": ("guarded", {"family.js", "office_docs.js"}),
     "dpfor": ("shared", {"agentrotate.js"}),
