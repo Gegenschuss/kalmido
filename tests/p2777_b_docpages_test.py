@@ -17,6 +17,7 @@ usage: p2777_b_docpages_test.py <datadir>   (P2777B_NOSTART=1: the container run
 import base64
 import json
 import subprocess
+import sys
 
 import kt
 from kt import B, CT, check, until
@@ -177,4 +178,4 @@ r = A.post(B + f"/api/docs/{D1}/pages", json={"rotate": {"1": 180}})
 check(r.status_code == 201 and rotations(content(A, D1)) == [180], f"... turned by 180 without expect_version (old clients) ({r.status_code})")
 check(Fr.get(B + f"/api/docs/{D1}/pages").status_code == 404, "frida never sees alice's document (404)")
 
-kt.done("p2777_b_docpages")
+sys.exit(kt.done("p2777_b_docpages"))
