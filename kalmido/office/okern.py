@@ -17,6 +17,7 @@ from ..core.pg import system_ctx
 from ..core.retention import ret_on, ret_trash_cut
 from ..core.writes import obj_restore, obj_trash, obj_trash_prune
 from .model import office_role, pb_owner
+from .rights import office_can
 
 OFK = {}  # kind -> {table, area}
 
@@ -32,7 +33,6 @@ def _base_of(kind):
             return "manage" if owner == uid else None
         if office_role(c, uid, oid) is None:
             return None  # not of this organisation at all
-        from .rights import office_can  # rights.py imports the office trash's module chain at its top
         k = OFK[kind]
         return "manage" if office_can(c, uid, oid, k["area"], k["need"]) else None
     return base
