@@ -950,7 +950,8 @@ def _settings_json(c, ws, uid):
     return {"ws": f"org:{oid}" if oid else "private", "can_manage": can, "fields": df_list(c, ws), "levels": cfg["levels"], "inbox": cfg["inbox"],
             "rules": _rules_v(c, ws) if can else [], **_flow_extra(c, ws, can), **_settings_labels(c, ws, uid, can), "folders": folders,
             "root_id": root, "inbox_path": S.inbox_path(c, root, uid), "ocr": ocr_available(), "ocr_missing": _ocr_missing(c, uid), "ocr_langs": _ocr_view(cfg), "asn_prefix": cfg["asn_prefix"], "asn_next": S.asn_next(c, ws),
-            "title_pattern": cfg["title_pattern"], "title_auto": cfg["title_auto"], "title_pattern_default": S.TITLE_PATTERN,  # 2.783.0 (#4882) "mail": {"enabled": MAIL_IN_ON, "address": mail_addr(mtk_plain(c, tok[0])) if (tok and MAIL_IN_ON) else ""},
+            "title_pattern": cfg["title_pattern"], "title_auto": cfg["title_auto"], "title_pattern_default": S.TITLE_PATTERN,  # 2.783.0 (#4882)
+            "mail": {"enabled": MAIL_IN_ON, "address": mail_addr(mtk_plain(c, tok[0])) if (tok and MAIL_IN_ON) else ""},
             "scan": _scan_json(c, uid, oid)}  # 2.207.0 A (#2763): scan inboxes, folder watcher downloads, the mail note
 
 
