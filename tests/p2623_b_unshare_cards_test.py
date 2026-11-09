@@ -6,8 +6,8 @@ an older version after a rollback reads only the card and must not open the shar
  - tables: the card of an organisation's table is marked, the guest reads nothing; Undo (share again) opens the card again
  - freelancer-matrix: sheets, wiki (a private table shared by address: the card goes, as in the table's dialog; a page and a
    folder of a person without an organisation: the card is marked, the folder card ends as a whole -- both core shares)
- - a share made in the file store on a table's node (no card) goes into obj_revoked too; a plain folder's share is deleted as
-   before (no obj_revoked row)
+ - a share made in the file store on a table's node (no card) goes into obj_revoked too; a plain folder's share is deleted
+   and (2.747.0, #5246) kept in obj_revoked as well (reason unshare, no kind)
  - tenant-matrix: sheet_share (a person of another workspace cannot take the share back: 404, the card stays)
 usage: p2623_b_unshare_cards_test.py <datadir>      (a fresh container; P2623B_NOSTART=1 = the server already runs)"""
 import sys
@@ -99,15 +99,18 @@ check(revoked("sheet", T1) == 2 and not dbx("SELECT 1 FROM fs_shares WHERE node_
       "... gone, the row in obj_revoked")
 check(Gi.get(B + f"/api/sheets/{T1}").status_code == 200, "... the guest's share is untouched")
 
-# a plain folder's share: deleted as before
+# a plain folder's share: deleted, and since 2.747.0 (#5246, decision 08.11.2026) kept in obj_revoked like every core share
 FO = Bo.post(B + "/api/files/folders", json={"name": "Plain", "space": SP}).json()["id"]
 r = Bo.post(B + f"/api/files/nodes/{FO}/shares", json={"user_id": CARL, "role": "view"})
 fs3 = dbx("SELECT id FROM fs_shares WHERE node_id=?", (FO,))
 check(r.ok and bool(fs3), f"a plain folder shared {r.status_code}")
-n0 = dbx("SELECT COUNT(*) FROM obj_revoked")[0][0]
-check(Bo.delete(B + f"/api/files/shares/{fs3[0][0] if fs3 else 0}").ok and not dbx("SELECT 1 FROM fs_shares WHERE node_id=?", (FO,)),
+FS3 = fs3[0][0] if fs3 else 0
+check(Bo.delete(B + f"/api/files/shares/{FS3}").ok and not dbx("SELECT 1 FROM fs_shares WHERE node_id=?", (FO,)),
       "... taken back: deleted")
-check(dbx("SELECT COUNT(*) FROM obj_revoked")[0][0] == n0, "... as before without an obj_revoked row")
+# 2.780.0 (#5385): was "as before without an obj_revoked row" -- #5246 (08.11.2026) sends the dialog's folder share through
+# the core's obj_node_unshare too (p2571_c_kern was adjusted then, this suite was missed)
+rv = [x for x in dbx("SELECT reason, kind, row_json FROM obj_revoked WHERE src='fs_shares'") if f'"id": {FS3},' in x[2]]
+check(len(rv) == 1 and rv[0][0] == "unshare" and rv[0][1] is None, f"... kept in obj_revoked (reason unshare, no kind) {rv}")
 
 # review F1 (2.623.0): a share on an organisation's knowledge page, taken back in the file store's dialog, lies in obj_revoked
 # under that organisation (not as a private row)
