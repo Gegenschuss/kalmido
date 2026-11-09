@@ -8,7 +8,8 @@ the suite calls this same logic.
 Read: schema.py + the fragments of migrations.d (tools/check_migrations.py schema_src).
   - an *_id BIGINT column of a CREATE TABLE needs REFERENCES, PRIMARY KEY or "no FK" on its line; a table whose comment block
     above it says "no FK" is skipped as a whole
-  - a MIGRATIONS step ("table", "x_id", "ALTER TABLE ... ADD COLUMN x_id BIGINT ...") the same, the marker on the step's line
+  - an ALTER TABLE ... ADD COLUMN [IF NOT EXISTS] x_id BIGINT ... anywhere (MIGRATIONS tuple, wrapped over lines, AFTER list)
+    the same, the marker in the statement, on its line or on the line before
   - the columns of 2.102 without a key stand frozen in tests/p2103_c_fk_legacy.txt: that list only shrinks; a line there whose
     column has a key by now (or is gone) is a finding too, take it out
 
@@ -26,7 +27,8 @@ from check_migrations import schema_src  # noqa: E402
 LEGACY = os.path.join("tests", "p2103_c_fk_legacy.txt")
 TABLE = re.compile(r"((?:--[^\n]*\n)*)CREATE TABLE IF NOT EXISTS (\w+) \((.*?)\);", re.S)
 COL = re.compile(r"(\w+_id) BIGINT(?! GENERATED)([^,]*)")
-STEP = re.compile(r'\s*\("(\w+)", "(\w+_id)", "ALTER TABLE \w+ ADD COLUMN \w+ BIGINT([^"]*)"\)')
+# 2.755.0 (#5261): over the whole text, not per line - IF NOT EXISTS, a wrapped tuple and an AFTER list are seen too
+STEP = re.compile(r"""ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(\w+)\s+ADD\s+COLUMN\s+(?:IF\s+NOT\s+EXISTS\s+)?"?(\w+_id)"?\s+BIGINT(?!\s+GENERATED)([^"']*)""", re.I)
 
 
 def legacy(root=ROOT):
@@ -46,9 +48,12 @@ def unkeyed(src):
             for col in COL.findall(line):
                 if "REFERENCES" not in col[1] and "PRIMARY KEY" not in col[1] and "no FK" not in line:
                     out.append(f"{t.group(2)}.{col[0]}")
-    for line in src.split("\n"):
-        m = STEP.match(line)
-        if m and "REFERENCES" not in m.group(3) and "no FK" not in line:
+    for m in STEP.finditer(src):
+        a = src.rfind("\n", 0, m.start())
+        a = src.rfind("\n", 0, a) if a > 0 else a  # the line before, too
+        b = src.find("\n", m.end())
+        ctx = src[a + 1:b if b >= 0 else len(src)]
+        if "REFERENCES" not in m.group(3) and "PRIMARY KEY" not in m.group(3) and "no FK" not in ctx:
             out.append(f"{m.group(1)}.{m.group(2)}")
     return out
 

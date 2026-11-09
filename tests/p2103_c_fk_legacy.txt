@@ -106,3 +106,16 @@ tchat_reads.last_id
 tchat_thread_reads.last_id
 tidy_pending.actor_id
 upload_scan.ref_id
+# 2.755.0 (#5261): found only when the check read IF NOT EXISTS / wrapped / AFTER-list steps; today's stock, the list only shrinks
+office_payments.bank_tx_id
+office_bank_tx.rule_id
+office_cash_entries.payment_id
+wiki_shares.page_id
+office_doc_items.origin_id
+office_doc_parts.origin_id
+user_task_order.section_id
+office_equipment.warranty_task_id
+sheet_shares.core_id
+wiki_shares.core_id
+office_meals.pay_id
+office_bank_imports.bank_account_id
