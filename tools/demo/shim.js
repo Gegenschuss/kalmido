@@ -1650,10 +1650,16 @@
   const docLive = () => nodeLive().filter(n => n.doc);
   const dcSettings = () => ({ws: 'private', can_manage: true, levels: {sender: 'learn', type: 'learn', tags: 'learn', folder: 'learn'}, inbox: false, rules: [], senders: mcol('dl_sender'), types: mcol('dl_type'), tags: mcol('dl_tag'), folders: [],
     root_id: docRoot().id, ocr: false, ocr_missing: [], asn_prefix: 'ASN', asn_next: (MD().asn || 0) + 1, mail: {enabled: false, address: ''}, ...(MD().dcset || {})});
+  // 2.772.0 (#4890): the filters with their numbers (count), the archive number with / without, no custom fields in the demo
+  const dcFacets = () => {
+    const facet = k => { const m = {}; for (const n of docLive()) for (const x of k === 'tags' ? n.doc.tags || [] : [n.doc[k]].filter(Boolean)) { const e = m[x.name] = m[x.name] || {ids: [], count: 0}; e.ids.push(x.id); e.count++; } return Object.entries(m).map(([name, e]) => ({name, ids: [...new Set(e.ids)], count: e.count})); };
+    const withAsn = docLive().filter(n => n.doc.asn != null).length;
+    return {senders: facet('sender'), types: facet('type'), tags: facet('tags'), folders: [], asn: {with: withAsn, without: docLive().length - withAsn}, fields: []};
+  };
+  on('GET', '/api/docs/facets', () => dcFacets());
   on('GET', '/api/docs', q => { const s = (q.get('q') || '').toLowerCase(), tag = q.get('tag'), lim = +q.get('limit') || 200;
     const all = docLive().filter(n => (!s || n.name.toLowerCase().includes(s)) && (!tag || (n.doc.tags || []).some(t => t.name === tag || String(t.id) === tag)) && (q.get('review') !== '1' || n.doc.review)).sort((a, b) => b.id - a.id);
-    const facet = k => { const m = {}; for (const n of docLive()) for (const x of k === 'tags' ? n.doc.tags || [] : [n.doc[k]].filter(Boolean)) (m[x.name] = m[x.name] || []).push(x.id); return Object.entries(m).map(([name, ids]) => ({name, ids: [...new Set(ids)]})); };
-    return {docs: all.slice(0, lim).map(dcOut), total: all.length, review: docLive().filter(n => n.doc.review).length, waiting: 0, facets: {senders: facet('sender'), types: facet('type'), tags: facet('tags'), folders: []}}; });
+    return {docs: all.slice(0, lim).map(dcOut), total: all.length, review: docLive().filter(n => n.doc.review).length, waiting: 0, facets: dcFacets()}; });
   on('GET', '/api/docs/settings', () => dcSettings());
   on('PUT', '/api/docs/settings', (q, b) => { const {ws, ...rest} = b; MD().dcset = {...(MD().dcset || {}), ...rest}; return dcSettings(); });
   on('POST', '/api/docs', (q, b) => { const root = docRoot(); return {ids: (b.files || []).map(f => putFile(root.id, f, {doc: {review: true, tags: []}}).id), errors: []}; });
