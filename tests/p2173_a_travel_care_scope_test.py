@@ -229,9 +229,12 @@ check(row and tuple(row[0]) == (ORG, D1, D2, 1, 1), f"filled from the trip: {row
 r = A.post(B + f"/api/life/trips/{OT}/expenses")
 check(r.status_code == 200 and r.json()["trip_id"] == TID and not r.json()["created"], "a second click: the same one")
 check(dbx("SELECT COUNT(*) FROM office_trips WHERE org_id=?", (ORG,))[0][0] == 1, "exactly one office trip")
-# 2.620.0 (#4642): the admin's travel expenses of the shared trip stay the admin's: the member 403
+# 2.620.0 (#4642): the admin's travel expenses of the shared trip stay the admin's
+# 2.766.0 (#5329): since 2.695.0 (#4958) a 409 with the way out (own travel expenses in the office) instead of a bare 403;
+# the body names no trip id and no amount of the admin's
 r = Bo.post(B + f"/api/life/trips/{OT}/expenses")
-check(r.status_code == 403, f"a member does not get the admin's travel expenses ({r.status_code})")
+check(r.status_code == 409 and "office" in (r.json().get("error") or ""), f"a member does not get the admin's travel expenses (409) ({r.status_code})")
+check("trip_id" not in r.json() and "amount" not in r.text, "#5329: the 409 carries only the text, no trip id or amounts " + r.text[:200])
 check(A.patch(B + "/api/settings", json={"workspace": SP}).ok, "the office of the organisation")
 j = A.get(B + "/api/office/trips", params={"year": D1[:4]}).json()
 t = next((x for x in j["trips"] if x["id"] == TID), None)
@@ -287,7 +290,9 @@ check(Fl.post(B + "/api/life/trips", json={"name": "X", "from": D1, "to": D2, "s
 # the travel expenses button knows whether expenses are linked (GET, the same gate as the POST)
 r = A.get(B + f"/api/life/trips/{OT}/expenses")
 check(r.ok and r.json().get("trip_id") == TID2, "GET: the linked travel expenses " + r.text[:200])
-check(Bo.get(B + f"/api/life/trips/{OT}/expenses").status_code == 403, "GET: a member 403")  # 2.620.0 (#4642): the admin's travel expenses
+# 2.620.0 (#4642): the admin's travel expenses; 2.766.0 (#5329): 409 since 2.695.0 (#4958), still no trip id in the body
+r = Bo.get(B + f"/api/life/trips/{OT}/expenses")
+check(r.status_code == 409 and "trip_id" not in r.text, f"GET: a member 409 without the trip ({r.status_code}) {r.text[:200]}")
 check(Fr.get(B + f"/api/life/trips/{OT}/expenses").status_code == 404, "GET: another organisation 404")
 check(requests.get(B + f"/api/life/trips/{OT}/expenses", headers=AGH).status_code in (401, 403, 404), "GET: no agent")
 check(requests.get(B + f"/api/life/trips/{PT}/expenses", headers=PTH).status_code in (401, 403, 404), "GET: no API token")
