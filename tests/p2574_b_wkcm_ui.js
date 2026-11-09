@@ -65,20 +65,24 @@ const BODY = Array.from({length: 100}, (_, i) => part(i)).join('\n');
       // 2.627.0 (#4977): the scroll is set ONCE, then only waited for (it was moved again in every poll: on a slow CI run it
       // kept moving while the decorations were still following the last one); a second scroll only when the first one did
       // not bring the line on screen (the line heights below were estimates until drawn)
-      const to1003 = `(() => { const v = WKCM.view, at = v.state.doc.line(1003).from, sc = document.querySelector('#view');
+      // 2.783.0 (#5376): on a computer the page's text scrolls inside the card (.wkcm), on the phone #view: the nearest box
+      // around the editor that really scrolls
+      const wkcm_sc = `const wkcm_sc = v => { for (let e = v.dom; e && e.id !== 'view'; e = e.parentElement) { const o = getComputedStyle(e).overflowY;
+        if ((o === 'auto' || o === 'scroll') && e.scrollHeight > e.clientHeight + 1) return e; } return document.querySelector('#view'); };`;
+      const to1003 = `(() => { ${wkcm_sc} const v = WKCM.view, at = v.state.doc.line(1003).from, sc = wkcm_sc(v);
         sc.scrollTop += v.documentTop + v.lineBlockAt(at).top - sc.getBoundingClientRect().top - 200; return 1; })()`;
-      const on1003 = `(() => { const v = WKCM.view, at = v.state.doc.line(1003).from; return v.visibleRanges.some(x => x.from <= at && x.to >= at); })()`;
+      const on1003 = `(() => { ${wkcm_sc} const v = WKCM.view, at = v.state.doc.line(1003).from; return v.visibleRanges.some(x => x.from <= at && x.to >= at); })()`;
       // 2.640.0 (#5019): after each scroll the test waits until CodeMirror has drawn the place the screen shows (its viewport holds
       // the line at the top of #view: the scroll is measured, the line heights there are real) - never a fixed time; only then, and
       // only when line 1003 is still not on screen (the first scroll used estimated heights: on the phone it landed near line 1450,
       // seen 07.11.2026), it is scrolled once more with the heights CodeMirror knows now; at most four times
-      const drawn = `(() => { const v = WKCM.view, sc = document.querySelector('#view'), at = v.lineBlockAtHeight(sc.getBoundingClientRect().top - v.documentTop + 1).from;
+      const drawn = `(() => { ${wkcm_sc} const v = WKCM.view, sc = wkcm_sc(v), at = v.lineBlockAtHeight(sc.getBoundingClientRect().top - v.documentTop + 1).from;
         return v.viewport.from <= at && v.viewport.to >= at; })()`;
       let seen = false;
       for (let i = 0; i < 4 && !seen; i++) { await ev(to1003); await until(drawn, 10000); seen = !!(await until(on1003, 2000)); }
       // 2.640.0 (#5019): a red check says where screen, CodeMirror's viewport and the decorated part stood (the CI log keeps only FAIL lines)
-      const where = `(() => { const v = WKCM.view, f = v.state.field(WKCM_FIELD), ln = p => v.state.doc.lineAt(Math.min(p, v.state.doc.length)).number;
-        return JSON.stringify({top: Math.round(document.querySelector('#view').scrollTop), viewport: [ln(v.viewport.from), ln(v.viewport.to)], told: [ln(f.vp.from), ln(f.vp.to)], part: f.r ? [ln(f.r.from), ln(f.r.to)] : null}); })()`;
+      const where = `(() => { ${wkcm_sc} const v = WKCM.view, f = v.state.field(WKCM_FIELD), ln = p => v.state.doc.lineAt(Math.min(p, v.state.doc.length)).number;
+        return JSON.stringify({top: Math.round(wkcm_sc(v).scrollTop), viewport: [ln(v.viewport.from), ln(v.viewport.to)], told: [ln(f.vp.from), ln(f.vp.to)], part: f.r ? [ln(f.r.from), ln(f.r.to)] : null}); })()`;
       check(seen, 'line 1003 is on screen' + (seen ? '' : ' ' + await ev(where)));
       const fol = await until(`(() => { const v = WKCM.view, r = v.state.field(WKCM_FIELD).r, at = v.state.doc.line(1003).from; return !!r && r.from <= at && r.to >= at; })()`);
       check(fol, 'the decorations followed the screen to line 1003' + (fol ? '' : ' ' + await ev(where)));
