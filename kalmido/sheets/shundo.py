@@ -24,7 +24,7 @@ from ..core.undodiff import ug_diff_add, undo_diff_reg, undo_person
 from ..core.undogroups import UG_LABEL, UG_TRACKED
 from ..core.undoweb import UG_GONE, UG_KEPT, UG_KEPT_REDO
 from ..core.writes import UNDO_NOTHING
-from .core import SH_STEP_KINDS, ShBook, sh_need, sh_reload, sh_touch, sh_undo_batch
+from .core import SH_STEP_KINDS, ShBook, sh_change, sh_need, sh_reload, sh_touch, sh_undo_batch
 from .formula import sh_col_letter
 from .shfmt import shfm_undo
 from .shkinds import _shk_file_swap
@@ -74,7 +74,6 @@ N_TABLE = "Table"
 def shu_rec(c, sheet_row, kind, old=None, new=None, cell_id=None, row_id=None, col_id=None):
     """2.800.0 (#5409): a person's structural change of sheet_row into the request's batch (sheets/shustep.py takes it back);
     nothing for an agent / no person / an undo running (shu_batch None)."""
-    from .core import sh_change
     batch = shu_batch(c, sheet_row)
     if batch:
         sh_change(c, int(sheet_row["id"]), batch, None, kind, cell_id=cell_id, row_id=row_id, col_id=col_id, old=old, new=new)

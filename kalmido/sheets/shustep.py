@@ -26,9 +26,12 @@ from ..core.access import Denied, need_feat
 from ..core.errors import BadInput
 from ..core.i18n import tr
 from ..core.undoweb import undo_need_reg
-from .core import SH_STEP_KINDS, ShBook, sh_need, sh_reload, sh_touch
+from ..files.fsref import fs_ref_rename
+from .core import SH_STEP_KINDS, ShBook, sh_freeze, sh_need, sh_reload, sh_set_name, sh_touch
+from .shbook import _name_free, shb_bid, shb_label, shb_name_set, shb_rows, shb_sync
 from ..core.pg import table_columns
 from .shhist import SHH_KIND, SHH_OWN, _core, shh_meta
+from .web import sh_order_apply, shx_col_apply, shx_place
 
 
 def _js(v):
@@ -55,12 +58,10 @@ def _trash(table, what):
 
 
 def _col_name(c, r, col_id):
-    from .web import shx_place
     return shx_place(c, r["id"], "col", col_id)
 
 
 def _cset(c, r, ch, uid, ts, redo):
-    from .web import shx_col_apply
     to, frm = (_js(x) or {} for x in _ends(ch, redo))
     col = c.execute("SELECT * FROM sheet_columns WHERE id=? AND sheet_id=?", (ch["col_id"], r["id"])).fetchone()
     name = _col_name(c, r, ch["col_id"]) if col else tr("Column {0}", "?")
@@ -87,7 +88,6 @@ def _cset(c, r, ch, uid, ts, redo):
 
 
 def _order(c, r, ch, uid, ts, redo):
-    from .web import sh_order_apply
     a, z = _js(ch["old_raw"]) or {}, _js(ch["new_raw"]) or {}
     kind = "row" if a.get("k") == "row" else "col"
     name = tr("Rows") if kind == "row" else tr("Columns")
@@ -149,7 +149,6 @@ def _cell(c, r, ch):
 
 
 def _freeze(c, r, ch, uid, ts, redo):
-    from .core import sh_freeze
     to, frm = _ends(ch, redo)
     x, name = _cell(c, r, ch)
     if x is None or ("1" if x["frozen"] else "0") != frm:
@@ -162,7 +161,6 @@ def _freeze(c, r, ch, uid, ts, redo):
 
 
 def _name(c, r, ch, uid, ts, redo):
-    from .core import sh_set_name
     to, frm = _ends(ch, redo)
     x, name = _cell(c, r, ch)
     if x is None or (x["name"] or "") != (frm or ""):
@@ -175,13 +173,11 @@ def _name(c, r, ch, uid, ts, redo):
 
 
 def _tab(c, r, tid):
-    from .shbook import shb_bid
     t = c.execute("SELECT * FROM sheets WHERE id=?", (int(tid),)).fetchone() if str(tid or "").isdigit() else None
     return t if t is not None and shb_bid(t) == r["id"] else None
 
 
 def _tab_name(t):
-    from .shbook import shb_label
     return tr("Sheet {0}", shb_label(t)) if t is not None else tr("Sheets")
 
 
@@ -196,7 +192,6 @@ def _tab_trash(added):
         if out:
             n = c.execute("UPDATE sheets SET deleted_at=? WHERE id=? AND deleted_at IS NULL", (when, t["id"])).rowcount
         else:
-            from .shbook import shb_label, shb_rows
             if any(shb_label(x).casefold() == shb_label(t).casefold() for x in shb_rows(c, r["id"])):
                 return False, _tab_name(t)  # its name is taken meanwhile
             n = c.execute("UPDATE sheets SET deleted_at=NULL WHERE id=? AND deleted_at=?", (t["id"], when)).rowcount
@@ -208,7 +203,6 @@ def _tab_trash(added):
 
 
 def _tname(c, r, ch, uid, ts, redo):
-    from .shbook import _name_free, shb_label, shb_name_set, shb_rows
     to, frm = (_js(x) or {} for x in _ends(ch, redo))
     t = _tab(c, r, to.get("t"))
     if t is None or t["deleted_at"] or shb_label(t) != frm.get("v"):
@@ -223,7 +217,6 @@ def _tname(c, r, ch, uid, ts, redo):
 
 
 def _tpos(c, r, ch, uid, ts, redo):
-    from .shbook import shb_rows
     to, frm = (_js(x) or [] for x in _ends(ch, redo))
     live = [x["id"] for x in shb_rows(c, r["id"])]
     seen = set(frm)
@@ -255,8 +248,6 @@ def _sheet_need(c, uid, rid, oid):
     keep = {k for k in table_columns(c, "sheets") if k not in SHH_OWN}
 
     def fix(c):
-        from .shbook import shb_sync
-        from ..files.fsref import fs_ref_rename
         now = sh_reload(c, int(rid))
         shb_sync(c, int(rid))  # every sheet of the table hangs on the same list
         if not now["book_id"]:

@@ -23,6 +23,7 @@ from ..core.retention import ret_on, ret_trash_days
 from ..core.serializers import unlink_files
 from ..accounts.orgs import is_org_admin
 from .core import sh_list_title, sh_may, sh_space, sh_space_key, sh_to_display
+from .formula import sh_col_letter  # 2.800.0 (#5409): shx_place
 from .shorder import sho_apply, sho_moved, sho_plan, sho_restore_apply, sho_restore_plan, sho_sort_plan  # 2.631.0 (#4620), 2.658.0 (#5000)
 from .shhist import shh_meta_write  # 2.564.0 (#4701/#4702); 2.571.0 (#4766): shh_meta_write
 from .shundo import shu_batch, shu_rec  # 2.778.0 (#5253): a person's writes as steps of "Recent steps"; 2.800.0 (#5409): shu_rec
@@ -353,7 +354,6 @@ def shx_place(c, sid, kind, xid):
     if kind == "row":
         return tr("Row {0}", i + 1)
     t = c.execute("SELECT title FROM sheet_columns WHERE id=?", (xid,)).fetchone()
-    from .formula import sh_col_letter
     return tr("Column {0}", (t and t[0]) or sh_col_letter(i))
 
 
