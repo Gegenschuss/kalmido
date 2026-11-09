@@ -1274,12 +1274,15 @@ def cal_restore_sub():
     """2.800.0 (#5466): {undo} -> the removed subscription back (its id, name, colour, link, login), pending until fetched again."""
     c, b, uid = db(), body(), me()
     tok = b.get("undo")
+    if c.execute("SELECT COUNT(*) FROM cal_subs WHERE user_id=?", (uid,)).fetchone()[0] >= CAL_MAX_SUBS:
+        return err(tr("At most {0} calendars", CAL_MAX_SUBS), 409)  # 2.800.0 (#5466, review): before the token is taken, so it stays usable
     v = eph_take(EPH_CALSUB, f"{uid}:{tok}", uid=uid) if isinstance(tok, str) and 0 < len(tok) <= 64 else None
-    keep = json.loads(unseal(c, f"calsub:{uid}", v)) if v else None
+    try:
+        keep = json.loads(unseal(c, f"calsub:{uid}", v)) if v else None
+    except Exception:  # 2.800.0 (#5466, review): a key rotated within the 15 minutes / a damaged row: 409, not 500
+        keep = None
     if not keep or keep.get("user_id") != uid:
         return err(tr("This can no longer be undone"), 409)
-    if c.execute("SELECT COUNT(*) FROM cal_subs WHERE user_id=?", (uid,)).fetchone()[0] >= CAL_MAX_SUBS:
-        return err(tr("At most {0} calendars", CAL_MAX_SUBS), 409)
     have = table_columns(c, "cal_subs")
     keep["changed_at"] = iso_ms(now_utc())
     if c.execute("SELECT 1 FROM cal_subs WHERE id=?", (keep.get("id"),)).fetchone():
