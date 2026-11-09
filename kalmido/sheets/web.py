@@ -6,7 +6,7 @@ import json
 from flask import jsonify, request
 
 from ..core.config import app
-from ..core.access import Denied, need_feat
+from ..core.access import Denied, live_sql, need_feat
 from ..core.db import body, db, iso_ms, now_utc
 from ..core.i18n import tr
 from ..accounts.session import me
@@ -349,7 +349,7 @@ def sheets_col_delete(sid, col_id):
 def shx_place(c, sid, kind, xid):
     """2.800.0 (#5409): how the table names a live row (its number) / column (its title or letter) right now."""
     table = "sheet_rows" if kind == "row" else "sheet_columns"
-    live = [x[0] for x in c.execute(f"SELECT id FROM {table} WHERE sheet_id=? AND deleted_at IS NULL ORDER BY pos, id", (sid,))]
+    live = [x[0] for x in c.execute(f"SELECT id FROM {table} WHERE sheet_id=? AND {live_sql()} ORDER BY pos, id", (sid,))]
     i = live.index(xid) if xid in live else 0
     if kind == "row":
         return tr("Row {0}", i + 1)

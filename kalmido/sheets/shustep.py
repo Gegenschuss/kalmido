@@ -22,7 +22,7 @@ The table's own title and project are written through the core's write layer (sh
 to the table now) and which columns of the sheets row it writes back (title, the sheet's name, the project)."""
 import json
 
-from ..core.access import Denied, need_feat
+from ..core.access import Denied, live_sql, need_feat
 from ..core.errors import BadInput
 from ..core.i18n import tr
 from ..core.undoweb import undo_need_reg
@@ -50,7 +50,7 @@ def _trash(table, what):
     def run(c, r, ch, uid, ts, redo):
         xid = ch["row_id"] if what == "row" else ch["col_id"]
         if redo:
-            n = c.execute(f"UPDATE {table} SET deleted_at=? WHERE id=? AND sheet_id=? AND deleted_at IS NULL", (ch["new_raw"], xid, r["id"])).rowcount
+            n = c.execute(f"UPDATE {table} SET deleted_at=? WHERE id=? AND sheet_id=? AND {live_sql()}", (ch["new_raw"], xid, r["id"])).rowcount
         else:
             n = c.execute(f"UPDATE {table} SET deleted_at=NULL WHERE id=? AND sheet_id=? AND deleted_at=?", (xid, r["id"], ch["new_raw"])).rowcount
         return (True, None) if n else (False, ch["old_raw"] or tr("Table"))
@@ -92,7 +92,7 @@ def _order(c, r, ch, uid, ts, redo):
     kind = "row" if a.get("k") == "row" else "col"
     name = tr("Rows") if kind == "row" else tr("Columns")
     table = "sheet_rows" if kind == "row" else "sheet_columns"
-    live = {x[0] for x in c.execute(f"SELECT id FROM {table} WHERE sheet_id=? AND deleted_at IS NULL", (r["id"],))}
+    live = {x[0] for x in c.execute(f"SELECT id FROM {table} WHERE sheet_id=? AND {live_sql()}", (r["id"],))}
     to, frm = (z.get("ids"), a.get("ids")) if redo else (a.get("ids"), z.get("ids"))
     b = {"ids": [x for x in to or [] if x in live], "prev": [x for x in frm or [] if x in live]}
     if z.get("move"):
@@ -190,7 +190,7 @@ def _tab_trash(added):
         out = (not redo) if added else redo  # into the trash
         when = (ts if added else ch["new_raw"]) if out else (ch["undone_at"] if added else ch["new_raw"])
         if out:
-            n = c.execute("UPDATE sheets SET deleted_at=? WHERE id=? AND deleted_at IS NULL", (when, t["id"])).rowcount
+            n = c.execute(f"UPDATE sheets SET deleted_at=? WHERE id=? AND {live_sql()}", (when, t["id"])).rowcount
         else:
             if any(shb_label(x).casefold() == shb_label(t).casefold() for x in shb_rows(c, r["id"])):
                 return False, _tab_name(t)  # its name is taken meanwhile
