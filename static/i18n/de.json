@@ -17893,5 +17893,8 @@
   "Shows the version and one hash of the code this browser was given, to compare with the release on GitHub. This display comes from the same server as the code: it catches mistakes and slips, not an operator who means to deceive. That needs a check from outside (guide).": "Zeigt die Version und einen Hash des Codes, den dieser Browser bekommen hat, zum Vergleich mit der Veröffentlichung auf GitHub. Diese Anzeige kommt vom selben Server wie der Code: Sie erkennt Fehler und Ausrutscher, nicht einen Betreiber, der gezielt täuscht. Dafür braucht es eine Prüfung von außen (Anleitung).",
   "The app's code changed without a new version": "Der Code der App hat sich ohne neue Version geändert",
   "Guide": "Anleitung",
-  "A row was not imported, its amount is not a number with at most two decimal places: {0} ({1})": "Eine Zeile wurde nicht übernommen, ihr Betrag ist keine Zahl mit höchstens zwei Nachkommastellen: {0} ({1})"
+  "A row was not imported, its amount is not a number with at most two decimal places: {0} ({1})": "Eine Zeile wurde nicht übernommen, ihr Betrag ist keine Zahl mit höchstens zwei Nachkommastellen: {0} ({1})",
+  "View version {0}": "Version {0} ansehen",
+  "Restore version {0}": "Version {0} wiederherstellen",
+  "New version of “{0}”": "Neue Version von „{0}“"
 }

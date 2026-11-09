@@ -62,10 +62,12 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   check((vers.versions || []).length === 2, 'the server keeps both versions');
 
   // ================= details: versions and the history
+  // 2.768.0 (#4888): the details of a file are the document view's tab History (the dialog stays for folders)
   await w.eval(`ab_details(${NID})`);
-  await until(() => d.querySelector('.abdlg'));
-  check(d.querySelectorAll('.abdlg .abvrow').length === 2 && d.querySelector('.abdlg [data-abv="1"]'), 'details: two versions, the old one restorable');
-  d.querySelector('.abdlg [data-m="close"]').click();
+  await until(() => d.querySelectorAll('.dv-view #dv-p-hist .abvrow').length === 2);
+  check(!d.querySelector('.abdlg') && d.querySelectorAll('.dv-view #dv-p-hist .abvrow').length === 2 && d.querySelector('.dv-view #dv-p-hist [data-abv="1"]'), 'details: two versions, the old one restorable (the view, no dialog)');
+  w.eval('dcv_close()');
+  await until(() => w.location.hash === '#ablage/' + FID && d.querySelector('.abrow'));
 
   // ================= Share dialog
   await w.eval(`ab_share(${FID})`);

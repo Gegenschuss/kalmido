@@ -409,9 +409,12 @@ async function ab_newVersionFile(n, f) {
   if (n.locked) return typeof fsl_newVersionFile === 'function' ? fsl_newVersionFile(n, f) : ab_noFsl();  // never plain (as above)
   const fd = new FormData(); fd.append('file', f, f.name);
   if (n.version) fd.append('expect_version', n.version);  // 2.577.0 (#4708 3): another version came meanwhile -> 409, nothing stored
-  try { await api('POST', `/api/files/nodes/${n.id}/versions`, fd); } catch { return; }
-  ab_reload(); toast(tr('New version of “{0}” saved', n.name));
-  if ($('.abdlg')) ab_details(n.id);
+  const was = n.version;
+  let r; try { r = await api('POST', `/api/files/nodes/${n.id}/versions`, fd); } catch { return; }
+  ab_verAfter(n.id);
+  // 2.768.0 (#4888): one undo step - the version before becomes the newest again (the server keeps every version)
+  if (!was || !r?.version) { toast(tr('New version of “{0}” saved', n.name)); return; }
+  offerUndo(tr('New version of “{0}” saved', n.name), histAdd({label: tr('New version of “{0}”', n.name), undo: () => ab_verStep(n, was), redo: () => ab_verStep(n, r.version)}));
 }
 function ab_menu(anchor, n, pick) { menu(anchor, pick ? [...cm_selHead(n.name, pick), ...ab_menuItems(n)] : ab_menuItems(n), null, null, pick ? '' : n.name); }  // 2.607.0 (#4612): pick = "Select" on top
 // 2.199.0 A (#2742): the items of a node's menu (the row's "…", the tree's right-click / long press); tree: + New folder…
@@ -423,7 +426,7 @@ function ab_menuItems(n, tree) {
     f && !ref ? {label: tr('Download'), icon: 'download', fn: () => { if (n._enc && typeof fsl_open === 'function') return fsl_open(n, true); const a = document.createElement('a'); a.href = ab_url(n, true); a.download = n.name; document.body.appendChild(a); a.click(); a.remove(); }} : null,
     tree && w && !f ? {label: tr('New folder…'), icon: 'plus', fn: () => ab_newFolder(n.id)} : null,
     n.kind === 'folder' ? {label: tr('Download as ZIP'), icon: 'download', fn: () => abm_download([n])} : null,  // 2.112.1 A (#2058)
-    {label: tr('Details and history'), icon: 'info', fn: () => ab_details(n.id)},
+    {label: tr('Details and history'), icon: 'info', fn: () => ab_detailsOf(n)},  // 2.768.0 (#4888): a file: the document view's tab History
     w && n.kind === 'folder' && !n.agent_id && !n.locked ? {label: tr('Request files…'), icon: 'upload', fn: () => frq_open(n)} : null,  // 2.122.0 A (#2097)
     own ? {label: tr('Share…'), icon: 'users', fn: () => ab_share(n.id)} : null,
     typeof xl_menuItem === 'function' && !n.locked ? xl_menuItem(n) : null,  // 2.112.1 B (#2058); 2.353.0 A (#2758): no links for externals
@@ -448,46 +451,101 @@ const AB_ACT = {list: N_('opened the folder'), read: N_('read'), download: N_('d
   tags: N_('changed the tags'),  // 2.122.0 B (#2099)
   recognise: N_('changed the recognition'),  // 2.353.0 D (#2759)
   flow: N_('ran a document flow'), 'flow-undo': N_('took a document flow back')};  // 2.581.0 (#4803): docs/flows.py
-// 2.123.0 C (#2103, #2107): the knowledge pages (that I may read) which show or link this file
-async function ab_wikiRefs(md, id) {
+// 2.768.0 (#4888): the details of a file are the document view (docview.js), its tab History: versions, history, "Mentioned in".
+// The dialog below stays for folders and for the files the view does not open (encrypted, locked by the virus scanner, a link,
+// the trash, documents off) - both draw the same parts (ab_versHtml, ab_logHtml, ab_wikiRefs), nothing twice.
+const ab_viewOk = n => n.kind === 'file' && !n.in_trash && !n.deleted_at && !n.locked && !n._enc && !upLocked(n) && typeof abd_on === 'function' && abd_on() && typeof dc_open === 'function';
+function ab_detailsOf(n) { if (ab_viewOk(n)) dc_open(n.id, {tab: 'hist'}); else ab_details(n.id); }
+// the versions: each one to view (the viewer of its kind), to download and - with the right to write - to restore; on top the
+// upload of a new version (a fixed hidden input: a file dropped onto the window lands there too, dropany.js)
+function ab_versHtml(n) {
+  if (n.kind !== 'file') return '';
+  const w = ab_canWrite(n.role);
+  const vers = (n.versions || []).map(v => {
+    const cur = v.no === n.version, see = !n._enc && !n.locked && ab_verKind(n, v);
+    return `<div class="abvrow" data-abvno="${v.no}"><span><b>v${v.no}</b>${cur ? ` <small class="muted">(${esc(tr('current'))})</small>` : ''} · ${esc(ab_when(v.created_at))} · ${fmtSize(v.size)}${v.by ? ' · ' + esc(v.by) : ''}</span><span class="spacer"></span>${see ? `<button type="button" class="iconbtn" data-abvv="${v.no}" title="${esc(tr('View version {0}', v.no))}" aria-label="${esc(tr('View version {0}', v.no))}">${ic('eye', 's')}</button>` : ''}<a class="iconbtn" href="${n._enc ? '#' : ab_url(n, true, v.no)}" ${n._enc ? `data-fslv="${v.no}" data-fslid="${n.id}" data-fsllk="${n.lock_id}"` : ''} download="${esc(n.name)}" title="${esc(tr('Download'))}" aria-label="${esc(tr('Download version {0}', v.no))}">${ic('download', 's')}</a>${w && !cur ? `<button type="button" class="btn sm" data-abv="${v.no}">${tr('Restore')}</button>` : ''}</div>`;
+  }).join('');
+  const up = w ? `<div class="row abvup"><input type="file" id="abd-verfile" hidden><button type="button" class="btn sm" data-abd="ver">${ic('upload', 's')} ${tr('Upload a new version…')}</button></div>` : '';
+  return `<h4>${tr('Versions')}</h4>${up}${vers ? `<div class="abvers">${vers}</div>` : ''}`;
+}
+// the history (owners and editors get it from the server, readers not)
+function ab_logHtml(n) {
+  if (!n.log) return '';
+  const log = n.log.map(x => `<div class="ablrow ${x.agent ? 'abag' : ''}">${x.agent ? ic('bot', 's') : ic('user', 's')}<span><b>${esc(x.name || (typeof xl_logWho === 'function' && xl_logWho(x)) || '?')}</b> ${esc(tr(AB_ACT[x.action] || x.action))}</span><span class="spacer"></span><small class="muted">${esc(fmtDay('short', new Date(x.at)))} ${esc(fmtTimeAt(new Date(x.at)))}</small></div>`).join('');
+  return `<h4>${tr('History')}</h4><div class="ablog">${log || `<span class="muted">${tr('Nothing yet')}</span>`}</div><p class="muted abhint">${tr('Every access of an agent is listed here.')}</p>`;
+}
+// which viewer a version opens in ('' = none, it downloads)
+function ab_verKind(n, v) {
+  const m = {...n, mime: v.mime || n.mime};
+  return ab_isPdf(m) ? 'pdf' : ab_isImg(m) ? 'img' : typeof isTextFile === 'function' && isTextFile(m) && (v.size || 0) <= TV_MAX ? 'text' : '';
+}
+function ab_verOpen(n, no) {
+  const v = (n.versions || []).find(x => x.no === no); if (!v) return;
+  const k = ab_verKind(n, v), name = `${n.name} · v${no}`, o = {url: ab_url(n, false, no), name, size: v.size, dlUrl: ab_url(n, true, no)};
+  if (k === 'pdf' && typeof pdfView === 'function') pdfView(o);
+  else if (k === 'img' && typeof pdfView === 'function') pdfView({...o, img: o.url, kind: 'img'});
+  else if (k === 'text') textView({url: o.dlUrl, name, size: v.size, md: isMdFile(n), ext: attExt(n)});
+}
+// one version back on top (the restore of the server: a new version with its content), the dialog / the view follow
+async function ab_verStep(n, no) {
+  try { await api('POST', `/api/files/nodes/${n.id}/versions/${no}/restore`); } catch { /* shown */ }
+  ab_verAfter(n.id); return {};
+}
+async function ab_verRestore(n, no) {
+  const was = n.version;
+  let r; try { r = await api('POST', `/api/files/nodes/${n.id}/versions/${no}/restore`, was ? {expect_version: was} : undefined); } catch { return; }
+  ab_verAfter(n.id);
+  const msg = tr('Version {0} is the newest again (as version {1})', no, r.version);
+  if (!was || n.locked) { toast(msg); return; }  // an encrypted file: as before, no step back
+  offerUndo(msg, histAdd({label: tr('Restore version {0}', no), undo: () => ab_verStep(n, was), redo: () => ab_verStep(n, no)}));
+}
+// a click inside the versions (the dialog, the view's tab History); true = it was one of theirs
+function ab_verClick(n, e, box) {
+  const t = /** @type {any} */ (e.target), b = t.closest?.('[data-abv], [data-abvv], [data-abd="ver"]'); if (!b) return false;
+  if (b.dataset.abvv) ab_verOpen(n, +b.dataset.abvv);
+  else if (b.dataset.abv) ab_verRestore(n, +b.dataset.abv);
+  else $('#abd-verfile', box)?.click();  // 2.633.0 (#4920): fixed hidden file input, its change uploads (a drop onto the window too, dropany.js)
+  return true;
+}
+// after a new / restored version: the list, the open dialog and the open view (docview.js) read it again
+function ab_verAfter(id) {
+  ab_reload();
+  if ($('.abdlg')?.dataset.abid === String(id)) ab_details(id);
+  if (typeof dcv_verAfter === 'function') dcv_verAfter(id);
+}
+// 2.123.0 C (#2103, #2107): the knowledge pages (that I may read) which show or link this file; 2.768.0 (#4888): into box
+async function ab_wikiRefs(box, id) {
+  if (!box || !feat('wiki')) return;
   let ps; try { ps = (await rawFetch('GET', '/api/wiki/refs?file=' + id)).pages || []; } catch { return; }
-  if (!ps.length || !md.isConnected) return;
-  const sec = document.createElement('div');
-  sec.className = 'dsec wkmen';
-  sec.innerHTML = `${ic('book', 's')}<span class="muted">${tr('Mentioned in')}</span>${ps.map(p => `<a href="#wiki/${p.id}" data-m="close">${esc(p.path)}</a>`).join('<span class="muted">,</span>')}`;
-  $('.foot', md)?.before(sec);
+  if (!box.isConnected) return;
+  box.innerHTML = ps.length ? `<div class="dsec wkmen">${ic('book', 's')}<span class="muted">${tr('Mentioned in')}</span>${ps.map(p => `<a href="#wiki/${p.id}" data-m="close">${esc(p.path)}</a>`).join('<span class="muted">,</span>')}</div>` : '';
 }
 async function ab_details(id) {
   let n; try { n = await api('GET', `/api/files/nodes/${id}`); } catch { return; }
+  if (ab_viewOk(n)) { $('.abdlg')?.remove(); dc_open(n.id, {tab: 'hist'}); return; }  // 2.768.0 (#4888): a file: the view
   if (typeof fsl_prep1 === 'function') await fsl_prep1(n);  // 2.353.0 A (#2758)
   $('.abdlg')?.remove();
-  const vers = (n.versions || []).map(v => `<div class="abvrow"><span><b>v${v.no}</b> · ${esc(ab_when(v.created_at))} · ${fmtSize(v.size)}${v.by ? ' · ' + esc(v.by) : ''}</span><span class="spacer"></span><a class="iconbtn" href="${n._enc ? '#' : ab_url(n, true, v.no)}" ${n._enc ? `data-fslv="${v.no}" data-fslid="${n.id}" data-fsllk="${n.lock_id}"` : ''} download="${esc(n.name)}" title="${esc(tr('Download'))}" aria-label="${esc(tr('Download version {0}', v.no))}">${ic('download', 's')}</a>${ab_canWrite(n.role) && v.no !== n.version ? `<button type="button" class="btn sm" data-abv="${v.no}">${tr('Restore')}</button>` : ''}</div>`).join('');
-  const log = (n.log || []).map(x => `<div class="ablrow ${x.agent ? 'abag' : ''}">${x.agent ? ic('bot', 's') : ic('user', 's')}<span><b>${esc(x.name || (typeof xl_logWho === 'function' && xl_logWho(x)) || '?')}</b> ${esc(tr(AB_ACT[x.action] || x.action))}</span><span class="spacer"></span><small class="muted">${esc(fmtDay('short', new Date(x.at)))} ${esc(fmtTimeAt(new Date(x.at)))}</small></div>`).join('');
   const shares = n.role === 'owner' ? [...(n.shares || []), ...(n.inherited || [])] : [];
   const md = modal(`<div class="lhdr"><h3>${ab_icon(n)} ${esc(n.name)}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
     <div class="muted abpath">${esc((n.crumbs || []).map(c => c.name).join(' / '))}</div>
     <div class="abfacts">${n.kind !== 'folder' ? `<span>${fmtSize(n.size || 0)}</span>` : ''}<span>${esc(tr('Changed {0}', ab_when(n.updated_at)))}</span>${n.owner ? `<span>${esc(tr('Owner: {0}', n.owner))}</span>` : ''}<span>${esc(ab_role(n.role))}</span></div>
     ${typeof dt_abDetails === 'function' ? dt_abDetails(n) : ''}
     ${n.kind === 'link' ? `<div class="shint keep">${ic('link', 's')} ${esc(tr('A link to a file of a task or project. Whoever opens it needs access to the original.'))}</div>` : ''}
-    ${n.kind !== 'folder' ? `<div class="row"><button type="button" class="btn sm" data-abd="open">${ic('eye', 's')} ${tr('Open')}</button>${ab_canWrite(n.role) && n.kind === 'file' ? `<input type="file" id="abd-verfile" hidden><button type="button" class="btn sm" data-abd="ver">${ic('upload', 's')} ${tr('Upload a new version…')}</button>` : ''}</div>` : ''}
-    ${vers ? `<h4>${tr('Versions')}</h4><div class="abvers">${vers}</div>` : ''}
+    ${n.kind !== 'folder' ? `<div class="row"><button type="button" class="btn sm" data-abd="open">${ic('eye', 's')} ${tr('Open')}</button></div>` : ''}
+    ${ab_versHtml(n)}
     ${n.role === 'owner' ? `<h4>${tr('Shared with')}</h4><div class="abshsum">${shares.length || n.org_access || n.org_access_from ? shares.map(s => `<span class="abshp">${s.agent_id ? ic('bot', 's') : s.group_id ? ic('users', 's') : ic('user', 's')}${esc(s.name)} · ${esc(ab_role(s.role))}${s.from ? ` <small class="muted">${esc(tr('from “{0}”', s.from))}</small>` : ''}</span>`).join('') + (n.org_access || n.org_access_from ? `<span class="abshp">${ic('building', 's')}${esc(tr('Whole organisation'))}</span>` : '') : `<span class="muted">${tr('Only you')}</span>`}</div><div class="row"><button type="button" class="btn sm" data-abd="share">${ic('users', 's')} ${tr('Share…')}</button></div>` : ''}
-    ${n.log ? `<h4>${tr('History')}</h4><div class="ablog">${log || `<span class="muted">${tr('Nothing yet')}</span>`}</div><p class="muted abhint">${tr('Every access of an agent is listed here.')}</p>` : ''}
+    ${ab_logHtml(n)}
+    ${n.kind === 'file' ? '<div class="abrefs"></div>' : ''}
     <div class="foot"><span class="spacer"></span><button class="btn pri" data-m="close">${tr('Done')}</button></div>`);
-  md.classList.add('abdlg');
-  if (n.kind === 'file' && feat('wiki')) ab_wikiRefs(md, n.id);  // 2.123.0 C (#2107)
+  md.classList.add('abdlg'); md.dataset.abid = String(n.id);
+  ab_wikiRefs($('.abrefs', md), n.id);  // 2.123.0 C (#2107)
   if (typeof xl_mount === 'function') xl_mount(md, n);  // 2.112.1 B (#2058): "Link for external people"
   md.addEventListener('change', e => { const t = e.target; if (t.id === 'abd-verfile' && t.files?.length) { const f = t.files[0]; t.value = ''; ab_newVersionFile(n, f); } });  // 2.633.0 (#4920)
   md.addEventListener('click', async e => {
     if (e.target.closest('[data-m="close"]')) { modalClose(md); return; }
-    const v = e.target.closest('[data-abv]');
-    if (v) {
-      const no = +v.dataset.abv; let r; try { r = await api('POST', `/api/files/nodes/${n.id}/versions/${no}/restore`); } catch { return; }
-      toast(tr('Version {0} is the newest again (as version {1})', no, r.version)); ab_reload(); ab_details(n.id); return;
-    }
+    if (ab_verClick(n, e, md)) return;
     const b = e.target.closest('[data-abd]'); if (!b) return;
     if (b.dataset.abd === 'open') ab_openFile(n);
-    else if (b.dataset.abd === 'ver') $('#abd-verfile', md)?.click();  // 2.633.0 (#4920): fixed hidden file input, its change uploads (a drop onto the window too, dropany.js)
     else if (b.dataset.abd === 'tags' && typeof dt_abEdit === 'function') dt_abEdit(n, () => ab_details(n.id));  // 2.122.0 B (#2099)
     else if (b.dataset.abd === 'share') { modalClose(md); ab_share(n.id); }
   });

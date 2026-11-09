@@ -17894,5 +17894,8 @@
   "Shows the version and one hash of the code this browser was given, to compare with the release on GitHub. This display comes from the same server as the code: it catches mistakes and slips, not an operator who means to deceive. That needs a check from outside (guide).": "Mostra la versione e un hash del codice ricevuto da questo browser, da confrontare con la release su GitHub. Questa vista viene dallo stesso server del codice: rileva errori e sviste, non un gestore che vuole ingannare. Per quello serve una verifica dall'esterno (guida).",
   "The app's code changed without a new version": "Il codice dell'app è cambiato senza una nuova versione",
   "Guide": "Guida",
-  "A row was not imported, its amount is not a number with at most two decimal places: {0} ({1})": "Una riga non è stata importata, il suo importo non è un numero con al massimo due decimali: {0} ({1})"
+  "A row was not imported, its amount is not a number with at most two decimal places: {0} ({1})": "Una riga non è stata importata, il suo importo non è un numero con al massimo due decimali: {0} ({1})",
+  "View version {0}": "Visualizza la versione {0}",
+  "Restore version {0}": "Ripristina la versione {0}",
+  "New version of “{0}”": "Nuova versione di «{0}»"
 }

@@ -17893,5 +17893,8 @@
   "Shows the version and one hash of the code this browser was given, to compare with the release on GitHub. This display comes from the same server as the code: it catches mistakes and slips, not an operator who means to deceive. That needs a check from outside (guide).": "Toont de versie en één hash van de code die deze browser kreeg, om te vergelijken met de release op GitHub. Deze weergave komt van dezelfde server als de code: ze vangt fouten en vergissingen, geen beheerder die bewust misleidt. Daarvoor is een controle van buitenaf nodig (handleiding).",
   "The app's code changed without a new version": "De code van de app is gewijzigd zonder nieuwe versie",
   "Guide": "Handleiding",
-  "A row was not imported, its amount is not a number with at most two decimal places: {0} ({1})": "Een regel is niet geïmporteerd, het bedrag is geen getal met hoogstens twee decimalen: {0} ({1})"
+  "A row was not imported, its amount is not a number with at most two decimal places: {0} ({1})": "Een regel is niet geïmporteerd, het bedrag is geen getal met hoogstens twee decimalen: {0} ({1})",
+  "View version {0}": "Versie {0} bekijken",
+  "Restore version {0}": "Versie {0} herstellen",
+  "New version of “{0}”": "Nieuwe versie van ‘{0}’"
 }

@@ -17893,5 +17893,8 @@
   "Shows the version and one hash of the code this browser was given, to compare with the release on GitHub. This display comes from the same server as the code: it catches mistakes and slips, not an operator who means to deceive. That needs a check from outside (guide).": "Affiche la version et un hash du code reçu par ce navigateur, à comparer avec la publication sur GitHub. Cet affichage vient du même serveur que le code : il repère les erreurs et les oublis, pas un opérateur qui veut tromper. Pour cela, il faut une vérification de l'extérieur (guide).",
   "The app's code changed without a new version": "Le code de l'app a changé sans nouvelle version",
   "Guide": "Guide",
-  "A row was not imported, its amount is not a number with at most two decimal places: {0} ({1})": "Une ligne n’a pas été importée, son montant n’est pas un nombre avec au plus deux décimales : {0} ({1})"
+  "A row was not imported, its amount is not a number with at most two decimal places: {0} ({1})": "Une ligne n’a pas été importée, son montant n’est pas un nombre avec au plus deux décimales : {0} ({1})",
+  "View version {0}": "Voir la version {0}",
+  "Restore version {0}": "Restaurer la version {0}",
+  "New version of “{0}”": "Nouvelle version de « {0} »"
 }

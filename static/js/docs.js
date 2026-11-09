@@ -269,6 +269,7 @@ async function dc_shareFiles(files) {  // the share sheet: "File as document"
 async function dc_open(id, o = {}) {
   // 2.683.0 (#5150): o.list = the ids of the documents shown where it was opened (the file store's cards): leafing goes through
   // them; 2.583.0: the view is #docs/<id> then, so the list counts while the view is open (dcv_left drops it)
+  if (o.tab && typeof DVW === 'object') DVW.tab = o.tab;  // 2.768.0 (#4888): o.tab = the tab it opens on ('hist': "Details and history" of a file)
   if (o.list) DC.navSrc = {mod: 'docs', docs: o.list.map(x => ({id: +x}))};
   else if (S.route.mod !== 'docs' || !dc_hashId()) DC.navSrc = null;  // opened from the documents' list or a link: their list
   // 2.583.0 (#4835): a document opens as its own view #docs/<id> (docview.js) -- from the list, the file store (#4832), a link;

@@ -112,7 +112,8 @@ function dcv_draw(md) {
   if (typeof dc_nbPre === 'function') dc_nbPre(d);  // 2.727.0 (#5202): the neighbours' small pictures ahead (2.736.0, #5212: and the neighbours drawn whole)
 }
 // 2.583.0 (#4832): a plain file has no recognised text
-const dcv_tabs = d => DCV_TABS.filter(([t]) => t === 'details' || (t === 'text' && !d.file) || (t === 'hist' && d.role !== 'view') || (t === 'share' && d.role === 'owner'));
+// 2.768.0 (#4888): History for readers too (versions to view and download, "Mentioned in"; no buttons that write)
+const dcv_tabs = d => DCV_TABS.filter(([t]) => t === 'details' || (t === 'text' && !d.file) || t === 'hist' || (t === 'share' && d.role === 'owner'));
 // the body: the strip, the fields in tabs, the preview. 2.736.0 (#5212): nb = a neighbour drawn ahead ({d, set}) by the same lines
 function dcv_bodyHtml(d, nb) {
   const w = d.role !== 'view', tabs = dcv_tabs(d), off = dcv_stripOff();
@@ -219,9 +220,13 @@ function dcv_actsHtml(d, w) {
     d.parent_id ? `<a class="btn sm" href="#ablage/${d.parent_id}">${ic('folder', 's')} ${tr('Show in the file store')}</a>` : '',
     d.role === 'owner' && typeof ab_share === 'function' ? `<button type="button" class="btn sm" data-dc="share">${ic('users', 's')} ${tr('Share…')}</button>` : '',
     d.role === 'owner' && typeof xl_newDlg === 'function' ? `<button type="button" class="btn sm" data-dc="xlink">${ic('link', 's')} ${tr('Link for external people…')}</button>` : '',  // 2.210 C (#2761)
+    // 2.768.0 (#4888): the file store's actions of the node (ablage.js ab_newVersion / ab_moveDlg / ab_rename; a document's title is its field)
+    w && typeof ab_newVersion === 'function' ? `<button type="button" class="btn sm" data-dc="dvnewver">${ic('upload', 's')} ${tr('Upload a new version…')}</button>` : '',
+    w && typeof ab_moveDlg === 'function' ? `<button type="button" class="btn sm" data-dc="dvmove">${ic('arrow', 's')} ${tr('Move to…')}</button>` : '',
+    w && d.file && typeof ab_rename === 'function' ? `<button type="button" class="btn sm" data-dc="dvren">${ic('edit', 's')} ${tr('Rename…')}</button>` : '',
     w && !d.file && smv_can(d.org_id) ? `<button type="button" class="btn sm" data-dc="space">${ic('building', 's')} ${tr('Move to another workspace…')}</button>` : ''].filter(Boolean);
   const open = DC.actsMore === d.id;
-  return `<a class="btn sm dv-dl" href="${dc_fileUrl(d, true)}" download title="${esc(tr('Download'))}">${ic('download', 's')} <span>${tr('Download')}</span></a>${more.length ? `<span class="dv-actw"><button type="button" class="btn sm" data-dc="actsmore" aria-expanded="${open}" aria-controls="dc-amore" aria-haspopup="true">${tr('Actions')}${ic('chev', 's dc-chev')}</button><div class="dc-ag dc-amore dv-amenu" id="dc-amore" ${open ? '' : 'hidden'}>${more.join('')}</div></span>` : ''}${w ? `<button type="button" class="btn sm danger dc-adel" data-dc="del" aria-label="${esc(tr('Delete'))}" title="${esc(tr('Delete'))}">${ic('trash', 's')} <span>${tr('Delete')}</span></button>` : ''}`;
+  return `<a class="btn sm dv-dl" href="${dcv_fileUrl(d, true)}" download title="${esc(tr('Download'))}">${ic('download', 's')} <span>${tr('Download')}</span></a>${more.length ? `<span class="dv-actw" data-abid="${d.id}"><button type="button" class="btn sm" data-dc="actsmore" data-ab="menu" aria-expanded="${open}" aria-controls="dc-amore" aria-haspopup="true">${tr('Actions')}${ic('chev', 's dc-chev')}</button><div class="dc-ag dc-amore dv-amenu" id="dc-amore" ${open ? '' : 'hidden'}>${more.join('')}</div></span>` : ''}${w ? `<button type="button" class="btn sm danger dc-adel" data-dc="del" aria-label="${esc(tr('Delete'))}" title="${esc(tr('Delete'))}">${ic('trash', 's')} <span>${tr('Delete')}</span></button>` : ''}`;
 }
 const dcv_gripHtml = (which, label) => `<button type="button" class="dv-grip" data-dvgrip="${which}" aria-label="${esc(label + ': ' + tr('Resize (arrow keys; double-click: default size)'))}" title="${esc(tr('Drag to resize · double-click: default size'))}"></button>`;
 // the strip: the neighbours in the list as shown (up to 15 on each side), the open one marked; a document outside the list alone
@@ -296,11 +301,13 @@ async function dcv_tabLoad(md, d) {
   for (const t of ['hist', 'share']) { const q = $(`.dv-view #dv-p-${t}`); if (q) dcv_tabFill(q, n, t); }
 }
 function dcv_tabFill(p, n, t) {
-  const when = iso => `${fmtDay('short', new Date(iso))} ${fmtTimeAt(new Date(iso))}`;
   if (t === 'hist') {
-    const vers = (n.versions || []).map(v => `<div class="abvrow"><span><b>v${v.no}</b> · ${esc(when(v.created_at))} · ${fmtSize(v.size)}${v.by ? ' · ' + esc(v.by) : ''}</span></div>`).join('');
-    const log = (n.log || []).map(x => `<div class="ablrow ${x.agent ? 'abag' : ''}">${x.agent ? ic('bot', 's') : ic('user', 's')}<span><b>${esc(x.name || (typeof xl_logWho === 'function' && xl_logWho(x)) || '?')}</b> ${esc(tr((typeof AB_ACT === 'object' && AB_ACT[x.action]) || x.action))}</span><span class="spacer"></span><small class="muted">${esc(when(x.at))}</small></div>`).join('');
-    p.innerHTML = `${vers ? `<h4>${tr('Versions')}</h4><div class="abvers">${vers}</div>` : ''}<h4>${tr('History')}</h4><div class="ablog">${log || `<span class="muted">${tr('Nothing yet')}</span>`}</div>`;
+    // 2.768.0 (#4888): the details of the file store's dialog live here (ablage.js draws the same parts for its dialog):
+    // the versions (view / download / restore, a new version on top), the history and the knowledge pages that mention it
+    if (typeof ab_versHtml !== 'function') return;
+    p.innerHTML = `<div class="dv-hist">${ab_versHtml(n)}${ab_logHtml(n)}<div class="abrefs">${DVW.node?.id === n.id && DVW.node.refs || ''}</div></div>`;
+    const node = DVW.node;
+    if (node?.id === n.id && node.refs == null) { node.refs = ''; const box = $('.abrefs', p); ab_wikiRefs(box, n.id).then(() => { if (DVW.node === node) node.refs = box?.isConnected ? box.innerHTML : null; }); }
     return;
   }
   const shares = [...(n.shares || []), ...(n.inherited || [])], role = r => typeof ab_role === 'function' ? ab_role(r) : r;
@@ -313,6 +320,31 @@ function dcv_tab(md, t, focus) {
   for (const b of $$('[data-dvtab]', md)) { const on = b.dataset.dvtab === t; b.setAttribute('aria-selected', String(on)); b.tabIndex = on ? 0 : -1; if (on && focus) b.focus(); }
   for (const p of $$('.dv-tp', md)) p.hidden = p.id !== `dv-p-${t}`;
   if ((t === 'hist' || t === 'share') && DC.doc) dcv_tabLoad(md, DC.doc);
+}
+// 2.768.0 (#4888): the document's file after a version change (d._fv): a new address past the cache of its old content
+const dcv_fileUrl = (d, dl) => dc_fileUrl(d, dl) + (d._fv && !d.file ? '&fv=' + d._fv : '');
+// a new / restored version (ablage.js ab_verAfter) or a new name: the open view reads the document again - its preview, its
+// fields and the tab History (the server recognises a document's new version again by itself: docs/ingest.py inbox_scan)
+async function dcv_verAfter(id, pv = true) {
+  if (DC.doc?.id !== id || !$('.dv-view')) return;
+  const was = DC.doc;
+  DVW.node = null;
+  const n = was.file ? await rawFetch('GET', `/api/files/nodes/${id}`).catch(() => null) : null;
+  const d = was.file ? (n?.kind === 'file' ? dc_fileDoc(n) : null) : await rawFetch('GET', `/api/docs/${id}`).catch(() => null);
+  if (!d || DC.doc?.id !== id) return;
+  d._fv = pv ? Date.now() : was._fv;
+  DC.doc = d;
+  const v = $('.dv-view'); if (v) dc_mdDraw(v);
+}
+// the actions of the node from the view's menu: the file store's own dialogs on the node as the file store has it
+async function dcv_nodeAct(a, d) {
+  const id = d.id;
+  let n = DVW.node?.id === id ? DVW.node.n : null;
+  if (!n) try { n = await api('GET', `/api/files/nodes/${id}`); } catch { return; }
+  if (!n || DC.doc?.id !== id) return;
+  if (a === 'dvnewver') ab_newVersion(n);
+  else if (a === 'dvmove') ab_moveDlg(n);
+  else if (a === 'dvren') { await ab_rename(n); dcv_verAfter(id, false); }
 }
 // "Saved (Undo)" in the head after a change (docs.js dc_patch); the same step as the toast's undo
 function dcv_saved(he) {
@@ -368,7 +400,7 @@ function dcv_free() { if (DVW.pdf) DVW.pdf.off = true; try { DVW.pdf?.doc?.destr
 // 2.736.0 (#5212): nb = a neighbour drawn ahead ({ctrl}): its own PDF (nb.pdf, the open one's stays), stopped by nb.ctrl
 async function dcv_pvDraw(md, d, nb) {
   const box = $('.dv-pages', md); if (!box) return;
-  const key = `${d.id}:${d.size}`;  // a field saved does not draw it again
+  const key = `${d.id}:${d.size}:${d._fv || ''}`;  // a field saved does not draw it again (2.768.0, #4888: another version does)
   if (box._pv === key && box.firstChild) return;
   box._pv = key;
   if (!nb && DVW.pdf && DVW.pdf.box !== box) dcv_free();
@@ -382,14 +414,14 @@ async function dcv_pvDraw(md, d, nb) {
   if (/^image\//.test(d.mime || '') && d.thumb) {  // the original, not the small picture
     const im = new Image(); im.alt = d.name;
     im.onload = () => { if (!live()) return; box.innerHTML = '<div class="dv-pgcol"><div class="dv-pg dv-img"></div></div>'; $('.dv-pg', box).appendChild(im); box._base = [{w: im.naturalWidth || 600, h: im.naturalHeight || 800, img: true}]; dcv_layout(box, false, true); };
-    im.src = dc_fileUrl(d);
+    im.src = dcv_fileUrl(d);
     return;
   }
   if (!dc_isPdf(d) || d.size > 40e6 || typeof loadModule !== 'function') return;
   try {
     await loadModule('pdf');
     const lib = typeof pv_load === 'function' ? await pv_load() : null; if (!lib || !live()) return;
-    const r = await fetch(dc_fileUrl(d), {credentials: 'same-origin', signal: nb?.ctrl.signal}); if (!r.ok || !live()) return;
+    const r = await fetch(dcv_fileUrl(d), {credentials: 'same-origin', signal: nb?.ctrl.signal}); if (!r.ok || !live()) return;
     // as in pdfview.js: nothing in the file runs (no eval, no scripts, no links)
     const doc = await lib.getDocument({data: new Uint8Array(await r.arrayBuffer()), isEvalSupported: false, enableScripting: false, disableAutoFetch: true, stopAtErrors: false, useSystemFonts: true}).promise;
     if (!live()) { doc.destroy(); return; }
@@ -509,8 +541,11 @@ document.addEventListener('click', e => {
   const t = /** @type {any} */ (e.target).closest('[data-dvtab]');
   if (t) { dcv_tab(v, t.dataset.dvtab); return; }
   if (DC.actsMore && !/** @type {any} */ (e.target).closest('.dv-actw')) dcv_menuClose();
+  const hp = /** @type {any} */ (e.target).closest('#dv-p-hist');  // 2.768.0 (#4888): the versions (ablage.js ab_verClick)
+  if (hp && DC.doc && DVW.node?.id === DC.doc.id && DVW.node.n && typeof ab_verClick === 'function' && ab_verClick(DVW.node.n, e, hp)) return;
   const b = /** @type {any} */ (e.target).closest('[data-dc]'); if (!b) return;
   const a = b.dataset.dc;
+  if ((a === 'dvnewver' || a === 'dvmove' || a === 'dvren') && DC.doc) { dcv_menuClose(); dcv_nodeAct(a, DC.doc); return; }  // 2.768.0 (#4888)
   if (a.startsWith('dvz:')) {
     const box = $('.dv-pages', v), k = a.slice(4); if (!box?._s) return;
     dcv_zoomSet(box, k === 'in' ? box._s * 1.25 : k === 'out' ? box._s / 1.25 : k);
@@ -536,7 +571,12 @@ document.addEventListener('click', e => {
   if (DC.actsMore && b.closest('.dv-amenu')) dcv_menuClose();  // an action of the menu: the menu closes
   dc_mdClick(e);
 });
-document.addEventListener('change', e => { if (/** @type {any} */ (e.target).closest?.('.dv-view')) dc_mdChange(e); });
+document.addEventListener('change', e => {
+  const t = /** @type {any} */ (e.target); if (!t.closest?.('.dv-view')) return;
+  // 2.768.0 (#4888): the fixed input of "Upload a new version…" in the tab History (chosen or dropped onto the window, dropany.js)
+  if (t.id === 'abd-verfile') { const f = t.files?.[0], n = DVW.node?.n; t.value = ''; if (f && n && DC.doc?.id === n.id) ab_newVersionFile(n, f); return; }
+  dc_mdChange(e);
+});
 document.addEventListener('toggle', e => { if (/** @type {any} */ (e.target)?.classList?.contains('dv-more')) DVW.more = /** @type {any} */ (e.target).open; }, true);
 function dcv_menuClose() {
   DC.actsMore = null;
@@ -623,8 +663,8 @@ document.addEventListener('keydown', e => {
 // ---- Full screen: the document in the viewer of pdfview.js; the arrow keys left / right and two buttons leaf through the
 // list as shown (the view follows), without closing it (2.521.0, #4476)
 function dcv_fullOpts(d) {
-  const o = {url: dc_fileUrl(d), name: d.name, size: d.size, dlUrl: dc_fileUrl(d, true)};
-  if (!dc_isPdf(d)) { o.img = /^image\//.test(d.mime || '') ? dc_fileUrl(d) : null; o.kind = o.img ? 'img' : 'file'; }
+  const o = {url: dcv_fileUrl(d), name: d.name, size: d.size, dlUrl: dcv_fileUrl(d, true)};
+  if (!dc_isPdf(d)) { o.img = /^image\//.test(d.mime || '') ? dcv_fileUrl(d) : null; o.kind = o.img ? 'img' : 'file'; }
   // 2.652.0 (#5071): phones too (before: no leafing there) - a swipe sideways leafs on every touch screen (pdfview.js)
   const i = dc_navIdx(d);
   if (i >= 0) {
