@@ -20,7 +20,7 @@ from flask import g, jsonify, request
 from .config import app
 from .ctx import me
 from .db import bump, db
-from .errors import Denied
+from .errors import BadInput, Denied
 from .i18n import N_, tr, tr_stored
 from .objects import obj_need
 from .objhooks import OBJ
@@ -95,6 +95,8 @@ def _diff_part(c, uid, p, redo):
     except Denied as e:
         code = "noaccess" if e.code in (403, 404) else "conflict"
         return {"group": p["group_id"], "kind": kind, "id": rid, "code": code, "reason": e.text()}
+    except BadInput as e:  # a value the area's checks refuse now (a rule changed since): stays, named
+        return {"group": p["group_id"], "kind": kind, "id": rid, "code": "conflict", "reason": str(e)}
 
 
 def _part(c, uid, p, redo):
