@@ -202,7 +202,7 @@ def _busy_conn_drop():
     if c is not None:
         try:
             c.close()
-        except Exception:  # noqa: BLE001
+        except Exception:  # noqa: BLE001 - the connection is dropped anyway; a failing close leaves nothing to undo
             pass
 
 

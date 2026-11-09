@@ -11,3 +11,8 @@ select = ["E", "F", "BLE"]
 ignore = ["E501"]
 # unknown codes in old noqa markers (S608, B018, PLC0415, ...) are not an error
 external = ["S", "B", "PLC", "ARG", "SIM", "N", "PLW", "PLR", "UP", "RUF", "C"]
+
+[lint.per-file-ignores]
+# app.py takes its names at run time from the kalmido modules (globals().update, app.py:42): F821 there is never a real
+# finding, and every new line using such a name would turn the gate red (2.755.0, #5294)
+"app.py" = ["F821"]
