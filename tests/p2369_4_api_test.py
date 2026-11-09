@@ -79,9 +79,19 @@ def moved(what, fn, see, skip):
     assert fn() is not False
     after = {k: ver(P[k]) for k in P}
     v = max(x[0] for x in after.values())
-    check(v > max(x[0] for x in before.values()), f"#2507 {what}: v moved")
+    v0 = max(x[0] for x in before.values())
+    check(v > v0, f"#2507 {what}: v moved")
+    # #5405: since 2.747 (#5249) the writer's step group bumps the writer's own counter ("self") right after the change, so
+    # the newest v can be that bump, which only the writer sees: the change's version is the one the readers got, newer
+    # than every version before the change and the same for all of them
+    # (the writer = the first word of what, its vs may be that newer own bump)
+    who = what.split()[0].split("'")[0]
+    readers = [k for k in see if k != who]
+    vc = max((after[k][1] or 0) for k in readers) if readers else v
     for k in see:
-        check(after[k][1] == v, f"#2507 {what}: {k} sees it (vs {before[k][1]} -> {after[k][1]}, v {v})")
+        check((after[k][1] or 0) >= vc if k == who else after[k][1] == vc, f"#2507 {what}: {k} sees it "
+              f"(vs {before[k][1]} -> {after[k][1]}, change {vc}, v {v})")
+    check(vc > v0, f"#2507 {what}: the change's version is newer than every one before ({vc} > {v0})")
     for k in skip:
         check(after[k][1] == before[k][1] and after[k][1] < v,
               f"#2507 {what}: {k} skips it (vs {before[k][1]} -> {after[k][1]}, v {v})")
