@@ -148,6 +148,12 @@ def fill_row(t, org):
             v = None
         elif typ == "jsonb":
             v = "{}"
+        # 2.780.0 (#5386): typed time columns (undo_groups.created_at / updated_at, TIMESTAMPTZ NOT NULL without a default,
+        # #5249) refused the made-up text: the suite passed only when the app had written a row of each organisation before
+        elif typ.startswith("timestamp"):
+            v = "2026-10-20T00:00:00+00:00"
+        elif typ == "date":
+            v = "2026-10-20"
         else:
             v = f"{MARK if org == ALPHA else 'b'}-{t}"
         if v is None:
