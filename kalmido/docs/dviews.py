@@ -38,7 +38,8 @@ DV_KIND = "docview"
 # the parameters of the documents search a view keeps (docs/web.py docs_list, docs/dsearch.py dsr_filters, doc_sort);
 # ws is a field of its own, paging / facets are never kept
 DV_KEYS = ("q", "sender", "type", "tag", "not_tag", "tag_mode", "from", "to", "added_from", "added_to", "review", "state",
-           "no_tag", "no_sender", "no_type", "folder", "under", "ftype", "sort", "dir", "area", "unbooked")
+           "no_tag", "no_sender", "no_type", "folder", "under", "ftype", "sort", "dir", "area", "unbooked",
+           "asn", "has_asn", "no_asn", "cf")  # 2.772.0 (#4890): archive number / range, with / without one, custom fields
 DV_QUERY_MAX = 4000
 DV_PAIRS_MAX = 200
 DV_LIST_MAX = 100   # views listed with their counts

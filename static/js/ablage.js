@@ -173,7 +173,7 @@ function ab_panelHtml() {
   // sbb_sync), then "Shared with me" and the trash. The part docs of the area stays the switch of the documents (Settings >
   // Modules, the menu's hidden parts: hidden = no documents' rows here)
   const rv = typeof DC !== 'undefined' && DC.review ? `<span class="c">${DC.review}</span>` : '';
-  const docRows = () => `<div class="abfilt" role="group" aria-label="${esc(tr('Documents'))}">${sbb_row('ablage/docs', 'file', tr('All documents'), r.mod === 'docs' && !r.review && !r.dv && !r.id, 'data-sbbpart="docs"')}${sbb_row('ablage/review', 'check', tr('To review'), r.mod === 'docs' && !!r.review, 'data-sbbpart="docs-review"', rv)}${typeof dcv_sideHtml === 'function' ? dcv_sideHtml() : (typeof loadModule === 'function' && ab_docsOn() ? (loadModule('docviews').catch(() => {}), '') : '')}</div>`;
+  const docRows = () => `<div class="abfilt" role="group" aria-label="${esc(tr('Documents'))}">${sbb_row('ablage/docs', 'file', tr('All documents'), r.mod === 'docs' && !r.review && !r.dv && !r.id, 'data-sbbpart="docs"')}${sbb_row('ablage/review', 'check', tr('To review'), r.mod === 'docs' && !!r.review, 'data-sbbpart="docs-review"', rv)}${typeof dcv_sideHtml === 'function' ? dcv_sideHtml() : (typeof loadModule === 'function' && ab_docsOn() ? (loadModule('docviews').catch(() => {}), '') : '')}</div>${typeof dfc_sideHtml === 'function' ? dfc_sideHtml() : ''}`;  // 2.772.0 (#4890): the filters with numbers (docfacets.js, loaded with docviews)
   const files = dOn => {
     const one = real.length === 1, top = one ? ab_ptGet('s:' + real[0]) : [];
     const tree = one ? (top ? sbb_treeHtml(withColl(real[0], top), 1) : `<p class="muted sbbtl" style="--sbbl:1">${esc(tr('Loading…'))}</p>`) : sbb_treeHtml(real.map(spaceNode), 1);

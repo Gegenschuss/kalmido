@@ -89,6 +89,7 @@ async function dc_load() {
     if (DC.docs && DC.key === key && DC.docs.length > docs.length && docs.length >= DC.page) { const have = new Set(docs.map(x => x.id)); docs = docs.concat(DC.docs.slice(docs.length).filter(x => !have.has(x.id))); }
     Object.assign(DC, {docs, total: j.total, review: j.review, waiting: j.waiting, facets: j.facets || DC.facets, err: null, key});
     if (rv0 !== DC.review && typeof sbb_sync === 'function') setTimeout(() => sbb_sync('ablage'), 0);  // 2.353.0 D (#2759): the counter of the saved filter To review
+    if (j.facets && typeof dfc_take === 'function') dfc_take(p, j.facets);  // 2.772.0 (#4890): the numbers below the tree follow the list
   } catch (x) { if (seq !== DC.seq || ws !== dc_ws()) return; DC.err = x.message || tr('unknown'); }
   DC.loading = false; DC.at = Date.now(); DC.atWs = ws;  // 2.62.0 (#1844)
   dc_draw();
@@ -124,6 +125,16 @@ function dc_moreWatch() {  // the list's end coming near loads the next page (no
 function dc_filterGo(k, v) {
   DC.f = {...dc_f0(), from: DC.f.from, to: DC.f.to, ...(k === 'tag' ? {tg: {[v]: 'in'}} : {[k]: v})}; DC.more = true; DC.at = 0;  // 2.122.0 B (#2294)
   if (S.route.mod === 'docs') dc_load(); else go('ablage/docs');  // 2.752.0 (#4887)
+}
+// 2.772.0 (#4890): a filter of the file store's sidebar (docfacets.js): "All documents" with only this filter (part: a
+// part of dc_f0, e.g. {sender: ['1,7']}); the search, a saved view and a folder's list are left
+function dc_facetGo(part) {
+  dc_ctxSet('list');
+  if (DC.dv) { DC.dv = null; if (typeof DCV === 'object') DCV.applied = null; }
+  DC.f = {...dc_f0(), ...part}; DC.q = ''; DC.under = null; DC.at = 0; DC.facets = null;
+  const qi = $('#dc-q'); if (qi) qi.value = '';
+  if (S.route.mod === 'docs' && !S.route.review && !S.route.dv && !S.route.id) dc_load(); else go('ablage/docs');
+  if (typeof sbb_sync === 'function') sbb_sync('ablage');
 }
 // 2.66.1 (#1945): the workspace switch (here, or on another device) drops the list, the counters, the filters (their values
 // are ids of the old workspace) and an open document of the old workspace; viewDocs then loads the new one at once
@@ -1179,8 +1190,12 @@ async function dcx_csv(ids = dc_selIds()) {
 // list (each one to take out, the number of hits); phones: the filters in a sheet. The chosen documents get tags / a type /
 // a sender at once (ONE undo step) or come as one ZIP.
 function dc_f0() {  // the empty filters (sender / type / folder: ids lists "1,7" per name; tg: {"1,7": 'in' | 'not'}; tag: the old single value)
-  return {sender: [], type: [], tag: '', tg: {}, tmode: 'any', from: '', to: '', afrom: '', ato: '', folder: [], ftype: [], notag: false, nosender: false, review: false};
+  return {sender: [], type: [], tag: '', tg: {}, tmode: 'any', from: '', to: '', afrom: '', ato: '', folder: [], ftype: [], notag: false, nosender: false, review: false,
+    asn: '', asnHas: '', cf: []};  // 2.772.0 (#4890): archive number or range, 'with' | 'without' one, custom fields ["<field ids>:<value>"]
 }
+// 2.772.0 (#4890): "143" or "140-150" (the server's dsearch.py dsr_asn), else ''
+const dc_asnOk = v => { const m = /^\s*(\d{1,9})\s*(?:[-–]\s*(\d{1,9})\s*)?$/.exec(String(v || '')); return m ? (m[2] ? `${m[1]}-${m[2]}` : m[1]) : ''; };
+const dc_cfName = (fc, v) => { const [ids, ...rest] = v.split(':'), val = rest.join(':'), x = (fc.fields || []).find(e => e.ids.join(',') === ids); const o = x?.values.find(y => y.value === val); return x ? `${x.name}: ${o ? o.name : val}` : val; };
 const dc_arr = v => Array.isArray(v) ? v : v ? [v] : [];
 const DC_FTYPES = [['pdf', N_('PDF')], ['image', N_('Image')], ['office', N_('Office files')], ['text', N_('Text')], ['other', N_('Other')]];
 function dc_fParams(p) {
@@ -1193,6 +1208,9 @@ function dc_fParams(p) {
   if (f.notag) p.set('no_tag', '1');
   if (f.nosender) p.set('no_sender', '1');
   if (dc_arr(f.ftype).length) p.set('ftype', dc_arr(f.ftype).join(','));
+  if (dc_asnOk(f.asn)) p.set('asn', dc_asnOk(f.asn));  // 2.772.0 (#4890)
+  if (f.asnHas) p.set(f.asnHas === 'with' ? 'has_asn' : 'no_asn', '1');
+  for (const v of dc_arr(f.cf)) p.append('cf', v);
 }
 const dc_fName = (list, ids) => (list || []).find(x => x.ids.join(',') === ids)?.name || '?';
 function dc_fEntries() {  // the chosen filters: [{label, not, rm}]
@@ -1205,6 +1223,9 @@ function dc_fEntries() {  // the chosen filters: [{label, not, rm}]
   for (const [k, lab] of [['from', N_('Document date from {0}')], ['to', N_('Document date to {0}')], ['afrom', N_('Arrived from {0}')], ['ato', N_('Arrived to {0}')]]) if (f[k]) out.push({label: tr(lab, dc_day(f[k])), rm: () => { f[k] = ''; }});
   if (f.notag) out.push({label: tr('Without tag'), rm: () => { f.notag = false; }});
   if (f.nosender) out.push({label: tr('Without sender'), rm: () => { f.nosender = false; }});
+  if (dc_asnOk(f.asn)) out.push({label: tr('Archive number {0}', dc_asnOk(f.asn)), rm: () => { f.asn = ''; }});  // 2.772.0 (#4890)
+  if (f.asnHas) out.push({label: f.asnHas === 'with' ? tr('With archive number') : tr('Without archive number'), rm: () => { f.asnHas = ''; }});
+  for (const v of dc_arr(f.cf)) out.push({label: dc_cfName(fc, v), rm: () => { f.cf = dc_arr(f.cf).filter(x => x !== v); }});
   return out;
 }
 function dc_fbarHtml() {
@@ -1219,17 +1240,28 @@ function dc_fltHtml() {  // the filters (desktop: below the bar; phones: the she
   const f = DC.f, fc = DC.facets || {senders: [], types: [], tags: [], folders: []};
   const st = (list, sel) => Object.fromEntries((list || []).filter(x => sel(x.ids.join(','))).map(x => [x.name, sel(x.ids.join(','))]));
   const tagSt = st(fc.tags, ids => (f.tg || {})[ids]), on = Object.values(f.tg || {}).filter(x => x === 'in').length;
-  const two = (k, list) => dt_pills(list, st(list, ids => dc_arr(f[k]).includes(ids) ? 'in' : ''), 'dcf' + k, false);
+  const two = (k, list) => dt_pills(list, st(list, ids => dc_arr(f[k]).includes(ids) ? 'in' : ''), 'dcf' + k, false, k !== 'folder');  // 2.772.0 (#4890): with numbers
   const sec = (title, inner) => inner ? `<h4>${esc(tr(title))}</h4><div class="tsgrp">${inner}</div>` : '';
   const pick = typeof dt_pills === 'function';
   return `<div class="tsflt">${isMobile() ? dc_sortHtml() : ''}
-    ${pick ? sec(N_('Tags'), dt_pills(fc.tags, tagSt, 'dcftg')) : ''}${pick && on > 1 ? `<div class="tsrow"><div class="seg" role="radiogroup" aria-label="${esc(tr('Several tags'))}">${['any', 'all'].map(m => `<button type="button" role="radio" data-dcfm="${m}" aria-checked="${(f.tmode || 'any') === m}">${m === 'all' ? tr('every one') : tr('one of them')}</button>`).join('')}</div></div>` : ''}
+    ${pick ? sec(N_('Tags'), dt_pills(fc.tags, tagSt, 'dcftg', true, true)) : ''}${pick && on > 1 ? `<div class="tsrow"><div class="seg" role="radiogroup" aria-label="${esc(tr('Several tags'))}">${['any', 'all'].map(m => `<button type="button" role="radio" data-dcfm="${m}" aria-checked="${(f.tmode || 'any') === m}">${m === 'all' ? tr('every one') : tr('one of them')}</button>`).join('')}</div></div>` : ''}
     ${pick ? sec(N_('Sender'), two('sender', fc.senders)) + sec(N_('Document type'), two('type', fc.types)) + sec(N_('Folder'), two('folder', fc.folders)) : ''}
     <h4>${tr('File type')}</h4><div class="tsgrp">${DC_FTYPES.map(([k, l]) => `<button type="button" class="tsp ${dc_arr(f.ftype).includes(k) ? 'tsp-in' : ''}" data-dcfft="${k}" aria-pressed="${dc_arr(f.ftype).includes(k)}">${esc(tr(l))}</button>`).join('')}</div>
     <h4>${tr('Document date')}</h4><div class="tsrow"><span class="dc-range">${tr('from')} ${dateIn('dc-ffrom', f.from, {label: tr('Document date from {0}', ''), attrs: 'data-dcf2="from"'})}</span><span class="dc-range">${tr('to')} ${dateIn('dc-fto', f.to, {label: tr('Document date to {0}', ''), attrs: 'data-dcf2="to"'})}</span></div>
     <h4>${tr('Date of arrival')}</h4><div class="tsrow"><span class="dc-range">${tr('from')} ${dateIn('dc-fafrom', f.afrom, {label: tr('Arrived from {0}', ''), attrs: 'data-dcf2="afrom"'})}</span><span class="dc-range">${tr('to')} ${dateIn('dc-fato', f.ato, {label: tr('Arrived to {0}', ''), attrs: 'data-dcf2="ato"'})}</span></div>
     <div class="tsrow"><label><input type="checkbox" data-dcf2="notag" ${f.notag ? 'checked' : ''}> ${tr('Without tag')}</label><label><input type="checkbox" data-dcf2="nosender" ${f.nosender ? 'checked' : ''}> ${tr('Without sender')}</label></div>
+    ${dc_fltMore(f, fc)}
     <div class="dc-synw"><p class="shint dc-syn">${esc(tr('In the search field: tag:Name, absender:Name, typ:Name, datum:2025 or datum:2025-01..2025-03, "exact text", -word'))}</p></div></div>`;  // 2.298.0 C (#3187): the search syntax behind (i)
+}
+// 2.772.0 (#4890): the archive number (a number or a range, with / without one) and the custom fields of type selection /
+// checkbox, with their numbers like the filters below the file store's tree (docfacets.js); every field one row of pills
+function dc_fltMore(f, fc) {
+  const a = fc.asn, cnt = n => n != null ? ` <span class="tsc">${n}</span>` : '';
+  const has = (k, lab, n) => `<button type="button" class="tsp ${f.asnHas === k ? 'tsp-in' : ''}" data-dcfasn="${k}" aria-pressed="${f.asnHas === k}">${esc(lab)}${cnt(n)}</button>`;
+  const asn = `<h4>${tr('Archive number')}</h4><div class="tsrow"><input type="text" inputmode="numeric" class="dc-asnin" data-dcf2="asn" value="${esc(f.asn || '')}" placeholder="${esc(tr('Number or range'))}" aria-label="${esc(tr('Archive number: number or range, e.g. 140-150'))}"></div>
+    <div class="tsgrp">${has('without', tr('Without archive number'), a?.without)}${has('with', tr('With archive number'), a?.with)}</div>`;
+  const fields = (fc.fields || []).map(x => `<h4>${esc(x.name)}</h4><div class="tsgrp">${x.values.map(v => { const k = x.ids.join(',') + ':' + v.value, on = dc_arr(f.cf).includes(k); return `<button type="button" class="tsp ${on ? 'tsp-in' : ''}" data-dcfcf="${esc(k)}" aria-pressed="${on}">${esc(v.name)}${cnt(v.count)}</button>`; }).join('')}</div>`).join('');
+  return asn + fields;
 }
 function dc_fSheet() {  // phones: the filters in a sheet; every change applies at once, the foot shows the hits
   $('.dc-fsheet')?.remove();
@@ -1261,7 +1293,7 @@ document.addEventListener('click', e => {
   const so = e.target.closest('[data-dcsort], [data-dcsortd]');  // 2.428.0 (#3579): the sort in the phone's sheet
   if (so) { if (so.dataset.dcsort) dc_sortPick(so.dataset.dcsort); else dc_sortSet(dc_sort().k, so.dataset.dcsortd); return; }
   const f = DC.f, fc = DC.facets || {};
-  const b = e.target.closest('[data-dcftg], [data-dcfsender], [data-dcftype], [data-dcffolder], [data-dcfft], [data-dcfm]'); if (!b) return;
+  const b = e.target.closest('[data-dcftg], [data-dcfsender], [data-dcftype], [data-dcffolder], [data-dcfft], [data-dcfm], [data-dcfasn], [data-dcfcf]'); if (!b) return;
   const ids = (list, name) => (list || []).find(x => x.name === name)?.ids.join(',');
   if (b.dataset.dcftg != null) {
     const k = ids(fc.tags, b.dataset.dcftg); if (!k) return;
@@ -1269,6 +1301,8 @@ document.addEventListener('click', e => {
     if (f.tag === k) f.tag = '';
   } else if (b.dataset.dcfm) f.tmode = b.dataset.dcfm;
   else if (b.dataset.dcfft) { const v = b.dataset.dcfft, a = dc_arr(f.ftype); f.ftype = a.includes(v) ? a.filter(x => x !== v) : [...a, v]; }
+  else if (b.dataset.dcfasn) f.asnHas = f.asnHas === b.dataset.dcfasn ? '' : b.dataset.dcfasn;  // 2.772.0 (#4890)
+  else if (b.dataset.dcfcf) { const v = b.dataset.dcfcf, a = dc_arr(f.cf); f.cf = a.includes(v) ? a.filter(x => x !== v) : [...a, v]; }
   else {
     const kind = b.dataset.dcfsender != null ? 'sender' : b.dataset.dcftype != null ? 'type' : 'folder';
     const k = ids(fc[{sender: 'senders', type: 'types', folder: 'folders'}[kind]], b.dataset['dcf' + kind]); if (!k) return;
@@ -1279,7 +1313,7 @@ document.addEventListener('click', e => {
 document.addEventListener('change', e => {
   const el = e.target.closest?.('[data-dcf2]'); if (!el || !el.closest('.dc-flt')) return;
   const k = el.dataset.dcf2;
-  DC.f[k] = el.type === 'checkbox' ? el.checked : el.value;
+  DC.f[k] = el.type === 'checkbox' ? el.checked : k === 'asn' ? dc_asnOk(el.value) : el.value;  // 2.772.0 (#4890): a wrong number is no filter
   dc_fChanged();
 });
 // ---- 2.122.0 B (#2294): the chosen documents at once (POST /api/docs/bulk in parts of 500; ONE undo step) and as a ZIP

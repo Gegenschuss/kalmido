@@ -23,9 +23,10 @@ async function dt_pick({title, all, cur, ok, known = false}) {
 }
 
 // ---- filter buttons: st = {name: 'in' | 'not'}; a click goes off -> in -> not -> off (dt_cycle)
-const dt_pills = (list, st, attr, tri = true) => (list || []).map(x => {
+// 2.772.0 (#4890): counts = each pill's number of documents after its name (x.count, the documents' filters)
+const dt_pills = (list, st, attr, tri = true, counts = false) => (list || []).map(x => {
   const s = st[x.name] || '';
-  return `<button type="button" class="tsp ${s ? 'tsp-' + s : ''}" data-${attr}="${esc(x.name)}" aria-pressed="${s ? 'true' : 'false'}" title="${esc(tri ? tr('Tap: with · without · off') : x.name)}">${s === 'not' ? `<span class="tsig" aria-hidden="true">−</span><span class="sr">${tr('not')} </span>` : s ? '<span class="tsig" aria-hidden="true">+</span>' : ''}${esc(x.name)}</button>`;
+  return `<button type="button" class="tsp ${s ? 'tsp-' + s : ''}" data-${attr}="${esc(x.name)}" aria-pressed="${s ? 'true' : 'false'}" title="${esc(tri ? tr('Tap: with · without · off') : x.name)}">${s === 'not' ? `<span class="tsig" aria-hidden="true">−</span><span class="sr">${tr('not')} </span>` : s ? '<span class="tsig" aria-hidden="true">+</span>' : ''}${esc(x.name)}${counts && x.count != null ? ` <span class="tsc">${x.count}</span>` : ''}</button>`;
 }).join('');
 function dt_cycle(st, name, tri = true) {
   const s = st[name];

@@ -1192,7 +1192,8 @@ ROUTES = {
     "DELETE /api/disc/requests/{}": "discover", "DELETE /api/disc/connections/{}": "discover",
     "POST /api/disc/connections/{}/restore": "discover", "POST /api/disc/blocks/{}": "discover", "DELETE /api/disc/blocks/{}": "discover",
     # 2.48.0 (#1111): documents
-    "GET /api/docs": "document", "POST /api/docs": "document", "GET /api/docs/{}": "document", "PATCH /api/docs/{}": "document",
+    "GET /api/docs": "document", "GET /api/docs/facets": "document",  # 2.772.0 (#4890): p4890_a_api_test.py
+    "POST /api/docs": "document", "GET /api/docs/{}": "document", "PATCH /api/docs/{}": "document",
     "POST /api/docs/{}/accept": "document", "POST /api/docs/{}/review": "document", "POST /api/docs/{}/redo": "document", "POST /api/docs/{}/redo/undo": "document",
     "GET /api/docs/{}/thumb": "document", "GET /api/docs/{}/file": "document", "POST /api/docs/{}/task": "document",
     "DELETE /api/docs/{}/task": "document", "GET /api/docs/settings": "document", "PUT /api/docs/settings": "document",

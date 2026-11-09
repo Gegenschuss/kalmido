@@ -331,30 +331,41 @@ def doc_query(c, uid, args, vis=None):
     return [got[i] for i in ids if i in got], total, review
 
 
-def facets(c, uid, ws_filter, vis=None):
-    """Senders, types and tags of the documents uid can see (in the workspace filter), merged by name: [{name, ids}] each.
+def facets(c, uid, ws_filter, vis=None, area=None, full=False):
+    """Senders, types and tags of the documents uid can see (in the workspace filter), merged by name: [{name, ids, count}] each.
     Only labels used on visible documents: names from documents one cannot open never show up in the filters.
-    vis: doc_visible of the request (2.525.0, #4195; None = worked out here)."""
+    vis: doc_visible of the request (2.525.0, #4195; None = worked out here).
+    2.772.0 (#4890): count = the visible documents with that name (one GROUP BY per kind, the palette keeps {name, ids});
+    area: the list's ?area= (docs/area.py ar_sql: the file store counts no office receipts, like its list); full: also
+    "asn" {with, without} and "fields" (custom fields of type select / checkbox, docs/fields.py facet_fields) -- the
+    filters below the file store's tree and the list's filter sheet, not the palette."""
     vv = vis or doc_visible(c, uid)
-    where, params = [f"n.id {vv[0]}"], [vv[1]]
+    where, params = [f"n.id {vv[0]}", "n.kind='file'"], [vv[1]]
     if ws_filter == "private":
         where.append("n.org_id IS NULL")
     elif re.fullmatch(r"org:\d+", str(ws_filter or "")):
         where.append("n.org_id = ?")
         params.append(int(ws_filter[4:]))
+    ar = ar_sql(c, uid, str(area or "")) if area else None
+    if ar:
+        where.append(ar[0])
+        params += ar[1]
     vis = f"SELECT d.node_id FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id WHERE {' AND '.join(where)}"
     used = {
-        "sender": c.execute(f"SELECT DISTINCT sender_id, ws FROM doc_meta WHERE sender_id IS NOT NULL AND node_id IN ({vis})", params).fetchall(),
-        "type": c.execute(f"SELECT DISTINCT type_id, ws FROM doc_meta WHERE type_id IS NOT NULL AND node_id IN ({vis})", params).fetchall(),
-        "tag": c.execute(f"SELECT DISTINCT t.id, t.ws FROM doc_node_tags nt JOIN doc_tags t ON t.id=nt.tag_id WHERE nt.node_id IN ({vis})",
-                         params).fetchall()}
+        "sender": c.execute(f"SELECT sender_id, ws, COUNT(*) FROM doc_meta WHERE sender_id IS NOT NULL AND node_id IN ({vis}) GROUP BY sender_id, ws",
+                            params).fetchall(),
+        "type": c.execute(f"SELECT type_id, ws, COUNT(*) FROM doc_meta WHERE type_id IS NOT NULL AND node_id IN ({vis}) GROUP BY type_id, ws", params).fetchall(),
+        "tag": c.execute(f"SELECT t.id, t.ws, COUNT(DISTINCT nt.node_id) FROM doc_node_tags nt JOIN doc_tags t ON t.id=nt.tag_id WHERE nt.node_id IN ({vis}) "
+                         "GROUP BY t.id, t.ws", params).fetchall()}
     out = {}
     for kind, key in (("sender", "senders"), ("type", "types"), ("tag", "tags")):
         merged = {}
-        for lid, ws in used[kind]:
+        for lid, ws, n in used[kind]:
             name = S.label_name(c, ws, kind, lid)
             if name:
-                merged.setdefault(name.lower(), {"name": name, "ids": []})["ids"].append(lid)
+                x = merged.setdefault(name.lower(), {"name": name, "ids": [], "count": 0})
+                x["ids"].append(lid)
+                x["count"] += n
         out[key] = sorted(merged.values(), key=lambda v: (v["name"] or "").lower())
     # 2.122.0 B (#2294): the folders the visible documents lie in (merged by name as the labels)
     merged = {}
@@ -362,7 +373,22 @@ def facets(c, uid, ws_filter, vis=None):
                        f"ON n.id=d.node_id WHERE {' AND '.join(where)}) AND p.id {vv[0]}", params + [vv[1]]):
         merged.setdefault(r[1].lower(), {"name": r[1], "ids": []})["ids"].append(r[0])
     out["folders"] = sorted(merged.values(), key=lambda v: v["name"].lower())
+    if full:
+        r = c.execute(f"SELECT COUNT(*) FILTER (WHERE asn IS NOT NULL), COUNT(*) FILTER (WHERE asn IS NULL) FROM doc_meta WHERE node_id IN ({vis})",
+                      params).fetchone()
+        out["asn"] = {"with": r[0], "without": r[1]}
+        from .fields import facet_fields
+        out["fields"] = facet_fields(c, vis, params)
     return out
+
+
+@app.get("/api/docs/facets")
+def docs_facets():
+    """2.772.0 (#4890): the filters of the documents with their numbers, without a list: ?ws=all|private|org:<id>&area=
+    (the filters below the file store's tree, ablage.js / docfacets.js). The same rights as /api/docs: only values and
+    numbers of documents the caller sees."""
+    c = db()
+    return jsonify(facets(c, me(), request.args.get("ws"), area=request.args.get("area"), full=True))
 
 
 @app.get("/api/docs")
@@ -386,7 +412,7 @@ def docs_list():
     waiting = c.execute(f"SELECT COUNT(*) FROM doc_meta d WHERE d.state IN ('wait','run') AND d.node_id {vis[0]}", (vis[1],)).fetchone()[0]
     res = {"docs": out, "total": total, "review": review, "waiting": waiting}
     if request.args.get("facets") != "0":
-        res["facets"] = facets(c, uid, request.args.get("ws"), vis)
+        res["facets"] = facets(c, uid, request.args.get("ws"), vis, area=request.args.get("area"), full=True)  # 2.772.0 (#4890): numbers, archive number, fields
     return jsonify(res)
 
 

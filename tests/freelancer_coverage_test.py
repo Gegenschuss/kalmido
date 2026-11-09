@@ -318,7 +318,8 @@ ROUTES = {
     "GET /api/docs/{}/split": "files", "GET /api/docs/{}/split/thumbs": "files", "POST /api/docs/{}/split": "files",  # 2.154.0 A (#1111)
     "POST /api/docs/{}/unsplit": "files", "POST /api/docs/{}/split/dismiss": "files", "POST /api/docs/{}/task/link": "files",
     "GET /api/tasks/{}/docs": "files", "GET /api/docs/split-sheet.pdf": "files",
-    "GET /api/docs": "files", "GET /api/docs/settings": "files", "GET /api/docs/{}": "files", "GET /api/docs/{}/file": "files",
+    "GET /api/docs": "files", "GET /api/docs/facets": "files", "GET /api/docs/settings": "files",  # 2.772.0 (#4890): facets = p4890_a_api_test.py
+    "GET /api/docs/{}": "files", "GET /api/docs/{}/file": "files",
     "GET /api/docs/{}/receipt": "files", "GET /api/docs/{}/thumb": "files", "GET /api/files": "files",
     "GET /api/files/collections/{}": "files",  # 2.429.0 (#3580)
     "GET /api/files/folders": "files", "GET /api/files/nodes/{}": "files", "GET /api/files/nodes/{}/content": "files",

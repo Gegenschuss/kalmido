@@ -8,3 +8,11 @@
   .dc-bar .dcv-cur .dcv-name>span:not(.dcv-dirty){position:static;width:auto;height:auto;overflow:hidden;clip:auto;clip-path:none;max-width:9rem}
   .dc-bar .dcv-cur .dcv-name{padding:0 .625rem}
 }
+/* 2.772.0 (#4890): the filters with numbers below the file store's tree (static/js/docfacets.js) */
+.dfc{margin-top:.25rem}
+.dfch .dfcm{opacity:.6}
+.dfch:hover .dfcm,.dfch .dfcm:focus-visible{opacity:1}
+.dfcb .dfcr .c{margin-left:auto}
+.dfcb .dfcall{display:block;margin:.125rem 0 .25rem 2.25rem;font-size:var(--fs-s)}
+.dfcasn{display:flex;gap:.25rem;align-items:center;margin:.125rem .5rem .25rem 2.25rem}
+.dfcasn input{flex:1;min-width:0;min-height:2rem;padding:0 .5rem;font-size:var(--fs-s)}

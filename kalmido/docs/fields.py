@@ -323,6 +323,54 @@ def df_index_texts(c, ws, nids):
     return {n: "\n".join(x) for n, x in vals.items()}
 
 
+def facet_fields(c, vis, params):
+    """2.772.0 (#4890): the custom fields of type select / checkbox as filters with numbers, over the documents of the
+    subquery vis (docs/web.py facets: only documents the caller sees) -> [{name, type, ids, values: [{value, name, count}]}].
+    Fields of several workspaces with the same name and type are one entry (ids: one per workspace, the filter ?cf=ids:value,
+    docs/dsearch.py dsr_cf); a selection's values are merged by the option's name (value = that name), a checkbox has
+    "1" (checked) and "0" (not checked: the workspace's documents without the tick). Only values with at least one document.
+    The values are sealed: they are opened here, per workspace with its key looked up once (store.py doc_opener)."""
+    per_ws = {r[0]: r[1] for r in c.execute(f"SELECT ws, COUNT(*) FROM doc_meta WHERE node_id IN ({vis}) GROUP BY ws", params)}
+    if not per_ws:
+        return []
+    rows = c.execute(f"SELECT * FROM doc_fields WHERE type IN ('select', 'checkbox') AND ws IN ({','.join('?' * len(per_ws))}) ORDER BY sort, id",
+                     list(per_ws)).fetchall()
+    if not rows:
+        return []
+    by_id = {r["id"]: r for r in rows}
+    merged, counts = {}, {}
+    for r in rows:
+        e = merged.setdefault((r["name"].lower(), r["type"]), {"name": r["name"], "type": r["type"], "ids": [], "values": {}})
+        e["ids"].append(r["id"])
+        if r["type"] == "select":
+            for o in _opts(r).get("options", []):
+                e["values"].setdefault(o["name"].lower(), {"value": o["name"], "name": o["name"], "count": 0})
+    q = f"SELECT field_id, value FROM doc_field_values WHERE field_id IN ({','.join('?' * len(by_id))}) AND node_id IN ({vis})"
+    openers = {}
+    for x in c.execute(q, list(by_id) + list(params)).fetchall():
+        f = by_id[x["field_id"]]
+        e = merged[(f["name"].lower(), f["type"])]
+        if f["type"] == "checkbox":
+            counts[f["id"]] = counts.get(f["id"], 0) + 1
+            continue
+        open_ = openers.get(f["ws"]) or openers.setdefault(f["ws"], S.doc_opener(c, f["ws"], CTX, default=None))
+        o = next((o for o in _opts(f).get("options", []) if o["id"] == open_(x["value"])), None)
+        if o:
+            e["values"][o["name"].lower()]["count"] += 1
+    out = []
+    for e in merged.values():
+        if e["type"] == "checkbox":
+            on = sum(counts.get(i, 0) for i in e["ids"])
+            off = sum(per_ws.get(by_id[i]["ws"], 0) - counts.get(i, 0) for i in e["ids"])
+            vals = [{"value": "1", "name": tr("Ticked"), "count": on}, {"value": "0", "name": tr("Not ticked"), "count": off}]
+        else:
+            vals = list(e["values"].values())
+        e["values"] = [v for v in vals if v["count"] > 0]
+        if e["values"]:
+            out.append(e)
+    return out
+
+
 def _put(c, nid, ws, fid, v):
     if v is None:
         c.execute("DELETE FROM doc_field_values WHERE node_id=? AND field_id=?", (nid, fid))

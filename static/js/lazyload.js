@@ -39,7 +39,7 @@ const LD_MODS = {
   calendar: ['calview', 'caldrag', 'apptbook', 'calyear', 'listcal', 'calgest'],  // 2.94.0 B (#1929): apptbook.js = appointment booking settings; 2.155.0 C (#2078): calyear.js = the year view; 2.156.0 C (#2071): listcal.js = a list's calendar view; 2.164.0 (#2625): calgest.js = swipe / pinch
   calrrule: ['calrrule'],  // 2.155.0 C (#2075): the own repeat rule dialog, loaded by the event editor
   calabs: ['calabs'],  // 2.155.0 B (#2076, #2077): holidays / absences in the "Calendars" window, the availability bar
-  docviews: ['docviews'],  // 2.579.0 (#4802): saved views of the documents search (the list, the sidebar, Today)
+  docviews: ['docviews', 'docfacets'],  // 2.772.0 (#4890): docfacets.js = the filters with numbers below the file store's tree;  2.579.0 (#4802): saved views of the documents search (the list, the sidebar, Today)
   docs: ['docs', 'paperless', 'receipts', 'letterdoc', 'letteragent', 'docsplit', 'docscan', 'docfetch', 'abdocs', 'docview', 'tilesize', 'docflows', 'docnotes'],  // 2.583.0 (#4812): tilesize.js = the card size  // 2.583.0 (#4835): docview.js = the document view (was docread.js, the reading view)  // 2.353.0 D (#2759): abdocs.js; 2.153.0 (#2028, #2031): letterdoc.js, letteragent.js; 2.154.0 A (#1111): docsplit.js; 2.207.0 A (#2763): docscan.js
   life: ['life', 'devlink', 'budget'],  // 2.149.0 F (#2518): budget.js (its view and dialogs used life.js already)
    // 2.140.0 B (#2136): devlink.js = a device <-> office equipment
@@ -116,7 +116,7 @@ const LD_CALL = {settings: ['settingsModal', 'setApply', 'settingsSync', 'modCou
   // 2.65.0 (#1823)
   agentchat: ['acdDeleteMsg', 'chatOpen', 'ac_modOff', 'chatClose', 'chatPop', 'chatDock', 'chatFloatMin', 'apvJump', 'chatChoice', 'shareDest', 'chatFileRm', 'chatReact',
     'chatModeMenu', 'stepsAlways', 'stepsLive', 'chatEditStart', 'chatOlder', 'chatSend', 'chatBottom', 'chatDraw', 'agModal', 'agDraw', 'aiuLoad', 'ains_setupModal', 'awOpen'],
-  pdf: ['pdfView', 'dpvOpen', 'dpvSumMount'], calendar: ['calColorPop', 'cg_commit', 'apbOpen'], docs: ['dc_shareFiles', 'dc_filterGo', 'pl_importActive', 'pl_openSettings'],  // 2.87.9 (#1934); 2.94.0 B (#1929): apbOpen
+  pdf: ['pdfView', 'dpvOpen', 'dpvSumMount'], calendar: ['calColorPop', 'cg_commit', 'apbOpen'], docs: ['dc_shareFiles', 'dc_filterGo', 'dc_facetGo', 'dc_settings', 'pl_importActive', 'pl_openSettings'],  // 2.87.9 (#1934); 2.94.0 B (#1929): apbOpen; 2.772.0 (#4890): dc_facetGo, dc_settings (the filters below the file store's tree)
   life: ['contractModal', 'deviceModal', 'upkeepModal', 'healthModal', 'tripModal'], integrations: ['pubWire'],
   playbook: ['pbMount', 'pbOpen', 'pbNewsOpen'], timeline: ['rmSet'],
   bookmarks: ['bm_shareSave', 'bm_confirmSave', 'bm_bookmarkletHelp', 'rdl_shareSave'],  // 2.97.0 A (#1950); 2.172.0 B (#2679): rdl_shareSave

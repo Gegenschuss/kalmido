@@ -63,6 +63,7 @@ function dcv_apply(v) {
   f.from = p.get('from') || ''; f.to = p.get('to') || ''; f.afrom = p.get('added_from') || ''; f.ato = p.get('added_to') || '';
   f.notag = p.get('no_tag') === '1'; f.nosender = p.get('no_sender') === '1'; f.review = p.get('review') === '1';
   f.ftype = (p.get('ftype') || '').split(',').filter(Boolean);
+  f.asn = p.get('asn') || ''; f.asnHas = p.get('has_asn') === '1' ? 'with' : p.get('no_asn') === '1' ? 'without' : ''; f.cf = p.getAll('cf');  // 2.772.0 (#4890)
   DC.f = f; DC.q = p.get('q') || ''; DC.under = p.get('under') || null;
   const qi = $('#dc-q'); if (qi) qi.value = DC.q;  // the field keeps its text in a redraw (docs.js "Remove filter q"): its next input would bring the old search back
   if (typeof dc_qTimer !== 'undefined') clearTimeout(dc_qTimer);
