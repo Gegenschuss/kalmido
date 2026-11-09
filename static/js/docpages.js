@@ -36,9 +36,11 @@ async function dpg_open(/** @type {any} */ d) {
   let j; try { j = await api('GET', `/api/docs/${d.id}/pages`); } catch { return; }
   if (DC.doc?.id !== d.id || !j?.pages) return;
   dpg_reset();
-  // review F7: more pages than the server changes (max) - a hint instead of a strip that could not be saved (413)
+  // review F7: more pages than the server changes (max) - a hint instead of a strip that could not be saved (413);
+  // review F4: no right to write (a receipt of a locked month) - a hint instead of a strip whose save is refused
   const max = +j.max || 1000;
-  const stop = +j.pages > max ? tr('This PDF has more than {0} pages - its pages cannot be changed here', max) : '';
+  const stop = +j.pages > max ? tr('This PDF has more than {0} pages - its pages cannot be changed here', max)
+    : j.write === false ? tr('The pages of this document cannot be changed (read-only or a locked month)') : '';
   Object.assign(DPG, {id: d.id, n: stop ? 0 : +j.pages, ver: +j.version || 0, blank: new Set(stop ? [] : j.blank || []), receipt: !!j.receipt, stop});
   dpg_draw(true);
 }

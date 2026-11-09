@@ -17984,5 +17984,6 @@
   "That version of the file is no longer there, so it cannot be undone": "Cette version du fichier n'existe plus, elle ne peut donc pas être annulée",
   "There is a newer version by now - this step was dropped": "Il existe entre-temps une version plus récente - cette étape est abandonnée",
   "The PDF cannot be read": "Le PDF ne peut pas être lu",
-  "This PDF has more than {0} pages - its pages cannot be changed here": "Ce PDF compte plus de {0} pages - ses pages ne peuvent pas être modifiées ici"
+  "This PDF has more than {0} pages - its pages cannot be changed here": "Ce PDF compte plus de {0} pages - ses pages ne peuvent pas être modifiées ici",
+  "The pages of this document cannot be changed (read-only or a locked month)": "Les pages de ce document ne peuvent pas être modifiées (lecture seule ou mois verrouillé)"
 }

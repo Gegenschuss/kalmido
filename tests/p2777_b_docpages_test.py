@@ -200,6 +200,8 @@ check(done(Fr, L), "setup: a two-page PDF for the locked folder")
 kt.dbx("INSERT INTO fs_locks(node_id, org_id, e2e, e2e_gen) VALUES(?, NULL, 'on', 1)", (L,))
 r = Fr.get(B + f"/api/docs/{L}/pages")
 check(r.status_code == 409 and r.json().get("code") == "fs_locked", f"F6: GET in a locked folder: 409 fs_locked ({r.status_code} {r.text[:160]})")
+r = Fr.post(B + f"/api/docs/{L}/pages", json={"delete": [2], "expect_version": 1})
+check(r.status_code == 409 and r.json().get("code") == "fs_locked" and node(Fr, L)["version"] == 1, f"F4: a save in a locked folder: 409 fs_locked, nothing stored ({r.status_code})")
 kt.dbx("DELETE FROM fs_locks WHERE node_id=?", (L,))
 
 # F2 / F3 / F5 / F6 in the container's Python (the route module itself, its child process replaced)

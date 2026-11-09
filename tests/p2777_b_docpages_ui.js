@@ -144,9 +144,9 @@ const three = tag => [['Kita Beispiel', 'Elternbrief ' + tag, 'Datum 01.09.2026'
   check((await call('GET', `/api/files/nodes/${D}`)).version === 5, '... nothing restored: version 5 stays on top');
   check(w.eval('!HIST.undo.includes(window.__dpgE) && !HIST.redo.includes(window.__dpgE)'), '... the step is dropped (not in Undo, not in Redo)');
 
-  // review F7: more pages than the server changes: a hint instead of the strip
+  // review F7 / F4: more pages than the server changes, or no right to write (a locked month): a hint instead of the strip
   w.eval(`window.__dpgApi = api; api = (m, u, b) => window.__dpgApi(m, u, b).then(j => m === 'GET' && String(u).endsWith('/pages') ? {...j, ...window.__dpgOver} : j)`);
-  for (const [over, re, what] of [[{max: 2}, /more than 2 pages - its pages cannot be changed here/, 'more pages than max']]) {
+  for (const [over, re, what] of [[{max: 2}, /more than 2 pages - its pages cannot be changed here/, 'more pages than max'], [{write: false}, /cannot be changed \(read-only or a locked month\)/, 'no right to write']]) {
     w.eval(`window.__dpgOver = ${JSON.stringify(over)}`);
     if (strip()) click(w, btn('cancel'));
     await until(() => !strip());

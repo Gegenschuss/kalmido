@@ -40,7 +40,8 @@ from . import store as S
 from .area import ar_is_receipt
 from .ingest import docs_kick
 from .split import _get as sp_get, _put as sp_put, _no_agent
-from ..files.fslock import fl_is_locked, fsl_denied  # 2.777.0 (#4874 review F6)
+from ..files.fslock import fl_is_locked, fsl_denied, fsl_need_unlocked  # 2.777.0 (#4874 review F4 / F6)
+from ..office.periodlock import pl_receipt_need_open  # 2.777.0 (#4874 review F4)
 
 DP_PAGES = 1000              # pages of a PDF this edits at most
 DP_BYTES = 100 << 20         # bytes of a PDF this edits at most (the child process holds it a few times)
@@ -189,8 +190,14 @@ def docs_pages_get(nid):
     np = _known_pages(m, n)
     if np < 1:
         np = dp_count(data)
+    write = n["role"] != "view"
+    if write:
+        try:  # review F4: a receipt of a locked month cannot be changed - the strip does not offer it
+            pl_receipt_need_open(c, nid)
+        except Denied:
+            write = False
     return jsonify(pages=np or 0, version=n["cur_version"], blank=_blank(m, np or 0), receipt=ar_is_receipt(c, nid),
-                   write=n["role"] != "view", max=DP_PAGES)
+                   write=write, max=DP_PAGES)
 
 
 def _known_pages(m, n):
@@ -208,6 +215,8 @@ def docs_pages_save(nid):
     c = db()
     b = body()
     need_node(c, nid, write=True)  # 403 / 404 before anything is read
+    fsl_need_unlocked(c, nid)  # review F4: a locked folder and a locked month say no before the PDF is read (fs_new_version checks again)
+    pl_receipt_need_open(c, nid)
     write_lock(c, f"fs_version:{int(nid)}")  # the same lock as an upload: no other version between the read and the write
     fs_web_expect(c, nid, b.get("expect_version"))
     m, n, data = _pdf_doc(c, nid, True)
