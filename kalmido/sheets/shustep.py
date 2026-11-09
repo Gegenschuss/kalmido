@@ -52,12 +52,11 @@ SHU_SHEET_COLS = ("chart", "fmt_rules")
 
 def _trash(table, what):
     def run(c, r, ch, uid, ts, redo):
-        t = qi(table, SHU_TABLES)
         xid = ch["row_id"] if what == "row" else ch["col_id"]
         if redo:
-            n = c.execute(f"UPDATE {t} SET deleted_at=? WHERE id=? AND sheet_id=? AND {live_sql()}", (ch["new_raw"], xid, r["id"])).rowcount
+            n = c.execute(f"UPDATE {qi(table, SHU_TABLES)} SET deleted_at=? WHERE id=? AND sheet_id=? AND {live_sql()}", (ch["new_raw"], xid, r["id"])).rowcount
         else:
-            n = c.execute(f"UPDATE {t} SET deleted_at=NULL WHERE id=? AND sheet_id=? AND deleted_at=?", (xid, r["id"], ch["new_raw"])).rowcount
+            n = c.execute(f"UPDATE {qi(table, SHU_TABLES)} SET deleted_at=NULL WHERE id=? AND sheet_id=? AND deleted_at=?", (xid, r["id"], ch["new_raw"])).rowcount
         return (True, None) if n else (False, ch["old_raw"] or tr("Table"))
     return run
 
@@ -96,8 +95,8 @@ def _order(c, r, ch, uid, ts, redo):
     a, z = _js(ch["old_raw"]) or {}, _js(ch["new_raw"]) or {}
     kind = "row" if a.get("k") == "row" else "col"
     name = tr("Rows") if kind == "row" else tr("Columns")
-    table = qi("sheet_rows" if kind == "row" else "sheet_columns", SHU_TABLES)
-    live = {x[0] for x in c.execute(f"SELECT id FROM {table} WHERE sheet_id=? AND {live_sql()}", (r["id"],))}
+    table = "sheet_rows" if kind == "row" else "sheet_columns"
+    live = {x[0] for x in c.execute(f"SELECT id FROM {qi(table, SHU_TABLES)} WHERE sheet_id=? AND {live_sql()}", (r["id"],))}
     to, frm = (z.get("ids"), a.get("ids")) if redo else (a.get("ids"), z.get("ids"))
     b = {"ids": [x for x in to or [] if x in live], "prev": [x for x in frm or [] if x in live]}
     if z.get("move"):
@@ -122,11 +121,10 @@ def _order(c, r, ch, uid, ts, redo):
 def _sheet_val(col, what, label):
     def run(c, r, ch, uid, ts, redo):
         to, frm = (x or "" for x in _ends(ch, redo))
-        q = qi(col, SHU_SHEET_COLS)
-        cur = c.execute(f"SELECT {q} FROM sheets WHERE id=?", (r["id"],)).fetchone()[0] or ""
+        cur = c.execute(f"SELECT {qi(col, SHU_SHEET_COLS)} FROM sheets WHERE id=?", (r["id"],)).fetchone()[0] or ""
         if cur != frm:
             return False, tr(label)
-        c.execute(f"UPDATE sheets SET {q}=? WHERE id=?", (to, r["id"]))
+        c.execute(f"UPDATE sheets SET {qi(col, SHU_SHEET_COLS)}=? WHERE id=?", (to, r["id"]))
         if what == "rules":
             shh_meta(c, r["id"], what, str(len(_js(frm) or [])) if frm else "", str(len(_js(to) or [])) if to else "", uid)
         else:

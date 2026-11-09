@@ -348,8 +348,8 @@ def sheets_col_delete(sid, col_id):
 
 def shx_place(c, sid, kind, xid):
     """2.800.0 (#5409): how the table names a live row (its number) / column (its title or letter) right now."""
-    table = qi("sheet_rows" if kind == "row" else "sheet_columns", ("sheet_rows", "sheet_columns"))
-    live = [x[0] for x in c.execute(f"SELECT id FROM {table} WHERE sheet_id=? AND {live_sql()} ORDER BY pos, id", (sid,))]
+    table = "sheet_rows" if kind == "row" else "sheet_columns"
+    live = [x[0] for x in c.execute(f"SELECT id FROM {qi(table, ('sheet_rows', 'sheet_columns'))} WHERE sheet_id=? AND {live_sql()} ORDER BY pos, id", (sid,))]
     i = live.index(xid) if xid in live else 0
     if kind == "row":
         return tr("Row {0}", i + 1)
