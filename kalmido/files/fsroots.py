@@ -165,12 +165,15 @@ def fs_area_ref_kind(ref_kind):
     return _ref_area(ref_kind)
 
 
-def fs_area_need_fit(c, parent_id, kind, ref_kind=None, node=None):
-    """Denied(409) when a node of kind / ref_kind (node: the row that moves) may not lie in folder parent_id."""
+def fs_area_need_fit(c, parent_id, kind, ref_kind=None, node=None, src_area=False):
+    """Denied(409) when a node of kind / ref_kind (node: the row that moves) may not lie in folder parent_id. src_area: the
+    node's area as it was before (2.777.0 #5254, review F6: files/fsundo.py checks after the copy put parent_id back)."""
     if not FS_AREA_RULES:
         return
     dst = fs_area_of(c, parent_id) if parent_id else None
-    if node is not None:
+    if node is not None and src_area is not False:
+        src = src_area
+    elif node is not None:
         src = fs_area_of(c, node["id"])
     else:  # a new node: only an area's own reference kind is bound to it (the kinds check below rules the rest)
         src = _ref_area(ref_kind if kind == "ref" else None) or dst

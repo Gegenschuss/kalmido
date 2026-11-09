@@ -257,7 +257,7 @@ UG_TRACKED = {}  # kind -> table of core/writes.py obj_track (filled there; this
 
 
 def ug_drop_orphans(c):
-    """2.747.0 (#5249, review F2): the parts of the old areas' kinds (core/writes.py obj_track: office documents, clients,
+    """2.747.0 (#5249, review F2): the parts (2.777.0 #5254 review F4: and the history rows) of the old areas' kinds (core/writes.py obj_track: office documents, clients,
     letters, master data, ...) whose row is gone. Their own deletions do not call objhooks.py obj_rows_drop, so a full copy
     of a client or document deleted for good would wait the whole UNDO_KEEP_D days; a copy of a missing row can never be
     taken back anyway (its fingerprint finds nothing). Registered core kinds go with obj_purge. Caller: system context."""
@@ -269,6 +269,9 @@ def ug_drop_orphans(c):
         gids = ug_gids(c, cond, (kind,))  # review N4: their groups are recounted (or go when empty)
         n += c.execute(f"DELETE FROM obj_undo WHERE {cond}", (kind,)).rowcount
         ug_gc(c, gids)
+        # 2.777.0 (#5254, review F4): their history rows too (an undo / redo writes one: an event's title and text) -- a
+        # purged event, file node, habit, office row or client leaves no history behind (one-way, the row is gone for good)
+        n += c.execute(f"DELETE FROM obj_history WHERE {cond.replace('obj_undo.', 'obj_history.')}", (kind,)).rowcount
     return n
 
 

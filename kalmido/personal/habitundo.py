@@ -10,6 +10,7 @@ from ..core.errors import Denied
 from ..core.undoareas import UA_DELETED, UA_RESTORED, ua_plain, ua_post, ua_pre
 from ..core.undogroups import UG_LABEL
 from ..core.undoweb import undo_need_reg
+from ..core.objhooks import GONE
 from ..core.writes import obj_track
 
 HBU_KIND = "habit"
@@ -23,6 +24,7 @@ def hbu_label(r):
 obj_track(HBU_KIND, "habits", area="self", undo_keep={"habits": {"user_id", "created_at", "sort", "reminded_on"}},
           undo_nofp={"habits": {"sort", "reminded_on"}},
           undo_label=hbu_label, undo_free=("deleted_at",))
+GONE[HBU_KIND] = "habits"  # review F4: an account's deletion takes its history / undo rows of the objects that went (core/objhooks.py)
 
 
 def hbu_pre(c, uid, hid, what=None):

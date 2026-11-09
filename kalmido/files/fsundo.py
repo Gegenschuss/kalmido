@@ -20,7 +20,7 @@ from ..core.undogroups import UG_LABEL
 from ..core.undoweb import undo_need_reg
 from ..core.writes import obj_track
 from ..office.periodlock import pl_tree_need_open
-from .fslock import fsl_of
+from .fslock import fsl_move_guard, fsl_of
 from .fsref import fs_ref_need_move, fs_ref_trashed, fs_trash_prepare, fs_trash_restored
 from .fsroots import fs_area_after, fs_area_before, fs_area_need_fit, fs_area_root_need_free
 from .store import DEPTH_MAX, _free_name, _now, fs_chain, fs_deleted, fs_height, fs_log_add, need_node
@@ -53,6 +53,9 @@ def fsu_pre(c, uid, n, what=None):
 def _target(c, uid, n, m):
     """Node n (as before the undo, with its role) goes back into folder m["parent_id"] (the checks of web.py _move)."""
     tid = m["parent_id"]
+    if tid:
+        need_node(c, tid)  # a folder the person does not see: 404 before its lock is checked (as _move)
+    fsl_move_guard(c, n, tid)  # review F1: across a locked folder's border only re-encrypted (409, as _move)
     fs_area_need_fit(c, tid, m["kind"], m["ref_kind"], node=m)
     fs_ref_need_move(c, uid, n)
     if tid:

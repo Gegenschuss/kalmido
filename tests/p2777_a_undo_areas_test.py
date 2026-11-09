@@ -11,8 +11,13 @@ go back from the list (POST /api/undo/to/<id>), also from another device of the 
  - a habit renamed -> undo -> the old name; into the trash -> undo -> back
  - only own steps: another person neither lists nor takes back a step (404); a step whose object someone else changed since
    stays (named in the answer)
+ - review of 2.777 (F1-F8): a move is not taken back into a folder locked since (409) nor into a folder that went into another
+   workspace since (409); a file out of the trash takes " (2)" when its name is taken meanwhile; the steps of an organisation's
+   contact and event carry the organisation and go when the person leaves it; the history rows of a file deleted for good go
+   with the watchdog's clean-up (undogroups.ug_drop_orphans); moving a contact out of a mirrored book (a copy) records no step
 freelancer-matrix: undo (a person without an organisation: her contact and her file step go back from the list)
 usage: p2777_a_undo_areas_test.py <datadir>"""
+import base64
 import os
 import sys
 from datetime import date, timedelta
@@ -182,6 +187,40 @@ check(res.get("partial") == [g["id"]] and [x["id"] for x in st] == [t1] and st[0
       and node(nid=t1)["name"] == "plan-bob.txt" and node(nid=t2)["name"] == "liste.txt",
       f"bob's change stays and is named, the other part goes back {res}")
 check(not [x for x in lst(Bo) if x["id"] == g["id"]], "bob does not see alice's step")
+
+# ---------------------------------------------------------------- review F1, F2, F5, F4 (2.777.0 #5254)
+def b64(n):
+    return base64.b64encode(os.urandom(n)).decode()
+
+
+def b64u(n):
+    return base64.urlsafe_b64encode(os.urandom(n)).decode().rstrip("=")
+
+
+def gid_after(s):
+    return newest(s).get("id")
+
+
+def stayed_of(res, nid):
+    return [x for x in (res.get("stayed") or []) if x.get("id") == nid]
+
+
+# F1: the folder the file came from is locked since -> the undo would put a plain file with a plain name into it: 409
+LF = A.post(B + "/api/files/folders", json={"name": "Tresor Beispiel"}).json()["id"]
+LN = A.post(B + "/api/files/upload", data={"parent_id": LF}, files={"file": ("geheim.txt", b"g", "text/plain")}).json()["items"][0]["id"]
+r = A.patch(B + f"/api/files/nodes/{LN}", json={"parent_id": None})
+check(r.ok and node(nid=LN).get("parent_id") in (None, 0), f"(setup) the file moved out of the folder {r.status_code} {r.text[:120]}")
+G1 = gid_after(A)
+keys = {"pub": {"kty": "EC", "crv": "P-256", "x": b64u(32), "y": b64u(32)},
+        "bundle_pass": {"v": 1, "kdf": "pbkdf2-sha256", "iter": 600000, "salt": b64(16), "iv": b64(12), "ct": b64(120)},
+        "bundle_rec": {"v": 1, "kdf": "hkdf-sha256", "salt": b64(16), "iv": b64(12), "ct": b64(120)}}
+check(A.put(B + "/api/e2e/keys", json=keys).ok, "(setup) alice sets up her keys")
+r = A.post(B + f"/api/files/lock/{LF}/start", json={"keys": [{"user_id": ALICE, "wrapped": {"v": 1, "iv": b64(12), "ct": b64(48)}}]})
+r2 = A.post(B + f"/api/files/lock/{LF}/finish", json={})
+check(r.ok and r2.ok, f"(setup) the folder is locked now {r.status_code} {r.text[:120]} {r2.status_code} {r2.text[:120]}")
+res = back(A, G1)
+check(stayed_of(res, LN) and stayed_of(res, LN)[0]["code"] == "conflict" and node(nid=LN).get("parent_id") in (None, 0),
+      f"F1: the move is not taken back into the folder locked since (409, the file stays at the top) {res} {node(nid=LN).get('parent_id')}")
 
 # ---------------------------------------------------------------- habits
 r = A.post(B + "/api/habits", json={"name": "Laufen Beispiel"})

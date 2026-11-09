@@ -269,10 +269,10 @@ def op_contact_edit(c, uid, cid, b):
     r, role = need_contact(c, cid, write=True)  # 2.182.0 (#2719): access before the body check (a foreign id is always 404)
     _unknown(b, CT_KEYS + ("expect",))
     r = c.execute("SELECT * FROM contacts WHERE id=? FOR UPDATE", (cid,)).fetchone() or r  # 2.273.0 C (#3048): expect checked under the row lock
-    ua_pre(c, uid, CTU_KIND, cid)  # 2.777.0 (#5254): the person's step (core/undoareas.py; an agent records none)
     if b.get("expect") and b["expect"] != r["updated_at"]:  # 2.564.0 (#4702): with the contact as it is now (the shared core's Conflict)
         raise Conflict("contact", contact_dict(c, r, uid), msg=tr("The contact was changed meanwhile"))
     b = {k: v for k, v in b.items() if k != "expect"}
+    stepped = False  # 2.777.0 (#5254, review F8): the step is recorded right before the contact itself changes (not for a copy)
     if "book_id" in b and b["book_id"] not in (None, "") and as_int(b["book_id"], "book_id", 1) != r["book_id"]:
         nb = as_int(b["book_id"], "book_id", 1)
         need_contact(c, cid, write=True, own=True)  # 2.351.0 B (#2749): moving it out of its book: never through its own folder alone
@@ -291,6 +291,8 @@ def op_contact_edit(c, uid, cid, b):
             ua_post(c)
             c.commit()
             return {**op_contact(c, uid, ncid), "copied": True}
+        ua_pre(c, uid, CTU_KIND, cid)  # 2.777.0 (#5254): the person's step (core/undoareas.py; an agent records none)
+        stepped = True
         nbk = c.execute("SELECT occ_list_id FROM books WHERE id=?", (nb,)).fetchone()
         if c.execute("SELECT occ_list_id FROM books WHERE id=?", (r["book_id"],)).fetchone()[0] != nbk[0]:
             from ..contacts.bulk import bk_occ_drop  # 2.46.1 (#1554): another birthday list: the old tasks go, contact_store makes new ones
@@ -298,6 +300,8 @@ def op_contact_edit(c, uid, cid, b):
         c.execute("UPDATE contacts SET book_id=?, updated_by=? WHERE id=?", (nb, uid, cid))  # 2.571.0 (#4776)
         book_touch(c, r["book_id"])
         r = c.execute("SELECT * FROM contacts WHERE id=?", (cid,)).fetchone()
+    if not stepped:
+        ua_pre(c, uid, CTU_KIND, cid)  # 2.777.0 (#5254): the person's step (core/undoareas.py; an agent records none)
     f = contact_fields({k: v for k, v in b.items() if k != "book_id"}, r)
     contact_store(c, uid, r["book_id"], f, cid=cid)
     ua_post(c)
