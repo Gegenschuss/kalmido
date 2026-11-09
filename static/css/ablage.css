@@ -6,3 +6,6 @@
 .abshw span,.abshby span{overflow:hidden;text-overflow:ellipsis}
 .abshline{display:flex;align-items:center;gap:.375rem;margin:.25rem 0 .5rem;font-size:var(--fs-b)}
 .lightbox>.lbload{color:#fff}  /* 2.683.0 (#5150): a picture of a locked folder being decrypted (attachments.js attLightbox prep) */
+
+/* 2.768.0 (#4888): "Upload a new version…" above the versions (the dialog, the document view) */
+.abvup{margin:.25rem 0 .5rem}

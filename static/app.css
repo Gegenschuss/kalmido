@@ -6871,12 +6871,6 @@ button.lnph:hover{border-color:var(--accent)}
 .abvers,.ablog{display:flex;flex-direction:column;gap:.125rem;max-height:16rem;overflow:auto}
 .abvrow,.ablrow{display:flex;align-items:center;gap:.5rem;min-height:2.5rem;padding:0 .25rem;border-bottom:1px solid var(--line)}
 .ablrow.abag{color:var(--accent)}
-/* 2.768.0 (#4888): the versions, the history and "Mentioned in" in the document view's tab History (the tab scrolls itself) */
-.dv-hist .abvers,.dv-hist .ablog{max-height:none}
-.dv-hist .abvrow>span:first-child{flex:1 1 auto;min-width:0;overflow-wrap:anywhere;padding:.25rem 0}
-.dv-hist .abvrow .spacer{display:none}
-.abvup{margin:.25rem 0 .5rem}
-.dv-hist .abrefs .wkmen{margin-top:.75rem}
 .ablrow.abag b{color:var(--fg,inherit)}
 .abshsum{display:flex;flex-wrap:wrap;gap:.375rem;margin-bottom:.5rem}
 .abshp{display:inline-flex;align-items:center;gap:.25rem;padding:.25rem .625rem;border:1px solid var(--line);border-radius:99rem;font-size:var(--fs-b)}

@@ -125,3 +125,9 @@
     .dv-mask{flex:none;overflow:visible}
   }
 }
+
+/* 2.768.0 (#4888): the versions, the history and "Mentioned in" in the view's tab History (the tab scrolls itself) */
+.dv-hist .abvers,.dv-hist .ablog{max-height:none}
+.dv-hist .abvrow>span:first-child{flex:1 1 auto;min-width:0;overflow-wrap:anywhere;padding:.25rem 0}
+.dv-hist .abvrow .spacer{display:none}
+.dv-hist .abrefs .wkmen{margin-top:.75rem}
