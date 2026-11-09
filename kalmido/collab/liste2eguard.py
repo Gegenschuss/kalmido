@@ -20,6 +20,7 @@ from flask import g, has_request_context, request
 
 from ..core.config import API_PREFIX, app
 from ..core.db import db
+from ..core.undogroups import ug_drop_ids, ug_gids
 from ..core.i18n import N_, tr
 from .liste2e import LE2E_PREFIX, le2e_is_cipher, le2e_modes, le2e_neutral
 from ..api.common import v1_err  # 2.369.5 (#2517): pulled up from functions
@@ -329,9 +330,23 @@ def le2b_scrub(c, lid):
                                     message_id IN (SELECT id FROM agent_chat WHERE task_id IN ({tq}))
                                     OR job_id IN (SELECT id FROM agent_jobs WHERE list_id=? OR task_id IN ({tq})))""",
                                  (lid, lid, lid)).rowcount
+    # #5408: the server's undo steps of the list's sections and of the order of its sections (tasks: le2b_scrub_tasks)
+    n["undo_sections"] = le2b_scrub_undo(c, "(kind='section' AND ref_id IN (SELECT id FROM sections WHERE list_id=?)) "
+                                            "OR (kind='section_order' AND ref_id=?)", (lid, lid))
     for fn in _SCRUB_MORE:
         n.update(fn(c, lid) or {})
     return n
+
+
+def le2b_scrub_undo(c, where, args):
+    """#5408 (finding H2): the server's undo steps (core/undogroups.py #5249, tasks/tundo.py #5251) keep a part's
+    values before / after as plain text (obj_undo.snap) and their group's label names the task (undo_groups.label_args).
+    Every group with a part matching where (on obj_undo) goes whole - a step is taken back as one, and its label may quote
+    the text -, a part of an editor session matching where too. The caller commits. Returns the groups dropped."""
+    gids = ug_gids(c, where, args)
+    ug_drop_ids(c, gids)
+    c.execute(f"DELETE FROM obj_undo WHERE {where}", tuple(args))
+    return len(gids)
 
 
 _SCRUB_MORE = []  # further copies (other modules append a function (c, lid) -> {what: n})
@@ -457,4 +472,5 @@ def le2b_scrub_tasks(c, ids):
         c.execute(f"UPDATE tasks SET delivery_note='' WHERE delivery_note<>'' AND id IN ({q})", part)  # 2.392.2 (#3365): as the reason
         c.execute(f"UPDATE task_decisions SET text=? WHERE task_id IN ({q})", (le2e_neutral(), *part))
         c.execute(f"DELETE FROM tidy_pending WHERE task_id IN ({q})", part)
+        n["undo_tasks"] = n.get("undo_tasks", 0) + le2b_scrub_undo(c, f"kind='task' AND ref_id IN ({q})", part)  # #5408
     return n
