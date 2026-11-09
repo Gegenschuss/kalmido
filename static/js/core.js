@@ -1760,13 +1760,16 @@ function ab_docsHash(h) {  // 'docs/…' -> 'ablage/…' (null: not an old docum
   if (+p[1]) { AB_FILEIDS.add(+p[1]); return 'ablage/' + +p[1]; }
   return 'ablage/' + (p[1] === 'review' ? 'review' : p[1] === 'v' && +p[2] ? 'v/' + +p[2] : 'docs');
 }
+// 2.787.0 (#5438): a task opened by its address on a fresh load (link, push, reload, bookmark) stands over its own project, not over the empty Inbox;
+// inside the running app the view stays (S.lastRouteKey is set after the first route()); no list of its own (unknown / area store list) = as before
+function th_ownKey(id) { const t = S.lastRouteKey ? null : taskById(id), l = t && listById(t.list_id); return l && !LIFE_STORE_GO[l.life] && l.life !== 'budget' ? 'l:' + l.id : null; }
 function parseHash() {
   let h = decodeURIComponent(location.hash.slice(1));
   if (!h) return {mod: 'tasks', key: LS.get('lastKey', START_KEY)};
   const dh = ab_docsHash(h); if (dh) { history.replaceState(history.state, '', '#' + dh); h = dh; }  // 2.752.0 (#4887): the old address replaced, no extra entry
   const [a, b] = h.split('/');
   if (a === 't' && b && S.route.mod === 'home') return {mod: 'home', key: 'home', task: +b};  // 2.542.0 (#4579): from Start the detail opens over Start
-  if (a === 't' && b) return {mod: 'tasks', key: S.route.key || START_KEY, task: +b};
+  if (a === 't' && b) return {mod: 'tasks', key: th_ownKey(+b) || S.route.key || START_KEY, task: +b};
   if (a === 'home') return {mod: 'home', key: 'home'};  // 2.17.0 (#475): the dashboard (the logo)
   if (a === 'projects') return {mod: 'tasks', key: 'projects'};  // 2.417.0 A (#3559): the start page of Projects (render.js viewProjStart)
   if (a === 'steps') return {mod: 'tasks', key: 'steps'};  // 2.773.0 (#5250): the page "Recent steps" (undolist.js viewSteps)
@@ -1777,7 +1780,7 @@ function parseHash() {
   if (a === 'notes' && !b) return {mod: 'notes', key: 'notes', lid: null};  // 2.45.0 (#1516): the notes of all lists (notesall.js)
   if (a === 'note' && +b === QN_DRAFT) { const d = S.nt.draft; return d ? {mod: 'notes', key: 'notes', lid: d.list_id, nid: QN_DRAFT} : {mod: 'notes', key: 'notes', lid: qn_list()?.id || null}; }  // 2.477.0 (#3881): the quick note being written
   if (a === 'note' && +b) { const n = (S.notes || []).find(x => x.id === +b); return n ? {mod: 'notes', key: 'notes', lid: n.list_id, nid: n.id} : {mod: 'tasks', key: LS.get('lastKey', START_KEY), noteMissing: true}; }
-  if (a === 'reply' && b) return {mod: 'tasks', key: S.route.key || START_KEY, task: +b, reply: true};  // 2.0.8 (#331): push button "Reply"
+  if (a === 'reply' && b) return {mod: 'tasks', key: th_ownKey(+b) || S.route.key || START_KEY, task: +b, reply: true};  // 2.0.8 (#331): push button "Reply"
   if (a === 'snooze' && b) return {mod: 'tasks', key: LS.get('lastKey', START_KEY), snooze: +b};
   if (a === 'done' && b) return {mod: 'tasks', key: LS.get('lastKey', START_KEY), complete: +b};
   if (a === 'nagoff' && b) return {mod: 'tasks', key: LS.get('lastKey', START_KEY), nagoff: +b};  // 2.7.0 (#413): push "Stop reminding"

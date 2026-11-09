@@ -77,20 +77,20 @@ const CHIP = `(() => { const a = [...document.querySelectorAll('#detail .attsec 
   const fb = d.querySelector('#d-tl .cmhead .dsfoldb');
   check(fb && fb.getAttribute('aria-expanded') === 'true' && fb.getAttribute('aria-label') === 'Fold the comments', '#344: the fold arrow in the head');
   check(!d.querySelector('#detail .djump') && !d.querySelector('#detail .dtabs'), '#344: no jump and no tabs on the desktop');
-  // keyboard
-  key(w, g, 'ArrowDown'); await sleep(50);
-  check(g.getAttribute('aria-valuenow') === '65', '#344: ↓ moves the line down by 5 %');
-  key(w, g, 'ArrowUp', {shiftKey: true}); await sleep(50);
-  check(g.getAttribute('aria-valuenow') === '55', '#344: Shift+↑ by 10 %');
-  key(w, g, 'Home'); await sleep(50);
-  const vHome = g.getAttribute('aria-valuenow');
-  key(w, g, 'End'); await sleep(50);
-  const vEnd = g.getAttribute('aria-valuenow');
+  // keyboard  // 2.787.0 (#5438): the project list stands behind the task now and the panel may be drawn again: the line is looked up each time
+  key(w, d.querySelector('#d-sgrip'), 'ArrowDown'); await sleep(50);
+  check(d.querySelector('#d-sgrip').getAttribute('aria-valuenow') === '65', '#344: ↓ moves the line down by 5 %');
+  key(w, d.querySelector('#d-sgrip'), 'ArrowUp', {shiftKey: true}); await sleep(50);
+  check(d.querySelector('#d-sgrip').getAttribute('aria-valuenow') === '55', '#344: Shift+↑ by 10 %');
+  key(w, d.querySelector('#d-sgrip'), 'Home'); await sleep(50);
+  const vHome = d.querySelector('#d-sgrip').getAttribute('aria-valuenow');
+  key(w, d.querySelector('#d-sgrip'), 'End'); await sleep(50);
+  const vEnd = d.querySelector('#d-sgrip').getAttribute('aria-valuenow');
   check(vHome === '20' && vEnd === '85', '#344: Home / End = the smallest / largest share ' + vHome + ' ' + vEnd);
-  for (let i = 0; i < 3; i++) key(w, g, 'ArrowUp');
+  for (let i = 0; i < 3; i++) key(w, d.querySelector('#d-sgrip'), 'ArrowUp');
   await sleep(900);
   let s = await sett();
-  check(g.getAttribute('aria-valuenow') === '70' && s.detail_split === '70' && s.detail_cm_fold === '0', '#344: saved for the user on the server (70) ' + s.detail_split);
+  check(d.querySelector('#d-sgrip').getAttribute('aria-valuenow') === '70' && s.detail_split === '70' && s.detail_cm_fold === '0', '#344: saved for the user on the server (70) ' + s.detail_split);
   g = d.querySelector('#d-sgrip');  // 2.48.1: the panel may have been drawn again since (slow CI runner): the current line
   key(w, g, 'Enter'); await sleep(900);
   s = await sett();
@@ -99,15 +99,15 @@ const CHIP = `(() => { const a = [...document.querySelectorAll('#detail .attsec 
   w = await boot({user: 'alice', hash: 't/' + T}); d = w.document;
   await until(() => d.querySelector('#d-sgrip'));
   g = d.querySelector('#d-sgrip');
-  check(d.querySelector('#detail.dsplit.dsfold') && g.getAttribute('aria-valuenow') === '70', '#344: after a reload: still folded, the line at 70 %');
+  check(d.querySelector('#detail.dsplit.dsfold') && d.querySelector('#d-sgrip').getAttribute('aria-valuenow') === '70', '#344: after a reload: still folded, the line at 70 %');
   click(w, d.querySelector('#d-tl .dsfoldb')); await sleep(900);
   check(!d.querySelector('#detail.dsfold') && (await sett()).detail_cm_fold === '0', '#344: the arrow unfolds it again');
-  g.dispatchEvent(new w.MouseEvent('dblclick', {bubbles: true})); await sleep(80);
+  d.querySelector('#d-sgrip').dispatchEvent(new w.MouseEvent('dblclick', {bubbles: true})); await sleep(80);
   check(d.querySelector('#detail.dsfold'), '#344: a double-click on the line folds');
-  key(w, g, 'ArrowDown'); await sleep(80);
-  check(!d.querySelector('#detail.dsfold') && g.getAttribute('aria-valuenow') === '75', '#344: moving the line unfolds it');
+  key(w, d.querySelector('#d-sgrip'), 'ArrowDown'); await sleep(80);
+  check(!d.querySelector('#detail.dsfold') && d.querySelector('#d-sgrip').getAttribute('aria-valuenow') === '75', '#344: moving the line unfolds it');
   // the reply button of a push focuses the box and opens a folded area
-  g.dispatchEvent(new w.MouseEvent('dblclick', {bubbles: true})); await sleep(80);
+  d.querySelector('#d-sgrip').dispatchEvent(new w.MouseEvent('dblclick', {bubbles: true})); await sleep(80);
   w.eval(`replyFocus(${T})`); await sleep(200);
   check(!d.querySelector('#detail.dsfold') && d.activeElement?.id === 'c-input', '#344: "Reply" opens a folded area and focuses the box');
   // order + history in the "…"
