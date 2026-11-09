@@ -11,10 +11,13 @@ The core's role of a page (the second floor under the route's own check): 'manag
 (wkfolder.wkf_base: deleting / restoring stay the space's, never an edit share), nothing for anyone else -- no shares, no
 agents (the area's own role has none for them). Its space hook names no organisation: wkf_base checks the organisation itself.
 The kind's name differs from the reference kind of the tree ("wiki", wkfolder.WKF_KIND): the folders keep their own rules."""
+from datetime import datetime
+
 from ..core.access import live_sql, trash_sql
 from ..core.db import iso, now_utc
 from ..core.i18n import N_
 from ..core.objects import obj_register
+from ..core.pg import ts_canon
 from ..core.writes import obj_on_purge, obj_purge, obj_restore, obj_trash
 from .wikiatt import wka_page_files
 from .wkfolder import wkf_base, wkf_drop
@@ -86,10 +89,34 @@ def wkk_restore(c, uid, pid):
     brings it back, for who could read the space then."""
     held = c.execute(f"SELECT id, deleted_at FROM wiki_files WHERE page_id=? AND wkx_held_at IS NOT NULL AND {trash_sql()}",
                      (int(pid),)).fetchall()
+    _wkk_align_old(c, pid)
     out = obj_restore(c, uid, WKK_KIND, pid, step=False)
     for f in held:
         c.execute(f"UPDATE wiki_files SET deleted_at=? WHERE id=? AND {live_sql()}", (f["deleted_at"], f["id"]))
     return out
+
+
+def _wkk_when(v):
+    t = ts_canon(v)
+    try:
+        return datetime.fromisoformat(t) if t else None
+    except ValueError:
+        return None
+
+
+def _wkk_align_old(c, pid):
+    """2.790.0 (#5365, review): a page trashed BEFORE 2.790 kept the old rule of wiki/pages.py - its files came back when they
+    went into the trash at the page's time OR LATER (wiki_bulk stamped the files a moment after the page). The core brings
+    back only the same time (core/writes.py _kids_restore), so such files get the page's time first; held ones stay."""
+    r = _row(c, pid)
+    gone = _wkk_when(r["deleted_at"]) if r is not None else None
+    if gone is None:
+        return
+    rows = c.execute(f"SELECT id, deleted_at FROM wiki_files WHERE page_id=? AND wkx_held_at IS NULL AND {trash_sql()}",
+                     (int(pid),)).fetchall()
+    ids = [f["id"] for f in rows if (_wkk_when(f["deleted_at"]) or gone) > gone]
+    if ids:
+        c.execute("UPDATE wiki_files SET deleted_at=? WHERE id = ANY(CAST(? AS BIGINT[]))", (r["deleted_at"], ids))
 
 
 def wkk_with_page(c, pid, fids):

@@ -578,9 +578,11 @@ def obj_trash_tick(c, force=False):
         for kind, reg in sorted(OBJ.items()):
             if reg.get("trash_prune"):
                 n0 = box["locked"]
-                out[kind] = obj_trash_prune(c, kind, cut, purge)
-                if box["locked"] > n0:
-                    out[kind + "_locked"] = box["locked"] - n0
+                n = obj_trash_prune(c, kind, cut, purge)
+                lk = box["locked"] - n0
+                out[kind] = n - lk  # 2.790.0 (#5365, review): a locked receipt counts as locked, not as deleted
+                if lk:
+                    out[kind + "_locked"] = lk
         for kind, k in sorted(PART_KINDS.items()):  # 2.783.0 (#5368): the side objects (core/objparts.py), one savepoint each
             if k["trash_prune"] and kind not in OBJ:
                 got = []
