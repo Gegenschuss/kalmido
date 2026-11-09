@@ -51,9 +51,10 @@ def done_at(nid):
 
 
 def redo(s, nid):
-    t0 = done_at(nid)
+    # done_at has whole seconds: two runs within one second would look alike, so a mark the run must replace
+    dbw("UPDATE doc_meta SET done_at='2000-01-01T00:00:00Z' WHERE node_id=?", (nid,))
     assert s.post(B + f"/api/docs/{nid}/redo").ok
-    check(until(lambda: get(s, nid)["state"] == "done" and done_at(nid) != t0, 90), f"recognised again {nid}")
+    check(until(lambda: get(s, nid)["state"] == "done" and done_at(nid) != "2000-01-01T00:00:00Z", 90), f"recognised again {nid}")
     return get(s, nid)
 
 
