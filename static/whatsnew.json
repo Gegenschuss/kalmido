@@ -1,6 +1,28 @@
 {
  "versions": [
   {
+   "version": "2.782.0",
+   "date": "2026-11-09",
+   "items": [
+    {
+     "de": "Unter dem Ordnerbaum in Dateien filterst du alle Dokumente mit einem Klick nach Absender, Dokumenttyp, Tag, Archivnummer oder eigenem Feld, jeweils mit Anzahl.",
+     "en": "Below the folder tree in Files you filter all documents with one click by sender, document type, tag, archive number or custom field, each with its count."
+    },
+    {
+     "de": "Dokumente haben einen eigenen Titel ohne „.pdf“, der Dateiname bleibt getrennt änderbar.",
+     "en": "Documents have their own title without \".pdf\", the file name stays editable apart."
+    },
+    {
+     "de": "Meine Aufgaben, Heute und Sammelansichten haben Spaltenköpfe zum Sortieren und eine Spalte Projekt.",
+     "en": "My tasks, Today and collected views have column titles for sorting and a column Project."
+    },
+    {
+     "de": "Rückgängig zeigt jetzt „Letzte Schritte“ von allen deinen Geräten - lange auf den Pfeil drücken oder im Konto-Menü öffnen.",
+     "en": "Undo now shows \"Recent steps\" from all your devices - long-press the arrow or open it from the account menu."
+    }
+   ]
+  },
+  {
    "version": "2.771.0",
    "date": "2026-11-09",
    "items": [

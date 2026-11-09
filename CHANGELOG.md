@@ -17,6 +17,43 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.782.0] - 2026-11-09
+
+Package 2.772 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Added
+- Files: below the folder tree, after "All documents" / "To review", foldable filter groups over all documents of the workspace: Sender, Document type, Tags, Archive number and every custom field of type selection or checkbox, each value with its number of documents; a click shows All documents with only that filter (the row is marked), a second click removes it; over 15 values the most used 15 and "Show all"; each group remembers open / closed, the head has a button to manage it (#4890)
+- Archive number as a filter: one number or a range ("143", "140-150"), with / without archive number; also in the filter sheet of the documents list on phones, together with the custom fields (#4890)
+- API: GET /api/docs/facets (filters with numbers, same rights as the list); /api/docs takes asn=, has_asn=1, no_asn=1, cf=<field ids>:<value>; facets carry count, asn and fields; saved views keep the new filters (#4890)
+
+### Changed
+- The filter pills of the documents list show the number of documents per sender, type and tag (#4890)
+
+Package 2.750 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Added
+- Documents have their own title, separate from the file name: the title (without ".pdf") is shown and edited in the document view, cards, list and the documents search and sort; the file name is changed apart under "More fields", with a button "File name from title" that keeps the ending. Titles may repeat; file names stay unique per folder. Download, ZIP and sharing use the file name and add a missing ending from the file type. API v1 `title` writes the title (#4876).
+- Column titles with click sorting and the column menu also in My tasks, Today, the collected views and in lists without own columns; a new column Project (on in collected views) (#4502).
+### Changed
+- The home-screen web app's status bar is plain black again (no more black strip below the tab bar or header under the clock); the slimmer tab bar stays (#5240).
+- Wiki: attaching, dropping and deleting a page's files only while the page is being edited; reading keeps Open and Copy link (#5229).
+- Prune keeps the checked version of a week only for the last 4 weeks; older GitHub release objects and images go, git tags always stay (#5247).
+### Fixed
+- Dragging a file or card inside Kalmido onto a folder moves it and never uploads it as a new version (#4879).
+- A recognised document opens the same document view from the file store's list as from the cards (#5228).
+- Agent and job chat header on phones: tight, even spacing and the same height in every state (#5243).
+- Wiki backlinks of a task, file or table list only pages the viewer may read by the page's own role (#5264).
+- An expired operator setup code is deleted, the start code comes back and the try counts as a failure (#4518).
+- A module loaded during the page start could run before the keyboard registry ("kb_on is not defined") and stayed broken until a reload (#5307).
+
+Package 2.773 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Sammelpaket: Aufgaben ).
+
+### Added
+- Undo across devices, stage 2: the list "Recent steps". Right-click or long-press the undo arrow, or open "Recent steps" in the account menu (own page, Android back closes it). It shows your own steps of the last 30 days from all devices with time, area and device, up to 100; "Back up to here" undoes everything above the chosen line, a step that cannot be undone (finalised invoice, sent document, very large change) is greyed out together with everything older; steps of areas still kept in this browser carry "only this device", unsent changes stand on top; on a conflict the rest of the group is undone and the list names what stayed. The redo menu shows area and time; the browser keeps 100 steps instead of 30 (#5250, #5242).
+- One trash in the core: `obj_trash` / `obj_restore` / `obj_purge` take an object's registered children along, purging goes one way, the core retention run (`obj_trash_prune`, hourly in the watchdog) deletes for kinds that opted in, and trashing / restoring is a step in "Recent steps". New helpers `live_sql()` / `trash_sql()` and the lint `tools/check_live_filter.py`: a new handwritten `deleted_at IS NULL` is red, the existing places stand in a baseline that only shrinks (#5292).
+
+### Changed
+- Customer link: a guest's fetch of a file is noted in the file's history ("opened through the link"); sealed files above 50 MB (`KALMIDO_REVIEW_LINK_SEALED_MAX_MB`) are not handed out without signing in, the link answers 413 with a short note (#5330).
+
 ## [2.774.0] - 2026-11-09
 
 Package 2.763 (Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
@@ -437,7 +474,8 @@ Package 2.685 (Bündel: Kommentare: Aktivität in drei Stufen (nur Kommenta, Bü
 - Office: switching "Office & finance" on no longer leaves the office saying it is switched off when it loaded before the switch was saved (#5176).
 - Balance sheet: a receipt booked against the bank (counter account "bank") and paid from the cash box is now booked bank to cash instead of being left out (#5128).
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.774.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.782.0...HEAD
+[2.782.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.782.0
 [2.774.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.774.0
 [2.771.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.771.0
 [2.766.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.766.0
