@@ -102,7 +102,8 @@ function dw_chip(t, lid) {
   if (!Number.isFinite(ms)) return '';
   const min = Math.max(0, Math.floor((Date.now() - ms) / 6e4)), lv = dw_level(min, wip_sec(ml_sec(t, lid))), txt = dw_text(min);
   const tip = tr('In this column for {0}', txt) + (lv === 'alert' ? ' · ' + tr('Over the red limit') : lv === 'warn' ? ' · ' + tr('Over the yellow limit') : '');
-  return `<span class="dwm${lv ? ' dw-' + lv : ''}" data-dw="${lv || 'ok'}" title="${esc(tip)}">${ic('timer', 's')}${esc(txt)}<span class="sr"> ${esc(tip)}</span></span>`;
+  // 2.800.0 (#5441): the card says "since 2 h", the meaning is not only in the tooltip
+  return `<span class="dwm${lv ? ' dw-' + lv : ''}" data-dw="${lv || 'ok'}" title="${esc(tip)}">${ic('timer', 's')}${esc(tr('since {0}', txt))}<span class="sr"> ${esc(tip)}</span></span>`;
 }
 const dw_limText = h => h % 24 ? tr('{0} h|dwell', h) : tr('{0} d|dwell', h / 24);
 const dw_menuItem = sid => { const s = wip_sec(sid), w = s?.dwell_warn_h, a = s?.dwell_alert_h;

@@ -52,12 +52,13 @@ const ago = h => new Date(Date.now() - h * 3600e3).toISOString().slice(0, 19) + 
   const chip = id => d.querySelector(`#view .kanban .trow[data-id="${id}"] .dwm`);
   await until(() => chip(FRESH));
   const st = id => { const c = chip(id); return c ? c.dataset.dw + ' ' + [...c.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join('').trim() : 'none'; };
-  check(/^ok [01] min$/.test(st(FRESH)), '#3515: a card moved a moment ago: grey, "0 min" (' + st(FRESH) + ')');
-  check(st(YEL) === 'warn 2 h', '#3515: 2 h in Doing (yellow after 1 h): yellow (' + st(YEL) + ')');
-  check(st(RED) === 'alert 3 d', '#3515: 3 days in Doing (red after 1 day): red (' + st(RED) + ')');
-  check(st(GREY) === 'ok 10 d', '#3515: a column without limits stays grey, "10 d" (' + st(GREY) + ')');
-  check(st(NEW) === 'warn 5 h', '#3515: never moved: counts from its creation (' + st(NEW) + ')');
-  check(st(LNK) === 'ok 1 d', '#3515: a linked task counts from its place on this board (' + st(LNK) + ')');
+  // 2.800.0 (#5441): the card's text says "since …"
+  check(/^ok since [01] min$/.test(st(FRESH)), '#3515: a card moved a moment ago: grey, "0 min" (' + st(FRESH) + ')');
+  check(st(YEL) === 'warn since 2 h', '#3515: 2 h in Doing (yellow after 1 h): yellow (' + st(YEL) + ')');
+  check(st(RED) === 'alert since 3 d', '#3515: 3 days in Doing (red after 1 day): red (' + st(RED) + ')');
+  check(st(GREY) === 'ok since 10 d', '#3515: a column without limits stays grey, "10 d" (' + st(GREY) + ')');
+  check(st(NEW) === 'warn since 5 h', '#3515: never moved: counts from its creation (' + st(NEW) + ')');
+  check(st(LNK) === 'ok since 1 d', '#3515: a linked task counts from its place on this board (' + st(LNK) + ')');
   check(/In this column for 3 d · Over the red limit/.test(chip(RED)?.getAttribute('title') || ''), '#3515: the tooltip says it (' + chip(RED)?.getAttribute('title') + ')');
   check(chip(RED)?.classList.contains('dw-alert') && chip(YEL)?.classList.contains('dw-warn') && !/dw-/.test(chip(GREY)?.className || 'x'), '#3515: the colour classes (red / yellow / none)');
 
@@ -82,7 +83,7 @@ const ago = h => new Date(Date.now() - h * 3600e3).toISOString().slice(0, 19) + 
   dlg.querySelector('form').dispatchEvent(new w.Event('submit', {bubbles: true, cancelable: true}));
   const saved = await until(() => { const r = sql('SELECT dwell_warn_h, dwell_alert_h FROM sections WHERE id=?', [RV])[0]; return r.dwell_warn_h === 24 && r.dwell_alert_h === 216 ? r : null; });
   check(!!saved, '#3515: the dialog saves 1 day / 9 days as 24 / 216 hours');
-  check(await until(() => st(GREY) === 'alert 10 d' && st(LNK) === 'warn 1 d'), '#3515: the cards follow the new limits (' + st(GREY) + ', ' + st(LNK) + ')');
+  check(await until(() => st(GREY) === 'alert since 10 d' && st(LNK) === 'warn since 1 d'), '#3515: the cards follow the new limits (' + st(GREY) + ', ' + st(LNK) + ')');
   mi = await menuOf(RV);
   check(mi && /Time limits: 1 d \/ 9 d/.test(mi.textContent), '#3515: the menu shows the limits (' + mi?.textContent + ')');
   d.querySelector('#pop')?.classList.add('hidden');
