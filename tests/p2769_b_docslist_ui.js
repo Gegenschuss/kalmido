@@ -88,10 +88,21 @@ const order = async q => ((await call('GET', '/api/docs?ws=private&facets=0&' + 
   check(await until(() => !w.eval('DC.loading') && ids()[0] === D2), 'the header To review: the one to check first ' + ids());
   d.querySelector('.abdl [data-abdls="title"]').click();
   check(await until(() => !w.eval('DC.loading') && ids().join() === [D1, D2, D3].join()), 'the header Name: A-Z ' + ids());
+  // 2.769.0 leader (rebase onto #4888): the list's rows use the area's one selection - Select, a row's box, the one bar
+  const selBtn = d.querySelector('.abview [data-absel="mode"]');
+  check(selBtn, 'the list has Select');
+  selBtn?.click();
+  check(await until(() => d.querySelector(`.abdl .abdlrow[data-abid="${D1}"] [data-dcchk="${D1}"]`)), 'choosing: each row gets the box');
+  d.querySelector(`.abdl [data-dcchk="${D1}"]`)?.click();
+  check(await until(() => w.eval(`AB.sel.has(${D1}) && AB.sel.size === 1`) && /1 selected/.test(d.querySelector('#ab-sbar .mcount')?.textContent || '')),
+        'a box ticks the row in the one selection, the one bar counts it ' + w.eval('AB.sel.size'));
+  check(w.eval('ab_selOrder().length') >= 3, 'All counts the list rows ' + w.eval('ab_selOrder().length'));
+  d.querySelector('#ab-sbar [data-absel="close"]')?.click();
+  check(await until(() => !d.querySelector('.abdl [data-dcchk]')), 'choosing ended: no boxes');
   d.querySelector(`.abdl [data-dco="${D2}"]`).click();
-  check(await until(() => d.querySelector('.dv-view')), 'a row opens the document view');
-  d.querySelector('.dv-view [data-dc="close"]')?.click();
-  check(await until(() => w.location.hash === `#ablage/${ROOT}` && d.querySelector(`.abdl [data-dco="${D2}"]`)), 'Back: the list again');
+  check(await until(() => d.querySelector('.dv-view [data-dc="close"]')), 'a row opens the document view');  // leader: wait for its Close (it was clicked before it was there: flaky)
+  d.querySelector('.dv-view [data-dc="close"]').click();
+  check(await until(() => w.location.hash === `#ablage/${ROOT}` && d.querySelector(`.abdl [data-dco="${D2}"]`)), 'Back: the list again ' + w.location.hash + ' list=' + !!d.querySelector('.abdl') + ' dv=' + !!d.querySelector('.dv-view') + ' sel=' + w.eval('AB.selOn'));
   w.close();
   w = await boot({user: 'alice', hash: 'ablage/' + ROOT}); d = w.document;
   check(await until(() => d.querySelector(`.abview .dc-infold .abdl [data-dco="${D1}"]`)), 'a new start: the folder shows its list again (kept)');
