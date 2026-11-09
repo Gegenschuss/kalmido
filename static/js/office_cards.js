@@ -85,7 +85,7 @@ function ccLine(x, s) {
   if (x.state !== 'open') return `<li class="bnkrow done">${head}<div class="bnkacts"><span class="rotag">${esc(x.state === 'private' ? tr('Private') : tr('No receipt needed'))}</span><button class="btn sm ghost" data-cc="mark" data-id="${x.id}" data-v="open">${ic('undo', 's')}<span>${tr('Needs a receipt')}</span></button></div></li>`;
   const sg = x.suggestion;
   return `<li class="bnkrow">${head}
-    ${sg ? `<div class="ccsug"><small class="muted">${tr('Suggestion')}</small>${ocd_row(ocd_card(sg, {btn: `data-cc="match" data-id="${x.id}" data-node="${sg.id}"`}))}</div>` : ''}
+    ${sg ? `<div class="ccsug"><small class="muted">${tr('Suggestion')}</small>${/*html-ok*/ ocd_row(ocd_card(sg, {btn: `data-cc="match" data-id="${x.id}" data-node="${sg.id}"`}))}</div>` : ''}
     <div class="bnkacts"><label class="btn sm">${ic('upload', 's')}<span>${tr('Upload receipt')}</span><input type="file" data-cc-rc="${x.id}" accept="${esc(typeof BK_ACCEPT === 'string' ? BK_ACCEPT : 'application/pdf,image/*')}" hidden></label>
     <button class="btn sm" data-cc="pick" data-id="${x.id}" aria-expanded="${CC.pick === x.id}">${ic('search', 's')}<span>${tr('Select receipt…')}</span></button>
     <button class="btn sm ghost" data-cc="mark" data-id="${x.id}" data-v="noreceipt">${tr('No receipt needed')}</button><button class="btn sm ghost" data-cc="mark" data-id="${x.id}" data-v="private">${tr('Private')}</button></div>

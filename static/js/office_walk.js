@@ -60,7 +60,7 @@ async function wlk_load() {
 function wlk_head(x) {
   if (WLK.kind === 'cc') {
     const sub = [fmtDateLoc(x.day), x.orig_amount ? `${x.orig_amount} ${x.orig_currency}` : '', CC_KIND[x.kind] ? tr(CC_KIND[x.kind]) : ''].filter(Boolean).join(' · ');
-    return `<span class="bnkn"><b>${esc(x.merchant)}</b><small class="muted">${esc(sub)}</small></span><span class="bnkamt ${+x.amount < 0 ? 'in' : 'out'}">${ofcMoney(x.amount)}</span>`;
+    return `<span class="bnkn"><b>${esc(x.merchant)}</b><small class="muted">${esc(sub)}</small></span><span class="bnkamt ${+x.amount < 0 ? 'in' : 'out'}">${esc(ofcMoney(x.amount))}</span>`;
   }
   return `<span class="bnkn"><b>${esc(x.counterpart || x.purpose || tr('Booking'))}</b><small class="muted">${esc([fmtDateLoc(x.day), x.counterpart ? x.purpose : ''].filter(Boolean).join(' · '))}</small></span><span class="bnkamt ${+x.amount > 0 ? 'in' : 'out'}">${esc(bnkAmt(x.amount))}</span>`;
 }
@@ -71,7 +71,7 @@ function wlk_draw() {
   const top = `<div class="wlk-top"><h3>${tr('Go through')}</h3><span class="wlk-n" data-wlk-n>${it ? esc(tr('{0} of {1}', String(WLK.i + 1), String(n))) : ''}</span><span class="spacer"></span>
     <button type="button" class="btn ghost icon" data-wlk="close" aria-label="${esc(tr('Close'))}">${ic('x', 's')}</button></div>`;
   if (!it) {
-    card.innerHTML = `${top}<div class="wlk-end"><p>${n ? tr('Every booking has its answer.') : tr('Nothing open here.')}</p></div><div class="foot">${undo}<span class="spacer"></span><button type="button" class="btn pri" data-wlk="close">${tr('Close')}</button></div>`;
+    card.innerHTML = `${/*html-ok*/ top}<div class="wlk-end"><p>${n ? tr('Every booking has its answer.') : tr('Nothing open here.')}</p></div><div class="foot">${/*html-ok*/ undo}<span class="spacer"></span><button type="button" class="btn pri" data-wlk="close">${tr('Close')}</button></div>`;
     return;
   }
   const x = it.x, bank = WLK.kind === 'bnk', out = !bank || +x.amount < 0, fine = wlk_fine();
@@ -84,18 +84,18 @@ function wlk_draw() {
     const search = many ? `<input type="search" class="wlk-q" data-wlk-q value="${esc(WLK.q)}" placeholder="${esc(bank && !out ? tr('Number or client') : tr('Search all receipts'))}" aria-label="${esc(tr('Search'))}">` : '';
     const acc = esc(bank ? BNK_ACCEPT_RC() : (typeof BK_ACCEPT === 'string' ? BK_ACCEPT : 'application/pdf,image/*'));
     const acts = [
-      `<button type="button" class="btn sm" data-wlk="search" aria-expanded="${many}">${ic('search', 's')}<span>${bank && !out ? tr('Other invoice…') : tr('Search another receipt')}</span></button>`,
-      out ? `<label class="btn sm">${ic('upload', 's')}<span>${tr('Upload receipt')}</span><input type="file" data-wlk-up accept="${acc}" hidden></label>` : '',
+      `<button type="button" class="btn sm" data-wlk="search" aria-expanded="${esc(String(many))}">${ic('search', 's')}<span>${bank && !out ? tr('Other invoice…') : tr('Search another receipt')}</span></button>`,
+      out ? `<label class="btn sm">${ic('upload', 's')}<span>${tr('Upload receipt')}</span><input type="file" data-wlk-up accept="${/*html-ok*/ acc}" hidden></label>` : '',
       `<button type="button" class="btn sm ghost" data-wlk="mark" data-v="noreceipt">${tr('No receipt needed')}</button>`,
       `<button type="button" class="btn sm ghost" data-wlk="mark" data-v="private">${tr('Private')}</button>`,
       bank ? `<button type="button" class="btn sm ghost" data-wlk="mark" data-v="ignored">${tr('Ignore')}</button><button type="button" class="btn sm ghost" data-wlk="mark" data-v="cash">${tr('Cash box transfer')}</button>` : '',
       bank && !out ? `<button type="button" class="btn sm ghost" data-wlk="split">${tr('Split across invoices…')}</button>` : ''].join('');
-    body = `${search}${cards}<div class="bnkacts wlk-acts">${acts}</div>`;
+    body = `${/*html-ok*/ search}${/*html-ok*/ cards}<div class="bnkacts wlk-acts">${/*html-ok*/ acts}</div>`;
   }
-  card.innerHTML = `${top}<div class="wlk-tx bnkhead">${wlk_head(x)}</div><div class="wlk-body">${body}</div>
-    <div class="foot wlk-foot"><button type="button" class="btn ghost" data-wlk="prev" ${WLK.i ? '' : 'disabled'}>${ic('back', 's')}<span>${tr('Back')}</span></button>${undo}
+  card.innerHTML = `${/*html-ok*/ top}<div class="wlk-tx bnkhead">${/*html-ok*/ wlk_head(x)}</div><div class="wlk-body">${/*html-ok*/ body}</div>
+    <div class="foot wlk-foot"><button type="button" class="btn ghost" data-wlk="prev" ${WLK.i ? '' : 'disabled'}>${ic('back', 's')}<span>${tr('Back')}</span></button>${/*html-ok*/ undo}
     ${fine ? `<small class="muted wlk-keys">${tr('1-3 select · Enter takes over · arrows back and forth')}</small>` : ''}<span class="spacer"></span>
-    ${!it.done && WLK.cands?.length ? `<button type="button" class="btn pri" data-wlk="take" data-k="${WLK.sel}">${ic('check', 's')}<span>${tr('Take over')}</span></button>` : ''}
+    ${!it.done && WLK.cands?.length ? `<button type="button" class="btn pri" data-wlk="take" data-k="${esc(String(WLK.sel))}">${ic('check', 's')}<span>${tr('Take over')}</span></button>` : ''}
     <button type="button" class="btn" data-wlk="skip">${it.done ? tr('Next') : tr('Skip')}${ic('right', 's')}</button></div>`;
   if (!md.contains(document.activeElement) || document.activeElement === document.body) card.focus({preventScroll: true});
 }
