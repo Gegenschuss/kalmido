@@ -592,6 +592,8 @@ ORDER = (
     "admin.worker",  # 2.102.0 D (#1994 / #1997): health numbers, the process role, one runner per background loop
     # -- sorted block (2.624.0, #3941): a new module WITHOUT an order need goes here, one per line, sorted by name (tools/check_layout.py)
     # (it loads after every module above, so it may use their names at import time; one with an order need goes above instead)
+    "core.undodiff",  # 2.774.0 (#5251): the diff parts of the step groups (no routes)
+    "tasks.tundo",  # 2.774.0 (#5251): the tasks' and sections' undo steps on the server (no routes)
     # -- end of the sorted block: only core.idem and startup follow, they stay last
     "core.idem",  # 2.270.0 C (#3022): idempotency keys of write requests (after every other before_request hook, its after_request runs first)
     "startup",
