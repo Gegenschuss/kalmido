@@ -89,6 +89,7 @@ def obj_gone_drop(c, refs):
 def obj_rows_drop_many(c, kind, ids, gone=None):
     """The rows in obj_history / obj_undo / obj_revoked of the objects ids of kind, 500 at a time; gone = the kind's table:
     only of those whose row is not there any more. Returns the number of rows deleted. One-way."""
+    from .pg import qi, table_names
     from .undogroups import ug_gc, ug_gids  # 2.747.0 (#5249)
     ids = sorted({int(i) for i in ids})
     n = 0
@@ -96,7 +97,7 @@ def obj_rows_drop_many(c, kind, ids, gone=None):
         for at in range(0, len(ids), 500):
             part = ids[at:at + 500]
             q = ",".join("?" * len(part))
-            cg = f" AND NOT EXISTS (SELECT 1 FROM {gone} g WHERE g.id=obj_undo.ref_id)" if gone else ""
+            cg = f" AND NOT EXISTS (SELECT 1 FROM {qi(gone, table_names(c))} g WHERE g.id=obj_undo.ref_id)" if gone else ""
             gids = ug_gids(c, f"kind=? AND ref_id IN ({q}){cg}", [kind] + part)  # 2.747.0 (#5249): their step groups
             for t in ("obj_history", "obj_undo", "obj_revoked"):
                 cond = f" AND NOT EXISTS (SELECT 1 FROM {gone} g WHERE g.id={t}.ref_id)" if gone else ""

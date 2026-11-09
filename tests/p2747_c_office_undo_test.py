@@ -49,8 +49,8 @@ ORG = A.post(B + "/api/admin/orgs", json={"name": "Alpha", "admin_id": ALICE}).j
 A.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
 FID, Fr = freelancer(B, A)
 Fr.patch(B + "/api/settings", json={"workspace": "private"})
-O = "/api/office"
-D = O + "/docs"
+OFF = "/api/office"
+D = OFF + "/docs"
 TODAY = date.today()
 COMPANY = {"name": "Beispiel Film GmbH", "street": "Musterweg 1", "zip": "12345", "city": "Musterstadt", "country": "DE",
            "email": "hallo@beispiel.example", "vat_id": "DE123456789", "iban": "DE02120300000000202051", "bic": "BYLADEM1001",
@@ -80,7 +80,7 @@ def nparts(gid):
 
 
 def setup_office(s, tag):
-    r = s.put(B + O + "/settings", json={"company_fields": COMPANY, "datev_email": "inbox@example.com",
+    r = s.put(B + OFF + "/settings", json={"company_fields": COMPANY, "datev_email": "inbox@example.com",
                                          "datev_extf": {"advisor_no": "1234567", "client_no": "12345", "fy_start": 1, "acct_len": 4, "chart": "SKR03"}})
     assert r.ok, r.text
     r = s.post(B + "/api/clients", json={"name": f"Kunde {tag} GmbH", "street": "Weg 2", "zip": "10115", "city": "Berlin", "country": "DE",
@@ -119,15 +119,15 @@ A.patch(B + "/api/settings", json={"lang": "en"})
 check(A.patch(B + f"/api/clients/{CL}", json={"note": "VIP"}).ok, "alice changes the client")
 g = last(ALICE)
 check(g.get("label_key") == "Changed: {0}" and args(g) == ["Kunde Alpha GmbH"] and g.get("area") == "office", f"a client: its name {g}")
-r = A.post(B + O + "/services", json={"name_de": "Beratung", "daily_rate": 800})
+r = A.post(B + OFF + "/services", json={"name_de": "Beratung", "daily_rate": 800})
 SV = r.json()["id"]
-check(A.patch(B + f"{O}/services/{SV}", json={"daily_rate": 900}).ok, "alice changes the service")
+check(A.patch(B + f"{OFF}/services/{SV}", json={"daily_rate": 900}).ok, "alice changes the service")
 g = last(ALICE)
 check(args(g) == ["Beratung"] and g.get("area") == "office", f"a service: its name {g}")
-r = A.post(B + O + "/letters", json={"subject": SECRET, "body": "Invented text.", "client_id": CL})
+r = A.post(B + OFF + "/letters", json={"subject": SECRET, "body": "Invented text.", "client_id": CL})
 check(r.status_code in (200, 201), f"a letter ({r.status_code} {r.text[:200]})")
 LT = r.json()["id"]
-check(A.patch(B + f"{O}/letters/{LT}", json={"body": "Invented text, longer."}).ok, "alice changes the letter")
+check(A.patch(B + f"{OFF}/letters/{LT}", json={"body": "Invented text, longer."}).ok, "alice changes the letter")
 g = last(ALICE)
 check(args(g) == [["{0} {1}", ["Letter"], f"#{LT}"]] and SECRET not in (g.get("label_args") or ""),
       f"a letter: only its object number, never the sealed subject {g}")
@@ -159,17 +159,17 @@ barrier(ALICE, "Sent: {0}", "marked sent")
 check(len(groups(ALICE)) == n0 + 2, "one barrier each")
 P = f"?from={(TODAY - timedelta(days=40)).isoformat()}&to={TODAY.isoformat()}"
 n0 = len(groups(ALICE))
-check(A.get(B + O + "/datev/extf" + P + "&check=1").ok and len(groups(ALICE)) == n0, "the DATEV check alone writes no barrier")
-check(A.get(B + O + "/datev/extf" + P).ok, "the DATEV booking batch downloaded")
+check(A.get(B + OFF + "/datev/extf" + P + "&check=1").ok and len(groups(ALICE)) == n0, "the DATEV check alone writes no barrier")
+check(A.get(B + OFF + "/datev/extf" + P).ok, "the DATEV booking batch downloaded")
 g = barrier(ALICE, "DATEV export: {0} to {1}", "DATEV export")
 M = (TODAY.replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
-r = A.post(B + O + "/periods/lock", json={"through": M, "confirm": f"{M[5:7]}/{M[:4]}"})
+r = A.post(B + OFF + "/periods/lock", json={"through": M, "confirm": f"{M[5:7]}/{M[:4]}"})
 check(r.ok, f"the previous month locked ({r.status_code} {r.text[:200]})")
 g = barrier(ALICE, "Months locked up to {0}", "period lock")
 check(args(g) == [f"{M[5:7]}/{M[:4]}"], f"the month named {g}")
-r = A.post(B + O + "/letters", json={"subject": "Second letter", "body": "Invented.", "client_id": CL})
+r = A.post(B + OFF + "/letters", json={"subject": "Second letter", "body": "Invented.", "client_id": CL})
 L2 = r.json()["id"]
-check(A.post(B + f"{O}/letters/{L2}/sent", json={"channel": "post"}).ok, "a letter marked sent")
+check(A.post(B + f"{OFF}/letters/{L2}/sent", json={"channel": "post"}).ok, "a letter marked sent")
 g = barrier(ALICE, "Sent: {0}", "a sent letter")
 check(args(g) == [["{0} {1}", ["Letter"], f"#{L2}"]], f"by its object number {g}")
 
@@ -189,16 +189,16 @@ c.commit()""")
 check("AGENT None" in out and "OUTSIDE None" in out and groups(AG) == [], f"an agent / no request: no barrier {out[-300:]}")
 
 # ---------------------------------------------------------------- "bis hierher" stops at the barrier
-check(A.patch(B + f"{O}/services/{SV}", json={"name_de": "Beratung A"}).ok, "service: step a")
+check(A.patch(B + f"{OFF}/services/{SV}", json={"name_de": "Beratung A"}).ok, "service: step a")
 GA = last(ALICE)["id"]
 I4 = invoice(A, rate=400)
 check(A.post(B + f"{D}/{I4}/finalize").ok, "an invoice finalised in between")
 GB = barrier(ALICE, "Finalised: {0}", "the barrier in between")["id"]
-check(A.patch(B + f"{O}/services/{SV}", json={"name_de": "Beratung B"}).ok, "service: step b")
+check(A.patch(B + f"{OFF}/services/{SV}", json={"name_de": "Beratung B"}).ok, "service: step b")
 GC = last(ALICE)["id"]
 r = A.post(B + f"/api/undo/to/{GA}")
 j = r.json() if r.ok else {}
-sv = A.get(B + f"{O}/services/{SV}").json()
+sv = A.get(B + f"{OFF}/services/{SV}").json()
 check(r.ok and j.get("undone") == [GC] and (j.get("stopped") or {}).get("id") == GB and sv.get("name_de") == "Beratung A",
       f"undo up to step a: b goes back, the barrier stops the run, a stays ({r.status_code} {j} {sv.get('name_de')})")
 check("Finalised" in (j.get("text") or "") and (j.get("stopped") or {}).get("state") == "barrier", f"the answer names the barrier {j.get('text')}")
@@ -263,13 +263,13 @@ print('MISS', miss, 'BOTH', both, 'AREA', area, 'N', len(office), 'SERIES', 'off
 # 2.747.0 (review N3): an invoice series never goes back from the list (an old active / next_date would auto-send missed periods)
 check("SERIES False" in out, f"office_inv_series: noaccess from the list {out[-200:]}")
 check("MISS [] BOTH [] AREA ['office']" in out, f"every tracked office kind: a check of its own or noaccess on purpose, area office {out[-500:]}")
-r = A.post(B + O + "/fixed-costs", json={"label": "Miete", "amount": "1000", "start": TODAY.replace(day=1).isoformat(), "repeat": "monthly"})
+r = A.post(B + OFF + "/fixed-costs", json={"label": "Miete", "amount": "1000", "start": TODAY.replace(day=1).isoformat(), "repeat": "monthly"})
 check(r.status_code == 201, f"a fixed cost ({r.status_code} {r.text[:200]})")
 FC = r.json()["id"]
-check(A.patch(B + f"{O}/fixed-costs/{FC}", json={"label": "Miete Studio"}).ok, "its label changed")
+check(A.patch(B + f"{OFF}/fixed-costs/{FC}", json={"label": "Miete Studio"}).ok, "its label changed")
 GF = last(ALICE)["id"]
 r = A.post(B + f"/api/undo/to/{GF}")
-fc = [x for x in (A.get(B + O + "/fixed-costs").json().get("items") or []) if x.get("id") == FC]
+fc = [x for x in (A.get(B + OFF + "/fixed-costs").json().get("items") or []) if x.get("id") == FC]
 check(r.ok and r.json().get("undone") == [GF] and fc and fc[0].get("label") == "Miete",
       f"a fixed cost (UGO_ADMIN) goes back from the list ({r.status_code} {r.text[:200]} {fc[:1]})")
 
@@ -282,19 +282,19 @@ check("PRUNE False SECTION False" in out, f"oun_prune and its watchdog section a
 
 # ---------------------------------------------------------------- a person without an organisation (freelancer-matrix: office)
 FCL = setup_office(Fr, "Frei")
-r = Fr.post(B + O + "/services", json={"name_de": "Schnitt", "daily_rate": 500})
+r = Fr.post(B + OFF + "/services", json={"name_de": "Schnitt", "daily_rate": 500})
 FSV = r.json()["id"]
-check(Fr.patch(B + f"{O}/services/{FSV}", json={"name_de": "Schnitt 1"}).ok, "she changes her service")
+check(Fr.patch(B + f"{OFF}/services/{FSV}", json={"name_de": "Schnitt 1"}).ok, "she changes her service")
 g = last(FID)
 check(args(g) == ["Schnitt"] and g.get("area") == "office", f"her step: labelled, area office {g}")
 FG = g["id"]
 FI = invoice(Fr, FCL)
 check(Fr.post(B + f"{D}/{FI}/finalize").ok, "she finalises an invoice")
 FB = barrier(FID, "Finalised: {0}", "her finalising")["id"]
-check(Fr.patch(B + f"{O}/services/{FSV}", json={"name_de": "Schnitt 2"}).ok, "another change")
+check(Fr.patch(B + f"{OFF}/services/{FSV}", json={"name_de": "Schnitt 2"}).ok, "another change")
 r = Fr.post(B + f"/api/undo/to/{FG}")
 j = r.json() if r.ok else {}
-check(r.ok and (j.get("stopped") or {}).get("id") == FB and Fr.get(B + f"{O}/services/{FSV}").json().get("name_de") == "Schnitt 1",
+check(r.ok and (j.get("stopped") or {}).get("id") == FB and Fr.get(B + f"{OFF}/services/{FSV}").json().get("name_de") == "Schnitt 1",
       f"her 'bis hierher' stops at her barrier ({r.status_code} {j})")
 check(A.post(B + f"/api/undo/to/{FB}").status_code == 404, "her barrier: 404 for alice")
 

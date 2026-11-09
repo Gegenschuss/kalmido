@@ -36,8 +36,8 @@ from .model import pb_owner  # 2.369.5 (#2517): pulled up from functions
 from ..core.pg import write_lock  # 2.369.5 (#2517): pulled up from functions
 from ..core.conflict import ccf_check  # 2.528.0 (#4305 A3)
 from .model import oxa_settings_at  # 2.528.0 (#4305 A3)
-from .model import MD  # 2.747.0 (#5246)
-from .owrite import ow_write  # 2.747.0 (#5246): the master data on the core's write layer
+from .model import MD  # noqa: E402  2.747.0 (#5246)
+from .owrite import ow_write  # noqa: E402  2.747.0 (#5246): the master data on the core's write layer
 
 
 @app.get("/api/office/settings")

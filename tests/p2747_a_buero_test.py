@@ -36,7 +36,7 @@ from freelancer_fixture import freelancer  # noqa: E402
 from kt import B, CT, DATA, check, sess, su_get  # noqa: E402
 
 FEAT = "cal,events,contacts,comments,collab,files,sheets,office,clients,docs"
-O = "/api/office"
+OFF = "/api/office"
 V = B + "/api/v1"
 TOK = "a1b2c3d4e5f60718293a4b5c6d7e8f90"  # an undo session of the dialog (static/js/objsave.js objSess)
 COMPANY = {"name": "Beispiel Film GmbH", "street": "Musterweg 1", "zip": "12345", "city": "Musterstadt", "country": "DE",
@@ -109,10 +109,10 @@ def shares(who, s, space, agid, org):
 
 # ================================================================ b the master data / a client on ow_write, the dialog's undo
 def master(who, s, other):
-    r = s.post(B + O + "/services", json={"name_de": f"Beratung {who}", "daily_rate": 800})
+    r = s.post(B + OFF + "/services", json={"name_de": f"Beratung {who}", "daily_rate": 800})
     check(r.status_code in (200, 201), f"b {who}: a service {r.text[:200]}")
     sv = r.json()
-    url = B + O + f"/services/{sv['id']}"
+    url = B + OFF + f"/services/{sv['id']}"
     r = s.patch(url, json={"daily_rate": 900, "expect_updated_at": sv["updated_at"]}, headers={"X-Kalmido-Undo": TOK})
     check(r.ok and r.json()["daily_rate"] == 900, f"b {who}: saved with its base and the undo header {r.status_code} {r.text[:200]}")
     h = sql("SELECT action, vals_before, vals_after FROM obj_history WHERE kind='office_md_services' AND ref_id=?", (sv["id"],))
@@ -124,7 +124,7 @@ def master(who, s, other):
     check(other.post(B + f"/api/office/services/{sv['id']}/undo", json={"sess": TOK, "op": "all"}).status_code == 404, f"b {who}: another office's undo: 404")
     r = s.post(B + f"/api/office/services/{sv['id']}/undo", json={"sess": TOK, "op": "all"})
     check(r.ok and s.get(url).json()["daily_rate"] == 800, f"b {who}: the dialog's undo (POST <save url>/undo) brings the old rate back {r.status_code} {r.text[:200]}")
-    check(s.post(B + O + "/docs/999999/undo", json={"sess": TOK, "op": "all"}).status_code == 404, f"b {who}: no master data kind: 404")
+    check(s.post(B + OFF + "/docs/999999/undo", json={"sess": TOK, "op": "all"}).status_code == 404, f"b {who}: no master data kind: 404")
     # a client
     r = s.post(B + "/api/clients", json={"name": f"Beispiel Studio {who}"})
     check(r.status_code == 201, f"b {who}: a client {r.text[:200]}")
@@ -140,45 +140,45 @@ def master(who, s, other):
 
 # ================================================================ 3 the last hard deletes into the office trash
 def in_trash(s, tid, kind):
-    return any(x["id"] == tid and x["kind"] == kind for x in s.get(B + O + "/trash").json().get("items") or [])
+    return any(x["id"] == tid and x["kind"] == kind for x in s.get(B + OFF + "/trash").json().get("items") or [])
 
 
 def part(who, s, other):
-    did = s.post(B + O + "/docs", json={"project_title": f"Spring {who}"}).json()["id"]
-    r = s.post(B + O + f"/docs/{did}/parts", json={"kind": "items", "title": f"Drehtage {who}"})
+    did = s.post(B + OFF + "/docs", json={"project_title": f"Spring {who}"}).json()["id"]
+    r = s.post(B + OFF + f"/docs/{did}/parts", json={"kind": "items", "title": f"Drehtage {who}"})
     check(r.status_code == 201 and r.json().get("part"), f"3 {who}: setup: a part {r.text[:200]}")
     pid = r.json()["part"]["id"]
-    r = s.put(B + O + f"/docs/{did}/parts/{pid}/items", json={"items": [{"kind": "service", "title": "Kamera", "qty": 2, "unit": "day", "rate": 500}]})
+    r = s.put(B + OFF + f"/docs/{did}/parts/{pid}/items", json={"items": [{"kind": "service", "title": "Kamera", "qty": 2, "unit": "day", "rate": 500}]})
     check(r.ok, f"3 {who}: setup: its position {r.text[:200]}")
     n_items = sql("SELECT COUNT(*) FROM office_doc_items WHERE doc_id=? AND (part_id=? OR ref_part_id=?)", (did, pid, pid))[0][0]
     check(n_items >= 2, f"3 {who}: setup: the position and the title page line {n_items}")
-    r = s.delete(B + O + f"/docs/{did}/parts/{pid}")
+    r = s.delete(B + OFF + f"/docs/{did}/parts/{pid}")
     tid = r.json().get("trash_id") if r.ok else None
     check(r.ok and tid and not sql("SELECT 1 FROM office_doc_parts WHERE id=?", (pid,)), f"3 {who}: the part goes, a trash copy {r.text[:200]}")
     check(in_trash(s, tid, "part"), f"3 {who}: the office trash lists the part")
-    check(other.post(B + O + f"/trash/{tid}/restore").status_code == 404, f"3 {who}: another office cannot restore it")
-    r = s.post(B + O + f"/trash/{tid}/restore")
+    check(other.post(B + OFF + f"/trash/{tid}/restore").status_code == 404, f"3 {who}: another office cannot restore it")
+    r = s.post(B + OFF + f"/trash/{tid}/restore")
     check(r.ok and r.json().get("kind") == "part" and r.json().get("doc_id") == did, f"3 {who}: restored, the answer names the quotation {r.text[:200]}")
-    d = s.get(B + O + f"/docs/{did}").json()
+    d = s.get(B + OFF + f"/docs/{did}").json()
     check(any(p["id"] == pid for p in d.get("parts") or []), f"3 {who}: the part is back in the quotation")
     check(sql("SELECT COUNT(*) FROM office_doc_items WHERE doc_id=? AND (part_id=? OR ref_part_id=?)", (did, pid, pid))[0][0] == n_items,
           f"3 {who}: with its positions and title page line")
-    check(s.post(B + O + f"/trash/{tid}/restore").status_code == 404, f"3 {who}: a second restore: 404")
+    check(s.post(B + OFF + f"/trash/{tid}/restore").status_code == 404, f"3 {who}: a second restore: 404")
 
 
 def rgroup(who, s, member_id=None):
-    r = s.post(B + O + "/rights/groups", json={"name": f"Schnitt {who}"})
+    r = s.post(B + OFF + "/rights/groups", json={"name": f"Schnitt {who}"})
     check(r.status_code == 201, f"3 {who}: setup: a rights group {r.text[:200]}")
     gid, levels = r.json()["id"], r.json()["levels"]
     if member_id:
-        check(s.put(B + O + f"/rights/people/{member_id}", json={"groups": [f"g:{gid}"]}).ok, f"3 {who}: setup: a member in the group")
-    r = s.delete(B + O + f"/rights/groups/{gid}")
+        check(s.put(B + OFF + f"/rights/people/{member_id}", json={"groups": [f"g:{gid}"]}).ok, f"3 {who}: setup: a member in the group")
+    r = s.delete(B + OFF + f"/rights/groups/{gid}")
     tid = r.json().get("trash_id") if r.ok else None
     check(r.ok and tid and not sql("SELECT 1 FROM office_rgroups WHERE id=?", (gid,)), f"3 {who}: the group goes, a trash copy {r.text[:200]}")
     check(in_trash(s, tid, "rgroup"), f"3 {who}: the office trash lists the rights group")
-    r = s.post(B + O + f"/trash/{tid}/restore")
+    r = s.post(B + OFF + f"/trash/{tid}/restore")
     check(r.ok, f"3 {who}: restored {r.text[:200]}")
-    g = next((x for x in s.get(B + O + "/rights").json().get("groups") or [] if x["id"] == gid), None)
+    g = next((x for x in s.get(B + OFF + "/rights").json().get("groups") or [] if x["id"] == gid), None)
     check(g and g["name"] == f"Schnitt {who}" and g["levels"] == levels, f"3 {who}: the group's definition is back {g}")
     check(not sql("SELECT 1 FROM office_rgroup_members WHERE group_id=?", (gid,)), f"3 {who}: its members do not come back (no rights handed out)")
 
@@ -192,7 +192,7 @@ def signoff(who, s, uid, org):
     tid = r.json().get("trash_id") if r.ok else None
     check(r.ok and tid and not sql("SELECT 1 FROM office_signoffs WHERE id=?", (sid,)), f"3 {who}: the record goes, a trash copy {r.text[:200]}")
     check(in_trash(s, tid, "signoff"), f"3 {who}: the trash of its office lists it")
-    r = s.post(B + O + f"/trash/{tid}/restore")
+    r = s.post(B + OFF + f"/trash/{tid}/restore")
     check(r.ok and sql("SELECT title, org_id FROM office_signoffs WHERE id=?", (sid,)) == [(f"Rohschnitt {who}", org)], f"3 {who}: restored as it was {r.text[:200]}")
 
 
@@ -261,7 +261,7 @@ r = Fr.post(B + "/api/my/agents", json={"username": "fridabot", "display_name": 
 assert r.status_code == 201, r.text
 FAG = r.json()["id"]
 for s in (A, Fr, Ca):
-    s.put(B + O + "/settings", json={"company_fields": COMPANY, "lang": "en", "currency": "EUR"})
+    s.put(B + OFF + "/settings", json={"company_fields": COMPANY, "lang": "en", "currency": "EUR"})
 
 export_gone()
 acct_export(Fr, "frida")

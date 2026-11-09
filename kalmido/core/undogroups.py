@@ -39,7 +39,7 @@ from flask import g, has_request_context, request
 from .access import acx_of
 from .db import bump, iso, lv_area, now_utc
 from .i18n import N_
-from .pg import insert_id, system_ctx, table_columns
+from .pg import insert_id, qi, system_ctx, table_columns
 
 UNDO_KEEP_D = 30  # 30 days, like the trash (#5249)
 UNDO_GROUPS_MAX = 300  # groups kept per person
@@ -259,7 +259,7 @@ def ug_drop_orphans(c):
     for kind, t in sorted(UG_TRACKED.items()):
         if not t or "id" not in (table_columns(c, t) or ()):
             continue
-        cond = f"kind=? AND NOT EXISTS (SELECT 1 FROM {t} r WHERE r.id=obj_undo.ref_id)"
+        cond = f"kind=? AND NOT EXISTS (SELECT 1 FROM {qi(t, set(UG_TRACKED.values()))} r WHERE r.id=obj_undo.ref_id)"
         gids = ug_gids(c, cond, (kind,))  # review N4: their groups are recounted (or go when empty)
         n += c.execute(f"DELETE FROM obj_undo WHERE {cond}", (kind,)).rowcount
         ug_gc(c, gids)

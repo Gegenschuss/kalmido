@@ -616,8 +616,6 @@ office_trips.created_at time
 office_trips.people json
 office_trips.updated_at time
 office_trips.vma_days json
-office_undo.created_at time
-office_undo.snap json
 office_vehicles.archived bool
 office_vehicles.created_at time
 office_vehicles.updated_at time
