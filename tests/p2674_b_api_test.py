@@ -189,7 +189,11 @@ def old_agents():
             d["projects"] = c.execute("SELECT COUNT(*) FROM list_members m JOIN lists l ON l.id=m.list_id WHERE m.user_id=? AND l.is_inbox=0 "
                                       "AND l.deleted_at IS NULL AND l.owner_id<>?", (a["user_id"], a["user_id"])).fetchone()[0]
             if not sh:
-                d.update(status_text="", status_key="", status_key_at="", status_task=None, pause_reason="", job_tasks=[])
+                # 2.777.0 (#5378, review F3): nothing of its work, host, model, rights mode, usage, costs or contact times either
+                d.update(shared=False, status="idle", status_text="", status_at=None, status_key="", status_key_at="", status_task=None,
+                         paused=False, pause_reason="", job_tasks=[], running=0, waiting=0, my_job=False, typing=0, limit_reached=False,
+                         last_poll_at=None, poll_age=None, contact_age=None, no_service=False, host=None, runtime_model="",
+                         permission_mode="", may_set_mode=False, quota=None, cost=None, flows=None, approvals_open=0)
         out.append(d)
     return out
 
