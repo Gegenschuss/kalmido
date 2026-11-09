@@ -1,0 +1,88 @@
+// @ts-check
+/* Kalmido web client: "Recently edited" (2.769.0, #5352), loaded on demand (lazyload.js LD_MODS recent).
+   Classic script sharing the global scope with the others (load order: index.html, docs/ARCHITECTURE.md).
+   ONE server route (GET /api/recent, kalmido/collab/recent.py) for two places:
+   - the overview "All workspaces" of Knowledge, Files and Reading (areas.js spo_recentHtml, called by wiki.js, ablage.js and
+     readlater.js instead of the list of the workspaces the sidebar shows already): "Pinned" (the person's favourites of the
+     area) on top, then the last 20 pages, files and read-later entries of all workspaces, newest first, each with the chip of
+     its workspace, who and when; a tap opens it in its area. The list of the workspaces only where no sidebar shows it (a
+     phone, the panel hidden, Reading: its panel has no workspaces), then compact as chips on top.
+   - the start page's block "Recently edited" (dashboard.js dashCard 'recent'): 8 entries; under "All" from every workspace
+     with the chip, in one workspace only its own; "More" leads to the overview.
+   The rows keep their height while loading (a placeholder of the same height): nothing jumps when the answer comes. */
+'use strict';
+
+const ZLE = {d: {}, busy: {}, more: false};
+const ZLE_N = 20, ZLE_HOME_N = 8;
+// area -> [icon, name, the view's route]
+const ZLE_AREA = {wiki: ['note', N_('Knowledge|area')], files: ['file', N_('File store')], reading: ['bookmark', N_('Read later')]};
+const zle_key = (sp, n) => sp + '|' + n;
+async function zle_load(sp, n) {
+  const k = zle_key(sp, n); if (ZLE.busy[k]) return;
+  ZLE.busy[k] = true;
+  const v0 = S.v;
+  try { const j = await api('GET', `/api/recent?space=${encodeURIComponent(sp)}&limit=${n}`); ZLE.d[k] = {items: j.items || [], v: v0, err: ''}; }
+  catch (e) { if (e.message === 'auth') { ZLE.busy[k] = false; return; } ZLE.d[k] = {items: ZLE.d[k]?.items || null, v: v0, err: e instanceof Offline ? tr('Only available online.') : e.message || tr('unknown')}; }
+  ZLE.busy[k] = false;
+  if (['home', 'wiki', 'ablage', 'reading'].includes(S.route.mod)) viewSafeRender();
+}
+// the items of a workspace key ('all' | 'private' | 'org:<id>'), loaded again after a change (S.v)
+function zle_data(sp, n) {
+  const d = ZLE.d[zle_key(sp, n)];
+  if (!d || d.v !== S.v) zle_load(sp, n);
+  return d || null;
+}
+// where a tap leads: the page, the file (its document view or folder), the read-later list of its workspace
+function zle_href(x) {
+  if (x.area === 'wiki') return '#wiki/' + x.id;
+  if (x.area === 'files') return '#ablage/' + x.id;
+  return '#' + (typeof rd_all === 'function' && rd_all() && x.space !== 'shared' ? 'reading/s/' + x.space : 'reading');
+}
+// the chip of the item's workspace (its symbol and name), 'shared' = shared with me from outside
+const zle_chip = sp => `<span class="zlec">${sp === 'shared' ? ic('users', 's') : wsIcon(sp)}<span>${esc(sp === 'shared' ? tr('Shared with me') : wsName(sp))}</span></span>`;
+function zle_rowHtml(x, chip) {
+  const a = ZLE_AREA[x.area] || ZLE_AREA.files, who = x.by_name ? esc(x.by_name) + ' · ' : '';
+  return `<li><a href="${esc(zle_href(x))}" class="zler" data-zle="${esc(x.area + ':' + x.id)}" title="${esc(tr(a[1]))}">${ic(a[0], 's')}<span class="zlet"><span class="zlen">${esc(x.title || tr(a[1]))}</span>${x.place ? `<small class="muted zlep">${esc(x.place)}</small>` : ''}</span>${chip ? zle_chip(x.space) : ''}<small class="muted zlew">${who}<time datetime="${esc(x.at || '')}">${esc(x.at ? relTime(x.at) : '')}</time></small></a></li>`;
+}
+// the rows, or while loading a placeholder of the same height (n rows), or the empty text
+function zle_listHtml(d, n, chip, empty) {
+  if (!d || !d.items) return d?.err ? `<p class="muted zleerr">${esc(d.err)}</p>` : `<div class="zleph" style="--zlen:${n}" aria-busy="true" role="status"><span class="sr">${esc(tr('Loading…'))}</span></div>`;
+  if (!d.items.length) return empty;
+  return `<ul class="zlel" aria-label="${esc(tr('Recently edited'))}">${d.items.slice(0, n).map(x => zle_rowHtml(x, chip)).join('')}</ul>`;
+}
+// 2.769.0 (#5352): is the list of the workspaces in the sidebar? (a computer with the panel shown; Reading's panel lists none)
+const zle_sideSpaces = mod => mod !== 'reading' && typeof sbb_on === 'function' && sbb_on() && !LS.get('sideFold', false) && !$('#app')?.classList.contains('side-rail');
+// the person's favourites of the area as tiles (favtiles.js): knowledge pages, files and documents
+const ZLE_PIN = {wiki: k => k.startsWith('r:wiki:'), ablage: k => k.startsWith('file:') || k.startsWith('doc:'), reading: () => false};
+function zle_pinHtml(mod) {
+  if (typeof fv2_tiles !== 'function') return '';
+  const ts = fv2_tiles().filter(t => !t.sep && (ZLE_PIN[mod] || ZLE_PIN.reading)(t.key));
+  return ts.length ? `<section class="zlepin" aria-labelledby="zlepin-h"><h3 id="zlepin-h" class="zleh">${ic('pin', 's')}<span>${esc(tr('Pinned|view'))}</span></h3><div class="fv2bar fv2-page">${ts.map(t => fv2_tileHtml(t, true)).join('')}</div></section>` : '';
+}
+// the empty state: one sentence and the area's way to add something
+function zle_emptyHtml(mod) {
+  const btn = mod === 'wiki' ? `<button type="button" class="btn sm pri" data-wk="new">${ic('plus', 's')}${esc(tr('New page'))}</button>`
+    : mod === 'ablage' ? `<a class="btn sm pri" href="#${esc(typeof ab_home === 'function' ? ab_home('private') : 'ablage')}">${ic('upload', 's')}${esc(tr('Upload'))}</a>` : '';
+  return `<div class="zleempty"><p class="muted">${esc(tr('Nothing edited yet. What you and your team change shows up here.'))}</p>${btn}</div>`;
+}
+// the overview "All workspaces" of an area: mod 'wiki' | 'ablage' | 'reading', to / rows as areas.js spo_html (the workspaces)
+/** @param {string} mod @param {any} to @param {any[]} rows @param {{chips?: string}} [o] */
+function zle_ovrHtml(mod, to, rows, o = {}) {
+  const chips = zle_sideSpaces(mod) ? '' : `<div class="zlechips">${o.chips || spo_html(to, rows)}</div>`;
+  const d = zle_data('all', ZLE_N);
+  return `<div class="zleov" data-zlemod="${esc(mod)}">${chips}${zle_pinHtml(mod)}<section class="zlesec" aria-labelledby="zle-h"><h3 id="zle-h" class="zleh">${ic('clock', 's')}<span>${esc(tr('Recently edited'))}</span></h3>${zle_listHtml(d, ZLE_N, true, zle_emptyHtml(mod))}</section></div>`;
+}
+// the start page's block (dashboard.js dashCard): card / slim as there
+function zle_homeHtml(card, slim) {
+  if (!feat('wiki') && !feat('files') && !feat('reading')) return '';  // none of the three areas on: no block
+  const ws = typeof wsCur === 'function' ? wsCur() : 'all', all = ws === 'all' || !wsOn();
+  const sp = all ? 'all' : ws, n = !all && ZLE.more ? ZLE_N : ZLE_HOME_N, d = zle_data(sp, n);
+  if (d?.items && !d.items.length) return slim(tr('Recently edited: nothing'));
+  const ovr = ['wiki', 'ablage', 'reading'].find(m => m === 'wiki' ? feat('wiki') : m === 'ablage' ? typeof ab_on === 'function' && ab_on() : feat('reading'));
+  const more = d?.items?.length >= ZLE_HOME_N ? (all ? (ovr ? `<a class="linkbtn hpall" href="#${ovr}">${esc(tr('More'))}</a>` : '') : !ZLE.more ? `<button type="button" class="linkbtn hpall" data-act="zle-more">${esc(tr('More'))}</button>` : '') : '';
+  return card(zle_listHtml(d, n, all && wsOn(), '') + more);
+}
+document.addEventListener('click', e => {
+  if (!/** @type {any} */ (e.target).closest?.('[data-act="zle-more"]')) return;
+  ZLE.more = true; renderView();
+});

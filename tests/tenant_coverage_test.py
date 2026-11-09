@@ -33,6 +33,7 @@ KINDS = {
     "aggregate": ("matrix", "p2280_api_test.py, p2300_tenant_test.py: state, search, trash, tags, roadmap, day plan, occurrences"),
     "task": ("matrix", "p2280_api_test.py, p2300_tenant_test.py: a task by id (read, change, complete, comment, subtasks, dependencies)"),
     "favtarget": ("matrix", "p2441_favs_api_test.py, p2441_favs_ui.js: the favourites of a person resolved to objects of any area (2.441.0, #3592)"),
+    "recent": ("matrix", "p2769_d_recent_api_test.py: \"Recently edited\" (2.769.0, #5352) never lists a page, file or read-later entry of another organisation / person"),
     "comment": ("matrix", "p2300_tenant_test.py: a comment by id (change, delete, react)"),
     "attachment": ("matrix", "p2300_tenant_test.py: a task's attachment / a list's file by id; p2610_c_v1restore_test.py: restoring them over the API v1 (2.610.0)"),
     "chatfile": ("matrix", "p2300_tenant_test.py: a file of an agent chat by id"),
@@ -857,6 +858,7 @@ ROUTES = {
     "POST /api/orgs/{}/export/file": "org", "POST /api/retention/org/{}/export.zip": "org", "POST /api/retention/me/export.zip": "own",
     # ---- own (119)
     "GET /api/favorites/targets": "favtarget",  # 2.441.0 (#3592): stored keys can name anything, each target is checked
+    "GET /api/recent": "recent",  # 2.769.0 (#5352): "Recently edited" over Knowledge, Files and Reading
     "POST /api/favorites/suggestion": "own",  # 2.46.1 (#1361): a favourite suggestion from the person's own activity
     "PUT /api/tasks/mine-order": "own", "GET /api/me/wait-suggestions": "own", "DELETE /api/me/wait-suggestions": "own",  # 2.41.0 (#1205)
     "POST /api/mine-sections": "own", "POST /api/mine-sections/init": "own", "PATCH /api/mine-sections/{}": "own", "DELETE /api/mine-sections/{}": "own", "PUT /api/mine-sections/order": "own",  # 2.569.0 (#4395): the own sections of My tasks

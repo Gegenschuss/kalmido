@@ -99,7 +99,9 @@ document.addEventListener('keydown', e => { const g = e.target.closest?.('.ngmai
 // Small cards, in your order, each can be hidden ("Customize": ↑ ↓ and a switch per card, keyboard too); stored with your
 // settings (all devices). What waits for you, today, bundled news, team chat, projects, pinned tasks, notes, agents, a
 // few numbers and a search field.
-const DASH = [['wait', N_('Waiting for you'), 'hourglass'], ['today', N_('Today'), 'sun'], ['news', N_('News'), 'bell'], ['chat', N_('Team chat'), 'comment'],
+const DASH = [['wait', N_('Waiting for you'), 'hourglass'], ['today', N_('Today'), 'sun'], ['news', N_('News'), 'bell'],
+  ['recent', N_('Recently edited'), 'clock'],  // 2.769.0 (#5352): the last pages, files and read-later entries (recent.js)
+  ['chat', N_('Team chat'), 'comment'],
   ['projects', N_('Projects'), 'brief'], ['pinned', N_('Pinned|view'), 'pin'], ['notes', N_('Notes'), 'edit'], ['agents', N_('Agents'), 'bot'],
   ['stats', N_('Statistics'), 'chart'], ['search', N_('Search'), 'search'], ['family', N_('Family'), 'family'],
   ['kpi', N_('Figures'), 'trend']];  // 2.50.0 (#1197): office admins only (office_kpi.js kp_tile)
@@ -326,7 +328,7 @@ LY.project = {quick: true, title: () => tr('Customise the project page'), blocks
 LY.home = {key: 'dashboard', grid: 'dgrid', title: () => tr('Customise the start page'), blocks: () => DASH.filter(d => (d[0] !== 'family' || famOn()) && (d[0] !== 'kpi' || (typeof officeOn === 'function' && officeOn()))).map(d => [d[0], d[1], d[2], 'half', false, 2]),  // 2.43.0 (#1452): a third wide
   // 2.45.0 (#1504): the default for accounts without an own arrangement (and no standard set by an admin): Today and News
   // two thirds wide on the left, the rest a third on the right, the phone in this order; Search hidden
-  def: () => ({order: ['today', 'agents', 'news', 'projects', 'wait', 'pinned', 'chat', 'notes', 'stats', 'family', 'search'], hidden: ['search'], opts: {today: {lw: 4}, news: {lw: 4}}})};
+  def: () => ({order: ['today', 'agents', 'news', 'recent', 'projects', 'wait', 'pinned', 'chat', 'notes', 'stats', 'family', 'search'], hidden: ['search'], opts: {today: {lw: 4}, news: {lw: 4}}})};
 // 2.43.0 (#1452): the review (day / week) and its journal on the builder
 LY.review = {key: 'view_review', grid: 'dgrid', title: () => tr('Customise the review'), blocks: () => [['done', N_('Done'), 'done', 'half', false, 3], ['open', N_('Still open'), 'alert', 'half', false, 3],
   ['moved', N_('Moved'), 'skip', 'half', false, 3], ['next', N_('Coming up'), 'cal', 'half', false, 3], ['journal', N_('Journal'), 'journal', 'half', false, 3]]};
@@ -393,6 +395,8 @@ function dashCard(k) {
     return card(`<ul class="dwl hpnl">${gs.map(hpNewsRow).join('')}</ul><a class="linkbtn hpall" href="#news">${tr('All news')}</a>`, '', bellCount() || '');
   }
   if (k === 'kpi') return typeof kp_tile === 'function' ? kp_tile(card) : '';  // 2.50.0 (#1197)
+  // 2.769.0 (#5352): "Recently edited" over Knowledge, Files and Reading (recent.js, loaded on demand; a placeholder of 8 rows until then)
+  if (k === 'recent') return typeof zle_homeHtml === 'function' ? zle_homeHtml(card, slim) : (ld_later('recent'), card('<div class="zleph" style="--zlen:8" aria-busy="true"></div>'));
   if (k === 'chat') {
     if (!teamOn()) return '';
     if (S.tc.rooms === null && !S.tc.loading) { S.tc.loading = true; loadTeam().then(() => { S.tc.loading = false; if (S.route.mod === 'home') renderView(); }); }

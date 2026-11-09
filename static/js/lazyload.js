@@ -99,6 +99,7 @@ const LD_MODS = {
   splitview: ['splitview'],  // 2.742.0 (#4858): the split view on a wide screen, only while it is on (miniwin.js spl_check)
   codecheck: ['codecheck'],  // 2.766.0 (#5220): Settings > Help > Check code (the hashes of the code this browser holds)
   undolist: ['undolist'],  // 2.773.0 (#5250): the list "Recent steps" (the ← button's right-click / long-press, the page #steps)
+  recent: ['recent'],  // 2.769.0 (#5352): "Recently edited" (the overview "All workspaces" of Knowledge / Files / Reading, the start page's block)
 };
 // 2.65.0 (#1823): modules a module needs before its own files (their globals are used while it draws): the settings dialog
 // draws the agent panes (agentchat.js), the calendars (calview.js) and the tokens / webhooks (integrations.js), the agent chat

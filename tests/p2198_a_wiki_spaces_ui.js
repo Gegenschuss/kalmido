@@ -54,7 +54,7 @@ async function newPage(w, d, name) {  // "New page" in the bar, the name typed, 
   check(root(d, 'private')?.querySelector('.sbbtn .n')?.textContent === 'Private' && root(d, OS)?.querySelector('.sbbtn .n')?.textContent === 'Alpha', 'the entries are named by the space');
   check(!d.querySelector('[data-wk="space"]') && !d.querySelector('#view select'), 'no space switch next to the search');
   check(!d.querySelector('#side .sbbi[data-go="wiki"]'), 'no single "All pages" row any more');
-  check(await until(() => d.querySelectorAll('#view .wkspaces [data-wksp]').length === 2) && h2(d) === 'All workspaces', 'no space open: the overview of the entries');
+  check(await until(() => d.querySelector('#view .zleov .zler') && !d.querySelector('#view .wkspaces')) && h2(d) === 'All workspaces', 'no space open: the overview (2.769.0, #5352: "Recently edited", no second list of the entries next to the panel)');
   check(!d.querySelector('#view [data-wk="amenu"]'), 'no space open: no space menu');
   root(d, OS).querySelector('[data-act="sbb-tree"]').click();
   check(await until(() => rowOf(d, 'Team')), 'the arrow of Alpha shows its folder Team');
@@ -107,7 +107,7 @@ async function newPage(w, d, name) {  // "New page" in the bar, the name typed, 
   w = await boot({user: 'alice', hash: 'wiki'}); d = w.document;
   w.eval(lockOrg); w.eval(`for (const s of wk_spaces()) delete WK.idx[s]; renderView(); renderSide();`);
   check(await until(() => root(d, OS)?.querySelector('.sbbtn')?.innerHTML.includes(icHtml(w, `ic('lock')`)) && !root(d, OS).querySelector('[data-act="sbb-tree"]')), 'the locked space: the lock, no folders');  // 2.406.0 (#3492): tree rows draw the full-size symbol
-  check(await until(() => d.querySelector(`#view .wkspaces [data-wksp="${OS}"] .wkemark`)), 'the overview: the entry with the lock');
+  check(await until(() => d.querySelector('#view .zleov')) && !d.querySelector('#view .wkspaces'), 'the overview: no second list of the entries (2.769.0, #5352: the panel shows the lock)');
   root(d, OS).querySelector('.sbbtn').click();
   check(await until(() => d.querySelector('#view .wkelock [data-wke="unlock"]')), 'a click on it: its page offers "Unlock"');
   w.location.hash = 'wiki'; await until(() => h2(d) === 'All workspaces');

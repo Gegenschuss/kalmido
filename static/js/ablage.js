@@ -84,7 +84,7 @@ function viewAblage() {
   if (ab_ovr()) {  // 2.540.0 (#4575): "All workspaces": the spaces first (also with the panel folded on a tablet); the search spans all of them
     AB.selHere = false;
     const search = typeof ftxtBox === 'function' ? ftxtBox() : '', found = search && ftxtActive();
-    return `<div class="abview abovr ${typeof sbb_on === 'function' && sbb_on() ? 'abdesk' : ''}"><div class="abmain">${search}${found ? `<h3 class="abtitle">${tr('Search results')}</h3>${ftxtResults()}` : spo_html('ablage', ab_spaces().map(s => [s, ab_spaceName(s), ab_spaceIcon(s)]))}</div></div>`;
+    return `<div class="abview abovr ${typeof sbb_on === 'function' && sbb_on() ? 'abdesk' : ''}"><div class="abmain">${search}${found ? `<h3 class="abtitle">${tr('Search results')}</h3>${ftxtResults()}` : spo_recentHtml('ablage', 'ablage', ab_spaces().map(s => [s, ab_spaceName(s), ab_spaceIcon(s)]))}</div></div>`;  // 2.769.0 (#5352): "Recently edited"
   }
   const key = ab_key(r);
   if (AB.key !== key && !AB.loading) setTimeout(ab_load, 0);

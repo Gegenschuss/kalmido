@@ -1036,6 +1036,7 @@ ROUTES = {
     "GET /api/orgs/{}/channels": "orgadmin", "POST /api/orgs/{}/channels": "orgadmin", "PATCH /api/orgs/{}/channels/{}": "orgadmin",
     "DELETE /api/orgs/{}/channels/{}": "orgadmin", "POST /api/orgs/{}/channels/{}/test": "orgadmin",
     # ---- wiki (24)
+    "GET /api/recent": "wiki",  # 2.769.0 (#5352): "Recently edited" over Knowledge, Files and Reading (p2769_d_recent_api_test.py)
     "DELETE /api/wiki/pages/{}": "wiki", "GET /api/wiki": "wiki", "GET /api/wiki/e2e": "wiki",
     "GET /api/wiki/e2e/todo": "wiki", "GET /api/wiki/export": "wiki", "GET /api/wiki/mentions": "wiki",
     "GET /api/wiki/pages/{}": "wiki", "GET /api/wiki/search": "wiki", "PATCH /api/wiki/pages/{}": "wiki",

@@ -672,6 +672,9 @@ APP_ONLY = [
     ("2.40.0 (#1344 / #1361): the own order of My tasks and the favourite star are personal app settings of a person; "
      "agents never set them; 2.46.1: the favourite suggestion asks the person", ("PUT /api/tasks/mine-order", "* /api/lists/{}/favorite",
                                                                                    "POST /api/favorites/suggestion", "GET /api/favorites/targets")),
+    ("2.769.0 (#5352): \"Recently edited\" is a view of the web app over Knowledge, Files and Reading for a person (the overview "
+     "\"All workspaces\", the start page's block); an agent reads the same objects with its own routes (GET /v1/wiki/pages, "
+     "GET /v1/files ...), each under its own rights", ("GET /api/recent",)),
     ("2.41.0 (#1365 / #1205): \"Show in My tasks\" per list and the person's Waiting-on suggestions are personal app "
      "settings of a person; agents never set them (an agent writes the waiting text itself with PUT /tasks/{id}/waiting)",
      ("PUT /api/lists/{}/in-mine", "* /api/me/wait-suggestions")),

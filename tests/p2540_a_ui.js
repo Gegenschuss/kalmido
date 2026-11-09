@@ -49,22 +49,24 @@ const ablageNames = d => [...d.querySelectorAll('#view .abrow .abname')].map(x =
   // ================= #4575 the file store under "All workspaces"
   let w = await boot({user: 'alice', hash: 'ablage', ls: {'tasks.abSpace': JSON.stringify(SP)}}), d = w.document;
   check(w.eval('wsCur()') === 'all' && w.eval('ab_all()'), '#4575: alice shows "All workspaces" with two spaces of her own');
-  check(await until(() => rows(d).length === 4), '#4575: the overview of the spaces ' + rows(d).join('|'));
-  check(JSON.stringify(rows(d)) === JSON.stringify(['private', SP, 'shared', 'trash']), '#4575: Private, the organisation, Shared with me, the trash ' + rows(d).join('|'));
-  check(/All workspaces/.test(d.querySelector('#view .spov .spovt')?.textContent || '') && /Alpha/.test(d.querySelector('#view .spov').textContent), '#4575: headed "All workspaces", the organisation by its name');
-  check(!d.querySelector('#view .abrow') && !/team\.txt/.test(d.querySelector('#view').textContent), '#4575: not silently the remembered space (abSpace = the organisation)');
+  // 2.769.0 (#5352): a computer with the panel shows "Recently edited" in the view, not a second list of the spaces (the
+  // panel lists them); a space opens from the panel / its address, the path leads back to the overview
+  const ovr = () => !!d.querySelector('#view .zleov') && !rows(d).length;
+  check(await until(ovr), '#4575 / #5352: the overview: "Recently edited", no second list of the spaces ' + rows(d).join('|'));
+  check(JSON.stringify(w.eval(`ab_spaces()`)) === JSON.stringify(['private', SP, 'shared', 'trash']), '#4575: Private, the organisation, Shared with me, the trash (the panel)');
+  check(!d.querySelector('#view .abrow') && !d.querySelector('#view .abcrumbs'), '#4575: not silently the remembered space (abSpace = the organisation; 2.769.0 #5352: its file may be listed under "Recently edited")');
   check(!d.querySelector('#side [data-absp][aria-current], #side .on[data-absp]'), '#4575: the panel marks no space on the overview');
-  d.querySelector(`#view .spov [data-spov="${SP}"]`).click();
-  check(await until(() => w.location.hash === '#ablage/s/' + SP && /team\.txt/.test(ablageNames(d))), '#4575: a tap opens the organisation, the address carries it ' + w.location.hash + ' ' + ablageNames(d));
+  w.location.hash = 'ablage/s/' + SP;
+  check(await until(() => w.location.hash === '#ablage/s/' + SP && /team\.txt/.test(ablageNames(d))), '#4575: the organisation opens, the address carries it ' + w.location.hash + ' ' + ablageNames(d));
   check(!/mine\.txt/.test(ablageNames(d)), '#4575: only the files of that space');
   check(d.querySelector('#view .abcrumbs [data-spovup]') && /Alpha/.test(d.querySelector('#view .abcrumbs').textContent), '#4575: the path "All workspaces / Alpha" above it');
   check(w.eval(`LS.get('abSpace', '')`) === SP && w.eval('AB.space') === SP, '#4575: under "All" abSpace is not written (still the old value)');
   d.querySelector('#view .abcrumbs [data-spovup]').click();
-  check(await until(() => w.location.hash === '#ablage' && rows(d).length === 4), '#4575: the path leads back to the overview ' + w.location.hash);
-  d.querySelector('#view .spov [data-spov="private"]').click();
+  check(await until(() => w.location.hash === '#ablage' && ovr()), '#4575: the path leads back to the overview ' + w.location.hash);
+  w.location.hash = 'ablage/s/private';
   check(await until(() => w.location.hash === '#ablage/s/private' && /mine\.txt/.test(ablageNames(d)) && !/team\.txt/.test(ablageNames(d))), '#4575: Private opens with its files ' + ablageNames(d));
   w.history.back();
-  check(await until(() => rows(d).length === 4), '#4575: the browser\'s Back returns to the overview');
+  check(await until(ovr), '#4575: the browser\'s Back returns to the overview');
   w.close();
   // an old address straight in
   w = await boot({user: 'alice', hash: 'ablage/s/' + SP}); d = w.document;
@@ -73,7 +75,7 @@ const ablageNames = d => [...d.querySelectorAll('#view .abrow .abname')].map(x =
 
   // the panel folded (a tablet width without the panel): the overview still shows in the view
   w = await boot({user: 'alice', hash: 'ablage', ls: {'tasks.sideFold': 'true'}}); d = w.document;
-  check(await until(() => rows(d).length === 4) && w.eval('sbb_on()'), '#4575: panel folded: the overview is in the view ' + rows(d).join('|'));
+  check(await until(() => rows(d).length === 4) && w.eval('sbb_on()'), '#4575: panel folded: the spaces in the view (2.769.0, #5352: as chips above "Recently edited") ' + rows(d).join('|'));
   check(!d.querySelector('#view .abspaces'), '#4575: no bar of spaces next to it');
   w.close();
   // the phone: the overview too, no bar of spaces on top of it

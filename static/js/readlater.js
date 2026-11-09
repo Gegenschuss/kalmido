@@ -41,7 +41,7 @@ const rdl_item = id => RDL.items.find(x => x.id === id);
 
 // ---- the view
 function viewReading() {
-  if (rd_ovr()) return `<div class="bmview rlview">${rd_ovrHtml('reading')}</div>`;  // 2.540.0 (#4588): "All workspaces": the spaces first
+  if (rd_ovr()) return `<div class="bmview rlview">${rd_recentHtml('reading')}</div>`;  // 2.540.0 (#4588): "All workspaces": the spaces first; 2.769.0 (#5352): "Recently edited"
   if (!RDL.loading && (!RDL.done || Date.now() - RDL.at > 60000 || RDL.sp !== rdl_sp())) setTimeout(rdl_reload, 0);
   const add = `<form class="bmadd" data-rl-form><label class="sr" for="rl-url">${tr('Link')}</label><input id="rl-url" type="url" inputmode="url" autocomplete="off" placeholder="${esc(tr('Paste a link to read later'))}" maxlength="2000"><button type="submit" class="btn pri" ${RDL.busy ? 'disabled' : ''}>${ic('plus', 's')}<span>${tr('Add')}</span></button></form>`;
   const seg = `<div class="seg bmseg rlseg" role="group" aria-label="${esc(tr('Show'))}"><button type="button" data-rl="open-list" class="${RDL.ticked ? '' : 'on'}" aria-pressed="${!RDL.ticked}">${tr('To read')}${RDL.count ? ` <span class="muted">${RDL.count}</span>` : ''}</button><button type="button" data-rl="done-list" class="${RDL.ticked ? 'on' : ''}" aria-pressed="${RDL.ticked}">${tr('Read|done')}${RDL.doneN ? ` <span class="muted">${RDL.doneN}</span>` : ''}</button></div>`;

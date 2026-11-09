@@ -38,7 +38,8 @@ SIDE_GROUPS = ("focus", "clients", "lists", "filters", "tags", "views", "areas",
 START_AREA_RE = re.compile(r"a:(tasks|cal|notes|office|time|review|life|reading|ablage|wiki|sheets|habits|team|agents)")
 PUSH_TEST_LIMIT = 40  # 2.367.5 (#2980): test pushes (ntfy and device) per person and hour
 SIDE_PEOPLE_MAX = 5  # 2.99.0 E (#2187): people pinned to the sidebar (static/js/sbnav.js SB_PINS)
-DASH_WIDGETS = ("wait", "today", "news", "chat", "projects", "pinned", "notes", "agents", "stats", "search", "family", "kpi")  # 2.17.0 (#475), 2.19.0; 2.55.1: kpi (2.50.0 #1197, office admins)
+DASH_WIDGETS = ("wait", "today", "news", "chat", "projects", "pinned", "notes", "agents", "stats", "search", "family", "kpi",  # 2.17.0 (#475), 2.19.0; 2.55.1: kpi (2.50.0 #1197, office admins)
+                "recent")  # 2.769.0 (#5352): "Recently edited" (static/js/recent.js)
 SETTINGS_FLAGS = ("hide_blocked_today", "progress_subtasks", "ical_alarms", "time_focus", "celebrate", "cal_today",
                   "push_title_only",  # 2.367.5 (#2980)
                   "date_confirm", "digest_mail", "mail_from_me", "mail_trim_fwd", "mail_trim_eml",  # 2.49.0 (#971)

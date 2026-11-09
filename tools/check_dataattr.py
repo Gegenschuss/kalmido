@@ -59,7 +59,7 @@ KNOWN = {
                          "settings.js"}),
     "sv": ("shared", {"favtiles.js"}),
     "wem": ("shared", {"wklive.js"}),
-    "wk": ("shared", {"wklive.js"}),
+    "wk": ("shared", {"wklive.js", "recent.js"}),  # 2.769.0 (#5352): recent.js: "New page" of the empty overview (the wiki view)
 }
 
 
