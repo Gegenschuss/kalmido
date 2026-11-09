@@ -226,7 +226,7 @@ function dcv_actsHtml(d, w) {
     w && d.file && typeof ab_rename === 'function' ? `<button type="button" class="btn sm" data-dc="dvren">${ic('edit', 's')} ${tr('Rename…')}</button>` : '',
     w && !d.file && smv_can(d.org_id) ? `<button type="button" class="btn sm" data-dc="space">${ic('building', 's')} ${tr('Move to another workspace…')}</button>` : ''].filter(Boolean);
   const open = DC.actsMore === d.id;
-  return `<a class="btn sm dv-dl" href="${dcv_fileUrl(d, true)}" download title="${esc(tr('Download'))}">${ic('download', 's')} <span>${tr('Download')}</span></a>${more.length ? `<span class="dv-actw" data-abid="${d.id}"><button type="button" class="btn sm" data-dc="actsmore" data-ab="menu" aria-expanded="${open}" aria-controls="dc-amore" aria-haspopup="true">${tr('Actions')}${ic('chev', 's dc-chev')}</button><div class="dc-ag dc-amore dv-amenu" id="dc-amore" ${open ? '' : 'hidden'}>${more.join('')}</div></span>` : ''}${w ? `<button type="button" class="btn sm danger dc-adel" data-dc="del" aria-label="${esc(tr('Delete'))}" title="${esc(tr('Delete'))}">${ic('trash', 's')} <span>${tr('Delete')}</span></button>` : ''}`;
+  return `<a class="btn sm dv-dl" href="${dcv_fileUrl(d, true)}" download title="${esc(tr('Download'))}">${ic('download', 's')} <span>${tr('Download')}</span></a>${more.length ? `<span class="dv-actw"><button type="button" class="btn sm" data-dc="actsmore" aria-expanded="${open}" aria-controls="dc-amore" aria-haspopup="true">${tr('Actions')}${ic('chev', 's dc-chev')}</button><div class="dc-ag dc-amore dv-amenu" id="dc-amore" ${open ? '' : 'hidden'}>${more.join('')}</div></span>` : ''}${w ? `<button type="button" class="btn sm danger dc-adel" data-dc="del" aria-label="${esc(tr('Delete'))}" title="${esc(tr('Delete'))}">${ic('trash', 's')} <span>${tr('Delete')}</span></button>` : ''}`;
 }
 const dcv_gripHtml = (which, label) => `<button type="button" class="dv-grip" data-dvgrip="${which}" aria-label="${esc(label + ': ' + tr('Resize (arrow keys; double-click: default size)'))}" title="${esc(tr('Drag to resize · double-click: default size'))}"></button>`;
 // the strip: the neighbours in the list as shown (up to 15 on each side), the open one marked; a document outside the list alone
@@ -343,7 +343,7 @@ async function dcv_nodeAct(a, d) {
   if (!n) try { n = await api('GET', `/api/files/nodes/${id}`); } catch { return; }
   if (!n || DC.doc?.id !== id) return;
   if (a === 'dvnewver') ab_newVersion(n);
-  else if (a === 'dvmove') ab_moveDlg(n);
+  else if (a === 'dvmove') ab_moveDlg(n, $('.dv-view [data-dc="actsmore"]'));
   else if (a === 'dvren') { await ab_rename(n); dcv_verAfter(id, false); }
 }
 // "Saved (Undo)" in the head after a change (docs.js dc_patch); the same step as the toast's undo

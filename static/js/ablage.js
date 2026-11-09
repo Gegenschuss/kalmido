@@ -373,13 +373,13 @@ async function ab_move(n, target) {
   ab_reload();
   offerUndo(tr('“{0}” moved', n.name), histAdd({label: tr('Move “{0}”', n.name), undo: () => ab_req('PATCH', `/api/files/nodes/${n.id}`, {parent_id: was}), redo: () => ab_req('PATCH', `/api/files/nodes/${n.id}`, {parent_id: target || null})}));
 }
-async function ab_moveDlg(n) {
+async function ab_moveDlg(n, at) {  // 2.768.0 (#4888): at = the anchor of the menu (the document view's Actions)
   let fs; try { fs = (await api('GET', '/api/files/folders?ablage=1')).folders; } catch { return; }
   // the same space and tree only (the server refuses the rest, and a folder into itself)
   const ok = fs.filter(f => (f.org_id || null) === (n.org_id || null) && f.owner_id === n.owner_id && f.id !== n.id && f.id !== n.parent_id);
   const items = [...(n.parent_id ? [{label: tr('Top level'), icon: 'up', fn: () => ab_move(n, null)}] : []), ...ok.map(f => ({label: f.path, icon: 'folder', fn: () => ab_move(n, f.id)}))];
   if (!items.length) { toast(tr('No other folder in this workspace')); return; }
-  const anchor = $(`[data-abid="${n.id}"] [data-ab="menu"]`) || $('[data-ab="menu"]') || document.body;
+  const anchor = at || $(`[data-abid="${n.id}"] [data-ab="menu"]`) || $('[data-ab="menu"]') || document.body;
   menu(anchor, [{head: tr('Move to …')}, ...items.slice(0, 60)], null, null, tr('Move to …'));
 }
 async function ab_delete(n) {
