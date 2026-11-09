@@ -65,7 +65,7 @@ function dpg_draw(focus = false) {
       <span class="dpg-cnt" role="status">${DPG.del.size ? esc(tr('{0} of {1} pages stay', keep, n)) : esc(trn('{0} page', '{0} pages', n))}${s ? ' · ' + esc(tr('{0} selected', s)) : ''}</span>
       <button type="button" class="btn sm" data-dpg="left"${s ? '' : ' disabled'} title="${esc(tr('Turn left'))}">${ic('undo', 's')} <span>${tr('Turn left')}</span></button>
       <button type="button" class="btn sm" data-dpg="right"${s ? '' : ' disabled'} title="${esc(tr('Turn right'))}">${ic('redo', 's')} <span>${tr('Turn right')}</span></button>
-      <button type="button" class="btn sm" data-dpg="del"${s && (allGone || keep - [...DPG.sel].filter(p => !DPG.del.has(p)).length >= 1) ? '' : ' disabled'} aria-keyshortcuts="Delete" title="${esc(allGone ? tr('Keep the chosen pages') : tr('Delete the chosen pages (Del)'))}">${ic(allGone ? 'undo' : 'trash', 's')} <span>${allGone ? tr('Keep') : tr('Delete')}</span></button>
+      <button type="button" class="btn sm" data-dpg="del"${s && (allGone || keep - [...DPG.sel].filter(p => !DPG.del.has(p)).length >= 1) ? '' : ' disabled'} aria-keyshortcuts="Delete" title="${esc(allGone ? tr('Keep the chosen pages') : tr('Delete the chosen pages (Del)'))}">${ic(allGone ? 'check' : 'trash', 's')} <span>${allGone ? tr('Keep') : tr('Delete')}</span></button>
       <span class="spacer"></span>
       <button type="button" class="btn sm" data-dpg="cancel">${tr('Cancel')}</button>
       <button type="button" class="btn sm pri" data-dpg="save"${dpg_changed() && !DPG.busy ? '' : ' disabled'}>${tr('Save as new version')}</button></div>
