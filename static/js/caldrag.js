@@ -218,7 +218,7 @@ async function cg_end() {
   // 2.484.0 (#3945): a date of a series that was changed on its own already (an override, e.changed) is a single event
   // to the user: it moves alone, no question (and never shifts the series by its own offset)
   if (ev.own && ev.recurring && ev.changed) scope = 'one';
-  else if (ev.own && ev.recurring) { scope = await evAskScope(tr('Change a repeating event'), tr('Save')); if (!scope) { st.ghost.remove(); renderView(); return; } }
+  else if (ev.own && ev.recurring) { scope = await evAskScope(tr('Change a repeating event')); if (!scope) { st.ghost.remove(); renderView(); return; } }
   else if (!ev.own && ev.dvw_rec) {  // a repeating event of a subscription: only every date (part B)
     if (!await askConfirm(tr('Change every date of this repeating event?'), tr('Single dates of a subscribed calendar cannot be changed here.'), {ok: tr('All dates')})) { st.ghost.remove(); renderView(); return; }
     scope = 'all';

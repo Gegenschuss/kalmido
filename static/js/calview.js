@@ -79,7 +79,10 @@ function calsWire(md) {
     if (act === 'edit') calEditModal(x, box._j.colors, () => calsDraw(md));
     if (act === 'del') {
       if (!await askConfirm(tr('Remove the calendar “{0}”?', x.name), tr('Its events disappear from Kalmido; the calendar itself does not change.'), {ok: tr('Remove'), danger: true})) return;
-      try { await calsDraw(md, await api('DELETE', `/api/calendars/${id}`)); toast(tr('Calendar removed')); } catch { /* api() showed it */ }
+      // 2.800.0 (#5466): the toast takes it back (POST /api/calendars/restore with the answer's token, within 15 minutes)
+      let j; try { j = await api('DELETE', `/api/calendars/${id}`); await calsDraw(md, j); } catch { return; /* api() showed it */ }
+      calInvalidate(); await cvxCals(true).catch(() => {}); renderView();
+      toast(tr('Calendar removed'), j?.undo ? async () => { let r; try { r = await api('POST', '/api/calendars/restore', {undo: j.undo}); } catch { return; } if (md.isConnected) await calsDraw(md, r); calInvalidate(); await cvxCals(true).catch(() => {}); renderView(); } : undefined);
     }
   });
   md.addEventListener('change', e => { const i = e.target.closest('[data-calact="vis"]'); if (i) calVis(md, +i.closest('[data-cal]').dataset.cal, i); });

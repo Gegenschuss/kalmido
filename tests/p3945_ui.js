@@ -10,7 +10,7 @@
 // freelancer-matrix: events (alice has no organisation: her private workspace)
 const {execFileSync} = require('child_process');
 const path = require('path');
-const {boot, sleep, B, login} = require('./boot');
+const {boot, sleep, B, login, undoToast} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
@@ -94,13 +94,15 @@ const D0 = day(0), D1 = day(1), D2 = day(2);
     'the changed date keeps its title, time and place after the series changed ' + JSON.stringify(x.overrides));
   const occ2 = ov.rid;  // the key moves with the series (RECURRENCE-ID of the new start)
 
-  // ---- 5. deleting the changed date: the plain question, only it goes
+  // ---- 5. deleting the changed date: only it goes
+  // 2.800.0 (#5466): without a question (a single event; the toast has Undo), and the Undo brings its own change back
   w.eval(`evDelete(${JSON.stringify(x)}, ${JSON.stringify(occ2)})`);
-  const q = await until(() => d.querySelector('.modal [data-cd="yes"]') && d.querySelector('.modal'));
-  check(q && !d.querySelector('.modal [data-sc]'), 'deleting the changed date does not ask "Only this date / All dates"');
-  if (q) click(w, q.querySelector('[data-cd="yes"]'));
   x = await until(async () => { const y = await get(); return (y.exdates || '').includes(occ2) ? y : null; });
+  check(!d.querySelector('.modal [data-sc]') && !d.querySelector('.modal [data-cd="yes"]'), 'deleting the changed date asks nothing');
   check(x && x.title === 'Daily' && !(x.overrides || []).length, 'only the changed date went, the series stays ' + JSON.stringify(x && [x.title, x.exdates, x.overrides]));
+  check(await undoToast(w, 'This date was removed'), '#5466: the toast offers Undo');
+  x = await until(async () => { const y = await get(); return !(y.exdates || '').includes(occ2) && (y.overrides || []).some(o => o.rid === occ2) ? y : null; });
+  check(x && x.overrides.find(o => o.rid === occ2).title === 'Standup (moved)', '#5466: Undo brings the date back with its own change ' + JSON.stringify(x && [x.exdates, x.overrides]));
 
   w.close();
   console.log(`p3945_ui: ${ok} ok, ${F.length} failed`);

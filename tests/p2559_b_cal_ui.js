@@ -136,10 +136,9 @@ const noState = (w, i) => !(w.__loads || []).slice(i).includes('own');
   check(noState(w, i0), 'drag: no GET /api/state');
 
   // ================= delete: gone at once, a refusal brings it back; Undo puts it back at once
+  // 2.800.0 (#5466): a single event goes without a question (the toast has Undo)
   const del = async () => {
     w.eval(`evDelete(${JSON.stringify(await call('GET', `/api/events/${DE.id}`))}, null)`);
-    const q = await until(() => d.querySelector('.modal [data-cd="yes"]'));
-    click(w, q);
   };
   hold(w, /^DELETE \/api\/events\/\d+/);
   i0 = mark(w);

@@ -137,15 +137,15 @@ async function evPop(anchor, e) {
 // the editor and deleting change only it, never ask "Only this date / All dates"; the series' changes leave it as it is
 const evOccOwn = (ev, occ) => !!occ && (ev?.overrides || []).some(x => x.rid === occ);
 async function evDelete(ev, occ) {
+  // 2.800.0 (#5466): a single event (or a date with its own change) goes without a question - the toast takes it back, like a
+  // task; a date of a series still asks which dates
   let mode = 'all';
-  if (evOccOwn(ev, occ)) {
-    if (!await askConfirm(tr('Delete the event “{0}”?', (ev.overrides.find(x => x.rid === occ).title) || ev.title), '', {ok: tr('Delete'), danger: true})) return;
-    mode = 'one';
-  } else if (occ) {
-    const r = await evAskScope(tr('Delete a repeating event'), tr('Delete'));
+  if (evOccOwn(ev, occ)) mode = 'one';
+  else if (occ) {
+    const r = await evAskScope(tr('Delete a repeating event'), true);
     if (!r) return;
     mode = r;
-  } else if (!await askConfirm(tr('Delete the event “{0}”?', ev.title), '', {ok: tr('Delete'), danger: true})) return;
+  }
   // 2.559.0 (#4659): the event leaves the calendar at once, the request runs behind it (an error brings it back); the undo
   // of the toast puts its dates back at once as well
   const gone = [], put = () => {
@@ -163,17 +163,34 @@ async function evDelete(ev, occ) {
     const its = S.cal.items; S.cal.items = its.concat(add); return () => { S.cal.items = its.filter(x => !add.includes(x)); };
   };
   if (mode === 'all') toast(tr('Event deleted'), async () => { try { await evOpt(back, () => api('POST', `/api/events/${ev.id}/restore`)); } catch { return; } calInvalidate(); renderView(); });
-  else toast(tr('This date was removed'));
+  else toast(tr('This date was removed'), () => evOccBack(ev, occ));  // 2.800.0 (#5466): with Undo
 }
-function evAskScope(title, ok) {  // a repeating event: only this date or every date
-  return new Promise(res => {
-    const md = modal(`<h3>${esc(title)}</h3><p class="muted">${tr('This event repeats.')}</p>
-      <div class="foot evscope"><button class="btn" data-sc="">${tr('Cancel')}</button><span class="spacer"></span><button class="btn" data-sc="one">${tr('Only this date')}</button><button class="btn pri" data-sc="all">${esc(ok === tr('Delete') ? tr('All dates') : tr('All dates'))}</button></div>`);
-    let done = false;
-    const fin = v => { if (done) return; done = true; res(v); md.remove(); };
-    md.addEventListener('click', e => { const b = e.target.closest('[data-sc]'); if (b) fin(b.dataset.sc || null); });
-    onRemove(md, () => fin(null));
-  });
+// 2.800.0 (#5466): the Undo of "only this date": the date leaves the left-out ones again through undoWrite (only exdates, with
+// the event's version: changed elsewhere meanwhile = "not undone"); a date with its own change gets that change back
+async function evOccBack(ev, occ) {
+  let cur; try { cur = await api('GET', `/api/events/${ev.id}`); } catch { return; }
+  const ex = (cur.exdates || []).filter(x => x !== occ);
+  const j = await undoWrite(`/api/events/${ev.id}`, {exdates: ex}, cur.updated_at, {now: {exdates: cur.exdates || []}, verKey: 'expect', label: ev.title}).catch(() => null);
+  if (!j) return;
+  const ov = (ev.overrides || []).find(x => x.rid === occ);
+  if (ov) {
+    const b = Object.fromEntries(['title', 'location', 'description', 'all_day', 'start', 'end', 'status'].filter(k => ov[k] != null).map(k => [k, ov[k]]));
+    try { await api('PATCH', `/api/events/${ev.id}?occ=${encodeURIComponent(occ)}`, b); } catch { /* api() said it */ }
+  }
+  calInvalidate(); renderView();
+}
+// a repeating event: only this date or every date -> 'one' | 'all' | null. 2.800.0 (#5466): the app's own question (askDialog,
+// dialogs.js) with a third button; when deleting, "All dates" in the warning colour (it takes every date)
+async function evAskScope(title, del) {
+  let sc = 'all';
+  const ok = await askDialog({title, body: tr('This event repeats.'), ok: tr('All dates'), danger: !!del, after: md => {
+    md.classList.add('evscope');
+    const yes = md.querySelector('[data-cd="yes"]'), no = md.querySelector('[data-cd="no"]');
+    yes.dataset.sc = 'all'; if (no) no.dataset.sc = '';
+    yes.insertAdjacentHTML('beforebegin', `<button type="submit" class="btn" data-sc="one">${esc(tr('Only this date'))}</button>`);
+    md.addEventListener('click', e => { const b = e.target.closest('[data-sc]'); if (b && b.dataset.sc) sc = b.dataset.sc; }, true);
+  }});
+  return ok ? sc : null;
 }
 async function evPrepTask(ev) {
   try {
@@ -621,7 +638,9 @@ async function evCalsModal() {
         {label: tr('Only this calendar'), icon: 'eye', fn: async () => { await cvxOnly(`e:${c.id}`); draw(); }},  // 2.36.1 (#1127)
         {label: tr('Show all calendars'), icon: 'all', fn: async () => { await cvxAll(); draw(); }},
         !own && {label: tr('Leave this calendar'), icon: 'logout', fn: async () => { if (!await askConfirm(tr('Leave the calendar “{0}”?', c.name), '', {ok: tr('Leave'), danger: true})) return; try { await api('DELETE', `/api/evcals/${c.id}/members/${S.me.id}`); } catch { return; } refresh(); }},
-        own && {label: tr('Delete…'), icon: 'trash', cls: 'danger', fn: async () => { if (!await askConfirm(tr('Delete the calendar “{0}” with all its events?', c.name), tr('They can be restored from the trash.'), {ok: tr('Delete'), danger: true})) return; try { await api('DELETE', `/api/evcals/${c.id}`); } catch { return; } st.trash = null; refresh(); }}]);  // 2.566.0 (#4707): into the trash
+        own && {label: tr('Delete…'), icon: 'trash', cls: 'danger', fn: async () => { if (!await askConfirm(tr('Delete the calendar “{0}” with all its events?', c.name), tr('They can be restored from the trash.'), {ok: tr('Delete'), danger: true})) return; try { await api('DELETE', `/api/evcals/${c.id}`); } catch { return; } st.trash = null; calInvalidate(); await refresh(); renderView();
+          // 2.800.0 (#5466): the toast takes it back (the trash's restore, with its events)
+          toast(tr('Calendar “{0}” deleted', c.name), async () => { try { await api('POST', `/api/evcals/${c.id}/restore`); } catch { return; } st.trash = null; calInvalidate(); if (md.isConnected) await refresh(); else await cvxCals(true).catch(() => {}); renderView(); }); }}]);  // 2.566.0 (#4707): into the trash
       return;
     }
     const rb = e.target.closest('[data-evctr]');
@@ -650,7 +669,8 @@ async function evCalsModal() {
   loadModule('calabs').then(() => { abc_wire(md, draw); draw(); }).catch(() => {});  // 2.155.0 B (#2076): holidays + absences
 }
 function evShareModal(c, users, done) {
-  const md = modal(`<h3>${tr('Share {0}', esc(c.name))}</h3><div class="shws"></div><div id="evs-list"></div>
+  // 2.800.0 (#5466): the X on top like every other dialog
+  const md = modal(`<div class="lhdr"><h3>${tr('Share {0}', esc(c.name))}</h3><span class="spacer"></span><button class="iconbtn" data-evs="close" aria-label="${esc(tr('Close'))}" title="${esc(tr('Close'))}">${ic('x')}</button></div><div class="shws"></div><div id="evs-list"></div>
     <div class="row"><label for="evs-user">${tr('Person')}</label><select id="evs-user" data-sheet-av>${shWsOptions(users, c.org_id || null, c.members)}</select>
       <select id="evs-role" aria-label="${esc(tr('Role'))}"><option value="view">${tr('can view')}</option><option value="edit">${tr('can edit')}</option></select><button class="btn sm pri" data-evs="add">${tr('Share')}</button></div>
     <div class="shint">${tr('People with “can view” see the events, with “can edit” they also change them. In their phone the calendar appears next to their own.')}</div>

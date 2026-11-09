@@ -18006,6 +18006,7 @@
   "This PDF has more than {0} pages - its pages cannot be changed here": "Questo PDF ha più di {0} pagine: qui non è possibile modificarne le pagine",
   "The pages of this document cannot be changed (read-only or a locked month)": "Le pagine di questo documento non possono essere modificate (sola lettura o mese bloccato)",
   "Subscribed calendar": "Calendario iscritto",
+  "Calendar “{0}” deleted": "Calendario «{0}» eliminato",
   "Kept rows and columns": "Righe e colonne bloccate",
   "People|event": "Persone",
   "Also private": "Anche privato",

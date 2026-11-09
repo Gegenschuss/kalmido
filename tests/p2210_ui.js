@@ -135,11 +135,11 @@ const ALL = 'cal,timeline,comments,collab,events,contacts';
   click(w, [...d.querySelectorAll('#view .wcev')].find(x => /Standup/.test(x.textContent)));
   await until(() => d.querySelector('#pop [data-evp="del"]'));
   click(w, d.querySelector('#pop [data-evp="del"]'));
-  // 2.484.0 (#3945): this date has its own change now (above): it is a single event, deleting asks the plain question
-  await until(() => d.querySelector('.modal [data-cd="yes"]'));
-  check(!d.querySelector('.modal [data-sc]'), 'the changed date: no "Only this date / All dates" when deleting');
-  click(w, d.querySelector('.modal [data-cd="yes"]'));
+  // 2.484.0 (#3945): this date has its own change now (above): it is a single event
+  // 2.800.0 (#5466): a single event goes without a question (the toast has Undo)
   check(await until(async () => (await call('GET', `/api/events/${SU.id}`)).exdates.length === 1), 'the changed date deleted: left out');
+  check(!d.querySelector('.modal [data-sc]') && !d.querySelector('.modal [data-cd="yes"]'), 'the changed date: no question when deleting');
+  check(await until(() => /This date was removed/.test(d.querySelector('#toast:not(.hidden)')?.textContent || '') && d.querySelector('#toast button:not(.tx)')), 'the changed date: the toast offers Undo');
   // the quick sheet from a free slot: "Event"
   w.eval(`S.calMode = 'week'; S.calSel = '${t1}'; renderView()`); await sleep(100);
   const col = d.querySelector(`#view .wcol[data-day="${t1}"]`);

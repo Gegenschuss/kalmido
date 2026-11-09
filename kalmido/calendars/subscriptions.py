@@ -16,6 +16,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import uuid
 import xml.etree.ElementTree as ET
 import icalendar
 import recurring_ical_events
@@ -27,11 +28,12 @@ from dateutil.rrule import rrulestr
 from flask import jsonify, request
 
 from ..core.config import _origin, app, APP_NAME, APP_VERSION, TZ
-from ..core.pg import insert_id, write_lock
-from ..core.ephem import eph_busy_give, eph_busy_take  # 2.642.0 (#4975)
+from ..core.pg import insert_id, qi, table_columns, write_lock
+from ..core.ephem import eph_busy_give, eph_busy_take, eph_put, eph_take  # 2.642.0 (#4975); 2.800.0 (#5466): put / take
 from ..core.i18n import lang, N_, tr
 from ..core.db import bump, ALLOW_PURPOSES, body, connect, db, err, gsetting, iso, iso_ms, local_now, now_utc, parse_iso
 from ..accounts.session import FAIL_WINDOW, GATE, me
+from ..accounts.login import seal, unseal  # 2.800.0 (#5466): the undo copy of a removed subscription
 from ..core.access import Denied
 from ..tasks.validation import RR_FREQS, RR_PROBE_DAYS
 from ..core.errors import BadInput
@@ -1244,14 +1246,50 @@ def cal_update(sid):
     return jsonify(cal_public(need_calsub(c, sid)))
 
 
+# 2.800.0 (#5466): a removed subscription can be put back for a while (the toast's Undo), the way a deleted CalDAV event is
+# (davwrite.py cdw_delete / cdw_restore): its row without the sync state, sealed once more, in eph_state under a token of the
+# person (any web process can take it, only once, only that account). Link and password stay sealed as stored (cal_seal).
+CAL_UNDO_S = 15 * 60
+EPH_CALSUB = "calsubundo"
+_CAL_UNDO_DROP = ("etag", "last_modified", "ctag", "digest", "status", "error", "fails", "events", "truncated", "tried_at",
+                  "synced_at", "fetched_at")
+
+
 @app.delete("/api/calendars/<int:sid>")
 def cal_delete(sid):
-    c = db()
-    need_calsub(c, sid)
-    c.execute("DELETE FROM cal_subs WHERE id=? AND user_id=?", (sid, me()))
+    c, uid = db(), me()
+    r = need_calsub(c, sid)
+    keep = {k: r[k] for k in r.keys() if k not in _CAL_UNDO_DROP}
+    c.execute("DELETE FROM cal_subs WHERE id=? AND user_id=?", (sid, uid))
     bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
-    return jsonify(cal_list(c, me()))
+    tok = uuid.uuid4().hex
+    kept = eph_put(EPH_CALSUB, f"{uid}:{tok}", seal(c, f"calsub:{uid}", json.dumps(keep, default=str)), CAL_UNDO_S, uid=uid,
+                   caps={"uid": CAL_MAX_SUBS})
+    return jsonify({**cal_list(c, uid), "undo": tok if kept else None})
+
+
+@app.post("/api/calendars/restore")
+def cal_restore_sub():
+    """2.800.0 (#5466): {undo} -> the removed subscription back (its id, name, colour, link, login), pending until fetched again."""
+    c, b, uid = db(), body(), me()
+    tok = b.get("undo")
+    v = eph_take(EPH_CALSUB, f"{uid}:{tok}", uid=uid) if isinstance(tok, str) and 0 < len(tok) <= 64 else None
+    keep = json.loads(unseal(c, f"calsub:{uid}", v)) if v else None
+    if not keep or keep.get("user_id") != uid:
+        return err(tr("This can no longer be undone"), 409)
+    if c.execute("SELECT COUNT(*) FROM cal_subs WHERE user_id=?", (uid,)).fetchone()[0] >= CAL_MAX_SUBS:
+        return err(tr("At most {0} calendars", CAL_MAX_SUBS), 409)
+    have = table_columns(c, "cal_subs")
+    keep["changed_at"] = iso_ms(now_utc())
+    if c.execute("SELECT 1 FROM cal_subs WHERE id=?", (keep.get("id"),)).fetchone():
+        keep.pop("id", None)
+    cols = [k for k in keep if k in have]
+    names = ",".join(qi(k, have) for k in cols)
+    sid = insert_id(c, f"INSERT INTO cal_subs({names}) VALUES({','.join('?' * len(cols))})", tuple(keep[k] for k in cols))
+    bump(c)
+    c.commit()  # no tried_at: the background sync (cal_loop) fetches it again on its next round, not this request
+    return jsonify({**cal_list(c, uid), "restored": sid})
 
 
 @app.post("/api/calendars/<int:sid>/refresh")

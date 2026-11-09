@@ -6,10 +6,14 @@
 // - #5468: dated tasks in the calendar follow the workspace like the events: in Private only the private list's task, in the
 //   organisation only its list's task, under "All" both; an event of a subscribed calendar shows in each, with its mark;
 //   a person without an organisation (bob) sees all of their own dated tasks
+// - #5466: a date of a series asks through the app's question (askDialog): Cancel - Only this date - All dates, "All dates" in
+//   the warning colour when deleting; "only this date" and a single event (no question any more) come back through the
+//   toast's Undo; the own repeat says "Apply"; the share dialog has the X; deleting a calendar and removing a subscription
+//   show a toast whose Undo brings them back
 // freelancer-matrix: events (alice has no organisation: her private workspace)
 const path = require('path');
 const {execFileSync} = require('child_process');
-const {sleep, B, login, boot, until: until0} = require('./boot');
+const {sleep, B, login, boot, until: until0, undoToast} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const firefox = require('./ff')({tag: 'p2800_a_cal_ui', check, shots: 'P2800A_SHOTS'});
@@ -86,6 +90,97 @@ c.commit(); c.close()`);
     const w = await boot({user: 'bob', hash: 'cal', ls: {'tasks.calMode': '"month"'}}), d = w.document;
     const ids = () => [...(d.querySelector(`#view .cell[data-day="${D}"]`)?.querySelectorAll('.ev[data-id]') || [])].map(x => +x.dataset.id);
     check(await until(() => ids().includes(TB.id) && ids().includes(TI.id)), '#5468 without an organisation: list and inbox task in the month ' + JSON.stringify(ids()));
+    w.close();
+  }
+
+  // ================= #5466: dialogs and Undo in the calendar
+  {
+    const K = await call(CA, 'POST', '/api/evcals', {name: 'Choir', color: '#c084fc'});
+    const SE = await call(CA, 'POST', '/api/events', {title: 'Rehearsal', cal_id: K.id, start: `${D}T18:00`, end: `${D}T19:00`, rrule: 'FREQ=DAILY;COUNT=5', reminders: []});
+    const ONE = await call(CA, 'POST', '/api/events', {title: 'Tuning the piano', cal_id: K.id, start: `${D}T08:00`, end: `${D}T09:00`, reminders: []});
+    check(SE.id && ONE.id, '#5466: a series and a single event');
+    const w = await boot({user: 'alice', hash: 'cal', ls: {'tasks.calMode': '"month"'}}), d = w.document;
+    await until(() => w.eval(`typeof evDelete === 'function' && typeof evAskScope === 'function'`));
+    const items = async () => (await call(CA, 'GET', `/api/events?from=${D}&to=${D}`)).items || [];
+    const occ = `${D}T18:00`;
+    // a date of the series: the app's question
+    w.eval(`evDelete(${JSON.stringify(await call(CA, 'GET', `/api/events/${SE.id}`))}, ${JSON.stringify(occ)})`);
+    let md = await until(() => d.querySelector('.modal.cdlg.evscope'));
+    const bt = md ? [...md.querySelectorAll('.foot button')].map(b => [b.textContent.trim(), b.dataset.sc, b.classList.contains('danger')]) : [];
+    check(md && md.getAttribute('role') === 'alertdialog' && /This event repeats/.test(md.textContent) && JSON.stringify(bt) === JSON.stringify([['Cancel', '', false], ['Only this date', 'one', false], ['All dates', 'all', true]]),
+      '#5466: askDialog with Cancel - Only this date - All dates (warning colour) ' + JSON.stringify(bt));
+    click(w, md.querySelector('[data-sc="one"]'));
+    check(await until(async () => (await call(CA, 'GET', `/api/events/${SE.id}`)).exdates?.includes(occ)), '#5466: Only this date: that date is left out');
+    check(!d.querySelector('.modal.evscope'), '#5466: the question closed');
+    check(await undoToast(w, 'This date was removed'), '#5466: the toast of the removed date offers Undo');
+    check(await until(async () => !(await call(CA, 'GET', `/api/events/${SE.id}`)).exdates?.length), '#5466: Undo brings the date back');
+    // the question again, cancelled: nothing happens
+    w.eval(`evDelete(${JSON.stringify(await call(CA, 'GET', `/api/events/${SE.id}`))}, ${JSON.stringify(occ)})`);
+    md = await until(() => d.querySelector('.modal.cdlg.evscope'));
+    click(w, md.querySelector('[data-cd="no"]'));
+    check(await until(() => !d.querySelector('.modal.evscope')) && !(await call(CA, 'GET', `/api/events/${SE.id}`)).exdates?.length, '#5466: Cancel deletes nothing');
+    // a change by dragging asks the same, "All dates" without the warning colour
+    w.eval(`evAskScope('Change a repeating event').then(v => { window.__sc = v; })`);
+    md = await until(() => d.querySelector('.modal.cdlg.evscope'));
+    check(md && !md.querySelector('[data-sc="all"]').classList.contains('danger') && md.querySelector('[data-sc="all"]').classList.contains('pri'), '#5466: changing: "All dates" as the main button, no warning colour');
+    click(w, md.querySelector('[data-sc="all"]'));
+    check(await until(() => w.eval('window.__sc') === 'all'), '#5466: All dates answers all');
+    // a single event: no question, the toast takes it back
+    w.eval(`evDelete(${JSON.stringify(await call(CA, 'GET', `/api/events/${ONE.id}`))}, null)`);
+    check(await until(async () => !(await items()).some(x => x.title === 'Tuning the piano')), '#5466: a single event is deleted');
+    check(!d.querySelector('.modal.cdlg'), '#5466: without a question');
+    check(await undoToast(w, 'Event deleted'), '#5466: the toast offers Undo');
+    check(await until(async () => (await items()).some(x => x.title === 'Tuning the piano')), '#5466: Undo brings it back');
+    // the own repeat: "Apply"
+    click(w, d.querySelector('#view [data-act="ev-new"]'));
+    md = await until(() => d.querySelector('.modal.evmodal'));
+    md.querySelector('#ev-rep').value = '__custom'; md.querySelector('#ev-rep').dispatchEvent(new w.Event('change', {bubbles: true}));
+    const cm = await until(() => d.querySelector('.modal.crrmodal'));
+    check(cm && cm.querySelector('[data-crr="ok"]').textContent.trim() === 'Apply' && cm.querySelector('.lhdr [data-crr="cancel"]'), '#5466: the own repeat says Apply (and has its X)');
+    click(w, cm.querySelector('[data-crr="ok"]'));
+    await until(() => !d.querySelector('.modal.crrmodal'));
+    md.remove();
+    // the share dialog: the X on top closes it
+    w.eval(`evShareModal(evCal(${K.id}), [], () => {})`);
+    md = await until(() => d.querySelector('.modal #evs-list') && d.querySelector('.modal #evs-list').closest('.modal'));
+    const x = md && md.querySelector('.lhdr [data-evs="close"][aria-label="Close"]');
+    check(x, '#5466: the share dialog has the X');
+    if (x) click(w, x);
+    check(await until(() => !d.querySelector('.modal #evs-list')), '#5466: the X closes it');
+    // deleting a calendar: the toast's Undo restores it (with its events)
+    click(w, d.querySelector('#view [data-act="ev-cals"]'));
+    md = await until(() => d.querySelector('.modal.evcmodal [data-evcmenu="' + K.id + '"]') && d.querySelector('.modal.evcmodal'));
+    click(w, md.querySelector(`[data-evcmenu="${K.id}"]`));
+    await until(() => [...d.querySelectorAll('#pop [role="menuitem"]')].some(b => /Delete/.test(b.textContent)));
+    click(w, [...d.querySelectorAll('#pop [role="menuitem"]')].find(b => /Delete/.test(b.textContent)));
+    const q = await until(() => d.querySelector('.modal.cdlg [data-cd="yes"]'));
+    click(w, q);
+    check(await until(async () => !(await call(CA, 'GET', '/api/evcals')).items?.some(c => c.id === K.id) && !(await items()).some(x => x.title === 'Rehearsal')), '#5466: the calendar is deleted with its events');
+    check(await until(() => !w.eval(`S.cal.items.some(x => x.own && x.eid === ${SE.id})`)), '#5466: its events left the view');
+    check(await undoToast(w, 'Calendar “Choir” deleted'), '#5466: the toast offers Undo');
+    check(await until(async () => (await call(CA, 'GET', '/api/evcals')).items?.some(c => c.id === K.id) && (await items()).some(x => x.title === 'Rehearsal')), '#5466: Undo brings the calendar and its events back');
+    check(await until(() => w.eval(`S.cal.items.some(x => x.own && x.eid === ${SE.id})`)), '#5466: and into the view');
+    w.close();
+  }
+  // removing a subscription (Settings > Integrations > Calendars): the toast's Undo brings it back
+  {
+    const subId = +py(`from kalmido.core.db import connect
+c = connect()
+print(c.execute("SELECT id FROM cal_subs WHERE name='Club fixtures'").fetchone()[0])
+c.close()`);
+    const w = await boot({user: 'alice', hash: 'cal'}), d = w.document;
+    await until(() => w.eval(`typeof settingsModal === 'function'`));
+    w.eval(`settingsModal('calendars')`);
+    const del = await until(() => d.querySelector(`[data-cal="${subId}"] [data-calact="del"]`));
+    check(del, '#5466: the subscription in the settings');
+    if (del) {
+      click(w, del);
+      click(w, await until(() => d.querySelector('.modal.cdlg [data-cd="yes"]')));
+      check(await until(async () => !(await call(CA, 'GET', '/api/calendars')).subs?.some(x => x.id === subId)), '#5466: the subscription is removed');
+      check(await undoToast(w, 'Calendar removed'), '#5466: the toast offers Undo');
+      check(await until(async () => (await call(CA, 'GET', '/api/calendars')).subs?.some(x => x.id === subId && x.name === 'Club fixtures')), '#5466: Undo brings the subscription back (same id)');
+      check(await until(() => d.querySelector(`[data-cal="${subId}"]`)), '#5466: and into the open list');
+    }
     w.close();
   }
 

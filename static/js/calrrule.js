@@ -46,7 +46,7 @@ function crr_html(st) {
       <label class="crropt"><input type="radio" name="crr-m" value="day" ${st.mode === 'day' ? 'checked' : ''}> <span>${esc(tr('on day {0}', ''))}</span><input type="number" id="crr-md" class="numin" min="1" max="31" inputmode="numeric" value="${st.md}" aria-label="${esc(tr('on day {0}', ''))}"></label>
       <label class="crropt"><input type="radio" name="crr-m" value="nth" ${st.mode === 'nth' ? 'checked' : ''}> <span>${esc(tr('on the'))}</span><select id="crr-pos" aria-label="${esc(tr('on the'))}">${posOpts}</select><select id="crr-wd" aria-label="${esc(tr('Weekday'))}">${wdOpts}</select></label></div></div>` : ''}
     <div class="row crrprev"><span class="rlab">${tr('Repeat')}</span><span class="muted" id="crr-prev">${esc(repeatLabelBase(crr_build(st)))}</span></div>
-    <div class="foot"><span class="spacer"></span><button class="btn" data-crr="cancel">${tr('Cancel')}</button><button class="btn pri" data-crr="ok">${tr('OK')}</button></div>`;
+    <div class="foot"><span class="spacer"></span><button class="btn" data-crr="cancel">${tr('Cancel')}</button><button class="btn pri" data-crr="ok">${tr('Apply')}</button></div>`;  // 2.800.0 (#5466): what it does, not "OK"
 }
 
 // opens the dialog on top of `parent` (which steps aside); done(rule) gets the rule body, nothing is called on cancel

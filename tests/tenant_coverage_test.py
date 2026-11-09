@@ -887,6 +887,7 @@ ROUTES = {
     "DELETE /api/me/app-passwords/{}": "own", "GET /api/calendars": "own", "POST /api/calendars/discover": "own",
     "POST /api/calendars": "own", "PATCH /api/calendars/{}": "own", "DELETE /api/calendars/{}": "own",
     "POST /api/calendars/{}/refresh": "own",
+    "POST /api/calendars/restore": "own",  # 2.800.0 (#5466): a removed subscription back through its token (eph_take with the account)
     # 2.52.0 (#1128): writing into the person's own CalDAV subscription (need_calsub: the subscription's owner only)
     "POST /api/calendars/{}/events": "own", "PATCH /api/calendars/{}/events": "own", "DELETE /api/calendars/{}/events": "own",
     "POST /api/calendars/{}/events/restore": "own", "POST /api/calendars/{}/write": "own", "POST /api/import/{}": "own",

@@ -792,7 +792,7 @@ ROUTES = {
     "PATCH /api/v1/address-books/{}": "pim", "PATCH /api/v1/contacts/{}": "pim", "PATCH /api/v1/event-calendars/{}": "pim",
     "PATCH /api/v1/events/{}": "pim", "POST /api/books": "pim", "POST /api/books/{}/import": "pim",
     "POST /api/books/{}/org": "pim", "POST /api/calendars": "pim", "POST /api/calendars/discover": "pim",
-    "POST /api/calendars/{}/events": "pim", "POST /api/calendars/{}/events/restore": "pim",
+    "POST /api/calendars/{}/events": "pim", "POST /api/calendars/{}/events/restore": "pim", "POST /api/calendars/restore": "pim",  # 2.800.0 (#5466)
     "POST /api/calendars/{}/refresh": "pim", "POST /api/calendars/{}/write": "pim", "POST /api/contacts": "pim",
     "POST /api/contacts/bulk": "pim", "POST /api/contacts/merge": "pim", "POST /api/contacts/merges/{}/undo": "pim",
     "POST /api/evcals": "pim", "POST /api/evcals/{}/import": "pim", "POST /api/events": "pim",
@@ -1295,7 +1295,6 @@ WRITE_UNPROVEN = set(x.strip() for x in """
 DELETE /api/account/export
 DELETE /api/books/{}/org
 DELETE /api/budget/files/{}
-DELETE /api/calendars/{}
 DELETE /api/calendars/{}/events
 DELETE /api/chat-files/{}
 DELETE /api/deps/{}/{}
