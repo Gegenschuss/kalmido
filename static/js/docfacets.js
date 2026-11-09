@@ -55,7 +55,7 @@ const dfc_arr = v => Array.isArray(v) ? v : v ? [v] : [];
 // is the filter of a row active (the row is marked; its click takes it away again)
 function dfc_isOn(g, v) {
   if (!dfc_listOn()) return false;
-  const f = DC.f || {};
+  const f = /** @type {any} */ (DC.f || {});
   if (g === 'sender' || g === 'type') return dfc_arr(f[g]).includes(v);
   if (g === 'tag') return (f.tg || {})[v] === 'in' || f.tag === v;
   if (g === 'asnhas') return f.asnHas === v;
@@ -98,7 +98,7 @@ function dfc_list(key, items, row) {
     + (sorted.length > DFC_TOP ? `<button type="button" class="linkbtn dfcall" data-dfcall="${esc(key)}">${all ? esc(tr('Show less')) : esc(tr('Show all ({0})', sorted.length))}</button>` : '');
 }
 function dfc_asnBody(a) {
-  const f = dfc_listOn() ? DC.f || {} : {}, cur = f.asn || '';
+  const f = /** @type {any} */ (dfc_listOn() ? DC.f || {} : {}), cur = f.asn || '';
   return `<form class="dfcasn" data-dfcasn="1"><input type="text" inputmode="numeric" name="asn" value="${esc(cur)}" placeholder="${esc(tr('Number or range'))}" aria-label="${esc(tr('Archive number: number or range, e.g. 140-150'))}" autocomplete="off">`
     + `<button type="submit" class="iconbtn" aria-label="${esc(tr('Filter'))}" title="${esc(tr('Filter'))}">${ic('search', 's')}</button></form>`
     + (a.without ? dfc_row('asnhas', 'without', 'hash', tr('without archive number'), a.without) : '')
