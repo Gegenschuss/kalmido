@@ -119,7 +119,7 @@ function srv_projHtml(ws) {
   const ls = srv_projs(ws);
   return `<legend>${tr('Projects for the agent')}</legend>
     <div class="shint keep">${esc(tr('Shared with the agent first: it works only in projects shared with it. Without one your routines wait and start on their own once you share one of your projects with it.'))}</div>
-    ${ls.length ? `<div class="srvpj" role="group" aria-label="${esc(tr('Projects for the agent'))}">${ls.map(l => `<label class="chkl"><input type="checkbox" data-srv-pj="${l.id}"><span>${esc(lname(l))}${wsOn() && !String(ws).startsWith('org:') ? ` <small class="muted">${esc(wsLabel(l.org_id))}</small>` : ''}</span></label>`).join('')}</div>`
+    ${ls.length ? `<div class="srvpj" role="group" aria-label="${esc(tr('Projects for the agent'))}">${ls.map(l => `<label class="chkl"><input type="checkbox" data-srv-pj="${esc(String(l.id))}"><span>${esc(lname(l))}${wsOn() && !String(ws).startsWith('org:') ? ` <small class="muted">${esc(wsLabel(l.org_id))}</small>` : ''}</span></label>`).join('')}</div>`
       : `<div class="muted mhint">${esc(tr('No project of yours to share yet; you can share one later.'))}</div>`}`;
 }
 // shares the projects lids with agent aid (role edit; a bridge between different people asks first) -> the failures as texts
@@ -134,7 +134,7 @@ async function srv_share(aid, lids) {
 // "Share project" in the agent's window: the projects of its workspace, then back to the window (its routines start)
 async function srv_shareModal(a, ws, done) {
   const md = /** @type {any} */ (modal(`<h3>${esc(tr('Share a project with {0}', a.name || ''))}</h3>
-    <fieldset class="srvpjs">${srv_projHtml(ws)}</fieldset>
+    <fieldset class="srvpjs">${/*html-ok*/ srv_projHtml(ws)}</fieldset>
     <div class="foot"><div class="calerr" role="alert" id="srv-pjerr" hidden></div><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="srv-pjok">${tr('Share')}</button></div>`));
   md.addEventListener('click', async e => {
     const b = /** @type {any} */ (e.target).closest('button[data-m]'); if (!b) return;
@@ -229,8 +229,8 @@ async function srv_stDraw(md, a) {
     : waits && !j.own ? tr('Your routines with {0} wait until you share one of your own projects with it; a project of someone else does not start them.', a.name || '') : '';
   box.innerHTML = `${!hint ? '' : `<div class="shint keep srvwait" role="note"><span>${esc(hint)}</span>
       <button type="button" class="btn sm" data-srv="share">${ic('users', 's')} ${tr('Share project')}</button></div>`}
-    <h4 id="srv-st-h">${tr('Starter pack')}</h4><div class="srvruns" role="list" aria-labelledby="srv-st-h">${SRV_ST.map(([k, n]) => { const st = (j.items || {})[k] || 'missing';
-      return `<div class="mrow srvsti" role="listitem" data-srv-sti="${k}" data-state="${st}"><span class="n">${esc(tr(n))} <small class="muted">${st === 'missing' ? '' : esc(tr(SRV_ST_STATE[st] || st))}</small></span>${st === 'missing' ? `<button type="button" class="btn sm" data-srv-add="${k}">${ic('plus', 's')} ${tr('Add')}</button>` : ''}</div>`; }).join('')}</div>
+    <h4 id="srv-st-h">${tr('Starter pack')}</h4><div class="srvruns" role="list" aria-labelledby="srv-st-h">${/*html-ok*/ SRV_ST.map(([k, n]) => { const st = (j.items || {})[k] || 'missing';
+      return `<div class="mrow srvsti" role="listitem" data-srv-sti="${esc(k)}" data-state="${esc(st)}"><span class="n">${esc(tr(n))} <small class="muted">${st === 'missing' ? '' : esc(tr(SRV_ST_STATE[st] || st))}</small></span>${st === 'missing' ? `<button type="button" class="btn sm" data-srv-add="${esc(k)}">${ic('plus', 's')} ${tr('Add')}</button>` : ''}</div>`; }).join('')}</div>
     <div class="shint keep" id="srv-sthint" role="status" hidden></div>`;
   box.dataset.ws = j.org_id ? 'org:' + j.org_id : 'private';
   md._srvSt = j;
@@ -246,7 +246,7 @@ async function srv_stWake(md, a) {
 async function srv_editModal(a, notes, calm) {
   const md = /** @type {any} */ (modal(`<h3>${esc(tr('{0} on the Kalmido server', a.name))}</h3>
     ${notes?.length ? `<div class="calerr" role="alert">${notes.map(esc).join('<br>')}</div>` : ''}
-    ${calm?.length ? `<div class="shint keep srvcalm" role="note">${calm.map(esc).join('<br>')}</div>` : ''}
+    ${calm?.length ? `<div class="shint keep srvcalm" role="note">${/*html-ok*/ calm.map(esc).join('<br>')}</div>` : ''}
     <div id="srv-st"></div>
     <div id="srv-ed"><div class="muted mhint">${tr('Loading…')}</div></div>
     <div id="srv-team"></div>

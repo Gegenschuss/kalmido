@@ -964,7 +964,7 @@ function pgw_menu(area, id) {
 }
 // the cards alone: typing in the search field re-renders only these (the field keeps the focus)
 function ntCardsHtml(vis, q, cur) {
-  return `${vis.length ? `<ul class="ntcards" aria-label="${esc(tr('Notes'))}">${vis.map(n => `<li><a href="#note/${n.id}" class="ntcard ${cur && cur.id === n.id ? 'on' : ''}" ${cur && cur.id === n.id ? 'aria-current="true"' : ''}>
+  return `${vis.length ? `<ul class="ntcards" aria-label="${esc(tr('Notes'))}">${/*html-ok*/ vis.map(n => `<li><a href="#note/${n.id}" class="ntcard ${cur && cur.id === n.id ? 'on' : ''}" ${cur && cur.id === n.id ? 'aria-current="true"' : ''}>
         <span class="ntt">${n.pinned ? `<span class="ntpin" title="${esc(tr('Pinned'))}">${ic('pin', 's')}</span>` : ''}${esc(n.title)}</span>
         <span class="ntx">${esc((qn_isList(n.list_id) ? n.body.replace(/^\s*[^\n]*\n?/, '') : n.body).replace(/^#{1,6}\s+/gm, '').replace(/[*_`>\[\]]/g, '').replace(/\s+/g, ' ').trim().slice(0, 140))}</span>
         <span class="ntm">${n.tags.map(t => `<span class="tag">#${esc(t)}</span>`).join('')}<time title="${esc(fmtWhen(n.updated_at))}">${esc(relTime(n.updated_at))}</time>${n.updated_by_name ? `<span class="muted">· ${esc(n.updated_by_name)}</span>` : ''}</span></a></li>`).join('')}</ul>`
