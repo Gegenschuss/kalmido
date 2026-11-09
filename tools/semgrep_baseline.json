@@ -1581,14 +1581,6 @@
   {
    "rule": "semgrep.kalmido-sql-ident-without-qi",
    "file": "kalmido/core/objparts.py",
-   "code": "c.execute(f\"INSERT INTO {PART_TRASH}(list_id,kind,ref_id,snap,held,deleted_by,deleted_at) VALUES(?,?,?,?,?,?,?)\",",
-   "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
-   "date": "2026-11-09",
-   "task": 5296
-  },
-  {
-   "rule": "semgrep.kalmido-sql-ident-without-qi",
-   "file": "kalmido/core/objparts.py",
    "code": "c.execute(f\"INSERT INTO {table}({','.join(cols)}) VALUES({','.join('?' * len(cols))})\", [snap[x] for x in cols])",
    "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
    "date": "2026-11-09",
@@ -1606,14 +1598,6 @@
    "rule": "semgrep.kalmido-sql-ident-without-qi",
    "file": "kalmido/core/objparts.py",
    "code": "if c.execute(f\"SELECT 1 FROM {k['table']} WHERE id=?\", (rid,)).fetchone() or \\",
-   "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
-   "date": "2026-11-09",
-   "task": 5296
-  },
-  {
-   "rule": "semgrep.kalmido-sql-ident-without-qi",
-   "file": "kalmido/core/objparts.py",
-   "code": "n = c.execute(f\"UPDATE {k['table']} SET deleted_at=?, deleted_by=? WHERE {w} AND deleted_at IS NULL\", (ts, uid, *a)).rowcount",
    "reason": "Existing SQL text before qi() (#5296): the interpolated name comes from fixed code, a registry or the schema, never from a request; listed, not rewritten (decision 08.11.2026); a touched place moves to qi().",
    "date": "2026-11-09",
    "task": 5296
