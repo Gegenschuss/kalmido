@@ -95,7 +95,9 @@ function ofcAreaHint() {
 // 2.577.0 (#4638): a tap opens the area's own address #office/s/<space> (like #workload/s/<space>) instead of switching the
 // workspace: the area goes along with every office request (core.js ofc_spHdr), the workspace on top stays "All", the
 // browser's Back and "All workspaces /" in the head lead to the overview again.
-const ofc_spaces = () => wsOptions().filter(w => w !== 'all');
+// 2.794.0 (#5392): only the workspaces whose office is on for me ("Also private" off = no Private here; an area / module I
+// switched off per workspace too, areas.js wsa_wsOn / mc_wsOn)
+const ofc_spaces = () => wsOptions().filter(w => w !== 'all' && wsa_wsOn(w, 'office') && mc_wsOn(w, 'office'));
 const ofc_sp = () => { const sp = ofc_spOpen(); return sp && ofc_spaces().includes(sp) ? sp : ''; };  // the open area under "All" ('' = none / not mine)
 const ofc_allOvr = () => wsOn() && wsCur() === 'all' && ofc_spaces().length > 1 && !ofc_sp();
 const ofc_allUpHtml = () => ofc_sp() ? `<a href="#office" class="linkbtn ofcallup" data-ofcall="up">${esc(tr('All workspaces'))}</a><span class="abcsep" aria-hidden="true">/</span>` : '';

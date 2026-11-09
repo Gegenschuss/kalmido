@@ -29,8 +29,9 @@ from ..core.pg import system_ctx, write_lock
 from ..core.access import Denied  # 2.149.0 G (#2517): pulled up from functions
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from .fixedimport import fci_people  # 2.369.5 (#2517): pulled up from functions
-from .model import office_on, office_role, office_settings  # 2.369.5 (#2517): pulled up from functions
+from .model import office_on, office_role, office_settings, pb_personal  # 2.369.5 (#2517): pulled up from functions
 from ..collab.news import news_add, notif_ok  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.modcards import mc_private_office_off  # 2.794.0 (#5392)
 from ..notify.push import push_prio, push_reachable  # 2.369.5 (#2517): pulled up from functions
 from .docs import recalc  # 2.369.5 (#2517): pulled up from functions
 from .invoices import inv_make_reminder  # 2.369.5 (#2517): pulled up from functions
@@ -125,6 +126,12 @@ def _dun_client(r):
     return str(_j(r["recipient"], {}).get("name") or "")[:200]
 
 
+def dun_priv_hidden(c, uid, oid):
+    """2.794.0 (#5392): office area oid is uid's own personal office and "Also private" is off (Settings > Modules > Office &
+    finance): its bell items do not show and push nothing; they stay and show again once switched on."""
+    return bool(oid) and mc_private_office_off(c, uid) and int(oid) == pb_personal(c, uid, create=False)
+
+
 def dun_paid_news(c, oid, r, uid):
     """2.367.4 (#2972): a payment on invoice row r of area oid (by person uid): News + push for the area's other people. No
     amount, the push shows on a locked screen too. The caller commits; the pushes go after the request (g.pushes)."""
@@ -137,7 +144,7 @@ def dun_paid_news(c, oid, r, uid):
     for p in people:
         s = usettings(c, p)
         news_add(c, p, "docpaid", actor=uid or 0, row="office", data={"org_id": oid, "number": number, "client": client, "click": click})  # 2.469.0 (#3459): 0 = no person (the provider's webhook)
-        if g.get("pushes") is not None and notif_ok(c, p, s, "office", "push") and push_reachable(c, p, s):
+        if g.get("pushes") is not None and notif_ok(c, p, s, "office", "push") and push_reachable(c, p, s) and not dun_priv_hidden(c, p, oid):  # 2.794.0 (#5392)
             g.pushes.append((p, tr("Payment received: {0}", ", ".join(x for x in (number, client) if x), lg=lang(c, p)), "",
                              f"{PUBLIC_URL.rstrip('/')}/{click}", push_prio(s)))
 
@@ -169,9 +176,12 @@ def dun_overdue(c, oid, today, people):
 
 
 def dun_news_live(c, uid, data):
-    """2.367.4 (#2972): a docpaid / docoverdue item shows while uid is still in that office."""
+    """2.367.4 (#2972): a docpaid / docoverdue item shows while uid is still in that office. 2.794.0 (#5392): not while it is
+    uid's private office and "Also private" is off (the item stays and shows again once switched on)."""
     d = _j(data, {})
     if not str(d.get("org_id") or "").isdigit():
+        return False
+    if dun_priv_hidden(c, uid, int(d["org_id"])):
         return False
     with system_ctx(c):
         return any(p["id"] == uid for p in fci_people(c, int(d["org_id"])))

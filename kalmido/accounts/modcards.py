@@ -21,7 +21,7 @@ from flask import g, jsonify, request
 
 from ..core.config import app
 from ..core.conflict import ccf_check
-from ..core.db import body, bump, db, iso_ms, now_utc
+from ..core.db import body, bump, db, iso_ms, now_utc, usettings
 from ..core.errors import BadInput, Denied
 from ..core.i18n import N_, tr
 from ..core.pg import insert_id, write_lock
@@ -47,6 +47,8 @@ MC_MAX = 50  # cards per workspace (private: per person)
 MC_PEOPLE_MAX = 2000
 MC_ICON_RE = re.compile(r"[a-z][a-z0-9-]{0,23}")
 MC_OFF_TEXT = N_("This module is not on your module card in this organisation.")
+# 2.794.0 (#5392)
+MC_PRIV_OFFICE_TEXT = N_("The office is switched off in the workspace Private. Switch it on under Settings > Modules > Office & finance > Also private.")
 USER_DEFAULTS.setdefault("ws_mods_off", "{}")  # my modules hidden per workspace (below the main switch and a card's cap)
 
 # the API paths of a module (prefix; the next character is "/" or "?" or the path ends there) -- refused outside the cap
@@ -144,6 +146,16 @@ def mc_cap_list(c, uid, oid):
     return None if cap is None else [m for m in mc_mods() if m in cap]
 
 
+def mc_private_office_off(c, uid):
+    """2.794.0 (#5392): Settings > Modules > Office & finance > "Also private" is off: the module "office" stands in my
+    ws_mods_off "private" (the same entry a private card writes). Hides my own personal office only; nothing is deleted."""
+    try:
+        off = json.loads(usettings(c, uid).get("ws_mods_off") or "{}").get("private") or []
+    except (ValueError, AttributeError):
+        return False
+    return isinstance(off, list) and "office" in off
+
+
 def mc_check(c, uid, oid, mod):
     """403 when module mod is outside uid's cap in organisation oid."""
     cap = mc_cap(c, uid, oid)
@@ -166,18 +178,22 @@ def mc_gate():
     if u is None or ("kind" in u.keys() and u["kind"] == "agent") or g.get("auth_via") == "token":
         return None
     c = db()
-    if not _cards_seen(c, u["id"])[0]:  # fast way out: none of my organisations has cards
-        return None
     if mod == "office":  # the office's own area; the person's own office is never capped
-        from ..office.model import office_on, office_where
+        from ..office.model import office_on, office_where, pb_personal
         if not office_on(c, u["id"]):
             return None
         try:
             oid, _role = office_where(c, u["id"])
         except (BadInput, Denied):
             return None  # the route answers with its own text
-        if oid:
+        # 2.794.0 (#5392): "Also private" off -> my own personal office answers 403 with a readable text (no card needed:
+        # before the fast way out); the offices of my organisations stay. Switched on again, the same data answers
+        if oid and mc_private_office_off(c, u["id"]) and oid == pb_personal(c, u["id"], create=False):
+            raise Denied(403, tr(MC_PRIV_OFFICE_TEXT))
+        if oid and _cards_seen(c, u["id"])[0]:
             mc_check(c, u["id"], oid, mod)
+        return None
+    if not _cards_seen(c, u["id"])[0]:  # fast way out: none of my organisations has cards
         return None
     for m, rx, table in MC_OBJ:
         hit = rx.match(p)

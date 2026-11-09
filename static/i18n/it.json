@@ -18007,5 +18007,8 @@
   "There is a newer version by now - this step was dropped": "Nel frattempo c'è una versione più recente: questo passaggio viene scartato",
   "The PDF cannot be read": "Il PDF non può essere letto",
   "This PDF has more than {0} pages - its pages cannot be changed here": "Questo PDF ha più di {0} pagine: qui non è possibile modificarne le pagine",
-  "The pages of this document cannot be changed (read-only or a locked month)": "Le pagine di questo documento non possono essere modificate (sola lettura o mese bloccato)"
+  "The pages of this document cannot be changed (read-only or a locked month)": "Le pagine di questo documento non possono essere modificate (sola lettura o mese bloccato)",
+  "Also private": "Anche privato",
+  "Off: the office disappears in the workspace Private, the offices of your organisations stay. Nothing is deleted; switched on again, everything is there as before.": "Spento: l’ufficio scompare nell’area di lavoro Privato, gli uffici delle tue organizzazioni restano. Non viene cancellato nulla; riacceso, tutto è come prima.",
+  "The office is switched off in the workspace Private. Switch it on under Settings > Modules > Office & finance > Also private.": "L’ufficio è spento nell’area di lavoro Privato. Accendilo in Impostazioni > Moduli > Ufficio e finanze > Anche privato."
 }
