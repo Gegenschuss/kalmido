@@ -209,9 +209,9 @@ function dcv_nbTake(d, old) {
 function dcv_headHtml(d, w) {
   const fromAb = /^#ablage/.test(DVW.back?.hash || '');
   // 2.780.0 (#5389): three columns 1fr auto 1fr -- left back + title, middle the arrows (always at the same place), right keys + saved + actions
-  const ti = esc(d.file ? d.name : dc_title(d));
+  const ti = d.file ? d.name : dc_title(d);
   return `<header class="dv-head"><div class="dv-hl"><button type="button" class="btn dv-back" data-dc="close" aria-keyshortcuts="Escape" title="${esc(tr('Back to the list (Esc)'))}">${ic('back', 's')} <span>${esc(fromAb ? tr('File store') : tr('Documents'))}</span></button>
-    <h2 id="dc-h" class="dv-title" title="${ti}">${ti}</h2></div><span class="dv-navslot">${dc_navHtml(d)}</span>
+    <h2 id="dc-h" class="dv-title" title="${esc(ti)}">${esc(ti)}</h2></div><span class="dv-navslot">${dc_navHtml(d)}</span>
     <div class="dv-hr"><span class="dv-keys muted" aria-hidden="true">${esc(tr('Arrow keys ← → leaf through, Esc back'))}</span><span class="spacer"></span>
     <span class="dv-saved" role="status" data-fl-fill></span><span class="dv-hacts">${dcv_actsHtml(d, w)}</span></div></header>`;
 }
