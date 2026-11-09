@@ -432,7 +432,7 @@ def vdm_pub_stage(v, src, lg, top, marks, nxt):
         bar = (f'<div class="vdr-pgbar" hidden><button type="button" class="btn sec" data-pg="-1" aria-label="{e(tr("Previous page", lg=lg))}">&lsaquo;</button>'
                f'<span class="vdr-pgno" aria-live="polite"></span><button type="button" class="btn sec" data-pg="1" aria-label="{e(tr("Next page", lg=lg))}">&rsaquo;</button></div>'
                f'<p class="vdr-hint vdr-pgmsg">{e(tr("Loading…", lg=lg))}</p>'
-               f'<noscript><p><a class="btn" href="{e(src)}?dl=1" rel="nofollow">{e(tr("Download the PDF", lg=lg))}</a></p></noscript>')
+               f'<noscript><p><a class="btn" href="{e(src + ("&" if "?" in src else "?") + "dl=1")}" rel="nofollow">{e(tr("Download the PDF", lg=lg))}</a></p></noscript>')
     else:
         body = f'<img src="{e(src)}" alt="{e(v["file_name"] or "")}" draggable="false">'
         bar = ""
