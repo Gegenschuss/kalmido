@@ -17981,5 +17981,6 @@
   "Restored: {0}": "Restauré : {0}",
   "New version: {0}": "Nouvelle version : {0}",
   "It lies in a locked folder, so it cannot be undone here": "Il se trouve dans un dossier verrouillé, il ne peut donc pas être annulé ici",
-  "That version of the file is no longer there, so it cannot be undone": "Cette version du fichier n'existe plus, elle ne peut donc pas être annulée"
+  "That version of the file is no longer there, so it cannot be undone": "Cette version du fichier n'existe plus, elle ne peut donc pas être annulée",
+  "There is a newer version by now - this step was dropped": "Il existe entre-temps une version plus récente - cette étape est abandonnée"
 }

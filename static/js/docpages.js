@@ -154,15 +154,27 @@ async function dpg_save() {
   dpg_after(id);
   const msg = tr('Saved as version {0} with {1} pages - the original stays as version {2}', r.version, r.pages, was);
   if (!was || !r?.version) { toast(msg); return; }
-  offerUndo(msg, histAdd({label: tr('Pages of “{0}” changed', name), undo: () => dpg_verStep(id, was), redo: () => dpg_verStep(id, r.version)}));
+  // review F1: each step names the version it expects on top (st.cur, from the answer of the step before) - a newer version
+  // from elsewhere (another device, another person) is never skipped: 409, a calm hint, the step dropped
+  const st = {cur: +r.version};
+  offerUndo(msg, histAdd({label: tr('Pages of “{0}” changed', name), undo: () => dpg_verStep(id, was, st), redo: () => dpg_verStep(id, r.version, st)}));
 }
 // after a new / restored version: the file store and the open view read it again (ablage.js ab_verAfter, docview.js dcv_verAfter)
 function dpg_after(/** @type {number} */ id) {
   if (typeof ab_verAfter === 'function') ab_verAfter(id);
   else if (typeof dcv_verAfter === 'function') dcv_verAfter(id);
 }
-async function dpg_verStep(/** @type {number} */ id, /** @type {number} */ no) {
-  try { await api('POST', `/api/files/nodes/${id}/versions/${no}/restore`); } catch { /* shown */ }
+async function dpg_verStep(/** @type {number} */ id, /** @type {number} */ no, /** @type {{cur: number}} */ st) {
+  try {
+    const j = await rawFetch('POST', `/api/files/nodes/${id}/versions/${no}/restore`, st?.cur ? {expect_version: st.cur} : undefined);
+    if (st) st.cur = +j?.version || 0;
+  } catch (/** @type {any} */ x) {  // histStep drops the step (thrown, already said); offline it stays
+    if (x?.status === 409 && x.data?.current) toast(tr('There is a newer version by now - this step was dropped'));
+    else if (x instanceof Offline) toast(tr('Offline: only works again with a connection'));
+    else if (x?.message !== 'auth' && !x?.shown) toast(x?.message || tr('unknown'));
+    if (x) x.shown = true;
+    dpg_after(id); throw x;
+  }
   dpg_after(id); return {};
 }
 

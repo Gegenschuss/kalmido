@@ -17982,5 +17982,6 @@
   "Restored: {0}": "Ripristinato: {0}",
   "New version: {0}": "Nuova versione: {0}",
   "It lies in a locked folder, so it cannot be undone here": "Si trova in una cartella bloccata, quindi qui non si può annullare",
-  "That version of the file is no longer there, so it cannot be undone": "Quella versione del file non esiste più, quindi non si può annullare"
+  "That version of the file is no longer there, so it cannot be undone": "Quella versione del file non esiste più, quindi non si può annullare",
+  "There is a newer version by now - this step was dropped": "Nel frattempo c'è una versione più recente: questo passaggio viene scartato"
 }

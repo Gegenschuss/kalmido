@@ -13,6 +13,9 @@ freelancer-matrix: files
    expect_version 409 with nothing stored; read only (shared to view) 403; somebody else's document unseen 404; a plain
    text document 409
  - everything as a person without organisation (frida), the share / foreign cases with alice
+- review fixes: a locked folder 409 fs_locked on GET and save (F4 / F6); in the container's Python: timeouts and failed starts
+   of the child process 409, not 500 (F2), both places taken = 409 busy (F3), exit 5 "cannot be read" (F6), the known page
+   count of the current version skips the count (F5)
 Red without the feature: the routes answer 404/405.
 usage: p2777_b_docpages_test.py <datadir>   (P2777B_NOSTART=1: the container runs already)"""
 import base64

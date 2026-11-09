@@ -12,6 +12,8 @@
 // - a reader (a view share) and a text document: no "Pages" button
 // - Firefox (1440 and phone 390): the strip's small pages are drawn from the PDF, a page clicked and deleted by the key Del,
 //   saved - the preview's counter says "Page 1 / 2"; nothing sideways on the phone
+// - review fixes: Shift+End marks the span (F8); Undo after a newer version from elsewhere keeps it, says so and drops the
+//   step (F1); more pages than max or no right to write (a locked month): a hint instead of the strip (F7 / F4)
 // P4: alice works without an organisation (private documents): the person without an organisation (freelancer-matrix: files)
 const {execFileSync} = require('child_process');
 const path = require('path');
@@ -132,6 +134,16 @@ const three = tag => [['Kita Beispiel', 'Elternbrief ' + tag, 'Datum 01.09.2026'
   click(w, btn('save'));
   check(await until(async () => (await call('GET', `/api/files/nodes/${D}`)).version === 4, 100), '... saved as version 4');
   await settled(D);
+
+  // review F1: meanwhile a newer version from elsewhere (version 5) - Undo does not skip it: a calm hint, the step dropped
+  check(w.eval(`(window.__dpgE = HIST.undo[HIST.undo.length - 1])?.label`) === 'Pages of “elternbrief.pdf” changed', 'the turn is the step on top of Undo');
+  check((await call('POST', `/api/docs/${D}/pages`, {rotate: {'2': 90}, expect_version: 4})).version === 5, 'elsewhere: version 5 saved');
+  await settled(D);
+  await w.eval(`histStep('undo')`);
+  check(await until(() => /There is a newer version by now - this step was dropped/.test(d.querySelector('#toast')?.textContent || '')), 'Undo after a newer version: the hint ' + (d.querySelector('#toast')?.textContent || ''));
+  check((await call('GET', `/api/files/nodes/${D}`)).version === 5, '... nothing restored: version 5 stays on top');
+  check(w.eval('!HIST.undo.includes(window.__dpgE) && !HIST.redo.includes(window.__dpgE)'), '... the step is dropped (not in Undo, not in Redo)');
+
   w.close();
 
   // ================= a reader and a text document: no "Pages"
