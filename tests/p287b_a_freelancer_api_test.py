@@ -52,6 +52,7 @@ EXPECT_4XX = {
     "GET /api/bookmarks/{}/image": (404, "the test server fetches no preview picture of the bookmarked page"),
     "GET /api/docs/{}/einvoice": (404, "the own document is a plain text receipt, no e-invoice"),
     "GET /api/docs/{}/split": (409, "the own document is no PDF with two pages or more"),
+    "GET /api/docs/{}/pages": (409, "the own document is a text receipt, no PDF: no pages to delete or turn (#4874, the same for every person)"),  # 2.777.0 (#4874)
     "GET /api/docs/{}/thumb": (404, "the own document is a text receipt: no thumbnail"),
     "GET /api/hubmail/targets": (404, "no filed mail on the test server (?mail= names one)"),
     # 2.649.0 (#5061): the mail rules (#4804) belong to a workspace's own mailbox; the test server sets up none (IMAP)
