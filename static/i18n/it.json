@@ -17940,5 +17940,10 @@
   "Move {0} item to the trash?": ["Spostare {0} elemento nel cestino?", "Spostare {0} elementi nel cestino?"],
   "View version {0}": "Visualizza la versione {0}",
   "Restore version {0}": "Ripristina la versione {0}",
-  "New version of “{0}”": "Nuova versione di «{0}»"
+  "New version of “{0}”": "Nuova versione di «{0}»",
+  "Moved: {0}": "Spostato: {0}",
+  "Restored: {0}": "Ripristinato: {0}",
+  "New version: {0}": "Nuova versione: {0}",
+  "It lies in a locked folder, so it cannot be undone here": "Si trova in una cartella bloccata, quindi qui non si può annullare",
+  "That version of the file is no longer there, so it cannot be undone": "Quella versione del file non esiste più, quindi non si può annullare"
 }

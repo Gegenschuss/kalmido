@@ -84,13 +84,16 @@ MOVE_SHARED = N_("It is shared with people or agents: remove those shares first"
 OBJ_TRACK = {}  # 2.567.0 (#4711): kind -> {table, area, undo_scope, undo_keep, undo_nofp, fields: None} (obj_track)
 
 
-def obj_track(kind, table, *, area="other", undo_scope=None, undo_keep=None, undo_nofp=None, undo_label=None):
+def obj_track(kind, table, *, area="other", undo_scope=None, undo_keep=None, undo_nofp=None, undo_label=None, undo_free=None):
     """2.567.0 (#4711): an old area's kind for the history and the undo only (module docstring). undo_keep / undo_nofp:
     {table: {column}} never written back on undo / never part of the fingerprint (a number drawn since, cached sums).
-    2.747.0 (#5252): undo_label(main row as stored) -> (i18n key, [values]) = the label of its step group (obj_undo_pre)."""
+    2.747.0 (#5252): undo_label(main row as stored) -> (i18n key, [values]) = the label of its step group (obj_undo_pre).
+    2.777.0 (#5254): undo_free = columns of UNDO_FIXED the undo writes back on the MAIN row all the same (deleted_at,
+    deleted_by: a step "into the trash" goes back; the area's fix then does what its own restore / trash does besides)."""
     UG_TRACKED[kind] = table  # 2.747.0 (#5249, review F2): undogroups.py ug_drop_orphans
     OBJ_TRACK[kind] = {"kind": kind, "table": table, "area": area, "undo_scope": undo_scope, "fields": None,
-                       "undo_keep": dict(undo_keep or {}), "undo_nofp": dict(undo_nofp or {}), "undo_label": undo_label}
+                       "undo_keep": dict(undo_keep or {}), "undo_nofp": dict(undo_nofp or {}), "undo_label": undo_label,
+                       "undo_free": frozenset(undo_free or ())}
     return OBJ_TRACK[kind]
 
 
@@ -537,9 +540,10 @@ def _lock_rows(c, sc):
     c.execute(f"SELECT id FROM {t} WHERE {where} FOR UPDATE", args).fetchall()
 
 
-def _write_back(c, sc, snap, uid, keep=None):
+def _write_back(c, sc, snap, uid, keep=None, free=()):
     """Copy snap back: the main row's own columns (not its identity, version, trash), the other tables' rows replaced.
-    keep {table: {column}}: columns that stay as they are now (obj_track undo_keep)."""
+    keep {table: {column}}: columns that stay as they are now (obj_track undo_keep). 2.777.0 (#5254): free = columns of
+    UNDO_FIXED written back on the main row all the same (obj_track undo_free: its trash state)."""
     keep = keep or {}
     # 2.755.0 (#5296): the table and column names only from the schema (qi): the snapshot's keys are data read back
     cols_of = {t: table_columns(c, t) for t, _w, _a, _m in sc}
@@ -553,7 +557,8 @@ def _write_back(c, sc, snap, uid, keep=None):
         if not many:
             if not rows:
                 continue
-            row = {k: _unval(v) for k, v in rows[0].items() if k in cols and k not in UNDO_FIXED and k not in keep.get(t, ())}
+            row = {k: _unval(v) for k, v in rows[0].items() if k in cols and (k not in UNDO_FIXED or (i == 0 and k in free))
+                   and k not in keep.get(t, ())}
             if i == 0 and {"rev", "updated_at", "updated_by"} <= cols:
                 c.execute(f"UPDATE {qi(t, tabs)} SET {','.join(qi(k, cols) + '=?' for k in row)}{',' if row else ''} "
                           f"rev=rev+1, updated_at=?, updated_by=? WHERE {where}", [*row.values(), _now(), uid, *args])
@@ -662,7 +667,7 @@ def _undo_one(c, sc, st, uid, reg, fix=None):
     old = json.loads(st["snap"])
     if _main_org(old, sc) != _main_org(cur, sc):
         raise Denied(409, tr(UNDO_MOVED))
-    _write_back(c, sc, old, uid, reg.get("undo_keep"))
+    _write_back(c, sc, old, uid, reg.get("undo_keep"), reg.get("undo_free") or ())
     if fix:
         fix(c)
     c.execute("UPDATE obj_undo SET state='undone', redo=?, fp_undone=? WHERE id=?",
@@ -679,7 +684,7 @@ def _redo_one(c, sc, st, uid, reg, fix=None):
     new = json.loads(st["redo"])
     if _main_org(new, sc) != _main_org(cur, sc):
         raise Denied(409, tr(UNDO_MOVED))
-    _write_back(c, sc, new, uid, reg.get("undo_keep"))
+    _write_back(c, sc, new, uid, reg.get("undo_keep"), reg.get("undo_free") or ())
     if fix:
         fix(c)
     c.execute("UPDATE obj_undo SET state='done', redo=NULL, fp_undone=NULL, fp_after=? WHERE id=?", (_fp(_snap(c, sc), nofp), st["id"]))

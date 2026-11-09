@@ -31,6 +31,8 @@ from ..contacts.model import task_contacts  # 2.369.5 (#2517): pulled up from fu
 from ..contacts.model import BK_KERN, bk_has_node  # 2.566.0 (#4712): the shared core (contacts/ctkern.py fills it)
 from ..contacts.model import VC_BEGIN_RE  # 2.630.0 (#4593)
 from ..core.pages import too_large  # 2.369.5 (#2517): pulled up from functions
+from ..core.undoareas import UA_DELETED, UA_RESTORED, ua_post, ua_pre  # 2.777.0 (#5254)
+from .ctundo import CTU_KIND, ctu_name  # 2.777.0 (#5254)
 from ..accounts.orgs import obj_org_set  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgout import org_out  # 2.369.5 (#2517): pulled up from functions
 from ..collab.liste2e import le2a_gen_refuse  # 2.369.5 (#2517): pulled up from functions
@@ -267,6 +269,7 @@ def op_contact_edit(c, uid, cid, b):
     r, role = need_contact(c, cid, write=True)  # 2.182.0 (#2719): access before the body check (a foreign id is always 404)
     _unknown(b, CT_KEYS + ("expect",))
     r = c.execute("SELECT * FROM contacts WHERE id=? FOR UPDATE", (cid,)).fetchone() or r  # 2.273.0 C (#3048): expect checked under the row lock
+    ua_pre(c, uid, CTU_KIND, cid)  # 2.777.0 (#5254): the person's step (core/undoareas.py; an agent records none)
     if b.get("expect") and b["expect"] != r["updated_at"]:  # 2.564.0 (#4702): with the contact as it is now (the shared core's Conflict)
         raise Conflict("contact", contact_dict(c, r, uid), msg=tr("The contact was changed meanwhile"))
     b = {k: v for k, v in b.items() if k != "expect"}
@@ -285,6 +288,7 @@ def op_contact_edit(c, uid, cid, b):
             ncid = contact_copy(c, uid, cid, nb)
             contact_store(c, uid, nb, contact_fields({k: v for k, v in b.items() if k != "book_id"}, r), cid=ncid)
             book_touch(c, nb)
+            ua_post(c)
             c.commit()
             return {**op_contact(c, uid, ncid), "copied": True}
         nbk = c.execute("SELECT occ_list_id FROM books WHERE id=?", (nb,)).fetchone()
@@ -296,15 +300,19 @@ def op_contact_edit(c, uid, cid, b):
         r = c.execute("SELECT * FROM contacts WHERE id=?", (cid,)).fetchone()
     f = contact_fields({k: v for k, v in b.items() if k != "book_id"}, r)
     contact_store(c, uid, r["book_id"], f, cid=cid)
+    ua_post(c)
     c.commit()
     return op_contact(c, uid, cid)
 
 
 def op_contact_delete(c, uid, cid):
     r, role = need_contact(c, cid, write=True, own=True)  # 2.351.0 B (#2749): never through the contact's own folder alone
+    write_lock(c, f"contact-{int(cid)}")  # 2.777.0 (#5254): the lock of its saves around its step
+    ua_pre(c, uid, CTU_KIND, cid, UA_DELETED, ctu_name(r))
     ctt_trash(c, uid, [cid])  # 2.272.0 E1 (#3038): into the trash (2.46.1 #1554: its birthday tasks with it)
     book_touch(c, r["book_id"])
     bump(c)
+    ua_post(c)
     c.commit()
     return {"trash_days": ctt_days()}
 
@@ -313,7 +321,10 @@ def op_contact_restore(c, uid, cid):
     """2.272.0 E1 (#3038): a contact out of the trash, with its notes and links."""
     r, _ = need_contact(c, cid, write=True, trash=True)
     if r["deleted_at"]:
+        write_lock(c, f"contact-{int(cid)}")  # 2.777.0 (#5254)
+        ua_pre(c, uid, CTU_KIND, cid, UA_RESTORED, ctu_name(r))
         ctt_restore(c, uid, [r])
+        ua_post(c)
         c.commit()
     return op_contact(c, uid, cid)
 

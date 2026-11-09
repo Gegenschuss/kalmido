@@ -17939,5 +17939,10 @@
   "Move {0} item to the trash?": ["¿Mover {0} elemento a la papelera?", "¿Mover {0} elementos a la papelera?"],
   "View version {0}": "Ver la versión {0}",
   "Restore version {0}": "Restaurar la versión {0}",
-  "New version of “{0}”": "Nueva versión de «{0}»"
+  "New version of “{0}”": "Nueva versión de «{0}»",
+  "Moved: {0}": "Movido: {0}",
+  "Restored: {0}": "Restaurado: {0}",
+  "New version: {0}": "Nueva versión: {0}",
+  "It lies in a locked folder, so it cannot be undone here": "Está en una carpeta bloqueada, por eso no se puede deshacer aquí",
+  "That version of the file is no longer there, so it cannot be undone": "Esa versión del archivo ya no existe, por eso no se puede deshacer"
 }

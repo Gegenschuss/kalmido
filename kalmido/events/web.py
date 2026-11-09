@@ -29,6 +29,8 @@ from ..events.model import EV_CALS_MAX, EV_KIND, KERN, ev_has_node, ev_role  # 2
 from ..files.fsref import fs_ref_rename  # 2.566.0 (#4712)
 from ..core.pg import system_ctx  # 2.566.0 (#4712)
 from ..core.retention import ret_trash_days  # 2.566.0 (#4707)
+from ..core.undoareas import UA_DELETED, UA_RESTORED, ua_plain, ua_post, ua_pre  # 2.777.0 (#5254)
+from .evundo import EVU_KIND  # 2.777.0 (#5254)
 
 
 def _unknown(b, allowed):
@@ -189,6 +191,7 @@ def op_event_edit(c, uid, eid, b, occ=None):
     send = evi_flag(b)  # 2.111.0 B (#2056)
     r, role = need_event(c, eid, write=True)
     r = ev_lock(c, eid)  # 2.565.0 (#4703): always under the event's lock, with the row as it is now (not only with expect)
+    ua_pre(c, uid, EVU_KIND, eid)  # 2.777.0 (#5254): the person's step (core/undoareas.py; an agent records none)
     if isinstance(b, dict) and b.get("expect_updated_at") and not b.get("expect"):  # 2.566.0 (#4712): the core's name, the same as expect
         b = {**{k: v for k, v in b.items() if k != "expect_updated_at"}, "expect": b["expect_updated_at"]}
     elif isinstance(b, dict) and "expect_updated_at" in b:
@@ -202,6 +205,7 @@ def op_event_edit(c, uid, eid, b, occ=None):
             raise _ev_conflict(c, r, uid)
     if occ:
         ev_occ_change(c, r, occ, b)
+        ua_post(c)  # 2.777.0 (#5254)
         c.commit()
         evi_after_save(c, uid, eid, snap, send, only_invited=True)
         return ev_dict(c, c.execute("SELECT * FROM events WHERE id=?", (eid,)).fetchone(), uid)
@@ -228,6 +232,7 @@ def op_event_edit(c, uid, eid, b, occ=None):
         ev_ov_tidy(r, f)  # 2.126.0 C (#1992 K6)
     att = att_clean(c, b["attendees"], eid, r["cal_id"]) if "attendees" in b else None
     ev_store(c, uid, r["cal_id"], f, eid=eid, attendees=att)
+    ua_post(c)  # 2.777.0 (#5254)
     c.commit()
     evi_after_save(c, uid, eid, snap, send)
     return ev_dict(c, c.execute("SELECT * FROM events WHERE id=?", (eid,)).fetchone(), uid)
@@ -241,11 +246,13 @@ def _ev_conflict(c, r, uid):
 def op_event_delete(c, uid, eid, occ=None):
     r, role = need_event(c, eid, write=True)
     r = ev_lock(c, eid)  # 2.565.0 (#4703): as op_event_edit
+    ua_pre(c, uid, EVU_KIND, eid, *(() if occ else (UA_DELETED, ua_plain(r["title"], eid))))  # 2.777.0 (#5254)
     snap = evi_snap(c, eid)
     if occ:
         ev_occ_change(c, r, occ, {"delete": True})
     else:
         ev_delete(c, r, uid)  # 2.571.0 (#4776): updated_by
+    ua_post(c)
     c.commit()
     if _by_agent():  # 2.148.1 D (#2495): invitation / cancellation mails only by people, never through an agent's change
         return
@@ -263,9 +270,12 @@ def _by_agent():
 
 def op_event_restore(c, uid, eid):
     r, role = need_event(c, eid, write=True, deleted=True)
+    write_lock(c, f"event-{int(eid)}")  # 2.777.0 (#5254): the event's lock (events/model.py ev_lock) around its step
+    ua_pre(c, uid, EVU_KIND, eid, UA_RESTORED, ua_plain(r["title"], eid))
     c.execute("UPDATE events SET deleted_at=NULL, updated_at=?, updated_by=? WHERE id=?", (iso_ms(now_utc()), uid, eid))  # 2.571.0 (#4776)
     cal_touch(c, r["cal_id"])
     bump(c)
+    ua_post(c)
     c.commit()
     if not _by_agent():  # 2.148.1 D (#2495)
         evi_after_restore(c, uid, eid)  # 2.111.0 B (#2056): the cancelled attendees are invited again

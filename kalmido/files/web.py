@@ -28,6 +28,8 @@ from .fsroots import fs_area_root_need_free, fs_area_root_of  # 2.199.0 F (#2742
 from .fsroots import fs_area_after, fs_area_before, fs_area_folder_name, fs_area_need_fit, fs_area_of, fs_area_open  # 2.200.0 A (#2747)
 from .fsroots import fs_area_share  # 2.200.0 B (#2747)
 from .fsref import fs_unshare_hooks  # 2.623.0 (#4778)
+from .fsundo import fsu_pre  # 2.777.0 (#5254): the steps of renaming, moving, the trash and the versions
+from ..core.undoareas import UA_DELETED, UA_MOVED, UA_RENAMED, UA_RESTORED, UA_VERSION, ua_post  # 2.777.0 (#5254)
 from .fsviews import fsv_collections, fsv_drop, fsv_hidden  # 2.429.0 (#3580): the file store shows only its own folders
 from ..core.conflict import Conflict, need_version, version_rule  # 2.577.0 (#4708 3)
 from ..core.pg import system_ctx, write_lock  # 2.149.0 G (#2517): pulled up from functions
@@ -540,6 +542,7 @@ def files_version_upload(nid):
     if not f:
         return err(tr("File missing"))
     fs_web_expect(c, nid, request.form.get("expect_version"))  # 2.577.0 (#4708 3)
+    fsu_pre(c, me(), n, UA_VERSION)  # 2.777.0 (#5254): the step points at the version before (no copy of the content)
     try:
         no = fs_new_version(c, nid, h6d_read(f), f.mimetype)
     except ValueError as e:
@@ -547,6 +550,7 @@ def files_version_upload(nid):
         return err(str(e))
     fs_log_add(c, nid, "version", str(no))
     bump(c)
+    ua_post(c)
     c.commit()
     return jsonify(files_node_get(nid).get_json()), 201
 
@@ -563,12 +567,14 @@ def files_version_restore(nid, no):
         raise Denied(404)
     fs_web_expect(c, nid, (request.get_json(silent=True) or {}).get("expect_version", request.args.get("expect_version")))  # 2.577.0 (#4708 3)
     from .fslock import fl_is_locked, fsl_restore_version
+    fsu_pre(c, me(), n, UA_VERSION)  # 2.777.0 (#5254)
     if fl_is_locked(c, nid):  # 2.353.0 A (#2758): the ciphertext as it is
         new = fsl_restore_version(c, n, no)
     else:
         new = fs_new_version(c, nid, fs_read(c, nid, no), v["mime"])
     fs_log_add(c, nid, "restore_version", f"{no}->{new}")
     bump(c)
+    ua_post(c)
     c.commit()
     return jsonify(files_node_get(nid).get_json())
 
@@ -587,6 +593,8 @@ def files_node_patch(nid):
         return err(tr("This entry takes its name from its document; rename it there"), 409)  # 2.199.0 A (#2742)
     if "name" in b or "parent_id" in b or b.get("org_access"):
         fs_area_root_need_free(c, nid)  # 2.199.0 F (#2742, review G1)
+    if "name" in b or "parent_id" in b:  # 2.777.0 (#5254): the person's step (an agent records none)
+        fsu_pre(c, uid, n, UA_RENAMED if "name" in b and str(b.get("name") or "").strip() != n["name"] else UA_MOVED)
     actx = fs_area_before(c, uid, n) if "name" in b or "parent_id" in b else None  # 2.200.0 A (#2747): e.g. the pages' paths
     if "name" in b:
         from .fslock import fsl_of, fsl_denied
@@ -616,6 +624,7 @@ def files_node_patch(nid):
         c.execute("UPDATE fs_nodes SET org_access=?, updated_at=? WHERE id=?", (v, ts, nid))
         fs_log_add(c, nid, "org_access", v or "off")
     bump(c)
+    ua_post(c)
     c.commit()
     n = need_node(c, nid)
     return jsonify(fs_node_json(c, n, n["role"]))
@@ -737,12 +746,14 @@ def files_node_delete(nid):
     # 2.148.0 A (#2471): a receipt of a locked month (also inside a folder) cannot go into the trash -- checked before the
     # protected nodes move up (CI of 2.223.1: afterwards the folder went into the trash and the locked receipt moved)
     pl_tree_need_open(c, nid)
+    fsu_pre(c, uid, n, UA_DELETED)  # 2.777.0 (#5254)
     kept, refs = fs_trash_prepare(c, uid, n)  # 2.199.0 A (#2742): what may not go into the trash moves one level up first
     c.execute("UPDATE fs_nodes SET deleted_at=?, deleted_by=? WHERE id=?", (_now(), uid, nid))
     fs_log_add(c, nid, "trash")
     for r in refs:
         fs_ref_trashed(c, uid, r, False)  # 2.199.0 A (#2742): the area's own trash (e.g. a sheet)
     bump(c)
+    ua_post(c)
     c.commit()
     return jsonify(ok=True, kept=kept)
 
@@ -758,11 +769,13 @@ def files_node_restore(nid):
     from ..office.periodlock import pl_tree_need_open
     pl_tree_need_open(c, nid)  # 2.148.0 A (#2471)
     fs_ref_need_move(c, me(), n, restore=True)  # 2.238.0 A (#2863): filed documents come back into the folder's shares -- edit on them, like moving
+    fsu_pre(c, me(), n, UA_RESTORED)  # 2.777.0 (#5254)
     nm = _free_name(c, n["parent_id"], n["owner_id"], n["org_id"], n["name"], skip=nid)
     c.execute("UPDATE fs_nodes SET deleted_at=NULL, deleted_by=NULL, name=? WHERE id=?", (nm, nid))
     fs_log_add(c, nid, "restore")
     stays = fs_trash_restored(c, me(), n)  # 2.199.0 A (#2742); 2.373.0 (#3335): what stays in its area's trash
     bump(c)
+    ua_post(c)
     c.commit()
     n = need_node(c, nid)
     return jsonify({**fs_node_json(c, n, n["role"]), "stays": stays})
