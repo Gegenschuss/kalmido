@@ -17982,5 +17982,6 @@
   "New version: {0}": "Neue Version: {0}",
   "It lies in a locked folder, so it cannot be undone here": "Es liegt in einem gesperrten Ordner und kann hier nicht rückgängig gemacht werden",
   "That version of the file is no longer there, so it cannot be undone": "Diese Version der Datei gibt es nicht mehr, darum lässt es sich nicht rückgängig machen",
-  "There is a newer version by now - this step was dropped": "Inzwischen gibt es eine neuere Version - dieser Schritt entfällt"
+  "There is a newer version by now - this step was dropped": "Inzwischen gibt es eine neuere Version - dieser Schritt entfällt",
+  "The PDF cannot be read": "Das PDF kann nicht gelesen werden"
 }

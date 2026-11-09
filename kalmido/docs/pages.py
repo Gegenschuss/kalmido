@@ -40,6 +40,7 @@ from . import store as S
 from .area import ar_is_receipt
 from .ingest import docs_kick
 from .split import _get as sp_get, _put as sp_put, _no_agent
+from ..files.fslock import fl_is_locked, fsl_denied  # 2.777.0 (#4874 review F6)
 
 DP_PAGES = 1000              # pages of a PDF this edits at most
 DP_BYTES = 100 << 20         # bytes of a PDF this edits at most (the child process holds it a few times)
@@ -148,8 +149,8 @@ def _edit(data, n, gone, turn):
         raise Denied(409, tr("The pages cannot be read right now, try again later"))
     if p.returncode == 3:
         raise Denied(409, tr("The PDF is encrypted and cannot be changed"))
-    if p.returncode == 5:
-        raise Denied(409, tr("The document is still being recognised"))
+    if p.returncode == 5:  # review F6: the state was checked before - pypdf counts this PDF differently each time (damaged)
+        raise Denied(409, tr("The PDF cannot be read"))
     if p.returncode != 0 or not p.stdout.startswith(b"%PDF"):
         raise Denied(409, tr("The pages cannot be read right now, try again later"))
     return p.stdout
@@ -163,6 +164,8 @@ def _pdf_doc(c, nid, write):
         raise Denied(404)
     if int(n["size"] or 0) > DP_BYTES:
         raise Denied(413, tr("The file is too large (at most {0} MB)", DP_BYTES >> 20))
+    if fl_is_locked(c, nid):  # review F6: the server holds only its ciphertext - say the folder, not "only PDFs"
+        raise fsl_denied("fs_locked")
     data = fs_read(c, nid)
     if file_kind(n["name"], n["mime"], data[:2048]) != "pdf":
         raise Denied(409, tr("Only the pages of a PDF can be changed"))

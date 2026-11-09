@@ -17982,5 +17982,6 @@
   "New version: {0}": "Nieuwe versie: {0}",
   "It lies in a locked folder, so it cannot be undone here": "Het staat in een vergrendelde map en kan hier daarom niet ongedaan worden gemaakt",
   "That version of the file is no longer there, so it cannot be undone": "Die versie van het bestand bestaat niet meer en kan daarom niet ongedaan worden gemaakt",
-  "There is a newer version by now - this step was dropped": "Inmiddels is er een nieuwere versie - deze stap vervalt"
+  "There is a newer version by now - this step was dropped": "Inmiddels is er een nieuwere versie - deze stap vervalt",
+  "The PDF cannot be read": "De pdf kan niet worden gelezen"
 }

@@ -194,6 +194,14 @@ check(r.status_code == 201 and rotations(content(A, D1)) == [180], f"... turned 
 check(Fr.get(B + f"/api/docs/{D1}/pages").status_code == 404, "frida never sees alice's document (404)")
 
 # ================================================================ review fixes (F2-F6)
+# F4 / F6: a document in a locked folder: GET names the folder (not "only PDFs"), a save says no before the PDF is read
+L = up(Fr, "gesperrt.pdf", make_pdf(["Vertrag Beispiel\nSeite eins", "Seite zwei"]))
+check(done(Fr, L), "setup: a two-page PDF for the locked folder")
+kt.dbx("INSERT INTO fs_locks(node_id, org_id, e2e, e2e_gen) VALUES(?, NULL, 'on', 1)", (L,))
+r = Fr.get(B + f"/api/docs/{L}/pages")
+check(r.status_code == 409 and r.json().get("code") == "fs_locked", f"F6: GET in a locked folder: 409 fs_locked ({r.status_code} {r.text[:160]})")
+kt.dbx("DELETE FROM fs_locks WHERE node_id=?", (L,))
+
 # F2 / F3 / F5 / F6 in the container's Python (the route module itself, its child process replaced)
 UNIT = r"""
 import app, subprocess, json
@@ -234,6 +242,7 @@ part("busy", busy)
 part("known", lambda: [P._known_pages({"state": "done", "version": 2, "pages": 3}, {"cur_version": 2}),
                        P._known_pages({"state": "done", "version": 1, "pages": 3}, {"cur_version": 2}),
                        P._known_pages({"state": "wait", "version": 2, "pages": 3}, {"cur_version": 2})])
+# F6: exit 5 (the page count differs: a damaged PDF)
 part("exit5", lambda: with_run(lambda *a, **k: subprocess.CompletedProcess(a[0], 5, b"", b""), lambda: P._edit(b"%PDF", 2, [1], {})))
 print(json.dumps(out))
 """
@@ -245,6 +254,7 @@ except (ValueError, IndexError):
 check(U, f"the unit part ran ({u.stderr[-400:]})")
 check(U.get("count_timeout") is None and U.get("count_oserror") is None, f"F2: a timeout / a failed start of the count = None (409), no 500 {U}")
 check(isinstance(U.get("edit_timeout"), list) and U["edit_timeout"][0] == 409, f"F2: a timeout of the edit: 409 {U.get('edit_timeout')}")
+check(isinstance(U.get("exit5"), list) and U["exit5"][0] == 409 and U["exit5"][1] == "The PDF cannot be read", f"F6: exit 5 says the PDF cannot be read {U.get('exit5')}")
 check(isinstance(U.get("busy"), list) and U["busy"][0] == 409 and "Several PDFs" in (U["busy"][1] or ""), f"F3: both places taken: 409 busy after the wait {U.get('busy')}")
 check(U.get("known") == [3, 0, 0], f"F5: the known page count only for the recognised current version {U.get('known')}")
 
