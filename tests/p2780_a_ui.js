@@ -54,16 +54,19 @@ async function upload(name, lines) {
   check([D1, D2, D3].every(Boolean), 'three documents uploaded');
 
   // ================= #5391 (jsdom): the address of a document opened anew
-  const w = await boot({user: 'alice', hash: `ablage/${D1}`}), d = w.document;
+  // every text the one toast element (#toast, not a class) shows, recorded from the first parse on: a toast that was already
+  // hidden again still counts (leader job/3681: the first version looked for .toast, which never exists, and was green without the fix)
+  const rec = w => { w.__toasts = []; new w.MutationObserver(() => { const t = w.document.getElementById('toast'), x = t?.textContent.trim(); if (x && w.__toasts[w.__toasts.length - 1] !== x) w.__toasts.push(x); }).observe(w.document, {subtree: true, childList: true, characterData: true}); };
+  const w = await boot({user: 'alice', hash: `ablage/${D1}`, setup: rec}), d = w.document;
   check(await until(() => d.querySelector('.dv-view .dc-body')?.dataset.id === String(D1)), '#5391: #ablage/<document> draws the document view');
   check(await until(() => d.querySelector('.dv-view #dc-h')?.textContent.trim().length > 0 && d.querySelector('.dv-view .dv-pv')), '... with its title and the preview box');
-  await sleep(800);  // the toast of the old way came with the answer of the folder query: give it its time
-  const toasts = [...d.querySelectorAll('.toast')].map(t => t.textContent);
+  // the old way toasted with the folder query's answer, before the document view was drawn: nothing to wait for here
+  const toasts = w.__toasts.slice();
   check(!toasts.some(t => /Not a folder/i.test(t)), '... no toast "Not a folder" ' + JSON.stringify(toasts));
   check(w.location.hash.startsWith('#ablage/') || w.location.hash.startsWith('#docs/'), '... the address stays a document address ' + w.location.hash);
   // a real failure of a folder load still says its message (a folder id that does not exist)
   w.location.hash = '#ablage/99999999';
-  check(await until(() => [...d.querySelectorAll('.toast')].some(t => t.textContent.trim().length > 0) || /not found|denied|No access|error/i.test(d.querySelector('#view')?.textContent || '')), '... a folder that does not exist still says its message');
+  check(await until(() => w.__toasts.length > toasts.length || /not found|denied|No access|error/i.test(d.querySelector('#view')?.textContent || '')), '... a folder that does not exist still says its message');
   w.close();
 
   // ================= #5389 (Firefox): the head of the document view
