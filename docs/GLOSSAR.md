@@ -519,6 +519,7 @@ Office & finance: quotations, invoices, bank, books, tax, DATEV, e-invoices, let
 - `kalmido/office/books.py` (`bk`) - Bookkeeping light -- income/expense statement (EUeR)
 - `kalmido/office/bpread.py` (`bp`) - A small PDF reader for the own letterhead (office.letterhead)
 - `kalmido/office/calc.py` (`calc`) - The quotation calculator of Office & Finance
+- `kalmido/office/candthumb.py` - The preview of a receipt on the candidate cards: the address of an existing preview (document thumb or file thumb), no new file processing
 - `kalmido/office/cardlines.py` (`cl`) - The positions of a credit card statement
 - `kalmido/office/cardnorc.py` (`ccn`) - Credit card positions without a receipt
 - `kalmido/office/cards.py` (`cc`) - Credit card statements in the office
@@ -586,6 +587,7 @@ Office & finance: quotations, invoices, bank, books, tax, DATEV, e-invoices, let
 - `kalmido/office/officemove.py` (`ofm`) - Office data between the personal office and an organisation
 - `kalmido/office/oftree.py` (`oft`) - The office's document areas as trees in the panel
 - `kalmido/office/oftref.py` (`rc`) - Generated documents, letters and receipts filed in folders
+- `kalmido/office/okern.py` - Office kinds on the one trash of the core (ofk_register / ofk_trash / ofk_restore); the area's own purge runs are gone
 - `kalmido/office/olock.py` (`olk`) - Legal retention locks of the office
 - `kalmido/office/otrash.py` (`otb`) - 2.272.0 E2 the office trash
 - `kalmido/office/oubar.py` (`oub`) - Undo across devices, stage 4 -- the office's steps in the core's step groups: labels and barriers (finalising, sending, payments)
@@ -680,6 +682,7 @@ Tables (spreadsheets): formulas, charts, pivot, printing, sharing, import / expo
 - `kalmido/sheets/shpivot.py` (`shp`) - The pivot sheet of a table
 - `kalmido/sheets/shprint.py` (`shp`) - The print view of a table as a PDF
 - `kalmido/sheets/shshare.py` (`shs`) - One table shared with single people or agents (read | write)
+- `kalmido/sheets/shundo.py` - Undo across devices for tables: a person's writes to cells, rows and columns as pointer steps to their batch (sh_undo_batch / shu_redo)
 - `kalmido/sheets/step2.py` (`sh2`) - Step 2 of the tables
 - `kalmido/sheets/v1.py` (`v1`) - Tables for agents and scripts (API v1; scopes sheets:read / sheets:write)
 - `kalmido/sheets/vars.py` (`sh`) - Kalmido variables of table formulas
@@ -761,6 +764,7 @@ Knowledge pages (wiki): pages, history, sharing, search, tags, folders and the l
 - `kalmido/wiki/wkshare.py` (`wsh`) - Read-only shares of a knowledge page or a folder
 - `kalmido/wiki/wkstyle.py` - The reading style of a knowledge space
 - `kalmido/wiki/wktags.py` (`wkt`) - 2.371 tags of knowledge pages and the `
+- `kalmido/wiki/wkundo.py` - Undo across devices for knowledge pages: a save as a pointer step to the page's own version history
 - `kalmido/wiki/wkv1.py` (`wkv`) - Knowledge pages for agents and scripts (API v1; scopes wiki:read / wiki:write)
 
 ### `kalmido/`
@@ -936,6 +940,7 @@ The start-up module.
 - `static/js/office_bankrules.js` (`brl`) - Bank rules -- bookings of a statement marked on their own (private, ignore, no receipt needed)
 - `static/js/office_bookarch.js` (`bka`) - Office & finance, the booking archive
 - `static/js/office_books.js` (`bk`) - Admins of the office area only (a personal office: its owner)
+- `static/js/office_cand.js` - The candidate card: one receipt / invoice that can match a booking, with preview, amount, date and why it fits
 - `static/js/office_cards.js` (`cc`) - Credit card statements (Office > Credit cards)
 - `static/js/office_cashbook.js` (`cb`) - The cash book in the office (tab "Cash book", menu group Money, admins only)
 - `static/js/office_cashflow.js` (`rk`) - In and goes out, actual (paid / past)
@@ -975,6 +980,7 @@ The start-up module.
 - `static/js/office_travel.js` (`rk`) - Their receipts (Kalmido keeps no receipt images: they live in DATEV, only the tick "in DATEV" + an optional DATEV number)
 - `static/js/office_tree.js` (`oft`) - The office's document areas as trees in the panel
 - `static/js/office_undo.js` (`oun`) - Undo for the editors that save every change at once
+- `static/js/office_walk.js` - The walk-through of open credit card positions and bank bookings, one after the other with their candidate cards
 - `static/js/officeagents.js` (`oa`) - Agents in the office (Office & finance)
 - `static/js/oinvview.js` (`oinv`) - The organisation settings for inviting people by e-mail
 - `static/js/oneway.js` (`dv`) - The mark "one-way step" of a task (reason, a person's yes)
