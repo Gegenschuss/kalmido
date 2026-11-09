@@ -521,6 +521,8 @@ APP_ONLY = [
         "=PATCH /api/me/tokens/{}", "POST /api/me/drop-token", "* /api/me/avatar", "GET /api/me/share/")),
     ("administration: never through a token (agents are never admins); admins read users / status with admin-read", (
         "* /api/admin/", "* /api/users", "GET /api/version", "GET /api/about", "GET /api/health")),
+    ("2.742.0 (#5217): the web manifest is public without signing in (only hashes of the served files), nothing to do with a token",
+     ("GET /api/code-manifest",)),
     ("agents are managed by people (admins / owners), not by tokens", ("* /api/my/agents",
                                                                        "PATCH /api/agents/{}/color",  # 2.47.1 (#1721)
                                                                        "* /api/my/mcp-grants",  # 2.488.0 (#3363): the accesses of MCP clients, a person revokes them

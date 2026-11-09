@@ -923,6 +923,7 @@ ROUTES = {
     "POST /drop/drop": "public", "GET /robots.txt": "public", "GET /manifest.json": "public", "GET /sw.js": "public",
     "GET /mail/off/{}": "mailoff", "POST /mail/off/{}": "mailoff",  # 2.367.5 (#2975): no sign-in, the link's signature names the person
     "GET /sw-manifest.json": "public",  # 2.149.0 B (#2506): the service worker's file hashes (no user data)
+    "GET /api/code-manifest": "public",  # 2.742.0 (#5217): the full hashes of every served file (no user data)
     "GET /static/i18n/{}.core.json": "public", "GET /static/i18n/{}.mod-{}.json": "public",  # 2.191.0 A (#2518): the split language files (no user data)
     "GET /api/health": "public", "GET /api/version": "public", "POST /api/qr": "public",
     # ---- publiclink (7)
