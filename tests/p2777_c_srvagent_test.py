@@ -17,6 +17,7 @@
  - review F1: the text of such a member and Kalmido's answer never reach the agent: its poll (GET /api/v1/agent/chats), the
    message search and delivered stay without them, also after a project is shared later; a repeat with the same client_id is
    the stored message (no second answer)
+ - review F3: a member without a shared project sees nothing of the agent's host, model, rights mode, usage, costs, contact
 tenant-matrix: agent (another organisation's admin: the state route, the chat and the tab never reach the team agent)
 usage: p2777_c_srvagent_test.py <datadir>      (KMT_NOSTART=1 / P2777C_NOSTART=1: a running server)"""
 import sys
@@ -127,6 +128,16 @@ check(r1.status_code == 201 and r2.status_code == 200 and r1.json().get("id") ==
       and len(Ca.get(B + f"/api/agents/{TK}/chat").json()["messages"]) == n_c + 2,
       f"review F1: the same client_id again is the stored message, no second answer {r1.status_code} {r2.status_code}")
 check(all(m["kind"] == "message" for m in Ca.get(B + f"/api/agents/{TK}/chat").json()["messages"]), "for carl they are normal messages")
+# review F3: the agent polls and says what it does - carl sees none of it
+requests.get(V + "/agent/events?wait=0", headers=TKH, timeout=30)
+requests.put(V + "/agent/status", headers=TKH, json={"status": "working", "text": "On the books"}, timeout=30)
+check(dbx("SELECT last_poll_at IS NOT NULL, status FROM agents WHERE user_id=?", (TK,)) == [(True, "working")], "setup: the agent polled and works")
+F3_EMPTY = {"status": "idle", "status_text": "", "host": None, "runtime_model": "", "permission_mode": "", "quota": None, "cost": None,
+            "limit_reached": False, "last_poll_at": None, "poll_age": None, "contact_age": None}
+a = listed(Ca, TK)
+check(a and all(a.get(k) == v for k, v in F3_EMPTY.items()), f"review F3: the tab Agents shows carl nothing of its host, model, usage, contact {a}")
+ag = Ca.get(B + f"/api/agents/{TK}/chat").json().get("agent") or {}
+check(all(ag.get(k) == v for k, v in F3_EMPTY.items()) and "online" in ag, f"review F3: nor its chat header {ag}")
 for path in (f"/api/agents/{TK}/schedules", f"/api/agents/{TK}/server", f"/api/agents/{TK}/server/starter"):
     check(Ca.get(B + path).status_code == 404, f"carl gets no data of it: {path} 404")
 for s, who in ((Gu, "a guest"), (Ol, "another organisation's admin"), (Fr, "a person without an organisation")):
@@ -143,6 +154,9 @@ j = Bo.get(B + f"/api/agents/{TK}/server/starter").json()
 check(j.get("shared") is True and j.get("projects") == 1 and j["items"]["briefing"] == "active", f"the state: shared, 1 project, active {j}")
 a = listed(Ca, TK)
 check(a and a.get("projects") == 1 and a.get("shared") is False, f"carl: '1 project', still not shared with him {a}")
+check(a and a.get("status") == "idle" and a.get("last_poll_at") is None, "review F3: carl still sees nothing of its work")
+a = listed(Bo, TK)
+check(a and a.get("status") == "working" and a.get("last_poll_at"), "review F3: bob, who shares a project with it, sees it working")
 r = Ca.post(B + f"/api/agents/{TK}/chat", json={"body": "And now?"})
 check(r.status_code == 201 and "do not see any project" in Ca.get(B + f"/api/agents/{TK}/chat").json()["messages"][-1]["body"],
       "carl still gets the fixed answer: the project is not opened to him")

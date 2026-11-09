@@ -32,7 +32,7 @@ from ..agents.core import (
     CHAT_KEEP, CHAT_MAX, is_agent, JOB_ACTIONS, job_dict, job_may_act, job_visible, list_agents, lst_brief,
     need_chat_agent, WAKE_LIMIT,
 )
-from ..agents.core import agent_org_sees  # 2.777.0 C (#5378)
+from ..agents.core import agent_org_sees, agent_unshared_view  # 2.777.0 C (#5378)
 from ..collab.reactions import clean_emoji
 from ..collab.news import news_read_job  # 2.369.5 (#2517): pulled up from functions
 from ..collab.replies import reply_quotes, reply_check  # 2.369.5 (#2517): pulled up from functions
@@ -947,8 +947,8 @@ def agent_chat_get(aid):
         f"SELECT * FROM agent_chat WHERE id IN ({','.join('?' * len(nw['coll']))}) ORDER BY id DESC", nw["coll"]).fetchall() if nw["coll"] else [])]
     jn9_chat_jobs(c, sug, me())
     ag = agent_public(c, a, me())
-    if not shared:  # 2.777.0 C (#5378): seen only as a member of its organisation -- nothing of its work (as agents_for)
-        ag.update(shared=False, status_text="", status_key="", status_key_at="", status_task=None, pause_reason="", job_tasks=[])
+    if not shared:  # 2.777.0 C (#5378): seen only as a member of its organisation -- nothing of its work (as agents_for, review F3)
+        agent_unshared_view(ag)
     return jsonify(agent=ag, messages=msgs, now=iso_ms(now_utc()), has_more=more, shared=shared,
                    suggestions=sug, chat_prefs=cp_get(c, aid, me()),  # 2.233.0 A (#2848)
                    steps_live=steps_live(c, aid, me()), approvals_open=apo,

@@ -1507,8 +1507,19 @@ def agents_for(c, uid):
         d["shared"] = a["user_id"] in sh
         d["projects"] = pn.get(a["user_id"], 0)  # how many projects it is in: a number, no names
         if not d["shared"]:  # seen only as an organisation member: nothing of its work (what it does, on which task)
-            d.update(status_text="", status_key="", status_key_at="", status_task=None, pause_reason="", job_tasks=[])
+            agent_unshared_view(d)
     return out
+
+
+def agent_unshared_view(d):
+    """2.777.0 C (#5378, review F3): agent_public d as a member of a team agent's organisation sees it without a shared project:
+    name, picture, online and the number of its projects -- nothing of its work, host, model, rights mode, plan usage, costs or
+    contact times (status always "idle"). Used by agents_for and the chat (agents/chat.py agent_chat_get). Changes d, returns it."""
+    d.update(shared=False, status="idle", status_text="", status_at=None, status_key="", status_key_at="", status_task=None,
+             paused=False, pause_reason="", job_tasks=[], running=0, waiting=0, my_job=False, typing=0, limit_reached=False,
+             last_poll_at=None, poll_age=None, contact_age=None, no_service=False, host=None, runtime_model="", permission_mode="",
+             may_set_mode=False, quota=None, cost=None, flows=None, approvals_open=0)
+    return d
 
 
 def ag_pre(c, rows, uid):
