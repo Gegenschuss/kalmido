@@ -55,6 +55,12 @@ Interface (signatures fixed; stages 2 / 3 and the first areas #1958 #1957 #4675 
                  core leaves the target check to the area
       on_revoke  f(c, uid, org, reason, role=None) -> {what: n}: called by obj_revoke_person after the core's own part
       list_col   the column an API token's list limit is checked against (lists: their own id)
+      2.773.0 (#5292) -- the one trash of the core (core/writes.py obj_trash / obj_restore / obj_purge / obj_trash_prune):
+      children   ((table, key column), ...): rows of other tables that belong to the object (an event of a calendar); they go
+                 into the trash with it (its deleted_at; one in the trash on its own before keeps its own time), come back with
+                 it (only the ones that went with it) and are deleted for good with it
+      trash_prune True: the core's retention run (obj_trash_tick) deletes the kind's trash after the trash period; False
+                 (default): the area keeps its own run until its stage moves it onto the core
   obj_role(c, uid, kind, id, row=None) -> None | 'view' | 'edit' | 'manage'
   obj_need(c, uid, kind, id, need="view" | "write" | "manage", trash=False) -> (row, role); Denied 404 / 403
   obj_visible_sql(c, uid, kind) -> "(SELECT id ...)" the ids uid sees (not in the trash), ids inlined, no ? parameters
@@ -183,7 +189,7 @@ def obj_register(kind, table, *, label, fields, open_url=None, space=None, title
                  hidden=None, org_access="edit", area="other", scopes=("read", "tasks:write"), dl_area=None, feat=None,
                  protect=None, on_trash=None, content=None, undo_scope=None, public=None, routes=True, trash_role="manage",
                  fsref=True, share_cols=(), on_restore=None, on_revoke=None, list_col="list_id", listed=True, members=None,
-                 fs_hooks=None, org_join="member"):
+                 fs_hooks=None, org_join="member", children=(), trash_prune=False):
     """Register a kind of core object (module docstring). Registering the same kind again replaces it (a module reload).
     2.565.0 (#4719): listed=False = the object's reference node only carries its shares (files/fsref.py): it lies in no
     folder and the file store never shows it; the area writes the shares with obj_member_put / obj_member_take.
@@ -216,6 +222,10 @@ def obj_register(kind, table, *, label, fields, open_url=None, space=None, title
            "org_join": org_join}  # 2.579.0 (#4802)
     if members and (len(members) != 2 or not all(_TABLE.fullmatch(x or "") for x in members)):
         raise ValueError(f"obj_register {kind}: members must be (table, key column)")
+    kids = tuple(tuple(x) for x in (children or ()))  # 2.773.0 (#5292)
+    if any(len(x) != 2 or not all(_TABLE.fullmatch(y or "") for y in x) or x[0] == table for x in kids):
+        raise ValueError(f"obj_register {kind}: children must be ((table, key column), ...) of other tables")
+    reg.update(children=kids, trash_prune=bool(trash_prune))
     OBJ[kind] = reg
     if not fsref:
         return reg  # 2.568.0 (#4739): the area's own registration in files/fsref.py stays
@@ -235,7 +245,7 @@ def obj_register(kind, table, *, label, fields, open_url=None, space=None, title
         if restore and row is not None and row["deleted_at"]:
             if uid and obj_role(c, uid, kind, rid, row=row) == "manage":
                 from .writes import obj_restore
-                obj_restore(c, uid, kind, rid)
+                obj_restore(c, uid, kind, rid, step=False)  # 2.773.0 (#5292): the file store's restore, no step of its own
             else:
                 c.execute("UPDATE fs_nodes SET deleted_at=?, deleted_by=? WHERE kind='ref' AND ref_kind=? AND ref_id=?",
                           (row["deleted_at"], row["deleted_by"], kind, int(rid)))
@@ -1119,7 +1129,10 @@ def _probe_register():
         return
     obj_register("objprobe", "obj_probe", label="Test object", area="other",
                  fields={"title": f_text(120, required=True), "note": f_text(2000, line=False), "size": f_int(0, 1000), "done": f_bool()},
-                 hidden=lambda c, uid: "(SELECT id FROM obj_probe WHERE title ILIKE 'hide%')", dl_area="contracts")
+                 hidden=lambda c, uid: "(SELECT id FROM obj_probe WHERE title ILIKE 'hide%')", dl_area="contracts",
+                 # 2.773.0 (#5292): with KALMIDO_TEST_OBJ_PARTS=1 (tests/p2773_b_trash_core_test.py) its parts (table
+                 # obj_probe_part, made by that suite) are its children, and the core's retention run takes its trash
+                 **({"children": (("obj_probe_part", "probe_id"),), "trash_prune": True} if os.environ.get("KALMIDO_TEST_OBJ_PARTS") == "1" else {}))
 
 
 _probe_register()

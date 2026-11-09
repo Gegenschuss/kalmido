@@ -17899,6 +17899,8 @@
   "The app's code changed without a new version": "Le code de l'app a changé sans nouvelle version",
   "Guide": "Guide",
   "A row was not imported, its amount is not a number with at most two decimal places: {0} ({1})": "Une ligne n’a pas été importée, son montant n’est pas un nombre avec au plus deux décimales : {0} ({1})",
+  "Moved to the trash: {0}": "Mis à la corbeille : {0}",
+  "Restored from the trash: {0}": "Restauré depuis la corbeille : {0}",
   "Recent steps": "Dernières étapes",
   "Back up to here": "Revenir jusqu'ici",
   "Behind a step that cannot be undone": "Derrière une étape qui ne peut pas être annulée",

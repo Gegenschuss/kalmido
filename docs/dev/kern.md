@@ -149,6 +149,15 @@ c.commit()
   object's reference node into the file store's trash with it and `obj_restore` brings that node back, so the folders and
   their searches hide a trashed object like any node in the trash (no extra clause per kind). Should the file store's
   trash empty the node first, the object comes back without its folder place.
+- 2.773.0 (#5292): this is THE trash of the core. `children=((table, key column), ...)` in `obj_register` = rows of other
+  tables that belong to the object: they go into the trash with it (its `deleted_at`), come back with it (only the ones that
+  went with it) and are deleted for good with it. A trash / restore of a person is a step of the list of steps
+  (`GET /api/undo`, mode `trash` / `restore`, no copy): taking it back runs `obj_restore` / `obj_trash` with the rights of
+  now. `trash_prune=True` lets the core's retention run (`obj_trash_tick`, hourly, `ret_trash_cut` + the switch "trash")
+  delete the kind's trash the same way as `obj_purge`; an area with its own run keeps it until its stage moves it.
+- Never write the trash filter by hand: `live_sql(alias)` / `trash_sql(alias)` of `core/access.py`. A new
+  `deleted_at IS NULL` in the server code is red in `tools/check_live_filter.py`; the existing ones stand per file in
+  `tools/live_filter_baseline.json`, which only shrinks (`--update` lowers it after a clean-up).
 - Write paths that do not go through `obj_write` yet (old areas during the move) use the adapters `obj_undo_pre` /
   `obj_undo_post`, `obj_history_add` and `obj_touch`.
 - Stage 2 (#4711, the office and the clients): their rows have no `owner_id` / `rev` and rights of their own, so they are

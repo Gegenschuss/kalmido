@@ -1,6 +1,7 @@
 """Access control: who sees / changes which list and task, module switches, list roles."""
 
 import os
+import re
 import time
 from typing import NamedTuple, Optional
 
@@ -455,10 +456,29 @@ def ov_role(c, lid, uid, row=None):
     return "edit" if row["org_edit"] and org_writes(c, uid, row["org_id"]) else "view"
 
 
+LIVE_COLS = ("deleted_at", "removed_at", "revoked_at", "closed_at")  # 2.773.0 (#5292): the trash markers live_sql knows
+_LIVE_ALIAS = re.compile(r"[a-z_][a-z0-9_]*")
+
+
+def live_sql(a="", col="deleted_at"):
+    """2.773.0 (#5292): THE condition "the row is not in the trash" for SQL of every table (a = the table name or its alias,
+    "" without one; col = its trash marker, one of LIVE_COLS). A handwritten 'deleted_at IS NULL' is red in the lint
+    tools/check_live_filter.py (the existing ones stand in tools/live_filter_baseline.json, which only shrinks)."""
+    if col not in LIVE_COLS or (a and not _LIVE_ALIAS.fullmatch(a)):
+        raise ValueError(f"live_sql: invalid alias / column {a!r} {col!r}")
+    return f"{a + '.' if a else ''}{col} IS NULL"
+
+
+def trash_sql(a="", col="deleted_at"):
+    """2.773.0 (#5292): the opposite of live_sql -- the row IS in the trash (the trash views, the retention runs)."""
+    return live_sql(a, col).replace(" IS NULL", " IS NOT NULL")
+
+
 def otr_live(a="l"):
     """2.102.0 A (#1988): THE condition "the list is not in the trash" (lists.deleted_at, see lists/listtrash.py) for SQL on
-    lists (a = the alias, "" without one). A deleted list is invisible everywhere except the trash's own routes."""
-    return f"{a + '.' if a else ''}deleted_at IS NULL"
+    lists (a = the alias, "" without one). A deleted list is invisible everywhere except the trash's own routes.
+    2.773.0 (#5292): through the core's live_sql."""
+    return live_sql(a)
 
 
 def acx_lists_sql(write=False, req=True, ov=True):

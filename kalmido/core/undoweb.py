@@ -22,14 +22,16 @@ from .ctx import me
 from .db import bump, db
 from .errors import BadInput, Denied
 from .i18n import N_, tr, tr_stored
-from .objects import obj_need
+from .objects import obj_need, obj_row
 from .objhooks import OBJ
 from .pg import write_lock
 from .undodiff import UNDO_DIFF
 from .undogroups import UNDO_GROUPS_MAX, UNDO_KEEP_D
 from .writes import UNDO_NOTHING, _area, _lock_rows, _redo_one, _reg, _undo_one, obj_is_agent, obj_undo_hist, undo_scope
+from .writes import UNDO_CONFLICT, obj_restore, obj_trash  # 2.773.0 (#5292): trash steps go back the core's way
 
 UNDO_NEED = {}  # kind -> fn(c, uid, rid, oid) -> {"fix": fn(c), "keep": {table: {column}}, "lock": name}; Denied = may not
+TRASH_MODES = ("trash", "restore")  # 2.773.0 (#5292): obj_undo.mode of a step without a copy (core/writes.py _trash_step)
 UG_NOACCESS = N_("You may not change it any more, so it cannot be undone")
 UG_GONE = N_("It is no longer there, so it cannot be undone")
 UG_STOP = N_("Stopped before a step that cannot be undone: {0}")
@@ -99,6 +101,22 @@ def _diff_part(c, uid, p, redo):
         return {"group": p["group_id"], "kind": kind, "id": rid, "code": "conflict", "reason": str(e)}
 
 
+def _trash_part(c, uid, kind, rid, p, redo):
+    """2.773.0 (#5292): a trash / restore step (mode, core/writes.py _trash_step) goes back the core's opposite way --
+    obj_restore / obj_trash with their rights of now, the node and the children; the object elsewhere already = 409."""
+    st = c.execute("SELECT * FROM obj_undo WHERE id=?", (p["id"],)).fetchone()
+    if st is None or st["state"] != ("undone" if redo else "done"):
+        raise Denied(409, tr(UNDO_NOTHING))
+    row = obj_row(c, kind, rid)
+    if row is None:
+        raise Denied(404, tr(UG_GONE))
+    back = (st["mode"] == "trash") != bool(redo)  # undo of a trash / redo of a restore = out of the trash
+    if bool(row["deleted_at"]) != back:
+        raise Denied(409, tr(UNDO_CONFLICT))
+    (obj_restore if back else obj_trash)(c, uid, kind, rid, step=False)
+    c.execute("UPDATE obj_undo SET state=? WHERE id=?", ("done" if redo else "undone", st["id"]))
+
+
 def _part(c, uid, p, redo):
     """One part back (redo: forward again). None when it went, else {group, kind, id, code, reason}."""
     kind, rid = p["kind"], int(p["ref_id"])
@@ -106,6 +124,10 @@ def _part(c, uid, p, redo):
         return _diff_part(c, uid, p, redo)
     try:
         with c.savepoint():
+            if p.get("mode") in TRASH_MODES and kind in OBJ:  # 2.773.0 (#5292)
+                _trash_part(c, uid, kind, rid, p, redo)
+                p["area"] = _area(_reg(kind))
+                return None
             try:
                 reg = _reg(kind)
             except Denied:

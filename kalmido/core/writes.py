@@ -42,14 +42,16 @@ from datetime import timedelta
 
 from flask import g, has_request_context, request
 
-from .access import Denied, acx_of, acx_org_ok, need_feat
+from .access import Denied, acx_of, acx_org_ok, live_sql, need_feat, trash_sql  # 2.773.0 (#5292): live_sql, trash_sql
 from .conflict import VersionRequired, ccf_check
 from .db import bump, insert_id, iso, iso_ms, now_utc
 from .undogroups import UG_LABEL, UG_LABEL_PLAIN, UNDO_KEEP_D, UG_TRACKED, ug_added, ug_current, ug_fits, ug_gc, ug_gids  # 2.747.0 (#5249)
 from .errors import BadInput, UnknownFields
 from .i18n import N_, tr
+from .objhooks import OBJ  # 2.773.0 (#5292): obj_trash_tick
 from .objects import OBJ_COLS, obj_need, obj_node_follow, obj_public, obj_reg, obj_row, obj_title, obj_forget
 from .pg import qi, system_ctx, table_columns, ts_canon, write_lock  # 2.755.0 (#5296): qi; 2.760.0 (#5311): ts_canon
+from .retention import ret_due, ret_on, ret_report, ret_trash_cut  # 2.773.0 (#5292): the trash's retention run
 from ..collab.comments import user_names
 from ..accounts.orgroles import need_org_write, org_role_key
 from ..accounts.orgout import org_out  # 2.579.0 (#4802): obj_space_set
@@ -71,6 +73,8 @@ UNDO_MOVED = N_("Moved to another workspace in the meantime, so it cannot be und
 UNDO_REKEYED = N_("The organisation's key was changed since then, so it cannot be undone")  # 2.747.0 (#5249, review F1)
 UNDO_NOTHING = N_("Nothing to undo")
 PURGE_FIRST = N_("Put it into the trash first")
+UG_TRASHED = N_("Moved to the trash: {0}")  # 2.773.0 (#5292): the label of a trash step (core/undogroups.py)
+UG_RESTORED = N_("Restored from the trash: {0}")
 JOIN_ADMIN = N_("Only admins of the organisation can share this with everyone of it")  # 2.579.0 (#4802)
 # 2.657.0 (#4828): a kind with org_join "admin" (a saved view) is always made private; sharing is a step of its own
 CREATE_PRIVATE = N_("This is created in your own space first; an admin of the organisation shares it with everyone afterwards")
@@ -341,48 +345,106 @@ def _trash_need(reg):
     return "write" if reg["trash_role"] == "edit" else "manage"
 
 
-def obj_trash(c, uid, kind, rid):
-    """Into the trash (deleted_at): restorable by who manages it (obj_restore)."""
+def _kids(reg):
+    """2.773.0 (#5292): the object's child tables ((table, key column), ...; obj_register children)."""
+    return reg.get("children") or ()
+
+
+def _kids_trash(c, reg, rid, ts):
+    """Its live children into the trash with the object's time (one already in the trash keeps its own: it stays there)."""
+    for t, col in _kids(reg):
+        c.execute(f"UPDATE {qi(t, (t,))} SET deleted_at=? WHERE {qi(col, (col,))}=? AND {live_sql()}", (ts, int(rid)))
+
+
+def _kids_restore(c, reg, rid, gone):
+    """The children that went with it (the same time, compared canonically: TEXT or TIMESTAMPTZ) come back; not the others."""
+    for t, col in _kids(reg):
+        back = [r[0] for r in c.execute(f"SELECT id, deleted_at FROM {qi(t, (t,))} WHERE {qi(col, (col,))}=? AND {trash_sql()}",
+                                        (int(rid),)).fetchall() if ts_canon(r[1]) == gone]
+        if back:
+            c.execute(f"UPDATE {qi(t, (t,))} SET deleted_at=NULL WHERE id = ANY(CAST(? AS BIGINT[]))", (back,))
+
+
+def _purge_rows(c, kind, reg, rid):
+    """THE delete for good of one object of the trash (obj_purge after its rights check, obj_trash_prune for the retention run):
+    its reference node, history, undo steps, revoked shares and children go with it."""
+    fs_ref_drop(c, kind, rid)
+    gids = ug_gids(c, "kind=? AND ref_id=?", (kind, int(rid)))  # 2.747.0 (#5249): the step groups of its undo rows
+    for t in ("obj_history", "obj_undo", "obj_revoked"):
+        c.execute(f"DELETE FROM {t} WHERE kind=? AND ref_id=?", (kind, int(rid)))
+    ug_gc(c, gids)
+    for t, col in _kids(reg):  # 2.773.0 (#5292)
+        c.execute(f"DELETE FROM {qi(t, (t,))} WHERE {qi(col, (col,))}=?", (int(rid),))
+    c.execute(f"DELETE FROM {qi(reg['table'], (reg['table'],))} WHERE id=?", (int(rid),))
+
+
+def _trash_step(c, uid, kind, rid, oid, op):
+    """2.773.0 (#5292): a trash / restore of a person is a part of the request's step group (core/undogroups.py) without a copy
+    (mode = op): taking it back is the opposite way of the core (core/undoweb.py _trash_part: obj_restore / obj_trash), so the
+    node, the children and the rights go as they do there. Agents and writes outside a request record nothing."""
+    if not has_request_context() or obj_is_agent(c, uid):
+        return
+    reg = _reg(kind)
+    grp = ug_current(c, uid, _area(reg), oid, (UG_TRASHED if op == "trash" else UG_RESTORED, [[reg["label"]]]))
+    if grp is None or not ug_fits(c, grp, 0):
+        return
+    insert_id(c, "INSERT INTO obj_undo(org_id, user_id, sess, kind, ref_id, seq, state, snap, fp_before, fp_after, created_at, "
+                 "group_id, mode, bytes) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+              (oid, uid, "", kind, int(rid), 1, "done", "{}", "", "", iso(now_utc()), grp["id"], op, 0))
+    ug_added(c, grp, 0)
+
+
+def obj_trash(c, uid, kind, rid, step=True):
+    """Into the trash (deleted_at): restorable by who manages it (obj_restore). 2.773.0 (#5292): THE trash of the core -- its
+    children go with it (obj_register children) and the step can be taken back (step=False: the undo itself)."""
     reg = obj_reg(kind)
-    obj_need(c, uid, kind, rid, _trash_need(reg))
+    row, _ = obj_need(c, uid, kind, rid, _trash_need(reg))
     write_lock(c, f"obj-{kind}-{int(rid)}")
     ts = _now()
-    c.execute(f"UPDATE {reg['table']} SET deleted_at=?, deleted_by=?, rev=rev+1, updated_at=?, updated_by=? WHERE id=? AND deleted_at IS NULL",
-              (ts, uid, ts, uid, int(rid)))
+    n = c.execute(f"UPDATE {reg['table']} SET deleted_at=?, deleted_by=?, rev=rev+1, updated_at=?, updated_by=? WHERE id=? AND {live_sql()}",
+                  (ts, uid, ts, uid, int(rid))).rowcount
+    if not n:
+        return obj_row(c, kind, rid)  # someone else was quicker (the lock waited): it is in the trash already
+    _kids_trash(c, reg, rid, ts)
     # review F7: its reference node goes into the file store's trash with it (the folders hide it as any node there)
-    c.execute("UPDATE fs_nodes SET deleted_at=?, deleted_by=? WHERE kind='ref' AND ref_kind=? AND ref_id=? AND deleted_at IS NULL",
+    c.execute(f"UPDATE fs_nodes SET deleted_at=?, deleted_by=? WHERE kind='ref' AND ref_kind=? AND ref_id=? AND {live_sql()}",
               (ts, uid, kind, int(rid)))
     obj_history_add(c, uid, kind, rid, {}, {}, action="trash")
+    if step:
+        _trash_step(c, uid, kind, rid, row["org_id"] or None, "trash")
     obj_forget()
     bump(c, _area(reg))
     return obj_row(c, kind, rid)
 
 
-def obj_restore(c, uid, kind, rid):
-    """Out of the trash ('manage')."""
+def obj_restore(c, uid, kind, rid, step=True):
+    """Out of the trash ('manage'), with the children that went with it. step=False: the undo itself."""
     reg = obj_reg(kind)
     row, _ = obj_need(c, uid, kind, rid, "manage", trash=True)
     write_lock(c, f"obj-{kind}-{int(rid)}")
     # 2.760.0 (#5311): the node's deleted_at is TEXT, the object's may be TIMESTAMPTZ (read canonically, pg.py ts_canon):
     # compare both canonically, not as text (a TIMESTAMPTZ table's restore left its node in the trash)
     gone = ts_canon(row["deleted_at"])
-    n = next((x for x in c.execute("SELECT * FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id=? AND deleted_at IS NOT NULL",
+    n = next((x for x in c.execute(f"SELECT * FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id=? AND {trash_sql()}",
                                    (kind, int(rid))).fetchall() if ts_canon(x["deleted_at"]) == gone), None)
     if n is not None:  # review F7: the node obj_trash put into the trash comes back (not one the file store's own trash holds)
         nm = _free_name(c, n["parent_id"], n["owner_id"], n["org_id"], n["name"], skip=n["id"])
         c.execute("UPDATE fs_nodes SET deleted_at=NULL, deleted_by=NULL, name=? WHERE id=?", (nm, n["id"]))
+    _kids_restore(c, reg, rid, gone)  # 2.773.0 (#5292)
     ts = _now()
     c.execute(f"UPDATE {reg['table']} SET deleted_at=NULL, deleted_by=NULL, rev=rev+1, updated_at=?, updated_by=? WHERE id=?",
               (ts, uid, int(rid)))
     obj_history_add(c, uid, kind, rid, {}, {}, action="restore")
+    if step:
+        _trash_step(c, uid, kind, rid, row["org_id"] or None, "restore")
     obj_forget()
     bump(c, _area(reg))
     return obj_row(c, kind, rid)
 
 
 def obj_purge(c, uid, kind, rid):
-    """Delete for good: only an object in the trash ('manage'; 409 otherwise). Its node, history, undo steps and revoked
-    shares go with it."""
+    """Delete for good: only an object in the trash ('manage'; 409 otherwise). Its node, history, undo steps, revoked
+    shares and children go with it (_purge_rows)."""
     reg = obj_reg(kind)
     row = obj_row(c, kind, rid)
     if row is not None and not row["deleted_at"]:
@@ -390,14 +452,50 @@ def obj_purge(c, uid, kind, rid):
         raise Denied(409, tr(PURGE_FIRST))
     obj_need(c, uid, kind, rid, "manage", trash=True)
     write_lock(c, f"obj-{kind}-{int(rid)}")
-    fs_ref_drop(c, kind, rid)
-    gids = ug_gids(c, "kind=? AND ref_id=?", (kind, int(rid)))  # 2.747.0 (#5249): the step groups of its undo rows
-    for t in ("obj_history", "obj_undo", "obj_revoked"):
-        c.execute(f"DELETE FROM {t} WHERE kind=? AND ref_id=?", (kind, int(rid)))
-    ug_gc(c, gids)
-    c.execute(f"DELETE FROM {reg['table']} WHERE id=?", (int(rid),))
+    _purge_rows(c, kind, reg, rid)
     obj_forget()
     bump(c, _area(reg))
+
+
+def obj_trash_due(c, kind, cut=None):
+    """2.773.0 (#5292): the ids of the kind's objects in the trash longer than the trash period (core/retention.py ret_trash_cut)."""
+    reg = obj_reg(kind)
+    t = reg["table"]
+    with system_ctx(c):  # the retention run reads every workspace's trash (ids only, no content)
+        return [r[0] for r in c.execute(f"SELECT id FROM {qi(t, (t,))} WHERE {trash_sql()} AND deleted_at<? ORDER BY id",
+                                        (cut or ret_trash_cut(),)).fetchall()]
+
+
+def obj_trash_prune(c, kind, cut=None, purge=None, ids=None):
+    """2.773.0 (#5292): THE retention run of a core kind -- its objects in the trash longer than the trash period are deleted
+    for good the same way as obj_purge (_purge_rows), with the switch of every run (ret_on("trash"); off = count only) and its
+    report (ret_report run obj_<kind>). ids: read already by the caller. Returns their number; the caller commits."""
+    reg = obj_reg(kind)
+    purge = ret_on("trash") if purge is None else bool(purge)
+    old = obj_trash_due(c, kind, cut) if ids is None else [int(x) for x in ids]
+    if old and purge:
+        with system_ctx(c):  # no person: the period ran out (the rights were checked when it went into the trash)
+            for rid in old:
+                write_lock(c, f"obj-{kind}-{int(rid)}")
+                _purge_rows(c, kind, reg, rid)
+        obj_forget()
+        bump(c, _area(reg))
+    return len(old)
+
+
+def obj_trash_tick(c, force=False):
+    """2.773.0 (#5292): the watchdog's hourly run over the kinds registered with trash_prune=True (the others keep their
+    area's run until their stage moves them onto the core)."""
+    if not ret_due("obj_trash", force=force):
+        return {}
+    purge, cut, out = ret_on("trash"), ret_trash_cut(), {}
+    for kind, reg in sorted(OBJ.items()):
+        if reg.get("trash_prune"):
+            out[kind] = obj_trash_prune(c, kind, cut, purge)
+    if out:
+        ret_report(c, "trash", out, purge, run="obj_trash")
+    c.commit()
+    return out
 
 
 # ---------------------------------------------------------------- undo (office/undo.py, generalised)

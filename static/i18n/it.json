@@ -17900,6 +17900,8 @@
   "The app's code changed without a new version": "Il codice dell'app è cambiato senza una nuova versione",
   "Guide": "Guida",
   "A row was not imported, its amount is not a number with at most two decimal places: {0} ({1})": "Una riga non è stata importata, il suo importo non è un numero con al massimo due decimali: {0} ({1})",
+  "Moved to the trash: {0}": "Spostato nel cestino: {0}",
+  "Restored from the trash: {0}": "Ripristinato dal cestino: {0}",
   "Recent steps": "Ultimi passaggi",
   "Back up to here": "Annulla fino a qui",
   "Behind a step that cannot be undone": "Dietro un passaggio che non si può annullare",
