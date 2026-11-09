@@ -8,6 +8,7 @@ invitations' sequence and the import marks stay as they are on undo (undo_keep);
 calendar the copy puts it back into; coming out of / going into the trash runs the calendar's own restore / delete
 (cal_touch, bump; ev_delete tells the invited people of the server). No mails from an undo: a restored event does not invite
 its external attendees again (the forward restore does). Steps of CalDAV and API v1 writes: not yet (stage 6 rest)."""
+from ..accounts.orgs import ws_fit_problem
 from ..core.errors import Denied
 from ..core.undoareas import ua_plain, ua_trash_fix
 from ..core.undogroups import UG_LABEL
@@ -50,7 +51,13 @@ def evu_need(c, uid, rid, oid):
     def fix(c):
         n = c.execute("SELECT cal_id FROM events WHERE id=?", (int(rid),)).fetchone()
         if n["cal_id"] != old_cal:
-            need_evcal(c, n["cal_id"], write=True, uid=uid)  # back into a calendar the person may still write
+            nk, _ = need_evcal(c, n["cal_id"], write=True, uid=uid)  # back into a calendar the person may still write
+            if nk["org_id"]:  # review F7: its invited people of the server fit that calendar's organisation (as op_event_edit)
+                for (au,) in c.execute("SELECT user_id FROM event_attendees WHERE event_id=? AND user_id IS NOT NULL ORDER BY user_id",
+                                       (int(rid),)).fetchall():
+                    p = ws_fit_problem(c, nk["org_id"], au, "cal")
+                    if p:
+                        raise Denied(409, p)
             cal_touch(c, old_cal)
         trash(c)
         cal_touch(c, n["cal_id"])  # the devices' sync (CalDAV ctag)
