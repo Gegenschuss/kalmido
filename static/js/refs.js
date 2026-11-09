@@ -83,6 +83,7 @@ function rf_srcKey(el) {
   if ((r = el.closest('#side .srow[data-list]'))) return {k: 'l:' + +r.dataset.list};
   if ((r = el.closest('#side .fhead[data-folder]'))) return {k: 'd:' + r.dataset.folder};
   if ((r = el.closest('.trow[data-id], .cal .ev[data-id], .week .ev[data-id], .wev[data-id]')) && +r.dataset.id > 0) return {k: 't:' + +r.dataset.id};
+  if ((r = el.closest('.dc-card[data-k^="dc"]')) && /^dc\d+$/.test(r.dataset.k)) return {k: 'f:' + +r.dataset.k.slice(2)};  // 2.760.0 (#4859): a document (docs.js card)
   if ((r = el.closest('.abrow[data-abid]'))) return {k: 'f:' + +r.dataset.abid, n: r.querySelector('.abname')?.textContent || ''};
   if ((r = el.closest('.ctrow[data-ctopen]'))) return {k: 'c:' + +r.dataset.ctopen, n: r.querySelector('.ctn b, b')?.textContent || ''};
   if ((r = el.closest('[data-cev]')) && /^\d+$/.test(r.dataset.cev)) return {k: 'e:' + +r.dataset.cev, n: r.querySelector('.cevn')?.textContent || r.getAttribute('title') || ''};
@@ -306,3 +307,112 @@ function rf_pvHtml(k) {
   line('info', [f.kind === 'file' && f.size != null ? fmtSize(f.size) : '', f.updated_at ? fmtDate(String(f.updated_at).slice(0, 10)) : ''].filter(Boolean).join('  ·  '));
   return head(f.kind === 'folder' ? 'folder' : 'file', v.name) + rows.join('');
 }
+
+// ---- 2.760.0 (#4859): dragging between the two halves of the split view (#4858) and between windows / tabs of this app.
+// What is dragged carries only kind + id in RF_MIME (no contents; the name "n" above is only the text fields' fallback),
+// plus a second type "application/x-kalmido-kind-<k>" so a target knows the kind already while hovering (the data itself
+// is readable only at the drop). A drag counts as foreign when it did not start in this document; only this app's drags
+// count: the payload carries a token of this origin (localStorage, which another site cannot read). The receiving half
+// calls the normal routes with its own rights check and the action's own undo; a refusal shows as the route's toast.
+// Dragging within ONE half is untouched (dnd.js, ablage.js keep their own drags; these targets ignore an own drag).
+const XD = {w: Math.random().toString(36).slice(2, 12), own: false, tg: [], hl: null};
+const XD_KIND = 'application/x-kalmido-kind-';
+function xd_tok() {
+  try {
+    let t = localStorage.getItem('kalmido.xd');
+    if (!t) { t = (crypto.randomUUID?.() || Math.random().toString(36).slice(2) + Date.now().toString(36)); localStorage.setItem('kalmido.xd', t); }
+    return t;
+  } catch { return ''; }
+}
+const xd_split = () => document.documentElement.classList.contains('split-on') || /[?&]split=1(?:&|$)/.test(location.search);
+// a drop target: sel (closest), kinds ('t', 'f', …), ok(el) optional, fn(payload, el, event, id)
+function xd_on(sel, kinds, fn, ok) { XD.tg.push({sel, kinds, fn, ok}); }
+function xd_kind(e) {  // the kind of a foreign drag of this app ('t', 'f', …), else ''
+  if (XD.own || !rf_has(e)) return '';
+  const k = [...(e.dataTransfer.types || [])].find(x => x.startsWith(XD_KIND));
+  return k ? k.slice(XD_KIND.length) : '';
+}
+function xd_target(e, k) {
+  if (!k || !e.target?.closest) return null;
+  for (const t of XD.tg) {
+    if (!t.kinds.includes(k)) continue;
+    const el = e.target.closest(t.sel);
+    if (el && (!t.ok || t.ok(el))) return {t, el};
+  }
+  return null;
+}
+function xd_mark(el) {  // the target under the pointer: an accent outline (set here, app.css takes no new rules)
+  if (XD.hl === el) return;
+  if (XD.hl) { XD.hl.classList.remove('xdrop'); XD.hl.style.outline = XD.hl.style.outlineOffset = ''; }
+  XD.hl = el;
+  if (el) { el.classList.add('xdrop'); el.style.outline = '2px solid var(--accent)'; el.style.outlineOffset = '-2px'; }
+}
+document.addEventListener('dragstart', e => {
+  if (!e.dataTransfer || ![...(e.dataTransfer.types || [])].includes(RF_MIME)) return;
+  let s; try { s = JSON.parse(e.dataTransfer.getData(RF_MIME)); } catch { return; }
+  XD.own = true;
+  try { e.dataTransfer.setData(RF_MIME, JSON.stringify({k: s.k, ...(s.ks ? {ks: s.ks} : {}), ...(s.n ? {n: s.n} : {}), o: xd_tok(), w: XD.w})); e.dataTransfer.setData(XD_KIND + s.k[0], '1'); } catch { /* read-only */ }
+}, true);
+document.addEventListener('dragend', () => { XD.own = false; xd_mark(null); }, true);
+// a source row drawn anew during its drag (the drop moved it) gets its dragend while detached, which never reaches the
+// document: the next press of a button ends the own drag in any case (no press can happen during a drag)
+document.addEventListener('pointerdown', () => { XD.own = false; }, true);
+window.addEventListener('dragover', e => {
+  const k = xd_kind(e); if (!k) return;
+  const hit = xd_target(e, k);
+  if (!hit) { xd_mark(null); return; }
+  e.preventDefault(); e.stopPropagation();
+  e.dataTransfer.dropEffect = k === 't' || hit.t.move ? 'move' : 'copy';
+  xd_mark(hit.el);
+}, true);
+window.addEventListener('dragleave', e => { if (!e.relatedTarget && XD.hl) xd_mark(null); }, true);
+window.addEventListener('drop', e => {
+  const k = xd_kind(e); if (!k) return;
+  const hit = xd_target(e, k); xd_mark(null);
+  if (!hit) return;
+  e.preventDefault(); e.stopPropagation();
+  let s; try { s = JSON.parse(e.dataTransfer.getData(RF_MIME)); } catch { return; }
+  // only this app (same origin = the same token), only a drag from another document, only kind + a number
+  if (!s || !s.o || s.o !== xd_tok() || s.w === XD.w || typeof s.k !== 'string' || !/^[tf]:\d{1,9}$/.test(s.k) || s.k[0] !== k) return;
+  Promise.resolve(hit.t.fn(s, hit.el, e, +s.k.slice(2))).catch(x => { if (x?.message && !x.shown) toast(x.message); });
+}, true);
+// the documents' cards (docs.js) can be dragged with the mouse while the split view is on (a reference, a link, the office)
+document.addEventListener('pointerover', e => {
+  if (e.pointerType !== 'mouse' || !xd_split()) return;
+  const b = e.target.closest?.('.dc-card[data-k^="dc"] > button[data-dco]');
+  if (b && !b.hasAttribute('draggable')) b.setAttribute('draggable', 'true');
+});
+async function xd_node(id) {  // the file / document as the reader may see it (the read route checks the access), else a toast
+  let j = null; try { j = await rawFetch('GET', `/api/files/nodes/${id}`); } catch { j = null; }
+  if (!j || j.deleted_at || j.in_trash) { toast(tr('No access')); return null; }
+  return j;
+}
+const xd_tid = el => el.closest('.trow[data-id]') ? +el.closest('.trow[data-id]').dataset.id : +S.sel || 0;
+
+// 1. a document / file onto a task (its row, the open task outside its text fields) = linked with the task, like "Link with
+//    a task…" (docs/tasklink.py, the same undo); a plain file that is no document goes into the comment box as a reference.
+//    Onto a text field (comment, description, chat, the knowledge page) every kind = a reference (rf drop above).
+xd_on('#view .trow[data-id], #detail', 'f', async (s, el, e, id) => {
+  const tid = xd_tid(el); if (!(tid > 0)) return;
+  let j;
+  try { j = await rawFetch('POST', `/api/docs/${id}/task/link`, {task_id: tid}); }
+  catch (x) {
+    if (x?.status !== 404) { toast(x?.message || tr('Error')); return; }
+    const v = await xd_node(id); if (!v) return;  // no document: a reference in the comment box, sent by the person
+    if (+S.sel !== tid) openDetail(tid);
+    for (let i = 0; i < 60 && !document.getElementById('c-input'); i++) await new Promise(r => requestAnimationFrame(r));
+    const ta = document.getElementById('c-input'); if (ta && !ta.disabled) rf_insert(ta, rf_text('f:' + id, v.name));
+    return;
+  }
+  const name = (await xd_node(id))?.name || tr('Document'), prev = j?.prev_task_id || null;
+  const go = to => async () => { if (to) await api('POST', `/api/docs/${id}/task/link`, {task_id: to}); else await api('DELETE', `/api/docs/${id}/task`); if (typeof dc_load === 'function' && S.route.mod === 'docs') dc_load(); return {}; };
+  const label = tr('{0} linked with a task', name);
+  histToast(label, histAdd({label, undo: go(prev), redo: go(tid)}));
+}, el => !!el.closest('.trow[data-id]') || +S.sel > 0);
+// the knowledge page's editor (CodeMirror, wkcm.js) takes a reference like the text fields ("[[#12]]" for a task)
+xd_on('#view .cm-editor', 'tf', async (s, el, e, id) => {
+  const v = typeof WKCM !== 'undefined' && WKCM.view; if (!v || !el.contains(v.dom)) return;
+  const name = s.k[0] === 'f' ? (await xd_node(id))?.name : ''; if (s.k[0] === 'f' && name == null) return;
+  const txt = s.k[0] === 't' ? `[[#${id}]]` : rf_text(s.k, name), at = v.posAtCoords({x: e.clientX, y: e.clientY}) ?? v.state.selection.main.head;
+  v.dispatch({changes: {from: at, insert: txt + ' '}, selection: {anchor: at + txt.length + 1}}); v.focus();
+}, el => typeof WKCM !== 'undefined' && !!WKCM.view && el.contains(WKCM.view.dom));
