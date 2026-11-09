@@ -321,6 +321,7 @@ ROUTES = {
     "GET /api/docs/{}/pages": "files", "POST /api/docs/{}/pages": "files",  # 2.777.0 B (#4874): p2777_b_docpages_test.py, freelancer-matrix: files
     "GET /api/docs": "files", "GET /api/docs/facets": "files", "GET /api/docs/settings": "files",  # 2.772.0 (#4890): facets = p4890_a_api_test.py
     "GET /api/docs/{}": "files", "GET /api/docs/{}/file": "files",
+    "GET /api/docs/{}/title-suggest": "files",  # 2.783.0 (#4882): p2783_b_doctitle_test.py as a person without an organisation
     "GET /api/docs/{}/receipt": "files", "GET /api/docs/{}/thumb": "files", "GET /api/files": "files",
     "GET /api/files/collections/{}": "files",  # 2.429.0 (#3580)
     "GET /api/files/folders": "files", "GET /api/files/nodes/{}": "files", "GET /api/files/nodes/{}/content": "files",

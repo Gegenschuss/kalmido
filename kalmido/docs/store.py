@@ -79,6 +79,69 @@ def doc_title(name, title=None):
     name = name or ""
     base = _TITLE_EXT.sub("", name).strip()
     return base or name
+
+
+# 2.783.0 (#4882): the title pattern of an area (doc_cfg title_pattern / title_auto). Placeholders in German or English, any
+# case; an unknown {x} stays as text. The date as DD.MM.YYYY. An empty part goes with the separator in front of it.
+TITLE_PATTERN = "{Absender} {Typ} {Datum}"
+TITLE_PATTERN_MAX = 120
+_TP_KEYS = {"absender": "sender", "sender": "sender", "typ": "type", "type": "type", "datum": "date", "date": "date"}
+_TP_RE = re.compile(r"\{([^{}]{1,20})\}")
+
+
+def title_fill(pattern, sender="", typ="", date=""):
+    """The title the pattern gives for these values ("" when every placeholder is empty and no text is left)."""
+    d = str(date or "")[:10]
+    vals = {"sender": str(sender or "").strip(), "type": str(typ or "").strip(),
+            "date": f"{d[8:10]}.{d[5:7]}.{d[:4]}" if re.fullmatch(r"\d{4}-\d{2}-\d{2}", d) else ""}
+    lits, keys, at = [""], [], 0
+    for mt in _TP_RE.finditer(str(pattern or "")):
+        k = _TP_KEYS.get(mt.group(1).strip().lower())
+        lits[-1] += pattern[at:mt.start()] + ("" if k else mt.group(0))
+        at = mt.end()
+        if k:
+            keys.append(k)
+            lits.append("")
+    lits[-1] += str(pattern or "")[at:]
+    out, first = lits[0], True
+    for i, k in enumerate(keys):
+        if not vals[k]:
+            continue
+        out += ("" if first else lits[i]) + vals[k]
+        first = False
+    out += lits[-1]
+    return re.sub(r"\s+", " ", out).strip(" -–—,;:/|")[:TITLE_MAX].strip()
+
+
+def title_is_manual(m):
+    """Set by hand (never replaced by the pattern): title_manual 1, or a row from before #4882 (NULL) that has a title."""
+    keys = m.keys() if hasattr(m, "keys") else ()
+    v = m["title_manual"] if "title_manual" in keys else None
+    return bool(v) if v is not None else bool(((m["title"] if "title" in keys else "") or "").strip())
+
+
+def title_of(c, m, pattern=None):
+    """The pattern's title for document row m (its area's pattern unless given)."""
+    ws = m["ws"]
+    return title_fill(pattern or cfg_get(c, ws)["title_pattern"], label_name(c, ws, "sender", m["sender_id"]) or "",
+                      label_name(c, ws, "type", m["type_id"]) or "", m["doc_date"] or "")
+
+
+def title_auto(c, nid):
+    """After a recognition / a rule / "Apply what was learned": the title from the area's pattern, when "Title automatically"
+    is on and the title was never set by hand. Only once a sender or a type is known (a date alone says less than the file
+    name; "Suggest title" gives it all the same). An empty result leaves the title as it is. -> True when it changed."""
+    m = meta_row(c, nid)
+    if not m or title_is_manual(m) or not (m["sender_id"] or m["type_id"]):
+        return False
+    cfg = cfg_get(c, m["ws"])
+    if not cfg["title_auto"]:
+        return False
+    t = title_of(c, m, cfg["title_pattern"])
+    if not t or t == (m["title"] or ""):
+        return False
+    c.execute("UPDATE doc_meta SET title=?, title_manual=0 WHERE node_id=?", (t, nid))
+    return True
 ASN_PREFIX_RE = r"[A-Za-z][A-Za-z0-9-]{0,9}"  # the prefix of archive serial numbers (letters first, at most 10)
 THUMB_DIR = "docthumbs"   # below ATT_DIR: the preview images (sealed like the file)
 ERRORS = {
@@ -416,7 +479,10 @@ def cfg_get(c, ws):
     ol = d.get("ocr_langs")  # 2.635.0 (#4807 b): the area's text recognition languages ([] = the default, deu+eng)
     return {"levels": RU.levels(d.get("levels")), "inbox": d.get("inbox", True) is not False,
             "asn_prefix": pre if re.fullmatch(ASN_PREFIX_RE, pre) else "ASN",
-            "ocr_langs": [str(x) for x in ol][:OCR_LANG_MAX] if isinstance(ol, list) else []}
+            "ocr_langs": [str(x) for x in ol][:OCR_LANG_MAX] if isinstance(ol, list) else [],
+            # 2.783.0 (#4882): the title pattern and "Title automatically" (on unless switched off)
+            "title_pattern": str(d.get("title_pattern") or "").strip()[:TITLE_PATTERN_MAX] or TITLE_PATTERN,
+            "title_auto": d.get("title_auto", True) is not False}
 
 
 def cfg_set(c, ws, data):
@@ -435,6 +501,13 @@ def cfg_set(c, ws, data):
         if not isinstance(ol, list) or len(ol) > OCR_LANG_MAX or not set(map(str, ol)) <= set(ocr_choices()):
             raise ValueError("ocr_langs")
         cur["ocr_langs"] = list(dict.fromkeys(str(x) for x in ol))
+    if "title_pattern" in data:  # 2.783.0 (#4882): empty = the default; at least one placeholder
+        tp = re.sub(r"\s+", " ", str(data["title_pattern"] or "")).strip() or TITLE_PATTERN
+        if len(tp) > TITLE_PATTERN_MAX or not any(mt.group(1).strip().lower() in _TP_KEYS for mt in _TP_RE.finditer(tp)):
+            raise ValueError("title_pattern")
+        cur["title_pattern"] = tp
+    if "title_auto" in data:
+        cur["title_auto"] = bool(data["title_auto"])
     rid = root_id(c, ws)  # 2.48.0 review: the mark of the documents folder stays
     if rid:
         cur["root_id"] = rid
@@ -1037,6 +1110,7 @@ def redo_save(c, m, nid):
         return
     prev = {k: m[k] for k in REDO_COLS}
     prev["ws"], prev["tags"] = m["ws"], [t["id"] for t in node_tags(c, nid)]
+    prev["title"], prev["title_manual"] = m["title"] or "", m["title_manual"]  # 2.783.0 (#4882): the run may set the pattern's title
     c.execute("UPDATE doc_meta SET redo_prev=?, redo_at=? WHERE node_id=?", (json.dumps(prev, separators=(",", ":")), _now(), nid))
 
 
@@ -1072,6 +1146,8 @@ def redo_back(c, nid):
         write_lock(c, f"doc-asn:{m['ws']}")  # the row is locked already: same order as asn_lock
         if asn_taken(c, m["ws"], vals["asn"], nid):
             vals["asn"] = m["asn"]
+    if "title" in prev and not title_is_manual(m):  # 2.783.0 (#4882): the title from before; one set by hand since then stays
+        vals["title"], vals["title_manual"] = prev["title"], prev.get("title_manual")
     sets = ", ".join(f"{k}=?" for k in vals)
     c.execute(f"UPDATE doc_meta SET {sets}, auto=?, redo_prev='', redo_at='', updated_at=? WHERE node_id=?",
               (*vals.values(), json.dumps(auto, separators=(",", ":")), _now(), nid))
@@ -1122,6 +1198,7 @@ def learn_apply(c, nid, uid, run):
     stamp = _now()
     prev = {"run": run, "ws": ws, "sender_id": m["sender_id"], "type_id": m["type_id"], "parent_id": node["parent_id"],
             "owner_id": node["owner_id"], "auto": m["auto"] or "", "suggest": m["suggest"] or "", "review": m["review"], "stamp": stamp,
+            "title": m["title"] or "", "title_manual": m["title_manual"],  # 2.783.0 (#4882)
             "after": {**{f: str(v) for f, v in newv.items() if f != "tags"}, "tags": added}}
     apply_values(c, m, node, newv, auto)
     auto_all.update({f: (a[added[0]] if f == "tags" else a) for f, a in auto.items()})
@@ -1129,7 +1206,8 @@ def learn_apply(c, nid, uid, run):
     c.execute("UPDATE doc_meta SET auto=?, suggest=?, review=?, learn_prev=?, learn_at=?, updated_at=? WHERE node_id=?",
               (json.dumps(auto_all, separators=(",", ":")), _jseal(c, ws, "doc_meta.suggest", new_sug) if new_sug else "", review,
                json.dumps(prev, separators=(",", ":")), stamp, stamp, nid))
-    if "sender" in newv:  # the word index holds the sender's name
+    t_new = title_auto(c, nid) if newv else False  # 2.783.0 (#4882): a new sender / type -> the pattern's title (never a hand one)
+    if "sender" in newv or t_new:  # the word index holds the sender's name (and the title)
         doc_index(c, nid, ws, index_text(c, dict(meta_row(c, nid)), node["name"], text))
     return ("both" if fresh else "set") if newv else ("suggest" if fresh else "")
 
@@ -1176,6 +1254,8 @@ def learn_back(c, nid, run):
         else:
             auto.pop(f, None)
     sets, args = "auto=?", [json.dumps(auto, separators=(",", ":"))]
+    if "title" in prev and not title_is_manual(m) and (m["title"] or "") != prev["title"]:  # 2.783.0 (#4882): the pattern's title back
+        sets, args = sets + ", title=?, title_manual=?", [*args, prev["title"], prev.get("title_manual")]
     if m["updated_at"] == prev.get("stamp"):  # nothing saved since: the suggestions and "To review" as they were
         sets, args = sets + ", suggest=?, review=?", [*args, prev.get("suggest") or "", int(prev.get("review") or 0)]
     c.execute(f"UPDATE doc_meta SET {sets}, learn_prev='', learn_at='', updated_at=? WHERE node_id=?", (*args, _now(), nid))
@@ -1445,7 +1525,9 @@ def process(c, nid):
         meta_set_json(c, nid, ws, "extracted", {**rx_compact(ei_det), "_einv": ei_compact(ei), **({"_eirc": 1} if ei_rc else {})})
     else:
         meta_set_json(c, nid, ws, "extracted", rx_compact(ex.get("details")))  # 2.121.0 A (#2092): a fresh run, a fresh suggestion
-    from .split import sp_detect
+    from .split import sp_detect, sp_view
     sp_detect(c, nid, data, res)             # 2.154.0 A (#1111): a stack scan with several archive number codes
+    if not (sp_view(meta_row(c, nid)) or {}).get("stack"):
+        title_auto(c, nid)                   # 2.783.0 (#4882): the title from the area's pattern (never one set by hand)
     doc_index(c, nid, ws, index_text(c, dict(meta_row(c, nid)), node["name"], text))
     return state

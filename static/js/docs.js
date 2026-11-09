@@ -834,6 +834,13 @@ async function dc_mdClick(e) {
     return;
   }
   if (a === 'asnnext') { await dc_patch(d.id, {asn: 'next'}, tr('Archive number of {0}', d.name)); return; }
+  if (a === 'titlesug') {  // 2.783.0 (#4882): the area's title pattern once (with undo: the title before and whether it was set by hand)
+    const x = await api('GET', `/api/docs/${d.id}/title-suggest`).catch(() => null); if (!x) return;
+    if (!x.title) { toast(tr('Nothing to suggest yet: sender, type and date are empty')); return; }
+    if (x.title === dc_title(d) && !d.title_manual) { toast(tr('The title already follows the pattern')); return; }
+    await dc_patch(d.id, {title: x.title, title_manual: false}, tr('Title of {0} suggested', dc_title(d)));
+    return;
+  }
   if (a.startsWith('edit:')) { $(`#dc-${a.slice(5)}`, md)?.focus(); return; }
   if (a === 'redo') {
     // 2.273.0 C (#3047): values set by hand stay -- say so before and after the new run
@@ -939,7 +946,7 @@ function dc_sDraw(md) {
     const P = {head,
       auto: `<p class="shint">${tr('Per feature: rules first, then what Kalmido learnt from your corrections. Sure matches are set directly, unsure ones wait in “To review”. “Left to an agent”: a connected agent with access may fill it in.')}</p>
         ${DC_FEATS.map(([f, n]) => `<div class="row"><label for="dcs-l-${f}">${tr(n)}</label><select id="dcs-l-${f}" data-dcl="${f}" ${dis}>${DC_LEVELS.map(([v, l]) => `<option value="${v}" ${s.levels[f] === v ? 'selected' : ''}>${tr(l)}</option>`).join('')}</select></div>`).join('')}
-        ${s.ocr_missing?.length ? `<p class="muted">${esc(tr('Text recognition is missing: {0}', s.ocr_missing.join(', ')))}</p>` : ''}${dcs_ocrHtml(s, dis)}`,
+        ${s.ocr_missing?.length ? `<p class="muted">${esc(tr('Text recognition is missing: {0}', s.ocr_missing.join(', ')))}</p>` : ''}${dcs_ocrHtml(s, dis)}${dcs_titleHtml(s, dis)}`,
       asn: `<div class="row"><label for="dcs-asn">${tr('Prefix of the archive numbers')}</label><input id="dcs-asn" data-dcs="asnprefix" value="${esc(s.asn_prefix || 'ASN')}" maxlength="10" autocomplete="off" ${dis}></div>
         <p class="muted">${esc(tr('Next free number: {0}. A QR code or text like {1} on a scan fills it in.', s.asn_next, `${s.asn_prefix || 'ASN'}${String(s.asn_next).padStart(5, '0')}`))}</p>
         <p class="muted">${esc(tr('A stack scan with several codes can be split into documents; a separator sheet between two letters splits there too.'))} <a href="/api/docs/split-sheet.pdf" target="_blank" rel="noopener">${tr('Separator sheet to print (PDF)')}</a></p>${'' /* 2.154.0 A (#1111) */}`,
@@ -964,6 +971,14 @@ function dc_sDraw(md) {
         <button type="button" class="iconbtn" data-dcs="ldel:${k}:${x.id}" aria-label="${esc(tr('Delete {0}', x.name))}" title="${esc(tr('Delete {0}', x.name))}">${ic('trash')}</button></span></li>`).join('')}</ul>` : ''}</details>`).join('')}` : ''}
     ${can ? dc_cfSettings(s) : ''}
     <div class="row dcs-to"><span class="muted">${tr('Sorting automatically, archive numbers and rules: Settings > Documents.')}</span><button type="button" class="btn sm" data-dcs="go-set">${ic('gear', 's')} ${tr('Settings of the documents')}</button></div>`;
+}
+// 2.783.0 (#4882): the title pattern of the area and "Title automatically" (a title set by hand is never replaced)
+function dcs_titleHtml(s, dis) {
+  if (!s.title_pattern) return '';
+  return `<fieldset class="dcs-title"><legend>${esc(tr('Title of new documents'))}</legend>
+    <label class="dcs-ocrc"><input type="checkbox" id="dcs-tauto" data-dcs="tauto" ${s.title_auto ? 'checked' : ''} ${dis}> ${esc(tr('Title automatically'))}</label>
+    <div class="row"><label for="dcs-tpat">${esc(tr('Title pattern'))}</label><input id="dcs-tpat" data-dcs="tpat" value="${esc(s.title_pattern)}" maxlength="120" autocomplete="off" placeholder="${esc(s.title_pattern_default || '')}" ${dis}></div>
+    <p class="shint">${esc(tr('Placeholders: {0} sender, {1} type, {2} date (DD.MM.YYYY). An empty part goes with its separator. Recognition, rules and “Apply what was learned” set the title from it; a title typed by hand stays.', '{Absender}', '{Typ}', '{Datum}'))}</p></fieldset>`;
 }
 // 2.635.0 (#4807 b): the languages of the text recognition of this workspace (the installed ones, deu+eng by default)
 function dcs_ocrHtml(s, dis) {
@@ -1040,6 +1055,16 @@ async function dc_sChange(e) {
     const put = v => async () => { DC.set = await api('PUT', '/api/docs/settings', {ws: s.ws, asn_prefix: v}); dc_sDraw($('.dc-smd')); return {}; };
     try { await put(to)(); } catch { e.target.value = from; return; }
     histToast(tr('Changed setting: {0}', tr('Prefix of the archive numbers')), histAdd({label: tr('Changed setting: {0}', tr('Prefix of the archive numbers')), sett: true, undo: put(from), redo: put(to)}));
+    return;
+  }
+  if (e.target.matches('[data-dcs="tpat"], [data-dcs="tauto"]')) {  // 2.783.0 (#4882): the title pattern / "Title automatically"
+    const k = e.target.dataset.dcs === 'tpat' ? 'title_pattern' : 'title_auto', from = s[k];
+    const to = k === 'title_auto' ? e.target.checked : e.target.value.trim() || s.title_pattern_default;
+    const pane = e.target.closest('.dcs-pane');
+    const put = v => async () => { DC.set = await api('PUT', '/api/docs/settings', {ws: s.ws, [k]: v}); dc_sDraw(pane || $('.dc-smd')); return {}; };
+    try { await put(to)(); } catch { if (k === 'title_auto') e.target.checked = from; else e.target.value = from; return; }
+    const lb = tr('Changed setting: {0}', tr(k === 'title_auto' ? 'Title automatically' : 'Title pattern'));
+    histToast(lb, histAdd({label: lb, sett: true, undo: put(from), redo: put(to)}));
     return;
   }
   if (e.target.matches('[data-dcs="ftype"]')) { const o = md.querySelector('.dcf-opts'); if (o) o.hidden = e.target.value !== 'select'; return; }  // 2.153.0 (#2179)
@@ -1363,6 +1388,7 @@ async function dc_bulk(change, label) {
 function dc_bulkMenu(anchor) {
   menu(anchor, [{label: tr('Add tags…'), icon: 'tag', fn: () => dc_bulkTags(true)}, {label: tr('Remove tags…'), icon: 'tag', fn: () => dc_bulkTags(false)},
     {label: tr('Set document type…'), icon: 'file', fn: () => dc_bulkSet('type')}, {label: tr('Set sender…'), icon: 'user', fn: () => dc_bulkSet('sender')},
+    {label: tr('Set title from pattern'), icon: 'edit', cls: 'dc-titlesel', fn: () => dc_bulk({title_pattern: true}, tr('Title set from pattern'))},  // 2.783.0 (#4882)
     {label: tr('Apply what was learned'), icon: 'sparkle', cls: 'dc-learnsel', fn: () => dc_learn(dc_selIds())}], null, null, tr('Edit'));  // 2.607.0 (#4872)
 }
 // 2.607.0 (#4872): "Apply what was learned": only the sorting (rules + what was learned) with the stored text, no new recognition

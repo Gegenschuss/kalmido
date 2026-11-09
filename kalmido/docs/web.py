@@ -154,6 +154,7 @@ def doc_json(c, m, node, full=False, role=None, pre=None):
             folder = _agent_folder(c, me(), node, r)
     err_key = m["error"] or ""
     d = {"id": m["node_id"], "name": node["name"], "title": S.doc_title(node["name"], m.get("title")), "title_own": bool((m.get("title") or "").strip()),  # 2.750.0 (#4876)
+         "title_manual": S.title_is_manual(m),  # 2.783.0 (#4882): set by hand -> the area's title pattern leaves it alone
          "mime": node["mime"], "size": node["size"], "org_id": node["org_id"], "ws": ws,
          "state": m["state"], "error": err_key, "error_text": tr(S.ERRORS[err_key]) if err_key in S.ERRORS else "",
          "method": m["method"], "pages": m["pages"], "date": m["doc_date"], "due": m["due_date"],
@@ -580,7 +581,11 @@ def doc_update_values(c, nid, d, uid, by=None):
         sets["text"] = S.doc_seal(c, ws, "doc_meta.text", str(d["text"] or "")[:200_000])
     if "title" in d:  # 2.750.0 (#4876): only the title (may be the same as another's; empty = the file name without its ending)
         t = re.sub(r"\s+", " ", str(d["title"] or "")).strip()[:S.TITLE_MAX]
-        c.execute("UPDATE doc_meta SET title=?, updated_at=? WHERE node_id=?", (t, _now(), nid))
+        # 2.783.0 (#4882): a title typed (by a person or an agent) is set by hand: the pattern never replaces it; emptied = free
+        # again. title_manual: false = the pattern's title ("Suggest title", its undo sends the flag back as it was)
+        tm = d.get("title_manual")
+        man = (1 if tm else 0) if isinstance(tm, bool) and t else (1 if t else 0)
+        c.execute("UPDATE doc_meta SET title=?, title_manual=?, updated_at=? WHERE node_id=?", (t, man, _now(), nid))
         _reindex(c, nid)
     if "name" in d and by is None:  # the file name (unique in its folder: "x (2).pdf")
         name = str(d["name"] or "").strip()
@@ -766,6 +771,17 @@ def docs_review(nid):
     return jsonify(doc_json(c, m, n, role=n["role"]))
 
 
+@app.get("/api/docs/<int:nid>/title-suggest")
+def docs_title_suggest(nid):
+    """2.783.0 (#4882): the title the area's pattern gives for the document now ("Suggest title"; the sheet saves it with
+    title_manual false, its undo sends the title before back) -> {title, pattern} (title "" = nothing to suggest)."""
+    c = db()
+    _no_agent()
+    m, _n = _doc(c, nid, write=True)
+    pat = S.cfg_get(c, m["ws"])["title_pattern"]
+    return jsonify(title=S.title_of(c, m, pat), pattern=pat)
+
+
 @app.post("/api/docs/<int:nid>/redo")
 def docs_redo(nid):
     """Recognise again (text, date, amount; the sorting keeps what is set)."""
@@ -864,7 +880,7 @@ def docs_task(nid):
     uid = me()
     sender = S.label_name(c, m["ws"], "sender", m["sender_id"])
     typ = S.label_name(c, m["ws"], "type", m["type_id"])
-    title = " ".join(x for x in (typ or "", sender or "") if x).strip() or n["name"]
+    title = S.title_fill("{Type} {Sender}", sender, typ) or n["name"]  # 2.783.0 (#4882): the title pattern's joining
     title = tr("Pay: {0}", title) if m["amount"] else title
     amount = S.doc_open(c, m["ws"], "doc_meta.amount", m["amount"])
     lines = [f"[{n['name']}](#docs/{nid})"]
@@ -933,7 +949,8 @@ def _settings_json(c, ws, uid):
     from .fields import df_list  # 2.153.0 (#2179): the custom fields of the workspace
     return {"ws": f"org:{oid}" if oid else "private", "can_manage": can, "fields": df_list(c, ws), "levels": cfg["levels"], "inbox": cfg["inbox"],
             "rules": _rules_v(c, ws) if can else [], **_flow_extra(c, ws, can), **_settings_labels(c, ws, uid, can), "folders": folders,
-            "root_id": root, "inbox_path": S.inbox_path(c, root, uid), "ocr": ocr_available(), "ocr_missing": _ocr_missing(c, uid), "ocr_langs": _ocr_view(cfg), "asn_prefix": cfg["asn_prefix"], "asn_next": S.asn_next(c, ws), "mail": {"enabled": MAIL_IN_ON, "address": mail_addr(mtk_plain(c, tok[0])) if (tok and MAIL_IN_ON) else ""},
+            "root_id": root, "inbox_path": S.inbox_path(c, root, uid), "ocr": ocr_available(), "ocr_missing": _ocr_missing(c, uid), "ocr_langs": _ocr_view(cfg), "asn_prefix": cfg["asn_prefix"], "asn_next": S.asn_next(c, ws),
+            "title_pattern": cfg["title_pattern"], "title_auto": cfg["title_auto"], "title_pattern_default": S.TITLE_PATTERN,  # 2.783.0 (#4882) "mail": {"enabled": MAIL_IN_ON, "address": mail_addr(mtk_plain(c, tok[0])) if (tok and MAIL_IN_ON) else ""},
             "scan": _scan_json(c, uid, oid)}  # 2.207.0 A (#2763): scan inboxes, folder watcher downloads, the mail note
 
 
@@ -973,7 +990,7 @@ def docs_settings():
 
 @app.put("/api/docs/settings")
 def docs_settings_put():
-    """{ws, levels?: {sender|type|tags|folder: rules|learn|agent|off}, inbox?: bool}"""
+    """{ws, levels?: {sender|type|tags|folder: rules|learn|agent|off}, inbox?: bool, title_pattern?: text, title_auto?: bool (2.783.0 #4882)}"""
     c = db()
     _no_agent()
     uid = me()
@@ -984,6 +1001,8 @@ def docs_settings_put():
     except ValueError as e:
         if str(e) == "ocr_langs":  # 2.635.0 (#4807 b)
             return err(tr("Select at most {0} of the languages installed for the text recognition", S.OCR_LANG_MAX))
+        if str(e) == "title_pattern":  # 2.783.0 (#4882)
+            return err(tr("The title pattern needs at least one of {0}, {1}, {2} (at most {3} characters)", "{Absender}", "{Typ}", "{Datum}", S.TITLE_PATTERN_MAX))
         return err(tr("The prefix takes letters, digits and dashes (at most 10, a letter first)"))
     c.commit()
     return jsonify(_settings_json(c, ws, uid))

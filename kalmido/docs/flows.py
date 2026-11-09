@@ -304,6 +304,7 @@ def fl_run(c, nid, r, trig, stamp="", run_id=None):
     _IN.on = True
     try:
         _sort(c, nid, r)
+        S.title_auto(c, nid)  # 2.783.0 (#4882): a rule's sender / type -> the pattern's title (never one set by hand)
         tid, told, hook, shared = _extra(c, nid, r)
     finally:
         _IN.on = False

@@ -81,7 +81,8 @@ def _names(v):
 
 @app.post("/api/docs/bulk")
 def docs_bulk():
-    """{ids, add_tags?: [names], remove_tags?: [names], type?: name | "" (none), sender?: name | ""} -- one change on every
+    """{ids, add_tags?: [names], remove_tags?: [names], type?: name | "" (none), sender?: name | "", title_pattern?: true (2.783.0
+    #4882: the title from the area's pattern; the undo's restore entries then carry {id, title, title_manual})} -- one change on every
     chosen document I may change (names make labels in each document's workspace) -> {changed, denied, before: [{id,
     sender, type, tags}]} (denied: chosen documents I may only view). {restore: [{id, sender, type, tags}]} (the undo): those values back."""
     c = db()
@@ -97,7 +98,8 @@ def docs_bulk():
     else:
         ids = dsr_idlist(b.get("ids"), DSR_EDIT)
         add, rem = _names(b.get("add_tags")), {x.lower() for x in _names(b.get("remove_tags"))}
-        if not (add or rem or "type" in b or "sender" in b):
+        tpat = b.get("title_pattern") is True  # 2.783.0 (#4882): "Set title from pattern"
+        if not (add or rem or "type" in b or "sender" in b or tpat):
             return err(tr("Nothing to change"))
     changed, denied, before = [], 0, []
     for n in dsr_visible(c, uid, ids):
@@ -109,6 +111,9 @@ def docs_bulk():
         if restore is not None:
             x = items[n["id"]]
             d = {k: (_names(x[k]) if k == "tags" else str(x[k] or "")[:S.NAME_MAX]) for k in ("sender", "type", "tags") if k in x}
+            if "title" in x:  # 2.783.0 (#4882): the title before "Set title from pattern" (and whether it was set by hand)
+                if str(x["title"] or "") != str(m["title"] or "") or bool(x.get("title_manual")) != S.title_is_manual(m):
+                    d["title"], d["title_manual"] = str(x["title"] or "")[:S.TITLE_MAX], bool(x.get("title_manual"))
         else:
             d = {}
             if add or rem:
@@ -119,6 +124,11 @@ def docs_bulk():
             for k in ("type", "sender"):
                 if k in b and str(b[k] or "").strip()[:S.NAME_MAX].lower() != cur[k].lower():
                     d[k] = str(b[k] or "").strip()[:S.NAME_MAX]
+            if tpat:  # 2.783.0 (#4882): the area's pattern once, also over a title set by hand (the undo brings it back)
+                t = S.title_of(c, m)
+                if t and (t != (m["title"] or "") or S.title_is_manual(m)):
+                    d["title"], d["title_manual"] = t, False
+                    cur = {"id": n["id"], "title": m["title"] or "", "title_manual": S.title_is_manual(m)}  # the undo touches the title only
         if not d:
             continue
         e = doc_update(c, n["id"], d, uid)

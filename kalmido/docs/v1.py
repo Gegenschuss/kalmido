@@ -142,7 +142,7 @@ def v1_doc_create():
         with c.savepoint():
             nid = docs_ingest(c, uid, org, name, data, mime, "api", meta, parent_id=pid)
             if title:  # 2.750.0 (#4876)
-                c.execute("UPDATE doc_meta SET title=? WHERE node_id=?", (title, nid))
+                c.execute("UPDATE doc_meta SET title=?, title_manual=1 WHERE node_id=?", (title, nid))  # 2.783.0 (#4882): the pattern leaves it
             fs_log_add(c, nid, "upload")
     except QuotaExceeded:
         raise Denied(413, tr("{0}: no space left in your storage", name)) from None
