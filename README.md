@@ -19,10 +19,10 @@
 
 ## What's new
 
-**2.771.0** (2026-11-09):
-- **Files**: one selection bar and one right-click / long-press menu for rows and cards; the History tab lists versions; cards can be dragged onto folders.
-- **Undo**: steps are kept on the server per account for 30 days (the list in the app follows).
-- **Navigation**: the back arrow on detail pages steps back in the history; contacts, clients, invoices and receipts share one list-beside-detail layout.
+**2.774.0** (2026-11-09):
+- **Undo**: task changes (edits, completing, trash, sections) are now recorded on the server and can be undone and redone across devices.
+- **Chat**: reactions on task comments, team chat and the agent chat share one core table; deleted messages bring their reactions back on undo.
+- **Files**: Office and file area move onto the shared core.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 
