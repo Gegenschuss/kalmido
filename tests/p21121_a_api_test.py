@@ -226,6 +226,31 @@ EPS_PAGE = b"%!PS-Adobe-3.0 EPSF-3.0\n%%BoundingBox: 0 0 2 2\n0 0 moveto 2 2 lin
 for kind, page in (("TIFF", TIFF_PAGE), ("EPS", EPS_PAGE)):
     r = scan(Ca, [page], [("space", "private")])
     check(r.status_code == 400 and "Page 1" in (r.json().get("error") or ""), f"{kind} page: 400 with the page ({r.status_code} {r.text[:200]})")
+# 2.763.0 (#4527): a page over 40 million pixels is refused from its header, before it is decoded - also when Pillow's
+# global limit is higher (the OCR module sets 80 M); without the fixed limit this header-only page was "not a picture"
+
+
+def _chunk(t, d):
+    return struct.pack(">I", len(d)) + t + d + struct.pack(">I", zlib.crc32(t + d) & 0xFFFFFFFF)
+
+
+# the header of a 7000 x 7000 grey picture and the start of its data: Pillow's open stops at the first IDAT, a full decode fails
+BIG_HEAD = (b"\x89PNG\r\n\x1a\n" + _chunk(b"IHDR", struct.pack(">IIBBBBB", 7000, 7000, 8, 0, 0, 0, 0))
+            + _chunk(b"IDAT", zlib.compress(b"\x00" * 7001)) + _chunk(b"IEND", b""))
+r = scan(Ca, [BIG_HEAD], [("space", "private")])
+check(r.status_code == 400 and "too large" in (r.json().get("error") or ""), f"49 M pixel page: 400 too large ({r.status_code} {r.text[:200]})")
+code = f"""
+from PIL import Image
+from kalmido.files.bulk import abm_pdf
+Image.MAX_IMAGE_PIXELS = 80_000_000
+try:
+    abm_pdf([{BIG_HEAD!r}], [], True); print("built")
+except ValueError as e:
+    print(e)
+"""
+r = subprocess.run(["docker", "exec", "-i", os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test"), "python", "-c", code],
+                   capture_output=True, text=True, timeout=120)
+check("too large" in r.stdout, f"abm_pdf with Pillow's limit at 80 M: the page is too large ({r.stdout[-160:]} {r.stderr[-300:]})")
 r = scan(Er, [IMG1], [("parent_id", str(SHF))])
 check(r.status_code == 403, f"erin with 'view' on the folder cannot scan into it ({r.status_code})")
 r = scan(Da, [IMG1], [("parent_id", str(PROJ))])

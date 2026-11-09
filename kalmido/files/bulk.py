@@ -45,6 +45,9 @@ ABM_BUSY = threading.BoundedSemaphore(2)
 ABM_BUSY_TEXT = N_("Another large export is running right now. Please try again in a moment.")
 ABM_SCAN_EDGE = 2000  # the long edge of a page in the PDF (pixels)
 ABM_SCAN_DPI = 180  # 2000 px at 180 dpi ~ the long edge of an A4 page
+# 2.763.0 (#4527): pixels of one scan page, checked from the header before decoding - fixed here, like PM_MAX_PIXELS for
+# photos, so the limit no longer depends on which module set Image.MAX_IMAGE_PIXELS last (30 M or 80 M)
+ABM_SCAN_MAX_PIXELS = 40_000_000
 # already packed: stored as they are (packing again costs time and wins nothing)
 ABM_PACKED = {"zip", "gz", "tgz", "bz2", "xz", "7z", "rar", "zst", "jpg", "jpeg", "png", "gif", "webp", "avif", "heic", "heif",
               "mp3", "m4a", "aac", "ogg", "opus", "mp4", "m4v", "mov", "mkv", "webm", "avi", "pdf", "docx", "xlsx", "pptx",
@@ -410,8 +413,8 @@ ABM_SCAN_FORMATS = ("JPEG", "PNG", "WEBP", "HEIF")  # 2.635.0 (#4645): Pillow fo
 
 def abm_pdf(pages, rots, bw):
     """The bytes of a PDF with one page per image (bytes): EXIF orientation applied, turned by rots[i] degrees (clockwise),
-    the long edge at most ABM_SCAN_EDGE, grey + auto contrast when bw. Pillow's guard against decompression bombs stays on
-    (its warning is an error here). No EXIF / location goes into the PDF (the pages are drawn again)."""
+    the long edge at most ABM_SCAN_EDGE, grey + auto contrast when bw. A page over ABM_SCAN_MAX_PIXELS is refused before it
+    is decoded (2.763.0, #4527); Pillow's guard against decompression bombs stays on as well (its warning is an error here). No EXIF / location goes into the PDF (the pages are drawn again)."""
     from PIL import Image, ImageOps
     out = []
     with warnings.catch_warnings():
@@ -421,7 +424,9 @@ def abm_pdf(pages, rots, bw):
         fmts = [f for f in ABM_SCAN_FORMATS if f != "HEIF" or f in Image.OPEN]  # Pillow itself loads JPEG / PNG / WEBP on demand
         for i, data in enumerate(pages):
             try:
-                im = Image.open(io.BytesIO(data), formats=fmts)
+                im = Image.open(io.BytesIO(data), formats=fmts)  # reads the header only
+                if im.width * im.height > ABM_SCAN_MAX_PIXELS:  # 2.763.0 (#4527): before load(), whatever Pillow's global says
+                    raise Image.DecompressionBombError(f"{im.width}x{im.height}")
                 im.load()
             except (Image.DecompressionBombWarning, Image.DecompressionBombError):
                 raise ValueError(tr("Page {0}: the picture is too large", i + 1)) from None
