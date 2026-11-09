@@ -9,3 +9,8 @@
 
 /* 2.768.0 (#4888): "Upload a new version…" above the versions (the dialog, the document view) */
 .abvup{margin:.25rem 0 .5rem}
+/* 2.768.0 (#4888): the "+" at the head of the file store's tree */
+#side .abthead{display:flex;align-items:center}
+#side .abthead>.sbbi{flex:1;min-width:0}
+#side .abthead>.abtadd{flex:none;margin-right:.25rem;color:var(--muted)}
+#side .abthead>.abtadd:hover{color:var(--text)}
