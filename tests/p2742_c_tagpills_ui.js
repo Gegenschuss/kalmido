@@ -118,7 +118,7 @@ const tagsOf = async id => ((await call('GET', `/api/docs/${id}`)).tags || []).m
   type(w, inp(), 'v');
   check(await until(() => lb()), 'the list open again');
   keyOn(w, inp(), 'Escape');
-  check(!lb() && w.location.hash === `#docs/${D1}` && d.querySelector('.dv-view'), 'Esc closes the list, the view stays');
+  check(!lb() && (w.location.hash === `#docs/${D1}` || w.location.hash === `#ablage/${D1}`) && d.querySelector('.dv-view'), 'Esc closes the list, the view stays');  // 2.780.0 (#5389): the view's address is #ablage/<id> since 2.752.0 (#4887)
   inp().value = '';
   // names are text
   type(w, inp(), 'img');
