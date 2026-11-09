@@ -134,6 +134,18 @@ k = keys(recent(Do))
 check({("wiki", P_ORG2), ("files", F_ORG2), ("reading", R_ORG2)} <= k and not k & {("wiki", P_ORG), ("wiki", P_BOB), ("reading", R_ORG), ("files", F_ORG)},
       f"#5352: dora: only Suedwind {sorted(k)}")
 
+# ================================================================== leader review: a folder share shows no folder above the shared one
+# (like /api/wiki/shared, #2747): alice shares her private Clients/Project X/Outside with bob; bob sees the page as "shared",
+# its place from the shared folder on - never "Clients" or "Project X"
+P_OUT = page(A, "private", "Clients/Project X/Outside/Handover")
+jw = A.get(B + "/api/wiki", params={"space": "private"}).json()
+FO = next((f["id"] for f in jw.get("folders", []) if f["path"] == "Clients/Project X/Outside"), None)
+r = A.post(B + f"/api/files/nodes/{FO}/shares", json={"user_id": BOB, "role": "view"}) if FO else None
+check(r is not None and r.status_code == 201, "setup: alice shares a knowledge folder with bob " + (r.text[:200] if r is not None else str(jw)[:200]))
+x = next((x for x in recent(Bo) or [] if x["area"] == "wiki" and x["id"] == P_OUT), None)
+check(x and x["space"] == "shared" and x["place"] == "Outside" and "Clients" not in str(x) and "Project X" not in str(x),
+      f"#5352: a page of a shared folder: shared, the place from the shared folder on {x}")
+
 # ================================================================== switched off: by the organisation's admins, by the person
 check(A.patch(B + f"/api/orgs/{ORG}", json={"areas_off": ["wiki", "reading"]}).ok, "setup: Nordwind switches Knowledge and Reading off")
 k = keys(recent(Bo))

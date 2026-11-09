@@ -115,17 +115,24 @@ def rcn_wiki(c, uid, key, oid, limit):
     if conds:
         rows = c.execute(f"SELECT * FROM wiki_pages WHERE deleted_at IS NULL AND ({' OR '.join(conds)}) "
                          f"ORDER BY updated_at DESC, id DESC LIMIT ?", (*args, limit * 4)).fetchall()
+    own_ids, info, via_share = {r["id"] for r in rows}, {}, set()
     if key == "all":  # pages others shared with uid from spaces uid does not read anyway (the list "Shared with me")
-        shared, _info = wsh_reach(c, uid)
-        rows = list(rows) + [r for r in shared if not _off(c, r["org_id"], "wiki")]
+        shared, info = wsh_reach(c, uid)
+        shared = [r for r in shared if not _off(c, r["org_id"], "wiki") and r["id"] not in own_ids]
+        via_share = {r["id"] for r in shared}
+        rows = list(rows) + shared
     out, seen = [], set()
     for r in sorted(rows, key=lambda x: (rcn_at_key(x["updated_at"]), x["id"]), reverse=True):
         if r["id"] in seen or wkf_locked(c, r) or not wiki_may_read(c, uid, r):
             continue
         seen.add(r["id"])
         parts = str(r["path"]).split("/")
-        out.append({"area": "wiki", "id": r["id"], "space": _sp_key(c, uid, r["org_id"], r["owner_id"]), "title": parts[-1],
-                    "place": "/".join(parts[:-1]), "by": r["updated_by"], "at": r["updated_at"]})
+        place, sp = "/".join(parts[:-1]), _sp_key(c, uid, r["org_id"], r["owner_id"])
+        if r["id"] in via_share:  # review: like /api/wiki/shared - a folder share shows the path from the shared folder on,
+            x = info.get(r["id"])  # never the folders above it; and it counts as shared, not as a space uid reads
+            place, sp = (x["folder"] or "") if x else place, "shared"
+        out.append({"area": "wiki", "id": r["id"], "space": sp, "title": parts[-1],
+                    "place": place, "by": r["updated_by"], "at": r["updated_at"]})
         if len(out) >= limit:
             break
     return out
