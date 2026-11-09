@@ -117,6 +117,10 @@ Adding an entry, in this order:
   itself. Since 2.64.2 files and the list channel are encrypted with the list key too, and when a member leaves the key
   changes and older contents are encrypted again in the background; until that run is done a former member who kept a
   copy of the database could still read older ciphertexts with the old key. Details: *Lock per list* in docs/ARCHITECTURE.md.
+- Since 2.761.0 every image and the web manifest of a weekly release (the SHA-256 of every file the browser gets) carry a
+  GitHub build attestation (Sigstore, keyless, public transparency log): `gh attestation verify` shows that the release
+  workflow of this repository built them from the tagged commit (*Production updates* in docs/SELF-HOSTING.md). It does
+  not yet let the browser check the app a server delivers; that is the next stage.
 - API tokens act as their user. Give scripts the smallest access they need (*read* unless they must change
   things), an expiry, and revoke tokens you no longer use. Behind a login proxy, only let `/api/v1/` requests that carry
   an `abk_` token bypass the login (see docs/API.md).

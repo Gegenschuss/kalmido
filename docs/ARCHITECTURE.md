@@ -479,7 +479,13 @@ About shows the window size, pixel ratio, pointer, hover and both switches of th
   `tools/web_manifest.py` builds it from a source tree without the app. The CI builds it twice independently (any
   difference stops the run), the weekly release attaches `web-manifest-X.Y.Z.json` built from the tag (also in
   `SHA256SUMS`). The first 12 digits of every entry are the `?v=` / `sw-manifest.json` value. `/manifest.json` is no code
-  (texts in the visitor's language, the signed-in person's shortcuts) and stays out. No signature yet.
+  (texts in the visitor's language, the signed-in person's shortcuts) and stays out.
+- *2.761.0 (code integrity, stage 1b, #5218):* signed with a GitHub build attestation (`actions/attest-build-provenance`,
+  Sigstore, keyless, public transparency log): `release.yml` attests the image digest right after the push (the job
+  `release`, the only one with the OIDC token there), `weekly-release.yml` attests `web-manifest-X.Y.Z.json` in its own job
+  `attest` between `pick` and `publish` - OIDC token, no checkout, no shell; no attestation = no release. The attestations
+  stay at GitHub (not in the registry). Check: `gh attestation verify` (docs/SELF-HOSTING.md, *Production updates*).
+  Pinned like every action, `tests/p23602_a_api_test.py` checks the rights.
 - Every answer carries `Server-Timing: app;dur=…, db;dur=…;desc="n=<statements>"` (`core/reqtime.py`, counted per
   thread in `core/pg.py`). A request slower than `KALMIDO_SLOW_REQUEST_MS` (default 500, 0 = off) logs one line with
   method, route pattern, duration, statements and database time; `GET /api/admin/health` has p50 / p95 / max of the

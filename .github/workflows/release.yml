@@ -78,6 +78,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write  # 2.761.0 (#5218): the keyless Sigstore signature of the image (OIDC token of this run)
+      attestations: write
     outputs:
       version: ${{ steps.v.outputs.version }}
     steps:
@@ -124,3 +126,13 @@ jobs:
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.version=${{ steps.v.outputs.version }}
             org.opencontainers.image.licenses=AGPL-3.0-only
+      # 2.761.0 (#5218): code integrity stage 1b - a GitHub build attestation (Sigstore, keyless, public transparency log Rekor)
+      # for the image digest just pushed: it states that this workflow of this repository built exactly this image from this
+      # commit. Kept at GitHub (not pushed into the registry: no extra tags there, prune-releases.yml stays as it is).
+      # Check: gh attestation verify oci://ghcr.io/gegenschuss/kalmido@sha256:... -R github.com/Gegenschuss/kalmido (SECURITY.md).
+      - name: Attest the image (Sigstore, keyless)
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ghcr.io/gegenschuss/kalmido
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: false

@@ -2151,6 +2151,19 @@ stay blocked until you allow them.
   Of older weeks only the weekly release and its image stay. The git tags of all versions stay. Pin a version that has a
   release page (the list: the Releases page of the repository).
 
+- **Check where an image or a release comes from** *(since 2.761.0, #5218)*: every image `:X.Y.Z` and the file
+  `web-manifest-X.Y.Z.json` of a weekly release carry a GitHub build attestation (Sigstore, without a key to manage; the
+  signature stands in the public transparency log). It proves that the release workflow of the repository built exactly
+  this image / this file from the tagged commit. Check it with the GitHub CLI (signed in to any GitHub account) before you
+  pin a version:
+
+  ```bash
+  gh attestation verify oci://ghcr.io/gegenschuss/kalmido:X.Y.Z -R github.com/Gegenschuss/kalmido
+  gh attestation verify web-manifest-X.Y.Z.json -R github.com/Gegenschuss/kalmido
+  ```
+
+  The installer pins the image to the digest of the release as before; it does not check the attestation itself.
+  Images before 2.761.0 have no attestation.
 - **Read [UPGRADING.md](UPGRADING.md) first:** it lists every version that needs a step from you.
 
 ### Back to the previous version

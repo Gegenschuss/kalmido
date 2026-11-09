@@ -10,6 +10,9 @@ name: Weekly release
 # order. Afterwards prune-releases.yml thins out old releases and images - a dry run (only the list in the log) unless the
 # repository variable KALMIDO_PRUNE_APPLY is 1. Git tags are never created, moved or deleted here (--verify-tag).
 # Rights as in release.yml: the job with checkout reads only; the job that writes runs only download-artifact.
+# 2.761.0 (#5218): the job attest signs web-manifest-X.Y.Z.json with a GitHub build attestation (Sigstore, keyless) between
+# the two: it has the OIDC token but no checkout (no code of the repository runs there) and cannot write contents; no
+# attestation = no release. The image is attested where it is built (release.yml).
 on:
   schedule:
     - cron: "30 20 * * 0"   # Sunday evening (UTC), the ISO week ends at midnight
@@ -31,6 +34,7 @@ jobs:
       contents: read
     outputs:
       version: ${{ steps.pick.outputs.version }}
+      manifest: ${{ steps.assets.outputs.manifest }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -58,6 +62,7 @@ jobs:
           [ "$a" = "$b" ] || { echo "::error::latest-ok/$ver is on $b, v$ver on $a"; exit 1; }
           cat notes.md
       - name: Release assets (installers, source archives, image digest, web manifest, SHA256SUMS)
+        id: assets
         if: steps.pick.outputs.version != ''
         env:
           VER: ${{ steps.pick.outputs.version }}
@@ -77,6 +82,7 @@ jobs:
           mkdir wm && tar -xzf "dist/kalmido-$VER.tar.gz" -C wm
           if [ -f "wm/kalmido-$VER/tools/web_manifest.py" ]; then
             python3 "wm/kalmido-$VER/tools/web_manifest.py" --root "wm/kalmido-$VER" --twice -o "dist/web-manifest-$VER.json"
+            echo "manifest=yes" >> "$GITHUB_OUTPUT"  # 2.761.0 (#5218): the job attest signs it
           else
             echo "::notice title=web manifest::v$VER has no tools/web_manifest.py (before 2.742.0): no web manifest"
           fi
@@ -91,10 +97,31 @@ jobs:
             notes.md
           retention-days: 1
 
+  attest:
+    name: Attest the web manifest (Sigstore, keyless)
+    needs: pick
+    if: needs.pick.outputs.version != '' && needs.pick.outputs.manifest == 'yes'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: weekly-release
+      # 2.761.0 (#5218): the attestation binds the SHA-256 of web-manifest-X.Y.Z.json to this workflow of this repository;
+      # check: gh attestation verify web-manifest-X.Y.Z.json -R github.com/Gegenschuss/kalmido (SECURITY.md)
+      - name: Attest web-manifest-X.Y.Z.json
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/web-manifest-${{ needs.pick.outputs.version }}.json
+
   publish:
     name: Publish the weekly release, move :latest
-    needs: pick
-    if: needs.pick.outputs.version != ''
+    needs: [pick, attest]
+    # 2.761.0 (#5218): after the attestation; skipped only for a version without a web manifest (before 2.742.0)
+    if: ${{ !cancelled() && needs.pick.result == 'success' && needs.pick.outputs.version != '' && (needs.attest.result == 'success' || (needs.attest.result == 'skipped' && needs.pick.outputs.manifest != 'yes')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:

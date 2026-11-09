@@ -54,6 +54,22 @@ wjob = {m.group(1): m.group(2) for m in re.finditer(r"^  ([a-z-]+):\n((?:    .*\
 check("write" not in wjob["pick"], "#5011: the weekly job with checkout cannot write")
 check(len(re.findall(r"uses:", wjob["publish"])) == 1 and "download-artifact@" in wjob["publish"] and "contents: write" in wjob["publish"],
       "#5011: the weekly job that writes runs only download-artifact")
+# 2.761.0 (#5218): code integrity stage 1b - the image (release.yml) and web-manifest-X.Y.Z.json (weekly-release.yml) get a
+# GitHub build attestation (Sigstore, keyless); the signing job of the weekly release runs no code of the repository
+ATT = "actions/attest-build-provenance@"
+check(ATT in job["release"] and "id-token: write" in job["release"] and "attestations: write" in job["release"]
+      and "subject-digest: ${{ steps.build.outputs.digest }}" in job["release"] and "subject-name: ghcr.io/gegenschuss/kalmido" in job["release"],
+      "#5218: release.yml attests the pushed image digest")
+check(job["release"].index(ATT) > job["release"].index("id: build"), "#5218: the attestation comes after the build")
+check("id-token" not in head and all("id-token" not in j for n, j in job.items() if n != "release"), "#5218: only the image job of release.yml gets the OIDC token")
+check("attest" in wjob and ATT in wjob["attest"] and "subject-path: dist/web-manifest-${{ needs.pick.outputs.version }}.json" in wjob["attest"],
+      "#5218: the weekly release attests web-manifest-X.Y.Z.json")
+check("checkout@" not in wjob["attest"] and "run:" not in wjob["attest"] and "contents: write" not in wjob["attest"]
+      and "packages: write" not in wjob["attest"] and "id-token: write" in wjob["attest"],
+      "#5218: the signing job: OIDC token, no checkout, no shell, no write right on contents / packages")
+check(all("id-token" not in j for n, j in wjob.items() if n != "attest"), "#5218: no other weekly job has the OIDC token")
+check(re.search(r"needs: \[pick, attest\]", wjob["publish"]) and "needs.attest.result == 'success'" in wjob["publish"],
+      "#5218: the release is published only after the attestation")
 
 # ------------------------------------------------------------------ #2913 notices
 notes = read("THIRD_PARTY_NOTICES.md").lower()
