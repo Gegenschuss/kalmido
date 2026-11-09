@@ -1267,6 +1267,7 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .wlk-end{flex:1;display:flex;align-items:center;justify-content:center}
 @media (max-width:767px) {
   .wlkdlg .card{min-height:100%}
+  .wlk-keys{display:none}  /* a narrow screen is mostly a phone: no keys */
   .wlk-cands .ocd,.ocdrow:not(.ocdgrid) .ocd{flex-basis:100%}
   .ocdrow.ocdgrid{display:flex;overflow-x:auto}
   .ocdrow.ocdgrid .ocd{flex-basis:100%}
