@@ -186,6 +186,16 @@ async function jth_load(j) {
   t.busy = false;
   jth_fill(j);
 }
+// 2.758.0 (#5223): an open conversation follows a newer version on its own (at most every 3 s; nothing is fetched while the
+// version stays). It used to be caught only by a redraw of the page - and by its own exchange, which fired "toggle" again and
+// rebuilt the section without end
+setInterval(() => {
+  if (document.hidden || S.route?.mod !== 'agents' || !S.jobThOpen) return;
+  for (const d of document.querySelectorAll('#view details.jobth[open]')) {
+    const j = (S.jobs?.items || []).find(x => x.id === +d.dataset.jid), t = j && S.jth[j.id];
+    if (t && t.msgs && !t.busy && t.v !== S.v && Date.now() - t.at > 3000) jth_load(j);
+  }
+}, 3000);
 document.addEventListener('toggle', e => {
   const d = e.target instanceof Element && e.target.matches?.('details.jobth') ? e.target : null; if (!d) return;
   (S.jobThOpen || (S.jobThOpen = {}))[d.dataset.jid] = d.open;
