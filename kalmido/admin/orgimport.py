@@ -72,15 +72,18 @@ class OiT:
              rows are removed with their parent by a foreign key ON DELETE CASCADE)
     fixed    constant values
     key      2.137.0 A (#2344): tables without id (rid=False) whose rows are recorded for undo by these columns + the space
-             column (office_numbers, office_settings ...: [table, {column: value}, space] in run.created["oi"])"""
+             column (office_numbers, office_settings ...: [table, {column: value}, space] in run.created["oi"])
+    src      2.763.0 (#5269): {column: archive column} for refs whose value the archive holds under another name (the reactions of
+             the core's obj_reactions: target_id <- comment_id / message_id)"""
 
     def __init__(self, path, table, kind=None, refs=None, need=(), late=None, people=None, space=("org_id",), private="user",
-                 label=None, prep=None, after=None, enc=True, rid=True, fixed=None, key=()):
+                 label=None, prep=None, after=None, enc=True, rid=True, fixed=None, key=(), src=None):
         self.path, self.table, self.kind = path, table, kind or table
         self.refs, self.need, self.late, self.people = refs or {}, tuple(need), late or {}, people or {}
         self.space, self.private, self.label = tuple(space), private, label
         self.prep, self.after, self.enc, self.rid, self.fixed = prep, after, enc, rid, fixed or {}
         self.key = tuple(key)
+        self.src = src or {}
 
 
 class OiFix:
@@ -267,7 +270,7 @@ def oi_write(c, run, uid, man, zf, files, data, who):
             fixed = dict(spec.fixed)
             skip = False
             for col, kind in spec.refs.items():
-                v = src.get(col)
+                v = src.get(spec.src.get(col, col))
                 new = run.m(kind, v) if v is not None else None
                 if new is None and v is not None and col in spec.need:
                     skip = "left" if kind in ("tasks", "comments") and run.m(kind + "_left", v) else True

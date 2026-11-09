@@ -765,8 +765,9 @@ SPECS = [
         space=(), label=N_("Time entries"), prep=_chain(_time, _time_person, _billed)),
     OiT("time_sheets.json", "time_sheets", people={"user_id": "null", "decided_by": "null"}, label=N_("Time entries"),
         prep=_chain(_person("user_id"), _ts_month)),
-    OiT("comments/reactions.json", "comment_reactions", refs={"comment_id": "comments"}, need=("comment_id",),
-        people={"user_id": "need"}, space=(), rid=False, label=N_("Reactions")),
+    # 2.763.0 (#5269): into the core's obj_reactions; the archive (also an older one) names the target comment_id / message_id
+    OiT("comments/reactions.json", "obj_reactions", kind="obj_reactions_comment", refs={"target_id": "comments"}, src={"target_id": "comment_id"},
+        need=("target_id",), people={"user_id": "need"}, space=(), rid=False, fixed={"target_kind": "comment"}, label=N_("Reactions")),
     # chat
     # 2.362.0 (#3092): + the organisation's channels with their members and the files of the messages
     OiT("chat/channels.json", "tchat_rooms", refs={"list_id": "lists"}, people={"created_by": "null"}, space=(), label=N_("Team chat"),
@@ -777,8 +778,8 @@ SPECS = [
     OiT("chat/messages.json", "tchat_msgs", refs={"room_id": "tchat_rooms", "task_id": "tasks"}, need=("room_id",),
         people={"user_id": "null", "pinned_by": "null"}, late={"reply_to": "tchat_msgs", "thread_of": "tchat_msgs"}, space=(), enc=False, label=N_("Team chat"),
         prep=_msg),
-    OiT("chat/reactions.json", "tchat_rx", refs={"message_id": "tchat_msgs"}, need=("message_id",), people={"user_id": "need"},
-        space=(), rid=False, label=N_("Team chat")),
+    OiT("chat/reactions.json", "obj_reactions", kind="obj_reactions_tchat", refs={"target_id": "tchat_msgs"}, src={"target_id": "message_id"},
+        need=("target_id",), people={"user_id": "need"}, space=(), rid=False, fixed={"target_kind": "tchat"}, label=N_("Team chat")),
     OiT("chat/files.json", "tchat_files", refs={"message_id": "tchat_msgs", "room_id": "tchat_rooms"}, need=("message_id", "room_id"),
         people={"user_id": "null"}, space=(), enc=False, label=N_("Team chat"), prep=_chat_file),
     # shares of calendars and address books (only with ticked people)

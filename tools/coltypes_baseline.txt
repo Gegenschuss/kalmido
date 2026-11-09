@@ -101,13 +101,11 @@ cal_subs.tried_at time
 cal_subs.updated_at time
 cal_subs.visible bool
 chat_files.created_at time
-chat_reactions.created_at time
 chat_saves.created_at time
 clients.archived bool
 clients.created_at time
 clients.deleted_at time
 clients.updated_at time
-comment_reactions.created_at time
 comments.created_at time
 comments.deleted_at time
 comments.edited_at time
@@ -763,7 +761,6 @@ tchat_rooms.deleted_at time
 tchat_rooms.is_open bool
 tchat_rooms.last_at time
 tchat_rooms.updated_at time
-tchat_rx.created_at time
 template_files.created_at time
 templates.created_at time
 templates.data json

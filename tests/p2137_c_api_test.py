@@ -285,7 +285,7 @@ M1 = ok(A.post(B + f"/api/team/rooms/{RID}/messages", json={"body": "Start um ne
 ok(Bo.post(B + f"/api/team/rooms/{RID}/messages", json={"body": "Passt", "reply_to": M1}), "bob answers")
 ok(Do.post(B + f"/api/team/rooms/{RID}/messages", json={"body": "Ich komme später"}), "dora writes")
 M1 = M1 or one("SELECT MIN(id) FROM tchat_msgs WHERE room_id=?", (RID,))
-dbx("INSERT INTO tchat_rx(message_id,user_id,emoji,created_at) VALUES(?,?,?,?)", (M1, BOB, "up", NOW))
+dbx("INSERT INTO obj_reactions(target_kind,target_id,user_id,emoji,created_at) VALUES('tchat',?,?,?,?)", (M1, BOB, "up", NOW))  # 2.763.0 (#5269): the reactions are rows of the core (obj_reactions)
 # 2.581.0 (#4811): a channel of the organisation with bob (the team chat on the core, #4719: its node carries bob's share)
 ok(A.post(B + "/api/team/channels", json={"name": "Studio", "org_id": ORG, "members": [BOB]}), "a channel with bob")
 # notes, notepads, playbook, form, rules
@@ -417,7 +417,9 @@ by = {x["body"]: dict(x) for x in msgs}
 check(by.get("Start um neun", {}).get("user_id") == ALICE and by.get("Passt", {}).get("user_id") is None, "authors: alice, bob (ticked) without account")
 check(by.get("Ich komme später", {}).get("user_id") is None, "dora (not ticked): the message stays without author")
 check(by.get("Passt", {}).get("reply_to") == by.get("Start um neun", {}).get("id"), "the answer points at the new message")
-check(T("SELECT user_id FROM tchat_rx WHERE message_id=?", (by.get("Start um neun", {}).get("id"),)) == [], "2.237.0 (#2870): bob's chat reaction not under his account")
+# 2.763.0 (#5269): the reactions are rows of the core (obj_reactions)
+check(T("SELECT user_id FROM obj_reactions WHERE target_kind='tchat' AND target_id=?", (by.get("Start um neun", {}).get("id"),)) == [],
+      "2.237.0 (#2870): bob's chat reaction not under his account")
 # persons' rows: bob yes, dora no
 check(one("SELECT COUNT(*) FROM hub_absences WHERE org_id=? AND user_id=?", (ORG3, BOB)) == 1, "bob's absence came along")
 check(one("SELECT COUNT(*) FROM hub_absences WHERE org_id=? AND user_id=?", (ORG3, DORA)) == 0, "dora's absence not")
@@ -439,7 +441,7 @@ check(NFD and NFD2 and hist == sorted([("move", str(NFD2)), ("move", ""), ("move
 check(one("SELECT COUNT(*) FROM task_enc_notes WHERE task_id=?", (NT,)) == 0 and "belong to other people" in W, "bob's encrypted note not taken over")
 check(one("SELECT user_id FROM task_people WHERE task_id=?", (NT,)) == BOB, "bob comes along to the new task")
 NC2 = one("SELECT id FROM comments WHERE task_id=?", (NT,))
-check(one("SELECT user_id FROM comment_reactions WHERE comment_id=?", (NC2,)) == ALICE, "the comment reaction came along")
+check(one("SELECT user_id FROM obj_reactions WHERE target_kind='comment' AND target_id=?", (NC2,)) == ALICE, "the comment reaction came along")  # 2.763.0 (#5269): the reactions are rows of the core (obj_reactions)
 bks = T("SELECT resource_kind, resource_id FROM hub_bookings WHERE org_id=?", (ORG3,))
 check(("user", BOB) in bks and ("user", DORA) not in bks, f"bookings: bob yes, dora no {bks}")  # the equipment: with part A
 # shares

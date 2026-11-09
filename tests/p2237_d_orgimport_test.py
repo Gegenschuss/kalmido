@@ -179,7 +179,7 @@ RID = rooms[0]["id"] if rooms else 0
 M1 = ok(A.post(B + f"/api/team/rooms/{RID}/messages", json={"body": "Start um neun"}), "alice writes").get("id")
 ok(Bo.post(B + f"/api/team/rooms/{RID}/messages", json={"body": "Passt", "reply_to": M1}), "bob answers")
 M1 = M1 or one("SELECT MIN(id) FROM tchat_msgs WHERE room_id=?", (RID,))
-dbx("INSERT INTO tchat_rx(message_id,user_id,emoji,created_at) VALUES(?,?,?,?)", (M1, BOB, "up", NOW))
+dbx("INSERT INTO obj_reactions(target_kind,target_id,user_id,emoji,created_at) VALUES('tchat',?,?,?,?)", (M1, BOB, "up", NOW))  # 2.763.0 (#5269): the reactions are rows of the core (obj_reactions)
 for s, who in ((A, "alice"), (Bo, "bob")):
     ok(s.post(B + "/api/time/entries", json={"list_id": LO, "start": "2026-10-12T09:00", "minutes": 30, "note": f"Schnitt {who}"}),
        f"time entry of {who}")
@@ -221,7 +221,8 @@ check(NL and NT and NR, "list, task and channel are in the new organisation")
 by = {x["body"]: x["user_id"] for x in dbx("SELECT body, user_id FROM tchat_msgs WHERE room_id=?", (NR,))}
 check(by.get("Start um neun") == ALICE, f"alice's own message keeps her as author {by}")
 check("Passt" in by and by["Passt"] is None, f"bob's message comes without an account as author {by}")
-check(not dbx("SELECT 1 FROM tchat_rx x JOIN tchat_msgs m ON m.id=x.message_id WHERE m.room_id=? AND x.user_id=?", (NR, BOB)),
+# 2.763.0 (#5269): the reactions are rows of the core (obj_reactions)
+check(not dbx("SELECT 1 FROM obj_reactions x JOIN tchat_msgs m ON m.id=x.target_id AND x.target_kind='tchat' WHERE m.room_id=? AND x.user_id=?", (NR, BOB)),
       "no reaction under bob's account")
 te = dbx("SELECT user_id, note FROM time_entries WHERE list_id=? ORDER BY note", (NL,))
 check(len(te) == 2 and all(x["user_id"] == ALICE for x in te), f"both time entries under the importing person {[dict(x) for x in te]}")

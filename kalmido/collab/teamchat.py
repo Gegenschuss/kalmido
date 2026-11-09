@@ -25,6 +25,7 @@ from ..collab.reactions import clean_emoji
 from ..collab.replies import reply_check, reply_quotes
 from ..collab.comments import mention_names  # 2.369.5 (#2517): pulled up from functions
 from .cmttrash import tcx_trash, tcx_restore
+from ..core.objreact import orx_of, orx_set, orx_toggle  # 2.763.0 (#5269): the reactions of the shared core
 
 
 # ---------------------------------------------------------------- 2.17.0 (#419): team chat
@@ -413,21 +414,8 @@ def tchat_msg_brief(c, m):
 
 
 def tchat_rx(c, ids):
-    out = {}
-    if not ids:
-        return out
-    names = {}
-    rows = c.execute(f"SELECT message_id, user_id, emoji FROM tchat_rx WHERE message_id IN ({','.join('?' * len(ids))}) ORDER BY created_at",
-                     list(ids)).fetchall()
-    names = user_names(c, {r["user_id"] for r in rows})
-    for r in rows:
-        lst = out.setdefault(r["message_id"], [])
-        e = next((x for x in lst if x["emoji"] == r["emoji"]), None)
-        if not e:
-            e = {"emoji": r["emoji"], "users": []}
-            lst.append(e)
-        e["users"].append({"id": r["user_id"], "name": names.get(r["user_id"], "?")})
-    return out
+    """{message id: [{emoji, count, users}]} -- the core's reactions (2.763.0, #5269: obj_reactions, kind tchat)."""
+    return orx_of(c, "tchat", ids)
 
 
 def tchat_msg_dict(c, m, rx=None, quotes=None, files=None, th=None):
@@ -438,7 +426,8 @@ def tchat_msg_dict(c, m, rx=None, quotes=None, files=None, th=None):
     return {"id": m["id"], "room_id": m["room_id"], "user_id": m["user_id"], "body": "" if m["deleted_at"] else m["body"],
             "task": {"id": t["id"], "title": t["title"]} if t and task_visible(c, t["id"], me()) else None,
             "created_at": m["created_at"], "edited_at": m["edited_at"], "deleted": bool(m["deleted_at"]),
-            "reactions": (rx or {}).get(m["id"], []), "reply_to": rt, "reply": rq,
+            # 2.763.0 (#5269): a deleted message keeps its reactions in the trash (a restore brings them back), it shows none
+            "reactions": [] if m["deleted_at"] else (rx or {}).get(m["id"], []), "reply_to": rt, "reply": rq,
             "enc": None if m["deleted_at"] or not m["enc"] else _e2e_parse(m["enc"]),  # 2.42.0 (#909): {v, iv, ct} | {sys}
             # 2.62.0 (#1848): pinned (collab/chatpins.py); a deleted message is never pinned
             "pinned_at": None if m["deleted_at"] or "pinned_at" not in m.keys() else m["pinned_at"],
@@ -902,8 +891,7 @@ def tchat_delete(mid):
     c = db()
     need_tchat(c)
     m, _r = need_tmsg(c, mid, edit="delete")
-    tcx_trash(c, mid)
-    c.execute("DELETE FROM tchat_rx WHERE message_id=?", (mid,))
+    tcx_trash(c, mid)  # 2.763.0 (#5269): the reactions stay with it until the trash run (a restore brings them back, decided 08.11.2026)
     c.commit()
     return jsonify(ok=True, id=mid)
 
@@ -933,15 +921,12 @@ def tchat_react(mid):
     need_dm_open(c, _r)  # 2.266.0 (#2970)
     b = body()
     emoji = clean_emoji(b.get("emoji"))
-    have = c.execute("SELECT 1 FROM tchat_rx WHERE message_id=? AND user_id=? AND emoji=?", (mid, me(), emoji)).fetchone() is not None
-    on = b["on"] if isinstance(b.get("on"), bool) else not have
-    if on and m["user_id"] == me():  # 2.23.0 (#823): not on one's own message
-        return err(tr("You cannot react to your own message"))
-    if on:
-        need_room_say(c, _r)  # 2.607.0 (#4549): taking a reaction back stays
-        c.execute("INSERT INTO tchat_rx(message_id,user_id,emoji,created_at) VALUES(?,?,?,?) ON CONFLICT DO NOTHING", (mid, me(), emoji, iso_ms(now_utc())))
-    else:
-        c.execute("DELETE FROM tchat_rx WHERE message_id=? AND user_id=? AND emoji=?", (mid, me(), emoji))
+    try:  # 2.763.0 (#5269): the core's one rule (own message 400, a guest / read-only person 403; taking one back stays)
+        on = orx_toggle(c, "tchat", mid, me(), emoji, b["on"] if isinstance(b.get("on"), bool) else None, own=m["user_id"] == me(),
+                        say=lambda: tchat_say_refusal(c, _r, me()))
+    except BadInput as e:
+        return err(str(e))
+    orx_set(c, "tchat", mid, me(), emoji, on)
     c.commit()
     return jsonify(ok=True, message_id=mid, reactions=tchat_rx(c, [mid]).get(mid, []))
 

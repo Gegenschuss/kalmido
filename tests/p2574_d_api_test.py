@@ -285,7 +285,7 @@ with _pg.system_ctx(c):
         time.sleep(0.05)
     sug["approvals"] = []  # carol takes her thumb back first
     c.execute("UPDATE comments SET suggestion=? WHERE id=?", (json.dumps(sug), cid))
-    c.execute("DELETE FROM comment_reactions WHERE comment_id=? AND emoji='up'", (cid,))
+    c.execute("DELETE FROM obj_reactions WHERE target_kind='comment' AND target_id=? AND emoji='up'", (cid,))  # 2.763.0 (#5269): the reactions are rows of the core (obj_reactions)
 c.commit()
 print("done", n, flush=True)
 """

@@ -39,11 +39,11 @@ TP_PLAIN = (
     ("sheet_columns", "sheet_columns", " AND sheet_id IN (SELECT id FROM sheets WHERE deleted_at IS NULL)"),
     ("deals", "office_deals", ""),  # office_docs.deal_id: ON DELETE SET NULL
     ("series", "office_inv_series", ""),  # the invoices made stay (series_id is a plain number)
-    # body is empty already; tchat_rx cascade. 2.152.0 (#2165, review C-H2): a thread's first message stays while replies point
+    # body is empty already; its reactions go by trigger (obj_reactions, 2.763.0 #5269). 2.152.0 (#2165, review C-H2): a thread's first message stays while replies point
     # at it (thread_of has no FK; without the root the replies can no longer be reached) -- it goes once its replies went
     # 2.530.0 A (#4315): + the kept text (tchat_trash_text cascades) and the files of the message (rows cascade, the disk after the commit)
     ("chat_tombstones", "tchat_msgs", " AND NOT EXISTS (SELECT 1 FROM tchat_msgs r WHERE r.thread_of=tchat_msgs.id)"),
-    # body is empty; reactions and (2.530.0 A, #4315) the kept text cascade; its files went through atr_tick above (same deleted_at)
+    # body is empty; reactions (trigger, #5269) and (2.530.0 A, #4315) the kept text go along; its files went through atr_tick above (same deleted_at)
     ("comments", "comments", ""),
     # 2.272.0 D (#3029): clients (contact persons, data protection sheets, mail-in addresses cascade -- video reviews go to their
     # own trash first, 2.530.0 D #4316; mails,

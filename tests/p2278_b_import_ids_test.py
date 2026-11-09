@@ -156,7 +156,7 @@ M2 = ok(A.post(B + f"/api/team/rooms/{RID}/messages", json={"body": "Thread Antw
 M1 = M1 or one("SELECT MIN(id) FROM tchat_msgs WHERE room_id=?", (RID,))
 M2 = M2 or one("SELECT MAX(id) FROM tchat_msgs WHERE room_id=?", (RID,))
 dbx("UPDATE tchat_msgs SET thread_of=? WHERE id=?", (M1, M2))
-dbx("INSERT INTO tchat_rx(message_id,user_id,emoji,created_at) VALUES(?,?,?,?)", (M1, BOB, "up", NOW))
+dbx("INSERT INTO obj_reactions(target_kind,target_id,user_id,emoji,created_at) VALUES('tchat',?,?,?,?)", (M1, BOB, "up", NOW))  # 2.763.0 (#5269): the reactions are rows of the core (obj_reactions)
 # a task in the trash with a comment + reaction (the trash stays behind: no warning for what hangs on it)
 TT = ok(A.post(B + "/api/tasks", json={"title": "Weg damit", "list_id": LO}), "task for the trash")["id"]
 CT = ok(A.post(B + f"/api/tasks/{TT}/comments", json={"body": "Notiz"}), "comment").get("id")

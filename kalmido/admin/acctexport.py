@@ -438,10 +438,11 @@ def umz_mine_queries(uid):
                             AND deleted_at IS NULL AND list_id IN {vis} AND list_id NOT IN {own} ORDER BY id""",
                         (uid, uid, uid, uid, uid, uid)),
         "task_people": ("SELECT task_id FROM task_people WHERE user_id=? ORDER BY task_id", (uid,)),
-        "reactions": ("""SELECT 'comment' AS kind, comment_id AS target_id, emoji, created_at FROM comment_reactions WHERE user_id=?
-                         UNION ALL SELECT 'message', message_id, emoji, created_at FROM tchat_rx WHERE user_id=?
-                         UNION ALL SELECT 'agent_chat', message_id, emoji, created_at FROM chat_reactions WHERE user_id=?
-                         ORDER BY created_at""", (uid, uid, uid)),
+        # 2.763.0 (#5269): one table of the core (obj_reactions); the file keeps its kinds (message = a team chat message) and
+        # the time as ISO text in UTC like before
+        "reactions": ("""SELECT CASE target_kind WHEN 'tchat' THEN 'message' ELSE target_kind END AS kind, target_id, emoji,
+                         to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"+00:00"') AS created_at
+                         FROM obj_reactions WHERE user_id=? ORDER BY obj_reactions.created_at, target_kind, target_id""", (uid,)),
         "kid_stars": ("SELECT id, delta, kind, task_id, reward_id, title, at, created_at FROM kid_stars WHERE kid_id=? ORDER BY id", (uid,)),
         # 2.531.0 (#4317 F12): my family links and my connections: the other person by name and address hash only (umz_build), as on
         # the people of my lists; role = what the other person is to me (parent | kid)

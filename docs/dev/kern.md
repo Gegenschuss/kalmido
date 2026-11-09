@@ -339,3 +339,21 @@ What is there today stands in `tools/core_crosscut_allow.json` with its reason: 
 logic (a task's placement in lists, a mail's text, an IMAP de-duplication ...). The list grows only with a decision of the product owner.
 A stage that takes a table or a function down takes its line out in the same commit; a line whose table or function is gone is
 red.
+
+### Reactions (stage Q1, 2.763.0, #5269)
+
+One table `obj_reactions(target_kind, target_id, user_id, emoji, created_at TIMESTAMPTZ)` holds every reaction; it replaced
+`comment_reactions`, `tchat_rx` and `chat_reactions`. Target kinds: `comment` (comments of tasks), `tchat` (team chat
+messages), `agent_chat` (the chat with an agent). `kalmido/core/objreact.py`:
+- `orx_toggle(c, kind, id, uid, emoji, on, own=, say=)`: the one rule -- not on one's own message (400, taking an old one back
+  works) and not for who may only read (`say`: the area's hook returning the organisation's refusal text,
+  `accounts/orgroles.py org_say_refusal`; 403; taking one back stays). `on=None` toggles.
+- `orx_set` writes it, `orx_of` reads `{id: [{emoji, count, users}]}` (emojis in the order of their first use).
+- What a reaction means on top (an approval, a suggestion applied, an agent's event) stays in the area
+  (`collab/reactions.py react`, `agents/chat.py chat_react`).
+
+The target has no foreign key; the trigger `kalmido_orx_gone` deletes a target's reactions when its row is deleted for good.
+A comment or team chat message in the trash keeps them (it shows none), a restore brings them back. The organisation export
+writes them into the old files (`comments/reactions.json` with `comment_id`, `chat/reactions.json` with `message_id`), so
+older archives and new ones import the same way. A new area with reactions adds its kind to `ORX_KINDS` and a trigger line in
+a fragment -- no table of its own.

@@ -20,10 +20,11 @@ from flask import g, jsonify
 
 from ..core.config import app
 from ..core.i18n import tr
-from ..core.db import body, bump, db, err, iso, iso_ms, now_utc
+from ..core.db import body, bump, db, err, iso, now_utc
 from ..accounts.session import me
 from ..core.access import Denied, list_role, need_collab, task_visible, tvis
 from ..core.errors import BadInput, UnknownFields
+from ..core.objreact import orx_set  # 2.763.0 (#5269)
 from ..tasks.oneway import DEPLOY_TAG, gate_irreversible, irreversible_open  # noqa: F401  (irreversible_open: the name other modules use here)
 from ..collab.comments import comment_plain, need_live_comment, user_names  # 2.369.5 (#2517): pulled up from functions
 from ..agents.core import agent_emit, agent_task_data, is_agent, is_approver  # 2.369.5 (#2517): pulled up from functions
@@ -178,12 +179,10 @@ def gate_decide_route(cid):
     approve = b["decision"] == "approve"
     st = gate_decide(c, k, t, me(), approve, b.get("skip_checklist", False))
     if st == "waiting":  # 2.574.0 (#3376): the first of two approvals -- the thumb is recorded, nobody is told yet
-        c.execute("INSERT INTO comment_reactions(comment_id,user_id,emoji,created_at) VALUES(?,?,?,?) ON CONFLICT DO NOTHING",
-                  (cid, me(), "up", iso_ms(now_utc())))
+        orx_set(c, "comment", cid, me(), "up", True)  # 2.763.0 (#5269): the core's reactions
         log_act(c, t["id"], "approval", {"agent": k["user_id"], "comment": cid, "ok": True, "waiting": True})
     elif st != "blocked":
-        c.execute("INSERT INTO comment_reactions(comment_id,user_id,emoji,created_at) VALUES(?,?,?,?) ON CONFLICT DO NOTHING",
-                  (cid, me(), "up" if approve else "down", iso_ms(now_utc())))
+        orx_set(c, "comment", cid, me(), "up" if approve else "down", True)
         log_act(c, t["id"], "approval", {"agent": k["user_id"], "comment": cid, "ok": approve})
         author = c.execute("SELECT * FROM users WHERE id=?", (k["user_id"],)).fetchone()
         k2 = c.execute("SELECT * FROM comments WHERE id=?", (cid,)).fetchone()

@@ -23,6 +23,7 @@ from ..tasks.deliver import dv_job_ended  # 2.392.2 (#3365)
 from ..tasks.attachments import safe_name, send_stored, unexec_name
 from ..collab.comments import user_names
 from ..core.errors import BadInput, UnknownFields, web_fields
+from ..core.objreact import orx_of, orx_set, orx_toggle  # 2.763.0 (#5269): the reactions of the shared core
 from ..notify.alerts import aa_count, aa_oserr
 from ..api.v1 import task_for
 from ..api.common import hit_limit, v1_args, v1_json, v1_view
@@ -835,21 +836,9 @@ def chat_asks(body):
 
 
 def chat_reactions_of(c, mids):
-    """2.7.2 (#421): {message id: [{emoji, count, users: [{id, name}]}]} like reactions_of for comments."""
-    out, mids = {}, [x for x in mids if x]
-    if not mids:
-        return out
-    for r in c.execute(f"""SELECT r.message_id, r.emoji, r.user_id, u.display_name, u.username FROM chat_reactions r
-                           JOIN users u ON u.id=r.user_id WHERE r.message_id IN ({','.join('?' * len(mids))})
-                           ORDER BY r.created_at, r.user_id""", mids):
-        lst = out.setdefault(r["message_id"], [])
-        e = next((x for x in lst if x["emoji"] == r["emoji"]), None)
-        if not e:
-            e = {"emoji": r["emoji"], "count": 0, "users": []}
-            lst.append(e)
-        e["count"] += 1
-        e["users"].append({"id": r["user_id"], "name": r["display_name"] or r["username"]})
-    return out
+    """2.7.2 (#421): {message id: [{emoji, count, users: [{id, name}]}]} like reactions_of for comments.
+    2.763.0 (#5269): the core's reactions (obj_reactions, kind agent_chat)."""
+    return orx_of(c, "agent_chat", mids)
 
 
 def chat_delivered(c, aid, mids=None, user_id=None):
@@ -1258,10 +1247,9 @@ def chat_react(c, m, uid, emoji, on):
     """Adds (on) / removes uid's reaction on chat row m. Returns {approval} (caller commits)."""
     res = {"approval": None}
     if not on:
-        c.execute("DELETE FROM chat_reactions WHERE message_id=? AND user_id=? AND emoji=?", (m["id"], uid, emoji))
+        orx_set(c, "agent_chat", m["id"], uid, emoji, False)
         return res
-    if not c.execute("INSERT INTO chat_reactions(message_id,user_id,emoji,created_at) VALUES(?,?,?,?) ON CONFLICT DO NOTHING",
-                     (m["id"], uid, emoji, iso_ms(now_utc()))).rowcount:
+    if not orx_set(c, "agent_chat", m["id"], uid, emoji, True):
         return res
     u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
     if is_agent(u) or m["sender"] != "agent" or uid != m["user_id"]:
@@ -1287,11 +1275,10 @@ def chat_react_req(c, m, uid):
     emoji = clean_emoji(b.get("emoji"))
     if "on" in b and not isinstance(b["on"], bool):
         raise BadInput(tr("Invalid value: {0}", "on"))
-    have = bool(c.execute("SELECT 1 FROM chat_reactions WHERE message_id=? AND user_id=? AND emoji=?", (m["id"], uid, emoji)).fetchone())
-    on = b["on"] if isinstance(b.get("on"), bool) else not have
     own = (m["sender"] == "agent" and uid == m["agent_id"]) or (m["sender"] != "agent" and uid == m["user_id"])
-    if on and own:  # 2.23.0 (#823): not on one's own message
-        raise BadInput(tr("You cannot react to your own message"))
+    # 2.763.0 (#5269): the core's one rule (own message 400); a conversation of one person with their agent has no organisation
+    # roles to ask (no say hook)
+    on = orx_toggle(c, "agent_chat", m["id"], uid, emoji, b.get("on"), own=own)
     res = chat_react(c, m, uid, emoji, on)
     c.commit()
     return {"ok": True, "message_id": m["id"], "reactions": chat_reactions_of(c, [m["id"]]).get(m["id"], []), **res}

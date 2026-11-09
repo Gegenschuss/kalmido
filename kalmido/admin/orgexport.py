@@ -199,8 +199,14 @@ def _ox_dec_row(c, oid, table, row):
     return row
 
 
+# 2.763.0 (#5269): the column a reaction's target had in the archive before the core's table (the import reads it so, old archives too)
+OX_RX_COL = {"comment": "comment_id", "tchat": "message_id"}
+
+
 def _clean(c, oid, table, r):
     row = {k: v for k, v in dict(r).items() if k not in OX_SECRET_COLS}
+    if table == "obj_reactions":
+        row[OX_RX_COL[row.pop("target_kind")]] = row.pop("target_id")
     row.pop("legacy_aad", None)  # 2.278.0 C (#3091): a person's own move detail (old AAD), not the organisation's
     return _ox_dec_row(c, oid, table, row)
 
@@ -286,7 +292,10 @@ OX_AREAS = (
     ("time_entries.json", "time_entries", f"list_id IN ({LSQ})"),
     ("time_sheets.json", "time_sheets", "org_id=?"),  # 2.137.0 C (#2344): monthly timesheets (note decrypted like the others)
     ("comments.json", "comments", f"task_id IN ({TSQ})"),
-    ("comments/reactions.json", "comment_reactions", f"comment_id IN (SELECT id FROM comments WHERE task_id IN ({TSQ}))"),
+    # 2.763.0 (#5269): the reactions are rows of the core (obj_reactions); the file keeps its columns (_clean: comment_id), a
+    # comment in the trash leaves its reactions out (as OX_GONE_WITH did)
+    ("comments/reactions.json", "obj_reactions",
+     f"target_kind='comment' AND target_id IN (SELECT id FROM comments WHERE task_id IN ({TSQ}) AND deleted_at IS NULL)"),
     ("attachments.json", "attachments", f"task_id IN ({TSQ})"),
     # 2.48.0 (#1207): the organisation's file store (folders, files, versions, shares, history)
     # 2.223.3 B (#2879): without the trash (ox_live, ox_dead_nodes)
@@ -303,7 +312,8 @@ OX_AREAS = (
     ("chat/channels.json", "tchat_rooms", f"id IN ({RSQ})"),
     ("chat/members.json", "tchat_members", f"room_id IN ({CSQ})"),
     ("chat/messages.json", "tchat_msgs", f"room_id IN ({RSQ})"),
-    ("chat/reactions.json", "tchat_rx", f"message_id IN (SELECT id FROM tchat_msgs WHERE room_id IN ({RSQ}))"),  # 2.137.0 C (#2344)
+    ("chat/reactions.json", "obj_reactions",  # 2.137.0 C (#2344); 2.763.0 (#5269): rows of the core, the file keeps message_id
+     f"target_kind='tchat' AND target_id IN (SELECT id FROM tchat_msgs WHERE room_id IN ({RSQ}) AND deleted_at IS NULL)"),
     ("chat/files.json", "tchat_files", f"room_id IN ({RSQ})"),
     ("calendars.json", "ev_cals", "org_id=?"),
     # 2.647.0 (#5046): the members as the core has them -- a calendar / book with a reference node only the people / agents with a
@@ -528,8 +538,6 @@ OX_LEFT = {
 # the rows of a deleted parent with them. office_drives keeps them: a removed drive stays for the change log (tax office).
 OX_KEEP_DELETED = ("office_drives",)
 OX_GONE_WITH = {  # table -> (parent table, column) pairs: a row goes when its parent row is deleted
-    "comment_reactions": (("comments", "comment_id"),),
-    "tchat_rx": (("tchat_msgs", "message_id"),),
     "tchat_files": (("tchat_msgs", "message_id"),),  # 2.362.0 (#3092)
     "hub_mail_links": (("hub_mails", "mail_id"),),  # 2.362.0 (#3096)
     "event_attendees": (("events", "event_id"),),

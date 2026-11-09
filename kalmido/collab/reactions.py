@@ -6,14 +6,15 @@ from flask import g, has_request_context, jsonify
 from ..core.config import app
 from ..core.pg import insert_id, st_ids
 from ..core.i18n import tr
-from ..core.db import body, bump, db, err, iso, iso_ms, now_utc
+from ..core.db import body, bump, db, err, iso, now_utc
 from ..accounts.session import me
 from ..core.access import Denied, list_role, MANAGE_ROLES, need_collab, need_list, need_task, task_visible, WRITE_ROLES
 from ..lists.lists import clean_color, clean_list_value
 from ..tasks.validation import as_int, CONTENT_MAX, descendants, log_act, PRIORITIES, TITLE_MAX
 from ..tasks.tasks import one_task
 from ..tasks.lifecycle import apply_update
-from ..collab.comments import comment_plain, need_live_comment, need_task_say, user_names
+from ..collab.comments import comment_plain, need_live_comment, task_say_refusal, user_names
+from ..core.objreact import orx_of, orx_set, orx_toggle  # 2.763.0 (#5269): the reactions of the shared core
 from ..core.errors import BadInput, UnknownFields
 from ..lists.orglabels import olb_match  # 2.609.0 (#3373)
 from ..api.v1 import _tag_arg, PRIO_NAMES, PRIO_VALUES
@@ -25,21 +26,8 @@ from ..agents.core import (
 
 # ---- reactions
 def reactions_of(c, cids):
-    out = {}
-    cids = [x for x in cids if x]
-    if not cids:
-        return out
-    rows = c.execute(f"""SELECT r.comment_id, r.emoji, r.user_id, u.display_name, u.username FROM comment_reactions r
-                         JOIN users u ON u.id=r.user_id WHERE r.comment_id IN ({','.join('?' * len(cids))})
-                         ORDER BY r.created_at, r.user_id""", cids).fetchall()
-    for r in rows:
-        lst = out.setdefault(r["comment_id"], [])
-        e = next((x for x in lst if x["emoji"] == r["emoji"]), None)
-        if not e:
-            e = {"emoji": r["emoji"], "count": 0, "users": []}
-            lst.append(e)
-        e["count"] += 1
-        e["users"].append({"id": r["user_id"], "name": r["display_name"] or r["username"]})
+    """{comment id: [{emoji, count, users}]} -- the core's reactions (2.763.0, #5269), up / down / heart first."""
+    out = orx_of(c, "comment", cids)
     for lst in out.values():
         lst.sort(key=lambda x: REACTIONS.index(x["emoji"]) if x["emoji"] in REACTIONS else len(REACTIONS))  # stable: others by first use
     return out
@@ -77,22 +65,27 @@ def clean_emoji(v):
     raise BadInput(tr("A reaction is one emoji (or up, down, heart)"))
 
 
+def comment_rx_on(c, k, uid, emoji, on=None):
+    """2.763.0 (#5269): the core's one rule for a reaction on comment row k (core/objreact.py orx_toggle): not on one's own
+    comment, a guest / read-only person of the task's organisation does not react (taking one back stays). -> on."""
+    return orx_toggle(c, "comment", k["id"], uid, emoji, on, own=k["user_id"] == uid,
+                      say=lambda: task_say_refusal(c, k["task_id"], uid))
+
+
 def react(c, k, uid, emoji, on):
     """Adds (on) / removes my reaction; on a new 👍 / 👎: approval, suggestion apply / reject, event to an agent author.
-    Returns {"approval": ..., "applied": bool} (caller commits)."""
+    Returns {"approval": ..., "applied": bool} (caller commits). The rule (comment_rx_on) the caller asked before."""
     res = {"approval": None, "applied": False}
     if emoji in ("up", "down") and k["suggestion"]:  # 2.574.0 (#3376, review F2): a thumb taken back and another one at the same
         k = c.execute("SELECT * FROM comments WHERE id=? FOR UPDATE", (k["id"],)).fetchone() or k  # time read the stored state in turn
     if not on:
-        c.execute("DELETE FROM comment_reactions WHERE comment_id=? AND user_id=? AND emoji=?", (k["id"], uid, emoji))
+        orx_set(c, "comment", k["id"], uid, emoji, False)
         sg = json.loads(k["suggestion"]) if emoji == "up" and k["suggestion"] else None
         if sg and sg.get("state") == "open" and any(isinstance(a, dict) and a.get("by") == uid for a in sg.get("approvals") or []):
             sg["approvals"] = [a for a in sg["approvals"] if not (isinstance(a, dict) and a.get("by") == uid)]  # 2.574.0 (#3376): a first of two taken back
             c.execute("UPDATE comments SET suggestion=? WHERE id=?", (json.dumps(sg, ensure_ascii=False), k["id"]))
         return res
-    need_task_say(c, k["task_id"], uid)  # 2.607.0 (#4549): a guest / read-only person reacts not (taking one back stays)
-    if not c.execute("INSERT INTO comment_reactions(comment_id,user_id,emoji,created_at) VALUES(?,?,?,?) ON CONFLICT DO NOTHING",
-                     (k["id"], uid, emoji, iso_ms(now_utc()))).rowcount:
+    if not orx_set(c, "comment", k["id"], uid, emoji, True):
         return res
     t = c.execute("SELECT * FROM tasks WHERE id=?", (k["task_id"],)).fetchone()
     author = c.execute("SELECT * FROM users WHERE id=?", (k["user_id"],)).fetchone() if k["user_id"] else None
@@ -164,10 +157,10 @@ def comment_react(cid):
     k, _ = need_live_comment(c, cid)
     b = body()
     emoji = clean_emoji(b.get("emoji"))
-    have = bool(c.execute("SELECT 1 FROM comment_reactions WHERE comment_id=? AND user_id=? AND emoji=?", (cid, me(), emoji)).fetchone())
-    on = bool(b["on"]) if isinstance(b.get("on"), bool) else not have
-    if on and k["user_id"] == me():  # 2.23.0 (#823): not on one's own comment (taking an old one back still works)
-        return err(tr("You cannot react to your own message"))
+    try:  # 2.763.0 (#5269): the core's rule (own comment 400, a guest / read-only person 403)
+        on = comment_rx_on(c, k, me(), emoji, bool(b["on"]) if isinstance(b.get("on"), bool) else None)
+    except BadInput as e:
+        return err(str(e))
     res = react(c, k, me(), emoji, on)
     bump(c)
     c.commit()
@@ -260,8 +253,7 @@ def comment_apply(cid):
     if sug.get("state") != "open" or t["deleted_at"]:
         return err(tr("This suggestion was already handled"), 409)
     suggestion_apply(c, k, t)
-    c.execute("INSERT INTO comment_reactions(comment_id,user_id,emoji,created_at) VALUES(?,?,?,?) ON CONFLICT DO NOTHING",
-              (cid, me(), "up", iso_ms(now_utc())))
+    orx_set(c, "comment", cid, me(), "up", True)
     author = c.execute("SELECT * FROM users WHERE id=?", (k["user_id"],)).fetchone() if k["user_id"] else None
     if is_agent(author) and task_visible(c, t["id"], author["id"], full=True):
         k2 = c.execute("SELECT * FROM comments WHERE id=?", (cid,)).fetchone()

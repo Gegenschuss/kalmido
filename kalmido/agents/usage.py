@@ -32,7 +32,7 @@ from ..agents.core import (
     agent_active, AGENT_EVENTS, agent_row, agent_shares, AGENT_STATUSES, AGENT_TYPING_S, AGENT_WAIT_MAX, need_person,
     JOB_ACTIONS, JOB_STATES, need_agent, TIDY_MODES,
 )
-from ..collab.reactions import clean_emoji, ltag_create, ltag_delete, ltag_update, react, with_reactions
+from ..collab.reactions import clean_emoji, comment_rx_on, ltag_create, ltag_delete, ltag_update, react, with_reactions
 from ..agents.chat import CHAT_FILES_MAX
 from ..agents.safety import access_cleanup
 from ..agents.admin import need_agent_admin, need_own_agent
@@ -874,9 +874,8 @@ def v1_comment_react(cid):
     b = v1_json()
     if set(b) - {"emoji"}:
         raise BadInput(tr("Expected {0}", '{"emoji": "up"}'))
-    if k["user_id"] == me():  # 2.23.0 (#823)
-        raise BadInput(tr("You cannot react to your own message"))
-    react(c, k, me(), clean_emoji(b.get("emoji")), True)
+    emoji = clean_emoji(b.get("emoji"))
+    react(c, k, me(), emoji, comment_rx_on(c, k, me(), emoji, True))  # 2.763.0 (#5269): the core's rule (own 400, read-only 403)
     bump(c)
     c.commit()
     return jsonify(v1_comment_one(c, cid))
