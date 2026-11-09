@@ -40,7 +40,7 @@ out = run(NEW)
 got = {x.split(":")[1].strip().split(" ")[0] for x in out}
 check(got == {"meeting_marks.seen_at", "meeting_marks.is_done", "meeting_marks.pinned", "meeting_marks.extra_json", "meeting_marks.filters",
               "meeting_marks.valid_until"}, f"a new table: every column of the old habits is red: {out}")
-check(any("meeting_marks.seen_at (kalmido/core/migrations.d/9999_x.py:4): a point in time as TEXT: use TIMESTAMPTZ" in x for x in out)
+check(any("meeting_marks.seen_at (kalmido/core/migrations.d/9999_x.py:4): a point in time as TEXT / a number / TIMESTAMP without zone: use TIMESTAMPTZ" in x for x in out)
       and any("is_done" in x and "BOOLEAN" in x for x in out) and any("extra_json" in x and "JSONB" in x for x in out),
       f"the finding names file:line and the real type: {out}")
 STEP = frag('MIGRATIONS = [\n    ("meetings", "closed_at", "ALTER TABLE meetings ADD COLUMN closed_at TEXT"),\n'
@@ -63,6 +63,13 @@ check(len(out) == 2 and any("meetings.closed_at has a real type by now" in x for
 GONE = frag('AFTER = ["DROP TABLE IF EXISTS meeting_marks"]\n', "9999_z.py")
 check(not run(NEW, GONE), f"a table a fragment drops does not count: {run(NEW, GONE)}")
 MARKED = frag('MIGRATIONS = [\n    ("meetings", "label_on", "ALTER TABLE meetings ADD COLUMN label_on TEXT"),  # coltype-ok: the text on a label, no day\n]\n')
+# 2.755.0 (#5305): *_at / _on / _until as a number or TIMESTAMP without zone is a point in time too
+EPOCH = frag('AFTER = ["ALTER TABLE meetings ADD COLUMN seen_at BIGINT", "ALTER TABLE meetings ADD COLUMN expires_at INTEGER NOT NULL DEFAULT 0",\n'
+             '         "ALTER TABLE meetings ADD COLUMN made_at TIMESTAMP", "ALTER TABLE meetings ADD COLUMN ok_at TIMESTAMP WITH TIME ZONE",\n'
+             '         "ALTER TABLE meetings ADD COLUMN fine_at TIMESTAMPTZ", "ALTER TABLE meetings ADD COLUMN day_on DATE"]\n')
+out = run(EPOCH)
+check(len(out) == 3 and all(k in " ".join(out) for k in ("meetings.seen_at", "meetings.expires_at", "meetings.made_at")),
+      f"BIGINT / INTEGER / TIMESTAMP without zone named *_at is red, TIMESTAMPTZ and DATE stay quiet: {out}")
 check(not run(MARKED), f"the marker coltype-ok lets one column through: {run(MARKED)}")
 check(len(run(base={"meetings.gone_at": "time"})) == 1, "a baseline line of a column that never was is red")
 

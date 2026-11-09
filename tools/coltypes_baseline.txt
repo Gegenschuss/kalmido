@@ -843,3 +843,7 @@ wiki_spaces.wkx_holds json
 wiki_versions.created_at time
 wiki_versions.updated_at time
 wiki_versions.wkx_held_at time
+lists.points_on time  # 2.755.0 (#5305 review): BIGINT 0/1 switch ("on"), no point in time - becomes BOOLEAN with its stage
+office_docs.accept_on time  # same: a number named *_on, found when BIGINT counts as time
+office_docs.producing_on time  # same
+sched_polls.link_on time  # same: DEFAULT 1 switch

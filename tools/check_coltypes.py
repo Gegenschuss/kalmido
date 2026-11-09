@@ -7,7 +7,7 @@ them anyway; a new column must not add to them. Read (static, no database): sche
 CREATE TABLE column, every ADD COLUMN (MIGRATIONS and AFTER); an ALTER COLUMN ... TYPE changes the type, a dropped table or
 column (DROP TABLE / DROP COLUMN in a fragment) is gone.
 
-  time   a column named *_at, *_on or *_until of type TEXT                                      -> TIMESTAMPTZ (DATE for a day)
+  time   a column named *_at, *_on or *_until of type TEXT, BIGINT / INTEGER or TIMESTAMP (no zone) -> TIMESTAMPTZ (DATE for a day)
   bool   is_* / has_* of type BIGINT / INTEGER / SMALLINT, or a flag name (enabled, archived, pinned, ... *_enabled, *_ok)
          of such a type with DEFAULT 0 / 1 or CHECK (... IN (0, 1))                            -> BOOLEAN
   json   a TEXT column named *_json or with DEFAULT '{}' / '[]'                                 -> JSONB
@@ -40,7 +40,7 @@ RETYPE = re.compile(r"ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:ONLY\s+)?(\w+)\s+ALT
 DROP_TABLE = re.compile(r"DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?(\w+)", re.I)
 DROP_COL = re.compile(r"ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(\w+)\s+DROP\s+COLUMN\s+(?:IF\s+EXISTS\s+)?\"?(\w+)", re.I)
 OK = "coltype-ok"
-WHY = {"time": "a point in time as TEXT: use TIMESTAMPTZ (DATE for a day)",
+WHY = {"time": "a point in time as TEXT / a number / TIMESTAMP without zone: use TIMESTAMPTZ (DATE for a day)",
        "bool": "yes / no as a number 0/1: use BOOLEAN",
        "json": "JSON as TEXT: use JSONB"}
 
@@ -107,7 +107,8 @@ def rule(col, definition):
     w = definition.split()
     typ = re.sub(r"\(.*", "", w[0]).upper() if w else ""
     up = " ".join(definition.upper().split())
-    if typ == "TEXT" and re.search(r"_(at|on|until)$", col):
+    naive_ts = typ == "TIMESTAMP" and not re.match(r"TIMESTAMP\s+WITH\s+TIME\s+ZONE", up)  # TIMESTAMPTZ is another word
+    if (typ == "TEXT" or typ in INTS or naive_ts) and re.search(r"_(at|on|until)$", col):  # 2.755.0 (#5261 review): not only TEXT
         return "time"
     if typ in INTS:
         if re.match(r"(is|has)_", col):
