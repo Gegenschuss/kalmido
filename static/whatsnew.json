@@ -1,6 +1,32 @@
 {
  "versions": [
   {
+   "version": "2.761.0",
+   "date": "2026-11-09",
+   "items": [
+    {
+     "de": "Auf breiten Bildschirmen zeigt die geteilte Ansicht rechts eine zweite Seite der App (Einstellungen > Darstellung).",
+     "en": "On wide screens the split view shows a second page of the app on the right (Settings > Appearance)."
+    },
+    {
+     "de": "Tags bei Dokumenten und Dateien vergibst du als Pillen mit Vorschlägen ab dem ersten Buchstaben.",
+     "en": "Tags on documents and files are pills with suggestions from the first letter."
+    },
+    {
+     "de": "In der Dokument-Vorschau markierst und kopierst du Text direkt aus dem PDF.",
+     "en": "Mark and copy text straight from the PDF in the document preview."
+    },
+    {
+     "de": "In der Ansicht eines Jobs steht der Auftrag, den der Agent dem Job gegeben hat, eingeklappt ganz oben.",
+     "en": "A job's own chat shows the brief its agent gave the job, folded at the top."
+    },
+    {
+     "de": "Absender und Dokumenttyp schlagen ab dem ersten Buchstaben bekannte Einträge vor, wie bei den Tags.",
+     "en": "Sender and document type suggest known entries from the first letter, like the tags."
+    }
+   ]
+  },
+  {
    "version": "2.759.0",
    "date": "2026-11-09",
    "items": [

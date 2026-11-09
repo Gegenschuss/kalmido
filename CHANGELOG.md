@@ -17,6 +17,58 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.761.0] - 2026-11-09
+
+Package 2.742 (Bündel: Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher), CI-only rot: p2191_c_perf, CI-only rot: p2290_c_fold_ui u. 1 weiter).
+
+### Added
+- Wide screens: Settings > Appearance > "Split view" (desktop with a mouse, from about 160 rem window width) shows a second copy of the app on the right; a grip in between moves to the neighbours' minimum width, "Open on the right" in the menus of a project, a task (More...), a document card, a knowledge page and the calendar; on / width / right page are remembered per person; off loads nothing (#4858).
+- Documents, file store and bulk edit: tags are a pill field with its own suggestion list from the first letter (start matches first, match in bold, "New: ..." last), arrows + Enter / Tab take a suggestion, comma or Enter adds a new tag, Backspace in the empty field removes the last pill (#4862).
+- Document preview: text of a PDF can be marked with the mouse and copied (a text layer over every drawn page, follows zoom); Cmd / Ctrl+A in the preview marks all pages; images and scanned PDFs show "Copy text" with the recognised text (#4861).
+- Code integrity, step 1: every weekly release carries web-manifest-X.Y.Z.json with the full SHA-256 of every file the browser gets (as served, comments stripped), built twice in the CI and compared; a server shows the same values at GET /api/code-manifest without signing in (#5217).
+
+### Changed
+- Lists: dragged column widths are remembered per person on every device (not only in this browser) and have no upper limit any more, only the title keeps its minimum; "Reset settings" covers them (#4857).
+
+### Fixed
+- CI: the SQL check pg_prepare no longer takes translated texts or str.replace() pieces for statements and knows two stand-in exceptions (#4949).
+
+Package 2.755 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Lint vor der CI: FK-Kommentar-Regel und nosham-Prü, Python-Linter Ruff als CI-Gate fü).
+### Added
+- Lint: tools/check_fk_comment.py (#2174 FK rule) and tools/check_nosham.py (checks that cannot fail) run in seconds without a database; the suites p2103_c_api and p2501_a_nosham call the same logic, so both stop turning red only in the full CI (#5261)
+- Lint: tools/check_core_crosscut.py keeps links, tags, comments, read marks, versions and following in the shared core - a new per-area table of that kind is red; today's tables stand in tools/core_crosscut_allow.json with a reason; docs/dev/kern.md section "Cross-cutting parts" (#5267)
+- Lint: tools/check_coltypes.py - new columns take TIMESTAMPTZ, BOOLEAN and JSONB instead of TEXT times, 0/1 numbers or JSON text; today's columns stand in tools/coltypes_baseline.txt, which only shrinks (#5305)
+- Lint: ruff (E, F, BLE; ruff.toml) as a CI gate for new code only, findings of the existing code in tools/ruff_baseline.json (file, rule, hash of the line); the line length is a guide, not part of the gate; every silent `except Exception: pass` names its reason (#5294)
+- SQL table and column names only through qi() with an allowlist (kalmido/core/pg.py); a semgrep rule (.semgrep/sql_ident.yml) flags new f-string SQL with FROM / JOIN / INTO / UPDATE / SET / TABLE / TRUNCATE / INDEX ON without qi(); existing places in the baseline (#5296)
+- Indexes lists(deleted_at), fs_nodes(parent_id, deleted_at), list_activity(list_id, created_at) (#5299)
+### Changed
+- Office money: the plain money columns of document positions (net, tax), cash book and ledger entries become NUMERIC(14,2) at start when every value fits exactly; answers, exports and the hash chain keep the same two-place text; money convention in docs/dev/geld.md (#5293)
+- Documents: the neighbour drawn ahead now has its receipt, letter and flow rows filled; the file store's full screen prepares its neighbours too - swiping shows the next document whole, without a placeholder (#5236)
+### Fixed
+- Tax return (UStVA): when the income statement basis changes between receipts and bank/cash at a year boundary, a receipt's input tax counts in exactly one year - the payment line's day decides at the edge; pure receipt years keep the receipt date (#5241)
+- Deleted video and image review comments: a one-off clean-up removes those deleted before 08.11.2026 with their text and guest names; the trash purge and the org export already handled later ones and are now covered by tests (#5263)
+- The dead table paperless_links is dropped (#5265)
+- Orphaned agent owners repaired on old databases: the agent's private polls go into the trash, their links answer 404 (#4978)
+- Document preview keeps its scrollbar's room, so the fit no longer changes after the pages arrive (CI red p2736_b_docswipe_seamless_ui at 460 px) (#5312)
+
+Package 2.739 (Bündel: Job-Ansicht: Auftrag des Jobs als erste, eingeklap).
+
+### Added
+- Agent chat: the brief of a job. An agent can post the exact wording it gave a job (`POST /api/v1/agent/chats/{id}` with `kind: "brief"` and `job_id`, MCP `send_chat`, up to 60000 characters). It shows only in the job's own chat, as its first row and folded ("Job brief" / "Show the brief", Markdown); never in the whole chat or the message search, no push, never unread, cannot be pinned, does not end open answer buttons; a newer brief of the job replaces the older one. `GET /api/agents/{id}/chat?job=` carries it as `brief`. Older servers answer 400 (#5216)
+
+Package 2.761 (Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Agenten-Seite: Job-K).
+
+### Changed
+- Documents: sender and document type use the same suggestion field as the tags (#4868) - from the first letter an own list
+  of the known senders / types (the start first, then within), Enter, Tab or a tap takes one and saves; a new name still
+  makes a new sender / type, a comma is part of a name, one value (no pills). The same field in the flows: "then sender",
+  "then document type", "Sender is", "Document type is". Find it: open a document, type two letters into Sender.
+
+### Added
+- Code integrity stage 1b (#5218): every image and the `web-manifest-X.Y.Z.json` of a weekly release get a GitHub build
+  attestation (Sigstore, keyless, public transparency log); check with `gh attestation verify` (docs/SELF-HOSTING.md,
+  *Production updates*). The signing job of the weekly release has the OIDC token but no checkout and no shell.
+
 ## [2.759.0] - 2026-11-09
 
 Package 2.386 (DATEV-Stapel: Bewirtungsbelege buchen).
@@ -249,7 +301,8 @@ Package 2.685 (Bündel: Kommentare: Aktivität in drei Stufen (nur Kommenta, Bü
 - Office: switching "Office & finance" on no longer leaves the office saying it is switched off when it loaded before the switch was saved (#5176).
 - Balance sheet: a receipt booked against the bank (counter account "bank") and paid from the cash box is now booked bank to cash instead of being left out (#5128).
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.759.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.761.0...HEAD
+[2.761.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.761.0
 [2.759.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.759.0
 [2.756.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.756.0
 [2.749.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.749.0
