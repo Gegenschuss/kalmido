@@ -275,4 +275,33 @@ check(res.get("undone") == [g["id"]] and Fr.get(B + f"/api/contacts/{FCT}").json
 check(not [x for x in lst(A) if x["id"] == g["id"]] and A.post(B + f"/api/undo/to/{g['id']}").status_code == 404,
       "the admin neither lists nor takes back the freelancer's step")
 
+# ---------------------------------------------------------------- review F3: the steps of an organisation's contact / event
+# (contacts and events carry their book's / calendar's org_id since 2.662.0 #4602, filled by triggers: the steps have it too)
+r = Bo.post(B + "/api/books", json={"name": "Team Kontakte", "org_id": ORG})
+check(r.ok, f"(setup) bob: an address book of the organisation {r.status_code} {r.text[:120]}")
+OBK = r.json()["id"]
+OCT = Bo.post(B + "/api/contacts", json={"book_id": OBK, "fn": "Kundin Team"}).json()["id"]
+check(Bo.patch(B + f"/api/contacts/{OCT}", json={"fn": "Kundin Team Neu"}).ok, "(setup) bob changes the organisation's contact")
+r = Bo.post(B + "/api/evcals", json={"name": "Team Kalender", "org_id": ORG})
+check(r.ok, f"(setup) bob: a calendar of the organisation {r.status_code} {r.text[:120]}")
+OCAL = r.json()["id"]
+r = Bo.post(B + "/api/events", json={"cal_id": OCAL, "title": "Teamtermin", "start": f"{D}T09:00", "end": f"{D}T10:00"})
+check(r.ok, f"(setup) an event in it {r.status_code} {r.text[:120]}")
+OEV = r.json()["id"]
+check(Bo.patch(B + f"/api/events/{OEV}", json={"title": "Teamtermin Neu"}).ok, "(setup) bob changes the event")
+
+
+def steps_of(kind, rid):
+    return kt.dbx("SELECT u.org_id, g.org_id FROM obj_undo u LEFT JOIN undo_groups g ON g.id=u.group_id WHERE u.user_id=? AND u.kind=? AND u.ref_id=?",
+                  (BOB, kind, rid))
+
+
+sc, se = steps_of("contact", OCT), steps_of("event", OEV)
+check(sc and se and all(tuple(x) == (ORG, ORG) for x in sc + se),
+      f"F3: the steps of the organisation's contact and event (and their groups) carry the organisation {sc} {se}")
+r = Bo.delete(B + f"/api/orgs/{ORG}/members/{BOB}")
+check(r.ok, f"(setup) bob leaves the organisation {r.status_code} {r.text[:120]}")
+sc, se = steps_of("contact", OCT), steps_of("event", OEV)
+check(not sc and not se, f"F3: leaving the organisation takes his steps of its contact and event with it {sc} {se}")
+
 sys.exit(done("p2777_a_undo_areas"))
