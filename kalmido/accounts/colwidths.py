@@ -14,7 +14,7 @@ from ..core.errors import BadInput
 
 LCW_LISTS, LCW_COLS = 300, 40
 LCW_MIN, LCW_MAX = 2.5, 1000  # rem; no real upper limit (#4830): the client keeps the title column at its minimum
-LCW_LID_RE = re.compile(r"[1-9][0-9]{0,11}")
+LCW_LID_RE = re.compile(r"[1-9][0-9]{0,11}|v")  # 2.750.0 (#4502): "v" = the collected views (Today, My tasks, filters: render.js VC)
 LCW_KEY_RE = re.compile(r"[a-z]{2,16}|f:[1-9][0-9]{0,11}")  # due, prio, tags ... or f:<field id>
 
 

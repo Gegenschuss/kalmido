@@ -42,6 +42,9 @@ const widths = async ck => JSON.parse((await call(ck, 'GET', '/api/state')).sett
   // ---- API: one list's patch is merged, a wrong value is refused, null drops the list
   check((await call(CF, 'PATCH', '/api/settings', {col_widths: {[L2]: {due: 9}}})).http === 200, 'API: a list width is stored');
   check((await call(CF, 'PATCH', '/api/settings', {col_widths: {999999: {prio: 6.123}}})).http === 200, 'API: a second list');
+  // 2.750.0 (#4502): the collected views (Today, My tasks, filters) keep their widths under "v" (render.js VC)
+  check((await call(CF, 'PATCH', '/api/settings', {col_widths: {v: {list: 10}}})).http === 200 && (await widths(CF)).v?.list === 10, 'API: the collected views\' widths (v) are stored');
+  await call(CF, 'PATCH', '/api/settings', {col_widths: {v: null}});
   let w = await widths(CF);
   check(w[L2]?.due === 9 && w[999999]?.prio === 6.12, 'API: the second patch is merged, not replacing the first ' + JSON.stringify(w));
   for (const bad of [{x: {due: 5}}, {[L]: {'Due!': 5}}, {[L]: {due: 'wide'}}, {[L]: [5]}, '[1]'])
