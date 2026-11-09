@@ -10,12 +10,14 @@
 // - a reader: a node without write rights is skipped and counted ("1 skipped"), the rest goes; the reader's menu has no
 //   writing items
 // - a phone (390 px): a long press on a card opens the menu with "Select" on top; while choosing a long press ticks
+// - Firefox (a finger, 390 and 320 px; a mouse, 1440 px): the bar with all six buttons stays inside the screen (P2768A_SHOTS: pictures)
 // freelancer-matrix: files, docs (alice and bob have no organisation: their private workspaces)
 const {execFileSync} = require('child_process');
 const path = require('path');
 const {boot, sleep, B, login, until, histAdded} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } return !!c; };
+const ff = require('./ff');
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 const DATA = process.argv[2] || path.join(__dirname, '.data');
 if (!process.env.P2768A_NOSTART && !process.env.KMT_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
@@ -181,6 +183,30 @@ const face = (d, id) => card(d, id)?.querySelector('[data-dco], [data-ab="open"]
   pe(w, face(d, D2), 'pointerup');
   check(/2 selected/.test(count(d)), 'phone: the bar counts both');
   w.close();
+
+  // ================= Firefox: the bar fits (a finger at 390 / 320 px, a mouse at 1440 px)
+  for (const [touch, sizes] of [[true, [[390, 844], [320, 640]]], [false, [[1440, 900]]]]) {
+    await ff({tag: 'p2768_a_ui', check, shots: 'P2768A_SHOTS'})(async o => {
+      const {cmd, ev, ctx, shot} = o;
+      await o.nav(B + 'static/icon.svg');
+      await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
+      check(await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`) === 200, 'Firefox: login');
+      const wait = async (js, n = 60) => { for (let i = 0; i < n; i++) { if (await ev(js).catch(() => false)) return true; await sleep(250); } return false; };
+      for (const [wd, h] of sizes) {
+        await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: wd, height: h}});
+        await o.nav(B + '#ablage/' + ROOT);
+        check(await wait(`!!document.querySelector('.dc-card [data-dcchk="${D1}"]') && !!document.querySelector('.dc-card [data-dcchk="${SUB}"]')`), `${wd}: the folder's cards`);
+        await ev(`(ab_selPick(${D1}), ab_selPick(${SUB}), 1)`);
+        check(await wait(`/2 selected/.test(document.querySelector('#ab-sbar .mcount')?.textContent || '')`), `${wd}: the bar with 2 selected`);
+        await sleep(400);
+        const m = await ev(`(() => { const b = document.querySelector('#ab-sbar'), r = b.getBoundingClientRect(), bs = [...b.querySelectorAll('.mbb, .mbx')].map(x => x.getBoundingClientRect());
+          return {l: Math.round(r.left), r: Math.round(r.right), n: bs.length, inside: bs.every(x => x.width > 0 && x.left >= r.left - 1 && x.right <= r.right + 1 && x.bottom <= innerHeight + 1), over: document.documentElement.scrollWidth > innerWidth + 1}; })()`);
+        check(m && m.n === 7 && m.l >= 0 && m.r <= wd + 1 && m.inside && !m.over, `${wd}: all six buttons and X inside the bar, the bar inside the screen ` + JSON.stringify(m));
+        await shot(`p2768-a-${wd}-bar.png`);
+        await ev(`(ab_selEnd(), ab_draw(), 1)`);
+      }
+    }, touch);
+  }
 
   console.log(`p2768_a_ui: ${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);
