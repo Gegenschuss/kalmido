@@ -33,7 +33,7 @@ from flask import Response, jsonify, request
 from ..core.config import app
 from ..core.i18n import LANGS, N_, lang, tr
 from ..core.db import body, bump, iso_ms, local_now, now_utc
-from ..core.access import Denied, list_role
+from ..core.access import Denied, list_role, live_sql
 from ..core.conflict import ccf_check
 from ..core.errors import BadInput
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
@@ -76,7 +76,7 @@ def cs_gate(job):
     if not CS_JOB_RE.match(job or ""):
         raise Denied(404)
     oid = _area(c, uid, request.args.get("org"))
-    rows = [dict(r) for r in c.execute("SELECT * FROM hub_bookings WHERE org_id=? AND job=? AND deleted_at IS NULL ORDER BY id",
+    rows = [dict(r) for r in c.execute(f"SELECT * FROM hub_bookings WHERE org_id=? AND job=? AND {live_sql()} ORDER BY id",
                                        (oid, job))]
     if not rows:
         raise Denied(404)
@@ -120,13 +120,13 @@ def cs_people(c, uid, rows):
     def contact(cid):
         if not books:
             return None
-        return c.execute(f"SELECT fn, given, family, emails, phones FROM contacts WHERE id=? AND book_id IN ({q}) AND deleted_at IS NULL",
+        return c.execute(f"SELECT fn, given, family, emails, phones FROM contacts WHERE id=? AND book_id IN ({q}) AND {live_sql()}",
                          (cid, *books)).fetchone()
 
     def by_mail(mail):
         if not books or not mail:
             return None
-        for r in c.execute(f"SELECT fn, given, family, emails, phones FROM contacts WHERE book_id IN ({q}) AND deleted_at IS NULL "
+        for r in c.execute(f"SELECT fn, given, family, emails, phones FROM contacts WHERE book_id IN ({q}) AND {live_sql()} "
                            "AND kind='individual' AND lower(emails) LIKE ? LIMIT 20", (*books, "%" + mail.lower().replace("%", "") + "%")):
             if any(str(x.get("value") or "").strip().lower() == mail.lower() for x in json.loads(r["emails"] or "[]") if isinstance(x, dict)):
                 return r
@@ -166,7 +166,7 @@ def cs_project(c, uid, rows):
     out = {"list_id": r["id"], "name": "" if locked else (r["name"] or ""), "client": {},
            "shoot": (r["ptype"] or "") == "shoot" and not locked and ptype_ok(c, uid, "shoot")}
     if r["client_id"]:
-        cl = c.execute("SELECT name, contact, phone, email, address FROM clients WHERE id=? AND deleted_at IS NULL", (r["client_id"],)).fetchone()
+        cl = c.execute(f"SELECT name, contact, phone, email, address FROM clients WHERE id=? AND {live_sql()}", (r["client_id"],)).fetchone()
         if cl:
             out["client"] = {k: (cl[k] or "") for k in ("name", "contact", "phone", "email", "address")}
     return out

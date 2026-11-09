@@ -29,52 +29,52 @@ function cs_mapHref(t) {
 
 /** one line of an editable table (key of CS_ROWS) */
 function cs_lineHtml(key, r) {
-  return `<div class="csrow" data-k="${key}">${CS_ROWS[key].map(([c, label]) => `<input data-c="${c}" maxlength="200" value="${esc(r[c] || '')}" placeholder="${esc(tr(label))}" aria-label="${esc(tr(label))}">`).join('')}<button type="button" class="iconbtn" data-cs="rowdel" aria-label="${esc(tr('Remove line'))}" title="${esc(tr('Remove line'))}">${ic('x', 's')}</button></div>`;
+  return `<div class="csrow" data-k="${esc(key)}">${CS_ROWS[key].map(([c, label]) => `<input data-c="${esc(c)}" maxlength="200" value="${esc(r[c] || '')}" placeholder="${esc(tr(label))}" aria-label="${esc(tr(label))}">`).join('')}<button type="button" class="iconbtn" data-cs="rowdel" aria-label="${esc(tr('Remove line'))}" title="${esc(tr('Remove line'))}">${ic('x', 's')}</button></div>`;
 }
 function cs_rowsHtml(key, rows) {
-  return `<div class="csrows" data-k="${key}" style="--cs-cols:${CS_ROWS[key].length}">${rows.map(r => cs_lineHtml(key, r)).join('')}</div><button type="button" class="btn sm ghost" data-cs="rowadd" data-k="${key}">${ic('plus', 's')} ${tr('Add line')}</button>`;
+  return `<div class="csrows" data-k="${esc(key)}" style="--cs-cols:${CS_ROWS[key].length}">${/*html-ok*/ rows.map(r => cs_lineHtml(key, r)).join('')}</div><button type="button" class="btn sm ghost" data-cs="rowadd" data-k="${esc(key)}">${ic('plus', 's')} ${tr('Add line')}</button>`;
 }
 
 function cs_formHtml(cs) {
-  const d = cs.data || {}, a = cs.auto || {}, v = k => esc(d[k] || '');
-  const txt = (k, label, ph = '', max = 200) => `<div class="row"><label for="cs-${k}">${tr(label)}</label><input id="cs-${k}" data-f="${k}" maxlength="${max}" value="${v(k)}" placeholder="${esc(ph)}"></div>`;
-  const area = (k, label, ph = '', max = 1500) => `<div class="row"><label for="cs-${k}">${tr(label)}</label><textarea id="cs-${k}" data-f="${k}" rows="2" maxlength="${max}" placeholder="${esc(ph)}">${v(k)}</textarea></div>`;
+  const d = cs.data || {}, a = cs.auto || {};
+  const txt = (k, label, ph = '', max = 200) => `<div class="row"><label for="cs-${esc(k)}">${tr(label)}</label><input id="cs-${esc(k)}" data-f="${esc(k)}" maxlength="${esc(String(max))}" value="${esc(d[k] || '')}" placeholder="${esc(ph)}"></div>`;
+  const area = (k, label, ph = '', max = 1500) => `<div class="row"><label for="cs-${esc(k)}">${tr(label)}</label><textarea id="cs-${esc(k)}" data-f="${esc(k)}" rows="2" maxlength="${esc(String(max))}" placeholder="${esc(ph)}">${esc(d[k] || '')}</textarea></div>`;
   const cl = a.client || {}, prod = a.production || {};
   const calls = d.calls?.length ? d.calls : CS_CALL_DEPTS.map(x => ({dept: tr(x), time: ''}));
   const crew = (a.crew || []).map(p => `<li class="${p.open ? 'csopen' : ''}"><b>${esc(p.function || '')}</b> <span>${esc(p.name)}</span> <span class="muted">${esc([p.phone, p.mail].filter(Boolean).join(' · '))}</span></li>`).join('');
   return `<h3>${tr('Call sheet')}: ${esc(a.project || a.title || '')}</h3>
     <p class="muted">${esc(fmtDayAbs(a.date))}${a.project && a.title ? ' · ' + esc(a.title) : ''}</p>
     <details class="cssec" open><summary>${tr('Header')}</summary>
-      ${txt('subtitle', N_('Subtitle'), a.project && a.title !== a.project ? a.title : '')}
-      <div class="csgrid2">${txt('day_no', N_('Shoot day no.'), '1', 12)}${txt('set_name', N_('Set phone: name'))}${txt('set_phone', N_('Set phone: number'), '', 60)}</div>
+      ${/*html-ok*/ txt('subtitle', N_('Subtitle'), a.project && a.title !== a.project ? a.title : '')}
+      <div class="csgrid2">${/*html-ok*/ txt('day_no', N_('Shoot day no.'), '1', 12)}${/*html-ok*/ txt('set_name', N_('Set phone: name'))}${/*html-ok*/ txt('set_phone', N_('Set phone: number'), '', 60)}</div>
       <p class="muted cshint">${tr('Production')}: ${esc([prod.name, ...(prod.lines || [])].filter(Boolean).join(', ') || tr('from the master data of the office'))}</p>
-      ${area('client', N_('Client'), [cl.name, cl.contact, cl.address, cl.phone, cl.email].filter(Boolean).join('\n') || tr('Company, contact person, phone, e-mail'), 400)}
-      ${area('agency', N_('Agency'), tr('optional'), 400)}
-      <p class="lbl">${tr('Contacts')}</p><p class="muted cshint">${tr('Empty: the crew functions of the bookings with their phone numbers.')}</p>${cs_rowsHtml('contacts', d.contacts || [])}
+      ${/*html-ok*/ area('client', N_('Client'), [cl.name, cl.contact, cl.address, cl.phone, cl.email].filter(Boolean).join('\n') || tr('Company, contact person, phone, e-mail'), 400)}
+      ${/*html-ok*/ area('agency', N_('Agency'), tr('optional'), 400)}
+      <p class="lbl">${tr('Contacts')}</p><p class="muted cshint">${tr('Empty: the crew functions of the bookings with their phone numbers.')}</p>${/*html-ok*/ cs_rowsHtml('contacts', d.contacts || [])}
     </details>
     <details class="cssec" open><summary>${tr('Location')}</summary>
-      ${txt('loc_name', N_('Location'))}
-      <div class="row"><label for="cs-loc_address">${tr('Address')}</label><input id="cs-loc_address" data-f="loc_address" maxlength="300" value="${v('loc_address')}"></div>
+      ${/*html-ok*/ txt('loc_name', N_('Location'))}
+      <div class="row"><label for="cs-loc_address">${tr('Address')}</label><input id="cs-loc_address" data-f="loc_address" maxlength="300" value="${esc(d.loc_address || '')}"></div>
       <p class="csmap">${d.loc_address ? `<a href="${esc(cs_mapHref(d.loc_address))}" target="_blank" rel="noopener noreferrer">${ic('link', 's')} ${tr('Open in maps')}</a>` : ''}</p>
-      ${area('parking', N_('Parking / directions'))}
-      ${area('transit', N_('Public transport'), tr('Lines and stop'), 1000)}
+      ${/*html-ok*/ area('parking', N_('Parking / directions'))}
+      ${/*html-ok*/ area('transit', N_('Public transport'), tr('Lines and stop'), 1000)}
     </details>
     <details class="cssec" open><summary>${tr('Times')}</summary>
-      <p class="lbl">${tr('Call on set')}</p>${cs_rowsHtml('calls', calls)}
-      <div class="csgrid2">${txt('shoot_start', N_('Shoot start'), a.start || '07:30', 20)}${txt('lunch_from', N_('Lunch from'), '13:00', 20)}${txt('lunch_to', N_('Lunch until'), '14:00', 20)}${txt('wrap', N_('Wrap'), a.end || '', 20)}${txt('strike', N_('Strike until'), '', 20)}</div>
-      ${txt('weather', N_('Weather'), tr('Sunrise, sunset, temperature'), 400)}
-      ${area('important', N_('Important'), tr('optional'), 3000)}
+      <p class="lbl">${tr('Call on set')}</p>${/*html-ok*/ cs_rowsHtml('calls', calls)}
+      <div class="csgrid2">${/*html-ok*/ txt('shoot_start', N_('Shoot start'), a.start || '07:30', 20)}${/*html-ok*/ txt('lunch_from', N_('Lunch from'), '13:00', 20)}${/*html-ok*/ txt('lunch_to', N_('Lunch until'), '14:00', 20)}${/*html-ok*/ txt('wrap', N_('Wrap'), a.end || '', 20)}${/*html-ok*/ txt('strike', N_('Strike until'), '', 20)}</div>
+      ${/*html-ok*/ txt('weather', N_('Weather'), tr('Sunrise, sunset, temperature'), 400)}
+      ${/*html-ok*/ area('important', N_('Important'), tr('optional'), 3000)}
     </details>
-    <details class="cssec"${d.cast?.length ? ' open' : ''}><summary>${tr('Cast')}</summary>${cs_rowsHtml('cast', d.cast || [])}</details>
-    <details class="cssec"${d.transport?.length ? ' open' : ''}><summary>${tr('Transport')}</summary><p class="muted cshint">${tr('Empty call time: "Own arrangement".')}</p>${cs_rowsHtml('transport', d.transport || [])}</details>
-    <details class="cssec"><summary>${tr('Crew list')}</summary>${crew ? `<ul class="cscrew">${crew}</ul>` : `<p class="muted">${tr('Nobody booked yet.')}</p>`}<p class="muted cshint">${tr('The crew comes from the bookings of this shoot day; phone numbers and e-mails from the address book.')}</p></details>
+    <details class="cssec"${d.cast?.length ? ' open' : ''}><summary>${tr('Cast')}</summary>${/*html-ok*/ cs_rowsHtml('cast', d.cast || [])}</details>
+    <details class="cssec"${d.transport?.length ? ' open' : ''}><summary>${tr('Transport')}</summary><p class="muted cshint">${tr('Empty call time: "Own arrangement".')}</p>${/*html-ok*/ cs_rowsHtml('transport', d.transport || [])}</details>
+    <details class="cssec"><summary>${tr('Crew list')}</summary>${crew ? `<ul class="cscrew">${/*html-ok*/ crew}</ul>` : `<p class="muted">${tr('Nobody booked yet.')}</p>`}<p class="muted cshint">${tr('The crew comes from the bookings of this shoot day; phone numbers and e-mails from the address book.')}</p></details>
     ${(a.shot_days || []).length ? `<div class="row"><label for="cs-shot_day">${tr('Shots of the day')}</label><select id="cs-shot_day" data-f="shot_day"><option value="">${tr('None')}</option>${a.shot_days.map(n => `<option value="${esc(n)}" ${d.shot_day === n ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>` : ''}
     <details class="cssec"${cs.sketch ? ' open' : ''}><summary>${tr('Directions sketch')}</summary>
-      <div class="cssketch">${cs.sketch ? `<img src="${esc(cs.sketch_url)}&v=${encodeURIComponent(cs.updated_at)}" alt="${esc(tr('Directions sketch'))}">` : `<p class="muted">${tr('A screenshot or drawing (PNG or JPEG); it gets a page of its own, with "Parking / directions" below it.')}</p>`}</div>
+      <div class="cssketch">${cs.sketch ? `<img src="${esc(cs.sketch_url)}&v=${esc(encodeURIComponent(cs.updated_at))}" alt="${esc(tr('Directions sketch'))}">` : `<p class="muted">${tr('A screenshot or drawing (PNG or JPEG); it gets a page of its own, with "Parking / directions" below it.')}</p>`}</div>
       <label class="btn sm">${ic('upload', 's')} ${cs.sketch ? tr('Replace picture') : tr('Select picture')}<input type="file" id="cs-sketch" accept="image/png,image/jpeg" hidden></label>
       ${cs.sketch ? `<button type="button" class="btn sm ghost" data-cs="sketchdel">${ic('trash', 's')} ${tr('Remove picture')}</button>` : ''}
     </details>
-    ${area('attachments', N_('More attachments'), tr('One per line'), 1000)}
+    ${/*html-ok*/ area('attachments', N_('More attachments'), tr('One per line'), 1000)}
     <p class="cserr" role="alert" hidden></p>
     <div class="foot"><button class="btn" data-cs="close">${tr('Close')}</button><span class="spacer"></span>
       <button class="btn" data-cs="pdf">${ic('download', 's')} ${tr('PDF')}</button>${navigator.canShare ? `<button class="btn" data-cs="share">${ic('share', 's')} ${tr('Share')}</button>` : ''}
