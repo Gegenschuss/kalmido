@@ -14,3 +14,7 @@
 #side .abthead>.sbbi{flex:1;min-width:0}
 #side .abthead>.abtadd{flex:none;margin-right:.25rem;color:var(--muted)}
 #side .abthead>.abtadd:hover{color:var(--text)}
+/* 2.783.0 (#5356): the tools above a folder with recognition stay ONE line down to 320 px: no wrap, New folder and Share as
+   icons on a narrow screen (the switch List | Cards is icons there already, docs.css .abviewseg) */
+.abtools.abfoldtools{flex-wrap:nowrap;min-width:0}
+@media (max-width:540px){.abfoldtools .abtl{display:none}}

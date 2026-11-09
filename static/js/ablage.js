@@ -126,7 +126,8 @@ function viewAblage() {
 // "Add documents" / "Scan" in the documents' bar, the same way into the folder)
 function ab_foldTools(d, canAdd) {
   const n = d.node;
-  return `<div class="abtools">${canAdd ? `<button type="button" class="btn sm" data-ab="new-folder">${ic('folder', 's')} ${tr('New folder')}</button>` : ''}${typeof abd_foldSeg === 'function' ? abd_foldSeg(d) : '' /* 2.769.0 (#5340): List | Cards */}${n.share_with ? `<button type="button" class="btn sm abshbtn" data-ab="share" data-id="${n.id}" title="${esc(tr('Share…'))}">${ic('users', 's')} ${tr('Share')}</button>` : ''}<button type="button" class="iconbtn" data-ab="menu" data-id="${n.id}" aria-label="${esc(tr('More actions for {0}', n.name))}" title="${esc(tr('More'))}">${ic('dots')}</button></div>`;
+  // 2.783.0 (#5356): one line at 320 px too - on a narrow screen New folder and Share as icons (ablage.css .abfoldtools)
+  return `<div class="abtools abfoldtools">${canAdd ? `<button type="button" class="btn sm" data-ab="new-folder" title="${esc(tr('New folder'))}">${ic('folder', 's')}<span class="abtl"> ${tr('New folder')}</span></button>` : ''}${typeof abd_foldSeg === 'function' ? abd_foldSeg(d) : '' /* 2.769.0 (#5340): List | Cards */}${n.share_with ? `<button type="button" class="btn sm abshbtn" data-ab="share" data-id="${n.id}" title="${esc(tr('Share…'))}" aria-label="${esc(tr('Share'))}">${ic('users', 's')}<span class="abtl"> ${tr('Share')}</span></button>` : ''}<button type="button" class="iconbtn" data-ab="menu" data-id="${n.id}" aria-label="${esc(tr('More actions for {0}', n.name))}" title="${esc(tr('More'))}">${ic('dots')}</button></div>`;
 }
 // 2.752.0 (#4887): ONE area "Files": below the folders "All documents" and "To review" (the documents' saved filters, routes
 // #ablage/docs and #ablage/review, docs.js). Phones / tablets without the panel: as buttons in the bar of the spaces on top;
