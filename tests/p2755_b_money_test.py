@@ -218,7 +218,8 @@ office(Fr, "freelancer")
 # app logs in as the database's owner without superuser / BYPASSRLS (start.sh KALMIDO_TEST_DB_LOGIN=owner, as tests/rls_owner_test.py):
 # the policies hold for it through FORCE, init_db's connection has no organisation. A chained position of an organisation stores
 # '-0.00' (an old value, the chain hashed it so), the column is TEXT again; a real restart (KEEP=1) runs mc_migrate in init_db.
-# Without system_ctx mc_misfits saw no row of the organisation and the ALTER turned '-0.00' into 0.00: column numeric, chain red.
+# Should the check see no row of the organisation, the ALTER turns '-0.00' into 0.00: column numeric, chain red. (A direct
+# connection starts as "system" already, core/pg.py Conn #3139: this guards the real start, the reviewed fault did not occur.)
 def start_owner(keep):
     e = dict(os.environ, KALMIDO_TEST_DB_LOGIN="owner", EXTRA=os.environ.get("EXTRA", "") + f" -e KALMIDO_INSTANCE_MODE=workspaces -e KALMIDO_ORGCRYPT_DELAY=0 -e KALMIDO_SECRET_KEY={KEY}")
     e.pop("KEEP", None)
