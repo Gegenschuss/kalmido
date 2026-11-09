@@ -190,7 +190,8 @@ out = in_app(f"""from kalmido.core.writes import obj_trash_due, obj_trash_prune,
 print("DUE", obj_trash_due(c, "{K}"))
 print("DRY", obj_trash_prune(c, "{K}"))
 print("TICK", obj_trash_tick(c, force=True))""")
-check(f"DUE [{O2}]" in out and "DRY 1" in out and f"TICK {{'{K}': 1}}" in out, f"due: only the old one; switch off = counted {out[-400:]}")
+# 2.784.0 (#5366): the tick reports every kind with trash_prune (the office's suppliers too) - this kind's count is the one asked
+check(f"DUE [{O2}]" in out and "DRY 1" in out and "TICK {" in out and f"'{K}': 1" in out.split("TICK", 1)[-1], f"due: only the old one; switch off = counted {out[-400:]}")
 check(not gone(O2) and not gone(O3), "switch off: nothing deleted")
 last = dbx("SELECT value FROM settings WHERE key='ret_last_trash.obj_trash'")
 check(last and json.loads(last[0][0]).get("counts") == {K: 1} and json.loads(last[0][0]).get("purged") is False, f"reported for the retention page {last}")
