@@ -1889,6 +1889,9 @@ def fd_fee_post(did):
         raise Denied(409, tr("This fee was cancelled together with its invoice"))
     paid_day = _fee_paid_day(c, oid, r, b.get("day")) if st == "paid" else None  # 2.784.0 (#5387): the day the money came, else today
     if st != before or (st == "paid" and b.get("day") and paid_day != (_col(r, "reminder_fee_paid_at") or "")):
+        if before == "paid":  # 2.784.0 (#5387 review): the day it leaves must lie in an open month too (else 409)
+            from .periodlock import period_need_open
+            period_need_open(c, oid, _col(r, "reminder_fee_paid_at"))
         # 2.545.0 (#4387): the day it was paid -- the income statement, key figures and cash flow count it then (books.bk_fees_paid)
         c.execute("UPDATE office_docs SET reminder_fee_state=?, reminder_fee_paid_at=? WHERE id=? AND org_id=?", (st, paid_day, did, oid))
         ofx_log(c, oid, "reminder_fee", doc_id=did, detail={"before": before, "after": st, "fee": dstr(money(dec(r["reminder_fee"]))),
