@@ -314,9 +314,10 @@ n = 1
 while n * chunk < len(ZGOOD):
     r = Bo.post(B + "/api/paperless/zip/part", data={"ws": OWS, "n": str(n)}, files={"part": ("part", ZGOOD[n * chunk:(n + 1) * chunk])})
     n += 1
-# 2.81.0 (#1874): the answer of the last part comes at once (the check runs in the worker), then the export is ready
+# 2.81.0 (#1874): the answer of the last part comes at once (the check runs in the worker), then the export is ready;
+# a fast worker may already be done before the answer leaves (state ready) - both mean "answered without waiting"
 z = r.json().get("zip") or {}
-check(r.ok and z.get("state") == "check" and z.get("got") == len(ZGOOD), f"the last part answers at once: being checked ({z.get('state')})")
+check(r.ok and z.get("state") in ("check", "ready") and z.get("got") == len(ZGOOD), f"the last part answers at once: being checked ({z.get('state')})")
 z = checked(Bo, OWS, r).json().get("zip") or {}
 check(z.get("state") == "ready" and z.get("got") == len(ZGOOD), f"all parts in: ready ({z.get('state')} {z.get('error_text')})")
 check(Ca.get(B + f"/api/paperless/zip/preview?ws={OWS}").status_code == 403, "a member sees no preview of the upload")
