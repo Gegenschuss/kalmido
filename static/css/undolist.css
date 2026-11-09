@@ -1,6 +1,6 @@
 /* 2.773.0 (#5250): the list "Recent steps" (undolist.js, loaded with it): the window of the ← button and the page #steps share
    the rows. A row: label, time · area · device, a greyed reason; its button at the right. The window's list scrolls inside. */
-#pop.ulwin{width:min(30rem,calc(100vw - 24px));padding:0}
+#pop.ulwin{width:min(30rem,calc(100vw - 1.5rem));padding:0}
 .ulpop .ulhead{padding:.75rem .875rem .25rem}
 .ulhead h2{margin:0;font-size:var(--fs-b)}
 .ulhead p{margin:.125rem 0 0;font-size:var(--fs-s)}
