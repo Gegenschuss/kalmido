@@ -80,7 +80,8 @@ const today = new Date().toISOString().slice(0, 10);
         check(!s.side && !s.over, `${theme} ${W}: settings: nothing overlaps, no sideways scrolling ` + JSON.stringify(s));
         // 2.583.0 (#4833): the settings stay ONE column on every width (no CSS columns); from 1920 px the column has form width (40rem)
         check(s.cols === 'auto' && s.nr === 0, `${theme} ${W}: one column ` + JSON.stringify(s));
-        if (W >= 1920) check(s.pw <= 642, `${theme} ${W}: the column has form width (40rem) ` + JSON.stringify(s));
+        // 2.805.0 (#5357): the column is the pane's width again; the dialog's width keeps it at about form width (40rem, + 1rem without a scrollbar)
+        if (W >= 1920) check(s.pw <= 658, `${theme} ${W}: the column has form width (40rem) ` + JSON.stringify(s));
         await ready(ev, theme_(theme)); await shot(`p2555-a-settings-${W}-${theme}.png`);
         await ev(`document.querySelector('.smodal')?.remove()`);
 
@@ -98,7 +99,8 @@ const today = new Date().toISOString().slice(0, 10);
           if (tab === 'invoices') { await ready(ev, theme_(theme)); await shot(`p2555-a-invoice-${W}-${theme}.png`); }
         }
       }
-      check(wide[2560] > wide[1440] + 200 && wide[1440] <= 1030, `${theme}: the dialog grows on wide monitors, 1440 px as before ` + JSON.stringify(wide));
+      // 2.805.0 (#5357): the dialog no longer grows on wide monitors: the width its content needs on every desktop width (wider only by the grip)
+      check(wide[2560] === wide[1440] && wide[3840] === wide[1440] && wide[1440] <= 1030, `${theme}: the dialog has the same width on wide monitors ` + JSON.stringify(wide));
     }
     // the settings area with sub-tabs: the strip spans both columns at 2560 px
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 2560, height: 1440}});

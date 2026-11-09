@@ -32,6 +32,7 @@ function dlg_grows(card) {
 }
 function dlg_resizable(m, again) {
   const card = m.querySelector(':scope > .card');
+  if (card && m.isConnected && dlg_wide() && m.dataset.dlgsz) { dlg_sizer(m, card, m.dataset.dlgsz); return; }  // 2.805.0 (#5357)
   if (!card || !m.isConnected || !dlg_wide() || m.classList.contains('authscreen') || m.classList.contains('cdlg') || m.classList.contains('shopmode') || m.classList.contains('smodal') || m.classList.contains('lmodal')) return;
   if (!dlg_grows(card)) {
     if (!again) { const k = dlg_key(m); if (k) try { localStorage.removeItem(k); } catch { /* private mode */ } setTimeout(() => dlg_resizable(m, true), 600); }  // content that loads after opening
@@ -68,6 +69,95 @@ function dlg_resizable(m, again) {
   // a dialog that redraws its card's content keeps its grip
   new MutationObserver(() => { if (!grip.isConnected) { grip = mk(); card.appendChild(grip); } }).observe(card, {childList: true});
 }
+// 2.805.0 (#5357): the full grip, opt-in per dialog: the caller sets data-dlgsz="<name>" on the dialog right after modal()
+// (Settings, Edit contact, a mail of the hub, Video review, Set up an agent). Two grips lie on the card's edge: the right edge
+// (width) and the bottom right corner (width and height); they are children of the backdrop, placed over the card from its
+// box, so they stay put when the card's content scrolls. The default size when it opens is the minimum, the window minus
+// 4rem the maximum; the size is kept per dialog and device (localStorage kalmido.dlgsize.<name>, h 0 = default height; a name
+// is never a class name, so the automatic grip's keys of other dialogs with the same class never share or clear it) and
+// applied before the first paint (no jump); double click or Enter / Space on a grip = default size; arrow keys resize (the
+// edge: left / right, the corner: all four), Home / End = smallest / largest. Mouse and pen only: phones and touch keep the
+// sheet without a grip. The card is centred, so both of its sides move: a drag counts twice.
+const DLGSZ_STEP = 24;
+function dlg_sizer(m, card, name) {
+  if (card._dlgsz) return;
+  const key = 'kalmido.dlgsize.' + name, lbl = tr('Drag to resize · double-click: default size');
+  const base = card.getBoundingClientRect();  // the default size = the minimum
+  let w = 0, h = 0;  // 0 = default
+  const lim = () => ({w: (document.documentElement.clientWidth || innerWidth) - 64, h: (window.visualViewport?.height || innerHeight) - 32});
+  const mk = (cls, or) => {
+    const g = document.createElement('div'); g.className = 'dlgsz ' + cls; g.tabIndex = 0;
+    g.setAttribute('role', 'separator'); g.setAttribute('aria-orientation', or); g.setAttribute('aria-label', lbl); g.title = lbl;
+    m.appendChild(g); return g;
+  };
+  const edge = mk('dlgsz-e', 'vertical'), corner = mk('dlgsz-c', 'horizontal');
+  const place = () => {
+    if (!card.isConnected) return;
+    const r = card.getBoundingClientRect();
+    edge.style.cssText = `left:${r.right - 4}px;top:${r.top + 8}px;height:${Math.max(0, r.height - 28)}px`;
+    corner.style.cssText = `left:${r.right - 16}px;top:${r.bottom - 16}px`;
+  };
+  card._dlgPlace = place;
+  const apply = (nw, nh) => {
+    const L = lim();
+    w = nw > 0 ? Math.round(Math.max(base.width, Math.min(nw, L.w))) : 0;
+    h = nh > 0 ? Math.round(Math.max(base.height, Math.min(nh, L.h))) : 0;
+    if (w <= base.width + .5) w = 0;
+    if (h <= base.height + .5) h = 0;
+    card.style.width = w ? w + 'px' : ''; card.style.maxWidth = w ? 'none' : '';
+    card.style.height = h ? h + 'px' : ''; card.style.maxHeight = h ? 'none' : '';
+    card.classList.toggle('dlgsz-w', !!w); card.classList.toggle('dlgsz-h', !!h);
+    if (card._dw && typeof dw_set === 'function') dw_set(card, card._dw.x, card._dw.y);  // a moved dialog stays inside the window
+    place();
+  };
+  const save = () => { try { if (w || h) localStorage.setItem(key, JSON.stringify({w, h})); else localStorage.removeItem(key); } catch { /* private mode */ } };
+  const reset = () => { apply(0, 0); save(); };
+  card._dlgsz = {apply, reset, get: () => ({w, h})};
+  card.style.transition = 'none';  // a size change must not glide
+  try { const v = JSON.parse(localStorage.getItem(key) || 'null'); if (v && (v.w > 0 || v.h > 0)) apply(v.w || 0, v.h || 0); } catch { /* bad value */ }
+  place();
+  for (const g of [edge, corner]) {
+    const both = g === corner;
+    g.addEventListener('pointerdown', e => {
+      if (e.button || e.pointerType === 'touch') return;
+      e.preventDefault(); e.stopPropagation();
+      const x0 = e.clientX, y0 = e.clientY, r0 = card.getBoundingClientRect(), pid = e.pointerId, h0 = both ? r0.height : h;
+      try { g.setPointerCapture(pid); } catch { /* gone */ }
+      g.classList.add('on'); card.classList.add('dlgsz-drag');
+      const put = rafThrottle((x, y) => apply(r0.width + (x - x0) * 2, both ? h0 + (y - y0) * 2 : h));
+      const mv = ev => { if (ev.pointerId === pid) put(ev.clientX, ev.clientY); };
+      const up = ev => {
+        if (ev.pointerId !== pid) return;
+        put.flush(); g.classList.remove('on'); card.classList.remove('dlgsz-drag');
+        document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up); document.removeEventListener('pointercancel', up);
+        try { g.releasePointerCapture(pid); } catch { /* released */ }
+        save();
+      };
+      document.addEventListener('pointermove', mv); document.addEventListener('pointerup', up); document.addEventListener('pointercancel', up);
+    });
+    g.addEventListener('dblclick', e => { e.preventDefault(); reset(); });
+    g.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); reset(); return; }
+      const r = card.getBoundingClientRect(), L = lim();
+      const dw = {ArrowLeft: -DLGSZ_STEP, ArrowRight: DLGSZ_STEP}[e.key], dh = both ? {ArrowUp: -DLGSZ_STEP, ArrowDown: DLGSZ_STEP}[e.key] : undefined;
+      if (e.key === 'Home') apply(0, both ? 0 : h);
+      else if (e.key === 'End') apply(L.w, both ? L.h : h);
+      else if (dw !== undefined) apply(r.width + dw, h);
+      else if (dh !== undefined) apply(w || r.width, r.height + dh);
+      else return;
+      e.preventDefault(); e.stopPropagation(); save();
+    });
+  }
+  // the card moves (opening animation, the dialog dragged by its header, its content changes its height): the grips follow
+  card.addEventListener('animationend', place);
+  if (typeof ResizeObserver === 'function') new ResizeObserver(() => place()).observe(card);
+}
+// a smaller window keeps every sized dialog inside it (the size applied again, clamped) and the grips on its edge
+let dlgsz_rsT = 0;
+window.addEventListener('resize', () => {
+  clearTimeout(dlgsz_rsT);
+  dlgsz_rsT = setTimeout(() => { for (const c of document.querySelectorAll('.modal > .card')) if (c._dlgsz) { const s = c._dlgsz.get(); c._dlgsz.apply(s.w, s.h); } }, 60);
+});
 // 2.38.0 (#1170): touch: a button in a dialog's foot (Save, Cancel ...) does not take the focus from the field being typed in, like
 // Send in the chat (#478): on iOS the first tap otherwise only closed the keyboard, the dialog moved and the tap missed Save
 for (const ev of ['pointerdown', 'mousedown']) document.addEventListener(ev, e => {

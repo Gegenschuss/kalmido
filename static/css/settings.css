@@ -242,14 +242,9 @@
 .umzleft { margin: .5rem 0; }
 .umzleft summary { cursor: pointer; padding: .5rem 0; min-height: 2.75rem; display: flex; align-items: center; }
 .umzleftl { margin: .25rem 0 0 1.25rem; padding: 0; line-height: var(--lh); color: var(--text2); }
-/* 2.555.0 A (#4554): wide monitors (from 1800 px): the settings dialog grows to the list width --w-seite; once the area beside
-   the tabs fits two columns of about a form section each, its content flows into two columns (CSS columns: the order stays the
-   DOM order, down the first column, then the second; the columns do not hang on heading levels, a heading only stays with what
-   follows it). Sub-tabs span both columns; rows, hints, folded parts and lists never break apart. 1440 px and smaller stay as they were. */
-@media (min-width:112.5rem){ .smodal .card{width:min(96rem,100% - 4rem);height:min(85dvh,75rem)} }
-/* 2.583.0 (#4833): the two CSS columns are gone again: on a wide monitor the content stays ONE column of form width (the wider
-   dialog stays); 1440 px and smaller as before */
-@media (min-width:112.5rem){ .smodal .spane{max-width:var(--w-form)} }
+/* 2.555.0 A (#4554) / 2.583.0 (#4833): the wider dialog on wide monitors (96rem) and its column of form width are gone again
+   (2.805.0, #5357): the dialog opens at the width its content needs (app.css .smodal .card), the grip makes it wider and the
+   content goes along. */
 /* 2.583.0 (#4833): "Further options" at the end of a tab (settings.js SET_MORE): the rarely changed part, folded; the count
    names how many settings under it differ from the default */
 details.setmore{margin:1.25rem 0 .5rem;border-top:1px solid var(--line)}

@@ -39,8 +39,9 @@ function dw_set(card, x, y, b = dw_box(card)) {
   if (!(x > -1e6)) x = 0; if (!(y > -1e6)) y = 0;  // NaN (no layout)
   x = Math.round(x); y = Math.round(y);
   card._dw = {x, y}; card.style.transform = x || y ? `translate(${x}px, ${y}px)` : '';
+  card._dlgPlace?.();  // 2.805.0 (#5357): the size grips (dialogs.js dlg_sizer) follow the card
 }
-function dw_reset(card) { card._dw = {x: 0, y: 0}; card.style.transform = ''; }
+function dw_reset(card) { card._dw = {x: 0, y: 0}; card.style.transform = ''; card._dlgPlace?.(); }
 document.addEventListener('pointerdown', e => {
   if (e.button !== 0 || e.pointerType === 'touch' || !dw_desk() || e.target.closest?.(DW_SKIP)) return;
   const card = dw_card(e.target); if (!card) return;

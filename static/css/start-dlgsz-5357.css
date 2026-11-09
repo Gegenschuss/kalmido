@@ -1,0 +1,19 @@
+/* 2.805.0 (#5357): the size grip of the dialogs that opt in (dialogs.js dlg_sizer: Settings, Edit contact, a mail of the hub,
+   Video review, Set up an agent): the right edge and the bottom right corner, over the card's edge (children of the backdrop,
+   placed from the card's box); desktop with a mouse only, a phone / touch has none. The settings' desktop width in app.css
+   (.smodal .card) is what their content needs again: the tabs (13.5rem), one form column (--w-form), the pane's padding
+   (3rem) and its scrollbar (1rem), on wide monitors too (the 96rem of #4554 are gone); wider only by the grip, the content goes along. */
+.dlgsz{display:none;position:absolute;z-index:2;touch-action:none;outline:0}
+@media (min-width:768px) and (pointer:fine){ .dlgsz{display:block} }
+.dlgsz-e{width:.5rem;cursor:ew-resize}
+.dlgsz-e::after{content:"";position:absolute;top:0;bottom:0;left:calc(50% - .5px);width:1px;background:transparent}
+.dlgsz-e:hover::after,.dlgsz-e.on::after,.dlgsz-e:focus-visible::after{left:calc(50% - .09375rem);width:.1875rem;background:var(--accent);border-radius:.125rem}
+.dlgsz-c{width:1rem;height:1rem;cursor:nwse-resize;opacity:.6;border-radius:0 0 .25rem 0;
+  background:linear-gradient(135deg,transparent 0 50%,var(--muted) 50% 58%,transparent 58% 72%,var(--muted) 72% 80%,transparent 80%)}
+.dlgsz-c:hover,.dlgsz-c.on,.dlgsz-c:focus-visible{opacity:1}
+.dlgsz-c:focus-visible{box-shadow:0 0 0 2px var(--accent)}
+.modal .card.dlgsz-drag{user-select:none;-webkit-user-select:none}
+/* a taller contact / agent / review dialog keeps its buttons at the bottom (the mail and the settings are columns already) */
+.ctmodal .card.dlgsz-h,.agguide .card.dlgsz-h,.vdrdlg .card.dlgsz-h{display:flex;flex-direction:column}
+.ctmodal .card.dlgsz-h>*,.agguide .card.dlgsz-h>*,.vdrdlg .card.dlgsz-h>*{flex:none}
+.ctmodal .card.dlgsz-h>.foot,.agguide .card.dlgsz-h>.foot{margin-top:auto}

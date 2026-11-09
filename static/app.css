@@ -4801,7 +4801,7 @@ button.lkchip:hover{border-color:var(--accent)}
 @media (min-width:768px){
   .smodal,:root .smodal.modal{background:rgba(4,6,9,.78)}
   :root[data-theme="light"] .smodal.modal{background:rgba(20,26,32,.55)}
-  .smodal .card{width:min(64rem,100%);height:min(85dvh,62rem);border:1px solid var(--line2);box-shadow:0 1.5rem 4rem rgba(0,0,0,.55)}
+  .smodal .card{width:min(calc(13.5rem + var(--w-form) + 4rem),100%);height:min(85dvh,62rem);border:1px solid var(--line2);box-shadow:0 1.5rem 4rem rgba(0,0,0,.55)}
   .snav{width:13.5rem}
 }
 .smodal a:not(.btn):not(.linkbtn),.lookpv .lpv-link{text-decoration:none}

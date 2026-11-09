@@ -1016,6 +1016,7 @@ function settingsModal(focus) {
     <div class="sbody"><nav class="snav" role="tablist" aria-label="${tr('Settings')}">${secs.map(([k, i, n]) => `<button role="tab" id="st-${k}" aria-controls="sp-${k}" aria-selected="${k === cur}" data-sec="${k}" class="${k === cur ? 'on' : ''}"${k === 'access' && k !== cur && !acz_mine() ? ' hidden' : ''/* 2.364.0 C (#3044) */}>${ic(i, 's')}<span>${tr(n)}</span>${SET_DESC[k] ? `<small class="sndesc">${esc(tr(SET_DESC[k]))}</small>` : ''}</button>`).join('')}</nav>${mvOn() ? `<button type="button" class="snmv" data-mv="off">${ic('eye', 's')}<span>${tr('Show administration again')}</span></button>` : ''/* 2.436.0 (#3620): the way back, under the areas */}
       <div class="spanes">${secs.map(([k]) => `<section class="spane ${k === cur ? '' : 'hidden'}" role="tabpanel" id="sp-${k}" aria-labelledby="st-${k}" data-pane="${k}">${pane[k]}</section>`).join('')}</div></div>`);
   md.classList.add('smodal');
+  md.dataset.dlgsz = 'settings';  // 2.805.0 (#5357): the size grip (dialogs.js dlg_sizer)
   som_build(md);  // 2.583.0 (#4833): the rare part of each tab under "Further options"
   xl_stdLater(md, hint);  // 2.470.0 (#3596): the sharing defaults of a workspace (ablinks.js); 2.599.0 (#4907): after the module ablage loaded
   tty_mount(md);  // 2.609.0 (#3372): own ticket types (below)

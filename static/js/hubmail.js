@@ -109,6 +109,7 @@ async function hbm_open(id, key) {
     ${m.folder_id ? `<p><a class="linkbtn" href="#ablage/${m.folder_id}" data-m="close">${ic('folder', 's')}<span>${tr('Attachments in the file store')}</span></a></p>` : ''}
     <div class="foot">${typeof hmb_replyBtn === 'function' ? hmb_replyBtn(m) : ''}${m.can_write ? `<button type="button" class="btn danger" data-hbmd="del">${ic('trash', 's')} ${tr('Delete')}</button><button type="button" class="btn" data-hbmd="asg">${tr('Assign…')}</button>` : ''}<span class="spacer"></span><button class="btn pri" data-m="close">${tr('Done')}</button></div>`);
   md.classList.add('hbmdlg');
+  md.dataset.dlgsz = 'mail';  // 2.805.0 (#5357): the size grip (dialogs.js dlg_sizer)
   md.addEventListener('click', e => {
     if (e.target.closest('[data-m="close"]')) { modalClose(md); return; }
     if (hbm_viewClick(e, md, m, key)) return;  // 2.141.0 B (#2140, #2139): Text / HTML, Load images, Task / Event from it

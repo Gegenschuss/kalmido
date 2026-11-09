@@ -191,6 +191,7 @@ async function vdr_open(id, have) {
     <div class="vdrbody"><div class="vdrstate"></div><div class="vdrpl"></div><div class="vdrtl" aria-label="${esc(tr('Comments on the time line'))}"></div>
       <div class="vdrcmp"></div><ul class="vdrcms" role="list"></ul><div class="vdrsig"></div></div>`);
   md.classList.add('vdrdlg');
+  md.dataset.dlgsz = 'review';  // 2.805.0 (#5357): the size grip (dialogs.js dlg_sizer)
   md.setAttribute('aria-labelledby', 'vdr-h');
   // 2.641.0 (#4769): pt = the point set on the image / page for the next comment, page = the PDF page shown, pdf = its document
   const st = VDR.cur = {md, r, ver: (r.versions[r.versions.length - 1] || {}).id, at: true, frozen: null, reply: null, ctl: null, pt: null, page: 1, pdf: null};

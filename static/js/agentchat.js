@@ -1550,6 +1550,7 @@ function agGuideModal() {
     ${agRulesHtml()}
     <div class="shint">${tr('Every command, the CLAUDE.md template, the firewall and the test cases:')} <a href="${AG_SETUP_DOC}" target="_blank" rel="noopener noreferrer">${tr('Setup guide (docs/AGENT-SETUP.md)')}</a> · <a href="${API_DOCS.replace('API.md', 'AGENT-SECURITY.md')}" target="_blank" rel="noopener noreferrer">${tr('Running an agent safely')}</a></div>`);
   md.classList.add('agguide');
+  md.dataset.dlgsz = 'agentsetup';  // 2.805.0 (#5357): the size grip (dialogs.js dlg_sizer)
   md.addEventListener('input', e => { if (e.target.id === 'agg-env') d.env = e.target.value.trim(); else if (e.target.id === 'agg-user') d.user = e.target.value.trim(); else return; $('#agg-prompt', md).textContent = fill(); });
   md.addEventListener('click', async e => {
     const t = e.target.closest('[data-agt]');

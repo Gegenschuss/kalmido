@@ -568,6 +568,7 @@ async function ctEditor(c, cf, draft) {  // draft: 2.576.0 (#4764) the input of 
       ${fold ? '' : `<div class="row"><label for="ct-bk">${tr('Address book')}</label><select id="ct-bk">${books.map(b => `<option value="${b.id}" ${b.id === st.book_id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select></div>`}</details>
     <div class="foot"><span class="spacer"></span><button class="btn" data-ctm2="close">${tr('Cancel')}</button><button class="btn pri" data-ctm2="save">${tr('Save')}</button></div>`);
   md.classList.add('ctmodal');
+  md.dataset.dlgsz = 'contact';  // 2.805.0 (#5357): the size grip (dialogs.js dlg_sizer)
   const form = () => {  // what the dialog would save now
     const v = id => $('#' + id, md)?.value.trim() || '';
     const dt = k => { const d = $('#ct-' + k, md)?.value || ''; return !d ? '' : $(`#ct-${k}-noy`, md)?.checked ? `--${d.slice(5, 7)}-${d.slice(8, 10)}` : d; };
