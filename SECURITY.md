@@ -85,8 +85,10 @@ Adding an entry, in this order:
   placeholder lists, never user input; values always go through parameters.
   2.755.0 (#5296): a varying table / column name goes through `qi()` (`kalmido/core/pg.py`, allowlist + quoting); the own
   rule `.semgrep/sql_ident.yml` (`kalmido-sql-ident-without-qi`) is red for every new f-string with `FROM / JOIN / INTO /
-  UPDATE / SET {...}` without it. Its ~430 existing places (names from fixed code, the schema or the registries) are listed
+  UPDATE / SET / TABLE / TRUNCATE / INDEX x ON {...}` without it. Its ~440 existing places (names from fixed code, the schema or the registries) are listed
   in `tools/semgrep_baseline.json` with that reason and task 5296, not rewritten; a place that is touched moves to `qi()`.
+  The rule is a net for the f-string form, no proof: `WHERE` / `ORDER BY` / `SELECT` names, `+` concatenation, `%` and
+  `.format()` are not seen.
 - `semgrep` / `bandit` flag `urllib` requests with a URL from configuration: server-side requests only go to
   the services in the [list of outgoing connections](docs/SELF-HOSTING.md#outgoing-connections), through a wrapper that
   allows http/https only and same-host redirects, or, for addresses people give (calendars, feeds, invoice links in mails),

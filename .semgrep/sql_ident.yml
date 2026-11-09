@@ -2,14 +2,14 @@
 # Red for NEW code only: the existing places stand in tools/semgrep_baseline.json (reason: names from fixed code / the schema).
 # A regex, not a structural pattern: `pattern-inside: f"..."` ran into semgrep's 5 s rule timeout on the big files (a skipped
 # file is no check). It finds the f-string (one line, or triple-quoted over several lines) whose text has FROM / JOIN / INTO /
-# UPDATE / SET followed by {...} without qi( inside the braces; the finding sits on the f-string's first line, one per string.
+# UPDATE / SET / TABLE / TRUNCATE / INDEX <name> ON followed by {...} without qi( inside the braces; the finding sits on the f-string's first line, one per string.
 rules:
   - id: kalmido-sql-ident-without-qi
     languages: [python]
     severity: WARNING
     message: >-
-      A name is put into SQL text with an f-string (FROM / JOIN / INTO / UPDATE / SET {...}) without qi(). Put table and
+      A name is put into SQL text with an f-string (FROM / JOIN / INTO / UPDATE / SET / TABLE / TRUNCATE / INDEX x ON {...}) without qi(). Put table and
       column names through qi(name, allowlist) from kalmido/core/pg.py; values always go as ? parameters.
     pattern-either:
-      - pattern-regex: \b[rR]?[fF][rR]?("|')(?:(?!\1)[^\n])*?\b(FROM|JOIN|INTO|UPDATE|SET)\s+\{(?![^{}]*\bqi\()
-      - pattern-regex: \b[rR]?[fF][rR]?("""|''')(?:(?!\1)[\s\S])*?\b(FROM|JOIN|INTO|UPDATE|SET)\s+\{(?![^{}]*\bqi\()
+      - pattern-regex: \b[rR]?[fF][rR]?("|')(?:(?!\1)[^\n])*?\b(FROM|JOIN|INTO|UPDATE|SET|TABLE|TRUNCATE|INDEX\s+\S+\s+ON)\s+\{(?![^{}]*\bqi\()
+      - pattern-regex: \b[rR]?[fF][rR]?("""|''')(?:(?!\1)[\s\S])*?\b(FROM|JOIN|INTO|UPDATE|SET|TABLE|TRUNCATE|INDEX\s+\S+\s+ON)\s+\{(?![^{}]*\bqi\()
