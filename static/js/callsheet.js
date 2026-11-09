@@ -151,7 +151,7 @@ async function cs_open(job, org) {
     const b = /** @type {any} */ (e.target).closest?.('[data-cs]'); if (!b || b.disabled) return;
     const k = b.dataset.cs;
     if (k === 'close') { md.remove(); return; }
-    if (k === 'rowadd') { const box = cs_one(`.csrows[data-k="${b.dataset.k}"]`, md); if (!box) return; box.insertAdjacentHTML('beforeend', cs_lineHtml(b.dataset.k, {})); cs_one('.csrow:last-child input', box)?.focus(); return; }
+    if (k === 'rowadd') { const box = cs_one(`.csrows[data-k="${b.dataset.k}"]`, md); if (!box) return; const tmp = document.createElement('div'); setHtml(tmp, cs_lineHtml(b.dataset.k, {})); box.append(...tmp.childNodes); cs_one('.csrow:last-child input', box)?.focus(); return; }
     if (k === 'rowdel') { b.closest('.csrow')?.remove(); return; }
     if (k === 'sketchdel') { sketch = ''; const box = cs_one('.cssketch', md); if (box) setHtml(box, `<p class="muted">${tr('The picture goes with "Save".')}</p>`); b.remove(); return; }
     if (k === 'reload') { if (md._cur) { cs = md._cur; md._cur = null; sketch = undefined; draw(); } return; }

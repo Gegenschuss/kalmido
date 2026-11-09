@@ -312,15 +312,17 @@ def cs_put(job):
     r = cs_row(c, oid, job)
     ccf_check(b, (r or {}).get("updated_at") or "", "callsheet", lambda: cs_public(c, uid, oid, job, rows, r))
     now = iso_ms(now_utc())
-    vals = {"data": json.dumps(data, ensure_ascii=False), "updated_at": now}
-    if sketch is not None:
-        vals.update(sketch=sketch[0], sketch_mime=sketch[1])
-    vals = oc_enc_fields(c, oid, "hub_callsheets", vals)
-    if r:
-        c.execute(f"UPDATE hub_callsheets SET {', '.join(k + '=?' for k in vals)} WHERE id=?", (*vals.values(), r["id"]))  # noqa: S608 (fixed keys)
+    keep = sketch is None  # no new sketch / no removal: the stored one stays
+    sketch = sketch or ("", "")
+    vals = oc_enc_fields(c, oid, "hub_callsheets", {"data": json.dumps(data, ensure_ascii=False), "sketch": sketch[0]})
+    if r and keep:
+        c.execute("UPDATE hub_callsheets SET data=?, updated_at=? WHERE id=?", (vals["data"], now, r["id"]))
+    elif r:
+        c.execute("UPDATE hub_callsheets SET data=?, sketch=?, sketch_mime=?, updated_at=? WHERE id=?",
+                  (vals["data"], vals["sketch"], sketch[1], now, r["id"]))
     else:
-        row = {"org_id": oid, "job": job, "created_by": uid, "created_at": now, "sketch": "", "sketch_mime": "", **vals}
-        c.execute(f"INSERT INTO hub_callsheets({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))  # noqa: S608
+        c.execute("INSERT INTO hub_callsheets(org_id, job, data, sketch, sketch_mime, created_by, created_at, updated_at) "
+                  "VALUES(?,?,?,?,?,?,?,?)", (oid, job, vals["data"], vals["sketch"], sketch[1], uid, now, now))
     bump(c)
     c.commit()
     return jsonify(callsheet=cs_public(c, uid, oid, job, rows))
