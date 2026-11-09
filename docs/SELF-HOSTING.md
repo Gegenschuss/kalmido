@@ -609,7 +609,9 @@ docker compose up -d kalmido
   and fields and the wiki history cannot be decrypted (the app answers with the code `orgcrypt`); remove the variable
   afterwards. A backup without such keys but from another key restores with a warning: its stored access tokens (Git,
   documents, single sign-on) may be unreadable; enter them again. Account keys have
-  no recovery key: without the old server key private files are lost for good. The backup passphrase and the off-site
+  no recovery key: without the old server key everything sealed with them is lost for good (2.760.0, #4523): private files (the own file store, attachments and files of projects without an organisation, chats with agents), the journal, privately filed e-mails, the household budget, private knowledge pages with their history and the sealed values of a person's own documents.
+  Organisations and private offices come back with their recovery key (`rewrap`, see
+  [Encryption at rest](#encryption-of-organisation-data)). The backup passphrase and the off-site
   access data set on the restoring server stay usable after the restore (2.359.0; before, encrypted backups failed until
   the passphrase was entered again).
 
@@ -811,7 +813,7 @@ Since 2.42 the server encrypts the sensitive data of every organisation **at res
 Nothing changes for the people: whoever may see a value or a file (also an agent through the API) sees it as before;
 only the database and the data folder hold ciphertext.
 
-At a glance (the same two lists as in Settings > Organisation > People > Organisations, since 2.46.1):
+At a glance - the main parts; the full list is in the app, *Settings > Organisation > People > Organisations* (since 2.46.1):
 
 | Encrypted (with `KALMIDO_SECRET_KEY`) | Not encrypted |
 |---|---|
@@ -959,7 +961,9 @@ shared with others, an agent the project is shared with); the database and the d
   ```
 
   (the earlier key is read from a file or stdin, never from the command line; `status` counts account keys made with
-  another server key as `keys_other_server_key`). Without the master key the private files are lost. Until the rewrap, and
+  another server key as `keys_other_server_key`). Without the master key everything sealed with an account key is lost
+  (2.760.0, #4523): private files (the own file store, attachments and files of projects without an organisation, chats with agents), the journal, privately filed e-mails, the household budget, private knowledge pages with their history and the sealed values of a person's own documents; organisations and private offices
+  come back with their recovery key. Until the rewrap, and
   without the earlier key for good, new private files of these people are refused with the same error as the old ones
   (an account key row stays as it is; only `private_encrypt` 0 stores new files plain).
   Some things stay on the server key itself and no rewrap brings them back (2.138.4): the Paperless-ngx API tokens, the
@@ -2045,11 +2049,12 @@ Notes:
    `KALMIDO_OPERATOR_TOKEN_FILE`, `KALMIDO_BACKUP_PASSPHRASE` when it is set that way, and any folder you moved with
    `TASKS_ATTACHMENTS`, `TASKS_OFFICE_DIR`, `TASKS_TEXT_CACHE` or `KALMIDO_PAPERLESS_ZIP_DIR`.
    `KALMIDO_FOLDERWATCH_DIR` comes with the image: nothing to copy.
-   **Without the old server key everything encrypted is lost for good:** it wraps the organisation and account keys, and
+   **Without the old server key the encrypted data is lost unless a recovery key brings it back:** it wraps the organisation and account keys, and
    with them every sealed file and field - attachments, private files, organisation files, office documents (PDF / XML)
    and office fields, the wiki history - plus the stored secrets (repository tokens, sign-on client secret). Account keys
-   have no recovery key, so private files cannot be brought back any other way, and the export of an office refuses
-   without the key. Put the key in place on the new server *before* its first start (see
+   have no recovery key, so what hangs on them cannot be brought back any other way (2.760.0, #4523): private files (the own file store, attachments and files of projects without an organisation, chats with agents), the journal, privately filed e-mails, the household budget, private knowledge pages with their history and the sealed values of a person's own documents.
+   Organisations and private offices are not lost: with their recovery key `rewrap` opens them under the new server key
+   (see [Encryption at rest](#encryption-of-organisation-data)); until then the export of an office refuses. Put the key in place on the new server *before* its first start (see
    [Backup and encryption](#backup-and-encryption)).
 3. **Start** the new server and check the attachments (number and size, see above) and the counts (users, lists,
    tasks; `GET /api/v1/admin/status` with an admin token) against the old server.
