@@ -30,6 +30,7 @@ from ..api.common import v1_args, v1_err, v1_json, v1_view
 from ..core.access import Denied
 from ..core.config import app
 from ..core.conflict import Conflict, VersionRequired, ccf_check
+from ..core.pg import ts_canon  # 2.760.0 (#5311): "stale" compares the version canonically, as ccf_check
 from ..core.db import bump, db, insert_id, iso, now_utc
 from ..core.errors import BadInput
 from ..core.i18n import N_, tr
@@ -142,7 +143,7 @@ def objp_view_extra(c, j):
     cur = _plain({k: row[k] for k in p.get("after") or {} if k in row.keys()})
     rows = [{"field": k, "before": (p.get("before") or {}).get(k), "now": cur.get(k), "after": v} for k, v in (p.get("after") or {}).items()]
     return {"object": {"kind": kind, "id": rid, "label": tr(reg["label"]), "title": obj_title(c, kind, rid), "open": reg["open_url"](rid),
-                       "can_write": role in ("edit", "manage"), "stale": str(row["updated_at"]) != str(p.get("version"))},
+                       "can_write": role in ("edit", "manage"), "stale": ts_canon(row["updated_at"]) != ts_canon(p.get("version"))},
             "changes": rows}
 
 

@@ -46,7 +46,7 @@ from .db import bump, insert_id, iso, iso_ms, now_utc
 from .errors import BadInput, UnknownFields
 from .i18n import N_, tr
 from .objects import OBJ_COLS, obj_need, obj_node_follow, obj_public, obj_reg, obj_row, obj_title, obj_forget
-from .pg import qi, system_ctx, table_columns, write_lock  # 2.755.0 (#5296): qi
+from .pg import qi, system_ctx, table_columns, ts_canon, write_lock  # 2.755.0 (#5296): qi; 2.760.0 (#5311): ts_canon
 from ..collab.comments import user_names
 from ..accounts.orgroles import need_org_write, org_role_key
 from ..accounts.orgout import org_out  # 2.579.0 (#4802): obj_space_set
@@ -357,7 +357,11 @@ def obj_restore(c, uid, kind, rid):
     reg = obj_reg(kind)
     row, _ = obj_need(c, uid, kind, rid, "manage", trash=True)
     write_lock(c, f"obj-{kind}-{int(rid)}")
-    n = c.execute("SELECT * FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id=? AND deleted_at=?", (kind, int(rid), row["deleted_at"])).fetchone()
+    # 2.760.0 (#5311): the node's deleted_at is TEXT, the object's may be TIMESTAMPTZ (read canonically, pg.py ts_canon):
+    # compare both canonically, not as text (a TIMESTAMPTZ table's restore left its node in the trash)
+    gone = ts_canon(row["deleted_at"])
+    n = next((x for x in c.execute("SELECT * FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id=? AND deleted_at IS NOT NULL",
+                                   (kind, int(rid))).fetchall() if ts_canon(x["deleted_at"]) == gone), None)
     if n is not None:  # review F7: the node obj_trash put into the trash comes back (not one the file store's own trash holds)
         nm = _free_name(c, n["parent_id"], n["owner_id"], n["org_id"], n["name"], skip=n["id"])
         c.execute("UPDATE fs_nodes SET deleted_at=NULL, deleted_by=NULL, name=? WHERE id=?", (nm, n["id"]))
