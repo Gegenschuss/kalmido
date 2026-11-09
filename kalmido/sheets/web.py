@@ -11,7 +11,7 @@ from ..core.db import body, db, iso_ms, now_utc
 from ..core.i18n import tr
 from ..accounts.session import me
 from ..core.errors import BadInput
-from ..core.pg import write_lock
+from ..core.pg import qi, write_lock
 from .core import (SH_ROWS_MAX, ShBook, sh_add_col, sh_add_rows, sh_brief, sh_check_list, sh_clean_col, sh_clean_title,
                    sh_col_dict, sh_create, sh_dict, sh_freeze, sh_index, sh_list_bound, sh_may_rebind, sh_need, sh_need_cell, sh_option_ops, sh_options, sh_presence_set, sh_reload, sh_rev_conflict,
                    sh_set_cells, sh_set_name, sh_touch, sh_undo_batch, sh_vars)
@@ -348,7 +348,7 @@ def sheets_col_delete(sid, col_id):
 
 def shx_place(c, sid, kind, xid):
     """2.800.0 (#5409): how the table names a live row (its number) / column (its title or letter) right now."""
-    table = "sheet_rows" if kind == "row" else "sheet_columns"
+    table = qi("sheet_rows" if kind == "row" else "sheet_columns", ("sheet_rows", "sheet_columns"))
     live = [x[0] for x in c.execute(f"SELECT id FROM {table} WHERE sheet_id=? AND {live_sql()} ORDER BY pos, id", (sid,))]
     i = live.index(xid) if xid in live else 0
     if kind == "row":

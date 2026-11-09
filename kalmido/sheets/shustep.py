@@ -29,7 +29,7 @@ from ..core.undoweb import undo_need_reg
 from ..files.fsref import fs_ref_rename
 from .core import SH_STEP_KINDS, ShBook, sh_freeze, sh_need, sh_reload, sh_set_name, sh_touch
 from .shbook import _name_free, shb_bid, shb_label, shb_name_set, shb_rows, shb_sync
-from ..core.pg import table_columns
+from ..core.pg import qi, table_columns
 from .shhist import SHH_KIND, SHH_OWN, _core, shh_meta
 from .web import sh_order_apply, shx_col_apply, shx_place
 
@@ -46,13 +46,18 @@ def _ends(ch, redo):
     return (ch["new_raw"], ch["old_raw"]) if redo else (ch["old_raw"], ch["new_raw"])
 
 
+SHU_TABLES = ("sheet_rows", "sheet_columns")
+SHU_SHEET_COLS = ("chart", "fmt_rules")
+
+
 def _trash(table, what):
     def run(c, r, ch, uid, ts, redo):
+        t = qi(table, SHU_TABLES)
         xid = ch["row_id"] if what == "row" else ch["col_id"]
         if redo:
-            n = c.execute(f"UPDATE {table} SET deleted_at=? WHERE id=? AND sheet_id=? AND {live_sql()}", (ch["new_raw"], xid, r["id"])).rowcount
+            n = c.execute(f"UPDATE {t} SET deleted_at=? WHERE id=? AND sheet_id=? AND {live_sql()}", (ch["new_raw"], xid, r["id"])).rowcount
         else:
-            n = c.execute(f"UPDATE {table} SET deleted_at=NULL WHERE id=? AND sheet_id=? AND deleted_at=?", (xid, r["id"], ch["new_raw"])).rowcount
+            n = c.execute(f"UPDATE {t} SET deleted_at=NULL WHERE id=? AND sheet_id=? AND deleted_at=?", (xid, r["id"], ch["new_raw"])).rowcount
         return (True, None) if n else (False, ch["old_raw"] or tr("Table"))
     return run
 
@@ -91,7 +96,7 @@ def _order(c, r, ch, uid, ts, redo):
     a, z = _js(ch["old_raw"]) or {}, _js(ch["new_raw"]) or {}
     kind = "row" if a.get("k") == "row" else "col"
     name = tr("Rows") if kind == "row" else tr("Columns")
-    table = "sheet_rows" if kind == "row" else "sheet_columns"
+    table = qi("sheet_rows" if kind == "row" else "sheet_columns", SHU_TABLES)
     live = {x[0] for x in c.execute(f"SELECT id FROM {table} WHERE sheet_id=? AND {live_sql()}", (r["id"],))}
     to, frm = (z.get("ids"), a.get("ids")) if redo else (a.get("ids"), z.get("ids"))
     b = {"ids": [x for x in to or [] if x in live], "prev": [x for x in frm or [] if x in live]}
@@ -117,10 +122,11 @@ def _order(c, r, ch, uid, ts, redo):
 def _sheet_val(col, what, label):
     def run(c, r, ch, uid, ts, redo):
         to, frm = (x or "" for x in _ends(ch, redo))
-        cur = c.execute(f"SELECT {col} FROM sheets WHERE id=?", (r["id"],)).fetchone()[0] or ""
+        q = qi(col, SHU_SHEET_COLS)
+        cur = c.execute(f"SELECT {q} FROM sheets WHERE id=?", (r["id"],)).fetchone()[0] or ""
         if cur != frm:
             return False, tr(label)
-        c.execute(f"UPDATE sheets SET {col}=? WHERE id=?", (to, r["id"]))
+        c.execute(f"UPDATE sheets SET {q}=? WHERE id=?", (to, r["id"]))
         if what == "rules":
             shh_meta(c, r["id"], what, str(len(_js(frm) or [])) if frm else "", str(len(_js(to) or [])) if to else "", uid)
         else:
