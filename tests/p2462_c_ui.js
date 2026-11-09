@@ -100,11 +100,18 @@ const item = (d, t) => items(d).find(x => (x.querySelector('.ml')?.firstChild?.t
   await until(() => d.querySelectorAll('#tc-msgs .cmsg').length === 2);
   check(d.querySelectorAll('#tc-msgs .cmsg')[1]?.classList.contains('cfin') && !d.querySelectorAll('#tc-msgs .cmsg')[0].classList.contains('cfin'), '#1660: a new team message fades in, the old one stays');
   // scrolled up: the pill (jsdom has no layout: fake the box height)
-  w.eval(`(() => { const b = document.getElementById('tc-msgs'); Object.defineProperty(b, 'scrollHeight', {value: 1000, configurable: true}); Object.defineProperty(b, 'clientHeight', {value: 300, configurable: true}); b.scrollTop = 0; })()`);
+  // #3506 (CI red of 2.786.0): the fake sits on the prototype for #tc-msgs, so a full redraw of the room (a live event that
+  // brings the message before tcPatch: cf_view) measures the same scrolled-up box; on the box itself it was lost with the box
+  w.eval(`(() => { const P = HTMLElement.prototype, o = {sh: Object.getOwnPropertyDescriptor(Element.prototype, 'scrollHeight'), ch: Object.getOwnPropertyDescriptor(Element.prototype, 'clientHeight')};
+    window.__tcFake = o;
+    Object.defineProperty(P, 'scrollHeight', {configurable: true, get() { return this.id === 'tc-msgs' ? 1000 : o.sh.get.call(this); }});
+    Object.defineProperty(P, 'clientHeight', {configurable: true, get() { return this.id === 'tc-msgs' ? 300 : o.ch.get.call(this); }});
+    document.getElementById('tc-msgs').scrollTop = 0; })()`);
   await call('POST', `/api/team/rooms/${RID}/messages`, {body: 'Third hello'}, BCK);
   w.eval(`loadRoom(S.tc.rid).then(() => tcPatch())`);
   await until(() => d.querySelectorAll('#tc-msgs .cmsg').length === 3);
-  check(!d.querySelector('#tc-new').classList.contains('hidden'), '#1660: scrolled up + a new message: "New message" shows');
+  check(await until(() => !d.querySelector('#tc-new').classList.contains('hidden'), 20), '#1660: scrolled up + a new message: "New message" shows ' + w.eval(`JSON.stringify({pills: document.querySelectorAll('#tc-new').length, boxes: document.querySelectorAll('#tc-msgs').length, cls: document.querySelector('#tc-new')?.className, sh: document.getElementById('tc-msgs')?.scrollHeight, ch: document.getElementById('tc-msgs')?.clientHeight, st: document.getElementById('tc-msgs')?.scrollTop, cf: CF['tc-msgs'], near: tcNear(document.getElementById('tc-msgs')), route: location.hash, th: !!S.tc.th})`));
+  w.eval(`(() => { delete HTMLElement.prototype.scrollHeight; delete HTMLElement.prototype.clientHeight; })()`);
   click(w, d.querySelector('#tc-new')); await sleep(50);
   check(d.querySelector('#tc-new').classList.contains('hidden'), '#1660: a tap hides the pill');
   w.close();
