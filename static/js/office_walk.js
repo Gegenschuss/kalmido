@@ -94,7 +94,7 @@ function wlk_draw() {
   }
   card.innerHTML = `${top}<div class="wlk-tx bnkhead">${wlk_head(x)}</div><div class="wlk-body">${body}</div>
     <div class="foot wlk-foot"><button type="button" class="btn ghost" data-wlk="prev" ${WLK.i ? '' : 'disabled'}>${ic('back', 's')}<span>${tr('Back')}</span></button>${undo}
-    ${fine ? `<small class="muted wlk-keys">${tr('1-3 choose · Enter takes over · arrows back and forth')}</small>` : ''}<span class="spacer"></span>
+    ${fine ? `<small class="muted wlk-keys">${tr('1-3 select · Enter takes over · arrows back and forth')}</small>` : ''}<span class="spacer"></span>
     ${!it.done && WLK.cands?.length ? `<button type="button" class="btn pri" data-wlk="take" data-k="${WLK.sel}">${ic('check', 's')}<span>${tr('Take over')}</span></button>` : ''}
     <button type="button" class="btn" data-wlk="skip">${it.done ? tr('Next') : tr('Skip')}${ic('right', 's')}</button></div>`;
   if (!md.contains(document.activeElement) || document.activeElement === document.body) card.focus({preventScroll: true});
