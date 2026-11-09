@@ -327,6 +327,40 @@ rc, out, er = py(f"from kalmido.integrations.mail import digest_mail_content\nc=
                  "print(r[1] if r else '')")
 check(rc == 0 and "e2e1" not in out and "(encrypted)" in out and "Strongbox" in out, f"digest: one line per locked list {out[:300]} {er}")
 
+# ================================================================== 2.787.0 (#5417, Fable review #5408): undo steps of a move
+# A move into the locked list (PATCH with the ciphertexts) records no undo step for the task: its "before" would keep the plain
+# texts in obj_undo.snap, written at the commit AFTER the move's scrub. The way back out of the lock and its undo: the undo moves
+# it in again, whose scrub takes the step's own part and group with it (wanted: the step held the plain texts).
+def undo_marks(m):
+    return dbx("SELECT COUNT(*) FROM obj_undo WHERE CAST(snap AS text) LIKE ?", (f"%{m}%",))[0][0]
+
+
+MV = MK + "Move"
+T3 = A.post(B + "/api/tasks", json={"list_id": L2, "title": MV + "Title0", "content": MV + "Note"}).json()["id"]
+check(A.patch(B + f"/api/tasks/{T3}", json={"title": MV + "Title"}).ok and undo_marks(MV) >= 1,
+      "an open list's task: its edit is an undo step with the plain texts (fine there)")
+ng0 = dbx("SELECT COUNT(*) FROM undo_groups WHERE user_id=1")[0][0]
+r = A.patch(B + f"/api/tasks/{T3}", json={"list_id": L, "title": cipher(5), "content": cipher(6)})
+check(r.ok and dbx("SELECT list_id FROM tasks WHERE id=?", (T3,))[0][0] == L, f"move into the locked list {r.status_code} {r.text[:200]}")
+check(undo_marks(MV) == 0, "move in: no plain text of the task in obj_undo (no step, the old ones scrubbed)")
+check(not dbx("SELECT 1 FROM obj_undo WHERE kind='task' AND ref_id=? AND CAST(snap AS text) LIKE ?", (T3, '%"fields"%')),
+      "move in: no undo part of the move")
+check(not dbx("SELECT 1 FROM undo_groups WHERE CAST(label_args AS text) LIKE ?", (f"%{MV}%",)), "move in: no undo label names the task")
+check(dbx("SELECT COUNT(*) FROM undo_groups WHERE user_id=1")[0][0] <= ng0, "move in: no new undo group")
+r = A.patch(B + f"/api/tasks/{T3}", json={"list_id": L2, "title": MV + "Out", "content": MV + "OutNote"})
+check(r.ok and dbx("SELECT title FROM tasks WHERE id=?", (T3,))[0][0] == MV + "Out", f"move out with plain texts {r.status_code} {r.text[:200]}")
+g = dbx("SELECT DISTINCT group_id FROM obj_undo WHERE kind='task' AND ref_id=? ORDER BY group_id DESC LIMIT 1", (T3,))
+check(bool(g), "move out: an undo step (the task is in the open list now)")
+if g:
+    GO = g[0][0]
+    r = A.post(B + f"/api/undo/to/{GO}")
+    row = dbx("SELECT list_id, title FROM tasks WHERE id=?", (T3,))[0]
+    check(r.status_code < 500 and row[0] == L and str(row[1]).startswith("e2e1:"),
+          f"undo of the move out: back in the locked list with the ciphertexts {r.status_code} {r.text[:200]} {row}")
+    check(not dbx("SELECT 1 FROM undo_groups WHERE id=?", (GO,)) and not dbx("SELECT 1 FROM obj_undo WHERE group_id=?", (GO,)),
+          "undo of the move out: the step's own part and group are scrubbed (wanted)")
+    check(undo_marks(MV) == 0, "after the undo: no plain text of the task in obj_undo")
+
 print(f"\n{OKS[0]} checks ok, {len(FAILS)} failed", flush=True)
 if FAILS:
     print("FAILED:\n - " + "\n - ".join(FAILS))

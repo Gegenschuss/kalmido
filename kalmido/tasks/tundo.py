@@ -143,8 +143,27 @@ def tu_flush(c):
         print("tasks undo step not recorded:", type(e).__name__, str(e)[:200], flush=True)
 
 
+TU_PLAIN = ("title", "content", "url")  # 2.787.0 (#5417): the task's own texts a locked list keeps as ciphertexts
+
+
+def _tu_locked(c, lid):
+    return bool(lid) and bool(c.execute("SELECT 1 FROM lists WHERE id=? AND e2e IS NOT NULL", (lid,)).fetchone())
+
+
+def _plain_under_lock(c, row, b):
+    """2.787.0 (#5417, Fable review #5408): the task's list has the lock now and "before" would keep a plain text (it came
+    in from an open list in this request, or a text of it is not a ciphertext): the step would put that text into
+    obj_undo.snap AFTER the move's scrub (le2b_scrub_undo). Such a task records no step at all -- not a half one, whose way
+    back would write a ciphertext into the open list (400)."""
+    if not _tu_locked(c, row["list_id"]):
+        return False
+    if "list_id" in b and b["list_id"] != row["list_id"] and not _tu_locked(c, b["list_id"]):
+        return True
+    return any(isinstance(b.get(k), str) and b[k] and not le2e_is_cipher(b[k]) for k in TU_PLAIN)
+
+
 def _flush(c, m):
-    parts = []
+    parts, skip = [], set()
     for op, tid, data in m["seq"]:
         row = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
         if row is None:
@@ -153,10 +172,14 @@ def _flush(c, m):
             before, extras = m["fields"][tid]
             after = _state(c, row, extras)
             keys = [k for k in before if _js(before[k]) != _js(after.get(k))]
-            if keys:
-                parts.append((row, {"op": "fields", "b": {k: before[k] for k in keys}, "a": {k: after.get(k) for k in keys}}))
+            b = {k: before[k] for k in keys}
+            if keys and _plain_under_lock(c, row, b):
+                skip.add(tid)
+            elif keys:
+                parts.append((row, {"op": "fields", "b": b, "a": {k: after.get(k) for k in keys}}))
         elif _holds(row, op, data):
             parts.append((row, {"op": op, **data}))
+    parts = [p for p in parts if p[0]["id"] not in skip]  # 2.787.0 (#5417): no part at all for such a task in this request
     if not parts:
         return
     tids = {r["id"] for r, _ in parts}
