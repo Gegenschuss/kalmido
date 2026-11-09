@@ -70,6 +70,7 @@ KINDS = {
     # 2.48.0 (#1111): documents = files of the file store (fs_visible_sql / need_node) + their recognition rows; labels, rules,
     # models, settings and the mail address belong to one workspace (private or an organisation, admins change it)
     "document": ("matrix", "p248_b_api_test.py: another organisation / person: 404 on a document, nothing in list, search, filter labels; settings and upload only for the own workspace; agents only with a share; "
+                           "p4890_a_api_test.py (2.772.0): GET /api/docs/facets and the filters asn / cf of another organisation: no values, all numbers 0, no hit; "
                            "p2122_b_api_test.py (2.122.0): bulk change, ZIP and the new filters / search syntax never reach another workspace; "
                            "p2154_a_api_test.py (2.154.0 A): splitting a stack, its pages, undo and the link with a task of another organisation / person: 404 or refused, a task's documents only the visible ones"),
     # 2.48.0 (#1207 / #1152 / #1356): the file store (fs_role / need_node / fs_visible_sql, org boundary before shares), the

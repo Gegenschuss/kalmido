@@ -24,6 +24,7 @@ const dstr = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate()
 // 'check:<name>' = keeps data of one workspace, checked below; 'draw' = filters what is in memory while drawing (render()
 // after wsSet is enough); 'helper' = no view of its own (decides, names or colours only)
 const WS_VIEWS = {
+  'static/js/docfacets.js': 'draw',          // 2.772.0 (#4890): the filters below the tree load again when the shown workspace changed (DFC.key = dfc_query with ws)
   'static/js/abdocs.js': 'draw',             // 2.752.0 (#4887): a folder with recognition compares DC.ws before drawing its documents (abd_foldHtml -> p61b_dcReset, like viewDocs)
   'static/js/docs.js': 'check:docs',          // documents: list, "To review", filters, the open document (viewDocs compares DC.ws)
   'static/js/ablage.js': 'check:files',       // files: the space follows (ab_curSpace -> AB.key)
