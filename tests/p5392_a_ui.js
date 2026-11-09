@@ -71,7 +71,7 @@ const FEATS = 'cal,collab,comments,contacts,files,clients,office';
   const offLinks = () => [...d.querySelectorAll('#side [data-go^="office"], #srail [data-go^="office"], #tabs [data-go^="office"]')].map(b => b.dataset.go);
   check(await until(() => offLinks().length === 0), 'Private: no way to Office & finance in the bar / sidebar ' + JSON.stringify(offLinks()));
   check(ev(`mg_parts(mg_area('office')).map(p => p[0]).join()`) === 'contacts,clients', 'Private: the area keeps contacts and clients only ' + ev(`mg_parts(mg_area('office')).map(p => p[0]).join()`));
-  ev(`go('office/settings')`);
+  ev(`go('office')`);
   check(await until(() => d.querySelector('#main')?.textContent.includes('Office & finance is off')), 'Private: the private office does not open, the page says it is off');
   check(!d.querySelector('#main')?.textContent.includes('Alice Privatbuero'), 'Private: no data of the private office on the page');
   await w.eval(`wsSet('${WS}')`);
