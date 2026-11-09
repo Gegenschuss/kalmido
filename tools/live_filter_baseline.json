@@ -1,6 +1,6 @@
 {
  "about": "tools/check_live_filter.py (#5292): handwritten 'deleted_at IS NULL' per file; only shrinks",
- "total": 1104,
+ "total": 1103,
  "files": {
   "kalmido/accounts/discover.py": 6,
   "kalmido/accounts/onboarding.py": 5,
@@ -184,7 +184,7 @@
   "kalmido/office/cashflow.py": 1,
   "kalmido/office/contacts_cl.py": 1,
   "kalmido/office/contractfiles.py": 5,
-  "kalmido/office/datevimp.py": 3,
+  "kalmido/office/datevimp.py": 2,
   "kalmido/office/datevin.py": 1,
   "kalmido/office/datevzip.py": 2,
   "kalmido/office/docproject.py": 1,

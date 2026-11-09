@@ -32,7 +32,7 @@ from ..core.config import app, SECRET_KEY
 from ..core.i18n import N_, tr
 from ..core.pg import insert_id, write_lock
 from ..core.db import body, bump, db, iso, local_now, now_utc  # 2.488.0 (#4004): the test clock
-from ..core.access import Denied
+from ..core.access import Denied, live_sql, trash_sql  # 2.784.0 (#5366): live_sql / trash_sql
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..personal.timetrack import BadInput
 from .model import office_gate, office_need_feature, office_org, office_settings, pb_cl_org, pb_cl_sql
@@ -233,7 +233,7 @@ def _sup_fp(oid, vals):
 
 def di_suppliers(c, oid, deleted=False):
     """The suppliers of office area oid (decrypted), by account."""
-    rows = c.execute("SELECT * FROM office_suppliers WHERE org_id=? AND deleted_at IS " + ("NOT NULL" if deleted else "NULL")
+    rows = c.execute("SELECT * FROM office_suppliers WHERE org_id=? AND " + (trash_sql() if deleted else live_sql())  # 2.784.0 (#5366)
                      + " ORDER BY account_no, id", (oid,)).fetchall()
     return [oc_dec_fields(c, oid, "office_suppliers", r) for r in rows]
 
@@ -348,7 +348,7 @@ def _apply16(c, oid, uid, rid, plan, ts):
             sid = insert_id(c, f"INSERT INTO office_suppliers({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
             made_s[str(sid)] = fp            # 2.273.0 C (#3051): the state the undo compares with
         elif x["action"] == "update":
-            r = c.execute("SELECT * FROM office_suppliers WHERE id=? AND org_id=? AND deleted_at IS NULL", (x["id"], oid)).fetchone()
+            r = c.execute(f"SELECT * FROM office_suppliers WHERE id=? AND org_id=? AND {live_sql()}", (x["id"], oid)).fetchone()
             if not r:
                 continue
             cur = oc_dec_fields(c, oid, "office_suppliers", r)
@@ -680,7 +680,7 @@ def _sup_public(x):
 
 
 def _sup_row(c, oid, sid, deleted=False):
-    r = c.execute("SELECT * FROM office_suppliers WHERE id=? AND org_id=? AND deleted_at IS " + ("NOT NULL" if deleted else "NULL"),
+    r = c.execute("SELECT * FROM office_suppliers WHERE id=? AND org_id=? AND " + (trash_sql() if deleted else live_sql()),  # 2.784.0 (#5366)
                   (sid, oid)).fetchone()
     if not r:
         raise Denied(404)
