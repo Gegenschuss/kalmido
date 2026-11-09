@@ -92,7 +92,8 @@ def fsu_need(c, uid, rid, oid):
         if n["role"] != "owner" and was_by != uid:  # as the restore route: its owner or who put it there
             raise Denied(403)
         fs_ref_need_move(c, uid, x, restore=True)
-        c.execute("UPDATE fs_nodes SET deleted_at=NULL, deleted_by=NULL WHERE id=?", (int(rid),))
+        nm = _free_name(c, x["parent_id"], x["owner_id"], x["org_id"], x["name"], skip=int(rid))  # review F5: as the restore route
+        c.execute("UPDATE fs_nodes SET deleted_at=NULL, deleted_by=NULL, name=? WHERE id=?", (nm, int(rid)))
         fs_log_add(c, rid, "restore")
         fs_trash_restored(c, uid, x)
 

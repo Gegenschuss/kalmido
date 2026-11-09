@@ -236,6 +236,17 @@ res = back(A, G2)
 check(stayed_of(res, SN) and stayed_of(res, SN)[0]["code"] == "conflict" and node(nid=SN).get("parent_id") in (None, 0),
       f"F2: the move is not taken back into a folder of another workspace (409, the file stays at the top) {res} {node(nid=SN).get('parent_id')}")
 
+# F5: out of the trash while a new file took its name meanwhile -> " (2)", as the restore route
+DN = A.post(B + "/api/files/upload", files={"file": ("doppelt.txt", b"d1", "text/plain")}).json()["items"][0]["id"]
+check(A.delete(B + f"/api/files/nodes/{DN}").ok, "(setup) the file went into the trash")
+G5 = gid_after(A)
+DN2 = A.post(B + "/api/files/upload", files={"file": ("doppelt.txt", b"d2", "text/plain")}).json()["items"][0]["id"]
+check(node(nid=DN2).get("name") == "doppelt.txt", f"(setup) a new file of the same name {node(nid=DN2)}")
+res = back(A, G5)
+check(res.get("undone") == [G5] and node(nid=DN).get("in_trash") is False and node(nid=DN).get("name") == "doppelt (2).txt"
+      and node(nid=DN2).get("name") == "doppelt.txt",
+      f"F5: out of the trash under a free name ({node(nid=DN).get('name')} next to {node(nid=DN2).get('name')}) {res}")
+
 # F4: the history rows an undo wrote of a file deleted for good go with the watchdog's clean-up
 HN = A.post(B + "/api/files/upload", files={"file": ("verlauf.txt", b"h", "text/plain")}).json()["items"][0]["id"]
 A.patch(B + f"/api/files/nodes/{HN}", json={"name": "verlauf-neu.txt"})
