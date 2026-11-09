@@ -293,7 +293,7 @@ check(Fr.post(B + f"/api/undo/to/{G1}").status_code == 404, "bob's group: 404 fo
 now_ = "to_char(now(), 'YYYY-MM-DD\"T\"HH24:MI:SS+00:00')"
 dbx(f"INSERT INTO obj_undo(user_id, sess, kind, ref_id, snap, created_at) VALUES(?, ?, 'client', 999999998, '{{\"clients\": [{{\"name\": \"Gone Ltd\"}}]}}', {now_})", (FID, "ef" * 8))
 dbx(f"INSERT INTO obj_undo(user_id, sess, kind, ref_id, created_at) VALUES(?, ?, 'client', ?, {now_})", (FID, "ef" * 8, FC))
-GOR = dbx(f"INSERT INTO undo_groups(user_id, area, label_key, state, parts, bytes, created_at, updated_at) VALUES(?, 'office', 'Change', 'done', 2, 20, date_trunc('second', now()), date_trunc('second', now())) "
+GOR = dbx("INSERT INTO undo_groups(user_id, area, label_key, state, parts, bytes, created_at, updated_at) VALUES(?, 'office', 'Change', 'done', 2, 20, date_trunc('second', now()), date_trunc('second', now())) "
           "RETURNING id", (FID,))[0][0]
 dbx(f"INSERT INTO obj_undo(user_id, sess, kind, ref_id, created_at, group_id, bytes) VALUES(?, '', 'client', 999999997, {now_}, ?, 10)", (FID, GOR))
 dbx(f"INSERT INTO obj_undo(user_id, sess, kind, ref_id, created_at, group_id, bytes) VALUES(?, '', 'client', ?, {now_}, ?, 10)", (FID, FC, GOR))
