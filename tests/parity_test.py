@@ -441,6 +441,7 @@ APP_ONLY = [
                                                    "=POST /api/docs/{}/redo", "=POST /api/docs/{}/redo/undo", "=GET /api/docs/{}/thumb", "=GET /api/docs/{}/file",
                                                    "* /api/docs/{}/task", "* /api/docs/settings", "* /api/docs/rules", "* /api/docs/labels/",
                                                    "* /api/docs/mail", "* /api/docs/fields", "* /api/docs/flowruns/", "=GET /api/docs/{}/flowruns",  # 2.581.0 (#4803): runs of flows + undo
+                                                   "=GET /api/docs/facets",  # 2.772.0 (#4890): the numbers of the filters below the file store's tree are a person's sidebar; an agent filters with /documents (sender / type / tag; archive number and custom field filters for agents: own task in the list Agenten)
                                                    "* /api/docs/views")),  # 2.579.0 (#4802): the saved views' counts / hits / sharing are a person's sidebar and Today; an agent reads a view shared with it as a core object (GET /agent/objects/docview) and runs its search with /documents  # 2.153.0 (#2179): agents fill in custom fields via /documents, never define them
     # 2.154.0 A (#1111): splitting a stack and linking a document with a task are a person's steps (an agent suggests, a person confirms)
     # 2.574.0 (#3376): "Duplicate" of a task has its v1 route now (POST /tasks/{id}/duplicate, MCP duplicate_task), see the mapping above
