@@ -8578,6 +8578,11 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 #side .sbbp{margin-top:.5rem}
 #side .sbbi.on{color:var(--accent)}
 #side .sbbi.on svg{color:var(--accent)}
+/* 2.768.0 (#4888): the "+" at the head of the file store's tree */
+#side .abthead{display:flex;align-items:center}
+#side .abthead>.sbbi{flex:1;min-width:0}
+#side .abthead>.abtadd{flex:none;margin-right:.25rem;color:var(--muted)}
+#side .abthead>.abtadd:hover{color:var(--text)}
 @media (max-width:767px){ #srail{display:none!important} }
 #srail .srb.aspin>svg{color:var(--st-work)}
 #srail .srb.await>svg{color:var(--st-wait-t)}

@@ -177,7 +177,9 @@ function ab_panelHtml() {
     const one = real.length === 1, top = one ? ab_ptGet('s:' + real[0]) : [];
     const tree = one ? (top ? sbb_treeHtml(withColl(real[0], top), 1) : `<p class="muted sbbtl" style="--sbbl:1">${esc(tr('Loading…'))}</p>`) : sbb_treeHtml(real.map(spaceNode), 1);
     const rest = sbb_treeHtml(ab_spaces().filter(s => !real.includes(s)).map(spaceNode), 1);
-    return sbb_row('ablage', 'folder', tr('Files'), one && cur === real[0], `data-sbbpart="ablage" ${one ? `data-absp="${esc(real[0])}"` : ''}`) + `<div class="sbbtree" role="group" aria-label="${esc(tr('Folders'))}">${tree}</div>`
+    // 2.768.0 (#4888): "+" at the head of the tree = a new folder at the top of the space it shows (one space: that one; several: the one open)
+    const add = `<button type="button" class="iconbtn abtadd" data-abtadd="${esc(one ? real[0] : (real.includes(ab_curSpace()) ? ab_curSpace() : real[0] || ''))}" title="${esc(tr('New folder'))}" aria-label="${esc(tr('New folder'))}">${ic('plus', 's')}</button>`;
+    return `<div class="abthead">${sbb_row('ablage', 'folder', tr('Files'), one && cur === real[0], `data-sbbpart="ablage" ${one ? `data-absp="${esc(real[0])}"` : ''}`)}${real.length ? add : ''}</div>` + `<div class="sbbtree" role="group" aria-label="${esc(tr('Folders'))}">${tree}</div>`
       + (dOn ? docRows() : '') + `<div class="sbbtree abrest" role="group" aria-label="${esc(tr('Shared with me'))}">${rest}</div>`;
   };
   const parts = nav_sort('ablage', mg_parts(a).filter(p => !nav_orgOff('ablage', p[0]) && (p[0] === r.mod || !nav_hid('ablage', p[0]))), p => p[0]);
@@ -314,22 +316,24 @@ async function ab_lockOf(id) {
   try { const t = await rawFetch('GET', `/api/files/nodes/${id}`); return t?.locked ? t.lock_id : null; } catch { return null; }
 }
 const ab_noFsl = () => toast(tr('This browser cannot encrypt'));
-async function ab_newFolder(parent) {  // 2.199.0 A (#2742): parent = a folder of the tree's menu (default: the open one)
-  const pid = typeof parent === 'number' ? parent : S.route.nid;
+async function ab_newFolder(parent, space) {  // 2.199.0 A (#2742): parent = a folder of the tree's menu (default: the open one); 2.768.0 (#4888): space = at the top of that space (the tree's "+")
+  const pid = space ? null : typeof parent === 'number' ? parent : S.route.nid;
+  const sp = space || ab_curSpace();
   // 2.364.0 D (#3020): an admin's new folder at the top of an organisation asks "Visible to all members?" (default off = as before)
-  const ask = !pid && ab_curSpace().startsWith('org:') && ab_orgAdmin(ab_curSpace());
+  const ask = !pid && sp.startsWith('org:') && ab_orgAdmin(sp);
   let all = false;
   const name = await askPrompt(tr('New folder'), '', {ok: tr('Create'), input: {placeholder: tr('Name'), max: 150},
     ...(ask ? {html: `<label class="chkl"><input type="checkbox" id="ab-nfall"> ${tr('Visible to all members?')}</label>`, after: md => $('#ab-nfall', md).addEventListener('change', e => { all = e.target.checked; })} : {})});
   if (!name || !name.trim()) return;
   const lid = await ab_lockOf(pid);  // 2.353.0 A (#2758); F (review N8): never the plain way into a locked folder
   if (lid) return typeof fsl_newFolder === 'function' ? fsl_newFolder(pid, name, lid) : ab_noFsl();
-  const b = pid ? {parent_id: pid, name} : {space: ab_curSpace(), name};
+  const b = pid ? {parent_id: pid, name} : {space: sp, name};
   let n; try { n = await api('POST', '/api/files/folders', b); } catch { return; }
   if (ask && all) { try { n = await api('PATCH', `/api/files/nodes/${n.id}`, {org_access: 'view'}); } catch { /* shown; the folder stays private to the admins */ } }
   ab_reload();
   offerUndo(tr('Folder “{0}” created', n.name), histAdd({label: tr('New folder “{0}”', n.name), undo: () => ab_req('DELETE', `/api/files/nodes/${n.id}`), redo: () => ab_req('POST', `/api/files/nodes/${n.id}/restore`)}));
 }
+document.addEventListener('click', e => { const b = e.target.closest?.('#side [data-abtadd]'); if (b) { e.preventDefault(); ab_newFolder(null, b.dataset.abtadd); } });  // 2.768.0 (#4888)
 // a request of an undo / redo step: the view follows, an error is a toast (api() shows it)
 async function ab_req(m, url, b) { try { await api(m, url, b); } catch { /* shown */ } ab_reload(); return {}; }
 async function ab_upload(files, target) {
