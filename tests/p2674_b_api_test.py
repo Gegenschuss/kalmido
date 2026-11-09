@@ -173,7 +173,25 @@ def strip(xs):
 def old_agents():
     rows = c.execute("SELECT a.*, u.username, u.display_name, u.avatar, u.disabled FROM agents a JOIN users u ON u.id=a.user_id "
                      "WHERE u.kind='agent' ORDER BY u.id").fetchall()
-    return [agent_public(c, a, UID) for a in rows if agent_shares(c, a["user_id"], UID)]
+    # 2.777.0 (#5378): + a team agent of an organisation the person is a member / admin of, also without a shared list ("shared":
+    # false, "projects", nothing of its work) - written out as plain SQL here, not with agents_for's helpers
+    me_ = c.execute("SELECT kind FROM users WHERE id=?", (UID,)).fetchone()
+    orgs = set() if (me_["kind"] or "user") == "agent" else {r[0] for r in c.execute(
+        "SELECT m.org_id FROM org_members m JOIN orgs o ON o.id=m.org_id WHERE m.user_id=? AND m.role IN ('admin','member') AND o.retired_at IS NULL", (UID,))}
+    out = []
+    for a in rows:
+        sh = agent_shares(c, a["user_id"], UID)
+        if not sh and not (a["owner_id"] is None and a["org_id"] in orgs):
+            continue
+        d = agent_public(c, a, UID)
+        if a["owner_id"] is None:
+            d["shared"] = sh
+            d["projects"] = c.execute("SELECT COUNT(*) FROM list_members m JOIN lists l ON l.id=m.list_id WHERE m.user_id=? AND l.is_inbox=0 "
+                                      "AND l.deleted_at IS NULL AND l.owner_id<>?", (a["user_id"], a["user_id"])).fetchone()[0]
+            if not sh:
+                d.update(status_text="", status_key="", status_key_at="", status_task=None, pause_reason="", job_tasks=[])
+        out.append(d)
+    return out
 
 
 def old_prop():

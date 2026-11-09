@@ -1471,11 +1471,22 @@ def agent_org_sees(c, a, uid):
     return bool(a) and not a["owner_id"] and bool(a["org_id"]) and a["org_id"] in agent_org_orgs(c, uid)
 
 
+def agent_projects_counts(c, aids):
+    """2.777.0 C (#5378): {agent id: how many projects are shared with it} for the agents aids, in one query (its own basket and
+    projects in the trash not counted; 0 = none) - numbers only, no names."""
+    ids = sorted({int(x) for x in aids or () if x})
+    if not ids:
+        return {}
+    with system_ctx(c):  # a count over the agents' memberships (structure; no project is named)
+        n = {r[0]: r[1] for r in c.execute("""SELECT m.user_id, COUNT(*) FROM list_members m JOIN lists l ON l.id=m.list_id
+                                               WHERE m.user_id = ANY(CAST(? AS BIGINT[])) AND l.is_inbox=0 AND l.deleted_at IS NULL
+                                               AND l.owner_id<>m.user_id GROUP BY m.user_id""", (st_ids(ids),))}
+    return {a: n.get(a, 0) for a in ids}
+
+
 def agent_projects_count(c, aid):
-    """2.777.0 C (#5378): how many projects are shared with agent aid (its own basket not counted) - a number only, no names."""
-    with system_ctx(c):  # a count over the agent's memberships (structure; no project is named)
-        return c.execute("SELECT COUNT(*) FROM lists l WHERE l.is_inbox=0 AND l.deleted_at IS NULL AND l.owner_id<>? AND l.id IN "
-                         "(SELECT list_id FROM list_members WHERE user_id=?)", (aid, aid)).fetchone()[0]
+    """2.777.0 C (#5378): agent_projects_counts for one agent."""
+    return agent_projects_counts(c, [aid]).get(aid, 0)
 
 
 def agents_for(c, uid):
@@ -1489,11 +1500,12 @@ def agents_for(c, uid):
     out = [agent_public(c, a, uid, pre) for a in rows]
     if not any(not a["owner_id"] for a in rows):
         return out
+    pn = agent_projects_counts(c, [a["user_id"] for a in rows if not a["owner_id"]])
     for a, d in zip(rows, out):
         if a["owner_id"]:
             continue
         d["shared"] = a["user_id"] in sh
-        d["projects"] = agent_projects_count(c, a["user_id"])  # how many projects it is in: a number, no names
+        d["projects"] = pn.get(a["user_id"], 0)  # how many projects it is in: a number, no names
         if not d["shared"]:  # seen only as an organisation member: nothing of its work (what it does, on which task)
             d.update(status_text="", status_key="", status_key_at="", status_task=None, pause_reason="", job_tasks=[])
     return out
