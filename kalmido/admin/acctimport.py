@@ -70,7 +70,7 @@ from ..life.model import JOURNAL_MAX, jr_open, jr_seal  # 2.306.0 A (#2885); 2.5
 from ..accounts.orginvite import ojn_drop_later, ojn_invite, ojn_later  # 2.278.0 A (#3095)
 from ..collab.e2e import _pub, e2e_has_keys, e2e_import_keys, e2e_same_keys  # 2.278.0 C (#3091)
 from .oilock import oil_preview, OIL_NODES, OIL_LOCKS, OIL_KEYS  # #4300: locked folders of the file store
-from ..hub.absence import ABS_HALF, ABS_KINDS, ABS_NOTE_MAX, ABS_SPAN_MAX, DATE_RE  # 2.584.0 (#3965)
+from ..hub.absence import ABS_HALF, ABS_KINDS, ABS_NOTE_MAX, ABS_SPAN_MAX, DATE_RE  # 2.765.0 (#3965)
 from .acctexport import umz_email_hash  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgs import org_role, user_orgs, visible_people, _need_org_admin  # 2.369.5 (#2517): pulled up from functions
 from ..integrations.importers import ACCOUNT_IMPORT_UNDO_DAYS, IMPORT_RATE, imp_undo_after, imp_undo_lists, imp_undo_split, imp_undo_trash  # 2.369.5 (#2517): pulled up from functions
@@ -184,7 +184,7 @@ UMZ_READ = frozenset((
     "hub_mails", "video_reviews", "video_versions", "video_comments", "list_notepads", "playbooks", "bookmarks", "pomos",
     "contact_care", "view_layouts", "list_layouts", "task_bell", "task_watchers",
     "kid_parents", "conn_links",  # 2.531.0 (#4317 F12): admin/umz_more.py _family
-    # 2.584.0 (#3965): absences (my personal office) and timesheets through the areas (umz_private), the household budgets
+    # 2.765.0 (#3965): absences (my personal office) and timesheets through the areas (umz_private), the household budgets
     # (life/budget.py bud_import) and a folder's playbooks directly (admin/umz_more.py)
     "absences", "timesheets", "budgets",
 ))
@@ -200,7 +200,7 @@ UMZ_PRIVATE = (
 UMZ_LEFT = (  # (name, parts): the first part counts, the others only when it is empty; a name used twice adds up
     # #3470: tables, knowledge pages and my files come along (UMZ_PRIVATE); 2.363.4 (#3127): mails, video sign-offs, bookmarks,
     # focus sessions, notepads, playbooks, staying in touch, saved arrangements and task bells too (what stays: umz_left counts it)
-    # 2.584.0 (#3965): household budgets, absences and timesheets come along too (UMZ_READ)
+    # 2.765.0 (#3965): household budgets, absences and timesheets come along too (UMZ_READ)
     (N_("Playbooks"), ("playbook_proposals",)),
     (N_("Saved arrangements"), ("view_layout_offers",)),
     (N_("History"), ("activity",)), (N_("Direct messages"), ("direct_messages",)), (N_("Agent chats"), ("agent_chats",)),
@@ -722,11 +722,11 @@ def umz_left(data, unread=None):
                     (N_("Tasks in the trash"), sum(1 for t in data.get("tasks", []) if t.get("deleted_at"))),
                     (N_("Comments on tasks in the trash"), on_trash("comments")),
                     (N_("Files of tasks in the trash"), on_trash("attachments")),
-                    # 2.363.4 (#3127): what hangs on a project that is not mine (or encrypted); 2.584.0 (#3965): a folder's playbook comes along
+                    # 2.363.4 (#3127): what hangs on a project that is not mine (or encrypted); 2.765.0 (#3965): a folder's playbook comes along
                     (N_("Notepads"), sum(1 for r in data.get("list_notepads", []) if _oid(r.get("list_id")) not in mine)),
                     (N_("Playbooks"), sum(1 for r in data.get("playbooks", []) if isinstance(r, dict) and r.get("list_id") is not None
                                           and _oid(r.get("list_id")) not in mine)),
-                    # 2.584.0 (#3965, fable F6): the budget's entries come along, their receipts (names only in the file) do not
+                    # 2.765.0 (#3965, fable F6): the budget's entries come along, their receipts (names only in the file) do not
                     (N_("Receipts in the household budget"), sum(len(b["files"]) for b in data.get("budgets", [])
                                                                  if isinstance(b, dict) and isinstance(b.get("files"), list)))):
         if k:
@@ -773,7 +773,7 @@ def umz_preview(c, uid, man, data, can_invite):
         skipped.append({"what": what, "count": n})
     if not org_kind:  # 2.273.0 A (#3030): every part of the file the import does not read (was a fixed list)
         skipped += umz_left(data, man.get("_unread"))
-        here = umz_sheets_here(c, uid, data)  # 2.584.0 (#3965): a month here already keeps the one here
+        here = umz_sheets_here(c, uid, data)  # 2.765.0 (#3965): a month here already keeps the one here
         if here:
             skipped.append({"what": tr(N_("Timesheets of months you have here already")), "count": len(here)})
     office = man.get("personal_office") if isinstance(man.get("personal_office"), dict) else {}  # 2.362.2 (#3099)
@@ -2015,15 +2015,15 @@ def umz_private_oi(data, files, me_old=None):
             rows = [r for r in rows if _oid(r.get("list_id")) in mine]
         if rows:
             oi[entry] = rows
-    oi.update(umz_office_oi(data, me_old))  # 2.584.0 (#3965)
+    oi.update(umz_office_oi(data, me_old))  # 2.765.0 (#3965)
     return oi
 
 
-UMZ_MONTH_RE = re.compile(r"^(19|20|21)\d\d-(0[1-9]|1[0-2])$")  # 2.584.0 (#3965): the month of a timesheet
+UMZ_MONTH_RE = re.compile(r"^(19|20|21)\d\d-(0[1-9]|1[0-2])$")  # 2.765.0 (#3965): the month of a timesheet
 
 
 def umz_office_oi(data, me_old):
-    """2.584.0 (#3965): my absences and timesheets as rows of hub/absences.json (into my personal office, oi_prepare) and
+    """2.765.0 (#3965): my absences and timesheets as rows of hub/absences.json (into my personal office, oi_prepare) and
     time_sheets.json (my private space). Both always mine: the person columns are set to my old account id whatever the file
     says (the areas map only that one to the importing person), who decided is never taken over. A request still waiting
     (pending) is an entered absence there (my personal office asks nobody); one month comes once (time_sheets: month per person)."""
@@ -2054,7 +2054,7 @@ def umz_office_oi(data, me_old):
         if not _oid(r.get("id") if isinstance(r, dict) else None) or not isinstance(m, str) or not UMZ_MONTH_RE.match(m) or m in seen:
             continue
         seen.add(m)
-        # 2.584.0 (#3965, fable F2): only the known fields of a month; the history (log) is never taken from a file (its "by"
+        # 2.765.0 (#3965, fable F2): only the known fields of a month; the history (log) is never taken from a file (its "by"
         # ids would be shown as names of this server's accounts), the state only one of the app's own
         ts.append({**{k: r[k] for k in UMZ_SHEET_KEEP if isinstance(r.get(k), str)}, "id": r["id"], "month": m,
                    "state": r.get("state") if r.get("state") in UMZ_SHEET_STATES else "open", "log": "[]",
@@ -2064,12 +2064,12 @@ def umz_office_oi(data, me_old):
     return out
 
 
-UMZ_SHEET_STATES = ("open", "closed", "approved")  # 2.584.0 (#3965, fable F2): time_sheets.state (personal/timesheet.py)
+UMZ_SHEET_STATES = ("open", "closed", "approved")  # 2.765.0 (#3965, fable F2): time_sheets.state (personal/timesheet.py)
 UMZ_SHEET_KEEP = ("closed_at", "decided_at", "note", "created_at", "updated_at")
 
 
 def umz_sheets_here(c, uid, data):
-    """2.584.0 (#3965): the months of the file's timesheets I have here already (the one here stays, the preview names them)."""
+    """2.765.0 (#3965): the months of the file's timesheets I have here already (the one here stays, the preview names them)."""
     want = {r.get("month") for r in data.get("timesheets") or [] if isinstance(r, dict) and isinstance(r.get("month"), str)}
     if not want:
         return set()
@@ -2084,7 +2084,7 @@ def umz_private(c, run, uid, man, zf, files, data, who):
     me_old = _oid((man.get("user") or {}).get("id")) or -1  # review: a file without its account id: the mails are still mine
     oi = umz_private_oi(data, files, me_old)
     here = umz_sheets_here(c, uid, data) if oi.get("time_sheets.json") else set()
-    if here:  # 2.584.0 (#3965): a month I have here already keeps the one here
+    if here:  # 2.765.0 (#3965): a month I have here already keeps the one here
         oi["time_sheets.json"] = [r for r in oi["time_sheets.json"] if r.get("month") not in here]
         run.warning(N_("Timesheets of months you have here already were not taken over: {0}"), ", ".join(sorted(here)))
         if not oi["time_sheets.json"]:
@@ -2268,7 +2268,7 @@ def umz_run(uid, iid, opts):
             if run.kind == "org":  # 2.137.0 (#2344): the personal office for office parts going into the private space
                 from .orgimport import oi_prepare
                 oi_prepare(c, run, uid, data)
-            elif data.get("absences"):  # 2.584.0 (#3965): my absences go into my personal office (umz_private, also next to an organisation)
+            elif data.get("absences"):  # 2.765.0 (#3965): my absences go into my personal office (umz_private, also next to an organisation)
                 from .orgimport import oi_prepare
                 oi_prepare(c, run, uid, {"oi": umz_office_oi(data, _oid((man.get("user") or {}).get("id")) or -1)}, private=True)
             _L.rej = {}  # 2.531.0 (#4317) F11: umz_insert counts the refused rows of the run
@@ -2644,7 +2644,7 @@ _UMZ_GONE_AREAS = {"habits": N_("Habits"), "filters": N_("Filters"), "templates"
                    "time_entries": N_("Time entries"), "bookmarks": N_("Bookmarks"), "sprints": N_("Sprints"), "list_rules": N_("Rules"),
                    "ev_cals": N_("Calendars"), "pomos": N_("Focus sessions"), "view_layouts": N_("Saved arrangements"),
                    "list_layouts": N_("Saved arrangements"), "journal": N_("Journal"),
-                   # 2.584.0 (#3965): a folder's playbooks and the household budget rows (umz_more)
+                   # 2.765.0 (#3965): a folder's playbooks and the household budget rows (umz_more)
                    "playbooks": N_("Playbooks"), "budget_cats": N_("Household budget"), "budget_entries": N_("Household budget"),
                    "budget_recurring": N_("Household budget")}
 

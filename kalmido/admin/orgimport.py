@@ -147,7 +147,7 @@ def oi_space(c, run, spec):
 
 def oi_prepare(c, run, uid, data, private=False):
     """Before the run's transaction (pb_personal commits): the personal office when office parts go into the private space.
-    2.584.0 (#3965): private = the parts go there also when the run's target is an organisation (an account import's absences)."""
+    2.765.0 (#3965): private = the parts go there also when the run's target is an organisation (an account import's absences)."""
     if (run.org and not private) or getattr(run, "pb", None):
         return
     oi = data.get("oi") or {}

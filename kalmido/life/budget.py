@@ -1504,7 +1504,7 @@ def bud_export(c, uid):
         lid = l["id"]
         out.append({"list_id": lid, "name": l["name"], "categories": [cat_out(d) for d in _cats(c, lid)],
                     "recurring": [rec_out(d) for d in _rec_rows(c, lid)],
-                    # 2.584.0 (#3965, fable F6): + rmonth, the month a template's entry was booked for (bud_import takes it)
+                    # 2.765.0 (#3965, fable F6): + rmonth, the month a template's entry was booked for (bud_import takes it)
                     "entries": [{**entry_out(bud_dec(c, "budget_entries", r)), "rmonth": r["rmonth"]} for r in
                                 c.execute("SELECT * FROM budget_entries WHERE list_id=? AND deleted_at IS NULL ORDER BY day, id", (lid,))],
                     "files": [dict(r) for r in c.execute("SELECT id, entry_id, name, mime, size, created_at FROM budget_files WHERE list_id=? AND entry_id IN (SELECT id FROM budget_entries WHERE deleted_at IS NULL)",
@@ -1514,7 +1514,7 @@ def bud_export(c, uid):
 
 
 def bud_import(c, uid, lid, b, task_of=None, step=None):
-    """2.584.0 (#3965): the counterpart of bud_export -- one exported budget b ({categories, recurring, entries}) into the budget
+    """2.765.0 (#3965): the counterpart of bud_export -- one exported budget b ({categories, recurring, entries}) into the budget
     list lid of uid (the caller made or mapped it; nothing here trusts an id of the file: categories and templates get new ids,
     an entry / template points only at one of THIS import, a contract only at a task task_of(old id) maps). Every value is
     checked like an entry made by hand (_entry_vals / _rec_vals), encrypted for the list's space (bud_enc), the limits of the

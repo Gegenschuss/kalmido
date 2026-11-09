@@ -588,7 +588,7 @@ def _act_data(run, who, kind, v):
 
 
 def _ts_month(c, run, src, d, ctx):
-    """2.584.0 (#3965, fable F2): a month's history (log, with the "by" ids of the old server) never comes from a file - this
+    """2.765.0 (#3965, fable F2): a month's history (log, with the "by" ids of the old server) never comes from a file - this
     server would show them as names of its own accounts; the state only one of the app's own (personal/timesheet.py)."""
     d["log"] = "[]"
     if d.get("state") not in ("open", "closed", "approved"):

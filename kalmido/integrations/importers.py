@@ -2520,7 +2520,7 @@ def imp_undo_split(c, uid, ids, since, te_ids=()):
 
 
 def imp_budget_touched(c, lid, since):
-    """2.584.0 (#3965, fable F5): was anything of budget list lid (a category, template, entry or receipt) made or changed since
+    """2.765.0 (#3965, fable F5): was anything of budget list lid (a category, template, entry or receipt) made or changed since
     the import? Then the undo keeps the list with all its rows (own work now)."""
     for t in ("budget_cats", "budget_recurring", "budget_entries", "budget_files"):
         cols = "created_at" if t == "budget_files" else "created_at, updated_at"
@@ -2534,7 +2534,7 @@ def imp_undo_lists(c, uid, lids, back, since):
     """2.272.0 C (#3027): the lists an import created go into the list trash (archived, with their tasks; restorable) when
     nothing in them is left but tasks the undo takes back and no project file was added since; otherwise the list stays
     (its unchanged imported tasks go into the trash on their own). End-to-end lists stay. Returns (trashed, kept, ids of the
-    tasks that went into the trash with their list). 2.584.0 (#3965, fable F5): a budget list stays when a row of it was written
+    tasks that went into the trash with their list). 2.765.0 (#3965, fable F5): a budget list stays when a row of it was written
     since (imp_budget_touched), else it goes with all its rows."""
     backs, went, n, kept = set(back), set(), 0, 0
     for lid in lids:
@@ -2543,7 +2543,7 @@ def imp_undo_lists(c, uid, lids, back, since):
             continue
         live = [x[0] for x in c.execute("SELECT id FROM tasks WHERE list_id=? AND deleted_at IS NULL", (lid,))]
         if (any(i not in backs for i in live) or le2e_mode(c, lid)
-                or (r["life"] == "budget" and imp_budget_touched(c, lid, since))  # 2.584.0 (fable F5)
+                or (r["life"] == "budget" and imp_budget_touched(c, lid, since))  # 2.765.0 (fable F5)
                 or any(imp_undo_after(x[0], since - timedelta(seconds=1))  # the import writes no project file in its last second
                        for x in c.execute("SELECT created_at FROM list_files WHERE list_id=?", (lid,)))):
             kept += 1

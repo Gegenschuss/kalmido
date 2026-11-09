@@ -1215,12 +1215,12 @@ access data of connections (calendar and address book subscriptions, Karakeep, n
 set them up again), lists of other people (the file names them and contains your own comments there), the trash, and
 organisation data that is not yours (use the organisation export for a whole organisation).
 
-**The household budget (2.584.0).** The file holds its categories, recurring items and entries in readable form and the
+**The household budget (2.765.0).** The file holds its categories, recurring items and entries in readable form and the
 receipts by name only. The import takes the categories (with their limits), recurring items and entries over onto the budget
 list that comes along with the file, sealed like entries made by hand; the receipt files are not in the file. Save the
 receipts on the old server before you give it up.
 
-**Absences, timesheets and folder playbooks (2.584.0).** Your absences go into your own private area (Team > Absences,
+**Absences, timesheets and folder playbooks (2.765.0).** Your absences go into your own private area (Team > Absences,
 sealed; a request still waiting arrives as an entered absence, nobody approves in the private area), your timesheets into
 your private space (a month you already have on the new server keeps the one there: the preview and the result name such
 months), the playbooks of your folders with their versions (a folder that already has a playbook there keeps it). The undo
@@ -1240,7 +1240,7 @@ of `data/wiki_files.json` and `sheet_files.json` name them under `file`. A file 
 `files/private_files/`, older versions under `files/store/`) and your private knowledge pages (`wiki_pages`), both taken over
 by the import, and your chats with agents, what you wrote in direct messages, your absences and timesheets (`agent_chats`,
 `direct_messages`, `absences`, `timesheets`; the import does not take over the chats and messages, the absences and
-timesheets it takes over since 2.584.0). `not_included` in the manifest names what
+timesheets it takes over since 2.765.0). `not_included` in the manifest names what
 is still missing (the history of knowledge pages, other people's chat messages, the organisation's office).
 
 **2.360.2:** also your booking page with its

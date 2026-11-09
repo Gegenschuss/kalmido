@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # kalmido-suite: fresh
-"""2.584.0 (#3965): the account import takes over absences, timesheets, household budgets and the playbooks of folders into
+"""2.765.0 (#3965): the account import takes over absences, timesheets, household budgets and the playbooks of folders into
 the private space, and the undo takes them away again. Invented names only (example.com). A crafted account export (old
 account id 1000) into a person without an organisation (freelancer_fixture, "gina"); a second one ("otto") is the stranger:
  - the preview no longer names "Household budget", "Absences" or "Timesheets" as staying behind, nor a folder's playbook;
@@ -17,7 +17,7 @@ account id 1000) into a person without an organisation (freelancer_fixture, "gin
    since the import stays
 Starts its OWN container (start.sh) with KALMIDO_SECRET_KEY (P2584D_NOSTART=1 = the server already runs like that).
 freelancer-matrix: own
-usage: p2584_d_umz_rest_test.py <datadir>"""
+usage: p2765_l_umz_rest_test.py <datadir>"""
 import base64
 import hashlib
 import io
@@ -165,7 +165,7 @@ check(sorted((x.get("kind"), x.get("note")) for x in items) == [("sick", "krank"
 
 # timesheets
 ts = kt.dbx("SELECT month, state, org_id, decided_by, note FROM time_sheets WHERE user_id=? ORDER BY month", (GID,))
-# 2.584.0 (#3965, fable F2): a third month with a state the app does not know arrives as open
+# 2.765.0 (#3965, fable F2): a third month with a state the app does not know arrives as open
 check([(t[0], t[1]) for t in ts] == [("2026-07", "open"), ("2026-08", "open"), ("2026-09", "approved")] and ts[2][2] is None and ts[2][3] is None,
       f"#3965 the month gina had stays hers, the other one arrives (private, no decider) {ts}")
 check(one("SELECT COUNT(*) FROM time_sheets WHERE user_id=?", (OID,)) == 0, "#3965 no timesheet lands with otto")
@@ -188,7 +188,7 @@ check(ents == [("Einkauf", 45.5, "Markt", True), ("Miete", 800.0, "", True)], f"
 rec = (Gi.get(B + f"/api/budget/{BL or 0}/recurring").json() or {}).get("items") or []
 RID = rec[0].get("id") if rec else None
 check(len(rec) == 1 and rec[0].get("title") == "Miete" and rec[0].get("amount") == 800, f"#3965 the template arrives {rec}")
-# 2.584.0 (#3965, fable F6): the booked month comes from the file (2026-09, booked on 1 October), not from the day
+# 2.765.0 (#3965, fable F6): the booked month comes from the file (2026-09, booked on 1 October), not from the day
 check(one("SELECT recurring_id FROM budget_entries WHERE list_id=? AND rmonth='2026-09'", (BL or 0,)) == RID and RID,
       "#3965 the booked month points at the new template, fable F6: the month of the file")
 sids = kt.dbx("SELECT sid, title FROM budget_entries WHERE list_id=?", (BL or 0,))
@@ -215,7 +215,7 @@ check(one("SELECT COUNT(*) FROM hub_absences WHERE deleted_at IS NULL") == 0, "#
 check([(t[0], t[1]) for t in kt.dbx("SELECT month, state FROM time_sheets WHERE user_id=? ORDER BY month", (GID,))] == [("2026-08", "open")],
       "#3965 ... the timesheet too, gina's own month stays")
 left = {t: one(f"SELECT COUNT(*) FROM {t} WHERE list_id=?", (BL or 0,)) for t in ("budget_cats", "budget_recurring", "budget_entries")}
-# 2.584.0 (#3965, fable F5): the budget list with an entry changed since stays WHOLE (before: its unchanged rows were deleted, the
+# 2.765.0 (#3965, fable F5): the budget list with an entry changed since stays WHOLE (before: its unchanged rows were deleted, the
 # list went into the trash all the same - the report said "kept", the budget was gone)
 check(left == {"budget_cats": 1, "budget_recurring": 1, "budget_entries": 2} and one("SELECT deleted_at FROM lists WHERE id=?", (BL or 0,)) is None,
       f"#3965 ... the budget list with an entry changed since stays whole, with all its rows {left}")
@@ -241,4 +241,4 @@ after2 = {t: one(f"SELECT COUNT(*) FROM {t} WHERE list_id=?", (BL2 or 0,)) for t
 check(one("SELECT deleted_at FROM lists WHERE id=?", (BL2 or 0,)) is not None and after2 == rows2,
       f"F5 the unchanged budget list goes into the trash with all its rows (restorable) {after2} {rows2}")
 
-sys.exit(kt.done("p2584_d_umz_rest"))
+sys.exit(kt.done("p2765_l_umz_rest"))
