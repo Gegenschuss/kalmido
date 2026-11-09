@@ -2123,17 +2123,19 @@ def umz_private(c, run, uid, man, zf, files, data, who):
     from .umz_more import umz_more_has, umz_more_write, umz_more_space
     me_old = _oid((man.get("user") or {}).get("id")) or -1  # review: a file without its account id: the mails are still mine
     oi = umz_private_oi(data, files, me_old)
-    here = umz_sheets_here(c, uid, data) if oi.get("time_sheets.json") else set()
-    if here:  # 2.765.0 (#3965): a month I have here already keeps the one here
-        oi["time_sheets.json"] = [r for r in oi["time_sheets.json"] if r.get("month") not in here]
-        run.warning(N_("Timesheets of months you have here already were not taken over: {0}"), ", ".join(sorted(here)))
-        if not oi["time_sheets.json"]:
-            oi.pop("time_sheets.json")
     if not oi and not umz_more_has(data):
         return
     if run.oi_done:  # 2.362.3 (#3098): an earlier import of this file brought them already
         run.warning(N_("Your files, knowledge pages and tables are here already from an earlier import: they were skipped."))
         return
+    here = umz_sheets_here(c, uid, data) if oi.get("time_sheets.json") else set()  # 2.765.0 (review N4): after the oi_done check
+    if here:  # 2.765.0 (#3965): a month I have here already keeps the one here
+        oi["time_sheets.json"] = [r for r in oi["time_sheets.json"] if r.get("month") not in here]
+        run.warning(N_("Timesheets of months you have here already were not taken over: {0}"), ", ".join(sorted(here)))
+        if not oi["time_sheets.json"]:
+            oi.pop("time_sheets.json")
+        if not oi and not umz_more_has(data):
+            return
     from .orgimport import oi_write
     umz_more_space(run, oi)  # 2.363.4 (#3127): a mail or sign-off in my private space never points into an organisation
     org = run.org
@@ -2308,7 +2310,7 @@ def umz_run(uid, iid, opts):
             if run.kind == "org":  # 2.137.0 (#2344): the personal office for office parts going into the private space
                 from .orgimport import oi_prepare
                 oi_prepare(c, run, uid, data)
-            elif data.get("absences"):  # 2.765.0 (#3965): my absences go into my personal office (umz_private, also next to an organisation)
+            elif data.get("absences") and not run.oi_done:  # 2.765.0 (#3965, review N3: not for a second import of the file): my absences go into my personal office (umz_private, also next to an organisation)
                 from .orgimport import oi_prepare
                 oi_prepare(c, run, uid, {"oi": umz_office_oi(data, _oid((man.get("user") or {}).get("id")) or -1)}, private=True)
             _L.rej = {}  # 2.531.0 (#4317) F11: umz_insert counts the refused rows of the run
