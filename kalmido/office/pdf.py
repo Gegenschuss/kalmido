@@ -28,6 +28,7 @@ import re
 import struct
 import unicodedata
 import zlib
+from urllib.parse import quote  # 2.802.0 (#1956): pdf_uri_esc
 
 try:
     from ..core.i18n import LANGS, N_, tr
@@ -673,7 +674,6 @@ def _meta_text(s):
 
 def pdf_uri_esc(url):
     """2.802.0 (#1956): a web address as the text of a PDF string: ASCII only (else percent-encoded), ( ) \\ escaped."""
-    from urllib.parse import quote
     s = quote(str(url), safe=":/?#[]@!$&'*+,;=%~-._")
     return s.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
 

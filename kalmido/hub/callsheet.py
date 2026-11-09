@@ -40,7 +40,12 @@ from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.pg import write_lock
 from ..accounts.orgroles import need_org_write, org_writes
 from ..accounts.onboarding import app_industry
+from ..collab.liste2e import le2e_mode
 from ..contacts.model import my_book_ids
+from ..files.scan import SC_RETRY_TEXT, sc_needs_retry
+from ..files.upsafe import UploadRefused, up_check
+from ..lists.shoot import sht_days
+from ..lists.templates import ptype_ok
 from ..office.pdf import (A4_H, C_INK, C_INK2, C_RULE, C_RULE2, MM, PDF_CW, PDF_L, _Page, pdf_date, pdf_image_object,
                           pdf_text_width, pdf_wrap, pdf_write)
 from .dispo import _area, _gate
@@ -154,8 +159,6 @@ def cs_project(c, uid, rows):
     lid = next((b["list_id"] for b in rows if b.get("list_id")), None)
     if not lid or not list_role(c, lid, uid):
         return {}
-    from ..collab.liste2e import le2e_mode
-    from ..lists.templates import ptype_ok
     r = c.execute("SELECT id, name, ptype, client_id FROM lists WHERE id=?", (lid,)).fetchone()
     if not r:
         return {}
@@ -187,7 +190,6 @@ def cs_shot_days(c, uid, proj):
     """[(day name, [shots])] of the project's shot list (lists/shoot.py sht_days), [] for another project type."""
     if not proj.get("shoot"):
         return []
-    from ..lists.shoot import sht_days
     return sht_days(c, uid, proj["list_id"])
 
 
@@ -275,8 +277,6 @@ def cs_sketch_in(c, uid, oid, v):
         mime, name = "image/jpeg", "sketch.jpg"
     else:
         raise BadInput(tr("Please select a PNG or JPEG picture"))
-    from ..files.scan import SC_RETRY_TEXT, sc_needs_retry
-    from ..files.upsafe import UploadRefused, up_check
     try:
         data, _mime, info = up_check(c, name, data, mime, uid, oid, kind="callsheet")
     except UploadRefused as e:
