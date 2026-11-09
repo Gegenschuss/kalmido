@@ -582,6 +582,7 @@ ORDER = (
     "core.objects", "core.writes", "core.objweb",  # 2.558.0 (#4709): the shared core (register, roles, write path) and its generic routes
     "core.undogroups",  # 2.747.0 (#5249): the step groups per account (storage, limits, prune; no routes)
     "core.undoweb",  # 2.747.0 (#5249): undo across devices -- the own step groups listed and taken back (GET /api/undo)
+    "core.undoareas",  # 2.777.0 (#5254): what the areas share to record and take back their steps (no routes)
     "agents.objprop",  # 2.623.0 (#4718): an agent's change of a core object as a proposal a person accepts (after core.objweb)
     "collab.tcxcore",  # 2.565.0 (#4719): the team chat's channels and groups as a kind of the shared core (no routes of its own)
     "lists.lmcore",  # 2.568.0 (#4739): the projects as a kind of the shared core (shares, revocation, settings history)

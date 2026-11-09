@@ -81,7 +81,7 @@ res = back(A, g["id"])
 r = A.get(B + f"/api/events/{EV}")
 check(res.get("undone") == [g["id"]] and r.ok and r.json()["start"].startswith(f"{D}T14:00"), f"undo of the delete: the event is there again {res}")
 in_range = A.get(B + "/api/events", params={"from": D, "to": (date.fromisoformat(D) + timedelta(days=1)).isoformat()})
-check(in_range.ok and EV in [x.get("id") for x in (in_range.json() if isinstance(in_range.json(), list) else in_range.json().get("items", []))],
+check(in_range.ok and EV in [x.get("eid") for x in in_range.json().get("items", [])],
       f"... and shows in the calendar's range again {in_range.status_code}")
 
 # ---------------------------------------------------------------- contacts
@@ -92,7 +92,7 @@ CT = r.json()["id"]
 r = A.patch(B + f"/api/contacts/{CT}", json={"fn": "Erika Muster", "family": "Muster"})
 check(r.ok, f"the contact changed {r.status_code} {r.text[:120]}")
 g = newest(PHONE)
-check(g.get("kind") == "contact" and "Erika Muster" in (g.get("label") or ""), f"the contact's step is listed with its name {g}")
+check(g.get("kind") == "contact" and "Erika Beispiel" in (g.get("label") or ""), f"the contact's step is listed with its name (before the step) {g}")
 res = back(PHONE, g["id"])
 c = A.get(B + f"/api/contacts/{CT}").json()
 check(res.get("undone") == [g["id"]] and c.get("fn") == "Erika Beispiel" and c.get("family") == "Beispiel",
@@ -132,10 +132,11 @@ g = newest(A)
 res = back(A, g["id"])
 check(res.get("undone") == [g["id"]] and node().get("parent_id") in (None, 0), f"undo of the move: at the top again {res} {node().get('parent_id')}")
 r = A.delete(B + f"/api/files/nodes/{NID}")
-check(r.ok and node().get("status") == 404, f"the file went into the trash {r.status_code}")
+check(r.ok and node().get("in_trash") is True, f"the file went into the trash {r.status_code} {node().get('in_trash')}")
 g = newest(A)
 res = back(A, g["id"])
-check(res.get("undone") == [g["id"]] and node().get("name") == "bericht.txt", f"undo of the delete: the file is back {res} {node()}")
+check(res.get("undone") == [g["id"]] and node().get("name") == "bericht.txt" and node().get("in_trash") is False,
+      f"undo of the delete: the file is back out of the trash {res} {node().get('in_trash')}")
 r = A.post(B + f"/api/files/nodes/{NID}/versions", files={"file": ("bericht.txt", b"v2", "text/plain")})
 check(r.ok and A.get(B + f"/api/files/nodes/{NID}/content").content == b"v2", f"a new version {r.status_code} {r.text[:120]}")
 g = newest(A)

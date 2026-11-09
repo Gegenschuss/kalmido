@@ -15,10 +15,12 @@ going into the trash runs the file store's own restore / trash (its owner or who
 areas' on_trash). The owner, workspace, kind, links and the organisation access of a node never change on undo (undo_keep)."""
 from ..core.errors import Denied
 from ..core.i18n import N_, tr
-from ..core.undoareas import ua_plain, ua_pre, ua_trash_fix
+from ..core.undoareas import UA_DELETED, UA_MOVED, UA_RENAMED, UA_RESTORED, UA_VERSION, ua_plain, ua_post, ua_pre, ua_trash_fix
 from ..core.undogroups import UG_LABEL
 from ..core.undoweb import undo_need_reg
 from ..core.writes import obj_track
+from ..office.periodlock import pl_tree_need_open
+from .fslock import fsl_of
 from .fsref import fs_ref_need_move, fs_ref_trashed, fs_trash_prepare, fs_trash_restored
 from .fsroots import fs_area_after, fs_area_before, fs_area_need_fit, fs_area_root_need_free
 from .store import DEPTH_MAX, _free_name, _now, fs_chain, fs_deleted, fs_height, fs_log_add, need_node
@@ -37,9 +39,13 @@ def fsu_label(r):
 obj_track(FSU_KIND, "fs_nodes", area="other", undo_keep=FSU_KEEP, undo_label=fsu_label, undo_free=("deleted_at", "deleted_by"))
 
 
-def fsu_pre(c, uid, n, key=None):
-    """The step of uid's change of node n (a row) with label key + its name (a node in a locked folder: its number only)."""
-    from .fslock import fsl_of  # fslock imports web.py (which imports this module)
+FSU_WHAT = {"rename": UA_RENAMED, "move": UA_MOVED, "delete": UA_DELETED, "restore": UA_RESTORED, "version": UA_VERSION}
+
+
+def fsu_pre(c, uid, n, what=None):
+    """The step of uid's change of node n (a row), labelled FSU_WHAT[what] + its name (in a locked folder: its number only).
+    files/web.py calls it (and fsu_post before its commit) through a function-local import: core/objects.py imports web.py."""
+    key = FSU_WHAT.get(what or "")
     nm = f"#{int(n['id'])}" if fsl_of(c, n["id"]) is not None else ua_plain(n["name"], n["id"])
     ua_pre(c, uid, FSU_KIND, n["id"], *((key, nm) if key else ()))
 
@@ -66,8 +72,6 @@ def _target(c, uid, n, m):
 
 def fsu_need(c, uid, rid, oid):
     """Who may take a node's step back now (module docstring)."""
-    from ..office.periodlock import pl_tree_need_open
-    from .fslock import fsl_of
     n = need_node(c, rid, write=True, trash=True)
     if fsl_of(c, rid) is not None:
         raise Denied(409, tr(FSU_LOCKED))
@@ -110,6 +114,10 @@ def fsu_need(c, uid, rid, oid):
         trash(c)
         fs_area_after(c, uid, rid, ctx)
     return {"fix": fix}
+
+
+def fsu_post(c):
+    ua_post(c)
 
 
 undo_need_reg(FSU_KIND, fsu_need)
