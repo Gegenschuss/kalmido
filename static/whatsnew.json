@@ -1,6 +1,36 @@
 {
  "versions": [
   {
+   "version": "2.787.0",
+   "date": "2026-11-10",
+   "items": [
+    {
+     "de": "Der Kunden-Link einer Abnahme geht jetzt auch für Bilder und PDFs: Kunden kommentieren an einem Punkt.",
+     "en": "The client link of an approval now works for images and PDFs too: clients comment at a point."
+    },
+    {
+     "de": "Im Dokument lassen sich Seiten löschen und drehen; das Original bleibt als ältere Version erhalten.",
+     "en": "You can delete and turn pages of a document; the original stays as an older version."
+    },
+    {
+     "de": "Beim Anlegen eines Agenten wählst du gleich die Projekte, mit denen er arbeiten soll.",
+     "en": "When you create an agent you pick the projects it works with right away."
+    },
+    {
+     "de": "Team-Agenten deiner Organisation stehen im Tab Agenten, auch wenn du noch kein Projekt mit ihnen teilst.",
+     "en": "Your organisation's team agents are listed in Agents, even before you share a project with them."
+    },
+    {
+     "de": "Kreditkarten und Bankabgleich lassen sich jetzt Buchung für Buchung durchgehen, mit Vorschau des passenden Belegs.",
+     "en": "Credit cards and bank reconciliation can now be walked through booking by booking, with a preview of the matching receipt."
+    },
+    {
+     "de": "Änderungen an Tabellenzellen und Wissen-Seiten stehen in „Letzte Schritte“ und lassen sich von jedem Gerät zurücknehmen.",
+     "en": "Changes to table cells and knowledge pages appear in \"Recent steps\" and can be undone from any device."
+    }
+   ]
+  },
+  {
    "version": "2.786.0",
    "date": "2026-11-09",
    "items": [
