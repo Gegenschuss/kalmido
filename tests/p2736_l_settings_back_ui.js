@@ -6,6 +6,7 @@
 //   Modules -> B -> overview -> A -> overview, the next Back closes the settings; no entry is pushed again in between (#5070)
 // - phone: the arrow in the header does what Back does (one view back, its history entry goes)
 // - phone opened straight into an area (settingsModal('modules')): Back shows the overview, the next closes
+// - 2.766.0 (#5322): opened into an area, a new address (location.hash) closes the settings whole, not only one view
 // - tablet: tab A -> tab B: Back shows A, the next Back closes; folding a part open inside an area is no step
 // P4: alice works without an organisation (her own private settings): the person without an organisation
 // freelancer-matrix: n/a - no route of its own, the settings dialog in the browser
@@ -88,6 +89,13 @@ const call = async (method, url, body) => { const r = await fetch(B + url.replac
       check(await at('idx', 1), `${W}: Back from there shows the overview ` + await ev(STATE));
       await back();
       check(await wait(`${VIEW} === 'closed' && f8d_bk.pushed === 0`, {timeout: 6000}), `${W}: and the next Back closes`);
+
+      // 2.766.0 (#5322, CI red p2123_d_ui): opened straight into an area, then a new view by address (a link, location.hash):
+      // the settings close whole - they stayed open on their overview since #5214
+      await ev(`(settingsModal('modules'), 1)`);
+      await at('modules', 2);
+      await ev(`(location.hash = '#inbox', 1)`);
+      check(await wait(`${VIEW} === 'closed' && f8d_bk.pushed === 0 && location.hash === '#inbox'`, {timeout: 6000}), `${W}: another address closes the settings whole ` + await ev(STATE));
     }
 
     // tablet / unfolded Fold: the areas as tabs, no overview

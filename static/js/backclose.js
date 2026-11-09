@@ -5,7 +5,7 @@
    2.652.0 (#5070): one entry per open overlay level (pushed = how many, state.f8d = the level of the entry), pushed when the level
    opens. Back closes exactly the topmost level and pushes nothing anew: an entry pushed in the popstate handler (without a tap)
    is skipped by Chrome's Back, so the second Back of document preview -> full view left the app instead of closing the preview. */
-const f8d_bk = {pushed: 0, skip: false, queued: false, url: '', after: /** @type {Array<() => void>} */ ([]), t: 0};  // after / t: f8d_defer
+const f8d_bk = {pushed: 0, skip: false, queued: false, url: '', at: '', after: /** @type {Array<() => void>} */ ([]), t: 0};  // after / t: f8d_defer; at: the address our entries were pushed on (#5322)
 const f8d_open = () => {
   if ($('.palette:not(.an-out)')) return 'palette';
   if ($('.lightbox')) return 'lightbox';
@@ -19,13 +19,14 @@ const f8d_open = () => {
   if ($('.tsheet')) return 'tsheet';
   return '';
 };
-function f8d_closeTop() {
+// 2.766.0 (#5322): nav = a new view (another address), not a Back: a dialog with views of its own closes whole, it does not step back
+function f8d_closeTop(nav = false) {
   const k = f8d_open();
   if (k === 'palette') closePalette();
   else if (k === 'lightbox') $('.lightbox').remove();
   else if (k === 'pop') closePop();
   else if (k === 'qsheet') { closePop(); tch_overlaysClose(); }  // 2.619.0 (#4943): the scrim + whoever holds popOnClose, then the sheet (popovers.js)
-  else if (k === 'modal') { const m = $$('.modal:not(.authscreen):not(.an-out)').pop(); if (!(m?._stk?.length && m._back?.())) modalClose(m); }  // 2.736.0 (#5214): a view inside the dialog first (settings areas)
+  else if (k === 'modal') { const m = $$('.modal:not(.authscreen):not(.an-out)').pop(); if (nav || !(m?._stk?.length && m._back?.())) modalClose(m); }  // 2.736.0 (#5214): a view inside the dialog first (settings areas)
   else if (k === 'tsheet') $('[data-ts="close"]', $('.tsheet'))?.click();
 }
 // 2.736.0 (#5214): a dialog with views of its own (md._stk = the views before the shown one, md._back() shows the last of them,
@@ -42,7 +43,7 @@ function f8d_sync() {
   f8d_bk.queued = false;
   if (f8d_bk.skip) return;  // our own history.back() is still on its way
   const n = f8d_depth();
-  if (n > f8d_bk.pushed) { while (f8d_bk.pushed < n) history.pushState({f8d: ++f8d_bk.pushed}, '', location.href); }
+  if (n > f8d_bk.pushed) { f8d_bk.at = location.href; while (f8d_bk.pushed < n) history.pushState({f8d: ++f8d_bk.pushed}, '', location.href); }
   else if (n < f8d_bk.pushed) {
     f8d_bk.pushed = n;
     // only our own entries above the open levels; after a route change (or a replaced entry) the current one is not ours
@@ -72,8 +73,11 @@ window.addEventListener('popstate', e => {
   // whose state another module replaced counts as one step), nothing is pushed again; forward onto an entry is left alone
   const v = history.state?.f8d, close = typeof v === 'number' ? f8d_bk.pushed - v : 1;
   if (close <= 0) return;
+  // 2.766.0 (#5322, CI red p2123_d_ui since #5214): an entry not ours with another address = a new view (location.hash = ...,
+  // a link): the settings opened into an area closed before #5214 and stayed open on their overview after it
+  const nav = typeof v !== 'number' && !!f8d_bk.at && location.href !== f8d_bk.at;
   f8d_bk.pushed -= close; e.stopImmediatePropagation();
-  for (let i = 0; i < close && f8d_open(); i++) f8d_closeTop();
+  for (let i = 0; i < close && f8d_open(); i++) f8d_closeTop(nav);
   f8d_queue();
 }, true);
 if (typeof isTouch === 'function' && isTouch()) {
