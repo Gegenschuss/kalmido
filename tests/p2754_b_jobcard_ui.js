@@ -110,11 +110,11 @@ const v1 = async (method, url, body) => { const r = await fetch(B + 'api/v1' + u
 
     // the running job: "Open chat", then the phone's Back
     await ready(ev, `!!${openBtn(JA)}`);
-    const n1 = await ev('history.length');
+    const n1 = await ev('BN.i');  // the app's view index: since #5235 the bar's Back is history.back(), so history.length no longer grows here
     await ev(`(${openBtn(JA)}.click(), 1)`);
     check(await ready(ev, inJob(JA), 40), `${wd} px: "Open chat" opens the running job's history`);
     check(await ev(`!document.getElementById('chat-in').disabled && /Clara/.test(document.getElementById('chat-in').placeholder)`), `${wd} px: the box writes to the running job`);
-    check(await ev(`history.length === ${n1} + 1`), `${wd} px: one step in the history (the chat page), no extra job entry`);
+    check(await ev(`BN.i === ${n1} + 1 && !history.state?.jc`), `${wd} px: one step in the history (the chat page), no extra job entry`);
     await ev('(history.back(), 1)');
     check(await ready(ev, onAgents, 40), `${wd} px: the phone's Back leads to the Agents page`);
   }, true);
