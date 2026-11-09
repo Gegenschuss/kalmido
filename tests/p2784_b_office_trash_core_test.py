@@ -126,6 +126,13 @@ c.commit()""")
 check("PURGED 2" in out and row(S2) is None and row(F1) is None, f"switch on: the old ones (an organisation's, the freelancer's) gone {out[-300:]}")
 check(row(S3) is not None and row(S3)[0] and row(S4) == (None, None), "the younger one stays in the trash, the live one stays live")
 check(not dbx("SELECT 1 FROM obj_undo WHERE kind=? AND ref_id IN (?, ?)", (K, S2, F1)), "their undo steps went with them")
+# 2.784.0 (#5366 review): ids read before a restore (the race of ofk_restore / the run) - the run checks again under the lock,
+# a live row or a young one in the trash is never deleted for good through the ids way
+out = in_app(f"""from kalmido.core.writes import obj_trash_prune
+obj_trash_prune(c, "{K}", purge=True, ids=[{S4}, {S3}])
+c.commit()
+print("IDSDONE")""")
+check("IDSDONE" in out and row(S4) == (None, None) and row(S3) is not None, f"ids way: the live and the young row stay {out[-300:]}")
 check(names(A) == ["Example Live Ltd", "Example Timber Ltd"] or sorted(names(A) or []) == ["Example Live Ltd", "Example Timber Ltd"],
       f"the list: the live ones only {names(A)}")
 

@@ -484,9 +484,15 @@ def obj_trash_prune(c, kind, cut=None, purge=None, ids=None):
     purge = ret_on("trash") if purge is None else bool(purge)
     old = obj_trash_due(c, kind, cut) if ids is None else [int(x) for x in ids]
     if old and purge:
+        t, cut = reg["table"], cut or ret_trash_cut()
         with system_ctx(c):  # no person: the period ran out (the rights were checked when it went into the trash)
             for rid in old:
                 write_lock(c, f"obj-{kind}-{int(rid)}")
+                # 2.784.0 (#5366 review): checked again under the lock - a restore (e.g. via /api/undo) between reading the
+                # ids and the lock keeps its row alive instead of losing it for good
+                if not c.execute(f"SELECT 1 FROM {qi(t, (t,))} WHERE id=? AND {trash_sql()} AND deleted_at<?",
+                                 (int(rid), cut)).fetchone():
+                    continue
                 _purge_rows(c, kind, reg, rid)
         obj_forget()
         bump(c, _area(reg))
