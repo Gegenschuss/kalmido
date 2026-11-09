@@ -130,7 +130,7 @@ function dc_filterGo(k, v) {
 // part of dc_f0, e.g. {sender: ['1,7']}); the search, a saved view and a folder's list are left
 function dc_facetGo(part) {
   dc_ctxSet('list');
-  if (DC.dv) { DC.dv = null; if (typeof DCV === 'object') DCV.applied = null; }
+  if (DC.dv) { DC.dv = null; DC.vsort = null; if (typeof DCV === 'object') DCV.applied = null; }  // the view's own sort goes with it
   DC.f = {...dc_f0(), ...part}; DC.q = ''; DC.under = null; DC.at = 0; DC.facets = null;
   const qi = $('#dc-q'); if (qi) qi.value = '';
   if (S.route.mod === 'docs' && !S.route.review && !S.route.dv && !S.route.id) dc_load(); else go('ablage/docs');

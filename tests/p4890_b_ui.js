@@ -94,7 +94,7 @@ const up = async (ck, name, text) => {
   w.location.hash = '#ablage/v/' + VID;
   check(await until(() => w.eval(`DC.dv === ${VID} && !DC.loading`)), 'a saved view open');
   d.querySelector('#side [data-dfc="sender"]').click();
-  check(await until(() => w.location.hash === '#ablage/docs' && w.eval('!DC.dv && !DC.q && !DC.loading && DC.total === 3')), 'from a saved view: All documents with only that filter');
+  check(await until(() => w.location.hash === '#ablage/docs' && w.eval('!DC.dv && !DC.q && !DC.loading && DC.total === 3')), 'from a saved view: All documents with only that filter ' + JSON.stringify(w.eval(`({hash: location.hash, dv: DC.dv, q: DC.q, loading: DC.loading, total: DC.total, f: DC.f, route: S.route})`)));
   check(JSON.stringify(w.eval(`LS.get('abFacOpen')`).sort()) === JSON.stringify(['asn', 'cf:stage', 'sender']), 'the fold state is kept: ' + JSON.stringify(w.eval(`LS.get('abFacOpen')`)));
   w.close();
   w = await boot({user: 'alice', hash: 'ablage/docs', shared}); d = w.document;
