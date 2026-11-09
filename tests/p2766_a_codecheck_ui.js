@@ -155,6 +155,7 @@ async function swCheck() {
     check(x.unchecked > 0 && /not in this browser/.test(res.sum), `files not in the cache are named "not checked" (${x.unchecked})`);
     check(res.ok === '1' && res.hash === SRV && x.hash === SRV, `ONE recipe: the hash shown is the SHA-256 of /api/code-manifest (cm_json) ${res.hash.slice(0, 16)} vs ${SRV.slice(0, 16)}`);
     check(res.rel === `https://github.com/Gegenschuss/kalmido/releases/tag/v${MAN.version}` && res.tgt === '_blank', 'the link leads to the GitHub release of that version ' + res.rel);
+    await ev(`document.querySelector('#s-cc-h').scrollIntoView({block: 'start'}), 1`);
     await shot('codecheck');
     // Copy hash (the clipboard stubbed)
     await ev(`(() => { window.__copied = []; Object.defineProperty(navigator, 'clipboard', {value: {writeText: async t => { window.__copied.push(t); }}, configurable: true}); return 1; })()`);

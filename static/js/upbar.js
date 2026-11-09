@@ -68,7 +68,7 @@ function upCodeBar(d) {
   const sp = /** @type {HTMLElement} */ (el.querySelector('span')), go = /** @type {HTMLElement} */ (el.querySelector('[data-ccgo]')), x = /** @type {HTMLElement} */ (el.querySelector('[data-ccx]'));
   sp.textContent = tr("The app's code changed without a new version"); sp.title = tr('Version {0}', d.version || '?');
   go.textContent = tr('Check code');
-  x.textContent = '×'; x.title = tr('Close'); x.setAttribute('aria-label', tr('Close'));
+  x.innerHTML = typeof ic === 'function' ? ic('x', 's') : '×'; x.title = tr('Close'); x.setAttribute('aria-label', tr('Close'));
   go.addEventListener('click', () => { el.remove(); upCodeAck(); loadModule('settings').then(() => settingsModal('codecheck'), () => {}); });
   x.addEventListener('click', () => { el.remove(); upCodeAck(); });
   document.body.appendChild(el);
