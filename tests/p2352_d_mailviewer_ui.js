@@ -73,7 +73,7 @@ const FEAT = 'cal,collab,comments,clients,contacts,events';
   check(md && !md.querySelector('input[data-hbmv="whole"]') && md.querySelector('iframe.hbmframe')?.getAttribute('src') === `/api/hubmail/mails/${PL}/html`, 'a plain mail: no switch, nothing shortened');
   click(w, md.querySelector('[data-m="close"]')); await sleep(300);
   const css = fs.readFileSync(path.join(__dirname, '..', 'static', 'app.css'), 'utf8');
-  check(/\.hbmdlg \.card\{width:min\(56rem,80vw\)/.test(css) && /@media \(max-width:40rem\)\{\.hbmdlg\{padding:0\}/.test(css), 'large window on the desktop, full screen on the phone (stylesheet)');
+  check(/\.hbmdlg \.card\{width:min\(56rem,80vw\)/.test(css) && /@media \(max-width:599px\)\{\.hbmdlg\{padding:0\}/.test(css), 'large window on the desktop, full screen on the phone (stylesheet)');  // 2.754.0 (#4511): the phone width is 599px
   const real = errs.filter(e => !/iframe|Could not load|resource/i.test(e));
   check(real.length === 0, 'no JS errors: ' + real.slice(0, 3).join(' | '));
   console.log(`${ok} ok, ${F.length} failed`);

@@ -593,7 +593,8 @@ function jobChain(j) {
 function jobHtml(j) {
   const mine = j.kind && S.me && j.user_id === S.me.id;  // 2.3.0: a proposal I asked for: reviewed in its dialog
   // 2.75.0 (#1411): a proposal of the built-in assistant has the person as its "agent" (agent_id = user_id): named Assistant
-  const acts = [mine && ['requested', 'ready'].includes(j.proposal_state) && `<button class="btn sm ${j.proposal_state === 'ready' ? 'pri' : ''}" data-act="prop-open" data-jid="${j.id}">${ic('bot', 's')} ${j.proposal_state === 'ready' ? tr('Review the proposal') : tr('Open')}</button>`,
+  const acts = [jc_openBtn(j),  // 2.754.0 (#5222): first, so the row stays put when the job ends
+    mine && ['requested', 'ready'].includes(j.proposal_state) && `<button class="btn sm ${j.proposal_state === 'ready' ? 'pri' : ''}" data-act="prop-open" data-jid="${j.id}">${ic('bot', 's')} ${j.proposal_state === 'ready' ? tr('Review the proposal') : tr('Open')}</button>`,
     !j.kind && j.can_act && j.state === 'waiting' && `<button class="btn sm pri" data-act="job-do" data-jid="${j.id}" data-a="approve">${thumbIc(true)} ${tr('Approve')}</button>`,
     !j.kind && j.can_act && j.state === 'waiting' && `<button class="btn sm" data-act="job-do" data-jid="${j.id}" data-a="reject">${thumbIc(false)} ${tr('Reject')}</button>`,
     jc_cardBtn(j),  // 2.56.0 (#1791): Message to a running job
@@ -601,7 +602,7 @@ function jobHtml(j) {
   const lg = jl_text(j), last = j.log != null ? String(j.log || '').trim().split('\n').pop() : String(j.log_last || '');  // 2.674.0 B (#4194): a list carries only the last line
   // 2.136.0 (#2193): a running job shows the bot at work (the antenna sways), one waiting for me the bot waiting (antenna up)
   const fo = S.jobFocus === j.id;  // 2.36.2 (#1141): opened by a "Job #id" link: highlighted, log + history unfolded
-  return `<div class="job st-${esc(j.state)}${fo ? ' jfocus' : ''}" id="job-${j.id}"${fo ? ' tabindex="-1"' : ''}><div class="jobh">${j.state === 'running' || j.state === 'waiting' ? botFig(j.state === 'running' ? 'arbeitet' : 'wartet', 'bjob') : ''}<span class="jst">${esc(tr(JOB_ST[j.state] || j.state))}</span><b>${esc(j.title)}</b><span class="spacer"></span><span class="muted">${ac_mk(j.agent_id) ? `<i class="acjob"${ac_mk(j.agent_id)} aria-hidden="true"></i>` : ''}${esc(j.kind && j.agent_id === j.user_id ? tr('Assistant') : j.agent_name)} · ${esc(relTime(j.updated_at))}</span></div>
+  return `<div class="job st-${esc(j.state)}${fo ? ' jfocus' : ''}" id="job-${j.id}"${fo ? ' tabindex="-1"' : ''}><div class="jobh">${j.state === 'running' || j.state === 'waiting' ? botFig(j.state === 'running' ? 'arbeitet' : 'wartet', 'bjob') : ''}<span class="jst">${esc(tr(JOB_ST[j.state] || j.state))}</span>${/*html-ok*/ jc_titleHtml(j)/* #5222: esc(j.title), numeric ids */}<span class="spacer"></span><span class="muted">${ac_mk(j.agent_id) ? `<i class="acjob"${ac_mk(j.agent_id)} aria-hidden="true"></i>` : ''}${esc(j.kind && j.agent_id === j.user_id ? tr('Assistant') : j.agent_name)} · ${esc(relTime(j.updated_at))}</span></div>
     ${j.task_id ? `<button class="runtask" data-act="open-id" data-id="${j.task_id}">${ic('arrow', 's')}<span>${esc(j.task_title || '')}</span></button>` : ''}
     ${jobMoreTasks(j)}${jobChain(j)}${''/* 2.392.2 (#3366): its other tasks, continuation and part jobs */}
     ${j.log || j.has_log ? `<details class="joblog" data-jid="${j.id}"${S.jobLogOpen[j.id] ?? fo ? ' open' : ''}><summary>${esc(last.slice(0, 140))}</summary><pre>${esc(lg)}</pre></details>` : ''}

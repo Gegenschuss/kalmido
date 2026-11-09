@@ -578,6 +578,14 @@ Two more files every package used to append to - `static/app.css` (new rules at 
   `tests/boot.js` `allCssSync()` reads it in the same order. `tools/check_appcss.py` (inside `tools/check_layout.py`)
   fails when `app.css` has more lines than its fixed limit (changing or deleting rules stays allowed; the limit is only
   ever lowered) and checks every start file's braces and comments on its own.
+- **Breakpoints (2.754, #4511).** Phone = `max-width:599px` (pairs with `min-width:600px`), tablet = `max-width:767px`
+  (pairs with `min-width:768px`). Deliberate special widths (small phones 320-480px, wide screens, print) stay;
+  `tools/check_css_classes.py` (CI lint, a warning only) lists every other width and the classes without a use.
+  (Kept here, not as a comment in `app.css`, which does not grow.)
+- **HTML templates are escaped (2.754, #5297).** Every `${}` in a template literal with markup in `static/js/**` goes through
+  `esc()` / `tr()` / `trh()`, is a number or a constant, or carries the mark `${/*html-ok*/ x}` (HTML built on purpose).
+  `tools/check_innerhtml.py` (CI lint, `--selftest` for the rule) is red for a NEW unescaped `${}`; the old ones are the
+  baseline `tools/innerhtml_baseline.json` (`--update` only shrinks it).
 - **Start scripts go below the mark.** The scripts above the comment `new start scripts go below this line` in
   `static/index.html` keep their order (defer runs them in it, some rely on it); their number only goes down. A new start
   script - better: a module loaded on demand - goes into the part between the mark and `main.js`, one tag per line,
@@ -822,7 +830,10 @@ Since 2.37.0 Kalmido runs on PostgreSQL 17 only (`DATABASE_URL`); SQLite is gone
 - `tests/run_all.sh`: the API, UI (jsdom and Firefox), security and calendar suites against a fresh test container
   (see [tests/README.md](../tests/README.md)).
 - CI (`.github/workflows/ci.yml`): Python and JavaScript syntax of every file, `tools/check_layout.py`, translations,
-  the MCP bridge, bandit (high severity), pip-audit, the browser demo, semgrep and the test shards.
+  the MCP bridge, bandit (high severity), pip-audit, the browser demo, semgrep and the test shards; reporting only
+  (no gate): a Trivy scan of the app image (job "Trivy image scan") and CodeQL (`.github/workflows/codeql.yml`), both with
+  their high / critical findings in the job summary (`tools/scan_summary.py`), and the server's test coverage of the
+  nightly full run (job "Test coverage", see [tests/README.md](../tests/README.md)).
 
 ### Performance budget
 

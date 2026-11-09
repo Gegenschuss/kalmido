@@ -46,11 +46,11 @@
 .bmtextb{max-height:50vh;overflow:auto;line-height:var(--lh);font-size:var(--fs-l);overflow-wrap:anywhere}
 .bmtextb p{margin:0 0 .75rem}
 .bmdfoot{flex-wrap:wrap;gap:.5rem}
-@media (max-width:40rem){ .bmgrid{grid-template-columns:1fr} .bmdfoot .btn{flex:1 1 auto;justify-content:center} }
+@media (max-width:599px){ .bmgrid{grid-template-columns:1fr} .bmdfoot .btn{flex:1 1 auto;justify-content:center} }
 .bmconf .bmctitle{margin:.25rem 0 0;overflow-wrap:anywhere}
 .bmconf .bmcurl{margin:.25rem 0 .75rem;font-size:var(--fs-m);overflow-wrap:anywhere}
 /* 2.122.4 C (#2223): on a phone the label sits above the field, so description and note use the full width; the save bar stays reachable above the keyboard */
-@media (max-width:40rem){
+@media (max-width:599px){
   .bmdlg .row label{flex:1 0 100%;min-width:0}
   .bmdlg .row input,.bmdlg .row select,.bmdlg .row textarea{flex:1 1 100%;min-width:0;width:100%;box-sizing:border-box}
   .bmdlg .bmdfoot{position:sticky;bottom:-1.25rem;background:var(--bg2);padding:.5rem 0 .25rem;margin-bottom:-.25rem}

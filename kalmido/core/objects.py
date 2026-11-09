@@ -61,6 +61,12 @@ Interface (signatures fixed; stages 2 / 3 and the first areas #1958 #1957 #4675 
                  it (only the ones that went with it) and are deleted for good with it
       trash_prune True: the core's retention run (obj_trash_tick) deletes the kind's trash after the trash period; False
                  (default): the area keeps its own run until its stage moves it onto the core
+      2.754.0 (#5268, Q0b of the cross-section audit #3563) -- a light kind of an old area (task, event, hub_mail, client):
+      node       False: the kind has no reference node at all (no fs_ref_register, no shares, no folder, no routes -- routes=
+                 is ignored --, no fields, no write path of the core: obj_reg_node refuses it with 404, obj_visible_sql / obj_rows with ValueError -- the
+                 area lists its own rows). It only names its objects for the (kind, id) tables of the core: obj_role /
+                 obj_need (base_role = exactly the area's own check, steps 1 + 2 still apply), obj_title, open_url, obj_space.
+                 base_role is required, visible is not.
   obj_role(c, uid, kind, id, row=None) -> None | 'view' | 'edit' | 'manage'
   obj_need(c, uid, kind, id, need="view" | "write" | "manage", trash=False) -> (row, role); Denied 404 / 403
   obj_visible_sql(c, uid, kind) -> "(SELECT id ...)" the ids uid sees (not in the trash), ids inlined, no ? parameters
@@ -189,7 +195,7 @@ def obj_register(kind, table, *, label, fields, open_url=None, space=None, title
                  hidden=None, org_access="edit", area="other", scopes=("read", "tasks:write"), dl_area=None, feat=None,
                  protect=None, on_trash=None, content=None, undo_scope=None, public=None, routes=True, trash_role="manage",
                  fsref=True, share_cols=(), on_restore=None, on_revoke=None, list_col="list_id", listed=True, members=None,
-                 fs_hooks=None, org_join="member", children=(), trash_prune=False):
+                 fs_hooks=None, org_join="member", children=(), trash_prune=False, node=True):
     """Register a kind of core object (module docstring). Registering the same kind again replaces it (a module reload).
     2.565.0 (#4719): listed=False = the object's reference node only carries its shares (files/fsref.py): it lies in no
     folder and the file store never shows it; the area writes the shares with obj_member_put / obj_member_take.
@@ -205,7 +211,11 @@ def obj_register(kind, table, *, label, fields, open_url=None, space=None, title
     obj_create refuses an org_id for such a kind, even from an admin -- it is made private and shared with obj_space_set)."""
     if not _NAME.fullmatch(kind or "") or not _TABLE.fullmatch(table or ""):
         raise ValueError(f"obj_register: invalid kind / table {kind!r} {table!r}")
-    if base_role is not None and visible is None:
+    if not node:  # 2.754.0 (#5268): a light kind (module docstring): only its role, title, open_url and space
+        if base_role is None or fields or members:
+            raise ValueError(f"obj_register {kind}: a kind without a node needs base_role and has no fields or members")
+        routes, fsref = False, False
+    elif base_role is not None and visible is None:
         raise ValueError(f"obj_register {kind}: a base_role hook needs its visible hook (obj_visible_sql)")
     if org_access not in ("edit", "view", None) or trash_role not in ("edit", "manage") or area not in LV_AREA_KEYS or org_join not in ("member", "admin"):
         raise ValueError(f"obj_register {kind}: invalid org_access / trash_role / area")
@@ -219,12 +229,15 @@ def obj_register(kind, table, *, label, fields, open_url=None, space=None, title
            "fsref": bool(fsref), "share_cols": tuple(x for x in share_cols if _TABLE.fullmatch(x)), "on_restore": on_restore,
            "on_revoke": on_revoke, "list_col": list_col if _TABLE.fullmatch(list_col or "") else "list_id",
            "members": tuple(members) if members else None,  # 2.566.0 (#4712)
-           "org_join": org_join}  # 2.579.0 (#4802)
+           "org_join": org_join,  # 2.579.0 (#4802)
+           "node": bool(node)}  # 2.754.0 (#5268)
     if members and (len(members) != 2 or not all(_TABLE.fullmatch(x or "") for x in members)):
         raise ValueError(f"obj_register {kind}: members must be (table, key column)")
     kids = tuple(tuple(x) for x in (children or ()))  # 2.773.0 (#5292)
     if any(len(x) != 2 or not all(_TABLE.fullmatch(y or "") for y in x) or x[0] == table for x in kids):
         raise ValueError(f"obj_register {kind}: children must be ((table, key column), ...) of other tables")
+    if not node and (kids or trash_prune):  # a light kind (2.754.0, #5268) has no trash of the core (2.773.0, #5292)
+        raise ValueError(f"obj_register {kind}: a kind without node has no children / trash_prune")
     reg.update(children=kids, trash_prune=bool(trash_prune))
     OBJ[kind] = reg
     if not fsref:
@@ -278,6 +291,15 @@ def obj_reg(kind):
     """The registered hooks of kind; Denied(404) for an unknown one."""
     r = OBJ.get(kind or "")
     if r is None:
+        raise Denied(404)
+    return r
+
+
+def obj_reg_node(kind):
+    """2.754.0 (#5268): obj_reg for the core's own write paths (core/writes.py): Denied(404) also for a light kind (node=False),
+    whose objects are written by their area only."""
+    r = obj_reg(kind)
+    if not r.get("node", True):
         raise Denied(404)
     return r
 
@@ -416,10 +438,11 @@ def obj_role(c, uid, kind, rid, row=None, pre=None):
         return None
     try:
         rid = int(rid)
+        uid = int(uid)  # #5268 review F6: the own-request checks (_req_token_lists, hmv1._hmv_own) compare ints
     except (TypeError, ValueError):
         return None
     cache = _cache()
-    key = (int(uid), kind, rid)
+    key = (uid, kind, rid)
     if cache is not None and key in cache:
         return cache[key]
     row = row if row is not None else obj_row(c, kind, rid)
@@ -502,6 +525,8 @@ def obj_visible_sql(c, uid, kind):
 def _visible_sql(c, uid, kind):
     """obj_visible_sql without the cap guard (obj_rows: the SQL is its candidate set, obj_role decides each row)."""
     reg = obj_reg(kind)
+    if not reg.get("node", True):  # 2.754.0 (#5268): a light kind is listed by its area (its own visibility), not here
+        raise ValueError(f"obj_visible_sql {kind}: a kind without a node is listed by its area")
     t = reg["table"]
     none = f"(SELECT id FROM {t} WHERE FALSE)"
     if not uid:
@@ -556,6 +581,8 @@ def obj_rows(c, uid, kind, where="", args=(), trash=False, limit=500):
     """[(row, role)] of the objects of kind uid sees (where: an extra condition on the table, alias o), newest change first.
     trash=True: the objects in the trash uid may restore. Every row is checked with obj_role (the SQL is the candidate set)."""
     reg = obj_reg(kind)
+    if not reg.get("node", True):  # 2.754.0 (#5268): see _visible_sql
+        raise ValueError(f"obj_rows {kind}: a kind without a node is listed by its area")
     t = reg["table"]
     if trash:  # the candidates: own private ones and those of uid's organisations (obj_role decides)
         ctx = acx_of(c, uid)

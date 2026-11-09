@@ -51,7 +51,7 @@
 .apb-books .apb-main{cursor:default}
 .apb-main span{overflow-wrap:anywhere}
 .apb-st{font-size:var(--fs-xs);color:var(--accent)}
-@media (max-width:40rem){.apb-hm .dpbtn{min-width:5.5rem}.apb-day .chkl{min-width:100%}}
+@media (max-width:599px){.apb-hm .dpbtn{min-width:5.5rem}.apb-day .chkl{min-width:100%}}
 /* 2.98.0 A (#1953): scheduling polls (polls.js): the list, the times of the form, one card per proposed time with its bar (yes
    in the accent, maybe lighter), the best / chosen time marked, the link row; phones: everything one column, large targets */
 .tpo-dlg .card{max-width:34rem}
@@ -86,7 +86,7 @@
 .tpo-on{display:flex;flex-direction:column;gap:.125rem;color:var(--text2);overflow-wrap:anywhere}
 .tpo-o .btn{align-self:flex-start;min-height:2.5rem}
 .tpo-dw{font-size:var(--fs-l);margin:.25rem 0}
-@media (max-width:40rem){.tpo-row{grid-template-columns:minmax(0,1fr) minmax(0,6rem) auto}.tpo-o .btn{align-self:stretch;justify-content:center}}
+@media (max-width:599px){.tpo-row{grid-template-columns:minmax(0,1fr) minmax(0,6rem) auto}.tpo-o .btn{align-self:stretch;justify-content:center}}
 
 /* 2.155.0 C (#2078): the calendar's year view; */
 .cyear{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1rem 1.25rem;padding:.5rem 0}

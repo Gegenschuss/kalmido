@@ -87,9 +87,10 @@ const FEAT = 'cal,comments,collab,time,progress,agents,kanban,timeline,fields,fa
     const order = JSON.parse(await ev(`JSON.stringify([...document.querySelectorAll('#view .trow')].map(r => +r.dataset.id))`));
     await ev(`(() => { openDetail(${order[1]}); return 1; })()`); await sleep(1000);
     const ty = await ev(`(() => { const r = document.querySelector('#d-title').getBoundingClientRect(); return Math.round(r.top + r.height / 2); })()`);
-    await swipe(300, 90, ty); await sleep(300);
+    // 2.754.0 (#5213): the next task snaps in first (swipenav.js), "3 of n" shows once it is open: waited for, not timed
+    await swipe(300, 90, ty);
+    for (let i = 0; i < 40 && !(await ev(`S.sel === ${order[2]} && !!document.querySelector('#dswpos.on')`)); i++) await sleep(100);
     const pos = await ev(`document.querySelector('#dswpos')?.textContent || ''`);
-    await sleep(500);
     check(await ev('S.sel') === order[2] && pos === `3 of ${order.length}`, `#1071: a swipe to the left opens the next task, "3 of n" shows (${pos})`);
     await swipe(90, 300, ty); await sleep(800);
     check(await ev('S.sel') === order[1], '#1071: a swipe to the right goes back');

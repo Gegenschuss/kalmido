@@ -8,3 +8,4 @@ openapi-spec-validator==0.9.0
 pillow==13.0.0
 pypdf==6.21.4
 vdirsyncer==0.19.3
+coverage==7.17.2  # #5298: tests/p2754_l_ci_test.py runs tools/cov_boot.py; the nightly coverage job of ci.yml pins the same version

@@ -464,8 +464,8 @@ document.addEventListener('click', async e => {
     case 'chat-bottom': chatBottom(); break;
     case 'job-do': jobDo(+a.dataset.jid, a.dataset.a); break;
     case 'jc-msg': jc_msg(+a.dataset.jid); break;  // 2.56.0 (#1791 / #1793): jobchat.js
-    case 'jc-open': jc_open(+a.dataset.aid, +a.dataset.jid); break;
-    case 'jc-back': jc_enter(S.chat.aid, null); break;
+    case 'jc-open': jc_open(+a.dataset.aid, +a.dataset.jid, a.dataset.from || null); break;  // #5222: from a job card
+    case 'jc-back': jc_back(); break;
     case 'prop-open': propOpen(+a.dataset.jid); break;  // 2.3.0
     case 'aiu-more': settingsModal('usage'); break;
     case 'ag-setup': agCreateGo(); break;  // 2.22.0 (#739); 2.366.0 (#2998): straight to creating one (the focus "agents" used to win over "Set up")

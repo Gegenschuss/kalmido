@@ -89,7 +89,7 @@
 .dc-due{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin:.5rem 0}
 .dc-ht{display:inline-flex;align-items:flex-start;gap:.375rem;flex:1 1 12rem;min-width:0}
 .dc-ht>svg,.dc-revt svg{flex:none}
-@media (max-width:600px){
+@media (max-width:599px){
   .dc-revact{flex:1 1 100%}
   .dc-revact .btn{flex:1 1 auto}
 }
@@ -201,7 +201,7 @@
 .pl-map { display: grid; grid-template-columns: 1fr auto 1fr; gap: .375rem; align-items: center; padding: .375rem 0; border-top: 1px solid var(--line, rgba(127,127,127,.2)); }
 .pl-map input:disabled { opacity: .5; }
 .pl-from { overflow-wrap: anywhere; }
-@media (max-width: 600px) {
+@media (max-width: 599px) {
   .pl-map { grid-template-columns: 1fr 1fr; }
   .pl-from { grid-column: 1 / -1; }
 }
@@ -315,7 +315,7 @@ body.pgdrag .dc-grid:not(.dc-selon) .dc-card:not(.dc-cur){content-visibility:aut
 .abrecog .linkbtn{margin-left:.25rem}
 .abdoc.rev{color:var(--accent)}
 .abdnav{flex-direction:row;flex-wrap:wrap;position:static;margin-bottom:.5rem}
-@media (max-width:640px){.abviewseg span{display:none}}
+@media (max-width:599px){.abviewseg span{display:none}}
 /* 2.540.0 (#4472): the toolbar of the documents: one height (--tb-h) for search, switch, filter, sort and buttons; the switch is framed once */
 .dc-bar{--bh:var(--tb-h)}
 .dc-bar .ctsearch,.dc-bar .btn,.dc-bar .iconbtn,.dc-bar .dc-up,.dc-bar .dc-sortb{min-height:var(--bh);height:var(--bh);box-sizing:border-box}

@@ -380,7 +380,7 @@ ul.ofdpick .ofcn{display:flex;flex-direction:column}
 .rktab th,.rktab td,.rkcftab th,.rkcftab td{padding:.5rem .5rem;border-bottom:1px solid var(--line2);text-align:left}
 .rktab .num,.rkcftab .num{text-align:right;white-space:nowrap}
 .rktab tfoot th,.rkcftab tfoot th{border-bottom:0}
-@media (max-width:600px) {
+@media (max-width:599px) {
   .rkits .rkit{flex-wrap:wrap}
   .rkits .rkit .ofcrow{flex-basis:calc(100% - 2.5rem)}
   .rkdatev{margin-left:2rem}
@@ -516,7 +516,7 @@ ul.ofdpick .ofcn{display:flex;flex-direction:column}
 .bk-pct{max-width:5rem}
 .bk-sname{margin:-.25rem 0 .25rem;font-size:var(--fs-s);overflow-wrap:anywhere}
 .bk-rec{min-height:1.25rem;margin:0 0 .25rem;font-size:var(--fs-s)}
-@media (max-width:600px) {
+@media (max-width:599px) {
   .bk-tab thead{display:none}
   .bk-tab tr{display:block;padding:.5rem 0;border-bottom:1px solid var(--line2)}
   .bk-tab th,.bk-tab td{display:flex;justify-content:space-between;border:0;padding:.125rem .25rem}
@@ -586,7 +586,7 @@ ul.ofdpick .ofcn{display:flex;flex-direction:column}
 .abo-notice{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem}
 .abo-notice input[type=number]{width:5.5rem}
 .abo-seats{display:flex;flex-wrap:wrap;gap:.25rem .75rem}
-@media (max-width:37.5rem){
+@media (max-width:599px){
   .abo-row{flex-direction:column;gap:0}
   .abo-row .abo-main{border-bottom-left-radius:0;border-bottom-right-radius:0}
   .abo-sw{min-height:2.75rem;border-top:0;border-top-left-radius:0;border-top-right-radius:0}
@@ -617,7 +617,7 @@ button.dun-hint:focus-visible{outline:.125rem solid var(--accent);outline-offset
 .rin-ph ul{margin:.25rem 0;padding-left:1rem}
 .rin-ph code{font-size:.9em}
 .rin-every{flex-wrap:wrap}
-@media (max-width:600px) {
+@media (max-width:599px) {
   .rin-acts{width:100%;justify-content:flex-end}
 }
 /* 2.92.0 A (#1925) */
@@ -747,7 +747,7 @@ button.dun-hint:focus-visible{outline:.125rem solid var(--accent);outline-offset
 .lgb-hlist{list-style:none;margin:.25rem 0;padding:0;display:flex;flex-direction:column;gap:.375rem;max-height:14rem;overflow:auto}
 .lgb-hlist li{display:flex;flex-direction:column;gap:.125rem;padding:.375rem .625rem;border-radius:var(--radius);background:var(--bg2);font-size:var(--fs-s)}
 .lgb-hlist small{color:var(--muted);overflow-wrap:anywhere}
-@media (max-width:40rem){
+@media (max-width:599px){
   .lgb-odo{grid-template-columns:1fr}
   .lgb-list .lgb-row{align-items:flex-start;padding:.625rem .75rem}
   .lgb-bar select{max-width:100%;flex:1 1 8rem}
@@ -841,7 +841,7 @@ button.dun-hint:focus-visible{outline:.125rem solid var(--accent);outline-offset
 .rki-dlg .card{max-height:90vh;overflow-y:auto}
 .fcirow .ofcn .rki-why{color:var(--muted);white-space:normal}
 .fcirow.warn .ofcn .rki-why{color:var(--accent)}
-@media (max-width:40rem){.rki-head select{flex:1 1 100%}.rki-row .ofcn{flex:1 1 calc(100% - 3.5rem)}}
+@media (max-width:599px){.rki-head select{flex:1 1 100%}.rki-row .ofcn{flex:1 1 calc(100% - 3.5rem)}}
 
 /* 2.97.0 B (#1951): the recipient from the client, read-only in the document head */
 .ofdgrid .row.cdnrec{align-items:flex-start;padding:.375rem 0}
@@ -905,7 +905,7 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .bwtab{margin-bottom:.75rem}
 .bwcset h4{margin:1.25rem 0 .5rem;font-size:var(--fs-m);font-weight:600}
 .bwclist li{display:flex;gap:.25rem}.bwclist input,.bwcadd input{flex:1;min-width:0;min-height:2.75rem}
-@media (max-width:37.5rem) {
+@media (max-width:599px) {
   .bwln{grid-template-columns:minmax(0,1fr) 4.75rem 2.75rem;grid-template-areas:"k r x" "g g g"}
   .bwln [data-bwl="kind"]{grid-area:k}.bwln [data-bwl="rate"]{grid-area:r}.bwln [data-bwl="gross"]{grid-area:g}.bwln .iconbtn{grid-area:x}
   .bwclist li,.bwcadd{flex-wrap:wrap}.bwclist input,.bwcadd input{flex-basis:100%}
@@ -990,7 +990,7 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .rcl-open{color:var(--muted)}
 .rcl-more{display:flex;justify-content:center;margin:.75rem 0}
 .rcl-more .btn{min-height:2.75rem;min-width:10rem}
-@media (max-width:600px) {
+@media (max-width:599px) {
   .rcl-grid{flex-direction:column;align-items:stretch}
   .rcl-f select,.rcl-q{width:100%}
   .rcl-f .seg{display:flex}
@@ -1029,7 +1029,7 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .lt-sigbox{min-height:3rem;display:flex;align-items:center}
 .lt-sigimg{max-width:15rem;max-height:5rem;background:#fff;border:1px solid var(--line2);border-radius:var(--radius);padding:.25rem}
 .lt-sigbtns{display:flex;gap:.5rem;align-items:center}
-@media (max-width:40rem){.lt-two{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:599px){.lt-two{grid-template-columns:minmax(0,1fr)}}
 /* 2.168.0 A (#2665): a document's project (editor, outside the locked fieldset) and a project page's documents */
 .dpjrow{margin-bottom:.5rem}
 .dpjrow select{max-width:100%}
@@ -1045,7 +1045,7 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .dpjk{display:inline-flex;align-items:center;gap:.375rem;min-width:7rem;color:var(--muted);font-size:var(--fs-s)}
 .dpjs{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-s)}
 .dpja{margin-left:auto;font-variant-numeric:tabular-nums;white-space:nowrap}
-@media (max-width:40rem){.dpjk{min-width:0}.dpjk span{display:none}}
+@media (max-width:599px){.dpjk{min-width:0}.dpjk span{display:none}}
 /* 2.537.0 C (#3433): tasks from a quotation (office_docproject.js otk_open): the preview with a tick per position */
 .otkrow{margin-top:.25rem}.otkrow .muted{font-size:var(--fs-s)}
 .otkdlg .card{max-width:48rem}
@@ -1110,7 +1110,7 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .orr-le{padding:.375rem .625rem;border-radius:var(--radius);background:var(--bg2);border:1px solid var(--line2)}
 .orr-le>summary{cursor:pointer;min-height:2rem;display:flex;flex-wrap:wrap;align-items:center;gap:.25rem .375rem}
 .orr-ld{margin:.375rem 0 0;padding-left:1.25rem;font-size:var(--fs-s)}
-@media (max-width:40rem){.orr-matrix{grid-template-columns:1fr}.orr-row select,.orr-lv-ro{width:auto;max-width:55%}.orr-pick,.orr-fixed{flex-basis:100%}}
+@media (max-width:599px){.orr-matrix{grid-template-columns:1fr}.orr-row select,.orr-lv-ro{width:auto;max-width:55%}.orr-pick,.orr-fixed{flex-basis:100%}}
 @media (pointer:coarse){.orr .orrsub button,.orr-pick>summary,.orr-opts .chkl,.orr-sp .chkl{min-height:2.75rem}}
 /* 2.224.0 B (#2816): the country card on a page that is not the office's first one: one slim line */
 .ocf-choose.ocf-slim{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;border-style:dashed;padding:.375rem .75rem;margin:0 0 .75rem}

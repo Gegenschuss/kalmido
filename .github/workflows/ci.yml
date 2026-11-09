@@ -231,6 +231,9 @@ jobs:
       # loaded it yet), and every var(--x) without a fallback is defined
       - name: Calls into modules loaded on demand are guarded, CSS variables defined
         run: python tools/check_lazy_calls.py -v
+      # 2.548.0 (#4511): a warning only (exit 0): CSS classes without a use, @media widths outside phone 599 / tablet 767
+      - name: CSS classes without a use, breakpoints (warning only)
+        run: python tools/check_css_classes.py
       - name: Server layers (module-level imports only from the own or a lower layer)
         run: python tools/check_layers.py -v
       # 2.521.0 (#4391): red only over a ceiling (decke_* in tools/perf_budget.json); the growth per package is measured by the train
@@ -250,6 +253,9 @@ jobs:
         run: python tools/check_singlefile.py
       - name: No unescaped value through tr() / trn() into HTML - trh() / trnh() (2.689.0, #5125)
         run: python tools/check_trh.py
+      # 2.754.0 (#5297): every ${} in an HTML template is escaped / a safe helper / marked; the old findings are the baseline
+      - name: Every ${} in an HTML template is escaped, new findings red (2.754.0, #5297)
+        run: python tools/check_innerhtml.py
       - name: Every table with people's data is exported or named (2.362.4, #3107)
         run: python tools/check_export_tables.py
       - name: Every new *_id column has a foreign key or a 'no FK' marker (2.755.0, #5261)
@@ -471,6 +477,56 @@ jobs:
           PWSH: powershell.exe
         run: python tests/p2609_d_winlauncher_test.py
 
+  trivy:
+    # #5300 (Profi-Bewertung F18, decision 08.11.2026): Trivy scans the app image (Debian packages of the base image and the
+    # Python packages in it), reporting only - no gate: findings rated HIGH / CRITICAL go into the job summary
+    # (tools/scan_summary.py), the full JSON report is an artifact. continue-on-error on the job: a red scan or a missing
+    # vulnerability database never turns the run of "CI" red. Trivy runs as its pinned image (tag + digest), no
+    # third-party action. The image of the job "image" (same key) when it is in the cache, else built here like ZAP does.
+    name: Trivy image scan (reporting only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Image key
+        id: imgkey
+        run: echo "key=kalmido-image-$(date -u +%G-%V)-${{ hashFiles('Dockerfile', 'tools/requirements.lock', 'tools/requirements.static.lock', 'app.py', 'VERSION', 'kalmido/**', 'static/**', 'folderwatch/**') }}" >> "$GITHUB_OUTPUT"
+      - name: Image cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        continue-on-error: true
+        with:
+          path: /tmp/kalmido-image
+          key: ${{ steps.imgkey.outputs.key }}
+      - name: Image (from the cache, build on miss)
+        run: |
+          mkdir -p /tmp/kalmido-image
+          if [ -s /tmp/kalmido-image/kalmido-test.tar ]; then
+            echo "image from the cache"
+          else
+            echo "image not in the cache - building it"
+            docker build -t kalmido:test .
+            docker save -o /tmp/kalmido-image/kalmido-test.tar kalmido:test
+          fi
+      - name: Trivy scan (HIGH, CRITICAL)
+        run: |
+          mkdir -p "$RUNNER_TEMP/trivy"
+          docker run --rm -v /tmp/kalmido-image:/img:ro -v "$RUNNER_TEMP/trivy:/out" \
+            aquasec/trivy:0.76.2@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb \
+            image --input /img/kalmido-test.tar --scanners vuln --severity HIGH,CRITICAL --exit-code 0 \
+            --format json --output /out/trivy.json
+      - name: Findings high / critical (job summary)
+        if: always()
+        run: python3 tools/scan_summary.py trivy "$RUNNER_TEMP/trivy/trivy.json" >> "$GITHUB_STEP_SUMMARY"
+      - name: Trivy report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: trivy-report
+          path: ${{ runner.temp }}/trivy
+          if-no-files-found: ignore
+          retention-days: 30
+
   semgrep:
     # 2.543.0 (#4625): red for NEW findings only (2.755.0, #5296: plus the own rule .semgrep/sql_ident.yml, qi()). The known, reviewed findings stand in tools/semgrep_baseline.json (rule, file,
     # code line, reason, date; SECURITY.md "Scanner exception lists"); tools/semgrep_baseline.py compares the JSON output
@@ -548,6 +604,17 @@ jobs:
       # 2.501.0 (#4296): without Firefox every suite with a browser part is red (tests/ff.js): say why at once, not suite by suite
       - name: Firefox is there
         run: firefox --version || { echo "::error title=no Firefox::the runner image has no firefox, the UI suites cannot run"; exit 1; }
+      # #5298 (Profi-Bewertung F14): the nightly full run (and a full run by hand) measures the server's coverage - the server
+      # of every test container runs under tools/cov_boot.py (tests/start.sh, KALMIDO_TEST_COVERAGE), the image stays as it
+      # is. Not on the release push: its shards stay as fast as before. The job "coverage" combines the shards' data.
+      - name: Coverage tools (nightly full run)
+        if: needs.plan.outputs.stage == 'full' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+        run: |
+          # the target folder as PIP_TARGET: tools/pins.py reads every word after "pip install" as a pinned package
+          PIP_TARGET="$RUNNER_TEMP/cov/lib" pip install coverage==7.17.2
+          cp tools/cov_boot.py "$RUNNER_TEMP/cov/lib/"
+          mkdir -p "$RUNNER_TEMP/cov/data"
+          echo "KALMIDO_TEST_COVERAGE=$RUNNER_TEMP/cov" >> "$GITHUB_ENV"
       - name: Run all suites
         env:
           TZ: Europe/Berlin
@@ -580,6 +647,65 @@ jobs:
       - name: Container log on failure
         if: failure()
         run: docker logs kalmido-test 2>&1 | tail -100 || true
+      - name: Coverage data of this shard (the last container stops first and writes its data)
+        if: always() && env.KALMIDO_TEST_COVERAGE != ''
+        run: |
+          docker stop -t 5 kalmido-test >/dev/null 2>&1 || true
+          ls "$KALMIDO_TEST_COVERAGE/data" | wc -l
+      - name: Coverage data
+        if: always() && env.KALMIDO_TEST_COVERAGE != ''
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: coverage-shard-${{ matrix.shard }}
+          path: ${{ env.KALMIDO_TEST_COVERAGE }}/data
+          include-hidden-files: true  # the data files are .coverage.<host>.<pid>.<random>
+          if-no-files-found: ignore
+          retention-days: 7
+
+  coverage:
+    # #5298 (Profi-Bewertung F14, decision 08.11.2026): the server coverage of the nightly full run, no gate. The data files of
+    # all shards are combined; the job summary shows the figure and the modules without any coverage (tools/coverage_summary.py),
+    # the HTML report, the JSON report and the zero list are the artifact coverage-report. The data paths are /app/... (the
+    # container); /app points at the checkout here, so the report finds the sources. continue-on-error: a missing or broken
+    # measurement never turns the run red.
+    name: Test coverage (server, reporting only)
+    needs: [plan, tests]
+    if: always() && needs.plan.outputs.stage == 'full' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+      - name: Coverage tool
+        run: pip install coverage==7.17.2
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: coverage-shard-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/covdata
+      - name: Combine and report
+        run: |
+          sudo ln -sfn "$GITHUB_WORKSPACE" /app
+          mkdir -p "$RUNNER_TEMP/covreport"
+          export COVERAGE_FILE="$RUNNER_TEMP/covreport/.coverage"
+          ls -A "$RUNNER_TEMP/covdata" | wc -l
+          coverage combine "$RUNNER_TEMP/covdata" || true
+          coverage json -o "$RUNNER_TEMP/covreport/coverage.json" || true
+          coverage html -d "$RUNNER_TEMP/covreport/html" || true
+          coverage report --sort=cover > "$RUNNER_TEMP/covreport/report.txt" || true
+          python3 tools/coverage_summary.py "$RUNNER_TEMP/covreport/coverage.json" \
+            --zero-out "$RUNNER_TEMP/covreport/zero-coverage.txt" >> "$GITHUB_STEP_SUMMARY"
+      - name: Coverage report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: coverage-report
+          path: ${{ runner.temp }}/covreport
+          if-no-files-found: ignore
+          retention-days: 30
 
   # #4006: the checks einreihen makes before a package lands, on the commits of a pull request / merge queue entry
   # (tools/pr_lint.py): #<task> in every commit subject, the changelog part of an app change, the privacy guard (patterns

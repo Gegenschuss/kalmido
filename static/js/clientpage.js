@@ -93,7 +93,11 @@ function oim_link(area, empty, csv) {
 function ms_clView() {
   if (MSC.ws !== undefined && MSC.ws !== (typeof wsCur === 'function' ? wsCur() : 'all')) ms_clDirty();
   MSC.ws = typeof wsCur === 'function' ? wsCur() : 'all';
-  if (S.route.client === 'mailhub' && typeof hbm_hubView === 'function') return hbm_hubView();  // 2.84.0 A (#1198)
+  if (S.route.client === 'mailhub' && typeof hbm_hubView === 'function') {  // 2.84.0 A (#1198)
+    const r = S.route;  // 2.754.0 (#5268): mailhub/<id> (the core's open_url of a filed e-mail) opens its reading view once
+    if (r.mail && !r.mailShown && typeof hbm_open === 'function') { r.mailShown = true; setTimeout(() => hbm_open(r.mail, 'inbox:0'), 0); }
+    return hbm_hubView();
+  }
   if (MSC.items === null && !MSC.loading) setTimeout(ms_clLoad, 0);
   const id = S.route.client || null, mob = isMobile();
   if (id && (!CLV.data || CLV.id !== id) && !CLV.loading) setTimeout(clLoad, 0);

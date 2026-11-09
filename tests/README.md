@@ -178,6 +178,16 @@ The container runs as your own user (`--user $(id -u):$(id -g)`), so the tests c
 the stub logs in the data dir. It gets `KALMIDO_UPDATE_CHECK=0` (no requests to GitHub) and a stub ntfy
 server inside the container that logs every push to `.data/ntfy.log`.
 
+## Coverage (#5298)
+
+The nightly full CI run (and a full run started by hand) measures which lines of the server ran during the suites: with
+`KALMIDO_TEST_COVERAGE=<folder>` `tests/start.sh` starts the server of the test container under `tools/cov_boot.py`
+(coverage from `<folder>/lib`, data into `<folder>/data`; the image itself is unchanged). The job "Test coverage" of
+`ci.yml` combines the data of all shards; its job summary shows the figure and the modules without any coverage
+(`tools/coverage_summary.py`), the artifact `coverage-report` holds the HTML report and the zero list. No gate - the
+figure is a floor (containers ended with `docker rm -f` lose their last seconds, isolated sub-processes are not
+measured). The release push and the pushes on main run without it, so their shards keep their times.
+
 ## Writing tests
 
 - Keep them black-box: HTTP API or the real UI in jsdom. Reading the SQLite file directly is fine for

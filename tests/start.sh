@@ -23,6 +23,8 @@
 #                           The container always gets KALMIDO_TEST=1, without it the app ignores KALMIDO_TEST_NOW
 #   KALMIDO_LOGIN_SLOW_S    2.282.0 (#3111): delay of sign-ins above the address limit (default 0.3 here, the app: 2.5)
 #   KALMIDO_NOTIF_TEMPLATE  notification template of a share without one (default all here: the suites before 2.33 expect every push; the app itself starts with read)
+#   KALMIDO_TEST_COVERAGE   #5298: a host folder with lib/ (coverage + tools/cov_boot.py) and data/ = the server runs under
+#                           coverage (tools/cov_boot.py), its data files land in data/ (the full CI run; default unset: not measured)
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 IMG=${KALMIDO_TEST_IMAGE:-kalmido:test}
@@ -31,6 +33,8 @@ PORT=${KALMIDO_TEST_PORT:-3048}
 PPORT=${KALMIDO_TEST_PROXY_PORT:-3041}
 D=${1:-${KALMIDO_TEST_DATA:-$HERE/.data}}
 # 2.138.4: stop the old container first - it may still write attachments while the data dir is removed (CI shard 15 race)
+# #5298: under coverage a stop first (SIGTERM: tools/cov_boot.py writes its last data), then the removal as before
+[[ -z "${KALMIDO_TEST_COVERAGE:-}" ]] || docker stop -t 5 "$NAME" >/dev/null 2>&1 || true
 docker rm -f "$NAME" >/dev/null 2>&1 || true
 [[ -n "${KEEP:-}" ]] || { rm -rf "$D"; }
 mkdir -p "$D"
@@ -83,6 +87,12 @@ TNOW=(-e KALMIDO_TEST=1)
 # 2.235.0 A (#2891): a new agent of the test container has no control level (works as before); the control suites ask for approve_all
 TNOW+=(-e "KALMIDO_AGENT_CONTROL_NEW=${KALMIDO_AGENT_CONTROL_NEW:-legacy}")
 [[ -z "${KALMIDO_TEST_NOW:-}" ]] || TNOW+=(-e "KALMIDO_TEST_NOW=$KALMIDO_TEST_NOW" -e "KALMIDO_TEST_NOW_AT=${KALMIDO_TEST_NOW_AT:-$(date +%s)}")
+# #5298: the server under coverage (tools/cov_boot.py instead of the image's "python app.py"), nothing changes in the image
+COV=()
+if [[ -n "${KALMIDO_TEST_COVERAGE:-}" ]]; then
+  mkdir -p "$KALMIDO_TEST_COVERAGE/data"
+  COV=(-v "$KALMIDO_TEST_COVERAGE/lib:/cov/lib:ro" -v "$KALMIDO_TEST_COVERAGE/data:/cov/data" -e PYTHONPATH=/cov/lib)
+fi
 # shellcheck disable=SC2086
 docker run -d --name "$NAME" --network bridge --user "$(id -u):$(id -g)" --security-opt no-new-privileges:true --cap-drop ALL \
   --read-only --tmpfs /tmp \
@@ -91,7 +101,7 @@ docker run -d --name "$NAME" --network bridge --user "$(id -u):$(id -g)" --secur
   -e AUTH_PROXY_HEADER=Remote-User -e AUTH_TRUSTED_PROXIES="$GW" -e AUTH_PROXY_PORT=3045 \
   -e KALMIDO_SETUP_CODE="${KALMIDO_SETUP_CODE-off}" -e KALMIDO_NO_SECRET_KEY="${KALMIDO_NO_SECRET_KEY-1}" -e KALMIDO_SECRET_KEY_CHANGED="${KALMIDO_SECRET_KEY_CHANGED-1}" \
   -e KALMIDO_UPDATE_CHECK=0 -e KALMIDO_ONBOARDING="${KALMIDO_ONBOARDING:-0}" -e KALMIDO_ADMIN_ALERTS="${KALMIDO_ADMIN_ALERTS:-0}" -e KALMIDO_TEST_TIMING_ALL="${KALMIDO_TEST_TIMING_ALL-1}" -e NTFY_URL=http://127.0.0.1:9999 -e TASKS_PUSH_GAP=3 -e KALMIDO_QUIET_PUSH=${KALMIDO_QUIET_PUSH:-0} -e KALMIDO_PUSH_BUNDLE=${KALMIDO_PUSH_BUNDLE:-0} -e TASKS_WATCHDOG_INTERVAL=1 -e KALMIDO_WD_SLOW_S=${KALMIDO_WD_SLOW_S:-0} -e KALMIDO_TIDY_QUIET_S=${KALMIDO_TIDY_QUIET_S:-0} -e KALMIDO_LOGIN_SLOW_S=${KALMIDO_LOGIN_SLOW_S:-0.3} -e KALMIDO_NOTIF_TEMPLATE=${KALMIDO_NOTIF_TEMPLATE:-all} -e TASKS_MAX_FILE_MB=1 \
-  -p "127.0.0.1:$PPORT:3045" -p "127.0.0.1:$PORT:3040" -v "$D":/data ${EXTRA:-} "$IMG" 2>&1 >/dev/null | { grep -v "Links on the default bridge" >&2 || true; }
+  -p "127.0.0.1:$PPORT:3045" -p "127.0.0.1:$PORT:3040" -v "$D":/data ${COV[@]+"${COV[@]}"} ${EXTRA:-} "$IMG" ${KALMIDO_TEST_COVERAGE:+python /cov/lib/cov_boot.py} 2>&1 >/dev/null | { grep -v "Links on the default bridge" >&2 || true; }
 [[ ${PIPESTATUS[0]} -eq 0 ]] || exit 1  # (the --link deprecation warning is noise here)
 # START_WAIT_S (#3506): an upgrade from an old dump runs every migration at the first start - it may take longer than 30 s
 for _ in $(seq 1 $(( ${START_WAIT_S:-30} * 2 ))); do

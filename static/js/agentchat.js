@@ -52,7 +52,7 @@ function chatOpen(aid, o = {}) {
   if (fl) chatFloatPlace(p); else p.style.left = p.style.top = p.style.right = p.style.bottom = '';
   p.classList.remove('hidden'); fitLayout(); chatDraw(); chatFabDraw(); chatLoad().then(() => $('#chat-in')?.focus());
 }
-function chatClose() { if (S.chat.job && chatFull()) { jc_enter(S.chat.aid, null); return; }  // 2.56.0 (#1793): Back leaves a job's history first
+function chatClose() { if (S.chat.job && chatFull()) { jc_back(); return; }  // 2.56.0 (#1793): Back leaves a job's history first; #5222: from a job card the chat
   chs_save($('#chat-msgs'));  // 2.380 F (#3381): the place as left
   if (typeof jc_hist === 'function') jc_hist(false, !(S.route.mod === 'agents' && S.route.agent));  // 2.152.8 (#2711)
   if (typeof cw_reset === 'function') cw_reset(); S.chat = {aid: null, msgs: [], err: null}; $('#achat')?.classList.add('hidden'); document.body.classList.remove('chat-open', 'chat-float'); fitLayout(); chatFabDraw(); if (S.route.mod === 'agents' && S.route.agent) { const b = S.chatBack; S.chatBack = null; navUp(b || 'agents'); } }  // 2.743.0 (#5235): navUp
@@ -889,7 +889,7 @@ function jobStepsBodyHtml(jid) {
 }
 function jobStepsHtml(jid, n) {
   const open = jobOpenIs(jid);
-  return `<details class="jobv" data-jv="${jid}"${open ? ' open' : ''}><summary>${esc(tr('History'))} <span class="muted">${n}</span></summary>${open ? jobStepsBodyHtml(jid) : ''}</details>`;
+  return `<details class="jobv" data-jv="${jid}"${open ? ' open' : ''}><summary>${esc(tr('History'))} <span class="muted">${n}</span></summary>${/*html-ok*/ open ? jobStepsBodyHtml(jid) : ''}</details>`;
 }
 function jobStepsBody(jid, d) {
   const rows = (d.steps || []).map(x => x.heading ? `<div class="jvh"><time>${esc(chatHM(x.at))}</time><b>${esc(x.text)}</b></div>` : `<div class="jvs">${esc(x.text)}</div>`).join('');
@@ -997,7 +997,7 @@ function chatInner(aid) {
     ${chatStepsLiveHtml()}
     <div class="mtgcards" id="chat-mtg">${mtg_cardsHtml(a.id)}</div>
     <div class="cfiles chfiles" id="chat-files">${chatFilesHtml(a.id)}</div>
-    <div class="acsug" id="chat-sug" hidden></div>${replyBarHtml('a:' + a.id)}<div class="chcomp${acc}">${chToolsHtml([`<button type="button" class="iconbtn chclip" data-act="chat-attach" title="${esc(tr('Attach images or files'))}" aria-label="${esc(tr('Attach images or files'))}" ${a.enabled ? '' : 'disabled'}>${ic('clip')}</button>`, mtg_btnHtml(a), typeof rf_btnHtml === 'function' ? rf_btnHtml('chat-in', !a.enabled || jc_ended()) : '' /* 2.147.1 A (#2523) */])/* 2.213.0 (#2788): phones: one plus menu */}<input type="file" id="chat-file" multiple hidden><textarea id="chat-in" rows="1" enterkeyhint="enter" placeholder="${esc(jc_ph(a))}" aria-label="${esc(jc_ph(a))}" ${a.enabled && !jc_ended() ? '' : 'disabled'}>${esc(S.drafts['chat:' + a.id] || '')}</textarea><span class="muted chkh">${esc(chatKeyHintVis())}</span><button class="btn sm pri" data-act="chat-send" title="${esc(chatKeyHint())}" aria-label="${esc(tr('Send'))}" ${a.enabled ? '' : 'disabled'}>${ic('send', 's')}<span>${tr('Send')}</span></button></div>`;
+    <div class="acsug" id="chat-sug" hidden></div>${replyBarHtml('a:' + a.id)}<div class="chcomp${acc}">${/*html-ok*/ chToolsHtml([`<button type="button" class="iconbtn chclip" data-act="chat-attach" title="${esc(tr('Attach images or files'))}" aria-label="${esc(tr('Attach images or files'))}" ${a.enabled ? '' : 'disabled'}>${ic('clip')}</button>`, mtg_btnHtml(a), typeof rf_btnHtml === 'function' ? rf_btnHtml('chat-in', !a.enabled) : '' /* 2.147.1 A (#2523) */])/* 2.213.0 (#2788): phones: one plus menu */}<input type="file" id="chat-file" multiple hidden><textarea id="chat-in" rows="1" enterkeyhint="enter" placeholder="${esc(jc_ph(a))}" aria-label="${esc(jc_ph(a))}" ${a.enabled ? '' : 'disabled'}>${esc(S.drafts['chat:' + a.id] || '')}</textarea><span class="muted chkh">${esc(chatKeyHintVis())}</span><button class="btn sm pri" data-act="chat-send" title="${esc(chatKeyHint())}" aria-label="${esc(tr('Send'))}" ${a.enabled ? '' : 'disabled'}>${ic('send', 's')}<span>${tr('Send')}</span></button></div>`;
 }
 function chatViewHtml(aid) {
   if (S.chat.aid !== +aid) { S.chat = {aid: +aid, msgs: [], err: null}; setTimeout(chatLoad, 0); }
@@ -1044,7 +1044,7 @@ function chatPatch(o = {}) {
   else if (o.keep) box.scrollTop = top + box.scrollHeight - h;
   else if (near || o.bottom) { box.scrollTop = box.scrollHeight; chatNewPill(false); S.chat.pin = true; chs_save(box); }
   else { if (box.scrollTop !== top) box.scrollTop = top; if (last && nl > last && ms.some(m => m.id > last && m.from === 'agent' && m.kind !== 'notice' && !jcd_hidden(m))) chatNewPill(true); }
-  const on = !!a?.enabled && !jc_ended(), ci = $('#chat-in'),  /* 2.56.0 (#1793): an ended job's history: box off */ sb = ci?.closest('.chcomp')?.querySelector('[data-act="chat-send"]') || $('[data-act="chat-send"]');  // paused / resumed: the same box; 2.47.1 (#1720): the live window's button
+  const on = !!a?.enabled, ci = $('#chat-in'),  /* 2.754.0 (#5222): an ended job's box stays on, a message wakes it (#1456) */ sb = ci?.closest('.chcomp')?.querySelector('[data-act="chat-send"]') || $('[data-act="chat-send"]');  // paused / resumed: the same box; 2.47.1 (#1720): the live window's button
   if (ci && ci.disabled === on) ci.disabled = !on;
   if (sb && sb.disabled === on && !S.chat.sending) sb.disabled = !on;
   jc_patch();  // 2.56.0 (#1793)

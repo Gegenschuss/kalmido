@@ -50,6 +50,7 @@ from .errors import BadInput, UnknownFields
 from .i18n import N_, tr
 from .objhooks import OBJ  # 2.773.0 (#5292): obj_trash_tick
 from .objects import OBJ_COLS, obj_need, obj_node_follow, obj_public, obj_reg, obj_row, obj_title, obj_forget
+from .objects import obj_reg_node  # 2.754.0 (#5268): the write paths refuse a light kind
 from .pg import qi, system_ctx, table_columns, ts_canon, write_lock  # 2.755.0 (#5296): qi; 2.760.0 (#5311): ts_canon
 from .retention import ret_due, ret_on, ret_report, ret_trash_cut  # 2.773.0 (#5292): the trash's retention run
 from ..collab.comments import user_names
@@ -127,7 +128,7 @@ def _area(reg):
 
 def obj_touch(c, uid, kind, rid):
     """The object changed (a write path of its own): rev+1, updated_at, updated_by and the area counter (bump)."""
-    reg = obj_reg(kind)
+    reg = obj_reg_node(kind)  # 2.754.0 (#5268): not a light kind
     ts = _now()
     c.execute(f"UPDATE {reg['table']} SET rev=rev+1, updated_at=?, updated_by=? WHERE id=?", (ts, uid, int(rid)))
     bump(c, _area(reg))
@@ -226,7 +227,7 @@ def obj_create(c, uid, kind, vals, org_id=None):
     """A new object of kind in uid's private space (org_id None) or organisation org_id (a member / admin). Agents make
     nothing (403, docs/AGENTS.md: creating stays with people; review F4). vals: the kind's fields (the cleaners; unknown =
     400). Returns the row."""
-    reg = obj_reg(kind)
+    reg = obj_reg_node(kind)  # 2.754.0 (#5268)
     if reg["feat"]:
         need_feat(reg["feat"])
     if acx_of(c, uid).role == "agent":
@@ -254,7 +255,7 @@ def obj_create(c, uid, kind, vals, org_id=None):
 
 def obj_write(c, uid, kind, rid, b, expect=None):
     """Change the fields of the object sent in b (module docstring). Returns (row, {field: (before, after)})."""
-    reg = obj_reg(kind)
+    reg = obj_reg_node(kind)  # 2.754.0 (#5268)
     obj_need(c, uid, kind, rid, "write")
     write_lock(c, f"obj-{kind}-{int(rid)}")
     row = c.execute(f"SELECT * FROM {reg['table']} WHERE id=? FOR UPDATE", (int(rid),)).fetchone()
@@ -299,7 +300,7 @@ def obj_space_set(c, uid, kind, rid, org_id):
     (accounts/orgout.py org_out: logged, News to the other admins). An object whose reference node carries shares is refused
     (409): they were made for the old workspace (the owner takes them back first). rev+1, updated_at, the history ('move', the
     org_id before / after), the reference node follows (objects.obj_node_follow), bump. Returns (row, moved). The caller commits."""
-    reg = obj_reg(kind)
+    reg = obj_reg_node(kind)  # 2.754.0 (#5268)
     obj_need(c, uid, kind, rid, "manage")
     if obj_is_agent(c, uid):
         raise Denied(403)
@@ -397,7 +398,7 @@ def _trash_step(c, uid, kind, rid, oid, op):
 def obj_trash(c, uid, kind, rid, step=True):
     """Into the trash (deleted_at): restorable by who manages it (obj_restore). 2.773.0 (#5292): THE trash of the core -- its
     children go with it (obj_register children) and the step can be taken back (step=False: the undo itself)."""
-    reg = obj_reg(kind)
+    reg = obj_reg_node(kind)  # 2.754.0 (#5268): a light kind has no write path of the core
     row, _ = obj_need(c, uid, kind, rid, _trash_need(reg))
     write_lock(c, f"obj-{kind}-{int(rid)}")
     ts = _now()
@@ -419,7 +420,7 @@ def obj_trash(c, uid, kind, rid, step=True):
 
 def obj_restore(c, uid, kind, rid, step=True):
     """Out of the trash ('manage'), with the children that went with it. step=False: the undo itself."""
-    reg = obj_reg(kind)
+    reg = obj_reg_node(kind)  # 2.754.0 (#5268)
     row, _ = obj_need(c, uid, kind, rid, "manage", trash=True)
     write_lock(c, f"obj-{kind}-{int(rid)}")
     # 2.760.0 (#5311): the node's deleted_at is TEXT, the object's may be TIMESTAMPTZ (read canonically, pg.py ts_canon):
@@ -445,7 +446,7 @@ def obj_restore(c, uid, kind, rid, step=True):
 def obj_purge(c, uid, kind, rid):
     """Delete for good: only an object in the trash ('manage'; 409 otherwise). Its node, history, undo steps, revoked
     shares and children go with it (_purge_rows)."""
-    reg = obj_reg(kind)
+    reg = obj_reg_node(kind)  # 2.754.0 (#5268)
     row = obj_row(c, kind, rid)
     if row is not None and not row["deleted_at"]:
         obj_need(c, uid, kind, rid, "manage")
@@ -459,7 +460,7 @@ def obj_purge(c, uid, kind, rid):
 
 def obj_trash_due(c, kind, cut=None):
     """2.773.0 (#5292): the ids of the kind's objects in the trash longer than the trash period (core/retention.py ret_trash_cut)."""
-    reg = obj_reg(kind)
+    reg = obj_reg_node(kind)  # 2.754.0 (#5268): a light kind has no trash of the core
     t = reg["table"]
     with system_ctx(c):  # the retention run reads every workspace's trash (ids only, no content)
         return [r[0] for r in c.execute(f"SELECT id FROM {qi(t, (t,))} WHERE {trash_sql()} AND deleted_at<? ORDER BY id",
@@ -470,7 +471,7 @@ def obj_trash_prune(c, kind, cut=None, purge=None, ids=None):
     """2.773.0 (#5292): THE retention run of a core kind -- its objects in the trash longer than the trash period are deleted
     for good the same way as obj_purge (_purge_rows), with the switch of every run (ret_on("trash"); off = count only) and its
     report (ret_report run obj_<kind>). ids: read already by the caller. Returns their number; the caller commits."""
-    reg = obj_reg(kind)
+    reg = obj_reg_node(kind)  # 2.754.0 (#5268): a light kind has no trash of the core
     purge = ret_on("trash") if purge is None else bool(purge)
     old = obj_trash_due(c, kind, cut) if ids is None else [int(x) for x in ids]
     if old and purge:

@@ -34,7 +34,7 @@
 .aiuch .muted{font-size:var(--fs-xs)}
 .aiucr{display:flex;align-items:center;gap:.5rem;font-size:var(--fs-s)}
 .aiucr .n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-@media (max-width:640px) {
+@media (max-width:599px) {
   .aiut{grid-template-columns:minmax(0,1fr) 3.5rem 4rem}
 }
 .audctl{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin-bottom:.5rem}
@@ -57,7 +57,7 @@
 .audd{grid-area:d;text-align:right;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
 .audr.den{background:color-mix(in srgb,var(--danger) 7%,transparent);box-shadow:inset .1875rem 0 0 var(--danger)}
 .audr.audh .auds,.audr.audh .audd{text-align:right}
-@media (max-width:640px) {
+@media (max-width:599px) {
   .audr{grid-template-columns:minmax(0,1fr) auto auto;grid-template-areas:"t a s" "r r r" "i i d";gap:.125rem .5rem;padding:.4375rem .5rem}
   .audr.audh{display:none}
   .auda{text-align:right;font-weight:600}
@@ -229,7 +229,7 @@ button.chmode:hover{color:var(--text);border-color:var(--muted)}
   .jobv>summary{padding:.625rem 0}
   .chstepon{min-height:2.75rem}
 }
-@media (max-width:37.5rem) {
+@media (max-width:599px) {
   .chnm b{flex:none;max-width:45%}
   .chnm .chmode{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
 }
@@ -237,7 +237,7 @@ button.chmode:hover{color:var(--text);border-color:var(--muted)}
   .chnm .chring{width:2.75rem;height:2.75rem;margin:-.75rem -1rem -.75rem 0}
   .chnm .chring::after{inset:0}
 }
-@media (max-width:37.5rem) {
+@media (max-width:599px) {
   .chmode[data-short] .pmlong{display:none}
   .chmode[data-short]::before{content:attr(data-short)}
   .chnm .chmode[data-short]{flex:none}
@@ -267,7 +267,7 @@ button.chmode:hover{color:var(--text);border-color:var(--muted)}
   .chnm .chring{margin:-.75rem 0}
   .chnm .ib:not(.chring){margin:0 .6875rem}
 }
-@media (pointer:coarse) and (max-width:37.5rem) {
+@media (pointer:coarse) and (max-width:599px) {
   .chath .chn{display:grid;grid-template-columns:auto auto auto minmax(0,1fr);align-items:center;row-gap:.25rem}
   .chath .chnm{display:contents}
   .chath .chnm b{grid-row:1;grid-column:1;min-width:3rem;max-width:none}
@@ -290,13 +290,13 @@ button.chmode .pmlong::after{content:"\a0\25BE";font-size:.75em}
   button.chmode,.chnm button.chmode{min-height:0;min-width:2.75rem;padding:0}
   button.chmode::after{height:2.75rem}
 }
-@media (max-width:37.5rem) {
+@media (max-width:599px) {
   .chnm .chmode{overflow:visible}
   .chmode[data-short]::before{content:"·\a0\a0" attr(data-short)}
   button.chmode[data-short]::before{content:"·\a0\a0" attr(data-short) "\a0\25BE"}
   .chnm button.chmode[data-short]{padding:0}
 }
-@media (pointer:coarse) and (max-width:37.5rem) {
+@media (pointer:coarse) and (max-width:599px) {
   .chath .chn{row-gap:.625rem}
   .chath .chnm .chmode,.chath .chnm .chmode[data-short]{margin:0 .5rem 0 .125rem}
   .chath .chmode[data-short]::before{content:attr(data-short)}
@@ -315,7 +315,7 @@ button.chmode .pmlong::after{content:"\a0\25BE";font-size:.75em}
 @media (pointer:coarse) {
   .cmeta .cedited{min-height:2.75rem;margin:-.625rem 0}
 }
-@media not all and (pointer:coarse) and (max-width:37.5rem) {
+@media not all and (pointer:coarse) and (max-width:599px) {
   .chath .chn{flex-direction:row;flex-wrap:wrap;align-items:center;column-gap:0;row-gap:.0625rem}
   .chath .chnm{display:contents}
   .chath .chnm b{flex:0 1 auto;min-width:3rem;max-width:none}
@@ -325,7 +325,7 @@ button.chmode .pmlong::after{content:"\a0\25BE";font-size:.75em}
   .chath .chl2{order:4;flex:1 1 0;min-width:0}
   .chath .chn:has(.chmode) .chl2::before{content:"\b7";color:var(--muted)}
 }
-@media not all and (pointer:coarse) and (max-width:37.5rem) { @media (max-width:37.5rem) {
+@media not all and (pointer:coarse) and (max-width:599px) { @media (max-width:599px) {
   .chath .chnm .chmode[data-short]::before{content:attr(data-short)}
   .chath .chnm button.chmode[data-short]::before{content:attr(data-short) "\a0\25BE"}
 }}
@@ -334,7 +334,7 @@ button.chmode .pmlong::after{content:"\a0\25BE";font-size:.75em}
 .ainsbar{gap:.5rem;align-items:center}
 .ainsm .n small{display:block;overflow:hidden;text-overflow:ellipsis}
 .ainsm .n{white-space:normal}
-@media (max-width:600px) {
+@media (max-width:599px) {
   .ainsm .btn{width:100%;justify-content:center}
 }
 .ainsun{margin:.5rem 0;padding:.5rem .625rem;background:var(--bg3);border-radius:var(--radius)}

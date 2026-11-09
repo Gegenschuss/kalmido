@@ -48,7 +48,8 @@ migrates itself.
 
 - Every push runs the automated test suite in CI (API, UI and a security regression suite that replays
   every finding of the last review), plus `bandit`, `pip-audit` on the hashed lock files of the image and the embedding service, `semgrep` and an
-  OWASP ZAP baseline scan.
+  OWASP ZAP baseline scan. CodeQL (Python, JavaScript; own workflow on every push to main and weekly) and a Trivy scan
+  of the app image report their high / critical findings in the job summary - reporting only, no gate yet (#5300).
 - Before 1.0.0 an independent AI security review (a separate agent, black-box testing plus code review) was
   run; all findings were fixed and re-verified (see CHANGELOG.md).
 - There has been **no independent human security audit** yet. Reviews are very welcome.

@@ -15,7 +15,7 @@ An agent with the data lock "Private e-mails" (the default) reads no mail of a p
 Anything else answers 404 (also another organisation's mail). Kid accounts get 403 (as in the app).
 The answer has no addresses for the client / project, no write flags and no file ids to download (the attachments' names,
 sizes and types only). No event "new mail filed" in this step (decision 30.10.2026)."""
-from flask import g, jsonify
+from flask import g, has_request_context, jsonify
 
 from ..core.config import app
 from ..core.access import Denied, list_role, token_lists
@@ -32,9 +32,18 @@ HMV_LIMIT, HMV_LIMIT_MAX = 100, 500  # like api/v1.py API_PAGE_DEFAULT / API_PAG
 HMV_DROP = ("mine", "can_write", "folder_id", "eml_id", "note")
 
 
-def _hmv_agent():
-    """The token's user is an agent (like agents.core.is_agent; no import upwards from this layer)."""
-    return (g.user["kind"] or "user") == "agent"
+def _hmv_agent(c=None, uid=None):
+    """The token's user is an agent (like agents.core.is_agent; no import upwards from this layer). 2.754.0 (#5268): uid = the
+    account asked about when it is not the request's (core/objlight.py asks obj_role for any account)."""
+    if uid is None or _hmv_own(uid):
+        return (g.user["kind"] or "user") == "agent"
+    r = c.execute("SELECT kind FROM users WHERE id=?", (int(uid),)).fetchone()
+    return bool(r) and (r[0] or "user") == "agent"
+
+
+def _hmv_own(uid):
+    """2.754.0 (#5268): uid is the account of this request (its token's list limit applies only then)."""
+    return has_request_context() and g.get("user") is not None and g.user["id"] == uid
 
 
 def _hmv_gate():
@@ -46,17 +55,18 @@ def _hmv_gate():
 
 def hmv_client(c, uid, cid):
     """The client row when the token's user may read the mails filed with client cid, else None (see the module text)."""
-    if not _hmv_agent() and token_lists() is None:
+    agent = _hmv_agent(c, uid)  # 2.754.0 (#5268): uid's own kind and token limit, list_role of uid (was the session's)
+    if not agent and (token_lists() if _hmv_own(uid) else None) is None:
         return _visible_client(c, uid, cid)
     k = c.execute("SELECT id, org_id, created_by FROM clients WHERE id=? AND deleted_at IS NULL", (cid,)).fetchone()
-    if not k or (not _hmv_agent() and not _visible_client(c, uid, cid)):
+    if not k or (not agent and not _visible_client(c, uid, cid)):
         return None
     if k["org_id"]:
         lids = c.execute("SELECT id FROM lists WHERE client_id=? AND org_id=? AND deleted_at IS NULL ORDER BY id", (cid, k["org_id"])).fetchall()
     else:
         lids = c.execute("SELECT id FROM lists WHERE client_id=? AND org_id IS NULL AND owner_id=? AND deleted_at IS NULL ORDER BY id",
                          (cid, k["created_by"])).fetchall()
-    return k if any(list_role(c, r[0]) for r in lids) else None
+    return k if any(list_role(c, r[0], uid) for r in lids) else None
 
 
 def hmv_locked(c, uid, org_id):

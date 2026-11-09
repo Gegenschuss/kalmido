@@ -1,0 +1,66 @@
+name: CodeQL
+
+# #5300 (Profi-Bewertung F18, decision 08.11.2026): CodeQL over the server (Python) and the client (JavaScript), reporting
+# only - no gate. The findings rated high / critical (security-severity >= 7) go into the job summary (tools/scan_summary.py),
+# the full SARIF files are an artifact. Nothing is uploaded to the code scanning page (that needs the write right
+# security-events and an enabled code scanning; a reporting step must never go red for it). Its own workflow, not a job of
+# "CI": the release tooling reads the run of "CI", a slow or broken CodeQL run never holds a landing or the live train.
+# Runs on every push to main, weekly (new queries see old code) and by hand.
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: CodeQL ${{ matrix.language }} (reporting only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true  # reporting only: a failed analysis never turns the run red
+    permissions:
+      contents: read
+      actions: read  # CodeQL reads the workflow run it belongs to
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python, javascript-typescript]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Initialise CodeQL (no build, the security queries)
+        uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+          queries: security-extended
+          # third-party copies and the test tools are not ours to fix here (their own audits: tools/pins.py --osv, npm audit)
+          config: |
+            paths-ignore:
+              - static/vendor
+              - tests/node_modules
+              - "**/*.min.js"
+      - name: Analyse
+        uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          category: /language:${{ matrix.language }}
+          upload: never
+          output: ${{ runner.temp }}/codeql
+      - name: Findings high / critical (job summary)
+        if: always()
+        run: python3 tools/scan_summary.py sarif "$RUNNER_TEMP/codeql" >> "$GITHUB_STEP_SUMMARY"
+      - name: SARIF report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: codeql-${{ matrix.language }}
+          path: ${{ runner.temp }}/codeql
+          if-no-files-found: ignore
+          retention-days: 30

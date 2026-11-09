@@ -186,7 +186,7 @@ html.mini-sheet .shvtop>a.btn{display:none}
 .shc-kind,.shc-ys{border:0;padding:0;margin:0 0 .75rem;display:flex;flex-wrap:wrap;gap:.25rem 1rem}
 .shc-kind legend,.shc-ys legend{font-weight:600;margin-bottom:.25rem;width:100%}
 .shc-ys{max-height:14rem;overflow:auto}
-@media (max-width:40rem){ .shc-ys{flex-direction:column} }
+@media (max-width:599px){ .shc-ys{flex-direction:column} }
 /* 2.578.0 (#3462): stacked bars, pie and ring - every second part hatched, the pie with a legend of value and share */
 .shc-hl{stroke:var(--bg2);stroke-width:1.5}
 .shc-svg .shc-hatch{pointer-events:none}

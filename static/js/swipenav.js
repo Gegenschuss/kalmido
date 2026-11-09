@@ -18,7 +18,10 @@
    2.736.0 (#5212): no seam after the snap. o.peek(dir) -> {el} = the neighbour made ready by the caller (drawn as it will stand,
    e.g. pdfview.js: its first page drawn ahead), laid in as it is; o.full = the neighbour fills the content box of the area's
    frame (its offsetParent, e.g. the image viewer: the picture where it will stand, not in the box of the picture shown now), and
-   the area glides by that width; the pictures fetched ahead are decoded too, so the one turned to stands there at once. */
+   the area glides by that width; the pictures fetched ahead are decoded too, so the one turned to stands there at once.
+   2.754.0 (#5213): o.inside = the area is a frame that stays (the task panel #detail, its styles hang on it): its children
+   glide, the neighbour lies inside it over the part seen now (its scroll position, its inner size); o.edge = the screen edge
+   left to the phone's Back (px, default 16); o.busy() = something else owns the finger now (a long press): no swipe. */
 'use strict';
 
 const SWN_EDGE = 16, SWN_GAP = 16;
@@ -32,58 +35,61 @@ function swn_pre(u) {
   if (SWN_PRE.size > 6) SWN_PRE.delete(/** @type {string} */ (SWN_PRE.keys().next().value));
 }
 /** @param {HTMLElement} el the area -> the box the neighbour takes: o.full = the content box of its frame, else its own box */
-function swn_box(el, full) {
+function swn_box(el, full, inside) {
+  if (inside) return {l: el.scrollLeft, t: el.scrollTop, w: el.clientWidth, h: el.clientHeight};  // 2.754.0 (#5213): the part of the frame seen now
   const f = full ? /** @type {HTMLElement|null} */ (el.offsetParent) : null;
   if (!f) return {l: el.offsetLeft, t: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight};
   const cs = getComputedStyle(f), pl = parseFloat(cs.paddingLeft) || 0, pt = parseFloat(cs.paddingTop) || 0;
   return {l: pl, t: pt, w: f.clientWidth - pl - (parseFloat(cs.paddingRight) || 0), h: f.clientHeight - pt - (parseFloat(cs.paddingBottom) || 0)};
 }
-/** @param {HTMLElement} root @param {{area: (t: any) => HTMLElement|null, can: (dir: number) => boolean, go: (dir: number) => any, peek?: (dir: number) => ({img?: string, el?: HTMLElement}|null), full?: boolean}} o */
+/** @param {HTMLElement} root @param {{area: (t: any) => HTMLElement|null, can: (dir: number) => boolean, go: (dir: number) => any, peek?: (dir: number) => ({img?: string, el?: HTMLElement}|null), full?: boolean, inside?: boolean, edge?: number, busy?: () => boolean}} o */
 function swn_attach(root, o) {
   /** @type {any} */
   let s = null, end = 0, snap = false;
+  const EDGE = o.edge ?? SWN_EDGE;
+  /** @param {HTMLElement} el -> what glides: the area, or (o.inside, #5213) its children but the neighbours */
+  const parts = el => o.inside ? /** @type {HTMLElement[]} */ ([...el.children]).filter(x => !x.classList.contains('swn-nb')) : [el];
   /** @param {HTMLElement} el @param {string} tf */
   const put = (el, tf) => { el.style.transition = 'none'; el.style.transform = tf; };
   /** @param {any} c the swipe: its area and the placeholders follow the finger (dx) */
   const move = (c, dx) => {
-    put(c.el, `translateX(${dx}px)`);
+    for (const p of parts(c.el)) put(p, `translateX(${dx}px)`);
     for (const nb of c.nb) put(nb, `translateX(${dx + +nb.dataset.dir * (c.w + SWN_GAP)}px)`);
   };
   /** @param {any} c */
   const clear = c => { for (const nb of c?.nb || []) nb.remove(); if (c) c.nb = []; };
   /** @param {any} c */
   const loose = c => {
-    const el = c.el;
-    el.style.transition = 'transform .2s ease-out'; el.style.transform = ''; setTimeout(() => { if (!el.style.transform) el.style.transition = ''; }, 250);
+    for (const el of parts(c.el)) { el.style.transition = 'transform .2s ease-out'; el.style.transform = ''; setTimeout(() => { if (!el.style.transform) el.style.transition = ''; }, 250); }
     for (const nb of c.nb) { nb.style.transition = 'transform .2s ease-out'; nb.style.transform = `translateX(${+nb.dataset.dir * (c.w + SWN_GAP)}px)`; }
     const gone = c.nb; c.nb = []; setTimeout(() => gone.forEach((/** @type {HTMLElement} */ x) => x.remove()), 250);
   };
   const drop = () => { if (s?.lock) loose(s); s = null; };
   /** @param {HTMLElement} el @param {number} dir the neighbour beside the area, in its place and size */
   const lay = (el, dir) => {
-    const p = o.peek ? o.peek(dir) : null, nb = document.createElement('div'), b = swn_box(el, o.full);
+    const p = o.peek ? o.peek(dir) : null, nb = document.createElement('div'), b = swn_box(el, o.full, o.inside);
     nb.className = 'swn-nb'; nb.dataset.dir = String(dir); nb.setAttribute('aria-hidden', 'true');
     nb.style.cssText = `position:absolute;left:${b.l}px;top:${b.t}px;width:${b.w}px;height:${b.h}px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;pointer-events:none;overflow:hidden`;
     if (p?.el) nb.appendChild(p.el);  // 2.736.0 (#5212): made ready by the caller, as it will stand
     else if (p?.img) { const im = document.createElement('img'); im.src = p.img; im.alt = ''; im.style.cssText = 'max-width:100%;max-height:100%;object-fit:contain'; nb.appendChild(im); }
     else { const pg = document.createElement('div'); pg.style.cssText = 'height:min(90%,calc(100vw * 297 / 210));aspect-ratio:210 / 297;max-width:94%;background:var(--bg3,#eee);border-radius:4px'; nb.appendChild(pg); }
-    el.after(nb);
+    if (o.inside) el.appendChild(nb); else el.after(nb);  // 2.754.0 (#5213): inside the frame, after its own children
     return nb;
   };
   const prime = () => { if (o.peek) for (const d of [1, -1]) if (o.can(d)) swn_pre(o.peek(d)?.img || ''); };
   /** @param {any} c @param {number} dir the neighbour snaps fully into place, then it loads */
   const turn = async (c, dir) => {
-    const el = c.el, ms = matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : Math.round(Math.max(120, Math.min(260, 260 * (1 - Math.abs(c.dx) / (c.w + SWN_GAP)))));
+    const el = c.el, ps = parts(el), ms = matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : Math.round(Math.max(120, Math.min(260, 260 * (1 - Math.abs(c.dx) / (c.w + SWN_GAP)))));
     snap = true;
     const tz = ms ? `transform ${ms}ms ease-out` : 'none';
-    el.style.transition = tz; el.style.transform = `translateX(${-dir * (c.w + SWN_GAP)}px)`;
+    for (const p of ps) { p.style.transition = tz; p.style.transform = `translateX(${-dir * (c.w + SWN_GAP)}px)`; }
     for (const nb of c.nb) { nb.style.transition = tz; nb.style.transform = `translateX(${(+nb.dataset.dir - dir) * (c.w + SWN_GAP)}px)`; }
     try {
-      if (ms) await new Promise(ok => { setTimeout(ok, ms + 60, null); el.addEventListener('transitionend', ev => { if (ev.target === el) ok(null); }, {once: true}); });  // a promise settles once: the late timer does nothing
+      if (ms) await new Promise(ok => { setTimeout(ok, ms + 60, null); const p0 = ps[0] || el; p0.addEventListener('transitionend', ev => { if (ev.target === p0) ok(null); }, {once: true}); });  // a promise settles once: the late timer does nothing
       await o.go(dir);
     } catch { /* the caller shows its own error */ } finally {
       snap = false; clear(c);
-      if (el.isConnected) { el.style.transition = 'none'; el.style.transform = ''; void el.offsetWidth; el.style.transition = ''; }  // drawn anew in place, or not turned after all
+      for (const p of ps) if (p.isConnected) { p.style.transition = 'none'; p.style.transform = ''; void p.offsetWidth; p.style.transition = ''; }  // drawn anew in place, or not turned after all
     }
   };
   root.addEventListener('touchstart', ev => {
@@ -92,20 +98,20 @@ function swn_attach(root, o) {
     if (snap) { s = null; return; }  // 2.727.0 (#5202): the last one still snaps in
     if (e.touches.length !== 1 || (typeof pz_busy === 'function' && pz_busy())) { drop(); return; }
     const t = e.touches[0], el = o.area(e.target);
-    if (!el || t.clientX < SWN_EDGE || t.clientX > innerWidth - SWN_EDGE || (window.visualViewport?.scale || 1) > 1.05) { s = null; return; }
+    if (!el || t.clientX < EDGE || t.clientX > innerWidth - EDGE || (window.visualViewport?.scale || 1) > 1.05) { s = null; return; }
     s = {el, x0: t.clientX, y0: t.clientY, lx: t.clientX, lt: Date.now(), v: 0, dx: 0, lock: null, edge: null};
   }, {passive: true});
   root.addEventListener('touchmove', ev => {
     const e = /** @type {any} */ (ev);
     if (!s) return;
-    if (e.touches.length !== 1 || (typeof pz_busy === 'function' && pz_busy())) { drop(); return; }  // a second finger: the zoom
+    if (e.touches.length !== 1 || (typeof pz_busy === 'function' && pz_busy()) || o.busy?.()) { drop(); return; }  // a second finger: the zoom; 2.754.0 (#5213): a long press
     const t = e.touches[0], dx = t.clientX - s.x0, dy = t.clientY - s.y0;
     if (!s.lock) {
       if (Math.hypot(dx, dy) < 10) return;
       if (Math.abs(dx) <= Math.abs(dy) * 1.2) { s = null; return; }  // up / down: scrolling
       s.lock = 'x';
       s.edge = {'1': !o.can(1), '-1': !o.can(-1)};
-      s.w = (o.full ? swn_box(s.el, true).w : s.el.offsetWidth) || innerWidth;  // 2.736.0 (#5212): o.full glides by the frame's width
+      s.w = (o.full || o.inside ? swn_box(s.el, !!o.full, o.inside).w : s.el.offsetWidth) || innerWidth;  // 2.736.0 (#5212): o.full glides by the frame's width
       s.nb = [1, -1].filter(d => !s.edge[String(d)]).map(d => lay(s.el, d));  // 2.727.0 (#5202): the neighbours glide along
     }
     if (e.cancelable) e.preventDefault();

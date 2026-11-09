@@ -17,4 +17,4 @@
 .efbsel{position:absolute;top:0;bottom:0;border:2px solid var(--accent);border-radius:.25rem;min-width:2px}
 .efbs{color:var(--muted);min-width:4rem;text-align:right}
 .efbr.busy .efbs,.efbr.away .efbs{color:var(--text);font-weight:600}
-@media (max-width:40rem){.efbr{grid-template-columns:minmax(0,5rem) minmax(0,1fr) auto}.efbs{min-width:3.5rem}}
+@media (max-width:599px){.efbr{grid-template-columns:minmax(0,5rem) minmax(0,1fr) auto}.efbs{min-width:3.5rem}}

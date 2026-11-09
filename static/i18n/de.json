@@ -17882,6 +17882,8 @@
   "Copy text": "Text kopieren",
   "Copy the recognised text": "Den erkannten Text kopieren",
   "Column widths of the lists": "Spaltenbreiten der Listen",
+  "Message wakes the job up…": "Nachricht weckt den Auftrag auf…",
+  "Back to the agents": "Zurück zu den Agenten",
   "This server has no code manifest (before 2.742.0).": "Dieser Server hat keine Code-Liste (vor 2.742.0).",
   "This window runs v{0}: reload first": "Dieses Fenster läuft mit v{0}: erst neu laden",
   "Hash of the code": "Hash des Codes",

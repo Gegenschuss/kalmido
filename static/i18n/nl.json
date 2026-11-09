@@ -17882,6 +17882,8 @@
   "Copy text": "Tekst kopiëren",
   "Copy the recognised text": "De herkende tekst kopiëren",
   "Column widths of the lists": "Kolombreedtes van de lijsten",
+  "Message wakes the job up…": "Een bericht wekt de job…",
+  "Back to the agents": "Terug naar de agents",
   "This server has no code manifest (before 2.742.0).": "Deze server heeft geen codelijst (vóór 2.742.0).",
   "This window runs v{0}: reload first": "Dit venster draait v{0}: eerst herladen",
   "Hash of the code": "Hash van de code",

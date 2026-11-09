@@ -913,7 +913,7 @@ async function loadTimeline(id) {
     drawTimeline(); return;
   }
   if (my !== S.tlSeq || S.sel !== id) return;
-  const first = S.tl.id !== id, fresh = first || !S.tl.comments;  // 2.31.0: fresh = the comments arrive for the first time
+  const first = S.tl.id !== id || !!S.tl.pre, fresh = first || !S.tl.comments;  // 2.31.0: fresh = the comments arrive for the first time; 2.754.0 (#5213): fetched ahead for a swipe = still the first time
   const seen = S.tl.id === id ? S.tl.seen : j.seen;  // "new" marks stay while the panel is open
   S.tl = {...j, id, v, seen};
   if (S.cedit && !j.comments.some(c => c.id === S.cedit)) S.cedit = null;

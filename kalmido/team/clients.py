@@ -82,15 +82,18 @@ def _org_boundary(c):
     return INSTANCE_ENV != "shared"  # 2.46.0 (#1592, review fix): always, as core/access.py _boundary_on
 
 
-def client_rows(c, uid, archived=True, trash=False):
+def client_rows(c, uid, archived=True, trash=False, only=None):
     """The clients uid may see (rows), sorted by name. 2.272.0 D (#3029): trash False = not in the trash, True = only the
-    ones in the trash, None = both."""
+    ones in the trash, None = both. 2.754.0 (#5268): only = a client id (the core's kind 'client', core/objlight.py): just
+    that one, under the same rules."""
     u = _user(c, uid)
     if not u or u["kid"] or (u["kind"] or "user") == "agent":
         return []
     w = [] if archived else ["archived=0"]
     if trash is not None:
         w.append("deleted_at IS NOT NULL" if trash else "deleted_at IS NULL")
+    if only is not None:
+        w.append(f"id={int(only)}")
     q = "SELECT * FROM clients" + (" WHERE " + " AND ".join(w) if w else "")
     rows = c.execute(q + " ORDER BY archived, lower(name), id").fetchall()
     if u["is_admin"] and not _org_boundary(c):
@@ -464,8 +467,9 @@ def cl_locked_docs(c, cid, real=False):
 def cl_may_delete(c, uid, r):
     """2.148.1 B (#2484): client r is deleted by its creator or an admin of its organisation (the server admin only without
     workspaces, like h6c_client_move_ok)."""
+    u = _user(c, uid)  # 2.754.0 (#5268): uid's own server admin flag (was the session's; the core asks for any account)
     return (r["created_by"] == uid or bool(r["org_id"] and is_org_admin(c, uid, r["org_id"]))
-            or bool(g.user["is_admin"] and not _org_boundary(c)))
+            or bool(u and u["is_admin"] and not _org_boundary(c)))
 
 
 def h6c_client_move_ok(c, uid, r):

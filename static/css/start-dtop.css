@@ -5,3 +5,6 @@
   #detail .dtop.dtl6 .iconbtn{padding:.25rem}
   #detail .dtop.dtl6 .dchip{padding-left:.375rem;padding-right:.375rem}
 }
+/* 2.754.0 (#5213): the neighbour drawn ahead lies inside the task panel while a swipe leafs (swipenav.js o.inside): a side
+   panel (touch tablets) holds it; on a phone the panel is fixed and holds it anyway */
+@media (min-width:768px){#detail:has(> .swn-nb){position:relative}}

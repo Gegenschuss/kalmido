@@ -79,7 +79,7 @@ instead of the full state, and rendering long lists incrementally. Issues and pu
 Kalmido is built with AI assistance (Claude Code). The owner decides what it does, uses it every day, and every
 change runs the automated test suite (API, UI, security regression tests) in CI. Before 1.0.0 an independent AI
 security review (separate agent, black-box + code review) was run and all findings were fixed and re-verified;
-automated scanners (bandit, pip-audit, semgrep, OWASP ZAP baseline) run too. There has been no independent human
+automated scanners (bandit, pip-audit, semgrep, OWASP ZAP baseline; CodeQL and Trivy reporting) run too. There has been no independent human
 security audit yet — reviews and reports are welcome ([SECURITY.md](../SECURITY.md)).
 
 ## Contributing and contact

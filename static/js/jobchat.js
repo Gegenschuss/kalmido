@@ -8,9 +8,12 @@
 // start of such a message) opens the chat filtered to that job (GET /api/agents/<id>/chat?job=<id>: its messages, mine to
 // it, the agent's answers to those); a bar under the header shows its name + title and leads back to the whole chat. What I
 // type there goes out as "Job 220: …" (review: always the number), the way the agent's service routes it (#1456). An ended
-// job keeps its history, the box is off. Running jobs with a name are in the agent menu of the top bar.
+// job keeps its history; 2.754.0 (#5222): its box stays on ("Message wakes the job up…"), the service wakes an ended job
+// with such a message (#1456). Running jobs with a name are in the agent menu of the top bar.
+// #5222: every job card on the Agents page has "Open chat" (and its title opens it too); Back from a history opened there
+// leads to the Agents page again, not into the whole chat (S.jc.from).
 // The chat keeps one state (S.chat); S.chat.job = {id} switches it to the job's history (agentchat.js asks jc_q / jc_send).
-S.jc = {jobs: {}, at: 0, busy: null, asked: new Set()};
+S.jc = {jobs: {}, at: 0, busy: null, asked: new Set(), from: null};
 const jc_live = j => !!j && ['running', 'waiting'].includes(j.state);
 const jc_label = j => j?.name || tr('Job #{0}', j?.id);
 const jc_rest = j => { const t = String(j?.title || ''); return j?.name && t.startsWith(j.name + ':') ? t.slice(j.name.length + 1).trim() : t; };
@@ -61,10 +64,11 @@ function jc_barHtml() {
   if (!S.chat.job) return '';
   const j = jc_cur(), end = jc_ended(), rest = jc_rest(j);
   const pj = +j.parent_id || 0, jb = {no: +j.id, name: j.name || '', parent: pj, pname: pj ? S.jc.jobs[pj]?.name || '' : ''};  // 2.59.0 (#1827)
-  return `<div class="jcbar${jn9_part(jb) ? ' jpart' : ''}" id="jc-bar" style="--jcol:${jn9_jobColor(jb)}"><button type="button" class="iconbtn jcback" data-act="jc-back" title="${esc(tr('Back to the whole chat'))}" aria-label="${esc(tr('Back to the whole chat'))}">${ic('back', 's')}</button><i class="jcdot" aria-hidden="true"></i><div class="jcn"><b>${esc(jc_label(j))}</b>${rest ? `<span>${esc(rest)}</span>` : ''}</div>${end ? `<span class="jcend">${esc(tr('Job has ended'))}</span>` : ''}</div>`;
+  return `<div class="jcbar${jn9_part(jb) ? ' jpart' : ''}" id="jc-bar" style="--jcol:${jn9_jobColor(jb)}"><button type="button" class="iconbtn jcback" data-act="jc-back" title="${esc(jc_backT())}" aria-label="${esc(jc_backT())}">${ic('back', 's')}</button><i class="jcdot" aria-hidden="true"></i><div class="jcn"><b>${esc(jc_label(j))}</b>${rest ? `<span>${esc(rest)}</span>` : ''}</div>${end ? `<span class="jcend">${esc(tr('Job has ended'))}</span>` : ''}</div>`;
 }
 // lazy-ok-end
-const jc_ph = a => S.chat.job ? (jc_ended() ? tr('Job has ended') : tr('Message to {0}…', jc_label(jc_cur()))) : tr('Message to {0}…', a.name);
+const jc_backT = () => S.jc.from ? tr('Back to the agents') : tr('Back to the whole chat');  // #5222
+const jc_ph = a => S.chat.job ? (jc_ended() ? tr('Message wakes the job up…') : tr('Message to {0}…', jc_label(jc_cur()))) : tr('Message to {0}…', a.name);
 // what the box sends: in a job's history (2.153.0 #1962: its own chat) "Job 220: <text>" (unless it already starts with that or the job's name) --
 // review: always the number, a title like "Release: 2.56" would otherwise address a job "Release" nobody knows
 // 2.153.0 (#1962): the job's id goes along as job_id (jc_field) for hosts that route by it; the prefix stays, hosts that read
@@ -82,11 +86,18 @@ function jc_patch() {
   const ci = $('#chat-in'), ph = jc_ph(agentById(S.chat.aid) || {}); if (ci && ci.placeholder !== ph) { ci.placeholder = ph; ci.setAttribute('aria-label', ph); }
   if (!S.jc.busy && Date.now() - S.jc.at > 15000) jc_sync().then(() => { if (S.chat.job) jc_patch(); });
 }
-// open the history of job jid (null = the whole chat again) in the chat of agent aid, where the chat is (panel or page)
-async function jc_open(aid, jid) {
+// open the history of job jid (null = the whole chat again) in the chat of agent aid, where the chat is (panel or page);
+// #5222: from = 'agents' (a job card): Back leads there again
+async function jc_open(aid, jid, from = null) {
   const j = jid ? await jc_one(jid) : null;
   if (jid && !j) { toast(tr('Job not found')); return; }
-  jc_enter(+aid || j?.agent_id, j);
+  jc_enter(+aid || j?.agent_id, j, from);
+}
+// #5222: Back from a job's history (the bar's button, the header's Back on a phone, the touch Back of the panel): opened from
+// a job card = leave the chat (phone: the Agents page, computer: the panel closes over it), else the whole chat as before
+function jc_back() {
+  if (!S.chat.job || !S.jc.from) { jc_enter(S.chat.aid, null); return; }
+  S.jc.from = null; delete S.chat.job; chatClose();
 }
 // 2.152.8 (#2711): on a touch device Back (key / swipe) in a job's history leads to the whole chat, like the bar's back button.
 // Entering a job's history pushes one history entry (backclose.js pattern), Back pops it and popstate leaves the job; leaving
@@ -107,18 +118,29 @@ window.addEventListener('popstate', e => {
   if (jc_bk.skip) { jc_bk.skip = false; e.stopImmediatePropagation(); return; }
   if (!jc_bk.pushed || history.state?.jc) return;
   jc_bk.pushed = false;
-  if (S.chat.job) { e.stopImmediatePropagation(); jc_enter(S.chat.aid, null); }
+  if (S.chat.job) { e.stopImmediatePropagation(); jc_back(); }  // #5222: from a job card = out of the chat
 }, true);
-function jc_enter(aid, j) {
+// #5222: a job opened from a job card on the phone has no entry of its own (the chat page's route is the step back): Back
+// leaves the chat page, the job's history is let go with it (the next chat opens fresh)
+window.addEventListener('hashchange', () => { if (S.jc.from && S.chat.job && !/^#agents\//.test(location.hash)) { S.jc.from = null; S.chat = {aid: S.chat.aid, msgs: [], err: null}; } });
+function jc_enter(aid, j, from = null) {
   if (!aid) return;
+  S.jc.from = j && from ? from : null;  // #5222
   const ci = $('#chat-in'); if (ci && S.chat.aid) S.drafts['chat:' + S.chat.aid] = ci.value;
   S.chat = {aid: +aid, msgs: [], err: null, ...(j ? {job: {id: j.id}} : {})};
   if (chatFull()) {
     // the phone chat page is never rebuilt by renderView (render.js, #451): the page swaps its chat itself
     const v = S.route.mod === 'agents' && +S.route.agent === +aid && $('#view .chview');
     if (v) { v.outerHTML = chatViewHtml(aid); chatFit(); chatLoad().then(() => chatPatch({bottom: true})); }
-    else { if (!/^#agents\//.test(location.hash)) S.chatBack = location.hash.slice(1); go('agents/' + aid); }
-    jc_hist(!!j);  // after go(): the entry belongs to the chat page's route
+    else {
+      if (!/^#agents\//.test(location.hash)) S.chatBack = location.hash.slice(1);
+      go('agents/' + aid);
+      // 2.754.0 (#5222): the chat page the route draws keeps S.chat (the same agent) and loads nothing: fetch the history here
+      // once the page is there (opened from a job card or the agent menu it stayed empty)
+      const k = jc_key(), w = n => { if (S.chat.aid !== +aid || jc_key() !== k) return; if ($('#view .chview #chat-msgs')) chatLoad().then(() => chatPatch({bottom: true})); else if (n > 0) setTimeout(() => w(n - 1), 50); };
+      w(100);
+    }
+    jc_hist(!!j && !S.jc.from);  // after go(): the entry belongs to the chat page's route; #5222: from a job card the route's own entry is the step back (Back = the Agents page)
     return;
   }
   const p = $('#achat');
@@ -126,6 +148,13 @@ function jc_enter(aid, j) {
   jc_hist(!!j);
 }
 
+// ---- #5222: "Open chat" on every job card (running and ended) of an agent I can chat with; it stands first, so the row does
+// not shift when the job ends (Message / Stop go away behind it). The title opens the same.
+const jc_hasChat = j => !j.kind && !!j.agent_id && !!agentById(j.agent_id);
+// #5222: only numeric ids and fixed words - safe in HTML, the callers mark it html-ok
+const jc_openAttrs = j => `data-act="jc-open" data-jid="${+j.id}" data-aid="${+j.agent_id}" data-from="agents"`;
+const jc_openBtn = j => jc_hasChat(j) ? `<button type="button" class="btn sm jc-open" ${/*html-ok*/ jc_openAttrs(j)}>${ic('comment', 's')} ${tr('Open chat')}</button>` : '';
+const jc_titleHtml = j => jc_hasChat(j) ? `<button type="button" class="jc-ttl" ${/*html-ok*/ jc_openAttrs(j)} title="${esc(tr('Open chat'))}">${esc(j.title)}</button>` : `<b>${esc(j.title)}</b>`;
 // ---- #1791: "Message" on the job card
 const jc_cardBtn = j => !j.kind && j.can_stop && jc_live(j) ? `<button class="btn sm" data-act="jc-msg" data-jid="${j.id}">${ic('comment', 's')} ${tr('Message')}</button>` : '';
 async function jc_msg(jid) {
@@ -159,7 +188,7 @@ function jth_bodyHtml(j) {
   const t = S.jth[j.id] || {};
   const body = !t.msgs ? `<p class="muted jthload">${tr('Loading…')}</p>` : t.msgs.length
     ? t.msgs.map(m => `<div class="jthm ${m.from === 'agent' ? 'ag' : 'me'}"><span class="muted">${esc(fmtWhen(m.created_at))}</span><p>${esc(String(m.body || '').slice(0, 400))}</p></div>`).join('') : `<p class="muted">${tr('No messages yet.')}</p>`;
-  return body + `<button type="button" class="btn sm" data-act="jc-open" data-jid="${j.id}" data-aid="${j.agent_id}">${ic('comment', 's')} ${tr('Open the whole conversation')}</button>`;
+  return body + `<button type="button" class="btn sm" ${/*html-ok*/ jc_openAttrs(j)}>${ic('comment', 's')} ${tr('Open the whole conversation')}</button>`;
 }
 function jth_html(j) {
   if (j.kind || !j.agent_id) return '';
@@ -167,7 +196,7 @@ function jth_html(j) {
   if (t.hide) return '';
   if (open && !t.busy && (!t.at || (t.v !== S.v && Date.now() - t.at > 3000))) setTimeout(() => jth_load(j), 0);
   // data-k: its own key for the redraw (the history .joblog of the same card has the same data-jid)
-  return `<details class="jobth" data-k="jth${j.id}" data-jid="${j.id}"${open ? ' open' : ''}><summary>${tr('Conversation')}</summary><div class="jthbody">${open ? jth_bodyHtml(j) : ''}</div></details>`;
+  return `<details class="jobth" data-k="jth${j.id}" data-jid="${j.id}"${open ? ' open' : ''}><summary>${tr('Conversation')}</summary><div class="jthbody">${/*html-ok*/ open ? jth_bodyHtml(j) : ''}</div></details>`;
 }
 function jth_fill(j) {
   const d = document.querySelector(`details.jobth[data-jid="${j.id}"]`); if (!d) return;

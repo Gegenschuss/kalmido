@@ -10,10 +10,12 @@ function openDetail(id, o = {}) {
   const other = S.sel !== id;
   if (other) { S.editLink = false; S.cedit = null; S.mp = null; recentPush('t', id); wpOpened(id); }
   S.sel = id; S.editContent = false;
+  if (other) dswTake(id);  // 2.754.0 (#5213): comments & co. fetched ahead for a neighbour are there at once
   const d = $('#detail');
   d.classList.remove('hidden');
   $('#app').classList.add('detail-open'); fitLayout();
-  renderDetail();
+  if (o.morph) { const pm = morphRoot; morphRoot = d; try { renderDetail(); } finally { morphRoot = pm; } }  // 2.754.0 (#5213): the neighbour's nodes taken over after a swipe are only brought up to date
+  else renderDetail();
   if (other) { d.scrollTop = 0; if (d.classList.contains('dsplit')) $('.dbody', d).scrollTop = 0; }  // 2.18.0 review (R7): a different task starts at its top, not at the previous one's scroll position
   requestAnimationFrame(() => d.classList.add('open'));
   // 2.16.0 (#473): the panel is a named region; opened with the keyboard (Enter / o on a row) or on a phone (it covers the
@@ -33,6 +35,7 @@ function openDetail(id, o = {}) {
   loadTaskTime(id);
   if (S.dp.id !== id) S.dp = {id: null};
   loadDeps(id);
+  if (isTouch()) { dswInit(); setTimeout(() => { if (S.sel === id) dswAhead(); }, 250); }  // 2.754.0 (#5213): the swipe, its neighbours drawn ahead
 }
 function closeDetail(fromPop) {
   flushSaves();
@@ -633,12 +636,13 @@ async function tkNotesLoad(ids) {
   await Promise.all(Array.from({length: Math.min(TKN_PAR, todo.length)}, run));
   return out;
 }
-function renderDetail0() {
-  const t = taskById(S.sel);
+// 2.754.0 (#5213): D = where it is drawn: the panel, or a neighbour drawn ahead for the swipe (dswDraw; no side effects on the page)
+function renderDetail0(D = $('#detail')) {
+  const t = taskById(S.sel), real = D.id === 'detail';
   if (!t) {  // 2.369.2 (#3136): a task of a list not loaded yet: its list comes; 2.509.0 (#4324): or the task alone, never an empty panel (liveparts.js)
-    if (lzSel(S.sel, true)) {
-      $('#detail').classList.remove('dsplit', 'dsfold');
-      setHtml($('#detail'), `<div class="dtop"><button class="iconbtn back" data-act="close-detail" aria-label="${tr('Back')}">${ic('back')}</button><button class="iconbtn dclose" data-act="close-detail" aria-label="${tr('Close (Esc)')}">${ic('x')}</button></div><div class="dbody"><div class="empty">${esc(tr('Loading…'))}</div></div>`);
+    if (real && lzSel(S.sel, true)) {
+      D.classList.remove('dsplit', 'dsfold');
+      setHtml(D, `<div class="dtop"><button class="iconbtn back" data-act="close-detail" aria-label="${tr('Back')}">${ic('back')}</button><button class="iconbtn dclose" data-act="close-detail" aria-label="${tr('Close (Esc)')}">${ic('x')}</button></div><div class="dbody"><div class="empty">${esc(tr('Loading…'))}</div></div>`);
     }
     return;
   }
@@ -719,7 +723,7 @@ function renderDetail0() {
   // the bar's Complete: a button with its word (a 44 px target), the same action as the round box of the header
   const dDone = !thumb ? '' : `<button type="button" class="btn dtdone${t.status === 2 ? ' on' : ''}" data-act="toggle" data-id="${t.id}" role="checkbox" aria-checked="${t.status === 2}" title="${esc(kt(msT ? tr('Complete milestone') : tr('Complete task'), 'x'))}" ${ro ? 'disabled' : ''}>${ic('check', 's')}<span>${esc(t.status === 2 ? tr('Completed') : tr('Complete'))}</span></button>`;
   const dProj = !thumb || !l ? '' : (mv => `<button type="button" class="dtproj" data-act="${mv ? 'crumb-menu' : 'crumb'}" data-k="list" data-id="${l.id}" ${mv ? 'aria-haspopup="menu"' : ''} title="${esc(tr('Project') + ': ' + lname(l))}" aria-label="${esc(tr('Project') + ': ' + lname(l))}">${l.is_inbox ? ic('inbox', 's') : licMark(l, 's', true) || ic('list', 's')}<span class="dtpn">${esc(lname(l))}</span></button>`)(canEdit(t) && canEditList(t.list_id) && t.status === 0 && !t.context);
-  setHtml($('#detail'), `
+  setHtml(D, `
     <div class="dtop">
       <button class="iconbtn back" data-act="close-detail" aria-label="${tr('Back')}">${ic('back')}</button>
       ${thumb ? '' : dChk}
@@ -784,6 +788,7 @@ function renderDetail0() {
       </div></div>`);
   // 2.4.1 (#385): no Delete / Track time in the footer any more (Delete sat right below the comment box's Send on a phone);
   // both are in the task's "…" menu (Delete with undo), a running timer still shows here as its pill
+  if (!real) return;  // 2.754.0 (#5213): a neighbour drawn ahead: its fields take their height once it is laid in (dswPeek)
   $('#detail').classList.toggle('tlk', tlkL);  // 2.36.0 (#1118)
   $('#detail').classList.toggle('dsplit', split); if (split) dsApply(); else $('#detail').classList.remove('dsfold');
   autosize($('#d-title')); autosize($('#d-content')); autosize($('#c-input'));
@@ -867,11 +872,18 @@ async function saveLink(v) {
 
 // ---- 2.32.0 (#1071): phones: a sideways swipe on the properties of the open task (title, date, list, assignee …, not the
 // comments, the comment box or a field) goes to the next (left) / previous (right) task of the view it was opened from, in its
-// order (sorting, filter). The panel follows the finger and slides; at the first / last task it springs back. "3 of 12"
-// shows for a moment at the top. Not from the screen edges (the phone's own Back gesture), not while text is selected, not
-// in areas that scroll sideways (tables, code, images). What was typed is saved first (flushSaves).
-const DSW_EDGE = 28, DSW_MIN = 70;
-let dsw = null;
+// order (sorting, filter). "3 of 12" shows for a moment at the top. Not from the screen edges (the phone's own Back gesture),
+// not while text is selected, not in areas that scroll sideways (tables, code, images). What was typed is saved first (flushSaves).
+// 2.754.0 (#5213): leafing like turning a page (swipenav.js, the gesture of the documents #5202 / #5212): the previous and the
+// next task of the view are drawn ahead by renderDetail0 itself (dswDraw, with their comments, dependencies and time entries
+// fetched ahead: dswAhead) and lie inside the panel beside the open one (swn o.inside: the panel's styles hold for them too);
+// they glide with the finger over the whole width and snap; after the snap the drawn neighbour's nodes ARE the panel (dswSwap)
+// and openDetail only morphs them: nothing glides in, no comment comes later. At the first / last task it springs back;
+// prefers-reduced-motion: no snapping animation. Back still closes the task (replaceState).
+const DSW_EDGE = 28, DSW_MIN = 70;  // DSW_MIN: the News swipe of collab.js (#2314) still leafs from 70 px on
+/** @type {Map<number, any>} task id -> what was fetched ahead for a direct neighbour {tl, dp, te, at, v, el, dv} */
+const DSW_PRE = new Map();
+let dswH = null, dswCur = null, dswAt = 0;
 function dswIds() { return [...new Set(vl_ids())].filter(i => S.tasks.has(i)); }  // 2.65.0 (#1825): vl_ids = also the rows a long list does not draw
 function dswBlocked(el) {
   const f = el.closest('textarea, input, select, [contenteditable="true"]');
@@ -882,61 +894,117 @@ function dswBlocked(el) {
   }
   return false;
 }
-document.addEventListener('touchstart', e => {
-  dsw = null;
-  if (!S.sel || !isTouch() || e.touches.length !== 1 || $('.modal') || $('#pop:not(.hidden)') || (typeof nswOn === 'function' && nswOn())) return;  // 2.122.0 (#2314): opened from the news: collab.js swipes
-  const d = $('#detail'), el = e.target;
-  if (!d || d.classList.contains('multi') || !el.closest?.('#detail .dbody, #detail .dtop') || dswBlocked(el)) return;
-  const t0 = e.touches[0];
-  if (t0.clientX < DSW_EDGE || t0.clientX > innerWidth - DSW_EDGE) return;
-  const sel = getSelection?.(); if (sel && !sel.isCollapsed && String(sel).trim()) return;
-  dsw = {x: t0.clientX, y: t0.clientY, dx: 0, lock: null, d};
-  // 2.32 review: the non-passive move listener only lives while a swipe may start (scrolling elsewhere stays passive)
-  document.addEventListener('touchmove', dswTouchMove, {passive: false});
-}, {passive: true});
-function dswTouchMove(e) {
-  if (!dsw || (typeof lp !== 'undefined' && lp?.active)) return;
-  const t = e.touches[0], dx = t.clientX - dsw.x, dy = t.clientY - dsw.y;
-  if (!dsw.lock) {
-    if (Math.hypot(dx, dy) < 10) return;
-    dsw.lock = Math.abs(dx) > Math.abs(dy) * 1.5 ? 'x' : 'y';
-    if (dsw.lock === 'y') { dsw = null; return; }
-    const ids = dswIds(), i = ids.indexOf(S.sel);
-    if (i < 0) { dsw = null; return; }
-    dsw.ids = ids; dsw.i = i;
-    dsw.d.classList.add('dswipe');
-  }
-  if (e.cancelable) e.preventDefault();
-  const end = (dx < 0 && dsw.i >= dsw.ids.length - 1) || (dx > 0 && dsw.i <= 0);
-  dsw.dx = end ? dx / 3 : dx;  // at the first / last task it only gives a little
-  dswMove(dsw.d, dsw.dx);
+// the order of the view at the start of a swipe: {ids, i}; null = no swipe here
+function dswOrder() {
+  if (dswCur && dswCur.sel === S.sel) return dswCur;
+  const ids = dswIds(), i = ids.indexOf(S.sel);
+  return (dswCur = {sel: S.sel, ids, i});
 }
-function dswOff() { document.removeEventListener('touchmove', dswTouchMove, {passive: false}); }
+function dswArea(el) {
+  dswCur = null;
+  if (!S.sel || !isTouch() || $('.modal') || $('#pop:not(.hidden)') || (typeof nswOn === 'function' && nswOn())) return null;  // 2.122.0 (#2314): opened from the news: collab.js swipes
+  const d = $('#detail');
+  if (!d || d.classList.contains('multi') || !el?.closest?.('#detail .dbody, #detail .dtop') || el.closest('.swn-nb') || dswBlocked(el)) return null;
+  const sel = getSelection?.(); if (sel && !sel.isCollapsed && String(sel).trim()) return null;
+  return d;
+}
+function dswCan(dir) {
+  const o = dswOrder();
+  return o.i >= 0 && !!o.ids[o.i + dir];
+}
+// the neighbour drawn by the same function as the panel, outside the page (no layout, its ids only count once it is laid in
+// after the open one's own nodes); the state renderDetail0 reads is the neighbour's for that moment
+function dswDraw(id) {
+  const t = taskById(id); if (!t || t.context) return null;
+  const e = DSW_PRE.get(id) || {}, host = document.createElement('div');
+  host.className = 'dnbp'; host.dataset.id = String(id); host.inert = true;
+  const k = {sel: S.sel, tl: S.tl, dp: S.dp, te: S.te, ec: S.editContent, ce: S.cedit, el: S.editLink, mp: S.mp};
+  try {
+    S.sel = id; S.tl = e.tl || {id}; S.dp = e.dp || {id: null}; S.te = e.te || {tid: null, items: null, v: -1, all: false, err: null};
+    S.editContent = false; S.cedit = null; S.editLink = false; S.mp = null;
+    renderDetail0(host);
+  } catch (x) { console.error(x); return null; }
+  finally { S.sel = k.sel; S.tl = k.tl; S.dp = k.dp; S.te = k.te; S.editContent = k.ec; S.cedit = k.ce; S.editLink = k.el; S.mp = k.mp; }
+  if (!host.firstElementChild) return null;
+  const top = $('#detail > .dtop'), nt = $(':scope > .dtop', host);
+  if (top && nt) for (const c of top.classList) if (/^dtl\d$/.test(c)) nt.classList.add(c);  // fitDtop's step of the open one (it is fitted again after the snap)
+  if (DSW_PRE.get(id) === e && !host.querySelector('#d-note-wait')) { e.el = host; e.dv = S.v; }  // kept for a neighbour fetched ahead only; a description still coming: drawn again at the swipe
+  // its pictures (attachments, loading="lazy" = not before they are in the page) are fetched and decoded now
+  e.imgs = [...host.querySelectorAll('img[src]')].slice(0, 12).map(im => { const x = new Image(); x.decoding = 'async'; x.src = im.src; x.decode?.().catch(() => {}); return x; });
+  return host;
+}
+function dswPeek(dir) {
+  const o = dswOrder(), id = o.ids[o.i + dir]; if (!id) return null;
+  const e = DSW_PRE.get(id), d = $('#detail');
+  const host = e?.el && e.dv === S.v && !e.el.isConnected ? e.el : dswDraw(id);
+  if (!host) return null;
+  host.style.cssText = `display:flex;flex-direction:column;align-self:stretch;width:100%;height:100%;box-sizing:border-box;overflow:hidden;padding-top:${d ? getComputedStyle(d).paddingTop : '0px'};background:var(--bg2);text-align:start`;
+  // laid in right after this (same task): its fields take their height like the open one's (autosize needs the layout)
+  queueMicrotask(() => { if (host.isConnected) for (const ta of host.querySelectorAll('#d-title, #d-content:not(.hidden), #c-input')) autosize(ta); });
+  return {el: host};
+}
+async function dswGo(dir) {
+  const o = dswOrder(), next = o.ids[o.i + dir]; if (!next) return;
+  await flushSaves();
+  if (S.sel !== o.sel) return;  // closed meanwhile
+  dswSwap(next, $(`#detail > .swn-nb > .dnbp[data-id="${next}"]`));
+  dswPos(o.ids.indexOf(next) + 1, o.ids.length);
+}
+// after the snap: the neighbour's nodes become the panel (the old ones go), the open task's fetched state waits for the way back
+function dswSwap(id, host) {
+  const was = S.sel, d = $('#detail');
+  if (was > 0) DSW_PRE.set(was, {tl: S.tl.id === was && S.tl.comments ? {...S.tl, pre: true} : null, dp: S.dp.id === was ? S.dp : null, te: S.te.tid === was ? S.te : null, at: Date.now(), v: S.v});
+  if (host && d) d.replaceChildren(...host.childNodes);
+  openDetail(id, {replace: true, morph: !!host});
+}
+// openDetail of another task: what was fetched ahead for it is its state at once (loadTimeline & co. bring it up to date quietly)
+function dswTake(id) {
+  const e = DSW_PRE.get(id); if (!e || Date.now() - e.at > 300000) return;
+  if (e.tl) S.tl = e.tl;
+  if (e.dp) S.dp = e.dp;
+  if (e.te) S.te = e.te;
+}
+// touch screens: the direct neighbours of the open task are fetched (comments, dependencies, time entries) and drawn ahead;
+// the others are dropped. Their pictures (attachments) start loading with the drawing.
+function dswAhead() {
+  if (!S.sel || !isTouch() || $('#detail')?.classList.contains('multi')) return;
+  const o = dswOrder(), want = new Set(o.i < 0 ? [] : [o.ids[o.i - 1], o.ids[o.i + 1]].filter(Boolean));
+  for (const k of [...DSW_PRE.keys()]) if (!want.has(k)) DSW_PRE.delete(k);
+  for (const id of want) {
+    const e = DSW_PRE.get(id);
+    if (e?.busy || (e && Date.now() - e.at < 60000)) { if (!e.busy && !e.el) dswDraw(id); continue; }
+    dswFetch(id);
+  }
+}
+async function dswFetch(id) {
+  const t = taskById(id); if (!(id > 0) || !t || t.context) return;
+  const e = {at: Date.now(), busy: true, v: S.v}; DSW_PRE.set(id, e);
+  const get = u => rawFetch('GET', u).catch(() => null);
+  const [tl, dp, te] = await Promise.all([cmtOn() || collab() ? get(`/api/tasks/${id}/timeline`) : null, depsOn() ? get(`/api/tasks/${id}/deps`) : null,
+    tFor(t) ? get(`/api/time/entries?task_id=${id}`) : null]);
+  if (DSW_PRE.get(id) !== e) return;
+  e.busy = false;
+  if (tl) e.tl = {...tl, id, v: e.v, pre: true};
+  if (dp) e.dp = {...dp, id, v: e.v};
+  if (te) e.te = {tid: id, items: te.entries, budget: te.budget || null, v: e.v, all: false, err: null};
+  dswDraw(id);
+}
+// once per page on a touch screen: the swipe of swipenav.js on the panel (loaded on demand)
+function dswInit() {
+  if (dswH || !isTouch()) return;
+  const d = $('#detail'); if (!d) return;
+  // lazy-ok-begin: runs only once swipenav.js is in (the typeof / loadModule below)
+  if (typeof swn_attach === 'function') dswH = swn_attach(d, {area: dswArea, can: dswCan, go: dswGo, peek: dswPeek, inside: true, edge: DSW_EDGE, busy: () => typeof lp !== 'undefined' && !!lp?.active});
+  // lazy-ok-end
+  else if (!dswInit.wait) { dswInit.wait = true; loadModule('swipenav').then(() => { dswInit.wait = false; dswInit(); }, () => { dswInit.wait = false; }); }
+}
+// the panel's parts follow the finger and slide (the news swipe of collab.js, #2314, still glides this way)
 function dswMove(d, x, anim) {
   for (const el of $$(':scope > .dtop, :scope > .dbody, :scope > .dsgrip, :scope > .dcpane, :scope > .dbot', d)) {
     el.style.transition = anim && !reducedMotion() ? 'transform .18s ease-out, opacity .18s ease-out' : 'none';
     el.style.transform = x ? `translateX(${x}px)` : '';
     el.style.opacity = x ? String(Math.max(.4, 1 - Math.abs(x) / innerWidth)) : '';
   }
-}
-function dswEnd() {
-  const st = dsw; dsw = null;
-  if (!st || st.lock !== 'x') return;
-  st.d.classList.remove('dswipe');
-  dswAt = Date.now();
-  const dir = st.dx < -DSW_MIN ? 1 : st.dx > DSW_MIN ? -1 : 0, next = dir ? st.ids[st.i + dir] : null;
-  if (!next) { dswMove(st.d, 0, true); return; }  // too short, or the first / last task: springs back
-  const w = innerWidth, slow = !reducedMotion();
-  dswMove(st.d, -dir * w, true);
-  setTimeout(async () => {
-    await flushSaves();
-    openDetail(next, {replace: true});
-    const d = $('#detail'); if (!d) return;
-    dswMove(d, dir * w * .35); d.offsetWidth;  // the new one comes in from the other side
-    dswMove(d, 0, true);
-    setTimeout(() => dswMove(d, 0), 220);
-    dswPos(st.ids.indexOf(next) + 1, st.ids.length);
-  }, slow ? 170 : 0);
 }
 // "3 of 12" for a moment at the top of the panel (and for screen readers)
 function dswPos(n, of) {
@@ -947,10 +1015,7 @@ function dswPos(n, of) {
   p.classList.add('on'); clearTimeout(dswPos.t); dswPos.t = setTimeout(() => p.classList.remove('on'), 1600);
 }
 // the lift that ends a swipe does not also press what is under the finger
-let dswAt = 0;
-document.addEventListener('click', e => { if (Date.now() - dswAt < 400 && e.target.closest?.('#detail')) { e.stopPropagation(); e.preventDefault(); } }, true);
-document.addEventListener('touchend', () => { dswOff(); dswEnd(); });
-document.addEventListener('touchcancel', () => { dswOff(); if (dsw?.lock === 'x') { dsw.d.classList.remove('dswipe'); dswMove(dsw.d, 0, true); } dsw = null; });
+document.addEventListener('click', e => { if ((Date.now() - dswAt < 400 || dswH?.recent(400)) && e.target.closest?.('#detail')) { e.stopPropagation(); e.preventDefault(); } }, true);
 
 
 // ---- 2.33.0 (#1087): iPhone: the focus in the comment box made iOS pan the page up by the keyboard (visualViewport.offsetTop

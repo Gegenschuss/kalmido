@@ -336,6 +336,25 @@ keeps the name the area's other writes use, e.g. `task-<id>` of `apply_update`, 
   them. A custom field's values (`set_field_values`) stay part of the task's write (`apply_update`: under the task's lock,
   compared per field against `_prev`).
 
+## Stage Q0b: the light kinds task, event, hub_mail, client (2.754.0, #5268)
+
+Every (kind, id) table of the core that comes next (links, tags, comments, seen, follow) needs a kind for the objects of the
+old areas it points at. `kalmido/core/objlight.py` registers four kinds without a reference node
+(`obj_register(..., node=False)`): `task`, `event`, `hub_mail`, `client`. Such a kind has no shares, no folder, no generic
+routes, no fields and no write path of the core (`obj_reg_node` refuses it with 404 in `core/writes.py`; `obj_visible_sql` /
+`obj_rows` with ValueError: the area lists its own rows). It only answers
+- `obj_role` / `obj_need`: steps 1 + 2 as for every kind (organisation floor, an agent of another workspace never, an API
+  token's list limit), then `base_role` = exactly the area's own check for the account asked about: a task its project role
+  (`need_task`: owner / project admin `manage`, editor `edit`, viewer `view`, a participant only the tasks `pvis` shows,
+  `edit` where they may write; a parent that is only context gives nothing), an event `ev_role_of` (calendar owner `manage`,
+  an invited person `view`), a filed e-mail `hbm_can` in the app (write = `edit`) and the API v1 rule `hmv_can` for agents
+  and tokens (read only, never "Not assigned"), a client `need_client` (`edit` unless read-only in its organisation,
+  `manage` for who may delete it). Agents get nothing the area does not give them.
+- `obj_title` (live, never stored; a task of an end-to-end locked project has none), `open_url` (`t/<id>`, `ev/<id>`,
+  `mailhub/<id>`, `client/<id>`) and `obj_space`.
+Nothing of the areas moved: their routes, rights and tables stay as they are. Test containers have
+`GET /api/test/objrole/<kind>/<id>` (tests/p2754_d_kinds_api_test.py).
+
 ## Cross-cutting parts (2.755.0, #5267)
 
 Links between objects, tags, comments, reactions, read marks, versions and following / notifying exist **once**, in the

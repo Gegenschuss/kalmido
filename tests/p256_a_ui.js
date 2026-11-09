@@ -3,7 +3,7 @@
 //   agent gets the 'job' event {action: message, text}; the job stays running
 // - #1793 the agent chat (phone page): a job's tag shows its name, a tap opens the job's own history (bar with name +
 //   title, only the job's messages), the box sends "Job N: …", Back leads to the whole chat; the name at the start of a
-//   job's message is the same link; an ended job: the bar says so, the box is off
+//   job's message is the same link; an ended job: the bar says so, the box stays on (2.754.0 #5222: a message wakes it)
 // - the agent menu of the top bar lists the running job with its name and title
 const {execFileSync} = require('child_process');
 const path = require('path');
@@ -90,12 +90,13 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   click(w, d.querySelector('#jc-bar [data-act="jc-back"]'));
   await until(() => !d.querySelector('#jc-bar') && /Hello, how can I help/.test(d.querySelector('#chat-msgs')?.textContent || ''));
   check(!d.querySelector('#jc-bar') && /Hello, how can I help/.test(d.querySelector('#chat-msgs')?.textContent || ''), '#1793: Back = the whole chat again');
-  // an ended job: history yes, box off; the phone's Back in the header leaves the job first
+  // an ended job: history yes, box on (2.754.0 #5222); the phone's Back in the header leaves the job first
   const tagD = await until(() => d.querySelector(`#chat-msgs button.jobtag[data-jid="${JD}"]`));
   click(w, tagD);
   await until(() => /Job has ended/.test(d.querySelector('#jc-bar')?.textContent || ''));
   check(/Ben/.test(d.querySelector('#jc-bar')?.textContent || '') && /Job has ended/.test(d.querySelector('#jc-bar')?.textContent || ''), '#1793: an ended job: the bar says so');
-  check(d.querySelector('#chat-in')?.disabled, '#1793: ... and the box is off');
+  // 2.754.0 (#5222): an ended job's box stays on, a message wakes the job (#1456): the placeholder says so
+  check(d.querySelector('#chat-in') && !d.querySelector('#chat-in').disabled && /wakes the job up/.test(d.querySelector('#chat-in').placeholder), '#5222: ... and the box stays on: "Message wakes the job up…" ' + (d.querySelector('#chat-in')?.placeholder || ''));
   click(w, d.querySelector('.chath [data-act="chat-close"]'));
   await until(() => !d.querySelector('#jc-bar'));
   check(!d.querySelector('#jc-bar') && d.querySelector('#chat-msgs'), '#1793: the header\'s Back leaves the job\'s history, the chat stays');

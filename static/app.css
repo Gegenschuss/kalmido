@@ -1458,7 +1458,7 @@ svg.chart{display:block;max-width:100%;overflow:visible}
 .pitem .pls{font:var(--fs-xs) var(--mono);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto}
 .pitem .pk{font:var(--fs-xs) var(--mono);color:var(--faint);width:3.25rem;text-align:right;flex:none}
 /* 2.217.0 A (#2796): on phones the title comes first and in full (up to two lines), project + kind small underneath */
-@media (max-width:37.5rem){
+@media (max-width:599px){
   .pitem{display:grid;grid-template-columns:1rem minmax(0,1fr) auto;column-gap:.625rem;row-gap:0;align-items:center;padding-top:.375rem;padding-bottom:.375rem}
   .pitem .pic{grid-row:1/span 2;grid-column:1;align-self:start;margin-top:.25rem}
   .pitem .pl{display:contents}
@@ -2060,7 +2060,7 @@ button.tvr-task:hover{color:var(--accent)}
 .arow .ameta span{display:inline-flex;align-items:center;gap:.25rem}
 .arow .aacts{grid-area:acts;display:flex;gap:.375rem;flex-wrap:wrap;justify-content:flex-end}
 .arow .aacts .btn{display:inline-flex;align-items:center;gap:.25rem}
-@media (max-width:640px){.arow{grid-template-columns:minmax(0,1fr);grid-template-areas:"name" "meta" "acts"}.arow .aacts{justify-content:flex-start;margin-top:.375rem}}
+@media (max-width:599px){.arow{grid-template-columns:minmax(0,1fr);grid-template-areas:"name" "meta" "acts"}.arow .aacts{justify-content:flex-start;margin-top:.375rem}}
 .dcopts{display:flex;flex-direction:column;gap:.5rem;margin:.25rem 0 .75rem}
 .dcopts .chkl{display:flex;align-items:center;gap:.5rem}
 @media (max-width:767px){ #top [data-act="done-clean"] .bl{display:none} }
@@ -2164,14 +2164,14 @@ button.tvr-task:hover{color:var(--accent)}
 .odban .odn{font-weight:600}
 .odban .odto{color:var(--muted);display:inline-flex}
 .odban .spacer{flex:1}
-@media (max-width:640px){.odban .odto{display:none}.odban .btn.sm{min-height:2.25rem}}
+@media (max-width:599px){.odban .odto{display:none}.odban .btn.sm{min-height:2.25rem}}
 /* 2.31.0 (#1052): Today grouped by date: the overdue actions in the head of "Overdue" instead of a card of their own */
 .ghead .odact{order:6;display:inline-flex;gap:.375rem;margin-left:.375rem;flex:none}
 .ghead .odact .btn.sm{font-weight:500;color:var(--text2);padding-top:.1875rem;padding-bottom:.1875rem}
 @media (pointer:coarse){ .ghead .odact .btn.sm{min-height:2.75rem} }  /* fix 2.31: 44 px on touch (own line on phones) */
 /* review 2.31: on narrow screens the overdue actions get a line of their own under the heading (long German labels) */
 .ghead:has(.odact){flex-wrap:wrap}
-@media (max-width:640px){ .ghead .odact{flex:1 0 calc(100% - 1.25rem);max-width:calc(100% - 1.25rem);flex-wrap:wrap;order:7;margin:.25rem 0 0 1.25rem} }  /* 2.31.1: 100% + the indent ran 2 px out at font size XL; the two buttons wrap instead */
+@media (max-width:599px){ .ghead .odact{flex:1 0 calc(100% - 1.25rem);max-width:calc(100% - 1.25rem);flex-wrap:wrap;order:7;margin:.25rem 0 0 1.25rem} }  /* 2.31.1: 100% + the indent ran 2 px out at font size XL; the two buttons wrap instead */
 /* 1.8.1: the sign-in / first-run screens are a page of their own, centered on every screen (tablets in portrait,
    e.g. a Galaxy Fold unfolded, showed a bottom sheet under 900 px) and never see-through (light theme dimmed the app) */
 .modal.authscreen,:root[data-theme] .modal.authscreen{background:var(--bg);align-items:center;padding:calc(1rem + var(--safe-t)) 1rem calc(1rem + var(--safe-b))}
@@ -2228,7 +2228,7 @@ button.tvr-task:hover{color:var(--accent)}
 .agjh{display:flex;align-items:center;gap:.5rem;margin-top:.5rem}.agjh h2{font-size:var(--fs-l);margin:0}
 .jobs{display:flex;flex-direction:column;gap:.5rem}
 .job{padding:.625rem .75rem;border:1px solid var(--line2);border-radius:var(--radius);background:var(--bg2);display:flex;flex-direction:column;gap:.375rem}
-.jobh{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.jobh{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}.jobh .jc-ttl{border:0;padding:0;margin:0;background:none;font:inherit;font-weight:700;color:inherit;text-align:start;cursor:pointer}  /* 2.754.0 (#5222): the title opens the job's chat, looks like the <b> it replaces */
 .jobh .bot.bjob{width:1.5rem;height:1.5rem}  /* 2.136.0 (#2193): arbeitet / wartet */.jobh .muted{font-size:var(--fs-s)}
 .jst{font:500 var(--fs-xs) var(--mono);padding:0 .375rem;border-radius:var(--r-s);background:var(--bg3);color:var(--text2);line-height:1.125rem}
 .job.st-running .jst{background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent)}
@@ -2525,7 +2525,7 @@ body.fab-on #view .chcomp,body.fab-on #detail .dbot .dcomp:not(.dctop){padding-r
 .aiur.aiuh{font-size:var(--fs-xs);color:var(--muted);text-transform:uppercase;letter-spacing:.04em;background:var(--bg2)}
 .aiur.aiuh span:not(:first-child),.aiur .aiuv{text-align:right}
 .aiuse{display:flex;align-items:center;gap:.375rem;font-size:var(--fs-s);color:var(--muted);min-height:2rem}
-@media (max-width:640px){
+@media (max-width:599px){
   .aiur{grid-template-columns:minmax(0,1fr) repeat(3,4.25rem);gap:.375rem;padding:.375rem .5rem}
 }
 /* 2.2.0 (#271 / #339): Git integration: the "Code" section, the row chip, repositories in the list dialog, merge requests */
@@ -4395,7 +4395,7 @@ a.tref:hover{background:var(--accent-soft)}
 .meta .msm{display:inline-flex;align-items:center;font-size:var(--fs-xs);color:var(--muted)}
 .meta .mschip{display:inline-flex;align-items:center;max-width:12rem;font-size:var(--fs-xs);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .meta .mschip .msd{width:.4375rem;height:.4375rem}
-@media (max-width:640px){ .meta .mschip{display:none} }
+@media (max-width:599px){ .meta .mschip{display:none} }
 .ev.ms .msd,.wev.ms .msd{width:.4375rem;height:.4375rem;margin-left:0;color:var(--accent)}
 .cal .dots i.ms{border-radius:1px;transform:rotate(45deg)}
 .fields .dmsl{display:flex;align-items:center;gap:.375rem;min-width:0}
@@ -4711,7 +4711,7 @@ button.lkchip:hover{border-color:var(--accent)}
 .cthn{min-width:0;flex:1}
 .cthn h3{margin:0;font-size:var(--fs-l);overflow-wrap:break-word;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}  /* 2.217.0 A (#2794): two lines, break inside a word only as last resort */
 .cthead .ctacts{display:flex;gap:.375rem;flex:none;align-items:center}
-@media (max-width:37.5rem){ .cthead{flex-wrap:wrap} .cthead .ctacts{flex:1 0 100%;justify-content:flex-end} }  /* 2.217.0 A (#2794): the name gets the width, actions drop to a second row */
+@media (max-width:599px){ .cthead{flex-wrap:wrap} .cthead .ctacts{flex:1 0 100%;justify-content:flex-end} }  /* 2.217.0 A (#2794): the name gets the width, actions drop to a second row */
 .ctfields{display:flex;flex-direction:column;gap:.25rem}
 .ctf{display:flex;align-items:center;gap:.5rem;min-height:2.25rem;flex-wrap:wrap}
 .ctf .ctfl{min-width:5.5rem;font-size:var(--fs-s)}
@@ -5718,7 +5718,7 @@ body.lydragging,body.lydragging *{cursor:grabbing!important;-webkit-user-select:
 /* 2.35.0 (#1107): the chat header on touch screens: no two tap areas overlap (measured before: ring / (i) 23 px, (i) /
    permission badge 7 px), each stays 44 x 44 px. The ring's 44 px box no longer reaches under the (i); on a phone the
    permission badge moves to the start of the second line (under the name), so name, ring and (i) fit in the first */
-@media (pointer:coarse) and (max-width:37.5rem){
+@media (pointer:coarse) and (max-width:599px){
   .chath{gap:.5rem} .chath .chback{margin-right:.125rem}
 }
 .lyed .lylist,.lyed .lyopts{max-width:var(--w-form)}
@@ -6272,7 +6272,7 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 .mgtabs button.on{color:var(--text);font-weight:600}
 .mgtabs .recdot{margin-left:.125rem}
 .modrow.mgarea .mgparts>.modlist{margin:.375rem 0 0 .75rem;padding-left:.75rem;border-left:2px solid var(--line2)}
-@media (max-width:640px){.mgtabs{margin:.25rem 0 .75rem}.mgtabs button{min-height:2.75rem;padding:.25rem .5rem}}
+@media (max-width:599px){.mgtabs{margin:.25rem 0 .75rem}.mgtabs button{min-height:2.75rem;padding:.25rem .5rem}}
 /* 2.98 (#2180): a phone's start list and its path "< Office · group" with the group's points as one row of underlined tabs
    (no wrap, it scrolls sideways); the path of a detail page stays grey text. 2.152.2 (#2617): the computer's office rail is
    gone (its points are the office's panel of sidebar B), the page keeps its width limit */
@@ -6378,7 +6378,7 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 .sbnbar{flex-wrap:wrap}
 .sbnbar .sbnsel{flex:0 1 14rem;min-width:0;min-height:2.25rem}
 .sbncard .sbnl{display:inline-flex;align-items:center;gap:.25rem;color:var(--text2);font-weight:500}
-@media (max-width:640px){.sbnbar .ssearch{flex:1 1 100%}.sbnbar .sbnsel{flex:1 1 auto;min-height:2.75rem}}
+@media (max-width:599px){.sbnbar .ssearch{flex:1 1 100%}.sbnbar .sbnsel{flex:1 1 auto;min-height:2.75rem}}
 .sbnpriv{display:flex;align-items:center;gap:.375rem;margin:.25rem 0 .5rem}  /* 2.398.0 (#3405): the privacy line of Notes in an organisation */
 /* 2.45.0 B (#1515) self-hosting: setup code field, missing server key */
 .authscreen .shint.shcode{margin:.25rem 0 .75rem}
@@ -6470,7 +6470,7 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 .mgtabs{background:none;border:0;padding:0;gap:.25rem}
 .mgtabs button{flex:none;border-radius:9rem;padding:.25rem .875rem}
 /* 2.218.0 C (#2804): area tabs wrap on the phone instead of cutting the last word */
-@media (max-width:640px){.mgtabs{flex-wrap:wrap;overflow-x:visible}.mgtabs button{max-width:100%;text-overflow:clip}}
+@media (max-width:599px){.mgtabs{flex-wrap:wrap;overflow-x:visible}.mgtabs button{max-width:100%;text-overflow:clip}}
 .seg.ofctabs{display:flex;flex-wrap:wrap;width:100%;background:none;border:0;border-bottom:1px solid var(--line);border-radius:0;padding:0;gap:.25rem;margin-bottom:.75rem}
 .seg.ofctabs button{flex:none;white-space:nowrap;border-radius:0;border-bottom:2px solid transparent;margin-bottom:-1px;padding:.375rem .75rem}
 .seg.ofctabs button.on{background:none;border-bottom-color:var(--accent);color:var(--text)}
@@ -7162,7 +7162,7 @@ button.kptile:hover,button.kptile:focus-visible{border-color:var(--accent)}
 .oa_logf{margin:.25rem 0 .5rem}
 .cchoices.oa_links a.cchb{text-decoration:none;display:inline-flex;align-items:center;gap:.375rem}
 .oa_sw .chkl{min-height:2.5rem}
-@media (max-width:600px){.oa_ppb{width:100%}.oa_ppb .btn{flex:1}}
+@media (max-width:599px){.oa_ppb{width:100%}.oa_ppb .btn{flex:1}}
 /* 2.51.0 C (#1352 #1353 #1355): an agent's notepad on the pin board, drafts (tentative events) in the calendar, time / shoot proposals */
 .wgpadag{display:flex;align-items:center;gap:.375rem;font-size:var(--fs-xs);margin:-.125rem 0 .375rem}
 .wgpadag .ic{opacity:.7}
@@ -7180,7 +7180,7 @@ button.kptile:hover,button.kptile:focus-visible{border-color:var(--accent)}
 .apf .ppt{flex:1 1 100%;min-height:2.5rem}
 .apwarn .ic{color:var(--accent)}
 .apalt{border-style:dashed}
-@media (max-width:600px){.apf .aptime,.apf .dpw{flex:1 1 40%}}
+@media (max-width:599px){.apf .aptime,.apf .dpw{flex:1 1 40%}}
 /* 2.52.0 B (#1128) events of writable CalDAV subscriptions: popover actions, hint under "Allow writing" */
 .cevact.dvwact { display: flex; flex-wrap: wrap; gap: .375rem; }
 .cevact.dvwact .btn.pri { margin-left: auto; }
@@ -7648,7 +7648,7 @@ label.pmsw>span:last-child>b,label.pmsw>span:last-child>small{display:block;widt
 .spract{display:flex;gap:.5rem;margin-top:.25rem}
 .sprseg button,.sprunit button{white-space:nowrap}
 .sprtop .btn.sm{align-self:center}
-@media (max-width:40rem){.sprh{padding:.5rem .625rem}.sprtop{gap:.25rem .5rem}.sprtop .spacer{display:none}
+@media (max-width:599px){.sprh{padding:.5rem .625rem}.sprtop{gap:.25rem .5rem}.sprtop .spacer{display:none}
   .sprtg{flex:1 1 0;min-width:0;flex-wrap:wrap;column-gap:.5rem;row-gap:0;text-align:left}.sprtg .muted{flex-basis:100%;padding-left:1.5rem;font-size:var(--fs-xs)}.sprsoon{display:none}.sprtop .sprp{order:5;flex:1 1 100%}.sprtop .sprp .pbar{flex:1;width:auto}
   .sprseg{display:flex}.sprtop .sprseg{flex:1 1 100%;order:6}.sprseg button{flex:1;padding:0 .5rem}}
 @media (prefers-reduced-motion:reduce){.sprp .pbar i{transition:none}}
@@ -7716,7 +7716,7 @@ label.pmsw>span:last-child>b,label.pmsw>span:last-child>small{display:block;widt
 .ptlsw{margin-right:.375rem}
 .ptlsw.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .ptltag.pub{color:var(--accent);white-space:nowrap}
-@media (max-width:40rem){.ptltag.pub .ptlt{position:absolute;width:.0625rem;height:.0625rem;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}}  /* phone: the globe only (read aloud) */
+@media (max-width:599px){.ptltag.pub .ptlt{position:absolute;width:.0625rem;height:.0625rem;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}}  /* phone: the globe only (read aloud) */
 
 /* 2.65.0 D (#1825) long lists: the spacers above and below the drawn rows (vlist.js) */
 /* no transition, also not the reduced-motion one: a spacer is measured right after it changes */
@@ -7789,7 +7789,7 @@ label.pmsw>span:last-child>b,label.pmsw>span:last-child>small{display:block;widt
 .pmcs.br b{color:var(--accent)}
 .pmcsn{display:block;margin-top:.375rem;font-size:var(--fs-xs)}
 .le2uhelp{margin-top:.5rem}
-@media (max-width:40rem){.le2ust > span{display:none}.le2upb{width:6rem}}
+@media (max-width:599px){.le2ust > span{display:none}.le2upb{width:6rem}}
 @media (prefers-reduced-motion:reduce){.le2upb i{transition:none}}
 /* 2.64.2 D (#1817): lock per list stage 2 -- key change hint, safety numbers of all members, head line of list chat / attachments */
 .le2urot{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem}
@@ -7836,9 +7836,9 @@ label.pmsw>span:last-child>b,label.pmsw>span:last-child>small{display:block;widt
 .fcichk .chkl{display:flex;align-items:center;gap:.5rem;min-height:2.75rem}
 .fcichk .row{display:flex;align-items:center;flex-wrap:wrap;gap:.75rem}
 .fcichk select{min-height:2.75rem}
-@media (max-width:40rem){.fcirow{flex-wrap:wrap}.fciamt{flex-direction:row;align-items:center;margin-left:auto}}
+@media (max-width:599px){.fcirow{flex-wrap:wrap}.fciamt{flex-direction:row;align-items:center;margin-left:auto}}
 /* 2.122.2 (#2323): on a phone the amount and the VAT rate get a second line below the name (beside it they overflowed the row) */
-@media (max-width:40rem){.fcirow .ofcn{flex:1 1 0}.fcirow>.fciamt{flex:1 1 100%;min-width:0;justify-content:space-between;gap:.5rem;margin-left:0;padding-left:2.125rem}.fcirow>.fciamt select{width:auto;flex:0 0 auto}}
+@media (max-width:599px){.fcirow .ofcn{flex:1 1 0}.fcirow>.fciamt{flex:1 1 100%;min-width:0;justify-content:space-between;gap:.5rem;margin-left:0;padding-left:2.125rem}.fcirow>.fciamt select{width:auto;flex:0 0 auto}}
 
 /* 2.67.0 B (#1865) dependency chain: the bars that move along while a timeline bar is dragged */
 .tl-bar.dch-ghost{opacity:.6;outline:.0625rem dashed var(--accent);outline-offset:.0625rem;transition:transform .15s ease-out,opacity .15s ease-out}
@@ -7849,7 +7849,7 @@ label.pmsw>span:last-child>b,label.pmsw>span:last-child>small{display:block;widt
 .aim-to .i{color:var(--accent);flex:none}
 .aim-note{white-space:pre-wrap}
 .fcirow.aim-r .fciamt small{line-height:var(--lh-tight)}
-@media (max-width:40rem){.ppm .card:has(.aim-l)>.foot{flex-wrap:wrap;row-gap:.5rem}.ppm .card:has(.aim-l)>.foot [data-pp="apply"]{flex:1 1 100%;min-height:2.75rem}}
+@media (max-width:599px){.ppm .card:has(.aim-l)>.foot{flex-wrap:wrap;row-gap:.5rem}.ppm .card:has(.aim-l)>.foot [data-pp="apply"]{flex:1 1 100%;min-height:2.75rem}}
 
 /* 2.69.0 B (#1847) Paperless-ngx: matching rules in the import preview */
 .pll-rules{margin:.75rem 0 0}
@@ -7917,7 +7917,7 @@ label.pmsw>span:last-child>b,label.pmsw>span:last-child>small{display:block;widt
 .meta .mlm{display:inline-flex;align-items:center;gap:.25rem;min-width:0;max-width:11rem;color:var(--muted)}
 .meta .mlm .mll{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .meta .mlm svg.i{flex:0 0 auto;color:var(--accent)}
-@media (max-width:40rem){.meta .mlm{max-width:8rem}}
+@media (max-width:599px){.meta .mlm{max-width:8rem}}
 /* 2.320.0 (#3289): the field Projects in the task panel; Alt onto a project in the sidebar (the hint while dragging) */
 #detail .dmlp{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;margin:.125rem 0 .5rem;font-size:var(--fs-s);color:var(--text2)}
 #detail .dmlpk{color:var(--muted);margin-right:.125rem}
@@ -8124,7 +8124,7 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 .ev.msvev .msvb{min-width:auto;height:.875rem;padding:0 .1875rem;font-size:var(--fs-xxs)}
 .msvvcal{display:flex;flex-direction:column;gap:.125rem;margin-top:.5rem}
 .cevrow.msvcev{display:flex;align-items:center;gap:.5rem;width:100%;min-height:2.75rem;background:none;border:0;color:inherit;font:inherit;text-align:left;cursor:pointer}
-@media (max-width:37.5rem){.trow.msvrow .meta .lst{max-width:40vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
+@media (max-width:599px){.trow.msvrow .meta .lst{max-width:40vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
 /* 2.73.0 B (#1473) move and export everything (Settings > Data, move.js) */
 .umzbar { display: grid; gap: .375rem; margin: .5rem 0; }
 .umzbar progress { width: 100%; height: .5rem; accent-color: var(--accent); }
@@ -8137,7 +8137,7 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 .umzsteps { margin: .25rem 0 0 1.25rem; padding: 0; line-height: var(--lh); }
 .umzem { flex: 1 1 12rem; min-height: 2.75rem; }  /* review M1: the address an admin types for an invitation */
 .umzmis { flex-basis: 100%; color: var(--danger, inherit); }
-@media (max-width: 40rem) { .umzp { flex-wrap: wrap; } }
+@media (max-width: 599px) { .umzp { flex-wrap: wrap; } }
 
 /* 2.74.0 A (#338): the supporter licence (badge in About + Account, the yearly hint for admins) */
 .supbadges{display:inline-flex;flex-wrap:wrap;align-items:center;gap:.375rem .5rem}
@@ -8282,7 +8282,7 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 .hbmdlg .card>.hbmview>.hbmframe,.hbmdlg .card>.hbmview>.hbmtext{flex:1 1 auto;height:auto;min-height:12rem;max-height:none}
 .hbmdlg .card>.foot{margin-top:auto}
 .hbmwhole{display:inline-flex;align-items:center;gap:.375rem;font-size:var(--fs-s);cursor:pointer}
-@media (max-width:40rem){.hbmdlg{padding:0}.hbmdlg .card{width:100%;height:100dvh;border-radius:0;padding-top:calc(1.25rem + var(--safe-t))}}  /* 2.633.0 (#4994): not under the clock */
+@media (max-width:599px){.hbmdlg{padding:0}.hbmdlg .card{width:100%;height:100dvh;border-radius:0;padding-top:calc(1.25rem + var(--safe-t))}}  /* 2.633.0 (#4994): not under the clock */
 .hbmactrow{display:flex;gap:.375rem;flex-wrap:wrap;margin:0 0 .5rem}
 .hbmmade{display:flex;flex-direction:column;align-items:flex-start;gap:.125rem;margin:0 0 .5rem;font-size:var(--fs-s)}
 .hbmvbar{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin:0 0 .375rem}
