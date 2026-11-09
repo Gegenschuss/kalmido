@@ -170,11 +170,11 @@ function wlk_change(e) {
   const f = t.files[0]; t.value = '';
   wlk_step(tr('Receipt added'), async () => { if (WLK.kind === 'cc') await ccRcUpload(it.x.id, f); else { await bnr_upload(it.x.id, f); bnkReload(); } });
 }
-let wlk_qT = null;
+// the search of another receipt: the list reloads 250 ms after the last key (core.js debounce, tools/perf_budget.py CLEARTIMEOUT_MAX)
+const wlk_qLoad = debounce(async () => { await wlk_load(); const i = /** @type {any} */ ($('[data-wlk-q]', WLK.md)); if (i) { i.focus(); i.setSelectionRange(WLK.q.length, WLK.q.length); } }, 250);
 function wlk_input(e) {
   const t = /** @type {any} */ (e.target); if (!t.matches?.('[data-wlk-q]')) return;
-  WLK.q = t.value; clearTimeout(wlk_qT);
-  wlk_qT = setTimeout(async () => { await wlk_load(); const i = /** @type {any} */ ($('[data-wlk-q]', WLK.md)); if (i) { i.focus(); i.setSelectionRange(WLK.q.length, WLK.q.length); } }, 250);
+  WLK.q = t.value; wlk_qLoad();
 }
 // the keys while the walk-through is the open dialog on top: 1-3, Enter, the arrows (not while typing in the search field)
 document.addEventListener('keydown', e => {
