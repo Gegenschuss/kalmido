@@ -18,7 +18,7 @@ into the text the code and the exports always had ("23.80"), core/orgcrypt.py oc
 import sys
 from decimal import Decimal
 
-from .pg import system_ctx
+from .pg import qi, system_ctx
 
 MC_COLS = (  # (table, column, nullable): the plain money columns of #5293
     ("office_doc_items", "net", True),
@@ -31,6 +31,8 @@ MC_FITS = r"^-?[0-9]{1,12}(\.[0-9]+)?$"
 MC_EXACT = r"^-?[0-9]{1,12}\.[0-9]{2}$"
 MC_SHOW = 5  # ids named in the log per column
 MC_ID = "type:{0}.{1}"  # its row in kalmido_migrations
+MC_TABLES = {t for t, _c, _n in MC_COLS}  # the allowlists of qi() (#5296)
+MC_NAMES = {c for _t, c, _n in MC_COLS}
 
 
 def mc_text(v):
@@ -61,11 +63,12 @@ def mc_type(c, table, col):
 def mc_misfits(c, table, col):
     """[ids] of the rows of table whose col does not fit NUMERIC(14,2) without a change (see the module text); the hash chain's
     positions must be exact text as well."""
-    t = f"btrim({col})"
+    tq, cq = qi(table, MC_TABLES), qi(col, MC_NAMES)
+    t = f"btrim({cq})"
     fits = f"CASE WHEN {t} ~ '{MC_FITS}' THEN {t}::numeric = round({t}::numeric, 2) ELSE {t} = '' END"
-    sql = f"SELECT id FROM {table} x WHERE {col} IS NOT NULL AND NOT ({fits})"
+    sql = f"SELECT id FROM {tq} x WHERE {cq} IS NOT NULL AND NOT ({fits})"
     if table == "office_doc_items":  # office/chain.py: a chained document's positions as the exact text
-        sql += (f" OR ({col} IS NOT NULL AND NOT ({col} ~ '{MC_EXACT}' AND {col} <> '-0.00') AND EXISTS (SELECT 1 FROM office_docs d "
+        sql += (f" OR ({cq} IS NOT NULL AND NOT ({cq} ~ '{MC_EXACT}' AND {cq} <> '-0.00') AND EXISTS (SELECT 1 FROM office_docs d "
                 "WHERE d.id=x.doc_id AND d.chain_seq IS NOT NULL))")
     return [r[0] for r in c.execute(sql + " ORDER BY id").fetchall()]
 
@@ -96,11 +99,12 @@ def _mc_run(c, at):
                   f"{', ...' if len(bad) > MC_SHOW else ''}); correct them and start again", file=sys.stderr, flush=True)
             continue
         empty = "NULL" if nullable else "0"
-        dflt = "" if nullable else f", ALTER COLUMN {col} SET DEFAULT 0"
+        tq, cq = qi(table, MC_TABLES), qi(col, MC_NAMES)
+        dflt = "" if nullable else f", ALTER COLUMN {cq} SET DEFAULT 0"
         try:
             with c.savepoint():
-                c.execute(f"ALTER TABLE {table} ALTER COLUMN {col} DROP DEFAULT, ALTER COLUMN {col} TYPE {MC_TYPE} "
-                          f"USING (CASE WHEN btrim({col}) = '' THEN {empty} ELSE btrim({col})::numeric END){dflt}")
+                c.execute(f"ALTER TABLE {tq} ALTER COLUMN {cq} DROP DEFAULT, ALTER COLUMN {cq} TYPE {MC_TYPE} "
+                          f"USING (CASE WHEN btrim({cq}) = '' THEN {empty} ELSE btrim({cq})::numeric END){dflt}")
         except Exception as e:  # noqa: BLE001 -- the start goes on with the column as it was, the log says why
             out[k] = "kept"
             print(f"migrations: 5293: {k} stays TEXT: {type(e).__name__}: {str(e)[:200]}", file=sys.stderr, flush=True)
