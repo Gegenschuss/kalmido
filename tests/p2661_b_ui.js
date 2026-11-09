@@ -58,6 +58,7 @@ const WS_VIEWS = {
   'static/js/ablinks.js': 'helper',           // 2.470.0 (#3596): wsCur only preselects the workspace of Settings > Data > Sharing defaults (the select has its own pick)
   'static/js/acctset.js': 'helper',           // 2.365.2 C (#2789): wsCur only preselects the organisation of Settings > Absences and holiday (the dialog has its own picker, no view keeping data)
   'static/js/polls.js': 'helper',            // 2.98.1: the default workspace of a new poll (the dialog shows all polls, with their workspace)
+  'static/js/recent.js': 'draw',             // 2.769.0 (#5352): Recently edited keeps its items per workspace key (zle_key: all | private | org:<id>), the shown workspace picks the key while drawing
   'static/js/widgets.js': 'draw',             // 2.627.0 (#4504): wgStdLoad loads the standard of the shown workspace again when it changed (WG.stdWs)
   'static/js/palette.js': 'draw',
   'static/js/areas.js': 'draw',               // 2.87.0: private areas hidden in an organisation's view (o3a_hid while drawing, #1845)

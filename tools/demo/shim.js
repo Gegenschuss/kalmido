@@ -1402,6 +1402,9 @@
     for (const o of wkLive()) if (o.id !== not && re.test(o.body || '')) { o.body = o.body.replace(re, '[[' + to); n++; } return n; };
   on('GET', '/api/wiki', q => ({space: 'private', may_write: true, e2e: null, pages: wkLive().sort((a, b) => a.path.localeCompare(b.path)).map(p => wkOut(p, q.get('bodies') === '1'))}));
   on('GET', '/api/wiki/shared', () => ({pages: []}));
+  // 2.769.0 (#5352): "Recently edited" (recent.js) - the demo's own pages, newest first (one person, the private workspace)
+  on('GET', '/api/recent', q => ({items: wkLive().filter(p => !/^(Templates|Vorlagen)\//.test(p.path)).sort((a, b) => (b.updated_at || '').localeCompare(a.updated_at || ''))
+    .slice(0, Math.min(50, +(q.get('limit') || 20))).map(p => { const parts = p.path.split('/'); return {area: 'wiki', id: p.id, space: 'private', title: parts.pop(), place: parts.join('/'), by: 1, by_name: DB.me.display_name, at: p.updated_at}; })}));
   // 2.371 (#3150): tags and the abfrage block -- the browser's own rules (wktags.js wkt_tags / wkq_run) over the demo's pages
   const wkAll = () => wkLive().sort((a, b) => a.path.toLowerCase() < b.path.toLowerCase() ? -1 : 1).map(p => wkOut(p, true));
   on('GET', '/api/wiki/tags', q => {

@@ -12,7 +12,7 @@
 .zlet{flex:1 1 auto;min-width:0;display:flex;align-items:baseline;gap:.5rem;overflow:hidden;white-space:nowrap}
 .zlen{overflow:hidden;text-overflow:ellipsis}
 .zlep{overflow:hidden;text-overflow:ellipsis;flex:0 1 auto}
-.zlec{flex:0 1 auto;display:inline-flex;align-items:center;gap:.25rem;max-width:10rem;padding:.0625rem .5rem;border:1px solid var(--line);border-radius:999px;font-size:var(--fs-s);white-space:nowrap;overflow:hidden}
+.zlec{flex:0 1 auto;display:inline-flex;align-items:center;gap:.25rem;max-width:10rem;padding:.0625rem .5rem;border:1px solid var(--line);border-radius:99rem;font-size:var(--fs-s);white-space:nowrap;overflow:hidden}
 .zlec>span{overflow:hidden;text-overflow:ellipsis}
 .zlew{flex:none;white-space:nowrap}
 .zleph{height:calc(var(--zlen, 8) * 2.75rem);border-top:1px solid var(--line)}
@@ -24,6 +24,6 @@
 .zlechips .spov{max-width:none}
 .zlechips .spovt{display:none}
 .zlechips .spovl,.zlechips .wkspaces{display:flex;flex-wrap:wrap;gap:.375rem;margin:0 0 .75rem;padding:0;border:0;list-style:none}
-.zlechips .spovr,.zlechips .wkdrow{min-height:2.25rem;height:auto;padding:.125rem .75rem;border:1px solid var(--line);border-radius:999px}
+.zlechips .spovr,.zlechips .wkdrow{min-height:2.25rem;height:auto;padding:.125rem .75rem;border:1px solid var(--line);border-radius:99rem}
 /* a narrow phone: the chip shows its symbol only, the folder of a page stays out */
 @media (max-width:25rem){.zlec>span,.zlep{display:none}.zler{gap:.5rem;padding:0 .5rem}}
