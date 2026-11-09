@@ -99,11 +99,11 @@ def _mc_run(c, at):
                   f"{', ...' if len(bad) > MC_SHOW else ''}); correct them and start again", file=sys.stderr, flush=True)
             continue
         empty = "NULL" if nullable else "0"
-        tq, cq = qi(table, MC_TABLES), qi(col, MC_NAMES)
+        cq = qi(col, MC_NAMES)
         dflt = "" if nullable else f", ALTER COLUMN {cq} SET DEFAULT 0"
         try:
             with c.savepoint():
-                c.execute(f"ALTER TABLE {tq} ALTER COLUMN {cq} DROP DEFAULT, ALTER COLUMN {cq} TYPE {MC_TYPE} "
+                c.execute(f"ALTER TABLE {qi(table, MC_TABLES)} ALTER COLUMN {cq} DROP DEFAULT, ALTER COLUMN {cq} TYPE {MC_TYPE} "
                           f"USING (CASE WHEN btrim({cq}) = '' THEN {empty} ELSE btrim({cq})::numeric END){dflt}")
         except Exception as e:  # noqa: BLE001 -- the start goes on with the column as it was, the log says why
             out[k] = "kept"
