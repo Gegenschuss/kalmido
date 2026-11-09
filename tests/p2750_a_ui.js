@@ -5,7 +5,7 @@
 //   folder card moves the file (before: the browser's own drag carried a file, the drop uploaded it as a new version); dropped
 //   on the empty view nothing happens; any other drag begun on the page (only the shared type of dropany.js) uploads nothing,
 //   not in the panel either; a file from the computer (no dragstart) still uploads into the folder; the own folder takes nothing
-// - #5228 a recognised document in the LIST opens the document view (#docs/<id>, leafing through the folder's documents) like
+// - #5228 a recognised document in the LIST opens the document view (#ablage/<id> since #4887, leafing through the folder's documents) like
 //   the cards, leafing through the folder's DOCUMENTS (before: the PDFs and pictures, one of them = no leafing), never the
 //   plain viewer; ab_openDoc loads the documents' module first when a click comes before it
 // - #4876 the document view: Title = the file name without its ending, the file name its own field, "File name from title"
@@ -122,7 +122,7 @@ const upload = async (name, parent) => {
   check(await until(() => w.eval(`!!(AB.data?.items || []).find(x => x.id === ${DOC})?.doc`)), 'the row knows it is a document (doc)');
   w.eval('window.__tv = 0; window.__pv = 0; textView = () => { window.__tv++; }; pdfView = () => { window.__pv++; };');
   row?.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
-  check(await until(() => w.location.hash === '#docs/' + DOC), 'the click opens the document view #docs/' + DOC + ' (got ' + w.location.hash + ')');
+  check(await until(() => w.location.hash === '#ablage/' + DOC), 'the click opens the document view #ablage/' + DOC + ' (got ' + w.location.hash + ')');
   check(!w.__tv && !w.__pv, 'not the plain viewer');
   check(await until(() => w.eval(`typeof DC !== 'undefined' && (DC.navSrc?.docs || []).some(x => x.id === ${DOC})`)), 'it leafs through the folder\'s documents');
 
