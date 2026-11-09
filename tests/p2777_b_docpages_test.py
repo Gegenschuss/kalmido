@@ -193,4 +193,44 @@ r = A.post(B + f"/api/docs/{D1}/pages", json={"rotate": {"1": 180}})
 check(r.status_code == 201 and rotations(content(A, D1)) == [180], f"... turned by 180 without expect_version (old clients) ({r.status_code})")
 check(Fr.get(B + f"/api/docs/{D1}/pages").status_code == 404, "frida never sees alice's document (404)")
 
+# ================================================================ review fixes (F2-F6)
+# F2 / F3 / F5 / F6 in the container's Python (the route module itself, its child process replaced)
+UNIT = r"""
+import app, subprocess, json
+from kalmido.docs import pages as P
+from kalmido.core.errors import Denied
+out = {}
+real = subprocess.run
+def part(key, fn):  # one finding each; a part that breaks says so in its value
+    try:
+        out[key] = fn()
+    except Denied as e:
+        out[key] = [e.code, e.msg]
+    except Exception as e:
+        out[key] = "crashed: " + repr(e)
+    finally:
+        subprocess.run = real
+def boom(*a, **k):
+    raise subprocess.TimeoutExpired(a[0], 1)
+def fork(*a, **k):
+    raise OSError("fork failed")
+def with_run(fake, fn):
+    subprocess.run = fake
+    return fn()
+# F2: a timeout / a failed start of the child process
+part("count_timeout", lambda: with_run(boom, lambda: P.dp_count(b"%PDF")))
+part("edit_timeout", lambda: with_run(boom, lambda: P._edit(b"%PDF", 2, [1], {})))
+part("count_oserror", lambda: with_run(fork, lambda: P.dp_count(b"%PDF")))
+part("exit5", lambda: with_run(lambda *a, **k: subprocess.CompletedProcess(a[0], 5, b"", b""), lambda: P._edit(b"%PDF", 2, [1], {})))
+print(json.dumps(out))
+"""
+u = subprocess.run(["docker", "exec", CT, "python", "-c", UNIT], capture_output=True, text=True)
+try:
+    U = json.loads(u.stdout.strip().splitlines()[-1])
+except (ValueError, IndexError):
+    U = {}
+check(U, f"the unit part ran ({u.stderr[-400:]})")
+check(U.get("count_timeout") is None and U.get("count_oserror") is None, f"F2: a timeout / a failed start of the count = None (409), no 500 {U}")
+check(isinstance(U.get("edit_timeout"), list) and U["edit_timeout"][0] == 409, f"F2: a timeout of the edit: 409 {U.get('edit_timeout')}")
+
 sys.exit(kt.done("p2777_b_docpages"))

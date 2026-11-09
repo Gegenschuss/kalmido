@@ -88,10 +88,21 @@ sys.stdout.buffer.write(out)
 COUNT_WORKER = PAGES_WORKER[:PAGES_WORKER.index("n = len(r.pages)")] + "sys.stdout.write(str(len(r.pages)))\n"
 
 
+def _dp_run(code, arg, data, secs):
+    """A limited pypdf child process (code, its argv JSON, the PDF on stdin). review F2: a timeout or a failed start (fork) =
+    None (the callers: 409)."""
+    try:
+        return subprocess.run([sys.executable, "-I", "-c", code, arg], input=data, capture_output=True, timeout=secs, close_fds=True,
+                              env={"PATH": os.environ.get("PATH", "/usr/bin:/bin")})
+    except (subprocess.TimeoutExpired, OSError):
+        return None
+
+
 def dp_count(data):
     """The real page count of a PDF (the same limited child process, nothing written), None when it cannot be read."""
-    p = subprocess.run([sys.executable, "-I", "-c", COUNT_WORKER, "{}"], input=data, capture_output=True, timeout=60, close_fds=True,
-                       env={"PATH": os.environ.get("PATH", "/usr/bin:/bin")})
+    p = _dp_run(COUNT_WORKER, "{}", data, 60)
+    if p is None:
+        return None
     try:
         return int(p.stdout.decode().strip()) if p.returncode == 0 else None
     except ValueError:
@@ -124,8 +135,9 @@ def dp_clean(b, n):
 
 
 def _edit(data, n, gone, turn):
-    p = subprocess.run([sys.executable, "-I", "-c", PAGES_WORKER, json.dumps({"n": n, "delete": gone, "rotate": {str(k): v for k, v in turn.items()}})],
-                       input=data, capture_output=True, timeout=180, close_fds=True, env={"PATH": os.environ.get("PATH", "/usr/bin:/bin")})
+    p = _dp_run(PAGES_WORKER, json.dumps({"n": n, "delete": gone, "rotate": {str(k): v for k, v in turn.items()}}), data, 180)
+    if p is None:
+        raise Denied(409, tr("The pages cannot be read right now, try again later"))
     if p.returncode == 3:
         raise Denied(409, tr("The PDF is encrypted and cannot be changed"))
     if p.returncode == 5:
