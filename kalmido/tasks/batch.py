@@ -23,7 +23,6 @@ from ..tasks.validation import lock_problem  # 2.369.5 (#2517): pulled up from f
 from ..tasks.validation import lock_done_problem  # 2.542.0 (#4609)
 from ..core.pg import write_lock  # review 2.528 (Fable 3)
 from ..lists.seckind import sk_after_status, sk_answer, sk_on_move, sk_snap  # 2.577.0 (#3354)
-from ..tasks.tundo import tu_mark, tu_op  # 2.774.0 (#5251)
 
 
 @app.delete("/api/attachments/<int:aid>")
@@ -130,6 +129,7 @@ def task_reorder():
                 f["milestone_id"] = None  # 2.18.0 (#430): the milestone stays in its list
             f["updated_at"] = ts
             before = c.execute("SELECT * FROM tasks WHERE id=?", (it["id"],)).fetchone()
+            from ..tasks.tundo import tu_mark
             tu_mark(c, int(it["id"]), before, {})  # 2.774.0 (#5251): a drag is a step on the server too
             if "section_id" in f or "list_id" in f:  # 2.577.0 (#3354): what task.status_changed compares with
                 sk_snap(c, int(it["id"]))
@@ -325,6 +325,7 @@ def task_batch():
                 log_act(c, tid, "reopen")
                 u = {"op": "reopen", "status": old["status"], "completed_at": old["completed_at"], "completed_by": old["completed_by"]}
                 sk_after_status(c, old, 0, u)  # 2.577.0 (#3354): out of a done / rejected column
+                from ..tasks.tundo import tu_op
                 tu_op(c, tid, "reopen", {"u": u})  # 2.774.0 (#5251): the server's undo step
                 rul_fire(c, tid, rb)
                 undo[str(tid)] = signed(tid, u)
@@ -340,6 +341,7 @@ def task_batch():
                 irr_guard(c, tid)  # 2.392.0 (#3370)
                 do_delete(c, tid)
                 log_act(c, tid, "delete")
+                from ..tasks.tundo import tu_op
                 tu_op(c, tid, "delete")  # 2.774.0 (#5251): the server's undo step
             elif action == "restore":
                 restore_task(c, tid)

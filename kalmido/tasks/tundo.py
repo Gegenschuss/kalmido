@@ -22,10 +22,19 @@ import json
 
 from flask import g
 
+from ..collab.liste2e import le2e_is_cipher
+from ..collab.reactions import ltag_names
+from ..core.access import need_list, need_task
 from ..core.db import bump
 from ..core.errors import Denied
 from ..core.i18n import N_, tr
+from ..core.pg import write_lock
 from ..core.undodiff import ug_diff_add, undo_diff_reg, undo_person
+from ..core.undoweb import UG_KEPT, UG_KEPT_REDO
+from ..lists.listtrash import otr_err_task
+from ..lists.sections import sec_apply
+from ..tasks.lifecycle import apply_update, need_live, restore_task, signed, trash_task, tsk_finish, tsk_reopen, undo_status
+from ..tasks.tasks import my_tags
 from ..tasks.validation import TASK_FIELDS
 
 TU_COLS = tuple(k for k in TASK_FIELDS if k not in ("snippets", "locked"))  # the snippets keep authors, the lock is its own step
@@ -61,10 +70,8 @@ def _marks(c):
 
 def _extra(c, tid, k):
     if k == "tags":
-        from ..tasks.tasks import my_tags
         return sorted(my_tags(c, tid))
     if k == "ltags":
-        from ..collab.reactions import ltag_names
         return sorted(ltag_names(c, tid))
     if k == "fields":
         return {str(r[0]): r[1] for r in c.execute("SELECT field_id, value FROM task_field_values WHERE task_id=? ORDER BY field_id", (tid,))}
@@ -170,7 +177,6 @@ def _org(c, lid):
 
 
 def _title(v):
-    from ..collab.liste2e import le2e_is_cipher
     return [TU_TASK] if not v or le2e_is_cipher(v) else str(v)[:60]
 
 
@@ -184,7 +190,6 @@ def tu_section(c, sid, cur, keys):
     ch = [k for k in keys if _js(cur[k]) != _js(now[k])]
     if not ch:
         return
-    from ..collab.liste2e import le2e_is_cipher
     plain = not le2e_is_cipher(now["name"] or "")  # a list with the lock: the name is a ciphertext, never in a label
     label = (TU_SEC, [now["name"]]) if "name" in ch and plain else (TU_SEC_SET, [now["name"] if plain else ""])
     ug_diff_add(c, uid, "section", sid, _org(c, now["list_id"]), TU_AREA, label,
@@ -199,7 +204,6 @@ def tu_sec_order(c, lid, before, after):
 
 # ---------------------------------------------------------------- taking a step back / forward (core/undoweb.py)
 def _fields(c, tid, data, redo):
-    from ..tasks.lifecycle import apply_update, need_live
     need_live(c, tid)
     src, dst = (data.get("b") or {}, data.get("a") or {}) if redo else (data.get("a") or {}, data.get("b") or {})
     if not dst:
@@ -210,20 +214,17 @@ def _fields(c, tid, data, redo):
         raise Denied(409, e)
     left = [x["field"] for x in cf]
     if left and len(left) >= sum(len(v) if k == "fields" and isinstance(v, dict) else 1 for k, v in dst.items()):
-        from ..core.undoweb import UG_KEPT, UG_KEPT_REDO
         raise Denied(409, tr(UG_KEPT_REDO if redo else UG_KEPT, ", ".join(left)))
     return data, left
 
 
 def _status_back(c, tid, u):
-    from ..tasks.lifecycle import signed, undo_status
     e = undo_status(c, tid, signed(tid, u))
     if e:
         raise Denied(409, e)
 
 
 def _complete(c, tid, data, redo):
-    from ..tasks.lifecycle import need_live, tsk_finish
     if not redo:
         _status_back(c, tid, data.get("u") or {})
         return data, []
@@ -236,7 +237,6 @@ def _complete(c, tid, data, redo):
 
 
 def _reopen(c, tid, data, redo):
-    from ..tasks.lifecycle import need_live, tsk_reopen
     if not redo:
         _status_back(c, tid, data.get("u") or {})
         return data, []
@@ -251,8 +251,6 @@ def _reopen(c, tid, data, redo):
 
 def _trash(c, tid, out):
     """out = True: to the trash (only while it is not there), False: back (only while it is there)."""
-    from ..lists.listtrash import otr_err_task
-    from ..tasks.lifecycle import restore_task, trash_task
     row = c.execute("SELECT deleted_at FROM tasks WHERE id=?", (tid,)).fetchone()
     if bool(row["deleted_at"]) == out:
         raise Denied(409, tr(TU_GONE))
@@ -272,7 +270,6 @@ def _created_changed(c, uid, tid, since):
 
 def tu_run(c, uid, tid, data, redo):
     """core/undodiff.py run: one task part back (redo: forward). The rights of now: write access to the task (need_task)."""
-    from ..core.access import need_task
     role = need_task(c, tid)
     op = data.get("op")
     if op in ("delete", "create", "restore") and role == "participant":
@@ -299,11 +296,9 @@ def tu_run(c, uid, tid, data, redo):
 
 def sec_run(c, uid, sid, data, redo):
     """A section's step back / forward: sec_apply with _prev (a value changed elsewhere since stays, named)."""
-    from ..lists.sections import sec_apply
     src, dst = (data.get("b") or {}, data.get("a") or {}) if redo else (data.get("a") or {}, data.get("b") or {})
     left = [x["field"] for x in sec_apply(c, sid, {**dst, "_prev": src})]
     if left and len(set(left)) >= len(dst):
-        from ..core.undoweb import UG_KEPT, UG_KEPT_REDO
         raise Denied(409, tr(UG_KEPT_REDO if redo else UG_KEPT, ", ".join(left)))
     bump(c, TU_AREA)
     return data, left
@@ -311,8 +306,6 @@ def sec_run(c, uid, sid, data, redo):
 
 def sec_order_run(c, uid, lid, data, redo):
     """The order of a project's sections back / forward: only while it is still the one the step left (same sections)."""
-    from ..core.access import need_list
-    from ..core.pg import write_lock
     need_list(c, lid)
     write_lock(c, f"sections:{lid}")
     src, dst = (data.get("b"), data.get("a")) if redo else (data.get("a"), data.get("b"))
