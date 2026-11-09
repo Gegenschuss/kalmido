@@ -100,7 +100,7 @@ ws("all")
 check(ofs({HS: "private"})[0] == 403, f"off, under All with the header Private: 403 {ofs({HS: 'private'})}")
 check(ofs(params={"_osp": "private"})[0] == 403, "off, under All with ?_osp=private: 403")
 check(ofs({HS: f"org:{ORG}"})[:2] == (200, ORG), f"off, under All with the header of the organisation: its office {ofs({HS: f'org:{ORG}'})}")
-check(A.get(B + "/api/settings").json().get("features", "").split(",").count("office") == 1, "off: the module switch itself stays on")
+check("office" in (A.get(B + "/api/state").json()["settings"].get("features") or "").split(","), "off: the module switch itself stays on")
 
 # ---------------------------------------------------------------- on again: everything as before
 priv_off(False)

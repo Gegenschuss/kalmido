@@ -385,7 +385,7 @@ function modulesHtmlMain(hint) {
       <div class="row"><label for="s-trem">${tr('Reminder after')}</label><input type="number" id="s-trem" value="${esc(s.time_remind_h ?? '4')}" min="0" max="48" step="0.5" class="numin"><span class="muted">${tr('hours, push “still running?”, 0 = off')}</span></div>
       ${tsl_setRows(s)}
       <div class="row"><label for="s-tstop">${tr('Stop automatically after')}</label><input type="number" id="s-tstop" value="${esc(s.time_autostop_h ?? '12')}" min="0" max="72" step="0.5" class="numin"><span class="muted">${tr('hours, end = start + value, 0 = off')}</span></div>
-      <div class="row"><label>${tr('Focus sessions')}</label><label class="chkl wtfocus"><input type="checkbox" id="s-tfocus" ${s.time_focus !== '0' ? 'checked' : ''}> ${tr('count as time entries (not while a timer runs)')}</label></div></details>` 
+      <div class="row"><label>${tr('Focus sessions')}</label><label class="chkl wtfocus"><input type="checkbox" id="s-tfocus" ${s.time_focus !== '0' ? 'checked' : ''}> ${tr('count as time entries (not while a timer runs)')}</label></div></details>`
     : k === 'office' ? ofp_html() : '';  // 2.794.0 (#5392): "Also private"
   const row = k => k.startsWith('a:') ? mg_modAreaHtml(k.slice(2), x => modRowHtml(x, opt)) : modRowHtml(k, opt);  // 2.44.0 (#1187)
   return `<h4 id="s-purpose-h">${tr('What do you use Kalmido for?')}</h4>${purposeCards(S.settings.purpose || '')}${mc_secHtml() /* 2.575.0 (#3778) */}${pm_allHtml('s-modsall', pm_allShown())}
@@ -410,12 +410,9 @@ function modCountsSyncMain(md) {
   if (pma) pma.indeterminate = !pma.checked && pma_full().some(k => feat(k));  // 2.364.0 A (#3015): some modules on = the switch half
   for (const d of $$('[data-modgrp]', md)) { const r = modGroupKeys(MOD_GROUPS[+d.dataset.modgrp][1]), c = $('.mgc', d); if (c) c.textContent = modGroupCount(r); }
 }
-// 2.306.0 B (#2887): health and journal entries are special categories of personal data: a plain note in the module row
-// (2.312.0 B #3264: MOD_PRIV / modPrivHtml in lazyload.js, shared with the area switch and the first-run setup)
-// one module switch (Settings > Modules; 2.6.0 (K09): the agents switch only there, Settings > Agents links to it)
 // 2.794.0 (#5392): Office & finance > "Also private": off = no office in the workspace Private (the organisations' offices
 // stay). Stored as the module "office" in ws_mods_off.private (the same switch a private module card writes, areas.js mc_*;
-// the server refuses the private office then, accounts/modcards.py mc_private_office); its data stays. Only with an
+// the server refuses the private office then, accounts/modcards.py mc_gate); its data stays. Only with an
 // organisation: alone, Private is the only workspace and the module switch itself is the switch. Hidden with the module
 // off (.modrow.off .mopt)
 const ofp_show = () => !S.me?.kid && (S.me?.workspaces || []).length > 0;
@@ -428,8 +425,12 @@ async function ofp_switch(el) {
   const n = `${tr('Office & finance')} · ${tr('Also private')}`;
   await setApply({ws_mods_off: JSON.stringify(o)}, on ? tr('{0} on', n) : tr('{0} off', n));
   ofp_sync(); render();
+  if ($('#s-mcards')) mc_draw();  // the private cards show which one matches now
 }
 function ofp_sync(md = $$('.smodal').pop()) { for (const el of $$('input[data-ofpriv]', md || document)) el.checked = ofp_on(); }
+// 2.306.0 B (#2887): health and journal entries are special categories of personal data: a plain note in the module row
+// (2.312.0 B #3264: MOD_PRIV / modPrivHtml in lazyload.js, shared with the area switch and the first-run setup)
+// one module switch (Settings > Modules; 2.6.0 (K09): the agents switch only there, Settings > Agents links to it)
 function modRowHtml(k, opt = () => '') {
   const adm = !!S.me?.is_admin;
   const n = FEATS.find(x => x[0] === k)?.[1] || k, srv = k === 'collab' ? S.collabAll !== false : k === 'time' ? S.timeAll !== false : true;
