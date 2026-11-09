@@ -149,10 +149,13 @@ check(A.put(B + f"/api/lists/{W['id']}/groups/{G}", json={"role": "edit"}).ok, "
 
 # ================================================================== #965 admins and personal agents
 A.patch(B + f"/api/users/{BOB}", json={"is_admin": True})
-check(not any(a["id"] in (CL, MB) for a in Bo.get(B + "/api/agents").json()["agents"]), "#965: an admin without a shared list sees no agent in /api/agents")
-check(not any(a["id"] in (CL, MB) for a in state(Bo)["agents"]), "#965: ... nor in the state")
+# 2.777.0 (#5378): the team agent is listed for every member of its organisation, but as not reached ("shared": false, no data)
+check(not any(a["id"] == MB or (a["id"] == CL and a.get("shared") is not False) for a in Bo.get(B + "/api/agents").json()["agents"]),
+      "#965: an admin without a shared list reaches no agent in /api/agents")
+check(not any(a["id"] == MB or (a["id"] == CL and a.get("shared") is not False) for a in state(Bo)["agents"]), "#965: ... nor in the state")
 check(Bo.get(B + f"/api/agents/{MB}/chat").status_code == 404 and Bo.post(B + f"/api/agents/{MB}/chat", json={"body": "hi"}).status_code == 404, "#965: an admin cannot chat with somebody's personal agent")
-check(Bo.get(B + f"/api/agents/{CL}/chat").status_code == 404, "#965: ... nor with a team agent of lists it is not in")
+# 2.777.0 (#5378): the chat of a team agent of his organisation opens, but as not reached (Kalmido's fixed answer, no event)
+check(Bo.get(B + f"/api/agents/{CL}/chat").json().get("shared") is False, "#965: ... nor really with a team agent of lists it is not in")
 adm = Bo.get(B + "/api/admin/agents").json()["agents"]
 mb = next(a for a in adm if a["id"] == MB)
 check(mb.get("restricted") is True and mb["owner"]["id"] == 1 and "tokens" in mb and not mb["tokens"] and not mb["lists"], "#965: the administration lists it restricted " + str(sorted(mb)))
@@ -162,9 +165,9 @@ check(A.patch(B + f"/api/admin/agents/{MB}", json={"enabled": True}).ok, "#965: 
 TW = A.post(B + "/api/tasks", json={"title": "Work task", "list_id": W["id"]}).json()["id"]
 check(A.put(B + f"/api/lists/{W['id']}/members", json={"user_id": CL, "role": "edit"}).ok, "share Work with Claude again")
 check(A.put(B + f"/api/lists/{W['id']}/members", json={"user_id": BOB, "role": "edit"}).ok, "share Work with bob")
-check(not any(a["id"] == CL for a in Bo.get(B + "/api/agents").json()["agents"]), "#965: a member (admin) still does not reach the agent while the list is not open to members")
+check(not any(a["id"] == CL and a.get("shared") is not False for a in Bo.get(B + "/api/agents").json()["agents"]), "#965: a member (admin) still does not reach the agent while the list is not open to members")  # 2.777.0 (#5378): listed, not reached
 A.patch(B + f"/api/lists/{W['id']}", json={"agent_members": True})
-check(any(a["id"] == CL for a in Bo.get(B + "/api/agents").json()["agents"]), "#965: with the list open he does, like everyone")
+check(any(a["id"] == CL and a.get("shared") is True for a in Bo.get(B + "/api/agents").json()["agents"]), "#965: with the list open he does, like everyone")
 jobs = Bo.get(B + "/api/agents/jobs").json()["jobs"]
 r = requests.post(V + "/agent/jobs", headers=MBH, json={"title": "Private job", "state": "running"})
 check(r.ok and not any(j["id"] == r.json()["id"] for j in Bo.get(B + "/api/agents/jobs").json()["jobs"]), "#965: an admin does not see the jobs of somebody's personal agent")

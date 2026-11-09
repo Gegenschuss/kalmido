@@ -6,7 +6,8 @@ freelancer-matrix: agents (the person without an organisation: her personal serv
 tenant-matrix: agent (another organisation's admin neither creates in, reads nor addresses the team agent, sees no proposal)
  - an organisation's admin (no instance admin) creates a team agent on the server and stores the key; a member, another
    organisation's admin and a person without an organisation cannot (404)
- - "Members may see and use the agent" off: a member's mention reaches the team agent not at all, the chat refuses; the
+ - "Members may see and use the agent" off: a member's mention reaches the team agent not at all, the chat reaches it not
+   (2.777.0: Kalmido's fixed answer instead of a refusal); the
    project's owner gives it orders
  - switched on: a member's mention starts a run that works for that member (agent_runs.asked_by, agent_usage.asked_by)
  - a limit per member (PUT /api/agents/<id>/server/team): only the admin; the member over it gets a clear answer and no model
@@ -117,7 +118,11 @@ n_ev = dbx("SELECT COUNT(*) FROM agent_events WHERE agent_id=?", (TK,))[0][0]
 check(Ca.post(B + f"/api/tasks/{T1}/comments", json={"body": f"<@{TK}> CARL-NORIGHT FAKE_COMMENT {T1}"}).ok, "carl mentions the agent")
 check(dbx("SELECT COUNT(*) FROM agent_events WHERE agent_id=? AND payload LIKE '%CARL-NORIGHT%'", (TK,))[0][0] == 0,
       "switch off: a member's mention reaches the team agent not at all")
-check(Ca.post(B + f"/api/agents/{TK}/chat", json={"body": "Hello CARL-CHAT"}).status_code in (403, 404), "switch off: the member's chat is refused")
+# 2.777.0 (#5378): a member of the team agent's organisation may write to it without a project opened to him - Kalmido answers
+# with a fixed text, nothing reaches the agent (was: refused)
+r = Ca.post(B + f"/api/agents/{TK}/chat", json={"body": "Hello CARL-CHAT"})
+check(r.status_code == 201 and dbx("SELECT COUNT(*) FROM agent_events WHERE agent_id=? AND payload LIKE '%CARL-CHAT%'", (TK,))[0][0] == 0,
+      f"switch off: the member's chat never reaches the agent, Kalmido answers ({r.status_code})")
 check(Bo.post(B + f"/api/tasks/{T1}/comments", json={"body": f"<@{TK}> FAKE_COMMENT {T1}"}).ok, "the owner mentions it")
 check(until(lambda: agent_comments(T1), 40), "the owner's order: the agent commented")
 rr = settled(1)
