@@ -82,8 +82,8 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
       return true;
     };
     const PAGES = [
-      ['start', '#home', '#view .dash', 'seite'],
-      ['list', '#l/' + L, '#view .lwrap', 'seite'],
+      ['start', '#home', '#view .dash', 'voll'],  // 2.583.0 (#4840): --w-seite is none, lists and overviews take the full width: #top as before
+      ['list', '#l/' + L, '#view .lwrap', 'voll'],  // 2.583.0 (#4840), as start
       ['board', '#l/' + K, '#view .kanban', 'voll'],
       ['wiki', '#wiki/' + WP.id, '#view article.wkpage', 'eigen'],
       ['note', '#note/' + NT.id, '#view .ntview.open', 'eigen'],
@@ -145,10 +145,11 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
       await ev(`(() => { LS.del('wkSt'); renderView(); return 1; })()`);
       // the width switch: this page Wide -> Full -> like the default; the default for knowledge pages Wide (the account)
       check(await menuPick('[data-wk="pmenu"]', 'm-pgw', 'm-pgw-breit'), '#4808: "…" > Page width… > Wide (this page)');
-      const wide = await until(`(() => { const x = ${SHEET}; return x && document.querySelector('.ntwrap.pgw-breit') && Math.abs(x.col - 96 * x.rem) <= 2 ? x : null; })()`, {timeout: 5000}) || await ev(SHEET);
-      check(wide && Math.abs(wide.col - 96 * wide.rem) <= 2, `#4808 2560px: Wide = the text column --w-seite ` + JSON.stringify(wide));
-      const t1 = await until(`(() => { const x = ${EDGES('#view article.wkpage')}; return x && Math.abs(x.tl - x.el) <= 2 ? x : null; })()`, {timeout: 5000}) || await ev(EDGES('#view article.wkpage'));
-      check(t1 && Math.abs(t1.tl - t1.el) <= 2 && Math.abs(t1.tr - t1.er) <= 2, `#4814/#4808 2560px Wide: #top follows the page ` + JSON.stringify(t1));
+      // 2.783.0 (#5376): Wide = the text takes the card's width (--w-seite is no limit since #4840); #top stays where the list has it
+      const wide = await until(`(() => { const x = ${SHEET}; return x && document.querySelector('.ntwrap.pgw-breit') && Math.abs(x.col - (x.w - 2 * x.pad - 2 * x.bw)) <= 2 ? x : null; })()`, {timeout: 5000}) || await ev(SHEET);
+      check(wide && Math.abs(wide.col - (wide.w - 2 * wide.pad - 2 * wide.bw)) <= 2, `#4808/#5376 2560px: Wide = the text column is the card's inside ` + JSON.stringify(wide));
+      const t1 = await until(`(() => { const x = ${EDGES('#view article.wkpage')}; return x && x.w === 'voll' && Math.abs(x.pl - 2 * x.rem) < 1 ? x : null; })()`, {timeout: 5000}) || await ev(EDGES('#view article.wkpage'));
+      check(t1 && t1.w === 'voll' && Math.abs(t1.pl - 2 * t1.rem) < 1, `#4814/#5376 2560px Wide: #top as in the list ` + JSON.stringify(t1));
       check(/"w\d+":"breit"/.test(await ev(`JSON.stringify(LS.get('pgW', null))`)), '#4808: the page\'s own width is kept on the device (LS pgW)');
       await shot('p2599b-wiki-2560-wide.png');
       check(await menuPick('[data-wk="pmenu"]', 'm-pgw', 'm-pgw-voll'), '#4808: "…" > Page width… > Full (this page)');
@@ -178,10 +179,12 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
     check(n1 && Math.abs(n1.l - n1.r) <= 2 && n1.l > 2, '#4808 2560px note: list + note one block in the middle ' + JSON.stringify(n1));
     for (const theme of ['light', 'dark']) { await paint(theme); await shot(`p2599b-note-2560-${theme}.png`); }
     check(await menuPick('[data-act="nt-menu"]', 'm-pgw', 'm-pgw-breit'), '#4808: the note\'s "…" > Page width… > Wide');
-    const n2 = await until(`(() => { const x = ${NS}; return x && document.querySelector('.ntwrap.pgw-breit') && Math.abs(x.col - 96 * x.rem) <= 2 ? x : null; })()`, {timeout: 5000}) || await ev(NS);
-    check(n2 && Math.abs(n2.col - 96 * n2.rem) <= 2, '#4808 2560px note: Wide = --w-seite ' + JSON.stringify(n2));
-    const tn = await until(`(() => { const x = ${EDGES('#view .ntview.open')}; return x && Math.abs(x.tl - x.el) <= 2 ? x : null; })()`, {timeout: 5000}) || await ev(EDGES('#view .ntview.open'));
-    check(tn && Math.abs(tn.tl - tn.el) <= 2 && Math.abs(tn.tr - tn.er) <= 2, '#4814 2560px note Wide: #top has the edges of the block ' + JSON.stringify(tn));
+    // 2.583.0 (#4840): --w-seite (Wide) is no limit any more: the note's text takes the sheet's whole inside, #top stays as in the list (voll)
+    const nWide = x => x && x.l <= 2 && x.r <= 2 && x.col > 96 * x.rem;
+    const n2 = await until(`(() => { const x = ${NS}; return x && document.querySelector('.ntwrap.pgw-breit') && x.l <= 2 && x.r <= 2 && x.col > 96 * x.rem ? x : null; })()`, {timeout: 5000}) || await ev(NS);
+    check(nWide(n2), '#4808/#4840 2560px note: Wide = the full width (--w-seite none) ' + JSON.stringify(n2));
+    const tn = await until(`(() => { const x = ${EDGES('#view .ntview.open')}; return x && x.w === 'voll' && Math.abs(x.pl - 2 * x.rem) < 1 ? x : null; })()`, {timeout: 5000}) || await ev(EDGES('#view .ntview.open'));
+    check(tn && tn.w === 'voll' && Math.abs(tn.pl - 2 * tn.rem) < 1, '#4814/#4840 2560px note Wide: #top as in the list ' + JSON.stringify(tn));
     check(await menuPick('[data-act="nt-menu"]', 'm-pgw', 'm-pgwd-voll'), '#4808: the note\'s "…" > default Full');
     let lk3 = '';
     for (let i = 0; i < 40 && !/"ntW":"voll"/.test(lk3); i++) { await sleep(250); lk3 = (await call('GET', '/api/state')).settings?.look || ''; }
