@@ -81,7 +81,8 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   click(w, d.querySelector('[data-act="dash-custom"]')); await settleW(w);
   const rows = [...d.querySelectorAll('.dcust li')];
   // 2.45.0 (#1504): the default order starts with Today, then Agents, News
-  check(rows.length === 10 && rows[0].dataset.k === 'today' && d.activeElement?.closest('.dcust'), 'Customize: every card with ↑ ↓ and a switch, the focus in the list');
+  // 2.769.0 (#5352): + the card "Recently edited" = 11
+  check(rows.length === 11 && rows.some(r => r.dataset.k === 'recent') && rows[0].dataset.k === 'today' && d.activeElement?.closest('.dcust'), 'Customize: every card with ↑ ↓ and a switch, the focus in the list ' + rows.map(r => r.dataset.k).join(','));
   click(w, d.querySelector('.dcust [data-act="dash-mv"][data-k="agents"][data-d="1"]')); await settleW(w);
   const sw = d.querySelector('.dcust [data-dshow="stats"]'); sw.checked = false; sw.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(300);
   const ds = JSON.parse((await call('GET', '/api/state')).settings.dashboard || '{}');
