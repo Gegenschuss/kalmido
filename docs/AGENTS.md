@@ -389,7 +389,9 @@ model itself. No computer of your own, no launcher, no `CLAUDE.md` file.
   documents of an organisation need its admin. 2.777.0 (#5378): the dialog asks for *Projects for the agent* (your own
   projects; for a team agent those of its organisation) and shares them **before** the starter pack. Without one the planned
   jobs are made all the same, switched off and marked as waiting (state `waiting`, a calm hint, no error); they switch
-  themselves on as soon as you reach the agent through a shared project. The agent's server settings list every item of
+  themselves on as soon as you share one of **your own** projects with the agent (you own it or are its admin). Someone
+  else taking the agent into a project where you are only a member does not start them; asking for the item again
+  yourself does. The agent's server settings list every item of
   the starter pack with its state and add a missing one later (*Add*), and say with a *Share project* button when no
   project is shared yet.
 - **Team agents for the whole organisation** (2.777.0, #5378): a team agent of an organisation shows in the tab *Agents*
@@ -398,8 +400,12 @@ model itself. No computer of your own, no launcher, no `CLAUDE.md` file.
   organisations, guests, read-only or accounting roles. A member who shares no project with it may write to it: the
   message starts no run and reaches the agent as no event (no costs on the organisation's key); Kalmido itself answers at
   once with a fixed text (no language model) that the agent sees nothing of theirs and how to share a project with it.
-  Their text stays in their conversation, where `GET /api/v1/agent/chats` lists it like every chat row; answering such a
-  person (`POST /api/v1/agent/chats/<id>`) stays 404 until a project is shared. Files, a task or a job in such a message: 400.
+  Their text and that answer stay in their own conversation only: no agent route lists, finds or marks them delivered
+  (`GET /api/v1/agent/chats`, the message search, reactions), also not after a project is shared later. Answering such a
+  person (`POST /api/v1/agent/chats/<id>`) stays 404 until a project is shared. Their chat is text only: files, a task, a
+  job or a reply in such a message: 400; reactions, pins and the chat settings are not offered. Such a person sees the
+  agent's name, picture, whether it is online and how many projects it has - not its work, status, host, model, rights
+  mode, plan usage, costs or last contact (`shared: false`, `status: "idle"`).
 - **Instance switch**: *Settings > Organisation > Agents > Agents on the Kalmido server* (the global setting
   `server_agents_off`, `PATCH /api/admin/settings {"server_agents_off": true}`). Off: the kind is not offered (the dialog
   explains why), saving the server settings and the starter pack answer 403 `{"error": "server_agents_off"}`, no run starts.
@@ -409,7 +415,7 @@ model itself. No computer of your own, no launcher, no `CLAUDE.md` file.
 | `GET /api/agents/server/defaults` | before the agent exists: `{docs_scopes, enabled_instance, provider, default_name, default_model, default_instructions, starter, flows, followup_days, followup_max}` (people only; `docs_scopes` 2.621.0: `[{key: "me"|"org:<id>", name}]`, the workspace the starter item "documents" meets per owner choice (Private, or an organisation the person administers); a plan of the starter pack is found by its fixed marker, a rule in any language, so a switch of language adds nothing twice; `flows` 2.565.0: the routines that may have a model of their own) |
 | `GET /api/agents/<id>/server` | `{provider, model, instructions, has_key, key_hint, enabled_instance, default_model, default_instructions, server, flow_models, flow_web}`, never the key; `flow_models` (2.565.0): `{briefing, tidy, meetings, followup}` each a model or `""` (= the agent's); `flow_web` (2.571.0): `{briefing, tidy, meetings, followup, other}` each `true` / `false` (web research) |
 | `PUT /api/agents/<id>/server` | `{provider?, model?, instructions?, api_key?, delete_key?, flow_models?}`; creates the settings and sets the agent's provider to `kalmido-server`. `flow_models` (2.565.0, #4674): `{routine: model}` for the routines named (the others stay), `""` = back to the agent's model; a model not in the provider's live list for the stored key, an unknown routine or no key yet: 400; the list not readable: 502. `flow_web` (2.571.0, #4676): `{key: true / false}` for the keys named (the others stay); an unknown key or no bool: 400 |
-| `GET /api/agents/<id>/server/starter` | 2.777.0 (#5378): `{items: {briefing, tidy, docs, meetings, followup, office}: "active" / "waiting" / "paused" / "missing", shared, projects, org_id}` for the person asking (who may: as for the POST): `waiting` = a plan that waits for a shared project, `shared` = you reach the agent through a project, `projects` = how many projects are shared with it (a number) |
+| `GET /api/agents/<id>/server/starter` | 2.777.0 (#5378): `{items: {briefing, tidy, docs, meetings, followup, office}: "active" / "waiting" / "paused" / "missing", shared, projects, org_id}` for the person asking (who may: as for the POST): `waiting` = a plan that waits for a shared project, `shared` = you reach the agent through a project, `own` = you shared one of your own projects with it (only that starts your waiting plans), `projects` = how many projects are shared with it (a number) |
 | `GET /api/agents/<id>/server/models` | `{models: [{id, name}], default, fallback_note?}` live from the provider; 409 `{"error": "no_key"}` without a key |
 | `GET /api/agents/<id>/server/runs?limit=20` | `{runs: [{id, trigger, state (run / done / failed / aborted), started, ended, steps, tokens_in, tokens_out, error, model, flow, web, web_searches, web_fetches, vat_checks}]}` (`flow` 2.565.0: the routine, `""` for none; `web` 2.571.0: the run had web research) |
 | `POST /api/agents/<id>/server/starter` | `{items: ["briefing", "tidy", "docs", "meetings", "followup", "office"], followup_days?: 5}` -> `{items: [{item, state: created / exists / skipped / waiting, id, reason}]}`; the same item twice changes nothing; `waiting` (2.777.0, #5378): a plan made switched off until a project is shared with the agent |

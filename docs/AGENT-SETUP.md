@@ -93,9 +93,11 @@ dialog (no server admin needed) and stores the organisation's key; its costs go 
 projects whose owner switched on *Members may see and use the agent*; its settings carry a *Limit per member* (tokens per
 day or month). A personal agent on the server stays yours in shared projects too: only you give it orders.
 2.777.0 (#5378): the dialog asks for *Projects for the agent* and shares the chosen ones first; without one the routines wait
-and start on their own once a project is shared (the agent's settings say so calmly and offer *Share project*). A team
+and start on their own once you share one of your own projects with it (the agent's settings say so calmly and offer
+*Share project*; a project of someone else does not start them). A team
 agent shows in the tab *Agents* for every member of its organisation, also without a shared project ("No project shared" /
-"N projects"); writing to it without one gets an automatic answer from Kalmido on how to share a project with it, and no data.
+"N projects"; nothing of its work, host, model or usage); writing to it without one gets an automatic answer from Kalmido on
+how to share a project with it, and no data - the message never reaches the agent.
 
 ## Quickest: one command on your computer
 
