@@ -133,7 +133,10 @@ function dc_facetGo(part) {
   if (DC.dv) { DC.dv = null; DC.vsort = null; if (typeof DCV === 'object') DCV.applied = null; }  // the view's own sort goes with it
   DC.f = {...dc_f0(), ...part}; DC.q = ''; DC.under = null; DC.at = 0; DC.facets = null;
   const qi = $('#dc-q'); if (qi) qi.value = '';
-  if (S.route.mod === 'docs' && !S.route.review && !S.route.dv && !S.route.id) dc_load(); else go('ablage/docs');
+  // the list on screen (a saved view, To review) is not loaded again by viewDocs: loaded here; from elsewhere viewDocs loads it
+  const here = S.route.mod === 'docs' && !dc_hashId();
+  if (here && (S.route.review || S.route.dv)) go('ablage/docs');
+  if (here) dc_load(); else go('ablage/docs');
   if (typeof sbb_sync === 'function') sbb_sync('ablage');
 }
 // 2.66.1 (#1945): the workspace switch (here, or on another device) drops the list, the counters, the filters (their values
