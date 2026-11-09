@@ -210,7 +210,7 @@ ok, txt, info = gate.judge_soft(red(base_jobs(), 5, "timed_out"), suites({}), PA
 check(ok and info["cut"], "#5324: a SOFT shard at its time limit = soft, named in the notes (%s, %s)" % (ok, info))
 ok, txt, _ = gate.judge_soft(red(base_jobs(), 4), suites({4: ["ux1_ui"]}), [], GRP)
 check(not ok and "hard_suites.txt" in txt, "#5324: no hard list in the tree = nothing is soft (%s)" % txt)
-nohard = [j for j in base_jobs() if "hart" not in j["name"]]
+nohard = [dict(j, name=j["name"].replace(" hart", "")) for j in base_jobs()]
 ok, txt, _ = gate.judge_soft(red(nohard, 4), suites({4: ["ux1_ui"]}), PATS, GRP)
 check(not ok and "no hard shard" in txt, "#5324: a plan without hard shards = unknown = hard (%s)" % txt)
 pushj = [dict(j, name=j["name"].replace(" full", " push")) for j in base_jobs()]
@@ -228,6 +228,20 @@ ok, txt, _ = gate.judge_soft([j for j in base_jobs() if j["id"] != 6] + lint("ba
 check(not ok and "Lint" in txt, "#5324: a red scanner step of Lint (bandit) = no image (%s)" % txt)
 ok, txt, _ = gate.judge_soft([j for j in base_jobs() if j["id"] != 6] + [job(6, "Lint, i18n, scanners", "failure")], suites({}), PATS, GRP)
 check(not ok, "#5324: a red Lint without a known step = hard (%s)" % txt)
+
+# review 2.767.0 (#5324): a scanner that did not run, a hard job skipped, a shard missing from the list, an unparsable title = hard
+lint2 = [job(6, "Lint, i18n, scanners", "failure", [{"name": "Install scanners", "conclusion": "failure"},
+                                                    {"name": "bandit (fails on high severity only)", "conclusion": "skipped"}])]
+ok, txt, _ = gate.judge_soft([j for j in base_jobs() if j["id"] != 6] + lint2, suites({}), PATS, GRP)
+check(not ok, "#5324 review: Install scanners red, bandit skipped = hard (%s)" % txt)
+lint3 = [job(6, "Lint, i18n, scanners", "failure", [{"name": "ESLint of the client", "conclusion": "failure"},
+                                                    {"name": "pip-audit (image and embedding service)", "conclusion": "skipped"}])]
+ok, txt, _ = gate.judge_soft([j for j in base_jobs() if j["id"] != 6] + lint3, suites({}), PATS, GRP)
+check(not ok, "#5324 review: a scanner skipped after a red ESLint = hard (it never ran) (%s)" % txt)
+ok, txt, _ = gate.judge_soft(base_jobs(job(7, "OWASP ZAP baseline", "skipped")), suites({}), PATS, GRP)
+check(not ok and "did not run" in txt, "#5324 review: a hard job that was skipped = hard (%s)" % txt)
+ok, txt, _ = gate.judge_soft([j for j in red(base_jobs(), 4) if j["id"] != 2], suites({4: ["ux1_ui"]}), PATS, GRP)
+check(not ok and "missing" in txt, "#5324 review: a shard missing from the job list = hard (%s)" % txt)
 
 res, txt = gate.decide([run(1, conclusion="failure")], jobs_of({}), soft=lambda rid: (True, "soft suites: ux1_ui"))
 check(res == "soft" and "ux1_ui" in txt, "#5324: decide - a finished run red only in soft parts = soft (%s)" % res)
@@ -294,6 +308,18 @@ check(rc == 1 and "p1_invoice_ui" in out, "#5324: main - hard red suite = no ima
 rc, out = main2([run(7, conclusion="failure")], soft_case, {4: ["ux1_ui", "pg_prepare"]}, "--report", "9.9.9")
 check(rc == 0 and "### Known test failures in 9.9.9" in out and "- suite `ux1_ui`" in out and "- suite `pg_prepare`" in out
       and "actions/runs/7" in out and "FAIL" not in out, "#5324: --report - the notes section names the soft red suites, no log text (%s)" % out[:200])
+_orig_fake = fake_api2
+
+
+def fake_odd(runs, jobs, anns):
+    inner = _orig_fake(runs, jobs, anns)
+    return lambda path: [{"title": "suite odd name failed"}] if "/annotations" in path else inner(path)
+
+
+fake_api2 = fake_odd
+rc, out = main2([run(7, conclusion="failure")], soft_case, {})
+check(rc == 1 and "not readable" in out, "#5324 review: an annotation title that does not parse = not readable = hard (rc %s)" % rc)
+fake_api2 = _orig_fake
 rc, out = main2([run(7)], base_jobs(), {}, "--report", "9.9.9")
 check(rc == 0 and out == "", "#5324: --report - green CI = no section")
 gate.groups = old_groups
@@ -304,6 +330,7 @@ with open(os.path.join(R, ".github", "workflows", "weekly-release.yml"), encodin
     wk = f.read()
 pk = re.search(r"^  pick:\n((?:    .*\n|\n)+)", wk.split("\njobs:\n", 1)[1], re.M)
 pk = pk.group(1) if pk else ""
+check("could not be read" in pk, "#5324 review: notes say so when the soft red list is not readable")
 check("tools/ci_gate.py --sha" in pk and "--report" in pk and "checks: read" in pk and "actions: read" in pk and "write" not in pk,
       "#5324: the weekly release names the soft red suites of its version (read rights only in pick)")
 

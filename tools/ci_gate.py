@@ -39,6 +39,8 @@ STAGE_RE = re.compile(r"^Test suites \d+/\d+ (full|push)\b")
 SHARD_RE = re.compile(r"^Test suites (\d+)/\d+ (full|push)( hart)?\b")  # #5324: " hart" = a shard of the hard groups (ci.yml, #4557)
 SUITE_ANN_RE = re.compile(r"^suite ([A-Za-z0-9_.-]+) failed$")  # tests/run_all.sh: ::error title=suite NAME failed::...
 SCANNERS = ("audit", "gitleaks", "secret", "bandit", "semgrep", "trivy")  # a red step of the Lint job is hard only as one of these
+# review 2.767.0 (#5324): the steps a scanner needs before it runs (install, the pin / OSV check) - red or not run = hard as well
+SCAN_PREP = ("install scanners*", "pinned dependencies*")
 
 
 def stage(job_names):
@@ -119,9 +121,13 @@ def hard_job(job, pats):
     if low.startswith("test suites") or "(informational)" in low:
         return False
     if low.startswith("lint"):
-        steps = [(s.get("name") or "").lower() for s in job.get("steps") or [] if s.get("conclusion") not in ("success", "skipped", None)]
-        scan = [m for m in pats if m.strip("*") in SCANNERS]
-        return not steps or any(fnmatch.fnmatch(st, m) for st in steps for m in scan)
+        steps = job.get("steps") or []
+        red = [(x.get("name") or "").lower() for x in steps if x.get("conclusion") not in ("success", "skipped", None)]
+        scan = [m for m in pats if m.strip("*") in SCANNERS] + list(SCAN_PREP)
+        # review (#5324): a scanner (or its install / pin check) that is red OR did not run (skipped after an earlier red step) = hard
+        miss = [n for n in ((x.get("name") or "").lower() for x in steps if x.get("conclusion") != "success")
+                if "(informational)" not in n and any(fnmatch.fnmatch(n, m) for m in scan)]
+        return not red or bool(miss)
     return any(fnmatch.fnmatch(low, m) for m in pats)
 
 
@@ -136,6 +142,10 @@ def judge_soft(jobs, suites_of, pats, grp):
     if not shards or any(m.group(2) != "full" for m, _ in shards):
         return False, "not the full stage", info
     hard = [j for m, j in shards if m.group(3)]
+    want = {int(m.group(1)) for m, _ in shards}
+    tot = max((int(re.match(r"^Test suites \d+/(\d+)", j["name"]).group(1)) for _, j in shards), default=0)
+    if want != set(range(1, tot + 1)):  # review (#5324): a shard missing from the list (paging, a matrix job that never ran) = unknown
+        return False, "shards missing from the job list (%d of %d)" % (len(want), tot), info
     if not hard:
         return False, "no hard shard in the plan (unknown = hard)", info
     for j in hard:
@@ -157,7 +167,11 @@ def judge_soft(jobs, suites_of, pats, grp):
                 return False, "hard suite red: %s" % s, info
             info["suites"].append(s)
     for j in jobs:
-        if SHARD_RE.match(j.get("name") or "") or j.get("conclusion") in ("success", "skipped", None):
+        if SHARD_RE.match(j.get("name") or "") or j.get("conclusion") == "success":
+            continue
+        if j.get("conclusion") in ("skipped", None):  # review (#5324): a hard job that did not run is no green one
+            if hard_job(j, pats) and not (j.get("name") or "").lower().startswith("lint"):
+                return False, "hard job did not run: %s" % j.get("name"), info
             continue
         if hard_job(j, pats):
             return False, "hard job red: %s (%s)" % (j.get("name"), j.get("conclusion")), info
@@ -239,7 +253,15 @@ def main():
 
     def jobs_full(rid):
         if rid not in cache:
-            cache[rid] = api("/repos/%s/actions/runs/%s/jobs?per_page=100" % (repo, rid)).get("jobs", [])
+            d = api("/repos/%s/actions/runs/%s/jobs?per_page=100" % (repo, rid))
+            js = d.get("jobs", [])
+            if int(d.get("total_count") or len(js)) > len(js):  # review (#5324): more than one page - read the rest
+                for page in range(2, 6):
+                    more = api("/repos/%s/actions/runs/%s/jobs?per_page=100&page=%d" % (repo, rid, page)).get("jobs", [])
+                    js += more
+                    if not more or len(js) >= int(d.get("total_count") or 0):
+                        break
+            cache[rid] = js
         return cache[rid]
 
     def jobs_of(rid):
@@ -250,7 +272,10 @@ def main():
             anns = api("/repos/%s/check-runs/%s/annotations?per_page=100" % (repo, job["id"]))
         except Exception:  # noqa: BLE001 - not readable = unknown = hard
             return None
-        return [m.group(1) for m in (SUITE_ANN_RE.match((x.get("title") or "").strip()) for x in anns or []) if m]
+        titles = [(x.get("title") or "").strip() for x in anns or []]
+        if any(t.startswith("suite ") and not SUITE_ANN_RE.match(t) for t in titles):
+            return None  # review (#5324): a suite title that does not parse = not readable = hard
+        return [m.group(1) for m in map(SUITE_ANN_RE.match, titles) if m]
 
     def judge(rid):
         if "pats" not in hard:

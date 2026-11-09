@@ -78,7 +78,8 @@ jobs:
             cat soft.md >> notes.md
             cat soft.md
           else
-            echo "::warning title=soft red suites::not readable - the notes go out without that list"
+            echo "::warning title=soft red suites::not readable - the notes say so"
+            printf '\n### Test state of %s\n\nThe list of test suites that were red outside the hard areas could not be read; see the CI run of v%s.\n' "$VER" "$VER" >> notes.md
           fi
       - name: Release assets (installers, source archives, image digest, web manifest, SHA256SUMS)
         id: assets
