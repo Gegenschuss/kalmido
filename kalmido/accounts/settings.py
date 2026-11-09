@@ -383,12 +383,12 @@ def clean_setting(k, v):
         if not 7 <= f <= 28:
             raise bad
         return f"{round(f, 2):g}"
-    if k == "ab_cards":  # 2.353.0 D (#2759): ["n:<folder id>" | "s:private" | "s:shared" | "s:org:<id>", ...] shown as cards
+    if k == "ab_cards":  # 2.353.0 D (#2759): ["n:<folder id>" | "s:private" | "s:shared" | "s:org:<id>", ...] shown as cards; 2.769.0 (#5340): "!n:<id>" = a recognising folder shown as a list
         try:
             o = json.loads(sv or "[]")  # a JSON string like trial_hint_seen
         except ValueError:
             raise bad from None
-        if not isinstance(o, list) or len(o) > 500 or not all(isinstance(x, str) and re.fullmatch(r"n:\d{1,12}|s:(private|shared|org:\d{1,12})", x) for x in o):
+        if not isinstance(o, list) or len(o) > 500 or not all(isinstance(x, str) and re.fullmatch(r"!?n:\d{1,12}|s:(private|shared|org:\d{1,12})", x) for x in o):
             raise bad
         return json.dumps(list(dict.fromkeys(o)))
     if k == "group_order":  # 2.39.1 (#1221)

@@ -245,7 +245,8 @@ def _doc(c, nid, write=False):
 # 2.428.0 (#3579): the sort of the list (?sort=&dir=), only from this list. SQL for the plain columns; sender names and amounts
 # are sealed at rest and sorted here after opening (None = sealed in Python).
 DOC_SORTS = {"date": "COALESCE(d.doc_date, substr(n.created_at, 1, 10))", "added": "n.created_at", "due": "NULLIF(d.due_date, '')",
-             "title": "lower(COALESCE(NULLIF(d.title, ''), n.name))", "sender": None, "amount": None}  # 2.750.0 (#4876): the own title, else the file name
+             "title": "lower(COALESCE(NULLIF(d.title, ''), n.name))", "sender": None, "amount": None,  # 2.750.0 (#4876): the own title, else the file name
+             "type": None, "review": "d.review"}  # 2.769.0 (#5340): + type (sealed name) and "to review" (the folder's list)
 
 
 def doc_sort(args):
@@ -253,13 +254,14 @@ def doc_sort(args):
     key = str(args.get("sort") or "date")
     key = key if key in DOC_SORTS else "date"
     d = str(args.get("dir") or "")
-    return key, (d == "desc") if d in ("asc", "desc") else key not in ("title", "sender")
+    return key, (d == "desc") if d in ("asc", "desc") else key not in ("title", "sender", "type")
 
 
 def _sort_value(c, r, key):
     """The sealed sort value of a row (sender name lower case / amount as a number), None when there is none."""
-    if key == "sender":
-        name = S.label_name(c, r["ws"], "sender", r["sender_id"]) if r["sender_id"] else None
+    if key in ("sender", "type"):  # 2.769.0 (#5340): + the document type
+        lid = r[f"{key}_id"]
+        name = S.label_name(c, r["ws"], key, lid) if lid else None
         return name.casefold() if name else None
     try:
         return Decimal(str(S.doc_open(c, r["ws"], "doc_meta.amount", r["amount"]) or "").replace(",", "."))
@@ -322,7 +324,7 @@ def doc_query(c, uid, args, vis=None):
         rows = c.execute(f"""SELECT d.*, n.id AS nid {sql} ORDER BY {DOC_SORTS[key]} {way} NULLS LAST, n.id {way}
                              LIMIT {limit} OFFSET {offset}""", params).fetchall()
         return rows, total, review
-    keyed = [(_sort_value(c, r, key), r["nid"]) for r in c.execute(f"SELECT d.node_id, d.ws, d.sender_id, d.amount, n.id AS nid {sql}", params)]
+    keyed = [(_sort_value(c, r, key), r["nid"]) for r in c.execute(f"SELECT d.node_id, d.ws, d.sender_id, d.type_id, d.amount, n.id AS nid {sql}", params)]
     has = sorted((x for x in keyed if x[0] is not None), reverse=desc)
     ids = [x[1] for x in has + sorted((x for x in keyed if x[0] is None), key=lambda x: x[1], reverse=desc)][offset:offset + limit]
     if not ids:

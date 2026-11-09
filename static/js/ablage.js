@@ -123,7 +123,7 @@ function viewAblage() {
 // "Add documents" / "Scan" in the documents' bar, the same way into the folder)
 function ab_foldTools(d, canAdd) {
   const n = d.node;
-  return `<div class="abtools">${canAdd ? `<button type="button" class="btn sm" data-ab="new-folder">${ic('folder', 's')} ${tr('New folder')}</button>` : ''}${n.share_with ? `<button type="button" class="btn sm abshbtn" data-ab="share" data-id="${n.id}" title="${esc(tr('Share…'))}">${ic('users', 's')} ${tr('Share')}</button>` : ''}<button type="button" class="iconbtn" data-ab="menu" data-id="${n.id}" aria-label="${esc(tr('More actions for {0}', n.name))}" title="${esc(tr('More'))}">${ic('dots')}</button></div>`;
+  return `<div class="abtools">${canAdd ? `<button type="button" class="btn sm" data-ab="new-folder">${ic('folder', 's')} ${tr('New folder')}</button>` : ''}${typeof abd_foldSeg === 'function' ? abd_foldSeg(d) : '' /* 2.769.0 (#5340): List | Cards */}${n.share_with ? `<button type="button" class="btn sm abshbtn" data-ab="share" data-id="${n.id}" title="${esc(tr('Share…'))}">${ic('users', 's')} ${tr('Share')}</button>` : ''}<button type="button" class="iconbtn" data-ab="menu" data-id="${n.id}" aria-label="${esc(tr('More actions for {0}', n.name))}" title="${esc(tr('More'))}">${ic('dots')}</button></div>`;
 }
 // 2.752.0 (#4887): ONE area "Files": below the folders "All documents" and "To review" (the documents' saved filters, routes
 // #ablage/docs and #ablage/review, docs.js). Phones / tablets without the panel: as buttons in the bar of the spaces on top;
@@ -721,7 +721,7 @@ function ab_selObj(id) {
 }
 const ab_selFold = () => typeof dc_inFold === 'function' && dc_inFold();
 const ab_selDocs = () => S.route.mod === 'docs' || ab_selFold();  // the documents' list is on screen (its own route or a folder's)
-const ab_selOrder = () => $$('#view .ablist .abrow[data-abid], #view .dc-card [data-dcchk]').map(x => +(x.dataset.abid || x.dataset.dcchk));
+const ab_selOrder = () => $$('#view .ablist .abrow[data-abid], #view .dc-card [data-dcchk], #view .abdl .abdlrow [data-dcchk]')  /* 2.769.0 (#5340): + the list of a recognising folder */.map(x => +(x.dataset.abid || x.dataset.dcchk));
 // everything one can choose here: the rows / cards shown and the documents the list has not loaded yet ("All" = every hit, dc_smvAll)
 const ab_selTotal = () => ab_selDocs() ? ab_selOrder().length + Math.max(0, (DC.total || 0) - (DC.docs || []).length) : (AB.data?.items || []).length;
 const ab_selCtx = () => S.route.mod === 'docs' ? 'docs:' + (S.route.review ? 'r' : '') + ':' + (S.route.dv || '') : 'ab:' + ab_key(S.route);
@@ -867,10 +867,10 @@ document.addEventListener('click', e => {
     setTimeout(() => { for (const x of $$('#view [data-absel="one"]')) x.checked = AB.sel.has(+x.dataset.id); }, 0);  // the cancelled click puts the box back
     return;
   }
-  const c = t.closest?.('#view .dc-card'); if (!c || !c.closest('.dc-view, .abcards')) return;
+  const c = t.closest?.('#view .dc-card, #view .abdl .abdlrow[data-abid]'); if (!c || !c.closest('.dc-view, .abcards')) return;  // 2.769.0 (#5340): + list rows
   const k = t.closest('[data-dcchk]');
   if (k) { e.preventDefault(); e.stopPropagation(); ab_selPick(+k.dataset.dcchk, e.shiftKey); return; }
-  if (t.closest('.abcmenu, .abcshw') || !(AB.selOn || (ms_modClick(e) && !isMobile()))) return;
+  if (t.closest('.abcmenu, .abcshw, .abdl-act') || !(AB.selOn || (ms_modClick(e) && !isMobile()))) return;
   const id = ab_cardId(c); if (!id) return;
   e.preventDefault(); e.stopPropagation(); ab_selPick(id, e.shiftKey);
 }, true);
@@ -892,7 +892,7 @@ function ab_cardMenu(c, anchor) {
   return true;
 }
 const ab_cardPick = c => { if (!AB.selOn) return false; const id = ab_cardId(c); if (!id) return false; ab_selPick(id); return true; };
-const AB_CARDLP = cm_bind('.dc-view .dc-card, .abcards .dc-card', c => ab_cardMenu(c), ab_cardPick, lm_keep);
+const AB_CARDLP = cm_bind('.dc-view .dc-card, .abcards .dc-card, .dc-view .abdl .abdlrow[data-abid]' /* 2.769.0 (#5340): + the list's rows */, c => ab_cardMenu(c), ab_cardPick, lm_keep);
 
 // ---- 2.112.1 A (#2058): the selection into the trash (ONE undo step for all), download (one file as it is, else a ZIP),
 // a folder as a ZIP, the phone scan (abscan.js) into the open folder

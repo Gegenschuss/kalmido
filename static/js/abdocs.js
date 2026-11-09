@@ -12,26 +12,30 @@ const abd_on = () => feat('docs') && !S.me?.kid;
 const abd_cardKeys = () => { try { const a = JSON.parse(S.settings?.ab_cards || '[]'); return Array.isArray(a) ? a : []; } catch { return []; } };
 // asked for by ablage.js with typeof before this file may be loaded: function declarations (window properties), never const -
 // a view drawn before the load kept seeing a const as missing (main red #3506: a new start showed the list, not the cards)
-function abd_cardsOn(key) { return abd_on() && (abd_recogHere(key) || abd_cardKeys().includes(key)); }
-// 2.583.0 (#4832): a folder that recognises always shows its content as document cards, without the switch (ab_cards only for
-// the folders without recognition); known once the folder is loaded (its node), the cards load its documents' fields then
+// 2.769.0 (#5340): a folder that recognises shows cards unless the person chose the list there ('!'+key in ab_cards); every
+// other folder a list unless chosen as cards (key in ab_cards); the old values stay valid
+function abd_cardsOn(key) { return abd_on() && (abd_recogHere(key) ? !abd_cardKeys().includes('!' + key) : abd_cardKeys().includes(key)); }
+// 2.583.0 (#4832): a folder that recognises shows its content as document cards by default (2.769.0, #5340: with the switch,
+// the list shows the documents' fields); known once the folder is loaded (its node), the cards load its documents' fields then
 function abd_recogHere(key) { const n = AB.data?.node; return !!(n && AB.dkey === key && n.kind === 'folder' && n.recog_on && !abd_locked(n)); }
 const abd_locked = n => !!n?.locked;  // part A (#2758): a locked folder and everything in it (a missing field = not locked)
 
 // ---- list / cards per folder (all devices of the person: the setting ab_cards, changed by single entries)
 async function abd_setCards(key, on) {
-  const ks = abd_cardKeys().filter(k => k !== key);
-  if (on) ks.push(key);
+  const rec = abd_recogHere(key), k2 = rec ? '!' + key : key, add = rec ? !on : on;  // 2.769.0 (#5340): a recognising folder stores "list chosen"
+  const ks = abd_cardKeys().filter(k => k !== k2);
+  if (add) ks.push(k2);
   if (S.settings) S.settings.ab_cards = JSON.stringify(ks);
   ab_draw();  // 2.477.0 (#3936): the loaded entries drawn again at once (no new load; the cards fetch the documents' fields themselves when needed)
-  try { await api('PATCH', '/api/settings', {set_delta: {ab_cards: on ? {add: [key]} : {remove: [key]}}}); } catch { /* shown; the local choice holds until the next load */ }
+  try { await api('PATCH', '/api/settings', {set_delta: {ab_cards: add ? {add: [k2]} : {remove: [k2]}}}); } catch { /* shown; the local choice holds until the next load */ }
 }
+// the switch List | Cards (2.769.0, #5340: also above a recognising folder, ablage.js ab_foldTools)
+const abd_viewSeg = c => `<div class="seg abviewseg" role="group" aria-label="${esc(tr('View'))}"><button type="button" data-abdv="list" aria-pressed="${!c}" class="${c ? '' : 'on'}" title="${esc(tr('List'))}">${ic('list', 's')}<span>${tr('List')}</span></button><button type="button" data-abdv="cards" aria-pressed="${c}" class="${c ? 'on' : ''}" title="${esc(tr('Cards'))}">${ic('grid', 's')}<span>${tr('Cards')}</span></button></div>`;
+function abd_foldSeg(d) { return abd_on() && d?.node ? abd_viewSeg(abd_cardsOn('n:' + d.node.id)) : ''; }
 function abd_toolsHtml(d, key) {
   if (!abd_on() || !d.items?.length) return '';
   const ts = abd_cardsOn(key) && typeof ts_barHtml === 'function' ? ts_barHtml() : '';  // 2.583.0 (#4812): the card size, the same as the documents'
-  if (abd_recogHere(key)) return ts;  // 2.583.0 (#4832): a recognising folder: always cards
-  const c = abd_cardsOn(key);
-  return ts + `<div class="seg abviewseg" role="group" aria-label="${esc(tr('View'))}"><button type="button" data-abdv="list" aria-pressed="${!c}" class="${c ? '' : 'on'}" title="${esc(tr('List'))}">${ic('list', 's')}<span>${tr('List')}</span></button><button type="button" data-abdv="cards" aria-pressed="${c}" class="${c ? 'on' : ''}" title="${esc(tr('Cards'))}">${ic('grid', 's')}<span>${tr('Cards')}</span></button></div>`;
+  return ts + abd_viewSeg(abd_cardsOn(key));  // 2.769.0 (#5340): a recognising folder has its switch in ab_foldTools
 }
 // a card: a document = its tile of the documents (preview, sender, date, type, tags), other files and folders = name + picture
 function abd_card(n) {
@@ -111,8 +115,36 @@ function abd_foldHtml(d) {
   const items = d.items || [], have = new Set((DC.docs || []).map(x => x.id));
   const kids = items.filter(x => x.kind === 'folder'), plain = items.filter(x => x.kind !== 'folder' && !(x.doc && !abd_locked(x)) && !have.has(x.id));
   const ul = xs => xs.length ? `<ul class="dc-grid abcards${AB.selOn ? ' dc-selon' : '' /* 2.768.0 (#4888) */}" aria-label="${esc(tr('Files'))}">${xs.map(abd_card).join('')}</ul>` : '';
-  const fold = {node: n, canAdd: ab_canWrite(n.role), before: ul(kids), after: ul(plain), card: abd_docCard};
-  return `<div class="dc-view dc-infold" data-abfold="${n.id}">${dc_headHtml(fold)}${dc_bodyHtml(fold)}</div>`;
+  // 2.769.0 (#5340): the list chosen (the switch, ab_cards '!n:<id>'): the same documents, sort and filters as rows with their fields
+  const list = !abd_cardsOn('n:' + n.id), li = xs => xs.map(abd_lRow).join('');
+  const fold = {node: n, canAdd: ab_canWrite(n.role), before: list ? li(kids) : ul(kids), after: list ? li(plain) : ul(plain), card: abd_docCard, list: list ? abd_listHtml : null};
+  return `<div class="dc-view dc-infold${list ? ' abdlon' : ''}" data-abfold="${n.id}">${dc_headHtml(fold)}${dc_bodyHtml(fold)}</div>`;
+}
+// ---- 2.769.0 (#5340): the list of a recognising folder: Name, Type, Sender, Date, Amount, To review (a header sorts like the
+// documents' sort, docs.js dc_sortPick: the server sorts, the pages stay right); narrow screens: type, sender, date and amount as
+// a second line below the name, the header gone (the bar's sort stays)
+const ABD_COLS = [['title', N_('Name')], ['type', N_('Type')], ['sender', N_('Sender')], ['date', N_('Date')], ['amount', N_('Amount')], ['review', N_('To review')]];
+function abd_listHtml(before, after) {
+  const s = dc_sort();
+  const head = ABD_COLS.map(([k, l]) => `<span role="columnheader" class="abdl-${k}" aria-sort="${s.k === k ? (s.d === 'asc' ? 'ascending' : 'descending') : 'none'}"><button type="button" class="abdlsort${s.k === k ? ' on' : ''}" data-abdls="${k}" title="${esc(tr('Sort by {0}', tr(l)))}">${esc(tr(l))}${s.k === k ? `<span aria-hidden="true">${s.d === 'asc' ? '↑' : '↓'}</span>` : ''}</button></span>`).join('');
+  return `<div class="abdl${AB.selOn ? ' abdlsel' : ''}" role="table" aria-label="${esc(tr('Documents'))}"><div class="abdlrow abdlhead" role="row">${head}<span role="columnheader" class="abdl-act"></span></div>${before}${(DC.docs || []).map(abd_lDocRow).join('')}${after}</div>`;
+}
+const abd_lMenu = n => `<span role="cell" class="abdl-act"><button data-rowmenu="abrow" type="button" class="iconbtn" data-ab="menu" data-id="${n.id}" aria-label="${esc(tr('More actions for {0}', n.name))}" title="${esc(tr('More'))}">${ic('dots', 's')}</button></span>`;
+const abd_lCells = c => ABD_COLS.slice(1).map(([k], i) => `<span role="cell" class="abdl-${k}">${c[i] || ''}</span>`).join('');  // c: html of Type .. To review
+// a folder or a file that is no document (yet): its name (and the file's date) in the same columns
+function abd_lRow(n) {
+  const day = n.kind === 'folder' ? '' : ab_when(n.updated_at);
+  const box = AB.selOn ? dc_selMark(n) : '', on = AB.selOn && AB.sel.has(n.id);  // 2.768.0 (#4888): the area's one selection
+  return `<div class="abdlrow${on ? ' dc-on' : ''}" role="row" data-abid="${n.id}"><span role="cell" class="abdl-title">${box}<button type="button" class="abdlopen" data-ab="open" data-id="${n.id}"${n.kind === 'folder' ? ` data-abdrop="${n.id}"` : ''}>${ab_icon(n)}<span class="abtxt"><span class="abname">${esc(n.name)}</span>${day ? `<span class="abdlsub muted">${esc(day)}</span>` : ''}</span></button></span>${abd_lCells(['', '', day ? `<span class="muted">${esc(day)}</span>` : '', '', ''])}${abd_lMenu(n)}</div>`;
+}
+// a document: its recognised fields (a locked one: the name only, as its card)
+function abd_lDocRow(doc) {
+  const n = (AB.data?.items || []).find(x => x.id === doc.id), lk = !!n && abd_locked(n), on = AB.selOn && AB.sel.has(doc.id);
+  const ty = lk ? '' : doc.type?.name || '', snd = lk ? '' : doc.sender?.name || '', day = lk ? '' : dc_day(doc.date), amt = lk || !doc.amount ? '' : dc_money(doc.amount, doc.currency);
+  const st = lk ? '' : doc.review ? `<span class="abver abdoc rev">${tr('To review')}</span>` : doc.state === 'wait' || doc.state === 'run' ? `<span class="abver abdoc">${tr('Recognising…')}</span>` : '';
+  const sub = [ty, snd, day, amt].filter(Boolean).map(esc).join(' · ');
+  const box = AB.selOn ? dc_selMark(doc) : '';  // 2.768.0 (#4888): the area's one selection (ablage.js ab_selPick)
+  return `<div class="abdlrow${doc.review ? ' rev' : ''}${on ? ' dc-on' : ''}${DC.lastId === doc.id ? ' dc-cur' : ''}" role="row" data-abid="${doc.id}"><span role="cell" class="abdl-title">${box}<button type="button" class="abdlopen" data-dco="${doc.id}">${ic(dc_isPdf(doc) ? 'pdf' : 'file')}<span class="abtxt"><span class="abname" title="${esc(doc.name)}">${esc(doc.name)}</span>${sub ? `<span class="abdlsub muted">${sub}</span>` : ''}</span></button></span>${abd_lCells([esc(ty), esc(snd), esc(day), esc(amt), st])}${n ? abd_lMenu(n) : '<span role="cell" class="abdl-act"></span>'}</div>`;
 }
 // a document of the folder: its card with the file store's menu and share names (an entry of the folder; one found in a
 // subfolder by a search: the documents' card)
@@ -127,6 +159,8 @@ document.addEventListener('click', e => {
   const t = /** @type {HTMLElement} */ (e.target);
   const v = /** @type {HTMLElement|null} */ (t.closest?.('.abview [data-abdv]'));
   if (v) { abd_setCards(AB.key || (S.route.nid ? 'n:' + S.route.nid : 's:' + ab_curSpace()), v.dataset.abdv === 'cards'); return; }
+  const hs = /** @type {HTMLElement|null} */ (t.closest?.('.abview [data-abdls]'));  // 2.769.0 (#5340): a column header of the list sorts
+  if (hs) { dc_sortPick(hs.dataset.abdls || 'date'); return; }
   const o = /** @type {HTMLElement|null} */ (t.closest?.('.abview [data-dco]'));  // a document's card: the document view (2.583.0, #4832/#4835; Back leads to the file store)
   if (o && !o.closest('.dc-infold')) { e.preventDefault(); dc_open(+o.dataset.dco, {list: abd_navIds()}); return; }  // 2.683.0 (#5150): + the folder's documents to leaf through; 2.752.0 (#4887): a folder with recognition: docs.js opens it
   const r = /** @type {HTMLElement|null} */ (t.closest?.('.abview [data-abdr]'));

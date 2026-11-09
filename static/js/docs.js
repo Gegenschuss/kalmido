@@ -38,8 +38,9 @@ const dc_fileDoc = n => ({id: n.id, name: n.name, mime: n.mime || '', size: n.si
   parent_id: n.parent_id, updated_at: n.updated_at, owner: n.owner, up: n.up, locked: n.locked, _enc: n._enc, file: true, state: 'none', tags: [], thumb: /^image\//.test(n.mime || '')});
 
 // ---- 2.428.0 (#3579): the sort of the list, sorted by the server (the pages stay right), remembered per device
-const DC_SORTS = [['date', N_('Document date')], ['added', N_('Date of arrival')], ['sender', N_('Sender')], ['amount', N_('Amount')], ['due', N_('Due date')], ['title', N_('Title')]];
-const dc_sortDir0 = k => (k === 'title' || k === 'sender' ? 'asc' : 'desc');
+const DC_SORTS = [['date', N_('Document date')], ['added', N_('Date of arrival')], ['sender', N_('Sender')], ['amount', N_('Amount')], ['due', N_('Due date')], ['title', N_('Title')],
+  ['type', N_('Document type')], ['review', N_('To review')]];  // 2.769.0 (#5340): + type and "to review" (the columns of a folder's list)
+const dc_sortDir0 = k => (k === 'title' || k === 'sender' || k === 'type' ? 'asc' : 'desc');
 function dc_sort() {
   if (DC.vsort && DC_SORTS.some(x => x[0] === DC.vsort.k)) return DC.vsort;  // 2.579.0 (#4802): a saved view keeps its own sort (docviews.js)
   const s = LS.get('dc.sort', null) || {}, k = DC_SORTS.some(x => x[0] === s.k) ? s.k : 'date';
@@ -216,7 +217,7 @@ function dc_headHtml(fold) {
     <div class="dc-bar">
       <div class="ctsearch">${ic('search', 's')}<input type="search" id="dc-q" value="${esc(DC.q)}" placeholder="${esc(fold ? tr('Search in this folder…') : tr('Search in the documents…'))}" aria-label="${esc(fold ? tr('Search in this folder') : tr('Search in the documents'))}" autocomplete="off"></div>
       ${seg}
-      <button type="button" class="btn sm ${active ? 'on' : ''}" data-dc="more" aria-expanded="${!!DC.more}">${ic('filter', 's')} <span>${tr('Filter')}</span>${active ? ` <span class="dc-count">${dc_fEntries().length}</span>` : ''}</button>${dc_sortBtn()}${typeof dcv_barHtml === 'function' ? dcv_barHtml() : '' /* 2.579.0 (#4802) */}${typeof ts_barHtml === 'function' ? ts_barHtml() : '' /* 2.583.0 (#4812) */}
+      <button type="button" class="btn sm ${active ? 'on' : ''}" data-dc="more" aria-expanded="${!!DC.more}">${ic('filter', 's')} <span>${tr('Filter')}</span>${active ? ` <span class="dc-count">${dc_fEntries().length}</span>` : ''}</button>${dc_sortBtn()}${typeof dcv_barHtml === 'function' ? dcv_barHtml() : '' /* 2.579.0 (#4802) */}${typeof ts_barHtml === 'function' && !fold?.list ? ts_barHtml() : '' /* 2.583.0 (#4812); 2.769.0 (#5340): no card size above the list */}
       <span class="dc-acts2">${add}${dc_smvBtn()}<button type="button" class="iconbtn" data-dc="lists" aria-label="${esc(tr('Senders, types and fields'))}" title="${esc(tr('Senders, types and fields'))}">${ic('list')}</button><button type="button" class="iconbtn" data-dc="settings" aria-label="${esc(tr('Settings of the documents'))}" title="${esc(tr('Settings of the documents'))}">${ic('gear')}</button></span>
     </div>
     ${DC.more && !isMobile() ? `<div class="dc-fpanel dc-flt">${dc_fltHtml()}</div>` : ''}${dc_fbarHtml()}${dc_learnBar() /* 2.607.0 (#4872) */}
@@ -227,12 +228,14 @@ function dc_headHtml(fold) {
 function dc_bodyHtml(fold) {
   const active = dc_fEntries().length > 0 || !!DC.q.trim();
   const card = fold?.card || dc_card;
-  const grid = DC.docs?.length ? `<ul class="dc-grid${AB.selOn ? ' dc-selon' : ''}" aria-label="${esc(tr('Documents'))}">${DC.docs.map(d => card(d)).join('')}</ul>${DC.total > DC.docs.length ? `<p class="muted dc-moreld"><button type="button" class="linkbtn" data-dc="loadmore">${esc(tr('Load more ({0} of {1})', DC.docs.length, DC.total))}</button></p>` /* 2.476.0 (#3935) */ : ''}` : '';
+  const more = DC.docs?.length && DC.total > DC.docs.length ? `<p class="muted dc-moreld"><button type="button" class="linkbtn" data-dc="loadmore">${esc(tr('Load more ({0} of {1})', DC.docs.length, DC.total))}</button></p>` /* 2.476.0 (#3935) */ : '';
+  const grid = DC.docs?.length ? `<ul class="dc-grid${AB.selOn ? ' dc-selon' : ''}" aria-label="${esc(tr('Documents'))}">${DC.docs.map(d => card(d)).join('')}</ul>${more}` : '';
   if (DC.err) return `<div class="empty">${ic('alert')}<span>${esc(DC.err)}</span></div>`;
   if (fold) {
     const before = active ? '' : fold.before || '', after = active ? '' : fold.after || '';
     if (!DC.docs && !before && !after) return `<p class="muted lempty">${tr('Loading…')}</p>`;
     if (!DC.docs?.length && !before && !after) return `<div class="empty nempty dc-empty abempty">${ic('folder')}<span>${active ? tr('No documents found') : fold.canAdd ? tr('Drop files here or use “Upload”') : tr('This folder is empty')}</span></div>`;
+    if (fold.list) return fold.list(before, after) + more + ab_selBar();  // 2.769.0 (#5340): a recognising folder as a list (abdocs.js abd_listHtml)
     return before + grid + after + ab_selBar();  // 2.768.0 (#4888): the area's one bar (ablage.js)
   }
   if (!DC.docs) return `<p class="muted lempty">${tr('Loading…')}</p>`;

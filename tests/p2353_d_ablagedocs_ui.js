@@ -80,7 +80,8 @@ await until(() => d.querySelector(`.dc-view [data-dco="${DOC}"]`));
   w = await boot({user: 'alice', hash: 'ablage/' + ROOT}); d = w.document;
   // 2.583.0 (#4832): a folder that recognises shows its content as document cards at once, without the list / cards switch
   check(await until(() => d.querySelector(`.abview .dc-infold [data-dco="${DOC}"]`)), 'the documents folder (it recognises): the document as its tile at once');
-  check(!d.querySelector('.abview [data-abdv]'), '... no list / cards switch there');
+  // 2.769.0 (#5340): the switch is back in a recognising folder, cards stay its default
+  check(d.querySelector('.abview [data-abdv="cards"][aria-pressed="true"]'), '... the list / cards switch there, Cards chosen (2.769.0, #5340)');
   check(await until(() => /Recognition on/.test(d.querySelector('.abrecog')?.textContent || '')), 'the documents folder: Recognition on');
   d.querySelector(`.dc-infold [data-dco="${DOC}"]`)?.closest('li')?.querySelector('[data-ab="menu"]')?.click();
   const cm = await until(() => menuItems(d).length && menuItems(d));
@@ -109,7 +110,8 @@ await until(() => d.querySelector(`.dc-view [data-dco="${DOC}"]`));
   pick(d, 'On')?.click();
   check(await until(async () => (await call('GET', `/api/files?parent=${PLAIN}`)).node?.recog_on === true), 'On: the folder recognises');
   w.location.hash = '#ablage/' + PLAIN;
-  check(await until(() => d.querySelector(`.abview .dc-infold [data-dco="${FILE}"]`) && !d.querySelector('.abview [data-abdv]')), '2.583.0 (#4832): recognising now, the folder shows document cards without the switch');
+  // 2.769.0 (#5340): ... with the switch (Cards by default)
+  check(await until(() => d.querySelector(`.abview .dc-infold .dc-card [data-dco="${FILE}"]`) && d.querySelector('.abview [data-abdv="cards"][aria-pressed="true"]')), '2.583.0 (#4832): recognising now, the folder shows document cards (2.769.0, #5340: the switch on Cards)');
   w.close();
   w = await boot({user: 'alice', hash: 'ablage/' + ROOT}); d = w.document;
   check(await until(() => d.querySelector(`.abview .dc-infold [data-dco="${DOC}"]`)), 'a new start: the documents folder shows its cards again');
