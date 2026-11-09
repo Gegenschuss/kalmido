@@ -20,7 +20,7 @@ const dpg_on = (/** @type {any} */ d) => !!d && !d.file && d.role !== 'view' && 
 const dpg_openFor = (/** @type {any} */ d) => !!d && DPG.id === d.id;
 // the button in the preview's bar (docview.js dcv_pvHtml)
 function dpg_btn(/** @type {any} */ d) {
-  return dpg_on(d) ? `<button type="button" class="btn sm" data-dpg="open" aria-expanded="${dpg_openFor(d)}" aria-controls="dv-dpg" title="${esc(tr('Delete or turn pages'))}">${ic('file', 's')} <span>${tr('Pages')}</span></button>` : '';
+  return dpg_on(d) ? `<button type="button" class="btn sm" data-dpg="open" aria-expanded="${esc(String(dpg_openFor(d)))}" aria-controls="dv-dpg" title="${esc(tr('Delete or turn pages'))}">${ic('file', 's')} <span>${tr('Pages')}</span></button>` : '';
 }
 // its box between the bar and the pages; filled here (data-fl-fill: a redraw of the view keeps the content)
 const dpg_boxHtml = (/** @type {any} */ d) => dpg_on(d) ? `<div class="dpg" id="dv-dpg" data-fl-fill role="region" aria-label="${esc(tr('Pages'))}"${dpg_openFor(d) ? '' : ' hidden'}></div>` : '';
@@ -52,8 +52,8 @@ function dpg_close() {
 function dpg_pageHtml(/** @type {number} */ p) {
   const sel = DPG.sel.has(p), gone = DPG.del.has(p), bl = DPG.blank.has(p), r = (DPG.rot.get(p) || 0) % 360;
   const lab = [tr('Page {0}', p), bl ? tr('looks blank') : '', gone ? tr('will be deleted') : '', r ? tr('turned by {0}°', r) : ''].filter(Boolean).join(', ');
-  return `<li><button type="button" class="dpg-pg${sel ? ' on' : ''}${gone ? ' gone' : ''}${bl ? ' blank' : ''}" data-dpgp="${p}" aria-pressed="${sel}" aria-label="${esc(lab)}" title="${esc(lab)}" tabindex="${p === (DPG.last > 0 ? DPG.last : 1) ? 0 : -1}">
-    <span class="dpg-th" data-dpgt="${p}" style="--dpg-r:${r}deg"></span><span class="dpg-no">${p}</span>${bl ? `<span class="dpg-bl">${tr('Blank?')}</span>` : ''}${gone ? `<span class="dpg-x">${ic('trash', 's')}</span>` : ''}</button></li>`;
+  return `<li><button type="button" class="dpg-pg${sel ? ' on' : ''}${gone ? ' gone' : ''}${bl ? ' blank' : ''}" data-dpgp="${esc(String(p))}" aria-pressed="${esc(String(sel))}" aria-label="${esc(lab)}" title="${esc(lab)}" tabindex="${p === (DPG.last > 0 ? DPG.last : 1) ? 0 : -1}">
+    <span class="dpg-th" data-dpgt="${esc(String(p))}" style="--dpg-r:${esc(String(r))}deg"></span><span class="dpg-no">${esc(String(p))}</span>${bl ? `<span class="dpg-bl">${tr('Blank?')}</span>` : ''}${gone ? `<span class="dpg-x">${ic('trash', 's')}</span>` : ''}</button></li>`;
 }
 function dpg_draw(focus = false) {
   const v = $('.dv-view'), box = v && $('.dpg', v), b = v && $('[data-dpg="open"]', v);
@@ -80,7 +80,7 @@ function dpg_draw(focus = false) {
       <button type="button" class="btn sm" data-dpg="cancel">${tr('Cancel')}</button>
       <button type="button" class="btn sm pri" data-dpg="save"${dpg_changed() && !DPG.busy ? '' : ' disabled'}>${tr('Save as new version')}</button></div>
     ${blankOpen ? `<p class="dpg-hint">${ic('info', 's')} <span>${esc(trn('{0} page looks blank (marked) - nothing is deleted without you', '{0} pages look blank (marked) - nothing is deleted without you', blankOpen))}</span>${keep - blankOpen >= 1 ? `<button type="button" class="linkbtn" data-dpg="blank">${tr('Delete blank pages')}</button>` : ''}</p>` : ''}
-    <ul class="dpg-list" aria-label="${esc(tr('Pages'))}">${ps.join('')}</ul>
+    <ul class="dpg-list" aria-label="${esc(tr('Pages'))}">${/*html-ok*/ ps.join('')}</ul>
     <p class="dpg-note muted">${ic('info', 's')} <span>${esc(DPG.receipt ? tr('A receipt of the office: the original stays as an older version of the file (tab History).') : tr('Saving makes a new version; the original stays as an older version (tab History).'))}</span></p>`;
   dpg_thumbs(box);
   if (focus) $('[data-dpgp][tabindex="0"]', box)?.focus({preventScroll: true});
