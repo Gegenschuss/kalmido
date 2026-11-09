@@ -14,6 +14,7 @@ from ..core.db import db_log_err, iso, now_utc
 from ..core.errors import BadInput
 from ..core.access import Denied
 from ..core.i18n import N_
+from ..core.pg import qi  # 2.765.0 (#3965): the table / column names of the undo from their allowlists
 from ..accounts.layouts import clean_layout
 from ..accounts.layoutsets import lyv_key_ok, lyv_save
 from ..accounts.discover import _push as conn_push  # 2.574.0 (#4556): a request asked again is told like one asked by hand
@@ -354,7 +355,8 @@ def umz_more_there(c, uid, cr):
         for i in range(0, len(ids), 500):
             p = ids[i:i + 500]
             mine = _UNDO_MINE.get(table, "user_id=?")  # 2.765.0 (#3965): budget rows / folder playbooks have no person column
-            out.update((table, r[0]) for r in c.execute(f"SELECT {col} FROM {table} WHERE {col} IN ({','.join('?' * len(p))}) AND {mine}",
+            qc, qt = qi(col, set(_UNDO.values())), qi(table, _UNDO)
+            out.update((table, r[0]) for r in c.execute(f"SELECT {qc} FROM {qt} WHERE {qc} IN ({','.join('?' * len(p))}) AND {mine}",
                                                          p + [uid]).fetchall())
     return out
 
@@ -388,11 +390,11 @@ def umz_more_undo(c, uid, cr, since, plan):
                 kept += r is not None and not gone
             else:  # 2.765.0 (fable F5): a budget row is never deleted on its own - its list goes into the trash with all its rows,
                 # or stays whole when anything in it was written since (importers.imp_undo_lists, imp_budget_touched)
-                r = c.execute(f"SELECT updated_at FROM {table} WHERE id=? AND {mine}", (v, uid)).fetchone()
+                r = c.execute(f"SELECT updated_at FROM {qi(table, _UNDO_MINE)} WHERE id=? AND {mine}", (v, uid)).fetchone()
                 kept += r is not None and imp_undo_after(r["updated_at"], since)
                 gone = False
             if gone:
-                c.execute(f"DELETE FROM {table} WHERE id=? AND {mine}", (v, uid))
+                c.execute(f"DELETE FROM {qi(table, _UNDO_MINE)} WHERE id=? AND {mine}", (v, uid))
             continue
         if table == "bookmarks":
             if not plan.goes(table, v):

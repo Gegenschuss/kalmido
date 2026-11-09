@@ -15,7 +15,7 @@ from dateutil.rrule import rrulestr
 from flask import has_request_context, jsonify, request
 
 from ..core.config import app, TZ
-from ..core.pg import insert_id, write_lock
+from ..core.pg import insert_id, qi, write_lock
 from ..core.schema import MAX_DEPTH, USER_DEFAULTS
 from ..core.i18n import lang, N_, tr
 from ..core.db import bump, db, err, iso, iso_ms, local_now, now_utc, parse_iso, usettings
@@ -2522,9 +2522,10 @@ def imp_undo_split(c, uid, ids, since, te_ids=()):
 def imp_budget_touched(c, lid, since):
     """2.765.0 (#3965, fable F5): was anything of budget list lid (a category, template, entry or receipt) made or changed since
     the import? Then the undo keeps the list with all its rows (own work now)."""
-    for t in ("budget_cats", "budget_recurring", "budget_entries", "budget_files"):
+    tables = ("budget_cats", "budget_recurring", "budget_entries", "budget_files")
+    for t in tables:
         cols = "created_at" if t == "budget_files" else "created_at, updated_at"
-        for x in c.execute(f"SELECT {cols} FROM {t} WHERE list_id=?", (lid,)):
+        for x in c.execute(f"SELECT {cols} FROM {qi(t, tables)} WHERE list_id=?", (lid,)):
             if any(imp_undo_after(v, since) for v in x):
                 return True
     return False
