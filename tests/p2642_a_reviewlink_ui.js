@@ -43,7 +43,8 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   w.eval(`vdr_open(${R.id})`);
   const dlg = await until(() => d.querySelector('.vdrdlg .vdrsig .vdrsignew') && d.querySelector('.vdrdlg'));
   const sig = dlg && dlg.querySelector('.vdrsig');
-  check(sig && sig.querySelector('input.vdrsigdate[type="date"]') && sig.querySelector('input.vdrsigold') && /older versions/.test(sig.textContent),
+  // 2.766.0 (#5321): the expiry is the app's own date picker (ux1_ui: no native date inputs)
+  check(sig && sig.querySelector('input.vdrsigdate[type="hidden"][data-dp="date"]') && sig.querySelector('.dpbtn[data-dpfor="vdrsigdate"]') && sig.querySelector('input.vdrsigold') && /older versions/.test(sig.textContent),
     'the dialog offers the expiry and "older versions too" ' + (sig && sig.textContent.replace(/\s+/g, ' ').slice(0, 300)));
   const cust = [...dlg.querySelectorAll('.vdrc.cust b')].map(b => b.textContent);
   check(cust.includes('Erika Gast (Guest)'), 'the client comment shows as Name (Guest) ' + JSON.stringify(cust));

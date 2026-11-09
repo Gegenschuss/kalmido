@@ -283,7 +283,7 @@ function vdr_sigDraw(st) {
   }).join('');
   el.innerHTML = `<h4>${tr('Client link')}</h4><p class="muted mhint">${esc(tr('Your client watches the newest version without an account, comments at a time and approves or requests changes.'))}</p>
     ${rows ? `<ul class="sglist" role="list">${rows}</ul>` : ''}
-    <div class="vdrsignew"><label class="vdrsigexp">${tr('Valid until (optional)')} <input type="date" class="vdrsigdate" min="${esc(today())}" aria-label="${esc(tr('Valid until (optional)'))}"></label>
+    <div class="vdrsignew"><span class="vdrsigexp">${tr('Valid until (optional)')} ${dateIn('vdrsigdate', '', {min: today(), label: tr('Valid until (optional)'), attrs: 'class="vdrsigdate"'})}</span>
     ${r.versions.length > 1 ? `<label class="chk"><input type="checkbox" class="vdrsigold"> ${tr('The client may also see the older versions')}</label>` : ''}
     <button type="button" class="btn sm" data-vdr="signew">${ic('link', 's')} ${live.length ? tr('New client link') : tr('Create client link')}</button></div>`;
 }
@@ -356,7 +356,7 @@ async function vdr_click(e, st) {
       histToast(tr(VDR_ST[b.dataset.st]), histAdd({label: tr(VDR_ST[b.dataset.st]), ids: [], snaps: [], lids: [],
         undo: async () => { await set(was); return {skipped: []}; }, redo: async () => { await set(b.dataset.st); return {skipped: []}; }}));
     }
-    if (a === 'signew') {  // 2.642.0 (#4772): expiry and "older versions too" set when the link is made
+    if (a === 'signew') {  // 2.642.0 (#4772): expiry and "older versions too" set when the link is made; 2.766.0 (#5321): the own date picker (hidden input), no native one
       const d = $('.vdrsigdate', st.md)?.value || null, old = !!$('.vdrsigold', st.md)?.checked;
       await rawFetch('POST', `/api/videos/${rid}/signoff`, {expires: d, show_old: old}); await vdr_after(rid, 'GET', `/api/videos/${rid}`); toast(tr('Client link created'));
     }
