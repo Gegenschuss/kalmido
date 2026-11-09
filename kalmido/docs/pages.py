@@ -30,8 +30,10 @@ from ..core.errors import BadInput
 from ..core.i18n import tr
 from ..core.pg import write_lock
 from ..core.access import Denied
+from ..accounts.session import me  # 2.777.0 (#5254)
 from ..files.store import fs_log_add, fs_new_version, fs_read, need_node
 from ..files.web import fs_web_expect
+from ..files.fsundo import FSU_VERSION_HOOKS, fsu_post, fsu_pre  # 2.777.0 (#5254 #4874): the save is a step of the undo list
 from ..tasks.attachtext import file_kind
 from . import store as S
 from .area import ar_is_receipt
@@ -188,6 +190,7 @@ def docs_pages_save(nid):
         return err(tr("At most {0} pages can be changed here", DP_PAGES), 413)
     gone, turn = dp_clean(b, np)
     out = _edit(data, np, gone, turn)
+    fsu_pre(c, me(), n, "version")  # 2.777.0 (#5254): the step points at the version before (taken back from the list too)
     try:
         no = fs_new_version(c, nid, out, "application/pdf")
     except ValueError as e:
@@ -200,6 +203,16 @@ def docs_pages_save(nid):
     # recognised again (text, page count, preview); the sorting and the values set by hand stay (docs_redo without its undo copy)
     c.execute("UPDATE doc_meta SET state='wait', tries=0, error='', updated_at=? WHERE node_id=?", (now_iso(), nid))
     bump(c)
+    fsu_post(c)
     c.commit()
     docs_kick()
     return jsonify(id=nid, version=no, was=n["cur_version"], pages=np - len(gone)), 201
+
+
+def dp_version_back(c, uid, nid):
+    """2.777.0 (#5254): an undo from the list pointed the file at another version (files/fsundo.py FSU_VERSION_HOOKS): the
+    document is recognised again at once, as after files_version_restore (the values set by hand stay)."""
+    c.execute("UPDATE doc_meta SET state='wait', tries=0 WHERE node_id=? AND state IN ('done', 'failed')", (int(nid),))
+
+
+FSU_VERSION_HOOKS.append(dp_version_back)

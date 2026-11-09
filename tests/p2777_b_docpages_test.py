@@ -7,7 +7,8 @@ freelancer-matrix: files
  - page 2 of 3 deleted: 201, a new version with 2 pages (the file itself read back), version 1 still there with 3 pages;
    the document keeps its id, archive number, tags and sender; the recognition ran again (pages 2); the blank mark gone
  - page 1 turned by 90 degrees: the new version's page 1 carries /Rotate 90, the others not
- - undo = "Restore version" of the file store: the version before on top again (3 pages)
+ - undo = "Restore version" of the file store: the version before on top again (3 pages); 2.777.0 (#5254): the save is a step
+   of the undo list too (GET /api/undo), taken back there the file points at its version before (no copy), redo forward
  - refused: invalid indices (0, past the end, twice, a bool, a wrong angle, every page deleted, nothing changed) 400; a stale
    expect_version 409 with nothing stored; read only (shared to view) 403; somebody else's document unseen 404; a plain
    text document 409
@@ -156,6 +157,17 @@ check(rotations(content(Fr, D)) == [90, 0], f"the new version: page 1 turned by 
 until(lambda: (lambda d: d and d["state"] == "done")(doc(Fr, D)), 180)
 r = Fr.post(B + f"/api/docs/{D}/pages", json={"rotate": {"1": -90, "2": 270}, "expect_version": 3})
 check(r.status_code == 201 and rotations(content(Fr, D)) == [0, 270], f"turned back left and page 2 by 270 ({r.status_code})")
+until(lambda: (lambda d: d and d["state"] == "done")(doc(Fr, D)), 180)
+
+# ================================================================ 2.777.0 (#5254): the save is a step of the undo list (all devices)
+st = (Fr.get(B + "/api/undo").json().get("items") or [{}])[0]
+check(st.get("kind") == "fs_node" and st.get("ref_id") == D and st.get("undo"), f"#5254: the pages save is the newest step of the list {st}")
+r = Fr.post(B + f"/api/undo/to/{st.get('id')}")
+check(r.ok and node(Fr, D)["version"] == 3 and rotations(content(Fr, D)) == [90, 0],
+      f"#5254: taken back from the list: the file points at version 3 again, no copy ({r.status_code} {r.text[:200]})")
+until(lambda: (lambda d: d and d["state"] == "done")(doc(Fr, D)), 180)
+r = Fr.post(B + f"/api/undo/{st.get('id')}/redo")
+check(r.ok and node(Fr, D)["version"] == 4 and rotations(content(Fr, D)) == [0, 270], f"#5254: redo: version 4 again ({r.status_code})")
 until(lambda: (lambda d: d and d["state"] == "done")(doc(Fr, D)), 180)
 
 # ================================================================ undo: the file store's "Restore version" (one step)
