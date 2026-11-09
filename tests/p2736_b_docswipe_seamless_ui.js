@@ -144,7 +144,16 @@ function hold(w, el, dx) {  // one finger from (200, 300) by dx in a few steps, 
       await ev(`(document.querySelector('.dc-view [data-dco="' + DC.docs[0].id + '"]').click(), 1)`);
       const NB = `DCW.nb?.get(DC.docs[1].id)`;
       check(await wait(`DC.doc?.id === DC.docs[0].id && !!document.querySelector('.dv-view .dv-pages canvas') && !!${NB}?.el?.querySelector('.dv-pages canvas')`, 120), `Firefox ${W}: open, the next one drawn ahead with its page`);
-      const r0 = await ev(`(() => { const c = document.querySelector('.dv-view .dc-body .dv-pages canvas'); if (c) c.__was = 1; return (${R})(document.querySelector('.dv-view .dc-body .dv-pages').getBoundingClientRect()); })()`);
+      // 2.755.0 (#5312): the fit is measured with the box's own scrollbar counted - the width a page was drawn for is the width
+      // the box has (else the next resize, e.g. the move after the snap, draws it anew at another scale: a jump, the page drawn
+      // ahead lost; red at 460 px before, where a page is taller than the box and a classic scrollbar appeared after the fit)
+      // the box's width for the pages is the same empty (when the fit is measured) and filled (a page taller than the box)
+      const FIT = `(b => { if (!b?._aw) return 'no fit'; const cs = getComputedStyle(b), aw = () => b.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - 2;
+        const full = aw(), kids = [...b.childNodes]; b.replaceChildren(); const empty = aw(); b.replaceChildren(...kids);
+        return Math.abs(full - empty) < 2 && Math.abs(b._aw - full) < 2 ? true : {fit: b._aw, full, empty}; })`;
+      const fit = await ev(`[${FIT}(document.querySelector('.dv-view .dc-body .dv-pages')), ${FIT}(${NB}.el.querySelector('.dv-pages'))]`);
+      check(fit[0] === true && fit[1] === true, `Firefox ${W}: the open preview and the one drawn ahead: the same width for the pages empty and filled, drawn for it (its scrollbar takes no width later): ` + JSON.stringify(fit));
+      const r0 = await ev(`(() => { const c =document.querySelector('.dv-view .dc-body .dv-pages canvas'); if (c) c.__was = 1; return (${R})(document.querySelector('.dv-view .dc-body .dv-pages').getBoundingClientRect()); })()`);
       const mid = await ev(`(() => { ${TOUCH} hold(document.querySelector('.dv-view .dc-body .dv-pages'), -${Math.round(W * .35)});
         const n = document.querySelector('.dv-view .dc-body > .dc-nb-n'); if (!n) return null; const cv = n.querySelector('.dv-pages canvas'); if (cv) cv.__ahead = 1;
         return {pv: (${R})(n.querySelector('.dv-pages').getBoundingClientRect()), name: n.querySelector('[data-dcp="name"]')?.value, cv: !!cv, t0: performance.now()}; })()`);
