@@ -268,17 +268,17 @@ def _budgets(c, run, uid, data):
         lid = run.m("lists", b.get("list_id")) if isinstance(b, dict) else None
         if not lid or run.old("lists", lid):
             if isinstance(b, dict) and not lid:
-                run.warning(N_("A row could not be taken over: {0}"), tr(N_("Household budget")))
+                run.warning(N_("A row could not be imported: {0}"), tr(N_("Household budget")))
             continue
         try:
             made, bad = bud_import(c, uid, lid, b, lambda t: run.m("tasks", t), run.step)  # 2.584.0 (fable F6): + step
         except Denied:  # not a budget list of mine (the file's list is no budget, or it did not come along as mine)
-            run.warning(N_("A row could not be taken over: {0}"), tr(N_("Household budget")))
+            run.warning(N_("A row could not be imported: {0}"), tr(N_("Household budget")))
             continue
         for table, nid in made:
             _more(run, table, nid)
         for _ in range(bad):
-            run.warning(N_("A row could not be taken over: {0}"), tr(N_("Household budget")))
+            run.warning(N_("A row could not be imported: {0}"), tr(N_("Household budget")))
 
 
 def _folder_pbs(c, run, uid, me_old, data):
@@ -294,7 +294,7 @@ def _folder_pbs(c, run, uid, me_old, data):
             folder, text = "", ""
         v = r.get("version")
         if not folder or not text or not isinstance(v, int) or isinstance(v, bool) or v < 1:
-            run.warning(N_("A row could not be taken over: {0}"), tr(N_("Playbooks")))
+            run.warning(N_("A row could not be imported: {0}"), tr(N_("Playbooks")))
             continue
         by.setdefault(folder, {})[v] = (r, text)
     here = []
