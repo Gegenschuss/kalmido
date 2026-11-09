@@ -6,7 +6,8 @@
 // padding of #top as before. Head bars in the content: the agenda's bar = the agenda list, the team chat room's head = the
 // reading column of its history, the letter's bar = its form, the rights page's bar = .orr.
 // #4808 a knowledge page and a note: from 1700 px a sheet (surface var(--bg2), border var(--line2), radius, inner space), its
-// text column --w-lesen; the bar 'Find a page / New page' in the sheet's middle and width; 1440 no sheet (as before); the
+// text column --w-lesen; 2.783.0 (#5376): the sheet takes the full width like the bar 'Find a page / New page' and #top stays as in
+// the list (before: bar and sheet in the middle); 1440 no sheet (as before); the
 // reading style Notepad without a second border; Read: a code block / a table reaches into the sheet's inner space; the width
 // switch in the page's / note's "…": Wide (--w-seite), Full (no limit), the default per area kept with the account (look.wkW /
 // ntW, a fixed choice only), a page's own choice on the device (LS pgW).
@@ -85,13 +86,13 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
       ['start', '#home', '#view .dash', 'voll'],  // 2.583.0 (#4840): --w-seite is none, lists and overviews take the full width: #top as before
       ['list', '#l/' + L, '#view .lwrap', 'voll'],  // 2.583.0 (#4840), as start
       ['board', '#l/' + K, '#view .kanban', 'voll'],
-      ['wiki', '#wiki/' + WP.id, '#view article.wkpage', 'eigen'],
+      ['wiki', '#wiki/' + WP.id, '#view article.wkpage', 'voll'],  // 2.783.0 (#5376): the page's card takes the full width, #top stays where the list has it (voll)
       ['note', '#note/' + NT.id, '#view .ntview.open', 'eigen'],
     ];
     for (const [vw, vh] of [[390, 844], [1440, 900], [1920, 1080], [2560, 1440]]) {
       await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
       for (const [name, hash, sel, kind] of PAGES) {
-        if (vw < 768 && kind === 'eigen') continue;  // the phone shows the page alone (as before)
+        if (vw < 768 && (kind === 'eigen' || name === 'wiki')) continue;  // the phone shows the page alone (as before)
         await nav(B + '?w=' + vw + hash);
         const m = await until(`!!S.booted && (${EDGES(sel)})`);
         if (!m) { check(false, `${vw}px ${name}: ${sel} shows`); continue; }
@@ -111,7 +112,8 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
     // ---- #4808 at 2560 and 1440: the knowledge page
     const SHEET = `(() => { const a = document.querySelector('#view article.wkpage'), bar = document.querySelector('#view .wkbar'); if (!a || !a.offsetWidth || !document.querySelector('#wk-md')) return null;
       const s = getComputedStyle(a), b = a.getBoundingClientRect(), rem = parseFloat(getComputedStyle(document.documentElement).fontSize), bg2 = (() => { const p = document.createElement('i'); p.style.color = 'var(--bg2)'; document.body.append(p); const c = getComputedStyle(p).color; p.remove(); return c; })();
-      const col = a.clientWidth - parseFloat(s.paddingLeft) - parseFloat(s.paddingRight), md = document.querySelector('#wk-md'), mr = md.getBoundingClientRect();
+      // 2.783.0 (#5376): the card is the full width, the text column is the inside of #wk-md (its padding centres it)
+      const md = document.querySelector('#wk-md'), ms = getComputedStyle(md), col = md.clientWidth - parseFloat(ms.paddingLeft) - parseFloat(ms.paddingRight), mr = {width: col};
       const pre = md.querySelector(':scope > pre.mdpre, :scope > .mdcode'), tb = md.querySelector(':scope > .mdtbl'), br = bar?.getBoundingClientRect();
       return {bg: s.backgroundColor, bg2, bw: parseFloat(s.borderTopWidth), rad: parseFloat(s.borderTopLeftRadius), pad: parseFloat(s.paddingLeft), col, w: b.width, l: b.left, r: b.right, rem,
         bar: br ? [Math.round(br.left), Math.round(br.right)] : null, pre: pre ? [Math.round(pre.getBoundingClientRect().width), Math.round(mr.width)] : null, tbl: tb ? [Math.round(tb.getBoundingClientRect().width), tb.scrollWidth > tb.clientWidth] : null}; })()`;
@@ -122,12 +124,13 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
       if (!s) { check(false, `#4808 ${vw}px: the page shows`); continue; }
       if (vw === 1440) {
         check(s.bw === 0 && s.pad === 0, `#4808 1440px: no sheet (as before) ` + JSON.stringify(s));
-        check(Math.abs(s.w - 46 * s.rem) <= 2, `#4808 1440px: the page in the reading column ` + JSON.stringify(s));
+        // 2.783.0 (#5376): the card takes the full width, the text keeps the reading column (before: the page was 46rem wide)
+        check(Math.abs(s.col - 46 * s.rem) <= 2 && s.bar && Math.abs(s.bar[0] - s.l) <= 2 && Math.abs(s.bar[1] - s.r) <= 2, `#4808/#5376 1440px: the card as wide as the bar, the text in the reading column ` + JSON.stringify(s));
         continue;
       }
       check(s.bg === s.bg2 && s.bw >= 1 && s.rad > 0 && s.pad >= s.rem, `#4808 2560px: the page lies as a sheet (surface, border, radius, inner space) ` + JSON.stringify(s));
       check(Math.abs(s.col - 46 * s.rem) <= 2, `#4808 2560px: Read = the text column --w-lesen ` + JSON.stringify(s));
-      check(s.bar && Math.abs(s.bar[0] - s.l) <= 2 && Math.abs(s.bar[1] - s.r) <= 2, `#4808 2560px: the bar (Find a page, New page) has the edges of the sheet ` + JSON.stringify(s));
+      check(s.bar && Math.abs(s.bar[0] - s.l) <= 2 && Math.abs(s.bar[1] - s.r) <= 2, `#4808/#5376 2560px: the bar (Find a page, New page) and the sheet share their edges (both the full width, 2.783.0) ` + JSON.stringify(s));
       check(s.pre && s.pre[0] > s.pre[1] + s.rem, `#4808 2560px: Read: the code block reaches beyond the text column into the sheet ` + JSON.stringify(s));
       check(s.tbl && s.tbl[0] > s.col + s.rem && s.tbl[0] <= s.w, `#4808 2560px: Read: the table reaches into the sheet, not beyond it ` + JSON.stringify(s));
       for (const theme of ['light', 'dark']) {

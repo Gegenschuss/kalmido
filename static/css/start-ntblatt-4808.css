@@ -15,9 +15,8 @@
   .ntwrap .ntedit:not(.wktagview):not(.wkst-notepad){background:var(--bg2);border-color:var(--line2)}
   /* Read: code blocks and tables may reach into the sheet's inner space (and scroll sideways beyond it, .mdtbl / pre.mdpre) */
   .ntwrap.pgw-lesen .ntedit:not(.wkst-notepad) :is(.wkmd,.ntmd) > :is(.mdtbl,pre.mdpre,.mdcode){margin-inline:calc(-1 * var(--ntpad));max-width:calc(100% + 2 * var(--ntpad))}
-  /* knowledge, a page open: the bar (Find a page, New page, Today, New folder) and the hints above it in the middle and width
-     of the sheet below - no empty space left of it */
-  .wkdesk.wkpgo > :not(.ntedit){width:100%;max-width:var(--ntsheet);margin-inline:auto}
+  /* knowledge, a page open: 2.783.0 (#5376) the bar stays left at the place of the list's bar and the page's card takes the full
+     width (wiki.css .wkpgo); only the text inside follows the width switch (the rule that centred the bar here is gone) */
   /* notes and a knowledge page with its list beside it: list + page as one block in the middle (one head line: the list's bar
      and the page's head side by side on its top edge); render.js topw_sync takes its width for #top (data-pw) */
   .ntwrap > .ntview.open{grid-template-columns:minmax(14rem,22rem) minmax(0,var(--ntsheet));max-width:calc(23rem + var(--ntsheet));margin-inline:auto}
