@@ -158,3 +158,14 @@
 .dpg-pg.gone .dpg-th{opacity:.35}
 .dv-pg.dpg-gone{opacity:.3}
 @media (prefers-reduced-motion:reduce){.dpg-th{transition:none}}
+@media (max-width:767px){
+  .dv-pv:has(>.dpg:not([hidden])){height:88dvh}  /* the strip open: the preview keeps room for the pages */
+  .dpg-bar .btn:not(.pri)>span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);clip-path:inset(50%)}
+  .dpg-bar .btn{min-width:2.75rem;min-height:2.75rem;justify-content:center}
+  .dpg-cnt{flex:1 1 100%}
+}
+@media (min-width:768px){
+  @container dvview (max-width:47.99rem){
+    .dv-pv:has(>.dpg:not([hidden])){height:88dvh}
+  }
+}

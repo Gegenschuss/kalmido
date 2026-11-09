@@ -106,7 +106,8 @@ const three = tag => [['Kita Beispiel', 'Elternbrief ' + tag, 'Datum 01.09.2026'
   check(await until(async () => (await call('GET', `/api/files/nodes/${D}`)).version === 2, 100), 'Save: the server has version 2');
   check(await until(() => !strip()), '... the strip closes');
   check(await until(() => /Saved as version 2 with 2 pages - the original stays as version 1/.test(d.querySelector('#toast')?.textContent || '') && d.querySelector('#toast button')), '... the toast says so and offers Undo ' + (d.querySelector('#toast')?.textContent || ''));
-  check(await settled(D) && (await call('GET', `/api/docs/${D}`)).pages === 2, '... recognised again with 2 pages');
+  check(await until(async () => (await call('GET', `/api/docs/${D}`)).pages === 2, 150), '... recognised again with 2 pages');
+  await settled(D);
   click(w, v().querySelector('[data-dpg="open"]'));
   check(await until(() => strip()?.querySelectorAll('[data-dpgp]').length === 2 && /^2 pages/.test(strip().querySelector('.dpg-cnt').textContent.trim())), 'opened again: "2 pages", two pages in the strip');
   check(!strip().querySelector('.blank') && !strip().querySelector('.dpg-hint'), '... no blank page left');
@@ -118,7 +119,8 @@ const three = tag => [['Kita Beispiel', 'Elternbrief ' + tag, 'Datum 01.09.2026'
   check(w.eval('HIST.undo[HIST.undo.length - 1]?.label') === 'Pages of “elternbrief.pdf” changed', 'the step on top of Undo: "Pages of … changed"');
   await w.eval(`histStep('undo')`);
   check(await until(async () => (await call('GET', `/api/files/nodes/${D}`)).version === 3, 100), 'Undo: a new version 3 with the content of version 1');
-  check(await settled(D) && (await call('GET', `/api/docs/${D}`)).pages === 3, '... recognised again: 3 pages');
+  check(await until(async () => (await call('GET', `/api/docs/${D}`)).pages === 3, 150), '... recognised again at once: 3 pages');
+  await settled(D);
   if (strip()) click(w, btn('cancel'));
   check(await until(() => !strip()), '... (strip closed)');
   click(w, v().querySelector('[data-dpg="open"]'));
@@ -151,19 +153,19 @@ const three = tag => [['Kita Beispiel', 'Elternbrief ' + tag, 'Datum 01.09.2026'
       await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
       await nav(B + `#ablage/${id}`);
       const wait = async (js, n = 80) => { for (let i = 0; i < n; i++) { if (await ev(js).catch(() => false)) return true; await sleep(250); } return false; };
-      check(await wait(`document.querySelectorAll('.dv-pages .dv-pg').length === 3 && !!document.querySelector('.dv-pages .dv-pg[data-i="0"] canvas') && /Page 1 \\/ 3/.test(document.querySelector('.dv-pgn').textContent)`), `Firefox ${tag}: the preview with three pages ("Page 1 / 3")`);
+      check(await wait(`document.querySelectorAll('.dv-view .dv-pages .dv-pg').length === 3 && !!document.querySelector('.dv-view .dv-pages .dv-pg[data-i="0"] canvas') && /Page 1 \\/ 3/.test(document.querySelector('.dv-view .dv-pgn').textContent)`), `Firefox ${tag}: the preview with three pages ("Page 1 / 3")`);
       await ev(`(document.querySelector('.dv-view [data-dpg="open"]').click(), 1)`);
       check(await wait(`document.querySelectorAll('.dpg [data-dpgt] canvas').length === 3`), `Firefox ${tag}: the strip's three small pages are drawn from the PDF`);
-      const lay = await ev(`(() => { const s = document.querySelector('.dpg').getBoundingClientRect(), p = document.querySelector('.dv-pages').getBoundingClientRect(), b = document.querySelector('.dpg [data-dpg="save"]').getBoundingClientRect(), v = document.querySelector('.dv-view');
+      const lay = await ev(`(() => { const s = document.querySelector('.dpg').getBoundingClientRect(), p = document.querySelector('.dv-view .dv-pages').getBoundingClientRect(), b = document.querySelector('.dpg [data-dpg="save"]').getBoundingClientRect(), v = document.querySelector('.dv-view');
         return {sb: Math.round(s.bottom), pt: Math.round(p.top), ph: Math.round(p.height), bw: Math.round(b.width), br: Math.round(b.right), vw: innerWidth, sw: v.scrollWidth, cw: v.clientWidth}; })()`);
       check(lay && lay.sb <= lay.pt + 1 && lay.ph > 120 && lay.bw > 40 && lay.br <= lay.vw && lay.sw <= lay.cw + 1, `Firefox ${tag}: the strip above the pages, the pages keep room, Save in view, nothing sideways ` + JSON.stringify(lay));
       check(await ev(`document.querySelector('.dpg [data-dpgp="2"]').classList.contains('blank')`), `Firefox ${tag}: page 2 marked "Blank?"`);
       await ev(`(() => { const b = document.querySelector('.dpg [data-dpgp="2"]'); b.click(); return 1; })()`);
       await ev(`(() => { const b = document.querySelector('.dpg [data-dpgp="2"]'); b.focus(); b.dispatchEvent(new KeyboardEvent('keydown', {key: 'Delete', bubbles: true, cancelable: true})); return 1; })()`);
-      check(await wait(`document.querySelector('.dpg [data-dpgp="2"]').classList.contains('gone') && document.querySelector('.dv-pg[data-i="1"]').classList.contains('dpg-gone')`), `Firefox ${tag}: Del marks page 2, the large preview shows it faded`);
+      check(await wait(`document.querySelector('.dpg [data-dpgp="2"]').classList.contains('gone') && document.querySelector('.dv-view .dv-pg[data-i="1"]').classList.contains('dpg-gone')`), `Firefox ${tag}: Del marks page 2, the large preview shows it faded`);
       await shot(`p2777-docpages-${tag}.png`);
       await ev(`(document.querySelector('.dpg [data-dpg="save"]').click(), 1)`);
-      check(await wait(`!document.querySelector('.dpg:not([hidden])') && document.querySelectorAll('.dv-pages .dv-pg').length === 2 && /Page 1 \\/ 2/.test(document.querySelector('.dv-pgn').textContent)`), `Firefox ${tag}: saved - the preview now counts "Page 1 / 2"`);
+      check(await wait(`!document.querySelector('.dpg:not([hidden])') && document.querySelectorAll('.dv-view .dv-pages .dv-pg').length === 2 && /Page 1 \\/ 2/.test(document.querySelector('.dv-view .dv-pgn').textContent)`), `Firefox ${tag}: saved - the preview now counts "Page 1 / 2"`);
     }, tag === 'phone');
     await settled(id);
   }

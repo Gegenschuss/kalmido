@@ -571,6 +571,9 @@ def files_version_restore(nid, no):
     else:
         new = fs_new_version(c, nid, fs_read(c, nid, no), v["mime"])
     fs_log_add(c, nid, "restore_version", f"{no}->{new}")
+    # 2.777.0 B (#4874): a document's restored version is recognised again at once (text, page count, preview; the values set by
+    # hand stay) - the undo of "Pages" in the document view; the queue's look for new versions (docs/ingest.py inbox_scan) came later
+    c.execute("UPDATE doc_meta SET state='wait', tries=0 WHERE node_id=? AND state IN ('done', 'failed')", (nid,))
     bump(c)
     _fsu_done(c)
     c.commit()
