@@ -51,7 +51,7 @@ from ..core.config import app, APP_VERSION, ATT_DIR, DB, OFFICE_DIR
 from ..core.db import connect, db, err, iso, now_utc
 from ..core.pg import system_ctx
 from ..core.i18n import N_, lang, tr
-from ..core.access import Denied
+from ..core.access import Denied, live_sql
 from ..accounts.pictures import list_icon_path, org_icon_path, org_icon_tok  # 2.363.2 (#3106)
 from ..accounts.session import me
 from ..lists.listhead import o3c_head_rel  # 2.363.2 (#3106)
@@ -295,7 +295,7 @@ OX_AREAS = (
     # 2.763.0 (#5269): the reactions are rows of the core (obj_reactions); the file keeps its columns (_clean: comment_id), a
     # comment in the trash leaves its reactions out (as OX_GONE_WITH did)
     ("comments/reactions.json", "obj_reactions",
-     f"target_kind='comment' AND target_id IN (SELECT id FROM comments WHERE task_id IN ({TSQ}) AND deleted_at IS NULL)"),
+     f"target_kind='comment' AND target_id IN (SELECT id FROM comments WHERE task_id IN ({TSQ}) AND {live_sql()})"),
     ("attachments.json", "attachments", f"task_id IN ({TSQ})"),
     # 2.48.0 (#1207): the organisation's file store (folders, files, versions, shares, history)
     # 2.223.3 B (#2879): without the trash (ox_live, ox_dead_nodes)
@@ -313,7 +313,7 @@ OX_AREAS = (
     ("chat/members.json", "tchat_members", f"room_id IN ({CSQ})"),
     ("chat/messages.json", "tchat_msgs", f"room_id IN ({RSQ})"),
     ("chat/reactions.json", "obj_reactions",  # 2.137.0 C (#2344); 2.763.0 (#5269): rows of the core, the file keeps message_id
-     f"target_kind='tchat' AND target_id IN (SELECT id FROM tchat_msgs WHERE room_id IN ({RSQ}) AND deleted_at IS NULL)"),
+     f"target_kind='tchat' AND target_id IN (SELECT id FROM tchat_msgs WHERE room_id IN ({RSQ}) AND {live_sql()})"),
     ("chat/files.json", "tchat_files", f"room_id IN ({RSQ})"),
     ("calendars.json", "ev_cals", "org_id=?"),
     # 2.647.0 (#5046): the members as the core has them -- a calendar / book with a reference node only the people / agents with a
