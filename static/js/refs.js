@@ -422,9 +422,21 @@ xd_on('#view .cm-editor', 'tf', async (s, el, e, id) => {
   v.dispatch({changes: {from: at, insert: txt + ' '}, selection: {anchor: at + txt.length + 1}}); v.focus();
 }, el => typeof WKCM !== 'undefined' && !!WKCM.view && el.contains(WKCM.view.dom));
 
-// 2. a task onto a project / the inbox in the sidebar, or onto a row / column of a list = moved there:
-//    dnd.js dropTask, the same checks, history step and undo as within one half
-xd_on('#side .srow[data-drop^="l:"], #side .srow[data-drop="inbox"], #view .trow[data-id], #view .kcol', 't', async (s, el, e, id) => {
+// 2. a task onto a project / the inbox in the sidebar, or onto a row / column of a list = moved there; 3. onto a day of
+//    the calendar = its date (a time in the week view): dnd.js dropTask, the same checks, history step and undo as within one half
+xd_on('#side .srow[data-drop^="l:"], #side .srow[data-drop="inbox"], .cal .cell[data-day], .wcol[data-day], .wad[data-day], #view .trow[data-id], #view .kcol', 't', async (s, el, e, id) => {
   if (!await xd_task(id)) return;
   await dropTask(id, el, e.clientY);
 });
+// 3. a document / file onto a day of the calendar = a new all-day appointment with its name and a reference to it (caldrag.js's undo)
+xd_on('.cal .cell[data-day], .wad[data-day], .wcol[data-day]', 'f', async (s, el, e, id) => {
+  const v = await xd_node(id); if (!v) return;
+  const cals = typeof evWritable === 'function' ? evWritable() : [];
+  if (!cals.length) { toast(tr('No calendar of this workspace you can write in.')); return; }
+  const day = el.dataset.day, pick = +LS.get('evCal', 0), title = String(v.name || tr('Document')).slice(0, 200);
+  const body = {title, all_day: true, start: day, end: addDays(day, 1), reminders: [-540], cal_id: cals.some(c => c.id === pick) ? pick : cals[0].id, tz: evTz(), description: rf_text('f:' + id, v.name)};
+  let r; try { r = await api('POST', '/api/events', body); } catch { return; }
+  const re = () => { if (typeof calInvalidate === 'function') calInvalidate(); renderView(); };
+  re();
+  offerUndo(tr('Event created'), histAdd({label: tr('New event “{0}”', title), undo: () => api('DELETE', `/api/events/${r.id}`), redo: () => api('POST', `/api/events/${r.id}/restore`), post: re}));
+}, () => feat('events'));
