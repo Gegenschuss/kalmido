@@ -32,7 +32,6 @@ from ..core.config import app, SECRET_KEY
 from ..core.i18n import N_, tr
 from ..core.pg import insert_id, write_lock
 from ..core.db import body, bump, db, iso, local_now, now_utc  # 2.488.0 (#4004): the test clock
-from ..core.retention import ret_on, ret_report, ret_trash_cut  # 2.272.0 F (#3026, review M4)
 from ..core.access import Denied
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..personal.timetrack import BadInput
@@ -45,11 +44,11 @@ from .legacyimport import fi_norm, _client_used, bk_detail, fi_client_undo_check
 from ..team.clients import clean_client  # 2.369.5 (#2517): pulled up from functions
 from .periodlock import period_need_open  # 2.369.5 (#2517): pulled up from functions
 from .ledger import ofx_log  # 2.369.5 (#2517): pulled up from functions
+from .okern import ofk_register, ofk_restore, ofk_trash  # 2.784.0 (#5366)
 
 DI_MAX = 10 * 1024 * 1024       # the uploaded file
 DI_ROWS_MAX = 20000             # data rows of one file
 DI_PREVIEW = 20                 # rows shown in the preview
-DI_TRASH_DAYS = 30              # a deleted supplier (undo possible) is purged after this
 DI_MAX_TEXT = {"name": 80, "street": 200, "zip": 20, "city": 120, "country": 2, "vat_id": 20, "iban": 34, "email": 200, "label": 60}
 DI_EB = ("9000", "9008", "9009")  # Saldenvorträge Sachkonten / Debitoren / Kreditoren (SKR03 and SKR04)
 DI_VERSIONS = {16: range(1, 6), 21: range(2, 14)}
@@ -670,14 +669,9 @@ def di_undo_post(rid):
 
 
 # ---------------------------------------------------------------- the suppliers list (DATEV settings)
-def _purge(c, oid):
-    """Suppliers deleted longer than the trash period ago are removed for good (2.272.0 F, #3026 review M4: only with the
-    trash switch on, ret_trash_cut instead of the fixed DI_TRASH_DAYS)."""
-    if not ret_on("trash"):
-        return
-    n = c.execute("DELETE FROM office_suppliers WHERE org_id=? AND deleted_at IS NOT NULL AND deleted_at<?", (oid, ret_trash_cut())).rowcount
-    if n:
-        ret_report(c, "trash", {"suppliers": n}, True, run="suppliers")
+DI_SUP_KIND = "osupplier"  # 2.784.0 (#5366): a deleted supplier lies in the core's trash (office/okern.py); its retention
+# run is the core's (obj_trash_tick), the office's own _purge is gone
+ofk_register(DI_SUP_KIND, "office_suppliers", N_("Supplier"), "books")
 
 
 def _sup_public(x):
@@ -721,12 +715,10 @@ def di_supplier_put(sid):
 
 @app.delete("/api/office/datev/suppliers/<int:sid>")
 def di_supplier_delete(sid):
-    """Org admin: deletes a supplier (restore possible for DI_TRASH_DAYS days, then removed for good)."""
+    """Org admin: deletes a supplier (the core's trash: restore possible for the trash period, then removed for good)."""
     c, uid, oid = _ctx()
-    _purge(c, oid)
     _sup_row(c, oid, sid)
-    c.execute("UPDATE office_suppliers SET deleted_at=? WHERE id=? AND org_id=?", (iso(now_utc()), sid, oid))
-    bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
+    ofk_trash(c, uid, DI_SUP_KIND, sid)  # 2.784.0 (#5366): the core's trash, an undo step of the person (GET /api/undo)
     c.commit()
     return jsonify(ok=True)
 
@@ -735,11 +727,8 @@ def di_supplier_delete(sid):
 def di_supplier_restore(sid):
     """Org admin: puts a deleted supplier back."""
     c, uid, oid = _ctx()
-    _purge(c, oid)  # one past the trash period is gone (404; committed before the refusal rolls back)
-    c.commit()
     _sup_row(c, oid, sid, deleted=True)
-    c.execute("UPDATE office_suppliers SET deleted_at=NULL, updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), sid, oid))
-    bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
+    ofk_restore(c, uid, DI_SUP_KIND, sid)  # 2.784.0 (#5366): one past the trash period is gone (404)
     c.commit()
     return jsonify(ok=True)
 
