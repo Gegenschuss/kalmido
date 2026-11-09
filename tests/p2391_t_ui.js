@@ -130,7 +130,9 @@ const FEAT = 'comments,collab,fields';
     await keys(TAB); await sleep(800);
     check(await ev(`document.activeElement === document.querySelector('${cellSel(T1, FS.id)}')`), '#1327: Tab goes to the next cell (the choice)');
     // choice: a menu with the colours
-    p = await mid(cellSel(T1, FS.id)); await clickAt(p.x, p.y); await sleep(300);
+    // 2.771.0 (#5343): CI v2.761.0 read the menu after a fixed 300 ms and found it empty: wait for its options (a real state)
+    p = await mid(cellSel(T1, FS.id)); await clickAt(p.x, p.y);
+    for (let i = 0; i < 100 && !(await ev(`[...document.querySelectorAll('#pop [role="menuitem"]')].some(b => /Paid/.test(b.textContent))`)); i++) await sleep(100);
     const mi = await ev(`[...document.querySelectorAll('#pop [role="menuitem"]')].map(b => b.textContent.trim() + (b.querySelector('.mswc') ? '*' : ''))`);
     check(mi.includes('Open*') && mi.includes('Paid*'), '#1327: the choice opens a menu with the option colours ' + JSON.stringify(mi));
     await shot('p2391t-select.png');
