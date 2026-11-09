@@ -363,7 +363,8 @@ def vdm_pub_first(rng):
     if not rng:
         return True
     r = rng.strip().lower().replace(" ", "")
-    return r.startswith("bytes=0-") and "," not in r
+    # review 2.773 F2: Safari's probe "bytes=0-1" (and any closed range from 0) is no start of playing - only an open "bytes=0-"
+    return r == "bytes=0-"
 
 
 def vdm_version_row(c, rid, nid):

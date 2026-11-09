@@ -88,6 +88,8 @@ check(log == [("ext_view", f"approval {R1['id']}", None)], f"the guest's fetch: 
 m = media(TOK1, headers={"Range": "bytes=100-199"})
 check(m.status_code == 206 and m.content == SMALL[100:200], f"the guest seeks: 206 {m.status_code}")
 check(len(link_log(F1)) == 1, f"a seek adds no entry {link_log(F1)}")
+m = media(TOK1, headers={"Range": "bytes=0-1"})
+check(m.status_code == 206 and len(link_log(F1)) == 1, f"Safari's probe bytes=0-1 adds no entry (review F2) {len(link_log(F1))}")
 m = media(TOK1, headers={"Range": "bytes=0-"})
 check(m.status_code in (200, 206) and len(link_log(F1)) == 2, f"playing again from byte 0: a second entry {len(link_log(F1))}")
 n = A.get(B + f"/api/files/nodes/{F1}")
