@@ -173,6 +173,17 @@ c.commit()
   kind: its own check, `UGO_ADMIN` (the office's admin) or `UGO_NOACCESS` on purpose (rows with locks / approvals of
   their own). A document's undo takes the lock of its saves and of finalising (`office_doc_<id>`). The editor session
   (`X-Kalmido-Undo`) stays; in the browser a barrier ends it as an entry of the history (`office_undo.js` `oun_bar`).
+- Undo across devices, stage 3 (2.774.0, #5251): diff parts (`core/undodiff.py`, `obj_undo.mode = 'diff'`): an area that
+  changes its objects field by field and in masses keeps only what a step changed and takes it back through its own
+  write path (`undo_diff_reg(kind, run, area)`). The tasks (`tasks/tundo.py`, kind `task`): an edit (`apply_update`, also
+  batch, drag, dependent dates, a proposal applied) keeps the changed fields before / after and goes back as
+  `apply_update` with `_prev` (a field changed elsewhere stays and is named, the rest goes back); completing / reopening
+  keep the payload of `undo_status`; the trash, restoring and a new task go back through `trash_task` / `restore_task`.
+  Sections (kind `section`: name, limits, meaning through `sec_apply`) and their order (kind `section_order`). The parts
+  are read right before the commit (`Conn.pre_commit` in `core/pg.py`), so a task a batch rolled back to its savepoint
+  records nothing; while a group is taken back nothing records (`undo_quiet`). Not yet: creating / deleting a section,
+  the project settings, and the browser's own task history (`undo.js`), which goes once the list of stage 2 shows the
+  server's groups.
 - Stage 2b (2.576.0, #4794): a 409 of `ow_write` carries the current state under `current` only (the old keys `row` /
   `letter` / `client` went). Every office row on `ow_write` has its history route `GET <its save path>/history`
   (`ow_history_answer`; e.g. `/api/office/trips/<id>/history`, `/api/clients/<id>/history`): the route runs the rights
