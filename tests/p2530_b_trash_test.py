@@ -164,7 +164,7 @@ check(r.ok and r.json()["restored"] == 3 and not dbx(f"SELECT 1 FROM {TZW} AND i
 # the trash run deletes an old copy
 r = F.post(B + f"/api/lists/{L}/time/delete-all", json={"confirm": "Frida film"})
 W2 = r.json()["wipe"]
-dbx(f"UPDATE list_part_trash SET deleted_at=? WHERE kind='time_wipe' AND id=?", (ago(400), W2))
+dbx("UPDATE list_part_trash SET deleted_at=? WHERE kind='time_wipe' AND id=?", (ago(400), W2))
 run_purge(True)
 check(not dbx(f"SELECT 1 FROM {TZW} AND id=?", (W2,)), "time: the trash run deletes the old copy")
 

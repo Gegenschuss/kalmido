@@ -5,5 +5,5 @@ version; their rows move into the core's copy trash (list_part_trash) at every s
 personal/timewipe.py tzw_move)."""
 MIGRATIONS = [
     ("hook_in", "deleted_by", "ALTER TABLE hook_in ADD COLUMN IF NOT EXISTS deleted_by BIGINT"),
-    ("hook_in", "updated_at", "ALTER TABLE hook_in ADD COLUMN IF NOT EXISTS updated_at TEXT"),
+    ("hook_in", "updated_at", "ALTER TABLE hook_in ADD COLUMN IF NOT EXISTS updated_at TEXT"),  # coltype-ok: like created_at / deleted_at of hook_in an iso() text, the core's version (objparts expect_updated_at) compares it as text
 ]
