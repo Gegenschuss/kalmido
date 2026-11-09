@@ -53,7 +53,9 @@ TD_SITES = {
     ("favtiles.js", ".fv2bar"): ("drag.js", "favtiles.js"),
     # 2.627.0 (#4961 #4962): a file onto a folder, the icons of the area rail
     ("ablage.js", 'class="abrow"'): ("drag.js", "ablage.js"),
-    ("ablage.js", ".abrow[draggable"): ("drag.js", "ablage.js"),
+    ("ablage.js", "ab_dragSrc(e.target)"): ("drag.js", "ablage.js"),  # 2.750.0 (#4879): the rows' and cards' dragstart (was .abrow[draggable)
+    # 2.750.0 (#4879): only a marker on every drag that begins in the page (a drop never uploads it); each drag's finger way is its own place
+    ("dropany.js", "setData(KN_IN_MIME"): ("kein", "a marker on every drag that begins in the page, no drag of its own; the finger ways are the places' own"),
     ("areas.js", "sbb_on() && !S.me?.kid"): ("drag.js", "areas.js"),
     ("areas.js", "#srail .srb"): ("drag.js", "areas.js"),
     # 2.633.0 (#4963 #4964 #4965): a receipt onto a booking, a document onto a folder of the panel, a pipeline card into a column
