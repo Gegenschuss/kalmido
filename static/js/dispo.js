@@ -181,7 +181,7 @@ function dp_editSheet(b) {
     <div class="row ab2dates"><label>${tr('Start time')}${timeIn('dpe-t0', dp_time(b.start))}</label><label>${tr('End time')}${timeIn('dpe-t1', dp_time(b.end) === '23:59' && !dp_time(b.start) ? '' : dp_time(b.end))}</label></div>
     <div class="row"><span class="lbl">${tr('Status')}</span><div class="seg dpstat" role="group" aria-label="${esc(tr('Status'))}">${['option', 'firm'].map(s => `<button type="button" data-s="${s}" class="${b.status === s ? 'on' : ''}" aria-pressed="${b.status === s}">${s === 'firm' ? tr('Firm') : tr('Option')}</button>`).join('')}</div></div>
     <div class="row"><label for="dpe-note">${tr('Note')}</label><input id="dpe-note" maxlength="1000" value="${esc(b.note || '')}"></div>
-    <div class="foot">${can ? `<button class="btn danger" data-m="del">${ic('trash', 's')} ${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${can ? tr('Cancel') : tr('Close')}</button>${can ? `<button class="btn pri" data-m="save">${ic('check', 's')} ${tr('Save')}</button>` : ''}</div>`);
+    <div class="foot">${can ? `<button class="btn danger" data-m="del">${ic('trash', 's')} ${tr('Delete')}</button>` : ''}<span class="spacer"></span>${S.industry?.code === 'film' ? `<button class="btn" data-m="callsheet">${ic('file', 's')} ${tr('Call sheet')}</button>` : ''}<button class="btn" data-m="close">${can ? tr('Cancel') : tr('Close')}</button>${can ? `<button class="btn pri" data-m="save">${ic('check', 's')} ${tr('Save')}</button>` : ''}</div>`);
   md.classList.add('ab2md', 'dpmd');
   if (!can) $$('input, select, .dpstat button', md).forEach(x => { x.disabled = true; });
   md.addEventListener('change', e => {  // 2.589.0 (#4571)
@@ -203,6 +203,7 @@ function dp_editSheet(b) {
     if (s) { $$('.dpstat button', md).forEach(x => { x.classList.toggle('on', x === s); x.setAttribute('aria-pressed', x === s); }); return; }
     const k = e.target.closest('[data-m]'); if (!k) return;
     if (k.dataset.m === 'close') { md.remove(); return; }
+    if (k.dataset.m === 'callsheet') { md.remove(); cs_open(b.job, d.org_id); return; }  // 2.802.0 (#1956): lazyload.js loads callsheet.js
     if (k.dataset.m === 'delone') { del(+k.dataset.id, false); return; }
     if (k.dataset.m === 'del') { del(b.id, true); return; }
     const t0 = $('#dpe-t0', md).value, t1 = $('#dpe-t1', md).value, a = $('#dpe-from', md).value, z = $('#dpe-to', md).value || a;

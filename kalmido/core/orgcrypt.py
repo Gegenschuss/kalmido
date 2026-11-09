@@ -110,6 +110,7 @@ FIELDS = {
     "office_texts": ("body",),  # 2.470.0 (#3596): the text of a letter block (kind letter); the other kinds are in text_de / text_en, in clear
     "office_deals": ("value", "contact", "note", "lost_reason",
                      "next_step", "email", "phone", "company"),  # 2.50.0 (#1196): the sales pipeline; 2.94.0 A (#1930): leads
+    "hub_callsheets": ("data", "sketch"),  # 2.802.0 (#1956): the call sheet of a shoot day (phone numbers, location, notes) and its sketch
     "time_sheets": ("note",),  # 2.125.0 R (#2119): the note of a timesheet decision
     "hub_absences": ("kind", "note", "decision_note"),  # 2.50.0 (#1195): the kind of an absence (sick leave = health data) and its note; 2.125.0 A (#2117): + the note of a decision
     # 2.72.0 (#1333): the household budget -- per row with the key of its list's space (column sid, life/budget.py bud_enc;
@@ -162,6 +163,7 @@ PM_CRYPT_CATS = {"office_company": N_("Bank and tax data of the company"), ("off
                  "office_letters": N_("Letters"), "office_letter_blocks": N_("Letters"), "office_letter_profiles": N_("Letters"),  # 2.153.0 (#2028)
                  "office_texts": N_("Letters"),  # 2.470.0 (#3596): only the letter blocks' text
                  "hub_absences": N_("Kind and note of absences"),  # 2.50.0 (#1195)
+                 "hub_callsheets": N_("Call sheets of shoot days"),  # 2.802.0 (#1956)
                  "time_sheets": N_("Notes on timesheet decisions"),  # 2.125.0 R (#2119)
                  # 2.72.0 (#1333): amounts, texts and limits of the household budget, its receipts
                  "budget_entries": N_("Household budget"), "budget_recurring": N_("Household budget"), "budget_cats": N_("Household budget"),

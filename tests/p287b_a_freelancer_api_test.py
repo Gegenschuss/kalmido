@@ -72,6 +72,9 @@ EXPECT_4XX = {
     "GET /api/tasks/{}/enc-note": (404, "no encrypted note on the own task"),
     "GET /api/tasks/{}/note-lock": (404, "the note of the own task is not locked"),
     "GET /api/trash/lists/{}/export.zip": (404, "the own list is not in the trash"),
+    "GET /api/team/dispo/callsheet/{}": (404, "the sweep's freelancer has no Film & Video and no shoot day (p2802_a_callsheet_test.py covers it)"),  # 2.802.0 (#1956)
+    "GET /api/team/dispo/callsheet/{}/pdf": (404, "the sweep's freelancer has no Film & Video and no shoot day (p2802_a_callsheet_test.py covers it)"),  # 2.802.0 (#1956)
+    "GET /api/team/dispo/callsheet/{}/sketch": (404, "the sweep's freelancer has no Film & Video and no shoot day (p2802_a_callsheet_test.py covers it)"),  # 2.802.0 (#1956)
     "GET /api/lists/{}/shotlist.pdf": (404, "the own list is no shoot (project type Shoot only with Film & Video; p2636_c_dreh_api_test.py covers it)"),  # 2.636.0 (#4565)
     "GET /api/v1/office/letters/{}": (404, "an agent reads only the letters it drafted itself; the freelancer wrote this one"),
     # 2.557.0 (#4670): the own agent has no provider key stored (the provider would be an outside service)
@@ -116,6 +119,7 @@ OT = A.post(B + "/api/tasks", json={"list_id": OL, "title": "Org-only task"}).js
 A.put(B + "/api/admin/agent-policy", json={"user_agents": True})  # the server's switch (the same for everybody)
 FID, F = freelancer(B, A)
 IDS = {"objkind": "objprobe"}  # 2.558.0 (#4709): the kind for the shared core's routes (SUBST)
+IDS["dispojob"] = "nojob"  # 2.802.0 (#1956): a shoot day of the disposition (a job, no number): none in the sweep
 
 # ================================================================== tasks + lists in the private workspace
 # freelancer-matrix: tasks, lists
@@ -358,6 +362,7 @@ SUBST = [
     # of the setup and expects 404 (EXPECT_4XX) -- the first real area on the core makes them stale, then its objects go here
     (r"/api/obj/$", "objkind"), (r"/api/obj/objprobe/$", "list"),
     (r"/api/v1/agent/objects/$", "objkind"), (r"/api/v1/agent/objects/objprobe/$", "list"),
+    (r"/api/team/dispo/callsheet/$", "dispojob"),  # 2.802.0 (#1956)
     # 2.421.0 A (#2936): own objects of the setup above; file ids of other stores than the file store: none (skipped)
     (r"/me/webhooks/$", "webhook"),  # 2.391.0 (#3362)
     (r"/sprints/$", "sprint"), (r"/api/fields/$", "field"), (r"/api/docs/views/$", "docview"),  # 2.602.0 (job/3106)

@@ -1,0 +1,184 @@
+#!/usr/bin/env python3
+# kalmido-suite: fresh
+"""2.802.0 A (#1956): the call sheet of a shoot day (Film-Tagesdispo, hub/callsheet.py). Invented people, firms and numbers only.
+ - without Film & Video: GET /api/team/dispo/callsheet/<job> and its PDF 404 (as if there was nothing)
+ - with it: the day, the title, the project, the production (office master data) and the crew of the job come from the app;
+   a contact booked brings its mobile number / e-mail, a member booked the ones of the address book entry with her e-mail
+ - PUT saves the day details (unknown keys go, texts are cut, a table with too many lines 400) and the directions sketch
+   (PNG only, a text file 400); GET shows them again, the sketch is served as image/png; a stale save 409 with the current
+   state (expect_updated_at), nothing overwritten
+ - the PDF: application/pdf, page 1 with location, call times, shoot start, wrap, strike, important, set phone, the link
+   "Open in maps" as a URI action, the crew list with the contact's phone, the cast, the transport ("Own arrangement"),
+   the shots of the chosen shot list day, the sketch as an image of its own page, the footer "As of" + "Page n of N"
+ - rights: another person's job 404 (with and without ?org=), an agent 403, the module Disposition off 409, Film & Video
+   switched off again 404
+freelancer-matrix: hub (frida has no organisation: her own area, her own office, her own industry)
+tenant-matrix: hub (greta, another person's area: frida's call sheet 404 for reading, the PDF and saving)
+usage: p2802_a_callsheet_test.py <datadir>"""
+import base64
+import re
+import struct
+import zlib
+
+import kt
+from kt import B, check
+from freelancer_fixture import freelancer
+
+A = kt.setup()
+FID, Fr = freelancer(B, A, "frida")
+GID, Gr = freelancer(B, A, "greta")
+FEAT = "cal,collab,comments,kanban,fields,files,contacts,office,clients,dispo,workload"
+for s in (Fr, Gr):
+    check(s.patch(B + "/api/settings", json={"features": FEAT}).ok, "the modules incl. Disposition")
+DAY = "2027-04-05"
+CS = "/api/team/dispo/callsheet/"
+
+
+def pdf_text(data):
+    out = b""
+    for m in re.finditer(rb"stream\r?\n(.*?)\nendstream", data, re.S):
+        try:
+            out += zlib.decompress(m.group(1))
+        except zlib.error:
+            out += m.group(1)
+    return out.decode("latin-1")
+
+
+def has(txt, s):
+    return s.encode("cp1252").hex() in txt
+
+
+def png(w=40, h=24, rgb=(20, 120, 200)):
+    def chunk(t, d):
+        return struct.pack(">I", len(d)) + t + d + struct.pack(">I", zlib.crc32(t + d) & 0xffffffff)
+    raw = b"".join(b"\x00" + bytes(rgb) * w for _ in range(h))
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(raw))
+            + chunk(b"IEND", b""))
+
+
+# ------------------------------------------------------------ frida's area: master data, address book, a shoot, a booking
+r = Fr.put(B + "/api/office/settings", json={"company_fields": {"name": "Beispiel Film GmbH", "street": "Musterweg 1", "zip": "12345",
+                                                                "city": "Musterstadt", "country": "DE", "phone": "030 1111111"},
+                                               "lang": "en", "currency": "EUR"})
+check(r.ok, "frida's office master data " + r.text[:120])
+PERS = kt.dbx("SELECT id FROM orgs WHERE personal_of=?", (FID,))[0][0]
+BK = Fr.post(B + "/api/books", json={"name": "Crew", "org_id": None}).json()["id"]
+r = Fr.post(B + "/api/contacts", json={"book_id": BK, "fn": "Carla Kamera", "emails": [{"value": "carla@example.com"}],
+                                       "phones": [{"value": "030 2222222", "type": ["work"]}, {"value": "0170 3333333", "type": ["cell"]}]})
+check(r.status_code == 201, "a crew contact " + r.text[:120])
+CARLA = r.json()["id"]
+check(Fr.post(B + "/api/contacts", json={"book_id": BK, "fn": "Frida Selbst", "emails": [{"value": "frida@example.com"}],
+                                         "phones": [{"value": "0170 4444444", "type": ["cell"]}]}).status_code == 201, "her own address book entry")
+r = Fr.post(B + "/api/team/dispo/bookings", json={"title": "Imagefilm Kueche", "start": DAY + "T07:00", "end": DAY + "T19:00", "status": "firm",
+                                                  "org": PERS, "resources": [{"kind": "contact", "id": CARLA}, {"kind": "user", "id": FID}]})
+check(r.status_code == 201, "the shoot day booked " + r.text[:160])
+JOB = r.json()["bookings"][0]["job"]
+Q = f"?org={PERS}"
+
+# ------------------------------------------------------------ without Film & Video: nothing
+check(Fr.get(B + f"/api/team/dispo/callsheet/{JOB}?org={PERS}").status_code == 404, "no Film & Video: the call sheet 404")
+check(Fr.get(B + f"/api/team/dispo/callsheet/{JOB}/pdf?org={PERS}").status_code == 404, "no Film & Video: its PDF 404")
+
+# ------------------------------------------------------------ Film & Video: what comes from the app
+check(Fr.put(B + "/api/industry", json={"industry": "film"}).ok, "frida chooses Film & Video")
+r = Fr.post(B + "/api/lists", json={"name": "Imagefilm Kueche", "ptype": "shoot", "sections": True})
+check(r.ok, "a shoot project " + r.text[:120])
+L = r.json()["id"]
+st = Fr.get(B + "/api/state").json()
+day1 = next(s for s in st["sections"] if s["list_id"] == L)
+check(Fr.post(B + "/api/tasks", json={"title": "Totale Kueche", "list_id": L, "section_id": day1["id"]}).ok, "a shot on day 1")
+r = Fr.post(B + "/api/team/dispo/bookings", json={"title": "Dreh Tag 1", "start": DAY, "end": DAY, "status": "option", "org": PERS,
+                                                  "list_id": L, "resources": [{"kind": "contact", "id": CARLA}]})
+check(r.status_code == 201, "a second shoot day with the project " + r.text[:160])
+JOB2 = r.json()["bookings"][0]["job"]
+
+r = Fr.get(B + f"/api/team/dispo/callsheet/{JOB}?org={PERS}")
+check(r.ok, "the call sheet " + r.text[:160])
+cs = r.json().get("callsheet") or {}
+a = cs.get("auto") or {}
+check(a.get("date") == DAY and a.get("start") == "07:00" and a.get("end") == "19:00" and a.get("title") == "Imagefilm Kueche",
+      f"the day and times of the job {a.get('date')} {a.get('start')} {a.get('end')}")
+check((a.get("production") or {}).get("name") == "Beispiel Film GmbH" and "030 1111111" in (a.get("production") or {}).get("lines", []),
+      f"the production from the office master data {a.get('production')}")
+crew = {p["name"]: p for p in a.get("crew", [])}
+check(crew.get("Carla Kamera", {}).get("phone") == "0170 3333333" and crew["Carla Kamera"].get("mail") == "carla@example.com",
+      f"the contact booked: her mobile number first, her e-mail {crew.get('Carla Kamera')}")
+check(crew.get("Frida", {}).get("phone") == "0170 4444444", f"the member booked: the number of her address book entry {crew}")
+check(cs.get("data") == {} and cs.get("updated_at") == "" and cs.get("can_edit") is True and cs.get("sketch") is False, f"nothing stored yet {cs.get('data')}")
+r2 = Fr.get(B + f"/api/team/dispo/callsheet/{JOB2}?org={PERS}").json().get("callsheet", {}).get("auto", {})
+check(r2.get("project") == "Imagefilm Kueche" and r2.get("shot_days", [])[:1] == [day1["name"]] and r2.get("start") == "",
+      f"the job with the project: its name and the shot list days {r2.get('project')} {r2.get('shot_days')}")
+
+# ------------------------------------------------------------ saving the day details + the sketch
+DATA = {"subtitle": "Kampagne Fruehjahr", "day_no": "2", "set_name": "Aufnahmeleitung", "set_phone": "0170 5555555",
+        "loc_name": "Studio Nord", "loc_address": "Musterweg 7, 12345 Musterstadt", "parking": "Parken im Hof hinten",
+        "transit": "Bus 100 bis Musterplatz", "calls": [{"dept": "Kamera", "time": "06:30"}, {"dept": "Licht", "time": "06:45"}],
+        "shoot_start": "08:00", "lunch_from": "13:00", "lunch_to": "14:00", "wrap": "18:00", "strike": "19:30",
+        "weather": "Sonnenaufgang 06:52, 14 Grad", "important": "Bitte leise am Set", "attachments": "Moodboard",
+        "cast": [{"role": "Koch", "name": "Max Beispiel", "phone": "0170 6666666", "arrival": "07:00", "ready": "08:00"}],
+        "transport": [{"vehicle": "Bus 1 / Carla", "from": "Lager", "to": "Set", "riders": "Max", "cargo": "Licht", "call": ""}],
+        "unknown": "goes", "contacts": [{"role": "Regie", "name": "Rita Regie", "phone": "0170 7777777"}]}
+r = Fr.put(B + f"/api/team/dispo/callsheet/{JOB}?org={PERS}", json={"data": {**DATA, "cast": [{"name": "x"}] * 61}})
+check(r.status_code == 400, f"a table with too many lines: 400 ({r.status_code})")
+r = Fr.put(B + f"/api/team/dispo/callsheet/{JOB}?org={PERS}", json={"data": DATA, "sketch": "data:image/png;base64," + base64.b64encode(b"just text").decode()})
+check(r.status_code == 400, f"a sketch that is no PNG / JPEG: 400 ({r.status_code})")
+check(kt.dbx("SELECT COUNT(*) FROM hub_callsheets")[0][0] == 0, "... and nothing stored")
+r = Fr.put(B + f"/api/team/dispo/callsheet/{JOB}?org={PERS}", json={"data": DATA, "sketch": "data:image/png;base64," + base64.b64encode(png()).decode()})
+check(r.ok, "saved with a sketch " + r.text[:200])
+cs = r.json().get("callsheet") or {}
+V1 = cs.get("updated_at")
+check(V1 and cs.get("sketch") is True and "unknown" not in cs["data"] and cs["data"]["loc_name"] == "Studio Nord"
+      and cs["data"]["calls"][0] == {"dept": "Kamera", "time": "06:30"}, f"the details back, unknown keys gone {cs.get('data')}")
+cs = Fr.get(B + f"/api/team/dispo/callsheet/{JOB}?org={PERS}").json()["callsheet"]
+check(cs["data"].get("important") == "Bitte leise am Set" and cs["data"].get("cast", [{}])[0].get("name") == "Max Beispiel"
+      and cs.get("updated_at") == V1, "opened again: the same details and version")
+r = Fr.get(B + cs["sketch_url"])
+check(r.ok and r.headers.get("Content-Type", "").startswith("image/png") and r.content[:8] == b"\x89PNG\r\n\x1a\n", f"the sketch as image/png ({r.status_code})")
+r = Fr.put(B + f"/api/team/dispo/callsheet/{JOB}?org={PERS}", json={"data": {**DATA, "important": "zweite Fassung"}, "expect_updated_at": V1})
+check(r.ok, "a save with the version read " + r.text[:120])
+V2 = r.json()["callsheet"]["updated_at"]
+r = Fr.put(B + f"/api/team/dispo/callsheet/{JOB}?org={PERS}", json={"data": {**DATA, "important": "veraltet"}, "expect_updated_at": V1})
+check(r.status_code == 409 and (r.json().get("callsheet") or {}).get("data", {}).get("important") == "zweite Fassung",
+      f"a stale save: 409 with the current state ({r.status_code})")
+check(Fr.get(B + f"/api/team/dispo/callsheet/{JOB}?org={PERS}").json()["callsheet"]["updated_at"] == V2, "... and nothing overwritten")
+
+# ------------------------------------------------------------ the PDF
+check(Fr.put(B + f"/api/team/dispo/callsheet/{JOB2}?org={PERS}", json={"data": {"loc_name": "Kueche Ost", "shot_day": day1["name"]}}).ok, "day 2: a shot list day chosen")
+r = Fr.get(B + f"/api/team/dispo/callsheet/{JOB}/pdf?org={PERS}")
+check(r.ok and r.headers.get("Content-Type", "").startswith("application/pdf") and r.content[:5] == b"%PDF-", f"the PDF ({r.status_code})")
+raw, txt = r.content, pdf_text(r.content)
+for s in ("Imagefilm Kueche", "Kampagne Fruehjahr", "Studio Nord", "Musterweg 7, 12345 Musterstadt", "Open in maps", "Parken im Hof hinten",
+          "06:30", "08:00", "18:00", "19:30", "zweite Fassung", "Sonnenaufgang 06:52, 14 Grad", "Beispiel Film GmbH",
+          "Carla Kamera", "0170 3333333", "carla@example.com", "Max Beispiel", "0170 6666666", "Bus 1 / Carla", "Own arrangement",
+          "Rita Regie", "Set phone: Aufnahmeleitung – 0170 5555555", "Shoot day 2", "Moodboard", "Directions sketch",
+          "As of: ", "Page 1 of ", "Crew list", "Cast", "Transport"):
+    check(has(txt, s), f"the PDF says {s!r}")
+check(b"/S /URI /URI (https://www.google.com/maps/search/?api=1&query=Musterweg%207%2C%2012345%20Musterstadt)" in raw,
+      "the address is a link that opens the maps app (a URI action, nothing fetched)")
+check(b"/Subtype /Image" in raw and raw.count(b"/Type /Page ") >= 3, "the sketch as an image on a page of its own (3 pages or more)")
+check(not has(txt, "Totale Kueche"), "no shot list day chosen: no shots")
+r = Fr.get(B + f"/api/team/dispo/callsheet/{JOB2}/pdf?org={PERS}")
+txt2 = pdf_text(r.content)
+check(r.ok and has(txt2, "Totale Kueche") and has(txt2, "Shots of the day") and has(txt2, "Kueche Ost"), "day 2: the shots of the chosen shot list day")
+check(not has(txt2, "Directions sketch") and not has(txt2, "Own arrangement"), "day 2: no sketch, no transport (only what is there)")
+
+# ------------------------------------------------------------ rights
+check(Gr.put(B + "/api/industry", json={"industry": "film"}).ok, "greta chooses Film & Video too")
+check(Gr.get(B + f"/api/team/dispo/callsheet/{JOB}?org={PERS}").status_code == 404, "greta: frida's area by ?org= 404")
+check(Gr.get(B + f"/api/team/dispo/callsheet/{JOB}").status_code == 404, "greta: frida's job in her own area 404")
+check(Gr.get(B + f"/api/team/dispo/callsheet/{JOB}/pdf?org={PERS}").status_code == 404, "greta: frida's PDF 404")
+check(Gr.get(B + f"/api/team/dispo/callsheet/{JOB}/sketch?org={PERS}").status_code == 404, "greta: frida's sketch 404")
+check(Gr.put(B + f"/api/team/dispo/callsheet/{JOB}?org={PERS}", json={"data": {"important": "fremd"}}).status_code == 404, "greta: saving frida's call sheet 404")
+check(Gr.get(B + f"/api/team/dispo/callsheet/x%20y?org={PERS}").status_code == 404, "a strange job name 404")
+r = A.post(B + "/api/admin/agents", json={"username": "dispobot", "display_name": "Dispobot", "scopes": ["calendar"]})
+check(r.status_code == 201, "an agent " + r.text[:120])
+AG = kt.sess(soft=True)
+AG.headers.update({"Authorization": "Bearer " + (r.json().get("token") or "")})
+check(AG.get(B + f"/api/team/dispo/callsheet/{JOB}?org={PERS}").status_code in (401, 403), "an agent: the call sheet is refused")
+check(Fr.patch(B + "/api/settings", json={"features": FEAT.replace(",dispo", "")}).ok, "frida switches the Disposition off")
+check(Fr.get(B + f"/api/team/dispo/callsheet/{JOB}?org={PERS}").status_code == 409, "the module off: 409 like the disposition")
+check(Fr.patch(B + "/api/settings", json={"features": FEAT}).ok and Fr.put(B + "/api/industry", json={"industry": ""}).ok, "the module on, Film & Video off")
+check(Fr.get(B + f"/api/team/dispo/callsheet/{JOB}?org={PERS}").status_code == 404, "Film & Video off again: 404")
+check(kt.dbx("SELECT COUNT(*) FROM hub_callsheets WHERE org_id=?", (PERS,))[0][0] == 2, "the stored call sheets stay (only hidden)")
+
+raise SystemExit(kt.done("p2802_a_callsheet"))

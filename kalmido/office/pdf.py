@@ -475,6 +475,10 @@ class _Page:
         """2.438.0 B (#3622): the box x, y, w, h jumps to height to_y of page `to` (a _Page of the same document)."""
         self.links.append((x, y, w, h, to, to_y))
 
+    def uri(self, x, y, w, h, url):
+        """2.802.0 (#1956): the box x, y, w, h opens url (an ASCII web address) in the reader's app (PDF/A allows URI actions)."""
+        self.links.append((x, y, w, h, str(url), None))
+
 
 def qac_sig_block_h(rows):
     """2.99.0 C (#2195): the height of the signature box of qac_sig_block for rows."""
@@ -667,6 +671,13 @@ def _meta_text(s):
     return "".join(c for c in s if unicodedata.category(c) not in ("Cf", "Cc", "Cs")).strip()
 
 
+def pdf_uri_esc(url):
+    """2.802.0 (#1956): a web address as the text of a PDF string: ASCII only (else percent-encoded), ( ) \\ escaped."""
+    from urllib.parse import quote
+    s = quote(str(url), safe=":/?#[]@!$&'*+,;=%~-._")
+    return s.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+
+
 def pdf_write(pages, images, title="", author="", xml=None, meta=None):
     """Serialises pages ([_Page]) and images ({name: (w, h, data)}) into PDF/A-3b bytes (PDF 1.7: embedded TrueType fonts,
     XMP + Info, sRGB OutputIntent, trailer ID). xml: bytes of the e-invoice to embed as factur-x.xml (AFRelationship
@@ -725,7 +736,8 @@ def pdf_write(pages, images, title="", author="", xml=None, meta=None):
         cid = add(f"<< /Length {len(content)} /Filter /FlateDecode >>\nstream\n".encode() + content + b"\nendstream")
         xo = " ".join([f"/{n} {img_ids[n]} 0 R" for n in sorted(p.images) if n in img_ids] + [f"/{n} {form_ids[n]} 0 R" for n in sorted(getattr(p, "forms", None) or {})])
         ann = " ".join(f"<< /Type /Annot /Subtype /Link /F 4 /Border [0 0 0] /Rect [{x:.2f} {p.H - y - h:.2f} {x + w:.2f} {p.H - y:.2f}] "
-                       f"/Dest [{page_at[id(to)]} 0 R /XYZ null {to.H - to_y:.2f} null] >>" for x, y, w, h, to, to_y in getattr(p, "links", None) or [])
+                       + (f"/A << /S /URI /URI ({pdf_uri_esc(to)}) >> >>" if isinstance(to, str) else  # 2.802.0 (#1956): a web link (_Page.uri)
+                          f"/Dest [{page_at[id(to)]} 0 R /XYZ null {to.H - to_y:.2f} null] >>") for x, y, w, h, to, to_y in getattr(p, "links", None) or [])
         pid = add(f"<< /Type /Page /Parent {pages_id} 0 R /MediaBox [0 0 {p.W:.2f} {p.H:.2f}] {f'/Annots [{ann}] ' if ann else ''}"
                   f"/Resources << /Font << /F1 {font_ids[False]} 0 R /F2 {font_ids[True]} 0 R >> /XObject << {xo} >> "
                   f"/ProcSet [/PDF /Text /ImageC] >> /Contents {cid} 0 R >>".encode())

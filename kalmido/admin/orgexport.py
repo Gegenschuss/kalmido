@@ -452,6 +452,7 @@ OX_AREAS = (
     ("documents/receipts.json", "rc_receipts", "org_id=?"),  # 2.137.0 B (#2344): project and category of receipts (set by people)
     ("hub/absences.json", "hub_absences", "org_id=?"),  # 2.50.0 (#1195): absences (kind + note decrypted like the others)
     ("hub/bookings.json", "hub_bookings", "org_id=?"),  # 2.50.0 (#1194): bookings of the disposition
+    ("hub/callsheets.json", "hub_callsheets", "org_id=?"),  # 2.802.0 (#1956): call sheets of the shoot days (decrypted)
     ("hub/leave_quota.json", "hub_leave_quota", "org_id=?"),  # 2.125.0 A (#2117): vacation accounts
     ("hub/mails.json", "hub_mails", "org_id=?"),  # 2.84.0 A (#1198): filed e-mails (texts decrypted; not the addresses, not the word index)
     ("hub/mail_links.json", "hub_mail_links", "org_id=?"),  # 2.362.0 (#3096): the tasks / events made from a filed e-mail
