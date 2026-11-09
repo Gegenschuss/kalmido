@@ -141,7 +141,7 @@ async function srv_shareModal(a, ws, done) {
     if (b.dataset.m === 'close') { md.remove(); return; }
     if (b.dataset.m !== 'srv-pjok') return;
     const lids = $$('[data-srv-pj]:checked', md).map(x => +x.dataset.srvPj), er = $('#srv-pjerr', md);
-    if (!lids.length) { er.textContent = tr('Choose a project'); er.hidden = false; return; }
+    if (!lids.length) { er.textContent = tr('Select a project'); er.hidden = false; return; }
     b.disabled = true;
     const f = await srv_share(a.id, lids);
     b.disabled = false;
@@ -186,7 +186,7 @@ async function srv_newModal(o = {}) {
     const team = o.admin && $('#srv-own', md)?.value === 'team';
     // 2.777.0 C (#5378): the chosen projects; an agent works in ONE workspace, so they decide the workspace of an agent of mine
     const pj = $$('[data-srv-pj]:checked', md).map(x => +x.dataset.srvPj), pws = [...new Set(pj.map(id => listById(id)?.org_id || null))];
-    if (pws.length > 1) { show(tr('Choose projects of one workspace: an agent works in one workspace.')); return; }
+    if (pws.length > 1) { show(tr('Select projects of one workspace: an agent works in one workspace.')); return; }
     b.disabled = true; show('');
     let r;
     try {
