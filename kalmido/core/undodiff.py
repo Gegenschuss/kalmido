@@ -15,7 +15,8 @@ Interface:
                                    no access, 409 = changed elsewhere / its own reason) when nothing of the part could go
   undo_quiet() -> bool             a group is being taken back / forward in this request: record nothing
   undo_person(c) -> uid | None     the person whose steps this request records (None: no request, no person, an agent)
-  ug_diff_add(c, uid, kind, rid, org_id, area, label, data)   one diff part into the request's group (in a pre-commit hook)"""
+  ug_diff_add(c, uid, kind, rid, org_id, area, label, data, mode="diff")   one diff part into the request's group (in a
+                                   pre-commit hook); mode "ref" (2.778.0, #5253): a pointer part (sheets/shundo.py, wiki/wkundo.py)"""
 import json
 
 from flask import g, has_request_context
@@ -49,15 +50,17 @@ def undo_person(c):
     return g.get(key)
 
 
-def ug_diff_add(c, uid, kind, rid, org_id, area, label, data):
-    """One diff part of uid into the request's group; nothing for a group too big for copies (it counts the part)."""
+def ug_diff_add(c, uid, kind, rid, org_id, area, label, data, mode="diff"):
+    """One diff part of uid into the request's group; nothing for a group too big for copies (it counts the part).
+    2.778.0 (#5253): mode "ref" = a pointer into a history the area keeps itself (a table's batch, a knowledge page's
+    versions): data holds only the pointer, taken back through the same run as a diff part."""
     js = json.dumps(data, ensure_ascii=False, default=str)
     n = len(js.encode())
     grp = ug_current(c, uid, area, org_id, label)
     if grp is None or not ug_fits(c, grp, n):
         return None
     pid = insert_id(c, "INSERT INTO obj_undo(org_id, user_id, sess, kind, ref_id, seq, state, snap, fp_before, fp_after, created_at, "
-                       "group_id, mode, bytes) VALUES(?,?,'',?,?,1,'done',?,'','',?,?,'diff',?)",
-                    (org_id, int(uid), kind, int(rid), js, iso(now_utc()), grp["id"], n))
+                       "group_id, mode, bytes) VALUES(?,?,'',?,?,1,'done',?,'','',?,?,?,?)",
+                    (org_id, int(uid), kind, int(rid), js, iso(now_utc()), grp["id"], "ref" if mode == "ref" else "diff", n))
     ug_added(c, grp, n)
     return pid

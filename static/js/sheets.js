@@ -506,17 +506,17 @@ async function shvPut(chg, label) {
   const keep = new Set(cf.map(x => x.row_id + ':' + x.col_id)), i0 = chg.map((x, i) => i).filter(i => !keep.has(chg[i].row_id + ':' + chg[i].col_id));
   if (!i0.length) return null;  // nothing written: no undo step
   const now = i0.map(i => ({row_id: chg[i].row_id, col_id: chg[i].col_id, raw: shvAt(r, chg[i])?.raw ?? chg[i].raw ?? ''})), was = i0.map(i => old[i]);
-  const e = histAdd({label: label || tr('Table changed'), ids: [], snaps: [], lids: [],
+  const e = histAdd({label: label || tr('Table changed'), ids: [], snaps: [], lids: [], srv: true,  // 2.778.0 (#5253): the server lists the step itself
     undo: () => shvSendStep(sid, was, now), redo: () => shvSendStep(sid, now, was)});
   return e;
 }
 async function shvReload() { if (SHV.sh) await shvLoad(SHV.sh.id, true); }
 // structural steps: one request, a reload, Undo by the counterpart request
-async function shvStep(label, doFn, undoFn, msg, redoFn) {  // redoFn(res): the way forward again (restore), else doFn once more
+async function shvStep(label, doFn, undoFn, msg, redoFn, srv) {  // redoFn(res): the way forward again (restore), else doFn once more; srv (2.778.0, #5253): the server lists the step
   const sid = SHV.sh?.id; if (!sid) return;
   let res; try { res = await doFn(); } catch (e) { if (e.message !== 'auth') toast(e.message); if (e.status === 409) await shvLoad(sid, true); return; }  // 2.528.0 (#4305 A12): changed elsewhere: show the current state
   await shvLoad(sid, true);
-  const e = histAdd({label, ids: [], snaps: [], lids: [],
+  const e = histAdd({label, ids: [], snaps: [], lids: [], ...(srv ? {srv: true} : {}),
     undo: async () => { await undoFn(res); if (SHV.sh?.id === sid) await shvLoad(sid, true); return {skipped: []}; },
     redo: async () => { if (redoFn) await redoFn(res); else res = await doFn(); if (SHV.sh?.id === sid) await shvLoad(sid, true); return {skipped: []}; }});
   if (msg) histToast(msg, e);
@@ -591,7 +591,7 @@ async function shvRowAdd(afterId, above) {
     return ids;
   };
   const res = await shvStep(tr('Row added'), doIt, async ids => { for (const x of ids || []) await rawFetch('DELETE', `/api/sheets/${sid}/rows/${x}`); }, null,
-    async ids => { for (const x of ids || []) await rawFetch('POST', `/api/sheets/${sid}/rows/${x}/restore`); });
+    async ids => { for (const x of ids || []) await rawFetch('POST', `/api/sheets/${sid}/rows/${x}/restore`); }, true);
   if (res?.length && SHV.sh) { SHV.cur = SHV.anc = {r: res[0], c: SHV.cur?.c ?? SHV.sh.columns[0]?.id}; shvRender(); }
   return res;
 }
@@ -734,7 +734,7 @@ function shvColModal(col, afterId, cf) {  // a new column (col = null) or its se
       if (cid && Object.keys(rest).length) await rawFetch('PATCH', `/api/sheets/${sid}/columns/${cid}`, rest);
       return cid;
     }, async x => { if (x || cid) await rawFetch('DELETE', `/api/sheets/${sid}/columns/${x || cid}`); }, tr('Column {0} added', title),
-    async x => { if (x || cid) await rawFetch('POST', `/api/sheets/${sid}/columns/${x || cid}/restore`); });
+    async x => { if (x || cid) await rawFetch('POST', `/api/sheets/${sid}/columns/${x || cid}/restore`); }, true);
   });
   if (cf?.theirs.length && typeof objMerge === 'function') objMerge(md, cf, () => {}, {field: k => { const x = SHV_CFLD[k] && $(SHV_CFLD[k], md); return x ? x.closest('.row') || x : null; },  // lazy-ok: shvColAgain loaded objsave.js
     take: ks => { md.remove(); const mine = Object.fromEntries(Object.entries(cf.mine || {}).filter(([k]) => !ks.includes(k))); if (Object.keys(mine).length) shvColModal(cf.cur, null, {...cf, mine, theirs: [], both: []}); else shvColModal(cf.cur); }});

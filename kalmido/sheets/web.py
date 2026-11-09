@@ -25,6 +25,7 @@ from ..accounts.orgs import is_org_admin
 from .core import sh_list_title, sh_may, sh_space, sh_space_key, sh_to_display
 from .shorder import sho_apply, sho_moved, sho_plan, sho_restore_apply, sho_restore_plan, sho_sort_plan  # 2.631.0 (#4620), 2.658.0 (#5000)
 from .shhist import shh_meta_write  # 2.564.0 (#4701/#4702); 2.571.0 (#4766): shh_meta_write
+from .shundo import shu_batch  # 2.778.0 (#5253): a person's writes as steps of "Recent steps"
 
 
 def _int(v, what):
@@ -171,7 +172,7 @@ def sheets_cells(sid):
     if cur:
         return jsonify(cur), 409
     cf = []
-    out = sh_set_cells(c, r, b.get("cells"), me(), conflicts=cf)
+    out = sh_set_cells(c, r, b.get("cells"), me(), batch=shu_batch(c, r), conflicts=cf)  # 2.778.0 (#5253): the person's step
     c.commit()
     return jsonify(cells=out, rev=sh_reload(c, sid)["rev"], conflicts=cf)
 
@@ -216,7 +217,8 @@ def sheets_col_add(sid):
     r = _need_w(c, sid)
     b = body()
     after = b.get("after_col_id")
-    col_id = sh_add_col(c, r, b, me(), after_col_id=_int(after, "after_col_id") if after is not None else None)
+    col_id = sh_add_col(c, r, b, me(), after_col_id=_int(after, "after_col_id") if after is not None else None,
+                        batch=shu_batch(c, r))  # 2.778.0 (#5253): the person's step
     sh_touch(c, sid, me())
     c.commit()
     book = ShBook(c, sh_reload(c, sid))
@@ -342,7 +344,8 @@ def sheets_rows_add(sid):
     if isinstance(n, bool) or not isinstance(n, int) or not 1 <= n <= SH_ROWS_MAX:
         raise BadInput(tr("Invalid value: {0}", "count"))
     after = b.get("after_row_id")
-    ids = sh_add_rows(c, r, n, me(), after_row_id=_int(after, "after_row_id") if after is not None else None)
+    ids = sh_add_rows(c, r, n, me(), after_row_id=_int(after, "after_row_id") if after is not None else None,
+                      batch=shu_batch(c, r))  # 2.778.0 (#5253): the person's step
     sh_touch(c, sid, me())
     return _done(c, sid, {"ids": ids})
 
@@ -456,7 +459,8 @@ def sheets_batch_undo(sid, batch):
     """Takes back one agent call's changes (a person who may write the sheet)."""
     c = db()
     r = _need_w(c, sid)
-    if not c.execute("SELECT 1 FROM sheet_changes WHERE sheet_id=? AND batch=? LIMIT 1", (sid, batch[:80])).fetchone():
+    # 2.778.0 (#5253): an agent's call only -- a person's batch is their own step (sheets/shundo.py, /api/undo)
+    if not c.execute("SELECT 1 FROM sheet_changes WHERE sheet_id=? AND batch=? AND agent_id IS NOT NULL LIMIT 1", (sid, batch[:80])).fetchone():
         raise Denied(404)
     kept = {}  # 2.528.0 (#4306 B24): rows / columns / the table a person typed into since stay
     n = sh_undo_batch(c, r, batch[:80], me(), kept=kept)

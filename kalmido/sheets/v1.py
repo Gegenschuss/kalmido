@@ -246,7 +246,8 @@ def v1_sheet_undo(sid, batch):
     c = db()
     r = sh_need(c, sid, write=True)
     batch = batch[:80]
-    q = "SELECT 1 FROM sheet_changes WHERE sheet_id=? AND batch=?" + (" AND agent_id=?" if _agent() else "") + " LIMIT 1"
+    # 2.778.0 (#5253): agent calls only (a person's batch is their own step, sheets/shundo.py)
+    q = "SELECT 1 FROM sheet_changes WHERE sheet_id=? AND batch=? AND agent_id IS NOT NULL" + (" AND agent_id=?" if _agent() else "") + " LIMIT 1"
     if not c.execute(q, (sid, batch, me()) if _agent() else (sid, batch)).fetchone():
         raise Denied(404)
     if not _agent():

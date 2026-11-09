@@ -84,7 +84,7 @@ async function wkh_restore(p, vid) {
   // since -> "Changed elsewhere, not undone", their text stays
   let ver = r.updated_at || '';
   const lbl = tr('Restored version of {0}', qn(wk_base(r.path))), then = x => { if (x?.id) { put(x); ver = x.updated_at || ver; } };
-  const e = histAdd({label: lbl, ids: [], snaps: [], lids: [], wsp: sp,
+  const e = histAdd({label: lbl, ids: [], snaps: [], lids: [], wsp: sp, srv: true,  // 2.778.0 (#5253): the server lists the restore itself
     undo: () => undoStep('/api/wiki/pages/' + p.id, {body: before}, ver, {label: lbl, then}),
     redo: () => undoStep(`/api/wiki/pages/${p.id}/versions/${vid}/restore`, {}, ver, {method: 'POST', full: true, label: lbl, then})});
   histToast(tr('Version restored'), e);

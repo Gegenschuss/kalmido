@@ -598,6 +598,8 @@ def wiki_update(pid):
         if plain is not None:
             f["body"] = wkh_seal(c, r["org_id"], r["owner_id"], plain)  # 2.123.0 A (#2105): sealed at rest
         prev = wkh_prev(c, r)
+        from .wkundo import wku_note, wku_pre  # 2.778.0 (#5253): the person's save as a step of "Recent steps"
+        pre = wku_pre(c, pid) if plain is not None and not locked else None
         guard = " AND updated_at=?" if exp else ""  # 2.200.0 F (#1781, review 5): the conflict check in the same statement
         try:
             with c.savepoint():
@@ -613,6 +615,8 @@ def wiki_update(pid):
             wkh_rename(c, r, f["path"], uid)  # 2.571.0 (#4766): the new name in the core's history (obj_history)
         if not locked:  # 2.123.0 A (#2102, #2106): the history and the word index
             wkh_note(c, pid, uid, ts, prev=prev)
+            if plain is not None:
+                wku_note(c, r, prev[0], uid, pre)  # 2.778.0 (#5253)
             wks_index(c, pid, r["org_id"], r["owner_id"], plain if plain is not None else wkh_body(c, r), ts)
         if "path" in f and b.get("relink", True) is not False and not locked:
             n = wiki_relink(c, r, r["path"], f["path"], uid, ts, only_edit=by_share)  # 2.200.0 F (B7): a share: its pages only

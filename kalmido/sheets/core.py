@@ -956,7 +956,8 @@ bus_on("shpres", _shpres_heard)
 
 def sh_batches(c, sid):
     rows = c.execute("SELECT batch, MIN(agent_id) AS agent_id, MIN(created_at) AS created_at, COUNT(*) AS n, COUNT(undone_at) AS u "
-                     "FROM sheet_changes WHERE sheet_id=? GROUP BY batch ORDER BY MIN(id) DESC LIMIT 50", (sid,)).fetchall()
+                     "FROM sheet_changes WHERE sheet_id=? AND agent_id IS NOT NULL GROUP BY batch ORDER BY MIN(id) DESC LIMIT 50",  # 2.778.0 (#5253): agents' calls only
+                     (sid,)).fetchall()
     names = user_names(c, {r["agent_id"] for r in rows})
     return [{"batch": r["batch"], "agent_id": r["agent_id"], "agent_name": names.get(r["agent_id"], ""), "created_at": r["created_at"],
              "count": r["n"], "undone": r["u"] >= r["n"]} for r in rows]
@@ -1319,18 +1320,19 @@ def _sh_cell_conflict(c, sheet_row, book, rid, cid, d, conflicts):
 
 
 def _store(c, book, sid, rid, cid, raw, uid, ts, agent_id, batch):
+    abatch = batch if agent_id else None  # 2.778.0 (#5253): a person's batch (sheets/shundo.py) is in sheet_changes only, no agent mark
     x = book.at.get((rid, cid))
     if x and x["raw"] == raw and not x["frozen"]:
         return None
     old = x["raw"] if x else None
     if x:
         c.execute("UPDATE sheet_cells SET raw=?, frozen=0, frozen_value=NULL, updated_by=?, updated_at=?, agent_id=?, agent_batch=? "
-                  "WHERE id=?", (raw, uid, ts, agent_id, batch, x["id"]))
-        x.update(raw=raw, frozen=0, frozen_value=None, updated_by=uid, updated_at=ts, agent_id=agent_id, agent_batch=batch)
+                  "WHERE id=?", (raw, uid, ts, agent_id, abatch, x["id"]))
+        x.update(raw=raw, frozen=0, frozen_value=None, updated_by=uid, updated_at=ts, agent_id=agent_id, agent_batch=abatch)
         xid = x["id"]
     else:
         xid = insert_id(c, "INSERT INTO sheet_cells(sheet_id,row_id,col_id,raw,updated_by,updated_at,agent_id,agent_batch) "
-                           "VALUES(?,?,?,?,?,?,?,?)", (sid, rid, cid, raw, uid, ts, agent_id, batch))
+                           "VALUES(?,?,?,?,?,?,?,?)", (sid, rid, cid, raw, uid, ts, agent_id, abatch))
         book._add(dict(c.execute("SELECT * FROM sheet_cells WHERE id=?", (xid,)).fetchone()))
     sh_change(c, sid, batch, agent_id, "cell", cell_id=xid, row_id=rid, col_id=cid, old=old, new=raw)
     shh_log(c, book, xid, rid, cid, old, raw, uid, agent_id, ts)  # 2.124.0 B (#2112): people's changes too
@@ -1420,9 +1422,10 @@ def sh_create(c, uid, space, title, list_id=None, columns=None, rows=None, agent
     return sid
 
 
-def sh_undo_batch(c, sheet_row, batch, uid, kept=None):
+def sh_undo_batch(c, sheet_row, batch, uid, kept=None, stayed=None):
     """Takes back exactly the changes of one agent call (newest first): cells get their former input when nobody changed them
-    since, added rows / columns go to the trash, a sheet the call created goes to the trash. -> number of changes undone."""
+    since, added rows / columns go to the trash, a sheet the call created goes to the trash. -> number of changes undone.
+    2.778.0 (#5253): also a person's step (sheets/shundo.py); stayed (a list) gets the cell / format changes left as they are."""
     rows = c.execute("SELECT * FROM sheet_changes WHERE sheet_id=? AND batch=? AND undone_at IS NULL ORDER BY id DESC",
                      (sheet_row["id"], batch)).fetchall()
     ts, n, book = iso_ms(now_utc()), 0, None
@@ -1431,6 +1434,8 @@ def sh_undo_batch(c, sheet_row, batch, uid, kept=None):
             x = c.execute("SELECT x.raw, x.row_id, x.col_id, k.kind FROM sheet_cells x JOIN sheet_columns k ON k.id=x.col_id "
                           "WHERE x.id=?", (r["cell_id"],)).fetchone()
             if not x or x["raw"] != (r["new_raw"] or ""):
+                if stayed is not None:
+                    stayed.append(dict(r))
                 continue  # changed again since: the newer input stays
             if x["kind"] == "file":  # 2.519.0 (#4386): the former file comes back out of the trash, the displaced one goes in
                 book = book or ShBook(c, sheet_row)
@@ -1443,6 +1448,8 @@ def sh_undo_batch(c, sheet_row, batch, uid, kept=None):
         elif r["kind"] == "fmt":  # 2.578.0 (#3462 C): the cell's former format, unless formatted otherwise since
             from .shfmt import shfm_undo
             if not shfm_undo(c, r, uid):
+                if stayed is not None:
+                    stayed.append(dict(r))
                 continue
         elif r["kind"] in ("row", "col", "create") and shx_undo_keeps(c, sheet_row, r, batch, uid, ts, kept):
             c.execute("UPDATE sheet_changes SET undone_at=? WHERE id=?", (ts, r["id"]))  # 2.528.0 (#4306 B24): stays, see kept

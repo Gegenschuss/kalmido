@@ -517,11 +517,24 @@ def wkh_get(pid, vid):
                    by_name=user_names(c, [v["created_by"]]).get(v["created_by"], ""))
 
 
+def wkh_put_text(c, r, text, uid):
+    """Page row r gets text as a new version (the name stays): the restore of a version, 2.778.0 (#5253) also the undo of a
+    person's step (wkundo.py). Caller: write right checked, write_lock wiki-<id> held, not a space with the lock."""
+    import json
+    pid, ts, prev = r["id"], iso_ms(now_utc()), wkh_prev(c, r)
+    c.execute("UPDATE wiki_pages SET body=?, attrs=?, updated_by=?, updated_at=? WHERE id=?",
+              (wkh_seal(c, r["org_id"], r["owner_id"], text), json.dumps(wiki_frontmatter(text), ensure_ascii=False), uid, ts, pid))
+    wiki_set_links(c, pid, text)
+    wkh_note(c, pid, uid, ts, prev=prev, fresh=True)
+    from .wksearch import wks_index
+    wks_index(c, pid, r["org_id"], r["owner_id"], text, ts)
+    bump(c, "wiki")
+
+
 @app.post("/api/wiki/pages/<int:pid>/versions/<int:vid>/restore")
 def wkh_restore(pid, vid):
     """{expect_updated_at?} -- the text of version vid becomes the page's text (a new version; the name stays). 409 with the
     current page when someone else saved in between. Write right on the page."""
-    import json
     from .wkfolder import wkf_shown_path
     write_lock(db(), f"wiki-{int(pid)}")  # 2.269.0 B (#3034): before the page is read (same name as wiki_update)
     c, r, locked = _page(pid, write=True)
@@ -534,14 +547,10 @@ def wkh_restore(pid, vid):
         cur = wiki_dict(r, names=user_names(c, [r["updated_by"]]))
         cur["path"] = wkf_shown_path(c, uid, r)  # 2.200.0 (#2747, review): nothing above a share
         return jsonify(error=tr("Changed in the meantime by {0}", cur.get("updated_by_name") or "?"), page=cur), 409
-    text, ts, prev = _vbody(c, v), iso_ms(now_utc()), wkh_prev(c, r)
-    c.execute("UPDATE wiki_pages SET body=?, attrs=?, updated_by=?, updated_at=? WHERE id=?",
-              (wkh_seal(c, r["org_id"], r["owner_id"], text), json.dumps(wiki_frontmatter(text), ensure_ascii=False), uid, ts, pid))
-    wiki_set_links(c, pid, text)
-    wkh_note(c, pid, uid, ts, prev=prev, fresh=True)
-    from .wksearch import wks_index
-    wks_index(c, pid, r["org_id"], r["owner_id"], text, ts)
-    bump(c)
+    from .wkundo import wku_note, wku_pre  # 2.778.0 (#5253): a restore is a step of "Recent steps" too
+    pre, before = wku_pre(c, pid), wkh_body(c, r)
+    wkh_put_text(c, r, _vbody(c, v), uid)
+    wku_note(c, r, before, uid, pre)
     c.commit()
     r2 = wiki_need(c, pid)
     d = wiki_dict(r2, names=user_names(c, [uid]))

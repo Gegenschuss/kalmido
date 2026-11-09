@@ -123,7 +123,7 @@ def _trash_part(c, uid, kind, rid, p, redo):
 def _part(c, uid, p, redo):
     """One part back (redo: forward again). None when it went, else {group, kind, id, code, reason}."""
     kind, rid = p["kind"], int(p["ref_id"])
-    if p.get("mode") == "diff":
+    if p.get("mode") in ("diff", "ref"):  # 2.778.0 (#5253): a pointer part (tables, knowledge) runs like a diff part
         return _diff_part(c, uid, p, redo)
     try:
         with c.savepoint():

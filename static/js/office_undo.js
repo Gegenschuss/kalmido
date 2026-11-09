@@ -127,7 +127,8 @@ function oun_sheetLeave(key) {
     if (SHV.sh?.id === s.sid && typeof shvReload === 'function') await shvReload();
     return {skipped: []};
   };
-  const e = histAdd({label: msg, ids: [], snaps: [], lids: [], ounAll: key, undo: () => run('undo', () => s.rev), redo: () => run('redo', () => s.back)});
+  const e = histAdd({label: msg, ids: [], snaps: [], lids: [], ounAll: key, ...(steps.every(p => p.srv) ? {srv: true} : {}),  // 2.778.0 (#5253)
+    undo: () => run('undo', () => s.rev), redo: () => run('redo', () => s.back)});
   histToast(msg, e, OUN.ms);
 }
 
