@@ -47,7 +47,7 @@ function bnkHtml() {
   if (typeof BNR === 'object') segs.splice(1, 0, ['norc', tr('Without receipt'), BNR.data?.counts?.out]);  // 2.299.0 C (#3192)
   const bar = `<div class="ofcbar bnkbar"><button class="btn pri" data-bnk="imp">${ic('upload', 's')}<span>${tr('Import bank statement')}</span></button>${bnkFntHtml()}<span class="spacer"></span>
     <div class="seg" role="group" aria-label="${esc(tr('Show'))}">${segs.map(([k, t, c]) => `<button type="button" data-bnk="state" data-v="${k}" class="${BNK.state === k ? 'on' : ''}" aria-pressed="${BNK.state === k}">${esc(t)}${c ? ` <small>${c}</small>` : ''}</button>`).join('')}</div>
-    <button class="btn ghost" data-bnk="imps" aria-expanded="${BNK.showImp}">${ic('list', 's')}<span>${tr('Imports')}</span></button></div>`;
+    ${n.open ? `<button class="btn" data-bnk="walk">${ic('right', 's')}<span>${tr('Go through')}</span></button>` : ''}<button class="btn ghost" data-bnk="imps" aria-expanded="${BNK.showImp}">${ic('list', 's')}<span>${tr('Imports')}</span></button></div>`;
   if (norc) return bar + (BNK.showImp ? bnkImpHtml() : '') + bnr_html();
   const items = d.items || [];
   const list = items.length ? `<ul class="bnklist" role="list">${items.map(bnkRow).join('')}</ul>`
@@ -65,9 +65,9 @@ function bnkRow(t) {
     act = `<div class="bnkacts"><span class="rotag bnkm">${ic('check', 's')} ${esc(tr(BNK_KIND[t.match.kind] || t.match.kind))}${t.match.label ? ` · ${esc(t.match.label)}` : ''}${esc(rest)}</span>${typeof brl_byRule === 'function' ? brl_byRule(t.match) : ''}<span class="spacer"></span>
       ${t.match.kind === 'invoice' ? `<a class="btn sm ghost" href="#office/invoices/${t.match.id}">${tr('Open')}</a>` : ''}<button class="btn sm ghost" data-bnk="unmatch" data-id="${t.id}">${ic('undo', 's')}<span>${tr('Undo match')}</span></button></div>`;
   } else {
-    const s = (t.suggestions || [])[0];
-    const sug = s ? `<div class="bnksug"><span class="bnksn"><small class="muted">${tr('Suggestion')}</small><b>${esc(tr(BNK_KIND[s.kind]))} · ${esc(s.label)}</b><small class="muted">${esc(s.reason)}</small></span>
-      <button class="btn sm pri" data-bnk="match" data-id="${t.id}" data-kind="${s.kind}" data-mid="${s.id}">${tr('Assign match')}</button></div>`
+    // 2.778.0 (#5383): the suggestions as candidate cards (office_cand.js), the best first, instead of the first one as text
+    const sg = t.suggestions || [];
+    const sug = sg.length ? `<div class="bnksug"><small class="muted">${tr('Suggestion')}</small>${ocd_row(sg.map(s => ocd_card({...s, label: s.label || tr(BNK_KIND[s.kind] || 'Receipt')}, {btn: `data-bnk="match" data-id="${t.id}" data-kind="${esc(s.kind)}" data-mid="${s.id}"`})).join(''))}</div>`
       : !inn ? `<p class="muted bnkmiss">${tr('Receipt missing? Upload it in the documents of the office, then match it here.')}</p>` : '';
     act = `${typeof brl_rowHint === 'function' ? brl_rowHint(t) : ''}${sug}<div class="bnkacts"><button class="btn sm" data-bnk="other" data-id="${t.id}" aria-expanded="${BNK.other === t.id}">${ic('search', 's')}<span>${inn ? tr('Other invoice…') : tr('Other receipt…')}</span></button>
       <button class="btn sm ghost" data-bnk="match" data-id="${t.id}" data-kind="private">${tr('Private')}</button><button class="btn sm ghost" data-bnk="match" data-id="${t.id}" data-kind="ignored">${tr('Ignore')}</button><button class="btn sm ghost" data-bnk="match" data-id="${t.id}" data-kind="noreceipt">${tr('No receipt needed')}</button><button class="btn sm ghost" data-bnk="match" data-id="${t.id}" data-kind="cash" title="${esc(tr('Cash withdrawal or cash paid in: a transfer between the bank and the cash book, no expense'))}">${tr('Cash box transfer')}</button></div>
@@ -79,7 +79,7 @@ function bnkOtherHtml(t) {
   const c = BNK.cand;
   if (+t.amount > 0 && BNK.split) return bnkSplitHtml(t, c);
   const rows = !c ? `<p class="muted">${tr('Loading…')}</p>` : !c.length ? `<p class="muted">${tr('Nothing found')}</p>`
-    : `<ul class="ofclist" role="list">${c.map(x => `<li><button type="button" class="ofcrow" data-bnk="match" data-id="${t.id}" data-kind="${x.kind}" data-mid="${x.id}"><span class="ofcn"><b>${esc(x.label || tr(BNK_KIND[x.kind]))}</b><small class="muted">${esc(fmtDateLoc(x.date))}${x.kind === 'invoice' ? ` · ${x.refund ? tr('refund open') : tr('open')}` : ''}</small></span><span class="rksum">${ofcMoney(x.amount)}</span></button></li>`).join('')}</ul>`;
+    : ocd_row(c.map(x => ocd_card({...x, label: x.label || tr(BNK_KIND[x.kind])}, {btn: `data-bnk="match" data-id="${t.id}" data-kind="${esc(x.kind)}" data-mid="${x.id}"`, sub: x.kind === 'invoice' ? (x.refund ? tr('refund open') : tr('open')) : ''})).join(''), 'ocdgrid');  // 2.778.0 (#5383): cards, not a text list
   const sp = +t.amount > 0 ? `<button type="button" class="btn sm ghost" data-bnk="split" data-id="${t.id}">${tr('Split across invoices…')}</button>` : '';
   return `<div class="bnkother"><input type="search" class="bnkq" data-bnk-q="${t.id}" value="${esc(BNK.candQ)}" placeholder="${esc(+t.amount > 0 ? tr('Number or client') : tr('Name of the receipt'))}" aria-label="${esc(tr('Search'))}">${rows}${sp}</div>`;
 }
@@ -296,6 +296,7 @@ document.addEventListener('click', e => {
   else if (a === 'impundo') bnkImpUndo(id);
   else if (a === 'match') bnkMatch(id, b.dataset.kind, b.dataset.mid);
   else if (a === 'unmatch') bnkUnmatch(id);
+  else if (a === 'walk') wlk_open('bnk');  // 2.778.0 (#5383): office_walk.js (lazyload.js LD_CALL)
   else if (a === 'other') { BNK.other = BNK.other === id ? null : id; BNK.cand = null; BNK.candQ = ''; BNK.split = false; BNK.parts = {}; ofcDraw(); if (BNK.other) bnkCand(id); }
   else if (a === 'split') { BNK.split = !BNK.split; BNK.parts = {}; ofcDraw(); }  // 2.355.0 B (#2843)
   else if (a === 'splitgo') {

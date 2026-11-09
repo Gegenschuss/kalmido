@@ -66,7 +66,7 @@ function ccSheetHtml() {
     : draft ? `<p class="muted">${s.reader === 'manual' && !ls.length ? tr('This statement could not be read. Enter its positions by hand.') : tr('Please check the positions. They count once you confirm them.')}</p>` : '';
   const acts = `<a class="btn sm" href="/api/office/cards/statements/${s.id}/file" target="_blank" rel="noopener">${ic('file', 's')}<span>PDF</span></a>
     ${lock ? '' : draft ? `<button class="btn sm" data-cc="addline">${ic('plus', 's')}<span>${tr('Add position')}</span></button><button class="btn sm pri" data-cc="confirm">${ic('check', 's')}<span>${tr('Confirm positions')}</span></button>`
-    : `<button class="btn sm ghost" data-cc="reopen">${tr('Undo confirmation')}</button>${CC.data.manage && !s.bank && ofcCan('bank', 'edit', 'pay') ? `<button class="btn sm" data-cc="bank" aria-expanded="${!!CC.bank}">${ic('bank', 's')}<span>${tr('Match bank booking')}</span></button>` : ''}`}
+    : `${ls.some(x => x.state === 'open') ? `<button class="btn sm pri" data-cc="walk">${ic('right', 's')}<span>${tr('Go through')}</span></button>` : ''}<button class="btn sm ghost" data-cc="reopen">${tr('Undo confirmation')}</button>${CC.data.manage && !s.bank && ofcCan('bank', 'edit', 'pay') ? `<button class="btn sm" data-cc="bank" aria-expanded="${!!CC.bank}">${ic('bank', 's')}<span>${tr('Match bank booking')}</span></button>` : ''}`}
     ${lock ? '' : `<button class="btn sm ghost" data-cc="delstmt">${tr('Delete')}</button>`}`;
   return `<div class="ofcbar"><button class="btn ghost" data-cc="tocard">${ic('back', 's')}<span>${tr('Back')}</span></button><span class="spacer"></span></div>
     <h3 class="ofcgrp">${esc(ccMon(s.month))}</h3>${facts}${hint}${draft && !lock && !ls.length && typeof ccs_html === 'function' ? ccs_html(s, CC.sheet.agent_read) : ''}<div class="bnkacts">${acts}</div>${CC.bank ? ccBankHtml(s) : ''}
@@ -85,7 +85,7 @@ function ccLine(x, s) {
   if (x.state !== 'open') return `<li class="bnkrow done">${head}<div class="bnkacts"><span class="rotag">${esc(x.state === 'private' ? tr('Private') : tr('No receipt needed'))}</span><button class="btn sm ghost" data-cc="mark" data-id="${x.id}" data-v="open">${ic('undo', 's')}<span>${tr('Needs a receipt')}</span></button></div></li>`;
   const sg = x.suggestion;
   return `<li class="bnkrow">${head}
-    ${sg ? `<div class="bnkacts ccsug"><button class="btn sm pri" data-cc="match" data-id="${x.id}" data-node="${sg.id}">${ic('check', 's')}<span>${esc(tr('Take “{0}”', sg.label || tr('Receipt')))}</span></button><small class="muted">${esc(sg.reason)}</small></div>` : ''}
+    ${sg ? `<div class="ccsug"><small class="muted">${tr('Suggestion')}</small>${ocd_row(ocd_card(sg, {btn: `data-cc="match" data-id="${x.id}" data-node="${sg.id}"`}))}</div>` : ''}
     <div class="bnkacts"><label class="btn sm">${ic('upload', 's')}<span>${tr('Upload receipt')}</span><input type="file" data-cc-rc="${x.id}" accept="${esc(typeof BK_ACCEPT === 'string' ? BK_ACCEPT : 'application/pdf,image/*')}" hidden></label>
     <button class="btn sm" data-cc="pick" data-id="${x.id}" aria-expanded="${CC.pick === x.id}">${ic('search', 's')}<span>${tr('Select receipt…')}</span></button>
     <button class="btn sm ghost" data-cc="mark" data-id="${x.id}" data-v="noreceipt">${tr('No receipt needed')}</button><button class="btn sm ghost" data-cc="mark" data-id="${x.id}" data-v="private">${tr('Private')}</button></div>
@@ -94,7 +94,7 @@ function ccLine(x, s) {
 function ccPickHtml(x) {
   const c = CC.cand;
   const rows = !c ? `<p class="muted">${tr('Loading…')}</p>` : !c.length ? `<p class="muted">${tr('Nothing found')}</p>`
-    : `<ul class="ofclist" role="list">${c.map(d => `<li><button type="button" class="ofcrow" data-cc="match" data-id="${x.id}" data-node="${d.id}"><span class="ofcn"><b>${esc(d.label || d.title)}</b><small class="muted">${esc([d.date && fmtDateLoc(d.date), d.reason].filter(Boolean).join(' · '))}</small></span>${d.amount ? `<span class="rksum">${ofcMoney(d.amount)}</span>` : ''}</button></li>`).join('')}</ul>`;
+    : ocd_row(c.map(d => ocd_card(d, {btn: `data-cc="match" data-id="${x.id}" data-node="${d.id}"`})).join(''), 'ocdgrid');  // 2.778.0 (#5383): cards, not a text list
   return `<div class="bnkother"><input type="search" data-cc-q="${x.id}" value="${esc(CC.q)}" placeholder="${esc(tr('Search all receipts'))}" aria-label="${esc(tr('Search all receipts'))}">${rows}</div>`;
 }
 async function ccCand(lid) {
@@ -177,6 +177,9 @@ async function ccBankLink(tid, fits) {
   ccDo(tr('Matched'), () => api('POST', `/api/office/bank/tx/${tid}/match`, {kind: 'card', id: sid, accept_diff: accept}), () => api('POST', `/api/office/bank/tx/${tid}/unmatch`));
 }
 const ccLineOf = id => (CC.sheet?.lines || []).find(x => x.id === id);
+// 2.778.0 (#5383): match / mark one position (the list and the walk-through, office_walk.js) -- one undo step each
+const ccMatchLine = (id, node) => ccDo(tr('Matched'), () => api('POST', `/api/office/cards/lines/${id}/match`, {node_id: node}), () => api('POST', `/api/office/cards/lines/${id}/unmatch`));
+const ccMarkLine = (id, v, was = 'open') => ccDo(tr('Saved'), () => api('PATCH', `/api/office/cards/lines/${id}`, {state: v}), () => api('PATCH', `/api/office/cards/lines/${id}`, {state: was}));
 document.addEventListener('click', async e => {
   // 2.525.0 (#4281): data-cc="pick" / "send" are the choice cards' too (choicecard.js) - only buttons inside the office view
   // count here (one-meaning guard: data-cc)
@@ -207,12 +210,10 @@ document.addEventListener('click', async e => {
     ccDo(tr('Position removed'), async () => { tid = (await api('DELETE', `/api/office/cards/lines/${cur}`)).trash_id || null; },
       async () => { const r = await (tid ? api('POST', `/api/office/cards/trash/${tid}/restore`) : api('POST', `/api/office/cards/statements/${sid}/lines`, req)); cur = r.line.id; return r.note ? {note: r.note} : undefined; });  // 2.560.0 (#4667): the office trash's sentence when something it named is gone for good
   } else if (a === 'mark') {
-    const was = ccLineOf(id)?.state || 'open', v = b.dataset.v;
-    ccDo(tr('Saved'), () => api('PATCH', `/api/office/cards/lines/${id}`, {state: v}), () => api('PATCH', `/api/office/cards/lines/${id}`, {state: was}));
-  } else if (a === 'match') {
-    const node = +b.dataset.node;
-    ccDo(tr('Matched'), () => api('POST', `/api/office/cards/lines/${id}/match`, {node_id: node}), () => api('POST', `/api/office/cards/lines/${id}/unmatch`));
-  } else if (a === 'unmatch') {
+    ccMarkLine(id, b.dataset.v, ccLineOf(id)?.state || 'open');
+  } else if (a === 'match') ccMatchLine(id, +b.dataset.node);
+  else if (a === 'walk') wlk_open('cc');  // 2.778.0 (#5383): office_walk.js (lazyload.js LD_CALL)
+  else if (a === 'unmatch') {
     const node = ccLineOf(id)?.node_id;
     ccDo(tr('Match undone'), () => api('POST', `/api/office/cards/lines/${id}/unmatch`), () => api('POST', `/api/office/cards/lines/${id}/match`, {node_id: node}));
   } else if (a === 'pick') { CC.pick = CC.pick === id ? null : id; CC.cand = null; CC.q = ''; ofcDraw(); if (CC.pick) ccCand(id); }

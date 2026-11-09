@@ -54,7 +54,7 @@ const camt = rows => `<?xml version="1.0" encoding="UTF-8"?><Document xmlns="urn
     await nav(B + '#office/bank');
     check(await ready(ev, `document.querySelectorAll('.bnklist .bnkrow').length === 1`, 80), 'the bank tab lists the booking');
     await ev(click(`document.querySelector('.bnkrow [data-bnk="other"]')`));
-    check(await ready(ev, `!!document.querySelector('.bnkother [data-bnk="split"]') && document.querySelectorAll('.bnkother .ofcrow[data-kind="invoice"]').length === 2`),
+    check(await ready(ev, `!!document.querySelector('.bnkother [data-bnk="split"]') && document.querySelectorAll('.bnkother .ocd [data-kind="invoice"]').length === 2`),  // 2.778.0 (#5383): candidate cards, not text rows
       'the other invoices with the button "Split across invoices…"');
     await ev(click(`document.querySelector('.bnkother [data-bnk="split"]')`));
     check(await ready(ev, `document.querySelectorAll('[data-bnk-part]').length === 2`), 'an amount field per open invoice');

@@ -24,6 +24,7 @@ from ..files.store import fs_chain, fs_deleted, fs_log_add, fs_role
 from .bank import _clean, _name_hit, _norm
 from .books import bk_receipt_set_paid, bk_to_home, bk_ws
 from .calc import dec, dstr, money
+from .candthumb import oc_with_thumbs  # 2.778.0 (#5383)
 from .cards import (CC_CONFIRMED, CC_DRAFT_ONLY, CC_KINDS, CC_NAME_MAX, _line_insert, _money, cc_ctx, cc_stmt, cc_stmt_row, cc_writable, cl_day)
 from .model import office_settings
 from .otrash import OTB_CHECK, otb_gone_out, otb_put, otb_restore
@@ -128,6 +129,7 @@ def cl_view(c, oid, uid, s, lines):
             best = cl_found(c, uid, x, docs)
             p["suggestion"] = next((d for d in best if d["amount_fits"]), None)  # a name alone is a search hit, no suggestion
         out.append(p)
+    oc_with_thumbs(c, [p["suggestion"] for p in out if p.get("suggestion")])  # 2.778.0 (#5383): the card's preview
     return out
 
 
@@ -299,7 +301,7 @@ def cl_candidates(lid):
     first. Without q only those that fit; with q everything the words find."""
     c, uid, oid, every = cc_ctx()
     x, _s = cl_row(c, oid, lid, uid, every)
-    return jsonify(items=cl_found(c, uid, x, cl_docs(c, oid), _norm(request.args.get("q") or "")[:100]))
+    return jsonify(items=oc_with_thumbs(c, cl_found(c, uid, x, cl_docs(c, oid), _norm(request.args.get("q") or "")[:100])))  # 2.778.0 (#5383): + thumb
 
 
 def _match(c, oid, uid, x, s, nid):

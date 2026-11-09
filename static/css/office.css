@@ -1230,3 +1230,44 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
   .ofdeditor>.ofdfs:first-child~.ofdfs{grid-column:2;grid-row:1 / span 2}
 }
 .fcicat .fcicatren{margin-inline-start:.25rem;vertical-align:middle;text-transform:none}  /* 2.581.0 (#4820): the pencil of a fixed cost category */
+/* 2.778.0 (#5383): the candidate card (office_cand.js) -- the preview area has a fixed size (no jump while the picture loads),
+   a wide screen shows the cards side by side, a phone one per screen width, swiped sideways (scroll snap) */
+.ocdrow{display:flex;gap:.5rem;overflow-x:auto;scroll-snap-type:x mandatory;overscroll-behavior-x:contain;padding-bottom:.25rem;scrollbar-width:thin}
+.ocdrow.ocdgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(13rem,1fr));overflow-x:visible}
+.ocd{flex:0 0 min(16rem,100%);scroll-snap-align:start;display:flex;flex-direction:column;border:.0625rem solid var(--line2);border-radius:var(--radius);background:var(--bg2);overflow:hidden;min-width:0}
+.ocd.on{border-color:var(--accent);box-shadow:0 0 0 .125rem var(--accent)}
+.ocd-pv{position:relative;height:9rem;display:flex;align-items:center;justify-content:center;background:var(--bg);border-bottom:.0625rem solid var(--line)}
+.ocd-img{width:100%;height:100%;object-fit:contain;display:block}
+.ocd-pv .ocd-ic{display:none;color:var(--text2)}
+.ocd-pv.none .ocd-ic{display:inline-flex}
+.ocd-pv .ocd-ic svg{width:2rem;height:2rem}
+.ocd-b{display:flex;flex-direction:column;gap:.25rem;padding:.5rem;flex:1}
+.ocd-n{display:flex;align-items:baseline;gap:.5rem;min-width:0}
+.ocd-n b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ocd-amt{font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:600}
+.ocd-why{overflow-wrap:anywhere}
+.ocd-take{margin-top:auto;align-self:flex-start}
+.ocd-key{margin-inline-end:.25rem}
+.bnksug:has(>.ocdrow),.ccsug{display:flex;flex-direction:column;align-items:stretch;gap:.25rem}
+.ccsug{margin:.375rem 0}
+.bnkother:has(.ocdrow) .ocdrow{max-height:min(60vh,40rem);overflow-y:auto}
+/* the walk-through (office_walk.js): one booking, its cards, the actions; the areas keep their height between the bookings */
+.wlkdlg .card{width:min(60rem,100%);min-height:min(36rem,90vh);display:flex;flex-direction:column;gap:.75rem}
+.wlk-top{display:flex;align-items:center;gap:.75rem}
+.wlk-top h3{margin:0}
+.wlk-n{font-variant-numeric:tabular-nums;color:var(--text2)}
+.wlk-tx{padding:.625rem .75rem;border:.0625rem solid var(--line2);border-radius:var(--radius);background:var(--bg2);touch-action:pan-y;user-select:none}
+.wlk-tx .bnkamt{font-size:1.25rem}
+.wlk-body{flex:1;display:flex;flex-direction:column;gap:.5rem;min-height:15rem}
+.wlk-q{width:100%}
+.wlk-cands .ocd{flex-basis:calc((100% - 1rem) / 3)}
+.wlk-foot{flex-wrap:wrap}
+.wlk-keys{align-self:center}
+.wlk-end{flex:1;display:flex;align-items:center;justify-content:center}
+@media (max-width:767px) {
+  .wlkdlg .card{min-height:100%}
+  .wlk-cands .ocd,.ocdrow:not(.ocdgrid) .ocd{flex-basis:100%}
+  .ocdrow.ocdgrid{display:flex;overflow-x:auto}
+  .ocdrow.ocdgrid .ocd{flex-basis:100%}
+  .bnkother:has(.ocdrow) .ocdrow{max-height:none}
+}

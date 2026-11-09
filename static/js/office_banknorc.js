@@ -79,7 +79,7 @@ async function bnr_match(tid, kind, mid) {
 }
 async function bnr_upload(tid, file) {
   const fd = new FormData();
-  fd.append('files', file, file.name || 'receipt.pdf'); fd.append('ws', BNR.data?.upload_ws || 'private'); fd.append('area', 'office');  // 2.522.0 (#4433): the office's own upload
+  fd.append('files', file, file.name || 'receipt.pdf'); fd.append('ws', BNR.data?.upload_ws || (typeof ofcWs === 'function' ? ofcWs() : 'private'));  /* 2.778.0 (#5383): the walk-through uploads without the list loaded */ fd.append('area', 'office');  // 2.522.0 (#4433): the office's own upload
   let j; try { j = await api('POST', '/api/docs', fd); } catch (x) { return; }
   for (const e of j.errors || []) toast(e);
   const id = (j.ids || [])[0] || (j.dups || [])[0]?.id;

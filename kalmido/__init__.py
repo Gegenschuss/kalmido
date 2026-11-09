@@ -433,6 +433,7 @@ ORDER = (
     "office.ccread",  # 2.444.0 (#3447): reading a credit card statement (PDF), one reader per provider's layout
     "office.cards",  # 2.444.0 (#3447): credit card statements: cards, PDF positions
     "office.cardlines",  # 2.444.0 (#3447): their positions, the search for the receipts, the match
+    "office.candthumb",  # 2.778.0 (#5383): the preview address of a candidate receipt (no route)
     "office.cardnorc",  # 2.444.0 (#3447): the reminder of the positions without a receipt, the rows of the exports
     "office.doctpl_samples_es", "office.doctpl_samples_fr", "office.doctpl_samples_it", "office.doctpl_samples_nl",  # 2.449.0 (#3768): the samples in other languages (data)
     "office.doctpl_samples",  # 2.117.0 B (#2283): the letter samples of the document templates (data, no routes)

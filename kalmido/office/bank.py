@@ -691,6 +691,8 @@ def bnk_tx_list():
             if best:  # 2.299.0 B (#3191): a category rule, a tie of rules or a rule that could not mark (locked month)
                 p["rule_hint"] = {**_br.br_hint(r or best[0]), "tie": r is None}
         items.append(p)
+    from .candthumb import oc_with_thumbs
+    oc_with_thumbs(c, [g for p in items for g in p.get("suggestions") or []])  # 2.778.0 (#5383): the receipts' previews on the cards
     return jsonify(items=items, currency=_home(c, oid), counts=counts)
 
 
@@ -726,7 +728,8 @@ def bnk_candidates(tid):
             out.append({"kind": "receipt", "id": r["node_id"], "label": lbl, "amount": dstr(money(dec(r["amount"]))), "date": r["date"]})
         from .cards import cc_bank_open
         out = cc_bank_open(c, oid, t, q) + out  # 2.444.0 (#3447): the statements waiting for their booking, the fitting total first
-    return jsonify(items=out[:30])
+    from .candthumb import oc_with_thumbs
+    return jsonify(items=oc_with_thumbs(c, out[:30]))  # 2.778.0 (#5383): + thumb (receipts only)
 
 
 def _tx_row(c, oid, tid):

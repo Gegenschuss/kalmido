@@ -74,7 +74,7 @@ const de = iso => `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(0, 4)}`;
     check(await ready(ev, `document.querySelectorAll('.bnklist .bnkrow').length === 2`), '"Private" marks a booking');
     // "Other invoice…" lists the open invoice
     await ev(`(() => { ${row}.querySelector('[data-bnk="other"]').click(); return 1; })()`);
-    check(await ready(ev, `!!document.querySelector('.bnkother .ofcrow[data-kind="invoice"]')`), '"Other invoice…" lists the open invoice');
+    check(await ready(ev, `!!document.querySelector('.bnkother .ocd [data-kind="invoice"]')`), '"Other invoice…" lists the open invoice');  // 2.778.0 (#5383): candidate cards
     // the import dialog: CAMT straight to the preview
     const camt = `<?xml version="1.0" encoding="UTF-8"?><Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.08"><BkToCstmrStmt><Stmt><Ntry><Amt Ccy="EUR">80.00</Amt><CdtDbtInd>DBIT</CdtDbtInd><BookgDt><Dt>${day(4)}</Dt></BookgDt><NtryDtls><TxDtls><RltdPties><Cdtr><Pty><Nm>Druckerei Beispiel</Nm></Pty></Cdtr></RltdPties><RmtInf><Ustrd>Flyer</Ustrd></RmtInf></TxDtls></NtryDtls></Ntry></Stmt></BkToCstmrStmt></Document>`;
     await ev(`(() => { bnkImpModal(${JSON.stringify(camt)}, 'auszug.xml'); return 1; })()`);

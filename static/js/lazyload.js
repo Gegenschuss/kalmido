@@ -15,6 +15,7 @@ const LD_MODS = {
     'office_books', 'office_receipts', 'office_bank', 'office_taxdates',  // 2.90.0 (#1921, #1922); 2.153.0 (#2055): office_receipts
     'office_banknorc',  // 2.299.0 C (#3192): bank bookings without a receipt
     'office_cards',  // 2.444.0 (#3447): credit card statements
+    'office_cand',  // 2.778.0 (#5383): the candidate card (credit card positions, bank bookings)
     'office_ledger',  // 2.666.0 (#3461): the balance sheet (double-entry bookkeeping)
     'office_recurring', 'office_subs', 'office_dunning',  // 2.91.0 (#1923, #1924); 2.147.1 B (#2054): office_dunning
     'office_peppol',  // 2.154.0 B (#1960): e-invoices over Peppol
@@ -100,6 +101,7 @@ const LD_MODS = {
   codecheck: ['codecheck'],  // 2.766.0 (#5220): Settings > Help > Check code (the hashes of the code this browser holds)
   undolist: ['undolist'],  // 2.773.0 (#5250): the list "Recent steps" (the ← button's right-click / long-press, the page #steps)
   recent: ['recent'],  // 2.769.0 (#5352): "Recently edited" (the overview "All workspaces" of Knowledge / Files / Reading, the start page's block)
+  ofwalk: ['office_walk'],  // 2.778.0 (#5383): the walk-through of open card positions / bank bookings (office_cards.js, office_bank.js)
 };
 // 2.65.0 (#1823): modules a module needs before its own files (their globals are used while it draws): the settings dialog
 // draws the agent panes (agentchat.js), the calendars (calview.js) and the tokens / webhooks (integrations.js), the agent chat
@@ -134,7 +136,8 @@ const LD_CALL = {settings: ['settingsModal', 'setApply', 'settingsSync', 'modCou
   hubmailbox: ['hmb_dialog', 'hmb_compose'],  // 2.141.0 A (#2141, #2138)
   listprint: ['lexPrint'], evinvite: ['evf_modal'], projtime: ['tz_open'], dayplan: ['dayplanModal'], gitrepo: ['repoWire', 'folderRepoModal'], hubmail: ['hbm_open'],
   sprints: ['spr_assign', 'spr_pick', 'spr_cfgModal', 'spr_cfgSet', 'spr_closeModal', 'spr_moreMenu'],  // 2.149.0 F (#2518)
-  undolist: ['ul_open']};  // 2.773.0 (#5250): the window of the ← button
+  undolist: ['ul_open'],  // 2.773.0 (#5250): the window of the ← button
+  ofwalk: ['wlk_open']};  // 2.778.0 (#5383)
 // 2.65.0 (#1823): functions that only update what the module drew: before it is loaded there is nothing to update (no loading)
 const LD_NOP = {agentchat: ['chatLoad', 'chatPatch', 'chatFit', 'stepsChanged', 'chatTypers', 'chatStHtml'], timeline: ['tlKbSync', 'tlAfterRender', 'rmAfterRender'],
   timesheet: ['tsl_printNote'],  // 2.149.0 F (#2518): the printed timesheet's month line (nothing before the card loaded the month)
