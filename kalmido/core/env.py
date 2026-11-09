@@ -192,6 +192,7 @@ VARS = (
     _v("KALMIDO_FILES_ZIP_MAX_MB", "1024", "Size in MB of a ZIP download of attachments at most.", "files"),
     _v("KALMIDO_EXT_ZIP_MAX_FILES", "1000", "Files per ZIP download through a shared link at most.", "files"),
     _v("KALMIDO_EXT_ZIP_MAX_MB", "256", "Size in MB of a ZIP download through a shared link at most.", "files"),
+    _v("KALMIDO_REVIEW_LINK_SEALED_MAX_MB", "50", "Size in MB of an encrypted file an approval's customer link hands out at most (larger ones only signed in).", "files"),
     _v("KALMIDO_FILE_REQUEST_MB_DAY", "1000", "MB per file request and day.", "files"),
     _v("KALMIDO_FORM_FILES_MB_HOUR", "200", "MB of files sent through public forms per hour.", "files"),
     _v("KALMIDO_FS_GC_EVERY", "86400", "Seconds between two clean-ups of moved files.", "files"),
