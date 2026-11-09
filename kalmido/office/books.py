@@ -235,20 +235,24 @@ def bk_receipts_basis(c, oid, frm, to, by="doc", uid=None, gaps=None, open_=None
     if "bank" not in eb_map(s).values():  # 2.755.0 (#5241): was "no strict year in [frm, to]" -- a receipts year next to a strict one has an edge
         return bk_receipts(c, oid, frm, to, uid=uid, by=by, gaps=gaps)
     out, lines = [], None
+    # 2.764.0 (#5314, review 2.755 M1): the bank / card / cash lines are read once and only for the years of [frm, to] and
+    # their neighbours (was every day of every year: eb_flows decrypts each bank line) -- a receipt and its line meet at an
+    # edge of the bases within a year; a line further away than the next / previous year no longer moves a receipt.
+    near = (f"{int(frm[:4]) - 1:04d}-01-01", f"{int(to[:4]) + 1:04d}-12-31")
     for i, (a, b, strict) in enumerate(segs):
         one = i == 0  # review N2: the receipts without any date belong to no period -- named (and counted as hidden) once
         if strict:
             flows = eb_flows(c, oid, a, b)
             if open_ is not None:
-                if lines is None:  # review M2: the lines of every day, read once
-                    lines = bk_paid_all(c, oid)
+                if lines is None:  # review M2: the lines of every day (2.764.0 #5314: of the near years), read once
+                    lines = eb_flows(c, oid, *near)["paid"]
                 open_ += [rc for rc in bk_receipts(c, oid, a, b, uid=uid, by=by, zero=True) if rc["node_id"] not in lines]
             if prep is not None:
                 prep(a, b, flows)
             out += bk_receipts(c, oid, a, b, uid=uid, paid=flows["paid"], gaps=gaps, with_undated=one)
         else:
-            if lines is None:  # 2.755.0 (#5241): the bank / card / cash lines of every day, read once
-                lines = bk_paid_all(c, oid)
+            if lines is None:  # 2.755.0 (#5241): the bank / card / cash lines, read once (2.764.0 #5314: of the near years)
+                lines = eb_flows(c, oid, *near)["paid"]
             out += bk_receipts_edge(c, oid, s, a, b, by, lines, uid=uid, gaps=gaps, with_undated=one)
     if gaps is not None and not gaps.get("no_amount"):
         gaps.pop("no_amount", None)
@@ -266,7 +270,7 @@ def bk_receipts_edge(c, oid, s, a, b, by, lines, uid=None, gaps=None, with_undat
     strict = lambda day: bool(day) and eb_basis_of(s, int(day[:4])) == "bank"  # noqa: E731
     gone = {n for n, x in lines.items() if strict(x["day"])}
     rows = bk_receipts(c, oid, a, b, uid=uid, by=by, gaps=gaps, with_undated=with_undated, skip=gone)
-    cand = sorted(n for n, x in lines.items() if a <= x["day"] <= b)
+    cand = sorted(n for n, x in lines.items() if a <= x["day"] <= b)[:20000]  # 2.764.0 (#5314): bounded as bk_receipts(paid)
     if not cand:
         return rows
     day = "COALESCE(NULLIF(r.paid_at, ''), d.doc_date)" if by == "paid" else "COALESCE(NULLIF(d.doc_date, ''), NULLIF(r.paid_at, ''))"
