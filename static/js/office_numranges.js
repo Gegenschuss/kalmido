@@ -1,9 +1,10 @@
 // @ts-check
 // 2.138.0 D (#2256): number ranges -- the office admin sets the next running number of every series (quotation, invoice,
 // credit note, reminder, delivery note) under the number schemes of the settings, and a draft's number can be changed in the document
-// editor (click on the number). Own save per row via /api/office/number-ranges (not the settings' save, hence the ids
+// editor (click on the number). Own save via /api/office/number-ranges (not the settings' save, hence the ids
 // without "os-" and data-fg-skip); only upwards, a jump in the invoice / credit note series needs a reason (office log).
-const ONUM = {ranges: null, loading: false, err: '', doc: null};
+// 2.802.0 (#5456): one form - every field with its hint right below it, one "Apply" at the end saves all changed rows.
+const ONUM = {ranges: null, loading: false, err: '', doc: null, busy: false};
 const ONUM_NAMES = {offer: N_('Quotation numbers'), invoice: N_('Invoice numbers'), credit: N_('Credit note numbers'), reminder: N_('Payment reminder numbers'), delivery: N_('Delivery note numbers')};
 const ONUM_SCHEME_IDS = {offer: 'os-scheme', invoice: 'os-inv-scheme', credit: 'os-cr-scheme', reminder: 'os-rm-scheme', delivery: 'os-ls-scheme'};
 
@@ -44,30 +45,46 @@ function onumHtml() {
     return `<div class="row onumrow" data-kind="${r.kind}"><label for="${id}">${esc(tr(ONUM_NAMES[r.kind]))}</label>
       <span class="lacts"><input id="${id}" data-onum-in="${r.kind}" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${esc(v)}" class="numin" aria-describedby="${id}-h">
       <span class="muted ofcpv" id="${id}-pv" aria-live="polite">${esc(pv)}</span>
-      <button type="button" class="btn sm" data-onum="set" data-kind="${r.kind}" ${n > r.next ? '' : 'disabled'}>${tr('Apply')}</button></span>
+      <span class="muted ofchint onumh" id="${id}-h">${esc(hint)}</span></span>
       ${r.reason_needed && jump ? `<span class="lacts onumwhy"><input id="${id}-why" data-onum-why="${r.kind}" value="${esc(ONUM['w' + r.kind] || '')}" maxlength="300" placeholder="${esc(tr('Reason for the jump (kept in the office log)'))}" aria-label="${esc(tr('Reason'))}"></span>` : ''}
-      <span class="muted ofchint" id="${id}-h">${esc(hint)}</span>${ONUM['e' + r.kind] ? `<span class="ofcpv err ofchint" role="alert">${esc(ONUM['e' + r.kind])}</span>` : ''}</div>`;
+      ${ONUM['e' + r.kind] ? `<span class="ofcpv err ofchint" role="alert">${esc(ONUM['e' + r.kind])}</span>` : ''}</div>`;
   }).join('');
+  const dirty = onumDirty().length > 0;
   return `<div id="onum-box" class="onum" data-fg-skip><h4>${tr('Next running number')}</h4><div class="shint">${esc(tr('With a year in the scheme it applies to the current year.'))}</div>
     <p class="muted ofchint">${esc(tr('E.g. to continue your previous program. Only upwards.'))}</p>
-    ${ONUM.err ? `<p class="ofcpv err">${esc(ONUM.err)}</p>` : ''}${rows}</div>`;
+    ${ONUM.err ? `<p class="ofcpv err">${esc(ONUM.err)}</p>` : ''}${rows}
+    ${ONUM.ranges.some(r => !r.shared) ? `<div class="row onumfoot"><span class="lacts"><button type="button" class="btn sm pri" data-onum="apply" ${dirty && !ONUM.busy ? '' : 'disabled'}>${tr('Apply')}</button></span></div>` : ''}</div>`;
 }
+// 2.802.0 (#5456): the rows whose field differs from the stored next number (shared rows have no own counter)
+const onumDirty = () => (ONUM.ranges || []).filter(r => !r.shared && ONUM['v' + r.kind] != null && ONUM['v' + r.kind].trim() !== String(r.next));
 
-async function onumApply(kind) {
-  const r = (ONUM.ranges || []).find(x => x.kind === kind); if (!r) return;
-  const n = parseInt($('#onum-' + kind)?.value || '', 10), why = ($('#onum-' + kind + '-why')?.value || '').trim();
-  if (!(n > r.next)) return;
-  if (!await askConfirm(tr('Continue {0} at {1}?', tr(ONUM_NAMES[kind]), onumFmt(r.scheme, n)),
-    tr('The numbers from {0} to {1} are skipped and cannot be given later.', r.next, n - 1), {ok: tr('Apply')})) return;
-  try {
-    const j = await rawFetch('POST', `/api/office/number-ranges/${kind}`, {next: n, reason: why});
-    Object.assign(r, j); delete ONUM['v' + kind]; delete ONUM['w' + kind]; delete ONUM['e' + kind];
-    if (typeof OFC === 'object') { OFC.log = null; if (OFC.pv) delete OFC.pv[kind]; if (kind === 'offer' && OFC.info) OFC.info.number_preview = j.preview; }
-    const sch = $('#' + ONUM_SCHEME_IDS[kind]); if (sch && typeof ofcSchemePv === 'function') ofcSchemePv(sch, true);  // the scheme's "next: …" again
-    toast(tr('Saved'));
-  } catch (x) { ONUM['e' + kind] = ofcErrHere(x); }
+// 2.802.0 (#5456): one "Apply" for all changed rows: one question naming every jump, then each row through its own route
+// (POST /api/office/number-ranges/<kind>); a row the server refuses keeps its value and says why at its field (no toast),
+// the others are saved; all saved = one "Saved"
+async function onumApplyAll() {
+  const ch = onumDirty(); if (!ch.length || ONUM.busy) return;
+  const val = r => parseInt(ONUM['v' + r.kind] || '', 10);
+  const bad = ch.filter(r => !(val(r) > r.next));
+  for (const r of bad) ONUM['e' + r.kind] = tr('Only upwards: at least {0}', r.next + 1);
+  if (bad.length) { onumRedraw(); $('#onum-' + bad[0].kind)?.focus(); return; }
+  const lines = ch.map(r => tr('{0}: continues at {1}, the numbers {2} to {3} are skipped.', tr(ONUM_NAMES[r.kind]), onumFmt(r.scheme, val(r)), r.next, val(r) - 1));
+  const html = lines.map(l => `<p>${esc(l)}</p>`).join('') + `<p>${esc(tr('Skipped numbers cannot be given later.'))}</p>`;
+  if (!await askConfirm(tr('Apply the new running numbers?'), '', {html, ok: tr('Apply')})) return;
+  ONUM.busy = true; onumRedraw();
+  let fail = '';
+  for (const r of ch) {
+    const kind = r.kind;
+    try {
+      const j = await rawFetch('POST', `/api/office/number-ranges/${kind}`, {next: val(r), reason: (ONUM['w' + kind] || '').trim()});
+      Object.assign(r, j); delete ONUM['v' + kind]; delete ONUM['w' + kind]; delete ONUM['e' + kind];
+      if (typeof OFC === 'object') { OFC.log = null; if (OFC.pv) delete OFC.pv[kind]; if (kind === 'offer' && OFC.info) OFC.info.number_preview = j.preview; }
+      const sch = $('#' + ONUM_SCHEME_IDS[kind]); if (sch && typeof ofcSchemePv === 'function') ofcSchemePv(sch, true);  // the scheme's "next: …" again
+    } catch (x) { ONUM['e' + kind] = ofcErrHere(x); fail ||= kind; }
+  }
+  ONUM.busy = false;
   onumRedraw();
-  $('#onum-' + kind)?.focus();
+  if (!fail) toast(tr('Saved'));
+  else $('#onum-' + fail)?.focus();
 }
 
 // ---- the draft's number in the document editor (office_docs.js: the head calls onumDocHtml, a click on the number opens it)
@@ -130,7 +147,7 @@ document.addEventListener('click', e => {
   const b = tg.closest?.('[data-onum]');
   if (!b) { if (tg.closest?.('.ofdhead .ofdnum b') && typeof OFD === 'object' && onumDocCan(OFD.doc) && !ONUM.doc) onumDocOpen(); return; }
   const a = b.dataset.onum;
-  if (a === 'set') { e.preventDefault(); onumApply(b.dataset.kind); }
+  if (a === 'apply') { e.preventDefault(); onumApplyAll(); }  // 2.802.0 (#5456): one Apply for the form
   else if (a === 'doc-open') onumDocOpen();
   else if (a === 'doc-save') onumDocSave();
   else if (a === 'doc-x') { ONUM.doc = null; ofdDraw(); }
@@ -142,7 +159,7 @@ document.addEventListener('input', e => {
     ONUM['v' + k] = t.value; delete ONUM['e' + k];
     const n = parseInt(t.value, 10), row = t.closest('.onumrow');
     const pv = $('#onum-' + k + '-pv'); if (pv) pv.textContent = n >= 1 ? tr('next: {0}', onumFmt(r.scheme, n)) : '';
-    const btn = row?.querySelector('[data-onum="set"]'); if (btn) btn.disabled = !(n > r.next);
+    const btn = $('#onum-box [data-onum="apply"]'); if (btn) btn.disabled = !onumDirty().length || !!ONUM.busy; row?.querySelector('[role="alert"]')?.remove();  // 2.802.0 (#5456)
     if (r.reason_needed && (n > r.min_next) !== !!$('#onum-' + k + '-why')) { onumRedraw(); const i = /** @type {HTMLInputElement|null} */ ($('#onum-' + k)); if (i) { i.focus(); const e = i.value.length; i.setSelectionRange(e, e); } }  // 2.138.0 (#2256): the caret stays at the end after the redraw (device test: 1001 became 0110; a text field, number fields have no caret API)
   } else if (t.dataset?.onumWhy) ONUM['w' + t.dataset.onumWhy] = t.value;
   else if (t.id === 'onum-doc' && ONUM.doc) ONUM.doc.val = t.value;
@@ -151,7 +168,7 @@ document.addEventListener('input', e => {
 document.addEventListener('keydown', e => {
   if (e.key !== 'Enter') return;
   const t = /** @type {any} */ (e.target);
-  if (t.dataset?.onumIn || t.dataset?.onumWhy) { e.preventDefault(); onumApply(t.dataset.onumIn || t.dataset.onumWhy); }  // never the settings' submit
+  if (t.dataset?.onumIn || t.dataset?.onumWhy) { e.preventDefault(); onumApplyAll(); }  // never the settings' submit; 2.802.0 (#5456): Enter = the form's Apply
   else if (t.id === 'onum-doc' || t.id === 'onum-doc-why') { e.preventDefault(); e.stopPropagation(); onumDocSave(); }
 }, true);
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && ONUM.doc && (/** @type {any} */ (e.target).id === 'onum-doc' || /** @type {any} */ (e.target).id === 'onum-doc-why')) { ONUM.doc = null; ofdDraw(); } });

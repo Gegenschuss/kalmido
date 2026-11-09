@@ -174,7 +174,8 @@ function ofc_setJump() {
 }
 const ofc_setBody = () => S.route.tab === 'import' && typeof oimHtml === 'function' ? oimHtml() : `<p class="muted lempty">${tr('Loading…')}</p>`;
 // 2.470.0 (#3596): the pages behind Settings (services, text blocks, rights) lead back there; was the tab row General | Templates
-const ofr_backHtml = tab => ofr_grp() && ofr_lvOf('settings') === 'none' ? '' : `<div class="ofcbar"><button type="button" class="btn sm" data-setgo="${tab === 'settings' ? 'biz' : 'biz-tpl'}">${ic('back', 's')} ${tr('Settings')}</button></div>`;
+// 2.802.0 (#5456): the button names where it leads (Settings › Company & office [› Texts & templates]), not just "Settings"
+const ofr_backHtml = tab => ofr_grp() && ofr_lvOf('settings') === 'none' ? '' : `<div class="ofcbar"><button type="button" class="btn sm" data-setgo="${tab === 'settings' ? 'biz' : 'biz-tpl'}">${ic('back', 's')} ${esc(tab === 'settings' ? tr('Settings › Company & office') : tr('Settings › Company & office › {0}', tr('Texts & templates')))}</button></div>`;
 function viewOffice() {
   if (!officeOn()) return `<div class="empty">${setLinkHtml(tr('Office & finance is off (Settings > Modules)'))}</div>`;
   const tab = ofcTab();

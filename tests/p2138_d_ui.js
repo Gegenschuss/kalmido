@@ -54,23 +54,25 @@ async function part_numranges() {
   check(d.querySelectorAll('#onum-box .onumrow').length === 5, 'five series: quotation, invoice, credit note, reminder, delivery note');
   check(!d.querySelector('#onum-box input[id^="os-"]') && d.querySelector('#onum-box').hasAttribute('data-fg-skip'), 'not part of the settings save (no os- ids, form guard skipped)');
   const rowI = () => d.querySelector('.onumrow[data-kind="invoice"]');
+  // 2.802.0 (#5456): one "Apply" at the end of the form instead of one per row
+  const applyB = () => d.querySelector('#onum-box [data-onum="apply"]');
   check(new RegExp('applies to ' + Y).test(rowI().textContent) && /at least 1/.test(rowI().textContent), 'invoice: "applies to <year>", smallest value');
   check(!/applies to/.test(d.querySelector('.onumrow[data-kind="offer"]').textContent), 'quotation without a year in the scheme: no year hint');
-  check(rowI().querySelector('[data-onum="set"]').disabled && !d.querySelector('#onum-invoice-why'), 'unchanged: Apply off, no reason field');
+  check(applyB().disabled && !d.querySelector('#onum-invoice-why'), 'unchanged: Apply off, no reason field');
   const inp = d.querySelector('#onum-invoice'); inp.value = '1001';
   inp.dispatchEvent(new w.Event('input', {bubbles: true}));
   check(await until(() => d.querySelector('#onum-invoice-why')), 'a jump in the invoice series asks for a reason');
   check(d.querySelector('#onum-invoice-pv').textContent.includes(`RE-${Y}-1001`), 'the preview shows the finished number: ' + d.querySelector('#onum-invoice-pv').textContent);
   check(d.activeElement && d.activeElement.id === 'onum-invoice', 'the focus stays in the field');
   check(d.activeElement.selectionStart === d.activeElement.value.length, 'the caret stays at the end after the redraw (device test: typing 1001 gave 0110)');  // 2.138.0 (#2256)
-  check(!rowI().querySelector('[data-onum="set"]').disabled, 'Apply on');
+  check(!applyB().disabled, 'Apply on');
   // without a reason: the server's error at the row
-  rowI().querySelector('[data-onum="set"]').click();
+  applyB().click();
   check(await until(() => /reason/.test(rowI().querySelector('[role="alert"]')?.textContent || '')), 'without a reason: the error at the row');
   check((await range('invoice')).next === 1, 'nothing saved without a reason');
   const why = d.querySelector('#onum-invoice-why'); why.value = 'Nummern bis 1000 im Altprogramm';
   why.dispatchEvent(new w.Event('input', {bubbles: true}));
-  rowI().querySelector('[data-onum="set"]').click();
+  applyB().click();
   check(await until(async () => (await range('invoice')).next === 1001, 40), 'Apply: the series continues at 1001');
   check(await until(() => /at least 1001/.test(rowI().textContent) && d.querySelector('#onum-invoice').value === '1001'), 'the row shows the new state');
   check(await until(() => (d.querySelector('#os-inv-scheme-pv')?.textContent || '').includes(`RE-${Y}-1001`)), 'the scheme\'s preview follows: ' + d.querySelector('#os-inv-scheme-pv')?.textContent);
@@ -79,7 +81,7 @@ async function part_numranges() {
   // a quotation needs no reason
   const io = d.querySelector('#onum-offer'); io.value = '40'; io.dispatchEvent(new w.Event('input', {bubbles: true}));
   check(!d.querySelector('#onum-offer-why'), 'quotations: no reason field');
-  d.querySelector('.onumrow[data-kind="offer"] [data-onum="set"]').click();
+  applyB().click();  // 2.802.0 (#5456): the form's one Apply
   check(await until(async () => (await range('offer')).next === 40, 40), 'quotation series at 40');
   w.close();
 

@@ -10,7 +10,7 @@
 // - the bank page: the fetch switched off says so without "FinTS" / "product registration"
 const {execFileSync} = require('child_process');
 const path = require('path');
-const {boot, sleep, B, login} = require('./boot');
+const {boot, sleep, B, login, idle} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
@@ -22,6 +22,8 @@ const FEAT = 'cal,comments,collab,files,docs,office,clients';
 const ERR = 'Testfehler Nordwind';
 const count = (s, t) => s.split(t).length - 1;
 // the visible toast's text ('' = none shown)
+// the text a person sees on the page: without the toast (toastTxt), the screen-reader-only parts (#srlive, .sr)
+const seen = d => { const c = d.body.cloneNode(true); c.querySelectorAll('#toast, #srlive, .sr').forEach(x => x.remove()); return c.textContent; };
 const toastTxt = d => { const t = d.querySelector('#toast'); return t && !t.classList.contains('hidden') ? t.textContent : ''; };
 // every toast() call of the page is recorded in window.__T (the global function, so office_*.js calls go through it)
 const spyToast = w => w.eval(`window.__T = []; { const t0 = toast; toast = (...a) => { window.__T.push(String(a[0])); return t0(...a); }; } 1`);
@@ -53,6 +55,7 @@ const failFetch = (w, method, re, status, msg) => w.eval(`{ const f0 = window.fe
     // ---- the helper: said by api() = not again; nobody said it = once; empty = a plain sentence
     let w = await boot({user: who, hash: 'office/offers/' + inv.id}), d = w.document;
     check(!!await until(() => d.querySelector('#ofd-order_ref')), `${who}: the invoice editor is open (field "Order number")`);
+    await idle(w);  // the editor's later loads may draw it again: the field taken after them
     spyToast(w);
     await w.eval(`api('POST', '/api/office/docs/99999999/status', {status: 'sent'}).catch(ofcErr)`);
     const t1 = w.eval('window.__T.slice()');
@@ -63,7 +66,7 @@ const failFetch = (w, method, re, status, msg) => w.eval(`{ const f0 = window.fe
 
     // ---- the editor: the field's refused save is said once, at the field, the value stays and is marked "not saved"
     w.eval('window.__T.length = 0; 1');
-    failFetch(w, 'PATCH', `/\\/api\\/office\\/docs\\/${inv.id}$/`, 400, ERR);
+    failFetch(w, 'PATCH', `/\\/api\\/office\\/docs\\/${inv.id}(\\?|$)/`, 400, ERR);
     const f = d.querySelector('#ofd-order_ref');
     f.value = 'PO-4711'; f.dispatchEvent(new w.Event('change', {bubbles: true}));
     const mk = await until(() => d.querySelector('.ostok.err'));
@@ -73,12 +76,12 @@ const failFetch = (w, method, re, status, msg) => w.eval(`{ const f0 = window.fe
     const head = d.querySelector('.ofdhead .ofdsave')?.textContent || '';
     check(!head.includes(ERR), `${who}: nothing raw in the head next to the buttons ${JSON.stringify(head)}`);
     check(!toastTxt(d).includes(ERR), `${who}: no toast left beside the field's message ${JSON.stringify(toastTxt(d))}`);
-    check(count(d.body.textContent + toastTxt(d), ERR) === 1, `${who}: the error is on the page exactly once (${count(d.body.textContent, ERR)})`);
+    check(count(seen(d) + toastTxt(d), ERR) === 1, `${who}: the error is on the page exactly once (${count(seen(d) + toastTxt(d), ERR)})`);
     w.close();
 
     // ---- the send dialog: no variable name, a part that failed to load is named in the dialog (no toast for it)
     w = await boot({user: who, hash: 'office/offers/' + inv.id}); d = w.document;
-    await until(() => d.querySelector('#ofd-order_ref'));
+    await until(() => d.querySelector('#ofd-order_ref')); await idle(w);
     w.eval('S.me.is_admin = true; 1');
     spyToast(w);
     failFetch(w, 'GET', `/\\/api\\/office\\/docs\\/${inv.id}\\/recipients$/`, 500, ERR);
@@ -89,7 +92,7 @@ const failFetch = (w, method, re, status, msg) => w.eval(`{ const f0 = window.fe
     if (!ms.smtp) check(/whoever runs the server/.test(md?.querySelector('.ofdwarn')?.textContent || ''), `${who}: mail not set up: who sets it up, in plain words`);
     const miss = md?.querySelector('.ofdmiss')?.textContent || '';
     check(/Could not be loaded: Recipients/.test(miss), `${who}: the recipients that failed to load are named in the dialog ${JSON.stringify(miss)}`);
-    check(!toastTxt(d).includes(ERR) && count(d.body.textContent, ERR) === 0, `${who}: no toast and no raw text for the failed part ${JSON.stringify(toastTxt(d))}`);
+    check(!toastTxt(d).includes(ERR) && count(seen(d), ERR) === 0, `${who}: no toast and no raw text for the failed part ${JSON.stringify(toastTxt(d))}`);
     md?.querySelector('[data-m="close"]')?.click();
     w.close();
 

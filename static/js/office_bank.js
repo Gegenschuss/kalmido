@@ -36,6 +36,7 @@ const bfbBooksStale = () => {
 const bnkReload = () => { BNK.data = null; BNK.imports = BNK.showImp ? BNK.imports : null; BNK.other = null; BNK.cand = null; bfbBooksStale(); ofcDraw(); };
 const bnkAmt = v => `${+v > 0 ? '+' : '−'}${ofcMoney(Math.abs(+v))}`;
 
+// 2.802.0 (#5456): the page links the bank accounts (IBAN, default account: Settings › Company & office › Bank & taxes)
 function bnkHtml() {
   if (BNK.oid !== OFC.info?.org_id) Object.assign(BNK, {oid: OFC.info?.org_id, data: null, imports: null, err: null, other: null, cand: null, fints: null});  // 2.616.0 (#2473): + fints  // another office area
   if (!ofcAdmin()) return ofcLockedHtml();  // 2.356.0 D (#3006): why, and the way to hand in receipts
@@ -54,7 +55,7 @@ function bnkHtml() {
     : `<div class="empty">${ic('bank')}<span>${BNK.state === 'open' && (n.open || 0) + (n.matched || 0) ? tr('Every booking is matched.') : tr('No bookings yet. Import the statement you download from your bank (CSV, CAMT or MT940).')}</span></div>`;
   // 2.809.0 (#5452): the hint for a missing receipt once above the list (was in every row without a suggestion)
   const miss = items.some(t => !t.match && +t.amount < 0 && !(t.suggestions || []).length) ? `<p class="muted bnkmiss bnkmiss1">${tr('Receipt missing? Upload it in the documents of the office, then match it here.')}</p>` : '';
-  return bar + (BNK.showImp ? bnkImpHtml() : '') + (typeof brl_sugHtml === 'function' ? brl_sugHtml() : '') + miss + list + `<div class="muted ofchint">${BNK.fints?.on ? tr('Bank access only when you fetch, with your PIN every time.') : tr('No bank access: only the file you download yourself.')/* 2.616.0 (#2473) */}<div class="shint">${tr('A match with an invoice records a payment; with a receipt it sets its payment day.')}</div></div>`;  // 2.298.0 A2 (#3186): the matching rule behind (i)
+  return bar + ofcSetLink('tax', tr('Bank accounts')) + (BNK.showImp ? bnkImpHtml() : '') + (typeof brl_sugHtml === 'function' ? brl_sugHtml() : '') + miss + list + `<div class="muted ofchint">${BNK.fints?.on ? tr('Bank access only when you fetch, with your PIN every time.') : tr('No bank access: only the file you download yourself.')/* 2.616.0 (#2473) */}<div class="shint">${tr('A match with an invoice records a payment; with a receipt it sets its payment day.')}</div></div>`;  // 2.298.0 A2 (#3186): the matching rule behind (i)
 }
 function bnkRow(t) {
   const inn = +t.amount > 0;

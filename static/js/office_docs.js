@@ -378,7 +378,7 @@ function ofdEditorHtml() {
   const dim = (k, kind, label) => `<div class="row ofdrt"><label for="ofd-r-${k}">${esc(label)}</label><span class="lacts ofdrtf">${ofdSel('r-' + k, rights[k]?.id, txtOpt(kind), tr('free text'))}${ofdIn('r-' + k + '-t', rights[k]?.text, {max: 1000, ph: tr('Text in the document')})}</span></div>`;
   const rightsSec = ofdSec('rights', tr('Transfer of rights'), dim('time', 'rights_time', tr('Duration')) + dim('territory', 'rights_territory', tr('Territory')) + dim('media', 'rights_media', tr('Media'))
     + ofdF('r-exceptions', tr('Exceptions'), ofdIn('r-exceptions', rights.exceptions, {max: 2000, ph: tr('e.g. music, stock material')}))
-    + `<div class="row"><label class="chkl" style="min-width:0"><input type="checkbox" id="ofd-r-exclusive" data-f="r-exclusive" ${rights.exclusive ? 'checked' : ''}> ${tr('Exclusive')}</label></div>`
+    + `<div class="row ofdchk"><label class="chkl"><input type="checkbox" id="ofd-r-exclusive" data-f="r-exclusive" ${rights.exclusive ? 'checked' : ''}> ${tr('Exclusive')}</label></div>`  // 2.802.0 (#5456): tick and text in the field column
     + ofdF('r-note', tr('Note'), ofdTa('r-note', rights.note, 2, {max: 2000})));
   const textsSec = ofdSec('texts', tr('Introduction and closing'), `
     <div class="row"><label for="ofd-intro">${tr('Introduction')}</label><span class="lacts ofdtxt">${ofdSel('intro_pick', '', txtOpt('intro'), tr('from a text block…'))}</span></div>${ofdTa('intro', d.intro, 3)}
