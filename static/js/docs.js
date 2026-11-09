@@ -946,7 +946,7 @@ function dc_sDraw(md) {
     const P = {head,
       auto: `<p class="shint">${tr('Per feature: rules first, then what Kalmido learnt from your corrections. Sure matches are set directly, unsure ones wait in “To review”. “Left to an agent”: a connected agent with access may fill it in.')}</p>
         ${DC_FEATS.map(([f, n]) => `<div class="row"><label for="dcs-l-${f}">${tr(n)}</label><select id="dcs-l-${f}" data-dcl="${f}" ${dis}>${DC_LEVELS.map(([v, l]) => `<option value="${v}" ${s.levels[f] === v ? 'selected' : ''}>${tr(l)}</option>`).join('')}</select></div>`).join('')}
-        ${s.ocr_missing?.length ? `<p class="muted">${esc(tr('Text recognition is missing: {0}', s.ocr_missing.join(', ')))}</p>` : ''}${dcs_ocrHtml(s, dis)}${dcs_titleHtml(s, dis)}`,
+        ${s.ocr_missing?.length ? `<p class="muted">${esc(tr('Text recognition is missing: {0}', s.ocr_missing.join(', ')))}</p>` : ''}${dcs_ocrHtml(s, dis)}${/*html-ok*/ dcs_titleHtml(s, dis)}`,
       asn: `<div class="row"><label for="dcs-asn">${tr('Prefix of the archive numbers')}</label><input id="dcs-asn" data-dcs="asnprefix" value="${esc(s.asn_prefix || 'ASN')}" maxlength="10" autocomplete="off" ${dis}></div>
         <p class="muted">${esc(tr('Next free number: {0}. A QR code or text like {1} on a scan fills it in.', s.asn_next, `${s.asn_prefix || 'ASN'}${String(s.asn_next).padStart(5, '0')}`))}</p>
         <p class="muted">${esc(tr('A stack scan with several codes can be split into documents; a separator sheet between two letters splits there too.'))} <a href="/api/docs/split-sheet.pdf" target="_blank" rel="noopener">${tr('Separator sheet to print (PDF)')}</a></p>${'' /* 2.154.0 A (#1111) */}`,
@@ -976,8 +976,8 @@ function dc_sDraw(md) {
 function dcs_titleHtml(s, dis) {
   if (!s.title_pattern) return '';
   return `<fieldset class="dcs-title"><legend>${esc(tr('Title of new documents'))}</legend>
-    <label class="dcs-ocrc"><input type="checkbox" id="dcs-tauto" data-dcs="tauto" ${s.title_auto ? 'checked' : ''} ${dis}> ${esc(tr('Title automatically'))}</label>
-    <div class="row"><label for="dcs-tpat">${esc(tr('Title pattern'))}</label><input id="dcs-tpat" data-dcs="tpat" value="${esc(s.title_pattern)}" maxlength="120" autocomplete="off" placeholder="${esc(s.title_pattern_default || '')}" ${dis}></div>
+    <label class="dcs-ocrc"><input type="checkbox" id="dcs-tauto" data-dcs="tauto" ${s.title_auto ? 'checked' : ''} ${/*html-ok*/ dis}> ${esc(tr('Title automatically'))}</label>
+    <div class="row"><label for="dcs-tpat">${esc(tr('Title pattern'))}</label><input id="dcs-tpat" data-dcs="tpat" value="${esc(s.title_pattern)}" maxlength="120" autocomplete="off" placeholder="${esc(s.title_pattern_default || '')}" ${/*html-ok*/ dis}></div>
     <p class="shint">${esc(tr('Placeholders: {0} sender, {1} type, {2} date (DD.MM.YYYY). An empty part goes with its separator. Recognition, rules and “Apply what was learned” set the title from it; a title typed by hand stays.', '{Absender}', '{Typ}', '{Datum}'))}</p></fieldset>`;
 }
 // 2.635.0 (#4807 b): the languages of the text recognition of this workspace (the installed ones, deu+eng by default)
