@@ -19,11 +19,10 @@
 
 ## What's new
 
-**2.756.0** (2026-11-09):
-- **Knowledge**: per space "Offline available" also keeps the space's files on the device (pausable, synced on the next online moment).
-- **Projects**: rules fire days before a due date or when overdue, run up to 5 actions and take "Only if" conditions.
-- **Documents**: swiping between documents is seamless.
-- **Self-hosting**: `KALMIDO_WEB_PROCS` (1-16) runs several web processes in one container.
+**2.761.0** (2026-11-09):
+- **Layout**: split view on wide screens shows a second page of the app on the right (Settings > Appearance).
+- **Documents**: tags, sender and document type suggest known entries from the first letter; text in the PDF preview can be marked and copied.
+- **Security**: web manifest per release (`web-manifest-X.Y.Z.json`, `/api/code-manifest`); images and the manifest carry a GitHub build attestation (`gh attestation verify`, see docs/SELF-HOSTING.md).
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 
