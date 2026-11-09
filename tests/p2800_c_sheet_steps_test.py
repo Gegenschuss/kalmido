@@ -177,6 +177,22 @@ check(j["title"] == "Budget plan" and j["chart"] is None, f"undo: the old title,
 fwd(Bo, G, "table renamed")
 check(sheet(Bo, SID)["title"] == "Budget 2027", "redo: the new title again")
 
+# ---------------------------------------------------------------- the table's project back (review of #5409): only with the
+# checks of a change of project (write access to the project now); without them the step stays, named
+L1 = ok(A.post(B + "/api/lists", json={"name": "Project one", "org_id": ORG})).json()["id"]
+ok(A.put(B + f"/api/lists/{L1}/members", json={"user_id": BOB, "role": "edit"}))
+L2 = ok(Bo.post(B + "/api/lists", json={"name": "Project two", "org_id": ORG})).json()["id"]
+S2 = ok(Bo.post(B + "/api/sheets", json={"title": "Moving sheet", "space": SP, "list_id": L1})).json()["id"]
+G = step(Bo, BOB, "table to another project", lambda: ok(Bo.patch(B + f"/api/sheets/{S2}", json={"list_id": L2})))
+back(Bo, G, "table to another project")
+check(sheet(Bo, S2)["list_id"] == L1, f"undo: the table hangs on its first project again {sheet(Bo, S2)['list_id']}")
+fwd(Bo, G, "table to another project")
+check(sheet(Bo, S2)["list_id"] == L2, "redo: on the second project again")
+ok(A.put(B + f"/api/lists/{L1}/members", json={"user_id": BOB, "role": "view"}))  # Bob may only look at the first project now
+r = Bo.post(B + f"/api/undo/to/{G}")
+check(r.ok and r.json().get("stayed") and G not in r.json().get("undone", []), f"no write access to the first project: the step stays, named {r.status_code} {r.text[:300]}")
+check(sheet(Bo, S2)["list_id"] == L2, "the table stays on the second project (not hung on a project Bob may not write to)")
+
 # ---------------------------------------------------------------- a person without an organisation
 r = ok(Fr.post(B + "/api/sheets", json={"title": "Frida's sheet", "space": "private"}))
 FS = r.json()["id"]

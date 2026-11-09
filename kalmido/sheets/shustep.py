@@ -27,10 +27,11 @@ from ..core.errors import BadInput
 from ..core.i18n import tr
 from ..core.undoweb import undo_need_reg
 from ..files.fsref import fs_ref_rename
-from .core import SH_STEP_KINDS, ShBook, sh_freeze, sh_need, sh_reload, sh_set_name, sh_touch
+from .core import SH_STEP_KINDS, ShBook, sh_check_list, sh_freeze, sh_may_rebind, sh_need, sh_reload, sh_set_name, sh_touch
 from .shbook import _name_free, shb_bid, shb_label, shb_name_set, shb_rows, shb_sync
 from ..core.pg import qi, table_columns
 from .shhist import SHH_KIND, SHH_OWN, _core, shh_meta
+from .shshare import shs_need_own
 from .web import sh_order_apply, shx_col_apply, shx_place
 
 
@@ -243,6 +244,20 @@ SH_STEP_KINDS.update({
 
 
 # ---------------------------------------------------------------- the table's own fields: the core's copy step
+def _rebind_ok(c, uid, r, now):
+    """An undo / redo that hangs table r on another project (now = the row after the write-back) is held to what
+    sheets_patch asks for a change of project: never through a share, its creator or the list's owner / admins only,
+    write access to the target project, same workspace, no project with a lock. Denied rolls the part back (savepoint).
+    2.800.0 (#5409, review): before, only write access to the table was checked."""
+    shs_need_own(c, r)
+    if not sh_may_rebind(c, uid, r):
+        raise Denied(403)
+    try:
+        sh_check_list(c, r["org_id"], now["list_id"], uid)
+    except BadInput as e:  # a project of another workspace / with a lock since: the step stays, named like a conflict
+        raise Denied(409, str(e)) from None
+
+
 def _sheet_need(c, uid, rid, oid):
     """Who may take a copy step of the tracked kind "sheet" back (core/undoweb.py _need): write access to the table now.
     Only its own fields go back (title, the sheet's name, the project); the rest of the row stays as it is now (a cell
@@ -253,6 +268,8 @@ def _sheet_need(c, uid, rid, oid):
 
     def fix(c):
         now = sh_reload(c, int(rid))
+        if now["list_id"] != r["list_id"]:
+            _rebind_ok(c, uid, r, now)  # 2.800.0 (#5409, review): the project back only with the checks of PATCH /api/sheets
         shb_sync(c, int(rid))  # every sheet of the table hangs on the same list
         if not now["book_id"]:
             fs_ref_rename(c, "sheet", int(rid), now["title"])  # the table's name in its folder
