@@ -29,13 +29,14 @@ from ..core.db import usettings
 from ..core.i18n import N_, tr
 from ..core.objects import obj_need, obj_reg_node, obj_register
 from ..core.orgcrypt import oc_enc_fields
-from ..core.pg import system_ctx
+from ..core.pg import qi, system_ctx
 from ..core.writes import _purge_rows, obj_restore, obj_trash
 from ..accounts.orgroles import RO_MSG, org_writes
 from .absence import abs_org
 from .callsheet import cs_clean
 
 DSK_DAY, DSK_CS = "shoot_day", "callsheet"
+DSK_TABLES = ("hub_bookings", "hub_callsheets")  # the tables of the two kinds (core/pg.py qi)
 DSK_SKETCH = "picture"  # the history's mark of a sketch (never the picture itself)
 
 
@@ -58,7 +59,7 @@ def _person_area(c, uid, oid):
 def _space_of(table):
     def space(c, rid):
         try:
-            r = c.execute(f"SELECT org_id FROM {table} WHERE id=?", (int(rid),)).fetchone()
+            r = c.execute(f"SELECT org_id FROM {qi(table, DSK_TABLES)} WHERE id=?", (int(rid),)).fetchone()
         except (TypeError, ValueError):
             return None
         if r is None:
@@ -71,7 +72,7 @@ def _space_of(table):
 def _base_of(table):
     def base(c, uid, rid):
         try:
-            r = c.execute(f"SELECT org_id FROM {table} WHERE id=?", (int(rid),)).fetchone()
+            r = c.execute(f"SELECT org_id FROM {qi(table, DSK_TABLES)} WHERE id=?", (int(rid),)).fetchone()
         except (TypeError, ValueError):
             return None
         return _person_area(c, uid, r["org_id"]) if r is not None else None
