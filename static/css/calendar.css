@@ -205,6 +205,8 @@ button.cyd:hover{background:var(--bg2)}
 }
 /* 2.884.0 (#5469): keyboard focus, finger targets (44 px through ::after like .ib), the draw-length handle, tidy-ups */
 .cal .cev:focus-visible,.week .cev:focus-visible,.wcev:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+/* the all-day chips of the week are buttons now: at least 24 px high (WCAG 2.5.8, axe target-size in p2210_ui) */
+.week .wad .cev{min-height:1.5rem}
 .rrwd{display:flex}
 .agdate{font-weight:400;font-size:var(--fs-m)}
 .agnone{padding:.5rem .25rem}
