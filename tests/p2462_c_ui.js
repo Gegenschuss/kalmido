@@ -107,6 +107,17 @@ const item = (d, t) => items(d).find(x => (x.querySelector('.ml')?.firstChild?.t
     Object.defineProperty(P, 'scrollHeight', {configurable: true, get() { return this.id === 'tc-msgs' ? 1000 : o.sh.get.call(this); }});
     Object.defineProperty(P, 'clientHeight', {configurable: true, get() { return this.id === 'tc-msgs' ? 300 : o.ch.get.call(this); }});
     document.getElementById('tc-msgs').scrollTop = 0; })()`);
+  // 2.832.0 (#5515, CI red of 2.786.0 / 2.819.0): opening the room keeps it at the end for 2 s (chat.js teamFit, re-scrolls at
+  // 60 / 300 / 900 ms) - on the slower CI runner that phase still ran and put the faked box back to the end (st 1000, near).
+  // A person scrolls up with the wheel, a tap or a key, and that ends the phase: the test does the same (a script's scrollTop
+  // does not). The phase is held open here, as on a slow runner, so the wheel is what ends it.
+  w.eval(`S.tc.fitUntil = Date.now() + 60000`);
+  d.getElementById('tc-msgs').dispatchEvent(new w.WheelEvent('wheel', {bubbles: true, deltaY: -300}));
+  check(w.eval(`S.tc.fitUntil`) === 0, '#1660/#5515: scrolling up with the wheel ends the "stay at the newest message" phase');
+  w.eval(`document.getElementById('tc-msgs').scrollTop = 0`);
+  w.eval(`setTimeout(() => { if (document && S.route.mod === 'team' && S.tc.fitUntil > Date.now()) teamFit(true); }, 0)`);  // a late re-scroll of the phase (as chat.js teamFit) finds it ended
+  await sleep(20);
+  check(w.eval(`document.getElementById('tc-msgs').scrollTop`) === 0, '#1660/#5515: the box stays scrolled up after the phase ended');
   await call('POST', `/api/team/rooms/${RID}/messages`, {body: 'Third hello'}, BCK);
   w.eval(`loadRoom(S.tc.rid).then(() => tcPatch())`);
   await until(() => d.querySelectorAll('#tc-msgs .cmsg').length === 3);
