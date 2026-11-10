@@ -1,6 +1,24 @@
 {
  "versions": [
   {
+   "version": "2.858.0",
+   "date": "2026-11-10",
+   "items": [
+    {
+     "de": "Agenten, die erst bei einer Nachricht starten, zeigen „bereit“ statt „nicht verbunden“ - die Warnung kommt nur noch, wenn eine Nachricht wirklich liegen bleibt.",
+     "en": "Agents that start with a message show \"ready\" instead of \"not connected\" - the warning only comes when a message really waits."
+    },
+    {
+     "de": "Die Pläne eines Agenten (z. B. Morgen-Briefing) erreichst du im ⋯-Menü des Chats und kannst sie dort mit einem Klick alle pausieren.",
+     "en": "An agent's plans (e.g. the morning briefing) are in the chat's … menu, where you can pause them all with one click."
+    },
+    {
+     "de": "Der Termin-Editor fragt nach, bevor Getipptes beim Schließen verloren geht, und die Zeitzone findest du jetzt unter „Weitere Optionen“ per Stadtsuche.",
+     "en": "The event editor asks before typed input is lost on closing, and the time zone is now under \"More options\" with a city search."
+    }
+   ]
+  },
+  {
    "version": "2.848.0",
    "date": "2026-11-10",
    "items": [
