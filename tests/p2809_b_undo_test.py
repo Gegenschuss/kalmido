@@ -13,6 +13,8 @@ Invented names only.
  - a project's environments (lists/envundo.py): renamed -> undo -> the old name and switch; the webhook alone is no step;
    removed -> undo -> back with the webhook off; removed again, the name taken meanwhile -> undo refused (named)
  - appointment types (calendars/apptundo.py): name and length -> undo from the phone; deleted -> undo -> back
+ - dispatch bookings (hub/dspundo.py): a job of two people changed -> one step, two parts -> undo -> both as before; the job
+   deleted -> undo -> back; redo -> deleted again
  - only own steps: another person neither lists nor takes back a step (404)
 freelancer-matrix: undo (a person without an organisation: her bookmark step goes back from the list)
 usage: p2809_b_undo_test.py <datadir>"""
@@ -237,6 +239,34 @@ g = newest(A)
 res = back(A, g["id"])
 check(r.ok and res.get("undone") == [g["id"]] and [x for x in A.get(B + "/api/appt/types").json().get("types", []) if x["id"] == AT],
       f"undo of the delete: the type is back {res}")
+
+# ---------------------------------------------------------------- bookings of the dispatch board
+r = A.post(B + "/api/team/dispo/bookings", json={"title": "Dreh Beispiel", "start": "2031-07-01", "end": "2031-07-02", "org": ORG,
+                                                 "resources": [{"kind": "user", "id": ALICE}, {"kind": "user", "id": BOB}]})
+check(r.status_code == 201 and len(r.json().get("bookings", [])) == 2, f"(setup) a job with two people {r.status_code} {r.text[:160]}")
+BK = sorted(x["id"] for x in r.json()["bookings"])
+
+
+def bookings():
+    return [dict(x) for x in kt.dbx("SELECT id, title, start, status, deleted_at FROM hub_bookings WHERE id IN (?, ?) ORDER BY id", tuple(BK))]
+
+
+r = A.patch(B + f"/api/team/dispo/bookings/{BK[0]}", json={"title": "Dreh Neu", "start": "2031-07-03", "end": "2031-07-04", "all": True},
+            headers=LAP)
+check(r.ok and all(x["title"] == "Dreh Neu" for x in bookings()), f"the whole job changed on the laptop {r.status_code} {r.text[:120]}")
+g = newest(PHONE)
+check(g.get("kind") == "booking" and g.get("area") == "team" and g.get("parts") == 2 and "Dreh Beispiel" in (g.get("label") or ""),
+      f"one step with a part per booking {g}")
+res = back(PHONE, g["id"])
+check(res.get("undone") == [g["id"]] and all(x["title"] == "Dreh Beispiel" and x["start"] == "2031-07-01" for x in bookings()),
+      f"taken back from the phone: both bookings as before {res} {bookings()}")
+r = A.delete(B + f"/api/team/dispo/bookings/{BK[0]}?all=1")
+check(r.ok and all(x["deleted_at"] for x in bookings()), f"the job deleted {r.status_code}")
+g = newest(A)
+res = back(A, g["id"])
+check(res.get("undone") == [g["id"]] and not any(x["deleted_at"] for x in bookings()), f"undo of the delete: the job is back {res}")
+res = redo(A, g["id"])
+check(res.get("redone") == 2 and all(x["deleted_at"] for x in bookings()), f"redo: both deleted again {res}")
 
 # ---------------------------------------------------------------- only own steps
 g = newest(A)

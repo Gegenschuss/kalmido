@@ -21,7 +21,7 @@ from datetime import date, datetime, timedelta
 from flask import Response, g, jsonify, request
 
 from ..core.config import app, APP_NAME
-from ..core.pg import insert_id
+from ..core.pg import insert_id, write_lock
 from ..core.i18n import dec_comma, lang, tr
 from ..core.db import body, bump, db, iso, local_now, now_utc
 from ..core.access import Denied, need_feat
@@ -426,9 +426,13 @@ def dsp_edit(bid):
         own = [t for t in targets if t["created_by"] == uid]
         skipped, targets = len(targets) - len(own), own
     if v:
+        for t in sorted(targets, key=lambda t: t["id"]):  # 2.809.0 (#5476): the bookings' locks in one order
+            write_lock(c, f"hub_bookings-{t['id']}")
         for t in targets:
+            _dsp_step(c, uid, t["id"])  # 2.809.0 (#5476): one part per booking (hub/dspundo.py), its state after right away
             # 2.589.0 (#4571): a change by hand takes the mark of a newer quotation version off
             c.execute(f"UPDATE hub_bookings SET {', '.join(_q(k) + '=?' for k in v)}, offer_mark='', updated_at=? WHERE id=?", (*v.values(), iso(now_utc()), t["id"]))
+            _dsp_done(c)
         if v.get("status") == "firm":
             for t in targets:
                 if t["status"] != "firm":
@@ -469,11 +473,14 @@ def dsp_fill(bid):
         if k not in DSP_KINDS or pick not in idx:
             raise Denied(404, tr("unknown"))
         label = idx[pick]["name"]
+    write_lock(c, f"hub_bookings-{bid}")  # 2.809.0 (#5476): the person's step (hub/dspundo.py) under the booking's lock
+    _dsp_step(c, uid, bid)
     c.execute("UPDATE hub_bookings SET resource_kind=?, resource_id=?, res_label=?, offer_mark='', updated_at=? WHERE id=?",
               (pick[0], pick[1], label[:200], iso(now_utc()), bid))
     x = dict(_row(c, bid))
     _notify(c, x)
     bump(c)
+    _dsp_done(c)
     c.commit()
     d0, d1 = date.fromisoformat(x["start"][:10]), date.fromisoformat(x["end"][:10])
     return jsonify(booking=dsp_public(x, dsp_conflicts(c, x["org_id"], [x], d0, d1).get(x["id"])))
@@ -491,8 +498,12 @@ def dsp_delete(bid):
     _may_change(c, uid, rows or [r])
     ids = [x["id"] for x in rows]
     now = iso(now_utc())
+    for x in sorted(ids):  # 2.809.0 (#5476): the bookings' locks in one order
+        write_lock(c, f"hub_bookings-{x}")
     for x in ids:
+        _dsp_step(c, uid, x, "delete")  # 2.809.0 (#5476): one part per booking (hub/dspundo.py)
         c.execute("UPDATE hub_bookings SET deleted_at=? WHERE id=?", (now, x))
+        _dsp_done(c)
     bump(c)
     c.commit()
     return jsonify(ids=ids)
@@ -512,10 +523,25 @@ def dsp_restore():
         except (TypeError, ValueError):
             raise BadInput(tr("Invalid data")) from None
         _may_change(c, uid, [r])
+        if r["deleted_at"]:  # 2.809.0 (#5476): the person's step (hub/dspundo.py) under the booking's lock
+            write_lock(c, f"hub_bookings-{r['id']}")
+            _dsp_step(c, uid, r["id"], "restore")
         n += c.execute("UPDATE hub_bookings SET deleted_at=NULL WHERE id=? AND deleted_at IS NOT NULL", (r["id"],)).rowcount
+        _dsp_done(c)
     bump(c)
     c.commit()
     return jsonify(restored=n)
+
+
+def _dsp_step(c, uid, bid, what=None):
+    """2.809.0 (#5476): the undo step of uid's write of booking bid (hub/dspundo.py imports this module)."""
+    from .dspundo import dsu_pre
+    dsu_pre(c, uid, bid, what)
+
+
+def _dsp_done(c):
+    from .dspundo import dsu_post
+    dsu_post(c)
 
 
 @app.get("/api/team/bookings/mine")

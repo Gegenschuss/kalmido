@@ -164,7 +164,7 @@ async function dp_fill(b, v) {
   try {
     const r = await api('POST', `/api/team/dispo/bookings/${b.id}/fill`, want);
     const put = x => async () => { await api('POST', `/api/team/dispo/bookings/${b.id}/fill`, x); dp_reload(); };
-    histAdd({label: tr('Place filled: {0}', b.slot), undo: put(before), redo: put(want)});
+    histAdd({label: tr('Place filled: {0}', b.slot), srv: true, undo: put(before), redo: put(want)});
     dp_reload();
     const nb = r.booking || {};
     toast(nb.conflicts?.length || nb.away ? tr('Filled, with a warning: double booking or away') : nb.kind === 'slot' ? tr('The place is open again') : tr('Filled'));
@@ -193,7 +193,7 @@ function dp_editSheet(b) {
   const del = async (id, all) => {
     try {
       const r = await api('DELETE', `/api/team/dispo/bookings/${id}${all ? '?all=1' : ''}`);
-      const e = histAdd({label: tr('Booking deleted'), undo: async () => { await api('POST', '/api/team/dispo/bookings/restore', {ids: r.ids}); dp_reload(); },
+      const e = histAdd({label: tr('Booking deleted'), srv: true, undo: async () => { await api('POST', '/api/team/dispo/bookings/restore', {ids: r.ids}); dp_reload(); },
         redo: async () => { for (const x of r.ids) await api('DELETE', `/api/team/dispo/bookings/${x}`); dp_reload(); }});
       md.remove(); dp_reload(); offerUndo(tr('Booking deleted'), e);
     } catch { /* api() said it */ }
@@ -212,7 +212,7 @@ function dp_editSheet(b) {
     try {
       const r = await api('PATCH', `/api/team/dispo/bookings/${b.id}`, v);
       const put = x => async () => { await api('PATCH', `/api/team/dispo/bookings/${b.id}`, x); dp_reload(); };
-      histAdd({label: tr('Booking changed'), undo: put(before), redo: put(v)});
+      histAdd({label: tr('Booking changed'), srv: true, undo: put(before), redo: put(v)});
       // 2.360.0 R (#2496): bookings of colleagues in the job stay as they were (only their author or an admin changes them)
       md.remove(); dp_reload(); toast(r?.skipped ? trn('Saved. {0} booking of someone else stays as it was', 'Saved. {0} bookings of others stay as they were', r.skipped) : tr('Saved'));
     } catch { k.disabled = false; /* api() said it */ }

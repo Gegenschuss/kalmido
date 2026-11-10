@@ -597,7 +597,7 @@ ORDER = (
     "events.evundo", "contacts.ctundo", "files.fsundo", "personal.habitundo",  # 2.777.0 (#5254): their steps in the step groups (who may take them back)
     "admin.supporter",  # 2.74.0 (#338): the supporter licence (self-hosted only, a badge, unlocks nothing)
     "admin.operator",  # 2.144.0 D (#797): the hosting operator's interface (off unless a token file is configured)
-    "life.bmundo", "calendars.pollundo", "hub.absundo", "lists.envundo", "calendars.apptundo",  # 2.809.0 (#5476, part B): steps in the step groups (core/undoareas.py)
+    "life.bmundo", "calendars.pollundo", "hub.absundo", "lists.envundo", "calendars.apptundo", "hub.dspundo",  # 2.809.0 (#5476, part B): steps in the step groups (core/undoareas.py)
     "assistant.core",  # 2.75.0 (#1411): the built-in assistant -- configuration, model call, prompts (off unless configured)
     "assistant.web",  # 2.75.0 (#1411): the routes of the built-in assistant
     "admin.worker",  # 2.102.0 D (#1994 / #1997): health numbers, the process role, one runner per background loop
