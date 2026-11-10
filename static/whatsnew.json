@@ -1,6 +1,16 @@
 {
  "versions": [
   {
+   "version": "2.819.0",
+   "date": "2026-11-10",
+   "items": [
+    {
+     "de": "Ordner geben jetzt auch Ansicht, Spalten, eigene Felder, Tags, Erinnerung, Stunden und Stundensatz an ihre Projekte weiter.",
+     "en": "Folders now also pass view, columns, custom fields, tags, reminders, hours and hourly rate to their projects."
+    }
+   ]
+  },
+  {
    "version": "2.787.0",
    "date": "2026-11-10",
    "items": [
