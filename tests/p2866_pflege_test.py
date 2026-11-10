@@ -106,6 +106,29 @@ def f6():
           f"F6: an unknown list role: 400, nothing written {r.status_code}")
 
 
+# ================================================================ F7 a share back with the move back: by_role kept, obj_revoked row gone
+def moved_rows(shid):
+    return [x[0] for x in sql("SELECT id, row_json FROM obj_revoked WHERE src='fs_shares' AND reason='move'") if json.loads(x[1]).get("id") == shid]
+
+
+def f7():
+    r = A.post(B + "/api/files/folders", json={"name": "Dailies F7", "space": f"org:{ORG}"})
+    check(r.status_code == 201, f"F7: setup: a folder of the organisation {r.text[:200]}")
+    nid = r.json()["id"]
+    r = A.post(B + f"/api/files/nodes/{nid}/shares", json={"user_id": ids["bob"], "role": "view"})
+    check(r.status_code == 201, f"F7: setup: shared with bob {r.text[:200]}")
+    shid = r.json()["id"]
+    sql("UPDATE fs_shares SET by_role='member' WHERE id=?", (shid,), write=True)  # made by a member (alice moves it: admin)
+    r = A.post(B + "/api/files/move-space", json={"ids": [nid], "to": "private", "parent": None})
+    check(r.ok and not sql("SELECT 1 FROM fs_shares WHERE node_id=?", (nid,)), f"F7: moved into the private space: the share ends {r.text[:200]}")
+    check(len(moved_rows(shid)) == 1, "F7: it is in obj_revoked (reason move)")
+    r = A.post(B + "/api/files/move-space", json={"ids": [nid], "to": f"org:{ORG}", "parent": None})
+    check(r.ok and r.json().get("restored", 0) >= 1, f"F7: moved back: the memo brings the share back {r.text[:200]}")
+    back = sql("SELECT user_id, role, by_role FROM fs_shares WHERE node_id=?", (nid,))
+    check(back == [(ids["bob"], "view", "member")], f"F7: the share is back with by_role of who made it, not of who moved it {back}")
+    check(moved_rows(shid) == [], f"F7: its obj_revoked row of the move is gone (no second way back) {moved_rows(shid)}")
+
+
 # ================================================================ setup
 kt.fresh({"KALMIDO_INSTANCE_MODE": "workspaces"}, prefix="P2866")
 kt.docker_logs_on_first_fail()
@@ -139,6 +162,7 @@ check(FOFF, "setup: frida's personal office")
 f5("alice", A)
 f5("frida", Fr)
 f6()
+f7()
 # -- more parts below --
 
 raise SystemExit(kt.done("p2866_pflege"))
