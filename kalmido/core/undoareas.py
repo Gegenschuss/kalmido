@@ -20,7 +20,7 @@ Interface:
   ua_trash_fix(table, rid, was, on_restore, on_trash) -> fix(c)   the area's own trash / restore after the flag went back"""
 from .i18n import N_
 from .pg import qi, table_columns
-from .undogroups import undo_label
+from .undogroups import ug_gc, undo_label
 from .writes import obj_undo_post, obj_undo_pre
 
 UA_MOVED = N_("Moved: {0}")
@@ -68,3 +68,23 @@ def ua_trash_fix(table, rid, was, on_restore=None, on_trash=None, cols=("deleted
             c.execute(f"UPDATE {qi(table, UA_TABLES)} SET {', '.join(qi(k, cols_now) + '=NULL' for k in cols)} WHERE id=?", (int(rid),))
             on_trash(c, c.execute(f"SELECT * FROM {qi(table, UA_TABLES)} WHERE id=?", (int(rid),)).fetchone())
     return fix
+
+
+def ua_done(c):
+    """2.809.0 (#5476): ua_post, and a step that changed nothing (its copy after = before: a save of the same values) goes
+    again, with its group when that is left without parts. -> the request's group id when the step stayed, else None."""
+    from flask import g, has_request_context
+    st = g.get("obj_undo_step") if has_request_context() else None
+    ua_post(c)
+    if not st:
+        return None
+    r = c.execute("SELECT fp_before, fp_after, group_id, sess FROM obj_undo WHERE id=?", (st[0],)).fetchone()
+    if r is None:
+        return None
+    if r["fp_before"] == r["fp_after"] and not r["sess"]:
+        c.execute("DELETE FROM obj_undo WHERE id=?", (st[0],))
+        ug_gc(c, [r["group_id"]])
+        if r["group_id"] and not c.execute("SELECT 1 FROM undo_groups WHERE id=?", (r["group_id"],)).fetchone():
+            g.undo_group = None  # gone: a later step of the request opens a new one
+        return None
+    return r["group_id"]

@@ -451,6 +451,8 @@ def list_update(lid):
     role = need_list(c, lid, write=False)
     lv0 = lv_check(c, lid, role, b)  # 2.657.0 (#5052): the settings' version under the project's lock
     b = {k: v for k, v in b.items() if k != "expect_updated_at"}
+    from .lpundo import lpu_post, lpu_pre
+    lpu_pre(c, me(), lid, b, role)  # 2.809.0 (#5476): a change of plain settings is a step of the person's undo list
     if qn_is(c, lid) and qn_shares(b):  # 2.477.0 (#3881): the list "Notes" stays private (no workspace, folder, agents, family)
         qn_private(c, lid)
     pz_has, pz_prev, pz_out = False, None, {}  # 2.528.0 B (#4305, A10): the properties merged key by key (oxb_props_merge)
@@ -705,9 +707,10 @@ def list_update(lid):
     if lh0 is not None:  # 2.568.0 (#4739): before / after in the core's history (an agent's change is marked)
         lmc_history(c, me(), lid, lh0, lmc_snap(c, lid, lh_keys))
     lv1 = lv_after(c, lid, lv0)  # 2.657.0 (#5052): a new version when the project's row changed
+    ug = lpu_post(c)  # 2.809.0 (#5476): the server lists the step (the app marks its own entry srv)
     bump(c)
     c.commit()
-    return jsonify(ok=True, conflicts=conflicts, updated_at=lv1, **pt_out, **pz_out)
+    return jsonify(ok=True, conflicts=conflicts, updated_at=lv1, **pt_out, **pz_out, **({"undo_group": ug} if ug else {}))
 
 
 @app.post("/api/lists/reorder")

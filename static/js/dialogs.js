@@ -376,6 +376,7 @@ async function listPatch(id, body, label, o = {}) {
     if (e) { HIST.undo = HIST.undo.filter(x => x !== e); renderHist(); }
     run(); return false;
   }
+  if (e && res?.undo_group) e.srv = true;  // 2.809.0 (#5476): the server lists the step ("Recent steps" shows its row, not "only this device")
   const cf = (res?.conflicts || []).map(c => c.field);  // 2.270.0 A (#3019): changed elsewhere meanwhile: kept, said, not in the undo step
   if (cf.length) {
     for (const k of cf) { delete before[k]; delete after[k]; }
