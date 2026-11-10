@@ -18012,6 +18012,7 @@
   "The field is not where this step left it, so it cannot be undone": "Het veld is niet meer zoals deze stap het achterliet, daarom kan dit niet ongedaan worden gemaakt",
   "An option this would remove holds values now, so it cannot be undone": "Een optie die zou verdwijnen bevat nu waarden, daarom kan dit niet ongedaan worden gemaakt",
   "The sprint is not where this step left it, so it cannot be undone": "De sprint is niet meer zoals deze stap hem achterliet, daarom kan dit niet ongedaan worden gemaakt",
+  "The folder is not where this step left it, so it cannot be undone": "De map is niet meer zoals deze stap hem achterliet, daarom kan dit niet ongedaan worden gemaakt",
   "Mark booking": "Boeking markeren",
   "Private withdrawal or deposit: neither expense nor income of the business": "Privéopname of -storting: geen uitgave of inkomst van het bedrijf",
   "A business payment without a receipt, e.g. bank fees or tax: it counts in the books": "Zakelijke betaling zonder bon, bijv. bankkosten of belasting: telt mee in de boekhouding",

@@ -603,6 +603,7 @@ ORDER = (
     "lists.tplundo",  # 2.809.0 (#5476): renaming / trashing a template in the step groups
     "lists.sprundo",  # 2.809.0 (#5476): a project's sprints in the step groups
     "life.budundo",  # 2.809.0 (#5476): the budget's entries in the step groups
+    "lists.foldundo",  # 2.809.0 (#5476): renaming / moving a sidebar folder in the step groups
     "admin.supporter",  # 2.74.0 (#338): the supporter licence (self-hosted only, a badge, unlocks nothing)
     "admin.operator",  # 2.144.0 D (#797): the hosting operator's interface (off unless a token file is configured)
     "life.bmundo", "calendars.pollundo", "hub.absundo", "lists.envundo",  # 2.809.0 (#5476, part B): steps in the step groups

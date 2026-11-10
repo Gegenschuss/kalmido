@@ -17,6 +17,7 @@ Invented names only.
    sprint comes back
  - budget entries (life/budundo.py): a change goes back from the phone (old title and amount) and forward; into the trash ->
    undo -> back, redo -> trash
+ - folders (lists/foldundo.py): a rename goes back from the phone and forward; a merge into an existing folder records no step
  - a project's settings (lists/lpundo.py): a rename + colour on the laptop is listed on the phone (area tasks, kind listset,
    label with the old name, device, the answer names its group) and goes back from there; redo; archiving -> undo -> out of
    the archive; a save of the same values and a save with a folder (side effects) record no step; a new sidebar order since
@@ -364,6 +365,22 @@ check(res.get("undone") == [g["id"]] and A.get(B + f"/api/budget/entries/{BE}").
 r = A.post(B + f"/api/undo/{g['id']}/redo")
 check(r.ok and A.get(B + f"/api/budget/entries/{BE}").status_code == 404, f"redo: in the trash again {r.status_code} {r.text[:120]}")
 check(Bo.post(B + f"/api/undo/to/{g['id']}").status_code == 404, "another person cannot take it back (404)")
+
+# ---------------------------------------------------------------- folders: rename / move
+r = A.post(B + "/api/lists", json={"name": "Im Ordner", "folder": "Mappe Eins"})
+FDL = r.json()["id"]
+r = A.post(B + "/api/folders/rename", json={"old": "Mappe Eins", "new": "Mappe Zwei"}, headers=LAP)
+check(r.ok and r.json().get("undo_group") and lrow(A, FDL).get("folder") == "Mappe Zwei", f"a folder renamed: a step {r.status_code} {r.text[:120]}")
+g = newest(PHONE)
+res = back(PHONE, g["id"])
+check(g.get("kind") == "folder_path" and "Mappe Zwei" in (g.get("label") or "") and res.get("undone") == [g["id"]]
+      and lrow(A, FDL).get("folder") == "Mappe Eins", f"taken back from the phone: the old folder name {res} {lrow(A, FDL).get('folder')}")
+r = PHONE.post(B + f"/api/undo/{g['id']}/redo")
+check(r.ok and lrow(A, FDL).get("folder") == "Mappe Zwei", f"redo: the new name again {r.status_code}")
+A.post(B + "/api/lists", json={"name": "Anderer Ordner", "folder": "Mappe Drei"})
+before = newest(A).get("id")
+r = A.post(B + "/api/folders/rename", json={"old": "Mappe Zwei", "new": "Mappe Drei"})
+check(r.ok and not r.json().get("undo_group") and newest(A).get("id") == before, f"a merge into an existing folder records no step {newest(A)}")
 
 # freelancer-matrix
 r = Fr.post(B + "/api/lists", json={"name": "Frida Projekt", "color": "#3366cc"})

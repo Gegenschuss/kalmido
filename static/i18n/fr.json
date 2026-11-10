@@ -18012,6 +18012,7 @@
   "The field is not where this step left it, so it cannot be undone": "Le champ n'est plus tel que cette étape l'a laissé, il ne peut donc pas être annulé",
   "An option this would remove holds values now, so it cannot be undone": "Une option qui serait retirée contient maintenant des valeurs, cela ne peut donc pas être annulé",
   "The sprint is not where this step left it, so it cannot be undone": "Le sprint n'est plus tel que cette étape l'a laissé, il ne peut donc pas être annulé",
+  "The folder is not where this step left it, so it cannot be undone": "Le dossier n'est plus tel que cette étape l'a laissé, il ne peut donc pas être annulé",
   "Mark booking": "Marquer l'opération",
   "Private withdrawal or deposit: neither expense nor income of the business": "Prélèvement ou apport privé : ni dépense ni recette de l'entreprise",
   "A business payment without a receipt, e.g. bank fees or tax: it counts in the books": "Paiement professionnel sans justificatif, p. ex. frais bancaires ou impôts : compte dans la comptabilité",

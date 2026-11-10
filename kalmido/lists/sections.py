@@ -188,10 +188,13 @@ def folder_rename():
     below = max([p.count(FOLDER_SEP) - old.count(FOLDER_SEP) for p in _folder_paths(c, uid) if folder_under(p, old)] or [0])
     if new.count(FOLDER_SEP) + 1 + below > FOLDER_DEPTH:
         return err(tr("Folders nest at most {0} levels deep", FOLDER_DEPTH))
+    merged = any(p == new or folder_under(p, new) for p in _folder_paths(c, uid))  # 2.809.0 (#5476): into an existing folder
     folder_rename_do(c, uid, old, new)
+    from .foldundo import fpu_add  # 2.809.0 (#5476): a step of the person's undo list (not a merge)
+    ug = fpu_add(c, uid, old, new, merged)
     bump(c)
     c.commit()
-    return jsonify(ok=True)
+    return jsonify(ok=True, **({"undo_group": ug} if ug else {}))
 
 
 def folder_rename_do(c, uid, old, new):
