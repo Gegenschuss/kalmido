@@ -20,10 +20,15 @@
 .cpal.inline{grid-template-columns:repeat(9,1.5rem);padding:0}
 .cpal button{width:1.5rem;height:1.5rem;border-radius:50%;background:var(--cc);border:2px solid transparent}
 .cpal button.on{box-shadow:0 0 0 2px var(--bg2),0 0 0 .25rem var(--cc)}
+@media (pointer:coarse),(max-width:767px){
+  .cpal,.cpal.inline{grid-template-columns:repeat(5,2.75rem);gap:.25rem}
+  .cpal button{width:2.75rem;height:2.75rem;padding:0;background:radial-gradient(circle,var(--cc) 0 .8125rem,transparent .875rem);box-shadow:none}
+  .cpal button.on{box-shadow:inset 0 0 0 2px var(--cc)}
+}
 #ca-cals{margin:.25rem 0 .5rem}
 #ca-cals .shint{grid-column:1/-1}
 @media (max-width:767px) {
-  .cpal.inline{grid-template-columns:repeat(5,1.5rem)}
+  .cpal.inline{grid-template-columns:repeat(5,2.75rem)}  /* 2.828.0 (#5464): 44 px swatches */
 }
 .evghost{position:absolute;left:2px;right:2px;background:var(--accent-soft);border:1px dashed var(--accent);border-radius:.3125rem;font:var(--fs-xs) var(--mono);padding:1px .25rem;z-index:2;pointer-events:none}
 /* 2.94.0 B (#1929): appointment booking (prefix apb-) */
@@ -140,4 +145,36 @@ button.cyd:hover{background:var(--bg2)}
   .tl-cal .tl-name{white-space:normal}
   .tl-cal .cvxtln .tln,.tl-cal .tl-name>.tln{white-space:normal;overflow-wrap:anywhere;line-height:var(--lh-tight);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;line-clamp:3;font-size:var(--fs-xs)}
   .tl-cal .cvxtlm{width:1.25rem;min-width:1.25rem}
+}
+/* 2.828.0 (#5464): the "Calendars" window (calevents.js evCalsModal). The switch columns are as wide as their heads, which may
+   wrap but are never cut; a phone shows one column "Show" (Today / Plan are in the row's menu) and the names in full, wrapped */
+.evcmodal{--cvxw:4.75rem}
+.evcmodal .cvxhead{text-transform:none;letter-spacing:0;align-items:flex-end;padding-bottom:.125rem}
+.evcmodal .cvxhead .cvxc{flex:none;width:var(--cvxw);overflow:visible;white-space:normal;text-overflow:clip;text-align:center;line-height:var(--lh-tight);overflow-wrap:normal;hyphens:auto}
+.evcmodal .cvxhead .cvxm{width:2.75rem}
+.evcmodal .cvxhead .cvxnarrow{display:none}
+.evcmodal .cvxrow>.swc.cvx-show,.evcmodal .cvxrow>.swc.cvx-today,.evcmodal .cvxrow>.swc.cvx-plan,.evcmodal .cvxrow>.swc.cvx-tasks,
+.evcmodal .evcrow>.swc.cvx-show,.evcmodal .evcrow>.swc.cvx-today,.evcmodal .evcrow>.swc.cvx-plan,.evcmodal .cvxpad,.evcmodal .abcrow>.swc,.evcmodal .abcrow .abcsw{width:var(--cvxw);justify-content:center}
+.evcmodal .cvxpad{flex:none;display:inline-block}
+.evcmodal .cvxrow>.swc .swt,.evcmodal .evcrow>.swc .swt{width:2.25rem;flex:none}
+.evcmodal .cvxrow>.iconbtn,.evcmodal .evcrow>.iconbtn{flex:none;width:2.75rem;min-width:2.75rem}
+.evcmodal .cvxtasks .cvxfold{width:2.75rem;height:2.75rem;min-width:2.75rem;min-height:2.75rem}
+.evcmodal .cvxtasks .cvxfold svg{transform:none}
+.evcmodal .cvxtasks .cvxfold[aria-expanded="true"]{color:var(--accent);background:var(--bg3)}
+.evcrowbtn{display:flex;align-items:center;gap:.5rem;width:100%;min-height:2.75rem;padding:.25rem .375rem;border:0;border-radius:var(--radius);background:none;color:var(--text2);font:inherit;font-size:var(--fs-m);text-align:left;cursor:pointer}
+.evcrowbtn:hover,.evcrowbtn:focus-visible{background:var(--bg2);color:var(--text)}
+.evcrowbtn>span{flex:1;min-width:0}
+.evcrowbtn.evctrbtn>svg:last-child{transition:transform .15s;color:var(--muted)}
+.evcrowbtn.evctrbtn[aria-expanded="true"]>svg:last-child{transform:rotate(90deg)}
+.evcfoot{flex-wrap:wrap;row-gap:.5rem;align-items:center}
+.evclinks{display:flex;flex-wrap:wrap;gap:.25rem 1rem;min-width:0}
+.evclinks .linkbtn{font-size:var(--fs-s);color:var(--text2);text-decoration-color:var(--line2);min-height:2rem}
+.evclinks .linkbtn:hover,.evclinks .linkbtn:focus-visible{color:var(--accent)}
+@media (max-width:599px){
+  .evcmodal .cvx-today,.evcmodal .cvx-plan,.evcmodal .cvxpad,.evcmodal .abcrow .abcsw{display:none}
+  .evcmodal .cvxhead .cvxwide{display:none}
+  .evcmodal .cvxhead .cvxnarrow{display:inline}
+  .evcmodal .evcrow .evcn,.evcmodal .cvxrow:not(.sub):not(.cvfrow) .evcn{white-space:normal;overflow-wrap:anywhere;line-height:var(--lh-tight)}
+  .evcfoot .evclinks{flex:1 1 100%}
+  .evcfoot .btn.pri{flex:1 1 100%;justify-content:center;min-height:2.75rem}
 }

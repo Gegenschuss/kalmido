@@ -605,19 +605,25 @@ async function evCalsModal() {
   // calendars, then the subscriptions; each calendar row has three switches: in my calendar (evcals.hidden /
   // cal_subs.visible, the same field as in the settings), on Today (today_cals_hidden) and when planning (plan_cals_off).
   // On a phone the dialog is the usual sheet from below.
+  // 2.828.0 (#5464): readable column heads (Calendar / Today / Plan, never cut), on a phone one switch "Show" per calendar and the
+  // other two in its "…" menu; "Done" closes as the main button, the side paths are quiet links, "New calendar" and the trash
+  // are rows at the end of my calendars, "Tasks with a date" a row like the others (its "…" opens the projects)
   let users = [];
   if (collab()) users = await evPeople();
+  await loadCss('calendar').catch(() => {});  // the window's styles (calendar.css), also when it opens outside the calendar
   const md = modal(`<div class="lhdr"><h3>${ic('cal', 's')} ${tr('Calendars')}</h3><span class="spacer"></span><button class="iconbtn" data-evc="close" aria-label="${tr('Close')}">${ic('x')}</button></div><div id="evc-body"></div>
-    <div class="foot">${feat('events') ? `<button class="btn" data-evc="phone">${ic('phone', 's')} ${tr('On the phone…')}</button>` : ''}${feat('events') && !S.me?.kid ? `<button class="btn" data-evc="booking">${ic('link', 's')} ${tr('Booking page…')}</button>` : ''}<span class="spacer"></span>${S.calendars?.enabled ? `<button class="btn" data-evc="subs">${ic('gear', 's')} ${tr('Subscriptions…')}</button>` : ''}${feat('events') ? `<button class="btn pri" data-evc="new">${ic('plus', 's')} ${tr('New calendar')}</button>` : ''}</div>`);
+    <div class="foot evcfoot"><span class="evclinks">${feat('events') ? `<button type="button" class="linkbtn" data-evc="phone">${tr('On the phone…')}</button>` : ''}${feat('events') && !S.me?.kid ? `<button type="button" class="linkbtn" data-evc="booking">${tr('Booking page…')}</button>` : ''}${S.calendars?.enabled ? `<button type="button" class="linkbtn" data-evc="subs">${tr('Subscriptions…')}</button>` : ''}</span><span class="spacer"></span><button type="button" class="btn pri" data-evc="done">${tr('Done')}</button></div>`);
   md.classList.add('evcmodal');
+  const narrow = () => matchMedia('(max-width: 599px)').matches;  // a phone: one switch per row, Today / Plan in the menu
   const st = {lists: false, trash: null};  // 2.566.0 (#4707): trash = the calendars in the trash once opened
-  const sw = (key, kind, on, dis, label) => `<label class="swc ${dis ? 'off' : ''}" title="${esc(label)}"><input type="checkbox" data-cvx="${kind}" data-key="${key}" ${on ? 'checked' : ''} ${dis ? 'disabled' : ''}><span class="swt" aria-hidden="true"></span><span class="sr">${esc(label)}</span></label>`;
+  const sw = (key, kind, on, dis, label) => `<label class="swc cvx-${/*html-ok*/ kind /* a constant of this file */} ${dis ? 'off' : ''}" title="${esc(label)}"><input type="checkbox" data-cvx="${kind}" data-key="${key}" ${on ? 'checked' : ''} ${dis ? 'disabled' : ''}><span class="swt" aria-hidden="true"></span><span class="sr">${esc(label)}</span></label>`;
   const three = c => {  // Today + planning (off while the calendar is hidden: hidden = gone from Today and the planner too)
     const off = !c.on;
     return sw(c.key, 'today', c.on && !cvxList('today_cals_hidden').includes(c.key), off, tr('Show {0} on Today', c.name))
       + sw(c.key, 'plan', c.on && !cvxList('plan_cals_off').includes(c.key), off, tr('Consider {0} when planning', c.name));
   };
-  const head = `<div class="cvxhead"><span class="cvxhn"></span><span title="${esc(tr('In my calendar'))}">${tr('Calendar|col')}</span><span title="${esc(tr('On Today'))}">${tr('Today')}</span><span title="${esc(tr('When planning'))}">${tr('Plan|col')}</span></div>`;
+  const pad = '<span class="cvxpad" aria-hidden="true"></span>';  // an empty cell of the Today / Plan columns
+  const head = `<div class="cvxhead"><span class="cvxhn"></span><span class="cvxc cvx-show" title="${esc(tr('In my calendar'))}"><span class="cvxwide">${tr('Calendar|col')}</span><span class="cvxnarrow">${tr('Show')}</span></span><span class="cvxc cvx-today" title="${esc(tr('On Today'))}">${tr('Today')}</span><span class="cvxc cvx-plan" title="${esc(tr('When planning'))}">${tr('Plan|col')}</span><span class="cvxc cvxm" aria-hidden="true"></span></div>`;
   const draw = () => {
     const cs = S.evcals || [], hidL = cvxList('cal_lists_hidden'), hidF = cvxList('cal_folders_hidden'), tasksOn = S.settings.cal_tasks !== '0';
     const lists = [...S.lists.filter(l => !l.archived && !l.is_inbox), ...S.lists.filter(l => !l.archived && l.is_inbox)];
@@ -625,29 +631,34 @@ async function evCalsModal() {
     // tasks: one switch for all dated tasks, fold-out: one per list (the lists are only listed, never changed here);
     // 2.624.0 (#3946): grouped by folder like the sidebar (own lists first, then folder by folder, subfolders indented, the
     // inbox last), a switch per folder (cal_folders_hidden: its lists and subfolders off, also later ones); from 8 lists a search
-    const tl = `<div class="cvxgrp">${tr('Tasks')}</div><div class="cvxrow" style="--cc:var(--accent)">
-      ${sw('tasks', 'tasks', tasksOn, false, tr('Show tasks in my calendar'))}<i class="cevdot"></i><span class="evcn">${tr('Tasks with a date')}${nOff && tasksOn ? `<span class="muted"> · ${esc(trn('{0} project hidden', '{0} projects hidden', nOff))}</span>` : ''}</span>
-      <button class="iconbtn cvxfold" data-evc="lists" aria-expanded="${st.lists}" aria-label="${esc(tr('Per project'))}" title="${esc(tr('Per project'))}">${ic('right', 's')}</button></div>
+    const tl = `<div class="cvxgrp">${tr('Tasks')}</div>${/*html-ok*/ head /* tr() only */}<div class="cvxrow cvxtasks" style="--cc:var(--accent)">
+      <i class="cevdot"></i><span class="evcn">${tr('Tasks with a date')}${nOff && tasksOn ? `<span class="muted"> · ${esc(trn('{0} project hidden', '{0} projects hidden', nOff))}</span>` : ''}</span>
+      ${sw('tasks', 'tasks', tasksOn, false, tr('Show tasks in my calendar'))}${/*html-ok*/ pad + pad /* constant markup */}<button class="iconbtn cvxfold" data-evc="lists" aria-expanded="${st.lists}" aria-label="${esc(tr('Per project'))}" title="${esc(tr('Per project'))}">${ic('dots')}</button></div>
       ${st.lists ? cvf_lists(lists, hidL, hidF, tasksOn, sw, st.q) : ''}`;
-    const own = !feat('events') ? '' : `<div class="cvxgrp">${tr('My calendars')}</div>${cs.length ? head + `<ul class="evclist">${cs.map(c => `<li class="evcrow" style="--cc:${cssColor(c.color) || 'var(--accent)'}">
+    const own = !feat('events') ? '' : `<div class="cvxgrp">${tr('My calendars')}</div>${cs.length ? `<ul class="evclist">${cs.map(c => `<li class="evcrow" style="--cc:${cssColor(c.color) || 'var(--accent)'}">
       <i class="cevdot"></i><span class="evcn">${esc(c.name)}${wsOn() && c.role === 'owner' ? `<span class="muted wslbl"> · ${esc(wsLabel(c.org_id))}</span>` : ''}${c.role !== 'owner' ? `<span class="muted"> · ${esc(c.owner_name || '')} · ${esc(c.role === 'edit' ? tr('can edit') : tr('can view'))}</span>` : c.members?.length ? `<span class="muted"> · ${esc(trn('shared with {0} person', 'shared with {0} people', c.members.length))}</span>` : ''}</span>
-      <label class="swc" title="${esc(tr('Show in my calendar'))}"><input type="checkbox" data-evcshow="${c.id}" ${c.hidden ? '' : 'checked'}><span class="swt" aria-hidden="true"></span><span class="sr">${esc(tr('Show {0} in my calendar', c.name))}</span></label>
+      <label class="swc cvx-show" title="${esc(tr('Show in my calendar'))}"><input type="checkbox" data-evcshow="${c.id}" ${c.hidden ? '' : 'checked'}><span class="swt" aria-hidden="true"></span><span class="sr">${esc(tr('Show {0} in my calendar', c.name))}</span></label>
       ${three({key: `e:${c.id}`, name: c.name, on: !c.hidden})}
       <button data-rowmenu="evcrow" class="iconbtn" data-evcmenu="${c.id}" aria-haspopup="menu" aria-label="${esc(tr('More for {0}', c.name))}" title="${esc(tr('More'))}">${ic('dots')}</button></li>`).join('')}</ul>`
-      : `<p class="muted">${tr('No calendar yet. A new event creates one.')}</p>`}`;
+      : `<p class="muted">${tr('No calendar yet. A new event creates one.')}</p>`}
+      <button type="button" class="evcrowbtn" data-evc="new">${ic('plus', 's')}<span>${tr('New calendar')}</span></button>`;
     const subs = cvxVisibleCals(true).filter(c => !c.own);
-    const sb = !S.calendars?.enabled ? '' : `<div class="cvxgrp">${tr('Subscriptions')}</div>${subs.length ? (cs.length && feat('events') ? '' : head) + subs.map(c => `<div class="cvxrow" style="--cc:${cssColor(c.color)}">
+    const sb = !S.calendars?.enabled ? '' : `<div class="cvxgrp">${tr('Subscriptions')}</div>${subs.length ? subs.map(c => `<div class="cvxrow" style="--cc:${cssColor(c.color)}">
       <i class="cevdot"></i><span class="evcn">${esc(c.name)}</span>${sw(c.key, 'show', c.on, false, tr('Show {0} in my calendar', c.name))}${three(c)}
       <button data-rowmenu="cvxrow" class="iconbtn" data-cvxmenu="${c.key}" data-name="${esc(c.name)}" aria-haspopup="menu" aria-label="${esc(tr('More for {0}', c.name))}" title="${esc(tr('More'))}">${ic('dots')}</button></div>`).join('')
       : `<p class="muted">${tr('No subscriptions yet. Add one under Settings > Integrations > Calendars.')}</p>`}`;
     // 2.566.0 (#4707): the calendars in the trash (the shared core's trash): opened on demand, restore with their events
-    const tr2 = !feat('events') ? '' : `<button type="button" class="btn sm evctrbtn" data-evc="trash" aria-expanded="${!!st.trash}">${ic('trash', 's')} ${tr('Trash')}</button>${!st.trash ? ''
+    const tr2 = !feat('events') ? '' : `<button type="button" class="evcrowbtn evctrbtn" data-evc="trash" aria-expanded="${!!st.trash}">${ic('trash', 's')}<span>${tr('Trash')}</span>${ic('right', 's')}</button>${!st.trash ? ''
       : st.trash.items.length ? `<ul class="evclist evctrash" aria-label="${esc(tr('Trash'))}">${st.trash.items.map(c => `<li class="evcrow" style="--cc:${cssColor(c.color) || 'var(--accent)'}"><i class="cevdot"></i><span class="evcn">${esc(c.name)}<span class="muted"> · ${esc(trn('{0} event', '{0} events', c.events))} · ${esc(tr('In the trash since {0}', fmtDate((c.deleted_at || '').slice(0, 10))))}</span></span><button type="button" class="btn sm" data-evctr="${c.id}">${ic('undo', 's')} ${tr('Restore')}</button></li>`).join('')}</ul>`
       : `<p class="muted">${tr('The trash is empty')}</p>`}${st.trash?.trash_days ? `<p class="muted">${esc(trashNote(tr('Calendars in the trash are deleted permanently after {0} days, with their events.', st.trash.trash_days)))}</p>` : ''}`;
     $('#evc-body', md).innerHTML = tl + own + tr2 + sb + (typeof abc_group === 'function' ? abc_group() : '');  // 2.155.0 B (#2076)
     cvf_filter(md, st.q);  // 2.624.0 (#3946)
   };
   const redraw = () => { cvxRedraw(); draw(); };
+  // 2.828.0 (#5464): a phone's row menu carries the switches "On Today" and "When planning" (ticked = on; off while hidden)
+  const cvxNarrowItems = (key, on) => !narrow() ? [] : [
+    {label: tr('On Today'), icon: 'sun', on: on && !cvxList('today_cals_hidden').includes(key), dis: !on, fn: async () => { await cvxOff('today_cals_hidden', key, !cvxList('today_cals_hidden').includes(key)); draw(); renderView(); }},
+    {label: tr('When planning'), icon: 'clock', on: on && !cvxList('plan_cals_off').includes(key), dis: !on, fn: async () => { await cvxOff('plan_cals_off', key, !cvxList('plan_cals_off').includes(key)); draw(); }}, '-'];
   const refresh = async () => { await load().catch(() => {}); await cvxCals(true).catch(() => {}); redraw(); };
   md.addEventListener('input', e => { if (e.target.matches?.('[data-cvfq-in]')) { st.q = e.target.value; cvf_filter(md, st.q); } });  // 2.624.0 (#3946)
   md.addEventListener('change', async e => {
@@ -670,7 +681,7 @@ async function evCalsModal() {
     const sm = e.target.closest('[data-cvxmenu]');
     if (sm) {
       const key = sm.dataset.cvxmenu;
-      menu(sm, [{label: tr('Only this calendar'), icon: 'eye', fn: async () => { await cvxOnly(key); draw(); }},
+      menu(sm, [...cvxNarrowItems(key, cvxVisibleCals(true).find(x => x.key === key)?.on !== false), {label: tr('Only this calendar'), icon: 'eye', fn: async () => { await cvxOnly(key); draw(); }},
         {label: tr('Show all calendars'), icon: 'all', fn: async () => { await cvxAll(); draw(); }}, ...(typeof spl_item === 'function' ? spl_item('#cal') : []) /* 2.742.0 (#4858) */, '-',
         {label: tr('Subscriptions…'), icon: 'gear', sub: tr('Settings > Integrations > Calendars'), fn: () => { md.remove(); settingsModal('calendars'); }}]);
       return;
@@ -679,7 +690,7 @@ async function evCalsModal() {
     if (m) {
       const c = evCal(+m.dataset.evcmenu); if (!c) return;
       const own = c.role === 'owner';
-      menu(m, [own && {label: tr('Rename…'), icon: 'edit', fn: async () => { const n = await askPrompt(tr('Rename the calendar'), c.name, {input: {max: 100}}); if (n && n.trim()) evCalRename(c.id, n.trim(), redraw); }},  // 2.46.2 (#1659): at once
+      menu(m, [...cvxNarrowItems(`e:${c.id}`, !c.hidden), own && {label: tr('Rename…'), icon: 'edit', fn: async () => { const n = await askPrompt(tr('Rename the calendar'), c.name, {input: {max: 100}}); if (n && n.trim()) evCalRename(c.id, n.trim(), redraw); }},  // 2.46.2 (#1659): at once
         own && {label: tr('Colour…'), icon: 'palette', next: 1, fn: () => calColorPop(m, LCOLORS.filter(Boolean), c.color, async col => { try { await evcPatch(c.id, {color: col}); } catch { return; } refresh(); })},
         own && wsOn() && {label: tr('Workspace…'), icon: 'brief', next: 1, fn: () => wsMoveMenu(m, c.org_id, async org => { try { await evcPatch(c.id, {org_id: org}); } catch { return; } refresh(); })},
         own && collab() && {label: tr('Share…'), icon: 'users', fn: () => evShareModal(c, users, refresh)},
@@ -701,7 +712,7 @@ async function evCalsModal() {
     }
     const b = e.target.closest('[data-evc]'); if (!b) return;
     if (b.dataset.evc === 'trash') { st.trash = st.trash ? null : await api('GET', '/api/evcals/trash').catch(() => ({items: []})); draw(); return; }
-    if (b.dataset.evc === 'close') md.remove();
+    if (b.dataset.evc === 'close' || b.dataset.evc === 'done') md.remove();
     if (b.dataset.evc === 'lists') { st.lists = !st.lists; draw(); }
     if (b.dataset.evc === 'phone') { md.remove(); settingsModal('caldav'); }  // 2.365.2 B (#2789): the steps live in Settings > Integrations
     if (b.dataset.evc === 'booking') { md.remove(); apbOpen(); }  // 2.94.0 B (#1929): apptbook.js (lazy module calendar)

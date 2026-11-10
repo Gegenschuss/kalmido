@@ -294,10 +294,11 @@ const utc = (d, h) => { const x = new Date(`${d}T${String(h).padStart(2, '0')}:0
     console.log(tag + ': window ' + await ev(`(document.querySelector('#evc-body')?.textContent || '').slice(0, 200)`));
     const s2 = await ev(`(() => { const c = document.querySelector('.modal.evcmodal .card'), r = c.getBoundingClientRect();
       const rows = [...c.querySelectorAll('.cvxrow:not(.sub), .evcrow')].map(x => Math.round(x.getBoundingClientRect().height));
-      const sw = [...c.querySelectorAll('.swc input')].map(x => { const b = x.getBoundingClientRect(); return [Math.round(b.width), Math.round(b.height)]; });
+      // 2.828.0 (#5464): on a phone a row shows one switch ("Show"), Today / Plan sit in its menu: only the shown switches count
+      const sw = [...c.querySelectorAll('.swc input')].filter(x => x.closest('.swc').offsetParent).map(x => { const b = x.getBoundingClientRect(); return [Math.round(b.width), Math.round(b.height)]; });
       return {bottom: Math.round(innerHeight - r.bottom), width: Math.round(r.width), rows, sw, fits: c.scrollWidth <= c.clientWidth + 1}; })()`);
     check(s2.bottom <= 2 && s2.width >= 380, `${tag}: the window is a sheet from below ` + JSON.stringify([s2.bottom, s2.width]));
-    check(s2.rows.length >= 5 && s2.rows.every(h => h >= 44) && s2.sw.every(([ww, h]) => ww >= 24 && h >= 24) && s2.fits, `${tag}: rows >= 44 px, switch targets >= 24 px, nothing cut ` + JSON.stringify(s2));
+    check(s2.rows.length >= 5 && s2.rows.every(h => h >= 44) && s2.sw.length >= 4 && s2.sw.every(([ww, h]) => ww >= 24 && h >= 24) && s2.fits, `${tag}: rows >= 44 px, switch targets >= 24 px, nothing cut ` + JSON.stringify(s2));
     await shot('p2361a-390-calendars.png');
   }, true);
   // desktop: the same bars, nothing outside

@@ -59,8 +59,16 @@ function calVis(md, id, inp) {
   };
   evOpt(put, () => api('PATCH', `/api/calendars/${id}`, {visible: on}), () => {}).then(() => { calInvalidate(); calsDraw(md); }, () => { inp.checked = !on; calsDraw(md); });
 }
-function calColorPop(anchor, colors, cur, fn) {
-  const p = openPop(anchor, `<div class="cpal">${colors.map(c => `<button data-c="${c}" style="--cc:${c}" class="${c === cur ? 'on' : ''}" aria-label="${c}"></button>`).join('')}</div>`);
+// 2.828.0 (#5464): ONE palette for every calendar (subscription and own: the colour pop and the edit dialog), each colour named
+// in its aria-label (not its hex code); a swatch is 44 px under a finger (calendar.css .cpal)
+const CAL_PAL = [['#6d8cff', N_('Blue')], ['#2dd4bf', N_('Teal')], ['#6ee7b7', N_('Mint')], ['#4ade80', N_('Green')], ['#f5b041', N_('Orange')],
+  ['#f87171', N_('Red')], ['#f472b6', N_('Pink')], ['#c084fc', N_('Purple')], ['#94a3b8', N_('Grey')]];
+function calPalHtml(cur, cls = '') {
+  const k = String(cur || '').toLowerCase();
+  return `<div class="cpal${/*html-ok*/ cls /* a constant class */}" role="group" aria-label="${esc(tr('Colour'))}">${CAL_PAL.map(([c, n]) => `<button type="button" data-c="${c}" style="--cc:${c}" class="${c === k ? 'on' : ''}" aria-pressed="${c === k ? 'true' : 'false'}" aria-label="${esc(tr(n))}" title="${esc(tr(n))}"></button>`).join('')}</div>`;
+}
+function calColorPop(anchor, _colors, cur, fn) {  // _colors: no longer used (the callers keep their argument)
+  const p = openPop(anchor, calPalHtml(cur));
   p.onclick = ev => { const b = ev.target.closest('[data-c]'); if (b) { closePop(); fn(b.dataset.c); } };
 }
 function calsWire(md) {
@@ -154,7 +162,7 @@ function calEditModal(x, colors, done) {
   let color = x.color;
   const md = modal(`<h3>${tr('Edit calendar')}</h3>
     <div class="row"><label for="ce-name">${tr('Name')}</label><input id="ce-name" maxlength="100" value="${esc(x.name)}"></div>
-    <div class="row"><label>${tr('Colour')}</label><div class="cpal inline">${colors.map(c => `<button data-c="${c}" style="--cc:${c}" class="${c === color ? 'on' : ''}" aria-label="${c}"></button>`).join('')}</div></div>
+    <div class="row"><label>${tr('Colour')}</label>${/*html-ok*/ calPalHtml(color, ' inline') /* names via esc(tr()) */}</div>
     <div class="row"><label for="ce-int">${tr('Refresh')}</label><select id="ce-int"><option value="15">${tr('every 15 minutes')}</option><option value="60" ${x.interval === 60 ? 'selected' : ''}>${tr('every hour')}</option></select></div>
     ${x.kind === 'ics' ? `<div class="row"><label for="ce-url">${tr('Link')}</label><input id="ce-url" type="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${trh('saved ({0}), empty = keep', x.url_hint)}"></div>`
     : `<div class="row"><label for="ce-user">${tr('Username')}</label><input id="ce-user" autocomplete="off" autocapitalize="off" value="${esc(x.username)}"></div>
@@ -165,7 +173,7 @@ function calEditModal(x, colors, done) {
   dvw_editWire(md, x, done);  // 2.52.0 (#1128): "Allow writing"
   md.addEventListener('click', async e => {
     const cb = e.target.closest('[data-c]');
-    if (cb) { color = cb.dataset.c; $$('.cpal [data-c]', md).forEach(b => b.classList.toggle('on', b === cb)); return; }
+    if (cb) { color = cb.dataset.c; $$('.cpal [data-c]', md).forEach(b => { b.classList.toggle('on', b === cb); b.setAttribute('aria-pressed', String(b === cb)); }); return; }
     const b = e.target.closest('button[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { md.remove(); return; }
     const body = {name: $('#ce-name', md).value.trim(), color, interval: +$('#ce-int', md).value};
@@ -235,6 +243,12 @@ function viewWeek() {
   const t0 = today(), H = weekH();
   const chip = t => `<div class="ev p${t.priority} ${t.status ? 'done' : ''} ${t.ghost ? 'ghost' : ''} ${isMs(t) ? 'ms' : ''}${lp_cls(t)}" data-id="${t.id}"${lp_attr(t) /* 2.53.0 (#1426) */} draggable="${t.status || t.ghost || isTouch() || !canEdit(t) ? 'false' : 'true'}">${msGlyph(t)}${mdTitleNL(t.title)}</div>`;
   const now = new Date(), nowTop = (now.getHours() * 60 + now.getMinutes()) / 60 * H;
+  // 2.828.0 (#5463): where the hours start: the first timed entry of the days shown or 07:00, the earlier one (render.js cvw_scroll)
+  let first = 7 * 60;
+  // 2.828.0 (#5463): a block of two lines or more shows its time above a one-line title (cut with "…", never word stumps); a
+  // short one keeps both in one line. Three lanes and more: on a phone strips without letters and one "+N" over the group
+  // (calendar.css .wn3 / .wmore), a tap on it opens the day
+  const two = Math.round(2.25 * remPx()), lane = it => `left:calc(${it.lane} * 100% / ${it.n});width:calc(100% / ${it.n} - 2px)`;
   const cols = days.map(d => {
     const lay = layoutDay((map.get(d) || []).filter(t => t.due_time), evsOf(d).filter(e => cevTimed(e, d)).map(e => ({c: e, ...cevMin(e, d)})));
     for (const it of lay) if (!it.c || it.c.d0 === d) first = Math.min(first, it.s);
@@ -246,29 +260,15 @@ function viewWeek() {
     }).join('');
     return `<div class="wcol ${d === t0 ? 'today' : ''}" data-day="${d}">${blocks}${d === t0 ? `<i class="nowline" style="top:${nowTop}px"></i>` : ''}</div>`;
   }).join('');
-  // 2.828.0 (#5463): where the hours start: the first timed entry of the days shown or 07:00, the earlier one (render.js cvw_scroll)
-  let first = 7 * 60;
-  // 2.828.0 (#5463): a block of two lines or more shows its time above a one-line title (cut with "…", never word stumps); a
-  // short one keeps both in one line. Three lanes and more: on a phone strips without letters and one "+N" over the group
-  // (calendar.css .wn3 / .wmore), a tap on it opens the day
-  const two = Math.round(2.25 * remPx()), lane = it => `left:calc(${it.lane} * 100% / ${it.n});width:calc(100% / ${it.n} - 2px)`;
   // 2.6.0 (K25): the week's own dates ("28. Sep – 4. Okt · KW 40"), short enough for one line on a phone; the month and
   // year of a week that spans two follow its middle (Thursday) where only one is shown
   const title = day ? fmtDay('long', pd(days[0])) : days.length === 7 && days[0] === weekStartOf(days[0]) ? weekTitle(days[0]) : calRangeTitle(days[0], days[days.length - 1]);
+  CVW.start = {k: `${S.calMode}|${days[0]}|${days.length}`, m: first};
   return `${calBar(title)}<div class="week calv ${day ? 'oneday' : ''}${live ? ' cgs-dz' : ''}${CAL_LIVE?.arm ? ' cgs-arm' : ''}" style="--cols:${days.length};--h:${H}px${live ? `;--nf:${nf}` : ''}">
     <div class="whead"><div></div>${days.map(d => `<div class="wh ${d === t0 ? 'today' : ''}" data-day="${d}"><span>${WD[pd(d).getDay()]}</span><b>${pd(d).getDate()}</b></div>`).join('')}</div>
     <div class="wallday"><div class="wlbl" title="${esc(tr('All day'))}">${tr('all day|short')}</div>${days.map(d => `<div class="wad" data-day="${d}">${evsOf(d).filter(e => !cevTimed(e, d)).map(e => cevChip(e, d)).join('')}${(map.get(d) || []).filter(t => !t.due_time).map(chip).join('')}${msvvCalChips(d).join('') /* 2.73.0 C (#661): other servers, in the all-day row */}</div>`).join('')}</div>
     <div class="wbody" id="wbody" tabindex="0" role="region" aria-label="${esc(tr('Hours of the week'))}"><div class="wgutter">${[...Array(24)].map((_, h) => `<div class="wtime" style="top:${h * H}px">${esc(fmtTimeLoc(pad(h) + ':00'))}</div>`).join('')}</div>${cols}</div></div>`;
 }
-// 2.290.0 A (#3144): "28. Sep – 1. Okt" for a grid of other than a week's days (the week number only while it is one week)
-function calRangeTitle(a, b) {
-  const x = pd(a), z = pd(b), y = new Date().getFullYear(), other = x.getFullYear() !== y || z.getFullYear() !== y, w = isoWeek(a);
-  CVW.start = {k: `${S.calMode}|${days[0]}|${days.length}`, m: first};
-  return `${dayNoWd(x, other && x.getFullYear() !== z.getFullYear())} – ${dayNoWd(z, other)}${w === isoWeek(b) ? ` · ${tr('Week {0}', w)}` : ''}`;
-}
-function layoutDay(evs, extra = []) {  // side-by-side lanes for overlapping timed tasks (+ calendar events: {c, s, e})
-  const items = evs.map(t => { const s = hm(t.due_time); return {t, s, e: s + Math.max(15, t.duration || 30)}; }).concat(extra).sort((a, b) => a.s - b.s || b.e - a.e);
-  const out = []; let cluster = [], lanes = [], end = -1;
 // 2.828.0 (#5463): the hour grid's scroll position after a render (render.js): a new grid (other mode, days or their count)
 // starts at CVW.start (the first entry or 07:00, the earlier); the same grid keeps where the person scrolled to, but follows a
 // new start while nobody scrolled (the events arrive after the first drawing)
@@ -289,6 +289,14 @@ document.addEventListener('click', e => {
   e.stopPropagation(); e.preventDefault();
   S.calSel = /** @type {HTMLElement} */ (b).dataset.calday; S.calMode = 'day'; LS.set('calMode', 'day'); renderView();
 }, true);
+// 2.290.0 A (#3144): "28. Sep – 1. Okt" for a grid of other than a week's days (the week number only while it is one week)
+function calRangeTitle(a, b) {
+  const x = pd(a), z = pd(b), y = new Date().getFullYear(), other = x.getFullYear() !== y || z.getFullYear() !== y, w = isoWeek(a);
+  return `${dayNoWd(x, other && x.getFullYear() !== z.getFullYear())} – ${dayNoWd(z, other)}${w === isoWeek(b) ? ` · ${tr('Week {0}', w)}` : ''}`;
+}
+function layoutDay(evs, extra = []) {  // side-by-side lanes for overlapping timed tasks (+ calendar events: {c, s, e})
+  const items = evs.map(t => { const s = hm(t.due_time); return {t, s, e: s + Math.max(15, t.duration || 30)}; }).concat(extra).sort((a, b) => a.s - b.s || b.e - a.e);
+  const out = []; let cluster = [], lanes = [], end = -1;
   const close = () => { const cl = cluster; cl.forEach(x => { x.n = lanes.length; x.cl = cl; }); out.push(...cl); cluster = []; lanes = []; end = -1; };  // 2.828.0 (#5463): + cl = its group
   for (const it of items) {
     if (cluster.length && it.s >= end) close();
