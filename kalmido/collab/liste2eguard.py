@@ -14,6 +14,7 @@ signed-in person gets them (and decrypts them); every other way that hands texts
   are NOT deleted: deleting data is a one-way step (named in docs/SECURITY.md).
 
 Prefix le2b_ (part B)."""
+import hmac
 import json
 import re
 
@@ -481,9 +482,10 @@ def le2b_scrub_trash(c, lid, plain_only=False):
                 continue
             for e in es:
                 if isinstance(e, dict) and (e.get("note") or e.get("task_title")):
+                    ok = isinstance(e.get("sig"), str) and hmac.compare_digest(e["sig"], h6b_sig(c, lid, e))
                     e["note"], e["task_title"] = "", ""
-                    if e.get("sig"):
-                        e["sig"] = h6b_sig(c, lid, e)
+                    if e.get("sig"):  # review 4: sealed again only when the old seal held (a broken one stays broken)
+                        e["sig"] = h6b_sig(c, lid, e) if ok else "-"
             c.execute("UPDATE list_part_trash SET held=? WHERE id=?", (json.dumps(es, ensure_ascii=False, default=str), r["id"]))
             n["trash_times"] += 1
             continue

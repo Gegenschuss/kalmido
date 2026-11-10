@@ -128,9 +128,12 @@ check(r.ok and r.json().get("trash_id"), f"#5549: the field deleted before the l
 r = A.post(B + "/api/time/entries", json={"task_id": T, "start": (datetime.now() - timedelta(hours=3)).isoformat(timespec="seconds"),
                                           "minutes": 20, "note": MK + "WipeNote"})
 check(r.ok, f"#5549: a time entry with a note {r.text[:200]}")
+r = Bo.post(B + "/api/time/entries", json={"task_id": T, "start": (datetime.now() - timedelta(hours=4)).isoformat(timespec="seconds"),
+                                           "minutes": 10, "note": MK + "BobNote"})
+check(r.ok, f"#5549: bob's time entry with a note (sealed in the Undo copy) {r.text[:200]}")
 r = A.post(B + f"/api/lists/{L}/time/delete-all", json={"confirm": "Strongbox"})
 WIPE = r.json().get("wipe") if r.ok else None
-check(r.ok and WIPE and r.json().get("deleted") == 1, f"#5549: delete all times (Undo copy on the server) {r.status_code} {r.text[:200]}")
+check(r.ok and WIPE and r.json().get("deleted") == 2, f"#5549: delete all times (Undo copy on the server) {r.status_code} {r.text[:200]}")
 check(len(dbx("SELECT id FROM list_part_trash WHERE list_id=? AND CAST(snap AS text) || CAST(held AS text) LIKE ?", (L, f"%{MK}%"))) == 3,
       "#5549: before the lock the three trash copies hold plain text")
 r = A.post(B + "/api/sections", json={"list_id": L, "name": MK + "Section"})
@@ -226,8 +229,9 @@ for h in hits:
 check(not dbx("SELECT 1 FROM list_part_trash WHERE list_id=? AND kind IN ('section', 'list_field')", (L,)),
       "#5549: no trash copy of a section / field deleted before the lock")
 r = A.post(B + f"/api/lists/{L}/time/restore", json={"wipe": WIPE})
-check(r.ok and [x[0] for x in dbx("SELECT note FROM time_entries WHERE list_id=? AND seconds=1200", (L,))] == [""],
-      f"#5549: Undo of 'delete all times' still works, the note stays empty {r.status_code} {r.text[:200]}")
+back = sorted((x[0], x[1], x[2]) for x in dbx("SELECT seconds, note, task_title FROM time_entries WHERE list_id=? AND seconds IN (600, 1200)", (L,)))
+check(r.ok and back == [(600, "", ""), (1200, "", "")],
+      f"#5549: Undo of 'delete all times' still works - also bob's entry (sealed again) -, note and task title empty {back} {r.text[:200]}")
 
 # ================================================================== API v1 / MCP
 r = TA.get(f"/tasks?list_id={L}")

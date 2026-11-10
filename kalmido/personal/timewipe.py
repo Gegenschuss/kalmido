@@ -277,11 +277,12 @@ def tz_restore(lid):
             left.append(e)  # 2.530.0 (#4315, review M1): stays in the server's copy
             continue  # 2.125.0 B (#2119): never into a closed month
         cid, pid = n43_restore_ids(c, owner, e)
+        lk_ = le2e_mode(c, lid)  # #5549 (review 1): an older window's entries after the lock: no plain task title either
         insert_id(c, """INSERT INTO time_entries(user_id,task_id,list_id,task_title,start,"end",seconds,note,source,client_id,pomo_id,
                                                  reminded,auto_stopped,created_at,updated_at)
                         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                  (owner, tid, lid, str(e.get("task_title") or "")[:500], str(e["start"])[:40], str(e["end"])[:40],
-                   max(0, int(e.get("seconds") or 0)), "" if le2e_mode(c, lid) else str(e.get("note") or "")[:500],  # 2.538.0 (#4372)
+                  (owner, tid, lid, "" if lk_ else str(e.get("task_title") or "")[:500], str(e["start"])[:40], str(e["end"])[:40],
+                   max(0, int(e.get("seconds") or 0)), "" if lk_ else str(e.get("note") or "")[:500],  # 2.538.0 (#4372)
                    e.get("source") if e.get("source") in ("timer", "manual", "focus") else "manual", cid, pid,
                    1 if e.get("reminded") in (1, True) else 0, 1 if e.get("auto_stopped") in (1, True) else 0,
                    n43_iso(e.get("created_at")) or ts, ts))
