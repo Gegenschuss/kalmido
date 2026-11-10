@@ -1155,7 +1155,7 @@ function settingsModal(focus) {
     setSaved(histAdd({label: tr('Changed setting: {0}', tr('Hours per day')), sett: true, undo: () => put(from), redo: () => put(to)}));
   });
   md.addEventListener('change', e => { if (e.target.id === 's-cerlist') cer_setList(e.target); });  // 2.102.0 E (#1999)
-  md.addEventListener('change', e => { if (e.target.id === 's-industry' && typeof ind_save === 'function') ind_save(md, e.target); });  // 2.578.0 (#4573)
+  md.addEventListener('change', e => { if (e.target.closest?.('#s-industry') && typeof ind_save === 'function') ind_save(md, e.target); });  // 2.578.0 (#4573); 2.828.0 (#5511): its boxes
   // 2.359.0 A (#3024): the page goes away within the 0.9 s of typing: the text fields waiting are sent with keepalive (core.js
   // keepSend). 2.527.0 (#4304 A6): and kept for the next start (core.js fdWrite): sent again after the sign-in should the
   // keepalive not arrive, unless the setting was changed elsewhere meanwhile (sv = the value this page saw)

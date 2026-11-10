@@ -674,7 +674,7 @@ function tourStart(mod) {
   TOUR.on = true; TOUR.steps = mod ? tourModSteps(mod) : tourSteps(); TOUR.i = 0;  // lazy-ok: both callers with mod load tourmods first
   TOUR.more = S.settings.tours_more !== '0'; TOUR.moreShown = false;  // 2.466.0 (#3314)
   // 1.8.0: first start of an account: "Create a sample project" on the first card (preticked for project setups)
-  TOUR.sample = !mod && S.settings.tour === 'pending' && !S.sample && S.settings.sample_ask !== '0' && !S.me?.kid && !tourHasProjects() && !tourOrg(); TOUR.sampleOn = false; TOUR.industry = S.industry?.code || '';  /* 2.578.0 (#4573) */  /* 2.46.1 (#1602): the sample project only when ticked */ TOUR.sampleSent = false; TOUR.sampleShown = false;
+  TOUR.sample = !mod && S.settings.tour === 'pending' && !S.sample && S.settings.sample_ask !== '0' && !S.me?.kid && !tourHasProjects() && !tourOrg(); TOUR.sampleOn = false; TOUR.industry = indCodes(S.industry);  /* 2.578.0 (#4573); 2.828.0 (#5511): the codes ticked */  /* 2.46.1 (#1602): the sample project only when ticked */ TOUR.sampleSent = false; TOUR.sampleShown = false;
   let el = $('.tour');
   if (!el) { el = document.createElement('div'); el.className = 'tour'; el.innerHTML = '<div class="tring"></div><div class="tcard" role="dialog" aria-live="polite"></div>'; document.body.appendChild(el); }
   el.addEventListener('click', e => {
@@ -682,7 +682,7 @@ function tourStart(mod) {
     const a = b.dataset.tour;
     if (a === 'next') tourGo(TOUR.i + 1); else if (a === 'back') tourGo(TOUR.i - 1); else tourEnd(true);
   });
-  el.addEventListener('change', e => { if (e.target.id === 't-sample') TOUR.sampleOn = e.target.checked; if (e.target.id === 't-ptype') TOUR.ptype = e.target.value; if (e.target.id === 't-more') TOUR.more = e.target.checked; if (e.target.id === 't-industry') { TOUR.industry = e.target.value; tourGo(TOUR.i); } });  // 2.578.0 (#4573): the sample's text follows the industry
+  el.addEventListener('change', e => { if (e.target.id === 't-sample') TOUR.sampleOn = e.target.checked; if (e.target.id === 't-ptype') TOUR.ptype = e.target.value; if (e.target.id === 't-more') TOUR.more = e.target.checked; if (e.target.closest?.('#t-industry')) { TOUR.industry = indPicked($('#t-industry', el)); tourGo(TOUR.i); } });  /* 2.828.0 (#5511): boxes */  // 2.578.0 (#4573): the sample's text follows the industry
   el.addEventListener('click', e => { const b = e.target.closest('[data-tpurpose]'); if (!b) return; TOUR.purpose = TOUR.purpose === b.dataset.tpurpose ? '' : b.dataset.tpurpose; tourGo(TOUR.i); $(`.tour [data-tpurpose="${b.dataset.tpurpose}"]`)?.focus(); });  // 2.19.0 (#653)
   TOUR.ptype = ''; TOUR.purpose = '';
   // 2.165.0 (#2612): the very first start of the account greets once: the figure waves on the first card (tourGo)
@@ -720,7 +720,7 @@ function tourGo(i) {
   el.dataset.step = st.id; el.dataset.sel = st.sel || '';
   card.innerHTML = `<div class="tstep"><span>${TOUR.i + 1}/${n}</span><span class="tdots">${TOUR.steps.map((_, j) => `<i class="${j === TOUR.i ? 'on' : j < TOUR.i ? 'past' : ''}"></i>`).join('')}</span></div>
     <h3>${TOUR.i === 0 && !TOUR.mod ? tourHiFig() : ''}${esc(st.tx ? st.t : tr(st.t, ...(st.targs || [])))}</h3><p>${esc(st.tx ? st.d : tr(st.d, ...(st.args || []))).replace(/!(\p{L})/gu, '!\u2060$1')}</p>
-    ${last && TOUR.sample && !TOUR.sampleSent ? `<label class="tsample"><input type="checkbox" id="t-sample" ${TOUR.sampleOn ? 'checked' : ''}><span><b>${tr('Create a sample project')}</b><small>${TOUR.industry === 'film' ? tr('A small video production with dates, dependencies and a packing list. Remove it any time under Settings > Data.') : tr('A small client project with dates, dependencies and a checklist. Remove it any time under Settings > Data.')}</small></span></label>${S.industry?.can_set && S.industry.choices?.length ? `<label class="tsample tind"><span><b>${tr('Industry')}</b><small>${tr('Film & Video adds the shoot calculation and the image film as sample. Change it any time under Settings > General.')}</small></span><select id="t-industry">${indOpts(S.industry, TOUR.industry)}</select></label>` : ''}` : ''}
+    ${last && TOUR.sample && !TOUR.sampleSent ? `<label class="tsample"><input type="checkbox" id="t-sample" ${TOUR.sampleOn ? 'checked' : ''}><span><b>${tr('Create a sample project')}</b><small>${TOUR.industry.includes('film') ? tr('A small video production with dates, dependencies and a packing list. Remove it any time under Settings > Data.') : tr('A small client project with dates, dependencies and a checklist. Remove it any time under Settings > Data.')}</small></span></label>${S.industry?.can_set && S.industry.choices?.length ? `<div class="tsample tind"><span><b id="t-industry-l">${tr('Industry')}</b><small>${tr('Film & Video adds the shoot calculation and the image film as sample. Change it any time under Settings > General.')}</small>${indBoxes(S.industry, TOUR.industry, 't-industry', 't-industry-l')}</span></div>` : ''}` : ''}
     ${last && !TOUR.mod && (S.agents || []).length ? pk2_setupHtml() : ''}
     ${last && !S.me?.kid ? `<label class="tsample"><input type="checkbox" id="t-more" ${TOUR.more ? 'checked' : ''}><span><b>${tr('Show more introductions')}</b></span></label>` : ''}
     <div class="tfoot"><button class="btn sm tskip" data-tour="skip">${tr('Skip tour')}</button><span class="spacer"></span>${TOUR.i ? `<button class="btn sm" data-tour="back">${tr('Back')}</button>` : ''}<button class="btn sm pri" data-tour="next">${last ? tr('Done') : tr('Next')}</button></div>`;
@@ -738,13 +738,20 @@ function tourGo(i) {
   if (last) TOUR.moreShown = true;
   $('[data-tour="next"]', card)?.focus();
 }
-// 2.578.0 (#4573): the options of the app's industry (S.industry): None + the industries; also Settings > General (acctset.js)
-const indOpts = (d, cur) => [{code: '', name: tr('None')}, ...(d?.choices || [])].map(x => `<option value="${esc(x.code)}" ${x.code === (cur || '') ? 'selected' : ''}>${esc(x.name)}</option>`).join('');
+// 2.578.0 (#4573): the app's industry (S.industry); also Settings > General (acctset.js) and the first-run setup (account.js)
+// 2.828.0 (#5511): several industries at once: one box per industry (as Office > Packs), none ticked = none. indCodes: the
+// industries on (S.industry.codes; old servers only send code), indOn(c): c among them, indBoxes: the group of boxes
+// (id = the group, lab = the id of its label), indPicked: the codes ticked in a group
+const indCodes = d => (Array.isArray(d?.codes) ? d.codes : d?.code ? [d.code] : []);
+const indOn = c => indCodes(S.industry).includes(c);
+const indBoxes = (d, codes, id, lab, dis) => `<span class="indbox" id="${id}" role="group" aria-labelledby="${lab}" style="display:flex;flex-wrap:wrap;gap:4px 16px">${(d?.choices || []).map(x => `<label class="chkl"><input type="checkbox" data-ind="${esc(x.code)}" ${(codes || []).includes(x.code) ? 'checked' : ''} ${dis ? 'disabled' : ''}> ${esc(x.name)}</label>`).join('')}</span>`;
+const indPicked = el => [...(el?.querySelectorAll('input[data-ind]:checked') || [])].map(i => i.dataset.ind);
+const indSame = (a, b) => a.length === b.length && a.every(x => b.includes(x));
 async function tourSample() {  // 2.25.0 (UX-24): once, when the tour ends and its last card offered the sample project
   if (!TOUR.sample || TOUR.sampleSent || !TOUR.sampleShown) return;
   TOUR.sampleSent = true;
-  if (TOUR.industry !== (S.industry?.code || '')) {  // 2.578.0 (#4573): the industry chosen on the last card, before the sample (it follows it)
-    try { S.industry = (await api('PUT', '/api/industry', {industry: TOUR.industry})).industry; } catch { /* api() said why; Settings > General */ }
+  if (!indSame(TOUR.industry, indCodes(S.industry))) {  // 2.578.0 (#4573): the industry chosen on the last card, before the sample (it follows it); 2.828.0 (#5511): several
+    try { S.industry = (await api('PUT', '/api/industry', {industries: TOUR.industry})).industry; } catch { /* api() said why; Settings > General */ }
   }
   if (TOUR.purpose) {  // 2.19.0 (#653): "What do you use Kalmido for?" -> the modules + starter lists of that purpose
     try { await api('POST', '/api/me/purpose', {purpose: TOUR.purpose}); await load(); render(); } catch { /* offline: Settings > Modules */ }

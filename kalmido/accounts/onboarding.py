@@ -226,7 +226,9 @@ def sample_create(c, uid):
     """Creates the sample for uid (caller commits). Returns the id of the project list. 2.578.0 (#4573): the variant of the
     app's industry (app_industry): the image film only with Film & Video, else the neutral website relaunch."""
     from ..lists.fields import fmt_num
-    var = SAMPLE_VARIANTS.get(app_industry(c, uid)) or SAMPLE_VARIANTS[""]
+    # 2.828.0 (#5511): several industries: the first with its own variant, Film & Video before the others
+    inds = app_industries(c, uid)
+    var = next((SAMPLE_VARIANTS[k] for k in sorted(inds, key=lambda k: k != "film") if k in SAMPLE_VARIANTS), SAMPLE_VARIANTS[""])
     c.execute("DELETE FROM sample_items WHERE user_id=?", (uid,))  # leftovers of a sample removed by hand
     lg = lang(c, uid)
     s = usettings(c, uid)
@@ -492,33 +494,64 @@ def _ind_data(c, oid):
     return (d if isinstance(d, dict) else {}), (r["updated_at"] if r else None)
 
 
-def ind_of_area(c, oid, d=None):
-    """The industry of office area oid (d: its settings data, read already): the first built-in pack switched on, "" = none."""
+def inds_of_area(c, oid, d=None):
+    """2.828.0 (#5511): the industries of office area oid (d: its settings data, read already): every built-in pack switched
+    on, in the order of industry_packs; [] = none. Several at once (Film & Video + Agency & services)."""
     packs = (_ind_data(c, oid)[0] if d is None else d).get("industry_packs")
-    return next((x for x in packs if x in ind_codes()), "") if isinstance(packs, list) else ""
+    return [x for x in dict.fromkeys(packs) if isinstance(x, str) and x in ind_codes()] if isinstance(packs, list) else []
+
+
+def ind_of_area(c, oid, d=None):
+    """The first industry of office area oid ("" = none); kept for old callers - a check for one industry asks
+    inds_of_area (2.828.0, #5511: several at once)."""
+    return next(iter(inds_of_area(c, oid, d)), "")
+
+
+def app_industries(c, uid):
+    """2.828.0 (#5511): THE read point of the app's industries for uid ([] = none, "film" in it = Film & Video): the
+    industries of uid's area. What hangs on one industry holds as soon as it is among them."""
+    return inds_of_area(c, ind_area(c, uid)[0])
 
 
 def app_industry(c, uid):
-    """THE read point of the app's industry for uid ("" = none, "film" = Film & Video): the industry of uid's area."""
-    return ind_of_area(c, ind_area(c, uid)[0])
+    """The first of app_industries ("" = none); kept for old callers (2.828.0, #5511)."""
+    return next(iter(app_industries(c, uid)), "")
 
 
 def ind_state(c, uid):
-    """The field industry of /api/state and GET /api/industry."""
+    """The field industry of /api/state and GET /api/industry: codes = every industry on (2.828.0, #5511), code = the first
+    (old clients)."""
     oid, may = ind_area(c, uid)
     d, at = _ind_data(c, oid)
-    return {"code": ind_of_area(c, oid, d), "can_set": bool(may), "choices": ind_choices(lang(c, uid)), "updated_at": at}
+    codes = inds_of_area(c, oid, d)
+    return {"code": next(iter(codes), ""), "codes": codes, "can_set": bool(may), "choices": ind_choices(lang(c, uid)), "updated_at": at}
+
+
+def ind_codes_in(v):
+    """2.828.0 (#5511): the industries of a request -> list of codes; a list (industries) as it is, a single value (the old
+    form industry: "x") as exactly that one, "" / None = none. BadInput on an unknown code or a wrong type."""
+    if v is None or v == "":
+        return []
+    vals = v if isinstance(v, list) else [v]
+    out = []
+    for x in vals:
+        x = x.strip().lower() if isinstance(x, str) else x
+        if x not in ind_codes():
+            raise BadInput(tr("Invalid value: {0}", "industry"))
+        if x not in out:
+            out.append(x)
+    return out
 
 
 def ind_set(c, uid, code, b=None, commit=True):
-    """Sets uid's industry ("" = none; caller commits). Only the built-in packs change in industry_packs, own packs stay.
+    """Sets uid's industries (code: a list of codes, 2.828.0 #5511, or one code = exactly that one, "" = none; caller commits).
+    Only the change is applied to industry_packs: built-in packs no longer chosen go, newly chosen ones are added at the
+    end, the rest (own packs, the order) stays.
     b: the request body (expect_updated_at = the version read, 409 when the settings moved on). commit=False (the first-run
     setup, review 2.578 F4): the new personal area is not committed early, so a later error of the setup leaves nothing
     half applied; its statements see the area all the same (the access context is applied per statement, as for the
     organisation om_setup_org makes in the same transaction). -> True when it changed."""
-    code = (code or "").strip().lower() if isinstance(code, str) else code
-    if code not in ("",) + ind_codes():
-        raise BadInput(tr("Invalid value: {0}", "industry"))
+    codes = ind_codes_in(code)
     oid, may = ind_area(c, uid)
     if not may:
         raise Denied(403, tr(IND_NO_AREA if oid is None and _ind_orgs(c, uid) else IND_NO_RIGHT))
@@ -535,7 +568,8 @@ def ind_set(c, uid, code, b=None, commit=True):
     d, at = _ind_data(c, oid)
     ccf_check(b, at, "industry", lambda: ind_state(c, uid))
     cur = [x for x in d.get("industry_packs") or [] if isinstance(x, str)] if isinstance(d.get("industry_packs"), list) else []
-    new = [x for x in cur if x not in ind_codes()] + ([code] if code else [])
+    # 2.828.0 (#5511): was "own packs + [code]" - a second industry switched on under Office > Packs fell away silently
+    new = [x for x in cur if x not in ind_codes() or x in codes] + [x for x in codes if x not in cur]
     if new == cur:
         return False
     d["industry_packs"] = new
@@ -560,13 +594,14 @@ def industry_get():
 
 @app.put("/api/industry")
 def industry_put():
-    """{industry: "" | "film", expect_updated_at?} -- chooses the industry of my area (an organisation's admin, a person
+    """{industries: ["film", "agency"] | [], expect_updated_at?} (2.828.0, #5511: several at once) or the old form
+    {industry: "" | "film"} (exactly that one) -- chooses the industries of my area (an organisation's admin, a person
     without organisation for her own area). 403 for members, kids and agents; 409 {industry: the current} when the
     settings changed since expect_updated_at."""
     c, uid, b = db(), me(), body()
-    if not isinstance(b, dict) or "industry" not in b:
+    if not isinstance(b, dict) or ("industry" not in b and not isinstance(b.get("industries"), list)):
         return err(tr("Invalid value: {0}", "industry"))
-    changed = ind_set(c, uid, b.get("industry"), b)
+    changed = ind_set(c, uid, b["industries"] if isinstance(b.get("industries"), list) else b.get("industry"), b)
     if changed:
         bump(c)
     c.commit()

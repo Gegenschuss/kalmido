@@ -19,7 +19,7 @@ import secrets
 from datetime import date, timedelta
 from decimal import Decimal
 
-from ..accounts.onboarding import ind_of_area
+from ..accounts.onboarding import inds_of_area  # 2.828.0 (#5511): the set
 from ..accounts.orgroles import org_writes
 from ..core.access import Denied, acx_org_ok, need_feat
 from ..core.db import iso, now_utc
@@ -38,7 +38,7 @@ ODP_DAYS_MAX = 31    # shoot days of one part (the disposition takes 62 per book
 
 def odp_gate(c, uid, oid):
     """'' when uid may book shoot days in office area oid, else the hint the preview shows."""
-    if ind_of_area(c, oid) != "film":
+    if "film" not in inds_of_area(c, oid):  # 2.828.0 (#5511): also with a second industry on
         return tr("Shoot days go into the disposition only with the industry Film & Video.")
     try:
         need_feat("dispo")

@@ -1906,8 +1906,8 @@ def fnt_industry(s):
     """2.636.0 (#4952): the file name template the industry of the office settings s suggests (its pack's
     legacy_fn_template: a fixed template, never "custom"), "standard" without one (Film & Video, no industry)."""
     packs = s.get("industry_packs") if isinstance(s.get("industry_packs"), list) else []
-    code = next((x for x in packs if x in ind_codes()), "")  # the industry: the first built-in pack (onboarding.py ind_of_area)
-    ft = (dk_pack(code) or {}).get("legacy_fn_template") if code else None
+    # 2.828.0 (#5511): several industries: the first built-in pack that suggests a template (was: the first built-in pack)
+    ft = next((t for t in ((dk_pack(x) or {}).get("legacy_fn_template") for x in packs if x in ind_codes()) if t in FNT_TEMPLATES and t != "custom"), None)
     return ft if ft in FNT_TEMPLATES and ft != "custom" else "standard"
 
 

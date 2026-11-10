@@ -19,7 +19,7 @@ function viewKanban() {
   const head = c => `<div class="khead" ${c.id ? `data-ksec="${c.id}"` : ''}>${c.id && !ro ? secHandle(c.id) : ''}${esc(c.name)} ${wip_kHead(c)}${spt_kSum(c, lid)}${c.id && !ro ? `<button class="iconbtn" data-act="section-menu" data-id="${c.id}" title="${esc(tr('More') + ': ' + c.name)}" aria-label="${esc(tr('More') + ': ' + c.name)}">${ic('dots', 's')}</button>` : ''}</div>`;
   const add = (c, sw, swn) => ro ? '' : `<div class="kadd"><input placeholder="${tr('+ Task')}" aria-label="${esc(tr('New task in {0}', sw == null ? c.name : c.name + ' · ' + swn))}" data-kadd="${c.id ?? ''}"${sw == null ? '' : ` data-swl="${esc(sw)}"`} enterkeyhint="done"></div>`;
   const knew = ro ? '' : `<div class="knew"><button class="btn sm" data-act="section-new">${ic('plus', 's')} ${tr('Column')}</button></div>`;
-  const swm = swlMode(lid), sht = listById(lid)?.ptype === 'shoot' && S.industry?.code === 'film';  // 2.636.0 (#4565): a shoot = the storyboard (shoot.js)
+  const swm = swlMode(lid), sht = listById(lid)?.ptype === 'shoot' && indOn('film');  // 2.636.0 (#4565): a shoot = the storyboard (shoot.js)
   if (swm) return `${listHead(listById(lid))}${swlBar(lid)}${swlBoard(lid, swm, cols, tasks, {head, add, knew})}`;
   return `${listHead(listById(lid))}${swlBar(lid)}${sht ? sht_bar(lid) : ''}<div class="kanban${sht ? ' shtboard' : ''}">${cols.map(c => `
     <div class="kcol" data-kcol="${c.id ?? ''}">

@@ -20,7 +20,7 @@ from ..tasks.ttypes import tt_check  # 2.609.0 (#3372)
 from ..tasks.tasks import ms_target, one_task, set_tags
 from ..core.errors import BadInput
 from ..core.conflict import ccf_check  # 2.564.0 (#4701)
-from ..accounts.onboarding import app_industry  # 2.636.0 (#4565)
+from ..accounts.onboarding import app_industries  # 2.636.0 (#4565); 2.828.0 (#5511): the set
 from ..core.objparts import part_kind, part_restore, part_trash, part_write  # 2.610.0 (#4762): the core's write layer of side objects
 from ..core.serializers import unlink_files
 from ..core.dlock import dl_of, dl_tasks_locked  # 2.574.0 (#3376): data lock of a copying agent
@@ -985,7 +985,7 @@ def ptype_ok(c, uid, k):
     need = PTYPE_INDUSTRY.get(k)
     if not need:
         return True
-    return app_industry(c, uid) == need
+    return need in app_industries(c, uid)  # 2.828.0 (#5511): Film & Video among several, not only the first
 
 
 # 2.412.0 (#3552): the properties of a task a project can show (client static/js/props.js PZ_KEYS) and the cut of each

@@ -1396,7 +1396,7 @@ function applyState(j, w0) {  // w0: S.wseq when its GET /api/state started (ld_
   S.calendars = j.calendars || {enabled: false, subs: 0};
   S.api = j.api || {enabled: false}; S.caldav = j.caldav || {enabled: false}; S.webhooks = j.webhooks || {enabled: false}; S.publicLinks = !!j.public_links; S.publicLinksOff = j.public_links_off || [];
   S.sample = j.sample || null;
-  S.industry = j.industry || null;  // 2.578.0 (#4573): the app's industry {code: '' | 'film', can_set, choices, updated_at}
+  S.industry = j.industry || null;  // 2.578.0 (#4573): the app's industry {code: '' | 'film', can_set, choices, updated_at}; 2.828.0 (#5511): + codes (several)
   S.agents = j.agents || []; S.agentsAt = Date.now(); S.setupPending = !!j.setup_pending;  // 2.13.0 (#453 A16)
   S.proposers = j.proposers || [];  // 2.3.0: agents I may ask for a proposal
   S.assistant = j.assistant || null;  // 2.75.0 (#1411): only with a configured assistant

@@ -290,7 +290,7 @@ const PTYPE_UI = [['', N_('Blank'), 'list', N_('Sections and fields as needed')]
   ['social', N_('Social media plan'), 'megaphone', N_('Calendar, channels, approval by the client')]];  // 2.387.0 (#1957)
 // 2.636.0 (#4565): the shoot (server PTYPE_INDUSTRY): offered only with the industry Film & Video; keep = the list's own type
 const PTYPE_SHOOT = ['shoot', N_('Shoot|project type'), 'film', N_('One card per shot, one column per shooting day, shot list as PDF')];
-const ptypeUi = keep => S.industry?.code === 'film' || keep === 'shoot' ? [...PTYPE_UI, PTYPE_SHOOT] : PTYPE_UI;
+const ptypeUi = keep => indOn('film') || keep === 'shoot' ? [...PTYPE_UI, PTYPE_SHOOT] : PTYPE_UI;
 // 2.27.0 (#972): the standard sections of each built-in project type (kalmido/lists/templates.py PTYPES), named next to the
 // box "With the standard sections" in the New list dialog; a new project gets them only when the box is ticked
 const PTYPE_SECS = {agency: [N_('Request'), N_('Concept'), N_('Production'), N_('Approval'), N_('Billing')],

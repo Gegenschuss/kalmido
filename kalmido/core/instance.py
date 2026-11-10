@@ -370,8 +370,9 @@ def admin_setup():
             uset(c, me(), "features", ",".join([x for x in fs.split(",") if x] + on))
         if b["purpose"] == "family":  # 2.46.1 (#1615): the two starter lists; their examples only with "Sample project" (#1602)
             family_examples(c, me(), tasks=b.get("examples") is True)
-    if b.get("industry") not in (None, ""):  # 2.578.0 (#4573): the industry (default none), after the organisation above: its area
-        ind_set(c, me(), b["industry"], commit=False)  # review 2.578 F4: no commit before the end of the setup
+    ind_in = b["industries"] if isinstance(b.get("industries"), list) else b.get("industry")  # 2.828.0 (#5511): + several (industries)
+    if ind_in not in (None, "", []):  # 2.578.0 (#4573): the industry (default none), after the organisation above: its area
+        ind_set(c, me(), ind_in, commit=False)  # review 2.578 F4: no commit before the end of the setup
     if b.get("sample") is True and not sample_state(c, me()):  # 1.8.0: "Create a sample project"
         sample_create(c, me())
     elif "sample" in b:

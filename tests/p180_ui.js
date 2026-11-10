@@ -67,9 +67,10 @@ async function openSetup(jar) {  // the app with a cookie jar of its own (the se
   check(card('sample').classList.contains('on') && !card('agency').classList.contains('on'), 'setup: one start at a time');
   // 2.578.0 (#4573): the industry (default none, the sample card speaks of a client project); Film & Video keeps the image
   // film this suite checks below
-  check(d.querySelector('#su-ind')?.value === '' && /client project/.test(card('sample').textContent), 'setup: industry offered, none preselected');
-  const ind = d.querySelector('#su-ind'); ind.value = 'film'; ind.dispatchEvent(new w.Event('change', {bubbles: true}));
-  await until(() => d.querySelector('#su-ind')?.value === 'film' && /video production/.test(card('sample')?.textContent || ''));
+  // 2.828.0 (#5511): one box per industry (was a select), none ticked
+  check(d.querySelectorAll('#su-ind input[data-ind]').length === 2 && !d.querySelector('#su-ind input[data-ind]:checked') && /client project/.test(card('sample').textContent), 'setup: industry offered, none preselected');
+  click(w, d.querySelector('#su-ind input[data-ind="film"]'));
+  await until(() => d.querySelector('#su-ind input[data-ind="film"]')?.checked && /video production/.test(card('sample')?.textContent || ''));
   check(/video production/.test(card('sample').textContent), 'setup: Film & Video -> the sample card names the video production');
   click(w, d.querySelector('[data-su="go"]'));
   await until(async () => { const s = await call('GET', '/api/state', null, jar.c); return s.sample && s.settings?.sample_ask === '0'; });
@@ -138,7 +139,8 @@ async function openSetup(jar) {  // the app with a cookie jar of its own (the se
   // 2.46.1 (#1602): the sample project is off by default, also with the project modules; ticked by hand it comes
   check(tb() && !tb().checked && /Create a sample project/.test(tb().closest('label').textContent), 'tour: the last card offers the sample, unticked (2.46.1)');
   // 2.578.0 (#4573): the industry next to it (none preselected): the neutral client project
-  check(d.querySelector('.tour #t-industry')?.value === '' && /client project/.test(tb().closest('label').textContent), 'tour: industry offered (none), the neutral sample named');
+  // 2.828.0 (#5511): boxes instead of the select
+  check(d.querySelector('.tour #t-industry input[data-ind]') && !d.querySelector('.tour #t-industry input:checked') && /client project/.test(tb().closest('label').textContent), 'tour: industry offered (none), the neutral sample named');
   click(w, tb());
   click(w, d.querySelector('[data-tour="next"]'));
   check(await until(() => w.eval('S.sample')), 'tour: Done created it');
