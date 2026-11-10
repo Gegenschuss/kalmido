@@ -16,7 +16,7 @@
    asks it through typeof checks. Classic script sharing the global scope with the others. */
 'use strict';
 
-const DVW = {back: null, tab: 'details', pdf: null, ro: null, drag: null, he: null, node: null, more: false, notext: null, closed: null, gone: new Set()};  // notext: 2.742.0 (#4861); closed: #3506 the id of a view just closed; gone: #5478
+const DVW = {back: null, tab: 'details', pdf: null, ro: null, drag: null, he: null, node: null, more: false, notext: null, closed: null, gone: new Set(), sz: null, th: null};  // notext: 2.742.0 (#4861); closed: #3506 the id of a view just closed; gone: #5478; sz / th: 2.882.0 (#5557) the sizes seen (dcv_phSize)
 // the tabs of the fields; History and Shares come from the file store's node (GET /api/files/nodes/<id>, its rights)
 const DCV_TABS = [['details', N_('Details')], ['text', N_('Content')], ['hist', N_('History')], ['share', N_('Shares')]];
 const DCV_ZMIN = 0.1, DCV_ZMAX = 8, DCV_CVMAX = 12e6;  // the zoom's limits; the most pixels one page's canvas gets
@@ -472,10 +472,18 @@ const DCV_A4 = {w: 595, h: 842};
 function dcv_phSize(d) {
   if (!d.thumb && !(dc_isPdf(d) && d.size <= 40e6)) return null;  // nothing to show: the icon as before
   const k = DVW.sz?.get(d.id); if (k && k.v === d.size) return {w: k.w, h: k.h, mw: k.mw};
-  const im = d.thumb ? dcv_thumbSeen(dc_thumbUrl(d)) || (d.file || d.thumb_l ? dcv_thumbSeen(dc_thumbUrl(d, true)) : null) : null;  // the small one, or the sharp one of a big card
+  const im = d.thumb ? DVW.th?.get(dcv_thumbKey(dc_thumbUrl(d))) || dcv_thumbSeen(dc_thumbUrl(d)) : null;
   return im ? {w: DCV_A4.w, h: Math.round(DCV_A4.w * im.h / im.w)} : {...DCV_A4};
 }
-// the small picture's shape when the browser has it already (fetched ahead for the neighbours, the cards of the list)
+// the shape of every small picture of a document shown so far (the cards of the list and the file store, the strip, the
+// neighbours fetched ahead), per document: the first picture of the view takes it before its own small picture is there
+const dcv_thumbKey = u => { const m = /\/api\/(docs|files\/nodes)\/(\d+)\/thumb/.exec(u || ''); return m ? +m[2] : 0; };
+document.addEventListener('load', e => {
+  const im = /** @type {any} */ (e.target), k = im?.tagName === 'IMG' && im.naturalWidth > 0 && dcv_thumbKey(im.getAttribute('src')); if (!k) return;
+  const m = DVW.th || (DVW.th = new Map()); m.set(k, {w: im.naturalWidth, h: im.naturalHeight});
+  if (m.size > 500) m.delete(m.keys().next().value);
+}, true);
+// the small picture's shape when the browser has it at hand already
 function dcv_thumbSeen(u) {
   const im = new Image(); im.src = u;
   return im.complete && im.naturalWidth > 0 ? {w: im.naturalWidth, h: im.naturalHeight} : null;

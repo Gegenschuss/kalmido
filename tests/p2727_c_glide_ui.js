@@ -101,7 +101,7 @@ const tx = el => { const m = /translateX\((-?[\d.]+)px\)/.exec(el?.style.transfo
   click(m, d.querySelector('.dv-view [data-dc="step:1"]'));
   check(await until(() => shown() === order[2]), 'the arrow forward: the last one');
   hold(m, prev(), -150);
-  check(!d.querySelector('.dv-view .dc-body > .swn-nb') && tx(part()) === -45, 'at the real end: no placeholder, it follows only a little: ' + part().style.transform);
+  check(!d.querySelector('.dv-view .dc-body > .swn-nb[data-dir="1"]') && tx(part()) === -45, 'at the real end: no placeholder, it follows only a little: ' + part().style.transform);
   touch(m, prev(), 'touchend', []);
   check(await until(() => !tx(part())) && shown() === order[2] && m.eval('DC.opening') == null, '... and springs back (2.882.0, #5557: the spring back of swipenav.js)');
   m.close();
