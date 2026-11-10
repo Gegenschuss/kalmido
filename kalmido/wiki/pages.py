@@ -697,7 +697,7 @@ def wiki_delete(pid):
     c = db()
     r = wiki_need(c, pid, write=True)  # 2.200.0 A (#2747): edit on the page
     wiki_need_space(c, me(), r)  # 2.200.0 B (#2747): deleting is the space's, not an edit share's
-    from .wkkern import wkk_trash  # 2.790.0 (#5365): the core's trash (wkkern loads after this module)
+    from .wkkern import wkk_trash  # 2.809.0 (#5365): the core's trash (wkkern loads after this module)
     wkk_trash(c, me(), pid)
     bump(c)
     c.commit()
@@ -745,7 +745,7 @@ def wiki_bulk(trash):
                 path = _wke_free_path(c, r["org_id"], r["owner_id"], pid, r["path"])
         try:
             with c.savepoint():
-                # 2.790.0 (#5365): the core's trash -- its files go with it as children (the same time) and only those come
+                # 2.809.0 (#5365): the core's trash -- its files go with it as children (the same time) and only those come
                 # back; a file deleted on its own before the page stays in the trash
                 from .wkkern import wkk_restore, wkk_trash, wkk_with_page
                 if trash:
@@ -777,7 +777,7 @@ def wiki_bulk(trash):
 
 
 # ---- 2.143.0 B (#2211): the trash of pages -- listed, deleted for good by hand ("Delete permanently", "Empty trash") and after
-# the trash period by the watchdog. 2.790.0 (#5365): both through the core's trash (wiki/wkkern.py: obj_purge, the core's
+# the trash period by the watchdog. 2.809.0 (#5365): both through the core's trash (wiki/wkkern.py: obj_purge, the core's
 # retention run obj_trash_tick); the area's own wiki_purge / wiki_trash_tick are gone.
 
 
@@ -832,7 +832,7 @@ def wiki_purge_many():
         if oid and b.get("all") is not True and len(mine) > 1 and not _wkp_may_empty(c, uid, oid):
             # 2.306.0 (#2875 review N12): several pages at once = emptying the trash by hand; one's own single page stays allowed
             raise Denied(403, tr(WKP_ADMIN_ONLY))
-    from ..core.writes import obj_purge_after  # 2.790.0 (#5365): the core's delete for good (the stored files after the commit)
+    from ..core.writes import obj_purge_after  # 2.809.0 (#5365): the core's delete for good (the stored files after the commit)
     from .wkkern import wkk_purge
     done = []
     with obj_purge_after() as box:

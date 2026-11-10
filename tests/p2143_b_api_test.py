@@ -356,7 +356,7 @@ def trash_ids(s, space):
 
 
 def tick():
-    # 2.790.0 (#5365): pages go through the core's run (wiki/wkkern.py, kind wiki_page); its count is the pages'
+    # 2.809.0 (#5365): pages go through the core's run (wiki/wkkern.py, kind wiki_page); its count is the pages'
     code = ("import json, app\nfrom kalmido.core.writes import obj_trash_tick\nc = app.connect()\n"
             "try:\n    n = obj_trash_tick(c, force=True)\n    print(json.dumps({'pages': n.get('wiki_page', 0)}))\nfinally:\n    c.close()")
     out = subprocess.run(["docker", "exec", "-e", "KALMIDO_PURGE_TRASH=1", CT, "python", "-c", code], capture_output=True, text=True)  # 2.272.0 (#3026): the trash runs delete only with the switch on
@@ -386,7 +386,7 @@ n = tick()
 check(n.get("pages") == 0 and not gone(old) and stored(old_path), f"#2211 inside the period nothing goes {n}")
 dbc.execute("UPDATE wiki_pages SET deleted_at='2000-01-01T00:00:00.000Z' WHERE id=?", (old,))
 n = tick()
-check(n.get("pages") == 1, f"#2211 the run counts one page {n}")  # 2.790.0 (#5365): its file is checked on the disk below
+check(n.get("pages") == 1, f"#2211 the run counts one page {n}")  # 2.809.0 (#5365): its file is checked on the disk below
 check(gone(old) and not dbc.execute("SELECT 1 FROM wiki_files WHERE id=?", (old_f,)).fetchall(), "#2211 page and file row gone")
 check(not dbc.execute("SELECT 1 FROM file_text WHERE kind='wiki' AND ref_id=?", (old_f,)).fetchall()
       and not dbc.execute("SELECT 1 FROM upload_scan WHERE kind='wiki' AND ref_id=?", (old_f,)).fetchall(), "#2211 text / scan marks gone")

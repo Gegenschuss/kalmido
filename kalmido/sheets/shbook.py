@@ -535,7 +535,7 @@ def sheets_tabs_delete(sid, tid):
     r = _need_tab(c, first, tid)
     if not r["book_id"]:
         raise Denied(409, tr("This sheet carries the table and cannot be deleted on its own: delete the table instead"))
-    from .shkern import shk_trash  # 2.790.0 (#5365): the core's trash
+    from .shkern import shk_trash  # 2.809.0 (#5365): the core's trash
     t = shk_trash(c, uid, tid)
     from .shundo import shu_rec
     shu_rec(c, first, "tdel", str(tid), t["deleted_at"])  # 2.800.0 (#5409): the person's step (its time in the trash)
@@ -555,7 +555,7 @@ def sheets_tabs_restore(sid, tid):
     if any(shb_label(x).casefold() == shb_label(r).casefold() for x in tabs):  # its name was taken meanwhile
         name = shb_label(r)[:SHB_NAME_MAX - 4] + " (2)"
         c.execute("UPDATE sheets SET tab_name=?, title=? WHERE id=?", (name, name, tid))
-    from .shkern import shk_restore  # 2.790.0 (#5365): the core's trash
+    from .shkern import shk_restore  # 2.809.0 (#5365): the core's trash
     shk_restore(c, uid, tid)
     sh_touch(c, tid, uid)
     return _answer(c, first)

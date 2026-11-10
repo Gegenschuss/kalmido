@@ -11,7 +11,7 @@ household budget (life/budget.py bud_trash_tick: entries with their receipts, te
 the copies of sections / sprints and the inbound webhooks are deleted by the core's run (core/writes.py obj_trash_tick).
 
 Like every retention run it only counts while ret_on("trash") is off (core/retention.py) and reports the numbers per
-area (GET /api/admin/retention). 2.790.0 (#5365): file-store nodes (with their versions, previews, text and index; a node a
+area (GET /api/admin/retention). 2.809.0 (#5365): file-store nodes (with their versions, previews, text and index; a node a
 hook of fs_on_delete refuses -- legal retention of a booked receipt, #2168 -- stays, counted as fs_entry_locked), knowledge
 pages and tables are deleted by the core's run (core/writes.py obj_trash_tick: files/fskern.py, wiki/wkkern.py,
 sheets/shkern.py). The logbook is never purged here: its entries are locked until the legal
@@ -35,7 +35,7 @@ TP_PRIVACY_HOLD = (" AND NOT EXISTS (SELECT 1 FROM office_privacy_sheets x WHERE
                    " AND (x.status='signed' OR x.signed_node_id IS NOT NULL))")
 # (count key, table, extra condition): the plain areas, one DELETE each (their child rows go by ON DELETE CASCADE)
 TP_PLAIN = (
-    # 2.790.0 (#5365): tables in the trash go through the core's run (sheets/shkern.py); their deleted rows / columns stay here
+    # 2.809.0 (#5365): tables in the trash go through the core's run (sheets/shkern.py); their deleted rows / columns stay here
     ("sheet_rows", "sheet_rows", f" AND sheet_id IN (SELECT id FROM sheets WHERE {live_sql()})"),
     ("sheet_columns", "sheet_columns", f" AND sheet_id IN (SELECT id FROM sheets WHERE {live_sql()})"),
     ("deals", "office_deals", ""),  # office_docs.deal_id: ON DELETE SET NULL
@@ -99,7 +99,7 @@ def tp_tick(c, force=False):
     TP_TICK["at"] = time.time()
     purge, cut, counts = ret_on("trash"), tp_cut(), {}
     with system_ctx(c):  # the trash of every organisation and private space (row-level security); nothing is handed to a person
-        # 2.790.0 (#5365): file-store nodes go through the core's run (core/writes.py obj_trash_tick, files/fskern.py:
+        # 2.809.0 (#5365): file-store nodes go through the core's run (core/writes.py obj_trash_tick, files/fskern.py:
         # fs_entry / fs_entry_locked); paths = the other areas' stored files below
         paths = []
         counts["hub_mails"] = tp_hubmail(c, cut, purge)

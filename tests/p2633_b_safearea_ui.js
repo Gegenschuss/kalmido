@@ -6,7 +6,7 @@
 //   measured with a simulated 47 px and stay valid); the head starts below the clock; the workspace stripe on top of the head and the loading bar sit
 //   below the status bar, not behind the clock (the glowing line seen on a phone)
 // - the tab bar keeps only part of the home indicator room: padding-bottom max(--safe-b - 1.4375rem, min(--safe-b, .5rem)),
-//   34 px -> 11 px (2.790.0, #5437: was 22 px with - .75rem), 12 px -> 8 px, 0 -> 0 (no safe area: as before); it ends at the
+//   34 px -> 11 px (2.809.0, #5437: was 22 px with - .75rem), 12 px -> 8 px, 0 -> 0 (no safe area: as before); it ends at the
 //   screen's bottom; the labels sit close to it but stay clear of the home indicator (its top ~13 px above the edge)
 // - 2.809.0 (#5437): the phone heads (#top, the agent chat's head) are sticky boxes as wide as the screen: iOS 26 draws its
 //   scroll-edge blur over the top of a home-screen app unless the top centre sits in such a fixed / sticky box; the head is

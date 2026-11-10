@@ -38,7 +38,7 @@ one write call on top is office/owrite.py ow_write."""
 import base64
 import hashlib
 import json
-from contextlib import contextmanager  # 2.790.0 (#5365): obj_purge_after
+from contextlib import contextmanager  # 2.809.0 (#5365): obj_purge_after
 from contextvars import ContextVar
 from datetime import timedelta
 
@@ -57,7 +57,7 @@ from .objects import obj_reg_node  # 2.754.0 (#5268): the write paths refuse a l
 from .pg import qi, system_ctx, table_columns, ts_canon, write_lock  # 2.755.0 (#5296): qi; 2.760.0 (#5311): ts_canon
 from .retention import ret_due, ret_on, ret_report, ret_trash_cut  # 2.773.0 (#5292): the trash's retention run
 from ..collab.comments import user_names
-from .serializers import unlink_files  # 2.790.0 (#5365): obj_trash_tick, after the commit
+from .serializers import unlink_files  # 2.809.0 (#5365): obj_trash_tick, after the commit
 from ..accounts.orgroles import need_org_write, org_role_key
 from ..accounts.orgout import org_out  # 2.579.0 (#4802): obj_space_set
 from ..files.fsref import fs_ref_drop, fs_ref_rename
@@ -376,12 +376,12 @@ def _kids_restore(c, reg, rid, gone):
             c.execute(f"UPDATE {qi(t, (t,))} SET deleted_at=NULL WHERE id = ANY(CAST(? AS BIGINT[]))", (back,))
 
 
-OBJ_PURGE = {}  # 2.790.0 (#5365): kind -> f(c, rid) of obj_on_purge
+OBJ_PURGE = {}  # 2.809.0 (#5365): kind -> f(c, rid) of obj_on_purge
 _PURGE_BOX = ContextVar("obj_purge_box", default=None)
 
 
 def obj_on_purge(kind, f):
-    """2.790.0 (#5365): the area's part of the delete for good of an object of kind (_purge_rows runs it first): f(c, rid) cleans
+    """2.809.0 (#5365): the area's part of the delete for good of an object of kind (_purge_rows runs it first): f(c, rid) cleans
     what the core does not know (stored files, scan / text rows, folder nodes) and returns what must happen after the commit
     (paths relative to ATT_DIR or callables, core/serializers.py unlink_files) or None; Denied = the object is kept (a receipt
     under the legal retention, files/store.py fs_on_delete): obj_purge refuses, the retention run counts it as locked."""
@@ -390,7 +390,7 @@ def obj_on_purge(kind, f):
 
 @contextmanager
 def obj_purge_after(keep_locked=False):
-    """2.790.0 (#5365): collects the after-commit work of the purges within ({"after": [...], "locked": n}); the caller commits
+    """2.809.0 (#5365): collects the after-commit work of the purges within ({"after": [...], "locked": n}); the caller commits
     and then calls unlink_files(box["after"]). keep_locked: a Denied of an area's hook keeps that object (counted) instead of
     refusing (the retention run)."""
     box = {"after": [], "locked": 0, "keep": bool(keep_locked)}
@@ -402,7 +402,7 @@ def obj_purge_after(keep_locked=False):
 
 
 def _purge_area(c, kind, rid):
-    """2.790.0 (#5365): the area's hook of obj_on_purge (in a savepoint: a refusal leaves nothing half done). False = kept."""
+    """2.809.0 (#5365): the area's hook of obj_on_purge (in a savepoint: a refusal leaves nothing half done). False = kept."""
     f = OBJ_PURGE.get(kind)
     if f is None:
         return True
@@ -424,7 +424,7 @@ def _purge_area(c, kind, rid):
 
 def _purge_rows(c, kind, reg, rid):
     """THE delete for good of one object of the trash (obj_purge after its rights check, obj_trash_prune for the retention run):
-    its reference node, history, undo steps, revoked shares and children go with it. 2.790.0 (#5365): the area's hook first
+    its reference node, history, undo steps, revoked shares and children go with it. 2.809.0 (#5365): the area's hook first
     (obj_on_purge); one that keeps the object (legal retention) leaves it in the trash."""
     if not _purge_area(c, kind, rid):
         return
@@ -574,13 +574,13 @@ def obj_trash_tick(c, force=False):
         return {}
     purge, cut, out = ret_on("trash"), ret_trash_cut(), {}
     paths = []
-    with obj_purge_after(keep_locked=True) as box:  # 2.790.0 (#5365): the areas' stored files after the commit, receipts locked
+    with obj_purge_after(keep_locked=True) as box:  # 2.809.0 (#5365): the areas' stored files after the commit, receipts locked
         for kind, reg in sorted(OBJ.items()):
             if reg.get("trash_prune"):
                 n0 = box["locked"]
                 n = obj_trash_prune(c, kind, cut, purge)
                 lk = box["locked"] - n0
-                out[kind] = n - lk  # 2.790.0 (#5365, review): a locked receipt counts as locked, not as deleted
+                out[kind] = n - lk  # 2.809.0 (#5365, review): a locked receipt counts as locked, not as deleted
                 if lk:
                     out[kind + "_locked"] = lk
         for kind, k in sorted(PART_KINDS.items()):  # 2.783.0 (#5368): the side objects (core/objparts.py), one savepoint each
@@ -599,7 +599,7 @@ def obj_trash_tick(c, force=False):
     if out:
         ret_report(c, "trash", out, purge, run="obj_trash")
     c.commit()
-    unlink_files(box["after"])  # 2.790.0 (#5365): after the commit (a failed commit keeps the rows and their files)
+    unlink_files(box["after"])  # 2.809.0 (#5365): after the commit (a failed commit keeps the rows and their files)
     if paths:  # after the commit: a failed commit keeps the rows and their files
         fs_purge_files([], paths)
     return out

@@ -194,7 +194,7 @@ print("TICK", obj_trash_tick(c, force=True))""")
 check(f"DUE [{O2}]" in out and "DRY 1" in out and "TICK {" in out and f"'{K}': 1" in out.split("TICK", 1)[-1], f"due: only the old one; switch off = counted {out[-400:]}")
 check(not gone(O2) and not gone(O3), "switch off: nothing deleted")
 last = dbx("SELECT value FROM settings WHERE key='ret_last_trash.obj_trash'")
-# 2.790.0 (#5365): file-store nodes, knowledge pages and tables report in the same run (only kinds with a count are kept)
+# 2.809.0 (#5365): file-store nodes, knowledge pages and tables report in the same run (only kinds with a count are kept)
 check(last and json.loads(last[0][0]).get("counts", {}).get(K) == 1 and json.loads(last[0][0]).get("purged") is False, f"reported for the retention page {last}")
 out = in_app(f"""from kalmido.core.writes import obj_trash_prune
 print("PURGED", obj_trash_prune(c, "{K}", purge=True))

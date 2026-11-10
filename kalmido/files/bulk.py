@@ -26,7 +26,7 @@ from ..core.config import app, MAX_FILE_MB
 from ..core.db import bump, db, body, err, local_now
 from ..core.i18n import N_, tr
 from ..core.access import Denied
-from ..core.serializers import unlink_files  # 2.790.0 (#5365): the purges' files after the commit
+from ..core.serializers import unlink_files  # 2.809.0 (#5365): the purges' files after the commit
 from ..accounts.session import me
 from .store import DEPTH_MAX, fs_chain, fs_deleted, fs_log_add, fs_put, fs_read, fs_role, fs_visible_ids, need_node, safe_fs_name, _free_name
 from .fsref import fs_ref_need_move, fs_ref_trashed, fs_trash_prepare, fs_trash_restored  # 2.199.0 A (#2742); 2.238.0 A (#2863)
@@ -101,7 +101,7 @@ def files_bulk_trash():
         k, r = fs_trash_prepare(c, uid, c.execute("SELECT * FROM fs_nodes WHERE id=?", (i,)).fetchone())
         kept += k
         refs += r
-    from .fskern import fsk_trash  # 2.790.0 (#5365): the core's trash
+    from .fskern import fsk_trash  # 2.809.0 (#5365): the core's trash
     for i in ids:
         fsk_trash(c, uid, i)
         fs_log_add(c, i, "trash")
@@ -138,7 +138,7 @@ def files_bulk_restore():
         nm = _free_name(c, n["parent_id"], n["owner_id"], n["org_id"], n["name"], skip=n["id"])
         if nm != n["name"]:
             c.execute("UPDATE fs_nodes SET name=? WHERE id=?", (nm, n["id"]))
-        fsk_restore(c, uid, n["id"])  # 2.790.0 (#5365): the core's trash
+        fsk_restore(c, uid, n["id"])  # 2.809.0 (#5365): the core's trash
         fs_log_add(c, n["id"], "restore")
         for k, v in fs_trash_restored(c, uid, n).items():  # 2.199.0 A (#2742); 2.373.0 (#3335): what stays in its area's trash
             stays[k] = stays.get(k, 0) + v
@@ -179,7 +179,7 @@ def files_bulk_purge():
 
 
 def abm_purge(c, uid, own):
-    """2.790.0 (#5365): the nodes own (outermost, owned by uid) for good through the core's trash (files/fskern.py) -> (deleted,
+    """2.809.0 (#5365): the nodes own (outermost, owned by uid) for good through the core's trash (files/fskern.py) -> (deleted,
     locked, the after-commit work). A node a hook keeps (legal retention, #2168) stays, like the core's retention run."""
     from ..core.writes import obj_purge_after
     from .fskern import fsk_purge

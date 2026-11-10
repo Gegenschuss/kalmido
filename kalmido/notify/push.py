@@ -873,7 +873,7 @@ def _watchdog_tick(c):
     _wd_section(c, "entertainment receipts trash", bw_purge_tick)  # 2.119.0 A (#2288): trashed drafts and bills go after 30 days
     from ..wiki.wikiatt import wka_tick
     _wd_section(c, "wiki files", wka_tick)  # 2.99.0 (#2182): files in the trash for good after 30 days
-    # 2.790.0 (#5365): pages in the trash go through the core's run above ("core trash", wiki/wkkern.py)
+    # 2.809.0 (#5365): pages in the trash go through the core's run above ("core trash", wiki/wkkern.py)
     from ..wiki.wkhist import wkx_tick
     _wd_section(c, "wiki held versions", wkx_tick)  # 2.528.0 D (#4306): versions held at a lock, after the trash period
     from ..sheets.shkinds import shk_tick

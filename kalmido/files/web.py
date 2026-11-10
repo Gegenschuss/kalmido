@@ -15,7 +15,7 @@ from ..core.errors import BadInput  # 2.577.0 (#4708 3)
 from ..core.db import bump, body, db, err, insert_id, iso
 from ..accounts.session import me
 from ..core.access import Denied, acx_of, collab_all
-from ..core.serializers import unlink_files  # 2.790.0 (#5365): the purges' files after the commit
+from ..core.serializers import unlink_files  # 2.809.0 (#5365): the purges' files after the commit
 from ..core.orgcrypt import oc_send_file
 from .upsafe import h6d_one_file_request, h6d_read
 from .scan import sc_guard  # 2.477.0 (#3936): pulled up from functions
@@ -734,7 +734,7 @@ def files_node_delete(nid):
             return err(tr("Only what is in the trash can be deleted permanently"), 409)
         if n["role"] != "owner":
             raise Denied(403)
-        from ..core.writes import obj_purge_after  # 2.790.0 (#5365): the core's delete for good (files/fskern.py)
+        from ..core.writes import obj_purge_after  # 2.809.0 (#5365): the core's delete for good (files/fskern.py)
         from .fskern import fsk_purge
         with obj_purge_after() as box:
             fsk_purge(c, uid, nid)  # this node and what is below it (a node inside a deleted folder: only that one)
@@ -753,7 +753,7 @@ def files_node_delete(nid):
     pl_tree_need_open(c, nid)
     _fsu_step(c, uid, n, "delete")  # 2.777.0 (#5254)
     kept, refs = fs_trash_prepare(c, uid, n)  # 2.199.0 A (#2742): what may not go into the trash moves one level up first
-    from .fskern import fsk_trash  # 2.790.0 (#5365): the core's trash
+    from .fskern import fsk_trash  # 2.809.0 (#5365): the core's trash
     fsk_trash(c, uid, nid)
     fs_log_add(c, nid, "trash")
     for r in refs:
@@ -779,7 +779,7 @@ def files_node_restore(nid):
     nm = _free_name(c, n["parent_id"], n["owner_id"], n["org_id"], n["name"], skip=nid)
     if nm != n["name"]:
         c.execute("UPDATE fs_nodes SET name=? WHERE id=?", (nm, nid))
-    from .fskern import fsk_restore  # 2.790.0 (#5365): the core's trash
+    from .fskern import fsk_restore  # 2.809.0 (#5365): the core's trash
     fsk_restore(c, me(), nid)
     fs_log_add(c, nid, "restore")
     stays = fs_trash_restored(c, me(), n)  # 2.199.0 A (#2742); 2.373.0 (#3335): what stays in its area's trash

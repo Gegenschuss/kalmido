@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # kalmido-suite: fresh
-"""2.790.0 (#5365): stage 3 of the core's trash -- file-store nodes (files/fskern.py, kind fs_entry), knowledge pages with
+"""2.809.0 (#5365): stage 3 of the core's trash -- file-store nodes (files/fskern.py, kind fs_entry), knowledge pages with
 their files (wiki/wkkern.py, wiki_page, children wiki_files) and tables (sheets/shkern.py, sheet_table) go into the ONE trash
 of the core (core/writes.py obj_trash / obj_restore / obj_purge, the retention run obj_trash_tick). Own container (kt.fresh).
 Invented names and texts only.
@@ -148,7 +148,7 @@ check(one("SELECT deleted_at FROM wiki_files WHERE id=?", (WF1,)) is None, "wiki
 check(one("SELECT deleted_at FROM wiki_files WHERE id=?", (WF2,)) is not None, "wiki: the file deleted on its own before stays in the trash")
 r = Fr.get(B + f"/api/wiki/pages/{W1}")
 check(r.ok and "Invented plan text" in r.text, f"wiki: the text is there again {r.status_code}")
-# review 2.790.0 (#5365): a page trashed before 2.790 by an import's undo - its files carry a time a moment AFTER the page's
+# review 2.809.0 (#5365): a page trashed before 2.809 by an import's undo - its files carry a time a moment AFTER the page's
 # (the old wiki_bulk); the old rule brought them back (">="), so the core's restore does too
 W4 = page("Stage3/Before", "Invented import text")
 WF4, _ = wfile(W4, "import.pdf")

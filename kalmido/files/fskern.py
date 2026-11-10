@@ -1,4 +1,4 @@
-"""2.790.0 (#5365, stage 3 of the core's trash): the file store's nodes on the ONE trash of the core (core/writes.py obj_trash /
+"""2.809.0 (#5365, stage 3 of the core's trash): the file store's nodes on the ONE trash of the core (core/writes.py obj_trash /
 obj_restore / obj_purge / obj_trash_prune, docs/dev/kern.md). A node is registered as a core object without routes, folder
 node or listing (the pattern of the office's kinds): the file store's routes (files/web.py, files/bulk.py) check their rights,
 locks and protected nodes as before and then put the node into the core's trash (fsk_trash: deleted_at / deleted_by; what

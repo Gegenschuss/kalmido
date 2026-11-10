@@ -18,7 +18,7 @@ Expired credentials (sessions, tokens, codes past their end) are no data of a pe
   run (module)                          kind     period            what goes / note
   tasks (tasks/tasktrash.py)            trash    trash             trashed tasks + attachments; lists kept by law stay (tasks_kept)
   lists (lists/listtrash.py otr_prune)  trash    trash             trashed lists with tasks + files; retain_until waits
-  obj_trash (core/writes.py)            trash    trash             2.773.0 (#5292): the core kinds with trash_prune; 2.790.0 (#5365):
+  obj_trash (core/writes.py)            trash    trash             2.773.0 (#5292): the core kinds with trash_prune; 2.809.0 (#5365):
                                                                     + fs nodes (fs_entry, receipts locked: fs_entry_locked), knowledge
                                                                     pages with their files (wiki_page), tables (sheet_table)
   - (files/trashpurge.py tp_tick)       trash    trash             hub mails, deleted table rows / columns, deals, series, tombstones

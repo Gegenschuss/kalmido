@@ -1,4 +1,4 @@
-"""2.790.0 (#5365, stage 3 of the core's trash): knowledge pages, tables and file-store nodes go into the ONE trash of the
+"""2.809.0 (#5365, stage 3 of the core's trash): knowledge pages, tables and file-store nodes go into the ONE trash of the
 core (core/writes.py obj_trash / obj_restore, wiki/wkkern.py, sheets/shkern.py, files/fskern.py), which writes the columns
 every core object carries: wiki_pages.rev + deleted_by, sheets.deleted_by, fs_nodes.rev + updated_by. New columns with a
 default / nullable only: an older version ignores them. No data moves: deleted_at stays the trash mark of these rows."""

@@ -1,4 +1,4 @@
-"""2.790.0 (#5365, stage 3 of the core's trash): knowledge pages on the ONE trash of the core (core/writes.py obj_trash /
+"""2.809.0 (#5365, stage 3 of the core's trash): knowledge pages on the ONE trash of the core (core/writes.py obj_trash /
 obj_restore / obj_purge / obj_trash_prune, docs/dev/kern.md). The page is registered as a core object without routes,
 folder node or listing (the pattern of office/okern.py): the knowledge routes (wiki/pages.py) check their rights as before
 and then put the page into the core's trash (wkk_trash: deleted_at / deleted_by, its files as children with the same time),
@@ -105,7 +105,7 @@ def _wkk_when(v):
 
 
 def _wkk_align_old(c, pid):
-    """2.790.0 (#5365, review): a page trashed BEFORE 2.790 kept the old rule of wiki/pages.py - its files came back when they
+    """2.809.0 (#5365, review): a page trashed BEFORE 2.809 kept the old rule of wiki/pages.py - its files came back when they
     went into the trash at the page's time OR LATER (wiki_bulk stamped the files a moment after the page). The core brings
     back only the same time (core/writes.py _kids_restore), so such files get the page's time first; held ones stay."""
     r = _row(c, pid)
@@ -120,7 +120,7 @@ def _wkk_align_old(c, pid):
 
 
 def wkk_with_page(c, pid, fids):
-    """2.790.0 (#5365): files fids of page pid put into the trash in the same request before it (wiki_bulk: an import's undo)
+    """2.809.0 (#5365): files fids of page pid put into the trash in the same request before it (wiki_bulk: an import's undo)
     get the page's time: they went with it and come back with it (core/writes.py children)."""
     r = _row(c, pid)
     if fids and r is not None and r["deleted_at"]:

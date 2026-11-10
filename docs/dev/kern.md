@@ -169,7 +169,7 @@ c.commit()
   tables `field_trash` and `time_wipes` stay for the version before; their rows move into `list_part_trash` at every start
   (`ftr_move`, `tzw_move`: one-way for those rows). No own runs any more in `files/trashpurge.py` or `integrations/hookin.py`
   for these kinds.
-- 2.790.0 (#5365, stage 3 of the trash): `obj_on_purge(kind, f)` = the area's part of the delete for good: `f(c, id)` runs
+- 2.809.0 (#5365, stage 3 of the trash): `obj_on_purge(kind, f)` = the area's part of the delete for good: `f(c, id)` runs
   first in `_purge_rows` (in a savepoint), cleans what the core does not know (stored files, scan / text rows, folder nodes)
   and returns the work for after the commit (paths or callables); `Denied` keeps the object (a receipt under the legal
   retention): `obj_purge` refuses, the retention run counts it as `<kind>_locked` and leaves it in the trash. Purges that

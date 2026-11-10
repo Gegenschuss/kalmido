@@ -3,7 +3,7 @@
 addresses only (example.com).
  - #2165: in every area one object goes into the trash and is dated back past the period (files with the stored file,
    wiki page, hub mail with its word index, table + a deleted row / column of a live table, pipeline deal, invoice series,
-   team chat tombstone, emptied comment; 2.790.0 #5365: files, tables and wiki pages through the core run obj_trash_tick); the run with the switch off deletes nothing and reports the numbers per area
+   team chat tombstone, emptied comment; 2.809.0 #5365: files, tables and wiki pages through the core run obj_trash_tick); the run with the switch off deletes nothing and reports the numbers per area
    (GET /api/admin/retention); with KALMIDO_RETENTION_PURGE=1 they are gone (the stored file from the disk too, the hub
    mail's folder in the file store's trash); what was deleted today stays; the file store's trash view says the period
  - #2172: keep_weekly at most 52 only with the switch (2.186.0 #2602: without it the value stays); a safety backup older than 30 days goes
@@ -213,7 +213,7 @@ sql("UPDATE comments SET deleted_at=? WHERE id=?", (OLD, CM), write=True)
 
 # 2.152.0 (#2165): no "wiki" here -- main's own run wiki/pages.py wiki_trash_tick deletes the pages with their files (below)
 # 2.783.0 (#5368): the tombstones of the team chat are the core's run (core/writes.py obj_trash_tick, kind tchat_msg): CORE
-# 2.790.0 (#5365): file-store nodes, tables and knowledge pages go through the core's run too (CORE)
+# 2.809.0 (#5365): file-store nodes, tables and knowledge pages go through the core's run too (CORE)
 WANT = {"sheet_rows": 1, "sheet_columns": 1, "hub_mails": 1, "deals": 1, "series": 1, "comments": 1}
 CORE = {"tchat_msg": 1, "fs_entry": 1, "sheet_table": 1, "wiki_page": 1}
 
@@ -233,7 +233,7 @@ st = retention("trash")
 last = (st or {}).get("last") or {}
 check(st and not st["on"] and st["days"] == 30 and last.get("purged") is False, f"retention: trash off, 30 days, dry run: {st}")
 check(all((last.get("counts") or {}).get(k) == v for k, v in WANT.items()), f"dry run counts per area: {last.get('counts')}")
-cr = core_run(False)  # 2.783.0 (#5368), 2.790.0 (#5365)
+cr = core_run(False)  # 2.783.0 (#5368), 2.809.0 (#5365)
 check(cr.get("purged") is False and all((cr.get("counts") or {}).get(k) == v for k, v in CORE.items())
       and sql("SELECT 1 FROM tchat_msgs WHERE room_id=? AND body='' AND id<>?", (ROOM, TROOT)), f"dry run of the core: the tombstone counted, it stays {cr}")
 check(one("SELECT COUNT(*) FROM wiki_pages WHERE id=?", (W_OLD,)) == 1 and one("SELECT COUNT(*) FROM sheets WHERE id=?", (S_OLD,)) == 1

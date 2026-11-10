@@ -1,4 +1,4 @@
-"""2.790.0 (#5365, stage 3 of the core's trash): tables on the ONE trash of the core (core/writes.py obj_trash / obj_restore /
+"""2.809.0 (#5365, stage 3 of the core's trash): tables on the ONE trash of the core (core/writes.py obj_trash / obj_restore /
 obj_purge / obj_trash_prune, docs/dev/kern.md). A sheet row (a table's first sheet or a further sheet of it, book_id) is
 registered as a core object without routes, folder node or listing (the pattern of the office's kinds): the tables' routes
 (sheets/web.py, sheets/shbook.py) check their rights as before and then put the sheet into the core's trash (shk_trash:

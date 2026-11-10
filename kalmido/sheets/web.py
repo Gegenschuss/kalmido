@@ -143,7 +143,7 @@ def sheets_delete(sid):
     c = db()
     from .shshare import shs_need_own
     shs_need_own(c, _need_w(c, sid))  # 2.124.0 C (#2113): never through a share
-    from .shkern import shk_trash  # 2.790.0 (#5365): the core's trash (shkern loads after this module)
+    from .shkern import shk_trash  # 2.809.0 (#5365): the core's trash (shkern loads after this module)
     shk_trash(c, me(), sid)
     sh_touch(c, sid, me())
     return _done(c, sid)
@@ -156,7 +156,7 @@ def sheets_restore(sid):
     if r["book_id"]:  # 2.124.0 (#2116, review): a further sheet comes back through its sheet route (name and count checks)
         from .shbook import sheets_tabs_restore
         return sheets_tabs_restore(r["book_id"], sid)
-    from .shkern import shk_restore  # 2.790.0 (#5365): the core's trash
+    from .shkern import shk_restore  # 2.809.0 (#5365): the core's trash
     shk_restore(c, me(), sid)
     from .shshare import shs_core_move
     shs_core_move(c, sid)  # 2.565.0 (#4717): its old share rows not moved yet get their core shares
@@ -626,7 +626,7 @@ def sheets_purge_many():
         mine = [x for x in mine if x in want]
     if oid and (b.get("all") is True or len(mine) > 1) and not shx_may_empty(c, uid, oid):
         raise Denied(403, tr(SHX_ADMIN_ONLY))  # one's own single table stays allowed (like knowledge)
-    from ..core.writes import obj_purge_after  # 2.790.0 (#5365): the core's delete for good (sheets/shkern.py)
+    from ..core.writes import obj_purge_after  # 2.809.0 (#5365): the core's delete for good (sheets/shkern.py)
     from .shkern import shk_purge
     with obj_purge_after() as box:
         for sid in mine:
