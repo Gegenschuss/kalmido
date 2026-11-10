@@ -143,8 +143,11 @@ const TOUCH = {'(hover: none)': true, '(hover:none)': true, '(pointer:coarse)': 
 
   // ================= CSS (static): the touch rule, the zoom lock, the sheet head
   const css = await require('./boot').allCss(); // 2.65.0 (#1824): + the module stylesheets
-  const tb = css.match(/@media \(hover: none\), \(pointer: coarse\)\{([^}]*\}[^}]*\})/);
-  check(tb && /\.trow \.ttl/.test(tb[1]) && /-webkit-user-select:none/.test(tb[1]) && /-webkit-touch-callout:none/.test(tb[1]) && /#side/.test(tb[1]), '#1178 / #1155 one touch rule: titles and the sidebar not selectable, with the -webkit- prefix');
+  // 2.828.0 (#5446): the task row part moved with the list rules into css/start-00-lists.css; the sidebar part stays in
+  // app.css - both blocks of the same touch query together are the rule
+  const tbs = [...css.matchAll(/@media \(hover: none\), \(pointer: coarse\)\{([^}]*\}[^}]*\})/g)].map(m => m[1]);
+  const tbRow = tbs.find(b => /\.trow \.ttl/.test(b)), tbSide = tbs.find(b => /#side\{/.test(b));
+  check(tbRow && tbSide && [tbRow, tbSide].every(b => /-webkit-user-select:none/.test(b) && /-webkit-touch-callout:none/.test(b)), '#1178 / #1155 one touch rule: titles and the sidebar not selectable, with the -webkit- prefix');
   check(/\.trow \.ttl\{-webkit-user-select:text;user-select:text\}/.test(css), '#1178 mouse: the title stays selectable');
   check(/html\.nozoom,html\.nozoom body\{touch-action:pan-x pan-y\}/.test(css), '#1173 html.nozoom: pan only');
   check(/\.tch-shx\{[^}]*width:2\.75rem;height:2\.75rem/.test(css), '#1177 the X is 44 px');
