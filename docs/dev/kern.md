@@ -412,6 +412,18 @@ Not counted: the core's own tables (`obj_*`), tables with `token_hash`, `url`, `
 lists, roles), and a table a fragment drops (`DROP TABLE IF EXISTS` in AFTER). In the code outside `kalmido/core/` a new
 `MENTION_RE`, `need_*_say(` or `*_react(` is red, a new `*_search(` a hint.
 
+Shares and rights checks (2.846.0, #5522): who may do what exists once too (section 3). The same check is red on
+- a new table whose name ends in `_shares`, or that holds an `*_id` on users, organisations, groups or agents (`user_id`,
+  `org_id`, `group_id`, `agent_id`, `owner_id`, or `REFERENCES` one of these tables) together with a `role` or `perm*` column
+  (also one added later with `ALTER TABLE ... ADD COLUMN`) -- here `role` and the other exceptions above do not count;
+- a new `def need_*(`, `def *_role(` or `def *_can(` outside `kalmido/core/`: a rights check of its own. A new area asks
+  `obj_need` / `obj_role` (or `AccessCtx`, `need_list`, `need_task`) instead.
+
+The tables of today (`fs_shares` as the core's own, `group_shares`, `folder_people`, `sheet_shares`, `wiki_shares`, the old
+member tables of stage 7 ...) stand in the allow file's `tables`, the checks of today in its section `rights`, each with its
+reason: the stage that takes it down (7b-7e), a door / hook to the core's role, or the area's own logic (the instance admin, a
+server switch, a person's own rows, agents, the office groups).
+
 What is there today stands in `tools/core_crosscut_allow.json` with its reason: the stage that takes it down, or the area's own
 logic (a task's placement in lists, a mail's text, an IMAP de-duplication ...). The list grows only with a decision of the product owner.
 A stage that takes a table or a function down takes its line out in the same commit; a line whose table or function is gone is

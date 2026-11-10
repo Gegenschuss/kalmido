@@ -6,6 +6,9 @@
  - quiet: the core's own tables (obj_*), a share link (token_hash), a plain table, a join table with a column of its own
  - a table a fragment drops (DROP TABLE IF EXISTS) does not count
  - code outside kalmido/core: a new *_react( / need_*_say( / MENTION_RE red, a new *_search( only a hint
+ - 2.846.0 (#5522): a _shares table and a table with a user / org / group / agent id plus role or perm* (also added with
+   ALTER TABLE) red, a role without such an id quiet; need_* / *_role / *_can outside kalmido/core red, in the core quiet,
+   allowed ones quiet, a stale rights line red
  - the repository: no finding
 usage: check_core_crosscut_test.py"""
 import os
@@ -60,6 +63,29 @@ check(len(out) == 1 and "meeting_tags is gone" in out[0], f"an allow line of a d
 out = run(allow={"meeting_tags": "a reason", "meetings": "a reason"})
 check(len(out) == 2 and all("take the line out" in x for x in out), f"an allow line of a missing / plain table is red: {out}")
 
+# 2.846.0 (#5522): shares and role tables of an area
+SHARES = frag("CREATE TABLE IF NOT EXISTS meeting_shares (\n  id BIGSERIAL PRIMARY KEY,\n  meeting_id BIGINT,\n  token_hash TEXT);")
+out = run(SHARES)
+check(len(out) == 1 and "table meeting_shares (kalmido/core/migrations.d/9999_x.py:2) looks like a share" in out[0]
+      and "kern.md section 3" in out[0], f"a new _shares table is red (also with token_hash): {out}")
+PEOPLE = frag("CREATE TABLE IF NOT EXISTS meeting_people (\n  meeting_id BIGINT REFERENCES meetings(id),\n"
+              "  user_id BIGINT REFERENCES users(id),\n  role TEXT NOT NULL DEFAULT 'view');")
+out = run(PEOPLE)
+check(len(out) == 1 and "meeting_people" in out[0] and "a share" in out[0], f"user_id + role is a share table, role no exception: {out}")
+check(not run(PEOPLE, allow={"meeting_people": "a reason"}), "the same share table in the allow file stays quiet")
+PERM = frag("CREATE TABLE IF NOT EXISTS meeting_access (\n  meeting_id BIGINT,\n  holder_id BIGINT REFERENCES groups(id),\n"
+            "  perms TEXT);")
+out = run(PERM)
+check(len(out) == 1 and "meeting_access" in out[0] and "a share" in out[0], f"an id REFERENCES groups + perms is a share table: {out}")
+LATER = frag("CREATE TABLE IF NOT EXISTS meeting_seats2 (\n  meeting_id BIGINT,\n  agent_id BIGINT,\n  seat TEXT);\n"
+             "ALTER TABLE meeting_seats2 ADD COLUMN IF NOT EXISTS role TEXT;")
+out = run(LATER)
+check(len(out) == 1 and "meeting_seats2" in out[0] and "a share" in out[0], f"a role added later with ALTER TABLE counts: {out}")
+NOROLE = frag("CREATE TABLE IF NOT EXISTS meeting_crew (\n  id BIGSERIAL PRIMARY KEY,\n  meeting_id BIGINT,\n  role TEXT);")
+check(not run(NOROLE), f"a role without a user / org / group / agent id (a job title) stays quiet: {run(NOROLE)}")
+out = run(allow={"meeting_people": "a reason"})
+check(len(out) == 1 and "meeting_people is gone" in out[0], f"an allow line of a missing share table is red: {out}")
+
 # code: a temporary tree with schema.py, one area module and kalmido/core
 tmp = tempfile.mkdtemp(prefix="c5267-")
 for d in ("kalmido/core/migrations.d", "kalmido/meet", "tools"):
@@ -79,11 +105,32 @@ bad, hints = cc.findings(tmp, allow={"code": {"kalmido/meet/routes.py:meeting_re
                                               "kalmido/meet/routes.py:MENTION_RE": "r", "kalmido/meet/routes.py:gone_react": "r"},
                                      "search_functions": {"kalmido/meet/routes.py:meeting_search": "r"}})
 check(len(bad) == 1 and "gone_react is gone" in bad[0] and not hints, f"code: allowed ones are quiet, a gone one is red: {bad} {hints}")
+# 2.846.0 (#5522): rights checks of their own
+with open(os.path.join(tmp, "kalmido/meet/rights.py"), "w", encoding="utf-8") as f:
+    f.write("def need_meeting(c, mid):\n    pass\n\n\ndef meeting_role(c, uid, m):\n    pass\n\n\ndef meeting_can(c, uid, m):\n"
+            "    pass\n\n\ndef _need_x():\n    pass\n")
+with open(os.path.join(tmp, "kalmido/core/meetkern.py"), "w", encoding="utf-8") as f:
+    f.write("def need_meeting(c, mid):\n    pass\n\n\ndef obj_meeting_role(c):\n    pass\n\n\ndef obj_meeting_can(c):\n    pass\n")
+OLD = {"code": {"kalmido/meet/routes.py:meeting_react": "r", "kalmido/meet/routes.py:need_meeting_say": "r",
+                "kalmido/meet/routes.py:MENTION_RE": "r"}, "search_functions": {"kalmido/meet/routes.py:meeting_search": "r"}}
+bad, hints = cc.findings(tmp, allow=OLD)
+check(len(bad) == 3 and any("need_meeting (kalmido/meet/rights.py:1) is a rights check of its own" in x for x in bad)
+      and any("meeting_role (kalmido/meet/rights.py:5)" in x for x in bad) and any("meeting_can (kalmido/meet/rights.py:9)" in x for x in bad)
+      and not any("kalmido/core/" in x or "need_meeting_say" in x for x in bad),
+      f"code: need_* / *_role / *_can outside the core red, in the core quiet, need_*_say only once (code): {bad}")
+bad, hints = cc.findings(tmp, allow=dict(OLD, rights={"kalmido/meet/rights.py:need_meeting": "r", "kalmido/meet/rights.py:meeting_role": "r",
+                                                      "kalmido/meet/rights.py:meeting_can": "r", "kalmido/meet/rights.py:gone_can": "r"}))
+check(len(bad) == 1 and "rights kalmido/meet/rights.py:gone_can is gone" in bad[0], f"code: allowed rights checks quiet, a gone one red: {bad}")
 shutil.rmtree(tmp, ignore_errors=True)
 
 # the repository: no finding (paperless_links dropped by #5265 counts no more)
 bad, hints = cc.findings()
 check(not bad, f"the repository: {bad}")
+al = cc.load_allow()
+check(all(isinstance(v, str) and len(v) > 20 for v in list(al["rights"].values()) + list(al["tables"].values())),
+      "every allow line has a reason of its own (#5522)")
+check({"fs_shares", "group_shares", "sheet_shares", "wiki_shares"} <= set(al["tables"]) and "kalmido/accounts/users.py:need_admin" in al["rights"],
+      "today's share tables and rights checks stand in the allow file (#5522)")
 check("paperless_links" not in cc.load_allow()["tables"], "paperless_links is not an exception (#5265 drops it)")
 
 print(f"check_core_crosscut: {OKS[0]} ok, {len(FAILS)} failed")

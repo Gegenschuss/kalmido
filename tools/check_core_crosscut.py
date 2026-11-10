@@ -13,8 +13,14 @@ A table looks like a cross-cutting part when
   - it joins two tables (two *_id columns with REFERENCES to different tables) and holds nothing else but id, created_at,
     created_by, sort
   not: the core's own tables (obj_*), and tables with token_hash, url, base_url or role (share links, address lists, roles).
+Shares and rights (2.846.0, #5522): who may do what exists once too (docs/dev/kern.md section 3: obj_role / obj_need,
+fs_shares). A table is red as a share of its own when
+  - its name ends in _shares, or
+  - it has an *_id column on users / orgs / groups / agents (user_id, org_id, group_id, agent_id, owner_id, or REFERENCES one
+    of them) and a role or perm* column (also one added later with ALTER TABLE ... ADD COLUMN); NOT_COLS do not count here.
 Code (outside kalmido/core/): a new MENTION_RE, need_*_say( or *_react( definition is red (the core's comment / reaction rules
-come once); a new def *_search( / *search_sql( is a hint only (the search stage Q6). Today's ones stand in the same file.
+come once); a new def need_*( / *_role( / *_can( is red as a rights check of its own (allow section "rights"); a new
+def *_search( / *search_sql( is a hint only (the search stage Q6). Today's ones stand in the same file.
 A line of the allow file whose table / definition is gone or no longer looks like one is a finding too: take it out.
 
 usage: python3 tools/check_core_crosscut.py [-v] [--root DIR]      exit 1 on a finding
@@ -36,6 +42,9 @@ SUFFIX = re.compile(r"_(links|tags|comments|notes|reactions|rx|trash_text|reads|
 MARK_COLS = {"tag", "tag_id", "body", "seen_id", "last_id", "read_at", "seen_at", "emoji", "follow", "muted", "no"}
 JOIN_FREE = {"id", "created_at", "created_by", "sort"}
 NOT_COLS = {"token_hash", "url", "base_url", "role"}
+SHARE_ON = {"users", "orgs", "groups", "agents"}
+SHARE_IDS = {"user_id", "org_id", "group_id", "agent_id", "owner_id"}
+ADD_COL = re.compile(r"ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:ONLY\s+)?(\w+)\s+ADD\s+COLUMN\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)", re.I)
 CREATE = re.compile(r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)\s*\(", re.I)
 DROP = re.compile(r"DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?(\w+)", re.I)
 KIND = {"_links": "a link", "_tags": "tags", "_comments": "a comment", "_notes": "a comment", "_reactions": "a reaction",
@@ -46,6 +55,7 @@ COL_KIND = {"tag": "tags", "tag_id": "tags", "body": "a comment", "emoji": "a re
             "last_id": "a read mark", "read_at": "a read mark", "seen_at": "a read mark", "follow": "following",
             "muted": "following", "no": "following"}
 CODE_RED = re.compile(r"^[ \t]*(?:MENTION_RE\s*=|def\s+(need_\w*_say|\w*_react)\s*\()", re.M)
+CODE_RIGHTS = re.compile(r"^[ \t]*def\s+(need_\w+|\w+_role|\w+_can)\s*\(", re.M)
 CODE_HINT = re.compile(r"^[ \t]*def\s+(\w*_search|\w*search_sql)\s*\(", re.M)
 
 
@@ -88,6 +98,27 @@ def tables(srcs):
     return {t: v for t, v in out.items() if t not in dropped}
 
 
+def added_cols(srcs):
+    """{table: {column}} of the ALTER TABLE ... ADD COLUMN of srcs (the share rule reads a role added later too)."""
+    out = {}
+    for _path, src in srcs:
+        for t, col in ADD_COL.findall(src):
+            out.setdefault(t, set()).add(col)
+    return out
+
+
+def looks_like_share(name, cols, added=()):
+    """'a share' when the table holds who may do what of its own (#5522), else None. NOT_COLS do not count here."""
+    if name.startswith("obj_"):
+        return None
+    if name.endswith("_shares"):
+        return "a share"
+    holder = [c for c in cols if c.endswith("_id") and (c in SHARE_IDS or (
+        (r := re.search(r"REFERENCES\s+(\w+)", cols[c], re.I)) and r.group(1) in SHARE_ON))]
+    right = [c for c in list(cols) + sorted(added) if c == "role" or c.startswith("perm")]
+    return "a share" if holder and right else None
+
+
 def looks_like(name, cols):
     """What the table looks like ('a link', 'tags', ...) or None."""
     if name.startswith("obj_") or NOT_COLS & set(cols):
@@ -106,18 +137,21 @@ def looks_like(name, cols):
 
 
 def code_defs(root=ROOT):
-    """({'file:name': line} of the red code rule, the same of the search hint) outside kalmido/core/."""
-    red, hint = {}, {}
+    """({'file:name': line} of the red code rule, the same of the search hint, the same of the rights checks) outside
+    kalmido/core/. A need_*_say( counts once, under the red code rule."""
+    red, hint, rights = {}, {}, {}
     for p in sorted(glob.glob(os.path.join(root, "kalmido", "**", "*.py"), recursive=True)):
         rel = os.path.relpath(p, root).replace(os.sep, "/")
         if rel.startswith("kalmido/core/"):
             continue
         with open(p, encoding="utf-8") as f:
             src = f.read()
-        for rx, into in ((CODE_RED, red), (CODE_HINT, hint)):
+        for rx, into in ((CODE_RED, red), (CODE_HINT, hint), (CODE_RIGHTS, rights)):
             for m in rx.finditer(src):
-                into.setdefault(f"{rel}:{m.group(1) or 'MENTION_RE'}", src.count("\n", 0, m.start()) + 1)
-    return red, hint
+                k = f"{rel}:{m.group(1) or 'MENTION_RE'}"
+                if into is not rights or k not in red:
+                    into.setdefault(k, src.count("\n", 0, m.start()) + 1)
+    return red, hint, rights
 
 
 def load_allow(root=ROOT):
@@ -130,9 +164,18 @@ def findings(root=ROOT, srcs=None, allow=None, code=True):
     srcs = sources(root) if srcs is None else srcs
     allow = load_allow(root) if allow is None else allow
     ok_tab, ok_code, ok_search = allow.get("tables", {}), allow.get("code", {}), allow.get("search_functions", {})
+    ok_rights = allow.get("rights", {})
     bad, hints, seen = [], [], set()
+    added = added_cols(srcs)
     for name, (path, line, cols) in sorted(tables(srcs).items()):
-        kind = looks_like(name, cols)
+        kind = looks_like_share(name, cols, added.get(name, ())) or looks_like(name, cols)
+        if kind == "a share":
+            seen.add(name)
+            if name not in ok_tab:
+                bad.append(f"check_core_crosscut: table {name} ({path}:{line}) looks like a share or role table of its own - who "
+                           f"may do what is the shared core's (fs_shares, obj_role / obj_share, docs/dev/kern.md section 3); an "
+                           f"exception only with its reason in {ALLOW}")
+            continue
         if not kind:
             continue
         seen.add(name)
@@ -140,9 +183,9 @@ def findings(root=ROOT, srcs=None, allow=None, code=True):
             bad.append(f"check_core_crosscut: table {name} ({path}:{line}) looks like {kind} - the shared core has it (obj_*, "
                        f"docs/dev/kern.md 'Cross-cutting parts'); an exception only with its reason in {ALLOW}")
     for name in sorted(set(ok_tab) - seen):
-        bad.append(f"{ALLOW}: table {name} is gone or no longer looks like a cross-cutting part - take the line out")
+        bad.append(f"{ALLOW}: table {name} is gone or no longer looks like a cross-cutting part or a share - take the line out")
     if code:
-        red, hint = code_defs(root)
+        red, hint, rights = code_defs(root)
         for k, ln in sorted(red.items()):
             if k not in ok_code:
                 f, n = k.rsplit(":", 1)
@@ -156,6 +199,14 @@ def findings(root=ROOT, srcs=None, allow=None, code=True):
                 hints.append(f"hint: {n} ({f}:{ln}) is a search of its own - the shared search comes with stage Q6")
         for k in sorted(set(ok_search) - set(hint)):
             bad.append(f"{ALLOW}: search_functions {k} is gone - take the line out")
+        for k, ln in sorted(rights.items()):
+            if k not in ok_rights:
+                f, n = k.rsplit(":", 1)
+                bad.append(f"check_core_crosscut: {n} ({f}:{ln}) is a rights check of its own - who may do what comes from the "
+                           f"core (core/access.py AccessCtx, obj_role / obj_need, docs/dev/kern.md section 3); an exception only "
+                           f"with its reason in {ALLOW} rights")
+        for k in sorted(set(ok_rights) - set(rights)):
+            bad.append(f"{ALLOW}: rights {k} is gone - take the line out")
     return bad, hints
 
 
