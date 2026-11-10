@@ -21,6 +21,14 @@ fs_shares). A table is red as a share of its own when
 Code (outside kalmido/core/): a new MENTION_RE, need_*_say( or *_react( definition is red (the core's comment / reaction rules
 come once); a new def need_*( / *_role( / *_can( is red as a rights check of its own (allow section "rights"); a new
 def *_search( / *search_sql( is a hint only (the search stage Q6). Today's ones stand in the same file.
+Filters (2.857.0, #5523): conditions are read once, by the core's filter (kalmido/core/filters.py, static/js/fltkern.js,
+static/js/fltdlg.js; docs/dev/kern.md section "Filter"). Outside them a definition named like a filter evaluator or a condition
+dialog is red (allow section "filter") -- Python: def *filter(s)_sql / _where / _match / _rules / _cond(s), *_cond_ok,
+*_match_rule(s), *_filters; browser (static/js/*.js, function NAME( and const NAME = (...) =>): *filterMatch,
+*_filter_match, *Cond(s) / *_cond(s), *CondOk / *_cond_ok, *FilterDlg / *FilterDialog / *CondDlg / *CondRows / *_cond_rows /
+*FilterRows (either case of the first letter). Green, because it only USES the core: a definition whose top-level block calls
+kflt_*, and one whose name stands in such a block or in a catalog (a block with two of has: / cond: / old: / text: / what: /
+ops: / vals:) -- the cnd function handed to kflt_where, a catalog's cond / old.
 A line of the allow file whose table / definition is gone or no longer looks like one is a finding too: take it out.
 
 usage: python3 tools/check_core_crosscut.py [-v] [--root DIR]      exit 1 on a finding
@@ -57,6 +65,14 @@ COL_KIND = {"tag": "tags", "tag_id": "tags", "body": "a comment", "emoji": "a re
 CODE_RED = re.compile(r"^[ \t]*(?:MENTION_RE\s*=|def\s+(need_\w*_say|\w*_react)\s*\()", re.M)
 CODE_RIGHTS = re.compile(r"^[ \t]*def\s+(need_\w+|\w+_role|\w+_can)\s*\(", re.M)
 CODE_HINT = re.compile(r"^[ \t]*def\s+(\w*_search|\w*search_sql)\s*\(", re.M)
+# 2.857.0 (#5523): a filter evaluator / condition dialog of its own (the core's filter: FLT_CORE)
+FLT_CORE = ("kalmido/core/filters.py", "static/js/fltkern.js", "static/js/fltdlg.js")
+FLT_PY = re.compile(r"^([ \t]*)def\s+(\w*(?:filters?_(?:sql|where|match|rules|conds?)|_cond_ok|_match_rules?|\w_filters))\s*\(",
+                    re.M)
+FLT_JS = re.compile(r"^([ \t]*)(?:(?:async\s+)?function\s*\*?\s*|(?:const|let|var)\s+)(\w*(?:[Ff]ilter[Mm]atch|_filter_match|[a-z]Conds?|"
+                    r"_conds?|[Cc]ond[Oo]k|_cond_ok|[Ff]ilter(?:Dlg|Dialog|Rows)|[Cc]ond(?:Dlg|Rows)|_cond_rows))"
+                    r"(?:\s*\(|\s*=\s*(?:async\s+)?(?:\([^)\n]*\)|\w+)\s*=>)", re.M)
+FLT_CAT = re.compile(r"\b(has|cond|old|text|what|ops|vals)\s*:")
 
 
 def sources(root=ROOT):
@@ -154,6 +170,45 @@ def code_defs(root=ROOT):
     return red, hint, rights
 
 
+def blocks(src):
+    """[(start, end)] of the top-level statements of a file: a block runs from a line that starts in column 0 (no comment, no
+    closing bracket) to the next one."""
+    starts = [m.start() for m in re.finditer(r"^(?![ \t\n#/)\]}*@])", src, re.M)] + [len(src)]
+    return list(zip(starts, starts[1:]))
+
+
+def filter_defs(rel, src):
+    """{'file:name': line} of the filter evaluators / condition dialogs of a file that do not use the core's filter (#5523)."""
+    rx = FLT_PY if rel.endswith(".py") else FLT_JS
+    bl = blocks(src)
+    cut = lambda b: re.sub(r"(?m)(#|//)[^\n]*$", "", src[b[0]:b[1]])  # noqa: E731 - a comment naming kflt_ uses nothing
+    users = [b for b in bl if "kflt_" in cut(b) or len(set(FLT_CAT.findall(cut(b)))) >= 2]
+    out = {}
+    for m in rx.finditer(src):
+        name = m.group(2)
+        own = next((b for b in bl if b[0] <= m.start() < b[1]), (0, 0))
+        if own in users and "kflt_" in cut(own):
+            continue  # its block calls the core
+        word = re.compile(r"(?<![\w.$])" + re.escape(name) + r"\b")
+        if sum(len(word.findall(cut(b))) for b in users) > (own in users):
+            continue  # handed to the core (kflt_where's cnd, a catalog's cond / old): named once more than its definition
+        out.setdefault(f"{rel}:{name}", src.count("\n", 0, m.start()) + 1)
+    return out
+
+
+def filter_code(root=ROOT):
+    """{'file:name': line} of the filter rule (#5523) over kalmido/**/*.py and static/js/*.js, without the core's filter."""
+    out = {}
+    paths = glob.glob(os.path.join(root, "kalmido", "**", "*.py"), recursive=True) + glob.glob(os.path.join(root, "static", "js", "*.js"))
+    for p in sorted(paths):
+        rel = os.path.relpath(p, root).replace(os.sep, "/")
+        if rel in FLT_CORE:
+            continue
+        with open(p, encoding="utf-8") as f:
+            out.update(filter_defs(rel, f.read()))
+    return out
+
+
 def load_allow(root=ROOT):
     with open(os.path.join(root, ALLOW), encoding="utf-8") as f:
         return json.load(f)
@@ -207,6 +262,16 @@ def findings(root=ROOT, srcs=None, allow=None, code=True):
                            f"with its reason in {ALLOW} rights")
         for k in sorted(set(ok_rights) - set(rights)):
             bad.append(f"{ALLOW}: rights {k} is gone - take the line out")
+        flt, ok_flt = filter_code(root), allow.get("filter", {})
+        for k, ln in sorted(flt.items()):
+            if k not in ok_flt:
+                f, n = k.rsplit(":", 1)
+                bad.append(f"check_core_crosscut: {n} ({f}:{ln}) looks like a filter of its own - conditions are read once, by the "
+                           f"core's filter (kalmido/core/filters.py kflt_where / kflt_match, static/js/fltkern.js + fltdlg.js, "
+                           f"docs/dev/kern.md 'Filter'): describe the fields in a catalog / a cnd function and hand them to "
+                           f"kflt_*; an exception only with its reason in {ALLOW} filter")
+        for k in sorted(set(ok_flt) - set(flt)):
+            bad.append(f"{ALLOW}: filter {k} is gone or uses the core's filter now - take the line out")
     return bad, hints
 
 

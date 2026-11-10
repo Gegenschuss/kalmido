@@ -9,6 +9,9 @@
  - 2.846.0 (#5522): a _shares table and a table with a user / org / group / agent id plus role or perm* (also added with
    ALTER TABLE) red, a role without such an id quiet; need_* / *_role / *_can outside kalmido/core red, in the core quiet,
    allowed ones quiet, a stale rights line red
+ - 2.857.0 (#5523): a filter evaluator / condition dialog of its own outside the core's filter (core/filters.py, fltkern.js,
+   fltdlg.js) red, in Python and in static/js; one that only uses the core (calls kflt_*, handed to kflt_where, a catalog's
+   cond / old) quiet; a comment naming kflt_ is no use; allowed ones quiet, a stale filter line red
  - the repository: no finding
 usage: check_core_crosscut_test.py"""
 import os
@@ -121,6 +124,35 @@ check(len(bad) == 3 and any("need_meeting (kalmido/meet/rights.py:1) is a rights
 bad, hints = cc.findings(tmp, allow=dict(OLD, rights={"kalmido/meet/rights.py:need_meeting": "r", "kalmido/meet/rights.py:meeting_role": "r",
                                                       "kalmido/meet/rights.py:meeting_can": "r", "kalmido/meet/rights.py:gone_can": "r"}))
 check(len(bad) == 1 and "rights kalmido/meet/rights.py:gone_can is gone" in bad[0], f"code: allowed rights checks quiet, a gone one red: {bad}")
+# 2.857.0 (#5523): filters of their own
+RIGHTS = {"kalmido/meet/rights.py:need_meeting": "r", "kalmido/meet/rights.py:meeting_role": "r", "kalmido/meet/rights.py:meeting_can": "r"}
+os.makedirs(os.path.join(tmp, "static/js"))
+FILES = {
+    "kalmido/meet/flt.py": "def meeting_filter_sql(rules):\n    return ' AND '.join(x['f'] for x in rules['conds'])\n\n\n"
+                           "def _meet_cond_ok(cnd):\n    return None\n\n\n"
+                           "def meeting_filter_where(c, rules):\n    return kflt_where(rules, lambda cnd: _meet_cond_ok(cnd))\n",
+    "kalmido/core/filters.py": "def kflt_filter_match(item, rules):\n    pass\n",
+    "static/js/meet.js": "function mtgFilterMatch(t, r) {  // unlike kflt_match\n  return r.conds.every(c => t[c.f] === c.v);\n}\n"
+                         "const mtg_conds = r => kflt_conds(r, MTG_CAT);\n"
+                         "function mtg_cfCond(c) {\n  return t => t.n > c.v;\n}\n"
+                         "const MTG_CAT = {has: {room: (t, x) => t.room === x}, cond: c => (c.f === 'n' ? mtg_cfCond(c) : undefined)};\n"
+                         "async function mtgCondDlg() {\n  return 1;\n}\n"
+                         "const mtgSearch = q => q.trim();\n",
+    "static/js/fltdlg.js": "function kfltCondRows(host) {\n  return host;\n}\n",
+}
+for name, text in FILES.items():
+    with open(os.path.join(tmp, name), "w", encoding="utf-8") as f:
+        f.write(text)
+bad, hints = cc.findings(tmp, allow=dict(OLD, rights=RIGHTS))
+check(len(bad) == 3 and any("meeting_filter_sql (kalmido/meet/flt.py:1) looks like a filter of its own" in x and "kern.md 'Filter'" in x for x in bad)
+      and any("mtgFilterMatch (static/js/meet.js:1)" in x for x in bad) and any("mtgCondDlg (static/js/meet.js:9)" in x for x in bad),
+      f"filter: an own evaluator in Python, one in the browser (a comment naming kflt_ is no use) and an own condition dialog are red: {bad}")
+check(not any(n in x for x in bad for n in ("meeting_filter_where", "_meet_cond_ok", "mtg_conds", "mtg_cfCond", "kflt_filter_match", "kfltCondRows")),
+      f"filter: using the core (calls kflt_*, the cnd function handed to kflt_where, a catalog's cond) and the core itself stay quiet: {bad}")
+FLT = {"kalmido/meet/flt.py:meeting_filter_sql": "r", "static/js/meet.js:mtgFilterMatch": "r", "static/js/meet.js:mtgCondDlg": "r"}
+bad, hints = cc.findings(tmp, allow=dict(OLD, rights=RIGHTS, filter=dict(FLT, **{"static/js/meet.js:mtg_conds": "r"})))
+check(len(bad) == 1 and "filter static/js/meet.js:mtg_conds is gone or uses the core's filter now" in bad[0],
+      f"filter: allowed ones quiet, a line whose definition uses the core is red: {bad}")
 shutil.rmtree(tmp, ignore_errors=True)
 
 # the repository: no finding (paperless_links dropped by #5265 counts no more)
@@ -131,6 +163,8 @@ check(all(isinstance(v, str) and len(v) > 20 for v in list(al["rights"].values()
       "every allow line has a reason of its own (#5522)")
 check({"fs_shares", "group_shares", "sheet_shares", "wiki_shares"} <= set(al["tables"]) and "kalmido/accounts/users.py:need_admin" in al["rights"],
       "today's share tables and rights checks stand in the allow file (#5522)")
+check(all(isinstance(v, str) and len(v) > 20 for v in al["filter"].values()) and "kalmido/docs/dsearch.py:dsr_filters" in al["filter"],
+      "today's filters outside the core stand in the allow file with their reason (#5523)")
 check("paperless_links" not in cc.load_allow()["tables"], "paperless_links is not an exception (#5265 drops it)")
 
 print(f"check_core_crosscut: {OKS[0]} ok, {len(FAILS)} failed")

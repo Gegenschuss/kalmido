@@ -473,6 +473,13 @@ of its own**. It describes its fields once in a catalog and hands it to the core
 - server: `kalmido/core/filters.py` -- `kflt_where(rules, cond, old)` -> one SQL condition, `kflt_match(item, rules, cond, old)`,
   `kflt_cond(cnd, has, empty)` for value lists
 
+The guard (2.857.0, #5523): `tools/check_core_crosscut.py` (CI) turns red on a filter evaluator or a condition dialog of its
+own outside the three files above -- Python `def *filter_sql / *filter_where / *filter_match / *filter_rules / *filter_cond(s)
+/ *_cond_ok / *_match_rule(s) / *_filters(`, browser `*filterMatch / *Cond(s) / *_cond(s) / *CondOk / *FilterDlg /
+*FilterDialog / *CondDlg / *CondRows / *FilterRows` -- unless it only uses the core (its block calls `kflt_*`, or it is named in
+such a block or in a catalog as `cond` / `old`). Today's others (search bars, automation triggers, id maps) stand with their
+reason in `tools/core_crosscut_allow.json` section `filter`.
+
 The format, stored as it is (JSON):
 
 ```js

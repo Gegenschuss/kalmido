@@ -1,5 +1,5 @@
 {
- "_": "2.755.0 (#5267): what tools/check_core_crosscut.py lets through today, each with its reason (the stage that takes it down, or the area's own logic). Grows only with a decision of the product owner; a stage that takes a table down takes its line out (a stale line is red). docs/dev/kern.md 'Cross-cutting parts'. 2.846.0 (#5522): share tables in 'tables' and rights checks (need_* / *_role / *_can outside kalmido/core) in 'rights' the same way.",
+ "_": "2.755.0 (#5267): what tools/check_core_crosscut.py lets through today, each with its reason (the stage that takes it down, or the area's own logic). Grows only with a decision of the product owner; a stage that takes a table down takes its line out (a stale line is red). docs/dev/kern.md 'Cross-cutting parts'. 2.846.0 (#5522): share tables in 'tables' and rights checks (need_* / *_role / *_can outside kalmido/core) in 'rights' the same way. 2.857.0 (#5523): filter evaluators / condition dialogs of their own outside the core's filter (kalmido/core/filters.py, static/js/fltkern.js, fltdlg.js) in 'filter' the same way.",
  "tables": {
   "agent_chat": "own logic: an agent's chat log (with read_at of its own)",
   "agent_rules": "own logic: an agent's rule text (body), no comment",
@@ -203,5 +203,16 @@
   "kalmido/wiki/wkfolder.py:wkf_role": "knowledge folders: the higher of the area's base role and the core's folder share (stage 4, #4717); stage 7c (#5244)",
   "kalmido/wiki/wkfshare.py:_folder_role": "maps the core's fs_role of a knowledge folder (owner -> edit), no rule of its own",
   "kalmido/wiki/wkshare.py:_shared_role": "a page shared through a folder: asks wkf_role; stage 7c (#5244)"
+ },
+ "filter": {
+  "kalmido/admin/acctimport.py:umz_filter_cond": "account move: maps the ids of one stored condition to this server; reads no item, the lists' filter (kflt_where) evaluates it",
+  "kalmido/admin/acctimport.py:umz_filter_rules": "account move: maps the ids of a saved filter's rules to this server; reads no item, the lists' filter (kflt_where) evaluates it",
+  "kalmido/api/scopes.py:v1_filters": "the route GET /api/v1/filters that lists the saved filters; no condition is read here",
+  "kalmido/core/access.py:_req_filters_sql": "the request's visibility (health / budget lists, trips), a rights limit of the core and no filter people pick",
+  "kalmido/docs/dsearch.py:dsr_filters": "the documents' search bar and its search syntax (sender, type, tag, dates, words); the saved document filter goes through the core's filter (#5518)",
+  "kalmido/docs/rules.py:_clean_filters": "document flows: cleans the trigger's fields of a flow (sources, file name, has tags); an automation trigger, no filter of items",
+  "kalmido/lists/rules.py:rul_cond_ok": "list automation rules: a fixed set of trigger conditions (priority, assignee, section, tag) on one task when it changes; no filter of items",
+  "kalmido/tasks/minerules.py:mr_cond_ok": "my rules: a fixed set of trigger conditions (priority, project, tag) on one task when it changes; no filter of items",
+  "static/js/office_bankrules.js:brl_cond": "bank rules: only the text of a rule's conditions for its line in the list, evaluates nothing"
  }
 }
