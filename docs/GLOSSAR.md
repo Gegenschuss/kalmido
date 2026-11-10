@@ -252,6 +252,7 @@ The foundation: database, schema, access layer, request context, conflicts (409)
 - `kalmido/core/env.py` (`env`) - The registry of the environment variables the server reads (name, default, one English sentence, group)
 - `kalmido/core/ephem.py` (`eph`) - Short-lived state in the database, so every web process of an instance sees it (later KALMIDO_WEB_PROCS, KALMIDO_REPLICAS, the roles of 2.102)
 - `kalmido/core/errors.py` - The error types and input checks every package uses
+- `kalmido/core/filters.py` (`kflt`) - The filter of the shared core on the server: rules {op, conds} of an area's catalog -> one SQL condition or a match (2.846.0, #5520)
 - `kalmido/core/fkeys.py` (`fk`) - Foreign keys for references that had none (GDPR art. 17: no reference to a deleted person / object)
 - `kalmido/core/i18n.py` - Server-side translations (tr / trn / N_)
 - `kalmido/core/i18nkeys.py` (`key`) - The translation keys of the code and their split per module loaded on demand
@@ -895,6 +896,7 @@ The start-up module.
 - `static/js/filetext.js` (`ftxt`) - Search in the file store (names + recognised text, also project files)
 - `static/js/flow.js` (`flw`) - The card "Flow" of a project page (block 'flow', projects.js POV_BLOCKS)
 - `static/js/fltdlg.js` (`flt`) - The dialog of a saved filter, loaded on demand (lazyload.js module fltdlg; its stand-in filterModal loads it, LD_CALL)
+- `static/js/fltkern.js` (`kflt`) - The filter of the shared core at start: kflt_match / kflt_conds / kflt_cond over an area's catalog (2.846.0, #5520; the dialog: fltdlg.js kflt_rows / kflt_dialog)
 - `static/js/formguard.js` (`fg`) - Form and its organisation / document, e.g
 - `static/js/formq.js` (`fq`) - Questionnaires -- the own questions of a form (team/formq.py)
 - `static/js/formula.js` (`fx`) - Calculating with custom fields

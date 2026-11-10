@@ -84,6 +84,7 @@ ORDER = (
     "lists.groups",
     "lists.grouppics",  # 2.46.0 (#1605)
     "lists.ownership",
+    "core.filters",  # 2.846.0 (#5520): the shared core's filter (rules -> SQL / match, no routes)
     "lists.filterrules",  # 2.577.0 (#3356): the rules of a saved filter as SQL (no routes)
     "lists.sections", "lists.seckind",
     "lists.sectpl",  # 2.156.0 C (#2073)

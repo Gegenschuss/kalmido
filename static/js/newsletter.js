@@ -119,7 +119,7 @@ async function nwl_put(body) {
 }
 // the segment sheet: name, groups / companies / address books (OR within, AND between), the list at the service
 // 2.625.0 (#4486): the choice is condition rows "what / is | is not / value / x" (the row and value menu of the filter dialog,
-// fltdlg.js flt_rowHtml / flt_valMenu with an own spec) instead of one button per group, company and address book. Rows of
+// fltdlg.js; since 2.846.0, #5520, the shared core's kflt_rows with the segment's catalog) instead of one button per group, company and address book. Rows of
 // one kind add up (any match within it), "is not" goes to not_tags / not_companies / not_books (takes a contact out); an old
 // segment opens as one "is" row per kind and is saved as before.
 const NWL_KINDS = [['tags', N_('Group')], ['companies', N_('Company')], ['books', N_('Address book')]];
@@ -140,43 +140,30 @@ async function nwl_segEdit(s) {
   const f = NWL.d.facets, r = s?.rule || {tags: [], companies: [], books: []};
   await loadModule('fltdlg');
   const cs = nwl_segConds(r);
-  const spec = {what: NWL_KINDS.filter(([k]) => (k === 'books' ? f.books : f[k]).length || cs.some(c => c.f === k)), ops: () => ['is', 'isnot'],
+  // 2.846.0 (#5520): the segment's catalog for the core's filter rows (fltdlg.js kflt_rows); a switched row keeps its is / is not
+  const what = NWL_KINDS.filter(([k]) => (k === 'books' ? f.books : f[k]).length || cs.some(c => c.f === k));
+  const cat = {what: () => what, ops: () => ['is', 'isnot'], fresh: (k, _, prev) => ({f: k, op: prev?.op || 'is', v: []}),
+    add: () => what.find(([k]) => !cs.some(c => c.f === k))?.[0] || what[0][0],
     vals: c => c.f === 'books' ? [...f.books.map(b => [b.id, b.name]), ...(c.v || []).filter(id => !f.books.some(b => b.id === id)).map(id => [id, '?'])]
       : [...f[c.f], ...(c.v || []).filter(x => !f[c.f].includes(x))].map(x => [x, x])};
   const md = modal(`<div class="lhdr"><h3>${s ? tr('Edit segment') : tr('New segment')}</h3><span class="spacer"></span><button class="iconbtn" data-ns="close" aria-label="${esc(tr('Close'))}">${ic('x')}</button></div>
     <div class="row"><label for="ns-name">${tr('Name')}</label><input id="ns-name" maxlength="120" value="${esc(s?.name || '')}"></div>
     <div class="fconds nwl-conds" role="group" aria-label="${esc(tr('Conditions'))}"></div>
-    <div><button type="button" class="btn sm" data-ns="cond-add" ${spec.what.length ? '' : 'disabled'}>${ic('plus', 's')} ${tr('Condition')}</button></div>
+    <div><button type="button" class="btn sm" data-ns="cond-add" ${what.length ? '' : 'disabled'}>${ic('plus', 's')} ${tr('Condition')}</button></div>
     <p class="muted">${tr('No condition = every contact of this workspace. Within one kind any match counts, across kinds all must match; “is not” takes a contact out.')}</p>
     <div class="row"><label for="ns-list">${tr('List at the service')}</label><select id="ns-list"><option value="">${tr('Loading…')}</option></select></div>
     <p class="nwl-err" role="alert"></p>
     <div class="foot"><button type="button" class="btn" data-ns="close">${tr('Cancel')}</button><span class="spacer"></span><button type="button" class="btn pri" data-ns="save">${tr('Save')}</button></div>`);
   md.classList.add('nwl-smd');
-  const draw = (focus = null) => {
-    $('.nwl-conds', md).innerHTML = cs.map((c, i) => flt_rowHtml(c, i, cs, [], 0, spec)).join('');
-    if (focus) $(`.fcond[data-i="${focus[0]}"] ${focus[1]}`, md)?.focus();
-  };
-  draw();
-  md.addEventListener('change', e => {
-    const el = e.target, i = +(el.dataset?.i ?? -1), c = cs[i]; if (!c || !el.closest('.nwl-conds')) return;
-    if (el.classList.contains('fc-f')) { cs[i] = {f: el.value, op: c.op, v: []}; draw([i, '.fc-f']); }
-    if (el.classList.contains('fc-op')) { c.op = el.value === 'isnot' ? 'isnot' : 'is'; draw([i, '.fc-op']); }
-  });
+  const rows = kflt_rows($('.nwl-conds', md), cs, cat, {addBtn: $('[data-ns="cond-add"]', md)});
   api('GET', `/api/newsletter/lists?ws=${encodeURIComponent(NWL.ws)}`).then(j => {
     const sel = $('#ns-list', md); if (!sel) return;
     sel.innerHTML = `<option value="__new">${tr('Create a new list with the segment’s name')}</option>` + j.lists.map(l => `<option value="${esc(l.id)}" ${s?.list_id === l.id ? 'selected' : ''}>${esc(l.name)}</option>`).join('');
   }).catch(() => { const sel = $('#ns-list', md); if (sel) sel.innerHTML = `<option value="${esc(s?.list_id || '')}">${esc(s?.list_name || tr('No list'))}</option>`; });
   md.addEventListener('click', async e => {
-    const cb = e.target.closest('.nwl-conds button');
-    if (cb?.classList.contains('fc-v')) {
-      const i = +cb.dataset.i, c = cs[i];
-      flt_valMenu(cb, c, cs, () => { const t = flt_sum(c, cs, spec), x = $(`.fcond[data-i="${i}"] .fc-v`, md); if (x) { $('.fc-vs', x).textContent = t || tr('Select') + '…'; x.classList.toggle('fc-v0', !t); x.setAttribute('aria-label', `${tr('Value')}: ${t || tr('Select')}`); } }, spec);
-      return;
-    }
-    if (cb?.classList.contains('fc-x')) { cs.splice(+cb.dataset.i, 1); draw(cs.length ? [Math.max(0, +cb.dataset.i - 1), '.fc-x'] : null); if (!cs.length) $('[data-ns="cond-add"]', md)?.focus(); return; }
     const b = e.target.closest('[data-ns]'); if (!b) return;
     if (b.dataset.ns === 'close') { md.remove(); return; }
-    if (b.dataset.ns === 'cond-add') { cs.push({f: spec.what.find(([k]) => !cs.some(c => c.f === k))?.[0] || spec.what[0][0], op: 'is', v: []}); draw([cs.length - 1, '.fc-f']); return; }
+    if (b.dataset.ns === 'cond-add') { rows.add(); return; }
     const lid = $('#ns-list', md).value;
     const body = {ws: NWL.ws, name: $('#ns-name', md).value.trim(), rule: nwl_segRule(cs)};
     if (lid === '__new') body.create_list = true; else body.list_id = lid;

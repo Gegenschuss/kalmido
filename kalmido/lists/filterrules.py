@@ -6,18 +6,21 @@ never reaches the SQL as text; every value is a parameter.
 Since 2.521.0 (#4479) a filter is a list of conditions, rules = {op: and | or, conds: [{f, op, v}]} (static/js/fltdlg.js);
 the older rules (one key per category) convert into the same conditions (flt_conds of views.js, here _old_conds). A
 condition that is off in the app (no values, an empty text, a gone field) is off here too; "is none of" (nin) always holds
-on top, also with OR (#4478)."""
+on top, also with OR (#4478).
+
+2.846.0 (#5520): the combination of the conditions (hard "none of", AND / OR, the limits) is the shared core's filter
+(kalmido/core/filters.py kflt_where); this file is the tasks' catalog: one condition -> SQL."""
 import json
 from datetime import timedelta
 
 from ..core.access import list_role, vis_sql
 from ..core.db import local_now
+from ..core.filters import COND_MAX, VAL_MAX, kflt_or as _or, kflt_where
 from ..core.pg import like_escape
 from .lists import FOLDER_SEP
 from .seckind import SEC_KINDS, SK_SQL
 
 ID_MAX = 2 ** 63 - 1
-COND_MAX, VAL_MAX = 100, 500  # more conditions / values than the dialog ever makes: the rest is left out
 # what a filter's sort (static/js sortMode) is in GET /api/v1/tasks; the other sorts of the app have no API name
 RULE_SORTS = {"prio": "-priority", "custom": "manual", "date": "due", "title": "title", "created": "-created", "created_asc": "created"}
 _NUM_RE = "'^-{0,1}[0-9]+([.][0-9]+){0,1}$'"  # no question mark: it is the placeholder
@@ -41,13 +44,6 @@ def _id(x):
     if isinstance(x, str) and not (x.isascii() and x.isdigit() and len(x) < 20):
         return None
     return int(x) if 0 < int(x) <= ID_MAX else None
-
-
-def _or(parts):
-    """OR over the parts (sql, args); no part = matches nothing. Every part is TRUE or FALSE, never NULL (NOT stays exact)."""
-    if not parts:
-        return "FALSE", []
-    return "COALESCE((" + " OR ".join(p[0] for p in parts) + "), FALSE)", [a for p in parts for a in p[1]]
 
 
 def _date(col, d, t0):
@@ -244,20 +240,9 @@ def _cond(c, uid, cnd, t0):
 
 def filter_where(c, uid, rules):
     """The rules of a filter -> (one SQL condition on tasks or None, args): the "none of" conditions always, the others combined
-    by rules.op (filterMatch of views.js)."""
-    r = rules if isinstance(rules, dict) else {}
-    conds = r["conds"] if isinstance(r.get("conds"), list) else _old_conds(r)
+    by rules.op (filterMatch of views.js; the core's kflt_where, only nin holds on top for tasks)."""
     t0 = local_now().date()
-    hard, soft = [], []
-    for cnd in conds[:COND_MAX]:
-        p = _cond(c, uid, cnd, t0)
-        if p:
-            (hard if cnd.get("op") == "nin" else soft).append(p)
-    if soft:
-        hard.append(("(" + (" OR " if r.get("op") == "or" else " AND ").join(p[0] for p in soft) + ")", [a for p in soft for a in p[1]]))
-    if not hard:
-        return None, []
-    return "(" + " AND ".join(p[0] for p in hard) + ")", [a for p in hard for a in p[1]]
+    return kflt_where(rules, lambda cnd: _cond(c, uid, cnd, t0), _old_conds, hard_ops=("nin",))
 
 
 def rule_kinds(rules):

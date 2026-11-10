@@ -127,12 +127,9 @@ const FLT_HAS = {
   kind: (t, x) => sk_task(t) === x,  // 2.577.0 (#3354): the state, as section_kind in the API
 };
 const FLT_EMPTY = {folder: '', type: '', tag: '', who: 'none', sec: 'none', sprint: 'none', ms: 'none', dlv: 'none'};
-const FLT_CACHE = new WeakMap();
-function flt_conds(r) {
-  if (!r || typeof r !== 'object') return [];
-  if (Array.isArray(r.conds)) return r.conds;
-  let c = FLT_CACHE.get(r); if (c) return c;
-  c = [];
+// 2.846.0 (#5520): the older rules as conditions (the catalog's old, kflt_conds of fltkern.js keeps them per rules object)
+function flt_oldConds(r) {
+  const c = [];
   for (const [k, f] of FLT_OLD) if (Array.isArray(r[k]) && r[k].length) c.push({f, op: 'in', v: r[k]});
   for (const [fid, cr] of Object.entries(r.cf && typeof r.cf === 'object' ? r.cf : {})) {
     if (!cfRuleOn(cr)) continue;
@@ -140,7 +137,7 @@ function flt_conds(r) {
     c.push(k ? {f: 'cf', fid: +fid, k, op: 'in', v: cr[k]} : {f: 'cf', fid: +fid, k: 'num', op: cr.num.op, v: cr.num.v});
   }
   const q = (r.text || '').trim(); if (q) c.push({f: 'text', op: 'has', v: q});
-  FLT_CACHE.set(r, c); return c;
+  return c;
 }
 // a custom field condition: the kind of its rule for cfMatch
 const flt_cfKind = ft => (ft === 'select' || ft === 'multiselect' ? 'sel' : ft === 'checkbox' ? 'chk' : ft === 'date' ? 'date' : 'num');
@@ -164,28 +161,20 @@ function flt_cfTest(t, c) {
   const hit = cfMatch(t, fd.id, rule);
   return c.op === 'nin' ? !hit : hit;
 }
-// one condition -> null (off: no values, an empty text, a gone field) or the test
-function flt_cond(c) {
-  if (!c || typeof c !== 'object') return null;
-  if (c.f === 'text') { const q = String(c.v || '').trim().toLowerCase(); if (!q) return null; const has = t => (t.title || '').toLowerCase().includes(q) || (t.content || '').toLowerCase().includes(q); return c.op === 'nhas' ? t => !has(t) : has; }
-  if (c.f === 'cf') {
-    if (c.fid ? !fieldById(+c.fid) : !(S.fields || []).some(fd => flt_cfSame(fd, c))) return null;
-    if (['in', 'nin'].includes(c.op) && !(Array.isArray(c.v) && c.v.length)) return null;
-    if (['gt', 'lt', 'eq'].includes(c.op) && (c.v === '' || c.v == null)) return null;
-    if (!['in', 'nin', 'empty', 'gt', 'lt', 'eq', 'set'].includes(c.op)) return null;
-    return t => flt_cfTest(t, c);
-  }
-  const has = FLT_HAS[c.f]; if (!has) return null;
-  if (c.op === 'empty') return c.f in FLT_EMPTY ? t => has(t, FLT_EMPTY[c.f]) : null;
-  if (!Array.isArray(c.v) || !c.v.length || !['in', 'nin'].includes(c.op)) return null;
-  return c.op === 'nin' ? t => !c.v.some(x => has(t, x)) : t => c.v.some(x => has(t, x));
+// a custom field condition -> null (off: a gone field, no values, an unknown comparison) or the test
+function flt_cfCond(c) {
+  if (c.fid ? !fieldById(+c.fid) : !(S.fields || []).some(fd => flt_cfSame(fd, c))) return null;
+  if (['in', 'nin'].includes(c.op) && !(Array.isArray(c.v) && c.v.length)) return null;
+  if (['gt', 'lt', 'eq'].includes(c.op) && (c.v === '' || c.v == null)) return null;
+  if (!['in', 'nin', 'empty', 'gt', 'lt', 'eq', 'set'].includes(c.op)) return null;
+  return t => flt_cfTest(t, c);
 }
-function filterMatch(t, r = {}) {
-  const cs = flt_conds(r), soft = [];
-  for (const c of cs) { const fn = flt_cond(c); if (!fn) continue; if (c.op === 'nin') { if (!fn(t)) return false; } else soft.push(fn); }
-  if (!soft.length) return true;
-  return r.op === 'or' ? soft.some(fn => fn(t)) : soft.every(fn => fn(t));
-}
+// 2.846.0 (#5520): the tasks' catalog of the core's filter (fltkern.js); the dialog adds its rows and values (fltdlg.js flt_cat)
+const FLT_TASKS = {has: FLT_HAS, empty: FLT_EMPTY, old: flt_oldConds, text: t => [t.title, t.content], hard: ['nin'],
+  cond: c => (c.f === 'cf' ? flt_cfCond(c) : c.f === 'text' || ['in', 'nin', 'empty'].includes(c.op) ? undefined : null)};  // no is / isnot here
+const flt_conds = r => kflt_conds(r, FLT_TASKS);
+const flt_cond = c => kflt_cond(c, FLT_TASKS);  // one condition -> null (off) or the test
+const filterMatch = (t, r = {}) => kflt_match(t, r, FLT_TASKS);
 // 1.5.1: "Show completed" per view (list, filter, smart list, tag), per user and synced (setting show_done_views, a json
 // map route key -> 0/1; not shared with the other members of a shared list). 1.8.1: no global switch any more, a view
 // without its own choice shows its completed tasks; the calendar has its own entry "cal" (toggle in its bar)

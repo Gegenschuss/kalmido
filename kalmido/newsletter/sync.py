@@ -24,6 +24,7 @@ from ..core.db import connect, iso, now_utc, parse_iso
 from ..core.i18n import N_, tr
 from ..core.pg import system_ctx
 from ..core.ephem import eph_busy_give, eph_busy_take  # 2.642.0 (#4975)
+from ..core.filters import kflt_cond, kflt_match  # 2.846.0 (#5520)
 from .adapters import NWL_KINDS, NwlError, nwl_adapter
 from ..core.config import SECRET_KEY  # 2.149.0 G (#2517): pulled up from functions
 from ..core.orgcrypt import oc_dec_k, oc_enc_k, OrgCryptError  # 2.149.0 G (#2517): pulled up from functions
@@ -206,24 +207,30 @@ def nwl_clean_rule(c, ws, rule):
     return out
 
 
+# 2.846.0 (#5520): a segment's rule is the shared core's filter (kalmido/core/filters.py): one condition per kind, "is" (any of
+# the values) or "is not" (takes the contact out), all of them AND -- the same rows as the dialog (newsletter.js nwl_segConds);
+# the stored form {tags, companies, books, not_*} stays
+NWL_SEG_KINDS = ("tags", "companies", "books")
+_NWL_HAS = {"books": lambda x, y: x["book_id"] == y, "tags": lambda x, y: str(y).lower() in x["tags"],
+            "companies": lambda x, y: x["org"] == str(y).lower()}
+
+
+def nwl_seg_conds(rule):
+    """The stored rule of a segment -> the core's conditions."""
+    r = rule if isinstance(rule, dict) else {}
+    return [{"f": k, "op": op, "v": r[key]} for k in NWL_SEG_KINDS for op, key in (("is", k), ("isnot", "not_" + k))
+            if isinstance(r.get(key), list) and r[key]]
+
+
 def nwl_match(rule, r):
     """AND between the kinds, OR within one; an excluded group / company / address book takes the contact out (#4486);
     an empty rule takes every contact of the workspace."""
-    if rule.get("books") and r["book_id"] not in rule["books"]:
-        return False
-    if rule.get("not_books") and r["book_id"] in rule["not_books"]:
-        return False
-    mine = {str(g).lower() for g in _jl(r["groups"])} if rule.get("tags") or rule.get("not_tags") else set()
-    if rule.get("tags") and not any(t.lower() in mine for t in rule["tags"]):
-        return False
-    if rule.get("not_tags") and any(t.lower() in mine for t in rule["not_tags"]):
-        return False
-    org = (r["org"] or "").strip().lower()
-    if rule.get("companies") and org not in {x.lower() for x in rule["companies"]}:
-        return False
-    if rule.get("not_companies") and org in {x.lower() for x in rule["not_companies"]}:
-        return False
-    return True
+    conds = nwl_seg_conds(rule)
+    if not conds:
+        return True
+    item = {"book_id": r["book_id"], "org": (r["org"] or "").strip().lower(),
+            "tags": {str(g).lower() for g in _jl(r["groups"])} if any(x["f"] == "tags" for x in conds) else set()}
+    return kflt_match(item, {"op": "and", "conds": conds}, lambda cnd: kflt_cond(cnd, _NWL_HAS))
 
 
 def nwl_wanted(status, mode):

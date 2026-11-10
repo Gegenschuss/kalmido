@@ -461,3 +461,57 @@ Checked against the core's versions and undo steps, the two change tables of the
   no marker column), so it has no line in `tools/core_crosscut_allow.json` (a line of a table that does not look like one
   is red); the reason stands here.
 
+
+## Filter (2.846.0, #5520)
+
+A saved filter, a shared view, a segment: an area that lets people pick its items by conditions builds **no condition logic
+of its own**. It describes its fields once in a catalog and hands it to the core's filter:
+
+- browser, at every start: `static/js/fltkern.js` -- `kflt_match(item, rules, cat)`, `kflt_conds(rules, cat)`, `kflt_cond(c, cat)`
+- browser, on demand (`await loadModule('fltdlg')`): `static/js/fltdlg.js` -- `kflt_dialog({...})` the whole dialog of a saved
+  filter, `kflt_rows(host, conds, cat, {changed, addBtn})` only the condition rows (for a dialog of the area's own)
+- server: `kalmido/core/filters.py` -- `kflt_where(rules, cond, old)` -> one SQL condition, `kflt_match(item, rules, cond, old)`,
+  `kflt_cond(cnd, has, empty)` for value lists
+
+The format, stored as it is (JSON):
+
+```js
+rules = {op: 'and' | 'or', conds: [{f: 'kind', op: 'in', v: ['pdf']}, {f: 'text', op: 'has', v: 'offer'}, {f: 'kind', op: 'nin', v: ['img']}]}
+```
+
+`f` is a key of the catalog, `op` the comparison: `in` / `is` (any of the values), `nin` / `isnot` (none of them; these hold
+**always on top, also with OR**), `empty`, `has` / `nhas` (text), `gt` / `lt` / `eq` / `set` (numbers, the area's own `cond`).
+A condition without values or with an empty text is off. An older stored form of the area converts through `old`; the
+stored data stays as it is (the lists' old rules, the segments' `{tags, companies, books, not_*}`).
+
+The catalog:
+
+```js
+const DOC_FLT = {
+  has: {kind: (d, x) => d.kind === x, folder: (d, x) => d.folder === x},  // the item has this one value
+  empty: {folder: ''},                        // what "is empty" stands for (only these)
+  text: d => [d.title, d.note],               // f 'text': contains (any of them)
+  // cond: c => test | null | undefined       // own kinds (numbers, custom fields); undefined = the core's
+  // old: rules => conds                      // an older stored form
+  // hard: ['nin']                            // fewer comparisons on top (the lists: only nin)
+  // for the dialog:
+  what: () => [['kind', N_('Kind')], ['folder', N_('Folder')], ['text', N_('Text')]],
+  ops: c => (c.f === 'text' ? ['has', 'nhas'] : ['in', 'nin', 'empty']),
+  vals: (c, conds) => (c.f === 'kind' ? [['pdf', 'PDF'], ['img', tr('Image')]] : folders().map(p => [p, p])),
+  // extra, key, fresh, add, prep, unit, keep: see the head of fltdlg.js
+};
+const n = docs.filter(d => kflt_match(d, rules, DOC_FLT)).length;
+await loadModule('fltdlg');
+kflt_dialog({cat: DOC_FLT, rules: f.rules, name: f.name, title: tr('Edit filter'),
+  count: r => trn('{0} document matches', '{0} documents match', docs.filter(d => kflt_match(d, r, DOC_FLT)).length),
+  save: async (name, rules, md) => { /* the area's save route */ md.remove(); }, del: f.id ? async md => { ... } : null});
+```
+
+On the server the area passes one function per condition: `kflt_where(rules, cnd -> (sql, args) | None)` for a list in SQL
+(every value a parameter; the area's own `WHERE` keeps deciding what the person may see, a filter only narrows it) or
+`kflt_match(item, rules, cnd -> test | None)` in memory. The two sides mean the same; a test of the area checks both with
+the same rules.
+
+Who uses it: the lists' saved filters and shared views (catalog `FLT_TASKS` in views.js + `flt_cat` in fltdlg.js, server
+`lists/filterrules.py`), the newsletter segments (newsletter.js `nwl_segEdit`, server `newsletter/sync.py nwl_match`). Tests:
+`tests/p2846_a_filterkern_test.py` (the core, the lists' API), `tests/p2846_a_filterkern_ui.js` (the dialog with a stand-in catalog).
