@@ -183,11 +183,13 @@ The built-in assistant.
 CalDAV, iCal feeds, appointment booking and polls.
 
 - `kalmido/calendars/apptbook.py` (`apb`) - Appointment booking by customers ("Booking page")
+- `kalmido/calendars/apptundo.py` - Undo across devices for the booking page's appointment types (change, delete, restore as steps of the core's step groups)
 - `kalmido/calendars/caldav.py` (`dav`) - CalDAV server for tasks (VTODO)
 - `kalmido/calendars/davwrite.py` (`cdw`) - Writing events into CalDAV subscriptions (new, change, delete)
 - `kalmido/calendars/icalfeed.py` (`ics`) - The subscribable ICS calendar feed of a user
 - `kalmido/calendars/polls.py` (`tpo`) - Scheduling polls -- several proposed times, people vote through a public link (yes / maybe / no)
 - `kalmido/calendars/pollsv1.py` (`v1`) - Scheduling polls over REST v1 (+ MCP)
+- `kalmido/calendars/pollundo.py` - Undo across devices for scheduling polls (dialog changes, link switch, trash and restore as steps)
 - `kalmido/calendars/subscriptions.py` (`cal`) - External calendars (read-only subscriptions)
 
 ### `kalmido/collab/`
@@ -359,6 +361,7 @@ The file store ("Ablage"): folders, files, shares, locks, scan, tags, views and 
 - `kalmido/files/bulk.py` (`abm`) - Actions on several nodes of the file store at once, the ZIP download and the phone scan
 - `kalmido/files/extlinks.py` (`xl`) - External share links of the file store ("Ablage")
 - `kalmido/files/filereq.py` (`frq`) - File requests ("Dateien anfordern")
+- `kalmido/files/fskern.py` - File-store nodes on the one trash of the core (stage 3): registration, purge hook, receipts under legal retention stay locked
 - `kalmido/files/fslock.py` (`fsl`) - Locked folders of the file store ("Ablage")
 - `kalmido/files/fsmove.py` (`fsm`) - Files, folders (with everything in them)
 - `kalmido/files/fsref.py` (`fs`) - Reference nodes -- an object of another area (an office document, a sheet ...)
@@ -383,8 +386,10 @@ The mail hub: filed e-mails, mailboxes and rules, absences, holidays and dispatc
 
 - `kalmido/hub/abscal.py` (`abc`) - Public holidays and absences in the calendar views + the absences as a subscription link
 - `kalmido/hub/absence.py` (`abs`) - Absences -- vacation, sick leave, days off, other
+- `kalmido/hub/absundo.py` - Undo across devices for team absences (change, delete, restore; a holiday decision since makes the step a conflict)
 - `kalmido/hub/agentdispo.py` (`adz`) - Shoot planning by an agent
 - `kalmido/hub/dispo.py` (`dsp`) - Resources and disposition -- booking crew and equipment for shoot days, seeing who and what is free per day, spotting double bookings
+- `kalmido/hub/dspundo.py` - Undo across devices for dispatch bookings (one part per booking, delete and restore)
 - `kalmido/hub/hmv1.py` (`hmv`) - The filed e-mails in the REST API v1 + MCP
 - `kalmido/hub/holidays.py` (`hol`) - 2.461 public holidays per country
 - `kalmido/hub/hubmail.py` (`hbm`) - E-mail as an input of the hub
@@ -421,15 +426,18 @@ Outbound and inbound connections: e-mail, webhooks, git, importers and exporters
 
 Home & life: bookmarks, household budget, feeds (RSS), reading list, trips.
 
+- `kalmido/life/bmundo.py` - Undo across devices for bookmarks (details, trash, restore)
 - `kalmido/life/bookmarks.py` (`bm`) - Bookmarks -- links with a preview (title, description, picture)
 - `kalmido/life/budget.py` (`bud`) - The household budget of "At home"
 - `kalmido/life/budget_web.py` (`budget`) - The household budget -- the web API (the model is life/budget.py)
+- `kalmido/life/budundo.py` - Undo across devices for household budget entries (change, trash, restore)
 - `kalmido/life/devlink.py` (`dl`) - A private device <-> a piece of office equipment
 - `kalmido/life/karakeep.py` (`kk`) - Home & life: "Read later" from Karakeep (a person's own connection: bookmarks -> tasks of a reading list, archive back)
 - `kalmido/life/model.py` (`journal`) - Home & life contracts, devices + upkeep, staying in touch, health, the review + journal, trips (the model)
 - `kalmido/life/reading.py` (`rl`) - Reading -- the view "Read later"
 - `kalmido/life/rss.py` (`rss`) - Reading: feeds (RSS 2.0, Atom 1.0, RSS 1.0 / RDF)
 - `kalmido/life/rss_web.py` (`feeds`) - Reading: the web API of the feeds (/api/feeds, life/rss.py)
+- `kalmido/life/rssundo.py` - Undo across devices for followed feeds (unfollow and follow again)
 - `kalmido/life/tripcost.py` (`ltc`) - From a trip (a project of Home & life, lists.life 'travel')
 - `kalmido/life/v1.py` (`v1`) - Home & life: the REST API v1 (+ MCP)
 - `kalmido/life/web.py` (`life`) - Home & life: the web API (overview, contracts, devices, upkeep, health, trips, review + journal, staying in touch, Karakeep)
@@ -440,13 +448,16 @@ Lists and projects: folders, sections, fields, formulas, templates, sprints, sha
 
 - `kalmido/lists/custview.py` (`cv`) - The customer view of a public list link - what the owner lets the customer see (public_links.cv_show, JSON)
 - `kalmido/lists/envs.py` (`env`) - Environments of a project list (Staging, Live, ...)
+- `kalmido/lists/envundo.py` - Undo across devices for a project's environments (change, removal, restore; the webhook secret never goes back)
 - `kalmido/lists/favorites.py` (`fv2`) - Favourite lists and projects, personal per person (the user setting fav_lists)
 - `kalmido/lists/fields.py` (`field`) - Custom fields of a list
+- `kalmido/lists/fieldundo.py` - Undo across devices for a project's custom fields (create, change, delete into the core's copy trash, restore)
 - `kalmido/lists/filterrules.py` (`cf`) - The rules of a saved filter on the server
 - `kalmido/lists/flow.py` (`flw`) - Flow figures of a project, computed on read from the task history (no own storage)
 - `kalmido/lists/folders.py` (`folder`) - Folder settings. A folder of its owner carries defaults for every list in it and in its subfolders (the owner's lists; members see the lists in their own folders)
 - `kalmido/lists/folderdefs.py` (`fdf`) - More folder defaults (view, columns, custom fields, project tags, repeat reminder, hours per day, rate, progress bar) handed to the lists in a folder
 - `kalmido/lists/foldershare.py` (`sh`) - Sharing a whole folder in one dialog, like a list
+- `kalmido/lists/foldundo.py` - Undo across devices for renaming / moving a sidebar folder (a diff part of the person's step group)
 - `kalmido/lists/formula.py` (`fx`) - Formula fields -- a small calculator over the number fields of a list, computed on the server
 - `kalmido/lists/grouppics.py` (`fg`) - Group pictures: a preset or an own photo per group, like the profile pictures of people
 - `kalmido/lists/groups.py` (`grp`) - Groups of people (admin): materialized list memberships, tasks assigned to a group
@@ -458,11 +469,13 @@ Lists and projects: folders, sections, fields, formulas, templates, sprints, sha
 - `kalmido/lists/listtrash.py` (`otr`) - The trash of deleted lists
 - `kalmido/lists/lmcore.py` (`lmc`) - Stage 6 of the shared core
 - `kalmido/lists/lmove.py` - A project into another workspace
+- `kalmido/lists/lpundo.py` - Undo across devices for a project's plain settings (PATCH /api/lists/<id>)
 - `kalmido/lists/membermemo.py` (`mm`) - What removing a member ends, remembered so that adding the person again brings it back
 - `kalmido/lists/orgfields.py` (`of`) - The field schema of an organisation
 - `kalmido/lists/orglabels.py` (`olb`) - Labels of an organisation -- project tags defined once for every project of the organisation (org_tags)
 - `kalmido/lists/orgvis.py` (`ov`) - Who sees an organisation list
 - `kalmido/lists/ownership.py` (`owner`) - Transferring the ownership of a list
+- `kalmido/lists/padundo.py` - Undo across devices for the notepads of a project's pin board (title and text)
 - `kalmido/lists/parttrash.py` (`lpt`) - The trash of a list's sections and planned sprints, and the one trash view of everything else 2.567.0 moved from the hard delete into a trash
 - `kalmido/lists/playbook.py` (`pb`) - The Playbook of a list or folder
 - `kalmido/lists/points.py` (`spt`) - Story points and velocity. tasks.points holds a task
@@ -470,13 +483,17 @@ Lists and projects: folders, sections, fields, formulas, templates, sprints, sha
 - `kalmido/lists/public.py` (`pub`) - Public links of lists and checklist mode
 - `kalmido/lists/report.py` - The status report of a project (or any list)
 - `kalmido/lists/rules.py` (`rul`) - Rules of a list ("When ... then ...")
+- `kalmido/lists/ruleundo.py` - Undo across devices for a project's rules (change, trash, restore; checked with the rights of the person taking it back)
 - `kalmido/lists/seckind.py` (`sk`) - The meaning of a column (sections.kind)
 - `kalmido/lists/sections.py` (`folder`) - Saved filters, folders and sections (kanban columns)
 - `kalmido/lists/sectpl.py` (`sct`) - Section templates -- a name and the ordered names of a list
+- `kalmido/lists/secundo.py` - Undo across devices for creating, deleting and restoring a project's section (diff parts)
 - `kalmido/lists/shoot.py` (`sht`) - The shot list of a shoot (project type "shoot", lists/templates.py PTYPES)
 - `kalmido/lists/sprints.py` (`spr`) - Sprints of a project list -- time boxes with a goal, a burndown and a close-out review
+- `kalmido/lists/sprundo.py` - Undo across devices for a project's sprints (plan, change, remove, restore)
 - `kalmido/lists/templates.py` (`tpl`) - Task and list templates, built-in project types
 - `kalmido/lists/tplextra.py` (`tx`) - What a duplicate and a template carry beyond the plain task nodes (lists/templates.py)
+- `kalmido/lists/tplundo.py` - Undo across devices for the person's templates (rename, trash, restore)
 
 ### `kalmido/newsletter/`
 
@@ -650,6 +667,7 @@ Personal tools: habits, statistics and time tracking.
 - `kalmido/personal/timegaps.py` - Time-tracking helper. "Maybe forgotten"
 - `kalmido/personal/timesheet.py` (`tsl`) - Monthly timesheets (close / approve / send back)
 - `kalmido/personal/timetrack.py` (`time`) - Time tracking (module "time")
+- `kalmido/personal/timeundo.py` - Undo across devices for a person's own time entries (change, delete)
 - `kalmido/personal/timewipe.py` (`tz`) - "Delete all times of this project"
 - `kalmido/personal/timexlsx.py` (`tx`) - Excel (.xlsx) export of the time report and of the workload view
 - `kalmido/personal/v1focus.py` (`v1`) - Focus sessions (pomodoro) and habit statistics over API v1
@@ -676,6 +694,7 @@ Tables (spreadsheets): formulas, charts, pivot, printing, sharing, import / expo
 - `kalmido/sheets/shfuncs.py` (`shf`) - The newer formula functions of tables
 - `kalmido/sheets/shfuncs2.py` (`shf`) - The everyday formula functions of tables that were still missing next to sheets/shfuncs.py
 - `kalmido/sheets/shhist.py` (`shh`) - The change history of a table
+- `kalmido/sheets/shkern.py` - Tables on the one trash of the core (stage 3): registration, purge hook with the further sheets and their files
 - `kalmido/sheets/shkinds.py` (`shk`) - More column kinds of a table and the rows / columns that stay in view
 - `kalmido/sheets/shmove.py` (`shm`) - A table to the other workspace (private <-> organisation)
 - `kalmido/sheets/shorder.py` (`sho`) - Ranges of formulas when rows or columns are moved (dragged in the grid, "Move up / down / left / right")
@@ -761,6 +780,7 @@ Knowledge pages (wiki): pages, history, sharing, search, tags, folders and the l
 - `kalmido/wiki/wkfolder.py` (`wkf`) - Knowledge pages in folders of the file store
 - `kalmido/wiki/wkfshare.py` (`wkfs`) - Knowledge pages for people who reach them only through a share of their folder / page node
 - `kalmido/wiki/wkhist.py` (`wkh`) - Knowledge pages -- the text sealed at rest and the history of a page
+- `kalmido/wiki/wkkern.py` - Knowledge pages on the one trash of the core (stage 3): registration, their files as children
 - `kalmido/wiki/wkmove.py` (`wkm`) - Wiki pages and folders (with their sub-pages)
 - `kalmido/wiki/wksearch.py` (`wks`) - The search of the knowledge pages over a word index instead of ILIKE on the text
 - `kalmido/wiki/wkshare.py` (`wsh`) - Read-only shares of a knowledge page or a folder

@@ -150,7 +150,8 @@ const bg_field = (md, k) => BG_FLD[k] ? ($('#' + BG_FLD[k], md)?.closest('.row')
 function bg_entryModal(e, cf) {
   const d = BG.data, w = d.can_write, kind = e?.kind || 'out';
   const day0 = e?.day || (d.month === bg_month() ? today() : d.month + '-01');
-  const filesHtml = x => !x ? '' : `<div class="row bgfiles"><label>${tr('Receipts')}</label><div class="bgfl">${(x.files || []).map(f => `<span class="bgfile"><a href="/api/budget/files/${f.id}?inline=1" target="_blank" rel="noopener">${ic('clip', 's')}<span>${esc(f.name)}</span></a>${w ? `<button type="button" class="iconbtn" data-bgf-del="${f.id}" aria-label="${esc(tr('Delete {0}', f.name))}" title="${esc(tr('Delete'))}">${ic('x', 's')}</button>` : ''}</span>`).join('')}
+  // 2.809.0: html-ok below - the receipts' names go through esc(), ids are numbers, the rest is tr() / ic() (check_innerhtml's span ran over the dialog)
+  const filesHtml = x => !x ? '' : `<div class="row bgfiles"><label>${tr('Receipts')}</label><div class="bgfl">${/*html-ok*/ (x.files || []).map(f => `<span class="bgfile"><a href="/api/budget/files/${f.id}?inline=1" target="_blank" rel="noopener">${ic('clip', 's')}<span>${esc(f.name)}</span></a>${w ? `<button type="button" class="iconbtn" data-bgf-del="${f.id}" aria-label="${esc(tr('Delete {0}', f.name))}" title="${esc(tr('Delete'))}">${ic('x', 's')}</button>` : ''}</span>`).join('')}
     ${w ? `<label class="btn sm bgup">${ic('upload', 's')}<span>${tr('Add a receipt')}</span><input type="file" multiple data-bgf-up hidden></label>` : ''}${!w && !(x.files || []).length ? `<span class="muted">${tr('none')}</span>` : ''}</div></div>`;
   const md = bg_modal(`<h3>${ic('wallet', 's')} ${e ? tr('Edit entry') : tr('New entry')}</h3>
     <div class="row"><label>${tr('Kind')}</label>${bg_kindSeg(kind)}</div>
