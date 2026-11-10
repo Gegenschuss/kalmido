@@ -26,6 +26,7 @@ from ..core.i18n import tr
 from ..core.db import body, bump, write_lock, iso, iso_ms, local_now, now_utc
 from ..core.access import Denied, live_sql, trash_sql, tvis, vis_sql, list_role
 from ..core.conflict import ccf_check
+from ..core.pg import qi
 from .mineorder import VW_MINE_MAX, _ms_person as _person, ms_rule_seed as mr_seed, vw_mine_order, vw_mine_sections
 
 MR_MAX = 20             # rules per person (deleted ones do not count)
@@ -37,6 +38,7 @@ MR_PRIO = {"none": 0, "low": 1, "medium": 3, "high": 5, "urgent": 7}  # the cond
 MR_HIGH = 5             # trigger prio: the priority becomes high (or urgent)
 MR_PLACES = ("top", "bottom")
 MR_EDGE = ("new", "prio", "list", "ltag")  # their marker goes when the trigger no longer holds
+MR_COLS = ("name", "trig", "trig_val", "conds", "section_id", "place", "active", "updated_at")  # what PATCH writes (mr_clean)
 
 
 class _Bad(Exception):
@@ -249,7 +251,7 @@ def mr_patch(rid):
     if any(k in v and v[k] != r[k] for k in ("trig", "trig_val", "conds", "section_id", "place")):
         c.execute("DELETE FROM user_mine_rule_runs WHERE rule_id=?", (rid,))
     v["updated_at"] = iso_ms(now_utc())
-    c.execute(f"UPDATE user_mine_rules SET {', '.join(k + '=?' for k in v)} WHERE id=?", (*v.values(), rid))
+    c.execute(f"UPDATE user_mine_rules SET {', '.join(qi(k, MR_COLS) + '=?' for k in v)} WHERE id=?", (*v.values(), rid))
     return _answer(c, uid, rule=mr_row(c, _get(c, uid, rid)))
 
 
