@@ -819,14 +819,14 @@ function commentHtml(c, U, ro = false) {
   return `<div class="cm ${isNew ? 'new' : ''}${isAgentUser(c.user_id) ? ' agc' : ''}${rxShow('k' + c.id)}" data-cid="${c.id}" data-mid="c:${c.id}">${cav}<div class="cmain"><div class="chead"><b>${esc(cv_who(c, U))}</b>${isAgentUser(c.user_id) ? agentBadge(c.user_id) : ''}${c.portal && typeof ptl_mark === 'function' ? ptl_mark(c) : '' /* 2.63.0 B (#1513) */}${rul_cmtTag(c) /* 2.71.0 A (#1457) */}<span class="muted cwhen" title="${esc(fmtWhen(c.created_at))}">${fmtWhenHead(c.created_at)}${c.edited_at ? ' · ' + tr('edited') : ''}</span>${csv}${acts}</div>${main}</div></div>`;
 }
 function timelineItems(ro = false) {
-  const T = S.tl, soc = cmSocial(taskById(T.id));
+  const T = S.tl;
   if (T.err) return `<div class="muted cmempty">${T.err === 'offline' ? tr('Comments and history are only available online.') : esc(T.err)}</div>`;
-  if (!T.comments) return `<div class="muted cmempty">${tr('Loading…')}</div>`;
+  if (!T.comments) return `<div class="muted cmempty cmload">${tr('Loading…')}</div>`;  // 2.891.0 (#5439): one line (start-detail-5439.css)
   const U = T.users || {};
   const items = [...T.comments.map(c => ({at: c.created_at, c, ro})), ...actItems(taskById(T.id), T).map(a => ({at: a.created_at, a}))]  // 2.685.0 (#5162): level 1 none, 2 changes of others, 3 all
     .sort((x, y) => new Date(x.at) - new Date(y.at) || (x.c ? 1 : 0) - (y.c ? 1 : 0));
   const pend = cmtPendItems(T);  // 2.537.0 (#4569): own comments still on their way, after the newest
-  if (!items.length && !pend.length) return soc || cmSplitOn(taskById(T.id)) ? `<div class="muted cmempty">${tr('No comments yet.')}</div>` : '';  // 2.31.0 (#344): the split keeps its area
+  if (!items.length && !pend.length) return `<div class="muted cmempty">${tr('No comments yet.')}</div>`;  // 2.31.0 (#344): the split keeps its area; 2.891.0 (#5439): every area that showed "Loading…" keeps it (no jump to nothing)
   const lastC = [...items].reverse().find(it => it.c);
   items.push(...pend);
   if (cmtNew()) items.reverse();  // 2.4.2 (#386)
@@ -852,7 +852,7 @@ function timelineHtml(t) {
   // (#344) the desktop split folds its area with the arrow at the end
   return `<h5 class="cmhead"><span>${tr('Comments')}</span><span class="c" id="d-tl-count">${n || ''}</span>${actLevel(t) === 1 ? `<span class="cmmode">${tr('Comments only')}</span>` : actLevel(t) === 2 && soc ? `<span class="cmmode">${tr('Only changes of others')}</span>` : ''}<span class="spacer"></span><button type="button" class="iconbtn cmmenu" data-act="tl-menu" aria-haspopup="menu" aria-label="${esc(tr('Comment options'))}" title="${esc(tr('Comment options'))}">${ic('dots', 's')}</button>${split ? `<button type="button" class="iconbtn dsfoldb" data-act="cm-fold" aria-controls="d-cpane" aria-expanded="${!dsFold()}" aria-label="${esc(dsFold() ? tr('Show the comments') : tr('Fold the comments'))}" title="${esc(dsFold() ? tr('Show the comments') : tr('Fold the comments'))}">${ic('chev', 's')}</button>` : ''}</h5>
     <div id="d-ptl">${typeof ptl_boxHtml === 'function' ? ptl_boxHtml(t) : '' /* 2.63.0 B (#1513): a customer's report */}</div>
-    ${top ? cmComposer(t, true) : ''}<div class="cms" id="d-tl-items">${S.tl.id === t.id ? timelineItems() : `<div class="muted cmempty">${tr('Loading…')}</div>`}</div><button type="button" class="chnew cmnew hidden" id="cm-new">${tr('New comment')} <span aria-hidden="true">↓</span></button>
+    ${top ? cmComposer(t, true) : ''}<div class="cms" id="d-tl-items">${/*html-ok*/ S.tl.id === t.id ? timelineItems() : `<div class="muted cmempty cmload">${tr('Loading…')}</div>`}</div><button type="button" class="chnew cmnew hidden" id="cm-new">${tr('New comment')} <span aria-hidden="true">↓</span></button>
     ${soc ? typingHtml(taskTypers(t), 'd-typing') : ''}`;
 }
 // 2.0.6: the comment box at the bottom edge of the task panel, visible while scrolling (sticky with the
@@ -912,8 +912,17 @@ async function loadTimeline(id) {
   // 2.24.0 (UX-41): opened with an unread comment of someone else: straight to the comments
   // 2.31.0 (#344): the desktop split shows the comments anyway: its area starts at the newest one
   const pane = fresh && $('#detail.dsplit #d-cpane');
-  if (pane && !cmtNew()) pane.scrollTop = pane.scrollHeight;
+  if (pane && !cmtNew()) cmPaneStart(pane);  // 2.891.0 (#5439): the newest comment in sight, not the history lines after it
   else if (first && j.comments.some(c => c.id > (j.seen || 0) && c.user_id !== S.me?.id)) setTimeout(() => { if (S.sel === id) $('#d-tl')?.scrollIntoView?.({block: 'start', behavior: reducedMotion() ? 'auto' : 'smooth'}); }, 60);
+}
+// 2.891.0 (#5439): the desktop split opens at the newest comment: its end at the bottom of the area (a longer one: its start at
+// the top); the history lines after it are a scroll further down. No comment yet = the end as before
+function cmPaneStart(pane) {
+  const lc = pane.querySelector('#d-tl-items > .cm.last') || [...pane.querySelectorAll('#d-tl-items > .cm')].pop();
+  if (!lc) { pane.scrollTop = pane.scrollHeight; return; }
+  pane.scrollTop = 0;
+  const pr = pane.getBoundingClientRect(), r = lc.getBoundingClientRect();
+  pane.scrollTop = Math.max(0, r.height <= pr.height - 16 ? r.bottom - pr.bottom + 8 : r.top - pr.top - 8);
 }
 // 2.527.0 (#4304 A5): a comment being written is kept in this browser (core.js fdKeep, kind 'fdc') until it is sent: an ended
 // session (401 -> sign-in -> reload) or a closed tab gives it back in the box; a locked list's text stays in memory only

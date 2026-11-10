@@ -134,7 +134,8 @@ const day = n => { const d = new Date(Date.now() + n * 864e5); return d.toISOStr
     await nav(B + '#t/' + tid);
     check(await ready(ev, `!!document.querySelector('#detail .dthumb .dchip')`, 80), L + ': the task with its bottom bar');
     const g = await ev(BAR);
-    check(g && g.date && g.quick >= 1 && g.chk && g.last && g.proj === 'Project: ' + lname, L + ': the bar holds date, Today / Tomorrow, the project and Complete (right) ' + JSON.stringify(g));
+    // 2.891.0 (#5439): no project in the bar any more (the path on top names it and moves it): no double project
+    check(g && g.date && g.quick >= 1 && g.chk && g.last && !g.proj, L + ': the bar holds date, Today / Tomorrow and Complete (right), no project ' + JSON.stringify(g));
     check(g && !g.topChk && !g.topDate && g.back && g.prio && g.more, L + ': the header keeps Back, Priority and "…" ' + JSON.stringify(g));
     check(g && (g.above === null || (g.above >= 0 && g.above < 4)) && g.cut <= 0 && !g.wide.some(c => /dthumb|dtop|dchip|dq|dtproj|dtdone/.test(c)), L + ': right above the comment field, nothing of the bar or the header sideways ' + JSON.stringify(g));  // the comment's action buttons at 360 px: #3471
     const sm = await ev(SMALL('#detail .dthumb button'));
@@ -145,10 +146,8 @@ const day = n => { const d = new Date(Date.now() + n * 864e5); return d.toISOStr
     await ready(ev, `(() => { const t = document.querySelector('#toast').getBoundingClientRect(), b = document.querySelector('#detail .dthumb').getBoundingClientRect(); return t.bottom <= b.top; })()`, 12);  // the message slides in
     const ts = await ev(`(() => { const e = document.querySelector('#toast'), t = e.getBoundingClientRect(), b = document.querySelector('#detail .dthumb').getBoundingClientRect(); return {t: Math.round(t.bottom), b: Math.round(b.top), sb: e.style.bottom, lay: document.documentElement.clientHeight, ih: innerHeight, kb: typeof kbReal === 'function' && kbReal(), vv: visualViewport.height}; })()`);
     check(ts.t <= ts.b, L + ': the message sits above the bar ' + JSON.stringify(ts));
-    // the project button opens the move menu; Escape closes it
-    await ev(`(() => { document.querySelector('#detail .dtproj').click(); return 1; })()`);
-    check(await ready(ev, `[...document.querySelectorAll('#pop:not(.hidden) [role=menuitem], #pop:not(.hidden) button')].some(b => /Move to project/.test(b.textContent))`), L + ': the project opens "Move to project…"');
-    await ev(`(() => { closePop(); return 1; })()`);
+    // 2.891.0 (#5439): the project of the path on top names the list (the bar's project button is gone)
+    check(await ev(`(document.querySelector('#detail .dbody .crumbs, #detail .dbody .dcrumbs, #detail .dbody [data-k="list"]')?.textContent || '').includes(${JSON.stringify(lname)})`), L + ': the path on top names the project');
     // typing a comment: the bar steps aside
     if (await ev(`!!document.querySelector('#detail .dcomp textarea') && document.hasFocus()`)) {  // a headless window without focus never matches :focus
       await ev(`(() => { document.querySelector('#detail .dcomp textarea').focus(); return 1; })()`);

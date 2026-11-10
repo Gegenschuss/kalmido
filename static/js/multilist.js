@@ -104,7 +104,7 @@ function ml_detailHtml(t) {
   if (!t || t.id <= 0 || t.parent_id || t.context || t.deleted_at) return '';
   const own = listById(t.list_id); if (!own) return '';
   const al = ml_also(t), add = canEdit(t) && ml_canAdd(t);
-  if (!al.length && !add) return '';
+  if (!al.length) return '';  // 2.891.0 (#5439): one project = the path on top says it; "Show also in project…" stays in the task's "…"
   const icon = l => l.is_inbox ? ic('inbox', 's') : licMark(l, 's', true) || ic('list', 's');
   const item = l => `<span class="mlp"><button type="button" class="mlpn" data-act="ml-open" data-lid="${l.id}" title="${esc(tr('Open {0}', lname(l)))}">${icon(l)}<span>${esc(lname(l))}</span></button>${
     canEdit(t) || canEditList(l.id) ? `<button type="button" class="mlpx" data-act="ml-rm" data-lid="${l.id}" title="${esc(tr('Remove from {0}', lname(l)))}" aria-label="${esc(tr('Remove from {0}', lname(l)))}">${ic('x', 's')}</button>` : ''}</span>`;

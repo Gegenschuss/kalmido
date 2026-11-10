@@ -56,19 +56,20 @@ const FEAT = 'cal,comments,collab';
   let w = await boot({user: 'alice', hash: 'l/' + SALES, ls: HINTS}), d = w.document;
   await until(() => d.querySelector(`.trow[data-id="${T}"]`));
   w.eval(`openDetail(${T})`); await sleep(200);
-  let f = await until(() => d.querySelector('#detail .dmlp'));
-  check(f, '#3289: the task panel has the field Projects');
-  check(/Projects/.test(f?.querySelector('.dmlpk')?.textContent || ''), '#3289: labelled "Projects"');
-  check(/Sales/.test(f?.querySelector('.mlp.own')?.textContent || '') && !f?.querySelector('.mlp.own .mlpx'), '#3289: its own project, fixed (no x)');
-  check(/Also in…/.test(f?.querySelector('.mlpadd')?.textContent || ''), '#3289: + "Also in…" while there is no further project');
-  click(w, f.querySelector('.mlpadd')); await sleep(150);
+  // 2.891.0 (#5439): one project = no field (the path on top names it, no double project); "Show also in project…" is in the task's "…"
+  await until(() => d.querySelector('#detail #d-title'));
+  check(!d.querySelector('#detail .dmlp'), '#5439: one project: no field Projects');
+  check(w.eval(`ml_menuItems(document.body, taskById(${T})).some(x => x.label === 'Show also in project…')`), '#5439: the task menu offers "Show also in project…"');
+  w.eval(`ml_pick(document.body, taskById(${T}))`); await sleep(150);
   const offered = items(d).map(x => x.textContent.trim());
   check(offered.includes('Marketing') && offered.includes('Ops') && !offered.includes('Private notes') && !offered.includes('Sales'),
     '#3289: + offers the projects of the same workspace, not its own, not the private one ' + JSON.stringify(offered));
   click(w, items(d).find(x => x.textContent.trim() === 'Marketing'));
   check(await until(async () => (await also(T)).join() === String(MKT)), '#3289: picking Marketing shows the task also there');
   check((await call('GET', `/api/tasks/${T}`)).list_id === SALES, '#3289: its own project stays Sales');
-  f = await until(() => { const x = d.querySelector('#detail .dmlp'); return x && x.querySelector('.mlpx') && x; });
+  let f = await until(() => { const x = d.querySelector('#detail .dmlp'); return x && x.querySelector('.mlpx') && x; });
+  check(/Projects/.test(f?.querySelector('.dmlpk')?.textContent || ''), '#3289: labelled "Projects"');
+  check(/Sales/.test(f?.querySelector('.mlp.own')?.textContent || '') && !f?.querySelector('.mlp.own .mlpx'), '#3289: its own project, fixed (no x)');
   check(/Marketing/.test(f?.textContent || '') && f?.querySelector(`.mlpx[data-lid="${MKT}"]`), '#3289: the field lists Marketing with an x');
   check(f && !/Also in…/.test(f.querySelector('.mlpadd')?.textContent || 'x'), '#3289: the + is only the sign once there is a further project');
   click(w, f.querySelector(`.mlpx[data-lid="${MKT}"]`));

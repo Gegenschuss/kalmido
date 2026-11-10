@@ -193,7 +193,8 @@ const CHIP = `(() => { const a = [...document.querySelectorAll('#detail .attsec 
     await open(o, T);
     let m = await ev(geo);
     check(m.v === '60' && m.body > 0 && m.pane > 0 && Math.abs(m.body / (m.body + m.pane) * 100 - 60) < 4, '1440: #344 the panel split 60 / 40 ' + JSON.stringify(m));
-    check(await ev(`(() => { const p = document.querySelector('#d-cpane'); return p.scrollHeight <= p.clientHeight + 2 || p.scrollTop > 0; })()`), '1440: #344 the comments area starts at the newest comment');
+    // 2.891.0 (#5439): the newest comment is in sight (was: scrolled to the very end, where history lines after it hid it)
+    check(await ev(`(() => { const p = document.querySelector('#d-cpane'), c = [...p.querySelectorAll('#d-tl-items > .cm')].pop(); if (!c) return false; const a = p.getBoundingClientRect(), r = c.getBoundingClientRect(); return r.top >= a.top - 1 && r.top < a.bottom - 8; })()`), '1440: #344 the comments area starts at the newest comment');
     // nothing in the properties overlaps the next block (the scroll area must not squeeze its children)
     const ovl = await ev(`(() => { const k = [...document.querySelectorAll('#detail .dbody > *')].filter(e => e.getBoundingClientRect().height); const bad = [];
       for (let i = 1; i < k.length; i++) { const a = k[i - 1], b = k[i]; if (a.scrollHeight > a.clientHeight + 2 && getComputedStyle(a).overflowY === 'visible' || a.getBoundingClientRect().bottom > b.getBoundingClientRect().top + 1) bad.push((a.id || a.className) + '>' + (b.id || b.className)); }

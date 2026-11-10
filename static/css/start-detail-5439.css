@@ -1,0 +1,17 @@
+/* 2.891.0 (#5439 task panel calmer): a start file - app.css takes no new rules (tools/check_appcss.py). The task panel is
+   drawn at start, so its rules load with app.css (the server sends this behind it). */
+/* "Loading…" of the comments is one line of the height of a history line (a shared task has at least its "created" line,
+   the comments only add below it): nothing falls together when they arrive; the empty places of the one-way mark, the
+   delivery state and the decisions take no gap of the panel (60-80 px under "Watch") */
+.cms>.cmempty.cmload{padding:.1875rem .375rem .1875rem 2.625rem;font-size:var(--fs-s);line-height:var(--lh);text-align:left}
+.dbody>:is(#d-dv,#d-ow,#d-dec):empty{display:none}
+/* the phone's bar holds date, Today / Tomorrow and Complete in one row (the project is in the path on top); a date chip keeps
+   room for its day, else the row wraps once */
+.dthumb .dchip{min-width:6rem}
+/* a narrow phone (up to 384 px): "-1 day" leaves the bar (the date chip's picker has it), so date, Today / Tomorrow and Complete fit one row */
+@container dthumb (max-width:24rem){ .dthumb .dq[data-d="-1"]{display:none} }
+/* Watch and "N watchers" one element (a joined pair) */
+.dlg-wg{display:inline-flex;align-items:stretch;border:1px solid var(--line);border-radius:var(--radius)}
+.dlg-wg .dlg-w{border:0;border-radius:var(--radius) 0 0 var(--radius)}
+.dlg-wg .dlg-l{display:inline-flex;align-items:center;padding:0 .625rem;border-left:1px solid var(--line);color:var(--text2);text-decoration:none}
+.dlg-wg:has(.dlg-w.on){border-color:var(--accent)}

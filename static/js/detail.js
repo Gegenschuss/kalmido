@@ -517,7 +517,7 @@ function dsSave(patch) {
 }
 function dsFoldToggle(on = !dsFold()) {
   dsSave({detail_cm_fold: on ? '1' : '0'});
-  if (!on) { const p = $('#d-cpane'); if (p && !cmtNew()) p.scrollTop = p.scrollHeight; }
+  if (!on) { const p = $('#d-cpane'); if (p && !cmtNew()) cmPaneStart(p); }  // 2.891.0 (#5439): at the newest comment
 }
 document.addEventListener('keydown', e => {
   const g = e.target.closest?.('#d-sgrip'); if (!g || e.altKey || e.ctrlKey || e.metaKey) return;
@@ -694,7 +694,7 @@ function renderDetail0(D = $('#detail')) {
     history: hist ? `<details class="dsec cmsec cmro" id="d-hist"><summary><span>${tr('History')}</span></summary><div class="cms" id="d-hist-items">${S.tl.id === t.id ? histItems() : `<div class="muted cmempty">${tr('Loading…')}</div>`}</div></details>` : '',
     deps: ck ? '' : `${t.id > 0 && dFor(t) && !t.context ? `<div class="dsec depsec" id="d-deps">${depsHtml(t)}</div>` : waitExtHtml(t, ro, true)}${typeof rel_secHtml === 'function' ? rel_secHtml(t) : ''}`,  // 2.22.0 (#686); 2.576.0 (#3371): saved relations (related.js)
     tags: ck || !pz_show(t, 'tags', (t.tags || []).length + (t.ltags || []).length) ? '' : `<div class="dsec"><h5>${tr('Tags')}</h5>${tagEditHtml(t, tlkR)}</div>`,
-    attachments: ck ? '' : `<div class="dsec attsec"><h5>${tr('Attachments')}</h5>${typeof le2uAttHead === 'function' ? le2uAttHead(t) : ''}<div class="atts">${(t.attachments || []).map(attHtml).join('')}
+    attachments: ck || (ro && !(t.attachments || []).length && !t.attachments_trash?.length) ? '' : `<div class="dsec attsec"><h5>${tr('Attachments')}</h5>${typeof le2uAttHead === 'function' ? le2uAttHead(t) : ''}<div class="atts">${(t.attachments || []).map(attHtml).join('')}
         ${t.id > 0 && !ro ? `<label class="attadd" title="${esc(isTouch() ? tr('Images, PDFs, documents') : tr('Images, PDFs, documents') + ' · ' + tr('or drop files here / paste an image with Ctrl+V'))}">${ic('clip', 's')}<span>${tr('Add file')}</span><input type="file" id="d-file" multiple hidden></label>${typeof le2eOn === 'function' && le2eOn(t.list_id) ? '' : e2eAttAddHtml(t)}` : ''}</div>${t.attachments_trash?.length ? (typeof attTrashHtml === 'function' ? attTrashHtml(t) : (loadModule('trashui').then(() => renderDetail(), () => {}), '')) : '' /* 2.272.0 G (#3038): trashui.js */}
 </div>`,
     fields: ck ? '' : `<div class="dsec fields">
@@ -722,7 +722,6 @@ function renderDetail0(D = $('#detail')) {
       ${ck || tlkR ? '' : [[0, 'sun', tr('Today')], [1, 'sunrise', qdLabel(t)], [-1, 'back', tr('-1 day')]].filter(([n]) => (n === -1 ? qdMinus(t) : n || t.due !== today())).map(([n, i, lab]) => `<button class="iconbtn dq ${t.due === addDays(today(), n) && n >= 0 ? 'on' : ''}" data-act="due-q" data-d="${n}" data-id="${t.id}" title="${esc(n === -1 ? tr('Set to {0}', dayLabel(addDays(t.due, -1))) : kt(n ? qdTitle(t) : tr('Due: {0}', lab), n ? 'Shift+T' : 't'))}" aria-label="${esc(n === -1 ? lab + ': ' + tr('Set to {0}', dayLabel(addDays(t.due, -1))) : n ? (qdPlus(t) ? lab + ': ' : '') + qdTitle(t) : tr('Due: {0}', lab))}">${ic(i, 's')}<span class="dql">${esc(lab)}</span></button>`).join('')}`;
   // the bar's Complete: a button with its word (a 44 px target), the same action as the round box of the header
   const dDone = !thumb ? '' : `<button type="button" class="btn dtdone${t.status === 2 ? ' on' : ''}" data-act="toggle" data-id="${t.id}" role="checkbox" aria-checked="${t.status === 2}" title="${esc(kt(msT ? tr('Complete milestone') : tr('Complete task'), 'x'))}" ${ro ? 'disabled' : ''}>${ic('check', 's')}<span>${esc(t.status === 2 ? tr('Completed') : tr('Complete'))}</span></button>`;
-  const dProj = !thumb || !l ? '' : (mv => `<button type="button" class="dtproj" data-act="${mv ? 'crumb-menu' : 'crumb'}" data-k="list" data-id="${l.id}" ${mv ? 'aria-haspopup="menu"' : ''} title="${esc(tr('Project') + ': ' + lname(l))}" aria-label="${esc(tr('Project') + ': ' + lname(l))}">${l.is_inbox ? ic('inbox', 's') : licMark(l, 's', true) || ic('list', 's')}<span class="dtpn">${esc(lname(l))}</span></button>`)(canEdit(t) && canEditList(t.list_id) && t.status === 0 && !t.context);
   setHtml(D, `
     <div class="dtop">
       <button class="iconbtn back" data-act="close-detail" aria-label="${tr('Back')}">${ic('back')}</button>
@@ -782,7 +781,7 @@ function renderDetail0(D = $('#detail')) {
       })()}
     </div>
     ${split ? `<div class="dsgrip" id="d-sgrip" role="separator" tabindex="0" aria-orientation="horizontal" aria-controls="d-cpane" aria-label="${esc(tr('Size of the comments area'))}" title="${esc(tr('Drag to resize; double-click or Enter folds the comments'))}" aria-valuemin="${CSPL_MIN}" aria-valuemax="${CSPL_MAX}" aria-valuenow="${dsTop()}"></div><div class="dcpane" id="d-cpane">${SEC.comments}</div>` : ''}
-    <div class="dbot">${thumb ? `<div class="dthumb" role="group" aria-label="${esc(tr('Task'))}">${dDate}<span class="dtbr" aria-hidden="true"></span>${dProj}${dDone}</div>` : ''}${cmOk && !(cm === 'full' && cmtNew()) ? cmComposer(t) : ''}<div class="dfoot"><span class="dfc" title="${esc(createdLine(t))}">${esc(createdLine(t))}</span>
+    <div class="dbot">${thumb ? `<div class="dthumb" role="group" aria-label="${esc(tr('Task'))}">${dDate}${dDone}</div>` : ''}${cmOk && !(cm === 'full' && cmtNew()) ? cmComposer(t) : ''}<div class="dfoot"><span class="dfc" title="${esc(createdLine(t))}">${esc(createdLine(t))}</span>
       <span class="spacer"></span>
       ${ck ? '' : runItems().filter(x => x.tid === t.id).map(x => `<button class="drun k-${x.k}" data-act="run-pop" title="${esc(tr(RUN_KIND[x.k][1]))}">${ic(RUN_KIND[x.k][0], 's')}<span ${x.attr}>${x.txt}</span><span class="drl">${tr(RUN_KIND[x.k][1])}</span></button>`).join('')}
       </div></div>`);

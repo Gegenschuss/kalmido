@@ -177,7 +177,7 @@ function dlg_rowHtml(t, ck, ro, shared) {
   const on = shared || w.length, tip = mine ? tr('Stop watching') : tr('Watch: comments and status changes reach you');
   const btn = on ? `<button type="button" class="btn sm dlg-w ${mine ? 'on' : ''}" data-act="watch" data-id="${t.id}" aria-pressed="${mine}" title="${esc(tip)}">${ic('eye', 's')} ${mine ? tr('Watching') : tr('Watch')}</button>` : '';
   const all = on ? `<button type="button" class="linkbtn dlg-l" data-act="watchers" data-id="${t.id}" aria-haspopup="menu">${esc(trn('{0} watcher', '{0} watchers', w.length))}</button>` : '';
-  return chip || btn ? `<div class="dmeta dlgrow" data-watrow="${t.id}">${chip}${btn}${all}</div>` : '';
+  return chip || btn ? `<div class="dmeta dlgrow" data-watrow="${t.id}">${chip}${btn ? `<span class="dlg-wg" role="group" aria-label="${esc(tr('Watchers'))}">${btn}${all}</span>` : ''}</div>` : '';  // 2.891.0 (#5439): Watch and the count as one element
 }
 function dlg_menu(anchor, id) {
   const t = taskById(id); if (!t) return;
