@@ -83,6 +83,29 @@ def f5(who, s):
           f"F5 {who}: its definition as after {rs}")
 
 
+# ================================================================ F6 a projects folder's share: the log names the final role
+def f6():
+    r = A.post(B + "/api/lists", json={"name": "Website", "folder": "Clients F6", "org_id": ORG})
+    check(r.ok, f"F6: setup: a project in a folder {r.text[:200]}")
+    tree = A.get(B + "/api/lists/tree").json().get("spaces") or []
+    nid = next((f["id"] for sp in tree if sp.get("org_id") == ORG for f in sp.get("folders") or [] if f["path"] == "Clients F6" and f.get("mine")), None)
+    check(nid, f"F6: setup: the projects folder's node {tree}")
+    n0 = len(sql("SELECT 1 FROM fs_log WHERE node_id=? AND action='share'", (nid,)))
+    r = A.post(B + f"/api/files/nodes/{nid}/shares", json={"user_id": ids["bob"], "role": "view", "list_role": "admin"})
+    check(r.status_code == 201, f"F6: shared with the list role admin {r.text[:200]}")
+    sid = r.json().get("id") if r.ok else None
+    check(sql("SELECT role, list_role FROM fs_shares WHERE id=?", (sid,)) == [("edit", "admin")], "F6: the row: role edit, list role admin")
+    lines = [x[0] for x in sql("SELECT detail FROM fs_log WHERE node_id=? AND action='share' ORDER BY id", (nid,))][n0:]
+    check(lines == [f"user:{ids['bob']}:edit"], f"F6: ONE log line, with the final role (not the role of the body) {lines}")
+    r = A.post(B + f"/api/files/nodes/{nid}/shares", json={"user_id": ids["bob"], "role": "edit", "list_role": "participant"})
+    lines = [x[0] for x in sql("SELECT detail FROM fs_log WHERE node_id=? AND action='share' ORDER BY id", (nid,))]
+    check(r.status_code == 201 and sql("SELECT role, list_role FROM fs_shares WHERE id=?", (sid,)) == [("view", "participant")]
+          and lines[-1] == f"user:{ids['bob']}:view", f"F6: changed to participant: the row and the log line say view {lines}")
+    r = A.post(B + f"/api/files/nodes/{nid}/shares", json={"user_id": ids["bob"], "role": "view", "list_role": "boss"})
+    check(r.status_code == 400 and sql("SELECT role, list_role FROM fs_shares WHERE id=?", (sid,)) == [("view", "participant")],
+          f"F6: an unknown list role: 400, nothing written {r.status_code}")
+
+
 # ================================================================ setup
 kt.fresh({"KALMIDO_INSTANCE_MODE": "workspaces"}, prefix="P2866")
 kt.docker_logs_on_first_fail()
@@ -115,6 +138,7 @@ check(FOFF, "setup: frida's personal office")
 
 f5("alice", A)
 f5("frida", Fr)
+f6()
 # -- more parts below --
 
 raise SystemExit(kt.done("p2866_pflege"))
