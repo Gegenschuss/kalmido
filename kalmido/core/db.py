@@ -1398,6 +1398,17 @@ def init_db(guard=True, load=None):
             gset(c, "migr_e2efree4372", "1")
             if any(n.values()):
                 print("locked projects: plain texts emptied " + ", ".join(f"{k} {v}" for k, v in sorted(n.items())), flush=True)
+        if gsetting(c, "migr_e2etrash5549") != "1":  # #5549: one way -- a project locked before loses the trash copies of its
+            # sections and custom fields deleted before the lock (plain text) and the notes of its "Delete all times" copies, as
+            # a project locked now does (le2b_scrub_trash). Only 'on', as migr_e2efree4372
+            from ..collab.liste2eguard import le2b_scrub_trash
+            n = {}
+            for r in c.execute("SELECT id FROM lists WHERE e2e='on' ORDER BY id").fetchall():
+                for k, v in le2b_scrub_trash(c, r[0], plain_only=True).items():
+                    n[k] = n.get(k, 0) + v
+            gset(c, "migr_e2etrash5549", "1")
+            if any(n.values()):
+                print("locked projects: plain trash copies removed " + ", ".join(f"{k} {v}" for k, v in sorted(n.items())), flush=True)
         if gsetting(c, "migr_offerlist4586") != "1":  # 2.620.0 (#4586, review C M1): the links of tasks moved before the trigger
             # kalmido_offer_link_list (migrations.d/4586_a.py) follow their task's list once
             c.execute("UPDATE task_offer_links l SET list_id=t.list_id FROM tasks t WHERE t.id=l.task_id AND l.list_id<>t.list_id")

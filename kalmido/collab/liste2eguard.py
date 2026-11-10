@@ -9,7 +9,8 @@ signed-in person gets them (and decrypts them); every other way that hands texts
   empty). le2b_mask is also used for webhook payloads.
 - History (activity.data): never texts of a locked list (le2b_act_data, called by tasks/validation.py log_act).
 - Copies (le2b_scrub, called by part A when the lock is switched on): history texts, time entry snapshots, the shopping
-  memory, news data, waiting webhook deliveries, agent events, the list's mail address. Templates (private copies of people)
+  memory, news data, waiting webhook deliveries, agent events, the list's mail address, the trash copies of deleted
+  sections and custom fields (#5549). Templates (private copies of people)
   are NOT deleted: deleting data is a one-way step (named in docs/SECURITY.md).
 
 Prefix le2b_ (part B)."""
@@ -339,6 +340,7 @@ def le2b_scrub(c, lid):
                                             "OR (kind='section_order' AND ref_id=?)", (lid, lid, lid))
     n["undo_time"] = le2b_scrub_undo(c, f"kind='time_entry' AND ref_id IN (SELECT id FROM time_entries WHERE list_id=? OR task_id IN ({tq}))",
                                      (lid, lid))
+    n.update(le2b_scrub_trash(c, lid))  # #5549: after undo_sections (it reads the section copies)
     for fn in _SCRUB_MORE:
         n.update(fn(c, lid) or {})
     return n
@@ -453,6 +455,57 @@ def le2b_scrub_free(c, lid):
         "list_status": c.execute("UPDATE list_status SET note='' WHERE list_id=? AND note<>''", (lid,)).rowcount,
         "desc_history": c.execute("DELETE FROM list_activity WHERE list_id=? AND kind='desc'", (lid,)).rowcount,
     }
+
+
+def le2b_scrub_trash(c, lid, plain_only=False):
+    """#5549 (finding H2): the copies of the list's trash (core/objparts.py part_copy, list_part_trash) made before the lock:
+    a deleted section keeps its name (snap), a deleted custom field the values of the tasks (held) - both go for good, as the
+    free texts of le2b_scrub_free (restoring them would also write plain text into the locked list). Planned sprints stay
+    (their names are not encrypted). The Undo copies of "Delete all times" (personal/timewipe.py) keep their entries, without
+    note and task title (emptied as le2b_scrub empties them in time_entries) and sealed again, so Undo still works.
+    plain_only (core/db.py, once for the projects locked before #5549): only copies holding plain text - a section whose
+    name is no ciphertext, a text field with a value that is none; a copy deleted under the lock stays.
+    Idempotent, the caller commits. Returns {what: rows}."""
+    from ..lists.fields import FIELD_KIND
+    from ..personal.timewipe import TZW_KIND, h6b_sig
+    n = {"trash_sections": 0, "trash_fields": 0, "trash_times": 0}
+    for r in c.execute("SELECT id, kind, snap, held FROM list_part_trash WHERE list_id=? AND kind IN (?, ?, ?) ORDER BY id",
+                       (lid, "section", FIELD_KIND, TZW_KIND)).fetchall():
+        if r["kind"] == TZW_KIND:
+            try:
+                es = json.loads(r["held"] or "[]")
+            except ValueError:
+                continue
+            es = es if isinstance(es, list) else []
+            if not any(isinstance(e, dict) and (e.get("note") or e.get("task_title")) for e in es):
+                continue
+            for e in es:
+                if isinstance(e, dict) and (e.get("note") or e.get("task_title")):
+                    e["note"], e["task_title"] = "", ""
+                    if e.get("sig"):
+                        e["sig"] = h6b_sig(c, lid, e)
+            c.execute("UPDATE list_part_trash SET held=? WHERE id=?", (json.dumps(es, ensure_ascii=False, default=str), r["id"]))
+            n["trash_times"] += 1
+            continue
+        if plain_only and not _trash_plain(r):
+            continue
+        c.execute("DELETE FROM list_part_trash WHERE id=?", (r["id"],))
+        n["trash_sections" if r["kind"] == "section" else "trash_fields"] += 1
+    return n
+
+
+def _trash_plain(r):
+    """Does copy r (a section or a custom field of list_part_trash) hold plain text of the encrypted fields?"""
+    try:
+        snap, held = json.loads(r["snap"] or "{}"), json.loads(r["held"] or "{}")
+    except ValueError:
+        return True
+    snap, held = (snap if isinstance(snap, dict) else {}), (held if isinstance(held, dict) else {})
+    if r["kind"] == "section":
+        return bool(snap.get("name")) and not le2e_is_cipher(snap.get("name"))
+    if snap.get("type") != "text":
+        return False  # select / number / date values stay readable in a locked list too (collab/liste2e.py, decision E2)
+    return any(isinstance(v, list) and len(v) > 1 and v[1] and not le2e_is_cipher(v[1]) for v in held.get("vals") or [])
 
 
 def le2b_scrub_tasks(c, ids):

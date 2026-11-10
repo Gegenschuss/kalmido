@@ -1047,9 +1047,10 @@ padded to 64-byte steps) and wraps that key for every member with ECDH between t
   is switched off; templates from or into it, imports, forms and the shopping memory refuse or skip it; pushes, mail
   digests, briefing, report, news and webhooks carry no texts of it; server search skips it. Switching on removes the
   plain copies the server kept elsewhere (history texts, time entry title snapshots, news and queued webhook / agent
-  event payloads, shopping memory, proposals, an agent's chat answers and step texts about the list's tasks). Kept on
-  purpose: the person's own chat messages to an agent (their own words), the note of a time entry (`time_entries.note`)
-  and the ids of people mentioned in a comment (metadata for the notification). Imports keep only ids and counts,
+  event payloads, shopping memory, proposals, an agent's chat answers and step texts about the list's tasks, the trash copies of sections and custom
+  fields deleted before - gone for good -; the notes of time entries, also in the "Delete all times" undo copies,
+  the status note and the description go empty). Kept on
+  purpose: the person's own chat messages to an agent (their own words) and the ids of people mentioned in a comment (metadata for the notification). Imports keep only ids and counts,
   the webhook log never bodies. Lists of the Family and Household & Life modules (and lists a contact sync
   writes birthdays into) cannot be locked.
 
