@@ -390,6 +390,7 @@ The mail hub: filed e-mails, mailboxes and rules, absences, holidays and dispatc
 - `kalmido/hub/absence.py` (`abs`) - Absences -- vacation, sick leave, days off, other
 - `kalmido/hub/absundo.py` - Undo across devices for team absences (change, delete, restore; a holiday decision since makes the step a conflict)
 - `kalmido/hub/agentdispo.py` (`adz`) - Shoot planning by an agent
+- `kalmido/hub/callsheet.py` (`cs`) - The call sheet of a shoot day (Film & Video): day details per disposition job, saved sealed, and the PDF for everybody on the day
 - `kalmido/hub/dispo.py` (`dsp`) - Resources and disposition -- booking crew and equipment for shoot days, seeing who and what is free per day, spotting double bookings
 - `kalmido/hub/dspundo.py` - Undo across devices for dispatch bookings (one part per booking, delete and restore)
 - `kalmido/hub/hmv1.py` (`hmv`) - The filed e-mails in the REST API v1 + MCP
@@ -831,6 +832,7 @@ The start-up module.
 - `static/js/calendar.js` (`cvx`) - Kanban, the calendar views and external calendar events
 - `static/js/calevents.js` (`ev`) - Events (module "events"): own calendars next to the tasks, the event editor and popover, the agenda, creating events in the week grid, calendars (share, import, export)
 - `static/js/calgest.js` (`cgs`) - Gestures of the calendar (module "calendar", loaded with calview.js / caldrag.js)
+- `static/js/callsheet.js` (`cs`) - The call sheet dialog of a shoot day (module "callsheet", loaded on demand from a booking in the disposition): day details, directions sketch, PDF
 - `static/js/calrrule.js` (`crr`) - An own repeat rule for an event ("every 2nd Tuesday", Mon + Wed + Fri)
 - `static/js/calview.js` (`cal`) - The calendar views month / week / day and Settings > Integrations > Calendars
 - `static/js/calyear.js` (`cyr`) - The calendar's year view: twelve small months, a day with events or tasks tinted in the accent colour (the more, the stronger)
