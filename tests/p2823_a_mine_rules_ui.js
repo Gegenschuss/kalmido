@@ -67,7 +67,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   click(w, ed().querySelector('[data-m="save"]'));
   check(await until(() => !ed() && rows().length === 2), 'saved: two rules in the list');
   const txt1 = rows()[1]?.textContent || '';
-  check(/When the priority of a task becomes high, move it to the top of “Someday”/.test(txt1), 'the new rule as a sentence: ' + txt1.trim());
+  check(/^\s*Priority becomes high/.test(txt1) && /When the priority of a task becomes high, move it to the top of “Someday”/.test(txt1), 'the new rule: its trigger as the name (none given), the sentence: ' + txt1.trim());
   click(w, dlg().querySelector('[data-m="close"]'));
   check(await until(() => !dlg()), 'the dialog closes');
 

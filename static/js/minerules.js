@@ -40,7 +40,7 @@ function mr_sentence(r) {
   const c = mr_condText(r), then = r.place === 'bottom' ? tr('move it to the end of {0}', where) : tr('move it to the top of {0}', where);
   return tr('When {0}, {1}', mr_trigText(r.trigger || {}), then) + (c ? ' ' + tr('(only if {0})', c) : '');
 }
-function mr_title(r) { return r.name || (r.default ? tr('Due today or overdue to Now') : tr('Rule')); }
+function mr_title(r) { return r.name || (r.default ? tr('Due today or overdue to Now') : tr((MR_TRIG.find(x => x[0] === mr_trigKey(r.trigger || {})) || ['', N_('Rule')])[1])); }  // without a name: its trigger
 
 async function mr_load() {
   const j = await api('GET', '/api/mine-rules');
