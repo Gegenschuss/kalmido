@@ -266,6 +266,25 @@ def n2(who, s, uid, org):
     check(t == [(f"Moodboard {who} draft",)], f"N2 {who}: the private task has its old title again {t}")
 
 
+def n2_mixed(who, s, uid, org):
+    """Review 2.866 (#5302 N2): one bundle token over a private step and an office step makes two groups (one per workspace),
+    so 'bis hierher' over an office barrier never takes an office part back inside a private group."""
+    tok = {"X-Kalmido-Undo-Group": ("ab%02d" % (uid % 100)) * 8}
+    r = s.post(B + "/api/lists", json={"name": f"Mixed {who}", "org_id": None})
+    check(r.ok, f"N2 mixed {who}: setup: a private project {r.text[:200]}")
+    tid = s.post(B + "/api/tasks", json={"list_id": r.json()["id"], "title": f"Mixed {who} draft"}).json()["id"]
+    sv = service(s, f"Ton {who}", 300)
+    r = s.patch(B + f"/api/tasks/{tid}", json={"title": f"Mixed {who} final"}, headers=tok)
+    check(r.ok, f"N2 mixed {who}: setup: private rename with the token {r.text[:200]}")
+    r = s.patch(B + OFF + f"/services/{sv['id']}", json={"daily_rate": 310, "expect_updated_at": sv["updated_at"]}, headers=tok)
+    check(r.ok, f"N2 mixed {who}: setup: office step with the same token {r.text[:200]}")
+    gt = sql("SELECT group_id FROM obj_undo WHERE kind='task' AND ref_id=? AND group_id IS NOT NULL ORDER BY id DESC LIMIT 1", (tid,))
+    gs = sql("SELECT u.group_id, g.org_id FROM obj_undo u JOIN undo_groups g ON g.id=u.group_id WHERE u.ref_id=? AND u.kind<>'task' "
+             "AND u.user_id=? ORDER BY u.id DESC LIMIT 1", (sv["id"], uid))
+    check(gt and gs and gt[0][0] != gs[0][0] and gs[0][1] == org,
+          f"N2 mixed {who}: the office step has its own group in its office, not the private one {gt} {gs}")
+
+
 # ================================================================ N5 no sealed value becomes a label; label columns not in FIELDS
 def n5():
     out = in_app("""from kalmido.office.oubar import _plain, oub_label_md, oub_label_client, oub_doc_name
@@ -321,6 +340,8 @@ f9()
 f10()
 n2("alice", A, ALICE, ORG)
 n2("frida", Fr, FID, FOFF)
+n2_mixed("alice", A, ALICE, ORG)
+n2_mixed("frida", Fr, FID, FOFF)
 n5()
 # -- more parts below --
 

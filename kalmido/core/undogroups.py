@@ -172,19 +172,22 @@ def ug_current(c, uid, area, org_id, label):
     if not has_request_context() or g.get("undo_own"):
         return None
     cur = g.get("undo_group")
-    if cur and cur["uid"] == int(uid):
+    # 2.866.0 (#5302 N2, review): a group stays in one workspace - a barrier holds only the groups of its org_id, so a part of
+    # another workspace (private / another organisation) opens its own group instead of slipping past that barrier in a mixed one
+    if cur and cur["uid"] == int(uid) and cur.get("org") == org_id:
         return cur
     tok = ug_token()
     row = None
     if tok:
-        row = c.execute("SELECT id, state, parts, bytes FROM undo_groups WHERE user_id=? AND token=? AND updated_at>=? ORDER BY id DESC LIMIT 1",
+        row = c.execute("SELECT id, state, parts, bytes, org_id FROM undo_groups WHERE user_id=? AND token=? AND updated_at>=? ORDER BY id DESC LIMIT 1",
                         (int(uid), tok, iso(now_utc() - timedelta(seconds=UNDO_BUNDLE_S)))).fetchone()
-        if row is not None and row["state"] not in ("done", "toobig"):
-            row = None  # undone meanwhile: a new step
+        if row is not None and (row["state"] not in ("done", "toobig") or row["org_id"] != org_id):
+            row = None  # undone meanwhile, or another workspace (#5302 N2): a new step
     if row is None:
         gid = _open(c, uid, area or lv_area(), org_id, g.get("undo_label") or label, token=tok)
         row = {"id": gid, "state": "done", "parts": 0, "bytes": 0}
-    cur = {"uid": int(uid), "id": row["id"], "state": row["state"], "parts": int(row["parts"]), "bytes": int(row["bytes"])}
+    cur = {"uid": int(uid), "id": row["id"], "state": row["state"], "parts": int(row["parts"]), "bytes": int(row["bytes"]),
+           "org": org_id}  # 2.866.0 (#5302 N2): the workspace of the group
     g.undo_group = cur
     return cur
 
