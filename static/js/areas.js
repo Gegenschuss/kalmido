@@ -738,7 +738,7 @@ document.addEventListener('click', e => {
 // opening the chat; the rest of the row opens it as before. The computer keeps the dot's title on hover
 document.addEventListener('click', e => {
   const s = e.target.closest?.('#side .steam .sdot'); if (!s || !sbm_on()) return;
-  const r = s.closest('.steam'), a = agentById(+(r.dataset.aid || String(r.dataset.go || '').split('/')[1]));
+  const r = s.closest('.steam'), g = /^agents\/(\d+)$/.exec(r.dataset.go || ''), a = agentById(+(r.dataset.aid || g?.[1] || 0));  // only an agent's row (a person's row keeps its own dot)
   if (!a) return;
   e.preventDefault(); e.stopPropagation();
   toast(`${agentHstLine(a)} · ${tr('Green: ready · Blue: working · Yellow: waiting for you · Grey: off or not connected · Red: error')}`, undefined, 6000);
