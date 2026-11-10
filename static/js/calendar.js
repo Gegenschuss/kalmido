@@ -168,7 +168,7 @@ function calInvalidate() { S.cal.key = ''; S.cal.loading = ''; S.cal.seq = (S.ca
 const cevWs = e => !e.own || e.cal == null || wsObjIn(evCal(e.cal));
 const cevOn = d => S.cal.items.filter(e => e.d0 <= d && e.d1 >= d && cevWs(e));
 const cevSort = (a, b) => (b.all_day - a.all_day) || a.start.localeCompare(b.start) || cmpText(a.title, b.title);
-const cevColor = e => e.booking ? 'var(--accent)' : abcX(e) ? 'var(--muted)' : e.own ? evCalColor(e) : cssColor(S.cal.subs[e.sub]?.color) || '#94a3b8';  // 2.50.0 (#1194): bookings
+const cevColor = e => e.booking ? 'var(--accent)' : abcX(e) ? 'var(--muted)' : e.own ? evCalColor(e) : cssColor(S.cal.subs[e.sub]?.color) || 'var(--muted)';  // 2.50.0 (#1194): bookings
 const cevCal = e => e.booking ? tr('Disposition') : e.holiday ? tr('Public holidays') : e.absence ? (e.absence === 'team' ? tr('Team absences') : tr('Absences')) : e.own ? evCalName(e) : S.cal.subs[e.sub]?.name || tr('Calendar');
 const cevTitle = e => e.title || tr('(no title)');
 // a timed event on day d is a block in the week grid, except on the middle days of a multi-day event (all-day row)
@@ -185,8 +185,13 @@ function cevTime(e, d) {
 // 2.52.0 (#1016): cgok = may be dragged into other days (caldrag.js)
 // 2.800.0 (#5468): an event of a subscribed calendar is personal and shows in every workspace: it carries the subscription's mark
 const cevSubMark = e => e.own || abcX(e) ? '' : `<span class="cevsub" title="${esc(tr('Subscribed calendar'))}" aria-label="${esc(tr('Subscribed calendar'))}" role="img">${ic('sync', 's')}</span>`;
-const cevChip = (e, d) => `<div class="cev${cevTimed(e, d) ? '' : ' allday'}${abcX(e) ? ' cevx' : ''}${ap_draftCls(e)}${cg_canDrag(e) ? ' cgok' : ''}" data-cev="${e.id}" style="--cc:${cevColor(e)}" title="${esc(cevTitle(e))}">${/*html-ok*/ cevSubMark(e)}${cevTimed(e, d) && e.d0 === d ? `<span class="muted">${fmtTimeAt(e.s)}</span> ` : ''}${esc(cevTitle(e))}</div>`;
+const cevChip = (e, d) => `<div class="cev${cevTimed(e, d) ? '' : ' allday'}${abcX(e) ? ' cevx' : ''}${ap_draftCls(e)}${cg_canDrag(e) ? ' cgok' : ''}" data-cev="${e.id}" style="--cc:${cevColor(e)}" title="${esc(cevTitle(e))}" role="button" tabindex="0">${/*html-ok*/ cevSubMark(e)}${cevTimed(e, d) && e.d0 === d ? `<span class="muted">${fmtTimeAt(e.s)}</span> ` : ''}${esc(cevTitle(e))}</div>`;
 const cevRow = (e, d, cls = '', mark = '') => `<div class="cevrow${ap_draftCls(e)}${cls}" data-cev="${e.id}" style="--cc:${cevColor(e)}" role="button" tabindex="0"><i class="cevdot"></i><span class="cevt">${cevTime(e, d)}</span><span class="cevn">${esc(cevTitle(e))}</span>${/*html-ok*/ cevSubMark(e)}${mark}${e.location ? `<span class="cevl">${esc(e.location)}</span>` : ''}<span class="cevc">${esc(cevCal(e))}</span></div>`;
+// 2.884.0 (#5469): month / week chips and event rows (Today, day lists, home) are role=button: Enter / Space opens the event like a click
+document.addEventListener('keydown', e => {
+  const c = (e.key === 'Enter' || e.key === ' ') && !e.repeat && !e.isComposing && e.target.closest?.('#view .cev[role="button"], #view .wcev[role="button"], .cevrow[role="button"]');
+  if (c && e.target === c) { e.preventDefault(); c.click(); }
+});
 // 2.490.0 (#4021): on Today a timed event that ends today and whose end has passed is "past"; all-day / multi-day ones stay until the day ends
 const cevPast = (e, d, now = new Date()) => cevTimed(e, d) && e.d1 === d && e.e <= now;
 const cevNow = (e, d, now = new Date()) => cevTimed(e, d) && e.s <= now && now < e.e;
@@ -360,7 +365,7 @@ function cvxVisibleCals(all) {
   const out = (S.evcals || []).filter(c => all || !c.hidden).map(c => ({key: `e:${c.id}`, id: c.id, name: c.name, color: cssColor(c.color) || 'var(--accent)', on: !c.hidden, own: true, c}));
   if (!S.calendars?.enabled && !S.cvxSubs) return out;
   const subs = S.cvxSubs ? S.cvxSubs.map(x => [x.id, x, !!x.visible]) : Object.entries(S.cal.subs || {}).map(([id, x]) => [+id, x, true]);
-  for (const [id, x, on] of subs) if (all || on) out.push({key: `s:${id}`, id, name: x.name || tr('Calendar'), color: cssColor(x.color) || '#94a3b8', on, own: false, c: x});
+  for (const [id, x, on] of subs) if (all || on) out.push({key: `s:${id}`, id, name: x.name || tr('Calendar'), color: cssColor(x.color) || 'var(--muted)', on, own: false, c: x});
   return out;
 }
 // "Show in my calendar" for one calendar; draw = redraw the views (false while several are switched in a row)

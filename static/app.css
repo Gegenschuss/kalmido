@@ -6962,7 +6962,7 @@ body.cgdrag,body.cgdrag *{user-select:none;-webkit-user-select:none}
 body.cgdrag #wbody{touch-action:none}
 body.cgdrag .week,body.cgdrag .cal{cursor:grabbing}
 .wcev.cgsrc{opacity:.35}
-.wcev.cgghost{z-index:3;pointer-events:none;box-shadow:0 .25rem .875rem rgba(0,0,0,.25);border-color:var(--cc);background:color-mix(in srgb,var(--cc) 28%,var(--bg2))}
+.wcev.cgghost{z-index:3;pointer-events:none;box-shadow:0 .25rem .875rem color-mix(in srgb,var(--text) 25%,transparent);border-color:var(--cc);background:color-mix(in srgb,var(--cc) 28%,var(--bg2))}
 .cgsaving{opacity:.6}
 .wad.cgsel,.cal .cell.cgsel{background:color-mix(in srgb,var(--accent) 14%,transparent)}
 .week .wallday,.cal{position:relative}
