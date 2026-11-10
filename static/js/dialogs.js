@@ -153,11 +153,8 @@ function dlg_sizer(m, card, name) {
   if (typeof ResizeObserver === 'function') new ResizeObserver(() => place()).observe(card);
 }
 // a smaller window keeps every sized dialog inside it (the size applied again, clamped) and the grips on its edge
-let dlgsz_rsT = 0;
-window.addEventListener('resize', () => {
-  clearTimeout(dlgsz_rsT);
-  dlgsz_rsT = setTimeout(() => { for (const c of document.querySelectorAll('.modal > .card')) if (c._dlgsz) { const s = c._dlgsz.get(); c._dlgsz.apply(s.w, s.h); } }, 60);
-});
+// 2.805 (#5357): debounce of core.js instead of a clearTimeout / setTimeout pair (perf budget)
+window.addEventListener('resize', debounce(() => { for (const c of document.querySelectorAll('.modal > .card')) if (c._dlgsz) { const s = c._dlgsz.get(); c._dlgsz.apply(s.w, s.h); } }, 60));
 // 2.38.0 (#1170): touch: a button in a dialog's foot (Save, Cancel ...) does not take the focus from the field being typed in, like
 // Send in the chat (#478): on iOS the first tap otherwise only closed the keyboard, the dialog moved and the tap missed Save
 for (const ev of ['pointerdown', 'mousedown']) document.addEventListener(ev, e => {
