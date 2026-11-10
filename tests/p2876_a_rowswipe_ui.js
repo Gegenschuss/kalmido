@@ -117,7 +117,8 @@ const width = (w, px) => Object.defineProperty(w, 'innerWidth', {configurable: t
   const n0 = await news();
   check(n0 >= 3, 'news: bob has the news of his three tasks (' + n0 + ')');
   w = await boot({user: 'bob', hash: 'news', mobile: true, media: TOUCH, setup: x => width(x, 390)}); d = w.document;
-  const items = () => [...d.querySelectorAll('#view .nitem')];
+  // jsdom lays nothing out: an item 360 px wide (the threshold is 35 % of it, at most 120 px)
+  const items = () => [...d.querySelectorAll('#view .nitem')].map(n => (Object.defineProperty(n, 'offsetWidth', {configurable: true, value: 360}), n));
   check(await until(() => items().length >= 3, 60), 'news: the items are shown');
   let it = items()[0]; s = await swipe(w, it, it, -40);
   check(s.mid === 'translateX(-40px)' && it.style.opacity && +it.style.opacity < 1, 'news: the item follows the finger and fades ' + JSON.stringify(s));
