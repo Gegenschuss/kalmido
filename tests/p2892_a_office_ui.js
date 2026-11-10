@@ -126,6 +126,24 @@ async function run(user, ck, tag) {
     await shot('p2892a-handy-loeschen-frage.png');
     await ev(`(() => { document.querySelector('.modal.cdlg [data-cd="no"]').click(); return 1; })()`);
     check(await ev(`window.__cf.then(v => v === false)`), '#5455 phone: Cancel answers no');
+
+    // ================= #5449: gina's new office (no country yet): the big card only on the phone's start page
+    await nav(B + 'static/icon.svg');  // a new page load: the app must not keep frida's office in memory
+    check(await signIn(ev, 'gina') === 200, 'phone: gina signed in');
+    await nav(B + '#office/offers');
+    check(await until(`!!document.querySelector('#view .ocf-choose')`, {timeout: 20000}), '#5449 phone: the country question shows on Quotations');
+    check(await ev(`!!document.querySelector('#view .ocf-choose.ocf-slim') && !document.querySelector('#view .ocf-choose:not(.ocf-slim)')`), '#5449 phone: Quotations shows the slim line, not the big card');
+    check(await ev(`document.querySelector('#view .ocf-slim [data-go]')?.dataset.go === 'office/start' && /Select country/.test(document.querySelector('#view .ocf-slim').textContent)`), '#5449 phone: its button "Select country" leads to the start page');
+    const slim = await ev(R('#view .ocf-slim'));
+    check(slim && slim.h < 100, '#5449 phone: the slim line stays small: ' + JSON.stringify(slim));
+    await shot('p2892a-handy-angebote-leer.png');
+    await nav(B + '#office/receipts');
+    check(await until(`!!document.querySelector('#view .ocf-slim')`, {timeout: 20000}) && await ev(`!document.querySelector('#view .ocf-choose:not(.ocf-slim)')`), '#5449 phone: Receipts shows the slim line too');
+    await ev(`(() => { document.querySelector('#view .ocf-slim [data-go]').click(); return 1; })()`);
+    check(await until(`location.hash === '#office/start' && !!document.querySelector('#view .ocf-choose:not(.ocf-slim) #ocf-ch')`), '#5449 phone: the button opens the start page with the big card ' + await ev('location.hash'));
+    const lab = await ev(`(() => { const l = document.querySelector('#view .ocf-choose label[for="ocf-eb"]'), s = document.querySelector('#ocf-eb'); if (!l || !s) return null; const a = l.getBoundingClientRect(), b = s.getBoundingClientRect(); return {t: l.textContent.trim(), w: a.width, above: a.bottom <= b.top + 2}; })()`);
+    check(lab && /Basis of the income statement/.test(lab.t) && lab.w > 0 && lab.above, '#5449 phone: the second choice has a visible name above it ' + JSON.stringify(lab));
+    await shot('p2892a-handy-start-leer.png');
   }, true);
 
   console.log(`p2892_a_office_ui: ${ok} ok, ${F.length} failed`);

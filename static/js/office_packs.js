@@ -249,8 +249,10 @@ function ocf_chooseHtml(slim) {
   if (!OFC.info?.pack_choose || OFC.info.role !== 'admin') return '';
   // 2.224.0 B (#2816): the card only on the page the office opens with (the pipeline, else the quotes; the phone's start list);
   // every other page: one slim line whose button leads there
-  const ent = typeof ofm_items === 'function' && ofm_items().some(i => i.key === 'pipeline') ? 'pipeline' : 'offers';
-  if (slim || (S.route.tab && ![ent, 'start'].includes(S.route.tab) && !isMobile()))  // 2.470.0 (#3596): slim in Settings, the card may stand behind the dialog
+  // 2.892.0 (#5449): a phone the same: the card only on its start page (office/start, the office without a tab), every other
+  // page the slim line leading there (the card filled the first screen of Quotations, Receipts, Bank ...)
+  const ent = isMobile() ? 'start' : typeof ofm_items === 'function' && ofm_items().some(i => i.key === 'pipeline') ? 'pipeline' : 'offers';
+  if (slim || (S.route.tab && ![ent, 'start'].includes(S.route.tab)))  // 2.470.0 (#3596): slim in Settings, the card may stand behind the dialog
     return `<div class="ocf-choose ocf-slim muted">${ic('globe', 's')}<span>${tr('Where is your office?')}</span><button type="button" class="btn sm" ${slim ? 'data-ocf="to-pack"' /* 2.555.0 (#4664): in Settings the country is chosen on the same page */ : `data-go="office/${ent}"`}>${tr('Select country')}</button></div>`;
   pkc_sync();
   if (!PKC.packs && !PKC.packsBusy) setTimeout(pkc_loadPacks, 0);
@@ -258,7 +260,7 @@ function ocf_chooseHtml(slim) {
   const sug = OFC.info.pack_suggest || 'DE';
   return `<section class="ocf-choose card" aria-labelledby="ocf-ch-h"><h3 id="ocf-ch-h">${ic('globe', 's')} ${tr('Where is your office?')}</h3>
     <p class="muted">${tr('The country decides tax rates, texts and functions. You can change it later.')}</p>
-    <div class="lacts">${opts.length ? ofcSel('ocf-ch', sug, opts, null, tr('Where is your office?')) : `<span class="muted">${tr('Loading…')}</span>`}${''/* 2.603.0 (#4927): the basis of the income statement, from this year on */}${ofcSel('ocf-eb', 'receipts', [['receipts', tr('Receipts')], ['bank', tr('Bank and cash (strict)')]], null, tr('Basis of the income statement'))}<button type="button" class="btn sm pri" data-ocf="choose" ${opts.length ? '' : 'disabled'}>${tr('Use')}</button></div>
+    <div class="lacts">${opts.length ? ofcSel('ocf-ch', sug, opts, null, tr('Where is your office?')) : `<span class="muted">${tr('Loading…')}</span>`}${''/* 2.603.0 (#4927): the basis of the income statement, from this year on; 2.892.0 (#5449): with its visible name */}<label class="ocf-ebl" for="ocf-eb">${tr('Basis of the income statement')}</label>${ofcSel('ocf-eb', 'receipts', [['receipts', tr('Receipts')], ['bank', tr('Bank and cash (strict)')]], null, tr('Basis of the income statement'))}<button type="button" class="btn sm pri" data-ocf="choose" ${opts.length ? '' : 'disabled'}>${tr('Use')}</button></div>
     <p class="muted ofchint">${tr('Basis of the income statement')}: ${esc(tr('Bank and cash (strict)'))} = ${esc(tr('only what went through the main account or the cash book counts; further accounts are possible, not required.'))}</p></section>`;
 }
 async function ocf_choose() {
