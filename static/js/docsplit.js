@@ -197,10 +197,12 @@ async function dsp_click(e, md) {
   b.disabled = true;
   const split = async () => { const r = await api('POST', `/api/docs/${d.id}/split`, {parts}); return r; };
   let r; try { r = await split(); } catch (x) { b.disabled = false; const er = $('.aerr', md); if (er) er.textContent = x.message || ''; return; }
+  const gone = on => { if (typeof dcv_gone === 'function') dcv_gone(d.id, on); };  // #5478: the stack is gone here (docview.js)
+  gone(true);
   md.remove();
   $('.dc-md')?.remove();
   dc_load();
   const label = trn('{1} split into {0} document', '{1} split into {0} documents', r.ids.length, d.name);
-  histToast(label, histAdd({label, undo: async () => { await api('POST', `/api/docs/${d.id}/unsplit`); dc_load(); return {}; },
-    redo: async () => { await split(); dc_load(); return {}; }}));
+  histToast(label, histAdd({label, undo: async () => { await api('POST', `/api/docs/${d.id}/unsplit`); gone(false); dc_load(); return {}; },
+    redo: async () => { await split(); gone(true); dc_load(); return {}; }}));
 }

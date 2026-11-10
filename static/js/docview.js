@@ -16,7 +16,7 @@
    asks it through typeof checks. Classic script sharing the global scope with the others. */
 'use strict';
 
-const DVW = {back: null, tab: 'details', pdf: null, ro: null, drag: null, he: null, node: null, more: false, notext: null, closed: null};  // notext: 2.742.0 (#4861); closed: #3506 the id of a view just closed
+const DVW = {back: null, tab: 'details', pdf: null, ro: null, drag: null, he: null, node: null, more: false, notext: null, closed: null, gone: new Set()};  // notext: 2.742.0 (#4861); closed: #3506 the id of a view just closed; gone: #5478
 // the tabs of the fields; History and Shares come from the file store's node (GET /api/files/nodes/<id>, its rights)
 const DCV_TABS = [['details', N_('Details')], ['text', N_('Content')], ['hist', N_('History')], ['share', N_('Shares')]];
 const DCV_ZMIN = 0.1, DCV_ZMAX = 8, DCV_CVMAX = 12e6;  // the zoom's limits; the most pixels one page's canvas gets
@@ -43,6 +43,9 @@ function dcv_html(id) {
 function dcv_hook(v) { if (v && !v._dv) { v._dv = true; v.remove = () => dcv_close(v); } }
 function dcv_fill(id) {
   const v = $('.dv-view'); if (!v || dc_hashId() !== id) return;
+  // #5478 (CI red of 2.786.0 / 2.833.0, p2154_a_ui): a document this client just removed (a split) whose address comes back by a
+  // late history step (the dialog's own Back racing the view's close) leaves quietly: no fetch, no 404 toast over the split's Undo
+  if (DVW.gone.has(id)) { dcv_close(v); return; }
   if (DVW.closed === id) return;  // #3506 (CI red of 2.786.0, p2154_a_ui): closed (a split, a delete), the address leaves a moment later: no fetch of the gone document (its 404 toast took the place of the split's Undo)
   dcv_hook(v);
   if (DC.doc?.id === id) { if (!v.firstChild) dc_mdDraw(v); return; }
@@ -55,6 +58,8 @@ function dcv_go(id) {
   AB_FILEIDS.add(id); location.hash = `#ablage/${id}`;  // 2.752.0 (#4887): one address for files and documents (core.js)
 }
 window.addEventListener('hashchange', () => { if (typeof DVW === 'object') DVW.closed = null; });
+// #5478: marks a document as removed by this client (a split) / back again (its Undo)
+function dcv_gone(id, on = true) { if (on) DVW.gone.add(id); else DVW.gone.delete(id); }
 function dcv_close(v) {
   v = v || $('.dv-view');
   if (v?.isConnected) Element.prototype.remove.call(v);

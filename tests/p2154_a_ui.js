@@ -96,6 +96,12 @@ const FEAT = 'cal,comments,collab,office,clients,docs,files';
     check(await ready(ev, `${ids}.then(a => !a.includes(${SID}) && a.length === 3)`, 80), 'split: the stack left the list, two documents came');
     check(await ev(`!document.querySelector('.dsp-md') && !document.querySelector('.dc-md')`), 'the dialogs closed');
     check(await ready(ev, `/split into 2 documents/.test(document.querySelector('#toast')?.textContent || '')`, 20), 'the toast names it ' + await ev(`document.querySelector('#toast')?.textContent || ''`));
+    // #5478 (CI red of 2.786.0 / 2.833.0): a late history step landing on the split stack's address again (the dialog's own Back
+    // racing the view's close) fetched the gone stack: its 404 toast "Not found" took the place of the split's Undo. Made here
+    // on purpose: the address leaves again by itself and the toast with Undo stays
+    await ev(`(() => { location.hash = '#ablage/${SID}'; return 1; })()`);
+    check(await ready(ev, `!/^#ablage\\/${SID}$/.test(location.hash) && !document.querySelector('.dv-view')`, 40), 'the address of the gone stack leaves by itself ' + await ev(`location.hash`));
+    check(await ready(ev, `/split into 2 documents/.test(document.querySelector('#toast')?.textContent || '')`, 8), 'the Undo toast stays, no "Not found" over it: ' + await ev(`document.querySelector('#toast')?.textContent || ''`));
     await undoToast(ev, /split into 2 documents/);  // 2.312.0 A (#3283)
     check(await ready(ev, `${ids}.then(a => a.includes(${SID}) && a.length === 2)`, 80), 'undo: the stack is back, the parts went');
     // link the letter with the task

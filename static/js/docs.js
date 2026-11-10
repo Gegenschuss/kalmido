@@ -318,7 +318,8 @@ async function dc_open(id, o = {}) {
     // 2.583.0 (#4835 review): a locked (encrypted folder) or malware-locked file keeps its own way, not the view
     if (n?.kind === 'file' && !n.in_trash && (n.locked || n._enc || (typeof upLocked === 'function' && upLocked(n)))) { DC.opening = null; if (typeof DVW === 'object') DVW.par = n.parent_id || null; if (typeof dcv_close === 'function') dcv_close(); if (n.locked && typeof fslPrepNode === 'function') await fslPrepNode(n, true); if (typeof ab_openFile === 'function') ab_openFile(n, {raw: true}); return; }
     if (n?.kind === 'file' && !n.in_trash) d = dc_fileDoc(n);
-    else { if (DC.opening === id) { DC.opening = null; toast(x?.message || tr('Not found')); } if (dc_hashId() === id && !DC.doc && typeof dcv_close === 'function') dcv_close(); return; }
+    else { if (DC.opening === id) { DC.opening = null; if (!(typeof DVW === 'object' && DVW.gone?.has(id))) toast(x?.message || tr('Not found')); }  // #5478: removed here a moment ago: no toast over its Undo
+      if (dc_hashId() === id && !DC.doc && typeof dcv_close === 'function') dcv_close(); return; }
   }
   // 2.603.0 (#4912): a redraw while the module still loads (docs.js runs before receipts.js ...) drew the sheet without its
   // later parts (receipt hints, suggestions): first the whole module
