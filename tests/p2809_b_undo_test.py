@@ -6,6 +6,8 @@ Invented names only.
  - bookmarks (life/bmundo.py): details changed on the laptop -> the phone lists the step (label with the title, device) and
    takes it back -> the old title / note / tags; redo -> the new ones; a link changed -> undo -> the old link, its preview
    fetched again; into the trash -> undo -> back; out of the trash refused (named) when the same link is saved again meanwhile
+ - scheduling polls (calendars/pollundo.py): title, place and times changed on the laptop -> the phone takes it back -> the old
+   ones (the times too); redo; the link switched off -> undo -> on, the same link; into the trash -> undo -> back
  - only own steps: another person neither lists nor takes back a step (404)
 freelancer-matrix: undo (a person without an organisation: her bookmark step goes back from the list)
 usage: p2809_b_undo_test.py <datadir>"""
@@ -103,6 +105,46 @@ check(r.status_code == 201, f"(setup) the same link saved again {r.status_code} 
 res = back(A, g["id"])
 check(not res.get("undone") and res.get("stayed") and res["stayed"][0].get("code") == "conflict"
       and row("bookmarks", BM, "deleted_at").get("deleted_at"), f"out of the trash refused, the same link is saved again {res}")
+
+# ---------------------------------------------------------------- scheduling polls
+TIMES = [{"start": "2031-03-10T10:00"}, {"start": "2031-03-11T14:30"}]
+r = A.post(B + "/api/polls", json={"title": "Teamessen Beispiel", "duration": 60, "tz": "Europe/Berlin", "options": TIMES})
+check(r.status_code == 201, f"(setup) a poll {r.status_code} {r.text[:120]}")
+PO = r.json()["poll"]
+PID = PO["id"]
+
+
+def poll(s=A):
+    return s.get(B + f"/api/polls/{PID}").json().get("poll") or {}
+
+
+opts = [{"id": PO["options"][0]["id"], "start": PO["options"][0]["start"]}, {"start": "2031-03-12T09:00"}]
+r = A.patch(B + f"/api/polls/{PID}", json={"title": "Teamessen Neu", "location": "Kantine", "options": opts}, headers=LAP)
+check(r.ok and len(poll()["options"]) == 2 and poll()["options"][1]["start"].startswith("2031-03-12"), f"the poll changed on the laptop {r.status_code} {r.text[:160]}")
+g = newest(PHONE)
+check(g.get("kind") == "poll" and g.get("ref_id") == PID and "Teamessen Beispiel" in (g.get("label") or "") and g.get("device") == "Laptop (Test)",
+      f"the phone lists the poll's step {g}")
+res = back(PHONE, g["id"])
+p = poll()
+check(res.get("undone") == [g["id"]] and p.get("title") == "Teamessen Beispiel" and p.get("location") == ""
+      and [o["start"][:16] for o in p["options"]] == ["2031-03-10T10:00", "2031-03-11T14:30"],
+      f"taken back from the phone: title, place and the old times {res} {p.get('title')} {[o['start'] for o in p.get('options', [])]}")
+res = redo(PHONE, g["id"])
+check(res.get("redone") == 1 and poll().get("title") == "Teamessen Neu", f"redo: the new title again {res}")
+tok = row("sched_polls", PID, "token_hash")["token_hash"]
+r = A.patch(B + f"/api/polls/{PID}", json={"link_on": False})
+check(r.ok and not poll()["link_on"], f"the link switched off {r.status_code}")
+g = newest(A)
+res = back(A, g["id"])
+check(res.get("undone") == [g["id"]] and poll()["link_on"] and row("sched_polls", PID, "token_hash")["token_hash"] == tok,
+      f"undo of the link switch: on again, the same link {res}")
+r = A.delete(B + f"/api/polls/{PID}")
+check(r.ok and row("sched_polls", PID, "deleted_at").get("deleted_at"), f"the poll went into the trash {r.status_code}")
+g = newest(A)
+check("Teamessen" in (g.get("label") or "") and g.get("kind") == "poll", f"the delete is a step with the title {g}")
+res = back(A, g["id"])
+check(res.get("undone") == [g["id"]] and not row("sched_polls", PID, "deleted_at").get("deleted_at") and poll().get("id") == PID,
+      f"undo of the delete: the poll is back {res}")
 
 # ---------------------------------------------------------------- only own steps
 check(not [x for x in lst(Bo) if x["id"] == g["id"]], "bob does not see alice's step")

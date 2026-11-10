@@ -446,11 +446,14 @@ def tpo_update(pid):
     if b.get("regenerate") is True:
         tok = secrets.token_urlsafe(18)
         f.update(token=seal(c, f"poll:{pid}", tok), token_hash=_token_hash(tok))
+    if set(b) - {"expect_updated_at", "regenerate"}:  # 2.809.0 (#5476): the person's step (calendars/pollundo.py) under its lock
+        _tpo_step(c, uid, pid)
     f["updated_at"] = iso_ms(now_utc())
     c.execute(f"UPDATE sched_polls SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), pid])
     if opts is not None:
         _store_options(c, pid, opts)
     bump(c)
+    _tpo_done(c)
     c.commit()
     return jsonify(poll=tpo_dict(c, tpo_need(c, pid), uid))
 
@@ -461,8 +464,11 @@ def tpo_delete(pid):
     tpo_gate()
     c = db()
     tpo_need(c, pid, write=True)
+    write_lock(c, f"sched_polls-{pid}")  # 2.809.0 (#5476): the lock of its saves around its step
+    _tpo_step(c, me(), pid, "delete")
     c.execute("UPDATE sched_polls SET deleted_at=?, updated_at=? WHERE id=?", (iso(now_utc()), iso_ms(now_utc()), pid))
     bump(c)
+    _tpo_done(c)
     c.commit()
     return jsonify(ok=True)
 
@@ -474,10 +480,24 @@ def tpo_restore(pid):
     if tpo_need(c, pid, deleted=True)["trash_owner"]:  # 2.625.0 C (#3961): kept from an agent that changed hands
         return err(tr("This poll belongs to an agent that changed hands: it stays in the trash"), 409)
     tpo_need(c, pid, write=True, deleted=True)
+    write_lock(c, f"sched_polls-{pid}")  # 2.809.0 (#5476)
+    _tpo_step(c, me(), pid, "restore")
     c.execute("UPDATE sched_polls SET deleted_at=NULL, updated_at=? WHERE id=?", (iso_ms(now_utc()), pid))
     bump(c)
+    _tpo_done(c)
     c.commit()
     return jsonify(poll=tpo_dict(c, tpo_need(c, pid), me()))
+
+
+def _tpo_step(c, uid, pid, what=None):
+    """2.809.0 (#5476): the undo step of uid's write of poll pid (calendars/pollundo.py; it imports this module)."""
+    from .pollundo import tpu_pre
+    tpu_pre(c, uid, pid, what)
+
+
+def _tpo_done(c):
+    from .pollundo import tpu_post
+    tpu_post(c)
 
 
 # ---- "Select this time": the event, the poll closes
