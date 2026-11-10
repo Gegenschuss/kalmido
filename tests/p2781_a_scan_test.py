@@ -163,8 +163,8 @@ check(r.status_code == 201, f"(f) upload through the inbox {r.status_code} {r.te
 d = wait(r.json().get("id"))
 check(d.get("source") == "scan" and d.get("scan") is True, f"(f) a document of a scan inbox is a scan {d.get('source')} {d.get('scan')}")
 
-# (g) API v1 has no "scan" (a view flag of the app)
-tok = Fr.post(B + "/api/me/tokens", json={"name": "p2781a", "scopes": ["read"]})
+# (g) API v1 has no "scan" (a view flag of the app); documents need the scope files:read (#5390)
+tok = Fr.post(B + "/api/me/tokens", json={"name": "p2781a", "scopes": ["read", "files:read"]})
 if tok.ok and tok.json().get("token"):
     v = requests.get(B + f"/api/v1/documents/{D['picture.pdf']['id']}", headers={"Authorization": "Bearer " + tok.json()["token"]})
     check(v.ok and "scan" not in v.json() and "_scan" not in (v.json().get("auto") or {}), f"(g) API v1 carries no scan {v.status_code} {sorted(v.json())[:40]}")
