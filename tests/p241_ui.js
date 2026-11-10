@@ -171,8 +171,13 @@ async function firefox(fn) {
   await v1(ag.token, 'PUT', '/agent/status', {status: 'waiting'});
   w.eval('load().then(render)'); await idle(w);
   check(await until(() => /waiting for you/.test(st().textContent) && st().querySelector('.adot.st-waiting')), 'waiting for you');  // 2.98.1: CI under load: wait instead of the fixed 800 ms
-  w.eval(`agentById(${ag.id}).online = true; agentById(${ag.id}).poll_age = 290; agentById(${ag.id}).contact_age = 290; S.agentsAt = Date.now() - 20000; agentLive()`);
-  check(/not connected/.test(st().textContent) && st().querySelector('.adot.st-offline'), 'not connected (2.6.0, K08; was "offline"): 5 minutes without contact (counted on the client)');
+  // 2.826.0 (#5509): 5 minutes without contact alone is no longer "not connected" (an agent that starts on demand): only a chat
+  // message that waits unfetched for over 5 minutes (pending_age, counted on the client like contact_age)
+  w.eval(`agentById(${ag.id}).online = false; agentById(${ag.id}).poll_age = 290; agentById(${ag.id}).contact_age = 290; agentById(${ag.id}).pending_age = null; S.agentsAt = Date.now() - 20000; agentLive()`);
+  check(!/not connected/.test(st().textContent) && !st().querySelector('.adot.st-offline'), '#5509: 5 minutes without contact, nothing waits: not "not connected"');
+  w.eval(`agentById(${ag.id}).pending_age = 290; agentLive()`);
+  check(/not connected/.test(st().textContent) && st().querySelector('.adot.st-offline'), 'not connected (2.6.0, K08; 2.826.0 #5509): a message waits unfetched for 5 minutes (counted on the client)');
+  w.eval(`agentById(${ag.id}).pending_age = null; agentLive()`);
   await call('PATCH', `/api/admin/agents/${ag.id}`, {limits: {period: 'day', metric: 'tokens', hard: 10}});
   await v1(ag.token, 'POST', '/agent/usage', {model: 'x', input_tokens: 100, output_tokens: 1});
   await v1(ag.token, 'GET', '/agent/events?since=0');

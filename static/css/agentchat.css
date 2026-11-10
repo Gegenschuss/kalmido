@@ -555,3 +555,5 @@ body.kb-open .acsug-l{max-height:min(30vh,9rem)}
 .jcbrief[open] .jcbs{display:none}
 .jcbrief[open]>summary>svg{margin-left:auto}
 .jcbb{padding:0 .625rem .625rem;overflow-wrap:anywhere}
+/* 2.826.0 (#5509): ready, starts with the next message: in the chat header (agentchat module) a calm ring instead of the filled green dot */
+.adot.st-idle.stby{background:var(--bg2);box-shadow:inset 0 0 0 2px var(--ok)}

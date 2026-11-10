@@ -20,17 +20,23 @@ const JOB_ST = {running: N_('running'), waiting: N_('waiting for approval'), don
 const agentAge = () => (Date.now() - (S.agentsAt || Date.now())) / 1000;
 // 2.6.0 (K08): "not connected" (grey) instead of a green "ready" for an agent that never got in touch (no event poll, no API
 // call) or has not for 5 minutes; a webhook agent is told about events, so only its explicit "offline" counts
-const agentOffline = a => !!a && (a.online === false || (!a.webhook && (a.contact_age === null || a.contact_age === undefined || a.contact_age + agentAge() > 300)));
+// 2.826.0 (#5509): no longer after 5 minutes without contact - an agent that starts on demand (a cloud or server agent) is then
+// "ready"; "not connected" only when it never got in touch or a chat message to it waits unfetched for over 5 minutes (pending_age)
+const agentOffline = a => !!a && !a.webhook && (agentNever(a) || (a.pending_age != null && a.pending_age + agentAge() > 300));
 // 2.366.0 (#3000): never got in touch at all (set up, but not yet connected on a computer)
 const agentNever = a => !!a && !a.webhook && (a.contact_age === null || a.contact_age === undefined);
+// 2.826.0 (#5509): connected, nothing waits and nothing to do, but no contact for 5 minutes or no service polling its events (an
+// agent that starts on demand and answers through the API): it starts with the next message (a calm dot + hint)
+const agentStandby = a => !!a && a.enabled && !a.webhook && !agentOffline(a) && (a.status || 'idle') === 'idle' && !a.running && a.pending_age == null && (!!a.no_service || a.contact_age + agentAge() > 300);
 // 2.26.0 (#949): paused with a reason ("does not answer right now: …"); (#933) "connected, but no service running": its
 // token is used (an interactive session) but nothing has collected its events for 10 minutes
 const AGENT_TXT = {status_chat: N_('Answering in the chat'), status_event: N_('Working on an event'), status_no_command: N_('The agent command cannot be started'), status_run_failed: N_('The last run failed'),
   status_outside_hours: N_('Outside working hours'), status_outside_hours_at: N_('Outside working hours, back {0}'), status_plan_limit: N_('Plan limit reached'), status_plan_limit_at: N_('Plan limit reached, back at {0}')};
 // 2.450.0 (#3769): the status text of the reference starter in the language of whoever looks; an unknown key or an older starter: its own text
 const agentStTx = a => { if (!a.status_text) return ''; const at = a.status_key_at ? new Date(a.status_key_at) : null, tim = at && !isNaN(at) ? AGENT_TXT[a.status_key + '_at'] : ''; return tim ? tr(tim, fmtStamp(at)) : AGENT_TXT[a.status_key] ? tr(AGENT_TXT[a.status_key]) : a.status_text; };
-const agentSt = a => !a.enabled ? tr('paused') : a.status === 'paused' ? tr('paused: {0}', agentStTx(a) || a.pause_reason || '') : agentOffline(a) ? tr('not connected') : a.limit_reached ? tr('limit reached') : a.no_service && (a.status || 'idle') === 'idle' ? tr('connected, but no service running') : tr(AGENT_ST[a.status] || AGENT_ST.idle);  // 2.1.1 (#326)
-const agentDot = id => { const a = agentById(id); return a ? `<i class="adot st-${!a.enabled || a.status === 'paused' ? 'paused' : agentOffline(a) ? 'offline' : esc(a.status)}" title="${esc(agentHstLine(a))}"></i>` : ''; };
+// 2.826.0 (#5509): "connected, but no service running" (#933) only while a message to it waits; answered = "ready"
+const agentSt = a => !a.enabled ? tr('paused') : a.status === 'paused' ? tr('paused: {0}', agentStTx(a) || a.pause_reason || '') : agentOffline(a) ? tr('not connected') : a.limit_reached ? tr('limit reached') : a.no_service && a.pending_age != null && (a.status || 'idle') === 'idle' ? tr('connected, but no service running') : tr(AGENT_ST[a.status] || AGENT_ST.idle);  // 2.1.1 (#326)
+const agentDot = id => { const a = agentById(id); return a ? `<i class="adot st-${!a.enabled || a.status === 'paused' ? 'paused' : agentOffline(a) ? 'offline' : esc(a.status)}${agentStandby(a) ? ' stby' : ''}" title="${esc(agentHstLine(a))}"></i>` : ''; };
 // 2.482.0 (#3530, EU AI Act Art. 50): "AI agent" unless the agent is marked as a bot without AI (ai: false); an agent the
 // viewer does not know counts as AI (the safe side)
 const agentIsAi = id => agentById(id)?.ai !== false;
@@ -85,7 +91,7 @@ function agentHst(a) {
   if (a.status === 'waiting' || a.waiting) return 'waiting';
   return 'ready';
 }
-const agentHstLine = a => `${a.name}: ${agentSt(a)}${a.status_text && agentHst(a) !== 'offline' ? ' · ' + a.status_text : ''}`;
+const agentHstLine = a => `${a.name}: ${agentSt(a)}${a.status_text && agentHst(a) !== 'offline' ? ' · ' + a.status_text : ''}${agentStandby(a) ? ' · ' + tr('starts with the next message') : ''}`;  // 2.826.0 (#5509)
 // 2.298.0 C (#3187): every dot names its state on hover (the header dots: agent and state)
 const hdot = (st, t) => `<i class="hdot hs-${st}" title="${esc(t || tr(AG_HST[st] || st))}" aria-hidden="true"></i>`;
 function hdotsHtml(ags, max = HDOT_MAX) {

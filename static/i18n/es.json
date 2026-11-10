@@ -18004,6 +18004,7 @@
   "The PDF cannot be read": "No se puede leer el PDF",
   "This PDF has more than {0} pages - its pages cannot be changed here": "Este PDF tiene más de {0} páginas: aquí no se pueden cambiar sus páginas",
   "The pages of this document cannot be changed (read-only or a locked month)": "Las páginas de este documento no se pueden cambiar (solo lectura o un mes bloqueado)",
+  "starts with the next message": "se inicia con el próximo mensaje",
   "Rules…": "Reglas…",
   "Some days before the due date": "Unos días antes del vencimiento",
   "Due today or overdue": "Vence hoy o vencida",

@@ -140,7 +140,9 @@ const TOUCH = `(() => {
   await v1(ag.token, 'PUT', '/agent/status', {status: 'working', task_id: T, text: 'Breaking it down'});
   w = await boot({user: 'alice', hash: 'l/' + L}); d = w.document;
   check(w.eval(`agentSt(agentById(${ag.id}))`) === 'working' && d.querySelector('#top .achip'), 'after a poll: working, the pill shows');
-  check(w.eval(`agentById(${ag.id}).contact_age`) <= 5 && w.eval(`(() => { const a = {...agentById(${ag.id}), contact_age: 400}; return agentSt(a); })()`) === 'not connected', 'no contact for more than 5 minutes: "not connected"');
+  // 2.826.0 (#5509): no contact for more than 5 minutes alone is "ready" (it starts on demand); "not connected" once a message waits over 5 minutes
+  check(w.eval(`agentById(${ag.id}).contact_age`) <= 5 && w.eval(`(() => { const a = {...agentById(${ag.id}), status: 'idle', contact_age: 400}; return agentSt(a); })()`) === 'ready'
+    && w.eval(`(() => { const a = {...agentById(${ag.id}), contact_age: 400, pending_age: 400}; return agentSt(a); })()`) === 'not connected', 'no contact for more than 5 minutes: "ready"; a message waiting over 5 minutes: "not connected"');
   check(w.eval(`agentSt({enabled: true, online: null, webhook: {id: 1}, contact_age: null, status: 'idle'})`) === 'ready', 'a webhook agent that never polled: its own state');
 
   // ================= K01 / K02 in jsdom: the status chip and what folds into "…"

@@ -955,6 +955,29 @@ def agent_contact_age(c, a):
     return round((now_utc() - parse_iso(last)).total_seconds()) if last else None
 
 
+# 2.826.0 (#5509): a person's chat message the agent has not fetched (no delivered_at) and not answered after it; the
+# oldest such message counts. Older than PENDING_DAYS days is left out (messages from before delivered_at existed)
+PENDING_DAYS = 30
+_PENDING_SQL = f"""SELECT m.agent_id, MIN(m.created_at) FROM agent_chat m
+                  WHERE m.agent_id = ANY(CAST(? AS BIGINT[])) AND m.sender='user' AND m.delivered_at IS NULL
+                  AND COALESCE(m.kind, '')<>'unshared' AND m.created_at>?
+                  AND NOT EXISTS(SELECT 1 FROM agent_chat r WHERE r.agent_id=m.agent_id AND r.user_id=m.user_id
+                                 AND r.sender='agent' AND r.id>m.id)
+                  GROUP BY m.agent_id"""
+
+
+def agent_pending_ages(c, ids):
+    """2.826.0 (#5509): {agent id: seconds the oldest waiting chat message to it waits} for the agents ids (missing = nothing
+    waits). The app shows "not connected" only for an agent that never got in touch or lets a message wait over 5 minutes;
+    an agent that starts on demand (a cloud or server agent) and answered its last message is "ready"."""
+    if not ids:
+        return {}
+    cut = iso(now_utc() - timedelta(days=PENDING_DAYS))
+    with system_ctx(c):  # only an age per agent, no text and no person leaves this function
+        rows = c.execute(_PENDING_SQL, (st_ids(list(ids)), cut)).fetchall()
+    return {r[0]: round((now_utc() - parse_iso(r[1])).total_seconds()) for r in rows if r[1]}
+
+
 AGENT_NO_SERVICE_S = 600
 
 
@@ -1397,6 +1420,9 @@ def agent_public(c, a, uid=None, pre=None):
             # app shows "not connected" after 5 minutes without one. A webhook agent is told about events, so for it only
             # "online": false counts
             "webhook": bool(a["webhook_id"]), "contact_age": age,
+            # 2.826.0 (#5509): seconds the oldest chat message to it waits unfetched and unanswered (null = nothing waits);
+            # only then (over 5 minutes) or without any contact the app says "not connected"
+            "pending_age": p["pending"].get(a["user_id"]) if pre is not None else agent_pending_ages(c, [a["user_id"]]).get(a["user_id"]),
             "poll_age": round((now_utc() - parse_iso(a["last_poll_at"])).total_seconds()) if a["last_poll_at"] else None,
             # 2.26.0 (#933): its token is in use (an interactive session) but nothing collects its events -- the setup is not
             # finished until a service (launcher / LaunchAgent / task) keeps polling
@@ -1518,7 +1544,7 @@ def agent_unshared_view(d):
     contact times (status always "idle"). Used by agents_for and the chat (agents/chat.py agent_chat_get). Changes d, returns it."""
     d.update(shared=False, status="idle", status_text="", status_at=None, status_key="", status_key_at="", status_task=None,
              paused=False, pause_reason="", job_tasks=[], running=0, waiting=0, my_job=False, typing=0, limit_reached=False,
-             last_poll_at=None, poll_age=None, contact_age=None, no_service=False, host=None, runtime_model="", permission_mode="",
+             last_poll_at=None, poll_age=None, contact_age=None, pending_age=None, no_service=False, host=None, runtime_model="", permission_mode="",
              may_set_mode=False, quota=None, cost=None, flows=None, approvals_open=0)
     return d
 
@@ -1583,5 +1609,5 @@ def ag_pre(c, rows, uid):
         return bool(org and oadm[org])
     return {"jobs": by, "unread": unread, "avatars": avatars, "age": age, "appr": appr, "admin": admin, "color": color,
             "tvis": tasks_visible(c, [a["status_task"] for a in rows if a["status_task"]], uid, full=True),
-            "cost": usage_cost_sums(c, ids),
+            "cost": usage_cost_sums(c, ids), "pending": agent_pending_ages(c, ids),  # 2.826.0 (#5509)
             "may_rt": lambda a: a["owner_id"] == uid if a["owner_id"] else bool(u and u["is_admin"])}  # = may_set_runtime
