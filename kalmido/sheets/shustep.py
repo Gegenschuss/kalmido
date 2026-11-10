@@ -28,7 +28,7 @@ from ..core.i18n import tr
 from ..core.undoweb import undo_need_reg
 from ..files.fsref import fs_ref_rename
 from .core import SH_STEP_KINDS, ShBook, sh_check_list, sh_freeze, sh_may_rebind, sh_need, sh_reload, sh_set_name, sh_touch
-from .shbook import _name_free, shb_bid, shb_label, shb_name_set, shb_rows, shb_sync
+from .shbook import SHB_TABS_MAX, _name_free, shb_bid, shb_label, shb_name_set, shb_rows, shb_sync
 from ..core.pg import qi, table_columns
 from .shhist import SHH_KIND, SHH_OWN, _core, shh_meta
 from .shshare import shs_need_own
@@ -54,8 +54,10 @@ SHU_SHEET_COLS = ("chart", "fmt_rules")
 def _trash(table, what):
     def run(c, r, ch, uid, ts, redo):
         xid = ch["row_id"] if what == "row" else ch["col_id"]
-        if redo:
-            n = c.execute(f"UPDATE {qi(table, SHU_TABLES)} SET deleted_at=? WHERE id=? AND sheet_id=? AND {live_sql()}", (ch["new_raw"], xid, r["id"])).rowcount
+        if redo:  # 2.884.0 (#5479): into the trash with the time of now (the old time would let the trash purge take it at once)
+            n = c.execute(f"UPDATE {qi(table, SHU_TABLES)} SET deleted_at=? WHERE id=? AND sheet_id=? AND {live_sql()}", (ts, xid, r["id"])).rowcount
+            if n:  # the next undo finds it by this time (a step redone before 2.884.0 keeps its old one: found as well)
+                c.execute("UPDATE sheet_changes SET new_raw=? WHERE id=?", (ts, ch["id"]))
         else:
             n = c.execute(f"UPDATE {qi(table, SHU_TABLES)} SET deleted_at=NULL WHERE id=? AND sheet_id=? AND deleted_at=?", (xid, r["id"], ch["new_raw"])).rowcount
         return (True, None) if n else (False, ch["old_raw"] or tr("Table"))
@@ -193,11 +195,17 @@ def _tab_trash(added):
         if t is None or not t["book_id"]:
             return False, _tab_name(t)
         out = (not redo) if added else redo  # into the trash
-        when = (ts if added else ch["new_raw"]) if out else (ch["undone_at"] if added else ch["new_raw"])
+        # 2.884.0 (#5479): a deleted sheet deleted again (redo) gets the time of now, like the rows / columns (_trash)
+        when = ts if out else (ch["undone_at"] if added else ch["new_raw"])
         if out:
             n = c.execute(f"UPDATE sheets SET deleted_at=? WHERE id=? AND {live_sql()}", (when, t["id"])).rowcount
+            if n and not added:
+                c.execute("UPDATE sheet_changes SET new_raw=? WHERE id=?", (ts, ch["id"]))
         else:
-            if any(shb_label(x).casefold() == shb_label(t).casefold() for x in shb_rows(c, r["id"])):
+            tabs = shb_rows(c, r["id"])
+            if len(tabs) >= SHB_TABS_MAX:  # 2.884.0 (#5479): back only below the limit, as sheets_tabs_restore
+                return False, _tab_name(t)
+            if any(shb_label(x).casefold() == shb_label(t).casefold() for x in tabs):
                 return False, _tab_name(t)  # its name is taken meanwhile
             n = c.execute("UPDATE sheets SET deleted_at=NULL WHERE id=? AND deleted_at=?", (t["id"], when)).rowcount
         if not n:
@@ -265,6 +273,8 @@ def _sheet_need(c, uid, rid, oid):
     need_feat("sheets")
     r = sh_need(c, int(rid), write=True)
     keep = {k for k in table_columns(c, "sheets") if k not in SHH_OWN}
+    if r["book_id"]:  # 2.884.0 (#5479): a further sheet's project follows the first sheet (shb_sync), never its own step
+        keep.add("list_id")
 
     def fix(c):
         now = sh_reload(c, int(rid))

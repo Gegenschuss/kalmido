@@ -646,10 +646,29 @@ def _snap(c, sc):
     return out
 
 
-def _fp(snap, nofp=None):
+def _fp(snap, nofp=None, rows=True):
     nofp = nofp or {}
-    s = {t: [{k: v for k, v in r.items() if k not in UNDO_NO_FP and k not in nofp.get(t, ())} for r in rows] for t, rows in snap.items()}
+
+    def skip(t, r):  # 2.884.0 (#5479): an entry with of_row(row) names the columns left out per row (sheets/shhist.py _NotOwn)
+        x = nofp.get(t, ())
+        return x.of_row(r) if rows and hasattr(x, "of_row") else x
+    s = {}
+    for t, rows in snap.items():
+        s[t] = []
+        for r in rows:
+            sk = skip(t, r)
+            s[t].append({k: v for k, v in r.items() if k not in UNDO_NO_FP and k not in sk})
     return hashlib.sha256(json.dumps(s, sort_keys=True, default=str).encode()).hexdigest()
+
+
+def _fp_is(snap, nofp, want):
+    """2.884.0 (#5479, review F8): snap still has the fingerprint want -- also the one without the per-row columns (of_row) a
+    step written before 2.884.0 noted."""
+    if not want:
+        return False
+    if _fp(snap, nofp) == want:
+        return True
+    return any(hasattr(x, "of_row") for x in (nofp or {}).values()) and _fp(snap, nofp, rows=False) == want
 
 
 def _lock_rows(c, sc):
@@ -778,7 +797,7 @@ def _undo_rekeyed(c, st):
 def _undo_one(c, sc, st, uid, reg, fix=None):
     nofp = reg.get("undo_nofp") or {}
     cur = _snap(c, sc)
-    if not st["fp_after"] or _fp(cur, nofp) != st["fp_after"]:
+    if not _fp_is(cur, nofp, st["fp_after"]):
         raise Denied(409, tr(UNDO_CONFLICT))
     _undo_rekeyed(c, st)
     old = json.loads(st["snap"])
@@ -795,7 +814,7 @@ def _undo_one(c, sc, st, uid, reg, fix=None):
 def _redo_one(c, sc, st, uid, reg, fix=None):
     nofp = reg.get("undo_nofp") or {}
     cur = _snap(c, sc)
-    if not st["fp_undone"] or _fp(cur, nofp) != st["fp_undone"] or not st["redo"]:
+    if not _fp_is(cur, nofp, st["fp_undone"]) or not st["redo"]:
         raise Denied(409, tr(UNDO_CONFLICT))
     _undo_rekeyed(c, st)
     new = json.loads(st["redo"])
