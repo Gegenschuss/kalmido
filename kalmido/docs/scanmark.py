@@ -79,7 +79,7 @@ def obj(x):
         return x.get_object()
     except Exception:
         return x
-def walk(stream, res, ctm, box, ev, depth):
+def walk(stream, res, ctm, box, ev, depth, tr0=0):
     # the events of one content stream: ("img", covered area) / ("txt", visible characters)
     res = obj(res) or {}
     xo = obj(res.get("/XObject")) if hasattr(res, "get") else None
@@ -88,7 +88,7 @@ def walk(stream, res, ctm, box, ev, depth):
         ops = (stream if isinstance(stream, ContentStream) else ContentStream(stream, r)).operations
     except Exception:
         return
-    stack, tr = [], 0
+    stack, tr = [], tr0  # 2.836.0 (#5390, review): the text render mode is inherited into a form XObject
     for operands, op in ops:
         BUDGET[0] -= 1
         if BUDGET[0] < 0:
@@ -127,7 +127,7 @@ def walk(stream, res, ctm, box, ev, depth):
                     m2 = mul(tuple(float(v) for v in fm), ctm) if fm and len(fm) == 6 else ctm
                 except (TypeError, ValueError):
                     m2 = ctm
-                walk(x, x.get("/Resources") or res, m2, box, ev, depth + 1)
+                walk(x, x.get("/Resources") or res, m2, box, ev, depth + 1, tr)
 def area(ctm, box):
     a, b, c, d, e, f = ctm
     xs = [e, a + e, c + e, a + c + e]
@@ -169,10 +169,16 @@ out(scan=looked > 0, pages=n, looked=looked)
 """
 
 
-def pdf_is_scan(data):
+class ScanBusy(Exception):
+    """2.836.0 (#5390, review): no free PDF slot -- the catch-up stops its portion and asks the same document again."""
+
+
+def pdf_is_scan(data, busy=False):
     """True / False for a PDF's bytes, None when it could not be told (busy, too slow, broken, encrypted) -- then nothing
-    is kept and a later run asks again."""
+    is kept and a later run asks again. busy=True: a missing slot raises ScanBusy instead of None."""
     if not _SEM.acquire(timeout=SCAN_WAIT):
+        if busy:
+            raise ScanBusy()
         return None
     try:
         p = subprocess.run([sys.executable, "-I", "-c", WORKER, str(PDF_MEM), str(PDF_SECONDS), str(SCAN_PAGES), str(SCAN_OPS), str(SCAN_COVER)],
@@ -188,8 +194,8 @@ def pdf_is_scan(data):
     return bool(res["scan"])
 
 
-def scan_of(name, mime, data, kind, source="", einvoice=False):
-    """1 = a scan, 0 = none, None = not to be told now (see the module text)."""
+def scan_of(name, mime, data, kind, source="", einvoice=False, busy=False):
+    """1 = a scan, 0 = none, None = not to be told now (see the module text). busy=True: see pdf_is_scan."""
     if einvoice:
         return 0
     if source == "scan":
@@ -198,7 +204,7 @@ def scan_of(name, mime, data, kind, source="", einvoice=False):
         low = (mime or "").lower()
         return 0 if "svg" in low or (name or "").lower().endswith(".svg") else 1
     if kind == "pdf":
-        s = pdf_is_scan(data)
+        s = pdf_is_scan(data, busy)
         return None if s is None else int(s)
     return 0
 

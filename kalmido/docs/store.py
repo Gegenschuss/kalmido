@@ -1139,7 +1139,7 @@ def redo_back(c, nid):
     auto.pop("_hand", None)
     auto.pop("_was", None)
     now_auto = meta_json(c, m, "auto", {})
-    auto.update({k: now_auto[k] for k in ("_hand", "_was") if k in now_auto})
+    auto.update({k: now_auto[k] for k in ("_hand", "_was", "_scan") if k in now_auto})  # 2.836.0 (#5390, review): the scan mark stays
     vals = {k: prev[k] for k in REDO_COLS if k != "auto"}
     for f in hand:
         vals[HAND_FIELDS[f]] = m[HAND_FIELDS[f]]
@@ -1403,9 +1403,9 @@ def process(c, nid):
         return "wait"
     if ei and not res.get("error"):
         res["method"] = "e-invoice"
-    thumb_store(c, m, node, data, res.get("kind"))
-    # 2.781.0 (#5390): read before the row is locked (a PDF is read in a child process)
+    # 2.781.0 (#5390): read before the row is locked (a PDF is read in a child process); 2.836.0 (review): before thumb_store's UPDATE
     scan = scan_of(node["name"], node["mime"], data, res.get("kind"), m["source"], einvoice=bool(ei))
+    thumb_store(c, m, node, data, res.get("kind"))
     text = res.get("text") or ""
     asn_found = None
     if not m["asn"]:

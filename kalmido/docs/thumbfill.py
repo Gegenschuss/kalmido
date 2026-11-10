@@ -16,7 +16,7 @@ from ..files.store import fs_read  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.attachtext import file_kind  # 2.369.5 (#2517): pulled up from functions
 from . import store as S  # 2.369.5 (#2517): pulled up from functions
 from ..core.access import live_sql  # 2.836.0 (#5390): the trash condition of the scan mark's catch-up
-from .scanmark import scan_of  # 2.836.0 (#5390)
+from .scanmark import ScanBusy, scan_of  # 2.836.0 (#5390)
 
 FILL = env_bool("KALMIDO_DOCS_THUMB_FILL", True)
 FILL_S = max(1, int(os.environ.get("KALMIDO_DOCS_THUMB_FILL_S", "15") or 15))  # s between two portions
@@ -165,7 +165,7 @@ def p5390_scan_fill(c):
                 node = c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
                 data = fs_read(c, nid)
                 ei = bool(S.meta_json(c, m, "extracted", {}).get("_einv")) if m["extracted"] else False
-                scan = scan_of(node["name"], node["mime"], data, file_kind(node["name"], node["mime"], data[:2048]), m["source"], einvoice=ei)
+                scan = scan_of(node["name"], node["mime"], data, file_kind(node["name"], node["mime"], data[:2048]), m["source"], einvoice=ei, busy=True)
                 if scan is not None:
                     r = c.execute("SELECT auto FROM doc_meta WHERE node_id=? FOR UPDATE", (nid,)).fetchone()  # a save meanwhile stays
                     auto = json.loads(r["auto"] or "{}") if r else None
@@ -173,6 +173,10 @@ def p5390_scan_fill(c):
                         auto["_scan"] = scan
                         c.execute("UPDATE doc_meta SET auto=? WHERE node_id=?", (json.dumps(auto, separators=(",", ":")), nid))
             c.commit()  # the row lock ends here, not after the whole portion
+        except ScanBusy:  # 2.836.0 (#5390, review): no free PDF slot -- this document again in the next portion, not skipped for good
+            c.rollback()
+            gset(c, FILL_SCAN_KEY, json.dumps({"below": nid + 1}))
+            return 1
         except Exception as e:  # noqa: BLE001 -- a missing file, a key that does not open, a broken PDF: skip it
             print("docs: scan mark catch-up", nid, type(e).__name__, e, flush=True)
     gset(c, FILL_SCAN_KEY, json.dumps({"below": rows[-1][0]}))
