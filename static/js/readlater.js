@@ -109,7 +109,8 @@ async function rdl_tick(id) {
   const done = !x.done, path = id => `/api/tasks/${id}/${done ? 'complete' : 'reopen'}`, back = id => `/api/tasks/${id}/${done ? 'reopen' : 'complete'}`;
   const req = RDL.pend = optWrite(rdl_tickPut(id, done), () => api('POST', path(id)), rdl_draw, {mod: true});
   await req;
-  offerUndo(done ? tr('Read: {0}', x.title) : tr('Unread: {0}', x.title), histAdd({label: done ? tr('Read: {0}', x.title) : tr('Unread: {0}', x.title),
+  // 2.809.0 (#5476): srv = the server lists the step itself (a task completed / reopened: tasks/tundo.py)
+  offerUndo(done ? tr('Read: {0}', x.title) : tr('Unread: {0}', x.title), histAdd({label: done ? tr('Read: {0}', x.title) : tr('Unread: {0}', x.title), srv: true,
     undo: async () => { await api('POST', back(id)); await rdl_reload(); },
     redo: async () => { await api('POST', path(id)); await rdl_reload(); }}));
 }

@@ -18,6 +18,7 @@ Invented names only.
  - notepads of the pin board (lists/padundo.py): renamed -> undo from the phone -> the old title; a text save -> undo
  - followed feeds (life/rssundo.py): unfollowed -> undo from the phone -> followed again; the same address followed again
    meanwhile -> undo refused (named), no error
+ - read later: marking an entry read (a task completed) is listed by the server already -> undo from the phone -> unread
  - only own steps: another person neither lists nor takes back a step (404)
 freelancer-matrix: undo (a person without an organisation: her bookmark step goes back from the list)
 usage: p2809_b_undo_test.py <datadir>"""
@@ -304,6 +305,16 @@ kt.dbx("INSERT INTO rss_feeds(user_id,url,created_at) VALUES(?,?,?)", (ALICE, "h
 res = back(A, g["id"])
 check(not res.get("undone") and res.get("stayed") and res["stayed"][0].get("code") == "conflict" and row("rss_feeds", FD, "deleted_at").get("deleted_at"),
       f"back refused (named): the same address is followed again meanwhile {res}")
+
+# ---------------------------------------------------------------- read later: ticking an entry is a step of the tasks already
+r = A.post(B + "/api/reading", json={"url": "https://example.com/spaeter", "title": "Spaeter Beispiel"})
+check(r.status_code == 201 and r.json().get("task_id"), f"(setup) a link to read later {r.status_code} {r.text[:120]}")
+RT = r.json()["task_id"]
+r = A.post(B + f"/api/tasks/{RT}/complete")
+g = newest(PHONE)
+check(r.ok and g.get("kind") == "task" and g.get("ref_id") == RT, f"marked read: the server lists the step (the browser's step is srv) {r.status_code} {g}")
+res = back(PHONE, g["id"])
+check(res.get("undone") == [g["id"]] and A.get(B + f"/api/tasks/{RT}").json().get("status") != "done", f"taken back from the phone: unread {res}")
 
 # ---------------------------------------------------------------- only own steps
 g = newest(A)
