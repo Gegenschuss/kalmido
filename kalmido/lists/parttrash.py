@@ -75,7 +75,7 @@ def lpt_section_back(c, sid, uid):
     404: not in the trash; the rights: whoever may change its list (_need_edit). The caller bumps and commits."""
     r = part_copy_take(c, LPT_SECTION, sid, uid, _need_edit)
     lid = r["list_id"]
-    _, held = part_copy_back(c, LPT_SECTION, r, f"sections:{lid}")  # like the order of the sections (sections.py)
+    _, held = part_copy_back(c, LPT_SECTION, r, f"sections:{lid}", fix=lambda c2, snap: _lpt_e2e(c2, lid, snap))
     moved, skipped = [], []
     for tid in held.get("tasks") or []:
         t = c.execute("SELECT list_id, section_id, deleted_at FROM tasks WHERE id=?", (tid,)).fetchone()
@@ -92,6 +92,24 @@ def lpt_section_back(c, sid, uid):
         c.execute("INSERT INTO shop_memory(list_id,item,section_id,at) VALUES(?,?,?,?) ON CONFLICT (list_id, item) DO NOTHING",
                   (lid, item, sid, at))
     return moved, skipped
+
+
+def _lpt_e2e(c, lid, snap):
+    """#5552: the lock of the project (collab/liste2e.py le2e_guard, as POST /api/sections) also guards the way back: a section
+    with a plain name never comes back into a locked project, a ciphertext name never into an open one (409 / 400 {code});
+    the copy stays in the trash. The section's own order lock is held (part_copy_back)."""
+    from ..collab.liste2e import le2e_guard
+    le2e_guard(c, lid, {"section": snap.get("name") or ""})
+
+
+def lpt_section_purge_list(c, lid):
+    """#5552: when the lock of project lid is switched on or off (collab/liste2e.py le2a_finish), the sections in its trash
+    go, like its files and the kept texts of deleted comments: their names are of the other state (plain text in a locked
+    project, a ciphertext nobody can read in an open one). The tasks in the trash forget their section's name too
+    (tasks.trash_section, restoring them would make a section of that name). The caller commits. Returns the copies dropped."""
+    n = c.execute("DELETE FROM list_part_trash WHERE list_id=? AND kind=?", (lid, LPT_SECTION)).rowcount
+    c.execute("UPDATE tasks SET trash_section=NULL WHERE list_id=? AND trash_section IS NOT NULL", (lid,))
+    return n
 
 
 @app.post("/api/sprints/<int:sid>/restore")

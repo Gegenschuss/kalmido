@@ -1007,11 +1007,21 @@ def rt_section(c, ids):
             write_lock(c, f"rt-section:{x['list_id']}")  # 2.370.4 (#3089 E2-N9): two restores at once make one section, not two
             s = c.execute("SELECT id FROM sections WHERE list_id=? AND name=? ORDER BY sort, id LIMIT 1", (x["list_id"], x["trash_section"])).fetchone()
             # 2.272.0 F (#3038, review E2-M5): a new section only with a write role in the list (else back without one)
+            # #5552: and only with a name of the project's lock state (back without one: a plain name in a locked project)
             sid = s[0] if s else insert_id(c, "INSERT INTO sections(list_id,name,sort) VALUES(?,?,(SELECT COALESCE(MAX(sort), 0) + 1 FROM sections "
-                                              "WHERE list_id=?))", (x["list_id"], x["trash_section"], x["list_id"])) if rt_may(c, x["list_id"]) else None
+                                              "WHERE list_id=?))", (x["list_id"], x["trash_section"], x["list_id"])) \
+                if rt_may(c, x["list_id"]) and rt_e2e_ok(c, x["list_id"], x["trash_section"]) else None
             if sid:
                 c.execute("UPDATE tasks SET section_id=? WHERE id=?", (sid, x["id"]))
         c.execute("UPDATE tasks SET trash_section=NULL WHERE id=?", (x["id"],))
+
+
+def rt_e2e_ok(c, lid, name):
+    """#5552: may rt_section make a section named name in list lid? An open project: a plain name; a locked one ('on'): a
+    ciphertext; while the lock switches: none (the texts go through /e2e/bulk only)."""
+    from ..collab.liste2e import le2a_gen, le2e_is_cipher
+    mode = le2a_gen(c, lid)[0]
+    return (mode is None and not le2e_is_cipher(name)) or (mode == "on" and le2e_is_cipher(name))
 
 
 # 2.272.0 B (#3045): "my own" done tasks (two ? = me, me); also the batch delete with data.own_only (2.272.0 F, review M7)

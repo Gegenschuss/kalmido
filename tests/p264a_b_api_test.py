@@ -144,6 +144,14 @@ SEC = dbx("SELECT id FROM sections WHERE list_id=?", (L,))[0][0]
 # copies the app writes in other places (shopping memory, a mail address, an agent proposal): written here like the app does
 dbx("INSERT INTO shop_memory(list_id,item,section_id,at) VALUES(?,?,?,?)", (L, MK.lower() + "milk", SEC, "2026-01-01T00:00:00Z"), write=True)
 dbx("INSERT INTO mail_tokens(token,user_id,list_id,created_at) VALUES(?,?,?,?)", ("tok264b", 1, L, "2026-01-01T00:00:00Z"), write=True)
+# 2.879.0 (#5552): a section deleted before the switch (its copy in the trash, list_part_trash.snap) and a task in the trash
+# that remembers its name (tasks.trash_section): both held the plain name after the lock; the sweep below finds them
+SG = A.post(B + "/api/sections", json={"list_id": L, "name": MK + "GoneSection"}).json()["id"]
+TG = A.post(B + "/api/tasks", json={"list_id": L, "title": MK + "TrashTask", "section_id": SG}).json()["id"]
+check(A.delete(B + f"/api/tasks/{TG}").ok, "#5552: a task of the section into the trash")
+check(A.delete(B + f"/api/sections/{SG}").ok and dbx("SELECT 1 FROM list_part_trash WHERE kind='section' AND ref_id=?", (SG,)),
+      "#5552: the section into the trash before the lock (its copy holds the plain name)")
+check(dbx("SELECT trash_section FROM tasks WHERE id=?", (TG,))[0][0] == MK + "GoneSection", "#5552: the task in the trash remembers the name")
 n_queue0 = dbx("SELECT COUNT(*) FROM webhook_queue")[0][0]
 check(n_queue0 >= 1 and dbx("SELECT COUNT(*) FROM webhook_queue WHERE payload LIKE ?", (f"%{MK}%",))[0][0] >= 1,
       f"webhook deliveries with the texts wait in the queue ({n_queue0})")
@@ -411,6 +419,34 @@ if g:
     check(row[2] == 1, f"#5447: the other field of the step (priority) goes back {row}")
     check(r.ok and g[0][0] in r.json().get("partial", []) and "list_id" in str(st[0].get("reason")) and st[0].get("code") == "conflict",
           f"#5447: the move is named as not undone (partial, UG_KEPT) {r.text[:300]}")
+
+# ================================================================== 2.879.0 (#5552): the trash of sections and the lock (at the end: the restored task
+# is not part of the v1 checks above)
+check(not dbx("SELECT 1 FROM list_part_trash WHERE list_id=? AND kind='section'", (L,)), "#5552: switching on emptied the sections in the trash")
+check(dbx("SELECT trash_section FROM tasks WHERE id=?", (TG,))[0][0] is None, "#5552: the task in the trash forgot its section's name")
+# a copy with a plain name (as an older version left it) never comes back into the locked project: restore and undo 409
+SP = 9905552
+dbx("INSERT INTO list_part_trash(list_id,kind,ref_id,snap,held,deleted_by,deleted_at) VALUES(?,?,?,?,?,?,?)",
+    (L, "section", SP, json.dumps({"name": MK + "OldPlain", "sort": 9}), "{}", 1, "2026-11-01T00:00:00Z"), write=True)
+r = A.post(B + f"/api/sections/{SP}/restore")
+check(r.status_code == 409 and r.json().get("code") == "list_e2e" and not dbx("SELECT 1 FROM sections WHERE id=?", (SP,)),
+      f"#5552: restoring a plain-named section into the locked project 409 {r.status_code} {r.text[:200]}")
+check(bool(dbx("SELECT 1 FROM list_part_trash WHERE ref_id=?", (SP,))), "#5552: the refused copy stays in the trash")
+dbx("DELETE FROM list_part_trash WHERE ref_id=?", (SP,), write=True)
+# a section deleted while locked (ciphertext name) comes back as before
+SC = A.post(B + "/api/sections", json={"list_id": L, "name": cipher(31)})
+check(SC.ok, f"#5552: a section with a ciphertext name in the locked project {SC.status_code} {SC.text[:200]}")
+if SC.ok:
+    SC = SC.json()["id"]
+    check(A.delete(B + f"/api/sections/{SC}").ok, "#5552: deleted while locked")
+    r = A.post(B + f"/api/sections/{SC}/restore")
+    check(r.ok and dbx("SELECT name FROM sections WHERE id=?", (SC,))[0][0] == cipher(31), f"#5552: and restored with its ciphertext {r.status_code} {r.text[:200]}")
+# a task in the trash with a plain section name: restoring it makes no plain-named section in the locked project
+dbx("UPDATE tasks SET trash_section=? WHERE id=?", ("PlainLeft", TG), write=True)
+r = A.post(B + f"/api/tasks/{TG}/restore")
+check(r.ok and dbx("SELECT section_id FROM tasks WHERE id=?", (TG,))[0][0] is None
+      and not dbx("SELECT 1 FROM sections WHERE list_id=? AND name=?", (L, "PlainLeft")),
+      f"#5552: a restored task makes no plain-named section in the locked project {r.status_code} {r.text[:200]}")
 
 print(f"\n{OKS[0]} checks ok, {len(FAILS)} failed", flush=True)
 if FAILS:

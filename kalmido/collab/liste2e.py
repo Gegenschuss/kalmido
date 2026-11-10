@@ -118,6 +118,7 @@ from ..core.config import app  # noqa: E402
 from ..core.db import body, bump, db, err, iso, now_utc  # noqa: E402
 from ..core.access import Denied, need_list  # noqa: E402
 from ..accounts.session import me  # noqa: E402
+from ..lists.parttrash import lpt_section_purge_list  # noqa: E402  #5552: the sections in the trash when the lock switches
 from .cmttrash import ctt_purge_list  # 2.530.0 A (#4315): the kept texts / files of deleted comments and channel messages
 
 LE2A_MANAGE = ("owner", "admin")  # finding M9: who may switch the lock and hand out list keys
@@ -1083,6 +1084,9 @@ def le2a_finish(lid):
         c.execute("UPDATE lists SET e2e_rotate=0, e2e_reenc=0 WHERE id=?", (lid,))
         c.execute("DELETE FROM list_keys WHERE list_id=?", (lid,))
         c.execute("DELETE FROM list_key_pending WHERE list_id=?", (lid,))
+    # #5552: deleted sections keep their names of the other state; after le2b_scrub, whose undo clean-up finds a deleted
+    # section's steps through its copy in the trash
+    lpt_section_purge_list(c, lid)
     c.execute("INSERT INTO list_activity(list_id,user_id,kind,data,created_at) VALUES(?,?,?,?,?)",
               (lid, uid, "e2e", json.dumps({"on": lr["e2e"] == "encrypting", "done": True, "gen": int(lr["e2e_gen"] or 0)}), ts))
     bump(c)
