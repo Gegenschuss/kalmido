@@ -330,9 +330,15 @@ def le2b_scrub(c, lid):
                                     message_id IN (SELECT id FROM agent_chat WHERE task_id IN ({tq}))
                                     OR job_id IN (SELECT id FROM agent_jobs WHERE list_id=? OR task_id IN ({tq})))""",
                                  (lid, lid, lid)).rowcount
-    # #5408: the server's undo steps of the list's sections and of the order of its sections (tasks: le2b_scrub_tasks)
-    n["undo_sections"] = le2b_scrub_undo(c, "(kind='section' AND ref_id IN (SELECT id FROM sections WHERE list_id=?)) "
-                                            "OR (kind='section_order' AND ref_id=?)", (lid, lid))
+    # #5408: the server's undo steps of the list's sections and of the order of its sections (tasks: le2b_scrub_tasks).
+    # 2.858.0 CI red (#5476): + a section's create / delete steps (lists/secundo.py "section_life", labelled with its name;
+    # also of a section in the list's trash) and the steps of the time entries whose note le2b_scrub_free empties
+    # (personal/timeundo.py "time_entry", the note in obj_undo.snap)
+    n["undo_sections"] = le2b_scrub_undo(c, "(kind IN ('section', 'section_life') AND ref_id IN (SELECT id FROM sections WHERE list_id=? "
+                                            "UNION SELECT ref_id FROM list_part_trash WHERE list_id=? AND kind='section')) "
+                                            "OR (kind='section_order' AND ref_id=?)", (lid, lid, lid))
+    n["undo_time"] = le2b_scrub_undo(c, f"kind='time_entry' AND ref_id IN (SELECT id FROM time_entries WHERE list_id=? OR task_id IN ({tq}))",
+                                     (lid, lid))
     for fn in _SCRUB_MORE:
         n.update(fn(c, lid) or {})
     return n
