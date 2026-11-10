@@ -490,7 +490,8 @@ push; the caller builds the text in their language (an end-to-end list's push ca
 - Still on their own check (later stages): the comment pushes and task events of `collab/comments.py` (stage Q4a), and the
   pushes about one's own account / organisation without an object; News with a project or an event but no task
   (`news_add(list_id=…)`, the event invitations / changes) and the job push of `agents/api.py job_notify` follow in task #5512
-  (stage Q2 rest).
+  (stage Q2 rest), as does the team chat's held-back room push `collab/teamchat.py tchat_push_tick` ("N new messages";
+  it still asks `tchat_room_members`, which does not know an own share that ran out, #5050 - found in the review of 2.891.0).
 
 
 ## Filter (2.846.0, #5520)
