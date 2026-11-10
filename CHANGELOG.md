@@ -18,6 +18,41 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.883.0] - 2026-11-11
+
+Package 2.857 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Kern-Wächter: zweite Filter-Logik außerhalb des Fi).
+
+### Added
+- Documents: saved filters work like the lists' saved filters - the same condition dialog (what / compare / value, AND / OR, "is none of", live count, value menus with a search field) with sender, document type, folder with subfolders, label, document date, added on, file type, archive number, to review, text and custom fields; "+ New filter" in the sidebar group "Saved filters" under Files; "Save view" from the search bar opens the same dialog prefilled. Built on the shared core's filter (fltkern.js / fltdlg.js / core/filters.py) as its second user; hits and counts always with the rights of whoever looks. Older views open converted and hit the same documents (#5518)
+- API: `?view=<id>` on `/api/docs` and `/api/v1/documents` runs a saved view the caller may see; `POST /api/docs/views/count` for the dialog's live count; a view's field `rules` (#5518)
+
+### Changed
+- Core guard: `tools/check_core_crosscut.py` reports a filter evaluator or condition dialog of an area's own outside the core's filter (Python and browser), today's exceptions with their reason in `core_crosscut_allow.json` section `filter` (#5523)
+- Documents: "Update view" / "Take over the current filters" open the filter dialog with the view's conditions plus the current search (#5518)
+
+Package 2.867.0 (Bündel: Polish Navigation: Seitenleiste am Handy gleichmäß).
+### Changed
+- Phone menu (the drawer behind the menu button, top left): the area icons form one calm grid of equal columns - up to 5 areas one row, more four per row (was up to 7 x 2 with columns as wide as their names) - and every area name is written in the same type size (#5540).
+- Phone menu: the small dot that is part of an icon (Projects, Calendar, Time, Files ...) is drawn in the icon's own colour there; a coloured dot on an area icon now only means that something new waits. A count on an area icon is that dot (named for screen readers); the numbers stand in the rows below it, and the agent pill in the header leaves its number out while the menu is open - one count per thing (#5540).
+- Phone menu: an agent's status dot shows the status colour only (no ring in the agent's own colour beside it); a tap on the dot explains the state and what the colours mean, a tap on the rest of the row opens the chat as before (#5540).
+
+Package 2.875 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Security
+- Switching on browser encryption for a project now also removes the plain-text trash copies the server kept: deleted sections (their names) and deleted custom fields (the tasks' values) go for good, the undo copies of "Delete all times" lose note and task title (sealed again, Undo keeps working); an Undo from an older window no longer writes a plain task title back. Projects locked before get a one-time pass for their plain copies (#5549)
+
+Package 2.876 (Bündel: Polish Kern: gemeinsamer Baustein Zeilen-Wischen ().
+### Changed
+- Shared core: one building block for swiping a row sideways (#5559) - `static/js/rowswipe.js` (`rsw_attach`): the task row (right = completed, left = the short menu), the news (either side removes) and the swipe to reply on a message now use the same gesture rules: 10 px and clearly sideways before it counts, 24 px at the screen edges stay the phone's Back gesture, a held finger (long press, drag) is no swipe, a light vibration at the threshold on all three, a cancelled touch does nothing, the click right after a swipe opens nothing, reduced motion without gliding. A live redraw while a finger is on any of these rows now waits until it is up (before: only the messages). `docs/dev/kern.md` has a new section "Gestures".
+
+Package 2.879 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Security
+- Project lock: switching the lock on (or off) now empties the project's trash of deleted sections and the section names that tasks in the trash remember; a section with a plain name never comes back into a locked project, neither through restore nor through undo, and a restored task makes no plain-named section there. A one-off clean-up removes plain-named section copies from the trash of projects that are locked already (#5552).
+
+Package 2.883 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Fixed
+- #5560: phone tab bar, "More" sheet: every entry shows its own icon (Knowledge pages, Tables, Office no longer show three dots), a place that is both an overflowing pinned tab and an area (Calendar, Reading) is listed once under Areas, and the sheet has no empty head line - its close X sits in the grip's line.
+
 ## [2.873.2] - 2026-11-10
 
 ### Fixed
@@ -210,7 +245,8 @@ Package 2.757 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: 
 - Lists and the start page report their width to the header again: the top bar lines up with the content instead of standing 4 px beside it, and the width "Wide" of a note / knowledge page keeps its list + note layout (CI red p2599_b_kopf_ui, #5309).
 - p151_ui says why the hint of the task just tracked is missing (toast, totals on the page and on the server); the Mac red was the sub-second discard fixed in #5186 (#5211).
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.873.2...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.883.0...HEAD
+[2.883.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.883.0
 [2.873.2]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.873.2
 [2.873.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.873.1
 [2.873.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.873.0

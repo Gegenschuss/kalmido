@@ -1,6 +1,28 @@
 {
  "versions": [
   {
+   "version": "2.883.0",
+   "date": "2026-11-11",
+   "items": [
+    {
+     "de": "In den Dokumenten legst du eigene Filter jetzt wie in den Listen an: mit Bedingungen, UND/ODER und einem Zähler, der sofort zeigt, wie viele Dokumente passen.",
+     "en": "In documents you now create your own filters like in the lists: with conditions, AND/OR and a count that shows at once how many documents match."
+    },
+    {
+     "de": "Neu unter Dateien in der Seitenleiste: „+ Neuer Filter“.",
+     "en": "New under Files in the sidebar: \"+ New filter\"."
+    },
+    {
+     "de": "Das Menü am Handy ist ruhiger: gleich breite Spalten, eine Schriftgröße, Punkte nur noch, wenn wirklich etwas Neues wartet.",
+     "en": "The phone menu is calmer: equal columns, one type size, and dots only when something new is really waiting."
+    },
+    {
+     "de": "Tippe im Handy-Menü auf den Punkt neben einem Agenten, um zu sehen, was seine Farbe bedeutet.",
+     "en": "In the phone menu, tap the dot next to an agent to see what its colour means."
+    }
+   ]
+  },
+  {
    "version": "2.873.0",
    "date": "2026-11-10",
    "items": [
