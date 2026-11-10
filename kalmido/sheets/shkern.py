@@ -14,10 +14,13 @@ sh_may of its first sheet), nothing for anyone else. Its space hook names no org
 project, an agent's data lock itself. The kind's name differs from the reference kind and the history's kind ("sheet")."""
 from ..core.i18n import N_
 from ..core.objects import obj_register
+from ..core.pg import qi
+from ..core.undogroups import ug_gc, ug_gids
 from ..core.writes import obj_on_purge, obj_purge, obj_restore, obj_trash
 from .core import sh_may
 
 SHK_KIND = "sheet_table"
+SHK_CORE_ROWS = ("obj_history", "obj_undo", "obj_revoked")  # 2.809.0 (#5365, review): the core rows of a further sheet
 
 
 def _row(c, rid):
@@ -55,6 +58,14 @@ def _shk_purge(c, rid):
         c.execute("DELETE FROM file_text WHERE kind='sheet' AND ref_id = ANY(CAST(? AS BIGINT[]))", (fids,))
     c.execute("DELETE FROM fs_nodes WHERE kind='ref' AND ref_kind='sheet' AND ref_id=?", (int(rid),))
     c.execute("DELETE FROM obj_history WHERE kind='sheet' AND ref_id = ANY(CAST(? AS BIGINT[]))", (sids,))  # 2.571.0 (#4766), no FK
+    # 2.809.0 (#5365, review): the core's rows of its further sheets (a tab's own trash / restore went through obj_trash); the
+    # core's _purge_rows takes those of the first sheet only
+    tabs = sids[1:]
+    if tabs:
+        gids = ug_gids(c, "kind=? AND ref_id = ANY(CAST(? AS BIGINT[]))", (SHK_KIND, tabs))
+        for t in SHK_CORE_ROWS:
+            c.execute(f"DELETE FROM {qi(t, SHK_CORE_ROWS)} WHERE kind=? AND ref_id = ANY(CAST(? AS BIGINT[]))", (SHK_KIND, tabs))
+        ug_gc(c, gids)
     return [x["path"] for x in fr]
 
 

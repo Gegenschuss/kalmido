@@ -193,6 +193,20 @@ check(r.ok and "Invented cell text" in r.text, f"tables: the cell is there again
 check(Fr.delete(B + f"/api/sheets/{S1}").ok, "tables: into the trash again")
 r = Fr.post(B + "/api/sheets/purge", json={"space": "private", "ids": [S1]})
 check(r.ok and r.json().get("ids") == [S1] and trashed("sheets", S1) is None, f"tables: deleted for good by hand {r.text[:160]}")
+# 2.809.0 (#5365, review): a further sheet's own trash / restore writes core rows (kind sheet_table, ref = the sheet); the
+# table's delete for good takes them along, not only the rows of its first sheet
+S4 = table("Stage3 tabs", "z")
+r = Fr.post(B + f"/api/sheets/{S4}/tabs", json={"name": "Second"})
+check(r.status_code == 201, f"tables: a further sheet {r.text[:160]}")
+T4 = r.json()["tab"]["id"]
+check(Fr.delete(B + f"/api/sheets/{S4}/tabs/{T4}").ok and Fr.post(B + f"/api/sheets/{S4}/tabs/{T4}/restore").ok,
+      "tables: the further sheet into the trash and back")
+check(one("SELECT count(*) FROM obj_history WHERE kind='sheet_table' AND ref_id=?", (T4,)), "setup: the further sheet has core history")
+check(Fr.delete(B + f"/api/sheets/{S4}").ok, "tables: the table with its further sheet into the trash")
+r = Fr.post(B + "/api/sheets/purge", json={"space": "private", "ids": [S4]})
+check(r.ok and trashed("sheets", S4) is None, f"tables: the table with a further sheet deleted for good {r.text[:160]}")
+left = [one(f"SELECT count(*) FROM {t} WHERE kind='sheet_table' AND ref_id=?", (T4,)) for t in ("obj_history", "obj_undo")]
+check(left == [0, 0], f"tables: no core rows of the further sheet stay behind {left}")
 S2, S3 = table("Stage3 old", "x"), table("Stage3 young", "y")
 for s in (S2, S3):
     check(Fr.delete(B + f"/api/sheets/{s}").ok, f"tables: {s} into the trash")
@@ -211,6 +225,12 @@ check(trashed("fs_nodes", R1) == (True, FID), "switch on: the receipt kept by la
 check(trashed("wiki_pages", W2) is None and not stored(WP2), "switch on: the old page and its stored file gone")
 check(trashed("sheets", S2) is None, "switch on: the old table gone")
 check(trashed("fs_nodes", F3) and trashed("wiki_pages", W3) and trashed("sheets", S3), "switch on: the ones deleted today stay")
+# 2.809.0 (#5365, review): one batch per kind and run (one advisory lock each), the rest in the next run
+out = subprocess.run(["docker", "exec", CT, "python", "-c",
+                      "import app\nfrom kalmido.core.db import connect\nfrom kalmido.core import writes\n"
+                      "c = connect()\nprint(writes.OBJ_PRUNE_BATCH, len(writes.obj_trash_due(c, 'fs_entry', '9999', limit=1)))\nc.close()"],
+                     capture_output=True, text=True)
+check(out.stdout.split()[:2] == ["500", "1"], f"the run takes a batch, not everything at once {(out.stdout + out.stderr)[-300:]}")
 last = sql("SELECT value FROM settings WHERE key='ret_last_trash.obj_trash'")
 check(last and json.loads(last[0][0]).get("purged") is True, f"the run reports for the retention page {last}")
 

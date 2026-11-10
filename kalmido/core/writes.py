@@ -520,16 +520,21 @@ def obj_purge(c, uid, kind, rid):
     bump(c, _area(reg))
 
 
-def obj_trash_due(c, kind, cut=None):
+OBJ_PRUNE_BATCH = 500  # 2.809.0 (#5365, review): at most so many objects per kind and run (one lock each); the rest next hour
+
+
+def obj_trash_due(c, kind, cut=None, limit=None):
     """2.773.0 (#5292): the ids of the kind's objects in the trash longer than the trash period (core/retention.py ret_trash_cut).
-    2.783.0 (#5368): a side object of core/objparts.py (part_kind trash_prune=True) the same way."""
+    2.783.0 (#5368): a side object of core/objparts.py (part_kind trash_prune=True) the same way.
+    2.809.0 (#5365, review): limit = at most so many (the oldest ids first; core kinds only)."""
     if kind in PART_KINDS and kind not in OBJ:
         with system_ctx(c):
             return part_trash_due(c, kind, cut or ret_trash_cut())
     reg = obj_reg_node(kind)  # 2.754.0 (#5268): a light kind has no trash of the core
     t = reg["table"]
     with system_ctx(c):  # the retention run reads every workspace's trash (ids only, no content)
-        return [r[0] for r in c.execute(f"SELECT id FROM {qi(t, (t,))} WHERE {trash_sql()} AND deleted_at<? ORDER BY id",
+        lim = f" LIMIT {int(limit)}" if limit else ""
+        return [r[0] for r in c.execute(f"SELECT id FROM {qi(t, (t,))} WHERE {trash_sql()} AND deleted_at<? ORDER BY id{lim}",
                                         (cut or ret_trash_cut(),)).fetchall()]
 
 
@@ -550,7 +555,9 @@ def obj_trash_prune(c, kind, cut=None, purge=None, ids=None, paths=None):
                 paths += got
         return len(old)
     reg = obj_reg_node(kind)  # 2.754.0 (#5268): a light kind has no trash of the core
-    old = obj_trash_due(c, kind, cut) if ids is None else [int(x) for x in ids]
+    # 2.809.0 (#5365, review): a batch per run - every file-store node runs here now, and thousands of advisory locks in one
+    # transaction would break the whole tick (max_locks_per_transaction) hour after hour
+    old = obj_trash_due(c, kind, cut, limit=OBJ_PRUNE_BATCH) if ids is None else [int(x) for x in ids]
     if old and purge:
         t, cut = reg["table"], cut or ret_trash_cut()
         with system_ctx(c):  # no person: the period ran out (the rights were checked when it went into the trash)
