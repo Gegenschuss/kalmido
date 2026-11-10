@@ -70,6 +70,10 @@ function textPdf(lines) {  // a one-page PDF with a text layer, written by hand
     const out = [...f.querySelectorAll('*')].filter(e => e.getClientRects().length && e.getBoundingClientRect().right > fr + .5).map(e => e.tagName + '.' + String(e.className).slice(0, 30));
     return JSON.stringify({ok: document.documentElement.scrollWidth <= W && card.scrollWidth <= card.clientWidth && !out.length, W, sw: document.documentElement.scrollWidth, cs: card.scrollWidth, cc: card.clientWidth, out: out.slice(0, 8)}); })()`;
 
+  // 2.869.0 (#5531): "Suggest title" is no "automatic" mark (own class .dc-tsug, not .dc-auto - CI red of 2.833.0 counted it as one)
+  // but sits like one: at the right of the title's label line, on the fields' right edge
+  const TSUG = `(() => { const t = document.querySelector('.dc-f > [data-dc="titlesug"]'); if (!t) return JSON.stringify({none: true}); const f = t.closest('.dc-f'), r = t.getBoundingClientRect(), fl = f.children[1].getBoundingClientRect(), lb = f.children[0].getBoundingClientRect();
+    return JSON.stringify({mark: t.classList.contains('dc-auto'), marks: document.querySelectorAll('.dc-f .dc-auto').length, inLabel: r.bottom <= fl.top + 1 && r.top < lb.bottom, right: Math.abs(r.right - fl.right) <= 1}); })()`;
   // the theme of this run: the appearance synced from the server wins over a value put into localStorage before the load
   const theme_ = t => `(() => { if (typeof LS === 'undefined' || typeof applyLook !== 'function') return false; if (LS.get('theme', 'auto') !== '${'${t}'}') { LS.set('theme', '${'${t}'}'); applyLook(); } return document.documentElement.dataset.theme === '${'${t}'}'; })()`;
   await firefox(async ({cmd, ev, ctx, nav, shot}) => {
@@ -88,6 +92,8 @@ function textPdf(lines) {  // a one-page PDF with a text layer, written by hand
       check(full(g.rows), `${theme} pane: every field the full width ` + JSON.stringify(g.rows.map(r => [r.f, r.fld.r - r.fld.l, r.row.r - r.row.l])));
       check(oneRight(g.rows), `${theme} pane: one right edge for all fields, also the automatic ones ` + JSON.stringify(g.rows.map(r => [r.f, r.fld.r])));
       check(g.rows.filter(r => r.auto).length === 2 && autoInLabelLine(g.rows), `${theme} pane: "automatic" at the right of the label line ` + JSON.stringify(g.rows.filter(r => r.auto)));
+      const ts = JSON.parse(await ev(TSUG));
+      check(!ts.none && !ts.mark && ts.marks === 2 && ts.inLabel && ts.right, `${theme} pane: "Suggest title" is no automatic mark, at the right of the title's label line ` + JSON.stringify(ts));
       const dt = JSON.parse(await ev(DATE));
       check(dateLikeField(dt), `${theme} pane: the date button looks like a text field ` + JSON.stringify(dt));
       await ev(`document.querySelector('.dc-form').scrollIntoView()`);

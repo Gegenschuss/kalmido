@@ -269,7 +269,7 @@ function dcv_detailsHtml(d, w, nb) {  // 2.736.0 (#5212): nb = a neighbour drawn
   // 2.750.0 (#4876): the title is the document's own field (may repeat, never renames the file); the file name below, "More fields"
   // 2.783.0 (#4882): "Suggest title" applies the area's title pattern once (with undo); a small button in the label line
   // (where "automatic" stands at other fields), the title field keeps its full width
-  const main = [field('name', tr('Title'), `<input id="dc-name" data-dcp="title" value="${esc(dc_title(d))}" maxlength="200" ${ro}>${w ? `<button type="button" class="dc-auto dc-tsug" data-dc="titlesug" title="${esc(tr('Title from sender, type and date (pattern in the settings)'))}">${tr('Suggest title')}</button>` : ''}`),
+  const main = [field('name', tr('Title'), `<input id="dc-name" data-dcp="title" value="${esc(dc_title(d))}" maxlength="200" ${ro}>${w ? `<button type="button" class="dc-tsug" data-dc="titlesug" title="${esc(tr('Title from sender, type and date (pattern in the settings)'))}">${tr('Suggest title')}</button>` : ''}`),
     field('date', tr('Date'), dateIn('dc-date', d.date || '', {label: tr('Date'), ro: !!ro, attrs: 'data-dcp="date"'})),
     // 2.761.0 (#4868): sender and type with the suggestion field of the tags (tagsel.js tf_html, one value)
     field('sender', tr('Sender'), typeof tf_html === 'function' ? tf_html({id: 'dc-sender', vals: [d.sender?.name || ''], all: set.senders, ro: !!ro, single: true, attrs: 'data-dcp="sender"'})

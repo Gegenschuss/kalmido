@@ -69,8 +69,8 @@
   .dv-mask .dc-f{grid-template-columns:var(--dc-lw,7.5rem) minmax(0,1fr);gap:.25rem .625rem}
   .dv-mask .dc-f>span:first-child:empty{display:block}
   .dv-mask .dc-f>:nth-child(2){grid-column:2;grid-row:1}
-  .dv-mask .dc-f:has(>.dc-auto)>:nth-child(2){grid-row:1 / span 2}
-  .dv-mask .dc-f>.dc-auto{grid-column:1;grid-row:2;justify-self:start}
+  .dv-mask .dc-f:has(>.dc-auto,>.dc-tsug)>:nth-child(2){grid-row:1 / span 2}
+  .dv-mask .dc-f>.dc-auto,.dv-mask .dc-f>.dc-tsug{grid-column:1;grid-row:2;justify-self:start}
 }
 /* the grips between the columns */
 .dv-grip{position:relative;width:.75rem;padding:0;border:0;background:none;cursor:col-resize;touch-action:none;z-index:1}
