@@ -133,10 +133,11 @@ function rul_mount(md, l) {
     if (b.dataset.rulEdit) { rul_dialog(lid, find(b.dataset.rulEdit), draw); return; }
     if (b.dataset.rulDel) {
       const r = find(b.dataset.rulDel); if (!r) return;
-      try { await api('DELETE', `/api/rules/${r.id}`); } catch { return; }
+      let dj;
+      try { dj = await api('DELETE', `/api/rules/${r.id}`); } catch { return; }
       await rul_load(lid).catch(() => {}); draw();
       const again = async () => { await rul_load(lid).catch(() => {}); draw(); return {skipped: []}; };
-      const h = histAdd({label: tr('Deleted the rule {0}', rul_q(r.name)), snaps: [], after: [], ids: [], lids: [lid],
+      const h = histAdd({label: tr('Deleted the rule {0}', rul_q(r.name)), snaps: [], after: [], ids: [], lids: [lid], ...(dj?.undo_group ? {srv: true} : {}),  // 2.809.0 (#5476)
         undo: async () => { await api('POST', `/api/rules/${r.id}/restore`); return again(); },
         redo: async () => { await api('DELETE', `/api/rules/${r.id}`); return again(); }});
       histToast(tr('Rule deleted'), h);

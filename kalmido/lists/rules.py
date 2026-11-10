@@ -628,10 +628,13 @@ def rule_update(rid):
     if any(k in f for k in ("trig", "act")) or (f.get("active") and not r["active"]):
         f.update(created_by=me(), paused_reason="")
     f["updated_at"] = iso(now_utc())
+    from .ruleundo import rlu_post, rlu_pre  # 2.809.0 (#5476): a step of the person's undo list
+    rlu_pre(c, me(), rid)
     c.execute(f"UPDATE list_rules SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), rid])
+    ug = rlu_post(c)
     bump(c)
     c.commit()
-    return jsonify(rul_dict(c, c.execute("SELECT * FROM list_rules WHERE id=?", (rid,)).fetchone()))
+    return jsonify({**rul_dict(c, c.execute("SELECT * FROM list_rules WHERE id=?", (rid,)).fetchone()), **({"undo_group": ug} if ug else {})})
 
 
 @app.delete("/api/rules/<int:rid>")
@@ -640,10 +643,13 @@ def rule_delete(rid):
     _need_person()
     c = db()
     need_rule(c, rid)
+    from .ruleundo import rlu_post, rlu_pre  # 2.809.0 (#5476): a step of the person's undo list
+    rlu_pre(c, me(), rid, "delete")
     c.execute("UPDATE list_rules SET deleted_at=?, updated_at=? WHERE id=?", (iso(now_utc()), iso(now_utc()), rid))
+    ug = rlu_post(c)
     bump(c)
     c.commit()
-    return jsonify(ok=True)
+    return jsonify(ok=True, **({"undo_group": ug} if ug else {}))
 
 
 @app.post("/api/rules/<int:rid>/restore")
@@ -653,7 +659,10 @@ def rule_restore(rid):
     r = need_rule(c, rid, deleted=True)
     if c.execute("SELECT COUNT(*) FROM list_rules WHERE list_id=? AND deleted_at IS NULL", (r["list_id"],)).fetchone()[0] >= RUL_LIST_MAX:
         return err(tr("At most {0} rules per project", RUL_LIST_MAX))
+    from .ruleundo import rlu_post, rlu_pre  # 2.809.0 (#5476): a step of the person's undo list
+    rlu_pre(c, me(), rid, "restore")
     c.execute("UPDATE list_rules SET deleted_at=NULL, updated_at=? WHERE id=?", (iso(now_utc()), rid))
+    rlu_post(c)
     bump(c)
     c.commit()
     return jsonify(rul_dict(c, c.execute("SELECT * FROM list_rules WHERE id=?", (rid,)).fetchone()))

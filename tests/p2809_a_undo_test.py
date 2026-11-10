@@ -11,6 +11,7 @@ Invented names only.
  - custom fields (lists/fieldundo.py): a new field is a step (undo = field trash, redo = back with its id); a rename goes back;
    an option added and used since is not removed by an undo (409); a change that clears values records no server step; a
    deleted field comes back and goes again on redo
+ - rules (lists/ruleundo.py): a change goes back (old name, switched on again); into the trash -> undo -> back, redo -> trash
  - a project's settings (lists/lpundo.py): a rename + colour on the laptop is listed on the phone (area tasks, kind listset,
    label with the old name, device, the answer names its group) and goes back from there; redo; archiving -> undo -> out of
    the archive; a save of the same values and a save with a folder (side effects) record no step; a new sidebar order since
@@ -254,6 +255,32 @@ res = back(A, g["id"])
 check(res.get("undone") == [g["id"]] and fld(A, FX) is not None, f"undo of the delete: the field is back {res}")
 r = A.post(B + f"/api/undo/{g['id']}/redo")
 check(r.ok and fld(A, FX) is None, f"redo: deleted again {r.status_code} {r.text[:120]}")
+
+# ---------------------------------------------------------------- rules: change / trash
+def rul(s, lid, rid):
+    return next((x for x in s.get(B + f"/api/lists/{lid}/rules").json().get("rules", []) if x["id"] == rid), None)
+
+
+r = A.post(B + "/api/lists", json={"name": "Regeln Beispiel"})
+RLX = r.json()["id"]
+r = A.post(B + f"/api/lists/{RLX}/rules", json={"name": "Fertig an Alice", "trigger": {"kind": "done"},
+                                                 "action": {"kind": "assign", "user_id": ALICE}})
+check(r.status_code in (200, 201), f"(setup) a rule {r.status_code} {r.text[:160]}")
+RU = r.json().get("id")
+r = A.patch(B + f"/api/rules/{RU}", json={"name": "Fertig an Alice neu", "active": False}, headers=LAP)
+check(r.ok and r.json().get("undo_group"), f"the rule changed: a step {r.status_code} {r.text[:120]}")
+g = newest(PHONE)
+check(g.get("kind") == "list_rule" and "Fertig an Alice" in (g.get("label") or ""), f"listed with its name {g}")
+res = back(PHONE, g["id"])
+x = rul(A, RLX, RU) or {}
+check(res.get("undone") == [g["id"]] and x.get("name") == "Fertig an Alice" and x.get("active"), f"taken back: old name, on again {res} {x.get('name')}")
+r = A.delete(B + f"/api/rules/{RU}")
+check(r.ok and r.json().get("undo_group") and rul(A, RLX, RU) is None, f"the rule into the trash: a step {r.status_code}")
+g = newest(A)
+res = back(A, g["id"])
+check(res.get("undone") == [g["id"]] and rul(A, RLX, RU) is not None, f"undo: the rule is back from the trash {res}")
+r = A.post(B + f"/api/undo/{g['id']}/redo")
+check(r.ok and rul(A, RLX, RU) is None, f"redo: in the trash again {r.status_code} {r.text[:120]}")
 
 # freelancer-matrix
 r = Fr.post(B + "/api/lists", json={"name": "Frida Projekt", "color": "#3366cc"})
