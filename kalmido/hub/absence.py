@@ -19,7 +19,7 @@ from datetime import date, timedelta
 from flask import g, jsonify, request
 
 from ..core.config import app
-from ..core.pg import insert_id, system_ctx
+from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.i18n import lang, tr
 from ..core.db import body, bump, db, iso, local_now, now_utc, usettings
 from ..core.access import Denied
@@ -328,6 +328,7 @@ def abs_create():
 @app.patch("/api/team/absences/<int:aid>")
 def abs_edit(aid):
     c, uid = _gate()
+    write_lock(c, f"hub_absences-{aid}")  # 2.809.0 (#5476): the lock of its saves around its step
     r = _row(c, aid)
     if r["deleted_at"] or not _may_edit(c, uid, r):
         raise Denied(404 if r["deleted_at"] else 403)
@@ -336,10 +337,12 @@ def abs_edit(aid):
     from .leave import lv_requested, lv_status_edit
     v.update(lv_status_edit(c, uid, r, p))  # 2.125.0 A (#2117): a member's changed vacation asks again
     if v:
+        _abs_step(c, uid, aid)  # 2.809.0 (#5476): the person's step (hub/absundo.py)
         c.execute(f"UPDATE hub_absences SET {', '.join(k + '=?' for k in v)} WHERE id=?", (*v.values(), aid))
         if v.get("status") == "pending" and r["status"] != "pending":
             lv_requested(c, _row(c, aid))
         bump(c)
+        _abs_done(c)
         c.commit()
     return jsonify({**abs_public(_row(c, aid), True, c), "can_edit": True})
 
@@ -350,8 +353,12 @@ def abs_delete(aid):
     r = _row(c, aid)
     if not _may_edit(c, uid, r):
         raise Denied(403)
+    write_lock(c, f"hub_absences-{aid}")  # 2.809.0 (#5476)
+    if not _row(c, aid)["deleted_at"]:
+        _abs_step(c, uid, aid, "delete")
     c.execute("UPDATE hub_absences SET deleted_at=? WHERE id=? AND deleted_at IS NULL", (iso(now_utc()), aid))
     bump(c)
+    _abs_done(c)
     c.commit()
     return jsonify(ok=True)
 
@@ -363,10 +370,25 @@ def abs_restore(aid):
     r = _row(c, aid)
     if not _may_edit(c, uid, r):
         raise Denied(403)
+    write_lock(c, f"hub_absences-{aid}")  # 2.809.0 (#5476)
+    if _row(c, aid)["deleted_at"]:
+        _abs_step(c, uid, aid, "restore")
     c.execute("UPDATE hub_absences SET deleted_at=NULL WHERE id=?", (aid,))
     bump(c)
+    _abs_done(c)
     c.commit()
     return jsonify({**abs_public(_row(c, aid), True, c), "can_edit": True})
+
+
+def _abs_step(c, uid, aid, what=None):
+    """2.809.0 (#5476): the undo step of uid's write of absence aid (hub/absundo.py; it imports this module)."""
+    from .absundo import abu_pre
+    abu_pre(c, uid, aid, what)
+
+
+def _abs_done(c):
+    from .absundo import abu_post
+    abu_post(c)
 
 
 @app.put("/api/team/absences/holidays")

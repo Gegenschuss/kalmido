@@ -8,6 +8,8 @@ Invented names only.
    fetched again; into the trash -> undo -> back; out of the trash refused (named) when the same link is saved again meanwhile
  - scheduling polls (calendars/pollundo.py): title, place and times changed on the laptop -> the phone takes it back -> the old
    ones (the times too); redo; the link switched off -> undo -> on, the same link; into the trash -> undo -> back
+ - team absences (hub/absundo.py): days moved on the laptop -> the phone lists it (area team, the old days) and takes it
+   back; redo; deleted -> undo -> back; a member takes back the change of their own absence
  - only own steps: another person neither lists nor takes back a step (404)
 freelancer-matrix: undo (a person without an organisation: her bookmark step goes back from the list)
 usage: p2809_b_undo_test.py <datadir>"""
@@ -146,8 +148,47 @@ res = back(A, g["id"])
 check(res.get("undone") == [g["id"]] and not row("sched_polls", PID, "deleted_at").get("deleted_at") and poll().get("id") == PID,
       f"undo of the delete: the poll is back {res}")
 
+# ---------------------------------------------------------------- team absences
+r = A.post(B + "/api/team/absences", json={"kind": "vacation", "start_date": "2031-05-04", "end_date": "2031-05-08", "note": "Urlaub", "org": ORG})
+check(r.status_code == 201, f"(setup) an absence {r.status_code} {r.text[:120]}")
+AB = r.json()["id"]
+
+
+def absence():
+    return row("hub_absences", AB, "start_date, end_date, half_day, deleted_at")
+
+
+r = A.patch(B + f"/api/team/absences/{AB}", json={"start_date": "2031-05-11", "end_date": "2031-05-15"}, headers=LAP)
+check(r.ok and absence().get("start_date") == "2031-05-11", f"the absence moved on the laptop {r.status_code} {r.text[:120]}")
+g = newest(PHONE)
+check(g.get("kind") == "absence" and g.get("area") == "team" and "2031-05-04 - 2031-05-08" in (g.get("label") or "")
+      and g.get("device") == "Laptop (Test)", f"the phone lists the absence's step (area team, the old days) {g}")
+res = back(PHONE, g["id"])
+check(res.get("undone") == [g["id"]] and absence().get("start_date") == "2031-05-04" and absence().get("end_date") == "2031-05-08",
+      f"taken back from the phone: the old days {res} {absence()}")
+items = A.get(B + f"/api/team/absences?org={ORG}&start=2031-05-01&end=2031-05-31").json().get("items", [])
+check([x["start_date"] for x in items if x["id"] == AB] == ["2031-05-04"], f"the team view shows the old days {items}")
+res = redo(PHONE, g["id"])
+check(res.get("redone") == 1 and absence().get("start_date") == "2031-05-11", f"redo: the new days again {res}")
+r = A.delete(B + f"/api/team/absences/{AB}")
+check(r.ok and absence().get("deleted_at"), f"the absence deleted {r.status_code}")
+g = newest(A)
+res = back(A, g["id"])
+check(res.get("undone") == [g["id"]] and not absence().get("deleted_at"), f"undo of the delete: the absence is back {res}")
+# a person who may not change it any more takes nothing back: bob's own absence, bob leaves the area's people? -> the admin
+# rule: bob's step on his own absence goes back for bob; alice's step on bob's absence needs alice to be admin NOW
+r = Bo.post(B + "/api/team/absences", json={"kind": "vacation", "start_date": "2031-06-01", "end_date": "2031-06-02", "org": ORG})
+check(r.status_code == 201, f"(setup) bob's absence {r.status_code} {r.text[:120]}")
+BAB = r.json()["id"]
+r = Bo.patch(B + f"/api/team/absences/{BAB}", json={"half_day": "am", "end_date": "2031-06-01"})
+g = newest(Bo)
+res = back(Bo, g["id"])
+check(r.ok and g.get("kind") == "absence" and res.get("undone") == [g["id"]]
+      and row("hub_absences", BAB, "end_date")["end_date"] == "2031-06-02", f"bob takes back his own change {res}")
+
 # ---------------------------------------------------------------- only own steps
-check(not [x for x in lst(Bo) if x["id"] == g["id"]], "bob does not see alice's step")
+g = newest(A)
+check(g.get("id") and not [x for x in lst(Bo) if x["id"] == g["id"]], "bob does not see alice's step")
 r = Bo.post(B + f"/api/undo/to/{g['id']}")
 check(r.status_code == 404, f"bob cannot take alice's step back {r.status_code}")
 

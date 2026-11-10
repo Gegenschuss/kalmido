@@ -107,7 +107,7 @@ function ab2_sheet(it) {
         const before = {kind: it.kind, start_date: it.start_date, end_date: it.end_date, half_day: it.half_day, note: it.note};
         await api('PATCH', `/api/team/absences/${it.id}`, v);
         const put = x => async () => { await api('PATCH', `/api/team/absences/${it.id}`, x); ab2_reload(); };
-        histAdd({label: tr('Absence changed'), undo: put(before), redo: put(v)});
+        histAdd({label: tr('Absence changed'), srv: true, undo: put(before), redo: put(v)});  // 2.809.0 (#5476): srv = the server lists the step (hub/absundo.py)
       } else {
         const r = await api('POST', '/api/team/absences', v);
         AB2.req = r.status === 'pending';  // 2.125.0 A (#2117): a request, not yet away
@@ -122,7 +122,7 @@ function ab2_sheet(it) {
 async function ab2_delete(it) {
   try {
     await api('DELETE', `/api/team/absences/${it.id}`);
-    const e = histAdd({label: tr('Absence deleted'), undo: async () => { await api('POST', `/api/team/absences/${it.id}/restore`); ab2_reload(); },
+    const e = histAdd({label: tr('Absence deleted'), srv: true, undo: async () => { await api('POST', `/api/team/absences/${it.id}/restore`); ab2_reload(); },
       redo: async () => { await api('DELETE', `/api/team/absences/${it.id}`); ab2_reload(); }});
     ab2_reload(); offerUndo(tr('Absence deleted'), e);
   } catch { /* api() said it */ }
