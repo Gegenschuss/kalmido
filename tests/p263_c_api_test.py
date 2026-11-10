@@ -59,6 +59,13 @@ A.put(B + f"/api/lists/{P}/members", json={"user_id": ids["dave"], "role": "admi
 A.put(B + f"/api/lists/{P}/members", json={"user_id": ids["erin"], "role": "edit"})  # an editor of the list, admin of its organisation
 T = A.post(B + "/api/tasks", json={"title": "Survey", "list_id": P}).json()["id"]
 now = datetime.now(timezone.utc).replace(microsecond=0)
+# 2.826.0 (#5507): the entries below lie 4 h .. 20 min before now; a CI run shortly after midnight split bob's timer over two
+# days (CSV: one row per day, setting time_split_midnight) -> 3 rows instead of 2. Everyone counts in UTC here and the
+# entries stay on one day: shortly after midnight they move to the evening before.
+if (now - timedelta(hours=4)).date() != now.date():
+    now = now.replace(hour=0, minute=0, second=0) - timedelta(minutes=1)
+for s_ in (A, Bo, Ca, Da, Er):
+    check(s_.patch(B + "/api/settings", json={"tz": "UTC"}).ok, "time zone UTC")
 
 
 def iso(d):
