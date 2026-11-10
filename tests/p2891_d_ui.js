@@ -30,7 +30,7 @@ const day = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
   check(await until(async () => (await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})}).catch(() => null))?.status < 500), 'setup');
   const CA = await login('alice');
   await call(CA, 'POST', '/api/admin/setup', {lang: 'en', collab_all: true, modules: ['comments']});
-  await call(CA, 'PATCH', '/api/settings', {tour: 'done', lang: 'en'});
+  await call(CA, 'PATCH', '/api/settings', {tour: 'done', lang: 'en', features: 'kanban,collab,comments'});  // the board needs Kanban
   const mk = async u => { await call(CA, 'POST', '/api/users', {username: u, display_name: u[0].toUpperCase() + u.slice(1), password: 'password123', email: u + '@example.com'}); const c = await login(u); await call(c, 'PATCH', '/api/settings', {lang: 'en', tour: 'done'}); return c; };
   const CC = await mk('carla'), CD = await mk('dora');
   const me = async ck => (await call(ck, 'GET', '/api/state')).me;
@@ -84,10 +84,12 @@ const day = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
   w.eval(`api = window.__api0`); rb?.click();
   check(await until(() => /Trash is empty\./.test(txt(d.querySelector('#view .empty.nempty'))) && !d.querySelector('#view .eerr')), '#5440: "Try again" loads the trash (now empty)');
   // an empty board: a sentence above its columns (it had only the column "Tasks"); a board with tasks has none
-  w.eval(`listById(${BOARD}).view = 'kanban'; go('l/${BOARD}')`);
+  w.eval(`go('l/${BOARD}')`); await until(() => w.eval(`S.route.key === 'l:${BOARD}'`));
+  await w.eval(`setListView(listById(${BOARD}), 'kanban')`);
   em = await until(() => d.querySelector('#view .empty.kempty'));
   check(em && /No tasks\./.test(txt(em)) && /\+ Task/.test(txt(em)) && em.classList.contains('es-sec') && d.querySelector('#view .kanban'), '#5440: empty board: the block above the columns ' + txt(em));
-  w.eval(`listById(${WORK}).view = 'kanban'; go('l/${WORK}')`);
+  w.eval(`go('l/${WORK}')`); await until(() => w.eval(`S.route.key === 'l:${WORK}'`));
+  await w.eval(`setListView(listById(${WORK}), 'kanban')`);
   check(await until(() => /Sand the boards/.test(txt(d.querySelector('#view .kanban')))) && !d.querySelector('#view .empty.kempty'), '#5440: a board with tasks has no empty state');
   w.close();
 
@@ -167,7 +169,8 @@ const day = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
     check(p && p.gap >= 0 && p.gap <= 40 && Math.abs(p.bc - p.tc) <= 2 && p.vis, '360: #5440 "+ Section" right under the text, not far below in the middle ' + JSON.stringify(p));
     await shot('p2891d-empty-360.png');
     await nav(B + `#l/${BOARD}`);
-    await ev(`(() => { listById(${BOARD}).view = 'kanban'; render(); return 1; })()`);
+    check(await ready(ev, `S.route?.key === 'l:${BOARD}' && !!listById(${BOARD})`, 60), '360: the board project opens');
+    await ev(`setListView(listById(${BOARD}), 'kanban').then(() => 1)`);
     check(await ready(ev, `!!document.querySelector('#view .empty.kempty') && !!document.querySelector('#view .kanban')`, 40), '360: #5440 the empty board says so above its columns');
     await nav(B + '#t/' + T);
     check(await ready(ev, `!!document.querySelector('#detail #d-tl-items .cm') && !!document.querySelector('#detail .dthumb')`, 80), '360: the task with its comments and the bar');
