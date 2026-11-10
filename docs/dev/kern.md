@@ -231,7 +231,7 @@ c.commit()
   table `undo_groups`; the header `X-Kalmido-Undo-Group` bundles several requests within 10 seconds, `X-Kalmido-Device`
   names the device). 30 days, 300 groups per person, 256 KB per part, 2 MB or 1000 parts per group (above: listed as
   `toobig`, no copy). `core/undoweb.py`: `GET /api/undo`, `POST /api/undo/to/<id>` (newest first, the rights of now,
-  a part that changed since stays and is named, a barrier stops), `POST /api/undo/<id>/redo`; `undo_barrier` for
+  a part that changed since stays and is named, a barrier stops the older groups of its own workspace only - same org_id, 2.866.0 #5302 N2; a group too big stops all), `POST /api/undo/<id>/redo`; `undo_barrier` for
   finalising / sending; a tracked kind registers who may take its steps back (`undo_need_reg`, the office in
   `office/undo.py`), a kind without one is never written back. People only (agents 403).
 - Undo across devices, stage 4 (2.747.0, #5252): the office's step groups have area `office` and a label naming the object

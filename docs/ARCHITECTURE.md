@@ -502,7 +502,7 @@ About shows the window size, pixel ratio, pointer, hover and both switches of th
   `GET /api/undo` (every device) merged by time with this browser's steps of areas not on the server's history yet
   (`HIST`, "only this device"; steps the server lists itself carry `srv` and are not shown twice). "Back up to here" walks
   the rows from the top: runs of browser steps through `histStep(dir, n, only)`, runs of server groups through
-  `POST /api/undo/to/<id>`; a barrier / a group too big for copies greys itself and every older row. Live through the
+  `POST /api/undo/to/<id>`; a barrier greys itself and the older rows of its own workspace (same org_id, 2.866.0 #5302 N2), a group too big for copies greys itself and every older row. Live through the
   person's own `self` counter of the poll; rows are patched in place, the top row stays put. Every write of the app sends
   `X-Kalmido-Device-Name` (`undo.js histDevice`: browser + system + a short mark in localStorage), which
   `core/undogroups.py ug_device` stores as the group's device.
