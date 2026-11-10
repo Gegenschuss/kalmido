@@ -1345,7 +1345,11 @@ Example `reaction`:
 
 *Since 2.34.0.*
 
-People plan recurring jobs for an agent in the app (Agents > the agent's card > *Plans*): "every working day at 8: my
+People plan recurring jobs for an agent in the app (Agents > the agent's card > *Plans*, since 2.826.0 also the *…* menu of
+the agent's chat > *Plans*; *Pause all* / *Resume all* there switches all of the person's own plans with this agent at once,
+with an undo step - `PATCH /api/agents/{id}/schedules` `{enabled, ids?}`, never another person's plans; resuming does not
+make up missed runs. A server agent's window switches each starter routine with its own plan *On* / *Paused*, the same
+`enabled`; a paused plan stays): "every working day at 8: my
 morning briefing", "every Monday at 9: the week status of project X". Kalmido never runs a model itself: at the planned
 time it records ONE event `scheduled_job` for the agent, the agent does the work with its tools and answers in its chat
 with that person (`send_chat` with `user_id` = `by.id`, MCP `send_chat`). Start the answer with the job's `title`.
@@ -1869,12 +1873,16 @@ POST /api/v1/agent/typing   {"chat_user_id": 1}     -> {ok, chat_user_id, expire
 ```
 
 The signal lasts 10 seconds (send it again while you are still writing); your answer (`POST /api/v1/agent/chats/{id}`)
-ends it. MCP: `chat_typing`. *Not connected* (2.6.0) means: the agent never got in touch, or has not for 5 minutes: no
-event poll and no API call with its token (`contact_age` in the agent lists people get, seconds since the last contact,
-`null` = never; `online: false` = no `GET /api/v1/agent/events` for 5 minutes). Its running jobs then no longer keep the
-header's agent pill busy. An agent with a webhook is told about events, so it only shows *not connected* when `online`
-is `false`. Kalmido stores the last poll at most every 30 seconds and a token's last use at most every 60 seconds, so
-this costs nothing extra.
+ends it. MCP: `chat_typing`. *Not connected* (2.6.0; since 2.826.0 only for a real problem) means: the agent never got
+in touch (`contact_age` in the agent lists people get, seconds since its last event poll or API call, `null` = never), or a
+chat message to it has waited for more than 5 minutes without being fetched or answered (`pending_age`, seconds the oldest
+such message waits, `null` = nothing waits). An agent that starts on demand (a cloud or server agent that runs only when a
+message comes) and has answered its last message shows *ready* with the hint "starts with the next message", also when it
+has not been in touch for a while or does not poll events (`online` / `no_service`). A message counts as fetched once it
+came through `GET /api/v1/agent/events`, `GET /api/v1/agent/chats`, MCP or a webhook (`delivered_at`), and as answered
+once the agent wrote in that conversation after it. Its running jobs then no longer keep the header's agent pill busy. An
+agent with a webhook is told about events, so it never shows *not connected*. Kalmido stores the last poll at most every
+30 seconds and a token's last use at most every 60 seconds, so this costs nothing extra.
 
 ### Stopping a running answer
 
