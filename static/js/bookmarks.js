@@ -137,7 +137,7 @@ async function bm_patch(id, ch, label, hl = label, x0 = null) {
   // preview fetch no longer moves it): changed in another session since -> "Changed elsewhere, not undone", their change stays
   let ver = nx?.updated_at || '';
   const st = (v, from) => undoStep(`/api/bookmarks/${id}`, v, ver, {now: from, label: hl, then: j => { ver = j?.updated_at || ver; }}).finally(bm_reload);
-  offerUndo(label, histAdd({label: hl, undo: () => st(old, ch), redo: () => st(ch, old)}));
+  offerUndo(label, histAdd({label: hl, srv: true, undo: () => st(old, ch), redo: () => st(ch, old)}));  // 2.809.0 (#5476): srv = the server lists the step (life/bmundo.py)
   if ('url' in ch) BM.polls = 0;
   if ('state' in ch || 'tags' in ch || 'url' in ch) bm_reload();
   return nx;
@@ -152,7 +152,7 @@ const bm_delPut = id => () => {
 async function bm_del(id, x0 = null) {
   const x = bm_item(id) || x0 || await api('GET', `/api/bookmarks/${id}`);
   await optWrite(bm_delPut(id), () => api('DELETE', `/api/bookmarks/${id}`), bm_draw, {mod: true});
-  offerUndo(tr('Deleted: {0}', x.title), histAdd({label: tr('Delete bookmark {0}', qn(x.title)),
+  offerUndo(tr('Deleted: {0}', x.title), histAdd({label: tr('Delete bookmark {0}', qn(x.title)), srv: true,  // 2.809.0 (#5476)
     undo: async () => { await api('POST', `/api/bookmarks/${id}/restore`, {}); await bm_reload(); },
     redo: async () => { await api('DELETE', `/api/bookmarks/${id}`); await bm_reload(); }}));
   bm_reload();

@@ -749,6 +749,17 @@ def bm_home(c, r, uid, old_paths):
 
 
 # ---- routes (/api/bookmarks; people only)
+def _bm_step(c, uid, bid, what=None):
+    """2.809.0 (#5476): the undo step of uid's write of bookmark bid (life/bmundo.py; it imports this module)."""
+    from .bmundo import bmu_pre
+    bmu_pre(c, uid, bid, what)
+
+
+def _bm_done(c):
+    from .bmundo import bmu_post
+    bmu_post(c)
+
+
 @app.get("/api/bookmarks")
 def bookmarks_get():
     c, uid = db(), me()
@@ -785,8 +796,16 @@ def bookmark_patch(bid):
     c, uid = db(), me()
     bm_need(c, uid)
     old = c.execute("SELECT image FROM bookmarks WHERE id=?", (bid,)).fetchone()
-    r, refetch = bm_patch(c, uid, bid, body())
+    b = body()
+    step = isinstance(b, dict) and set(b) - {"expect_updated_at"}
+    if step:  # 2.809.0 (#5476): the person's step (life/bmundo.py) under the bookmark's lock, after the rights check
+        write_lock(c, f"bookmarks-{int(bid)}")
+        bm_get(c, uid, bid, write=True)
+        _bm_step(c, uid, bid)
+    r, refetch = bm_patch(c, uid, bid, b)
     bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
+    if step:
+        _bm_done(c)
     c.commit()
     if refetch and old and old["image"] and old["image"] != r["image"]:
         bm_rm_file(old["image"])  # 2.97.0 review (L2): the old link's picture
@@ -800,9 +819,12 @@ def bookmark_delete(bid):
     """Deleted (undo: POST /api/bookmarks/<id>/restore within BM_TRASH_DAYS)."""
     c, uid = db(), me()
     bm_need(c, uid)
+    write_lock(c, f"bookmarks-{int(bid)}")  # 2.809.0 (#5476): the lock of its saves around its step
     bm_get(c, uid, bid, write=True)
+    _bm_step(c, uid, bid, "delete")
     c.execute("UPDATE bookmarks SET deleted_at=? WHERE id=?", (iso_ms(now_utc()), bid))
     bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
+    _bm_done(c)
     c.commit()
     return jsonify({"ok": True, "id": bid})
 
@@ -811,12 +833,15 @@ def bookmark_delete(bid):
 def bookmark_restore(bid):
     c, uid = db(), me()
     bm_need(c, uid)
+    write_lock(c, f"bookmarks-{int(bid)}")  # 2.809.0 (#5476)
     r = bm_get(c, uid, bid, write=True, deleted=True)
     if c.execute("SELECT 1 FROM bookmarks WHERE user_id=? AND org_id IS NOT DISTINCT FROM ? AND url_key=? AND deleted_at IS NULL",
                  (r["user_id"], r["org_id"], r["url_key"])).fetchone():
         raise Denied(409, tr("This link is already saved"))
+    _bm_step(c, uid, bid, "restore")
     c.execute("UPDATE bookmarks SET deleted_at=NULL WHERE id=?", (bid,))
     bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
+    _bm_done(c)
     c.commit()
     return jsonify(bm_out(c, uid, c.execute("SELECT * FROM bookmarks WHERE id=?", (bid,)).fetchone(), full=True))
 
