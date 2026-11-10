@@ -92,18 +92,27 @@ const FEAT = 'cal,comments,collab,office,clients,docs,files';
     check(await ready(ev, `/Makes 3 documents/.test(document.querySelector('.dsp-md .dsp-sum').textContent)`, 20), 'a cut by tap: 3 documents');
     await ev(`(() => { document.querySelector('.dsp-md [data-dspc="3"]').click(); return 1; })()`);
     check(await ready(ev, `/Makes 2 documents/.test(document.querySelector('.dsp-md .dsp-sum').textContent)`, 20), 'the cut removed: 2 documents');
+    // #5478 (CI red of 2.786.0 / 2.833.0, 2 of 12 runs): a trace of the address changes from the split on, named by the FAILs below
+    await ev(`(() => { const T = window.__p2154 = []; const at = () => Math.round(performance.now());
+      const rec = e => T.push([at(), e.type, location.hash, JSON.stringify(history.state), history.length].join(' '));
+      addEventListener('hashchange', rec); addEventListener('popstate', rec);
+      const of = window.fetch; window.fetch = (u, o) => { const p = of(u, o); if (/\\/api\\/(docs|files\\/nodes)\\/${SID}\\b/.test(String(u))) p.then(r => T.push([at(), 'fetch', String(u), r.status, location.hash].join(' '))); return p; };
+      return 1; })()`);
+    const diag = async () => ' | toast: ' + await ev(`(() => { const t = document.querySelector('#toast'); return JSON.stringify({text: t?.textContent || '', hidden: !!t?.classList.contains('hidden'), page: t?.dataset.page || '', hash: location.hash, gone: typeof DVW === 'object' ? [...(DVW.gone || [])] : null, trace: window.__p2154 || []}); })()`).catch(e => String(e));
     await ev(`(() => { document.querySelector('.dsp-md [data-m="split"]').click(); return 1; })()`);
     check(await ready(ev, `${ids}.then(a => !a.includes(${SID}) && a.length === 3)`, 80), 'split: the stack left the list, two documents came');
     check(await ev(`!document.querySelector('.dsp-md') && !document.querySelector('.dc-md')`), 'the dialogs closed');
-    check(await ready(ev, `/split into 2 documents/.test(document.querySelector('#toast')?.textContent || '')`, 20), 'the toast names it ' + await ev(`document.querySelector('#toast')?.textContent || ''`));
-    // #5478 (CI red of 2.786.0 / 2.833.0): a late history step landing on the split stack's address again (the dialog's own Back
-    // racing the view's close) fetched the gone stack: its 404 toast "Not found" took the place of the split's Undo. Made here
-    // on purpose: the address leaves again by itself and the toast with Undo stays
-    await ev(`(() => { location.hash = '#ablage/${SID}'; return 1; })()`);
-    check(await ready(ev, `!/^#ablage\\/${SID}$/.test(location.hash) && !document.querySelector('.dv-view')`, 40), 'the address of the gone stack leaves by itself ' + await ev(`location.hash`));
-    check(await ready(ev, `/split into 2 documents/.test(document.querySelector('#toast')?.textContent || '')`, 8), 'the Undo toast stays, no "Not found" over it: ' + await ev(`document.querySelector('#toast')?.textContent || ''`));
+    check(await ready(ev, `/split into 2 documents/.test(document.querySelector('#toast')?.textContent || '')`, 20), 'the toast names it' + await diag());
+    check(await ev(`DVW.gone.has(${SID})`), 'the split stack counts as gone here (docview.js DVW.gone, #5478)');
     await undoToast(ev, /split into 2 documents/);  // 2.312.0 A (#3283)
-    check(await ready(ev, `${ids}.then(a => a.includes(${SID}) && a.length === 2)`, 80), 'undo: the stack is back, the parts went');
+    check(await ready(ev, `${ids}.then(a => a.includes(${SID}) && a.length === 2)`, 80), 'undo: the stack is back, the parts went' + await diag());
+    check(await ev(`!DVW.gone.has(${SID})`), 'undo: the stack is no longer gone');
+    // #5478: the address of a document removed here a moment ago coming back (a late history step): it leaves again by itself,
+    // no fetch of it, no "Not found" message (that one took the place of the split's Undo in CI)
+    const GONE = 990000 + SID;
+    await ev(`(() => { AB_FILEIDS.add(${GONE}); dcv_gone(${GONE}); location.hash = '#ablage/${GONE}'; return 1; })()`);
+    check(await ready(ev, `!/^#ablage\\/${GONE}$/.test(location.hash) && !document.querySelector('.dv-view')`, 40), 'a gone document: its address leaves by itself ' + await ev(`location.hash`));
+    check(await ev(`!/Not found/.test(document.querySelector('#toast')?.textContent || '')`), 'a gone document: no "Not found" message' + await diag());
     // link the letter with the task
     await nav(B + `#docs/${ONE}`);
     // 2.554.0 (#4469): one button "Task…" with a menu (New task / Link with a task…)
