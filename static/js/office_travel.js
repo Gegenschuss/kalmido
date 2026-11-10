@@ -281,7 +281,7 @@ function rk_tripModal(t) {
     ${ofcRowF('rk-km', tr('Kilometres'), ofcIn('rk-km', t?.km != null ? fmtNum(+t.km, 0) : '', {num: true, ph: tr('optional')}))}
     <div class="row"><label for="rk-note">${tr('Note')}</label><textarea id="rk-note" rows="2" maxlength="2000">${esc(t?.note || '')}</textarea></div>
     <div class="aerr" role="alert"></div>
-    <div class="foot">${t ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${t ? tr('Save') : tr('Add')}</button></div>`);
+    <div class="foot">${t ? `<button class="btn danger solid" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${t ? tr('Save') : tr('Add')}</button></div>`);
   md.classList.add('ofcdlg');
   if (t && typeof ofm_can === 'function' && ofm_can(ofm_officeFrom())) $('.foot .spacer', md)?.insertAdjacentHTML('beforebegin', `<button class="btn" data-m="move">${ic('brief', 's')} ${esc(tr('Move to another workspace…'))}</button>`);  // 2.97.0 C (#2049)
   const close = fgModal(md);
@@ -345,7 +345,7 @@ function rk_itemModal(t, i) {
     ${rk_dv() && ofr_lvOf('travel') !== 'own' ? `${ofcChk('rk-datev', tr('Receipt is in DATEV'), i?.datev)}
     ${ofcRowF('rk-dno', tr('DATEV receipt number'), ofcIn('rk-dno', i?.datev_no, {max: 60, ph: tr('optional')}))}` : ''}
     <div class="aerr" role="alert"></div>
-    <div class="foot">${i ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${i ? tr('Save') : tr('Add')}</button></div>`);
+    <div class="foot">${i ? `<button class="btn danger solid" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${i ? tr('Save') : tr('Add')}</button></div>`);
   md.classList.add('ofcdlg');
   const close = fgModal(md);
   const fx = () => {

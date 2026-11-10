@@ -160,7 +160,7 @@ async function cbEntryModal(e) {
     try {
       if (b.dataset.m === 'log') { cbLogModal(e); return; }
       if (b.dataset.m === 'cancel') {
-        if (!await askConfirm(tr('Cancel entry no. {0}?', e.no), tr('A counter entry with a new number books the amount back; both stay in the cash book.'), {ok: tr('Cancel entry')})) return;
+        if (!await askConfirm(tr('Cancel entry no. {0}?', e.no), tr('A counter entry with a new number books the amount back; both stay in the cash book.'), {ok: tr('Cancel entry'), danger: true})) return;
         const j = await api('POST', `/api/office/cash-entries/${e.id}/cancel`, {}); md.remove(); cbReload(true);
         // the undo books the original once more (nothing is deleted)
         toast(tr('Cancelled by no. {0}', j.entry.no), async () => {
@@ -224,7 +224,7 @@ async function cbCloseModal() {
   md.addEventListener('click', async ev => {
     const x = /** @type {any} */ (ev.target).closest('[data-m]'); if (!x) return;
     if (x.dataset.m === 'close') { close(); return; }
-    if (!await askConfirm(tr('Close the day permanently?'), tr('This cannot be undone.'), {ok: tr('Close permanently')})) return;
+    if (!await askConfirm(tr('Close the day permanently?'), tr('This cannot be undone.'), {ok: tr('Close permanently'), danger: true})) return;
     try { await api('POST', `/api/office/cashbooks/${b.id}/closing`, {day: cb$('#cb-cday', md).value}); md.remove(); cbReload(true); toast(tr('Day closed')); }
     catch (y) { err.textContent = ofcErrHere(y); }
   });

@@ -79,7 +79,7 @@ function ltmBlockEdit(t, after) {
     ${ofcRowF('ltm-bname', tr('Name'), ofcIn('ltm-bname', t?.name, {max: 120}))}
     <label for="ltm-bbody" class="dtp-lab">${tr('Text')}</label><textarea id="ltm-bbody" class="dtp-ta" rows="10" maxlength="20000">${esc(t?.body || '')}</textarea>
     <div class="aerr" role="alert"></div>
-    <div class="foot">${t ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${t ? tr('Save') : tr('Add')}</button></div>`);
+    <div class="foot">${t ? `<button class="btn danger solid" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${t ? tr('Save') : tr('Add')}</button></div>`);
   md.classList.add('ofcdlg', 'ltm-dlg');
   const close = fgModal(md);
   md.addEventListener('click', async e => {

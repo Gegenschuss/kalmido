@@ -123,7 +123,7 @@ async function brl_del(id) {
 }
 async function brl_revert(id) {
   const r = (BRL.items || []).find(x => x.id === id);
-  if (!await askConfirm(tr('Undo the marks of this rule?'), tr('Every booking this rule marked becomes open again (not in locked months). The rule itself stays.'), {ok: tr('Undo its marks')})) return;
+  if (!await askConfirm(tr('Undo the marks of this rule?'), tr('Every booking this rule marked becomes open again (not in locked months). The rule itself stays.'), {ok: tr('Undo its marks'), danger: true})) return;
   let j;
   try { j = await api('POST', `/api/office/bank/rules/${id}/revert`); } catch (x) { ofcErr(x); return; }
   brl_stale(); brl_load();

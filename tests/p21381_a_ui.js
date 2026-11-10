@@ -40,6 +40,7 @@ async function editor(user, id) {
   w.__pv = []; w.pdfView = o => { w.__pv.push(o); };  // the PDF viewer (module pdf) is not opened in jsdom
   return [w, d];
 }
+// 2.892.0 (#5455): ofdPdfAsk is built on askDialog: Cancel = [data-cd="no"], Finalise now = [data-cd="yes"], the draft button keeps data-pa
 const dlg = d => d.querySelector('.modal.ofdpa');
 
 async function run(user, ck, tag) {
@@ -57,9 +58,9 @@ async function run(user, ck, tag) {
   check((await call('GET', `/api/office/docs/${q.id}`, null, ck)).locked === false, `${tag}: Preview keeps the draft`);
   click(w, dl);
   const m = await until(() => dlg(d), 30);
-  check(m && /not finalised yet/.test(m.textContent) && m.querySelector('[data-pa="final"]') && m.querySelector('[data-pa="draft"]') && m.querySelector('[data-pa=""]')
+  check(m && /not finalised yet/.test(m.textContent) && m.querySelector('[data-cd="yes"]') && m.querySelector('[data-pa="draft"]') && m.querySelector('[data-cd="no"]')
     && m.getAttribute('role') === 'alertdialog', `${tag}: the download asks: Finalise now / Show as draft / Cancel ` + (m?.textContent || '').slice(0, 160));
-  click(w, m?.querySelector('[data-pa=""]'));
+  click(w, m?.querySelector('[data-cd="no"]'));
   await until(() => !dlg(d), 20); await sleep(300);
   const q1 = await call('GET', `/api/office/docs/${q.id}`, null, ck);
   check(!dlg(d) && w.__pv.length === 1 && q1.locked === false && q1.status === 'draft', `${tag}: Cancel does nothing (still a draft)`);
@@ -73,7 +74,7 @@ async function run(user, ck, tag) {
   // ---- a draft invoice: Finalise now gives the number, then the PDF; afterwards plain links
   [w, d] = await editor(user, inv.id);
   click(w, d.querySelector('.ofdhead .ofddl'));  // 2.380.0 A (#3410): the download asks (Preview no longer)
-  click(w, await until(() => dlg(d)?.querySelector('[data-pa="final"]'), 30));
+  click(w, await until(() => dlg(d)?.querySelector('[data-cd="yes"]'), 30));
   const srv = await until(async () => { const j = await call('GET', `/api/office/docs/${inv.id}`, null, ck); return j.locked && j; }, 60);
   check(srv && srv.locked && /\d/.test(srv.number || ''), `${tag}: Finalise now finalises and gives the number ` + (srv && srv.number));
   await sleep(300);

@@ -96,7 +96,7 @@ function aboModal(f) {
       <span class="muted ofchint">${tr('Days before the last day to cancel; 0 = no reminder.')}</span></div>
     ${ofcRowF('abo-url', tr('Web address'), `<input id="abo-url" type="url" inputmode="url" maxlength="500" value="${esc(f?.url || '')}" placeholder="https://">`)}
     <div class="aerr" role="alert"></div>
-    <div class="foot">${f ? `<button class="btn danger" data-m="del">${tr('Delete')}</button><button class="btn ghost" data-m="unsub">${tr('No subscription')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${f ? tr('Save') : tr('Add')}</button></div>`);
+    <div class="foot">${f ? `<button class="btn danger solid" data-m="del">${tr('Delete')}</button><button class="btn ghost" data-m="unsub">${tr('No subscription')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${f ? tr('Save') : tr('Add')}</button></div>`);
   md.classList.add('ofcdlg', 'abo-dlg');
   const close = fgModal(md);
   md.addEventListener('click', async e => {

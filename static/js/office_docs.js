@@ -625,19 +625,17 @@ function ofdPdfOpen(d, dl) {
   if (dl) a.download = ''; else { a.target = '_blank'; a.rel = 'noopener'; }
   document.body.appendChild(a); a.click(); a.remove();
 }
-function ofdPdfAsk() {
-  return new Promise(res => {
-    let done = false;
-    const md = modal(`<h3 id="ofdpa-t">${esc(tr('This document is not finalised yet'))}</h3><div class="cdlg-b" id="ofdpa-b">${esc(tr('Finalise it now: number, positions, sums, sender and tax rates are frozen. Or look at it as a draft: every page is marked DRAFT.'))}</div>
-      <div class="foot"><button type="button" class="btn" data-pa="">${esc(tr('Cancel'))}</button><span class="spacer"></span><button type="button" class="btn" data-pa="draft">${esc(tr('Show as draft'))}</button><button type="button" class="btn pri" data-pa="final">${ic('lock', 's')} ${esc(tr('Finalise now'))}</button></div>`);
-    md.classList.add('cdlg', 'ofdpa');
-    md.setAttribute('role', 'alertdialog'); md.setAttribute('aria-modal', 'true'); md.setAttribute('aria-labelledby', 'ofdpa-t'); md.setAttribute('aria-describedby', 'ofdpa-b');
-    const prev = document.activeElement;
-    const fin = v => { if (done) return; done = true; res(v); if (md.isConnected) md.remove(); try { if (prev && prev.isConnected) prev.focus({preventScroll: true}); } catch { /* gone */ } };
-    md.addEventListener('click', e => { const b = e.target.closest('[data-pa]'); if (b) fin(b.dataset.pa || null); });
-    onRemove(md, () => fin(null));
-    setTimeout(() => $('[data-pa="draft"]', md)?.focus(), 30);
-  });
+// 2.892.0 (#5455): built on askDialog (Cancel left of the main button, focus on "Finalise now"); "Show as draft" is the extra middle button
+async function ofdPdfAsk() {
+  let pick = '';
+  const r = await askDialog({title: tr('This document is not finalised yet'), body: tr('Finalise it now: number, positions, sums, sender and tax rates are frozen. Or look at it as a draft: every page is marked DRAFT.'),
+    ok: tr('Finalise now'), after: md => {
+      md.classList.add('ofdpa');
+      const yes = md.querySelector('[data-cd="yes"]');
+      yes.insertAdjacentHTML('beforebegin', `<button type="button" class="btn" data-pa="draft">${esc(tr('Show as draft'))}</button>`);
+      md.querySelector('[data-pa="draft"]').addEventListener('click', () => { pick = 'draft'; yes.click(); });
+    }});
+  return r ? (pick || 'final') : null;
 }
 // 2.154.0 D (#2567): duplicating an invoice made from times: say that the hours stay with the original
 // 2.437.0 B (#3621): a sent / accepted quotation asks whether the copy replaces it (ticked by default; a supplement stays next to it):

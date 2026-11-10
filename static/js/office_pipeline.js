@@ -111,7 +111,7 @@ function pp_modal(x, stage) {
       ${x.list_id ? `<a class="btn" href="#l/${x.list_id}" data-m="close">${ic('brief', 's')}<span>${tr('Open project')}</span></a>` : x.stage === 'won' ? `<button class="btn" data-m="project">${ic('brief', 's')}<span>${tr('Create project')}</span></button>` : ''}</div>
       ${x.offer_status === 'declined' && x.stage !== 'lost' ? `<p class="muted ofchint">${tr('The client rejected the quotation. Set the stage to "Lost" or make a new quotation.')}</p>` : ''}` : ''}
     <div class="aerr" role="alert"></div>
-    <div class="foot">${x ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${x ? tr('Save') : tr('Add')}</button></div>`);
+    <div class="foot">${x ? `<button class="btn danger solid" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${x ? tr('Save') : tr('Add')}</button></div>`);
   md.classList.add('ofcdlg');
   const close = fgModal(md);
   const PROB = PPS.data?.probabilities || {lead: 10, inquiry: 20, offer: 50, won: 100, lost: 0};

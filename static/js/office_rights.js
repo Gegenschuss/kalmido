@@ -60,18 +60,17 @@ function orr_personHtml(d, p) {
   const names = (p.groups || []).map(r => orr_refName(d, r)).join(', ');
   if (p.fixed) return `<li class="orr-p">${head}<span class="orr-fixed muted">${esc(tr('Organisation admin, always sees everything'))}</span></li>`;
   if (!p.can_edit) return `<li class="orr-p">${head}<span class="orr-fixed"><span>${esc(names)}</span><small class="muted">${esc(p.id === S.me?.id ? tr('You cannot change your own office rights') : tr('Has more rights than you can hand out'))}</small></span></li>`;
-  const opts = orr_all(d).filter(g => g.can_give || (p.groups || []).includes(g.ref)).filter(g => !(p.agent && g.key === 'legacy'))
-    .map(g => `<label class="chkl"><input type="checkbox" data-orr="pg" data-pid="${p.id}" value="${esc(g.ref)}" ${(p.groups || []).includes(g.ref) ? 'checked' : ''}><span>${esc(g.name)}</span></label>`).join('');
-  const k = 'p:' + p.id;
-  return `<li class="orr-p">${head}<details class="orr-pick" data-orr-open="${k}" ${ORR.open.has(k) ? 'open' : ''}><summary><span>${esc(names)}</span>${ic('chev', 's')}</summary><div class="orr-opts" role="group" aria-label="${esc(tr('Groups of {0}', p.name))}">${opts}</div></details></li>`;
+  // 2.892.0 (#5455): the group picker is the core menu() (Esc, focus, phone sheet), no own details menu
+  return `<li class="orr-p">${head}<button type="button" class="orr-pick" data-orr="pick" data-pid="${p.id}" aria-haspopup="menu" aria-label="${esc(tr('Groups of {0}', p.name))}"><span>${esc(names)}</span>${ic('chev', 's')}</button></li>`;
 }
-async function orr_personSave(el) {
-  const box = el.closest('.orr-opts'), pid = +el.dataset.pid, ref = el.value; if (!box) return;
-  const all = /** @type {HTMLInputElement[]} */ ($$('input[data-orr="pg"]', box));
-  const solo = r => r === 'tpl:legacy' || r === 'tpl:none';  // "Previous access" / "No office access" stand alone
-  if (el.checked) all.forEach(x => { if (x !== el && (solo(ref) || solo(x.value))) x.checked = false; });
-  const refs = all.filter(x => x.checked).map(x => x.value);
-  ORR.open.add('p:' + pid);
+function orr_pickMenu(btn) {
+  const d = ORR.data, pid = +(btn.dataset.pid || 0), p = (d?.people || []).find(x => x.id === pid); if (!d || !p) return;
+  const cur = p.groups || [], solo = r => r === 'tpl:legacy' || r === 'tpl:none';  // "Previous access" / "No office access" stand alone
+  menu(btn, orr_all(d).filter(g => g.can_give || cur.includes(g.ref)).filter(g => !(p.agent && g.key === 'legacy')).map(g => ({
+    label: g.name, on: cur.includes(g.ref),
+    fn: () => orr_personSave(pid, cur.includes(g.ref) ? cur.filter(r => r !== g.ref) : [...cur.filter(r => !(solo(g.ref) || solo(r))), g.ref], btn)})), null, null, tr('Groups of {0}', p.name));
+}
+async function orr_personSave(pid, refs, el) {
   try { await api('PUT', `/api/office/rights/people/${pid}`, {groups: refs}); savedTick(el); ORR.log = null; }  // 2.298.0 A1 (#3186): the quiet tick
   catch (x) { ofcErr(x); }
   await orr_load();
@@ -182,11 +181,11 @@ function orr_mineHtml(d) {
 // ---- events
 document.addEventListener('click', e => {
   const t = /** @type {HTMLElement} */ (e.target);
-  for (const p of $$('.orr-pick[open]')) if (!p.contains(t)) /** @type {HTMLDetailsElement} */ (p).open = false;  // the group picker closes like a menu
   const b = /** @type {HTMLElement|null} */ (t.closest?.('[data-orr]'));
   if (!b || b.tagName === 'INPUT' || b.tagName === 'SELECT') return;
   const k = b.dataset.orr;
   if (k === 'sub') { LS.set('orrSub', b.dataset.k); ofcDraw(); }
+  else if (k === 'pick') orr_pickMenu(b);
   else if (k === 'copy') orr_copy(b.dataset.ref || '');
   else if (k === 'del') orr_del(+(b.dataset.gid || 0));
   else return;
@@ -195,15 +194,9 @@ document.addEventListener('click', e => {
 document.addEventListener('change', e => {
   const el = /** @type {HTMLInputElement} */ (e.target); if (!el.closest?.('.orr')) return;
   const k = el.dataset.orr, gid = +(el.dataset.gid || 0);
-  if (k === 'pg') orr_personSave(el);
-  else if (k === 'lv' && gid) orr_groupPatch(gid, {levels: {[el.dataset.area || '']: el.value}});
+  if (k === 'lv' && gid) orr_groupPatch(gid, {levels: {[el.dataset.area || '']: el.value}});
   else if (k === 'sp' && gid) orr_groupPatch(gid, {specials: $$(`input[data-orr="sp"][data-gid="${gid}"]`).filter(x => /** @type {HTMLInputElement} */ (x).checked).map(x => /** @type {HTMLInputElement} */ (x).value)});
   else if (k === 'name' && gid) { if (el.value.trim()) orr_groupPatch(gid, {name: el.value.trim()}); else { el.value = (ORR.data?.groups || []).find(x => x.id === gid)?.name || ''; } }
-});
-document.addEventListener('keydown', e => {
-  if (e.key !== 'Escape') return;
-  const p = /** @type {HTMLDetailsElement|null} */ ((/** @type {HTMLElement} */ (e.target)).closest?.('.orr-pick[open]')); if (!p) return;
-  p.open = false; /** @type {HTMLElement|null} */ (p.querySelector('summary'))?.focus(); e.stopPropagation();
 });
 // the open sections stay open after a save (the page is drawn again)
 document.addEventListener('toggle', e => {

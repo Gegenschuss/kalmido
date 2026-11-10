@@ -137,7 +137,7 @@ async function bkaOpen(id) {
     <p class="bka-dsum">${bkaAcct(j.account, j.account_label)}${j.counter ? ` <span class="muted">→</span> ${bkaAcct(j.counter, j.counter_label)}` : ''} · <b>${esc(ofcMoney(j.amount))}</b> ${esc(bkaSide(j.side))}</p>
     <div class="bka-raw scroll"><table class="bka-rawt"><tbody>${raw.map(([k, v]) => `<tr><th scope="row">${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}</tbody></table></div>
     <p class="muted ofchint">${esc(tr('Line {0} of the booking batch; read-only.', j.line))}</p>
-    <div class="foot">${j.doc_id ? `<a class="btn" href="${BKA_URL}/docs/${j.doc_id}" target="_blank" rel="noopener" data-bka-doc>${ic('file', 's')}<span>${tr('Open receipt')}</span></a>` : ''}<span class="spacer"></span><button type="button" class="btn pri" data-m="close">${tr('Close')}</button></div>`);
+    <div class="foot">${j.doc_id ? `<a class="btn" href="${BKA_URL}/docs/${j.doc_id}" target="_blank" rel="noopener" data-bka-doc>${ic('file', 's')}<span>${tr('Open receipt')}</span></a>` : ''}<span class="spacer"></span><button type="button" class="btn" data-m="close">${tr('Close')}</button></div>`);
   md.classList.add('bka-dlg');
   md.addEventListener('click', e => { if (/** @type {any} */ (e.target).closest('[data-m="close"]')) md.remove(); });
 }

@@ -139,7 +139,7 @@ function rk_fixedModal(f) {
     <div class="row"><label id="cf-startl">${tr('First due date')}</label>${dateIn('cf-start', f?.start || today(), {label: tr('First due date'), clear: false})}</div>
     <div class="row"><label id="cf-untill">${tr('Ends on')}</label>${dateIn('cf-until', f?.until || '', {label: tr('Ends on'), empty: tr('open-ended'), after: 'cf-start'})}</div>
     <div class="aerr" role="alert"></div>
-    <div class="foot">${f ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}${f && typeof ofm_can === 'function' && ofm_can(ofm_officeFrom()) ? `<button class="btn" data-m="move">${ic('brief', 's')} ${esc(tr('Move to another workspace…'))}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${f ? tr('Save') : tr('Add')}</button></div>`);
+    <div class="foot">${f ? `<button class="btn danger solid" data-m="del">${tr('Delete')}</button>` : ''}${f && typeof ofm_can === 'function' && ofm_can(ofm_officeFrom()) ? `<button class="btn" data-m="move">${ic('brief', 's')} ${esc(tr('Move to another workspace…'))}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${f ? tr('Save') : tr('Add')}</button></div>`);
   md.classList.add('ofcdlg');
   const close = fgModal(md);
   md.addEventListener('click', async e => {
@@ -308,7 +308,7 @@ function cfs_modal(a, mo) {
     ${ofcRowF('cfs-amount', tr('Amount'), ofcIn('cfs-amount', a ? fmtNum(+a.amount, 2) : '', {num: true}), ofcCur(), {keep: 1})}
     ${ofcRowF('cfs-note', tr('Note'), ofcIn('cfs-note', a?.note, {max: 200, ph: tr('e.g. cash payment')}))}
     <div class="aerr" role="alert"></div>
-    <div class="foot">${a ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${a ? tr('Save') : tr('Add')}</button></div>`);
+    <div class="foot">${a ? `<button class="btn danger solid" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${a ? tr('Save') : tr('Add')}</button></div>`);
   md.classList.add('ofcdlg');
   const close = fgModal(md);
   const keep = x => ({month: x.month, dir: x.dir, amount: x.amount, note: x.note || ''});

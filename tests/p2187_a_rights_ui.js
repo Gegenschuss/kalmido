@@ -96,12 +96,15 @@ const FEAT = 'cal,comments,collab,office,clients,docs,contacts,time,travel';
     await shot('p2187-a-groups.png');
     // People: Bob gets "Staff" by the picker
     await ev(`(() => { document.querySelector('.orr [data-orr="sub"][data-k="people"]').click(); return 1; })()`);
-    await ready(ev, `!!document.querySelector('.orr input[data-orr="pg"][data-pid="${bob.id}"][value="tpl:staff"]')`);
-    await ev(`(() => { const d = document.querySelector('.orr input[data-orr="pg"][data-pid="${bob.id}"]').closest('details'); d.open = true; const x = d.querySelector('input[value="tpl:staff"]'); x.checked = true; x.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
+    await ready(ev, `!!document.querySelector('.orr button[data-orr="pick"][data-pid="${bob.id}"]')`);
+    // 2.892.0 (#5455): the picker is the core menu(): click the button, then the entry "Staff"
+    await ev(`(() => { document.querySelector('.orr button[data-orr="pick"][data-pid="${bob.id}"]').click(); return 1; })()`);
+    await ready(ev, `!![...document.querySelectorAll('#pop [role="menuitem"]')].find(x => /Staff/.test(x.textContent))`);
+    await ev(`(() => { [...document.querySelectorAll('#pop [role="menuitem"]')].find(x => /Staff/.test(x.textContent)).click(); return 1; })()`);
     let bg = [];
     for (let i = 0; i < 40 && bg.join() !== 'tpl:staff'; i++) { bg = ((await rights()).people || []).find(p => p.id === bob.id)?.groups || []; if (bg.join() !== 'tpl:staff') await sleep(200); }
     check(bg.join() === 'tpl:staff', 'Bob in "Staff" (Previous access unticked) ' + bg.join());
-    check(await ready(ev, `/Staff/.test(document.querySelector('.orr input[data-pid="${bob.id}"]')?.closest('.orr-p')?.querySelector('summary')?.textContent || '')`), 'the picker shows the new group');
+    check(await ready(ev, `/Staff/.test(document.querySelector('.orr button[data-orr="pick"][data-pid="${bob.id}"]')?.textContent || '')`), 'the picker shows the new group');
     await shot('p2187-a-people.png');
     check((await call(CA, 'PUT', `/api/office/rights/people/${carl.id}`, {groups: [`g:${gid}`]})).http === 200, 'Carl in the own group (API)');
     // Log

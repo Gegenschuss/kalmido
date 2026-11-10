@@ -114,7 +114,7 @@ function agrModal(a) {
     ${ofcRowF('agr-note', tr('Note'), `<textarea id="agr-note" rows="2" maxlength="2000">${esc(a?.note || '')}</textarea>`)}
     ${cov}
     <div class="aerr" role="alert"></div>
-    <div class="foot">${a ? `<button class="btn danger" data-m="del">${tr('Delete')}</button><button class="btn" data-m="arch">${a.archived ? tr('Restore') : tr('Archive')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${a ? tr('Save') : tr('Add')}</button></div>`);
+    <div class="foot">${a ? `<button class="btn danger solid" data-m="del">${tr('Delete')}</button><button class="btn" data-m="arch">${a.archived ? tr('Restore') : tr('Archive')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${a ? tr('Save') : tr('Add')}</button></div>`);
   md.classList.add('ofcdlg', 'agr-dlg');
   let doc = a?.doc || null;
   const drawDoc = () => {

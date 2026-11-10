@@ -97,7 +97,7 @@ function onumDocHtml(d) {
   return `<span class="onumdoc" role="group" aria-label="${esc(tr('Change number'))}">
     <input id="onum-doc" value="${esc(e.val)}" maxlength="80" autocomplete="off" spellcheck="false" aria-label="${esc(tr('Change number'))}" aria-describedby="onum-doc-h">
     ${inv ? `<input id="onum-doc-why" value="${esc(e.why)}" maxlength="300" placeholder="${esc(tr('Reason (needed when numbers are skipped)'))}" aria-label="${esc(tr('Reason'))}">` : ''}
-    <button type="button" class="btn sm pri" data-onum="doc-save" ${e.busy ? 'disabled' : ''}>${tr('Save')}</button><button type="button" class="btn sm" data-onum="doc-x">${tr('Cancel')}</button>
+    <button type="button" class="btn sm" data-onum="doc-x">${tr('Cancel')}</button><button type="button" class="btn sm pri" data-onum="doc-save" ${e.busy ? 'disabled' : ''}>${tr('Save')}</button>
     <span class="muted ofchint" id="onum-doc-h">${esc(inv ? tr('The series continues from this number.') + (d.number_at_finalize && !d.number ? ' ' + tr('A numbered draft can no longer be deleted.') : '') : tr('The counter of the series stays as it is.'))}</span>
     ${e.err ? `<span class="ofcpv err ofchint" role="alert">${esc(e.err)}</span>` : ''}</span>`;
 }

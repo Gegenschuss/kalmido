@@ -145,7 +145,7 @@ function ldbEntryDialog(e) {
 
 async function ldbEntryDelete(id) {
   const e = LDB.d?.entries.find(x => x.id === id); if (!e) return;
-  if (!await askConfirm(tr('Delete this entry?'), '', {ok: tr('Delete')})) return;
+  if (!await askConfirm(tr('Delete this entry?'), '', {ok: tr('Delete'), danger: true})) return;
   try { await api('DELETE', `${ldbBase()}/entries/${id}?expect_updated_at=${encodeURIComponent(e.updated_at)}`); toast(tr('Deleted')); ldbReload(); }
   catch (x) { ofcErr(x); }
 }
