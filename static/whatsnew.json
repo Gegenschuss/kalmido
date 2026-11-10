@@ -1,6 +1,32 @@
 {
  "versions": [
   {
+   "version": "2.873.0",
+   "date": "2026-11-10",
+   "items": [
+    {
+     "de": "Du kannst mehrere Branchen gleichzeitig wählen, zum Beispiel Film & Video und Agentur - ein Haken schaltet die andere nicht mehr ab.",
+     "en": "You can choose several industries at once, for example Film & Video and Agency - ticking one no longer switches the other off."
+    },
+    {
+     "de": "Der Kalender bleibt bei vielen gleichzeitigen Terminen lesbar, und das Kalender-Fenster ist aufgeräumt mit lesbaren Spalten und einem Fertig-Knopf.",
+     "en": "The calendar stays readable with many events at once, and the Calendars window is tidied with readable columns and a Done button."
+    },
+    {
+     "de": "Mit Branche Film gibt es zu jedem Drehtag in der Disposition ein Call Sheet als PDF mit Motiv, Zeiten, Crew und Anfahrtsskizze.",
+     "en": "With the Film industry every shoot day in the Disposition has a call sheet as a PDF with location, times, crew and directions sketch."
+    },
+    {
+     "de": "Am Handy ist der Kalender-Kopf schlanker: Ansichten und Zeitraum in zwei Zeilen, der Rest im Menü, das Plus legt einen Termin an.",
+     "en": "On a phone the calendar head is slimmer: views and period in two rows, the rest in the menu, the plus creates an appointment."
+    },
+    {
+     "de": "Im Büro kommt ein Fehler nur noch einmal und in verständlichen Worten; Nummernkreise speichert ein einziges Übernehmen.",
+     "en": "In the office an error now shows once and in plain words; number ranges are saved with a single Apply."
+    }
+   ]
+  },
+  {
    "version": "2.870.0",
    "date": "2026-11-10",
    "items": [

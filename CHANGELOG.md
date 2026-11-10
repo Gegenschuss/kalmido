@@ -18,6 +18,39 @@ in Settings > Help shows that section of the target version.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.873.0] - 2026-11-10
+
+Package 2.828 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Changed
+- Industry: Settings > General, the first-run setup and the welcome tour show one box per industry instead of a single choice; several industries can be on at once (e.g. Film & Video and Agency) and ticking one never switches the others off. Film-only things (shoot project type, shoot days into the dispo, the film sample project) apply as soon as Film is among the chosen. `PUT /api/industry` takes `industries: [...]`, the old `industry: "x"` still sets exactly that one; `GET` returns `codes` (#5511).
+- Calendar week and day: an event two rows high or more shows its time above a one-line title; from three overlapping events the phone week shows thin colour stripes with a "+N" button that opens the day. Week and day start at the first event of the shown days or 07:00, whichever is earlier. The now line runs behind the events. In the month "+N" is a button ("2 more") that opens the day. The year view shows all twelve months on a computer (six per row) and opens at the chosen month on a phone; calendar names in the phone timeline are no longer cut after a few characters (#5463).
+- Calendars window: readable column heads (Calendar / Today / Plan) over their switches; on a phone one "Show" switch per calendar, "In Today" and "When planning" move into the row's menu; "Done" closes the window, "On the phone", "Booking" and "Subscribed calendars" are quiet links; "New calendar" and "Trash" are rows at the end of the own calendars. One shared colour palette with colour names instead of hex codes, 44 px targets on touch (#5464).
+- Lists: the view switch has one form on every width - the active view with its name, the others as symbols named in their tooltip - and is 44 px high on touch; touch tablets no longer fold it. When the project name would be cut, the header shows only the active view first. The phone's column strip fades out at the edge where more column names wait instead of ending mid-word (#5443).
+- Lists: the rules for list rows, check marks and the detail live in their own start style file `static/css/start-00-lists.css` (one check mark definition, a small z-index scale in `:root`, duplicates and dead `.lhead .lpx` rules gone); dragging a task onto a project no longer lies above dialogs (#5446).
+
+### Fixed
+- Lists: editing a task title in the row keeps a visible keyboard focus frame (#5446).
+
+### Fixed
+- main: switching on the end-to-end lock of a project also drops the server's undo steps of its sections (created / deleted) and of its time entries, which still held the section name or the note in plain text (CI red of 2.858.0, p264a_b_api)
+- main: the agent setup prompt (file and app) matches step 9 of the setup guide again (CI red of 2.858.0, p2306_f_doc_anchors)
+- main: p2239_b_logs no longer counts the watchdog's security line of the first admin as a leak (CI red of 2.858.0)
+
+Package 2.855 (Bündel: Call Sheet (Drehplan / Tagesablauf), Polish Kalender: Kopfleiste am Handy und Tablet sc, Polish Büro: Fehler-Rückmeldung einmal und ).
+### Added
+- Call sheet of a shoot day (Film & Video only, #1956): in the Disposition's booking sheet a "Call sheet" button opens the day details (subtitle, shoot day number, set phone, location with parking / public transport, call times per department, shoot start, lunch, wrap, strike, weather as free text, important note, contacts, cast, transport, attachments) and an uploaded directions sketch (PNG / JPEG, at most 4 MB and 12 megapixels); the PDF has page 1 (distribution, production / client / contacts, DISPOSITION with weekday and date, location with "Open in maps" link, times, important box), the cast, the crew list grouped with phone and e-mail (open places as "– ?? –"), the transport, the shots of the chosen shot list day, the sketch on its own page and a footer "company – project – as of date time, page n of N" on every page. Data from the disposition, the office master data, the readable address books and the shot list; no weather or map service. Stored per shoot day in hub_callsheets (migration fragment 1956_callsheet, new table only; sealed with the org key), saving with version check; it goes with the last booking of its shoot day in the trash run, phone and e-mail come only from the address books of the area.
+### Changed
+- Calendar head on a phone and a tablet (#5462): on a phone two rows (views, then period with back / today / next and "..."), the round plus creates an appointment in the calendar; poll, calendars, completed tasks and "Undated" are in the "..." menu; at tablet width everything in one row without wrapping; the view buttons report aria-pressed.
+- Office settings (#5456): number ranges are one form with one "Apply" and the hint under its field; the bank page links to the bank accounts; Import and Rights say where "back" leads; "Exclusive" in the content rights sits with its text.
+### Fixed
+- Office errors are said once and in plain words (#5451): no double or triple message, an empty error text becomes a sentence, a field the invoice editor did not save says so at the field and keeps the value, no server variable names (mail sending, bank access) shown to people, the send dialog says when something could not be loaded.
+
+Package 2.869 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Fixed
+- Documents: the "Suggest title" button beside the title has its own class instead of the "automatic" mark's - same look and place in the label line, but no longer counted or styled as a mark; p2555_a_formnarrow_ui stays green with either form of its mark filter and checks the button's place (#5531, CI red of 2.833.0).
+
 ## [2.870.0] - 2026-11-10
 
 Package 2.805 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
@@ -167,7 +200,8 @@ Package 2.757 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: 
 - Lists and the start page report their width to the header again: the top bar lines up with the content instead of standing 4 px beside it, and the width "Wide" of a note / knowledge page keeps its list + note layout (CI red p2599_b_kopf_ui, #5309).
 - p151_ui says why the hint of the task just tracked is missing (toast, totals on the page and on the server); the Mac red was the sub-second discard fixed in #5186 (#5211).
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.870.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.873.0...HEAD
+[2.873.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.873.0
 [2.870.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.870.0
 [2.858.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.858.0
 [2.848.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.848.0
