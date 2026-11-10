@@ -3,7 +3,7 @@
 // - "My tasks" is in the sidebar also alone (no collaboration); in German it is called "Meine Aufgaben", the filter
 //   "Assigned to me" stays "Mir zugewiesen"
 // - the first opening shows "Recently assigned" (tasks without a place) and the made sections Now / Soon / Someday
-// - a task due today or overdue goes into Now by itself; one dragged by hand stays where it was put (hand wins)
+// - a task due today or overdue goes into Now by itself (2.823.0 #4773: the first own rule); one dragged by hand stays where it was put (hand wins)
 // - dragging onto a section head or a row of it, a new section ("New section"), renaming, folding (kept on the server)
 // - deleting a section: its tasks fall into the topmost section; after deleting Now nothing moves any more
 // - the list's own order and sections stay untouched
@@ -47,7 +47,8 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   check(await until(() => head(/\bNow\b/) && head(/Soon/) && head(/Someday/)), '(6) Now, Soon, Someday made at the first opening ' + heads().map(x => x.textContent.trim()).join(' | '));
   check(head(/Recently assigned/) && heads()[0] === head(/Recently assigned/), '(3) "Recently assigned" on top');
   check(inSec(/Recently assigned/, TB) && inSec(/Recently assigned/, TC), '(3) tasks without a place stand in "Recently assigned"');
-  check(inSec(/\bNow\b/, TA) && inSec(/\bNow\b/, TE), '(7) overdue tasks in Now by themselves');
+  // 2.823.0 (#4773): Now gets them through the person's first own rule (server, one answer later): waited for
+  check(await until(() => inSec(/\bNow\b/, TA) && inSec(/\bNow\b/, TE)), '(7) overdue tasks in Now by themselves');
   check(!head(/Recently assigned/).querySelector('[data-mse-menu]') && head(/Soon/).querySelector('[data-mse-menu]'), '"Recently assigned" has no "…", own sections have one');
   check(d.querySelector(`#view .trow[data-id="${TB}"] .mosub`), '(4) the origin "List › Section" stays');
 
@@ -145,7 +146,8 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
     check(box && box.sw <= box.vw + 1, '320 px: no sideways scrolling ' + JSON.stringify(box && [box.sw, box.vw]));
     check(box && box.heads.every(x => x.l >= 0 && x.r <= box.vw + 1) && box.dots.length >= 3 && box.dots.every(x => x.l >= 0 && x.r <= box.vw + 1), '320 px: the heads and their "…" inside the screen ' + JSON.stringify(box && box.dots));
     check(box && box.add.l >= 0 && box.add.r <= box.vw + 1, '320 px: "New section" inside the screen');
-    check(await ev(`!!document.querySelector('#view .ghead[data-key^="ms:"]') && [...document.querySelectorAll('#view .ghead[data-key^="ms:"]')].find(x => /Now/.test(x.textContent))?.closest('.group')?.querySelector('.trow') !== null`), '320 px: the overdue task in Now');
+    // 2.823.0 (#4773): waited for (the first own rule puts it there, one answer later); was "!== null", which undefined passed too
+    check(await ready(`!![...document.querySelectorAll('#view .ghead[data-key^="ms:"]')].find(x => /Now/.test(x.textContent))?.closest('.group')?.querySelector('.trow')`), '320 px: the overdue task in Now');
     await o.shot('p2569a-320.png');
   }, true);
 
