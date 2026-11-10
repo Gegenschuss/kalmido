@@ -79,7 +79,7 @@ def f5(who, s):
     check([x["action"] for x in mine][:2] == ["group_restore", "group_delete"],
           f"F5 {who}: the rights log names the restore after the delete (newest first) {[x['action'] for x in mine]}")
     rs = mine[0] if mine else {}
-    check(rs.get("after", {}).get("name") == f"Grading {who}" and rs.get("after", {}).get("levels") == levels and rs.get("before") is None,
+    check((rs.get("after") or {}).get("name") == f"Grading {who}" and (rs.get("after") or {}).get("levels") == levels and rs.get("before") is None,
           f"F5 {who}: its definition as after {rs}")
 
 
