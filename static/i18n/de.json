@@ -18004,6 +18004,7 @@
   "The PDF cannot be read": "Das PDF kann nicht gelesen werden",
   "This PDF has more than {0} pages - its pages cannot be changed here": "Dieses PDF hat mehr als {0} Seiten - seine Seiten lassen sich hier nicht ändern",
   "The pages of this document cannot be changed (read-only or a locked month)": "Die Seiten dieses Dokuments lassen sich nicht ändern (nur lesen oder gesperrter Monat)",
+  "The section is not where this step left it, so it cannot be undone": "Der Abschnitt ist nicht mehr so, wie dieser Schritt ihn hinterlassen hat, darum lässt er sich nicht rückgängig machen",
   "Mark booking": "Buchung markieren",
   "Private withdrawal or deposit: neither expense nor income of the business": "Privatentnahme oder -einlage: weder Ausgabe noch Einnahme des Geschäfts",
   "A business payment without a receipt, e.g. bank fees or tax: it counts in the books": "Geschäftliche Zahlung ohne Beleg, z. B. Bankgebühren oder Steuern: zählt in der Buchhaltung",

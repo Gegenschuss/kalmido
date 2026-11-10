@@ -322,7 +322,7 @@ async function sectionCreate(lid, name) {
   try { s = await pr; } catch { return; } finally { SEC_TMP.delete(tmp); }
   render();
   const nm = qn(name.slice(0, 40));
-  histAdd({label: tr('Section {0} added', nm), lids: [lid], sid: s.id,
+  histAdd({label: tr('Section {0} added', nm), lids: [lid], sid: s.id, ...(s.undo_group ? {srv: true} : {}),  // 2.809.0 (#5476): the server lists the step
     undo: async e => { const r = await api('DELETE', '/api/sections/' + secId(e.sid), {_prev: {name, tasks: []}}); return r.ok ? {} : {skipped: [tr('Section {0}', nm)], none: true}; },
     redo: async e => { const r = await api('POST', '/api/sections', {list_id: lid, name, sort: s.sort}); HIST.secmap.set(secId(e.sid), r.id); return {}; }});
   return s;
@@ -352,7 +352,7 @@ async function sectionDelete(sid) {
   let r;
   try { r = await optWrite(put, () => api('DELETE', '/api/sections/' + sid)); } catch { return; }
   const sec = r.section || {name: s0.name, sort: s0.sort, list_id: s0.list_id}, nm = qn(sec.name.slice(0, 40));
-  const e = histAdd({label: tr('Section {0} deleted', nm), lids: [sec.list_id], sid, tasks: r.tasks || [],
+  const e = histAdd({label: tr('Section {0} deleted', nm), lids: [sec.list_id], sid, tasks: r.tasks || [], ...(r.undo_group ? {srv: true} : {}),  // 2.809.0 (#5476)
     undo: async x => {
       // 2.567.0 A (#4707): the section waits in the trash: back with the same id, its limits and the tasks still free
       const j = r.trash ? await api('POST', `/api/sections/${secId(x.sid)}/restore`) : await api('POST', '/api/sections', {list_id: sec.list_id, name: sec.name, sort: sec.sort, wip_limit: sec.wip_limit ?? null, kind: sec.kind || '', tasks: x.tasks.map(rid)});

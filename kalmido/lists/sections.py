@@ -350,9 +350,12 @@ def section_create():
         c.execute("UPDATE tasks SET section_id=?, updated_at=? WHERE id=?", (sid, iso(now_utc()), tid))
         log_changes(c, tid, before)
         moved.append(tid)
+    from .secundo import secu_add  # 2.809.0 (#5476): a step of the person's undo list
+    ug = secu_add(c, sid, "create", name, lid)
     bump(c)
     c.commit()
-    return jsonify({**dict(c.execute("SELECT * FROM sections WHERE id=?", (sid,)).fetchone()), "moved": moved, "skipped": skipped})
+    return jsonify({**dict(c.execute("SELECT * FROM sections WHERE id=?", (sid,)).fetchone()), "moved": moved, "skipped": skipped,
+                    **({"undo_group": ug} if ug else {})})
 
 
 @app.patch("/api/sections/<int:sid>")
@@ -465,11 +468,19 @@ def section_delete(sid):
         if sec["name"] != str(prev.get("name") or "") or sorted(tids) != sorted(x for x in want if isinstance(x, int)):
             return jsonify(ok=False, section=sec, tasks=tids,
                            conflicts=[{"field": "section", "server": {"name": sec["name"], "tasks": tids}, "mine": prev}])
-    # 2.272.0 E2 (#3038): its tasks in the trash remember the section's name (restoring one puts it back, lifecycle.py restore_task)
-    c.execute("UPDATE tasks SET trash_section=? WHERE section_id=? AND deleted_at IS NOT NULL", (sec["name"], sid))
-    from .parttrash import lpt_section_put  # 2.567.0 A (#4707): a copy into the trash (POST /api/sections/<id>/restore)
-    lpt_section_put(c, sid, me())
-    c.execute("DELETE FROM sections WHERE id=?", (sid,))
+    sec_trash(c, sid, sec["name"], me())
+    from .secundo import secu_add  # 2.809.0 (#5476): a step of the person's undo list
+    ug = secu_add(c, sid, "delete", sec["name"], sec["list_id"])
     bump(c)
     c.commit()
-    return jsonify(ok=True, section=sec, tasks=tids, conflicts=[], trash=True)
+    return jsonify(ok=True, section=sec, tasks=tids, conflicts=[], trash=True, **({"undo_group": ug} if ug else {}))
+
+
+def sec_trash(c, sid, name, uid):
+    """2.809.0 (#5476, from section_delete): section sid into the trash -- a copy (POST /api/sections/<id>/restore), the row
+    goes, its tasks stay without one. The caller checked the rights and holds the section's lock."""
+    # 2.272.0 E2 (#3038): its tasks in the trash remember the section's name (restoring one puts it back, lifecycle.py restore_task)
+    c.execute("UPDATE tasks SET trash_section=? WHERE section_id=? AND deleted_at IS NOT NULL", (name, sid))
+    from .parttrash import lpt_section_put  # 2.567.0 A (#4707): a copy into the trash (POST /api/sections/<id>/restore)
+    lpt_section_put(c, sid, uid)
+    c.execute("DELETE FROM sections WHERE id=?", (sid,))

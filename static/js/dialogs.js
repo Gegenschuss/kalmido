@@ -294,7 +294,7 @@ function ptypeOfferDraw(box, id, k, names) {
 }
 async function ptypeAddSections(id, names, k) {
   const made = [];
-  for (const n of names) { try { made.push({id: (await api('POST', '/api/sections', {list_id: id, name: n, kind: ptSecKind(k, n)})).id, name: n, kind: ptSecKind(k, n)}); } catch { break; } }
+  for (const n of names) { try { const r = await api('POST', '/api/sections', {list_id: id, name: n, kind: ptSecKind(k, n)}); made.push({id: r.id, name: n, kind: ptSecKind(k, n), ug: r.undo_group}); } catch { break; } }  // 2.809.0 (#5476): ug = its step on the server
   if (!made.length) return null;
   await load(); render();
   const del = async () => {
@@ -303,7 +303,7 @@ async function ptypeAddSections(id, names, k) {
     return {skipped: skip ? [tr('Sections of {0}', qn(lname(listById(id)) || ''))] : []};
   };
   const add = async () => { for (const s of made) s.id = (await api('POST', '/api/sections', {list_id: id, name: s.name, kind: s.kind})).id; return {}; };
-  offerUndo(trn('{0} section added', '{0} sections added', made.length), histAdd({label: tr('Sections of {0}', qn(lname(listById(id)) || '')), undo: del, redo: add, lids: [id]}));
+  offerUndo(trn('{0} section added', '{0} sections added', made.length), histAdd({label: tr('Sections of {0}', qn(lname(listById(id)) || '')), undo: del, redo: add, lids: [id], ...(made.every(s => s.ug) ? {srv: true} : {})}));
   return made;
 }
 // list settings (type, name, colour, folder, view, "move dependent tasks along", hourly rate, archived) as one history

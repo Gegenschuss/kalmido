@@ -596,6 +596,7 @@ ORDER = (
     "files.fskern", "wiki.wkkern", "sheets.shkern",  # 2.809.0 (#5365): file-store nodes, knowledge pages, tables on the core's trash
     "events.evundo", "contacts.ctundo", "files.fsundo", "personal.habitundo",  # 2.777.0 (#5254): their steps in the step groups (who may take them back)
     "lists.lpundo",  # 2.809.0 (#5476): a project's settings in the step groups
+    "lists.secundo",  # 2.809.0 (#5476): creating / deleting / restoring a section in the step groups
     "admin.supporter",  # 2.74.0 (#338): the supporter licence (self-hosted only, a badge, unlocks nothing)
     "admin.operator",  # 2.144.0 D (#797): the hosting operator's interface (off unless a token file is configured)
     "life.bmundo", "calendars.pollundo", "hub.absundo", "lists.envundo",  # 2.809.0 (#5476, part B): steps in the step groups

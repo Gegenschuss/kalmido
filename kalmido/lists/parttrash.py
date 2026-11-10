@@ -61,7 +61,19 @@ def section_restore(sid):
     """A deleted section comes back with the same id, its limits and its tasks that are still without a section in the list
     -> the section + {moved, skipped} (like POST /api/sections, the undo of the app). 404: not in the trash."""
     c = db()
-    r = part_copy_take(c, LPT_SECTION, sid, me(), _need_edit)
+    moved, skipped = lpt_section_back(c, sid, me())
+    from .secundo import secu_add  # 2.809.0 (#5476): a step of the person's undo list
+    sec = c.execute("SELECT name, list_id FROM sections WHERE id=?", (sid,)).fetchone()
+    secu_add(c, sid, "restore", sec["name"], sec["list_id"])
+    bump(c)
+    c.commit()
+    return jsonify({**dict(c.execute("SELECT * FROM sections WHERE id=?", (sid,)).fetchone()), "moved": moved, "skipped": skipped})
+
+
+def lpt_section_back(c, sid, uid):
+    """2.809.0 (#5476, from section_restore): section sid out of the trash with what still fits -> (moved, skipped) task ids.
+    404: not in the trash; the rights: whoever may change its list (_need_edit). The caller bumps and commits."""
+    r = part_copy_take(c, LPT_SECTION, sid, uid, _need_edit)
     lid = r["list_id"]
     _, held = part_copy_back(c, LPT_SECTION, r, f"sections:{lid}")  # like the order of the sections (sections.py)
     moved, skipped = [], []
@@ -79,9 +91,7 @@ def section_restore(sid):
     for item, at in held.get("shop") or []:
         c.execute("INSERT INTO shop_memory(list_id,item,section_id,at) VALUES(?,?,?,?) ON CONFLICT (list_id, item) DO NOTHING",
                   (lid, item, sid, at))
-    bump(c)
-    c.commit()
-    return jsonify({**dict(c.execute("SELECT * FROM sections WHERE id=?", (sid,)).fetchone()), "moved": moved, "skipped": skipped})
+    return moved, skipped
 
 
 @app.post("/api/sprints/<int:sid>/restore")
