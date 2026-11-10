@@ -12,6 +12,7 @@ Invented names only.
    an option added and used since is not removed by an undo (409); a change that clears values records no server step; a
    deleted field comes back and goes again on redo
  - rules (lists/ruleundo.py): a change goes back (old name, switched on again); into the trash -> undo -> back, redo -> trash
+ - templates (lists/tplundo.py): a rename goes back; into the trash -> undo -> back, redo -> trash
  - a project's settings (lists/lpundo.py): a rename + colour on the laptop is listed on the phone (area tasks, kind listset,
    label with the old name, device, the answer names its group) and goes back from there; redo; archiving -> undo -> out of
    the archive; a save of the same values and a save with a folder (side effects) record no step; a new sidebar order since
@@ -281,6 +282,28 @@ res = back(A, g["id"])
 check(res.get("undone") == [g["id"]] and rul(A, RLX, RU) is not None, f"undo: the rule is back from the trash {res}")
 r = A.post(B + f"/api/undo/{g['id']}/redo")
 check(r.ok and rul(A, RLX, RU) is None, f"redo: in the trash again {r.status_code} {r.text[:120]}")
+
+# ---------------------------------------------------------------- templates: rename / trash
+def tpl(s, tid):
+    return next((x for x in s.get(B + "/api/templates").json().get("templates", []) if x["id"] == tid), None)
+
+
+r = A.post(B + "/api/templates", json={"list_id": RLX, "name": "Vorlage Beispiel"})
+check(r.ok, f"(setup) a template {r.status_code} {r.text[:120]}")
+TP = r.json().get("id")
+r = A.patch(B + f"/api/templates/{TP}", json={"name": "Vorlage Neu"})
+check(r.ok and r.json().get("undo_group"), f"the template renamed: a step {r.status_code} {r.text[:120]}")
+g = newest(PHONE)
+res = back(PHONE, g["id"])
+check(g.get("kind") == "list_template" and res.get("undone") == [g["id"]] and (tpl(A, TP) or {}).get("name") == "Vorlage Beispiel",
+      f"taken back from the phone: the old name {res} {tpl(A, TP)}")
+r = A.delete(B + f"/api/templates/{TP}")
+check(r.ok and r.json().get("undo_group") and tpl(A, TP) is None, f"the template into the trash: a step {r.status_code}")
+g = newest(A)
+res = back(A, g["id"])
+check(res.get("undone") == [g["id"]] and tpl(A, TP) is not None, f"undo: the template is back {res}")
+r = A.post(B + f"/api/undo/{g['id']}/redo")
+check(r.ok and tpl(A, TP) is None, f"redo: in the trash again {r.status_code} {r.text[:120]}")
 
 # freelancer-matrix
 r = Fr.post(B + "/api/lists", json={"name": "Frida Projekt", "color": "#3366cc"})

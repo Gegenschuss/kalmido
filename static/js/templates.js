@@ -145,7 +145,7 @@ function templateModal(tp, done) {
     try {
       if (b.dataset.m === 'del') {
         if (!await askConfirm(tr('Delete the template “{0}”?', tp.name), tr('Projects and tasks made from it stay.'), {ok: tr('Delete'), danger: true})) return;
-        await api('DELETE', '/api/templates/' + tp.id);
+        tp.ug = (await api('DELETE', '/api/templates/' + tp.id))?.undo_group;  // 2.809.0 (#5476): its step on the server
       }
       if (b.dataset.m === 'save') {
         const name = $('#tp-name', md).value.trim(); if (!name) { need($('#tp-name', md)); return; }
@@ -169,7 +169,7 @@ function templateModal(tp, done) {
     }
     md.remove(); await load(); render(); done && done();
     // 2.567.0 A (#4707): a deleted template waits in the trash: the toast and the undo history take it back out
-    if (b.dataset.m === 'del') offerUndo(tr('Template deleted'), histAdd({label: tr('Template “{0}” deleted', tp.name), undo: async () => { await api('POST', `/api/templates/${tp.id}/restore`); await load(); render(); done && done(); }, redo: async () => { await api('DELETE', '/api/templates/' + tp.id); await load(); render(); done && done(); }}));
+    if (b.dataset.m === 'del') offerUndo(tr('Template deleted'), histAdd({label: tr('Template “{0}” deleted', tp.name), ...(tp.ug ? {srv: true} : {}), undo: async () => { await api('POST', `/api/templates/${tp.id}/restore`); await load(); render(); done && done(); }, redo: async () => { await api('DELETE', '/api/templates/' + tp.id); await load(); render(); done && done(); }}));
     else toast(tr('Saved'));
   });
   if (!isTouch()) setTimeout(() => $('#tp-name', md).focus(), 50);  // 2.13.0: no keyboard popping up on touch

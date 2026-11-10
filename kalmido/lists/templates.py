@@ -533,8 +533,14 @@ def template_update(tid):
     # and version check through the core (core/objparts.py part_write); 2.609.0 (#3373): an error answer or a failure rolls back
     # and removes the file copies made for a new owner
     gone, made = [], []
+    from .tplundo import tpu_plain, tpu_post, tpu_pre  # 2.809.0 (#5476): a rename is a step of the person's undo list
+
+    def apply(c, r):
+        if tpu_plain(b):
+            tpu_pre(c, me(), tid)
+        return _tpl_update(c, tid, r, b, gone, made)
     try:
-        _, res = part_write(c, TPL_KIND, tid, b, lambda c, r: _tpl_update(c, tid, r, b, gone, made), public=lambda c, r: tpl_dict(r))
+        _, res = part_write(c, TPL_KIND, tid, b, apply, public=lambda c, r: tpl_dict(r))
     except Exception:
         c.rollback()
         unlink_files(made)
@@ -543,10 +549,11 @@ def template_update(tid):
         c.rollback()
         unlink_files(made)
         return res
+    ug = tpu_post(c) if tpu_plain(b) else None
     bump(c)
     c.commit()
     unlink_files(gone)
-    return jsonify(tpl_dict(c.execute("SELECT * FROM templates WHERE id=?", (tid,)).fetchone()))
+    return jsonify({**tpl_dict(c.execute("SELECT * FROM templates WHERE id=?", (tid,)).fetchone()), **({"undo_group": ug} if ug else {})})
 
 
 def _tpl_update(c, tid, r, b, gone, made):
@@ -590,10 +597,13 @@ def template_delete(tid):
     POST /api/templates/<id>/restore, after the trash period tpl_trash_tick deletes it for good -> {ok, id, trash}."""
     c = db()
     need_template(c, tid, write=True)
+    from .tplundo import tpu_post, tpu_pre  # 2.809.0 (#5476): a step of the person's undo list
+    tpu_pre(c, me(), tid, "delete")  # its row locked for the copy (obj_undo_pre); part_trash takes the kind's lock
     part_trash(c, TPL_KIND, tid, me())  # 2.610.0 (#4762): the core's trash of a side object (deleted_at, under its lock)
+    ug = tpu_post(c)
     bump(c)
     c.commit()
-    return jsonify(ok=True, id=tid, trash=True)
+    return jsonify(ok=True, id=tid, trash=True, **({"undo_group": ug} if ug else {}))
 
 
 @app.post("/api/templates/<int:tid>/restore")
@@ -608,9 +618,12 @@ def template_restore(tid):
             raise Denied(404)
         return tpl_room(c, r["org_id"], uid)
 
+    from .tplundo import tpu_post, tpu_pre  # 2.809.0 (#5476): a step of the person's undo list
+    tpu_pre(c, uid, tid, "restore")
     row, stop = part_restore(c, TPL_KIND, tid, uid, guard=guard)
     if stop is not None:
         return stop
+    tpu_post(c)
     bump(c)
     c.commit()
     return jsonify(tpl_dict(row))
