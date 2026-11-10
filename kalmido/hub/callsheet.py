@@ -13,7 +13,7 @@ opens (decision 09.11.2026); nothing is sent anywhere by the server. No public l
 
 Rights exactly as the disposition: signed in, no agent (403), no kid account, the module "dispo" on, a member of the area
 (organisations without guests / accounting, or the own personal area; else 404). Only with the industry Film & Video
-(accounts/onboarding.py app_industry, as lists/shoot.py; else 404 as if there was nothing). Saving needs a role that changes
+(the industry of the asked area, accounts/onboarding.py ind_of_area; else 404 as if there was nothing). Saving needs a role that changes
 content (orgroles.need_org_write), carries the version read (expect_updated_at; 409 with the current state, core/conflict.py)
 under write_lock, and bumps the change counter.
 
@@ -39,7 +39,8 @@ from ..core.errors import BadInput
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.pg import write_lock
 from ..accounts.orgroles import need_org_write, org_writes
-from ..accounts.onboarding import app_industry
+from ..accounts.onboarding import ind_of_area  # review 2.802 F3: the asked area's industry
+from ..team.clients import client_rows  # review 2.802 F1
 from ..collab.liste2e import le2e_mode
 from ..contacts.model import my_book_ids
 from ..files.scan import SC_RETRY_TEXT, sc_needs_retry
@@ -71,11 +72,11 @@ CS_CTRL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
 def cs_gate(job):
     """(c, uid, oid, bookings of the job) for a person who may see the disposition of the job's area, else 401/403/404."""
     c, uid = _gate()
-    if app_industry(c, uid) != "film":
-        raise Denied(404)
     if not CS_JOB_RE.match(job or ""):
         raise Denied(404)
     oid = _area(c, uid, request.args.get("org"))
+    if ind_of_area(c, oid) != "film":  # review 2.802 F3: the industry of the asked area, not of the workspace switch
+        raise Denied(404)
     rows = [dict(r) for r in c.execute(f"SELECT * FROM hub_bookings WHERE org_id=? AND job=? AND {live_sql()} ORDER BY id",
                                        (oid, job))]
     if not rows:
@@ -127,8 +128,12 @@ def cs_people(c, uid, rows):
         if not books or not mail:
             return None
         for r in c.execute(f"SELECT fn, given, family, emails, phones FROM contacts WHERE book_id IN ({q}) AND {live_sql()} "
-                           "AND kind='individual' AND lower(emails) LIKE ? LIMIT 20", (*books, "%" + mail.lower().replace("%", "") + "%")):
-            if any(str(x.get("value") or "").strip().lower() == mail.lower() for x in json.loads(r["emails"] or "[]") if isinstance(x, dict)):
+                           "AND kind='individual' AND lower(emails) LIKE ? ESCAPE '\\' LIMIT 20", (*books, "%" + re.sub(r"([%_\\])", r"\\\1", mail.lower()) + "%")):
+            try:  # review 2.802 F4: a contact with broken e-mail JSON is skipped, not a 500
+                ems = json.loads(r["emails"] or "[]")
+            except ValueError:
+                continue
+            if any(str(x.get("value") or "").strip().lower() == mail.lower() for x in (ems if isinstance(ems, list) else []) if isinstance(x, dict)):
                 return r
         return None
 
@@ -166,7 +171,8 @@ def cs_project(c, uid, rows):
     out = {"list_id": r["id"], "name": "" if locked else (r["name"] or ""), "client": {},
            "shoot": (r["ptype"] or "") == "shoot" and not locked and ptype_ok(c, uid, "shoot")}
     if r["client_id"]:
-        cl = c.execute(f"SELECT name, contact, phone, email, address FROM clients WHERE id=? AND {live_sql()}", (r["client_id"],)).fetchone()
+        # review 2.802 F1: the client file's own reading rules (not guests / accounting, a private client = its creator only)
+        cl = next(iter(client_rows(c, uid, only=r["client_id"])), None)
         if cl:
             out["client"] = {k: (cl[k] or "") for k in ("name", "contact", "phone", "email", "address")}
     return out

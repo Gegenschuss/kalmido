@@ -108,6 +108,19 @@ check(cs.get("data") == {} and cs.get("updated_at") == "" and cs.get("can_edit")
 r2 = Fr.get(B + f"/api/team/dispo/callsheet/{JOB2}?org={PERS}").json().get("callsheet", {}).get("auto", {})
 check(r2.get("project") == "Imagefilm Kueche" and r2.get("shot_days", [])[:1] == [day1["name"]] and r2.get("start") == "",
       f"the job with the project: its name and the shot list days {r2.get('project')} {r2.get('shot_days')}")
+# review 2.802 F1: the project's client follows the client file's rules - frida's own client shows, a private client of greta
+# (org NULL, created by her) hung on frida's project never does (row security alone lets org NULL through)
+r = Fr.post(B + "/api/clients", json={"name": "Kunde Beispiel AG", "contact": "Anna Auftrag", "phone": "030 8888888"})
+check(r.ok, "frida's client " + r.text[:120])
+kt.dbx("UPDATE lists SET client_id=? WHERE id=?", (r.json()["id"], L))
+cl = Fr.get(B + f"/api/team/dispo/callsheet/{JOB2}?org={PERS}").json().get("callsheet", {}).get("auto", {}).get("client") or {}
+check(cl.get("name") == "Kunde Beispiel AG" and cl.get("phone") == "030 8888888", f"frida's own client on her call sheet {cl}")
+r = Gr.post(B + "/api/clients", json={"name": "Geheim GmbH", "contact": "Gerd Geheim", "phone": "030 9999999"})
+check(r.ok, "greta's private client " + r.text[:120])
+kt.dbx("UPDATE lists SET client_id=? WHERE id=?", (r.json()["id"], L))
+cl = Fr.get(B + f"/api/team/dispo/callsheet/{JOB2}?org={PERS}").json().get("callsheet", {}).get("auto", {}).get("client") or {}
+check("Geheim" not in str(cl) and "9999999" not in str(cl), f"greta's private client never on frida's call sheet {cl}")
+kt.dbx("UPDATE lists SET client_id=NULL WHERE id=?", (L,))
 
 # ------------------------------------------------------------ saving the day details + the sketch
 DATA = {"subtitle": "Kampagne Fruehjahr", "day_no": "2", "set_name": "Aufnahmeleitung", "set_phone": "0170 5555555",

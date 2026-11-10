@@ -478,6 +478,8 @@ class _Page:
 
     def uri(self, x, y, w, h, url):
         """2.802.0 (#1956): the box x, y, w, h opens url (an ASCII web address) in the reader's app (PDF/A allows URI actions)."""
+        if not re.match(r"(?i)^(https?://|mailto:)", str(url)):  # review 2.802 F5: web and mail addresses only
+            raise ValueError("pdf uri: scheme")
         self.links.append((x, y, w, h, str(url), None))
 
 
