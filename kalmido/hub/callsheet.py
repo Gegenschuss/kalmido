@@ -14,13 +14,18 @@ opens (decision 09.11.2026); nothing is sent anywhere by the server. No public l
 Rights exactly as the disposition: signed in, no agent (403), no kid account, the module "dispo" on, a member of the area
 (organisations without guests / accounting, or the own personal area; else 404). Only with the industry Film & Video
 (the industry of the asked area, accounts/onboarding.py ind_of_area; else 404 as if there was nothing). Saving needs a role that changes
-content (orgroles.need_org_write), carries the version read (expect_updated_at; 409 with the current state, core/conflict.py)
-under write_lock, and bumps the change counter.
+content, carries the version read (expect_updated_at; 409 with the current state, core/conflict.py) under write_lock, and bumps
+the change counter.
+2.872.0 (#5532): the call sheet is a kind of the shared core (hub/dspkern.py, kind "callsheet", a part of its shoot day): the
+write right is the core's (obj_need of the shoot day / the call sheet, no own check), the day details are saved by obj_write
+(history, undo step of the person, rev / updated_by), the sketch through the core's adapters (its history shows a mark, never
+the picture); it goes into the core's trash with the last booking of its shoot day and comes back with a booking.
 
 GET  /api/team/dispo/callsheet/<job>?org=      the stored details + what comes from the app (auto)
 PUT  /api/team/dispo/callsheet/<job>?org=      {data: {...}, sketch?: data URI | "" (remove), expect_updated_at?}
 GET  /api/team/dispo/callsheet/<job>/pdf?org=  the PDF (?inline=1: shown in the browser instead of downloaded)
-GET  /api/team/dispo/callsheet/<job>/sketch?org=  the stored sketch (the dialog's preview)"""
+GET  /api/team/dispo/callsheet/<job>/sketch?org=  the stored sketch (the dialog's preview)
+GET  /api/team/dispo/callsheet/<job>/history?org=  2.872.0 (#5532): who changed the call sheet when, and which details"""
 import base64
 import binascii
 import io
@@ -38,9 +43,9 @@ from ..core.db import body, bump, iso_ms, local_now, now_utc
 from ..core.access import Denied, list_role, live_sql
 from ..core.conflict import ccf_check
 from ..core.errors import BadInput
-from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
-from ..core.pg import write_lock
-from ..accounts.orgroles import need_org_write, org_writes
+from ..core.orgcrypt import OrgCryptError, oc_dec_fields, oc_enc_fields
+from ..core.pg import insert_id, write_lock
+from ..accounts.orgroles import org_writes
 from ..accounts.onboarding import ind_of_area  # review 2.802 F3: the asked area's industry
 from ..team.clients import client_rows  # review 2.802 F1
 from ..collab.liste2e import le2e_mode
@@ -86,9 +91,12 @@ def cs_gate(job):
     return c, uid, oid, rows
 
 
-def cs_row(c, oid, job):
+def cs_row(c, oid, job, trash=False):
+    """The call sheet of shoot day (oid, job), decrypted; one in the core's trash only with trash=True (2.872.0, #5532)."""
     r = c.execute("SELECT * FROM hub_callsheets WHERE org_id=? AND job=?", (oid, job)).fetchone()
-    return oc_dec_fields(c, oid, "hub_callsheets", r) if r else None
+    if r is None or (r["deleted_at"] and not trash):
+        return None
+    return oc_dec_fields(c, oid, "hub_callsheets", r)
 
 
 def cs_data(r):
@@ -311,9 +319,14 @@ def cs_get(job):
 @app.put("/api/team/dispo/callsheet/<job>")
 def cs_put(job):
     """{data: {...}, sketch?: data URI (a new sketch) | "" (none), expect_updated_at?}: saves the day details (the whole
-    data object replaces the stored one). 409 {callsheet: the current state} when it changed since expect_updated_at."""
+    data object replaces the stored one). 409 {callsheet: the current state} when it changed since expect_updated_at.
+    2.872.0 (#5532): through the shared core (module docstring): the shoot day's write right (obj_need), the details by
+    obj_write, the sketch by the core's adapters; a first save makes the row with the core's columns (history "create")."""
+    from ..core.objects import obj_need
+    from ..core.writes import obj_history_add, obj_undo_post, obj_undo_pre, obj_write
+    from .dspkern import DSK_CS, DSK_SKETCH, dsk_need_day, dsk_sync
     c, uid, oid, rows = cs_gate(job)
-    need_org_write(c, uid, oid)
+    dsk_need_day(c, uid, rows[:1])  # the core's role of the shoot day (was orgroles.need_org_write)
     b = body()
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
@@ -322,23 +335,63 @@ def cs_put(job):
     if "sketch" in b and b["sketch"] not in (None, False):
         sketch = ("", "") if b["sketch"] == "" else cs_sketch_in(c, uid, oid, b["sketch"])
     write_lock(c, f"hub_callsheets-{oid}-{job}")
+    dsk_sync(c, uid, oid, job)  # a call sheet an older version left in the trash beside live bookings comes back first
     r = cs_row(c, oid, job)
     ccf_check(b, (r or {}).get("updated_at") or "", "callsheet", lambda: cs_public(c, uid, oid, job, rows, r))
-    now = iso_ms(now_utc())
-    keep = sketch is None  # no new sketch / no removal: the stored one stays
-    sketch = sketch or ("", "")
-    vals = oc_enc_fields(c, oid, "hub_callsheets", {"data": json.dumps(data, ensure_ascii=False), "sketch": sketch[0]})
-    if r and keep:
-        c.execute("UPDATE hub_callsheets SET data=?, updated_at=? WHERE id=?", (vals["data"], now, r["id"]))
-    elif r:
-        c.execute("UPDATE hub_callsheets SET data=?, sketch=?, sketch_mime=?, updated_at=? WHERE id=?",
-                  (vals["data"], vals["sketch"], sketch[1], now, r["id"]))
-    else:
-        c.execute("INSERT INTO hub_callsheets(org_id, job, data, sketch, sketch_mime, created_by, created_at, updated_at) "
-                  "VALUES(?,?,?,?,?,?,?,?)", (oid, job, vals["data"], vals["sketch"], sketch[1], uid, now, now))
+    if r is None:
+        now = iso_ms(now_utc())
+        rid = insert_id(c, "INSERT INTO hub_callsheets(org_id, job, data, sketch, sketch_mime, owner_id, rev, created_by, "
+                           "created_at, updated_by, updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                        (oid, job, "{}", "", "", uid, 1, uid, now, uid, now))
+        obj_history_add(c, uid, DSK_CS, rid, {}, {}, action="create", org_id=oid)
+        r = cs_row(c, oid, job)
+    rid = r["id"]
+    write_lock(c, f"obj-{DSK_CS}-{int(rid)}")  # the core's lock of the object (obj_write takes it again in this transaction)
+    if sketch is not None and sketch[0] != (r.get("sketch") or ""):
+        obj_need(c, uid, DSK_CS, rid, "write")
+        obj_undo_pre(c, uid, DSK_CS, rid, oid)  # the person's step (a copy only while it fits the step group's limits)
+        vals = oc_enc_fields(c, oid, "hub_callsheets", {"sketch": sketch[0]})
+        c.execute("UPDATE hub_callsheets SET sketch=?, sketch_mime=?, rev=rev+1, updated_at=?, updated_by=? WHERE id=?",
+                  (vals["sketch"], sketch[1], iso_ms(now_utc()), uid, rid))
+        obj_history_add(c, uid, DSK_CS, rid, {"sketch": DSK_SKETCH if r.get("sketch") else ""},
+                        {"sketch": DSK_SKETCH if sketch[0] else ""}, org_id=oid)
+        obj_undo_post(c)
+    if data != cs_data(r):
+        obj_write(c, uid, DSK_CS, rid, {"data": data})
     bump(c)
     c.commit()
     return jsonify(callsheet=cs_public(c, uid, oid, job, rows))
+
+
+@app.get("/api/team/dispo/callsheet/<job>/history")
+def cs_history(job):
+    """2.872.0 (#5532): the history of the call sheet (the core's obj_history, newest first): [{at, name, action, fields}]
+    -- fields = the day details that changed (their keys, e.g. loc_name, calls; "sketch" for the picture), never their values."""
+    from ..core.writes import obj_history
+    from .dspkern import DSK_CS
+    c, uid, oid, _rows = cs_gate(job)
+    r = cs_row(c, oid, job)
+    if r is None:
+        return jsonify(history=[])
+    out = []
+    for h in obj_history(c, uid, DSK_CS, r["id"]):
+        keys = set()
+        for k in set(h["before"]) | set(h["after"]):
+            if k == "data":
+                a, z = (cs_data(_hist_plain(c, oid, h[x].get("data"))) for x in ("before", "after"))
+                keys |= {x for x in set(a) | set(z) if a.get(x) != z.get(x)}
+            else:
+                keys.add(k)
+        out.append({"at": h["at"], "name": h["name"], "action": h["action"], "fields": sorted(keys)})
+    return jsonify(history=out)
+
+
+def _hist_plain(c, oid, v):
+    """A value of the history's 'data' (sealed when the organisation's encryption was on) as {"data": plain JSON text}."""
+    try:
+        return oc_dec_fields(c, oid, "hub_callsheets", {"data": v or "{}"})
+    except OrgCryptError:  # a key rotated since: the old sealed text cannot be read any more (no details then)
+        return {"data": "{}"}
 
 
 @app.get("/api/team/dispo/callsheet/<job>/sketch")

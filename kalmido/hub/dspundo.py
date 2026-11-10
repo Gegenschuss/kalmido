@@ -55,6 +55,9 @@ def dsu_need(c, uid, rid, oid):
         now = (n["resource_kind"], n["resource_id"])
         if now != was and n["resource_kind"] != DSP_SLOT and now not in _res_index(dsp_resources(c, uid, n["org_id"])):
             raise Denied(409, tr("unknown"))  # the place filled back with someone who is no resource of the area any more
+        if bool(n["deleted_at"]) != bool(r["deleted_at"]):  # 2.872.0 (#5532): the call sheet follows the shoot day's trash
+            from .dspkern import dsk_sync
+            dsk_sync(c, uid, n["org_id"], n["job"])
     return {"fix": fix, "lock": f"hub_bookings-{int(rid)}"}
 
 

@@ -468,6 +468,25 @@ routes, no fields and no write path of the core (`obj_reg_node` refuses it with 
 Nothing of the areas moved: their routes, rights and tables stay as they are. Test containers have
 `GET /api/test/objrole/<kind>/<id>` (tests/p2754_d_kinds_api_test.py).
 
+## The disposition: shoot day and call sheet (2.872.0, #5532)
+
+`kalmido/hub/dspkern.py` puts the disposition's shoot day and its call sheet on the core (decision of #5532: both kinds of the
+core, the call sheet a part of its shoot day with the same rights and a history of its own, no new rights table):
+- `shoot_day` is a light kind (`node=False`) on `hub_bookings`: a shoot day is the bookings made together (`job`), its id the id
+  of any of its bookings. The disposition's routes ask `obj_need(shoot_day, ...)` (`dsk_need_day`, also for a booking in the
+  trash) instead of `need_org_write`; "a member changes only the bookings they saved" stays the area's rule on top. The
+  bookings keep their routes and their steps of the step groups (`hub/dspundo.py`, kind `booking`).
+- `callsheet` is a kind with the core's columns on `hub_callsheets` (`migrations.d/5532_a.py`) without routes, node or listing
+  (the pattern of `sheets/shkern.py`): `hub/callsheet.py` saves the day details through `obj_write` (the field `data`, sealed
+  with the organisation's key when its encryption is on -- the history keeps the sealed text, as `ow_write`), the sketch
+  through the adapters (`obj_undo_pre` / `obj_undo_post`, `obj_history_add` with the mark `picture`: a picture never goes into
+  the history). `GET /api/team/dispo/callsheet/<job>/history` lists the core's history (who, when, which details).
+- The role of both: the person may enter the area with the module on (`abs_org`) -> `manage` when the organisation role
+  writes, `view` read-only; agents and kid accounts nothing; `cap` gives nothing (no shares).
+- The trash: the shoot day's last live booking deleted -> `obj_trash` of the call sheet, a booking back (the route, or the
+  step list's undo / redo through `dsu_need`'s fix) -> `obj_restore` (`dsk_sync`); the core's run deletes it after the period
+  (`trash_prune=True`), the bookings' trash run deletes a call sheet without any booking the core's way (`dsk_orphans`).
+
 ## Cross-cutting parts (2.755.0, #5267)
 
 Links between objects, tags, comments, reactions, read marks, versions and following / notifying exist **once**, in the

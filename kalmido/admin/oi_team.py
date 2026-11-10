@@ -993,8 +993,10 @@ SPECS = [
         label=N_("Absences and bookings"), prep=_person("user_id", member=True)),
     OiT("hub/bookings.json", "hub_bookings", refs={"list_id": "lists", "event_id": "events"}, people={"created_by": "null"},
         fixed={"resource_id": 0}, private="office", label=N_("Absences and bookings"), prep=_booking),
-    OiT("hub/callsheets.json", "hub_callsheets", people={"created_by": "null"}, private="office", label=N_("Absences and bookings"),
-        prep=_callsheet),  # 2.855.0 (#1956)
+    # 2.855.0 (#1956); 2.872.0 (#5532): + the core's columns (owner_id, updated_by, deleted_by)
+    OiT("hub/callsheets.json", "hub_callsheets",
+        people={"created_by": "null", "owner_id": "null", "updated_by": "null", "deleted_by": "null"},
+        private="office", label=N_("Absences and bookings"), prep=_callsheet),
     OiT("hub/leave_quota.json", "hub_leave_quota", people={"user_id": "null", "updated_by": "null"}, private="office", label=N_("Absences and bookings"),
         prep=_person("user_id", member=True)),
     OiT("hub/mails.json", "hub_mails", refs={"client_id": "clients", "list_id": "lists", "eml_id": "fs_nodes", "folder_id": "fs_nodes"},
