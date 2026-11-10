@@ -381,6 +381,9 @@ def wg_pad_create(lid):
     return jsonify({**page_layouts(c, lid, me(), role), "id": nid})
 
 
+WG_PAD_STEP = {}  # 2.809.0 (#5476): {pre, post} of the notepads' undo steps, filled by lists/padundo.py
+
+
 def _wg_pad(c, pid, write):
     r = c.execute("SELECT * FROM list_notepads WHERE id=?", (pid,)).fetchone()
     if not r:
@@ -403,9 +406,14 @@ def wg_pad_patch(pid):
     if b.get("base") and b["base"] != r["updated_at"] and r["updated_by"] != me():
         return jsonify({"error": tr("Someone else changed this notepad in the meantime"), "pad": wg_pad_dict(r)}), 409
     if v:
+        write_lock(c, f"list_notepads-{pid}")  # 2.809.0 (#5476): the person's step (lists/padundo.py) under its lock
+        if WG_PAD_STEP:
+            WG_PAD_STEP["pre"](c, me(), pid)
         sets = ", ".join(f"{k}=?" for k in v)
         c.execute(f"UPDATE list_notepads SET {sets}, updated_by=?, updated_at=? WHERE id=?", (*v.values(), me(), iso(now_utc()), pid))
         bump(c)
+        if WG_PAD_STEP:
+            WG_PAD_STEP["post"](c)
         c.commit()
     return jsonify(page_layouts(c, r["list_id"], me(), role))
 

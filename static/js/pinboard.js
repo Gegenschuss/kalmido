@@ -42,7 +42,7 @@ function wgPadItems(k) {
       const t = await askDialog({title: tr('Name of the notepad'), ok: tr('Save'), input: {value: p.title, max: 200}}); if (t == null || t === false) return;
       const put = async x => { wgPovSet(P, await api('PATCH', `/api/notepads/${p.id}`, {title: x})); return {}; }, old = p.title;
       try { await put(String(t).trim()); } catch { return; }
-      histToast(tr('Renamed'), histAdd({label: tr('Renamed'), undo: () => put(old), redo: () => put(String(t).trim())}));
+      histToast(tr('Renamed'), histAdd({label: tr('Renamed'), srv: true, undo: () => put(old), redo: () => put(String(t).trim())}));
     }},
     {label: tr('Delete notepad'), icon: 'trash', cls: 'danger', fn: async () => {
       if (p.body && !await askConfirm(tr('Delete this notepad?'), tr('Everyone in the project loses its text.'), {ok: tr('Delete'), danger: true})) return;

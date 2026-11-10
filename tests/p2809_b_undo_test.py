@@ -15,6 +15,7 @@ Invented names only.
  - appointment types (calendars/apptundo.py): name and length -> undo from the phone; deleted -> undo -> back
  - dispatch bookings (hub/dspundo.py): a job of two people changed -> one step, two parts -> undo -> both as before; the job
    deleted -> undo -> back; redo -> deleted again
+ - notepads of the pin board (lists/padundo.py): renamed -> undo from the phone -> the old title; a text save -> undo
  - only own steps: another person neither lists nor takes back a step (404)
 freelancer-matrix: undo (a person without an organisation: her bookmark step goes back from the list)
 usage: p2809_b_undo_test.py <datadir>"""
@@ -267,6 +268,23 @@ res = back(A, g["id"])
 check(res.get("undone") == [g["id"]] and not any(x["deleted_at"] for x in bookings()), f"undo of the delete: the job is back {res}")
 res = redo(A, g["id"])
 check(res.get("redone") == 2 and all(x["deleted_at"] for x in bookings()), f"redo: both deleted again {res}")
+
+# ---------------------------------------------------------------- notepads of a project's pin board
+r = A.post(B + f"/api/lists/{LID}/notepads", json={"title": "Notizen Beispiel", "body": "erste Zeile"})
+check(r.ok and r.json().get("id"), f"(setup) a notepad {r.status_code} {r.text[:120]}")
+NP = r.json()["id"]
+r = A.patch(B + f"/api/notepads/{NP}", json={"title": "Notizen Neu"}, headers=LAP)
+g = newest(PHONE)
+check(r.ok and g.get("kind") == "notepad" and "Notizen Beispiel" in (g.get("label") or ""), f"the phone lists the rename {r.status_code} {g}")
+res = back(PHONE, g["id"])
+check(res.get("undone") == [g["id"]] and row("list_notepads", NP, "title")["title"] == "Notizen Beispiel", f"taken back: the old title {res}")
+r = A.patch(B + f"/api/notepads/{NP}", json={"body": "neuer Text"})
+g = newest(A)
+res = back(A, g["id"])
+check(r.ok and res.get("undone") == [g["id"]] and row("list_notepads", NP, "body")["body"] == "erste Zeile", f"a text save taken back {res}")
+r = A.get(B + f"/api/lists/{LID}/overview")
+pads = [x for x in ((r.json().get("layout") or {}).get("pads") or []) if x.get("id") == NP] if r.ok else []
+check(pads and pads[0].get("body") == "erste Zeile" and pads[0].get("title") == "Notizen Beispiel", f"the pin board shows the old title and text {r.status_code} {pads}")
 
 # ---------------------------------------------------------------- only own steps
 g = newest(A)
