@@ -40,6 +40,7 @@ db_ids = {r[0]: r[1] for r in q("SELECT srv_flow, id FROM agent_schedules WHERE 
 check(set(ids) == {"briefing", "followup"} and ids.get("briefing") == db_ids.get("briefing") and ids.get("followup") == db_ids.get("followup"),
       f"#5510: the plan id per routine with a plan (meetings is a rule: none) {ids} {db_ids}")
 check(j["items"].get("briefing") == "active", f"the briefing is on {j['items']}")
+check(j.get("shared") is True and j.get("own") is True and j.get("projects") == 1, f"the state route keeps shared / own / projects next to ids {j}")
 BR = ids.get("briefing")
 r = Fr.patch(B + f"/api/agent-schedules/{BR}", json={"enabled": False})
 j = Fr.get(B + f"/api/agents/{FA}/server/starter").json()
@@ -77,6 +78,17 @@ nows = q("SELECT COUNT(*) FROM agent_schedules WHERE agent_id=? AND user_id=? AN
          (FA, FID, "2000-01-01"))[0][0]
 fut = q("SELECT COUNT(*) FROM agent_schedules WHERE agent_id=? AND user_id=? AND enabled=1 AND CAST(next_at AS timestamptz) > now()", (FA, FID))[0][0]
 check(nows == 3 and fut == 3, f"resumed: each plan has its next run in the future (no missed runs made up) {nows} {fut}")
+
+# a starter plan that waits for a project of her own (share_wait, #5378 review F2) keeps waiting: Resume all never starts it
+FU = ids["followup"]
+c.execute("UPDATE agent_schedules SET enabled=0, share_wait=1, next_at=NULL WHERE id=?", (FU,))
+c.commit()
+check(Fr.patch(B + f"/api/agents/{FA}/schedules", json={"enabled": False}).ok, "pause all")
+r = Fr.patch(B + f"/api/agents/{FA}/schedules", json={"enabled": True})
+check(r.ok and FU not in (r.json().get("changed") or []) and tuple(q("SELECT enabled, share_wait FROM agent_schedules WHERE id=?", (FU,))[0]) == (0, 1),
+      f"#5510: Resume all leaves a waiting starter plan waiting {r.text[:200]} {q('SELECT enabled, share_wait FROM agent_schedules WHERE id=?', (FU,))}")
+r = Fr.patch(B + f"/api/agents/{FA}/schedules", json={"enabled": True, "ids": [FU]})
+check(r.ok and r.json().get("changed") == [], "... also when named in ids")
 
 # ---------------------------------------------------------------- refused
 check(Fr.patch(B + f"/api/agents/{FA}/schedules", json={"enabled": "no"}).status_code == 400, "enabled must be true / false")

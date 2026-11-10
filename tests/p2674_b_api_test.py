@@ -143,7 +143,7 @@ from kalmido.accounts.pictures import avatar_url
 from kalmido.agents.usage import usage_block
 from kalmido.agents.core import agent_online
 UID = WHO
-TIME = ("contact_age", "poll_age", "typing", "online", "status_at")
+TIME = ("contact_age", "poll_age", "typing", "online", "status_at", "pending_age")  # 2.826.0 (#5509): pending_age counts seconds too
 res = {}
 c = connect()
 
@@ -192,7 +192,7 @@ def old_agents():
                 # 2.777.0 (#5378, review F3): nothing of its work, host, model, rights mode, usage, costs or contact times either
                 d.update(shared=False, status="idle", status_text="", status_at=None, status_key="", status_key_at="", status_task=None,
                          paused=False, pause_reason="", job_tasks=[], running=0, waiting=0, my_job=False, typing=0, limit_reached=False,
-                         last_poll_at=None, poll_age=None, contact_age=None, no_service=False, host=None, runtime_model="",
+                         last_poll_at=None, poll_age=None, contact_age=None, pending_age=None, no_service=False, host=None, runtime_model="",
                          permission_mode="", may_set_mode=False, quota=None, cost=None, flows=None, approvals_open=0)
         out.append(d)
     return out

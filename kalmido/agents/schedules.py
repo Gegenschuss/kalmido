@@ -452,14 +452,15 @@ def agent_schedules_all(aid):
     if ids is not None and (not isinstance(ids, list) or not all(isinstance(x, int) and not isinstance(x, bool) for x in ids) or len(ids) > 500):
         return err(tr("ids must be a list of numbers"))
     on = 1 if b["enabled"] else 0
-    q, args = "SELECT id FROM agent_schedules WHERE agent_id=? AND user_id=? AND list_check=0 AND enabled<>?", [aid, uid, on]
+    # a starter plan that waits for a project of my own (share_wait, #5378 review F2) keeps waiting: resuming all never starts it
+    q, args = "SELECT id FROM agent_schedules WHERE agent_id=? AND user_id=? AND list_check=0 AND share_wait=0 AND enabled<>?", [aid, uid, on]
     if ids is not None:
         q += " AND id = ANY(CAST(? AS BIGINT[]))"
         args.append(st_ids(ids))
     changed = [r["id"] for r in c.execute(q + " ORDER BY id", tuple(args)).fetchall()]
     ts = iso(now_utc())
     for sid in changed:
-        c.execute("UPDATE agent_schedules SET enabled=?, share_wait=0, updated_at=?" + (", last_state=''" if on else "") + " WHERE id=?",
+        c.execute("UPDATE agent_schedules SET enabled=?, updated_at=?" + (", last_state=''" if on else "") + " WHERE id=?",
                   (on, ts, sid))
         _sched_set_next(c, sid)
     c.commit()

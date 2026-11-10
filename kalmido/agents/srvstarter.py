@@ -333,5 +333,6 @@ def srv_starter_get(aid):
     c = db()
     a = srv_need(c, aid)
     # own (review F2): I shared one of MY projects with it myself (agents/core.py agent_shared_by) -- only that wakes my waiting plans
-    return jsonify(items=srv_starter_state(c, a, me()), ids=srv_starter_plan_ids(c, aid, me()),  # 2.826.0 (#5510): ids shared=agent_shares(c, aid, me()), own=agent_shared_by(c, aid, me()),
+    # 2.826.0 (#5510): ids = the plan id per starter routine with a plan (the switches On / Paused in the agent's window)
+    return jsonify(items=srv_starter_state(c, a, me()), ids=srv_starter_plan_ids(c, aid, me()), shared=agent_shares(c, aid, me()), own=agent_shared_by(c, aid, me()),
                    projects=agent_projects_count(c, aid), org_id=a["org_id"])

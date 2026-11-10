@@ -191,7 +191,8 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   // late load redrew the chat from the server's state (online) after the test had set it offline
   w.eval(`chatOpen(${AG})`);
   await until(() => [...d.querySelectorAll('#chat-msgs .cmsg')].some(m => /Still there\?/.test(m.textContent)));
-  check(await until(() => { w.eval(`Object.assign(S.agents.find(a => a.id === ${AG}), {online: false}); chatDraw()`); return /offline – will answer later/.test(d.querySelector('#chat-msgs .chpend.off')?.textContent || ''); }), '"offline – will answer later"');
+  // 2.826.0 (#5509): "online: false" alone is no longer offline (an agent on demand); the message has waited over 5 minutes
+  check(await until(() => { w.eval(`Object.assign(S.agents.find(a => a.id === ${AG}), {online: false, pending_age: 400}); chatDraw()`); return /offline – will answer later/.test(d.querySelector('#chat-msgs .chpend.off')?.textContent || ''); }), '"offline – will answer later"');
   w.close();
 
   // ================= #420 Settings > Agents > Set up

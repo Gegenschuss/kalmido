@@ -1097,7 +1097,7 @@ async function schedOpen(aid) {
   const md = modal('<div class="schedbody"></div>');
   md.classList.add('schedmd');
   const draw = () => {
-    const mine = j.data.filter(s => s.mine).length, own = j.data.filter(s => s.mine && !s.list_check), allOff = own.length && own.every(s => !s.enabled);
+    const mine = j.data.filter(s => s.mine).length, own = j.data.filter(s => s.mine && !s.list_check && !s.share_wait), allOff = own.length && own.every(s => !s.enabled);
     // 2.826.0 (#5510): pause / resume all of my plans with this agent in one step (with undo); the chat stays on
     // allBtn: built just above from ic() and esc(tr()) (html-ok below)
     const allBtn = own.length ? `<div class="schedall"><button type="button" class="btn sm" data-sm="all">${ic(allOff ? 'play' : 'pause', 's')} ${esc(allOff ? tr('Resume all') : tr('Pause all'))}</button></div>` : '';
@@ -1114,7 +1114,7 @@ async function schedOpen(aid) {
     const sid = +(b.closest('[data-sid]')?.dataset.sid || 0), s = j.data.find(x => x.id === sid);
     if (b.dataset.sm === 'close') md.remove();
     else if (b.dataset.sm === 'all') {  // 2.826.0 (#5510)
-      const own = j.data.filter(x => x.mine && !x.list_check), on = own.length > 0 && own.every(x => !x.enabled);
+      const own = j.data.filter(x => x.mine && !x.list_check && !x.share_wait), on = own.length > 0 && own.every(x => !x.enabled);
       b.disabled = true;
       let r; try { r = await api('PATCH', `/api/agents/${a.id}/schedules`, {enabled: on}); } catch { b.disabled = false; return; }
       await reload();
