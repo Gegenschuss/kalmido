@@ -374,7 +374,7 @@ function entryModal(e, preset = {}, cf) {
 // 2.144.6 A (#2053): the billable switch of a saved change is one undo step
 function teBillStep(e, j, bill) {
   const set = async v => { const r = await api('PATCH', `/api/time/entries/${e.id}`, {billable: v}); await timeChanged(r); return {q: r?._q || null}; };
-  histAdd({label: bill ? tr('Time marked billable') : tr('Time marked not billable'), res: j, lids: e.list_id ? [e.list_id] : [],
+  histAdd({label: bill ? tr('Time marked billable') : tr('Time marked not billable'), res: j, lids: e.list_id ? [e.list_id] : [], ...(j?.undo_group ? {srv: true} : {}),  // 2.809.0 (#5476): the server lists the step
     undo: () => set(!bill), redo: () => set(bill)});
 }
 // 2.576.0 (#4764): oxbTeStale (the bar "Reload" = own input dropped) is gone: entryModal goes through objsave.js saveDialog
@@ -386,7 +386,7 @@ async function teDelete(id) {
   const back = {...(e.task_id ? {task_id: e.task_id} : {list_id: e.list_id}), start: e.start, end: e.end, seconds: e.seconds, note: e.note, source: e.source, billable: e.billable !== false};
   await timeChanged(r);
   if (e.end) {
-    const x = histAdd({label: tr('Time entry deleted ({0})', hmm(e.seconds)), res: r, lids: e.list_id ? [e.list_id] : [],
+    const x = histAdd({label: tr('Time entry deleted ({0})', hmm(e.seconds)), res: r, lids: e.list_id ? [e.list_id] : [], ...(r?.undo_group ? {srv: true} : {}),  // 2.809.0 (#5476)
       undo: async h => { const j = await api('POST', '/api/time/entries', {...back, client_id: newCid()}); h.eid = j?.id; await timeChanged(j); return {q: j?._q || null}; },
       redo: async h => { if (!h.eid) return {skipped: [tr('Time entry')], none: true}; const j = await api('DELETE', `/api/time/entries/${h.eid}`); await timeChanged(j); return {q: j?._q || null}; }});
     offerUndo(tr('Time entry deleted ({0})', hmm(e.seconds)), x);

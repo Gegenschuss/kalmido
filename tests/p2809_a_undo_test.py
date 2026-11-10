@@ -5,12 +5,15 @@
 Invented names only.
  - sections (lists/secundo.py): a new section is a step (listed on the phone with its name) -> undo = gone, redo = back with its
    id; a deleted section -> undo = back with its card; restoring it from the trash is a step too; one deleted again since stays
+ - time entries (personal/timeundo.py): a change on the laptop is listed on the phone (area time, duration before) and goes
+   back / forward; a deleted entry comes back with its id and goes again on redo; not back into a project without time
+   tracking; another person cannot take it back
  - a project's settings (lists/lpundo.py): a rename + colour on the laptop is listed on the phone (area tasks, kind listset,
    label with the old name, device, the answer names its group) and goes back from there; redo; archiving -> undo -> out of
    the archive; a save of the same values and a save with a folder (side effects) record no step; a new sidebar order since
    does not block the undo; a rename by someone else since stays (named); a project admin takes back her own rename, but not
    after she became an editor (noaccess); another person neither lists nor takes back the step (404)
-freelancer-matrix: undo (a person without an organisation: her project's colour and her new section go back from the list)
+freelancer-matrix: undo (a person without an organisation: her project's colour, her new section and her deleted time entry go back from the list)
 usage: p2809_a_undo_test.py <datadir>"""
 import os
 import sys
@@ -160,6 +163,47 @@ res = back(A, g["id"])
 check(not res.get("undone") and res.get("stayed") and res["stayed"][0].get("code") == "conflict",
       f"a section no longer where the step left it stays (named) {res}")
 
+# ---------------------------------------------------------------- time entries: change / delete
+from datetime import date, timedelta  # noqa: E402
+DAY = (date.today() - timedelta(days=1)).isoformat()
+r = A.post(B + "/api/lists", json={"name": "Zeit Beispiel", "time_tracking": True})
+TL = r.json()["id"]
+r = A.post(B + "/api/time/entries", json={"list_id": TL, "start": DAY + "T09:00", "minutes": 30, "note": "Schnitt"})
+check(r.ok, f"(setup) a time entry {r.status_code} {r.text[:120]}")
+TE = r.json()["id"]
+r = A.patch(B + f"/api/time/entries/{TE}", json={"minutes": 90, "note": "Schnitt und Ton"}, headers=LAP)
+check(r.ok and r.json().get("undo_group"), f"the entry changed on the laptop: a step {r.status_code} {r.text[:120]}")
+g = newest(PHONE)
+check(g.get("kind") == "time_entry" and g.get("area") == "time" and "0:30" in (g.get("label") or ""), f"listed with its duration before {g}")
+res = back(PHONE, g["id"])
+e = A.get(B + f"/api/time/entries/{TE}").json()
+check(res.get("undone") == [g["id"]] and e.get("seconds") == 1800 and e.get("note") == "Schnitt", f"taken back: 30 minutes and the old note {res} {e.get('seconds')}")
+r = PHONE.post(B + f"/api/undo/{g['id']}/redo")
+e = A.get(B + f"/api/time/entries/{TE}").json()
+check(r.ok and e.get("seconds") == 5400, f"redo: 90 minutes again {r.status_code} {e.get('seconds')}")
+check(Bo.post(B + f"/api/undo/to/{g['id']}").status_code == 404, "another person cannot take it back (404)")
+r = A.delete(B + f"/api/time/entries/{TE}")
+check(r.ok and r.json().get("undo_group") and A.get(B + f"/api/time/entries/{TE}").status_code == 404, f"the entry deleted: a step {r.status_code}")
+g = newest(A)
+check(g.get("kind") == "time_life" and "1:30" in (g.get("label") or ""), f"listed as deleted with its duration {g.get('label')}")
+res = back(A, g["id"])
+e = A.get(B + f"/api/time/entries/{TE}")
+check(res.get("undone") == [g["id"]] and e.ok and e.json().get("seconds") == 5400 and e.json().get("note") == "Schnitt und Ton",
+      f"undo of the delete: the entry is back with its id {res} {e.status_code}")
+r = A.post(B + f"/api/undo/{g['id']}/redo")
+check(r.ok and A.get(B + f"/api/time/entries/{TE}").status_code == 404, f"redo: deleted again {r.status_code} {r.text[:120]}")
+r = A.post(B + "/api/time/entries", json={"list_id": TL, "start": DAY + "T13:00", "minutes": 20})
+TE2 = r.json()["id"]
+A.patch(B + f"/api/time/entries/{TE2}", json={"minutes": 25})
+g = newest(A)
+A.patch(B + f"/api/lists/{TL}", json={"time_tracking": False})  # the project takes no time any more
+A.patch(B + f"/api/time/entries/{TE2}", json={"note": "x"})
+A.delete(B + f"/api/time/entries/{TE2}")
+gd = newest(A)
+res = back(A, gd["id"])
+check(not res.get("undone") and res.get("stayed") and A.get(B + f"/api/time/entries/{TE2}").status_code == 404,
+      f"a deleted entry does not come back into a project without time tracking (409, named) {res}")
+
 # freelancer-matrix
 r = Fr.post(B + "/api/lists", json={"name": "Frida Projekt", "color": "#3366cc"})
 FL = r.json()["id"]
@@ -173,5 +217,12 @@ FS = r.json()["id"]
 g = newest(Fr)
 res = back(Fr, g["id"])
 check(g.get("kind") == "section_life" and res.get("undone") == [g["id"]] and FS not in secs(Fr, FL), f"... and her new section goes back {res}")
+Fr.patch(B + f"/api/lists/{FL}", json={"time_tracking": True})
+r = Fr.post(B + "/api/time/entries", json={"list_id": FL, "start": DAY + "T10:00", "minutes": 15})
+FT = r.json()["id"]
+Fr.delete(B + f"/api/time/entries/{FT}")
+g = newest(Fr)
+res = back(Fr, g["id"])
+check(g.get("kind") == "time_life" and res.get("undone") == [g["id"]] and Fr.get(B + f"/api/time/entries/{FT}").ok, f"... and her deleted time entry comes back {res}")
 
 sys.exit(done("p2809_a_undo"))

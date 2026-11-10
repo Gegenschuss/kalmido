@@ -704,7 +704,10 @@ def time_update(eid):
         tsl_check(c, r["user_id"], start, zone=zone)  # 2.125.0 B (#2119)
         sets += ["start=?", "\"end\"=?", "seconds=?"]
         args += [iso(start), iso(end), sec]
+    ug = None
     if sets:
+        from .timeundo import teu_post, teu_pre  # 2.809.0 (#5476): a step of the person's undo list
+        teu_pre(c, me(), eid)
         guard = " AND billed_doc_id IS NULL" if tbill_guard(r, b) else ""  # 2.144.6 A (#2053 review 1): billed meanwhile -> 409
         # 2.576.0 (#4764): to the millisecond: two saves in one second are two versions for the dialog's watch (objsave.js dlgStale)
         if c.execute(f"UPDATE time_entries SET {', '.join(sets)}, updated_at=? WHERE id=?{guard}", (*args, iso_ms(now_utc()), eid)).rowcount == 0:
@@ -712,9 +715,10 @@ def time_update(eid):
         if r["end"] is not None:  # 2.555.0 (#4570): a finished entry changed its time or its place (the old place too)
             from .budgetwarn import bw_check
             bw_check(c, [(r["list_id"], r["task_id"]), (lid, tid if "task_id" in b or "list_id" in b else r["task_id"])])
+        ug = teu_post(c)
         bump(c)
         c.commit()
-    return jsonify(one_entry(c, eid))
+    return jsonify({**one_entry(c, eid), **({"undo_group": ug} if ug else {})})
 
 
 @app.delete("/api/time/entries/<int:eid>")
@@ -733,9 +737,11 @@ def time_delete(eid):
         tbill_lost(c, eid, True)  # 2.144.6 A (#2053 review 1): billed between the check and the delete
     from .budgetwarn import bw_check
     bw_check(c, [(r["list_id"], r["task_id"])])  # 2.555.0 (#4570): the share falls: the mark goes down with it
+    from .timeundo import teu_deleted  # 2.809.0 (#5476): a step of the person's undo list
+    ug = teu_deleted(c, me(), r)
     bump(c)
     c.commit()
-    return jsonify(ok=True, entry=old)
+    return jsonify(ok=True, entry=old, **({"undo_group": ug} if ug else {}))
 
 
 def focus_to_entry(c, pid):
